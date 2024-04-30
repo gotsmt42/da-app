@@ -32,6 +32,7 @@ root.render(
         <AuthProvider>
           <StyleSheetManager shouldForwardProp={(prop) => prop !== "align"}>
             <App />
+
           </StyleSheetManager>
         </AuthProvider>
       </Router>

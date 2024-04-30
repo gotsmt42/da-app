@@ -5,7 +5,7 @@ import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import { Container } from "reactstrap";
-
+import { SpeedInsights } from "@vercel/speed-insights/react"
 const FullLayout = () => {
   const sidebarRef = useRef(null);
   const [isMobile, setIsMobile] = useState(false); // State เพื่อติดตามสถานะโหมด mobile
@@ -87,6 +87,8 @@ return (
         {/* Middle Content */}
         <Container className="p-4" fluid>
           <Outlet />
+          <SpeedInsights />
+
         </Container>
       </div>
     </div>
