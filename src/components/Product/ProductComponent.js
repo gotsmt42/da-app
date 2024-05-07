@@ -121,13 +121,14 @@ const ProductComponent = () => {
 
   //ฟังชั่นเพิ่มข้อมูลใหม่
   const addProduct = async (e) => {
+    setLoading(true)
     e.preventDefault();
     const formData = new FormData();
     for (const [key, value] of Object.entries(form)) {
       formData.append(key, value);
     }
     try {
-      await ProductService.AddProduct(formData).then(() => {
+      await ProductService.AddProduct(formData).then(async() => {
         setForm({
           name: "Add product name",
           description: "Description of the product",
@@ -137,8 +138,8 @@ const ProductComponent = () => {
         setModalOpenInsert(false);
         setSelectedFile(null);
         setExpandedRows({});
-        fetchData();
-
+        await fetchData();
+        setLoading(false)
         Swal.fire({
           title: "Inserted Success!",
           icon: "success",
@@ -196,7 +197,7 @@ const ProductComponent = () => {
       setSelectedFile(null);
       setSelectedRows([]);
       setToggleCleared(true);
-      fetchData();
+      await fetchData();
 
       Swal.fire("Updeated Success!", "", "success");
     } catch (error) {
@@ -219,10 +220,11 @@ const ProductComponent = () => {
               console.error("Error deleting product: ", error);
             }
           }
-          fetchData(); // รีเฟรชข้อมูลหลังจากลบสินค้าเรียบร้อยแล้ว
           setSelectedRows([]); // เคลียร์รายการที่ถูกเลือก
           setToggleCleared(true); // ตั้งค่าให้เคลียร์รายการที่ถูกเลือก
           setExpandedRows({}); // ล้างข้อมูลการขยายแถว
+          await fetchData(); // รีเฟรชข้อมูลหลังจากลบสินค้าเรียบร้อยแล้ว
+
           Swal.fire("Deleted Success!", "", "success");
         }
       });
@@ -238,10 +240,11 @@ const ProductComponent = () => {
         if (result.isConfirmed) {
           await ProductService.DeleteProduct(rowId);
 
-          fetchData(); // รีเฟรชข้อมูลหลังจากลบสินค้าเรียบร้อยแล้ว
           setSelectedRows([]); // เคลียร์รายการที่ถูกเลือก
           setToggleCleared(true); // ตั้งค่าให้เคลียร์รายการที่ถูกเลือก
           setExpandedRows({}); // ล้างข้อมูลการขยายแถว
+          await fetchData(); // รีเฟรชข้อมูลหลังจากลบสินค้าเรียบร้อยแล้ว
+
           Swal.fire("Deleted Success!", "", "success");
         }
       });
@@ -369,6 +372,7 @@ const ProductComponent = () => {
         selectedFile={selectedFile}
         setModalOpenInsert={setModalOpenInsert}
         form={form}
+        setForm={setForm}
         setSelectedFile={setSelectedFile}
       />
 

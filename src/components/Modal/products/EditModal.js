@@ -1,4 +1,6 @@
+import React, { useState } from "react";
 import { Button } from "react-bootstrap";
+import API from "../../../API/axiosInstance";
 
 import {
   MDBBtn,
@@ -10,7 +12,6 @@ import {
   MDBModalBody,
   MDBModalFooter,
 } from "mdb-react-ui-kit";
-import API from "../../../API/axiosInstance";
 
 const EditProductModal = ({
   show,
@@ -26,7 +27,9 @@ const EditProductModal = ({
     <>
       <MDBModal
         open={show}
-        onClose={() => setModalOpenEdit(false)}
+        onClose={() => {
+          setModalOpenEdit(false);
+        }}
         tabIndex="-1"
       >
         <MDBModalDialog scrollable>
@@ -44,7 +47,7 @@ const EditProductModal = ({
               <input
                 type="text"
                 className="form-control"
-                defaultValue={editedData.name}
+                value={editedData.name}
                 onChange={(e) =>
                   setEditedData({ ...editedData, name: e.target.value })
                 }
@@ -53,7 +56,7 @@ const EditProductModal = ({
               <input
                 type="number"
                 className="form-control"
-                defaultValue={editedData.price}
+                value={editedData.price}
                 onChange={(e) =>
                   setEditedData({ ...editedData, price: e.target.value })
                 }
@@ -66,7 +69,7 @@ const EditProductModal = ({
                 aria-label="With textarea"
                 rows="4"
                 cols="50"
-                defaultValue={editedData.description}
+                value={editedData.description}
                 onChange={(e) =>
                   setEditedData({ ...editedData, description: e.target.value })
                 }
@@ -97,70 +100,6 @@ const EditProductModal = ({
         </MDBModalDialog>
       </MDBModal>
     </>
-
-    // <Modal show={show} onHide={handleClose} style={{ overflowY: "auto" }}>
-    //   <form onSubmit={handleSubmit}>
-    //     <Modal.Header closeButton>
-    //       <Modal.Title>Edit Product </Modal.Title>
-    //     </Modal.Header>
-    //     <Modal.Body style={{ overflowY: "auto" }}>
-    //       <label>Name:</label>
-    //       <input
-    //         type="text"
-    //         className="form-control"
-    //         defaultValue={editedData.name}
-    //         onChange={(e) =>
-    //           setEditedData({ ...editedData, name: e.target.value })
-    //         }
-    //       />
-    //       <label>Price:</label>
-    //       <input
-    //         type="number"
-    //         className="form-control"
-    //         defaultValue={editedData.price}
-    //         onChange={(e) =>
-    //           setEditedData({ ...editedData, price: e.target.value })
-    //         }
-    //       />
-    //       <label>Description:</label>
-    //       <textarea
-    //         type="text"
-    //         className="form-control"
-    //         as="textarea"
-    //         aria-label="With textarea"
-    //         rows="6" cols="50"
-    //         defaultValue={editedData.description}
-    //         onChange={(e) =>
-    //           setEditedData({ ...editedData, description: e.target.value })
-    //         }
-    //       />
-    //       <label>Image:</label>
-    //       <input
-    //         type="file"
-    //         className="form-control"
-    //         onChange={handleEditFileChange}
-    //       />
-    //       <img
-    //         className="mt-2 img-preview"
-    //         src={
-    //           selectedFile
-    //             ? URL.createObjectURL(selectedFile)
-    //             : `http://localhost:5000/${editedData.imageUrl}`
-    //         }
-    //         alt=""
-
-    //       />
-    //     </Modal.Body>
-    //     <Modal.Footer>
-    //       <Button variant="secondary" onClick={handleClose}>
-    //         Close
-    //       </Button>
-    //       <Button type="submit" variant="primary">
-    //         Save Changes
-    //       </Button>
-    //     </Modal.Footer>
-    //   </form>
-    // </Modal>
   );
 };
 

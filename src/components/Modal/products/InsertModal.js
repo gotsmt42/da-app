@@ -30,7 +30,7 @@ const InsertProductModal = ({
     open={show}
     onClose={() =>{
       setSelectedFile(null)
-      setModalOpenInsert(false)
+      setModalOpenInsert(false)    
     } }
     tabIndex="-1"
   >
