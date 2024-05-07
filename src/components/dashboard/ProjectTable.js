@@ -124,7 +124,7 @@ const ProjectTables = () => {
                         height="45"
                       />
                       <div className="ms-3">
-                        <h6 className="mb-0">{user.fname}</h6>
+                        <h6 className="mb-0">{user.fname} {user.lname}</h6>
                         <span className="text-muted">{user.email}</span>
                       </div>
                     </div>
