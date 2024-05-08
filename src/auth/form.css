@@ -43,7 +43,7 @@
     text-transform: uppercase;
     padding: 0 0 2px;
     margin: 0 0 30px;
-    border-bottom: 2px solid #FF97A8;
+    border-bottom: 2px solid #0c49ac;
 }
 .form-container .right-content .form-horizontal {
     color: #999;
@@ -113,7 +113,7 @@
     width: 17px;
     min-height: auto;
     margin: 0 1px 0 0;
-    border: 2px solid #FF97A8;
+    border: 2px solid #0c49ac;
     border-radius: 5px;
     cursor: pointer;
     display: inline-block;
