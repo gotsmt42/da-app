@@ -68,7 +68,7 @@
 .form-container .form-horizontal .form-control:focus{ box-shadow: 0 0 5px #FF97A8; }
 .form-container .form-horizontal .signin{
     color: #fff;
-    background: linear-gradient(to right, #FF638E, #FF97A8);
+    background: linear-gradient( 45deg, #0c49ac, #4c81d7, #8ca3f0, #aed9e0, #adb4c4);
     font-size: 15px;
     font-weight: 500;
     letter-spacing: 0.5px;
@@ -81,7 +81,7 @@
 }
 .form-container .form-horizontal .signup{
     color: #fff;
-    background: linear-gradient(to right, #292828, #656363);
+    background: linear-gradient( 45deg, #0c49ac, #4c81d7, #8ca3f0, #aed9e0, #adb4c4);
     font-size: 15px;
     font-weight: 500;
     letter-spacing: 0.5px;
