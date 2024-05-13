@@ -1,6 +1,7 @@
 /* eslint-disable no-unused-vars */
 import React, { useEffect, useState, useRef } from "react";
 import ProductService from "../../services/ProductService";
+import TypeProductService from "../../services/TypeProductService";
 import AuthService from "../../services/authService";
 import Swal from "sweetalert2";
 
@@ -39,6 +40,7 @@ const ProductComponent = () => {
     name: "Add product name",
     description: "Description of the product",
     price: 0,
+    type: "Type of product",
     image: null,
   });
   // eslint-disable-next-line no-unused-vars
@@ -133,6 +135,7 @@ const ProductComponent = () => {
           name: "Add product name",
           description: "Description of the product",
           price: 0,
+          type: "Type of product",
           image: null,
         });
         setModalOpenInsert(false);

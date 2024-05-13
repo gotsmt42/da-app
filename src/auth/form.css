@@ -14,8 +14,8 @@
     vertical-align: top;
 }
 .form-container .left-content .title{
-    color: #0c49ac;
-    font-size: 20px;
+    color: #8ca3f0;
+    font-size: 24px;
     font-weight: 300;
     letter-spacing: 2px;
     text-transform: uppercase;
@@ -43,7 +43,7 @@
     text-transform: uppercase;
     padding: 0 0 2px;
     margin: 0 0 30px;
-    border-bottom: 2px solid #0c49ac;
+    border-bottom: 2px solid #8ca3f0;
 }
 .form-container .right-content .form-horizontal {
     color: #999;
@@ -65,7 +65,7 @@
     border: none;
     box-shadow: none;
 }
-.form-container .form-horizontal .form-control:focus{ box-shadow: 0 0 5px #FF97A8; }
+.form-container .form-horizontal .form-control:focus{ box-shadow: 0 0 5px #0c49ac; }
 .form-container .form-horizontal .signin{
     color: #fff;
     background: linear-gradient( 45deg, #0c49ac, #4c81d7, #8ca3f0, #aed9e0, #adb4c4);
@@ -94,7 +94,7 @@
 }
 .form-container .form-horizontal .btn:hover,
 .form-container .form-horizontal .btn:focus{
-    box-shadow: 0 0 10px #FF97A8;
+    box-shadow: 0 0 10px #0c49ac;
     outline: none;
 }
 .form-container .form-horizontal .remember-me{
@@ -112,7 +112,7 @@
     height: 17px;
     width: 17px;
     min-height: auto;
-    margin: 0 1px 0 0;
+    margin: 0 5px 0 0;
     border: 2px solid #0c49ac;
     border-radius: 5px;
     cursor: pointer;
@@ -135,7 +135,7 @@
     top: 2.5px;
     transition: all 0.3s ease;
 }
-.form-container .form-horizontal .remember-me .checkbox:checked{ background-color: #FF97A8; }
+.form-container .form-horizontal .remember-me .checkbox:checked{ background-color: #0c49ac; }
 .form-container .form-horizontal .remember-me .checkbox:checked:before{ opacity: 1; }
 .form-container .form-horizontal .remember-me .checkbox:not(:checked):before{ opacity: 0; }
 .form-container .form-horizontal .remember-me .checkbox:focus{ outline: none; }
@@ -147,6 +147,7 @@
     vertical-align: top;
     display: inline-block;
     transition: all 0.3s ease 0s;
+    text-decoration: none;
 }
 .form-container .form-horizontal .forgot:hover{ text-decoration: underline; }
 .form-container .right-content .separator{

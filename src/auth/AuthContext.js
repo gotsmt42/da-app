@@ -30,6 +30,8 @@ export const AuthProvider = ({ children }) => {
       }
     } else {
       setLoggedIn(false);
+
+
       // console.log("Redirecting to ", location.pathname);
     }
   }, [navigate, isLoggedIn, location.pathname, previousPath]);
@@ -47,8 +49,8 @@ export const AuthProvider = ({ children }) => {
     navigate("/login");
   };
 
-  console.log("Login: " + isLoggedIn);
-  console.log("PathName: " + previousPath);
+  // console.log("Login: " + isLoggedIn);
+  // console.log("PathName: " + previousPath);
 
   return (
     <AuthContext.Provider value={{ isLoggedIn, login, logout }}>

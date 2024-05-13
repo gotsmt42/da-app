@@ -57,7 +57,7 @@ const DataTableColumns = ({
   setEditedData,
   setModalOpenEdit,
   handleDeleteRow,
-  setSelectedFile
+  setSelectedFile,
 }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
@@ -73,7 +73,7 @@ const DataTableColumns = ({
   const handleClose = () => {
     setSelectedRowMenu(null);
     setAnchorEl(null);
-    setSelectedFile(null)
+    setSelectedFile(null);
   };
 
   // เพิ่ม state เพื่อเก็บค่าหน้าจอขนาดเล็กหรือไม่
@@ -91,15 +91,12 @@ const DataTableColumns = ({
     };
   }, []);
 
-
-
   const columns = [
     {
       name: "Product Name",
       cell: (row) => <CustomCell row={row} isSmallScreen={isSmallScreen} />,
       sortable: true,
       selector: (row) => row.name,
-
     },
 
     {
@@ -107,6 +104,28 @@ const DataTableColumns = ({
       selector: (row) => moment(row.updatedAt).format("DD/MM/YYYY HH:mm:ss"),
       sortable: true,
     },
+
+    {
+      name: "Action",
+      cell: (row) => (
+        <IconButton
+          id={`action-button-${row._id}`}
+          aria-controls={`action-menu-${row._id}`}
+          aria-haspopup="true"
+          aria-expanded={open ? "true" : undefined}
+          variant="contained"
+          onClick={() => {
+            setModalOpenEdit(true);
+            setEditedData(row);
+          }}
+        >
+          <EditIcon />
+        </IconButton>
+      ),
+      width: "80px",
+    },
+
+   
 
     {
       cell: (row) => (
@@ -134,8 +153,7 @@ const DataTableColumns = ({
             <MenuItem
               onClick={() => {
                 setModalOpenEdit(true);
-                handleClose()
-            
+                handleClose();
               }}
             >
               <EditIcon />
@@ -153,7 +171,7 @@ const DataTableColumns = ({
             <MenuItem
               onClick={() => {
                 handleDeleteRow(row._id); // เรียกใช้ handleDelete โดยส่ง parameter row._id
-                handleClose()
+                handleClose();
               }}
             >
               <Delete />

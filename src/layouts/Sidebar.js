@@ -6,7 +6,21 @@ import {
   BiChevronRight,
   BiUpload,
   BiFile,
+  BiLogoProductHunt,
+  BiOutline,
+  BiBox,
+
 } from "react-icons/bi"; // Import icons from React Icons
+
+import { LuFileStack } from "react-icons/lu";
+
+import { IoFileTrayFullOutline } from "react-icons/io5";
+
+import { FaProductHunt } from "react-icons/fa";
+
+import { CiBoxList } from "react-icons/ci";
+
+
 import probg from "../assets/images/bg/download.jpg";
 
 import AuthService from "../services/authService";
@@ -26,7 +40,7 @@ const navigation = [
 
   {
     title: "File",
-    icon: "bi-files",
+    icon: <IoFileTrayFullOutline />,
     items: [
       {
         title: "File Upload",
@@ -36,15 +50,27 @@ const navigation = [
       {
         title: "All Files",
         href: "/files",
-        icon: BiFile,
+        icon: LuFileStack,
       },
     ],
   },
   {
     title: "Product",
-    href: "/product",
-    icon: "bi-box",
+    icon: <FaProductHunt />,
+    items: [
+      {
+        title: "List Product",
+        href: "/product",
+        icon: CiBoxList,
+      },
+      {
+        title: "Stock Product",
+        href: "/stock",
+        icon: BiOutline,
+      },
+    ],
   },
+
   {
     title: "About",
     href: "/about",
@@ -119,7 +145,7 @@ const Sidebar = ({handleMenuClick}) => {
                     onClick={() => toggleNavbar(index)} // นี่คือส่วนที่เรียกใช้ toggleNavbar
                     style={{ width: "100%", textAlign: "left" }}
                   >
-                    <i className={`bi ${navi.icon}`}></i>
+                    {navi.icon}
                     <span className="ms-2 me-1">{navi.title}</span>
                     {collapsedMenu[index] ? (
                       <BiChevronDown />
