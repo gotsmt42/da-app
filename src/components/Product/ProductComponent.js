@@ -96,8 +96,8 @@ const ProductComponent = () => {
   //useEffect hook for date search
   useEffect(() => {
     const result = products.filter((product) => {
-      const updatedDate = moment(product.updatedAt).format("YYYY-MM-DD HH:mm"); // Convert updated date to a localized string
-      return updatedDate.includes(dateSearch);
+      const createdDate = moment(product.createdAt).format("YYYY-MM-DD HH:mm"); // Convert updated date to a localized string
+      return createdDate.includes(dateSearch);
     });
 
     setFilter(result);

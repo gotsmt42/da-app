@@ -20,9 +20,7 @@ const ExpandedProduct = ({ data }) => (
           <p className="card-text">ราคา: {data.price} - ฿</p>
           <strong>รายละเอียด: </strong>
           <p className="card-text mt-1 ">
-            {data.description}, This is a wider card with supporting text below
-            as a natural lead-in to additional content. This content is a little
-            bit longer.
+            {data.description}
           </p>
           <p className="card-text">
             <small className="text-body-secondary">
@@ -32,7 +30,13 @@ const ExpandedProduct = ({ data }) => (
           </p>
           <p className="card-text">
             <small className="text-body-secondary">
-              Last updated
+              สร้างเมื่อ 
+              {moment(data.createdAt).format("- DD/MM/YYYY  HH:mm:ss ")}
+            </small>
+          </p>
+          <p className="card-text">
+            <small className="text-body-secondary">
+              แก้ไขล่าสุด
               {moment(data.updatedAt).format("- DD/MM/YYYY  HH:mm:ss ")}
             </small>
           </p>

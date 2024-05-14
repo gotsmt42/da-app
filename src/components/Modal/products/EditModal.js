@@ -58,6 +58,9 @@ const EditProductModal = ({
               <option selected disabled>
                 Select type product
               </option>
+              <option selected disabled>
+              {editedData.type}
+              </option>
               <option value="Smoke ADD">Smoke ADD</option>
               <option value="Smoke Conven">Smoke Conven</option>
               <option value="Heat ADD">Heat ADD</option>

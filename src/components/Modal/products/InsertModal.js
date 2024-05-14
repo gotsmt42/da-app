@@ -62,7 +62,6 @@ const InsertProductModal = ({
     handleClose();
   };
 
-  console.log(selectedType);
 
   return (
     <MDBModal open={show} onClose={handleModalClose} tabIndex="-1">
@@ -91,8 +90,11 @@ const InsertProductModal = ({
               <option value="Sounder Base">Sounder Base</option>
               <option value="Module">Module</option>
               <option value="Manual Station">Manual Station</option>
+              <option value="Bell">Bell</option>
               <option value="Speaker & Strobe">Speaker & Strobe</option>
               <option value="Horn & Strobe">Horn & Strobe</option>
+              <option value="Horn & Strobe">Horn & Strobe</option>
+              <option value="Hardware">Hardware</option>
               {types &&
                 Array.isArray(types) &&
                 types.map((type, idx) => (
