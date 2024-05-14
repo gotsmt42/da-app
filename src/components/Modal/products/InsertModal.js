@@ -1,9 +1,6 @@
-// InsertProductModal.jsx
 import { Modal, Button } from "react-bootstrap";
 import API from "../../../API/axiosInstance";
-
 import TypeProductService from "../../../services/TypeProductService";
-
 import {
   MDBBtn,
   MDBModal,
@@ -27,8 +24,10 @@ const InsertProductModal = ({
   setModalOpenInsert,
   setSelectedFile,
   form,
+  setForm, // Adding setForm to manage the form state
 }) => {
-  const [types, setTypes] = useState({});
+  const [types, setTypes] = useState([]);
+  const [selectedType, setSelectedType] = useState(form.type); // Default to form.type
 
   useEffect(() => {
     const fetchData = async () => {
@@ -43,34 +42,47 @@ const InsertProductModal = ({
     fetchData();
   }, []);
 
+  useEffect(() => {
+    setSelectedType(form.type || ""); // Reset selectedType when form.type changes
+  }, [form.type]);
+
+  const handleTypeChange = (e) => {
+    setSelectedType(e.target.value);
+    setForm({ ...form, type: e.target.value });
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setForm({ ...form, [name]: value });
+  };
+
+  const handleModalClose = () => {
+    setSelectedFile(null);
+    setModalOpenInsert(false);
+    handleClose();
+  };
+
+  console.log(selectedType);
+
   return (
-    <MDBModal
-      open={show}
-      onClose={() => {
-        setSelectedFile(null);
-        setModalOpenInsert(false);
-      }}
-      tabIndex="-1"
-    >
+    <MDBModal open={show} onClose={handleModalClose} tabIndex="-1">
       <MDBModalDialog scrollable>
         <MDBModalContent>
           <MDBModalHeader>
             <MDBModalTitle>Insert Product</MDBModalTitle>
-            <MDBBtn
-              className="btn-close"
-              color="none"
-              onClick={handleClose}
-            ></MDBBtn>
+            <MDBBtn className="btn-close" color="none" onClick={handleModalClose}></MDBBtn>
           </MDBModalHeader>
           <MDBModalBody className="m-2">
             <label>Type : </label>
             <select
               name="type"
               className="form-select mt-1 mb-2"
-              onChange={handleChange}
+              // defaultValue={form.type}
+              onChange={handleTypeChange}
             >
-                    <option selected disabled>Select type product</option>
-
+              <option selected disabled>
+                Select type product
+              </option>
               <option value="Smoke ADD">Smoke ADD</option>
               <option value="Smoke Conven">Smoke Conven</option>
               <option value="Heat ADD">Heat ADD</option>
@@ -83,13 +95,11 @@ const InsertProductModal = ({
               <option value="Horn & Strobe">Horn & Strobe</option>
               {types &&
                 Array.isArray(types) &&
-                types.map((type, idx) => {
-                  return (
-                    <option key={idx} value={type}>
-                      {type.type}
-                    </option>
-                  );
-                })}
+                types.map((type, idx) => (
+                  <option key={idx} value={type.type}>
+                    {type.type}
+                  </option>
+                ))}
               <option value="Other">Other</option>
             </select>
             <label>Name:</label>
@@ -97,25 +107,21 @@ const InsertProductModal = ({
               type="text"
               name="name"
               className="form-control mt-1 mb-2"
-              onChange={handleChange}
+              onChange={handleInputChange}
             />
             <label>Price : </label>
             <input
               type="number"
               name="price"
               className="form-control mt-1 mb-2"
-              onChange={handleChange}
+              onChange={handleInputChange}
             />
             <label>Description : </label>
             <textarea
-              type="text"
               name="description"
               className="form-control mt-1 mb-2"
-              as="textarea"
-              aria-label="With textarea"
               rows="4"
-              cols="50"
-              onChange={handleChange}
+              onChange={handleInputChange}
             />
             <label>Image : </label>
             <input
@@ -132,13 +138,15 @@ const InsertProductModal = ({
               src={
                 selectedFile
                   ? URL.createObjectURL(selectedFile)
-                  : `${API.defaults.baseURL}/${form.imageUrl}`
+                  : form.imageUrl
+                  ? `${API.defaults.baseURL}/${form.imageUrl}`
+                  : ""
               }
               alt=""
             />
           </MDBModalBody>
           <MDBModalFooter>
-            <Button variant="secondary" onClick={handleClose}>
+            <Button variant="secondary" onClick={handleModalClose}>
               Close
             </Button>
             <Button onClick={handleSubmit}>Save changes</Button>

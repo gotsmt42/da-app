@@ -37,12 +37,21 @@ const ProductComponent = () => {
 
   const [filter, setFilter] = useState([]);
   const [form, setForm] = useState({
-    name: "Add product name",
-    description: "Description of the product",
+  
+    description: "",
     price: 0,
     type: "Type of product",
     image: null,
   });
+
+  useEffect(() => {
+    setForm(prevForm => ({
+      ...prevForm,
+      name:"Product " + (products.length + 1)
+    }));
+  }, [products]);
+  
+
   // eslint-disable-next-line no-unused-vars
   const [rows, setRows] = useState([]);
   const [expandedRows, setExpandedRows] = useState({});
@@ -132,10 +141,10 @@ const ProductComponent = () => {
     try {
       await ProductService.AddProduct(formData).then(async() => {
         setForm({
-          name: "Add product name",
-          description: "Description of the product",
+          name: form.name,
+          description: form.description,
           price: 0,
-          type: "Type of product",
+          type: form.type,
           image: null,
         });
         setModalOpenInsert(false);

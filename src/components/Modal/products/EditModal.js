@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Button } from "react-bootstrap";
 import API from "../../../API/axiosInstance";
 
@@ -23,6 +23,8 @@ const EditProductModal = ({
   setEditedData,
   setModalOpenEdit,
 }) => {
+
+
   return (
     <>
       <MDBModal
@@ -43,6 +45,32 @@ const EditProductModal = ({
               ></MDBBtn>
             </MDBModalHeader>
             <MDBModalBody>
+            <label>Type : </label>
+            <select
+              name="type"
+              className="form-select mt-1 mb-2"
+              // defaultValue={form.type}
+              value={editedData.type}
+
+              onChange={(e) =>
+                setEditedData({ ...editedData, type: e.target.value })
+              }            >
+              <option selected disabled>
+                Select type product
+              </option>
+              <option value="Smoke ADD">Smoke ADD</option>
+              <option value="Smoke Conven">Smoke Conven</option>
+              <option value="Heat ADD">Heat ADD</option>
+              <option value="Heat Conven">Heat Conven</option>
+              <option value="Base">Base</option>
+              <option value="Sounder Base">Sounder Base</option>
+              <option value="Module">Module</option>
+              <option value="Manual Station">Manual Station</option>
+              <option value="Speaker & Strobe">Speaker & Strobe</option>
+              <option value="Horn & Strobe">Horn & Strobe</option>
+     \
+              <option value="Other">Other</option>
+            </select>
               <label>Name:</label>
               <input
                 type="text"
