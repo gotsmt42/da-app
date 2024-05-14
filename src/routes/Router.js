@@ -19,6 +19,7 @@ const Forms = lazy(() => import("../views/ui/Forms"));
 const Breadcrumbs = lazy(() => import("../views/ui/Breadcrumbs"));
 const Account = lazy(() => import("../components/User/Account.js"));
 const Product = lazy(() => import("../views/ui/Product"));
+const StockProduct = lazy(() => import("../views/ui/StockProduct"));
 const Files = lazy(() => import("../views/ui/Files"));
 const FileUpload = lazy(() => import("../views/ui/FileUpload"));
 const EventCalendar = lazy(() => import("../views/ui/EventCalendar.js"));
@@ -73,6 +74,7 @@ const ThemeRoutes = [
         title: "Breadcrumbs",
       },
       { path: "/product", exact: true, element: <Product />, title: "Product" },
+      { path: "/product/stock", exact: true, element: <StockProduct />, title: "Stock Product" },
       {
         path: "/fileupload",
         exact: true,

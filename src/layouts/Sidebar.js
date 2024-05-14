@@ -65,7 +65,7 @@ const navigation = [
       },
       {
         title: "Stock Product",
-        href: "/stock",
+        href: "/product/stock",
         icon: BiOutline,
       },
     ],
