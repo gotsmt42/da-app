@@ -287,7 +287,7 @@ const ShowFiles = () => {
           downloadFile,
         })}
         data={sortedData}
-
+        selectableRows
         fixedHeaderScrollHeight="625px"
         
         paginationPerPage={5}
