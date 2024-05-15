@@ -104,7 +104,7 @@ const DataTableColumns = ({
       selector: (row) => moment(row.updatedAt).format("DD/MM/YYYY HH:mm:ss"),
       sortable: true,
     },
-
+    /*
     {
       name: "Action",
       cell: (row) => (
@@ -124,7 +124,7 @@ const DataTableColumns = ({
       ),
       width: "80px",
     },
-
+       */
    
 
     {
