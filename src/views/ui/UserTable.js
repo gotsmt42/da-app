@@ -1,19 +1,13 @@
-import ProjectTables from "../../components/dashboard/ProjectTable";
+import UserTable from "../../components/User/UserTable";
 import { Row, Col, Table, Card, CardTitle, CardBody } from "reactstrap";
 
 const Tables = () => {
   return (
     <Row>
-      {/* --------------------------------------------------------------------------------*/}
-      {/* table-1*/}
-      {/* --------------------------------------------------------------------------------*/}
       <Col lg="12">
-        <ProjectTables />
+        <UserTable />
       </Col>
-      {/* --------------------------------------------------------------------------------*/}
-      {/* table-2*/}
-      {/* --------------------------------------------------------------------------------*/}
-      <Col lg="12">
+      {/* <Col lg="12">
         <Card>
           <CardTitle tag="h6" className="border-bottom p-3 mb-0">
             <i className="bi bi-card-text me-2"> </i>
@@ -53,9 +47,7 @@ const Tables = () => {
           </CardBody>
         </Card>
       </Col>
-      {/* --------------------------------------------------------------------------------*/}
-      {/* table-3*/}
-      {/* --------------------------------------------------------------------------------*/}
+     
       <Col lg="12">
         <Card>
           <CardTitle tag="h6" className="border-bottom p-3 mb-0">
@@ -96,9 +88,6 @@ const Tables = () => {
           </CardBody>
         </Card>
       </Col>
-      {/* --------------------------------------------------------------------------------*/}
-      {/* table-3*/}
-      {/* --------------------------------------------------------------------------------*/}
       <Col lg="12">
         <Card>
           <CardTitle tag="h6" className="border-bottom p-3 mb-0">
@@ -138,7 +127,7 @@ const Tables = () => {
             </Table>
           </CardBody>
         </Card>
-      </Col>
+      </Col> */}
     </Row>
   );
 };

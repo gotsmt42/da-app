@@ -1,92 +1,124 @@
 import { Col, Row } from "reactstrap";
 
-import Event from "../views/ui/EventCalendar"
+import Event from "../views/ui/EventCalendar";
 // import SalesChart from "../components/dashboard/SalesChart";
 import Feeds from "../components/dashboard/Feeds";
-import ProjectTables from "../components/dashboard/ProjectTable";
 
-// import Blog from "../components/dashboard/Blog";
-// import bg1 from "../assets/images/bg/bg1.jpg";
-// import bg2 from "../assets/images/bg/bg2.jpg";
-// import bg3 from "../assets/images/bg/bg3.jpg";
-// import bg4 from "../assets/images/bg/bg4.jpg";
+import Blog from "../components/dashboard/Blog";
 
+import { FaImage, FaCoffee, FaApple, FaCarrot, FaCalendar, FaFile } from "react-icons/fa"; // นำเข้าไอคอนต่างๆ จาก react-icons
 
-// const BlogData = [
-//   {
-//     image: bg1,
-//     title: "This is simple blog",
-//     subtitle: "2 comments, 1 Like",
-//     description:
-//       "This is a wider card with supporting text below as a natural lead-in to additional content.",
-//     btnbg: "primary",
-//   },
-//   {
-//     image: bg2,
-//     title: "Lets be simple blog",
-//     subtitle: "2 comments, 1 Like",
-//     description:
-//       "This is a wider card with supporting text below as a natural lead-in to additional content.",
-//     btnbg: "primary",
-//   },
-//   {
-//     image: bg3,
-//     title: "Don't Lamp blog",
-//     subtitle: "2 comments, 1 Like",
-//     description:
-//       "This is a wider card with supporting text below as a natural lead-in to additional content.",
-//     btnbg: "primary",
-//   },
-//   {
-//     image: bg4,
-//     title: "Simple is beautiful",
-//     subtitle: "2 comments, 1 Like",
-//     description:
-//       "This is a wider card with supporting text below as a natural lead-in to additional content.",
-//     btnbg: "primary",
-//   },
-// ];
+const BlogData = [
+  // {
+  //   image: bg1,
+  //   title: "This is simple blog",
+  //   subtitle: "2 comments, 1 Like",
+  //   description: "This is a wider card with supporting text below as a natural lead-in to additional content.",
+  //   btnbg: "primary",
+  //   link: "/event",
+  // },
+  {
+    icon: FaCalendar,
+    title: "ตารางแผนงาน",
+    subtitle: "อัพเดทเมื่อ...",
+    link: "/event",
+    iconColor: "3498db", // สีไอคอน
+    iconBgColor: "#ecf0f1", // สีพื้นหลังไอคอน
 
+  },
+  {
+    icon: FaFile,
+    title: "รวมไฟล์",
+    subtitle: "464 ไฟล์",
+    link: "/files",
+    iconColor: "#e74c3c",
+    iconBgColor: "#fde3e3",
 
+  },
+  {
+    icon: FaApple,
+    title: "สินค้าทั้งหมด",
+    subtitle: "521 EA",
+    link: "/product",
+    iconColor: "#2ecc71",
+    iconBgColor: "#e8f5e9",
+  },
+  {
+    icon: FaCarrot,
+    title: "สต๊อกสินค้า",
+    subtitle: "65 EA",
+    link: "/event/4",
+    iconColor: "#f39c12",
+    iconBgColor: "#fef5e7",
+  },
+];
+const BlogData2 = [
+  {
+    icon: FaCalendar,
+    title: "ตารางผู้ใช้งาน",
+    subtitle: "20 Users",
+    link: "/usertable",
+    iconColor: "#A02BFF", // สีไอคอน
+    iconBgColor: "#ecf0f1", // สีพื้นหลังไอคอน
+
+  },
+
+];
 
 const Dashboard = () => {
   return (
     <div>
-      {/***Top Cards***/}
 
-      {/* <h1>Dashboard Page Comming Soon...</h1> */}
-
-      {/***Sales & Feed***/}
       <Row>
-        {/* <Col sm="6" lg="6" xl="7" xxl="8">
-          <Event />
-        </Col> */}
-        <Col sm="6" lg="6" xl="5" xxl="4" style={{ marginTop: "2rem" }}>
-          <Feeds />
-        </Col>
-      </Row>
-      {/***Table ***/}
-      <Row>
-        <Col lg="12" style={{ marginTop: "2rem" }}>
-          <ProjectTables />
-        </Col>
-      </Row>
-
-
-      {/***Blog Cards***/}
-      <Row>
-        {/* {BlogData.map((blg, index) => (
+        {/***Blog Cards***/}
+        {BlogData.map((blg, index) => (
           <Col sm="6" lg="6" xl="3" key={index}>
             <Blog
-              image={blg.image}
+              // image={blg.image}
+              link={blg.link}
+              icon={blg.icon}
+              iconSize={100}
+              iconColor={blg.iconColor} // ส่งสีของไอคอน
+              // iconBgColor={blg.iconBgColor} // ส่งสีพื้นหลังของไอคอน
               title={blg.title}
               subtitle={blg.subtitle}
-              text={blg.description}
+              // text={blg.description}
               color={blg.btnbg}
             />
           </Col>
-        ))} */}
+        ))}
+        {/* <Col sm="6" lg="6" xl="5" xxl="4" style={{ marginTop: "2rem" }}>
+          <Feeds />
+        </Col> */}
       </Row>
+
+      <p></p>
+      <p></p>
+
+      <Row>
+        {/***Blog Cards***/}
+        {BlogData2.map((blg, index) => (
+          <Col sm="6" lg="6" xl="3" key={index}>
+            <Blog
+              link={blg.link}
+              icon={blg.icon}
+              iconSize={100}
+              iconColor={blg.iconColor} // ส่งสีของไอคอน
+              // iconBgColor={blg.iconBgColor} // ส่งสีพื้นหลังของไอคอน
+              title={blg.title}
+              subtitle={blg.subtitle}
+              // text={blg.description}
+              color={blg.btnbg}
+              
+    
+            />
+          </Col>
+        ))}
+        {/* <Col sm="6" lg="6" xl="5" xxl="4" style={{ marginTop: "2rem" }}>
+          <Feeds />
+        </Col> */}
+      </Row>
+    
     </div>
   );
 };

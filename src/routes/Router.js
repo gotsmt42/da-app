@@ -14,7 +14,7 @@ const Badges = lazy(() => import("../views/ui/Badges"));
 const Buttons = lazy(() => import("../views/ui/Buttons"));
 const Cards = lazy(() => import("../views/ui/Cards"));
 const Grid = lazy(() => import("../views/ui/Grid"));
-const Tables = lazy(() => import("../views/ui/Tables"));
+const UserTable = lazy(() => import("../views/ui/UserTable.js"));
 const Forms = lazy(() => import("../views/ui/Forms"));
 const Breadcrumbs = lazy(() => import("../views/ui/Breadcrumbs"));
 const Account = lazy(() => import("../components/User/Account.js"));
@@ -65,7 +65,7 @@ const ThemeRoutes = [
       { path: "/buttons", exact: true, element: <Buttons />, title: "Buttons" },
       { path: "/cards", exact: true, element: <Cards />, title: "Cards" },
       { path: "/grid", exact: true, element: <Grid />, title: "Grid" },
-      { path: "/table", exact: true, element: <Tables />, title: "Tables" },
+      { path: "/usertable", exact: true, element: <UserTable />, title: "User Table" },
       { path: "/forms", exact: true, element: <Forms />, title: "Forms" },
       {
         path: "/breadcrumbs",

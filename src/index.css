@@ -3,6 +3,16 @@
 }
 
 
+.icon-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px; /* ปรับขนาดตามต้องการ */
+  background-color: #f8f9fa; /* สีพื้นหลังที่ต้องการ */
+}
+
+
+
 
 /* กำหนด animation สำหรับเมื่อ Header เปลี่ยนเป็น fixed */
 @keyframes fadeInDown {
@@ -242,6 +252,10 @@
   } */
 
   .dataTables_wrapper .rdt_TableCol:nth-child(2) {
+    /* display: none !important; */
+  }
+  
+  .dataTables_wrapper .rdt_TableCol:nth-child(3) {
     display: none !important;
   }
   .dataTables_wrapper .rdt_TableCell:nth-child(3) {

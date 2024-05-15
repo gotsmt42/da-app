@@ -19,8 +19,6 @@ import moment from "moment";
 
 import { ThreeDots } from "react-loader-spinner";
 
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
 
 import generatePDF, { Resolution, Margin } from "react-to-pdf";
 
@@ -423,9 +421,6 @@ function EventCalendar() {
       allDay: event.allDay,
     };
 
-    // console.log(updatedEvent.start);
-    // console.log(updatedEvent.end);
-
     try {
       // อัปเดตเหตุการณ์ในฐานข้อมูล
 
@@ -581,58 +576,8 @@ function EventCalendar() {
     }
   };
 
-  // const handlePrint = useReactToPrint({
-  //   content: () => componentRef.current,
-  // });
-
   const calendarRef = useRef(null);
 
-  // ฟังก์ชันสำหรับสร้าง PDF จาก FullCalendar
-  // const generatePDF = () => {
-  //   const input = document.getElementById("fullCalendar");
-  //   const pdf = new jsPDF("p", "mm", "a4"); // กำหนด PDF ให้มีขนาด A4
-  //   const pageWidth = pdf.internal.pageSize.getWidth(); // ขนาดกว้างของหน้า PDF
-  //   const pageHeight = pdf.internal.pageSize.getHeight(); // ขนาดสูงของหน้า PDF
-  //   const margin = 10; // ขอบเริ่มต้นที่ 10 หน่วย
-  //   let positionY = margin;
-
-  //   html2canvas(input).then((canvas) => {
-  //     const imgWidth = pageWidth - 2 * margin; // ความกว้างของรูปที่ต้องการแสดงใน PDF
-  //     const imgHeight = (canvas.height * imgWidth) / canvas.width; // คำนวณความสูงของรูป
-
-  //     let remainingHeight = canvas.height;
-
-  //     while (remainingHeight > 0) {
-  //       const imgData = canvas.toDataURL("image/png");
-  //       const pageData = (remainingHeight / canvas.height) * canvas.width; // คำนวณอัตราส่วนของหน้าที่จะแสดงใน PDF
-
-  //       // รวมรูปภาพที่ใช้เพื่อแสดงในหน้า PDF
-  //       pdf.addImage(
-  //         imgData,
-  //         "PNG",
-  //         margin,
-  //         positionY,
-  //         imgWidth,
-  //         imgHeight,
-  //         null,
-  //         "FAST"
-  //       );
-
-  //       remainingHeight -= pageData * imgHeight; // ลบความสูงของหน้าละกับขอบ
-  //       positionY += imgHeight; // ตำแหน่ง Y ของภาพในหน้า PDF
-
-  //       if (remainingHeight > 0) {
-  //         pdf.addPage();
-  //         // ตรวจสอบว่ามีพื้นที่สำหรับรูปภาพในหน้า PDF ถ้าไม่มีให้เพิ่มหน้าใหม่
-  //         if (remainingHeight < imgHeight) {
-  //           remainingHeight = 0;
-  //         }
-  //       }
-  //     }
-
-  //     pdf.save("calendar.pdf");
-  //   });
-  // };
 
   const options = {
     // default is `save`
