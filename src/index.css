@@ -261,11 +261,11 @@
   } */
 
   .dataTables_wrapper .rdt_TableCol:nth-child(2) {
-    display: none !important;
+    /*display: none !important;*/
   }
   
   .dataTables_wrapper .rdt_TableCol:nth-child(3) {
-    display: none !important;
+    /*display: none !important;*/
   }
   .dataTables_wrapper .rdt_TableCell:nth-child(3) {
     display: none !important;
