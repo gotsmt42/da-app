@@ -122,7 +122,7 @@ const FileUpload = () => {
   
 
   return (
-    <div className="container-sm mt-5">
+    <div className="container">
       <div
         {...getRootProps()}
         className={`border rounded p-5 text-center upload-container ${
