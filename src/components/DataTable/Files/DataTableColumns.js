@@ -98,6 +98,11 @@ const DataTableColumns = ({
       selector: (row) => row.filename, // เพิ่ม selector เพื่อให้สามารถเรียงลำดับได้ตามค่า filename
 
     },
+    {
+      name: "อัพโหลดเมื่อ",
+      selector: (row) => moment(row.createdAt).format("DD/MM/YYYY HH:mm:ss"),
+      sortable: true,
+    },
 
     {
       cell: (row) => (
