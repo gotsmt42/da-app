@@ -100,12 +100,6 @@ const DataTableColumns = ({
     },
 
     {
-      name: "Created",
-      selector: (row) => moment(row.createdAt).format("DD/MM/YYYY HH:mm:ss"),
-      sortable: true,
-    },
-
-    {
       cell: (row) => (
         <div>
           <IconButton
