@@ -105,7 +105,7 @@ const DataTableComponent = ({
       expandableRowExpanded={expandableRowExpanded}
       expandableRowsHideExpander
       onRowClicked={onRowClicked}
-      selectableRows
+      selectableRows={selectableRows}
       selectableRowsHighlight
       selectableRowsComponent={Checkbox}
       selectableRowsComponentProps={selectProps}

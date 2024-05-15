@@ -2,7 +2,7 @@ import ProductComponent from "../../components/Product/ProductComponent";
 
 const Product = () => {
   return (
-    <div className="container-sm mt-5 ">
+    <div>
       <ProductComponent />
     </div>
   );

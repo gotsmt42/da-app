@@ -39,7 +39,10 @@ const App = () => {
   return (
     <div className="dark">
       <title>{`${pageTitle} - DA-APP`}</title>
+
       {routing}
+
+
     </div>
   );
 };

@@ -1,12 +1,17 @@
 // FullLayout.js
 
 import React, { useRef, useEffect, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import { Container } from "reactstrap";
-import { SpeedInsights } from "@vercel/speed-insights/react"
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import Footer from "./Footer";
+import { FaArrowCircleLeft, FaArrowLeft } from "react-icons/fa";
+import { IconButton } from "@mui/material";
+
+import './FullLayout.css'
+
 const FullLayout = () => {
   const sidebarRef = useRef(null);
   const [isMobile, setIsMobile] = useState(false); // State เพื่อติดตามสถานะโหมด mobile
@@ -14,6 +19,8 @@ const FullLayout = () => {
   const [lastScrollTop, setLastScrollTop] = useState(0);
   const [isHeaderFixed, setIsHeaderFixed] = useState(false);
 
+  const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleOutsideClick = (e) => {
@@ -49,15 +56,15 @@ const FullLayout = () => {
   };
 
   const handleScroll = () => {
-    const currentScrollTop = window.pageYOffset || document.documentElement.scrollTop;
-  
+    const currentScrollTop =
+      window.pageYOffset || document.documentElement.scrollTop;
+
     setIsScrollingUp(currentScrollTop < lastScrollTop && currentScrollTop > 0);
     setLastScrollTop(currentScrollTop <= 0 ? 0 : currentScrollTop);
-  
+
     // ตรวจสอบว่าต้องกำหนด Header เป็น fixed หรือไม่
     setIsHeaderFixed(currentScrollTop > 0);
   };
-  
 
   useEffect(() => {
     window.addEventListener("scroll", handleScroll); // เพิ่ม event listener สำหรับ scroll
@@ -70,36 +77,50 @@ const FullLayout = () => {
   // ใช้ตรวจสอบค่า isScrollingUp และใส่คลาส CSS ตามที่ต้องการใน Header
   const headerClass = isScrollingUp ? "stickyHeader" : "";
 
-return (
-  <main>
-    {/* Header */}
-    <div className={`header ${headerClass}`}>
-      <Header />
-    </div>
-    
-    <div className="pageWrapper d-lg-flex">
-      {/* Sidebar */}
-      <aside className={`sidebarArea shadow ${isMobile ? "" : "showSidebar"}`} id="sidebarArea" ref={sidebarRef}>
-        <Sidebar handleMenuClick={handleMenuClick} />
-      </aside>
+  const isDashboard = location.pathname === "/dashboard";
 
-      {/* Content Area */}
-      <div className="contentArea" onClick={isMobile ? closeSidebar : null}>
-        {/* Middle Content */}
-        <Container className="p-4" fluid>
-          <Outlet />
-          <SpeedInsights />
-
-        </Container>
-
-        <Footer className="footer" />
-
+  return (
+    <main>
+      {/* Header */}
+      <div className={`header ${headerClass}`}>
+        <Header />
       </div>
 
+      <div className="pageWrapper d-lg-flex">
+        {/* Sidebar */}
+        <aside
+          className={`sidebarArea shadow ${isMobile ? "" : "showSidebar"}`}
+          id="sidebarArea"
+          ref={sidebarRef}
+        >
+          <Sidebar handleMenuClick={handleMenuClick} />
+        </aside>
 
-    </div>
-  </main>
-);
+        {/* Content Area */}
+        <div className="contentArea" onClick={isMobile ? closeSidebar : null}>
+          {/* Back Button */}
+          {!isDashboard && (
+            <div className="back-button">
+              <IconButton
+                onClick={() => navigate("/dashboard")}
+                style={{ margin: "15px", fontSize: "40px" }}
+              >
+                <FaArrowLeft />
+              </IconButton>
+            </div>
+          )}
 
+          {/* Middle Content */}
+          <Container className="p-3" fluid>
+            <Outlet />
+            <SpeedInsights />
+          </Container>
+
+          <Footer className="footer" />
+        </div>
+      </div>
+    </main>
+  );
 };
+
 export default FullLayout;

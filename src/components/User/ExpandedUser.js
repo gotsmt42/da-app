@@ -28,7 +28,7 @@ const ExpandedUser = ({ data }) => (
           alt="Avatar"
           width={300}
           height={300}
-          style={{ marginRight: "10px", borderRadius: "50%" }}
+          style={{ margin:"auto", borderRadius: "50%" }}
 
           
         />
@@ -39,16 +39,15 @@ const ExpandedUser = ({ data }) => (
           <h5 className="card-title">
             {data.fname} {data.lname}
           </h5>
-          <p className="text-muted">{data.emai}</p>
-          <p className="card-text">ระดับ {data.rank}</p>
-          <p className="card-text">อีเมลล์ {data.email}</p>
+          <p className="card-text">ระดับ : {data.rank}</p>
+          <p className="card-text">อีเมลล์ : {data.email}</p>
 
           <p className="card-text">
-              เป็นสมาชิกมากแล้ว {" "}
+              เป็นสมาชิกมาแล้ว {" : "}
               {moment().diff(moment(data.createdAt), "weeks") } สัปดาห์
           </p>
 
-          <span>เงินเดือน {formatCurrency(parseFloat(data.salary.$numberDecimal))}</span>
+          <span>เงินเดือน : {formatCurrency(parseFloat(data.salary.$numberDecimal))}</span>
           {/* <p className="card-text">
             <small className="text-body-secondary">
               แก้ไขล่าสุด

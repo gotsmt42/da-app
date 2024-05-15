@@ -98,6 +98,10 @@ const DataTableColumns = ({
   //     <span>{formatCurrency(user.salary)}</span>
   //   )}
 
+
+  const success = 'success'
+  const office = 'danger'
+
   const columns = [
     {
       name: "ชื่อ-นามสกุล",
@@ -112,11 +116,7 @@ const DataTableColumns = ({
       selector: (row) => row.email,
     },
 
-    {
-      name: "ระดับ",
-      selector: (row) => row.rank,
-      sortable: true,
-    },
+
 
     // {
     //   name: "Action",

@@ -305,6 +305,7 @@ const ProductComponent = () => {
         })}
         data={sortedData}
         fixedHeaderScrollHeight="625px"
+        selectableRows
         paginationPerPage={5}
         expandableRowsComponent={ExpandedProduct} // เปิดใช้งาน Expandle
         expandableRowExpanded={(row) => expandedRows[row._id]}

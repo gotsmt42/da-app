@@ -6,7 +6,8 @@ import Feeds from "../components/dashboard/Feeds";
 
 import Blog from "../components/dashboard/Blog";
 
-import { FaImage, FaCoffee, FaApple, FaCarrot, FaCalendar, FaFile } from "react-icons/fa"; // นำเข้าไอคอนต่างๆ จาก react-icons
+import { FaImage, FaCoffee, FaApple, FaCarrot, FaCalendar, FaFile, FaCube, FaCubes, FaUser, FaProductHunt, FaCalendarAlt, FaFileAlt, FaUserAlt } from "react-icons/fa"; // นำเข้าไอคอนต่างๆ จาก react-icons
+import { faBoxes, faCubesStacked } from "@fortawesome/free-solid-svg-icons";
 
 const BlogData = [
   // {
@@ -18,16 +19,16 @@ const BlogData = [
   //   link: "/event",
   // },
   {
-    icon: FaCalendar,
+    icon: FaCalendarAlt,
     title: "ตารางแผนงาน",
     subtitle: "อัพเดทเมื่อ...",
     link: "/event",
     iconColor: "3498db", // สีไอคอน
-    iconBgColor: "#ecf0f1", // สีพื้นหลังไอคอน
+    iconBgColor: "rgba(51, 105, 232, 0.1)", // สีพื้นหลังไอคอน
 
   },
   {
-    icon: FaFile,
+    icon: FaFileAlt,
     title: "รวมไฟล์",
     subtitle: "464 ไฟล์",
     link: "/files",
@@ -36,30 +37,30 @@ const BlogData = [
 
   },
   {
-    icon: FaApple,
+    icon: FaProductHunt,
     title: "สินค้าทั้งหมด",
     subtitle: "521 EA",
     link: "/product",
     iconColor: "#2ecc71",
-    iconBgColor: "#e8f5e9",
+    iconBgColor: "rgba(22, 160, 133, 0.1)",
   },
   {
-    icon: FaCarrot,
+    icon: FaCubes,
     title: "สต๊อกสินค้า",
     subtitle: "65 EA",
-    link: "/event/4",
+    link: "/product/stock",
     iconColor: "#f39c12",
     iconBgColor: "#fef5e7",
   },
 ];
 const BlogData2 = [
   {
-    icon: FaCalendar,
+    icon: FaUserAlt,
     title: "ตารางผู้ใช้งาน",
     subtitle: "20 Users",
     link: "/usertable",
-    iconColor: "#A02BFF", // สีไอคอน
-    iconBgColor: "#ecf0f1", // สีพื้นหลังไอคอน
+    iconColor: "#795A47", // สีไอคอน
+    iconBgColor: "rgba(121, 90, 71, 0.1)", // สีพื้นหลังไอคอน
 
   },
 
@@ -69,17 +70,17 @@ const Dashboard = () => {
   return (
     <div>
 
-      <Row>
+<Row className="flex-wrap" style={{ display: 'flex', justifyContent: 'space-between' }}>
         {/***Blog Cards***/}
         {BlogData.map((blg, index) => (
-          <Col sm="6" lg="6" xl="3" key={index}>
-            <Blog
+          <Col key={index} className="col-12 col-md-6 col-lg-4 col-xl-2.4 mb-4">
+          <Blog
               // image={blg.image}
               link={blg.link}
               icon={blg.icon}
               iconSize={100}
               iconColor={blg.iconColor} // ส่งสีของไอคอน
-              // iconBgColor={blg.iconBgColor} // ส่งสีพื้นหลังของไอคอน
+              iconBgColor={blg.iconBgColor} // ส่งสีพื้นหลังของไอคอน
               title={blg.title}
               subtitle={blg.subtitle}
               // text={blg.description}
@@ -95,16 +96,16 @@ const Dashboard = () => {
       <p></p>
       <p></p>
 
-      <Row>
+      <Row className="flex-wrap" style={{ display: 'flex', justifyContent: 'space-between' }}>
         {/***Blog Cards***/}
         {BlogData2.map((blg, index) => (
-          <Col sm="6" lg="6" xl="3" key={index}>
-            <Blog
+          <Col key={index} className="col-12 col-md-6 col-lg-4 col-xl-2.4 mb-4">
+          <Blog
               link={blg.link}
               icon={blg.icon}
               iconSize={100}
               iconColor={blg.iconColor} // ส่งสีของไอคอน
-              // iconBgColor={blg.iconBgColor} // ส่งสีพื้นหลังของไอคอน
+              iconBgColor={blg.iconBgColor} // ส่งสีพื้นหลังของไอคอน
               title={blg.title}
               subtitle={blg.subtitle}
               // text={blg.description}

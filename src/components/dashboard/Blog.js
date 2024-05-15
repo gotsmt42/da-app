@@ -14,7 +14,7 @@ const Blog = (props) => {
 
   return (
     <Link to={props.link} style={{ textDecoration: "none", color: "inherit" }}>
-       <Card className="mb-4" style={{ border: '1px solid #e3e3e3', borderRadius: '10px' }}>
+       <Card className="wrimagecard mb-4"style={{ border: '1px solid #e3e3e3', borderRadius: '10px' }}>
         <div className="icon-container" style={{ textAlign: 'center', padding: '20px', backgroundColor: props.iconBgColor || '#f8f9fa' }}>
           <Icon size={props.iconSize || 50} color={props.iconColor || '#000'} />
         </div>
