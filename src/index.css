@@ -265,7 +265,7 @@
   }
   
   .dataTables_wrapper .rdt_TableCol:nth-child(3) {
-    /*display: none !important;*/
+    display: none !important;
   }
   .dataTables_wrapper .rdt_TableCell:nth-child(3) {
     display: none !important;
@@ -275,7 +275,7 @@
     display: none !important;
   }
   .dataTables_wrapper .rdt_TableCell:nth-child(4) {
-    display: none !important;
+    /*display: none !important;*/
   }
   .dataTables_wrapper .rdt_TableCol:nth-child(4) {
     width: 2px;
