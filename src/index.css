@@ -261,7 +261,7 @@
   } */
 
   .dataTables_wrapper .rdt_TableCol:nth-child(2) {
-    /* display: none !important; */
+    display: none !important;
   }
   
   .dataTables_wrapper .rdt_TableCol:nth-child(3) {
