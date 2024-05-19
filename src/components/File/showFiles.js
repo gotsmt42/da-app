@@ -352,15 +352,18 @@ const ShowFiles = () => {
         }
         actions={[
           <Link to={"/fileupload"} key="file-upload-link">
-            <IconButton
+            <button
               key="file-upload"
               aria-label="File Upload"
               data-toggle="tooltip"
               data-placement="top"
               title="Upload File"
+              className="btn btn-primary"
+
             >
               <Add />
-            </IconButton>
+              อัพโหลดไฟล์ใหม่
+            </button>
           </Link>,
         ]}
       />

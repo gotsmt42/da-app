@@ -12,15 +12,22 @@ import Swal from "sweetalert2";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"; // Import FontAwesomeIcon component
 
-import { faBell, faFilePdf } from "@fortawesome/free-solid-svg-icons"; // Import ไอคอนต่างๆ
+import {
+  faBell,
+  faFileExcel,
+  faFilePdf,
+} from "@fortawesome/free-solid-svg-icons"; // Import ไอคอนต่างๆ
 
 import EventService from "../../services/EventService";
 import moment from "moment";
 
 import { ThreeDots } from "react-loader-spinner";
 
-
 import generatePDF, { Resolution, Margin } from "react-to-pdf";
+
+import { Col, Row } from "reactstrap";
+
+import { CSVLink } from "react-csv";
 
 function EventCalendar() {
   const [events, setEvents] = useState([]);
@@ -578,7 +585,6 @@ function EventCalendar() {
 
   const calendarRef = useRef(null);
 
-
   const options = {
     // default is `save`
     method: "save",
@@ -630,23 +636,40 @@ function EventCalendar() {
 
   return (
     <div>
-      <div className="mb-3 d-flex flex-column">
-        <div className="row">
-          <div className="col-md-8">
-            <button className="btn btn-danger " onClick={generatePdf}>
-              <FontAwesomeIcon icon={faFilePdf} /> Generate PDF
+      <Row className="flex-wrap mb-3 d-flex justify-content-center justify-content-md-between">
+        <Col className="col-12 col-md-5 col-lg">
+          <button className="btn btn-sm btn-danger" onClick={generatePdf}>
+            <FontAwesomeIcon icon={faFilePdf} /> สร้าง PDF
+          </button>
+
+          <CSVLink
+            data={
+              events
+                ? Object.keys(events).map((event) => ({
+                    Title: event.title,
+                    Date: event.date,
+                    Start: event.start,
+                    End: event.end,
+                    AllDay: event.allDay,
+                  }))
+                : null
+            }
+            filename={"events.csv"}
+          >
+            <button className="btn btn-sm btn-success mx-1 m-2 ">
+              <FontAwesomeIcon icon={faFileExcel} /> สร้าง Excel
             </button>
-          </div>
-          <div className="col-md-8 mt-2">
-            <button
-              className="btn btn-success"
-              onClick={handleLineNotify}
-            >
-              <FontAwesomeIcon icon={faBell} /> ส่งแจ้งเตือนอัพเดตผ่าน LINE
-            </button>
-          </div>
-        </div>
-      </div>
+          </CSVLink>
+
+          <button
+            className="btn btn-sm btn-secondary mx-1 "
+            onClick={handleLineNotify}
+          >
+            <FontAwesomeIcon icon={faBell} /> LINE NOTIFY
+          </button>
+        </Col>
+      </Row>
+
       <div id="content-id">
         <FullCalendar
           ref={calendarRef}

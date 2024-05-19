@@ -75,10 +75,17 @@ const FullLayout = () => {
   }, [lastScrollTop]); // ให้ useEffect ทำงานเมื่อ lastScrollTop เปลี่ยนแปลง
 
   // ใช้ตรวจสอบค่า isScrollingUp และใส่คลาส CSS ตามที่ต้องการใน Header
-  const headerClass = isScrollingUp ? "stickyHeader" : "";
+// ใช้ตรวจสอบความกว้างของหน้าจอเพื่อตัดสินใจใช้งาน stickyHeader หรือไม่
+const Mobile = window.innerWidth <= 768; // ตรวจสอบว่าเป็นโหมดมือถือหรือไม่
+const isLargeScreen = window.innerWidth > 1024; // ตรวจสอบว่าเป็นหน้าจอใหญ่หรือไม่
+const shouldUseStickyHeader = Mobile && !isLargeScreen;
+
+// ใช้ตรวจสอบค่า isScrollingUp และใส่คลาส CSS ตามที่ต้องการใน Header
+const headerClass = isScrollingUp && shouldUseStickyHeader ? "stickyHeader" : "";
 
   const isDashboard = location.pathname === "/dashboard";
-
+  
+  
   return (
     <main>
       {/* Header */}

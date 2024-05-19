@@ -3,11 +3,10 @@ import { Link } from 'react-router-dom'
 
 const Footer = () => {
   return (
-    <div className="container my-5">
       <footer
     
-              className="text-center text-lg-start text-dark"
-              style={{backgroundColor: "#ECEFF1"}}
+              className="text-center text-lg-start text-dark my-5"
+              style={{backgroundColor: "#f8f9fa"}}
               >
   
         <div
@@ -19,7 +18,6 @@ const Footer = () => {
              >MDBootstrap.com</Link> */}
         </div>
       </footer>
-    </div>
   )
 }
 

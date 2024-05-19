@@ -7,7 +7,7 @@ import Swal from "sweetalert2";
 import { ThreeDots } from "react-loader-spinner";
 import { getFileIcon, getFileIconColor } from "../../functions/CustomFile";
 
-const MAX_FILE_SIZE_MB = 500 // ขนาดไฟล์สูงสุดที่อนุญาต (MB)
+const MAX_FILE_SIZE_MB = 500; // ขนาดไฟล์สูงสุดที่อนุญาต (MB)
 const MAX_UPLOAD_FILE = 500;
 
 const FileUpload = () => {
@@ -28,15 +28,15 @@ const FileUpload = () => {
 
   const onDrop = (acceptedFiles) => {
     setLoading(true);
-  
+
     const nonImageFiles = acceptedFiles.filter(
       (file) => !file.type.startsWith("image")
     );
-  
+
     const oversizedFiles = nonImageFiles.filter(
       (file) => file.size > MAX_FILE_SIZE_MB * 1024 * 1024
     );
-  
+
     if (oversizedFiles.length > 0) {
       Swal.fire({
         icon: "warning",
@@ -45,11 +45,11 @@ const FileUpload = () => {
       });
     } else {
       let newFiles = [];
-      const existingFileNames = uploadedFiles.map(file => file.name);
+      const existingFileNames = uploadedFiles.map((file) => file.name);
       nonImageFiles.forEach((file) => {
         let newName = file.name;
-        const fileNameParts = file.name.split('.');
-        const fileName = fileNameParts.slice(0, -1).join('.');
+        const fileNameParts = file.name.split(".");
+        const fileName = fileNameParts.slice(0, -1).join(".");
         const fileExtension = fileNameParts.pop();
         let counter = 1;
         while (existingFileNames.includes(newName)) {
@@ -59,14 +59,12 @@ const FileUpload = () => {
         newFiles.push(new File([file], newName, { type: file.type }));
         existingFileNames.push(newName);
       });
-  
+
       setUploadedFiles((prevFiles) => [...prevFiles, ...newFiles]);
     }
-  
+
     setLoading(false);
   };
-  
-  
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
   const handleUpload = async () => {
@@ -78,7 +76,7 @@ const FileUpload = () => {
           const utf8Name = encodeURIComponent(file.name);
           formData.append("files", file, utf8Name);
         });
-  
+
         const config = {
           onUploadProgress: (progressEvent) => {
             const percentCompleted = Math.round(
@@ -87,13 +85,13 @@ const FileUpload = () => {
             setUploadProgress(percentCompleted);
           },
         };
-  
+
         await FileService.uploadFiles(formData, config);
-  
+
         setUploadedFiles([]);
         setLoading(false);
         setUploadProgress(0);
-  
+
         Swal.fire({
           icon: "success",
           title: "Upload Successful",
@@ -118,8 +116,6 @@ const FileUpload = () => {
       });
     }
   };
-  
-  
 
   return (
     <div className="container">
@@ -128,12 +124,15 @@ const FileUpload = () => {
         className={`border rounded p-5 text-center upload-container ${
           isDragActive ? "shadow" : ""
         }`}
+        // style={{backgroundColor: "#fde3e3"}}
+
       >
         <input {...getInputProps()} />
         <FontAwesomeIcon
           icon={faFileImport}
-          size="3x"
-          className="text-primary mb-3"
+          size="5x"
+          className="mb-5"
+          style={{color: "#e74c3c"}}
         />
         <p className="fs-4">Drag and drop files here or click to browse.</p>
         {uploadedFiles.length > 0 && (
@@ -183,10 +182,15 @@ const FileUpload = () => {
 
       <button
         onClick={handleUpload}
-        className="btn btn-success btn-lg mt-3"
+        // style={{
+        //   background:
+        //     "linear-gradient(45deg, #0c49ac, #4c81d7, #7c96ea, #aed9e0, #adb4c4)",
+        //   color: "white", // เพิ่มสีข้อความเป็นขาวเพื่อให้ตัวอักษรมองเห็นชัดเจน
+        // }}
+        className="btn-upload btn btn-primary btn-lg mt-3 w-100"
         disabled={loading}
       >
-        <FontAwesomeIcon icon={faUpload} className="me-2" /> Upload
+        <FontAwesomeIcon icon={faUpload} className="me-2" /> Upload File
       </button>
     </div>
   );

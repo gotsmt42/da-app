@@ -24,6 +24,8 @@ import ExpandedProduct from "./ExpandedProduct";
 
 import moment from "moment"; // Import moment library for date formatting
 import { ThreeDots } from "react-loader-spinner";
+import { FaFileExcel } from "react-icons/fa";
+import { Description } from "@mui/icons-material";
 
 const ProductComponent = () => {
   const [user, setUser] = useState([]);
@@ -33,11 +35,11 @@ const ProductComponent = () => {
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
+  const [typeSearch, setTypeSearch] = useState("");
   const [dateSearch, setDateSearch] = useState(""); // New state for date search
 
   const [filter, setFilter] = useState([]);
   const [form, setForm] = useState({
-  
     description: "",
     price: 0,
     type: "Type of product",
@@ -45,12 +47,11 @@ const ProductComponent = () => {
   });
 
   useEffect(() => {
-    setForm(prevForm => ({
+    setForm((prevForm) => ({
       ...prevForm,
-      name:"Product " + (products.length + 1)
+      name: "Product " + (products.length + 1),
     }));
   }, [products]);
-  
 
   // eslint-disable-next-line no-unused-vars
   const [rows, setRows] = useState([]);
@@ -59,8 +60,6 @@ const ProductComponent = () => {
   const [modalOpenInsert, setModalOpenInsert] = useState(false);
   const [modalOpenEdit, setModalOpenEdit] = useState(false);
   const [editedData, setEditedData] = useState({});
-
-
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -92,6 +91,17 @@ const ProductComponent = () => {
 
     setFilter(result);
   }, [search, products]);
+
+  useEffect(() => {
+    const result = products.filter((product) => {
+      const type = product.type.toLowerCase();
+
+      return type.includes(typeSearch.toLowerCase());
+    });
+    setDateSearch("");
+    setSearch("");
+    setFilter(result);
+  }, [typeSearch, products]);
 
   //useEffect hook for date search
   useEffect(() => {
@@ -132,14 +142,14 @@ const ProductComponent = () => {
 
   //ฟังชั่นเพิ่มข้อมูลใหม่
   const addProduct = async (e) => {
-    setLoading(true)
+    setLoading(true);
     e.preventDefault();
     const formData = new FormData();
     for (const [key, value] of Object.entries(form)) {
       formData.append(key, value);
     }
     try {
-      await ProductService.AddProduct(formData).then(async() => {
+      await ProductService.AddProduct(formData).then(async () => {
         setForm({
           name: form.name,
           description: form.description,
@@ -151,7 +161,7 @@ const ProductComponent = () => {
         setSelectedFile(null);
         setExpandedRows({});
         await fetchData();
-        setLoading(false)
+        setLoading(false);
         Swal.fire({
           title: "Inserted Success!",
           icon: "success",
@@ -292,6 +302,8 @@ const ProductComponent = () => {
     setSelectedFile(null);
   };
 
+  const uniqueType = [...new Set(products.map((tProduct) => tProduct.type))];
+
   return (
     <>
       <DataTableComponent
@@ -327,6 +339,26 @@ const ProductComponent = () => {
                     />
                   </div>
                   <div className="col-md m-2">
+                    <select
+                      id="userSelect"
+                      className="form-select"
+                      value={typeSearch}
+                      onChange={(e) => setTypeSearch(e.target.value)}
+                    >
+                      <option value={""}>Search for type product</option>
+                      {uniqueType.map((type, idx) => {
+                        const typeProduct = products.find(
+                          (product) => product.type === type
+                        ); // ค้นหา typeProduct ที่มี type ตรงกับ type ที่กำลัง map
+                        return (
+                          <option key={idx} value={type}>
+                            {type}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                  <div className="col-md m-2">
                     <input
                       style={{ cursor: "pointer" }}
                       className="form-control"
@@ -342,18 +374,35 @@ const ProductComponent = () => {
         }
         contextActions={<DataTableContextActions handleDelete={handleDelete} />}
         actions={[
-          <CSVLink key="export-csv" data={products} filename={"products.csv"}>
-            <IconButton
-              aria-label="export csv"
+          <CSVLink
+            key="export-csv"
+            data={
+              sortedData
+                ? sortedData.map((product) => ({
+                    Type: product.type,
+                    Name: product.name,
+                    Price: product.price,
+                    Description: product.description,
+                    CreateAt: product.createdAt,
+                    UpdatedAt: product.updatedAt,
+                  }))
+                : null
+            }
+            filename={"products.csv"}
+          >
+            <button
+              aria-label="export Excel"
               data-toggle="tooltip"
               data-placement="top"
-              title="Export CSV"
+              title="สร้าง Excel"
+              className="btn btn-success"
             >
-              <CloudDownloadIcon />
-            </IconButton>
+              <FaFileExcel />
+              สร้าง Excel
+            </button>
           </CSVLink>,
 
-          <IconButton
+          <button
             key="insert-product"
             onClick={() => {
               setSelectedFile(null);
@@ -363,9 +412,11 @@ const ProductComponent = () => {
             data-toggle="tooltip"
             data-placement="top"
             title="เพิ่มข้อมูลสินค้าใหม่"
+            className="btn btn-primary"
           >
             <Add />
-          </IconButton>,
+            เพิ่มข้อมูลสินค้าใหม่
+          </button>,
         ]}
       />
 
