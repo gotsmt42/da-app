@@ -645,12 +645,12 @@ function EventCalendar() {
           <CSVLink
             data={
               events
-                ? Object.keys(events).map((event) => ({
+                ? Object.values(events).map((event) => ({
                     Title: event.title,
                     Date: event.date,
-                    Start: event.start,
-                    End: event.end,
                     AllDay: event.allDay,
+                    Start: moment(event.start).format("YYYY-MM-DD: HH:mm"),
+                    End: moment(event.end).format("YYYY-MM-DD: HH:mm"),
                   }))
                 : null
             }
