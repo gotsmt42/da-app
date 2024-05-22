@@ -244,7 +244,7 @@ const Dashboard = () => {
       >
         {/***Blog Cards***/}
         {BlogData.map((blg, index) => (
-          <Col key={index} className="col col-md-3 col-lg-2 mb-4">
+          <Col key={index} className="col col-md-3 col-lg-3 mb-4">
             <Blog
               // image={blg.image}
               link={blg.link}

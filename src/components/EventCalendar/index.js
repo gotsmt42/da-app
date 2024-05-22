@@ -755,7 +755,7 @@ function EventCalendar() {
                     <span
                       style={{
                         whiteSpace: "nowrap",
-                        fontSize: eventInfo.event.extendedProps.fontSize,
+                        fontSize: window.innerWidth >= 576 ? eventInfo.event.extendedProps.fontSize+2 : eventInfo.event.extendedProps.fontSize-2  ,
                       }}
                     >
                       {eventInfo.event.title}
@@ -764,7 +764,7 @@ function EventCalendar() {
                     <span
                       style={{
                         whiteSpace: "nowrap",
-                        fontSize: eventInfo.event.extendedProps.fontSize,
+                        fontSize: window.innerWidth >= 576 ? eventInfo.event.extendedProps.fontSize+2 : eventInfo.event.extendedProps.fontSize-2  ,
                       }}
                     >
                       {eventInfo.event.title}

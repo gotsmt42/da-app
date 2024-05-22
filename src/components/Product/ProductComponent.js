@@ -306,6 +306,7 @@ const ProductComponent = () => {
 
   return (
     <>
+    
       <DataTableComponent
         title={`${user.username} - Product`}
         columns={DataTableColumns({

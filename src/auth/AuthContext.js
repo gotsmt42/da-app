@@ -13,6 +13,8 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const storedToken = localStorage.getItem("token");
+
+    console.log(storedToken);
     if (storedToken) {
       setLoggedIn(true);
       
