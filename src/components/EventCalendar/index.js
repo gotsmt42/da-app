@@ -783,16 +783,16 @@ function EventCalendar() {
           dayMaxEventRows={true} // ใช้งานการแสดงเหตุการณ์ที่ยาวนานใน dayGridMonth
           views={{
             listWeek: {
-              dayMaxEventRows: window.innerWidth >= 576 ? 5 : 3,
+              dayMaxEventRows: window.innerWidth >= 576 ? 7 : 5,
             },
             dayGridMonth: {
-              dayMaxEventRows: window.innerWidth >= 576 ? 5 : 3,
+              dayMaxEventRows: window.innerWidth >= 576 ? 7 : 5,
             },
             timeGridWeek: {
-              dayMaxEventRows: window.innerWidth >= 576 ? 5 : 3,
+              dayMaxEventRows: window.innerWidth >= 576 ? 7 : 5,
             },
             timeGridDay: {
-              dayMaxEventRows: window.innerWidth >= 576 ? 5 : 3,
+              dayMaxEventRows: window.innerWidth >= 576 ? 7 : 5,
             },
           }}
         />
