@@ -83,15 +83,7 @@ const EditProductModal = ({
                   setEditedData({ ...editedData, name: e.target.value })
                 }
               />
-              <label>Price:</label>
-              <input
-                type="number"
-                className="form-control"
-                value={editedData.price}
-                onChange={(e) =>
-                  setEditedData({ ...editedData, price: e.target.value })
-                }
-              />
+             
               <label>Description:</label>
               <textarea
                 type="text"

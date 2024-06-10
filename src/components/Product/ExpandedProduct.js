@@ -17,7 +17,6 @@ const ExpandedProduct = ({ data }) => (
       <div className="col-md-8">
         <div className="card-body text">
           <h5 className="card-title">{data.name}</h5>
-          <p className="card-text">ราคา: {data.price} - ฿</p>
           <strong>รายละเอียด: </strong>
           <p className="card-text mt-1 ">
             {data.description}

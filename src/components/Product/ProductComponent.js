@@ -41,7 +41,6 @@ const ProductComponent = () => {
   const [filter, setFilter] = useState([]);
   const [form, setForm] = useState({
     description: "",
-    price: 0,
     type: "Type of product",
     image: null,
   });
@@ -153,7 +152,6 @@ const ProductComponent = () => {
         setForm({
           name: form.name,
           description: form.description,
-          price: 0,
           type: form.type,
           image: null,
         });
@@ -382,7 +380,6 @@ const ProductComponent = () => {
                 ? sortedData.map((product) => ({
                     Type: product.type,
                     Name: product.name,
-                    Price: product.price,
                     Description: product.description,
                     CreateAt: product.createdAt,
                     UpdatedAt: product.updatedAt,

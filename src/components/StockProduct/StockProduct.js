@@ -10,8 +10,8 @@ import { SwalDelete } from "../../functions/Swal";
 
 import DataTableComponent from "../DataTable/DataTableComponent";
 import DataTableContextActions from "../DataTable/DataTableContextActions";
-import DataTableColumns from "../DataTable/Product/DataTableColumns";
-import ExpandedProduct from "../Product/ExpandedProduct";
+import DataTableColumns from "../DataTable/StockProduct/DataTableColumns";
+import ExpandedStockProduct from "./ExpandedStockProduct";
 
 import moment from "moment"; // Import moment library for date formatting
 import { ThreeDots } from "react-loader-spinner";
@@ -30,21 +30,17 @@ const StockProduct = () => {
   const [dateSearch, setDateSearch] = useState("");
 
   const [filter, setFilter] = useState([]);
-  const [form, setForm] = useState({
-    productId: "",
-    price: 0,
-    quantity: 0,
-  });
+  const [filterStock, setFilterStock] = useState([]);
 
   const [rows, setRows] = useState([]);
   const [expandedRows, setExpandedRows] = useState({});
   const [selectedRow, setSelectedRow] = useState(null);
   const [editedData, setEditedData] = useState({});
 
-  const [stocks, setStocks] = useState({});
+  const [stocks, setStocks] = useState([]);
 
   const [inputStocks, setInputStocks] = useState([
-    { productId: "", price: 0, quantity: 0 },
+    { productId: "", price: 0, quantity: 0, countingUnit: "EA" },
   ]);
 
   useEffect(() => {
@@ -56,43 +52,43 @@ const StockProduct = () => {
 
   useEffect(() => {
     fetchData();
-    // fetchDataStock();
+    fetchDataStock();
     getUserData();
   }, []);
 
-  useEffect(() => {
-    const result = products.filter((product) => {
-      const productName = product.name.toLowerCase();
-      const updatedDate = moment(product.updatedAt).format("DD/MM/YYYY HH:mm");
+  // useEffect(() => {
+  //   const result = stocks.filter((product) => {
+  //     const productName = product.name.toLowerCase();
+  //     const updatedDate = moment(product.updatedAt).format("DD/MM/YYYY HH:mm");
 
-      return (
-        productName.includes(search.toLowerCase()) ||
-        updatedDate.includes(search.toLowerCase())
-      );
-    });
+  //     return (
+  //       productName.includes(search.toLowerCase()) ||
+  //       updatedDate.includes(search.toLowerCase())
+  //     );
+  //   });
 
-    setFilter(result);
-  }, [search, products]);
+  //   setFilter(result);
+  // }, [search, stocks]);
 
-  useEffect(() => {
-    const result = products.filter((product) => {
-      const type = product.type.toLowerCase();
+  // useEffect(() => {
+  //   const result = stocks.filter((product) => {
+  //     const type = product.type.toLowerCase();
 
-      return type.includes(typeSearch.toLowerCase());
-    });
-    setDateSearch("");
-    setSearch("");
-    setFilter(result);
-  }, [typeSearch, products]);
+  //     return type.includes(typeSearch.toLowerCase());
+  //   });
+  //   setDateSearch("");
+  //   setSearch("");
+  //   setFilter(result);
+  // }, [typeSearch, stocks]);
 
-  useEffect(() => {
-    const result = products.filter((product) => {
-      const createdDate = moment(product.createdAt).format("YYYY-MM-DD HH:mm");
-      return createdDate.includes(dateSearch);
-    });
+  // useEffect(() => {
+  //   const result = stocks.filter((product) => {
+  //     const createdDate = moment(product.createdAt).format("YYYY-MM-DD HH:mm");
+  //     return createdDate.includes(dateSearch);
+  //   });
 
-    setFilter(result);
-  }, [dateSearch, products]);
+  //   setFilter(result);
+  // }, [dateSearch, stocks]);
 
   const getUserData = async () => {
     const getUser = await AuthService.getUserData();
@@ -116,9 +112,9 @@ const StockProduct = () => {
     setLoading(true);
     try {
       const res = await StockProductService.getUserProductStock();
-      const stocks = res.userStockProducts;
+      const stocks = res.userStock;
       setStocks(stocks);
-      setFilter(stocks);
+      setFilterStock(stocks);
       setSelectedRows([]);
       setToggleCleared(false);
       setExpandedRows({});
@@ -131,34 +127,22 @@ const StockProduct = () => {
       setLoading(false);
     }
   };
-
   const addProductStock = async (e) => {
     setLoading(true);
     e.preventDefault();
     try {
-      // สร้าง FormData
-      const formData = new FormData();
-  
-      // วนลูปผ่าน inputStocks เพื่อเพิ่มข้อมูลลงใน FormData
-      inputStocks.forEach((stock, index) => {
-        // ตรวจสอบว่าข้อมูลที่ใส่เข้ามาไม่ใช่ค่าว่างหรือ null ก่อนที่จะเพิ่มข้อมูลลงใน FormData
-        if (stock.productId && stock.price && stock.quantity) {
-          // ใช้ index เป็น key เพื่อให้ข้อมูลถูกเรียงลำดับตามลำดับของ inputStocks
-          formData.append(`inputStocks[${index}][productId]`, stock.productId);
-          formData.append(`inputStocks[${index}][price]`, stock.price);
-          formData.append(`inputStocks[${index}][quantity]`, stock.quantity);
-        }
-      });
-  
-      // เรียกใช้งาน API โดยส่ง FormData ไปยังฟังก์ชัน AddProductStock ของ StockProductService
-      await StockProductService.AddProductStock(formData);
-  
+      // วนลูปผ่าน inputStocks เพื่อส่งข้อมูลทีละแถว
+      for (const stock of inputStocks) {
+        // เรียกใช้งาน API โดยส่งข้อมูลในแถวนั้นๆ
+        await StockProductService.AddProductStock(stock);
+      }
+
       // เรียกใช้ fetchDataStock เพื่อโหลดข้อมูลสินค้าใหม่
       await fetchDataStock();
-  
+
       // หยุดการโหลด
       setLoading(false);
-  
+
       // แสดงข้อความแจ้งเตือนเมื่อสำเร็จ
       Swal.fire({
         title: "Stock Inserted Successfully!",
@@ -172,13 +156,11 @@ const StockProduct = () => {
       setLoading(false);
     }
   };
-  
-  
 
   const handleChange = (e, index) => {
     const { name, value } = e.target;
     const newInputStocks = [...inputStocks];
-    newInputStocks[index][name] = value;
+    newInputStocks[index] = { ...newInputStocks[index], [name]: value };
     setInputStocks(newInputStocks);
   };
 
@@ -247,7 +229,7 @@ const StockProduct = () => {
     setExpandedRows(newRowState);
   };
 
-  const sortedData = filter.slice().sort((a, b) => {
+  const sortedData = filterStock.slice().sort((a, b) => {
     return new Date(b.updatedAt) - new Date(a.updatedAt);
   });
 
@@ -259,24 +241,28 @@ const StockProduct = () => {
         <div className="row">
           <div className="col-md-12">
             <form onSubmit={addProductStock}>
-              <div className="row mt-3">
-                <div className="col-md-12">
-                  <div className="d-flex justify-content-end ">
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-secondary "
-                      onClick={addInputStock}
-                    >
-                      <FaPlus /> เพิ่มแถว
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div className="row g-3">
+              <div className="row">
                 {inputStocks.map((inputStock, index) => (
                   <React.Fragment key={index}>
-                    <div className="col-md-4">
-                      <label for="" className="form-label">
+                    <div className="col-md-12 mt-5">
+                      <div className="d-flex justify-content-end ">
+                        {index > 0 && (
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-danger"
+                            onClick={() => removeInputStock(index)}
+                          >
+                            <FaMinus /> ลบแถวที่ {index + 1}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <p >
+                      {" "}
+                      <strong>{index + 1}</strong>
+                    </p>
+                    <div className="col-md-12">
+                      <label htmlFor="" className="form-label">
                         เลือกสินค้า:{" "}
                       </label>
                       <select
@@ -296,8 +282,8 @@ const StockProduct = () => {
                         ))}
                       </select>
                     </div>
-                    <div className="col-md-4">
-                      <label for="" className="form-label">
+                    <div className="col-md-12">
+                      <label htmlFor="" className="form-label">
                         ราคา:{" "}
                       </label>
 
@@ -311,8 +297,8 @@ const StockProduct = () => {
                         required
                       />
                     </div>
-                    <div className="col-md-3">
-                      <label for="" className="form-label">
+                    <div className="col-md-12">
+                      <label htmlFor="" className="form-label">
                         จำนวน:{" "}
                       </label>
 
@@ -326,22 +312,42 @@ const StockProduct = () => {
                         required
                       />
                     </div>
-                    <div className="col-md-1">
-                      {index > 0 && (
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-danger"
-                          onClick={() => removeInputStock(index)}
-                        >
-                          <FaMinus /> ลบ
-                        </button>
-                      )}
+
+                    <div className="col-md-12">
+                      <label htmlFor="" className="form-label">
+                        เลือกหน่วยนับสินค้า:{" "}
+                      </label>
+                      <select
+                        className="form-select"
+                        name="countingUnit"
+                        value={inputStock.countingUnit}
+                        onChange={(e) => handleChange(e, index)}
+                        required
+                      >
+                        <option value="" disabled>
+                          Select Counting unit
+                        </option>
+                        <option value="EA">EA</option>
+                        <option value="Lot">Lot</option>
+                        <option value="Other">Other</option>
+                      </select>
                     </div>
                   </React.Fragment>
                 ))}
+                <div className="col-md-12 mt-3">
+                  <div className="d-flex justify-content-end ">
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-secondary "
+                      onClick={addInputStock}
+                    >
+                      <FaPlus /> เพิ่มแถว
+                    </button>
+                  </div>
+                </div>
               </div>
               <div className="row mt-3">
-                <div className="col-md-12">
+                <div className="col">
                   <div className="d-flex justify-content-start mb-3">
                     <button type="submit" className="btn btn-primary">
                       <FaSave /> บันทึกสินค้าลงในสต๊อก
@@ -354,6 +360,7 @@ const StockProduct = () => {
         </div>
       </div>
 
+      <hr className="mt-5 mb-5" />
       <DataTableComponent
         title={`${user.username} - Stock Product`}
         columns={DataTableColumns({
@@ -366,7 +373,7 @@ const StockProduct = () => {
         fixedHeaderScrollHeight="625px"
         selectableRows
         paginationPerPage={5}
-        expandableRowsComponent={ExpandedProduct}
+        expandableRowsComponent={ExpandedStockProduct}
         expandableRowExpanded={(row) => expandedRows[row._id]}
         onRowClicked={handleRowClicked}
         onSelectedRowsChange={handleRowSelected}

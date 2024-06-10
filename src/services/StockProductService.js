@@ -7,11 +7,11 @@
         try {
         const userData = await AuthService.getUserData();
         if (userData) {
-            const response = await API.get(`/product/stock`);
+            const response = await API.get(`/stockproduct`);
             return response.data;
         }
         } catch (error) {
-        console.error("Error fetching user products:", error);
+        console.error("Error fetching user stockproduct:", error);
         throw error;
         }
     },
@@ -20,7 +20,7 @@
         try {
           const userData = await AuthService.getUserData();
           if (userData) {
-            const response = await API.post(`/product/stock`, formData);
+            const response = await API.post(`/stockproduct`, formData);
             return response.data;
           }
         } catch (error) {
@@ -47,7 +47,7 @@
         try {
         const userData = await AuthService.getUserData();
         if (userData) {
-            const response = await API.put(`/product/stock/${productId}`, editedData);
+            const response = await API.put(`/stockproduct/${productId}`, editedData);
             return response.data;
         }
         } catch (error) {

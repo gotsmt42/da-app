@@ -111,13 +111,6 @@ const InsertProductModal = ({
               className="form-control mt-1 mb-2"
               onChange={handleInputChange}
             />
-            <label>Price : </label>
-            <input
-              type="number"
-              name="price"
-              className="form-control mt-1 mb-2"
-              onChange={handleInputChange}
-            />
             <label>Description : </label>
             <textarea
               name="description"

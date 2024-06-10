@@ -20,17 +20,20 @@ import FileService from "../services/FileService";
 import ProductService from "../services/ProductService";
 import AuthService from "../services/authService";
 import EventService from "../services/EventService";
+import StockProductService from "../services/StockProductService";
 import moment from "moment";
 
 const Dashboard = () => {
   const [loading, setLoading] = useState(false);
   const [files, setFiles] = useState({});
   const [products, setProducts] = useState({});
+  const [stocks, setStocks] = useState({});
   const [users, setUsers] = useState({});
   const [events, setEvents] = useState({});
   useEffect(() => {
     fetchFiles();
     fetchProducts();
+    fetchStockProducts();
     fetchUsers();
     fetchEvents();
   }, []);
@@ -56,6 +59,20 @@ const Dashboard = () => {
       const products = res.userProducts;
 
       setProducts(products);
+
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching files:", error);
+      setLoading(false);
+    }
+  };
+  const fetchStockProducts = async () => {
+    setLoading(true);
+    try {
+      const res = await StockProductService.getUserProductStock();
+      const stocks = res.userStock;
+
+      setStocks(stocks);
 
       setLoading(false);
     } catch (error) {
@@ -118,7 +135,7 @@ const Dashboard = () => {
     {
       icon: FaCube,
       title: "สินค้า",
-      subtitle: loading ? "กำลังโหลด..." : Object.keys(products).length + " EA",
+      subtitle: loading ? "กำลังโหลด..." : Object.keys(products).length + " Row",
       link: "/product",
       iconColor: "#2ecc71",
       iconBgColor: "rgba(22, 160, 133, 0.1)",
@@ -126,7 +143,7 @@ const Dashboard = () => {
     {
       icon: FaCubes,
       title: "สต๊อกสินค้า",
-      subtitle: "0 EA",
+      subtitle: loading ? "กำลังโหลด..." : Object.keys(stocks).length + " Row",
       link: "/product/stock",
       iconColor: "#f39c12",
       iconBgColor: "#fef5e7",
