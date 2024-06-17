@@ -8,7 +8,7 @@ const customCell = ({ row, isSmallScreen }) => {
       {/* หากหน้าจอขนาดเล็ก ให้แสดง updatedAt ด้านล่าง */}
       {isSmallScreen && (
         
-        <span style={{ marginTop: "50px"  }}>{row.quantity} EA</span>
+        <span style={{ marginTop: "50px"  }}>{row.quantity} {row.countingUnit}</span>
         // <span style={{ marginTop: "20px"  }}>แก้ไขล่าสุด{moment(row.updatedAt).format(" DD/MM/YYYY HH:mm:ss")}</span>
       )}
     </div>

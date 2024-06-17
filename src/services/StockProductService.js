@@ -30,40 +30,14 @@
       },
       
 
-    //   async ReadProduct(productId) {
-    //     try {
-    //       const userData = await AuthService.getUserData();
-    //       if (userData) {
-    //         const response = await API.get(`/product/stock/${productId}`);
-    //         return response.data;
-    //       }
-    //     } catch (error) {
-    //       console.error("Error reading product:", error);
-    //       throw error;
-    //     }
-    //   },
-
-    async UpdateProduct(productId, editedData) {
+    async DeleteProductStock(id) {
         try {
         const userData = await AuthService.getUserData();
         if (userData) {
-            const response = await API.put(`/stockproduct/${productId}`, editedData);
-            return response.data;
+            await API.delete(`/stockproduct/${id}`);
         }
         } catch (error) {
-        console.error("Error updating product:", error);
-        throw error;
-        }
-    },
-
-    async DeleteProductStock(productId) {
-        try {
-        const userData = await AuthService.getUserData();
-        if (userData) {
-            await API.delete(`/product/stock/${productId}`);
-        }
-        } catch (error) {
-        console.error("Error deleting product:", error);
+        console.error("Error deleting stock product:", error);
         throw error;
         }
     },

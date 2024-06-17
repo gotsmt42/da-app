@@ -32,11 +32,11 @@ const ExpandedStockProduct = ({ data }) => (
       <div className="col-md-8">
         <div className="card-body text">
           <h5 className="card-title">
-            จำนวน : {data.quantity} {data.countingUnit}
+            จำนวน : {data.quantity} {data.productInfo.countingUnit}
           </h5>
           <p></p>
           <h5 className="card-title">
-            ราคาล่าสุด : {formatCurrency(parseFloat(data.price.$numberDecimal))}{" "}
+            ราคาล่าสุด : {formatCurrency(parseFloat(data.productInfo.price.$numberDecimal))}{" "}
           </h5>
 
           <p></p>

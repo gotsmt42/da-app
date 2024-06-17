@@ -53,8 +53,6 @@ const StyledMenu = styled((props) => (
 
 const DataTableColumns = ({
   setSelectedRow,
-  setEditedData,
-  setModalOpenEdit,
   handleDeleteRow,
   setSelectedFile,
 }) => {
@@ -66,7 +64,6 @@ const DataTableColumns = ({
     setSelectedRowMenu(row);
     setAnchorEl(event.currentTarget);
     setSelectedRow(row);
-    setEditedData(row);
   };
 
   const handleClose = () => {
@@ -98,11 +95,7 @@ const DataTableColumns = ({
       selector: (row) => row.name,
     },
   
-    // {
-    //   name: "Updated",
-    //   selector: (row) => moment(row.updatedAt).format("DD/MM/YYYY HH:mm:ss"),
-    //   sortable: true,
-    // },
+
 
     {
       name: "Quantity",
@@ -112,28 +105,7 @@ const DataTableColumns = ({
 
     },
 
-    /*
-    {
-      name: "Action",
-      cell: (row) => (
-        <IconButton
-          id={`action-button-${row._id}`}
-          aria-controls={`action-menu-${row._id}`}
-          aria-haspopup="true"
-          aria-expanded={open ? "true" : undefined}
-          variant="contained"
-          onClick={() => {
-            setModalOpenEdit(true);
-            setEditedData(row);
-          }}
-        >
-          <EditIcon />
-        </IconButton>
-      ),
-      width: "80px",
-    },
-       */
-   
+  
 
     {
       cell: (row) => (
@@ -158,24 +130,6 @@ const DataTableColumns = ({
             open={open && selectedRowMenu === row}
             onClose={handleClose}
           >
-            <MenuItem
-              onClick={() => {
-                setModalOpenEdit(true);
-                handleClose();
-              }}
-            >
-              <EditIcon />
-              Edit
-            </MenuItem>
-            {/* <MenuItem onClick={handleClose} disableRipple>
-              <FileCopyIcon />
-              Duplicate
-            </MenuItem>
-            <Divider sx={{ my: 0.5 }} />
-            <MenuItem onClick={handleClose} disableRipple>
-              <ArchiveIcon />
-              Archive
-            </MenuItem> */}
             <MenuItem
               onClick={() => {
                 handleDeleteRow(row._id); // เรียกใช้ handleDelete โดยส่ง parameter row._id

@@ -1,7 +1,6 @@
 /* eslint-disable no-unused-vars */
 import React, { useEffect, useState, useRef } from "react";
 import ProductService from "../../services/ProductService";
-import TypeProductService from "../../services/TypeProductService";
 import AuthService from "../../services/authService";
 import Swal from "sweetalert2";
 
@@ -42,6 +41,8 @@ const ProductComponent = () => {
   const [form, setForm] = useState({
     description: "",
     type: "Type of product",
+    price: 0,
+    countingUnit: "",
     image: null,
   });
 
@@ -153,6 +154,8 @@ const ProductComponent = () => {
           name: form.name,
           description: form.description,
           type: form.type,
+          price: form.price,
+          countingUnit: form.countingUnit,
           image: null,
         });
         setModalOpenInsert(false);

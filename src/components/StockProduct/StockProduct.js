@@ -35,12 +35,11 @@ const StockProduct = () => {
   const [rows, setRows] = useState([]);
   const [expandedRows, setExpandedRows] = useState({});
   const [selectedRow, setSelectedRow] = useState(null);
-  const [editedData, setEditedData] = useState({});
 
   const [stocks, setStocks] = useState([]);
 
   const [inputStocks, setInputStocks] = useState([
-    { productId: "", price: 0, quantity: 0, countingUnit: "EA" },
+    { productId: "", price: 0, quantity: 0, countingUnit: "" },
   ]);
 
   useEffect(() => {
@@ -137,6 +136,10 @@ const StockProduct = () => {
         await StockProductService.AddProductStock(stock);
       }
 
+      setInputStocks([
+        { productId: "", price: 0, quantity: 0, countingUnit: "" },
+      ]);
+
       // เรียกใช้ fetchDataStock เพื่อโหลดข้อมูลสินค้าใหม่
       await fetchDataStock();
 
@@ -180,7 +183,6 @@ const StockProduct = () => {
         if (result.isConfirmed) {
           for (const row of selectedRows) {
             const productId = row._id;
-            console.log("ProductID", productId);
             try {
               await StockProductService.DeleteProductStock(productId);
             } catch (error) {
@@ -191,6 +193,8 @@ const StockProduct = () => {
           setToggleCleared(true);
           setExpandedRows({});
           await fetchData();
+
+          await fetchDataStock();
 
           Swal.fire("Deleted Success!", "", "success");
         }
@@ -204,12 +208,14 @@ const StockProduct = () => {
     try {
       await SwalDelete().then(async (result) => {
         if (result.isConfirmed) {
-          await ProductService.DeleteProduct(rowId);
+
+          await StockProductService.DeleteProductStock(rowId);
 
           setSelectedRows([]);
           setToggleCleared(true);
           setExpandedRows({});
           await fetchData();
+          await fetchDataStock();
 
           Swal.fire("Deleted Success!", "", "success");
         }
@@ -235,124 +241,103 @@ const StockProduct = () => {
 
   const uniqueType = [...new Set(products.map((tProduct) => tProduct.type))];
 
+
+  const formatCurrency = (amount) => {
+    // Check if amount is valid and numeric
+    if (!amount || isNaN(amount)) {
+      return ""; // Return empty string if amount is invalid
+    }
+  
+    // Use Intl.NumberFormat to format amount as currency
+    const formatter = new Intl.NumberFormat("en-TH", {
+      style: "currency",
+      currency: "THB", // Change currency code as needed
+      minimumFractionDigits: 2, // Minimum number of fractional digits
+    });
+  
+    return formatter.format(amount); // Format amount as currency string
+  };
+
   return (
     <>
       <div className="container mb-4">
         <div className="row">
           <div className="col-md-12">
             <form onSubmit={addProductStock}>
-              <div className="row">
-                {inputStocks.map((inputStock, index) => (
-                  <React.Fragment key={index}>
-                    <div className="col-md-12 mt-5">
-                      <div className="d-flex justify-content-end ">
-                        {index > 0 && (
-                          <button
-                            type="button"
-                            className="btn btn-sm btn-danger"
-                            onClick={() => removeInputStock(index)}
-                          >
-                            <FaMinus /> ลบแถวที่ {index + 1}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <p >
-                      {" "}
+              {inputStocks.map((inputStock, index) => (
+                <div className="row align-items-start mb-3" key={index}>
+                  <div className="col-md-1">
+                    <p>
                       <strong>{index + 1}</strong>
                     </p>
-                    <div className="col-md-12">
-                      <label htmlFor="" className="form-label">
-                        เลือกสินค้า:{" "}
-                      </label>
-                      <select
-                        className="form-select"
-                        name="productId"
-                        value={inputStock.productId}
-                        onChange={(e) => handleChange(e, index)}
-                        required
-                      >
-                        <option value="" disabled>
-                          Select Product
-                        </option>
-                        {products.map((product) => (
-                          <option key={product._id} value={product._id}>
-                            [{product.type}] {product.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-md-12">
-                      <label htmlFor="" className="form-label">
-                        ราคา:{" "}
-                      </label>
+                  </div>
 
-                      <input
-                        type="number"
-                        className="form-control"
-                        placeholder="Price"
-                        name="price"
-                        value={inputStock.price}
-                        onChange={(e) => handleChange(e, index)}
-                        required
-                      />
-                    </div>
-                    <div className="col-md-12">
-                      <label htmlFor="" className="form-label">
-                        จำนวน:{" "}
-                      </label>
-
-                      <input
-                        type="number"
-                        className="form-control"
-                        placeholder="Quantity"
-                        name="quantity"
-                        value={inputStock.quantity}
-                        onChange={(e) => handleChange(e, index)}
-                        required
-                      />
-                    </div>
-
-                    <div className="col-md-12">
-                      <label htmlFor="" className="form-label">
-                        เลือกหน่วยนับสินค้า:{" "}
-                      </label>
-                      <select
-                        className="form-select"
-                        name="countingUnit"
-                        value={inputStock.countingUnit}
-                        onChange={(e) => handleChange(e, index)}
-                        required
-                      >
-                        <option value="" disabled>
-                          Select Counting unit
-                        </option>
-                        <option value="EA">EA</option>
-                        <option value="Lot">Lot</option>
-                        <option value="Other">Other</option>
-                      </select>
-                    </div>
-                  </React.Fragment>
-                ))}
-                <div className="col-md-12 mt-3">
-                  <div className="d-flex justify-content-end ">
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-secondary "
-                      onClick={addInputStock}
+                  <div className="col-md-3">
+                    <label htmlFor="" className="form-label">
+                      เลือกสินค้า:{" "}
+                    </label>
+                    <select
+                      className="form-select"
+                      name="productId"
+                      value={inputStock.productId}
+                      onChange={(e) => handleChange(e, index)}
+                      required
                     >
-                      <FaPlus /> เพิ่มแถว
-                    </button>
+                      <option value="" disabled>
+                        Select Product
+                      </option>
+                      {products.map((product) => (
+                        <option key={product._id} value={product._id}>
+                          [{product.type}] {product.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="col-md-3">
+                    <label htmlFor="" className="form-label">
+                      จำนวน:{" "}
+                    </label>
+                    <input
+                      type="number"
+                      className="form-control"
+                      placeholder="Quantity"
+                      name="quantity"
+                      value={inputStock.quantity}
+                      onChange={(e) => handleChange(e, index)}
+                      required
+                    />
+                  </div>
+
+                  <div className="col-md-2 mt-3 d-flex align-items-end">
+                    {index > 0 && (
+                      <button
+                        type="button"
+                        className="btn btn-danger mb-3"
+                        onClick={() => removeInputStock(index)}
+                      >
+                        <FaMinus /> ลบรายการที่ {index + 1}
+                      </button>
+                    )}
                   </div>
                 </div>
+              ))}
+              <div className="col-md-12 mt-5">
+                <div className="d-flex justify-content-end">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-secondary w-100"
+                    onClick={addInputStock}
+                  >
+                    <FaPlus /> เพิ่มรายการ
+                  </button>
+                </div>
               </div>
-              <div className="row mt-3">
-                <div className="col">
-                  <div className="d-flex justify-content-start mb-3">
-                    <button type="submit" className="btn btn-primary">
-                      <FaSave /> บันทึกสินค้าลงในสต๊อก
-                    </button>
-                  </div>
+              <div className="col-md-12 mt-3">
+                <div className="d-flex justify-content-start mb-3">
+                  <button type="submit" className="btn btn-primary w-100">
+                    <FaSave /> บันทึกสินค้าลงในสต๊อก
+                  </button>
                 </div>
               </div>
             </form>
@@ -365,7 +350,6 @@ const StockProduct = () => {
         title={`${user.username} - Stock Product`}
         columns={DataTableColumns({
           setSelectedRow,
-          setEditedData,
           handleDeleteRow,
           setSelectedFile,
         })}
@@ -433,16 +417,17 @@ const StockProduct = () => {
             data={
               sortedData
                 ? sortedData.map((product) => ({
-                    Type: product.type,
-                    Name: product.name,
-                    Price: product.price,
-                    Description: product.description,
+                    Type: product.productInfo.type,
+                    Name: product.productInfo.name,
+                    Price: formatCurrency(parseFloat(product.productInfo.price.$numberDecimal)),
+                    Quantity: product.quantity,
+                    CountingUnit: product.productInfo.countingUnit,
                     CreateAt: product.createdAt,
                     UpdatedAt: product.updatedAt,
                   }))
                 : null
             }
-            filename={"products.csv"}
+            filename={"Stock-products.csv"}
           >
             <button
               aria-label="export Excel"

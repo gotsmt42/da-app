@@ -1,6 +1,5 @@
 import { Modal, Button } from "react-bootstrap";
 import API from "../../../API/axiosInstance";
-import TypeProductService from "../../../services/TypeProductService";
 import {
   MDBBtn,
   MDBModal,
@@ -12,6 +11,7 @@ import {
   MDBModalFooter,
 } from "mdb-react-ui-kit";
 import { useEffect, useState } from "react";
+import ProductService from "../../../services/ProductService";
 
 const InsertProductModal = ({
   show,
@@ -26,28 +26,27 @@ const InsertProductModal = ({
   form,
   setForm, // Adding setForm to manage the form state
 }) => {
-  const [types, setTypes] = useState([]);
-  const [selectedType, setSelectedType] = useState(form.type); // Default to form.type
+  // const [types, setTypes] = useState([]);
+  // const [selectedType, setSelectedType] = useState(form.type); // Default to form.type
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await TypeProductService.getUserTypeProducts();
-        setTypes(res.userTypeProducts);
-      } catch (error) {
-        console.error("Error fetching type product:", error);
-      }
-    };
+  // useEffect(() => {
+  //   const fetchData = async () => {
+  //     try {
+  //       const res = await ProductService.getUserProducts();
+  //       setTypes(res.userProducts);
+  //     } catch (error) {
+  //       console.error("Error fetching type product:", error);
+  //     }
+  //   };
 
-    fetchData();
-  }, []);
+  //   fetchData();
+  // }, []);
 
-  useEffect(() => {
-    setSelectedType(form.type || ""); // Reset selectedType when form.type changes
-  }, [form.type]);
+  // useEffect(() => {
+  //   setSelectedType(form.type || ""); // Reset selectedType when form.type changes
+  // }, [form.type]);
 
   const handleTypeChange = (e) => {
-    setSelectedType(e.target.value);
     setForm({ ...form, type: e.target.value });
   };
 
@@ -62,21 +61,24 @@ const InsertProductModal = ({
     handleClose();
   };
 
-
   return (
     <MDBModal open={show} onClose={handleModalClose} tabIndex="-1">
       <MDBModalDialog scrollable>
         <MDBModalContent>
           <MDBModalHeader>
             <MDBModalTitle>Insert Product</MDBModalTitle>
-            <MDBBtn className="btn-close" color="none" onClick={handleModalClose}></MDBBtn>
+            <MDBBtn
+              className="btn-close"
+              color="none"
+              onClick={handleModalClose}
+            ></MDBBtn>
           </MDBModalHeader>
           <MDBModalBody className="m-2">
             <label>Type : </label>
             <select
               name="type"
               className="form-select mt-1 mb-2"
-              // defaultValue={form.type}
+              // defaultValue={form}
               onChange={handleTypeChange}
             >
               <option selected disabled>
@@ -95,13 +97,13 @@ const InsertProductModal = ({
               <option value="Horn & Strobe">Horn & Strobe</option>
               <option value="Horn & Strobe">Horn & Strobe</option>
               <option value="Hardware">Hardware</option>
-              {types &&
+              {/* {types &&
                 Array.isArray(types) &&
                 types.map((type, idx) => (
                   <option key={idx} value={type.type}>
                     {type.type}
                   </option>
-                ))}
+                ))} */}
               <option value="Other">Other</option>
             </select>
             <label>Name:</label>
@@ -111,6 +113,31 @@ const InsertProductModal = ({
               className="form-control mt-1 mb-2"
               onChange={handleInputChange}
             />
+            <label>Price:</label>
+            <input
+              type="number"
+              name="price"
+              className="form-control mt-1 mb-2"
+              onChange={handleInputChange}
+            />
+            <label htmlFor="" className="form-label">
+              {" "}
+              เลือกหน่วยนับสินค้า:
+            </label>
+            <select
+              className="form-select"
+              name="countingUnit"
+              onChange={handleInputChange}
+              required
+            >
+              <option selected disabled>
+                Select Counting unit
+              </option>
+              <option value="EA">EA</option>
+              <option value="Lot">Lot</option>
+              <option value="Other">Other</option>
+            </select>
+
             <label>Description : </label>
             <textarea
               name="description"
