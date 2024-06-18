@@ -3,6 +3,23 @@ import moment from "moment";
 import API from "../../API/axiosInstance";
 
 
+const formatCurrency = (amount) => {
+  // Check if amount is valid and numeric
+  if (!amount || isNaN(amount)) {
+    return ""; // Return empty string if amount is invalid
+  }
+
+  // Use Intl.NumberFormat to format amount as currency
+  const formatter = new Intl.NumberFormat("en-TH", {
+    style: "currency",
+    currency: "THB", // Change currency code as needed
+    minimumFractionDigits: 2, // Minimum number of fractional digits
+  });
+
+  return formatter.format(amount); // Format amount as currency string
+};
+
+
 const ExpandedProduct = ({ data }) => (
   <div className="card mb-3">
     <div className="row g-0">
@@ -17,6 +34,11 @@ const ExpandedProduct = ({ data }) => (
       <div className="col-md-8">
         <div className="card-body text">
           <h5 className="card-title">{data.name}</h5>
+          <p></p>
+          <h5 className="card-title">
+            ราคาล่าสุด : {formatCurrency(parseFloat(data.price.$numberDecimal))}{" "}
+          </h5>
+          <p></p>
           <strong>รายละเอียด: </strong>
           <p className="card-text mt-1 ">
             {data.description}

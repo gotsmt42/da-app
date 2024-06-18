@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import StockProductService from "../../services/StockProductService";
 import ProductService from "../../services/ProductService";
 import AuthService from "../../services/authService";
@@ -16,7 +16,6 @@ import ExpandedStockProduct from "./ExpandedStockProduct";
 import moment from "moment"; // Import moment library for date formatting
 import { ThreeDots } from "react-loader-spinner";
 import { FaAd, FaFileExcel, FaMinus, FaPlus, FaSave } from "react-icons/fa";
-import { Add } from "@mui/icons-material";
 
 const StockProduct = () => {
   const [user, setUser] = useState([]);
@@ -39,7 +38,7 @@ const StockProduct = () => {
   const [stocks, setStocks] = useState([]);
 
   const [inputStocks, setInputStocks] = useState([
-    { productId: "", price: 0, quantity: 0, countingUnit: "" },
+    { productId: "", quantity: 0 },
   ]);
 
   useEffect(() => {
@@ -47,47 +46,52 @@ const StockProduct = () => {
       setRows(filter);
     }, 1000);
     return () => clearTimeout(timeout);
-  }, []);
+  }, [filter]);
 
   useEffect(() => {
+    
     fetchData();
     fetchDataStock();
     getUserData();
   }, []);
-
-  // useEffect(() => {
-  //   const result = stocks.filter((product) => {
-  //     const productName = product.name.toLowerCase();
-  //     const updatedDate = moment(product.updatedAt).format("DD/MM/YYYY HH:mm");
-
-  //     return (
-  //       productName.includes(search.toLowerCase()) ||
-  //       updatedDate.includes(search.toLowerCase())
-  //     );
-  //   });
-
-  //   setFilter(result);
-  // }, [search, stocks]);
-
-  // useEffect(() => {
-  //   const result = stocks.filter((product) => {
-  //     const type = product.type.toLowerCase();
-
-  //     return type.includes(typeSearch.toLowerCase());
-  //   });
-  //   setDateSearch("");
-  //   setSearch("");
-  //   setFilter(result);
-  // }, [typeSearch, stocks]);
-
-  // useEffect(() => {
-  //   const result = stocks.filter((product) => {
-  //     const createdDate = moment(product.createdAt).format("YYYY-MM-DD HH:mm");
-  //     return createdDate.includes(dateSearch);
-  //   });
-
-  //   setFilter(result);
-  // }, [dateSearch, stocks]);
+  
+  useEffect(() => {
+    const result = stocks.filter((stock) => {
+      const productName = stock.productInfo.name.toLowerCase();
+      const productType = stock.productInfo.type.toLowerCase();
+      const updatedDate = moment(stock.updatedAt).format("DD/MM/YYYY HH:mm");
+  
+      return (
+        productName.includes(search.toLowerCase()) ||
+        productType.includes(search.toLowerCase()) ||
+        updatedDate.includes(search.toLowerCase())
+      );
+    });
+  
+    setFilterStock(result);
+  }, [search, stocks]);
+  
+  useEffect(() => {
+    const result = stocks.filter((stock) => {
+      const type = stock.productInfo.type.toLowerCase();
+  
+      return type.includes(typeSearch.toLowerCase());
+    });
+  
+    setSearch("");
+    setFilterStock(result);
+  }, [typeSearch, stocks]);
+  
+  useEffect(() => {
+    const result = stocks.filter((stock) => {
+      const createdDate = moment(stock.createdAt).format("YYYY-MM-DD HH:mm"); // Convert updated date to a localized string
+      return createdDate.includes(dateSearch);
+    });
+    setSearch("");
+    setTypeSearch("")
+    setFilterStock(result);
+  }, [dateSearch, stocks]);
+  
 
   const getUserData = async () => {
     const getUser = await AuthService.getUserData();
@@ -98,22 +102,23 @@ const StockProduct = () => {
     setLoading(true);
     try {
       const res = await ProductService.getUserProducts();
-      const products = res.userProducts;
-      setProducts(products);
-      setFilter(products);
+      const resProducts = res.userProducts;
+      setProducts(resProducts);
+      setFilter(resProducts);
       setLoading(false);
     } catch (error) {
       console.error("Error fetching products:", error);
       setLoading(false);
     }
   };
+
   const fetchDataStock = async () => {
     setLoading(true);
     try {
       const res = await StockProductService.getUserProductStock();
-      const stocks = res.userStock;
-      setStocks(stocks);
-      setFilterStock(stocks);
+      const resStocks = res.userStock;
+      setStocks(resStocks);
+      setFilterStock(resStocks);
       setSelectedRows([]);
       setToggleCleared(false);
       setExpandedRows({});
@@ -126,27 +131,26 @@ const StockProduct = () => {
       setLoading(false);
     }
   };
+
   const addProductStock = async (e) => {
     setLoading(true);
     e.preventDefault();
     try {
-      // วนลูปผ่าน inputStocks เพื่อส่งข้อมูลทีละแถว
+      // Loop through inputStocks to send data row by row
       for (const stock of inputStocks) {
-        // เรียกใช้งาน API โดยส่งข้อมูลในแถวนั้นๆ
+        // Call the API with the data in the current row
         await StockProductService.AddProductStock(stock);
       }
 
-      setInputStocks([
-        { productId: "", price: 0, quantity: 0, countingUnit: "" },
-      ]);
+      setInputStocks([{ productId: "", quantity: 0 }]);
 
-      // เรียกใช้ fetchDataStock เพื่อโหลดข้อมูลสินค้าใหม่
+      // Call fetchDataStock to load the new product data
       await fetchDataStock();
 
-      // หยุดการโหลด
+      // Stop loading
       setLoading(false);
 
-      // แสดงข้อความแจ้งเตือนเมื่อสำเร็จ
+      // Show success message
       Swal.fire({
         title: "Stock Inserted Successfully!",
         icon: "success",
@@ -154,7 +158,7 @@ const StockProduct = () => {
         showConfirmButton: false,
       });
     } catch (error) {
-      // แสดงข้อความแจ้งเตือนเมื่อเกิดข้อผิดพลาด
+      // Show error message
       console.error("Error adding product stock:", error);
       setLoading(false);
     }
@@ -168,7 +172,7 @@ const StockProduct = () => {
   };
 
   const addInputStock = () => {
-    setInputStocks([...inputStocks, { productId: "", price: 0, quantity: 0 }]);
+    setInputStocks([...inputStocks, { productId: "", quantity: 0 }]);
   };
 
   const removeInputStock = (index) => {
@@ -192,10 +196,9 @@ const StockProduct = () => {
           setSelectedRows([]);
           setToggleCleared(true);
           setExpandedRows({});
-          await fetchData();
-
+          // เรียก fetchDataStock เพื่ออัปเดตข้อมูลหลังจากลบ
           await fetchDataStock();
-
+          await fetchData(); // เพิ่มการเรียก fetchData เพื่ออัปเดตรายการสินค้าทั้งหมด
           Swal.fire("Deleted Success!", "", "success");
         }
       });
@@ -203,20 +206,19 @@ const StockProduct = () => {
       console.error("Error deleting product:", error);
     }
   };
-
+  
   const handleDeleteRow = async (rowId) => {
     try {
       await SwalDelete().then(async (result) => {
         if (result.isConfirmed) {
-
           await StockProductService.DeleteProductStock(rowId);
-
+  
           setSelectedRows([]);
           setToggleCleared(true);
           setExpandedRows({});
-          await fetchData();
+          // เรียก fetchDataStock เพื่ออัปเดตข้อมูลหลังจากลบ
           await fetchDataStock();
-
+          await fetchData(); // เพิ่มการเรียก fetchData เพื่ออัปเดตรายการสินค้าทั้งหมด
           Swal.fire("Deleted Success!", "", "success");
         }
       });
@@ -224,6 +226,7 @@ const StockProduct = () => {
       console.error("Error deleting product:", error);
     }
   };
+  
 
   const handleRowSelected = (state) => {
     setSelectedRows(state.selectedRows);
@@ -238,23 +241,21 @@ const StockProduct = () => {
   const sortedData = filterStock.slice().sort((a, b) => {
     return new Date(b.updatedAt) - new Date(a.updatedAt);
   });
-
-  const uniqueType = [...new Set(products.map((tProduct) => tProduct.type))];
-
+  const uniqueType = [...new Set(products.filter(product => product && product.type).map((tProduct) => tProduct.type))];
 
   const formatCurrency = (amount) => {
     // Check if amount is valid and numeric
     if (!amount || isNaN(amount)) {
       return ""; // Return empty string if amount is invalid
     }
-  
+
     // Use Intl.NumberFormat to format amount as currency
     const formatter = new Intl.NumberFormat("en-TH", {
       style: "currency",
       currency: "THB", // Change currency code as needed
       minimumFractionDigits: 2, // Minimum number of fractional digits
     });
-  
+
     return formatter.format(amount); // Format amount as currency string
   };
 
@@ -385,9 +386,9 @@ const StockProduct = () => {
                     >
                       <option value={""}>Search for type product</option>
                       {uniqueType.map((type, idx) => {
-                        // const typeProduct = products.find(
-                        //   (product) => product.type === type
-                        // );
+                        const typeProduct = stocks.find(
+                          (stock) => stock.productInfo.type === type
+                        );
                         return (
                           <option key={idx} value={type}>
                             {type}
@@ -396,7 +397,7 @@ const StockProduct = () => {
                       })}
                     </select>
                   </div>
-                  <div className="col-md m-2">
+                  {/* <div className="col-md m-2">
                     <input
                       style={{ cursor: "pointer" }}
                       className="form-control"
@@ -404,7 +405,7 @@ const StockProduct = () => {
                       value={dateSearch}
                       onChange={(e) => setDateSearch(e.target.value)}
                     />
-                  </div>
+                  </div> */}
                 </div>
               </div>
             </div>
@@ -417,11 +418,11 @@ const StockProduct = () => {
             data={
               sortedData
                 ? sortedData.map((product) => ({
-                    Type: product.productInfo.type,
-                    Name: product.productInfo.name,
-                    Price: formatCurrency(parseFloat(product.productInfo.price.$numberDecimal)),
+                    Type: product.productInfo?.type || "",
+                    Name: product.productInfo?.name || "",
+                    Price: formatCurrency(parseFloat(product.productInfo?.price?.$numberDecimal)),
                     Quantity: product.quantity,
-                    CountingUnit: product.productInfo.countingUnit,
+                    CountingUnit: product.productInfo?.countingUnit || "",
                     CreateAt: product.createdAt,
                     UpdatedAt: product.updatedAt,
                   }))

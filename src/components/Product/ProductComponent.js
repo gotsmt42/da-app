@@ -24,7 +24,6 @@ import ExpandedProduct from "./ExpandedProduct";
 import moment from "moment"; // Import moment library for date formatting
 import { ThreeDots } from "react-loader-spinner";
 import { FaFileExcel } from "react-icons/fa";
-import { Description } from "@mui/icons-material";
 
 const ProductComponent = () => {
   const [user, setUser] = useState([]);

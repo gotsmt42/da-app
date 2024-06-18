@@ -78,7 +78,6 @@ const InsertProductModal = ({
             <select
               name="type"
               className="form-select mt-1 mb-2"
-              // defaultValue={form}
               onChange={handleTypeChange}
             >
               <option selected disabled>
@@ -127,6 +126,7 @@ const InsertProductModal = ({
             <select
               className="form-select"
               name="countingUnit"
+              
               onChange={handleInputChange}
               required
             >

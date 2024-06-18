@@ -23,8 +23,6 @@ const EditProductModal = ({
   setEditedData,
   setModalOpenEdit,
 }) => {
-
-
   return (
     <>
       <MDBModal
@@ -45,35 +43,33 @@ const EditProductModal = ({
               ></MDBBtn>
             </MDBModalHeader>
             <MDBModalBody>
-            <label>Type : </label>
-            <select
-              name="type"
-              className="form-select mt-1 mb-2"
-              // defaultValue={form.type}
-              value={editedData.type}
-
-              onChange={(e) =>
-                setEditedData({ ...editedData, type: e.target.value })
-              }            >
-              <option selected disabled>
-                Select type product
-              </option>
-              <option selected disabled>
-              {editedData.type}
-              </option>
-              <option value="Smoke ADD">Smoke ADD</option>
-              <option value="Smoke Conven">Smoke Conven</option>
-              <option value="Heat ADD">Heat ADD</option>
-              <option value="Heat Conven">Heat Conven</option>
-              <option value="Base">Base</option>
-              <option value="Sounder Base">Sounder Base</option>
-              <option value="Module">Module</option>
-              <option value="Manual Station">Manual Station</option>
-              <option value="Speaker & Strobe">Speaker & Strobe</option>
-              <option value="Horn & Strobe">Horn & Strobe</option>
-     \
-              <option value="Other">Other</option>
-            </select>
+              <label>Type : </label>
+              <select
+                name="type"
+                className="form-select mt-1 mb-2"
+                value={editedData.type}
+                onChange={(e) =>
+                  setEditedData({ ...editedData, type: e.target.value })
+                }
+              >
+                <option selected disabled>
+                  Select type product
+                </option>
+                <option selected disabled>
+                  {editedData.type}
+                </option>
+                <option value="Smoke ADD">Smoke ADD</option>
+                <option value="Smoke Conven">Smoke Conven</option>
+                <option value="Heat ADD">Heat ADD</option>
+                <option value="Heat Conven">Heat Conven</option>
+                <option value="Base">Base</option>
+                <option value="Sounder Base">Sounder Base</option>
+                <option value="Module">Module</option>
+                <option value="Manual Station">Manual Station</option>
+                <option value="Speaker & Strobe">Speaker & Strobe</option>
+                <option value="Horn & Strobe">Horn & Strobe</option>\
+                <option value="Other">Other</option>
+              </select>
               <label>Name:</label>
               <input
                 type="text"
@@ -83,7 +79,35 @@ const EditProductModal = ({
                   setEditedData({ ...editedData, name: e.target.value })
                 }
               />
-             
+              <label>Price:</label>
+              <input
+                type="number"
+                value={editedData.price ? editedData.price.toString() : ''}
+                className="form-control mt-1 mb-2"
+                onChange={(e) =>
+                  setEditedData({
+                    ...editedData,
+                    price: e.target.value ? parseFloat(e.target.value) : null,
+                  })
+                }
+              />
+              <label>เลือกหน่วยนับสินค้า:</label>
+              <select
+                className="form-select"
+                value={editedData.countingUnit}
+                onChange={(e) =>
+                  setEditedData({ ...editedData, countingUnit: e.target.value })
+                }
+                required
+              >
+                <option selected disabled>
+                  Select Counting unit
+                </option>
+                <option value="EA">EA</option>
+                <option value="Lot">Lot</option>
+                <option value="Other">Other</option>
+              </select>
+
               <label>Description:</label>
               <textarea
                 type="text"
