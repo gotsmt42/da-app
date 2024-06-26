@@ -308,7 +308,20 @@ const ProductComponent = () => {
   return (
     <>
     
+    <Link
+            to={'/product/stock'}
+            key="insert-product"
+            aria-label="Insert stock products"
+            data-toggle="tooltip"
+            data-placement="top"
+            title="เพิ่มสต๊อกสินค้า"
+            className="btn btn-warning w-100 mb-4"
+          >
+            <Add />
+            เพิ่มสต๊อกสินค้า
+          </Link>
       <DataTableComponent
+
         title={`${user.username} - Product`}
         columns={DataTableColumns({
           setSelectedRow,
@@ -403,18 +416,7 @@ const ProductComponent = () => {
             </button>
           </CSVLink>,
           
-          <Link
-            to={'/product/stock'}
-            key="insert-product"
-            aria-label="Insert stock products"
-            data-toggle="tooltip"
-            data-placement="top"
-            title="เพิ่มสต๊อกสินค้า"
-            className="btn btn-warning"
-          >
-            <Add />
-            เพิ่มสต๊อกสินค้า
-          </Link>,
+
           <button
             key="insert-product"
             onClick={() => {

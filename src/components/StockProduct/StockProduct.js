@@ -274,11 +274,11 @@ const StockProduct = () => {
             data-toggle="tooltip"
             data-placement="top"
             title="ดูข้อมูลสินค้า"
-            className="btn btn-primary"
+            className="btn btn-primary mb-4"
           >
             <Search />
             ดูข้อมูลสินค้าทั้งหมด
-          </Link>,
+          </Link>
           <div className="col-md-12">
             <form onSubmit={addProductStock}>
               {inputStocks.map((inputStock, index) => (

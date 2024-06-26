@@ -175,14 +175,7 @@ const Dashboard = () => {
       iconColor: "#e74c3c", // สีไอคอน
       iconBgColor: "#fde3e3",
     },
-    {
-      icon: FaBoxes,
-      title: "เพิ่มสต๊อกสินค้า",
-      // subtitle: "....",
-      link: "/product/stock",
-      iconColor: "#f39c12", // สีไอคอน
-      iconBgColor: "#fef5e7",
-    },
+ 
     {
       icon: FaBoxOpen,
       title: "เพิ่มสินค้า",
@@ -190,6 +183,14 @@ const Dashboard = () => {
       link: "/product",
       iconColor: "#2ecc71",
       iconBgColor: "rgba(22, 160, 133, 0.1)",
+    },
+    {
+      icon: FaBoxes,
+      title: "เพิ่มสต๊อกสินค้า",
+      // subtitle: "....",
+      link: "/product/stock",
+      iconColor: "#f39c12", // สีไอคอน
+      iconBgColor: "#fef5e7",
     },
     
   ];
