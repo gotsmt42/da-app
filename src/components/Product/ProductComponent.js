@@ -24,6 +24,7 @@ import ExpandedProduct from "./ExpandedProduct";
 import moment from "moment"; // Import moment library for date formatting
 import { ThreeDots } from "react-loader-spinner";
 import { FaFileExcel } from "react-icons/fa";
+import { Link } from "react-router-dom";
 
 const ProductComponent = () => {
   const [user, setUser] = useState([]);
@@ -401,7 +402,19 @@ const ProductComponent = () => {
               สร้าง Excel
             </button>
           </CSVLink>,
-
+          
+          <Link
+            to={'/product/stock'}
+            key="insert-product"
+            aria-label="Insert stock products"
+            data-toggle="tooltip"
+            data-placement="top"
+            title="เพิ่มสต๊อกสินค้า"
+            className="btn btn-warning"
+          >
+            <Add />
+            เพิ่มสต๊อกสินค้า
+          </Link>,
           <button
             key="insert-product"
             onClick={() => {

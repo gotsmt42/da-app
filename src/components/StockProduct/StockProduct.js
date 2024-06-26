@@ -16,6 +16,8 @@ import ExpandedStockProduct from "./ExpandedStockProduct";
 import moment from "moment"; // Import moment library for date formatting
 import { ThreeDots } from "react-loader-spinner";
 import { FaAd, FaFileExcel, FaMinus, FaPlus, FaSave } from "react-icons/fa";
+import { Link } from "react-router-dom";
+import { Add, Search } from "@mui/icons-material";
 
 const StockProduct = () => {
   const [user, setUser] = useState([]);
@@ -262,7 +264,21 @@ const StockProduct = () => {
   return (
     <>
       <div className="container mb-4">
+         
+     
         <div className="row">
+        <Link
+            to={'/product'}
+            key="product"
+            aria-label="products"
+            data-toggle="tooltip"
+            data-placement="top"
+            title="ดูข้อมูลสินค้า"
+            className="btn btn-primary"
+          >
+            <Search />
+            ดูข้อมูลสินค้าทั้งหมด
+          </Link>,
           <div className="col-md-12">
             <form onSubmit={addProductStock}>
               {inputStocks.map((inputStock, index) => (
@@ -336,7 +352,7 @@ const StockProduct = () => {
               </div>
               <div className="col-md-12 mt-3">
                 <div className="d-flex justify-content-start mb-3">
-                  <button type="submit" className="btn btn-primary w-100">
+                  <button type="submit" className="btn btn-success w-100">
                     <FaSave /> บันทึกสินค้าลงในสต๊อก
                   </button>
                 </div>
