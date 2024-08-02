@@ -59,8 +59,8 @@ const StockProduct = () => {
   
   useEffect(() => {
     const result = stocks.filter((stock) => {
-      const productName = stock.productInfo.name.toLowerCase();
-      const productType = stock.productInfo.type.toLowerCase();
+      const productName = stock.name.toLowerCase();
+      const productType = stock.type.toLowerCase();
       const updatedDate = moment(stock.updatedAt).format("DD/MM/YYYY HH:mm");
   
       return (
@@ -75,7 +75,7 @@ const StockProduct = () => {
   
   useEffect(() => {
     const result = stocks.filter((stock) => {
-      const type = stock.productInfo.type.toLowerCase();
+      const type = stock.type.toLowerCase();
   
       return type.includes(typeSearch.toLowerCase());
     });
@@ -243,7 +243,7 @@ const StockProduct = () => {
   const sortedData = filterStock.slice().sort((a, b) => {
     return new Date(b.updatedAt) - new Date(a.updatedAt);
   });
-  const uniqueType = [...new Set(products.filter(product => product && product.type).map((tProduct) => tProduct.type))];
+  const uniqueType = [...new Set(stocks.filter(stock => stock && stock.type).map((tProduct) => tProduct.type))];
 
   const formatCurrency = (amount) => {
     // Check if amount is valid and numeric
@@ -403,7 +403,7 @@ const StockProduct = () => {
                       <option value={""}>Search for type product</option>
                       {uniqueType.map((type, idx) => {
                         const typeProduct = stocks.find(
-                          (stock) => stock.productInfo.type === type
+                          (stock) => stock.type === type
                         );
                         return (
                           <option key={idx} value={type}>
