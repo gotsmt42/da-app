@@ -41,7 +41,7 @@ const ProductComponent = () => {
   const [form, setForm] = useState({
     description: "",
     type: "Type of product",
-    price: 0,
+    price: 0.00,
     countingUnit: "",
     image: null,
   });
@@ -205,6 +205,7 @@ const ProductComponent = () => {
     try {
       const productId = selectedRow._id;
       const formData = new FormData();
+      
       for (const [key, value] of Object.entries(editedData)) {
         formData.append(key, value);
       }

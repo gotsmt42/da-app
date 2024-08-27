@@ -24,6 +24,7 @@ const StockProduct = lazy(() => import("../views/ui/StockProduct"));
 const Files = lazy(() => import("../views/ui/Files"));
 const FileUpload = lazy(() => import("../views/ui/FileUpload"));
 const EventCalendar = lazy(() => import("../views/ui/EventCalendar.js"));
+const Comming = lazy(() => import("../views/ui/Comming.js"));
 const Login = lazy(() => import("../auth/Login.js"));
 const Register = lazy(() => import("../auth/Register.js"));
 
@@ -66,6 +67,7 @@ const ThemeRoutes = [
       { path: "/fileupload", element: <FileUpload />, title: "File Upload" },
       { path: "/files", element: <Files />, title: "Files" },
       { path: "/event", element: <EventCalendar />, title: "Event Calendar" },
+      { path: "/coming", element: <Comming />, title: "Comming Soon" },
     ],
   },
   { path: "/login", element: <Login />, title: "Login" },

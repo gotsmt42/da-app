@@ -37,6 +37,11 @@ const navigation = [
     href: "/event",
     icon: "bi-calendar-event",
   },
+  {
+    title: "การดำเนินงาน",
+    href: "/coming",
+    icon: "bi-clock",
+  },
 
   {
     title: "File",

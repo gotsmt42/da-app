@@ -82,13 +82,10 @@ const EditProductModal = ({
               <label>Price:</label>
               <input
                 type="number"
-                value={editedData.price ? editedData.price.toString() : ''}
+                value={editedData.price}
                 className="form-control mt-1 mb-2"
                 onChange={(e) =>
-                  setEditedData({
-                    ...editedData,
-                    price: e.target.value ? parseFloat(e.target.value) : null,
-                  })
+                  setEditedData({...editedData,price: e.target.value })
                 }
               />
               <label>เลือกหน่วยนับสินค้า:</label>
