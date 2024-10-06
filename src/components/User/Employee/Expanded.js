@@ -47,7 +47,7 @@ const Expanded = ({ data }) => (
               {moment().diff(moment(data.createdAt), "weeks") } สัปดาห์
           </p>
 
-          <span>เงินเดือน : {formatCurrency(parseFloat(data.salary.$numberDecimal))}</span>
+          {/* <span>เงินเดือน : {formatCurrency(parseFloat(data.salary.$numberDecimal))}</span> */}
           {/* <p className="card-text">
             <small className="text-body-secondary">
               แก้ไขล่าสุด
