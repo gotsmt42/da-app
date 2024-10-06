@@ -136,7 +136,7 @@ const DataTableColumns = ({
       name: "วันที่สิ้นสุด",
       sortable: true,
       selector: (row) => row.end,
-      cell: (row) => <span>{moment(row.end).format("DD/MM/YYYY")}</span>,
+      cell: (row) => <span>{moment(row.end).subtract(1, "days").format("DD/MM/YYYY")}</span>,
     },
     {
       name: "เอกสารที่เกี่ยวข้อง",

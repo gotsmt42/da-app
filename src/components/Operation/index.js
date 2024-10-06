@@ -81,7 +81,7 @@ const Operation = () => {
   //useEffect hook for date search
   useEffect(() => {
     const result = events.filter((event) => {
-      const createdDate = moment(event.createdAt).format("YYYY-MM-DD HH:mm"); // Convert updated date to a localized string
+      const createdDate = moment(event.start || event.end).format("YYYY-MM-DD HH:mm"); 
       return createdDate.includes(dateSearch);
     });
 
