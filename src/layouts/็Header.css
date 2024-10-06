@@ -1,0 +1,65 @@
+
+/* Header.css */
+
+
+.nav-link {
+  color: #fff;
+  font-weight: 600;
+}
+
+
+
+
+.fix-header {
+  height: auto; /* ให้ความสูงเป็นอัตโนมัติ */
+  padding: 10px; /* กำหนด padding เพื่อลดพื้นที่ */
+  
+}
+
+.gradiant-bg {
+  display: flex; /* ใช้ flexbox */
+  align-items: center; /* จัดแนวกลาง */
+}
+
+.logo {
+  height: 50px; /* ความสูงของโลโก้ */
+  width: auto; /* ทำให้ความกว้างปรับอัตโนมัติตามอัตราส่วน */
+}
+
+.navbar-nav {
+  justify-content: center; /* จัดกลางเมนู */
+  flex-grow: 1; /* ให้ Nav ใช้พื้นที่เต็มที่ */
+  width: 100%; /* กำหนดให้มีความกว้างเต็ม */
+}
+
+
+/* ปรับให้แสดงปุ่ม toggle ในมือถือ */
+.toggle-button {
+  display: block; /* แสดงปุ่ม toggle */
+  background-color: transparent; /* สีพื้นหลัง */
+  border: none; /* ไม่มีขอบ */
+}
+
+@media (max-width: 768px) {
+  .navbar-nav {
+    display: none; /* ซ่อนเมนู */
+  }
+  
+  .hstack {
+    justify-content: center; /* จัดปุ่มในมือถือให้ตรงกลาง */
+  }
+}
+
+/* ยังคงแสดงเมนูในหน้าจอที่ใหญ่กว่า 768px */
+@media (min-width: 768px) {
+  .navbar-nav {
+    flex-direction: row; /* แนวนอนในหน้าจอใหญ่ */
+  }
+  
+  .toggle-button {
+    display: none; /* ซ่อนปุ่ม toggle */
+  }
+}
+
+
+

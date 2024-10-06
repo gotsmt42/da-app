@@ -1,0 +1,46 @@
+.sidebar-container {
+    list-style: none; /* ลบจุดหน้าเมนู */
+
+    display: flex;
+    flex-direction: column;
+    height: 90vh; /* Sidebar เต็มความสูงของหน้าจอ */
+    position: relative;
+  }
+  
+  .sidebar-content {
+    flex: 1;
+    overflow-y: auto; /* ทำให้เนื้อหา Sidebar สามารถเลื่อนได้ */
+  }
+  
+  .sidebar-fixed-bottom {
+    padding: 20px;
+
+    flex-shrink: 0; /* ส่วน Footer ตรึงอยู่ด้านล่าง */
+    bottom: 0;
+    width: 100%;
+    z-index: 1; /* ป้องกันการล้นของเนื้อหา */
+
+  }
+
+  .sidenav-bg{
+    font-size: 14px;
+    font-weight: bold;
+
+  }
+  
+  .centered-button {
+    display: flex;
+    justify-content: center; /* จัดข้อความให้อยู่กึ่งกลางแนวนอน */
+
+  }
+  
+
+  /* กำหนดสีของข้อความทั้งหมดใน Sidebar */
+.sidebar-container .nav-link {
+    color: #333; /* สีข้อความใน Sidebar */
+  }
+  
+
+  
+
+  

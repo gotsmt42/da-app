@@ -1,0 +1,77 @@
+@media only screen and (max-width: 600px) {
+    .text {
+      width: 21em;
+    }
+    .MuiIconButton-root {
+      padding: 8px;
+    }
+  
+    /* .dataTables_wrapper .rdt_TableCell{
+      font-size:12px;
+    } */
+  
+    /* .dataTables_wrapper .rdt_TableCell:nth-child(1) {
+      display: none !important;
+    }
+  
+    .dataTables_wrapper .rdt_TableCol:nth-child(1) {
+      display: none !important;
+    } */
+  
+    .dataTables_wrapper .rdt_TableCol:nth-child(2) {
+      /*display: none !important;*/
+    }
+    
+    .dataTables_wrapper .rdt_TableCol:nth-child(3) {
+      display: none !important;
+    }
+    .dataTables_wrapper .rdt_TableCell:nth-child(3) {
+      display: none !important;
+    }
+  
+    .dataTables_wrapper .rdt_TableCol:nth-child(4) {
+      display: none !important;
+    }
+    .dataTables_wrapper .rdt_TableCell:nth-child(4) {
+      /*display: none !important;*/
+    }
+    .dataTables_wrapper .rdt_TableCol:nth-child(4) {
+      width: 2px;
+    }
+    .dataTables_wrapper .rdt_TableCell:nth-child(4) {
+      width: 2px;
+    }
+  }
+  
+  @media only screen and (max-width: 420px) {
+    .text {
+      width: 17.5em;
+    }
+  
+    .dataTables_wrapper .rdt_TableCol:nth-child(4) {
+      width: 2px;
+    }
+    .dataTables_wrapper .rdt_TableCell:nth-child(3) {
+      display: none;
+    }
+    /* .dataTables_wrapper .rdt_TableCol:nth-child(3) {
+      display: none;
+    } */
+  }
+  
+  @media only screen and (max-width: 320px) {
+    .text {
+      width: 19em;
+    }
+  
+    .dataTables_wrapper .rdt_TableCol:nth-child(4) {
+      width: 2px;
+    }
+    .dataTables_wrapper .rdt_TableCell:nth-child(3) {
+      display: none;
+    }
+    .dataTables_wrapper .rdt_TableCol:nth-child(3) {
+      display: none;
+    }
+  }
+  

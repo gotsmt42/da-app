@@ -1,11 +1,18 @@
-import UserTable from "../../components/User/UserTable";
+import EmployeeComponent from "../../components/User/Employee/";
+import CustomerComponent from "../../components/User/Customer/";
+
 import { Row, Col, Table, Card, CardTitle, CardBody } from "reactstrap";
 
-const Tables = () => {
+const Employee = () => {
   return (
     <Row>
       <Col lg="12">
-        <UserTable />
+        
+        <EmployeeComponent  />
+      </Col>
+
+      <Col lg="12">
+        <CustomerComponent />
       </Col>
       {/* <Col lg="12">
         <Card>
@@ -132,4 +139,4 @@ const Tables = () => {
   );
 };
 
-export default Tables;
+export default Employee;

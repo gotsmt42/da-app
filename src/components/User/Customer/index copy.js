@@ -1,23 +1,23 @@
 /* eslint-disable no-unused-vars */
 import React, { useEffect, useState, useRef } from "react";
-import AuthService from "../../services/authService";
-import Swal from "sweetalert2";
+import AuthService from "../../../services/authService";
+// import Swal from "sweetalert2";
 
-import IconButton from "@mui/material/IconButton";
+// import IconButton from "@mui/material/IconButton";
 
-import CloudDownloadIcon from "@mui/icons-material/CloudDownload";
-import Add from "@mui/icons-material/Add";
+// import CloudDownloadIcon from "@mui/icons-material/CloudDownload";
+// import Add from "@mui/icons-material/Add";
 
-import { CSVLink } from "react-csv";
+// import { CSVLink } from "react-csv";
 
-import { SwalDelete } from "../../functions/Swal";
+// import { SwalDelete } from "../../../functions/Swal";
 
-import DataTableComponent from "../DataTable/DataTableComponent";
-import DataTableColumns from "../DataTable/๊Users/DataTableColumns";
+import DataTableComponent from "../../DataTable/Main/DataTableComponent";
+import DataTableColumns from "../../DataTable/๊Users/DataTableColumns";
 
-import ExpandedUser from "./ExpandedUser";
+import Expanded from "./Expanded";
 
-const UserTable = () => {
+const Employee = () => {
   const [users, setUsers] = useState([]);
 
   const [rows, setRows] = useState([]);
@@ -70,7 +70,7 @@ const UserTable = () => {
       data={users}
       paginationPerPage={5}
 
-      expandableRowsComponent={ExpandedUser} // เปิดใช้งาน Expandle
+      expandableRowsComponent={Expanded} // เปิดใช้งาน Expandle
       expandableRowExpanded={(row) => expandedRows[row._id]}
 
       // subHeaderComponent={
@@ -131,4 +131,4 @@ const UserTable = () => {
   );
 };
 
-export default UserTable;
+export default Employee;

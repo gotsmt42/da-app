@@ -9,8 +9,8 @@ import Add from "@mui/icons-material/Add";
 
 import { SwalDelete } from "../../functions/Swal";
 
-import DataTableComponent from "../DataTable/DataTableComponent";
-import DataTableContextActions from "../DataTable/DataTableContextActions";
+import DataTableComponent from "../DataTable/Main/DataTableComponent";
+import DataTableContextActions from "../DataTable/Main/DataTableContextActions";
 import DataTableColumns from "../DataTable/Files/DataTableColumns";
 
 import moment from "moment"; // Import moment library for date formatting

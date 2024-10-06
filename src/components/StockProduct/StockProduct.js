@@ -8,8 +8,8 @@ import { CSVLink } from "react-csv";
 
 import { SwalDelete } from "../../functions/Swal";
 
-import DataTableComponent from "../DataTable/DataTableComponent";
-import DataTableContextActions from "../DataTable/DataTableContextActions";
+import DataTableComponent from "../DataTable/Main/DataTableComponent";
+import DataTableContextActions from "../DataTable/Main/DataTableContextActions";
 import DataTableColumns from "../DataTable/StockProduct/DataTableColumns";
 import ExpandedStockProduct from "./ExpandedStockProduct";
 

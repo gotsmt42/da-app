@@ -4,6 +4,8 @@ import { defaultThemes } from "react-data-table-component";
 import ArrowDownward from "@mui/icons-material/ArrowDownward";
 import Checkbox from "@mui/material/Checkbox";
 
+import './DataTable.css'
+
 const selectProps = { indeterminate: (isIndeterminate) => isIndeterminate };
 const ArrowDownIcon = <ArrowDownward />;
 
@@ -81,6 +83,7 @@ const DataTableComponent = ({
 
   return (
     <DataTable
+      className="dataTables_wrapper"
       title={title}
       columns={columns}
       data={data}

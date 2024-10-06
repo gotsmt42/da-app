@@ -13,8 +13,8 @@ import { CSVLink } from "react-csv";
 
 import { SwalDelete } from "../../functions/Swal";
 
-import DataTableComponent from "../DataTable/DataTableComponent";
-import DataTableContextActions from "../DataTable/DataTableContextActions";
+import DataTableComponent from "../DataTable/Main/DataTableComponent";
+import DataTableContextActions from "../DataTable/Main/DataTableContextActions";
 import DataTableColumns from "../DataTable/Product/DataTableColumns";
 import InsertModal from "../Modal/products/InsertModal";
 import EditModal from "../Modal/products/EditModal";

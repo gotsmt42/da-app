@@ -26,65 +26,61 @@ import probg from "../assets/images/bg/download.jpg";
 import AuthService from "../services/authService";
 import API from "../API/axiosInstance";
 
+import './Sidebar.css'
 const navigation = [
   {
-    title: "Dashboard",
+    title: "DASHBOARD",
     href: "/dashboard",
     icon: "bi-speedometer2",
   },
   {
-    title: "Action Plan",
+    title: "ACTION PLAN",
     href: "/event",
-    icon: "bi-calendar-event",
+    icon: "bi-calendar-event-fill",
   },
   {
     title: "การดำเนินงาน",
-    href: "/coming",
-    icon: "bi-clock",
+    href: "/operation",
+    icon: "bi-clock-fill",
   },
 
-  {
-    title: "File",
-    icon: <IoFileTrayFullOutline />,
-    items: [
-      {
-        title: "File Upload",
-        href: "/fileupload",
-        icon: BiUpload,
-      },
-      {
-        title: "All Files",
-        href: "/files",
-        icon: LuFileStack,
-      },
-    ],
-  },
-  {
-    title: "Product",
-    icon: <FaProductHunt />,
-    items: [
-      {
-        title: "List Product",
-        href: "/product",
-        icon: CiBoxList,
-      },
-      {
-        title: "Stock Product",
-        href: "/product/stock",
-        icon: BiOutline,
-      },
-    ],
-  },
+  // {
+  //   title: "File",
+  //   icon: <IoFileTrayFullOutline />,
+  //   items: [
+  //     {
+  //       title: "File Upload",
+  //       href: "/fileupload",
+  //       icon: BiUpload,
+  //     },
+  //     {
+  //       title: "All Files",
+  //       href: "/files",
+  //       icon: LuFileStack,
+  //     },
+  //   ],
+  // },
+  // {
+  //   title: "Product",
+  //   icon: <FaProductHunt />,
+  //   items: [
+  //     {
+  //       title: "List Product",
+  //       href: "/product",
+  //       icon: CiBoxList,
+  //     },
+  //     {
+  //       title: "Stock Product",
+  //       href: "/product/stock",
+  //       icon: BiOutline,
+  //     },
+  //   ],
+  // },
 
-  {
-    title: "About",
-    href: "/about",
-    icon: "bi-people",
-  },
+  
 ];
 
-const Sidebar = ({handleMenuClick}) => {
-  
+const Sidebar = ({ handleMenuClick }) => {
   const [collapsedMenu, setCollapsedMenu] = useState({});
   const location = useLocation();
 
@@ -100,15 +96,7 @@ const Sidebar = ({handleMenuClick}) => {
     };
 
     getUserData();
-  
-
-
-  }, []); // เมื่อ user เปลี่ยนแปลงให้เรียกใช้ useEffect ใหม่
-
-  // const getUserData = async () => {
-  //   const getUser = await AuthService.getUserData();
-  //   setUser(getUser.user);
-  // };
+  }, []);
 
   const toggleNavbar = (index) => {
     setCollapsedMenu({
@@ -118,7 +106,7 @@ const Sidebar = ({handleMenuClick}) => {
   };
 
   return (
-    <div>
+    <div className="sidebar-container">
       <div
         className="profilebg"
         style={{ background: `url(${probg}) no-repeat` }}
@@ -138,65 +126,86 @@ const Sidebar = ({handleMenuClick}) => {
           {user.fname} {user.lname} ({user.role})
         </div>
       </div>
-      <div className="p-3 mt-2 ">
-        <Nav vertical className="sidebarNav">
-          {navigation.map((navi, index) => (
-            <NavItem key={index} className="sidenav-bg ">
-              {navi.items ? (
-                <>
-                  <button
-                    color="link"
-                    className="nav-link py-3 "
-                    onClick={() => toggleNavbar(index)} // นี่คือส่วนที่เรียกใช้ toggleNavbar
-                    style={{ width: "100%", textAlign: "left" }}
+
+      {/* เนื้อหา Sidebar */}
+      <div className="p-3 mt-2 sidebar-content">
+    <Nav vertical className="sidebarNav">
+      {navigation.map((navi, index) => (
+        <NavItem key={index} className="sidenav-bg ">
+          {navi.items ? (
+            <>
+              <button
+                color="link"
+                className="nav-link py-3"
+                onClick={() => toggleNavbar(index)}
+                style={{ width: "100%", textAlign: "left" }}
+              >
+                <i className={`bi ${navi.icon}`}></i>
+                <span className="ms-2 me-1">{navi.title}</span>
+                {collapsedMenu[index] ? <BiChevronDown /> : <BiChevronRight />}
+              </button>
+              <Collapse isOpen={collapsedMenu[index]} style={{ paddingLeft: "21px" }}>
+                {navi.items.map((item, idx) => (
+                  <Link
+                    key={idx}
+                    className={`mt-0 my-1 nav-link ${
+                      location.pathname === item.href ? "active" : ""
+                    }`}
+                    to={item.href}
+                    style={{ textDecoration: "none" }}
+                    onClick={handleMenuClick}
                   >
-                    {navi.icon}
-                    <span className="ms-2 me-1">{navi.title}</span>
-                    {collapsedMenu[index] ? (
-                      <BiChevronDown />
-                    ) : (
-                      <BiChevronRight />
-                    )}
-                  </button>
-                  <Collapse
-                    isOpen={collapsedMenu[index]}
-                    style={{ paddingLeft: "21px" }}
-                  >
-                    {navi.items.map((item, idx) => (
-                      <Link
-                        key={idx}
-                        className={`mt-0 my-1 nav-link ${
-                          location.pathname === item.href ? "active" : ""
-                        }`}
-                        to={item.href} // นี่คือส่วนที่ให้ลิงก์ไปยังหน้าต่าง ๆ
-                        style={{ textDecoration: "none" }}
-                        onClick={handleMenuClick} // เรียกใช้ handleMenuClick เมื่อคลิกที่ลิงก์
+                    {item.icon && <item.icon />} {item.title}
+                  </Link>
+                ))}
+              </Collapse>
+            </>
+          ) : (
+            <Link
+              to={navi.href}
+              className={`nav-link py-3 ${
+                location.pathname === navi.href ? "active" : ""
+              }`}
+              onClick={handleMenuClick}
+            >
+              <i className={`bi ${navi.icon}`}></i>
+              <span className="ms-2">{navi.title}</span>
+            </Link>
+          )}
+        </NavItem>
+      ))}
+    </Nav>
+  </div>
 
-                      >
-                        {item.icon && <item.icon />}{" "}
-                        {/* Render icon component */}
-                        {item.title}
-                      </Link>
-                    ))}
-                  </Collapse>
-                </>
-              ) : (
-                <Link
-                  to={navi.href} // นี่คือส่วนที่ให้ลิงก์ไปยังหน้าต่าง ๆ
-                  className={`nav-link py-3 ${
-                    location.pathname === navi.href ? "active" : ""
-                  }`}
+      {/* ส่วนที่ fixed ด้านล่าง */}
+      <div className="sidebar-fixed-bottom p-3 mt-2">
 
-                  onClick={handleMenuClick} // เรียกใช้ handleMenuClick เมื่อคลิกที่ลิงก์
+        <NavItem className="sidenav-bg ">
+          <Link
+            to="/customer-employee"
+            className={`centered-button nav-link py-3 ${
+              location.pathname === "/customer-employee" ? "active" : ""
+            }`}
+            onClick={handleMenuClick}
+          >
+            <i className="bi bi-people-fill ms-3" ></i>
+            <span className="ms-2">CUSTOMER & EMPLOYEE MANAGEMENT</span>
+          </Link>
+        </NavItem>
 
-                >
-                  <i className={`bi ${navi.icon}`}></i>
-                  <span className="ms-2">{navi.title}</span>
-                </Link>
-              )}
-            </NavItem>
-          ))}
-        </Nav>
+        <NavItem className="sidenav-bg">
+          <Link
+            to="/about"
+            className={`nav-link py-3 ${
+              location.pathname === "/about" ? "active" : ""
+            }`}
+            onClick={handleMenuClick}
+          >
+            <i className="bi bi-gear-fill ms-3"></i>
+            <span className="ms-2">SETTINGS</span>
+          </Link>
+          </NavItem>
+   
       </div>
     </div>
   );

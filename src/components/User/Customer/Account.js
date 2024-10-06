@@ -8,10 +8,10 @@ import { Instagram, Twitter } from "@mui/icons-material";
 
 import ManageAccountsRoundedIcon from "@mui/icons-material/ManageAccountsRounded";
 
-import EditModal from "../Modal/users/EditModal";
+import EditModal from "../../Modal/users/EditModal";
 
-import AuthService from "../../services/authService";
-import API from "../../API/axiosInstance";
+import AuthService from "../../../services/authService";
+import API from "../../../API/axiosInstance";
 
 const Account = () => {
   const [modalOpenEdit, setModalOpenEdit] = useState(false);

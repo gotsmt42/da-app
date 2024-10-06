@@ -14,6 +14,7 @@ import {
   FaFileImport,
   FaBoxOpen,
   FaBoxes,
+  FaUsers,
 } from "react-icons/fa"; // นำเข้าไอคอนต่างๆ จาก react-icons
 import { useEffect, useState } from "react";
 import FileService from "../services/FileService";
@@ -124,74 +125,67 @@ const Dashboard = () => {
     //   link: "/event",
     // },
 
-    {
-      icon: FaFileAlt,
-      title: "รวมไฟล์",
-      subtitle: loading ? "กำลังโหลด..." : Object.keys(files).length + " files",
-      link: "/files",
-      iconColor: "#e74c3c",
-      iconBgColor: "#fde3e3",
-    },
-    {
-      icon: FaCube,
-      title: "สินค้า",
-      subtitle: loading ? "กำลังโหลด..." : Object.keys(products).length + " Row",
-      link: "/product",
-      iconColor: "#2ecc71",
-      iconBgColor: "rgba(22, 160, 133, 0.1)",
-    },
-    {
-      icon: FaCubes,
-      title: "สต๊อกสินค้า",
-      subtitle: loading ? "กำลังโหลด..." : Object.keys(stocks).length + " Row",
-      link: "/product/stock",
-      iconColor: "#f39c12",
-      iconBgColor: "#fef5e7",
-    },
+    // {
+    //   icon: FaFileAlt,
+    //   title: "รวมไฟล์",
+    //   subtitle: loading ? "กำลังโหลด..." : Object.keys(files).length + " files",
+    //   link: "/files",
+    //   iconColor: "#e74c3c",
+    //   iconBgColor: "#fde3e3",
+    // },
+    // {
+    //   icon: FaCube,
+    //   title: "สินค้า",
+    //   subtitle: loading ? "กำลังโหลด..." : Object.keys(products).length + " Row",
+    //   link: "/product",
+    //   iconColor: "#2ecc71",
+    //   iconBgColor: "rgba(22, 160, 133, 0.1)",
+    // },
+    // {
+    //   icon: FaCubes,
+    //   title: "สต๊อกสินค้า",
+    //   subtitle: loading ? "กำลังโหลด..." : Object.keys(stocks).length + " Row",
+    //   link: "/product/stock",
+    //   iconColor: "#f39c12",
+    //   iconBgColor: "#fef5e7",
+    // },
 
     {
-      icon: FaUserAlt,
-      title: "ผู้ใช้งาน",
-      subtitle: loading ? "กำลังโหลด..." : Object.keys(users).length + " User",
-      link: "/usertable",
+      icon: FaUsers,
+      title: "Customer & Employee",
+      subtitle: loading ? "กำลังโหลด..." : Object.keys(users).length + " More",
+      link: "/customer-employee",
       iconColor: "#795A47", // สีไอคอน
       iconBgColor: "rgba(121, 90, 71, 0.1)", // สีพื้นหลังไอคอน
     },
   ];
   const BlogData2 = [
+
     // {
     //   icon: FaFileImport,
     //   title: "จัดเก็บไฟล์",
     //   // subtitle: "....",
     //   link: "/fileupload",
-    //   iconColor: "#f056a1", // สีไอคอน
-    //   iconBgColor: "rgba(248, 114, 179, 0.1)", // สีพื้นหลังไอคอน
+    //   iconColor: "#e74c3c", // สีไอคอน
+    //   iconBgColor: "#fde3e3",
     // },
-    {
-      icon: FaFileImport,
-      title: "จัดเก็บไฟล์",
-      // subtitle: "....",
-      link: "/fileupload",
-      iconColor: "#e74c3c", // สีไอคอน
-      iconBgColor: "#fde3e3",
-    },
  
-    {
-      icon: FaBoxOpen,
-      title: "เพิ่มสินค้า",
-      // subtitle: "....",
-      link: "/product",
-      iconColor: "#2ecc71",
-      iconBgColor: "rgba(22, 160, 133, 0.1)",
-    },
-    {
-      icon: FaBoxes,
-      title: "เพิ่มสต๊อกสินค้า",
-      // subtitle: "....",
-      link: "/product/stock",
-      iconColor: "#f39c12", // สีไอคอน
-      iconBgColor: "#fef5e7",
-    },
+    // {
+    //   icon: FaBoxOpen,
+    //   title: "เพิ่มสินค้า",
+    //   // subtitle: "....",
+    //   link: "/product",
+    //   iconColor: "#2ecc71",
+    //   iconBgColor: "rgba(22, 160, 133, 0.1)",
+    // },
+    // {
+    //   icon: FaBoxes,
+    //   title: "เพิ่มสต๊อกสินค้า",
+    //   // subtitle: "....",
+    //   link: "/product/stock",
+    //   iconColor: "#f39c12", // สีไอคอน
+    //   iconBgColor: "#fef5e7",
+    // },
     
   ];
   const BlogData3 = [

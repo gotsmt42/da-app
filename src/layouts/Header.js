@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import AuthService from "../services/authService";
 import { useAuth } from "../auth/AuthContext";
 
+import './็Header.css'
 import {
   Navbar,
   Collapse,
@@ -24,7 +25,6 @@ import Swal from "sweetalert2";
 import API from "../API/axiosInstance";
 
 const Header = () => {
-
   const navigate = useNavigate();
 
   const { logout } = useAuth();
@@ -74,48 +74,21 @@ const Header = () => {
 
   return (
     <Navbar dark expand="md" className="fix-header">
-      <div className="d-flex align-items-center">
-        <div className="d-lg-block d-none me-5 pe-3">{/* <Logo /> */}</div>
+  <div className="d-flex align-items-center justify-content-between w-100">
+    <div className="d-lg-block d-none me-2 pe-3">{/* <Logo /> */}</div>
 
-        <NavbarBrand tag={Link} to="/dashboard">
-          <div className="gradiant-bg">
-            <h2>Logo App</h2>
-          </div>
-        </NavbarBrand>
-
-        <Button
-          style={{
-            backgroundColor: "transparent", // กำหนดให้พื้นหลังเป็นโปร่งใส
-
-            border: "none",
-          }}
-          className="d-lg-none"
-          onClick={() => showMobilemenu()}
-        >
-          <i className="bi bi-list"></i>
-        </Button>
+    <NavbarBrand tag={Link} to="/dashboard" className="m-0">
+      <div className="d-flex align-items-center gradiant-bg">
+        <img 
+          src="logo512.png" 
+          alt="Logo" 
+          className="logo"
+        />
+        <h2 className="ms-2">System Service </h2> {/* เพิ่มข้อความถัดจากโลโก้ */}
       </div>
-      <div className="hstack gap-2">
-        <Button
-          style={{
-            backgroundColor: "transparent", // กำหนดให้พื้นหลังเป็นโปร่งใส
+    </NavbarBrand>
 
-            border: "none",
-          }}
-          size="sm"
-          className="d-sm-block d-md-none"
-          onClick={Handletoggle}
-        >
-          {isOpen ? (
-            <i className="bi bi-x"></i>
-          ) : (
-            <i className="bi bi-three-dots-vertical"></i>
-          )}
-        </Button>
-      </div>
-
-      <Collapse navbar isOpen={isOpen}>
-        <Nav className="me-auto" navbar>
+        <Nav className="navbar-nav mx-auto" navbar> {/* จัดกลาง */}
           <NavItem>
             <Link to="/dashboard" className="nav-link">
               Dashboard
@@ -150,28 +123,46 @@ const Header = () => {
           </UncontrolledDropdown>
         </Nav>
 
-        <Dropdown isOpen={dropdownOpen} toggle={toggle}>
-          <DropdownToggle color="transparent">
-            <img
-              src={`${API.defaults.baseURL}/${user.imageUrl}`}
-              alt="profile"
-              className="rounded-circle"
-              width="30"
-              height="30"
-            />
-          </DropdownToggle>
-          <DropdownMenu>
-            <DropdownItem header>Info</DropdownItem>
-            <Link to={"/account"} style={{ textDecoration: "none" }}>
-              <DropdownItem>My Account</DropdownItem>
-            </Link>
-            <DropdownItem divider />
-            <DropdownItem onClick={handleLogout}>Logout</DropdownItem>
-          </DropdownMenu>
-        </Dropdown>
-      </Collapse>
+        <div className="profile-img"> {/* เพิ่ม div สำหรับรูปโปรไฟล์ */}
+          <Dropdown isOpen={dropdownOpen} toggle={toggle}>
+            <DropdownToggle color="transparent">
+              <img
+                src={`${API.defaults.baseURL}/${user.imageUrl}`}
+                alt="profile"
+                className="rounded-circle"
+                width="30"
+                height="30"
+              />
+            </DropdownToggle>
+            <DropdownMenu>
+              <DropdownItem header>Info</DropdownItem>
+              <Link to={"/account"} style={{ textDecoration: "none" }}>
+                <DropdownItem>My Account</DropdownItem>
+              </Link>
+              <DropdownItem divider />
+              <DropdownItem onClick={handleLogout}>Logout</DropdownItem>
+            </DropdownMenu>
+          </Dropdown>
+        </div>
+
+        <Button
+          style={{
+            backgroundColor: "transparent",
+            border: "none",
+          }}
+          className="d-lg-none"
+          onClick={() => showMobilemenu()}
+        >
+          <i className="bi bi-list"></i>
+        </Button>
+      </div>
+
+   
+
     </Navbar>
   );
 };
 
 export default Header;
+
+

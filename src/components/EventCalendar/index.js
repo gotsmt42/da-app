@@ -8,6 +8,10 @@ import adaptivePlugin from "@fullcalendar/adaptive";
 
 import listPlugin from "@fullcalendar/list";
 
+import { saveAs } from "file-saver";
+
+import * as XLSX from "xlsx";
+
 import Swal from "sweetalert2";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"; // Import FontAwesomeIcon component
@@ -634,6 +638,29 @@ function EventCalendar() {
     }
   };
 
+  const exportToExcel = () => {
+    const data = events
+      ? Object.values(events)
+          .sort((a, b) => new Date(a.start) - new Date(b.start)) // จัดเรียงตามวันและเวลา
+          .map((event) => ({
+            Date: moment(event.start).format("YYYY-MM-DD"), // วันที่
+            Title: event.title, // ชื่อเหตุการณ์
+            AllDay: event.allDay ? "Yes" : "No", // เหตุการณ์ทั้งวัน
+          }))
+      : [];
+
+    const ws = XLSX.utils.json_to_sheet(data); // สร้าง worksheet จาก JSON
+    const wb = XLSX.utils.book_new(); // สร้าง workbook ใหม่
+    XLSX.utils.book_append_sheet(wb, ws, "Events"); // ใส่ worksheet ลงใน workbook
+
+    // เขียนไฟล์เป็น .xlsx
+    const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const dataBlob = new Blob([excelBuffer], {
+      type: "application/octet-stream",
+    });
+    saveAs(dataBlob, "events.xlsx"); // ใช้ file-saver เพื่อดาวน์โหลดไฟล์
+  };
+
   return (
     <div>
       <Row className="flex-wrap mb-3 d-flex justify-content-center justify-content-md-between">
@@ -641,17 +668,18 @@ function EventCalendar() {
           <button className="btn btn-sm btn-danger" onClick={generatePdf}>
             <FontAwesomeIcon icon={faFilePdf} /> สร้าง PDF
           </button>
-
           <CSVLink
             data={
               events
-                ? Object.values(events).map((event) => ({
-                    Title: event.title,
-                    Date: event.date,
-                    AllDay: event.allDay,
-                    Start: moment(event.start).format("YYYY-MM-DD: HH:mm"),
-                    End: moment(event.end).format("YYYY-MM-DD: HH:mm"),
-                  }))
+                ? Object.values(events)
+                    .sort((a, b) => new Date(a.start) - new Date(b.start)) // จัดเรียงตามวันและเวลา
+                    .map((event) => ({
+                      Date: moment(event.start).format("YYYY-MM-DD"), // วันที่
+                      Title: event.title, // ชื่อเหตุการณ์
+
+                      AllDay: event.allDay ? "Yes" : "No", // เหตุการณ์ทั้งวัน
+                     
+                    }))
                 : null
             }
             filename={"events.csv"}
@@ -659,8 +687,17 @@ function EventCalendar() {
             <button className="btn btn-sm btn-success mx-1 m-2 ">
               <FontAwesomeIcon icon={faFileExcel} /> สร้าง Excel
             </button>
-          </CSVLink>
+          </CSVLink> 
 
+{/* 
+          <button
+            className="btn btn-sm btn-success mx-1 m-2"
+            onClick={exportToExcel}
+          >
+            <FontAwesomeIcon icon={faFileExcel} /> สร้าง Excel
+          </button> */}
+
+          
           <button
             className="btn btn-sm btn-secondary mx-1 "
             onClick={handleLineNotify}
@@ -755,7 +792,10 @@ function EventCalendar() {
                     <span
                       style={{
                         whiteSpace: "nowrap",
-                        fontSize: window.innerWidth >= 576 ? eventInfo.event.extendedProps.fontSize+2 : eventInfo.event.extendedProps.fontSize-2  ,
+                        fontSize:
+                          window.innerWidth >= 576
+                            ? eventInfo.event.extendedProps.fontSize + 2
+                            : eventInfo.event.extendedProps.fontSize - 2,
                       }}
                     >
                       {eventInfo.event.title}
@@ -764,7 +804,10 @@ function EventCalendar() {
                     <span
                       style={{
                         whiteSpace: "nowrap",
-                        fontSize: window.innerWidth >= 576 ? eventInfo.event.extendedProps.fontSize+2 : eventInfo.event.extendedProps.fontSize-2  ,
+                        fontSize:
+                          window.innerWidth >= 576
+                            ? eventInfo.event.extendedProps.fontSize + 2
+                            : eventInfo.event.extendedProps.fontSize - 2,
                       }}
                     >
                       {eventInfo.event.title}

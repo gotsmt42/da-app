@@ -9,22 +9,22 @@ const PrivateRoute = lazy(() => import("./PrivateRoute.js"));
 
 const Dashboard = lazy(() => import("../views/Dashboard.js"));
 const NoConnection = lazy(() => import("../views/NoConnection.js"));
-const About = lazy(() => import("../views/About.js"));
+const About = lazy(() => import("../views/Settings.js"));
 const Alerts = lazy(() => import("../views/ui/Alerts"));
 const Badges = lazy(() => import("../views/ui/Badges"));
 const Buttons = lazy(() => import("../views/ui/Buttons"));
 const Cards = lazy(() => import("../views/ui/Cards"));
 const Grid = lazy(() => import("../views/ui/Grid"));
-const UserTable = lazy(() => import("../views/ui/UserTable.js"));
+const UserTable = lazy(() => import("../views/ui/Users.js"));
 const Forms = lazy(() => import("../views/ui/Forms"));
 const Breadcrumbs = lazy(() => import("../views/ui/Breadcrumbs"));
-const Account = lazy(() => import("../components/User/Account.js"));
+const Account = lazy(() => import("../components/User/Employee/Account.js"));
 const Product = lazy(() => import("../views/ui/Product"));
 const StockProduct = lazy(() => import("../views/ui/StockProduct"));
 const Files = lazy(() => import("../views/ui/Files"));
 const FileUpload = lazy(() => import("../views/ui/FileUpload"));
 const EventCalendar = lazy(() => import("../views/ui/EventCalendar.js"));
-const Comming = lazy(() => import("../views/ui/Comming.js"));
+const Operate = lazy(() => import("../views/ui/Operation.js"));
 const Login = lazy(() => import("../auth/Login.js"));
 const Register = lazy(() => import("../auth/Register.js"));
 
@@ -55,7 +55,7 @@ const ThemeRoutes = [
       { path: "/buttons", element: <Buttons />, title: "Buttons" },
       { path: "/cards", element: <Cards />, title: "Cards" },
       { path: "/grid", element: <Grid />, title: "Grid" },
-      { path: "/usertable", element: <UserTable />, title: "User Table" },
+      { path: "/customer-employee", element: <UserTable />, title: "Customer & Employee" },
       { path: "/forms", element: <Forms />, title: "Forms" },
       { path: "/breadcrumbs", element: <Breadcrumbs />, title: "Breadcrumbs" },
       { path: "/product", element: <Product />, title: "Product" },
@@ -67,8 +67,9 @@ const ThemeRoutes = [
       { path: "/fileupload", element: <FileUpload />, title: "File Upload" },
       { path: "/files", element: <Files />, title: "Files" },
       { path: "/event", element: <EventCalendar />, title: "Event Calendar" },
-      { path: "/coming", element: <Comming />, title: "Comming Soon" },
+      { path: "/operation", element: <Operate />, title: "Operation" },
     ],
+
   },
   { path: "/login", element: <Login />, title: "Login" },
   // { path: "/register", element: <Register />, title: "Register" },

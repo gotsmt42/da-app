@@ -18,7 +18,7 @@ const formatCurrency = (amount) => {
   return formatter.format(amount); // Format amount as currency string
 };
 
-const ExpandedUser = ({ data }) => (
+const Expanded = ({ data }) => (
   <div className="card mb-3">
     <div className="row g-0">
       <div className="col-md" style={{ display: "flex", alignItems: "center" }}>
@@ -26,9 +26,7 @@ const ExpandedUser = ({ data }) => (
           src={`${API.defaults.baseURL}/${data.imageUrl}`} // Construct the full URL for the image
           className="img-fluid img-thumbnail "
           alt="Avatar"
-          width={300}
-          height={300}
-          style={{ margin:"auto", borderRadius: "50%" }}
+          width={400}
 
           
         />
@@ -37,27 +35,17 @@ const ExpandedUser = ({ data }) => (
       <div className="col-md-8">
         <div className="card-body text">
           <h5 className="card-title">
-            {data.fname} {data.lname}
+            ชื่อโครงการ: TEST
           </h5>
-          <p className="card-text">ระดับ : {data.rank}</p>
-          <p className="card-text">อีเมลล์ : {data.email}</p>
+          <p></p>
+          <p className="card-text">ชื่องาน : {data.title}</p>
+          {/* <p className="card-text">อีเมลล์ : test@test.com</p> */}
 
-          <p className="card-text">
-              เป็นสมาชิกมาแล้ว {" : "}
-              {moment().diff(moment(data.createdAt), "weeks") } สัปดาห์
-          </p>
-
-          <span>เงินเดือน : {formatCurrency(parseFloat(data.salary.$numberDecimal))}</span>
-          {/* <p className="card-text">
-            <small className="text-body-secondary">
-              แก้ไขล่าสุด
-              {moment(data.updatedAt).format("- DD/MM/YYYY  HH:mm:ss ")}
-            </small>
-          </p> */}
+          
         </div>
       </div>
     </div>
   </div>
 );
 
-export default ExpandedUser;
+export default Expanded;

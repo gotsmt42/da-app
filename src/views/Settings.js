@@ -1,7 +1,7 @@
 const About = () => {
   return (
     <>
-      About Page Comming Soon....
+      Setting Page Comming Soon....
     </>
   );
 };
