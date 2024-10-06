@@ -34,7 +34,7 @@ const navigation = [
     icon: "bi-speedometer2",
   },
   {
-    title: "ACTION PLAN",
+    title: "แผนงาน",
     href: "/event",
     icon: "bi-calendar-event-fill",
   },

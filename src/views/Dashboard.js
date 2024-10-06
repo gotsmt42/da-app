@@ -15,6 +15,9 @@ import {
   FaBoxOpen,
   FaBoxes,
   FaUsers,
+  FaTimesCircle,
+  FaTimes,
+  FaClock,
 } from "react-icons/fa"; // นำเข้าไอคอนต่างๆ จาก react-icons
 import { useEffect, useState } from "react";
 import FileService from "../services/FileService";
@@ -23,6 +26,7 @@ import AuthService from "../services/authService";
 import EventService from "../services/EventService";
 import StockProductService from "../services/StockProductService";
 import moment from "moment";
+import { faTimeline } from "@fortawesome/free-solid-svg-icons";
 
 const Dashboard = () => {
   const [loading, setLoading] = useState(false);
@@ -158,6 +162,8 @@ const Dashboard = () => {
       iconColor: "#795A47", // สีไอคอน
       iconBgColor: "rgba(121, 90, 71, 0.1)", // สีพื้นหลังไอคอน
     },
+
+    
   ];
   const BlogData2 = [
 
@@ -178,14 +184,14 @@ const Dashboard = () => {
     //   iconColor: "#2ecc71",
     //   iconBgColor: "rgba(22, 160, 133, 0.1)",
     // },
-    // {
-    //   icon: FaBoxes,
-    //   title: "เพิ่มสต๊อกสินค้า",
-    //   // subtitle: "....",
-    //   link: "/product/stock",
-    //   iconColor: "#f39c12", // สีไอคอน
-    //   iconBgColor: "#fef5e7",
-    // },
+    {
+      icon: FaClock,
+      title: "การดำเนินงาน",
+      subtitle: loading ? "กำลังโหลด..." : Object.keys(events).length + " more",
+      link: "/operation",
+      iconColor: "#f39c12", // สีไอคอน
+      iconBgColor: "#fef5e7",
+    },
     
   ];
   const BlogData3 = [
