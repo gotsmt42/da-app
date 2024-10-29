@@ -283,7 +283,7 @@ function EventCalendar() {
         setDefaultTextColor(textColor);
         setDefaultBackgroundColor(backgroundColor);
         setDefaultFontSize(fontSize);
-        fetchEventsFromDB(); // Fetch events from database
+        fetchAllEvents(); // Fetch events from database
       }
     });
   };
@@ -596,7 +596,7 @@ function EventCalendar() {
           // Update events state after deletion
           const updatedEvents = events.filter((event) => event._id !== id);
           setEvents(updatedEvents);
-          await fetchEventsFromDB();
+          await fetchAllEvents();
 
           setLoading(false);
 
