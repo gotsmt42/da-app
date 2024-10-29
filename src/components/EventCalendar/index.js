@@ -33,8 +33,10 @@ import { Col, Row } from "reactstrap";
 
 import { CSVLink } from "react-csv";
 
+import "./index.css";
+import axios from "axios";
 
-import './index.css'
+
 
 function EventCalendar() {
   const [events, setEvents] = useState([]);
@@ -46,35 +48,114 @@ function EventCalendar() {
 
   const [loading, setLoading] = useState(false); // เพิ่มสถานะการโหลด
 
-  const componentRef = useRef();
 
-  useEffect(() => {
-    fetchEventsFromDB(); // Fetch events when component mounts
-  }, []);
-
-  const saveEventToDB = async (newEvent) => {
-    try {
-      await EventService.AddEvent(newEvent);
-    } catch (error) {
-      console.error("Error saving event:", error);
-    }
+  const fetchWithTimeout = async (url, options = {}, timeout = 5000) => {
+    return Promise.race([
+      fetch(url, options),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Request timed out")), timeout)
+      ),
+    ]);
   };
 
+  
+
+  useEffect(() => {
+    fetchAllEvents(); // ดึงข้อมูลเมื่อ component mount
+  }, []);
+
+  const fetchAllEvents = async () => {
+    setLoading(true);
+    console.time("fetchAllEvents"); // เริ่มจับเวลา
+    try {
+      const [dbEvents, thaiHolidays] = await Promise.all([
+        fetchEventsFromDB(),
+        fetchThaiHolidays(),
+      ]);
+  
+      const combinedEvents = [...dbEvents, ...thaiHolidays];
+      setEvents(combinedEvents);
+    } catch (error) {
+      console.error("Error fetching events or holidays:", error);
+    } finally {
+      setLoading(false);
+      console.timeEnd("fetchAllEvents"); // จบจับเวลา
+    }
+  };
+  
   const fetchEventsFromDB = async () => {
     setLoading(true);
-
+    console.time("fetchEventsFromDB"); // เริ่มจับเวลา
     try {
       const res = await EventService.getEvents();
       const eventsWithId = res.userEvents.map((event) => ({
         ...event,
         id: event._id,
       }));
-      setEvents(eventsWithId);
-
-      setLoading(false);
+      return eventsWithId; // คืนค่าข้อมูล
     } catch (error) {
       console.error("Error fetching events:", error);
+      return []; // คืนค่าเป็น array ว่างในกรณีเกิดข้อผิดพลาด
+    } finally {
+      console.timeEnd("fetchEventsFromDB"); // จบจับเวลา
       setLoading(false);
+    }
+  };
+
+
+
+  let cachedHolidays = null;
+  let holidaysLastFetched = null;
+  
+  const fetchThaiHolidays = async () => {
+    const now = new Date();
+  
+    // ตรวจสอบ cache
+    if (cachedHolidays && holidaysLastFetched && (now - holidaysLastFetched < 24 * 60 * 60 * 1000)) {
+      console.log("Using cached holidays");
+      return cachedHolidays;
+    }
+  
+    console.time("fetchThaiHolidays");
+    try {
+      const response = await axios.get(`https://api.allorigins.win/get?url=${encodeURIComponent('https://www.myhora.com/calendar/ical/holiday.aspx?latest.json')}`);
+      
+      if (response.status !== 200) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+  
+      const data = JSON.parse(response.data.contents);
+      if (!data || !data.VCALENDAR || !data.VCALENDAR[0].VEVENT) {
+        throw new Error("Invalid data structure");
+      }
+  
+      cachedHolidays = data.VCALENDAR[0].VEVENT.map((holiday) => ({
+        title: holiday.SUMMARY,
+        date: moment(holiday["DTSTART;VALUE=DATE"]).format("YYYY-MM-DD"),
+        allDay: true,
+        backgroundColor: "#ff0000",
+        textColor: "#f5e5da",
+        fontSize: 6,
+      }));
+  
+      holidaysLastFetched = new Date(); // อัปเดตวันและเวลา
+      return cachedHolidays;
+    } catch (error) {
+      console.error("Error fetching Thai holidays:", error);
+      return []; // คืนค่าเป็น array ว่างในกรณีเกิดข้อผิดพลาด
+    } finally {
+    console.timeEnd("fetchThaiHolidays");
+  }
+  };
+  
+  
+  
+
+  const saveEventToDB = async (newEvent) => {
+    try {
+      await EventService.AddEvent(newEvent);
+    } catch (error) {
+      console.error("Error saving event:", error);
     }
   };
 
@@ -394,7 +475,7 @@ function EventCalendar() {
 
         setEvents(updatedEvents);
 
-        fetchEventsFromDB();
+        fetchAllEvents();
 
         setLoading(false); // เริ่มต้นโหลดข้อมูล
 
@@ -448,7 +529,7 @@ function EventCalendar() {
       setEvents(updatedEvents);
 
       // ดึงข้อมูลเหตุการณ์จากฐานข้อมูลอีกครั้งเพื่อให้มั่นใจว่าข้อมูลเป็นปัจจุบัน
-      fetchEventsFromDB();
+      fetchAllEvents();
 
       // แสดงข้อความแจ้งเตือนเมื่ออัปเดตเหตุการณ์สำเร็จ
       // Swal.fire("Event Updated", "", "success");
@@ -491,7 +572,7 @@ function EventCalendar() {
 
     setEvents(updatedEvents);
 
-    fetchEventsFromDB();
+    fetchAllEvents();
 
     // Swal.fire("Event Updated", "", "success");
   };
@@ -681,7 +762,6 @@ function EventCalendar() {
                       Title: event.title, // ชื่อเหตุการณ์
 
                       AllDay: event.allDay ? "Yes" : "No", // เหตุการณ์ทั้งวัน
-                     
                     }))
                 : null
             }
@@ -690,17 +770,9 @@ function EventCalendar() {
             <button className="btn btn-sm btn-success mx-1 m-2 ">
               <FontAwesomeIcon icon={faFileExcel} /> สร้าง Excel
             </button>
-          </CSVLink> 
+          </CSVLink>
 
-{/* 
-          <button
-            className="btn btn-sm btn-success mx-1 m-2"
-            onClick={exportToExcel}
-          >
-            <FontAwesomeIcon icon={faFileExcel} /> สร้าง Excel
-          </button> */}
-
-          
+      
           <button
             className="btn btn-sm btn-secondary mx-1 "
             onClick={handleLineNotify}
@@ -713,8 +785,7 @@ function EventCalendar() {
       <div id="content-id">
         <FullCalendar
           ref={calendarRef}
-          // schedulerLicenseKey="<YOUR-LICENSE-KEY-GOES-HERE>" //FullCalendar Premium
-          contentHeight="auto" // กำหนดให้ความสูงของตารางปรับเป็นอัตโนมัติ
+          contentHeight="auto"
           timeZone="local"
           plugins={[
             dayGridPlugin,
@@ -734,13 +805,6 @@ function EventCalendar() {
           nowIndicator={true}
           selectMirror={true}
           weekends={true}
-          // slotLabelFormat={{
-          //   hour: "2-digit",
-          //   minute: "2-digit",
-          //   omitZeroMinute: false,
-          //   hour12: false,
-          // }}
-
           eventContent={(eventInfo) => (
             <div>
               {eventInfo.event.allDay === false ? (
@@ -770,51 +834,55 @@ function EventCalendar() {
               ) : null}
               <div
                 style={{
-                  backgroundColor: eventInfo.event.backgroundColor,
-                  color: eventInfo.event.textColor,
+                  backgroundColor:eventInfo.event.backgroundColor, // เปลี่ยนสีพื้นหลังสำหรับวันหยุด
+                  color:eventInfo.event.textColor, // เปลี่ยนสีข้อความสำหรับวันหยุด
                   display: "flex",
-                  justifyContent: "space-between",
+                  justifyContent: "center",
                   alignItems: "center",
-                  border: "2px solid",
+                  padding: "5px",
                   borderRadius: "5px",
-                  padding: "5px", // เพิ่ม padding
-                  flexDirection: "column", // ให้ข้อความในกรอบต่อกันลงมา
+                  flexDirection: "column",
+                  // เพิ่มเงาหรือการจัดระเบียบที่แตกต่างถ้าต้องการ
+                  boxShadow: eventInfo.event.allDay
+                    ? "0 0 20px rgba(0, 0, 0, 0.2)"
+                    : "none", // เพิ่มเงาเฉพาะสำหรับวันหยุด
                 }}
               >
-                 {window.innerWidth >= 768 ? (
-                <span
-                  style={{
-                    textOverflow: "ellipsis",
-                    overflow: "hidden",
-                    margin: "auto",
-                    fontSize: eventInfo.event.extendedProps.fontSize + 4,
-                    display: "block", // เปลี่ยนให้ display เป็น block
-                  }}
-                >
-                  {eventInfo.event.title}
-                </span>
-                 ): <span
-                 style={{
-                   textOverflow: "ellipsis",
-                   overflow: "hidden",
-                   margin: "auto",
-                   fontSize: eventInfo.event.extendedProps.fontSize,
-                   display: "block", // เปลี่ยนให้ display เป็น block
-                 }}
-               >
-                 {eventInfo.event.title}
-               </span>}
+                {window.innerWidth >= 768 ? (
+                  <span
+                    style={{
+                      textOverflow: "ellipsis",
+                      overflow: "hidden",
+                      margin: "auto",
+                      fontSize: eventInfo.event.extendedProps.fontSize + 4,
+                      display: "block",
+                    }}
+                  >
+                    {eventInfo.event.title}
+                  </span>
+                ) : (
+                  <span
+                    style={{
+                      textOverflow: "ellipsis",
+                      overflow: "hidden",
+                      margin: "auto",
+                      fontSize: eventInfo.event.extendedProps.fontSize,
+                      display: "block",
+                    }}
+                  >
+                    {eventInfo.event.title}
+                  </span>
+                )}
               </div>
             </div>
           )}
-          
           eventClick={handleEditEvent}
           headerToolbar={{
             left: "prev,next today",
             center: "title",
             right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek",
           }}
-          dayMaxEventRows={true} // ใช้งานการแสดงเหตุการณ์ที่ยาวนานใน dayGridMonth
+          dayMaxEventRows={true}
           views={{
             listWeek: {
               dayMaxEventRows: window.innerWidth >= 576 ? 7 : 5,
@@ -828,6 +896,19 @@ function EventCalendar() {
             timeGridDay: {
               dayMaxEventRows: window.innerWidth >= 576 ? 7 : 5,
             },
+          }}
+          dayCellDidMount={(info) => {
+            // เช็คว่าวันนี้เป็นวันเสาร์หรือวันอาทิตย์หรือไม่
+            const date = info.date;
+            const isSaturday = date.getUTCDay() === 5; // 6 = Saturday
+            const isSunday = date.getUTCDay() === 6; // 0 = Sunday
+        
+            if (isSaturday || isSunday) {
+              // ถ้าเป็นวันเสาร์หรือวันอาทิตย์
+              info.el.style.backgroundColor = "#FFFFF4"; // สีพื้นหลังสำหรับวันเสาร์-อาทิตย์
+            }
+            
+           
           }}
         />
       </div>

@@ -37,6 +37,7 @@
     "history": "5.3.0",
     "html2canvas": "^1.4.1",
     "html2pdf": "^0.0.11",
+    "http-proxy-middleware": "^3.0.3",
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^2.5.1",
     "jwt-decode": "^4.0.0",
@@ -75,13 +76,16 @@
     "utils": "^0.3.1",
     "web-vitals": "^2.1.4",
     "xlsx": "^0.18.5"
+   
+
   },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
-  },
+  },  
+
   "eslintConfig": {
     "extends": [
       "react-app",
