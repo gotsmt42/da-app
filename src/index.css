@@ -55,18 +55,7 @@
   z-index: 9999;
 
   }
-  .stickyHeader {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    z-index: 1000;
-    animation: fadeInDown 0.3s ease forwards;
-    transition: top 0.3s ease-in-out; /* เพิ่ม transition เข้ามา */
 
-    /* สามารถเพิ่มสีพื้นหลัง, ขอบ, หรือสไตล์อื่น ๆ ตามต้องการ */
-  }
-  
   @media (min-width: 1025px) {
     .stickyHeader {
       position: static; /* เปลี่ยนเป็น static ในหน้าจอใหญ่ */
@@ -152,101 +141,7 @@
   background-color: rgba(0, 0, 0, 0.5);
   z-index: 9999; /* ตั้งค่า Z-index เพื่อให้แสดงเหนือหน้าอื่น */
 }
-.fc-daygrid-event {
-  font-size: 10px; 
-}
 
-.fc-daygrid-event-dot {
-  width: 10px; 
-  height: 10px;
-}
-
-
-.fc-col-header-cell,
-.fc-day-header,
-.fc-col-header-cell-cushion {
-  /* เลือกส่วนหัวของวัน */
-  background-color: #1a2530;
-  color: #fff; /* ตั้งค่าสีข้อความเป็นสีขาว */
-  text-decoration: none; /* ลบขีดเส้นใต้ของข้อความ */
-}
-
-.fc-daygrid-day-number {
-  color: #1a2530;
-  text-decoration: none; /* ลบขีดเส้นใต้ของข้อความ */
-}
-
-.fc-event {
-  border: solid #fff;
-  padding: 5px;
-  border-radius: 25px;
-
-  background-clip: padding-box;
-}
-
-/* CSS สำหรับปรับขนาดตัวหนังสือของวันและวันที่ใน FullCalendar เมื่อหน้าจอเล็ก */
-
-@media (max-width: 768px) {
-  .fc-daygrid-day-number {
-    /* เลือกตัวหนังสือของวันที่ */
-    font-size: 12px; /* ปรับขนาดตัวหนังสือลงเมื่อหน้าจอเล็ก */
-  }
-  .fc-daygrid-day {
-    /* เลือกตัวหนังสือของวัน */
-    font-size: 12px; /* ปรับขนาดตัวหนังสือลงเมื่อหน้าจอเล็ก */
-  }
-
-  
-  .fc-col-header-cell,
-  .fc-day-header {
-    /* เลือกส่วนหัวของวัน */
-    font-size: 12px; /* ปรับขนาดตัวหนังสือลงเมื่อหน้าจอเล็ก */
-    text-decoration: none;
-
-  }
-}
-
-
-@media (max-width: 576px) {
-  .fc {
-    width: 100%; /* ปรับความกว้างของตารางให้เต็มขนาดจอเมื่อหน้าจอขนาดเล็ก */
-  }
-  .fc-header-toolbar {
-    flex-direction: column; /* แสดง Header เป็นคอลัมน์เมื่ออยู่ในโหมด Mobile */
-    justify-content: flex-start; /* ชิดด้านซ้าย */
-    align-items: flex-start; /* ชิดด้านซ้าย */    
-    padding: 10px; /* ลด padding เพื่อปรับขนาดของ Header */
-    font-size: 14px;
-  }
-
-  .fc-header-toolbar .fc-left,
-  .fc-header-toolbar .fc-center,
-  .fc-header-toolbar .fc-right {
-    width: 100%; /* ให้แต่ละส่วนของ Header ขยายตามความกว้างของหน้าจอ */
-    margin-bottom: 5px; /* ลดระยะห่างระหว่างส่วนของ Header */
-  }
-
-  .fc-day-header {
-    font-size: 12px; /* ปรับขนาดตัวหนังสือลงเมื่อหน้าจอเล็ก */
-
-    min-width: 40px;
-  }
-
-  .fc-list-heading td,
-  .fc-list-heading thead th {
-    text-align: center;
-  }
-
-  .fc-list-day-cushion,
-  .fc-list-heading thead td,
-  .fc-list-heading thead th {
-    padding: 5px;
-  }
-
-  /* .fc-scrollgrid {
-    height: 100vh;
-  } */
-}
 
 @media only screen and (max-width: 1280px) {
   .text {

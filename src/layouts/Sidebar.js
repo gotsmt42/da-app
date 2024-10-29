@@ -9,7 +9,6 @@ import {
   BiLogoProductHunt,
   BiOutline,
   BiBox,
-
 } from "react-icons/bi"; // Import icons from React Icons
 
 import { LuFileStack } from "react-icons/lu";
@@ -20,13 +19,17 @@ import { FaProductHunt } from "react-icons/fa";
 
 import { CiBoxList } from "react-icons/ci";
 
-
 import probg from "../assets/images/bg/download.jpg";
 
 import AuthService from "../services/authService";
 import API from "../API/axiosInstance";
 
-import './Sidebar.css'
+import "./Sidebar.css";
+
+import Swal from "sweetalert2";
+import { swalLogout } from "../functions/user";
+import { useAuth } from "../auth/AuthContext";
+
 const navigation = [
   {
     title: "DASHBOARD",
@@ -44,45 +47,45 @@ const navigation = [
     icon: "bi-clock-fill",
   },
 
-  // {
-  //   title: "File",
-  //   icon: <IoFileTrayFullOutline />,
-  //   items: [
-  //     {
-  //       title: "File Upload",
-  //       href: "/fileupload",
-  //       icon: BiUpload,
-  //     },
-  //     {
-  //       title: "All Files",
-  //       href: "/files",
-  //       icon: LuFileStack,
-  //     },
-  //   ],
-  // },
-  // {
-  //   title: "Product",
-  //   icon: <FaProductHunt />,
-  //   items: [
-  //     {
-  //       title: "List Product",
-  //       href: "/product",
-  //       icon: CiBoxList,
-  //     },
-  //     {
-  //       title: "Stock Product",
-  //       href: "/product/stock",
-  //       icon: BiOutline,
-  //     },
-  //   ],
-  // },
-
-  
+  {
+    title: "File",
+    icon: <IoFileTrayFullOutline />,
+    items: [
+      {
+        title: "File Upload",
+        href: "/fileupload",
+        icon: BiUpload,
+      },
+      {
+        title: "All Files",
+        href: "/files",
+        icon: LuFileStack,
+      },
+    ],
+  },
+  {
+    title: "Product",
+    icon: <FaProductHunt />,
+    items: [
+      {
+        title: "List Product",
+        href: "/product",
+        icon: CiBoxList,
+      },
+      {
+        title: "Stock Product",
+        href: "/product/stock",
+        icon: BiOutline,
+      },
+    ],
+  },
 ];
 
 const Sidebar = ({ handleMenuClick }) => {
   const [collapsedMenu, setCollapsedMenu] = useState({});
   const location = useLocation();
+
+  const { logout } = useAuth();
 
   const [user, setUser] = useState({});
   useEffect(() => {
@@ -102,6 +105,15 @@ const Sidebar = ({ handleMenuClick }) => {
     setCollapsedMenu({
       ...collapsedMenu,
       [index]: !collapsedMenu[index],
+    });
+  };
+
+  const handleLogout = async () => {
+    await swalLogout().then((result) => {
+      if (result.isConfirmed) {
+        logout();
+        Swal.fire("Logout Success!", "", "success");
+      }
     });
   };
 
@@ -129,57 +141,63 @@ const Sidebar = ({ handleMenuClick }) => {
 
       {/* เนื้อหา Sidebar */}
       <div className="p-3 mt-2 sidebar-content">
-    <Nav vertical className="sidebarNav">
-      {navigation.map((navi, index) => (
-        <NavItem key={index} className="sidenav-bg ">
-          {navi.items ? (
-            <>
-              <button
-                color="link"
-                className="nav-link py-3"
-                onClick={() => toggleNavbar(index)}
-                style={{ width: "100%", textAlign: "left" }}
-              >
-                <i className={`bi ${navi.icon}`}></i>
-                <span className="ms-2 me-1">{navi.title}</span>
-                {collapsedMenu[index] ? <BiChevronDown /> : <BiChevronRight />}
-              </button>
-              <Collapse isOpen={collapsedMenu[index]} style={{ paddingLeft: "21px" }}>
-                {navi.items.map((item, idx) => (
-                  <Link
-                    key={idx}
-                    className={`mt-0 my-1 nav-link ${
-                      location.pathname === item.href ? "active" : ""
-                    }`}
-                    to={item.href}
-                    style={{ textDecoration: "none" }}
-                    onClick={handleMenuClick}
+        <Nav vertical className="sidebarNav">
+          {navigation.map((navi, index) => (
+            <NavItem key={index} className="sidenav-bg ">
+              {navi.items ? (
+                <>
+                  <button
+                    color="link"
+                    className="nav-link py-3"
+                    onClick={() => toggleNavbar(index)}
+                    style={{ width: "100%", textAlign: "left" }}
                   >
-                    {item.icon && <item.icon />} {item.title}
-                  </Link>
-                ))}
-              </Collapse>
-            </>
-          ) : (
-            <Link
-              to={navi.href}
-              className={`nav-link py-3 ${
-                location.pathname === navi.href ? "active" : ""
-              }`}
-              onClick={handleMenuClick}
-            >
-              <i className={`bi ${navi.icon}`}></i>
-              <span className="ms-2">{navi.title}</span>
-            </Link>
-          )}
-        </NavItem>
-      ))}
-    </Nav>
-  </div>
+                    <i className={`bi ${navi.icon}`}></i>
+                    <span className="ms-2 me-1">{navi.title}</span>
+                    {collapsedMenu[index] ? (
+                      <BiChevronDown />
+                    ) : (
+                      <BiChevronRight />
+                    )}
+                  </button>
+                  <Collapse
+                    isOpen={collapsedMenu[index]}
+                    style={{ paddingLeft: "21px" }}
+                  >
+                    {navi.items.map((item, idx) => (
+                      <Link
+                        key={idx}
+                        className={`mt-0 my-1 nav-link ${
+                          location.pathname === item.href ? "active" : ""
+                        }`}
+                        to={item.href}
+                        style={{ textDecoration: "none" }}
+                        onClick={handleMenuClick}
+                      >
+                        {item.icon && <item.icon />} {item.title}
+                      </Link>
+                    ))}
+                  </Collapse>
+                </>
+              ) : (
+                <Link
+                  to={navi.href}
+                  className={`nav-link py-3 ${
+                    location.pathname === navi.href ? "active" : ""
+                  }`}
+                  onClick={handleMenuClick}
+                >
+                  <i className={`bi ${navi.icon}`}></i>
+                  <span className="ms-2">{navi.title}</span>
+                </Link>
+              )}
+            </NavItem>
+          ))}
+        </Nav>
+      </div>
 
       {/* ส่วนที่ fixed ด้านล่าง */}
       <div className="sidebar-fixed-bottom p-3 mt-2">
-
         <NavItem className="sidenav-bg ">
           <Link
             to="/customer-employee"
@@ -188,7 +206,7 @@ const Sidebar = ({ handleMenuClick }) => {
             }`}
             onClick={handleMenuClick}
           >
-            <i className="bi bi-people-fill ms-3" ></i>
+            <i className="bi bi-people-fill ms-3"></i>
             <span className="ms-2">CUSTOMER & EMPLOYEE MANAGEMENT</span>
           </Link>
         </NavItem>
@@ -204,8 +222,19 @@ const Sidebar = ({ handleMenuClick }) => {
             <i className="bi bi-gear-fill ms-3"></i>
             <span className="ms-2">SETTINGS</span>
           </Link>
-          </NavItem>
-   
+        </NavItem>
+      </div>
+          
+      <div className="sidebar-fixed-bottom  text-lg-start p-3 mt-2">
+        <NavItem className="sidenav-bg">
+          <Link
+           className='nav-link py-3'
+            onClick={handleLogout}
+          >
+            <i className="bi bi-box-arrow-right ms-3"></i>
+            <span className="ms-2">LOGOUT</span>
+          </Link>
+        </NavItem>
       </div>
     </div>
   );

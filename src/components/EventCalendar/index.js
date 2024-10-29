@@ -33,6 +33,9 @@ import { Col, Row } from "reactstrap";
 
 import { CSVLink } from "react-csv";
 
+
+import './index.css'
+
 function EventCalendar() {
   const [events, setEvents] = useState([]);
   const [defaultAllDay, setdefaultAllDay] = useState(true); // สีข้อความเริ่มต้น
@@ -755,7 +758,6 @@ function EventCalendar() {
                       alignItems: "center",
                       textOverflow: "ellipsis",
                       overflow: "hidden",
-                      whiteSpace: "nowrap",
                       margin: "auto",
                       padding: "2px",
                       fontSize: "11px",
@@ -769,54 +771,31 @@ function EventCalendar() {
               <div
                 style={{
                   backgroundColor: eventInfo.event.backgroundColor,
-
                   color: eventInfo.event.textColor,
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  border: "3px solid",
-                  borderRadius: "20px",
+                  border: "2px solid",
+                  borderRadius: "5px",
+                  padding: "5px", // เพิ่ม padding
+                  flexDirection: "column", // ให้ข้อความในกรอบต่อกันลงมา
                 }}
               >
                 <span
                   style={{
                     textOverflow: "ellipsis",
                     overflow: "hidden",
-                    whiteSpace: "nowrap",
                     margin: "auto",
-                    padding: "5px",
                     fontSize: eventInfo.event.extendedProps.fontSize,
+                    display: "block", // เปลี่ยนให้ display เป็น block
                   }}
                 >
-                  {eventInfo.event.allDay === false ? (
-                    <span
-                      style={{
-                        whiteSpace: "nowrap",
-                        fontSize:
-                          window.innerWidth >= 576
-                            ? eventInfo.event.extendedProps.fontSize + 2
-                            : eventInfo.event.extendedProps.fontSize - 2,
-                      }}
-                    >
-                      {eventInfo.event.title}
-                    </span>
-                  ) : (
-                    <span
-                      style={{
-                        whiteSpace: "nowrap",
-                        fontSize:
-                          window.innerWidth >= 576
-                            ? eventInfo.event.extendedProps.fontSize + 2
-                            : eventInfo.event.extendedProps.fontSize - 2,
-                      }}
-                    >
-                      {eventInfo.event.title}
-                    </span>
-                  )}
+                  {eventInfo.event.title}
                 </span>
               </div>
             </div>
           )}
+          
           eventClick={handleEditEvent}
           headerToolbar={{
             left: "prev,next today",

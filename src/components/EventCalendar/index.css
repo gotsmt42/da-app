@@ -1,0 +1,93 @@
+.fc-daygrid-event {
+  font-size: 10px;
+}
+
+.fc-daygrid-event-dot {
+  width: 10px;
+  height: 10px;
+}
+
+.fc-col-header-cell,
+.fc-day-header,
+.fc-col-header-cell-cushion {
+  /* เลือกส่วนหัวของวัน */
+  background-color: #1a2530;
+  color: #fff; /* ตั้งค่าสีข้อความเป็นสีขาว */
+  text-decoration: none; /* ลบขีดเส้นใต้ของข้อความ */
+}
+
+.fc-daygrid-day-number {
+  color: #1a2530;
+  text-decoration: none; /* ลบขีดเส้นใต้ของข้อความ */
+}
+
+.fc-event {
+  /* border: solid #fff; */
+  display: contents;
+  padding: 0px;
+  border-radius: 5px;
+  white-space: normal;
+  max-height: 100vh;
+  overflow: hidden;
+}
+
+/* CSS สำหรับปรับขนาดตัวหนังสือของวันและวันที่ใน FullCalendar เมื่อหน้าจอเล็ก */
+
+@media (max-width: 768px) {
+  .fc-daygrid-day-number {
+    /* เลือกตัวหนังสือของวันที่ */
+    font-size: 12px; /* ปรับขนาดตัวหนังสือลงเมื่อหน้าจอเล็ก */
+  }
+  .fc-daygrid-day {
+    /* เลือกตัวหนังสือของวัน */
+    font-size: 12px; /* ปรับขนาดตัวหนังสือลงเมื่อหน้าจอเล็ก */
+  }
+
+  .fc-col-header-cell,
+  .fc-day-header {
+    /* เลือกส่วนหัวของวัน */
+    font-size: 12px; /* ปรับขนาดตัวหนังสือลงเมื่อหน้าจอเล็ก */
+    text-decoration: none;
+  }
+}
+
+@media (max-width: 576px) {
+  .fc {
+    width: 100%; /* ปรับความกว้างของตารางให้เต็มขนาดจอเมื่อหน้าจอขนาดเล็ก */
+  }
+  .fc-header-toolbar {
+    flex-direction: column; /* แสดง Header เป็นคอลัมน์เมื่ออยู่ในโหมด Mobile */
+    justify-content: flex-start; /* ชิดด้านซ้าย */
+    align-items: flex-start; /* ชิดด้านซ้าย */
+    padding: 10px; /* ลด padding เพื่อปรับขนาดของ Header */
+    font-size: 14px;
+  }
+
+  .fc-header-toolbar .fc-left,
+  .fc-header-toolbar .fc-center,
+  .fc-header-toolbar .fc-right {
+    width: 100%; /* ให้แต่ละส่วนของ Header ขยายตามความกว้างของหน้าจอ */
+    margin-bottom: 5px; /* ลดระยะห่างระหว่างส่วนของ Header */
+  }
+
+  .fc-day-header {
+    font-size: 12px; /* ปรับขนาดตัวหนังสือลงเมื่อหน้าจอเล็ก */
+
+    min-width: 40px;
+  }
+
+  .fc-list-heading td,
+  .fc-list-heading thead th {
+    text-align: center;
+  }
+
+  .fc-list-day-cushion,
+  .fc-list-heading thead td,
+  .fc-list-heading thead th {
+    padding: 5px;
+  }
+
+  /* .fc-scrollgrid {
+      height: 100vh;
+    } */
+}

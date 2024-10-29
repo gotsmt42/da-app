@@ -1,5 +1,7 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+
+const version = process.env.REACT_APP_VERSION;
+
 
 const Footer = () => {
   return (
@@ -13,7 +15,7 @@ const Footer = () => {
              className="text-center p-3"
             //  style={{backgroundColor: "rgba(0, 0, 0, 0.2)"}}
              >
-          © 2024 Develop By Santisuk
+          © 2024 Develop By Santisuk (Version {version})
           {/* <Link className="text-dark" href="https://mdbootstrap.com/"
              >MDBootstrap.com</Link> */}
         </div>

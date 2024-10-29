@@ -2,112 +2,91 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AuthService from "../services/authService";
 import { useAuth } from "../auth/AuthContext";
-
-import './็Header.css'
+import './Header.css'
 import {
   Navbar,
-  Collapse,
   Nav,
   NavItem,
   NavbarBrand,
   UncontrolledDropdown,
   DropdownToggle,
+  Dropdown,
   DropdownMenu,
   DropdownItem,
-  Dropdown,
   Button,
 } from "reactstrap";
-// import Logo from "./Logo";
-// import { ReactComponent as LogoWhite } from "../assets/images/logos/materialprowhite.svg";
 import { swalLogout } from "../functions/user";
 import Swal from "sweetalert2";
-
 import API from "../API/axiosInstance";
 
 const Header = () => {
   const navigate = useNavigate();
-
   const { logout } = useAuth();
   const [user, setUser] = useState({});
-  const [isOpen, setIsOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768); // ตรวจสอบว่าเป็นมือถือหรือไม่
 
   useEffect(() => {
     const getUserData = async () => {
       try {
         const getUser = await AuthService.getUserData();
+        console.log(getUser); // เพิ่มบรรทัดนี้เพื่อตรวจสอบข้อมูลผู้ใช้
         setUser(getUser.user);
       } catch (error) {
         console.error("Error fetching user data:", error);
       }
     };
+    
     getUserData();
-  }, []);
 
-  const toggle = () => setDropdownOpen((prevState) => !prevState);
-  const Handletoggle = () => setIsOpen(!isOpen);
-  const showMobilemenu = () => {
-    document.getElementById("sidebarArea").classList.toggle("showSidebar");
-  };
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener("resize", checkIsMobile);
 
-  const handleClickOutside = (e) => {
-    if (!e.target.closest(".navbar")) {
-      setIsOpen(false);
-    }
-  };
-
-  useEffect(() => {
-    document.addEventListener("click", handleClickOutside);
     return () => {
-      document.removeEventListener("click", handleClickOutside);
+      window.removeEventListener("resize", checkIsMobile);
     };
   }, []);
 
+  const toggle = () => setDropdownOpen((prevState) => !prevState);
+  const showMobileMenu = () => {
+    const sidebar = document.getElementById("sidebarArea");
+    console.log("Toggling sidebar:", sidebar.classList.contains("showSidebar"));
+    sidebar.classList.toggle("showSidebar");
+  };
+  
+
   const handleLogout = async () => {
-    await swalLogout().then((result) => {
-      if (result.isConfirmed) {
-        logout();
-        Swal.fire("Logout Success!", "", "success");
-      }
-    });
+    const result = await swalLogout();
+    if (result.isConfirmed) {
+      logout();
+      Swal.fire("Logout Success!", "", "success");
+    }
   };
 
   return (
     <Navbar dark expand="md" className="fix-header">
-  <div className="d-flex align-items-center justify-content-between w-100">
-    <div className="d-lg-block d-none me-2 pe-3">{/* <Logo /> */}</div>
+      <div className="d-flex align-items-center justify-content-between w-100">
+        <NavbarBrand tag={Link} to="/dashboard" className="m-0">
+          <div className="d-flex align-items-center gradiant-bg">
+            <img src="logo512.png" alt="Logo" className="logo" />
+            <h2 className="ms-2">System Service</h2>
+          </div>
+        </NavbarBrand>
 
-    <NavbarBrand tag={Link} to="/dashboard" className="m-0">
-      <div className="d-flex align-items-center gradiant-bg">
-        <img 
-          src="logo512.png" 
-          alt="Logo" 
-          className="logo"
-        />
-        <h2 className="ms-2">System Service </h2> {/* เพิ่มข้อความถัดจากโลโก้ */}
-      </div>
-    </NavbarBrand>
-
-        <Nav className="navbar-nav mx-auto" navbar> {/* จัดกลาง */}
+        <Nav className="navbar-nav mx-auto" navbar>
           <NavItem>
-            <Link to="/dashboard" className="nav-link">
-              Dashboard
-            </Link>
+            <Link to="/dashboard" className="nav-link">Dashboard</Link>
           </NavItem>
           <NavItem>
-            <Link to="/event" className="nav-link">
-              Event
-            </Link>
+            <Link to="/event" className="nav-link">Event</Link>
           </NavItem>
           <NavItem>
-            <Link to="/about" className="nav-link">
-              About
-            </Link>
+            <Link to="/about" className="nav-link">About</Link>
           </NavItem>
           <UncontrolledDropdown inNavbar nav>
-            <DropdownToggle caret nav>
-              Menu
-            </DropdownToggle>
+            <DropdownToggle caret nav>Menu</DropdownToggle>
             <DropdownMenu end>
               <Link to="/files" style={{ textDecoration: "none" }}>
                 <DropdownItem>Files</DropdownItem>
@@ -123,46 +102,41 @@ const Header = () => {
           </UncontrolledDropdown>
         </Nav>
 
-        <div className="profile-img"> {/* เพิ่ม div สำหรับรูปโปรไฟล์ */}
-          <Dropdown isOpen={dropdownOpen} toggle={toggle}>
-            <DropdownToggle color="transparent">
-              <img
-                src={`${API.defaults.baseURL}/${user.imageUrl}`}
-                alt="profile"
-                className="rounded-circle"
-                width="30"
-                height="30"
-              />
-            </DropdownToggle>
-            <DropdownMenu>
-              <DropdownItem header>Info</DropdownItem>
-              <Link to={"/account"} style={{ textDecoration: "none" }}>
-                <DropdownItem>My Account</DropdownItem>
-              </Link>
-              <DropdownItem divider />
-              <DropdownItem onClick={handleLogout}>Logout</DropdownItem>
-            </DropdownMenu>
-          </Dropdown>
-        </div>
+        {/* Conditional rendering of profile-img */}
+        {!isMobile && ( // If not mobile, show profile-img
+          <div className="profile-img">
+            <Dropdown isOpen={dropdownOpen} toggle={toggle}>
+              <DropdownToggle color="transparent">
+                <img
+                  src={`${API.defaults.baseURL}/${user.imageUrl}`}
+                  alt="profile"
+                  className="rounded-circle"
+                  width="30"
+                  height="30"
+                />
+              </DropdownToggle>
+              <DropdownMenu>
+                <DropdownItem header>Info</DropdownItem>
+                <Link to={"/account"} style={{ textDecoration: "none" }}>
+                  <DropdownItem>My Account</DropdownItem>
+                </Link>
+                <DropdownItem divider />
+                <DropdownItem onClick={handleLogout}>Logout</DropdownItem>
+              </DropdownMenu>
+            </Dropdown>
+          </div>
+        )}
 
         <Button
-          style={{
-            backgroundColor: "transparent",
-            border: "none",
-          }}
+          style={{ backgroundColor: "transparent", border: "none" }}
           className="d-lg-none"
-          onClick={() => showMobilemenu()}
+          onClick={showMobileMenu}
         >
           <i className="bi bi-list"></i>
         </Button>
       </div>
-
-   
-
     </Navbar>
   );
 };
 
 export default Header;
-
-

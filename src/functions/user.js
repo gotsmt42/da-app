@@ -11,6 +11,7 @@ export const swalLogout = () => {
         showCancelButton: true,
         confirmButtonText: "Logout",
         cancelButtonText: "Cancel",
+        confirmButtonColor:"#d33"
       }).then((result) => {
         if (result.isConfirmed) {
     

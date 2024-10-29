@@ -7,43 +7,44 @@ import Header from "./Header";
 import { Container } from "reactstrap";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import Footer from "./Footer";
-import { FaArrowCircleLeft, FaArrowLeft } from "react-icons/fa";
+import { FaArrowLeft } from "react-icons/fa";
 import { IconButton } from "@mui/material";
 
-import './FullLayout.css'
+import './FullLayout.css';
 
 const FullLayout = () => {
   const sidebarRef = useRef(null);
-  const [isMobile, setIsMobile] = useState(false); // State เพื่อติดตามสถานะโหมด mobile
+  const [isMobile, setIsMobile] = useState(false);
   const [isScrollingUp, setIsScrollingUp] = useState(false);
   const [lastScrollTop, setLastScrollTop] = useState(0);
-  const [isHeaderFixed, setIsHeaderFixed] = useState(false);
+  const [touchStartY, setTouchStartY] = useState(null);
 
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
     const handleOutsideClick = (e) => {
-      // ตรวจสอบว่าคลิกอยู่นอกเหนือจาก contentArea
-      if (sidebarRef.current && !sidebarRef.current.contains(e.target)) {
+      if (isMobile && sidebarRef.current && !sidebarRef.current.contains(e.target)) {
         closeSidebar();
       }
     };
 
     const checkIsMobile = () => {
       const screenWidth = window.innerWidth;
-      setIsMobile(screenWidth <= 768); // ตั้งค่าให้เป็น mobile เมื่อหน้าจอน้อยกว่าหรือเท่ากับ 768px
+      setIsMobile(screenWidth <= 768);
     };
-    checkIsMobile(); // เรียกฟังก์ชันเมื่อโหลดหน้าเว็บ
+    checkIsMobile();
 
-    // เพิ่ม event listener เมื่อ component ถูก mount
     document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("touchstart", handleOutsideClick); // เพิ่ม event สำหรับการสัมผัส
+    window.addEventListener("resize", checkIsMobile);
 
-    // ถอด event listener เมื่อ component ถูก unmount
     return () => {
       document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("touchstart", handleOutsideClick);
+      window.removeEventListener("resize", checkIsMobile);
     };
-  }, []);
+  }, [isMobile]);
 
   const closeSidebar = () => {
     if (isMobile) {
@@ -52,49 +53,52 @@ const FullLayout = () => {
   };
 
   const handleMenuClick = () => {
-    closeSidebar(); // เมื่อคลิกที่เมนูให้ปิด Slidebar
+    closeSidebar();
   };
 
   const handleScroll = () => {
-    const currentScrollTop =
-      window.pageYOffset || document.documentElement.scrollTop;
+    const currentScrollTop = window.pageYOffset || document.documentElement.scrollTop;
 
     setIsScrollingUp(currentScrollTop < lastScrollTop && currentScrollTop > 0);
     setLastScrollTop(currentScrollTop <= 0 ? 0 : currentScrollTop);
 
-    // ตรวจสอบว่าต้องกำหนด Header เป็น fixed หรือไม่
-    setIsHeaderFixed(currentScrollTop > 0);
+    if (currentScrollTop > 0 && isMobile) {
+      closeSidebar();
+    }
   };
 
   useEffect(() => {
-    window.addEventListener("scroll", handleScroll); // เพิ่ม event listener สำหรับ scroll
+    window.addEventListener("scroll", handleScroll);
 
     return () => {
-      window.removeEventListener("scroll", handleScroll); // ถอด event listener เมื่อ component ถูก unmount
+      window.removeEventListener("scroll", handleScroll);
     };
-  }, [lastScrollTop]); // ให้ useEffect ทำงานเมื่อ lastScrollTop เปลี่ยนแปลง
+  }, [lastScrollTop, isMobile]);
 
-  // ใช้ตรวจสอบค่า isScrollingUp และใส่คลาส CSS ตามที่ต้องการใน Header
-// ใช้ตรวจสอบความกว้างของหน้าจอเพื่อตัดสินใจใช้งาน stickyHeader หรือไม่
-const Mobile = window.innerWidth <= 768; // ตรวจสอบว่าเป็นโหมดมือถือหรือไม่
-const isLargeScreen = window.innerWidth > 1024; // ตรวจสอบว่าเป็นหน้าจอใหญ่หรือไม่
-const shouldUseStickyHeader = Mobile && !isLargeScreen;
-
-// ใช้ตรวจสอบค่า isScrollingUp และใส่คลาส CSS ตามที่ต้องการใน Header
-const headerClass = isScrollingUp && shouldUseStickyHeader ? "stickyHeader" : "";
-
+  const headerClass = isScrollingUp ? "stickyHeader" : "";
   const isDashboard = location.pathname === "/dashboard";
-  
-  
+
+  const handleTouchStart = (e) => {
+    setTouchStartY(e.touches[0].clientY);
+  };
+
+  const handleTouchEnd = (e) => {
+    const touchEndY = e.changedTouches[0].clientY;
+
+    // ตรวจสอบการเลื่อน
+    const distance = touchStartY - touchEndY;
+    if (distance > 50) { // ถ้าลงมากกว่าหรือเท่ากับ 50px ปิด Sidebar
+      closeSidebar();
+    }
+  };
+
   return (
-    <main>
-      {/* Header */}
+    <main onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       <div className={`header ${headerClass}`}>
         <Header />
       </div>
 
       <div className="pageWrapper d-lg-flex">
-        {/* Sidebar */}
         <aside
           className={`sidebarArea shadow ${isMobile ? "" : "showSidebar"}`}
           id="sidebarArea"
@@ -103,9 +107,7 @@ const headerClass = isScrollingUp && shouldUseStickyHeader ? "stickyHeader" : ""
           <Sidebar handleMenuClick={handleMenuClick} />
         </aside>
 
-        {/* Content Area */}
         <div className="contentArea" onClick={isMobile ? closeSidebar : null}>
-          {/* Back Button */}
           {!isDashboard && (
             <div className="back-button">
               <IconButton
@@ -117,7 +119,6 @@ const headerClass = isScrollingUp && shouldUseStickyHeader ? "stickyHeader" : ""
             </div>
           )}
 
-          {/* Middle Content */}
           <Container className="p-3" fluid>
             <Outlet />
             <SpeedInsights />
