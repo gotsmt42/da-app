@@ -42,7 +42,7 @@ function EventCalendar() {
   const [defaultTextColor, setDefaultTextColor] = useState("#FFFFFF"); // สีข้อความเริ่มต้น
   const [defaultBackgroundColor, setDefaultBackgroundColor] =
     useState("#0c49ac"); // สีพื้นหลังเริ่มต้น
-  const [defaultFontSize, setDefaultFontSize] = useState(11); // สีพื้นหลังเริ่มต้น
+  const [defaultFontSize, setDefaultFontSize] = useState(8); // สีพื้นหลังเริ่มต้น
 
   const [loading, setLoading] = useState(false); // เพิ่มสถานะการโหลด
 
@@ -781,17 +781,29 @@ function EventCalendar() {
                   flexDirection: "column", // ให้ข้อความในกรอบต่อกันลงมา
                 }}
               >
+                 {window.innerWidth >= 768 ? (
                 <span
                   style={{
                     textOverflow: "ellipsis",
                     overflow: "hidden",
                     margin: "auto",
-                    fontSize: eventInfo.event.extendedProps.fontSize,
+                    fontSize: eventInfo.event.extendedProps.fontSize + 4,
                     display: "block", // เปลี่ยนให้ display เป็น block
                   }}
                 >
                   {eventInfo.event.title}
                 </span>
+                 ): <span
+                 style={{
+                   textOverflow: "ellipsis",
+                   overflow: "hidden",
+                   margin: "auto",
+                   fontSize: eventInfo.event.extendedProps.fontSize,
+                   display: "block", // เปลี่ยนให้ display เป็น block
+                 }}
+               >
+                 {eventInfo.event.title}
+               </span>}
               </div>
             </div>
           )}
