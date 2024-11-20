@@ -4,7 +4,6 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction"; // for selectable
 import timeGridPlugin from "@fullcalendar/timegrid"; // for dayClick
 import momentTimezonePlugin from "@fullcalendar/moment-timezone";
-import adaptivePlugin from "@fullcalendar/adaptive";
 
 import listPlugin from "@fullcalendar/list";
 
@@ -23,6 +22,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons"; // Import ไอคอนต่างๆ
 
 import EventService from "../../services/EventService";
+import fetchHolidayService from "../../services/fetchHolidayService";
 import moment from "moment";
 
 import { ThreeDots } from "react-loader-spinner";
@@ -34,8 +34,9 @@ import { Col, Row } from "reactstrap";
 import { CSVLink } from "react-csv";
 
 import "./index.css";
-import axios from "axios";
 
+
+import API from "../../API/axiosInstance";
 
 
 function EventCalendar() {
@@ -44,112 +45,96 @@ function EventCalendar() {
   const [defaultTextColor, setDefaultTextColor] = useState("#FFFFFF"); // สีข้อความเริ่มต้น
   const [defaultBackgroundColor, setDefaultBackgroundColor] =
     useState("#0c49ac"); // สีพื้นหลังเริ่มต้น
-  const [defaultFontSize, setDefaultFontSize] = useState(8); // สีพื้นหลังเริ่มต้น
+
+
+    
+  const [defaultFontSize, setDefaultFontSize] = useState(8); //
+
+
 
   const [loading, setLoading] = useState(false); // เพิ่มสถานะการโหลด
-
-
-  const fetchWithTimeout = async (url, options = {}, timeout = 5000) => {
-    return Promise.race([
-      fetch(url, options),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Request timed out")), timeout)
-      ),
-    ]);
-  };
-
   
-
   useEffect(() => {
-    fetchAllEvents(); // ดึงข้อมูลเมื่อ component mount
+    fetchEventsFromDB(); // Fetch events when component mounts
+    // fetchThaiHolidaysFromAPI()
   }, []);
 
-  const fetchAllEvents = async () => {
-    setLoading(true);
-    console.time("fetchAllEvents"); // เริ่มจับเวลา
+
+  const fetchThaiHolidaysFromAPI = async () => {
     try {
-      const [dbEvents, thaiHolidays] = await Promise.all([
-        fetchEventsFromDB(),
-        fetchThaiHolidays(),
-      ]);
+      const response = await API.get(`/holidays`);
+      // console.log("API Response:", response.data); // ตรวจสอบโครงสร้างของ API response
   
-      const combinedEvents = [...dbEvents, ...thaiHolidays];
-      setEvents(combinedEvents);
+      // ตรวจสอบว่า response.data มีค่าหรือไม่
+      if (response.data) {
+        // แสดงข้อมูลทั้งหมดของ response.data
+        // console.log("Complete Data Structure:", JSON.stringify(response.data, null, 2));  // ตรวจสอบโครงสร้างทั้งหมด
+  
+        // ตรวจสอบโครงสร้างและหาข้อมูลที่ต้องการ
+        if (response.data && Array.isArray(response.data)) {
+          // ถ้าข้อมูลใน response.data เป็น Array
+          const holidays = response.data.map((holiday) => ({
+            title: holiday.HolidayDescriptionThai, 
+            start: holiday.Date, // 
+            color: "#FF0000", // กำหนดสี
+          }));
+  
+          // console.log("Mapped Holidays for Calendar:", holidays);  // ตรวจสอบข้อมูลหลังจาก map
+          return holidays;
+        } else {
+          console.error("Invalid structure, 'result.data' missing or incorrect.");
+          return [];
+        }
+      } else {
+        console.error("No data found in API response.");
+        return [];
+      }
     } catch (error) {
-      console.error("Error fetching events or holidays:", error);
-    } finally {
-      setLoading(false);
-      console.timeEnd("fetchAllEvents"); // จบจับเวลา
+      console.error("Error fetching holidays from API:", error.message);
+      return [];
     }
   };
   
+  
+  
   const fetchEventsFromDB = async () => {
     setLoading(true);
-    console.time("fetchEventsFromDB"); // เริ่มจับเวลา
     try {
+      // ดึงข้อมูล events จากฐานข้อมูล
       const res = await EventService.getEvents();
       const eventsWithId = res.userEvents.map((event) => ({
         ...event,
         id: event._id,
       }));
-      return eventsWithId; // คืนค่าข้อมูล
+  
+      // ดึงข้อมูลวันหยุดจาก API
+      const thaiHolidays = await fetchThaiHolidaysFromAPI();
+      // console.log("Fetched holidays:", thaiHolidays);
+  
+      // ตรวจสอบว่าได้ข้อมูลวันหยุดแล้วหรือไม่
+      if (thaiHolidays.length > 0) {
+ const combinedEvents = [
+      ...eventsWithId,
+      ...thaiHolidays.map((holiday) => ({
+        ...holiday,
+        fontSize: defaultFontSize.extendedProps, // Apply default font size
+      })),
+    ];        // console.log("Combined events:", combinedEvents); // ตรวจสอบข้อมูลที่รวมกันแล้ว
+  
+        // อัปเดตข้อมูลใน state
+        setEvents(combinedEvents);
+      } else {
+        console.log("No holidays found, only user events will be displayed.");
+        setEvents(eventsWithId);
+      }
     } catch (error) {
-      console.error("Error fetching events:", error);
-      return []; // คืนค่าเป็น array ว่างในกรณีเกิดข้อผิดพลาด
+      console.error("Error fetching events or holidays:", error);
     } finally {
-      console.timeEnd("fetchEventsFromDB"); // จบจับเวลา
       setLoading(false);
     }
   };
-
-
-
-  let cachedHolidays = null;
-  let holidaysLastFetched = null;
   
-  const fetchThaiHolidays = async () => {
-    const now = new Date();
-  
-    // ตรวจสอบ cache
-    if (cachedHolidays && holidaysLastFetched && (now - holidaysLastFetched < 24 * 60 * 60 * 1000)) {
-      console.log("Using cached holidays");
-      return cachedHolidays;
-    }
-  
-    console.time("fetchThaiHolidays");
-    try {
-      const response = await axios.get(`https://api.allorigins.win/get?url=${encodeURIComponent('https://www.myhora.com/calendar/ical/holiday.aspx?latest.json')}`);
-      
-      if (response.status !== 200) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-  
-      const data = JSON.parse(response.data.contents);
-      if (!data || !data.VCALENDAR || !data.VCALENDAR[0].VEVENT) {
-        throw new Error("Invalid data structure");
-      }
-  
-      cachedHolidays = data.VCALENDAR[0].VEVENT.map((holiday) => ({
-        title: holiday.SUMMARY,
-        date: moment(holiday["DTSTART;VALUE=DATE"]).format("YYYY-MM-DD"),
-        allDay: true,
-        backgroundColor: "#ff0000",
-        textColor: "#f5e5da",
-        fontSize: 6,
-      }));
-  
-      holidaysLastFetched = new Date(); // อัปเดตวันและเวลา
-      return cachedHolidays;
-    } catch (error) {
-      console.error("Error fetching Thai holidays:", error);
-      return []; // คืนค่าเป็น array ว่างในกรณีเกิดข้อผิดพลาด
-    } finally {
-    console.timeEnd("fetchThaiHolidays");
-  }
-  };
-  
-  
-  
+    
 
   const saveEventToDB = async (newEvent) => {
     try {
@@ -283,7 +268,7 @@ function EventCalendar() {
         setDefaultTextColor(textColor);
         setDefaultBackgroundColor(backgroundColor);
         setDefaultFontSize(fontSize);
-        fetchAllEvents(); // Fetch events from database
+        fetchEventsFromDB(); // Fetch events from database
       }
     });
   };
@@ -475,7 +460,7 @@ function EventCalendar() {
 
         setEvents(updatedEvents);
 
-        fetchAllEvents();
+        fetchEventsFromDB();
 
         setLoading(false); // เริ่มต้นโหลดข้อมูล
 
@@ -529,7 +514,7 @@ function EventCalendar() {
       setEvents(updatedEvents);
 
       // ดึงข้อมูลเหตุการณ์จากฐานข้อมูลอีกครั้งเพื่อให้มั่นใจว่าข้อมูลเป็นปัจจุบัน
-      fetchAllEvents();
+      fetchEventsFromDB();
 
       // แสดงข้อความแจ้งเตือนเมื่ออัปเดตเหตุการณ์สำเร็จ
       // Swal.fire("Event Updated", "", "success");
@@ -572,7 +557,7 @@ function EventCalendar() {
 
     setEvents(updatedEvents);
 
-    fetchAllEvents();
+    fetchEventsFromDB();
 
     // Swal.fire("Event Updated", "", "success");
   };
@@ -596,7 +581,7 @@ function EventCalendar() {
           // Update events state after deletion
           const updatedEvents = events.filter((event) => event._id !== id);
           setEvents(updatedEvents);
-          await fetchAllEvents();
+          await fetchEventsFromDB();
 
           setLoading(false);
 
@@ -848,31 +833,33 @@ function EventCalendar() {
                     : "none", // เพิ่มเงาเฉพาะสำหรับวันหยุด
                 }}
               >
-                {window.innerWidth >= 768 ? (
-                  <span
-                    style={{
-                      textOverflow: "ellipsis",
-                      overflow: "hidden",
-                      margin: "auto",
-                      fontSize: eventInfo.event.extendedProps.fontSize + 4,
-                      display: "block",
-                    }}
-                  >
-                    {eventInfo.event.title}
-                  </span>
-                ) : (
-                  <span
-                    style={{
-                      textOverflow: "ellipsis",
-                      overflow: "hidden",
-                      margin: "auto",
-                      fontSize: eventInfo.event.extendedProps.fontSize,
-                      display: "block",
-                    }}
-                  >
-                    {eventInfo.event.title}
-                  </span>
-                )}
+
+{window.innerWidth >= 768 ? (
+  <span
+    style={{
+      textOverflow: "ellipsis",
+      overflow: "hidden",
+      margin: "auto",
+      fontSize: isNaN(eventInfo.event.extendedProps.fontSize) ? 12 : eventInfo.event.extendedProps.fontSize + 4, // Default to 14 if NaN
+      display: "block",
+    }}
+  >
+    {eventInfo.event.title}
+  </span>
+) : (
+  <span
+    style={{
+      textOverflow: "ellipsis",
+      overflow: "hidden",
+      margin: "auto",
+      fontSize: isNaN(eventInfo.event.extendedProps.fontSize) ? 8 : eventInfo.event.extendedProps.fontSize, // Default to 14 if NaN
+      display: "block",
+    }}
+  >
+    {eventInfo.event.title}
+  </span>
+)}
+
               </div>
             </div>
           )}

@@ -9,9 +9,10 @@ const API = axios.create({
   
   baseURL: apiUrl, // ใช้ Environment Variable ที่ชื่อ APP_API_URL
   headers: {
-    Accept: "application/json", // แก้ไข Content-Type ให้เป็น application/json
-    "X-API-Key": apiKey, // เพิ่ม API Key เข้าไปใน header หากต้องการ
-    "X-Secret": apiSecret // เพิ่ม Secret Key เข้าไปใน header หากต้องการ
+    "Content-Type": "application/json",
+    "X-API-Key": apiKey,
+    "X-Secret": apiSecret,
+    "Authorization": `Bearer ${localStorage.getItem('token')}`, 
   },
 
   
