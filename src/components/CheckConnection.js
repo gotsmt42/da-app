@@ -7,32 +7,32 @@ const CheckConnection = ({ children }) => {
   const [hasError, setHasError] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const checkConnectivity = async () => {
-      try {
-        const response = await fetch(`${apiUrl}`);
-        if (response.status === 503) {
-          // If the server is unavailable (HTTP 503), set hasError to true
-          setHasError(true);
-        } else if (response.status === 200) {
-          // If everything is fine (HTTP 200), set hasError to false
-          setHasError(false);
-        }
-      } catch (error) {
-        console.error('Error checking connectivity:', error);
-        // If there's a fetch error (e.g., network issue), consider it an error
-        setHasError(true);
-      }
-    };
+  // useEffect(() => {
+  //   const checkConnectivity = async () => {
+  //     try {
+  //       const response = await fetch(`${apiUrl}`);
+  //       if (response.status === 503) {
+  //         // If the server is unavailable (HTTP 503), set hasError to true
+  //         setHasError(true);
+  //       } else if (response.status === 200) {
+  //         // If everything is fine (HTTP 200), set hasError to false
+  //         setHasError(false);
+  //       }
+  //     } catch (error) {
+  //       console.error('Error checking connectivity:', error);
+  //       // If there's a fetch error (e.g., network issue), consider it an error
+  //       setHasError(true);
+  //     }
+  //   };
 
-    checkConnectivity();
+  //   checkConnectivity();
 
-    // Set up interval to check connectivity periodically
-    const intervalId = setInterval(checkConnectivity, 5000); // Check every 5 seconds
+  //   // Set up interval to check connectivity periodically
+  //   const intervalId = setInterval(checkConnectivity, 5000); // Check every 5 seconds
 
-    // Clean up interval on component unmount
-    return () => clearInterval(intervalId);
-  }, []);
+  //   // Clean up interval on component unmount
+  //   return () => clearInterval(intervalId);
+  // }, []);
 
   useEffect(() => {
     if (hasError) {
