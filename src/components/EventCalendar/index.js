@@ -43,6 +43,7 @@ import API from "../../API/axiosInstance";
 import { toast } from "react-toastify"; // หากใช้ react-toastify
 
 import { faTimes } from "@fortawesome/free-solid-svg-icons";
+import { faSearch } from "@fortawesome/free-solid-svg-icons";
 
 function EventCalendar() {
   const [events, setEvents] = useState([]);
@@ -57,6 +58,8 @@ function EventCalendar() {
   const [defaultFontSize, setDefaultFontSize] = useState(8); //
 
   const [loading, setLoading] = useState(false); // เพิ่มสถานะการโหลด
+
+  const [searchTerm, setSearchTerm] = useState(""); // 🔍 State สำหรับค้นหา
 
   let isProcessing = false; // ตัวแปรกันซ้ำ
 
@@ -252,16 +255,18 @@ function EventCalendar() {
   };
   const handleAddEventToCalendar = async (eventData) => {
     Swal.fire({
-      title: `${eventData.title || "Untitled Event"}`, // ✅ แสดงชื่ออีเวนต์ที่ถูกคลิก
+      title: `${eventData.title || "Untitled Event"} `, // ✅ แสดงชื่ออีเวนต์ที่ถูกคลิก
+      customClass: "swal-wide",
+
       html: `
         <label for="startDate">Start Date:</label>
-        <input id="startDate" type="date" class="swal2-input" style="margin-bottom: 1rem; width: 250px">
+        <input id="startDate" type="date" class="swal2-input" style="margin-bottom: 1rem; width: 250px"><br>
     
         <label for="endDate">End Date:</label>
         <input id="endDate" type="date" class="swal2-input" style="margin-bottom: 1rem; width: 250px">
       `,
       showCancelButton: true,
-      confirmButtonText: "Add Event",
+      confirmButtonText: "เพิ่มลงในตาราง",
       preConfirm: () => {
         const startDate = document.getElementById("startDate").value;
         const endDate = document.getElementById("endDate").value;
@@ -353,22 +358,24 @@ function EventCalendar() {
         if (result.isConfirmed) {
           // ✅ ลบข้อมูลออกจากฐานข้อมูล
           await deleteEventFromDB(eventId);
-  
+
           // ✅ อัปเดต state eventReceive (ลบอีเวนต์ที่ถูกลบออก)
           setEventReceive((prevEvents) => {
-            const updatedEvents = prevEvents.filter((event) => event._id !== eventId);
-  
+            const updatedEvents = prevEvents.filter(
+              (event) => event._id !== eventId
+            );
+
             // ✅ ตรวจสอบว่าเหลือข้อมูลในหน้าปัจจุบันหรือไม่
             const totalItemsLeft = updatedEvents.length;
             const maxPages = Math.ceil(totalItemsLeft / eventsPerPage);
-  
+
             if (totalItemsLeft <= startIndex && currentPage > 1) {
               setCurrentPage(Math.max(1, currentPage - 1)); // ✅ กลับไปหน้าก่อนหน้า
             }
-  
+
             return updatedEvents;
           });
-  
+
           // Swal.fire({
           //   title: "Deleted!",
           //   text: "The event has been deleted.",
@@ -387,7 +394,7 @@ function EventCalendar() {
       });
     }
   };
-  
+
   const fetchThaiHolidaysFromAPI = async () => {
     try {
       const response = await API.get(`/holidays`);
@@ -572,19 +579,12 @@ function EventCalendar() {
           fontSize,
           start,
           end,
-          
         };
       },
     }).then(async (result) => {
       if (result.isConfirmed) {
-        const {
-          title,
-          backgroundColor,
-          textColor,
-          fontSize,
-          start,
-          end,
-        } = result.value;
+        const { title, backgroundColor, textColor, fontSize, start, end } =
+          result.value;
 
         const newEnd = moment(end).add(1, "days");
         const newEvent = {
@@ -734,7 +734,9 @@ function EventCalendar() {
         if (end === "null" || end === "") {
           // If end is null or empty, set end to original event end
           end = eventEnd.toISOString();
-         } 
+        }
+        end = moment(end).add(1, "days").toISOString();
+
         // else {
         //   if (!isAllDay) {
         //     // Convert end to datetime format
@@ -1060,27 +1062,26 @@ function EventCalendar() {
       : a._id
       ? moment(a._id?.toString().substring(0, 8), "hex")
       : moment(0);
-  
+
     const dateB = b.createdAt
       ? moment(b.createdAt)
       : b._id
       ? moment(b._id?.toString().substring(0, 8), "hex")
       : moment(0);
-  
+
     return dateB.diff(dateA); // เรียงจากใหม่ไปเก่า
   });
-  
 
-// ✅ คำนวณ Pagination
-const startIndex = (currentPage - 1) * eventsPerPage;
-const endIndex = startIndex + eventsPerPage;
-const currentEvents = sortedEvents.slice(startIndex, endIndex);
+  // ✅ คำนวณ Pagination
+  const startIndex = (currentPage - 1) * eventsPerPage;
+  const endIndex = startIndex + eventsPerPage;
+  const currentEvents = sortedEvents.slice(startIndex, endIndex);
 
-// ✅ ปรับจำนวนหน้าหลังจากลบข้อมูลออก
-const totalPages = Math.ceil(sortedEvents.length / eventsPerPage);
-if (currentPage > totalPages && totalPages > 0) {
-  setCurrentPage(totalPages);
-}
+  // ✅ ปรับจำนวนหน้าหลังจากลบข้อมูลออก
+  const totalPages = Math.ceil(sortedEvents.length / eventsPerPage);
+  if (currentPage > totalPages && totalPages > 0) {
+    setCurrentPage(totalPages);
+  }
 
   const handleNextPage = () => {
     if (currentPage < totalPages) {
@@ -1131,20 +1132,28 @@ if (currentPage > totalPages && totalPages > 0) {
       </Row>
 
       <div
-        className="card p-4 mb-4"
-        style={{ background: "#f8f9fa", borderRadius: "10px" }}
+        className="card p-2 mb-4 mt-4"
+        style={{ background: "#f8f9fa", borderRadius: "8px", width: "100%" }}
       >
-        <h4 className="mb-3">เพิ่มแผนงานใหม่</h4>
-        <form onSubmit={handleAddEventReceive} className="d-flex gap-3">
+        <h5 className="mb-3">เพิ่มแผนงานใหม่</h5>
+        <form onSubmit={handleAddEventReceive} className="d-flex gap-2 p-2">
           <input
             type="text"
-            className="form-control"
+            className="form-control form-control-sm"
             placeholder="Enter event title"
-            value={newEventTitle} // ✅ ใช้ value เพื่อให้ state อัปเดตทันที
+            value={newEventTitle}
             onChange={(e) => setNewEventTitle(e.target.value)}
+            style={{ width: "100%", fontSize: "14px", padding: "6px" }} // ✅ ขยาย input เต็มความกว้าง
           />
-
-          <button type="submit" className="btn btn-primary">
+          <button
+            type="submit"
+            className="btn btn-primary btn-sm"
+            style={{
+              fontSize: "14px",
+              padding: "6px 12px",
+              whiteSpace: "nowrap",
+            }}
+          >
             Add Event
           </button>
         </form>
@@ -1152,88 +1161,102 @@ if (currentPage > totalPages && totalPages > 0) {
 
       <div
         id="external-events"
-        style={{ padding: "10px", background: "#f8f9fa" }}
-        className="mb-5"
+        style={{ padding: "8px", background: "#f8f9fa", width: "100%" }}
+        className="mb-4"
       >
-        <h4 className="mb-3">แผนงานใหม่รอจัดลงตาราง :</h4>
+        <h5 className="mb-2 p-2">แผนงานรอจัดลงตาราง</h5>
 
-        <div className="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-4 g-2">
-          {currentEvents.map((event) => (
-            <div
-              key={event._id || event.id || Math.random()}
-              className="col d-flex align-items-center"
-            >
+        {/* 🔍 ช่องค้นหาใหม่ พร้อมไอคอน */}
+        <div className="input-group mb-2 p-2">
+          <span className="input-group-text bg-white border border-secondary">
+            <FontAwesomeIcon icon={faSearch} className="text-muted" />{" "}
+            {/* ✅ แก้ให้ใช้ faSearch */}
+          </span>
+          <input
+            type="search"
+            className="form-control form-control-sm border border-secondary"
+            placeholder="ค้นหาแผนงาน..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{ fontSize: "14px", padding: "6px" }}
+          />
+        </div>
+
+        <div className="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-2 p-2">
+          {currentEvents
+            .filter((event) =>
+              event.title.toLowerCase().includes(searchTerm.toLowerCase())
+            ) // ✅ กรองข้อมูลตามคำค้นหา
+            .map((event) => (
               <div
-                className="fc-event flex-grow-1 text-white d-flex align-items-center px-3 py-2"
-                data-event-id={event._id || event.id}
-                onClick={() => handleAddEventToCalendar(event)}
-                style={{
-                  background: event.backgroundColor || "#0c49ac",
-                  borderRadius: "5px",
-                  minWidth: "120px",
-                  maxWidth: "100%",
-                  overflow: "hidden",
-                  whiteSpace: "normal",
-                  wordBreak: "break-word",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  textAlign: "center",
-                  cursor: "pointer",
-                }}
+                key={event._id || event.id || Math.random()}
+                className="col d-flex align-items-center gap-2 mb-2"
               >
-                <span
+                {/* กล่อง Event */}
+                <div
+                  className="fc-event flex-grow-1 text-white d-flex align-items-center justify-content-between px-3 py-2"
+                  data-event-id={event._id || event.id}
+                  onClick={() => handleAddEventToCalendar(event)}
                   style={{
-                    display: "block",
+                    background: event.backgroundColor || "#0c49ac",
+                    borderRadius: "4px",
+                    fontSize: "12px",
                     width: "100%",
+                    overflow: "hidden",
+                    whiteSpace: "normal",
+                    wordBreak: "break-word",
                     textAlign: "center",
+                    cursor: "pointer",
                   }}
                 >
-                  {event.title}
-                </span>
-              </div>
+                  <span>{event.title}</span>
+                </div>
 
-              {/* ปุ่มลบอีเวนต์ */}
-              <button
-                className="btn btn-danger btn-sm ms-2 d-flex align-items-center justify-content-center"
-                onClick={() => handleDeleteEventReceive(event._id || event.id)}
-                style={{ width: "30px", height: "30px", borderRadius: "50%" }}
-              >
-                <FontAwesomeIcon icon={faTimes} className="text-white" />
-              </button>
-            </div>
-          ))}
+                {/* ปุ่มลบ */}
+                <button
+                  className="btn btn-danger btn-sm d-flex  align-items-center justify-content-center"
+                  onClick={() =>
+                    handleDeleteEventReceive(event._id || event.id)
+                  }
+                  style={{
+                    width: "25px",
+                    height: "25px",
+                    borderRadius: "50%",
+                    marginRight: "5px", // ✅ ขยับขอบขวา
+                  }}
+                >
+                  <FontAwesomeIcon icon={faTimes} className="text-white" />
+                </button>
+              </div>
+            ))}
         </div>
 
         {/* ✅ Pagination Controls */}
         {totalPages > 1 && (
-          <div className="d-flex justify-content-center mt-3">
+          <div className="d-flex justify-content-center mt-2">
             <button
-              className="btn btn-outline-primary me-2"
+              className="btn btn-outline-primary btn-sm me-1"
               onClick={handlePrevPage}
               disabled={currentPage === 1}
             >
-              « Previous
+              «
             </button>
-            <span className="mx-2">
-              Page {currentPage} of {totalPages}
+            <span className="mx-1" style={{ fontSize: "12px" }}>
+              {currentPage} / {totalPages}
             </span>
             <button
-              className="btn btn-outline-primary ms-2"
+              className="btn btn-outline-primary btn-sm ms-1"
               onClick={handleNextPage}
               disabled={currentPage === totalPages}
             >
-              Next »
+              »
             </button>
           </div>
         )}
       </div>
-
-      <div id="content-id" style={{ flex: 1 }}>
+      <div id="content-id" style={{ flex: 1, width: "100%" }}>
         <FullCalendar
           ref={calendarRef}
-          contentHeight="auto"
-          timeZone="local"
           plugins={[
             dayGridPlugin,
             interactionPlugin,
@@ -1243,125 +1266,100 @@ if (currentPage > totalPages && totalPages > 0) {
           ]}
           initialView="dayGridMonth"
           selectable={true}
-          editable={true} // ✅ ให้สามารถลาก event ได้
-          droppable={true} // ✅ เปิดให้ลาก event จากภายนอกลงใน calendar ได้
-          eventReceive={handleEventReceive} // ✅ จับ event ที่ถูกลากลงมา
-          events={events} // ✅ ใช้ state events
+          editable={true}
+          droppable={true}
+          eventReceive={handleEventReceive}
+          events={events}
           dateClick={handleAddEvent}
           eventDrop={handleEventDrop}
           eventResize={handleEventResize}
+          eventClick={handleEditEvent}
+ 
           allDaySlot={true}
           nowIndicator={true}
           selectMirror={true}
           weekends={true}
-          eventContent={(eventInfo) => (
-            <div>
-              {eventInfo.event.allDay === false ? (
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <span
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      textOverflow: "ellipsis",
-                      overflow: "hidden",
-                      margin: "auto",
-                      padding: "2px",
-                      fontSize: "11px",
-                    }}
-                  >
-                    {moment(eventInfo.event.startStr).format("HH:mm")} -{" "}
-                    {moment(eventInfo.event.endStr).format("HH:mm")}
-                  </span>
-                </div>
-              ) : null}
-              <div
-                style={{
-                  backgroundColor: eventInfo.event.backgroundColor, // เปลี่ยนสีพื้นหลังสำหรับวันหยุด
-                  color: eventInfo.event.textColor, // เปลี่ยนสีข้อความสำหรับวันหยุด
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  padding: "5px",
-                  borderRadius: "5px",
-                  flexDirection: "column",
-                  // เพิ่มเงาหรือการจัดระเบียบที่แตกต่างถ้าต้องการ
-                  boxShadow: eventInfo.event.allDay
-                    ? "0 0 20px rgba(0, 0, 0, 0.2)"
-                    : "none", // เพิ่มเงาเฉพาะสำหรับวันหยุด
-                }}
-              >
-                {window.innerWidth >= 768 ? (
-                  <span
-                    style={{
-                      textOverflow: "ellipsis",
-                      overflow: "hidden",
-                      margin: "auto",
-                      fontSize: isNaN(eventInfo.event.extendedProps.fontSize)
-                        ? 12
-                        : eventInfo.event.extendedProps.fontSize + 4, // Default to 14 if NaN
-                      display: "block",
-                    }}
-                  >
-                    {eventInfo.event.title}
-                  </span>
-                ) : (
-                  <span
-                    style={{
-                      textOverflow: "ellipsis",
-                      overflow: "hidden",
-                      margin: "auto",
-                      fontSize: isNaN(eventInfo.event.extendedProps.fontSize)
-                        ? 8
-                        : eventInfo.event.extendedProps.fontSize, // Default to 14 if NaN
-                      display: "block",
-                    }}
-                  >
-                    {eventInfo.event.title}
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-          eventClick={handleEditEvent}
+          contentHeight="auto"
           headerToolbar={{
-            left: "prev,next today",
+            left: "prev,next",
             center: "title",
+            right: "today",
+          }}
+          footerToolbar={{
             right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek",
+          }}
+          customButtons={{
+            prev: {
+              text: "‹",
+              click: () => calendarRef.current.getApi().prev(),
+            },
+            next: {
+              text: "›",
+              click: () => calendarRef.current.getApi().next(),
+            },
+            today: {
+              text: "Today",
+              click: () => calendarRef.current.getApi().today(),
+            },
           }}
           dayMaxEventRows={true}
           views={{
-            listWeek: {
-              dayMaxEventRows: window.innerWidth >= 576 ? 7 : 5,
-            },
-            dayGridMonth: {
-              dayMaxEventRows: window.innerWidth >= 576 ? 7 : 5,
-            },
-            timeGridWeek: {
-              dayMaxEventRows: window.innerWidth >= 576 ? 7 : 5,
-            },
-            timeGridDay: {
-              dayMaxEventRows: window.innerWidth >= 576 ? 7 : 5,
-            },
+            listWeek: { dayMaxEventRows: window.innerWidth >= 576 ? 7 : 5 },
+            dayGridMonth: { dayMaxEventRows: window.innerWidth >= 576 ? 7 : 5 },
+            timeGridWeek: { dayMaxEventRows: window.innerWidth >= 576 ? 7 : 5 },
+            timeGridDay: { dayMaxEventRows: window.innerWidth >= 576 ? 7 : 5 },
           }}
           dayCellDidMount={(info) => {
-            // เช็คว่าวันนี้เป็นวันเสาร์หรือวันอาทิตย์หรือไม่
             const date = info.date;
-            const isSaturday = date.getUTCDay() === 5; // 6 = Saturday
-            const isSunday = date.getUTCDay() === 6; // 0 = Sunday
+            const isSaturday = date.getUTCDay() === 5;
+            const isSunday = date.getUTCDay() === 6;
 
             if (isSaturday || isSunday) {
-              // ถ้าเป็นวันเสาร์หรือวันอาทิตย์
-              info.el.style.backgroundColor = "#FFFFF4"; // สีพื้นหลังสำหรับวันเสาร์-อาทิตย์
+              info.el.style.backgroundColor = "#FFFFF4";
             }
           }}
         />
+        <style>
+          {`
+      @media (max-width: 768px) {
+        .fc-header-toolbar {
+          display: flex;
+          flex-direction: column;
+          width: 100%;
+          gap: 8px;
+        }
+        .fc-toolbar-chunk {
+          display: flex;
+          justify-content: space-between;
+          width: 100%;
+        }
+        .fc-toolbar-title {
+          flex: 1;
+          text-align: center;
+          font-size: 1.5em;
+          margin: 0;
+        }
+        .fc-button {
+          flex: 1;
+          min-width: 0;
+          margin: 2px;
+        }
+        .fc-button-group {
+          display: flex;
+          width: 100%;
+        }
+        .fc-button-group .fc-button {
+          flex: 1;
+        }
+        .fc-footer-toolbar {
+          display: flex;
+          justify-content: center;
+          width: 100%;
+          margin-top: 5px;
+        }
+      }
+    `}
+        </style>
       </div>
 
       {loading && (

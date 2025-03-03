@@ -1,6 +1,25 @@
-.fc-daygrid-event {
-  font-size: 10px;
+/* ปรับแต่ง Event ใน FullCalendar ให้รองรับภาษาไทย */
+/* ปรับแต่ง Event ใน FullCalendar ให้รองรับภาษาไทย */
+.fc-event {
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* จัดชิดซ้ายเพื่อให้ข้อความไทยดูเป็นระเบียบ */
+  justify-content: center;
+  text-align: left ; /* ใช้ชิดซ้ายแทน justify */
+  padding: 8px;
+  border-radius: 8px;
+  white-space: normal; /* อนุญาตให้ขึ้นบรรทัดใหม่ */
+  word-break: break-word;
+  overflow-wrap: break-word;
+  overflow: hidden;
+  max-width: 100%;
+  font-size: 13px; /* ขยายตัวอักษรให้ดูชัดขึ้น */
+  font-weight: 500;
+  line-height: 1.6; /* ป้องกันวรรณยุกต์ทับกัน */
+  font-family: "Noto Sans Thai", sans-serif; /* ใช้ฟอนต์ที่รองรับภาษาไทย */
 }
+
+/* ปรับแต่งตัวอักษรภายในปฏิทิน */
 
 .fc-daygrid-event-dot {
   width: 10px;
@@ -21,15 +40,6 @@
   text-decoration: none; /* ลบขีดเส้นใต้ของข้อความ */
 }
 
-.fc-event {
-  /* border: solid #fff; */
-  /* display: contents; */
-  padding: 0px;
-  border-radius: 5px;
-  white-space: normal;
-  max-height: 100vh;
-  overflow: hidden;
-}
 
 .drag-items {
   display: flex;
@@ -55,6 +65,15 @@
 /* CSS สำหรับปรับขนาดตัวหนังสือของวันและวันที่ใน FullCalendar เมื่อหน้าจอเล็ก */
 
 @media (max-width: 768px) {
+  .fc-event {
+    font-size: 10px;
+    min-height: 40px;
+    max-width: 100%;
+    max-height: 100%;
+    padding: 8px;
+    line-height: 1.5;
+  }
+
   .fc-daygrid-day-number {
     /* เลือกตัวหนังสือของวันที่ */
     font-size: 12px; /* ปรับขนาดตัวหนังสือลงเมื่อหน้าจอเล็ก */
