@@ -28,7 +28,7 @@ const Expanded = ({ data }) => (
           alt="Avatar"
           width={300}
           height={300}
-          style={{ margin:"auto", borderRadius: "40%" }}
+          style={{ margin:"auto" }}
 
           
         />

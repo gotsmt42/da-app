@@ -156,7 +156,7 @@ const Dashboard = () => {
 
     {
       icon: FaUsers,
-      title: "Customer & Employee",
+      title: "จัดการสมาชิก",
       subtitle: loading ? "กำลังโหลด..." : Object.keys(users).length + " More",
       link: "/customer-employee",
       iconColor: "#795A47", // สีไอคอน
@@ -184,14 +184,14 @@ const Dashboard = () => {
     //   iconColor: "#2ecc71",
     //   iconBgColor: "rgba(22, 160, 133, 0.1)",
     // },
-    {
-      icon: FaClock,
-      title: "การดำเนินงาน",
-      subtitle: loading ? "กำลังโหลด..." : Object.keys(events).length + " more",
-      link: "/operation",
-      iconColor: "#f39c12", // สีไอคอน
-      iconBgColor: "#fef5e7",
-    },
+    // {
+    //   icon: FaClock,
+    //   title: "การดำเนินงาน",
+    //   subtitle: loading ? "กำลังโหลด..." : Object.keys(events).length + " more",
+    //   link: "/operation",
+    //   iconColor: "#f39c12", // สีไอคอน
+    //   iconBgColor: "#fef5e7",
+    // },
     
   ];
   const BlogData3 = [
@@ -282,7 +282,7 @@ const Dashboard = () => {
           </Col>
         ))}
       </Row>
-
+{/* 
       <Row
         className="flex-wrap mt-5"
         style={{ display: "flex", justifyContent: "space-between" }}
@@ -293,7 +293,7 @@ const Dashboard = () => {
         <Col className="col">
           <Chart />
         </Col>
-      </Row>
+      </Row> */}
     </div>
   );
 };

@@ -10,10 +10,10 @@ const Employee = () => {
         
         <EmployeeComponent  />
       </Col>
-
+{/* 
       <Col lg="12">
         <CustomerComponent />
-      </Col>
+      </Col> */}
       {/* <Col lg="12">
         <Card>
           <CardTitle tag="h6" className="border-bottom p-3 mb-0">

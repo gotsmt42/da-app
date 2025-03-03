@@ -41,44 +41,44 @@ const navigation = [
     href: "/event",
     icon: "bi-calendar-event-fill",
   },
-  {
-    title: "การดำเนินงาน",
-    href: "/operation",
-    icon: "bi-clock-fill",
-  },
+  // {
+  //   title: "การดำเนินงาน",
+  //   href: "/operation",
+  //   icon: "bi-clock-fill",
+  // },
 
-  {
-    title: "File",
-    icon: <IoFileTrayFullOutline />,
-    items: [
-      {
-        title: "File Upload",
-        href: "/fileupload",
-        icon: BiUpload,
-      },
-      {
-        title: "All Files",
-        href: "/files",
-        icon: LuFileStack,
-      },
-    ],
-  },
-  {
-    title: "Product",
-    icon: <FaProductHunt />,
-    items: [
-      {
-        title: "List Product",
-        href: "/product",
-        icon: CiBoxList,
-      },
-      {
-        title: "Stock Product",
-        href: "/product/stock",
-        icon: BiOutline,
-      },
-    ],
-  },
+  // {
+  //   title: "File",
+  //   icon: <IoFileTrayFullOutline />,
+  //   items: [
+  //     {
+  //       title: "File Upload",
+  //       href: "/fileupload",
+  //       icon: BiUpload,
+  //     },
+  //     {
+  //       title: "All Files",
+  //       href: "/files",
+  //       icon: LuFileStack,
+  //     },
+  //   ],
+  // },
+  // {
+  //   title: "Product",
+  //   icon: <FaProductHunt />,
+  //   items: [
+  //     {
+  //       title: "List Product",
+  //       href: "/product",
+  //       icon: CiBoxList,
+  //     },
+  //     {
+  //       title: "Stock Product",
+  //       href: "/product/stock",
+  //       icon: BiOutline,
+  //     },
+  //   ],
+  // },
 ];
 
 const Sidebar = ({ handleMenuClick }) => {
@@ -207,7 +207,7 @@ const Sidebar = ({ handleMenuClick }) => {
             onClick={handleMenuClick}
           >
             <i className="bi bi-people-fill ms-3"></i>
-            <span className="ms-2">CUSTOMER & EMPLOYEE MANAGEMENT</span>
+            <span className="ms-2">EMPLOYEE MANAGEMENT</span>
           </Link>
         </NavItem>
 
