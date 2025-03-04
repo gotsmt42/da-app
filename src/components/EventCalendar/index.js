@@ -119,17 +119,28 @@ function EventCalendar() {
   };
   const deleteEventFromDB = async (eventId) => {
     try {
-      // console.log(`🗑 Attempting to delete event ID: ${eventId}`); // ตรวจสอบว่า ID ถูกส่งมาหรือไม่
+      if (!eventId) {
+        console.warn("⚠ Event ID is missing, skipping deletion.");
+        return;
+      }
 
+      console.log(`🔍 ตรวจสอบ Event ID: ${eventId} ก่อนลบ`);
+
+      // ✅ ตรวจสอบว่า Event มีอยู่ใน eventReceive หรือไม่
+      const eventExists = eventReceive.some((e) => e._id === eventId);
+      if (!eventExists) {
+        console.warn(`⚠ Event ID ${eventId} ไม่พบใน eventReceive, ข้ามการลบ.`);
+        return;
+      }
+
+      console.log(`🗑 ลบ Event ID: ${eventId}`);
       const response = await API.delete(`/eventReceive/${eventId}`);
 
-      // console.log("📩 Response from server:", response);
-
       if (response.status === 200) {
-        // console.log(`✅ Event ${eventId} deleted successfully`);
+        console.log(`✅ Event ${eventId} ลบสำเร็จ`);
       } else {
         console.warn(
-          `⚠ Event ${eventId} deletion failed, status: ${response.status}`
+          `⚠ Event ${eventId} ลบไม่สำเร็จ, status: ${response.status}`
         );
       }
     } catch (error) {
@@ -191,7 +202,6 @@ function EventCalendar() {
         return;
       }
 
-      // ✅ ดึง `_id` ของ event ที่ถูกลาก
       let eventIdToDelete = droppedEvent.extendedProps?._id || droppedEvent.id;
       if (!eventIdToDelete) {
         eventIdToDelete =
@@ -204,13 +214,36 @@ function EventCalendar() {
         return;
       }
 
-      // ✅ ลบข้อมูลจากฐานข้อมูลก่อนที่จะบันทึก event ใหม่
-      await deleteEventFromDB(eventIdToDelete);
+      // ✅ ตรวจสอบว่า Event ซ้ำหรือไม่
+      const isDuplicate = events.some((e) => e._id === eventIdToDelete);
+      if (isDuplicate) {
+        console.warn(
+          `⚠ Event ID ${eventIdToDelete} is already in FullCalendar.`
+        );
+        return;
+      }
 
-      // ✅ ลบอีเวนต์ออกจาก `eventReceive`
-      setEventReceive((prevEvents) =>
-        prevEvents.filter((event) => event._id !== eventIdToDelete)
+      // ✅ ตรวจสอบว่า Event มีอยู่ใน `eventReceive` หรือไม่
+      const eventExistsInReceive = eventReceive.some(
+        (e) => e._id === eventIdToDelete
       );
+      if (eventExistsInReceive) {
+        console.log(
+          `✅ Event ID ${eventIdToDelete} found in eventReceive, proceeding with deletion.`
+        );
+
+        // ✅ ลบออกจาก state โดยใช้ `setEventReceive` เพียงครั้งเดียว
+        setEventReceive((prevEvents) =>
+          prevEvents.filter((event) => event._id !== eventIdToDelete)
+        );
+
+        // ✅ ลบออกจากฐานข้อมูล
+        await deleteEventFromDB(eventIdToDelete);
+      } else {
+        console.warn(
+          `⚠ Event ID ${eventIdToDelete} not found in eventReceive, skipping deletion.`
+        );
+      }
 
       // ✅ ตั้งค่า start, end และ date
       const startDate = moment(droppedEvent.start).format("YYYY-MM-DD");
@@ -226,12 +259,10 @@ function EventCalendar() {
           ? droppedEvent.extendedProps.fontSize.toString()
           : "8",
         start: startDate,
-        end: endDate, // ✅ กำหนดค่า end เสมอ
-        date: startDate, // ✅ เพิ่ม date ให้ตรงกับ Schema
+        end: endDate,
+        date: startDate,
         allDay: droppedEvent.allDay ?? true,
       };
-
-      // console.log("✅ New Event Data:", newEvent);
 
       // ✅ บันทึกอีเวนต์ใหม่ลงฐานข้อมูล
       const response = await saveEventToDB(newEvent);
@@ -244,8 +275,7 @@ function EventCalendar() {
       // ✅ อัปเดต events ใน FullCalendar
       setEvents((prevEvents) => [...prevEvents, newEvent]);
 
-      // โหลดข้อมูลใหม่จากฐานข้อมูล
-      await fetchEventReceiveFromDB();
+      // ✅ รีโหลดปฏิทินและ eventReceive เพื่อป้องกันข้อมูลซ้ำ
       await fetchEventsFromDB();
     } catch (error) {
       console.error("❌ Error in handleEventReceive:", error);
@@ -253,20 +283,21 @@ function EventCalendar() {
       isProcessing = false;
     }
   };
+
   const handleAddEventToCalendar = async (eventData) => {
     Swal.fire({
-      title: `${eventData.title || "Untitled Event"} `, // ✅ แสดงชื่ออีเวนต์ที่ถูกคลิก
+      title: `${eventData.title || "แผนงานไม่มีชื่อ"} `, // ✅ แสดงชื่อแผนงานที่ถูกคลิก
       customClass: "swal-wide",
-
       html: `
-        <label for="startDate">Start Date:</label>
-        <input id="startDate" type="date" class="swal2-input" style="margin-bottom: 1rem; width: 250px"><br>
-    
-        <label for="endDate">End Date:</label>
-        <input id="endDate" type="date" class="swal2-input" style="margin-bottom: 1rem; width: 250px">
-      `,
+          <label for="startDate">วันที่เริ่มต้น:</label>
+          <input id="startDate" type="date" class="swal2-input" style="margin-bottom: 1rem; width: 250px"><br>
+      
+          <label for="endDate">วันที่สิ้นสุด:</label>
+          <input id="endDate" type="date" class="swal2-input" style="margin-bottom: 1rem; width: 250px">
+        `,
       showCancelButton: true,
       confirmButtonText: "เพิ่มลงในตาราง",
+      cancelButtonText: "ยกเลิก",
       preConfirm: () => {
         const startDate = document.getElementById("startDate").value;
         const endDate = document.getElementById("endDate").value;
@@ -277,7 +308,7 @@ function EventCalendar() {
         }
 
         if (moment(endDate).isBefore(moment(startDate))) {
-          Swal.showValidationMessage("วันที่สิ้นสุดต้องอยู่หลังวันที่เริ่มต้น");
+          Swal.showValidationMessage("วันที่สิ้นสุดต้องมากกว่าหรือเท่ากับวันที่เริ่มต้น");
           return false;
         }
 
@@ -288,22 +319,19 @@ function EventCalendar() {
         const { startDate, endDate } = result.value;
 
         if (!startDate || !endDate) {
-          Swal.fire("Error", "Start date and end date are required!", "error");
+          Swal.fire("เกิดข้อผิดพลาด", "กรุณาระบุวันที่เริ่มต้นและวันที่สิ้นสุด!", "error");
           return;
         }
 
         const start = moment(startDate).format("YYYY-MM-DD");
-        const end = moment(endDate).add(1, "days").format("YYYY-MM-DD"); // ✅ เพิ่ม 1 วันเพื่อให้สิ้นสุดวันสุดท้าย
+        const end = moment(endDate).add(1, "days").format("YYYY-MM-DD");
 
-        // ✅ ตรวจสอบค่าก่อนบันทึก
-        // console.log("📅 New Event Data:", { start, end, date: start });
-
-        // ✅ เพิ่ม Event ลง FullCalendar
+        // ✅ เพิ่มแผนงานลงใน FullCalendar
         const newEvent = {
           title: eventData.title,
           start: start,
           end: end,
-          date: start, // ✅ ต้องมี date เพื่อให้ Mongoose ไม่ error
+          date: start, 
           backgroundColor: eventData.backgroundColor || "#0c49ac",
           textColor: eventData.textColor || "#ffffff",
           fontSize: eventData.fontSize || "12",
@@ -317,17 +345,17 @@ function EventCalendar() {
           // ✅ บันทึกลงฐานข้อมูล
           await saveEventToDB(newEvent);
 
-          // ✅ ลบ Event ออกจาก `eventReceive`
+          // ✅ ลบแผนงานออกจาก "รายการรอจัดลงตาราง"
           setEventReceive((prevEvents) =>
             prevEvents.filter((event) => event._id !== eventData._id)
           );
 
-          // ✅ ลบออกจากฐานข้อมูลของ `eventReceive`
+          // ✅ ลบออกจากฐานข้อมูลของ "รายการรอจัดลงตาราง"
           await deleteEventFromDB(eventData._id);
 
           Swal.fire({
-            title: "Added!",
-            text: "Event added successfully.",
+            title: "เพิ่มแผนงานสำเร็จ!",
+            text: "แผนงานถูกเพิ่มลงในตารางเรียบร้อยแล้ว",
             icon: "success",
             timer: 1500,
             showConfirmButton: false,
@@ -336,64 +364,65 @@ function EventCalendar() {
           // ✅ โหลดข้อมูลใหม่จากฐานข้อมูล
           await fetchEventsFromDB();
         } catch (error) {
-          console.error("❌ Error adding event:", error);
-          Swal.fire("Error", "Failed to add event. Please try again.", "error");
+          console.error("❌ เกิดข้อผิดพลาดขณะเพิ่มแผนงาน:", error);
+          Swal.fire("เกิดข้อผิดพลาด", "ไม่สามารถเพิ่มแผนงานได้ กรุณาลองใหม่อีกครั้ง", "error");
         }
       }
     });
-  };
+};
 
-  const handleDeleteEventReceive = async (eventId) => {
-    try {
-      Swal.fire({
-        title: "Are you sure?",
-        text: "You won't be able to undo this action!",
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonColor: "#d33",
-        cancelButtonColor: "#3085d6",
-        confirmButtonText: "Yes, delete it!",
-        cancelButtonText: "Cancel",
-      }).then(async (result) => {
-        if (result.isConfirmed) {
-          // ✅ ลบข้อมูลออกจากฐานข้อมูล
-          await deleteEventFromDB(eventId);
 
-          // ✅ อัปเดต state eventReceive (ลบอีเวนต์ที่ถูกลบออก)
-          setEventReceive((prevEvents) => {
-            const updatedEvents = prevEvents.filter(
-              (event) => event._id !== eventId
-            );
+const handleDeleteEventReceive = async (eventId) => {
+  try {
+    Swal.fire({
+      title: "คุณแน่ใจหรือไม่?",
+      text: "การกระทำนี้ไม่สามารถย้อนกลับได้!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "ใช่, ลบออก!",
+      cancelButtonText: "ยกเลิก",
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        // ✅ ลบข้อมูลออกจากฐานข้อมูล
+        await deleteEventFromDB(eventId);
 
-            // ✅ ตรวจสอบว่าเหลือข้อมูลในหน้าปัจจุบันหรือไม่
-            const totalItemsLeft = updatedEvents.length;
-            const maxPages = Math.ceil(totalItemsLeft / eventsPerPage);
+        // ✅ อัปเดต state eventReceive (ลบอีเวนต์ที่ถูกลบออก)
+        setEventReceive((prevEvents) => {
+          const updatedEvents = prevEvents.filter(
+            (event) => event._id !== eventId
+          );
 
-            if (totalItemsLeft <= startIndex && currentPage > 1) {
-              setCurrentPage(Math.max(1, currentPage - 1)); // ✅ กลับไปหน้าก่อนหน้า
-            }
+          // ✅ ตรวจสอบว่าเหลือข้อมูลในหน้าปัจจุบันหรือไม่
+          const totalItemsLeft = updatedEvents.length;
+          const maxPages = Math.ceil(totalItemsLeft / eventsPerPage);
 
-            return updatedEvents;
-          });
+          if (totalItemsLeft <= startIndex && currentPage > 1) {
+            setCurrentPage(Math.max(1, currentPage - 1)); // ✅ กลับไปหน้าก่อนหน้า
+          }
 
-          // Swal.fire({
-          //   title: "Deleted!",
-          //   text: "The event has been deleted.",
-          //   icon: "success",
-          //   timer: 1500,
-          //   showConfirmButton: false,
-          // });
-        }
-      });
-    } catch (error) {
-      console.error("❌ Error deleting event:", error);
-      Swal.fire({
-        title: "Error!",
-        text: "Failed to delete event. Please try again.",
-        icon: "error",
-      });
-    }
-  };
+          return updatedEvents;
+        });
+
+        // Swal.fire({
+        //   title: "ลบสำเร็จ!",
+        //   text: "กิจกรรมถูกลบออกเรียบร้อยแล้ว",
+        //   icon: "success",
+        //   timer: 1500,
+        //   showConfirmButton: false,
+        // });
+      }
+    });
+  } catch (error) {
+    console.error("❌ เกิดข้อผิดพลาดขณะลบกิจกรรม:", error);
+    Swal.fire({
+      title: "เกิดข้อผิดพลาด!",
+      text: "ไม่สามารถลบกิจกรรมได้ กรุณาลองใหม่อีกครั้ง",
+      icon: "error",
+    });
+  }
+};
 
   const fetchThaiHolidaysFromAPI = async () => {
     try {
@@ -495,24 +524,21 @@ function EventCalendar() {
 
   const handleAddEvent = (arg) => {
     Swal.fire({
-      title: "Enter for your event : ",
+      title: "เพิ่มแผนงานใหม่",
       customClass: "swal-wide",
       html: `
+        <label for="eventTitle">ชื่อแผนงาน:</label>
+        <input id="eventTitle" type="text" class="swal2-input" placeholder="กรอกชื่อแผนงาน" 
+        style="margin-bottom: 1rem; width: 250px"><br>
 
-      <label for="editTitle">Title : </label>
-
-      <input id="eventTitle" type="text" class="swal2-input"  placeholder="Event Title"  style="margin-bottom: 1rem; width: 250px"> <br>
-
-
-        <label for="fontSize">Font Size:</label><br>
+        <label for="fontSize">ขนาดตัวอักษร:</label><br>
         <select id="fontSize" class="swal2-input">
-        
           <option selected disabled>${defaultFontSize}</option>
           <option value="8">8</option>
           <option value="9">9</option>
           <option value="10">10</option>
           <option value="11">11</option>
-          <option value="12" >12</option>
+          <option value="12">12</option>
           <option value="14">14</option>
           <option value="16">16</option>
           <option value="18">18</option>
@@ -526,50 +552,38 @@ function EventCalendar() {
           <option value="72">72</option>
         </select><br><br>
 
-        <label for="textColorPicker">Text Color:</label><br>
+        <label for="textColorPicker">สีข้อความ:</label><br>
         <input id="textColorPicker" type="color" value="${defaultTextColor}" style="margin-bottom: 1rem;"><br>
-  
-        <label for="backgroundColorPicker">Background Color:</label><br>
+
+        <label for="backgroundColorPicker">สีพื้นหลัง:</label><br>
         <input id="backgroundColorPicker" type="color" value="${defaultBackgroundColor}" style="margin-bottom: 1rem;"><br>
-  
-        <label for="start">Start:</label>
+
+        <label for="start">วันที่เริ่มต้น:</label>
         <input id="start" type="date" class="swal2-input" value="${arg.dateStr}" style="margin-bottom: 1rem;"><br>
-  
-        <label for="end">End:</label>
-        <input id="end" type="date" class="swal2-input"  value="${arg.dateStr}" style="margin-bottom: 1rem;"><br>
 
-        <br><br><br>
-
-
-  
+        <label for="end">วันที่สิ้นสุด:</label>
+        <input id="end" type="date" class="swal2-input" value="${arg.dateStr}" style="margin-bottom: 1rem;"><br>
       `,
       showCancelButton: true,
-      confirmButtonText: "Save",
-      cancelButtonText: "Cancel",
+      confirmButtonText: "บันทึกแผนงาน",
+      cancelButtonText: "ยกเลิก",
       didOpen: () => {
-        const textColorPicker =
-          Swal.getPopup().querySelector("#textColorPicker");
+        const textColorPicker = Swal.getPopup().querySelector("#textColorPicker");
         textColorPicker.setAttribute("value", defaultTextColor);
-        const backgroundColorPicker = Swal.getPopup().querySelector(
-          "#backgroundColorPicker"
-        );
+
+        const backgroundColorPicker = Swal.getPopup().querySelector("#backgroundColorPicker");
         backgroundColorPicker.setAttribute("value", defaultBackgroundColor);
       },
       preConfirm: () => {
         const start = document.getElementById("start").value;
         const end = document.getElementById("end").value;
-
-        // const startTime = document.getElementById("startTime").value;
-        // const endTime = document.getElementById("endTime").value;
-
         const title = document.getElementById("eventTitle").value;
-        const backgroundColor = document.getElementById(
-          "backgroundColorPicker"
-        ).value;
+        const backgroundColor = document.getElementById("backgroundColorPicker").value;
         const textColor = document.getElementById("textColorPicker").value;
         const fontSize = document.getElementById("fontSize").value;
+
         if (!title) {
-          Swal.showValidationMessage("Please enter a title");
+          Swal.showValidationMessage("กรุณากรอกชื่อแผนงาน");
         }
 
         return {
@@ -583,8 +597,7 @@ function EventCalendar() {
       },
     }).then(async (result) => {
       if (result.isConfirmed) {
-        const { title, backgroundColor, textColor, fontSize, start, end } =
-          result.value;
+        const { title, backgroundColor, textColor, fontSize, start, end } = result.value;
 
         const newEnd = moment(end).add(1, "days");
         const newEvent = {
@@ -596,218 +609,195 @@ function EventCalendar() {
           start,
           end: newEnd.format("YYYY-MM-DD"),
         };
-        setEvents([...events, newEvent]); // Update local state
-        await saveEventToDB(newEvent); // Save event to database
+
+        setEvents([...events, newEvent]); // อัปเดต state ของ FullCalendar
+        await saveEventToDB(newEvent); // บันทึกแผนงานลงฐานข้อมูล
         setDefaultTextColor(textColor);
         setDefaultBackgroundColor(backgroundColor);
         setDefaultFontSize(fontSize);
-        fetchEventsFromDB(); // Fetch events from database
+        fetchEventsFromDB(); // โหลดข้อมูลแผนงานใหม่จากฐานข้อมูล
       }
     });
-  };
+};
 
-  const handleEditEvent = (eventInfo) => {
-    const inputBackgroundColor = document.createElement("input");
-    inputBackgroundColor.type = "color";
-    inputBackgroundColor.value = eventInfo.event.backgroundColor;
+const handleEditEvent = (eventInfo) => {
+  const inputBackgroundColor = document.createElement("input");
+  inputBackgroundColor.type = "color";
+  inputBackgroundColor.value = eventInfo.event.backgroundColor;
 
-    const inputTextColor = document.createElement("input");
-    inputTextColor.type = "color";
-    inputTextColor.value = eventInfo.event.textColor;
+  const inputTextColor = document.createElement("input");
+  inputTextColor.type = "color";
+  inputTextColor.value = eventInfo.event.textColor;
 
-    const eventId = eventInfo.event.id;
-    const eventTitle = eventInfo.event.title;
+  const eventId = eventInfo.event.id;
+  const eventTitle = eventInfo.event.title;
+  const eventFontSize = eventInfo.event.extendedProps.fontSize;
 
-    const eventFontSize = eventInfo.event.extendedProps.fontSize;
+  const eventStart = moment(eventInfo.event.start);
+  const eventEnd = moment(eventInfo.event.end);
+  const eventAllDay = eventInfo.event.allDay;
 
-    const eventStart = moment(eventInfo.event.start);
-    const eventEnd = moment(eventInfo.event.end);
+  const htmlEdit = `
+    <label for="editTitle">ชื่อแผนงาน:</label>
+    <input id="editTitle" class="swal2-input" type="text" value="${eventTitle}"
+    style="margin-bottom: 1rem; width: 250px">
 
-    const eventAllDay = eventInfo.event.allDay;
-
-    const htmlEdit = `
-    <input id="editTitle" class="swal2-input" type="text" value="${eventTitle}" 
-    style="margin-bottom: 1rem; width: 250px"><i id="copyEventDetails" title="Copied to clipboard!" class="fas fa-copy"></i>
-    
     <br>
 
-    <label for="editFontSize">Font Size : </label><br>
+    <label for="editFontSize">ขนาดตัวอักษร:</label><br>
     <select id="editFontSize" class="swal2-input">
       <option selected disabled>${eventFontSize}</option>
       <option value="8">8</option>
-      <option value="9">9</option>
       <option value="10">10</option>
-      <option value="11">11</option>
       <option value="12">12</option>
       <option value="14">14</option>
       <option value="16">16</option>
       <option value="18">18</option>
       <option value="20">20</option>
-      <option value="22">22</option>
-      <option value="24">24</option>
-      <option value="26">26</option>
-      <option value="28">28</option>
-      <option value="36">36</option>
-      <option value="48">48</option>
-      <option value="72">72</option>
     </select><br><br>
 
-    <label for="editBackgroundColor">Background Color : </label><br>
+    <label for="editBackgroundColor">สีพื้นหลัง:</label><br>
     <div id="backgroundColorPickerContainer"></div><br>
 
-    <label for="editTextColor">Text Color : </label><br>
+    <label for="editTextColor">สีข้อความ:</label><br>
     <div id="textColorPickerContainer" class="swal2-input"></div>
 
-    <label for="editStart">Start : </label>
+    <label for="editStart">วันที่เริ่มต้น:</label>
     <input id="editStart" type="datetime-local" class="swal2-input" value="${eventStart.format(
       "YYYY-MM-DDTHH:mm"
     )}" style="margin-bottom: 1rem;"><br>
 
-    <label for="fakeEditEnd">End :</label>
+    <label for="fakeEditEnd">วันที่สิ้นสุด:</label>
     <input id="fakeEditEnd" type="datetime-local" class="swal2-input" value="${
       eventAllDay
         ? moment(eventEnd).subtract(1, "days").format("YYYY-MM-DDTHH:mm")
         : eventEnd.format("YYYY-MM-DDTHH:mm")
     }" style="margin-bottom: 1rem;"><br>
-
-    <input id="editEnd" type="datetime-local" class="swal2-input" style="display: none; margin-bottom: 1rem;"><br>
-<span style='color:red'; font-size: 2px>ถ้าต้องการตั้งระยะเวลาของเหตุการณ์ กรุณาตั้งค่า All-Day เป็น False ก่อน</span> <br><br>
-    <label for="editAllDay">All-Day : </label>
-    <select id="editAllDay" class="swal2-select">
-      <option selected disabled>${eventAllDay}</option>
-      <option value="true">True</option>
-      <option value="false">False</option>
-    </select><br><br>
-
-   
   `;
 
-    Swal.fire({
-      title: eventTitle,
-      html: htmlEdit,
-      customClass: "swal-wide",
-      didOpen: () => {
-        document
-          .getElementById("backgroundColorPickerContainer")
-          .appendChild(inputBackgroundColor);
-        document
-          .getElementById("textColorPickerContainer")
-          .appendChild(inputTextColor);
+  Swal.fire({
+    title: `แก้ไขแผนงาน: ${eventTitle}`,
+    html: htmlEdit,
+    customClass: "swal-wide",
+    showCloseButton: true, // ✅ เพิ่มปุ่ม X ปิดหน้าต่าง
+    didOpen: () => {
+      document.getElementById("backgroundColorPickerContainer").appendChild(inputBackgroundColor);
+      document.getElementById("textColorPickerContainer").appendChild(inputTextColor);
+    },
+    showDenyButton: true,
+    showCancelButton: true,
+    confirmButtonColor: "#0ECC00",
+    confirmButtonText: "บันทึกการเปลี่ยนแปลง",
+    denyButtonText: "ลบแผนงาน",
+    cancelButtonText: "ยกเลิกแผนงาน", 
+    preConfirm: () => {
+      const title = document.getElementById("editTitle").value;
+      const textColor = inputTextColor.value;
+      const backgroundColor = inputBackgroundColor.value;
+      const fontSize = document.getElementById("editFontSize").value;
 
-        // สร้างการจัดการเหตุการณ์สำหรับปุ่มคัดลอกรายละเอียด
-        document
-          .getElementById("copyEventDetails")
-          .addEventListener("click", () => {
-            const details = `${eventTitle}`;
-            copyToClipboard(details);
+      const start = moment(document.getElementById("editStart").value).toISOString();
+      let end = document.getElementById("fakeEditEnd").value;
 
-            Swal.fire({
-              title: "Copied",
-              icon: "success",
-              showConfirmButton: false,
-              timer: 1000,
-            });
-          });
-
-        // Handle change event for fakeEditEnd and update editEnd value
-        document
-          .getElementById("fakeEditEnd")
-          .addEventListener("change", (e) => {
-            const newEndDate = moment(e.target.value); // สร้างวัตถุ Moment จาก string
-
-            const formattedNewEnd = newEndDate.format("YYYY-MM-DDTHH:mm:ss"); // จัดรูปแบบวันที่
-
-            document.getElementById("editEnd").value = formattedNewEnd; // กำหนดค่าให้กับ editEnd
-          });
-      },
-      showDenyButton: true,
-      showCancelButton: true,
-      confirmButtonColor: "#0ECC00",
-      confirmButtonText: "Save Update",
-      denyButtonText: `Delete Event`,
-      preConfirm: () => {
-        const title = document.getElementById("editTitle").value;
-        const textColor = inputTextColor.value;
-        const backgroundColor = inputBackgroundColor.value;
-        const fontSize = document.getElementById("editFontSize").value;
-
-        const isAllDay = document.getElementById("editAllDay").value === "true";
-
-        const start = moment(
-          document.getElementById("editStart").value
-        ).toISOString();
-        let end = document.getElementById("editEnd").value;
-
-        if (end === "null" || end === "") {
-          // If end is null or empty, set end to original event end
-          end = eventEnd.toISOString();
-        } else {
-          if (!isAllDay) {
-            // Convert end to datetime format
-            end = moment(end).toISOString();
-          } else {
-            end = moment(end).add(1, "days").toISOString();
-          }
-        }
-
-        if (!title) {
-          Swal.showValidationMessage("Please enter a title");
-        }
-
-        return {
-          id: eventId,
-          title,
-          textColor,
-          backgroundColor,
-          fontSize,
-          start,
-          end,
-          allDay: isAllDay,
-        };
-      },
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        setLoading(true); // เริ่มต้นโหลดข้อมูล
-
-        const {
-          id,
-          title,
-          textColor,
-          backgroundColor,
-          fontSize,
-          start,
-          end,
-          // allDay,
-        } = result.value;
-
-        const updatedEvent = {
-          title,
-          textColor,
-          backgroundColor,
-          fontSize,
-          start,
-          end,
-          // allDay,
-        };
-
-        const updatedEvents = await EventService.UpdateEvent(id, updatedEvent);
-
-        setEvents(updatedEvents);
-
-        fetchEventsFromDB();
-
-        setLoading(false); // เริ่มต้นโหลดข้อมูล
-
-        Swal.fire({
-          title: "Updated Successfully",
-          icon: "success",
-          showConfirmButton: false,
-          timer: 1000,
-        });
-      } else if (result.isDenied) {
-        handleDeleteEvent(eventId);
+      if (!end) {
+        end = eventEnd.toISOString();
+      } else {
+        end = moment(end).toISOString();
       }
-    });
+
+      if (!title) {
+        Swal.showValidationMessage("กรุณากรอกชื่อแผนงาน");
+      }
+
+      return {
+        id: eventId,
+        title,
+        textColor,
+        backgroundColor,
+        fontSize,
+        start,
+        end,
+      };
+    },
+  }).then(async (result) => {
+    if (result.isConfirmed) {
+      setLoading(true);
+      const { id, title, textColor, backgroundColor, fontSize, start, end } =
+        result.value;
+      const updatedEvent = { title, textColor, backgroundColor, fontSize, start, end };
+
+      await EventService.UpdateEvent(id, updatedEvent);
+      fetchEventsFromDB();
+      setLoading(false);
+
+      Swal.fire({
+        title: "บันทึกการเปลี่ยนแปลงสำเร็จ",
+        icon: "success",
+        showConfirmButton: false,
+        timer: 1000,
+      });
+    } else if (result.isDenied) {
+      handleDeleteEvent(eventId);
+    } else if (result.dismiss === Swal.DismissReason.cancel) {
+      confirmCancelEvent(eventId);
+    }
+  });
+};
+
+const confirmCancelEvent = async (eventId) => {
+  Swal.fire({
+    title: "ยืนยันการยกเลิกแผนงาน?",
+    text: "แผนงานนี้จะถูกนำออกจากปฏิทินและสามารถเพิ่มกลับมาได้ในภายหลัง",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonColor: "#d33",
+    cancelButtonColor: "#3085d6",
+    confirmButtonText: "ใช่, ยกเลิกแผนงาน",
+    cancelButtonText: "ไม่, เก็บไว้",
+  }).then(async (result) => {
+    if (result.isConfirmed) {
+      handleCancelEvent(eventId);
+    }
+  });
+};
+
+  // ฟังก์ชันยกเลิกแผนงานออกจาก FullCalendar และเก็บไว้ในรายการรอจัดลงตาราง
+  const handleCancelEvent = async (eventId) => {
+    setLoading(true);
+
+    try {
+      // ค้นหาอีเวนต์จาก events
+      const eventToCancel = events.find((event) => event.id === eventId);
+      if (!eventToCancel) {
+        console.warn("⚠ Event not found for cancellation");
+        return;
+      }
+
+      // ลบอีเวนต์ออกจากปฏิทิน
+      setEvents((prevEvents) =>
+        prevEvents.filter((event) => event.id !== eventId)
+      );
+
+      // เพิ่มอีเวนต์กลับไปที่แผนงานรอจัดลงตาราง
+      setEventReceive((prevEvents) => [
+        ...prevEvents,
+        { ...eventToCancel, id: eventToCancel.id || generateTemporaryId() },
+      ]);
+
+      // อัปเดตฐานข้อมูล (ลบออกจากปฏิทินและเพิ่มกลับไปที่รายการรอจัดตาราง)
+      await EventService.DeleteEvent(eventId);
+
+      // Swal.fire({
+      //   title: "Event Moved to Unscheduled",
+      //   icon: "info",
+      //   showConfirmButton: false,
+      //   timer: 1000,
+      // });
+    } catch (error) {
+      console.error("❌ Error in handleCancelEvent:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleEventDrop = async (arg) => {
@@ -899,37 +889,56 @@ function EventCalendar() {
   const handleDeleteEvent = (id) => {
     try {
       Swal.fire({
-        title: "Are you sure?",
-        text: "You won't be able to revert this!",
+        title: "คุณแน่ใจหรือไม่?",
+        text: "เมื่อทำการลบแล้ว คุณจะไม่สามารถกู้คืนแผนงานนี้ได้!",
         icon: "warning",
         showCancelButton: true,
-        confirmButtonColor: "#3085d6",
-        cancelButtonColor: "#d33",
-        confirmButtonText: "Yes, delete it!",
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "ใช่, ลบแผนงาน",
+        cancelButtonText: "ยกเลิก",
       }).then(async (result) => {
         if (result.isConfirmed) {
           setLoading(true); // เริ่มต้นโหลดข้อมูล
 
-          // Send DELETE request to server with event ID
-          await EventService.DeleteEvent(id);
-          // Update events state after deletion
-          const updatedEvents = events.filter((event) => event._id !== id);
-          setEvents(updatedEvents);
-          await fetchEventsFromDB();
+          try {
+            // ส่งคำขอลบแผนงานไปที่เซิร์ฟเวอร์
+            await EventService.DeleteEvent(id);
+            
+            // อัปเดต state โดยกรองแผนงานที่ถูกลบออกจากปฏิทิน
+            setEvents((prevEvents) => prevEvents.filter((event) => event._id !== id));
 
-          setLoading(false);
+            // โหลดข้อมูลใหม่จากฐานข้อมูล
+            await fetchEventsFromDB();
 
-          // Swal.fire({
-          //   title: "Deleted!",
-          //   text: "Your file has been deleted.",
-          //   icon: "success",
-          // });
+            setLoading(false);
+
+            // แสดงข้อความแจ้งเตือนว่าการลบสำเร็จ
+            Swal.fire({
+              title: "ลบแผนงานสำเร็จ!",
+              text: "แผนงานของคุณถูกลบแล้ว",
+              icon: "success",
+              showConfirmButton: false,
+              timer: 1500,
+            });
+
+          } catch (error) {
+            console.error("❌ เกิดข้อผิดพลาดในการลบแผนงาน:", error);
+            Swal.fire({
+              title: "เกิดข้อผิดพลาด!",
+              text: "ไม่สามารถลบแผนงานได้ กรุณาลองใหม่อีกครั้ง",
+              icon: "error",
+            });
+          } finally {
+            setLoading(false);
+          }
         }
       });
     } catch (error) {
-      console.error("Error deleting event:", error);
+      console.error("❌ เกิดข้อผิดพลาดในการลบแผนงาน:", error);
     }
-  };
+};
+
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
@@ -937,13 +946,13 @@ function EventCalendar() {
 
   const handleLineNotify = () => {
     const html = `
-    <label for="description">เพิ่มคำอธิบายสำหรับการอัพเดตนี้ : </label> <br>
-    <input id="description" class="swal2-input"  type="text"  placeholder="กรอกคำอธิบาย"
-    style="margin-bottom: 2rem width: auto"> <br /> 
+      <label for="description">เพิ่มคำอธิบายสำหรับการอัพเดตนี้ : </label> <br>
+      <input id="description" class="swal2-input"  type="text"  placeholder="กรอกคำอธิบาย"
+      style="margin-bottom: 2rem width: auto"> <br /> 
+      
+      
     
-    
-   
-  `;
+    `;
     try {
       Swal.fire({
         title: "ส่งแจ้งเตือนการอัพเดตตารางแผนงานไปที่ Line Notify",
@@ -1094,7 +1103,6 @@ function EventCalendar() {
     }
   }, [filteredEvents, totalPages, currentPage]);
 
-
   return (
     <div>
       <Row className="flex-wrap mb-3 d-flex justify-content-center justify-content-md-between">
@@ -1154,7 +1162,7 @@ function EventCalendar() {
               whiteSpace: "nowrap",
             }}
           >
-            Add Event
+            เพิ่มแผนงาน
           </button>
         </form>
       </div>
@@ -1310,44 +1318,44 @@ function EventCalendar() {
         />
         <style>
           {`
-      @media (max-width: 768px) {
-        .fc-header-toolbar {
-          display: flex;
-          flex-direction: column;
-          width: 100%;
-          gap: 8px;
+        @media (max-width: 768px) {
+          .fc-header-toolbar {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            gap: 8px;
+          }
+          .fc-toolbar-chunk {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+          }
+          .fc-toolbar-title {
+            flex: 1;
+            text-align: center;
+            font-size: 1.5em;
+            margin: 0;
+          }
+          .fc-button {
+            flex: 1;
+            min-width: 0;
+            margin: 2px;
+          }
+          .fc-button-group {
+            display: flex;
+            width: 100%;
+          }
+          .fc-button-group .fc-button {
+            flex: 1;
+          }
+          .fc-footer-toolbar {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+            margin-top: 5px;
+          }
         }
-        .fc-toolbar-chunk {
-          display: flex;
-          justify-content: space-between;
-          width: 100%;
-        }
-        .fc-toolbar-title {
-          flex: 1;
-          text-align: center;
-          font-size: 1.5em;
-          margin: 0;
-        }
-        .fc-button {
-          flex: 1;
-          min-width: 0;
-          margin: 2px;
-        }
-        .fc-button-group {
-          display: flex;
-          width: 100%;
-        }
-        .fc-button-group .fc-button {
-          flex: 1;
-        }
-        .fc-footer-toolbar {
-          display: flex;
-          justify-content: center;
-          width: 100%;
-          margin-top: 5px;
-        }
-      }
-    `}
+      `}
         </style>
       </div>
 
