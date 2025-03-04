@@ -1,22 +1,35 @@
 /* ปรับแต่ง Event ใน FullCalendar ให้รองรับภาษาไทย */
 /* ปรับแต่ง Event ใน FullCalendar ให้รองรับภาษาไทย */
 .fc-event {
-  display: flex;
-  flex-direction: column;
-  align-items: center; /* จัดชิดซ้ายเพื่อให้ข้อความไทยดูเป็นระเบียบ */
-  justify-content: center;
-  text-align: left ; /* ใช้ชิดซ้ายแทน justify */
-  padding: 8px;
-  border-radius: 8px;
+ 
+  /* padding: 5px; */
+  border-radius: 5px;
   white-space: normal; /* อนุญาตให้ขึ้นบรรทัดใหม่ */
-  word-break: break-word;
-  overflow-wrap: break-word;
+  word-break:normal;
+  overflow-wrap:normal;
   overflow: hidden;
   max-width: 100%;
-  font-size: 13px; /* ขยายตัวอักษรให้ดูชัดขึ้น */
-  font-weight: 500;
+  /* font-weight: 500; */
   line-height: 1.6; /* ป้องกันวรรณยุกต์ทับกัน */
   font-family: "Noto Sans Thai", sans-serif; /* ใช้ฟอนต์ที่รองรับภาษาไทย */
+}
+
+.fc-daygrid-event {
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* จัดข้อความไทยให้ดูสมดุล */
+  justify-content:center;
+  text-align: left;
+  white-space: normal;
+  word-break:normal;
+  overflow-wrap:normal;
+  overflow: hidden;
+  padding: 2px;
+  /* border-radius: 8px; */
+  min-height: 2px; /* ป้องกันการบีบตัวอักษร */
+  
+  font-family: "Noto Sans Thai", sans-serif;
 }
 
 /* ปรับแต่งตัวอักษรภายในปฏิทิน */
@@ -66,12 +79,12 @@
 
 @media (max-width: 768px) {
   .fc-event {
-    font-size: 10px;
-    min-height: 40px;
+    font-size: 8px;
+    min-height: 20px;
     max-width: 100%;
     max-height: 100%;
-    padding: 8px;
-    line-height: 1.5;
+    padding: 2px;
+    line-height: 1.4;
   }
 
   .fc-daygrid-day-number {
@@ -99,7 +112,6 @@
     flex-direction: column; /* แสดง Header เป็นคอลัมน์เมื่ออยู่ในโหมด Mobile */
     justify-content: flex-start; /* ชิดด้านซ้าย */
     align-items: flex-start; /* ชิดด้านซ้าย */
-    padding: 10px; /* ลด padding เพื่อปรับขนาดของ Header */
     font-size: 14px;
   }
 

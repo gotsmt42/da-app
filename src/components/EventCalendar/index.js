@@ -671,6 +671,13 @@ function EventCalendar() {
     }" style="margin-bottom: 1rem;"><br>
 
     <input id="editEnd" type="datetime-local" class="swal2-input" style="display: none; margin-bottom: 1rem;"><br>
+<span style='color:red'; font-size: 2px>ถ้าต้องการตั้งระยะเวลาของเหตุการณ์ กรุณาตั้งค่า All-Day เป็น False ก่อน</span> <br><br>
+    <label for="editAllDay">All-Day : </label>
+    <select id="editAllDay" class="swal2-select">
+      <option selected disabled>${eventAllDay}</option>
+      <option value="true">True</option>
+      <option value="false">False</option>
+    </select><br><br>
 
    
   `;
@@ -724,7 +731,7 @@ function EventCalendar() {
         const backgroundColor = inputBackgroundColor.value;
         const fontSize = document.getElementById("editFontSize").value;
 
-        // const isAllDay = document.getElementById("editAllDay").value === "true";
+        const isAllDay = document.getElementById("editAllDay").value === "true";
 
         const start = moment(
           document.getElementById("editStart").value
@@ -734,17 +741,14 @@ function EventCalendar() {
         if (end === "null" || end === "") {
           // If end is null or empty, set end to original event end
           end = eventEnd.toISOString();
+        } else {
+          if (!isAllDay) {
+            // Convert end to datetime format
+            end = moment(end).toISOString();
+          } else {
+            end = moment(end).add(1, "days").toISOString();
+          }
         }
-        end = moment(end).add(1, "days").toISOString();
-
-        // else {
-        //   if (!isAllDay) {
-        //     // Convert end to datetime format
-        //     end = moment(end).toISOString();
-        //   } else {
-        //     end = moment(end).add(1, "days").toISOString();
-        //   }
-        // }
 
         if (!title) {
           Swal.showValidationMessage("Please enter a title");
@@ -758,8 +762,9 @@ function EventCalendar() {
           fontSize,
           start,
           end,
-          // allDay: isAllDay,
+          allDay: isAllDay,
         };
+
       },
     }).then(async (result) => {
       if (result.isConfirmed) {
@@ -1199,12 +1204,12 @@ function EventCalendar() {
                   onClick={() => handleAddEventToCalendar(event)}
                   style={{
                     background: event.backgroundColor || "#0c49ac",
-                    borderRadius: "4px",
-                    fontSize: "12px",
+                    borderRadius: "5px",
+                    fontSize: "11px",
                     width: "100%",
                     overflow: "hidden",
                     whiteSpace: "normal",
-                    wordBreak: "break-word",
+                    wordBreak: "normal",
                     textAlign: "center",
                     cursor: "pointer",
                   }}
