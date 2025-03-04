@@ -764,7 +764,6 @@ function EventCalendar() {
           end,
           allDay: isAllDay,
         };
-
       },
     }).then(async (result) => {
       if (result.isConfirmed) {
@@ -1077,28 +1076,24 @@ function EventCalendar() {
     return dateB.diff(dateA); // เรียงจากใหม่ไปเก่า
   });
 
-  // ✅ คำนวณ Pagination
+  // ✅ กรองข้อมูลที่ค้นหา ก่อนแบ่งหน้า
+  const filteredEvents = sortedEvents.filter((event) =>
+    event.title.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // ✅ คำนวณ Pagination จากผลลัพธ์ที่กรองแล้ว
+  const totalPages = Math.ceil(filteredEvents.length / eventsPerPage);
   const startIndex = (currentPage - 1) * eventsPerPage;
   const endIndex = startIndex + eventsPerPage;
-  const currentEvents = sortedEvents.slice(startIndex, endIndex);
+  const paginatedEvents = filteredEvents.slice(startIndex, endIndex);
 
-  // ✅ ปรับจำนวนหน้าหลังจากลบข้อมูลออก
-  const totalPages = Math.ceil(sortedEvents.length / eventsPerPage);
-  if (currentPage > totalPages && totalPages > 0) {
-    setCurrentPage(totalPages);
-  }
-
-  const handleNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
+  // ✅ ตรวจสอบว่าหน้าปัจจุบันเกิน totalPages หรือไม่ แล้วปรับให้ถูกต้อง
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
     }
-  };
+  }, [filteredEvents, totalPages, currentPage]);
 
-  const handlePrevPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
-  };
 
   return (
     <div>
@@ -1171,11 +1166,10 @@ function EventCalendar() {
       >
         <h5 className="mb-2 p-2">แผนงานรอจัดลงตาราง</h5>
 
-        {/* 🔍 ช่องค้นหาใหม่ พร้อมไอคอน */}
+        {/* 🔍 ช่องค้นหา */}
         <div className="input-group mb-2 p-2">
           <span className="input-group-text bg-white border border-secondary">
-            <FontAwesomeIcon icon={faSearch} className="text-muted" />{" "}
-            {/* ✅ แก้ให้ใช้ faSearch */}
+            <FontAwesomeIcon icon={faSearch} className="text-muted" />
           </span>
           <input
             type="search"
@@ -1186,72 +1180,63 @@ function EventCalendar() {
             style={{ fontSize: "14px", padding: "6px" }}
           />
         </div>
-
+        {/* ✅ แสดงเฉพาะข้อมูลที่ค้นหา พร้อม Pagination */}
         <div className="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-2 p-2">
-          {currentEvents
-            .filter((event) =>
-              event.title.toLowerCase().includes(searchTerm.toLowerCase())
-            ) // ✅ กรองข้อมูลตามคำค้นหา
-            .map((event) => (
+          {paginatedEvents.map((event) => (
+            <div
+              key={event._id || event.id}
+              className="col d-flex align-items-center gap-2 mb-2"
+            >
+              {/* 🔹 กล่อง Event */}
               <div
-                key={event._id || event.id || Math.random()}
-                className="col d-flex align-items-center gap-2 mb-2"
+                className="fc-event flex-grow-1 text-white d-flex align-items-center justify-content-between px-3 py-2"
+                data-event-id={event._id || event.id}
+                onClick={() => handleAddEventToCalendar(event)}
+                style={{
+                  background: event.backgroundColor || "#0c49ac",
+                  borderRadius: "5px",
+                  fontSize: "11px",
+                  width: "100%",
+                  overflow: "hidden",
+                  textAlign: "center",
+                  cursor: "pointer",
+                }}
               >
-                {/* กล่อง Event */}
-                <div
-                  className="fc-event flex-grow-1 text-white d-flex align-items-center justify-content-between px-3 py-2"
-                  data-event-id={event._id || event.id}
-                  onClick={() => handleAddEventToCalendar(event)}
-                  style={{
-                    background: event.backgroundColor || "#0c49ac",
-                    borderRadius: "5px",
-                    fontSize: "11px",
-                    width: "100%",
-                    overflow: "hidden",
-                    whiteSpace: "normal",
-                    wordBreak: "normal",
-                    textAlign: "center",
-                    cursor: "pointer",
-                  }}
-                >
-                  <span>{event.title}</span>
-                </div>
-
-                {/* ปุ่มลบ */}
-                <button
-                  className="btn btn-danger btn-sm d-flex  align-items-center justify-content-center"
-                  onClick={() =>
-                    handleDeleteEventReceive(event._id || event.id)
-                  }
-                  style={{
-                    width: "25px",
-                    height: "25px",
-                    borderRadius: "50%",
-                    marginRight: "5px", // ✅ ขยับขอบขวา
-                  }}
-                >
-                  <FontAwesomeIcon icon={faTimes} className="text-white" />
-                </button>
+                <span>{event.title}</span>
               </div>
-            ))}
+
+              {/* 🔹 ปุ่มลบ */}
+              <button
+                className="btn btn-danger btn-sm d-flex align-items-center justify-content-center"
+                onClick={() => handleDeleteEventReceive(event._id || event.id)}
+                style={{
+                  width: "25px",
+                  height: "25px",
+                  borderRadius: "50%",
+                }}
+              >
+                <FontAwesomeIcon icon={faTimes} className="text-white" />
+              </button>
+            </div>
+          ))}
         </div>
 
-        {/* ✅ Pagination Controls */}
+        {/* ✅ Pagination Controls เฉพาะข้อมูลที่ค้นหา */}
         {totalPages > 1 && (
           <div className="d-flex justify-content-center mt-2">
             <button
               className="btn btn-outline-primary btn-sm me-1"
-              onClick={handlePrevPage}
+              onClick={() => setCurrentPage(currentPage - 1)}
               disabled={currentPage === 1}
             >
               «
             </button>
-            <span className="mx-1" style={{ fontSize: "12px" }}>
+            <span className="mx-1">
               {currentPage} / {totalPages}
             </span>
             <button
               className="btn btn-outline-primary btn-sm ms-1"
-              onClick={handleNextPage}
+              onClick={() => setCurrentPage(currentPage + 1)}
               disabled={currentPage === totalPages}
             >
               »
@@ -1279,7 +1264,6 @@ function EventCalendar() {
           eventDrop={handleEventDrop}
           eventResize={handleEventResize}
           eventClick={handleEditEvent}
- 
           allDaySlot={true}
           nowIndicator={true}
           selectMirror={true}
