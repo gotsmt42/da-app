@@ -1,112 +1,102 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-
-import axios from "axios";
-
-import Google from "@mui/icons-material/Google";
+import Swal from "sweetalert2";
 import { Button } from "react-bootstrap";
-import { Facebook } from "@mui/icons-material";
+import Google from "@mui/icons-material/Google";
+import Facebook from "@mui/icons-material/Facebook";
 
 import "./form.css";
-
 import API from "../API/axiosInstance";
-import Swal from "sweetalert2";
-
 
 const Register = () => {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [email, setEmail] = useState("");
-  const [fname, setFname] = useState("");
-  const [lname, setLname] = useState("");
-  const [tel, setTel] = useState("");
-  const [errors, setErrors] = useState({});
+  const [formData, setFormData] = useState({
+    fname: "",
+    lname: "",
+    email: "",
+    tel: "",
+    username: "",
+    password: "",
+  });
 
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
 
   const handleValidation = () => {
     let formIsValid = true;
     let errors = {};
-  
-    // Validate First Name
-    if (!fname) {
+
+    if (!formData.fname.trim()) {
       formIsValid = false;
-      errors["fname"] = "Please enter your first name.";
+      errors.fname = "Please enter your first name.";
     }
-  
-    // Validate Last Name
-    if (!lname) {
+
+    if (!formData.lname.trim()) {
       formIsValid = false;
-      errors["lname"] = "Please enter your last name.";
+      errors.lname = "Please enter your last name.";
     }
-  
-    // Validate Email
-    if (!email) {
+
+    if (!formData.email.trim()) {
       formIsValid = false;
-      errors["email"] = "Please enter your email.";
+      errors.email = "Please enter your email.";
     } else {
-      // Regular expression for email validation
-      let emailPattern = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/;
-      if (!emailPattern.test(email)) {
+      let emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailPattern.test(formData.email)) {
         formIsValid = false;
-        errors["email"] = "Please enter a valid email address.";
+        errors.email = "Please enter a valid email address.";
       }
     }
-  
-    // Validate Telephone
-    if (!tel) {
+
+    if (!formData.tel.trim()) {
       formIsValid = false;
-      errors["tel"] = "Please enter your telephone number.";
+      errors.tel = "Please enter your telephone number.";
     }
-  
-    // Validate Username
-    if (!username) {
+
+    if (!formData.username.trim()) {
       formIsValid = false;
-      errors["username"] = "Please enter your username.";
+      errors.username = "Please enter your username.";
     }
-  
-    // Validate Password
-    if (!password) {
+
+    if (!formData.password.trim()) {
       formIsValid = false;
-      errors["password"] = "Please enter your password.";
-    } else if (password.length < 4) {
+      errors.password = "Please enter your password.";
+    } else if (formData.password.length < 4) {
       formIsValid = false;
-      errors["password"] = "Password must be at least 4 characters long.";
+      errors.password = "Password must be at least 4 characters long.";
     }
-  
+
     setErrors(errors);
     return formIsValid;
   };
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    if (handleValidation()) {
-      try {
-        await API.post("/auth/signup", {
-          fname,
-          lname,
-          tel,
-          email,
-          username,
-          password,
-        });
+    if (!handleValidation()) return;
 
-        navigate("/login");
-
-        Swal.fire({
-          icon: "success",
-          title:"สมัครสมาชิกสำเร็จ",
-          timer:2000
-        })
-      } catch (error) {
-        console.error("Registration failed", error);
-        Swal.fire({
-          icon: "error",
-          title: "Registration failed",
-          text: error.response.data.err
-        });
-        
-      }
+    setLoading(true);
+    try {
+      await API.post("/auth/signup", formData);
+      Swal.fire({
+        icon: "success",
+        title: "สมัครสมาชิกสำเร็จ",
+        text: "คุณสามารถเข้าสู่ระบบได้ทันที",
+        timer: 2000,
+      });
+      navigate("/login", { replace: true });
+    } catch (error) {
+      console.error("Registration failed", error);
+      const errorMessage = error.response?.data?.err || "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง";
+      Swal.fire({
+        icon: "error",
+        title: "Registration failed",
+        text: errorMessage,
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -130,11 +120,11 @@ const Register = () => {
                         <input
                           type="text"
                           className="form-control"
-                          onChange={(e) => setFname(e.target.value)}
+                          name="fname"
+                          value={formData.fname}
+                          onChange={handleChange}
                         />
-                        <span className="text-danger">
-                          {errors["fname"]}
-                        </span>
+                        <span className="text-danger">{errors.fname}</span>
                       </div>
                     </div>
                     <div className="col">
@@ -143,11 +133,11 @@ const Register = () => {
                         <input
                           type="text"
                           className="form-control"
-                          onChange={(e) => setLname(e.target.value)}
+                          name="lname"
+                          value={formData.lname}
+                          onChange={handleChange}
                         />
-                        <span className="text-danger">
-                          {errors["lname"]}
-                        </span>
+                        <span className="text-danger">{errors.lname}</span>
                       </div>
                     </div>
                   </div>
@@ -157,9 +147,11 @@ const Register = () => {
                     <input
                       type="email"
                       className="form-control"
-                      onChange={(e) => setEmail(e.target.value)}
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
                     />
-                    <span className="text-danger">{errors["email"]}</span>
+                    <span className="text-danger">{errors.email}</span>
                   </div>
 
                   <div className="form-group">
@@ -167,9 +159,11 @@ const Register = () => {
                     <input
                       type="number"
                       className="form-control"
-                      onChange={(e) => setTel(e.target.value)}
+                      name="tel"
+                      value={formData.tel}
+                      onChange={handleChange}
                     />
-                    <span className="text-danger">{errors["tel"]}</span>
+                    <span className="text-danger">{errors.tel}</span>
                   </div>
 
                   <div className="form-group">
@@ -177,43 +171,48 @@ const Register = () => {
                     <input
                       type="text"
                       className="form-control"
-                      onChange={(e) => setUsername(e.target.value)}
+                      name="username"
+                      value={formData.username}
+                      onChange={handleChange}
                       required
                     />
-                    <span className="text-danger">{errors["username"]}</span>
+                    <span className="text-danger">{errors.username}</span>
                   </div>
+
                   <div className="form-group">
                     <label>Password</label>
                     <input
                       type="password"
                       className="form-control"
-                      onChange={(e) => setPassword(e.target.value)}
+                      name="password"
+                      value={formData.password}
+                      onChange={handleChange}
                       required
                     />
-                    <span className="text-danger">{errors["password"]}</span>
+                    <span className="text-danger">{errors.password}</span>
                   </div>
-                  <button className="btn signup" type="submit">
-                    signup
+
+                  <button className="btn signup" type="submit" disabled={loading}>
+                    {loading ? "Signing up..." : "Signup"}
                   </button>
                 </form>
+
                 <span className="separator">OR</span>
                 <ul className="social-links">
                   <li>
                     <Button variant="danger">
-                      {" "}
                       <Google /> Login with Google
                     </Button>
                   </li>
                   <li>
                     <Button variant="primary">
-                      {" "}
                       <Facebook /> Login with Facebook
                     </Button>
                   </li>
                 </ul>
+
                 <span className="signup-link">
-                  Already have an account? Sign in{" "}
-                  <Link to={"/login"}>here</Link>
+                  Already have an account? Sign in <Link to={"/login"}>here</Link>
                 </span>
               </div>
             </div>

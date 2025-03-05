@@ -85,7 +85,9 @@ const Sidebar = ({ handleMenuClick }) => {
   const [collapsedMenu, setCollapsedMenu] = useState({});
   const location = useLocation();
 
-  const { logout } = useAuth();
+  const { userData, logout } = useAuth();
+
+  const isAdmin = userData?.role?.toLowerCase() === "admin"; // ✅ รองรับ case-insensitive
 
   const [user, setUser] = useState({});
   useEffect(() => {
@@ -197,6 +199,8 @@ const Sidebar = ({ handleMenuClick }) => {
       </div>
 
       {/* ส่วนที่ fixed ด้านล่าง */}
+      {isAdmin && (
+
       <div className="sidebar-fixed-bottom p-3 mt-2">
         <NavItem className="sidenav-bg ">
           <Link
@@ -224,7 +228,8 @@ const Sidebar = ({ handleMenuClick }) => {
           </Link>
         </NavItem>
       </div>
-          
+          )}
+
       <div className="sidebar-fixed-bottom  text-lg-start p-3 mt-2">
         <NavItem className="sidenav-bg">
           <Link

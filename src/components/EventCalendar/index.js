@@ -45,7 +45,12 @@ import { toast } from "react-toastify"; // หากใช้ react-toastify
 import { faTimes } from "@fortawesome/free-solid-svg-icons";
 import { faSearch } from "@fortawesome/free-solid-svg-icons";
 
+import { useAuth } from "../../auth/AuthContext"; // ✅ ดึงข้อมูล Auth
+
 function EventCalendar() {
+  const { userData } = useAuth(); // ✅ เปลี่ยนจาก user → userData
+  const isAdmin = userData?.role?.toLowerCase() === "admin"; // ✅ รองรับ case-insensitive
+
   const [events, setEvents] = useState([]);
   const [newEventTitle, setNewEventTitle] = useState(""); // State สำหรับ input
 
@@ -308,7 +313,9 @@ function EventCalendar() {
         }
 
         if (moment(endDate).isBefore(moment(startDate))) {
-          Swal.showValidationMessage("วันที่สิ้นสุดต้องมากกว่าหรือเท่ากับวันที่เริ่มต้น");
+          Swal.showValidationMessage(
+            "วันที่สิ้นสุดต้องมากกว่าหรือเท่ากับวันที่เริ่มต้น"
+          );
           return false;
         }
 
@@ -319,7 +326,11 @@ function EventCalendar() {
         const { startDate, endDate } = result.value;
 
         if (!startDate || !endDate) {
-          Swal.fire("เกิดข้อผิดพลาด", "กรุณาระบุวันที่เริ่มต้นและวันที่สิ้นสุด!", "error");
+          Swal.fire(
+            "เกิดข้อผิดพลาด",
+            "กรุณาระบุวันที่เริ่มต้นและวันที่สิ้นสุด!",
+            "error"
+          );
           return;
         }
 
@@ -331,7 +342,7 @@ function EventCalendar() {
           title: eventData.title,
           start: start,
           end: end,
-          date: start, 
+          date: start,
           backgroundColor: eventData.backgroundColor || "#0c49ac",
           textColor: eventData.textColor || "#ffffff",
           fontSize: eventData.fontSize || "12",
@@ -365,64 +376,67 @@ function EventCalendar() {
           await fetchEventsFromDB();
         } catch (error) {
           console.error("❌ เกิดข้อผิดพลาดขณะเพิ่มแผนงาน:", error);
-          Swal.fire("เกิดข้อผิดพลาด", "ไม่สามารถเพิ่มแผนงานได้ กรุณาลองใหม่อีกครั้ง", "error");
+          Swal.fire(
+            "เกิดข้อผิดพลาด",
+            "ไม่สามารถเพิ่มแผนงานได้ กรุณาลองใหม่อีกครั้ง",
+            "error"
+          );
         }
       }
     });
-};
+  };
 
+  const handleDeleteEventReceive = async (eventId) => {
+    try {
+      Swal.fire({
+        title: "คุณแน่ใจหรือไม่?",
+        text: "การกระทำนี้ไม่สามารถย้อนกลับได้!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "ใช่, ลบออก!",
+        cancelButtonText: "ยกเลิก",
+      }).then(async (result) => {
+        if (result.isConfirmed) {
+          // ✅ ลบข้อมูลออกจากฐานข้อมูล
+          await deleteEventFromDB(eventId);
 
-const handleDeleteEventReceive = async (eventId) => {
-  try {
-    Swal.fire({
-      title: "คุณแน่ใจหรือไม่?",
-      text: "การกระทำนี้ไม่สามารถย้อนกลับได้!",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#d33",
-      cancelButtonColor: "#3085d6",
-      confirmButtonText: "ใช่, ลบออก!",
-      cancelButtonText: "ยกเลิก",
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        // ✅ ลบข้อมูลออกจากฐานข้อมูล
-        await deleteEventFromDB(eventId);
+          // ✅ อัปเดต state eventReceive (ลบอีเวนต์ที่ถูกลบออก)
+          setEventReceive((prevEvents) => {
+            const updatedEvents = prevEvents.filter(
+              (event) => event._id !== eventId
+            );
 
-        // ✅ อัปเดต state eventReceive (ลบอีเวนต์ที่ถูกลบออก)
-        setEventReceive((prevEvents) => {
-          const updatedEvents = prevEvents.filter(
-            (event) => event._id !== eventId
-          );
+            // ✅ ตรวจสอบว่าเหลือข้อมูลในหน้าปัจจุบันหรือไม่
+            const totalItemsLeft = updatedEvents.length;
+            const maxPages = Math.ceil(totalItemsLeft / eventsPerPage);
 
-          // ✅ ตรวจสอบว่าเหลือข้อมูลในหน้าปัจจุบันหรือไม่
-          const totalItemsLeft = updatedEvents.length;
-          const maxPages = Math.ceil(totalItemsLeft / eventsPerPage);
+            if (totalItemsLeft <= startIndex && currentPage > 1) {
+              setCurrentPage(Math.max(1, currentPage - 1)); // ✅ กลับไปหน้าก่อนหน้า
+            }
 
-          if (totalItemsLeft <= startIndex && currentPage > 1) {
-            setCurrentPage(Math.max(1, currentPage - 1)); // ✅ กลับไปหน้าก่อนหน้า
-          }
+            return updatedEvents;
+          });
 
-          return updatedEvents;
-        });
-
-        // Swal.fire({
-        //   title: "ลบสำเร็จ!",
-        //   text: "กิจกรรมถูกลบออกเรียบร้อยแล้ว",
-        //   icon: "success",
-        //   timer: 1500,
-        //   showConfirmButton: false,
-        // });
-      }
-    });
-  } catch (error) {
-    console.error("❌ เกิดข้อผิดพลาดขณะลบกิจกรรม:", error);
-    Swal.fire({
-      title: "เกิดข้อผิดพลาด!",
-      text: "ไม่สามารถลบกิจกรรมได้ กรุณาลองใหม่อีกครั้ง",
-      icon: "error",
-    });
-  }
-};
+          // Swal.fire({
+          //   title: "ลบสำเร็จ!",
+          //   text: "กิจกรรมถูกลบออกเรียบร้อยแล้ว",
+          //   icon: "success",
+          //   timer: 1500,
+          //   showConfirmButton: false,
+          // });
+        }
+      });
+    } catch (error) {
+      console.error("❌ เกิดข้อผิดพลาดขณะลบกิจกรรม:", error);
+      Swal.fire({
+        title: "เกิดข้อผิดพลาด!",
+        text: "ไม่สามารถลบกิจกรรมได้ กรุณาลองใหม่อีกครั้ง",
+        icon: "error",
+      });
+    }
+  };
 
   const fetchThaiHolidaysFromAPI = async () => {
     try {
@@ -568,17 +582,22 @@ const handleDeleteEventReceive = async (eventId) => {
       confirmButtonText: "บันทึกแผนงาน",
       cancelButtonText: "ยกเลิก",
       didOpen: () => {
-        const textColorPicker = Swal.getPopup().querySelector("#textColorPicker");
+        const textColorPicker =
+          Swal.getPopup().querySelector("#textColorPicker");
         textColorPicker.setAttribute("value", defaultTextColor);
 
-        const backgroundColorPicker = Swal.getPopup().querySelector("#backgroundColorPicker");
+        const backgroundColorPicker = Swal.getPopup().querySelector(
+          "#backgroundColorPicker"
+        );
         backgroundColorPicker.setAttribute("value", defaultBackgroundColor);
       },
       preConfirm: () => {
         const start = document.getElementById("start").value;
         const end = document.getElementById("end").value;
         const title = document.getElementById("eventTitle").value;
-        const backgroundColor = document.getElementById("backgroundColorPicker").value;
+        const backgroundColor = document.getElementById(
+          "backgroundColorPicker"
+        ).value;
         const textColor = document.getElementById("textColorPicker").value;
         const fontSize = document.getElementById("fontSize").value;
 
@@ -597,7 +616,8 @@ const handleDeleteEventReceive = async (eventId) => {
       },
     }).then(async (result) => {
       if (result.isConfirmed) {
-        const { title, backgroundColor, textColor, fontSize, start, end } = result.value;
+        const { title, backgroundColor, textColor, fontSize, start, end } =
+          result.value;
 
         const newEnd = moment(end).add(1, "days");
         const newEvent = {
@@ -618,32 +638,31 @@ const handleDeleteEventReceive = async (eventId) => {
         fetchEventsFromDB(); // โหลดข้อมูลแผนงานใหม่จากฐานข้อมูล
       }
     });
-};
+  };
 
-const handleEditEvent = (eventInfo) => {
-  const inputBackgroundColor = document.createElement("input");
-  inputBackgroundColor.type = "color";
-  inputBackgroundColor.value = eventInfo.event.backgroundColor;
+  const handleEditEvent = (eventInfo) => {
+    const inputBackgroundColor = document.createElement("input");
+    inputBackgroundColor.type = "color";
+    inputBackgroundColor.value = eventInfo.event.backgroundColor;
 
-  const inputTextColor = document.createElement("input");
-  inputTextColor.type = "color";
-  inputTextColor.value = eventInfo.event.textColor;
+    const inputTextColor = document.createElement("input");
+    inputTextColor.type = "color";
+    inputTextColor.value = eventInfo.event.textColor;
 
-  const eventId = eventInfo.event.id;
-  const eventTitle = eventInfo.event.title;
-  const eventFontSize = eventInfo.event.extendedProps.fontSize;
+    const eventId = eventInfo.event.id;
+    const eventTitle = eventInfo.event.title;
+    const eventFontSize = eventInfo.event.extendedProps.fontSize;
 
-  const eventStart = moment(eventInfo.event.start);
-  const eventEnd = moment(eventInfo.event.end);
-  const eventAllDay = eventInfo.event.allDay;
+    const eventStart = moment(eventInfo.event.start);
+    const eventEnd = moment(eventInfo.event.end);
+    const eventAllDay = eventInfo.event.allDay;
 
-  // ✅ แก้ไข: ไม่ใช้ .subtract(1, "days") ตอนแสดงวันที่
-  const formattedEnd = eventAllDay
-  ? moment(eventEnd).subtract(1, "days").format("YYYY-MM-DDTHH:mm")
-  : moment(eventEnd).format("YYYY-MM-DDTHH:mm");
+    // ✅ แก้ไข: ไม่ใช้ .subtract(1, "days") ตอนแสดงวันที่
+    const formattedEnd = eventAllDay
+      ? moment(eventEnd).subtract(1, "days").format("YYYY-MM-DDTHH:mm")
+      : moment(eventEnd).format("YYYY-MM-DDTHH:mm");
 
-
-  const htmlEdit = `
+    const htmlEdit = `
     <label for="editTitle">ชื่อแผนงาน:</label>
     <input id="editTitle" class="swal2-input" type="text" value="${eventTitle}"
     style="margin-bottom: 1rem; width: 250px">
@@ -675,93 +694,106 @@ const handleEditEvent = (eventInfo) => {
     <input id="editEnd" type="datetime-local" class="swal2-input" value="${formattedEnd}" style="margin-bottom: 1rem;"><br>
   `;
 
-  Swal.fire({
-    title: `แก้ไขแผนงาน: ${eventTitle}`,
-    html: htmlEdit,
-    customClass: "swal-wide",
-    showCloseButton: true,
-    didOpen: () => {
-      document.getElementById("backgroundColorPickerContainer").appendChild(inputBackgroundColor);
-      document.getElementById("textColorPickerContainer").appendChild(inputTextColor);
-    },
-    showDenyButton: true,
-    showCancelButton: true,
-    confirmButtonColor: "#0ECC00",
-    confirmButtonText: "บันทึกการเปลี่ยนแปลง",
-    denyButtonText: "ลบแผนงาน",
-    cancelButtonText: "ยกเลิกแผนงาน", 
-    preConfirm: () => {
-      const title = document.getElementById("editTitle").value;
-      const textColor = inputTextColor.value;
-      const backgroundColor = inputBackgroundColor.value;
-      const fontSize = document.getElementById("editFontSize").value;
-    
-      const start = moment(document.getElementById("editStart").value).toISOString();
-      let end = document.getElementById("editEnd").value;
-    
-      if (!end) {
-        end = eventEnd.toISOString();
-      } else {
-        end = eventAllDay
-          ? moment(end).add(1, "days").toISOString() // ✅ บวก 1 วันสำหรับ allDay event
-          : moment(end).toISOString();
+    Swal.fire({
+      title: `แก้ไขแผนงาน: ${eventTitle}`,
+      html: htmlEdit,
+      customClass: "swal-wide",
+      showCloseButton: true,
+      didOpen: () => {
+        document
+          .getElementById("backgroundColorPickerContainer")
+          .appendChild(inputBackgroundColor);
+        document
+          .getElementById("textColorPickerContainer")
+          .appendChild(inputTextColor);
+      },
+      showDenyButton: true,
+      showCancelButton: true,
+      confirmButtonColor: "#0ECC00",
+      confirmButtonText: "บันทึกการเปลี่ยนแปลง",
+      denyButtonText: "ลบแผนงาน",
+      cancelButtonText: "ยกเลิกแผนงาน",
+      preConfirm: () => {
+        const title = document.getElementById("editTitle").value;
+        const textColor = inputTextColor.value;
+        const backgroundColor = inputBackgroundColor.value;
+        const fontSize = document.getElementById("editFontSize").value;
+
+        const start = moment(
+          document.getElementById("editStart").value
+        ).toISOString();
+        let end = document.getElementById("editEnd").value;
+
+        if (!end) {
+          end = eventEnd.toISOString();
+        } else {
+          end = eventAllDay
+            ? moment(end).add(1, "days").toISOString() // ✅ บวก 1 วันสำหรับ allDay event
+            : moment(end).toISOString();
+        }
+
+        if (!title) {
+          Swal.showValidationMessage("กรุณากรอกชื่อแผนงาน");
+        }
+
+        return {
+          id: eventId,
+          title,
+          textColor,
+          backgroundColor,
+          fontSize,
+          start,
+          end,
+        };
+      },
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        setLoading(true);
+        const { id, title, textColor, backgroundColor, fontSize, start, end } =
+          result.value;
+        const updatedEvent = {
+          title,
+          textColor,
+          backgroundColor,
+          fontSize,
+          start,
+          end,
+        };
+
+        await EventService.UpdateEvent(id, updatedEvent);
+        fetchEventsFromDB();
+        setLoading(false);
+
+        Swal.fire({
+          title: "บันทึกการเปลี่ยนแปลงสำเร็จ",
+          icon: "success",
+          showConfirmButton: false,
+          timer: 1000,
+        });
+      } else if (result.isDenied) {
+        handleDeleteEvent(eventId);
+      } else if (result.dismiss === Swal.DismissReason.cancel) {
+        confirmCancelEvent(eventId);
       }
-    
-      if (!title) {
-        Swal.showValidationMessage("กรุณากรอกชื่อแผนงาน");
+    });
+  };
+
+  const confirmCancelEvent = async (eventId) => {
+    Swal.fire({
+      title: "ยืนยันการยกเลิกแผนงาน?",
+      text: "แผนงานนี้จะถูกนำออกจากปฏิทินและสามารถเพิ่มกลับมาได้ในภายหลัง",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "ใช่, ยกเลิกแผนงาน",
+      cancelButtonText: "ไม่, เก็บไว้",
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        handleCancelEvent(eventId);
       }
-    
-      return {
-        id: eventId,
-        title,
-        textColor,
-        backgroundColor,
-        fontSize,
-        start,
-        end,
-      };
-    }
-    
-  }).then(async (result) => {
-    if (result.isConfirmed) {
-      setLoading(true);
-      const { id, title, textColor, backgroundColor, fontSize, start, end } = result.value;
-      const updatedEvent = { title, textColor, backgroundColor, fontSize, start, end };
-
-      await EventService.UpdateEvent(id, updatedEvent);
-      fetchEventsFromDB();
-      setLoading(false);
-
-      Swal.fire({
-        title: "บันทึกการเปลี่ยนแปลงสำเร็จ",
-        icon: "success",
-        showConfirmButton: false,
-        timer: 1000,
-      });
-    } else if (result.isDenied) {
-      handleDeleteEvent(eventId);
-    } else if (result.dismiss === Swal.DismissReason.cancel) {
-      confirmCancelEvent(eventId);
-    }
-  });
-};
-
-const confirmCancelEvent = async (eventId) => {
-  Swal.fire({
-    title: "ยืนยันการยกเลิกแผนงาน?",
-    text: "แผนงานนี้จะถูกนำออกจากปฏิทินและสามารถเพิ่มกลับมาได้ในภายหลัง",
-    icon: "warning",
-    showCancelButton: true,
-    confirmButtonColor: "#d33",
-    cancelButtonColor: "#3085d6",
-    confirmButtonText: "ใช่, ยกเลิกแผนงาน",
-    cancelButtonText: "ไม่, เก็บไว้",
-  }).then(async (result) => {
-    if (result.isConfirmed) {
-      handleCancelEvent(eventId);
-    }
-  });
-};
+    });
+  };
 
   // ฟังก์ชันยกเลิกแผนงานออกจาก FullCalendar และเก็บไว้ในรายการรอจัดลงตาราง
   const handleCancelEvent = async (eventId) => {
@@ -906,9 +938,11 @@ const confirmCancelEvent = async (eventId) => {
           try {
             // ส่งคำขอลบแผนงานไปที่เซิร์ฟเวอร์
             await EventService.DeleteEvent(id);
-            
+
             // อัปเดต state โดยกรองแผนงานที่ถูกลบออกจากปฏิทิน
-            setEvents((prevEvents) => prevEvents.filter((event) => event._id !== id));
+            setEvents((prevEvents) =>
+              prevEvents.filter((event) => event._id !== id)
+            );
 
             // โหลดข้อมูลใหม่จากฐานข้อมูล
             await fetchEventsFromDB();
@@ -923,7 +957,6 @@ const confirmCancelEvent = async (eventId) => {
               showConfirmButton: false,
               timer: 1500,
             });
-
           } catch (error) {
             console.error("❌ เกิดข้อผิดพลาดในการลบแผนงาน:", error);
             Swal.fire({
@@ -939,8 +972,7 @@ const confirmCancelEvent = async (eventId) => {
     } catch (error) {
       console.error("❌ เกิดข้อผิดพลาดในการลบแผนงาน:", error);
     }
-};
-
+  };
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
@@ -1140,120 +1172,125 @@ const confirmCancelEvent = async (eventId) => {
           </button>
         </Col>
       </Row>
-
-      <div
-        className="card p-2 mb-4 mt-4"
-        style={{ background: "#f8f9fa", borderRadius: "8px", width: "100%" }}
-      >
-        <h5 className="mb-3">เพิ่มแผนงานใหม่</h5>
-        <form onSubmit={handleAddEventReceive} className="d-flex gap-2 p-2">
-          <input
-            type="text"
-            className="form-control form-control-sm"
-            placeholder="Enter event title"
-            value={newEventTitle}
-            onChange={(e) => setNewEventTitle(e.target.value)}
-            style={{ width: "100%", fontSize: "14px", padding: "6px" }} // ✅ ขยาย input เต็มความกว้าง
-          />
-          <button
-            type="submit"
-            className="btn btn-primary btn-sm"
-            style={{
-              fontSize: "14px",
-              padding: "6px 12px",
-              whiteSpace: "nowrap",
-            }}
-          >
-            เพิ่มแผนงาน
-          </button>
-        </form>
-      </div>
-
-      <div
-        id="external-events"
-        style={{ padding: "8px", background: "#f8f9fa", width: "100%" }}
-        className="mb-4"
-      >
-        <h5 className="mb-2 p-2">แผนงานรอจัดลงตาราง</h5>
-
-        {/* 🔍 ช่องค้นหา */}
-        <div className="input-group mb-2 p-2">
-          <span className="input-group-text bg-white border border-secondary">
-            <FontAwesomeIcon icon={faSearch} className="text-muted" />
-          </span>
-          <input
-            type="search"
-            className="form-control form-control-sm border border-secondary"
-            placeholder="ค้นหาแผนงาน..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ fontSize: "14px", padding: "6px" }}
-          />
-        </div>
-        {/* ✅ แสดงเฉพาะข้อมูลที่ค้นหา พร้อม Pagination */}
-        <div className="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-2 p-2">
-          {paginatedEvents.map((event) => (
-            <div
-              key={event._id || event.id}
-              className="col d-flex align-items-center gap-2 mb-2"
+      {isAdmin && (
+        <div
+          className="card p-2 mb-4 mt-4"
+          style={{ background: "#f8f9fa", borderRadius: "8px", width: "100%" }}
+        >
+          <h5 className="mb-3">เพิ่มแผนงานใหม่</h5>
+          <form onSubmit={handleAddEventReceive} className="d-flex gap-2 p-2">
+            <input
+              type="text"
+              className="form-control form-control-sm"
+              placeholder="Enter event title"
+              value={newEventTitle}
+              onChange={(e) => setNewEventTitle(e.target.value)}
+              style={{ width: "100%", fontSize: "14px", padding: "6px" }} // ✅ ขยาย input เต็มความกว้าง
+            />
+            <button
+              type="submit"
+              className="btn btn-primary btn-sm"
+              style={{
+                fontSize: "14px",
+                padding: "6px 12px",
+                whiteSpace: "nowrap",
+              }}
             >
-              {/* 🔹 กล่อง Event */}
-              <div
-                className="fc-event flex-grow-1 text-white d-flex align-items-center justify-content-between px-3 py-2"
-                data-event-id={event._id || event.id}
-                onClick={() => handleAddEventToCalendar(event)}
-                style={{
-                  background: event.backgroundColor || "#0c49ac",
-                  borderRadius: "5px",
-                  fontSize: "11px",
-                  width: "100%",
-                  overflow: "hidden",
-                  textAlign: "center",
-                  cursor: "pointer",
-                }}
-              >
-                <span>{event.title}</span>
-              </div>
+              เพิ่มแผนงาน
+            </button>
+          </form>
+        </div>
+      )}
+      {isAdmin && (
+        <div
+          id="external-events"
+          style={{ padding: "8px", background: "#f8f9fa", width: "100%" }}
+          className="mb-4"
+        >
+          <h5 className="mb-2 p-2">แผนงานรอจัดลงตาราง</h5>
 
-              {/* 🔹 ปุ่มลบ */}
-              <button
-                className="btn btn-danger btn-sm d-flex align-items-center justify-content-center"
-                onClick={() => handleDeleteEventReceive(event._id || event.id)}
-                style={{
-                  width: "25px",
-                  height: "25px",
-                  borderRadius: "50%",
-                }}
+          {/* 🔍 ช่องค้นหา */}
+          <div className="input-group mb-2 p-2">
+            <span className="input-group-text bg-white border border-secondary">
+              <FontAwesomeIcon icon={faSearch} className="text-muted" />
+            </span>
+            <input
+              type="search"
+              className="form-control form-control-sm border border-secondary"
+              placeholder="ค้นหาแผนงาน..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{ fontSize: "14px", padding: "6px" }}
+            />
+          </div>
+          {/* ✅ แสดงเฉพาะข้อมูลที่ค้นหา พร้อม Pagination */}
+          <div className="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-2 p-2">
+            {paginatedEvents.map((event) => (
+              <div
+                key={event._id || event.id}
+                className="col d-flex align-items-center gap-2 mb-2"
               >
-                <FontAwesomeIcon icon={faTimes} className="text-white" />
+                {/* 🔹 กล่อง Event */}
+                <div
+                  className="fc-event flex-grow-1 text-white d-flex align-items-center justify-content-between px-3 py-2"
+                  data-event-id={event._id || event.id}
+                  onClick={() => handleAddEventToCalendar(event)}
+                  style={{
+                    background: event.backgroundColor || "#0c49ac",
+                    borderRadius: "5px",
+                    fontSize: "11px",
+                    width: "100%",
+                    overflow: "hidden",
+                    textAlign: "center",
+                    cursor: "pointer",
+                  }}
+                >
+                  <span>{event.title}</span>
+                </div>
+
+                {/* 🔹 ปุ่มลบ */}
+                <button
+                  className="btn btn-danger btn-sm d-flex align-items-center justify-content-center"
+                  onClick={() =>
+                    handleDeleteEventReceive(event._id || event.id)
+                  }
+                  style={{
+                    width: "25px",
+                    height: "25px",
+                    borderRadius: "50%",
+                  }}
+                >
+                  <FontAwesomeIcon icon={faTimes} className="text-white" />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* ✅ Pagination Controls เฉพาะข้อมูลที่ค้นหา */}
+          {totalPages > 1 && (
+            <div className="d-flex justify-content-center mt-2">
+              <button
+                className="btn btn-outline-primary btn-sm me-1"
+                onClick={() => setCurrentPage(currentPage - 1)}
+                disabled={currentPage === 1}
+              >
+                «
+              </button>
+              <span className="mx-1">
+                {currentPage} / {totalPages}
+              </span>
+              <button
+                className="btn btn-outline-primary btn-sm ms-1"
+                onClick={() => setCurrentPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+              >
+                »
               </button>
             </div>
-          ))}
+          )}
         </div>
+      )}
 
-        {/* ✅ Pagination Controls เฉพาะข้อมูลที่ค้นหา */}
-        {totalPages > 1 && (
-          <div className="d-flex justify-content-center mt-2">
-            <button
-              className="btn btn-outline-primary btn-sm me-1"
-              onClick={() => setCurrentPage(currentPage - 1)}
-              disabled={currentPage === 1}
-            >
-              «
-            </button>
-            <span className="mx-1">
-              {currentPage} / {totalPages}
-            </span>
-            <button
-              className="btn btn-outline-primary btn-sm ms-1"
-              onClick={() => setCurrentPage(currentPage + 1)}
-              disabled={currentPage === totalPages}
-            >
-              »
-            </button>
-          </div>
-        )}
-      </div>
       <div id="content-id" style={{ flex: 1, width: "100%" }}>
         <FullCalendar
           ref={calendarRef}
@@ -1265,15 +1302,14 @@ const confirmCancelEvent = async (eventId) => {
             listPlugin,
           ]}
           initialView="dayGridMonth"
-          selectable={true}
-          editable={true}
-          droppable={true}
-          eventReceive={handleEventReceive}
+          editable={isAdmin} // ✅ ปิดการแก้ไขถ้าไม่ใช่ admin
+          selectable={isAdmin} // ✅ ปิดการเลือกวันที่ถ้าไม่ใช่ admin
+          droppable={isAdmin} // ✅ ปิดการลาก event ถ้าไม่ใช่ admin
+          dateClick={isAdmin ? handleAddEvent : null} // ✅ ปิดการเพิ่ม event ถ้าไม่ใช่ admin
+          eventClick={isAdmin ? handleEditEvent : null} // ✅ ปิดการแก้ไข event ถ้าไม่ใช่ admin
+          eventDrop={isAdmin ? handleEventDrop : null} // ✅ ปิดการลาก event ถ้าไม่ใช่ admin
+          eventResize={isAdmin ? handleEventResize : null} // ✅ ปิดการปรับขนาด event ถ้าไม่ใช่ admin
           events={events}
-          dateClick={handleAddEvent}
-          eventDrop={handleEventDrop}
-          eventResize={handleEventResize}
-          eventClick={handleEditEvent}
           allDaySlot={true}
           nowIndicator={true}
           selectMirror={true}

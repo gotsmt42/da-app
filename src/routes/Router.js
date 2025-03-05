@@ -194,6 +194,16 @@ const ThemeRoutes = [
         ),
         title: "Operation",
       },
+
+      {
+        path: "/register",
+        element: (
+          <Suspense fallback={<div>Loading Register...</div>}>
+            <Register />
+          </Suspense>
+        ),
+        title: "Register",
+      },
     ],
   },
   {
@@ -205,15 +215,7 @@ const ThemeRoutes = [
     ),
     title: "Login",
   },
-  {
-    path: "/register",
-    element: (
-      <Suspense fallback={<div>Loading Register...</div>}>
-        <Register />
-      </Suspense>
-    ),
-    title: "Register",
-  },
+
   {
     path: "/noconnection",
     element: (

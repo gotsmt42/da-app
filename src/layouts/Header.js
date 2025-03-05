@@ -82,10 +82,10 @@ const Header = () => {
           <NavItem>
             <Link to="/event" className="nav-link">Event</Link>
           </NavItem>
-          <NavItem>
+          {/* <NavItem>
             <Link to="/about" className="nav-link">About</Link>
-          </NavItem>
-          <UncontrolledDropdown inNavbar nav>
+          </NavItem> */}
+          {/* <UncontrolledDropdown inNavbar nav>
             <DropdownToggle caret nav>Menu</DropdownToggle>
             <DropdownMenu end>
               <Link to="/files" style={{ textDecoration: "none" }}>
@@ -99,7 +99,7 @@ const Header = () => {
                 <DropdownItem>Reset</DropdownItem>
               </Link>
             </DropdownMenu>
-          </UncontrolledDropdown>
+          </UncontrolledDropdown> */}
         </Nav>
 
         {/* Conditional rendering of profile-img */}

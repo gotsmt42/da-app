@@ -8,54 +8,85 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [isLoggedIn, setLoggedIn] = useState(false);
-  const [previousPath, setPreviousPath] = useState(""); // เริ่มต้น previousPath เป็นค่าว่าง
 
+  const [isLoggedIn, setLoggedIn] = useState(null);
+  const [userData, setUserData] = useState(null);
+
+  // ✅ โหลด Token และข้อมูลผู้ใช้จาก Local Storage เมื่อเปิดหน้าเว็บ
   useEffect(() => {
     const storedToken = localStorage.getItem("token");
+    const storedUser = localStorage.getItem("payload");
 
-    console.log(storedToken);
-    if (storedToken) {
+    if (storedToken && storedUser) {
       setLoggedIn(true);
-      
-      if (location.pathname === "/") {
-        navigate("/dashboard");
-      } else if (location.pathname === "/login") {
-        if (previousPath) {
-          navigate(previousPath);
-        } else {
-          navigate("/dashboard"); // หากไม่มีเส้นทางก่อนหน้านี้ ให้เข้าไปยัง /dashboard
-        }
-      } else {
-        setPreviousPath(location.pathname);
-        navigate({ state: { from: location } });
-      }
+      setUserData(JSON.parse(storedUser));
     } else {
       setLoggedIn(false);
-
-
-      // console.log("Redirecting to ", location.pathname);
+      setUserData(null);
+      if (location.pathname !== "/login") {
+        navigate("/login", { replace: true });
+      }
     }
-  }, [navigate, isLoggedIn, location.pathname, previousPath]);
+  }, [navigate, location.pathname]);
 
+  // ✅ ดักจับการเปลี่ยนแปลงของ Token ใน Local Storage
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const newToken = localStorage.getItem("token");
+      const newUser = localStorage.getItem("payload");
+
+      if (newToken && newUser) {
+        setLoggedIn(true);
+        setUserData(JSON.parse(newUser));
+      } else {
+        setLoggedIn(false);
+        setUserData(null);
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
+
+  // ✅ ฟังก์ชัน Login
   const login = (newToken, payload) => {
-    localStorage.setItem("payload", JSON.stringify(payload));
     localStorage.setItem("token", newToken);
+    localStorage.setItem("payload", JSON.stringify(payload));
+
     setLoggedIn(true);
+    setUserData(payload);
+
+    navigate("/dashboard", { replace: true });
+
+    // ✅ บังคับ Refresh หน้าเพื่อให้ข้อมูลอัปเดต
+    setTimeout(() => {
+      window.location.reload();
+    }, 500);
   };
 
+  // ✅ ฟังก์ชัน Logout
   const logout = () => {
-    localStorage.removeItem("payload");
     localStorage.removeItem("token");
+    localStorage.removeItem("payload");
+
     setLoggedIn(false);
-    navigate("/login");
+    setUserData(null);
+
+    navigate("/login", { replace: true });
+
+    // ✅ บังคับ Refresh หน้าเพื่อให้ข้อมูลอัปเดต
+    setTimeout(() => {
+      window.location.reload();
+    }, 500);
   };
 
-  // console.log("Login: " + isLoggedIn);
-  // console.log("PathName: " + previousPath);
+  // ✅ ป้องกัน UI Render ก่อนโหลดค่า Token
+  if (isLoggedIn === null) {
+    return <div>Loading...</div>;
+  }
 
   return (
-    <AuthContext.Provider value={{ isLoggedIn, login, logout }}>
+    <AuthContext.Provider value={{ isLoggedIn, userData, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

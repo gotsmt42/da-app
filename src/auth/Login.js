@@ -10,6 +10,8 @@ import { Facebook } from "@mui/icons-material";
 
 import { useAuth } from "./AuthContext";
 
+
+
 const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -38,31 +40,34 @@ const Login = () => {
     setErrors(errors);
     return formIsValid;
   };
-
   const handleLogin = async (e) => {
     e.preventDefault();
+    
     if (handleValidation()) {
       try {
-        const response = await API.post(`/auth/login`, {
-          username,
-          password,
-        });
+        const response = await API.post(`/auth/login`, { username, password });
         const { token, payload } = response.data;
-
+  
         login(token, payload);
-
-        // const { from } = location.state || { from: { pathname: "/starter" } }; // ถ้าไม่มี state ให้กลับไปที่หน้าหลัก
+        Swal.fire({
+          icon: "success",
+          title: "เข้าสู่ระบบสำเร็จ!",
+          text: `ยินดีต้อนรับ, ${payload.fname} ${payload.lname}`,
+        });
+  
         navigate("/dashboard");
       } catch (error) {
-        console.error("Login failed", error);
+        console.error("🔴 Login failed", error);
         Swal.fire({
           icon: "error",
-          title: "Login failed",
-          text: error.response.data.err,
+          title: "เข้าสู่ระบบล้มเหลว",
+          text: error.response.data.err || "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
         });
       }
     }
   };
+  
+  
 
   return (
     <div className="form-bg mt-5">
