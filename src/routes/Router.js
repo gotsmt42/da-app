@@ -1,9 +1,8 @@
-import { lazy } from "react";
-import { Outlet, useNavigate, Navigate } from "react-router-dom";
-import { useEffect } from "react";
-import CheckConnection from "../components/CheckConnection.js"; // นำเข้าคอมโพเนนต์ใหม่
+import { lazy, Suspense } from "react";
+import { Navigate } from "react-router-dom";
+import CheckConnection from "../components/CheckConnection.js";
 
-// Layouts และ Pages
+// Layouts และ Pages (Lazy Loaded)
 const FullLayout = lazy(() => import("../layouts/FullLayout.js"));
 const PrivateRoute = lazy(() => import("./PrivateRoute.js"));
 
@@ -34,46 +33,196 @@ const ThemeRoutes = [
     element: (
       <CheckConnection>
         <PrivateRoute>
-          <FullLayout />
+          <Suspense fallback={<div>Loading Layout...</div>}>
+            <FullLayout />
+          </Suspense>
         </PrivateRoute>
       </CheckConnection>
     ),
     children: [
-      {
-        path: "/",
-        element: <Navigate to="/dashboard" />,
-      },
+      { path: "/", element: <Navigate to="/dashboard" /> },
       {
         path: "/dashboard",
-        element: <Dashboard />,
+        element: (
+          <Suspense fallback={<div>Loading Dashboard...</div>}>
+            <Dashboard />
+          </Suspense>
+        ),
         title: "Dashboard",
       },
-      { path: "/about", element: <About />, title: "About" },
-      { path: "/account", element: <Account />, title: "Account" },
-      { path: "/alerts", element: <Alerts />, title: "Alerts" },
-      { path: "/badges", element: <Badges />, title: "Badges" },
-      { path: "/buttons", element: <Buttons />, title: "Buttons" },
-      { path: "/cards", element: <Cards />, title: "Cards" },
-      { path: "/grid", element: <Grid />, title: "Grid" },
-      { path: "/customer-employee", element: <UserTable />, title: "Customer & Employee" },
-      { path: "/forms", element: <Forms />, title: "Forms" },
-      { path: "/breadcrumbs", element: <Breadcrumbs />, title: "Breadcrumbs" },
-      { path: "/product", element: <Product />, title: "Product" },
+      {
+        path: "/about",
+        element: (
+          <Suspense fallback={<div>Loading About...</div>}>
+            <About />
+          </Suspense>
+        ),
+        title: "About",
+      },
+      {
+        path: "/account",
+        element: (
+          <Suspense fallback={<div>Loading Account...</div>}>
+            <Account />
+          </Suspense>
+        ),
+        title: "Account",
+      },
+      {
+        path: "/alerts",
+        element: (
+          <Suspense fallback={<div>Loading Alerts...</div>}>
+            <Alerts />
+          </Suspense>
+        ),
+        title: "Alerts",
+      },
+      {
+        path: "/badges",
+        element: (
+          <Suspense fallback={<div>Loading Badges...</div>}>
+            <Badges />
+          </Suspense>
+        ),
+        title: "Badges",
+      },
+      {
+        path: "/buttons",
+        element: (
+          <Suspense fallback={<div>Loading Buttons...</div>}>
+            <Buttons />
+          </Suspense>
+        ),
+        title: "Buttons",
+      },
+      {
+        path: "/cards",
+        element: (
+          <Suspense fallback={<div>Loading Cards...</div>}>
+            <Cards />
+          </Suspense>
+        ),
+        title: "Cards",
+      },
+      {
+        path: "/grid",
+        element: (
+          <Suspense fallback={<div>Loading Grid...</div>}>
+            <Grid />
+          </Suspense>
+        ),
+        title: "Grid",
+      },
+      {
+        path: "/customer-employee",
+        element: (
+          <Suspense fallback={<div>Loading Users...</div>}>
+            <UserTable />
+          </Suspense>
+        ),
+        title: "Customer & Employee",
+      },
+      {
+        path: "/forms",
+        element: (
+          <Suspense fallback={<div>Loading Forms...</div>}>
+            <Forms />
+          </Suspense>
+        ),
+        title: "Forms",
+      },
+      {
+        path: "/breadcrumbs",
+        element: (
+          <Suspense fallback={<div>Loading Breadcrumbs...</div>}>
+            <Breadcrumbs />
+          </Suspense>
+        ),
+        title: "Breadcrumbs",
+      },
+      {
+        path: "/product",
+        element: (
+          <Suspense fallback={<div>Loading Product...</div>}>
+            <Product />
+          </Suspense>
+        ),
+        title: "Product",
+      },
       {
         path: "/product/stock",
-        element: <StockProduct />,
+        element: (
+          <Suspense fallback={<div>Loading Stock Product...</div>}>
+            <StockProduct />
+          </Suspense>
+        ),
         title: "Stock Product",
       },
-      { path: "/fileupload", element: <FileUpload />, title: "File Upload" },
-      { path: "/files", element: <Files />, title: "Files" },
-      { path: "/event", element: <EventCalendar />, title: "Event Calendar" },
-      { path: "/operation", element: <Operate />, title: "Operation" },
+      {
+        path: "/fileupload",
+        element: (
+          <Suspense fallback={<div>Loading File Upload...</div>}>
+            <FileUpload />
+          </Suspense>
+        ),
+        title: "File Upload",
+      },
+      {
+        path: "/files",
+        element: (
+          <Suspense fallback={<div>Loading Files...</div>}>
+            <Files />
+          </Suspense>
+        ),
+        title: "Files",
+      },
+      {
+        path: "/event",
+        element: (
+          <Suspense fallback={<div>Loading Event Calendar...</div>}>
+            <EventCalendar />
+          </Suspense>
+        ),
+        title: "Event Calendar",
+      },
+      {
+        path: "/operation",
+        element: (
+          <Suspense fallback={<div>Loading Operation...</div>}>
+            <Operate />
+          </Suspense>
+        ),
+        title: "Operation",
+      },
     ],
-
   },
-  { path: "/login", element: <Login />, title: "Login" },
-  // { path: "/register", element: <Register />, title: "Register" },
-  { path: "/noconnection", element: <NoConnection />, title: "No Connection" },
+  {
+    path: "/login",
+    element: (
+      <Suspense fallback={<div>Loading Login...</div>}>
+        <Login />
+      </Suspense>
+    ),
+    title: "Login",
+  },
+  {
+    path: "/register",
+    element: (
+      <Suspense fallback={<div>Loading Register...</div>}>
+        <Register />
+      </Suspense>
+    ),
+    title: "Register",
+  },
+  {
+    path: "/noconnection",
+    element: (
+      <Suspense fallback={<div>Loading No Connection...</div>}>
+        <NoConnection />
+      </Suspense>
+    ),
+    title: "No Connection",
+  },
 ];
 
 export default ThemeRoutes;

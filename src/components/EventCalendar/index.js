@@ -529,10 +529,10 @@ const handleDeleteEventReceive = async (eventId) => {
       html: `
         <label for="eventTitle">ชื่อแผนงาน:</label>
         <input id="eventTitle" type="text" class="swal2-input" placeholder="กรอกชื่อแผนงาน" 
-        style="margin-bottom: 1rem; width: 250px"><br>
+        style="margin-bottom: 1rem; width: 250px">
 
-        <label for="fontSize">ขนาดตัวอักษร:</label><br>
-        <select id="fontSize" class="swal2-input">
+        <label for="fontSize" style="display: none;">ขนาดตัวอักษร:</label>
+        <select id="fontSize" style="display: none;" class="swal2-input">
           <option selected disabled>${defaultFontSize}</option>
           <option value="8">8</option>
           <option value="9">9</option>
@@ -637,15 +637,19 @@ const handleEditEvent = (eventInfo) => {
   const eventEnd = moment(eventInfo.event.end);
   const eventAllDay = eventInfo.event.allDay;
 
+  // ✅ แก้ไข: ไม่ใช้ .subtract(1, "days") ตอนแสดงวันที่
+  const formattedEnd = eventAllDay
+  ? moment(eventEnd).subtract(1, "days").format("YYYY-MM-DDTHH:mm")
+  : moment(eventEnd).format("YYYY-MM-DDTHH:mm");
+
+
   const htmlEdit = `
     <label for="editTitle">ชื่อแผนงาน:</label>
     <input id="editTitle" class="swal2-input" type="text" value="${eventTitle}"
     style="margin-bottom: 1rem; width: 250px">
 
-    <br>
-
-    <label for="editFontSize">ขนาดตัวอักษร:</label><br>
-    <select id="editFontSize" class="swal2-input">
+    <label for="editFontSize" style="display: none;">ขนาดตัวอักษร:</label>
+    <select id="editFontSize" style="display: none;" class="swal2-input">
       <option selected disabled>${eventFontSize}</option>
       <option value="8">8</option>
       <option value="10">10</option>
@@ -667,19 +671,15 @@ const handleEditEvent = (eventInfo) => {
       "YYYY-MM-DDTHH:mm"
     )}" style="margin-bottom: 1rem;"><br>
 
-    <label for="fakeEditEnd">วันที่สิ้นสุด:</label>
-    <input id="fakeEditEnd" type="datetime-local" class="swal2-input" value="${
-      eventAllDay
-        ? moment(eventEnd).subtract(1, "days").format("YYYY-MM-DDTHH:mm")
-        : eventEnd.format("YYYY-MM-DDTHH:mm")
-    }" style="margin-bottom: 1rem;"><br>
+    <label for="editEnd">วันที่สิ้นสุด:</label>
+    <input id="editEnd" type="datetime-local" class="swal2-input" value="${formattedEnd}" style="margin-bottom: 1rem;"><br>
   `;
 
   Swal.fire({
     title: `แก้ไขแผนงาน: ${eventTitle}`,
     html: htmlEdit,
     customClass: "swal-wide",
-    showCloseButton: true, // ✅ เพิ่มปุ่ม X ปิดหน้าต่าง
+    showCloseButton: true,
     didOpen: () => {
       document.getElementById("backgroundColorPickerContainer").appendChild(inputBackgroundColor);
       document.getElementById("textColorPickerContainer").appendChild(inputTextColor);
@@ -695,20 +695,22 @@ const handleEditEvent = (eventInfo) => {
       const textColor = inputTextColor.value;
       const backgroundColor = inputBackgroundColor.value;
       const fontSize = document.getElementById("editFontSize").value;
-
+    
       const start = moment(document.getElementById("editStart").value).toISOString();
-      let end = document.getElementById("fakeEditEnd").value;
-
+      let end = document.getElementById("editEnd").value;
+    
       if (!end) {
         end = eventEnd.toISOString();
       } else {
-        end = moment(end).toISOString();
+        end = eventAllDay
+          ? moment(end).add(1, "days").toISOString() // ✅ บวก 1 วันสำหรับ allDay event
+          : moment(end).toISOString();
       }
-
+    
       if (!title) {
         Swal.showValidationMessage("กรุณากรอกชื่อแผนงาน");
       }
-
+    
       return {
         id: eventId,
         title,
@@ -718,12 +720,12 @@ const handleEditEvent = (eventInfo) => {
         start,
         end,
       };
-    },
+    }
+    
   }).then(async (result) => {
     if (result.isConfirmed) {
       setLoading(true);
-      const { id, title, textColor, backgroundColor, fontSize, start, end } =
-        result.value;
+      const { id, title, textColor, backgroundColor, fontSize, start, end } = result.value;
       const updatedEvent = { title, textColor, backgroundColor, fontSize, start, end };
 
       await EventService.UpdateEvent(id, updatedEvent);
