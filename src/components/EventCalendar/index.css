@@ -73,6 +73,9 @@
   cursor: grabbing;
 }
 
+.fc-day-today {
+  background-color: #f7f1cf !important; /* ✅ เปลี่ยนสีพื้นหลังของวันปัจจุบัน */
+}
 
 
 /* CSS สำหรับปรับขนาดตัวหนังสือของวันและวันที่ใน FullCalendar เมื่อหน้าจอเล็ก */

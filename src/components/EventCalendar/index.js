@@ -44,6 +44,7 @@ import { toast } from "react-toastify"; // หากใช้ react-toastify
 
 import { faTimes } from "@fortawesome/free-solid-svg-icons";
 import { faSearch } from "@fortawesome/free-solid-svg-icons";
+import thLocale from "@fullcalendar/core/locales/th"; // นำเข้า locale ภาษาไทย
 
 import { useAuth } from "../../auth/AuthContext"; // ✅ ดึงข้อมูล Auth
 
@@ -65,6 +66,8 @@ function EventCalendar() {
   const [loading, setLoading] = useState(false); // เพิ่มสถานะการโหลด
 
   const [searchTerm, setSearchTerm] = useState(""); // 🔍 State สำหรับค้นหา
+
+  const [currentMonth, setCurrentMonth] = useState(moment().format("YYYY-MM"));
 
   let isProcessing = false; // ตัวแปรกันซ้ำ
 
@@ -1137,6 +1140,11 @@ function EventCalendar() {
     }
   }, [filteredEvents, totalPages, currentPage]);
 
+  const handleDatesSet = (info) => {
+    const newMonth = moment(info.start).format("YYYY-MM");
+    setCurrentMonth(newMonth);
+  };
+
   return (
     <div>
       <Row className="flex-wrap mb-3 d-flex justify-content-center justify-content-md-between">
@@ -1294,6 +1302,8 @@ function EventCalendar() {
       <div id="content-id" style={{ flex: 1, width: "100%" }}>
         <FullCalendar
           ref={calendarRef}
+          locales={[thLocale]} // ใช้งานภาษาไทย
+          locale="th" // กำหนดให้ใช้ภาษาไทยเป็นค่าเริ่มต้น
           plugins={[
             dayGridPlugin,
             interactionPlugin,
@@ -1302,19 +1312,22 @@ function EventCalendar() {
             listPlugin,
           ]}
           initialView="dayGridMonth"
-          editable={isAdmin} // ✅ ปิดการแก้ไขถ้าไม่ใช่ admin
-          selectable={isAdmin} // ✅ ปิดการเลือกวันที่ถ้าไม่ใช่ admin
-          droppable={isAdmin} // ✅ ปิดการลาก event ถ้าไม่ใช่ admin
-          dateClick={isAdmin ? handleAddEvent : null} // ✅ ปิดการเพิ่ม event ถ้าไม่ใช่ admin
-          eventClick={isAdmin ? handleEditEvent : null} // ✅ ปิดการแก้ไข event ถ้าไม่ใช่ admin
-          eventDrop={isAdmin ? handleEventDrop : null} // ✅ ปิดการลาก event ถ้าไม่ใช่ admin
-          eventResize={isAdmin ? handleEventResize : null} // ✅ ปิดการปรับขนาด event ถ้าไม่ใช่ admin
+          editable={isAdmin}
+          selectable={isAdmin}
+          droppable={isAdmin}
+          dateClick={isAdmin ? handleAddEvent : null}
+          eventClick={isAdmin ? handleEditEvent : null}
+          eventDrop={isAdmin ? handleEventDrop : null}
+          eventResize={isAdmin ? handleEventResize : null}
           events={events}
           allDaySlot={true}
           nowIndicator={true}
           selectMirror={true}
           weekends={true}
           contentHeight="auto"
+          showNonCurrentDates={false} // ✅ ไม่แสดงวันของเดือนก่อนและหลัง
+          firstDay={0} // ✅ กำหนดให้วันอาทิตย์เป็นวันแรกของสัปดาห์
+
           headerToolbar={{
             left: "prev,next",
             center: "title",
@@ -1325,19 +1338,26 @@ function EventCalendar() {
           }}
           customButtons={{
             prev: {
-              text: "‹",
+              text: "ย้อนกลับ",
               click: () => calendarRef.current.getApi().prev(),
             },
             next: {
-              text: "›",
+              text: "ถัดไป",
               click: () => calendarRef.current.getApi().next(),
             },
             today: {
-              text: "Today",
+              text: "วันนี้",
               click: () => calendarRef.current.getApi().today(),
             },
           }}
-          dayMaxEventRows={true}
+          datesSet={handleDatesSet} // ✅ ใช้ตรวจจับเดือนที่เปลี่ยน
+          buttonText={{
+            today: "วันนี้",
+            month: "เดือน",
+            week: "สัปดาห์",
+            day: "วัน",
+            list: "รายการ",
+          }}
           views={{
             listWeek: { dayMaxEventRows: window.innerWidth >= 576 ? 7 : 5 },
             dayGridMonth: { dayMaxEventRows: window.innerWidth >= 576 ? 7 : 5 },
@@ -1346,11 +1366,22 @@ function EventCalendar() {
           }}
           dayCellDidMount={(info) => {
             const date = info.date;
+            const today = moment().format("YYYY-MM-DD"); // ดึงวันที่ปัจจุบัน
+
             const isSaturday = date.getUTCDay() === 5;
             const isSunday = date.getUTCDay() === 6;
+            const currentMonth = moment(info.view.currentStart).month(); // ดึงเดือนปัจจุบันของปฏิทิน
 
-            if (isSaturday || isSunday) {
-              info.el.style.backgroundColor = "#FFFFF4";
+            const cellMonth = moment(date).month(); // ดึงเดือนของเซลล์นั้นๆ
+
+            if (date === today) {
+              info.el.style.backgroundColor = "#FFD700"; // ✅ เปลี่ยนสีพื้นหลังเป็นสีทอง
+              info.el.style.color = "#000"; // ✅ เปลี่ยนสีตัวอักษรเป็นสีดำ
+              info.el.style.fontWeight = "bold"; // ✅ ทำให้ตัวอักษรหนาขึ้น
+            }
+            
+            if ((isSaturday || isSunday) && cellMonth === currentMonth) {
+              info.el.style.backgroundColor = "#FFFFF4"; // ✅ ไฮไลต์เฉพาะวันเสาร์-อาทิตย์ของเดือนปัจจุบัน
             }
           }}
         />
