@@ -1349,6 +1349,8 @@
             showNonCurrentDates={false} // ✅ ไม่แสดงวันของเดือนก่อนและหลัง
             firstDay={0} // ✅ กำหนดให้วันอาทิตย์เป็นวันแรกของสัปดาห์
 
+  eventReceive={handleEventReceive} // ✅ ต้องกำหนด eventReceive
+
             headerToolbar={{
               left: "prev,next",
               center: "title",
