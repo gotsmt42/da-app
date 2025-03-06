@@ -1365,25 +1365,21 @@ function EventCalendar() {
             timeGridDay: { dayMaxEventRows: window.innerWidth >= 576 ? 7 : 5 },
           }}
           dayCellDidMount={(info) => {
-            const date = info.date;
-            const today = moment().format("YYYY-MM-DD"); // ดึงวันที่ปัจจุบัน
+            const date = moment(info.date); // แปลงเป็น moment object
+          
+            const isSaturday = date.isoWeekday() === 6; // ตรวจสอบวันเสาร์
+            const isSunday = date.isoWeekday() === 7; // ตรวจสอบวันอาทิตย์
+          
 
-            const isSaturday = date.getUTCDay() === 5;
-            const isSunday = date.getUTCDay() === 6;
-            const currentMonth = moment(info.view.currentStart).month(); // ดึงเดือนปัจจุบันของปฏิทิน
-
-            const cellMonth = moment(date).month(); // ดึงเดือนของเซลล์นั้นๆ
-
-            if (date === today) {
-              info.el.style.backgroundColor = "#FFD700"; // ✅ เปลี่ยนสีพื้นหลังเป็นสีทอง
-              info.el.style.color = "#000"; // ✅ เปลี่ยนสีตัวอักษรเป็นสีดำ
-              info.el.style.fontWeight = "bold"; // ✅ ทำให้ตัวอักษรหนาขึ้น
-            }
-            
-            if ((isSaturday || isSunday) && cellMonth === currentMonth) {
-              info.el.style.backgroundColor = "#FFFFF4"; // ✅ ไฮไลต์เฉพาะวันเสาร์-อาทิตย์ของเดือนปัจจุบัน
+          
+            // ✅ ไฮไลต์วันเสาร์-อาทิตย์ (ของทุกเดือน)
+            if (isSaturday || isSunday) {
+              info.el.style.backgroundColor = "#FFFFF4"; // สีเหลืองอ่อน
             }
           }}
+          
+          
+          
         />
         <style>
           {`
