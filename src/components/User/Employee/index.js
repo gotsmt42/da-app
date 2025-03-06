@@ -25,7 +25,12 @@ import AddIcon from "@mui/icons-material/Add"; // ✅ เพิ่มไอค�
 import API from "../../../API/axiosInstance";
 import Swal from "sweetalert2";
 
+import { useMediaQuery } from "@mui/material"; // ✅ ใช้สำหรับ Responsive
+
 const Employee = () => {
+  const isSmallScreen = useMediaQuery("(max-width:600px)"); // ✅ เช็คว่าหน้าจอเล็กหรือไม่
+
+
   const [users, setUsers] = useState([]);
   const [expandedRows, setExpandedRows] = useState({});
   const [modalOpenInsert, setModalOpenInsert] = useState(false);
@@ -44,6 +49,18 @@ const Employee = () => {
   const [modalOpenPasswordConfirm, setModalOpenPasswordConfirm] =
     useState(false);
   const [passwordConfirm, setPasswordConfirm] = useState(""); // รหัสผ่านของ Admin
+
+   // ✅ สไตล์สำหรับ Modal (Responsive)
+   const modalStyle = {
+    padding: isSmallScreen ? 2 : 3, // ✅ ลด padding บนอุปกรณ์เล็ก
+    background: "white",
+    margin: isSmallScreen ? "5% auto" : "5% auto", // ✅ ปรับ margin ให้พอดี
+    width: isSmallScreen ? "95%" : "500px", // ✅ ลดขนาด Modal บนอุปกรณ์เล็ก
+    maxWidth: "500px",
+    borderRadius: 2,
+    overflowY: "auto", // ✅ ป้องกันการล้นของ Modal
+    maxHeight: "90vh", // ✅ ป้องกัน Modal ล้นจอ
+  };
 
   const [newUserData, setNewUserData] = useState({
     fname: "",
@@ -131,7 +148,7 @@ const Employee = () => {
     const { fname, lname, tel, email, username, role } = editedData;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const telRegex = /^[0-9]{10}$/; // ✅ ต้องเป็นตัวเลข 10 หลักเท่านั้น
-  
+
     if (!fname || !lname || !tel || !email || !username || !role) {
       setAlert({
         open: true,
@@ -166,7 +183,6 @@ const Employee = () => {
     }
     return true;
   };
-  
 
   const validateAdminPassword = async () => {
     try {
@@ -305,7 +321,7 @@ const Employee = () => {
 
   const handleChangeEdit = (e) => {
     const { name, value } = e.target;
-  
+
     if (name === "tel") {
       // ✅ อนุญาตให้กรอกเฉพาะตัวเลขเท่านั้น
       const onlyNumbers = value.replace(/[^0-9]/g, "");
@@ -314,10 +330,10 @@ const Employee = () => {
       setEditedData({ ...editedData, [name]: value });
     }
   };
-  
+
   const handleEditUser = async () => {
     if (!validateEditForm()) return; // ✅ ถ้าไม่ผ่านให้หยุดทำงาน
-  
+
     if (!editedData._id) {
       Swal.fire({
         title: "เกิดข้อผิดพลาด!",
@@ -326,18 +342,25 @@ const Employee = () => {
       });
       return;
     }
-  
+
     try {
       console.log("🔄 กำลังอัปเดตข้อมูล:", editedData); // ✅ Debug: เช็คค่าที่จะส่งไป API
-  
-      const response = await API.put(`/auth/user/${editedData._id}`, editedData);
-  
+
+      const response = await API.put(
+        `/auth/user/${editedData._id}`,
+        editedData
+      );
+
       if (response.status === 200) {
-        setUsers(users.map(user => (user._id === editedData._id ? { ...user, ...editedData } : user)));
+        setUsers(
+          users.map((user) =>
+            user._id === editedData._id ? { ...user, ...editedData } : user
+          )
+        );
         setModalOpenEdit(false);
         setSelectedUser(null);
         setEditedData({});
-  
+
         Swal.fire({
           title: "สำเร็จ!",
           text: "อัปเดตข้อมูลผู้ใช้เรียบร้อย",
@@ -353,7 +376,6 @@ const Employee = () => {
       });
     }
   };
-  
 
   const handleDeleteRow = async (userId) => {
     Swal.fire({
@@ -393,6 +415,10 @@ const Employee = () => {
           color="primary"
           startIcon={<AddIcon />}
           onClick={() => setModalOpenInsert(true)}
+          sx={{
+            fontSize: isSmallScreen ? "0.85rem" : "1rem", // ✅ ปรับขนาดปุ่มให้พอดี
+            padding: isSmallScreen ? "6px 10px" : "8px 16px", // ✅ ปรับ Padding ปุ่ม
+          }}
         >
           เพิ่มผู้ใช้ใหม่
         </Button>
@@ -414,15 +440,8 @@ const Employee = () => {
 
       {/* โมดอลเพิ่มผู้ใช้ */}
       <Modal open={modalOpenInsert} onClose={() => setModalOpenInsert(false)}>
-        <Box
-          sx={{
-            padding: 3,
-            background: "white",
-            margin: "5% auto",
-            width: 500,
-            borderRadius: 2,
-          }}
-        >
+      <Box sx={modalStyle}>
+
           <h2 style={{ textAlign: "center" }}>เพิ่มผู้ใช้ใหม่</h2>
           <TextField
             label="ชื่อ"
@@ -540,69 +559,96 @@ const Employee = () => {
         </Box>
       </Modal>
 
-   {/* Modal แก้ไขผู้ใช้ */}
-<Modal open={modalOpenEdit} onClose={() => setModalOpenEdit(false)}>
-  <Box sx={{ padding: 3, background: "white", margin: "5% auto", width: 500, borderRadius: 2 }}>
-    <h2 style={{ textAlign: "center" }}>แก้ไขข้อมูลผู้ใช้</h2>
-    <TextField label="ชื่อ" name="fname" fullWidth margin="normal" value={editedData.fname || ""} onChange={handleChangeEdit} />
-    <TextField label="นามสกุล" name="lname" fullWidth margin="normal" value={editedData.lname || ""} onChange={handleChangeEdit} />
+      {/* Modal แก้ไขผู้ใช้ */}
+      <Modal open={modalOpenEdit} onClose={() => setModalOpenEdit(false)}>
+      <Box sx={modalStyle}>
 
-    {/* ✅ ช่องเบอร์โทร (แก้ไข) กรองให้กรอกเฉพาะตัวเลข */}
-    <TextField
-      label="เบอร์โทร"
-      name="tel"
-      fullWidth
-      margin="normal"
-      value={editedData.tel || ""}
-      onChange={handleChangeEdit}
-      inputProps={{ maxLength: 10 }} // ✅ จำกัดให้กรอกได้แค่ 10 หลัก
-      InputProps={{
-        startAdornment: (
-          <InputAdornment position="start">
-            <PhoneIcon />
-          </InputAdornment>
-        ),
-      }}
-    />
+          <h2 style={{ textAlign: "center" }}>แก้ไขข้อมูลผู้ใช้</h2>
+          <TextField
+            label="ชื่อ"
+            name="fname"
+            fullWidth
+            margin="normal"
+            value={editedData.fname || ""}
+            onChange={handleChangeEdit}
+          />
+          <TextField
+            label="นามสกุล"
+            name="lname"
+            fullWidth
+            margin="normal"
+            value={editedData.lname || ""}
+            onChange={handleChangeEdit}
+          />
 
-    <TextField label="อีเมล" name="email" fullWidth margin="normal" value={editedData.email || ""} onChange={handleChangeEdit} />
-    <TextField label="ชื่อผู้ใช้" name="username" fullWidth margin="normal" value={editedData.username || ""} onChange={handleChangeEdit} />
+          {/* ✅ ช่องเบอร์โทร (แก้ไข) กรองให้กรอกเฉพาะตัวเลข */}
+          <TextField
+            label="เบอร์โทร"
+            name="tel"
+            fullWidth
+            margin="normal"
+            value={editedData.tel || ""}
+            onChange={handleChangeEdit}
+            inputProps={{ maxLength: 10 }} // ✅ จำกัดให้กรอกได้แค่ 10 หลัก
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <PhoneIcon />
+                </InputAdornment>
+              ),
+            }}
+          />
 
-    {/* ✅ Dropdown สำหรับเลือก Role */}
-    <FormControl fullWidth margin="normal">
-      <InputLabel id="role-label">สิทธิ์ของผู้ใช้</InputLabel>
-      <Select
-        labelId="role-label"
-        name="role"
-        value={editedData.role || ""} 
-        onChange={handleChangeEdit}
-      >
-        <MenuItem value="admin">Admin</MenuItem>
-        <MenuItem value="tecnicain">Technician</MenuItem>
-        <MenuItem value="editor">Editor</MenuItem>
-      </Select>
-    </FormControl>
+          <TextField
+            label="อีเมล"
+            name="email"
+            fullWidth
+            margin="normal"
+            value={editedData.email || ""}
+            onChange={handleChangeEdit}
+          />
+          <TextField
+            label="ชื่อผู้ใช้"
+            name="username"
+            fullWidth
+            margin="normal"
+            value={editedData.username || ""}
+            onChange={handleChangeEdit}
+          />
 
-    <Button variant="contained" color="primary" fullWidth onClick={handleEditUser} sx={{ marginTop: 2 }}>
-      บันทึก
-    </Button>
-  </Box>
-</Modal>
+          {/* ✅ Dropdown สำหรับเลือก Role */}
+          <FormControl fullWidth margin="normal">
+            <InputLabel id="role-label">สิทธิ์ของผู้ใช้</InputLabel>
+            <Select
+              labelId="role-label"
+              name="role"
+              value={editedData.role || ""}
+              onChange={handleChangeEdit}
+            >
+              <MenuItem value="admin">Admin</MenuItem>
+              <MenuItem value="tecnicain">Technician</MenuItem>
+              <MenuItem value="editor">Editor</MenuItem>
+            </Select>
+          </FormControl>
 
+          <Button
+            variant="contained"
+            color="primary"
+            fullWidth
+            onClick={handleEditUser}
+            sx={{ marginTop: 2 }}
+          >
+            บันทึก
+          </Button>
+        </Box>
+      </Modal>
 
       <Modal
         open={modalOpenPasswordConfirm}
         onClose={() => setModalOpenPasswordConfirm(false)}
       >
-        <Box
-          sx={{
-            padding: 3,
-            background: "white",
-            margin: "5% auto",
-            width: 400,
-            borderRadius: 2,
-          }}
-        >
+               <Box sx={modalStyle}>
+
           <h2 style={{ textAlign: "center" }}>ยืนยันรหัสผ่าน Admin</h2>
           <TextField
             label="รหัสผ่านของคุณ"

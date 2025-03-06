@@ -28,7 +28,14 @@ import StockProductService from "../services/StockProductService";
 import moment from "moment";
 import { faTimeline } from "@fortawesome/free-solid-svg-icons";
 
+import { useAuth } from "../auth/AuthContext";
+
+
 const Dashboard = () => {
+  const { userData } = useAuth();
+
+  const isAdmin = userData?.role?.toLowerCase() === "admin"; // ✅ รองรับ case-insensitive
+
   const [loading, setLoading] = useState(false);
   const [files, setFiles] = useState({});
   const [products, setProducts] = useState({});
@@ -154,6 +161,7 @@ const Dashboard = () => {
     //   iconBgColor: "#fef5e7",
     // },
 
+    
     {
       icon: FaUsers,
       title: "จัดการสมาชิก",
@@ -233,6 +241,7 @@ const Dashboard = () => {
           </Col>
         ))}
       </Row>
+
       <Row
         className="flex-wrap"
         style={{ display: "flex", justifyContent: "space-between" }}
@@ -256,7 +265,8 @@ const Dashboard = () => {
           </Col>
         ))}
       </Row>
-    
+      {isAdmin && (
+
       <Row
         className="flex-wrap"
         style={{ display: "flex", justifyContent: "space-between" }}
@@ -282,6 +292,8 @@ const Dashboard = () => {
           </Col>
         ))}
       </Row>
+            )}
+
 {/* 
       <Row
         className="flex-wrap mt-5"
