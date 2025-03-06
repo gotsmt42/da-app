@@ -74,7 +74,9 @@
 }
 
 .fc-day-today {
-  background-color: #f7f1cf !important; /* ✅ เปลี่ยนสีพื้นหลังของวันปัจจุบัน */
+  /* background-color: #f7f1cf !important;  */
+  background-color: #FFFFF4 !important; /* ✅ เปลี่ยนสีพื้นหลังของวันปัจจุบัน */
+
 }
 
 
