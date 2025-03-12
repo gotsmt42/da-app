@@ -10,7 +10,7 @@
   overflow: hidden;
   max-width: 100%;
   /* font-weight: 500; */
-  line-height: 1.6; /* ป้องกันวรรณยุกต์ทับกัน */
+  line-height: 1.5; /* ป้องกันวรรณยุกต์ทับกัน */
   font-family: "Noto Sans Thai", sans-serif; /* ใช้ฟอนต์ที่รองรับภาษาไทย */
 }
 

@@ -1,4 +1,3 @@
-
 import "./index.css";
 
 import React, { Suspense } from "react";
@@ -15,24 +14,18 @@ import { StyleSheetManager } from "styled-components";
 
 import "bootstrap/dist/css/bootstrap.min.css"; // import Bootstrap CSS
 
-import "@fortawesome/react-fontawesome"
-
-
+import "@fortawesome/react-fontawesome";
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 
 
-
 root.render(
-  
   <React.StrictMode>
-    
     <Suspense fallback={<Loader />}>
-      <Router>
-        <AuthProvider>
+      <Router future={{ v7_relativeSplatPath: true }}>
+        <AuthProvider >
           <StyleSheetManager shouldForwardProp={(prop) => prop !== "align"}>
             <App />
-
           </StyleSheetManager>
         </AuthProvider>
       </Router>

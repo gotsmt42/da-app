@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, createBrowserRouter } from "react-router-dom";
 import CheckConnection from "../components/CheckConnection.js";
 
 // Layouts และ Pages (Lazy Loaded)
@@ -27,12 +27,13 @@ const Operate = lazy(() => import("../views/ui/Operation.js"));
 const Login = lazy(() => import("../auth/Login.js"));
 const Register = lazy(() => import("../auth/Register.js"));
 
+
 const ThemeRoutes = [
   {
     path: "/",
     element: (
       <CheckConnection>
-        <PrivateRoute>
+        <PrivateRoute >
           <Suspense fallback={<div>Loading Layout...</div>}>
             <FullLayout />
           </Suspense>
@@ -40,9 +41,9 @@ const ThemeRoutes = [
       </CheckConnection>
     ),
     children: [
-      { path: "/", element: <Navigate to="/dashboard" /> },
+      { path: "/", element: <Navigate  to="/dashboard" /> },
       {
-        path: "/dashboard",
+        path: "dashboard",
         element: (
           <Suspense fallback={<div>Loading Dashboard...</div>}>
             <Dashboard />
@@ -51,7 +52,7 @@ const ThemeRoutes = [
         title: "Dashboard",
       },
       {
-        path: "/about",
+        path: "about",
         element: (
           <Suspense fallback={<div>Loading About...</div>}>
             <About />
@@ -60,7 +61,7 @@ const ThemeRoutes = [
         title: "About",
       },
       {
-        path: "/account",
+        path: "account",
         element: (
           <Suspense fallback={<div>Loading Account...</div>}>
             <Account />
@@ -69,7 +70,7 @@ const ThemeRoutes = [
         title: "Account",
       },
       {
-        path: "/alerts",
+        path: "alerts",
         element: (
           <Suspense fallback={<div>Loading Alerts...</div>}>
             <Alerts />
@@ -78,7 +79,7 @@ const ThemeRoutes = [
         title: "Alerts",
       },
       {
-        path: "/badges",
+        path: "badges",
         element: (
           <Suspense fallback={<div>Loading Badges...</div>}>
             <Badges />
@@ -87,7 +88,7 @@ const ThemeRoutes = [
         title: "Badges",
       },
       {
-        path: "/buttons",
+        path: "buttons",
         element: (
           <Suspense fallback={<div>Loading Buttons...</div>}>
             <Buttons />
@@ -96,7 +97,7 @@ const ThemeRoutes = [
         title: "Buttons",
       },
       {
-        path: "/cards",
+        path: "cards",
         element: (
           <Suspense fallback={<div>Loading Cards...</div>}>
             <Cards />
@@ -105,7 +106,7 @@ const ThemeRoutes = [
         title: "Cards",
       },
       {
-        path: "/grid",
+        path: "grid",
         element: (
           <Suspense fallback={<div>Loading Grid...</div>}>
             <Grid />
@@ -114,7 +115,7 @@ const ThemeRoutes = [
         title: "Grid",
       },
       {
-        path: "/customer-employee",
+        path: "customer-employee",
         element: (
           <Suspense fallback={<div>Loading Users...</div>}>
             <UserTable />
@@ -123,7 +124,7 @@ const ThemeRoutes = [
         title: "Customer & Employee",
       },
       {
-        path: "/forms",
+        path: "forms",
         element: (
           <Suspense fallback={<div>Loading Forms...</div>}>
             <Forms />
@@ -132,7 +133,7 @@ const ThemeRoutes = [
         title: "Forms",
       },
       {
-        path: "/breadcrumbs",
+        path: "breadcrumbs",
         element: (
           <Suspense fallback={<div>Loading Breadcrumbs...</div>}>
             <Breadcrumbs />
@@ -141,7 +142,7 @@ const ThemeRoutes = [
         title: "Breadcrumbs",
       },
       {
-        path: "/product",
+        path: "product",
         element: (
           <Suspense fallback={<div>Loading Product...</div>}>
             <Product />
@@ -150,7 +151,7 @@ const ThemeRoutes = [
         title: "Product",
       },
       {
-        path: "/product/stock",
+        path: "product/stock",
         element: (
           <Suspense fallback={<div>Loading Stock Product...</div>}>
             <StockProduct />
@@ -159,7 +160,7 @@ const ThemeRoutes = [
         title: "Stock Product",
       },
       {
-        path: "/fileupload",
+        path: "fileupload",
         element: (
           <Suspense fallback={<div>Loading File Upload...</div>}>
             <FileUpload />
@@ -168,7 +169,7 @@ const ThemeRoutes = [
         title: "File Upload",
       },
       {
-        path: "/files",
+        path: "files",
         element: (
           <Suspense fallback={<div>Loading Files...</div>}>
             <Files />
@@ -177,7 +178,7 @@ const ThemeRoutes = [
         title: "Files",
       },
       {
-        path: "/event",
+        path: "event",
         element: (
           <Suspense fallback={<div>Loading Event Calendar...</div>}>
             <EventCalendar />
@@ -186,7 +187,7 @@ const ThemeRoutes = [
         title: "Event Calendar",
       },
       {
-        path: "/operation",
+        path: "operation",
         element: (
           <Suspense fallback={<div>Loading Operation...</div>}>
             <Operate />
@@ -196,7 +197,7 @@ const ThemeRoutes = [
       },
 
       {
-        path: "/register",
+        path: "register",
         element: (
           <Suspense fallback={<div>Loading Register...</div>}>
             <Register />
@@ -204,8 +205,11 @@ const ThemeRoutes = [
         ),
         title: "Register",
       },
-    ],
+    ],  
+
+    
   },
+  
   {
     path: "/login",
     element: (
@@ -225,6 +229,16 @@ const ThemeRoutes = [
     ),
     title: "No Connection",
   },
-];
+  
+]
+
+
+createBrowserRouter(ThemeRoutes, {
+  future: {
+    v7_skipActionErrorRevalidation: true,
+  },
+});
+
+
 
 export default ThemeRoutes;
