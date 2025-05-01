@@ -27,6 +27,7 @@ import {
   faPlus,
 } from "@fortawesome/free-solid-svg-icons"; // Import ไอคอนต่างๆ
 
+import CustomerService from "../../services/CustomerService";
 import EventService from "../../services/EventService";
 import EventReceiveService from "../../services/EventReceiveService";
 import fetchHolidayService from "../../services/fetchHolidayService";
@@ -61,6 +62,15 @@ import {
   faCheckDouble,
 } from "@fortawesome/free-solid-svg-icons";
 
+import { jsPDF } from "jspdf";
+
+import thSarabunFont from "../../Fonts/THSarabunNew_base64"; // นำเข้า base64 font
+
+import TomSelect from "tom-select";
+import "tom-select/dist/css/tom-select.css";
+
+import Hammer from "hammerjs";
+
 function EventCalendar() {
   const { userData } = useAuth(); // ✅ เปลี่ยนจาก user → userData
   const isAdmin = userData?.role?.toLowerCase() === "admin"; // ✅ รองรับ case-insensitive
@@ -91,56 +101,175 @@ function EventCalendar() {
   }, []);
 
   useEffect(() => {
-    const today = moment().format("YYYY-MM-DD"); // วันที่ปัจจุบัน
-    let hasUpdated = false; // ใช้เพื่อตรวจสอบว่ามีการอัปเดตหรือยัง
+    const today = moment().format("YYYY-MM-DD");
+    let hasUpdated = false;
 
     const updatedEvents = events.map((event) => {
       const eventStartDate = moment(event.start).format("YYYY-MM-DD");
-
-      // ✅ อัปเดตเฉพาะอีเวนต์ที่
-      // 1️⃣ วันที่เริ่มตรงกับวันนี้
-      // 2️⃣ ยังไม่เป็น "กำลังดำเนินการ"
-      // 3️⃣ ไม่เคยถูกอัปเดต (isAutoUpdated === false หรือไม่มีค่า)
+      // เงื่อนไข: หาก event อยู่ในวันที่ปัจจุบันและ
+      // ไม่มีการแก้ไขด้วยมือ (manualStatus ไม่เป็น true)
+      // และ status ไม่ใช่ "กำลังดำเนินการ"
       if (
         eventStartDate === today &&
-        event.extendedProps?.status !== "กำลังดำเนินการ" &&
-        !event.extendedProps?.isAutoUpdated
+        !event.manualStatus && // สามารถใช้ event.manualStatus จากระดับบนสุดได้
+        event.extendedProps?.status !== "กำลังดำเนินการ"
       ) {
         hasUpdated = true;
         return {
           ...event,
           extendedProps: {
             ...event.extendedProps,
-            status: "กำลังดำเนินการ", // ✅ เปลี่ยนสถานะ
-            isAutoUpdated: true, // ✅ บันทึกว่าอัปเดตไปแล้ว
+            status: "กำลังดำเนินการ",
           },
+          manualStatus: false, // กำหนดให้ชัดเจน
         };
       }
       return event;
     });
 
     if (hasUpdated) {
-      setEvents(updatedEvents); // ✅ อัปเดต UI
+      setEvents(updatedEvents);
       updatedEvents.forEach(async (event) => {
         if (
-          event.extendedProps?.status === "กำลังดำเนินการ" &&
-          !event.extendedProps?.isAutoUpdated
+          moment(event.start).format("YYYY-MM-DD") === today &&
+          !event.manualStatus &&
+          event.extendedProps?.status === "กำลังดำเนินการ"
         ) {
           try {
             await EventService.UpdateEvent(event.id, {
               status: "กำลังดำเนินการ",
-              isAutoUpdated: true,
+              manualStatus: false,
             });
             console.log(
               `✅ อัปเดตสถานะของ Event ID ${event.id} เป็น "กำลังดำเนินการ"`
             );
           } catch (error) {
-            console.error(`❌ อัปเดตสถานะไม่สำเร็จ: ${error}`);
+            console.error(
+              `❌ อัปเดตสถานะของ Event ID ${event.id} ไม่สำเร็จ: ${error}`
+            );
           }
         }
       });
     }
   }, [events]);
+
+  useEffect(() => {
+    const calendarEl = document.querySelector(".fc-view-harness");
+    if (!calendarEl) return;
+
+    const hammer = new Hammer(calendarEl);
+
+    hammer.on("swipeleft", () => {
+      calendarRef.current?.getApi().next();
+    });
+
+    hammer.on("swiperight", () => {
+      calendarRef.current?.getApi().prev();
+    });
+
+    return () => hammer.destroy();
+  }, []);
+
+  const generateWorkPermitPDF = (event) => {
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "A4",
+    });
+
+    // 👉 ฟอนต์ THSarabun
+    doc.addFileToVFS("THSarabun.ttf", thSarabunFont);
+    doc.addFont("THSarabun.ttf", "THSarabun", "normal");
+    doc.setFont("THSarabun");
+    doc.setFontSize(16);
+
+    // 👉 ใส่โลโก้บริษัท (ระบุ base64 หรือ path)
+    const logo = "001.png"; // 👈 โลโก้บริษัท
+    doc.addImage(logo, "PNG", 15, 10, 30, 30); // x, y, width, height
+
+    // 👉 ข้อมูลหัวจดหมาย
+    doc.setFontSize(20);
+    doc.text("บริษัท ดู ออล อาร์คิเทค แอนด์ เอ็นจิเนียริ่ง จำกัด", 105, 20, {
+      align: "center",
+    });
+
+    doc.setFontSize(14);
+    doc.text("DO ALL ARCHITECT AND ENGINEERING CO.,LTD.", 105, 28, {
+      align: "center",
+    });
+
+    doc.setFontSize(12);
+    doc.text(
+      "68/155 หมู่ 3 ถนนชัยพฤกษ์ ตำบลคลองพระอุดม อำเภอปากเกร็ด จังหวัดนนทบุรี 11120",
+      105,
+      34,
+      {
+        align: "center",
+      }
+    );
+
+    doc.text("วันที่: " + moment().format("DD-MM-YYYY"), 170, 44, {
+      align: "right",
+    });
+
+    doc.line(15, 48, 195, 48); // เส้นคั่น
+
+    // 👉 หัวเรื่อง
+    doc.setFontSize(16);
+    doc.text(
+      "แจ้งแผนงานการเข้าดำเนินการซ่อมหรือปรับปรุงระบบสัญญาณแจ้งเหตุเพลิงไหม้",
+      105,
+      58,
+      {
+        align: "center",
+      }
+    );
+
+    // 👉 ข้อมูล Event
+    const end_o = moment(event.end).format("DD-MM-YYYY");
+    const start = moment(event.start).format("DD-MM-YYYY");
+    const end = moment(event.end).format("DD-MM-YYYY");
+
+    const lines = [
+      "",
+      `เรียน  ผู้จัดการโครงการ`,
+      "",
+      `        ตามที่บริษัท ดู ออล อาคิเทค แอนด์ เอ็นจิเนียริ่ง จำกัด ได้รับความไว้วางใจจาก บริษัท ${event.extendedProps.company} `,
+      `ให้เข้าดำเนินการ ${event.title} ระบบ ${event.extendedProps.system} ครั้งที่ ${event.extendedProps.time} ณ โครงการ ${event.extendedProps.site}`,
+      "",
+
+      `        บริษัท ดู ออล อาคิเทค แอนด์ เอ็นจิเนียริ่ง จำกัด ขอแจ้งให้ท่านทราบถึงกำหนดการเข้า ${event.title} ระบบ ${event.extendedProps.system}`,
+      `ครั้งที่ ${event.extendedProps.time} ซึ่งทางบริษัทฯ มีกำหนดการเข้าดำเนินการในช่วงเวลาดังนี้`,
+
+      "",
+
+      `        Description`,
+
+      "",
+
+      "        ดังนั้น บริษัท ฯ ใคร่ขอความร่วมมือ แจ้งผู้เกี่ยวข้องทุกท่านเพื่อทราบกำหนดการดังกล่าว ทั้งนี้บริษัทจะเข้าดำเนินการโดยไม่ส่งผลกระทบ",
+      "ต่อผู้ใช้งานพื้นที่พร้อมมีมาตรการความปลอดภัยตามมาตรฐาน หากท่านไม่สะดวกในการดำเนินการตามวันเวลาดังกล่าวกรุณาแจ้งกลับที่",
+      "บริษัท ดู ออล อาคิเทค แอนด์ เอ็นจิเนียริ่ง จำกัด โทรศัพท์ 082-069-0919 ด้วย จักขอบพระคุณยิ่ง ",
+    ];
+
+    doc.setFontSize(14);
+    let y = 68;
+    lines.forEach((line) => {
+      doc.text(line, 20, y);
+      y += 8;
+    });
+
+    // 👉 ลายเซ็น
+    const signature = "001.png"; // 👈 ลายเซ็น
+    doc.addImage(signature, "PNG", 140, y + 10, 40, 20); // ปรับตำแหน่งตามความเหมาะสม
+
+    doc.text("ขอแสดงความนับถือ", 140, y + 35);
+    doc.text("วิศวกรควบคุมระบบ", 140, y + 45);
+    doc.text("064-111-0988", 140, y + 52);
+
+    // 👉 บันทึก PDF
+    doc.save(`WorkPermit_${event.title}.pdf`);
+  };
 
   // ✅ ฟังก์ชันตั้งค่า External Events ให้สามารถลากได้
   const initExternalEvents = () => {
@@ -551,6 +680,16 @@ function EventCalendar() {
       const eventsWithId = res.userEvents.map((event) => ({
         ...event,
         id: event._id,
+        extendedProps: {
+          ...event.extendedProps,
+          company: event.company,
+          site: event.site,
+          system: event.system,
+          time: event.time,
+          manualStatus: event.manualStatus,
+          status: event.status,
+          fontSize: event.fontSize,
+        },
       }));
 
       // ดึงข้อมูลวันหยุดจาก API
@@ -604,52 +743,160 @@ function EventCalendar() {
     return "_" + Math.random().toString(36).substr(2, 9); // สร้าง id แบบสุ่ม
   };
 
-  const handleAddEvent = (arg) => {
+  const handleAddEvent = async (arg) => {
+    const res = await CustomerService.getUserCustomers();
+
     Swal.fire({
       title: "เพิ่มแผนงานใหม่",
       customClass: "swal-wide",
+      // ✅ ฟอร์มเพิ่มแผนงานแบบ 2 คอลัมน์ Responsive
       html: `
-          <label for="eventTitle">ชื่อแผนงาน:</label>
-          <input id="eventTitle" type="text" class="swal2-input" placeholder="กรอกชื่อแผนงาน" 
-          style="margin-bottom: 1rem; width: 250px">
+      <div class="swal-form-grid">
+        <!-- กลุ่มซ้าย-ขวาแบบ 2 คอลัมน์ -->
+        <div>
+          <label for="eventCompany">ชื่อบริษัท : </label>
+          <select id="eventCompany" class="swal2-select">
+            <option selected disabled></option>
+            ${res.userCustomers
+              .map(
+                (customer) =>
+                  `<option value="${customer.cCompany}">${customer.cCompany}</option>`
+              )
+              .join("")}
+          </select>
+        </div>
+    
+        <div>
+          <label for="eventSite">ชื่อโครงการ : </label>
+          <select id="eventSite" class="swal2-select">
+            <option selected disabled></option>
+            ${res.userCustomers
+              .map(
+                (customer) =>
+                  `<option value="${customer.cSite}">${customer.cSite}</option>`
+              )
+              .join("")}
+          </select>
+        </div>
+    
+        <div>
+          <label for="eventTitle">ประเภทงาน:</label>
+          <select id="eventTitle" class="swal2-select">
+            <option selected disabled></option>
+            <option value="Preventive Maintenance (PM)">Preventive Maintenance (PM)</option>
+            <option value="Service">Service</option>
+            <option value="Inspection">Inspection</option>
+            <option value="Test & Commissioning">Test & Commissioning</option>
+          </select>
+        </div>
+    
+        <div>
+          <label for="eventSystem">ระบบงาน:</label>
+          <select id="eventSystem" class="swal2-select">
+            <option selected disabled></option>
+            <option value="Fire Alarm">Fire Alarm</option>
+            <option value="CCTV">CCTV</option>
+            <option value="Access Control">Access Control</option>
+          </select>
+        </div>
+    
+        <div>
+          <label for="eventTime">ครั้งที่:</label>
+          <select id="eventTime" class="swal2-select">
+            <option selected disabled></option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+          </select>
+        </div>
+    
+        <div style="display: none;">
+          <label for="fontSize">ขนาดตัวอักษร:</label>
+          <select id="fontSize" class="swal2-input">
+            ${[8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72]
+              .map((size) => `<option value="${size}">${size}</option>`)
+              .join("")}
+          </select>
+        </div>
+      </div>
+    
+      <!-- ส่วนล่างแนวตั้ง -->
+      <div class="swal-form-bottom">
+     
+    
+        <div>
+          <label for="backgroundColorPicker">สีพื้นหลัง:</label>
+          <input id="backgroundColorPicker" style="width: 150px; height: 35px" type="color" value="${defaultBackgroundColor}" />
+        </div><br>
+       <div>
+          <label for="textColorPicker">สีข้อความ:</label>
+          <input id="textColorPicker" style="width: 150; height: 35px" type="color" value="${defaultTextColor}" />
+        </div><br>
+        
+      </div>
+      <div>
+          <label for="start">เริ่มต้น:</label>
+          <input id="start" type="date" style="width: 80%; height: 35px" class="swal2-input" value="${
+            arg.dateStr
+          }" />
+        </div>
+    
+        <div>
+          <label for="end">สิ้นสุด:</label>
+          <input id="end" type="date" style="width: 80%; height: 35px" class="swal2-input" value="${
+            arg.dateStr
+          }" />
+        </div>
+    `,
 
-          <label for="fontSize" style="display: none;">ขนาดตัวอักษร:</label>
-          <select id="fontSize" style="display: none;" class="swal2-input">
-            <option selected disabled>${defaultFontSize}</option>
-            <option value="8">8</option>
-            <option value="9">9</option>
-            <option value="10">10</option>
-            <option value="11">11</option>
-            <option value="12">12</option>
-            <option value="14">14</option>
-            <option value="16">16</option>
-            <option value="18">18</option>
-            <option value="20">20</option>
-            <option value="22">22</option>
-            <option value="24">24</option>
-            <option value="26">26</option>
-            <option value="28">28</option>
-            <option value="36">36</option>
-            <option value="48">48</option>
-            <option value="72">72</option>
-          </select><br>
-
-          <label for="textColorPicker" >สีข้อความ:</label> <br><br>
-          <input id="textColorPicker"  type="color" value=" ${defaultTextColor}" style="margin-bottom: 1rem;"><br>
-
-          <label for="backgroundColorPicker" >สีพื้นหลัง:</label><br><br>
-          <input id="backgroundColorPicker" type="color" value="${defaultBackgroundColor}" style="margin-bottom: 1rem;"><br>
-
-          <label for="start">วันที่เริ่มต้น:</label>
-          <input id="start" type="date" class="swal2-input" value="${arg.dateStr}" style="margin-bottom: 1rem;"><br>
-
-          <label for="end">วันที่สิ้นสุด:</label>
-          <input id="end" type="date" class="swal2-input" value="${arg.dateStr}" style="margin-bottom: 1rem;"><br>
-        `,
       showCancelButton: true,
       confirmButtonText: "บันทึกแผนงาน",
       cancelButtonText: "ยกเลิก",
       didOpen: () => {
+        new TomSelect("#eventCompany", {
+          create: true, // ✅ อนุญาตให้ผู้ใช้พิมพ์ชื่อใหม่ได้
+          placeholder: "เลือกหรือพิมพ์ชื่อบริษัท",
+          sortField: {
+            field: "text",
+            direction: "asc",
+          },
+        });
+
+        new TomSelect("#eventSite", {
+          create: true,
+          placeholder: "เลือกหรือพิมพ์ชื่อโครงการ",
+          sortField: {
+            field: "text",
+            direction: "asc",
+          },
+        });
+
+        new TomSelect("#eventTitle", {
+          create: true,
+          placeholder: "เลือกหรือพิมพ์ชื่อหัวข้อ",
+          sortField: {
+            field: "text",
+            direction: "asc",
+          },
+        });
+
+        new TomSelect("#eventSystem", {
+          create: true,
+          placeholder: "เลือกหรือพิมพ์ชื่อระบบ",
+          sortField: {
+            field: "text",
+            direction: "asc",
+          },
+        });
+        new TomSelect("#eventTime", {
+          create: false,
+          sortField: {
+            field: "text",
+            direction: "asc",
+          },
+        });
+
         const textColorPicker =
           Swal.getPopup().querySelector("#textColorPicker");
         textColorPicker.setAttribute("value", defaultTextColor);
@@ -662,19 +909,29 @@ function EventCalendar() {
       preConfirm: () => {
         const start = document.getElementById("start").value;
         const end = document.getElementById("end").value;
+        const company = document.getElementById("eventCompany").value;
+        const site = document.getElementById("eventSite").value;
         const title = document.getElementById("eventTitle").value;
+        const system = document.getElementById("eventSystem").value;
+        const time = document.getElementById("eventTime").value;
         const backgroundColor = document.getElementById(
           "backgroundColorPicker"
         ).value;
         const textColor = document.getElementById("textColorPicker").value;
         const fontSize = document.getElementById("fontSize").value;
-
+        if (!site) {
+          Swal.showValidationMessage("กรุณาระบุโครงการ");
+        }
         if (!title) {
-          Swal.showValidationMessage("กรุณากรอกชื่อแผนงาน");
+          Swal.showValidationMessage("กรุณาระบุหัวข้อ");
         }
 
         return {
+          company,
+          site,
           title,
+          system,
+          time,
           backgroundColor,
           textColor,
           fontSize,
@@ -684,12 +941,26 @@ function EventCalendar() {
       },
     }).then(async (result) => {
       if (result.isConfirmed) {
-        const { title, backgroundColor, textColor, fontSize, start, end } =
-          result.value;
+        const {
+          company,
+          site,
+          title,
+          system,
+          time,
+          backgroundColor,
+          textColor,
+          fontSize,
+          start,
+          end,
+        } = result.value;
 
         const newEnd = moment(end).add(1, "days");
         const newEvent = {
+          company,
+          site,
           title,
+          system,
+          time,
           date: arg.dateStr,
           backgroundColor,
           textColor,
@@ -723,7 +994,7 @@ function EventCalendar() {
     }
   };
 
-  const handleEditEvent = (eventInfo) => {
+  const handleEditEvent = async (eventInfo) => {
     const inputBackgroundColor = document.createElement("input");
     inputBackgroundColor.type = "color";
     inputBackgroundColor.value = eventInfo.event.backgroundColor;
@@ -733,7 +1004,13 @@ function EventCalendar() {
     inputTextColor.value = eventInfo.event.textColor;
 
     const eventId = eventInfo.event.id;
+    const eventCompany = eventInfo.event.extendedProps?.company || "";
+    const eventSite = eventInfo.event.extendedProps?.site || "";
+
     const eventTitle = eventInfo.event.title;
+    const eventSystem = eventInfo.event.extendedProps?.system || "";
+    const eventTime = eventInfo.event.extendedProps?.time || "";
+
     const eventFontSize = eventInfo.event.extendedProps.fontSize;
 
     const eventStart = moment(eventInfo.event.start);
@@ -780,99 +1057,245 @@ function EventCalendar() {
     let currentTextColor = getTextColorByStatus(eventStatus);
     let currentBackgroundColor = getBackgroundColorByStatus(eventStatus);
 
+    const res = await CustomerService.getUserCustomers();
+
+    // 🔧 โค้ด htmlEdit พร้อม label ทุกหัวข้อเพื่อความชัดเจน
     const htmlEdit = `
-  <div style="display: flex; flex-direction: column; gap: 10px; width: 100%;">
+      <div class="swal-form-grid">
   
-    <div style="display: flex; align-items: center;">
-      <select id="editStatus" class="swal2-select" style="flex: 1;">
-        <option value="กำลังรอยืนยัน" ${
-          eventStatus === "กำลังรอยืนยัน" ? "selected" : ""
-        }>กำลังรอยืนยัน</option>
-        <option value="ยืนยันแล้ว" ${
-          eventStatus === "ยืนยันแล้ว" ? "selected" : ""
-        }>ยืนยันแล้ว</option>
-        <option value="กำลังดำเนินการ" ${
-          eventStatus === "กำลังดำเนินการ" ? "selected" : ""
-        }>กำลังดำเนินการ</option>
-        <option value="ดำเนินการเสร็จสิ้น" ${
-          eventStatus === "ดำเนินการเสร็จสิ้น" ? "selected" : ""
-        }>ดำเนินการเสร็จสิ้น</option>
-      </select>
-    </div>
-
-    <div style="display: flex; align-items: center;">
-      <input id="editTitle" class="swal2-input" type="text" value="${eventTitle}" style="flex: 1;">
-    </div>
-
-    <div style="display: flex; align-items: center;">
-      <div id="backgroundColorPickerContainer" style="flex: 1;"></div>
-    </div>
-
-    <div style="display: flex; align-items: center;">
-      <div id="textColorPickerContainer" style="flex: 1;"></div>
-    </div>
-
-    <div style="display: flex; align-items: center;">
-      <input id="editStart" type="datetime-local" class="swal2-input" value="${eventStart.format(
-        "YYYY-MM-DDTHH:mm"
-      )}" style="flex: 1;">
-    </div>
-
-    <div style="display: flex; align-items: center;">
-      <input id="editEnd" type="datetime-local" class="swal2-input" value="${formattedEnd}" style="flex: 1;">
-    </div>
+      <!-- สถานะงาน -->
+      <div>
+        <label for="editStatus">สถานะงาน : </label>
+        <select id="editStatus" class="swal2-select">
+          <option disabled selected>${eventStatus}</option>
+          <option value="กำลังรอยืนยัน" ${
+            eventStatus === "กำลังรอยืนยัน" ? "selected" : ""
+          }>กำลังรอยืนยัน</option>
+          <option value="ยืนยันแล้ว" ${
+            eventStatus === "ยืนยันแล้ว" ? "selected" : ""
+          }>ยืนยันแล้ว</option>
+          <option value="กำลังดำเนินการ" ${
+            eventStatus === "กำลังดำเนินการ" ? "selected" : ""
+          }>กำลังดำเนินการ</option>
+          <option value="ดำเนินการเสร็จสิ้น" ${
+            eventStatus === "ดำเนินการเสร็จสิ้น" ? "selected" : ""
+          }>ดำเนินการเสร็จสิ้น</option>
+        </select>
+      </div>
   
-  </div>
-`;
+      <!-- ชื่อบริษัท -->
+      <div>
+        <label for="editCompany">ชื่อบริษัท : </label>
+        <select id="editCompany" class="swal2-select">
+          <option disabled selected>${eventCompany || "เลือกบริษัท"}</option>
+          ${res.userCustomers
+            .map(
+              (c) =>
+                `<option value="${c.cCompany}" ${
+                  eventCompany === c.cCompany ? "selected" : ""
+                }>${c.cCompany}</option>`
+            )
+            .join("")}
+        </select>
+      </div>
+  
+      <!-- สถานที่ -->
+      <div>
+        <label for="editSite">ชื่อโครงการ : </label>
+        <select id="editSite" class="swal2-select">
+          <option disabled selected>${eventSite || "เลือกสถานที่"}</option>
+          ${res.userCustomers
+            .map(
+              (c) =>
+                `<option value="${c.cSite}" ${
+                  eventSite === c.cSite ? "selected" : ""
+                }>${c.cSite}</option>`
+            )
+            .join("")}
+        </select>
+      </div>
+  
+      <!-- ประเภทแผนงาน -->
+      <div>
+        <label for="editTitle">ประเภทงาน : </label>
+        <select id="editTitle" class="swal2-select">
+          <option disabled selected>${
+            eventTitle || "เลือกประเภทแผนงาน"
+          }</option>
+          ${[
+            "Preventive Maintenance (PM)",
+            "Service",
+            "Inspection",
+            "Test & Commissioning",
+          ]
+            .map(
+              (title) =>
+                `<option value="${title}" ${
+                  eventTitle === title ? "selected" : ""
+                }>${title}</option>`
+            )
+            .join("")}
+        </select>
+      </div>
+  
+      <!-- ระบบงาน -->
+      <div>
+        <label for="editSystem">ระบบงาน : </label>
+        <select id="editSystem" class="swal2-select">
+          <option disabled selected>${eventSystem || "เลือกระบบงาน"}</option>
+          ${["Fire Alarm", "CCTV", "Access Control"]
+            .map(
+              (sys) =>
+                `<option value="${sys}" ${
+                  eventSystem === sys ? "selected" : ""
+                }>${sys}</option>`
+            )
+            .join("")}
+        </select>
+      </div>
+  
+      <!-- ครั้งที่ -->
+      <div>
+        <label for="editTime">ครั้งที่ : </label>
+        <select id="editTime" class="swal2-select">
+          <option disabled selected>${eventTime}</option>
+          ${["1", "2", "3", "4"]
+            .map(
+              (t) =>
+                `<option value="${t}" ${
+                  eventTime === t ? "selected" : ""
+                }>${t}</option>`
+            )
+            .join("")}
+        </select>
+      </div>
+  
+      
+  
+    </div>
+    <!-- สีพื้นหลัง -->
+      <div>
+        <label>สีพื้นหลัง : </label><br>
+        <div id="backgroundColorPickerContainer"></div>
+      </div><br>
+  
+      <!-- สีข้อความ -->
+      <div>
+        <label>สีข้อความ : </label><br>
+        <div id="textColorPickerContainer" ></div>
+      </div><br>
+  
+      <!-- วันที่เริ่ม -->
+      <div >
+        <label for="editStart">เริ่มต้น : </label>
+        <input id="editStart" type="datetime-local" style="width: 80%; height: 35px" class="swal2-input" value="${eventStart.format(
+          "YYYY-MM-DDTHH:mm"
+        )}" />
+      </div><br>
+  
+      <!-- วันที่สิ้นสุด -->
+      <div>
+        <label for="editEnd">สิ้นสุด : </label>
+        <input id="editEnd" type="datetime-local" style="width: 80%; height: 35px" class="swal2-input" value="${formattedEnd}" />
+      </div><br>
+  `;
 
     Swal.fire({
-      title: `แก้ไขแผนงาน: ${eventTitle}`,
+      title: `แก้ไขแผนงาน: ${eventSite}`,
       html: htmlEdit,
       customClass: "swal-wide",
       showCloseButton: true,
       didOpen: () => {
+        new TomSelect("#editStatus", {
+          create: false, // ✅ อนุญาตให้ผู้ใช้พิมพ์ชื่อใหม่ได้
+          placeholder: "เลือกหรือพิมพ์ชื่อบริษัท",
+          sortField: {
+            field: "text",
+            direction: "asc",
+          },
+        });
+
+        new TomSelect("#editCompany", {
+          create: true, // ✅ อนุญาตให้ผู้ใช้พิมพ์ชื่อใหม่ได้
+          placeholder: "เลือกหรือพิมพ์ชื่อบริษัท",
+          sortField: {
+            field: "text",
+            direction: "asc",
+          },
+        });
+
+        new TomSelect("#editSite", {
+          create: true, // ✅ อนุญาตให้ผู้ใช้พิมพ์ชื่อใหม่ได้
+          placeholder: "เลือกหรือพิมพ์ชื่อโครงการ",
+          sortField: {
+            field: "text",
+            direction: "asc",
+          },
+        });
+
+        new TomSelect("#editTitle", {
+          create: true, // ✅ อนุญาตให้ผู้ใช้พิมพ์ชื่อใหม่ได้
+          placeholder: "เลือกหรือพิมพ์ชื่อหัวข้อ",
+          sortField: {
+            field: "text",
+            direction: "asc",
+          },
+        });
+
+        new TomSelect("#editSystem", {
+          create: true, // ✅ อนุญาตให้ผู้ใช้พิมพ์ชื่อใหม่ได้
+          placeholder: "เลือกหรือพิมพ์ชื่อระบบ",
+          sortField: {
+            field: "text",
+            direction: "asc",
+          },
+        });
+
+        new TomSelect("#editTime", {
+          create: false, // ✅ อนุญาตให้ผู้ใช้พิมพ์ชื่อใหม่ได้
+          sortField: {
+            field: "text",
+            direction: "asc",
+          },
+        });
+
         document
           .getElementById("backgroundColorPickerContainer")
           .appendChild(inputBackgroundColor);
         document
           .getElementById("textColorPickerContainer")
           .appendChild(inputTextColor);
-
-        // ✅ เปลี่ยนสีข้อความเมื่อเปลี่ยนค่าใน Select Box
-        // document
-        //   .getElementById("editStatus")
-        //   .addEventListener("change", (e) => {
-        //     eventStatus = e.target.value;
-        //     currentTextColor = getTextColorByStatus(eventStatus);
-        //     currentBackgroundColor = getBackgroundColorByStatus(eventStatus);
-
-        //     inputTextColor.value = currentTextColor;
-        //     inputBackgroundColor.value = currentBackgroundColor;
-
-        //     // ✅ อัปเดต UI ของสีข้อความและสีพื้นหลัง
-        //     inputTextColor.style.backgroundColor = currentTextColor;
-        //     inputTextColor.style.color = currentBackgroundColor; // ทำให้มองเห็นตัวเลือกชัดขึ้น
-        //   });
       },
-
       showDenyButton: true,
       showCancelButton: true,
       confirmButtonColor: "#0ECC00",
       confirmButtonText: "บันทึกการเปลี่ยนแปลง",
       denyButtonText: "ลบแผนงาน",
-      cancelButtonText: "ยกเลิกแผนงาน",
+      // cancelButtonText: "ยกเลิกแผนงาน",
+      showExtraButton: true,
+      didRender: () => {
+        const pdfButton = document.createElement("button");
+        pdfButton.innerText = "ออกใบแจ้งเข้างาน";
+        pdfButton.className = "swal2-confirm swal2-styled";
+        pdfButton.style.backgroundColor = "#6c757d"; // สีเทา
+        pdfButton.style.marginLeft = "10px";
+        pdfButton.onclick = () => generateWorkPermitPDF(eventInfo.event);
+        Swal.getActions().appendChild(pdfButton);
+      },
       preConfirm: () => {
+        const company = document.getElementById("editCompany").value;
+        const site = document.getElementById("editSite").value;
         const title = document.getElementById("editTitle").value;
+        const system = document.getElementById("editSystem").value;
+        const time = document.getElementById("editTime").value;
         const textColor = inputTextColor.value;
         const backgroundColor = inputBackgroundColor.value;
         const fontSize = eventFontSize;
-        const status = document.getElementById("editStatus").value; // ✅ ค่าที่ผู้ใช้เลือก
-
+        const status = document.getElementById("editStatus").value;
         const start = moment(
           document.getElementById("editStart").value
         ).toISOString();
         let end = document.getElementById("editEnd").value;
-
         if (!end) {
           end = eventEnd.toISOString();
         } else {
@@ -880,21 +1303,24 @@ function EventCalendar() {
             ? moment(end).add(1, "days").toISOString()
             : moment(end).toISOString();
         }
-
         if (!title) {
           Swal.showValidationMessage("กรุณากรอกชื่อแผนงาน");
         }
-
+        // ส่งกลับข้อมูลพร้อมกับ flag manualStatus: true
         return {
           id: eventId,
+          company,
+          site,
           title,
+          system,
+          time,
           textColor,
           backgroundColor,
           fontSize,
-          status, // ✅ เพิ่มสถานะของแผนงาน
+          status,
           start,
           end,
-          isAutoUpdated: false, // ✅ รีเซ็ตค่าเพื่อให้ไม่เปลี่ยนกลับอัตโนมัติ
+          manualStatus: true,
         };
       },
     }).then(async (result) => {
@@ -902,37 +1328,47 @@ function EventCalendar() {
         setLoading(true);
         const {
           id,
+          company,
+          site,
           title,
+          system,
+          time,
           textColor,
           backgroundColor,
           fontSize,
           status,
           start,
           end,
-          isAutoUpdated,
+          manualStatus,
         } = result.value;
 
         const updatedEvent = {
+          company,
+          site,
           title,
+          system,
+          time,
           textColor,
           backgroundColor,
           fontSize,
-          status, // ✅ เพิ่มสถานะลงในข้อมูลที่บันทึก
+          status,
           start,
           end,
-          extendedProps: { isAutoUpdated },
+          manualStatus, // เพิ่ม field นี้ในรูปแบบ level บนสุด
+          extendedProps: { manualStatus },
         };
 
-        // ✅ อัปเดตสีข้อความของอีเวนต์ใน FullCalendar
+        // อัปเดต event ใน FullCalendar
         eventInfo.event.setProp("textColor", textColor);
         eventInfo.event.setProp("backgroundColor", backgroundColor);
         eventInfo.event.setExtendedProp("status", status);
+        eventInfo.event.setExtendedProp("manualStatus", manualStatus);
 
         setEvents((prevEvents) =>
           prevEvents.map((event) => (event.id === id ? updatedEvent : event))
         );
 
-        // ✅ อัปเดตฐานข้อมูล
+        // ส่งข้อมูลแก้ไขไปยัง API
         await EventService.UpdateEvent(id, updatedEvent);
         await fetchEventsFromDB();
         setLoading(false);
@@ -945,28 +1381,29 @@ function EventCalendar() {
         });
       } else if (result.isDenied) {
         handleDeleteEvent(eventId);
-      } else if (result.dismiss === Swal.DismissReason.cancel) {
-        confirmCancelEvent(eventId);
       }
+      // else if (result.dismiss === Swal.DismissReason.cancel) {
+      //   confirmCancelEvent(eventId);
+      // }
     });
   };
 
-  const confirmCancelEvent = async (eventId) => {
-    Swal.fire({
-      title: "ยืนยันการยกเลิกแผนงาน?",
-      text: "แผนงานนี้จะถูกนำออกจากปฏิทินและสามารถเพิ่มกลับมาได้ในภายหลัง",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#d33",
-      cancelButtonColor: "#3085d6",
-      confirmButtonText: "ใช่, ยกเลิกแผนงาน",
-      cancelButtonText: "ไม่, เก็บไว้",
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        handleCancelEvent(eventId);
-      }
-    });
-  };
+  // const confirmCancelEvent = async (eventId) => {
+  //   Swal.fire({
+  //     title: "ยืนยันการยกเลิกแผนงาน?",
+  //     text: "แผนงานนี้จะถูกนำออกจากปฏิทินและสามารถเพิ่มกลับมาได้ในภายหลัง",
+  //     icon: "warning",
+  //     showCancelButton: true,
+  //     confirmButtonColor: "#d33",
+  //     cancelButtonColor: "#3085d6",
+  //     confirmButtonText: "ใช่, ยกเลิกแผนงาน",
+  //     cancelButtonText: "ไม่, เก็บไว้",
+  //   }).then(async (result) => {
+  //     if (result.isConfirmed) {
+  //       handleCancelEvent(eventId);
+  //     }
+  //   });
+  // };
 
   // ฟังก์ชันยกเลิกแผนงานออกจาก FullCalendar และเก็บไว้ในรายการรอจัดลงตาราง
   const handleCancelEvent = async (eventId) => {
@@ -1340,6 +1777,17 @@ function EventCalendar() {
     }, 0); // ใช้ setTimeout(0) เพื่อให้แน่ใจว่าทำหลังจาก FullCalendar render เสร็จ
   };
 
+  const filteredCalendarEvents = events.filter((event) => {
+    const keyword = searchTerm.toLowerCase();
+    return (
+      event.title?.toLowerCase().includes(keyword) ||
+      event.extendedProps?.site?.toLowerCase().includes(keyword) ||
+      event.extendedProps?.company?.toLowerCase().includes(keyword) ||
+      event.extendedProps?.system?.toLowerCase().includes(keyword) ||
+      event.extendedProps?.time?.toString().includes(keyword)
+    );
+  });
+
   return (
     <div>
       <Row className="flex-wrap mb-3 d-flex justify-content-center justify-content-md-between">
@@ -1367,15 +1815,15 @@ function EventCalendar() {
             </button>
           </CSVLink>
 
-          <button
+          {/* <button
             className="btn btn-sm btn-secondary mx-1 "
             onClick={handleLineNotify}
           >
             <FontAwesomeIcon icon={faBell} /> LINE NOTIFY
-          </button>
+          </button> */}
         </Col>
       </Row>
-      {isAdmin && (
+      {/* {isAdmin && (
         <div
           className="card p-2 mb-4 mt-4"
           style={{ background: "#f8f9fa", borderRadius: "8px", width: "100%" }}
@@ -1403,16 +1851,15 @@ function EventCalendar() {
             </button>
           </form>
         </div>
-      )}
+      )} */}
       {isAdmin && (
         <div
           id="external-events"
           style={{ padding: "8px", background: "#f8f9fa", width: "100%" }}
           className="mb-4"
         >
-          <h5 className="mb-2 p-2">แผนงานรอจัดลงตาราง</h5>
+          {/* <h5 className="mb-2 p-2">แผนงานรอจัดลงตาราง</h5>
 
-          {/* 🔍 ช่องค้นหา */}
           <div className="input-group mb-2 p-2">
             <span className="input-group-text bg-white border border-secondary">
               <FontAwesomeIcon icon={faSearch} className="text-muted" />
@@ -1425,15 +1872,13 @@ function EventCalendar() {
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{ fontSize: "14px", padding: "6px" }}
             />
-          </div>
-          {/* ✅ แสดงเฉพาะข้อมูลที่ค้นหา พร้อม Pagination */}
+          </div> */}
           <div className="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-2 p-2">
             {paginatedEvents.map((event) => (
               <div
                 key={event._id || event.id}
                 className="col d-flex align-items-center gap-2 mb-2"
               >
-                {/* 🔹 กล่อง Event */}
                 <div
                   className="fc-event flex-grow-1 text-white d-flex align-items-center justify-content-between px-3 py-2"
                   data-event-id={event._id || event.id}
@@ -1451,7 +1896,6 @@ function EventCalendar() {
                   <span>{event.title}</span>
                 </div>
 
-                {/* 🔹 ปุ่มลบ */}
                 <button
                   className="btn btn-danger btn-sm d-flex align-items-center justify-content-center"
                   onClick={() =>
@@ -1469,8 +1913,7 @@ function EventCalendar() {
             ))}
           </div>
 
-          {/* ✅ Pagination Controls เฉพาะข้อมูลที่ค้นหา */}
-          {totalPages > 1 && (
+          {/* {totalPages > 1 && (
             <div className="d-flex justify-content-center mt-2">
               <button
                 className="btn btn-outline-primary btn-sm me-1"
@@ -1490,10 +1933,18 @@ function EventCalendar() {
                 »
               </button>
             </div>
-          )}
+          )} */}
         </div>
       )}
-
+      <div className="mb-3">
+        <input
+          type="search"
+          className="form-control"
+          placeholder="🔍 ค้นหาแผนงาน เช่น ชื่อโครงการ หัวข้อ ระบบ..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
       <div id="content-id" style={{ flex: 1, width: "100%" }}>
         <FullCalendar
           ref={calendarRef}
@@ -1514,7 +1965,7 @@ function EventCalendar() {
           eventClick={isAdmin ? handleEditEvent : null}
           eventDrop={isAdmin ? handleEventDrop : null}
           eventResize={isAdmin ? handleEventResize : null}
-          events={events}
+          events={filteredCalendarEvents}
           allDaySlot={true}
           nowIndicator={true}
           selectMirror={true}
@@ -1523,6 +1974,19 @@ function EventCalendar() {
           showNonCurrentDates={false} // ✅ ไม่แสดงวันของเดือนก่อนและหลัง
           firstDay={0} // ✅ กำหนดให้วันอาทิตย์เป็นวันแรกของสัปดาห์
           eventReceive={handleEventReceive} // ✅ ต้องกำหนด eventReceive
+          eventContent={(arg) => {
+            const { title, extendedProps } = arg.event;
+            const { system = "", time = "", site = "" } = extendedProps;
+
+            const timeDisplay = time ? `ครั้งที่ ${time}` : "";
+            return {
+              html: `
+              [ ${title} ]
+              ${system} ${timeDisplay}
+              ${site}
+            `,
+            };
+          }}
           headerToolbar={{
             left: "prev,next",
             center: "title",

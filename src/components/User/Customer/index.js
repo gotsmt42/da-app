@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars */
 import React, { useEffect, useState, useRef } from "react";
-import AuthService from "../../../services/authService";
+import AuthService from "../../../services/CustomerService";
 
 import DataTableComponent from "../../DataTable/DataTableComponent";
 import DataTableColumns from "../../DataTable/TblCustomer/DataTableColumns";
@@ -25,8 +25,8 @@ const Customer = () => {
     useEffect(() => {
       async function fetchData() {
         try {
-          const getAllUser = await AuthService.getAllUserData();
-          setUsers(getAllUser.allUser);
+          const getAllCustomer = await AuthService.getUserCustomers();
+          setUsers(getAllCustomer.userCustomers);
         } catch (error) {
           console.error("Error fetching user data:", error);
         }

@@ -1,5 +1,5 @@
-import EmployeeComponent from "../../components/User/Employee/";
-import CustomerComponent from "../../components/User/Customer/";
+import EmployeeComponent from "../../components/User/Employee";
+import CustomerComponent from "../../components/User/Customer";
 
 import { Row, Col, Table, Card, CardTitle, CardBody } from "reactstrap";
 
@@ -10,10 +10,10 @@ const Employee = () => {
         
         <EmployeeComponent  />
       </Col>
-{/* 
+
       <Col lg="12">
         <CustomerComponent />
-      </Col> */}
+      </Col>
       {/* <Col lg="12">
         <Card>
           <CardTitle tag="h6" className="border-bottom p-3 mb-0">

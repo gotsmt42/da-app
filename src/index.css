@@ -93,12 +93,26 @@
 
 
 
-.swal-wide {
-  width:650px !important;
-  font-size: 12px !important;
+  .swal-wide {
+    max-width: 90vw !important;  /* ไม่เกิน 90% ของ viewport */
+    width: 50% !important;
+    overflow-x: hidden !important;
+    font-size: 12px !important;
+  
+    padding-bottom: 2rem;
+  }
 
-  padding-bottom: 2rem;
-}
+  .swal2-html-container {
+    max-height: 70vh;
+    overflow-y: auto;
+    padding-right: 10px; /* เผื่อ scrollbar */
+  }
+  
+  /* ทำให้ dropdown ดูสวยขึ้นและไม่ล้น */
+  .swal2-select {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
 
 .swal2-title {
   margin: 0px;
@@ -110,10 +124,61 @@
 }
 
 
+
+.swal-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.swal-form-grid label,
+.swal-form-bottom label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.swal-form-bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 16ฃpx;
+}
+
+.swal-form-bottom input[type="color"],
+.swal-form-grid select,
+.swal-form-bottom input[type="date"] {
+  width: 100%;
+  padding: 5px;
+  box-sizing: border-box;
+}
+
 @media (max-width: 768px) {
 .swal2-popup {
   font-size: 10px !important;
 }
+
+.swal-wide {
+  max-width: 90vw !important;  /* ไม่เกิน 90% ของ viewport */
+  width: 100% !important;
+  overflow-x: hidden !important;
+  font-size: 12px !important;
+
+  padding-bottom: 2rem;
+}
+
+.swal2-html-container > div {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+
+
+
+/* 
+
+
 
 
 }

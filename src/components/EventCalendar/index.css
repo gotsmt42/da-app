@@ -30,6 +30,7 @@
   min-height: 2px; /* ป้องกันการบีบตัวอักษร */
   
   font-family: "Noto Sans Thai", sans-serif;
+  
 }
 
 /* ปรับแต่งตัวอักษรภายในปฏิทิน */
@@ -78,6 +79,10 @@
 
 }
 
+.fc-day-other {
+  opacity: 0.4 !important; /* ทำให้วันนอกเดือนจางลง */
+}
+
 
 /* CSS สำหรับปรับขนาดตัวหนังสือของวันและวันที่ใน FullCalendar เมื่อหน้าจอเล็ก */
 
@@ -87,7 +92,7 @@
     min-height: 20px;
     max-width: 100%;
     max-height: 100%;
-    padding: 2px;
+    padding: 5px;
     line-height: 1.4;
   }
 

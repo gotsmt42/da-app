@@ -88,50 +88,64 @@ const DataTableColumns = ({
 
   const columns = [
     {
-      name: "ชื่อโครงการ",
-      cell: (row) => <CustomCell row={row} isSmallScreen={isSmallScreen} />,
+      name: "ชื่อบริษัท",
+      // cell: (row) => <CustomCell row={row} isSmallScreen={isSmallScreen} />,
       sortable: true,
-      selector: (row) => row.projectName,
+      selector: (row) => row.cCompany,
+    },
+    {
+      name: "ชื่อโครงการ",
+      // cell: (row) => <CustomCell row={row} isSmallScreen={isSmallScreen} />,
+      sortable: true,
+      selector: (row) => row.cSite,
     },
 
     {
-      name: "ที่อยู่",
+      name: "ชื่อโปรเจค",
       sortable: true,
-      selector: (row) => row.address, // ตัวอย่าง: "อยู่ระหว่างดำเนินการ", "สำเร็จ", "เลื่อน", "ยกเลิก"
-      cell: (row) => (
-        // <span style={{ color: row.status === "สำเร็จ" ? "green" : "orange" }}>
-        //   {row.status}
-        // </span>
+      selector: (row) => row.projName, 
+    },
 
-        <span >123/999</span>
-      ),
+
+  
+    {
+      name: "ชื่อผู้ติดต่อ",
+      sortable: true,
+      selector: (row) => row.cName, 
     },
 
     {
       name: "อีเมลล์",
       sortable: true,
-      selector: (row) => row.address, // ตัวอย่าง: "อยู่ระหว่างดำเนินการ", "สำเร็จ", "เลื่อน", "ยกเลิก"
-      cell: (row) => (
-        // <span style={{ color: row.status === "สำเร็จ" ? "green" : "orange" }}>
-        //   {row.status}
-        // </span>
-
-        <span >test@test.com</span>
-      ),
+      selector: (row) => row.cEmail, 
     },
+
+
+    {
+      name: "ที่อยู่",
+      sortable: true,
+      selector: (row) => row.address, 
+    
+    },
+    {
+      name: "เบอร์โทร",
+      sortable: true,
+      selector: (row) => row.tel, 
+    
+    },
+
 
    
+    // {
+    //   name: "เอกสารที่เกี่ยวข้อง",
+    //   cell: (row) => (
+    //     <a className="btn btn-primary btn-sm" href={row.documentLink} target="_blank" rel="noopener noreferrer">
+    //       ดาวน์โหลด
+    //     </a>
+    //   ),
+    //   width: "150px",
+    // },
     {
-      name: "เอกสารที่เกี่ยวข้อง",
-      cell: (row) => (
-        <a className="btn btn-primary btn-sm" href={row.documentLink} target="_blank" rel="noopener noreferrer">
-          ดาวน์โหลด
-        </a>
-      ),
-      width: "150px",
-    },
-    {
-      name: "Action",
       cell: (row) => (
         <div>
           <IconButton
