@@ -33,10 +33,16 @@ const AuthService = {
   },
 
   async UpdateUser(userId, editedData) {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
+  
     try {
       if (token) {
-        const response = await API.put(`/auth/user/${userId}`, editedData);
+        const response = await API.put(`/auth/user/${userId}`, editedData, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        });
+  
         console.log("Update User data", response.data);
         return response.data.user;
       }
@@ -44,7 +50,8 @@ const AuthService = {
       console.error("Error updating user data:", error);
       throw error;
     }
-  },
+  }
+  
 };
 
 export default AuthService;

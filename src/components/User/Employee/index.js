@@ -69,7 +69,11 @@ const Employee = () => {
     email: "",
     username: "",
     password: "",
+    role: "",
+    rank: ""
   });
+
+  
 
   useEffect(() => {
     fetchUsers();
@@ -253,6 +257,10 @@ const Employee = () => {
         email: newUserData.email.trim(),
         username: newUserData.username.trim(),
         password: newUserData.password.trim(),
+        role: newUserData.role.trim(),
+        rank: newUserData.rank.trim(),
+
+
       };
 
       const response = await API.post("/auth/signup", requestData);

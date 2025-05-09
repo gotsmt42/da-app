@@ -33,6 +33,7 @@ const Account = () => {
   //ฟังชั่นแก้ไข File Image
   const handleEditFileChange = (e) => {
     const file = e.target.files[0];
+
     setSelectedFile(file);
   };
 
@@ -48,6 +49,7 @@ const Account = () => {
       if (selectedFile) {
         formData.append("image", selectedFile);
       }
+
       const updatedUser = await AuthService.UpdateUser(userId, formData);
       setUser(updatedUser); // อัพเดทข้อมูลผู้ใช้
       
@@ -81,7 +83,7 @@ const Account = () => {
                   }}
                 >
                   <img
-                    src={`${API.defaults.baseURL}/${user.imageUrl}`}
+                    src={`${API.defaults.baseURL}/${user.imageUrl}`} // จะได้ path เช่น uploads/images/xxx.jpg
                     alt="Avatar"
                     className="img-fluid my-5 rounded-circle"
                     style={{ width: "120px", height:"120px"}}
