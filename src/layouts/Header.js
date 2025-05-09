@@ -108,7 +108,7 @@ const Header = () => {
             <Dropdown isOpen={dropdownOpen} toggle={toggle}>
               <DropdownToggle color="transparent">
                 <img
-                  src={`${API.defaults.baseURL}/${user.imageUrl}`}
+                  src={user.imageUrl}
                   alt="profile"
                   className="rounded-circle"
                   width="30"

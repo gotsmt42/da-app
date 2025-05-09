@@ -6,7 +6,7 @@ const customCell = ({ row, isSmallScreen }) => {
     <div key="cell-product" style={{ display: "flex", alignItems: "center" }}>
     <div style={{ position: "relative" }}>
       <img
-        src={`${API.defaults.baseURL}/${row.imageUrl}`} // Construct the full URL for the image
+        src={row.imageUrl} // Construct the full URL for the image
         width={40}
         height={40}
         alt="Avatar"

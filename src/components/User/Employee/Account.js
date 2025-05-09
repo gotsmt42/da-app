@@ -83,7 +83,7 @@ const Account = () => {
                   }}
                 >
                   <img
-                    src={`${API.defaults.baseURL}/${user.imageUrl}`} // จะได้ path เช่น uploads/images/xxx.jpg
+                    src={user.imageUrl} // จะได้ path เช่น uploads/images/xxx.jpg
                     alt="Avatar"
                     className="img-fluid my-5 rounded-circle"
                     style={{ width: "120px", height:"120px"}}

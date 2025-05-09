@@ -128,7 +128,7 @@ const Sidebar = ({ handleMenuClick }) => {
         <div className="p-3 d-flex">
           <Link to={"/account"}>
             <img
-              src={`${API.defaults.baseURL}/${user.imageUrl}`}
+              src={user.imageUrl}
               alt="user"
               width="50"
               height="50"

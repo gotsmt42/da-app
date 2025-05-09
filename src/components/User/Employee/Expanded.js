@@ -23,7 +23,7 @@ const Expanded = ({ data }) => (
     <div className="row g-0">
       <div className="col-md" style={{ display: "flex", alignItems: "center" }}>
         <img
-          src={`${API.defaults.baseURL}/${data.imageUrl}`} // Construct the full URL for the image
+         src={data.imageUrl} // Construct the full URL for the image
           className="img-fluid img-thumbnail "
           alt="Avatar"
           width={300}
