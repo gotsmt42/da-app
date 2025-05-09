@@ -88,6 +88,12 @@ const DataTableColumns = ({
       sortable: true,
       selector: (row) => row.email,
     },
+
+    {
+      name: "ระดับการใช้งาน",
+      sortable: true,
+      selector: (row) => row.role,
+    },
     {
       cell: (row) => (
         <div>

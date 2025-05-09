@@ -31,6 +31,7 @@ const customCell = ({ row, isSmallScreen }) => {
           {row.fname} {row.lname} ({row.rank})
         </div>
         <div>{row.email}</div>
+        <div>{row.role}</div>
       </div>
     </div>
   );
