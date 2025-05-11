@@ -230,7 +230,7 @@ const Customer = () => {
         <Box sx={modalStyle}>
           <h2 style={{ textAlign: "center" }}>เพิ่มลูกค้าใหม่</h2>
           <TextField
-            label="บริษัทหรือนิติบุคล"
+            label="บริษัท / นิติบุคล"
             name="cCompany"
             fullWidth
             margin="normal"

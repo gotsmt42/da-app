@@ -22,7 +22,7 @@ const Expanded = ({ data }) => {
 
         <div className="col-md-8">
           <div className="card-body text">
-            <h5 className="card-title">บริษัทหรือนิติบุคล: {data.cCompany || "ไม่ระบุ"}</h5>
+            <h5 className="card-title">บริษัท / นิติบุคล: {data.cCompany || "ไม่ระบุ"}</h5>
             <p></p>
             <p className="card-text">โครงการ: {data.cSite || "ไม่ระบุ"}</p>
             <p className="card-text">อีเมล: {data.cEmail || "ไม่ระบุ"}</p>
