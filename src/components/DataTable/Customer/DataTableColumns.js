@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import IconButton from "@mui/material/IconButton";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import Menu from "@mui/material/Menu";
@@ -12,14 +12,8 @@ import CustomCell from "./customCell";
 const StyledMenu = styled((props) => (
   <Menu
     elevation={0}
-    anchorOrigin={{
-      vertical: "bottom",
-      horizontal: "right",
-    }}
-    transformOrigin={{
-      vertical: "top",
-      horizontal: "right",
-    }}
+    anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+    transformOrigin={{ vertical: "top", horizontal: "right" }}
     {...props}
   />
 ))(({ theme }) => ({
@@ -78,21 +72,29 @@ const DataTableColumns = ({
 
   const columns = [
     {
-      name: "ชื่อ-นามสกุล",
-      cell: (row) => <CustomCell row={row} />,
+      name: "บริษัท",
+      selector: (row) => row.cCompany,
       sortable: true,
-      selector: (row) => row.fname,
     },
     {
-      name: "อีเมลล์",
+      name: "โครงการ",
+      selector: (row) => row.cSite,
       sortable: true,
-      selector: (row) => row.email,
     },
-
     {
-      name: "ระดับการใช้งาน",
+      name: "อีเมล",
+      selector: (row) => row.cEmail,
       sortable: true,
-      selector: (row) => row.role,
+    },
+    {
+      name: "ชื่อผู้ติดต่อ",
+      selector: (row) => row.cName,
+      sortable: true,
+    },
+    {
+      name: "เบอร์โทร",
+      selector: (row) => row.tel,
+      sortable: true,
     },
     {
       cell: (row) => (

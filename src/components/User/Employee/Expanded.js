@@ -21,39 +21,30 @@ const formatCurrency = (amount) => {
 const Expanded = ({ data }) => (
   <div className="card mb-3">
     <div className="row g-0">
-      <div className="col-md" style={{ display: "flex", alignItems: "center" }}>
-        <img
-         src={data.imageUrl} // Construct the full URL for the image
-          className="img-fluid img-thumbnail "
-          alt="Avatar"
-          width={300}
-          height={300}
-          style={{ margin:"auto" }}
-
-          
-        />
+      <div className="col-md-4" style={{ display: "flex", alignItems: "center", justifyContent: "start" }}>
+      <img
+            src={data.imageUrl} 
+            className="img-fluid img-thumbnail"
+            alt="Customer Avatar"
+            width={250}
+          />
       </div>
 
       <div className="col-md-8">
         <div className="card-body text">
           <h5 className="card-title">
-            {data.fname} {data.lname}
+            {data.fname} {data.lname} ({data.role})
           </h5>
-          <p className="card-text">ระดับ : {data.rank}</p>
+          <p></p>
           <p className="card-text">อีเมลล์ : {data.email}</p>
+          <p className="card-text">เบอร์โทร : {data.tel}</p>
 
           <p className="card-text">
               เป็นสมาชิกมาแล้ว {" : "}
               {moment().diff(moment(data.createdAt), "weeks") } สัปดาห์
           </p>
 
-          {/* <span>เงินเดือน : {formatCurrency(parseFloat(data.salary.$numberDecimal))}</span> */}
-          {/* <p className="card-text">
-            <small className="text-body-secondary">
-              แก้ไขล่าสุด
-              {moment(data.updatedAt).format("- DD/MM/YYYY  HH:mm:ss ")}
-            </small>
-          </p> */}
+    
         </div>
       </div>
     </div>

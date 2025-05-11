@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import AuthService from "../../../services/authService";
 import DataTableComponent from "../../DataTable/Main/DataTableComponent";
-import DataTableColumns from "../../DataTable/๊Users/DataTableColumns";
+import DataTableColumns from "../../DataTable/Users/DataTableColumns";
 import Expanded from "./Expanded";
 import {
   Modal,
@@ -30,7 +30,7 @@ import { useMediaQuery } from "@mui/material"; // ✅ ใช้สำหรั�
 const Employee = () => {
   const isSmallScreen = useMediaQuery("(max-width:600px)"); // ✅ เช็คว่าหน้าจอเล็กหรือไม่
 
-
+  const [searchTerm, setSearchTerm] = useState("");
   const [users, setUsers] = useState([]);
   const [expandedRows, setExpandedRows] = useState({});
   const [modalOpenInsert, setModalOpenInsert] = useState(false);
@@ -50,8 +50,8 @@ const Employee = () => {
     useState(false);
   const [passwordConfirm, setPasswordConfirm] = useState(""); // รหัสผ่านของ Admin
 
-   // ✅ สไตล์สำหรับ Modal (Responsive)
-   const modalStyle = {
+  // ✅ สไตล์สำหรับ Modal (Responsive)
+  const modalStyle = {
     padding: isSmallScreen ? 2 : 3, // ✅ ลด padding บนอุปกรณ์เล็ก
     background: "white",
     margin: isSmallScreen ? "5% auto" : "5% auto", // ✅ ปรับ margin ให้พอดี
@@ -70,10 +70,8 @@ const Employee = () => {
     username: "",
     password: "",
     role: "",
-    rank: ""
+    rank: "",
   });
-
-  
 
   useEffect(() => {
     fetchUsers();
@@ -259,8 +257,6 @@ const Employee = () => {
         password: newUserData.password.trim(),
         role: newUserData.role.trim(),
         rank: newUserData.rank.trim(),
-
-
       };
 
       const response = await API.post("/auth/signup", requestData);
@@ -412,24 +408,46 @@ const Employee = () => {
     });
   };
 
+  const filteredUsers = users.filter((user) => {
+    const lowerSearch = searchTerm.toLowerCase();
+    return (
+      user.fname?.toLowerCase().includes(lowerSearch) ||
+      user.lname?.toLowerCase().includes(lowerSearch) ||
+      user.email?.toLowerCase().includes(lowerSearch) ||
+      user.tel?.toLowerCase().includes(lowerSearch) 
+    );
+  });
+
   return (
     <>
-      {/* ✅ ย้ายปุ่มไปด้านขวาบนของตาราง */}
       <Box
-        sx={{ display: "flex", justifyContent: "flex-end", marginBottom: 2 }}
+        className="mt-5"
+        sx={{ display: "flex", flexDirection: "column", gap: 1 }}
       >
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AddIcon />}
-          onClick={() => setModalOpenInsert(true)}
-          sx={{
-            fontSize: isSmallScreen ? "0.85rem" : "1rem", // ✅ ปรับขนาดปุ่มให้พอดี
-            padding: isSmallScreen ? "6px 10px" : "8px 16px", // ✅ ปรับ Padding ปุ่ม
-          }}
-        >
-          เพิ่มผู้ใช้ใหม่
-        </Button>
+        <Box sx={{ display: "flex", justifyContent: "flex-end", marginBottom: "30px" }}>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AddIcon />}
+            onClick={() => setModalOpenInsert(true)}
+            sx={{
+              fontSize: isSmallScreen ? "0.85rem" : "1rem",
+              padding: isSmallScreen ? "6px 10px" : "8px 16px",
+            }}
+          >
+            เพิ่มผู้ใช้ใหม่
+          </Button>
+        </Box>
+
+        <TextField
+          
+          label="🔍🤵 ค้นหาสมาชิก"
+          variant="outlined"
+          size="small"
+          fullWidth
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </Box>
 
       <DataTableComponent
@@ -440,7 +458,7 @@ const Employee = () => {
           setSelectedFile,
           handleDeleteRow, // ✅ เพิ่มฟังก์ชันลบ
         })}
-        data={users}
+        data={filteredUsers}
         paginationPerPage={5}
         expandableRowsComponent={Expanded}
         expandableRowExpanded={(row) => expandedRows[row._id]}
@@ -448,8 +466,7 @@ const Employee = () => {
 
       {/* โมดอลเพิ่มผู้ใช้ */}
       <Modal open={modalOpenInsert} onClose={() => setModalOpenInsert(false)}>
-      <Box sx={modalStyle}>
-
+        <Box sx={modalStyle}>
           <h2 style={{ textAlign: "center" }}>เพิ่มผู้ใช้ใหม่</h2>
           <TextField
             label="ชื่อ"
@@ -569,8 +586,7 @@ const Employee = () => {
 
       {/* Modal แก้ไขผู้ใช้ */}
       <Modal open={modalOpenEdit} onClose={() => setModalOpenEdit(false)}>
-      <Box sx={modalStyle}>
-
+        <Box sx={modalStyle}>
           <h2 style={{ textAlign: "center" }}>แก้ไขข้อมูลผู้ใช้</h2>
           <TextField
             label="ชื่อ"
@@ -655,8 +671,7 @@ const Employee = () => {
         open={modalOpenPasswordConfirm}
         onClose={() => setModalOpenPasswordConfirm(false)}
       >
-               <Box sx={modalStyle}>
-
+        <Box sx={modalStyle}>
           <h2 style={{ textAlign: "center" }}>ยืนยันรหัสผ่าน Admin</h2>
           <TextField
             label="รหัสผ่านของคุณ"

@@ -725,6 +725,55 @@ function EventCalendar() {
     }
   };
 
+
+
+  let cachedHolidays = null;
+  let holidaysLastFetched = null;
+  
+  // const fetchThaiHolidays = async () => {
+  //   const now = new Date();
+  
+  //   // ตรวจสอบ cache
+  //   if (cachedHolidays && holidaysLastFetched && (now - holidaysLastFetched < 24 * 60 * 60 * 1000)) {
+  //     console.log("Using cached holidays");
+  //     return cachedHolidays;
+  //   }
+  
+  //   console.time("fetchThaiHolidays");
+  //   try {
+  //     const response = await axios.get(`https://www.myhora.com/calendar/ical/holiday.aspx?latest.json`);
+      
+  //     if (response.status !== 200) {
+  //       throw new Error(`HTTP error! status: ${response.status}`);
+  //     }
+  
+  //     const data = JSON.parse(response.data.contents);
+  //     if (!data || !data.VCALENDAR || !data.VCALENDAR[0].VEVENT) {
+  //       throw new Error("Invalid data structure");
+  //     }
+  
+  //     cachedHolidays = data.VCALENDAR[0].VEVENT.map((holiday) => ({
+  //       title: holiday.SUMMARY,
+  //       date: moment(holiday["DTSTART;VALUE=DATE"]).format("YYYY-MM-DD"),
+  //       allDay: true,
+  //       backgroundColor: "#ff0000",
+  //       textColor: "#f5e5da",
+  //       fontSize: 6,
+  //     }));
+  
+  //     holidaysLastFetched = new Date(); // อัปเดตวันและเวลา
+  //     return cachedHolidays;
+  //   } catch (error) {
+  //     console.error("Error fetching Thai holidays:", error);
+  //     return []; // คืนค่าเป็น array ว่างในกรณีเกิดข้อผิดพลาด
+  //   } finally {
+  //   console.timeEnd("fetchThaiHolidays");
+  // }
+  // };
+  
+  
+  
+
   const saveEventToDB = async (newEvent) => {
     try {
       // ✅ ตรวจสอบว่ามี start, end, และ date ครบถ้วน
@@ -750,7 +799,7 @@ function EventCalendar() {
   };
 
   const handleAddEvent = async (arg) => {
-    const res = await CustomerService.getUserCustomers();
+    const res = await CustomerService.getCustomers();
 
     Swal.fire({
       title: "เพิ่มแผนงานใหม่",
@@ -789,7 +838,7 @@ function EventCalendar() {
           <label for="eventTitle">ประเภทงาน:</label>
           <select id="eventTitle" class="swal2-select">
             <option selected disabled></option>
-            <option value="Preventive Maintenance (PM)">Preventive Maintenance (PM)</option>
+            <option value="PM">Preventive Maintenance (PM)</option>
             <option value="Service">Service</option>
             <option value="Inspection">Inspection</option>
             <option value="Test & Commissioning">Test & Commissioning</option>
@@ -896,7 +945,7 @@ function EventCalendar() {
           },
         });
         new TomSelect("#eventTime", {
-          create: false,
+          create: true,
           sortField: {
             field: "text",
             direction: "asc",
@@ -1063,7 +1112,7 @@ function EventCalendar() {
     let currentTextColor = getTextColorByStatus(eventStatus);
     let currentBackgroundColor = getBackgroundColorByStatus(eventStatus);
 
-    const res = await CustomerService.getUserCustomers();
+    const res = await CustomerService.getCustomers();
 
     // 🔧 โค้ด htmlEdit พร้อม label ทุกหัวข้อเพื่อความชัดเจน
     const htmlEdit = `
@@ -1109,7 +1158,7 @@ function EventCalendar() {
       <div>
         <label for="editSite">ชื่อโครงการ : </label>
         <select id="editSite" class="swal2-select">
-          <option disabled selected>${eventSite || "เลือกสถานที่"}</option>
+          <option disabled selected>${eventSite || ""}</option>
           ${res.userCustomers
             .map(
               (c) =>
@@ -1126,10 +1175,10 @@ function EventCalendar() {
         <label for="editTitle">ประเภทงาน : </label>
         <select id="editTitle" class="swal2-select">
           <option disabled selected>${
-            eventTitle || "เลือกประเภทแผนงาน"
+            eventTitle || ""
           }</option>
           ${[
-            "Preventive Maintenance (PM)",
+            "PM",
             "Service",
             "Inspection",
             "Test & Commissioning",
@@ -1148,7 +1197,7 @@ function EventCalendar() {
       <div>
         <label for="editSystem">ระบบงาน : </label>
         <select id="editSystem" class="swal2-select">
-          <option disabled selected>${eventSystem || "เลือกระบบงาน"}</option>
+          <option disabled selected>${eventSystem || ""}</option>
           ${["Fire Alarm", "CCTV", "Access Control"]
             .map(
               (sys) =>
@@ -1258,7 +1307,7 @@ function EventCalendar() {
         });
 
         new TomSelect("#editTime", {
-          create: false, // ✅ อนุญาตให้ผู้ใช้พิมพ์ชื่อใหม่ได้
+          create: true, // ✅ อนุญาตให้ผู้ใช้พิมพ์ชื่อใหม่ได้
           sortField: {
             field: "text",
             direction: "asc",

@@ -2,8 +2,8 @@
 import API from "../API/axiosInstance";
 import AuthService from "./authService";
 
-const ProductService = {
-  async getUserCustomers() {
+const CustomerService = {
+  async getCustomers() {
     
     try {
       const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token
@@ -29,7 +29,7 @@ const ProductService = {
 
         // console.log("Add Product data", response.data);
 
-        return response.data.userProducts;
+        return response.data;
       }
     } catch (error) {
       console.error("Error fetching user products:", error);
@@ -37,16 +37,16 @@ const ProductService = {
     }
   },
 
-  async ReadProduct(productId) {
+  async ReadCustomer(customerId) {
     try {
       const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token
 
       if (userData) {
-        const response = await API.get(`/product/${productId}`); // เพิ่มข้อมูลสินค้า
+        const response = await API.get(`/customer/${customerId}`); // เพิ่มข้อมูลสินค้า
 
         // console.log("Read Product data", response.data);
 
-        return response.data.product;
+        return response.data;
       }
     } catch (error) {
       console.error("Error fetching user products:", error);
@@ -54,12 +54,12 @@ const ProductService = {
     }
   },
 
-  async UpdateProduct(productId, editedData) {
+  async UpdateCustomer(customerId, editedData) {
     try {
       const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token
 
       if (userData) {
-        const response = await API.put(`/product/${productId}`, editedData); // เพิ่มข้อมูลสินค้า
+        const response = await API.put(`/customer/${customerId}`, editedData); // เพิ่มข้อมูลสินค้า
         // const response = await API.put(`/product/${productId}`, formData); // เพิ่มข้อมูลสินค้า
 
         // console.log("Update Product data", response.data);
@@ -72,11 +72,11 @@ const ProductService = {
     }
   },
 
-  async DeleteProduct(productId) {
+  async DeleteCustomer(customerId) {
     try {
       const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token
       if (userData) {
-        const response = await API.delete(`/product/${productId}`); // ลบข้อมูลสินค้า
+        const response = await API.delete(`/customer/${customerId}`); // ลบข้อมูลสินค้า
 
         // console.log("Delete Product Success", response.data);
 
@@ -92,4 +92,4 @@ const ProductService = {
   // เพิ่มฟังก์ชันสำหรับการสร้าง, อัปเดต, และลบสินค้าตามที่ต้องการ
 };
 
-export default ProductService;
+export default CustomerService;

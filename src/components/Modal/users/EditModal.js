@@ -41,13 +41,13 @@ const EditProductModal = ({
             </MDBModalHeader>
 
             <MDBModalBody>
-              <img
+              <img 
                 className="img-fluid my-3 rounded-circle"
                 style={{ width: "180px", height: "180px" }}
                 src={
                   selectedFile
                     ? URL.createObjectURL(selectedFile)
-                    : `${API.defaults.baseURL}/${editedData.imageUrl}`
+                    : `${editedData.imageUrl}`
                 }
                 alt=""
               />

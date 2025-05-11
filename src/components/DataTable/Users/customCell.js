@@ -28,10 +28,10 @@ const customCell = ({ row, isSmallScreen }) => {
     </div>
       <div>
         <div style={{ fontWeight: "bold" }}>
-          {row.fname} {row.lname} ({row.rank})
+          {row.fname} {row.lname} ({row.role})
         </div>
-        <div>{row.email}</div>
-        <div>{row.role}</div>
+
+
       </div>
     </div>
   );
