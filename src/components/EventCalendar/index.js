@@ -1472,16 +1472,16 @@ statusSelect.control_input.parentElement.style.color =
         };
 
         // ✅ ตรวจสอบและเพิ่ม Customer ถ้าไม่มี
-        const existingCustomer = res.userCustomers.find(
-          (c) => c.cCompany === company && c.cSite === site
-        );
+     const existingCustomer = res.userCustomers.find(
+  (c) => c.cCompany === company && c.cSite === site
+);
 
-        if (!existingCustomer) {
-          await CustomerService.AddCustomer({
-            cCompany: company,
-            cSite: site,
-          });
-        }
+if (!existingCustomer && company && site) {
+  await CustomerService.AddCustomer({
+    cCompany: company,
+    cSite: site,
+  });
+}
 
         // อัปเดต event ใน FullCalendar
         eventInfo.event.setProp("textColor", textColor);
