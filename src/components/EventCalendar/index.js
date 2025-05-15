@@ -178,8 +178,8 @@ function EventCalendar() {
     });
 
     const timeText = event.extendedProps.time
-    ? `ครั้งที่ ${event.extendedProps.time} `
-    : ""; // ถ้าไม่มี time จะไม่แสดงอะไรเลย
+      ? `ครั้งที่ ${event.extendedProps.time} `
+      : ""; // ถ้าไม่มี time จะไม่แสดงอะไรเลย
 
     // 👉 ฟอนต์ THSarabun
     doc.addFileToVFS("THSarabun.ttf", thSarabunFont);
@@ -233,8 +233,6 @@ function EventCalendar() {
     const end_o = moment(event.end).format("DD-MM-YYYY");
     const start = moment(event.start).format("DD-MM-YYYY");
     const end = moment(event.end).format("DD-MM-YYYY");
-
-
 
     const lines = [
       "",
@@ -725,33 +723,31 @@ function EventCalendar() {
     }
   };
 
-
-
   let cachedHolidays = null;
   let holidaysLastFetched = null;
-  
+
   // const fetchThaiHolidays = async () => {
   //   const now = new Date();
-  
+
   //   // ตรวจสอบ cache
   //   if (cachedHolidays && holidaysLastFetched && (now - holidaysLastFetched < 24 * 60 * 60 * 1000)) {
   //     console.log("Using cached holidays");
   //     return cachedHolidays;
   //   }
-  
+
   //   console.time("fetchThaiHolidays");
   //   try {
   //     const response = await axios.get(`https://www.myhora.com/calendar/ical/holiday.aspx?latest.json`);
-      
+
   //     if (response.status !== 200) {
   //       throw new Error(`HTTP error! status: ${response.status}`);
   //     }
-  
+
   //     const data = JSON.parse(response.data.contents);
   //     if (!data || !data.VCALENDAR || !data.VCALENDAR[0].VEVENT) {
   //       throw new Error("Invalid data structure");
   //     }
-  
+
   //     cachedHolidays = data.VCALENDAR[0].VEVENT.map((holiday) => ({
   //       title: holiday.SUMMARY,
   //       date: moment(holiday["DTSTART;VALUE=DATE"]).format("YYYY-MM-DD"),
@@ -760,7 +756,7 @@ function EventCalendar() {
   //       textColor: "#f5e5da",
   //       fontSize: 6,
   //     }));
-  
+
   //     holidaysLastFetched = new Date(); // อัปเดตวันและเวลา
   //     return cachedHolidays;
   //   } catch (error) {
@@ -770,9 +766,6 @@ function EventCalendar() {
   //   console.timeEnd("fetchThaiHolidays");
   // }
   // };
-  
-  
-  
 
   const saveEventToDB = async (newEvent) => {
     try {
@@ -911,6 +904,8 @@ function EventCalendar() {
       didOpen: () => {
         new TomSelect("#eventCompany", {
           create: true, // ✅ อนุญาตให้ผู้ใช้พิมพ์ชื่อใหม่ได้
+          maxOptions: 7,
+
           placeholder: "เลือกหรือพิมพ์ชื่อบริษัท",
           sortField: {
             field: "text",
@@ -920,6 +915,8 @@ function EventCalendar() {
 
         new TomSelect("#eventSite", {
           create: true,
+          maxOptions: 7,
+
           placeholder: "เลือกหรือพิมพ์ชื่อโครงการ",
           sortField: {
             field: "text",
@@ -929,6 +926,7 @@ function EventCalendar() {
 
         new TomSelect("#eventTitle", {
           create: true,
+
           placeholder: "เลือกหรือพิมพ์ชื่อหัวข้อ",
           sortField: {
             field: "text",
@@ -1023,7 +1021,17 @@ function EventCalendar() {
           start,
           end: newEnd.format("YYYY-MM-DD"),
         };
+        // ✅ เพิ่มตรวจสอบและเพิ่ม Customer ใหม่ถ้ายังไม่มี
+        const existingCustomer = res.userCustomers.find(
+          (c) => c.cCompany === company && c.cSite === site
+        );
 
+        if (!existingCustomer) {
+          await CustomerService.AddCustomer({
+            cCompany: company,
+            cSite: site,
+          });
+        }
         setEvents([...events, newEvent]); // อัปเดต state ของ FullCalendar
         await saveEventToDB(newEvent); // บันทึกแผนงานลงฐานข้อมูล
         setDefaultTextColor(textColor);
@@ -1116,28 +1124,42 @@ function EventCalendar() {
 
     // 🔧 โค้ด htmlEdit พร้อม label ทุกหัวข้อเพื่อความชัดเจน
     const htmlEdit = `
+
+<!-- สถานะงาน (อยู่แยกด้านบน แถวเดียว) -->
+<div style="margin-bottom: 20px;margin-top: 20px; width: 100%;">
+  <label
+    for="editStatus"
+    style="display: block; margin-bottom: 10px; font-weight: bold;"
+  >
+    🛠️ สถานะงาน :
+  </label>
+ <select
+  id="editStatus"
+  class="swal2-select"
+  style="
+    width: 100%;
+    height: 40px;
+    font-size: 16px;
+    padding: 5px 10px;
+    text-align-last: center;
+    line-height: 30px;
+  "
+>
+    ${["กำลังรอยืนยัน", "ยืนยันแล้ว", "กำลังดำเนินการ", "ดำเนินการเสร็จสิ้น"]
+      .map(
+        (status) =>
+          `<option value="${status}" ${
+            eventStatus === status ? "selected" : ""
+          }>${status}</option>`
+      )
+      .join("")}
+  </select>
+</div>
+
       <div class="swal-form-grid">
   
-      <!-- สถานะงาน -->
-      <div>
-        <label for="editStatus">สถานะงาน : </label>
-        <select id="editStatus" class="swal2-select">
-          <option disabled selected>${eventStatus}</option>
-          <option value="กำลังรอยืนยัน" ${
-            eventStatus === "กำลังรอยืนยัน" ? "selected" : ""
-          }>กำลังรอยืนยัน</option>
-          <option value="ยืนยันแล้ว" ${
-            eventStatus === "ยืนยันแล้ว" ? "selected" : ""
-          }>ยืนยันแล้ว</option>
-          <option value="กำลังดำเนินการ" ${
-            eventStatus === "กำลังดำเนินการ" ? "selected" : ""
-          }>กำลังดำเนินการ</option>
-          <option value="ดำเนินการเสร็จสิ้น" ${
-            eventStatus === "ดำเนินการเสร็จสิ้น" ? "selected" : ""
-          }>ดำเนินการเสร็จสิ้น</option>
-        </select>
-      </div>
-  
+
+
       <!-- ชื่อบริษัท -->
       <div>
         <label for="editCompany">ชื่อบริษัท : </label>
@@ -1174,15 +1196,8 @@ function EventCalendar() {
       <div>
         <label for="editTitle">ประเภทงาน : </label>
         <select id="editTitle" class="swal2-select">
-          <option disabled selected>${
-            eventTitle || ""
-          }</option>
-          ${[
-            "PM",
-            "Service",
-            "Inspection",
-            "Test & Commissioning",
-          ]
+          <option disabled selected>${eventTitle || ""}</option>
+          ${["PM", "Service", "Inspection", "Test & Commissioning"]
             .map(
               (title) =>
                 `<option value="${title}" ${
@@ -1261,17 +1276,57 @@ function EventCalendar() {
       customClass: "swal-wide",
       showCloseButton: true,
       didOpen: () => {
-        new TomSelect("#editStatus", {
-          create: false, // ✅ อนุญาตให้ผู้ใช้พิมพ์ชื่อใหม่ได้
-          placeholder: "เลือกหรือพิมพ์ชื่อบริษัท",
-          sortField: {
-            field: "text",
-            direction: "asc",
-          },
-        });
+        const statusColorMap = {
+  "กำลังรอยืนยัน": "#FF5733",
+  "ยืนยันแล้ว": "#0c49ac",
+  "กำลังดำเนินการ": "#a1b50b",
+  "ดำเนินการเสร็จสิ้น": "#18b007",
+};
 
+const statusSelect = new TomSelect("#editStatus", {
+  create: false,
+  maxOptions: 5,
+  placeholder: "เลือกสถานะงาน",
+  render: {
+    option: function (data, escape) {
+      const iconMap = {
+        "กำลังรอยืนยัน": "fa-hourglass-half",
+        "ยืนยันแล้ว": "fa-check",
+        "กำลังดำเนินการ": "fa-clock-rotate-left",
+        "ดำเนินการเสร็จสิ้น": "fa-check-double",
+      };
+      const color = statusColorMap[data.value] || "#ccc";
+      const icon = iconMap[data.value] || "fa-circle";
+
+      return `
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <i class="fas ${icon}" style="color: ${color}; width: 18px;"></i>
+          <span>${escape(data.text)}</span>
+        </div>`;
+    },
+    item: function (data, escape) {
+      return `<div>${escape(data.text)}</div>`;
+    },
+  },
+  onChange: function (value) {
+    const control = statusSelect.control_input.parentElement; // .ts-control
+    const color = statusColorMap[value] || "#ccc";
+    control.style.backgroundColor = color;
+    control.style.color = value === "กำลังดำเนินการ" ? "#000" : "#fff";
+    control.style.borderColor = "#999";
+  },
+});
+
+// ✅ เซ็ตสีเริ่มต้นตามสถานะที่โหลดมา
+const initialColor = statusColorMap[statusSelect.getValue()] || "#ccc";
+statusSelect.control_input.parentElement.style.backgroundColor = initialColor;
+statusSelect.control_input.parentElement.style.color =
+  statusSelect.getValue() === "กำลังดำเนินการ" ? "#000" : "#fff";
+  
         new TomSelect("#editCompany", {
           create: true, // ✅ อนุญาตให้ผู้ใช้พิมพ์ชื่อใหม่ได้
+          maxOptions: 7,
+
           placeholder: "เลือกหรือพิมพ์ชื่อบริษัท",
           sortField: {
             field: "text",
@@ -1281,6 +1336,8 @@ function EventCalendar() {
 
         new TomSelect("#editSite", {
           create: true, // ✅ อนุญาตให้ผู้ใช้พิมพ์ชื่อใหม่ได้
+          maxOptions: 7,
+
           placeholder: "เลือกหรือพิมพ์ชื่อโครงการ",
           sortField: {
             field: "text",
@@ -1291,6 +1348,7 @@ function EventCalendar() {
         new TomSelect("#editTitle", {
           create: true, // ✅ อนุญาตให้ผู้ใช้พิมพ์ชื่อใหม่ได้
           placeholder: "เลือกหรือพิมพ์ชื่อหัวข้อ",
+
           sortField: {
             field: "text",
             direction: "asc",
@@ -1412,6 +1470,18 @@ function EventCalendar() {
           manualStatus, // เพิ่ม field นี้ในรูปแบบ level บนสุด
           extendedProps: { manualStatus },
         };
+
+        // ✅ ตรวจสอบและเพิ่ม Customer ถ้าไม่มี
+        const existingCustomer = res.userCustomers.find(
+          (c) => c.cCompany === company && c.cSite === site
+        );
+
+        if (!existingCustomer) {
+          await CustomerService.AddCustomer({
+            cCompany: company,
+            cSite: site,
+          });
+        }
 
         // อัปเดต event ใน FullCalendar
         eventInfo.event.setProp("textColor", textColor);
@@ -1909,9 +1979,9 @@ function EventCalendar() {
       )} */}
       {isAdmin && (
         <div
-          // id="external-events"
-          // style={{ padding: "8px", background: "#f8f9fa", width: "100%" }}
-          // className="mb-4"
+        // id="external-events"
+        // style={{ padding: "8px", background: "#f8f9fa", width: "100%" }}
+        // className="mb-4"
         >
           {/* <h5 className="mb-2 p-2">แผนงานรอจัดลงตาราง</h5>
 
