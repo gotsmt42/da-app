@@ -31,6 +31,9 @@ import CustomerService from "../../services/CustomerService";
 import EventService from "../../services/EventService";
 import EventReceiveService from "../../services/EventReceiveService";
 import fetchHolidayService from "../../services/fetchHolidayService";
+
+import AuthService from "../../services/authService";
+
 import moment from "moment";
 
 import { ThreeDots } from "react-loader-spinner";
@@ -792,7 +795,10 @@ function EventCalendar() {
   };
 
   const handleAddEvent = async (arg) => {
-    const res = await CustomerService.getCustomers();
+    const customers = await CustomerService.getCustomers();
+    const employees = await AuthService.getAllUserData();
+
+    const employeeList = employees?.allUser || [];
 
     Swal.fire({
       title: "เพิ่มแผนงานใหม่",
@@ -805,7 +811,7 @@ function EventCalendar() {
           <label for="eventCompany">ชื่อบริษัท : </label>
           <select id="eventCompany" class="swal2-select">
             <option selected disabled></option>
-            ${res.userCustomers
+            ${customers.userCustomers
               .map(
                 (customer) =>
                   `<option value="${customer.cCompany}">${customer.cCompany}</option>`
@@ -818,7 +824,7 @@ function EventCalendar() {
           <label for="eventSite">ชื่อโครงการ : </label>
           <select id="eventSite" class="swal2-select">
             <option selected disabled></option>
-            ${res.userCustomers
+            ${customers.userCustomers
               .map(
                 (customer) =>
                   `<option value="${customer.cSite}">${customer.cSite}</option>`
@@ -856,6 +862,23 @@ function EventCalendar() {
             <option value="2">2</option>
             <option value="3">3</option>
             <option value="4">4</option>
+          </select>
+        </div>
+
+
+              <div>
+          <label for="eventTeam">ทีม : </label>
+          <select id="eventTeam" class="swal2-select">
+            <option selected disabled></option>
+${employeeList
+  .map(
+    (employee) =>
+      `<option value="${employee.fname}">${employee.fname}</option>`
+  )
+  .join("")}
+
+
+
           </select>
         </div>
     
@@ -944,6 +967,18 @@ function EventCalendar() {
         });
         new TomSelect("#eventTime", {
           create: true,
+          placeholder: "เลือกหรือพิมพ์ครั้งที่",
+
+          sortField: {
+            field: "text",
+            direction: "asc",
+          },
+        });
+
+        new TomSelect("#eventTeam", {
+          create: true,
+          placeholder: "เลือกหรือพิมพ์ชื่อทีม",
+
           sortField: {
             field: "text",
             direction: "asc",
@@ -967,6 +1002,8 @@ function EventCalendar() {
         const title = document.getElementById("eventTitle").value;
         const system = document.getElementById("eventSystem").value;
         const time = document.getElementById("eventTime").value;
+        const team = document.getElementById("eventTeam").value;
+
         const backgroundColor = document.getElementById(
           "backgroundColorPicker"
         ).value;
@@ -980,11 +1017,12 @@ function EventCalendar() {
         }
 
         return {
-          company,
+          company: company || "", // ✅ ถ้าไม่กรอก ให้เป็น string ว่าง
           site,
           title,
           system,
           time,
+          team,
           backgroundColor,
           textColor,
           fontSize,
@@ -1000,6 +1038,7 @@ function EventCalendar() {
           title,
           system,
           time,
+          team,
           backgroundColor,
           textColor,
           fontSize,
@@ -1014,6 +1053,7 @@ function EventCalendar() {
           title,
           system,
           time,
+          team, // ✅ เพิ่มตรงนี้
           date: arg.dateStr,
           backgroundColor,
           textColor,
@@ -1021,12 +1061,13 @@ function EventCalendar() {
           start,
           end: newEnd.format("YYYY-MM-DD"),
         };
+
         // ✅ เพิ่มตรวจสอบและเพิ่ม Customer ใหม่ถ้ายังไม่มี
-        const existingCustomer = res.userCustomers.find(
+        const existingCustomer = customers.userCustomers.find(
           (c) => c.cCompany === company && c.cSite === site
         );
-
-        if (!existingCustomer) {
+        // ✅ เพิ่มเงื่อนไขเฉพาะกรณีที่ company มีค่า
+        if (company && !existingCustomer) {
           await CustomerService.AddCustomer({
             cCompany: company,
             cSite: site,
@@ -1072,6 +1113,7 @@ function EventCalendar() {
 
     const eventTitle = eventInfo.event.title;
     const eventSystem = eventInfo.event.extendedProps?.system || "";
+    const eventTeam = eventInfo.event.extendedProps?.team || "";
     const eventTime = eventInfo.event.extendedProps?.time || "";
 
     const eventFontSize = eventInfo.event.extendedProps.fontSize;
@@ -1121,40 +1163,50 @@ function EventCalendar() {
     let currentBackgroundColor = getBackgroundColorByStatus(eventStatus);
 
     const res = await CustomerService.getCustomers();
+    const employees = await AuthService.getAllUserData();
+
+    const employeeList = employees?.allUser || [];
 
     // 🔧 โค้ด htmlEdit พร้อม label ทุกหัวข้อเพื่อความชัดเจน
     const htmlEdit = `
 
-<!-- สถานะงาน (อยู่แยกด้านบน แถวเดียว) -->
-<div style="margin-bottom: 20px;margin-top: 20px; width: 100%;">
-  <label
-    for="editStatus"
-    style="display: block; margin-bottom: 10px; font-weight: bold;"
-  >
-    🛠️ สถานะงาน :
-  </label>
- <select
-  id="editStatus"
-  class="swal2-select"
-  style="
-    width: 100%;
-    height: 40px;
-    font-size: 16px;
-    padding: 5px 10px;
-    text-align-last: center;
-    line-height: 30px;
-  "
->
-    ${["กำลังรอยืนยัน", "ยืนยันแล้ว", "กำลังดำเนินการ", "ดำเนินการเสร็จสิ้น"]
-      .map(
-        (status) =>
-          `<option value="${status}" ${
-            eventStatus === status ? "selected" : ""
-          }>${status}</option>`
-      )
-      .join("")}
-  </select>
-</div>
+          <!-- สถานะงาน (อยู่แยกด้านบน แถวเดียว) -->
+          <!-- ✅ ไม่ใช้ label ครอบ select -->
+          <div style="margin-bottom: 12px; width: 100%;">
+            <label
+              for="editStatus"
+              style="display: block; margin-bottom: 4px; font-weight: bold;"
+            >
+              🛠️ สถานะงาน :
+            </label>
+
+            <!-- ✅ คลิกได้เฉพาะตรง select -->
+            <select
+              id="editStatus"
+              class="swal2-select"
+              style="
+                width: 100%;
+                height: 40px;
+                text-align-last: center;
+                appearance: none;
+              "
+            >
+              ${[
+                "กำลังรอยืนยัน",
+                "ยืนยันแล้ว",
+                "กำลังดำเนินการ",
+                "ดำเนินการเสร็จสิ้น",
+              ]
+                .map(
+                  (status) =>
+                    `<option value="${status}" ${
+                      eventStatus === status ? "selected" : ""
+                    }>${status}</option>`
+                )
+                .join("")}
+            </select>
+          </div>
+
 
       <div class="swal-form-grid">
   
@@ -1239,6 +1291,22 @@ function EventCalendar() {
             .join("")}
         </select>
       </div>
+
+
+      <div>
+        <label for="editSystem">ทีม : </label>
+        <select id="editTeam" class="swal2-select">
+          <option disabled selected>${eventTeam || ""}</option>
+            ${employeeList
+              .map(
+                (employee) =>
+                  `<option value="${employee.fname}">${employee.fname}</option>`
+              )
+              .join("")}
+
+        </select>
+      </div>
+  
   
       
   
@@ -1271,58 +1339,59 @@ function EventCalendar() {
   `;
 
     Swal.fire({
-      title: `แก้ไขแผนงาน: ${eventSite}`,
+      title: `<h4>[ ${eventTitle} ] ${eventSystem} ${eventSite}${eventTeam ? ` (ทีม ${eventTeam})` : ""}</h4>`,
       html: htmlEdit,
       customClass: "swal-wide",
       showCloseButton: true,
       didOpen: () => {
         const statusColorMap = {
-  "กำลังรอยืนยัน": "#FF5733",
-  "ยืนยันแล้ว": "#0c49ac",
-  "กำลังดำเนินการ": "#a1b50b",
-  "ดำเนินการเสร็จสิ้น": "#18b007",
-};
+          กำลังรอยืนยัน: "#FF5733",
+          ยืนยันแล้ว: "#0c49ac",
+          กำลังดำเนินการ: "#a1b50b",
+          ดำเนินการเสร็จสิ้น: "#18b007",
+        };
 
-const statusSelect = new TomSelect("#editStatus", {
-  create: false,
-  maxOptions: 5,
-  placeholder: "เลือกสถานะงาน",
-  render: {
-    option: function (data, escape) {
-      const iconMap = {
-        "กำลังรอยืนยัน": "fa-hourglass-half",
-        "ยืนยันแล้ว": "fa-check",
-        "กำลังดำเนินการ": "fa-clock-rotate-left",
-        "ดำเนินการเสร็จสิ้น": "fa-check-double",
-      };
-      const color = statusColorMap[data.value] || "#ccc";
-      const icon = iconMap[data.value] || "fa-circle";
+        const statusSelect = new TomSelect("#editStatus", {
+          create: false,
+          maxOptions: 5,
+          placeholder: "เลือกสถานะงาน",
+          render: {
+            option: function (data, escape) {
+              const iconMap = {
+                กำลังรอยืนยัน: "fa-hourglass-half",
+                ยืนยันแล้ว: "fa-check",
+                กำลังดำเนินการ: "fa-clock-rotate-left",
+                ดำเนินการเสร็จสิ้น: "fa-check-double",
+              };
+              const color = statusColorMap[data.value] || "#ccc";
+              const icon = iconMap[data.value] || "fa-circle";
 
-      return `
+              return `
         <div style="display: flex; align-items: center; gap: 8px;">
           <i class="fas ${icon}" style="color: ${color}; width: 18px;"></i>
           <span>${escape(data.text)}</span>
         </div>`;
-    },
-    item: function (data, escape) {
-      return `<div>${escape(data.text)}</div>`;
-    },
-  },
-  onChange: function (value) {
-    const control = statusSelect.control_input.parentElement; // .ts-control
-    const color = statusColorMap[value] || "#ccc";
-    control.style.backgroundColor = color;
-    control.style.color = value === "กำลังดำเนินการ" ? "#000" : "#fff";
-    control.style.borderColor = "#999";
-  },
-});
+            },
+            item: function (data, escape) {
+              return `<div>${escape(data.text)}</div>`;
+            },
+          },
+          onChange: function (value) {
+            const control = statusSelect.control_input.parentElement; // .ts-control
+            const color = statusColorMap[value] || "#ccc";
+            control.style.backgroundColor = color;
+            control.style.color = value === "กำลังดำเนินการ" ? "#000" : "#fff";
+            control.style.borderColor = "#999";
+          },
+        });
 
-// ✅ เซ็ตสีเริ่มต้นตามสถานะที่โหลดมา
-const initialColor = statusColorMap[statusSelect.getValue()] || "#ccc";
-statusSelect.control_input.parentElement.style.backgroundColor = initialColor;
-statusSelect.control_input.parentElement.style.color =
-  statusSelect.getValue() === "กำลังดำเนินการ" ? "#000" : "#fff";
-  
+        // ✅ เซ็ตสีเริ่มต้นตามสถานะที่โหลดมา
+        const initialColor = statusColorMap[statusSelect.getValue()] || "#ccc";
+        statusSelect.control_input.parentElement.style.backgroundColor =
+          initialColor;
+        statusSelect.control_input.parentElement.style.color =
+          statusSelect.getValue() === "กำลังดำเนินการ" ? "#000" : "#fff";
+
         new TomSelect("#editCompany", {
           create: true, // ✅ อนุญาตให้ผู้ใช้พิมพ์ชื่อใหม่ได้
           maxOptions: 7,
@@ -1366,11 +1435,35 @@ statusSelect.control_input.parentElement.style.color =
 
         new TomSelect("#editTime", {
           create: true, // ✅ อนุญาตให้ผู้ใช้พิมพ์ชื่อใหม่ได้
+          placeholder: "เลือกหรือพิมพ์ครั้งที่",
+
           sortField: {
             field: "text",
             direction: "asc",
           },
         });
+        new TomSelect("#editTeam", {
+          create: true, // ✅ อนุญาตให้ผู้ใช้พิมพ์ชื่อใหม่ได้
+          placeholder: "เลือกหรือพิมพ์ชื่อทีม",
+
+          sortField: {
+            field: "text",
+            direction: "asc",
+          },
+        });
+
+
+        inputBackgroundColor.style.width = "150px";
+inputBackgroundColor.style.height = "35px";
+inputBackgroundColor.style.border = "4px solid #ccc";
+// inputBackgroundColor.style.borderRadius = "6px";
+inputBackgroundColor.style.cursor = "pointer";
+
+inputTextColor.style.width = "150px";
+inputTextColor.style.height = "35px";
+inputTextColor.style.border = "4px solid #ccc";
+// inputTextColor.style.borderRadius = "6px";
+inputTextColor.style.cursor = "pointer";
 
         document
           .getElementById("backgroundColorPickerContainer")
@@ -1401,6 +1494,7 @@ statusSelect.control_input.parentElement.style.color =
         const title = document.getElementById("editTitle").value;
         const system = document.getElementById("editSystem").value;
         const time = document.getElementById("editTime").value;
+        const team = document.getElementById("editTeam").value;
         const textColor = inputTextColor.value;
         const backgroundColor = inputBackgroundColor.value;
         const fontSize = eventFontSize;
@@ -1422,11 +1516,12 @@ statusSelect.control_input.parentElement.style.color =
         // ส่งกลับข้อมูลพร้อมกับ flag manualStatus: true
         return {
           id: eventId,
-          company,
+          company: company || "", // ✅ ถ้าไม่กรอก ให้เป็น string ว่าง
           site,
           title,
           system,
           time,
+          team,
           textColor,
           backgroundColor,
           fontSize,
@@ -1446,6 +1541,7 @@ statusSelect.control_input.parentElement.style.color =
           title,
           system,
           time,
+          team,
           textColor,
           backgroundColor,
           fontSize,
@@ -1461,6 +1557,7 @@ statusSelect.control_input.parentElement.style.color =
           title,
           system,
           time,
+          team,
           textColor,
           backgroundColor,
           fontSize,
@@ -1472,16 +1569,16 @@ statusSelect.control_input.parentElement.style.color =
         };
 
         // ✅ ตรวจสอบและเพิ่ม Customer ถ้าไม่มี
-     const existingCustomer = res.userCustomers.find(
-  (c) => c.cCompany === company && c.cSite === site
-);
+        const existingCustomer = res.userCustomers.find(
+          (c) => c.cCompany === company && c.cSite === site
+        );
 
-if (!existingCustomer && company && site) {
-  await CustomerService.AddCustomer({
-    cCompany: company,
-    cSite: site,
-  });
-}
+        if (company && !existingCustomer) {
+          await CustomerService.AddCustomer({
+            cCompany: company,
+            cSite: site,
+          });
+        }
 
         // อัปเดต event ใน FullCalendar
         eventInfo.event.setProp("textColor", textColor);
@@ -2101,14 +2198,15 @@ if (!existingCustomer && company && site) {
           eventReceive={handleEventReceive} // ✅ ต้องกำหนด eventReceive
           eventContent={(arg) => {
             const { title, extendedProps } = arg.event;
-            const { system = "", time = "", site = "" } = extendedProps;
+            const { system = "", time = "", site = "", team = "" } = extendedProps;
 
             const timeDisplay = time ? `ครั้งที่ ${time}` : "";
+            const teamDisplay = team ? `( ทีม ${team} )` : "";
             return {
               html: `
               [ ${title} ]
               ${system} ${timeDisplay}
-              ${site}
+              ${site} ${teamDisplay}
             `,
             };
           }}
