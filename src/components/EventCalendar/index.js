@@ -2200,13 +2200,14 @@ inputTextColor.style.cursor = "pointer";
             const { title, extendedProps } = arg.event;
             const { system = "", time = "", site = "", team = "" } = extendedProps;
 
-            const timeDisplay = time ? `ครั้งที่ ${time}` : "";
-            const teamDisplay = team ? `( ทีม ${team} )` : "";
+            const siteDisplay = site ? ` - ${site}` : "";
+            const timeDisplay = time ? ` ครั้งที่ ${time}` : "";
+            const teamDisplay = team ? ` - ( ทีม ${team} )` : "";
             return {
               html: `
               [ ${title} ]
               ${system} ${timeDisplay}
-              ${site} ${teamDisplay}
+              ${siteDisplay} ${teamDisplay}
             `,
             };
           }}
