@@ -1062,17 +1062,22 @@ ${employeeList
           end: newEnd.format("YYYY-MM-DD"),
         };
 
-        // ✅ เพิ่มตรวจสอบและเพิ่ม Customer ใหม่ถ้ายังไม่มี
-        const existingCustomer = customers.userCustomers.find(
-          (c) => c.cCompany === company && c.cSite === site
-        );
-        // ✅ เพิ่มเงื่อนไขเฉพาะกรณีที่ company มีค่า
-        if (company && !existingCustomer) {
-          await CustomerService.AddCustomer({
-            cCompany: company,
-            cSite: site,
-          });
-        }
+            // ✅ ตรวจสอบและเพิ่ม Customer ใหม่ถ้ายังไม่มี (ไม่ต้องเช็คว่า company ต้องมีค่า)
+          const existingCustomer = customers.userCustomers.find(
+            (c) => c.cCompany === company && c.cSite === site
+          );
+
+          // ✅ เพิ่มแม้ว่า company จะไม่มีค่า (null หรือ "")
+          if (!existingCustomer) {
+            await CustomerService.AddCustomer({
+              cCompany: company ?? "", // ป้องกัน null โดยแทนเป็น string ว่าง
+              cSite: site ?? "",
+            });
+          }
+
+
+
+
         setEvents([...events, newEvent]); // อัปเดต state ของ FullCalendar
         await saveEventToDB(newEvent); // บันทึกแผนงานลงฐานข้อมูล
         setDefaultTextColor(textColor);
@@ -1568,17 +1573,18 @@ inputTextColor.style.cursor = "pointer";
           extendedProps: { manualStatus },
         };
 
-        // ✅ ตรวจสอบและเพิ่ม Customer ถ้าไม่มี
-        const existingCustomer = res.userCustomers.find(
-          (c) => c.cCompany === company && c.cSite === site
-        );
+          // ✅ ตรวจสอบและเพิ่ม Customer ใหม่ถ้ายังไม่มี (ไม่ต้องเช็คว่า company ต้องมีค่า)
+          const existingCustomer = res.userCustomers.find(
+            (c) => c.cCompany === company && c.cSite === site
+          );
 
-        if (company && !existingCustomer) {
-          await CustomerService.AddCustomer({
-            cCompany: company,
-            cSite: site,
-          });
-        }
+          // ✅ เพิ่มแม้ว่า company จะไม่มีค่า (null หรือ "")
+          if (!existingCustomer) {
+            await CustomerService.AddCustomer({
+              cCompany: company ?? "", // ป้องกัน null โดยแทนเป็น string ว่าง
+              cSite: site ?? "",
+            });
+          }
 
         // อัปเดต event ใน FullCalendar
         eventInfo.event.setProp("textColor", textColor);
