@@ -133,6 +133,24 @@ const Operation = () => {
     return new Date(b.start) - new Date(a.start);
   });
 
+  const isMobile = useMediaQuery("(max-width:600px)");
+
+const customStyles = {
+  headCells: {
+    style: {
+      fontSize: isMobile ? "0.75rem" : "0.9rem",
+      padding: isMobile ? "8px" : "12px",
+    },
+  },
+  cells: {
+    style: {
+      fontSize: isMobile ? "0.75rem" : "0.9rem",
+      padding: isMobile ? "8px" : "12px",
+      whiteSpace: "nowrap",
+    },
+  },
+};
+
   return (
     <>
       <div className="row align-items-end g-3 mt-5">
@@ -165,27 +183,26 @@ const Operation = () => {
             sx={{ minWidth: "300px", mt: 1 }}
           />
         </div>
-  <div className="col-12 col-sm mt-5">
-  <button
-    className="btn btn-light btn-sm"
-    onClick={() => {
-      if (showAll) {
-        // 👈 ถ้ากำลังแสดงทั้งหมด → กลับมาเป็นเดือนปัจจุบัน
-        setSelectedDate(moment().format("YYYY-MM"));
-        setShowAll(false);
-      } else {
-        // 👈 ถ้ากำลังดูเดือน → สลับเป็นแสดงทั้งหมด
-        setShowAll(true);
-      }
-    }}
-  >
-    • แสดงข้อมูล:{" "}
-    {showAll
-      ? "ทั้งหมด"
-      : moment(selectedDate).locale("th").format("MMMM YYYY")}
-  </button>
-</div>
-
+        <div className="col-12 col-sm mt-5">
+          <button
+            className="btn btn-light btn-sm"
+            onClick={() => {
+              if (showAll) {
+                // 👈 ถ้ากำลังแสดงทั้งหมด → กลับมาเป็นเดือนปัจจุบัน
+                setSelectedDate(moment().format("YYYY-MM"));
+                setShowAll(false);
+              } else {
+                // 👈 ถ้ากำลังดูเดือน → สลับเป็นแสดงทั้งหมด
+                setShowAll(true);
+              }
+            }}
+          >
+            • แสดงข้อมูล:{" "}
+            {showAll
+              ? "ทั้งหมด"
+              : moment(selectedDate).locale("th").format("MMMM YYYY")}
+          </button>
+        </div>
 
         {/* <div className="form-text mt-3">
           • แสดงข้อมูล:{" "}
@@ -196,6 +213,7 @@ const Operation = () => {
           </strong>
         </div> */}
       </div>
+<div style={{ overflowX: "auto" }}>
 
       <DataTableComponent
         columns={DataTableColumns({
@@ -206,6 +224,9 @@ const Operation = () => {
           handleDeleteRow,
         })}
         data={sortedData}
+highlightOnHover
+    dense={isMobile} // ใช้ dense บนมือถือเพื่อลดระยะห่าง
+    customStyles={customStyles}
         paginationPerPage={10}
         expandableRowsComponent={Expanded} // เปิดใช้งาน Expandle
         expandableRowExpanded={(row) => expandedRows[row._id]}
@@ -236,7 +257,11 @@ const Operation = () => {
         //   </div>
         // }
       />
+      </div>
+
     </>
+
+    
   );
 };
 

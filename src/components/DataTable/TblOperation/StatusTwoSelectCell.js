@@ -4,6 +4,7 @@ import Swal from "sweetalert2";
 import EventService from "../../../services/EventService";
 
 const statusColorMap = {
+  เสนอราคาแก้ไขแล้ว: "#f39c12",
   วางบิลแล้วรอเก็บเงิน: "#9b59b6",
   เก็บเงินแล้ว: "#18b007",
 };

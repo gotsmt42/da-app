@@ -13,6 +13,7 @@ import EventService from "../../../services/EventService";
 import StatusSelectCell from "./StatusSelectCell"; // ✅ import component
 import StatusTwoSelectCell from "./StatusTwoSelectCell"; // ✅ import component
 import StatusThreeSelectCell from "./StatusThreeSelectCell"; // ✅ import component
+import { useMediaQuery } from "@mui/material";
 
 const StyledMenu = styled((props) => (
   <Menu
@@ -82,8 +83,10 @@ const DataTableColumns = ({
     setSelectedFile(null);
   };
 
+  const isMobile = useMediaQuery("(max-width:600px)");
+
   const columns = [
-       {
+    {
       name: "วันที่เข้าดำเนินการ",
       width: "180px",
 
@@ -94,8 +97,10 @@ const DataTableColumns = ({
         <div>
           <div style={{ fontSize: "0.9em", color: "#333" }}>
             <span>{moment(row.start).format("DD/MM/YYYY")}</span>
-             {" - "}
-            <span>{moment(row.end).subtract(1, "days").format("DD/MM/YYYY")}</span>
+            {" - "}
+            <span>
+              {moment(row.end).subtract(1, "days").format("DD/MM/YYYY")}
+            </span>
           </div>
         </div>
       ),
@@ -115,7 +120,8 @@ const DataTableColumns = ({
     // },
     {
       name: "งาน / โครงการ",
-      width: "370px",
+
+      width: isMobile ? "200px" : "370px", // ✅ ปรับขนาดตามหน้าจอ
 
       sortable: true,
       sortFunction: (a, b) => new Date(a.start) - new Date(b.start),
@@ -128,23 +134,21 @@ const DataTableColumns = ({
         </div>
       ),
     },
-        {
+    {
       name: "การดำเนินการ",
       sortable: true,
       width: "210px",
+      omit: isMobile, // ซ่อนไปถ้าเป็นมือถือ
 
       selector: (row) => row.status,
       cell: (row) => (
         <StatusSelectCell row={row} onStatusUpdate={onStatusUpdate} />
       ),
     },
-   {
-     name: (
-      <div style={{ textAlign: "center", width: "100%" }}>
-        สถานะ 1
-      </div>
-    ),
+    {
+      name: <div style={{ textAlign: "center", width: "100%" }}>สถานะ 1</div>,
       sortable: true,
+      omit: isMobile, // ซ่อนไปถ้าเป็นมือถือ
 
       width: "210px",
 
@@ -153,14 +157,12 @@ const DataTableColumns = ({
         <StatusTwoSelectCell row={row} onStatusUpdate={onStatusUpdate} />
       ),
     },
- 
+
     {
-    name: (
-      <div style={{ textAlign: "center", width: "100%" }}>
-        สถานะ 2
-      </div>
-    ),      sortable: true,
+      name: <div style={{ textAlign: "center", width: "100%" }}>สถานะ 2</div>,
+      sortable: true,
       width: "210px",
+      omit: isMobile, // ซ่อนไปถ้าเป็นมือถือ
 
       selector: (row) => row.status,
       cell: (row) => (
