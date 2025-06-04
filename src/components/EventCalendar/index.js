@@ -25,6 +25,16 @@ import {
   faFileExcel,
   faFilePdf,
   faPlus,
+  faHourglassHalf,
+  faCheckCircle,
+  faCheck,
+  faClock,
+  faSpinner,
+  faCheckDouble,
+  faTimesCircle,
+  faFileSignature,
+  faFileInvoiceDollar,
+  faCoins
 } from "@fortawesome/free-solid-svg-icons"; // Import ไอคอนต่างๆ
 
 import CustomerService from "../../services/CustomerService";
@@ -55,15 +65,6 @@ import { faSearch } from "@fortawesome/free-solid-svg-icons";
 import thLocale from "@fullcalendar/core/locales/th"; // นำเข้า locale ภาษาไทย
 
 import { useAuth } from "../../auth/AuthContext"; // ✅ ดึงข้อมูล Auth
-
-import {
-  faHourglassHalf,
-  faCheckCircle,
-  faCheck,
-  faClock,
-  faSpinner,
-  faCheckDouble,
-} from "@fortawesome/free-solid-svg-icons";
 
 import { jsPDF } from "jspdf";
 
@@ -872,8 +873,7 @@ function EventCalendar() {
             <option selected disabled></option>
 ${employeeList
   .map(
-    (employee) =>
-      `<option value="${employee.fname}">${employee.fname}</option>`
+    (employee) => `<option value="${employee.fname}">${employee.fname}</option>`
   )
   .join("")}
 
@@ -1062,21 +1062,18 @@ ${employeeList
           end: newEnd.format("YYYY-MM-DD"),
         };
 
-            // ✅ ตรวจสอบและเพิ่ม Customer ใหม่ถ้ายังไม่มี (ไม่ต้องเช็คว่า company ต้องมีค่า)
-          const existingCustomer = customers.userCustomers.find(
-            (c) => c.cCompany === company && c.cSite === site
-          );
+        // ✅ ตรวจสอบและเพิ่ม Customer ใหม่ถ้ายังไม่มี (ไม่ต้องเช็คว่า company ต้องมีค่า)
+        const existingCustomer = customers.userCustomers.find(
+          (c) => c.cCompany === company && c.cSite === site
+        );
 
-          // ✅ เพิ่มแม้ว่า company จะไม่มีค่า (null หรือ "")
-          if (!existingCustomer) {
-            await CustomerService.AddCustomer({
-              cCompany: company ?? "", // ป้องกัน null โดยแทนเป็น string ว่าง
-              cSite: site ?? "",
-            });
-          }
-
-
-
+        // ✅ เพิ่มแม้ว่า company จะไม่มีค่า (null หรือ "")
+        if (!existingCustomer) {
+          await CustomerService.AddCustomer({
+            cCompany: company ?? "", // ป้องกัน null โดยแทนเป็น string ว่าง
+            cSite: site ?? "",
+          });
+        }
 
         setEvents([...events, newEvent]); // อัปเดต state ของ FullCalendar
         await saveEventToDB(newEvent); // บันทึกแผนงานลงฐานข้อมูล
@@ -1087,21 +1084,26 @@ ${employeeList
       }
     });
   };
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case "กำลังรอยืนยัน":
-        return faHourglassHalf; // ⏳ รอยืนยัน
-      case "ยืนยันแล้ว":
-        return faCheck; // ✅ ยืนยันแล้ว
-      case "กำลังดำเนินการ":
-        return faClockRotateLeft; // 🔄 กำลังดำเนินการ
-      case "ดำเนินการเสร็จสิ้น":
-        return faCheckDouble; // ✔✔ เสร็จสิ้น
-      default:
-        return null;
-    }
-  };
+const getStatusIcon = (status) => {
+  switch (status) {
+    // case "ยกเลิก":
+    //   return faTimesCircle; // ❌
+    case "กำลังรอยืนยัน":
+      return faHourglassHalf; // ⏳
+    case "ยืนยันแล้ว":
+      return faCheck; // ✔️
+    case "กำลังดำเนินการ":
+      return faClockRotateLeft; // 🕒
+    // case "เสนอราคาแก้ไขแล้ว":
+    //   return faFileSignature; // 📝
+    // case "วางบิลแล้วรอเก็บเงิน":
+    //   return faFileInvoiceDollar; // 📄💸
+    case "ดำเนินการเสร็จสิ้น":
+      return faCheckDouble; // 💰
+    default:
+      return null;
+  }
+};
 
   const handleEditEvent = async (eventInfo) => {
     const inputBackgroundColor = document.createElement("input");
@@ -1197,10 +1199,14 @@ ${employeeList
               "
             >
               ${[
+                // "ยกเลิก",
                 "กำลังรอยืนยัน",
                 "ยืนยันแล้ว",
                 "กำลังดำเนินการ",
+                // "เสนอราคาแก้ไขแล้ว",
+                // "วางบิลแล้วรอเก็บเงิน",
                 "ดำเนินการเสร็จสิ้น",
+
               ]
                 .map(
                   (status) =>
@@ -1344,30 +1350,38 @@ ${employeeList
   `;
 
     Swal.fire({
-      title: `<h4>[ ${eventTitle} ] ${eventSystem} ${eventSite}${eventTeam ? ` (ทีม ${eventTeam})` : ""}</h4>`,
+      title: `<h4>[ ${eventTitle} ] ${eventSystem} ${eventSite}${
+        eventTeam ? ` (ทีม ${eventTeam})` : ""
+      }</h4>`,
       html: htmlEdit,
       customClass: "swal-wide",
       showCloseButton: true,
       didOpen: () => {
         const statusColorMap = {
-          กำลังรอยืนยัน: "#FF5733",
+          // ยกเลิก: "#d33",
+          กำลังรอยืนยัน: "#888888",
           ยืนยันแล้ว: "#0c49ac",
           กำลังดำเนินการ: "#a1b50b",
+          // เสนอราคาแก้ไขแล้ว: "#f39c12",
+          // วางบิลแล้วรอเก็บเงิน: "#9b59b6",
           ดำเนินการเสร็จสิ้น: "#18b007",
         };
 
         const statusSelect = new TomSelect("#editStatus", {
           create: false,
-          maxOptions: 5,
+          // maxOptions: 5,
           placeholder: "เลือกสถานะงาน",
           render: {
             option: function (data, escape) {
               const iconMap = {
-                กำลังรอยืนยัน: "fa-hourglass-half",
-                ยืนยันแล้ว: "fa-check",
-                กำลังดำเนินการ: "fa-clock-rotate-left",
-                ดำเนินการเสร็จสิ้น: "fa-check-double",
-              };
+  // ยกเลิก: "fa-times-circle",                     // ❌ ไอคอนปิด/ยกเลิก
+  กำลังรอยืนยัน: "fa-hourglass-half",           // ⏳
+  ยืนยันแล้ว: "fa-check",                        // ✔️
+  กำลังดำเนินการ: "fa-clock-rotate-left",       // 🕒
+  // เสนอราคาแก้ไขแล้ว: "fa-file-signature",       // 📝
+  // วางบิลแล้วรอเก็บเงิน: "fa-file-invoice-dollar", // 📄💸
+  ดำเนินการเสร็จสิ้น: "fa-check-double", // 💰
+};
               const color = statusColorMap[data.value] || "#ccc";
               const icon = iconMap[data.value] || "fa-circle";
 
@@ -1457,18 +1471,17 @@ ${employeeList
           },
         });
 
-
         inputBackgroundColor.style.width = "150px";
-inputBackgroundColor.style.height = "35px";
-inputBackgroundColor.style.border = "4px solid #ccc";
-// inputBackgroundColor.style.borderRadius = "6px";
-inputBackgroundColor.style.cursor = "pointer";
+        inputBackgroundColor.style.height = "35px";
+        inputBackgroundColor.style.border = "4px solid #ccc";
+        // inputBackgroundColor.style.borderRadius = "6px";
+        inputBackgroundColor.style.cursor = "pointer";
 
-inputTextColor.style.width = "150px";
-inputTextColor.style.height = "35px";
-inputTextColor.style.border = "4px solid #ccc";
-// inputTextColor.style.borderRadius = "6px";
-inputTextColor.style.cursor = "pointer";
+        inputTextColor.style.width = "150px";
+        inputTextColor.style.height = "35px";
+        inputTextColor.style.border = "4px solid #ccc";
+        // inputTextColor.style.borderRadius = "6px";
+        inputTextColor.style.cursor = "pointer";
 
         document
           .getElementById("backgroundColorPickerContainer")
@@ -1573,18 +1586,18 @@ inputTextColor.style.cursor = "pointer";
           extendedProps: { manualStatus },
         };
 
-          // ✅ ตรวจสอบและเพิ่ม Customer ใหม่ถ้ายังไม่มี (ไม่ต้องเช็คว่า company ต้องมีค่า)
-          const existingCustomer = res.userCustomers.find(
-            (c) => c.cCompany === company && c.cSite === site
-          );
+        // ✅ ตรวจสอบและเพิ่ม Customer ใหม่ถ้ายังไม่มี (ไม่ต้องเช็คว่า company ต้องมีค่า)
+        const existingCustomer = res.userCustomers.find(
+          (c) => c.cCompany === company && c.cSite === site
+        );
 
-          // ✅ เพิ่มแม้ว่า company จะไม่มีค่า (null หรือ "")
-          if (!existingCustomer) {
-            await CustomerService.AddCustomer({
-              cCompany: company ?? "", // ป้องกัน null โดยแทนเป็น string ว่าง
-              cSite: site ?? "",
-            });
-          }
+        // ✅ เพิ่มแม้ว่า company จะไม่มีค่า (null หรือ "")
+        if (!existingCustomer) {
+          await CustomerService.AddCustomer({
+            cCompany: company ?? "", // ป้องกัน null โดยแทนเป็น string ว่าง
+            cSite: site ?? "",
+          });
+        }
 
         // อัปเดต event ใน FullCalendar
         eventInfo.event.setProp("textColor", textColor);
@@ -2016,6 +2029,16 @@ inputTextColor.style.cursor = "pointer";
     );
   });
 
+  const statusLegend = [
+  // { label: "ยกเลิก", color: "#d33", icon: faTimesCircle },
+  { label: "กำลังรอยืนยัน", color: "#888888", icon: faHourglassHalf },
+  { label: "ยืนยันแล้ว", color: "#0c49ac", icon: faCheck },
+  { label: "กำลังดำเนินการ", color: "#a1b50b", icon: faClockRotateLeft },
+  // { label: "เสนอราคาแก้ไขแล้ว", color: "#f39c12", icon: faFileSignature },
+  // { label: "วางบิลแล้วรอเก็บเงิน", color: "#9b59b6", icon: faFileInvoiceDollar },
+  { label: "ดำเนินการเสร็จสิ้น", color: "#18b007", icon: faCheckDouble },
+];
+
   return (
     <div>
       <Row className="flex-wrap mb-3 d-flex justify-content-center justify-content-md-between">
@@ -2204,7 +2227,12 @@ inputTextColor.style.cursor = "pointer";
           eventReceive={handleEventReceive} // ✅ ต้องกำหนด eventReceive
           eventContent={(arg) => {
             const { title, extendedProps } = arg.event;
-            const { system = "", time = "", site = "", team = "" } = extendedProps;
+            const {
+              system = "",
+              time = "",
+              site = "",
+              team = "",
+            } = extendedProps;
 
             const siteDisplay = site ? ` - ${site}` : "";
             const timeDisplay = time ? ` ครั้งที่ ${time}` : "";
@@ -2257,12 +2285,16 @@ inputTextColor.style.cursor = "pointer";
           eventDidMount={(info) => {
             const status = info.event.extendedProps.status;
             const icon = getStatusIcon(status);
-            const statusDescription = {
-              กำลังรอยืนยัน: "กำลังรอยืนยัน",
-              ยืนยันแล้ว: "ยืนยันแล้ว",
-              กำลังดำเนินการ: "กำลังดำเนินการ",
-              ดำเนินการเสร็จสิ้น: "ดำเนินการเสร็จสิ้น",
-            };
+              const statusDescription = {
+            ยกเลิก: "ยกเลิก",
+            กำลังรอยืนยัน: "กำลังรอยืนยัน",
+            ยืนยันแล้ว: "ยืนยันแล้ว",
+            กำลังดำเนินการ: "กำลังดำเนินการ",
+            เสนอราคาแก้ไขแล้ว: "เสนอราคาแก้ไขแล้ว",
+            วางบิลแล้วรอเก็บเงิน: "วางบิลแล้วรอเก็บเงิน",
+            ดำเนินการเสร็จสิ้นเก็บเงินแล้ว: "ดำเนินการเสร็จสิ้นเก็บเงินแล้ว",
+          };
+
 
             if (icon) {
               // ✅ ตรวจสอบขนาดหน้าจอ
@@ -2395,64 +2427,35 @@ inputTextColor.style.cursor = "pointer";
         `}
         </style>
         {/* ✅ คำอธิบายสถานะแผนงาน (Legend) */}
-        <div
-          className="color-legend-container"
-          style={{
-            display: "flex",
-            justifyContent: "left",
-            alignItems: "left",
-            flexWrap: "wrap",
-            padding: "8px",
-            borderRadius: "8px",
-            width: "100%",
-          }}
-        >
-          <div
-            className="color-legend"
-            style={{ display: "flex", gap: "15px", flexWrap: "wrap" }}
-          >
-            <div
-              className="legend-item"
-              style={{ display: "flex", alignItems: "center", gap: "8px" }}
-            >
-              <FontAwesomeIcon
-                icon={faHourglassHalf}
-                style={{ color: "#FF5733" }}
-              />
-              <span>กำลังรอยืนยัน</span>
-            </div>
+       <div
+  className="color-legend-container"
+  style={{
+    display: "flex",
+    justifyContent: "left",
+    alignItems: "flex-start",
+    flexWrap: "wrap",
+    padding: "8px",
+    borderRadius: "8px",
+    width: "100%",
+  }}
+>
+  <div
+    className="color-legend"
+    style={{ display: "flex", gap: "15px", flexWrap: "wrap" }}
+  >
+    {statusLegend.map((status) => (
+      <div
+        key={status.label}
+        className="legend-item"
+        style={{ display: "flex", alignItems: "center", gap: "8px" }}
+      >
+        <FontAwesomeIcon icon={status.icon} style={{ color: status.color }} />
+        <span>{status.label}</span>
+      </div>
+    ))}
+  </div>
+</div>
 
-            <div
-              className="legend-item"
-              style={{ display: "flex", alignItems: "center", gap: "8px" }}
-            >
-              <FontAwesomeIcon icon={faCheck} style={{ color: "#0c49ac" }} />
-              <span>ยืนยันแล้ว</span>
-            </div>
-
-            <div
-              className="legend-item"
-              style={{ display: "flex", alignItems: "center", gap: "8px" }}
-            >
-              <FontAwesomeIcon
-                icon={faClockRotateLeft}
-                style={{ color: "#a1b50b" }}
-              />
-              <span>กำลังดำเนินการ</span>
-            </div>
-
-            <div
-              className="legend-item"
-              style={{ display: "flex", alignItems: "center", gap: "8px" }}
-            >
-              <FontAwesomeIcon
-                icon={faCheckDouble}
-                style={{ color: "#18b007" }}
-              />
-              <span>ดำเนินการเสร็จสิ้น</span>
-            </div>
-          </div>
-        </div>
       </div>
 
       {loading && (

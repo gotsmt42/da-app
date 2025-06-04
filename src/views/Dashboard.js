@@ -192,14 +192,14 @@ const Dashboard = () => {
     //   iconColor: "#2ecc71",
     //   iconBgColor: "rgba(22, 160, 133, 0.1)",
     // },
-    // {
-    //   icon: FaClock,
-    //   title: "การดำเนินงาน",
-    //   subtitle: loading ? "กำลังโหลด..." : Object.keys(events).length + " more",
-    //   link: "/operation",
-    //   iconColor: "#f39c12", // สีไอคอน
-    //   iconBgColor: "#fef5e7",
-    // },
+    {
+      icon: FaClock,
+      title: "การดำเนินงาน",
+      subtitle: loading ? "กำลังโหลด..." : Object.keys(events).length + " more",
+      link: "/operation",
+      iconColor: "#f39c12", // สีไอคอน
+      iconBgColor: "#fef5e7",
+    },
     
   ];
   const BlogData3 = [
@@ -241,7 +241,7 @@ const Dashboard = () => {
           </Col>
         ))}
       </Row>
-
+ {isAdmin && (
       <Row
         className="flex-wrap"
         style={{ display: "flex", justifyContent: "space-between" }}
@@ -265,8 +265,10 @@ const Dashboard = () => {
           </Col>
         ))}
       </Row>
-      {isAdmin && (
+     
+   )}
 
+   {isAdmin && (
       <Row
         className="flex-wrap"
         style={{ display: "flex", justifyContent: "space-between" }}
@@ -292,7 +294,7 @@ const Dashboard = () => {
           </Col>
         ))}
       </Row>
-            )}
+         )}
 
 {/* 
       <Row

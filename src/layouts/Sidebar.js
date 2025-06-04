@@ -41,11 +41,11 @@ const navigation = [
     href: "/event",
     icon: "bi-calendar-event-fill",
   },
-  // {
-  //   title: "การดำเนินงาน",
-  //   href: "/operation",
-  //   icon: "bi-clock-fill",
-  // },
+  {
+    title: "การดำเนินงาน",
+    href: "/operation",
+    icon: "bi-clock-fill",
+  },
 
   // {
   //   title: "File",

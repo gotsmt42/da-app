@@ -1,28 +1,24 @@
 import { useState, useEffect } from "react";
-import moment from "moment"; // Import moment library for date formatting
+import moment from "moment";
 import IconButton from "@mui/material/IconButton";
-
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
 import EditIcon from "@mui/icons-material/Edit";
 import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
-
 import { styled } from "@mui/material/styles";
 import Delete from "@mui/icons-material/Delete";
-import CustomCell from "./customCell";
+import EventService from "../../../services/EventService";
+
+import StatusSelectCell from "./StatusSelectCell"; // ✅ import component
+import StatusTwoSelectCell from "./StatusTwoSelectCell"; // ✅ import component
+import StatusThreeSelectCell from "./StatusThreeSelectCell"; // ✅ import component
 
 const StyledMenu = styled((props) => (
   <Menu
     elevation={0}
-    anchorOrigin={{
-      vertical: "bottom",
-      horizontal: "right",
-    }}
-    transformOrigin={{
-      vertical: "top",
-      horizontal: "right",
-    }}
+    anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+    transformOrigin={{ vertical: "top", horizontal: "right" }}
     {...props}
   />
 ))(({ theme }) => ({
@@ -55,10 +51,23 @@ const DataTableColumns = ({
   setModalOpenEdit,
   handleDeleteRow,
   setSelectedFile,
+  onStatusUpdate, // ✅ รับจาก parent
 }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
   const [selectedRowMenu, setSelectedRowMenu] = useState(null);
+  const [isSmallScreen, setIsSmallScreen] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsSmallScreen(window.innerWidth <= 768);
+    };
+    window.addEventListener("resize", handleResize);
+    handleResize();
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
 
   const handleClick = (event, row) => {
     setSelectedRowMenu(row);
@@ -73,87 +82,95 @@ const DataTableColumns = ({
     setSelectedFile(null);
   };
 
-  const [isSmallScreen, setIsSmallScreen] = useState(false);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsSmallScreen(window.innerWidth <= 768);
-    };
-    window.addEventListener("resize", handleResize);
-    handleResize();
-    return () => {
-      window.removeEventListener("resize", handleResize);
-    };
-  }, []);
-
   const columns = [
-    {
-      name: "ชื่อโครงการ",
-      cell: (row) => <CustomCell row={row} isSmallScreen={isSmallScreen} />,
-      sortable: true,
-      selector: (row) => row.CustomerName,
-
+       {
+      name: "วันที่เข้าดำเนินการ",
       width: "180px",
 
-    },
-
-    {
-      name: "ชื่องาน",
-
       sortable: true,
-      selector: (row) => row.projectName,
+      sortFunction: (a, b) => new Date(a.start) - new Date(b.start),
+
       cell: (row) => (
-        <span> {row.title}</span>
-      ),
-
-      width: "180px",
-
-    },
-
-    {
-      name: "สถานะ",
-      sortable: true,
-      selector: (row) => row.status, // ตัวอย่าง: "อยู่ระหว่างดำเนินการ", "สำเร็จ", "เลื่อน", "ยกเลิก"
-      cell: (row) => (
-        <span style={{ color:"orange" }}>
-          กำลังดำเนินการ
-        </span>
+        <div>
+          <div style={{ fontSize: "0.9em", color: "#333" }}>
+            <span>{moment(row.start).format("DD/MM/YYYY")}</span>
+             {" - "}
+            <span>{moment(row.end).subtract(1, "days").format("DD/MM/YYYY")}</span>
+          </div>
+        </div>
       ),
     },
+    // {
+    //   name: "อ้างอิงเอกสารเลขที่ ",
+    //   sortable: true,
+    //   width: "130px",
+
+    //   selector: (row) => row.company,
+
+    //   cell: (row) => (
+    //     <div>
+    //       <div>QT2025060215</div>
+    //     </div>
+    //   ),
+    // },
     {
-      name: "ความคืบหน้า (%)",
+      name: "งาน / โครงการ",
+      width: "370px",
+
       sortable: true,
-      selector: (row) => row.progress, // ตัวอย่าง: 45%, 70%, 100%
-      cell: (row) => <span>{row.progress}0%</span>,
-    },
-    {
-      name: "วันที่เริ่มต้น",
-      sortable: true,
-      selector: (row) => row.start,
-      cell: (row) => <span>{moment(row.start).format("DD/MM/YYYY")}</span>,
-    },
-    {
-      name: "วันที่สิ้นสุด",
-      sortable: true,
-      selector: (row) => row.end,
-      cell: (row) => <span>{moment(row.end).subtract(1, "days").format("DD/MM/YYYY")}</span>,
-    },
-    {
-      name: "เอกสารที่เกี่ยวข้อง",
+      sortFunction: (a, b) => new Date(a.start) - new Date(b.start),
       cell: (row) => (
-        <a
-          className="btn btn-primary btn-sm"
-          href={row.documentLink}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          ดาวน์โหลด
-        </a>
+        <div>
+          <div style={{ fontSize: "0.8em", color: "#888" }}>
+            [{row.title}] - {row.system}
+          </div>
+          <div>{row.site}</div>
+        </div>
       ),
-      width: "150px",
     },
+        {
+      name: "การดำเนินการ",
+      sortable: true,
+      width: "210px",
+
+      selector: (row) => row.status,
+      cell: (row) => (
+        <StatusSelectCell row={row} onStatusUpdate={onStatusUpdate} />
+      ),
+    },
+   {
+     name: (
+      <div style={{ textAlign: "center", width: "100%" }}>
+        สถานะ 1
+      </div>
+    ),
+      sortable: true,
+
+      width: "210px",
+
+      selector: (row) => row.status,
+      cell: (row) => (
+        <StatusTwoSelectCell row={row} onStatusUpdate={onStatusUpdate} />
+      ),
+    },
+ 
+    {
+    name: (
+      <div style={{ textAlign: "center", width: "100%" }}>
+        สถานะ 2
+      </div>
+    ),      sortable: true,
+      width: "210px",
+
+      selector: (row) => row.status,
+      cell: (row) => (
+        <StatusThreeSelectCell row={row} onStatusUpdate={onStatusUpdate} />
+      ),
+    },
+
     {
       name: "Action",
+      width: "80px",
       cell: (row) => (
         <div>
           <IconButton
@@ -161,7 +178,6 @@ const DataTableColumns = ({
             aria-controls={open ? "demo-customized-menu" : undefined}
             aria-haspopup="true"
             aria-expanded={open ? "true" : undefined}
-            variant="contained"
             onClick={(event) => handleClick(event, row)}
           >
             <MoreVertIcon />
@@ -169,9 +185,7 @@ const DataTableColumns = ({
 
           <StyledMenu
             id="demo-customized-menu"
-            MenuListProps={{
-              "aria-labelledby": "demo-customized-button",
-            }}
+            MenuListProps={{ "aria-labelledby": "demo-customized-button" }}
             anchorEl={anchorEl}
             open={open && selectedRowMenu === row}
             onClose={handleClose}
@@ -201,11 +215,8 @@ const DataTableColumns = ({
           </StyledMenu>
         </div>
       ),
-      width: "80px",
     },
   ];
-
-  
 
   return columns;
 };

@@ -83,6 +83,7 @@ const DataTableComponent = ({
     <DataTable
       title={title}
       columns={columns}
+      
       data={data}
       sortIcon={ArrowDownIcon}
       defaultSortFieldId={defaultSortFieldId}

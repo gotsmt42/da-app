@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@babel/plugin-proposal-private-property-in-object": "7.21.11",
+    "@date-io/moment": "^3.2.0",
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.0",
     "@fortawesome/fontawesome-svg-core": "^6.5.1",
@@ -21,6 +22,7 @@
     "@mui/icons-material": "^5.15.11",
     "@mui/material": "^5.15.11",
     "@mui/utils": "latest",
+    "@mui/x-date-pickers": "^5.0.16",
     "@react-pdf/renderer": "^3.4.2",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
@@ -67,6 +69,7 @@
     "react-pagination": "^1.0.0",
     "react-router-dom": "^6.30.0",
     "react-scripts": "5.0.1",
+    "react-select": "^5.10.1",
     "react-table": "^7.8.0",
     "react-to-pdf": "^1.0.1",
     "react-to-print": "^2.15.1",
