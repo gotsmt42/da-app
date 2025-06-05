@@ -19,6 +19,20 @@ const EventService = {
     }
   },
 
+  async GetEventById(id) {
+  try {
+    const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token
+    if (userData) {
+      const response = await API.get(`/events/${id}`); // ดึง event ตาม id
+      return response.data;
+    }
+  } catch (error) {
+    console.error("Error fetching event by ID:", error);
+    throw error;
+  }
+},
+
+
 
   async LineNotify(description) {
     

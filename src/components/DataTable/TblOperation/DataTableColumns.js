@@ -53,6 +53,7 @@ const DataTableColumns = ({
   handleDeleteRow,
   setSelectedFile,
   onStatusUpdate, // ✅ รับจาก parent
+  onDocNoUpdate,
 }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
@@ -105,23 +106,22 @@ const DataTableColumns = ({
         </div>
       ),
     },
-    // {
-    //   name: "อ้างอิงเอกสารเลขที่ ",
-    //   sortable: true,
-    //   width: "130px",
+    {
+      name: "เลขที่อกสาร",
+      sortable: true,
+      width: "120px",
+      selector: (row) => row.docNo || "-",
+      cell: (row) => (
+        <div style={{ fontSize: "0.85em", color: "#333" }}>
+          {row.docNo || <span style={{ color: "#bbb" }}>ไม่ระบุ</span>}
+        </div>
+      ),
+    },
 
-    //   selector: (row) => row.company,
-
-    //   cell: (row) => (
-    //     <div>
-    //       <div>QT2025060215</div>
-    //     </div>
-    //   ),
-    // },
     {
       name: "งาน / โครงการ",
 
-      width: isMobile ? "200px" : "370px", // ✅ ปรับขนาดตามหน้าจอ
+      width: isMobile ? "200px" : "255px", // ✅ ปรับขนาดตามหน้าจอ
 
       sortable: true,
       sortFunction: (a, b) => new Date(a.start) - new Date(b.start),

@@ -34,7 +34,7 @@ import {
   faTimesCircle,
   faFileSignature,
   faFileInvoiceDollar,
-  faCoins
+  faCoins,
 } from "@fortawesome/free-solid-svg-icons"; // Import ไอคอนต่างๆ
 
 import CustomerService from "../../services/CustomerService";
@@ -75,7 +75,11 @@ import "tom-select/dist/css/tom-select.css";
 
 import Hammer from "hammerjs";
 
+import { useNavigate } from "react-router-dom";
+
 function EventCalendar() {
+  const navigate = useNavigate();
+
   const { userData } = useAuth(); // ✅ เปลี่ยนจาก user → userData
   const isAdmin = userData?.role?.toLowerCase() === "admin"; // ✅ รองรับ case-insensitive
 
@@ -1084,26 +1088,26 @@ ${employeeList
       }
     });
   };
-const getStatusIcon = (status) => {
-  switch (status) {
-    // case "ยกเลิก":
-    //   return faTimesCircle; // ❌
-    case "กำลังรอยืนยัน":
-      return faHourglassHalf; // ⏳
-    case "ยืนยันแล้ว":
-      return faCheck; // ✔️
-    case "กำลังดำเนินการ":
-      return faClockRotateLeft; // 🕒
-    // case "เสนอราคาแก้ไขแล้ว":
-    //   return faFileSignature; // 📝
-    // case "วางบิลแล้วรอเก็บเงิน":
-    //   return faFileInvoiceDollar; // 📄💸
-    case "ดำเนินการเสร็จสิ้น":
-      return faCheckDouble; // 💰
-    default:
-      return null;
-  }
-};
+  const getStatusIcon = (status) => {
+    switch (status) {
+      // case "ยกเลิก":
+      //   return faTimesCircle; // ❌
+      case "กำลังรอยืนยัน":
+        return faHourglassHalf; // ⏳
+      case "ยืนยันแล้ว":
+        return faCheck; // ✔️
+      case "กำลังดำเนินการ":
+        return faClockRotateLeft; // 🕒
+      // case "เสนอราคาแก้ไขแล้ว":
+      //   return faFileSignature; // 📝
+      // case "วางบิลแล้วรอเก็บเงิน":
+      //   return faFileInvoiceDollar; // 📄💸
+      case "ดำเนินการเสร็จสิ้น":
+        return faCheckDouble; // 💰
+      default:
+        return null;
+    }
+  };
 
   const handleEditEvent = async (eventInfo) => {
     const inputBackgroundColor = document.createElement("input");
@@ -1115,6 +1119,7 @@ const getStatusIcon = (status) => {
     inputTextColor.value = eventInfo.event.textColor;
 
     const eventId = eventInfo.event.id;
+    const eventDocNo = eventInfo.event.extendedProps?.docNo || "";
     const eventCompany = eventInfo.event.extendedProps?.company || "";
     const eventSite = eventInfo.event.extendedProps?.site || "";
 
@@ -1206,7 +1211,6 @@ const getStatusIcon = (status) => {
                 // "เสนอราคาแก้ไขแล้ว",
                 // "วางบิลแล้วรอเก็บเงิน",
                 "ดำเนินการเสร็จสิ้น",
-
               ]
                 .map(
                   (status) =>
@@ -1374,22 +1378,22 @@ const getStatusIcon = (status) => {
           render: {
             option: function (data, escape) {
               const iconMap = {
-  // ยกเลิก: "fa-times-circle",                     // ❌ ไอคอนปิด/ยกเลิก
-  กำลังรอยืนยัน: "fa-hourglass-half",           // ⏳
-  ยืนยันแล้ว: "fa-check",                        // ✔️
-  กำลังดำเนินการ: "fa-clock-rotate-left",       // 🕒
-  // เสนอราคาแก้ไขแล้ว: "fa-file-signature",       // 📝
-  // วางบิลแล้วรอเก็บเงิน: "fa-file-invoice-dollar", // 📄💸
-  ดำเนินการเสร็จสิ้น: "fa-check-double", // 💰
-};
+                // ยกเลิก: "fa-times-circle",                     // ❌ ไอคอนปิด/ยกเลิก
+                กำลังรอยืนยัน: "fa-hourglass-half", // ⏳
+                ยืนยันแล้ว: "fa-check", // ✔️
+                กำลังดำเนินการ: "fa-clock-rotate-left", // 🕒
+                // เสนอราคาแก้ไขแล้ว: "fa-file-signature",       // 📝
+                // วางบิลแล้วรอเก็บเงิน: "fa-file-invoice-dollar", // 📄💸
+                ดำเนินการเสร็จสิ้น: "fa-check-double", // 💰
+              };
               const color = statusColorMap[data.value] || "#ccc";
               const icon = iconMap[data.value] || "fa-circle";
 
               return `
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <i class="fas ${icon}" style="color: ${color}; width: 18px;"></i>
-          <span>${escape(data.text)}</span>
-        </div>`;
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <i class="fas ${icon}" style="color: ${color}; width: 18px;"></i>
+                  <span>${escape(data.text)}</span>
+                </div>`;
             },
             item: function (data, escape) {
               return `<div>${escape(data.text)}</div>`;
@@ -1501,10 +1505,21 @@ const getStatusIcon = (status) => {
         const pdfButton = document.createElement("button");
         pdfButton.innerText = "ออกใบแจ้งเข้างาน";
         pdfButton.className = "swal2-confirm swal2-styled";
-        pdfButton.style.backgroundColor = "#6c757d"; // สีเทา
+        pdfButton.style.backgroundColor = "#0064de"; // สีเทา
         pdfButton.style.marginLeft = "10px";
         pdfButton.onclick = () => generateWorkPermitPDF(eventInfo.event);
         Swal.getActions().appendChild(pdfButton);
+
+        // ✅ ปุ่ม Redirect ไปหน้า Operation
+        const operationButton = document.createElement("button");
+        operationButton.innerText = "ดูตารางการดำเนินงาน";
+        operationButton.className = "swal2-confirm swal2-styled";
+        operationButton.style.backgroundColor = "#d602a1";
+        operationButton.style.marginLeft = "10px";
+        operationButton.onclick = () => {
+          window.location.href = `/operation/${eventId}`; // ✅ แนบ eventId ใน URL
+        };
+        Swal.getActions().appendChild(operationButton);
       },
       preConfirm: () => {
         const company = document.getElementById("editCompany").value;
@@ -1554,6 +1569,7 @@ const getStatusIcon = (status) => {
         setLoading(true);
         const {
           id,
+          docNo,
           company,
           site,
           title,
@@ -1570,6 +1586,7 @@ const getStatusIcon = (status) => {
         } = result.value;
 
         const updatedEvent = {
+          docNo,
           company,
           site,
           title,
@@ -2030,14 +2047,14 @@ const getStatusIcon = (status) => {
   });
 
   const statusLegend = [
-  // { label: "ยกเลิก", color: "#d33", icon: faTimesCircle },
-  { label: "กำลังรอยืนยัน", color: "#888888", icon: faHourglassHalf },
-  { label: "ยืนยันแล้ว", color: "#0c49ac", icon: faCheck },
-  { label: "กำลังดำเนินการ", color: "#a1b50b", icon: faClockRotateLeft },
-  // { label: "เสนอราคาแก้ไขแล้ว", color: "#f39c12", icon: faFileSignature },
-  // { label: "วางบิลแล้วรอเก็บเงิน", color: "#9b59b6", icon: faFileInvoiceDollar },
-  { label: "ดำเนินการเสร็จสิ้น", color: "#18b007", icon: faCheckDouble },
-];
+    // { label: "ยกเลิก", color: "#d33", icon: faTimesCircle },
+    { label: "กำลังรอยืนยัน", color: "#888888", icon: faHourglassHalf },
+    { label: "ยืนยันแล้ว", color: "#0c49ac", icon: faCheck },
+    { label: "กำลังดำเนินการ", color: "#a1b50b", icon: faClockRotateLeft },
+    // { label: "เสนอราคาแก้ไขแล้ว", color: "#f39c12", icon: faFileSignature },
+    // { label: "วางบิลแล้วรอเก็บเงิน", color: "#9b59b6", icon: faFileInvoiceDollar },
+    { label: "ดำเนินการเสร็จสิ้น", color: "#18b007", icon: faCheckDouble },
+  ];
 
   return (
     <div>
@@ -2285,16 +2302,15 @@ const getStatusIcon = (status) => {
           eventDidMount={(info) => {
             const status = info.event.extendedProps.status;
             const icon = getStatusIcon(status);
-              const statusDescription = {
-            ยกเลิก: "ยกเลิก",
-            กำลังรอยืนยัน: "กำลังรอยืนยัน",
-            ยืนยันแล้ว: "ยืนยันแล้ว",
-            กำลังดำเนินการ: "กำลังดำเนินการ",
-            เสนอราคาแก้ไขแล้ว: "เสนอราคาแก้ไขแล้ว",
-            วางบิลแล้วรอเก็บเงิน: "วางบิลแล้วรอเก็บเงิน",
-            ดำเนินการเสร็จสิ้นเก็บเงินแล้ว: "ดำเนินการเสร็จสิ้นเก็บเงินแล้ว",
-          };
-
+            const statusDescription = {
+              ยกเลิก: "ยกเลิก",
+              กำลังรอยืนยัน: "กำลังรอยืนยัน",
+              ยืนยันแล้ว: "ยืนยันแล้ว",
+              กำลังดำเนินการ: "กำลังดำเนินการ",
+              เสนอราคาแก้ไขแล้ว: "เสนอราคาแก้ไขแล้ว",
+              วางบิลแล้วรอเก็บเงิน: "วางบิลแล้วรอเก็บเงิน",
+              ดำเนินการเสร็จสิ้นเก็บเงินแล้ว: "ดำเนินการเสร็จสิ้นเก็บเงินแล้ว",
+            };
 
             if (icon) {
               // ✅ ตรวจสอบขนาดหน้าจอ
@@ -2427,35 +2443,37 @@ const getStatusIcon = (status) => {
         `}
         </style>
         {/* ✅ คำอธิบายสถานะแผนงาน (Legend) */}
-       <div
-  className="color-legend-container"
-  style={{
-    display: "flex",
-    justifyContent: "left",
-    alignItems: "flex-start",
-    flexWrap: "wrap",
-    padding: "8px",
-    borderRadius: "8px",
-    width: "100%",
-  }}
->
-  <div
-    className="color-legend"
-    style={{ display: "flex", gap: "15px", flexWrap: "wrap" }}
-  >
-    {statusLegend.map((status) => (
-      <div
-        key={status.label}
-        className="legend-item"
-        style={{ display: "flex", alignItems: "center", gap: "8px" }}
-      >
-        <FontAwesomeIcon icon={status.icon} style={{ color: status.color }} />
-        <span>{status.label}</span>
-      </div>
-    ))}
-  </div>
-</div>
-
+        <div
+          className="color-legend-container"
+          style={{
+            display: "flex",
+            justifyContent: "left",
+            alignItems: "flex-start",
+            flexWrap: "wrap",
+            padding: "8px",
+            borderRadius: "8px",
+            width: "100%",
+          }}
+        >
+          <div
+            className="color-legend"
+            style={{ display: "flex", gap: "15px", flexWrap: "wrap" }}
+          >
+            {statusLegend.map((status) => (
+              <div
+                key={status.label}
+                className="legend-item"
+                style={{ display: "flex", alignItems: "center", gap: "8px" }}
+              >
+                <FontAwesomeIcon
+                  icon={status.icon}
+                  style={{ color: status.color }}
+                />
+                <span>{status.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {loading && (

@@ -29,8 +29,12 @@ import { Select, MenuItem, InputLabel, FormControl, Grid } from "@mui/material";
 
 import { Button } from "reactstrap";
 
+import { useParams, useNavigate } from "react-router-dom";
+
 const Operation = () => {
   moment.locale("th"); // ✅ ตั้งค่า default เป็นภาษาไทย
+  const { id } = useParams(); // 👈 ดึง eventId จาก path /operation/:id
+  const navigate = useNavigate(); // 👈 ใช้สำหรับเปลี่ยนเส้นทาง
 
   const [rows, setRows] = useState([]);
   const [expandedRows, setExpandedRows] = useState({});
@@ -56,22 +60,36 @@ const Operation = () => {
   // ✅ คำนวณ dateSearch จาก 2 dropdown
   const [selectedDate, setSelectedDate] = useState(moment().format("YYYY-MM")); // ค่าเริ่มต้นเป็นเดือนนี้
   const [showAll, setShowAll] = useState(false); // สำหรับแสดงทั้งหมด
+  const [selectedEvent, setSelectedEvent] = useState(null);
 
   const dateSearch = !showAll ? selectedDate : ""; // ถ้าเลือกแสดงทั้งหมดให้ dateSearch เป็นว่าง
   useEffect(() => {
     fetchEventsFromDB();
-  }, []);
+  }, [id]);
 
   const fetchEventsFromDB = async () => {
     setLoading(true);
-
     try {
       const res = await EventService.getEvents();
       const eventsWithId = res.userEvents.map((event) => ({
         ...event,
         id: event._id,
       }));
+
       setEvents(eventsWithId);
+
+      if (id) {
+        const found = eventsWithId.find((ev) => ev._id === id);
+        setSelectedEvent(found || null);
+
+        // ✅ ตั้ง selectedDate ให้ตรงกับเดือนของ event
+        if (found && !showAll) {
+          const eventMonth = moment(found.start || found.end).format("YYYY-MM");
+          setSelectedDate(eventMonth);
+        }
+      } else {
+        setSelectedEvent(null);
+      }
 
       setLoading(false);
     } catch (error) {
@@ -81,27 +99,33 @@ const Operation = () => {
   };
 
   useEffect(() => {
-    const result = events.filter((event) => {
-      const createdDate = moment(event.start || event.end).format("YYYY-MM");
-      const matchMonth = dateSearch ? createdDate === dateSearch : true;
+    if (id && selectedEvent) {
+      // ✅ ถ้ามี id ให้แสดงเฉพาะ event เดียวนั้น
+      setFilter([selectedEvent]);
+    } else {
+      // ✅ ปกติ: กรองจาก selectedDate + search
+      const filtered = events.filter((event) => {
+        const createdDate = moment(event.start || event.end).format("YYYY-MM");
+        const matchMonth = dateSearch ? createdDate === dateSearch : true;
 
-      const keyword = search.toLowerCase();
-      const matchSearch = [
-        event.company,
-        event.site,
-        event.title,
-        event.system,
-        event.team,
-        moment(event.start).format("DD/MM/YYYY HH:mm"),
-      ]
-        .map((v) => (v || "").toLowerCase())
-        .some((text) => text.includes(keyword));
+        const keyword = search.toLowerCase();
+        const matchSearch = [
+          event.company,
+          event.site,
+          event.title,
+          event.system,
+          event.team,
+          moment(event.start).format("DD/MM/YYYY HH:mm"),
+        ]
+          .map((v) => (v || "").toLowerCase())
+          .some((text) => text.includes(keyword));
 
-      return matchMonth && matchSearch;
-    });
+        return matchMonth && matchSearch;
+      });
 
-    setFilter(result);
-  }, [search, dateSearch, events]);
+      setFilter(filtered);
+    }
+  }, [id, selectedEvent, search, dateSearch, events]);
 
   const handleDeleteRow = async (customerId) => {
     Swal.fire({
@@ -135,73 +159,101 @@ const Operation = () => {
 
   const isMobile = useMediaQuery("(max-width:600px)");
 
-const customStyles = {
-  headCells: {
-    style: {
-      fontSize: isMobile ? "0.75rem" : "0.9rem",
-      padding: isMobile ? "8px" : "12px",
+  const customStyles = {
+    headCells: {
+      style: {
+        fontSize: isMobile ? "0.75rem" : "0.9rem",
+        padding: isMobile ? "8px" : "12px",
+      },
     },
-  },
-  cells: {
-    style: {
-      fontSize: isMobile ? "0.75rem" : "0.9rem",
-      padding: isMobile ? "8px" : "12px",
-      whiteSpace: "nowrap",
+    cells: {
+      style: {
+        fontSize: isMobile ? "0.75rem" : "0.9rem",
+        padding: isMobile ? "8px" : "12px",
+        whiteSpace: "nowrap",
+      },
     },
-  },
-};
+  };
+
+  const handleDocNoUpdate = (id, newDocNo) => {
+    setEvents((prev) =>
+      prev.map((event) =>
+        event._id === id ? { ...event, docNo: newDocNo } : event
+      )
+    );
+  };
 
   return (
     <>
       <div className="row align-items-end g-3 mt-5">
         <div className="col-12 col-md-6">
-          <LocalizationProvider dateAdapter={AdapterMoment} adapterLocale="th">
-            <DatePicker
-              views={["year", "month"]} // ✅ แสดงเฉพาะ ปี/เดือน
-              openTo="month" // ✅ เปิดที่หน้าจอเลือกเดือนก่อน
-              label="📅 เลือกเดือน"
-              value={moment(selectedDate)}
-              onChange={(newValue) => {
-                setSelectedDate(moment(newValue).format("YYYY-MM"));
-                setShowAll(false);
-              }}
-              renderInput={(params) => (
-                <TextField {...params} fullWidth size="small" />
-              )}
-            />
-          </LocalizationProvider>
+          {!id && !selectedEvent && (
+            <LocalizationProvider
+              dateAdapter={AdapterMoment}
+              adapterLocale="th"
+            >
+              <DatePicker
+                views={["year", "month"]} // ✅ แสดงเฉพาะ ปี/เดือน
+                openTo="month" // ✅ เปิดที่หน้าจอเลือกเดือนก่อน
+                label="📅 เลือกเดือน"
+                value={moment(selectedDate)}
+                onChange={(newValue) => {
+                  setSelectedDate(moment(newValue).format("YYYY-MM"));
+                  setShowAll(false);
+                }}
+                renderInput={(params) => (
+                  <TextField {...params} fullWidth size="small" />
+                )}
+              />
+            </LocalizationProvider>
+          )}
         </div>
 
         <div className="col-12 col-md-6">
-          <TextField
-            label="🔍 ค้นหา เช่น ชื่อโครงการ เลขที่เอกสาร"
-            variant="outlined"
-            size="small"
-            fullWidth
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            sx={{ minWidth: "300px", mt: 1 }}
-          />
+          {!id && !selectedEvent && (
+            <TextField
+              label="🔍 ค้นหา เช่น ชื่อโครงการ เลขที่เอกสาร"
+              variant="outlined"
+              size="small"
+              fullWidth
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              sx={{ minWidth: "300px", mt: 1 }}
+            />
+          )}
         </div>
         <div className="col-12 col-sm mt-5">
-          <button
-            className="btn btn-light btn-sm"
-            onClick={() => {
-              if (showAll) {
-                // 👈 ถ้ากำลังแสดงทั้งหมด → กลับมาเป็นเดือนปัจจุบัน
-                setSelectedDate(moment().format("YYYY-MM"));
-                setShowAll(false);
-              } else {
-                // 👈 ถ้ากำลังดูเดือน → สลับเป็นแสดงทั้งหมด
-                setShowAll(true);
-              }
-            }}
-          >
-            • แสดงข้อมูล:{" "}
-            {showAll
-              ? "ทั้งหมด"
-              : moment(selectedDate).locale("th").format("MMMM YYYY")}
-          </button>
+          {!id && !selectedEvent && (
+            <button
+              className="btn btn-light btn-sm"
+              onClick={() => {
+                if (showAll) {
+                  // 👈 ถ้ากำลังแสดงทั้งหมด → กลับมาเป็นเดือนปัจจุบัน
+                  setSelectedDate(moment().format("YYYY-MM"));
+                  setShowAll(false);
+                } else {
+                  // 👈 ถ้ากำลังดูเดือน → สลับเป็นแสดงทั้งหมด
+                  setShowAll(true);
+                }
+              }}
+            >
+              • แสดงข้อมูล:{" "}
+              {showAll
+                ? "ทั้งหมด"
+                : moment(selectedDate).locale("th").format("MMMM YYYY")}
+            </button>
+          )}
+          {selectedEvent && (
+            <div className="col-12 col-sm mt-2">
+              <button
+                className="btn btn-outline-secondary btn-sm"
+                onClick={() => navigate("/operation")}
+              >
+                ❌ แสดงข้อมูล: [{selectedEvent.title}] {selectedEvent.system} -{" "}
+                {selectedEvent.site}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* <div className="form-text mt-3">
@@ -213,55 +265,54 @@ const customStyles = {
           </strong>
         </div> */}
       </div>
-<div style={{ overflowX: "auto" }}>
+      <div style={{ overflowX: "auto" }}>
+        <DataTableComponent
+          columns={DataTableColumns({
+            setSelectedRow,
+            setEditedData,
+            setModalOpenEdit,
+            setSelectedFile,
+            handleDeleteRow,
+          })}
+          data={sortedData}
+          highlightOnHover
+          dense={isMobile} // ใช้ dense บนมือถือเพื่อลดระยะห่าง
+          customStyles={customStyles}
+          paginationPerPage={10}
+          // expandableRowsComponent={Expanded} // เปิดใช้งาน Expandle
+          expandableRowsComponent={(props) => (
+            <Expanded {...props} onStatusUpdate={handleDocNoUpdate} />
+          )}
+          expandableRowExpanded={(row) => expandedRows[row._id]}
+          // subHeaderComponent={
+          //   <div className="container">
+          //     <div className="row align-items-end g-3 flex-wrap">
+          //       {/* เดือน */}
+          //       <div className="col-12 col-md-6">
+          //         <input
+          //           className="form-control"
+          //           type="month"
+          //           value={dateSearch}
+          //           onChange={(e) => setDateSearch(e.target.value)}
+          //         />
+          //       </div>
 
-      <DataTableComponent
-        columns={DataTableColumns({
-          setSelectedRow,
-          setEditedData,
-          setModalOpenEdit,
-          setSelectedFile,
-          handleDeleteRow,
-        })}
-        data={sortedData}
-highlightOnHover
-    dense={isMobile} // ใช้ dense บนมือถือเพื่อลดระยะห่าง
-    customStyles={customStyles}
-        paginationPerPage={10}
-        expandableRowsComponent={Expanded} // เปิดใช้งาน Expandle
-        expandableRowExpanded={(row) => expandedRows[row._id]}
-        // subHeaderComponent={
-        //   <div className="container">
-        //     <div className="row align-items-end g-3 flex-wrap">
-        //       {/* เดือน */}
-        //       <div className="col-12 col-md-6">
-        //         <input
-        //           className="form-control"
-        //           type="month"
-        //           value={dateSearch}
-        //           onChange={(e) => setDateSearch(e.target.value)}
-        //         />
-        //       </div>
-
-        //       {/* ค้นหา */}
-        //       <div className="col-12 col-md-6">
-        //         <input
-        //           type="search"
-        //           className="form-control"
-        //           placeholder="🔍 ค้นหา เช่น ชื่อโครงการ เลขที่เอกสาร"
-        //           value={search}
-        //           onChange={(e) => setSearch(e.target.value)}
-        //         />
-        //       </div>
-        //     </div>
-        //   </div>
-        // }
-      />
+          //       {/* ค้นหา */}
+          //       <div className="col-12 col-md-6">
+          //         <input
+          //           type="search"
+          //           className="form-control"
+          //           placeholder="🔍 ค้นหา เช่น ชื่อโครงการ เลขที่เอกสาร"
+          //           value={search}
+          //           onChange={(e) => setSearch(e.target.value)}
+          //         />
+          //       </div>
+          //     </div>
+          //   </div>
+          // }
+        />
       </div>
-
     </>
-
-    
   );
 };
 

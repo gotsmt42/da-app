@@ -195,6 +195,15 @@ const ThemeRoutes = [
         ),
         title: "Operation",
       },
+      {
+        path: "operation/:id",
+        element: (
+          <Suspense fallback={<div>Loading Operation...</div>}>
+            <Operate />
+          </Suspense>
+        ),
+        title: "Operation",
+      },
 
       {
         path: "register",
