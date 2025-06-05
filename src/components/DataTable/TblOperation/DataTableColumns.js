@@ -107,7 +107,7 @@ const DataTableColumns = ({
       ),
     },
     {
-      name: "เลขที่อกสาร",
+      name: "เลขที่เอกสาร",
       sortable: true,
       width: "120px",
       selector: (row) => row.docNo || "-",
