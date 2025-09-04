@@ -86,16 +86,22 @@ const FileUpload = () => {
           },
         };
 
-        await FileService.uploadFiles(formData, config);
+        const response = await FileService.uploadFiles(formData, config);
 
         setUploadedFiles([]);
         setLoading(false);
         setUploadProgress(0);
-
         Swal.fire({
           icon: "success",
           title: "Upload Successful",
-          text: "All files have been uploaded successfully!",
+          html: `
+    <p>All files uploaded successfully!</p>
+    ${response.data.data
+      .map(
+        (file) => `<a href="${file.path}" target="_blank">${file.filename}</a>`
+      )
+      .join("<br>")}
+  `,
         });
       } catch (error) {
         console.error("Error uploading files:", error);
@@ -125,14 +131,13 @@ const FileUpload = () => {
           isDragActive ? "shadow" : ""
         }`}
         // style={{backgroundColor: "#fde3e3"}}
-
       >
         <input {...getInputProps()} />
         <FontAwesomeIcon
           icon={faFileImport}
           size="5x"
           className="mb-5"
-          style={{color: "#e74c3c"}}
+          style={{ color: "#e74c3c" }}
         />
         <p className="fs-4">Drag and drop files here or click to browse.</p>
         {uploadedFiles.length > 0 && (
