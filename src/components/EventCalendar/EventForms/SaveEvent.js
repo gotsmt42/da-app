@@ -1,28 +1,14 @@
-import CustomerService from "../../../services/CustomerService";
-import EventService from "../../../services/EventService";
-import EventReceiveService from "../../../services/EventReceiveService"; // eventDialog.js
-import AuthService from "../../../services/authService";
-import Swal from "sweetalert2";
-import TomSelect from "tom-select";
-import moment from "moment";
+export const getSaveEventToDB = async ({ newEvent, EventService }) => {
+  // ตรวจสอบข้อมูลเบื้องต้นแบบเร็ว
+  if (!newEvent?.start || !newEvent?.end || !newEvent?.date) {
+    console.warn("⚠️ ข้อมูลไม่ครบ:", newEvent);
+    return null; // ไม่ต้อง throw error เพื่อให้ flow ไม่สะดุด
+  }
 
-export const getSaveEventToDB = async ({
-  newEvent
-}) => {
-    try {
-      // ✅ ตรวจสอบว่ามี start, end, และ date ครบถ้วน
-      if (!newEvent.start || !newEvent.end || !newEvent.date) {
-        console.error("❌ Missing required fields:", newEvent);
-        throw new Error("Missing required fields: start, end, or date");
-      }
-
-      // console.log("🔍 Sending data to API:", JSON.stringify(newEvent, null, 2));
-
-      const response = await EventService.AddEvent(newEvent);
-
-      return response;
-    } catch (error) {
-      console.error("❌ Error saving event to DB:", error.message);
-      throw error;
-    }
+  try {
+    return await EventService.AddEvent(newEvent);
+  } catch (error) {
+    console.error("❌ บันทึกแผนงานไม่สำเร็จ:", error.message);
+    return null; // ส่งค่า null แทนการ throw เพื่อให้ caller จัดการได้เร็ว
+  }
 };

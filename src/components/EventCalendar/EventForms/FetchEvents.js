@@ -6,10 +6,18 @@ export const getFetchEvents = async ({
   fetchThaiHolidaysFromAPI,
 }) => {
   setLoading(true);
+
   try {
-    // ดึงข้อมูล events จากฐานข้อมูล
-    const res = await EventService.getEvents();
-    const eventsWithId = res.userEvents.map((event) => ({
+    // เรียก API พร้อมกัน
+    const [res, thaiHolidays] = await Promise.all([
+      EventService.getEvents(),
+      fetchThaiHolidaysFromAPI(),
+    ]);
+
+    const userEvents = Array.isArray(res?.userEvents) ? res.userEvents : [];
+
+    // แปลงข้อมูล userEvents
+    const eventsWithId = userEvents.map((event) => ({
       ...event,
       id: event._id,
       extendedProps: {
@@ -21,31 +29,30 @@ export const getFetchEvents = async ({
         manualStatus: event.manualStatus,
         status: event.status,
         fontSize: event.fontSize,
+        start: event.start,
+        end: event.end,
       },
     }));
 
-    // ดึงข้อมูลวันหยุดจาก API
-    const thaiHolidays = await fetchThaiHolidaysFromAPI();
-    // console.log("Fetched holidays:", thaiHolidays);
-
-    // ตรวจสอบว่าได้ข้อมูลวันหยุดแล้วหรือไม่
-    if (thaiHolidays.length > 0) {
-      const combinedEvents = [
-        ...eventsWithId,
-        ...thaiHolidays.map((holiday) => ({
+    // แปลงข้อมูลวันหยุด (ถ้ามี)
+    const holidayEvents = Array.isArray(thaiHolidays)
+      ? thaiHolidays.map((holiday) => ({
           ...holiday,
-          fontSize: defaultFontSize.extendedProps, // Apply default font size
-        })),
-      ]; // console.log("Combined events:", combinedEvents); // ตรวจสอบข้อมูลที่รวมกันแล้ว
+          extendedProps: {
+            ...holiday.extendedProps,
+            fontSize: defaultFontSize.extendedProps || "12",
+          },
+        }))
+      : [];
 
-      // อัปเดตข้อมูลใน state
-      setEvents(combinedEvents);
-    } else {
-      console.log("No holidays found, only user events will be displayed.");
-      setEvents(eventsWithId);
-    }
+    // รวมข้อมูลทั้งหมด
+    const combinedEvents = [...eventsWithId, ...holidayEvents];
+
+    // อัปเดต state ครั้งเดียว
+    setEvents(combinedEvents);
   } catch (error) {
-    console.error("Error fetching events or holidays:", error);
+    console.error("❌ Error fetching events or holidays:", error);
+    setEvents([]); // fallback กรณี error
   } finally {
     setLoading(false);
   }

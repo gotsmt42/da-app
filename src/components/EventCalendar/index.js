@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+} from "react";
 import ReactDOM from "react-dom/client";
 
 import FullCalendar from "@fullcalendar/react";
@@ -15,22 +21,12 @@ import Swal from "sweetalert2";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"; // Import FontAwesomeIcon component
 
 import {
-  faBell,
-  faClockFour,
   faClockRotateLeft,
   faFileExcel,
   faFilePdf,
-  faPlus,
   faHourglassHalf,
-  faCheckCircle,
   faCheck,
-  faClock,
-  faSpinner,
   faCheckDouble,
-  faTimesCircle,
-  faFileSignature,
-  faFileInvoiceDollar,
-  faCoins,
 } from "@fortawesome/free-solid-svg-icons"; // Import ไอคอนต่างๆ
 
 import CustomerService from "../../services/CustomerService";
@@ -71,6 +67,9 @@ import { getSaveEventToDB } from "./EventForms/SaveEvent";
 import { getEventDrop } from "./EventForms/EventDrop";
 import { getEventResize } from "./EventForms/EventResize";
 import { getFetchEvents } from "./EventForms/FetchEvents";
+import { getDeleteEvent } from "./EventForms/DeleteEvent";
+
+import { getGeneratePDF } from "./Functions/GenPDF";
 
 function EventCalendar() {
   const { userData } = useAuth(); // ✅ เปลี่ยนจาก user → userData
@@ -78,7 +77,6 @@ function EventCalendar() {
 
   const [events, setEvents] = useState([]);
 
-  const [eventReceive, setEventReceive] = useState([]);
   const [defaultTextColor, setDefaultTextColor] = useState("#FFFFFF"); // สีข้อความเริ่มต้น
   const [defaultBackgroundColor, setDefaultBackgroundColor] =
     useState("#FF5733"); // สีพื้นหลังเริ่มต้น
@@ -89,255 +87,111 @@ function EventCalendar() {
 
   const [searchTerm, setSearchTerm] = useState(""); // 🔍 State สำหรับค้นหา
 
+  const calendarRef = useRef(null);
+
   useEffect(() => {
     fetchEventsFromDB();
     initExternalEvents(); // ✅ เรียกใช้เมื่อลง component
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     const today = moment().format("YYYY-MM-DD");
-    let hasUpdated = false;
 
-    const updatedEvents = events.map((event) => {
+    const eventsToUpdate = events.filter((event) => {
       const eventStartDate = moment(event.start).format("YYYY-MM-DD");
-      // เงื่อนไข: หาก event อยู่ในวันที่ปัจจุบันและ
-      // ไม่มีการแก้ไขด้วยมือ (manualStatus ไม่เป็น true)
-      // และ status ไม่ใช่ "กำลังดำเนินการ"
-      if (
+      return (
         eventStartDate === today &&
-        !event.manualStatus && // สามารถใช้ event.manualStatus จากระดับบนสุดได้
+        !event.manualStatus &&
         event.extendedProps?.status !== "กำลังดำเนินการ"
-      ) {
-        hasUpdated = true;
-        return {
-          ...event,
-          extendedProps: {
-            ...event.extendedProps,
-            status: "กำลังดำเนินการ",
-          },
-          manualStatus: false, // กำหนดให้ชัดเจน
-        };
-      }
-      return event;
+      );
     });
 
-    if (hasUpdated) {
-      setEvents(updatedEvents);
-      updatedEvents.forEach(async (event) => {
-        if (
-          moment(event.start).format("YYYY-MM-DD") === today &&
-          !event.manualStatus &&
-          event.extendedProps?.status === "กำลังดำเนินการ"
-        ) {
-          try {
-            await EventService.UpdateEvent(event.id, {
+    if (eventsToUpdate.length === 0) return;
+
+    const updatedEvents = events.map((event) => {
+      const match = eventsToUpdate.find((e) => e.id === event.id);
+      return match
+        ? {
+            ...event,
+            extendedProps: {
+              ...event.extendedProps,
               status: "กำลังดำเนินการ",
-              manualStatus: false,
-            });
-            console.log(
-              `✅ อัปเดตสถานะของ Event ID ${event.id} เป็น "กำลังดำเนินการ"`
-            );
-          } catch (error) {
-            console.error(
-              `❌ อัปเดตสถานะของ Event ID ${event.id} ไม่สำเร็จ: ${error}`
-            );
+            },
+            manualStatus: false,
           }
-        }
+        : event;
+    });
+
+    setEvents(updatedEvents);
+
+    Promise.all(
+      eventsToUpdate.map((event) =>
+        EventService.UpdateEvent(event.id, {
+          status: "กำลังดำเนินการ",
+          manualStatus: false,
+        })
+      )
+    )
+      .then(() => {
+        console.log("✅ อัปเดตสถานะเรียบร้อย");
+      })
+      .catch((error) => {
+        console.error("❌ อัปเดตสถานะไม่สำเร็จ:", error);
       });
-    }
   }, [events]);
 
   useEffect(() => {
+    if (!("ontouchstart" in window)) return;
+
     const calendarEl = document.querySelector(".fc-view-harness");
     if (!calendarEl) return;
 
     const hammer = new Hammer(calendarEl);
-
-    hammer.on("swipeleft", () => {
-      calendarRef.current?.getApi().next();
-    });
-
-    hammer.on("swiperight", () => {
-      calendarRef.current?.getApi().prev();
-    });
+    hammer.on("swipeleft", () => calendarRef.current?.getApi().next());
+    hammer.on("swiperight", () => calendarRef.current?.getApi().prev());
 
     return () => hammer.destroy();
   }, []);
 
-  const generateWorkPermitPDF = (event) => {
-    const doc = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "A4",
-    });
-
-    const timeText = event.extendedProps.time
-      ? `ครั้งที่ ${event.extendedProps.time} `
-      : ""; // ถ้าไม่มี time จะไม่แสดงอะไรเลย
-
-    // 👉 ฟอนต์ THSarabun
-    doc.addFileToVFS("THSarabun.ttf", thSarabunFont);
-    doc.addFont("THSarabun.ttf", "THSarabun", "normal");
-    doc.setFont("THSarabun");
-    doc.setFontSize(16);
-
-    // 👉 ใส่โลโก้บริษัท (ระบุ base64 หรือ path)
-    const logo = "001.png"; // 👈 โลโก้บริษัท
-    doc.addImage(logo, "PNG", 15, 10, 30, 30); // x, y, width, height
-
-    // 👉 ข้อมูลหัวจดหมาย
-    doc.setFontSize(20);
-    doc.text("บริษัท ดู ออล อาร์คิเทค แอนด์ เอ็นจิเนียริ่ง จำกัด", 105, 20, {
-      align: "center",
-    });
-
-    doc.setFontSize(14);
-    doc.text("DO ALL ARCHITECT AND ENGINEERING CO.,LTD.", 105, 28, {
-      align: "center",
-    });
-
-    doc.setFontSize(12);
-    doc.text(
-      "68/155 หมู่ 3 ถนนชัยพฤกษ์ ตำบลคลองพระอุดม อำเภอปากเกร็ด จังหวัดนนทบุรี 11120",
-      105,
-      34,
-      {
-        align: "center",
-      }
-    );
-
-    doc.text("วันที่: " + moment().format("DD-MM-YYYY"), 170, 44, {
-      align: "right",
-    });
-
-    doc.line(15, 48, 195, 48); // เส้นคั่น
-
-    // 👉 หัวเรื่อง
-    doc.setFontSize(16);
-    doc.text(
-      `แจ้งแผนงานการเข้าดำเนินการ ${event.title} ระบบ ${event.extendedProps.system} ${timeText}`,
-      105,
-      58,
-      {
-        align: "center",
-      }
-    );
-
-    // 👉 ข้อมูล Event
-    const end_o = moment(event.end).format("DD-MM-YYYY");
-    const start = moment(event.start).format("DD-MM-YYYY");
-    const end = moment(event.end).format("DD-MM-YYYY");
-
-    const lines = [
-      "",
-      `เรียน  ผู้จัดการโครงการ ${event.extendedProps.site}`,
-      "",
-      `        ตามที่บริษัท ดู ออล อาคิเทค แอนด์ เอ็นจิเนียริ่ง จำกัด ได้รับความไว้วางใจจาก ${event.extendedProps.company} `,
-      `ให้เข้าดำเนินการ ${event.title} ระบบ ${event.extendedProps.system} ${timeText} ณ โครงการ ${event.extendedProps.site}`,
-      "",
-
-      `        บริษัท ดู ออล อาคิเทค แอนด์ เอ็นจิเนียริ่ง จำกัด ขอแจ้งให้ท่านทราบถึงกำหนดการเข้า ${event.title} ระบบ ${event.extendedProps.system}`,
-      `ครั้งที่ ${event.extendedProps.time} ซึ่งทางบริษัทฯ มีกำหนดการเข้าดำเนินการในช่วงเวลาดังนี้`,
-
-      "",
-
-      `        Description`,
-
-      "",
-
-      "        ดังนั้น บริษัท ฯ ใคร่ขอความร่วมมือ แจ้งผู้เกี่ยวข้องทุกท่านเพื่อทราบกำหนดการดังกล่าว ทั้งนี้บริษัทจะเข้าดำเนินการโดยไม่ส่งผลกระทบ",
-      "ต่อผู้ใช้งานพื้นที่พร้อมมีมาตรการความปลอดภัยตามมาตรฐาน หากท่านไม่สะดวกในการดำเนินการตามวันเวลาดังกล่าวกรุณาแจ้งกลับที่",
-      "บริษัท ดู ออล อาคิเทค แอนด์ เอ็นจิเนียริ่ง จำกัด ด้วย จักขอบพระคุณยิ่ง ",
-    ];
-
-    doc.setFontSize(14);
-    let y = 68;
-    lines.forEach((line) => {
-      doc.text(line, 20, y);
-      y += 8;
-    });
-
-    // 👉 ลายเซ็น
-    const signature = "001.png"; // 👈 ลายเซ็น
-    doc.addImage(signature, "PNG", 140, y + 10, 40, 20); // ปรับตำแหน่งตามความเหมาะสม
-
-    doc.text("ขอแสดงความนับถือ", 150, y + 35);
-    // doc.text("วิศวกรควบคุมระบบ", 140, y + 45);
-    // doc.text("064-111-0988", 140, y + 52);
-
-    // 👉 บันทึก PDF
-    doc.save(`WorkPermit_${event.title}.pdf`);
-  };
-
-  const getStatusIcon = (status) => {
-    switch (status) {
-      // case "ยกเลิก":
-      //   return faTimesCircle; // ❌
-      case "กำลังรอยืนยัน":
-        return faHourglassHalf; // ⏳
-      case "ยืนยันแล้ว":
-        return faCheck; // ✔️
-      case "กำลังดำเนินการ":
-        return faClockRotateLeft; // 🕒
-      // case "เสนอราคาแก้ไขแล้ว":
-      //   return faFileSignature; // 📝
-      // case "วางบิลแล้วรอเก็บเงิน":
-      //   return faFileInvoiceDollar; // 📄💸
-      case "ดำเนินการเสร็จสิ้น":
-        return faCheckDouble; // 💰
-      default:
-        return null;
+  const generateWorkPermitPDF = async (event) => {
+    try {
+      setLoading(true);
+      await getGeneratePDF({ jsPDF, thSarabunFont, event, moment });
+    } catch (error) {
+      console.error("❌ สร้าง PDF ไม่สำเร็จ:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
   // ✅ ฟังก์ชันตั้งค่า External Events ให้สามารถลากได้
-  const initExternalEvents = () => {
-    let containerEl = document.getElementById("external-events");
+  const initExternalEvents = useCallback(() => {
+    const containerEl = document.getElementById("external-events");
     if (containerEl) {
       new Draggable(containerEl, {
         itemSelector: ".fc-event",
-        eventData: (eventEl) => {
-          return {
-            title: eventEl.innerText.trim(), // ดึงข้อความของ event
-          };
-        },
+        eventData: (eventEl) => ({
+          title: eventEl.innerText.trim(),
+        }),
       });
     }
-  };
+  }, []);
 
   const fetchThaiHolidaysFromAPI = async () => {
     try {
-      const response = await API.get(`/holidays`);
-      // console.log("API Response:", response.data); // ตรวจสอบโครงสร้างของ API response
-
-      // ตรวจสอบว่า response.data มีค่าหรือไม่
-      if (response.data) {
-        // แสดงข้อมูลทั้งหมดของ response.data
-        // console.log("Complete Data Structure:", JSON.stringify(response.data, null, 2));  // ตรวจสอบโครงสร้างทั้งหมด
-
-        // ตรวจสอบโครงสร้างและหาข้อมูลที่ต้องการ
-        if (response.data && Array.isArray(response.data)) {
-          // ถ้าข้อมูลใน response.data เป็น Array
-          const holidays = response.data.map((holiday) => ({
-            title: holiday.HolidayDescriptionThai,
-            start: holiday.Date, //
-            color: "#FF0000", // กำหนดสี
-          }));
-
-          // console.log("Mapped Holidays for Calendar:", holidays);  // ตรวจสอบข้อมูลหลังจาก map
-          return holidays;
-        } else {
-          console.error(
-            "Invalid structure, 'result.data' missing or incorrect."
-          );
-          return [];
-        }
-      } else {
-        console.error("No data found in API response.");
-        return [];
+      const { data } = await API.get(`/holidays`);
+      if (Array.isArray(data)) {
+        return data.map((holiday) => ({
+          title: holiday.HolidayDescriptionThai,
+          start: holiday.Date,
+          color: "#FF0000",
+        }));
       }
+      console.warn("Holiday data structure is invalid");
+      return [];
     } catch (error) {
-      console.error("Error fetching holidays from API:", error.message);
+      console.error("Error fetching holidays:", error.message);
       return [];
     }
   };
@@ -353,7 +207,7 @@ function EventCalendar() {
   };
 
   const saveEventToDB = async (newEvent) => {
-    await getSaveEventToDB({ newEvent });
+    await getSaveEventToDB({ newEvent, EventService });
   };
 
   const handleAddEvent = async (arg) => {
@@ -394,58 +248,16 @@ function EventCalendar() {
     });
   };
 
-  const handleDeleteEvent = (id) => {
-    try {
-      Swal.fire({
-        title: "คุณแน่ใจหรือไม่?",
-        text: "เมื่อทำการลบแล้ว คุณจะไม่สามารถกู้คืนแผนงานนี้ได้!",
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonColor: "#d33",
-        cancelButtonColor: "#3085d6",
-        confirmButtonText: "ใช่, ลบแผนงาน",
-        cancelButtonText: "ยกเลิก",
-      }).then(async (result) => {
-        if (result.isConfirmed) {
-          setLoading(true); // เริ่มต้นโหลดข้อมูล
+  const handleDeleteEvent = async (id) => {
+    await getDeleteEvent({
+      setLoading,
+      id,
+      EventService,
+      setEvents,
+      fetchEventsFromDB,
 
-          try {
-            // ส่งคำขอลบแผนงานไปที่เซิร์ฟเวอร์
-            await EventService.DeleteEvent(id);
-
-            // อัปเดต state โดยกรองแผนงานที่ถูกลบออกจากปฏิทิน
-            setEvents((prevEvents) =>
-              prevEvents.filter((event) => event._id !== id)
-            );
-
-            // โหลดข้อมูลใหม่จากฐานข้อมูล
-            await fetchEventsFromDB();
-
-            setLoading(false);
-
-            // แสดงข้อความแจ้งเตือนว่าการลบสำเร็จ
-            Swal.fire({
-              title: "ลบแผนงานสำเร็จ!",
-              text: "แผนงานของคุณถูกลบแล้ว",
-              icon: "success",
-              showConfirmButton: false,
-              timer: 1500,
-            });
-          } catch (error) {
-            console.error("❌ เกิดข้อผิดพลาดในการลบแผนงาน:", error);
-            Swal.fire({
-              title: "เกิดข้อผิดพลาด!",
-              text: "ไม่สามารถลบแผนงานได้ กรุณาลองใหม่อีกครั้ง",
-              icon: "error",
-            });
-          } finally {
-            setLoading(false);
-          }
-        }
-      });
-    } catch (error) {
-      console.error("❌ เกิดข้อผิดพลาดในการลบแผนงาน:", error);
-    }
+      Swal,
+    });
   };
 
   const handleEventDrop = async (arg) => {
@@ -469,8 +281,6 @@ function EventCalendar() {
       moment,
     });
   };
-
-  const calendarRef = useRef(null);
 
   const options = {
     // default is `save`
@@ -521,92 +331,44 @@ function EventCalendar() {
     }
   };
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const [eventsPerPage, setEventsPerPage] = useState(8); // ค่าเริ่มต้น
-
-  // ✅ ตรวจจับขนาดหน้าจอและอัปเดตจำนวน event ต่อหน้า
-  useEffect(() => {
-    const updateEventsPerPage = () => {
-      if (window.innerWidth < 768) {
-        setEventsPerPage(5); // หน้าจอเล็ก
-      } else {
-        setEventsPerPage(8); // หน้าจอใหญ่
-      }
-    };
-
-    updateEventsPerPage(); // เรียกใช้งานครั้งแรก
-    window.addEventListener("resize", updateEventsPerPage); // ฟังชั่นจะทำงานทุกครั้งที่หน้าจอเปลี่ยนขนาด
-
-    return () => window.removeEventListener("resize", updateEventsPerPage); // ลบ event listener เมื่อ component ถูก unmount
-  }, []);
-
-  const sortedEvents = [...eventReceive].sort((a, b) => {
-    const dateA = a.createdAt
-      ? moment(a.createdAt)
-      : a._id
-      ? moment(a._id?.toString().substring(0, 8), "hex")
-      : moment(0);
-
-    const dateB = b.createdAt
-      ? moment(b.createdAt)
-      : b._id
-      ? moment(b._id?.toString().substring(0, 8), "hex")
-      : moment(0);
-
-    return dateB.diff(dateA); // เรียงจากใหม่ไปเก่า
-  });
-
-  // ✅ กรองข้อมูลที่ค้นหา ก่อนแบ่งหน้า
-  const filteredEvents = sortedEvents.filter((event) =>
-    event.title.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // ✅ คำนวณ Pagination จากผลลัพธ์ที่กรองแล้ว
-  const totalPages = Math.ceil(filteredEvents.length / eventsPerPage);
-  const startIndex = (currentPage - 1) * eventsPerPage;
-  const endIndex = startIndex + eventsPerPage;
-  const paginatedEvents = filteredEvents.slice(startIndex, endIndex);
-
-  // ✅ ตรวจสอบว่าหน้าปัจจุบันเกิน totalPages หรือไม่ แล้วปรับให้ถูกต้อง
-  useEffect(() => {
-    if (currentPage > totalPages && totalPages > 0) {
-      setCurrentPage(totalPages);
-    }
-  }, [filteredEvents, totalPages, currentPage]);
-
-  const handleHighlightWeekends = () => {
-    setTimeout(() => {
+  const handleHighlightWeekends = useCallback(() => {
+    requestAnimationFrame(() => {
       document.querySelectorAll(".fc-daygrid-day").forEach((cell) => {
-        const dateStr = cell.getAttribute("data-date"); // รับค่าวันที่จาก attribute
+        const dateStr = cell.getAttribute("data-date");
         const date = moment(dateStr);
         const currentMonth = moment(
           calendarRef.current.getApi().getDate()
-        ).month(); // ดึงเดือนปัจจุบันที่กำลังแสดง
-        const isSaturday = date.isoWeekday() === 6;
-        const isSunday = date.isoWeekday() === 7;
-        const isSameMonth = date.month() === currentMonth; // ตรวจสอบว่าเป็นของเดือนปัจจุบัน
+        ).month();
+        const isWeekend = [6, 7].includes(date.isoWeekday());
+        const isSameMonth = date.month() === currentMonth;
 
-        // รีเซ็ตสีพื้นหลังทุกเซลล์ก่อน
-        cell.style.backgroundColor = "";
-
-        // ไฮไลต์เฉพาะวันเสาร์-อาทิตย์ของเดือนปัจจุบัน
-        if ((isSaturday || isSunday) && isSameMonth) {
-          cell.style.backgroundColor = "#FFFFF4"; // สีเหลืองอ่อน
-        }
+        cell.style.backgroundColor = isWeekend && isSameMonth ? "#FFFFF4" : "";
       });
-    }, 0); // ใช้ setTimeout(0) เพื่อให้แน่ใจว่าทำหลังจาก FullCalendar render เสร็จ
-  };
+    });
+  }, []);
 
-  const filteredCalendarEvents = events.filter((event) => {
+  const filteredCalendarEvents = useMemo(() => {
     const keyword = searchTerm.toLowerCase();
-    return (
-      event.title?.toLowerCase().includes(keyword) ||
-      event.extendedProps?.site?.toLowerCase().includes(keyword) ||
-      event.extendedProps?.company?.toLowerCase().includes(keyword) ||
-      event.extendedProps?.system?.toLowerCase().includes(keyword) ||
-      event.extendedProps?.time?.toString().includes(keyword)
+    return events.filter((event) =>
+      [
+        event.title,
+        event.extendedProps?.site,
+        event.extendedProps?.company,
+        event.extendedProps?.system,
+        event.extendedProps?.time?.toString(),
+      ].some((field) => field?.toLowerCase().includes(keyword))
     );
-  });
+  }, [events, searchTerm]);
+
+  const getStatusIcon = useCallback((status) => {
+    const icons = {
+      กำลังรอยืนยัน: faHourglassHalf,
+      ยืนยันแล้ว: faCheck,
+      กำลังดำเนินการ: faClockRotateLeft,
+      ดำเนินการเสร็จสิ้น: faCheckDouble,
+    };
+    return icons[status] || null;
+  }, []);
 
   const statusLegend = [
     // { label: "ยกเลิก", color: "#d33", icon: faTimesCircle },

@@ -21,7 +21,6 @@ export const getEditEvent = async ({
   inputTextColor.value = eventInfo.event.textColor;
 
   const eventId = eventInfo.event.id;
-  const eventDocNo = eventInfo.event.extendedProps?.docNo || "";
   const eventCompany = eventInfo.event.extendedProps?.company || "";
   const eventSite = eventInfo.event.extendedProps?.site || "";
 
@@ -37,44 +36,10 @@ export const getEditEvent = async ({
   const eventAllDay = eventInfo.event.allDay;
 
   let eventStatus = eventInfo.event.extendedProps?.status || "กำลังรอยืนยัน"; // ค่าเริ่มต้น
-  let isAutoUpdated = eventInfo.event.extendedProps?.isAutoUpdated || false;
 
   const formattedEnd = eventAllDay
     ? moment(eventEnd).subtract(1, "days").format("YYYY-MM-DDTHH:mm")
     : moment(eventEnd).format("YYYY-MM-DDTHH:mm");
-
-  const getBackgroundColorByStatus = (status) => {
-    switch (status) {
-      case "กำลังรอยืนยัน":
-        return "#FF5733"; // สีส้ม
-      case "ยืนยันแล้ว":
-        return "#0c49ac"; // สีน้ำเงิน
-      case "กำลังดำเนินการ":
-        return "#d1c000"; // สีเหลือง
-      case "ดำเนินการเสร็จสิ้น":
-        return "#7bff00"; // สีเขียว (เอา # ตัวที่สองออก)
-      default:
-        return "#ffffff"; // สีขาว
-    }
-  };
-
-  const getTextColorByStatus = (status) => {
-    switch (status) {
-      case "กำลังรอยืนยัน":
-        return "#ffffff"; // ดำ
-      case "ยืนยันแล้ว":
-        return "#ffffff"; // ขาว
-      case "กำลังดำเนินการ":
-        return "#000000"; // ขาว
-      case "ดำเนินการเสร็จสิ้น":
-        return "#000000"; // ดำ (แก้จาก ##fff เป็น #000)
-      default:
-        return "#ffffff"; // ขาว
-    }
-  };
-
-  let currentTextColor = getTextColorByStatus(eventStatus);
-  let currentBackgroundColor = getBackgroundColorByStatus(eventStatus);
 
   const res = await CustomerService.getCustomers();
   const employees = await AuthService.getAllUserData();
@@ -275,134 +240,82 @@ export const getEditEvent = async ({
       eventTeam ? ` (ทีม ${eventTeam})` : ""
     }</h4>`,
     html: htmlEdit,
+    showDenyButton: true,
+    showCancelButton: true,
+    confirmButtonColor: "#0ECC00",
+    confirmButtonText: "บันทึกการเปลี่ยนแปลง",
+    denyButtonText: "ลบแผนงาน",
+    showExtraButton: true,
     customClass: "swal-wide",
     showCloseButton: true,
     didOpen: () => {
       const statusColorMap = {
-        // ยกเลิก: "#d33",
         กำลังรอยืนยัน: "#888888",
         ยืนยันแล้ว: "#0c49ac",
         กำลังดำเนินการ: "#a1b50b",
-        // เสนอราคาแก้ไขแล้ว: "#f39c12",
-        // วางบิลแล้วรอเก็บเงิน: "#9b59b6",
         ดำเนินการเสร็จสิ้น: "#18b007",
       };
 
+      const iconMap = {
+        กำลังรอยืนยัน: "fa-hourglass-half",
+        ยืนยันแล้ว: "fa-check",
+        กำลังดำเนินการ: "fa-clock-rotate-left",
+        ดำเนินการเสร็จสิ้น: "fa-check-double",
+      };
+      const initTomSelect = (id, create = true, placeholder = "") => {
+        return new TomSelect(id, {
+          create,
+          maxOptions: 7,
+          placeholder,
+          sortField: { field: "text", direction: "asc" },
+        });
+      };
       const statusSelect = new TomSelect("#editStatus", {
         create: false,
-        // maxOptions: 5,
         placeholder: "เลือกสถานะงาน",
         render: {
-          option: function (data, escape) {
-            const iconMap = {
-              // ยกเลิก: "fa-times-circle",                     // ❌ ไอคอนปิด/ยกเลิก
-              กำลังรอยืนยัน: "fa-hourglass-half", // ⏳
-              ยืนยันแล้ว: "fa-check", // ✔️
-              กำลังดำเนินการ: "fa-clock-rotate-left", // 🕒
-              // เสนอราคาแก้ไขแล้ว: "fa-file-signature",       // 📝
-              // วางบิลแล้วรอเก็บเงิน: "fa-file-invoice-dollar", // 📄💸
-              ดำเนินการเสร็จสิ้น: "fa-check-double", // 💰
-            };
+          option: (data, escape) => {
             const color = statusColorMap[data.value] || "#ccc";
             const icon = iconMap[data.value] || "fa-circle";
-
             return `
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <i class="fas ${icon}" style="color: ${color}; width: 18px;"></i>
-                  <span>${escape(data.text)}</span>
-                </div>`;
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <i class="fas ${icon}" style="color: ${color}; width: 18px;"></i>
+              <span>${escape(data.text)}</span>
+            </div>`;
           },
-          item: function (data, escape) {
-            return `<div>${escape(data.text)}</div>`;
-          },
+          item: (data, escape) => `<div>${escape(data.text)}</div>`,
         },
-        onChange: function (value) {
-          const control = statusSelect.control_input.parentElement; // .ts-control
-          const color = statusColorMap[value] || "#ccc";
-          control.style.backgroundColor = color;
+        onChange: (value) => {
+          const control = statusSelect.control_input.parentElement;
+          control.style.backgroundColor = statusColorMap[value] || "#ccc";
           control.style.color = value === "กำลังดำเนินการ" ? "#000" : "#fff";
           control.style.borderColor = "#999";
         },
       });
-
-      // ✅ เซ็ตสีเริ่มต้นตามสถานะที่โหลดมา
       const initialColor = statusColorMap[statusSelect.getValue()] || "#ccc";
-      statusSelect.control_input.parentElement.style.backgroundColor =
-        initialColor;
-      statusSelect.control_input.parentElement.style.color =
+      const control = statusSelect.control_input.parentElement;
+      control.style.backgroundColor = initialColor;
+      control.style.color =
         statusSelect.getValue() === "กำลังดำเนินการ" ? "#000" : "#fff";
 
-      new TomSelect("#editCompany", {
-        create: true, // ✅ อนุญาตให้ผู้ใช้พิมพ์ชื่อใหม่ได้
-        maxOptions: 7,
+      // 🔄 สร้าง TomSelect ทั้งหมด
+      [
+        ["#editCompany", "เลือกหรือพิมพ์ชื่อบริษัท"],
+        ["#editSite", "เลือกหรือพิมพ์ชื่อโครงการ"],
+        ["#editTitle", "เลือกหรือพิมพ์ชื่อหัวข้อ"],
+        ["#editSystem", "เลือกหรือพิมพ์ชื่อระบบ"],
+        ["#editTime", "เลือกหรือพิมพ์ครั้งที่"],
+        ["#editTeam", "เลือกหรือพิมพ์ชื่อทีม"],
+      ].forEach(([id, placeholder]) => initTomSelect(id, true, placeholder));
 
-        placeholder: "เลือกหรือพิมพ์ชื่อบริษัท",
-        sortField: {
-          field: "text",
-          direction: "asc",
-        },
+      [inputBackgroundColor, inputTextColor].forEach((el) => {
+        Object.assign(el.style, {
+          width: "150px",
+          height: "35px",
+          border: "4px solid #ccc",
+          cursor: "pointer",
+        });
       });
-
-      new TomSelect("#editSite", {
-        create: true, // ✅ อนุญาตให้ผู้ใช้พิมพ์ชื่อใหม่ได้
-        maxOptions: 7,
-
-        placeholder: "เลือกหรือพิมพ์ชื่อโครงการ",
-        sortField: {
-          field: "text",
-          direction: "asc",
-        },
-      });
-
-      new TomSelect("#editTitle", {
-        create: true, // ✅ อนุญาตให้ผู้ใช้พิมพ์ชื่อใหม่ได้
-        placeholder: "เลือกหรือพิมพ์ชื่อหัวข้อ",
-
-        sortField: {
-          field: "text",
-          direction: "asc",
-        },
-      });
-
-      new TomSelect("#editSystem", {
-        create: true, // ✅ อนุญาตให้ผู้ใช้พิมพ์ชื่อใหม่ได้
-        placeholder: "เลือกหรือพิมพ์ชื่อระบบ",
-        sortField: {
-          field: "text",
-          direction: "asc",
-        },
-      });
-
-      new TomSelect("#editTime", {
-        create: true, // ✅ อนุญาตให้ผู้ใช้พิมพ์ชื่อใหม่ได้
-        placeholder: "เลือกหรือพิมพ์ครั้งที่",
-
-        sortField: {
-          field: "text",
-          direction: "asc",
-        },
-      });
-      new TomSelect("#editTeam", {
-        create: true, // ✅ อนุญาตให้ผู้ใช้พิมพ์ชื่อใหม่ได้
-        placeholder: "เลือกหรือพิมพ์ชื่อทีม",
-
-        sortField: {
-          field: "text",
-          direction: "asc",
-        },
-      });
-
-      inputBackgroundColor.style.width = "150px";
-      inputBackgroundColor.style.height = "35px";
-      inputBackgroundColor.style.border = "4px solid #ccc";
-      // inputBackgroundColor.style.borderRadius = "6px";
-      inputBackgroundColor.style.cursor = "pointer";
-
-      inputTextColor.style.width = "150px";
-      inputTextColor.style.height = "35px";
-      inputTextColor.style.border = "4px solid #ccc";
-      // inputTextColor.style.borderRadius = "6px";
-      inputTextColor.style.cursor = "pointer";
 
       document
         .getElementById("backgroundColorPickerContainer")
@@ -411,72 +324,50 @@ export const getEditEvent = async ({
         .getElementById("textColorPickerContainer")
         .appendChild(inputTextColor);
     },
-    showDenyButton: true,
-    showCancelButton: true,
-    confirmButtonColor: "#0ECC00",
-    confirmButtonText: "บันทึกการเปลี่ยนแปลง",
-    denyButtonText: "ลบแผนงาน",
-    // cancelButtonText: "ยกเลิกแผนงาน",
-    showExtraButton: true,
-    didRender: () => {
-      const pdfButton = document.createElement("button");
-      pdfButton.innerText = "ออกใบแจ้งเข้างาน";
-      pdfButton.className = "swal2-confirm swal2-styled";
-      pdfButton.style.backgroundColor = "#0064de"; // สีเทา
-      pdfButton.style.marginLeft = "10px";
-      pdfButton.onclick = () => generateWorkPermitPDF(eventInfo.event);
-      Swal.getActions().appendChild(pdfButton);
 
-      // ✅ ปุ่ม Redirect ไปหน้า Operation
-      const operationButton = document.createElement("button");
-      operationButton.innerText = "ดูตารางการดำเนินงาน";
-      operationButton.className = "swal2-confirm swal2-styled";
-      operationButton.style.backgroundColor = "#d602a1";
-      operationButton.style.marginLeft = "10px";
-      operationButton.onclick = () => {
-        window.location.href = `/operation/${eventId}`; // ✅ แนบ eventId ใน URL
+    didRender: () => {
+      const createButton = (text, color, onClick) => {
+        const btn = document.createElement("button");
+        btn.innerText = text;
+        btn.className = "swal2-confirm swal2-styled";
+        btn.style.backgroundColor = color;
+        btn.style.marginLeft = "10px";
+        btn.onclick = onClick;
+        Swal.getActions().appendChild(btn);
       };
-      Swal.getActions().appendChild(operationButton);
+
+      createButton("ออกใบแจ้งเข้างาน", "#0064de", () =>
+        generateWorkPermitPDF(eventInfo.event)
+      );
+      createButton("ดูตารางการดำเนินงาน", "#d602a1", () => {
+        window.location.href = `/operation/${eventId}`;
+      });
     },
     preConfirm: () => {
-      const company = document.getElementById("editCompany").value;
-      const site = document.getElementById("editSite").value;
-      const title = document.getElementById("editTitle").value;
-      const system = document.getElementById("editSystem").value;
-      const time = document.getElementById("editTime").value;
-      const team = document.getElementById("editTeam").value;
-      const textColor = inputTextColor.value;
-      const backgroundColor = inputBackgroundColor.value;
-      const fontSize = eventFontSize;
-      const status = document.getElementById("editStatus").value;
-      const start = moment(
-        document.getElementById("editStart").value
-      ).toISOString();
-      let end = document.getElementById("editEnd").value;
-      if (!end) {
-        end = eventEnd.toISOString();
-      } else {
-        end = eventAllDay
-          ? moment(end).add(1, "days").toISOString()
-          : moment(end).toISOString();
-      }
-      if (!title) {
-        Swal.showValidationMessage("กรุณากรอกชื่อแผนงาน");
-      }
-      // ส่งกลับข้อมูลพร้อมกับ flag manualStatus: true
+      const getVal = (id) => document.getElementById(id)?.value || "";
+      const title = getVal("editTitle");
+      if (!title) Swal.showValidationMessage("กรุณากรอกชื่อแผนงาน");
+
+      const endInput = getVal("editEnd");
+      const end = endInput
+        ? eventAllDay
+          ? moment(endInput).add(1, "days").toISOString()
+          : moment(endInput).toISOString()
+        : eventEnd.toISOString();
+
       return {
         id: eventId,
-        company: company || "", // ✅ ถ้าไม่กรอก ให้เป็น string ว่าง
-        site,
+        company: getVal("editCompany"),
+        site: getVal("editSite"),
         title,
-        system,
-        time,
-        team,
-        textColor,
-        backgroundColor,
-        fontSize,
-        status,
-        start,
+        system: getVal("editSystem"),
+        time: getVal("editTime"),
+        team: getVal("editTeam"),
+        textColor: inputTextColor.value,
+        backgroundColor: inputBackgroundColor.value,
+        fontSize: eventFontSize,
+        status: getVal("editStatus"),
+        start: moment(getVal("editStart")).toISOString(),
         end,
         manualStatus: true,
       };
@@ -557,8 +448,5 @@ export const getEditEvent = async ({
     } else if (result.isDenied) {
       handleDeleteEvent(eventId);
     }
-    // else if (result.dismiss === Swal.DismissReason.cancel) {
-    //   confirmCancelEvent(eventId);
-    // }
   });
 };

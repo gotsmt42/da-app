@@ -1,56 +1,55 @@
-
 export const getEventDrop = async ({
   arg,
   fetchEventsFromDB,
   setEvents,
-
   EventService,
   Swal,
-  moment
+  moment,
 }) => {
   const event = arg.event;
 
-  const start = moment(event.startStr);
-  const end = moment(event.endStr);
-
-  let newEnd;
-
-  if (start.isSame(end, "day")) {
-    newEnd = end;
-  } else {
-    newEnd = end.subtract(1, "days");
-  }
+  const start = moment(event.startStr).format("YYYY-MM-DD");
+  const endRaw = moment(event.endStr);
+  const end = event.allDay
+    ? endRaw.format("YYYY-MM-DD")
+    : endRaw.subtract(1, "days").format("YYYY-MM-DD");
 
   const updatedEvent = {
     id: event.id,
     title: event.title,
     textColor: event.textColor,
     backgroundColor: event.backgroundColor,
-    fontSize: event.extendedProps.fontSize.toString(),
-    start: event.startStr,
-    end: event.endStr, // ตรวจสอบ allDay ก่อนกำหนด end
+    fontSize: event.extendedProps?.fontSize?.toString() || "12",
+    start,
+    end,
     allDay: event.allDay,
   };
 
+  // ตรวจสอบว่า event มีการเปลี่ยนแปลงจริงหรือไม่
+  const originalStart = moment(event.extendedProps?.start).format("YYYY-MM-DD");
+  const originalEnd = moment(event.extendedProps?.end).format("YYYY-MM-DD");
+
+  const hasChanged = start !== originalStart || end !== originalEnd;
+
+  if (!hasChanged) {
+    console.log("⏸️ ไม่มีการเปลี่ยนแปลงวันที่ ไม่ต้องอัปเดต");
+    return;
+  }
+
   try {
-    // ✅ อัปเดตเหตุการณ์ในฐานข้อมูล
     await EventService.UpdateEvent(event.id, updatedEvent);
 
-    // ✅ ตรวจสอบว่า events เป็น Array ก่อนใช้ map
+    // อัปเดตเฉพาะ event ที่เปลี่ยนใน state
     setEvents((prevEvents) =>
-      Array.isArray(prevEvents)
-        ? prevEvents.map((e) => (e.id === updatedEvent.id ? updatedEvent : e))
-        : [updatedEvent]
+      prevEvents.map((e) =>
+        e.id === updatedEvent.id ? { ...e, ...updatedEvent } : e
+      )
     );
 
-    // ดึงข้อมูลเหตุการณ์จากฐานข้อมูลอีกครั้งเพื่อให้มั่นใจว่าข้อมูลเป็นปัจจุบัน
-    await fetchEventsFromDB();
-
-    // แสดงข้อความแจ้งเตือนเมื่ออัปเดตเหตุการณ์สำเร็จ
-    // Swal.fire("Event Updated", "", "success");
+    console.log(`✅ Event ${event.id} updated`);
+    // ไม่ต้อง fetchEventsFromDB ถ้าเราอัปเดต state แล้ว
   } catch (error) {
-    console.error("Error updating event:", error);
-    // แสดงข้อความแจ้งเตือนเมื่อเกิดข้อผิดพลาดในการอัปเดตเหตุการณ์
-    Swal.fire("Error", "Failed to update event", "error");
+    console.error("❌ Error updating event:", error);
+    Swal.fire("เกิดข้อผิดพลาด", "ไม่สามารถอัปเดตแผนงานได้", "error");
   }
 };

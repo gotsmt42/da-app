@@ -1,4 +1,3 @@
-
 export const getAddEvent = async ({
   arg,
   events,
@@ -11,15 +10,16 @@ export const getAddEvent = async ({
   saveEventToDB,
   fetchEventsFromDB,
 
-
   CustomerService,
   AuthService,
   Swal,
   TomSelect,
-  moment
+  moment,
 }) => {
-  const customers = await CustomerService.getCustomers();
-  const employees = await AuthService.getAllUserData();
+  const [customers, employees] = await Promise.all([
+    CustomerService.getCustomers(),
+    AuthService.getAllUserData(),
+  ]);
   const employeeList = employees?.allUser || [];
 
   Swal.fire({
@@ -226,39 +226,28 @@ ${employeeList
       backgroundColorPicker.setAttribute("value", defaultBackgroundColor);
     },
     preConfirm: () => {
-      const start = document.getElementById("start").value;
-      const end = document.getElementById("end").value;
-      const company = document.getElementById("eventCompany").value;
-      const site = document.getElementById("eventSite").value;
-      const title = document.getElementById("eventTitle").value;
-      const system = document.getElementById("eventSystem").value;
-      const time = document.getElementById("eventTime").value;
-      const team = document.getElementById("eventTeam").value;
-
-      const backgroundColor = document.getElementById(
-        "backgroundColorPicker"
-      ).value;
-      const textColor = document.getElementById("textColorPicker").value;
-      const fontSize = document.getElementById("fontSize").value;
-      if (!site) {
-        Swal.showValidationMessage("กรุณาระบุโครงการ");
-      }
-      if (!title) {
-        Swal.showValidationMessage("กรุณาระบุหัวข้อ");
+      const requiredFields = ["eventSite", "eventTitle"];
+      for (const id of requiredFields) {
+        const value = document.getElementById(id)?.value;
+        if (!value) {
+          Swal.showValidationMessage(`กรุณาระบุ ${id.replace("event", "")}`);
+          return false;
+        }
       }
 
       return {
-        company: company || "", // ✅ ถ้าไม่กรอก ให้เป็น string ว่าง
-        site,
-        title,
-        system,
-        time,
-        team,
-        backgroundColor,
-        textColor,
-        fontSize,
-        start,
-        end,
+        company: document.getElementById("eventCompany")?.value || "",
+        site: document.getElementById("eventSite")?.value,
+        title: document.getElementById("eventTitle")?.value,
+        system: document.getElementById("eventSystem")?.value,
+        time: document.getElementById("eventTime")?.value,
+        team: document.getElementById("eventTeam")?.value,
+        backgroundColor: document.getElementById("backgroundColorPicker")
+          ?.value,
+        textColor: document.getElementById("textColorPicker")?.value,
+        fontSize: document.getElementById("fontSize")?.value,
+        start: document.getElementById("start")?.value,
+        end: document.getElementById("end")?.value,
       };
     },
   }).then(async (result) => {
@@ -306,12 +295,21 @@ ${employeeList
         });
       }
 
-      setEvents([...events, newEvent]); // อัปเดต state ของ FullCalendar
-      await saveEventToDB(newEvent); // บันทึกแผนงานลงฐานข้อมูล
+      setEvents((prev) => [...prev, newEvent]);
+      await Promise.all([
+        saveEventToDB(newEvent),
+        !existingCustomer &&
+          CustomerService.AddCustomer({
+            cCompany: company ?? "",
+            cSite: site ?? "",
+          }),
+      ]);
       setDefaultTextColor(textColor);
       setDefaultBackgroundColor(backgroundColor);
       setDefaultFontSize(fontSize);
-      await fetchEventsFromDB(); // โหลดข้อมูลแผนงานใหม่จากฐานข้อมูล
+
+      // ✅ โหลดใหม่เฉพาะเมื่อจำเป็น
+      await fetchEventsFromDB();
     }
   });
 };
