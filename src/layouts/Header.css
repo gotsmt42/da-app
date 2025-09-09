@@ -23,7 +23,7 @@
 
 .logo {
   height: auto;
-  max-height: 200px;        /* ✅ โลโก้ไม่เต็ม 200px เพื่อให้ดูย่นลง */
+  max-height: 190px;        /* ✅ โลโก้ไม่เต็ม 200px เพื่อให้ดูย่นลง */
   width: auto;
   object-fit: contain;
   margin: 0 auto;

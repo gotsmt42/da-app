@@ -38,7 +38,7 @@ export const getEditEvent = async ({
 
   let eventStatus = eventInfo.event.extendedProps?.status || "กำลังรอยืนยัน"; // ค่าเริ่มต้น
 
-  let eventDescription = eventInfo.event.extendedProps?.description || ""; // ค่าเริ่มต้น
+  const eventDescription = eventInfo.event.extendedProps?.description ?? "";
 
   const formattedEnd = eventAllDay
     ? moment(eventEnd).subtract(1, "days").format("YYYY-MM-DD")
@@ -108,7 +108,14 @@ export const getEditEvent = async ({
       <label for="editCompany" style="font-weight: bold; margin-bottom: 6px; display: block;">ชื่อบริษัท/นิติบุคคล:</label>
       <select id="editCompany" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
         <option disabled selected>${eventCompany}</option>
-        ${res.userCustomers.map(c => `<option value="${c.cCompany}" ${eventCompany === c.cCompany ? "selected" : ""}>${c.cCompany}</option>`).join("")}
+        ${res.userCustomers
+          .map(
+            (c) =>
+              `<option value="${c.cCompany}" ${
+                eventCompany === c.cCompany ? "selected" : ""
+              }>${c.cCompany}</option>`
+          )
+          .join("")}
       </select>
     </div>
 
@@ -117,7 +124,14 @@ export const getEditEvent = async ({
       <label for="editSite" style="font-weight: bold; margin-bottom: 6px; display: block;">ชื่อโครงการ:</label>
       <select id="editSite" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
         <option disabled selected>${eventSite || ""}</option>
-        ${res.userCustomers.map(c => `<option value="${c.cSite}" ${eventSite === c.cSite ? "selected" : ""}>${c.cSite}</option>`).join("")}
+        ${res.userCustomers
+          .map(
+            (c) =>
+              `<option value="${c.cSite}" ${
+                eventSite === c.cSite ? "selected" : ""
+              }>${c.cSite}</option>`
+          )
+          .join("")}
       </select>
     </div>
 
@@ -127,10 +141,27 @@ export const getEditEvent = async ({
       <select id="editTitle" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
         <option disabled selected>${eventTitle || ""}</option>
         ${[
-          "LOCAL", "PO", "PM", "Service", "Training", "Inspection",
-          "Test & Commissioning", "สำรวจหน้างาน", "ตรวจเช็คปัญหา",
-          "แก้ไขปัญหา", "สแตนบาย", "เปลี่ยนอุปกรณ์", "ติดตั้งอุปกรณ์"
-        ].map(title => `<option value="${title}" ${eventTitle === title ? "selected" : ""}>${title}</option>`).join("")}
+          "LOCAL",
+          "PO",
+          "PM",
+          "Service",
+          "Training",
+          "Inspection",
+          "Test & Commissioning",
+          "สำรวจหน้างาน",
+          "ตรวจเช็คปัญหา",
+          "แก้ไขปัญหา",
+          "สแตนบาย",
+          "เปลี่ยนอุปกรณ์",
+          "ติดตั้งอุปกรณ์",
+        ]
+          .map(
+            (title) =>
+              `<option value="${title}" ${
+                eventTitle === title ? "selected" : ""
+              }>${title}</option>`
+          )
+          .join("")}
       </select>
     </div>
 
@@ -139,7 +170,14 @@ export const getEditEvent = async ({
       <label for="editSystem" style="font-weight: bold; margin-bottom: 6px; display: block;">ระบบงาน:</label>
       <select id="editSystem" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
         <option disabled selected>${eventSystem || ""}</option>
-        ${["Office", "Fire Alarm", "CCTV", "Access Control", "Networks"].map(sys => `<option value="${sys}" ${eventSystem === sys ? "selected" : ""}>${sys}</option>`).join("")}
+        ${["Office", "Fire Alarm", "CCTV", "Access Control", "Networks"]
+          .map(
+            (sys) =>
+              `<option value="${sys}" ${
+                eventSystem === sys ? "selected" : ""
+              }>${sys}</option>`
+          )
+          .join("")}
       </select>
     </div>
 
@@ -148,7 +186,14 @@ export const getEditEvent = async ({
       <label for="editTime" style="font-weight: bold; margin-bottom: 6px; display: block;">ครั้งที่:</label>
       <select id="editTime" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
         <option disabled selected>${eventTime}</option>
-        ${["1", "2", "3", "4"].map(t => `<option value="${t}" ${eventTime === t ? "selected" : ""}>${t}</option>`).join("")}
+        ${["1", "2", "3", "4"]
+          .map(
+            (t) =>
+              `<option value="${t}" ${
+                eventTime === t ? "selected" : ""
+              }>${t}</option>`
+          )
+          .join("")}
       </select>
     </div>
 
@@ -157,7 +202,14 @@ export const getEditEvent = async ({
       <label for="editTeam" style="font-weight: bold; margin-bottom: 6px; display: block;">ทีม:</label>
       <select id="editTeam" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
         <option disabled selected>${eventTeam || ""}</option>
-        ${employeeList.map(e => `<option value="${e.fname}" ${eventTeam === e.fname ? "selected" : ""}>${e.fname}</option>`).join("")}
+        ${employeeList
+          .map(
+            (e) =>
+              `<option value="${e.fname}" ${
+                eventTeam === e.fname ? "selected" : ""
+              }>${e.fname}</option>`
+          )
+          .join("")}
       </select>
     </div>
 
@@ -250,7 +302,7 @@ export const getEditEvent = async ({
       font-family: 'Segoe UI', sans-serif;
     "
     placeholder="กรอกรายละเอียดงานที่ต้องการแสดงในเอกสาร PDF"
-  >${eventDescription || ""}</textarea>
+  > ${eventDescription || ""}</textarea>
 
 
 
@@ -269,9 +321,11 @@ export const getEditEvent = async ({
       eventTeam ? ` (ทีม ${eventTeam})` : ""
     }</h4>`,
     html: htmlEdit,
+
     showConfirmButton: false, // ❌ ซ่อนปุ่มเดิม
     showCancelButton: false,
-    showDenyButton: false,
+    showDenyButton: true, // ใช้ปุ่ม Deny เป็นปุ่มลบ
+    denyButtonText: "❌ ลบแผนงานนี้",
     showCloseButton: true,
     customClass: "swal-wide",
     footer: `
@@ -279,11 +333,9 @@ export const getEditEvent = async ({
       <button id="btnConfirm" class="swal2-confirm swal2-styled" style="background-color: #0ECC00;">
         ✅ บันทึกการเปลี่ยนแปลง
       </button>
-      <button id="btnDeny" class="swal2-cancel swal2-styled" style="background-color: #ff3b3b;">
-        ❌ ลบแผนงาน
-      </button>
+   
       <button id="btnCancel" class="swal2-cancel swal2-styled" style="background-color: #999;">
-        🔙 ยกเลิก
+        🔙 ปิดหน้าต่าง
       </button>
       <button id="btnGeneratePDF" class="swal2-confirm swal2-styled" style="background-color: #0064de;">
         📝 ออกใบแจ้งเข้างาน
@@ -296,6 +348,11 @@ export const getEditEvent = async ({
       const charCountDisplay = document.getElementById("charCount");
 
       const clearBtn = document.getElementById("clearDescriptionBtn");
+
+      const textarea = document.getElementById("editDescription");
+      if (textarea) {
+        textarea.value = eventDescription || "";
+      }
       const statusColorMap = {
         กำลังรอยืนยัน: "#888888",
         ยืนยันแล้ว: "#0c49ac",
@@ -414,7 +471,7 @@ export const getEditEvent = async ({
 
           const updatedEvent = {
             id: eventId,
-            
+
             docNo: getVal("editdocNo"),
             company: getVal("editCompany"),
             site: getVal("editSite"),
