@@ -154,16 +154,18 @@ function EventCalendar() {
     return () => hammer.destroy();
   }, []);
 
-  const generateWorkPermitPDF = async (event) => {
-    try {
-      setLoading(true);
-      await getGeneratePDF({ jsPDF, thSarabunFont, event, moment });
-    } catch (error) {
-      console.error("❌ สร้าง PDF ไม่สำเร็จ:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  
+const generateWorkPermitPDF = async (event, description) => {
+  try {
+    setLoading(true);
+    await getGeneratePDF({ jsPDF, thSarabunFont, event, moment, description });
+  } catch (error) {
+    console.error("❌ สร้าง PDF ไม่สำเร็จ:", error);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   // ✅ ฟังก์ชันตั้งค่า External Events ให้สามารถลากได้
   const initExternalEvents = useCallback(() => {

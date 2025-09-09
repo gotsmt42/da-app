@@ -95,7 +95,7 @@
 
   .swal-wide {
     max-width: 90vw !important;  /* ไม่เกิน 90% ของ viewport */
-    width: 50% !important;
+    width: 70% !important;
     overflow-x: hidden !important;
     font-size: 12px !important;
   
@@ -172,12 +172,6 @@
   display: flex !important;
   flex-direction: column !important;
 }
-
-
-
-
-/* 
-
 
 
 

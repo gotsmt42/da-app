@@ -21,6 +21,7 @@ export const getEditEvent = async ({
   inputTextColor.value = eventInfo.event.textColor;
 
   const eventId = eventInfo.event.id;
+  const evendocNo = eventInfo.event.extendedProps?.docNo || "";
   const eventCompany = eventInfo.event.extendedProps?.company || "";
   const eventSite = eventInfo.event.extendedProps?.site || "";
 
@@ -37,8 +38,10 @@ export const getEditEvent = async ({
 
   let eventStatus = eventInfo.event.extendedProps?.status || "กำลังรอยืนยัน"; // ค่าเริ่มต้น
 
+  let eventDescription = eventInfo.event.extendedProps?.description || ""; // ค่าเริ่มต้น
+
   const formattedEnd = eventAllDay
-    ? moment(eventEnd).subtract(1, "days").format("YYYY-MM-DDTHH:mm")
+    ? moment(eventEnd).subtract(1, "days").format("YYYY-MM-DD")
     : moment(eventEnd).format("YYYY-MM-DDTHH:mm");
 
   const res = await CustomerService.getCustomers();
@@ -89,150 +92,176 @@ export const getEditEvent = async ({
             </select>
           </div>
 
+<!-- Container กึ่งกลาง -->
+<div style="display: flex; justify-content: center;">
+  <!-- Grid ฟอร์ม -->
+  <div class="swal-form-grid" style="
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 12px;
+    font-family: 'Segoe UI', sans-serif;
+  ">
 
-      <div class="swal-form-grid">
-  
-
-
-      <!-- ชื่อบริษัท -->
-      <div>
-        <label for="editCompany">ชื่อบริษัท : </label>
-        <select id="editCompany" class="swal2-select">
-          <option disabled selected>${eventCompany}</option>
-          ${res.userCustomers
-            .map(
-              (c) =>
-                `<option value="${c.cCompany}" ${
-                  eventCompany === c.cCompany ? "selected" : ""
-                }>${c.cCompany}</option>`
-            )
-            .join("")}
-        </select>
-      </div>
-  
-      <!-- สถานที่ -->
-      <div>
-        <label for="editSite">ชื่อโครงการ : </label>
-        <select id="editSite" class="swal2-select">
-          <option disabled selected>${eventSite || ""}</option>
-          ${res.userCustomers
-            .map(
-              (c) =>
-                `<option value="${c.cSite}" ${
-                  eventSite === c.cSite ? "selected" : ""
-                }>${c.cSite}</option>`
-            )
-            .join("")}
-        </select>
-      </div>
-  
-      <!-- ประเภทแผนงาน -->
-      <div>
-        <label for="editTitle">ประเภทงาน : </label>
-        <select id="editTitle" class="swal2-select">
-          <option disabled selected>${eventTitle || ""}</option>
-          
-          ${[
-            "LOCAL",
-            "PO",
-            "PM",
-            "Service",
-            "Training",
-            "Inspection",
-            "Test & Commissioning",
-            "สำรวจหน้างาน",
-            "ตรวจเช็คปัญหา",
-            "แก้ไขปัญหา",
-            "สแตนบาย",
-            "เปลี่ยนอุปกรณ์",
-            "ติดตั้งอุปกรณ์",
-          ]
-            .map(
-              (title) =>
-                `<option value="${title}" ${
-                  eventTitle === title ? "selected" : ""
-                }>${title}</option>`
-            )
-            .join("")}
-        </select>
-      </div>
-  
-      <!-- ระบบงาน -->
-      <div>
-        <label for="editSystem">ระบบงาน : </label>
-        <select id="editSystem" class="swal2-select">
-          <option disabled selected>${eventSystem || ""}</option>
-          ${["Office", "Fire Alarm", "CCTV", "Access Control", "Networks"]
-            .map(
-              (sys) =>
-                `<option value="${sys}" ${
-                  eventSystem === sys ? "selected" : ""
-                }>${sys}</option>`
-            )
-            .join("")}
-        </select>
-      </div>
-  
-      <!-- ครั้งที่ -->
-      <div>
-        <label for="editTime">ครั้งที่ : </label>
-        <select id="editTime" class="swal2-select">
-          <option disabled selected>${eventTime}</option>
-          ${["1", "2", "3", "4"]
-            .map(
-              (t) =>
-                `<option value="${t}" ${
-                  eventTime === t ? "selected" : ""
-                }>${t}</option>`
-            )
-            .join("")}
-        </select>
-      </div>
-
-
-      <div>
-        <label for="editSystem">ทีม : </label>
-        <select id="editTeam" class="swal2-select">
-          <option disabled selected>${eventTeam || ""}</option>
-            ${employeeList
-              .map(
-                (employee) =>
-                  `<option value="${employee.fname}">${employee.fname}</option>`
-              )
-              .join("")}
-
-        </select>
-      </div>
-  
-  
-      
-  
+    <!-- ชื่อบริษัท -->
+    <div style="flex: 1 1 calc(33.333% - 16px); min-width: 220px;">
+      <label for="editCompany" style="font-weight: bold; margin-bottom: 6px; display: block;">ชื่อบริษัท/นิติบุคคล:</label>
+      <select id="editCompany" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
+        <option disabled selected>${eventCompany}</option>
+        ${res.userCustomers.map(c => `<option value="${c.cCompany}" ${eventCompany === c.cCompany ? "selected" : ""}>${c.cCompany}</option>`).join("")}
+      </select>
     </div>
+
+    <!-- ชื่อโครงการ -->
+    <div style="flex: 1 1 calc(33.333% - 16px); min-width: 220px;">
+      <label for="editSite" style="font-weight: bold; margin-bottom: 6px; display: block;">ชื่อโครงการ:</label>
+      <select id="editSite" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
+        <option disabled selected>${eventSite || ""}</option>
+        ${res.userCustomers.map(c => `<option value="${c.cSite}" ${eventSite === c.cSite ? "selected" : ""}>${c.cSite}</option>`).join("")}
+      </select>
+    </div>
+
+    <!-- ประเภทงาน -->
+    <div style="flex: 1 1 calc(33.333% - 16px); min-width: 220px;">
+      <label for="editTitle" style="font-weight: bold; margin-bottom: 6px; display: block;">ประเภทงาน:</label>
+      <select id="editTitle" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
+        <option disabled selected>${eventTitle || ""}</option>
+        ${[
+          "LOCAL", "PO", "PM", "Service", "Training", "Inspection",
+          "Test & Commissioning", "สำรวจหน้างาน", "ตรวจเช็คปัญหา",
+          "แก้ไขปัญหา", "สแตนบาย", "เปลี่ยนอุปกรณ์", "ติดตั้งอุปกรณ์"
+        ].map(title => `<option value="${title}" ${eventTitle === title ? "selected" : ""}>${title}</option>`).join("")}
+      </select>
+    </div>
+
+    <!-- ระบบงาน -->
+    <div style="flex: 1 1 calc(33.333% - 16px); min-width: 220px;">
+      <label for="editSystem" style="font-weight: bold; margin-bottom: 6px; display: block;">ระบบงาน:</label>
+      <select id="editSystem" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
+        <option disabled selected>${eventSystem || ""}</option>
+        ${["Office", "Fire Alarm", "CCTV", "Access Control", "Networks"].map(sys => `<option value="${sys}" ${eventSystem === sys ? "selected" : ""}>${sys}</option>`).join("")}
+      </select>
+    </div>
+
+    <!-- ครั้งที่ -->
+    <div style="flex: 1 1 calc(33.333% - 16px); min-width: 220px;">
+      <label for="editTime" style="font-weight: bold; margin-bottom: 6px; display: block;">ครั้งที่:</label>
+      <select id="editTime" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
+        <option disabled selected>${eventTime}</option>
+        ${["1", "2", "3", "4"].map(t => `<option value="${t}" ${eventTime === t ? "selected" : ""}>${t}</option>`).join("")}
+      </select>
+    </div>
+
+    <!-- ทีม -->
+    <div style="flex: 1 1 calc(33.333% - 16px); min-width: 220px;">
+      <label for="editTeam" style="font-weight: bold; margin-bottom: 6px; display: block;">ทีม:</label>
+      <select id="editTeam" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
+        <option disabled selected>${eventTeam || ""}</option>
+        ${employeeList.map(e => `<option value="${e.fname}" ${eventTeam === e.fname ? "selected" : ""}>${e.fname}</option>`).join("")}
+      </select>
+    </div>
+
+  </div>
+</div>
+
+
+
+<div style="display: flex; justify-content: center;">
+  <div class="swal-form-grid" style="
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-start;
+    margin-top: 12px;
+    font-family: 'Segoe UI', sans-serif;
+    max-width: 1000px; /* ✅ ป้องกันไม่ให้กว้างเกิน modal */
+  ">
+
     <!-- สีพื้นหลัง -->
-      <div>
-        <label>สีพื้นหลัง : </label><br>
-        <div id="backgroundColorPickerContainer"></div>
-      </div><br>
-  
-      <!-- สีข้อความ -->
-      <div>
-        <label>สีข้อความ : </label><br>
-        <div id="textColorPickerContainer" ></div>
-      </div><br>
-  
-      <!-- วันที่เริ่ม -->
-      <div >
-        <label for="editStart">เริ่มต้น : </label>
-        <input id="editStart" type="datetime-local" style="width: 80%; height: 35px" class="swal2-input" value="${eventStart.format(
-          "YYYY-MM-DDTHH:mm"
-        )}" />
-      </div><br>
-  
-      <!-- วันที่สิ้นสุด -->
-      <div>
-        <label for="editEnd">สิ้นสุด : </label>
-        <input id="editEnd" type="datetime-local" style="width: 80%; height: 35px" class="swal2-input" value="${formattedEnd}" />
-      </div><br>
+    <div style=" min-width: 100px;">
+      <label style="font-weight: bold; margin-bottom: 4px; display: block;">สีพื้นหลัง :</label>
+      <div id="backgroundColorPickerContainer"></div>
+    </div>
+
+    <!-- สีข้อความ -->
+    <div style="flex: 1; min-width: 100px;">
+      <label style="font-weight: bold; margin-bottom: 4px; display: block;">สีข้อความ :</label>
+      <div id="textColorPickerContainer"></div>
+    </div>
+
+    <!-- วันที่เริ่ม -->
+    <div style="flex: 1; min-width: 100px;">
+      <label for="editStart" style="font-weight: bold; margin-bottom: 4px; display: block;">เริ่มต้น :</label>
+      <input
+        id="editStart"
+        type="date"
+        style="width: 100%; padding: 6px 10px; border-radius: 6px; border: 1px solid #ccc;"
+        value="${eventStart.format("YYYY-MM-DD")}"
+      />
+    </div>
+
+    <!-- วันที่สิ้นสุด -->
+    <div style="flex: 1; min-width: 100px;">
+      <label for="editEnd" style="font-weight: bold; margin-bottom: 4px; display: block;">สิ้นสุด :</label>
+      <input
+        id="editEnd"
+        type="date"
+        style="width: 100%; padding: 6px 10px; border-radius: 6px; border: 1px solid #ccc;"
+        value="${formattedEnd}"
+      />
+    </div>
+
+  </div>
+</div>
+<br>
+
+
+      <!-- เลขที่อ้างอิงเอกสาร -->
+<div style="margin-top: 12px; position: relative;">
+  <label for="editDescription" style="font-weight: bold; display: block; margin-bottom: 6px;">
+    ** เลขที่อ้างอิงเอกสาร (doc No.) :
+  </label>
+
+
+          <input id="editdocNo" type="" style="width: 80%; height: 35px" class="swal2-input" value="${evendocNo}" />
+
+
+
+</div>
+<br>
+<!-- รายละเอียดงานสำหรับออกใบแจ้งเข้างาน -->
+<div style="margin-top: 12px; position: relative;">
+  <label for="editDescription" style="font-weight: bold; display: block; margin-bottom: 6px;">
+    ** รายละเอียดงานสำหรับออกใบแจ้งเข้างาน (Work Permit) :
+  </label>
+
+ <textarea
+    id="editDescription"
+    rows="10"
+    style="
+      width: 100%;
+      padding: 14px 16px;
+      font-size: 15px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+      transition: border-color 0.3s, box-shadow 0.3s;
+      resize: vertical;
+      font-family: 'Segoe UI', sans-serif;
+    "
+    placeholder="กรอกรายละเอียดงานที่ต้องการแสดงในเอกสาร PDF"
+  >${eventDescription || ""}</textarea>
+
+
+
+  <!-- ตัวนับจำนวนตัวอักษร -->
+<div id="charCount" style="text-align: right; font-size: 12px; color: #666; margin-top: 4px;">
+  จำนวนตัวอักษร: 0
+</div>
+
+</div>
+
+
   `;
 
   Swal.fire({
@@ -240,15 +269,33 @@ export const getEditEvent = async ({
       eventTeam ? ` (ทีม ${eventTeam})` : ""
     }</h4>`,
     html: htmlEdit,
-    showDenyButton: true,
-    showCancelButton: true,
-    confirmButtonColor: "#0ECC00",
-    confirmButtonText: "บันทึกการเปลี่ยนแปลง",
-    denyButtonText: "ลบแผนงาน",
-    showExtraButton: true,
-    customClass: "swal-wide",
+    showConfirmButton: false, // ❌ ซ่อนปุ่มเดิม
+    showCancelButton: false,
+    showDenyButton: false,
     showCloseButton: true,
+    customClass: "swal-wide",
+    footer: `
+    <div id="custom-footer-buttons" style="margin-top: 20px; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px;">
+      <button id="btnConfirm" class="swal2-confirm swal2-styled" style="background-color: #0ECC00;">
+        ✅ บันทึกการเปลี่ยนแปลง
+      </button>
+      <button id="btnDeny" class="swal2-cancel swal2-styled" style="background-color: #ff3b3b;">
+        ❌ ลบแผนงาน
+      </button>
+      <button id="btnCancel" class="swal2-cancel swal2-styled" style="background-color: #999;">
+        🔙 ยกเลิก
+      </button>
+      <button id="btnGeneratePDF" class="swal2-confirm swal2-styled" style="background-color: #0064de;">
+        📝 ออกใบแจ้งเข้างาน
+      </button>
+      
+    </div>
+  `,
     didOpen: () => {
+      const descriptionInput = document.getElementById("editDescription");
+      const charCountDisplay = document.getElementById("charCount");
+
+      const clearBtn = document.getElementById("clearDescriptionBtn");
       const statusColorMap = {
         กำลังรอยืนยัน: "#888888",
         ยืนยันแล้ว: "#0c49ac",
@@ -323,26 +370,104 @@ export const getEditEvent = async ({
       document
         .getElementById("textColorPickerContainer")
         .appendChild(inputTextColor);
+
+      const updateCharCount = () => {
+        const val = descriptionInput?.value || "";
+        if (charCountDisplay) {
+          charCountDisplay.innerText = `จำนวนตัวอักษร: ${val.length}`;
+        }
+      };
+
+      if (descriptionInput) {
+        descriptionInput.addEventListener("input", updateCharCount);
+        updateCharCount(); // เรียกตอนเปิด popup
+      }
+
+      if (clearBtn && descriptionInput) {
+        clearBtn.addEventListener("click", () => {
+          descriptionInput.value = "";
+          updateCharCount();
+        });
+      }
     },
 
     didRender: () => {
-      const createButton = (text, color, onClick) => {
-        const btn = document.createElement("button");
-        btn.innerText = text;
-        btn.className = "swal2-confirm swal2-styled";
-        btn.style.backgroundColor = color;
-        btn.style.marginLeft = "10px";
-        btn.onclick = onClick;
-        Swal.getActions().appendChild(btn);
-      };
+      const getVal = (id) => document.getElementById(id)?.value || "";
 
-      createButton("ออกใบแจ้งเข้างาน", "#0064de", () =>
-        generateWorkPermitPDF(eventInfo.event)
-      );
-      createButton("ดูตารางการดำเนินงาน", "#d602a1", () => {
-        window.location.href = `/operation/${eventId}`;
+      document
+        .getElementById("btnConfirm")
+        ?.addEventListener("click", async () => {
+          const title = getVal("editTitle");
+          if (!title) {
+            Swal.showValidationMessage("กรุณากรอกชื่อแผนงาน");
+            return;
+          }
+
+          const endInput = getVal("editEnd");
+          const end = endInput
+            ? eventAllDay
+              ? moment(endInput).add(1, "days").toISOString()
+              : moment(endInput).toISOString()
+            : eventEnd.toISOString();
+
+          const description = getVal("editDescription");
+
+          const updatedEvent = {
+            id: eventId,
+            
+            docNo: getVal("editdocNo"),
+            company: getVal("editCompany"),
+            site: getVal("editSite"),
+            title,
+            system: getVal("editSystem"),
+            time: getVal("editTime"),
+            team: getVal("editTeam"),
+            textColor: inputTextColor.value,
+            backgroundColor: inputBackgroundColor.value,
+            fontSize: eventFontSize,
+            status: getVal("editStatus"),
+            start: moment(getVal("editStart")).toISOString(),
+            end,
+            manualStatus: true,
+            description,
+          };
+
+          // ✅ อัปเดต event และปิด Swal
+          await EventService.UpdateEvent(eventId, updatedEvent);
+          await fetchEventsFromDB();
+          Swal.close();
+
+          Swal.fire({
+            title: "บันทึกการเปลี่ยนแปลงสำเร็จ",
+            icon: "success",
+            showConfirmButton: false,
+            timer: 1000,
+          });
+        });
+
+      document.getElementById("btnDeny")?.addEventListener("click", () => {
+        handleDeleteEvent(eventId);
+        Swal.close();
       });
+
+      document.getElementById("btnCancel")?.addEventListener("click", () => {
+        Swal.close();
+      });
+
+      document
+        .getElementById("btnGeneratePDF")
+        ?.addEventListener("click", () => {
+          const description = getVal("editDescription");
+          generateWorkPermitPDF(eventInfo.event, description);
+        });
+
+      document
+        .getElementById("btnViewSchedule")
+        ?.addEventListener("click", () => {
+          window.location.href = `/operation/${eventId}`;
+        });
     },
+
     preConfirm: () => {
       const getVal = (id) => document.getElementById(id)?.value || "";
       const title = getVal("editTitle");
@@ -355,8 +480,10 @@ export const getEditEvent = async ({
           : moment(endInput).toISOString()
         : eventEnd.toISOString();
 
+      const description = getVal("editDescription");
       return {
         id: eventId,
+        docNo: getVal("editdocNo"),
         company: getVal("editCompany"),
         site: getVal("editSite"),
         title,
@@ -370,6 +497,7 @@ export const getEditEvent = async ({
         start: moment(getVal("editStart")).toISOString(),
         end,
         manualStatus: true,
+        description,
       };
     },
   }).then(async (result) => {
@@ -391,6 +519,7 @@ export const getEditEvent = async ({
         start,
         end,
         manualStatus,
+        description,
       } = result.value;
 
       const updatedEvent = {
@@ -408,7 +537,7 @@ export const getEditEvent = async ({
         start,
         end,
         manualStatus, // เพิ่ม field นี้ในรูปแบบ level บนสุด
-        extendedProps: { manualStatus },
+        extendedProps: { manualStatus, description },
       };
 
       // ✅ ตรวจสอบและเพิ่ม Customer ใหม่ถ้ายังไม่มี (ไม่ต้องเช็คว่า company ต้องมีค่า)
@@ -429,6 +558,7 @@ export const getEditEvent = async ({
       eventInfo.event.setProp("backgroundColor", backgroundColor);
       eventInfo.event.setExtendedProp("status", status);
       eventInfo.event.setExtendedProp("manualStatus", manualStatus);
+      eventInfo.event.setExtendedProp("description", description);
 
       setEvents((prevEvents) =>
         prevEvents.map((event) => (event.id === id ? updatedEvent : event))

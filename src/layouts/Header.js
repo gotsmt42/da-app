@@ -69,10 +69,11 @@ const Header = () => {
     <Navbar dark expand="md" className="fix-header">
       <div className="d-flex align-items-center justify-content-between w-100">
         <NavbarBrand tag={Link} to="/dashboard" className="m-0">
-          <div className="d-flex align-items-center gradiant-bg">
-            <img src="logo512.png" alt="Logo" className="logo" />
-            <h2 className="ms-2">System Service</h2>
-          </div>
+         <div className="d-flex align-items-center gradiant-bg" >
+  <img src="logo-dark-2.png" alt="Logo" className="logo" />
+  {/* <h2 className="ms-2" style={{ margin: 0 }}>System Service</h2> */}
+</div>
+
         </NavbarBrand>
 
         <Nav className="navbar-nav mx-auto" navbar>
@@ -129,7 +130,7 @@ const Header = () => {
 
         <Button
           style={{ backgroundColor: "transparent", border: "none" }}
-          className="d-lg-none"
+          className="d-lg-none hamburger-toggle" 
           onClick={showMobileMenu}
         >
           <i className="bi bi-list"></i>

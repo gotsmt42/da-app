@@ -1,29 +1,34 @@
-
 /* Header.css */
-
 
 .nav-link {
   color: #fff;
   font-weight: 600;
 }
 
-
-
-
 .fix-header {
-  height: auto; /* ให้ความสูงเป็นอัตโนมัติ */
-  padding: 10px; /* กำหนด padding เพื่อลดพื้นที่ */
+  height: 94px; /* ✅ กำหนดความสูงคงที่ของ Header */
+  overflow: visible;  padding: 0 50px 0px 20px; /* ✅ เพิ่ม padding ด้านล่างเพื่อให้โลโก้ดูย่นลง */
   
 }
 
 .gradiant-bg {
-  display: flex; /* ใช้ flexbox */
-  align-items: center; /* จัดแนวกลาง */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 23px 0px 0px ;       /* ✅ เพิ่ม padding บน-ล่างให้โลโก้ดูย่นลง */
+  height: 200px;            /* ✅ ความสูงคงที่ของ header */
+  overflow: hidden;
+  background-color: #fff;   /* (ถ้ามีพื้นหลัง) */
 }
 
 .logo {
-  height: 50px; /* ความสูงของโลโก้ */
-  width: auto; /* ทำให้ความกว้างปรับอัตโนมัติตามอัตราส่วน */
+  height: auto;
+  max-height: 200px;        /* ✅ โลโก้ไม่เต็ม 200px เพื่อให้ดูย่นลง */
+  width: auto;
+  object-fit: contain;
+  margin: 0 auto;
+  display: block;
+  transition: max-height 0.3s ease;
 }
 
 .navbar-nav {
@@ -32,7 +37,6 @@
   width: 100%; /* กำหนดให้มีความกว้างเต็ม */
 }
 
-
 /* ปรับให้แสดงปุ่ม toggle ในมือถือ */
 .toggle-button {
   display: block; /* แสดงปุ่ม toggle */
@@ -40,11 +44,51 @@
   border: none; /* ไม่มีขอบ */
 }
 
+
+@media (max-width: 768px) {
+  .hamburger-toggle{
+    margin-top: -20px; /* ✅ ขยับโลโก้ขึ้นด้านบน */
+    transition: margin-top 0.3s ease;
+    font-size: 30px;
+  }
+
+ .fix-header {
+    height: 100px;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  .gradiant-bg {
+    height: auto;
+    padding: 0;
+    position: relative; /* ✅ เพื่อให้ logo ขยับภายในได้ */
+  }
+
+  .logo {
+    max-height: 140px;
+    margin-top: -20px; /* ✅ ขยับโลโก้ขึ้นด้านบน */
+    transition: margin-top 0.3s ease;
+  }
+
+  .navbar-nav {
+    display: none;
+  }
+
+  .toggle-button {
+    display: block;
+  }
+
+  .hstack {
+    justify-content: center;
+  }
+}
+
+
 @media (max-width: 768px) {
   .navbar-nav {
     display: none; /* ซ่อนเมนู */
   }
-  
+
   .hstack {
     justify-content: center; /* จัดปุ่มในมือถือให้ตรงกลาง */
   }
@@ -55,11 +99,8 @@
   .navbar-nav {
     flex-direction: row; /* แนวนอนในหน้าจอใหญ่ */
   }
-  
+
   .toggle-button {
     display: none; /* ซ่อนปุ่ม toggle */
   }
 }
-
-
-

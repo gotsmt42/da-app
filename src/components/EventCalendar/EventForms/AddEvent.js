@@ -27,135 +27,124 @@ export const getAddEvent = async ({
     customClass: "swal-wide",
     // ✅ ฟอร์มเพิ่มแผนงานแบบ 2 คอลัมน์ Responsive
     html: `
-      <div class="swal-form-grid">
-        <!-- กลุ่มซ้าย-ขวาแบบ 2 คอลัมน์ -->
-        <div>
-          <label for="eventCompany">ชื่อบริษัท : </label>
-          <select id="eventCompany" class="swal2-select">
-            <option selected disabled></option>
-            ${customers.userCustomers
-              .map(
-                (customer) =>
-                  `<option value="${customer.cCompany}">${customer.cCompany}</option>`
-              )
-              .join("")}
-          </select>
-        </div>
-    
-        <div>
-          <label for="eventSite">ชื่อโครงการ : </label>
-          <select id="eventSite" class="swal2-select">
-            <option selected disabled></option>
-            ${customers.userCustomers
-              .map(
-                (customer) =>
-                  `<option value="${customer.cSite}">${customer.cSite}</option>`
-              )
-              .join("")}
-          </select>
-        </div>
-    
-        <div>
-          <label for="eventTitle">ประเภทงาน:</label>
-          <select id="eventTitle" class="swal2-select">
-            <option selected disabled></option>
-            <option value="LOCAL">LOCAL</option>
-            <option value="PO">PO</option>
-            <option value="PM">Preventive Maintenance (PM)</option>
-            <option value="Service">Service</option>
-            <option value="Training">Training</option>
-            <option value="Inspection">Inspection</option>
-            <option value="Test & Commissioning">Test & Commissioning</option>
-            <option value="สำรวจหน้างาน">สำรวจหน้างาน</option>
-            <option value="ตรวจเช็คปัญหา">ตรวจเช็คปัญหา</option>
-            <option value="แก้ไขปัญหา">แก้ไขปัญหา</option>
-            <option value="สแตนบาย">สแตนบาย</option>
-            <option value="เปลี่ยนอุปกรณ์">เปลี่ยนอุปกรณ์</option>
-            <option value="ติดตั้งอุปกรณ์">ติดตั้งอุปกรณ์</option>
-          </select>
-        </div>
-    
-        <div>
-          <label for="eventSystem">ระบบงาน:</label>
-          <select id="eventSystem" class="swal2-select">
-            <option selected disabled></option>
-            <option value="Office">Office</option>
-            <option value="Fire Alarm">Fire Alarm</option>
-            <option value="CCTV">CCTV</option>
-            <option value="Access Control">Access Control</option>
-            <option value="Networks">Networks</option>
-          </select>
-        </div>
-    
-        <div>
-          <label for="eventTime">ครั้งที่:</label>
-          <select id="eventTime" class="swal2-select">
-            <option selected disabled></option>
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-          </select>
-        </div>
+<!-- Container กึ่งกลาง -->
+<div style="display: flex; justify-content: center;">
+  <div class="swal-form-grid" style="
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 12px;
+    font-family: 'Segoe UI', sans-serif;
 
+  ">
 
-              <div>
-          <label for="eventTeam">ทีม : </label>
-          <select id="eventTeam" class="swal2-select">
-            <option selected disabled></option>
-${employeeList
-  .map(
-    (employee) => `<option value="${employee.fname}">${employee.fname}</option>`
-  )
-  .join("")}
+    <!-- ชื่อบริษัท -->
+    <div style="flex: 1 1 calc(33.333% - 16px); min-width: 220px;">
+      <label for="eventCompany" style="font-weight: bold; margin-bottom: 6px; display: block;">ชื่อบริษัท/นิติบุคคล:</label>
+      <select id="eventCompany" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
+        <option selected disabled></option>
+        ${customers.userCustomers.map(c => `<option value="${c.cCompany}">${c.cCompany}</option>`).join("")}
+      </select>
+    </div>
 
+    <!-- ชื่อโครงการ -->
+    <div style="flex: 1 1 calc(33.333% - 16px); min-width: 220px;">
+      <label for="eventSite" style="font-weight: bold; margin-bottom: 6px; display: block;">ชื่อโครงการ:</label>
+      <select id="eventSite" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
+        <option selected disabled></option>
+        ${customers.userCustomers.map(c => `<option value="${c.cSite}">${c.cSite}</option>`).join("")}
+      </select>
+    </div>
 
+    <!-- ประเภทงาน -->
+    <div style="flex: 1 1 calc(33.333% - 16px); min-width: 220px;">
+      <label for="eventTitle" style="font-weight: bold; margin-bottom: 6px; display: block;">ประเภทงาน:</label>
+      <select id="eventTitle" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
+        <option selected disabled></option>
+        ${[
+          "LOCAL", "PO", "PM", "Service", "Training", "Inspection",
+          "Test & Commissioning", "สำรวจหน้างาน", "ตรวจเช็คปัญหา",
+          "แก้ไขปัญหา", "สแตนบาย", "เปลี่ยนอุปกรณ์", "ติดตั้งอุปกรณ์"
+        ].map(title => `<option value="${title}">${title}</option>`).join("")}
+      </select>
+    </div>
 
-          </select>
-        </div>
-    
-        <div style="display: none;">
-          <label for="fontSize">ขนาดตัวอักษร:</label>
-          <select id="fontSize" class="swal2-input">
-            ${[8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72]
-              .map((size) => `<option value="${size}">${size}</option>`)
-              .join("")}
-          </select>
-        </div>
-      </div>
-    
-      <!-- ส่วนล่างแนวตั้ง -->
-      <div class="swal-form-bottom">
-     
-    
-        <div>
-          <label for="backgroundColorPicker">สีพื้นหลัง:</label>
-          <input id="backgroundColorPicker" style="width: 150px; height: 35px" type="color" value="${defaultBackgroundColor}" />
-        </div><br>
-       <div>
-          <label for="textColorPicker">สีข้อความ:</label>
-          <input id="textColorPicker" style="width: 150; height: 35px" type="color" value="${defaultTextColor}" />
-        </div><br>
-        
-      </div>
-      <div>
-          <label for="start">เริ่มต้น:</label>
-          <input id="start" type="date" style="width: 80%; height: 35px" class="swal2-input" value="${
-            arg.dateStr
-          }" />
-        </div>
-    
-        <div>
-          <label for="end">สิ้นสุด:</label>
-          <input id="end" type="date" style="width: 80%; height: 35px" class="swal2-input" value="${
-            arg.dateStr
-          }" />
-        </div>
+    <!-- ระบบงาน -->
+    <div style="flex: 1 1 calc(33.333% - 16px); min-width: 220px;">
+      <label for="eventSystem" style="font-weight: bold; margin-bottom: 6px; display: block;">ระบบงาน:</label>
+      <select id="eventSystem" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
+        <option selected disabled></option>
+        ${["Office", "Fire Alarm", "CCTV", "Access Control", "Networks"].map(sys => `<option value="${sys}">${sys}</option>`).join("")}
+      </select>
+    </div>
+
+    <!-- ครั้งที่ -->
+    <div style="flex: 1 1 calc(33.333% - 16px); min-width: 220px;">
+      <label for="eventTime" style="font-weight: bold; margin-bottom: 6px; display: block;">ครั้งที่:</label>
+      <select id="eventTime" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
+        <option selected disabled></option>
+        ${["1", "2", "3", "4"].map(t => `<option value="${t}">${t}</option>`).join("")}
+      </select>
+    </div>
+
+    <!-- ทีม -->
+    <div style="flex: 1 1 calc(33.333% - 16px); min-width: 220px;">
+      <label for="eventTeam" style="font-weight: bold; margin-bottom: 6px; display: block;">ทีม:</label>
+      <select id="eventTeam" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
+        <option selected disabled></option>
+        ${employeeList.map(e => `<option value="${e.fname}">${e.fname}</option>`).join("")}
+      </select>
+    </div>
+
+    <!-- ขนาดตัวอักษร (ซ่อนอยู่) -->
+    <div style="display: none;">
+      <label for="fontSize">ขนาดตัวอักษร:</label>
+      <select id="fontSize" class="swal2-input">
+        ${[8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72].map(size => `<option value="${size}">${size}</option>`).join("")}
+      </select>
+    </div>
+
+  </div>
+</div>
+
+<!-- ส่วนล่างแนวตั้ง -->
+<div style="display: flex; justify-content: center;">
+  <div class="swal-form-grid" style="
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-start;
+    margin-top: 12px;
+    font-family: 'Segoe UI', sans-serif;
+    max-width: 1000px; /* ✅ ป้องกันไม่ให้กว้างเกิน modal */
+  ">
+  <div style="margin-bottom: 12px;">
+    <label for="backgroundColorPicker" style="font-weight: bold;">สีพื้นหลัง:</label><br>
+    <input id="backgroundColorPicker" type="color" style="width: 150px; height: 35px; border-radius: 6px;" value="${defaultBackgroundColor}" />
+  </div>
+
+  <div style="margin-bottom: 12px;">
+    <label for="textColorPicker" style="font-weight: bold;">สีข้อความ:</label><br>
+    <input id="textColorPicker" type="color" style="width: 150px; height: 35px; border-radius: 6px;" value="${defaultTextColor}" />
+  </div>
+
+  <div style="margin-bottom: 12px;">
+    <label for="start" style="font-weight: bold;">เริ่มต้น:</label><br>
+    <input id="start" type="date"  style="width: 250px; height: 35px; padding: 6px 12px; border-radius: 6px;" value="${arg.dateStr}" />
+  </div>
+
+  <div>
+    <label for="end" style="font-weight: bold;">สิ้นสุด:</label><br>
+    <input id="end" type="date"  style="width: 250px; height: 35px; padding: 6px 12px; border-radius: 6px;" value="${arg.dateStr}" />
+  </div>
+</div>
+</div>
+
     `,
 
     showCancelButton: true,
-    confirmButtonText: "บันทึกแผนงาน",
-    cancelButtonText: "ยกเลิก",
+    confirmButtonText: "✅ บันทึกแผนงาน",
+    cancelButtonText: "🔙 ยกเลิก",
     didOpen: () => {
       new TomSelect("#eventCompany", {
         create: true, // ✅ อนุญาตให้ผู้ใช้พิมพ์ชื่อใหม่ได้
