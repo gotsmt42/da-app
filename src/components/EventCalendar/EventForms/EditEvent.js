@@ -354,10 +354,9 @@ export const getEditEvent = async ({
 
       const clearBtn = document.getElementById("clearDescriptionBtn");
 
-      const textarea = document.getElementById("editDescription");
-      if (textarea) {
-        textarea.value = eventDescription || "";
-      }
+  if (descriptionInput) {
+  descriptionInput.value = eventDescription || "";
+}
 
 
       
