@@ -84,8 +84,7 @@ export const getGeneratePDF = async ({
 
   const start = moment(event.start).format("DD-MM-YYYY");
   const end = moment(event.end).format("DD-MM-YYYY");
-const descriptionLines = description.split("\n");
-
+const descriptionLines = (description || "").split("\n");
 const lines = [
   "",
   `เรียน  ผู้จัดการโครงการ ${event.extendedProps.site}`,
@@ -118,7 +117,9 @@ const lines = [
 
   doc.text("ขอแสดงความนับถือ", 145, y + 40);
 
-  doc.save(
-    `ใบแจ้งขอเข้างาน (${event.title}) ${event.extendedProps.system} ${siteCompany} ${timeText}.pdf`
-  );
+  const safeFileName = `ใบแจ้งขอเข้างาน (${event.title}) ${event.extendedProps.system} ${siteCompany} ${timeText}`
+  .replace(/[\/\\:*?"<>|]/g, "_");
+
+doc.save(`${safeFileName}.pdf`);
+
 };
