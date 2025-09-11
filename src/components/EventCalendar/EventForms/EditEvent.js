@@ -11,6 +11,7 @@ export const getEditEvent = async ({
   Swal,
   TomSelect,
   moment,
+  calendarRef,
 }) => {
   const inputBackgroundColor = document.createElement("input");
   inputBackgroundColor.type = "color";
@@ -343,6 +344,8 @@ export const getEditEvent = async ({
       
     </div>
   `,
+
+  
     didOpen: () => {
       const descriptionInput = document.getElementById("editDescription");
       const charCountDisplay = document.getElementById("charCount");
@@ -389,11 +392,47 @@ export const getEditEvent = async ({
           },
           item: (data, escape) => `<div>${escape(data.text)}</div>`,
         },
+
+        
         onChange: (value) => {
           const control = statusSelect.control_input.parentElement;
           control.style.backgroundColor = statusColorMap[value] || "#ccc";
           control.style.color = value === "กำลังดำเนินการ" ? "#000" : "#fff";
           control.style.borderColor = "#999";
+
+          // ✅ อัปเดต eventInfo.event ทันที
+          if (eventInfo?.event) {
+            const calendarApi = calendarRef.current?.getApi();
+            const oldEvent = eventInfo.event;
+
+            const newEventData = {
+              id: oldEvent.id,
+              title: oldEvent.title,
+              start: oldEvent.start,
+              end: oldEvent.end,
+              backgroundColor: inputBackgroundColor.value, // ✅ สีใหม่
+              textColor: inputTextColor.value,
+              fontSize: oldEvent.extendedProps.fontSize,
+              status: oldEvent.extendedProps.status,
+              manualStatus: oldEvent.extendedProps.manualStatus,
+              description: oldEvent.extendedProps.description,
+              extendedProps: {
+                ...oldEvent.extendedProps,
+              },
+            };
+
+            oldEvent.remove();
+            calendarApi.addEvent(newEventData);
+          }
+
+          // ✅ อัปเดตใน state ถ้าใช้ React หรือ Vue
+          //   setEvents((prevEvents) =>
+          //     prevEvents.map((event) =>
+          //       event.id === eventInfo.event.id
+          //         ? { ...event, status: value }
+          //         : event
+          //     )
+          //   );
         },
       });
       const initialColor = statusColorMap[statusSelect.getValue()] || "#ccc";
@@ -448,7 +487,40 @@ export const getEditEvent = async ({
       }
     },
 
+    
+
+
+    
+
     didRender: () => {
+
+        const replaceEventWithUpdatedColors = (event, newColors = {}) => {
+  const calendarApi = calendarRef.current?.getApi();
+  if (!calendarApi || !event) return;
+
+  const newEventData = {
+    id: event.id,
+    title: event.title,
+    start: event.start,
+    end: event.end,
+    backgroundColor: newColors.backgroundColor || event.backgroundColor,
+    textColor: newColors.textColor || event.textColor,
+    fontSize: event.extendedProps.fontSize,
+    status: event.extendedProps.status,
+    manualStatus: event.extendedProps.manualStatus,
+    description: event.extendedProps.description,
+    extendedProps: {
+      ...event.extendedProps,
+      status: event.extendedProps.status,
+    },
+  };
+
+  event.remove();
+  calendarApi.addEvent(newEventData);
+};
+
+
+
       const getVal = (id) => document.getElementById(id)?.value || "";
 
       document
@@ -493,6 +565,13 @@ export const getEditEvent = async ({
           await EventService.UpdateEvent(eventId, updatedEvent);
           await fetchEventsFromDB();
           Swal.close();
+
+
+          // ✅ อัปเดตสี icon ทันทีหลังบันทึก
+replaceEventWithUpdatedColors(eventInfo.event, {
+  backgroundColor: inputBackgroundColor.value,
+  textColor: inputTextColor.value,
+})
 
           Swal.fire({
             title: "บันทึกการเปลี่ยนแปลงสำเร็จ",

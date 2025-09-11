@@ -247,7 +247,9 @@ const generateWorkPermitPDF = async (event, description) => {
       Swal,
       TomSelect,
       moment,
+      calendarRef
     });
+
   };
 
   const handleDeleteEvent = async (id) => {
