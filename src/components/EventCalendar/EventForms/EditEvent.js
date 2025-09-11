@@ -291,7 +291,11 @@ export const getEditEvent = async ({
  <textarea
     id="editDescription"
     rows="10"
-    style="
+    
+   
+    placeholder="กรอกรายละเอียดงานที่ต้องการแสดงในเอกสาร PDF"
+
+     style="
       width: 100%;
       padding: 14px 16px;
       font-size: 15px;
@@ -302,7 +306,6 @@ export const getEditEvent = async ({
       resize: vertical;
       font-family: 'Segoe UI', sans-serif;
     "
-    placeholder="กรอกรายละเอียดงานที่ต้องการแสดงในเอกสาร PDF"
   > ${eventDescription || ""}</textarea>
 
 
@@ -345,7 +348,6 @@ export const getEditEvent = async ({
     </div>
   `,
 
-  
     didOpen: () => {
       const descriptionInput = document.getElementById("editDescription");
       const charCountDisplay = document.getElementById("charCount");
@@ -356,6 +358,9 @@ export const getEditEvent = async ({
       if (textarea) {
         textarea.value = eventDescription || "";
       }
+
+
+      
       const statusColorMap = {
         กำลังรอยืนยัน: "#888888",
         ยืนยันแล้ว: "#0c49ac",
@@ -393,7 +398,6 @@ export const getEditEvent = async ({
           item: (data, escape) => `<div>${escape(data.text)}</div>`,
         },
 
-        
         onChange: (value) => {
           const control = statusSelect.control_input.parentElement;
           control.style.backgroundColor = statusColorMap[value] || "#ccc";
@@ -467,17 +471,17 @@ export const getEditEvent = async ({
         .getElementById("textColorPickerContainer")
         .appendChild(inputTextColor);
 
-      const updateCharCount = () => {
-        const val = descriptionInput?.value || "";
-        if (charCountDisplay) {
-          charCountDisplay.innerText = `จำนวนตัวอักษร: ${val.length}`;
-        }
-      };
+  const updateCharCount = () => {
+  const val = descriptionInput?.value || "";
+  if (charCountDisplay) {
+    charCountDisplay.innerText = `จำนวนตัวอักษร: ${val.length}`;
+  }
+};
 
-      if (descriptionInput) {
-        descriptionInput.addEventListener("input", updateCharCount);
-        updateCharCount(); // เรียกตอนเปิด popup
-      }
+if (descriptionInput) {
+  descriptionInput.addEventListener("input", updateCharCount);
+  updateCharCount(); // เรียกตอนเปิด popup
+}
 
       if (clearBtn && descriptionInput) {
         clearBtn.addEventListener("click", () => {
@@ -487,39 +491,31 @@ export const getEditEvent = async ({
       }
     },
 
-    
-
-
-    
-
     didRender: () => {
+      const replaceEventWithUpdatedColors = (event, newColors = {}) => {
+        const calendarApi = calendarRef.current?.getApi();
+        if (!calendarApi || !event) return;
 
-        const replaceEventWithUpdatedColors = (event, newColors = {}) => {
-  const calendarApi = calendarRef.current?.getApi();
-  if (!calendarApi || !event) return;
+        const newEventData = {
+          id: event.id,
+          title: event.title,
+          start: event.start,
+          end: event.end,
+          backgroundColor: newColors.backgroundColor || event.backgroundColor,
+          textColor: newColors.textColor || event.textColor,
+          fontSize: event.extendedProps.fontSize,
+          status: event.extendedProps.status,
+          manualStatus: event.extendedProps.manualStatus,
+          description: event.extendedProps.description,
+          extendedProps: {
+            ...event.extendedProps,
+            status: event.extendedProps.status,
+          },
+        };
 
-  const newEventData = {
-    id: event.id,
-    title: event.title,
-    start: event.start,
-    end: event.end,
-    backgroundColor: newColors.backgroundColor || event.backgroundColor,
-    textColor: newColors.textColor || event.textColor,
-    fontSize: event.extendedProps.fontSize,
-    status: event.extendedProps.status,
-    manualStatus: event.extendedProps.manualStatus,
-    description: event.extendedProps.description,
-    extendedProps: {
-      ...event.extendedProps,
-      status: event.extendedProps.status,
-    },
-  };
-
-  event.remove();
-  calendarApi.addEvent(newEventData);
-};
-
-
+        event.remove();
+        calendarApi.addEvent(newEventData);
+      };
 
       const getVal = (id) => document.getElementById(id)?.value || "";
 
@@ -566,12 +562,11 @@ export const getEditEvent = async ({
           await fetchEventsFromDB();
           Swal.close();
 
-
           // ✅ อัปเดตสี icon ทันทีหลังบันทึก
-replaceEventWithUpdatedColors(eventInfo.event, {
-  backgroundColor: inputBackgroundColor.value,
-  textColor: inputTextColor.value,
-})
+          replaceEventWithUpdatedColors(eventInfo.event, {
+            backgroundColor: inputBackgroundColor.value,
+            textColor: inputTextColor.value,
+          });
 
           Swal.fire({
             title: "บันทึกการเปลี่ยนแปลงสำเร็จ",
@@ -607,6 +602,7 @@ replaceEventWithUpdatedColors(eventInfo.event, {
     preConfirm: () => {
       const getVal = (id) => document.getElementById(id)?.value || "";
       const title = getVal("editTitle");
+      const description = getVal("editDescription");
       if (!title) Swal.showValidationMessage("กรุณากรอกชื่อแผนงาน");
 
       const endInput = getVal("editEnd");
@@ -616,7 +612,6 @@ replaceEventWithUpdatedColors(eventInfo.event, {
           : moment(endInput).toISOString()
         : eventEnd.toISOString();
 
-      const description = getVal("editDescription");
       return {
         id: eventId,
         docNo: getVal("editdocNo"),
