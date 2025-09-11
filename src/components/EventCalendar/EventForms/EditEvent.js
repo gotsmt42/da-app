@@ -1,3 +1,6 @@
+import Toastify from "toastify-js";
+import "toastify-js/src/toastify.css";
+
 export const getEditEvent = async ({
   setEvents,
   fetchEventsFromDB,
@@ -22,6 +25,7 @@ export const getEditEvent = async ({
   inputTextColor.value = eventInfo.event.textColor;
 
   const eventId = eventInfo.event.id;
+  const docNum = eventInfo.event.docNum;
   const evendocNo = eventInfo.event.extendedProps?.docNo || "";
   const eventCompany = eventInfo.event.extendedProps?.company || "";
   const eventSite = eventInfo.event.extendedProps?.site || "";
@@ -39,7 +43,8 @@ export const getEditEvent = async ({
 
   let eventStatus = eventInfo.event.extendedProps?.status || "กำลังรอยืนยัน"; // ค่าเริ่มต้น
 
-  const eventDescription = eventInfo.event.extendedProps?.description ?? "";
+  const eventSubject = eventInfo.event.extendedProps?.subject || "";
+  const eventDescription = eventInfo.event.extendedProps?.description || "";
 
   const formattedEnd = eventAllDay
     ? moment(eventEnd).subtract(1, "days").format("YYYY-MM-DD")
@@ -269,44 +274,53 @@ export const getEditEvent = async ({
 <br>
 
 
-      <!-- เลขที่อ้างอิงเอกสาร -->
-<div style="margin-top: 12px; position: relative;">
-  <label for="editDescription" style="font-weight: bold; display: block; margin-bottom: 6px;">
-    ** เลขที่อ้างอิงเอกสาร (doc No.) :
-  </label>
+    <!-- เลขที่อ้างอิงเอกสาร -->
+        <div style="margin-top: 12px; position: relative;">
+        <label for="editDescription" style="font-weight: bold; display: block; margin-bottom: 6px;">
+            ** เลขที่อ้างอิงเอกสาร (doc No.) :
+        </label>
+
+            <input id="editdocNo" type="" style="width: 80%; height: 35px" class="swal2-input" value="${evendocNo}" />
+        </div>      
+        <br>
+        
+        
+    <!-- ชื่อเรื่อง -->
+        <div style="margin-top: 12px; position: relative;">
+        <label for="editSubject" style="font-weight: bold; display: block; margin-bottom: 6px;">
+            ** ชื่อเรื่อง (Subject.) :
+        </label>
+
+            <input id="editSubject" type="" style="width: 80%; height: 35px" class="swal2-input" value="${eventSubject}" />
+        </div>      
+        <br>
 
 
-          <input id="editdocNo" type="" style="width: 80%; height: 35px" class="swal2-input" value="${evendocNo}" />
+    <!-- รายละเอียดงานสำหรับออกใบแจ้งเข้างาน -->
+    <div style="margin-top: 12px; position: relative;">
+    <label for="editDescription" style="font-weight: bold; display: block; margin-bottom: 6px;">
+        ** รายละเอียดงานสำหรับออกใบแจ้งเข้างาน (Work Permit) :
+    </label>
 
-
-
-</div>
-<br>
-<!-- รายละเอียดงานสำหรับออกใบแจ้งเข้างาน -->
-<div style="margin-top: 12px; position: relative;">
-  <label for="editDescription" style="font-weight: bold; display: block; margin-bottom: 6px;">
-    ** รายละเอียดงานสำหรับออกใบแจ้งเข้างาน (Work Permit) :
-  </label>
-
- <textarea
-    id="editDescription"
-    rows="10"
+    <textarea
+        id="editDescription"
+        rows="10"
+        
     
-   
-    placeholder="กรอกรายละเอียดงานที่ต้องการแสดงในเอกสาร PDF"
+        placeholder="กรอกรายละเอียดงานที่ต้องการแสดงในเอกสาร PDF"
 
-     style="
-      width: 100%;
-      padding: 14px 16px;
-      font-size: 15px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-      transition: border-color 0.3s, box-shadow 0.3s;
-      resize: vertical;
-      font-family: 'Segoe UI', sans-serif;
-    "
-  ></textarea>
+        style="
+        width: 100%;
+        padding: 14px 16px;
+        font-size: 15px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+        transition: border-color 0.3s, box-shadow 0.3s;
+        resize: vertical;
+        font-family: 'Segoe UI', sans-serif;
+        "
+    ></textarea>
 
 
 
@@ -319,12 +333,6 @@ export const getEditEvent = async ({
 
 
   `;
-setTimeout(() => {
-  const descriptionInput = document.getElementById("editDescription");
-  if (descriptionInput) {
-    descriptionInput.value = eventDescription || "";
-  }
-}, 0);
 
   Swal.fire({
     title: `<h4>[ ${eventTitle} ] ${eventSystem} ${eventSite}${
@@ -360,12 +368,10 @@ setTimeout(() => {
 
       const clearBtn = document.getElementById("clearDescriptionBtn");
 
-  if (descriptionInput) {
-  descriptionInput.value = eventDescription || "";
-}
+      if (descriptionInput) {
+        descriptionInput.value = eventDescription || "";
+      }
 
-
-      
       const statusColorMap = {
         กำลังรอยืนยัน: "#888888",
         ยืนยันแล้ว: "#0c49ac",
@@ -476,17 +482,17 @@ setTimeout(() => {
         .getElementById("textColorPickerContainer")
         .appendChild(inputTextColor);
 
-  const updateCharCount = () => {
-  const val = descriptionInput?.value || "";
-  if (charCountDisplay) {
-    charCountDisplay.innerText = `จำนวนตัวอักษร: ${val.length}`;
-  }
-};
+      const updateCharCount = () => {
+        const val = descriptionInput?.value || "";
+        if (charCountDisplay) {
+          charCountDisplay.innerText = `จำนวนตัวอักษร: ${val.length}`;
+        }
+      };
 
-if (descriptionInput) {
-  descriptionInput.addEventListener("input", updateCharCount);
-  updateCharCount(); // เรียกตอนเปิด popup
-}
+      if (descriptionInput) {
+        descriptionInput.addEventListener("input", updateCharCount);
+        updateCharCount(); // เรียกตอนเปิด popup
+      }
 
       if (clearBtn && descriptionInput) {
         clearBtn.addEventListener("click", () => {
@@ -503,6 +509,7 @@ if (descriptionInput) {
 
         const newEventData = {
           id: event.id,
+          docNo: event.extendedProps.docNo,
           title: event.title,
           start: event.start,
           end: event.end,
@@ -511,11 +518,13 @@ if (descriptionInput) {
           fontSize: event.extendedProps.fontSize,
           status: event.extendedProps.status,
           manualStatus: event.extendedProps.manualStatus,
-          description: event.extendedProps.description,
           extendedProps: {
             ...event.extendedProps,
             status: event.extendedProps.status,
           },
+          subject: event.extendedProps.subject,
+
+          description: event.extendedProps.description,
         };
 
         event.remove();
@@ -540,8 +549,6 @@ if (descriptionInput) {
               : moment(endInput).toISOString()
             : eventEnd.toISOString();
 
-          const description = getVal("editDescription");
-
           const updatedEvent = {
             id: eventId,
 
@@ -559,7 +566,9 @@ if (descriptionInput) {
             start: moment(getVal("editStart")).toISOString(),
             end,
             manualStatus: true,
-            description,
+
+            subject: getVal("editSubject"),
+            description: getVal("editDescription"),
           };
 
           // ✅ อัปเดต event และปิด Swal
@@ -590,13 +599,109 @@ if (descriptionInput) {
         Swal.close();
       });
 
+      const endInput = getVal("editEnd");
+      const end = endInput
+        ? eventAllDay
+          ? moment(endInput).add(1, "days").toISOString()
+          : moment(endInput).toISOString()
+        : eventEnd.toISOString();
       document
         .getElementById("btnGeneratePDF")
         ?.addEventListener("click", () => {
-          const description = getVal("editDescription");
-          generateWorkPermitPDF(eventInfo.event, description);
-        });
+          const toast = Toastify({
+            text: `
+      <div style="text-align:center">
+        <div style="margin-bottom:8px;">ต้องการบันทึกข้อมูลก่อนออกใบแจ้งเข้างานหรือไม่?</div>
+        <button id="toast-confirm" style="margin-right:10px; padding:4px 12px; background:#fff; border:none; border-radius:4px; cursor:pointer;">ตกลง</button>
+        <button id="toast-cancel" style="padding:4px 12px; background:#fff; border:none; border-radius:4px; cursor:pointer;">ยกเลิก</button>
+      </div>
+    `,
+            duration: 3000,
+            gravity: "top", // ต้องใช้ "top" เพื่อให้เราดัดแปลงตำแหน่งได้
+            position: "center",
+            backgroundColor: "#0064de",
+            escapeMarkup: false,
+          });
 
+          toast.showToast();
+
+          setTimeout(() => {
+            const confirmBtn = document.getElementById("toast-confirm");
+            const cancelBtn = document.getElementById("toast-cancel");
+
+            if (confirmBtn) {
+              confirmBtn.addEventListener("click", async () => {
+                toast.hideToast(); // ✅ ปิด Toastify
+
+                const subject = getVal("editSubject");
+                if (!subject) {
+                  Toastify({
+                    text: "กรุณากรอกชื่อเรื่อง",
+                    duration: 3000,
+                    backgroundColor: "#f44336",
+                    gravity: "top",
+                    position: "center",
+                  }).showToast();
+                  return;
+                }
+
+                const updatedEvent = {
+                  id: eventId,
+                  docNo: getVal("editdocNo"),
+                  company: getVal("editCompany"),
+                  site: getVal("editSite"),
+                  title: getVal("editTitle"),
+                  system: getVal("editSystem"),
+                  time: getVal("editTime"),
+                  team: getVal("editTeam"),
+                  textColor: inputTextColor.value,
+                  backgroundColor: inputBackgroundColor.value,
+                  fontSize: eventFontSize,
+                  status: getVal("editStatus"),
+                  start: moment(getVal("editStart")).toISOString(),
+                  end,
+                  manualStatus: true,
+                  subject: getVal("editSubject"),
+                  description: getVal("editDescription"),
+                };
+
+                try {
+                  await EventService.UpdateEvent(eventId, updatedEvent);
+                  await fetchEventsFromDB();
+
+                  Toastify({
+                    text: "✅ บันทึกข้อมูลสำเร็จ กำลังสร้าง PDF...",
+                    duration: 3000,
+                    backgroundColor: "#0ECC00",
+                    gravity: "top",
+                    position: "center",
+                  }).showToast();
+
+                  generateWorkPermitPDF(
+                    eventInfo.event,
+                    updatedEvent.docNo,
+                    updatedEvent.subject,
+                    updatedEvent.description
+                  );
+                } catch (error) {
+                  Toastify({
+                    text: "❌ เกิดข้อผิดพลาดในการบันทึก",
+                    duration: 3000,
+                    backgroundColor: "#f44336",
+                    gravity: "top",
+                    position: "center",
+                  }).showToast();
+                }
+              });
+            }
+
+            if (cancelBtn) {
+              cancelBtn.addEventListener("click", () => {
+                toast.hideToast(); // ✅ ปิด Toastify
+              });
+            }
+          }, 100);
+        });
       document
         .getElementById("btnViewSchedule")
         ?.addEventListener("click", () => {
@@ -607,7 +712,7 @@ if (descriptionInput) {
     preConfirm: () => {
       const getVal = (id) => document.getElementById(id)?.value || "";
       const title = getVal("editTitle");
-      const description = getVal("editDescription");
+
       if (!title) Swal.showValidationMessage("กรุณากรอกชื่อแผนงาน");
 
       const endInput = getVal("editEnd");
@@ -633,7 +738,9 @@ if (descriptionInput) {
         start: moment(getVal("editStart")).toISOString(),
         end,
         manualStatus: true,
-        description,
+
+        subject: getVal("editSubject"),
+        description: getVal("editDescription"),
       };
     },
   }).then(async (result) => {
@@ -655,6 +762,7 @@ if (descriptionInput) {
         start,
         end,
         manualStatus,
+        subject,
         description,
       } = result.value;
 
@@ -672,8 +780,11 @@ if (descriptionInput) {
         status,
         start,
         end,
-        manualStatus, // เพิ่ม field นี้ในรูปแบบ level บนสุด
-        extendedProps: { manualStatus, description },
+        manualStatus,
+        extendedProps: { manualStatus },
+
+        subject,
+        description,
       };
 
       // ✅ ตรวจสอบและเพิ่ม Customer ใหม่ถ้ายังไม่มี (ไม่ต้องเช็คว่า company ต้องมีค่า)
@@ -694,11 +805,12 @@ if (descriptionInput) {
       eventInfo.event.setProp("backgroundColor", backgroundColor);
       eventInfo.event.setExtendedProp("status", status);
       eventInfo.event.setExtendedProp("manualStatus", manualStatus);
-      eventInfo.event.setExtendedProp("description", description);
 
       setEvents((prevEvents) =>
         prevEvents.map((event) => (event.id === id ? updatedEvent : event))
       );
+
+      console.log("updatedEvent", updatedEvent);
 
       // ส่งข้อมูลแก้ไขไปยัง API
       await EventService.UpdateEvent(id, updatedEvent);

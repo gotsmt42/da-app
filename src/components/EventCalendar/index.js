@@ -20,6 +20,8 @@ import Swal from "sweetalert2";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"; // Import FontAwesomeIcon component
 
+
+
 import {
   faClockRotateLeft,
   faFileExcel,
@@ -70,6 +72,8 @@ import { getFetchEvents } from "./EventForms/FetchEvents";
 import { getDeleteEvent } from "./EventForms/DeleteEvent";
 
 import { getGeneratePDF } from "./Functions/GenPDF";
+
+
 
 function EventCalendar() {
   const { userData } = useAuth(); // ✅ เปลี่ยนจาก user → userData
@@ -155,10 +159,10 @@ function EventCalendar() {
   }, []);
 
   
-const generateWorkPermitPDF = async (event, description) => {
+const generateWorkPermitPDF = async (event, docNo, subject, description) => {
   try {
     setLoading(true);
-    await getGeneratePDF({ jsPDF, thSarabunFont, event, moment, description });
+    await getGeneratePDF({ jsPDF, thSarabunFont, event, moment, docNo, subject, description });
   } catch (error) {
     console.error("❌ สร้าง PDF ไม่สำเร็จ:", error);
   } finally {
