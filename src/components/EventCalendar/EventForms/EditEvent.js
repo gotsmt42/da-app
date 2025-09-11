@@ -306,7 +306,7 @@ export const getEditEvent = async ({
       resize: vertical;
       font-family: 'Segoe UI', sans-serif;
     "
-  > ${eventDescription || ""}</textarea>
+  ></textarea>
 
 
 
@@ -319,6 +319,12 @@ export const getEditEvent = async ({
 
 
   `;
+setTimeout(() => {
+  const descriptionInput = document.getElementById("editDescription");
+  if (descriptionInput) {
+    descriptionInput.value = eventDescription || "";
+  }
+}, 0);
 
   Swal.fire({
     title: `<h4>[ ${eventTitle} ] ${eventSystem} ${eventSite}${
