@@ -43,7 +43,9 @@ export const getAddEvent = async ({
       <label for="eventCompany" style="font-weight: bold; margin-bottom: 6px; display: block;">ชื่อบริษัท/นิติบุคคล:</label>
       <select id="eventCompany" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
         <option selected disabled></option>
-        ${customers.userCustomers.map(c => `<option value="${c.cCompany}">${c.cCompany}</option>`).join("")}
+        ${customers.userCustomers
+          .map((c) => `<option value="${c.cCompany}">${c.cCompany}</option>`)
+          .join("")}
       </select>
     </div>
 
@@ -52,7 +54,9 @@ export const getAddEvent = async ({
       <label for="eventSite" style="font-weight: bold; margin-bottom: 6px; display: block;">ชื่อโครงการ:</label>
       <select id="eventSite" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
         <option selected disabled></option>
-        ${customers.userCustomers.map(c => `<option value="${c.cSite}">${c.cSite}</option>`).join("")}
+        ${customers.userCustomers
+          .map((c) => `<option value="${c.cSite}">${c.cSite}</option>`)
+          .join("")}
       </select>
     </div>
 
@@ -62,10 +66,22 @@ export const getAddEvent = async ({
       <select id="eventTitle" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
         <option selected disabled></option>
         ${[
-          "LOCAL", "PO", "PM", "Service", "Training", "Inspection",
-          "Test & Commissioning", "สำรวจหน้างาน", "ตรวจเช็คปัญหา",
-          "แก้ไขปัญหา", "สแตนบาย", "เปลี่ยนอุปกรณ์", "ติดตั้งอุปกรณ์"
-        ].map(title => `<option value="${title}">${title}</option>`).join("")}
+          "LOCAL",
+          "PO",
+          "PM",
+          "Service",
+          "Training",
+          "Inspection",
+          "Test & Commissioning",
+          "สำรวจหน้างาน",
+          "ตรวจเช็คปัญหา",
+          "แก้ไขปัญหา",
+          "สแตนบาย",
+          "เปลี่ยนอุปกรณ์",
+          "ติดตั้งอุปกรณ์",
+        ]
+          .map((title) => `<option value="${title}">${title}</option>`)
+          .join("")}
       </select>
     </div>
 
@@ -74,7 +90,9 @@ export const getAddEvent = async ({
       <label for="eventSystem" style="font-weight: bold; margin-bottom: 6px; display: block;">ระบบงาน:</label>
       <select id="eventSystem" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
         <option selected disabled></option>
-        ${["Office", "Fire Alarm", "CCTV", "Access Control", "Networks"].map(sys => `<option value="${sys}">${sys}</option>`).join("")}
+        ${["Office", "Fire Alarm", "CCTV", "Access Control", "Networks"]
+          .map((sys) => `<option value="${sys}">${sys}</option>`)
+          .join("")}
       </select>
     </div>
 
@@ -83,7 +101,9 @@ export const getAddEvent = async ({
       <label for="eventTime" style="font-weight: bold; margin-bottom: 6px; display: block;">ครั้งที่:</label>
       <select id="eventTime" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
         <option selected disabled></option>
-        ${["1", "2", "3", "4"].map(t => `<option value="${t}">${t}</option>`).join("")}
+        ${["1", "2", "3", "4"]
+          .map((t) => `<option value="${t}">${t}</option>`)
+          .join("")}
       </select>
     </div>
 
@@ -92,7 +112,9 @@ export const getAddEvent = async ({
       <label for="eventTeam" style="font-weight: bold; margin-bottom: 6px; display: block;">ทีม:</label>
       <select id="eventTeam" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
         <option selected disabled></option>
-        ${employeeList.map(e => `<option value="${e.fname}">${e.fname}</option>`).join("")}
+        ${employeeList
+          .map((e) => `<option value="${e.fname}">${e.fname}</option>`)
+          .join("")}
       </select>
     </div>
 
@@ -100,7 +122,9 @@ export const getAddEvent = async ({
     <div style="display: none;">
       <label for="fontSize">ขนาดตัวอักษร:</label>
       <select id="fontSize" class="swal2-input">
-        ${[8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72].map(size => `<option value="${size}">${size}</option>`).join("")}
+        ${[8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72]
+          .map((size) => `<option value="${size}">${size}</option>`)
+          .join("")}
       </select>
     </div>
 
@@ -128,17 +152,65 @@ export const getAddEvent = async ({
     <input id="textColorPicker" type="color" style="width: 150px; height: 35px; border-radius: 6px;" value="${defaultTextColor}" />
   </div>
 
-  <div style="margin-bottom: 12px;">
-    <label for="start" style="font-weight: bold;">เริ่มต้น:</label><br>
-    <input id="start" type="date"  style="width: 250px; height: 35px; padding: 6px 12px; border-radius: 6px;" value="${arg.dateStr}" />
+<div style="flex: 1; min-width: 100px;">
+    <label for="start" style="font-weight: bold; margin-bottom: 4px; display: block;">วันที่เริ่มต้น:</label><br>
+    <input id="start" type="date"  style="width: 100%; padding: 6px 10px; border-radius: 6px; border: 1px solid #ccc;" value="${
+      arg.dateStr
+    }" />
   </div>
 
-  <div>
-    <label for="end" style="font-weight: bold;">สิ้นสุด:</label><br>
-    <input id="end" type="date"  style="width: 250px; height: 35px; padding: 6px 12px; border-radius: 6px;" value="${arg.dateStr}" />
+<div style="flex: 1; min-width: 100px;">
+    <label for="end"style="font-weight: bold; margin-bottom: 4px; display: block;">วันที่สิ้นสุด:</label><br>
+    <input id="end" type="date"  style="width: 100%; padding: 6px 10px; border-radius: 6px; border: 1px solid #ccc;" value="${
+      arg.dateStr
+    }" />
   </div>
 </div>
 </div>
+
+<div style="display: flex; justify-content: center;">
+  <div class="swal-form-grid" style="
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-start;
+    margin-top: 12px;
+    font-family: 'Segoe UI', sans-serif;
+    max-width: 1000px; /* ✅ ป้องกันไม่ให้กว้างเกิน modal */
+  ">
+
+
+<!-- เวลาเริ่ม -->
+<div style="flex: 1; min-width: 100px;">
+  <label for="startTime" style="font-weight: bold; margin-bottom: 4px; display: block;">เวลาเริ่ม :</label>
+  <input
+    id="startTime"
+    type="text"
+    placeholder="เช่น 08:30"
+
+    style="width: 100%; padding: 6px 10px; border-radius: 6px; border: 1px solid #ccc;"
+ 
+  />
+</div>
+
+<!-- เวลาสิ้นสุด -->
+<div style="flex: 1; min-width: 100px;">
+  <label for="endTime" style="font-weight: bold; margin-bottom: 4px; display: block;">เวลาสิ้นสุด :</label>
+  <input
+    id="endTime"
+    type="text"
+    placeholder="เช่น 17:45"
+
+    style="width: 100%; padding: 6px 10px; border-radius: 6px; border: 1px solid #ccc;"
+ 
+  />
+</div>
+
+
+
+  </div>
+</div>
+
 
     `,
 
@@ -237,6 +309,9 @@ export const getAddEvent = async ({
         fontSize: document.getElementById("fontSize")?.value,
         start: document.getElementById("start")?.value,
         end: document.getElementById("end")?.value,
+
+        startTime: document.getElementById("startTime")?.value,
+        endTime: document.getElementById("endTime")?.value,
       };
     },
   }).then(async (result) => {
@@ -253,6 +328,9 @@ export const getAddEvent = async ({
         fontSize,
         start,
         end,
+
+          startTime,
+             endTime,
       } = result.value;
 
       const newEnd = moment(end).add(1, "days");
@@ -269,6 +347,9 @@ export const getAddEvent = async ({
         fontSize,
         start,
         end: newEnd.format("YYYY-MM-DD"),
+
+             startTime,
+             endTime,
       };
 
       // ✅ ตรวจสอบและเพิ่ม Customer ใหม่ถ้ายังไม่มี (ไม่ต้องเช็คว่า company ต้องมีค่า)

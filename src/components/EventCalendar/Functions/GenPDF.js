@@ -83,7 +83,7 @@ const docNumber = `เลขที่เอกสาร: DA-${moment().format("Y
 
   doc.setFontSize(16);
   doc.text(
-    `แจ้งแผนงานการเข้าดำเนินการ ${event.title} ระบบ ${event.extendedProps.system} ${timeText}`,
+    `แจ้งแผนงานการเข้าดำเนินการ ${subject}`,
     105,
     58,
     { align: "center" }
@@ -97,7 +97,7 @@ const docNumber = `เลขที่เอกสาร: DA-${moment().format("Y
     `เรียน  ผู้จัดการโครงการ ${event.extendedProps.site}`,
     "",
     `        ตามที่บริษัท ดู ออล อาคิเทค แอนด์ เอ็นจิเนียริ่ง จำกัด ได้รับความไว้วางใจจาก ${siteCompany} `,
-    `ให้เข้าดำเนินการ ${event.title} ระบบ ${event.extendedProps.system} ${timeText} ในระหว่างวันที่ ${start} ถึงวันที่ ${end}`,
+    `ให้เข้าดำเนินการ ${subject} ในระหว่างวันที่ ${start} ถึงวันที่ ${end}`,
     "",
     `        บริษัท ดู ออล อาคิเทค แอนด์ เอ็นจิเนียริ่ง จำกัด ขอแจ้งให้ท่านทราบถึงกำหนดการเข้า ${event.title} ระบบ ${event.extendedProps.system}`,
     `ครั้งที่ ${event.extendedProps.time} ซึ่งทางบริษัทฯ มีกำหนดการเข้าดำเนินการในช่วงเวลาดังนี้`,
@@ -138,12 +138,12 @@ const docNumber = `เลขที่เอกสาร: DA-${moment().format("Y
   // ช่องเซ็นชื่อ
   const boxY = footerY + sigHeight + 15;
   const boxHeight = 40;
-  const boxSpacing = 20;
+  const boxSpacing = 5;
   const boxWidth = (contentWidth - boxSpacing) / 2;
 
   // ผู้อนุมัติ
   doc.setDrawColor(0);
-  doc.setLineWidth(0.5);
+  // doc.setLineWidth(0.5);
   doc.rect(marginLeft, boxY, boxWidth, boxHeight);
   doc.setFontSize(12);
   doc.text(
@@ -159,8 +159,8 @@ const docNumber = `เลขที่เอกสาร: DA-${moment().format("Y
 
 // 🔹 คำกำกับแทรก
 doc.setFontSize(11);
-doc.text("/", marginLeft + 35, boxY + 32);
-doc.text("/", marginLeft + 48, boxY + 32);
+doc.text("/", marginLeft + 38, boxY + 32);
+doc.text("/", marginLeft + 53, boxY + 32);
 
 // 🔹 เส้นใต้แต่ละช่อง (ลดความกว้างลงอีกครึ่ง)
 doc.setLineWidth(0.2);
@@ -180,8 +180,8 @@ doc.line(marginLeft + 25, boxY + 33, marginLeft + boxWidth - 10, boxY + 33);
   doc.setFontSize(11);
   doc.text("วันที่:", rightBoxX + 5, boxY + 32);
 
-  doc.text("/", rightBoxX + 35, boxY + 32);
-  doc.text("/", rightBoxX + 48, boxY + 32);
+  doc.text("/", rightBoxX + 38, boxY + 32);
+  doc.text("/", rightBoxX + 53, boxY + 32);
 
   doc.setLineWidth(0.2);
   doc.line(rightBoxX + 25, boxY + 33, rightBoxX + boxWidth - 10, boxY + 33); // ช่องวัน

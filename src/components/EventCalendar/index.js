@@ -20,8 +20,6 @@ import Swal from "sweetalert2";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"; // Import FontAwesomeIcon component
 
-
-
 import {
   faClockRotateLeft,
   faFileExcel,
@@ -72,8 +70,6 @@ import { getFetchEvents } from "./EventForms/FetchEvents";
 import { getDeleteEvent } from "./EventForms/DeleteEvent";
 
 import { getGeneratePDF } from "./Functions/GenPDF";
-
-
 
 function EventCalendar() {
   const { userData } = useAuth(); // ✅ เปลี่ยนจาก user → userData
@@ -158,18 +154,24 @@ function EventCalendar() {
     return () => hammer.destroy();
   }, []);
 
-  
-const generateWorkPermitPDF = async (event, docNo, subject, description) => {
-  try {
-    setLoading(true);
-    await getGeneratePDF({ jsPDF, thSarabunFont, event, moment, docNo, subject, description });
-  } catch (error) {
-    console.error("❌ สร้าง PDF ไม่สำเร็จ:", error);
-  } finally {
-    setLoading(false);
-  }
-};
-
+  const generateWorkPermitPDF = async (event, docNo, subject, description) => {
+    try {
+      setLoading(true);
+      await getGeneratePDF({
+        jsPDF,
+        thSarabunFont,
+        event,
+        moment,
+        docNo,
+        subject,
+        description,
+      });
+    } catch (error) {
+      console.error("❌ สร้าง PDF ไม่สำเร็จ:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // ✅ ฟังก์ชันตั้งค่า External Events ให้สามารถลากได้
   const initExternalEvents = useCallback(() => {
@@ -251,9 +253,8 @@ const generateWorkPermitPDF = async (event, docNo, subject, description) => {
       Swal,
       TomSelect,
       moment,
-      calendarRef
+      calendarRef,
     });
-
   };
 
   const handleDeleteEvent = async (id) => {
@@ -413,6 +414,9 @@ const generateWorkPermitPDF = async (event, docNo, subject, description) => {
                         ? `'${event.extendedProps.time}`
                         : "",
                       ทีมงาน: event.extendedProps?.team ?? "",
+
+                      เวลาเริ่ม: event.extendedProps?.startTime ?? "",
+                      เวลาสิ้นสุด: event.extendedProps?.endTime ?? "",
                     }))
                 : []
             }
@@ -469,17 +473,38 @@ const generateWorkPermitPDF = async (event, docNo, subject, description) => {
               time = "",
               site = "",
               team = "",
+              startTime = "",
+              endTime = "",
             } = extendedProps;
 
-            const siteDisplay = site ? ` - ${site}` : "";
-            const timeDisplay = time ? ` ครั้งที่ ${time}` : "";
-            const teamDisplay = team ? ` - ( ทีม ${team} )` : "";
+            // ✅ สร้าง display string แบบมีเงื่อนไข
+            const siteDisplay = site ? `- ${site}` : "";
+            const timeDisplay = time ? `- ครั้งที่ ${time}` : "";
+            const teamDisplay = team ? `- ทีม: ${team}` : "";
+            const timeRangeDisplay =
+              startTime && endTime
+                ? `เวลา: ${startTime} - ${endTime}`
+                : startTime
+                ? `เริ่มเวลา: ${startTime}`
+                : endTime
+                ? `สิ้นสุดเวลา: ${endTime}`
+                : "";
+
+            // ✅ สร้าง layout HTML แบบมืออาชีพ
             return {
               html: `
-              [ ${title} ]
-              ${system} ${timeDisplay}
-              ${siteDisplay} ${teamDisplay}
-            `,
+                <div style="font-size: 1em; line-height: 1.8; padding: 2px;">
+                  <div>[ ${title} ] ${system} ${timeDisplay}</div>
+            
+                  <div> ${siteDisplay}</div>
+
+
+              <div>${teamDisplay}</div>
+                ${
+                  timeRangeDisplay ? `<div>- ${timeRangeDisplay}</div>` : ""
+                }
+              </div>
+    `,
             };
           }}
           headerToolbar={{
@@ -541,10 +566,10 @@ const generateWorkPermitPDF = async (event, docNo, subject, description) => {
               const textColor = info.event.textColor || "#000000"; // สีตัวหนังสือ
 
               // ✅ ขนาดของไอคอนตามขนาดหน้าจอ
-              const iconSize = isSmallScreen ? "10px" : "15px"; // 📌 ถ้าหน้าจอเล็ก ใช้ขนาด 10px, ถ้าหน้าจอใหญ่ ใช้ขนาด 16px
+              const iconSize = isSmallScreen ? "10px" : "19px"; // 📌 ถ้าหน้าจอเล็ก ใช้ขนาด 10px, ถ้าหน้าจอใหญ่ ใช้ขนาด 16px
               const padding = isSmallScreen
                 ? "10px 0px 2px 2px" // 📌 ถ้าหน้าจอเล็ก
-                : "10px 0px 3px 3px"; // 📌 ถ้าหน้าจอใหญ่
+                : "10px 20px 3px 3px"; // 📌 ถ้าหน้าจอใหญ่
 
               // 🔹 ปรับแต่ง container หลักของ event (ให้มีพื้นที่สำหรับไอคอน)
               info.el.style.position = "relative"; // ✅ ทำให้ไอคอนใช้ absolute ได้

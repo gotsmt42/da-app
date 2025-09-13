@@ -22,15 +22,8 @@ export const getFetchEvents = async ({
       id: event._id,
       extendedProps: {
         ...event.extendedProps,
-        company: event.company,
-        site: event.site,
-        system: event.system,
-        time: event.time,
-        manualStatus: event.manualStatus,
-        status: event.status,
-        fontSize: event.fontSize,
-        start: event.start,
-        end: event.end,
+        startTime: event.extendedProps?.startTime ?? event.startTime ?? "",
+        endTime: event.extendedProps?.endTime ?? event.endTime ?? "",
       },
     }));
 

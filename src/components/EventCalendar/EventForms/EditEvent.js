@@ -46,6 +46,9 @@ export const getEditEvent = async ({
   const eventSubject = eventInfo.event.extendedProps?.subject || "";
   const eventDescription = eventInfo.event.extendedProps?.description || "";
 
+  const eventStartTime = eventInfo.event.extendedProps?.startTime || "";
+  const eventEndTime = eventInfo.event.extendedProps?.endTime || "";
+
   const formattedEnd = eventAllDay
     ? moment(eventEnd).subtract(1, "days").format("YYYY-MM-DD")
     : moment(eventEnd).format("YYYY-MM-DDTHH:mm");
@@ -98,48 +101,48 @@ export const getEditEvent = async ({
             </select>
           </div>
 
-<!-- Container กึ่งกลาง -->
-<div style="display: flex; justify-content: center;">
-  <!-- Grid ฟอร์ม -->
-  <div class="swal-form-grid" style="
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
-    margin-top: 12px;
-    font-family: 'Segoe UI', sans-serif;
-  ">
+      <!-- Container กึ่งกลาง -->
+      <div style="display: flex; justify-content: center;">
+        <!-- Grid ฟอร์ม -->
+        <div class="swal-form-grid" style="
+          display: flex;
+          flex-wrap: wrap;
+          gap: 16px;
+          margin-top: 12px;
+          font-family: 'Segoe UI', sans-serif;
+        ">
 
-    <!-- ชื่อบริษัท -->
-    <div style="flex: 1 1 calc(33.333% - 16px); min-width: 220px;">
-      <label for="editCompany" style="font-weight: bold; margin-bottom: 6px; display: block;">ชื่อบริษัท/นิติบุคคล:</label>
-      <select id="editCompany" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
-        <option disabled selected>${eventCompany}</option>
-        ${res.userCustomers
-          .map(
-            (c) =>
-              `<option value="${c.cCompany}" ${
-                eventCompany === c.cCompany ? "selected" : ""
-              }>${c.cCompany}</option>`
-          )
-          .join("")}
-      </select>
-    </div>
+          <!-- ชื่อบริษัท -->
+          <div style="flex: 1 1 calc(33.333% - 16px); min-width: 220px;">
+            <label for="editCompany" style="font-weight: bold; margin-bottom: 6px; display: block;">ชื่อบริษัท/นิติบุคคล:</label>
+            <select id="editCompany" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
+              <option disabled selected>${eventCompany}</option>
+              ${res.userCustomers
+                .map(
+                  (c) =>
+                    `<option value="${c.cCompany}" ${
+                      eventCompany === c.cCompany ? "selected" : ""
+                    }>${c.cCompany}</option>`
+                )
+                .join("")}
+            </select>
+          </div>
 
-    <!-- ชื่อโครงการ -->
-    <div style="flex: 1 1 calc(33.333% - 16px); min-width: 220px;">
-      <label for="editSite" style="font-weight: bold; margin-bottom: 6px; display: block;">ชื่อโครงการ:</label>
-      <select id="editSite" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
-        <option disabled selected>${eventSite || ""}</option>
-        ${res.userCustomers
-          .map(
-            (c) =>
-              `<option value="${c.cSite}" ${
-                eventSite === c.cSite ? "selected" : ""
-              }>${c.cSite}</option>`
-          )
-          .join("")}
-      </select>
-    </div>
+          <!-- ชื่อโครงการ -->
+          <div style="flex: 1 1 calc(33.333% - 16px); min-width: 220px;">
+            <label for="editSite" style="font-weight: bold; margin-bottom: 6px; display: block;">ชื่อโครงการ:</label>
+            <select id="editSite" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
+              <option disabled selected>${eventSite || ""}</option>
+              ${res.userCustomers
+                .map(
+                  (c) =>
+                    `<option value="${c.cSite}" ${
+                      eventSite === c.cSite ? "selected" : ""
+                    }>${c.cSite}</option>`
+                )
+                .join("")}
+            </select>
+          </div>
 
     <!-- ประเภทงาน -->
     <div style="flex: 1 1 calc(33.333% - 16px); min-width: 220px;">
@@ -249,7 +252,7 @@ export const getEditEvent = async ({
 
     <!-- วันที่เริ่ม -->
     <div style="flex: 1; min-width: 100px;">
-      <label for="editStart" style="font-weight: bold; margin-bottom: 4px; display: block;">เริ่มต้น :</label>
+      <label for="editStart" style="font-weight: bold; margin-bottom: 4px; display: block;">วันที่เริ่ม :</label>
       <input
         id="editStart"
         type="date"
@@ -260,7 +263,7 @@ export const getEditEvent = async ({
 
     <!-- วันที่สิ้นสุด -->
     <div style="flex: 1; min-width: 100px;">
-      <label for="editEnd" style="font-weight: bold; margin-bottom: 4px; display: block;">สิ้นสุด :</label>
+      <label for="editEnd" style="font-weight: bold; margin-bottom: 4px; display: block;">วันที่สิ้นสุด :</label>
       <input
         id="editEnd"
         type="date"
@@ -269,15 +272,69 @@ export const getEditEvent = async ({
       />
     </div>
 
+
+
+
+
+
   </div>
 </div>
-<br>
+
+
+<div style="display: flex; justify-content: center;">
+  <div class="swal-form-grid" style="
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-start;
+    margin-top: 12px;
+    font-family: 'Segoe UI', sans-serif;
+    max-width: 1000px; /* ✅ ป้องกันไม่ให้กว้างเกิน modal */
+  ">
+
+
+<!-- เวลาเริ่ม -->
+<div style="flex: 1; min-width: 100px;">
+  <label for="editStartTime" style="font-weight: bold; margin-bottom: 4px; display: block;">เวลาเริ่ม :</label>
+  <input
+    id="editStartTime"
+    type="text"
+    placeholder="เช่น 08:30"
+
+    style="width:80%; padding: 6px 10px; border-radius: 6px; border: 1px solid #ccc;"
+    value="${eventStartTime || ""}"
+  />
+</div>
+
+<!-- เวลาสิ้นสุด -->
+<div style="flex: 1; min-width: 100px;">
+  <label for="editEndTime" style="font-weight: bold; margin-bottom: 4px; display: block;">เวลาสิ้นสุด :</label>
+  <input
+    id="editEndTime"
+    type="text"
+    placeholder="เช่น 17:45"
+
+    style="width: 80%; padding: 6px 10px; border-radius: 6px; border: 1px solid #ccc;"
+    value="${eventEndTime || ""}"
+  />
+</div>
+
+
+
+  </div>
+</div>
+<br><br>
+
+  <label for="editDescription" style="font-weight: bold; display: block; margin-bottom: 6px;">
+        ** รายละเอียดงานสำหรับออกใบแจ้งเข้างาน (Work Permit) :
+    </label>
+<br><br>
 
 
     <!-- เลขที่อ้างอิงเอกสาร -->
         <div style="margin-top: 12px; position: relative;">
         <label for="editDescription" style="font-weight: bold; display: block; margin-bottom: 6px;">
-            ** เลขที่อ้างอิงเอกสาร (doc No.) :
+            * เลขที่อ้างอิงเอกสาร (doc No.) :
         </label>
 
             <input id="editdocNo" type="" style="width: 80%; height: 35px" class="swal2-input" value="${evendocNo}" />
@@ -288,7 +345,7 @@ export const getEditEvent = async ({
     <!-- ชื่อเรื่อง -->
         <div style="margin-top: 12px; position: relative;">
         <label for="editSubject" style="font-weight: bold; display: block; margin-bottom: 6px;">
-            ** ชื่อเรื่อง (Subject.) :
+            * ชื่อเรื่อง (Subject.) :
         </label>
 
             <input id="editSubject" type="" style="width: 80%; height: 35px" class="swal2-input" value="${eventSubject}" />
@@ -299,7 +356,7 @@ export const getEditEvent = async ({
     <!-- รายละเอียดงานสำหรับออกใบแจ้งเข้างาน -->
     <div style="margin-top: 12px; position: relative;">
     <label for="editDescription" style="font-weight: bold; display: block; margin-bottom: 6px;">
-        ** รายละเอียดงานสำหรับออกใบแจ้งเข้างาน (Work Permit) :
+        * รายละเอียดงาน (Description) :
     </label>
 
     <textarea
@@ -503,92 +560,11 @@ export const getEditEvent = async ({
     },
 
     didRender: () => {
-      const replaceEventWithUpdatedColors = (event, newColors = {}) => {
-        const calendarApi = calendarRef.current?.getApi();
-        if (!calendarApi || !event) return;
-
-        const newEventData = {
-          id: event.id,
-          docNo: event.extendedProps.docNo,
-          title: event.title,
-          start: event.start,
-          end: event.end,
-          backgroundColor: newColors.backgroundColor || event.backgroundColor,
-          textColor: newColors.textColor || event.textColor,
-          fontSize: event.extendedProps.fontSize,
-          status: event.extendedProps.status,
-          manualStatus: event.extendedProps.manualStatus,
-          extendedProps: {
-            ...event.extendedProps,
-            status: event.extendedProps.status,
-          },
-          subject: event.extendedProps.subject,
-
-          description: event.extendedProps.description,
-        };
-
-        event.remove();
-        calendarApi.addEvent(newEventData);
-      };
-
       const getVal = (id) => document.getElementById(id)?.value || "";
 
-      document
-        .getElementById("btnConfirm")
-        ?.addEventListener("click", async () => {
-          const title = getVal("editTitle");
-          if (!title) {
-            Swal.showValidationMessage("กรุณากรอกชื่อแผนงาน");
-            return;
-          }
-
-          const endInput = getVal("editEnd");
-          const end = endInput
-            ? eventAllDay
-              ? moment(endInput).add(1, "days").toISOString()
-              : moment(endInput).toISOString()
-            : eventEnd.toISOString();
-
-          const updatedEvent = {
-            id: eventId,
-
-            docNo: getVal("editdocNo"),
-            company: getVal("editCompany"),
-            site: getVal("editSite"),
-            title,
-            system: getVal("editSystem"),
-            time: getVal("editTime"),
-            team: getVal("editTeam"),
-            textColor: inputTextColor.value,
-            backgroundColor: inputBackgroundColor.value,
-            fontSize: eventFontSize,
-            status: getVal("editStatus"),
-            start: moment(getVal("editStart")).toISOString(),
-            end,
-            manualStatus: true,
-
-            subject: getVal("editSubject"),
-            description: getVal("editDescription"),
-          };
-
-          // ✅ อัปเดต event และปิด Swal
-          await EventService.UpdateEvent(eventId, updatedEvent);
-          await fetchEventsFromDB();
-          Swal.close();
-
-          // ✅ อัปเดตสี icon ทันทีหลังบันทึก
-          replaceEventWithUpdatedColors(eventInfo.event, {
-            backgroundColor: inputBackgroundColor.value,
-            textColor: inputTextColor.value,
-          });
-
-          Swal.fire({
-            title: "บันทึกการเปลี่ยนแปลงสำเร็จ",
-            icon: "success",
-            showConfirmButton: false,
-            timer: 1000,
-          });
-        });
+      document.getElementById("btnConfirm")?.addEventListener("click", () => {
+        Swal.clickConfirm(); // ✅ ทำให้ result.isConfirmed === true
+      });
 
       document.getElementById("btnDeny")?.addEventListener("click", () => {
         handleDeleteEvent(eventId);
@@ -610,12 +586,12 @@ export const getEditEvent = async ({
         ?.addEventListener("click", () => {
           const toast = Toastify({
             text: `
-      <div style="text-align:center">
-        <div style="margin-bottom:8px;">ต้องการบันทึกข้อมูลก่อนออกใบแจ้งเข้างานหรือไม่?</div>
-        <button id="toast-confirm" style="margin-right:10px; padding:4px 12px; background:#fff; border:none; border-radius:4px; cursor:pointer;">ตกลง</button>
-        <button id="toast-cancel" style="padding:4px 12px; background:#fff; border:none; border-radius:4px; cursor:pointer;">ยกเลิก</button>
-      </div>
-    `,
+              <div style="text-align:center">
+                <div style="margin-bottom:8px;">ต้องการบันทึกข้อมูลก่อนออกใบแจ้งเข้างานหรือไม่?</div>
+                <button id="toast-confirm" style="margin-right:10px; padding:4px 12px; background:#fff; border:none; border-radius:4px; cursor:pointer;">ตกลง</button>
+                <button id="toast-cancel" style="padding:4px 12px; background:#fff; border:none; border-radius:4px; cursor:pointer;">ยกเลิก</button>
+              </div>
+            `,
             duration: 3000,
             gravity: "top", // ต้องใช้ "top" เพื่อให้เราดัดแปลงตำแหน่งได้
             position: "center",
@@ -663,6 +639,9 @@ export const getEditEvent = async ({
                   manualStatus: true,
                   subject: getVal("editSubject"),
                   description: getVal("editDescription"),
+
+                  startTime: getVal("editStartTime"),
+                  endTime: getVal("editEndTime"),
                 };
 
                 try {
@@ -681,7 +660,10 @@ export const getEditEvent = async ({
                     eventInfo.event,
                     updatedEvent.docNo,
                     updatedEvent.subject,
-                    updatedEvent.description
+                    updatedEvent.description,
+
+                    updatedEvent.startTime,
+                    updatedEvent.endTime
                   );
                 } catch (error) {
                   Toastify({
@@ -713,6 +695,9 @@ export const getEditEvent = async ({
       const getVal = (id) => document.getElementById(id)?.value || "";
       const title = getVal("editTitle");
 
+      const startTime = getVal("editStartTime") || "";
+      const endTime = getVal("editEndTime") || "";
+
       if (!title) Swal.showValidationMessage("กรุณากรอกชื่อแผนงาน");
 
       const endInput = getVal("editEnd");
@@ -741,9 +726,14 @@ export const getEditEvent = async ({
 
         subject: getVal("editSubject"),
         description: getVal("editDescription"),
+
+        startTime,
+        endTime,
       };
     },
   }).then(async (result) => {
+    console.log("🔥 Swal result:", result);
+
     if (result.isConfirmed) {
       setLoading(true);
       const {
@@ -764,7 +754,13 @@ export const getEditEvent = async ({
         manualStatus,
         subject,
         description,
+
+        startTime,
+        endTime,
       } = result.value;
+
+      console.log("StartTimeInput", startTime);
+      console.log("EndTimeInput", endTime);
 
       const updatedEvent = {
         docNo,
@@ -781,10 +777,12 @@ export const getEditEvent = async ({
         start,
         end,
         manualStatus,
-        extendedProps: { manualStatus },
 
         subject,
         description,
+
+        startTime,
+        endTime,
       };
 
       // ✅ ตรวจสอบและเพิ่ม Customer ใหม่ถ้ายังไม่มี (ไม่ต้องเช็คว่า company ต้องมีค่า)
@@ -800,21 +798,21 @@ export const getEditEvent = async ({
         });
       }
 
-      // อัปเดต event ใน FullCalendar
-      eventInfo.event.setProp("textColor", textColor);
-      eventInfo.event.setProp("backgroundColor", backgroundColor);
-      eventInfo.event.setExtendedProp("status", status);
-      eventInfo.event.setExtendedProp("manualStatus", manualStatus);
-
       setEvents((prevEvents) =>
         prevEvents.map((event) => (event.id === id ? updatedEvent : event))
       );
 
-      console.log("updatedEvent", updatedEvent);
-
       // ส่งข้อมูลแก้ไขไปยัง API
       await EventService.UpdateEvent(id, updatedEvent);
       await fetchEventsFromDB();
+
+      console.log("📤 updatedEvent:", updatedEvent);
+      console.log("📦 event.start:", updatedEvent.start);
+      console.log("📦 event.end:", updatedEvent.end);
+
+      console.log("✅ Valid start:", moment(updatedEvent.start).isValid());
+      console.log("✅ Valid end:", moment(updatedEvent.end).isValid());
+
       setLoading(false);
 
       Swal.fire({

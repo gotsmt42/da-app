@@ -16,10 +16,10 @@ export const getEventDrop = async ({
 
   const updatedEvent = {
     id: event.id,
-    title: event.title,
-    textColor: event.textColor,
-    backgroundColor: event.backgroundColor,
-    fontSize: event.extendedProps?.fontSize?.toString() || "12",
+    // title: event.title,
+    // textColor: event.textColor,
+    // backgroundColor: event.backgroundColor,
+    // fontSize: event.extendedProps?.fontSize?.toString() || "12",
     start,
     end,
     allDay: event.allDay,
