@@ -23,7 +23,9 @@ export const getGeneratePDF = async ({
   const marginRight = 25;
   const contentWidth = pageWidth - marginLeft - marginRight;
 
-const docNumber = `เลขที่เอกสาร: DA-${moment().format("YYYYMMDD")}-${event.extendedProps._id.slice(-5)}`;
+  const docNumber = `เลขที่เอกสาร: DA-${moment().format(
+    "YYYYMMDD"
+  )}-${event.extendedProps._id.slice(-5)}`;
 
   doc.setFontSize(12);
 
@@ -82,12 +84,9 @@ const docNumber = `เลขที่เอกสาร: DA-${moment().format("Y
   doc.line(15, 48, 195, 48);
 
   doc.setFontSize(16);
-  doc.text(
-    `แจ้งแผนงานการเข้าดำเนินการ ${subject}`,
-    105,
-    58,
-    { align: "center" }
-  );
+  doc.text(`แจ้งแผนงานการเข้าดำเนินการ ${subject}`, 105, 58, {
+    align: "center",
+  });
 
   const start = moment(event.start).format("DD-MM-YYYY");
   const end = moment(event.end).format("DD-MM-YYYY");
@@ -146,28 +145,27 @@ const docNumber = `เลขที่เอกสาร: DA-${moment().format("Y
   // doc.setLineWidth(0.5);
   doc.rect(marginLeft, boxY, boxWidth, boxHeight);
   doc.setFontSize(12);
-  doc.text(
-    `ลงชื่อผู้รับทราบในนามโครงการ ${event.extendedProps.site}`,
-    marginLeft + 5,
-    boxY + 8
-  );
+
+  const sigText = `ลงชื่อผู้รับทราบในนามโครงการ: ${event.extendedProps.site}`;
+  const sigLines = doc.splitTextToSize(sigText, boxWidth - 10); // เว้นขอบซ้าย-ขวา 5mm
+  doc.text(sigLines, marginLeft + 5, boxY + 8);
+
   doc.setFontSize(11);
   doc.text("ลงชื่อ", marginLeft + 5, boxY + 22);
   doc.line(marginLeft + 25, boxY + 22, marginLeft + boxWidth - 10, boxY + 22);
   doc.setFontSize(11);
   doc.text("วันที่:", marginLeft + 5, boxY + 32);
 
-// 🔹 คำกำกับแทรก
-doc.setFontSize(11);
-doc.text("/", marginLeft + 38, boxY + 32);
-doc.text("/", marginLeft + 53, boxY + 32);
+  // 🔹 คำกำกับแทรก
+  doc.setFontSize(11);
+  doc.text("/", marginLeft + 38, boxY + 32);
+  doc.text("/", marginLeft + 53, boxY + 32);
 
-// 🔹 เส้นใต้แต่ละช่อง (ลดความกว้างลงอีกครึ่ง)
-doc.setLineWidth(0.2);
+  // 🔹 เส้นใต้แต่ละช่อง (ลดความกว้างลงอีกครึ่ง)
+  doc.setLineWidth(0.2);
 
-// 🔹 ช่องวัน (ลดจาก 8mm → 6mm)
-doc.line(marginLeft + 25, boxY + 33, marginLeft + boxWidth - 10, boxY + 33);
-
+  // 🔹 ช่องวัน (ลดจาก 8mm → 6mm)
+  doc.line(marginLeft + 25, boxY + 33, marginLeft + boxWidth - 10, boxY + 33);
 
   // ผู้รับทราบ
   const rightBoxX = marginLeft + boxWidth + boxSpacing;
@@ -186,11 +184,23 @@ doc.line(marginLeft + 25, boxY + 33, marginLeft + boxWidth - 10, boxY + 33);
   doc.setLineWidth(0.2);
   doc.line(rightBoxX + 25, boxY + 33, rightBoxX + boxWidth - 10, boxY + 33); // ช่องวัน
 
-
   // บันทึกไฟล์
   const safeFileName = `ใบแจ้งขอเข้างาน (${subject})`.replace(
     /[\/\\:*?"<>|]/g,
     "_"
   );
-  doc.save(`${safeFileName}.pdf`);
+
+  // doc.save(`${safeFileName}.pdf`);
+
+  const pdfBlob = doc.output("blob");
+  const pdfUrl = URL.createObjectURL(pdfBlob);
+
+  // ✅ เปิด PDF ในแท็บใหม่
+  window.open(pdfUrl, "_blank");
+
+  // ✅ ถ้าต้องการดาวน์โหลดด้วย
+  const link = document.createElement("a");
+  link.href = pdfUrl;
+  link.download = `${safeFileName}.pdf`;
+  link.click();
 };

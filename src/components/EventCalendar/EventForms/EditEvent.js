@@ -656,15 +656,24 @@ export const getEditEvent = async ({
                     position: "center",
                   }).showToast();
 
-                  generateWorkPermitPDF(
+                  // สมมติว่า generateWorkPermitPDF คืน URL ของ PDF
+                  const pdfUrl = await generateWorkPermitPDF(
                     eventInfo.event,
                     updatedEvent.docNo,
                     updatedEvent.subject,
                     updatedEvent.description,
-
                     updatedEvent.startTime,
                     updatedEvent.endTime
                   );
+
+
+                  
+                  // เปิด PDF ในแท็บใหม่ทันที
+                  window.open(pdfUrl, "_blank");
+
+
+
+                  
                 } catch (error) {
                   Toastify({
                     text: "❌ เกิดข้อผิดพลาดในการบันทึก",
@@ -684,6 +693,7 @@ export const getEditEvent = async ({
             }
           }, 100);
         });
+
       document
         .getElementById("btnViewSchedule")
         ?.addEventListener("click", () => {
