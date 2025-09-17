@@ -19,7 +19,14 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState({});
 
-  const { login } = useAuth();
+const { login, isLoggedIn } = useAuth(); // ✅ เพิ่ม isLoggedIn
+
+useEffect(() => {
+  if (isLoggedIn) {
+    navigate("/", { replace: true }); // หรือ "/dashboard"
+  }
+}, [isLoggedIn, navigate]);
+
 
   const handleValidation = () => {
     let formIsValid = true;
@@ -40,34 +47,78 @@ const Login = () => {
     setErrors(errors);
     return formIsValid;
   };
-  const handleLogin = async (e) => {
-    e.preventDefault();
+  // const handleLogin = async (e) => {
+  //   e.preventDefault();
     
-    if (handleValidation()) {
-      try {
-        const response = await API.post(`/auth/login`, { username, password });
-        const { token, payload } = response.data;
+  //   if (handleValidation()) {
+  //     try {
+  //       const response = await API.post(`/auth/login`, { username, password });
+  //       const { token, payload } = response.data;
   
+  //       login(token, payload);
+  //       Swal.fire({
+  //         icon: "success",
+  //         title: "เข้าสู่ระบบสำเร็จ!",
+  //         text: `ยินดีต้อนรับ, ${payload.fname} ${payload.lname}`,
+  //       });
+  
+  //       navigate("/dashboard");
+  //     } catch (error) {
+  //       console.error("🔴 Login failed", error);
+  //       Swal.fire({
+  //         icon: "error",
+  //         title: "เข้าสู่ระบบล้มเหลว",
+  //         text: error.response.data.err || "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
+  //       });
+  //     }
+  //   }
+  // };
+  
+  const handleLogin = async (e) => {
+  e.preventDefault();
+
+  if (handleValidation()) {
+    try {
+      const response = await API.post(`/auth/login`, { username, password });
+
+      // ✅ ตรวจสอบว่ามี response และมี data
+      if (response?.data?.token && response?.data?.payload) {
+        const { token, payload } = response.data;
+
         login(token, payload);
+
         Swal.fire({
           icon: "success",
           title: "เข้าสู่ระบบสำเร็จ!",
           text: `ยินดีต้อนรับ, ${payload.fname} ${payload.lname}`,
         });
-  
+
         navigate("/dashboard");
-      } catch (error) {
-        console.error("🔴 Login failed", error);
+      } else {
         Swal.fire({
           icon: "error",
           title: "เข้าสู่ระบบล้มเหลว",
-          text: error.response.data.err || "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
+          text: "ไม่สามารถเข้าสู่ระบบได้ กรุณาลองใหม่",
         });
       }
+    } catch (error) {
+      console.error("🔴 Login failed", error);
+
+      const errMsg =
+        error?.response?.data?.err ||
+        error?.response?.data?.message ||
+        error?.message ||
+        "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง";
+
+      Swal.fire({
+        icon: "error",
+        title: "เข้าสู่ระบบล้มเหลว",
+        text: errMsg,
+      });
     }
-  };
-  
-  
+  }
+};
+
 
   return (
     <div className="form-bg mt-5">

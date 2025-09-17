@@ -10,7 +10,7 @@ import Footer from "./Footer";
 import { FaArrowLeft } from "react-icons/fa";
 import { IconButton } from "@mui/material";
 
-import './FullLayout.css';
+import "./FullLayout.css";
 
 const FullLayout = () => {
   const sidebarRef = useRef(null);
@@ -24,7 +24,11 @@ const FullLayout = () => {
 
   useEffect(() => {
     const handleOutsideClick = (e) => {
-      if (isMobile && sidebarRef.current && !sidebarRef.current.contains(e.target)) {
+      if (
+        isMobile &&
+        sidebarRef.current &&
+        !sidebarRef.current.contains(e.target)
+      ) {
         closeSidebar();
       }
     };
@@ -57,7 +61,8 @@ const FullLayout = () => {
   };
 
   const handleScroll = () => {
-    const currentScrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    const currentScrollTop =
+      window.pageYOffset || document.documentElement.scrollTop;
 
     setIsScrollingUp(currentScrollTop < lastScrollTop && currentScrollTop > 0);
     setLastScrollTop(currentScrollTop <= 0 ? 0 : currentScrollTop);
@@ -87,7 +92,8 @@ const FullLayout = () => {
 
     // ตรวจสอบการเลื่อน
     const distance = touchStartY - touchEndY;
-    if (distance > 50) { // ถ้าลงมากกว่าหรือเท่ากับ 50px ปิด Sidebar
+    if (distance > 50) {
+      // ถ้าลงมากกว่าหรือเท่ากับ 50px ปิด Sidebar
       closeSidebar();
     }
   };

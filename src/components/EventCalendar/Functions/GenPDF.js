@@ -84,7 +84,7 @@ export const getGeneratePDF = async ({
   doc.line(15, 48, 195, 48);
 
   doc.setFontSize(16);
-  doc.text(`แจ้งแผนงานการเข้าดำเนินการ ${subject}`, 105, 58, {
+  doc.text(`${subject}`, 105, 58, {
     align: "center",
   });
 

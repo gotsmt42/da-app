@@ -30,7 +30,7 @@ const Header = () => {
     const getUserData = async () => {
       try {
         const getUser = await AuthService.getUserData();
-        console.log(getUser); // เพิ่มบรรทัดนี้เพื่อตรวจสอบข้อมูลผู้ใช้
+        // console.log(getUser); // เพิ่มบรรทัดนี้เพื่อตรวจสอบข้อมูลผู้ใช้
         setUser(getUser.user);
       } catch (error) {
         console.error("Error fetching user data:", error);

@@ -356,18 +356,19 @@ function EventCalendar() {
     });
   }, []);
 
-  const filteredCalendarEvents = useMemo(() => {
-    const keyword = searchTerm.toLowerCase();
-    return events.filter((event) =>
-      [
-        event.title,
-        event.extendedProps?.site,
-        event.extendedProps?.company,
-        event.extendedProps?.system,
-        event.extendedProps?.time?.toString(),
-      ].some((field) => field?.toLowerCase().includes(keyword))
-    );
-  }, [events, searchTerm]);
+const filteredCalendarEvents = useMemo(() => {
+  const keyword = searchTerm.toLowerCase();
+  return events.filter((event) =>
+    [
+      event.title ?? "",
+      event.site ?? "",
+      event.company ?? "",
+      event.system ?? "",
+      event.time?.toString() ?? "",
+    ].some((field) => field.toLowerCase().includes(keyword))
+  );
+}, [events, searchTerm]);
+
 
   const getStatusIcon = useCallback((status) => {
     const icons = {

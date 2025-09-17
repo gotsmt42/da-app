@@ -1,6 +1,5 @@
 import { lazy, Suspense } from "react";
 import { Navigate, createBrowserRouter } from "react-router-dom";
-import CheckConnection from "../components/CheckConnection.js";
 
 // Layouts และ Pages (Lazy Loaded)
 const FullLayout = lazy(() => import("../layouts/FullLayout.js"));
@@ -27,21 +26,22 @@ const Operate = lazy(() => import("../views/ui/Operation.js"));
 const Login = lazy(() => import("../auth/Login.js"));
 const Register = lazy(() => import("../auth/Register.js"));
 
-
+const PublicRoute = lazy(() => import("./PublicRoute.js"));
+const CheckConnectionToast = lazy(() => import("./CheckConnectionToast.js"));
 const ThemeRoutes = [
   {
     path: "/",
     element: (
-      <CheckConnection>
-        <PrivateRoute >
+      <CheckConnectionToast>
+        <PrivateRoute>
           <Suspense fallback={<div>Loading Layout...</div>}>
             <FullLayout />
           </Suspense>
         </PrivateRoute>
-      </CheckConnection>
+      </CheckConnectionToast>
     ),
     children: [
-      { path: "/", element: <Navigate  to="/dashboard" /> },
+      { path: "/", element: <Navigate to="/dashboard" /> },
       {
         path: "dashboard",
         element: (
@@ -214,20 +214,31 @@ const ThemeRoutes = [
         ),
         title: "Register",
       },
-    ],  
-
-    
+    ],
   },
-  
+
   {
     path: "/login",
     element: (
       <Suspense fallback={<div>Loading Login...</div>}>
-        <Login />
+        <PublicRoute>
+          <Login />
+        </PublicRoute>
       </Suspense>
     ),
     title: "Login",
   },
+
+  // {
+  //   path: "/login",
+  //   element: (
+
+  //     <Suspense fallback={<div>Loading Login...</div>}>
+  //       <Login />
+  //     </Suspense>
+  //   ),
+  //   title: "Login",
+  // },
 
   {
     path: "/noconnection",
@@ -238,16 +249,12 @@ const ThemeRoutes = [
     ),
     title: "No Connection",
   },
-  
-]
-
+];
 
 createBrowserRouter(ThemeRoutes, {
   future: {
     v7_skipActionErrorRevalidation: true,
   },
 });
-
-
 
 export default ThemeRoutes;

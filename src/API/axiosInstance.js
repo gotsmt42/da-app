@@ -27,4 +27,26 @@ API.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// ✅ Interceptor สำหรับจัดการ token หมดอายุหรือไม่ถูกต้อง
+API.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const msg = error.response?.data?.message;
+
+    if (msg === "Token expired" || msg === "Invalid token") {
+      localStorage.removeItem("token");
+      localStorage.removeItem("payload");
+
+      // ✅ แจ้งผู้ใช้ก่อน redirect (ถ้าต้องการ)
+      alert("Session หมดอายุ กรุณาเข้าสู่ระบบใหม่");
+
+      // ✅ Redirect ไปหน้า login
+      window.location.href = "/login";
+    }
+
+    return Promise.reject(error);
+  }
+);
+
+
 export default API;
