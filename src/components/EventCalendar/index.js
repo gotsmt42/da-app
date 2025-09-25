@@ -479,30 +479,38 @@ const filteredCalendarEvents = useMemo(() => {
             } = extendedProps;
 
             // ✅ สร้าง display string แบบมีเงื่อนไข
-            const siteDisplay = site ? `- ${site}` : "";
-            const timeDisplay = time ? `- ครั้งที่ ${time}` : "";
-            const teamDisplay = team ? `- ทีม: ${team}` : "";
+            const siteDisplay = site ? `- โครงการ : ${site}` : "";
+            const timeDisplay = time ? `- ครั้งที่ : ${time}` : "";
+            const teamDisplay = team ? `- ทีม : ${team}` : "";
+
+
+
+            const systemDisplay = system ? `- ระบบ : ${system}` : "";
+
+
             const timeRangeDisplay =
               startTime && endTime
-                ? `เวลา: ${startTime} - ${endTime}`
+                ? `- เวลา : ${startTime} - ${endTime}`
                 : startTime
-                ? `เริ่มเวลา: ${startTime}`
+                ? `- เริ่มเวลา : ${startTime}`
                 : endTime
-                ? `สิ้นสุดเวลา: ${endTime}`
+                ? `- สิ้นสุดเวลา : ${endTime}`
                 : "";
 
             // ✅ สร้าง layout HTML แบบมืออาชีพ
             return {
               html: `
-                <div style="font-size: 1em; line-height: 1.8; padding: 2px;">
-                  <div>[ ${title} ] ${system} ${timeDisplay}</div>
-            
+                <div style="font-size: 0.82em; line-height: 1.8; padding: 1px;">
+                  <div>[ ${title} ]  </div>
+                 
+                  <div> ${systemDisplay} </div>
                   <div> ${siteDisplay}</div>
+                   <div>${timeDisplay} </div>
 
 
               <div>${teamDisplay}</div>
                 ${
-                  timeRangeDisplay ? `<div>- ${timeRangeDisplay}</div>` : ""
+                  timeRangeDisplay ? `<div>${timeRangeDisplay}</div>` : ""
                 }
               </div>
     `,
