@@ -497,10 +497,13 @@ const filteredCalendarEvents = useMemo(() => {
                 ? `- สิ้นสุดเวลา : ${endTime}`
                 : "";
 
-            // ✅ สร้าง layout HTML แบบมืออาชีพ
+
+              const isSmallScreen = window.innerWidth < 576;
+
+             const fontSize = isSmallScreen ? "0.82em" : "1em";
             return {
               html: `
-                <div style="font-size: 0.82em; line-height: 1.8; padding: 1px;">
+                <div style="font-size:  ${fontSize}; line-height: 1.8; padding: 1px;">
                   <div>[ ${title} ]  </div>
                  
                   <div> ${systemDisplay} </div>
