@@ -325,11 +325,6 @@ export const getEditEvent = async ({
 </div>
 <br><br>
 
-  <label for="editDescription" style="font-weight: bold; display: block; margin-bottom: 6px;">
-        ** รายละเอียดงานสำหรับออกใบแจ้งเข้างาน (Work Permit) :
-    </label>
-<br><br>
-
 
     <!-- เลขที่อ้างอิงเอกสาร -->
         <div style="margin-top: 12px; position: relative;">
@@ -442,14 +437,22 @@ export const getEditEvent = async ({
         กำลังดำเนินการ: "fa-clock-rotate-left",
         ดำเนินการเสร็จสิ้น: "fa-check-double",
       };
-      const initTomSelect = (id, create = true, placeholder = "") => {
-        return new TomSelect(id, {
-          create,
-          maxOptions: 7,
-          placeholder,
-          sortField: { field: "text", direction: "asc" },
-        });
-      };
+const initTomSelect = (id, create = true, placeholder = "") => {
+  return new TomSelect(id, {
+    create,
+    persist: false,
+    placeholder,
+    maxItems: null, // ✅ พิมพ์หลายค่าได้
+    delimiter: ",",
+    closeAfterSelect: false,
+    dropdownInput: true,
+    selectOnTab: true,
+    plugins: ['remove_button'],
+  });
+};
+
+
+
       const statusSelect = new TomSelect("#editStatus", {
         create: false,
         placeholder: "เลือกสถานะงาน",

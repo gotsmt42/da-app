@@ -59,6 +59,11 @@ import thSarabunFont from "../../Fonts/THSarabunNew_base64"; // นำเข้�
 import TomSelect from "tom-select";
 import "tom-select/dist/css/tom-select.css";
 
+
+import 'choices.js/public/assets/styles/choices.min.css';
+import Choices from 'choices.js';
+
+
 import Hammer from "hammerjs";
 
 import { getAddEvent } from "./EventForms/AddEvent";
@@ -254,6 +259,7 @@ function EventCalendar() {
       TomSelect,
       moment,
       calendarRef,
+      Choices
     });
   };
 
