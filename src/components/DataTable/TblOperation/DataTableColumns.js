@@ -191,7 +191,7 @@ const DataTableColumns = ({
   const columns = [
     {
       name: "วันดำเนินการ",
-      width: "120px",
+      width: "130px",
 
       sortable: true,
       sortFunction: (a, b) => new Date(a.start) - new Date(b.start),
@@ -199,15 +199,15 @@ const DataTableColumns = ({
       cell: (row) => (
         <div>
           <div style={{ fontSize: "0.9em", color: "#333" }}>
-            {/* <span>
+            <span>
               {moment(row.start).format("DD")} {" - "}{" "}
               {moment(row.end).format("DD/MM/YYYY")}
             </span>     
-             */}
-            <span>
+            
+            {/* <span>
               {moment(row.start).format("DD")} {" - "}{" "}
               {moment(row.end).format("DD")}
-            </span>
+            </span> */}
             {/* {" - "}
             <span>
               {moment(row.end).subtract(1, "days").format("DD/MM/YYYY")}
@@ -216,17 +216,17 @@ const DataTableColumns = ({
         </div>
       ),
     },
-    {
-      name: "เลขที่เอกสาร",
-      sortable: true,
-      width: "115px",
-      selector: (row) => row.docNo || "-",
-      cell: (row) => (
-        <div style={{ fontSize: "0.85em", color: "#333" }}>
-          {row.docNo || <span style={{ color: "#bbb" }}>ไม่ระบุ</span>}
-        </div>
-      ),
-    },
+    // {
+    //   name: "เลขที่เอกสาร",
+    //   sortable: true,
+    //   width: "115px",
+    //   selector: (row) => row.docNo || "-",
+    //   cell: (row) => (
+    //     <div style={{ fontSize: "0.85em", color: "#333" }}>
+    //       {row.docNo || <span style={{ color: "#bbb" }}>ไม่ระบุ</span>}
+    //     </div>
+    //   ),
+    // },
 
     {
       name: "งาน / โครงการ",
@@ -269,7 +269,7 @@ const DataTableColumns = ({
     },
     {
       name: "อัพโหลดไฟล์",
-      width: "150px",
+      width: "160px",
       sortable: false,
       cell: (row) => (
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
