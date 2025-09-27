@@ -248,7 +248,7 @@ const DataTableColumns = ({
       name: "การดำเนินการ",
       sortable: true,
       width: "182px",
-      omit: isMobile, // ซ่อนไปถ้าเป็นมือถือ
+      // omit: isMobile, // ซ่อนไปถ้าเป็นมือถือ
 
       selector: (row) => row.status,
       cell: (row) => (
@@ -260,7 +260,7 @@ const DataTableColumns = ({
     {
       name: <div style={{ textAlign: "center", width: "100%" }}>สถานะ</div>,
       sortable: true,
-      omit: isMobile,
+      // omit: isMobile,
       width: "150px",
       selector: (row) => row.status,
       cell: (row) => (
