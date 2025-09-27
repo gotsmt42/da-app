@@ -130,6 +130,10 @@ const Operation = () => {
     },
   });
 
+  const [filterType, setFilterType] = useState("");
+  const [filterSystem, setFilterSystem] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+
   useEffect(() => {
     fetchEventsFromDB();
   }, [id]);
@@ -175,24 +179,46 @@ const Operation = () => {
         const createdDate = moment(event.start || event.end).format("YYYY-MM");
         const matchMonth = dateSearch ? createdDate === dateSearch : true;
 
-        const keyword = search.toLowerCase();
-        const matchSearch = [
-          event.company,
-          event.site,
-          event.title,
-          event.system,
-          event.team,
-          moment(event.start).format("DD/MM/YYYY HH:mm"),
-        ]
-          .map((v) => (v || "").toLowerCase())
-          .some((text) => text.includes(keyword));
+        const matchType = filterType ? event.title === filterType : true;
+        const matchSystem = filterSystem ? event.system === filterSystem : true;
+        const matchStatus = filterStatus
+          ? [event.status, event.status_two, event.status_three].includes(
+              filterStatus
+            )
+          : true;
 
-        return matchMonth && matchSearch;
+        const keyword = search.toLowerCase();
+        const matchSearch = keyword
+          ? [
+              event.company,
+              event.site,
+              event.title,
+              event.system,
+              event.team,
+              event.docNo,
+              moment(event.start).format("DD/MM/YYYY HH:mm"),
+            ]
+              .map((v) => (v || "").toLowerCase())
+              .some((text) => text.includes(keyword))
+          : true;
+
+        return (
+          matchMonth && matchType && matchSystem && matchStatus && matchSearch
+        );
       });
 
       setFilter(filtered);
     }
-  }, [id, selectedEvent, search, dateSearch, events]);
+  }, [
+    id,
+    selectedEvent,
+    search,
+    dateSearch,
+    events,
+    filterType,
+    filterSystem,
+    filterStatus,
+  ]);
 
   const handleDeleteRow = async (customerId) => {
     Swal.fire({
@@ -265,17 +291,17 @@ const Operation = () => {
 
   const handleStatusUpdate = async (id, updates) => {
     try {
+      await EventService.UpdateEvent(id, updates);
       setEvents((prev) =>
         prev.map((event) =>
           event._id === id ? { ...event, ...updates } : event
         )
       );
-
-      await EventService.UpdateEvent(id, updates);
     } catch (error) {
       console.error("เกิดข้อผิดพลาดในการอัปเดตสถานะ:", error);
     }
   };
+
   const capitalize = (str = "") => str.charAt(0).toUpperCase() + str.slice(1);
 
   const handleFileUpload = async (file, eventId, type) => {
@@ -351,6 +377,19 @@ const Operation = () => {
     return "unknown";
   };
 
+  const typeList = ["PM", "Service", "Inspection", "Emergency"];
+
+  const systemList = ["Fire Alarm", "CCTV", "Fire Suppression", "Fire Pump"];
+
+  const statusList = ["วางบิลแล้ว", "เก็บเงินแล้ว"];
+
+  const activeFilterCount = [
+    filterType,
+    filterSystem,
+    filterStatus,
+    search.trim(),
+  ].filter((v) => v !== "").length;
+
   return (
     <>
       <div className="row align-items-end g-3 mt-5">
@@ -422,6 +461,71 @@ const Operation = () => {
               </button>
             </div>
           )}
+        </div>
+
+        <div className="d-flex flex-wrap gap-2 mt-3">
+          {typeList.map((type) => (
+            <button
+              key={type}
+              className={`btn btn-sm ${
+                filterType === type ? "btn-success" : "btn-outline-success"
+              }`}
+              onClick={() =>
+                setFilterType((prev) => (prev === type ? "" : type))
+              }
+            >
+              🔧 {type}
+            </button>
+          ))}
+
+          {systemList.map((system) => (
+            <button
+              key={system}
+              className={`btn btn-sm ${
+                filterSystem === system
+                  ? "btn-secondary"
+                  : "btn-outline-secondary"
+              }`}
+              onClick={() =>
+                setFilterSystem((prev) => (prev === system ? "" : system))
+              }
+            >
+              🛠️ {system}
+            </button>
+          ))}
+
+          {statusList.map((status) => (
+            <button
+              key={status}
+              className={`btn btn-sm ${
+                filterStatus === status ? "btn-primary" : "btn-outline-primary"
+              }`}
+              onClick={() =>
+                setFilterStatus((prev) => (prev === status ? "" : status))
+              }
+            >
+              📖 {status}
+            </button>
+          ))}
+
+          {activeFilterCount > 0 && (
+            <div className="form-text mt-2">
+              🔎 ตัวกรอง <strong>{activeFilterCount}</strong> รายการ
+            </div>
+          )}
+        </div>
+
+        <div className="col-12 col-sm mt-3">
+          <button
+            className="btn btn-light btn-sm"
+            onClick={() => {
+              setFilterType("");
+              setFilterSystem("");
+              setFilterStatus("");
+            }}
+          >
+            ❌ ล้างตัวกรองทั้งหมด
+          </button>
         </div>
 
         {/* <div className="form-text mt-3">

@@ -94,7 +94,6 @@ const DataTableColumns = ({
   uploadingState,
   isUploadingState,
   uploadingFileSizeState,
-  
 }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
@@ -191,8 +190,8 @@ const DataTableColumns = ({
   const theme = useTheme();
   const columns = [
     {
-      name: "วันที่เข้าดำเนินการ",
-      width: "130px",
+      name: "วันดำเนินการ",
+      width: "120px",
 
       sortable: true,
       sortFunction: (a, b) => new Date(a.start) - new Date(b.start),
@@ -200,9 +199,14 @@ const DataTableColumns = ({
       cell: (row) => (
         <div>
           <div style={{ fontSize: "0.9em", color: "#333" }}>
-            <span>
+            {/* <span>
               {moment(row.start).format("DD")} {" - "}{" "}
               {moment(row.end).format("DD/MM/YYYY")}
+            </span>     
+             */}
+            <span>
+              {moment(row.start).format("DD")} {" - "}{" "}
+              {moment(row.end).format("DD")}
             </span>
             {/* {" - "}
             <span>
@@ -251,22 +255,124 @@ const DataTableColumns = ({
         <StatusSelectCell row={row} onStatusUpdate={onStatusUpdate} />
       ),
     },
+
+    // Status 2
     {
       name: <div style={{ textAlign: "center", width: "100%" }}>สถานะ</div>,
       sortable: true,
-      omit: isMobile, // ซ่อนไปถ้าเป็นมือถือ
-
+      omit: isMobile,
       width: "150px",
-
       selector: (row) => row.status,
       cell: (row) => (
         <StatusTwoSelectCell row={row} onStatusUpdate={onStatusUpdate} />
       ),
     },
+    {
+      name: "อัพโหลดไฟล์",
+      width: "150px",
+      sortable: false,
+      cell: (row) => (
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          {/* ✅ ปุ่มแนบไฟล์ */}
+          <Tooltip title="อัพโหลดไฟล์" arrow>
+            <IconButton component="label" size="small" color="info">
+              <AttachFileIcon fontSize="small" />
+              <input
+                type="file"
+                hidden
+                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file && typeof onFileUpload === "function") {
+                    setSelectedFile(file);
+                    onFileUpload(file, row._id, "status");
+                  }
+                }}
+              />
+            </IconButton>
+          </Tooltip>
 
+          {/* ✅ หลอดโหลด */}
+          {uploadingState.status === row._id && (
+            <Box
+              sx={{
+                minWidth: "90px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 0.5,
+              }}
+            >
+              {uploadingFileSizeState.status && (
+                <Typography variant="caption" sx={{ fontWeight: 500 }}>
+                  Size: {uploadingFileSizeState.status}
+                </Typography>
+              )}
+              {isUploadingState.status && (
+                <LinearProgress
+                  variant="indeterminate"
+                  sx={{ height: 6, borderRadius: 3 }}
+                />
+              )}
+            </Box>
+          )}
+
+          {/* ✅ ปุ่มดูไฟล์ */}
+          {row.statusFileName && row.statusFileUrl && (
+            <Tooltip title={row.statusFileName} arrow>
+              <Button
+                size="small"
+                onClick={() => {
+                  setPreviewUrl(row.statusFileUrl);
+                  setPreviewFileName(row.statusFileName);
+                }}
+                style={{
+                  fontSize: "0.75em",
+                  color: "#007bff",
+                  textTransform: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
+              >
+                <span style={{ minWidth: "20px" }}>
+                  {getFileIcon(row.statusFileType || "")}
+                </span>
+                ดูไฟล์
+              </Button>
+            </Tooltip>
+          )}
+
+          {/* ✅ ปุ่มลบไฟล์ */}
+          {row.statusFileName && row.statusFileUrl && (
+            <Tooltip title="ลบไฟล์" arrow>
+              <span>
+                <IconButton
+                  size="small"
+                  color="error"
+                  onClick={() => {
+                    setPendingDelete({ id: row._id, type: "status" });
+                    setConfirmOpen(true);
+                  }}
+                  sx={{
+                    padding: "2px",
+                    backgroundColor: "transparent",
+                    border: "none",
+                    "&:hover": {
+                      backgroundColor: "transparent",
+                    },
+                  }}
+                >
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
+          )}
+        </Box>
+      ),
+    },
     {
       name: "เสนอราคาเพิ่มเติม",
-      width: "210px",
+      width: "200px",
       sortable: false,
       cell: (row) => (
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -397,7 +503,7 @@ const DataTableColumns = ({
     },
     {
       name: "รายงาน",
-      width: "210px",
+      width: "200px",
       sortable: false,
       cell: (row) => (
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>

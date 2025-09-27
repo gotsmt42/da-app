@@ -1,15 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Select from "react-select";
 import Swal from "sweetalert2";
 import EventService from "../../../services/EventService";
 
 const statusColorMap = {
-  // เสนอราคาแก้ไขแล้ว: "#f39c12",
   วางบิลแล้ว: "#9b59b6",
   เก็บเงินแล้ว: "#18b007",
 };
 
-// ✅ เพิ่ม option ว่างไว้ข้างบนสุด
 const options = [
   { value: "", label: "None", color: "#ccc" },
   ...Object.entries(statusColorMap).map(([label, color]) => ({
@@ -21,6 +19,11 @@ const options = [
 
 const StatusTwoSelectCell = ({ row, onStatusUpdate }) => {
   const [localStatus, setLocalStatus] = useState(row.status_two || "");
+
+  // ✅ Sync กับ row.status_two ทุกครั้งที่ row เปลี่ยน (เช่นตอนเปลี่ยนหน้า)
+  useEffect(() => {
+    setLocalStatus(row.status_two || "");
+  }, [row.status_two]);
 
   const customStyles = {
     container: (provided) => ({
@@ -83,12 +86,11 @@ const StatusTwoSelectCell = ({ row, onStatusUpdate }) => {
     if (result.isConfirmed) {
       const updatedEvent = { ...row, status_two: newStatus };
       try {
-        await EventService.UpdateEvent(row.id, updatedEvent);
+        await EventService.UpdateEvent(row._id, { status_two: newStatus }); // ✅ ใช้ _id
         setLocalStatus(newStatus);
         if (onStatusUpdate) {
-          onStatusUpdate(updatedEvent);
+          onStatusUpdate(row._id, { status_two: newStatus }); // ✅ ส่งกลับไปอัปเดต state หลัก
         }
-        // Swal.fire("อัปเดตสถานะสำเร็จ", "", "success");
       } catch (error) {
         console.error("เกิดข้อผิดพลาด:", error);
         Swal.fire("เกิดข้อผิดพลาดในการบันทึก", "", "error");
