@@ -4,7 +4,6 @@ import AuthService from "./authService";
 
 const EventService = {
   async getEvents() {
-    
     try {
       const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token
       if (userData) {
@@ -20,51 +19,29 @@ const EventService = {
   },
 
   async GetEventById(id) {
-  try {
-    const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token
-    if (userData) {
-      const response = await API.get(`/events/${id}`); // ดึง event ตาม id
-      return response.data;
-    }
-  } catch (error) {
-    console.error("Error fetching event by ID:", error);
-    throw error;
-  }
-},
-
-
-
-  async LineNotify(description) {
-    
     try {
       const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token
       if (userData) {
-        await API.post(`/events/linenotify`, description); 
+        const response = await API.get(`/events/${id}`); // ดึง event ตาม id
+        return response.data;
+      }
+    } catch (error) {
+      console.error("Error fetching event by ID:", error);
+      throw error;
+    }
+  },
 
+  async LineNotify(description) {
+    try {
+      const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token
+      if (userData) {
+        await API.post(`/events/linenotify`, description);
       }
     } catch (error) {
       console.error("Error fetching user linenotify:", error);
       throw error;
     }
   },
-
-//   async getUserDeleteProducts() {
-    
-//     try {
-//       const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token
-//       if (userData) {
-//         // const response = await API.get(`/product?search=${searchTerm}`); // เรียกข้อมูลสินค้าโดยใช้ ID ของผู้ใช้
-//         const response = await API.get(`/product`); // เรียกข้อมูลสินค้าโดยใช้ ID ของผู้ใช้
-//         // const response = await API.get(`/product?page=${currentPage}&per_page=${perPage}`); // เรียกข้อมูลสินค้าโดยใช้ ID ของผู้ใช้
-
-//         return response.data;
-//       }
-//     } catch (error) {
-//       console.error("Error fetching user products:", error);
-//       throw error;
-//     }
-//   },
-
   async AddEvent(newEvent) {
     try {
       const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token
@@ -95,6 +72,69 @@ const EventService = {
     }
   },
 
+  async updateDocumentStatus(id, documentSent, documentFile) {
+    try {
+      const userData = await AuthService.getUserData();
+      if (userData) {
+        const response = await API.put(`/events/${id}`, {
+          documentSent,
+          documentFile,
+        });
+        return response.data;
+      }
+    } catch (error) {
+      console.error("Error updating document status:", error);
+      throw error;
+    }
+  },
+
+async Upload(id, file, type, config = {}) {
+  try {
+    const userData = await AuthService.getUserData();
+    if (!userData) throw new Error("User not authenticated");
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("type", type);
+
+    const response = await API.put(`/events/upload/${id}`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+        Authorization: `Bearer ${userData.token}`,
+      },
+      ...config, // ✅ รองรับ onUploadProgress หรืออื่น ๆ
+    });
+
+    return response.data;
+  } catch (error) {
+    console.error("Error uploading file:", error);
+    throw error;
+  }
+},
+
+
+  async DeleteFile(id, type) {
+    try {
+      const userData = await AuthService.getUserData(); // ดึง Token
+
+      if (!userData) throw new Error("User not authenticated");
+
+      const response = await API.put(
+        `/events/delete-file/${id}`,
+        { type },
+        {
+          headers: {
+            Authorization: `Bearer ${userData.token}`,
+          },
+        }
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error("Error deleting file:", error);
+      throw error;
+    }
+  },
   async DeleteEvent(id) {
     try {
       const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token
@@ -110,9 +150,6 @@ const EventService = {
       throw error;
     }
   },
-
-
-
 
   // เพิ่มฟังก์ชันสำหรับการสร้าง, อัปเดต, และลบสินค้าตามที่ต้องการ
 };

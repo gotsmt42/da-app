@@ -60,6 +60,19 @@ const DataTableComponent = ({
         borderTopColor: defaultThemes.default.divider.default,
       },
     },
+
+    headCells: {
+    style: {
+      backgroundColor: "#fdd835", // ✅ สีเหลืองเด่น
+      color: "#333",
+      fontWeight: "bold",
+      fontSize: "0.95em",
+      textTransform: "uppercase",
+      borderBottom: "2px solid #fbc02d",
+    },
+  },
+
+  
     // headCells: {
     //   style: {
     //     "&:not(:last-of-type)": {
@@ -83,6 +96,7 @@ const DataTableComponent = ({
 
   return (
     <DataTable
+      customStyles={customStyles}
       className="dataTables_wrapper"
       title={title}
       columns={columns}
@@ -115,7 +129,6 @@ const DataTableComponent = ({
       clearSelectedRows={clearSelectedRows}
       striped
       responsive={responsive}
-      customStyles={customStyles}
       contextActions={contextActions}
       subHeader
       subHeaderComponent={subHeaderComponent}

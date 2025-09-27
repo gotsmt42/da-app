@@ -24,12 +24,26 @@ import { AdapterMoment } from "@mui/x-date-pickers/AdapterMoment";
 import moment from "moment";
 import "moment/locale/th"; // ✅ โหลดภาษาไทย
 
-import { Box, TextField, useMediaQuery } from "@mui/material";
+import {
+  Box,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  TextField,
+  Typography,
+  useMediaQuery,
+} from "@mui/material";
 import { Select, MenuItem, InputLabel, FormControl, Grid } from "@mui/material";
 
 import { Button } from "reactstrap";
 
 import { useParams, useNavigate } from "react-router-dom";
+
+import { styled } from "@mui/material/styles";
+import styleButton from "@mui/material/Button";
+import { Close, Download } from "@mui/icons-material";
 
 const Operation = () => {
   moment.locale("th"); // ✅ ตั้งค่า default เป็นภาษาไทย
@@ -63,6 +77,59 @@ const Operation = () => {
   const [selectedEvent, setSelectedEvent] = useState(null);
 
   const dateSearch = !showAll ? selectedDate : ""; // ถ้าเลือกแสดงทั้งหมดให้ dateSearch เป็นว่าง
+
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [previewFileName, setPreviewFileName] = useState("");
+
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(null); // { id, type }
+
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadingFileName, setUploadingFileName] = useState("");
+  const [uploadingFileSize, setUploadingFileSize] = useState("");
+  const [uploadingId, setUploadingId] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isUploadSuccess, setIsUploadSuccess] = useState(false);
+
+  const [uploadingState, setUploadingState] = useState({
+    quotation: null,
+    report: null,
+  });
+  const [uploadProgressState, setUploadProgressState] = useState({
+    quotation: 0,
+    report: 0,
+  });
+  const [uploadingFileSizeState, setUploadingFileSizeState] = useState({
+    quotation: "",
+    report: "",
+  });
+  const [isUploadingState, setIsUploadingState] = useState({
+    quotation: false,
+    report: false,
+  });
+
+  const RedButton = styled(styleButton)(({ theme }) => ({
+    backgroundColor: "#f44336", // สีแดงสด
+    color: "#fff",
+    fontWeight: "bold",
+    borderRadius: "4px",
+    boxShadow: "none",
+    "&:hover": {
+      backgroundColor: "#d32f2f", // สีแดงเข้มตอน hover
+    },
+  }));
+
+  const GrayButton = styled(styleButton)({
+    backgroundColor: "#9e9e9e", // สีเทา
+    color: "#fff",
+    fontWeight: "bold",
+    borderRadius: "4px",
+    boxShadow: "none",
+    "&:hover": {
+      backgroundColor: "#757575",
+    },
+  });
+
   useEffect(() => {
     fetchEventsFromDB();
   }, [id]);
@@ -182,6 +249,107 @@ const Operation = () => {
       )
     );
   };
+  const handleDeleteFile = async (eventId, type) => {
+    try {
+      await EventService.DeleteFile(eventId, type);
+      handleStatusUpdate(eventId, {
+        [`${type}FileName`]: null,
+        [`${type}FileUrl`]: null,
+        [`${type}FileType`]: null,
+        [`documentSent${capitalize(type)}`]: false,
+      });
+    } catch (err) {
+      console.error("ลบไฟล์ไม่สำเร็จ:", err);
+    }
+  };
+
+  const handleStatusUpdate = async (id, updates) => {
+    try {
+      setEvents((prev) =>
+        prev.map((event) =>
+          event._id === id ? { ...event, ...updates } : event
+        )
+      );
+
+      await EventService.UpdateEvent(id, updates);
+    } catch (error) {
+      console.error("เกิดข้อผิดพลาดในการอัปเดตสถานะ:", error);
+    }
+  };
+  const capitalize = (str = "") => str.charAt(0).toUpperCase() + str.slice(1);
+
+  const handleFileUpload = async (file, eventId, type) => {
+    try {
+      setUploadingState((prev) => ({ ...prev, [type]: eventId }));
+      setUploadingFileSizeState((prev) => ({
+        ...prev,
+        [type]: (file.size / (1024 * 1024)).toFixed(2) + " MB",
+      }));
+      setUploadProgressState((prev) => ({ ...prev, [type]: 0 }));
+      setIsUploadingState((prev) => ({ ...prev, [type]: true }));
+
+      const result = await EventService.Upload(eventId, file, type, {
+        onUploadProgress: (progressEvent) => {
+          const percent = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          );
+          setUploadProgressState((prev) => ({ ...prev, [type]: percent }));
+        },
+      });
+
+      await handleStatusUpdate(eventId, {
+        [`${type}FileName`]: result.fileName,
+        [`${type}FileUrl`]: result.fileUrl,
+        [`${type}FileType`]: result.fileType,
+        [`documentSent${capitalize(type)}`]: true,
+      });
+
+      setIsUploadingState((prev) => ({ ...prev, [type]: false }));
+      setTimeout(() => {
+        setUploadingState((prev) => ({ ...prev, [type]: null }));
+        setUploadingFileSizeState((prev) => ({ ...prev, [type]: "" }));
+        setUploadProgressState((prev) => ({ ...prev, [type]: 0 }));
+      }, 1000);
+    } catch (err) {
+      console.error("Upload failed:", err);
+      setIsUploadingState((prev) => ({ ...prev, [type]: false }));
+      setUploadingState((prev) => ({ ...prev, [type]: null }));
+      setUploadingFileSizeState((prev) => ({ ...prev, [type]: "" }));
+      setUploadProgressState((prev) => ({ ...prev, [type]: 0 }));
+    }
+  };
+
+  const isImageFile = (fileNameOrType = "") => {
+    if (!fileNameOrType || typeof fileNameOrType !== "string") return false;
+
+    const lower = fileNameOrType.toLowerCase();
+    return (
+      lower.includes("image") ||
+      lower.endsWith(".jpg") ||
+      lower.endsWith(".jpeg") ||
+      lower.endsWith(".png") ||
+      lower.endsWith(".webp")
+    );
+  };
+
+  const getFileType = (fileName = "") => {
+    if (!fileName || typeof fileName !== "string") return "unknown";
+    const lower = fileName.toLowerCase();
+
+    if (
+      lower.endsWith(".jpg") ||
+      lower.endsWith(".jpeg") ||
+      lower.endsWith(".png") ||
+      lower.endsWith(".webp")
+    ) {
+      return "image";
+    }
+    if (lower.endsWith(".pdf")) return "pdf";
+    if (lower.endsWith(".doc") || lower.endsWith(".docx")) return "word";
+    if (lower.endsWith(".xls") || lower.endsWith(".xlsx")) return "excel";
+
+    return "unknown";
+  };
 
   return (
     <>
@@ -273,6 +441,27 @@ const Operation = () => {
             setModalOpenEdit,
             setSelectedFile,
             handleDeleteRow,
+            onStatusUpdate: handleStatusUpdate,
+            onDocNoUpdate: handleDocNoUpdate,
+            onFileUpload: handleFileUpload, // ✅ เพิ่มตรงนี้
+            handleDeleteFile,
+            setPreviewUrl,
+            setPreviewFileName,
+
+            setConfirmOpen, // ✅ ส่งเข้า
+            setPendingDelete,
+
+            uploadingFileName,
+            uploadingFileSize,
+            uploadProgress,
+            uploadingId,
+
+            isUploading,
+            isUploadSuccess,
+
+            uploadingState,
+            isUploadingState,
+            uploadingFileSizeState,
           })}
           data={sortedData}
           highlightOnHover
@@ -284,34 +473,111 @@ const Operation = () => {
             <Expanded {...props} onStatusUpdate={handleDocNoUpdate} />
           )}
           expandableRowExpanded={(row) => expandedRows[row._id]}
-          // subHeaderComponent={
-          //   <div className="container">
-          //     <div className="row align-items-end g-3 flex-wrap">
-          //       {/* เดือน */}
-          //       <div className="col-12 col-md-6">
-          //         <input
-          //           className="form-control"
-          //           type="month"
-          //           value={dateSearch}
-          //           onChange={(e) => setDateSearch(e.target.value)}
-          //         />
-          //       </div>
-
-          //       {/* ค้นหา */}
-          //       <div className="col-12 col-md-6">
-          //         <input
-          //           type="search"
-          //           className="form-control"
-          //           placeholder="🔍 ค้นหา เช่น ชื่อโครงการ เลขที่เอกสาร"
-          //           value={search}
-          //           onChange={(e) => setSearch(e.target.value)}
-          //         />
-          //       </div>
-          //     </div>
-          //   </div>
-          // }
         />
       </div>
+
+      <Dialog
+        open={Boolean(previewUrl)}
+        onClose={() => setPreviewUrl(null)}
+        maxWidth="xl"
+        fullWidth
+      >
+        <DialogTitle sx={{ m: 0, p: 2 }}>
+          {previewFileName || "ดูไฟล์"}
+          <IconButton
+            aria-label="close"
+            onClick={() => setPreviewUrl(null)}
+            sx={{
+              position: "absolute",
+              right: 8,
+              top: 8,
+              color: (theme) => theme.palette.grey[500],
+            }}
+          >
+            <Close />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent>
+          {(() => {
+            const type = getFileType(previewFileName || previewUrl);
+
+            if (type === "image") {
+              return (
+                <img
+                  src={previewUrl}
+                  alt={previewFileName}
+                  style={{
+                    maxWidth: "100%",
+                    maxHeight: "800px",
+                    display: "block",
+                    margin: "0 auto",
+                    borderRadius: "8px",
+                  }}
+                />
+              );
+            }
+
+            if (type === "pdf") {
+              return (
+                <iframe
+                  src={`https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(
+                    previewUrl
+                  )}`}
+                  width="100%"
+                  height="800px"
+                  style={{ border: "none" }}
+                  title="PDF Preview"
+                />
+              );
+            }
+
+            if (type === "word" || type === "excel") {
+              return (
+                <iframe
+                  src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(
+                    previewUrl
+                  )}`}
+                  width="100%"
+                  height="800px"
+                  style={{ border: "none" }}
+                  title="Office Preview"
+                />
+              );
+            }
+
+            return (
+              <div
+                style={{ textAlign: "center", padding: "2em", color: "#888" }}
+              >
+                ไม่สามารถแสดงไฟล์นี้ได้
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
+        <DialogTitle>ยืนยันการลบไฟล์</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            คุณแน่ใจหรือไม่ว่าต้องการลบไฟล์นี้? การลบจะไม่สามารถย้อนกลับได้
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <GrayButton onClick={() => setConfirmOpen(false)}>ยกเลิก</GrayButton>
+          <RedButton
+            onClick={() => {
+              if (pendingDelete) {
+                handleDeleteFile(pendingDelete.id, pendingDelete.type);
+              }
+              setConfirmOpen(false);
+            }}
+          >
+            ลบไฟล์
+          </RedButton>
+        </DialogActions>
+      </Dialog>
     </>
   );
 };

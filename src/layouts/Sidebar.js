@@ -41,6 +41,8 @@ const navigation = [
     href: "/event",
     icon: "bi-calendar-event-fill",
   },
+
+  
   {
     title: "การดำเนินงาน",
     href: "/operation",
@@ -162,6 +164,7 @@ const Sidebar = ({ handleMenuClick }) => {
                       <BiChevronRight />
                     )}
                   </button>
+                  
                   <Collapse
                     isOpen={collapsedMenu[index]}
                     style={{ paddingLeft: "21px" }}
@@ -178,7 +181,12 @@ const Sidebar = ({ handleMenuClick }) => {
                       >
                         {item.icon && <item.icon />} {item.title}
                       </Link>
+
+                      
                     ))}
+
+   
+                
                   </Collapse>
                 </>
               ) : (
@@ -200,42 +208,38 @@ const Sidebar = ({ handleMenuClick }) => {
 
       {/* ส่วนที่ fixed ด้านล่าง */}
       {isAdmin && (
+        <div className="sidebar-fixed-bottom p-3 mt-2">
+          <NavItem className="sidenav-bg ">
+            <Link
+              to="/customer-employee"
+              className={`centered-button nav-link py-3 ${
+                location.pathname === "/customer-employee" ? "active" : ""
+              }`}
+              onClick={handleMenuClick}
+            >
+              <i className="bi bi-people-fill ms-3"></i>
+              <span className="ms-2">EMPLOYEE MANAGEMENT</span>
+            </Link>
+          </NavItem>
 
-      <div className="sidebar-fixed-bottom p-3 mt-2">
-        <NavItem className="sidenav-bg ">
-          <Link
-            to="/customer-employee"
-            className={`centered-button nav-link py-3 ${
-              location.pathname === "/customer-employee" ? "active" : ""
-            }`}
-            onClick={handleMenuClick}
-          >
-            <i className="bi bi-people-fill ms-3"></i>
-            <span className="ms-2">EMPLOYEE MANAGEMENT</span>
-          </Link>
-        </NavItem>
-
-        <NavItem className="sidenav-bg">
-          <Link
-            to="/about"
-            className={`nav-link py-3 ${
-              location.pathname === "/about" ? "active" : ""
-            }`}
-            onClick={handleMenuClick}
-          >
-            <i className="bi bi-gear-fill ms-3"></i>
-            <span className="ms-2">SETTINGS</span>
-          </Link>
-        </NavItem>
-      </div>
-          )}
+          <NavItem className="sidenav-bg">
+            <Link
+              to="/about"
+              className={`nav-link py-3 ${
+                location.pathname === "/about" ? "active" : ""
+              }`}
+              onClick={handleMenuClick}
+            >
+              <i className="bi bi-gear-fill ms-3"></i>
+              <span className="ms-2">SETTINGS</span>
+            </Link>
+          </NavItem>
+        </div>
+      )}
 
       <div className="sidebar-fixed-bottom  text-lg-start p-3 mt-2">
         <NavItem className="sidenav-bg">
-          <Link
-           className='nav-link py-3'
-            onClick={handleLogout}
-          >
+          <Link className="nav-link py-3" onClick={handleLogout}>
             <i className="bi bi-box-arrow-right ms-3"></i>
             <span className="ms-2">LOGOUT</span>
           </Link>

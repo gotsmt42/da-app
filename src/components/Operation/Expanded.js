@@ -6,11 +6,10 @@ import React, { useState, useEffect } from "react";
 import EventService from "../../services/EventService"; // 👈 สำหรับอัปเดตข้อมูล
 import { TextField, Box, CircularProgress } from "@mui/material";
 import Swal from "sweetalert2";
-const Expanded = ({ data, onStatusUpdate, onDocNoUpdate
- }) => {
+const Expanded = ({ data, onStatusUpdate, onDocNoUpdate }) => {
   const isMobile = useMediaQuery("(max-width:600px)");
 
-    const [docNo, setDocNo] = useState(data.docNo || "");
+  const [docNo, setDocNo] = useState(data.docNo || "");
   const [loading, setLoading] = useState(false);
   const [initialDocNo, setInitialDocNo] = useState(data.docNo || "");
   const [saving, setSaving] = useState(false);
@@ -20,38 +19,38 @@ const Expanded = ({ data, onStatusUpdate, onDocNoUpdate
     setInitialDocNo(data.docNo || "");
   }, [data]);
 
-const handleAutoUpdate = async () => {
-  if (docNo === initialDocNo) return;
+  const handleAutoUpdate = async () => {
+    if (docNo === initialDocNo) return;
 
-  try {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    const updated = await EventService.UpdateEvent(data._id, {
-      ...data,
-      docNo,
-    });
+      const updated = await EventService.UpdateEvent(data._id, {
+        ...data,
+        docNo,
+      });
 
-    setInitialDocNo(docNo);
+      setInitialDocNo(docNo);
 
-    // 🟢 อัปเดตแสดงผลในตารางด้วย
-    if (onStatusUpdate) {
-      onStatusUpdate(data._id, docNo); // 👉 ส่ง id และ docNo ใหม่
+      // 🟢 อัปเดตแสดงผลในตารางด้วย
+      if (onStatusUpdate) {
+        onStatusUpdate(data._id, docNo); // 👉 ส่ง id และ docNo ใหม่
+      }
+
+      Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "success",
+        title: "บันทึกแล้ว",
+        showConfirmButton: false,
+        timer: 1200,
+      });
+    } catch (err) {
+      Swal.fire("เกิดข้อผิดพลาด", "ไม่สามารถบันทึกเลขที่เอกสารได้", "error");
+    } finally {
+      setLoading(false);
     }
-
-    Swal.fire({
-      toast: true,
-      position: "top-end",
-      icon: "success",
-      title: "บันทึกแล้ว",
-      showConfirmButton: false,
-      timer: 1200,
-    });
-  } catch (err) {
-    Swal.fire("เกิดข้อผิดพลาด", "ไม่สามารถบันทึกเลขที่เอกสารได้", "error");
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   if (!data) return <div>ไม่พบข้อมูล</div>;
 
@@ -70,21 +69,20 @@ const handleAutoUpdate = async () => {
               }}
             >
               {" "}
-            <TextField
-        label="เลขที่เอกสาร (docNo)"
-        value={docNo}
-        onChange={(e) => setDocNo(e.target.value)}
-        onBlur={handleAutoUpdate} // ✅ อัปเดตอัตโนมัติเมื่อออกจากช่อง
-        size="small"
-        fullWidth
-        sx={{ maxWidth: 350, mb: 1 }}
-      />
-
-      {loading && <CircularProgress size={20} />}
+              <TextField
+                label="เลขที่เอกสาร (docNo)"
+                value={docNo}
+                onChange={(e) => setDocNo(e.target.value)}
+                onBlur={handleAutoUpdate} // ✅ อัปเดตอัตโนมัติเมื่อออกจากช่อง
+                size="small"
+                fullWidth
+                sx={{ maxWidth: 350, mb: 1 }}
+              />
+              {loading && <CircularProgress size={20} />}
             </Box>
-      <h5 className="card-title mt-4">
-  อ้างอิงเอกสารเลขที่ : {docNo || "ไม่ระบุ"}
-</h5>
+            <h5 className="card-title mt-4">
+              อ้างอิงเอกสารเลขที่ : {docNo || "ไม่ระบุ"}
+            </h5>
 
             <p></p>
 
@@ -110,7 +108,7 @@ const handleAutoUpdate = async () => {
                   maxWidth: "400px", // ✅ จำกัดความกว้างไม่ให้ยืดเกินไป
                 }}
               >
-                <div
+                {/* <div
                   style={{
                     display: "flex",
                     flexDirection: "column",
@@ -150,7 +148,7 @@ const handleAutoUpdate = async () => {
                     row={data}
                     onStatusUpdate={onStatusUpdate}
                   />
-                </div>
+                </div> */}
               </div>
             )}
           </div>
