@@ -130,8 +130,9 @@ export const getEditEvent = async ({
 
           <!-- ชื่อโครงการ -->
           <div style="flex: 1 1 calc(33.333% - 16px); min-width: 220px;">
-            <label for="editSite" style="font-weight: bold; margin-bottom: 6px; display: block;">ชื่อโครงการ:</label>
-            <select id="editSite" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
+<label for="editSite" style="font-weight: bold; margin-bottom: 6px; display: block;">
+  <span style="color: red;">*</span> ชื่อโครงการ:
+</label>            <select id="editSite" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
               <option disabled selected>${eventSite || ""}</option>
               ${res.userCustomers
                 .map(
@@ -146,7 +147,9 @@ export const getEditEvent = async ({
 
     <!-- ประเภทงาน -->
     <div style="flex: 1 1 calc(33.333% - 16px); min-width: 220px;">
-      <label for="editTitle" style="font-weight: bold; margin-bottom: 6px; display: block;">ประเภทงาน:</label>
+<label for="editTitle" style="font-weight: bold; margin-bottom: 6px; display: block;">
+  <span style="color: red;">*</span> ประเภทงาน:
+</label>
       <select id="editTitle" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
         <option disabled selected>${eventTitle || ""}</option>
         ${[
@@ -176,8 +179,9 @@ export const getEditEvent = async ({
 
     <!-- ระบบงาน -->
     <div style="flex: 1 1 calc(33.333% - 16px); min-width: 220px;">
-      <label for="editSystem" style="font-weight: bold; margin-bottom: 6px; display: block;">ระบบงาน:</label>
-      <select id="editSystem" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
+<label for="editSystem" style="font-weight: bold; margin-bottom: 6px; display: block;">
+  <span style="color: red;">*</span> ระบบงาน:
+</label>      <select id="editSystem" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
         <option disabled selected>${eventSystem || ""}</option>
         ${["Office", "Fire Alarm", "CCTV", "Access Control", "Networks"]
           .map(
@@ -381,6 +385,18 @@ export const getEditEvent = async ({
   จำนวนตัวอักษร: 0
 </div>
 
+
+<div style="margin-top: 16px;">
+  <label for="editImage" style="font-weight: bold; display: block; margin-bottom: 6px;">
+    รูปภาพประกอบ:
+  </label>
+  <input type="file" id="editImage" accept="image/*" style="width: 100%; padding: 8px;" />
+  <div id="imagePreviewContainer" style="margin-top: 10px;"></div>
+</div>
+
+<br><br><br>
+
+
 </div>
 
 
@@ -420,6 +436,39 @@ export const getEditEvent = async ({
 
       const clearBtn = document.getElementById("clearDescriptionBtn");
 
+      const imageInput = document.getElementById("editImage");
+      const previewContainer = document.getElementById("imagePreviewContainer");
+
+      if (imageInput) {
+        imageInput.addEventListener("change", () => {
+          const file = imageInput.files[0];
+          if (!file) return;
+
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const imgUrl = e.target.result;
+
+            previewContainer.innerHTML = `
+        <img src="${imgUrl}" alt="Preview" style="max-width: 100%; max-height: 200px; border-radius: 8px; cursor: pointer;" id="previewImage" />
+      `;
+
+            // ✅ เปิดภาพเต็มเมื่อคลิก
+            document
+              .getElementById("previewImage")
+              ?.addEventListener("click", () => {
+                Swal.fire({
+                  title: "ดูรูปภาพ",
+                  imageUrl: imgUrl,
+                  imageAlt: "Uploaded Image",
+                  showCloseButton: true,
+                  width: "auto",
+                });
+              });
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+
       if (descriptionInput) {
         descriptionInput.value = eventDescription || "";
       }
@@ -437,21 +486,34 @@ export const getEditEvent = async ({
         กำลังดำเนินการ: "fa-clock-rotate-left",
         ดำเนินการเสร็จสิ้น: "fa-check-double",
       };
-const initTomSelect = (id, create = true, placeholder = "") => {
-  return new TomSelect(id, {
-    create,
-    persist: false,
-    placeholder,
-    maxItems: null, // ✅ พิมพ์หลายค่าได้
-    delimiter: ",",
-    closeAfterSelect: false,
-    dropdownInput: true,
-    selectOnTab: true,
-    plugins: ['remove_button'],
-  });
-};
+      const initTomSelect = (id, create = true, placeholder = "") => {
+        return new TomSelect(id, {
+          create,
+          persist: false,
+          placeholder,
+          maxItems: null, // ✅ ไม่จำกัดจำนวน เพื่อให้ input ไม่ถูกซ่อน
+          closeAfterSelect: false,
+          dropdownInput: true,
+          selectOnTab: true,
+          plugins: ["remove_button"],
+          onItemAdd: function () {
+            // ✅ ลบรายการเก่าเมื่อเพิ่มใหม่ เพื่อให้มีแค่ 1 ค่าเสมอ
+            if (this.items.length > 1) {
+              this.removeItem(this.items[0], true);
+            }
+          },
+        });
+      };
 
-
+      // 🔄 สร้าง TomSelect ทั้งหมด
+      [
+        ["#editCompany", "เลือกหรือพิมพ์ชื่อบริษัท"],
+        ["#editSite", "เลือกหรือพิมพ์ชื่อโครงการ"],
+        ["#editTitle", "เลือกหรือพิมพ์ชื่อหัวข้อ"],
+        ["#editSystem", "เลือกหรือพิมพ์ชื่อระบบ"],
+        ["#editTime", "เลือกหรือพิมพ์ครั้งที่"],
+        ["#editTeam", "เลือกหรือพิมพ์ชื่อทีม"],
+      ].forEach(([id, placeholder]) => initTomSelect(id, true, placeholder));
 
       const statusSelect = new TomSelect("#editStatus", {
         create: false,
@@ -515,16 +577,6 @@ const initTomSelect = (id, create = true, placeholder = "") => {
       control.style.backgroundColor = initialColor;
       control.style.color =
         statusSelect.getValue() === "กำลังดำเนินการ" ? "#000" : "#fff";
-
-      // 🔄 สร้าง TomSelect ทั้งหมด
-      [
-        ["#editCompany", "เลือกหรือพิมพ์ชื่อบริษัท"],
-        ["#editSite", "เลือกหรือพิมพ์ชื่อโครงการ"],
-        ["#editTitle", "เลือกหรือพิมพ์ชื่อหัวข้อ"],
-        ["#editSystem", "เลือกหรือพิมพ์ชื่อระบบ"],
-        ["#editTime", "เลือกหรือพิมพ์ครั้งที่"],
-        ["#editTeam", "เลือกหรือพิมพ์ชื่อทีม"],
-      ].forEach(([id, placeholder]) => initTomSelect(id, true, placeholder));
 
       [inputBackgroundColor, inputTextColor].forEach((el) => {
         Object.assign(el.style, {
@@ -669,14 +721,8 @@ const initTomSelect = (id, create = true, placeholder = "") => {
                     updatedEvent.endTime
                   );
 
-
-                  
                   // เปิด PDF ในแท็บใหม่ทันที
                   window.open(pdfUrl, "_blank");
-
-
-
-                  
                 } catch (error) {
                   Toastify({
                     text: "❌ เกิดข้อผิดพลาดในการบันทึก",
@@ -707,11 +753,15 @@ const initTomSelect = (id, create = true, placeholder = "") => {
     preConfirm: () => {
       const getVal = (id) => document.getElementById(id)?.value || "";
       const title = getVal("editTitle");
+      const site = getVal("editSite");
+      const system = getVal("editSystem");
 
       const startTime = getVal("editStartTime") || "";
       const endTime = getVal("editEndTime") || "";
 
-      if (!title) Swal.showValidationMessage("กรุณากรอกชื่อแผนงาน");
+      if (!title) Swal.showValidationMessage("กรุณาระบุชื่อประเภทงาน");
+      if (!site) Swal.showValidationMessage("กรุณาระบุชื่อโครงการ");
+      if (!system) Swal.showValidationMessage("กรุณาระบุชื่อระบบงาน");
 
       const endInput = getVal("editEnd");
       const end = endInput
@@ -719,6 +769,8 @@ const initTomSelect = (id, create = true, placeholder = "") => {
           ? moment(endInput).add(1, "days").toISOString()
           : moment(endInput).toISOString()
         : eventEnd.toISOString();
+
+      const imageFile = document.getElementById("editImage")?.files[0] || null;
 
       return {
         id: eventId,
@@ -742,6 +794,8 @@ const initTomSelect = (id, create = true, placeholder = "") => {
 
         startTime,
         endTime,
+
+        imageFile,
       };
     },
   }).then(async (result) => {
@@ -811,6 +865,15 @@ const initTomSelect = (id, create = true, placeholder = "") => {
         });
       }
 
+      const { imageFile } = result.value;
+
+      if (imageFile) {
+        const formData = new FormData();
+        formData.append("image", imageFile);
+        formData.append("eventId", id);
+await EventService.UpdateImageEvent(eventId, updatedEvent, imageFile);
+      }
+
       setEvents((prevEvents) =>
         prevEvents.map((event) => (event.id === id ? updatedEvent : event))
       );
@@ -819,12 +882,12 @@ const initTomSelect = (id, create = true, placeholder = "") => {
       await EventService.UpdateEvent(id, updatedEvent);
       await fetchEventsFromDB();
 
-      console.log("📤 updatedEvent:", updatedEvent);
-      console.log("📦 event.start:", updatedEvent.start);
-      console.log("📦 event.end:", updatedEvent.end);
+      // console.log("📤 updatedEvent:", updatedEvent);
+      // console.log("📦 event.start:", updatedEvent.start);
+      // console.log("📦 event.end:", updatedEvent.end);
 
-      console.log("✅ Valid start:", moment(updatedEvent.start).isValid());
-      console.log("✅ Valid end:", moment(updatedEvent.end).isValid());
+      // console.log("✅ Valid start:", moment(updatedEvent.start).isValid());
+      // console.log("✅ Valid end:", moment(updatedEvent.end).isValid());
 
       setLoading(false);
 

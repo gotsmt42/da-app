@@ -133,6 +133,7 @@ const Operation = () => {
   const [filterType, setFilterType] = useState("");
   const [filterSystem, setFilterSystem] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+  const [filterTeam, setFilterTeam] = useState("");
 
   useEffect(() => {
     fetchEventsFromDB();
@@ -181,6 +182,7 @@ const Operation = () => {
 
         const matchType = filterType ? event.title === filterType : true;
         const matchSystem = filterSystem ? event.system === filterSystem : true;
+        const matchTeam = filterTeam ? event.team === filterTeam : true;
         const matchStatus = filterStatus
           ? [event.status, event.status_two, event.status_three].includes(
               filterStatus
@@ -203,7 +205,7 @@ const Operation = () => {
           : true;
 
         return (
-          matchMonth && matchType && matchSystem && matchStatus && matchSearch
+          matchMonth && matchType && matchSystem && matchStatus && matchTeam && matchSearch
         );
       });
 
@@ -218,6 +220,7 @@ const Operation = () => {
     filterType,
     filterSystem,
     filterStatus,
+    filterTeam
   ]);
 
   const handleDeleteRow = async (customerId) => {

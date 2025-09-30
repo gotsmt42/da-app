@@ -59,10 +59,8 @@ import thSarabunFont from "../../Fonts/THSarabunNew_base64"; // นำเข้�
 import TomSelect from "tom-select";
 import "tom-select/dist/css/tom-select.css";
 
-
-import 'choices.js/public/assets/styles/choices.min.css';
-import Choices from 'choices.js';
-
+import "choices.js/public/assets/styles/choices.min.css";
+import Choices from "choices.js";
 
 import Hammer from "hammerjs";
 
@@ -259,7 +257,7 @@ function EventCalendar() {
       TomSelect,
       moment,
       calendarRef,
-      Choices
+      Choices,
     });
   };
 
@@ -362,19 +360,19 @@ function EventCalendar() {
     });
   }, []);
 
-const filteredCalendarEvents = useMemo(() => {
-  const keyword = searchTerm.toLowerCase();
-  return events.filter((event) =>
-    [
-      event.title ?? "",
-      event.site ?? "",
-      event.company ?? "",
-      event.system ?? "",
-      event.time?.toString() ?? "",
-    ].some((field) => field.toLowerCase().includes(keyword))
-  );
-}, [events, searchTerm]);
-
+  const filteredCalendarEvents = useMemo(() => {
+    const keyword = searchTerm.toLowerCase();
+    return events.filter((event) =>
+      [
+        event.title ?? "",
+        event.site ?? "",
+        event.company ?? "",
+        event.system ?? "",
+        event.time?.toString() ?? "",
+        event.team ?? "",
+      ].some((field) => field.toLowerCase().includes(keyword))
+    );
+  }, [events, searchTerm]);
 
   const getStatusIcon = useCallback((status) => {
     const icons = {
@@ -489,10 +487,7 @@ const filteredCalendarEvents = useMemo(() => {
             const timeDisplay = time ? `- ครั้งที่ : ${time}` : "";
             const teamDisplay = team ? `- ทีม : ${team}` : "";
 
-
-
             const systemDisplay = system ? `- ระบบ : ${system}` : "";
-
 
             const timeRangeDisplay =
               startTime && endTime
@@ -503,10 +498,9 @@ const filteredCalendarEvents = useMemo(() => {
                 ? `- สิ้นสุดเวลา : ${endTime}`
                 : "";
 
+            const isSmallScreen = window.innerWidth < 576;
 
-              const isSmallScreen = window.innerWidth < 576;
-
-             const fontSize = isSmallScreen ? "0.82em" : "1em";
+            const fontSize = isSmallScreen ? "0.82em" : "1em";
             return {
               html: `
                 <div style="font-size:  ${fontSize}; line-height: 1.8; padding: 1px;">
@@ -518,9 +512,7 @@ const filteredCalendarEvents = useMemo(() => {
 
 
               <div>${teamDisplay}</div>
-                ${
-                  timeRangeDisplay ? `<div>${timeRangeDisplay}</div>` : ""
-                }
+                ${timeRangeDisplay ? `<div>${timeRangeDisplay}</div>` : ""}
               </div>
     `,
             };
