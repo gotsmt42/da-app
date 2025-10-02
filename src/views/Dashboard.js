@@ -6,18 +6,11 @@ import Blog from "../components/dashboard/Blog";
 import Chart from "../components/dashboard/SalesChart";
 
 import {
-  FaCube,
-  FaCubes,
   FaCalendarAlt,
-  FaFileAlt,
-  FaUserAlt,
-  FaFileImport,
-  FaBoxOpen,
-  FaBoxes,
   FaUsers,
-  FaTimesCircle,
-  FaTimes,
   FaClock,
+  FaHourglass,
+  FaHourglassStart,
 } from "react-icons/fa"; // นำเข้าไอคอนต่างๆ จาก react-icons
 import { useEffect, useState } from "react";
 import FileService from "../services/FileService";
@@ -192,28 +185,52 @@ const Dashboard = () => {
     //   iconColor: "#2ecc71",
     //   iconBgColor: "rgba(22, 160, 133, 0.1)",
     // },
-    {
-      icon: FaClock,
-      title: "การดำเนินงาน",
-      subtitle: loading ? "กำลังโหลด..." : Object.keys(events).length + " more",
-      link: "/operation",
-      iconColor: "#f39c12", // สีไอคอน
-      iconBgColor: "#fef5e7",
-    },
+{
+  icon: FaClock,
+  title: "การดำเนินงาน",
+  subtitle: loading
+    ? "กำลังโหลด..."
+       : Object.values(events).length + " รายการ",
+
+  link: "/operation",
+  iconColor: "#f39c12",
+  iconBgColor: "#fef5e7",
+}
+  ,
+{
+  icon: FaHourglassStart,
+  title: "ติดตามงาน",
+  subtitle: loading
+    ? "กำลังโหลด..."
+    : Object.values(events).filter((e) => Boolean(e.quotationFileUrl)).length + " รายการ",
+  link: "/tackstatus",
+  iconColor: "#e74c3c",
+  iconBgColor: "#fde3e3",
+}
+
     
   ];
   const BlogData3 = [
-    {
-      icon: FaCalendarAlt,
-      title: "แผนงาน",
-      subtitle: loading ? "กำลังโหลด..." : Object.keys(events).length + " events",
-      link: "/event",
-      iconColor: "3498db", // สีไอคอน
-      iconBgColor: "rgba(51, 105, 232, 0.1)", // สีพื้นหลังไอคอน
+{
+  icon: FaCalendarAlt,
+  title: "แผนงาน",
+  subtitle: loading
+    ? "กำลังโหลด..."
+    : `กำลังรอยืนยัน: ${
+        Object.values(events).filter((e) => e.status === "กำลังรอยืนยัน").length
+      } | ยืนยันแล้ว: ${
+        Object.values(events).filter((e) => e.status === "ยืนยันแล้ว").length
+      } | กำลังดำเนินการ: ${
+        Object.values(events).filter((e) => e.status === "กำลังดำเนินการ").length
+      } | เสร็จสิ้นแล้ว: ${
+        Object.values(events).filter((e) => e.status === "ดำเนินการเสร็จสิ้น").length
+      }`,
+  link: "/event",
+  iconColor: "#3498db",
+  iconBgColor: "rgba(51, 105, 232, 0.1)",
+}
 
-      subtitleStyle: { fontSize: "5px" }, // เพิ่ม style สำหรับ subtitle
-
-    },
+,
   ];
 
   return (
