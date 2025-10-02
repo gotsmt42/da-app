@@ -15,9 +15,9 @@ import { CSVLink } from "react-csv";
 import { SwalDelete } from "../../functions/Swal";
 
 import DataTableComponent from "../DataTable/DataTableComponent";
-import DataTableColumns from "../DataTable/TblOperation/DataTableColumns";
+import DataTableColumns from "../DataTable/TblTackStatus/DataTableColumns";
 
-import Expanded from "./Expanded";
+import Expanded from "./Expanded.js";
 
 import { LocalizationProvider, DatePicker } from "@mui/x-date-pickers";
 import { AdapterMoment } from "@mui/x-date-pickers/AdapterMoment";
@@ -45,15 +45,13 @@ import { styled } from "@mui/material/styles";
 import styleButton from "@mui/material/Button";
 import { Close, Download } from "@mui/icons-material";
 
-const Operation = () => {
+const Tackstatus = () => {
   moment.locale("th"); // ✅ ตั้งค่า default เป็นภาษาไทย
   const { id } = useParams(); // 👈 ดึง eventId จาก path /operation/:id
   const navigate = useNavigate(); // 👈 ใช้สำหรับเปลี่ยนเส้นทาง
 
-  const [rows, setRows] = useState([]);
   const [expandedRows, setExpandedRows] = useState({});
   const [selectedRow, setSelectedRow] = useState(null);
-  const [modalOpenInsert, setModalOpenInsert] = useState(false);
   const [modalOpenEdit, setModalOpenEdit] = useState(false);
   const [editedData, setEditedData] = useState({});
   const [selectedFile, setSelectedFile] = useState(null);
@@ -67,9 +65,6 @@ const Operation = () => {
 
   const [filter, setFilter] = useState([]);
   const isSmallScreen = useMediaQuery("(max-width:600px)");
-
-  const [selectedMonth, setSelectedMonth] = useState(""); // "" = ทั้งหมด
-  const [selectedYear, setSelectedYear] = useState(moment().year().toString());
 
   // ✅ คำนวณ dateSearch จาก 2 dropdown
   const [selectedDate, setSelectedDate] = useState(moment().format("YYYY-MM")); // ค่าเริ่มต้นเป็นเดือนนี้
@@ -204,8 +199,17 @@ const Operation = () => {
               .some((text) => text.includes(keyword))
           : true;
 
+        const matchQuotation =
+          event.documentSentQuotation && event.quotationFileUrl;
+
         return (
-          matchMonth && matchType && matchSystem && matchStatus && matchTeam && matchSearch
+          matchMonth &&
+          matchType &&
+          matchSystem &&
+          matchStatus &&
+          matchTeam &&
+          matchSearch &&
+          matchQuotation // ✅ เงื่อนไขใหม่
         );
       });
 
@@ -220,7 +224,7 @@ const Operation = () => {
     filterType,
     filterSystem,
     filterStatus,
-    filterTeam
+    filterTeam,
   ]);
 
   const handleDeleteRow = async (customerId) => {
@@ -333,9 +337,9 @@ const Operation = () => {
         [`documentSent${capitalize(type)}`]: true,
       });
 
-
-            setPreviewUrl(result.fileUrl);
+      setPreviewUrl(result.fileUrl);
 setPreviewFileName(result.fileName);
+
 
       setIsUploadingState((prev) => ({ ...prev, [type]: false }));
       setTimeout(() => {
@@ -387,8 +391,6 @@ setPreviewFileName(result.fileName);
   const typeList = ["PM", "Service", "Inspection", "Emergency"];
 
   const systemList = ["Fire Alarm", "CCTV", "Fire Suppression", "Fire Pump"];
-
-  const statusList = ["วางบิลแล้ว", "เก็บเงินแล้ว"];
 
   const activeFilterCount = [
     filterType,
@@ -498,20 +500,6 @@ setPreviewFileName(result.fileName);
               }
             >
               🛠️ {system}
-            </button>
-          ))}
-
-          {statusList.map((status) => (
-            <button
-              key={status}
-              className={`btn btn-sm ${
-                filterStatus === status ? "btn-primary" : "btn-outline-primary"
-              }`}
-              onClick={() =>
-                setFilterStatus((prev) => (prev === status ? "" : status))
-              }
-            >
-              📖 {status}
             </button>
           ))}
 
@@ -695,4 +683,4 @@ setPreviewFileName(result.fileName);
   );
 };
 
-export default Operation;
+export default Tackstatus;

@@ -23,6 +23,7 @@ const Files = lazy(() => import("../views/ui/Files"));
 const FileUpload = lazy(() => import("../views/ui/FileUpload"));
 const EventCalendar = lazy(() => import("../views/ui/EventCalendar.js"));
 const Operate = lazy(() => import("../views/ui/Operation.js"));
+const Tackstatus = lazy(() => import("../views/ui/Tackstatus.js"));
 const Login = lazy(() => import("../auth/Login.js"));
 const Register = lazy(() => import("../auth/Register.js"));
 
@@ -195,16 +196,16 @@ const ThemeRoutes = [
         ),
         title: "Operation",
       },
+      
       {
-        path: "operation/:id",
+        path: "tackstatus",
         element: (
-          <Suspense fallback={<div>Loading Operation...</div>}>
-            <Operate />
+          <Suspense fallback={<div>Loading Tackstatus...</div>}>
+            <Tackstatus />
           </Suspense>
         ),
-        title: "Operation",
+        title: "Tackstatus",
       },
-
       {
         path: "register",
         element: (

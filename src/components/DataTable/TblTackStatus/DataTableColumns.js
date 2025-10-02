@@ -6,35 +6,14 @@ import MenuItem from "@mui/material/MenuItem";
 import EditIcon from "@mui/icons-material/Edit";
 import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import Delete from "@mui/icons-material/Delete";
-import EventService from "../../../services/EventService";
 
-import StatusSelectCell from "./StatusSelectCell"; // ✅ import component
-import StatusTwoSelectCell from "./StatusTwoSelectCell"; // ✅ import component
-import StatusThreeSelectCell from "./StatusThreeSelectCell"; // ✅ import component
-import {
-  Box,
-  CircularProgress,
-  LinearProgress,
-  Typography,
-  useMediaQuery,
-} from "@mui/material";
-
-import AttachFileIcon from "@mui/icons-material/AttachFile";
-import Button from "@mui/material/Button";
-import Tooltip from "@mui/material/Tooltip"; // อย่าลืม import
+import { useMediaQuery } from "@mui/material";
 
 import { useTheme } from "@mui/material/styles";
-import CloseIcon from "@mui/icons-material/Close";
-
-
-import { getFileIcon } from "../../../utils/getFileIcon";
 
 import StyledMenu from "../components/StyledMenu";
 
 import DocumentCell from "../components/DocumentCell";
-
-import StatusFileCell from "../components/StatusFileCell";
-
 
 const DataTableColumns = ({
   setSelectedRow,
@@ -48,10 +27,9 @@ const DataTableColumns = ({
   handleDeleteFile,
   setPreviewUrl,
   setPreviewFileName,
-
+  disableUpload,
   setConfirmOpen,
   setPendingDelete,
-
   uploadingState,
   isUploadingState,
   uploadingFileSizeState,
@@ -100,8 +78,8 @@ const DataTableColumns = ({
             <span>
               {moment(row.start).format("DD")} {" - "}{" "}
               {moment(row.end).format("DD/MM/YYYY")}
-            </span>     
-            
+            </span>
+
             {/* <span>
               {moment(row.start).format("DD")} {" - "}{" "}
               {moment(row.end).format("DD")}
@@ -114,17 +92,17 @@ const DataTableColumns = ({
         </div>
       ),
     },
-    // {
-    //   name: "เลขที่เอกสาร",
-    //   sortable: true,
-    //   width: "115px",
-    //   selector: (row) => row.docNo || "-",
-    //   cell: (row) => (
-    //     <div style={{ fontSize: "0.85em", color: "#333" }}>
-    //       {row.docNo || <span style={{ color: "#bbb" }}>ไม่ระบุ</span>}
-    //     </div>
-    //   ),
-    // },
+    {
+      name: "เลขที่เอกสาร",
+      sortable: true,
+      width: "115px",
+      selector: (row) => row.docNo || "-",
+      cell: (row) => (
+        <div style={{ fontSize: "0.85em", color: "#333" }}>
+          {row.docNo || <span style={{ color: "#bbb" }}>ไม่ระบุ</span>}
+        </div>
+      ),
+    },
 
     {
       name: "งาน / โครงการ",
@@ -142,51 +120,10 @@ const DataTableColumns = ({
         </div>
       ),
     },
-    {
-      name: "การดำเนินการ",
-      sortable: true,
-      width: "182px",
-      // omit: isMobile, // ซ่อนไปถ้าเป็นมือถือ
 
-      selector: (row) => row.status,
-      cell: (row) => (
-        <StatusSelectCell row={row} onStatusUpdate={onStatusUpdate} />
-      ),
-    },
-
-    // Status 2
     {
-      name: <div style={{ textAlign: "center", width: "100%" }}>สถานะ</div>,
-      sortable: true,
-      // omit: isMobile,
-      width: "150px",
-      selector: (row) => row.status,
-      cell: (row) => (
-        <StatusTwoSelectCell row={row} onStatusUpdate={onStatusUpdate} />
-      ),
-    },
-   {
-  name: "อัพโหลดไฟล์",
-  width: "160px",
-  sortable: false,
-  cell: (row) => (
-    <StatusFileCell
-      row={row}
-      onFileUpload={onFileUpload}
-      setSelectedFile={setSelectedFile}
-      setPreviewUrl={setPreviewUrl}
-      setPreviewFileName={setPreviewFileName}
-      setPendingDelete={setPendingDelete}
-      setConfirmOpen={setConfirmOpen}
-      uploadingState={uploadingState}
-      isUploadingState={isUploadingState}
-      uploadingFileSizeState={uploadingFileSizeState}
-    />
-  ),
-},
- {
       name: "เสนอราคาเพิ่มเติม",
-      width: "200px",
+      width: "150px",
       sortable: false,
       cell: (row) => (
         <DocumentCell
@@ -198,6 +135,37 @@ const DataTableColumns = ({
           fileUrlField="quotationFileUrl"
           fileTypeField="quotationFileType"
           sentField="documentSentQuotation"
+          disableUpload={true} // ✅ ปิด input และปุ่มอัปโหลด
+          {...{
+            onStatusUpdate,
+            onFileUpload,
+            setSelectedFile,
+            setPreviewUrl,
+            setPreviewFileName,
+            setPendingDelete,
+            setConfirmOpen,
+            uploadingState,
+            isUploadingState,
+            uploadingFileSizeState,
+          }}
+        />
+      ),
+    },
+
+    {
+      name: "อนุมัติแล้ว",
+      width: "200px",
+      sortable: false,
+      cell: (row) => (
+        <DocumentCell
+          row={row}
+          type="trackStatusConfirm"
+          label="อัปโหลดหลักฐานการติตามลูกค้า"
+          color="info"
+          fileNameField="trackStatusConfirmFileName"
+          fileUrlField="trackStatusConfirmFileUrl"
+          fileTypeField="trackStatusConfirmFileType"
+          sentField="trackStatusConfirm"
           {...{
             onStatusUpdate,
             onFileUpload,
@@ -214,19 +182,19 @@ const DataTableColumns = ({
       ),
     },
     {
-      name: "รายงาน",
+      name: "ติดตามครั้งที่ 1",
       width: "200px",
       sortable: false,
       cell: (row) => (
         <DocumentCell
           row={row}
-          type="report"
-          label="อัปโหลดรายงาน"
-          color="success"
-          fileNameField="reportFileName"
-          fileUrlField="reportFileUrl"
-          fileTypeField="reportFileType"
-          sentField="documentSentReport"
+          type="trackStatus1"
+          label="อัปโหลดหลักฐานการติตามลูกค้า"
+          color="info"
+          fileNameField="trackStatus1FileName"
+          fileUrlField="trackStatus1FileUrl"
+          fileTypeField="trackStatus1FileType"
+          sentField="trackStatus1"
           {...{
             onStatusUpdate,
             onFileUpload,
@@ -242,6 +210,94 @@ const DataTableColumns = ({
         />
       ),
     },
+    {
+      name: "ติดตามครั้งที่ 2",
+      width: "200px",
+      sortable: false,
+      cell: (row) => (
+        <DocumentCell
+          row={row}
+          type="trackStatus2"
+          label="อัปโหลดหลักฐานการติตามลูกค้า"
+          color="info"
+          fileNameField="trackStatus2FileName"
+          fileUrlField="trackStatus2FileUrl"
+          fileTypeField="trackStatus2FileType"
+          sentField="trackStatus2"
+          {...{
+            onStatusUpdate,
+            onFileUpload,
+            setSelectedFile,
+            setPreviewUrl,
+            setPreviewFileName,
+            setPendingDelete,
+            setConfirmOpen,
+            uploadingState,
+            isUploadingState,
+            uploadingFileSizeState,
+          }}
+        />
+      ),
+    },
+    {
+      name: "ติดตามครั้งที่ 3",
+      width: "200px",
+      sortable: false,
+      cell: (row) => (
+        <DocumentCell
+          row={row}
+          type="trackStatus3"
+          label="อัปโหลดหลักฐานการติตามลูกค้า"
+          color="info"
+          fileNameField="trackStatus3FileName"
+          fileUrlField="trackStatus3FileUrl"
+          fileTypeField="trackStatus3FileType"
+          sentField="trackStatus3"
+          {...{
+            onStatusUpdate,
+            onFileUpload,
+            setSelectedFile,
+            setPreviewUrl,
+            setPreviewFileName,
+            setPendingDelete,
+            setConfirmOpen,
+            uploadingState,
+            isUploadingState,
+            uploadingFileSizeState,
+          }}
+        />
+      ),
+    },
+    {
+      name: "ติดตามครั้งที่ 4 ",
+      width: "200px",
+      sortable: false,
+      cell: (row) => (
+        <DocumentCell
+          row={row}
+          type="trackStatus4"
+          label="อัปโหลดหลักฐานการติตามลูกค้า"
+          color="info"
+          fileNameField="trackStatus4FileName"
+          fileUrlField="trackStatus4FileUrl"
+          fileTypeField="trackStatus4FileType"
+          sentField="trackStatus4"
+          {...{
+            onStatusUpdate,
+            onFileUpload,
+            setSelectedFile,
+            setPreviewUrl,
+            setPreviewFileName,
+            setPendingDelete,
+            setConfirmOpen,
+            uploadingState,
+            isUploadingState,
+            uploadingFileSizeState,
+          }}
+        />
+      ),
+    },
+
     {
       name: "Action",
       width: "80px",

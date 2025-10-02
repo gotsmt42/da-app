@@ -48,6 +48,11 @@ const navigation = [
     href: "/operation",
     icon: "bi-clock-fill",
   },
+  {
+    title: "ติดตามงาน",
+    href: "/tackstatus",
+    icon: "bi-hourglass-top"
+  },
 
   // {
   //   title: "File",
