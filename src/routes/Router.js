@@ -13,7 +13,8 @@ const Badges = lazy(() => import("../views/ui/Badges"));
 const Buttons = lazy(() => import("../views/ui/Buttons"));
 const Cards = lazy(() => import("../views/ui/Cards"));
 const Grid = lazy(() => import("../views/ui/Grid"));
-const CE = lazy(() => import("../views/ui/CustomerEmployee.js"));
+const Customer = lazy(() => import("../views/ui/Customer.js"));
+const Employee = lazy(() => import("../views/ui/Employee.js"));
 const Forms = lazy(() => import("../views/ui/Forms"));
 const Breadcrumbs = lazy(() => import("../views/ui/Breadcrumbs"));
 const Account = lazy(() => import("../components/User/Employee/Account.js"));
@@ -116,13 +117,22 @@ const ThemeRoutes = [
         title: "Grid",
       },
       {
-        path: "customer-employee",
+        path: "customer",
         element: (
-          <Suspense fallback={<div>Loading Users...</div>}>
-            <CE />
+          <Suspense fallback={<div>Loading Customers...</div>}>
+            <Customer />
           </Suspense>
         ),
-        title: "Customer & Employee",
+        title: "Customer",
+      },
+      {
+        path: "employee",
+        element: (
+          <Suspense fallback={<div>Loading Users...</div>}>
+            <Employee />
+          </Suspense>
+        ),
+        title: "Employee",
       },
       {
         path: "forms",

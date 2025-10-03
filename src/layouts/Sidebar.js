@@ -42,7 +42,6 @@ const navigation = [
     icon: "bi-calendar-event-fill",
   },
 
-  
   {
     title: "การดำเนินงาน",
     href: "/operation",
@@ -51,7 +50,7 @@ const navigation = [
   {
     title: "ติดตามงาน",
     href: "/tackstatus",
-    icon: "bi-hourglass-top"
+    icon: "bi-hourglass-top",
   },
 
   // {
@@ -169,7 +168,7 @@ const Sidebar = ({ handleMenuClick }) => {
                       <BiChevronRight />
                     )}
                   </button>
-                  
+
                   <Collapse
                     isOpen={collapsedMenu[index]}
                     style={{ paddingLeft: "21px" }}
@@ -186,12 +185,7 @@ const Sidebar = ({ handleMenuClick }) => {
                       >
                         {item.icon && <item.icon />} {item.title}
                       </Link>
-
-                      
                     ))}
-
-   
-                
                   </Collapse>
                 </>
               ) : (
@@ -216,14 +210,27 @@ const Sidebar = ({ handleMenuClick }) => {
         <div className="sidebar-fixed-bottom p-3 mt-2">
           <NavItem className="sidenav-bg ">
             <Link
-              to="/customer-employee"
-              className={`centered-button nav-link py-3 ${
-                location.pathname === "/customer-employee" ? "active" : ""
+              to="/customer"
+              // className={`centered-button nav-link py-3 ${
+              className={`nav-link py-3 ${
+                location.pathname === "/customer" ? "active" : ""
+              }`}
+              onClick={handleMenuClick}
+            >
+              <i className="bi bi-building-fill ms-3"></i>
+              <span className="ms-2">Customer</span>
+            </Link>
+          </NavItem>
+          <NavItem className="sidenav-bg ">
+            <Link
+              to="/employee"
+              className={`nav-link py-3 ${
+                location.pathname === "/employee" ? "active" : ""
               }`}
               onClick={handleMenuClick}
             >
               <i className="bi bi-people-fill ms-3"></i>
-              <span className="ms-2">EMPLOYEE MANAGEMENT</span>
+              <span className="ms-2">EMPLOYEE</span>
             </Link>
           </NavItem>
 

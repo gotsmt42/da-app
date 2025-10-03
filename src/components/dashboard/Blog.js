@@ -18,7 +18,7 @@ const Blog = (props) => {
         <div className="icon-container" style={{ textAlign: 'center', padding: '20px', backgroundColor: props.iconBgColor || '#f8f9fa' }}>
           <Icon size={props.iconSize || 50} color={props.iconColor || '#000'} />
         </div>
-        <CardBody className="p-4">
+        <CardBody className="p-3">
           <CardTitle tag="h5">{props.title}</CardTitle>
           <CardSubtitle>{props.subtitle}</CardSubtitle>
           <CardText className="mt-3">{props.text}</CardText>

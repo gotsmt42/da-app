@@ -11,18 +11,19 @@ import {
   FaClock,
   FaHourglass,
   FaHourglassStart,
+  FaBuilding,
 } from "react-icons/fa"; // นำเข้าไอคอนต่างๆ จาก react-icons
 import { useEffect, useState } from "react";
 import FileService from "../services/FileService";
 import ProductService from "../services/ProductService";
 import AuthService from "../services/authService";
+import CustomerService from "../services/CustomerService";
 import EventService from "../services/EventService";
 import StockProductService from "../services/StockProductService";
 import moment from "moment";
 import { faTimeline } from "@fortawesome/free-solid-svg-icons";
 
 import { useAuth } from "../auth/AuthContext";
-
 
 const Dashboard = () => {
   const { userData } = useAuth();
@@ -33,6 +34,7 @@ const Dashboard = () => {
   const [files, setFiles] = useState({});
   const [products, setProducts] = useState({});
   const [stocks, setStocks] = useState({});
+  const [customers, setCustomers] = useState({});
   const [users, setUsers] = useState({});
   const [events, setEvents] = useState({});
   useEffect(() => {
@@ -41,6 +43,7 @@ const Dashboard = () => {
     fetchStockProducts();
     fetchUsers();
     fetchEvents();
+    fetchCustomers();
   }, []);
 
   const fetchFiles = async () => {
@@ -101,6 +104,20 @@ const Dashboard = () => {
     }
   };
 
+  const fetchCustomers = async () => {
+    setLoading(true);
+    try {
+      const res = await CustomerService.getCustomers();
+      const customers = res.userCustomers;
+
+      setCustomers(customers);
+
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+      setLoading(false);
+    }
+  };
 
   const fetchEvents = async () => {
     setLoading(true);
@@ -153,21 +170,41 @@ const Dashboard = () => {
     //   iconColor: "#f39c12",
     //   iconBgColor: "#fef5e7",
     // },
+ {
+      icon: FaBuilding,
+      title: "ลูกค้า",
+      subtitle: loading
+        ? "กำลังโหลด..."
+        : (() => {
+            const customerCount = Object.values(customers).length;
+      
 
-    
+            return `ลูกค้า: ${customerCount} รายการ`;
+          })(),
+      link: "/customer",
+      iconColor: "#795A47",
+      iconBgColor: "rgba(121, 90, 71, 0.1)",
+    },
     {
       icon: FaUsers,
-      title: "จัดการสมาชิก",
-      subtitle: loading ? "กำลังโหลด..." : Object.keys(users).length + " More",
-      link: "/customer-employee",
-      iconColor: "#795A47", // สีไอคอน
-      iconBgColor: "rgba(121, 90, 71, 0.1)", // สีพื้นหลังไอคอน
-    },
+      title: "สมาชิก",
+      subtitle: loading
+        ? "กำลังโหลด..."
+        : (() => {
+            const employeeCount = Object.values(users).length;
+            const adminCount = Object.values(users).filter(
+              (u) => u.role === "admin"
+            ).length;
 
-    
+            return `พนักงาน: ${employeeCount} | ผู้ดูแล: ${adminCount}`;
+          })(),
+      link: "/employee",
+      iconColor: "#2ecc71",
+      iconBgColor: "rgba(22, 160, 133, 0.1)",
+    },
+   
   ];
   const BlogData2 = [
-
     // {
     //   icon: FaFileImport,
     //   title: "จัดเก็บไฟล์",
@@ -176,7 +213,7 @@ const Dashboard = () => {
     //   iconColor: "#e74c3c", // สีไอคอน
     //   iconBgColor: "#fde3e3",
     // },
- 
+
     // {
     //   icon: FaBoxOpen,
     //   title: "เพิ่มสินค้า",
@@ -185,57 +222,58 @@ const Dashboard = () => {
     //   iconColor: "#2ecc71",
     //   iconBgColor: "rgba(22, 160, 133, 0.1)",
     // },
-{
-  icon: FaClock,
-  title: "การดำเนินงาน",
-  subtitle: loading
-    ? "กำลังโหลด..."
-       : Object.values(events).length + " รายการ",
+    {
+      icon: FaClock,
+      title: "การดำเนินงาน",
+      subtitle: loading
+        ? "กำลังโหลด..."
+        : Object.values(events).length + " รายการ",
 
-  link: "/operation",
-  iconColor: "#f39c12",
-  iconBgColor: "#fef5e7",
-}
-  ,
-{
-  icon: FaHourglassStart,
-  title: "ติดตามงาน",
-  subtitle: loading
-    ? "กำลังโหลด..."
-    : Object.values(events).filter((e) => Boolean(e.quotationFileUrl)).length + " รายการ",
-  link: "/tackstatus",
-  iconColor: "#e74c3c",
-  iconBgColor: "#fde3e3",
-}
-
-    
+      link: "/operation",
+      iconColor: "#f39c12",
+      iconBgColor: "#fef5e7",
+    },
+    {
+      icon: FaHourglassStart,
+      title: "ติดตามงาน",
+      subtitle: loading
+        ? "กำลังโหลด..."
+        : Object.values(events).filter((e) => Boolean(e.quotationFileUrl))
+            .length + " รายการ",
+      link: "/tackstatus",
+      iconColor: "#e74c3c",
+      iconBgColor: "#fde3e3",
+    },
   ];
   const BlogData3 = [
-{
-  icon: FaCalendarAlt,
-  title: "แผนงาน",
-  subtitle: loading
-    ? "กำลังโหลด..."
-    : `กำลังรอยืนยัน: ${
-        Object.values(events).filter((e) => e.status === "กำลังรอยืนยัน").length
-      } | ยืนยันแล้ว: ${
-        Object.values(events).filter((e) => e.status === "ยืนยันแล้ว").length
-      } | กำลังดำเนินการ: ${
-        Object.values(events).filter((e) => e.status === "กำลังดำเนินการ").length
-      } | เสร็จสิ้นแล้ว: ${
-        Object.values(events).filter((e) => e.status === "ดำเนินการเสร็จสิ้น").length
-      }`,
-  link: "/event",
-  iconColor: "#3498db",
-  iconBgColor: "rgba(51, 105, 232, 0.1)",
-}
-
-,
+    {
+      icon: FaCalendarAlt,
+      title: "แผนงาน",
+      subtitle: loading
+        ? "กำลังโหลด..."
+        : `กำลังรอยืนยัน: ${
+            Object.values(events).filter((e) => e.status === "กำลังรอยืนยัน")
+              .length
+          } | ยืนยันแล้ว: ${
+            Object.values(events).filter((e) => e.status === "ยืนยันแล้ว")
+              .length
+          } | กำลังดำเนินการ: ${
+            Object.values(events).filter((e) => e.status === "กำลังดำเนินการ")
+              .length
+          } | เสร็จสิ้นแล้ว: ${
+            Object.values(events).filter(
+              (e) => e.status === "ดำเนินการเสร็จสิ้น"
+            ).length
+          }`,
+      link: "/event",
+      iconColor: "#3498db",
+      iconBgColor: "rgba(51, 105, 232, 0.1)",
+    },
   ];
 
   return (
     <div>
-        <Row
+      <Row
         className="flex-wrap"
         style={{ display: "flex", justifyContent: "space-between" }}
       >
@@ -252,68 +290,62 @@ const Dashboard = () => {
               subtitle={blg.subtitle}
               // text={blg.description}
               color={blg.btnbg}
-
-
             />
           </Col>
         ))}
       </Row>
- {isAdmin && (
-      <Row
-        className="flex-wrap"
-        style={{ display: "flex", justifyContent: "space-between" }}
-      >
-        {BlogData2.map((blg, index) => (
-          <Col key={index} className="col mb-4">
-            <Blog
-              // image={blg.image}
-              link={blg.link}
-              icon={blg.icon}
-              iconSize={100}
-              iconColor={blg.iconColor} // ส่งสีของไอคอน
-              iconBgColor={blg.iconBgColor} // ส่งสีพื้นหลังของไอคอน
-              title={blg.title}
-              subtitle={blg.subtitle}
-              // text={blg.description}
-              color={blg.btnbg}
+      {isAdmin && (
+        <Row
+          className="flex-wrap"
+          style={{ display: "flex", justifyContent: "space-between" }}
+        >
+          {BlogData2.map((blg, index) => (
+            <Col key={index} className="col mb-4">
+              <Blog
+                // image={blg.image}
+                link={blg.link}
+                icon={blg.icon}
+                iconSize={100}
+                iconColor={blg.iconColor} // ส่งสีของไอคอน
+                iconBgColor={blg.iconBgColor} // ส่งสีพื้นหลังของไอคอน
+                title={blg.title}
+                subtitle={blg.subtitle}
+                // text={blg.description}
+                color={blg.btnbg}
+              />
+            </Col>
+          ))}
+        </Row>
+      )}
 
+      {isAdmin && (
+        <Row
+          className="flex-wrap"
+          style={{ display: "flex", justifyContent: "space-between" }}
+        >
+          {/***Blog Cards***/}
+          {BlogData.map((blg, index) => (
+            <Col key={index} className="col mb-4">
+            {/* <Col key={index} className="col col-md-3 col-lg-3 mb-4"> */}
+              <Blog
+                // image={blg.image}
+                link={blg.link}
+                icon={blg.icon}
+                iconSize={100}
+                iconColor={blg.iconColor} // ส่งสีของไอคอน
+                iconBgColor={blg.iconBgColor} // ส่งสีพื้นหลังของไอคอน
+                title={blg.title}
+                subtitle={blg.subtitle}
+                // text={blg.description}
+                color={blg.btnbg}
+                subtitleStyle={blg.subtitleStyle} // ใช้ style ที่กำหนดใน BlogData
+              />
+            </Col>
+          ))}
+        </Row>
+      )}
 
-            />
-          </Col>
-        ))}
-      </Row>
-     
-   )}
-
-   {isAdmin && (
-      <Row
-        className="flex-wrap"
-        style={{ display: "flex", justifyContent: "space-between" }}
-      >
-        {/***Blog Cards***/}
-        {BlogData.map((blg, index) => (
-          <Col key={index} className="col col-md-3 col-lg-3 mb-4">
-            <Blog
-              // image={blg.image}
-              link={blg.link}
-              icon={blg.icon}
-              iconSize={100}
-              iconColor={blg.iconColor} // ส่งสีของไอคอน
-              iconBgColor={blg.iconBgColor} // ส่งสีพื้นหลังของไอคอน
-              title={blg.title}
-              subtitle={blg.subtitle}
-              // text={blg.description}
-              color={blg.btnbg}
-
-              subtitleStyle={blg.subtitleStyle} // ใช้ style ที่กำหนดใน BlogData
-
-            />
-          </Col>
-        ))}
-      </Row>
-         )}
-
-{/* 
+      {/* 
       <Row
         className="flex-wrap mt-5"
         style={{ display: "flex", justifyContent: "space-between" }}
