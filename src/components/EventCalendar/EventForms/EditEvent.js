@@ -410,25 +410,27 @@ export const getEditEvent = async ({
 
     showConfirmButton: false, // ❌ ซ่อนปุ่มเดิม
     showCancelButton: false,
-    showDenyButton: true, // ใช้ปุ่ม Deny เป็นปุ่มลบ
-    denyButtonText: "❌ ลบแผนงานนี้",
+
     showCloseButton: true,
     customClass: "swal-wide",
     footer: `
-    <div id="custom-footer-buttons" style="margin-top: 20px; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px;">
-      <button id="btnConfirm" class="swal2-confirm swal2-styled" style="background-color: #0ECC00;">
-        ✅ บันทึกการเปลี่ยนแปลง
-      </button>
-   
-      <button id="btnCancel" class="swal2-cancel swal2-styled" style="background-color: #999;">
-        🔙 ปิดหน้าต่าง
-      </button>
-      <button id="btnGeneratePDF" class="swal2-confirm swal2-styled" style="background-color: #0064de;">
-        📝 ออกใบแจ้งเข้างาน
-      </button>
-      
-    </div>
-  `,
+  <div id="custom-footer-buttons" style="margin-top: 20px; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px;">
+    <button id="btnConfirm" class="swal2-confirm swal2-styled" style="background-color: #0ECC00;">
+      ✅ บันทึกการเปลี่ยนแปลง
+    </button>
+
+    <button id="btnGeneratePDF" class="swal2-confirm swal2-styled" style="background-color: #0064de;">
+      📝 ออกใบแจ้งเข้างาน
+    </button>
+
+    <button id="btnCancel" class="swal2-cancel swal2-styled" style="background-color: #999;">
+      🔙 ปิดหน้าต่าง
+    </button>
+  </div>
+`,
+showDenyButton: true,
+denyButtonText: "❌ ลบแผนงานนี้",
+
 
     didOpen: () => {
       const descriptionInput = document.getElementById("editDescription");

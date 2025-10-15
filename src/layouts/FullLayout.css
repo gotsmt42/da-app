@@ -1,7 +1,25 @@
 /* FullLayout.css */
 /* FullLayout.css */
 
+.contentArea {
+  flex: 1;
+  max-width: 85%;
+  padding: 0 12px; /* ลดหรือปรับตามต้องการ */
+}
+.sidebarArea {
+  width: 220px; /* ลดลงจากเดิมถ้าอยากให้ content กว้างขึ้น */
+}
 
+@media (min-width: 992px) {
+  .pageWrapper {
+    display: flex;
+    flex-direction: row;
+  }
+
+  .contentArea {
+    width: calc(100% - 250px); /* ปรับตาม sidebar */
+  }
+}
 
   .footer {
     flex-shrink: 0;

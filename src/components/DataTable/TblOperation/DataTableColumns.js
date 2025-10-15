@@ -26,7 +26,6 @@ import Tooltip from "@mui/material/Tooltip"; // อย่าลืม import
 import { useTheme } from "@mui/material/styles";
 import CloseIcon from "@mui/icons-material/Close";
 
-
 import { getFileIcon } from "../../../utils/getFileIcon";
 
 import StyledMenu from "../components/StyledMenu";
@@ -34,7 +33,6 @@ import StyledMenu from "../components/StyledMenu";
 import DocumentCell from "../components/DocumentCell";
 
 import StatusFileCell from "../components/StatusFileCell";
-
 
 const DataTableColumns = ({
   setSelectedRow,
@@ -89,7 +87,7 @@ const DataTableColumns = ({
   const columns = [
     {
       name: "วันดำเนินการ",
-      width: "130px",
+      width: "150px",
 
       sortable: true,
       sortFunction: (a, b) => new Date(a.start) - new Date(b.start),
@@ -98,10 +96,27 @@ const DataTableColumns = ({
         <div>
           <div style={{ fontSize: "0.9em", color: "#333" }}>
             <span>
-              {moment(row.start).format("DD")} {" - "}{" "}
-              {moment(row.end).format("DD/MM/YYYY")}
-            </span>     
-            
+              {moment(row.start).isSame(
+                moment(row.end).clone().subtract(1, "day"),
+                "day"
+              ) ? (
+                <>
+                  {moment(row.start).format("DD")}{" "}
+                  <span style={{ color: "#888" }}>
+                    {moment(row.start).format("MMMM YYYY")}
+                  </span>
+                </>
+              ) : (
+                <>
+                  {moment(row.start).format("DD")} –{" "}
+                  {moment(row.end).clone().subtract(1, "day").format("DD")}{" "}
+                  <span style={{ color: "#888" }}>
+                    {moment(row.start).format("MMMM YYYY")}
+                  </span>
+                </>
+              )}
+            </span>
+
             {/* <span>
               {moment(row.start).format("DD")} {" - "}{" "}
               {moment(row.end).format("DD")}
@@ -165,28 +180,28 @@ const DataTableColumns = ({
         <StatusTwoSelectCell row={row} onStatusUpdate={onStatusUpdate} />
       ),
     },
-   {
-  name: "อัพโหลดไฟล์",
-  width: "160px",
-  sortable: false,
-  cell: (row) => (
-    <StatusFileCell
-      row={row}
-      onFileUpload={onFileUpload}
-      setSelectedFile={setSelectedFile}
-      setPreviewUrl={setPreviewUrl}
-      setPreviewFileName={setPreviewFileName}
-      setPendingDelete={setPendingDelete}
-      setConfirmOpen={setConfirmOpen}
-      uploadingState={uploadingState}
-      isUploadingState={isUploadingState}
-      uploadingFileSizeState={uploadingFileSizeState}
-    />
-  ),
-},
- {
+    {
+      name: "อัพโหลดไฟล์",
+      width: "220px",
+      sortable: false,
+      cell: (row) => (
+        <StatusFileCell
+          row={row}
+          onFileUpload={onFileUpload}
+          setSelectedFile={setSelectedFile}
+          setPreviewUrl={setPreviewUrl}
+          setPreviewFileName={setPreviewFileName}
+          setPendingDelete={setPendingDelete}
+          setConfirmOpen={setConfirmOpen}
+          uploadingState={uploadingState}
+          isUploadingState={isUploadingState}
+          uploadingFileSizeState={uploadingFileSizeState}
+        />
+      ),
+    },
+    {
       name: "เสนอราคาเพิ่มเติม",
-      width: "200px",
+      width: "220px",
       sortable: false,
       cell: (row) => (
         <DocumentCell
@@ -215,7 +230,7 @@ const DataTableColumns = ({
     },
     {
       name: "รายงาน",
-      width: "200px",
+      width: "220px",
       sortable: false,
       cell: (row) => (
         <DocumentCell

@@ -67,7 +67,7 @@ const DataTableColumns = ({
   const columns = [
     {
       name: "วันดำเนินการ",
-      width: "130px",
+      width: "150px",
 
       sortable: true,
       sortFunction: (a, b) => new Date(a.start) - new Date(b.start),
@@ -75,10 +75,27 @@ const DataTableColumns = ({
       cell: (row) => (
         <div>
           <div style={{ fontSize: "0.9em", color: "#333" }}>
-            <span>
-              {moment(row.start).format("DD")} {" - "}{" "}
-              {moment(row.end).format("DD/MM/YYYY")}
-            </span>
+             <span>
+                    {moment(row.start).isSame(
+                      moment(row.end).clone().subtract(1, "day"),
+                      "day"
+                    ) ? (
+                      <>
+                        {moment(row.start).format("DD")}{" "}
+                        <span style={{ color: "#888" }}>
+                          {moment(row.start).format("MMMM YYYY")}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        {moment(row.start).format("DD")} –{" "}
+                        {moment(row.end).clone().subtract(1, "day").format("DD")}{" "}
+                        <span style={{ color: "#888" }}>
+                          {moment(row.start).format("MMMM YYYY")}
+                        </span>
+                      </>
+                    )}
+                  </span>
 
             {/* <span>
               {moment(row.start).format("DD")} {" - "}{" "}

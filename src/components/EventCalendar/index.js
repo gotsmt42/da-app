@@ -59,8 +59,10 @@ import thSarabunFont from "../../Fonts/THSarabunNew_base64"; // นำเข้�
 import TomSelect from "tom-select";
 import "tom-select/dist/css/tom-select.css";
 
-import "choices.js/public/assets/styles/choices.min.css";
-import Choices from "choices.js";
+
+import 'choices.js/public/assets/styles/choices.min.css';
+import Choices from 'choices.js';
+
 
 import Hammer from "hammerjs";
 
@@ -257,7 +259,7 @@ function EventCalendar() {
       TomSelect,
       moment,
       calendarRef,
-      Choices,
+      Choices
     });
   };
 
@@ -360,19 +362,19 @@ function EventCalendar() {
     });
   }, []);
 
-  const filteredCalendarEvents = useMemo(() => {
-    const keyword = searchTerm.toLowerCase();
-    return events.filter((event) =>
-      [
-        event.title ?? "",
-        event.site ?? "",
-        event.company ?? "",
-        event.system ?? "",
-        event.time?.toString() ?? "",
-        event.team ?? "",
-      ].some((field) => field.toLowerCase().includes(keyword))
-    );
-  }, [events, searchTerm]);
+const filteredCalendarEvents = useMemo(() => {
+  const keyword = searchTerm.toLowerCase();
+  return events.filter((event) =>
+    [
+      event.title ?? "",
+      event.site ?? "",
+      event.company ?? "",
+      event.system ?? "",
+      event.time?.toString() ?? "",
+    ].some((field) => field.toLowerCase().includes(keyword))
+  );
+}, [events, searchTerm]);
+
 
   const getStatusIcon = useCallback((status) => {
     const icons = {
@@ -443,7 +445,7 @@ function EventCalendar() {
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
-      <div id="content-id" style={{ flex: 1, width: "100%" }}>
+      <div id="content-id" className="calendar-wrapper" style={{ flex: 1, width: "100%" }}>
         <FullCalendar
           ref={calendarRef}
           locales={[thLocale]} // ใช้งานภาษาไทย
@@ -469,6 +471,8 @@ function EventCalendar() {
           selectMirror={true}
           weekends={true}
           contentHeight="auto"
+
+
           showNonCurrentDates={false} // ✅ ไม่แสดงวันของเดือนก่อนและหลัง
           firstDay={0} // ✅ กำหนดให้วันอาทิตย์เป็นวันแรกของสัปดาห์
           eventContent={(arg) => {
@@ -487,7 +491,10 @@ function EventCalendar() {
             const timeDisplay = time ? `- ครั้งที่ : ${time}` : "";
             const teamDisplay = team ? `- ทีม : ${team}` : "";
 
+
+
             const systemDisplay = system ? `- ระบบ : ${system}` : "";
+
 
             const timeRangeDisplay =
               startTime && endTime
@@ -498,9 +505,10 @@ function EventCalendar() {
                 ? `- สิ้นสุดเวลา : ${endTime}`
                 : "";
 
-            const isSmallScreen = window.innerWidth < 576;
 
-            const fontSize = isSmallScreen ? "0.82em" : "1em";
+              const isSmallScreen = window.innerWidth < 576;
+
+             const fontSize = isSmallScreen ? "0.82em" : "1em";
             return {
               html: `
                 <div style="font-size:  ${fontSize}; line-height: 1.8; padding: 1px;">
@@ -512,7 +520,9 @@ function EventCalendar() {
 
 
               <div>${teamDisplay}</div>
-                ${timeRangeDisplay ? `<div>${timeRangeDisplay}</div>` : ""}
+                ${
+                  timeRangeDisplay ? `<div>${timeRangeDisplay}</div>` : ""
+                }
               </div>
     `,
             };

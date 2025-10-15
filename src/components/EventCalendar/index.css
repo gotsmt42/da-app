@@ -1,5 +1,7 @@
 /* ปรับแต่ง Event ใน FullCalendar ให้รองรับภาษาไทย */
 /* ปรับแต่ง Event ใน FullCalendar ให้รองรับภาษาไทย */
+
+
 .fc-event {
  
   /* padding: 5px; */
@@ -47,6 +49,8 @@
   background-color: #1a2530;
   color: #fff; /* ตั้งค่าสีข้อความเป็นสีขาว */
   text-decoration: none; /* ลบขีดเส้นใต้ของข้อความ */
+
+  
 }
 
 .fc-daygrid-day-number {
