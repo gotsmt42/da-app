@@ -133,6 +133,7 @@ const Operation = () => {
   const [filterType, setFilterType] = useState("");
   const [filterSystem, setFilterSystem] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+  const [filterOP, setFilterOP] = useState("");
   const [filterTeam, setFilterTeam] = useState("");
 
   useEffect(() => {
@@ -184,10 +185,9 @@ const Operation = () => {
         const matchSystem = filterSystem ? event.system === filterSystem : true;
         const matchTeam = filterTeam ? event.team === filterTeam : true;
         const matchStatus = filterStatus
-          ? [event.status, event.status_two, event.status_three].includes(
-              filterStatus
-            )
+          ? [event.status_two, event.status_three].includes(filterStatus)
           : true;
+        const matchOP = filterOP ? [event.status].includes(filterOP) : true;
 
         const keyword = search.toLowerCase();
         const matchSearch = keyword
@@ -205,7 +205,13 @@ const Operation = () => {
           : true;
 
         return (
-          matchMonth && matchType && matchSystem && matchStatus && matchTeam && matchSearch
+          matchMonth &&
+          matchType &&
+          matchSystem &&
+          matchStatus &&
+          matchOP &&
+          matchTeam &&
+          matchSearch
         );
       });
 
@@ -220,7 +226,8 @@ const Operation = () => {
     filterType,
     filterSystem,
     filterStatus,
-    filterTeam
+    filterOP,
+    filterTeam,
   ]);
 
   const handleDeleteRow = async (customerId) => {
@@ -333,9 +340,8 @@ const Operation = () => {
         [`documentSent${capitalize(type)}`]: true,
       });
 
-
-            setPreviewUrl(result.fileUrl);
-setPreviewFileName(result.fileName);
+      setPreviewUrl(result.fileUrl);
+      setPreviewFileName(result.fileName);
 
       setIsUploadingState((prev) => ({ ...prev, [type]: false }));
       setTimeout(() => {
@@ -384,16 +390,29 @@ setPreviewFileName(result.fileName);
     return "unknown";
   };
 
-  const typeList = ["PM", "Service", "Inspection", "Emergency"];
+  const typeList = [
+    "PM",
+    "Service",
+    "Inspection",
+    "ตรวจเช็คปัญหา",
+    "สำรวจระบบ",
+  ];
 
-  const systemList = ["Fire Alarm", "CCTV", "Fire Suppression", "Fire Pump"];
+  const systemList = ["Fire Alarm", "CCTV", "Fire Pump"];
 
-  const statusList = ["วางบิลแล้ว", "เก็บเงินแล้ว", "ยืนยันแล้ว", "ดำเนินการเสร็จสิ้น"];
+  const statusList = ["วางบิลแล้ว", "เก็บเงินแล้ว"];
+  const opList = [
+    "กำลังรอยืนยัน",
+    "ยืนยันแล้ว",
+    "กำลังดำเนินการ",
+    "ดำเนินการเสร็จสิ้น",
+  ];
 
   const activeFilterCount = [
     filterType,
     filterSystem,
     filterStatus,
+    filterOP,
     search.trim(),
   ].filter((v) => v !== "").length;
 
@@ -457,8 +476,9 @@ setPreviewFileName(result.fileName);
                 : moment(selectedDate).locale("th").format("MMMM YYYY")}
             </button>
           )}
-          {selectedEvent && (
-            <div className="col-12 col-sm mt-2">
+
+          <div className="col-12 col-sm mt-2">
+            {selectedEvent && (
               <button
                 className="btn btn-outline-secondary btn-sm"
                 onClick={() => navigate("/operation")}
@@ -466,10 +486,32 @@ setPreviewFileName(result.fileName);
                 ❌ แสดงข้อมูล: [{selectedEvent.title}] {selectedEvent.system} -{" "}
                 {selectedEvent.site}
               </button>
-            </div>
-          )}
-        </div>
+            )}
 
+             <div className="form-text mt-5">
+              🔎 ตัวกรอง <strong>{activeFilterCount}</strong> รายการ
+            </div>
+          </div>
+
+          {/* {activeFilterCount > 0 && (
+            <div className="form-text mt-2">
+              🔎 ตัวกรอง <strong>{activeFilterCount}</strong> รายการ
+            </div>
+          )} */}
+        </div>
+        <div className="d-flex flex-wrap gap-2 mt-3">
+          {opList.map((op) => (
+            <button
+              key={op}
+              className={`btn btn-sm ${
+                filterOP === op ? "btn-warning" : "btn-outline-warning"
+              }`}
+              onClick={() => setFilterOP((prev) => (prev === op ? "" : op))}
+            >
+              🪒 {op}
+            </button>
+          ))}
+        </div>
         <div className="d-flex flex-wrap gap-2 mt-3">
           {typeList.map((type) => (
             <button
@@ -500,7 +542,9 @@ setPreviewFileName(result.fileName);
               🛠️ {system}
             </button>
           ))}
+        </div>
 
+        <div className="d-flex flex-wrap gap-2 mt-3">
           {statusList.map((status) => (
             <button
               key={status}
@@ -514,12 +558,6 @@ setPreviewFileName(result.fileName);
               📖 {status}
             </button>
           ))}
-
-          {activeFilterCount > 0 && (
-            <div className="form-text mt-2">
-              🔎 ตัวกรอง <strong>{activeFilterCount}</strong> รายการ
-            </div>
-          )}
         </div>
 
         <div className="col-12 col-sm mt-3">
@@ -529,6 +567,7 @@ setPreviewFileName(result.fileName);
               setFilterType("");
               setFilterSystem("");
               setFilterStatus("");
+              setFilterOP("");
             }}
           >
             ❌ ล้างตัวกรองทั้งหมด
@@ -573,8 +612,6 @@ setPreviewFileName(result.fileName);
             uploadingState,
             isUploadingState,
             uploadingFileSizeState,
-
-            
           })}
           data={sortedData}
           highlightOnHover
