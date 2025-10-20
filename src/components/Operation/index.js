@@ -388,7 +388,7 @@ setPreviewFileName(result.fileName);
 
   const systemList = ["Fire Alarm", "CCTV", "Fire Suppression", "Fire Pump"];
 
-  const statusList = ["วางบิลแล้ว", "เก็บเงินแล้ว"];
+  const statusList = ["วางบิลแล้ว", "เก็บเงินแล้ว", "ยืนยันแล้ว", "ดำเนินการเสร็จสิ้น"];
 
   const activeFilterCount = [
     filterType,
