@@ -30,7 +30,32 @@ import Swal from "sweetalert2";
 import { swalLogout } from "../functions/user";
 import { useAuth } from "../auth/AuthContext";
 
-const navigation = [
+
+
+const Sidebar = ({ handleMenuClick }) => {
+  const [collapsedMenu, setCollapsedMenu] = useState({});
+  const location = useLocation();
+
+  const { userData, logout } = useAuth();
+
+  const isAdmin = userData?.role?.toLowerCase() === "admin"; // ✅ รองรับ case-insensitive
+
+  const [user, setUser] = useState({});
+  useEffect(() => {
+    const getUserData = async () => {
+      try {
+        const getUser = await AuthService.getUserData();
+        setUser(getUser.user);
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      }
+    };
+
+    getUserData();
+  }, []);
+
+
+  const navigation = [
   {
     title: "DASHBOARD",
     href: "/dashboard",
@@ -41,7 +66,8 @@ const navigation = [
     href: "/event",
     icon: "bi-calendar-event-fill",
   },
-
+  ]
+    const navigation2= [
   {
     title: "การดำเนินงาน",
     href: "/operation",
@@ -52,7 +78,7 @@ const navigation = [
     href: "/tackstatus",
     icon: "bi-hourglass-top",
   },
-
+    ]
   // {
   //   title: "File",
   //   icon: <IoFileTrayFullOutline />,
@@ -85,29 +111,7 @@ const navigation = [
   //     },
   //   ],
   // },
-];
 
-const Sidebar = ({ handleMenuClick }) => {
-  const [collapsedMenu, setCollapsedMenu] = useState({});
-  const location = useLocation();
-
-  const { userData, logout } = useAuth();
-
-  const isAdmin = userData?.role?.toLowerCase() === "admin"; // ✅ รองรับ case-insensitive
-
-  const [user, setUser] = useState({});
-  useEffect(() => {
-    const getUserData = async () => {
-      try {
-        const getUser = await AuthService.getUserData();
-        setUser(getUser.user);
-      } catch (error) {
-        console.error("Error fetching user data:", error);
-      }
-    };
-
-    getUserData();
-  }, []);
 
   const toggleNavbar = (index) => {
     setCollapsedMenu({
@@ -202,9 +206,63 @@ const Sidebar = ({ handleMenuClick }) => {
               )}
             </NavItem>
           ))}
+{isAdmin && navigation2.map((navi, index) => (
+            <NavItem key={index} className="sidenav-bg ">
+              {navi.items ? (
+                <>
+                  <button
+                    color="link"
+                    className="nav-link py-3"
+                    onClick={() => toggleNavbar(index)}
+                    style={{ width: "100%", textAlign: "left" }}
+                  >
+                    <i className={`bi ${navi.icon}`}></i>
+                    <span className="ms-2 me-1">{navi.title}</span>
+                    {collapsedMenu[index] ? (
+                      <BiChevronDown />
+                    ) : (
+                      <BiChevronRight />
+                    )}
+                  </button>
+
+                  <Collapse
+                    isOpen={collapsedMenu[index]}
+                    style={{ paddingLeft: "21px" }}
+                  >
+                    {navi.items.map((item, idx) => (
+                      <Link
+                        key={idx}
+                        className={`mt-0 my-1 nav-link ${
+                          location.pathname === item.href ? "active" : ""
+                        }`}
+                        to={item.href}
+                        style={{ textDecoration: "none" }}
+                        onClick={handleMenuClick}
+                      >
+                        {item.icon && <item.icon />} {item.title}
+                      </Link>
+                    ))}
+                  </Collapse>
+                </>
+              ) : (
+                <Link
+                  to={navi.href}
+                  className={`nav-link py-3 ${
+                    location.pathname === navi.href ? "active" : ""
+                  }`}
+                  onClick={handleMenuClick}
+                >
+                  <i className={`bi ${navi.icon}`}></i>
+                  <span className="ms-2">{navi.title}</span>
+                </Link>
+              )}
+            </NavItem>
+
+            
+          ))}
         </Nav>
       </div>
-
+        
       {/* ส่วนที่ fixed ด้านล่าง */}
       {isAdmin && (
         <div className="sidebar-fixed-bottom p-3 mt-2">

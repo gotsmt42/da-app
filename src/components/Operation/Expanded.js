@@ -59,7 +59,7 @@ const Expanded = ({ data, onStatusUpdate, onDocNoUpdate }) => {
       <div className="row g-0">
         <div className="col-md-12">
           <div className="card-body text">
-            <Box
+            {/* <Box
               sx={{
                 display: "flex",
                 alignItems: "center",
@@ -79,8 +79,8 @@ const Expanded = ({ data, onStatusUpdate, onDocNoUpdate }) => {
                 sx={{ maxWidth: 350, mb: 1 }}
               />
               {loading && <CircularProgress size={20} />}
-            </Box>
-            <h5 className="card-title mt-4">
+            </Box> */}
+            <h5 className="card-title mt-2">
               อ้างอิงเอกสารเลขที่ : {docNo || "ไม่ระบุ"}
             </h5>
 

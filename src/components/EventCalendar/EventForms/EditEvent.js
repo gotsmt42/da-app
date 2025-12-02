@@ -56,7 +56,37 @@ export const getEditEvent = async ({
   const res = await CustomerService.getCustomers();
   const employees = await AuthService.getAllUserData();
 
+  const userId = eventInfo.event.extendedProps?.userId;
   const employeeList = employees?.allUser || [];
+  const lastModifiedBy = eventInfo.event.extendedProps?.lastModifiedBy; // คนแก้ไขล่าสุด
+  // หาคนที่สร้าง event
+
+  // หาคนที่แก้ไขล่าสุด
+  const modifier = employeeList.find(
+    (emp) => emp?._id?.toString() === lastModifiedBy?.toString()
+  );
+
+  // หาคนที่สร้าง event
+  const eventOwner = employeeList.find(
+    (emp) => emp?._id?.toString() === userId?.toString()
+  );
+
+  // ✅ เงื่อนไข: แสดงเฉพาะ admin หรือเจ้าของเดิม
+  let footerName = "";
+  if (modifier) {
+    if (
+      modifier.role === "admin" ||
+      modifier._id.toString() === userId?.toString()
+    ) {
+      footerName = modifier.username || `${modifier.fname} ${modifier.lname}`;
+    }
+  }
+
+  // ถ้าไม่มี modifier ที่เข้าเงื่อนไข → fallback เป็นเจ้าของเดิม
+  if (!footerName && eventOwner) {
+    footerName =
+      eventOwner.username || `${eventOwner.fname} ${eventOwner.lname}`;
+  }
 
   // 🔧 โค้ด htmlEdit พร้อม label ทุกหัวข้อเพื่อความชัดเจน
   const htmlEdit = `
@@ -386,15 +416,7 @@ export const getEditEvent = async ({
 </div>
 
 
-<div style="margin-top: 16px;">
-  <label for="editImage" style="font-weight: bold; display: block; margin-bottom: 6px;">
-    รูปภาพประกอบ:
-  </label>
-  <input type="file" id="editImage" accept="image/*" style="width: 100%; padding: 8px;" />
-  <div id="imagePreviewContainer" style="margin-top: 10px;"></div>
-</div>
 
-<br><br><br>
 
 
 </div>
@@ -403,7 +425,7 @@ export const getEditEvent = async ({
   `;
 
   Swal.fire({
-    title: `<h4>[ ${eventTitle} ] ${eventSystem} ${eventSite}${
+    title: `<h4>[ ${eventTitle} ] ${eventSystem}  ${eventSite} ${
       eventTeam ? ` (ทีม ${eventTeam})` : ""
     }</h4>`,
     html: htmlEdit,
@@ -414,23 +436,27 @@ export const getEditEvent = async ({
     showCloseButton: true,
     customClass: "swal-wide",
     footer: `
-  <div id="custom-footer-buttons" style="margin-top: 20px; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px;">
-    <button id="btnConfirm" class="swal2-confirm swal2-styled" style="background-color: #0ECC00;">
-      ✅ บันทึกการเปลี่ยนแปลง
-    </button>
-
-    <button id="btnGeneratePDF" class="swal2-confirm swal2-styled" style="background-color: #0064de;">
-      📝 ออกใบแจ้งเข้างาน
-    </button>
-
-    <button id="btnCancel" class="swal2-cancel swal2-styled" style="background-color: #999;">
-      🔙 ปิดหน้าต่าง
-    </button>
-  </div>
+  <div style="margin-top: 20px; display: flex; flex-direction: column; align-items: center; gap: 12px;">
+      <div style="width: 100%; overflow: hidden; white-space: nowrap;">
+        <marquee behavior="scroll" direction="left" scrollamount="5" style="color:#0064de; font-weight:bold;">
+          👤 เพิ่มข้อมูลโดย: ${footerName}
+        </marquee>
+      </div>
+      <div id="custom-footer-buttons" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 12px;">
+        <button id="btnConfirm" class="swal2-confirm swal2-styled" style="background-color: #0ECC00;">
+          ✅ บันทึกการเปลี่ยนแปลง
+        </button>
+        <button id="btnGeneratePDF" class="swal2-confirm swal2-styled" style="background-color: #0064de;">
+          📝 ออกใบแจ้งเข้างาน
+        </button>
+        <button id="btnCancel" class="swal2-cancel swal2-styled" style="background-color: #999;">
+          🔙 ปิดหน้าต่าง
+        </button>
+      </div>
+    </div>
 `,
-showDenyButton: true,
-denyButtonText: "❌ ลบแผนงานนี้",
-
+    showDenyButton: true,
+    denyButtonText: "❌ ลบแผนงานนี้",
 
     didOpen: () => {
       const descriptionInput = document.getElementById("editDescription");
@@ -873,7 +899,7 @@ denyButtonText: "❌ ลบแผนงานนี้",
         const formData = new FormData();
         formData.append("image", imageFile);
         formData.append("eventId", id);
-await EventService.UpdateImageEvent(eventId, updatedEvent, imageFile);
+        await EventService.UpdateImageEvent(eventId, updatedEvent, imageFile);
       }
 
       setEvents((prevEvents) =>

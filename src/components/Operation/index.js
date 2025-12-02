@@ -278,13 +278,18 @@ const Operation = () => {
     },
   };
 
-  const handleDocNoUpdate = (id, newDocNo) => {
-    setEvents((prev) =>
-      prev.map((event) =>
-        event._id === id ? { ...event, docNo: newDocNo } : event
-      )
-    );
-  };
+const handleDocNoUpdate = (id, newDocNo) => {
+  // อัปเดตค่าใน state
+  setEvents((prev) =>
+    prev.map((event) =>
+      event._id === id ? { ...event, docNo: newDocNo } : event
+    )
+  );
+
+  // บันทึกลง DB ทันที
+  EventService.UpdateEvent(id, { docNo: newDocNo });
+};
+
   const handleDeleteFile = async (eventId, type) => {
     try {
       await EventService.DeleteFile(eventId, type);
@@ -415,6 +420,8 @@ const Operation = () => {
     filterOP,
     search.trim(),
   ].filter((v) => v !== "").length;
+
+
 
   return (
     <>
@@ -593,6 +600,9 @@ const Operation = () => {
             handleDeleteRow,
             onStatusUpdate: handleStatusUpdate,
             onDocNoUpdate: handleDocNoUpdate,
+
+
+
             onFileUpload: handleFileUpload, // ✅ เพิ่มตรงนี้
             handleDeleteFile,
             setPreviewUrl,

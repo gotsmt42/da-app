@@ -4,6 +4,7 @@ import { Navigate, createBrowserRouter } from "react-router-dom";
 // Layouts และ Pages (Lazy Loaded)
 const FullLayout = lazy(() => import("../layouts/FullLayout.js"));
 const PrivateRoute = lazy(() => import("./PrivateRoute.js"));
+const AdminRoute = lazy(() => import("./AdminRoute.js"));
 
 const Dashboard = lazy(() => import("../views/Dashboard.js"));
 const NoConnection = lazy(() => import("../views/NoConnection.js"));
@@ -30,6 +31,7 @@ const Register = lazy(() => import("../auth/Register.js"));
 
 const PublicRoute = lazy(() => import("./PublicRoute.js"));
 const CheckConnectionToast = lazy(() => import("./CheckConnectionToast.js"));
+
 const ThemeRoutes = [
   {
     path: "/",
@@ -119,18 +121,22 @@ const ThemeRoutes = [
       {
         path: "customer",
         element: (
-          <Suspense fallback={<div>Loading Customers...</div>}>
-            <Customer />
-          </Suspense>
+          <AdminRoute>
+            <Suspense fallback={<div>Loading Customers...</div>}>
+              <Customer />
+            </Suspense>
+          </AdminRoute>
         ),
         title: "Customer",
       },
       {
         path: "employee",
         element: (
-          <Suspense fallback={<div>Loading Users...</div>}>
-            <Employee />
-          </Suspense>
+          <AdminRoute>
+            <Suspense fallback={<div>Loading Users...</div>}>
+              <Employee />
+            </Suspense>
+          </AdminRoute>
         ),
         title: "Employee",
       },
@@ -155,36 +161,44 @@ const ThemeRoutes = [
       {
         path: "product",
         element: (
-          <Suspense fallback={<div>Loading Product...</div>}>
-            <Product />
-          </Suspense>
+          <AdminRoute>
+            <Suspense fallback={<div>Loading Product...</div>}>
+              <Product />
+            </Suspense>
+          </AdminRoute>
         ),
         title: "Product",
       },
       {
         path: "product/stock",
         element: (
-          <Suspense fallback={<div>Loading Stock Product...</div>}>
-            <StockProduct />
-          </Suspense>
+          <AdminRoute>
+            <Suspense fallback={<div>Loading Stock Product...</div>}>
+              <StockProduct />
+            </Suspense>
+          </AdminRoute>
         ),
         title: "Stock Product",
       },
       {
         path: "fileupload",
         element: (
-          <Suspense fallback={<div>Loading File Upload...</div>}>
-            <FileUpload />
-          </Suspense>
+          <AdminRoute>
+            <Suspense fallback={<div>Loading File Upload...</div>}>
+              <FileUpload />
+            </Suspense>
+          </AdminRoute>
         ),
         title: "File Upload",
       },
       {
         path: "files",
         element: (
-          <Suspense fallback={<div>Loading Files...</div>}>
-            <Files />
-          </Suspense>
+          <AdminRoute>
+            <Suspense fallback={<div>Loading Files...</div>}>
+              <Files />
+            </Suspense>
+          </AdminRoute>
         ),
         title: "Files",
       },
@@ -200,19 +214,23 @@ const ThemeRoutes = [
       {
         path: "operation",
         element: (
-          <Suspense fallback={<div>Loading Operation...</div>}>
-            <Operate />
-          </Suspense>
+          <AdminRoute>
+            <Suspense fallback={<div>Loading Operation...</div>}>
+              <Operate />
+            </Suspense>
+          </AdminRoute>
         ),
         title: "Operation",
       },
-      
+
       {
         path: "tackstatus",
         element: (
-          <Suspense fallback={<div>Loading Tackstatus...</div>}>
-            <Tackstatus />
-          </Suspense>
+          <AdminRoute>
+            <Suspense fallback={<div>Loading Tackstatus...</div>}>
+              <Tackstatus />
+            </Suspense>
+          </AdminRoute>
         ),
         title: "Tackstatus",
       },

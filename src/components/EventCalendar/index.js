@@ -59,10 +59,8 @@ import thSarabunFont from "../../Fonts/THSarabunNew_base64"; // นำเข้�
 import TomSelect from "tom-select";
 import "tom-select/dist/css/tom-select.css";
 
-
-import 'choices.js/public/assets/styles/choices.min.css';
-import Choices from 'choices.js';
-
+import "choices.js/public/assets/styles/choices.min.css";
+import Choices from "choices.js";
 
 import Hammer from "hammerjs";
 
@@ -79,6 +77,10 @@ import { getGeneratePDF } from "./Functions/GenPDF";
 function EventCalendar() {
   const { userData } = useAuth(); // ✅ เปลี่ยนจาก user → userData
   const isAdmin = userData?.role?.toLowerCase() === "admin"; // ✅ รองรับ case-insensitive
+
+  const userId = userData?.userId; // หรือ field ที่เก็บ id ของ user
+
+    const employees =  AuthService.getAllUserData();
 
   const [events, setEvents] = useState([]);
 
@@ -259,7 +261,7 @@ function EventCalendar() {
       TomSelect,
       moment,
       calendarRef,
-      Choices
+      Choices,
     });
   };
 
@@ -362,18 +364,38 @@ function EventCalendar() {
     });
   }, []);
 
+
+  const [employeeList, setEmployeeList] = useState([]);
+
+useEffect(() => {
+  (async () => {
+    const res = await AuthService.getAllUserData();
+    setEmployeeList(res?.allUser || []);
+  })();
+}, []);
+
 const filteredCalendarEvents = useMemo(() => {
   const keyword = searchTerm.toLowerCase();
-  return events.filter((event) =>
-    [
+
+  return events.filter((event) => {
+    // หาคนที่เป็นเจ้าของ event จาก employeeList
+    const owner = employeeList.find(
+      (emp) => emp._id?.toString() === event.extendedProps?.userId?.toString()
+    );
+
+    const ownerName = owner?.username?.toLowerCase() || "";
+
+    return [
       event.title ?? "",
       event.site ?? "",
       event.company ?? "",
       event.system ?? "",
+      event.team ?? "",
       event.time?.toString() ?? "",
-    ].some((field) => field.toLowerCase().includes(keyword))
-  );
-}, [events, searchTerm]);
+      ownerName, // ✅ เพิ่มชื่อเจ้าของเข้าไปในเงื่อนไข search
+    ].some((field) => field.toLowerCase().includes(keyword));
+  });
+}, [events, searchTerm, employeeList]);
 
 
   const getStatusIcon = useCallback((status) => {
@@ -445,7 +467,11 @@ const filteredCalendarEvents = useMemo(() => {
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
-      <div id="content-id" className="calendar-wrapper" style={{ flex: 1, width: "100%" }}>
+      <div
+        id="content-id"
+        className="calendar-wrapper"
+        style={{ flex: 1, width: "100%" }}
+      >
         <FullCalendar
           ref={calendarRef}
           locales={[thLocale]} // ใช้งานภาษาไทย
@@ -458,21 +484,48 @@ const filteredCalendarEvents = useMemo(() => {
             listPlugin,
           ]}
           initialView="dayGridMonth"
-          editable={isAdmin}
-          selectable={isAdmin}
-          droppable={isAdmin}
-          dateClick={isAdmin ? handleAddEvent : null}
-          eventClick={isAdmin ? handleEditEvent : null}
-          eventDrop={isAdmin ? handleEventDrop : null}
-          eventResize={isAdmin ? handleEventResize : null}
+          // editable={isAdmin}
+          // selectable={isAdmin}
+          // droppable={isAdmin}
+          // dateClick={isAdmin ? handleAddEvent : null}
+
+          editable={true} // ✅ เปิดให้ทุกคน drag/resize ได้
+          selectable={true} // ✅ เปิดให้ทุกคนเลือกวันได้
+          droppable={true}
+          dateClick={handleAddEvent}
+          eventClick={(arg) => {
+            const eventOwnerId = arg.event.extendedProps?.userId;
+            if (isAdmin || eventOwnerId === userId) {
+              handleEditEvent(arg);
+            } else {
+              Swal.fire("❌ คุณไม่มีสิทธิ์แก้ไขแผนงานนี้");
+            }
+          }}
+          eventDrop={(arg) => {
+            const eventOwnerId = arg.event.extendedProps?.userId;
+
+            if (isAdmin || eventOwnerId === userId) {
+              handleEventDrop(arg);
+            } else {
+              Swal.fire("❌ คุณไม่มีสิทธิ์แก้ไขแผนงานนี้");
+              arg.revert(); // ยกเลิกการลาก
+            }
+          }}
+          eventResize={(arg) => {
+            const eventOwnerId = arg.event.extendedProps?.userId;
+            if (isAdmin || eventOwnerId === userId) {
+              handleEventResize(arg);
+            } else {
+              Swal.fire("❌ คุณไม่มีสิทธิ์แก้ไขแผนงานนี้");
+              arg.revert(); // ยกเลิกการ resize
+            }
+          }}
           events={filteredCalendarEvents}
           allDaySlot={true}
           nowIndicator={true}
           selectMirror={true}
           weekends={true}
           contentHeight="auto"
-
-
           showNonCurrentDates={false} // ✅ ไม่แสดงวันของเดือนก่อนและหลัง
           firstDay={0} // ✅ กำหนดให้วันอาทิตย์เป็นวันแรกของสัปดาห์
           eventContent={(arg) => {
@@ -491,10 +544,7 @@ const filteredCalendarEvents = useMemo(() => {
             const timeDisplay = time ? `- ครั้งที่ : ${time}` : "";
             const teamDisplay = team ? `- ทีม : ${team}` : "";
 
-
-
             const systemDisplay = system ? `- ระบบ : ${system}` : "";
-
 
             const timeRangeDisplay =
               startTime && endTime
@@ -505,10 +555,9 @@ const filteredCalendarEvents = useMemo(() => {
                 ? `- สิ้นสุดเวลา : ${endTime}`
                 : "";
 
+            const isSmallScreen = window.innerWidth < 576;
 
-              const isSmallScreen = window.innerWidth < 576;
-
-             const fontSize = isSmallScreen ? "0.82em" : "1em";
+            const fontSize = isSmallScreen ? "0.82em" : "1em";
             return {
               html: `
                 <div style="font-size:  ${fontSize}; line-height: 1.8; padding: 1px;">
@@ -520,9 +569,7 @@ const filteredCalendarEvents = useMemo(() => {
 
 
               <div>${teamDisplay}</div>
-                ${
-                  timeRangeDisplay ? `<div>${timeRangeDisplay}</div>` : ""
-                }
+                ${timeRangeDisplay ? `<div>${timeRangeDisplay}</div>` : ""}
               </div>
     `,
             };
@@ -576,6 +623,18 @@ const filteredCalendarEvents = useMemo(() => {
               วางบิลแล้วรอเก็บเงิน: "วางบิลแล้วรอเก็บเงิน",
               ดำเนินการเสร็จสิ้นเก็บเงินแล้ว: "ดำเนินการเสร็จสิ้นเก็บเงินแล้ว",
             };
+
+            const eventOwnerId = info.event.extendedProps?.userId; // เจ้าของเดิม
+            const isOwner = eventOwnerId?.toString() === userId?.toString();
+
+            // ✅ ถ้าไม่ใช่ admin และไม่ใช่เจ้าของ → ทำให้สีซีดลง
+            if (!isAdmin && !isOwner) {
+              info.el.style.opacity = "0.7"; // ทำให้ซีดลง
+              info.el.style.filter = "grayscale(10%)"; // เพิ่มความซีดด้วย grayscale
+            } else {
+              info.el.style.opacity = "1"; // คงสีเดิม
+              info.el.style.filter = "none";
+            }
 
             if (icon) {
               // ✅ ตรวจสอบขนาดหน้าจอ

@@ -20,8 +20,11 @@ export const getFetchEvents = async ({
     const eventsWithId = userEvents.map((event) => ({
       ...event,
       id: event._id,
+
       extendedProps: {
         ...event.extendedProps,
+        userId: event.userId, // ✅ เพิ่มเข้า extendedProps
+        lastModifiedBy: event.lastModifiedBy, // ✅ เพิ่มเข้า extendedProps
         startTime: event.extendedProps?.startTime ?? event.startTime ?? "",
         endTime: event.extendedProps?.endTime ?? event.endTime ?? "",
       },

@@ -53,11 +53,15 @@ const DataTableColumns = ({
   uploadingState,
   isUploadingState,
   uploadingFileSizeState,
+
+    onInputUpdate, // ✅ รับจาก parent
 }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
   const [selectedRowMenu, setSelectedRowMenu] = useState(null);
   const [isSmallScreen, setIsSmallScreen] = useState(false);
+
+
 
   useEffect(() => {
     const handleResize = () => {
@@ -83,11 +87,74 @@ const DataTableColumns = ({
     setSelectedFile(null);
   };
 
+
+const DocNoCell = ({ row, onDocNoUpdate }) => {
+  const [value, setValue] = useState(row.docNo || "");
+
+  // base URLs ของเอกสารแต่ละประเภท
+  const QT = "https://advance.flowaccount.com/N633835/business/quotations";
+  const BL = "https://advance.flowaccount.com/N633835/business/billing-notes";
+  const INV = "https://advance.flowaccount.com/N633835/business/invoices";
+  const RE = "https://advance.flowaccount.com/N633835/business/receipts";
+
+  // เลือก base URL ตาม prefix
+  let baseUrl = value;
+  // if (value.startsWith("QT")) baseUrl = QT;
+  // else if (value.startsWith("BL")) baseUrl = BL;
+  // else if (value.startsWith("INV")) baseUrl = INV;
+  // else if (value.startsWith("RE")) baseUrl = RE;
+
+  // ถ้ามี baseUrl → สร้างลิงก์โดยตัด prefix 2 ตัวออก
+  const link = baseUrl ? `${baseUrl}` : null;
+
+  return (
+    <div style={{ display: "flex", gap: "4px" }}>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={(e) => onDocNoUpdate(row._id, e.target.value)} // ✅ บันทึกเมื่อ blur
+        placeholder="กรอกเลขที่เอกสาร เช่น QT12345"
+        style={{
+          flex: 1,
+          padding: "6px",
+          fontSize: "0.85em",
+          border: "1px solid #ccc",
+          borderRadius: "4px",
+        }}
+      />
+      {/* ✅ แสดงปุ่ม "เรียกดู" เฉพาะเมื่อมีข้อมูลและตรงกับ prefix */}
+      {link && (
+        <a
+          href={link}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            background: "#1976d2",
+            color: "#fff",
+            padding: "6px 10px",
+            borderRadius: "4px",
+            textDecoration: "none",
+          }}
+        >
+          เรียกดู
+        </a>
+      )}
+    </div>
+  );
+};
+
+
+
+
+
+
+  
   const isMobile = useMediaQuery("(max-width:600px)");
   const columns = [
     {
       name: "วันดำเนินการ",
-      width: "150px",
+      width: "165px",
 
       sortable: true,
       sortFunction: (a, b) => new Date(a.start) - new Date(b.start),
@@ -129,17 +196,14 @@ const DataTableColumns = ({
         </div>
       ),
     },
-    // {
-    //   name: "เลขที่เอกสาร",
-    //   sortable: true,
-    //   width: "115px",
-    //   selector: (row) => row.docNo || "-",
-    //   cell: (row) => (
-    //     <div style={{ fontSize: "0.85em", color: "#333" }}>
-    //       {row.docNo || <span style={{ color: "#bbb" }}>ไม่ระบุ</span>}
-    //     </div>
-    //   ),
-    // },
+{
+  name: "URL เอกสาร",
+  width: "250px",
+  cell: (row) => <DocNoCell row={row} onDocNoUpdate={onDocNoUpdate} />,
+}
+
+,
+
 
     {
       name: "งาน / โครงการ",
@@ -180,25 +244,26 @@ const DataTableColumns = ({
         <StatusTwoSelectCell row={row} onStatusUpdate={onStatusUpdate} />
       ),
     },
-    {
-      name: "อัพโหลดไฟล์",
-      width: "220px",
-      sortable: false,
-      cell: (row) => (
-        <StatusFileCell
-          row={row}
-          onFileUpload={onFileUpload}
-          setSelectedFile={setSelectedFile}
-          setPreviewUrl={setPreviewUrl}
-          setPreviewFileName={setPreviewFileName}
-          setPendingDelete={setPendingDelete}
-          setConfirmOpen={setConfirmOpen}
-          uploadingState={uploadingState}
-          isUploadingState={isUploadingState}
-          uploadingFileSizeState={uploadingFileSizeState}
-        />
-      ),
-    },
+//    {
+//   name: "กรอกข้อมูล",
+//   width: "220px",
+//   sortable: false,
+//   cell: (row) => (
+//     <input
+//       type="text"
+//       placeholder="กรอกข้อมูลที่ต้องการ..."
+//       value={row.inputValue || ""}
+//       onChange={(e) => onInputUpdate(row.id, e.target.value)}
+//       style={{
+//         width: "100%",
+//         padding: "6px",
+//         border: "1px solid #ccc",
+//         borderRadius: "4px",
+//       }}
+//     />
+//   ),
+// }
+
     {
       name: "เสนอราคาเพิ่มเติม",
       width: "220px",
