@@ -11,8 +11,8 @@ import CloseIcon from "@mui/icons-material/Close";
 import { getFileIcon } from "../../../utils/getFileIcon"; // ✅ ปรับ path ตามโปรเจกต์
 
 const StatusFileCell = ({
-    type,
-    color,
+  type,
+  color,
   row,
   onFileUpload,
   setSelectedFile,
@@ -26,35 +26,36 @@ const StatusFileCell = ({
 }) => {
   const hasFile = Boolean(row.statusFileName && row.statusFileUrl);
 
-  const isAnyUploading = Object.values(isUploadingState).some((v) => v === true);
+  const isAnyUploading = Object.values(isUploadingState).some(
+    (v) => v === true
+  );
 
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
       {/* ✅ ปุ่มแนบไฟล์ */}
       <Tooltip title="อัพโหลดไฟล์" arrow>
- <IconButton
-  component="label"
-  size="small"
-  color={color}
-  disabled={isAnyUploading} // ✅ ปิดทุกปุ่มขณะอัปโหลด
->
-  <AttachFileIcon fontSize="small" />
-  <input
-    type="file"
-    hidden
-    multiple={false}
-    disabled={isAnyUploading} // ✅ ปิด input ทุกตัว
-    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
-    onChange={(e) => {
-      const file = e.target.files?.[0];
-      if (file && typeof onFileUpload === "function") {
-        setSelectedFile(file);
-        onFileUpload(file, row._id, type);
-      }
-    }}
-  />
-</IconButton>
-
+        <IconButton
+          component="label"
+          size="small"
+          color={color}
+          disabled={isAnyUploading} // ✅ ปิดทุกปุ่มขณะอัปโหลด
+        >
+          <AttachFileIcon fontSize="small" />
+          <input
+            type="file"
+            hidden
+            multiple={false}
+            disabled={isAnyUploading} // ✅ ปิด input ทุกตัว
+            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file && typeof onFileUpload === "function") {
+                setSelectedFile(file);
+                onFileUpload(file, row._id, type);
+              }
+            }}
+          />
+        </IconButton>
       </Tooltip>
 
       {/* ✅ หลอดโหลด */}

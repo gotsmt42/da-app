@@ -8,25 +8,12 @@ import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import Delete from "@mui/icons-material/Delete";
 import EventService from "../../../services/EventService";
 
+import ResPersonCell from "../components/ResPersonCell"; // ✅ import component
+
 import StatusSelectCell from "./StatusSelectCell"; // ✅ import component
 import StatusTwoSelectCell from "./StatusTwoSelectCell"; // ✅ import component
 import StatusThreeSelectCell from "./StatusThreeSelectCell"; // ✅ import component
-import {
-  Box,
-  CircularProgress,
-  LinearProgress,
-  Typography,
-  useMediaQuery,
-} from "@mui/material";
-
-import AttachFileIcon from "@mui/icons-material/AttachFile";
-import Button from "@mui/material/Button";
-import Tooltip from "@mui/material/Tooltip"; // อย่าลืม import
-
-import { useTheme } from "@mui/material/styles";
-import CloseIcon from "@mui/icons-material/Close";
-
-import { getFileIcon } from "../../../utils/getFileIcon";
+import { useMediaQuery } from "@mui/material";
 
 import StyledMenu from "../components/StyledMenu";
 
@@ -54,14 +41,15 @@ const DataTableColumns = ({
   isUploadingState,
   uploadingFileSizeState,
 
-    onInputUpdate, // ✅ รับจาก parent
+  resPerson,
+  currentUserRole,
+
+  onInputUpdate, // ✅ รับจาก parent
 }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
   const [selectedRowMenu, setSelectedRowMenu] = useState(null);
   const [isSmallScreen, setIsSmallScreen] = useState(false);
-
-
 
   useEffect(() => {
     const handleResize = () => {
@@ -87,71 +75,70 @@ const DataTableColumns = ({
     setSelectedFile(null);
   };
 
+  const DocNoCell = ({ row, onDocNoUpdate }) => {
+    const [value, setValue] = useState(row.docNo || "");
 
-const DocNoCell = ({ row, onDocNoUpdate }) => {
-  const [value, setValue] = useState(row.docNo || "");
+    let baseUrl = value;
+    // if (value.startsWith("QT")) baseUrl = QT;
+    // else if (value.startsWith("BL")) baseUrl = BL;
+    // else if (value.startsWith("INV")) baseUrl = INV;
+    // else if (value.startsWith("RE")) baseUrl = RE;
 
-  // base URLs ของเอกสารแต่ละประเภท
-  const QT = "https://advance.flowaccount.com/N633835/business/quotations";
-  const BL = "https://advance.flowaccount.com/N633835/business/billing-notes";
-  const INV = "https://advance.flowaccount.com/N633835/business/invoices";
-  const RE = "https://advance.flowaccount.com/N633835/business/receipts";
+    // ถ้ามี baseUrl → สร้างลิงก์โดยตัด prefix 2 ตัวออก
+    const link = baseUrl ? `${baseUrl}` : null;
 
-  // เลือก base URL ตาม prefix
-  let baseUrl = value;
-  // if (value.startsWith("QT")) baseUrl = QT;
-  // else if (value.startsWith("BL")) baseUrl = BL;
-  // else if (value.startsWith("INV")) baseUrl = INV;
-  // else if (value.startsWith("RE")) baseUrl = RE;
-
-  // ถ้ามี baseUrl → สร้างลิงก์โดยตัด prefix 2 ตัวออก
-  const link = baseUrl ? `${baseUrl}` : null;
-
-  return (
-    <div style={{ display: "flex", gap: "4px" }}>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={(e) => onDocNoUpdate(row._id, e.target.value)} // ✅ บันทึกเมื่อ blur
-        placeholder="กรอกเลขที่เอกสาร เช่น QT12345"
-        style={{
-          flex: 1,
-          padding: "6px",
-          fontSize: "0.85em",
-          border: "1px solid #ccc",
-          borderRadius: "4px",
-        }}
-      />
-      {/* ✅ แสดงปุ่ม "เรียกดู" เฉพาะเมื่อมีข้อมูลและตรงกับ prefix */}
-      {link && (
-        <a
-          href={link}
-          target="_blank"
-          rel="noopener noreferrer"
+    return (
+      <div style={{ display: "flex", gap: "4px" }}>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={(e) => onDocNoUpdate(row._id, e.target.value)} // ✅ บันทึกเมื่อ blur
+          placeholder="กรอกเลขที่เอกสาร เช่น QT12345"
           style={{
-            background: "#1976d2",
-            color: "#fff",
-            padding: "6px 10px",
+            flex: 1,
+            padding: "6px",
+            fontSize: "0.85em",
+            border: "1px solid #ccc",
             borderRadius: "4px",
-            textDecoration: "none",
           }}
-        >
-          เรียกดู
-        </a>
-      )}
-    </div>
-  );
-};
+        />
+        {/* ✅ แสดงปุ่ม "เรียกดู" เฉพาะเมื่อมีข้อมูลและตรงกับ prefix */}
+        {link && (
+          <a
+            href={link}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              background: "#1976d2",
+              color: "#fff",
+              padding: "6px 10px",
+              borderRadius: "4px",
+              textDecoration: "none",
+            }}
+          >
+            เรียกดู
+          </a>
+        )}
+      </div>
+    );
+  };
 
-
-
-
-
-
-  
   const isMobile = useMediaQuery("(max-width:600px)");
   const columns = [
+
+        {
+      name: "ผู้รับผิดชอบงาน",
+      width: "180px",
+      cell: (row) => (
+        <ResPersonCell
+          row={row}
+          employee={resPerson}
+          onInputUpdate={onInputUpdate}
+          currentUserRole={currentUserRole}
+        />
+      ),
+    },
     {
       name: "วันดำเนินการ",
       width: "165px",
@@ -196,13 +183,11 @@ const DocNoCell = ({ row, onDocNoUpdate }) => {
         </div>
       ),
     },
-{
-  name: "URL เอกสาร",
-  width: "250px",
-  cell: (row) => <DocNoCell row={row} onDocNoUpdate={onDocNoUpdate} />,
-}
-
-,
+    // {
+    //   name: "URL เอกสาร",
+    //   width: "250px",
+    //   cell: (row) => <DocNoCell row={row} onDocNoUpdate={onDocNoUpdate} />,
+    // }
 
 
     {
@@ -221,6 +206,7 @@ const DocNoCell = ({ row, onDocNoUpdate }) => {
         </div>
       ),
     },
+
     {
       name: "การดำเนินการ",
       sortable: true,
@@ -244,29 +230,29 @@ const DocNoCell = ({ row, onDocNoUpdate }) => {
         <StatusTwoSelectCell row={row} onStatusUpdate={onStatusUpdate} />
       ),
     },
-//    {
-//   name: "กรอกข้อมูล",
-//   width: "220px",
-//   sortable: false,
-//   cell: (row) => (
-//     <input
-//       type="text"
-//       placeholder="กรอกข้อมูลที่ต้องการ..."
-//       value={row.inputValue || ""}
-//       onChange={(e) => onInputUpdate(row.id, e.target.value)}
-//       style={{
-//         width: "100%",
-//         padding: "6px",
-//         border: "1px solid #ccc",
-//         borderRadius: "4px",
-//       }}
-//     />
-//   ),
-// }
+    //    {
+    //   name: "กรอกข้อมูล",
+    //   width: "220px",
+    //   sortable: false,
+    //   cell: (row) => (
+    //     <input
+    //       type="text"
+    //       placeholder="กรอกข้อมูลที่ต้องการ..."
+    //       value={row.inputValue || ""}
+    //       onChange={(e) => onInputUpdate(row.id, e.target.value)}
+    //       style={{
+    //         width: "100%",
+    //         padding: "6px",
+    //         border: "1px solid #ccc",
+    //         borderRadius: "4px",
+    //       }}
+    //     />
+    //   ),
+    // }
 
     {
       name: "เสนอราคาเพิ่มเติม",
-      width: "220px",
+      width: "210px",
       sortable: false,
       cell: (row) => (
         <DocumentCell
@@ -295,7 +281,7 @@ const DocNoCell = ({ row, onDocNoUpdate }) => {
     },
     {
       name: "รายงาน",
-      width: "220px",
+      width: "210px",
       sortable: false,
       cell: (row) => (
         <DocumentCell
@@ -322,54 +308,54 @@ const DocNoCell = ({ row, onDocNoUpdate }) => {
         />
       ),
     },
-    {
-      name: "Action",
-      width: "80px",
-      cell: (row) => (
-        <div>
-          <IconButton
-            id="demo-customized-button"
-            aria-controls={open ? "demo-customized-menu" : undefined}
-            aria-haspopup="true"
-            aria-expanded={open ? "true" : undefined}
-            onClick={(event) => handleClick(event, row)}
-          >
-            <MoreVertIcon />
-          </IconButton>
+    // {
+    //   name: "Action",
+    //   width: "80px",
+    //   cell: (row) => (
+    //     <div>
+    //       <IconButton
+    //         id="demo-customized-button"
+    //         aria-controls={open ? "demo-customized-menu" : undefined}
+    //         aria-haspopup="true"
+    //         aria-expanded={open ? "true" : undefined}
+    //         onClick={(event) => handleClick(event, row)}
+    //       >
+    //         <MoreVertIcon />
+    //       </IconButton>
 
-          <StyledMenu
-            id="demo-customized-menu"
-            MenuListProps={{ "aria-labelledby": "demo-customized-button" }}
-            anchorEl={anchorEl}
-            open={open && selectedRowMenu === row}
-            onClose={handleClose}
-          >
-            <MenuItem
-              onClick={() => {
-                setModalOpenEdit(true);
-                handleClose();
-              }}
-            >
-              <EditIcon />
-              แก้ไข
-            </MenuItem>
-            <MenuItem
-              onClick={() => {
-                handleDeleteRow(row._id);
-                handleClose();
-              }}
-            >
-              <Delete />
-              ลบ
-            </MenuItem>
-            <MenuItem onClick={handleClose} disableRipple>
-              <MoreHorizIcon />
-              เพิ่มเติม
-            </MenuItem>
-          </StyledMenu>
-        </div>
-      ),
-    },
+    //       <StyledMenu
+    //         id="demo-customized-menu"
+    //         MenuListProps={{ "aria-labelledby": "demo-customized-button" }}
+    //         anchorEl={anchorEl}
+    //         open={open && selectedRowMenu === row}
+    //         onClose={handleClose}
+    //       >
+    //         <MenuItem
+    //           onClick={() => {
+    //             setModalOpenEdit(true);
+    //             handleClose();
+    //           }}
+    //         >
+    //           <EditIcon />
+    //           แก้ไข
+    //         </MenuItem>
+    //         <MenuItem
+    //           onClick={() => {
+    //             handleDeleteRow(row._id);
+    //             handleClose();
+    //           }}
+    //         >
+    //           <Delete />
+    //           ลบ
+    //         </MenuItem>
+    //         <MenuItem onClick={handleClose} disableRipple>
+    //           <MoreHorizIcon />
+    //           เพิ่มเติม
+    //         </MenuItem>
+    //       </StyledMenu>
+    //     </div>
+    //   ),
+    // },
   ];
 
   return columns;

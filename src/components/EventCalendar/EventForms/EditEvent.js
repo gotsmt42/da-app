@@ -854,8 +854,6 @@ export const getEditEvent = async ({
         endTime,
       } = result.value;
 
-      console.log("StartTimeInput", startTime);
-      console.log("EndTimeInput", endTime);
 
       const updatedEvent = {
         docNo,

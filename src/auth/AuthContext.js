@@ -36,6 +36,9 @@ export const AuthProvider = ({ children }) => {
   const storedToken = localStorage.getItem("token");
   const storedUser = localStorage.getItem("payload");
 
+        console.log(storedUser);
+
+
   if (storedToken && storedUser) {
     const decoded = jwtDecode(storedToken);
     const now = Date.now() / 1000;
@@ -64,6 +67,8 @@ export const AuthProvider = ({ children }) => {
     const handleStorageChange = () => {
       const newToken = localStorage.getItem("token");
       const newUser = localStorage.getItem("payload");
+
+      
 
       if (newToken && newUser) {
         setLoggedIn(true);

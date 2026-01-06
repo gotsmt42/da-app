@@ -15,6 +15,8 @@ import StyledMenu from "../components/StyledMenu";
 
 import DocumentCell from "../components/DocumentCell";
 
+import ResPersonCell from "../components/ResPersonCell"; // ✅ import component
+
 const DataTableColumns = ({
   setSelectedRow,
   setEditedData,
@@ -33,6 +35,10 @@ const DataTableColumns = ({
   uploadingState,
   isUploadingState,
   uploadingFileSizeState,
+
+  resPerson,
+  currentUserRole,
+  onInputUpdate
 }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
@@ -65,6 +71,21 @@ const DataTableColumns = ({
 
   const isMobile = useMediaQuery("(max-width:600px)");
   const columns = [
+
+    
+            {
+          name: "ผู้รับผิดชอบงาน",
+          width: "180px",
+          cell: (row) => (
+            <ResPersonCell
+              row={row}
+              employee={resPerson}
+              onInputUpdate={onInputUpdate}
+              currentUserRole={currentUserRole}
+            />
+          ),
+        },
+
     {
       name: "วันดำเนินการ",
       width: "150px",
@@ -109,17 +130,17 @@ const DataTableColumns = ({
         </div>
       ),
     },
-    {
-      name: "เลขที่เอกสาร",
-      sortable: true,
-      width: "115px",
-      selector: (row) => row.docNo || "-",
-      cell: (row) => (
-        <div style={{ fontSize: "0.85em", color: "#333" }}>
-          {row.docNo || <span style={{ color: "#bbb" }}>ไม่ระบุ</span>}
-        </div>
-      ),
-    },
+    // {
+    //   name: "เลขที่เอกสาร",
+    //   sortable: true,
+    //   width: "115px",
+    //   selector: (row) => row.docNo || "-",
+    //   cell: (row) => (
+    //     <div style={{ fontSize: "0.85em", color: "#333" }}>
+    //       {row.docNo || <span style={{ color: "#bbb" }}>ไม่ระบุ</span>}
+    //     </div>
+    //   ),
+    // },
 
     {
       name: "งาน / โครงการ",
@@ -315,54 +336,54 @@ const DataTableColumns = ({
       ),
     },
 
-    {
-      name: "Action",
-      width: "80px",
-      cell: (row) => (
-        <div>
-          <IconButton
-            id="demo-customized-button"
-            aria-controls={open ? "demo-customized-menu" : undefined}
-            aria-haspopup="true"
-            aria-expanded={open ? "true" : undefined}
-            onClick={(event) => handleClick(event, row)}
-          >
-            <MoreVertIcon />
-          </IconButton>
+    // {
+    //   name: "Action",
+    //   width: "80px",
+    //   cell: (row) => (
+    //     <div>
+    //       <IconButton
+    //         id="demo-customized-button"
+    //         aria-controls={open ? "demo-customized-menu" : undefined}
+    //         aria-haspopup="true"
+    //         aria-expanded={open ? "true" : undefined}
+    //         onClick={(event) => handleClick(event, row)}
+    //       >
+    //         <MoreVertIcon />
+    //       </IconButton>
 
-          <StyledMenu
-            id="demo-customized-menu"
-            MenuListProps={{ "aria-labelledby": "demo-customized-button" }}
-            anchorEl={anchorEl}
-            open={open && selectedRowMenu === row}
-            onClose={handleClose}
-          >
-            <MenuItem
-              onClick={() => {
-                setModalOpenEdit(true);
-                handleClose();
-              }}
-            >
-              <EditIcon />
-              แก้ไข
-            </MenuItem>
-            <MenuItem
-              onClick={() => {
-                handleDeleteRow(row._id);
-                handleClose();
-              }}
-            >
-              <Delete />
-              ลบ
-            </MenuItem>
-            <MenuItem onClick={handleClose} disableRipple>
-              <MoreHorizIcon />
-              เพิ่มเติม
-            </MenuItem>
-          </StyledMenu>
-        </div>
-      ),
-    },
+    //       <StyledMenu
+    //         id="demo-customized-menu"
+    //         MenuListProps={{ "aria-labelledby": "demo-customized-button" }}
+    //         anchorEl={anchorEl}
+    //         open={open && selectedRowMenu === row}
+    //         onClose={handleClose}
+    //       >
+    //         <MenuItem
+    //           onClick={() => {
+    //             setModalOpenEdit(true);
+    //             handleClose();
+    //           }}
+    //         >
+    //           <EditIcon />
+    //           แก้ไข
+    //         </MenuItem>
+    //         <MenuItem
+    //           onClick={() => {
+    //             handleDeleteRow(row._id);
+    //             handleClose();
+    //           }}
+    //         >
+    //           <Delete />
+    //           ลบ
+    //         </MenuItem>
+    //         <MenuItem onClick={handleClose} disableRipple>
+    //           <MoreHorizIcon />
+    //           เพิ่มเติม
+    //         </MenuItem>
+    //       </StyledMenu>
+    //     </div>
+    //   ),
+    // },
   ];
 
   return columns;

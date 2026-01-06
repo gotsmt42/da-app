@@ -77,6 +77,13 @@ const DataTableColumns = ({
   };
 
   const columns = [
+    // {
+    //   name: "userId",
+    //   // cell: (row) => <CustomCell row={row} />,
+    //   sortable: true,
+    //   selector: (row) => row._id,
+    //   width: "300px",
+    // },
     {
       name: "ชื่อ-นามสกุล",
       cell: (row) => <CustomCell row={row} />,

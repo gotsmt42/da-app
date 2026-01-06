@@ -214,11 +214,9 @@ const ThemeRoutes = [
       {
         path: "operation",
         element: (
-          <AdminRoute>
             <Suspense fallback={<div>Loading Operation...</div>}>
               <Operate />
             </Suspense>
-          </AdminRoute>
         ),
         title: "Operation",
       },

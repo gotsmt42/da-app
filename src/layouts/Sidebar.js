@@ -66,13 +66,14 @@ const Sidebar = ({ handleMenuClick }) => {
     href: "/event",
     icon: "bi-calendar-event-fill",
   },
-  ]
-    const navigation2= [
-  {
+    {
     title: "การดำเนินงาน",
     href: "/operation",
     icon: "bi-clock-fill",
   },
+  ]
+    const navigation2= [
+
   {
     title: "ติดตามงาน",
     href: "/tackstatus",

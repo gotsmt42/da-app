@@ -495,7 +495,8 @@ const filteredCalendarEvents = useMemo(() => {
           dateClick={handleAddEvent}
           eventClick={(arg) => {
             const eventOwnerId = arg.event.extendedProps?.userId;
-            if (isAdmin || eventOwnerId === userId) {
+            const eventResperson = arg.event.extendedProps?.userId;
+            if (isAdmin || eventOwnerId || eventResperson === userId) {
               handleEditEvent(arg);
             } else {
               Swal.fire("❌ คุณไม่มีสิทธิ์แก้ไขแผนงานนี้");
@@ -503,8 +504,9 @@ const filteredCalendarEvents = useMemo(() => {
           }}
           eventDrop={(arg) => {
             const eventOwnerId = arg.event.extendedProps?.userId;
+            const eventResperson = arg.event.extendedProps?.userId;
 
-            if (isAdmin || eventOwnerId === userId) {
+            if (isAdmin || eventOwnerId || eventResperson === userId) {
               handleEventDrop(arg);
             } else {
               Swal.fire("❌ คุณไม่มีสิทธิ์แก้ไขแผนงานนี้");
@@ -513,7 +515,9 @@ const filteredCalendarEvents = useMemo(() => {
           }}
           eventResize={(arg) => {
             const eventOwnerId = arg.event.extendedProps?.userId;
-            if (isAdmin || eventOwnerId === userId) {
+                        const eventResperson = arg.event.extendedProps?.userId;
+
+            if (isAdmin || eventOwnerId || eventResperson === userId) {
               handleEventResize(arg);
             } else {
               Swal.fire("❌ คุณไม่มีสิทธิ์แก้ไขแผนงานนี้");
@@ -627,8 +631,12 @@ const filteredCalendarEvents = useMemo(() => {
             const eventOwnerId = info.event.extendedProps?.userId; // เจ้าของเดิม
             const isOwner = eventOwnerId?.toString() === userId?.toString();
 
+            
+            const eventResPerson = info.event.extendedProps?.resPerson; // เจ้าของเดิม
+            const isResperson = eventResPerson?.toString() === userId?.toString();
+
             // ✅ ถ้าไม่ใช่ admin และไม่ใช่เจ้าของ → ทำให้สีซีดลง
-            if (!isAdmin && !isOwner) {
+            if (!isAdmin && !isOwner && !isResperson) {
               info.el.style.opacity = "0.7"; // ทำให้ซีดลง
               info.el.style.filter = "grayscale(10%)"; // เพิ่มความซีดด้วย grayscale
             } else {

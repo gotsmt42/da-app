@@ -17,6 +17,20 @@ const EventService = {
       throw error;
     }
   },
+  async getEventOp() {
+    try {
+      const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token
+      if (userData) {
+        // const response = await API.get(`/product?search=${searchTerm}`); // เรียกข้อมูลสินค้าโดยใช้ ID ของผู้ใช้
+        const response = await API.get(`/events/event-op`); // เรียกข้อมูลสินค้าโดยใช้ ID ของผู้ใช้
+
+        return response.data;
+      }
+    } catch (error) {
+      console.error("Error fetching user events:", error);
+      throw error;
+    }
+  },
 
   async GetEventById(id) {
     try {

@@ -45,6 +45,8 @@ import { styled } from "@mui/material/styles";
 import styleButton from "@mui/material/Button";
 import { Close, Download } from "@mui/icons-material";
 
+import AuthService from "../../services/authService";
+
 const Tackstatus = () => {
   moment.locale("th"); // ✅ ตั้งค่า default เป็นภาษาไทย
   const { id } = useParams(); // 👈 ดึง eventId จาก path /operation/:id
@@ -130,40 +132,21 @@ const Tackstatus = () => {
   const [filterStatus, setFilterStatus] = useState("");
   const [filterTeam, setFilterTeam] = useState("");
 
+  const [employee, setEmployee] = useState([]);
+
+  const [currentUserRole, setCurrentUserRole] = useState("");
+
+  useEffect(() => {
+    const payload = JSON.parse(localStorage.getItem("payload"));
+    if (payload?.role) {
+      setCurrentUserRole(payload.role);
+    }
+  }, []);
+
   useEffect(() => {
     fetchEventsFromDB();
+    fetchEmployee();
   }, [id]);
-
-  const fetchEventsFromDB = async () => {
-    setLoading(true);
-    try {
-      const res = await EventService.getEvents();
-      const eventsWithId = res.userEvents.map((event) => ({
-        ...event,
-        id: event._id,
-      }));
-
-      setEvents(eventsWithId);
-
-      if (id) {
-        const found = eventsWithId.find((ev) => ev._id === id);
-        setSelectedEvent(found || null);
-
-        // ✅ ตั้ง selectedDate ให้ตรงกับเดือนของ event
-        if (found && !showAll) {
-          const eventMonth = moment(found.start || found.end).format("YYYY-MM");
-          setSelectedDate(eventMonth);
-        }
-      } else {
-        setSelectedEvent(null);
-      }
-
-      setLoading(false);
-    } catch (error) {
-      console.error("Error fetching events:", error);
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
     if (id && selectedEvent) {
@@ -226,6 +209,42 @@ const Tackstatus = () => {
     filterStatus,
     filterTeam,
   ]);
+
+  const fetchEmployee = async () => {
+    setLoading(true);
+    try {
+      const res = await AuthService.getAllUserData();
+      // สมมติ API return { users: [...] }
+      setEmployee(res.allUser || []);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching events:", error);
+      setLoading(false);
+    }
+  };
+
+  const fetchEventsFromDB = async () => {
+    setLoading(true);
+    try {
+      const res = await EventService.getEventOp();
+
+      setEvents(res.userEvents);
+
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching events:", error);
+      setLoading(false);
+    }
+  };
+
+  const handleInputUpdate = async (id, updatedData) => {
+    try {
+      await EventService.UpdateEvent(id, updatedData); // 👈 API update
+      fetchEventsFromDB(); // refresh events หลัง update
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const handleDeleteRow = async (customerId) => {
     Swal.fire({
@@ -338,8 +357,7 @@ const Tackstatus = () => {
       });
 
       setPreviewUrl(result.fileUrl);
-setPreviewFileName(result.fileName);
-
+      setPreviewFileName(result.fileName);
 
       setIsUploadingState((prev) => ({ ...prev, [type]: false }));
       setTimeout(() => {
@@ -561,8 +579,10 @@ setPreviewFileName(result.fileName);
             uploadingState,
             isUploadingState,
             uploadingFileSizeState,
-
-            
+            employee,
+            resPerson: employee,
+            onInputUpdate: handleInputUpdate, // ✅ ส่ง callback update เข้าไป
+            currentUserRole: currentUserRole,
           })}
           data={sortedData}
           highlightOnHover
