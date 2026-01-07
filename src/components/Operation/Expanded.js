@@ -6,6 +6,9 @@ import React, { useState, useEffect } from "react";
 import EventService from "../../services/EventService"; // 👈 สำหรับอัปเดตข้อมูล
 import { TextField, Box, CircularProgress } from "@mui/material";
 import Swal from "sweetalert2";
+
+import moment from "moment";
+
 const Expanded = ({ data, onStatusUpdate, onDocNoUpdate }) => {
   const isMobile = useMediaQuery("(max-width:600px)");
 
@@ -80,9 +83,35 @@ const Expanded = ({ data, onStatusUpdate, onDocNoUpdate }) => {
               />
               {loading && <CircularProgress size={20} />}
             </Box> */}
-            <h5 className="card-title mt-2">
+            {/* <h5 className="card-title mt-2">
               อ้างอิงเอกสารเลขที่ : {docNo || "ไม่ระบุ"}
-            </h5>
+            </h5> */}
+<h5>
+
+วันที่ : <span></span> 
+   <span> 
+              {moment(data.start).isSame(
+                moment(data.end).clone().subtract(1, "day"),
+                "day"
+              ) ? (
+                <>
+                  {moment(data.start).format("DD")}{" "}
+                  <span style={{ color: "#888" }}>
+                    {moment(data.start).format("MMMM YYYY")}
+                  </span>
+                </>
+              ) : (
+                <>
+                  {moment(data.start).format("DD")} –{" "}
+                  {moment(data.end).clone().subtract(1, "day").format("DD")}{" "}
+                  <span style={{ color: "#888" }}>
+                    {moment(data.start).format("MMMM YYYY")}
+                  </span>
+                </>
+              )}
+            </span>
+</h5>
+           
 
             <p></p>
 

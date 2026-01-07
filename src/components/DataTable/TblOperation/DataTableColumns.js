@@ -139,6 +139,23 @@ const DataTableColumns = ({
         />
       ),
     },
+
+        {
+      name: "งาน / โครงการ",
+
+      width: isMobile ? "200px" : "200px", // ✅ ปรับขนาดตามหน้าจอ
+
+      sortable: true,
+      sortFunction: (a, b) => new Date(a.start) - new Date(b.start),
+      cell: (row) => (
+        <div>
+          <div style={{ fontSize: "0.8em", color: "#888" }}>
+            [{row.title}] - {row.system} - ครั้งที่ {row.time}
+          </div>
+          <div>{row.site}</div>
+        </div>
+      ),
+    },
     {
       name: "วันดำเนินการ",
       width: "165px",
@@ -190,22 +207,7 @@ const DataTableColumns = ({
     // }
 
 
-    {
-      name: "งาน / โครงการ",
 
-      width: isMobile ? "200px" : "200px", // ✅ ปรับขนาดตามหน้าจอ
-
-      sortable: true,
-      sortFunction: (a, b) => new Date(a.start) - new Date(b.start),
-      cell: (row) => (
-        <div>
-          <div style={{ fontSize: "0.8em", color: "#888" }}>
-            [{row.title}] - {row.system} - ครั้งที่ {row.time}
-          </div>
-          <div>{row.site}</div>
-        </div>
-      ),
-    },
 
     {
       name: "การดำเนินการ",
