@@ -193,23 +193,45 @@ function EventCalendar() {
     }
   }, []);
 
-  const fetchThaiHolidaysFromAPI = async () => {
-    try {
-      const { data } = await API.get(`/holidays`);
-      if (Array.isArray(data)) {
-        return data.map((holiday) => ({
-          title: holiday.HolidayDescriptionThai,
-          start: holiday.Date,
-          color: "#FF0000",
-        }));
-      }
-      console.warn("Holiday data structure is invalid");
-      return [];
-    } catch (error) {
-      console.error("Error fetching holidays:", error.message);
+const HOLIDAY_COLORS = {
+  public: "#FF0000",   // วันหยุดราชการ = แดง
+  bank: "#1E90FF",     // วันหยุดธนาคาร = น้ำเงิน
+  default: "#8A8A8A",  // อื่น ๆ = เทา
+};
+
+const fetchThaiHolidaysFromAPI = async () => {
+  try {
+    const { data } = await API.get("/holidays");
+
+    const holidays =
+      Array.isArray(data?.holidays) ? data.holidays :
+      Array.isArray(data?.data) ? data.data :
+      Array.isArray(data?.result?.data) ? data.result.data :
+      Array.isArray(data) ? data :
+      null;
+
+    if (!Array.isArray(holidays)) {
+      console.warn("⚠️ โครงสร้างข้อมูลวันหยุดไม่ถูกต้อง:", data);
       return [];
     }
-  };
+
+    return holidays.map((h) => ({
+      title: h.name_thai || h.name || "ไม่ระบุชื่อวันหยุด",
+      start: h.date || h.Date || null,
+      color: HOLIDAY_COLORS[h.type] || HOLIDAY_COLORS.default,
+    })).filter((h) => !!h.start);
+  } catch (error) {
+    console.error("❌ Error fetching holidays:", error.response?.status, error.response?.data || error.message);
+
+    // fallback mock data
+    return [
+      { title: "วันปีใหม่", start: "2026-01-01", color: HOLIDAY_COLORS.public },
+      { title: "วันสงกรานต์", start: "2026-04-13", color: HOLIDAY_COLORS.public },
+    ];
+  }
+};
+
+
 
   const fetchEventsFromDB = async () => {
     await getFetchEvents({

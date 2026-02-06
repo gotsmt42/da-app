@@ -30,6 +30,8 @@ export const getFetchEvents = async ({
       },
     }));
 
+    console.log("thaiHolidays:", thaiHolidays);
+
     // แปลงข้อมูลวันหยุด (ถ้ามี)
     const holidayEvents = Array.isArray(thaiHolidays)
       ? thaiHolidays.map((holiday) => ({
