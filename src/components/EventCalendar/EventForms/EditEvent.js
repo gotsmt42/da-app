@@ -856,6 +856,7 @@ export const getEditEvent = async ({
 
 
       const updatedEvent = {
+        id,
         docNo,
         company,
         site,
@@ -901,7 +902,7 @@ export const getEditEvent = async ({
       }
 
       setEvents((prevEvents) =>
-        prevEvents.map((event) => (event.id === id ? updatedEvent : event))
+        prevEvents.map((event) => (event._id === id ? updatedEvent : event))
       );
 
       // ส่งข้อมูลแก้ไขไปยัง API
