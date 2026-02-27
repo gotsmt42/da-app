@@ -117,7 +117,7 @@ export const getGeneratePDF = async ({
 
   // 🔹 Footer (ข้อความ + ช่องเซ็นชื่อ อยู่ล่างเสมอ)
   const footerTextY = pageHeight - marginBottom - 65; // ตำแหน่งข้อความเหนือช่องเซ็นชื่อ
-  doc.setFont("THSarabun"); // ✅ ตั้งค่า font เป็น TH Sarabun อีกครั้ง doc.setFontSize(14);
+  doc.setFont("THSarabun");
   doc.setFontSize(14);
   doc.text(
     "        ดังนั้น บริษัท ฯ ใคร่ขอความร่วมมือ แจ้งผู้เกี่ยวข้องทุกท่านเพื่อทราบกำหนดการดังกล่าว ทั้งนี้บริษัทจะเข้าดำเนินการโดยไม่ส่งผลกระทบต่อผู้ใช้งานพื้นที่พร้อมมีมาตรการความปลอดภัยตามมาตรฐาน หากท่านไม่สะดวกในการดำเนินการตามวันเวลาดังกล่าวกรุณาแจ้งกลับที่บริษัท ดู ออล อาคิเทค แอนด์ เอ็นจิเนียริ่ง จำกัด ด้วย จักขอบพระคุณยิ่ง",
@@ -125,7 +125,6 @@ export const getGeneratePDF = async ({
     footerTextY,
     { maxWidth: contentWidth }, // ✅ ตัดบรรทัดอัตโนมัติ
   );
-  
 
   // 🔹 ช่องเซ็นชื่อ (อยู่ล่างกระดาษเสมอ)
   const boxHeight = 40;
