@@ -80,7 +80,7 @@ function EventCalendar() {
 
   const userId = userData?.userId; // หรือ field ที่เก็บ id ของ user
 
-    const employees =  AuthService.getAllUserData();
+  const employees = AuthService.getAllUserData();
 
   const [events, setEvents] = useState([]);
 
@@ -137,8 +137,8 @@ function EventCalendar() {
         EventService.UpdateEvent(event.id, {
           status: "กำลังดำเนินการ",
           manualStatus: false,
-        })
-      )
+        }),
+      ),
     )
       .then(() => {
         console.log("✅ อัปเดตสถานะเรียบร้อย");
@@ -193,45 +193,76 @@ function EventCalendar() {
     }
   }, []);
 
-const HOLIDAY_COLORS = {
-  public: "#FF0000",   // วันหยุดราชการ = แดง
-  bank: "#1E90FF",     // วันหยุดธนาคาร = น้ำเงิน
-  default: "#8A8A8A",  // อื่น ๆ = เทา
-};
+  const HOLIDAY_COLORS = {
+    public: "#FF0000", // วันหยุดราชการ
+    bank: "#1E90FF", // วันหยุดธนาคาร
+    default: "#8A8A8A", // อื่น ๆ
+  };
 
-const fetchThaiHolidaysFromAPI = async () => {
-  try {
-    const { data } = await API.get("/holidays");
+  const mapHolidayType = (type) => {
+    if (!type) return "default";
+    if (type.includes("ราชการ")) return "public";
+    if (type.includes("ธนาคาร")) return "bank";
+    return "default";
+  };
 
-    const holidays =
-      Array.isArray(data?.holidays) ? data.holidays :
-      Array.isArray(data?.data) ? data.data :
-      Array.isArray(data?.result?.data) ? data.result.data :
-      Array.isArray(data) ? data :
-      null;
+  const fetchThaiHolidaysFromAPI = async () => {
+    try {
+      const { data } = await API.get("/holidays");
 
-    if (!Array.isArray(holidays)) {
-      console.warn("⚠️ โครงสร้างข้อมูลวันหยุดไม่ถูกต้อง:", data);
-      return [];
+      // ✅ ตรวจสอบโครงสร้างข้อมูลที่ API ส่งมา
+      let holidays = null;
+      if (Array.isArray(data?.holidays)) {
+        holidays = data.holidays;
+      } else if (Array.isArray(data?.data)) {
+        holidays = data.data;
+      } else if (Array.isArray(data?.result?.data)) {
+        holidays = data.result.data;
+      } else if (Array.isArray(data)) {
+        holidays = data;
+      }
+
+      if (!Array.isArray(holidays)) {
+        console.warn("⚠️ โครงสร้างข้อมูลวันหยุดไม่ถูกต้อง:", data);
+        return [];
+      }
+
+      // ✅ map ให้เป็นรูปแบบที่ FullCalendar ใช้ได้
+      return holidays.map((h, idx) => ({
+        id: h.id || h._id || `holiday-${idx}`, // ✅ ใส่ id ให้แน่ใจว่า unique
+        title: h.name_thai || h.name || "ไม่ระบุชื่อวันหยุด",
+        start: h.date || h.Date || null,
+        color: HOLIDAY_COLORS[mapHolidayType(h.type)],
+        extendedProps: {
+          type: h.type || "public",
+          isHoliday: true,
+          raw: h,
+        },
+      }));
+    } catch (error) {
+      console.error(
+        "❌ Error fetching holidays:",
+        error.response?.status,
+        error.response?.data || error.message,
+      );
+
+      // ✅ fallback mock data
+      return [
+        {
+          title: "วันปีใหม่",
+          start: "2026-01-01",
+          color: HOLIDAY_COLORS.public,
+          extendedProps: { type: "public" },
+        },
+        {
+          title: "วันสงกรานต์",
+          start: "2026-04-13",
+          color: HOLIDAY_COLORS.public,
+          extendedProps: { type: "public" },
+        },
+      ];
     }
-
-    return holidays.map((h) => ({
-      title: h.name_thai || h.name || "ไม่ระบุชื่อวันหยุด",
-      start: h.date || h.Date || null,
-      color: HOLIDAY_COLORS[h.type] || HOLIDAY_COLORS.default,
-    })).filter((h) => !!h.start);
-  } catch (error) {
-    console.error("❌ Error fetching holidays:", error.response?.status, error.response?.data || error.message);
-
-    // fallback mock data
-    return [
-      { title: "วันปีใหม่", start: "2026-01-01", color: HOLIDAY_COLORS.public },
-      { title: "วันสงกรานต์", start: "2026-04-13", color: HOLIDAY_COLORS.public },
-    ];
-  }
-};
-
-
+  };
 
   const fetchEventsFromDB = async () => {
     await getFetchEvents({
@@ -376,7 +407,7 @@ const fetchThaiHolidaysFromAPI = async () => {
         const dateStr = cell.getAttribute("data-date");
         const date = moment(dateStr);
         const currentMonth = moment(
-          calendarRef.current.getApi().getDate()
+          calendarRef.current.getApi().getDate(),
         ).month();
         const isWeekend = [6, 7].includes(date.isoWeekday());
         const isSameMonth = date.month() === currentMonth;
@@ -386,39 +417,38 @@ const fetchThaiHolidaysFromAPI = async () => {
     });
   }, []);
 
-
   const [employeeList, setEmployeeList] = useState([]);
 
-useEffect(() => {
-  (async () => {
-    const res = await AuthService.getAllUserData();
-    setEmployeeList(res?.allUser || []);
-  })();
-}, []);
+  useEffect(() => {
+    (async () => {
+      const res = await AuthService.getAllUserData();
+      setEmployeeList(res?.allUser || []);
+    })();
+  }, []);
 
-const filteredCalendarEvents = useMemo(() => {
-  const keyword = searchTerm.toLowerCase();
+  const filteredCalendarEvents = useMemo(() => {
+    const keyword = searchTerm.toLowerCase();
 
-  return events.filter((event) => {
-    // หาคนที่เป็นเจ้าของ event จาก employeeList
-    const owner = employeeList.find(
-      (emp) => emp._id?.toString() === event.extendedProps?.userId?.toString()
-    );
+    return events.filter((event) => {
+      // หาคนที่เป็นเจ้าของ event จาก employeeList
+      const owner = employeeList.find(
+        (emp) =>
+          emp._id?.toString() === event.extendedProps?.userId?.toString(),
+      );
 
-    const ownerName = owner?.username?.toLowerCase() || "";
+      const ownerName = owner?.username?.toLowerCase() || "";
 
-    return [
-      event.title ?? "",
-      event.site ?? "",
-      event.company ?? "",
-      event.system ?? "",
-      event.team ?? "",
-      event.time?.toString() ?? "",
-      ownerName, // ✅ เพิ่มชื่อเจ้าของเข้าไปในเงื่อนไข search
-    ].some((field) => field.toLowerCase().includes(keyword));
-  });
-}, [events, searchTerm, employeeList]);
-
+      return [
+        event.title ?? "",
+        event.site ?? "",
+        event.company ?? "",
+        event.system ?? "",
+        event.team ?? "",
+        event.time?.toString() ?? "",
+        ownerName, // ✅ เพิ่มชื่อเจ้าของเข้าไปในเงื่อนไข search
+      ].some((field) => field.toLowerCase().includes(keyword));
+    });
+  }, [events, searchTerm, employeeList]);
 
   const getStatusIcon = useCallback((status) => {
     const icons = {
@@ -516,6 +546,11 @@ const filteredCalendarEvents = useMemo(() => {
           droppable={true}
           dateClick={handleAddEvent}
           eventClick={(arg) => {
+            if (arg.event.extendedProps?.isHoliday) {
+              Swal.fire("❌ ข้อมูลวันหยุดไม่สามารถแก้ไขได้");
+              return;
+            }
+
             const eventOwnerId = arg.event.extendedProps?.userId;
             const eventResperson = arg.event.extendedProps?.userId;
             if (isAdmin || eventOwnerId || eventResperson === userId) {
@@ -525,6 +560,12 @@ const filteredCalendarEvents = useMemo(() => {
             }
           }}
           eventDrop={(arg) => {
+            if (arg.event.extendedProps?.isHoliday) {
+              Swal.fire("❌ ข้อมูลวันหยุดไม่สามารถแก้ไขได้");
+              arg.revert();
+              return;
+            }
+
             const eventOwnerId = arg.event.extendedProps?.userId;
             const eventResperson = arg.event.extendedProps?.userId;
 
@@ -536,8 +577,14 @@ const filteredCalendarEvents = useMemo(() => {
             }
           }}
           eventResize={(arg) => {
+            if (arg.event.extendedProps?.isHoliday) {
+              Swal.fire("❌ ข้อมูลวันหยุดไม่สามารถแก้ไขได้");
+              arg.revert();
+              return;
+            }
+
             const eventOwnerId = arg.event.extendedProps?.userId;
-                        const eventResperson = arg.event.extendedProps?.userId;
+            const eventResperson = arg.event.extendedProps?.userId;
 
             if (isAdmin || eventOwnerId || eventResperson === userId) {
               handleEventResize(arg);
@@ -576,10 +623,10 @@ const filteredCalendarEvents = useMemo(() => {
               startTime && endTime
                 ? `- เวลา : ${startTime} - ${endTime}`
                 : startTime
-                ? `- เริ่มเวลา : ${startTime}`
-                : endTime
-                ? `- สิ้นสุดเวลา : ${endTime}`
-                : "";
+                  ? `- เริ่มเวลา : ${startTime}`
+                  : endTime
+                    ? `- สิ้นสุดเวลา : ${endTime}`
+                    : "";
 
             const isSmallScreen = window.innerWidth < 576;
 
@@ -653,9 +700,9 @@ const filteredCalendarEvents = useMemo(() => {
             const eventOwnerId = info.event.extendedProps?.userId; // เจ้าของเดิม
             const isOwner = eventOwnerId?.toString() === userId?.toString();
 
-            
             const eventResPerson = info.event.extendedProps?.resPerson; // เจ้าของเดิม
-            const isResperson = eventResPerson?.toString() === userId?.toString();
+            const isResperson =
+              eventResPerson?.toString() === userId?.toString();
 
             // ✅ ถ้าไม่ใช่ admin และไม่ใช่เจ้าของ → ทำให้สีซีดลง
             if (!isAdmin && !isOwner && !isResperson) {
@@ -709,7 +756,7 @@ const filteredCalendarEvents = useMemo(() => {
                     fontSize: isSmallScreen ? "8px" : "12px", // ✅ ปรับขนาด icon ตามหน้าจอ
                     color: textColor, // ✅ ไอคอนใช้สีเดียวกับตัวหนังสือ
                   }}
-                />
+                />,
               );
 
               // 🔹 เพิ่มไอคอนไปที่ event container
