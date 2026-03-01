@@ -137,8 +137,8 @@ function EventCalendar() {
         EventService.UpdateEvent(event.id, {
           status: "กำลังดำเนินการ",
           manualStatus: false,
-        }),
-      ),
+        })
+      )
     )
       .then(() => {
         console.log("✅ อัปเดตสถานะเรียบร้อย");
@@ -172,9 +172,15 @@ function EventCalendar() {
         docNo,
         subject,
         description,
+        userData,
       });
     } catch (error) {
-      console.error("❌ สร้าง PDF ไม่สำเร็จ:", error);
+      Swal.fire({
+        title: "สร้าง PDF ไม่สำเร็จ",
+        text: error.message || "โปรดลองอีกครั้ง",
+        icon: "error",
+        showConfirmButton: true,
+      });
     } finally {
       setLoading(false);
     }
@@ -243,7 +249,7 @@ function EventCalendar() {
       console.error(
         "❌ Error fetching holidays:",
         error.response?.status,
-        error.response?.data || error.message,
+        error.response?.data || error.message
       );
 
       // ✅ fallback mock data
@@ -315,6 +321,7 @@ function EventCalendar() {
       moment,
       calendarRef,
       Choices,
+      userData,
     });
   };
 
@@ -407,7 +414,7 @@ function EventCalendar() {
         const dateStr = cell.getAttribute("data-date");
         const date = moment(dateStr);
         const currentMonth = moment(
-          calendarRef.current.getApi().getDate(),
+          calendarRef.current.getApi().getDate()
         ).month();
         const isWeekend = [6, 7].includes(date.isoWeekday());
         const isSameMonth = date.month() === currentMonth;
@@ -432,8 +439,7 @@ function EventCalendar() {
     return events.filter((event) => {
       // หาคนที่เป็นเจ้าของ event จาก employeeList
       const owner = employeeList.find(
-        (emp) =>
-          emp._id?.toString() === event.extendedProps?.userId?.toString(),
+        (emp) => emp._id?.toString() === event.extendedProps?.userId?.toString()
       );
 
       const ownerName = owner?.username?.toLowerCase() || "";
@@ -623,10 +629,10 @@ function EventCalendar() {
               startTime && endTime
                 ? `- เวลา : ${startTime} - ${endTime}`
                 : startTime
-                  ? `- เริ่มเวลา : ${startTime}`
-                  : endTime
-                    ? `- สิ้นสุดเวลา : ${endTime}`
-                    : "";
+                ? `- เริ่มเวลา : ${startTime}`
+                : endTime
+                ? `- สิ้นสุดเวลา : ${endTime}`
+                : "";
 
             const isSmallScreen = window.innerWidth < 576;
 
@@ -756,7 +762,7 @@ function EventCalendar() {
                     fontSize: isSmallScreen ? "8px" : "12px", // ✅ ปรับขนาด icon ตามหน้าจอ
                     color: textColor, // ✅ ไอคอนใช้สีเดียวกับตัวหนังสือ
                   }}
-                />,
+                />
               );
 
               // 🔹 เพิ่มไอคอนไปที่ event container

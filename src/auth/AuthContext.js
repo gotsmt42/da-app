@@ -36,7 +36,7 @@ export const AuthProvider = ({ children }) => {
   const storedToken = localStorage.getItem("token");
   const storedUser = localStorage.getItem("payload");
 
-        console.log(storedUser);
+        // console.log(storedUser);
 
 
   if (storedToken && storedUser) {

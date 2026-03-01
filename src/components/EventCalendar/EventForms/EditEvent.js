@@ -15,7 +15,10 @@ export const getEditEvent = async ({
   TomSelect,
   moment,
   calendarRef,
+  userData
 }) => {
+
+
   const inputBackgroundColor = document.createElement("input");
   inputBackgroundColor.type = "color";
   inputBackgroundColor.value = eventInfo.event.backgroundColor;
@@ -62,25 +65,22 @@ export const getEditEvent = async ({
   // หาคนที่สร้าง event
 
   // หาคนที่แก้ไขล่าสุด
-  const modifier = employeeList.find(
-    (emp) => emp?._id?.toString() === lastModifiedBy?.toString()
-  );
+  // const modifier = employeeList.find(
+  //   (emp) => emp?._id?.toString() === lastModifiedBy?.toString()
+  // );
 
-  // หาคนที่สร้าง event
-  const eventOwner = employeeList.find(
-    (emp) => emp?._id?.toString() === userId?.toString()
-  );
+// หาคนที่สร้าง event
+const eventOwner = employeeList.find(
+  (emp) => emp?._id?.toString() === userId?.toString()
+);
 
-  // ✅ เงื่อนไข: แสดงเฉพาะ admin หรือเจ้าของเดิม
-  let footerName = "";
-  if (modifier) {
-    if (
-      modifier.role === "admin" ||
-      modifier._id.toString() === userId?.toString()
-    ) {
-      footerName = modifier.username || `${modifier.fname} ${modifier.lname}`;
-    }
-  }
+// ✅ แสดงเฉพาะชื่อเจ้าของเดิม ไม่ว่าใครจะ update
+let footerName = "";
+if (eventOwner) {
+  footerName =
+    eventOwner.username || `${eventOwner.fname} ${eventOwner.lname}`;
+}
+
 
   // ถ้าไม่มี modifier ที่เข้าเงื่อนไข → fallback เป็นเจ้าของเดิม
   if (!footerName && eventOwner) {
@@ -725,6 +725,8 @@ export const getEditEvent = async ({
 
                   startTime: getVal("editStartTime"),
                   endTime: getVal("editEndTime"),
+
+              
                 };
 
                 try {
@@ -746,7 +748,9 @@ export const getEditEvent = async ({
                     updatedEvent.subject,
                     updatedEvent.description,
                     updatedEvent.startTime,
-                    updatedEvent.endTime
+                    updatedEvent.endTime,
+                    updatedEvent.time,
+                    userData
                   );
 
                   // เปิด PDF ในแท็บใหม่ทันที
@@ -831,6 +835,7 @@ export const getEditEvent = async ({
 
     if (result.isConfirmed) {
       setLoading(true);
+
       const {
         id,
         docNo,
@@ -849,11 +854,10 @@ export const getEditEvent = async ({
         manualStatus,
         subject,
         description,
-
         startTime,
         endTime,
+        imageFile,
       } = result.value;
-
 
       const updatedEvent = {
         id,
@@ -871,59 +875,56 @@ export const getEditEvent = async ({
         start,
         end,
         manualStatus,
-
         subject,
         description,
-
         startTime,
         endTime,
       };
 
-      // ✅ ตรวจสอบและเพิ่ม Customer ใหม่ถ้ายังไม่มี (ไม่ต้องเช็คว่า company ต้องมีค่า)
+      // ✅ ตรวจสอบและเพิ่ม Customer ใหม่ถ้ายังไม่มี
       const existingCustomer = res.userCustomers.find(
         (c) => c.cCompany === company && c.cSite === site
       );
 
-      // ✅ เพิ่มแม้ว่า company จะไม่มีค่า (null หรือ "")
       if (!existingCustomer) {
         await CustomerService.AddCustomer({
-          cCompany: company ?? "", // ป้องกัน null โดยแทนเป็น string ว่าง
+          cCompany: company ?? "",
           cSite: site ?? "",
         });
       }
 
-      const { imageFile } = result.value;
-
+      // ✅ อัพเดทรูปภาพถ้ามี
       if (imageFile) {
-        const formData = new FormData();
-        formData.append("image", imageFile);
-        formData.append("eventId", id);
-        await EventService.UpdateImageEvent(eventId, updatedEvent, imageFile);
+        await EventService.UpdateImageEvent(id, updatedEvent, imageFile);
       }
 
+      // ✅ อัพเดท state
       setEvents((prevEvents) =>
         prevEvents.map((event) => (event._id === id ? updatedEvent : event))
       );
 
-      // ส่งข้อมูลแก้ไขไปยัง API
-      await EventService.UpdateEvent(id, updatedEvent);
-      await fetchEventsFromDB();
+      try {
+        // ✅ ส่งข้อมูลแก้ไขไปยัง API
+        await EventService.UpdateEvent(id, updatedEvent);
+        await fetchEventsFromDB();
 
-      // console.log("📤 updatedEvent:", updatedEvent);
-      // console.log("📦 event.start:", updatedEvent.start);
-      // console.log("📦 event.end:", updatedEvent.end);
+        setLoading(false);
 
-      // console.log("✅ Valid start:", moment(updatedEvent.start).isValid());
-      // console.log("✅ Valid end:", moment(updatedEvent.end).isValid());
-
-      setLoading(false);
-
-      Swal.fire({
-        title: "บันทึกการเปลี่ยนแปลงสำเร็จ",
-        icon: "success",
-        showConfirmButton: false,
-        timer: 1000,
-      });
+        Swal.fire({
+          title: "บันทึกการเปลี่ยนแปลงสำเร็จ",
+          icon: "success",
+          showConfirmButton: false,
+          timer: 1000,
+        });
+      } catch (error) {
+        setLoading(false);
+        Swal.fire({
+          title: "เกิดข้อผิดพลาดในการบันทึก",
+          text: error.message || "โปรดลองอีกครั้ง",
+          icon: "error",
+          showConfirmButton: true,
+        });
+      }
     } else if (result.isDenied) {
       handleDeleteEvent(eventId);
     }
