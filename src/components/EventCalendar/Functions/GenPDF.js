@@ -1,5 +1,6 @@
-import moment from "moment";
-import "moment/locale/th";
+import moment from "moment/min/moment-with-locales";
+moment.locale("th");
+
 export const getGeneratePDF = async ({
   jsPDF,
   thSarabunFont,

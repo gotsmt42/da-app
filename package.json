@@ -115,10 +115,8 @@
   },
   "devDependencies": {
     "ajv": "^8.17.1"
-  },
-  "engines": {
-      "node": "24.x"
   }
+
 
   
 }
