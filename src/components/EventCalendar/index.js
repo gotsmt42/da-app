@@ -559,7 +559,11 @@ function EventCalendar() {
 
             const eventOwnerId = arg.event.extendedProps?.userId;
             const eventResperson = arg.event.extendedProps?.userId;
-            if (isAdmin || eventOwnerId || eventResperson === userId) {
+            if (
+              isAdmin ||
+              eventOwnerId === userId ||
+              eventResperson === userId
+            ) {
               handleEditEvent(arg);
             } else {
               Swal.fire("❌ คุณไม่มีสิทธิ์แก้ไขแผนงานนี้");
@@ -575,7 +579,11 @@ function EventCalendar() {
             const eventOwnerId = arg.event.extendedProps?.userId;
             const eventResperson = arg.event.extendedProps?.userId;
 
-            if (isAdmin || eventOwnerId || eventResperson === userId) {
+            if (
+              isAdmin ||
+              eventOwnerId === userId ||
+              eventResperson === userId
+            ) {
               handleEventDrop(arg);
             } else {
               Swal.fire("❌ คุณไม่มีสิทธิ์แก้ไขแผนงานนี้");
@@ -592,7 +600,11 @@ function EventCalendar() {
             const eventOwnerId = arg.event.extendedProps?.userId;
             const eventResperson = arg.event.extendedProps?.userId;
 
-            if (isAdmin || eventOwnerId || eventResperson === userId) {
+            if (
+              isAdmin ||
+              eventOwnerId === userId ||
+              eventResperson === userId
+            ) {
               handleEventResize(arg);
             } else {
               Swal.fire("❌ คุณไม่มีสิทธิ์แก้ไขแผนงานนี้");
