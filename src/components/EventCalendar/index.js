@@ -557,12 +557,10 @@ function EventCalendar() {
               return;
             }
 
-            const eventOwnerId = arg.event.extendedProps?.userId;
-            const eventResperson = arg.event.extendedProps?.userId;
+            const eventResponsible = arg.event.extendedProps?.userId;
             if (
               isAdmin ||
-              eventOwnerId === userId ||
-              eventResperson === userId
+              eventResponsible === userId
             ) {
               handleEditEvent(arg);
             } else {
@@ -576,18 +574,14 @@ function EventCalendar() {
               return;
             }
 
-            const eventOwnerId = arg.event.extendedProps?.userId;
-            const eventResperson = arg.event.extendedProps?.userId;
-
+            const eventResponsible = arg.event.extendedProps?.userId;
             if (
               isAdmin ||
-              eventOwnerId === userId ||
-              eventResperson === userId
+              eventResponsible === userId
             ) {
-              handleEventDrop(arg);
+              handleEditEvent(arg);
             } else {
               Swal.fire("❌ คุณไม่มีสิทธิ์แก้ไขแผนงานนี้");
-              arg.revert(); // ยกเลิกการลาก
             }
           }}
           eventResize={(arg) => {
@@ -597,18 +591,14 @@ function EventCalendar() {
               return;
             }
 
-            const eventOwnerId = arg.event.extendedProps?.userId;
-            const eventResperson = arg.event.extendedProps?.userId;
-
+            const eventResponsible = arg.event.extendedProps?.userId;
             if (
               isAdmin ||
-              eventOwnerId === userId ||
-              eventResperson === userId
+              eventResponsible === userId
             ) {
-              handleEventResize(arg);
+              handleEditEvent(arg);
             } else {
               Swal.fire("❌ คุณไม่มีสิทธิ์แก้ไขแผนงานนี้");
-              arg.revert(); // ยกเลิกการ resize
             }
           }}
           events={filteredCalendarEvents}
