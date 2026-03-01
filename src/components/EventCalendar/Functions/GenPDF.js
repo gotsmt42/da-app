@@ -38,7 +38,7 @@ export const getGeneratePDF = async ({
   // 🔹 ฟังก์ชันวาดหัวกระดาษ (เรียกซ้ำทุกหน้า)
   const drawHeader = () => {
     // โลโก้บริษัท
-    const logo = "logo-light-2.png"; // ✅ ใส่ path/logo ของคุณ
+    const logo = "/logo-light-2.png"; // ✅ ใส่ path/logo ของคุณ
     try {
       const logoProps = doc.getImageProperties(logo);
       const logoWidth = 35;
