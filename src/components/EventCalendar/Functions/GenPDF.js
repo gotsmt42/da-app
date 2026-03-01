@@ -1,10 +1,9 @@
+import moment from "moment";
 import "moment/locale/th";
-
 export const getGeneratePDF = async ({
   jsPDF,
   thSarabunFont,
   event,
-  moment,
   docNo,
   description,
   subject,
