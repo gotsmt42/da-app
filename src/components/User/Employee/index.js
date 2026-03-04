@@ -27,7 +27,10 @@ import Swal from "sweetalert2";
 
 import { useMediaQuery } from "@mui/material"; // ✅ ใช้สำหรับ Responsive
 
+import { useAuth } from "../../../auth/AuthContext";
+
 const Employee = () => {
+  const { userData, updateUserData } = useAuth();
   const isSmallScreen = useMediaQuery("(max-width:600px)"); // ✅ เช็คว่าหน้าจอเล็กหรือไม่
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -336,7 +339,7 @@ const Employee = () => {
   };
 
   const handleEditUser = async () => {
-    if (!validateEditForm()) return; // ✅ ถ้าไม่ผ่านให้หยุดทำงาน
+    if (!validateEditForm()) return;
 
     if (!editedData._id) {
       Swal.fire({
@@ -348,22 +351,29 @@ const Employee = () => {
     }
 
     try {
-      console.log("🔄 กำลังอัปเดตข้อมูล:", editedData); // ✅ Debug: เช็คค่าที่จะส่งไป API
-
       const response = await API.put(
         `/auth/user/${editedData._id}`,
-        editedData
+        editedData,
       );
-
       if (response.status === 200) {
+        const updatedUser = response.data.user;
+
+        // ✅ อัปเดตเฉพาะ user ที่ล็อกอินอยู่
+        if (userData && updatedUser._id === userData._id) {
+          updateUserData(updatedUser);
+        }
+
+        // ✅ อัปเดต list ของ users ด้วยข้อมูลจาก API
         setUsers(
           users.map((user) =>
-            user._id === editedData._id ? { ...user, ...editedData } : user
-          )
+            user._id === updatedUser._id ? updatedUser : user,
+          ),
         );
+
         setModalOpenEdit(false);
         setSelectedUser(null);
         setEditedData({});
+        fetchUsers();
 
         Swal.fire({
           title: "สำเร็จ!",
@@ -414,7 +424,7 @@ const Employee = () => {
       user.fname?.toLowerCase().includes(lowerSearch) ||
       user.lname?.toLowerCase().includes(lowerSearch) ||
       user.email?.toLowerCase().includes(lowerSearch) ||
-      user.tel?.toLowerCase().includes(lowerSearch) 
+      user.tel?.toLowerCase().includes(lowerSearch)
     );
   });
 
@@ -424,7 +434,13 @@ const Employee = () => {
         className="mt-5"
         sx={{ display: "flex", flexDirection: "column", gap: 1 }}
       >
-        <Box sx={{ display: "flex", justifyContent: "flex-end", marginBottom: "30px" }}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "flex-end",
+            marginBottom: "30px",
+          }}
+        >
           <Button
             variant="contained"
             color="primary"
@@ -440,7 +456,6 @@ const Employee = () => {
         </Box>
 
         <TextField
-          
           label="🔍🤵 ค้นหาสมาชิก"
           variant="outlined"
           size="small"

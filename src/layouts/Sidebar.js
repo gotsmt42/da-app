@@ -36,7 +36,7 @@ const Sidebar = ({ handleMenuClick }) => {
   const [collapsedMenu, setCollapsedMenu] = useState({});
   const location = useLocation();
 
-  const { userData, logout } = useAuth();
+  const { userData, logout, updateUserData } = useAuth();
 
   const isAdmin = userData?.role?.toLowerCase() === "admin"; // ✅ รองรับ case-insensitive
 
@@ -139,7 +139,7 @@ const Sidebar = ({ handleMenuClick }) => {
         <div className="p-3 d-flex">
           <Link to={"/account"}>
             <img
-              src={user.imageUrl}
+              src={userData.imageUrl}
               alt="user"
               width="50"
               height="50"
@@ -148,7 +148,7 @@ const Sidebar = ({ handleMenuClick }) => {
           </Link>
         </div>
         <div className="bg-dark text-white p-2 opacity-75">
-          {user.fname} {user.lname} ({user.role})
+          {userData.fname} {userData.lname} ({userData.role})
         </div>
       </div>
 

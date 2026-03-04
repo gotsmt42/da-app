@@ -13,7 +13,13 @@ import EditModal from "../../Modal/users/EditModal";
 import AuthService from "../../../services/authService";
 import API from "../../../API/axiosInstance";
 
+import { useAuth } from "../../../auth/AuthContext";
+
+
 const Account = () => {
+
+  const { updateUserData, userData } = useAuth();
+
   const [modalOpenEdit, setModalOpenEdit] = useState(false);
   const [editedData, setEditedData] = useState({});
   const [user, setUser] = useState([]);
@@ -38,30 +44,39 @@ const Account = () => {
   };
 
   //ฟังชั่นแก้ไขข้อมูล
-  const handleEdit = async (e) => {
-    e.preventDefault();
-    try {
-      const userId = user._id;
-      const formData = new FormData();
-      for (const [key, value] of Object.entries(editedData)) {
-        formData.append(key, value);
-      }
-      if (selectedFile) {
-        formData.append("image", selectedFile);
-      }
-
-      const updatedUser = await AuthService.UpdateUser(userId, formData);
-      setUser(updatedUser); // อัพเดทข้อมูลผู้ใช้
-      
-      setModalOpenEdit(false);
-      setSelectedFile(null);
-      Swal.fire("Updated Success!", "", "success");
-
-    } catch (error) {
-      console.error("Error updating data:", error);
+const handleEdit = async (e) => {
+  e.preventDefault();
+  try {
+    const userId = user._id;
+    const formData = new FormData();
+    for (const [key, value] of Object.entries(editedData)) {
+      formData.append(key, value);
     }
-  };
-  
+    if (selectedFile) {
+      formData.append("image", selectedFile);
+    }
+
+   const updatedUser = await AuthService.UpdateUser(userId, formData);
+
+// ✅ updatedUser คือ object ของ user ที่แก้ไขแล้ว
+setUser(updatedUser);
+
+// ✅ อัพเดต LocalStorage และ Context ถ้าเป็น user ที่ล็อกอินอยู่
+if (userData && updatedUser._id === userData._id) {
+  updateUserData(updatedUser);
+}
+
+
+    setModalOpenEdit(false);
+    setSelectedFile(null);
+    Swal.fire("Updated Success!", "", "success");
+
+  } catch (error) {
+    console.error("Error updating data:", error);
+    Swal.fire("Update Failed!", "", "error");
+  }
+};
+
   
   const handleCloseModalEdit = () => {
     setModalOpenEdit(false);
@@ -83,16 +98,16 @@ const Account = () => {
                   }}
                 >
                   <img
-                    src={user.imageUrl} // จะได้ path เช่น uploads/images/xxx.jpg
+                    src={user?.imageUrl} // จะได้ path เช่น uploads/images/xxx.jpg
                     alt="Avatar"
                     className="img-fluid my-5 rounded-circle"
                     style={{ width: "120px", height:"120px"}}
                   />
                   <p>
-                    <b>{user.fname} {user.lname}</b>
+                    <b>{user?.fname} {user?.lname}</b>
                   </p>
-                  <p>สถานะ: {user.role}</p>
-                  <p>ตำแหน่ง: {user.rank}</p>
+                  <p>สถานะ: {user?.role}</p>
+                  <p>ตำแหน่ง: {user?.rank}</p>
                   <Link
                     onClick={() => {
                       setEditedData(user);
@@ -112,11 +127,11 @@ const Account = () => {
                     <div className="row pt-1">
                       <div className="col-6 mb-3">
                         <h6>Email</h6>
-                        <p className="text-muted">{user.email}</p>
+                        <p className="text-muted">{user?.email}</p>
                       </div>
                       <div className="col-6 mb-3">
                         <h6>Phone</h6>
-                        <p className="text-muted">{user.tel}</p>
+                        <p className="text-muted">{user?.tel}</p>
                       </div>
                     </div>
                     <h6>Projects</h6>

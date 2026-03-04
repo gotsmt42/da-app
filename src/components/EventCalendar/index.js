@@ -558,10 +558,7 @@ function EventCalendar() {
             }
 
             const eventResponsible = arg.event.extendedProps?.userId;
-            if (
-              isAdmin ||
-              eventResponsible === userId
-            ) {
+            if (isAdmin || eventResponsible === userId) {
               handleEditEvent(arg);
             } else {
               Swal.fire("❌ คุณไม่มีสิทธิ์แก้ไขแผนงานนี้");
@@ -575,10 +572,7 @@ function EventCalendar() {
             }
 
             const eventResponsible = arg.event.extendedProps?.userId;
-            if (
-              isAdmin ||
-              eventResponsible === userId
-            ) {
+            if (isAdmin || eventResponsible === userId) {
               handleEditEvent(arg);
             } else {
               Swal.fire("❌ คุณไม่มีสิทธิ์แก้ไขแผนงานนี้");
@@ -592,10 +586,7 @@ function EventCalendar() {
             }
 
             const eventResponsible = arg.event.extendedProps?.userId;
-            if (
-              isAdmin ||
-              eventResponsible === userId
-            ) {
+            if (isAdmin || eventResponsible === userId) {
               handleEditEvent(arg);
             } else {
               Swal.fire("❌ คุณไม่มีสิทธิ์แก้ไขแผนงานนี้");
