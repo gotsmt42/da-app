@@ -139,7 +139,7 @@ const Sidebar = ({ handleMenuClick }) => {
         <div className="p-3 d-flex">
           <Link to={"/account"}>
             <img
-              src={userData.imageUrl}
+              src={userData?.imageUrl}
               alt="user"
               width="50"
               height="50"
@@ -148,7 +148,7 @@ const Sidebar = ({ handleMenuClick }) => {
           </Link>
         </div>
         <div className="bg-dark text-white p-2 opacity-75">
-          {userData.fname} {userData.lname} ({userData.role})
+          {userData?.fname} {userData?.lname} ({userData?.role})
         </div>
       </div>
 

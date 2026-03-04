@@ -19,12 +19,16 @@ import { swalLogout } from "../functions/user";
 import Swal from "sweetalert2";
 import API from "../API/axiosInstance";
 
+
+
 const Header = () => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
   const [user, setUser] = useState({});
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768); // ตรวจสอบว่าเป็นมือถือหรือไม่
+
+    const { userData, logout, updateUserData } = useAuth();
+
 
   useEffect(() => {
     const getUserData = async () => {
@@ -109,7 +113,7 @@ const Header = () => {
             <Dropdown isOpen={dropdownOpen} toggle={toggle}>
               <DropdownToggle color="transparent">
                 <img
-                  src={user.imageUrl}
+                  src={userData.imageUrl}
                   alt="profile"
                   className="rounded-circle"
                   width="30"
