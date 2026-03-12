@@ -573,7 +573,7 @@ function EventCalendar() {
 
             const eventResponsible = arg.event.extendedProps?.userId;
             if (isAdmin || eventResponsible === userId) {
-              handleEditEvent(arg);
+              getEventDrop({ arg, setEvents, EventService, moment });
             } else {
               Swal.fire("❌ คุณไม่มีสิทธิ์แก้ไขแผนงานนี้");
             }
@@ -587,7 +587,7 @@ function EventCalendar() {
 
             const eventResponsible = arg.event.extendedProps?.userId;
             if (isAdmin || eventResponsible === userId) {
-              handleEditEvent(arg);
+              getEventResize({ arg, setEvents, EventService, moment });
             } else {
               Swal.fire("❌ คุณไม่มีสิทธิ์แก้ไขแผนงานนี้");
             }
