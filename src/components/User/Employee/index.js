@@ -350,45 +350,43 @@ const Employee = () => {
       return;
     }
 
-    try {
-      const response = await API.put(
-        `/auth/user/${editedData._id}`,
-        editedData,
-      );
-      if (response.status === 200) {
-        const updatedUser = response.data.user;
+  try {
+    const response = await API.put(`/auth/user/${editedData._id}`, editedData);
 
-        // ✅ อัปเดตเฉพาะ user ที่ล็อกอินอยู่
- if (userData && updatedUser._id.toString() === userData._id.toString()) {
-  updateUserData(updatedUser);
-}
+    if (response.status === 200) {
+      const { user, token } = response.data;
 
-        // ✅ อัปเดต list ของ users ด้วยข้อมูลจาก API
-        setUsers(
-          users.map((user) =>
-            user._id === updatedUser._id ? updatedUser : user,
-          ),
-        );
-
-        setModalOpenEdit(false);
-        setSelectedUser(null);
-        setEditedData({});
-        fetchUsers();
-
-        Swal.fire({
-          title: "สำเร็จ!",
-          text: "อัปเดตข้อมูลผู้ใช้เรียบร้อย",
-          icon: "success",
-        });
+      // ✅ อัปเดตเฉพาะ user ที่ login อยู่
+      if (userData && user._id && userData.userId) {
+        if (user._id.toString() === userData.userId.toString()) {
+          localStorage.setItem("token", token);
+          localStorage.setItem("payload", JSON.stringify(user));
+          updateUserData(user);
+        }
       }
-    } catch (error) {
-      console.error("❌ Error updating user:", error);
+
+      // ✅ อัปเดต list ของ users
+      setUsers(users.map((u) => (u._id === user._id ? user : u)));
+
+      setModalOpenEdit(false);
+      setSelectedUser(null);
+      setEditedData({});
+      fetchUsers();
+
       Swal.fire({
-        title: "เกิดข้อผิดพลาด!",
-        text: "ไม่สามารถอัปเดตข้อมูลผู้ใช้ได้",
-        icon: "error",
+        title: "สำเร็จ!",
+        text: "อัปเดตข้อมูลผู้ใช้เรียบร้อย",
+        icon: "success",
       });
     }
+  } catch (error) {
+    console.error("❌ Error updating user:", error);
+    Swal.fire({
+      title: "เกิดข้อผิดพลาด!",
+      text: "ไม่สามารถอัปเดตข้อมูลผู้ใช้ได้",
+      icon: "error",
+    });
+  }
   };
 
   const handleDeleteRow = async (userId) => {
