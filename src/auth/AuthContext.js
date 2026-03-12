@@ -82,7 +82,7 @@ const updateUserData = (newData) => {
   localStorage.setItem("payload", JSON.stringify(newData));
   setUserData(newData); // ไม่ต้อง merge
 
-  window.location.reload();
+  // window.location.reload();
 
 };
 

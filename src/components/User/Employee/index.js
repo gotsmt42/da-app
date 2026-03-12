@@ -359,9 +359,9 @@ const Employee = () => {
         const updatedUser = response.data.user;
 
         // ✅ อัปเดตเฉพาะ user ที่ล็อกอินอยู่
-        if (userData && updatedUser._id === userData._id) {
-          updateUserData(updatedUser);
-        }
+ if (userData && updatedUser._id.toString() === userData._id.toString()) {
+  updateUserData(updatedUser);
+}
 
         // ✅ อัปเดต list ของ users ด้วยข้อมูลจาก API
         setUsers(
