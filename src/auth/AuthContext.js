@@ -77,14 +77,11 @@ export const AuthProvider = ({ children }) => {
     window.addEventListener("storage", handleStorageChange);
     return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
-
 const updateUserData = (newData) => {
   localStorage.setItem("payload", JSON.stringify(newData));
-  setUserData(newData); // ไม่ต้อง merge
-
-  // window.location.reload();
-
+  setUserData({ ...newData }); // ✅ clone object เพื่อบังคับ re-render
 };
+
 
   // ✅ ฟังก์ชัน Login
   // const login = (newToken, payload) => {

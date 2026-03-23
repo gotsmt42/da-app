@@ -15,10 +15,8 @@ export const getEditEvent = async ({
   TomSelect,
   moment,
   calendarRef,
-  userData
+  userData,
 }) => {
-
-
   const inputBackgroundColor = document.createElement("input");
   inputBackgroundColor.type = "color";
   inputBackgroundColor.value = eventInfo.event.backgroundColor;
@@ -26,6 +24,7 @@ export const getEditEvent = async ({
   const inputTextColor = document.createElement("input");
   inputTextColor.type = "color";
   inputTextColor.value = eventInfo.event.textColor;
+
 
   const eventId = eventInfo.event.id;
   const docNum = eventInfo.event.docNum;
@@ -69,18 +68,17 @@ export const getEditEvent = async ({
   //   (emp) => emp?._id?.toString() === lastModifiedBy?.toString()
   // );
 
-// หาคนที่สร้าง event
-const eventOwner = employeeList.find(
-  (emp) => emp?._id?.toString() === userId?.toString()
-);
+  // หาคนที่สร้าง event
+  const eventOwner = employeeList.find(
+    (emp) => emp?._id?.toString() === userId?.toString(),
+  );
 
-// ✅ แสดงเฉพาะชื่อเจ้าของเดิม ไม่ว่าใครจะ update
-let footerName = "";
-if (eventOwner) {
-  footerName =
-    eventOwner.username || `${eventOwner.fname} ${eventOwner.lname}`;
-}
-
+  // ✅ แสดงเฉพาะชื่อเจ้าของเดิม ไม่ว่าใครจะ update
+  let footerName = "";
+  if (eventOwner) {
+    footerName =
+      eventOwner.username || `${eventOwner.fname} ${eventOwner.lname}`;
+  }
 
   // ถ้าไม่มี modifier ที่เข้าเงื่อนไข → fallback เป็นเจ้าของเดิม
   if (!footerName && eventOwner) {
@@ -125,7 +123,7 @@ if (eventOwner) {
                   (status) =>
                     `<option value="${status}" ${
                       eventStatus === status ? "selected" : ""
-                    }>${status}</option>`
+                    }>${status}</option>`,
                 )
                 .join("")}
             </select>
@@ -152,7 +150,7 @@ if (eventOwner) {
                   (c) =>
                     `<option value="${c.cCompany}" ${
                       eventCompany === c.cCompany ? "selected" : ""
-                    }>${c.cCompany}</option>`
+                    }>${c.cCompany}</option>`,
                 )
                 .join("")}
             </select>
@@ -169,7 +167,7 @@ if (eventOwner) {
                   (c) =>
                     `<option value="${c.cSite}" ${
                       eventSite === c.cSite ? "selected" : ""
-                    }>${c.cSite}</option>`
+                    }>${c.cSite}</option>`,
                 )
                 .join("")}
             </select>
@@ -201,7 +199,7 @@ if (eventOwner) {
             (title) =>
               `<option value="${title}" ${
                 eventTitle === title ? "selected" : ""
-              }>${title}</option>`
+              }>${title}</option>`,
           )
           .join("")}
       </select>
@@ -218,7 +216,7 @@ if (eventOwner) {
             (sys) =>
               `<option value="${sys}" ${
                 eventSystem === sys ? "selected" : ""
-              }>${sys}</option>`
+              }>${sys}</option>`,
           )
           .join("")}
       </select>
@@ -234,7 +232,7 @@ if (eventOwner) {
             (t) =>
               `<option value="${t}" ${
                 eventTime === t ? "selected" : ""
-              }>${t}</option>`
+              }>${t}</option>`,
           )
           .join("")}
       </select>
@@ -250,7 +248,7 @@ if (eventOwner) {
             (e) =>
               `<option value="${e.fname}" ${
                 eventTeam === e.fname ? "selected" : ""
-              }>${e.fname}</option>`
+              }>${e.fname}</option>`,
           )
           .join("")}
       </select>
@@ -570,6 +568,14 @@ if (eventOwner) {
             const calendarApi = calendarRef.current?.getApi();
             const oldEvent = eventInfo.event;
 
+            eventInfo.event.setExtendedProp("status", value);
+            eventInfo.event.setProp(
+              "backgroundColor",
+              inputBackgroundColor.value,
+            );
+            eventInfo.event.setProp("textColor", inputTextColor.value);
+            
+
             const newEventData = {
               id: oldEvent.id,
               title: oldEvent.title,
@@ -725,8 +731,6 @@ if (eventOwner) {
 
                   startTime: getVal("editStartTime"),
                   endTime: getVal("editEndTime"),
-
-              
                 };
 
                 try {
@@ -750,7 +754,7 @@ if (eventOwner) {
                     updatedEvent.startTime,
                     updatedEvent.endTime,
                     updatedEvent.time,
-                    userData
+                    userData,
                   );
 
                   // เปิด PDF ในแท็บใหม่ทันที
@@ -883,7 +887,7 @@ if (eventOwner) {
 
       // ✅ ตรวจสอบและเพิ่ม Customer ใหม่ถ้ายังไม่มี
       const existingCustomer = res.userCustomers.find(
-        (c) => c.cCompany === company && c.cSite === site
+        (c) => c.cCompany === company && c.cSite === site,
       );
 
       if (!existingCustomer) {
@@ -900,7 +904,7 @@ if (eventOwner) {
 
       // ✅ อัพเดท state
       setEvents((prevEvents) =>
-        prevEvents.map((event) => (event._id === id ? updatedEvent : event))
+        prevEvents.map((event) => (event._id === id ? updatedEvent : event)),
       );
 
       try {

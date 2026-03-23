@@ -8,8 +8,8 @@ export const getEventDrop = async ({
 }) => {
   const event = arg.event;
 
-  const start = moment(event.startStr).format("YYYY-MM-DD");
-  const endRaw = moment(event.endStr);
+  const start = moment(event.start).format("YYYY-MM-DD");
+  const endRaw = moment(event.end);
   const end = event.allDay
     ? endRaw.format("YYYY-MM-DD")
     : endRaw.subtract(1, "days").format("YYYY-MM-DD");

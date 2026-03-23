@@ -96,6 +96,8 @@ function EventCalendar() {
 
   const calendarRef = useRef(null);
 
+  
+
   useEffect(() => {
     fetchEventsFromDB();
     initExternalEvents(); // ✅ เรียกใช้เมื่อลง component
@@ -278,10 +280,13 @@ function EventCalendar() {
       EventService,
       fetchThaiHolidaysFromAPI,
     });
+    
   };
 
   const saveEventToDB = async (newEvent) => {
     await getSaveEventToDB({ newEvent, EventService });
+
+
   };
 
   const handleAddEvent = async (arg) => {
@@ -323,6 +328,9 @@ function EventCalendar() {
       Choices,
       userData,
     });
+
+
+    // await fetchEventsFromDB()
   };
 
   const handleDeleteEvent = async (id) => {
@@ -335,6 +343,7 @@ function EventCalendar() {
 
       Swal,
     });
+
   };
 
   const handleEventDrop = async (arg) => {
@@ -560,6 +569,7 @@ function EventCalendar() {
             const eventResponsible = arg.event.extendedProps?.userId;
             if (isAdmin || eventResponsible === userId) {
               handleEditEvent(arg);
+              
             } else {
               Swal.fire("❌ คุณไม่มีสิทธิ์แก้ไขแผนงานนี้");
             }
@@ -573,7 +583,7 @@ function EventCalendar() {
 
             const eventResponsible = arg.event.extendedProps?.userId;
             if (isAdmin || eventResponsible === userId) {
-              getEventDrop({ arg, setEvents, EventService, moment });
+              handleEventDrop(arg);
             } else {
               Swal.fire("❌ คุณไม่มีสิทธิ์แก้ไขแผนงานนี้");
             }
@@ -587,7 +597,7 @@ function EventCalendar() {
 
             const eventResponsible = arg.event.extendedProps?.userId;
             if (isAdmin || eventResponsible === userId) {
-              getEventResize({ arg, setEvents, EventService, moment });
+              handleEventResize(arg);
             } else {
               Swal.fire("❌ คุณไม่มีสิทธิ์แก้ไขแผนงานนี้");
             }
@@ -774,6 +784,8 @@ function EventCalendar() {
               info.el.style.backgroundColor = "#FFFFF4"; // สีเหลืองอ่อน
             }
           }}
+
+          
         />
         <style>
           {`
