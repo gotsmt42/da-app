@@ -12,9 +12,13 @@ import {
   FaHourglass,
   FaHourglassStart,
   FaBuilding,
+  FaFile,
+  FaFileAlt,
+  FaWrench,
 } from "react-icons/fa"; // นำเข้าไอคอนต่างๆ จาก react-icons
 import { useEffect, useState } from "react";
 import FileService from "../services/FileService";
+import WorkOrderService from "../services/workOrderService";
 import ProductService from "../services/ProductService";
 import AuthService from "../services/authService";
 import CustomerService from "../services/CustomerService";
@@ -32,6 +36,7 @@ const Dashboard = () => {
 
   const [loading, setLoading] = useState(false);
   const [files, setFiles] = useState({});
+  const [WorkOrders, setWorkOrders] = useState({});
   const [products, setProducts] = useState({});
   const [stocks, setStocks] = useState({});
   const [customers, setCustomers] = useState({});
@@ -44,6 +49,7 @@ const Dashboard = () => {
     fetchUsers();
     fetchEvents();
     fetchCustomers();
+    fetchWorkOrders();
   }, []);
 
   const fetchFiles = async () => {
@@ -53,6 +59,20 @@ const Dashboard = () => {
       const files = res.userFiles;
 
       setFiles(files);
+
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching files:", error);
+      setLoading(false);
+    }
+  };
+  const fetchWorkOrders = async () => {
+    setLoading(true);
+    try {
+      const res = await WorkOrderService.getMyJobs();
+      const myjob = res;
+
+      setWorkOrders(myjob);
 
       setLoading(false);
     } catch (error) {
@@ -170,14 +190,13 @@ const Dashboard = () => {
     //   iconColor: "#f39c12",
     //   iconBgColor: "#fef5e7",
     // },
- {
+    {
       icon: FaBuilding,
       title: "ลูกค้า",
       subtitle: loading
         ? "กำลังโหลด..."
         : (() => {
             const customerCount = Object.values(customers).length;
-      
 
             return `ลูกค้า: ${customerCount} รายการ`;
           })(),
@@ -193,7 +212,7 @@ const Dashboard = () => {
         : (() => {
             const employeeCount = Object.values(users).length;
             const adminCount = Object.values(users).filter(
-              (u) => u.role === "admin"
+              (u) => u.role === "admin",
             ).length;
 
             return `พนักงาน: ${employeeCount} | ผู้ดูแล: ${adminCount}`;
@@ -202,7 +221,6 @@ const Dashboard = () => {
       iconColor: "#2ecc71",
       iconBgColor: "rgba(22, 160, 133, 0.1)",
     },
-   
   ];
   const BlogData2 = [
     // {
@@ -262,12 +280,34 @@ const Dashboard = () => {
               .length
           } | เสร็จสิ้นแล้ว: ${
             Object.values(events).filter(
-              (e) => e.status === "ดำเนินการเสร็จสิ้น"
+              (e) => e.status === "ดำเนินการเสร็จสิ้น",
             ).length
           }`,
       link: "/event",
       iconColor: "#3498db",
       iconBgColor: "rgba(51, 105, 232, 0.1)",
+    },
+  ];
+  const BlogData4 = [
+    {
+      icon: FaFileAlt,
+      title: "Reports",
+      subtitle: loading
+        ? "กำลังโหลด..."
+        : `จำนวน: ${Object.values(files).length} รายการ`,
+      link: "/files",
+      iconColor: "#c3d104",
+      iconBgColor: "rgba(214, 148, 6, 0.1)",
+    },
+    {
+      icon: FaWrench,
+      title: "งานของฉัน",
+      subtitle: loading
+        ? "กำลังโหลด..."
+        : `จำนวน: ${Object.values(WorkOrders).length} รายการ`,
+      link: "/technician/jobs",
+      iconColor: "#04d126",
+      iconBgColor: "rgba(7, 243, 133, 0.1)",
     },
   ];
 
@@ -294,7 +334,29 @@ const Dashboard = () => {
           </Col>
         ))}
       </Row>
-      {isAdmin && (
+
+      <Row
+        className="flex-wrap"
+        style={{ display: "flex", justifyContent: "space-between" }}
+      >
+        {BlogData4.map((blg, index) => (
+          <Col key={index} className="col mb-4">
+            <Blog
+              // image={blg.image}
+              link={blg.link}
+              icon={blg.icon}
+              iconSize={100}
+              iconColor={blg.iconColor} // ส่งสีของไอคอน
+              iconBgColor={blg.iconBgColor} // ส่งสีพื้นหลังของไอคอน
+              title={blg.title}
+              subtitle={blg.subtitle}
+              // text={blg.description}
+              color={blg.btnbg}
+            />
+          </Col>
+        ))}
+      </Row>
+      {/* {isAdmin && (
         <Row
           className="flex-wrap"
           style={{ display: "flex", justifyContent: "space-between" }}
@@ -316,7 +378,7 @@ const Dashboard = () => {
             </Col>
           ))}
         </Row>
-      )}
+      )} */}
 
       {isAdmin && (
         <Row
@@ -326,7 +388,7 @@ const Dashboard = () => {
           {/***Blog Cards***/}
           {BlogData.map((blg, index) => (
             <Col key={index} className="col mb-4">
-            {/* <Col key={index} className="col col-md-3 col-lg-3 mb-4"> */}
+              {/* <Col key={index} className="col col-md-3 col-lg-3 mb-4"> */}
               <Blog
                 // image={blg.image}
                 link={blg.link}

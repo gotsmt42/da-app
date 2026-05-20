@@ -32,6 +32,10 @@ const Register = lazy(() => import("../auth/Register.js"));
 const PublicRoute = lazy(() => import("./PublicRoute.js"));
 const CheckConnectionToast = lazy(() => import("./CheckConnectionToast.js"));
 
+const MyJobs = lazy(() => import("../views/Technician/MyJobs.js"));
+const WorkOrderDetail = lazy(() => import("../views/Technician/WorkOrderDetail.js"));
+
+
 const ThemeRoutes = [
   {
     path: "/",
@@ -183,22 +187,22 @@ const ThemeRoutes = [
       {
         path: "fileupload",
         element: (
-          <AdminRoute>
+
             <Suspense fallback={<div>Loading File Upload...</div>}>
               <FileUpload />
             </Suspense>
-          </AdminRoute>
+
         ),
         title: "File Upload",
       },
       {
         path: "files",
         element: (
-          <AdminRoute>
+
             <Suspense fallback={<div>Loading Files...</div>}>
               <Files />
             </Suspense>
-          </AdminRoute>
+   
         ),
         title: "Files",
       },
@@ -241,6 +245,28 @@ const ThemeRoutes = [
         ),
         title: "Register",
       },
+
+
+      {
+  path: "technician/jobs",
+  element: (
+    <Suspense fallback={<div>Loading Jobs...</div>}>
+      <MyJobs />
+    </Suspense>
+  ),
+  title: "My Jobs",
+},
+
+{
+  path: "technician/job/:id",
+  element: (
+    <Suspense fallback={<div>Loading Work Order...</div>}>
+      <WorkOrderDetail />
+    </Suspense>
+  ),
+  title: "Work Order",
+},
+
     ],
   },
 

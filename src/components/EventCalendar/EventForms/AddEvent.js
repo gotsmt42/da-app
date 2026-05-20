@@ -15,6 +15,8 @@ export const getAddEvent = async ({
   Swal,
   TomSelect,
   moment,
+
+  userData,
 }) => {
   const [customers, employees] = await Promise.all([
     CustomerService.getCustomers(),
@@ -282,7 +284,7 @@ export const getAddEvent = async ({
       textColorPicker.setAttribute("value", defaultTextColor);
 
       const backgroundColorPicker = Swal.getPopup().querySelector(
-        "#backgroundColorPicker"
+        "#backgroundColorPicker",
       );
       backgroundColorPicker.setAttribute("value", defaultBackgroundColor);
     },
@@ -329,12 +331,15 @@ export const getAddEvent = async ({
         start,
         end,
 
-          startTime,
-             endTime,
+        startTime,
+        endTime,
+
+        userId
       } = result.value;
 
       const newEnd = moment(end).add(1, "days");
       const newEvent = {
+        userId,
         company,
         site,
         title,
@@ -348,13 +353,13 @@ export const getAddEvent = async ({
         start,
         end: newEnd.format("YYYY-MM-DD"),
 
-             startTime,
-             endTime,
+        startTime,
+        endTime,
       };
 
       // ✅ ตรวจสอบและเพิ่ม Customer ใหม่ถ้ายังไม่มี (ไม่ต้องเช็คว่า company ต้องมีค่า)
       const existingCustomer = customers.userCustomers.find(
-        (c) => c.cCompany === company && c.cSite === site
+        (c) => c.cCompany === company && c.cSite === site,
       );
 
       // ✅ เพิ่มแม้ว่า company จะไม่มีค่า (null หรือ "")

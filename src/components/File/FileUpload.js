@@ -7,7 +7,7 @@ import Swal from "sweetalert2";
 import { ThreeDots } from "react-loader-spinner";
 import { getFileIcon, getFileIconColor } from "../../functions/CustomFile";
 
-const MAX_FILE_SIZE_MB = 500; // ขนาดไฟล์สูงสุดที่อนุญาต (MB)
+const MAX_FILE_SIZE_MB = 500;
 const MAX_UPLOAD_FILE = 500;
 
 const FileUpload = () => {
@@ -26,61 +26,167 @@ const FileUpload = () => {
     }
   }, [uploadedFiles]);
 
+  // const onDrop = (acceptedFiles) => {
+  //   setLoading(true);
+  //   const nonImageFiles = acceptedFiles.filter(
+  //     (file) => !file.type.startsWith("image"),
+  //   );
+  //   const oversizedFiles = nonImageFiles.filter(
+  //     (file) => file.size > MAX_FILE_SIZE_MB * 1024 * 1024,
+  //   );
+
+  //   if (oversizedFiles.length > 0) {
+  //     Swal.fire({
+  //       icon: "warning",
+  //       title: "ไฟล์ใหญ่เกินไป",
+  //       text: `ไม่สามารถอัพโหลดไฟล์ที่มีขนาดเกิน ${MAX_FILE_SIZE_MB}MB ได้`,
+  //     });
+  //   } else {
+  //     let newFiles = [];
+  //     const existingFileNames = uploadedFiles.map((file) => file.name);
+  //     nonImageFiles.forEach((file) => {
+  //       let newName = file.name;
+  //       const fileNameParts = file.name.split(".");
+  //       const fileName = fileNameParts.slice(0, -1).join(".");
+  //       const fileExtension = fileNameParts.pop();
+  //       let counter = 1;
+  //       while (existingFileNames.includes(newName)) {
+  //         newName = `${fileName} (${counter}).${fileExtension}`;
+  //         counter++;
+  //       }
+  //       newFiles.push(new File([file], newName, { type: file.type }));
+  //       existingFileNames.push(newName);
+  //     });
+  //     setUploadedFiles((prevFiles) => [...prevFiles, ...newFiles]);
+  //   }
+  //   setLoading(false);
+  // };
+
   const onDrop = (acceptedFiles) => {
     setLoading(true);
 
-    const nonImageFiles = acceptedFiles.filter(
-      (file) => !file.type.startsWith("image")
-    );
-
-    const oversizedFiles = nonImageFiles.filter(
-      (file) => file.size > MAX_FILE_SIZE_MB * 1024 * 1024
+    // ✅ ไม่ตัด image ออกแล้ว
+    const oversizedFiles = acceptedFiles.filter(
+      (file) => file.size > MAX_FILE_SIZE_MB * 1024 * 1024,
     );
 
     if (oversizedFiles.length > 0) {
       Swal.fire({
         icon: "warning",
-        title: "แจ้งเตือน",
-        text: `ไม่สามารถอัพโหลดไฟล์ที่มีขนาดเกิน ${MAX_FILE_SIZE_MB}MB ได้ กรุณาตรวจสอบไฟล์และลองใหม่อีกครั้ง`,
+        title: "ไฟล์ใหญ่เกินไป",
+        text: `ไม่สามารถอัพโหลดไฟล์ที่มีขนาดเกิน ${MAX_FILE_SIZE_MB}MB ได้`,
       });
     } else {
       let newFiles = [];
       const existingFileNames = uploadedFiles.map((file) => file.name);
-      nonImageFiles.forEach((file) => {
+
+      acceptedFiles.forEach((file) => {
         let newName = file.name;
         const fileNameParts = file.name.split(".");
         const fileName = fileNameParts.slice(0, -1).join(".");
         const fileExtension = fileNameParts.pop();
         let counter = 1;
+
         while (existingFileNames.includes(newName)) {
           newName = `${fileName} (${counter}).${fileExtension}`;
           counter++;
         }
-        newFiles.push(new File([file], newName, { type: file.type }));
+
+        // ✅ เก็บทั้งไฟล์และชื่อที่แก้ไขได้
+        newFiles.push({ file, name: newName });
         existingFileNames.push(newName);
       });
 
       setUploadedFiles((prevFiles) => [...prevFiles, ...newFiles]);
     }
-
     setLoading(false);
   };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
+
+  // const handleUpload = async () => {
+  //   if (uploadedFiles.length > 0) {
+  //     setLoading(true);
+  //     try {
+  //       const formData = new FormData();
+  //       uploadedFiles.forEach((file) => {
+  //         formData.append("files", file, file.name);
+  //       });
+
+  //       const config = {
+  //         onUploadProgress: (progressEvent) => {
+  //           const percentCompleted = Math.round(
+  //             (progressEvent.loaded * 100) / progressEvent.total,
+  //           );
+  //           setUploadProgress(percentCompleted);
+  //         },
+  //       };
+
+  //       const response = await FileService.uploadFiles(formData, config);
+
+  //       Swal.fire({
+  //         icon: "success",
+  //         title: "อัพโหลดสำเร็จ",
+  //         html: response.data.data
+  //           .map(
+  //             (file) =>
+  //               `<a href="files">${file.filename}</a>`,
+  //           )
+  //           .join("<br>"),
+  //       });
+
+  //       setUploadedFiles([]);
+  //       setLoading(false);
+  //       setUploadProgress(0);
+  //     } catch (error) {
+  //       console.error("Error uploading files:", error);
+  //       Swal.fire({
+  //         icon: "error",
+  //         title: "Upload Failed",
+  //         text: "เกิดข้อผิดพลาดในการอัพโหลด กรุณาลองใหม่อีกครั้ง",
+  //       });
+  //       setLoading(false);
+  //       setUploadProgress(0);
+  //     }
+  //   } else {
+  //     Swal.fire({
+  //       icon: "warning",
+  //       title: "ไม่มีไฟล์",
+  //       text: "กรุณาเลือกไฟล์ก่อนอัพโหลด",
+  //     });
+  //   }
+  // };
+
   const handleUpload = async () => {
     if (uploadedFiles.length > 0) {
+      // ✅ ตรวจสอบชื่อไฟล์ว่าง
+      const invalidFiles = uploadedFiles.filter((item) => {
+        const fileNameParts = item.name.split(".");
+        const extension = fileNameParts.pop();
+        const baseName = fileNameParts.join(".");
+        return !baseName.trim(); // ❌ ถ้าไม่มีชื่อ
+      });
+
+      if (invalidFiles.length > 0) {
+        Swal.fire({
+          icon: "warning",
+          title: "ชื่อไฟล์ไม่ถูกต้อง",
+          text: "กรุณาตั้งชื่อไฟล์ให้ครบทุกไฟล์ก่อนอัพโหลด",
+        });
+        return; // ❌ ไม่ส่งไป backend
+      }
+
       setLoading(true);
       try {
         const formData = new FormData();
-        uploadedFiles.forEach((file) => {
-          const utf8Name = encodeURIComponent(file.name);
-          formData.append("files", file, utf8Name);
+        uploadedFiles.forEach((item) => {
+          formData.append("files", item.file, item.name);
         });
 
         const config = {
           onUploadProgress: (progressEvent) => {
             const percentCompleted = Math.round(
-              (progressEvent.loaded * 100) / progressEvent.total
+              (progressEvent.loaded * 100) / progressEvent.total,
             );
             setUploadProgress(percentCompleted);
           },
@@ -88,27 +194,23 @@ const FileUpload = () => {
 
         const response = await FileService.uploadFiles(formData, config);
 
+        Swal.fire({
+          icon: "success",
+          title: "อัพโหลดสำเร็จ",
+          html: response.data.data
+            .map((file) => `<a href="files">${file.filename}</a>`)
+            .join("<br>"),
+        });
+
         setUploadedFiles([]);
         setLoading(false);
         setUploadProgress(0);
-        Swal.fire({
-          icon: "success",
-          title: "Upload Successful",
-          html: `
-    <p>All files uploaded successfully!</p>
-    ${response.data.data
-      .map(
-        (file) => `<a href="${file.path}" target="_blank">${file.filename}</a>`
-      )
-      .join("<br>")}
-  `,
-        });
       } catch (error) {
         console.error("Error uploading files:", error);
         Swal.fire({
           icon: "error",
           title: "Upload Failed",
-          text: "An error occurred while uploading files. Please try again.",
+          text: "เกิดข้อผิดพลาดในการอัพโหลด กรุณาลองใหม่อีกครั้ง",
         });
         setLoading(false);
         setUploadProgress(0);
@@ -116,86 +218,114 @@ const FileUpload = () => {
     } else {
       Swal.fire({
         icon: "warning",
-        title: "No Files Selected",
-        text: "Please upload files before proceeding.",
-        confirmButtonColor: "#333",
+        title: "ไม่มีไฟล์",
+        text: "กรุณาเลือกไฟล์ก่อนอัพโหลด",
       });
     }
   };
 
   return (
-    <div className="container">
+    <div className="container my-ๅ">
+      {/* พื้นที่ลากไฟล์ */}
       <div
         {...getRootProps()}
         className={`border rounded p-5 text-center upload-container ${
-          isDragActive ? "shadow" : ""
+          isDragActive ? "bg-light shadow" : ""
         }`}
-        // style={{backgroundColor: "#fde3e3"}}
+        style={{
+          cursor: "pointer",
+          padding: "2rem", // ลดจาก 5rem เหลือ 2rem
+          maxWidth: "800px", // กำหนดความกว้างสูงสุด
+          maxHeight: "300px", // กำหนดความกว้างสูงสุด
+          margin: "0 auto", // จัดให้อยู่ตรงกลาง
+        }}
       >
-        <input {...getInputProps()} />
+        <input {...getInputProps()} accept="image/*,application/pdf" />
         <FontAwesomeIcon
           icon={faFileImport}
           size="5x"
-          className="mb-5"
-          style={{ color: "#e74c3c" }}
+          className="mb-4"
+          style={{ color: "#0d6efd" }}
         />
-        <p className="fs-4">Drag and drop files here or click to browse.</p>
-        {uploadedFiles.length > 0 && (
-          <div>
-            <p className="fs-6">
-              {uploadedFiles.length} / {MAX_UPLOAD_FILE} files selected
-            </p>
-            <ul className="list-group mt-3">
-              {uploadedFiles.map((file, index) => (
-                <li
-                  key={index}
-                  className="list-group-item d-flex align-items-center"
-                >
-                  <FontAwesomeIcon
-                    icon={getFileIcon(file.name)}
-                    className="me-2"
-                    style={{ color: getFileIconColor(file.name) }}
-                  />
-                  {file.name}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        <p className="fs-2 mb-0">
+          {isDragActive
+            ? "ปล่อยไฟล์ที่นี่..."
+            : "ลากไฟล์มาวาง หรือคลิกเพื่อเลือกไฟล์"}
+        </p>
       </div>
 
+      {/* รายการไฟล์ */}
+    {uploadedFiles.length > 0 && (
+  <div className="mt-4">
+    <h6>ไฟล์ที่เลือก ({uploadedFiles.length})</h6>
+    <ul className="list-group">
+      {uploadedFiles.map((item, index) => {
+        const fileNameParts = item.name.split(".");
+        const extension = fileNameParts.pop();
+        const baseName = fileNameParts.join(".");
+
+        return (
+          <li key={index} className="list-group-item d-flex align-items-center">
+            {/* ✅ ไอคอนไฟล์ กดเพื่อ Preview */}
+            <FontAwesomeIcon
+              icon={getFileIcon(item.name)}
+              className="me-2"
+              style={{ color: getFileIconColor(item.name), cursor: "pointer" }}
+              onClick={() => {
+                const blobUrl = URL.createObjectURL(item.file);
+                // เปิดในแท็บใหม่
+                window.open(blobUrl, "_blank");
+              }}
+            />
+
+            {/* ✅ ช่องแก้ชื่อไฟล์ (อนุญาตให้ว่างได้ แต่เช็คตอน upload) */}
+            <input
+              type="text"
+              value={baseName}
+              onChange={(e) => {
+                const newFiles = [...uploadedFiles];
+                newFiles[index].name = `${e.target.value}.${extension}`;
+                setUploadedFiles(newFiles);
+              }}
+              style={{ flex: 1, border: "none", background: "transparent" }}
+            />
+            <span style={{ marginLeft: "5px", color: "#888" }}>
+              .{extension}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  </div>
+)}
+
+
+      {/* Progress */}
       {loading && (
-        <div className="progress mt-3">
-          <div
-            className="progress-bar"
-            role="progressbar"
-            style={{ width: `${uploadProgress}%` }}
-            aria-valuenow={uploadProgress}
-            aria-valuemin="0"
-            aria-valuemax="100"
-          >
-            {uploadProgress}%
+        <>
+          <div className="progress mt-3">
+            <div
+              className="progress-bar progress-bar-striped progress-bar-animated"
+              role="progressbar"
+              style={{ width: `${uploadProgress}%` }}
+            >
+              {uploadProgress}%
+            </div>
           </div>
-        </div>
+          <div className="d-flex justify-content-center mt-3">
+            <ThreeDots color="#0d6efd" height={40} width={40} />
+          </div>
+        </>
       )}
 
-      {loading && (
-        <div className="d-flex justify-content-center mt-3">
-          <ThreeDots type="ThreeDots" color="#007bff" height={50} width={50} />
-        </div>
-      )}
-
+      {/* ปุ่มอัพโหลด */}
       <button
         onClick={handleUpload}
-        // style={{
-        //   background:
-        //     "linear-gradient(45deg, #0c49ac, #4c81d7, #7c96ea, #aed9e0, #adb4c4)",
-        //   color: "white", // เพิ่มสีข้อความเป็นขาวเพื่อให้ตัวอักษรมองเห็นชัดเจน
-        // }}
-        className="btn-upload btn btn-primary btn-lg mt-3 w-100"
+        className="btn btn-primary btn-lg mt-4 w-100"
         disabled={loading}
+        style={{ maxWidth: "800px", margin: "0 auto", display: "block" }}
       >
-        <FontAwesomeIcon icon={faUpload} className="me-2" /> Upload File
+        <FontAwesomeIcon icon={faUpload} className="me-2" /> อัพโหลดไฟล์
       </button>
     </div>
   );

@@ -38,38 +38,37 @@ const ShowFiles = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false); // เพิ่มสถานะการแสดง modal
   const [confirmExit, setConfirmExit] = useState(false); // เพิ่มสถานะการยืนยันออกจากเพจ
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const rowsPerPage = 10;
+
   //useEffect for get data
   useEffect(() => {
     fetchData();
-    getUserData();
   }, []);
 
   useEffect(() => {
     const result = files.filter((file) => {
       const fileName = file.filename.toLowerCase();
       const updatedDate = moment(file.updatedAt).format("DD/MM/YYYY HH:mm:ss");
-  
+
       if (userSearch !== "") {
         // เพิ่มเงื่อนไขการค้นหาด้วย userSearch
         return (
           (fileName.includes(search.toLowerCase()) ||
-          updatedDate.includes(search.toLowerCase())) &&
+            updatedDate.includes(search.toLowerCase())) &&
           file.user.username.toLowerCase().includes(userSearch.toLowerCase())
         );
       }
-
-    
-
 
       return (
         fileName.includes(search.toLowerCase()) ||
         updatedDate.includes(search.toLowerCase())
       );
     });
-  
+
     setFilter(result);
   }, [search, userSearch, files]);
-  
+
   useEffect(() => {
     const result = files.filter((file) => {
       const email = file.user.email.toLowerCase();
@@ -90,11 +89,11 @@ const ShowFiles = () => {
   useEffect(() => {
     const result = files.filter((file) => {
       const updatedDate = moment(file.updatedAt).format("YYYY-MM-DD HH:mm:ss"); // Convert updated date to a localized string
-     
+
       if (userSearch !== "") {
         // เพิ่มเงื่อนไขการค้นหาด้วย userSearch
         return (
-          (updatedDate.includes(search.toLowerCase())) &&
+          updatedDate.includes(search.toLowerCase()) &&
           file.user.username.toLowerCase().includes(userSearch.toLowerCase())
         );
       }
@@ -104,13 +103,6 @@ const ShowFiles = () => {
     setFilter(result);
   }, [dateSearch, userSearch, files]);
 
-  //ฟังชั่น get ข้อมูล User ที่ login ตาม jwt
-  const getUserData = async () => {
-    const res = await AuthService.getUserData();
-    const getUser = res.user;
-
-    setUser(getUser);
-  };
 
   //ฟังชั่น get ข้อมูล User Data มาแสดงทั้งหมด
   const fetchData = async () => {
@@ -209,61 +201,97 @@ const ShowFiles = () => {
   };
 
   // Select ข้อมูลในแถวเก็บไว้ใน state
-  const handleRowSelected = (state) => {
-    setSelectedRows(state.selectedRows);
-    // เมื่อมีการเลือกข้อมูล ตั้งค่าการยืนยันออกจากเพจเป็น true
-    setConfirmExit(true);
-  };
-
-  const handleRowClicked = (row) => {
-    const newRowState = { ...expandedRows };
-    newRowState[row._id] = !expandedRows[row._id];
-    setExpandedRows(newRowState);
-  };
-
-  const handleDownload = async () => {
-    if (selectedRows.length > 0) {
-      try {
-        // วนลูปผ่านแต่ละแถวที่เลือก
-        for (const row of selectedRows) {
-          // เรียกใช้ฟังก์ชัน downloadFile ที่รับพารามิเตอร์เป็นเส้นทางของไฟล์และชื่อไฟล์
-          await downloadFile(row.path, row.filename);
-        }
-      } catch (error) {
-        console.error("Error downloading files:", error);
-        Swal.fire("Error downloading files", "", "error");
-      }
-    } else {
-      // ถ้าไม่มีแถวที่เลือก
-      Swal.fire("No files selected for download", "", "warning");
-    }
-  };
-
-  // ฟังก์ชัน downloadFile สำหรับดาวน์โหลดไฟล์
-  const downloadFile = async (filePath, fileName) => {
+const handleDownload = async () => {
+  if (selectedRows.length > 0) {
     try {
-      const downloadUrl = `${API.defaults.baseURL}/${filePath}`;
-      const response = await fetch(downloadUrl);
-      const blob = await response.blob();
+      const result = await Swal.fire({
+        title: "ยืนยันการดาวน์โหลด?",
+        text: `คุณต้องการดาวน์โหลด ${selectedRows.length} ไฟล์ใช่หรือไม่`,
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonText: "ดาวน์โหลด",
+        cancelButtonText: "ยกเลิก",
+      });
 
-      // สร้าง URL สำหรับ Blob
-      const blobUrl = URL.createObjectURL(blob);
+      if (!result.isConfirmed) return;
 
-      // สร้าง element <a> เพื่อดาวน์โหลดไฟล์
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = fileName;
+      // ✅ แสดง Swal พร้อม progress bar
+      Swal.fire({
+        title: "กำลังดาวน์โหลด...",
+        html: `
+          <div style="width:100%; background:#eee; border-radius:4px;">
+            <div id="progress-bar" style="width:0%; height:20px; background:#4caf50; border-radius:4px;"></div>
+          </div>
+          <p id="progress-text" style="margin-top:10px;">0 / ${selectedRows.length} ไฟล์</p>
+        `,
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: async () => {
+          let completed = 0;
 
-      // เรียกใช้งานฟังก์ชัน click เพื่อเริ่มการดาวน์โหลดไฟล์
-      link.click();
+          // ✅ โหลดทีละไฟล์แบบมี timeout
+          selectedRows.forEach((row, index) => {
+            setTimeout(async () => {
+              try {
+                await downloadFile(row.url, row.filename);
+              } catch (error) {
+                console.error("Error downloading file:", error);
+              }
 
-      // หลังจากการดาวน์โหลดเสร็จสิ้น ลบ URL สำหรับ Blob ที่สร้างขึ้นไป
-      URL.revokeObjectURL(blobUrl);
+              completed++;
+              const percent = Math.round((completed / selectedRows.length) * 100);
+              const bar = Swal.getHtmlContainer().querySelector("#progress-bar");
+              const text = Swal.getHtmlContainer().querySelector("#progress-text");
+              if (bar) bar.style.width = percent + "%";
+              if (text) text.textContent = `${completed} / ${selectedRows.length} ไฟล์`;
+
+              // ✅ เมื่อโหลดครบ
+              if (completed === selectedRows.length) {
+                Swal.fire("ดาวน์โหลดเสร็จสิ้น!", "", "success");
+              }
+            }, index * 500); // หน่วง 1 วินาทีต่อไฟล์
+          });
+        },
+      });
     } catch (error) {
-      console.error("Error downloading file:", error);
-      throw error;
+      console.error("Error downloading files:", error);
+      Swal.fire("Error downloading files", "", "error");
     }
-  };
+  } else {
+    Swal.fire("No files selected for download", "", "warning");
+  }
+};
+
+
+const downloadFile = async (fileUrl, fileName) => {
+  try {
+    const userData = await AuthService.getUserData();
+    const downloadUrl = fileUrl.startsWith("http")
+      ? fileUrl
+      : `${API.defaults.baseURL.replace(/\/api$/, "")}${fileUrl}`;
+
+    const response = await fetch(downloadUrl, {
+      headers: { Authorization: `Bearer ${userData.token}` },
+    });
+
+    if (!response.ok) throw new Error("Failed to download file");
+
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = fileName;
+    document.body.appendChild(link); // ✅ ป้องกันบาง browser block
+    link.click();
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(blobUrl);
+  } catch (error) {
+    console.error("Error downloading file:", error);
+    Swal.fire("Error downloading file", "", "error");
+  }
+};
 
   // Sort ข้อมูลให้เรียงลำดับใหม่
   const sortedData = filter.slice().sort((a, b) => {
@@ -276,10 +304,25 @@ const ShowFiles = () => {
 
   const dateInputRef = useRef(null);
 
+
+
+   const handleRowSelected = (state) => {
+    setSelectedRows(state.selectedRows);
+    // เมื่อมีการเลือกข้อมูล ตั้งค่าการยืนยันออกจากเพจเป็น true
+    setConfirmExit(true);
+  };
+
+  const handleRowClicked = (row) => {
+    const newRowState = { ...expandedRows };
+    newRowState[row._id] = !expandedRows[row._id];
+    setExpandedRows(newRowState);
+  };
+
+
   return (
     <>
       <DataTableComponent
-        title={`${user.username} - Files`}
+        title={`- Service Reports -`}
         columns={DataTableColumns({
           setSelectedRow,
           setSelectedFile,
@@ -289,8 +332,7 @@ const ShowFiles = () => {
         data={sortedData}
         selectableRows
         fixedHeaderScrollHeight="625px"
-        
-        paginationPerPage={5}
+        paginationPerPage={10}
         expandableRowsComponent={ExpandedFile} // เปิดใช้งาน Expandle
         // expandableRowExpanded={(row) => expandedRows[row._id]}
         onRowClicked={handleRowClicked}
@@ -305,7 +347,7 @@ const ShowFiles = () => {
                     <input
                       className="form-control"
                       type="search"
-                      placeholder="Search File"
+                      placeholder="ค้นหาไฟล์"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                     />
@@ -317,15 +359,16 @@ const ShowFiles = () => {
                       value={userSearch}
                       onChange={(e) => setUserSearch(e.target.value)}
                     >
-                      <option value={""}>Search for user upload</option>
+                      <option value={""} >อัปโหลดโดย (ทั้งหมด)</option>
                       {uniqueUser.map((username, idx) => {
                         const userFile = files.find(
-                          (file) => file.user.username === username
+                          (file) => file.user.username === username,
                         ); // ค้นหา userFile ที่มี username ตรงกับ username ที่กำลัง map
                         return (
                           <option key={idx} value={username}>
-                            {username}, ({userFile.user.fname}{" "}
-                            {userFile.user.lname}), (สถานะ: {userFile.user.role})
+                            - {userFile.user.fname}{" "}
+                            {userFile.user.lname}
+                          
                           </option>
                         );
                       })}
@@ -348,6 +391,7 @@ const ShowFiles = () => {
           <DataTableContextActions
             handleDelete={handleDelete}
             handleDownload={handleDownload}
+            selectedCount={selectedRows.length} // ✅ ส่งจำนวนที่เลือกเข้าไป
           />
         }
         actions={[
@@ -359,7 +403,6 @@ const ShowFiles = () => {
               data-placement="top"
               title="Upload File"
               className="btn btn-primary"
-
             >
               <Add />
               อัพโหลดไฟล์ใหม่
@@ -368,18 +411,12 @@ const ShowFiles = () => {
         ]}
       />
       {/* Loader */}
- 
-          {loading && (
-            <div className="loading-overlay">
-              <ThreeDots
-                type="ThreeDots"
-                color="#007bff"
-                height={50}
-                width={50}
-              />
-            </div>
-          )}
-  
+
+      {loading && (
+        <div className="loading-overlay">
+          <ThreeDots type="ThreeDots" color="#007bff" height={50} width={50} />
+        </div>
+      )}
     </>
   );
 };

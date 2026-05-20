@@ -87,6 +87,12 @@ const Header = () => {
           <NavItem>
             <Link to="/event" className="nav-link">Event</Link>
           </NavItem>
+          <NavItem>
+            <Link to="/files" className="nav-link">Service Reports</Link>
+          </NavItem>
+          <NavItem>
+            <Link to="/technician/jobs" className="nav-link">งานของฉัน</Link>
+          </NavItem>
           {/* <NavItem>
             <Link to="/about" className="nav-link">About</Link>
           </NavItem> */}

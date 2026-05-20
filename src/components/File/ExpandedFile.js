@@ -19,8 +19,7 @@ const ExpandedFile = ({ data }) => {
             <p className="card-text">
               อัพโหลดโดย:{" "}
               <small className="text-body-secondary">
-                {data.user.username},({data.user.fname} {data.user.lname}) (
-                ตำแหน่ง {data.user.role} )
+                 {data.user.fname} {data.user.lname} → ({data.user.username})
               </small>
             </p>
             <p className="card-text">
@@ -28,13 +27,6 @@ const ExpandedFile = ({ data }) => {
               <small className="text-body-secondary">
                 {moment(data.createdAt).format(" DD/MM/YYYY  HH:mm:ss ")}
               </small>
-            </p>
-
-            <p className="card-text">
-             <a href={data.path} target="_blank" rel="noopener noreferrer" download>
-              <FontAwesomeIcon icon={faFileDownload} />
-            </a>
-
             </p>
           </div>
         </div>

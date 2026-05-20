@@ -138,7 +138,7 @@ const Employee = () => {
       });
       return false;
     }
-    if (!["admin", "tecnicain", "editor"].includes(role)) {
+    if (!["admin", "technician", "editor"].includes(role)) {
       setAlert({
         open: true,
         message: "กรุณาเลือกสิทธิ์ของผู้ใช้!",
@@ -580,7 +580,7 @@ const Employee = () => {
               onChange={handleChange}
             >
               <MenuItem value="admin">Admin</MenuItem>
-              <MenuItem value="tecnicain">Technician</MenuItem>
+              <MenuItem value="technician">Technician</MenuItem>
               <MenuItem value="editor">Editor</MenuItem>
             </Select>
           </FormControl>
@@ -663,7 +663,7 @@ const Employee = () => {
               onChange={handleChangeEdit}
             >
               <MenuItem value="admin">Admin</MenuItem>
-              <MenuItem value="tecnicain">Technician</MenuItem>
+              <MenuItem value="technician">Technician</MenuItem>
               <MenuItem value="editor">Editor</MenuItem>
             </Select>
           </FormControl>

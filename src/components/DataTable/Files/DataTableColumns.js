@@ -130,7 +130,7 @@ const DataTableColumns = ({
           >
             <MenuItem
               onClick={() => {
-                downloadFile(row.path, row.filename); // เรียกใช้งานฟังก์ชัน downloadFile โดยส่งพาธของไฟล์ไปด้วย
+                downloadFile(row.url, row.filename); // เรียกใช้งานฟังก์ชัน downloadFile โดยส่งพาธของไฟล์ไปด้วย
                 handleClose(); // ปิดเมนูหลังจากการคลิก
               }}
               disableRipple
