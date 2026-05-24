@@ -369,14 +369,16 @@ const ShowFiles = () => {
           editedName,
           setEditedName,
           setEditingRowId,
+
+           setExpandedRows,   // ✅ ส่งไป
+    expandedRows,      // ✅ ส่งไป
         })}
         data={sortedData}
         selectableRows
         fixedHeaderScrollHeight="625px"
         paginationPerPage={5}
         expandableRowsComponent={ExpandedFile} // เปิดใช้งาน Expandle
-        // expandableRowExpanded={(row) => expandedRows[row._id]}
-        onRowClicked={handleRowClicked}
+  expandableRowExpanded={(row) => expandedRows[row._id]} // ✅ ใช้ state        onRowClicked={handleRowClicked}
         onSelectedRowsChange={handleRowSelected}
         clearSelectedRows={toggleCleared}
         subHeaderComponent={

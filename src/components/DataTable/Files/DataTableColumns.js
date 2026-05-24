@@ -60,11 +60,7 @@ const DataTableColumns = ({
   downloadFile,
 
   handleInlineEdit,
-
-  editingRowId,
-  setEditingRowId,
-  editedName,
-  setEditedName,
+  setExpandedRows,
   Swal,
 }) => {
   const [anchorEl, setAnchorEl] = useState(null);
@@ -99,14 +95,12 @@ const DataTableColumns = ({
   }, []);
 
   const columns = [
-   {
-  name: "File Name",
-  cell: (row) => (
-    <CustomCell row={row} isSmallScreen={isSmallScreen} />
-  ),
-  sortable: true,
-  selector: (row) => row.filename,
-},
+    {
+      name: "File Name",
+      cell: (row) => <CustomCell row={row} isSmallScreen={isSmallScreen} />,
+      sortable: true,
+      selector: (row) => row.filename,
+    },
     {
       name: "อัพโหลดเมื่อ",
       selector: (row) => moment(row.createdAt).format("DD/MM/YYYY HH:mm:ss"),
@@ -193,14 +187,26 @@ const DataTableColumns = ({
               <Delete />
               Delete
             </MenuItem>
-            <MenuItem onClick={handleClose} disableRipple>
-              <MoreHorizIcon />
-              More
-            </MenuItem>
+<MenuItem
+  onClick={() => {
+    setExpandedRows((prev) => ({
+      ...prev,
+      [row._id]: !prev[row._id],  // ✅ toggle เปิด/ปิด ExpandedFile
+    }));
+    handleClose();
+  }}
+  disableRipple
+>
+  <MoreHorizIcon />
+  More
+</MenuItem>
+
+
+
           </StyledMenu>
         </div>
       ),
-      width: "80px",
+      width: "70px",
     },
   ];
 
