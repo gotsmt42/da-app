@@ -19,6 +19,8 @@ import ExpandedFile from "./ExpandedFile";
 import API from "../../API/axiosInstance";
 import { ThreeDots } from "react-loader-spinner";
 
+import Select from "react-select";
+
 const ShowFiles = () => {
   const [user, setUser] = useState([]);
   const [files, setFiles] = useState([]);
@@ -38,11 +40,10 @@ const ShowFiles = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false); // เพิ่มสถานะการแสดง modal
   const [confirmExit, setConfirmExit] = useState(false); // เพิ่มสถานะการยืนยันออกจากเพจ
 
-  const [currentPage, setCurrentPage] = useState(1);
-
   const [editingRowId, setEditingRowId] = useState();
   const [editedName, setEditedName] = useState("");
-  const rowsPerPage = 10;
+
+  const [categorySearch, setCategorySearch] = useState("");
 
   //useEffect for get data
   useEffect(() => {
@@ -53,24 +54,22 @@ const ShowFiles = () => {
     const result = files.filter((file) => {
       const fileName = file.filename.toLowerCase();
       const updatedDate = moment(file.updatedAt).format("DD/MM/YYYY HH:mm:ss");
-
-      if (userSearch !== "") {
-        // เพิ่มเงื่อนไขการค้นหาด้วย userSearch
-        return (
-          (fileName.includes(search.toLowerCase()) ||
-            updatedDate.includes(search.toLowerCase())) &&
-          file.user.username.toLowerCase().includes(userSearch.toLowerCase())
-        );
-      }
+      const category = file.category ? file.category.toLowerCase() : "";
 
       return (
-        fileName.includes(search.toLowerCase()) ||
-        updatedDate.includes(search.toLowerCase())
+        (fileName.includes(search.toLowerCase()) ||
+          updatedDate.includes(search.toLowerCase())) &&
+        (userSearch === "" ||
+          file.user.username
+            .toLowerCase()
+            .includes(userSearch.toLowerCase())) &&
+        (categorySearch === "" ||
+          category.includes(categorySearch.toLowerCase()))
       );
     });
 
     setFilter(result);
-  }, [search, userSearch, files]);
+  }, [search, userSearch, categorySearch, files]);
 
   useEffect(() => {
     const result = files.filter((file) => {
@@ -339,13 +338,26 @@ const ShowFiles = () => {
     }
   };
 
+  const uniqueCategory = [
+    ...new Set(
+      files
+        .map((file) => file.category)
+        .filter((cat) => cat && cat !== "uncategorized" && cat.trim() !== ""),
+    ),
+  ];
+
+  const categoryOptions = uniqueCategory.map((cat) => ({
+    value: cat,
+    label: cat,
+  }));
+
   return (
     <>
       <DataTableComponent
         title={`- Service Reports -`}
         columns={DataTableColumns({
           Swal,
-          
+
           setSelectedRow,
           setSelectedFile,
           handleDeleteRow,
@@ -373,6 +385,19 @@ const ShowFiles = () => {
               <div className="col-md-12">
                 <div className="row g-0">
                   <div className="col-md m-2">
+                    <Select
+                      options={categoryOptions.slice(0, 7)} // ✅ จำกัดไม่เกิน 7 แถว
+                      value={categoryOptions.find(
+                        (opt) => opt.value === categorySearch,
+                      )}
+                      onChange={(selected) =>
+                        setCategorySearch(selected ? selected.value : "")
+                      }
+                      isClearable
+                      isSearchable // ✅ สามารถพิมพ์ค้นหาได้
+                      placeholder="ค้นหาหมวดหมู่..."
+                    />
+
                     <input
                       className="form-control"
                       type="search"

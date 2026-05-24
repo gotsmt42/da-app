@@ -3,6 +3,27 @@ import API from "../API/axiosInstance";
 import AuthService from "./authService";
 
 const FileService = {
+
+  async getCategories() {
+  try {
+    const userData = await AuthService.getUserData();
+    if (userData) {
+      const response = await API.get(`/files/categories`, {
+        headers: {
+          Authorization: `Bearer ${userData.token}`, // ✅ แนบ token
+        },
+      });
+      return response.data; // { categories: [...] }
+    }
+  } catch (error) {
+    console.error("Error fetching categories:", error.response?.data || error.message);
+    throw error;
+  }
+},
+
+
+
+
   async getUserFiles() {
     try {
       const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token

@@ -7,6 +7,7 @@ import Swal from "sweetalert2";
 import { ThreeDots } from "react-loader-spinner";
 import { getFileIcon, getFileIconColor } from "../../functions/CustomFile";
 
+import CreatableSelect from "react-select/creatable";
 const MAX_FILE_SIZE_MB = 500;
 const MAX_UPLOAD_FILE = 500;
 
@@ -14,6 +15,20 @@ const FileUpload = () => {
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [loading, setLoading] = useState(false);
+
+  const [categories, setCategories] = useState([]);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await FileService.getCategories();
+        setCategories(res.categories.map((c) => c.name));
+      } catch (err) {
+        console.error("Error fetching categories:", err);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   useEffect(() => {
     if (uploadedFiles.length > MAX_UPLOAD_FILE) {
@@ -25,42 +40,6 @@ const FileUpload = () => {
       setUploadedFiles(uploadedFiles.slice(0, MAX_UPLOAD_FILE));
     }
   }, [uploadedFiles]);
-
-  // const onDrop = (acceptedFiles) => {
-  //   setLoading(true);
-  //   const nonImageFiles = acceptedFiles.filter(
-  //     (file) => !file.type.startsWith("image"),
-  //   );
-  //   const oversizedFiles = nonImageFiles.filter(
-  //     (file) => file.size > MAX_FILE_SIZE_MB * 1024 * 1024,
-  //   );
-
-  //   if (oversizedFiles.length > 0) {
-  //     Swal.fire({
-  //       icon: "warning",
-  //       title: "ไฟล์ใหญ่เกินไป",
-  //       text: `ไม่สามารถอัพโหลดไฟล์ที่มีขนาดเกิน ${MAX_FILE_SIZE_MB}MB ได้`,
-  //     });
-  //   } else {
-  //     let newFiles = [];
-  //     const existingFileNames = uploadedFiles.map((file) => file.name);
-  //     nonImageFiles.forEach((file) => {
-  //       let newName = file.name;
-  //       const fileNameParts = file.name.split(".");
-  //       const fileName = fileNameParts.slice(0, -1).join(".");
-  //       const fileExtension = fileNameParts.pop();
-  //       let counter = 1;
-  //       while (existingFileNames.includes(newName)) {
-  //         newName = `${fileName} (${counter}).${fileExtension}`;
-  //         counter++;
-  //       }
-  //       newFiles.push(new File([file], newName, { type: file.type }));
-  //       existingFileNames.push(newName);
-  //     });
-  //     setUploadedFiles((prevFiles) => [...prevFiles, ...newFiles]);
-  //   }
-  //   setLoading(false);
-  // };
 
   const onDrop = (acceptedFiles) => {
     setLoading(true);
@@ -104,59 +83,6 @@ const FileUpload = () => {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
 
-  // const handleUpload = async () => {
-  //   if (uploadedFiles.length > 0) {
-  //     setLoading(true);
-  //     try {
-  //       const formData = new FormData();
-  //       uploadedFiles.forEach((file) => {
-  //         formData.append("files", file, file.name);
-  //       });
-
-  //       const config = {
-  //         onUploadProgress: (progressEvent) => {
-  //           const percentCompleted = Math.round(
-  //             (progressEvent.loaded * 100) / progressEvent.total,
-  //           );
-  //           setUploadProgress(percentCompleted);
-  //         },
-  //       };
-
-  //       const response = await FileService.uploadFiles(formData, config);
-
-  //       Swal.fire({
-  //         icon: "success",
-  //         title: "อัพโหลดสำเร็จ",
-  //         html: response.data.data
-  //           .map(
-  //             (file) =>
-  //               `<a href="files">${file.filename}</a>`,
-  //           )
-  //           .join("<br>"),
-  //       });
-
-  //       setUploadedFiles([]);
-  //       setLoading(false);
-  //       setUploadProgress(0);
-  //     } catch (error) {
-  //       console.error("Error uploading files:", error);
-  //       Swal.fire({
-  //         icon: "error",
-  //         title: "Upload Failed",
-  //         text: "เกิดข้อผิดพลาดในการอัพโหลด กรุณาลองใหม่อีกครั้ง",
-  //       });
-  //       setLoading(false);
-  //       setUploadProgress(0);
-  //     }
-  //   } else {
-  //     Swal.fire({
-  //       icon: "warning",
-  //       title: "ไม่มีไฟล์",
-  //       text: "กรุณาเลือกไฟล์ก่อนอัพโหลด",
-  //     });
-  //   }
-  // };
-
   const handleUpload = async () => {
     if (uploadedFiles.length > 0) {
       // ✅ ตรวจสอบชื่อไฟล์ว่าง
@@ -181,6 +107,7 @@ const FileUpload = () => {
         const formData = new FormData();
         uploadedFiles.forEach((item) => {
           formData.append("files", item.file, item.name);
+          formData.append("categories", item.category || "uncategorized"); // ✅ ใช้ categories
         });
 
         const config = {
@@ -224,6 +151,10 @@ const FileUpload = () => {
     }
   };
 
+  const categoryOptions = categories.map((cat) => ({
+    value: cat,
+    label: cat,
+  }));
   return (
     <div className="container my-ๅ">
       {/* พื้นที่ลากไฟล์ */}
@@ -265,43 +196,79 @@ const FileUpload = () => {
               const baseName = fileNameParts.join(".");
 
               return (
-                <li
-                  key={index}
-                  className="list-group-item d-flex align-items-center"
-                >
-                  {/* ✅ ไอคอนไฟล์ กดเพื่อ Preview */}
-                  <FontAwesomeIcon
-                    icon={getFileIcon(item.name)}
-                    className="me-2"
-                    style={{
-                      color: getFileIconColor(item.name),
-                      cursor: "pointer",
-                    }}
-                    onClick={() => {
-                      const blobUrl = URL.createObjectURL(item.file);
-                      // เปิดในแท็บใหม่
-                      window.open(blobUrl, "_blank");
-                    }}
-                  />
+                <li key={index} className="list-group-item">
+                  <div className="row align-items-center">
+                    {/* Icon */}
+                    <div className="col-12 col-md-1 d-flex flex-column align-items-center justify-content-center mb-2 mb-md-0">
+                      <FontAwesomeIcon
+                        icon={getFileIcon(item.name)}
+                        style={{
+                          color: getFileIconColor(item.name),
+                          cursor: "pointer",
+                          fontSize: "1.4rem",
+                          marginBottom: "6px",
+                        }}
+                        onClick={() => {
+                          const blobUrl = URL.createObjectURL(item.file);
+                          window.open(blobUrl, "_blank");
+                        }}
+                      />
+                      <small
+                        className="text-primary"
+                        style={{ cursor: "pointer" }}
+                      >
+                        Preview
+                      </small>
+                    </div>
 
-                  {/* ✅ ช่องแก้ชื่อไฟล์ (อนุญาตให้ว่างได้ แต่เช็คตอน upload) */}
-                  <input
-                    type="text"
-                    value={baseName}
-                    onChange={(e) => {
-                      const newFiles = [...uploadedFiles];
-                      newFiles[index].name = `${e.target.value}.${extension}`;
-                      setUploadedFiles(newFiles);
-                    }}
-                    style={{
-                      flex: 1,
-                      border: "none",
-                      background: "transparent",
-                    }}
-                  />
-                  <span style={{ marginLeft: "5px", color: "#888" }}>
-                    .{extension}
-                  </span>
+                    {/* ช่องหมวดหมู่ */}
+                    <div className="col-12 col-md-3 mb-2 mb-md-0">
+                      <CreatableSelect
+                        options={categoryOptions.slice(0, 5)} // ✅ จำกัดไม่เกิน 7 แถว
+                        value={
+                          item.category
+                            ? { value: item.category, label: item.category }
+                            : null
+                        }
+                        onChange={(selected) => {
+                          const newFiles = [...uploadedFiles];
+                          newFiles[index].category = selected
+                            ? selected.value
+                            : "";
+                          setUploadedFiles(newFiles);
+                        }}
+                        isClearable
+                        isSearchable
+                        placeholder="เลือกหรือกรอกหมวดหมู่..."
+                        styles={{
+                          control: (base) => ({
+                            ...base,
+                            maxWidth: "260px",
+                            backgroundColor: "#f0f8ff",
+                            borderColor: "#0d6efd",
+                            color: "#333",
+                            fontSize: "0.85rem",
+                          }),
+                        }}
+                      />
+                    </div>
+
+                    {/* ช่องแก้ชื่อไฟล์ */}
+                    <div className="col-12 col-md-8 d-flex align-items-center">
+                      <input
+                        type="text"
+                        value={baseName}
+                        onChange={(e) => {
+                          const newFiles = [...uploadedFiles];
+                          newFiles[index].name =
+                            `${e.target.value}.${extension}`;
+                          setUploadedFiles(newFiles);
+                        }}
+                        className="form-control form-control-sm w-100"
+                      />
+                      <span className="text-muted ms-2">.{extension}</span>
+                    </div>
+                  </div>
                 </li>
               );
             })}
