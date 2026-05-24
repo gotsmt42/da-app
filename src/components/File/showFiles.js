@@ -39,6 +39,9 @@ const ShowFiles = () => {
   const [confirmExit, setConfirmExit] = useState(false); // เพิ่มสถานะการยืนยันออกจากเพจ
 
   const [currentPage, setCurrentPage] = useState(1);
+
+  const [editingRowId, setEditingRowId] = useState();
+  const [editedName, setEditedName] = useState("");
   const rowsPerPage = 10;
 
   //useEffect for get data
@@ -102,7 +105,6 @@ const ShowFiles = () => {
 
     setFilter(result);
   }, [dateSearch, userSearch, files]);
-
 
   //ฟังชั่น get ข้อมูล User Data มาแสดงทั้งหมด
   const fetchData = async () => {
@@ -201,97 +203,101 @@ const ShowFiles = () => {
   };
 
   // Select ข้อมูลในแถวเก็บไว้ใน state
-const handleDownload = async () => {
-  if (selectedRows.length > 0) {
-    try {
-      const result = await Swal.fire({
-        title: "ยืนยันการดาวน์โหลด?",
-        text: `คุณต้องการดาวน์โหลด ${selectedRows.length} ไฟล์ใช่หรือไม่`,
-        icon: "question",
-        showCancelButton: true,
-        confirmButtonText: "ดาวน์โหลด",
-        cancelButtonText: "ยกเลิก",
-      });
+  const handleDownload = async () => {
+    if (selectedRows.length > 0) {
+      try {
+        const result = await Swal.fire({
+          title: "ยืนยันการดาวน์โหลด?",
+          text: `คุณต้องการดาวน์โหลด ${selectedRows.length} ไฟล์ใช่หรือไม่`,
+          icon: "question",
+          showCancelButton: true,
+          confirmButtonText: "ดาวน์โหลด",
+          cancelButtonText: "ยกเลิก",
+        });
 
-      if (!result.isConfirmed) return;
+        if (!result.isConfirmed) return;
 
-      // ✅ แสดง Swal พร้อม progress bar
-      Swal.fire({
-        title: "กำลังดาวน์โหลด...",
-        html: `
+        // ✅ แสดง Swal พร้อม progress bar
+        Swal.fire({
+          title: "กำลังดาวน์โหลด...",
+          html: `
           <div style="width:100%; background:#eee; border-radius:4px;">
             <div id="progress-bar" style="width:0%; height:20px; background:#4caf50; border-radius:4px;"></div>
           </div>
           <p id="progress-text" style="margin-top:10px;">0 / ${selectedRows.length} ไฟล์</p>
         `,
-        allowOutsideClick: false,
-        showConfirmButton: false,
-        didOpen: async () => {
-          let completed = 0;
+          allowOutsideClick: false,
+          showConfirmButton: false,
+          didOpen: async () => {
+            let completed = 0;
 
-          // ✅ โหลดทีละไฟล์แบบมี timeout
-          selectedRows.forEach((row, index) => {
-            setTimeout(async () => {
-              try {
-                await downloadFile(row.url, row.filename);
-              } catch (error) {
-                console.error("Error downloading file:", error);
-              }
+            // ✅ โหลดทีละไฟล์แบบมี timeout
+            selectedRows.forEach((row, index) => {
+              setTimeout(async () => {
+                try {
+                  await downloadFile(row.url, row.filename);
+                } catch (error) {
+                  console.error("Error downloading file:", error);
+                }
 
-              completed++;
-              const percent = Math.round((completed / selectedRows.length) * 100);
-              const bar = Swal.getHtmlContainer().querySelector("#progress-bar");
-              const text = Swal.getHtmlContainer().querySelector("#progress-text");
-              if (bar) bar.style.width = percent + "%";
-              if (text) text.textContent = `${completed} / ${selectedRows.length} ไฟล์`;
+                completed++;
+                const percent = Math.round(
+                  (completed / selectedRows.length) * 100,
+                );
+                const bar =
+                  Swal.getHtmlContainer().querySelector("#progress-bar");
+                const text =
+                  Swal.getHtmlContainer().querySelector("#progress-text");
+                if (bar) bar.style.width = percent + "%";
+                if (text)
+                  text.textContent = `${completed} / ${selectedRows.length} ไฟล์`;
 
-              // ✅ เมื่อโหลดครบ
-              if (completed === selectedRows.length) {
-                Swal.fire("ดาวน์โหลดเสร็จสิ้น!", "", "success");
-              }
-            }, index * 500); // หน่วง 1 วินาทีต่อไฟล์
-          });
-        },
-      });
-    } catch (error) {
-      console.error("Error downloading files:", error);
-      Swal.fire("Error downloading files", "", "error");
+                // ✅ เมื่อโหลดครบ
+                if (completed === selectedRows.length) {
+                  Swal.fire("ดาวน์โหลดเสร็จสิ้น!", "", "success");
+                }
+              }, index * 500); // หน่วง 1 วินาทีต่อไฟล์
+            });
+          },
+        });
+      } catch (error) {
+        console.error("Error downloading files:", error);
+        Swal.fire("Error downloading files", "", "error");
+      }
+    } else {
+      Swal.fire("No files selected for download", "", "warning");
     }
-  } else {
-    Swal.fire("No files selected for download", "", "warning");
-  }
-};
+  };
 
+  const downloadFile = async (fileUrl, fileName) => {
+    try {
+      const userData = await AuthService.getUserData();
+      const downloadUrl = fileUrl.startsWith("http")
+        ? fileUrl
+        : `${API.defaults.baseURL.replace(/\/api$/, "")}${fileUrl}`;
 
-const downloadFile = async (fileUrl, fileName) => {
-  try {
-    const userData = await AuthService.getUserData();
-    const downloadUrl = fileUrl.startsWith("http")
-      ? fileUrl
-      : `${API.defaults.baseURL.replace(/\/api$/, "")}${fileUrl}`;
+      const response = await fetch(downloadUrl, {
+        headers: { Authorization: `Bearer ${userData.token}` },
+      });
 
-    const response = await fetch(downloadUrl, {
-      headers: { Authorization: `Bearer ${userData.token}` },
-    });
+      if (!response.ok) throw new Error("Failed to download file");
 
-    if (!response.ok) throw new Error("Failed to download file");
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
 
-    const blob = await response.blob();
-    const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = fileName;
+      document.body.appendChild(link); // ✅ ป้องกันบาง browser block
+      link.click();
+      document.body.removeChild(link);
 
-    const link = document.createElement("a");
-    link.href = blobUrl;
-    link.download = fileName;
-    document.body.appendChild(link); // ✅ ป้องกันบาง browser block
-    link.click();
-    document.body.removeChild(link);
-
-    URL.revokeObjectURL(blobUrl);
-  } catch (error) {
-    console.error("Error downloading file:", error);
-    Swal.fire("Error downloading file", "", "error");
-  }
-};
+      URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error("Error downloading file:", error);
+      Swal.fire("Error downloading file", "", "error");
+    }
+  };
 
   // Sort ข้อมูลให้เรียงลำดับใหม่
   const sortedData = filter.slice().sort((a, b) => {
@@ -304,9 +310,7 @@ const downloadFile = async (fileUrl, fileName) => {
 
   const dateInputRef = useRef(null);
 
-
-
-   const handleRowSelected = (state) => {
+  const handleRowSelected = (state) => {
     setSelectedRows(state.selectedRows);
     // เมื่อมีการเลือกข้อมูล ตั้งค่าการยืนยันออกจากเพจเป็น true
     setConfirmExit(true);
@@ -318,21 +322,46 @@ const downloadFile = async (fileUrl, fileName) => {
     setExpandedRows(newRowState);
   };
 
+  const handleInlineEdit = async (fileId, newName) => {
+    if (!newName.trim()) {
+      Swal.fire("ชื่อไฟล์ไม่ถูกต้อง", "กรุณาใส่ชื่อไฟล์", "warning");
+      return;
+    }
+    try {
+      await FileService.updateFile(fileId, { filename: newName });
+      fetchData(); // โหลดข้อมูลใหม่
+      // Swal.fire("แก้ไขสำเร็จ!", "", "success");
+    } catch (error) {
+      Swal.fire("Error updating file", "", "error");
+    } finally {
+      setEditingRowId(null);
+      setEditedName("");
+    }
+  };
 
   return (
     <>
       <DataTableComponent
         title={`- Service Reports -`}
         columns={DataTableColumns({
+          Swal,
+          
           setSelectedRow,
           setSelectedFile,
           handleDeleteRow,
           downloadFile,
+
+          handleInlineEdit,
+
+          editingRowId,
+          editedName,
+          setEditedName,
+          setEditingRowId,
         })}
         data={sortedData}
         selectableRows
         fixedHeaderScrollHeight="625px"
-        paginationPerPage={10}
+        paginationPerPage={5}
         expandableRowsComponent={ExpandedFile} // เปิดใช้งาน Expandle
         // expandableRowExpanded={(row) => expandedRows[row._id]}
         onRowClicked={handleRowClicked}
@@ -359,22 +388,20 @@ const downloadFile = async (fileUrl, fileName) => {
                       value={userSearch}
                       onChange={(e) => setUserSearch(e.target.value)}
                     >
-                      <option value={""} >อัปโหลดโดย (ทั้งหมด)</option>
+                      <option value={""}>อัปโหลดโดย (ทั้งหมด)</option>
                       {uniqueUser.map((username, idx) => {
                         const userFile = files.find(
                           (file) => file.user.username === username,
                         ); // ค้นหา userFile ที่มี username ตรงกับ username ที่กำลัง map
                         return (
                           <option key={idx} value={username}>
-                            - {userFile.user.fname}{" "}
-                            {userFile.user.lname}
-                          
+                            - {userFile.user.fname} {userFile.user.lname}
                           </option>
                         );
                       })}
                     </select>
                   </div>
-                  <div className="col-md m-2">
+                  <div className="col-md m-2 mb-4">
                     <input
                       className="form-control"
                       type="date"
@@ -402,7 +429,7 @@ const downloadFile = async (fileUrl, fileName) => {
               data-toggle="tooltip"
               data-placement="top"
               title="Upload File"
-              className="btn btn-primary"
+              className="btn btn-primary mt-4"
             >
               <Add />
               อัพโหลดไฟล์ใหม่

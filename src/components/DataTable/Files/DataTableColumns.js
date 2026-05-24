@@ -57,7 +57,15 @@ const DataTableColumns = ({
   setSelectedRow,
   handleDeleteRow,
   setSelectedFile,
-  downloadFile
+  downloadFile,
+
+  handleInlineEdit,
+
+  editingRowId,
+  setEditingRowId,
+  editedName,
+  setEditedName,
+  Swal,
 }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
@@ -91,13 +99,14 @@ const DataTableColumns = ({
   }, []);
 
   const columns = [
-    {
-      name: "File Name",
-      cell: (row) => <CustomCell row={row} isSmallScreen={isSmallScreen} />,
-      sortable: true,
-      selector: (row) => row.filename, // เพิ่ม selector เพื่อให้สามารถเรียงลำดับได้ตามค่า filename
-
-    },
+   {
+  name: "File Name",
+  cell: (row) => (
+    <CustomCell row={row} isSmallScreen={isSmallScreen} />
+  ),
+  sortable: true,
+  selector: (row) => row.filename,
+},
     {
       name: "อัพโหลดเมื่อ",
       selector: (row) => moment(row.createdAt).format("DD/MM/YYYY HH:mm:ss"),
@@ -138,12 +147,43 @@ const DataTableColumns = ({
               <GetAppIcon />
               Download
             </MenuItem>
-{/* 
+            {/* 
             <Divider sx={{ my: 0.5 }} /> */}
             {/* <MenuItem onClick={handleClose} disableRipple>
               <ArchiveIcon />
               Archive
             </MenuItem> */}
+            <MenuItem
+              onClick={async () => {
+                const parts = row.filename.split(".");
+                const ext = parts.pop();
+                const base = parts.join(".");
+
+                const { value: newBase } = await Swal.fire({
+                  title: "แก้ไขชื่อไฟล์",
+                  input: "text",
+                  inputValue: base,
+                  showCancelButton: true,
+                  confirmButtonText: "บันทึก",
+                  cancelButtonText: "ยกเลิก",
+                  inputValidator: (value) => {
+                    if (!value.trim()) {
+                      return "กรุณาใส่ชื่อไฟล์";
+                    }
+                  },
+                });
+
+                if (newBase) {
+                  const newName = `${newBase}.${ext}`;
+                  handleInlineEdit(row._id, newName);
+                }
+                handleClose();
+              }}
+            >
+              <EditIcon />
+              Edit
+            </MenuItem>
+
             <MenuItem
               onClick={() => {
                 handleDeleteRow(row._id); // เรียกใช้ handleDelete โดยส่ง parameter row._id
@@ -157,7 +197,6 @@ const DataTableColumns = ({
               <MoreHorizIcon />
               More
             </MenuItem>
-           
           </StyledMenu>
         </div>
       ),

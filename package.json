@@ -56,6 +56,7 @@
     "querystring": "^0.2.1",
     "react": "^18.2.0",
     "react-apexcharts": "1.4.0",
+    "react-beautiful-dnd": "^13.1.1",
     "react-bootstrap": "^2.10.1",
     "react-csv": "^2.2.2",
     "react-data-table-component": "^7.6.2",
@@ -87,7 +88,6 @@
     "utils": "^0.3.1",
     "web-vitals": "^2.1.4",
     "xlsx": "^0.18.5"
-    
   },
   "scripts": {
     "start": "react-scripts start",
@@ -116,7 +116,4 @@
   "devDependencies": {
     "ajv": "^8.17.1"
   }
-
-
-  
 }

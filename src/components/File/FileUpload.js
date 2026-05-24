@@ -255,50 +255,59 @@ const FileUpload = () => {
       </div>
 
       {/* รายการไฟล์ */}
-    {uploadedFiles.length > 0 && (
-  <div className="mt-4">
-    <h6>ไฟล์ที่เลือก ({uploadedFiles.length})</h6>
-    <ul className="list-group">
-      {uploadedFiles.map((item, index) => {
-        const fileNameParts = item.name.split(".");
-        const extension = fileNameParts.pop();
-        const baseName = fileNameParts.join(".");
+      {uploadedFiles.length > 0 && (
+        <div className="mt-4">
+          <h6>ไฟล์ที่เลือก ({uploadedFiles.length})</h6>
+          <ul className="list-group">
+            {uploadedFiles.map((item, index) => {
+              const fileNameParts = item.name.split(".");
+              const extension = fileNameParts.pop();
+              const baseName = fileNameParts.join(".");
 
-        return (
-          <li key={index} className="list-group-item d-flex align-items-center">
-            {/* ✅ ไอคอนไฟล์ กดเพื่อ Preview */}
-            <FontAwesomeIcon
-              icon={getFileIcon(item.name)}
-              className="me-2"
-              style={{ color: getFileIconColor(item.name), cursor: "pointer" }}
-              onClick={() => {
-                const blobUrl = URL.createObjectURL(item.file);
-                // เปิดในแท็บใหม่
-                window.open(blobUrl, "_blank");
-              }}
-            />
+              return (
+                <li
+                  key={index}
+                  className="list-group-item d-flex align-items-center"
+                >
+                  {/* ✅ ไอคอนไฟล์ กดเพื่อ Preview */}
+                  <FontAwesomeIcon
+                    icon={getFileIcon(item.name)}
+                    className="me-2"
+                    style={{
+                      color: getFileIconColor(item.name),
+                      cursor: "pointer",
+                    }}
+                    onClick={() => {
+                      const blobUrl = URL.createObjectURL(item.file);
+                      // เปิดในแท็บใหม่
+                      window.open(blobUrl, "_blank");
+                    }}
+                  />
 
-            {/* ✅ ช่องแก้ชื่อไฟล์ (อนุญาตให้ว่างได้ แต่เช็คตอน upload) */}
-            <input
-              type="text"
-              value={baseName}
-              onChange={(e) => {
-                const newFiles = [...uploadedFiles];
-                newFiles[index].name = `${e.target.value}.${extension}`;
-                setUploadedFiles(newFiles);
-              }}
-              style={{ flex: 1, border: "none", background: "transparent" }}
-            />
-            <span style={{ marginLeft: "5px", color: "#888" }}>
-              .{extension}
-            </span>
-          </li>
-        );
-      })}
-    </ul>
-  </div>
-)}
-
+                  {/* ✅ ช่องแก้ชื่อไฟล์ (อนุญาตให้ว่างได้ แต่เช็คตอน upload) */}
+                  <input
+                    type="text"
+                    value={baseName}
+                    onChange={(e) => {
+                      const newFiles = [...uploadedFiles];
+                      newFiles[index].name = `${e.target.value}.${extension}`;
+                      setUploadedFiles(newFiles);
+                    }}
+                    style={{
+                      flex: 1,
+                      border: "none",
+                      background: "transparent",
+                    }}
+                  />
+                  <span style={{ marginLeft: "5px", color: "#888" }}>
+                    .{extension}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
 
       {/* Progress */}
       {loading && (

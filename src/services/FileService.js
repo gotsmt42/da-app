@@ -39,6 +39,24 @@ const FileService = {
     }
   },
 
+  async updateFile(fileId, data) {
+  try {
+    const userData = await AuthService.getUserData();
+    if (userData) {
+      const response = await API.put(`/files/${fileId}`, data, {
+        headers: {
+          Authorization: `Bearer ${userData.token}`,
+        },
+      });
+      return response.data;
+    }
+  } catch (error) {
+    console.error("Error updating file:", error.response?.data || error.message);
+    throw error;
+  }
+}
+,
+
   async deleteFile(fileId) {
     try {
       const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token
