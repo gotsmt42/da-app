@@ -1,46 +1,264 @@
+/* ==========================================================================
+   Sidebar.css - Premium Modern Minimalist UI & Responsive Layout
+   ========================================================================== */
+
+:root {
+  --bg-primary: #0f172a;      /* Slate 900 */
+  --bg-secondary: #1e293b;    /* Slate 800 */
+  --bg-hover: #334155;        /* Slate 700 */
+  --text-main: #f8fafc;       /* Slate 50 */
+  --text-muted: #94a3b8;      /* Slate 400 */
+  --accent-color: #0ea5e9;    /* Sky 500 (ฟ้านีออนพรีเมียม) */
+  --danger-color: #f87171;    /* Red 400 */
+  --sidebar-width: 260px;
+  --transition-speed: 0.3s;
+}
+
+/* --------------------------------------------------------------------------
+   RESPONSIVE MOBILE TOGGLE BUTTON & OVERLAY
+   -------------------------------------------------------------------------- */
+.sidebar-toggle-btn {
+  position: fixed;
+  top: 15px;
+  left: 15px;
+  z-index: 1050;
+  background-color: var(--bg-secondary);
+  color: var(--text-main);
+  border: 1px solid var(--bg-hover);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.sidebar-toggle-btn:hover {
+  background-color: var(--bg-hover);
+  color: var(--accent-color);
+}
+
+.sidebar-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 1030;
+}
+
+/* --------------------------------------------------------------------------
+   MAIN SIDEBAR CONTAINER
+   -------------------------------------------------------------------------- */
 .sidebar-container {
-    list-style: none; /* ลบจุดหน้าเมนู */
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: var(--sidebar-width);
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1040;
+  transform: translateX(-100%); /* ซ่อนไว้ทางซ้ายในจอมือถือ */
+  transition: transform var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1);
+}
 
-    display: flex;
-    flex-direction: column;
-    height: 100%; /* Sidebar เต็มความสูงของหน้าจอ */
-    position: relative;
+/* คลาสสำหรับสั่งให้เปิดสไลด์ออกมาบนมือถือ */
+.sidebar-container.show {
+  transform: translateX(0);
+}
+
+/* --------------------------------------------------------------------------
+   PROFILE SECTION
+   -------------------------------------------------------------------------- */
+.profilebg {
+  padding: 24px 20px;
+  position: relative;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.profile-img {
+  border: 2px solid var(--accent-color);
+  box-shadow: 0 0 15px rgba(14, 165, 233, 0.3);
+  object-fit: cover;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.profile-img:hover {
+  transform: scale(1.1) rotate(5deg);
+}
+
+.user-name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--text-main);
+}
+
+.user-role-badge {
+  display: inline-block;
+  font-size: 11px;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--accent-color);
+  background-color: rgba(14, 165, 233, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-top: 4px;
+}
+
+/* --------------------------------------------------------------------------
+   NAVIGATION LINKS
+   -------------------------------------------------------------------------- */
+.sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 14px;
+}
+
+/* ซ่อน Scrollbar */
+.sidebar-content::-webkit-scrollbar { width: 4px; }
+.sidebar-content::-webkit-scrollbar-thumb { background: var(--bg-hover); border-radius: 4px; }
+
+.sidebar-container .nav-link,
+.sidebar-container button.menu-dropdown-btn {
+  display: flex;
+  align-items: center;
+  color: var(--text-muted) !important;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 12px 16px !important;
+  border-radius: 10px !important;
+  margin-bottom: 6px;
+  transition: all 0.2s ease-in-out;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-decoration: none !important;
+  cursor: pointer;
+}
+
+.sidebar-container .nav-link:hover,
+.sidebar-container button.menu-dropdown-btn:hover {
+  color: var(--text-main) !important;
+  background-color: var(--bg-secondary) !important;
+}
+
+/* สถานะ Active */
+.sidebar-container .nav-link.active {
+  color: #ffffff !important;
+  background: linear-gradient(135deg, var(--accent-color) 0%, #0284c7 100%) !important;
+  font-weight: 600;
+  box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3);
+}
+
+/* ไอคอนหน้าเมนู */
+.nav-icon {
+  font-size: 18px;
+  margin-right: 14px;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.nav-link:hover .nav-icon {
+  transform: scale(1.1);
+}
+
+.nav-text {
+  flex-grow: 1;
+  text-align: left;
+}
+
+/* ลูกศรกาง Sub-menu */
+.arrow-icon {
+  font-size: 12px;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.arrow-icon.rotate {
+  transform: rotate(90deg);
+}
+
+/* --------------------------------------------------------------------------
+   SUB-MENU SYSTEM
+   -------------------------------------------------------------------------- */
+.submenu-wrapper {
+  padding-left: 10px;
+  margin: 4px 0 8px 12px;
+  border-left: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.submenu-link {
+  font-size: 13px !important;
+  padding: 9px 14px !important;
+  margin-bottom: 2px !important;
+}
+
+.submenu-dot {
+  font-size: 6px !important;
+  margin-right: 12px;
+  color: var(--text-muted);
+  opacity: 0.5;
+  transition: all 0.2s ease;
+}
+
+.submenu-link:hover .submenu-dot,
+.submenu-link.active .submenu-dot {
+  color: var(--accent-color);
+  opacity: 1;
+  transform: scale(1.3);
+}
+
+/* --------------------------------------------------------------------------
+   FIXED BOTTOM & ADMIN LABELS
+   -------------------------------------------------------------------------- */
+.sidebar-fixed-bottom {
+  flex-shrink: 0;
+  padding: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  background-color: #0b111e; /* เข้มขึ้นเล็กน้อยเพื่อให้มิติดูลึก */
+}
+
+.admin-divider-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  font-weight: 700;
+  padding: 10px 16px;
+  opacity: 0.4;
+}
+
+/* LOGOUT Link */
+.logout-link {
+  color: var(--danger-color) !important;
+  background-color: rgba(248, 113, 113, 0.03) !important;
+}
+
+.logout-link:hover {
+  background-color: rgba(248, 113, 113, 0.12) !important;
+  color: var(--danger-color) !important;
+}
+
+/* --------------------------------------------------------------------------
+   RESPONSIVE BREAKPOINT FOR DESKTOP
+   -------------------------------------------------------------------------- */
+@media (min-width: 1200px) {
+  .sidebar-toggle-btn,
+  .sidebar-overlay {
+    display: none !important; /* ซ่อนปุ่มเปิดปิดและแผ่นหลังบนจอใหญ่ */
   }
-  
-  .sidebar-content {
-    flex: 1;
-    overflow-y: auto; /* ทำให้เนื้อหา Sidebar สามารถเลื่อนได้ */
+
+  .sidebar-container {
+    transform: translateX(0); /* แสดงค้างไว้ตลอดเวลาบน Desktop */
+    position: fixed;
   }
-  
-  .sidebar-fixed-bottom {
-    padding: 20px;
-
-    flex-shrink: 0; /* ส่วน Footer ตรึงอยู่ด้านล่าง */
-    bottom: 0;
-    width: 100%;
-    z-index: 1; /* ป้องกันการล้นของเนื้อหา */
-
-  }
-
-  .sidenav-bg{
-    font-size: 14px;
-    font-weight: bold;
-
-  }
-  
-  .centered-button {
-    display: flex;
-    justify-content: center; /* จัดข้อความให้อยู่กึ่งกลางแนวนอน */
-
-  }
-  
-
-  /* กำหนดสีของข้อความทั้งหมดใน Sidebar */
-.sidebar-container .nav-link {
-    color: #333; /* สีข้อความใน Sidebar */
-  }
-  
-
-  
-
-  
+}

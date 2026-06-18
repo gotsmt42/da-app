@@ -1,46 +1,148 @@
-/* FullLayout.css */
-/* FullLayout.css */
+/* ==========================================================================
+   FullLayout.css - ฉบับแก้ไขปัญหาหน้าจอเพี้ยน และจัดสรรพื้นที่เต็ม 100%
+   ========================================================================== */
 
-/* .contentArea {
-  flex: 1;
-  max-width: 85%;
-  padding: 0 12px; 
+/* เคลียร์กล่องให้คำนวณรวม padding/border เสมอ ป้องกันการล้นจอ */
+*, *::before, *::after {
+  box-sizing: border-box;
 }
-.sidebarArea {
-  width: 220px; 
-} */
 
-@media (min-width: 992px) {
-  .pageWrapper {
-    display: flex;
-    flex-direction: row;
+.pageWrapper {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* --------------------------------------------------------------------------
+   DESKTOP MODE (หน้าจอใหญ่คอมพิวเตอร์ >= 993px)
+   -------------------------------------------------------------------------- */
+@media (min-width: 993px) {
+  .sidebarArea.desktopSidebar {
+    width: 250px;
+    min-width: 250px;
+    position: relative;
+    left: 0;
+    visibility: visible;
+    display: block;
   }
 
   .contentArea {
-    width: calc(100% - 250px); /* ปรับตาม sidebar */
+    /* ใช้ flex-grow และ flex-basis แทน calc เพื่อให้ขยายเต็มพื้นที่ที่เหลือได้อย่างสมบูรณ์ */
+    flex: 1;
+    min-width: 0; 
+    display: flex;
+    flex-direction: column;
+    background-color: #f8fafc; /* เติมสีพื้นหลังให้อ่อนโยนสบายตา */
+  }
+
+  .mobile-toggle-bar {
+    display: none !important; /* ซ่อนแถบเปิดปิดบนจอคอม */
   }
 }
 
-  .footer {
-    flex-shrink: 0;
-    width: 100%;
-    background-color: #f8f9fa;
-    padding: 1rem;
-    text-align: center;
-    box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+/* --------------------------------------------------------------------------
+   MOBILE & TABLET RESPONSIVE MODE (หน้าจอขนาดเล็ก <= 992px)
+   -------------------------------------------------------------------------- */
+@media (max-width: 992px) {
+  .pageWrapper {
+    flex-direction: column; /* เปลี่ยนทิศทางโครงสร้างหลักบนมือถือ */
   }
 
+  /* แถบหัวข้อมินิบนมือถือ */
+  .mobile-toggle-bar {
+    display: flex;
+    align-items: center;
+    background-color: #ffffff;
+    padding: 10px 15px;
+    border-bottom: 1px solid #e2e8f0;
+    position: sticky;
+    top: 0;
+    z-index: 999;
+  }
 
-  @media (min-width: 768px) {
-    .back-button {
-      display: none !important;
+  .mobile-page-title {
+    font-weight: 700;
+    font-size: 16px;
+    margin-left: 10px;
+    color: #1e293b;
+  }
 
-   
-    }
+  /* จัดการ Sidebar บนมือถือให้เป็นแบบสไลด์ซ่อน-แสดง (Off-Canvas) */
+  .sidebarArea {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 280px;
+    max-width: 80vw;
+    z-index: 10000;
+    transition: transform 0.3s ease-in-out, visibility 0.3s;
+    background-color: #1e293b;
+  }
 
-    
-  
-  }  
-  
+  /* สถานะตอนสั่ง "หุบซ่อน" Sidebar บนมือถือ */
+  .sidebarArea.hideSidebar {
+    transform: translateX(-100%);
+    visibility: hidden;
+  }
 
-  
+  /* สถานะตอนสั่ง "เปิดแสดง" Sidebar บนมือถือ */
+  .sidebarArea.showSidebar {
+    transform: translateX(0);
+    visibility: visible;
+  }
+
+  /* กล่อง Content หลักบนจอมือถือขยายเต็ม 100% ไม่โดนสไลด์บาร์เบียด */
+  .contentArea {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 1;
+    padding: 0 !important; /* ปล่อยให้ Container ด้านในจัดการ Padding เอง */
+    transition: filter 0.3s ease;
+  }
+
+  /* ทำเอฟเฟกต์พื้นหลังจางลงเมื่อเปิดเมนูมือถือ */
+  .blur-content {
+    filter: brightness(0.6);
+    pointer-events: none; /* ห้ามกดปุ่มภายในเนื้อหาระหว่างเปิดเมนู */
+  }
+}
+
+/* --------------------------------------------------------------------------
+   CALENDAR MODE CONFIGURATION (การขยายตารางปฏิทินหน้างาน)
+   -------------------------------------------------------------------------- */
+.contentArea.calendar-mode {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* เคลียร์ขอบ Container บนหน้าจอมือถือไม่ให้เบียดตัวหนังสือภาษาไทย */
+.contentArea.calendar-mode .container-fluid {
+  width: 100% !important;
+  max-width: 100% !important;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+  margin: 0 !important;
+}
+
+/* ซ่อนปุ่มย้อนกลับตามเงื่อนไขเดิม */
+@media (min-width: 768px) {
+  .back-button {
+    display: none !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   FOOTER
+   -------------------------------------------------------------------------- */
+.footer {
+  margin-top: auto;
+  flex-shrink: 0;
+  width: 100%;
+  background-color: #f8f9fa;
+  padding: 1rem;
+  text-align: center;
+  box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.05);
+}

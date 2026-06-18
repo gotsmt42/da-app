@@ -1,106 +1,112 @@
-/* Header.css */
+/* ==========================================================================
+   Header.css - สไตล์มินิมอลโมเดิร์น รองรับสัดส่วนโลโก้สมบูรณ์แบบ
+   ========================================================================== */
 
-.nav-link {
-  color: #fff;
-  font-weight: 600;
-}
-
+/* แถบ Header หลัก */
 .fix-header {
-  height: 94px; /* ✅ กำหนดความสูงคงที่ของ Header */
-  overflow: visible;  padding: 0 50px 0px 20px; /* ✅ เพิ่ม padding ด้านล่างเพื่อให้โลโก้ดูย่นลง */
-  
+  height: 70px; /* ล็อกความสูงไว้ที่ 70px กำลังพอดีสำหรับแดชบอร์ดระดับพรีเมียม */
+  background-color: #1a2232 !important; 
+  padding: 0 24px !important; 
+  display: flex;
+  align-items: center;
+  overflow: visible !important; 
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); 
+  border-bottom: 1px solid #243048;
+  position: relative;
+  z-index: 1030;
 }
 
+/* กล่องหุ้มโลโก้ฝั่งซ้าย */
 .gradiant-bg {
   display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 23px 0px 0px ;       /* ✅ เพิ่ม padding บน-ล่างให้โลโก้ดูย่นลง */
-  height: 200px;            /* ✅ ความสูงคงที่ของ header */
-  overflow: hidden;
-  background-color: #fff;   /* (ถ้ามีพื้นหลัง) */
-}
-
-.logo {
-  height: auto;
-  max-height: 190px;        /* ✅ โลโก้ไม่เต็ม 200px เพื่อให้ดูย่นลง */
+  justify-content: flex-start;
+  height: 100%;
   width: auto;
-  object-fit: contain;
-  margin: 0 auto;
+}
+
+/* ตัวรูปภาพโลโก้ (ควบคุมสัดส่วนสมดุล ไม่ล้นแถบบาร์) */
+.logo {
+  height: 48px !important; /* สัดส่วนที่เหมาะสมที่สุดสำหรับแถบบาร์สูง 70px คือให้โลโก้สูง 48px */
+  width: auto !important; 
+  max-width: 200px; 
+  object-fit: contain !important; 
   display: block;
-  transition: max-height 0.3s ease;
+  filter: drop-shadow(0px 2px 4px rgba(0, 0, 0, 0.15));
+  transition: transform 0.2s ease;
 }
 
+.logo:hover {
+  transform: scale(1.02);
+}
+
+/* ลิงก์เมนูหลักตรงกลางบนหน้าจอขนาดใหญ่ */
+.nav-link {
+  color: #94a3b8 !important; /* ปรับเป็นสีเทาอ่อนก่อน Hover เพื่อความมินิมอล */
+  font-size: 14px;
+  font-weight: 500;
+  padding: 0 16px !important;
+  transition: all 0.2s ease;
+}
+
+.nav-link:hover {
+  color: #ffffff !important;
+}
+
+/* คอนเทนเนอร์เมนูตรงกลาง */
 .navbar-nav {
-  justify-content: center; /* จัดกลางเมนู */
-  flex-grow: 1; /* ให้ Nav ใช้พื้นที่เต็มที่ */
-  width: 100%; /* กำหนดให้มีความกว้างเต็ม */
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
 }
 
-/* ปรับให้แสดงปุ่ม toggle ในมือถือ */
-.toggle-button {
-  display: block; /* แสดงปุ่ม toggle */
-  background-color: transparent; /* สีพื้นหลัง */
-  border: none; /* ไม่มีขอบ */
+/* ปุ่ม Hamburger บนมือถือ */
+.toggle-sidebar-btn {
+  background-color: transparent !important;
+  border: none !important;
+  padding: 6px !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
 }
 
+.toggle-sidebar-btn:focus,
+.toggle-sidebar-btn:active {
+  box-shadow: none !important;
+}
 
-@media (max-width: 768px) {
-  .hamburger-toggle{
-    margin-top: -20px; /* ✅ ขยับโลโก้ขึ้นด้านบน */
-    transition: margin-top 0.3s ease;
-    font-size: 30px;
-  }
+/* ตกแต่งกล่อง Dropdown ข้อมูลผู้ใช้เพิ่มเติมให้ดูทันสมัย */
+.modern-dropdown-menu {
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
+  border-radius: 8px !important;
+  padding: 6px 0 !important;
+}
 
- .fix-header {
-    height: 100px;
-    overflow: hidden;
-    padding: 0;
-  }
+.user-display-name {
+  font-weight: 600 !important;
+  color: #1e293b !important;
+  font-size: 14px;
+}
 
-  .gradiant-bg {
-    height: auto;
-    padding: 0;
-    position: relative; /* ✅ เพื่อให้ logo ขยับภายในได้ */
+/* --------------------------------------------------------------------------
+   RESPONSIVE CONTROL (จัดระเบียบสำหรับแท็บเล็ตและมือถือ <= 992px)
+   -------------------------------------------------------------------------- */
+@media (max-width: 992px) {
+  .fix-header {
+    height: 64px; /* กระชับพื้นที่บนจอเล็ก */
+    padding: 0 16px !important;
   }
 
   .logo {
-    max-height: 140px;
-    margin-top: -20px; /* ✅ ขยับโลโก้ขึ้นด้านบน */
-    transition: margin-top 0.3s ease;
+    height: 60px !important; /* ลดขนาดโลโก้ลงมาเล็กน้อยให้พอดีกับแถบ 64px */
+    max-width: 150px;
   }
 
+  /* ปิดการแสดงผลเมนูข้อความตรงกลาง */
   .navbar-nav {
-    display: none;
-  }
-
-  .toggle-button {
-    display: block;
-  }
-
-  .hstack {
-    justify-content: center;
-  }
-}
-
-
-@media (max-width: 768px) {
-  .navbar-nav {
-    display: none; /* ซ่อนเมนู */
-  }
-
-  .hstack {
-    justify-content: center; /* จัดปุ่มในมือถือให้ตรงกลาง */
-  }
-}
-
-/* ยังคงแสดงเมนูในหน้าจอที่ใหญ่กว่า 768px */
-@media (min-width: 768px) {
-  .navbar-nav {
-    flex-direction: row; /* แนวนอนในหน้าจอใหญ่ */
-  }
-
-  .toggle-button {
-    display: none; /* ซ่อนปุ่ม toggle */
+    display: none !important; 
   }
 }

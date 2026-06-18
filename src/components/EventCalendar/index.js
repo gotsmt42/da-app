@@ -486,8 +486,7 @@ function EventCalendar() {
   ];
 
   return (
-    <div>
-      <Row className="flex-wrap mb-3 d-flex justify-content-center justify-content-md-between">
+<div className="modern-calendar-container">      <Row className="flex-wrap mb-3 d-flex justify-content-center justify-content-md-between">
         <Col className="col-12 col-md-5 col-lg">
           <button className="btn btn-sm btn-danger" onClick={generatePdf}>
             <FontAwesomeIcon icon={faFilePdf} /> สร้าง PDF

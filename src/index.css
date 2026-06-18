@@ -184,9 +184,9 @@
   height: auto;
 }
 
-.text {
+/* .text {
   width: 49em;
-}
+} */
 
 .loading-overlay {
   display: flex;
@@ -202,7 +202,7 @@
 }
 
 
-@media only screen and (max-width: 1280px) {
+/* @media only screen and (max-width: 1280px) {
   .text {
     width: 39em;
   }
@@ -211,7 +211,7 @@
   .text {
     width: 28em;
   }
-}
+} */
 
 
 .gradient-custom {

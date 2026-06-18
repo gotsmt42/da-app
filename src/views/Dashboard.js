@@ -1,426 +1,498 @@
-import { Col, Row } from "reactstrap";
-
-import Feeds from "../components/dashboard/Feeds";
-
-import Blog from "../components/dashboard/Blog";
-import Chart from "../components/dashboard/SalesChart";
-
+import { Col, Row, Container, Spinner } from "reactstrap";
 import {
   FaCalendarAlt,
   FaUsers,
-  FaClock,
-  FaHourglass,
-  FaHourglassStart,
   FaBuilding,
-  FaFile,
   FaFileAlt,
   FaWrench,
-} from "react-icons/fa"; // นำเข้าไอคอนต่างๆ จาก react-icons
+  FaChevronRight,
+  FaClock,
+  FaCheckCircle,
+  FaExclamationCircle,
+  FaArrowRight
+} from "react-icons/fa";
 import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import FileService from "../services/FileService";
 import WorkOrderService from "../services/workOrderService";
-import ProductService from "../services/ProductService";
 import AuthService from "../services/authService";
 import CustomerService from "../services/CustomerService";
 import EventService from "../services/EventService";
-import StockProductService from "../services/StockProductService";
-import moment from "moment";
-import { faTimeline } from "@fortawesome/free-solid-svg-icons";
-
 import { useAuth } from "../auth/AuthContext";
 
 const Dashboard = () => {
   const { userData } = useAuth();
-
-  const isAdmin = userData?.role?.toLowerCase() === "admin"; // ✅ รองรับ case-insensitive
+  const navigate = useNavigate();
+  const isAdmin = userData?.role?.toLowerCase() === "admin";
 
   const [loading, setLoading] = useState(false);
-  const [files, setFiles] = useState({});
-  const [WorkOrders, setWorkOrders] = useState({});
-  const [products, setProducts] = useState({});
-  const [stocks, setStocks] = useState({});
-  const [customers, setCustomers] = useState({});
-  const [users, setUsers] = useState({});
-  const [events, setEvents] = useState({});
+  const [files, setFiles] = useState([]);
+  const [workOrders, setWorkOrders] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [events, setEvents] = useState([]);
+
   useEffect(() => {
-    fetchFiles();
-    fetchProducts();
-    fetchStockProducts();
-    fetchUsers();
-    fetchEvents();
-    fetchCustomers();
-    fetchWorkOrders();
+    const fetchAllDashboardData = async () => {
+      setLoading(true);
+      try {
+        const [resFiles, resJobs, resUsers, resCustomers, resEvents] = await Promise.all([
+          FileService.getUserFiles().catch(() => ({ userFiles: [] })),
+          WorkOrderService.getMyJobs().catch(() => []),
+          AuthService.getAllUserData().catch(() => ({ allUser: [] })),
+          CustomerService.getCustomers().catch(() => ({ userCustomers: [] })),
+          EventService.getEvents().catch(() => ({ userEvents: [] })),
+        ]);
+
+        setFiles(resFiles?.userFiles || []);
+        setWorkOrders(resJobs || []);
+        setUsers(resUsers?.allUser || []);
+        setCustomers(resCustomers?.userCustomers || []);
+        setEvents(resEvents?.userEvents || []);
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAllDashboardData();
   }, []);
 
-  const fetchFiles = async () => {
-    setLoading(true);
-    try {
-      const res = await FileService.getUserFiles();
-      const files = res.userFiles;
+  const countStatus = (status) => events.filter(e => e.status === status).length;
 
-      setFiles(files);
-
-      setLoading(false);
-    } catch (error) {
-      console.error("Error fetching files:", error);
-      setLoading(false);
-    }
-  };
-  const fetchWorkOrders = async () => {
-    setLoading(true);
-    try {
-      const res = await WorkOrderService.getMyJobs();
-      const myjob = res;
-
-      setWorkOrders(myjob);
-
-      setLoading(false);
-    } catch (error) {
-      console.error("Error fetching files:", error);
-      setLoading(false);
-    }
-  };
-  const fetchProducts = async () => {
-    setLoading(true);
-    try {
-      const res = await ProductService.getUserProducts();
-      const products = res.userProducts;
-
-      setProducts(products);
-
-      setLoading(false);
-    } catch (error) {
-      console.error("Error fetching files:", error);
-      setLoading(false);
-    }
-  };
-  const fetchStockProducts = async () => {
-    setLoading(true);
-    try {
-      const res = await StockProductService.getUserProductStock();
-      const stocks = res.userStock;
-
-      setStocks(stocks);
-
-      setLoading(false);
-    } catch (error) {
-      console.error("Error fetching files:", error);
-      setLoading(false);
-    }
-  };
-
-  const fetchUsers = async () => {
-    setLoading(true);
-    try {
-      const res = await AuthService.getAllUserData();
-      const users = res.allUser;
-
-      setUsers(users);
-
-      setLoading(false);
-    } catch (error) {
-      console.error("Error fetching files:", error);
-      setLoading(false);
-    }
-  };
-
-  const fetchCustomers = async () => {
-    setLoading(true);
-    try {
-      const res = await CustomerService.getCustomers();
-      const customers = res.userCustomers;
-
-      setCustomers(customers);
-
-      setLoading(false);
-    } catch (error) {
-      console.error("Error fetching customers:", error);
-      setLoading(false);
-    }
-  };
-
-  const fetchEvents = async () => {
-    setLoading(true);
-    try {
-      const res = await EventService.getEvents();
-      const events = res.userEvents;
-
-      setEvents(events);
-
-      setLoading(false);
-    } catch (error) {
-      console.error("Error fetching files:", error);
-      setLoading(false);
-    }
-  };
-
-  const latestEvent = events.length > 0 ? events[0] : null;
-
-  const BlogData = [
-    // {
-    //   image: bg1,
-    //   title: "This is simple blog",
-    //   subtitle: "2 comments, 1 Like",
-    //   description: "This is a wider card with supporting text below as a natural lead-in to additional content.",
-    //   btnbg: "primary",
-    //   link: "/event",
-    // },
-
-    // {
-    //   icon: FaFileAlt,
-    //   title: "รวมไฟล์",
-    //   subtitle: loading ? "กำลังโหลด..." : Object.keys(files).length + " files",
-    //   link: "/files",
-    //   iconColor: "#e74c3c",
-    //   iconBgColor: "#fde3e3",
-    // },
-    // {
-    //   icon: FaCube,
-    //   title: "สินค้า",
-    //   subtitle: loading ? "กำลังโหลด..." : Object.keys(products).length + " Row",
-    //   link: "/product",
-    //   iconColor: "#2ecc71",
-    //   iconBgColor: "rgba(22, 160, 133, 0.1)",
-    // },
-    // {
-    //   icon: FaCubes,
-    //   title: "สต๊อกสินค้า",
-    //   subtitle: loading ? "กำลังโหลด..." : Object.keys(stocks).length + " Row",
-    //   link: "/product/stock",
-    //   iconColor: "#f39c12",
-    //   iconBgColor: "#fef5e7",
-    // },
-    {
-      icon: FaBuilding,
-      title: "ลูกค้า",
-      subtitle: loading
-        ? "กำลังโหลด..."
-        : (() => {
-            const customerCount = Object.values(customers).length;
-
-            return `ลูกค้า: ${customerCount} รายการ`;
-          })(),
-      link: "/customer",
-      iconColor: "#795A47",
-      iconBgColor: "rgba(121, 90, 71, 0.1)",
+  // 🎨 แยกเฉดสีละมุน (ซอฟต์ลงสำหรับพื้นหลังเข้ม) และผูกไอคอนประจำสถานะ
+  const statusItems = [
+    { 
+      label: "รอยืนยัน", 
+      count: countStatus("กำลังรอยืนยัน"), 
+      color: "#ffedd5", // ส้มพาสเทล
+      icon: <FaExclamationCircle size={10} style={{ color: "#f97316" }} />, 
+      bg: "rgba(139, 92, 246, 0.15)" 
     },
-    {
-      icon: FaUsers,
-      title: "สมาชิก",
-      subtitle: loading
-        ? "กำลังโหลด..."
-        : (() => {
-            const employeeCount = Object.values(users).length;
-            const adminCount = Object.values(users).filter(
-              (u) => u.role === "admin",
-            ).length;
-
-            return `พนักงาน: ${employeeCount} | ผู้ดูแล: ${adminCount}`;
-          })(),
-      link: "/employee",
-      iconColor: "#2ecc71",
-      iconBgColor: "rgba(22, 160, 133, 0.1)",
+    { 
+      label: "ยืนยันแล้ว", 
+      count: countStatus("ยืนยันแล้ว"), 
+      color: "#dbeafe", // ฟ้าพาสเทล
+      icon: <FaCheckCircle size={10} style={{ color: "#3b82f6" }} />, 
+      bg: "rgba(139, 92, 246, 0.15)" 
     },
-  ];
-  const BlogData2 = [
-    // {
-    //   icon: FaFileImport,
-    //   title: "จัดเก็บไฟล์",
-    //   // subtitle: "....",
-    //   link: "/fileupload",
-    //   iconColor: "#e74c3c", // สีไอคอน
-    //   iconBgColor: "#fde3e3",
-    // },
-
-    // {
-    //   icon: FaBoxOpen,
-    //   title: "เพิ่มสินค้า",
-    //   // subtitle: "....",
-    //   link: "/product",
-    //   iconColor: "#2ecc71",
-    //   iconBgColor: "rgba(22, 160, 133, 0.1)",
-    // },
-    {
-      icon: FaClock,
-      title: "การดำเนินงาน",
-      subtitle: loading
-        ? "กำลังโหลด..."
-        : Object.values(events).length + " รายการ",
-
-      link: "/operation",
-      iconColor: "#f39c12",
-      iconBgColor: "#fef5e7",
+    { 
+      label: "กำลังทำ", 
+      count: countStatus("กำลังดำเนินการ"), 
+      color: "#ede9fe", // ม่วงพาสเทล
+      icon: <FaClock size={10} style={{ color: "#a78bfa" }} />, 
+      bg: "rgba(139, 92, 246, 0.15)" 
     },
-    {
-      icon: FaHourglassStart,
-      title: "ติดตามงาน",
-      subtitle: loading
-        ? "กำลังโหลด..."
-        : Object.values(events).filter((e) => Boolean(e.quotationFileUrl))
-            .length + " รายการ",
-      link: "/tackstatus",
-      iconColor: "#e74c3c",
-      iconBgColor: "#fde3e3",
-    },
-  ];
-  const BlogData3 = [
-    {
-      icon: FaCalendarAlt,
-      title: "แผนงาน",
-      subtitle: loading
-        ? "กำลังโหลด..."
-        : `กำลังรอยืนยัน: ${
-            Object.values(events).filter((e) => e.status === "กำลังรอยืนยัน")
-              .length
-          } | ยืนยันแล้ว: ${
-            Object.values(events).filter((e) => e.status === "ยืนยันแล้ว")
-              .length
-          } | กำลังดำเนินการ: ${
-            Object.values(events).filter((e) => e.status === "กำลังดำเนินการ")
-              .length
-          } | เสร็จสิ้นแล้ว: ${
-            Object.values(events).filter(
-              (e) => e.status === "ดำเนินการเสร็จสิ้น",
-            ).length
-          }`,
-      link: "/event",
-      iconColor: "#3498db",
-      iconBgColor: "rgba(51, 105, 232, 0.1)",
-    },
-  ];
-  const BlogData4 = [
-    {
-      icon: FaFileAlt,
-      title: "Reports",
-      subtitle: loading
-        ? "กำลังโหลด..."
-        : `จำนวน: ${Object.values(files).length} รายการ`,
-      link: "/files",
-      iconColor: "#c3d104",
-      iconBgColor: "rgba(214, 148, 6, 0.1)",
-    },
-    {
-      icon: FaWrench,
-      title: "งานของฉัน",
-      subtitle: loading
-        ? "กำลังโหลด..."
-        : `จำนวน: ${Object.values(WorkOrders).length} รายการ`,
-      link: "/technician/jobs",
-      iconColor: "#04d126",
-      iconBgColor: "rgba(7, 243, 133, 0.1)",
-    },
+    { 
+      label: "เสร็จสิ้น", 
+      count: countStatus("ดำเนินการเสร็จสิ้น"), 
+      color: "#d1fae5", // เขียวพาสเทล
+      icon: <FaCheckCircle size={10} style={{ color: "#10b981" }} />, 
+      bg: "rgba(139, 92, 246, 0.15)" 
+    }
   ];
 
   return (
-    <div>
-      <Row
-        className="flex-wrap"
-        style={{ display: "flex", justifyContent: "space-between" }}
-      >
-        {BlogData3.map((blg, index) => (
-          <Col key={index} className="col mb-4">
-            <Blog
-              // image={blg.image}
-              link={blg.link}
-              icon={blg.icon}
-              iconSize={100}
-              iconColor={blg.iconColor} // ส่งสีของไอคอน
-              iconBgColor={blg.iconBgColor} // ส่งสีพื้นหลังของไอคอน
-              title={blg.title}
-              subtitle={blg.subtitle}
-              // text={blg.description}
-              color={blg.btnbg}
-            />
-          </Col>
-        ))}
-      </Row>
+    <Container fluid style={styles.container}>
+      {/* ─── SECTION 1: TOP APP BAR PROFILE ─── */}
+      <div style={styles.topAppBar}>
+        <div style={styles.userInfo}>
+          <div style={styles.avatarPlaceholder}>
+            {userData?.fname ? userData.fname.charAt(0).toUpperCase() : "U"}
+          </div>
+          <div>
+            <span style={styles.welcomeSub}>ยินดีต้อนรับ</span>
+            <h2 style={styles.welcomeTitle}>{userData?.fname || "ผู้ใช้งาน"}</h2>
+          </div>
+        </div>
+        <span style={styles.roleBadge}>{userData?.role || "User"}</span>
+      </div>
 
-      <Row
-        className="flex-wrap"
-        style={{ display: "flex", justifyContent: "space-between" }}
+      {/* ─── SECTION 2: HERO ACTION CARD (ฝังป้ายสถานะแยกสีแบบสะอาดตา) ─── */}
+      <div 
+        onClick={() => navigate("/event")}
+        style={styles.bigHeroButton}
+        className="action-hero-btn"
       >
-        {BlogData4.map((blg, index) => (
-          <Col key={index} className="col mb-4">
-            <Blog
-              // image={blg.image}
-              link={blg.link}
-              icon={blg.icon}
-              iconSize={100}
-              iconColor={blg.iconColor} // ส่งสีของไอคอน
-              iconBgColor={blg.iconBgColor} // ส่งสีพื้นหลังของไอคอน
-              title={blg.title}
-              subtitle={blg.subtitle}
-              // text={blg.description}
-              color={blg.btnbg}
-            />
-          </Col>
-        ))}
-      </Row>
-      {/* {isAdmin && (
-        <Row
-          className="flex-wrap"
-          style={{ display: "flex", justifyContent: "space-between" }}
-        >
-          {BlogData2.map((blg, index) => (
-            <Col key={index} className="col mb-4">
-              <Blog
-                // image={blg.image}
-                link={blg.link}
-                icon={blg.icon}
-                iconSize={100}
-                iconColor={blg.iconColor} // ส่งสีของไอคอน
-                iconBgColor={blg.iconBgColor} // ส่งสีพื้นหลังของไอคอน
-                title={blg.title}
-                subtitle={blg.subtitle}
-                // text={blg.description}
-                color={blg.btnbg}
-              />
-            </Col>
+        <div style={styles.heroButtonContent}>
+          <div style={styles.heroIconCircle}>
+            <FaCalendarAlt size={24} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={styles.heroBtnTitle}>ปฏิทินและแผนงานทั้งหมด</h3>
+              <FaArrowRight size={13} className="arrow-bounce" style={{ opacity: 0.8 }} />
+            </div>
+            <p style={styles.heroBtnSub}>ตรวจสอบตารางนัดหมายและจัดการสถานะงานระบบกลาง</p>
+          </div>
+        </div>
+
+        {/* 📊 บาร์สถานะงาน: แยกเฉดสี + มีไอคอนกำกับแบบ Mini ไม่แย่งซีน */}
+        <div style={styles.heroStatusInlineGrid}>
+          {statusItems.map((item, i) => (
+            <div key={i} style={{ ...styles.inlineStatusBadge, backgroundColor: item.bg }}>
+              <span style={styles.inlineStatusLabel}>{item.label}</span>
+              <div style={styles.countWrapper}>
+                {item.icon}
+                <span style={{ ...styles.inlineStatusCount, color: item.color }}>
+                  {loading ? "..." : item.count}
+                </span>
+              </div>
+            </div>
           ))}
-        </Row>
-      )} */}
+        </div>
+      </div>
 
+      {/* ─── SECTION 3: PERSONAL TASKS (Service Reports เด่นรองลงมา) ─── */}
+      <h5 style={styles.sectionTitle}>การปฏิบัติงาน</h5>
+      <Row className="g-2 mb-2">
+        {[
+          {
+            title: "Service Reports",
+            count: files.length,
+            desc: "เอกสารรายงานการบริการในระบบ",
+            link: "/files",
+            icon: <FaFileAlt size={20} />,
+            theme: "#6366f1",
+            isFeatured: true
+          },
+          {
+            title: "งานของฉัน",
+            count: workOrders.length,
+            desc: "ใบสั่งซ่อมที่ได้รับมอบหมาย",
+            link: "/technician/jobs",
+            icon: <FaWrench size={18} />,
+            theme: "#475569",
+            isFeatured: false
+          }
+        ].map((card, idx) => (
+          <Col xs="12" key={idx}>
+            <Link to={card.link} style={{ textDecoration: 'none' }}>
+              <div 
+                style={{ 
+                  ...styles.metricCard, 
+                  ...(card.isFeatured ? styles.featuredMetricCard : {}) 
+                }} 
+                className="metric-card-hover"
+              >
+                <div style={styles.cardContent}>
+                  <div style={{ 
+                    ...styles.iconContainer, 
+                    backgroundColor: card.isFeatured ? "rgba(255,255,255,0.2)" : `${card.theme}15`, 
+                    color: card.isFeatured ? "#ffffff" : card.theme 
+                  }}>
+                    {card.icon}
+                  </div>
+                  <div>
+                    <h4 style={{ ...styles.cardTitle, color: card.isFeatured ? "#ffffff" : "#0f172a" }}>{card.title}</h4>
+                    <p style={{ ...styles.cardDesc, color: card.isFeatured ? "rgba(255,255,255,0.8)" : "#64748b" }}>{card.desc}</p>
+                  </div>
+                </div>
+                <div style={styles.cardRight}>
+                  <span style={{ ...styles.bigNumber, color: card.isFeatured ? "#ffffff" : card.theme }}>
+                    {loading ? <Spinner size="sm" color="secondary" /> : card.count}
+                  </span>
+                  <FaChevronRight style={{ ...styles.arrowIcon, color: card.isFeatured ? "rgba(255,255,255,0.6)" : "#94a3b8" }} />
+                </div>
+              </div>
+            </Link>
+          </Col>
+        ))}
+      </Row>
+
+      {/* ─── SECTION 4: ADMIN CONTROLS ─── */}
       {isAdmin && (
-        <Row
-          className="flex-wrap"
-          style={{ display: "flex", justifyContent: "space-between" }}
-        >
-          {/***Blog Cards***/}
-          {BlogData.map((blg, index) => (
-            <Col key={index} className="col mb-4">
-              {/* <Col key={index} className="col col-md-3 col-lg-3 mb-4"> */}
-              <Blog
-                // image={blg.image}
-                link={blg.link}
-                icon={blg.icon}
-                iconSize={100}
-                iconColor={blg.iconColor} // ส่งสีของไอคอน
-                iconBgColor={blg.iconBgColor} // ส่งสีพื้นหลังของไอคอน
-                title={blg.title}
-                subtitle={blg.subtitle}
-                // text={blg.description}
-                color={blg.btnbg}
-                subtitleStyle={blg.subtitleStyle} // ใช้ style ที่กำหนดใน BlogData
-              />
-            </Col>
-          ))}
-        </Row>
+        <>
+          <h5 style={styles.sectionTitle}>การจัดการระบบสำหรับ Admin</h5>
+          <Row className="g-2">
+            {[
+              {
+                title: "ฐานข้อมูลลูกค้า",
+                count: customers.length,
+                desc: "พันธมิตรและคู่ค้าทั้งหมด",
+                link: "/customer",
+                icon: <FaBuilding size={18} />,
+                theme: "#3b82f6",
+                extra: "รายการทั้งหมด"
+              },
+              {
+                title: "การจัดการสมาชิก",
+                count: users.length,
+                desc: "พนักงานและสิทธิ์ผู้ดูแลระบบ",
+                link: "/employee",
+                icon: <FaUsers size={18} />,
+                theme: "#f43f5e",
+                extra: `แอดมิน: ${users.filter(u => u.role === "admin").length} คน`
+              }
+            ].map((card, idx) => (
+              <Col xs="12" key={idx}>
+                <Link to={card.link} style={{ textDecoration: 'none' }}>
+                  <div style={styles.metricCard} className="metric-card-hover">
+                    <div style={styles.cardContent}>
+                      <div style={{ ...styles.iconContainer, backgroundColor: `${card.theme}15`, color: card.theme }}>
+                        {card.icon}
+                      </div>
+                      <div>
+                        <h4 style={styles.cardTitle}>{card.title}</h4>
+                        <p style={styles.cardDesc}>{card.desc}</p>
+                        <span style={{ ...styles.extraTag, backgroundColor: `${card.theme}10`, color: card.theme }}>{card.extra}</span>
+                      </div>
+                    </div>
+                    <div style={styles.cardRight}>
+                      <span style={{ ...styles.bigNumber, color: card.theme }}>
+                        {loading ? <Spinner size="sm" color="secondary" /> : card.count}
+                      </span>
+                      <FaChevronRight style={styles.arrowIcon} />
+                    </div>
+                  </div>
+                </Link>
+              </Col>
+            ))}
+          </Row>
+        </>
       )}
 
-      {/* 
-      <Row
-        className="flex-wrap mt-5"
-        style={{ display: "flex", justifyContent: "space-between" }}
-      >
-        <Col className="col">
-          <Feeds />
-        </Col>
-        <Col className="col">
-          <Chart />
-        </Col>
-      </Row> */}
-    </div>
+      {/* ─── INTERACTIVE EFFECTS FOR MOBILE ─── */}
+      <style>{`
+        .action-hero-btn {
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+          touch-action: manipulation;
+        }
+        .action-hero-btn:active {
+          transform: scale(0.97);
+          filter: brightness(0.95);
+        }
+        .metric-card-hover { 
+          transition: all 0.15s ease; 
+          touch-action: manipulation;
+        }
+        .metric-card-hover:active { 
+          opacity: 0.9;
+          transform: scale(0.99);
+        }
+        @keyframes bounceRight {
+          0%, 100% { transform: translateX(0); }
+          50% { transform: translateX(3px); }
+        }
+        .action-hero-btn:hover .arrow-bounce {
+          animation: bounceRight 1s infinite;
+        }
+      `}</style>
+    </Container>
   );
+};
+
+// ─── STYLES OBJECT ───
+const styles = {
+  container: {
+    padding: "12px 14px 30px 14px", 
+    backgroundColor: "#f8fafc", 
+    width: "100%",
+    minHeight: "100vh"
+  },
+  topAppBar: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "16px",
+    padding: "4px 2px",
+  },
+  userInfo: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px"
+  },
+  avatarPlaceholder: {
+    width: "38px",
+    height: "38px",
+    borderRadius: "50%",
+    backgroundColor: "#4f46e5",
+    color: "#ffffff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: "700",
+    fontSize: "15px",
+    boxShadow: "0 2px 8px rgba(79, 70, 229, 0.25)"
+  },
+  welcomeTitle: {
+    fontSize: "18px",
+    fontWeight: "700",
+    color: "#0f172a",
+    margin: 0,
+    lineHeight: 1.2
+  },
+  welcomeSub: {
+    fontSize: "11px",
+    color: "#94a3b8",
+    display: "block",
+    marginBottom: "1px"
+  },
+  roleBadge: {
+    padding: "4px 10px",
+    backgroundColor: "#ffffff",
+    color: "#475569",
+    borderRadius: "12px",
+    fontSize: "11px",
+    fontWeight: "600",
+    border: "1px solid #e2e8f0",
+    textTransform: "uppercase",
+    boxShadow: "0 1px 2px rgba(0,0,0,0.03)"
+  },
+
+  /* 🌟 ปุ่มหลักปฏิทินกลาง */
+  bigHeroButton: {
+    width: "100%",
+    background: "linear-gradient(135deg, #4f46e5 0%, #2e2894 100%)",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "20px",
+    padding: "22px 16px 16px 16px",
+    textAlign: "left",
+    cursor: "pointer",
+    boxShadow: "0 12px 24px -8px rgba(79, 70, 229, 0.4)",
+    marginBottom: "22px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "18px"
+  },
+  heroButtonContent: {
+    display: "flex",
+    gap: "12px",
+    alignItems: "flex-start",
+  },
+  heroIconCircle: {
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    width: "44px",
+    height: "44px",
+    borderRadius: "12px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  heroBtnTitle: {
+    fontSize: "17px",
+    fontWeight: "800",
+    margin: 0,
+    color: "#ffffff",
+    letterSpacing: "-0.3px"
+  },
+  heroBtnSub: {
+    fontSize: "11.5px",
+    color: "rgba(255, 255, 255, 0.75)",
+    margin: "3px 0 0 0",
+    lineHeight: "1.3",
+  },
+
+  /* 📊 โครงสร้างสถานะในปุ่มแบบ Minimal */
+  heroStatusInlineGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(4, 1fr)",
+    gap: "6px",
+    borderTop: "1px solid rgba(255, 255, 255, 0.12)",
+    paddingTop: "12px"
+  },
+  inlineStatusBadge: {
+    borderRadius: "8px",
+    padding: "5px 2px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  inlineStatusLabel: {
+    fontSize: "10px",
+    fontWeight: "500",
+    color: "rgba(255, 255, 255, 0.7)",
+    textAlign: "center",
+    marginBottom: "2px"
+  },
+  countWrapper: {
+    display: "flex",
+    alignItems: "center",
+    gap: "4px",
+    backgroundColor: "rgba(0, 0, 0, 0.15)", // วงแหวนมืดซับแรงเงาไอคอน
+    padding: "2px 6px",
+    borderRadius: "6px",
+  },
+  inlineStatusCount: {
+    fontSize: "12.5px",
+    fontWeight: "700",
+    lineHeight: "1"
+  },
+
+  /* 🧾 List Cards */
+  sectionTitle: {
+    fontSize: "11px",
+    fontWeight: "700",
+    color: "#64748b",
+    textTransform: "uppercase",
+    letterSpacing: "0.5px",
+    marginBottom: "8px",
+    paddingLeft: "2px",
+  },
+  metricCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: "14px",
+    padding: "14px",
+    border: "1px solid #e2e8f0",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    boxShadow: "0 2px 4px rgba(0,0,0,0.015)",
+    marginBottom: "6px"
+  },
+  featuredMetricCard: {
+    background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+    border: "none",
+    boxShadow: "0 8px 16px -4px rgba(99, 102, 241, 0.3)",
+  },
+  cardContent: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+  },
+  iconContainer: {
+    width: "40px",
+    height: "40px",
+    borderRadius: "10px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  cardTitle: {
+    fontSize: "14px",
+    fontWeight: "700",
+    margin: 0,
+  },
+  cardDesc: {
+    fontSize: "11px",
+    margin: "2px 0 0 0",
+    lineHeight: "1.3",
+  },
+  cardRight: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+  },
+  bigNumber: {
+    fontSize: "20px",
+    fontWeight: "700",
+  },
+  arrowIcon: {
+    fontSize: "11px",
+  },
+  extraTag: {
+    display: "inline-block",
+    fontSize: "10px",
+    padding: "2px 6px",
+    borderRadius: "6px",
+    marginTop: "6px",
+    fontWeight: "600",
+  }
 };
 
 export default Dashboard;

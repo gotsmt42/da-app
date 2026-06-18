@@ -1,39 +1,23 @@
 import { useState, useEffect } from "react";
 import { Nav, NavItem, Collapse } from "reactstrap";
 import { Link, useLocation } from "react-router-dom";
-import {
-  BiChevronDown,
-  BiChevronRight,
-  BiUpload,
-  BiFile,
-  BiLogoProductHunt,
-  BiOutline,
-  BiBox,
-} from "react-icons/bi"; // Import icons from React Icons
-
-
-import probg from "../assets/images/bg/download.jpg";
-
 import AuthService from "../services/authService";
-import API from "../API/axiosInstance";
-
 import "./Sidebar.css";
-
 import Swal from "sweetalert2";
 import { swalLogout } from "../functions/user";
 import { useAuth } from "../auth/AuthContext";
 
 const Sidebar = ({ handleMenuClick }) => {
+  const [isOpen, setIsOpen] = useState(false); // สำหรับเปิด-ปิด Sidebar บนมือถือ
   const [collapsedMenu, setCollapsedMenu] = useState({});
   const location = useLocation();
+  const { userData, logout } = useAuth();
 
-  const { userData, logout, updateUserData } = useAuth();
-
-  const isAdmin = userData?.role?.toLowerCase() === "admin"; // ✅ รองรับ case-insensitive
-
+  const isAdmin = userData?.role?.toLowerCase() === "admin";
   const isTechnician = userData?.role?.toLowerCase() === "technician";
 
   const [user, setUser] = useState({});
+  
   useEffect(() => {
     const getUserData = async () => {
       try {
@@ -43,81 +27,30 @@ const Sidebar = ({ handleMenuClick }) => {
         console.error("Error fetching user data:", error);
       }
     };
-
     getUserData();
   }, []);
 
+  // โครงสร้างเมนูหลัก (เพิ่มตัวอย่าง Sub-menu ในแผนงานให้เห็นวิธีใช้)
   const navigation = [
-    {
-      title: "DASHBOARD",
-      href: "/dashboard",
-      icon: "bi-speedometer2",
-    },
-    {
-      title: "แผนงาน",
+    { title: "Dashboard", href: "/dashboard", icon: "bi-grid-1x2-fill" },
+    { 
+      title: "แผนงาน", 
       href: "/event",
       icon: "bi-calendar-event-fill",
+      
+      // items: [
+      //   { title: "ตารางงานทั้งหมด", href: "/event" },
+      //   { title: "เพิ่มแผนงาน", href: "/event/create" }
+      // ]
     },
-
-    {
-      title: "Service Reports",
-      href: "/files",
-      icon: "bi-files",
-    },
-    // {
-    //   title: "การดำเนินงาน",
-    //   href: "/operation",
-    //   icon: "bi-clock-fill",
-    // },
+    { title: "Service Reports", href: "/files", icon: "bi-file-earmark-text-fill" },
   ];
 
   const technicianMenu = [
-    {
-      title: "งานของฉัน",
-      href: "/technician/jobs",
-      icon: "bi-wrench-adjustable",
-    },
+    { title: "งานของฉัน", href: "/technician/jobs", icon: "bi-tools" },
   ];
 
-  const navigation2 = [
-    // {
-    //   title: "ติดตามงาน",
-    //   href: "/tackstatus",
-    //   icon: "bi-hourglass-top",
-    // },
-  ];
-  // {
-  //   title: "File",
-  //   icon: <IoFileTrayFullOutline />,
-  //   items: [
-  //     {
-  //       title: "File Upload",
-  //       href: "/fileupload",
-  //       icon: BiUpload,
-  //     },
-  //     {
-  //       title: "All Files",
-  //       href: "/files",
-  //       icon: LuFileStack,
-  //     },
-  //   ],
-  // },
-  // {
-  //   title: "Product",
-  //   icon: <FaProductHunt />,
-  //   items: [
-  //     {
-  //       title: "List Product",
-  //       href: "/product",
-  //       icon: CiBoxList,
-  //     },
-  //     {
-  //       title: "Stock Product",
-  //       href: "/product/stock",
-  //       icon: BiOutline,
-  //     },
-  //   ],
-  // },
+  const toggleSidebar = () => setIsOpen(!isOpen);
 
   const toggleNavbar = (index) => {
     setCollapsedMenu({
@@ -135,207 +68,156 @@ const Sidebar = ({ handleMenuClick }) => {
     });
   };
 
+  const handleItemClick = () => {
+    if (handleMenuClick) handleMenuClick();
+    setIsOpen(false); // ปิด sidebar อัตโนมัติบนมือถือเมื่อคลิกลิงก์
+  };
+
   return (
-    <div className="sidebar-container">
-      <div
-        className="profilebg"
-        style={{ background: `url(${probg}) no-repeat` }}
-      >
-        <div className="p-3 d-flex">
-          <Link to={"/account"}>
-            <img
-              src={userData?.imageUrl}
-              alt="user"
-              width="50"
-              height="50"
-              className="rounded-circle"
-            />
-          </Link>
+    <>
+      {/* ปุ่ม Toggle สำหรับหน้าจอมือถือ */}
+      <button className="sidebar-toggle-btn d-xl-none" onClick={toggleSidebar}>
+        <i className={`bi ${isOpen ? "bi-list" : "bi-x-lg"}`}></i>
+      </button>
+
+      {/* Backdrop สีดำจางๆ เมื่อเปิดเมนูบนมือถือ */}
+      {isOpen && <div className="sidebar-overlay d-xl-none" onClick={toggleSidebar}></div>}
+
+      <div className={`sidebar-container ${isOpen ? "" : "show"}`}>
+        {/* ส่วนหัว: โปรไฟล์ผู้ใช้ */}
+        <div className="profilebg" style={{ background: `linear-gradient(rgba(30, 41, 59, 0.4), rgba(15, 23, 42, 0.95))` }}>
+          <div className="p-2 d-flex align-items-center gap-3">
+            <Link to={"/account"} onClick={handleItemClick}>
+              <img
+                src={userData?.imageUrl || "https://via.placeholder.com/48"}
+                alt="user"
+                width="48"
+                height="48"
+                className="rounded-circle profile-img"
+              />
+            </Link>
+            <div className="text-truncate" style={{ zIndex: 2 }}>
+              <h6 className="user-name text-truncate">
+                {userData?.fname} {userData?.lname}
+              </h6>
+              <span className="user-role-badge">
+                {userData?.role || "User"}
+              </span>
+            </div>
+          </div>
         </div>
-        <div className="bg-dark text-white p-2 opacity-75">
-          {userData?.fname} {userData?.lname} ({userData?.role})
-        </div>
-      </div>
 
-      {/* เนื้อหา Sidebar */}
-      <div className="p-3 mt-2 sidebar-content">
-        <Nav vertical className="sidebarNav">
-          {navigation.map((navi, index) => (
-            <NavItem key={index} className="sidenav-bg ">
-              {navi.items ? (
-                <>
-                  <button
-                    color="link"
-                    className="nav-link py-3"
-                    onClick={() => toggleNavbar(index)}
-                    style={{ width: "100%", textAlign: "left" }}
-                  >
-                    <i className={`bi ${navi.icon}`}></i>
-                    <span className="ms-2 me-1">{navi.title}</span>
-                    {collapsedMenu[index] ? (
-                      <BiChevronDown />
-                    ) : (
-                      <BiChevronRight />
-                    )}
-                  </button>
-
-                  <Collapse
-                    isOpen={collapsedMenu[index]}
-                    style={{ paddingLeft: "21px" }}
-                  >
-                    {navi.items.map((item, idx) => (
-                      <Link
-                        key={idx}
-                        className={`mt-0 my-1 nav-link ${
-                          location.pathname === item.href ? "active" : ""
-                        }`}
-                        to={item.href}
-                        style={{ textDecoration: "none" }}
-                        onClick={handleMenuClick}
-                      >
-                        {item.icon && <item.icon />} {item.title}
-                      </Link>
-                    ))}
-                  </Collapse>
-                </>
-              ) : (
-                <Link
-                  to={navi.href}
-                  className={`nav-link py-3 ${
-                    location.pathname === navi.href ? "active" : ""
-                  }`}
-                  onClick={handleMenuClick}
-                >
-                  <i className={`bi ${navi.icon}`}></i>
-                  <span className="ms-2">{navi.title}</span>
-                </Link>
-              )}
-            </NavItem>
-          ))}
-
-          {isTechnician &&
-            technicianMenu.map((navi, index) => (
-              <NavItem key={index} className="sidenav-bg">
-                <Link
-                  to={navi.href}
-                  className={`nav-link py-3 ${location.pathname === navi.href ? "active" : ""}`}
-                  onClick={handleMenuClick}
-                >
-                  <i className={`bi ${navi.icon}`}></i>
-                  <span className="ms-2">{navi.title}</span>
-                </Link>
-              </NavItem>
-            ))}
-
-          {isAdmin &&
-            navigation2.map((navi, index) => (
-              <NavItem key={index} className="sidenav-bg ">
+        {/* ตรงกลาง: รายการเมนูหลัก */}
+        <div className="sidebar-content">
+          <Nav vertical className="sidebarNav">
+            {navigation.map((navi, index) => (
+              <NavItem key={index}>
                 {navi.items ? (
                   <>
-                    <button
-                      color="link"
-                      className="nav-link py-3"
+                    <button 
+                      className={`nav-link menu-dropdown-btn ${collapsedMenu[index] ? "expanded" : ""}`} 
                       onClick={() => toggleNavbar(index)}
-                      style={{ width: "100%", textAlign: "left" }}
                     >
-                      <i className={`bi ${navi.icon}`}></i>
-                      <span className="ms-2 me-1">{navi.title}</span>
-                      {collapsedMenu[index] ? (
-                        <BiChevronDown />
-                      ) : (
-                        <BiChevronRight />
-                      )}
+                      <i className={`bi ${navi.icon} nav-icon`}></i>
+                      <span className="nav-text">{navi.title}</span>
+                      <i className={`bi bi-chevron-right arrow-icon ${collapsedMenu[index] ? "rotate" : ""}`}></i>
                     </button>
-
-                    <Collapse
-                      isOpen={collapsedMenu[index]}
-                      style={{ paddingLeft: "21px" }}
-                    >
-                      {navi.items.map((item, idx) => (
-                        <Link
-                          key={idx}
-                          className={`mt-0 my-1 nav-link ${
-                            location.pathname === item.href ? "active" : ""
-                          }`}
-                          to={item.href}
-                          style={{ textDecoration: "none" }}
-                          onClick={handleMenuClick}
-                        >
-                          {item.icon && <item.icon />} {item.title}
-                        </Link>
-                      ))}
+                    <Collapse isOpen={collapsedMenu[index]}>
+                      <div className="submenu-wrapper">
+                        {navi.items.map((item, idx) => (
+                          <Link
+                            key={idx}
+                            className={`nav-link submenu-link ${location.pathname === item.href ? "active" : ""}`}
+                            to={item.href}
+                            onClick={handleItemClick}
+                          >
+                            <i className="bi bi-circle submenu-dot"></i>
+                            <span className="nav-text">{item.title}</span>
+                          </Link>
+                        ))}
+                      </div>
                     </Collapse>
                   </>
                 ) : (
                   <Link
                     to={navi.href}
-                    className={`nav-link py-3 ${
-                      location.pathname === navi.href ? "active" : ""
-                    }`}
-                    onClick={handleMenuClick}
+                    className={`nav-link ${location.pathname === navi.href ? "active" : ""}`}
+                    onClick={handleItemClick}
                   >
-                    <i className={`bi ${navi.icon}`}></i>
-                    <span className="ms-2">{navi.title}</span>
+                    <i className={`bi ${navi.icon} nav-icon`}></i>
+                    <span className="nav-text">{navi.title}</span>
                   </Link>
                 )}
               </NavItem>
             ))}
-        </Nav>
-      </div>
 
-      {/* ส่วนที่ fixed ด้านล่าง */}
-      {isAdmin && (
-        <div className="sidebar-fixed-bottom p-3 mt-2">
-          <NavItem className="sidenav-bg ">
-            <Link
-              to="/customer"
-              // className={`centered-button nav-link py-3 ${
-              className={`nav-link py-3 ${
-                location.pathname === "/customer" ? "active" : ""
-              }`}
-              onClick={handleMenuClick}
-            >
-              <i className="bi bi-building-fill ms-3"></i>
-              <span className="ms-2">Customer</span>
-            </Link>
-          </NavItem>
-          <NavItem className="sidenav-bg ">
-            <Link
-              to="/employee"
-              className={`nav-link py-3 ${
-                location.pathname === "/employee" ? "active" : ""
-              }`}
-              onClick={handleMenuClick}
-            >
-              <i className="bi bi-people-fill ms-3"></i>
-              <span className="ms-2">EMPLOYEE</span>
-            </Link>
-          </NavItem>
-
-          <NavItem className="sidenav-bg">
-            <Link
-              to="/about"
-              className={`nav-link py-3 ${
-                location.pathname === "/about" ? "active" : ""
-              }`}
-              onClick={handleMenuClick}
-            >
-              <i className="bi bi-gear-fill ms-3"></i>
-              <span className="ms-2">SETTINGS</span>
-            </Link>
-          </NavItem>
+            {/* เมนูสำหรับช่าง (Technician) */}
+            {isTechnician &&
+              technicianMenu.map((navi, index) => (
+                <NavItem key={index}>
+                  <Link
+                    to={navi.href}
+                    className={`nav-link ${location.pathname === navi.href ? "active" : ""}`}
+                    onClick={handleItemClick}
+                  >
+                    <i className={`bi ${navi.icon} nav-icon`}></i>
+                    <span className="nav-text">{navi.title}</span>
+                  </Link>
+                </NavItem>
+              ))}
+          </Nav>
         </div>
-      )}
 
-      <div className="sidebar-fixed-bottom  text-lg-start p-3 mt-2">
-        <NavItem className="sidenav-bg">
-          <Link className="nav-link py-3" onClick={handleLogout}>
-            <i className="bi bi-box-arrow-right ms-3"></i>
-            <span className="ms-2">LOGOUT</span>
-          </Link>
-        </NavItem>
+        {/* ด้านล่างสุด: กลุ่มปุ่มตั้งค่าแอดมินและปุ่มออกจากระบบ */}
+        <div className="sidebar-fixed-bottom">
+          <Nav vertical>
+            {isAdmin && (
+              <>
+                <div className="admin-divider-label">Admin Management</div>
+                <NavItem>
+                  <Link
+                    to="/customer"
+                    className={`nav-link ${location.pathname === "/customer" ? "active" : ""}`}
+                    onClick={handleItemClick}
+                  >
+                    <i className="bi bi-building-fill-gear nav-icon"></i>
+                    <span className="nav-text">Customer</span>
+                  </Link>
+                </NavItem>
+                <NavItem>
+                  <Link
+                    to="/employee"
+                    className={`nav-link ${location.pathname === "/employee" ? "active" : ""}`}
+                    onClick={handleItemClick}
+                  >
+                    <i className="bi bi-people-fill nav-icon"></i>
+                    <span className="nav-text">Employee</span>
+                  </Link>
+                </NavItem>
+                <NavItem>
+                  <Link
+                    to="/about"
+                    className={`nav-link ${location.pathname === "/about" ? "active" : ""}`}
+                    onClick={handleItemClick}
+                  >
+                    <i className="bi bi-sliders nav-icon"></i>
+                    <span className="nav-text">Settings</span>
+                  </Link>
+                </NavItem>
+              </>
+            )}
+
+            {/* ปุ่มออกจากระบบ */}
+            <NavItem className="mt-2">
+              <Link className="nav-link logout-link" onClick={handleLogout}>
+                <i className="bi bi-box-arrow-right nav-icon"></i>
+                <span className="nav-text">LOGOUT</span>
+              </Link>
+            </NavItem>
+          </Nav>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

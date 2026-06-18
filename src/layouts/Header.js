@@ -2,39 +2,34 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AuthService from "../services/authService";
 import { useAuth } from "../auth/AuthContext";
-import './Header.css'
+import './Header.css';
 import {
   Navbar,
   Nav,
   NavItem,
   NavbarBrand,
-  UncontrolledDropdown,
-  DropdownToggle,
   Dropdown,
+  DropdownToggle,
   DropdownMenu,
   DropdownItem,
   Button,
 } from "reactstrap";
 import { swalLogout } from "../functions/user";
 import Swal from "sweetalert2";
-import API from "../API/axiosInstance";
+import { FaBars } from "react-icons/fa";
 
-
-
-const Header = () => {
+const Header = ({ toggleMobileSidebar }) => {
   const navigate = useNavigate();
   const [user, setUser] = useState({});
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768); // ตรวจสอบว่าเป็นมือถือหรือไม่
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 992); 
 
-    const { userData, logout, updateUserData } = useAuth();
-
+  const { userData, logout } = useAuth();
 
   useEffect(() => {
     const getUserData = async () => {
       try {
         const getUser = await AuthService.getUserData();
-        // console.log(getUser); // เพิ่มบรรทัดนี้เพื่อตรวจสอบข้อมูลผู้ใช้
         setUser(getUser.user);
       } catch (error) {
         console.error("Error fetching user data:", error);
@@ -44,7 +39,7 @@ const Header = () => {
     getUserData();
 
     const checkIsMobile = () => {
-      setIsMobile(window.innerWidth <= 768);
+      setIsMobile(window.innerWidth <= 992);
     };
     window.addEventListener("resize", checkIsMobile);
 
@@ -54,12 +49,6 @@ const Header = () => {
   }, []);
 
   const toggle = () => setDropdownOpen((prevState) => !prevState);
-  const showMobileMenu = () => {
-    const sidebar = document.getElementById("sidebarArea");
-    console.log("Toggling sidebar:", sidebar.classList.contains("showSidebar"));
-    sidebar.classList.toggle("showSidebar");
-  };
-  
 
   const handleLogout = async () => {
     const result = await swalLogout();
@@ -72,15 +61,17 @@ const Header = () => {
   return (
     <Navbar dark expand="md" className="fix-header">
       <div className="d-flex align-items-center justify-content-between w-100">
+        
+        {/* ฝั่งซ้าย: โลโก้แบรนด์ */}
         <NavbarBrand tag={Link} to="/dashboard" className="m-0">
-         <div className="d-flex align-items-center gradiant-bg" >
-  <img src="logo-dark-2.png" alt="Logo" className="logo" />
-  {/* <h2 className="ms-2" style={{ margin: 0 }}>System Service</h2> */}
-</div>
-
+          <div className="gradiant-bg">
+            {/* 🚀 ลบ inline style height: 40px ออกเพื่อให้ CSS ทำงานเต็มที่ */}
+            <img src="logo-dark-2.png" alt="Logo" className="logo" />
+          </div>
         </NavbarBrand>
 
-        <Nav className="navbar-nav mx-auto" navbar>
+        {/* ตรงกลาง: รายการเมนูลิงก์ */}
+        <Nav className="navbar-nav mx-auto d-none d-lg-flex" navbar>
           <NavItem>
             <Link to="/dashboard" className="nav-link">Dashboard</Link>
           </NavItem>
@@ -93,58 +84,45 @@ const Header = () => {
           <NavItem>
             <Link to="/technician/jobs" className="nav-link">งานของฉัน</Link>
           </NavItem>
-          {/* <NavItem>
-            <Link to="/about" className="nav-link">About</Link>
-          </NavItem> */}
-          {/* <UncontrolledDropdown inNavbar nav>
-            <DropdownToggle caret nav>Menu</DropdownToggle>
-            <DropdownMenu end>
-              <Link to="/files" style={{ textDecoration: "none" }}>
-                <DropdownItem>Files</DropdownItem>
-              </Link>
-              <Link to="/product" style={{ textDecoration: "none" }}>
-                <DropdownItem>Product</DropdownItem>
-              </Link>
-              <DropdownItem divider />
-              <Link to="/dashboard" style={{ textDecoration: "none" }}>
-                <DropdownItem>Reset</DropdownItem>
-              </Link>
-            </DropdownMenu>
-          </UncontrolledDropdown> */}
         </Nav>
 
-        {/* Conditional rendering of profile-img */}
-        {!isMobile && ( // If not mobile, show profile-img
+        {/* ฝั่งขวา: รูปโปรไฟล์ผู้ใช้งาน + ปุ่มแฮมเบอร์เกอร์ */}
+        <div className="d-flex align-items-center gap-3">
           <div className="profile-img">
             <Dropdown isOpen={dropdownOpen} toggle={toggle}>
-              <DropdownToggle color="transparent">
+              <DropdownToggle color="transparent" style={{ padding: 0, border: 'none' }}>
                 <img
-                  src={userData.imageUrl}
+                  src={userData?.imageUrl || "https://via.placeholder.com/30"}
                   alt="profile"
                   className="rounded-circle"
-                  width="30"
-                  height="30"
+                  width="38"
+                  height="38"
+                  style={{ objectFit: 'cover', border: '2px solid #243048' }}
                 />
               </DropdownToggle>
-              <DropdownMenu>
-                <DropdownItem header>Info</DropdownItem>
+              <DropdownMenu end className="modern-dropdown-menu">
+                <DropdownItem header>ข้อมูลผู้ใช้งาน</DropdownItem>
+                <DropdownItem text className="user-display-name">
+                  {user?.username || userData?.name}
+                </DropdownItem>
+                <DropdownItem divider />
                 <Link to={"/account"} style={{ textDecoration: "none" }}>
                   <DropdownItem>My Account</DropdownItem>
                 </Link>
                 <DropdownItem divider />
-                <DropdownItem onClick={handleLogout}>Logout</DropdownItem>
+                <DropdownItem onClick={handleLogout} style={{ color: '#ef4444' }}>Logout</DropdownItem>
               </DropdownMenu>
             </Dropdown>
           </div>
-        )}
 
-        <Button
-          style={{ backgroundColor: "transparent", border: "none" }}
-          className="d-lg-none hamburger-toggle" 
-          onClick={showMobileMenu}
-        >
-          <i className="bi bi-list"></i>
-        </Button>
+          <Button
+            className="d-lg-none toggle-sidebar-btn" 
+            onClick={toggleMobileSidebar}
+          >
+            <FaBars style={{ fontSize: "22px", color: "#ffffff" }} />
+          </Button>
+        </div>
+
       </div>
     </Navbar>
   );
