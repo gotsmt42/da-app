@@ -90,11 +90,11 @@
   }
 
 
-
+/* 
 
 
   .swal-wide {
-    max-width: 90vw !important;  /* ไม่เกิน 90% ของ viewport */
+    max-width: 90vw !important; 
     width: 70% !important;
     overflow-x: hidden !important;
     font-size: 12px !important;
@@ -105,10 +105,10 @@
   .swal2-html-container {
     max-height: 70vh;
     overflow-y: auto;
-    padding-right: 10px; /* เผื่อ scrollbar */
+    padding-right: 10px;
   }
   
-  /* ทำให้ dropdown ดูสวยขึ้นและไม่ล้น */
+
   .swal2-select {
     max-width: 100%;
     box-sizing: border-box;
@@ -160,7 +160,7 @@
 }
 
 .swal-wide {
-  max-width: 90vw !important;  /* ไม่เกิน 90% ของ viewport */
+  max-width: 90vw !important;  
   width: 100% !important;
   overflow-x: hidden !important;
   font-size: 12px !important;
@@ -175,7 +175,7 @@
 
 
 
-}
+} */
 
 .img-preview {
   max-width: 100%;

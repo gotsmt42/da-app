@@ -1,7 +1,270 @@
 import Toastify from "toastify-js";
 import "toastify-js/src/toastify.css";
 
+function injectStyles() {
+  const existing = document.getElementById("edit-event-styles");
+  if (existing) existing.remove(); // ลบของเก่าทิ้งทุกครั้ง เพื่อให้ style ล่าสุดเสมอ
+  const style = document.createElement("style");
+  style.id = "edit-event-styles";
+  style.textContent = `
+    .swal-edit-event.swal2-popup {
+      padding: 0 !important;
+      border-radius: 16px !important;
+      overflow: hidden !important;
+      max-height: 95vh !important;
+      display: flex !important;
+      flex-direction: column !important;
+      font-family: 'Inter', system-ui, sans-serif !important;
+      box-shadow: 0 25px 60px rgba(10,22,40,.35) !important;
+    }
+    .swal-edit-event .swal2-html-container {
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: hidden !important;
+      display: flex !important;
+      flex-direction: column !important;
+      flex: 1 !important;
+      min-height: 0 !important;
+    }
+    .swal-edit-event #ee-modal-inner {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      min-height: 0;
+    }
+    .swal-edit-event .swal2-title  { display: none !important; }
+    .swal-edit-event .swal2-actions{ display: none !important; }
+    .swal-edit-event .swal2-footer { display: none !important; }
+    .swal-edit-event .swal2-close { display: none !important; }
+
+    #ee-close-btn {
+      width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+      background: rgba(255,255,255,.18); border: 1.5px solid rgba(255,255,255,.30);
+      color: #fff; font-size: 16px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .15s; line-height: 1;
+    }
+    #ee-close-btn:hover { background: rgba(255,255,255,.32); }
+
+    /* ── Status header ── */
+    #ee-status-header {
+      padding: 12px 16px;
+      display: flex; align-items: center; gap: 12px;
+      transition: background .4s; flex-shrink: 0;
+    }
+    #ee-status-icon {
+      width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+      background: rgba(255,255,255,.18); backdrop-filter: blur(4px);
+      border: 1.5px solid rgba(255,255,255,.30);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; line-height: 1;
+      box-shadow: 0 2px 8px rgba(0,0,0,.15);
+    }
+    #ee-status-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+    #ee-status-title h3 {
+      margin: 0; font-size: 15px; font-weight: 700; color: #fff;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      letter-spacing: .01em; text-shadow: 0 1px 3px rgba(0,0,0,.2);
+    }
+    @media (max-width: 600px) {
+      #ee-status-title h3 { text-overflow: unset; }
+      #ee-status-title h3 .marquee-track {
+        display: inline-block;
+        animation: marquee-scroll 12s linear infinite;
+        padding-right: 80px;
+      }
+      #ee-status-title h3:hover .marquee-track { animation-play-state: paused; }
+    }
+    @media (min-width: 601px) {
+      #ee-status-title h3 .marquee-track { display: contents; }
+    }
+    @keyframes marquee-scroll {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    #ee-status-title .ee-header-meta {
+      display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+    }
+    #ee-status-title .ee-tag {
+      display: inline-flex; align-items: center; gap: 3px;
+      background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.22);
+      border-radius: 20px; padding: 1px 8px;
+      font-size: 10.5px; font-weight: 600; color: rgba(255,255,255,.92);
+      white-space: nowrap;
+    }
+    /* ── Status bar (ใน body) ── */
+    #ee-status-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      background: #fff; border: 1.5px solid #e2e8f0; border-radius: 10px;
+      padding: 8px 14px; margin-bottom: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+    #ee-status-bar-left { display: flex; align-items: center; }
+    #ee-status-bar-right { display: flex; align-items: center; gap: 8px; }
+    .ee-status-bar-label {
+      font-size: 11px; font-weight: 700; color: #64748b; white-space: nowrap;
+    }
+    #ee-status-select-wrap { position: relative; flex-shrink: 0; }
+    #ee-status-select-wrap select {
+      appearance: none;
+      background: #f1f5f9;
+      border: 1.5px solid #e2e8f0; color: #1e293b;
+      border-radius: 8px; padding: 7px 30px 7px 12px;
+      font-size: 12.5px; font-weight: 700; cursor: pointer;
+      min-width: 160px;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    #ee-status-select-wrap select:focus {
+      outline: none; border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37,99,235,.10);
+    }
+    #ee-status-select-wrap::after {
+      content: "▾"; position: absolute; right: 10px; top: 50%;
+      transform: translateY(-50%); color: #64748b; pointer-events: none; font-size: 12px;
+    }
+
+    /* ── Body ── */
+    #ee-body {
+      padding: 14px 20px 10px;
+      background: #f8fafc;
+      overflow-y: auto;
+      flex: 1; min-height: 0;
+    }
+
+    /* ── Owner badge ── */
+    .ee-owner-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: #eff6ff; border: 1px solid #bfdbfe;
+      color: #1d4ed8; border-radius: 20px; padding: 3px 10px;
+      font-size: 11px; font-weight: 600;
+    }
+
+    /* ── Section label ── */
+    .ee-section-label {
+      font-size: 10px; font-weight: 700; letter-spacing: .08em;
+      text-transform: uppercase; color: #94a3b8; margin: 0 0 6px;
+    }
+
+    /* ── Grid ── */
+    .ee-grid   { display: grid; gap: 8px; margin-bottom: 8px; }
+    .ee-grid-2 { grid-template-columns: 1fr 1fr; }
+    .ee-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .ee-grid-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+    @media(max-width:600px) { .ee-grid-2,.ee-grid-3,.ee-grid-4 { grid-template-columns: 1fr; } }
+
+    /* ── Field ── */
+    .ee-field { display: flex; flex-direction: column; gap: 3px; }
+    .ee-field label {
+      font-size: 11px; font-weight: 600; color: #374151;
+      display: flex; align-items: center; gap: 3px;
+    }
+    .ee-field label .req { color: #ef4444; }
+    .ee-field select, .ee-field input, .ee-field textarea {
+      width: 100%; box-sizing: border-box;
+      border: 1.5px solid #e2e8f0; border-radius: 7px;
+      padding: 7px 10px; font-size: 13px; color: #1e293b;
+      background: #fff; transition: border-color .15s, box-shadow .15s;
+      font-family: inherit;
+    }
+    .ee-field select:focus, .ee-field input:focus, .ee-field textarea:focus {
+      outline: none; border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37,99,235,.10);
+    }
+    .ee-field textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
+    .ee-char-count { font-size: 10px; color: #94a3b8; text-align: right; margin-top: 2px; }
+
+    /* ── Divider ── */
+    .ee-divider { border: none; border-top: 1px solid #e2e8f0; margin: 10px 0; }
+
+    /* ── Color inline row ── */
+    .ee-color-inline {
+      display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+      padding: 8px 0;
+    }
+    .ee-color-item { display: flex; align-items: center; gap: 6px; }
+    .ee-color-item span { font-size: 11px; font-weight: 600; color: #374151; }
+    .ee-color-item input[type=color] {
+      width: 40px; height: 32px; border: 1.5px solid #e2e8f0;
+      border-radius: 7px; cursor: pointer; padding: 2px; background: #fff;
+    }
+
+    /* ── Action bar ── */
+    #ee-action-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 12px 20px 14px;
+      background: #f1f5f9;
+      border-top: 1px solid #e2e8f0;
+      flex-shrink: 0;
+      position: sticky;
+      bottom: 0;
+      z-index: 10;
+    }
+
+    /* กลุ่มปุ่ม */
+    .ee-btn-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .ee-btn-group-left  { justify-content: flex-start; }
+    .ee-btn-group-center { justify-content: center; flex: 1; }
+    .ee-btn-group-right { justify-content: flex-end; }
+
+    /* เส้นคั่นระหว่างกลุ่ม */
+    .ee-btn-group-center {
+      border-left: 1px solid #cbd5e1;
+      border-right: 1px solid #cbd5e1;
+      padding: 0 12px;
+    }
+
+    .ee-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      border: none; border-radius: 8px; padding: 9px 16px;
+      font-size: 12.5px; font-weight: 700; cursor: pointer;
+      transition: opacity .15s, transform .1s; white-space: nowrap;
+      font-family: inherit;
+    }
+    .ee-btn:hover  { opacity: .88; transform: translateY(-1px); }
+    .ee-btn:active { transform: translateY(0); }
+    .ee-btn-success   { background: #10b981; color: #fff; }
+    .ee-btn-info      { background: #0ea5e9; color: #fff; }
+    .ee-btn-operation { background: linear-gradient(135deg,#7c3aed,#4f46e5); color: #fff; }
+    .ee-btn-danger    { background: #ef4444; color: #fff; }
+    .ee-btn-ghost     { background: #e2e8f0; color: #475569; }
+
+    @media(max-width:640px) {
+      #ee-action-bar { flex-direction: column; gap: 8px; }
+      .ee-btn-group  { width: 100%; justify-content: center; }
+      .ee-btn-group-center { border: none; border-top: 1px solid #cbd5e1; border-bottom: 1px solid #cbd5e1; padding: 8px 0; }
+    }
+
+    /* ── TomSelect override ── */
+    .swal-edit-event .ts-wrapper { width: 100%; }
+    .swal-edit-event .ts-wrapper .ts-control {
+      border: 1.5px solid #e2e8f0 !important; border-radius: 7px !important;
+      padding: 6px 10px !important; font-size: 13px !important; min-height: 36px;
+      box-shadow: none !important;
+    }
+    .swal-edit-event .ts-wrapper.focus .ts-control {
+      border-color: #2563eb !important;
+      box-shadow: 0 0 0 3px rgba(37,99,235,.10) !important;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+const STATUS_CONFIG = {
+  "กำลังรอยืนยัน":      { bg: "linear-gradient(135deg,#475569,#64748b)", icon: "⏳" },
+  "ยืนยันแล้ว":         { bg: "linear-gradient(135deg,#1d4ed8,#2563eb)", icon: "✅" },
+  "กำลังดำเนินการ":     { bg: "linear-gradient(135deg,#92400e,#d97706)", icon: "🔄" },
+  "ดำเนินการเสร็จสิ้น": { bg: "linear-gradient(135deg,#065f46,#10b981)", icon: "🎉" },
+};
+
 export const getEditEvent = async ({
+  navigate,
   setEvents,
   fetchEventsFromDB,
   eventInfo,
@@ -15,922 +278,378 @@ export const getEditEvent = async ({
   TomSelect,
   moment,
   calendarRef,
+  Choices,
   userData,
 }) => {
-  const inputBackgroundColor = document.createElement("input");
-  inputBackgroundColor.type = "color";
-  inputBackgroundColor.value = eventInfo.event.backgroundColor;
+  injectStyles();
 
-  const inputTextColor = document.createElement("input");
-  inputTextColor.type = "color";
-  inputTextColor.value = eventInfo.event.textColor;
-
-
-  const eventId = eventInfo.event.id;
-  const docNum = eventInfo.event.docNum;
-  const evendocNo = eventInfo.event.extendedProps?.docNo || "";
-  const eventCompany = eventInfo.event.extendedProps?.company || "";
-  const eventSite = eventInfo.event.extendedProps?.site || "";
-
-  const eventTitle = eventInfo.event.title;
-  const eventSystem = eventInfo.event.extendedProps?.system || "";
-  const eventTeam = eventInfo.event.extendedProps?.team || "";
-  const eventTime = eventInfo.event.extendedProps?.time || "";
-
-  const eventFontSize = eventInfo.event.extendedProps.fontSize;
-
-  const eventStart = moment(eventInfo.event.start);
-  const eventEnd = moment(eventInfo.event.end);
-  const eventAllDay = eventInfo.event.allDay;
-
-  let eventStatus = eventInfo.event.extendedProps?.status || "กำลังรอยืนยัน"; // ค่าเริ่มต้น
-
-  const eventSubject = eventInfo.event.extendedProps?.subject || "";
-  const eventDescription = eventInfo.event.extendedProps?.description || "";
-
-  const eventStartTime = eventInfo.event.extendedProps?.startTime || "";
-  const eventEndTime = eventInfo.event.extendedProps?.endTime || "";
+  const ev             = eventInfo.event;
+  const eventId        = ev.id;
+  const eventTitle     = ev.title;
+  const evendocNo      = ev.extendedProps?.docNo        || "";
+  const eventCompany   = ev.extendedProps?.company      || "";
+  const eventSite      = ev.extendedProps?.site         || "";
+  const eventSystem    = ev.extendedProps?.system       || "";
+  const eventTeam      = ev.extendedProps?.team         || "";
+  const eventTime      = ev.extendedProps?.time         || "";
+  const eventFontSize  = ev.extendedProps?.fontSize;
+  const eventStart     = moment(ev.start);
+  const eventEnd       = moment(ev.end);
+  const eventAllDay    = ev.allDay;
+  const eventStatus    = ev.extendedProps?.status       || "กำลังรอยืนยัน";
+  const eventSubject   = ev.extendedProps?.subject      || "";
+  const eventDescription = ev.extendedProps?.description || "";
+  const eventStartTime = ev.extendedProps?.startTime    || "";
+  const eventEndTime   = ev.extendedProps?.endTime      || "";
+  const userId         = ev.extendedProps?.userId;
 
   const formattedEnd = eventAllDay
     ? moment(eventEnd).subtract(1, "days").format("YYYY-MM-DD")
-    : moment(eventEnd).format("YYYY-MM-DDTHH:mm");
+    : moment(eventEnd).format("YYYY-MM-DD");
 
-  const res = await CustomerService.getCustomers();
-  const employees = await AuthService.getAllUserData();
-
-  const userId = eventInfo.event.extendedProps?.userId;
+  const res          = await CustomerService.getCustomers();
+  const employees    = await AuthService.getAllUserData();
   const employeeList = employees?.allUser || [];
-  const lastModifiedBy = eventInfo.event.extendedProps?.lastModifiedBy; // คนแก้ไขล่าสุด
-  // หาคนที่สร้าง event
 
-  // หาคนที่แก้ไขล่าสุด
-  // const modifier = employeeList.find(
-  //   (emp) => emp?._id?.toString() === lastModifiedBy?.toString()
-  // );
-
-  // หาคนที่สร้าง event
   const eventOwner = employeeList.find(
-    (emp) => emp?._id?.toString() === userId?.toString(),
+    (e) => e?._id?.toString() === userId?.toString()
   );
+  const footerName = eventOwner?.username
+    || (eventOwner ? `${eventOwner.fname} ${eventOwner.lname}` : "ไม่ทราบผู้เพิ่ม");
 
-  // ✅ แสดงเฉพาะชื่อเจ้าของเดิม ไม่ว่าใครจะ update
-  let footerName = "";
-  if (eventOwner) {
-    footerName =
-      eventOwner.username || `${eventOwner.fname} ${eventOwner.lname}`;
-  }
+  const inputBg   = Object.assign(document.createElement("input"), {
+    type: "color", value: ev.backgroundColor || "#3b82f6",
+  });
+  const inputText = Object.assign(document.createElement("input"), {
+    type: "color", value: ev.textColor || "#ffffff",
+  });
 
-  // ถ้าไม่มี modifier ที่เข้าเงื่อนไข → fallback เป็นเจ้าของเดิม
-  if (!footerName && eventOwner) {
-    footerName =
-      eventOwner.username || `${eventOwner.fname} ${eventOwner.lname}`;
-  }
+  const statusOptions = Object.keys(STATUS_CONFIG)
+    .map(s => `<option value="${s}" ${eventStatus === s ? "selected" : ""}>${s}</option>`)
+    .join("");
 
-  // 🔧 โค้ด htmlEdit พร้อม label ทุกหัวข้อเพื่อความชัดเจน
-  const htmlEdit = `
+  const custOpt = (field) => res.userCustomers.map(c => {
+    const val     = field === "company" ? c.cCompany : c.cSite;
+    const current = field === "company" ? eventCompany : eventSite;
+    return `<option value="${val}" ${current === val ? "selected" : ""}>${val}</option>`;
+  }).join("");
 
-          <!-- สถานะงาน (อยู่แยกด้านบน แถวเดียว) -->
-          <!-- ✅ ไม่ใช้ label ครอบ select -->
-          <div style="margin-bottom: 12px; width: 100%;">
-            <label
-              for="editStatus"
-              style="display: block; margin-bottom: 4px; font-weight: bold;"
-            >
-              🛠️ สถานะงาน :
-            </label>
+  const titleOpts = ["LOCAL","PO","PM","Service","Training","Inspection",
+    "Test & Commissioning","สำรวจหน้างาน","ตรวจเช็คปัญหา","แก้ไขปัญหา",
+    "สแตนบาย","เปลี่ยนอุปกรณ์","ติดตั้งอุปกรณ์"]
+    .map(t => `<option value="${t}" ${eventTitle===t?"selected":""}>${t}</option>`).join("");
 
-            <!-- ✅ คลิกได้เฉพาะตรง select -->
-            <select
-              id="editStatus"
-              class="swal2-select"
-              style="
-                width: 100%;
-                height: 40px;
-                text-align-last: center;
-                appearance: none;
-              "
-            >
-              ${[
-                // "ยกเลิก",
-                "กำลังรอยืนยัน",
-                "ยืนยันแล้ว",
-                "กำลังดำเนินการ",
-                // "เสนอราคาแก้ไขแล้ว",
-                // "วางบิลแล้วรอเก็บเงิน",
-                "ดำเนินการเสร็จสิ้น",
-              ]
-                .map(
-                  (status) =>
-                    `<option value="${status}" ${
-                      eventStatus === status ? "selected" : ""
-                    }>${status}</option>`,
-                )
-                .join("")}
-            </select>
-          </div>
+  const systemOpts = ["Office","Fire Alarm","CCTV","Access Control","Networks"]
+    .map(s => `<option value="${s}" ${eventSystem===s?"selected":""}>${s}</option>`).join("");
 
-      <!-- Container กึ่งกลาง -->
-      <div style="display: flex; justify-content: center;">
-        <!-- Grid ฟอร์ม -->
-        <div class="swal-form-grid" style="
-          display: flex;
-          flex-wrap: wrap;
-          gap: 16px;
-          margin-top: 12px;
-          font-family: 'Segoe UI', sans-serif;
-        ">
+  const timeOpts = ["1","2","3","4"]
+    .map(t => `<option value="${t}" ${eventTime===t?"selected":""}>${t}</option>`).join("");
 
-          <!-- ชื่อบริษัท -->
-          <div style="flex: 1 1 calc(33.333% - 16px); min-width: 220px;">
-            <label for="editCompany" style="font-weight: bold; margin-bottom: 6px; display: block;">ชื่อบริษัท/นิติบุคคล:</label>
-            <select id="editCompany" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
-              <option disabled selected>${eventCompany}</option>
-              ${res.userCustomers
-                .map(
-                  (c) =>
-                    `<option value="${c.cCompany}" ${
-                      eventCompany === c.cCompany ? "selected" : ""
-                    }>${c.cCompany}</option>`,
-                )
-                .join("")}
-            </select>
-          </div>
+  const teamOpts = employeeList
+    .map(e => `<option value="${e.fname}" ${eventTeam===e.fname?"selected":""}>${e.fname}</option>`)
+    .join("");
 
-          <!-- ชื่อโครงการ -->
-          <div style="flex: 1 1 calc(33.333% - 16px); min-width: 220px;">
-<label for="editSite" style="font-weight: bold; margin-bottom: 6px; display: block;">
-  <span style="color: red;">*</span> ชื่อโครงการ:
-</label>            <select id="editSite" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
-              <option disabled selected>${eventSite || ""}</option>
-              ${res.userCustomers
-                .map(
-                  (c) =>
-                    `<option value="${c.cSite}" ${
-                      eventSite === c.cSite ? "selected" : ""
-                    }>${c.cSite}</option>`,
-                )
-                .join("")}
-            </select>
-          </div>
+  const cfg0 = STATUS_CONFIG[eventStatus] || STATUS_CONFIG["กำลังรอยืนยัน"];
 
-    <!-- ประเภทงาน -->
-    <div style="flex: 1 1 calc(33.333% - 16px); min-width: 220px;">
-<label for="editTitle" style="font-weight: bold; margin-bottom: 6px; display: block;">
-  <span style="color: red;">*</span> ประเภทงาน:
-</label>
-      <select id="editTitle" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
-        <option disabled selected>${eventTitle || ""}</option>
-        ${[
-          "LOCAL",
-          "PO",
-          "PM",
-          "Service",
-          "Training",
-          "Inspection",
-          "Test & Commissioning",
-          "สำรวจหน้างาน",
-          "ตรวจเช็คปัญหา",
-          "แก้ไขปัญหา",
-          "สแตนบาย",
-          "เปลี่ยนอุปกรณ์",
-          "ติดตั้งอุปกรณ์",
-        ]
-          .map(
-            (title) =>
-              `<option value="${title}" ${
-                eventTitle === title ? "selected" : ""
-              }>${title}</option>`,
-          )
-          .join("")}
-      </select>
+  const html = `
+<div id="ee-modal-inner">
+
+  <!-- ── Header ── -->
+  <div id="ee-status-header" style="background:${cfg0.bg}">
+    <div id="ee-status-icon">${cfg0.icon}</div>
+    <div id="ee-status-title">
+      <h3><span >${eventTitle} · ${eventSystem} ${eventTime ? `· ครั้งที่ ${eventTime}` : ""}</span></h3>
+      <div class="ee-header-meta">
+        <span class="ee-tag">📍 ${eventSite || "—"}</span>
+        ${eventTeam ? `<span class="ee-tag">👷 ${eventTeam}</span>` : ""}
+      </div>
+    </div>
+    <button id="ee-close-btn" title="ปิด">✕</button>
+  </div>
+
+  <!-- ── Body ── -->
+  <div id="ee-body">
+
+    <!-- Status bar -->
+    <div id="ee-status-bar">
+      <div id="ee-status-bar-left">
+        <div class="ee-owner-badge">👤 ${footerName}</div>
+      </div>
+      <div id="ee-status-bar-right">
+        <span class="ee-status-bar-label">🔖 สถานะ</span>
+        <div id="ee-status-select-wrap">
+          <select id="editStatus">${statusOptions}</select>
+        </div>
+      </div>
     </div>
 
-    <!-- ระบบงาน -->
-    <div style="flex: 1 1 calc(33.333% - 16px); min-width: 220px;">
-<label for="editSystem" style="font-weight: bold; margin-bottom: 6px; display: block;">
-  <span style="color: red;">*</span> ระบบงาน:
-</label>      <select id="editSystem" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
-        <option disabled selected>${eventSystem || ""}</option>
-        ${["Office", "Fire Alarm", "CCTV", "Access Control", "Networks"]
-          .map(
-            (sys) =>
-              `<option value="${sys}" ${
-                eventSystem === sys ? "selected" : ""
-              }>${sys}</option>`,
-          )
-          .join("")}
-      </select>
+    <!-- section: โครงการ -->
+    <p class="ee-section-label">ข้อมูลโครงการ</p>
+    <div class="ee-grid ee-grid-3">
+      <div class="ee-field">
+        <label>🏢 ชื่อบริษัท</label>
+        <select id="editCompany"><option disabled>${eventCompany||"—"}</option>${custOpt("company")}</select>
+      </div>
+      <div class="ee-field">
+        <label><span class="req">*</span> ชื่อโครงการ</label>
+        <select id="editSite"><option disabled>${eventSite||"—"}</option>${custOpt("site")}</select>
+      </div>
+      <div class="ee-field">
+        <label><span class="req">*</span> ประเภทงาน</label>
+        <select id="editTitle"><option disabled>${eventTitle||"—"}</option>${titleOpts}</select>
+      </div>
+    </div>
+    <div class="ee-grid ee-grid-3">
+      <div class="ee-field">
+        <label><span class="req">*</span> ระบบงาน</label>
+        <select id="editSystem"><option disabled>${eventSystem||"—"}</option>${systemOpts}</select>
+      </div>
+      <div class="ee-field">
+        <label>🔢 ครั้งที่</label>
+        <select id="editTime"><option disabled>${eventTime||"—"}</option>${timeOpts}</select>
+      </div>
+      <div class="ee-field">
+        <label>👷 ทีม</label>
+        <select id="editTeam"><option disabled>${eventTeam||"—"}</option>${teamOpts}</select>
+      </div>
     </div>
 
-    <!-- ครั้งที่ -->
-    <div style="flex: 1 1 calc(33.333% - 16px); min-width: 220px;">
-      <label for="editTime" style="font-weight: bold; margin-bottom: 6px; display: block;">ครั้งที่:</label>
-      <select id="editTime" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
-        <option disabled selected>${eventTime}</option>
-        ${["1", "2", "3", "4"]
-          .map(
-            (t) =>
-              `<option value="${t}" ${
-                eventTime === t ? "selected" : ""
-              }>${t}</option>`,
-          )
-          .join("")}
-      </select>
+    <hr class="ee-divider">
+
+    <!-- section: วันที่ เวลา สี — แถวเดียวกัน 4 คอลัมน์ -->
+    <p class="ee-section-label">วันที่ & เวลา</p>
+    <div class="ee-grid ee-grid-4">
+      <div class="ee-field">
+        <label>📅 วันที่เริ่ม</label>
+        <input id="editStart" type="date" value="${eventStart.format("YYYY-MM-DD")}">
+      </div>
+      <div class="ee-field">
+        <label>📅 วันที่สิ้นสุด</label>
+        <input id="editEnd" type="date" value="${formattedEnd}">
+      </div>
+      <div class="ee-field">
+        <label>🕐 เวลาเริ่ม</label>
+        <input id="editStartTime" type="text" placeholder="เช่น 08:30" value="${eventStartTime}">
+      </div>
+      <div class="ee-field">
+        <label>🕔 เวลาสิ้นสุด</label>
+        <input id="editEndTime" type="text" placeholder="เช่น 17:00" value="${eventEndTime}">
+      </div>
     </div>
 
-    <!-- ทีม -->
-    <div style="flex: 1 1 calc(33.333% - 16px); min-width: 220px;">
-      <label for="editTeam" style="font-weight: bold; margin-bottom: 6px; display: block;">ทีม:</label>
-      <select id="editTeam" class="swal2-select" style="width: 100%; padding: 10px 14px; font-size: 15px; border: 1px solid #ccc; border-radius: 8px; background-color: #f9f9f9;">
-        <option disabled selected>${eventTeam || ""}</option>
-        ${employeeList
-          .map(
-            (e) =>
-              `<option value="${e.fname}" ${
-                eventTeam === e.fname ? "selected" : ""
-              }>${e.fname}</option>`,
-          )
-          .join("")}
-      </select>
+    <!-- สี — inline กับส่วนบน -->
+    <div class="ee-color-inline">
+      <div class="ee-color-item">
+        <span>🎨 สีพื้นหลัง</span>
+        <div id="ee-bg-picker"></div>
+      </div>
+      <div class="ee-color-item">
+        <span>✏️ สีข้อความ</span>
+        <div id="ee-txt-picker"></div>
+      </div>
+    </div>
+
+    <hr class="ee-divider">
+
+    <!-- section: เอกสาร -->
+    <p class="ee-section-label">เอกสาร</p>
+    <div class="ee-grid ee-grid-2">
+      <div class="ee-field">
+        <label>📄 เลขที่อ้างอิง (Doc No.)</label>
+        <input id="editdocNo" type="text" value="${evendocNo}" placeholder="เช่น DOC-2026-001">
+      </div>
+      <div class="ee-field">
+        <label>📝 ชื่อเรื่อง (Subject)</label>
+        <input id="editSubject" type="text" value="${eventSubject}" placeholder="ระบุชื่อเรื่อง">
+      </div>
+    </div>
+    <div class="ee-field">
+      <label>📋 รายละเอียดงาน (Description)</label>
+      <textarea id="editDescription" placeholder="กรอกรายละเอียดงาน..."></textarea>
+      <div class="ee-char-count" id="charCount">0 ตัวอักษร</div>
     </div>
 
   </div>
-</div>
 
+  <!-- ── Action bar (แยก 3 กลุ่มชัดเจน) ── -->
+  <div id="ee-action-bar">
 
-
-<div style="display: flex; justify-content: center;">
-  <div class="swal-form-grid" style="
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    align-items: flex-start;
-    margin-top: 12px;
-    font-family: 'Segoe UI', sans-serif;
-    max-width: 1000px; /* ✅ ป้องกันไม่ให้กว้างเกิน modal */
-  ">
-
-    <!-- สีพื้นหลัง -->
-    <div style=" min-width: 100px;">
-      <label style="font-weight: bold; margin-bottom: 4px; display: block;">สีพื้นหลัง :</label>
-      <div id="backgroundColorPickerContainer"></div>
+    <!-- 🔴 ซ้าย: อันตราย -->
+    <div class="ee-btn-group ee-btn-group-left">
+      <button class="ee-btn ee-btn-danger" id="btnDelete">🗑 ลบแผนงาน</button>
     </div>
 
-    <!-- สีข้อความ -->
-    <div style="flex: 1; min-width: 100px;">
-      <label style="font-weight: bold; margin-bottom: 4px; display: block;">สีข้อความ :</label>
-      <div id="textColorPickerContainer"></div>
+    <!-- 🔵 กลาง: นำทาง & เอกสาร -->
+    <div class="ee-btn-group ee-btn-group-center">
+      <button class="ee-btn ee-btn-operation" id="btnViewSchedule">📊 ดูการดำเนินงาน</button>
+      <button class="ee-btn ee-btn-info"      id="btnGeneratePDF">📄 ออกใบแจ้งเข้างาน</button>
     </div>
 
-    <!-- วันที่เริ่ม -->
-    <div style="flex: 1; min-width: 100px;">
-      <label for="editStart" style="font-weight: bold; margin-bottom: 4px; display: block;">วันที่เริ่ม :</label>
-      <input
-        id="editStart"
-        type="date"
-        style="width: 100%; padding: 6px 10px; border-radius: 6px; border: 1px solid #ccc;"
-        value="${eventStart.format("YYYY-MM-DD")}"
-      />
+    <!-- 🟢 ขวา: ยืนยัน -->
+    <div class="ee-btn-group ee-btn-group-right">
+      <button class="ee-btn ee-btn-ghost"   id="btnCancel">✕ ปิด</button>
+      <button class="ee-btn ee-btn-success" id="btnConfirm">💾 บันทึก</button>
     </div>
-
-    <!-- วันที่สิ้นสุด -->
-    <div style="flex: 1; min-width: 100px;">
-      <label for="editEnd" style="font-weight: bold; margin-bottom: 4px; display: block;">วันที่สิ้นสุด :</label>
-      <input
-        id="editEnd"
-        type="date"
-        style="width: 100%; padding: 6px 10px; border-radius: 6px; border: 1px solid #ccc;"
-        value="${formattedEnd}"
-      />
-    </div>
-
-
-
-
-
 
   </div>
-</div>
-
-
-<div style="display: flex; justify-content: center;">
-  <div class="swal-form-grid" style="
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    align-items: flex-start;
-    margin-top: 12px;
-    font-family: 'Segoe UI', sans-serif;
-    max-width: 1000px; /* ✅ ป้องกันไม่ให้กว้างเกิน modal */
-  ">
-
-
-<!-- เวลาเริ่ม -->
-<div style="flex: 1; min-width: 100px;">
-  <label for="editStartTime" style="font-weight: bold; margin-bottom: 4px; display: block;">เวลาเริ่ม :</label>
-  <input
-    id="editStartTime"
-    type="text"
-    placeholder="เช่น 08:30"
-
-    style="width:80%; padding: 6px 10px; border-radius: 6px; border: 1px solid #ccc;"
-    value="${eventStartTime || ""}"
-  />
-</div>
-
-<!-- เวลาสิ้นสุด -->
-<div style="flex: 1; min-width: 100px;">
-  <label for="editEndTime" style="font-weight: bold; margin-bottom: 4px; display: block;">เวลาสิ้นสุด :</label>
-  <input
-    id="editEndTime"
-    type="text"
-    placeholder="เช่น 17:45"
-
-    style="width: 80%; padding: 6px 10px; border-radius: 6px; border: 1px solid #ccc;"
-    value="${eventEndTime || ""}"
-  />
-</div>
-
-
-
-  </div>
-</div>
-<br><br>
-
-
-    <!-- เลขที่อ้างอิงเอกสาร -->
-        <div style="margin-top: 12px; position: relative;">
-        <label for="editDescription" style="font-weight: bold; display: block; margin-bottom: 6px;">
-            * เลขที่อ้างอิงเอกสาร (doc No.) :
-        </label>
-
-            <input id="editdocNo" type="" style="width: 80%; height: 35px" class="swal2-input" value="${evendocNo}" />
-        </div>      
-        <br>
-        
-        
-    <!-- ชื่อเรื่อง -->
-        <div style="margin-top: 12px; position: relative;">
-        <label for="editSubject" style="font-weight: bold; display: block; margin-bottom: 6px;">
-            * ชื่อเรื่อง (Subject.) :
-        </label>
-
-            <input id="editSubject" type="" style="width: 80%; height: 35px" class="swal2-input" value="${eventSubject}" />
-        </div>      
-        <br>
-
-
-    <!-- รายละเอียดงานสำหรับออกใบแจ้งเข้างาน -->
-    <div style="margin-top: 12px; position: relative;">
-    <label for="editDescription" style="font-weight: bold; display: block; margin-bottom: 6px;">
-        * รายละเอียดงาน (Description) :
-    </label>
-
-    <textarea
-        id="editDescription"
-        rows="10"
-        
-    
-        placeholder="กรอกรายละเอียดงานที่ต้องการแสดงในเอกสาร PDF"
-
-        style="
-        width: 100%;
-        padding: 14px 16px;
-        font-size: 15px;
-        border: 1px solid #ccc;
-        border-radius: 8px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-        transition: border-color 0.3s, box-shadow 0.3s;
-        resize: vertical;
-        font-family: 'Segoe UI', sans-serif;
-        "
-    ></textarea>
-
-
-
-  <!-- ตัวนับจำนวนตัวอักษร -->
-<div id="charCount" style="text-align: right; font-size: 12px; color: #666; margin-top: 4px;">
-  จำนวนตัวอักษร: 0
-</div>
-
-
-
-
 
 </div>
-
-
-  `;
+`;
 
   Swal.fire({
-    title: `<h4>[ ${eventTitle} ] ${eventSystem}  ${eventSite} ${
-      eventTeam ? ` (ทีม ${eventTeam})` : ""
-    }</h4>`,
-    html: htmlEdit,
-
-    showConfirmButton: false, // ❌ ซ่อนปุ่มเดิม
-    showCancelButton: false,
-
-    showCloseButton: true,
-    customClass: "swal-wide",
-    footer: `
-  <div style="margin-top: 20px; display: flex; flex-direction: column; align-items: center; gap: 12px;">
-      <div style="width: 100%; overflow: hidden; white-space: nowrap;">
-        <marquee behavior="scroll" direction="left" scrollamount="5" style="color:#0064de; font-weight:bold;">
-          👤 เพิ่มข้อมูลโดย: ${footerName}
-        </marquee>
-      </div>
-      <div id="custom-footer-buttons" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 12px;">
-        <button id="btnConfirm" class="swal2-confirm swal2-styled" style="background-color: #0ECC00;">
-          ✅ บันทึกการเปลี่ยนแปลง
-        </button>
-        <button id="btnGeneratePDF" class="swal2-confirm swal2-styled" style="background-color: #0064de;">
-          📝 ออกใบแจ้งเข้างาน
-        </button>
-        <button id="btnCancel" class="swal2-cancel swal2-styled" style="background-color: #999;">
-          🔙 ปิดหน้าต่าง
-        </button>
-      </div>
-    </div>
-`,
-    showDenyButton: true,
-    denyButtonText: "❌ ลบแผนงานนี้",
+    html,
+    width: "1100px",
+    showConfirmButton: false,
+    showCancelButton:  false,
+    showCloseButton:   false,
+    customClass: { popup: "swal-edit-event" },
 
     didOpen: () => {
-      const descriptionInput = document.getElementById("editDescription");
-      const charCountDisplay = document.getElementById("charCount");
+      /* color pickers */
+      Object.assign(inputBg.style,   { width:"40px", height:"32px", border:"1.5px solid #e2e8f0", borderRadius:"7px", cursor:"pointer", padding:"2px" });
+      Object.assign(inputText.style, { width:"40px", height:"32px", border:"1.5px solid #e2e8f0", borderRadius:"7px", cursor:"pointer", padding:"2px" });
+      document.getElementById("ee-bg-picker").appendChild(inputBg);
+      document.getElementById("ee-txt-picker").appendChild(inputText);
 
-      const clearBtn = document.getElementById("clearDescriptionBtn");
-
-      const imageInput = document.getElementById("editImage");
-      const previewContainer = document.getElementById("imagePreviewContainer");
-
-      if (imageInput) {
-        imageInput.addEventListener("change", () => {
-          const file = imageInput.files[0];
-          if (!file) return;
-
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            const imgUrl = e.target.result;
-
-            previewContainer.innerHTML = `
-        <img src="${imgUrl}" alt="Preview" style="max-width: 100%; max-height: 200px; border-radius: 8px; cursor: pointer;" id="previewImage" />
-      `;
-
-            // ✅ เปิดภาพเต็มเมื่อคลิก
-            document
-              .getElementById("previewImage")
-              ?.addEventListener("click", () => {
-                Swal.fire({
-                  title: "ดูรูปภาพ",
-                  imageUrl: imgUrl,
-                  imageAlt: "Uploaded Image",
-                  showCloseButton: true,
-                  width: "auto",
-                });
-              });
-          };
-          reader.readAsDataURL(file);
-        });
+      /* description */
+      const descEl   = document.getElementById("editDescription");
+      const countEl  = document.getElementById("charCount");
+      if (descEl) {
+        descEl.value = eventDescription || "";
+        const upd = () => { if (countEl) countEl.textContent = `${descEl.value.length} ตัวอักษร`; };
+        descEl.addEventListener("input", upd);
+        upd();
       }
 
-      if (descriptionInput) {
-        descriptionInput.value = eventDescription || "";
-      }
-
-      const statusColorMap = {
-        กำลังรอยืนยัน: "#888888",
-        ยืนยันแล้ว: "#0c49ac",
-        กำลังดำเนินการ: "#a1b50b",
-        ดำเนินการเสร็จสิ้น: "#18b007",
-      };
-
-      const iconMap = {
-        กำลังรอยืนยัน: "fa-hourglass-half",
-        ยืนยันแล้ว: "fa-check",
-        กำลังดำเนินการ: "fa-clock-rotate-left",
-        ดำเนินการเสร็จสิ้น: "fa-check-double",
-      };
-      const initTomSelect = (id, create = true, placeholder = "") => {
-        return new TomSelect(id, {
-          create,
-          persist: false,
-          placeholder,
-          maxItems: null, // ✅ ไม่จำกัดจำนวน เพื่อให้ input ไม่ถูกซ่อน
-          closeAfterSelect: false,
-          dropdownInput: true,
-          selectOnTab: true,
-          plugins: ["remove_button"],
-          onItemAdd: function () {
-            // ✅ ลบรายการเก่าเมื่อเพิ่มใหม่ เพื่อให้มีแค่ 1 ค่าเสมอ
-            if (this.items.length > 1) {
-              this.removeItem(this.items[0], true);
-            }
-          },
-        });
-      };
-
-      // 🔄 สร้าง TomSelect ทั้งหมด
-      [
-        ["#editCompany", "เลือกหรือพิมพ์ชื่อบริษัท"],
-        ["#editSite", "เลือกหรือพิมพ์ชื่อโครงการ"],
-        ["#editTitle", "เลือกหรือพิมพ์ชื่อหัวข้อ"],
-        ["#editSystem", "เลือกหรือพิมพ์ชื่อระบบ"],
-        ["#editTime", "เลือกหรือพิมพ์ครั้งที่"],
-        ["#editTeam", "เลือกหรือพิมพ์ชื่อทีม"],
-      ].forEach(([id, placeholder]) => initTomSelect(id, true, placeholder));
-
-      const statusSelect = new TomSelect("#editStatus", {
-        create: false,
-        placeholder: "เลือกสถานะงาน",
-        render: {
-          option: (data, escape) => {
-            const color = statusColorMap[data.value] || "#ccc";
-            const icon = iconMap[data.value] || "fa-circle";
-            return `
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <i class="fas ${icon}" style="color: ${color}; width: 18px;"></i>
-              <span>${escape(data.text)}</span>
-            </div>`;
-          },
-          item: (data, escape) => `<div>${escape(data.text)}</div>`,
-        },
-
-        onChange: (value) => {
-          const control = statusSelect.control_input.parentElement;
-          control.style.backgroundColor = statusColorMap[value] || "#ccc";
-          control.style.color = value === "กำลังดำเนินการ" ? "#000" : "#fff";
-          control.style.borderColor = "#999";
-
-          // ✅ อัปเดต eventInfo.event ทันที
-          if (eventInfo?.event) {
-            const calendarApi = calendarRef.current?.getApi();
-            const oldEvent = eventInfo.event;
-
-            eventInfo.event.setExtendedProp("status", value);
-            eventInfo.event.setProp(
-              "backgroundColor",
-              inputBackgroundColor.value,
-            );
-            eventInfo.event.setProp("textColor", inputTextColor.value);
-            
-
-            const newEventData = {
-              id: oldEvent.id,
-              title: oldEvent.title,
-              start: oldEvent.start,
-              end: oldEvent.end,
-              backgroundColor: inputBackgroundColor.value, // ✅ สีใหม่
-              textColor: inputTextColor.value,
-              fontSize: oldEvent.extendedProps.fontSize,
-              status: oldEvent.extendedProps.status,
-              manualStatus: oldEvent.extendedProps.manualStatus,
-              description: oldEvent.extendedProps.description,
-              extendedProps: {
-                ...oldEvent.extendedProps,
-              },
-            };
-
-            oldEvent.remove();
-            calendarApi.addEvent(newEventData);
-          }
-
-          // ✅ อัปเดตใน state ถ้าใช้ React หรือ Vue
-          //   setEvents((prevEvents) =>
-          //     prevEvents.map((event) =>
-          //       event.id === eventInfo.event.id
-          //         ? { ...event, status: value }
-          //         : event
-          //     )
-          //   );
-        },
-      });
-      const initialColor = statusColorMap[statusSelect.getValue()] || "#ccc";
-      const control = statusSelect.control_input.parentElement;
-      control.style.backgroundColor = initialColor;
-      control.style.color =
-        statusSelect.getValue() === "กำลังดำเนินการ" ? "#000" : "#fff";
-
-      [inputBackgroundColor, inputTextColor].forEach((el) => {
-        Object.assign(el.style, {
-          width: "150px",
-          height: "35px",
-          border: "4px solid #ccc",
-          cursor: "pointer",
-        });
+      /* status header reactive */
+      const statusSel = document.getElementById("editStatus");
+      const headerEl  = document.getElementById("ee-status-header");
+      const iconEl    = document.getElementById("ee-status-icon");
+      statusSel?.addEventListener("change", (e) => {
+        const cfg = STATUS_CONFIG[e.target.value] || STATUS_CONFIG["กำลังรอยืนยัน"];
+        headerEl.style.background = cfg.bg;
+        iconEl.innerHTML = cfg.icon;
       });
 
-      document
-        .getElementById("backgroundColorPickerContainer")
-        .appendChild(inputBackgroundColor);
-      document
-        .getElementById("textColorPickerContainer")
-        .appendChild(inputTextColor);
-
-      const updateCharCount = () => {
-        const val = descriptionInput?.value || "";
-        if (charCountDisplay) {
-          charCountDisplay.innerText = `จำนวนตัวอักษร: ${val.length}`;
-        }
-      };
-
-      if (descriptionInput) {
-        descriptionInput.addEventListener("input", updateCharCount);
-        updateCharCount(); // เรียกตอนเปิด popup
-      }
-
-      if (clearBtn && descriptionInput) {
-        clearBtn.addEventListener("click", () => {
-          descriptionInput.value = "";
-          updateCharCount();
-        });
-      }
-    },
-
-    didRender: () => {
-      const getVal = (id) => document.getElementById(id)?.value || "";
-
-      document.getElementById("btnConfirm")?.addEventListener("click", () => {
-        Swal.clickConfirm(); // ✅ ทำให้ result.isConfirmed === true
-      });
-
-      document.getElementById("btnDeny")?.addEventListener("click", () => {
-        handleDeleteEvent(eventId);
-        Swal.close();
-      });
-
-      document.getElementById("btnCancel")?.addEventListener("click", () => {
-        Swal.close();
-      });
-
-      const endInput = getVal("editEnd");
-      const end = endInput
-        ? eventAllDay
-          ? moment(endInput).add(1, "days").toISOString()
-          : moment(endInput).toISOString()
-        : eventEnd.toISOString();
-      document
-        .getElementById("btnGeneratePDF")
-        ?.addEventListener("click", () => {
-          const toast = Toastify({
-            text: `
-              <div style="text-align:center">
-                <div style="margin-bottom:8px;">ต้องการบันทึกข้อมูลก่อนออกใบแจ้งเข้างานหรือไม่?</div>
-                <button id="toast-confirm" style="margin-right:10px; padding:4px 12px; background:#fff; border:none; border-radius:4px; cursor:pointer;">ตกลง</button>
-                <button id="toast-cancel" style="padding:4px 12px; background:#fff; border:none; border-radius:4px; cursor:pointer;">ยกเลิก</button>
-              </div>
-            `,
-            duration: 3000,
-            gravity: "top", // ต้องใช้ "top" เพื่อให้เราดัดแปลงตำแหน่งได้
-            position: "center",
-            backgroundColor: "#0064de",
-            escapeMarkup: false,
+      /* TomSelect */
+      const mkTs = (id) => {
+        try {
+          return new TomSelect(id, {
+            create: true, persist: false, closeAfterSelect: true,
+            selectOnTab: true, plugins: ["remove_button"],
+            onItemAdd() { if (this.items.length > 1) this.removeItem(this.items[0], true); },
           });
-
-          toast.showToast();
-
-          setTimeout(() => {
-            const confirmBtn = document.getElementById("toast-confirm");
-            const cancelBtn = document.getElementById("toast-cancel");
-
-            if (confirmBtn) {
-              confirmBtn.addEventListener("click", async () => {
-                toast.hideToast(); // ✅ ปิด Toastify
-
-                const subject = getVal("editSubject");
-                if (!subject) {
-                  Toastify({
-                    text: "กรุณากรอกชื่อเรื่อง",
-                    duration: 3000,
-                    backgroundColor: "#f44336",
-                    gravity: "top",
-                    position: "center",
-                  }).showToast();
-                  return;
-                }
-
-                const updatedEvent = {
-                  id: eventId,
-                  docNo: getVal("editdocNo"),
-                  company: getVal("editCompany"),
-                  site: getVal("editSite"),
-                  title: getVal("editTitle"),
-                  system: getVal("editSystem"),
-                  time: getVal("editTime"),
-                  team: getVal("editTeam"),
-                  textColor: inputTextColor.value,
-                  backgroundColor: inputBackgroundColor.value,
-                  fontSize: eventFontSize,
-                  status: getVal("editStatus"),
-                  start: moment(getVal("editStart")).toISOString(),
-                  end,
-                  manualStatus: true,
-                  subject: getVal("editSubject"),
-                  description: getVal("editDescription"),
-
-                  startTime: getVal("editStartTime"),
-                  endTime: getVal("editEndTime"),
-                };
-
-                try {
-                  await EventService.UpdateEvent(eventId, updatedEvent);
-                  await fetchEventsFromDB();
-
-                  Toastify({
-                    text: "✅ บันทึกข้อมูลสำเร็จ กำลังสร้าง PDF...",
-                    duration: 3000,
-                    backgroundColor: "#0ECC00",
-                    gravity: "top",
-                    position: "center",
-                  }).showToast();
-
-                  // สมมติว่า generateWorkPermitPDF คืน URL ของ PDF
-                  const pdfUrl = await generateWorkPermitPDF(
-                    eventInfo.event,
-                    updatedEvent.docNo,
-                    updatedEvent.subject,
-                    updatedEvent.description,
-                    updatedEvent.startTime,
-                    updatedEvent.endTime,
-                    updatedEvent.time,
-                    userData,
-                  );
-
-                  // เปิด PDF ในแท็บใหม่ทันที
-                  window.open(pdfUrl, "_blank");
-                } catch (error) {
-                  Toastify({
-                    text: "❌ เกิดข้อผิดพลาดในการบันทึก",
-                    duration: 3000,
-                    backgroundColor: "#f44336",
-                    gravity: "top",
-                    position: "center",
-                  }).showToast();
-                }
-              });
-            }
-
-            if (cancelBtn) {
-              cancelBtn.addEventListener("click", () => {
-                toast.hideToast(); // ✅ ปิด Toastify
-              });
-            }
-          }, 100);
-        });
-
-      document
-        .getElementById("btnViewSchedule")
-        ?.addEventListener("click", () => {
-          window.location.href = `/operation/${eventId}`;
-        });
-    },
-
-    preConfirm: () => {
-      const getVal = (id) => document.getElementById(id)?.value || "";
-      const title = getVal("editTitle");
-      const site = getVal("editSite");
-      const system = getVal("editSystem");
-
-      const startTime = getVal("editStartTime") || "";
-      const endTime = getVal("editEndTime") || "";
-
-      if (!title) Swal.showValidationMessage("กรุณาระบุชื่อประเภทงาน");
-      if (!site) Swal.showValidationMessage("กรุณาระบุชื่อโครงการ");
-      if (!system) Swal.showValidationMessage("กรุณาระบุชื่อระบบงาน");
-
-      const endInput = getVal("editEnd");
-      const end = endInput
-        ? eventAllDay
-          ? moment(endInput).add(1, "days").toISOString()
-          : moment(endInput).toISOString()
-        : eventEnd.toISOString();
-
-      const imageFile = document.getElementById("editImage")?.files[0] || null;
-
-      return {
-        id: eventId,
-        docNo: getVal("editdocNo"),
-        company: getVal("editCompany"),
-        site: getVal("editSite"),
-        title,
-        system: getVal("editSystem"),
-        time: getVal("editTime"),
-        team: getVal("editTeam"),
-        textColor: inputTextColor.value,
-        backgroundColor: inputBackgroundColor.value,
-        fontSize: eventFontSize,
-        status: getVal("editStatus"),
-        start: moment(getVal("editStart")).toISOString(),
-        end,
-        manualStatus: true,
-
-        subject: getVal("editSubject"),
-        description: getVal("editDescription"),
-
-        startTime,
-        endTime,
-
-        imageFile,
+        } catch { return null; }
       };
-    },
-  }).then(async (result) => {
-    console.log("🔥 Swal result:", result);
+      ["#editCompany","#editSite","#editTitle","#editSystem","#editTime","#editTeam"].forEach(mkTs);
 
-    if (result.isConfirmed) {
-      setLoading(true);
+      const getVal = (id) => document.getElementById(id)?.value?.trim() || "";
 
-      const {
-        id,
-        docNo,
-        company,
-        site,
-        title,
-        system,
-        time,
-        team,
-        textColor,
-        backgroundColor,
-        fontSize,
-        status,
-        start,
-        end,
-        manualStatus,
-        subject,
-        description,
-        startTime,
-        endTime,
-        imageFile,
-      } = result.value;
-
-      const updatedEvent = {
-        id,
-        docNo,
-        company,
-        site,
-        title,
-        system,
-        time,
-        team,
-        textColor,
-        backgroundColor,
-        fontSize,
-        status,
-        start,
-        end,
-        manualStatus,
-        subject,
-        description,
-        startTime,
-        endTime,
+      const buildPayload = () => {
+        const endInput = getVal("editEnd");
+        const end = endInput
+          ? eventAllDay
+            ? moment(endInput).add(1, "days").toISOString()
+            : moment(endInput).toISOString()
+          : eventEnd.toISOString();
+        return {
+          id: eventId,
+          docNo:           getVal("editdocNo"),
+          company:         getVal("editCompany"),
+          site:            getVal("editSite"),
+          title:           getVal("editTitle"),
+          system:          getVal("editSystem"),
+          time:            getVal("editTime"),
+          team:            getVal("editTeam"),
+          textColor:       inputText.value,
+          backgroundColor: inputBg.value,
+          fontSize:        eventFontSize,
+          status:          getVal("editStatus"),
+          start:           moment(getVal("editStart")).toISOString(),
+          end,
+          manualStatus:    true,
+          subject:         getVal("editSubject"),
+          description:     getVal("editDescription"),
+          startTime:       getVal("editStartTime"),
+          endTime:         getVal("editEndTime"),
+        };
       };
 
-      // ✅ ตรวจสอบและเพิ่ม Customer ใหม่ถ้ายังไม่มี
-      const existingCustomer = res.userCustomers.find(
-        (c) => c.cCompany === company && c.cSite === site,
-      );
+      /* Save */
+      document.getElementById("btnConfirm")?.addEventListener("click", async () => {
+        const payload = buildPayload();
+        if (!payload.title)  { Swal.showValidationMessage("กรุณาระบุประเภทงาน");  return; }
+        if (!payload.site)   { Swal.showValidationMessage("กรุณาระบุชื่อโครงการ"); return; }
+        if (!payload.system) { Swal.showValidationMessage("กรุณาระบบงาน");    return; }
+        setLoading(true);
+        try {
+          await EventService.UpdateEvent(eventId, payload);
+          await fetchEventsFromDB();
+          setLoading(false);
+          Swal.fire({ title: "บันทึกสำเร็จ ✅", icon: "success", timer: 1200, showConfirmButton: false });
+          if (payload.status === "ยืนยันแล้ว") {
+            setTimeout(() => navigate(`/operation/${eventId}`), 1300);
+          }
+        } catch (err) {
+          setLoading(false);
+          Swal.fire({ title: "เกิดข้อผิดพลาด", text: err.message, icon: "error" });
+        }
+      });
 
-      if (!existingCustomer) {
-        await CustomerService.AddCustomer({
-          cCompany: company ?? "",
-          cSite: site ?? "",
-        });
-      }
-
-      // ✅ อัพเดทรูปภาพถ้ามี
-      if (imageFile) {
-        await EventService.UpdateImageEvent(id, updatedEvent, imageFile);
-      }
-
-      // ✅ อัพเดท state
-      setEvents((prevEvents) =>
-        prevEvents.map((event) => (event._id === id ? updatedEvent : event)),
-      );
-
-      try {
-        // ✅ ส่งข้อมูลแก้ไขไปยัง API
-        await EventService.UpdateEvent(id, updatedEvent);
-        await fetchEventsFromDB();
-
-        setLoading(false);
-
+      /* Delete */
+      document.getElementById("btnDelete")?.addEventListener("click", () => {
         Swal.fire({
-          title: "บันทึกการเปลี่ยนแปลงสำเร็จ",
-          icon: "success",
-          showConfirmButton: false,
-          timer: 1000,
+          title: "ลบแผนงานนี้?", text: "ไม่สามารถกู้คืนได้", icon: "warning",
+          showCancelButton: true, confirmButtonColor: "#ef4444",
+          confirmButtonText: "ลบ", cancelButtonText: "ยกเลิก",
+        }).then((r) => { if (r.isConfirmed) { handleDeleteEvent(eventId); Swal.close(); } });
+      });
+
+      /* View operation */
+      document.getElementById("btnViewSchedule")?.addEventListener("click", () => {
+        navigate(`/operation/${eventId}`);
+        Swal.close();
+      });
+
+      /* Cancel / custom close */
+      document.getElementById("btnCancel")?.addEventListener("click", () => Swal.close());
+      document.getElementById("ee-close-btn")?.addEventListener("click", () => Swal.close());
+
+      /* Generate PDF */
+      document.getElementById("btnGeneratePDF")?.addEventListener("click", () => {
+        const payload = buildPayload();
+        const toast = Toastify({
+          text: `<div style="text-align:center;font-family:system-ui">
+            <div style="margin-bottom:8px;font-weight:600">บันทึกข้อมูลก่อนออกใบแจ้งเข้างาน?</div>
+            <button id="toast-ok" style="margin-right:8px;padding:5px 14px;background:#fff;color:#1d4ed8;border:none;border-radius:6px;font-weight:700;cursor:pointer">ตกลง</button>
+            <button id="toast-no" style="padding:5px 14px;background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:6px;cursor:pointer">ยกเลิก</button>
+          </div>`,
+          duration: 5000, gravity: "top", position: "center",
+          backgroundColor: "#1d4ed8", escapeMarkup: false,
         });
-      } catch (error) {
-        setLoading(false);
-        Swal.fire({
-          title: "เกิดข้อผิดพลาดในการบันทึก",
-          text: error.message || "โปรดลองอีกครั้ง",
-          icon: "error",
-          showConfirmButton: true,
-        });
-      }
-    } else if (result.isDenied) {
-      handleDeleteEvent(eventId);
-    }
+        toast.showToast();
+        setTimeout(() => {
+          document.getElementById("toast-ok")?.addEventListener("click", async () => {
+            toast.hideToast();
+            if (!payload.subject) {
+              Toastify({ text: "กรุณากรอกชื่อเรื่อง", duration: 3000,
+                backgroundColor: "#ef4444", gravity: "top", position: "center" }).showToast();
+              return;
+            }
+            try {
+              await EventService.UpdateEvent(eventId, payload);
+              await fetchEventsFromDB();
+              Toastify({ text: "✅ บันทึกแล้ว กำลังสร้าง PDF...", duration: 2000,
+                backgroundColor: "#10b981", gravity: "top", position: "center" }).showToast();
+              await generateWorkPermitPDF(ev, payload.docNo, payload.subject, payload.description);
+            } catch {
+              Toastify({ text: "❌ เกิดข้อผิดพลาด", duration: 3000,
+                backgroundColor: "#ef4444", gravity: "top", position: "center" }).showToast();
+            }
+          });
+          document.getElementById("toast-no")?.addEventListener("click", () => toast.hideToast());
+        }, 100);
+      });
+    },
   });
 };

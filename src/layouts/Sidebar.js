@@ -38,10 +38,10 @@ const Sidebar = ({ handleMenuClick }) => {
       href: "/event",
       icon: "bi-calendar-event-fill",
       
-      // items: [
-      //   { title: "ตารางงานทั้งหมด", href: "/event" },
-      //   { title: "เพิ่มแผนงาน", href: "/event/create" }
-      // ]
+      items: [
+        { title: "ตารางงานทั้งหมด", href: "/event" },
+        { title: "การดำเนินงาน", href: "/operation" }
+      ]
     },
     { title: "Service Reports", href: "/files", icon: "bi-file-earmark-text-fill" },
   ];

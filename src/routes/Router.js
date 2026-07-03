@@ -25,7 +25,6 @@ const Files = lazy(() => import("../views/ui/Files"));
 const FileUpload = lazy(() => import("../views/ui/FileUpload"));
 const EventCalendar = lazy(() => import("../views/ui/EventCalendar.js"));
 const Operate = lazy(() => import("../views/ui/Operation.js"));
-const Tackstatus = lazy(() => import("../views/ui/Tackstatus.js"));
 const Login = lazy(() => import("../auth/Login.js"));
 const Register = lazy(() => import("../auth/Register.js"));
 
@@ -215,27 +214,25 @@ const ThemeRoutes = [
         ),
         title: "Event Calendar",
       },
-      {
-        path: "operation",
-        element: (
-            <Suspense fallback={<div>Loading Operation...</div>}>
-              <Operate />
-            </Suspense>
-        ),
-        title: "Operation",
-      },
+     {
+  path: "operation",
+  element: (
+      <Suspense fallback={<div>Loading Operation...</div>}>
+        <Operate />
+      </Suspense>
+  ),
+  title: "Operation",
+},
+{
+  path: "operation/:id",    // ← เพิ่มอันนี้
+  element: (
+      <Suspense fallback={<div>Loading Operation...</div>}>
+        <Operate />
+      </Suspense>
+  ),
+  title: "Operation Detail",
+},
 
-      {
-        path: "tackstatus",
-        element: (
-          <AdminRoute>
-            <Suspense fallback={<div>Loading Tackstatus...</div>}>
-              <Tackstatus />
-            </Suspense>
-          </AdminRoute>
-        ),
-        title: "Tackstatus",
-      },
       {
         path: "register",
         element: (

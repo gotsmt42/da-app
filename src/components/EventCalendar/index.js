@@ -7,6 +7,9 @@ import React, {
 } from "react";
 import ReactDOM from "react-dom/client";
 
+import { useNavigate } from "react-router-dom";
+
+
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid"; // for dayClick
@@ -75,6 +78,11 @@ import { getDeleteEvent } from "./EventForms/DeleteEvent";
 import { getGeneratePDF } from "./Functions/GenPDF";
 
 function EventCalendar() {
+
+  const navigate = useNavigate();
+
+
+
   const { userData } = useAuth(); // ✅ เปลี่ยนจาก user → userData
   const isAdmin = userData?.role?.toLowerCase() === "admin"; // ✅ รองรับ case-insensitive
 
@@ -312,6 +320,7 @@ function EventCalendar() {
 
   const handleEditEvent = async (eventInfo) => {
     await getEditEvent({
+      navigate,
       setEvents,
       fetchEventsFromDB,
       eventInfo,
