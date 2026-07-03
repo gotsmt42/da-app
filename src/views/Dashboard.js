@@ -148,24 +148,26 @@ const Dashboard = () => {
       <h5 style={styles.sectionTitle}>การปฏิบัติงาน</h5>
       <Row className="g-2 mb-2">
         {[
+
+            {
+            title: "การดำเนินงาน",
+            // count: EventService.getEventOp.length,
+            desc: "การดำเนินงานทั้งหมด",
+            link: "/operation",
+            icon: <FaWrench size={18} />,
+            theme: "#6366f1",
+            isFeatured: true
+          },
           {
             title: "Service Reports",
             count: files.length,
             desc: "เอกสารรายงานการบริการในระบบ",
             link: "/files",
             icon: <FaFileAlt size={20} />,
-            theme: "#6366f1",
-            isFeatured: true
-          },
-          {
-            title: "งานของฉัน",
-            count: workOrders.length,
-            desc: "ใบสั่งซ่อมที่ได้รับมอบหมาย",
-            link: "/technician/jobs",
-            icon: <FaWrench size={18} />,
             theme: "#475569",
             isFeatured: false
-          }
+          },
+    
         ].map((card, idx) => (
           <Col xs="12" key={idx}>
             <Link to={card.link} style={{ textDecoration: 'none' }}>
