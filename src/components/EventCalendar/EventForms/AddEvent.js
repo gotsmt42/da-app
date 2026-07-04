@@ -326,6 +326,10 @@ export const getAddEvent = async ({
             maxOptions,
             placeholder,
             sortField: { field: "text", direction: "asc" },
+            // ✅ ถ้าไม่ใส่ allowEmptyOption, TomSelect จะทิ้ง <option value="">
+            // (placeholder ที่ตั้งใจให้ว่างไว้) แล้วเผลอเลือก option แรกที่มีค่าจริงให้เองอัตโนมัติ
+            // ทำให้ "ครั้งที่" กับ "ทีม" มีค่าขึ้นมาเองทั้งที่ไม่ได้เลือก
+            allowEmptyOption: true,
           });
         } catch { return null; }
       };
@@ -341,7 +345,12 @@ export const getAddEvent = async ({
       document.getElementById("ae-btnCancel")?.addEventListener("click", () => Swal.close());
 
       document.getElementById("ae-btnConfirm")?.addEventListener("click", async (clickEvt) => {
-        const getVal = (id) => document.getElementById(id)?.value?.trim() || "";
+        // ✅ กันเผื่อ TomSelect หลุด placeholder text ออกมาเป็นค่าจริงตอนไม่ได้เลือกอะไรเลย
+        const PLACEHOLDER = "— เลือกหรือพิมพ์ —";
+        const getVal = (id) => {
+          const raw = document.getElementById(id)?.value?.trim() || "";
+          return raw === PLACEHOLDER ? "" : raw;
+        };
 
         const site   = getVal("eventSite");
         const title  = getVal("eventTitle");

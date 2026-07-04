@@ -301,7 +301,22 @@ export const getEditEvent = async ({
   const eventDescription = ev.extendedProps?.description || "";
   const eventStartTime = ev.extendedProps?.startTime || "";
   const eventEndTime = ev.extendedProps?.endTime || "";
-  const userId = ev.extendedProps?.userId;
+  const userId = ev.extendedProps?.userId; // ⚠️ นี่คือ id ของ "คนสร้าง event" ไม่ใช่ผู้ใช้ที่ล็อกอินอยู่ตอนนี้
+  const eventResPerson = ev.extendedProps?.resPerson || "";
+
+  // ✅ ปุ่ม "ดูการดำเนินงาน" ให้กดได้เมื่อ: เป็น admin, เป็นคนเพิ่ม event เอง,
+  // หรือได้รับมอบหมาย (resPerson ตรงกับตัวเอง "หรือ" team ตรงกับชื่อตัวเอง — อย่างใดอย่างหนึ่งพอ)
+  const isAdminUser   = userData?.role?.toLowerCase() === "admin";
+  const isAdminOrManagerUser = ["admin", "manager"].includes(userData?.role?.toLowerCase());
+  const isOwnerUser    = Boolean(userId) && userId.toString() === userData?.userId?.toString();
+  const isAssignedUser =
+    (eventResPerson && eventResPerson === userData?.userId) ||
+    (eventTeam && eventTeam === userData?.fname);
+  const canViewOperation =
+    (isAdminUser || isOwnerUser || isAssignedUser) &&
+    eventStatus !== "กำลังรอยืนยัน"; // งานที่ยังไม่ยืนยัน ยังไม่มีอะไรให้ดูในหน้าดำเนินงาน
+  // ❌ งานที่ admin ปิดแล้ว (ดำเนินการเสร็จสิ้น) ช่างลบไม่ได้อีก มีแค่ admin/manager เท่านั้น
+  const canDeleteEvent = isAdminOrManagerUser || eventStatus !== "ดำเนินการเสร็จสิ้น";
 
   const formattedEnd = eventAllDay
     ? moment(eventEnd).subtract(1, "days").format("YYYY-MM-DD")
@@ -435,29 +450,29 @@ export const getEditEvent = async ({
     <div class="ee-grid ee-grid-3">
       <div class="ee-field">
         <label>🏢 ชื่อบริษัท</label>
-        <select id="editCompany"><option disabled>${eventCompany || "—"}</option>${custOpt("company")}</select>
+        <select id="editCompany"><option value="" disabled selected>${eventCompany || "—"}</option>${custOpt("company")}</select>
       </div>
       <div class="ee-field">
         <label><span class="req">*</span> ชื่อโครงการ</label>
-        <select id="editSite"><option disabled>${eventSite || "—"}</option>${custOpt("site")}</select>
+        <select id="editSite"><option value="" disabled selected>${eventSite || "—"}</option>${custOpt("site")}</select>
       </div>
       <div class="ee-field">
         <label><span class="req">*</span> ประเภทงาน</label>
-        <select id="editTitle"><option disabled>${eventTitle || "—"}</option>${titleOpts}</select>
+        <select id="editTitle"><option value="" disabled selected>${eventTitle || "—"}</option>${titleOpts}</select>
       </div>
     </div>
     <div class="ee-grid ee-grid-3">
       <div class="ee-field">
         <label><span class="req">*</span> ระบบงาน</label>
-        <select id="editSystem"><option disabled>${eventSystem || "—"}</option>${systemOpts}</select>
+        <select id="editSystem"><option value="" disabled selected>${eventSystem || "—"}</option>${systemOpts}</select>
       </div>
       <div class="ee-field">
         <label>🔢 ครั้งที่</label>
-        <select id="editTime"><option disabled>${eventTime || "—"}</option>${timeOpts}</select>
+        <select id="editTime"><option value="" disabled selected>${eventTime || "—"}</option>${timeOpts}</select>
       </div>
       <div class="ee-field">
         <label>👷 ทีม</label>
-        <select id="editTeam"><option disabled>${eventTeam || "—"}</option>${teamOpts}</select>
+        <select id="editTeam"><option value="" disabled selected>${eventTeam || "—"}</option>${teamOpts}</select>
       </div>
     </div>
 
@@ -523,12 +538,12 @@ export const getEditEvent = async ({
 
     <!-- 🔴 ซ้าย: อันตราย -->
     <div class="ee-btn-group ee-btn-group-left">
-      <button class="ee-btn ee-btn-danger" id="btnDelete">🗑 ลบแผนงาน</button>
+      ${canDeleteEvent ? `<button class="ee-btn ee-btn-danger" id="btnDelete">🗑 ลบแผนงาน</button>` : ""}
     </div>
 
     <!-- 🔵 กลาง: นำทาง & เอกสาร -->
     <div class="ee-btn-group ee-btn-group-center">
-      <button class="ee-btn ee-btn-operation" id="btnViewSchedule">📊 ดูการดำเนินงาน</button>
+      ${canViewOperation ? `<button class="ee-btn ee-btn-operation" id="btnViewSchedule">📊 ดูการดำเนินงาน</button>` : ""}
       <button class="ee-btn ee-btn-info"      id="btnGeneratePDF">📄 ออกใบแจ้งเข้างาน</button>
     </div>
 
@@ -602,8 +617,14 @@ export const getEditEvent = async ({
             create: true,
             persist: false,
             closeAfterSelect: true,
-            selectOnTab: true,
+            // ⚠️ selectOnTab: true ทำให้แค่กด Tab ผ่านช่องนี้ (โดยไม่ได้ตั้งใจเลือกอะไรเลย)
+            // ก็จะเลือก option ที่ถูก highlight ค้างอยู่ให้อัตโนมัติ (เช่น ตัวเลือกแรกในลิสต์
+            // หรือข้อความที่พิมพ์ค้างไว้ในช่อง create) ทำให้ "ครั้งที่"/"ทีม" มีค่าขึ้นมาเองทั้งที่ไม่ได้เลือก
+            selectOnTab: false,
             plugins: ["remove_button"],
+            // ✅ ไม่งั้น TomSelect จะทิ้ง <option value=""> (placeholder ตอนไม่มีค่า)
+            // แล้วเผลอเลือก option แรกที่มีค่าจริงให้เองอัตโนมัติ
+            allowEmptyOption: true,
             onItemAdd() {
               if (this.items.length > 1) this.removeItem(this.items[0], true);
             },
@@ -682,6 +703,7 @@ export const getEditEvent = async ({
               showConfirmButton: false,
             });
             // if (payload.status === "ยืนยันแล้ว") {
+      
             //   setTimeout(() => navigate(`/operation/${eventId}`), 1300);
             // }
             await fetchEventsFromDB();
@@ -696,21 +718,13 @@ export const getEditEvent = async ({
         });
 
       /* Delete */
+      // ⚠️ handleDeleteEvent (getDeleteEvent) เปิด Swal ยืนยันของตัวเองอยู่แล้ว
+      // เดิมโค้ดนี้เปิด Swal ยืนยันซ้อนอีกชั้น แล้วเรียก Swal.close() ทันทีหลังเรียก handleDeleteEvent
+      // ซึ่งไปปิดกล่องยืนยันที่ handleDeleteEvent เพิ่งเปิดขึ้นมาก่อนที่ผู้ใช้จะกดอะไรได้เลย
+      // ทำให้การลบไม่ทำงาน — ปิด modal แก้ไขนี้ก่อน แล้วปล่อยให้ handleDeleteEvent ยืนยันเอง
       document.getElementById("btnDelete")?.addEventListener("click", () => {
-        Swal.fire({
-          title: "ลบแผนงานนี้?",
-          text: "ไม่สามารถกู้คืนได้",
-          icon: "warning",
-          showCancelButton: true,
-          confirmButtonColor: "#ef4444",
-          confirmButtonText: "ลบ",
-          cancelButtonText: "ยกเลิก",
-        }).then((r) => {
-          if (r.isConfirmed) {
-            handleDeleteEvent(eventId);
-            Swal.close();
-          }
-        });
+        Swal.close();
+        handleDeleteEvent(eventId);
       });
 
       /* View operation */

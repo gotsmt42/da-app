@@ -50,13 +50,14 @@ const DOCUMENT_TYPES = [
   { type: "completion", label: "ใบส่งมอบงาน",     color: "#10b981", alwaysRequired: false, icon: <AssignmentTurnedIn sx={{ fontSize: 18 }} /> },
 ];
 
-// เอกสารชนิดนี้ถือว่า "เสร็จ" แล้วหรือยัง (report ต้องติ๊ก, ที่เหลือ "ไม่มี" หรือ "มี"+มีไฟล์)
+// เอกสารชนิดนี้ถือว่า "เสร็จ" แล้วหรือยัง (report ต้องติ๊ก, ที่เหลือ "ไม่มี" หรือ "มี"+มีไฟล์อย่างน้อย 1 ไฟล์)
 const isDocComplete = (event, type) => {
-  // Service Report: บังคับต้องติ๊ก "และ" ต้องแนบไฟล์จริงด้วย ถึงจะถือว่าเสร็จ
-  if (type === "report") return Boolean(event.documentSentReport) && Boolean(event.reportFileName);
+  const hasFiles = (event[`${type}Files`] || []).length > 0;
+  // Service Report: บังคับต้องติ๊ก "และ" ต้องแนบไฟล์จริงอย่างน้อย 1 ไฟล์ ถึงจะถือว่าเสร็จ
+  if (type === "report") return Boolean(event.documentSentReport) && hasFiles;
   const applicable = event[`${type}Applicable`];
   if (applicable === false) return true;
-  if (applicable === true) return Boolean(event[`${type}FileName`]);
+  if (applicable === true) return hasFiles;
   return false;
 };
 
@@ -131,54 +132,65 @@ const fileTypeIcon = (fileName) => {
   return <AttachFile sx={{ color: "#6b7280", fontSize: 16 }} />;
 };
 
-// ─── DocumentFileRow ──────────────────────────────────────────────────
-// แถวแนบไฟล์ (ใช้ร่วมกันทั้งเอกสารที่ required เสมอ และเอกสารที่เลือก "มี")
-const DocumentFileRow = ({ type, fileName, fileUrl, isUploading, uploadProgress, onFileUpload, onDeleteFile }) => {
+// ─── DocumentFileList ─────────────────────────────────────────────────
+// รายการไฟล์ที่แนบ (แนบได้หลายไฟล์) + ปุ่มเพิ่มไฟล์อีก (ใช้ร่วมกันทั้ง required เสมอ และ "มี")
+const DocumentFileList = ({ type, files, isUploading, uploadProgress, onFileUpload, onDeleteFile, onPreview, isLocked }) => {
   const fileRef = useRef();
+  const fileList = files || [];
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) onFileUpload(file, type);
+    if (e.target.files?.length) onFileUpload(e.target.files, type);
   };
 
-  if (fileName) {
-    return (
-      <Stack direction="row" alignItems="center" gap={0.5} sx={{
-        p: 1, borderRadius: 1.5, bgcolor: alpha("#6b7280", 0.06),
-      }}>
-        {fileTypeIcon(fileName)}
-        <Typography variant="caption" color="text.secondary" noWrap flex={1} sx={{ fontSize: "0.8rem" }}>
-          {fileName}
-        </Typography>
-        <Tooltip title="ดาวน์โหลด">
-          <IconButton onClick={() => downloadFile(fileUrl, fileName)} sx={{ p: 1 }}>
-            <Download sx={{ fontSize: 18 }} />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title="ลบไฟล์">
-          <IconButton color="error" onClick={() => onDeleteFile(type)} sx={{ p: 1 }}>
-            <Delete sx={{ fontSize: 18 }} />
-          </IconButton>
-        </Tooltip>
-      </Stack>
-    );
-  }
-
-  if (isUploading) {
-    return <LinearProgress variant="determinate" value={uploadProgress || 0} sx={{ borderRadius: 2, height: 6 }} />;
-  }
-
   return (
-    <>
-      <input ref={fileRef} type="file" hidden accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={handleFileChange} />
-      <Button
-        variant="outlined" fullWidth
-        startIcon={<CloudUpload sx={{ fontSize: 18 }} />}
-        onClick={() => fileRef.current?.click()}
-        sx={{ textTransform: "none", fontSize: "0.8rem", fontWeight: 600, borderRadius: 1.5, borderStyle: "dashed", py: 1 }}>
-        แนบไฟล์
-      </Button>
-    </>
+    <Box>
+      {fileList.length > 0 && (
+        <Stack spacing={0.5} sx={{ mb: 0.5 }}>
+          {fileList.map(f => (
+            <Stack key={f._id || f.fileUrl} direction="row" alignItems="center" gap={0.5} sx={{
+              p: 1, borderRadius: 1.5, bgcolor: alpha("#6b7280", 0.06),
+            }}>
+              {fileTypeIcon(f.fileName)}
+              <Typography variant="caption" color="text.secondary" noWrap flex={1} sx={{ fontSize: "0.8rem" }}>
+                {f.fileName}
+              </Typography>
+              <Tooltip title="ดูไฟล์">
+                <IconButton onClick={() => onPreview(f.fileUrl, f.fileName)} sx={{ p: 1 }}>
+                  <Visibility sx={{ fontSize: 18 }} />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="ดาวน์โหลด">
+                <IconButton onClick={() => downloadFile(f.fileUrl, f.fileName)} sx={{ p: 1 }}>
+                  <Download sx={{ fontSize: 18 }} />
+                </IconButton>
+              </Tooltip>
+              {!isLocked && (
+                <Tooltip title="ลบไฟล์">
+                  <IconButton color="error" onClick={() => onDeleteFile(type, f._id)} sx={{ p: 1 }}>
+                    <Delete sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </Tooltip>
+              )}
+            </Stack>
+          ))}
+        </Stack>
+      )}
+
+      {isLocked ? null : isUploading ? (
+        <LinearProgress variant="determinate" value={uploadProgress || 0} sx={{ borderRadius: 2, height: 6 }} />
+      ) : (
+        <>
+          <input ref={fileRef} type="file" hidden multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={handleFileChange} />
+          <Button
+            variant="outlined" fullWidth
+            startIcon={<CloudUpload sx={{ fontSize: 18 }} />}
+            onClick={() => fileRef.current?.click()}
+            sx={{ textTransform: "none", fontSize: "0.8rem", fontWeight: 600, borderRadius: 1.5, borderStyle: "dashed", py: 1 }}>
+            {fileList.length > 0 ? "+ เพิ่มไฟล์อีก" : "แนบไฟล์ (เลือกได้หลายไฟล์)"}
+          </Button>
+        </>
+      )}
+    </Box>
   );
 };
 
@@ -188,14 +200,14 @@ const DocumentFileRow = ({ type, fileName, fileUrl, isUploading, uploadProgress,
 // ถ้า "มี" ต้องแนบไฟล์ให้ครบถึงจะถือว่าเสร็จ, ถ้า "ไม่มี" ถือว่าเสร็จทันที
 const DocumentChecklistItem = ({
   type, label, color, icon, event, alwaysRequired,
-  onToggleCheck, onSetApplicable, onFileUpload, onDeleteFile,
-  isUploading, uploadProgress,
+  onToggleCheck, onSetApplicable, onFileUpload, onDeleteFile, onPreview,
+  isUploading, uploadProgress, isLocked,
 }) => {
-  const fileName  = event[`${type}FileName`];
-  const fileUrl   = event[`${type}FileUrl`];
+  const files      = event[`${type}Files`] || [];
+  const hasFiles   = files.length > 0;
   const applicable = event[`${type}Applicable`];
-  const complete  = isDocComplete(event, type);
-  const checked   = Boolean(event[`documentSent${capitalize(type)}`]);
+  const complete   = isDocComplete(event, type);
+  const checked    = Boolean(event[`documentSent${capitalize(type)}`]);
 
   return (
     <Box sx={{
@@ -207,10 +219,10 @@ const DocumentChecklistItem = ({
     }}>
       {/* แถวหัวข้อ — แตะได้ทั้งแถวเพื่อติ๊ก (เฉพาะ Service Report) */}
       <Stack direction="row" alignItems="center" gap={1.25}
-        onClick={alwaysRequired ? () => onToggleCheck(type, !checked) : undefined}
+        onClick={alwaysRequired && !isLocked ? () => onToggleCheck(type, !checked) : undefined}
         sx={{
           p: 1.5,
-          cursor: alwaysRequired ? "pointer" : "default",
+          cursor: alwaysRequired && !isLocked ? "pointer" : "default",
           minHeight: 48,
         }}>
         <Box sx={{
@@ -243,15 +255,16 @@ const DocumentChecklistItem = ({
       {/* เนื้อหาย่อย: คำเตือน / ปุ่มมี-ไม่มี / แนบไฟล์ */}
       {alwaysRequired ? (
         <Box sx={{ px: 1.5, pb: 1.5 }}>
-          {checked && !fileName && (
+          {checked && !hasFiles && (
             <Typography variant="caption" color="warning.main" sx={{ display: "block", mb: 0.75, fontWeight: 600 }}>
               ⚠️ ต้องแนบไฟล์ก่อน จึงจะขอปิดงานได้
             </Typography>
           )}
-          <DocumentFileRow
-            type={type} fileName={fileName} fileUrl={fileUrl}
+          <DocumentFileList
+            type={type} files={files}
             isUploading={isUploading} uploadProgress={uploadProgress}
-            onFileUpload={onFileUpload} onDeleteFile={onDeleteFile}
+            onFileUpload={onFileUpload} onDeleteFile={onDeleteFile} onPreview={onPreview}
+            isLocked={isLocked}
           />
         </Box>
       ) : applicable === null || applicable === undefined ? (
@@ -262,6 +275,7 @@ const DocumentChecklistItem = ({
           <ToggleButtonGroup
             fullWidth exclusive size="small"
             value={null}
+            disabled={isLocked}
             onChange={(_, val) => { if (val !== null) onSetApplicable(type, val === "yes"); }}
             sx={{ height: 40 }}>
             <ToggleButton value="yes" sx={{ textTransform: "none", fontWeight: 700, fontSize: "0.8rem", gap: 0.5 }}>
@@ -275,19 +289,22 @@ const DocumentChecklistItem = ({
       ) : applicable === false ? (
         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 1.5, pb: 1.5 }}>
           <Typography variant="caption" color="text.disabled">ไม่มีเอกสารนี้สำหรับงานนี้</Typography>
-          <Button size="small" onClick={() => onSetApplicable(type, true)}
-            sx={{ textTransform: "none", fontSize: "0.75rem", minWidth: "auto" }}>
-            เปลี่ยนเป็นมี
-          </Button>
+          {!isLocked && (
+            <Button size="small" onClick={() => onSetApplicable(type, true)}
+              sx={{ textTransform: "none", fontSize: "0.75rem", minWidth: "auto" }}>
+              เปลี่ยนเป็นมี
+            </Button>
+          )}
         </Stack>
       ) : (
         <Box sx={{ px: 1.5, pb: 1.5 }}>
-          <DocumentFileRow
-            type={type} fileName={fileName} fileUrl={fileUrl}
+          <DocumentFileList
+            type={type} files={files}
             isUploading={isUploading} uploadProgress={uploadProgress}
-            onFileUpload={onFileUpload} onDeleteFile={onDeleteFile}
+            onFileUpload={onFileUpload} onDeleteFile={onDeleteFile} onPreview={onPreview}
+            isLocked={isLocked}
           />
-          {!fileName && (
+          {!hasFiles && !isLocked && (
             <Button size="small" onClick={() => onSetApplicable(type, false)}
               sx={{ textTransform: "none", fontSize: "0.75rem", minWidth: "auto", p: 0, mt: 0.75, color: "text.disabled" }}>
               เปลี่ยนเป็นไม่มี
@@ -384,6 +401,7 @@ const TechnicianJobCard = ({
   onInputUpdate,
   onFileUpload,
   onDeleteFile,
+  onPreview,
   uploadingState,
   isUploadingState,
   uploadProgressState,
@@ -441,19 +459,25 @@ const TechnicianJobCard = ({
     await onInputUpdate(event._id, updates);
   };
 
-  // ── อัปโหลด/ลบไฟล์เอกสาร ──────────────────────────────────────────
-  const handleDocFileUpload = (file, type) => {
-    onFileUpload(file, event._id, type);
+  // ── อัปโหลด/ลบไฟล์เอกสาร (แนบได้หลายไฟล์พร้อมกัน) ───────────────────
+  const handleDocFileUpload = (filesOrFileList, type) => {
+    const fileArray = Array.from(filesOrFileList);
+    onFileUpload(filesOrFileList, event._id, type);
     const label = DOCUMENT_TYPES.find(d => d.type === type)?.label || type;
-    pushLog("file_uploaded", `${label}: ${file.name}`);
+    const detail = fileArray.length > 1
+      ? `${label}: ${fileArray.length} ไฟล์ (${fileArray.map(f => f.name).join(", ")})`
+      : `${label}: ${fileArray[0]?.name}`;
+    pushLog("file_uploaded", detail);
   };
 
-  const handleDocFileDelete = (type) => {
-    onDeleteFile(event._id, type);
+  const handleDocFileDelete = (type, fileId) => {
+    onDeleteFile(event._id, type, fileId);
   };
 
   const completedDocCount = DOCUMENT_TYPES.filter(doc => isDocComplete(event, doc.type)).length;
   const canRequestClose   = completedDocCount === DOCUMENT_TYPES.length;
+  // ❌ งานที่ admin ปิดแล้ว (ดำเนินการเสร็จสิ้น) ช่างแก้ไข/ลบ/อัปโหลดไฟล์ไม่ได้อีก
+  const isLocked = event.status === "ดำเนินการเสร็จสิ้น";
 
   // ── Request Close (ขอปิดงาน) ──────────────────────────────────────
   const handleRequestClose = async () => {
@@ -533,7 +557,7 @@ const TechnicianJobCard = ({
             }}>
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
               <Typography variant="body2" fontWeight={700} color="text.secondary">
-                📋 เอกสารประจำงาน
+                📋 เอกสารประจำงาน{isLocked ? " 🔒" : ""}
               </Typography>
               <Stack direction="row" alignItems="center" gap={0.5}>
                 <Typography variant="body2" fontWeight={800} color={canRequestClose ? "#10b981" : "text.secondary"}>
@@ -571,8 +595,10 @@ const TechnicianJobCard = ({
                   onSetApplicable={handleSetApplicable}
                   onFileUpload={handleDocFileUpload}
                   onDeleteFile={handleDocFileDelete}
+                  onPreview={onPreview}
                   isUploading={Boolean(isUploadingState?.[doc.type]) && uploadingState?.[doc.type] === event._id}
                   uploadProgress={uploadProgressState?.[doc.type] || 0}
+                  isLocked={isLocked}
                 />
               ))}
             </Stack>

@@ -191,8 +191,6 @@ const fileTypeIcon = (fileName) => {
   return <AttachFile sx={{ color: "#6b7280" }} />;
 };
 
-const capitalize = (str = "") => str.charAt(0).toUpperCase() + str.slice(1);
-
 // ไฟล์เก็บบน Cloudinary (คนละโดเมน) และบาง URL เก่าอาจไม่มีนามสกุลติดมาด้วย
 // (ไฟล์ resource_type "raw" ที่อัปโหลดไว้ก่อนแก้ backend) จึงดึงไฟล์มาเป็น blob
 // แล้วสั่งดาวน์โหลดเอง เพื่อบังคับชื่อไฟล์ + นามสกุลที่ถูกต้องจากฐานข้อมูลเสมอ
@@ -908,8 +906,9 @@ const TimelineView = ({ events }) => {
 };
 
 // ─── FileUploadSection ────────────────────────────────────────────────
+// เอกสารแต่ละชนิดแนบได้หลายไฟล์ (files คือ array) — เพิ่ม/ลบทีละไฟล์ได้อิสระ
 const FileUploadSection = ({
-  eventId, type, label, fileName, fileUrl, applicable,
+  eventId, type, label, files, applicable,
   onUpload, onDelete, onPreview,
   uploading, progress, uploading_size, currentUserRole,
 }) => {
@@ -918,44 +917,53 @@ const FileUploadSection = ({
   const overrideInputRef = React.useRef();
   const canEdit  = ["admin", "manager", "user"].includes(currentUserRole);
 
+  const fileList = files || [];
+  const hasFiles = fileList.length > 0;
+
   const handleDrop = e => {
     e.preventDefault();
     setDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file) onUpload(file, eventId, type);
+    if (e.dataTransfer.files?.length) onUpload(e.dataTransfer.files, eventId, type);
   };
 
   // ช่างระบุไว้แล้วว่างานนี้ "ไม่มี" เอกสารชนิดนี้ (ใบเสนอราคา/ใบวางบิล/ใบส่งมอบงาน)
-  const notApplicable = applicable === false && !fileName;
+  const notApplicable = applicable === false && !hasFiles;
 
   return (
     <Box>
       <Typography variant="caption" fontWeight={700} color="text.secondary"
         sx={{ textTransform: "uppercase", letterSpacing: 0.5, mb: 1, display: "block" }}>
-        {label}
+        {label} {hasFiles && `(${fileList.length})`}
       </Typography>
-      {fileName ? (
-        <Stack direction="row" alignItems="center" gap={0.5} sx={{
-          p: 1.25, borderRadius: 2, border: "1px solid", borderColor: "divider",
-          background: t => alpha(t.palette.success.main, 0.04),
-        }}>
-          {fileTypeIcon(fileName)}
-          <Box flex={1} minWidth={0}>
-            <Typography variant="caption" fontWeight={600} noWrap sx={{ fontSize: "0.8rem" }}>{fileName}</Typography>
-          </Box>
-          <Tooltip title="ดูไฟล์">
-            <IconButton onClick={() => onPreview(fileUrl, fileName)} sx={{ p: 1 }}><Visibility sx={{ fontSize: 20 }} /></IconButton>
-          </Tooltip>
-          <Tooltip title="ดาวน์โหลด">
-            <IconButton onClick={() => downloadFile(fileUrl, fileName)} sx={{ p: 1 }}><Download sx={{ fontSize: 20 }} /></IconButton>
-          </Tooltip>
-          {canEdit && (
-            <Tooltip title="ลบไฟล์">
-              <IconButton color="error" onClick={() => onDelete(eventId, type)} sx={{ p: 1 }}><Delete sx={{ fontSize: 20 }} /></IconButton>
-            </Tooltip>
-          )}
+
+      {hasFiles && (
+        <Stack spacing={0.75} sx={{ mb: uploading || canEdit ? 1 : 0 }}>
+          {fileList.map(f => (
+            <Stack key={f._id || f.fileUrl} direction="row" alignItems="center" gap={0.5} sx={{
+              p: 1.25, borderRadius: 2, border: "1px solid", borderColor: "divider",
+              background: t => alpha(t.palette.success.main, 0.04),
+            }}>
+              {fileTypeIcon(f.fileName)}
+              <Box flex={1} minWidth={0}>
+                <Typography variant="caption" fontWeight={600} noWrap sx={{ fontSize: "0.8rem", display: "block" }}>{f.fileName}</Typography>
+              </Box>
+              <Tooltip title="ดูไฟล์">
+                <IconButton onClick={() => onPreview(f.fileUrl, f.fileName)} sx={{ p: 1 }}><Visibility sx={{ fontSize: 20 }} /></IconButton>
+              </Tooltip>
+              <Tooltip title="ดาวน์โหลด">
+                <IconButton onClick={() => downloadFile(f.fileUrl, f.fileName)} sx={{ p: 1 }}><Download sx={{ fontSize: 20 }} /></IconButton>
+              </Tooltip>
+              {canEdit && (
+                <Tooltip title="ลบไฟล์">
+                  <IconButton color="error" onClick={() => onDelete(eventId, type, f._id)} sx={{ p: 1 }}><Delete sx={{ fontSize: 20 }} /></IconButton>
+                </Tooltip>
+              )}
+            </Stack>
+          ))}
         </Stack>
-      ) : uploading ? (
+      )}
+
+      {uploading ? (
         <Box sx={{ p: 1.5, borderRadius: 2, border: "1px solid", borderColor: "primary.main" }}>
           <Stack direction="row" gap={1} alignItems="center" mb={0.5}>
             <CloudUpload fontSize="small" color="primary" />
@@ -977,8 +985,8 @@ const FileUploadSection = ({
           </Stack>
           {canEdit && (
             <>
-              <input ref={overrideInputRef} type="file" hidden
-                onChange={e => { if (e.target.files[0]) onUpload(e.target.files[0], eventId, type); }} />
+              <input ref={overrideInputRef} type="file" hidden multiple
+                onChange={e => { if (e.target.files?.length) onUpload(e.target.files, eventId, type); }} />
               <Button size="small" onClick={() => overrideInputRef.current?.click()}
                 sx={{ textTransform: "none", fontSize: "0.72rem", mt: 0.5, minHeight: 32 }}>
                 มีไฟล์จริง? แนบที่นี่
@@ -993,16 +1001,22 @@ const FileUploadSection = ({
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
           onClick={() => inputRef.current?.click()}
-          sx={{ minHeight: 76, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-          <input ref={inputRef} type="file" hidden onChange={e => { if (e.target.files[0]) onUpload(e.target.files[0], eventId, type); }} />
-          <CloudUpload sx={{ color: "text.disabled", mb: 0.5, fontSize: 26 }} />
-          <Typography variant="caption" color="text.secondary">แตะเพื่อเลือกไฟล์ หรือลากมาวาง</Typography>
+          sx={{
+            minHeight: hasFiles ? 48 : 76, display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center", py: hasFiles ? 1 : undefined,
+          }}>
+          <input ref={inputRef} type="file" hidden multiple
+            onChange={e => { if (e.target.files?.length) onUpload(e.target.files, eventId, type); }} />
+          {!hasFiles && <CloudUpload sx={{ color: "text.disabled", mb: 0.5, fontSize: 26 }} />}
+          <Typography variant="caption" color="text.secondary">
+            {hasFiles ? "+ เพิ่มไฟล์อีก" : "แตะเพื่อเลือกไฟล์ (เลือกได้หลายไฟล์) หรือลากมาวาง"}
+          </Typography>
         </UploadZone>
-      ) : (
+      ) : !hasFiles ? (
         <Box sx={{ p: 1.5, borderRadius: 2, border: "1px dashed", borderColor: "divider", textAlign: "center" }}>
           <Typography variant="caption" color="text.disabled">ไม่มีไฟล์</Typography>
         </Box>
-      )}
+      ) : null}
     </Box>
   );
 };
@@ -1111,11 +1125,10 @@ const EventRowCard = ({
             </Box>
           </Stack>
           <Stack direction="row" gap={0.5} flexShrink={0}>
-                        {event.reportFileName    && <Tooltip title={`Service Report: ${event.reportFileName}`}><Description sx={{ fontSize: 18, color: "#3b82f6", opacity: 0.8 }} /></Tooltip>}
-
-            {event.quotationFileName && <Tooltip title={`ใบเสนอราคา: ${event.quotationFileName}`}><Description sx={{ fontSize: 18, color: "#ef4444", opacity: 0.8 }} /></Tooltip>}
-            {event.invoiceFileName   && <Tooltip title={`ใบวางบิล: ${event.invoiceFileName}`}><Description sx={{ fontSize: 18, color: "#f59e0b", opacity: 0.8 }} /></Tooltip>}
-            {event.completionFileName && <Tooltip title={`ใบส่งมอบงาน: ${event.completionFileName}`}><Description sx={{ fontSize: 18, color: "#07941a", opacity: 0.8 }} /></Tooltip>}
+            {event.reportFiles?.length > 0     && <Tooltip title={`Service Report: ${event.reportFiles.length} ไฟล์`}><Description sx={{ fontSize: 18, color: "#3b82f6", opacity: 0.8 }} /></Tooltip>}
+            {event.quotationFiles?.length > 0  && <Tooltip title={`ใบเสนอราคา: ${event.quotationFiles.length} ไฟล์`}><Description sx={{ fontSize: 18, color: "#ef4444", opacity: 0.8 }} /></Tooltip>}
+            {event.invoiceFiles?.length > 0    && <Tooltip title={`ใบวางบิล: ${event.invoiceFiles.length} ไฟล์`}><Description sx={{ fontSize: 18, color: "#f59e0b", opacity: 0.8 }} /></Tooltip>}
+            {event.completionFiles?.length > 0 && <Tooltip title={`ใบส่งมอบงาน: ${event.completionFiles.length} ไฟล์`}><Description sx={{ fontSize: 18, color: "#07941a", opacity: 0.8 }} /></Tooltip>}
             {event.activityLog?.length > 0 && (
               <Tooltip title={`${event.activityLog.length} กิจกรรม`}>
                 <History sx={{ fontSize: 18, color: "#f59e0b", opacity: 0.8 }} />
@@ -1191,7 +1204,7 @@ const EventRowCard = ({
                         <Grid item xs={12} sm={6}>
               <FileUploadSection
                 eventId={event._id} type="report" label="Service Report"
-                fileName={event.reportFileName} fileUrl={event.reportFileUrl}
+                files={event.reportFiles}
                 onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
                 uploading={isUploadingState.report && uploadingState.report === event._id}
                 progress={uploadProgressState.report}
@@ -1202,7 +1215,7 @@ const EventRowCard = ({
             <Grid item xs={12} sm={6}>
               <FileUploadSection
                 eventId={event._id} type="quotation" label="ใบเสนอราคา"
-                fileName={event.quotationFileName} fileUrl={event.quotationFileUrl}
+                files={event.quotationFiles}
                 applicable={event.quotationApplicable}
                 onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
                 uploading={isUploadingState.quotation && uploadingState.quotation === event._id}
@@ -1216,7 +1229,7 @@ const EventRowCard = ({
              <Grid item xs={12} sm={6}>
               <FileUploadSection
                 eventId={event._id} type="invoice" label="ใบวางบิล"
-                fileName={event.invoiceFileName} fileUrl={event.invoiceFileUrl}
+                files={event.invoiceFiles}
                 applicable={event.invoiceApplicable}
                 onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
                 uploading={isUploadingState.invoice && uploadingState.invoice === event._id}
@@ -1229,7 +1242,7 @@ const EventRowCard = ({
              <Grid item xs={12} sm={6}>
               <FileUploadSection
                 eventId={event._id} type="completion" label="ใบส่งมอบงาน"
-                fileName={event.completionFileName} fileUrl={event.completionFileUrl}
+                files={event.completionFiles}
                 applicable={event.completionApplicable}
                 onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
                 uploading={isUploadingState.completion && uploadingState.completion === event._id}
@@ -1678,44 +1691,48 @@ const Operation = () => {
     });
   };
 
-  const handleDeleteFile = useCallback(async (eventId, type) => {
+  const handleDeleteFile = useCallback(async (eventId, type, fileId) => {
     try {
-      await EventService.DeleteFile(eventId, type);
-      handleInputUpdate(eventId, {
-        [`${type}FileName`]: null, [`${type}FileUrl`]: null,
-        [`${type}FileType`]: null, [`documentSent${capitalize(type)}`]: false,
-      });
+      await EventService.DeleteFile(eventId, type, fileId);
       setSnackbar({ open: true, msg: "ลบไฟล์เรียบร้อย", severity: "success" });
-
-      fetchEventsFromDB(true)
+      await fetchEventsFromDB(true);
     } catch {
       setSnackbar({ open: true, msg: "ลบไฟล์ไม่สำเร็จ", severity: "error" });
     }
-  }, [handleInputUpdate]);
+  }, []);
 
-  const handleFileUpload = useCallback(async (file, eventId, type) => {
+  // ✅ รองรับแนบหลายไฟล์พร้อมกัน (FileList หรือ array ของ File) — อัปโหลดทีละไฟล์ตามลำดับ
+  const handleFileUpload = useCallback(async (fileOrFiles, eventId, type) => {
+    const files = Array.from(fileOrFiles?.length !== undefined ? fileOrFiles : [fileOrFiles]);
+    if (files.length === 0) return;
+
     setUploadingState(p => ({ ...p, [type]: eventId }));
-    setUploadingFileSizeState(p => ({ ...p, [type]: (file.size / (1024 * 1024)).toFixed(2) + " MB" }));
-    setUploadProgressState(p => ({ ...p, [type]: 0 }));
     setIsUploadingState(p => ({ ...p, [type]: true }));
+
+    let successCount = 0;
     try {
-      const result = await EventService.Upload(eventId, file, type, {
-        onUploadProgress: pe => {
-          setUploadProgressState(p => ({ ...p, [type]: Math.round((pe.loaded * 100) / pe.total) }));
-        },
-      });
-      await handleInputUpdate(eventId, {
-        [`${type}FileName`]: result.fileName, [`${type}FileUrl`]: result.fileUrl,
-        [`${type}FileType`]: result.fileType, [`documentSent${capitalize(type)}`]: true,
-      });
-    
-        fetchEventsFromDB(true)
-      setSnackbar({ open: true, msg: `อัปโหลดเรียบร้อย`, severity: "success" });
-      setPreviewUrl(result.fileUrl);
-      setPreviewFileName(result.fileName);
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const sizeLabel = `${(file.size / (1024 * 1024)).toFixed(2)} MB` + (files.length > 1 ? ` (${i + 1}/${files.length})` : "");
+        setUploadingFileSizeState(p => ({ ...p, [type]: sizeLabel }));
+        setUploadProgressState(p => ({ ...p, [type]: 0 }));
+
+        await EventService.Upload(eventId, file, type, {
+          onUploadProgress: pe => {
+            setUploadProgressState(p => ({ ...p, [type]: Math.round((pe.loaded * 100) / pe.total) }));
+          },
+        });
+        successCount++;
+      }
+      setSnackbar({ open: true, msg: `อัปโหลด ${successCount} ไฟล์เรียบร้อย`, severity: "success" });
     } catch {
-      setSnackbar({ open: true, msg: "อัปโหลดไม่สำเร็จ", severity: "error" });
+      setSnackbar({
+        open: true,
+        msg: successCount > 0 ? `อัปโหลดสำเร็จ ${successCount}/${files.length} ไฟล์ (มีไฟล์ที่ล้มเหลว)` : "อัปโหลดไม่สำเร็จ",
+        severity: "error",
+      });
     } finally {
+      await fetchEventsFromDB(true);
       setIsUploadingState(p => ({ ...p, [type]: false }));
       setTimeout(() => {
         setUploadingState(p => ({ ...p, [type]: null }));
@@ -1723,7 +1740,7 @@ const Operation = () => {
         setUploadProgressState(p => ({ ...p, [type]: 0 }));
       }, 800);
     }
-  }, [handleInputUpdate]);
+  }, []);
 
   const handleExportCSV = () => {
     const headers = [
@@ -1847,7 +1864,8 @@ const Operation = () => {
                     onStatusUpdate={handleStatusUpdate}
                     onInputUpdate={handleInputUpdate}
                     onFileUpload={handleFileUpload}
-                    onDeleteFile={(eid, type) => handleDeleteFile(eid, type)}
+                    onDeleteFile={(eid, type, fileId) => { setPendingDelete({ id: eid, type, fileId }); setConfirmOpen(true); }}
+                    onPreview={(url, name) => { setPreviewUrl(url); setPreviewFileName(name); }}
                     uploadingState={uploadingState}
                     isUploadingState={isUploadingState}
                     uploadProgressState={uploadProgressState}
@@ -1863,7 +1881,7 @@ const Operation = () => {
                     onDocNoUpdate={handleDocNoUpdate}
                     onInputUpdate={handleInputUpdate}
                     onFileUpload={handleFileUpload}
-                    onDeleteFile={(eid, type) => { setPendingDelete({ id: eid, type }); setConfirmOpen(true); }}
+                    onDeleteFile={(eid, type, fileId) => { setPendingDelete({ id: eid, type, fileId }); setConfirmOpen(true); }}
                     onPreview={(url, name) => { setPreviewUrl(url); setPreviewFileName(name); }}
                     onDelete={handleDeleteRow}
                     onApproveClose={handleApproveClose}
@@ -1966,7 +1984,7 @@ const Operation = () => {
           <Button variant="outlined" onClick={() => setConfirmOpen(false)} sx={{ borderRadius: 2 }}>ยกเลิก</Button>
           <Button variant="contained" color="error" sx={{ borderRadius: 2 }}
             onClick={() => {
-              if (pendingDelete) handleDeleteFile(pendingDelete.id, pendingDelete.type);
+              if (pendingDelete) handleDeleteFile(pendingDelete.id, pendingDelete.type, pendingDelete.fileId);
               setConfirmOpen(false);
             }}>
             ลบไฟล์

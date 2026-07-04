@@ -127,7 +127,7 @@ async Upload(id, file, type, config = {}) {
 },
 
 
-  async DeleteFile(id, type) {
+  async DeleteFile(id, type, fileId) {
     try {
       const userData = await AuthService.getUserData(); // ดึง Token
 
@@ -135,7 +135,7 @@ async Upload(id, file, type, config = {}) {
 
       const response = await API.put(
         `/events/delete-file/${id}`,
-        { type },
+        { type, fileId },
         {
           headers: {
             Authorization: `Bearer ${userData.token}`,

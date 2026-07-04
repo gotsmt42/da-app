@@ -151,20 +151,7 @@ const Sidebar = ({ handleMenuClick }) => {
               </NavItem>
             ))}
 
-            {/* เมนูสำหรับช่าง (Technician) */}
-            {isTechnician &&
-              technicianMenu.map((navi, index) => (
-                <NavItem key={index}>
-                  <Link
-                    to={navi.href}
-                    className={`nav-link ${location.pathname === navi.href ? "active" : ""}`}
-                    onClick={handleItemClick}
-                  >
-                    <i className={`bi ${navi.icon} nav-icon`}></i>
-                    <span className="nav-text">{navi.title}</span>
-                  </Link>
-                </NavItem>
-              ))}
+  
           </Nav>
         </div>
 

@@ -5,10 +5,7 @@ import React, {
   useMemo,
   useCallback,
 } from "react";
-import ReactDOM from "react-dom/client";
-
 import { useNavigate } from "react-router-dom";
-
 
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
@@ -77,24 +74,62 @@ import { getDeleteEvent } from "./EventForms/DeleteEvent";
 
 import { getGeneratePDF } from "./Functions/GenPDF";
 
+// ✅ คำอธิบายสถานะแบบยาว (ใช้เป็น tooltip ของไอคอนสถานะบน event)
+const STATUS_DESCRIPTIONS = {
+  ยกเลิก: "ยกเลิก",
+  กำลังรอยืนยัน: "กำลังรอยืนยัน",
+  ยืนยันแล้ว: "ยืนยันแล้ว",
+  กำลังดำเนินการ: "กำลังดำเนินการ",
+  ดำเนินการเสร็จสิ้น: "ดำเนินการเสร็จสิ้น",
+  เสนอราคาแก้ไขแล้ว: "เสนอราคาแก้ไขแล้ว",
+  วางบิลแล้วรอเก็บเงิน: "วางบิลแล้วรอเก็บเงิน",
+  ดำเนินการเสร็จสิ้นเก็บเงินแล้ว: "ดำเนินการเสร็จสิ้นเก็บเงินแล้ว",
+};
+
+// ✅ แปลง FontAwesome icon object (เช่น faCheck) เป็น inline SVG string
+// ใช้แทนการ mount ผ่าน ReactDOM.createRoot ใน eventDidMount เพราะ eventDidMount
+// จะไม่ถูกเรียกซ้ำเมื่อ "ข้อมูล" ของ event เปลี่ยน (เช่น status) โดยที่ element ยังอยู่
+// การฝัง SVG ไว้ใน eventContent (ที่ FullCalendar เรียกทุกครั้งที่ re-render event) ทำให้
+// ไอคอนอัปเดตทันทีตาม status ใหม่ โดยไม่ต้องรีเฟรชหน้า
+const faIconToSvg = (iconDef, { size = 12, color = "#000000" } = {}) => {
+  if (!iconDef?.icon) return "";
+  const [width, height, , , svgPathData] = iconDef.icon;
+  const paths = Array.isArray(svgPathData) ? svgPathData : [svgPathData];
+  const pathsHtml = paths
+    .map((d) => `<path fill="${color}" d="${d}"></path>`)
+    .join("");
+  return `<svg viewBox="0 0 ${width} ${height}" style="width:${size}px;height:${size}px;display:block;">${pathsHtml}</svg>`;
+};
+
 function EventCalendar() {
-
   const navigate = useNavigate();
-
-
 
   const { userData } = useAuth(); // ✅ เปลี่ยนจาก user → userData
   const isAdmin = userData?.role?.toLowerCase() === "admin"; // ✅ รองรับ case-insensitive
+  const isAdminOrManager = ["admin", "manager"].includes(
+    userData?.role?.toLowerCase(),
+  );
 
   const userId = userData?.userId; // หรือ field ที่เก็บ id ของ user
 
+  // งานที่ปิดแล้ว (ดำเนินการเสร็จสิ้น) และผู้ใช้ไม่ใช่ admin/manager → ล็อก แก้ไขไม่ได้อีก
+  const isJobLocked = (extendedProps) =>
+    extendedProps?.status === "ดำเนินการเสร็จสิ้น" && !isAdminOrManager;
+
   // ✅ แก้ไขได้ถ้า: เป็น admin, เป็นคนเพิ่ม event เอง, หรือได้รับมอบหมาย
   // (resPerson ตรงกับ ID ตัวเอง หรือ team ตรงกับชื่อตัวเอง — เผื่อ event เก่าที่ยังไม่มี resPerson)
-  const canEditEvent = (extendedProps) =>
-    isAdmin
-    || extendedProps?.userId === userId
-    || (extendedProps?.resPerson && extendedProps.resPerson === userId)
-    || (extendedProps?.team && extendedProps.team === userData?.fname);
+  // ❌ ยกเว้น: งานที่ admin ปิดแล้ว (ดำเนินการเสร็จสิ้น) ช่างแก้ไขไม่ได้อีก มีแค่ admin/manager เท่านั้น
+  const canEditEvent = (extendedProps) => {
+    if (isJobLocked(extendedProps)) {
+      return false;
+    }
+    return (
+      isAdmin ||
+      extendedProps?.userId === userId ||
+      (extendedProps?.resPerson && extendedProps.resPerson === userId) ||
+      (extendedProps?.team && extendedProps.team === userData?.fname)
+    );
+  };
 
   const employees = AuthService.getAllUserData();
 
@@ -111,8 +146,6 @@ function EventCalendar() {
   const [searchTerm, setSearchTerm] = useState(""); // 🔍 State สำหรับค้นหา
 
   const calendarRef = useRef(null);
-
-  
 
   useEffect(() => {
     fetchEventsFromDB();
@@ -133,12 +166,18 @@ function EventCalendar() {
   useEffect(() => {
     const today = moment().format("YYYY-MM-DD");
 
+    // ⚠️ เดิมเช็ค event.extendedProps?.status ซึ่งใน state ธรรมดา (ก่อนส่งเข้า FullCalendar)
+    // extendedProps มีแค่ userId/lastModifiedBy/startTime/endTime เท่านั้น ไม่มี status เลย
+    // ทำให้เงื่อนไขนี้เป็นจริงเสมอ (undefined !== "กำลังดำเนินการ") และงานทุกงานของวันนี้
+    // (รวมถึงงานที่ปิดแล้ว "ดำเนินการเสร็จสิ้น") ถูกดันสถานะกลับเป็น "กำลังดำเนินการ" ซ้ำๆ ทุกครั้งที่ fetch
+    // แก้เป็นเช็คจาก event.status (ค่าจริงที่ top-level) และเปลี่ยนอัตโนมัติเฉพาะงานที่ "ยืนยันแล้ว" เท่านั้น
+    // (ไม่แตะงานที่ปิดแล้ว/กำลังดำเนินการอยู่แล้ว/ยังไม่ยืนยัน)
     const eventsToUpdate = events.filter((event) => {
       const eventStartDate = moment(event.start).format("YYYY-MM-DD");
       return (
         eventStartDate === today &&
         !event.manualStatus &&
-        event.extendedProps?.status !== "กำลังดำเนินการ"
+        event.status === "ยืนยันแล้ว"
       );
     });
 
@@ -149,6 +188,7 @@ function EventCalendar() {
       return match
         ? {
             ...event,
+            status: "กำลังดำเนินการ",
             extendedProps: {
               ...event.extendedProps,
               status: "กำลังดำเนินการ",
@@ -165,8 +205,8 @@ function EventCalendar() {
         EventService.UpdateEvent(event.id, {
           status: "กำลังดำเนินการ",
           manualStatus: false,
-        })
-      )
+        }),
+      ),
     )
       .then(() => {
         console.log("✅ อัปเดตสถานะเรียบร้อย");
@@ -277,7 +317,7 @@ function EventCalendar() {
       console.error(
         "❌ Error fetching holidays:",
         error.response?.status,
-        error.response?.data || error.message
+        error.response?.data || error.message,
       );
 
       // ✅ fallback mock data
@@ -311,8 +351,6 @@ function EventCalendar() {
 
   const saveEventToDB = async (newEvent) => {
     await getSaveEventToDB({ newEvent, EventService });
-
-
   };
 
   const handleAddEvent = async (arg) => {
@@ -356,7 +394,6 @@ function EventCalendar() {
       userData,
     });
 
-
     // await fetchEventsFromDB()
   };
 
@@ -370,7 +407,6 @@ function EventCalendar() {
 
       Swal,
     });
-
   };
 
   const handleEventDrop = async (arg) => {
@@ -450,7 +486,7 @@ function EventCalendar() {
         const dateStr = cell.getAttribute("data-date");
         const date = moment(dateStr);
         const currentMonth = moment(
-          calendarRef.current.getApi().getDate()
+          calendarRef.current.getApi().getDate(),
         ).month();
         const isWeekend = [6, 7].includes(date.isoWeekday());
         const isSameMonth = date.month() === currentMonth;
@@ -475,7 +511,8 @@ function EventCalendar() {
     return events.filter((event) => {
       // หาคนที่เป็นเจ้าของ event จาก employeeList
       const owner = employeeList.find(
-        (emp) => emp._id?.toString() === event.extendedProps?.userId?.toString()
+        (emp) =>
+          emp._id?.toString() === event.extendedProps?.userId?.toString(),
       );
 
       const ownerName = owner?.username?.toLowerCase() || "";
@@ -511,6 +548,7 @@ function EventCalendar() {
     // { label: "วางบิลแล้วรอเก็บเงิน", color: "#9b59b6", icon: faFileInvoiceDollar },
     { label: "ดำเนินการเสร็จสิ้น", color: "#18b007", icon: faCheckDouble },
   ];
+
 
   return (
 <div className="modern-calendar-container">      <Row className="flex-wrap mb-3 d-flex justify-content-center justify-content-md-between">
@@ -634,7 +672,7 @@ function EventCalendar() {
           showNonCurrentDates={false} // ✅ ไม่แสดงวันของเดือนก่อนและหลัง
           firstDay={0} // ✅ กำหนดให้วันอาทิตย์เป็นวันแรกของสัปดาห์
           eventContent={(arg) => {
-            const { title, extendedProps } = arg.event;
+            const { title, extendedProps, backgroundColor, textColor } = arg.event;
             const {
               system = "",
               time = "",
@@ -642,6 +680,7 @@ function EventCalendar() {
               team = "",
               startTime = "",
               endTime = "",
+              status,
             } = extendedProps;
 
             // ✅ สร้าง display string แบบมีเงื่อนไข
@@ -661,21 +700,45 @@ function EventCalendar() {
                 : "";
 
             const isSmallScreen = window.innerWidth < 576;
+            const fontSize = isSmallScreen ? "0.5em" : "1em";
 
-            const fontSize = isSmallScreen ? "0.82em" : "1em";
+            // ✅ ไอคอนสถานะ — คำนวณใหม่ทุกครั้งที่ event นี้ re-render (เช่นหลังบันทึกแก้ไข)
+            // ต่างจาก eventDidMount ที่จะไม่ถูกเรียกซ้ำถ้า element ของ event ยังไม่ถูก unmount
+            const isSmallBadgeScreen = window.innerWidth < 768;
+            const badgeIconPx = isSmallBadgeScreen ? 5 : 12;
+            const badgeBoxSize = isSmallBadgeScreen ? "6px" : "19px";
+            const badgePadding = isSmallBadgeScreen
+              ? "8px 0px 3px 1px"
+              : "10px 20px 3px 3px";
+
+            const icon = getStatusIcon(status);
+            const iconColor = textColor || "#000000";
+            const bgColor = backgroundColor || "#ffffff";
+            const statusTitle = STATUS_DESCRIPTIONS[status] || "สถานะไม่ระบุ";
+
+            const badgeHtml = icon
+              ? `<div title="${statusTitle}" style="position:absolute; top:0px; right:0px; width:${badgeBoxSize}; height:${badgeBoxSize}; display:flex; align-items:center; justify-content:center; background:${bgColor}; z-index:10; cursor:pointer;">${faIconToSvg(
+                  icon,
+                  { size: badgeIconPx, color: iconColor },
+                )}</div>`
+              : "";
+
             return {
               html: `
-                <div style="font-size:  ${fontSize}; line-height: 1.8; padding: 1px;">
-                  <div>[ ${title} ]  </div>
-                 
-                  <div> ${systemDisplay} </div>
-                  <div> ${siteDisplay}</div>
-                   <div>${timeDisplay} </div>
+                <div style="position: relative; display: flex; align-items: center; padding: ${badgePadding}; width: 110%;">
+                  <div style="font-size: ${fontSize}; line-height: 2; padding: 0px; flex: 1; min-width: 0;">
+                    <div>[ ${title} ]  </div>
+
+                    <div> ${systemDisplay} </div>
+                    <div> ${siteDisplay}</div>
+                     <div>${timeDisplay} </div>
 
 
-              <div>${teamDisplay}</div>
-                ${timeRangeDisplay ? `<div>${timeRangeDisplay}</div>` : ""}
-              </div>
+                <div>${teamDisplay}</div>
+                  ${timeRangeDisplay ? `<div>${timeRangeDisplay}</div>` : ""}
+                </div>
+                  ${badgeHtml}
+                </div>
     `,
             };
           }}
@@ -716,78 +779,9 @@ function EventCalendar() {
             timeGridWeek: { dayMaxEventRows: window.innerWidth >= 576 ? 7 : 5 },
             timeGridDay: { dayMaxEventRows: window.innerWidth >= 576 ? 7 : 5 },
           }}
-          eventDidMount={(info) => {
-            const status = info.event.extendedProps.status;
-            const icon = getStatusIcon(status);
-            const statusDescription = {
-              ยกเลิก: "ยกเลิก",
-              กำลังรอยืนยัน: "กำลังรอยืนยัน",
-              ยืนยันแล้ว: "ยืนยันแล้ว",
-              กำลังดำเนินการ: "กำลังดำเนินการ",
-              เสนอราคาแก้ไขแล้ว: "เสนอราคาแก้ไขแล้ว",
-              วางบิลแล้วรอเก็บเงิน: "วางบิลแล้วรอเก็บเงิน",
-              ดำเนินการเสร็จสิ้นเก็บเงินแล้ว: "ดำเนินการเสร็จสิ้นเก็บเงินแล้ว",
-            };
-
-            // ✅ ถ้าแก้ไขไม่ได้ (ไม่ใช่ admin/เจ้าของ/ผู้ได้รับมอบหมาย) → ทำให้สีซีดลง
-            if (!canEditEvent(info.event.extendedProps)) {
-              info.el.style.opacity = "0.7"; // ทำให้ซีดลง
-              info.el.style.filter = "grayscale(10%)"; // เพิ่มความซีดด้วย grayscale
-            } else {
-              info.el.style.opacity = "1"; // คงสีเดิม
-              info.el.style.filter = "none";
-            }
-
-            if (icon) {
-              // ✅ ตรวจสอบขนาดหน้าจอ
-              const isSmallScreen = window.innerWidth < 768; // ✅ กำหนดเงื่อนไขสำหรับหน้าจอเล็ก
-
-              // ✅ ดึงสีพื้นหลังและสีตัวหนังสือของ Event
-              const backgroundColor = info.event.backgroundColor || "#ffffff"; // สีพื้นหลัง
-              const textColor = info.event.textColor || "#000000"; // สีตัวหนังสือ
-
-              // ✅ ขนาดของไอคอนตามขนาดหน้าจอ
-              const iconSize = isSmallScreen ? "10px" : "19px"; // 📌 ถ้าหน้าจอเล็ก ใช้ขนาด 10px, ถ้าหน้าจอใหญ่ ใช้ขนาด 16px
-              const padding = isSmallScreen
-                ? "10px 0px 2px 2px" // 📌 ถ้าหน้าจอเล็ก
-                : "10px 20px 3px 3px"; // 📌 ถ้าหน้าจอใหญ่
-
-              // 🔹 ปรับแต่ง container หลักของ event (ให้มีพื้นที่สำหรับไอคอน)
-              info.el.style.position = "relative"; // ✅ ทำให้ไอคอนใช้ absolute ได้
-              info.el.style.display = "flex";
-              info.el.style.alignItems = "center"; // ✅ จัดข้อความให้อยู่ตรงกลางแนวตั้ง
-              info.el.style.padding = `${padding}`; // ✅ เพิ่ม Padding ด้านขวาให้ไอคอนไม่ทับตัวหนังสือ
-
-              // 🔹 สร้าง div สำหรับไอคอน
-              const iconContainer = document.createElement("div");
-              iconContainer.style.position = "absolute";
-              iconContainer.style.right = "2px"; // ✅ อยู่ชิดขวา
-              iconContainer.style.top = "1px"; // ✅ อยู่มุมขวาบน
-              iconContainer.style.width = iconSize; // ✅ ใช้ขนาดที่กำหนดจากเงื่อนไข
-              iconContainer.style.height = iconSize;
-              iconContainer.style.display = "flex";
-              iconContainer.style.alignItems = "center";
-              iconContainer.style.justifyContent = "center";
-              iconContainer.style.backgroundColor = `${backgroundColor}`; // ✅ ใช้สีพื้นหลังของ event
-              iconContainer.style.cursor = "pointer"; // ✅ เปลี่ยนเป็น pointer แสดงว่าเป็น tooltip
-              iconContainer.style.zIndex = "10"; // ✅ ให้ไอคอนอยู่ด้านหน้า
-              iconContainer.title = statusDescription[status] || "สถานะไม่ระบุ"; // ✅ Tooltip
-
-              // 🔹 เรนเดอร์ไอคอนใน FullCalendar
-              ReactDOM.createRoot(iconContainer).render(
-                <FontAwesomeIcon
-                  icon={icon}
-                  style={{
-                    fontSize: isSmallScreen ? "8px" : "12px", // ✅ ปรับขนาด icon ตามหน้าจอ
-                    color: textColor, // ✅ ไอคอนใช้สีเดียวกับตัวหนังสือ
-                  }}
-                />
-              );
-
-              // 🔹 เพิ่มไอคอนไปที่ event container
-              info.el.appendChild(iconContainer);
-            }
-          }}
+          eventClassNames={(arg) =>
+            !canEditEvent(arg.event.extendedProps) ? ["fc-event-locked"] : []
+          }
           dayCellDidMount={(info) => {
             const date = moment(info.date); // แปลงเป็น moment object
             const currentMonth = moment(info.view.currentStart).month(); // เดือนปัจจุบันที่กำลังแสดงในปฏิทิน
@@ -843,6 +837,11 @@ function EventCalendar() {
               margin-top: 5px;
             }
           }
+.fc-event-locked {
+      opacity: 0.7;
+      filter: grayscale(10%);
+    }
+
 .legend-item {
       display: flex;
       align-items: center;
