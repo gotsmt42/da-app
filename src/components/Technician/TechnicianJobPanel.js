@@ -1,11 +1,11 @@
 /**
- * TechnicianJobPanel.jsx — v2
+ * TechnicianJobPanel.jsx — v3
  *
- * ฟีเจอร์ใหม่:
- *   ✅ Step progress bar (รับงาน → กำลังทำ → เสร็จสิ้น)
+ * ฟีเจอร์:
+ *   ✅ เอกสารประจำงาน 4 ชนิด (Service Report, ใบเสนอราคา, ใบวางบิล, ใบส่งมอบงาน)
+ *      ติ๊กสถานะได้อิสระ + แนบไฟล์แยกกันแต่ละชนิด
  *   ✅ บันทึกสรุปงานเป็นข้อความ (workNote) พร้อม push activityLog
- *   ✅ Check-in / Check-out กด 1 ครั้ง พร้อม timestamp
- *   ✅ อัปโหลดรูปภาพ/ไฟล์งาน
+ *   ✅ ขอปิดงาน (เมื่อติ๊ก Service Report แล้ว) → รอแอดมินอนุมัติ
  *   ✅ ส่ง activityLog กลับไปที่ parent (Operation) เพื่อแอดมินเห็น real-time
  */
 
@@ -15,15 +15,16 @@ import "moment/locale/th";
 import {
   Box, Card, CardContent, Typography, Stack, Chip, Avatar,
   Button, IconButton, TextField, Collapse, Divider, LinearProgress,
-  Tooltip, Badge, Alert,
+  Tooltip, ToggleButton, ToggleButtonGroup,
 } from "@mui/material";
 import { styled, alpha } from "@mui/material/styles";
 import {
   Build, Assignment, Visibility, Warning, Description,
-  Login, Logout, Edit, CloudUpload, CheckCircle,
-  ExpandMore, ExpandLess, Circle, NoteAdd, History,
-  AccessTime, PictureAsPdf, Image, Article, InsertDriveFile,
-  AttachFile, Delete, Download,
+  Edit, CloudUpload, CheckCircle,
+  ExpandMore, ExpandLess, History,
+  PictureAsPdf, Image, Article, InsertDriveFile,
+  AttachFile, Delete, Download, TaskAlt, HourglassTop, NoteAdd,
+  RequestQuote, ReceiptLong, AssignmentTurnedIn, Close,
 } from "@mui/icons-material";
 
 // ─── Constants ────────────────────────────────────────────────────────
@@ -42,11 +43,24 @@ const TYPE_ICON = {
   "สำรวจระบบ":     <Description fontSize="small" />,
 };
 
-const WORK_STEPS = [
-  { key: "received",    label: "รับงาน",       icon: <Assignment sx={{ fontSize: 16 }} /> },
-  { key: "in_progress", label: "กำลังดำเนินการ", icon: <Build sx={{ fontSize: 16 }} /> },
-  { key: "done",        label: "เสร็จสิ้น",     icon: <CheckCircle sx={{ fontSize: 16 }} /> },
+const DOCUMENT_TYPES = [
+  { type: "report",     label: "Service Report", color: "#3b82f6", alwaysRequired: true,  icon: <Description sx={{ fontSize: 18 }} /> },
+  { type: "quotation",  label: "ใบเสนอราคา",     color: "#f59e0b", alwaysRequired: false, icon: <RequestQuote sx={{ fontSize: 18 }} /> },
+  { type: "invoice",    label: "ใบวางบิล",       color: "#8b5cf6", alwaysRequired: false, icon: <ReceiptLong sx={{ fontSize: 18 }} /> },
+  { type: "completion", label: "ใบส่งมอบงาน",     color: "#10b981", alwaysRequired: false, icon: <AssignmentTurnedIn sx={{ fontSize: 18 }} /> },
 ];
+
+// เอกสารชนิดนี้ถือว่า "เสร็จ" แล้วหรือยัง (report ต้องติ๊ก, ที่เหลือ "ไม่มี" หรือ "มี"+มีไฟล์)
+const isDocComplete = (event, type) => {
+  // Service Report: บังคับต้องติ๊ก "และ" ต้องแนบไฟล์จริงด้วย ถึงจะถือว่าเสร็จ
+  if (type === "report") return Boolean(event.documentSentReport) && Boolean(event.reportFileName);
+  const applicable = event[`${type}Applicable`];
+  if (applicable === false) return true;
+  if (applicable === true) return Boolean(event[`${type}FileName`]);
+  return false;
+};
+
+const capitalize = (str = "") => str.charAt(0).toUpperCase() + str.slice(1);
 
 // ─── Styled ──────────────────────────────────────────────────────────
 const JobCard = styled(Card)(({ theme }) => ({
@@ -58,28 +72,12 @@ const JobCard = styled(Card)(({ theme }) => ({
   overflow: "visible",
 }));
 
-const StepDot = styled(Box)(({ active, done, color }) => ({
-  width: 32,
-  height: 32,
-  borderRadius: "50%",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  background: done || active
-    ? (color || "#10b981")
-    : alpha("#6b7280", 0.12),
-  color: done || active ? "#fff" : "#9ca3af",
-  border: active ? `3px solid ${alpha(color || "#10b981", 0.35)}` : "none",
-  transition: "all 0.25s ease",
-  flexShrink: 0,
-}));
-
 const ActionBtn = styled(Button)(({ theme, variant: v, btncolor }) => ({
   borderRadius: 10,
   fontWeight: 700,
-  fontSize: "0.8rem",
+  fontSize: "0.85rem",
   textTransform: "none",
-  padding: "6px 16px",
+  padding: "10px 16px",
   ...(v === "contained" && {
     background: btncolor || theme.palette.primary.main,
     color: "#fff",
@@ -93,6 +91,28 @@ const ActionBtn = styled(Button)(({ theme, variant: v, btncolor }) => ({
 }));
 
 // ─── Helper ───────────────────────────────────────────────────────────
+// ไฟล์เก็บบน Cloudinary (คนละโดเมน) และบาง URL เก่าอาจไม่มีนามสกุลติดมาด้วย
+// จึงดึงไฟล์มาเป็น blob แล้วสั่งดาวน์โหลดเอง เพื่อบังคับชื่อไฟล์ + นามสกุลที่ถูกต้องเสมอ
+const downloadFile = async (url, fileName) => {
+  if (!url) return;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("Download failed");
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = fileName || "download";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+  } catch (err) {
+    console.error("Download error:", err);
+    window.open(url, "_blank");
+  }
+};
+
 const getFileType = (fileName = "") => {
   const lower = (fileName || "").toLowerCase();
   if ([".jpg", ".jpeg", ".png", ".webp"].some(e => lower.endsWith(e))) return "image";
@@ -104,56 +124,183 @@ const getFileType = (fileName = "") => {
 
 const fileTypeIcon = (fileName) => {
   const t = getFileType(fileName);
-  if (t === "image") return <Image sx={{ color: "#10b981", fontSize: 18 }} />;
-  if (t === "pdf")   return <PictureAsPdf sx={{ color: "#ef4444", fontSize: 18 }} />;
-  if (t === "word")  return <Article sx={{ color: "#3b82f6", fontSize: 18 }} />;
-  if (t === "excel") return <InsertDriveFile sx={{ color: "#10b981", fontSize: 18 }} />;
-  return <AttachFile sx={{ color: "#6b7280", fontSize: 18 }} />;
+  if (t === "image") return <Image sx={{ color: "#10b981", fontSize: 16 }} />;
+  if (t === "pdf")   return <PictureAsPdf sx={{ color: "#ef4444", fontSize: 16 }} />;
+  if (t === "word")  return <Article sx={{ color: "#3b82f6", fontSize: 16 }} />;
+  if (t === "excel") return <InsertDriveFile sx={{ color: "#10b981", fontSize: 16 }} />;
+  return <AttachFile sx={{ color: "#6b7280", fontSize: 16 }} />;
 };
 
-// ─── WorkStepBar ─────────────────────────────────────────────────────
-const WorkStepBar = ({ currentStep }) => {
-  const stepIndex = WORK_STEPS.findIndex(s => s.key === currentStep);
-  return (
-    <Box sx={{ px: 1, py: 1.5 }}>
-      <Stack direction="row" alignItems="center">
-        {WORK_STEPS.map((step, i) => {
-          const done   = i < stepIndex;
-          const active = i === stepIndex;
-          const color  = i === 2 ? "#10b981" : i === 1 ? "#8b5cf6" : "#3b82f6";
-          return (
-            <React.Fragment key={step.key}>
-              <Stack alignItems="center" gap={0.5} sx={{ flex: i < WORK_STEPS.length - 1 ? "0 0 auto" : "0 0 auto" }}>
-                <StepDot active={active ? 1 : 0} done={done ? 1 : 0} color={color}>
-                  {done ? <CheckCircle sx={{ fontSize: 16 }} /> : step.icon}
-                </StepDot>
-                <Typography
-                  variant="caption"
-                  fontWeight={active ? 700 : 500}
-                  color={done || active ? color : "text.disabled"}
-                  sx={{ fontSize: "0.65rem", whiteSpace: "nowrap" }}>
-                  {step.label}
-                </Typography>
-              </Stack>
-              {i < WORK_STEPS.length - 1 && (
-                <Box sx={{
-                  flex: 1, height: 3, mx: 0.75, borderRadius: 2, mb: 2.5,
-                  background: done
-                    ? "linear-gradient(90deg, #3b82f6, #8b5cf6)"
-                    : alpha("#6b7280", 0.12),
-                  transition: "background 0.3s ease",
-                }} />
-              )}
-            </React.Fragment>
-          );
-        })}
+// ─── DocumentFileRow ──────────────────────────────────────────────────
+// แถวแนบไฟล์ (ใช้ร่วมกันทั้งเอกสารที่ required เสมอ และเอกสารที่เลือก "มี")
+const DocumentFileRow = ({ type, fileName, fileUrl, isUploading, uploadProgress, onFileUpload, onDeleteFile }) => {
+  const fileRef = useRef();
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) onFileUpload(file, type);
+  };
+
+  if (fileName) {
+    return (
+      <Stack direction="row" alignItems="center" gap={0.5} sx={{
+        p: 1, borderRadius: 1.5, bgcolor: alpha("#6b7280", 0.06),
+      }}>
+        {fileTypeIcon(fileName)}
+        <Typography variant="caption" color="text.secondary" noWrap flex={1} sx={{ fontSize: "0.8rem" }}>
+          {fileName}
+        </Typography>
+        <Tooltip title="ดาวน์โหลด">
+          <IconButton onClick={() => downloadFile(fileUrl, fileName)} sx={{ p: 1 }}>
+            <Download sx={{ fontSize: 18 }} />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="ลบไฟล์">
+          <IconButton color="error" onClick={() => onDeleteFile(type)} sx={{ p: 1 }}>
+            <Delete sx={{ fontSize: 18 }} />
+          </IconButton>
+        </Tooltip>
       </Stack>
+    );
+  }
+
+  if (isUploading) {
+    return <LinearProgress variant="determinate" value={uploadProgress || 0} sx={{ borderRadius: 2, height: 6 }} />;
+  }
+
+  return (
+    <>
+      <input ref={fileRef} type="file" hidden accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={handleFileChange} />
+      <Button
+        variant="outlined" fullWidth
+        startIcon={<CloudUpload sx={{ fontSize: 18 }} />}
+        onClick={() => fileRef.current?.click()}
+        sx={{ textTransform: "none", fontSize: "0.8rem", fontWeight: 600, borderRadius: 1.5, borderStyle: "dashed", py: 1 }}>
+        แนบไฟล์
+      </Button>
+    </>
+  );
+};
+
+// ─── DocumentChecklistItem ────────────────────────────────────────────
+// alwaysRequired (Service Report): แตะทั้งแถวเพื่อติ๊ก + แนบไฟล์
+// ไม่ใช่ alwaysRequired (ใบเสนอราคา/ใบวางบิล/ใบส่งมอบงาน): ต้องเลือก "มี/ไม่มี" ก่อน (ปุ่มใหญ่ กดง่ายบนมือถือ)
+// ถ้า "มี" ต้องแนบไฟล์ให้ครบถึงจะถือว่าเสร็จ, ถ้า "ไม่มี" ถือว่าเสร็จทันที
+const DocumentChecklistItem = ({
+  type, label, color, icon, event, alwaysRequired,
+  onToggleCheck, onSetApplicable, onFileUpload, onDeleteFile,
+  isUploading, uploadProgress,
+}) => {
+  const fileName  = event[`${type}FileName`];
+  const fileUrl   = event[`${type}FileUrl`];
+  const applicable = event[`${type}Applicable`];
+  const complete  = isDocComplete(event, type);
+  const checked   = Boolean(event[`documentSent${capitalize(type)}`]);
+
+  return (
+    <Box sx={{
+      borderRadius: 2, border: "1px solid",
+      borderColor: complete ? alpha(color, 0.35) : "divider",
+      background: complete ? alpha(color, 0.05) : "transparent",
+      transition: "all 0.15s ease",
+      overflow: "hidden",
+    }}>
+      {/* แถวหัวข้อ — แตะได้ทั้งแถวเพื่อติ๊ก (เฉพาะ Service Report) */}
+      <Stack direction="row" alignItems="center" gap={1.25}
+        onClick={alwaysRequired ? () => onToggleCheck(type, !checked) : undefined}
+        sx={{
+          p: 1.5,
+          cursor: alwaysRequired ? "pointer" : "default",
+          minHeight: 48,
+        }}>
+        <Box sx={{
+          width: 34, height: 34, borderRadius: "10px", flexShrink: 0,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          bgcolor: alpha(color, complete ? 0.18 : 0.1),
+          color,
+        }}>
+          {icon}
+        </Box>
+        <Typography variant="body2" fontWeight={700} flex={1}
+          color={complete ? color : "text.primary"}>
+          {label}
+        </Typography>
+        {alwaysRequired ? (
+          <Box sx={{
+            width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            border: `2px solid ${checked ? color : alpha("#6b7280", 0.4)}`,
+            background: checked ? color : "transparent",
+            transition: "all 0.15s ease",
+          }}>
+            {checked && <CheckCircle sx={{ fontSize: 16, color: "#fff" }} />}
+          </Box>
+        ) : complete ? (
+          <CheckCircle sx={{ fontSize: 22, color, flexShrink: 0 }} />
+        ) : null}
+      </Stack>
+
+      {/* เนื้อหาย่อย: คำเตือน / ปุ่มมี-ไม่มี / แนบไฟล์ */}
+      {alwaysRequired ? (
+        <Box sx={{ px: 1.5, pb: 1.5 }}>
+          {checked && !fileName && (
+            <Typography variant="caption" color="warning.main" sx={{ display: "block", mb: 0.75, fontWeight: 600 }}>
+              ⚠️ ต้องแนบไฟล์ก่อน จึงจะขอปิดงานได้
+            </Typography>
+          )}
+          <DocumentFileRow
+            type={type} fileName={fileName} fileUrl={fileUrl}
+            isUploading={isUploading} uploadProgress={uploadProgress}
+            onFileUpload={onFileUpload} onDeleteFile={onDeleteFile}
+          />
+        </Box>
+      ) : applicable === null || applicable === undefined ? (
+        <Box sx={{ px: 1.5, pb: 1.5 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.75 }}>
+            งานนี้มีเอกสารนี้หรือไม่?
+          </Typography>
+          <ToggleButtonGroup
+            fullWidth exclusive size="small"
+            value={null}
+            onChange={(_, val) => { if (val !== null) onSetApplicable(type, val === "yes"); }}
+            sx={{ height: 40 }}>
+            <ToggleButton value="yes" sx={{ textTransform: "none", fontWeight: 700, fontSize: "0.8rem", gap: 0.5 }}>
+              <CheckCircle sx={{ fontSize: 17 }} /> มี
+            </ToggleButton>
+            <ToggleButton value="no" sx={{ textTransform: "none", fontWeight: 700, fontSize: "0.8rem", gap: 0.5 }}>
+              <Close sx={{ fontSize: 17 }} /> ไม่มี
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
+      ) : applicable === false ? (
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 1.5, pb: 1.5 }}>
+          <Typography variant="caption" color="text.disabled">ไม่มีเอกสารนี้สำหรับงานนี้</Typography>
+          <Button size="small" onClick={() => onSetApplicable(type, true)}
+            sx={{ textTransform: "none", fontSize: "0.75rem", minWidth: "auto" }}>
+            เปลี่ยนเป็นมี
+          </Button>
+        </Stack>
+      ) : (
+        <Box sx={{ px: 1.5, pb: 1.5 }}>
+          <DocumentFileRow
+            type={type} fileName={fileName} fileUrl={fileUrl}
+            isUploading={isUploading} uploadProgress={uploadProgress}
+            onFileUpload={onFileUpload} onDeleteFile={onDeleteFile}
+          />
+          {!fileName && (
+            <Button size="small" onClick={() => onSetApplicable(type, false)}
+              sx={{ textTransform: "none", fontSize: "0.75rem", minWidth: "auto", p: 0, mt: 0.75, color: "text.disabled" }}>
+              เปลี่ยนเป็นไม่มี
+            </Button>
+          )}
+        </Box>
+      )}
     </Box>
   );
 };
 
 // ─── WorkNoteEditor ───────────────────────────────────────────────────
-const WorkNoteEditor = ({ eventId, currentNote, onSave, userName }) => {
+const WorkNoteEditor = ({ eventId, currentNote, onSave }) => {
   const [editing, setEditing] = useState(false);
   const [note,    setNote]    = useState(currentNote || "");
   const [saving,  setSaving]  = useState(false);
@@ -161,7 +308,7 @@ const WorkNoteEditor = ({ eventId, currentNote, onSave, userName }) => {
   const handleSave = async () => {
     if (!note.trim()) return;
     setSaving(true);
-    await onSave(eventId, note.trim(), userName);
+    await onSave(eventId, note.trim());
     setSaving(false);
     setEditing(false);
   };
@@ -234,25 +381,16 @@ const WorkNoteEditor = ({ eventId, currentNote, onSave, userName }) => {
 // ─── Main: TechnicianJobCard ──────────────────────────────────────────
 const TechnicianJobCard = ({
   event,
-  onStatusUpdate,
   onInputUpdate,
   onFileUpload,
   onDeleteFile,
   uploadingState,
   isUploadingState,
   uploadProgressState,
-  currentUserRole,
-  isTechnicianView = true,
 }) => {
-  const [expanded,   setExpanded]   = useState(false);
-  const [localStep,  setLocalStep]  = useState(
-    event.status === "ดำเนินการเสร็จสิ้น" ? "done"
-    : event.status === "กำลังดำเนินการ"   ? "in_progress"
-    : "received"
-  );
-  const [checkingIn,  setCheckingIn]  = useState(false);
-  const [checkingOut, setCheckingOut] = useState(false);
-  const fileRef = useRef();
+  const [expanded,        setExpanded]        = useState(false);
+  const [docsExpanded,    setDocsExpanded]     = useState(false);
+  const [requestingClose, setRequestingClose] = useState(false);
 
   // ดึง userName จาก localStorage
   const payload  = JSON.parse(localStorage.getItem("payload") || "{}");
@@ -270,55 +408,72 @@ const TechnicianJobCard = ({
     await onInputUpdate(event._id, { activityLog: updated });
   }, [event._id, event.activityLog, onInputUpdate, userName]);
 
-  // ── Check In ────────────────────────────────────────────────────
-  const handleCheckIn = async () => {
-    if (event.checkedInAt) return; // กันกด 2 ครั้ง
-    setCheckingIn(true);
-    const now = new Date().toISOString();
+  // ── Toggle เอกสาร (ติ๊ก/ยกเลิกติ๊ก) — เฉพาะ Service Report ─────────
+  const handleToggleDocument = async (type, checked) => {
+    const label = DOCUMENT_TYPES.find(d => d.type === type)?.label || type;
+    const newLog = {
+      action: "document_checked",
+      detail: `${label} ${checked ? "✓ ติ๊กแล้ว" : "ยกเลิกติ๊ก"}`,
+      userName,
+      timestamp: new Date().toISOString(),
+    };
     await onInputUpdate(event._id, {
-      checkedInAt: now,
-      status: "กำลังดำเนินการ",
+      [`documentSent${capitalize(type)}`]: checked,
+      activityLog: [...(event.activityLog || []), newLog],
     });
-    await pushLog("check_in", `เช็คอิน ${moment(now).format("HH:mm")}`);
-    setLocalStep("in_progress");
-    onStatusUpdate(event._id, { status: "กำลังดำเนินการ" });
-    setCheckingIn(false);
   };
 
-  // ── Check Out ───────────────────────────────────────────────────
-  const handleCheckOut = async () => {
-    if (event.checkedOutAt) return;
-    setCheckingOut(true);
+  // ── เลือก "มี/ไม่มี" เอกสาร (quotation/invoice/completion) ─────────
+  const handleSetApplicable = async (type, applicable) => {
+    const label = DOCUMENT_TYPES.find(d => d.type === type)?.label || type;
+    const newLog = {
+      action: "document_applicable_set",
+      detail: `${label}: ${applicable ? "มีเอกสารนี้" : "ไม่มีเอกสารนี้"}`,
+      userName,
+      timestamp: new Date().toISOString(),
+    };
+    const updates = {
+      [`${type}Applicable`]: applicable,
+      activityLog: [...(event.activityLog || []), newLog],
+    };
+    // ไม่มี = ถือว่าจัดการแล้วทันที / มี = ยังไม่เสร็จจนกว่าจะแนบไฟล์ (เผื่อสลับมาจาก "ไม่มี" เดิม)
+    updates[`documentSent${capitalize(type)}`] = applicable === false;
+    await onInputUpdate(event._id, updates);
+  };
+
+  // ── อัปโหลด/ลบไฟล์เอกสาร ──────────────────────────────────────────
+  const handleDocFileUpload = (file, type) => {
+    onFileUpload(file, event._id, type);
+    const label = DOCUMENT_TYPES.find(d => d.type === type)?.label || type;
+    pushLog("file_uploaded", `${label}: ${file.name}`);
+  };
+
+  const handleDocFileDelete = (type) => {
+    onDeleteFile(event._id, type);
+  };
+
+  const completedDocCount = DOCUMENT_TYPES.filter(doc => isDocComplete(event, doc.type)).length;
+  const canRequestClose   = completedDocCount === DOCUMENT_TYPES.length;
+
+  // ── Request Close (ขอปิดงาน) ──────────────────────────────────────
+  const handleRequestClose = async () => {
+    if (event.closeRequested) return;
+    setRequestingClose(true);
     const now = new Date().toISOString();
     await onInputUpdate(event._id, {
-      checkedOutAt: now,
-      status: "ดำเนินการเสร็จสิ้น",
+      closeRequested: true,
+      closeRequestedAt: now,
+      closeRequestedBy: userName,
     });
-    await pushLog("check_out", `เช็คเอาท์ ${moment(now).format("HH:mm")}`);
-    setLocalStep("done");
-    onStatusUpdate(event._id, { status: "ดำเนินการเสร็จสิ้น" });
-    setCheckingOut(false);
+    await pushLog("close_requested", "ขอปิดงาน รอแอดมินอนุมัติ");
+    setRequestingClose(false);
   };
 
   // ── Save Work Note ───────────────────────────────────────────────
-  const handleSaveNote = async (eventId, note, uName) => {
+  const handleSaveNote = async (eventId, note) => {
     await onInputUpdate(eventId, { workNote: note });
     await pushLog("note_saved", note.slice(0, 80) + (note.length > 80 ? "…" : ""));
   };
-
-  // ── File Upload ──────────────────────────────────────────────────
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      onFileUpload(file, event._id, "report");
-      pushLog("file_uploaded", file.name);
-    }
-  };
-
-  // ── Duration ────────────────────────────────────────────────────
-  const duration = event.checkedInAt && event.checkedOutAt
-    ? moment.duration(moment(event.checkedOutAt).diff(moment(event.checkedInAt))).humanize()
-    : null;
 
   const statusColor = OP_COLOR[event.status] || "#6b7280";
 
@@ -360,62 +515,120 @@ const TechnicianJobCard = ({
               </Typography>
             </Box>
           </Stack>
-          <IconButton size="small" onClick={() => setExpanded(p => !p)}
-            sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2 }}>
-            {expanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+          <IconButton onClick={() => setExpanded(p => !p)}
+            sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1 }}>
+            {expanded ? <ExpandLess /> : <ExpandMore />}
           </IconButton>
         </Stack>
 
-        {/* ── Step Bar ── */}
-        <Box sx={{ mt: 2, mb: 0.5 }}>
-          <WorkStepBar currentStep={localStep} />
+        {/* ── เอกสารประจำงาน: หลอดความคืบหน้า + dropdown ── */}
+        <Box sx={{ mt: 2 }}>
+          <Box
+            onClick={() => setDocsExpanded(p => !p)}
+            sx={{
+              cursor: "pointer", p: 1.5, borderRadius: 2, minHeight: 56,
+              border: "1px solid", borderColor: "divider",
+              "&:active": { bgcolor: alpha("#6b7280", 0.06) },
+              "&:hover": { borderColor: canRequestClose ? "#10b981" : "#3b82f6" },
+            }}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+              <Typography variant="body2" fontWeight={700} color="text.secondary">
+                📋 เอกสารประจำงาน
+              </Typography>
+              <Stack direction="row" alignItems="center" gap={0.5}>
+                <Typography variant="body2" fontWeight={800} color={canRequestClose ? "#10b981" : "text.secondary"}>
+                  {completedDocCount}/{DOCUMENT_TYPES.length}
+                </Typography>
+                {docsExpanded ? <ExpandLess sx={{ fontSize: 22, color: "text.secondary" }} /> : <ExpandMore sx={{ fontSize: 22, color: "text.secondary" }} />}
+              </Stack>
+            </Stack>
+            <LinearProgress
+              variant="determinate"
+              value={(completedDocCount / DOCUMENT_TYPES.length) * 100}
+              sx={{
+                height: 10, borderRadius: 5,
+                bgcolor: alpha("#6b7280", 0.12),
+                "& .MuiLinearProgress-bar": {
+                  bgcolor: canRequestClose ? "#10b981" : "#3b82f6",
+                  borderRadius: 5,
+                },
+              }}
+            />
+          </Box>
+
+          <Collapse in={docsExpanded}>
+            <Stack spacing={1} sx={{ mt: 1.5 }}>
+              {DOCUMENT_TYPES.map(doc => (
+                <DocumentChecklistItem
+                  key={doc.type}
+                  type={doc.type}
+                  label={doc.label}
+                  color={doc.color}
+                  icon={doc.icon}
+                  event={event}
+                  alwaysRequired={doc.alwaysRequired}
+                  onToggleCheck={handleToggleDocument}
+                  onSetApplicable={handleSetApplicable}
+                  onFileUpload={handleDocFileUpload}
+                  onDeleteFile={handleDocFileDelete}
+                  isUploading={Boolean(isUploadingState?.[doc.type]) && uploadingState?.[doc.type] === event._id}
+                  uploadProgress={uploadProgressState?.[doc.type] || 0}
+                />
+              ))}
+            </Stack>
+          </Collapse>
         </Box>
 
-        {/* ── Check In / Out Row ── */}
-        <Stack direction="row" gap={1.5} alignItems="center" flexWrap="wrap" sx={{ mt: 1.5 }}>
-          {!event.checkedInAt ? (
+        {/* ── Request Close (ขอปิดงาน) ── */}
+        {event.status === "ดำเนินการเสร็จสิ้น" ? (
+          <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap" sx={{
+            mt: 1.5, px: 1.5, py: 0.8, borderRadius: 2, bgcolor: alpha("#10b981", 0.08),
+          }}>
+            <TaskAlt sx={{ fontSize: 16, color: "#10b981" }} />
+            <Typography variant="caption" fontWeight={700} color="#10b981">
+              แอดมินอนุมัติปิดงานแล้ว
+            </Typography>
+            {event.closeApprovedAt && (
+              <Typography variant="caption" color="text.disabled">
+                · {moment(event.closeApprovedAt).locale("th").format("DD MMM HH:mm")}
+              </Typography>
+            )}
+          </Stack>
+        ) : event.closeRequested ? (
+          <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap" sx={{
+            mt: 1.5, px: 1.5, py: 0.8, borderRadius: 2, bgcolor: alpha("#f59e0b", 0.08),
+          }}>
+            <HourglassTop sx={{ fontSize: 16, color: "#f59e0b" }} />
+            <Typography variant="caption" fontWeight={700} color="#f59e0b">
+              รอแอดมินอนุมัติปิดงาน
+            </Typography>
+            {event.closeRequestedAt && (
+              <Typography variant="caption" color="text.disabled">
+                · ขอเมื่อ {moment(event.closeRequestedAt).locale("th").format("DD MMM HH:mm")}
+              </Typography>
+            )}
+          </Stack>
+        ) : canRequestClose ? (
+          <Box sx={{ mt: 1.5 }}>
             <ActionBtn
               variant="contained"
-              btncolor="#8b5cf6"
-              startIcon={<Login sx={{ fontSize: 16 }} />}
-              onClick={handleCheckIn}
-              disabled={checkingIn}>
-              {checkingIn ? "กำลังเช็คอิน..." : "เช็คอิน"}
+              btncolor="#f59e0b"
+              startIcon={<TaskAlt sx={{ fontSize: 16 }} />}
+              onClick={handleRequestClose}
+              disabled={requestingClose}
+              fullWidth>
+              {requestingClose ? "กำลังส่งคำขอ..." : "ขอปิดงาน"}
             </ActionBtn>
-          ) : (
-            <Stack direction="row" alignItems="center" gap={0.75}
-              sx={{ px: 1.5, py: 0.6, borderRadius: 2, bgcolor: alpha("#8b5cf6", 0.08) }}>
-              <Login sx={{ fontSize: 14, color: "#8b5cf6" }} />
-              <Typography variant="caption" fontWeight={700} color="#8b5cf6">
-                เข้างาน {moment(event.checkedInAt).format("HH:mm")}
-              </Typography>
-            </Stack>
-          )}
+          </Box>
+        ) : (
+          <Typography variant="caption" color="text.disabled"
+            onClick={() => setDocsExpanded(true)}
+            sx={{ display: "block", mt: 1.5, textAlign: "center", cursor: "pointer", "&:hover": { textDecoration: "underline" } }}>
+            จัดการเอกสารให้ครบก่อน จึงจะขอปิดงานได้ ({completedDocCount}/{DOCUMENT_TYPES.length})
+          </Typography>
+        )}
 
-          {event.checkedInAt && !event.checkedOutAt ? (
-            <ActionBtn
-              variant="contained"
-              btncolor="#10b981"
-              startIcon={<Logout sx={{ fontSize: 16 }} />}
-              onClick={handleCheckOut}
-              disabled={checkingOut}>
-              {checkingOut ? "กำลังบันทึก..." : "เสร็จงาน / เช็คเอาท์"}
-            </ActionBtn>
-          ) : event.checkedOutAt ? (
-            <Stack direction="row" alignItems="center" gap={0.75}
-              sx={{ px: 1.5, py: 0.6, borderRadius: 2, bgcolor: alpha("#10b981", 0.08) }}>
-              <Logout sx={{ fontSize: 14, color: "#10b981" }} />
-              <Typography variant="caption" fontWeight={700} color="#10b981">
-                เสร็จงาน {moment(event.checkedOutAt).format("HH:mm")}
-              </Typography>
-              {duration && (
-                <Typography variant="caption" color="text.disabled">· ใช้เวลา {duration}</Typography>
-              )}
-            </Stack>
-          ) : null}
-        </Stack>
-
-        {/* ── Expanded: WorkNote + Upload ── */}
+        {/* ── Expanded: WorkNote + ActivityLog ── */}
         <Collapse in={expanded}>
           <Divider sx={{ my: 2 }} />
 
@@ -430,55 +643,7 @@ const TechnicianJobCard = ({
                 eventId={event._id}
                 currentNote={event.workNote}
                 onSave={handleSaveNote}
-                userName={userName}
               />
-            </Box>
-
-            {/* อัปโหลดรายงาน */}
-            <Box>
-              <Typography variant="caption" fontWeight={700} color="text.secondary"
-                sx={{ textTransform: "uppercase", letterSpacing: 0.5, display: "block", mb: 1 }}>
-                รายงาน / รูปภาพงาน
-              </Typography>
-
-              {event.reportFileName ? (
-                <Stack direction="row" alignItems="center" gap={1} sx={{
-                  p: 1.5, borderRadius: 2, border: "1px solid",
-                  borderColor: alpha("#10b981", 0.25),
-                  background: alpha("#10b981", 0.04),
-                }}>
-                  {fileTypeIcon(event.reportFileName)}
-                  <Typography variant="caption" fontWeight={600} flex={1} noWrap>
-                    {event.reportFileName}
-                  </Typography>
-                  <IconButton size="small" component="a" href={event.reportFileUrl} download target="_blank">
-                    <Download sx={{ fontSize: 16 }} />
-                  </IconButton>
-                </Stack>
-              ) : isUploadingState?.report ? (
-                <Box sx={{ p: 1.5, borderRadius: 2, border: "1px solid", borderColor: "primary.main" }}>
-                  <Typography variant="caption" color="text.secondary" display="block" mb={0.5}>
-                    กำลังอัปโหลด...
-                  </Typography>
-                  <LinearProgress
-                    variant="determinate"
-                    value={uploadProgressState?.report || 0}
-                    sx={{ borderRadius: 2, height: 6 }}
-                  />
-                </Box>
-              ) : (
-                <>
-                  <input ref={fileRef} type="file" hidden accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={handleFileChange} />
-                  <ActionBtn
-                    variant="outlined"
-                    btncolor="#f59e0b"
-                    startIcon={<CloudUpload sx={{ fontSize: 16 }} />}
-                    onClick={() => fileRef.current?.click()}
-                    fullWidth>
-                    อัปโหลดรายงาน / รูปภาพ
-                  </ActionBtn>
-                </>
-              )}
             </Box>
 
             {/* ActivityLog mini (ของช่างเอง) */}
@@ -496,10 +661,11 @@ const TechnicianJobCard = ({
                         {moment(log.timestamp).format("HH:mm")}
                       </Typography>
                       <Typography variant="caption" fontWeight={600} color="text.secondary">
-                        {log.action === "check_in"   ? "เช็คอิน"
-                        : log.action === "check_out"  ? "เช็คเอาท์"
-                        : log.action === "note_saved" ? "บันทึกสรุปงาน"
-                        : log.action === "file_uploaded" ? "อัปโหลดไฟล์"
+                        {log.action === "note_saved"             ? "บันทึกสรุปงาน"
+                        : log.action === "file_uploaded"          ? "อัปโหลดไฟล์"
+                        : log.action === "document_checked"       ? "ทำเครื่องหมายเอกสาร"
+                        : log.action === "document_applicable_set" ? "ระบุมี/ไม่มีเอกสาร"
+                        : log.action === "close_requested"        ? "ขอปิดงาน"
                         : log.action}
                       </Typography>
                       {log.detail && (

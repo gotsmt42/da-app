@@ -4,8 +4,9 @@ export const getFetchEvents = async ({
   setLoading,
   EventService,
   fetchThaiHolidaysFromAPI,
+  silent = false,
 }) => {
-  setLoading(true);
+  if (!silent) setLoading(true);
 
   try {
     // เรียก API พร้อมกัน
@@ -51,8 +52,10 @@ export const getFetchEvents = async ({
     setEvents(combinedEvents);
   } catch (error) {
     console.error("❌ Error fetching events or holidays:", error);
-    setEvents([]); // fallback กรณี error
+    // ✅ ล้างข้อมูลเฉพาะตอนโหลดครั้งแรก (ไม่ใช่ตอน background refresh)
+    // ไม่งั้น network สะดุดแค่แป๊บเดียวระหว่าง polling จะทำให้ปฏิทินว่างเปล่าทั้งที่ไม่มีอะไรผิดปกติจริง
+    if (!silent) setEvents([]);
   } finally {
-    setLoading(false);
+    if (!silent) setLoading(false);
   }
 };

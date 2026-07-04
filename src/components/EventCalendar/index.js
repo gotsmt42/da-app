@@ -88,6 +88,14 @@ function EventCalendar() {
 
   const userId = userData?.userId; // หรือ field ที่เก็บ id ของ user
 
+  // ✅ แก้ไขได้ถ้า: เป็น admin, เป็นคนเพิ่ม event เอง, หรือได้รับมอบหมาย
+  // (resPerson ตรงกับ ID ตัวเอง หรือ team ตรงกับชื่อตัวเอง — เผื่อ event เก่าที่ยังไม่มี resPerson)
+  const canEditEvent = (extendedProps) =>
+    isAdmin
+    || extendedProps?.userId === userId
+    || (extendedProps?.resPerson && extendedProps.resPerson === userId)
+    || (extendedProps?.team && extendedProps.team === userData?.fname);
+
   const employees = AuthService.getAllUserData();
 
   const [events, setEvents] = useState([]);
@@ -109,6 +117,16 @@ function EventCalendar() {
   useEffect(() => {
     fetchEventsFromDB();
     initExternalEvents(); // ✅ เรียกใช้เมื่อลง component
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ✅ Realtime: รีเฟรชข้อมูลเงียบๆ ทุก 30 วินาที เพื่อให้เห็นการเปลี่ยนแปลง
+  // จากคนอื่น (เพิ่ม/แก้ไข/ลบ event) โดยไม่ต้องกดรีเฟรชหน้าเอง
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchEventsFromDB(true);
+    }, 30000);
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -280,15 +298,15 @@ function EventCalendar() {
     }
   };
 
-  const fetchEventsFromDB = async () => {
+  const fetchEventsFromDB = async (silent = false) => {
     await getFetchEvents({
       defaultFontSize,
       setEvents,
       setLoading,
       EventService,
       fetchThaiHolidaysFromAPI,
+      silent,
     });
-    
   };
 
   const saveEventToDB = async (newEvent) => {
@@ -502,8 +520,8 @@ function EventCalendar() {
           </button>
           <CSVLink
             data={
-              events
-                ? Object.values(events)
+              filteredCalendarEvents
+                ? Object.values(filteredCalendarEvents)
                     .sort((a, b) => new Date(a.start) - new Date(b.start))
                     .map((event) => ({
                       วันที่เริ่มต้น: moment(event.start).format("YYYY-MM-DD"),
@@ -574,10 +592,9 @@ function EventCalendar() {
               return;
             }
 
-            const eventResponsible = arg.event.extendedProps?.userId;
-            if (isAdmin || eventResponsible === userId) {
+            if (canEditEvent(arg.event.extendedProps)) {
               handleEditEvent(arg);
-              
+
             } else {
               Swal.fire("❌ คุณไม่มีสิทธิ์แก้ไขแผนงานนี้");
             }
@@ -589,8 +606,7 @@ function EventCalendar() {
               return;
             }
 
-            const eventResponsible = arg.event.extendedProps?.userId;
-            if (isAdmin || eventResponsible === userId) {
+            if (canEditEvent(arg.event.extendedProps)) {
               handleEventDrop(arg);
             } else {
               Swal.fire("❌ คุณไม่มีสิทธิ์แก้ไขแผนงานนี้");
@@ -603,8 +619,7 @@ function EventCalendar() {
               return;
             }
 
-            const eventResponsible = arg.event.extendedProps?.userId;
-            if (isAdmin || eventResponsible === userId) {
+            if (canEditEvent(arg.event.extendedProps)) {
               handleEventResize(arg);
             } else {
               Swal.fire("❌ คุณไม่มีสิทธิ์แก้ไขแผนงานนี้");
@@ -714,15 +729,8 @@ function EventCalendar() {
               ดำเนินการเสร็จสิ้นเก็บเงินแล้ว: "ดำเนินการเสร็จสิ้นเก็บเงินแล้ว",
             };
 
-            const eventOwnerId = info.event.extendedProps?.userId; // เจ้าของเดิม
-            const isOwner = eventOwnerId?.toString() === userId?.toString();
-
-            const eventResPerson = info.event.extendedProps?.resPerson; // เจ้าของเดิม
-            const isResperson =
-              eventResPerson?.toString() === userId?.toString();
-
-            // ✅ ถ้าไม่ใช่ admin และไม่ใช่เจ้าของ → ทำให้สีซีดลง
-            if (!isAdmin && !isOwner && !isResperson) {
+            // ✅ ถ้าแก้ไขไม่ได้ (ไม่ใช่ admin/เจ้าของ/ผู้ได้รับมอบหมาย) → ทำให้สีซีดลง
+            if (!canEditEvent(info.event.extendedProps)) {
               info.el.style.opacity = "0.7"; // ทำให้ซีดลง
               info.el.style.filter = "grayscale(10%)"; // เพิ่มความซีดด้วย grayscale
             } else {
@@ -892,6 +900,18 @@ function EventCalendar() {
                 <span>{status.label}</span>
               </div>
             ))}
+            <div
+              className="legend-item"
+              style={{ display: "flex", alignItems: "center", gap: "8px", opacity: 0.7, filter: "grayscale(10%)" }}
+            >
+              <span
+                style={{
+                  display: "inline-block", width: 14, height: 14, borderRadius: 3,
+                  background: "#8A8A8A",
+                }}
+              />
+              <span>งานสีจาง = ไม่ใช่งานของคุณ (ดูได้ แต่แก้ไขไม่ได้)</span>
+            </div>
           </div>
         </div>
       </div>

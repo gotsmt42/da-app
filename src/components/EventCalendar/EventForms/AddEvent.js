@@ -179,6 +179,9 @@ export const getAddEvent = async ({
     AuthService.getAllUserData(),
   ]);
   const employeeList = employees?.allUser || [];
+  // ใช้ผูก resPerson (ID จริง) จากชื่อที่เลือกใน dropdown ทีม
+  // เพื่อให้ technician มองเห็น/จัดการงานของตัวเองในหน้า Operation ได้ถูกต้อง
+  const teamToId = new Map(employeeList.map((e) => [e.fname, e._id]));
 
   const displayDate = moment(arg.dateStr).format("DD MMMM YYYY");
 
@@ -337,7 +340,7 @@ export const getAddEvent = async ({
       /* buttons */
       document.getElementById("ae-btnCancel")?.addEventListener("click", () => Swal.close());
 
-      document.getElementById("ae-btnConfirm")?.addEventListener("click", async () => {
+      document.getElementById("ae-btnConfirm")?.addEventListener("click", async (clickEvt) => {
         const getVal = (id) => document.getElementById(id)?.value?.trim() || "";
 
         const site   = getVal("eventSite");
@@ -348,53 +351,69 @@ export const getAddEvent = async ({
         if (!title)  { Swal.showValidationMessage("กรุณาระบุประเภทงาน");    return; }
         if (!system) { Swal.showValidationMessage("กรุณาระบุระบบงาน");      return; }
 
-        const payload = {
-          company:         getVal("eventCompany"),
-          site,
-          title,
-          system,
-          time:            getVal("eventTime"),
-          team:            getVal("eventTeam"),
-          backgroundColor: document.getElementById("backgroundColorPicker")?.value,
-          textColor:       document.getElementById("textColorPicker")?.value,
-          fontSize:        getVal("fontSize") || "8",
-          start:           getVal("start"),
-          end:             getVal("end"),
-          startTime:       getVal("startTime"),
-          endTime:         getVal("endTime"),
-        };
+        // ✅ กันกดซ้ำระหว่างบันทึก + ให้เห็นว่ากำลังทำงานอยู่
+        const btn = clickEvt.currentTarget;
+        const originalLabel = btn.textContent;
+        btn.disabled = true;
+        btn.style.opacity = "0.7";
+        btn.textContent = "⏳ กำลังบันทึก...";
 
-        const newEnd = moment(payload.end).add(1, "days");
-        const newEvent = {
-          ...payload,
-          date: arg.dateStr,
-          end:  newEnd.format("YYYY-MM-DD"),
-        };
+        try {
+          const payload = {
+            company:         getVal("eventCompany"),
+            site,
+            title,
+            system,
+            time:            getVal("eventTime"),
+            team:            getVal("eventTeam"),
+            resPerson:       teamToId.get(getVal("eventTeam")) || "",
+            backgroundColor: document.getElementById("backgroundColorPicker")?.value,
+            textColor:       document.getElementById("textColorPicker")?.value,
+            fontSize:        getVal("fontSize") || "8",
+            start:           getVal("start"),
+            end:             getVal("end"),
+            startTime:       getVal("startTime"),
+            endTime:         getVal("endTime"),
+          };
 
-        /* upsert customer */
-        const existing = customers.userCustomers.find(
-          (c) => c.cCompany === payload.company && c.cSite === payload.site
-        );
-        if (!existing) {
-          await CustomerService.AddCustomer({
-            cCompany: payload.company ?? "",
-            cSite:    payload.site    ?? "",
+          const newEnd = moment(payload.end).add(1, "days");
+          const newEvent = {
+            ...payload,
+            date: arg.dateStr,
+            end:  newEnd.format("YYYY-MM-DD"),
+          };
+
+          /* upsert customer */
+          const existing = customers.userCustomers.find(
+            (c) => c.cCompany === payload.company && c.cSite === payload.site
+          );
+          if (!existing) {
+            await CustomerService.AddCustomer({
+              cCompany: payload.company ?? "",
+              cSite:    payload.site    ?? "",
+            });
+          }
+
+          setEvents((prev) => [...prev, newEvent]);
+          await saveEventToDB(newEvent);
+          setDefaultTextColor(payload.textColor);
+          setDefaultBackgroundColor(payload.backgroundColor);
+          setDefaultFontSize(payload.fontSize);
+          await fetchEventsFromDB();
+
+          Swal.fire({
+            title: "บันทึกแผนงานสำเร็จ ✅",
+            icon: "success",
+            timer: 1200,
+            showConfirmButton: false,
           });
+        } catch (error) {
+          console.error("❌ Error saving event:", error);
+          btn.disabled = false;
+          btn.style.opacity = "1";
+          btn.textContent = originalLabel;
+          Swal.showValidationMessage("บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
         }
-
-        setEvents((prev) => [...prev, newEvent]);
-        await saveEventToDB(newEvent);
-        setDefaultTextColor(payload.textColor);
-        setDefaultBackgroundColor(payload.backgroundColor);
-        setDefaultFontSize(payload.fontSize);
-        await fetchEventsFromDB();
-
-        Swal.fire({
-          title: "บันทึกแผนงานสำเร็จ ✅",
-          icon: "success",
-          timer: 1200,
-          showConfirmButton: false,
-        });
       });
     },
   });

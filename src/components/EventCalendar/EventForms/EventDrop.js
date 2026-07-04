@@ -39,15 +39,17 @@ export const getEventDrop = async ({
   try {
     await EventService.UpdateEvent(event.id, updatedEvent);
 
-    // อัปเดตเฉพาะ event ที่เปลี่ยนใน state
+    // อัปเดตทันทีแบบ optimistic ให้เห็นผลไว ๆ ก่อน
     setEvents((prevEvents) =>
       prevEvents.map((e) =>
         e.id === updatedEvent.id ? { ...e, ...updatedEvent } : e
       )
     );
 
+    // แล้วรีเฟรชเงียบ ๆ เพื่อให้ตรงกับข้อมูลจริงบนเซิร์ฟเวอร์เสมอ (เผื่อมีผลข้างเคียงอื่น)
+    await fetchEventsFromDB(true);
+
     console.log(`✅ Event ${event.id} updated`);
-    // ไม่ต้อง fetchEventsFromDB ถ้าเราอัปเดต state แล้ว
   } catch (error) {
     console.error("❌ Error updating event:", error);
     Swal.fire("เกิดข้อผิดพลาด", "ไม่สามารถอัปเดตแผนงานได้", "error");

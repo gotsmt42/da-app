@@ -257,10 +257,10 @@ function injectStyles() {
 }
 
 const STATUS_CONFIG = {
-  "กำลังรอยืนยัน":      { bg: "linear-gradient(135deg,#475569,#64748b)", icon: "⏳" },
-  "ยืนยันแล้ว":         { bg: "linear-gradient(135deg,#1d4ed8,#2563eb)", icon: "✅" },
-  "กำลังดำเนินการ":     { bg: "linear-gradient(135deg,#92400e,#d97706)", icon: "🔄" },
-  "ดำเนินการเสร็จสิ้น": { bg: "linear-gradient(135deg,#065f46,#10b981)", icon: "🎉" },
+  กำลังรอยืนยัน: { bg: "linear-gradient(135deg,#475569,#64748b)", icon: "⏳" },
+  ยืนยันแล้ว: { bg: "linear-gradient(135deg,#1d4ed8,#2563eb)", icon: "✅" },
+  // "กำลังดำเนินการ":     { bg: "linear-gradient(135deg,#92400e,#d97706)", icon: "🔄" },
+  // "ดำเนินการเสร็จสิ้น": { bg: "linear-gradient(135deg,#065f46,#10b981)", icon: "🎉" },
 };
 
 export const getEditEvent = async ({
@@ -283,70 +283,117 @@ export const getEditEvent = async ({
 }) => {
   injectStyles();
 
-  const ev             = eventInfo.event;
-  const eventId        = ev.id;
-  const eventTitle     = ev.title;
-  const evendocNo      = ev.extendedProps?.docNo        || "";
-  const eventCompany   = ev.extendedProps?.company      || "";
-  const eventSite      = ev.extendedProps?.site         || "";
-  const eventSystem    = ev.extendedProps?.system       || "";
-  const eventTeam      = ev.extendedProps?.team         || "";
-  const eventTime      = ev.extendedProps?.time         || "";
-  const eventFontSize  = ev.extendedProps?.fontSize;
-  const eventStart     = moment(ev.start);
-  const eventEnd       = moment(ev.end);
-  const eventAllDay    = ev.allDay;
-  const eventStatus    = ev.extendedProps?.status       || "กำลังรอยืนยัน";
-  const eventSubject   = ev.extendedProps?.subject      || "";
+  const ev = eventInfo.event;
+  const eventId = ev.id;
+  const eventTitle = ev.title;
+  const evendocNo = ev.extendedProps?.docNo || "";
+  const eventCompany = ev.extendedProps?.company || "";
+  const eventSite = ev.extendedProps?.site || "";
+  const eventSystem = ev.extendedProps?.system || "";
+  const eventTeam = ev.extendedProps?.team || "";
+  const eventTime = ev.extendedProps?.time || "";
+  const eventFontSize = ev.extendedProps?.fontSize;
+  const eventStart = moment(ev.start);
+  const eventEnd = moment(ev.end);
+  const eventAllDay = ev.allDay;
+  const eventStatus = ev.extendedProps?.status || "กำลังรอยืนยัน";
+  const eventSubject = ev.extendedProps?.subject || "";
   const eventDescription = ev.extendedProps?.description || "";
-  const eventStartTime = ev.extendedProps?.startTime    || "";
-  const eventEndTime   = ev.extendedProps?.endTime      || "";
-  const userId         = ev.extendedProps?.userId;
+  const eventStartTime = ev.extendedProps?.startTime || "";
+  const eventEndTime = ev.extendedProps?.endTime || "";
+  const userId = ev.extendedProps?.userId;
 
   const formattedEnd = eventAllDay
     ? moment(eventEnd).subtract(1, "days").format("YYYY-MM-DD")
     : moment(eventEnd).format("YYYY-MM-DD");
 
-  const res          = await CustomerService.getCustomers();
-  const employees    = await AuthService.getAllUserData();
+  const res = await CustomerService.getCustomers();
+  const employees = await AuthService.getAllUserData();
   const employeeList = employees?.allUser || [];
+  // ใช้ผูก resPerson (ID จริง) จากชื่อที่เลือกใน dropdown ทีม
+  // เพื่อให้ technician มองเห็น/จัดการงานของตัวเองในหน้า Operation ได้ถูกต้อง
+  const teamToId = new Map(employeeList.map((e) => [e.fname, e._id]));
 
   const eventOwner = employeeList.find(
-    (e) => e?._id?.toString() === userId?.toString()
+    (e) => e?._id?.toString() === userId?.toString(),
   );
-  const footerName = eventOwner?.username
-    || (eventOwner ? `${eventOwner.fname} ${eventOwner.lname}` : "ไม่ทราบผู้เพิ่ม");
+  const footerName =
+    eventOwner?.username ||
+    (eventOwner
+      ? `${eventOwner.fname} ${eventOwner.lname}`
+      : "ไม่ทราบผู้เพิ่ม");
 
-  const inputBg   = Object.assign(document.createElement("input"), {
-    type: "color", value: ev.backgroundColor || "#3b82f6",
+  const inputBg = Object.assign(document.createElement("input"), {
+    type: "color",
+    value: ev.backgroundColor || "#3b82f6",
   });
   const inputText = Object.assign(document.createElement("input"), {
-    type: "color", value: ev.textColor || "#ffffff",
+    type: "color",
+    value: ev.textColor || "#ffffff",
   });
 
   const statusOptions = Object.keys(STATUS_CONFIG)
-    .map(s => `<option value="${s}" ${eventStatus === s ? "selected" : ""}>${s}</option>`)
+    .map(
+      (s) =>
+        `<option value="${s}" ${eventStatus === s ? "selected" : ""}>${s}</option>`,
+    )
     .join("");
 
-  const custOpt = (field) => res.userCustomers.map(c => {
-    const val     = field === "company" ? c.cCompany : c.cSite;
-    const current = field === "company" ? eventCompany : eventSite;
-    return `<option value="${val}" ${current === val ? "selected" : ""}>${val}</option>`;
-  }).join("");
+  const custOpt = (field) =>
+    res.userCustomers
+      .map((c) => {
+        const val = field === "company" ? c.cCompany : c.cSite;
+        const current = field === "company" ? eventCompany : eventSite;
+        return `<option value="${val}" ${current === val ? "selected" : ""}>${val}</option>`;
+      })
+      .join("");
 
-  const titleOpts = ["LOCAL","PO","PM","Service","Training","Inspection",
-    "Test & Commissioning","สำรวจหน้างาน","ตรวจเช็คปัญหา","แก้ไขปัญหา",
-    "สแตนบาย","เปลี่ยนอุปกรณ์","ติดตั้งอุปกรณ์"]
-    .map(t => `<option value="${t}" ${eventTitle===t?"selected":""}>${t}</option>`).join("");
+  const titleOpts = [
+    "LOCAL",
+    "PO",
+    "PM",
+    "Service",
+    "Training",
+    "Inspection",
+    "Test & Commissioning",
+    "สำรวจหน้างาน",
+    "ตรวจเช็คปัญหา",
+    "แก้ไขปัญหา",
+    "สแตนบาย",
+    "เปลี่ยนอุปกรณ์",
+    "ติดตั้งอุปกรณ์",
+  ]
+    .map(
+      (t) =>
+        `<option value="${t}" ${eventTitle === t ? "selected" : ""}>${t}</option>`,
+    )
+    .join("");
 
-  const systemOpts = ["Office","Fire Alarm","CCTV","Access Control","Networks"]
-    .map(s => `<option value="${s}" ${eventSystem===s?"selected":""}>${s}</option>`).join("");
+  const systemOpts = [
+    "Office",
+    "Fire Alarm",
+    "CCTV",
+    "Access Control",
+    "Networks",
+  ]
+    .map(
+      (s) =>
+        `<option value="${s}" ${eventSystem === s ? "selected" : ""}>${s}</option>`,
+    )
+    .join("");
 
-  const timeOpts = ["1","2","3","4"]
-    .map(t => `<option value="${t}" ${eventTime===t?"selected":""}>${t}</option>`).join("");
+  const timeOpts = ["1", "2", "3", "4"]
+    .map(
+      (t) =>
+        `<option value="${t}" ${eventTime === t ? "selected" : ""}>${t}</option>`,
+    )
+    .join("");
 
   const teamOpts = employeeList
-    .map(e => `<option value="${e.fname}" ${eventTeam===e.fname?"selected":""}>${e.fname}</option>`)
+    .map(
+      (e) =>
+        `<option value="${e.fname}" ${eventTeam === e.fname ? "selected" : ""}>${e.fname}</option>`,
+    )
     .join("");
 
   const cfg0 = STATUS_CONFIG[eventStatus] || STATUS_CONFIG["กำลังรอยืนยัน"];
@@ -388,29 +435,29 @@ export const getEditEvent = async ({
     <div class="ee-grid ee-grid-3">
       <div class="ee-field">
         <label>🏢 ชื่อบริษัท</label>
-        <select id="editCompany"><option disabled>${eventCompany||"—"}</option>${custOpt("company")}</select>
+        <select id="editCompany"><option disabled>${eventCompany || "—"}</option>${custOpt("company")}</select>
       </div>
       <div class="ee-field">
         <label><span class="req">*</span> ชื่อโครงการ</label>
-        <select id="editSite"><option disabled>${eventSite||"—"}</option>${custOpt("site")}</select>
+        <select id="editSite"><option disabled>${eventSite || "—"}</option>${custOpt("site")}</select>
       </div>
       <div class="ee-field">
         <label><span class="req">*</span> ประเภทงาน</label>
-        <select id="editTitle"><option disabled>${eventTitle||"—"}</option>${titleOpts}</select>
+        <select id="editTitle"><option disabled>${eventTitle || "—"}</option>${titleOpts}</select>
       </div>
     </div>
     <div class="ee-grid ee-grid-3">
       <div class="ee-field">
         <label><span class="req">*</span> ระบบงาน</label>
-        <select id="editSystem"><option disabled>${eventSystem||"—"}</option>${systemOpts}</select>
+        <select id="editSystem"><option disabled>${eventSystem || "—"}</option>${systemOpts}</select>
       </div>
       <div class="ee-field">
         <label>🔢 ครั้งที่</label>
-        <select id="editTime"><option disabled>${eventTime||"—"}</option>${timeOpts}</select>
+        <select id="editTime"><option disabled>${eventTime || "—"}</option>${timeOpts}</select>
       </div>
       <div class="ee-field">
         <label>👷 ทีม</label>
-        <select id="editTeam"><option disabled>${eventTeam||"—"}</option>${teamOpts}</select>
+        <select id="editTeam"><option disabled>${eventTeam || "—"}</option>${teamOpts}</select>
       </div>
     </div>
 
@@ -500,33 +547,50 @@ export const getEditEvent = async ({
     html,
     width: "1100px",
     showConfirmButton: false,
-    showCancelButton:  false,
-    showCloseButton:   false,
+    showCancelButton: false,
+    showCloseButton: false,
     customClass: { popup: "swal-edit-event" },
 
     didOpen: () => {
       /* color pickers */
-      Object.assign(inputBg.style,   { width:"40px", height:"32px", border:"1.5px solid #e2e8f0", borderRadius:"7px", cursor:"pointer", padding:"2px" });
-      Object.assign(inputText.style, { width:"40px", height:"32px", border:"1.5px solid #e2e8f0", borderRadius:"7px", cursor:"pointer", padding:"2px" });
+      Object.assign(inputBg.style, {
+        width: "40px",
+        height: "32px",
+        border: "1.5px solid #e2e8f0",
+        borderRadius: "7px",
+        cursor: "pointer",
+        padding: "2px",
+      });
+      Object.assign(inputText.style, {
+        width: "40px",
+        height: "32px",
+        border: "1.5px solid #e2e8f0",
+        borderRadius: "7px",
+        cursor: "pointer",
+        padding: "2px",
+      });
       document.getElementById("ee-bg-picker").appendChild(inputBg);
       document.getElementById("ee-txt-picker").appendChild(inputText);
 
       /* description */
-      const descEl   = document.getElementById("editDescription");
-      const countEl  = document.getElementById("charCount");
+      const descEl = document.getElementById("editDescription");
+      const countEl = document.getElementById("charCount");
       if (descEl) {
         descEl.value = eventDescription || "";
-        const upd = () => { if (countEl) countEl.textContent = `${descEl.value.length} ตัวอักษร`; };
+        const upd = () => {
+          if (countEl) countEl.textContent = `${descEl.value.length} ตัวอักษร`;
+        };
         descEl.addEventListener("input", upd);
         upd();
       }
 
       /* status header reactive */
       const statusSel = document.getElementById("editStatus");
-      const headerEl  = document.getElementById("ee-status-header");
-      const iconEl    = document.getElementById("ee-status-icon");
+      const headerEl = document.getElementById("ee-status-header");
+      const iconEl = document.getElementById("ee-status-icon");
       statusSel?.addEventListener("change", (e) => {
-        const cfg = STATUS_CONFIG[e.target.value] || STATUS_CONFIG["กำลังรอยืนยัน"];
+        const cfg =
+          STATUS_CONFIG[e.target.value] || STATUS_CONFIG["กำลังรอยืนยัน"];
         headerEl.style.background = cfg.bg;
         iconEl.innerHTML = cfg.icon;
       });
@@ -535,13 +599,27 @@ export const getEditEvent = async ({
       const mkTs = (id) => {
         try {
           return new TomSelect(id, {
-            create: true, persist: false, closeAfterSelect: true,
-            selectOnTab: true, plugins: ["remove_button"],
-            onItemAdd() { if (this.items.length > 1) this.removeItem(this.items[0], true); },
+            create: true,
+            persist: false,
+            closeAfterSelect: true,
+            selectOnTab: true,
+            plugins: ["remove_button"],
+            onItemAdd() {
+              if (this.items.length > 1) this.removeItem(this.items[0], true);
+            },
           });
-        } catch { return null; }
+        } catch {
+          return null;
+        }
       };
-      ["#editCompany","#editSite","#editTitle","#editSystem","#editTime","#editTeam"].forEach(mkTs);
+      [
+        "#editCompany",
+        "#editSite",
+        "#editTitle",
+        "#editSystem",
+        "#editTime",
+        "#editTeam",
+      ].forEach(mkTs);
 
       const getVal = (id) => document.getElementById(id)?.value?.trim() || "";
 
@@ -554,102 +632,167 @@ export const getEditEvent = async ({
           : eventEnd.toISOString();
         return {
           id: eventId,
-          docNo:           getVal("editdocNo"),
-          company:         getVal("editCompany"),
-          site:            getVal("editSite"),
-          title:           getVal("editTitle"),
-          system:          getVal("editSystem"),
-          time:            getVal("editTime"),
-          team:            getVal("editTeam"),
-          textColor:       inputText.value,
+          docNo: getVal("editdocNo"),
+          company: getVal("editCompany"),
+          site: getVal("editSite"),
+          title: getVal("editTitle"),
+          system: getVal("editSystem"),
+          time: getVal("editTime"),
+          team: getVal("editTeam"),
+          resPerson: teamToId.get(getVal("editTeam")) || "",
+          textColor: inputText.value,
           backgroundColor: inputBg.value,
-          fontSize:        eventFontSize,
-          status:          getVal("editStatus"),
-          start:           moment(getVal("editStart")).toISOString(),
+          fontSize: eventFontSize,
+          status: getVal("editStatus"),
+          start: moment(getVal("editStart")).toISOString(),
           end,
-          manualStatus:    true,
-          subject:         getVal("editSubject"),
-          description:     getVal("editDescription"),
-          startTime:       getVal("editStartTime"),
-          endTime:         getVal("editEndTime"),
+          manualStatus: true,
+          subject: getVal("editSubject"),
+          description: getVal("editDescription"),
+          startTime: getVal("editStartTime"),
+          endTime: getVal("editEndTime"),
         };
       };
 
       /* Save */
-      document.getElementById("btnConfirm")?.addEventListener("click", async () => {
-        const payload = buildPayload();
-        if (!payload.title)  { Swal.showValidationMessage("กรุณาระบุประเภทงาน");  return; }
-        if (!payload.site)   { Swal.showValidationMessage("กรุณาระบุชื่อโครงการ"); return; }
-        if (!payload.system) { Swal.showValidationMessage("กรุณาระบบงาน");    return; }
-        setLoading(true);
-        try {
-          await EventService.UpdateEvent(eventId, payload);
-          await fetchEventsFromDB();
-          setLoading(false);
-          Swal.fire({ title: "บันทึกสำเร็จ ✅", icon: "success", timer: 1200, showConfirmButton: false });
-          if (payload.status === "ยืนยันแล้ว") {
-            setTimeout(() => navigate(`/operation/${eventId}`), 1300);
+      document
+        .getElementById("btnConfirm")
+        ?.addEventListener("click", async () => {
+          const payload = buildPayload();
+          if (!payload.title) {
+            Swal.showValidationMessage("กรุณาระบุประเภทงาน");
+            return;
           }
-        } catch (err) {
-          setLoading(false);
-          Swal.fire({ title: "เกิดข้อผิดพลาด", text: err.message, icon: "error" });
-        }
-      });
+          if (!payload.site) {
+            Swal.showValidationMessage("กรุณาระบุชื่อโครงการ");
+            return;
+          }
+          if (!payload.system) {
+            Swal.showValidationMessage("กรุณาระบบงาน");
+            return;
+          }
+          setLoading(true);
+          try {
+            await EventService.UpdateEvent(eventId, payload);
+            setLoading(false);
+            Swal.fire({
+              title: "บันทึกสำเร็จ ✅",
+              icon: "success",
+              timer: 1200,
+              showConfirmButton: false,
+            });
+            // if (payload.status === "ยืนยันแล้ว") {
+            //   setTimeout(() => navigate(`/operation/${eventId}`), 1300);
+            // }
+            await fetchEventsFromDB();
+          } catch (err) {
+            setLoading(false);
+            Swal.fire({
+              title: "เกิดข้อผิดพลาด",
+              text: err.message,
+              icon: "error",
+            });
+          }
+        });
 
       /* Delete */
       document.getElementById("btnDelete")?.addEventListener("click", () => {
         Swal.fire({
-          title: "ลบแผนงานนี้?", text: "ไม่สามารถกู้คืนได้", icon: "warning",
-          showCancelButton: true, confirmButtonColor: "#ef4444",
-          confirmButtonText: "ลบ", cancelButtonText: "ยกเลิก",
-        }).then((r) => { if (r.isConfirmed) { handleDeleteEvent(eventId); Swal.close(); } });
+          title: "ลบแผนงานนี้?",
+          text: "ไม่สามารถกู้คืนได้",
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonColor: "#ef4444",
+          confirmButtonText: "ลบ",
+          cancelButtonText: "ยกเลิก",
+        }).then((r) => {
+          if (r.isConfirmed) {
+            handleDeleteEvent(eventId);
+            Swal.close();
+          }
+        });
       });
 
       /* View operation */
-      document.getElementById("btnViewSchedule")?.addEventListener("click", () => {
-        navigate(`/operation/${eventId}`);
-        Swal.close();
-      });
+      document
+        .getElementById("btnViewSchedule")
+        ?.addEventListener("click", () => {
+          navigate(`/operation/${eventId}`);
+          Swal.close();
+        });
 
       /* Cancel / custom close */
-      document.getElementById("btnCancel")?.addEventListener("click", () => Swal.close());
-      document.getElementById("ee-close-btn")?.addEventListener("click", () => Swal.close());
+      document
+        .getElementById("btnCancel")
+        ?.addEventListener("click", () => Swal.close());
+      document
+        .getElementById("ee-close-btn")
+        ?.addEventListener("click", () => Swal.close());
 
       /* Generate PDF */
-      document.getElementById("btnGeneratePDF")?.addEventListener("click", () => {
-        const payload = buildPayload();
-        const toast = Toastify({
-          text: `<div style="text-align:center;font-family:system-ui">
+      document
+        .getElementById("btnGeneratePDF")
+        ?.addEventListener("click", () => {
+          const payload = buildPayload();
+          const toast = Toastify({
+            text: `<div style="text-align:center;font-family:system-ui">
             <div style="margin-bottom:8px;font-weight:600">บันทึกข้อมูลก่อนออกใบแจ้งเข้างาน?</div>
             <button id="toast-ok" style="margin-right:8px;padding:5px 14px;background:#fff;color:#1d4ed8;border:none;border-radius:6px;font-weight:700;cursor:pointer">ตกลง</button>
             <button id="toast-no" style="padding:5px 14px;background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:6px;cursor:pointer">ยกเลิก</button>
           </div>`,
-          duration: 5000, gravity: "top", position: "center",
-          backgroundColor: "#1d4ed8", escapeMarkup: false,
-        });
-        toast.showToast();
-        setTimeout(() => {
-          document.getElementById("toast-ok")?.addEventListener("click", async () => {
-            toast.hideToast();
-            if (!payload.subject) {
-              Toastify({ text: "กรุณากรอกชื่อเรื่อง", duration: 3000,
-                backgroundColor: "#ef4444", gravity: "top", position: "center" }).showToast();
-              return;
-            }
-            try {
-              await EventService.UpdateEvent(eventId, payload);
-              await fetchEventsFromDB();
-              Toastify({ text: "✅ บันทึกแล้ว กำลังสร้าง PDF...", duration: 2000,
-                backgroundColor: "#10b981", gravity: "top", position: "center" }).showToast();
-              await generateWorkPermitPDF(ev, payload.docNo, payload.subject, payload.description);
-            } catch {
-              Toastify({ text: "❌ เกิดข้อผิดพลาด", duration: 3000,
-                backgroundColor: "#ef4444", gravity: "top", position: "center" }).showToast();
-            }
+            duration: 5000,
+            gravity: "top",
+            position: "center",
+            backgroundColor: "#1d4ed8",
+            escapeMarkup: false,
           });
-          document.getElementById("toast-no")?.addEventListener("click", () => toast.hideToast());
-        }, 100);
-      });
+          toast.showToast();
+          setTimeout(() => {
+            document
+              .getElementById("toast-ok")
+              ?.addEventListener("click", async () => {
+                toast.hideToast();
+                if (!payload.subject) {
+                  Toastify({
+                    text: "กรุณากรอกชื่อเรื่อง",
+                    duration: 3000,
+                    backgroundColor: "#ef4444",
+                    gravity: "top",
+                    position: "center",
+                  }).showToast();
+                  return;
+                }
+                try {
+                  await EventService.UpdateEvent(eventId, payload);
+                  await fetchEventsFromDB();
+                  Toastify({
+                    text: "✅ บันทึกแล้ว กำลังสร้าง PDF...",
+                    duration: 2000,
+                    backgroundColor: "#10b981",
+                    gravity: "top",
+                    position: "center",
+                  }).showToast();
+                  await generateWorkPermitPDF(
+                    ev,
+                    payload.docNo,
+                    payload.subject,
+                    payload.description,
+                  );
+                } catch {
+                  Toastify({
+                    text: "❌ เกิดข้อผิดพลาด",
+                    duration: 3000,
+                    backgroundColor: "#ef4444",
+                    gravity: "top",
+                    position: "center",
+                  }).showToast();
+                }
+              });
+            document
+              .getElementById("toast-no")
+              ?.addEventListener("click", () => toast.hideToast());
+          }, 100);
+        });
     },
   });
 };

@@ -26,7 +26,7 @@ import {
   Menu, MenuItem, ListItemIcon, ListItemText, Card, CardContent,
   Skeleton, Alert, Snackbar, ToggleButton, ToggleButtonGroup,
   List, ListItem, ListItemAvatar, ListItemText as MuiListItemText,
-  Popover,
+  Popover, Pagination,
 } from "@mui/material";
 
 // MUI Icons
@@ -39,7 +39,7 @@ import {
   Refresh, ArrowUpward, ArrowDownward, Circle, ExpandMore,
   ExpandLess, FolderOpen, AttachFile, Login, Logout, Edit,
   NoteAdd, History, Person, AccessTime, FiberManualRecord,
-  NotificationsActive,
+  NotificationsActive, TaskAlt, HourglassTop,
 } from "@mui/icons-material";
 
 // MUI Date Picker
@@ -165,6 +165,10 @@ const ACTION_META = {
   report_saved:   { label: "บันทึก Report",     icon: <NoteAdd sx={{ fontSize: 13 }} />,     color: "#10b981" },
   file_uploaded:  { label: "อัปโหลดไฟล์",       icon: <CloudUpload sx={{ fontSize: 13 }} />, color: "#f59e0b" },
   status_changed: { label: "เปลี่ยนสถานะ",      icon: <Circle sx={{ fontSize: 7 }} />,       color: "#6b7280" },
+  close_requested:{ label: "ขอปิดงาน",          icon: <TaskAlt sx={{ fontSize: 13 }} />,     color: "#f59e0b" },
+  close_approved: { label: "อนุมัติปิดงาน",      icon: <CheckCircle sx={{ fontSize: 13 }} />, color: "#10b981" },
+  document_checked:        { label: "ทำเครื่องหมายเอกสาร", icon: <CheckCircle sx={{ fontSize: 13 }} />, color: "#3b82f6" },
+  document_applicable_set: { label: "ระบุมี/ไม่มีเอกสาร",   icon: <TaskAlt sx={{ fontSize: 13 }} />,     color: "#8b5cf6" },
 };
 
 // ─── Helper Functions ─────────────────────────────────────────────────
@@ -188,6 +192,29 @@ const fileTypeIcon = (fileName) => {
 };
 
 const capitalize = (str = "") => str.charAt(0).toUpperCase() + str.slice(1);
+
+// ไฟล์เก็บบน Cloudinary (คนละโดเมน) และบาง URL เก่าอาจไม่มีนามสกุลติดมาด้วย
+// (ไฟล์ resource_type "raw" ที่อัปโหลดไว้ก่อนแก้ backend) จึงดึงไฟล์มาเป็น blob
+// แล้วสั่งดาวน์โหลดเอง เพื่อบังคับชื่อไฟล์ + นามสกุลที่ถูกต้องจากฐานข้อมูลเสมอ
+const downloadFile = async (url, fileName) => {
+  if (!url) return;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("Download failed");
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = fileName || "download";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+  } catch (err) {
+    console.error("Download error:", err);
+    window.open(url, "_blank"); // fallback: เปิดไฟล์ให้ผู้ใช้บันทึกเอง
+  }
+};
 
 // ═══════════════════════════════════════════════════════════════════════
 // ─── NEW: LiveTrackingPanel ───────────────────────────────────────────
@@ -543,16 +570,20 @@ const DashboardStats = ({ events }) => {
     const total    = events.length;
     const byStatus = OP_LIST.reduce((acc, s) => { acc[s] = events.filter(e => e.status === s).length; return acc; }, {});
     const thisMonth = events.filter(e => moment(e.start).format("YYYY-MM") === moment().format("YYYY-MM")).length;
-    const billing   = events.filter(e => e.status_two === "วางบิลแล้ว" || e.status_three === "วางบิลแล้ว").length;
-    const collected = events.filter(e => e.status_two === "เก็บเงินแล้ว" || e.status_three === "เก็บเงินแล้ว").length;
-    return { total, byStatus, thisMonth, billing, collected };
+    // ✅ อิงจากฟีเจอร์ "ขอปิดงาน" ที่ใช้งานจริงตอนนี้ (แทนสถานะวางบิล/เก็บเงินแบบเก่าที่ไม่มีช่องให้กรอกแล้ว)
+    const pendingClose = events.filter(e => e.closeRequested && e.status !== "ดำเนินการเสร็จสิ้น").length;
+    return { total, byStatus, thisMonth, pendingClose };
   }, [events]);
 
   const cards = [
-    { label: "งานทั้งหมด",    value: stats.total,       color: "linear-gradient(135deg,#667eea,#764ba2)", icon: <TableChart />,    sub: `เดือนนี้ ${stats.thisMonth} งาน` },
-    { label: "กำลังดำเนินการ", value: stats.byStatus["กำลังดำเนินการ"] + stats.byStatus["ยืนยันแล้ว"], color: "linear-gradient(135deg,#8b5cf6,#6d28d9)", icon: <PendingActions />, sub: `รอยืนยัน ${stats.byStatus["กำลังรอยืนยัน"]} งาน` },
-    { label: "เสร็จสิ้น",     value: stats.byStatus["ดำเนินการเสร็จสิ้น"], color: "linear-gradient(135deg,#10b981,#059669)", icon: <CheckCircle />, sub: `คิดเป็น ${stats.total ? Math.round((stats.byStatus["ดำเนินการเสร็จสิ้น"] / stats.total) * 100) : 0}%` },
-    { label: "วางบิล/เก็บเงิน",value: stats.billing + stats.collected, color: "linear-gradient(135deg,#f59e0b,#d97706)", icon: <TrendingUp />,  sub: `เก็บเงินแล้ว ${stats.collected} งาน` },
+    { label: "งานทั้งหมด",     value: stats.total, color: "linear-gradient(135deg,#667eea,#764ba2)", icon: <TableChart />,
+      sub: `เดือนนี้ ${stats.thisMonth} งาน` },
+    { label: "กำลังดำเนินการ", value: stats.byStatus["กำลังดำเนินการ"], color: "linear-gradient(135deg,#8b5cf6,#6d28d9)", icon: <PendingActions />,
+      sub: `ยืนยันแล้ว ${stats.byStatus["ยืนยันแล้ว"]} · รอยืนยัน ${stats.byStatus["กำลังรอยืนยัน"]} งาน` },
+    { label: "เสร็จสิ้น",      value: stats.byStatus["ดำเนินการเสร็จสิ้น"], color: "linear-gradient(135deg,#10b981,#059669)", icon: <CheckCircle />,
+      sub: `คิดเป็น ${stats.total ? Math.round((stats.byStatus["ดำเนินการเสร็จสิ้น"] / stats.total) * 100) : 0}% ของงานทั้งหมด` },
+    { label: "รอคุณอนุมัติปิดงาน", value: stats.pendingClose, color: "linear-gradient(135deg,#f59e0b,#d97706)", icon: <TaskAlt />,
+      sub: stats.pendingClose > 0 ? "ช่างขอปิดงาน รอตรวจสอบ" : "ไม่มีงานรออนุมัติ" },
   ];
 
   return (
@@ -562,15 +593,15 @@ const DashboardStats = ({ events }) => {
           <StatCard color={c.color}>
             <CardContent sx={{ p: 2.5 }}>
               <Stack direction="row" alignItems="flex-start" justifyContent="space-between">
-                <Box>
+                <Box minWidth={0}>
                   <Typography variant="caption" color="text.secondary" fontWeight={600} letterSpacing={0.5}
-                    sx={{ textTransform: "uppercase", fontSize: "0.7rem" }}>
+                    sx={{ textTransform: "uppercase", fontSize: "0.7rem", display: "block" }}>
                     {c.label}
                   </Typography>
                   <Typography variant="h4" fontWeight={800} sx={{ my: 0.5, lineHeight: 1 }}>{c.value}</Typography>
-                  <Typography variant="caption" color="text.secondary">{c.sub}</Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>{c.sub}</Typography>
                 </Box>
-                <Box sx={{ p: 1, borderRadius: 2, background: c.color, color: "#fff", display: "flex" }}>
+                <Box sx={{ p: 1, borderRadius: 2, background: c.color, color: "#fff", display: "flex", flexShrink: 0 }}>
                   {c.icon}
                 </Box>
               </Stack>
@@ -593,16 +624,17 @@ const TechnicianSummary = ({ events, selectedDate }) => {
         if (!log.userName) return;
         if (!map[log.userName]) {
           map[log.userName] = {
-            name: log.userName, checkIns: 0, checkOuts: 0,
-            notes: 0, reports: 0, jobs: new Set(),
+            name: log.userName,
+            notes: 0, filesUploaded: 0, closeRequests: 0,
+            jobs: new Set(),
             jobDetails: [],
           };
         }
         const m = map[log.userName];
-        if (log.action === "check_in")     m.checkIns++;
-        if (log.action === "check_out")    m.checkOuts++;
-        if (log.action === "note_saved")   m.notes++;
-        if (log.action === "report_saved") m.reports++;
+        // ✅ อ้างอิงตาม action ที่ใช้งานจริงตอนนี้ (ระบบเช็คอิน/เช็คเอาท์เดิมถูกตัดออกไปแล้ว)
+        if (log.action === "note_saved")      m.notes++;
+        if (log.action === "file_uploaded")   m.filesUploaded++;
+        if (log.action === "close_requested") m.closeRequests++;
         m.jobs.add(ev._id);
       });
       // เก็บ job details สำหรับ drill-down
@@ -667,15 +699,16 @@ const TechnicianSummary = ({ events, selectedDate }) => {
                   <Typography fontWeight={700} fontSize="0.875rem" flex={1}>{t.name}</Typography>
                   <Stack direction="row" gap={0.75} flexWrap="wrap">
                     <Chip size="small" label={`${t.jobCount} งาน`} sx={{ height: 22, fontSize: "0.68rem" }} />
-                    <Chip size="small" icon={<Login sx={{ fontSize: "13px !important" }} />}
-                      label={`${t.checkIns} เช็คอิน`}
+                    <Chip size="small" icon={<CloudUpload sx={{ fontSize: "13px !important" }} />}
+                      label={`${t.filesUploaded} ไฟล์`}
                       sx={{ height: 22, fontSize: "0.68rem", bgcolor: alpha("#8b5cf6", 0.1), color: "#8b5cf6" }} />
-                    <Chip size="small" icon={<Logout sx={{ fontSize: "13px !important" }} />}
-                      label={`${t.checkOuts} เช็คเอาท์`}
-                      sx={{ height: 22, fontSize: "0.68rem", bgcolor: alpha("#10b981", 0.1), color: "#10b981" }} />
-                    {t.reports > 0 && (
-                      <Chip size="small" label={`${t.reports} report`}
-                        sx={{ height: 22, fontSize: "0.68rem", bgcolor: alpha("#f59e0b", 0.1), color: "#f59e0b" }} />
+                    <Chip size="small" icon={<NoteAdd sx={{ fontSize: "13px !important" }} />}
+                      label={`${t.notes} สรุปงาน`}
+                      sx={{ height: 22, fontSize: "0.68rem", bgcolor: alpha("#3b82f6", 0.1), color: "#3b82f6" }} />
+                    {t.closeRequests > 0 && (
+                      <Chip size="small" icon={<TaskAlt sx={{ fontSize: "13px !important" }} />}
+                        label={`${t.closeRequests} ขอปิดงาน`}
+                        sx={{ height: 22, fontSize: "0.68rem", bgcolor: alpha("#10b981", 0.1), color: "#10b981" }} />
                     )}
                   </Stack>
                   {selectedTech === t.name ? <ExpandLess sx={{ fontSize: 18, color: "text.secondary" }} /> : <ExpandMore sx={{ fontSize: 18, color: "text.secondary" }} />}
@@ -876,12 +909,13 @@ const TimelineView = ({ events }) => {
 
 // ─── FileUploadSection ────────────────────────────────────────────────
 const FileUploadSection = ({
-  eventId, type, label, fileName, fileUrl,
+  eventId, type, label, fileName, fileUrl, applicable,
   onUpload, onDelete, onPreview,
   uploading, progress, uploading_size, currentUserRole,
 }) => {
   const [dragging, setDragging] = useState(false);
   const inputRef = React.useRef();
+  const overrideInputRef = React.useRef();
   const canEdit  = ["admin", "manager", "user"].includes(currentUserRole);
 
   const handleDrop = e => {
@@ -891,6 +925,9 @@ const FileUploadSection = ({
     if (file) onUpload(file, eventId, type);
   };
 
+  // ช่างระบุไว้แล้วว่างานนี้ "ไม่มี" เอกสารชนิดนี้ (ใบเสนอราคา/ใบวางบิล/ใบส่งมอบงาน)
+  const notApplicable = applicable === false && !fileName;
+
   return (
     <Box>
       <Typography variant="caption" fontWeight={700} color="text.secondary"
@@ -898,27 +935,25 @@ const FileUploadSection = ({
         {label}
       </Typography>
       {fileName ? (
-        <Stack direction="row" alignItems="center" gap={1} sx={{
-          p: 1.5, borderRadius: 2, border: "1px solid", borderColor: "divider",
+        <Stack direction="row" alignItems="center" gap={0.5} sx={{
+          p: 1.25, borderRadius: 2, border: "1px solid", borderColor: "divider",
           background: t => alpha(t.palette.success.main, 0.04),
         }}>
           {fileTypeIcon(fileName)}
           <Box flex={1} minWidth={0}>
-            <Typography variant="caption" fontWeight={600} noWrap>{fileName}</Typography>
+            <Typography variant="caption" fontWeight={600} noWrap sx={{ fontSize: "0.8rem" }}>{fileName}</Typography>
           </Box>
-          <Stack direction="row" gap={0.5}>
-            <Tooltip title="ดูไฟล์">
-              <IconButton size="small" onClick={() => onPreview(fileUrl, fileName)}><Visibility fontSize="small" /></IconButton>
+          <Tooltip title="ดูไฟล์">
+            <IconButton onClick={() => onPreview(fileUrl, fileName)} sx={{ p: 1 }}><Visibility sx={{ fontSize: 20 }} /></IconButton>
+          </Tooltip>
+          <Tooltip title="ดาวน์โหลด">
+            <IconButton onClick={() => downloadFile(fileUrl, fileName)} sx={{ p: 1 }}><Download sx={{ fontSize: 20 }} /></IconButton>
+          </Tooltip>
+          {canEdit && (
+            <Tooltip title="ลบไฟล์">
+              <IconButton color="error" onClick={() => onDelete(eventId, type)} sx={{ p: 1 }}><Delete sx={{ fontSize: 20 }} /></IconButton>
             </Tooltip>
-            <Tooltip title="ดาวน์โหลด">
-              <IconButton size="small" component="a" href={fileUrl} download target="_blank"><Download fontSize="small" /></IconButton>
-            </Tooltip>
-            {canEdit && (
-              <Tooltip title="ลบไฟล์">
-                <IconButton size="small" color="error" onClick={() => onDelete(eventId, type)}><Delete fontSize="small" /></IconButton>
-              </Tooltip>
-            )}
-          </Stack>
+          )}
         </Stack>
       ) : uploading ? (
         <Box sx={{ p: 1.5, borderRadius: 2, border: "1px solid", borderColor: "primary.main" }}>
@@ -929,16 +964,39 @@ const FileUploadSection = ({
           <LinearProgress variant="determinate" value={progress} sx={{ borderRadius: 2 }} />
           <Typography variant="caption" color="text.secondary">{progress}%</Typography>
         </Box>
+      ) : notApplicable ? (
+        <Box sx={{
+          p: 1.5, borderRadius: 2, border: "1px dashed", borderColor: alpha("#6b7280", 0.4),
+          textAlign: "center", bgcolor: alpha("#6b7280", 0.05),
+        }}>
+          <Stack direction="row" alignItems="center" justifyContent="center" gap={0.5}>
+            <Close sx={{ fontSize: 16, color: "text.disabled" }} />
+            <Typography variant="caption" color="text.secondary" fontWeight={600}>
+              ไม่มีเอกสารนี้ (ช่างระบุไว้)
+            </Typography>
+          </Stack>
+          {canEdit && (
+            <>
+              <input ref={overrideInputRef} type="file" hidden
+                onChange={e => { if (e.target.files[0]) onUpload(e.target.files[0], eventId, type); }} />
+              <Button size="small" onClick={() => overrideInputRef.current?.click()}
+                sx={{ textTransform: "none", fontSize: "0.72rem", mt: 0.5, minHeight: 32 }}>
+                มีไฟล์จริง? แนบที่นี่
+              </Button>
+            </>
+          )}
+        </Box>
       ) : canEdit ? (
         <UploadZone
           dragging={dragging ? 1 : 0}
           onDragOver={e => { e.preventDefault(); setDragging(true); }}
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
-          onClick={() => inputRef.current?.click()}>
+          onClick={() => inputRef.current?.click()}
+          sx={{ minHeight: 76, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
           <input ref={inputRef} type="file" hidden onChange={e => { if (e.target.files[0]) onUpload(e.target.files[0], eventId, type); }} />
-          <CloudUpload sx={{ color: "text.disabled", mb: 0.5 }} />
-          <Typography variant="caption" color="text.secondary">คลิกหรือลากไฟล์มาวาง</Typography>
+          <CloudUpload sx={{ color: "text.disabled", mb: 0.5, fontSize: 26 }} />
+          <Typography variant="caption" color="text.secondary">แตะเพื่อเลือกไฟล์ หรือลากมาวาง</Typography>
         </UploadZone>
       ) : (
         <Box sx={{ p: 1.5, borderRadius: 2, border: "1px dashed", borderColor: "divider", textAlign: "center" }}>
@@ -952,7 +1010,7 @@ const FileUploadSection = ({
 // ─── EventRowCard ─────────────────────────────────────────────────────
 const EventRowCard = ({
   event, employee, onStatusUpdate, onDocNoUpdate, onInputUpdate,
-  onFileUpload, onDeleteFile, onPreview, onDelete,
+  onFileUpload, onDeleteFile, onPreview, onDelete, onApproveClose,
   uploadingState, isUploadingState, uploadProgressState, uploadingFileSizeState,
   currentUserRole,
 }) => {
@@ -961,8 +1019,10 @@ const EventRowCard = ({
   const [docNo,      setDocNo]      = useState(event.docNo || "");
   const [anchorEl,   setAnchorEl]   = useState(null);
   const [localStatus,setLocalStatus]= useState(event.status || "");
+  const [approving,  setApproving]  = useState(false);
   const theme  = useTheme();
   const canEdit = ["admin", "manager", "user"].includes(currentUserRole);
+  const isAdminOrManager = ["admin", "manager"].includes(currentUserRole);
 
   const handleStatusChange = newStatus => {
     setLocalStatus(newStatus);
@@ -971,6 +1031,13 @@ const EventRowCard = ({
   };
 
   const handleDocSave = () => { onDocNoUpdate(event._id, docNo); setEditingDoc(false); };
+
+  const handleApprove = async () => {
+    setApproving(true);
+    await onApproveClose(event._id);
+    setLocalStatus("ดำเนินการเสร็จสิ้น");
+    setApproving(false);
+  };
 
   return (
     <GlassCard sx={{ mb: 1.5, "&:hover": { transform: "none", boxShadow: `0 4px 20px ${alpha(theme.palette.common.black, 0.08)}` } }}>
@@ -1044,24 +1111,45 @@ const EventRowCard = ({
             </Box>
           </Stack>
           <Stack direction="row" gap={0.5} flexShrink={0}>
+                        {event.reportFileName    && <Tooltip title={`Service Report: ${event.reportFileName}`}><Description sx={{ fontSize: 18, color: "#3b82f6", opacity: 0.8 }} /></Tooltip>}
+
             {event.quotationFileName && <Tooltip title={`ใบเสนอราคา: ${event.quotationFileName}`}><Description sx={{ fontSize: 18, color: "#ef4444", opacity: 0.8 }} /></Tooltip>}
-            {event.reportFileName    && <Tooltip title={`Service Report: ${event.reportFileName}`}><Description sx={{ fontSize: 18, color: "#3b82f6", opacity: 0.8 }} /></Tooltip>}
+            {event.invoiceFileName   && <Tooltip title={`ใบวางบิล: ${event.invoiceFileName}`}><Description sx={{ fontSize: 18, color: "#f59e0b", opacity: 0.8 }} /></Tooltip>}
             {event.completionFileName && <Tooltip title={`ใบส่งมอบงาน: ${event.completionFileName}`}><Description sx={{ fontSize: 18, color: "#07941a", opacity: 0.8 }} /></Tooltip>}
             {event.activityLog?.length > 0 && (
               <Tooltip title={`${event.activityLog.length} กิจกรรม`}>
                 <History sx={{ fontSize: 18, color: "#f59e0b", opacity: 0.8 }} />
               </Tooltip>
             )}
-            <IconButton size="small" onClick={() => setExpanded(p => !p)}>
+            <IconButton onClick={() => setExpanded(p => !p)} sx={{ p: 1 }}>
               {expanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
             </IconButton>
             {canEdit && (
-              <IconButton size="small" color="error" onClick={() => onDelete(event._id)}>
+              <IconButton color="error" onClick={() => onDelete(event._id)} sx={{ p: 1 }}>
                 <Delete fontSize="small" />
               </IconButton>
             )}
           </Stack>
         </Stack>
+
+        {/* แจ้งเตือนคำขอปิดงานจากช่าง (ยังไม่อนุมัติ) */}
+        {event.closeRequested && localStatus !== "ดำเนินการเสร็จสิ้น" && (
+          <Alert
+            severity="warning"
+            icon={<HourglassTop fontSize="small" />}
+            sx={{ mt: 1.5, borderRadius: 2 }}
+            action={isAdminOrManager ? (
+              <Button color="warning" variant="contained" size="small"
+                startIcon={<TaskAlt sx={{ fontSize: 16 }} />}
+                onClick={handleApprove} disabled={approving}
+                sx={{ borderRadius: 2, textTransform: "none" }}>
+                {approving ? "กำลังอนุมัติ..." : "อนุมัติปิดงาน"}
+              </Button>
+            ) : undefined}>
+            {event.closeRequestedBy || "ช่าง"} ขอปิดงาน
+            {event.closeRequestedAt && ` เมื่อ ${moment(event.closeRequestedAt).locale("th").format("DD MMM HH:mm")}`}
+          </Alert>
+        )}
 
         {/* Status Menu */}
         <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}
@@ -1072,7 +1160,7 @@ const EventRowCard = ({
           <Divider />
           {OP_LIST.map(s => (
             <MenuItem key={s} onClick={() => handleStatusChange(s)} selected={localStatus === s}
-              sx={{ gap: 1.5, py: 0.75 }}>
+              sx={{ gap: 1.5, py: 1.25, minHeight: 44 }}>
               <Circle sx={{ fontSize: 8, color: OP_COLOR[s] }} />
               <Typography variant="body2" fontWeight={localStatus === s ? 700 : 400}>{s}</Typography>
             </MenuItem>
@@ -1099,18 +1187,8 @@ const EventRowCard = ({
                 </Box>
               </Grid>
             )}
-            <Grid item xs={12} sm={6}>
-              <FileUploadSection
-                eventId={event._id} type="quotation" label="ใบเสนอราคา"
-                fileName={event.quotationFileName} fileUrl={event.quotationFileUrl}
-                onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
-                uploading={isUploadingState.quotation && uploadingState.quotation === event._id}
-                progress={uploadProgressState.quotation}
-                uploading_size={uploadingFileSizeState.quotation}
-                currentUserRole={currentUserRole}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
+
+                        <Grid item xs={12} sm={6}>
               <FileUploadSection
                 eventId={event._id} type="report" label="Service Report"
                 fileName={event.reportFileName} fileUrl={event.reportFileUrl}
@@ -1121,11 +1199,38 @@ const EventRowCard = ({
                 currentUserRole={currentUserRole}
               />
             </Grid>
+            <Grid item xs={12} sm={6}>
+              <FileUploadSection
+                eventId={event._id} type="quotation" label="ใบเสนอราคา"
+                fileName={event.quotationFileName} fileUrl={event.quotationFileUrl}
+                applicable={event.quotationApplicable}
+                onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
+                uploading={isUploadingState.quotation && uploadingState.quotation === event._id}
+                progress={uploadProgressState.quotation}
+                uploading_size={uploadingFileSizeState.quotation}
+                currentUserRole={currentUserRole}
+              />
+            </Grid>
+
+
+             <Grid item xs={12} sm={6}>
+              <FileUploadSection
+                eventId={event._id} type="invoice" label="ใบวางบิล"
+                fileName={event.invoiceFileName} fileUrl={event.invoiceFileUrl}
+                applicable={event.invoiceApplicable}
+                onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
+                uploading={isUploadingState.invoice && uploadingState.invoice === event._id}
+                progress={uploadProgressState.invoice}
+                uploading_size={uploadingFileSizeState.invoice}
+                currentUserRole={currentUserRole}
+              />
+            </Grid>
 
              <Grid item xs={12} sm={6}>
               <FileUploadSection
                 eventId={event._id} type="completion" label="ใบส่งมอบงาน"
                 fileName={event.completionFileName} fileUrl={event.completionFileUrl}
+                applicable={event.completionApplicable}
                 onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
                 uploading={isUploadingState.completion && uploadingState.completion === event._id}
                 progress={uploadProgressState.completion}
@@ -1294,6 +1399,40 @@ const FilterPanel = ({
 // ─── FilePreviewDialog ────────────────────────────────────────────────
 const FilePreviewDialog = ({ previewUrl, previewFileName, onClose }) => {
   const type = getFileType(previewFileName || previewUrl || "");
+
+  // PDF: โหลดเป็น blob เองแล้วใช้ตัวแสดงผล PDF ในตัวของเบราว์เซอร์
+  // (เลี่ยงปัญหา CDN ของ Cloudinary ที่ประกาศรองรับ Range request แต่จริง ๆ ไม่ทำงานตามนั้น
+  // ซึ่งทำให้ตัวแสดงผล PDF ภายนอกโหลดไฟล์ไม่สำเร็จ)
+  const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfError,   setPdfError]   = useState(false);
+
+  useEffect(() => {
+    if (type !== "pdf" || !previewUrl) {
+      setPdfBlobUrl(null);
+      setPdfError(false);
+      return;
+    }
+    let cancelled = false;
+    let objectUrl = null;
+    setPdfLoading(true);
+    setPdfError(false);
+    fetch(previewUrl)
+      .then(res => { if (!res.ok) throw new Error("โหลดไฟล์ไม่สำเร็จ"); return res.blob(); })
+      .then(blob => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setPdfBlobUrl(objectUrl);
+      })
+      .catch(() => { if (!cancelled) setPdfError(true); })
+      .finally(() => { if (!cancelled) setPdfLoading(false); });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [type, previewUrl]);
+
   return (
     <Dialog open={Boolean(previewUrl)} onClose={onClose} maxWidth="xl" fullWidth
       PaperProps={{ sx: { borderRadius: 3, overflow: "hidden" } }}>
@@ -1301,16 +1440,34 @@ const FilePreviewDialog = ({ previewUrl, previewFileName, onClose }) => {
         {fileTypeIcon(previewFileName)}
         <Typography fontWeight={700} noWrap flex={1}>{previewFileName || "ดูไฟล์"}</Typography>
         <Stack direction="row" gap={0.5}>
-          {previewUrl && <Tooltip title="ดาวน์โหลด"><IconButton component="a" href={previewUrl} download target="_blank"><Download /></IconButton></Tooltip>}
+          {previewUrl && <Tooltip title="ดาวน์โหลด"><IconButton onClick={() => downloadFile(previewUrl, previewFileName)}><Download /></IconButton></Tooltip>}
           <IconButton onClick={onClose}><Close /></IconButton>
         </Stack>
       </DialogTitle>
       <Divider />
       <DialogContent sx={{ p: 0 }}>
-        {type === "image"                   && <img src={previewUrl} alt={previewFileName} style={{ maxWidth: "100%", maxHeight: 780, display: "block", margin: "0 auto", padding: 16 }} />}
-        {type === "pdf"                     && <iframe src={`https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(previewUrl)}`} width="100%" height="780px" style={{ border: "none" }} title="PDF" />}
+        {type === "image" && <img src={previewUrl} alt={previewFileName} style={{ maxWidth: "100%", maxHeight: 780, display: "block", margin: "0 auto", padding: 16 }} />}
+        {type === "pdf" && (
+          pdfLoading ? (
+            <Box sx={{ textAlign: "center", py: 8, color: "text.secondary" }}>
+              <LinearProgress sx={{ mx: 6, mb: 2, borderRadius: 1 }} />
+              <Typography variant="body2">กำลังโหลดไฟล์...</Typography>
+            </Box>
+          ) : pdfError ? (
+            <Box sx={{ textAlign: "center", py: 8, color: "text.secondary" }}>
+              <PictureAsPdf sx={{ fontSize: 48, opacity: 0.3 }} />
+              <Typography>ไม่สามารถแสดงตัวอย่างไฟล์นี้ได้</Typography>
+              <Button size="small" variant="outlined" sx={{ mt: 1.5, borderRadius: 2 }}
+                onClick={() => downloadFile(previewUrl, previewFileName)}>
+                ดาวน์โหลดแทน
+              </Button>
+            </Box>
+          ) : pdfBlobUrl ? (
+            <iframe src={pdfBlobUrl} width="100%" height="780px" style={{ border: "none" }} title="PDF" />
+          ) : null
+        )}
         {(type === "word" || type === "excel") && <iframe src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewUrl)}`} width="100%" height="780px" style={{ border: "none" }} title="Office" />}
-        {type === "unknown"                 && <Box sx={{ textAlign: "center", py: 8, color: "text.secondary" }}><FolderOpen sx={{ fontSize: 48 }} /><Typography>ไม่สามารถแสดงไฟล์นี้ได้</Typography></Box>}
+        {type === "unknown" && <Box sx={{ textAlign: "center", py: 8, color: "text.secondary" }}><FolderOpen sx={{ fontSize: 48 }} /><Typography>ไม่สามารถแสดงไฟล์นี้ได้</Typography></Box>}
       </DialogContent>
     </Dialog>
   );
@@ -1341,7 +1498,9 @@ const Operation = () => {
   const [filterOP,      setFilterOP]      = useState("");
   const [filterTeam,    setFilterTeam]    = useState("");
 
-  const [selectedEvent,    setSelectedEvent]    = useState(null);
+  const [page,     setPage]     = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   const [previewUrl,       setPreviewUrl]        = useState(null);
   const [previewFileName,  setPreviewFileName]   = useState("");
   const [confirmOpen,      setConfirmOpen]        = useState(false);
@@ -1349,10 +1508,10 @@ const Operation = () => {
   const [snackbar,         setSnackbar]           = useState({ open: false, msg: "", severity: "success" });
   const [currentUserRole,  setCurrentUserRole]    = useState("");
 
-  const [uploadingState,         setUploadingState]         = useState({ quotation: null, report: null, completion: null });
-  const [uploadProgressState,    setUploadProgressState]    = useState({ quotation: 0, report: 0, completion:0 });
-  const [uploadingFileSizeState, setUploadingFileSizeState] = useState({ quotation: "", report: "", completion: "" });
-  const [isUploadingState,       setIsUploadingState]       = useState({ quotation: false, report: false, completion:false });
+  const [uploadingState,         setUploadingState]         = useState({ quotation: null, report: null, invoice: null, completion: null });
+  const [uploadProgressState,    setUploadProgressState]    = useState({ quotation: 0, report: 0, invoice: 0, completion:0 });
+  const [uploadingFileSizeState, setUploadingFileSizeState] = useState({ quotation: "", report: "", invoice: "", completion: "" });
+  const [isUploadingState,       setIsUploadingState]       = useState({ quotation: false, report: false, invoice: false, completion:false });
 
   useEffect(() => {
     const payload = JSON.parse(localStorage.getItem("payload") || "{}");
@@ -1379,10 +1538,6 @@ const Operation = () => {
       const res = await EventService.getEventOp();
       setEvents(res.userEvents || []);
       setLastRefreshed(new Date());
-      if (id) {
-        const found = (res.userEvents || []).find(e => e._id === id);
-        setSelectedEvent(found || null);
-      }
     } catch (err) { console.error(err); }
     finally { if (!silent) setLoading(false); }
   };
@@ -1396,27 +1551,57 @@ const Operation = () => {
 
   const dateSearch = !showAll ? selectedDate : "";
 
+  // ✅ อ้างอิงจาก events (state ที่อัปเดตสดทุกครั้งที่แก้ไข) แทนการเก็บ snapshot แยก
+  // เพื่อไม่ให้หน้า /operation/:id ค้างข้อมูลเก่าจนกว่าจะรีเฟรชหน้า
+  const selectedEvent = useMemo(
+    () => (id ? events.find(e => e._id === id) || null : null),
+    [id, events]
+  );
+
   const filteredEvents = useMemo(() => {
-    if (id && selectedEvent) return [selectedEvent];
-    return events.filter(event => {
-      const matchMonth  = dateSearch ? moment(event.start).format("YYYY-MM") === dateSearch : true;
-      const matchType   = filterType   ? event.title  === filterType   : true;
-      const matchSystem = filterSystem ? event.system === filterSystem  : true;
-      const matchTeam   = filterTeam   ? event.team   === filterTeam   : true;
-      const matchStatus = filterStatus ? [event.status_two, event.status_three].includes(filterStatus) : true;
-      const matchOP     = filterOP     ? event.status === filterOP     : true;
-      const keyword = search.toLowerCase();
-      const matchSearch = keyword
-        ? [event.company, event.site, event.title, event.system, event.team, event.docNo,
-           moment(event.start).format("DD/MM/YYYY HH:mm")]
-            .map(v => (v || "").toLowerCase()).some(t => t.includes(keyword))
-        : true;
-      return matchMonth && matchType && matchSystem && matchStatus && matchOP && matchTeam && matchSearch;
-    });
-  }, [id, selectedEvent, events, dateSearch, filterType, filterSystem, filterStatus, filterOP, filterTeam, search]);
+  if (id && selectedEvent) return [selectedEvent];
+  return events.filter(event => {
+    const matchMonth  = dateSearch ? moment(event.start).format("YYYY-MM") === dateSearch : true;
+    const matchType   = filterType   ? event.title  === filterType   : true;
+    const matchSystem = filterSystem ? event.system === filterSystem  : true;
+    const matchTeam   = filterTeam   ? event.team   === filterTeam   : true;
+    const matchStatus = filterStatus ? [event.status_two, event.status_three].includes(filterStatus) : true;
+    const matchOP     = filterOP     ? event.status === filterOP     : true;
+
+    // ✅ เบื้องต้น: ตัดงานสถานะ "กำลังรอยืนยัน" ออกทั้งหมดfilteredEvents
+    // (ยกเว้นผู้ใช้ตั้งใจกรองสถานะนี้เองโดยเฉพาะ)
+    const matchNotPending = filterOP === "กำลังรอยืนยัน" ? true : event.status !== "กำลังรอยืนยัน";
+
+    const keyword = search.toLowerCase();
+    const matchSearch = keyword
+      ? [event.company, event.site, event.title, event.system, event.team, event.docNo,
+         moment(event.start).format("DD/MM/YYYY HH:mm")]
+          .map(v => (v || "").toLowerCase()).some(t => t.includes(keyword))
+      : true;
+
+    return matchMonth && matchType && matchSystem && matchStatus && matchOP && matchTeam && matchSearch && matchNotPending;
+  });
+}, [id, selectedEvent, events, dateSearch, filterType, filterSystem, filterStatus, filterOP, filterTeam, search]);
 
   const sortedEvents      = useMemo(() => filteredEvents.slice().sort((a, b) => new Date(b.start) - new Date(a.start)), [filteredEvents]);
   const activeFilterCount = [filterType, filterSystem, filterStatus, filterOP, search.trim(), filterTeam].filter(Boolean).length;
+
+  // รีเซ็ตกลับหน้า 1 ทุกครั้งที่ตัวกรอง/คำค้นหา/แท็บเปลี่ยน
+  useEffect(() => {
+    setPage(1);
+  }, [dateSearch, filterType, filterSystem, filterStatus, filterOP, filterTeam, search, activeTab]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedEvents.length / pageSize));
+
+  // กันหน้าเกินขอบเขตเมื่อผลลัพธ์หลังกรองน้อยกว่าหน้าปัจจุบัน
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  const pagedEvents = useMemo(
+    () => sortedEvents.slice((page - 1) * pageSize, page * pageSize),
+    [sortedEvents, page, pageSize]
+  );
 
   const handleStatusUpdate = useCallback(async (id, updates) => {
     try {
@@ -1424,6 +1609,38 @@ const Operation = () => {
       setEvents(prev => prev.map(e => e._id === id ? { ...e, ...updates } : e));
     } catch (err) { console.error(err); }
   }, []);
+
+  // อนุมัติคำขอปิดงานจากช่าง → เปลี่ยนสถานะเป็น "ดำเนินการเสร็จสิ้น"
+  const handleApproveClose = useCallback(async (id) => {
+    try {
+      const payload   = JSON.parse(localStorage.getItem("payload") || "{}");
+      const adminName = payload?.name || payload?.username || "แอดมิน";
+      const now = new Date().toISOString();
+
+      const target = events.find(e => e._id === id);
+      const newLog = {
+        action: "close_approved",
+        detail: `อนุมัติปิดงานโดย ${adminName}`,
+        userName: adminName,
+        timestamp: now,
+      };
+
+      const updates = {
+        status: "ดำเนินการเสร็จสิ้น",
+        closeRequested: false,
+        closeApprovedAt: now,
+        closeApprovedBy: adminName,
+        activityLog: [...(target?.activityLog || []), newLog],
+      };
+
+      await EventService.UpdateEvent(id, updates);
+      setEvents(prev => prev.map(e => e._id === id ? { ...e, ...updates } : e));
+      setSnackbar({ open: true, msg: "อนุมัติปิดงานเรียบร้อย", severity: "success" });
+    } catch (err) {
+      console.error(err);
+      setSnackbar({ open: true, msg: "อนุมัติปิดงานไม่สำเร็จ", severity: "error" });
+    }
+  }, [events]);
 
   const handleDocNoUpdate = useCallback((id, newDocNo) => {
     setEvents(prev => prev.map(e => e._id === id ? { ...e, docNo: newDocNo } : e));
@@ -1568,7 +1785,7 @@ const Operation = () => {
 
       {selectedEvent && (
         <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}
-          action={<Button color="inherit" size="small" onClick={() => { setSelectedEvent(null); navigate("/operation"); }}>แสดงทั้งหมด</Button>}>
+          action={<Button color="inherit" size="small" onClick={() => navigate("/operation")}>แสดงทั้งหมด</Button>}>
           กรองเฉพาะงาน: <strong>{selectedEvent.title}</strong> · {selectedEvent.system} · {selectedEvent.site}
         </Alert>
       )}
@@ -1579,7 +1796,9 @@ const Operation = () => {
           sx={{ "& .MuiTabs-indicator": { height: 3, borderRadius: "3px 3px 0 0" } }}>
           <StyledTab icon={<TableChart fontSize="small" />} iconPosition="start" label="รายการงาน" />
           <StyledTab icon={<Timeline fontSize="small" />}   iconPosition="start" label="Timeline" />
-          <StyledTab icon={<Dashboard fontSize="small" />}  iconPosition="start" label="Dashboard" />
+          {isAdminOrManager && (
+            <StyledTab icon={<Dashboard fontSize="small" />}  iconPosition="start" label="Dashboard" />
+          )}
         </Tabs>
       </Box>
 
@@ -1619,41 +1838,61 @@ const Operation = () => {
               <Typography variant="body2" color="text.disabled">ลองเปลี่ยนเงื่อนไขการค้นหา</Typography>
             </Box>
           ) : (
-            sortedEvents.map(event =>
-              currentUserRole === "technician" ? (
-                <TechnicianJobCard
-                  key={event._id}
-                  event={event}
-                  onStatusUpdate={handleStatusUpdate}
-                  onInputUpdate={handleInputUpdate}
-                  onFileUpload={handleFileUpload}
-                  onDeleteFile={(eid, type) => handleDeleteFile(eid, type)}
-                  uploadingState={uploadingState}
-                  isUploadingState={isUploadingState}
-                  uploadProgressState={uploadProgressState}
-                  currentUserRole={currentUserRole}
-                  isTechnicianView={true}
+            <>
+              {pagedEvents.map(event =>
+                currentUserRole === "technician" ? (
+                  <TechnicianJobCard
+                    key={event._id}
+                    event={event}
+                    onStatusUpdate={handleStatusUpdate}
+                    onInputUpdate={handleInputUpdate}
+                    onFileUpload={handleFileUpload}
+                    onDeleteFile={(eid, type) => handleDeleteFile(eid, type)}
+                    uploadingState={uploadingState}
+                    isUploadingState={isUploadingState}
+                    uploadProgressState={uploadProgressState}
+                    currentUserRole={currentUserRole}
+                    isTechnicianView={true}
+                  />
+                ) : (
+                  <EventRowCard
+                    key={event._id}
+                    event={event}
+                    employee={employee}
+                    onStatusUpdate={handleStatusUpdate}
+                    onDocNoUpdate={handleDocNoUpdate}
+                    onInputUpdate={handleInputUpdate}
+                    onFileUpload={handleFileUpload}
+                    onDeleteFile={(eid, type) => { setPendingDelete({ id: eid, type }); setConfirmOpen(true); }}
+                    onPreview={(url, name) => { setPreviewUrl(url); setPreviewFileName(name); }}
+                    onDelete={handleDeleteRow}
+                    onApproveClose={handleApproveClose}
+                    uploadingState={uploadingState}
+                    isUploadingState={isUploadingState}
+                    uploadProgressState={uploadProgressState}
+                    uploadingFileSizeState={uploadingFileSizeState}
+                    currentUserRole={currentUserRole}
+                  />
+                )
+              )}
+
+              <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" justifyContent="space-between"
+                gap={1.5} sx={{ mt: 2, mb: 1 }}>
+                <TextField
+                  select size="small" label="ต่อหน้า" value={pageSize}
+                  onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
+                  sx={{ width: 110, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+                  SelectProps={{ native: true }}>
+                  {[10, 20, 50, 100].map(n => <option key={n} value={n}>{n} รายการ</option>)}
+                </TextField>
+                <Pagination
+                  count={totalPages} page={page}
+                  onChange={(_, v) => setPage(v)}
+                  color="primary" shape="rounded" size={isMobile ? "small" : "medium"}
+                  showFirstButton showLastButton
                 />
-              ) : (
-                <EventRowCard
-                  key={event._id}
-                  event={event}
-                  employee={employee}
-                  onStatusUpdate={handleStatusUpdate}
-                  onDocNoUpdate={handleDocNoUpdate}
-                  onInputUpdate={handleInputUpdate}
-                  onFileUpload={handleFileUpload}
-                  onDeleteFile={(eid, type) => { setPendingDelete({ id: eid, type }); setConfirmOpen(true); }}
-                  onPreview={(url, name) => { setPreviewUrl(url); setPreviewFileName(name); }}
-                  onDelete={handleDeleteRow}
-                  uploadingState={uploadingState}
-                  isUploadingState={isUploadingState}
-                  uploadProgressState={uploadProgressState}
-                  uploadingFileSizeState={uploadingFileSizeState}
-                  currentUserRole={currentUserRole}
-                />
-              )
-            )
+              </Stack>
+            </>
           )}
         </>
       )}
@@ -1677,8 +1916,8 @@ const Operation = () => {
         </>
       )}
 
-      {/* TAB 2: DASHBOARD */}
-      {activeTab === 2 && (
+      {/* TAB 2: DASHBOARD (เฉพาะ admin/manager) */}
+      {activeTab === 2 && isAdminOrManager && (
         <>
           <DashboardStats events={events} />
           <StatusProgressBar events={events} />
