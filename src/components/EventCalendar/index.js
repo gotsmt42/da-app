@@ -680,7 +680,7 @@ function EventCalendar() {
                 : "";
 
             const isSmallScreen = window.innerWidth < 576;
-            const fontSize = isSmallScreen ? "0.67em" : "1em";
+            const fontSize = isSmallScreen ? "0.7em" : "1em";
 
             // ✅ ไอคอนสถานะ — คำนวณใหม่ทุกครั้งที่ event นี้ re-render (เช่นหลังบันทึกแก้ไข)
             // ต่างจาก eventDidMount ที่จะไม่ถูกเรียกซ้ำถ้า element ของ event ยังไม่ถูก unmount
