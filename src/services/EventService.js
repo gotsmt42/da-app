@@ -32,6 +32,19 @@ const EventService = {
     }
   },
 
+  async GetServiceReportFiles() {
+    try {
+      const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token
+      if (userData) {
+        const response = await API.get(`/events/documents`);
+        return response.data;
+      }
+    } catch (error) {
+      console.error("Error fetching service report files:", error);
+      throw error;
+    }
+  },
+
   async GetEventById(id) {
     try {
       const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token

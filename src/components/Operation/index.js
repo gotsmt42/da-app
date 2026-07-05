@@ -39,7 +39,7 @@ import {
   Refresh, ArrowUpward, ArrowDownward, Circle, ExpandMore,
   ExpandLess, FolderOpen, AttachFile, Login, Logout, Edit,
   NoteAdd, History, Person, AccessTime, FiberManualRecord,
-  NotificationsActive, TaskAlt, HourglassTop,
+  NotificationsActive, TaskAlt, HourglassTop, Cancel,
 } from "@mui/icons-material";
 
 // MUI Date Picker
@@ -167,6 +167,7 @@ const ACTION_META = {
   status_changed: { label: "เปลี่ยนสถานะ",      icon: <Circle sx={{ fontSize: 7 }} />,       color: "#6b7280" },
   close_requested:{ label: "ขอปิดงาน",          icon: <TaskAlt sx={{ fontSize: 13 }} />,     color: "#f59e0b" },
   close_approved: { label: "อนุมัติปิดงาน",      icon: <CheckCircle sx={{ fontSize: 13 }} />, color: "#10b981" },
+  close_rejected: { label: "ไม่อนุมัติปิดงาน",    icon: <Cancel sx={{ fontSize: 13 }} />,      color: "#ef4444" },
   document_checked:        { label: "ทำเครื่องหมายเอกสาร", icon: <CheckCircle sx={{ fontSize: 13 }} />, color: "#3b82f6" },
   document_applicable_set: { label: "ระบุมี/ไม่มีเอกสาร",   icon: <TaskAlt sx={{ fontSize: 13 }} />,     color: "#8b5cf6" },
 };
@@ -1024,7 +1025,7 @@ const FileUploadSection = ({
 // ─── EventRowCard ─────────────────────────────────────────────────────
 const EventRowCard = ({
   event, employee, onStatusUpdate, onDocNoUpdate, onInputUpdate,
-  onFileUpload, onDeleteFile, onPreview, onDelete, onApproveClose,
+  onFileUpload, onDeleteFile, onPreview, onDelete, onApproveClose, onRejectClose,
   uploadingState, isUploadingState, uploadProgressState, uploadingFileSizeState,
   currentUserRole,
 }) => {
@@ -1034,6 +1035,9 @@ const EventRowCard = ({
   const [anchorEl,   setAnchorEl]   = useState(null);
   const [localStatus,setLocalStatus]= useState(event.status || "");
   const [approving,  setApproving]  = useState(false);
+  const [rejecting,      setRejecting]      = useState(false);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectReason,   setRejectReason]   = useState("");
   const theme  = useTheme();
   const canEdit = ["admin", "manager", "user"].includes(currentUserRole);
   const isAdminOrManager = ["admin", "manager"].includes(currentUserRole);
@@ -1053,6 +1057,14 @@ const EventRowCard = ({
     setApproving(false);
   };
 
+  const handleReject = async () => {
+    setRejecting(true);
+    await onRejectClose(event._id, rejectReason.trim());
+    setRejecting(false);
+    setRejectDialogOpen(false);
+    setRejectReason("");
+  };
+
   return (
     <GlassCard sx={{ mb: 1.5, "&:hover": { transform: "none", boxShadow: `0 4px 20px ${alpha(theme.palette.common.black, 0.08)}` } }}>
       <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
@@ -1067,7 +1079,7 @@ const EventRowCard = ({
               {TYPE_ICON[event.title] || <Build />}
             </Avatar>
             <Box minWidth={0} flex={1}>
-              <Stack direction="row" flexWrap="wrap" gap={0.5} mb={0.5}>
+              <Stack direction="row" flexWrap="wrap" alignItems="center" gap={0.5} mb={0.5}>
                 <Tooltip title="เปลี่ยนสถานะ">
                   <Box onClick={e => canEdit && setAnchorEl(e.currentTarget)} sx={{ cursor: canEdit ? "pointer" : "default" }}>
                     <StatusBadge color={OP_COLOR[localStatus]}>
@@ -1075,18 +1087,39 @@ const EventRowCard = ({
                     </StatusBadge>
                   </Box>
                 </Tooltip>
-                {event.title  && <Chip label={event.title}  size="small" variant="outlined" sx={{ fontSize: "0.7rem", height: 22 }} />}
-                {event.system && <Chip label={event.system} size="small" variant="outlined" color="secondary" sx={{ fontSize: "0.7rem", height: 22 }} />}
-                {event.team   && <Chip icon={<Group sx={{ fontSize: "14px !important" }} />} label={event.team} size="small" variant="outlined" sx={{ fontSize: "0.7rem", height: 22 }} />}
+                {event.title  && <Chip label={event.title}  size="small" variant="outlined" sx={{ fontSize: "0.7rem", height: 22, maxWidth: 130 }} />}
+                {event.system && <Chip label={event.system} size="small" variant="outlined" color="secondary" sx={{ fontSize: "0.7rem", height: 22, maxWidth: 130 }} />}
+                {event.team   && <Chip icon={<Group sx={{ fontSize: "14px !important" }} />} label={event.team} size="small" variant="outlined" sx={{ fontSize: "0.7rem", height: 22, maxWidth: 150 }} />}
+                {/* ✅ ย้ายไอคอนเอกสาร/กิจกรรมมาไว้แถวเดียวกับ chip (wrap ได้ตามธรรมชาติ)
+                    แทนที่จะปักไว้คงที่ทางขวาสุดของแถวหัวข้อ ซึ่งไปแย่งพื้นที่ปีบให้ชื่องาน/ทีมถูกตัดคำบนจอมือถือ */}
+                <Stack direction="row" alignItems="center" gap={0.6} sx={{ ml: "auto", flexShrink: 0 }}>
+                  {event.reportFiles?.length > 0     && <Tooltip title={`Service Report: ${event.reportFiles.length} ไฟล์`}><Description sx={{ fontSize: 17, color: "#3b82f6", opacity: 0.8 }} /></Tooltip>}
+                  {event.quotationFiles?.length > 0  && <Tooltip title={`ใบเสนอราคา: ${event.quotationFiles.length} ไฟล์`}><Description sx={{ fontSize: 17, color: "#ef4444", opacity: 0.8 }} /></Tooltip>}
+                  {event.invoiceFiles?.length > 0    && <Tooltip title={`ใบวางบิล: ${event.invoiceFiles.length} ไฟล์`}><Description sx={{ fontSize: 17, color: "#f59e0b", opacity: 0.8 }} /></Tooltip>}
+                  {event.completionFiles?.length > 0 && <Tooltip title={`ใบส่งมอบงาน: ${event.completionFiles.length} ไฟล์`}><Description sx={{ fontSize: 17, color: "#07941a", opacity: 0.8 }} /></Tooltip>}
+                  {event.activityLog?.length > 0 && (
+                    <Tooltip title={`${event.activityLog.length} กิจกรรม`}>
+                      <History sx={{ fontSize: 17, color: "#f59e0b", opacity: 0.8 }} />
+                    </Tooltip>
+                  )}
+                </Stack>
               </Stack>
               <Typography fontWeight={700} fontSize="0.95rem" noWrap>
                 {event.company || "—"} · {event.site || "—"}
               </Typography>
               <Stack direction="row" flexWrap="wrap" gap={1} mt={0.3}>
                 <Typography variant="caption" color="text.secondary">
-                  📅 {moment(event.start).locale("th").format("DD MMM YYYY HH:mm")}
-                  {event.end && ` — ${moment(event.end).locale("th").format("DD MMM YYYY HH:mm")}`}
+                  📅 {moment(event.start).locale("th").format("DD MMM YYYY")}
+                  {/* ✅ event.end ของงานแบบ allDay ถูกบวกไป 1 วันตอนบันทึก (ค่า end แบบ exclusive ของ FullCalendar)
+                      ต้องลบ 1 วันคืนตอนแสดงผล ไม่งั้นวันที่ที่โชว์ในหน้า operation จะเพี้ยนไม่ตรงกับหน้า event
+                      และแสดงแค่วันที่ ไม่รวมเวลา เพราะเวลาจริงที่ผู้ใช้กรอกอยู่ใน startTime/endTime แยกต่างหาก */}
+                  {event.end && ` — ${moment(event.end).subtract(event.allDay ? 1 : 0, "days").locale("th").format("DD MMM YYYY")}`}
                 </Typography>
+                {(event.startTime || event.endTime) && (
+                  <Typography variant="caption" color="text.secondary">
+                    🕐 {event.startTime || "-"} — {event.endTime || "-"}
+                  </Typography>
+                )}
                 {editingDoc ? (
                   <Stack direction="row" gap={0.5} alignItems="center">
                     <TextField size="small" variant="standard" value={docNo}
@@ -1125,15 +1158,6 @@ const EventRowCard = ({
             </Box>
           </Stack>
           <Stack direction="row" gap={0.5} flexShrink={0}>
-            {event.reportFiles?.length > 0     && <Tooltip title={`Service Report: ${event.reportFiles.length} ไฟล์`}><Description sx={{ fontSize: 18, color: "#3b82f6", opacity: 0.8 }} /></Tooltip>}
-            {event.quotationFiles?.length > 0  && <Tooltip title={`ใบเสนอราคา: ${event.quotationFiles.length} ไฟล์`}><Description sx={{ fontSize: 18, color: "#ef4444", opacity: 0.8 }} /></Tooltip>}
-            {event.invoiceFiles?.length > 0    && <Tooltip title={`ใบวางบิล: ${event.invoiceFiles.length} ไฟล์`}><Description sx={{ fontSize: 18, color: "#f59e0b", opacity: 0.8 }} /></Tooltip>}
-            {event.completionFiles?.length > 0 && <Tooltip title={`ใบส่งมอบงาน: ${event.completionFiles.length} ไฟล์`}><Description sx={{ fontSize: 18, color: "#07941a", opacity: 0.8 }} /></Tooltip>}
-            {event.activityLog?.length > 0 && (
-              <Tooltip title={`${event.activityLog.length} กิจกรรม`}>
-                <History sx={{ fontSize: 18, color: "#f59e0b", opacity: 0.8 }} />
-              </Tooltip>
-            )}
             <IconButton onClick={() => setExpanded(p => !p)} sx={{ p: 1 }}>
               {expanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
             </IconButton>
@@ -1145,24 +1169,85 @@ const EventRowCard = ({
           </Stack>
         </Stack>
 
-        {/* แจ้งเตือนคำขอปิดงานจากช่าง (ยังไม่อนุมัติ) */}
+        {/* แจ้งเตือนคำขอปิดงานจากช่าง (ยังไม่อนุมัติ) — ใช้ Box แทน Alert action slot
+            เพราะ Alert วางข้อความ+ปุ่มแถวเดียวกันแล้วทับ/ล้นกันบนจอมือถือ */}
         {event.closeRequested && localStatus !== "ดำเนินการเสร็จสิ้น" && (
-          <Alert
-            severity="warning"
-            icon={<HourglassTop fontSize="small" />}
-            sx={{ mt: 1.5, borderRadius: 2 }}
-            action={isAdminOrManager ? (
-              <Button color="warning" variant="contained" size="small"
-                startIcon={<TaskAlt sx={{ fontSize: 16 }} />}
-                onClick={handleApprove} disabled={approving}
-                sx={{ borderRadius: 2, textTransform: "none" }}>
-                {approving ? "กำลังอนุมัติ..." : "อนุมัติปิดงาน"}
-              </Button>
-            ) : undefined}>
-            {event.closeRequestedBy || "ช่าง"} ขอปิดงาน
-            {event.closeRequestedAt && ` เมื่อ ${moment(event.closeRequestedAt).locale("th").format("DD MMM HH:mm")}`}
-          </Alert>
+          <Box sx={{
+            mt: 1.5, p: 1.5, borderRadius: 2,
+            bgcolor: alpha("#f59e0b", 0.08),
+            border: "1px solid", borderColor: alpha("#f59e0b", 0.25),
+          }}>
+            <Stack direction="row" alignItems="flex-start" gap={1}>
+              <HourglassTop sx={{ fontSize: 18, color: "#f59e0b", mt: 0.2, flexShrink: 0 }} />
+              <Typography variant="body2" sx={{ flex: 1, wordBreak: "break-word" }}>
+                {event.closeRequestedBy || "ช่าง"} ขอปิดงาน
+                {event.closeRequestedAt && ` เมื่อ ${moment(event.closeRequestedAt).locale("th").format("DD MMM HH:mm")}`}
+              </Typography>
+            </Stack>
+            {isAdminOrManager && (
+              <Stack direction={{ xs: "column", sm: "row" }} gap={1} sx={{ mt: 1.25 }}>
+                <Button color="warning" variant="contained" size="small"
+                  startIcon={<TaskAlt sx={{ fontSize: 16 }} />}
+                  onClick={handleApprove} disabled={approving || rejecting}
+                  sx={{ flex: 1, borderRadius: 2, textTransform: "none", fontWeight: 700 }}>
+                  {approving ? "กำลังอนุมัติ..." : "อนุมัติปิดงาน"}
+                </Button>
+                <Button color="error" variant="outlined" size="small"
+                  startIcon={<Cancel sx={{ fontSize: 16 }} />}
+                  onClick={() => setRejectDialogOpen(true)} disabled={approving || rejecting}
+                  sx={{ flex: 1, borderRadius: 2, textTransform: "none", fontWeight: 700 }}>
+                  ไม่อนุมัติ
+                </Button>
+              </Stack>
+            )}
+          </Box>
         )}
+
+        {/* ประวัติการไม่อนุมัติล่าสุด (ถ้ายังไม่มีการขอปิดงานใหม่เข้ามา) */}
+        {!event.closeRequested && event.closeRejectReason && localStatus !== "ดำเนินการเสร็จสิ้น" && (
+          <Box sx={{
+            mt: 1.5, p: 1.5, borderRadius: 2,
+            bgcolor: alpha("#ef4444", 0.08),
+            border: "1px solid", borderColor: alpha("#ef4444", 0.25),
+          }}>
+            <Stack direction="row" alignItems="center" gap={0.75}>
+              <Cancel sx={{ fontSize: 16, color: "#ef4444", flexShrink: 0 }} />
+              <Typography variant="body2" fontWeight={700} color="#ef4444">
+                ไม่อนุมัติคำขอปิดงาน
+              </Typography>
+              {event.closeRejectedAt && (
+                <Typography variant="caption" color="text.disabled">
+                  · {moment(event.closeRejectedAt).locale("th").format("DD MMM HH:mm")}
+                </Typography>
+              )}
+            </Stack>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, wordBreak: "break-word" }}>
+              "{event.closeRejectReason}"
+            </Typography>
+          </Box>
+        )}
+
+        {/* Dialog: ระบุเหตุผลที่ไม่อนุมัติ */}
+        <Dialog open={rejectDialogOpen} onClose={() => !rejecting && setRejectDialogOpen(false)} fullWidth maxWidth="xs">
+          <DialogTitle>ไม่อนุมัติปิดงาน</DialogTitle>
+          <DialogContent>
+            <DialogContentText sx={{ mb: 1.5 }}>
+              ระบุเหตุผล/คอมเมนต์ที่ไม่อนุมัติ เพื่อแจ้งให้ช่างทราบและแก้ไข
+            </DialogContentText>
+            <TextField
+              autoFocus fullWidth multiline minRows={3}
+              placeholder="เช่น ไฟล์ใบเสนอราคายังไม่ครบ กรุณาแนบเพิ่ม"
+              value={rejectReason}
+              onChange={e => setRejectReason(e.target.value)}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setRejectDialogOpen(false)} disabled={rejecting}>ยกเลิก</Button>
+            <Button variant="contained" color="error" onClick={handleReject} disabled={rejecting}>
+              {rejecting ? "กำลังบันทึก..." : "ยืนยันไม่อนุมัติ"}
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         {/* Status Menu */}
         <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}
@@ -1655,6 +1740,38 @@ const Operation = () => {
     }
   }, [events]);
 
+  // ไม่อนุมัติคำขอปิดงานจากช่าง → เปิดให้ช่างแก้ไขแล้วขอปิดงานใหม่ได้ พร้อมเหตุผล/comment แจ้งช่าง
+  const handleRejectClose = useCallback(async (id, reason) => {
+    try {
+      const payload   = JSON.parse(localStorage.getItem("payload") || "{}");
+      const adminName = payload?.name || payload?.username || "แอดมิน";
+      const now = new Date().toISOString();
+
+      const target = events.find(e => e._id === id);
+      const newLog = {
+        action: "close_rejected",
+        detail: reason ? `ไม่อนุมัติปิดงานโดย ${adminName}: ${reason}` : `ไม่อนุมัติปิดงานโดย ${adminName}`,
+        userName: adminName,
+        timestamp: now,
+      };
+
+      const updates = {
+        closeRequested: false,
+        closeRejectedAt: now,
+        closeRejectedBy: adminName,
+        closeRejectReason: reason || "",
+        activityLog: [...(target?.activityLog || []), newLog],
+      };
+
+      await EventService.UpdateEvent(id, updates);
+      setEvents(prev => prev.map(e => e._id === id ? { ...e, ...updates } : e));
+      setSnackbar({ open: true, msg: "ไม่อนุมัติคำขอปิดงานแล้ว", severity: "success" });
+    } catch (err) {
+      console.error(err);
+      setSnackbar({ open: true, msg: "ดำเนินการไม่สำเร็จ", severity: "error" });
+    }
+  }, [events]);
+
   const handleDocNoUpdate = useCallback((id, newDocNo) => {
     setEvents(prev => prev.map(e => e._id === id ? { ...e, docNo: newDocNo } : e));
     EventService.UpdateEvent(id, { docNo: newDocNo });
@@ -1751,7 +1868,7 @@ const Operation = () => {
     const rows = sortedEvents.map(e => [
       e.company, e.site, e.title, e.system, e.status, e.docNo,
       moment(e.start).format("DD/MM/YYYY HH:mm"),
-      e.end ? moment(e.end).format("DD/MM/YYYY HH:mm") : "",
+      e.end ? moment(e.end).subtract(e.allDay ? 1 : 0, "days").format("DD/MM/YYYY HH:mm") : "",
       e.team,
       e.checkedInAt  ? moment(e.checkedInAt).format("DD/MM/YYYY HH:mm")  : "",
       e.checkedOutAt ? moment(e.checkedOutAt).format("DD/MM/YYYY HH:mm") : "",
@@ -1885,6 +2002,7 @@ const Operation = () => {
                     onPreview={(url, name) => { setPreviewUrl(url); setPreviewFileName(name); }}
                     onDelete={handleDeleteRow}
                     onApproveClose={handleApproveClose}
+                    onRejectClose={handleRejectClose}
                     uploadingState={uploadingState}
                     isUploadingState={isUploadingState}
                     uploadProgressState={uploadProgressState}

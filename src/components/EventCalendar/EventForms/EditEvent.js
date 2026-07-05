@@ -256,16 +256,22 @@ function injectStyles() {
   document.head.appendChild(style);
 }
 
+// ✅ ครบทั้ง 4 สถานะ ให้ตรงกับ OP_LIST/OP_COLOR ของหน้า Operation เสมอ
+// (เดิมมีแค่ 2 สถานะแรก ทำให้งานที่สถานะไปไกลกว่านั้นแล้ว เช่น "กำลังดำเนินการ" หา config ไม่เจอ
+// แล้ว fallback ไปแสดงเป็น "กำลังรอยืนยัน" ผิดๆ ทั้ง header สีและตัวเลือกใน dropdown)
 const STATUS_CONFIG = {
   กำลังรอยืนยัน: { bg: "linear-gradient(135deg,#475569,#64748b)", icon: "⏳" },
   ยืนยันแล้ว: { bg: "linear-gradient(135deg,#1d4ed8,#2563eb)", icon: "✅" },
-  // "กำลังดำเนินการ":     { bg: "linear-gradient(135deg,#92400e,#d97706)", icon: "🔄" },
-  // "ดำเนินการเสร็จสิ้น": { bg: "linear-gradient(135deg,#065f46,#10b981)", icon: "🎉" },
+  กำลังดำเนินการ: { bg: "linear-gradient(135deg,#6d28d9,#8b5cf6)", icon: "🔄" },
+  ดำเนินการเสร็จสิ้น: { bg: "linear-gradient(135deg,#065f46,#10b981)", icon: "🎉" },
 };
+
+// ✅ ช่างแก้สถานะเองได้แค่ 2 สถานะแรก (กำลังรอยืนยัน/ยืนยันแล้ว) — สอดคล้องกับหน้า Operation
+// ที่ปล่อยให้แอดมิน/manager เป็นคนเปลี่ยนสถานะขั้นถัดไป (กำลังดำเนินการ/ดำเนินการเสร็จสิ้น) เท่านั้น
+const TECH_EDITABLE_STATUSES = ["กำลังรอยืนยัน", "ยืนยันแล้ว"];
 
 export const getEditEvent = async ({
   navigate,
-  setEvents,
   fetchEventsFromDB,
   eventInfo,
   setLoading,
@@ -277,8 +283,6 @@ export const getEditEvent = async ({
   Swal,
   TomSelect,
   moment,
-  calendarRef,
-  Choices,
   userData,
 }) => {
   injectStyles();
@@ -299,8 +303,16 @@ export const getEditEvent = async ({
   const eventStatus = ev.extendedProps?.status || "กำลังรอยืนยัน";
   const eventSubject = ev.extendedProps?.subject || "";
   const eventDescription = ev.extendedProps?.description || "";
-  const eventStartTime = ev.extendedProps?.startTime || "";
-  const eventEndTime = ev.extendedProps?.endTime || "";
+  // ✅ normalize เผื่อข้อมูลเก่าที่กรอกเป็น text อิสระมาก่อน (เช่น "8.00" ใช้จุดแทนโคลอน ไม่มีเลขศูนย์นำหน้า)
+  // ตอนนี้เปลี่ยนช่องเป็น <input type="time"> ซึ่งรับได้แค่รูปแบบ HH:mm มาตรฐานเท่านั้น
+  // ถ้าไม่ normalize ค่าเก่าที่ไม่ตรงรูปแบบจะโชว์ว่างเปล่า แล้วถ้าผู้ใช้กดบันทึกโดยไม่ได้แก้ไข
+  // ช่องนี้จะถูกเขียนทับเป็นค่าว่างไปเลย ทั้งที่จริงมีข้อมูลอยู่
+  // const normalizeTime = (t) => {
+  //   const m = String(t || "").trim().match(/^(\d{1,2})[.:](\d{2})$/);
+  //   return m ? `${m[1].padStart(2, "0")}:${m[2]}` : "";
+  // };
+  const eventStartTime = ev.extendedProps?.startTime;
+  const eventEndTime = ev.extendedProps?.endTime;
   const userId = ev.extendedProps?.userId; // ⚠️ นี่คือ id ของ "คนสร้าง event" ไม่ใช่ผู้ใช้ที่ล็อกอินอยู่ตอนนี้
   const eventResPerson = ev.extendedProps?.resPerson || "";
 
@@ -317,6 +329,9 @@ export const getEditEvent = async ({
     eventStatus !== "กำลังรอยืนยัน"; // งานที่ยังไม่ยืนยัน ยังไม่มีอะไรให้ดูในหน้าดำเนินงาน
   // ❌ งานที่ admin ปิดแล้ว (ดำเนินการเสร็จสิ้น) ช่างลบไม่ได้อีก มีแค่ admin/manager เท่านั้น
   const canDeleteEvent = isAdminOrManagerUser || eventStatus !== "ดำเนินการเสร็จสิ้น";
+  // ✅ ช่างแก้ไขสถานะเองได้แค่ตอนยังอยู่ในช่วง กำลังรอยืนยัน/ยืนยันแล้ว เท่านั้น
+  // ถ้าสถานะถูกเลื่อนไปไกลกว่านั้นแล้ว (กำลังดำเนินการ/ดำเนินการเสร็จสิ้น) ให้แสดงค่าจริงไว้ แต่แก้ไม่ได้
+  const canEditStatus = isAdminOrManagerUser || TECH_EDITABLE_STATUSES.includes(eventStatus);
 
   const formattedEnd = eventAllDay
     ? moment(eventEnd).subtract(1, "days").format("YYYY-MM-DD")
@@ -347,7 +362,16 @@ export const getEditEvent = async ({
     value: ev.textColor || "#ffffff",
   });
 
-  const statusOptions = Object.keys(STATUS_CONFIG)
+  // ✅ admin/manager เลือกได้ครบทุกสถานะเสมอ; ช่างเลือกได้แค่ 2 สถานะแรกถ้ายังไม่ถูกเลื่อนสถานะ
+  // แต่ถ้าสถานะถูกเลื่อนไปไกลกว่านั้นแล้ว (canEditStatus=false) ให้เหลือแค่ตัวเลือกเดียวคือสถานะปัจจุบัน
+  // (แสดงค่าจริงถูกต้อง แต่กด select ไม่ได้เพราะ disabled ด้านล่าง)
+  const selectableStatuses = isAdminOrManagerUser
+    ? Object.keys(STATUS_CONFIG)
+    : canEditStatus
+    ? TECH_EDITABLE_STATUSES
+    : [eventStatus];
+
+  const statusOptions = selectableStatuses
     .map(
       (s) =>
         `<option value="${s}" ${eventStatus === s ? "selected" : ""}>${s}</option>`,
@@ -440,7 +464,7 @@ export const getEditEvent = async ({
       <div id="ee-status-bar-right">
         <span class="ee-status-bar-label">🔖 สถานะ</span>
         <div id="ee-status-select-wrap">
-          <select id="editStatus">${statusOptions}</select>
+          <select id="editStatus" ${canEditStatus ? "" : "disabled title=\"สถานะนี้เปลี่ยนได้เฉพาะแอดมิน/manager\""}>${statusOptions}</select>
         </div>
       </div>
     </div>
@@ -565,6 +589,10 @@ export const getEditEvent = async ({
     showCancelButton: false,
     showCloseButton: false,
     customClass: { popup: "swal-edit-event" },
+    // ✅ กันคลิกนอกกล่อง/กด ESC แล้วปิดโดยไม่ตั้งใจ ข้อมูลที่แก้ไว้ทั้งหมดหายหมด
+    // ต้องกดปุ่ม "ปิด" (✕) หรือ "ยกเลิก" อย่างชัดเจนเท่านั้น
+    allowOutsideClick: false,
+    allowEscapeKey: false,
 
     didOpen: () => {
       /* color pickers */
@@ -646,11 +674,20 @@ export const getEditEvent = async ({
 
       const buildPayload = () => {
         const endInput = getVal("editEnd");
+        // ⚠️ เดิม fallback ไปที่ eventEnd.toISOString() ตรงๆ เวลาช่องวันที่สิ้นสุดว่าง
+        // แต่ถ้า eventEnd (มาจาก ev.end ของ FullCalendar ตอนเปิด modal) ดันเป็นค่า invalid
+        // (เช่น event ที่เคยถูกบันทึกมาแบบ end หายไปก่อนหน้านี้) .toISOString() จะคืนค่า null
+        // แล้ว null ก็จะถูกบันทึกทับเป็น end ของ event ไปเลย ทำให้ event กลายเป็น "ไม่มีวันจบ"
+        // แสดงซ้ำทุกวันในปฏิทิน (bug ที่ทำให้ปฏิทินเพี้ยนทั้งเดือน) — จึงต้องเช็ค isValid() ก่อนเสมอ
+        // ถ้า invalid ให้ใช้วันเริ่มบวก 1 วันแทน (ปลอดภัยกว่าปล่อยให้ end เป็น null)
+        const fallbackEnd = eventEnd.isValid()
+          ? eventEnd.toISOString()
+          : moment(getVal("editStart")).add(1, "days").toISOString();
         const end = endInput
           ? eventAllDay
             ? moment(endInput).add(1, "days").toISOString()
             : moment(endInput).toISOString()
-          : eventEnd.toISOString();
+          : fallbackEnd;
         return {
           id: eventId,
           docNo: getVal("editdocNo"),
@@ -680,6 +717,12 @@ export const getEditEvent = async ({
         .getElementById("btnConfirm")
         ?.addEventListener("click", async () => {
           const payload = buildPayload();
+          // ✅ กันบันทึก end เป็น null/invalid เด็ดขาด (ทำให้ event กลายเป็น "ไม่มีวันจบ"
+          // แสดงซ้ำทุกวันทั้งเดือนในปฏิทิน) — ถ้าเกิดขึ้นจริง ให้บังคับกรอกวันที่สิ้นสุดใหม่แทนการบันทึกทับ
+          if (!payload.end || !moment(payload.end).isValid()) {
+            Swal.showValidationMessage("กรุณาระบุวันที่สิ้นสุดใหม่อีกครั้ง (ข้อมูลเดิมไม่ถูกต้อง)");
+            return;
+          }
           if (!payload.title) {
             Swal.showValidationMessage("กรุณาระบุประเภทงาน");
             return;
@@ -690,6 +733,14 @@ export const getEditEvent = async ({
           }
           if (!payload.system) {
             Swal.showValidationMessage("กรุณาระบบงาน");
+            return;
+          }
+          // ✅ กันวันที่สิ้นสุดก่อนวันที่เริ่ม (เทียบจากค่าดิบในช่อง ก่อนที่ end จะถูกปรับ +1 วัน
+          // สำหรับงาน allDay ใน buildPayload ไม่งั้นเทียบกับ payload.end ตรงๆ จะเพี้ยน)
+          const rawStart = getVal("editStart");
+          const rawEnd = getVal("editEnd");
+          if (rawStart && rawEnd && moment(rawEnd).isBefore(moment(rawStart))) {
+            Swal.showValidationMessage("วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม");
             return;
           }
           setLoading(true);

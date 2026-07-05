@@ -16,13 +16,16 @@ import {
 } from "reactstrap";
 import { swalLogout } from "../functions/user";
 import Swal from "sweetalert2";
-import { FaBars } from "react-icons/fa";
+import { FaBars, FaBell, FaBellSlash } from "react-icons/fa";
+import PushService from "../services/PushService";
 
 const Header = ({ toggleMobileSidebar }) => {
   const navigate = useNavigate();
   const [user, setUser] = useState({});
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 992); 
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 992);
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushLoading, setPushLoading] = useState(false);
 
   const { userData, logout } = useAuth();
 
@@ -35,8 +38,12 @@ const Header = ({ toggleMobileSidebar }) => {
         console.error("Error fetching user data:", error);
       }
     };
-    
+
     getUserData();
+
+    if (PushService.isSupported()) {
+      PushService.isSubscribed().then(setPushSubscribed);
+    }
 
     const checkIsMobile = () => {
       setIsMobile(window.innerWidth <= 992);
@@ -49,6 +56,30 @@ const Header = ({ toggleMobileSidebar }) => {
   }, []);
 
   const toggle = () => setDropdownOpen((prevState) => !prevState);
+
+  // ✅ เปิด/ปิดการแจ้งเตือนผ่านมือถือ/เบราว์เซอร์ (ใช้ได้ทั้งช่างและแอดมิน)
+  const handleTogglePush = async () => {
+    if (!PushService.isSupported()) {
+      Swal.fire("อุปกรณ์นี้ไม่รองรับ", "เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือนแบบ Push", "warning");
+      return;
+    }
+    setPushLoading(true);
+    try {
+      if (pushSubscribed) {
+        await PushService.unsubscribe();
+        setPushSubscribed(false);
+        Swal.fire({ title: "ปิดการแจ้งเตือนแล้ว", icon: "success", timer: 1200, showConfirmButton: false });
+      } else {
+        await PushService.subscribe();
+        setPushSubscribed(true);
+        Swal.fire({ title: "เปิดการแจ้งเตือนแล้ว 🔔", icon: "success", timer: 1200, showConfirmButton: false });
+      }
+    } catch (error) {
+      Swal.fire("ทำรายการไม่สำเร็จ", error.message || "กรุณาลองใหม่อีกครั้ง", "error");
+    } finally {
+      setPushLoading(false);
+    }
+  };
 
   const handleLogout = async () => {
     const result = await swalLogout();
@@ -79,15 +110,26 @@ const Header = ({ toggleMobileSidebar }) => {
             <Link to="/event" className="nav-link">Event</Link>
           </NavItem>
           <NavItem>
-            <Link to="/files" className="nav-link">Service Reports</Link>
+            <Link to="/files" className="nav-link">เอกสารทั้งหมด</Link>
           </NavItem>
-          <NavItem>
+          {/* <NavItem>
             <Link to="/technician/jobs" className="nav-link">งานของฉัน</Link>
-          </NavItem>
+          </NavItem> */}
         </Nav>
 
         {/* ฝั่งขวา: รูปโปรไฟล์ผู้ใช้งาน + ปุ่มแฮมเบอร์เกอร์ */}
         <div className="d-flex align-items-center gap-3">
+          <Button
+            color="transparent"
+            onClick={handleTogglePush}
+            disabled={pushLoading}
+            title={pushSubscribed ? "ปิดการแจ้งเตือน" : "เปิดการแจ้งเตือนบนมือถือ"}
+            style={{ padding: "6px", border: "none" }}
+          >
+            {pushSubscribed
+              ? <FaBell style={{ fontSize: "20px", color: "#facc15" }} />
+              : <FaBellSlash style={{ fontSize: "20px", color: "#94a3b8" }} />}
+          </Button>
           <div className="profile-img">
             <Dropdown isOpen={dropdownOpen} toggle={toggle}>
               <DropdownToggle color="transparent" style={{ padding: 0, border: 'none' }}>

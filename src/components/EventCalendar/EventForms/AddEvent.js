@@ -156,8 +156,6 @@ function injectAddStyles() {
 ───────────────────────────────────────────── */
 export const getAddEvent = async ({
   arg,
-  events,
-  setEvents,
   defaultTextColor,
   defaultBackgroundColor,
   setDefaultTextColor,
@@ -170,7 +168,6 @@ export const getAddEvent = async ({
   Swal,
   TomSelect,
   moment,
-  userData,
 }) => {
   injectAddStyles();
 
@@ -316,6 +313,10 @@ export const getAddEvent = async ({
     showCancelButton: false,
     showCloseButton: true,
     customClass: { popup: "swal-add-event" },
+    // ✅ กันคลิกนอกกล่อง/กด ESC แล้วปิดโดยไม่ตั้งใจ ข้อมูลที่กรอกไว้ทั้งหมดหายหมด
+    // ต้องกดปุ่ม "ยกเลิก" หรือปุ่มปิด (✕) อย่างชัดเจนเท่านั้น
+    allowOutsideClick: false,
+    allowEscapeKey: false,
 
     didOpen: () => {
       /* TomSelect */
@@ -360,6 +361,14 @@ export const getAddEvent = async ({
         if (!title)  { Swal.showValidationMessage("กรุณาระบุประเภทงาน");    return; }
         if (!system) { Swal.showValidationMessage("กรุณาระบุระบบงาน");      return; }
 
+        // ✅ กันวันที่สิ้นสุดก่อนวันที่เริ่ม (พิมพ์/เลือกผิดได้ง่ายเพราะเป็นช่องแยกกันคนละช่อง)
+        const startVal = getVal("start");
+        const endVal   = getVal("end");
+        if (startVal && endVal && moment(endVal).isBefore(moment(startVal))) {
+          Swal.showValidationMessage("วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม");
+          return;
+        }
+
         // ✅ กันกดซ้ำระหว่างบันทึก + ให้เห็นว่ากำลังทำงานอยู่
         const btn = clickEvt.currentTarget;
         const originalLabel = btn.textContent;
@@ -403,7 +412,10 @@ export const getAddEvent = async ({
             });
           }
 
-          setEvents((prev) => [...prev, newEvent]);
+          // ⚠️ เดิม optimistic-add newEvent เข้า state ตรงนี้ก่อน แต่ newEvent ไม่มี id/ _id เลย
+          // (ยังไม่ถูกบันทึกจริง) ทำให้ถ้า saveEventToDB ด้านล่างล้มเหลว จะมี event ผีค้างอยู่ใน
+          // ปฏิทินโดยไม่มีทางลบออก จนกว่าจะรีเฟรชหน้า — fetchEventsFromDB() หลังบันทึกสำเร็จ
+          // ก็ดึงข้อมูลจริงมาแสดงอยู่แล้ว จึงตัด optimistic add ที่ไม่จำเป็นและเสี่ยงนี้ออก
           await saveEventToDB(newEvent);
           setDefaultTextColor(payload.textColor);
           setDefaultBackgroundColor(payload.backgroundColor);

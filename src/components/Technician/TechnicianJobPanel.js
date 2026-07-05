@@ -24,7 +24,7 @@ import {
   ExpandMore, ExpandLess, History,
   PictureAsPdf, Image, Article, InsertDriveFile,
   AttachFile, Delete, Download, TaskAlt, HourglassTop, NoteAdd,
-  RequestQuote, ReceiptLong, AssignmentTurnedIn, Close,
+  RequestQuote, ReceiptLong, AssignmentTurnedIn, Close, Cancel,
 } from "@mui/icons-material";
 
 // ─── Constants ────────────────────────────────────────────────────────
@@ -488,6 +488,9 @@ const TechnicianJobCard = ({
       closeRequested: true,
       closeRequestedAt: now,
       closeRequestedBy: userName,
+      // ✅ เก็บ userId จริงของคนกดขอปิดงานไว้ด้วย เพื่อให้แจ้งเตือน push ตอนอนุมัติ/ไม่อนุมัติ
+      // ส่งถึงคนที่กดขอจริงๆ ได้ (resPerson ของงานอาจไม่ตรงกับคนกดขอ เช่น งานมอบหมายผ่านชื่อทีมแบบเก่า)
+      closeRequestedByUserId: payload?.userId || "",
     });
     await pushLog("close_requested", "ขอปิดงาน รอแอดมินอนุมัติ");
     setRequestingClose(false);
@@ -533,10 +536,17 @@ const TechnicianJobCard = ({
               <Typography fontWeight={800} fontSize="0.95rem">
                 {event.company || "—"} · {event.site || "—"}
               </Typography>
-              <Typography variant="caption" color="text.secondary">
-                📅 {moment(event.start).locale("th").format("DD MMM YYYY HH:mm")}
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                {/* ✅ วันที่เริ่ม-สิ้นสุด (event.end งาน allDay ถูก +1 วันตอนบันทึกไว้ ต้องลบคืนตอนแสดงผล) */}
+                📅 {moment(event.start).locale("th").format("DD MMM YYYY")}
+                {event.end && ` — ${moment(event.end).subtract(event.allDay ? 1 : 0, "days").locale("th").format("DD MMM YYYY")}`}
                 {event.docNo && <> · 📄 {event.docNo}</>}
               </Typography>
+              {(event.startTime || event.endTime) && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                  🕐 {event.startTime || "-"} — {event.endTime || "-"}
+                </Typography>
+              )}
             </Box>
           </Stack>
           <IconButton onClick={() => setExpanded(p => !p)}
@@ -636,6 +646,22 @@ const TechnicianJobCard = ({
           </Stack>
         ) : canRequestClose ? (
           <Box sx={{ mt: 1.5 }}>
+            {event.closeRejectReason && (
+              <Box sx={{
+                mb: 1, p: 1.25, borderRadius: 2,
+                bgcolor: alpha("#ef4444", 0.08), border: "1px solid", borderColor: alpha("#ef4444", 0.25),
+              }}>
+                <Stack direction="row" alignItems="center" gap={0.5}>
+                  <Cancel sx={{ fontSize: 15, color: "#ef4444" }} />
+                  <Typography variant="caption" fontWeight={700} color="#ef4444">
+                    แอดมินไม่อนุมัติคำขอก่อนหน้า
+                  </Typography>
+                </Stack>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.3, wordBreak: "break-word" }}>
+                  "{event.closeRejectReason}"
+                </Typography>
+              </Box>
+            )}
             <ActionBtn
               variant="contained"
               btncolor="#f59e0b"
@@ -643,7 +669,7 @@ const TechnicianJobCard = ({
               onClick={handleRequestClose}
               disabled={requestingClose}
               fullWidth>
-              {requestingClose ? "กำลังส่งคำขอ..." : "ขอปิดงาน"}
+              {requestingClose ? "กำลังส่งคำขอ..." : event.closeRejectReason ? "ขอปิดงานอีกครั้ง" : "ขอปิดงาน"}
             </ActionBtn>
           </Box>
         ) : (

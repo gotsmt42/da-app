@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUpload, faFileImport } from "@fortawesome/free-solid-svg-icons";
+import { faUpload, faFileImport, faTimes } from "@fortawesome/free-solid-svg-icons";
 import FileService from "../../services/FileService";
 import Swal from "sweetalert2";
 import { ThreeDots } from "react-loader-spinner";
@@ -156,39 +156,54 @@ const FileUpload = () => {
     label: cat,
   }));
   return (
-    <div className="container my-ๅ">
+    <div className="container my-3">
       {/* พื้นที่ลากไฟล์ */}
       <div
         {...getRootProps()}
-        className={`border rounded p-5 text-center upload-container ${
-          isDragActive ? "bg-light shadow" : ""
+        className={`text-center upload-container ${
+          isDragActive ? "shadow" : ""
         }`}
         style={{
           cursor: "pointer",
-          padding: "2rem", // ลดจาก 5rem เหลือ 2rem
-          maxWidth: "800px", // กำหนดความกว้างสูงสุด
-          maxHeight: "300px", // กำหนดความกว้างสูงสุด
-          margin: "0 auto", // จัดให้อยู่ตรงกลาง
+          padding: "2.5rem 2rem",
+          maxWidth: "800px",
+          margin: "0 auto",
+          borderRadius: "16px",
+          border: isDragActive ? "2px solid #0d6efd" : "2px dashed #cbd5e1",
+          background: isDragActive ? "#eff6ff" : "#f8fafc",
+          transition: "all .15s ease",
         }}
       >
         <input {...getInputProps()} accept="image/*,application/pdf" />
         <FontAwesomeIcon
           icon={faFileImport}
-          size="5x"
-          className="mb-4"
+          size="3x"
+          className="mb-3"
           style={{ color: "#0d6efd" }}
         />
-        <p className="fs-2 mb-0">
+        <p className="fs-5 fw-semibold mb-1">
           {isDragActive
             ? "ปล่อยไฟล์ที่นี่..."
             : "ลากไฟล์มาวาง หรือคลิกเพื่อเลือกไฟล์"}
+        </p>
+        <p className="text-muted small mb-0">
+          รองรับสูงสุด {MAX_UPLOAD_FILE} ไฟล์ / ครั้ง, ไม่เกิน {MAX_FILE_SIZE_MB}MB ต่อไฟล์
         </p>
       </div>
 
       {/* รายการไฟล์ */}
       {uploadedFiles.length > 0 && (
         <div className="mt-4">
-          <h6>ไฟล์ที่เลือก ({uploadedFiles.length})</h6>
+          <div className="d-flex align-items-center justify-content-between mb-2">
+            <h6 className="mb-0">ไฟล์ที่เลือก ({uploadedFiles.length})</h6>
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-secondary"
+              onClick={() => setUploadedFiles([])}
+            >
+              ล้างทั้งหมด
+            </button>
+          </div>
           <ul className="list-group">
             {uploadedFiles.map((item, index) => {
               const fileNameParts = item.name.split(".");
@@ -254,7 +269,7 @@ const FileUpload = () => {
                     </div>
 
                     {/* ช่องแก้ชื่อไฟล์ */}
-                    <div className="col-12 col-md-8 d-flex align-items-center">
+                    <div className="col-11 col-md-7 d-flex align-items-center">
                       <input
                         type="text"
                         value={baseName}
@@ -267,6 +282,20 @@ const FileUpload = () => {
                         className="form-control form-control-sm w-100"
                       />
                       <span className="text-muted ms-2">.{extension}</span>
+                    </div>
+
+                    {/* ปุ่มลบไฟล์นี้ออกจากรายการ (ก่อนกดอัพโหลด) */}
+                    <div className="col-1 d-flex align-items-center justify-content-end">
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-link text-danger p-1"
+                        title="เอาไฟล์นี้ออก"
+                        onClick={() =>
+                          setUploadedFiles((prev) => prev.filter((_, i) => i !== index))
+                        }
+                      >
+                        <FontAwesomeIcon icon={faTimes} />
+                      </button>
                     </div>
                   </div>
                 </li>

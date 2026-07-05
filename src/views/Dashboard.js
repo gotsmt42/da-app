@@ -159,7 +159,7 @@ const Dashboard = () => {
             isFeatured: true
           },
           {
-            title: "Service Reports",
+            title: "เอกสารทั้งหมด",
             count: files.length,
             desc: "เอกสารรายงานการบริการในระบบ",
             link: "/files",

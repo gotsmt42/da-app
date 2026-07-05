@@ -43,7 +43,7 @@ const Sidebar = ({ handleMenuClick }) => {
         { title: "การดำเนินงาน", href: "/operation" }
       ]
     },
-    { title: "Service Reports", href: "/files", icon: "bi-file-earmark-text-fill" },
+    { title: "เอกสารทั้งหมด", href: "/files", icon: "bi-file-earmark-text-fill" },
   ];
 
   const technicianMenu = [
