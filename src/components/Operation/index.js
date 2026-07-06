@@ -41,7 +41,7 @@ import {
   ExpandLess, FolderOpen, AttachFile, Login, Logout, Edit,
   NoteAdd, History, Person, AccessTime, FiberManualRecord,
   NotificationsActive, TaskAlt, HourglassTop, Cancel,
-  Send, Chat,
+  Send, Chat, Link as LinkIcon,
 } from "@mui/icons-material";
 
 // MUI Date Picker
@@ -1342,6 +1342,12 @@ const EventRowCard = ({
   onFileUpload, onDeleteFile, onPreview, onDelete, onApproveClose, onRejectClose,
   uploadingState, isUploadingState, uploadProgressState, uploadingFileSizeState,
   currentUserRole,
+  // ✅ งานที่เข้าหลายวัน (กลุ่มเดียวกัน) ใช้เอกสารร่วมกันชุดเดียว — JobGroupBlock จะโชว์
+  // เอกสารรวมไว้ที่หัวกลุ่มแทน จึงซ่อนส่วนอัปโหลดเอกสารในการ์ดรายวันแต่ละใบไม่ให้ซ้ำกัน
+  hideDocuments = false,
+  // ✅ เวลาอยู่ในกลุ่มงานหลายวัน JobGroupBlock จะรวมทุกวันไว้ใน GlassCard ใบเดียวกันเอง
+  // (ห่อจากข้างนอก) จึงไม่ต้องมี GlassCard/เงา/ระยะห่างซ้อนของตัวเองอีกชั้น
+  noOuterCard = false,
 }) => {
   const [expanded,   setExpanded]   = useState(false);
   const [editingDoc, setEditingDoc] = useState(false);
@@ -1352,6 +1358,9 @@ const EventRowCard = ({
   const [rejecting,      setRejecting]      = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectReason,   setRejectReason]   = useState("");
+  // ✅ เอกสารของงานกลุ่มเดียวกันปกติซ่อนไว้ (ใช้ร่วมกันที่การ์ดหลัก) แต่แอดมิน/manager
+  // ยังต้องแนบ/แก้ไฟล์แยกเฉพาะวันนี้ได้เหมือนเดิมถ้าจำเป็น จึงเปิดให้กดดูเพิ่มเติมได้เสมอ
+  const [showDocsOverride, setShowDocsOverride] = useState(false);
   const theme  = useTheme();
   const canEdit = ["admin", "manager", "user"].includes(currentUserRole);
   const isAdminOrManager = ["admin", "manager"].includes(currentUserRole);
@@ -1392,8 +1401,13 @@ const EventRowCard = ({
     setRejectReason("");
   };
 
+  const Wrapper = noOuterCard ? React.Fragment : GlassCard;
+  const wrapperProps = noOuterCard
+    ? {}
+    : { sx: { mb: 1.5, "&:hover": { transform: "none", boxShadow: `0 4px 20px ${alpha(theme.palette.common.black, 0.08)}` } } };
+
   return (
-    <GlassCard sx={{ mb: 1.5, "&:hover": { transform: "none", boxShadow: `0 4px 20px ${alpha(theme.palette.common.black, 0.08)}` } }}>
+    <Wrapper {...wrapperProps}>
       <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
         {/* Header */}
         <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={1}>
@@ -1432,6 +1446,11 @@ const EventRowCard = ({
                   {event.comments?.length > 0 && (
                     <Tooltip title={`${event.comments.length} ข้อความ`}>
                       <Chat sx={{ fontSize: 17, color: "#3b82f6", opacity: 0.8 }} />
+                    </Tooltip>
+                  )}
+                  {event.jobGroupId && (
+                    <Tooltip title="งานนี้เป็นส่วนหนึ่งของงานหลายวัน (กลุ่มเดียวกัน)">
+                      <LinkIcon sx={{ fontSize: 17, color: "#8b5cf6", opacity: 0.8 }} />
                     </Tooltip>
                   )}
                 </Stack>
@@ -1618,7 +1637,16 @@ const EventRowCard = ({
               </Grid>
             )}
 
-                        <Grid item xs={12} sm={6}>
+                        {hideDocuments && !showDocsOverride && (
+              <Grid item xs={12}>
+                <Button size="small" onClick={() => setShowDocsOverride(true)}
+                  sx={{ textTransform: "none", fontSize: "0.75rem", color: "text.secondary" }}>
+                  📄 เอกสารหลักอยู่ที่การ์ดวันล่าสุด — กดเพื่อแนบ/แก้ไฟล์แยกเฉพาะวันนี้
+                </Button>
+              </Grid>
+            )}
+            {(!hideDocuments || showDocsOverride) && (
+              <Grid item xs={12} sm={6}>
               <FileUploadSection
                 eventId={event._id} type="report" label="Service Report"
                 files={event.reportFiles}
@@ -1629,6 +1657,8 @@ const EventRowCard = ({
                 currentUserRole={currentUserRole}
               />
             </Grid>
+            )}
+            {(!hideDocuments || showDocsOverride) && (
             <Grid item xs={12} sm={6}>
               <FileUploadSection
                 eventId={event._id} type="quotation" label="ใบเสนอราคา"
@@ -1641,8 +1671,9 @@ const EventRowCard = ({
                 currentUserRole={currentUserRole}
               />
             </Grid>
+            )}
 
-
+            {(!hideDocuments || showDocsOverride) && (
              <Grid item xs={12} sm={6}>
               <FileUploadSection
                 eventId={event._id} type="invoice" label="ใบวางบิล"
@@ -1655,7 +1686,9 @@ const EventRowCard = ({
                 currentUserRole={currentUserRole}
               />
             </Grid>
+            )}
 
+            {(!hideDocuments || showDocsOverride) && (
              <Grid item xs={12} sm={6}>
               <FileUploadSection
                 eventId={event._id} type="completion" label="ใบส่งมอบงาน"
@@ -1668,6 +1701,7 @@ const EventRowCard = ({
                 currentUserRole={currentUserRole}
               />
             </Grid>
+            )}
 
             {/* <Grid item xs={12}>
               <Stack direction="row" flexWrap="wrap" gap={1} alignItems="center">
@@ -1703,7 +1737,7 @@ const EventRowCard = ({
           </Grid>
         </Collapse>
       </CardContent>
-    </GlassCard>
+    </Wrapper>
   );
 };
 
@@ -1915,6 +1949,111 @@ const FilePreviewDialog = ({ previewUrl, previewFileName, onClose }) => {
 };
 
 // ═══════════════════════════════════════════════════════════════════════
+// ─── JobGroupBlock ──────────────────────────────────────────────────────
+// การ์ดรวมสำหรับงานที่เข้าหลายวันไม่ติดกัน (ผูกกันด้วย jobGroupId/signature เดียวกัน)
+// โชว์ช่วงวันที่รวมทั้งหมด (เริ่ม–สิ้นสุด) ในหัวการ์ดเดียว + ยุบ/ขยายเพื่อซ่อนการ์ดรายวัน
+// ลดความรกเวลามีหลายวัน แต่ยังกดขยายดู/จัดการแต่ละวันแยกกันได้ตามเดิม
+// ═══════════════════════════════════════════════════════════════════════
+const JobGroupBlock = ({ sessions, currentUserRole, ...cardProps }) => {
+  const [expanded, setExpanded] = useState(false);
+  const isGrouped = sessions.length > 1;
+
+  // ✅ งานกลุ่มเดียวกันใช้เอกสาร (Service Report/ใบเสนอราคา/ใบวางบิล/ใบส่งมอบงาน) และ "ขอปิดงาน"
+  // ร่วมกันชุดเดียว แทนที่จะให้อัปโหลด/ขอปิดซ้ำทุกวัน — ยึดวันล่าสุด (sessions[0]) เป็น "การ์ดหลัก"
+  // ที่ถือเอกสาร/คำขอปิดงานของทั้งกลุ่ม ส่วนวันอื่นๆ ซ่อนส่วนนี้ไป เหลือแค่สรุปงาน/คุยกับอีกฝั่ง/ประวัติ
+  const anchorId = sessions[0]._id;
+
+  const renderCard = (event) => {
+    const hideDocuments = isGrouped && event._id !== anchorId;
+    return currentUserRole === "technician" ? (
+      <TechnicianJobCard key={event._id} event={event} {...cardProps} isTechnicianView={true} hideDocuments={hideDocuments} noOuterCard={isGrouped} />
+    ) : (
+      <EventRowCard key={event._id} event={event} {...cardProps} currentUserRole={currentUserRole} hideDocuments={hideDocuments} noOuterCard={isGrouped} />
+    );
+  };
+
+  if (!isGrouped) return renderCard(sessions[0]);
+
+  const head = sessions[0];
+  const sortedByStart = sessions.slice().sort((a, b) => new Date(a.start) - new Date(b.start));
+  const latestEndSession = sessions.reduce((latest, s) =>
+    new Date(s.end || s.start) > new Date(latest.end || latest.start) ? s : latest
+  );
+  const rangeStart = moment(sortedByStart[0].start).locale("th").format("DD MMM");
+  const rangeEnd = moment(latestEndSession.end || latestEndSession.start)
+    .subtract(latestEndSession.allDay ? 1 : 0, "days")
+    .locale("th").format("DD MMM YYYY");
+
+  // ✅ นับ "จำนวนวันเข้างานจริง" ตามที่ลงไว้ (รวมทุกวันในแต่ละช่วง เช่น 13-15 = 3 วัน)
+  // แทนที่จะนับจำนวนแถว/ช่วงที่ลง (เดิมนับ sessions.length เพียว ๆ ทำให้ 13-15 และ 17-18
+  // ซึ่งจริงๆ คือ 5 วัน กลับโชว์ว่า "เข้างาน 2 วัน" เพราะมีแค่ 2 ช่วง)
+  const dayEnd = (s) => moment(s.end || s.start).subtract(s.allDay ? 1 : 0, "days").startOf("day");
+  const totalWorkDays = sessions.reduce((sum, s) => {
+    const days = dayEnd(s).diff(moment(s.start).startOf("day"), "days") + 1;
+    return sum + Math.max(days, 1);
+  }, 0);
+
+  // ✅ รวมงานทั้งกลุ่ม (หัวข้อ + ทุกวัน) ไว้ใน GlassCard ใบเดียวกันเลย (ไม่ใช่การ์ดแยกคนละใบ)
+  // แต่ละวันคั่นด้วย Divider แทน — เพื่อให้เห็นชัดว่าเป็น "งานเดียวกัน" จริงๆ ไม่ใช่แค่จัดกลุ่มแยกกันไว้
+  return (
+    <GlassCard sx={{ mb: 2, border: "1px solid", borderColor: alpha("#8b5cf6", 0.3) }}>
+      <Box
+        onClick={() => setExpanded(p => !p)}
+        sx={{
+          p: 2, cursor: "pointer", background: alpha("#8b5cf6", 0.04),
+          borderBottom: expanded ? "1px solid" : "none", borderColor: alpha("#8b5cf6", 0.2),
+        }}>
+        <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
+          <CalendarMonth sx={{ fontSize: 18, color: "#8b5cf6" }} />
+          <Typography variant="body2" fontWeight={700} color="#8b5cf6">
+            {head.company || "—"} · {head.site || "—"} — {head.title}{head.system && ` · ${head.system}`}{head.time && ` ครั้งที่ ${head.time}`}
+          </Typography>
+          <Chip label={`เข้างาน ${totalWorkDays} วัน`} size="small"
+            sx={{ height: 20, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha("#8b5cf6", 0.15), color: "#8b5cf6" }} />
+          <Typography variant="caption" color="text.secondary">
+            📅 {rangeStart} – {rangeEnd}
+          </Typography>
+          <IconButton size="small" sx={{ ml: "auto" }} onClick={(e) => { e.stopPropagation(); setExpanded(p => !p); }}>
+            {expanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+          </IconButton>
+        </Stack>
+        <Stack direction="row" gap={0.5} flexWrap="wrap" sx={{ mt: 0.75 }}>
+          {sortedByStart.map(s => {
+            const sStart = moment(s.start);
+            const sEnd = dayEnd(s);
+            const chipLabel = sStart.isSame(sEnd, "day")
+              ? sStart.locale("th").format("DD MMM")
+              : `${sStart.locale("th").format("DD")}-${sEnd.locale("th").format("DD MMM")}`;
+            return (
+            <Chip key={s._id} label={chipLabel} size="small"
+              variant={s._id === anchorId ? "filled" : "outlined"}
+              sx={{
+                height: 20, fontSize: "0.68rem",
+                borderColor: alpha("#8b5cf6", 0.35),
+                bgcolor: s._id === anchorId ? alpha("#8b5cf6", 0.2) : "transparent",
+                color: "#8b5cf6", fontWeight: s._id === anchorId ? 700 : 400,
+              }} />
+            );
+          })}
+        </Stack>
+        <Typography variant="caption" color="text.disabled" sx={{ display: "block", mt: 0.5 }}>
+          📄 เอกสารประจำงาน/ขอปิดงาน ใช้ร่วมกันที่การ์ดวันที่ {moment(head.start).locale("th").format("DD MMM")} (วันล่าสุด)
+        </Typography>
+      </Box>
+
+      <Collapse in={expanded}>
+        {sessions.map((event, i) => (
+          <React.Fragment key={event._id}>
+            {i > 0 && <Divider />}
+            {renderCard(event)}
+          </React.Fragment>
+        ))}
+      </Collapse>
+    </GlassCard>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════════
 // ─── Main: Operation ──────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════
 const Operation = () => {
@@ -2056,31 +2195,68 @@ const Operation = () => {
   const pendingCount  = useMemo(() => events.filter(e => e.closeRequested === true && e.status !== "ดำเนินการเสร็จสิ้น").length, [events]);
   const inProgressCount  = useMemo(() => events.filter(e => ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(e.status) && !e.closeRequested).length, [events]);
 
+  // ✅ จัดกลุ่ม event ที่เป็น "งานเดียวกัน" เข้าด้วยกัน กันงานที่ต้องเข้าหลายวันแบบไม่ติดกัน
+  // (เช่น PM ครั้งที่ 1 แบ่งเข้า 3 วันเว้นระยะ) ถูกนับ/แสดงเป็นคนละงานแยกกัน
+  // ลำดับความสำคัญ: jobGroupId (งานที่สร้างผ่านฟอร์มหลายวันแบบใหม่ ผูกกันแน่นอน) →
+  // fallback จับคู่ตาม company/site/title/system/team/time ที่ตรงกันทุกช่อง (งานเก่าก่อนมี jobGroupId)
+  const getJobSignature = (ev) => {
+    if (ev.jobGroupId) return `gid:${ev.jobGroupId}`;
+    return ["company", "site", "title", "system", "team", "time"]
+      .map(k => (ev[k] || "").toString().trim().toLowerCase())
+      .join("|");
+  };
+
+  const jobGroups = useMemo(() => {
+    const map = new Map();
+    sortedEvents.forEach(ev => {
+      const key = getJobSignature(ev);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(ev);
+    });
+    // แต่ละกลุ่มเรียงวันที่ล่าสุดขึ้นก่อน (เหมือน sortedEvents เดิม)
+    return [...map.values()].map(sessions =>
+      sessions.slice().sort((a, b) => new Date(b.start) - new Date(a.start))
+    );
+  }, [sortedEvents]);
+
   // รีเซ็ตกลับหน้า 1 ทุกครั้งที่ตัวกรอง/คำค้นหา/แท็บ/กลุ่มสถานะเปลี่ยน
   useEffect(() => {
     setPage(1);
   }, [dateSearch, filterType, filterSystem, filterStatus, filterOP, filterTeam, search, activeTab, statusGroup]);
 
-  const totalPages = Math.max(1, Math.ceil(sortedEvents.length / pageSize));
+  // ✅ เพจจิ้งอิงตาม "งาน" (jobGroups) ไม่ใช่ raw event — กันงานเดียวกันถูกตัดกระจายไปคนละหน้า
+  const totalPages = Math.max(1, Math.ceil(jobGroups.length / pageSize));
 
   // กันหน้าเกินขอบเขตเมื่อผลลัพธ์หลังกรองน้อยกว่าหน้าปัจจุบัน
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
-  const pagedEvents = useMemo(
-    () => sortedEvents.slice((page - 1) * pageSize, page * pageSize),
-    [sortedEvents, page, pageSize]
+  const pagedGroups = useMemo(
+    () => jobGroups.slice((page - 1) * pageSize, page * pageSize),
+    [jobGroups, page, pageSize]
   );
+
+  // ✅ งานที่เข้าหลายวัน (ผูกด้วย jobGroupId เดียวกัน) ถือเป็นงานเดียวกัน — แก้ไขจากวันไหน
+  // ในกลุ่มก็ควรอ้างอิง id เดียวกันทั้งหมด เพื่อแก้ไขทุกวันในกลุ่มพร้อมกันในคราวเดียว
+  // ไม่งั้นแต่ละวันจะมีสถานะ/เลขเอกสารไม่ตรงกันทั้งที่จริงเป็นงานเดียวกัน
+  const getGroupEventIds = useCallback((id) => {
+    const target = events.find(e => e._id === id);
+    if (!target?.jobGroupId) return [id];
+    return events.filter(e => e.jobGroupId === target.jobGroupId).map(e => e._id);
+  }, [events]);
 
   const handleStatusUpdate = useCallback(async (id, updates) => {
     try {
-      await EventService.UpdateEvent(id, updates);
-      setEvents(prev => prev.map(e => e._id === id ? { ...e, ...updates } : e));
+      const ids = getGroupEventIds(id);
+      await Promise.all(ids.map(gid => EventService.UpdateEvent(gid, updates)));
+      setEvents(prev => prev.map(e => (ids.includes(e._id) ? { ...e, ...updates } : e)));
     } catch (err) { console.error(err); }
-  }, []);
+  }, [getGroupEventIds]);
 
   // อนุมัติคำขอปิดงานจากช่าง → เปลี่ยนสถานะเป็น "ดำเนินการเสร็จสิ้น"
+  // ✅ ถ้างานนี้เข้าหลายวัน (กลุ่มเดียวกัน) ให้ปิดทุกวันในกลุ่มพร้อมกัน — งานที่ถือว่าเสร็จแล้ว
+  // ควรเสร็จทั้งหมดทุกวัน ไม่ใช่แค่วันที่กดอนุมัติ (การ์ดวันอื่นจะได้ไม่ค้างสถานะเดิม)
   const handleApproveClose = useCallback(async (id) => {
     try {
       const payload   = JSON.parse(localStorage.getItem("payload") || "{}");
@@ -2095,22 +2271,32 @@ const Operation = () => {
         timestamp: now,
       };
 
-      const updates = {
+      const sharedUpdates = {
         status: "ดำเนินการเสร็จสิ้น",
         closeRequested: false,
         closeApprovedAt: now,
         closeApprovedBy: adminName,
-        activityLog: [...(target?.activityLog || []), newLog],
       };
 
-      await EventService.UpdateEvent(id, updates);
-      setEvents(prev => prev.map(e => e._id === id ? { ...e, ...updates } : e));
+      const ids = getGroupEventIds(id);
+      await Promise.all(ids.map(gid => {
+        const data = gid === id
+          ? { ...sharedUpdates, activityLog: [...(target?.activityLog || []), newLog] }
+          : sharedUpdates;
+        return EventService.UpdateEvent(gid, data);
+      }));
+      setEvents(prev => prev.map(e => {
+        if (!ids.includes(e._id)) return e;
+        return e._id === id
+          ? { ...e, ...sharedUpdates, activityLog: [...(e.activityLog || []), newLog] }
+          : { ...e, ...sharedUpdates };
+      }));
       setSnackbar({ open: true, msg: "อนุมัติปิดงานเรียบร้อย", severity: "success" });
     } catch (err) {
       console.error(err);
       setSnackbar({ open: true, msg: "อนุมัติปิดงานไม่สำเร็จ", severity: "error" });
     }
-  }, [events]);
+  }, [events, getGroupEventIds]);
 
   // ไม่อนุมัติคำขอปิดงานจากช่าง → เปิดให้ช่างแก้ไขแล้วขอปิดงานใหม่ได้ พร้อมเหตุผล/comment แจ้งช่าง
   const handleRejectClose = useCallback(async (id, reason) => {
@@ -2145,9 +2331,10 @@ const Operation = () => {
   }, [events]);
 
   const handleDocNoUpdate = useCallback((id, newDocNo) => {
-    setEvents(prev => prev.map(e => e._id === id ? { ...e, docNo: newDocNo } : e));
-    EventService.UpdateEvent(id, { docNo: newDocNo });
-  }, []);
+    const ids = getGroupEventIds(id);
+    setEvents(prev => prev.map(e => (ids.includes(e._id) ? { ...e, docNo: newDocNo } : e)));
+    ids.forEach(gid => EventService.UpdateEvent(gid, { docNo: newDocNo }));
+  }, [getGroupEventIds]);
 
   const handleInputUpdate = useCallback(async (id, data) => {
     try {
@@ -2394,44 +2581,27 @@ const Operation = () => {
             </Box>
           ) : (
             <>
-              {pagedEvents.map(event =>
-                currentUserRole === "technician" ? (
-                  <TechnicianJobCard
-                    key={event._id}
-                    event={event}
-                    onStatusUpdate={handleStatusUpdate}
-                    onInputUpdate={handleInputUpdate}
-                    onFileUpload={handleFileUpload}
-                    onDeleteFile={(eid, type, fileId) => { setPendingDelete({ id: eid, type, fileId }); setConfirmOpen(true); }}
-                    onPreview={(url, name) => { setPreviewUrl(url); setPreviewFileName(name); }}
-                    uploadingState={uploadingState}
-                    isUploadingState={isUploadingState}
-                    uploadProgressState={uploadProgressState}
-                    currentUserRole={currentUserRole}
-                    isTechnicianView={true}
-                  />
-                ) : (
-                  <EventRowCard
-                    key={event._id}
-                    event={event}
-                    employee={employee}
-                    onStatusUpdate={handleStatusUpdate}
-                    onDocNoUpdate={handleDocNoUpdate}
-                    onInputUpdate={handleInputUpdate}
-                    onFileUpload={handleFileUpload}
-                    onDeleteFile={(eid, type, fileId) => { setPendingDelete({ id: eid, type, fileId }); setConfirmOpen(true); }}
-                    onPreview={(url, name) => { setPreviewUrl(url); setPreviewFileName(name); }}
-                    onDelete={handleDeleteRow}
-                    onApproveClose={handleApproveClose}
-                    onRejectClose={handleRejectClose}
-                    uploadingState={uploadingState}
-                    isUploadingState={isUploadingState}
-                    uploadProgressState={uploadProgressState}
-                    uploadingFileSizeState={uploadingFileSizeState}
-                    currentUserRole={currentUserRole}
-                  />
-                )
-              )}
+              {pagedGroups.map(sessions => (
+                <JobGroupBlock
+                  key={sessions[0].jobGroupId || sessions[0]._id}
+                  sessions={sessions}
+                  currentUserRole={currentUserRole}
+                  employee={employee}
+                  onStatusUpdate={handleStatusUpdate}
+                  onDocNoUpdate={handleDocNoUpdate}
+                  onInputUpdate={handleInputUpdate}
+                  onFileUpload={handleFileUpload}
+                  onDeleteFile={(eid, type, fileId) => { setPendingDelete({ id: eid, type, fileId }); setConfirmOpen(true); }}
+                  onPreview={(url, name) => { setPreviewUrl(url); setPreviewFileName(name); }}
+                  onDelete={handleDeleteRow}
+                  onApproveClose={handleApproveClose}
+                  onRejectClose={handleRejectClose}
+                  uploadingState={uploadingState}
+                  isUploadingState={isUploadingState}
+                  uploadProgressState={uploadProgressState}
+                  uploadingFileSizeState={uploadingFileSizeState}
+                />
+              ))}
 
               <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" justifyContent="space-between"
                 gap={1.5} sx={{ mt: 2, mb: 1 }}>

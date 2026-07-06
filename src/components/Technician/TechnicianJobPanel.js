@@ -27,7 +27,7 @@ import {
   PictureAsPdf, Image, Article, InsertDriveFile,
   AttachFile, Delete, Download, TaskAlt, HourglassTop, NoteAdd,
   RequestQuote, ReceiptLong, AssignmentTurnedIn, Close, Cancel,
-  Send, Chat,
+  Send, Chat, Link as LinkIcon,
 } from "@mui/icons-material";
 
 // ─── Constants ────────────────────────────────────────────────────────
@@ -476,6 +476,12 @@ const TechnicianJobCard = ({
   uploadingState,
   isUploadingState,
   uploadProgressState,
+  // ✅ งานที่เข้าหลายวัน (กลุ่มเดียวกัน) ใช้เอกสาร + ขอปิดงานร่วมกันครั้งเดียวที่การ์ดตัวแทนของกลุ่ม
+  // (JobGroupBlock) จึงซ่อนเอกสารประจำงาน/ปุ่มขอปิดงานในการ์ดรายวันที่เหลือไม่ให้ซ้ำ/สับสน
+  hideDocuments = false,
+  // ✅ เวลาอยู่ในกลุ่มงานหลายวัน JobGroupBlock จะรวมทุกวันไว้ใน JobCard ใบเดียวกันเอง (ห่อจาก
+  // ข้างนอก) จึงไม่ต้องมี JobCard/เงา/ระยะห่างซ้อนของตัวเองอีกชั้น
+  noOuterCard = false,
 }) => {
   const [expanded,        setExpanded]        = useState(false);
   const [docsExpanded,    setDocsExpanded]     = useState(false);
@@ -588,8 +594,10 @@ const TechnicianJobCard = ({
 
   const statusColor = OP_COLOR[event.status] || "#6b7280";
 
+  const Wrapper = noOuterCard ? React.Fragment : JobCard;
+
   return (
-    <JobCard>
+    <Wrapper>
       <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
 
         {/* ── Header ── */}
@@ -616,6 +624,11 @@ const TechnicianJobCard = ({
                 />
                 {event.title  && <Chip label={event.title}  size="small" variant="outlined" sx={{ height: 22, fontSize: "0.7rem" }} />}
                 {event.system && <Chip label={event.system} size="small" variant="outlined" color="secondary" sx={{ height: 22, fontSize: "0.7rem" }} />}
+                {event.jobGroupId && (
+                  <Tooltip title="งานนี้เป็นส่วนหนึ่งของงานหลายวัน (กลุ่มเดียวกัน)">
+                    <LinkIcon sx={{ fontSize: 16, color: "#8b5cf6", opacity: 0.8 }} />
+                  </Tooltip>
+                )}
               </Stack>
               <Typography fontWeight={800} fontSize="0.95rem">
                 {event.company || "—"} · {event.site || "—"}
@@ -639,7 +652,9 @@ const TechnicianJobCard = ({
           </IconButton>
         </Stack>
 
-        {/* ── เอกสารประจำงาน: หลอดความคืบหน้า + dropdown ── */}
+        {/* ── เอกสารประจำงาน + ขอปิดงาน: ซ่อนถ้างานนี้ใช้เอกสารร่วมกับกลุ่ม (แสดงที่การ์ดตัวแทนแทน) ── */}
+        {!hideDocuments && (
+        <>
         <Box sx={{ mt: 2 }}>
           <Box
             onClick={() => setDocsExpanded(p => !p)}
@@ -763,6 +778,8 @@ const TechnicianJobCard = ({
             จัดการเอกสารให้ครบก่อน จึงจะขอปิดงานได้ ({completedDocCount}/{DOCUMENT_TYPES.length})
           </Typography>
         )}
+        </>
+        )}
 
         {/* ── Expanded: WorkNote + ActivityLog ── */}
         <Collapse in={expanded}>
@@ -828,7 +845,7 @@ const TechnicianJobCard = ({
         </Collapse>
 
       </CardContent>
-    </JobCard>
+    </Wrapper>
   );
 };
 

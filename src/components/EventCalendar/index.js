@@ -358,6 +358,7 @@ function EventCalendar() {
   const handleEditEvent = async (eventInfo) => {
     await getEditEvent({
       navigate,
+      events,
       setEvents,
       fetchEventsFromDB,
       eventInfo,
@@ -661,6 +662,7 @@ function EventCalendar() {
               startTime = "",
               endTime = "",
               status,
+              jobGroupId,
             } = extendedProps;
 
             // ✅ สร้าง display string แบบมีเงื่อนไข
@@ -703,6 +705,12 @@ function EventCalendar() {
                 )}</div>`
               : "";
 
+            // ✅ สัญลักษณ์บอกว่างานนี้เป็นส่วนหนึ่งของ "งานหลายวัน" (ผูกกับ jobGroupId เดียวกัน)
+            // กันผู้ใช้สับสนว่าทำไมมี event หน้าตาเหมือนกันโผล่คนละวันในปฏิทิน
+            const groupBadgeHtml = jobGroupId
+              ? `<div title="งานนี้เป็นส่วนหนึ่งของงานหลายวัน (กลุ่มเดียวกัน)" style="position:absolute; top:0px; left:3px; font-size:${badgeIconPx}px; line-height:1; z-index:10;">🔗</div>`
+              : "";
+
             return {
               html: `
                 <div style="position: relative; display: flex; align-items: center; padding: ${badgePadding}; width: 110%;">
@@ -718,6 +726,7 @@ function EventCalendar() {
                   ${timeRangeDisplay ? `<div>${timeRangeDisplay}</div>` : ""}
                 </div>
                   ${badgeHtml}
+                  ${groupBadgeHtml}
                 </div>
     `,
             };

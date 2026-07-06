@@ -108,6 +108,30 @@ function injectAddStyles() {
       font-size: 12px; font-weight: 600; margin-bottom: 16px;
     }
 
+    /* ── Multi-date (งานเข้าหลายวันไม่ติดกัน) ── */
+    .ae-checkbox-row {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; font-weight: 600; color: #374151;
+      margin-bottom: 14px; cursor: pointer;
+    }
+    .ae-checkbox-row input { width: auto !important; cursor: pointer; }
+    .ae-multi-date-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .ae-multi-date-row input {
+      flex: 1; box-sizing: border-box;
+      border: 1.5px solid #e2e8f0; border-radius: 8px;
+      padding: 9px 12px; font-size: 14px; color: #1e293b;
+      background: #fff; font-family: inherit;
+    }
+    .ae-multi-date-row input:focus {
+      outline: none; border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+    }
+    .ae-multi-date-row .ae-range-sep { flex-shrink: 0; color: #94a3b8; font-weight: 700; }
+    .ae-multi-date-remove {
+      flex-shrink: 0; width: 34px; height: 34px; padding: 0 !important;
+      display: flex; align-items: center; justify-content: center;
+    }
+
     /* ── Color row ── */
     .ae-color-row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin-bottom: 0; }
     .ae-color-item { display: flex; align-items: center; gap: 8px; }
@@ -260,15 +284,31 @@ export const getAddEvent = async ({
 
     <!-- section 2 -->
     <p class="ae-section-label">วันที่ & เวลา</p>
+
+    <label class="ae-checkbox-row">
+      <input type="checkbox" id="ae-multiDateToggle">
+      🗓️ งานนี้ต้องเข้างานหลายวัน (ไม่ติดกันก็ได้) — ถือเป็นงานเดียวกัน
+    </label>
+
+    <div id="ae-singleDateSection">
+      <div class="ae-grid ae-grid-2">
+        <div class="ae-field">
+          <label>📅 วันที่เริ่ม</label>
+          <input id="start" type="date" value="${arg.dateStr}">
+        </div>
+        <div class="ae-field">
+          <label>📅 วันที่สิ้นสุด</label>
+          <input id="end" type="date" value="${arg.dateStr}">
+        </div>
+      </div>
+    </div>
+
+    <div id="ae-multiDateSection" style="display:none;">
+      <div id="ae-multiDateList"></div>
+      <button type="button" class="ae-btn ae-btn-ghost" id="ae-addDateBtn" style="margin-bottom:16px;">➕ เพิ่มช่วงวันที่</button>
+    </div>
+
     <div class="ae-grid ae-grid-2">
-      <div class="ae-field">
-        <label>📅 วันที่เริ่ม</label>
-        <input id="start" type="date" value="${arg.dateStr}">
-      </div>
-      <div class="ae-field">
-        <label>📅 วันที่สิ้นสุด</label>
-        <input id="end" type="date" value="${arg.dateStr}">
-      </div>
       <div class="ae-field">
         <label>🕐 เวลาเริ่ม</label>
         <input id="startTime" type="text" placeholder="เช่น 08:30">
@@ -342,6 +382,39 @@ export const getAddEvent = async ({
       mkTs("#eventTime",    "เลือกครั้งที่", 4);
       mkTs("#eventTeam",    "เลือกหรือพิมพ์ชื่อทีม");
 
+      /* ── งานเข้าหลายวันไม่ติดกัน (multi-date) ── */
+      // ✅ แต่ละแถว = "ช่วงวันที่" หนึ่งช่วง (เริ่ม–สิ้นสุด) เช่น 6-7 และ 9-10
+      // เพิ่มได้หลายช่วง แต่ละช่วงถือเป็นงานเดียวกันทั้งหมด (ผูกด้วย jobGroupId เดียวกัน)
+      const multiToggle  = document.getElementById("ae-multiDateToggle");
+      const singleSection = document.getElementById("ae-singleDateSection");
+      const multiSection  = document.getElementById("ae-multiDateSection");
+      const multiDateList = document.getElementById("ae-multiDateList");
+
+      const addDateRow = (startValue = "", endValue = "") => {
+        const row = document.createElement("div");
+        row.className = "ae-multi-date-row";
+        row.innerHTML = `
+          <input type="date" class="ae-range-start" value="${startValue}">
+          <span class="ae-range-sep">–</span>
+          <input type="date" class="ae-range-end" value="${endValue || startValue}">
+          <button type="button" class="ae-btn ae-btn-ghost ae-multi-date-remove" title="ลบช่วงนี้ออก">✕</button>
+        `;
+        row.querySelector(".ae-multi-date-remove").addEventListener("click", () => {
+          // ต้องเหลืออย่างน้อย 1 แถวเสมอ กันผู้ใช้ลบจนหมด
+          if (multiDateList.children.length > 1) row.remove();
+        });
+        multiDateList.appendChild(row);
+      };
+      addDateRow(arg.dateStr, arg.dateStr); // แถวแรก prefill ด้วยวันที่ที่คลิกบนปฏิทินมา
+
+      document.getElementById("ae-addDateBtn")?.addEventListener("click", () => addDateRow());
+
+      multiToggle?.addEventListener("change", () => {
+        const isMulti = multiToggle.checked;
+        singleSection.style.display = isMulti ? "none" : "";
+        multiSection.style.display  = isMulti ? "" : "none";
+      });
+
       /* buttons */
       document.getElementById("ae-btnCancel")?.addEventListener("click", () => Swal.close());
 
@@ -361,12 +434,34 @@ export const getAddEvent = async ({
         if (!title)  { Swal.showValidationMessage("กรุณาระบุประเภทงาน");    return; }
         if (!system) { Swal.showValidationMessage("กรุณาระบุระบบงาน");      return; }
 
-        // ✅ กันวันที่สิ้นสุดก่อนวันที่เริ่ม (พิมพ์/เลือกผิดได้ง่ายเพราะเป็นช่องแยกกันคนละช่อง)
-        const startVal = getVal("start");
-        const endVal   = getVal("end");
-        if (startVal && endVal && moment(endVal).isBefore(moment(startVal))) {
-          Swal.showValidationMessage("วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม");
-          return;
+        const isMultiDate = Boolean(multiToggle?.checked);
+        let dateRanges = [];
+
+        if (isMultiDate) {
+          // ✅ เก็บทุกช่วงวันที่ที่กรอกไว้ (เช่น 6-7 และ 9-10) — แต่ละช่วงเป็นงานเดียวกันทั้งหมด
+          const rows = [...document.querySelectorAll(".ae-multi-date-row")];
+          for (const row of rows) {
+            const s = row.querySelector(".ae-range-start")?.value;
+            const e = row.querySelector(".ae-range-end")?.value || s;
+            if (!s) continue;
+            if (moment(e).isBefore(moment(s))) {
+              Swal.showValidationMessage("แต่ละช่วงวันที่ วันสิ้นสุดต้องไม่ก่อนวันเริ่ม");
+              return;
+            }
+            dateRanges.push({ start: s, end: e });
+          }
+          if (dateRanges.length === 0) {
+            Swal.showValidationMessage("กรุณาเลือกอย่างน้อย 1 ช่วงวันที่");
+            return;
+          }
+        } else {
+          // ✅ กันวันที่สิ้นสุดก่อนวันที่เริ่ม (พิมพ์/เลือกผิดได้ง่ายเพราะเป็นช่องแยกกันคนละช่อง)
+          const startVal = getVal("start");
+          const endVal   = getVal("end");
+          if (startVal && endVal && moment(endVal).isBefore(moment(startVal))) {
+            Swal.showValidationMessage("วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม");
+            return;
+          }
         }
 
         // ✅ กันกดซ้ำระหว่างบันทึก + ให้เห็นว่ากำลังทำงานอยู่
@@ -388,18 +483,27 @@ export const getAddEvent = async ({
             backgroundColor: document.getElementById("backgroundColorPicker")?.value,
             textColor:       document.getElementById("textColorPicker")?.value,
             fontSize:        getVal("fontSize") || "8",
-            start:           getVal("start"),
-            end:             getVal("end"),
             startTime:       getVal("startTime"),
             endTime:         getVal("endTime"),
           };
 
-          const newEnd = moment(payload.end).add(1, "days");
-          const newEvent = {
-            ...payload,
-            date: arg.dateStr,
-            end:  newEnd.format("YYYY-MM-DD"),
-          };
+          // ✅ งานหลายช่วงวันที่ไม่ติดกัน: ส่ง dates[] แทน start/end/date เดี่ยว — backend จะสร้าง
+          // record แยกต่อช่วงแต่ผูกกันด้วย jobGroupId เดียวกัน ให้รู้ว่าเป็นงานเดียวกัน
+          const newEvent = isMultiDate
+            ? {
+                ...payload,
+                dates: dateRanges.map((r) => ({
+                  start: r.start,
+                  end:   moment(r.end).add(1, "days").format("YYYY-MM-DD"),
+                  date:  r.start,
+                })),
+              }
+            : {
+                ...payload,
+                start: getVal("start"),
+                end:   moment(getVal("end")).add(1, "days").format("YYYY-MM-DD"),
+                date:  arg.dateStr,
+              };
 
           /* upsert customer */
           const existing = customers.userCustomers.find(
