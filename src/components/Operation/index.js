@@ -1,13 +1,14 @@
 /* eslint-disable no-unused-vars */
 /**
- * Operation/index.js — v3
+ * Operation/index.js — v4
  *
- * สิ่งที่เพิ่มจาก v2:
- *   ✅ LiveTrackingPanel — แสดงสถานะช่างแบบ real-time (auto-refresh 30s)
- *   ✅ NotificationBell — badge แจ้งเตือนเมื่อช่างเสร็จงาน (ตั้งแต่เปิดหน้า)
- *   ✅ TechnicianSummary — ปรับปรุงให้เห็น workNote สรุปรายช่างต่อวัน
- *   ✅ EventRowCard — แสดง workNote และ activityLog เหมือน v2 (ไม่เปลี่ยน)
- *   ✅ ส่วนอื่นๆ backward compatible กับ v2 ทุกอย่าง
+ * สิ่งที่เพิ่มจาก v3:
+ *   ✅ ClosureRequestsPanel — แยกงานที่ช่างขอปิดออกมาเป็นพาแนลเฉพาะ เห็นชัดทันที
+ *      ไม่ต้องไล่หาในลิสต์ที่มีการแบ่งหน้า/กรองอยู่ อนุมัติ/ไม่อนุมัติได้จากพาแนลนี้เลย
+ *   ✅ NotificationBell — แก้ให้ยิงตาม closeRequested (ของเดิมยิงตาม checkedOutAt
+ *      ซึ่งเลิกใช้ไปแล้วตั้งแต่เปลี่ยนมาใช้ระบบ "ขอปิดงาน" จึงไม่เคยแจ้งเตือนอีกเลย)
+ *   ✅ Auto-refresh: ลดเหลือ 15s และขยายให้ทำงานกับทุก role (เดิมเฉพาะ admin/manager)
+ *      เพื่อให้ผลอนุมัติ/ไม่อนุมัติ render กลับไปหาช่างแบบ realtime โดยไม่ต้องรีเฟรชเอง
  */
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
@@ -40,6 +41,7 @@ import {
   ExpandLess, FolderOpen, AttachFile, Login, Logout, Edit,
   NoteAdd, History, Person, AccessTime, FiberManualRecord,
   NotificationsActive, TaskAlt, HourglassTop, Cancel,
+  Send, Chat,
 } from "@mui/icons-material";
 
 // MUI Date Picker
@@ -238,218 +240,448 @@ const LiveTrackingPanel = ({ events, onRefresh, lastRefreshed }) => {
 
   const [expanded, setExpanded] = useState(true);
 
+  // return (
+  //   <GlassCard sx={{ mb: 3, border: "1px solid", borderColor: alpha("#8b5cf6", 0.2) }}>
+  //     <CardContent sx={{ p: 2.5 }}>
+  //       {/* Header */}
+  //       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={expanded ? 2 : 0}>
+  //         <Stack direction="row" alignItems="center" gap={1}>
+  //           <PulseDot color={todayActive.length > 0 ? "#10b981" : "#6b7280"} />
+  //           <Typography variant="subtitle2" fontWeight={700}>
+  //             งานที่กำลังดำเนินการ
+  //           </Typography>
+  //           <Chip
+  //             label={`${todayActive.length} งาน`}
+  //             size="small"
+  //             sx={{
+  //               height: 20, fontSize: "0.68rem", fontWeight: 700,
+  //               bgcolor: alpha("#8b5cf6", 0.1), color: "#8b5cf6",
+  //             }}
+  //           />
+  //           {lastRefreshed && (
+  //             <Typography variant="caption" color="text.disabled">
+  //               · อัปเดต {moment(lastRefreshed).format("HH:mm:ss")}
+  //             </Typography>
+  //           )}
+  //         </Stack>
+  //         <Stack direction="row" gap={0.5}>
+  //           <Tooltip title="รีเฟรชข้อมูล">
+  //             <IconButton size="small" onClick={onRefresh}>
+  //               <Refresh sx={{ fontSize: 16 }} />
+  //             </IconButton>
+  //           </Tooltip>
+  //           <IconButton size="small" onClick={() => setExpanded(p => !p)}>
+  //             {expanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+  //           </IconButton>
+  //         </Stack>
+  //       </Stack>
+
+  //       <Collapse in={expanded}>
+  //         {todayActive.length === 0 ? (
+  //           <Box sx={{ textAlign: "center", py: 3, color: "text.disabled" }}>
+  //             <AccessTime sx={{ fontSize: 36, opacity: 0.25, mb: 0.5 }} />
+  //             <Typography variant="body2">ไม่มีช่างที่กำลังทำงานอยู่ขณะนี้</Typography>
+  //           </Box>
+  //         ) : (
+  //           <Stack spacing={1.5}>
+  //             {todayActive.map(ev => {
+  //               const isCheckedOut = Boolean(ev.checkedOutAt);
+  //               const isActive     = ev.checkedInAt && !ev.checkedOutAt;
+  //               const duration     = ev.checkedInAt
+  //                 ? moment.duration(
+  //                     moment(isCheckedOut ? ev.checkedOutAt : undefined).diff(moment(ev.checkedInAt))
+  //                   ).humanize()
+  //                 : null;
+
+  //               // หาช่างจาก activityLog
+  //               const techNames = [...new Set(
+  //                 (ev.activityLog || [])
+  //                   .filter(l => l.action === "check_in" && l.userName)
+  //                   .map(l => l.userName)
+  //               )];
+
+  //               const latestLog = [...(ev.activityLog || [])].reverse()[0];
+
+  //               return (
+  //                 <Box key={ev._id} sx={{
+  //                   p: 1.5, borderRadius: 2,
+  //                   border: "1px solid",
+  //                   borderColor: isActive
+  //                     ? alpha("#8b5cf6", 0.25)
+  //                     : isCheckedOut
+  //                       ? alpha("#10b981", 0.2)
+  //                       : alpha("#6b7280", 0.15),
+  //                   background: isActive
+  //                     ? alpha("#8b5cf6", 0.03)
+  //                     : isCheckedOut
+  //                       ? alpha("#10b981", 0.03)
+  //                       : "transparent",
+  //                 }}>
+  //                   <Stack direction="row" alignItems="flex-start" gap={1.5}>
+  //                     {/* Status dot */}
+  //                     <Box sx={{ pt: 0.5 }}>
+  //                       {isActive
+  //                         ? <PulseDot color="#8b5cf6" />
+  //                         : <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#10b981" }} />
+  //                       }
+  //                     </Box>
+
+  //                     <Box flex={1} minWidth={0}>
+  //                       {/* บริษัท + ไซต์ */}
+  //                       <Typography fontWeight={700} fontSize="0.875rem" noWrap>
+  //                         {ev.company || "—"} · {ev.site || "—"}
+  //                       </Typography>
+
+  //                       {/* ช่าง */}
+  //                       {techNames.length > 0 && (
+  //                         <Stack direction="row" gap={0.5} alignItems="center" mt={0.3}>
+  //                           <Person sx={{ fontSize: 13, color: "text.secondary" }} />
+  //                           <Typography variant="caption" color="text.secondary">
+  //                             {techNames.join(", ")}
+  //                           </Typography>
+  //                         </Stack>
+  //                       )}
+
+  //                       {/* เวลา */}
+  //                       <Stack direction="row" gap={1.5} mt={0.5} flexWrap="wrap">
+  //                         {ev.checkedInAt && (
+  //                           <Stack direction="row" alignItems="center" gap={0.4}>
+  //                             <Login sx={{ fontSize: 12, color: "#8b5cf6" }} />
+  //                             <Typography variant="caption" color="#8b5cf6" fontWeight={600}>
+  //                               {moment(ev.checkedInAt).format("HH:mm")}
+  //                             </Typography>
+  //                           </Stack>
+  //                         )}
+  //                         {ev.checkedOutAt && (
+  //                           <Stack direction="row" alignItems="center" gap={0.4}>
+  //                             <Logout sx={{ fontSize: 12, color: "#10b981" }} />
+  //                             <Typography variant="caption" color="#10b981" fontWeight={600}>
+  //                               {moment(ev.checkedOutAt).format("HH:mm")}
+  //                             </Typography>
+  //                           </Stack>
+  //                         )}
+  //                         {duration && (
+  //                           <Typography variant="caption" color="text.disabled">· {duration}</Typography>
+  //                         )}
+  //                       </Stack>
+
+  //                       {/* workNote preview */}
+  //                       {ev.workNote && (
+  //                         <Typography variant="caption" color="text.secondary"
+  //                           sx={{
+  //                             display: "block", mt: 0.75, fontStyle: "italic",
+  //                             overflow: "hidden", textOverflow: "ellipsis",
+  //                             whiteSpace: "nowrap", maxWidth: "100%",
+  //                           }}>
+  //                           "{ev.workNote.slice(0, 80)}{ev.workNote.length > 80 ? "…" : ""}"
+  //                         </Typography>
+  //                       )}
+
+  //                       {/* latest activity */}
+  //                       {latestLog && (
+  //                         <Typography variant="caption" color="text.disabled"
+  //                           sx={{ display: "block", mt: 0.25 }}>
+  //                           อัปเดตล่าสุด: {moment(latestLog.timestamp).locale("th").fromNow()}
+  //                         </Typography>
+  //                       )}
+  //                     </Box>
+
+  //                     {/* Status chip */}
+  //                     <Chip
+  //                       label={isActive ? "กำลังทำ" : "กำลังดำเนินการ"}
+  //                       size="small"
+  //                       sx={{
+  //                         height: 22, fontSize: "0.68rem", fontWeight: 700,
+  //                         bgcolor: isActive ? alpha("#8b5cf6", 0.12) : alpha("#8b5cf6", 0.12),
+  //                         color: isActive ? "#8b5cf6" : "#8b5cf6",
+  //                         flexShrink: 0,
+  //                       }}
+  //                     />
+  //                   </Stack>
+  //                 </Box>
+  //               );
+  //             })}
+  //           </Stack>
+  //         )}
+  //       </Collapse>
+  //     </CardContent>
+  //   </GlassCard>
+  // );
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// ─── NEW: ClosureRequestsPanel ─────────────────────────────────────────
+// แยกงานที่ช่างส่ง "ขอปิดงาน" ออกมาให้เห็นชัดในที่เดียว ไม่ต้องไล่หาใน
+// ลิสต์หลักที่มีการแบ่งหน้า/กรองอยู่ — อนุมัติ/ไม่อนุมัติได้จากพาแนลนี้เลย
+// อ้างอิงจาก events ทั้งหมด (ไม่ผ่านตัวกรอง/pagination ของตาราง)
+// ═══════════════════════════════════════════════════════════════════════
+const ClosureRequestsPanel = ({ events, onApprove, onReject }) => {
+  const [expanded,     setExpanded]     = useState(true);
+  const [busyId,       setBusyId]       = useState(null);
+  const [rejectTarget, setRejectTarget] = useState(null);
+  const [rejectReason, setRejectReason] = useState("");
+
+  const pending = useMemo(
+    () => events
+      .filter(e => e.closeRequested)
+      .sort((a, b) => new Date(b.closeRequestedAt || 0) - new Date(a.closeRequestedAt || 0)),
+    [events]
+  );
+
+  const handleApprove = async (id) => {
+    setBusyId(id);
+    await onApprove(id);
+    setBusyId(null);
+  };
+
+  const handleRejectConfirm = async () => {
+    if (!rejectTarget) return;
+    setBusyId(rejectTarget);
+    await onReject(rejectTarget, rejectReason.trim());
+    setBusyId(null);
+    setRejectTarget(null);
+    setRejectReason("");
+  };
+
   return (
-    <GlassCard sx={{ mb: 3, border: "1px solid", borderColor: alpha("#8b5cf6", 0.2) }}>
+    <GlassCard sx={{ mb: 3, border: "1px solid", borderColor: alpha("#f59e0b", 0.25) }}>
       <CardContent sx={{ p: 2.5 }}>
-        {/* Header */}
         <Stack direction="row" alignItems="center" justifyContent="space-between" mb={expanded ? 2 : 0}>
           <Stack direction="row" alignItems="center" gap={1}>
-            <PulseDot color={todayActive.length > 0 ? "#10b981" : "#6b7280"} />
+            <PulseDot color={pending.length > 0 ? "#f59e0b" : "#6b7280"} />
             <Typography variant="subtitle2" fontWeight={700}>
-              งานที่กำลังดำเนินการ
+              งานที่ช่างขอปิด · รอตรวจสอบ
             </Typography>
             <Chip
-              label={`${todayActive.length} งาน`}
+              label={`${pending.length} งาน`}
               size="small"
               sx={{
                 height: 20, fontSize: "0.68rem", fontWeight: 700,
-                bgcolor: alpha("#8b5cf6", 0.1), color: "#8b5cf6",
+                bgcolor: alpha("#f59e0b", 0.12), color: "#f59e0b",
               }}
             />
-            {lastRefreshed && (
-              <Typography variant="caption" color="text.disabled">
-                · อัปเดต {moment(lastRefreshed).format("HH:mm:ss")}
-              </Typography>
-            )}
           </Stack>
-          <Stack direction="row" gap={0.5}>
-            <Tooltip title="รีเฟรชข้อมูล">
-              <IconButton size="small" onClick={onRefresh}>
-                <Refresh sx={{ fontSize: 16 }} />
-              </IconButton>
-            </Tooltip>
-            <IconButton size="small" onClick={() => setExpanded(p => !p)}>
-              {expanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
-            </IconButton>
-          </Stack>
+          <IconButton size="small" onClick={() => setExpanded(p => !p)}>
+            {expanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+          </IconButton>
         </Stack>
 
         <Collapse in={expanded}>
-          {todayActive.length === 0 ? (
+          {pending.length === 0 ? (
             <Box sx={{ textAlign: "center", py: 3, color: "text.disabled" }}>
-              <AccessTime sx={{ fontSize: 36, opacity: 0.25, mb: 0.5 }} />
-              <Typography variant="body2">ไม่มีช่างที่กำลังทำงานอยู่ขณะนี้</Typography>
+              <TaskAlt sx={{ fontSize: 36, opacity: 0.25, mb: 0.5 }} />
+              <Typography variant="body2">ยังไม่มีคำขอปิดงานที่รอตรวจสอบ</Typography>
             </Box>
           ) : (
             <Stack spacing={1.5}>
-              {todayActive.map(ev => {
-                const isCheckedOut = Boolean(ev.checkedOutAt);
-                const isActive     = ev.checkedInAt && !ev.checkedOutAt;
-                const duration     = ev.checkedInAt
-                  ? moment.duration(
-                      moment(isCheckedOut ? ev.checkedOutAt : undefined).diff(moment(ev.checkedInAt))
-                    ).humanize()
-                  : null;
-
-                // หาช่างจาก activityLog
-                const techNames = [...new Set(
-                  (ev.activityLog || [])
-                    .filter(l => l.action === "check_in" && l.userName)
-                    .map(l => l.userName)
-                )];
-
-                const latestLog = [...(ev.activityLog || [])].reverse()[0];
-
-                return (
-                  <Box key={ev._id} sx={{
-                    p: 1.5, borderRadius: 2,
-                    border: "1px solid",
-                    borderColor: isActive
-                      ? alpha("#8b5cf6", 0.25)
-                      : isCheckedOut
-                        ? alpha("#10b981", 0.2)
-                        : alpha("#6b7280", 0.15),
-                    background: isActive
-                      ? alpha("#8b5cf6", 0.03)
-                      : isCheckedOut
-                        ? alpha("#10b981", 0.03)
-                        : "transparent",
-                  }}>
-                    <Stack direction="row" alignItems="flex-start" gap={1.5}>
-                      {/* Status dot */}
-                      <Box sx={{ pt: 0.5 }}>
-                        {isActive
-                          ? <PulseDot color="#8b5cf6" />
-                          : <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#10b981" }} />
-                        }
-                      </Box>
-
+              {pending.map(ev => (
+                <Box key={ev._id} sx={{
+                  p: 1.5, borderRadius: 2, border: "1px solid",
+                  borderColor: alpha("#f59e0b", 0.25), background: alpha("#f59e0b", 0.03),
+                }}>
+                  <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ sm: "flex-start" }} gap={1.5}>
+                    <Stack direction="row" alignItems="flex-start" gap={1.5} flex={1} minWidth={0}>
+                      <HourglassTop sx={{ fontSize: 18, color: "#f59e0b", mt: 0.3, flexShrink: 0 }} />
                       <Box flex={1} minWidth={0}>
-                        {/* บริษัท + ไซต์ */}
                         <Typography fontWeight={700} fontSize="0.875rem" noWrap>
                           {ev.company || "—"} · {ev.site || "—"}
                         </Typography>
-
-                        {/* ช่าง */}
-                        {techNames.length > 0 && (
-                          <Stack direction="row" gap={0.5} alignItems="center" mt={0.3}>
-                            <Person sx={{ fontSize: 13, color: "text.secondary" }} />
-                            <Typography variant="caption" color="text.secondary">
-                              {techNames.join(", ")}
-                            </Typography>
-                          </Stack>
-                        )}
-
-                        {/* เวลา */}
-                        <Stack direction="row" gap={1.5} mt={0.5} flexWrap="wrap">
-                          {ev.checkedInAt && (
-                            <Stack direction="row" alignItems="center" gap={0.4}>
-                              <Login sx={{ fontSize: 12, color: "#8b5cf6" }} />
-                              <Typography variant="caption" color="#8b5cf6" fontWeight={600}>
-                                {moment(ev.checkedInAt).format("HH:mm")}
-                              </Typography>
-                            </Stack>
-                          )}
-                          {ev.checkedOutAt && (
-                            <Stack direction="row" alignItems="center" gap={0.4}>
-                              <Logout sx={{ fontSize: 12, color: "#10b981" }} />
-                              <Typography variant="caption" color="#10b981" fontWeight={600}>
-                                {moment(ev.checkedOutAt).format("HH:mm")}
-                              </Typography>
-                            </Stack>
-                          )}
-                          {duration && (
-                            <Typography variant="caption" color="text.disabled">· {duration}</Typography>
-                          )}
-                        </Stack>
-
-                        {/* workNote preview */}
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                          {ev.closeRequestedBy || "ช่าง"} ขอปิดงาน
+                          {ev.closeRequestedAt && ` · ${moment(ev.closeRequestedAt).locale("th").fromNow()}`}
+                        </Typography>
                         {ev.workNote && (
                           <Typography variant="caption" color="text.secondary"
                             sx={{
-                              display: "block", mt: 0.75, fontStyle: "italic",
-                              overflow: "hidden", textOverflow: "ellipsis",
-                              whiteSpace: "nowrap", maxWidth: "100%",
+                              display: "block", mt: 0.5, fontStyle: "italic",
+                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                             }}>
-                            "{ev.workNote.slice(0, 80)}{ev.workNote.length > 80 ? "…" : ""}"
-                          </Typography>
-                        )}
-
-                        {/* latest activity */}
-                        {latestLog && (
-                          <Typography variant="caption" color="text.disabled"
-                            sx={{ display: "block", mt: 0.25 }}>
-                            อัปเดตล่าสุด: {moment(latestLog.timestamp).locale("th").fromNow()}
+                            "{ev.workNote.slice(0, 100)}{ev.workNote.length > 100 ? "…" : ""}"
                           </Typography>
                         )}
                       </Box>
-
-                      {/* Status chip */}
-                      <Chip
-                        label={isActive ? "กำลังทำ" : "กำลังดำเนินการ"}
-                        size="small"
-                        sx={{
-                          height: 22, fontSize: "0.68rem", fontWeight: 700,
-                          bgcolor: isActive ? alpha("#8b5cf6", 0.12) : alpha("#8b5cf6", 0.12),
-                          color: isActive ? "#8b5cf6" : "#8b5cf6",
-                          flexShrink: 0,
-                        }}
-                      />
                     </Stack>
-                  </Box>
-                );
-              })}
+                    <Stack direction="row" gap={0.75} flexShrink={0} sx={{ width: { xs: "100%", sm: "auto" } }}>
+                      <Button size="small" color="warning" variant="contained"
+                        startIcon={<TaskAlt sx={{ fontSize: 15 }} />}
+                        disabled={busyId === ev._id}
+                        onClick={() => handleApprove(ev._id)}
+                        sx={{ flex: { xs: 1, sm: "initial" }, borderRadius: 2, textTransform: "none", fontWeight: 700 }}>
+                        อนุมัติ
+                      </Button>
+                      <Button size="small" color="error" variant="outlined"
+                        startIcon={<Cancel sx={{ fontSize: 15 }} />}
+                        disabled={busyId === ev._id}
+                        onClick={() => { setRejectTarget(ev._id); setRejectReason(""); }}
+                        sx={{ flex: { xs: 1, sm: "initial" }, borderRadius: 2, textTransform: "none", fontWeight: 700 }}>
+                        ไม่อนุมัติ
+                      </Button>
+                    </Stack>
+                  </Stack>
+                </Box>
+              ))}
             </Stack>
           )}
         </Collapse>
       </CardContent>
+
+      {/* Dialog: ระบุเหตุผลที่ไม่อนุมัติ */}
+      <Dialog open={Boolean(rejectTarget)} onClose={() => !busyId && setRejectTarget(null)} fullWidth maxWidth="xs">
+        <DialogTitle>ไม่อนุมัติปิดงาน</DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 1.5 }}>
+            ระบุเหตุผล/คอมเมนต์ที่ไม่อนุมัติ เพื่อแจ้งให้ช่างทราบและแก้ไข
+          </DialogContentText>
+          <TextField
+            autoFocus fullWidth multiline minRows={3}
+            placeholder="เช่น ไฟล์ใบเสนอราคายังไม่ครบ กรุณาแนบเพิ่ม"
+            value={rejectReason}
+            onChange={e => setRejectReason(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRejectTarget(null)} disabled={Boolean(busyId)}>ยกเลิก</Button>
+          <Button variant="contained" color="error" onClick={handleRejectConfirm} disabled={Boolean(busyId)}>
+            {busyId ? "กำลังบันทึก..." : "ยืนยันไม่อนุมัติ"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </GlassCard>
   );
 };
 
 // ═══════════════════════════════════════════════════════════════════════
 // ─── NEW: NotificationBell ────────────────────────────────────────────
-// แจ้งเตือนเมื่อช่างเสร็จงาน (เปรียบเทียบกับ snapshot ก่อนหน้า)
+// แจ้งเตือนเทียบกับ snapshot ก่อนหน้า — เนื้อหาแตกต่างกันตาม role:
+//   admin/manager: มีคำขอปิดงานใหม่เข้ามา
+//   ช่าง: ผลอนุมัติ/ไม่อนุมัติคำขอปิดงานของตัวเอง + ข้อความตอบกลับจากแอดมิน
 // ═══════════════════════════════════════════════════════════════════════
-const NotificationBell = ({ events }) => {
-  const [anchorEl,      setAnchorEl]      = useState(null);
-  const [notifications, setNotifications] = useState([]);
-  const [readCount,     setReadCount]     = useState(0);
-  const prevEventsRef = useRef({});
+const NOTI_META = {
+  close_requested: { icon: <HourglassTop sx={{ fontSize: 16 }} />, color: "#f59e0b" },
+  close_approved:  { icon: <CheckCircle  sx={{ fontSize: 16 }} />, color: "#10b981" },
+  close_rejected:  { icon: <Cancel       sx={{ fontSize: 16 }} />, color: "#ef4444" },
+  comment:         { icon: <Chat         sx={{ fontSize: 16 }} />, color: "#3b82f6" },
+};
 
-  // ตรวจจับงานที่เพิ่ง check_out หรือ เสร็จสิ้น
+const NotificationBell = ({ events, role = "admin" }) => {
+  // ✅ เก็บลิสต์แจ้งเตือน (พร้อมสถานะอ่านแล้ว/ยัง) ลง localStorage แยกตาม userId
+  // เพื่อให้ count และรายการไม่หายไปเมื่อรีเฟรชหน้า — โหลดค่าตั้งต้นจาก storage ตอน mount
+  const payload     = JSON.parse(localStorage.getItem("payload") || "{}");
+  const storageKey  = `noti_${payload?.userId || "guest"}_${role}`;
+
+  const [anchorEl,      setAnchorEl]      = useState(null);
+  const [notifications, setNotifications] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(storageKey) || "[]");
+    } catch {
+      return [];
+    }
+  });
+  const prevEventsRef = useRef({});
+  // ✅ ข้ามการสร้างแจ้งเตือนในรอบแรกที่โหลดข้อมูล (แค่บันทึก snapshot ตั้งต้นไว้เทียบ)
+  // ไม่งั้นงานเก่าที่ปิดไปแล้ว/ขอปิดไปแล้วก่อนหน้านี้ จะโผล่เป็น "แจ้งเตือนใหม่" ทันทีที่เปิดหน้า
+  const isFirstRun = useRef(true);
+
+  const isNewTimestamp = (incoming, previous) =>
+    incoming && (!previous || new Date(incoming).getTime() !== new Date(previous).getTime());
+
+  // ✅ sync ลง localStorage ทุกครั้งที่ลิสต์เปลี่ยน (อ่านแล้ว/มีรายการใหม่เข้ามา) กันรีเฟรชแล้วหาย
+  useEffect(() => {
+    localStorage.setItem(storageKey, JSON.stringify(notifications.slice(0, 30)));
+  }, [notifications, storageKey]);
+
   useEffect(() => {
     const newNoti = [];
+    const firstRun = isFirstRun.current;
     events.forEach(ev => {
       const prev = prevEventsRef.current[ev._id];
-      // ถ้างานนี้เพิ่ง checkedOutAt ใหม่ (prev ไม่มี checkedOutAt)
-      if (ev.checkedOutAt && (!prev || !prev.checkedOutAt)) {
-        const techName = [...(ev.activityLog || [])]
-          .reverse()
-          .find(l => l.action === "check_out")?.userName || "ช่าง";
-        newNoti.push({
-          id:        ev._id + "_checkout_" + ev.checkedOutAt,
-          type:      "checkout",
-          message:   `${techName} เสร็จงาน`,
-          detail:    `${ev.company} · ${ev.site}`,
-          time:      ev.checkedOutAt,
-          eventId:   ev._id,
-        });
+
+      if (firstRun) {
+        // ยังไม่ต้องเทียบอะไร แค่รอบันทึก snapshot ท้ายลูปด้านล่าง
+      } else if (role === "admin") {
+        // ตรวจจับงานที่เพิ่งถูกช่างกดขอปิด (closeRequested: false/undefined → true)
+        // ⚠️ เดิมเช็คจาก checkedOutAt แต่ฟิลด์นี้เลิกถูกตั้งค่าไปแล้วตั้งแต่เปลี่ยนมาใช้
+        // ระบบ "ขอปิดงาน" (closeRequested) ทำให้กระดิ่งแจ้งเตือนไม่เคยทำงานอีกเลย
+        if (ev.closeRequested && (!prev || !prev.closeRequested)) {
+          newNoti.push({
+            id:      ev._id + "_closereq_" + (ev.closeRequestedAt || Date.now()),
+            type:    "close_requested",
+            message: `${ev.closeRequestedBy || "ช่าง"} ขอปิดงาน`,
+            detail:  `${ev.company} · ${ev.site}`,
+            time:    ev.closeRequestedAt || new Date().toISOString(),
+            eventId: ev._id,
+          });
+        }
+      } else {
+        // ฝั่งช่าง: แจ้งผลอนุมัติ/ไม่อนุมัติคำขอปิดงานของตัวเอง (เทียบเวลาจริง เผื่อโดนตีกลับซ้ำหลายรอบ)
+        if (isNewTimestamp(ev.closeApprovedAt, prev?.closeApprovedAt)) {
+          newNoti.push({
+            id:      ev._id + "_approved_" + ev.closeApprovedAt,
+            type:    "close_approved",
+            message: "แอดมินอนุมัติปิดงานแล้ว",
+            detail:  `${ev.company} · ${ev.site}`,
+            time:    ev.closeApprovedAt,
+            eventId: ev._id,
+          });
+        }
+        if (isNewTimestamp(ev.closeRejectedAt, prev?.closeRejectedAt)) {
+          newNoti.push({
+            id:      ev._id + "_rejected_" + ev.closeRejectedAt,
+            type:    "close_rejected",
+            message: "แอดมินไม่อนุมัติปิดงาน",
+            detail:  ev.closeRejectReason ? `${ev.company} · ${ev.site}: ${ev.closeRejectReason}` : `${ev.company} · ${ev.site}`,
+            time:    ev.closeRejectedAt,
+            eventId: ev._id,
+          });
+        }
+        // ข้อความใหม่จากแอดมิน/manager (comments เก็บมาทั้งชุดเสมอ จึงเทียบจำนวนแทน)
+        const comments     = ev.comments || [];
+        const prevComments = prev?.comments || [];
+        if (comments.length > prevComments.length) {
+          comments.slice(prevComments.length)
+            .filter(c => c.role !== "technician")
+            .forEach(c => {
+              newNoti.push({
+                id:      ev._id + "_comment_" + c.timestamp,
+                type:    "comment",
+                message: `${c.userName || "แอดมิน"} ตอบกลับ`,
+                detail:  `${ev.company} · ${ev.site}: ${c.message}`,
+                time:    c.timestamp,
+                eventId: ev._id,
+              });
+            });
+        }
       }
+
       // บันทึก snapshot
       prevEventsRef.current[ev._id] = ev;
     });
+    isFirstRun.current = false;
 
     if (newNoti.length > 0) {
-      setNotifications(prev => [...newNoti, ...prev].slice(0, 20));
+      setNotifications(prev => {
+        // กันซ้ำ (id เดิมที่ rehydrate มาจาก localStorage อยู่แล้วตอน mount)
+        const existingIds = new Set(prev.map(p => p.id));
+        const fresh = newNoti.filter(n => !existingIds.has(n.id)).map(n => ({ ...n, read: false }));
+        return [...fresh, ...prev].slice(0, 30);
+      });
     }
-  }, [events]);
+  }, [events, role]);
 
-  const unread = Math.max(0, notifications.length - readCount);
+  // ✅ count = จำนวนแจ้งเตือนที่ยังไม่เคยเปิดดู (read: false) ลดลงทีละอันตอนกดเข้าไปดูงานนั้นครั้งแรก
+  // รายการจะยังอยู่ในลิสต์เสมอ (แค่จางลง) กดย้อนกลับไปดูซ้ำได้ตลอด — ไม่ถูกลบทิ้ง
+  const unread = notifications.filter(n => !n.read).length;
+  const navigate = useNavigate();
 
-  const handleOpen = (e) => {
-    setAnchorEl(e.currentTarget);
-    setReadCount(notifications.length); // mark all read
+  const handleOpen = (e) => setAnchorEl(e.currentTarget);
+  const handleClose = () => setAnchorEl(null);
+
+  // ✅ กดที่รายการแจ้งเตือน ให้พาไปหน้างานนั้น + มาร์คว่าอ่านแล้ว (count ลดของอันนั้นอันเดียว)
+  // แต่ยังคงอยู่ในลิสต์ให้กดย้อนกลับมาดูอีกได้ (แค่จางสีลง)
+  const handleNotificationClick = (n) => {
+    setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x));
+    setAnchorEl(null);
+    if (n.eventId) navigate(`/operation/${n.eventId}`);
   };
 
   return (
@@ -468,7 +700,7 @@ const NotificationBell = ({ events }) => {
       <Popover
         open={Boolean(anchorEl)}
         anchorEl={anchorEl}
-        onClose={() => setAnchorEl(null)}
+        onClose={handleClose}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         transformOrigin={{ vertical: "top", horizontal: "right" }}
         PaperProps={{ sx: { borderRadius: 3, width: 320, boxShadow: "0 8px 32px rgba(0,0,0,0.12)" } }}>
@@ -485,16 +717,29 @@ const NotificationBell = ({ events }) => {
           </Box>
         ) : (
           <List disablePadding sx={{ maxHeight: 360, overflowY: "auto" }}>
-            {notifications.map((n, i) => (
-              <ListItem key={n.id} divider={i < notifications.length - 1} sx={{ py: 1.25, px: 2 }}>
+            {notifications.map((n, i) => {
+              const meta = NOTI_META[n.type] || NOTI_META.close_requested;
+              return (
+              <ListItem key={n.id} divider={i < notifications.length - 1}
+                onClick={() => handleNotificationClick(n)}
+                sx={{
+                  py: 1.25, px: 2, cursor: n.eventId ? "pointer" : "default",
+                  opacity: n.read ? 0.5 : 1,
+                  transition: "opacity 0.2s ease, background-color 0.15s ease",
+                  "&:hover": n.eventId ? { bgcolor: t => alpha(t.palette.primary.main, 0.06) } : {},
+                }}>
                 <ListItemAvatar sx={{ minWidth: 36 }}>
-                  <Avatar sx={{ width: 30, height: 30, bgcolor: alpha("#10b981", 0.12), color: "#10b981" }}>
-                    <CheckCircle sx={{ fontSize: 16 }} />
+                  <Avatar sx={{
+                    width: 30, height: 30,
+                    bgcolor: n.read ? alpha("#6b7280", 0.12) : alpha(meta.color, 0.12),
+                    color: n.read ? "#6b7280" : meta.color,
+                  }}>
+                    {meta.icon}
                   </Avatar>
                 </ListItemAvatar>
                 <MuiListItemText
                   primary={
-                    <Typography variant="caption" fontWeight={700}>{n.message}</Typography>
+                    <Typography variant="caption" fontWeight={n.read ? 500 : 700}>{n.message}</Typography>
                   }
                   secondary={
                     <Stack>
@@ -506,7 +751,8 @@ const NotificationBell = ({ events }) => {
                   }
                 />
               </ListItem>
-            ))}
+              );
+            })}
           </List>
         )}
       </Popover>
@@ -581,7 +827,7 @@ const DashboardStats = ({ events }) => {
       sub: `ยืนยันแล้ว ${stats.byStatus["ยืนยันแล้ว"]} · รอยืนยัน ${stats.byStatus["กำลังรอยืนยัน"]} งาน` },
     { label: "เสร็จสิ้น",      value: stats.byStatus["ดำเนินการเสร็จสิ้น"], color: "linear-gradient(135deg,#10b981,#059669)", icon: <CheckCircle />,
       sub: `คิดเป็น ${stats.total ? Math.round((stats.byStatus["ดำเนินการเสร็จสิ้น"] / stats.total) * 100) : 0}% ของงานทั้งหมด` },
-    { label: "รอคุณอนุมัติปิดงาน", value: stats.pendingClose, color: "linear-gradient(135deg,#f59e0b,#d97706)", icon: <TaskAlt />,
+    { label: "คำขออนุมัติปิดงาน", value: stats.pendingClose, color: "linear-gradient(135deg,#f59e0b,#d97706)", icon: <TaskAlt />,
       sub: stats.pendingClose > 0 ? "ช่างขอปิดงาน รอตรวจสอบ" : "ไม่มีงานรออนุมัติ" },
   ];
 
@@ -1022,6 +1268,74 @@ const FileUploadSection = ({
   );
 };
 
+// ─── CommentThread ────────────────────────────────────────────────────
+// คุยโต้ตอบกับช่าง (เช่น ตอบคำขอใบเสนอราคา) แยกจาก activityLog ที่เป็น log อัตโนมัติ
+// myRole ใช้กำหนดว่าข้อความฝั่งไหนคือ "ของเรา" (จัดชิดขวา) — ฝั่งแอดมิน: role !== "technician"
+const CommentThread = ({ comments = [], onSend, myRole }) => {
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const handleSend = async () => {
+    if (!message.trim() || sending) return;
+    setSending(true);
+    await onSend(message.trim());
+    setMessage("");
+    setSending(false);
+  };
+
+  const isMine = (c) => (myRole === "technician" ? c.role === "technician" : c.role !== "technician");
+
+  return (
+    <Box>
+      {comments.length > 0 && (
+        <Stack spacing={1} sx={{ mb: 1.5, maxHeight: 280, overflowY: "auto", pr: 0.5 }}>
+          {comments.map((c, i) => {
+            const mine = isMine(c);
+            return (
+              <Box key={i} sx={{ display: "flex", justifyContent: mine ? "flex-end" : "flex-start" }}>
+                <Box sx={{
+                  maxWidth: "82%", p: 1.25, borderRadius: 2,
+                  bgcolor: mine ? alpha("#3b82f6", 0.12) : alpha("#6b7280", 0.1),
+                  borderTopRightRadius: mine ? 4 : 2,
+                  borderTopLeftRadius: mine ? 2 : 4,
+                }}>
+                  <Stack direction="row" gap={0.75} alignItems="center" sx={{ mb: 0.25 }}>
+                    <Typography variant="caption" fontWeight={700} color={mine ? "#3b82f6" : "text.secondary"}>
+                      {c.userName || (c.role === "technician" ? "ช่าง" : "แอดมิน")}
+                    </Typography>
+                    <Typography variant="caption" color="text.disabled">
+                      · {moment(c.timestamp).locale("th").format("DD MMM HH:mm")}
+                    </Typography>
+                  </Stack>
+                  <Typography variant="body2" sx={{ whiteSpace: "pre-line", wordBreak: "break-word" }}>
+                    {c.message}
+                  </Typography>
+                </Box>
+              </Box>
+            );
+          })}
+        </Stack>
+      )}
+      <Stack direction="row" gap={1} alignItems="flex-end">
+        <TextField
+          fullWidth size="small" multiline maxRows={4}
+          placeholder="พิมพ์ข้อความถึงช่าง..."
+          value={message}
+          onChange={e => setMessage(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+          sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: "0.85rem" } }}
+        />
+        <IconButton
+          onClick={handleSend}
+          disabled={!message.trim() || sending}
+          sx={{ border: "1px solid", borderColor: "primary.main", borderRadius: 2, color: "primary.main", flexShrink: 0 }}>
+          <Send sx={{ fontSize: 18 }} />
+        </IconButton>
+      </Stack>
+    </Box>
+  );
+};
+
 // ─── EventRowCard ─────────────────────────────────────────────────────
 const EventRowCard = ({
   event, employee, onStatusUpdate, onDocNoUpdate, onInputUpdate,
@@ -1041,6 +1355,19 @@ const EventRowCard = ({
   const theme  = useTheme();
   const canEdit = ["admin", "manager", "user"].includes(currentUserRole);
   const isAdminOrManager = ["admin", "manager"].includes(currentUserRole);
+
+  // ── Send Comment (คุยกับช่าง เช่น ตอบคำขอใบเสนอราคา) ──────────────────
+  const handleSendComment = async (message) => {
+    const payload = JSON.parse(localStorage.getItem("payload") || "{}");
+    const newComment = {
+      userId: payload?.userId || "",
+      userName: payload?.name || payload?.username || "แอดมิน",
+      role: currentUserRole,
+      message,
+      timestamp: new Date().toISOString(),
+    };
+    await onInputUpdate(event._id, { comments: [...(event.comments || []), newComment] });
+  };
 
   const handleStatusChange = newStatus => {
     setLocalStatus(newStatus);
@@ -1100,6 +1427,11 @@ const EventRowCard = ({
                   {event.activityLog?.length > 0 && (
                     <Tooltip title={`${event.activityLog.length} กิจกรรม`}>
                       <History sx={{ fontSize: 17, color: "#f59e0b", opacity: 0.8 }} />
+                    </Tooltip>
+                  )}
+                  {event.comments?.length > 0 && (
+                    <Tooltip title={`${event.comments.length} ข้อความ`}>
+                      <Chat sx={{ fontSize: 17, color: "#3b82f6", opacity: 0.8 }} />
                     </Tooltip>
                   )}
                 </Stack>
@@ -1351,6 +1683,17 @@ const EventRowCard = ({
                 ))}
               </Stack>
             </Grid> */}
+
+            {/* คุยกับช่าง (เช่น ตอบคำขอใบเสนอราคา) */}
+            <Grid item xs={12}>
+              <Divider sx={{ mb: 1.5 }} />
+              <Typography variant="caption" fontWeight={700} color="text.secondary"
+                sx={{ textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 0.5, mb: 1 }}>
+                <Chat sx={{ fontSize: 14 }} /> คุยกับช่าง{(event.comments || []).length > 0 && ` (${event.comments.length})`}
+              </Typography>
+              <CommentThread comments={event.comments} onSend={handleSendComment} myRole={currentUserRole} />
+            </Grid>
+
             {event.activityLog?.length > 0 && (
               <Grid item xs={12}>
                 <Divider sx={{ mb: 1.5 }} />
@@ -1587,6 +1930,11 @@ const Operation = () => {
   const [activeTab,    setActiveTab]    = useState(0);
   const [lastRefreshed,setLastRefreshed]= useState(null);
 
+  // ✅ แยกกลุ่มงานให้ชัดเจน แทนที่จะปนกันเป็นลิสต์เดียวเรียงตามวันที่อย่างเดียว
+  // ใช้กลุ่มเดียวกันทั้งฝั่งช่างและแอดมิน/manager:
+  // "pending" (รอคุณ/ผู้ดูแลอนุมัติปิดงาน — default) | "active" (ยืนยันแล้ว/กำลังดำเนินการ) | "closed" (เสร็จสิ้น)
+  const [statusGroup,   setStatusGroup]   = useState("");
+
   const [search,        setSearch]        = useState("");
   const [showAll,       setShowAll]       = useState(true);
   const [selectedDate,  setSelectedDate]  = useState("");
@@ -1621,12 +1969,15 @@ const Operation = () => {
     fetchEmployee();
   }, [id]);
 
-  // ── Auto-refresh 30 วินาที (เฉพาะ admin/manager) ────────────────────
+  // ── Auto-refresh ทุก 15 วินาที (ทุก role ที่ล็อกอินอยู่) ──────────────
+  // ✅ ขยายจากเดิมที่จำกัดเฉพาะ admin/manager ทุก 30s → ให้ทำงานกับช่างด้วย
+  // เพื่อให้ผลอนุมัติ/ไม่อนุมัติคำขอปิดงาน render กลับไปหาช่างแบบ realtime
+  // โดยไม่ต้องกดรีเฟรชเอง
   useEffect(() => {
-    if (!["admin", "manager"].includes(currentUserRole)) return;
+    if (!currentUserRole) return;
     const interval = setInterval(() => {
       fetchEventsFromDB(true); // silent refresh
-    }, 30000);
+    }, 15000);
     return () => clearInterval(interval);
   }, [currentUserRole]);
 
@@ -1670,6 +2021,22 @@ const Operation = () => {
     // (ยกเว้นผู้ใช้ตั้งใจกรองสถานะนี้เองโดยเฉพาะ)
     const matchNotPending = filterOP === "กำลังรอยืนยัน" ? true : event.status !== "กำลังรอยืนยัน";
 
+    // ✅ แยกกลุ่มงานให้ชัดเจนเป็น 3 กลุ่มเดียวกันทั้งฝั่งช่างและแอดมิน/manager
+    // (รอคุณ/ผู้ดูแลอนุมัติ / กำลังดำเนินการ-ยืนยันแล้ว / เสร็จสิ้น) — ถ้าผู้ใช้เลือกสถานะเจาะจงไว้แล้ว
+    // (filterOP) ให้ยึดตามนั้นแทน ไม่ต้องกรองซ้ำด้วย toggle นี้ (กันผลลัพธ์ขัดกันจนว่างเปล่า)
+    // ค่า default ต่างกันตาม role: แอดมิน/manager เปิดที่ "รอคุณอนุมัติ" ก่อน (งานด่วนที่ต้องรีวิว)
+    // ส่วนช่างเปิดที่ "กำลังดำเนินการ/ยืนยันแล้ว" ก่อน (งานที่ต้องลงมือทำจริง)
+    let matchGroup;
+    if (filterOP) {
+      matchGroup = true;
+    } else {
+      const isAdminOrManagerRole = ["admin", "manager"].includes(currentUserRole);
+      const group = statusGroup || (isAdminOrManagerRole ? "pending" : "active");
+      if (group === "pending")      matchGroup = event.closeRequested === true && event.status !== "ดำเนินการเสร็จสิ้น";
+      else if (group === "active")  matchGroup = ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(event.status) && !event.closeRequested;
+      else                          matchGroup = event.status === "ดำเนินการเสร็จสิ้น"; // "closed"
+    }
+
     const keyword = search.toLowerCase();
     const matchSearch = keyword
       ? [event.company, event.site, event.title, event.system, event.team, event.docNo,
@@ -1677,17 +2044,22 @@ const Operation = () => {
           .map(v => (v || "").toLowerCase()).some(t => t.includes(keyword))
       : true;
 
-    return matchMonth && matchType && matchSystem && matchStatus && matchOP && matchTeam && matchSearch && matchNotPending;
+    return matchMonth && matchType && matchSystem && matchStatus && matchOP && matchTeam && matchSearch && matchNotPending && matchGroup;
   });
-}, [id, selectedEvent, events, dateSearch, filterType, filterSystem, filterStatus, filterOP, filterTeam, search]);
+}, [id, selectedEvent, events, dateSearch, filterType, filterSystem, filterStatus, filterOP, filterTeam, search, statusGroup, currentUserRole]);
 
   const sortedEvents      = useMemo(() => filteredEvents.slice().sort((a, b) => new Date(b.start) - new Date(a.start)), [filteredEvents]);
   const activeFilterCount = [filterType, filterSystem, filterStatus, filterOP, search.trim(), filterTeam].filter(Boolean).length;
 
-  // รีเซ็ตกลับหน้า 1 ทุกครั้งที่ตัวกรอง/คำค้นหา/แท็บเปลี่ยน
+  // นับจำนวนงานแต่ละกลุ่มไว้โชว์บน toggle — อ้างอิงจาก events ทั้งหมด ไม่ผ่านตัวกรองอื่น
+  const closedCount   = useMemo(() => events.filter(e => e.status === "ดำเนินการเสร็จสิ้น").length, [events]);
+  const pendingCount  = useMemo(() => events.filter(e => e.closeRequested === true && e.status !== "ดำเนินการเสร็จสิ้น").length, [events]);
+  const inProgressCount  = useMemo(() => events.filter(e => ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(e.status) && !e.closeRequested).length, [events]);
+
+  // รีเซ็ตกลับหน้า 1 ทุกครั้งที่ตัวกรอง/คำค้นหา/แท็บ/กลุ่มสถานะเปลี่ยน
   useEffect(() => {
     setPage(1);
-  }, [dateSearch, filterType, filterSystem, filterStatus, filterOP, filterTeam, search, activeTab]);
+  }, [dateSearch, filterType, filterSystem, filterStatus, filterOP, filterTeam, search, activeTab, statusGroup]);
 
   const totalPages = Math.max(1, Math.ceil(sortedEvents.length / pageSize));
 
@@ -1906,8 +2278,8 @@ const Operation = () => {
               <Refresh fontSize="small" />
             </IconButton>
           </Tooltip>
-          {/* Notification bell (admin/manager เท่านั้น) */}
-          {isAdminOrManager && <NotificationBell events={events} />}
+          {/* Notification bell — ทุก role เห็น แต่เนื้อหาต่างกันตามฝั่ง (ดูคอมเมนต์ใน NotificationBell) */}
+          <NotificationBell events={events} role={isAdminOrManager ? "admin" : "technician"} />
           <Tooltip title="Export CSV (รวมเวลาเข้า/ออก + สรุปงาน)">
             <IconButton onClick={handleExportCSV} size="small"
               sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2 }}>
@@ -1936,18 +2308,67 @@ const Operation = () => {
         </Tabs>
       </Box>
 
+      {/* ✅ แยกกลุ่มงานให้เห็นชัดเจนเป็น 3 กลุ่มเดียวกันทั้งฝั่งช่างและแอดมิน/manager
+          (รอคุณ/ผู้ดูแลอนุมัติ / กำลังดำเนินการ-ยืนยันแล้ว / เสร็จสิ้น)
+          (ใช้ร่วมกันทั้ง Tab รายการงาน/Timeline — Dashboard ดูภาพรวมทั้งหมดอยู่แล้วจึงไม่ต้องมี) */}
+      {activeTab !== 2 && (() => {
+        // ค่า default ต่างกันตาม role: แอดมิน/manager เปิดที่ "รอคุณอนุมัติ" ก่อน
+        // ส่วนช่างเปิดที่ "กำลังดำเนินการ/ยืนยันแล้ว" ก่อน (ตรงกับงานที่ต้องลงมือทำจริง)
+        const effectiveGroup = statusGroup || (isAdminOrManager ? "pending" : "active");
+        return (
+        <ToggleButtonGroup
+          value={effectiveGroup}
+          exclusive
+          onChange={(_, v) => { if (v) setStatusGroup(v); }}
+          size="small"
+          sx={{ mb: 3, flexWrap: "wrap" }}>
+          <ToggleButton value="pending" sx={{ textTransform: "none", fontWeight: 700, px: 2, gap: 1 }}>
+            <HourglassTop sx={{ fontSize: 18 }} /> {isAdminOrManager ? "รอคุณอนุมัติ" : "รอผู้ดูแลอนุมัติ"}
+            <Chip label={pendingCount} size="small" sx={{
+              height: 20, fontSize: "0.68rem", ml: 0.75, fontWeight: 700,
+              bgcolor: effectiveGroup === "pending" ? "rgba(255,255,255,0.28)" : alpha("#f59e0b", 0.12),
+              color: effectiveGroup === "pending" ? "inherit" : "#f59e0b",
+            }} />
+          </ToggleButton>
+          <ToggleButton value="active" sx={{ textTransform: "none", fontWeight: 700, px: 2, gap: 1 }}>
+            <PendingActions sx={{ fontSize: 18 }} /> กำลังดำเนินการ/ยืนยันแล้ว
+            <Chip label={inProgressCount} size="small" sx={{
+              height: 20, fontSize: "0.68rem", ml: 0.75, fontWeight: 700,
+              bgcolor: effectiveGroup === "active" ? "rgba(255,255,255,0.28)" : alpha("#8b5cf6", 0.12),
+              color: effectiveGroup === "active" ? "inherit" : "#8b5cf6",
+            }} />
+          </ToggleButton>
+          <ToggleButton value="closed" sx={{ textTransform: "none", fontWeight: 700, px: 2, gap: 1 }}>
+            <CheckCircle sx={{ fontSize: 18 }} /> งานที่เสร็จสิ้น
+            <Chip label={closedCount} size="small" sx={{
+              height: 20, fontSize: "0.68rem", ml: 0.75, fontWeight: 700,
+              bgcolor: effectiveGroup === "closed" ? "rgba(255,255,255,0.28)" : alpha("#10b981", 0.12),
+              color: effectiveGroup === "closed" ? "inherit" : "#10b981",
+            }} />
+          </ToggleButton>
+        </ToggleButtonGroup>
+        );
+      })()}
+
       {loading && <LinearProgress sx={{ borderRadius: 1, mb: 2 }} />}
 
       {/* TAB 0: TABLE */}
       {activeTab === 0 && (
         <>
-          {/* LiveTrackingPanel แสดงเฉพาะ admin/manager */}
+          {/* ClosureRequestsPanel + LiveTrackingPanel แสดงเฉพาะ admin/manager */}
           {isAdminOrManager && (
-            <LiveTrackingPanel
-              events={events}
-              onRefresh={() => fetchEventsFromDB(true)}
-              lastRefreshed={lastRefreshed}
-            />
+            <>
+              <ClosureRequestsPanel
+                events={events}
+                onApprove={handleApproveClose}
+                onReject={handleRejectClose}
+              />
+              <LiveTrackingPanel
+                events={events}
+                onRefresh={() => fetchEventsFromDB(true)}
+                lastRefreshed={lastRefreshed}
+              />
+            </>
           )}
 
           <FilterPanel

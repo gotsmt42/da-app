@@ -215,22 +215,18 @@ const ThemeRoutes = [
         title: "Event Calendar",
       },
      {
-  path: "operation",
+  // ✅ รวม "operation" กับ "operation/:id" เป็น route เดียวด้วย ":id?" (optional segment)
+  // เดิมแยกเป็น 2 route object ทำให้ React Router unmount/remount <Operate/> ใหม่ทั้งหมด
+  // ทุกครั้งที่สลับไปมาระหว่างสองเส้นทางนี้ (เช่น กดแจ้งเตือนแล้วเด้งไปงานเฉพาะ) หน้าเลย
+  // กระพริบ/โหลดใหม่ทั้งหน้า ให้ความรู้สึกเหมือนรีเฟรช — รวมเป็น route เดียวกันคง state
+  // ของ component ไว้ได้ระหว่างเปลี่ยนแค่ :id param
+  path: "operation/:id?",
   element: (
       <Suspense fallback={<div>Loading Operation...</div>}>
         <Operate />
       </Suspense>
   ),
   title: "Operation",
-},
-{
-  path: "operation/:id",    // ← เพิ่มอันนี้
-  element: (
-      <Suspense fallback={<div>Loading Operation...</div>}>
-        <Operate />
-      </Suspense>
-  ),
-  title: "Operation Detail",
 },
 
       {

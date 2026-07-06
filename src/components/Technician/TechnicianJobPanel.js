@@ -1,5 +1,5 @@
 /**
- * TechnicianJobPanel.jsx — v3
+ * TechnicianJobPanel.jsx — v4
  *
  * ฟีเจอร์:
  *   ✅ เอกสารประจำงาน 4 ชนิด (Service Report, ใบเสนอราคา, ใบวางบิล, ใบส่งมอบงาน)
@@ -7,6 +7,8 @@
  *   ✅ บันทึกสรุปงานเป็นข้อความ (workNote) พร้อม push activityLog
  *   ✅ ขอปิดงาน (เมื่อติ๊ก Service Report แล้ว) → รอแอดมินอนุมัติ
  *   ✅ ส่ง activityLog กลับไปที่ parent (Operation) เพื่อแอดมินเห็น real-time
+ *   ✅ CommentThread — คุยโต้ตอบกับแอดมิน/manager ได้ในตัว (เช่น "ขอใบเสนอราคางานนี้")
+ *      แยกจาก activityLog ที่เป็น log อัตโนมัติของระบบ ใช้งานได้แม้งานจะปิดไปแล้ว
  */
 
 import React, { useState, useRef, useCallback } from "react";
@@ -25,6 +27,7 @@ import {
   PictureAsPdf, Image, Article, InsertDriveFile,
   AttachFile, Delete, Download, TaskAlt, HourglassTop, NoteAdd,
   RequestQuote, ReceiptLong, AssignmentTurnedIn, Close, Cancel,
+  Send, Chat,
 } from "@mui/icons-material";
 
 // ─── Constants ────────────────────────────────────────────────────────
@@ -395,6 +398,74 @@ const WorkNoteEditor = ({ eventId, currentNote, onSave }) => {
   );
 };
 
+// ─── CommentThread ────────────────────────────────────────────────────
+// คุยโต้ตอบกับแอดมิน/manager (เช่น "ขอใบเสนอราคางานนี้") แยกจาก activityLog
+// ที่เป็น log อัตโนมัติของระบบ — myRole ใช้กำหนดว่าข้อความฝั่งไหนคือ "ของเรา" (จัดชิดขวา)
+const CommentThread = ({ comments = [], onSend, myRole }) => {
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const handleSend = async () => {
+    if (!message.trim() || sending) return;
+    setSending(true);
+    await onSend(message.trim());
+    setMessage("");
+    setSending(false);
+  };
+
+  const isMine = (c) => (myRole === "technician" ? c.role === "technician" : c.role !== "technician");
+
+  return (
+    <Box>
+      {comments.length > 0 && (
+        <Stack spacing={1} sx={{ mb: 1.5, maxHeight: 280, overflowY: "auto", pr: 0.5 }}>
+          {comments.map((c, i) => {
+            const mine = isMine(c);
+            return (
+              <Box key={i} sx={{ display: "flex", justifyContent: mine ? "flex-end" : "flex-start" }}>
+                <Box sx={{
+                  maxWidth: "82%", p: 1.25, borderRadius: 2,
+                  bgcolor: mine ? alpha("#3b82f6", 0.12) : alpha("#6b7280", 0.1),
+                  borderTopRightRadius: mine ? 4 : 2,
+                  borderTopLeftRadius: mine ? 2 : 4,
+                }}>
+                  <Stack direction="row" gap={0.75} alignItems="center" sx={{ mb: 0.25 }}>
+                    <Typography variant="caption" fontWeight={700} color={mine ? "#3b82f6" : "text.secondary"}>
+                      {c.userName || (c.role === "technician" ? "ช่าง" : "แอดมิน")}
+                    </Typography>
+                    <Typography variant="caption" color="text.disabled">
+                      · {moment(c.timestamp).locale("th").format("DD MMM HH:mm")}
+                    </Typography>
+                  </Stack>
+                  <Typography variant="body2" sx={{ whiteSpace: "pre-line", wordBreak: "break-word" }}>
+                    {c.message}
+                  </Typography>
+                </Box>
+              </Box>
+            );
+          })}
+        </Stack>
+      )}
+      <Stack direction="row" gap={1} alignItems="flex-end">
+        <TextField
+          fullWidth size="small" multiline maxRows={4}
+          placeholder="พิมพ์ข้อความถึงแอดมิน เช่น ขอใบเสนอราคางานนี้..."
+          value={message}
+          onChange={e => setMessage(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+          sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: "0.85rem" } }}
+        />
+        <IconButton
+          onClick={handleSend}
+          disabled={!message.trim() || sending}
+          sx={{ border: "1px solid", borderColor: "primary.main", borderRadius: 2, color: "primary.main", flexShrink: 0 }}>
+          <Send sx={{ fontSize: 18 }} />
+        </IconButton>
+      </Stack>
+    </Box>
+  );
+};
+
 // ─── Main: TechnicianJobCard ──────────────────────────────────────────
 const TechnicianJobCard = ({
   event,
@@ -500,6 +571,19 @@ const TechnicianJobCard = ({
   const handleSaveNote = async (eventId, note) => {
     await onInputUpdate(eventId, { workNote: note });
     await pushLog("note_saved", note.slice(0, 80) + (note.length > 80 ? "…" : ""));
+  };
+
+  // ── Send Comment (คุยกับแอดมิน เช่น "ขอใบเสนอราคางานนี้") ───────────
+  // ทำงานได้แม้งานจะปิดแล้ว (isLocked) เพราะ backend อนุญาตให้ comment-only update ผ่านได้เสมอ
+  const handleSendComment = async (message) => {
+    const newComment = {
+      userId: payload?.userId || "",
+      userName,
+      role: payload?.role || "technician",
+      message,
+      timestamp: new Date().toISOString(),
+    };
+    await onInputUpdate(event._id, { comments: [...(event.comments || []), newComment] });
   };
 
   const statusColor = OP_COLOR[event.status] || "#6b7280";
@@ -696,6 +780,16 @@ const TechnicianJobCard = ({
                 currentNote={event.workNote}
                 onSave={handleSaveNote}
               />
+            </Box>
+
+            {/* คุยกับแอดมิน (เช่น ขอใบเสนอราคางานนี้) */}
+            <Box>
+              <Divider sx={{ mb: 1.5 }} />
+              <Typography variant="caption" fontWeight={700} color="text.secondary"
+                sx={{ textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 0.5, mb: 1 }}>
+                <Chat sx={{ fontSize: 14 }} /> คุยกับแอดมิน{(event.comments || []).length > 0 && ` (${event.comments.length})`}
+              </Typography>
+              <CommentThread comments={event.comments} onSend={handleSendComment} myRole="technician" />
             </Box>
 
             {/* ActivityLog mini (ของช่างเอง) */}
