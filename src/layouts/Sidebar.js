@@ -54,6 +54,13 @@ const Sidebar = ({ handleMenuClick }) => {
     { title: "งานของฉัน", href: "/technician/jobs", icon: "bi-tools" },
   ];
 
+  // ✅ เดิม submenu จะปิดเสมอตอนโหลดหน้าใหม่ ต่อให้กำลังอยู่ในหน้าลูกของมันอยู่ก็ตาม
+  // (เช่น เข้า /operation ตรงๆ จาก Dashboard) ทำให้มองไม่ออกเลยว่าอยู่หมวดไหน — ใช้ route
+  // เป็นค่าเริ่มต้นแทน จนกว่าผู้ใช้จะกดเปิด/ปิดเองจึงค่อยยึดตามที่กดล่าสุด
+  const isParentActive = (navi) => navi.items?.some((item) => location.pathname === item.href);
+  const isMenuOpen = (navi, index) =>
+    collapsedMenu[index] !== undefined ? collapsedMenu[index] : isParentActive(navi);
+
   const toggleNavbar = (index) => {
     setCollapsedMenu({
       ...collapsedMenu,
@@ -127,14 +134,14 @@ const Sidebar = ({ handleMenuClick }) => {
               {navi.items ? (
                 <>
                   <button
-                    className={`nav-link menu-dropdown-btn ${collapsedMenu[index] ? "expanded" : ""}`}
+                    className={`nav-link menu-dropdown-btn ${isMenuOpen(navi, index) ? "expanded" : ""} ${isParentActive(navi) ? "parent-active" : ""}`}
                     onClick={() => toggleNavbar(index)}
                   >
                     <i className={`bi ${navi.icon} nav-icon`}></i>
                     <span className="nav-text">{navi.title}</span>
-                    <i className={`bi bi-chevron-right arrow-icon ${collapsedMenu[index] ? "rotate" : ""}`}></i>
+                    <i className={`bi bi-chevron-right arrow-icon ${isMenuOpen(navi, index) ? "rotate" : ""}`}></i>
                   </button>
-                  <Collapse isOpen={collapsedMenu[index]}>
+                  <Collapse isOpen={isMenuOpen(navi, index)}>
                     <div className="submenu-wrapper">
                       {navi.items.map((item, idx) => (
                         <Link

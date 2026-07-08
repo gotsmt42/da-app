@@ -37,9 +37,6 @@
     background-color: #f8fafc; /* เติมสีพื้นหลังให้อ่อนโยนสบายตา */
   }
 
-  .mobile-toggle-bar {
-    display: none !important; /* ซ่อนแถบเปิดปิดบนจอคอม */
-  }
 }
 
 /* --------------------------------------------------------------------------
@@ -48,25 +45,6 @@
 @media (max-width: 992px) {
   .pageWrapper {
     flex-direction: column; /* เปลี่ยนทิศทางโครงสร้างหลักบนมือถือ */
-  }
-
-  /* แถบหัวข้อมินิบนมือถือ */
-  .mobile-toggle-bar {
-    display: flex;
-    align-items: center;
-    background-color: #ffffff;
-    padding: 10px 15px;
-    border-bottom: 1px solid #e2e8f0;
-    position: sticky;
-    top: 0;
-    z-index: 999;
-  }
-
-  .mobile-page-title {
-    font-weight: 700;
-    font-size: 16px;
-    margin-left: 10px;
-    color: #1e293b;
   }
 
   /* จัดการ Sidebar บนมือถือให้เป็นแบบสไลด์ซ่อน-แสดง (Off-Canvas) */
@@ -134,15 +112,5 @@
   }
 }
 
-/* --------------------------------------------------------------------------
-   FOOTER
-   -------------------------------------------------------------------------- */
-.footer {
-  margin-top: auto;
-  flex-shrink: 0;
-  width: 100%;
-  background-color: #f8f9fa;
-  padding: 1rem;
-  text-align: center;
-  box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.05);
-}
+/* ✅ ย้ายสไตล์ Footer ไปที่ Footer.css ของตัวเองแล้ว (เดิมกฎ .footer ตรงนี้ไม่เคยถูกใช้จริง
+   เพราะ Footer.js ไม่ได้รับ/ใช้ prop className ที่ FullLayout.js ส่งมาให้เลย) */

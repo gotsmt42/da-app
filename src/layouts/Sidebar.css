@@ -8,7 +8,9 @@
   --bg-hover: #334155;        /* Slate 700 */
   --text-main: #f8fafc;       /* Slate 50 */
   --text-muted: #94a3b8;      /* Slate 400 */
-  --accent-color: #0ea5e9;    /* Sky 500 (ฟ้านีออนพรีเมียม) */
+  /* ✅ อิงสีธีมจากโลโก้บริษัท (เฟือง+ตัวอักษรสีแดง) แทนฟ้าเดิม ให้ทั้งแอปเป็นแบรนด์เดียวกัน */
+  --accent-color: #dc2626;    /* Red 600 (สีแดงจากโลโก้) */
+  --accent-color-dark: #7f1d1d; /* Red 900 สำหรับไล่เฉด */
   --danger-color: #f87171;    /* Red 400 */
   --sidebar-width: 260px;
   --transition-speed: 0.3s;
@@ -42,7 +44,7 @@
 
 .profile-img {
   border: 2px solid var(--accent-color);
-  box-shadow: 0 0 15px rgba(14, 165, 233, 0.3);
+  box-shadow: 0 0 15px rgba(220, 38, 38, 0.3);
   object-fit: cover;
   transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
@@ -59,7 +61,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, var(--accent-color) 0%, #0284c7 100%);
+  background: linear-gradient(135deg, var(--accent-color) 0%, var(--accent-color-dark) 100%);
   color: #fff;
   font-weight: 700;
   font-size: 18px;
@@ -80,7 +82,7 @@
   font-weight: 700;
   letter-spacing: 0.5px;
   color: var(--accent-color);
-  background-color: rgba(14, 165, 233, 0.1);
+  background-color: rgba(220, 38, 38, 0.1);
   padding: 2px 8px;
   border-radius: 4px;
   margin-top: 4px;
@@ -126,9 +128,15 @@
 /* สถานะ Active */
 .sidebar-container .nav-link.active {
   color: #ffffff !important;
-  background: linear-gradient(135deg, var(--accent-color) 0%, #0284c7 100%) !important;
+  background: linear-gradient(135deg, var(--accent-color) 0%, var(--accent-color-dark) 100%) !important;
   font-weight: 600;
-  box-shadow: 0 4px 15px rgba(14, 165, 233, 0.3);
+  box-shadow: 0 4px 15px rgba(220, 38, 38, 0.3);
+}
+
+/* ✅ หมวดแม่ (เช่น "แผนงาน") ที่มีลูกกำลัง active อยู่ — เดิมไม่มีทางรู้เลยว่าอยู่หมวดไหน
+   ถ้า submenu ถูกกดปิดไว้ ให้ติดสีแดงจางๆ บอกใบ้โดยไม่แย่งซีน active pill ของลูก */
+.sidebar-container button.menu-dropdown-btn.parent-active {
+  color: var(--accent-color) !important;
 }
 
 /* ไอคอนหน้าเมนู */

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import AuthService from "../services/authService";
 import EventService from "../services/EventService";
 import { useAuth } from "../auth/AuthContext";
@@ -19,15 +19,14 @@ import {
 } from "reactstrap";
 import { swalLogout } from "../functions/user";
 import Swal from "sweetalert2";
-import { FaBars, FaBell, FaBellSlash } from "react-icons/fa";
-import PushService from "../services/PushService";
+import { FaBars } from "react-icons/fa";
 
 const Header = ({ toggleMobileSidebar }) => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const isActive = (path) => location.pathname === path || location.pathname.startsWith(`${path}/`);
   const [user, setUser] = useState({});
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [pushSubscribed, setPushSubscribed] = useState(false);
-  const [pushLoading, setPushLoading] = useState(false);
 
   // ✅ ดึง events เองที่นี่ (แยกจากหน้า Operation) เพื่อให้กระดิ่งแจ้งเตือนเห็นได้ทุกหน้า
   // ไม่ใช่แค่ตอนเปิดหน้า Operation ค้างไว้เท่านั้น — poll ทุก 30s เหมือนหน้าอื่นๆ ในระบบ
@@ -64,39 +63,11 @@ const Header = ({ toggleMobileSidebar }) => {
     getUserData();
     fetchEventsForNotifications();
 
-    if (PushService.isSupported()) {
-      PushService.isSubscribed().then(setPushSubscribed);
-    }
-
     const interval = setInterval(fetchEventsForNotifications, 30000);
     return () => clearInterval(interval);
   }, []);
 
   const toggle = () => setDropdownOpen((prevState) => !prevState);
-
-  // ✅ เปิด/ปิดการแจ้งเตือนผ่านมือถือ/เบราว์เซอร์ (ใช้ได้ทั้งช่างและแอดมิน)
-  const handleTogglePush = async () => {
-    if (!PushService.isSupported()) {
-      Swal.fire("อุปกรณ์นี้ไม่รองรับ", "เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือนแบบ Push", "warning");
-      return;
-    }
-    setPushLoading(true);
-    try {
-      if (pushSubscribed) {
-        await PushService.unsubscribe();
-        setPushSubscribed(false);
-        Swal.fire({ title: "ปิดการแจ้งเตือนแล้ว", icon: "success", timer: 1200, showConfirmButton: false });
-      } else {
-        await PushService.subscribe();
-        setPushSubscribed(true);
-        Swal.fire({ title: "เปิดการแจ้งเตือนแล้ว 🔔", icon: "success", timer: 1200, showConfirmButton: false });
-      }
-    } catch (error) {
-      Swal.fire("ทำรายการไม่สำเร็จ", error.message || "กรุณาลองใหม่อีกครั้ง", "error");
-    } finally {
-      setPushLoading(false);
-    }
-  };
 
   const handleLogout = async () => {
     const result = await swalLogout();
@@ -122,37 +93,28 @@ const Header = ({ toggleMobileSidebar }) => {
         {/* ตรงกลาง: รายการเมนูลิงก์ */}
         <Nav className="navbar-nav mx-auto d-none d-lg-flex" navbar>
           <NavItem>
-            <Link to="/dashboard" className="nav-link">Dashboard</Link>
+            <Link to="/dashboard" className={`nav-link ${isActive("/dashboard") ? "active" : ""}`}>Dashboard</Link>
           </NavItem>
           <NavItem>
-            <Link to="/event" className="nav-link">Event</Link>
+            <Link to="/event" className={`nav-link ${isActive("/event") ? "active" : ""}`}>Event</Link>
           </NavItem>
           <NavItem>
-            <Link to="/files" className="nav-link">เอกสารทั้งหมด</Link>
+            <Link to="/files" className={`nav-link ${isActive("/files") ? "active" : ""}`}>เอกสารทั้งหมด</Link>
           </NavItem>
           {/* ✅ เดิม comment ทิ้งไว้ — ช่างไม่มีทางกดเข้า "งานของฉัน" จาก Header ได้เลย */}
           {isTechnician && (
             <NavItem>
-              <Link to="/technician/jobs" className="nav-link">งานของฉัน</Link>
+              <Link to="/technician/jobs" className={`nav-link ${isActive("/technician") ? "active" : ""}`}>งานของฉัน</Link>
             </NavItem>
           )}
         </Nav>
 
-        {/* ฝั่งขวา: แจ้งเตือน + push toggle + รูปโปรไฟล์ผู้ใช้งาน + ปุ่มแฮมเบอร์เกอร์ */}
+        {/* ฝั่งขวา: แจ้งเตือน + รูปโปรไฟล์ผู้ใช้งาน + ปุ่มแฮมเบอร์เกอร์ */}
+        {/* ✅ ปุ่มเปิด/ปิด push notification ย้ายไปอยู่ที่หน้า Settings แล้ว (เดิมมีทั้งที่นี่และ
+            ที่ Settings ทำให้สับสนว่าอันไหนคือจุดควบคุมจริง) */}
         <div className="d-flex align-items-center gap-2">
           <NotificationBell notifications={notifications} unread={unread} onItemClick={markRead} dark />
 
-          <Button
-            color="transparent"
-            onClick={handleTogglePush}
-            disabled={pushLoading}
-            title={pushSubscribed ? "ปิดการแจ้งเตือน" : "เปิดการแจ้งเตือนบนมือถือ"}
-            style={{ padding: "6px", border: "none" }}
-          >
-            {pushSubscribed
-              ? <FaBell style={{ fontSize: "20px", color: "#facc15" }} />
-              : <FaBellSlash style={{ fontSize: "20px", color: "#94a3b8" }} />}
-          </Button>
           <div className="profile-img">
             <Dropdown isOpen={dropdownOpen} toggle={toggle}>
               <DropdownToggle color="transparent" style={{ padding: 0, border: 'none' }}>

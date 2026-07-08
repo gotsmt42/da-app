@@ -17,7 +17,7 @@ import "moment/locale/th";
 import {
   Box, Card, CardContent, Typography, Stack, Chip, Avatar,
   Button, IconButton, TextField, Collapse, Divider, LinearProgress,
-  Tooltip, ToggleButton, ToggleButtonGroup,
+  Tooltip, ToggleButton, ToggleButtonGroup, Menu, MenuItem, ListItemIcon, ListItemText,
 } from "@mui/material";
 import { styled, alpha } from "@mui/material/styles";
 import {
@@ -27,8 +27,20 @@ import {
   PictureAsPdf, Image, Article, InsertDriveFile,
   AttachFile, Delete, Download, TaskAlt, HourglassTop, NoteAdd,
   RequestQuote, ReceiptLong, AssignmentTurnedIn, Close, Cancel,
-  Send, Chat, Link as LinkIcon,
+  Send, Chat, Link as LinkIcon, MoreVert, Print, Share,
 } from "@mui/icons-material";
+import LineIcon from "../icons/LineIcon";
+import { printFile, shareFile, shareToLine, isMobileDevice } from "../../functions/fileActions";
+
+// ✅ ใช้ตัดสินใจลำดับปุ่มแชร์ในเมนู "⋮" ต่อไฟล์ (ดูเหตุผลใน fileActions.js)
+const IS_MOBILE = isMobileDevice();
+
+// ✅ เดิม MUI Menu เปิดช้า/รู้สึกหน่วง เพราะ transition คำนวณตามความสูงเมนู (auto) และมีการ
+// ล็อกสกรอลของหน้าทุกครั้งที่เปิด — ลด duration ลงคงที่ + ปิด scroll lock ให้ลื่นขึ้น
+const FAST_MENU_PROPS = {
+  transitionDuration: { enter: 120, exit: 80 },
+  disableScrollLock: true,
+};
 
 // ─── Constants ────────────────────────────────────────────────────────
 const OP_COLOR = {
@@ -141,6 +153,11 @@ const DocumentFileList = ({ type, files, isUploading, uploadProgress, onFileUplo
   const fileRef = useRef();
   const fileList = files || [];
 
+  // ✅ เมนู "⋮" ต่อไฟล์ — เดิมโชว์ปุ่มดู/ดาวน์โหลด/ลบ เรียงเป็นไอคอนแยกทุกแถว ดูรกเวลามีหลายไฟล์
+  // รวมเป็นเมนูเดียว เหลือแค่ปุ่มดูไฟล์ (บ่อยสุด) + ปุ่ม "⋮" ที่มีดาวน์โหลด/พิมพ์/แชร์ LINE/ลบ
+  const [fileMenu, setFileMenu] = useState(null); // { el, file }
+  const closeFileMenu = () => setFileMenu(null);
+
   const handleFileChange = (e) => {
     if (e.target.files?.length) onFileUpload(e.target.files, type);
   };
@@ -154,7 +171,8 @@ const DocumentFileList = ({ type, files, isUploading, uploadProgress, onFileUplo
               p: 1, borderRadius: 1.5, bgcolor: alpha("#6b7280", 0.06),
             }}>
               {fileTypeIcon(f.fileName)}
-              <Typography variant="caption" color="text.secondary" noWrap flex={1} sx={{ fontSize: "0.8rem" }}>
+              <Typography variant="caption" color="text.secondary" noWrap flex={1} sx={{ fontSize: "0.8rem" }}
+                onClick={() => onPreview(f.fileUrl, f.fileName)} style={{ cursor: "pointer" }}>
                 {f.fileName}
               </Typography>
               <Tooltip title="ดูไฟล์">
@@ -162,22 +180,61 @@ const DocumentFileList = ({ type, files, isUploading, uploadProgress, onFileUplo
                   <Visibility sx={{ fontSize: 18 }} />
                 </IconButton>
               </Tooltip>
-              <Tooltip title="ดาวน์โหลด">
-                <IconButton onClick={() => downloadFile(f.fileUrl, f.fileName)} sx={{ p: 1 }}>
-                  <Download sx={{ fontSize: 18 }} />
+              <Tooltip title="เพิ่มเติม">
+                <IconButton onClick={e => setFileMenu({ el: e.currentTarget, file: f })} sx={{ p: 1 }}>
+                  <MoreVert sx={{ fontSize: 18 }} />
                 </IconButton>
               </Tooltip>
-              {!isLocked && (
-                <Tooltip title="ลบไฟล์">
-                  <IconButton color="error" onClick={() => onDeleteFile(type, f._id)} sx={{ p: 1 }}>
-                    <Delete sx={{ fontSize: 18 }} />
-                  </IconButton>
-                </Tooltip>
-              )}
             </Stack>
           ))}
         </Stack>
       )}
+
+      {/* เมนู "⋮" ต่อไฟล์ — ดาวน์โหลด/พิมพ์/แชร์ LINE/แชร์อื่น/ลบ รวมไว้ที่เดียว */}
+      <Menu {...FAST_MENU_PROPS} anchorEl={fileMenu?.el} open={Boolean(fileMenu)} onClose={closeFileMenu}
+        PaperProps={{ sx: { borderRadius: 2, boxShadow: "0 8px 32px rgba(0,0,0,0.12)" } }}>
+        <MenuItem onClick={() => { downloadFile(fileMenu.file.fileUrl, fileMenu.file.fileName); closeFileMenu(); }} sx={{ gap: 1.5, minHeight: 44 }}>
+          <ListItemIcon><Download fontSize="small" /></ListItemIcon>
+          <ListItemText>ดาวน์โหลด</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => { printFile(fileMenu.file.fileUrl, fileMenu.file.fileName); closeFileMenu(); }} sx={{ gap: 1.5, minHeight: 44 }}>
+          <ListItemIcon><Print fontSize="small" /></ListItemIcon>
+          <ListItemText>พิมพ์</ListItemText>
+        </MenuItem>
+        {/* ✅ LINE เดสก์ท็อปไม่ลงทะเบียนเป็น Share Target ของ OS จึงไม่มีทางโผล่ในแผง Share ของ
+            Windows/Mac ได้เลย (ที่ shareFile() เรียกผ่าน navigator.share) — สลับให้ปุ่มที่
+            การันตีว่าเข้าถึง LINE ได้จริงขึ้นก่อนตามชนิดอุปกรณ์ */}
+        {IS_MOBILE ? (
+          <>
+            <MenuItem onClick={() => { shareFile(fileMenu.file.fileUrl, fileMenu.file.fileName); closeFileMenu(); }} sx={{ gap: 1.5, minHeight: 44 }}>
+              <ListItemIcon><Share fontSize="small" /></ListItemIcon>
+              <ListItemText>แชร์ไฟล์ (รูป/PDF)</ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => { shareToLine(fileMenu.file.fileUrl, fileMenu.file.fileName); closeFileMenu(); }} sx={{ gap: 1.5, minHeight: 44 }}>
+              <ListItemIcon><LineIcon size={20} /></ListItemIcon>
+              <ListItemText>แชร์ลิงก์ไปยัง LINE</ListItemText>
+            </MenuItem>
+          </>
+        ) : (
+          <>
+            <MenuItem onClick={() => { shareToLine(fileMenu.file.fileUrl, fileMenu.file.fileName); closeFileMenu(); }} sx={{ gap: 1.5, minHeight: 44 }}>
+              <ListItemIcon><LineIcon size={20} /></ListItemIcon>
+              <ListItemText>แชร์ไปยัง LINE</ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => { shareFile(fileMenu.file.fileUrl, fileMenu.file.fileName); closeFileMenu(); }} sx={{ gap: 1.5, minHeight: 44 }}>
+              <ListItemIcon><Share fontSize="small" /></ListItemIcon>
+              <ListItemText>แชร์ไฟล์ผ่านระบบ (ไม่รวม LINE บนคอม)</ListItemText>
+            </MenuItem>
+          </>
+        )}
+        {!isLocked && [
+          <Divider key="file-menu-divider" />,
+          <MenuItem key="file-menu-delete" onClick={() => { onDeleteFile(type, fileMenu.file._id); closeFileMenu(); }} sx={{ gap: 1.5, minHeight: 44, color: "error.main" }}>
+            <ListItemIcon><Delete fontSize="small" color="error" /></ListItemIcon>
+            <ListItemText>ลบไฟล์</ListItemText>
+          </MenuItem>,
+        ]}
+      </Menu>
 
       {isLocked ? null : isUploading ? (
         <LinearProgress variant="determinate" value={uploadProgress || 0} sx={{ borderRadius: 2, height: 6 }} />
@@ -600,8 +657,12 @@ const TechnicianJobCard = ({
     <Wrapper>
       <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
 
-        {/* ── Header ── */}
-        <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={1.5}>
+        {/* ── Header — กดที่ไหนก็ได้บนแถวนี้เพื่อกาง/พับการ์ด ไม่ต้องเล็งกดลูกศรเล็กๆ อีกต่อไป ── */}
+        <Stack
+          direction="row" alignItems="flex-start" justifyContent="space-between" gap={1.5}
+          onClick={() => setExpanded(p => !p)}
+          sx={{ cursor: "pointer" }}
+        >
           <Stack direction="row" alignItems="flex-start" gap={1.5} flex={1} minWidth={0}>
             <Avatar sx={{
               width: 44, height: 44, flexShrink: 0,
@@ -631,7 +692,10 @@ const TechnicianJobCard = ({
                 )}
               </Stack>
               <Typography fontWeight={800} fontSize="0.95rem">
-                {event.company || "—"} · {event.site || "—"}
+                {/* ✅ เดิม `{company || "—"} · {site || "—"}` โชว์ "— · ไซต์" เป็นขีดลอยๆ เวลาช่องใดช่องหนึ่งว่าง */}
+                {event.company && event.site
+                  ? `${event.company} · ${event.site}`
+                  : (event.company || event.site || "ไม่ระบุบริษัท/ไซต์")}
               </Typography>
               <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
                 {/* ✅ วันที่เริ่ม-สิ้นสุด (event.end งาน allDay ถูก +1 วันตอนบันทึกไว้ ต้องลบคืนตอนแสดงผล) */}
@@ -646,8 +710,8 @@ const TechnicianJobCard = ({
               )}
             </Box>
           </Stack>
-          <IconButton onClick={() => setExpanded(p => !p)}
-            sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1 }}>
+          {/* ✅ ไม่มี onClick ของตัวเองแล้ว — แค่ไอคอนบอกสถานะ ตัวกดจริงคือทั้งแถว Header (คลิกบับเบิลขึ้นมาถึงเอง) */}
+          <IconButton sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: 1, pointerEvents: "none" }}>
             {expanded ? <ExpandLess /> : <ExpandMore />}
           </IconButton>
         </Stack>

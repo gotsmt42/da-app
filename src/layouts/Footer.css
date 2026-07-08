@@ -1,0 +1,43 @@
+/* ==========================================================================
+   Footer.css - แถบท้ายหน้าแบบมินิมอล อิงสีธีมแดงจากโลโก้บริษัท
+   ========================================================================== */
+
+/* ✅ margin-top: auto ให้เกาะติดขอบล่างเสมอใน .contentArea ที่เป็น flex column
+   (เดิม FullLayout.js ส่ง className="footer" มาแต่ Footer.js ไม่รับ prop นี้เลย
+   ทำให้กฎ CSS เดิมไม่เคยถูกใช้งานจริง — ตอนนี้ Footer จัดการคลาสของตัวเองแล้ว) */
+.app-footer {
+  margin-top: auto;
+  flex-shrink: 0;
+  width: 100%;
+  padding: 18px 16px 14px 16px;
+  text-align: center;
+  background-color: transparent;
+}
+
+.app-footer__divider {
+  width: 48px;
+  height: 3px;
+  margin: 0 auto 10px auto;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #dc2626 0%, #f87171 100%);
+  opacity: 0.7;
+}
+
+.app-footer__text {
+  margin: 0;
+  font-size: 11.5px;
+  color: #94a3b8;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+}
+
+.app-footer__version {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #dc2626;
+  background-color: rgba(220, 38, 38, 0.08);
+  border-radius: 8px;
+}

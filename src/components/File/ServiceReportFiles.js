@@ -287,7 +287,7 @@ const ServiceReportFiles = () => {
                       {f.fileName}
                     </Typography>
                     <Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block" }}>
-                      {f.company || "—"} · {f.site || "—"}
+                      {f.company && f.site ? `${f.company} · ${f.site}` : (f.company || f.site || "ไม่ระบุบริษัท/ไซต์")}
                       {f.docNo ? ` · 📄 ${f.docNo}` : ""}
                       {f.team ? ` · 👷 ${f.team}` : ""}
                     </Typography>

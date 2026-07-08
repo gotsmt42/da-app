@@ -8,7 +8,9 @@
       "Bash(curl -s http://localhost:5099/api/events/documents -H 'Authorization: Bearer __CMDSUB_OUTPUT__')",
       "Bash(taskkill //PID 13996 //F)",
       "Bash(curl -s http://localhost:5000/api/events/documents -H 'Authorization: Bearer __TRACKED_VAR__')",
-      "Bash(awk 'NR==2059,NR==2450' src/components/Operation/index.js)"
+      "Bash(awk 'NR==2059,NR==2450' src/components/Operation/index.js)",
+      "Bash(grep -iE \"^\\(jimp|sharp|pngjs|get-pixels|canvas\\)$\")",
+      "Bash(grep -n \"IconButton\\\\|<Button\\\\|onClick={.*[Dd]elete\\\\|handleDelete\\\\|onDelete\\\\|Delete /\\\\|<Delete\\\\|window.print\\\\|navigator.share\\\\|Share\\\\b\" \"C:\\\\Users\\\\Admin\\\\Desktop\\\\da-app\\\\src\\\\components\\\\Operation\\\\index.js\")"
     ]
   }
 }

@@ -5,8 +5,10 @@ import Header from "./Header";
 import { Container } from "reactstrap";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import Footer from "./Footer";
-import { FaArrowLeft } from "react-icons/fa"; 
+import { FaArrowLeft } from "react-icons/fa";
 import { IconButton } from "@mui/material";
+import Swal from "sweetalert2";
+import PushService from "../services/PushService";
 
 import "./FullLayout.css";
 
@@ -79,6 +81,43 @@ const FullLayout = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [lastScrollTop, isMobile]);
 
+  // ✅ ชวนเปิดการแจ้งเตือนแบบ Push ทุกครั้งที่เข้าแอพ ถ้ายังไม่เคยเปิดไว้ — เดิมมีแค่ปุ่ม
+  // เปิด/ปิดเงียบๆ ที่ Header ซึ่งผู้ใช้ส่วนใหญ่ไม่รู้ตัวว่ามันมีอยู่เลยไม่เคยกดเปิด ทำให้พลาด
+  // แจ้งเตือนงานสำคัญ — FullLayout mount แค่ครั้งเดียวต่อการเข้าแอพหนึ่งรอบ (ไม่ใช่ทุกครั้งที่
+  // เปลี่ยนหน้าใน SPA) จึงชวนซ้ำทุกครั้งที่เปิดแอพใหม่จนกว่าจะกดเปิดจริง โดยไม่เด้งซ้ำถ้า
+  // เบราว์เซอร์บล็อกไว้แล้ว (permission "denied") เพราะเด้งไปก็ไม่มีประโยชน์อะไร
+  useEffect(() => {
+    const promptEnablePush = async () => {
+      if (!PushService.isSupported()) return;
+      const permission = await PushService.getPermissionState();
+      if (permission === "denied") return;
+
+      const alreadySubscribed = await PushService.isSubscribed();
+      if (alreadySubscribed) return;
+
+      const result = await Swal.fire({
+        title: "เปิดการแจ้งเตือนไหม? 🔔",
+        text: "รับแจ้งเตือนงานใหม่ อนุมัติ/ไม่อนุมัติปิดงาน และข้อความถึงคุณทันที ไม่ต้องเปิดแอพค้างไว้",
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonText: "เปิดการแจ้งเตือน",
+        cancelButtonText: "ไว้ทีหลัง",
+        confirmButtonColor: "#dc2626",
+      });
+
+      if (result.isConfirmed) {
+        try {
+          await PushService.subscribe();
+          Swal.fire({ title: "เปิดการแจ้งเตือนแล้ว 🔔", icon: "success", timer: 1200, showConfirmButton: false });
+        } catch (error) {
+          Swal.fire("เปิดไม่สำเร็จ", error.message || "กรุณาลองใหม่อีกครั้ง", "error");
+        }
+      }
+    };
+
+    promptEnablePush();
+  }, []);
+
   const headerClass = isScrollingUp ? "stickyHeader" : "";
   const isDashboard = location.pathname === "/dashboard";
   
@@ -135,7 +174,7 @@ const FullLayout = () => {
             <SpeedInsights />
           </Container>
 
-          <Footer className="footer" />
+          <Footer />
         </div>
       </div>
     </main>

@@ -61,11 +61,11 @@ const ThemeRoutes = [
       {
         path: "about",
         element: (
-          <Suspense fallback={<div>Loading About...</div>}>
+          <Suspense fallback={<div>Loading Settings...</div>}>
             <About />
           </Suspense>
         ),
-        title: "About",
+        title: "Settings",
       },
       {
         path: "account",

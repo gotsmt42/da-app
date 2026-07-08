@@ -16,7 +16,9 @@ import {
   FaCommentDots,
   FaClipboardList,
   FaCog,
-  FaMapMarkerAlt
+  FaMapMarkerAlt,
+  FaCogs,
+  FaUserCog
 } from "react-icons/fa";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -110,19 +112,67 @@ const Dashboard = () => {
     { label: "เสร็จสิ้น", status: "ดำเนินการเสร็จสิ้น", count: countStatus("ดำเนินการเสร็จสิ้น") },
   ];
 
-  // 📅 งานวันนี้ (เทียบฟิลด์ date จริงของ CalendarEvent) เรียงตามเวลาเริ่ม
+  // 📅 งานวันนี้ — เดิมเทียบแค่ฟิลด์ date (=วันแรกที่สร้างงานเท่านั้น) ทำให้งานที่เริ่มเมื่อวาน
+  // แต่ยังดำเนินอยู่ข้ามมาถึงวันนี้ (multi-day event, date ปักหมุดไว้ที่วันแรกแต่ start/end ยาวกว่านั้น)
+  // ไม่ถูกนับว่าเป็น "งานวันนี้" เลย — ใช้ start/end ของช่วงงานจริงแทน (end เป็น exclusive
+  // ตามธรรมเนียม FullCalendar ของระบบนี้ คือวันสุดท้ายจริง + 1 วัน)
+  const getEventRange = (e) => {
+    const start = moment(e.start || e.date).startOf("day");
+    const end = e.end ? moment(e.end).startOf("day") : start.clone().add(1, "day");
+    return { start, end };
+  };
+
+  const today = moment().startOf("day");
   const todayJobs = events
-    .filter((e) => e.date && moment(e.date).isSame(moment(), "day"))
+    .filter((e) => {
+      if (!e.start && !e.date) return false;
+      const { start, end } = getEventRange(e);
+      return today.isSameOrAfter(start) && today.isBefore(end);
+    })
     .sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
+
+  // 👤 หาชื่อผู้รับผิดชอบงานจากรายชื่อพนักงานจริง (resPerson เก็บเป็น userId ไม่ใช่ชื่อ)
+  // fallback ไปที่ team ถ้าไม่มี resPerson หรือหาไม่เจอในรายชื่อ
+  const getAssignedName = (job) => {
+    if (job.resPerson) {
+      const u = users.find((u) => u._id === job.resPerson);
+      if (u) return `${u.fname || ""} ${u.lname || ""}`.trim() || u.username;
+    }
+    return job.team || null;
+  };
+
+  // 🧾 สรุปเอกสารแยกตามประเภท (docType มาจาก backend: report/quotation/invoice/completion)
+  const docTypeCounts = files.reduce((acc, f) => {
+    acc[f.docType] = (acc[f.docType] || 0) + 1;
+    return acc;
+  }, {});
+  const docTypeItems = [
+    { key: "report", label: "Service Report", color: "#3b82f6", bg: "#dbeafe" },
+    { key: "quotation", label: "ใบเสนอราคา", color: "#f59e0b", bg: "#ffedd5" },
+    { key: "invoice", label: "ใบวางบิล", color: "#a78bfa", bg: "#ede9fe" },
+    { key: "completion", label: "ใบส่งมอบงาน", color: "#10b981", bg: "#d1fae5" },
+  ];
+
+  // 👥 ภาพรวมทีมงานแยกตามสิทธิ์ (เฉพาะแอดมิน)
+  const roleCounts = users.reduce((acc, u) => {
+    const r = (u.role || "other").toLowerCase();
+    acc[r] = (acc[r] || 0) + 1;
+    return acc;
+  }, {});
+  const teamItems = [
+    { key: "technician", label: "ช่างเทคนิค", color: "#0891b2" },
+    { key: "admin", label: "ผู้ดูแลระบบ", color: "#dc2626" },
+    { key: "manager", label: "ผู้จัดการ", color: "#f59e0b" },
+  ];
 
   // 🚀 ทางลัดแบบไอคอน (คล้ายหน้าจอโฮมของแอปมือถือ) ปรับตามสิทธิ์ผู้ใช้
   const quickActions = [
-    { title: "ปฏิทิน", icon: <FaCalendarAlt size={20} />, link: "/event", color: "#4f46e5" },
-    { title: "การดำเนินงาน", icon: <FaWrench size={20} />, link: "/operation", color: "#6366f1" },
+    { title: "แผนงานทั้งหมด", icon: <FaCalendarAlt size={20} />, link: "/event", color: "#dc2626" },
+    { title: "การดำเนินงาน", icon: <FaWrench size={20} />, link: "/operation", color: "#b91c1c" },
     { title: "เอกสารทั้งหมด", icon: <FaFileAlt size={20} />, link: "/files", color: "#475569", badge: files.length },
-    ...(isTechnician ? [{ title: "งานของฉัน", icon: <FaClipboardList size={20} />, link: "/technician/jobs", color: "#0ea5e9" }] : []),
+    ...(isTechnician ? [{ title: "งานของฉัน", icon: <FaClipboardList size={20} />, link: "/technician/jobs", color: "#0891b2" }] : []),
     ...(isAdmin ? [
-      { title: "ลูกค้า", icon: <FaBuilding size={20} />, link: "/customer", color: "#3b82f6", badge: customers.length },
+      { title: "รายชื่อลูกค้าทั้งหมด", icon: <FaBuilding size={20} />, link: "/customer", color: "#3b82f6", badge: customers.length },
       { title: "พนักงาน", icon: <FaUsers size={20} />, link: "/employee", color: "#f43f5e", badge: users.length },
       { title: "ตั้งค่า", icon: <FaCog size={20} />, link: "/about", color: "#64748b" },
     ] : []),
@@ -170,22 +220,20 @@ const Dashboard = () => {
         <FaArrowRight size={13} className="arrow-bounce" style={{ opacity: 0.8, flexShrink: 0 }} />
       </div>
 
-      {/* ─── SECTION 3: QUICK STATS GRID ─── */}
+      {/* ─── SECTION 3: QUICK STATS STRIP (ลดความเด่นลง เอาไว้แค่ให้เห็นภาพรวมเร็วๆ) ─── */}
       <h5 style={styles.sectionTitle}>สรุปสถานะงาน</h5>
-      <div style={styles.statsGrid}>
+      <div style={styles.statsStrip} onClick={() => navigate("/operation")} className="metric-card-hover">
         {statItems.map((item, i) => {
           const meta = getStatusMeta(item.status);
           return (
-            <div key={i} style={styles.statCard} className="metric-card-hover" onClick={() => navigate("/operation")}>
-              <div style={{ ...styles.statIconCircle, backgroundColor: meta.bg, color: meta.color }}>
-                {meta.icon}
-              </div>
+            <div key={i} style={{ ...styles.statSegment, borderLeft: i === 0 ? "none" : "1px solid #eef1f5" }}>
+              <span style={{ ...styles.statDot, backgroundColor: meta.color }} />
               {loading ? (
-                <span style={styles.skeletonBlock} className="skeleton-pulse" />
+                <span style={styles.skeletonInline} className="skeleton-pulse" />
               ) : (
-                <span style={styles.statNumber}>{item.count}</span>
+                <span style={styles.statNumberSm}>{item.count}</span>
               )}
-              <span style={styles.statLabel}>{item.label}</span>
+              <span style={styles.statLabelSm}>{item.label}</span>
             </div>
           );
         })}
@@ -213,6 +261,7 @@ const Dashboard = () => {
         <div style={styles.todayScrollRow}>
           {todayJobs.map((job) => {
             const meta = getStatusMeta(job.status);
+            const assignedName = getAssignedName(job);
             return (
               <div
                 key={job._id}
@@ -229,11 +278,24 @@ const Dashboard = () => {
                     {job.status}
                   </span>
                 </div>
+                {job.docNo && <span style={styles.todayJobDocNo}>#{job.docNo}</span>}
                 <h4 style={styles.todayJobTitle}>{job.title || job.company}</h4>
                 <p style={styles.todayJobSite}>
                   <FaMapMarkerAlt size={10} style={{ marginRight: "4px", opacity: 0.6 }} />
                   {job.company} · {job.site}
                 </p>
+                {job.system && (
+                  <p style={styles.todayJobDetail}>
+                    <FaCogs size={10} style={{ marginRight: "4px", opacity: 0.6 }} />
+                    {job.system}
+                  </p>
+                )}
+                {assignedName && (
+                  <p style={styles.todayJobDetail}>
+                    <FaUserCog size={10} style={{ marginRight: "4px", opacity: 0.6 }} />
+                    {assignedName}
+                  </p>
+                )}
               </div>
             );
           })}
@@ -299,6 +361,40 @@ const Dashboard = () => {
           </Link>
         ))}
       </div>
+
+      {/* ─── SECTION 7: DOCUMENT SUMMARY (สรุปเอกสารแยกตามประเภทจริงจาก Operation) ─── */}
+      <h5 style={{ ...styles.sectionTitle, marginTop: "18px" }}>เอกสารแยกตามประเภท</h5>
+      <div style={styles.docSummaryGrid}>
+        {docTypeItems.map((item) => (
+          <Link key={item.key} to="/files" style={{ textDecoration: "none" }}>
+            <div style={{ ...styles.docChip, backgroundColor: item.bg }} className="metric-card-hover">
+              <span style={{ ...styles.docChipCount, color: item.color }}>
+                {loading ? "…" : (docTypeCounts[item.key] || 0)}
+              </span>
+              <span style={{ ...styles.docChipLabel, color: item.color }}>{item.label}</span>
+            </div>
+          </Link>
+        ))}
+      </div>
+
+      {/* ─── SECTION 8: TEAM OVERVIEW (เฉพาะแอดมิน) ─── */}
+      {isAdmin && (
+        <>
+          <h5 style={styles.sectionTitle}>ภาพรวมทีมงาน</h5>
+          <div style={styles.notiCard}>
+            <div style={styles.teamRow}>
+              {teamItems.map((item) => (
+                <div key={item.key} style={styles.teamChip}>
+                  <span style={{ ...styles.teamChipCount, color: item.color }}>
+                    {loading ? "…" : (roleCounts[item.key] || 0)}
+                  </span>
+                  <span style={styles.teamChipLabel}>{item.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* ─── INTERACTIVE EFFECTS FOR MOBILE ─── */}
       <style>{`
@@ -371,21 +467,21 @@ const styles = {
     width: "38px",
     height: "38px",
     borderRadius: "50%",
-    backgroundColor: "#4f46e5",
+    background: "linear-gradient(135deg, #ef4444 0%, #7f1d1d 100%)",
     color: "#ffffff",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     fontWeight: "700",
     fontSize: "15px",
-    boxShadow: "0 2px 8px rgba(79, 70, 229, 0.25)"
+    boxShadow: "0 2px 8px rgba(220, 38, 38, 0.25)"
   },
   avatarImg: {
     width: "38px",
     height: "38px",
     borderRadius: "50%",
     objectFit: "cover",
-    boxShadow: "0 2px 8px rgba(79, 70, 229, 0.25)"
+    boxShadow: "0 2px 8px rgba(220, 38, 38, 0.25)"
   },
   welcomeTitle: {
     fontSize: "18px",
@@ -446,13 +542,13 @@ const styles = {
   /* 🌟 CTA banner แบบกระชับ (ไม่ฝังสถิติแล้ว ย้ายไป Quick Stats แยกเป็นสัดส่วน) */
   ctaBanner: {
     width: "100%",
-    background: "linear-gradient(135deg, #4f46e5 0%, #2e2894 100%)",
+    background: "linear-gradient(135deg, #ef4444 0%, #7f1d1d 100%)",
     color: "#ffffff",
     border: "none",
     borderRadius: "18px",
     padding: "16px",
     cursor: "pointer",
-    boxShadow: "0 12px 24px -8px rgba(79, 70, 229, 0.4)",
+    boxShadow: "0 12px 24px -8px rgba(220, 38, 38, 0.35)",
     marginBottom: "20px",
     display: "flex",
     alignItems: "center",
@@ -482,49 +578,47 @@ const styles = {
     lineHeight: "1.3",
   },
 
-  /* 📊 Quick Stats Grid — การ์ดสถิติจริงแยกเป็นสัดส่วน แทนแถบเล็กในปุ่มเดิม */
-  statsGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(4, 1fr)",
-    gap: "8px",
-    marginBottom: "20px",
-  },
-  statCard: {
+  /* 📊 Quick Stats Strip — แถบบางเดียว ลดความเด่นลงจากการ์ดใหญ่แยกชิ้นเดิม แค่ให้เห็นภาพรวมเร็วๆ */
+  statsStrip: {
+    display: "flex",
     backgroundColor: "#ffffff",
-    borderRadius: "14px",
-    border: "1px solid #e2e8f0",
-    padding: "12px 6px",
+    borderRadius: "12px",
+    border: "1px solid #eef1f5",
+    padding: "10px 4px",
+    marginBottom: "20px",
+    cursor: "pointer",
+  },
+  statSegment: {
+    flex: 1,
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    gap: "6px",
-    boxShadow: "0 2px 4px rgba(0,0,0,0.015)",
+    gap: "3px",
+    padding: "0 4px",
   },
-  statIconCircle: {
-    width: "28px",
-    height: "28px",
+  statDot: {
+    width: "6px",
+    height: "6px",
     borderRadius: "50%",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
+    marginBottom: "1px",
   },
-  statNumber: {
-    fontSize: "17px",
-    fontWeight: "800",
-    color: "#0f172a",
+  statNumberSm: {
+    fontSize: "14px",
+    fontWeight: "700",
+    color: "#334155",
     lineHeight: 1,
   },
-  statLabel: {
-    fontSize: "10px",
-    fontWeight: "600",
-    color: "#64748b",
+  statLabelSm: {
+    fontSize: "9.5px",
+    fontWeight: "500",
+    color: "#94a3b8",
     textAlign: "center",
   },
-  skeletonBlock: {
+  skeletonInline: {
     display: "inline-block",
-    width: "24px",
-    height: "17px",
-    borderRadius: "4px",
+    width: "18px",
+    height: "13px",
+    borderRadius: "3px",
     backgroundColor: "#e2e8f0",
   },
   skeletonPulseBg: {
@@ -542,8 +636,8 @@ const styles = {
     scrollSnapType: "x mandatory",
   },
   todayJobCard: {
-    minWidth: "220px",
-    maxWidth: "220px",
+    minWidth: "240px",
+    maxWidth: "240px",
     backgroundColor: "#ffffff",
     borderRadius: "14px",
     border: "1px solid #e2e8f0",
@@ -552,6 +646,13 @@ const styles = {
     flexShrink: 0,
     scrollSnapAlign: "start",
     minHeight: "88px",
+  },
+  todayJobDocNo: {
+    display: "inline-block",
+    fontSize: "9px",
+    fontWeight: "700",
+    color: "#dc2626",
+    marginTop: "6px",
   },
   todayJobTime: {
     fontSize: "10.5px",
@@ -586,10 +687,20 @@ const styles = {
     overflow: "hidden",
     textOverflow: "ellipsis",
   },
+  todayJobDetail: {
+    fontSize: "10.5px",
+    color: "#94a3b8",
+    margin: "3px 0 0 0",
+    display: "flex",
+    alignItems: "center",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
   viewAllLink: {
     fontSize: "11px",
     fontWeight: "600",
-    color: "#4f46e5",
+    color: "#dc2626",
     textDecoration: "none",
     display: "flex",
     alignItems: "center",
@@ -725,6 +836,53 @@ const styles = {
     fontWeight: "600",
     color: "#334155",
     textAlign: "center",
+  },
+
+  /* 🧾 Document Summary — สรุปเอกสารแยกตามประเภทจริง (report/quotation/invoice/completion) */
+  docSummaryGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, 1fr)",
+    gap: "8px",
+    marginBottom: "20px",
+  },
+  docChip: {
+    borderRadius: "12px",
+    padding: "10px 12px",
+    display: "flex",
+    flexDirection: "column",
+  },
+  docChipCount: {
+    fontSize: "18px",
+    fontWeight: "800",
+    lineHeight: 1,
+  },
+  docChipLabel: {
+    fontSize: "10.5px",
+    fontWeight: "600",
+    marginTop: "4px",
+  },
+
+  /* 👥 Team Overview — เฉพาะแอดมิน */
+  teamRow: {
+    display: "flex",
+    justifyContent: "space-around",
+    padding: "16px 8px",
+  },
+  teamChip: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "4px",
+  },
+  teamChipCount: {
+    fontSize: "20px",
+    fontWeight: "800",
+    lineHeight: 1,
+  },
+  teamChipLabel: {
+    fontSize: "10.5px",
+    fontWeight: "600",
+    color: "#64748b",
   },
 };
 

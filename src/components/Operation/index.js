@@ -41,6 +41,7 @@ import {
   NoteAdd, History, Person, AccessTime, FiberManualRecord,
   TaskAlt, HourglassTop, Cancel,
   Send, Chat, Link as LinkIcon,
+  Print, Share,
 } from "@mui/icons-material";
 
 // MUI Date Picker
@@ -57,6 +58,19 @@ import { styled, alpha } from "@mui/material/styles";
 import TechnicianJobCard from "../Technician/TechnicianJobPanel";
 import useEventNotifications from "../../hooks/useEventNotifications";
 import NotificationBell from "../Notifications/NotificationBell";
+import LineIcon from "../icons/LineIcon";
+import { printFile, shareFile, shareToLine, isMobileDevice } from "../../functions/fileActions";
+
+// ✅ ใช้ตัดสินใจลำดับปุ่มแชร์ในเมนู "⋮" ต่อไฟล์ (ดูเหตุผลใน fileActions.js)
+const IS_MOBILE = isMobileDevice();
+
+// ✅ เดิม MUI Menu เปิดช้า/รู้สึกหน่วง เพราะ transition คำนวณตามความสูงเมนู (auto) และมีการ
+// ล็อกสกรอลของหน้า (เพิ่ม padding ชดเชย scrollbar) ทุกครั้งที่เปิด ทำให้เกิด reflow เห็นได้ชัด
+// บนมือถือ — ลด duration ลงคงที่ + ปิด scroll lock ให้ลื่นขึ้นทุกเมนูในหน้านี้
+const FAST_MENU_PROPS = {
+  transitionDuration: { enter: 120, exit: 80 },
+  disableScrollLock: true,
+};
 
 // ─── Styled Components ────────────────────────────────────────────────
 const GlassCard = styled(Card)(({ theme }) => ({
@@ -184,6 +198,13 @@ const getFileType = (fileName = "") => {
   if (lower.endsWith(".doc") || lower.endsWith(".docx")) return "word";
   if (lower.endsWith(".xls") || lower.endsWith(".xlsx")) return "excel";
   return "unknown";
+};
+
+// ✅ รวม company · site แบบไม่โชว์ "—" ซ้ำเวลาช่องใดช่องหนึ่งว่าง (เดิม `{company || "—"} · {site || "—"}`
+// จะเห็น "— · ไซต์" หรือ "บริษัท · —" เป็นขีดลอยๆ ดูรก/เหมือนบั๊กเวลาข้อมูลไม่ครบทั้งคู่)
+const companySite = (company, site) => {
+  if (company && site) return `${company} · ${site}`;
+  return company || site || "ไม่ระบุบริษัท/ไซต์";
 };
 
 const fileTypeIcon = (fileName) => {
@@ -485,7 +506,7 @@ const ClosureRequestsPanel = ({ events, onApprove, onReject }) => {
                       <HourglassTop sx={{ fontSize: 18, color: "#f59e0b", mt: 0.3, flexShrink: 0 }} />
                       <Box flex={1} minWidth={0}>
                         <Typography fontWeight={700} fontSize="0.875rem" noWrap>
-                          {ev.company || "—"} · {ev.site || "—"}
+                          {companySite(ev.company, ev.site)}
                         </Typography>
                         <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
                           {ev.closeRequestedBy || "ช่าง"} ขอปิดงาน
@@ -776,7 +797,7 @@ const TechnicianSummary = ({ events, selectedDate }) => {
                           }} />
                           <Box flex={1} minWidth={0}>
                             <Typography fontWeight={700} fontSize="0.8rem">
-                              {job.company} · {job.site}
+                              {companySite(job.company, job.site)}
                             </Typography>
                             <Stack direction="row" gap={1.5} mt={0.25} flexWrap="wrap">
                               {job.checkedInAt && (
@@ -914,7 +935,7 @@ const TimelineView = ({ events }) => {
                           {event.system && <Chip label={event.system} size="small" variant="outlined" color="secondary" sx={{ fontSize: "0.7rem", height: 22 }} />}
                         </Stack>
                         <Typography fontWeight={700} sx={{ mt: 0.8 }}>
-                          {event.company || "—"} · {event.site || "—"}
+                          {companySite(event.company, event.site)}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
                           {moment(event.start).locale("th").format("DD MMM YYYY HH:mm")}
@@ -960,6 +981,11 @@ const FileUploadSection = ({
   const overrideInputRef = React.useRef();
   const canEdit  = ["admin", "manager", "user"].includes(currentUserRole);
 
+  // ✅ เมนู "⋮" ต่อไฟล์ — เดิมโชว์ปุ่มดาวน์โหลด/ลบเรียงเป็นไอคอนแยกทุกแถว ดูรกตาเวลามีหลายไฟล์
+  // รวมเป็นเมนูเดียว เหลือแค่ปุ่มดูไฟล์ (บ่อยสุด) + ปุ่ม "⋮" แยกต่างหาก
+  const [fileMenu, setFileMenu] = useState(null); // { el, file }
+  const closeFileMenu = () => setFileMenu(null);
+
   const fileList = files || [];
   const hasFiles = fileList.length > 0;
 
@@ -987,24 +1013,67 @@ const FileUploadSection = ({
               background: t => alpha(t.palette.success.main, 0.04),
             }}>
               {fileTypeIcon(f.fileName)}
-              <Box flex={1} minWidth={0}>
+              <Box flex={1} minWidth={0} onClick={() => onPreview(f.fileUrl, f.fileName)} sx={{ cursor: "pointer" }}>
                 <Typography variant="caption" fontWeight={600} noWrap sx={{ fontSize: "0.8rem", display: "block" }}>{f.fileName}</Typography>
               </Box>
               <Tooltip title="ดูไฟล์">
                 <IconButton onClick={() => onPreview(f.fileUrl, f.fileName)} sx={{ p: 1 }}><Visibility sx={{ fontSize: 20 }} /></IconButton>
               </Tooltip>
-              <Tooltip title="ดาวน์โหลด">
-                <IconButton onClick={() => downloadFile(f.fileUrl, f.fileName)} sx={{ p: 1 }}><Download sx={{ fontSize: 20 }} /></IconButton>
+              <Tooltip title="เพิ่มเติม">
+                <IconButton onClick={e => setFileMenu({ el: e.currentTarget, file: f })} sx={{ p: 1 }}>
+                  <MoreVert sx={{ fontSize: 20 }} />
+                </IconButton>
               </Tooltip>
-              {canEdit && (
-                <Tooltip title="ลบไฟล์">
-                  <IconButton color="error" onClick={() => onDelete(eventId, type, f._id)} sx={{ p: 1 }}><Delete sx={{ fontSize: 20 }} /></IconButton>
-                </Tooltip>
-              )}
             </Stack>
           ))}
         </Stack>
       )}
+
+      {/* เมนู "⋮" ต่อไฟล์ — ดาวน์โหลด/พิมพ์/แชร์/ลบ รวมไว้ที่เดียว แทนไอคอนแยกเรียงเต็มแถว */}
+      <Menu {...FAST_MENU_PROPS} anchorEl={fileMenu?.el} open={Boolean(fileMenu)} onClose={closeFileMenu}
+        PaperProps={{ sx: { borderRadius: 2, boxShadow: "0 8px 32px rgba(0,0,0,0.12)" } }}>
+        <MenuItem onClick={() => { downloadFile(fileMenu.file.fileUrl, fileMenu.file.fileName); closeFileMenu(); }} sx={{ gap: 1.5, minHeight: 44 }}>
+          <ListItemIcon><Download fontSize="small" /></ListItemIcon>
+          <ListItemText>ดาวน์โหลด</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => { printFile(fileMenu.file.fileUrl, fileMenu.file.fileName); closeFileMenu(); }} sx={{ gap: 1.5, minHeight: 44 }}>
+          <ListItemIcon><Print fontSize="small" /></ListItemIcon>
+          <ListItemText>พิมพ์</ListItemText>
+        </MenuItem>
+        {/* ✅ LINE เดสก์ท็อปไม่ลงทะเบียนเป็น Share Target ของ OS จึงไม่มีทางโผล่ในแผง Share ของ
+            Windows/Mac ได้เลย (ที่ shareFile() เรียกผ่าน navigator.share) — สลับให้ปุ่มที่
+            การันตีว่าเข้าถึง LINE ได้จริงขึ้นก่อนตามชนิดอุปกรณ์ */}
+        {IS_MOBILE ? (
+          <>
+            <MenuItem onClick={() => { shareFile(fileMenu.file.fileUrl, fileMenu.file.fileName); closeFileMenu(); }} sx={{ gap: 1.5, minHeight: 44 }}>
+              <ListItemIcon><Share fontSize="small" /></ListItemIcon>
+              <ListItemText>แชร์ไฟล์ (รูป/PDF)</ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => { shareToLine(fileMenu.file.fileUrl, fileMenu.file.fileName); closeFileMenu(); }} sx={{ gap: 1.5, minHeight: 44 }}>
+              <ListItemIcon><LineIcon size={20} /></ListItemIcon>
+              <ListItemText>แชร์ลิงก์ไปยัง LINE</ListItemText>
+            </MenuItem>
+          </>
+        ) : (
+          <>
+            <MenuItem onClick={() => { shareToLine(fileMenu.file.fileUrl, fileMenu.file.fileName); closeFileMenu(); }} sx={{ gap: 1.5, minHeight: 44 }}>
+              <ListItemIcon><LineIcon size={20} /></ListItemIcon>
+              <ListItemText>แชร์ไปยัง LINE</ListItemText>
+            </MenuItem>
+            <MenuItem onClick={() => { shareFile(fileMenu.file.fileUrl, fileMenu.file.fileName); closeFileMenu(); }} sx={{ gap: 1.5, minHeight: 44 }}>
+              <ListItemIcon><Share fontSize="small" /></ListItemIcon>
+              <ListItemText>แชร์ไฟล์</ListItemText>
+            </MenuItem>
+          </>
+        )}
+        {canEdit && [
+          <Divider key="file-menu-divider" />,
+          <MenuItem key="file-menu-delete" onClick={() => { onDelete(eventId, type, fileMenu.file._id); closeFileMenu(); }} sx={{ gap: 1.5, minHeight: 44, color: "error.main" }}>
+            <ListItemIcon><Delete fontSize="small" color="error" /></ListItemIcon>
+            <ListItemText>ลบไฟล์</ListItemText>
+          </MenuItem>,
+        ]}
+      </Menu>
 
       {uploading ? (
         <Box sx={{ p: 1.5, borderRadius: 2, border: "1px solid", borderColor: "primary.main" }}>
@@ -1149,6 +1218,8 @@ const EventRowCard = ({
   const [editingDoc, setEditingDoc] = useState(false);
   const [docNo,      setDocNo]      = useState(event.docNo || "");
   const [anchorEl,   setAnchorEl]   = useState(null);
+  // ✅ เมนู "⋮" ของการ์ดงาน — เดิมปุ่มลบงานเป็นไอคอนสีแดงโชว์ตลอดเวลาข้างปุ่มพับ/กาง ดูรกและเสี่ยงกดพลาด
+  const [moreAnchorEl, setMoreAnchorEl] = useState(null);
   const [localStatus,setLocalStatus]= useState(event.status || "");
   const [approving,  setApproving]  = useState(false);
   const [rejecting,      setRejecting]      = useState(false);
@@ -1205,8 +1276,14 @@ const EventRowCard = ({
   return (
     <Wrapper {...wrapperProps}>
       <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-        {/* Header */}
-        <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={1}>
+        {/* Header — กดที่ไหนก็ได้บนแถวนี้เพื่อกาง/พับการ์ดได้เลย ไม่ต้องเล็งกดลูกศรเล็กๆ อีกต่อไป
+            (ปุ่ม/ลิงก์ย่อยด้านในที่มี action ของตัวเอง เช่น เปลี่ยนสถานะ/เมนู "⋮"/แก้เลขเอกสาร
+            ต้อง stopPropagation ไว้ ไม่งั้นกดแล้วจะกาง/พับซ้อนกับ action หลักโดยไม่ตั้งใจ) */}
+        <Stack
+          direction="row" alignItems="flex-start" justifyContent="space-between" gap={1}
+          onClick={() => setExpanded(p => !p)}
+          sx={{ cursor: "pointer" }}
+        >
           <Stack direction="row" alignItems="flex-start" gap={1.5} flex={1} minWidth={0}>
             <Avatar sx={{
               width: 40, height: 40, flexShrink: 0, fontSize: "0.8rem", fontWeight: 700,
@@ -1218,7 +1295,7 @@ const EventRowCard = ({
             <Box minWidth={0} flex={1}>
               <Stack direction="row" flexWrap="wrap" alignItems="center" gap={0.5} mb={0.5}>
                 <Tooltip title="เปลี่ยนสถานะ">
-                  <Box onClick={e => canEdit && setAnchorEl(e.currentTarget)} sx={{ cursor: canEdit ? "pointer" : "default" }}>
+                  <Box onClick={e => { e.stopPropagation(); canEdit && setAnchorEl(e.currentTarget); }} sx={{ cursor: canEdit ? "pointer" : "default" }}>
                     <StatusBadge color={OP_COLOR[localStatus]}>
                       <Circle sx={{ fontSize: 6 }} /> {localStatus || "ไม่ระบุ"}
                     </StatusBadge>
@@ -1252,7 +1329,7 @@ const EventRowCard = ({
                 </Stack>
               </Stack>
               <Typography fontWeight={700} fontSize="0.95rem" noWrap>
-                {event.company || "—"} · {event.site || "—"}
+                {companySite(event.company, event.site)}
               </Typography>
               <Stack direction="row" flexWrap="wrap" gap={1} mt={0.3}>
                 <Typography variant="caption" color="text.secondary">
@@ -1267,22 +1344,26 @@ const EventRowCard = ({
                     🕐 {event.startTime || "-"} — {event.endTime || "-"}
                   </Typography>
                 )}
-                {editingDoc ? (
-                  <Stack direction="row" gap={0.5} alignItems="center">
-                    <TextField size="small" variant="standard" value={docNo}
-                      onChange={e => setDocNo(e.target.value)}
-                      onKeyDown={e => e.key === "Enter" && handleDocSave()}
-                      inputProps={{ style: { fontSize: "0.75rem" } }} sx={{ width: 120 }} autoFocus />
-                    <Button size="small" onClick={handleDocSave} sx={{ minWidth: "auto", p: 0.5, fontSize: "0.7rem" }}>บันทึก</Button>
-                    <Button size="small" color="inherit" onClick={() => setEditingDoc(false)} sx={{ minWidth: "auto", p: 0.5, fontSize: "0.7rem" }}>ยกเลิก</Button>
-                  </Stack>
-                ) : (
-                  <Typography variant="caption"
-                    color={event.docNo ? "text.secondary" : "text.disabled"}
-                    onClick={() => canEdit && setEditingDoc(true)}
-                    sx={{ cursor: canEdit ? "pointer" : "default", "&:hover": canEdit ? { color: "primary.main", textDecoration: "underline" } : {} }}>
-                    📄 {event.docNo || "— ใส่เลขที่เอกสาร"}
-                  </Typography>
+                {/* ✅ ถ้ายังไม่มีเลขเอกสาร ซ่อนช่อง "ใส่เลขที่เอกสาร" ไว้ตอนพับการ์ด — เดิมโชว์ทุกการ์ด
+                    ในลิสต์ตลอดเวลาแม้ยังไม่มีข้อมูล ดูรกเวลามีงานหลายรายการ ให้กดขยายก่อนค่อยใส่ */}
+                {(event.docNo || expanded) && (
+                  editingDoc ? (
+                    <Stack direction="row" gap={0.5} alignItems="center" onClick={e => e.stopPropagation()}>
+                      <TextField size="small" variant="standard" value={docNo}
+                        onChange={e => setDocNo(e.target.value)}
+                        onKeyDown={e => e.key === "Enter" && handleDocSave()}
+                        inputProps={{ style: { fontSize: "0.75rem" } }} sx={{ width: 120 }} autoFocus />
+                      <Button size="small" onClick={handleDocSave} sx={{ minWidth: "auto", p: 0.5, fontSize: "0.7rem" }}>บันทึก</Button>
+                      <Button size="small" color="inherit" onClick={() => setEditingDoc(false)} sx={{ minWidth: "auto", p: 0.5, fontSize: "0.7rem" }}>ยกเลิก</Button>
+                    </Stack>
+                  ) : (
+                    <Typography variant="caption"
+                      color={event.docNo ? "text.secondary" : "text.disabled"}
+                      onClick={e => { e.stopPropagation(); canEdit && setEditingDoc(true); }}
+                      sx={{ cursor: canEdit ? "pointer" : "default", "&:hover": canEdit ? { color: "primary.main", textDecoration: "underline" } : {} }}>
+                      📄 {event.docNo || "ใส่เลขที่เอกสาร"}
+                    </Typography>
+                  )
                 )}
               </Stack>
               {/* เวลาเข้า/ออก */}
@@ -1305,16 +1386,27 @@ const EventRowCard = ({
             </Box>
           </Stack>
           <Stack direction="row" gap={0.5} flexShrink={0}>
-            <IconButton onClick={() => setExpanded(p => !p)} sx={{ p: 1 }}>
+            {/* ✅ ไม่มี onClick ของตัวเองแล้ว — แค่ไอคอนบอกสถานะกาง/พับ ตัวกดจริงคือทั้งแถว Header
+                ด้านบน (คลิกบับเบิลขึ้นมาถึงเอง) กันปัญหาเดิมที่กดซ้อนกับ handler บนแล้วพับคืนทันที */}
+            <IconButton sx={{ p: 1, pointerEvents: "none" }}>
               {expanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
             </IconButton>
             {canEdit && (
-              <IconButton color="error" onClick={() => onDelete(event._id)} sx={{ p: 1 }}>
-                <Delete fontSize="small" />
+              <IconButton onClick={e => { e.stopPropagation(); setMoreAnchorEl(e.currentTarget); }} sx={{ p: 1 }}>
+                <MoreVert fontSize="small" />
               </IconButton>
             )}
           </Stack>
         </Stack>
+
+        {/* เมนู "⋮" ของการ์ดงาน — ปุ่มลบ (เดิมโชว์เป็นไอคอนสีแดงตลอดเวลา) ย้ายมารวมที่นี่ */}
+        <Menu {...FAST_MENU_PROPS} anchorEl={moreAnchorEl} open={Boolean(moreAnchorEl)} onClose={() => setMoreAnchorEl(null)}
+          PaperProps={{ sx: { borderRadius: 2, boxShadow: "0 8px 32px rgba(0,0,0,0.12)" } }}>
+          <MenuItem onClick={() => { setMoreAnchorEl(null); onDelete(event._id); }} sx={{ gap: 1.5, minHeight: 44, color: "error.main" }}>
+            <ListItemIcon><Delete fontSize="small" color="error" /></ListItemIcon>
+            <ListItemText>ลบงานนี้</ListItemText>
+          </MenuItem>
+        </Menu>
 
         {/* แจ้งเตือนคำขอปิดงานจากช่าง (ยังไม่อนุมัติ) — ใช้ Box แทน Alert action slot
             เพราะ Alert วางข้อความ+ปุ่มแถวเดียวกันแล้วทับ/ล้นกันบนจอมือถือ */}
@@ -1397,7 +1489,7 @@ const EventRowCard = ({
         </Dialog>
 
         {/* Status Menu */}
-        <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}
+        <Menu {...FAST_MENU_PROPS} anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}
           PaperProps={{ sx: { borderRadius: 2, boxShadow: "0 8px 32px rgba(0,0,0,0.12)" } }}>
           <Typography variant="caption" sx={{ px: 2, py: 0.5, display: "block", color: "text.secondary", fontWeight: 700 }}>
             เปลี่ยนสถานะ
@@ -1802,7 +1894,7 @@ const JobGroupBlock = ({ sessions, currentUserRole, ...cardProps }) => {
         <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
           <CalendarMonth sx={{ fontSize: 18, color: "#8b5cf6" }} />
           <Typography variant="body2" fontWeight={700} color="#8b5cf6">
-            {head.company || "—"} · {head.site || "—"} — {head.title}{head.system && ` · ${head.system}`}{head.time && ` ครั้งที่ ${head.time}`}
+            {companySite(head.company, head.site)} — {head.title}{head.system && ` · ${head.system}`}{head.time && ` ครั้งที่ ${head.time}`}
           </Typography>
           <Chip label={`เข้างาน ${totalWorkDays} วัน`} size="small"
             sx={{ height: 20, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha("#8b5cf6", 0.15), color: "#8b5cf6" }} />
@@ -2463,7 +2555,7 @@ const Operation = () => {
                       {TYPE_ICON[e.title] || <Build fontSize="small" />}
                     </Avatar>
                     <Box flex={1} minWidth={0}>
-                      <Typography variant="caption" fontWeight={700} noWrap>{e.company} · {e.site}</Typography>
+                      <Typography variant="caption" fontWeight={700} noWrap>{companySite(e.company, e.site)}</Typography>
                       <Typography variant="caption" color="text.secondary" display="block">
                         {moment(e.start).locale("th").fromNow()}
                       </Typography>
