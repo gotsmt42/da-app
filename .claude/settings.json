@@ -7,7 +7,8 @@
       "Bash(grep -rn \"updateMany\\\\|update\\(\\\\{\" C:/Users/Admin/Desktop/da-app-server/routes/ C:/Users/Admin/Desktop/da-app-server/models/)",
       "Bash(curl -s http://localhost:5099/api/events/documents -H 'Authorization: Bearer __CMDSUB_OUTPUT__')",
       "Bash(taskkill //PID 13996 //F)",
-      "Bash(curl -s http://localhost:5000/api/events/documents -H 'Authorization: Bearer __TRACKED_VAR__')"
+      "Bash(curl -s http://localhost:5000/api/events/documents -H 'Authorization: Bearer __TRACKED_VAR__')",
+      "Bash(awk 'NR==2059,NR==2450' src/components/Operation/index.js)"
     ]
   }
 }

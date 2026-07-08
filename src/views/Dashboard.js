@@ -1,4 +1,4 @@
-import { Col, Row, Container, Spinner } from "reactstrap";
+import { Container } from "reactstrap";
 import {
   FaCalendarAlt,
   FaUsers,
@@ -9,43 +9,84 @@ import {
   FaClock,
   FaCheckCircle,
   FaExclamationCircle,
-  FaArrowRight
+  FaArrowRight,
+  FaBell,
+  FaHourglassHalf,
+  FaTimesCircle,
+  FaCommentDots,
+  FaClipboardList,
+  FaCog,
+  FaMapMarkerAlt
 } from "react-icons/fa";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import FileService from "../services/FileService";
-import WorkOrderService from "../services/workOrderService";
+import moment from "moment";
+import "moment/locale/th";
 import AuthService from "../services/authService";
 import CustomerService from "../services/CustomerService";
 import EventService from "../services/EventService";
 import { useAuth } from "../auth/AuthContext";
+import useEventNotifications from "../hooks/useEventNotifications";
+
+// 🔔 ไอคอน/สีของแจ้งเตือนแต่ละประเภท (คู่กับ NotificationBell แต่ใช้ react-icons ให้เข้าธีมมือถือของหน้านี้)
+const NOTI_META = {
+  close_requested: { icon: <FaHourglassHalf size={13} />, color: "#f59e0b" },
+  close_approved: { icon: <FaCheckCircle size={13} />, color: "#10b981" },
+  close_rejected: { icon: <FaTimesCircle size={13} />, color: "#ef4444" },
+  comment: { icon: <FaCommentDots size={13} />, color: "#3b82f6" },
+};
+
+// 🎨 สีประจำสถานะงาน — ใช้ร่วมกันทั้ง Quick Stats และการ์ดงานวันนี้
+const STATUS_META = {
+  "กำลังรอยืนยัน": { color: "#f97316", bg: "#ffedd5", icon: <FaExclamationCircle size={11} /> },
+  "ยืนยันแล้ว": { color: "#3b82f6", bg: "#dbeafe", icon: <FaCheckCircle size={11} /> },
+  "กำลังดำเนินการ": { color: "#a78bfa", bg: "#ede9fe", icon: <FaClock size={11} /> },
+  "ดำเนินการเสร็จสิ้น": { color: "#10b981", bg: "#d1fae5", icon: <FaCheckCircle size={11} /> },
+};
+const getStatusMeta = (status) => STATUS_META[status] || { color: "#64748b", bg: "#f1f5f9", icon: <FaClock size={11} /> };
+
+const getGreeting = () => {
+  const h = new Date().getHours();
+  if (h < 12) return "สวัสดีตอนเช้า";
+  if (h < 17) return "สวัสดีตอนบ่าย";
+  return "สวัสดีตอนเย็น";
+};
 
 const Dashboard = () => {
   const { userData } = useAuth();
   const navigate = useNavigate();
-  const isAdmin = userData?.role?.toLowerCase() === "admin";
+  const role = userData?.role?.toLowerCase();
+  const isAdmin = role === "admin";
+  const isAdminOrManager = ["admin", "manager"].includes(role);
+  const isTechnician = role === "technician";
 
   const [loading, setLoading] = useState(false);
   const [files, setFiles] = useState([]);
-  const [workOrders, setWorkOrders] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [users, setUsers] = useState([]);
   const [events, setEvents] = useState([]);
+
+  const { notifications, unread, markRead } = useEventNotifications(
+    events,
+    isAdminOrManager ? "admin" : "technician"
+  );
 
   useEffect(() => {
     const fetchAllDashboardData = async () => {
       setLoading(true);
       try {
-        const [resFiles, resJobs, resUsers, resCustomers, resEvents] = await Promise.all([
-          FileService.getUserFiles().catch(() => ({ userFiles: [] })),
-          WorkOrderService.getMyJobs().catch(() => []),
+        // ✅ ใช้ getEventOp() (scoped ตาม role) แทน getEvents() (คืนทุก event ของทุกคนเสมอ)
+        // ไม่งั้นช่างจะเห็นสถิติงานของทั้งบริษัท ไม่ใช่งานของตัวเอง
+        // ✅ ตัด WorkOrderService ออก — คอลเลกชัน workorders ว่างเปล่าจริงในระบบ (ไม่เคยถูกใช้งาน)
+        // ระบบงานจริงคือ CalendarEvent ผ่านหน้า Operation ทั้งหมด
+        const [resFiles, resUsers, resCustomers, resEvents] = await Promise.all([
+          EventService.GetServiceReportFiles().catch(() => ({ files: [] })),
           AuthService.getAllUserData().catch(() => ({ allUser: [] })),
           CustomerService.getCustomers().catch(() => ({ userCustomers: [] })),
-          EventService.getEvents().catch(() => ({ userEvents: [] })),
+          EventService.getEventOp().catch(() => ({ userEvents: [] })),
         ]);
 
-        setFiles(resFiles?.userFiles || []);
-        setWorkOrders(resJobs || []);
+        setFiles(resFiles?.files || []);
         setUsers(resUsers?.allUser || []);
         setCustomers(resCustomers?.userCustomers || []);
         setEvents(resEvents?.userEvents || []);
@@ -61,36 +102,30 @@ const Dashboard = () => {
 
   const countStatus = (status) => events.filter(e => e.status === status).length;
 
-  // 🎨 แยกเฉดสีละมุน (ซอฟต์ลงสำหรับพื้นหลังเข้ม) และผูกไอคอนประจำสถานะ
-  const statusItems = [
-    { 
-      label: "รอยืนยัน", 
-      count: countStatus("กำลังรอยืนยัน"), 
-      color: "#ffedd5", // ส้มพาสเทล
-      icon: <FaExclamationCircle size={10} style={{ color: "#f97316" }} />, 
-      bg: "rgba(139, 92, 246, 0.15)" 
-    },
-    { 
-      label: "ยืนยันแล้ว", 
-      count: countStatus("ยืนยันแล้ว"), 
-      color: "#dbeafe", // ฟ้าพาสเทล
-      icon: <FaCheckCircle size={10} style={{ color: "#3b82f6" }} />, 
-      bg: "rgba(139, 92, 246, 0.15)" 
-    },
-    { 
-      label: "กำลังทำ", 
-      count: countStatus("กำลังดำเนินการ"), 
-      color: "#ede9fe", // ม่วงพาสเทล
-      icon: <FaClock size={10} style={{ color: "#a78bfa" }} />, 
-      bg: "rgba(139, 92, 246, 0.15)" 
-    },
-    { 
-      label: "เสร็จสิ้น", 
-      count: countStatus("ดำเนินการเสร็จสิ้น"), 
-      color: "#d1fae5", // เขียวพาสเทล
-      icon: <FaCheckCircle size={10} style={{ color: "#10b981" }} />, 
-      bg: "rgba(139, 92, 246, 0.15)" 
-    }
+  // 📊 สถิติงานหลัก 4 สถานะ — การ์ดใหญ่แยกจากกัน แทนแถบเล็กๆ ฝังในปุ่มเดิม
+  const statItems = [
+    { label: "รอยืนยัน", status: "กำลังรอยืนยัน", count: countStatus("กำลังรอยืนยัน") },
+    { label: "ยืนยันแล้ว", status: "ยืนยันแล้ว", count: countStatus("ยืนยันแล้ว") },
+    { label: "กำลังทำ", status: "กำลังดำเนินการ", count: countStatus("กำลังดำเนินการ") },
+    { label: "เสร็จสิ้น", status: "ดำเนินการเสร็จสิ้น", count: countStatus("ดำเนินการเสร็จสิ้น") },
+  ];
+
+  // 📅 งานวันนี้ (เทียบฟิลด์ date จริงของ CalendarEvent) เรียงตามเวลาเริ่ม
+  const todayJobs = events
+    .filter((e) => e.date && moment(e.date).isSame(moment(), "day"))
+    .sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
+
+  // 🚀 ทางลัดแบบไอคอน (คล้ายหน้าจอโฮมของแอปมือถือ) ปรับตามสิทธิ์ผู้ใช้
+  const quickActions = [
+    { title: "ปฏิทิน", icon: <FaCalendarAlt size={20} />, link: "/event", color: "#4f46e5" },
+    { title: "การดำเนินงาน", icon: <FaWrench size={20} />, link: "/operation", color: "#6366f1" },
+    { title: "เอกสารทั้งหมด", icon: <FaFileAlt size={20} />, link: "/files", color: "#475569", badge: files.length },
+    ...(isTechnician ? [{ title: "งานของฉัน", icon: <FaClipboardList size={20} />, link: "/technician/jobs", color: "#0ea5e9" }] : []),
+    ...(isAdmin ? [
+      { title: "ลูกค้า", icon: <FaBuilding size={20} />, link: "/customer", color: "#3b82f6", badge: customers.length },
+      { title: "พนักงาน", icon: <FaUsers size={20} />, link: "/employee", color: "#f43f5e", badge: users.length },
+      { title: "ตั้งค่า", icon: <FaCog size={20} />, link: "/about", color: "#64748b" },
+    ] : []),
   ];
 
   return (
@@ -98,162 +133,172 @@ const Dashboard = () => {
       {/* ─── SECTION 1: TOP APP BAR PROFILE ─── */}
       <div style={styles.topAppBar}>
         <div style={styles.userInfo}>
-          <div style={styles.avatarPlaceholder}>
-            {userData?.fname ? userData.fname.charAt(0).toUpperCase() : "U"}
-          </div>
+          {userData?.imageUrl ? (
+            <img src={userData.imageUrl} alt="profile" style={styles.avatarImg} />
+          ) : (
+            <div style={styles.avatarPlaceholder}>
+              {userData?.fname ? userData.fname.charAt(0).toUpperCase() : "U"}
+            </div>
+          )}
           <div>
-            <span style={styles.welcomeSub}>ยินดีต้อนรับ</span>
+            <span style={styles.welcomeSub}>{getGreeting()} · {moment().locale("th").format("D MMMM YYYY")}</span>
             <h2 style={styles.welcomeTitle}>{userData?.fname || "ผู้ใช้งาน"}</h2>
           </div>
         </div>
-        <span style={styles.roleBadge}>{userData?.role || "User"}</span>
-      </div>
-
-      {/* ─── SECTION 2: HERO ACTION CARD (ฝังป้ายสถานะแยกสีแบบสะอาดตา) ─── */}
-      <div 
-        onClick={() => navigate("/event")}
-        style={styles.bigHeroButton}
-        className="action-hero-btn"
-      >
-        <div style={styles.heroButtonContent}>
-          <div style={styles.heroIconCircle}>
-            <FaCalendarAlt size={24} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={styles.heroBtnTitle}>ปฏิทินและแผนงานทั้งหมด</h3>
-              <FaArrowRight size={13} className="arrow-bounce" style={{ opacity: 0.8 }} />
-            </div>
-            <p style={styles.heroBtnSub}>ตรวจสอบตารางนัดหมายและจัดการสถานะงานระบบกลาง</p>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <span style={styles.roleBadge}>{userData?.role || "User"}</span>
+          <div
+            style={styles.bellButton}
+            onClick={() => document.getElementById("noti-section")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            className="bell-btn-hover"
+          >
+            <FaBell size={16} color="#475569" />
+            {unread > 0 && <span style={styles.bellDot}>{unread > 9 ? "9+" : unread}</span>}
           </div>
         </div>
+      </div>
 
-        {/* 📊 บาร์สถานะงาน: แยกเฉดสี + มีไอคอนกำกับแบบ Mini ไม่แย่งซีน */}
-        <div style={styles.heroStatusInlineGrid}>
-          {statusItems.map((item, i) => (
-            <div key={i} style={{ ...styles.inlineStatusBadge, backgroundColor: item.bg }}>
-              <span style={styles.inlineStatusLabel}>{item.label}</span>
-              <div style={styles.countWrapper}>
-                {item.icon}
-                <span style={{ ...styles.inlineStatusCount, color: item.color }}>
-                  {loading ? "..." : item.count}
-                </span>
+      {/* ─── SECTION 2: COMPACT CTA BANNER ─── */}
+      <div onClick={() => navigate("/event")} style={styles.ctaBanner} className="action-hero-btn">
+        <div style={styles.heroIconCircle}>
+          <FaCalendarAlt size={20} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <h3 style={styles.heroBtnTitle}>ปฏิทินและแผนงานทั้งหมด</h3>
+          <p style={styles.heroBtnSub}>ตรวจสอบตารางนัดหมายและจัดการสถานะงานระบบกลาง</p>
+        </div>
+        <FaArrowRight size={13} className="arrow-bounce" style={{ opacity: 0.8, flexShrink: 0 }} />
+      </div>
+
+      {/* ─── SECTION 3: QUICK STATS GRID ─── */}
+      <h5 style={styles.sectionTitle}>สรุปสถานะงาน</h5>
+      <div style={styles.statsGrid}>
+        {statItems.map((item, i) => {
+          const meta = getStatusMeta(item.status);
+          return (
+            <div key={i} style={styles.statCard} className="metric-card-hover" onClick={() => navigate("/operation")}>
+              <div style={{ ...styles.statIconCircle, backgroundColor: meta.bg, color: meta.color }}>
+                {meta.icon}
               </div>
+              {loading ? (
+                <span style={styles.skeletonBlock} className="skeleton-pulse" />
+              ) : (
+                <span style={styles.statNumber}>{item.count}</span>
+              )}
+              <span style={styles.statLabel}>{item.label}</span>
             </div>
+          );
+        })}
+      </div>
+
+      {/* ─── SECTION 4: TODAY'S JOBS (ข้อมูลจริงจาก CalendarEvent ของวันนี้) ─── */}
+      <div style={styles.notiHeaderRow}>
+        <h5 style={{ ...styles.sectionTitle, marginBottom: 0 }}>งานวันนี้ · {moment().locale("th").format("D MMM")}</h5>
+        <Link to="/operation" style={styles.viewAllLink}>ดูทั้งหมด <FaChevronRight size={9} /></Link>
+      </div>
+      {loading ? (
+        <div style={styles.todayScrollRow}>
+          {[1, 2].map((i) => (
+            <div key={i} style={{ ...styles.todayJobCard, ...styles.skeletonPulseBg }} className="skeleton-pulse" />
           ))}
         </div>
+      ) : todayJobs.length === 0 ? (
+        <div style={styles.notiCard}>
+          <div style={styles.notiEmpty}>
+            <FaCalendarAlt size={22} style={{ opacity: 0.25, marginBottom: "6px" }} />
+            <p style={{ margin: 0, fontSize: "12px", color: "#94a3b8" }}>ไม่มีงานที่นัดหมายไว้ในวันนี้</p>
+          </div>
+        </div>
+      ) : (
+        <div style={styles.todayScrollRow}>
+          {todayJobs.map((job) => {
+            const meta = getStatusMeta(job.status);
+            return (
+              <div
+                key={job._id}
+                style={styles.todayJobCard}
+                className="metric-card-hover"
+                onClick={() => navigate(`/operation/${job._id}`)}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <span style={styles.todayJobTime}>
+                    <FaClock size={10} style={{ marginRight: "4px" }} />
+                    {job.startTime && job.endTime ? `${job.startTime}-${job.endTime}` : "ทั้งวัน"}
+                  </span>
+                  <span style={{ ...styles.todayJobStatusChip, backgroundColor: meta.bg, color: meta.color }}>
+                    {job.status}
+                  </span>
+                </div>
+                <h4 style={styles.todayJobTitle}>{job.title || job.company}</h4>
+                <p style={styles.todayJobSite}>
+                  <FaMapMarkerAlt size={10} style={{ marginRight: "4px", opacity: 0.6 }} />
+                  {job.company} · {job.site}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ─── SECTION 5: NOTIFICATIONS WIDGET ─── */}
+      <div id="noti-section" style={styles.notiHeaderRow}>
+        <h5 style={{ ...styles.sectionTitle, marginBottom: 0 }}>การแจ้งเตือนล่าสุด</h5>
+        {unread > 0 && <span style={styles.notiUnreadBadge}>{unread} ใหม่</span>}
+      </div>
+      <div style={styles.notiCard}>
+        {notifications.length === 0 ? (
+          <div style={styles.notiEmpty}>
+            <FaBell size={22} style={{ opacity: 0.25, marginBottom: "6px" }} />
+            <p style={{ margin: 0, fontSize: "12px", color: "#94a3b8" }}>ยังไม่มีการแจ้งเตือน</p>
+          </div>
+        ) : (
+          notifications.slice(0, 4).map((n, i) => {
+            const meta = NOTI_META[n.type] || NOTI_META.close_requested;
+            return (
+              <div
+                key={n.id}
+                onClick={() => {
+                  markRead(n.id);
+                  if (n.eventId) navigate(`/operation/${n.eventId}`);
+                }}
+                className="noti-row-hover"
+                style={{
+                  ...styles.notiRow,
+                  borderBottom: i < Math.min(notifications.length, 4) - 1 ? "1px solid #f1f5f9" : "none",
+                  opacity: n.read ? 0.55 : 1
+                }}
+              >
+                <div style={{ ...styles.notiIconCircle, backgroundColor: `${meta.color}18`, color: meta.color }}>
+                  {meta.icon}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={styles.notiMessage}>{n.message}</p>
+                  <p style={styles.notiDetail}>{n.detail}</p>
+                </div>
+                <span style={styles.notiTime}>{moment(n.time).locale("th").fromNow(true)}</span>
+              </div>
+            );
+          })
+        )}
       </div>
 
-      {/* ─── SECTION 3: PERSONAL TASKS (Service Reports เด่นรองลงมา) ─── */}
-      <h5 style={styles.sectionTitle}>การปฏิบัติงาน</h5>
-      <Row className="g-2 mb-2">
-        {[
-
-            {
-            title: "การดำเนินงาน",
-            // count: EventService.getEventOp.length,
-            desc: "การดำเนินงานทั้งหมด",
-            link: "/operation",
-            icon: <FaWrench size={18} />,
-            theme: "#6366f1",
-            isFeatured: true
-          },
-          {
-            title: "เอกสารทั้งหมด",
-            count: files.length,
-            desc: "เอกสารรายงานการบริการในระบบ",
-            link: "/files",
-            icon: <FaFileAlt size={20} />,
-            theme: "#475569",
-            isFeatured: false
-          },
-    
-        ].map((card, idx) => (
-          <Col xs="12" key={idx}>
-            <Link to={card.link} style={{ textDecoration: 'none' }}>
-              <div 
-                style={{ 
-                  ...styles.metricCard, 
-                  ...(card.isFeatured ? styles.featuredMetricCard : {}) 
-                }} 
-                className="metric-card-hover"
-              >
-                <div style={styles.cardContent}>
-                  <div style={{ 
-                    ...styles.iconContainer, 
-                    backgroundColor: card.isFeatured ? "rgba(255,255,255,0.2)" : `${card.theme}15`, 
-                    color: card.isFeatured ? "#ffffff" : card.theme 
-                  }}>
-                    {card.icon}
-                  </div>
-                  <div>
-                    <h4 style={{ ...styles.cardTitle, color: card.isFeatured ? "#ffffff" : "#0f172a" }}>{card.title}</h4>
-                    <p style={{ ...styles.cardDesc, color: card.isFeatured ? "rgba(255,255,255,0.8)" : "#64748b" }}>{card.desc}</p>
-                  </div>
+      {/* ─── SECTION 6: QUICK ACTIONS (ทางลัดคล้ายหน้าโฮมแอปมือถือ) ─── */}
+      <h5 style={styles.sectionTitle}>ทางลัด</h5>
+      <div style={styles.quickActionsGrid}>
+        {quickActions.map((action, idx) => (
+          <Link key={idx} to={action.link} style={{ textDecoration: "none" }}>
+            <div style={styles.quickActionItem} className="metric-card-hover">
+              <div style={{ position: "relative" }}>
+                <div style={{ ...styles.quickActionIcon, backgroundColor: `${action.color}15`, color: action.color }}>
+                  {action.icon}
                 </div>
-                <div style={styles.cardRight}>
-                  <span style={{ ...styles.bigNumber, color: card.isFeatured ? "#ffffff" : card.theme }}>
-                    {loading ? <Spinner size="sm" color="secondary" /> : card.count}
-                  </span>
-                  <FaChevronRight style={{ ...styles.arrowIcon, color: card.isFeatured ? "rgba(255,255,255,0.6)" : "#94a3b8" }} />
-                </div>
+                {action.badge > 0 && <span style={styles.quickActionBadge}>{action.badge > 99 ? "99+" : action.badge}</span>}
               </div>
-            </Link>
-          </Col>
+              <span style={styles.quickActionLabel}>{action.title}</span>
+            </div>
+          </Link>
         ))}
-      </Row>
-
-      {/* ─── SECTION 4: ADMIN CONTROLS ─── */}
-      {isAdmin && (
-        <>
-          <h5 style={styles.sectionTitle}>การจัดการระบบสำหรับ Admin</h5>
-          <Row className="g-2">
-            {[
-              {
-                title: "ฐานข้อมูลลูกค้า",
-                count: customers.length,
-                desc: "พันธมิตรและคู่ค้าทั้งหมด",
-                link: "/customer",
-                icon: <FaBuilding size={18} />,
-                theme: "#3b82f6",
-                extra: "รายการทั้งหมด"
-              },
-              {
-                title: "การจัดการสมาชิก",
-                count: users.length,
-                desc: "พนักงานและสิทธิ์ผู้ดูแลระบบ",
-                link: "/employee",
-                icon: <FaUsers size={18} />,
-                theme: "#f43f5e",
-                extra: `แอดมิน: ${users.filter(u => u.role === "admin").length} คน`
-              }
-            ].map((card, idx) => (
-              <Col xs="12" key={idx}>
-                <Link to={card.link} style={{ textDecoration: 'none' }}>
-                  <div style={styles.metricCard} className="metric-card-hover">
-                    <div style={styles.cardContent}>
-                      <div style={{ ...styles.iconContainer, backgroundColor: `${card.theme}15`, color: card.theme }}>
-                        {card.icon}
-                      </div>
-                      <div>
-                        <h4 style={styles.cardTitle}>{card.title}</h4>
-                        <p style={styles.cardDesc}>{card.desc}</p>
-                        <span style={{ ...styles.extraTag, backgroundColor: `${card.theme}10`, color: card.theme }}>{card.extra}</span>
-                      </div>
-                    </div>
-                    <div style={styles.cardRight}>
-                      <span style={{ ...styles.bigNumber, color: card.theme }}>
-                        {loading ? <Spinner size="sm" color="secondary" /> : card.count}
-                      </span>
-                      <FaChevronRight style={styles.arrowIcon} />
-                    </div>
-                  </div>
-                </Link>
-              </Col>
-            ))}
-          </Row>
-        </>
-      )}
+      </div>
 
       {/* ─── INTERACTIVE EFFECTS FOR MOBILE ─── */}
       <style>{`
@@ -265,13 +310,14 @@ const Dashboard = () => {
           transform: scale(0.97);
           filter: brightness(0.95);
         }
-        .metric-card-hover { 
-          transition: all 0.15s ease; 
+        .metric-card-hover {
+          transition: all 0.15s ease;
           touch-action: manipulation;
+          cursor: pointer;
         }
-        .metric-card-hover:active { 
+        .metric-card-hover:active {
           opacity: 0.9;
-          transform: scale(0.99);
+          transform: scale(0.97);
         }
         @keyframes bounceRight {
           0%, 100% { transform: translateX(0); }
@@ -279,6 +325,22 @@ const Dashboard = () => {
         }
         .action-hero-btn:hover .arrow-bounce {
           animation: bounceRight 1s infinite;
+        }
+        .noti-row-hover:hover {
+          background-color: #f8fafc;
+        }
+        .noti-row-hover:active {
+          background-color: #f1f5f9;
+        }
+        .bell-btn-hover:active {
+          transform: scale(0.92);
+        }
+        @keyframes skeletonPulse {
+          0%, 100% { opacity: 0.35; }
+          50% { opacity: 0.85; }
+        }
+        .skeleton-pulse {
+          animation: skeletonPulse 1.1s ease-in-out infinite;
         }
       `}</style>
     </Container>
@@ -288,8 +350,8 @@ const Dashboard = () => {
 // ─── STYLES OBJECT ───
 const styles = {
   container: {
-    padding: "12px 14px 30px 14px", 
-    backgroundColor: "#f8fafc", 
+    padding: "12px 14px 30px 14px",
+    backgroundColor: "#f8fafc",
     width: "100%",
     minHeight: "100vh"
   },
@@ -318,6 +380,13 @@ const styles = {
     fontSize: "15px",
     boxShadow: "0 2px 8px rgba(79, 70, 229, 0.25)"
   },
+  avatarImg: {
+    width: "38px",
+    height: "38px",
+    borderRadius: "50%",
+    objectFit: "cover",
+    boxShadow: "0 2px 8px rgba(79, 70, 229, 0.25)"
+  },
   welcomeTitle: {
     fontSize: "18px",
     fontWeight: "700",
@@ -342,32 +411,57 @@ const styles = {
     textTransform: "uppercase",
     boxShadow: "0 1px 2px rgba(0,0,0,0.03)"
   },
+  bellButton: {
+    position: "relative",
+    width: "34px",
+    height: "34px",
+    borderRadius: "50%",
+    backgroundColor: "#ffffff",
+    border: "1px solid #e2e8f0",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
+    transition: "transform 0.15s ease",
+  },
+  bellDot: {
+    position: "absolute",
+    top: "-4px",
+    right: "-4px",
+    backgroundColor: "#ef4444",
+    color: "#fff",
+    fontSize: "9px",
+    fontWeight: "700",
+    minWidth: "16px",
+    height: "16px",
+    borderRadius: "8px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "0 3px",
+    border: "2px solid #f8fafc",
+  },
 
-  /* 🌟 ปุ่มหลักปฏิทินกลาง */
-  bigHeroButton: {
+  /* 🌟 CTA banner แบบกระชับ (ไม่ฝังสถิติแล้ว ย้ายไป Quick Stats แยกเป็นสัดส่วน) */
+  ctaBanner: {
     width: "100%",
     background: "linear-gradient(135deg, #4f46e5 0%, #2e2894 100%)",
     color: "#ffffff",
     border: "none",
-    borderRadius: "20px",
-    padding: "22px 16px 16px 16px",
-    textAlign: "left",
+    borderRadius: "18px",
+    padding: "16px",
     cursor: "pointer",
     boxShadow: "0 12px 24px -8px rgba(79, 70, 229, 0.4)",
-    marginBottom: "22px",
+    marginBottom: "20px",
     display: "flex",
-    flexDirection: "column",
-    gap: "18px"
-  },
-  heroButtonContent: {
-    display: "flex",
-    gap: "12px",
-    alignItems: "flex-start",
+    alignItems: "center",
+    gap: "12px"
   },
   heroIconCircle: {
     backgroundColor: "rgba(255, 255, 255, 0.15)",
-    width: "44px",
-    height: "44px",
+    width: "40px",
+    height: "40px",
     borderRadius: "12px",
     display: "flex",
     alignItems: "center",
@@ -375,57 +469,204 @@ const styles = {
     flexShrink: 0,
   },
   heroBtnTitle: {
-    fontSize: "17px",
+    fontSize: "15px",
     fontWeight: "800",
     margin: 0,
     color: "#ffffff",
-    letterSpacing: "-0.3px"
+    letterSpacing: "-0.2px"
   },
   heroBtnSub: {
-    fontSize: "11.5px",
+    fontSize: "11px",
     color: "rgba(255, 255, 255, 0.75)",
-    margin: "3px 0 0 0",
+    margin: "2px 0 0 0",
     lineHeight: "1.3",
   },
 
-  /* 📊 โครงสร้างสถานะในปุ่มแบบ Minimal */
-  heroStatusInlineGrid: {
+  /* 📊 Quick Stats Grid — การ์ดสถิติจริงแยกเป็นสัดส่วน แทนแถบเล็กในปุ่มเดิม */
+  statsGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(4, 1fr)",
-    gap: "6px",
-    borderTop: "1px solid rgba(255, 255, 255, 0.12)",
-    paddingTop: "12px"
+    gap: "8px",
+    marginBottom: "20px",
   },
-  inlineStatusBadge: {
-    borderRadius: "8px",
-    padding: "5px 2px",
+  statCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: "14px",
+    border: "1px solid #e2e8f0",
+    padding: "12px 6px",
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    justifyContent: "center",
+    gap: "6px",
+    boxShadow: "0 2px 4px rgba(0,0,0,0.015)",
   },
-  inlineStatusLabel: {
-    fontSize: "10px",
-    fontWeight: "500",
-    color: "rgba(255, 255, 255, 0.7)",
-    textAlign: "center",
-    marginBottom: "2px"
-  },
-  countWrapper: {
+  statIconCircle: {
+    width: "28px",
+    height: "28px",
+    borderRadius: "50%",
     display: "flex",
     alignItems: "center",
-    gap: "4px",
-    backgroundColor: "rgba(0, 0, 0, 0.15)", // วงแหวนมืดซับแรงเงาไอคอน
-    padding: "2px 6px",
-    borderRadius: "6px",
+    justifyContent: "center",
   },
-  inlineStatusCount: {
-    fontSize: "12.5px",
-    fontWeight: "700",
-    lineHeight: "1"
+  statNumber: {
+    fontSize: "17px",
+    fontWeight: "800",
+    color: "#0f172a",
+    lineHeight: 1,
+  },
+  statLabel: {
+    fontSize: "10px",
+    fontWeight: "600",
+    color: "#64748b",
+    textAlign: "center",
+  },
+  skeletonBlock: {
+    display: "inline-block",
+    width: "24px",
+    height: "17px",
+    borderRadius: "4px",
+    backgroundColor: "#e2e8f0",
+  },
+  skeletonPulseBg: {
+    backgroundColor: "#e2e8f0",
+    border: "none",
   },
 
-  /* 🧾 List Cards */
+  /* 📅 Today's Jobs — เลื่อนแนวนอนแบบฟีดในแอปมือถือ */
+  todayScrollRow: {
+    display: "flex",
+    gap: "10px",
+    overflowX: "auto",
+    paddingBottom: "6px",
+    marginBottom: "20px",
+    scrollSnapType: "x mandatory",
+  },
+  todayJobCard: {
+    minWidth: "220px",
+    maxWidth: "220px",
+    backgroundColor: "#ffffff",
+    borderRadius: "14px",
+    border: "1px solid #e2e8f0",
+    padding: "12px 14px",
+    boxShadow: "0 2px 4px rgba(0,0,0,0.015)",
+    flexShrink: 0,
+    scrollSnapAlign: "start",
+    minHeight: "88px",
+  },
+  todayJobTime: {
+    fontSize: "10.5px",
+    fontWeight: "700",
+    color: "#475569",
+    display: "flex",
+    alignItems: "center",
+  },
+  todayJobStatusChip: {
+    fontSize: "9px",
+    fontWeight: "700",
+    padding: "2px 7px",
+    borderRadius: "8px",
+    whiteSpace: "nowrap",
+  },
+  todayJobTitle: {
+    fontSize: "13px",
+    fontWeight: "700",
+    color: "#0f172a",
+    margin: "8px 0 2px 0",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
+  todayJobSite: {
+    fontSize: "10.5px",
+    color: "#94a3b8",
+    margin: 0,
+    display: "flex",
+    alignItems: "center",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
+  viewAllLink: {
+    fontSize: "11px",
+    fontWeight: "600",
+    color: "#4f46e5",
+    textDecoration: "none",
+    display: "flex",
+    alignItems: "center",
+    gap: "3px",
+  },
+
+  /* 🔔 Notifications Widget */
+  notiHeaderRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: "8px",
+    paddingLeft: "2px",
+    paddingRight: "2px",
+  },
+  notiUnreadBadge: {
+    fontSize: "10px",
+    fontWeight: "700",
+    color: "#ef4444",
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
+    padding: "2px 8px",
+    borderRadius: "10px",
+  },
+  notiCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: "14px",
+    border: "1px solid #e2e8f0",
+    boxShadow: "0 2px 4px rgba(0,0,0,0.015)",
+    marginBottom: "22px",
+    overflow: "hidden",
+  },
+  notiEmpty: {
+    padding: "24px 12px",
+    textAlign: "center",
+  },
+  notiRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    padding: "12px 14px",
+    cursor: "pointer",
+    transition: "background-color 0.15s ease",
+  },
+  notiIconCircle: {
+    width: "32px",
+    height: "32px",
+    borderRadius: "50%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  notiMessage: {
+    margin: 0,
+    fontSize: "12.5px",
+    fontWeight: "700",
+    color: "#0f172a",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
+  notiDetail: {
+    margin: "1px 0 0 0",
+    fontSize: "11px",
+    color: "#64748b",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
+  notiTime: {
+    fontSize: "10px",
+    color: "#94a3b8",
+    flexShrink: 0,
+    whiteSpace: "nowrap",
+  },
+
+  /* 🧾 Section Titles */
   sectionTitle: {
     fontSize: "11px",
     fontWeight: "700",
@@ -435,66 +676,56 @@ const styles = {
     marginBottom: "8px",
     paddingLeft: "2px",
   },
-  metricCard: {
+
+  /* 🚀 Quick Actions Grid — ทางลัดคล้ายหน้าโฮมแอปมือถือ พร้อม badge จำนวน */
+  quickActionsGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(4, 1fr)",
+    gap: "10px",
+    marginBottom: "10px",
+  },
+  quickActionItem: {
     backgroundColor: "#ffffff",
     borderRadius: "14px",
-    padding: "14px",
     border: "1px solid #e2e8f0",
+    padding: "12px 4px",
     display: "flex",
-    justifyContent: "space-between",
+    flexDirection: "column",
     alignItems: "center",
+    gap: "6px",
     boxShadow: "0 2px 4px rgba(0,0,0,0.015)",
-    marginBottom: "6px"
   },
-  featuredMetricCard: {
-    background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
-    border: "none",
-    boxShadow: "0 8px 16px -4px rgba(99, 102, 241, 0.3)",
-  },
-  cardContent: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-  },
-  iconContainer: {
-    width: "40px",
-    height: "40px",
-    borderRadius: "10px",
+  quickActionIcon: {
+    width: "44px",
+    height: "44px",
+    borderRadius: "12px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    flexShrink: 0,
   },
-  cardTitle: {
-    fontSize: "14px",
+  quickActionBadge: {
+    position: "absolute",
+    top: "-5px",
+    right: "-5px",
+    backgroundColor: "#ef4444",
+    color: "#fff",
+    fontSize: "9px",
     fontWeight: "700",
-    margin: 0,
-  },
-  cardDesc: {
-    fontSize: "11px",
-    margin: "2px 0 0 0",
-    lineHeight: "1.3",
-  },
-  cardRight: {
+    minWidth: "16px",
+    height: "16px",
+    borderRadius: "8px",
     display: "flex",
     alignItems: "center",
-    gap: "10px",
+    justifyContent: "center",
+    padding: "0 3px",
+    border: "2px solid #ffffff",
   },
-  bigNumber: {
-    fontSize: "20px",
-    fontWeight: "700",
-  },
-  arrowIcon: {
-    fontSize: "11px",
-  },
-  extraTag: {
-    display: "inline-block",
-    fontSize: "10px",
-    padding: "2px 6px",
-    borderRadius: "6px",
-    marginTop: "6px",
+  quickActionLabel: {
+    fontSize: "10.5px",
     fontWeight: "600",
-  }
+    color: "#334155",
+    textAlign: "center",
+  },
 };
 
 export default Dashboard;

@@ -15,63 +15,19 @@
 }
 
 /* --------------------------------------------------------------------------
-   RESPONSIVE MOBILE TOGGLE BUTTON & OVERLAY
-   -------------------------------------------------------------------------- */
-.sidebar-toggle-btn {
-  position: fixed;
-  top: 15px;
-  left: 15px;
-  z-index: 1050;
-  background-color: var(--bg-secondary);
-  color: var(--text-main);
-  border: 1px solid var(--bg-hover);
-  padding: 8px 12px;
-  border-radius: 8px;
-  font-size: 20px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-}
-
-.sidebar-toggle-btn:hover {
-  background-color: var(--bg-hover);
-  color: var(--accent-color);
-}
-
-.sidebar-overlay {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-  z-index: 1030;
-}
-
-/* --------------------------------------------------------------------------
    MAIN SIDEBAR CONTAINER
    -------------------------------------------------------------------------- */
+/* ✅ ไม่ position:fixed/transform ของตัวเองอีกแล้ว — ให้เต็มพื้นที่ของ <aside class="sidebarArea">
+   ที่ FullLayout.js ควบคุมการสไลด์เข้า/ออกอยู่แล้วจุดเดียว (กันสถานะเปิด/ปิดสองระบบขัดกัน) */
 .sidebar-container {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  width: var(--sidebar-width);
+  height: 100%;
+  width: 100%;
   background-color: var(--bg-primary);
   color: var(--text-main);
   border-right: 1px solid rgba(255, 255, 255, 0.05);
   overflow: hidden;
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 1040;
-  transform: translateX(-100%); /* ซ่อนไว้ทางซ้ายในจอมือถือ */
-  transition: transform var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* คลาสสำหรับสั่งให้เปิดสไลด์ออกมาบนมือถือ */
-.sidebar-container.show {
-  transform: translateX(0);
 }
 
 /* --------------------------------------------------------------------------
@@ -93,6 +49,20 @@
 
 .profile-img:hover {
   transform: scale(1.1) rotate(5deg);
+}
+
+/* ✅ ตัวอักษรย่อแทนรูปโปรไฟล์ตอนยังไม่มี imageUrl (แทน placeholder URL ภายนอกเดิม) */
+.profile-img-fallback {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--accent-color) 0%, #0284c7 100%);
+  color: #fff;
+  font-weight: 700;
+  font-size: 18px;
 }
 
 .user-name {
@@ -248,17 +218,6 @@
   color: var(--danger-color) !important;
 }
 
-/* --------------------------------------------------------------------------
-   RESPONSIVE BREAKPOINT FOR DESKTOP
-   -------------------------------------------------------------------------- */
-@media (min-width: 1200px) {
-  .sidebar-toggle-btn,
-  .sidebar-overlay {
-    display: none !important; /* ซ่อนปุ่มเปิดปิดและแผ่นหลังบนจอใหญ่ */
-  }
-
-  .sidebar-container {
-    transform: translateX(0); /* แสดงค้างไว้ตลอดเวลาบน Desktop */
-    position: fixed;
-  }
-}
+/* ✅ ไม่ต้องมี breakpoint แยกของตัวเองอีกแล้ว — การสลับ mobile/desktop (off-canvas vs
+   เต็มพื้นที่ถาวร) ทั้งหมดถูกควบคุมโดย FullLayout.css ที่ breakpoint 992px จุดเดียวแล้ว
+   (เดิมไฟล์นี้ใช้ 1200px ซึ่งไม่ตรงกัน ทำให้ช่วง 993–1199px แสดงผลขัดกันเอง) */

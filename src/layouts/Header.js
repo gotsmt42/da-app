@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AuthService from "../services/authService";
+import EventService from "../services/EventService";
 import { useAuth } from "../auth/AuthContext";
+import useEventNotifications from "../hooks/useEventNotifications";
+import NotificationBell from "../components/Notifications/NotificationBell";
 import './Header.css';
 import {
   Navbar,
@@ -23,11 +26,21 @@ const Header = ({ toggleMobileSidebar }) => {
   const navigate = useNavigate();
   const [user, setUser] = useState({});
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 992);
   const [pushSubscribed, setPushSubscribed] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
 
+  // ✅ ดึง events เองที่นี่ (แยกจากหน้า Operation) เพื่อให้กระดิ่งแจ้งเตือนเห็นได้ทุกหน้า
+  // ไม่ใช่แค่ตอนเปิดหน้า Operation ค้างไว้เท่านั้น — poll ทุก 30s เหมือนหน้าอื่นๆ ในระบบ
+  const [events, setEvents] = useState([]);
+
   const { userData, logout } = useAuth();
+  const isTechnician = userData?.role?.toLowerCase() === "technician";
+  const isAdminOrManager = ["admin", "manager"].includes(userData?.role?.toLowerCase());
+
+  const { notifications, unread, markRead } = useEventNotifications(
+    events,
+    isAdminOrManager ? "admin" : "technician"
+  );
 
   useEffect(() => {
     const getUserData = async () => {
@@ -39,20 +52,24 @@ const Header = ({ toggleMobileSidebar }) => {
       }
     };
 
+    const fetchEventsForNotifications = async () => {
+      try {
+        const res = await EventService.getEventOp();
+        setEvents(res?.userEvents || []);
+      } catch {
+        // เงียบไว้ — ไม่ใช่หน้าจอหลักของ endpoint นี้ ไม่ต้องกวนผู้ใช้ด้วย error
+      }
+    };
+
     getUserData();
+    fetchEventsForNotifications();
 
     if (PushService.isSupported()) {
       PushService.isSubscribed().then(setPushSubscribed);
     }
 
-    const checkIsMobile = () => {
-      setIsMobile(window.innerWidth <= 992);
-    };
-    window.addEventListener("resize", checkIsMobile);
-
-    return () => {
-      window.removeEventListener("resize", checkIsMobile);
-    };
+    const interval = setInterval(fetchEventsForNotifications, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const toggle = () => setDropdownOpen((prevState) => !prevState);
@@ -89,14 +106,15 @@ const Header = ({ toggleMobileSidebar }) => {
     }
   };
 
+  const initials = (userData?.fname?.charAt(0) || userData?.username?.charAt(0) || "U").toUpperCase();
+
   return (
     <Navbar dark expand="md" className="fix-header">
       <div className="d-flex align-items-center justify-content-between w-100">
-        
+
         {/* ฝั่งซ้าย: โลโก้แบรนด์ */}
         <NavbarBrand tag={Link} to="/dashboard" className="m-0">
           <div className="gradiant-bg">
-            {/* 🚀 ลบ inline style height: 40px ออกเพื่อให้ CSS ทำงานเต็มที่ */}
             <img src="logo-dark-2.png" alt="Logo" className="logo" />
           </div>
         </NavbarBrand>
@@ -112,13 +130,18 @@ const Header = ({ toggleMobileSidebar }) => {
           <NavItem>
             <Link to="/files" className="nav-link">เอกสารทั้งหมด</Link>
           </NavItem>
-          {/* <NavItem>
-            <Link to="/technician/jobs" className="nav-link">งานของฉัน</Link>
-          </NavItem> */}
+          {/* ✅ เดิม comment ทิ้งไว้ — ช่างไม่มีทางกดเข้า "งานของฉัน" จาก Header ได้เลย */}
+          {isTechnician && (
+            <NavItem>
+              <Link to="/technician/jobs" className="nav-link">งานของฉัน</Link>
+            </NavItem>
+          )}
         </Nav>
 
-        {/* ฝั่งขวา: รูปโปรไฟล์ผู้ใช้งาน + ปุ่มแฮมเบอร์เกอร์ */}
-        <div className="d-flex align-items-center gap-3">
+        {/* ฝั่งขวา: แจ้งเตือน + push toggle + รูปโปรไฟล์ผู้ใช้งาน + ปุ่มแฮมเบอร์เกอร์ */}
+        <div className="d-flex align-items-center gap-2">
+          <NotificationBell notifications={notifications} unread={unread} onItemClick={markRead} dark />
+
           <Button
             color="transparent"
             onClick={handleTogglePush}
@@ -133,14 +156,18 @@ const Header = ({ toggleMobileSidebar }) => {
           <div className="profile-img">
             <Dropdown isOpen={dropdownOpen} toggle={toggle}>
               <DropdownToggle color="transparent" style={{ padding: 0, border: 'none' }}>
-                <img
-                  src={userData?.imageUrl || "https://via.placeholder.com/30"}
-                  alt="profile"
-                  className="rounded-circle"
-                  width="38"
-                  height="38"
-                  style={{ objectFit: 'cover', border: '2px solid #243048' }}
-                />
+                {userData?.imageUrl ? (
+                  <img
+                    src={userData.imageUrl}
+                    alt="profile"
+                    className="rounded-circle"
+                    width="38"
+                    height="38"
+                    style={{ objectFit: 'cover', border: '2px solid #243048' }}
+                  />
+                ) : (
+                  <div className="header-avatar-fallback">{initials}</div>
+                )}
               </DropdownToggle>
               <DropdownMenu end className="modern-dropdown-menu">
                 <DropdownItem header>ข้อมูลผู้ใช้งาน</DropdownItem>
@@ -158,7 +185,7 @@ const Header = ({ toggleMobileSidebar }) => {
           </div>
 
           <Button
-            className="d-lg-none toggle-sidebar-btn" 
+            className="d-lg-none toggle-sidebar-btn"
             onClick={toggleMobileSidebar}
           >
             <FaBars style={{ fontSize: "22px", color: "#ffffff" }} />

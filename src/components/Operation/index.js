@@ -26,8 +26,7 @@ import {
   Tabs, Tab, Divider, useMediaQuery, useTheme, InputAdornment,
   Menu, MenuItem, ListItemIcon, ListItemText, Card, CardContent,
   Skeleton, Alert, Snackbar, ToggleButton, ToggleButtonGroup,
-  List, ListItem, ListItemAvatar, ListItemText as MuiListItemText,
-  Popover, Pagination,
+  List, ListItem, Pagination,
 } from "@mui/material";
 
 // MUI Icons
@@ -40,7 +39,7 @@ import {
   Refresh, ArrowUpward, ArrowDownward, Circle, ExpandMore,
   ExpandLess, FolderOpen, AttachFile, Login, Logout, Edit,
   NoteAdd, History, Person, AccessTime, FiberManualRecord,
-  NotificationsActive, TaskAlt, HourglassTop, Cancel,
+  TaskAlt, HourglassTop, Cancel,
   Send, Chat, Link as LinkIcon,
 } from "@mui/icons-material";
 
@@ -56,6 +55,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { styled, alpha } from "@mui/material/styles";
 
 import TechnicianJobCard from "../Technician/TechnicianJobPanel";
+import useEventNotifications from "../../hooks/useEventNotifications";
+import NotificationBell from "../Notifications/NotificationBell";
 
 // ─── Styled Components ────────────────────────────────────────────────
 const GlassCard = styled(Card)(({ theme }) => ({
@@ -550,215 +551,10 @@ const ClosureRequestsPanel = ({ events, onApprove, onReject }) => {
   );
 };
 
-// ═══════════════════════════════════════════════════════════════════════
-// ─── NEW: NotificationBell ────────────────────────────────────────────
-// แจ้งเตือนเทียบกับ snapshot ก่อนหน้า — เนื้อหาแตกต่างกันตาม role:
-//   admin/manager: มีคำขอปิดงานใหม่เข้ามา
-//   ช่าง: ผลอนุมัติ/ไม่อนุมัติคำขอปิดงานของตัวเอง + ข้อความตอบกลับจากแอดมิน
-// ═══════════════════════════════════════════════════════════════════════
-const NOTI_META = {
-  close_requested: { icon: <HourglassTop sx={{ fontSize: 16 }} />, color: "#f59e0b" },
-  close_approved:  { icon: <CheckCircle  sx={{ fontSize: 16 }} />, color: "#10b981" },
-  close_rejected:  { icon: <Cancel       sx={{ fontSize: 16 }} />, color: "#ef4444" },
-  comment:         { icon: <Chat         sx={{ fontSize: 16 }} />, color: "#3b82f6" },
-};
-
-const NotificationBell = ({ events, role = "admin" }) => {
-  // ✅ เก็บลิสต์แจ้งเตือน (พร้อมสถานะอ่านแล้ว/ยัง) ลง localStorage แยกตาม userId
-  // เพื่อให้ count และรายการไม่หายไปเมื่อรีเฟรชหน้า — โหลดค่าตั้งต้นจาก storage ตอน mount
-  const payload     = JSON.parse(localStorage.getItem("payload") || "{}");
-  const storageKey  = `noti_${payload?.userId || "guest"}_${role}`;
-
-  const [anchorEl,      setAnchorEl]      = useState(null);
-  const [notifications, setNotifications] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem(storageKey) || "[]");
-    } catch {
-      return [];
-    }
-  });
-  const prevEventsRef = useRef({});
-  // ✅ ข้ามการสร้างแจ้งเตือนในรอบแรกที่โหลดข้อมูล (แค่บันทึก snapshot ตั้งต้นไว้เทียบ)
-  // ไม่งั้นงานเก่าที่ปิดไปแล้ว/ขอปิดไปแล้วก่อนหน้านี้ จะโผล่เป็น "แจ้งเตือนใหม่" ทันทีที่เปิดหน้า
-  const isFirstRun = useRef(true);
-
-  const isNewTimestamp = (incoming, previous) =>
-    incoming && (!previous || new Date(incoming).getTime() !== new Date(previous).getTime());
-
-  // ✅ sync ลง localStorage ทุกครั้งที่ลิสต์เปลี่ยน (อ่านแล้ว/มีรายการใหม่เข้ามา) กันรีเฟรชแล้วหาย
-  useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify(notifications.slice(0, 30)));
-  }, [notifications, storageKey]);
-
-  useEffect(() => {
-    const newNoti = [];
-    const firstRun = isFirstRun.current;
-    events.forEach(ev => {
-      const prev = prevEventsRef.current[ev._id];
-
-      if (firstRun) {
-        // ยังไม่ต้องเทียบอะไร แค่รอบันทึก snapshot ท้ายลูปด้านล่าง
-      } else if (role === "admin") {
-        // ตรวจจับงานที่เพิ่งถูกช่างกดขอปิด (closeRequested: false/undefined → true)
-        // ⚠️ เดิมเช็คจาก checkedOutAt แต่ฟิลด์นี้เลิกถูกตั้งค่าไปแล้วตั้งแต่เปลี่ยนมาใช้
-        // ระบบ "ขอปิดงาน" (closeRequested) ทำให้กระดิ่งแจ้งเตือนไม่เคยทำงานอีกเลย
-        if (ev.closeRequested && (!prev || !prev.closeRequested)) {
-          newNoti.push({
-            id:      ev._id + "_closereq_" + (ev.closeRequestedAt || Date.now()),
-            type:    "close_requested",
-            message: `${ev.closeRequestedBy || "ช่าง"} ขอปิดงาน`,
-            detail:  `${ev.company} · ${ev.site}`,
-            time:    ev.closeRequestedAt || new Date().toISOString(),
-            eventId: ev._id,
-          });
-        }
-      } else {
-        // ฝั่งช่าง: แจ้งผลอนุมัติ/ไม่อนุมัติคำขอปิดงานของตัวเอง (เทียบเวลาจริง เผื่อโดนตีกลับซ้ำหลายรอบ)
-        if (isNewTimestamp(ev.closeApprovedAt, prev?.closeApprovedAt)) {
-          newNoti.push({
-            id:      ev._id + "_approved_" + ev.closeApprovedAt,
-            type:    "close_approved",
-            message: "แอดมินอนุมัติปิดงานแล้ว",
-            detail:  `${ev.company} · ${ev.site}`,
-            time:    ev.closeApprovedAt,
-            eventId: ev._id,
-          });
-        }
-        if (isNewTimestamp(ev.closeRejectedAt, prev?.closeRejectedAt)) {
-          newNoti.push({
-            id:      ev._id + "_rejected_" + ev.closeRejectedAt,
-            type:    "close_rejected",
-            message: "แอดมินไม่อนุมัติปิดงาน",
-            detail:  ev.closeRejectReason ? `${ev.company} · ${ev.site}: ${ev.closeRejectReason}` : `${ev.company} · ${ev.site}`,
-            time:    ev.closeRejectedAt,
-            eventId: ev._id,
-          });
-        }
-        // ข้อความใหม่จากแอดมิน/manager (comments เก็บมาทั้งชุดเสมอ จึงเทียบจำนวนแทน)
-        const comments     = ev.comments || [];
-        const prevComments = prev?.comments || [];
-        if (comments.length > prevComments.length) {
-          comments.slice(prevComments.length)
-            .filter(c => c.role !== "technician")
-            .forEach(c => {
-              newNoti.push({
-                id:      ev._id + "_comment_" + c.timestamp,
-                type:    "comment",
-                message: `${c.userName || "แอดมิน"} ตอบกลับ`,
-                detail:  `${ev.company} · ${ev.site}: ${c.message}`,
-                time:    c.timestamp,
-                eventId: ev._id,
-              });
-            });
-        }
-      }
-
-      // บันทึก snapshot
-      prevEventsRef.current[ev._id] = ev;
-    });
-    isFirstRun.current = false;
-
-    if (newNoti.length > 0) {
-      setNotifications(prev => {
-        // กันซ้ำ (id เดิมที่ rehydrate มาจาก localStorage อยู่แล้วตอน mount)
-        const existingIds = new Set(prev.map(p => p.id));
-        const fresh = newNoti.filter(n => !existingIds.has(n.id)).map(n => ({ ...n, read: false }));
-        return [...fresh, ...prev].slice(0, 30);
-      });
-    }
-  }, [events, role]);
-
-  // ✅ count = จำนวนแจ้งเตือนที่ยังไม่เคยเปิดดู (read: false) ลดลงทีละอันตอนกดเข้าไปดูงานนั้นครั้งแรก
-  // รายการจะยังอยู่ในลิสต์เสมอ (แค่จางลง) กดย้อนกลับไปดูซ้ำได้ตลอด — ไม่ถูกลบทิ้ง
-  const unread = notifications.filter(n => !n.read).length;
-  const navigate = useNavigate();
-
-  const handleOpen = (e) => setAnchorEl(e.currentTarget);
-  const handleClose = () => setAnchorEl(null);
-
-  // ✅ กดที่รายการแจ้งเตือน ให้พาไปหน้างานนั้น + มาร์คว่าอ่านแล้ว (count ลดของอันนั้นอันเดียว)
-  // แต่ยังคงอยู่ในลิสต์ให้กดย้อนกลับมาดูอีกได้ (แค่จางสีลง)
-  const handleNotificationClick = (n) => {
-    setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x));
-    setAnchorEl(null);
-    if (n.eventId) navigate(`/operation/${n.eventId}`);
-  };
-
-  return (
-    <>
-      <Tooltip title="การแจ้งเตือน">
-        <IconButton
-          onClick={handleOpen}
-          size="small"
-          sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2 }}>
-          <Badge badgeContent={unread} color="error" max={9}>
-            <Notifications fontSize="small" />
-          </Badge>
-        </IconButton>
-      </Tooltip>
-
-      <Popover
-        open={Boolean(anchorEl)}
-        anchorEl={anchorEl}
-        onClose={handleClose}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-        transformOrigin={{ vertical: "top", horizontal: "right" }}
-        PaperProps={{ sx: { borderRadius: 3, width: 320, boxShadow: "0 8px 32px rgba(0,0,0,0.12)" } }}>
-        <Box sx={{ p: 2, borderBottom: "1px solid", borderColor: "divider" }}>
-          <Stack direction="row" alignItems="center" gap={1}>
-            <NotificationsActive sx={{ fontSize: 18, color: "primary.main" }} />
-            <Typography fontWeight={700} fontSize="0.9rem">การแจ้งเตือน</Typography>
-          </Stack>
-        </Box>
-        {notifications.length === 0 ? (
-          <Box sx={{ p: 3, textAlign: "center", color: "text.disabled" }}>
-            <Notifications sx={{ fontSize: 36, opacity: 0.25 }} />
-            <Typography variant="body2">ยังไม่มีการแจ้งเตือน</Typography>
-          </Box>
-        ) : (
-          <List disablePadding sx={{ maxHeight: 360, overflowY: "auto" }}>
-            {notifications.map((n, i) => {
-              const meta = NOTI_META[n.type] || NOTI_META.close_requested;
-              return (
-              <ListItem key={n.id} divider={i < notifications.length - 1}
-                onClick={() => handleNotificationClick(n)}
-                sx={{
-                  py: 1.25, px: 2, cursor: n.eventId ? "pointer" : "default",
-                  opacity: n.read ? 0.5 : 1,
-                  transition: "opacity 0.2s ease, background-color 0.15s ease",
-                  "&:hover": n.eventId ? { bgcolor: t => alpha(t.palette.primary.main, 0.06) } : {},
-                }}>
-                <ListItemAvatar sx={{ minWidth: 36 }}>
-                  <Avatar sx={{
-                    width: 30, height: 30,
-                    bgcolor: n.read ? alpha("#6b7280", 0.12) : alpha(meta.color, 0.12),
-                    color: n.read ? "#6b7280" : meta.color,
-                  }}>
-                    {meta.icon}
-                  </Avatar>
-                </ListItemAvatar>
-                <MuiListItemText
-                  primary={
-                    <Typography variant="caption" fontWeight={n.read ? 500 : 700}>{n.message}</Typography>
-                  }
-                  secondary={
-                    <Stack>
-                      <Typography variant="caption" color="text.secondary">{n.detail}</Typography>
-                      <Typography variant="caption" color="text.disabled">
-                        {moment(n.time).locale("th").fromNow()}
-                      </Typography>
-                    </Stack>
-                  }
-                />
-              </ListItem>
-              );
-            })}
-          </List>
-        )}
-      </Popover>
-    </>
-  );
-};
+// ─── NotificationBell ─────────────────────────────────────────────────
+// ✅ ย้ายไปเป็น shared hook (useEventNotifications) + shared component
+// (components/Notifications/NotificationBell) ให้ Header ใช้ร่วมได้ทุกหน้า
+// ไม่ใช่แค่ตอนเปิดหน้า Operation ค้างไว้เท่านั้น
 
 // ─── ActivityLogMini ──────────────────────────────────────────────────
 const ActivityLogMini = ({ logs = [] }) => {
@@ -2446,6 +2242,10 @@ const Operation = () => {
   };
 
   const isAdminOrManager = ["admin", "manager"].includes(currentUserRole);
+  const { notifications, unread, markRead } = useEventNotifications(
+    events,
+    isAdminOrManager ? "admin" : "technician"
+  );
 
   return (
     <Box sx={{ px: { xs: 1, sm: 2, md: 3 }, py: 3, maxWidth: 1400, mx: "auto" }}>
@@ -2466,7 +2266,7 @@ const Operation = () => {
             </IconButton>
           </Tooltip>
           {/* Notification bell — ทุก role เห็น แต่เนื้อหาต่างกันตามฝั่ง (ดูคอมเมนต์ใน NotificationBell) */}
-          <NotificationBell events={events} role={isAdminOrManager ? "admin" : "technician"} />
+          <NotificationBell notifications={notifications} unread={unread} onItemClick={markRead} />
           <Tooltip title="Export CSV (รวมเวลาเข้า/ออก + สรุปงาน)">
             <IconButton onClick={handleExportCSV} size="small"
               sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2 }}>
