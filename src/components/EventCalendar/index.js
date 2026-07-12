@@ -27,10 +27,14 @@ import {
   faHourglassHalf,
   faCheck,
   faCheckDouble,
+  faFilter,
+  faXmark,
 } from "@fortawesome/free-solid-svg-icons"; // Import ไอคอนต่างๆ
 
 import CustomerService from "../../services/CustomerService";
 import EventService from "../../services/EventService";
+import JobTypeService from "../../services/JobTypeService";
+import SystemTypeService from "../../services/SystemTypeService";
 
 import AuthService from "../../services/authService";
 
@@ -39,8 +43,6 @@ import moment from "moment";
 import { ThreeDots } from "react-loader-spinner";
 
 import generatePDF, { Resolution, Margin } from "react-to-pdf";
-
-import { Col, Row } from "reactstrap";
 
 import { CSVLink } from "react-csv";
 
@@ -139,6 +141,11 @@ function EventCalendar() {
   const [loading, setLoading] = useState(false); // เพิ่มสถานะการโหลด
 
   const [searchTerm, setSearchTerm] = useState(""); // 🔍 State สำหรับค้นหา
+  const [selectedTechnician, setSelectedTechnician] = useState(""); // "" = ทุกคน, ไม่งั้นเก็บ _id
+  const [selectedStatus, setSelectedStatus] = useState(""); // "" = ทุกสถานะ
+  const [selectedJobType, setSelectedJobType] = useState(""); // "" = ทุกประเภทงาน (event.title)
+  const [selectedSystem, setSelectedSystem] = useState(""); // "" = ทุกระบบ (event.system)
+  const [showFilterPanel, setShowFilterPanel] = useState(false); // ✅ ซ่อนตัวกรองไว้ ไม่ให้เกะกะจอมือถือโดย default
 
   const calendarRef = useRef(null);
 
@@ -346,9 +353,12 @@ function EventCalendar() {
       setDefaultFontSize,
       saveEventToDB,
       fetchEventsFromDB,
+      fetchLookupOptions,
 
       CustomerService,
       AuthService,
+      JobTypeService,
+      SystemTypeService,
       Swal,
       TomSelect,
       moment,
@@ -361,6 +371,7 @@ function EventCalendar() {
       events,
       setEvents,
       fetchEventsFromDB,
+      fetchLookupOptions,
       eventInfo,
       setLoading,
       generateWorkPermitPDF,
@@ -368,6 +379,8 @@ function EventCalendar() {
       EventService,
       CustomerService,
       AuthService,
+      JobTypeService,
+      SystemTypeService,
       Swal,
       TomSelect,
       moment,
@@ -477,6 +490,8 @@ function EventCalendar() {
   }, []);
 
   const [employeeList, setEmployeeList] = useState([]);
+  const [jobTypeOptions, setJobTypeOptions] = useState([]);
+  const [systemOptions, setSystemOptions] = useState([]);
 
   useEffect(() => {
     (async () => {
@@ -485,8 +500,42 @@ function EventCalendar() {
     })();
   }, []);
 
+  // ✅ ตัวเลือก "ประเภทงาน"/"ระบบ" ในตัวกรอง — เดิมดึงเฉพาะค่าที่เคยใช้ในงานที่มีอยู่แล้ว
+  // (เดายาก/ไม่ครบถ้วน) ตอนนี้มีตารางกลาง "ประเภทงาน"/"ระบบ" จัดการได้จริงที่ /worktype แล้ว
+  // ดึงจากตรงนั้นแทน ให้ครบทุกตัวเลือกที่มีจริงในระบบ ไม่ใช่แค่ที่เคยถูกใช้ไปแล้ว
+  const fetchLookupOptions = async () => {
+    const [jobTypes, systemTypes] = await Promise.all([
+      JobTypeService.getAll().catch(() => ({ items: [] })),
+      SystemTypeService.getAll().catch(() => ({ items: [] })),
+    ]);
+    setJobTypeOptions((jobTypes?.items || []).map((t) => t.name).sort());
+    setSystemOptions((systemTypes?.items || []).map((s) => s.name).sort());
+  };
+
+  useEffect(() => {
+    fetchLookupOptions();
+  }, []);
+
+  // ✅ ช่างเทคนิคทั้งหมด — ใช้สร้าง dropdown ค้นหางานของช่างแต่ละคน (resPerson เก็บเป็น _id)
+  const technicianOptions = useMemo(
+    () => employeeList.filter((u) => u.role?.toLowerCase() === "technician"),
+    [employeeList],
+  );
+
+  const activeFilterCount = [selectedTechnician, selectedStatus, selectedJobType, selectedSystem].filter(Boolean).length;
+  const hasActiveFilters = Boolean(searchTerm) || activeFilterCount > 0;
+  const clearFilters = () => {
+    setSearchTerm("");
+    setSelectedTechnician("");
+    setSelectedStatus("");
+    setSelectedJobType("");
+    setSelectedSystem("");
+  };
+
   const filteredCalendarEvents = useMemo(() => {
     const keyword = searchTerm.toLowerCase();
+    // เผื่องานเก่าที่ยังไม่มี resPerson (ผูกด้วยชื่อ team แทน) ให้ยังกรองเจอได้เหมือนกัน
+    const selectedTechnicianName = technicianOptions.find((t) => t._id === selectedTechnician)?.fname;
 
     return events.filter((event) => {
       // หาคนที่เป็นเจ้าของ event จาก employeeList
@@ -497,7 +546,7 @@ function EventCalendar() {
 
       const ownerName = owner?.username?.toLowerCase() || "";
 
-      return [
+      const matchesKeyword = [
         event.title ?? "",
         event.site ?? "",
         event.company ?? "",
@@ -506,8 +555,19 @@ function EventCalendar() {
         event.time?.toString() ?? "",
         ownerName, // ✅ เพิ่มชื่อเจ้าของเข้าไปในเงื่อนไข search
       ].some((field) => field.toLowerCase().includes(keyword));
+
+      const matchesTechnician =
+        !selectedTechnician ||
+        event.resPerson === selectedTechnician ||
+        (!event.resPerson && selectedTechnicianName && event.team === selectedTechnicianName);
+
+      const matchesStatus = !selectedStatus || event.status === selectedStatus;
+      const matchesJobType = !selectedJobType || event.title === selectedJobType;
+      const matchesSystem = !selectedSystem || event.system === selectedSystem;
+
+      return matchesKeyword && matchesTechnician && matchesStatus && matchesJobType && matchesSystem;
     });
-  }, [events, searchTerm, employeeList]);
+  }, [events, searchTerm, employeeList, selectedTechnician, selectedStatus, selectedJobType, selectedSystem, technicianOptions]);
 
   const getStatusIcon = useCallback((status) => {
     const icons = {
@@ -531,54 +591,125 @@ function EventCalendar() {
 
 
   return (
-<div className="modern-calendar-container">      <Row className="flex-wrap mb-3 d-flex justify-content-center justify-content-md-between">
-        <Col className="col-12 col-md-5 col-lg">
-          <button className="btn btn-sm btn-danger" onClick={generatePdf}>
-            <FontAwesomeIcon icon={faFilePdf} /> สร้าง PDF
+    <div className="modern-calendar-container">
+      {/* ✅ แถบเดียวกระชับ: ค้นหา + ปุ่มตัวกรอง (มี badge บอกจำนวนที่เลือกไว้) + Export
+          แบบไอคอนล้วน — เดิมมีทั้งแถวปุ่ม Export ข้อความยาว + แถวค้นหา + dropdown 2 ตัวโชว์
+          ตลอดเวลา กินพื้นที่แนวตั้งเยอะมากบนจอมือถือ ตอนนี้ซ่อนตัวกรองทั้งหมดไว้หลังปุ่มเดียว
+          กดเปิดเฉพาะตอนต้องการ ไม่เกะกะจอเวลาแค่อยากดูปฏิทินเฉยๆ */}
+      <div className="event-toolbar-row mb-2">
+        <div className="event-search-input">
+          <span className="event-search-icon">🔍</span>
+          <input
+            type="search"
+            placeholder="ค้นหาแผนงาน เช่น ชื่อโครงการ หัวข้อ ระบบ..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+
+        <button
+          className={`filter-toggle-btn ${showFilterPanel ? "filter-toggle-btn--open" : ""} ${activeFilterCount > 0 ? "filter-toggle-btn--active" : ""}`}
+          onClick={() => setShowFilterPanel((p) => !p)}
+          title="ตัวกรอง"
+        >
+          <FontAwesomeIcon icon={faFilter} />
+          {activeFilterCount > 0 && <span className="filter-badge">{activeFilterCount}</span>}
+        </button>
+
+        <button className="toolbar-icon-btn toolbar-icon-btn--pdf" onClick={generatePdf} title="สร้าง PDF">
+          <FontAwesomeIcon icon={faFilePdf} />
+        </button>
+
+        <CSVLink
+          data={
+            filteredCalendarEvents
+              ? Object.values(filteredCalendarEvents)
+                  .sort((a, b) => new Date(a.start) - new Date(b.start))
+                  .map((event) => ({
+                    วันที่เริ่มต้น: moment(event.start).format("YYYY-MM-DD"),
+                    วันที่สิ้นสุด: event.end
+                      ? moment(event.end).format("YYYY-MM-DD")
+                      : moment(event.start).format("YYYY-MM-DD"),
+                    บริษัท: event.company ?? "",
+                    สถานที่ติดตั้ง: event.site ?? "",
+                    หัวข้อ: event.title ?? "",
+                    ระบบ: event.system ?? "",
+                    // ⚠️ event.extendedProps มีแค่ userId/lastModifiedBy/startTime/endTime เท่านั้น
+                    // (ดู FetchEvents.js) ไม่มี time/team อยู่ในนั้นเลย ต้องอ่านจาก event.time/event.team
+                    // (top-level) โดยตรง ไม่งั้นสองคอลัมน์นี้จะว่างเปล่าทุกแถวใน Excel/CSV ที่ export ออกไป
+                    ครั้งที่: event.time ? `'${event.time}` : "",
+                    ทีมงาน: event.team ?? "",
+
+                    เวลาเริ่ม: event.extendedProps?.startTime ?? "",
+                    เวลาสิ้นสุด: event.extendedProps?.endTime ?? "",
+                  }))
+              : []
+          }
+          filename="events.csv"
+        >
+          <button className="toolbar-icon-btn toolbar-icon-btn--excel" title="สร้าง Excel">
+            <FontAwesomeIcon icon={faFileExcel} />
           </button>
-          <CSVLink
-            data={
-              filteredCalendarEvents
-                ? Object.values(filteredCalendarEvents)
-                    .sort((a, b) => new Date(a.start) - new Date(b.start))
-                    .map((event) => ({
-                      วันที่เริ่มต้น: moment(event.start).format("YYYY-MM-DD"),
-                      วันที่สิ้นสุด: event.end
-                        ? moment(event.end).format("YYYY-MM-DD")
-                        : moment(event.start).format("YYYY-MM-DD"),
-                      บริษัท: event.company ?? "",
-                      สถานที่ติดตั้ง: event.site ?? "",
-                      หัวข้อ: event.title ?? "",
-                      ระบบ: event.system ?? "",
-                      // ⚠️ event.extendedProps มีแค่ userId/lastModifiedBy/startTime/endTime เท่านั้น
-                      // (ดู FetchEvents.js) ไม่มี time/team อยู่ในนั้นเลย ต้องอ่านจาก event.time/event.team
-                      // (top-level) โดยตรง ไม่งั้นสองคอลัมน์นี้จะว่างเปล่าทุกแถวใน Excel/CSV ที่ export ออกไป
-                      ครั้งที่: event.time ? `'${event.time}` : "",
-                      ทีมงาน: event.team ?? "",
-
-                      เวลาเริ่ม: event.extendedProps?.startTime ?? "",
-                      เวลาสิ้นสุด: event.extendedProps?.endTime ?? "",
-                    }))
-                : []
-            }
-            filename="events.csv"
-          >
-            <button className="btn btn-sm btn-success mx-1 m-2">
-              <FontAwesomeIcon icon={faFileExcel} /> สร้าง Excel
-            </button>
-          </CSVLink>
-        </Col>
-      </Row>
-
-      <div className="mb-3">
-        <input
-          type="search"
-          className="form-control"
-          placeholder="🔍 ค้นหาแผนงาน เช่น ชื่อโครงการ หัวข้อ ระบบ..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+        </CSVLink>
       </div>
+
+      {/* ✅ แผงตัวกรอง — พับซ่อนไว้ default กดปุ่มช่องแว่นขยาย/漏斗ด้านบนถึงเปิด แยกประเภทงาน/ระบบ
+          เพิ่มจากเดิมที่มีแค่ช่าง/สถานะ ให้ค้นหางานตามหมวดได้ครบขึ้น */}
+      {showFilterPanel && (
+        <div className="event-filter-panel mb-3">
+          <select
+            className="event-filter-select"
+            value={selectedTechnician}
+            onChange={(e) => setSelectedTechnician(e.target.value)}
+          >
+            <option value="">ช่างทุกคน</option>
+            {technicianOptions.map((tech) => (
+              <option key={tech._id} value={tech._id}>
+                {tech.fname ? `${tech.fname} ${tech.lname || ""}`.trim() : tech.username}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="event-filter-select"
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value)}
+          >
+            <option value="">ทุกสถานะ</option>
+            {statusLegend.map((s) => (
+              <option key={s.label} value={s.label}>{s.label}</option>
+            ))}
+          </select>
+
+          <select
+            className="event-filter-select"
+            value={selectedJobType}
+            onChange={(e) => setSelectedJobType(e.target.value)}
+          >
+            <option value="">ทุกประเภทงาน</option>
+            {jobTypeOptions.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+
+          <select
+            className="event-filter-select"
+            value={selectedSystem}
+            onChange={(e) => setSelectedSystem(e.target.value)}
+          >
+            <option value="">ทุกระบบ</option>
+            {systemOptions.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+
+          {hasActiveFilters && (
+            <button className="event-filter-clear" onClick={clearFilters}>
+              <FontAwesomeIcon icon={faXmark} /> ล้างตัวกรองทั้งหมด
+            </button>
+          )}
+        </div>
+      )}
       <div
         id="content-id"
         className="calendar-wrapper"
@@ -713,7 +844,7 @@ function EventCalendar() {
 
             return {
               html: `
-                <div style="position: relative; display: flex; align-items: center; padding: ${badgePadding}; width: 110%;">
+                <div style="position: relative; display: flex; align-items: center; padding: ${badgePadding}; width: 100%;">
                   <div style="font-size: ${fontSize}; line-height: 2; padding: 0px; flex: 1; min-width: 0;">
                     <div>[ ${title} ]  </div>
 

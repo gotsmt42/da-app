@@ -11,6 +11,7 @@ import {
   FaChevronRight,
   FaInfoCircle,
   FaSignOutAlt,
+  FaTags,
 } from "react-icons/fa";
 import Swal from "sweetalert2";
 import { useAuth } from "../auth/AuthContext";
@@ -74,6 +75,7 @@ const Settings = () => {
     { title: "พนักงาน", desc: "จัดการสิทธิ์และข้อมูลพนักงาน", link: "/employee", icon: <FaUsers size={18} />, color: "#f43f5e" },
     { title: "สินค้า", desc: "จัดการรายการสินค้าในระบบ", link: "/product", icon: <FaBoxOpen size={18} />, color: "#dc2626" },
     { title: "สต็อกสินค้า", desc: "ตรวจสอบจำนวนคงเหลือในคลัง", link: "/product/stock", icon: <FaWarehouse size={18} />, color: "#b91c1c" },
+    { title: "ประเภทงาน / ระบบ", desc: "จัดการตัวเลือกใน dropdown ตอนเพิ่ม/แก้ไขแผนงาน", link: "/worktype", icon: <FaTags size={18} />, color: "#8b5cf6" },
   ];
 
   return (

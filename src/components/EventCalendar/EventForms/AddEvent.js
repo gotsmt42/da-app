@@ -175,6 +175,14 @@ function injectAddStyles() {
   document.head.appendChild(style);
 }
 
+// ✅ กันบันทึกซ้ำแบบ module-level (ไม่ผูกกับ closure ของ didOpen แต่ละครั้ง) — เคยพบว่ากด
+// เพิ่มแผนงานทีเดียว แต่โครงการ/ประเภทงาน/ระบบ ไปลงตารางซ้ำ 2 แถว ต้นเหตุที่เป็นไปได้คือ
+// dateClick ของ FullCalendar ยิงซ้ำ (พบได้บนอุปกรณ์ทัชสกรีนบางรุ่น) ทำให้ didOpen รันซ้ำ และ
+// ปุ่มยืนยันมี listener ซ้อนกันสองตัว คลิกครั้งเดียวจึงทำงานสองรอบ — ตัวแปรนี้อยู่นอกฟังก์ชัน
+// จึงกันได้แม้ listener จะถูก attach ซ้ำกี่ตัวก็ตาม (ต่างจาก flag ที่ผูกกับ closure ของแต่ละ
+// didOpen ซึ่งจะมีคนละตัวแปรกันถ้า didOpen รันซ้ำจริง ป้องกันไม่ได้)
+let isSavingEvent = false;
+
 /* ─────────────────────────────────────────────
    MAIN EXPORT
 ───────────────────────────────────────────── */
@@ -187,17 +195,24 @@ export const getAddEvent = async ({
   setDefaultFontSize,
   saveEventToDB,
   fetchEventsFromDB,
+  fetchLookupOptions,
   CustomerService,
   AuthService,
+  JobTypeService,
+  SystemTypeService,
   Swal,
   TomSelect,
   moment,
 }) => {
   injectAddStyles();
 
-  const [customers, employees] = await Promise.all([
+  // ✅ เดิม titleOpts/systemOpts เป็น array ฝังโค้ดตายตัว แก้ไขเองไม่ได้นอกจากแก้โค้ด —
+  // ดึงจากตาราง "ประเภทงาน"/"ระบบ" ที่จัดการได้จริงผ่านหน้า /worktype (Settings) แทน
+  const [customers, employees, jobTypes, systemTypes] = await Promise.all([
     CustomerService.getCustomers(),
     AuthService.getAllUserData(),
+    JobTypeService.getAll(),
+    SystemTypeService.getAll(),
   ]);
   const employeeList = employees?.allUser || [];
   // ใช้ผูก resPerson (ID จริง) จากชื่อที่เลือกใน dropdown ทีม
@@ -215,14 +230,11 @@ export const getAddEvent = async ({
     .map((c) => `<option value="${c.cSite}">${c.cSite}</option>`)
     .join("");
 
-  const titleOpts = [
-    "LOCAL","PO","PM","Service","Training","Inspection",
-    "Test & Commissioning","สำรวจหน้างาน","ตรวจเช็คปัญหา",
-    "แก้ไขปัญหา","สแตนบาย","เปลี่ยนอุปกรณ์","ติดตั้งอุปกรณ์",
-  ].map((t) => `<option value="${t}">${t}</option>`).join("");
+  const titleOpts = (jobTypes?.items || [])
+    .map((t) => `<option value="${t.name}">${t.name}</option>`).join("");
 
-  const systemOpts = ["Office","Fire Alarm","CCTV","Access Control","Networks"]
-    .map((s) => `<option value="${s}">${s}</option>`).join("");
+  const systemOpts = (systemTypes?.items || [])
+    .map((s) => `<option value="${s.name}">${s.name}</option>`).join("");
 
   const timeOpts = ["1","2","3","4"]
     .map((t) => `<option value="${t}">${t}</option>`).join("");
@@ -419,6 +431,8 @@ export const getAddEvent = async ({
       document.getElementById("ae-btnCancel")?.addEventListener("click", () => Swal.close());
 
       document.getElementById("ae-btnConfirm")?.addEventListener("click", async (clickEvt) => {
+        if (isSavingEvent) return; // ✅ กันกรณี listener ถูก attach/ยิงซ้ำ ไม่ให้บันทึกซ้ำ
+
         // ✅ กันเผื่อ TomSelect หลุด placeholder text ออกมาเป็นค่าจริงตอนไม่ได้เลือกอะไรเลย
         const PLACEHOLDER = "— เลือกหรือพิมพ์ —";
         const getVal = (id) => {
@@ -465,6 +479,7 @@ export const getAddEvent = async ({
         }
 
         // ✅ กันกดซ้ำระหว่างบันทึก + ให้เห็นว่ากำลังทำงานอยู่
+        isSavingEvent = true;
         const btn = clickEvt.currentTarget;
         const originalLabel = btn.textContent;
         btn.disabled = true;
@@ -506,6 +521,9 @@ export const getAddEvent = async ({
               };
 
           /* upsert customer */
+          // ✅ .catch(() => {}) กันไว้ — ฝั่ง backend ตอนนี้มี unique index (cCompany+cSite) กันซ้ำ
+          // จริงจังแล้ว ถ้า "existing" ด้านบนพลาดเพราะ snapshot เก่า (เช่น listener ยิงซ้ำ) แล้ว
+          // backend ตีกลับ 409 ไม่ควรทำให้การบันทึกแผนงานทั้งฟอร์มพังไปด้วย แค่ข้ามการเพิ่มโครงการซ้ำ
           const existing = customers.userCustomers.find(
             (c) => c.cCompany === payload.company && c.cSite === payload.site
           );
@@ -513,7 +531,18 @@ export const getAddEvent = async ({
             await CustomerService.AddCustomer({
               cCompany: payload.company ?? "",
               cSite:    payload.site    ?? "",
-            });
+            }).catch(() => {});
+          }
+
+          // ✅ TomSelect ของช่องประเภทงาน/ระบบเปิด create:true ไว้ (พิมพ์ค่าใหม่ที่ไม่มีในลิสต์ได้)
+          // เดิมค่าที่พิมพ์ใหม่ถูกบันทึกแค่ในตัวแผนงานนี้ ไม่เคยเข้าตารางกลาง "ประเภทงาน"/"ระบบ"
+          // เลย ทำให้ครั้งถัดไปต้องพิมพ์ใหม่ซ้ำอีก ไม่โผล่เป็นตัวเลือกให้เลือก — upsert เข้าตาราง
+          // กลางเหมือนที่ทำกับลูกค้า/โครงการด้านบน ถ้ายังไม่มีชื่อนี้อยู่ก่อน
+          if (!jobTypes?.items?.some((t) => t.name === title)) {
+            await JobTypeService.add(title).catch(() => {});
+          }
+          if (!systemTypes?.items?.some((s) => s.name === system)) {
+            await SystemTypeService.add(system).catch(() => {});
           }
 
           // ⚠️ เดิม optimistic-add newEvent เข้า state ตรงนี้ก่อน แต่ newEvent ไม่มี id/ _id เลย
@@ -525,6 +554,8 @@ export const getAddEvent = async ({
           setDefaultBackgroundColor(payload.backgroundColor);
           setDefaultFontSize(payload.fontSize);
           await fetchEventsFromDB();
+          await fetchLookupOptions?.(); // ✅ รีเฟรชตัวเลือกตัวกรองให้เห็นประเภทงาน/ระบบที่เพิ่งพิมพ์ใหม่ทันที
+          isSavingEvent = false;
 
           Swal.fire({
             title: "บันทึกแผนงานสำเร็จ ✅",
@@ -534,6 +565,7 @@ export const getAddEvent = async ({
           });
         } catch (error) {
           console.error("❌ Error saving event:", error);
+          isSavingEvent = false;
           btn.disabled = false;
           btn.style.opacity = "1";
           btn.textContent = originalLabel;

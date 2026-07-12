@@ -21,6 +21,7 @@ const Breadcrumbs = lazy(() => import("../views/ui/Breadcrumbs"));
 const Account = lazy(() => import("../components/User/Employee/Account.js"));
 const Product = lazy(() => import("../views/ui/Product"));
 const StockProduct = lazy(() => import("../views/ui/StockProduct"));
+const WorkTypeSystem = lazy(() => import("../views/ui/WorkTypeSystem.js"));
 const Files = lazy(() => import("../views/ui/Files"));
 const FileUpload = lazy(() => import("../views/ui/FileUpload"));
 const EventCalendar = lazy(() => import("../views/ui/EventCalendar.js"));
@@ -131,6 +132,17 @@ const ThemeRoutes = [
           </AdminRoute>
         ),
         title: "Customer",
+      },
+      {
+        path: "worktype",
+        element: (
+          <AdminRoute>
+            <Suspense fallback={<div>Loading...</div>}>
+              <WorkTypeSystem />
+            </Suspense>
+          </AdminRoute>
+        ),
+        title: "Work Type",
       },
       {
         path: "employee",

@@ -294,10 +294,15 @@ const STATUS_CONFIG = {
 // ที่ปล่อยให้แอดมิน/manager เป็นคนเปลี่ยนสถานะขั้นถัดไป (กำลังดำเนินการ/ดำเนินการเสร็จสิ้น) เท่านั้น
 const TECH_EDITABLE_STATUSES = ["กำลังรอยืนยัน", "ยืนยันแล้ว"];
 
+// ✅ กันบันทึกซ้ำแบบ module-level เหมือนใน AddEvent.js — กันกรณี didOpen/listener ของปุ่มยืนยัน
+// ถูก attach ซ้ำ (เช่น เปิดฟอร์มแก้ไขซ้อนกันสองครั้งเร็วๆ) ทำให้คลิกครั้งเดียวบันทึกสองรอบ
+let isSavingEdit = false;
+
 export const getEditEvent = async ({
   navigate,
   events,
   fetchEventsFromDB,
+  fetchLookupOptions,
   eventInfo,
   setLoading,
   generateWorkPermitPDF,
@@ -305,6 +310,8 @@ export const getEditEvent = async ({
   EventService,
   CustomerService,
   AuthService,
+  JobTypeService,
+  SystemTypeService,
   Swal,
   TomSelect,
   moment,
@@ -380,8 +387,14 @@ export const getEditEvent = async ({
     ? moment(eventEnd).subtract(1, "days").format("YYYY-MM-DD")
     : moment(eventEnd).format("YYYY-MM-DD");
 
-  const res = await CustomerService.getCustomers();
-  const employees = await AuthService.getAllUserData();
+  // ✅ เดิม titleOpts/systemOpts เป็น array ฝังโค้ดตายตัว แก้ไขเองไม่ได้นอกจากแก้โค้ด —
+  // ดึงจากตาราง "ประเภทงาน"/"ระบบ" ที่จัดการได้จริงผ่านหน้า /worktype (Settings) แทน
+  const [res, employees, jobTypes, systemTypes] = await Promise.all([
+    CustomerService.getCustomers(),
+    AuthService.getAllUserData(),
+    JobTypeService.getAll(),
+    SystemTypeService.getAll(),
+  ]);
   const employeeList = employees?.allUser || [];
   // ใช้ผูก resPerson (ID จริง) จากชื่อที่เลือกใน dropdown ทีม
   // เพื่อให้ technician มองเห็น/จัดการงานของตัวเองในหน้า Operation ได้ถูกต้อง
@@ -430,37 +443,17 @@ export const getEditEvent = async ({
       })
       .join("");
 
-  const titleOpts = [
-    "LOCAL",
-    "PO",
-    "PM",
-    "Service",
-    "Training",
-    "Inspection",
-    "Test & Commissioning",
-    "สำรวจหน้างาน",
-    "ตรวจเช็คปัญหา",
-    "แก้ไขปัญหา",
-    "สแตนบาย",
-    "เปลี่ยนอุปกรณ์",
-    "ติดตั้งอุปกรณ์",
-  ]
+  const titleOpts = (jobTypes?.items || [])
     .map(
       (t) =>
-        `<option value="${t}" ${eventTitle === t ? "selected" : ""}>${t}</option>`,
+        `<option value="${t.name}" ${eventTitle === t.name ? "selected" : ""}>${t.name}</option>`,
     )
     .join("");
 
-  const systemOpts = [
-    "Office",
-    "Fire Alarm",
-    "CCTV",
-    "Access Control",
-    "Networks",
-  ]
+  const systemOpts = (systemTypes?.items || [])
     .map(
       (s) =>
-        `<option value="${s}" ${eventSystem === s ? "selected" : ""}>${s}</option>`,
+        `<option value="${s.name}" ${eventSystem === s.name ? "selected" : ""}>${s.name}</option>`,
     )
     .join("");
 
@@ -838,10 +831,25 @@ export const getEditEvent = async ({
         };
       };
 
+      // ✅ TomSelect ของช่องประเภทงาน/ระบบเปิด create:true ไว้ (พิมพ์ค่าใหม่ที่ไม่มีในลิสต์ได้)
+      // เดิมค่าที่พิมพ์ใหม่ถูกบันทึกแค่ในตัวแผนงานนี้ ไม่เคยเข้าตารางกลาง "ประเภทงาน"/"ระบบ" เลย
+      // ทำให้ครั้งถัดไปต้องพิมพ์ใหม่ซ้ำอีก ไม่โผล่เป็นตัวเลือกให้เลือก — upsert เข้าตารางกลาง
+      // ถ้ายังไม่มีชื่อนี้อยู่ก่อน (best-effort เฉยๆ ไม่ให้กระทบการบันทึกแผนงานหลักถ้าล้มเหลว)
+      const upsertLookups = async (title, system) => {
+        if (title && !jobTypes?.items?.some((t) => t.name === title)) {
+          await JobTypeService.add(title).catch(() => {});
+        }
+        if (system && !systemTypes?.items?.some((s) => s.name === system)) {
+          await SystemTypeService.add(system).catch(() => {});
+        }
+      };
+
       /* Save */
       document
         .getElementById("btnConfirm")
         ?.addEventListener("click", async () => {
+          if (isSavingEdit) return; // ✅ กันกรณี listener ถูก attach/ยิงซ้ำ ไม่ให้บันทึกซ้ำ
+
           // ✅ ยึด hasSiblings (ข้อมูลจริงว่างานนี้อยู่ในกลุ่มอยู่แล้วหรือไม่) เป็นหลักด้วย ไม่ใช่แค่
           // สถานะ checkbox สดๆ ตอนกดบันทึกอย่างเดียว — กันงานที่เป็นกลุ่มอยู่แล้วหลุดไปแก้แบบวันเดียว
           // โดยไม่ตั้งใจ ซึ่งจะทำให้แก้สี/ชื่อโครงการ/รายละเอียดแค่วันเดียวไม่ทั้งกลุ่ม
@@ -875,8 +883,10 @@ export const getEditEvent = async ({
               Swal.showValidationMessage("วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม");
               return;
             }
+            isSavingEdit = true;
             setLoading(true);
             try {
+              await upsertLookups(payload.title, payload.system);
               await EventService.UpdateEvent(eventId, payload);
               setLoading(false);
               Swal.fire({
@@ -886,6 +896,7 @@ export const getEditEvent = async ({
                 showConfirmButton: false,
               });
               await fetchEventsFromDB();
+              await fetchLookupOptions?.(); // ✅ รีเฟรชตัวเลือกตัวกรองให้เห็นประเภทงาน/ระบบที่เพิ่งพิมพ์ใหม่ทันที
             } catch (err) {
               setLoading(false);
               Swal.fire({
@@ -893,6 +904,8 @@ export const getEditEvent = async ({
                 text: err.message,
                 icon: "error",
               });
+            } finally {
+              isSavingEdit = false;
             }
             return;
           }
@@ -920,8 +933,10 @@ export const getEditEvent = async ({
             return;
           }
 
+          isSavingEdit = true;
           setLoading(true);
           try {
+            await upsertLookups(shared.title, shared.system);
             // ✅ ผูก jobGroupId เฉพาะตอนมีมากกว่า 1 ช่วงจริงๆ หรือเป็นงานที่อยู่ในกลุ่มอยู่แล้ว
             // ถ้าติ๊กโหมดหลายวันไว้แต่สุดท้ายเหลือแค่ 1 ช่วง ไม่ควรผูก jobGroupId ให้ (ไม่งั้นจะ
             // โดนเข้าใจผิดว่าเป็นงานหลายวันทั้งที่จริงมีวันเดียว)
@@ -949,6 +964,7 @@ export const getEditEvent = async ({
               showConfirmButton: false,
             });
             await fetchEventsFromDB();
+            await fetchLookupOptions?.(); // ✅ รีเฟรชตัวเลือกตัวกรองให้เห็นประเภทงาน/ระบบที่เพิ่งพิมพ์ใหม่ทันที
           } catch (err) {
             setLoading(false);
             Swal.fire({
@@ -956,6 +972,8 @@ export const getEditEvent = async ({
               text: err.message,
               icon: "error",
             });
+          } finally {
+            isSavingEdit = false;
           }
         });
 

@@ -7,6 +7,234 @@
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
 }
 
+/* ==========================================================================
+   TOOLBAR — แถวเดียวกระชับ: ค้นหา + ปุ่มตัวกรอง (badge) + Export ไอคอนล้วน
+   (อิงสีธีมแดงจากโลโก้บริษัท) — เน้นไม่เกะกะจอมือถือ ตัวกรองซ่อนไว้ default
+   ========================================================================== */
+.event-toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.event-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.event-search-input:focus-within {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+  background: #ffffff;
+}
+
+.event-search-icon {
+  font-size: 13px;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.event-search-input input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 10px 0;
+  font-size: 13.5px;
+}
+
+/* ── ปุ่มไอคอนกลม (Export PDF/Excel + ปุ่มตัวกรอง) ให้ขนาดเท่ากันหมด แตะง่ายบนมือถือ ── */
+.toolbar-icon-btn,
+.filter-toggle-btn {
+  position: relative;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background-color: #ffffff;
+  color: #475569;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  touch-action: manipulation;
+}
+
+.toolbar-icon-btn:active,
+.filter-toggle-btn:active {
+  transform: scale(0.94);
+}
+
+.toolbar-icon-btn--pdf {
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.25);
+}
+.toolbar-icon-btn--pdf:hover {
+  background-color: rgba(220, 38, 38, 0.08);
+}
+
+.toolbar-icon-btn--excel {
+  color: #047857;
+  border-color: rgba(4, 120, 87, 0.25);
+}
+.toolbar-icon-btn--excel:hover {
+  background-color: rgba(4, 120, 87, 0.08);
+}
+
+.filter-toggle-btn--open {
+  border-color: #dc2626;
+  color: #dc2626;
+}
+
+.filter-toggle-btn--active {
+  background: linear-gradient(135deg, #dc2626 0%, #7f1d1d 100%);
+  border-color: transparent;
+  color: #fff;
+}
+
+.filter-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 8px;
+  background-color: #f59e0b;
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #ffffff;
+}
+
+/* ── แผงตัวกรอง — พับซ่อนไว้ default กดปุ่มช่องแว่นขยายด้านบนถึงเปิด ── */
+.event-filter-panel {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding: 12px;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  animation: filterPanelIn 0.15s ease;
+}
+
+@keyframes filterPanelIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.event-filter-select {
+  width: 100%;
+  padding: 9px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.event-filter-select:focus {
+  outline: none;
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+.event-filter-clear {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #dc2626;
+  background-color: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  touch-action: manipulation;
+}
+
+.event-filter-clear:hover {
+  background-color: rgba(220, 38, 38, 0.14);
+}
+
+.event-filter-clear:active {
+  transform: scale(0.97);
+}
+
+@media (min-width: 577px) {
+  .event-filter-panel {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* ==========================================================================
+   FULLCALENDAR TOOLBAR — ปุ่ม prev/next/today/มุมมอง เดิมใช้สีฟ้า default ของ
+   FullCalendar เอง ปรับให้เข้าธีมแดงของแบรนด์เดียวกับส่วนอื่นของแอป
+   ========================================================================== */
+.fc .fc-button-primary {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  font-weight: 600;
+  text-transform: none;
+  box-shadow: none !important;
+  transition: all 0.15s ease;
+}
+
+.fc .fc-button-primary:hover {
+  background-color: #fef2f2;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+.fc .fc-button-primary:not(:disabled).fc-button-active,
+.fc .fc-button-primary:not(:disabled):active {
+  background: linear-gradient(135deg, #dc2626 0%, #7f1d1d 100%);
+  border-color: transparent;
+  color: #fff;
+}
+
+.fc .fc-button-primary:disabled {
+  opacity: 0.4;
+}
+
+.fc .fc-today-button {
+  background-color: rgba(220, 38, 38, 0.08);
+  border-color: rgba(220, 38, 38, 0.2);
+  color: #dc2626;
+}
+.fc .fc-today-button:hover:not(:disabled) {
+  background-color: rgba(220, 38, 38, 0.14);
+}
+
+.fc .fc-toolbar-title {
+  font-weight: 800;
+  color: #0f172a;
+}
+
 
 .fc-event {
  

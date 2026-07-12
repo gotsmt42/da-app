@@ -141,17 +141,30 @@ const Dashboard = () => {
     return job.team || null;
   };
 
-  // 🧾 สรุปเอกสารแยกตามประเภท (docType มาจาก backend: report/quotation/invoice/completion)
-  const docTypeCounts = files.reduce((acc, f) => {
-    acc[f.docType] = (acc[f.docType] || 0) + 1;
-    return acc;
-  }, {});
-  const docTypeItems = [
-    { key: "report", label: "Service Report", color: "#3b82f6", bg: "#dbeafe" },
-    { key: "quotation", label: "ใบเสนอราคา", color: "#f59e0b", bg: "#ffedd5" },
-    { key: "invoice", label: "ใบวางบิล", color: "#a78bfa", bg: "#ede9fe" },
-    { key: "completion", label: "ใบส่งมอบงาน", color: "#10b981", bg: "#d1fae5" },
-  ];
+  // 🏆 โครงการที่มีงานมากที่สุด (Top 10) — จัดกลุ่มงานตาม บริษัท+โครงการ (company+site) เพราะ
+  // Event ไม่มี customerId อ้างอิงตรงๆ (เทียบ pattern เดียวกับที่ Customer/index.js ใช้ผูกประวัติงาน)
+  // ✅ events มาจาก getEventOp() ที่ scope ตาม role อยู่แล้ว — แอดมิน/manager เห็นทุกโครงการจริง
+  // ส่วนช่างจะเห็นแค่โครงการที่ตัวเองเคยได้รับมอบหมาย จึงโชว์ section นี้เฉพาะแอดมิน/manager
+  // ที่ข้อมูลมีความหมายเป็น "ภาพรวมทั้งบริษัท" จริงๆ
+  const topProjects = (() => {
+    const counts = {};
+    events.forEach((e) => {
+      if (!e.company && !e.site) return;
+      // ✅ เก็บ company/site แยกไว้ (ไม่ใช่แค่รวมเป็นข้อความเดียว) เพื่อส่งเป็น query param
+      // ไปกรองหน้า /customer ให้ตรงตัวเป๊ะๆ ตอนกดแถวโครงการ
+      const key = `${e.company || ""} ${e.site || ""}`;
+      if (!counts[key]) counts[key] = { company: e.company || "", site: e.site || "", count: 0 };
+      counts[key].count += 1;
+    });
+    return Object.values(counts)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10)
+      .map((p) => ({
+        ...p,
+        name: p.company && p.site ? `${p.company} · ${p.site}` : (p.company || p.site),
+      }));
+  })();
+  const maxProjectCount = topProjects[0]?.count || 1;
 
   // 👥 ภาพรวมทีมงานแยกตามสิทธิ์ (เฉพาะแอดมิน)
   const roleCounts = users.reduce((acc, u) => {
@@ -344,7 +357,53 @@ const Dashboard = () => {
         )}
       </div>
 
-      {/* ─── SECTION 6: QUICK ACTIONS (ทางลัดคล้ายหน้าโฮมแอปมือถือ) ─── */}
+      {/* ─── SECTION 6: TOP PROJECTS (เฉพาะแอดมิน/manager — events scope ตาม role มีความหมาย
+          เป็น "ภาพรวมทั้งบริษัท" จริงๆ แค่กับสองสิทธิ์นี้เท่านั้น) ─── */}
+      {isAdminOrManager && (
+        <>
+          <h5 style={styles.sectionTitle}>โครงการที่มีงานมากที่สุด</h5>
+          <div style={styles.notiCard}>
+            {loading ? (
+              <div style={{ padding: "16px" }}>
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} style={{ ...styles.topProjectSkeletonRow }} className="skeleton-pulse" />
+                ))}
+              </div>
+            ) : topProjects.length === 0 ? (
+              <div style={styles.notiEmpty}>
+                <FaBuilding size={22} style={{ opacity: 0.25, marginBottom: "6px" }} />
+                <p style={{ margin: 0, fontSize: "12px", color: "#94a3b8" }}>ยังไม่มีข้อมูลงานของโครงการ</p>
+              </div>
+            ) : (
+              <div style={styles.topProjectList}>
+                {topProjects.map((p, i) => (
+                  <Link
+                    key={p.name}
+                    to={`/customer?company=${encodeURIComponent(p.company)}&site=${encodeURIComponent(p.site)}`}
+                    style={{ textDecoration: "none" }}
+                  >
+                    <div style={styles.topProjectRow} className="metric-card-hover">
+                      <span style={{
+                        ...styles.topProjectRank,
+                        ...(i === 0 ? { backgroundColor: "#dc2626", color: "#fff" } : {}),
+                      }}>{i + 1}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={styles.topProjectName}>{p.name}</p>
+                        <div style={styles.topProjectTrack}>
+                          <div style={{ ...styles.topProjectBar, width: `${Math.max((p.count / maxProjectCount) * 100, 6)}%` }} />
+                        </div>
+                      </div>
+                      <span style={styles.topProjectCount}>{p.count}</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ─── SECTION 7: QUICK ACTIONS (ทางลัดคล้ายหน้าโฮมแอปมือถือ) ─── */}
       <h5 style={styles.sectionTitle}>ทางลัด</h5>
       <div style={styles.quickActionsGrid}>
         {quickActions.map((action, idx) => (
@@ -357,21 +416,6 @@ const Dashboard = () => {
                 {action.badge > 0 && <span style={styles.quickActionBadge}>{action.badge > 99 ? "99+" : action.badge}</span>}
               </div>
               <span style={styles.quickActionLabel}>{action.title}</span>
-            </div>
-          </Link>
-        ))}
-      </div>
-
-      {/* ─── SECTION 7: DOCUMENT SUMMARY (สรุปเอกสารแยกตามประเภทจริงจาก Operation) ─── */}
-      <h5 style={{ ...styles.sectionTitle, marginTop: "18px" }}>เอกสารแยกตามประเภท</h5>
-      <div style={styles.docSummaryGrid}>
-        {docTypeItems.map((item) => (
-          <Link key={item.key} to="/files" style={{ textDecoration: "none" }}>
-            <div style={{ ...styles.docChip, backgroundColor: item.bg }} className="metric-card-hover">
-              <span style={{ ...styles.docChipCount, color: item.color }}>
-                {loading ? "…" : (docTypeCounts[item.key] || 0)}
-              </span>
-              <span style={{ ...styles.docChipLabel, color: item.color }}>{item.label}</span>
             </div>
           </Link>
         ))}
@@ -838,28 +882,67 @@ const styles = {
     textAlign: "center",
   },
 
-  /* 🧾 Document Summary — สรุปเอกสารแยกตามประเภทจริง (report/quotation/invoice/completion) */
-  docSummaryGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(2, 1fr)",
-    gap: "8px",
-    marginBottom: "20px",
-  },
-  docChip: {
-    borderRadius: "12px",
-    padding: "10px 12px",
+  /* 🏆 Top Projects — แถบแนวนอน สีเดียว (แดงแบรนด์) ความยาวแปรตามสัดส่วนงาน
+     เทียบ mark spec: หนา ≤24px, มุมโค้งฝั่งปลาย (data-end) เท่านั้น, ค่าตัวเลขอยู่นอกแท่ง
+     ไม่ทับสี — อันดับ 1 เน้นด้วยสีแบรนด์ ที่เหลือเป็นกลาง (emphasis pattern) */
+  topProjectList: {
     display: "flex",
     flexDirection: "column",
   },
-  docChipCount: {
-    fontSize: "18px",
-    fontWeight: "800",
-    lineHeight: 1,
+  topProjectRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    padding: "12px 14px",
+    borderBottom: "1px solid #f1f5f9",
   },
-  docChipLabel: {
-    fontSize: "10.5px",
-    fontWeight: "600",
-    marginTop: "4px",
+  topProjectRank: {
+    width: "22px",
+    height: "22px",
+    borderRadius: "50%",
+    flexShrink: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "11px",
+    fontWeight: "800",
+    backgroundColor: "#f1f5f9",
+    color: "#64748b",
+  },
+  topProjectName: {
+    fontSize: "12.5px",
+    fontWeight: "700",
+    color: "#0f172a",
+    margin: "0 0 5px 0",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
+  topProjectTrack: {
+    height: "8px",
+    borderRadius: "4px",
+    backgroundColor: "#f1f5f9",
+    overflow: "hidden",
+  },
+  topProjectBar: {
+    height: "100%",
+    borderRadius: "0 4px 4px 0",
+    background: "linear-gradient(90deg, #ef4444 0%, #dc2626 100%)",
+    transition: "width 0.4s ease",
+  },
+  topProjectCount: {
+    fontSize: "14px",
+    fontWeight: "800",
+    color: "#334155",
+    flexShrink: 0,
+    minWidth: "20px",
+    textAlign: "right",
+  },
+  topProjectSkeletonRow: {
+    height: "36px",
+    borderRadius: "8px",
+    backgroundColor: "#f1f5f9",
+    marginBottom: "8px",
   },
 
   /* 👥 Team Overview — เฉพาะแอดมิน */

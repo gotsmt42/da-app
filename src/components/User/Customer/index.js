@@ -1,24 +1,28 @@
 /* eslint-disable no-unused-vars */
 /**
- * Customer/index.js — v3
+ * Customer/index.js — v4
  *
- * เปลี่ยนจาก v2:
- *   ❌ ตัดการใช้ DataTableComponent / DataTableColumns / Expanded (react-data-table-component) ทิ้งทั้งหมด
- *   ✅ สร้างตารางเองใหม่ทั้งหมดด้วย MUI Table ล้วนๆ:
- *        - หัวคอลัมน์กดเรียงลำดับได้ (TableSortLabel)
- *        - แถวขยายดูรายละเอียดเพิ่มเติมได้ (Collapse) แทนที่ expandableRowsComponent เดิม
- *        - Pagination จริงของ MUI (TablePagination)
- *        - คอลัมน์แอคชัน (แก้ไข/ลบ) เป็นไอคอนอยู่ในแถวเลย ไม่ต้องเปิดเมนู
- *        - บริษัท+โครงการ รวมเป็นเซลล์เดียว มี avatar ตัวอักษรแรก สีตาม hash ชื่อ
- *        - อีเมล/เบอร์โทร มีปุ่มคัดลอกในตัว
- *   ✅ คงฟีเจอร์เดิมทั้งหมด: สถิติสรุป, ค้นหา, เพิ่ม/แก้ไขลูกค้า, ลบ, Export CSV, Snackbar
+ * เปลี่ยนจาก v3:
+ *   ❌ ตัด MUI Table (คอลัมน์ตายตัว 6 คอลัมน์) ทิ้ง — ยังเป็นเลย์เอาต์ desktop-first อยู่ดี ต้อง
+ *      ซ่อน/บีบคอลัมน์บนจอเล็ก อ่านยากบนมือถือ
+ *   ✅ เปลี่ยนเป็นการ์ดวางซ้อนกันแนวตั้ง (CustomerCard) อ่านง่ายเหมือนกันทั้งจอเล็ก/จอใหญ่:
+ *        - โครงการ (cSite) เป็นชื่อหลัก เพราะเป็นฟิลด์เดียวที่บังคับกรอก บริษัทเป็นบรรทัดรองถ้ามี
+ *        - แสดงเฉพาะข้อมูลที่มีจริง (ผู้ติดต่อ/เบอร์/อีเมล/ที่อยู่/เลขผู้เสียภาษี) ไม่โชว์ "—"
+ *          หรือชิป "ไม่มี..." เกลื่อนการ์ดอีกต่อไป เพราะฟิลด์เหล่านี้ไม่บังคับกรอกแล้ว
+ *        - ตัดสถิติ "ข้อมูลไม่ครบ" และคำเตือน "ข้อมูลติดต่อยังไม่ครบถ้วน" ออก (ไม่สื่อความหมาย
+ *          อีกต่อไปเมื่อฟิลด์พวกนี้เป็นทางเลือก ไม่ใช่ข้อผิดพลาด)
+ *        - ตัดฟิลด์ "ชื่อโปรเจค" (row.projName) ที่ไม่มีอยู่จริงใน schema ออก (โชว์ "—" เปล่าๆ มาตลอด)
+ *   ✅ คงฟีเจอร์เดิมทั้งหมด: สถิติสรุป (เหลือ 2 การ์ด), ค้นหา, กรองโครงการเดียวจาก Dashboard,
+ *      เพิ่ม/แก้ไขลูกค้า, ลบ, Export CSV, ประวัติงานรายปี, Snackbar, Pagination
  *
  * หมายเหตุ: handleUpdateCustomer เรียก CustomerService.UpdateCustomer(id, data)
  * โปรดตรวจสอบว่ามีเมธอดนี้จริงในฝั่ง service
  */
 
 import React, { useMemo, useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import CustomerService from "../../../services/CustomerService";
+import EventService from "../../../services/EventService";
 import Swal from "sweetalert2";
 import moment from "moment";
 import "moment/locale/th";
@@ -26,8 +30,7 @@ import "moment/locale/th";
 import {
   Modal, TextField, Button, Snackbar, Alert, Box, Stack, Typography, Avatar,
   Chip, IconButton, Tooltip, Divider, Grid, Skeleton, InputAdornment,
-  useMediaQuery, Table, TableBody, TableCell, TableContainer, TableHead,
-  TableRow, TableSortLabel, TablePagination, Collapse,
+  useMediaQuery, TablePagination, Collapse,
 } from "@mui/material";
 import { styled, alpha, useTheme } from "@mui/material/styles";
 
@@ -48,10 +51,14 @@ import DownloadIcon from "@mui/icons-material/Download";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import GroupsIcon from "@mui/icons-material/Groups";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
-import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
+import WorkHistoryIcon from "@mui/icons-material/WorkHistory";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import AssignmentIcon from "@mui/icons-material/Assignment";
+import CircleIcon from "@mui/icons-material/Circle";
+import FilterAltIcon from "@mui/icons-material/FilterAlt";
 
 // ─── Styled ─────────────────────────────────────────────────────────────
 const GlassCard = styled(Box)(({ theme }) => ({
@@ -83,20 +90,15 @@ const SectionLabel = styled(Typography)(({ theme }) => ({
   color: theme.palette.text.secondary,
 }));
 
-const HeadCell = styled(TableCell)(({ theme }) => ({
-  fontSize: "0.7rem",
-  fontWeight: 700,
-  letterSpacing: "0.04em",
-  textTransform: "uppercase",
-  color: theme.palette.text.secondary,
-  background: alpha(theme.palette.primary.main, 0.04),
-  borderBottom: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
-  whiteSpace: "nowrap",
-}));
-
-const BodyRow = styled(TableRow)(({ theme }) => ({
-  "&:hover": { background: alpha(theme.palette.primary.main, 0.03) },
-  "& > td": { borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` },
+// ✅ การ์ดรายชื่อลูกค้า — เดิมใช้ MUI Table (คอลัมน์ตายตัว 6 คอลัมน์) ซึ่งบนมือถือต้องบีบ/ซ่อน
+// คอลัมน์จนอ่านยาก เปลี่ยนเป็นการ์ดวางซ้อนกันแนวตั้งแทน อ่านง่ายทั้งจอเล็ก/จอใหญ่เหมือนกัน
+const CustomerCardBox = styled(Box)(({ theme }) => ({
+  background: theme.palette.background.paper,
+  borderRadius: 14,
+  border: `1px solid ${alpha(theme.palette.divider, 0.7)}`,
+  overflow: "hidden",
+  transition: "box-shadow .15s ease",
+  "&:hover": { boxShadow: `0 2px 10px ${alpha(theme.palette.common.black, 0.06)}` },
 }));
 
 // ─── Constants / Helpers ────────────────────────────────────────────────
@@ -116,23 +118,25 @@ const copyToClipboard = (text, cb) => {
 
 const EMPTY_FORM = { cCompany: "", cSite: "", cEmail: "", cName: "", address: "", tel: "", tax: "" };
 
+// ✅ สีสถานะงาน — ใช้โทนเดียวกับหน้า Dashboard/Operation ให้เห็นภาพเดียวกันทั้งแอป
+const STATUS_COLORS = {
+  "กำลังรอยืนยัน": "#f59e0b",
+  "ยืนยันแล้ว": "#3b82f6",
+  "กำลังดำเนินการ": "#8b5cf6",
+  "ดำเนินการเสร็จสิ้น": "#10b981",
+};
+const statusColor = (status) => STATUS_COLORS[status] || "#64748b";
+
+// ✅ เดิมบังคับกรอกบริษัท+อีเมลด้วย ทั้งที่งานจริงบางโครงการยังไม่มีข้อมูลสองอย่างนี้ตอนสร้าง
+// (เช่น เพิ่งมีชื่อไซต์งานให้ก่อน) — บังคับแค่ "โครงการ" ช่องเดียว ที่เหลือกรอกทีหลังได้
 const FIELD_CONFIG = [
-  { name: "cCompany", label: "บริษัท / นิติบุคคล", icon: <BusinessIcon fontSize="small" />, required: true, group: "org" },
+  { name: "cCompany", label: "บริษัท / นิติบุคคล", icon: <BusinessIcon fontSize="small" />, group: "org" },
   { name: "cSite",    label: "โครงการ / ไซต์งาน",   icon: <ApartmentIcon fontSize="small" />, required: true, group: "org" },
   { name: "tax",      label: "เลขประจำตัวผู้เสียภาษี", icon: <BadgeIcon fontSize="small" />, maxLength: 13, group: "org" },
   { name: "cName",    label: "ชื่อผู้ติดต่อ",        icon: <PersonIcon fontSize="small" />, group: "contact" },
-  { name: "cEmail",   label: "อีเมล",                icon: <EmailIcon fontSize="small" />, required: true, group: "contact" },
+  { name: "cEmail",   label: "อีเมล",                icon: <EmailIcon fontSize="small" />, group: "contact" },
   { name: "tel",      label: "เบอร์โทรศัพท์",         icon: <PhoneIcon fontSize="small" />, maxLength: 10, group: "contact" },
   { name: "address",  label: "ที่อยู่",               icon: <HomeIcon fontSize="small" />, multiline: true, group: "contact" },
-];
-
-const HEAD_CELLS = [
-  { id: "expand",    label: "",           sortable: false, width: 44 },
-  { id: "cCompany",  label: "บริษัท / โครงการ", sortable: true },
-  { id: "cName",     label: "ผู้ติดต่อ",   sortable: true },
-  { id: "cEmail",    label: "อีเมล",       sortable: true },
-  { id: "tel",       label: "เบอร์โทร",    sortable: true },
-  { id: "actions",   label: "จัดการ",      sortable: false, width: 96, align: "right" },
 ];
 
 const comparator = (a, b, orderBy) => {
@@ -240,131 +244,201 @@ const modalStyle = {
   );
 };
 
-// ─── CustomerRow: แถวหลัก + แถวขยายรายละเอียด ───────────────────────────
-const CustomerRow = ({ row, isSmallScreen, onEdit, onDelete, onCopy }) => {
+// ─── CustomerCard: การ์ดลูกค้าแบบวางซ้อนกันแนวตั้ง (มือถือ-first) ───────
+// เดิมเป็นแถวตาราง 6 คอลัมน์คงที่ ต้องซ่อน/บีบคอลัมน์บนจอเล็ก อ่านยาก — เปลี่ยนเป็นการ์ด
+// เดียวที่โชว์เฉพาะข้อมูลที่มีจริง (ไม่มีค่าก็ไม่โชว์แถวนั้นเลย แทนการโชว์ "—"/ชิป "ไม่มี..."
+// เกลื่อนทุกใบ เพราะบริษัท/อีเมล/เบอร์/ที่อยู่ ไม่บังคับกรอกแล้ว)
+const CustomerCard = ({ row, events, onEdit, onDelete, onCopy }) => {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const initial = (row.cCompany || "?").charAt(0).toUpperCase();
-  const color = colorFromName(row.cCompany || "");
-  const isComplete = row.cEmail && row.tel && row.address;
+  const [openYears, setOpenYears] = useState({}); // ✅ ค่าเริ่มต้นเปิดเฉพาะปีล่าสุดตอน compute ด้านล่าง
+
+  // ✅ โครงการ (cSite) คือฟิลด์เดียวที่บังคับกรอกแล้ว ใช้เป็นชื่อหลัก/สีอวาตาร์แทนบริษัท
+  const primaryLabel = row.cSite || row.cCompany || "ไม่ระบุชื่อ";
+  const initial = (row.cSite || row.cCompany || "?").charAt(0).toUpperCase();
+  const color = colorFromName(row.cSite || row.cCompany || "");
+
+  // ✅ งานที่ทำให้โครงการนี้ — Event ไม่มี customerId อ้างอิงโดยตรง ผูกด้วยการเทียบ
+  // company+site ตรงตัว (เหมือน pattern ที่ AddEvent.js ใช้ upsert ลูกค้าอยู่แล้ว)
+  const customerEvents = useMemo(
+    () => (events || []).filter((e) => e.company === row.cCompany && e.site === row.cSite),
+    [events, row.cCompany, row.cSite],
+  );
+
+  // ✅ จัดกลุ่มเป็น ปี → ประเภทงาน (title เช่น PM/Service) → รายการงาน เรียงปีใหม่สุดก่อน
+  const yearGroups = useMemo(() => {
+    const byYear = {};
+    customerEvents.forEach((e) => {
+      const year = moment(e.start || e.date).format("YYYY");
+      if (!byYear[year]) byYear[year] = { jobs: [], typeCounts: {} };
+      byYear[year].jobs.push(e);
+      const type = e.title || "ไม่ระบุประเภท";
+      byYear[year].typeCounts[type] = (byYear[year].typeCounts[type] || 0) + 1;
+    });
+    return Object.entries(byYear)
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([year, data]) => ({
+        year,
+        jobs: data.jobs.sort((a, b) => new Date(b.start || b.date) - new Date(a.start || a.date)),
+        typeCounts: Object.entries(data.typeCounts).sort((a, b) => b[1] - a[1]),
+      }));
+  }, [customerEvents]);
+
+  const toggleYear = (year) => setOpenYears((p) => ({ ...p, [year]: !p[year] }));
+
+  // ✅ มีค่าอะไรก็โชว์แค่นั้น — เดิมโชว์ชิป "ไม่มีอีเมล"/"ไม่มีเบอร์" ทุกใบเป็นค่าเริ่มต้น
+  // ซึ่งตอนนี้เป็นเรื่องปกติ (ไม่บังคับกรอกแล้ว) ไม่ใช่สิ่งที่ต้องเตือนอีกต่อไป
+  const contactChips = [
+    row.cName && { icon: <PersonIcon sx={{ fontSize: 13 }} />, label: row.cName },
+    row.tel && { icon: <PhoneIcon sx={{ fontSize: 13 }} />, label: row.tel, onClick: () => onCopy(row.tel, "เบอร์โทร") },
+    row.cEmail && { icon: <EmailIcon sx={{ fontSize: 13 }} />, label: row.cEmail, onClick: () => onCopy(row.cEmail, "อีเมล") },
+  ].filter(Boolean);
+
+  const detailFields = [
+    row.tax && { label: "เลขประจำตัวผู้เสียภาษี", value: row.tax },
+    row.address && { label: "ที่อยู่", value: row.address },
+  ].filter(Boolean);
 
   return (
-    <>
-      <BodyRow>
-        <TableCell sx={{ width: 44 }}>
-          <IconButton size="small" onClick={() => setOpen(p => !p)}>
-            {open ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
-          </IconButton>
-        </TableCell>
-
-        <TableCell sx={{ minWidth: 220 }}>
-          <Stack direction="row" alignItems="center" gap={1.25} sx={{ py: 0.5, minWidth: 0 }}>
-            <Avatar sx={{ width: 34, height: 34, fontSize: "0.85rem", fontWeight: 700, flexShrink: 0, bgcolor: alpha(color, 0.15), color }}>
-              {initial}
-            </Avatar>
-            <Box minWidth={0}>
-              <Typography fontWeight={700} fontSize="0.85rem" noWrap>{row.cCompany || "—"}</Typography>
-              <Stack direction="row" alignItems="center" gap={0.4}>
-                <ApartmentIcon sx={{ fontSize: 12, color: "text.disabled" }} />
-                <Typography variant="caption" color="text.secondary" noWrap>{row.cSite || "ไม่ระบุโครงการ"}</Typography>
-              </Stack>
-            </Box>
-          </Stack>
-        </TableCell>
-
-        {!isSmallScreen && (
-          <TableCell>
-            <Typography variant="body2" fontWeight={600} fontSize="0.8rem">{row.cName || "—"}</Typography>
-          </TableCell>
-        )}
-
-        <TableCell>
-          {row.cEmail ? (
-            <Stack direction="row" alignItems="center" gap={0.5} sx={{ minWidth: 0 }}>
-              <EmailIcon sx={{ fontSize: 15, color: "text.disabled", flexShrink: 0 }} />
-              <Typography variant="body2" noWrap sx={{ fontSize: "0.8rem", maxWidth: 180 }}>{row.cEmail}</Typography>
-              <Tooltip title="คัดลอกอีเมล">
-                <IconButton size="small" sx={{ p: 0.4 }} onClick={() => onCopy(row.cEmail, "อีเมล")}>
-                  <ContentCopyIcon sx={{ fontSize: 13 }} />
-                </IconButton>
-              </Tooltip>
+    <CustomerCardBox>
+      <Stack
+        direction="row" alignItems="center" gap={1.25}
+        onClick={() => setOpen(p => !p)}
+        sx={{ p: 1.5, cursor: "pointer" }}
+      >
+        <Avatar sx={{ width: 38, height: 38, fontSize: "0.9rem", fontWeight: 700, flexShrink: 0, bgcolor: alpha(color, 0.15), color }}>
+          {initial}
+        </Avatar>
+        <Box minWidth={0} flex={1}>
+          <Typography fontWeight={700} fontSize="0.88rem" noWrap>{primaryLabel}</Typography>
+          {row.cCompany && row.cSite && (
+            <Stack direction="row" alignItems="center" gap={0.4}>
+              <BusinessIcon sx={{ fontSize: 11, color: "text.disabled" }} />
+              <Typography variant="caption" color="text.secondary" noWrap>{row.cCompany}</Typography>
             </Stack>
-          ) : (
-            <Chip label="ไม่มีอีเมล" size="small" variant="outlined" sx={{ fontSize: "0.68rem", height: 22, color: "text.disabled" }} />
           )}
-        </TableCell>
+        </Box>
+        <Tooltip title="แก้ไข">
+          <IconButton size="small" onClick={(e) => { e.stopPropagation(); onEdit(row); }}>
+            <EditIcon sx={{ fontSize: 17 }} />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title="ลบ">
+          <IconButton size="small" color="error" onClick={(e) => { e.stopPropagation(); onDelete(row._id); }}>
+            <DeleteIcon sx={{ fontSize: 17 }} />
+          </IconButton>
+        </Tooltip>
+        {open ? <ExpandLessIcon fontSize="small" sx={{ color: "text.disabled" }} /> : <ExpandMoreIcon fontSize="small" sx={{ color: "text.disabled" }} />}
+      </Stack>
 
-        {!isSmallScreen && (
-          <TableCell>
-            {row.tel ? (
-              <Stack direction="row" alignItems="center" gap={0.5}>
-                <PhoneIcon sx={{ fontSize: 15, color: "text.disabled" }} />
-                <Typography variant="body2" sx={{ fontSize: "0.8rem" }}>{row.tel}</Typography>
-                <Tooltip title="คัดลอกเบอร์โทร">
-                  <IconButton size="small" sx={{ p: 0.4 }} onClick={() => onCopy(row.tel, "เบอร์โทร")}>
-                    <ContentCopyIcon sx={{ fontSize: 13 }} />
-                  </IconButton>
-                </Tooltip>
-              </Stack>
-            ) : (
-              <Chip label="ไม่มีเบอร์" size="small" variant="outlined" sx={{ fontSize: "0.68rem", height: 22, color: "text.disabled" }} />
-            )}
-          </TableCell>
-        )}
+      {contactChips.length > 0 && (
+        <Stack direction="row" gap={0.75} flexWrap="wrap" sx={{ px: 1.5, pb: 1.5 }}>
+          {contactChips.map((c, i) => (
+            <Chip
+              key={i} size="small" variant="outlined" icon={c.icon} label={c.label}
+              onClick={c.onClick ? (e) => { e.stopPropagation(); c.onClick(); } : undefined}
+              deleteIcon={c.onClick ? <ContentCopyIcon sx={{ fontSize: "11px !important" }} /> : undefined}
+              onDelete={c.onClick}
+              sx={{ fontSize: "0.7rem", height: 24, maxWidth: "100%" }}
+            />
+          ))}
+        </Stack>
+      )}
 
-        <TableCell align="right">
-          <Stack direction="row" gap={0.25} justifyContent="flex-end">
-            <Tooltip title="แก้ไข">
-              <IconButton size="small" onClick={() => onEdit(row)}><EditIcon sx={{ fontSize: 17 }} /></IconButton>
-            </Tooltip>
-            <Tooltip title="ลบ">
-              <IconButton size="small" color="error" onClick={() => onDelete(row._id)}><DeleteIcon sx={{ fontSize: 17 }} /></IconButton>
-            </Tooltip>
+      <Collapse in={open} timeout="auto" unmountOnExit>
+        <Box sx={{ px: 1.5, pb: 2, pt: 1, borderTop: "1px solid", borderColor: alpha("#000", 0.06) }}>
+          {detailFields.length > 0 && (
+            <Stack spacing={1.25} sx={{ mb: 2 }}>
+              {detailFields.map((f) => (
+                <Box key={f.label}>
+                  <SectionLabel>{f.label}</SectionLabel>
+                  <Typography variant="body2" sx={{ whiteSpace: "pre-line" }}>{f.value}</Typography>
+                </Box>
+              ))}
+            </Stack>
+          )}
+
+          {/* ─── ประวัติงานรายปี — งานที่ทำให้โครงการนี้ แยกเป็นปี → ประเภทงาน (PM/Service/...) ─── */}
+          <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1.5 }}>
+            <WorkHistoryIcon sx={{ fontSize: 16, color: "text.secondary" }} />
+            <SectionLabel>ประวัติงานรายปี</SectionLabel>
+            <Chip size="small" label={`${customerEvents.length} งานทั้งหมด`}
+              sx={{ height: 20, fontSize: "0.65rem", bgcolor: alpha("#667eea", 0.1), color: "#667eea" }} />
           </Stack>
-        </TableCell>
-      </BodyRow>
 
-      <TableRow>
-        <TableCell colSpan={6} sx={{ p: 0, border: 0 }}>
-          <Collapse in={open} timeout="auto" unmountOnExit>
-            <Box sx={{ px: 3, py: 2, background: theme => alpha(theme.palette.primary.main, 0.02) }}>
-              <Grid container spacing={2}>
-                {isSmallScreen && (
-                  <>
-                    <Grid item xs={12} sm={4}>
-                      <SectionLabel>ผู้ติดต่อ</SectionLabel>
-                      <Typography variant="body2" fontWeight={600}>{row.cName || "—"}</Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={4}>
-                      <SectionLabel>เบอร์โทร</SectionLabel>
-                      <Typography variant="body2">{row.tel || "—"}</Typography>
-                    </Grid>
-                  </>
-                )}
-                <Grid item xs={12} sm={4}>
-                  <SectionLabel>ชื่อโปรเจค</SectionLabel>
-                  <Typography variant="body2">{row.projName || "—"}</Typography>
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <SectionLabel>เลขประจำตัวผู้เสียภาษี</SectionLabel>
-                  <Typography variant="body2">{row.tax || "—"}</Typography>
-                </Grid>
-                <Grid item xs={12} sm={isSmallScreen ? 12 : 8}>
-                  <SectionLabel>ที่อยู่</SectionLabel>
-                  <Typography variant="body2" sx={{ whiteSpace: "pre-line" }}>{row.address || "—"}</Typography>
-                </Grid>
-              </Grid>
-              {!isComplete && (
-                <Chip
-                  size="small" icon={<WarningAmberIcon sx={{ fontSize: 14 }} />}
-                  label="ข้อมูลติดต่อยังไม่ครบถ้วน"
-                  sx={{ mt: 1.5, height: 22, fontSize: "0.68rem", bgcolor: alpha("#f59e0b", 0.1), color: "#d97706" }}
-                />
-              )}
-            </Box>
-          </Collapse>
-        </TableCell>
-      </TableRow>
-    </>
+          {yearGroups.length === 0 ? (
+            <Typography variant="caption" color="text.disabled">ยังไม่มีประวัติงานของโครงการนี้ในระบบ</Typography>
+          ) : (
+            <Stack spacing={1}>
+              {yearGroups.map(({ year, jobs, typeCounts }, idx) => {
+                // ✅ ค่าเริ่มต้น: เปิดเฉพาะปีล่าสุด (แถวแรกหลังเรียงใหม่สุดก่อน) ปีอื่นพับไว้ ไม่ให้รกตา
+                const isYearOpen = openYears[year] ?? idx === 0;
+                return (
+                  <Box key={year} sx={{
+                    border: "1px solid", borderColor: alpha("#000", 0.08), borderRadius: 2, overflow: "hidden",
+                  }}>
+                    <Stack
+                      direction="row" alignItems="center" justifyContent="space-between"
+                      onClick={() => toggleYear(year)}
+                      sx={{ px: 1.5, py: 1, cursor: "pointer", bgcolor: alpha("#667eea", 0.04), "&:hover": { bgcolor: alpha("#667eea", 0.08) } }}
+                    >
+                      <Stack direction="row" alignItems="center" gap={1}>
+                        <ChevronRightIcon sx={{ fontSize: 16, transition: "transform .15s", transform: isYearOpen ? "rotate(90deg)" : "none", color: "text.secondary" }} />
+                        <Typography fontWeight={700} fontSize="0.82rem">ปี {year}</Typography>
+                        <Chip size="small" label={`${jobs.length} งาน`} sx={{ height: 18, fontSize: "0.62rem" }} />
+                      </Stack>
+                      <Stack direction="row" gap={0.5} flexWrap="wrap" justifyContent="flex-end">
+                        {typeCounts.map(([type, count]) => (
+                          <Chip key={type} size="small" label={`${type} · ${count}`}
+                            sx={{ height: 18, fontSize: "0.6rem", fontWeight: 700, bgcolor: alpha(colorFromName(type), 0.12), color: colorFromName(type) }} />
+                        ))}
+                      </Stack>
+                    </Stack>
+
+                    <Collapse in={isYearOpen} timeout="auto" unmountOnExit>
+                      <Stack divider={<Divider />}>
+                        {jobs.map((job) => (
+                          <Stack
+                            key={job.id || job._id}
+                            direction="row" alignItems="center" gap={1.25}
+                            onClick={() => navigate(`/operation/${job.id || job._id}`)}
+                            sx={{ px: 1.5, py: 1, cursor: "pointer", "&:hover": { bgcolor: alpha("#000", 0.02) } }}
+                          >
+                            <AssignmentIcon sx={{ fontSize: 15, color: colorFromName(job.title || ""), flexShrink: 0 }} />
+                            <Box flex={1} minWidth={0}>
+                              <Stack direction="row" alignItems="center" gap={0.6} flexWrap="wrap">
+                                <Typography fontWeight={700} fontSize="0.76rem">{job.title || "ไม่ระบุประเภท"}</Typography>
+                                {job.system && <Typography variant="caption" color="text.secondary">· {job.system}</Typography>}
+                                {job.docNo && <Typography variant="caption" color="text.disabled">· #{job.docNo}</Typography>}
+                              </Stack>
+                              <Typography variant="caption" color="text.secondary">
+                                {moment(job.start || job.date).format("D MMM YYYY")}
+                                {job.team && ` · ทีม ${job.team}`}
+                              </Typography>
+                            </Box>
+                            <Chip
+                              size="small"
+                              icon={<CircleIcon sx={{ fontSize: "8px !important" }} />}
+                              label={job.status || "ไม่ระบุ"}
+                              sx={{
+                                height: 20, fontSize: "0.62rem", fontWeight: 700, flexShrink: 0,
+                                bgcolor: alpha(statusColor(job.status), 0.12), color: statusColor(job.status),
+                                "& .MuiChip-icon": { color: statusColor(job.status) },
+                              }}
+                            />
+                            <ChevronRightIcon sx={{ fontSize: 15, color: "text.disabled", flexShrink: 0 }} />
+                          </Stack>
+                        ))}
+                      </Stack>
+                    </Collapse>
+                  </Box>
+                );
+              })}
+            </Stack>
+          )}
+        </Box>
+      </Collapse>
+    </CustomerCardBox>
   );
 };
 
@@ -374,9 +448,22 @@ const Customer = () => {
   const isSmallScreen = useMediaQuery("(max-width:600px)");
   moment.locale("th");
 
+  // ✅ มาจากการ์ด "โครงการที่มีงานมากที่สุด" ในหน้า Dashboard (/customer?company=X&site=Y) —
+  // กรองแบบตรงตัวเป๊ะๆ (ไม่ใช่ substring search ธรรมดา) ให้เห็นแค่โครงการนั้นโครงการเดียวจริงๆ
+  const [searchParams, setSearchParams] = useSearchParams();
+  const projectFilter = useMemo(() => {
+    const company = searchParams.get("company");
+    const site = searchParams.get("site");
+    return (company || site) ? { company: company || "", site: site || "" } : null;
+  }, [searchParams]);
+  const clearProjectFilter = () => setSearchParams({});
+
   const [searchTerm, setSearchTerm] = useState("");
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(false);
+  // ✅ งานทั้งหมด (CalendarEvent) — ใช้คำนวณ "โครงการนี้ทำงานอะไรไปบ้างแต่ละปี" ในแถวขยายรายละเอียด
+  // ผูกกับลูกค้าด้วยการเทียบ company+site ตรงๆ เพราะ Event ไม่มี customerId อ้างอิงโดยตรง
+  const [events, setEvents] = useState([]);
 
   const [modalOpenInsert, setModalOpenInsert] = useState(false);
   const [modalOpenEdit, setModalOpenEdit] = useState(false);
@@ -389,12 +476,15 @@ const Customer = () => {
 
   // ตาราง: เรียงลำดับ + pagination
   const [order, setOrder] = useState("asc");
-  const [orderBy, setOrderBy] = useState("cCompany");
+  const [orderBy, setOrderBy] = useState("cSite"); // ✅ โครงการเป็นฟิลด์บังคับ ใช้เรียงเริ่มต้นแทนบริษัท (ไม่บังคับกรอกแล้ว)
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
   useEffect(() => {
     fetchCustomers();
+    EventService.getEvents()
+      .then((res) => setEvents(res?.userEvents || []))
+      .catch((error) => console.error("Error fetching events for customer history:", error));
   }, []);
 
   const fetchCustomers = async () => {
@@ -422,15 +512,23 @@ const Customer = () => {
     if (formErrors[name]) setFormErrors(p => ({ ...p, [name]: "" }));
   };
 
+  // ✅ บังคับกรอกแค่ "โครงการ" — บริษัท/อีเมลกรอกทีหลังได้ แต่ถ้ากรอกอีเมลมาก็ยังเช็ครูปแบบให้ถูกต้องอยู่
   const validateForm = (form) => {
     const errs = {};
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!form.cCompany) errs.cCompany = "กรุณากรอกชื่อบริษัท";
     if (!form.cSite) errs.cSite = "กรุณากรอกชื่อโครงการ";
-    if (!form.cEmail || !emailRegex.test(form.cEmail)) errs.cEmail = "กรุณากรอกอีเมลให้ถูกต้อง";
+    if (form.cEmail && !emailRegex.test(form.cEmail)) errs.cEmail = "กรุณากรอกอีเมลให้ถูกต้อง";
     setFormErrors(errs);
     return Object.keys(errs).length === 0;
   };
+
+  // ✅ บริษัท+โครงการซ้ำกัน (ทั้งคู่พร้อมกัน) ถูกกันไว้ที่ backend แล้วด้วย unique index
+  // (คืน 409 พร้อมข้อความ "มีโครงการนี้อยู่แล้ว") เดิม catch ตรงนี้โชว์ข้อความรวมๆ
+  // "ไม่สามารถเพิ่ม/แก้ไขลูกค้าได้" ทุกกรณี ผู้ใช้ไม่รู้เลยว่าที่จริงคือชื่อซ้ำ ไม่ใช่ error อื่น
+  const getSaveErrorMessage = (error) =>
+    error?.response?.status === 409
+      ? (error.response.data || "มีบริษัทและโครงการนี้อยู่แล้ว ห้ามซ้ำกัน")
+      : "กรุณาลองใหม่อีกครั้ง";
 
   const handleAddCustomer = async () => {
     if (!validateForm(newCustomerData)) return;
@@ -444,7 +542,7 @@ const Customer = () => {
       await fetchCustomers();
     } catch (error) {
       console.error("Error adding customer:", error);
-      Swal.fire({ title: "เกิดข้อผิดพลาด!", text: "ไม่สามารถเพิ่มลูกค้าได้", icon: "error" });
+      Swal.fire({ title: "เพิ่มลูกค้าไม่สำเร็จ", text: getSaveErrorMessage(error), icon: "error" });
     }
   };
 
@@ -458,7 +556,7 @@ const Customer = () => {
       await fetchCustomers();
     } catch (error) {
       console.error("Error updating customer:", error);
-      Swal.fire({ title: "เกิดข้อผิดพลาด!", text: "ไม่สามารถแก้ไขข้อมูลได้", icon: "error" });
+      Swal.fire({ title: "แก้ไขข้อมูลไม่สำเร็จ", text: getSaveErrorMessage(error), icon: "error" });
     }
   };
 
@@ -527,13 +625,19 @@ const Customer = () => {
 
   // ─── Derived data ──────────────────────────────────────────────────
   const filteredCustomers = useMemo(() => {
+    // ✅ กรองตรงตัวเป๊ะๆ ตามโครงการที่กดมาจาก Dashboard — ทับตัวค้นหาข้อความปกติไว้ก่อน
+    if (projectFilter) {
+      return customers.filter((customer) =>
+        customer.cCompany === projectFilter.company && customer.cSite === projectFilter.site
+      );
+    }
     const lowerSearch = searchTerm.toLowerCase();
     return customers.filter((customer) =>
       customer.cCompany?.toLowerCase().includes(lowerSearch) ||
       customer.cSite?.toLowerCase().includes(lowerSearch) ||
       customer.cEmail?.toLowerCase().includes(lowerSearch)
     );
-  }, [customers, searchTerm]);
+  }, [customers, searchTerm, projectFilter]);
 
   const sortedCustomers = useMemo(
     () => filteredCustomers.slice().sort(getComparator(order, orderBy)),
@@ -547,22 +651,20 @@ const Customer = () => {
 
   useEffect(() => { setPage(0); }, [searchTerm]);
 
+  // ✅ ตัด "ข้อมูลไม่ครบ" ออก — เดิมนับลูกค้าที่ขาดอีเมล/เบอร์/ที่อยู่ แต่ตอนนี้สามอย่างนี้ไม่บังคับ
+  // กรอกแล้ว ทำให้ทุกรายการ (แทบ 100%) ขึ้นเป็น "ไม่ครบ" เสมอ กลายเป็นค่าที่ไม่สื่อความหมายอะไร
   const stats = useMemo(() => {
     const total = customers.length;
     const thisMonth = customers.filter(c =>
       c.createdAt && moment(c.createdAt).format("YYYY-MM") === moment().format("YYYY-MM")
     ).length;
-    const incomplete = customers.filter(c => !c.cEmail || !c.tel || !c.address).length;
-    return { total, thisMonth, incomplete };
+    return { total, thisMonth };
   }, [customers]);
 
   const statCards = [
     { label: "ลูกค้าทั้งหมด", value: stats.total, bar: "linear-gradient(135deg,#667eea,#764ba2)", icon: <GroupsIcon />, sub: "บริษัท/โครงการที่ดูแลอยู่" },
     { label: "เพิ่มเดือนนี้", value: stats.thisMonth, bar: "linear-gradient(135deg,#10b981,#059669)", icon: <CalendarMonthIcon />, sub: moment().format("MMMM YYYY") },
-    { label: "ข้อมูลไม่ครบ", value: stats.incomplete, bar: "linear-gradient(135deg,#f59e0b,#d97706)", icon: <WarningAmberIcon />, sub: "ขาดอีเมล/เบอร์/ที่อยู่" },
   ];
-
-  const visibleHeadCells = HEAD_CELLS.filter(c => !isSmallScreen || !["cName", "tel"].includes(c.id));
 
   return (
     <>
@@ -596,7 +698,7 @@ const Customer = () => {
         {/* Stat cards */}
         <Grid container spacing={2} sx={{ mb: 3 }}>
           {statCards.map(s => (
-            <Grid item xs={12} sm={4} key={s.label}>
+            <Grid item xs={6} key={s.label}>
               <StatCard barColor={s.bar}>
                 <Stack direction="row" alignItems="flex-start" justifyContent="space-between">
                   <Box>
@@ -617,6 +719,26 @@ const Customer = () => {
           ))}
         </Grid>
 
+        {/* ✅ แบนเนอร์ตัวกรองโครงการเดียว — มาจากการ์ด "โครงการที่มีงานมากที่สุด" ในหน้า Dashboard
+            ต้องมีทางออกชัดเจนเสมอ ไม่งั้นผู้ใช้จะติดอยู่กับลิสต์ 1 แถวโดยไม่รู้จะกลับไปดูทั้งหมดยังไง */}
+        {projectFilter && (
+          <Box sx={{
+            display: "flex", alignItems: "center", gap: 1, mb: 2, px: 2, py: 1.25,
+            borderRadius: 2, bgcolor: alpha("#dc2626", 0.06), border: "1px solid", borderColor: alpha("#dc2626", 0.2),
+          }}>
+            <FilterAltIcon sx={{ fontSize: 18, color: "#dc2626" }} />
+            <Typography variant="body2" sx={{ flex: 1, fontWeight: 600, color: "#991b1b" }}>
+              กำลังแสดงเฉพาะโครงการ: {projectFilter.company && projectFilter.site
+                ? `${projectFilter.company} · ${projectFilter.site}`
+                : (projectFilter.company || projectFilter.site)}
+            </Typography>
+            <Button size="small" startIcon={<ClearIcon fontSize="small" />} onClick={clearProjectFilter}
+              sx={{ color: "#dc2626", textTransform: "none", fontWeight: 700, borderRadius: 2 }}>
+              ดูทั้งหมด
+            </Button>
+          </Box>
+        )}
+
         {/* Search */}
         <GlassCard sx={{ p: 2, mb: 2.5 }}>
           <TextField
@@ -625,7 +747,10 @@ const Customer = () => {
             size="small"
             fullWidth
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              if (projectFilter) clearProjectFilter(); // ✅ พิมพ์ค้นหาเองแล้วให้ยกเลิกตัวกรองโครงการเดิมทันที
+              setSearchTerm(e.target.value);
+            }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start"><SearchIcon sx={{ fontSize: 18, color: "text.disabled" }} /></InputAdornment>
@@ -640,57 +765,48 @@ const Customer = () => {
           />
         </GlassCard>
 
-        {/* Table */}
-        <GlassCard sx={{ overflow: "hidden" }}>
-          {loading ? (
-            <Stack spacing={1.5} sx={{ p: 2 }}>
-              {[1, 2, 3, 4].map(i => <Skeleton key={i} variant="rounded" height={52} sx={{ borderRadius: 2 }} />)}
+        {/* ✅ เรียงลำดับ — เดิมกดที่หัวคอลัมน์ตาราง ตอนนี้ไม่มีหัวตารางแล้ว เหลือปุ่มเดียวสลับทิศทาง */}
+        {!loading && filteredCustomers.length > 0 && (
+          <Stack direction="row" justifyContent="flex-end" sx={{ mb: 1 }}>
+            <Button
+              size="small" onClick={() => handleSort("cSite")}
+              sx={{ textTransform: "none", fontSize: "0.75rem", color: "text.secondary", fontWeight: 600 }}
+            >
+              เรียงตามโครงการ {order === "asc" ? "A → Z" : "Z → A"}
+            </Button>
+          </Stack>
+        )}
+
+        {/* List */}
+        {loading ? (
+          <Stack spacing={1.25}>
+            {[1, 2, 3, 4].map(i => <Skeleton key={i} variant="rounded" height={64} sx={{ borderRadius: 2 }} />)}
+          </Stack>
+        ) : filteredCustomers.length === 0 ? (
+          <GlassCard sx={{ textAlign: "center", py: 8, color: "text.secondary" }}>
+            <FolderOpenIcon sx={{ fontSize: 48, opacity: 0.25, mb: 1 }} />
+            <Typography fontWeight={600}>
+              {projectFilter ? "ไม่พบโครงการนี้ในระบบแล้ว" : searchTerm ? "ไม่พบลูกค้าที่ตรงกับการค้นหา" : "ยังไม่มีข้อมูลลูกค้า"}
+            </Typography>
+            <Typography variant="body2" color="text.disabled">
+              {projectFilter ? "อาจถูกลบไปแล้ว" : searchTerm ? "ลองเปลี่ยนคำค้นหาดูอีกครั้ง" : "กด “เพิ่มข้อมูลลูกค้าใหม่” เพื่อเริ่มต้น"}
+            </Typography>
+          </GlassCard>
+        ) : (
+          <>
+            <Stack spacing={1.25}>
+              {paginatedCustomers.map((row) => (
+                <CustomerCard
+                  key={row._id}
+                  row={row}
+                  events={events}
+                  onEdit={handleEditOpen}
+                  onDelete={handleDeleteRow}
+                  onCopy={handleCopy}
+                />
+              ))}
             </Stack>
-          ) : filteredCustomers.length === 0 ? (
-            <Box sx={{ textAlign: "center", py: 8, color: "text.secondary" }}>
-              <FolderOpenIcon sx={{ fontSize: 48, opacity: 0.25, mb: 1 }} />
-              <Typography fontWeight={600}>
-                {searchTerm ? "ไม่พบลูกค้าที่ตรงกับการค้นหา" : "ยังไม่มีข้อมูลลูกค้า"}
-              </Typography>
-              <Typography variant="body2" color="text.disabled">
-                {searchTerm ? "ลองเปลี่ยนคำค้นหาดูอีกครั้ง" : "กด “เพิ่มข้อมูลลูกค้าใหม่” เพื่อเริ่มต้น"}
-              </Typography>
-            </Box>
-          ) : (
-            <>
-              <TableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      {visibleHeadCells.map(cell => (
-                        <HeadCell key={cell.id} align={cell.align || "left"} sx={{ width: cell.width }}>
-                          {cell.sortable ? (
-                            <TableSortLabel
-                              active={orderBy === cell.id}
-                              direction={orderBy === cell.id ? order : "asc"}
-                              onClick={() => handleSort(cell.id)}
-                            >
-                              {cell.label}
-                            </TableSortLabel>
-                          ) : cell.label}
-                        </HeadCell>
-                      ))}
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {paginatedCustomers.map((row) => (
-                      <CustomerRow
-                        key={row._id}
-                        row={row}
-                        isSmallScreen={isSmallScreen}
-                        onEdit={handleEditOpen}
-                        onDelete={handleDeleteRow}
-                        onCopy={handleCopy}
-                      />
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+            <GlassCard sx={{ mt: 1.5, overflow: "hidden" }}>
               <TablePagination
                 component="div"
                 count={filteredCustomers.length}
@@ -701,11 +817,10 @@ const Customer = () => {
                 rowsPerPageOptions={[5, 10, 25, 50]}
                 labelRowsPerPage="แถวต่อหน้า"
                 labelDisplayedRows={({ from, to, count }) => `${from}–${to} จาก ${count}`}
-                sx={{ borderTop: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}
               />
-            </>
-          )}
-        </GlassCard>
+            </GlassCard>
+          </>
+        )}
       </Box>
 
       {/* Add modal */}

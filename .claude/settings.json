@@ -10,7 +10,20 @@
       "Bash(curl -s http://localhost:5000/api/events/documents -H 'Authorization: Bearer __TRACKED_VAR__')",
       "Bash(awk 'NR==2059,NR==2450' src/components/Operation/index.js)",
       "Bash(grep -iE \"^\\(jimp|sharp|pngjs|get-pixels|canvas\\)$\")",
-      "Bash(grep -n \"IconButton\\\\|<Button\\\\|onClick={.*[Dd]elete\\\\|handleDelete\\\\|onDelete\\\\|Delete /\\\\|<Delete\\\\|window.print\\\\|navigator.share\\\\|Share\\\\b\" \"C:\\\\Users\\\\Admin\\\\Desktop\\\\da-app\\\\src\\\\components\\\\Operation\\\\index.js\")"
+      "Bash(grep -n \"IconButton\\\\|<Button\\\\|onClick={.*[Dd]elete\\\\|handleDelete\\\\|onDelete\\\\|Delete /\\\\|<Delete\\\\|window.print\\\\|navigator.share\\\\|Share\\\\b\" \"C:\\\\Users\\\\Admin\\\\Desktop\\\\da-app\\\\src\\\\components\\\\Operation\\\\index.js\")",
+      "Bash(powershell -Command \"Get-ChildItem -Path 'C:\\\\Users\\\\Admin\\\\Desktop\\\\da-app-server' -File | Select-Object Name\")",
+      "Bash(node --check routes/jobType.js)",
+      "Bash(node --check routes/systemType.js)",
+      "Bash(node --check routes/lookupCrud.js)",
+      "Bash(node --check models/JobType.js)",
+      "Bash(node --check models/SystemType.js)",
+      "Bash(curl -s -H 'Authorization: Bearer __CMDSUB_OUTPUT__' http://localhost:5000/api/jobtype)",
+      "Bash(curl -s -H 'Authorization: Bearer __CMDSUB_OUTPUT__' http://localhost:5000/api/systemtype)",
+      "Bash(curl -s -o /dev/null -w '%{http_code}\\\\n' -H 'Authorization: Bearer __CMDSUB_OUTPUT__' http://localhost:5000/api/jobtype)",
+      "Bash(curl -s -o /dev/null -w '%{http_code}\\\\n' -X POST -H 'Authorization: Bearer __CMDSUB_OUTPUT__' -H 'Content-Type: application/json' -d '{\"name\":\"hack\"}' http://localhost:5000/api/jobtype)",
+      "Bash(node --check models/Customer.js)",
+      "Skill(dataviz)",
+      "Skill(dataviz:*)"
     ]
   }
 }
