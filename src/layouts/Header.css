@@ -5,13 +5,13 @@
 /* แถบ Header หลัก */
 .fix-header {
   height: 70px; /* ล็อกความสูงไว้ที่ 70px กำลังพอดีสำหรับแดชบอร์ดระดับพรีเมียม */
-  background-color: #1a2232 !important; 
-  padding: 0 24px !important; 
+  background: linear-gradient(180deg, #182031 0%, #141b29 100%) !important;
+  padding: 0 24px !important;
   display: flex;
   align-items: center;
-  overflow: visible !important; 
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); 
-  border-bottom: 1px solid #243048;
+  overflow: visible !important;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 4px 16px rgba(0, 0, 0, 0.12);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   position: relative;
   z-index: 1030;
 }
@@ -43,11 +43,11 @@
 /* ลิงก์เมนูหลักตรงกลางบนหน้าจอขนาดใหญ่ */
 .nav-link {
   color: #94a3b8 !important; /* ปรับเป็นสีเทาอ่อนก่อน Hover เพื่อความมินิมอล */
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 500;
   padding: 8px 16px !important;
-  border-radius: 8px;
-  transition: all 0.2s ease;
+  border-radius: 10px;
+  transition: all 0.18s ease;
 }
 
 .nav-link:hover {
@@ -56,12 +56,13 @@
 }
 
 /* ✅ บอกตำแหน่งหน้าปัจจุบัน — เดิมไม่มีทางรู้เลยว่ากำลังอยู่หน้าไหนจาก Header
-   (ต่างจาก Sidebar ที่มี active state อยู่แล้ว) อิงสีแดงจากโลโก้ให้เข้าธีมเดียวกัน */
+   (ต่างจาก Sidebar ที่มี active state อยู่แล้ว) — ใช้ pill โทนแดงจางแทนบล็อกไล่เฉดหนักๆ
+   ให้ดูสะอาดตา ทันสมัยขึ้น แทนที่จะดูเป็นปุ่มหนาทึบ */
 .nav-link.active {
   color: #ffffff !important;
-  background: linear-gradient(135deg, #dc2626 0%, #7f1d1d 100%);
+  background: rgba(220, 38, 38, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(220, 38, 38, 0.35);
   font-weight: 700;
-  box-shadow: 0 3px 10px rgba(220, 38, 38, 0.35);
 }
 
 /* คอนเทนเนอร์เมนูตรงกลาง */
@@ -70,6 +71,7 @@
   flex-direction: row;
   justify-content: center;
   align-items: center;
+  gap: 4px;
 }
 
 /* ปุ่ม Hamburger บนมือถือ */
@@ -90,16 +92,61 @@
 
 /* ตกแต่งกล่อง Dropdown ข้อมูลผู้ใช้เพิ่มเติมให้ดูทันสมัย */
 .modern-dropdown-menu {
-  border: 1px solid #e2e8f0 !important;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
-  border-radius: 8px !important;
-  padding: 6px 0 !important;
+  border: 1px solid #eef1f5 !important;
+  box-shadow: 0 16px 32px -8px rgba(15, 23, 42, 0.18) !important;
+  border-radius: 14px !important;
+  padding: 8px !important;
+  min-width: 220px;
+}
+
+/* ✅ สรุปตัวตนผู้ใช้แบบการ์ดเล็กๆ อยู่บนสุดของเมนู แทน header ข้อความล้วนเดิม —
+   เห็นรูป/ชื่อ/สิทธิ์พร้อมกันในแวบเดียว ไม่ต้องอ่านสองบรรทัดแยกกัน */
+.dropdown-user-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 10px 10px;
+}
+
+.dropdown-user-summary .dropdown-user-avatar {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.dropdown-user-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .user-display-name {
-  font-weight: 600 !important;
-  color: #1e293b !important;
-  font-size: 14px;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  font-size: 13.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dropdown-user-role {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #dc2626;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.dropdown-item-icon {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  border-radius: 8px !important;
+  font-size: 13.5px !important;
+  padding: 9px 10px !important;
 }
 
 /* ✅ ตัวอักษรย่อแทนรูปโปรไฟล์ตอนยังไม่มี imageUrl — อิงสีแดงจากโลโก้บริษัท */
@@ -115,6 +162,17 @@
   font-weight: 700;
   font-size: 14px;
   border: 2px solid #243048;
+  transition: box-shadow 0.18s ease;
+}
+
+.profile-img .rounded-circle,
+.profile-img .header-avatar-fallback {
+  transition: box-shadow 0.18s ease;
+}
+
+.profile-img:hover .rounded-circle,
+.profile-img:hover .header-avatar-fallback {
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.35);
 }
 
 /* --------------------------------------------------------------------------
@@ -127,7 +185,9 @@
   }
 
   .logo {
-    height: 60px !important; /* ลดขนาดโลโก้ลงมาเล็กน้อยให้พอดีกับแถบ 64px */
+    /* ✅ เดิม comment เขียนว่า "ลดขนาด" แต่ค่าจริงคือ 60px ซึ่งใหญ่กว่าจอใหญ่ (48px) เสียอีก
+       เหลือพื้นที่ว่างแนวตั้งแค่ ~2px ในแถบสูง 64px แทบไม่มีลมหายใจเลย ปรับให้เล็กลงจริงตามที่ตั้งใจ */
+    height: 40px !important;
     max-width: 150px;
   }
 

@@ -33,7 +33,6 @@ const PublicRoute = lazy(() => import("./PublicRoute.js"));
 const CheckConnectionToast = lazy(() => import("./CheckConnectionToast.js"));
 
 const MyJobs = lazy(() => import("../views/Technician/MyJobs.js"));
-const WorkOrderDetail = lazy(() => import("../views/Technician/WorkOrderDetail.js"));
 
 
 const ThemeRoutes = [
@@ -260,16 +259,6 @@ const ThemeRoutes = [
     </Suspense>
   ),
   title: "My Jobs",
-},
-
-{
-  path: "technician/job/:id",
-  element: (
-    <Suspense fallback={<div>Loading Work Order...</div>}>
-      <WorkOrderDetail />
-    </Suspense>
-  ),
-  title: "Work Order",
 },
 
     ],

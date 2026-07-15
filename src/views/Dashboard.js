@@ -18,7 +18,8 @@ import {
   FaCog,
   FaMapMarkerAlt,
   FaCogs,
-  FaUserCog
+  FaUserCog,
+  FaChevronLeft
 } from "react-icons/fa";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -141,7 +142,28 @@ const Dashboard = () => {
     return job.team || null;
   };
 
-  // 🏆 โครงการที่มีงานมากที่สุด (Top 10) — จัดกลุ่มงานตาม บริษัท+โครงการ (company+site) เพราะ
+  // 🔧 สรุปงานของฉัน (เฉพาะช่าง) — ใช้ทำให้ปุ่ม "งานของฉัน" เด่นและละเอียดขึ้น (มีตัวเลขจริง ไม่ใช่แค่ไอคอนลอยๆ)
+  // นับจาก events ที่มาจาก getEventOp() ซึ่ง backend scope ตาม role ให้แล้ว (ช่างเห็นแค่งานตัวเอง)
+  // เกณฑ์เดียวกับที่ใช้แบ่งกลุ่มในหน้า Operation/งานของฉัน (active/pending/overdue) — "ค้างเกินกำหนด"
+  // ที่นี่นับด้วยเกณฑ์เดียวกับแท็บ "ค้างงาน" ของ Operation (เลย 1 สัปดาห์ขึ้นไป) ตัวเลขจะได้ตรงกัน
+  // ไม่ใช่นับแค่ 1 วันหลังกำหนดแบบเดิมซึ่งจะเห็นตัวเลขไม่ตรงกับที่ไปเปิดหน้า Operation จริง
+  const myActiveJobsCount = events.filter((e) => ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(e.status) && !e.closeRequested).length;
+  const myPendingApprovalCount = events.filter((e) => e.closeRequested && e.status !== "ดำเนินการเสร็จสิ้น").length;
+  const myOverdueCount = events.filter((e) => {
+    if (e.status === "ดำเนินการเสร็จสิ้น" || e.closeRequested) return false;
+    const planEnd = e.end ? moment(e.end).subtract(e.allDay ? 1 : 0, "days") : moment(e.start || e.date);
+    const daysPastDue = moment().startOf("day").diff(planEnd.startOf("day"), "days");
+    return daysPastDue >= 7;
+  }).length;
+  const myJobsSummary = (() => {
+    const parts = [];
+    if (myActiveJobsCount > 0) parts.push(`${myActiveJobsCount} งานที่ต้องทำ`);
+    if (myPendingApprovalCount > 0) parts.push(`${myPendingApprovalCount} รอตรวจอนุมัติ`);
+    if (myOverdueCount > 0) parts.push(`⚠️ ${myOverdueCount} ค้างเกินกำหนด`);
+    return parts.length > 0 ? parts.join(" · ") : "ไม่มีงานค้างในตอนนี้ 🎉";
+  })();
+
+  // 🏆 โครงการที่มีงานมากที่สุด (ทั้งหมด แบ่งหน้า) — จัดกลุ่มงานตาม บริษัท+โครงการ (company+site) เพราะ
   // Event ไม่มี customerId อ้างอิงตรงๆ (เทียบ pattern เดียวกับที่ Customer/index.js ใช้ผูกประวัติงาน)
   // ✅ events มาจาก getEventOp() ที่ scope ตาม role อยู่แล้ว — แอดมิน/manager เห็นทุกโครงการจริง
   // ส่วนช่างจะเห็นแค่โครงการที่ตัวเองเคยได้รับมอบหมาย จึงโชว์ section นี้เฉพาะแอดมิน/manager
@@ -158,13 +180,22 @@ const Dashboard = () => {
     });
     return Object.values(counts)
       .sort((a, b) => b.count - a.count)
-      .slice(0, 10)
       .map((p) => ({
         ...p,
         name: p.company && p.site ? `${p.company} · ${p.site}` : (p.company || p.site),
       }));
   })();
   const maxProjectCount = topProjects[0]?.count || 1;
+
+  // 📄 แบ่งหน้ารายการโครงการ — แสดงหน้าละ 5 รายการ (รีเซ็ตกลับหน้า 1 เมื่อดึงข้อมูลใหม่)
+  const PROJECTS_PER_PAGE = 5;
+  const [projectPage, setProjectPage] = useState(1);
+  useEffect(() => { setProjectPage(1); }, [events]);
+  const totalProjectPages = Math.max(1, Math.ceil(topProjects.length / PROJECTS_PER_PAGE));
+  const pagedProjects = topProjects.slice(
+    (projectPage - 1) * PROJECTS_PER_PAGE,
+    projectPage * PROJECTS_PER_PAGE
+  );
 
   // 👥 ภาพรวมทีมงานแยกตามสิทธิ์ (เฉพาะแอดมิน)
   const roleCounts = users.reduce((acc, u) => {
@@ -183,7 +214,8 @@ const Dashboard = () => {
     { title: "แผนงานทั้งหมด", icon: <FaCalendarAlt size={20} />, link: "/event", color: "#dc2626" },
     { title: "การดำเนินงาน", icon: <FaWrench size={20} />, link: "/operation", color: "#b91c1c" },
     { title: "เอกสารทั้งหมด", icon: <FaFileAlt size={20} />, link: "/files", color: "#475569", badge: files.length },
-    ...(isTechnician ? [{ title: "งานของฉัน", icon: <FaClipboardList size={20} />, link: "/technician/jobs", color: "#0891b2" }] : []),
+    // ✅ "งานของฉัน" ของช่างถูกย้ายขึ้นไปเป็นแบนเนอร์ hero เด่นๆ ด้านบนแทนแล้ว (ดู SECTION 2)
+    // ไม่ต้องมีซ้ำเป็นไอคอนเล็กๆ ที่นี่อีก
     ...(isAdmin ? [
       { title: "รายชื่อลูกค้าทั้งหมด", icon: <FaBuilding size={20} />, link: "/customer", color: "#3b82f6", badge: customers.length },
       { title: "พนักงาน", icon: <FaUsers size={20} />, link: "/employee", color: "#f43f5e", badge: users.length },
@@ -221,6 +253,24 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* ─── SECTION 1.5: "งานของฉัน" HERO (เฉพาะช่าง) — ให้เด่นและละเอียดกว่าไอคอนเล็กๆ เดิม
+          วางไว้บนสุด (ก่อนแบนเนอร์ปฏิทินทั่วไป) เพราะเป็นสิ่งที่ช่างต้องใช้งานทุกวันมากที่สุด ─── */}
+      {isTechnician && (
+        <div onClick={() => navigate("/technician/jobs")} style={styles.myJobsBanner} className="action-hero-btn">
+          <div style={styles.myJobsIconCircle}>
+            <FaClipboardList size={22} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h3 style={styles.heroBtnTitle}>งานของฉัน</h3>
+            <p style={styles.heroBtnSub}>{loading ? "กำลังโหลด..." : myJobsSummary}</p>
+          </div>
+          {!loading && (myActiveJobsCount + myPendingApprovalCount) > 0 && (
+            <span style={styles.myJobsCountBadge}>{myActiveJobsCount + myPendingApprovalCount}</span>
+          )}
+          <FaArrowRight size={13} className="arrow-bounce" style={{ opacity: 0.8, flexShrink: 0 }} />
+        </div>
+      )}
+
       {/* ─── SECTION 2: COMPACT CTA BANNER ─── */}
       <div onClick={() => navigate("/event")} style={styles.ctaBanner} className="action-hero-btn">
         <div style={styles.heroIconCircle}>
@@ -255,7 +305,7 @@ const Dashboard = () => {
       {/* ─── SECTION 4: TODAY'S JOBS (ข้อมูลจริงจาก CalendarEvent ของวันนี้) ─── */}
       <div style={styles.notiHeaderRow}>
         <h5 style={{ ...styles.sectionTitle, marginBottom: 0 }}>งานวันนี้ · {moment().locale("th").format("D MMM")}</h5>
-        <Link to="/operation" style={styles.viewAllLink}>ดูทั้งหมด <FaChevronRight size={9} /></Link>
+        <Link to="/operation" style={styles.viewAllLink}>ดูการดำเนินงานทั้งหมด <FaChevronRight size={9} /></Link>
       </div>
       {loading ? (
         <div style={styles.todayScrollRow}>
@@ -375,29 +425,57 @@ const Dashboard = () => {
                 <p style={{ margin: 0, fontSize: "12px", color: "#94a3b8" }}>ยังไม่มีข้อมูลงานของโครงการ</p>
               </div>
             ) : (
-              <div style={styles.topProjectList}>
-                {topProjects.map((p, i) => (
-                  <Link
-                    key={p.name}
-                    to={`/customer?company=${encodeURIComponent(p.company)}&site=${encodeURIComponent(p.site)}`}
-                    style={{ textDecoration: "none" }}
-                  >
-                    <div style={styles.topProjectRow} className="metric-card-hover">
-                      <span style={{
-                        ...styles.topProjectRank,
-                        ...(i === 0 ? { backgroundColor: "#dc2626", color: "#fff" } : {}),
-                      }}>{i + 1}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={styles.topProjectName}>{p.name}</p>
-                        <div style={styles.topProjectTrack}>
-                          <div style={{ ...styles.topProjectBar, width: `${Math.max((p.count / maxProjectCount) * 100, 6)}%` }} />
+              <>
+                <div style={styles.topProjectList}>
+                  {pagedProjects.map((p, i) => {
+                    const rank = (projectPage - 1) * PROJECTS_PER_PAGE + i + 1;
+                    return (
+                      <Link
+                        key={p.name}
+                        to={`/customer?company=${encodeURIComponent(p.company)}&site=${encodeURIComponent(p.site)}`}
+                        style={{ textDecoration: "none" }}
+                      >
+                        <div style={styles.topProjectRow} className="metric-card-hover">
+                          <span style={{
+                            ...styles.topProjectRank,
+                            ...(rank === 1 ? { backgroundColor: "#dc2626", color: "#fff" } : {}),
+                          }}>{rank}</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={styles.topProjectName}>{p.name}</p>
+                            <div style={styles.topProjectTrack}>
+                              <div style={{ ...styles.topProjectBar, width: `${Math.max((p.count / maxProjectCount) * 100, 6)}%` }} />
+                            </div>
+                          </div>
+                          <span style={styles.topProjectCount}>{p.count}</span>
                         </div>
-                      </div>
-                      <span style={styles.topProjectCount}>{p.count}</span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+                {totalProjectPages > 1 && (
+                  <div style={styles.projectPagination}>
+                    <button
+                      type="button"
+                      onClick={() => setProjectPage((p) => Math.max(1, p - 1))}
+                      disabled={projectPage === 1}
+                      style={{ ...styles.projectPageBtn, opacity: projectPage === 1 ? 0.35 : 1 }}
+                      className="metric-card-hover"
+                    >
+                      <FaChevronLeft size={10} />
+                    </button>
+                    <span style={styles.projectPageLabel}>หน้า {projectPage} / {totalProjectPages}</span>
+                    <button
+                      type="button"
+                      onClick={() => setProjectPage((p) => Math.min(totalProjectPages, p + 1))}
+                      disabled={projectPage === totalProjectPages}
+                      style={{ ...styles.projectPageBtn, opacity: projectPage === totalProjectPages ? 0.35 : 1 }}
+                      className="metric-card-hover"
+                    >
+                      <FaChevronRight size={10} />
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </>
@@ -620,6 +698,46 @@ const styles = {
     color: "rgba(255, 255, 255, 0.75)",
     margin: "2px 0 0 0",
     lineHeight: "1.3",
+  },
+
+  /* 🔧 "งานของฉัน" hero (เฉพาะช่าง) — สีต่างจาก ctaBanner (cyan แทนแดง) เพื่อแยกให้เห็นชัดว่า
+     เป็นคนละปุ่มกัน แต่ใช้โครงสไตล์เดียวกัน (icon circle/title/sub/arrow) ให้ดูเป็นชุดเดียวกัน */
+  myJobsBanner: {
+    width: "100%",
+    background: "linear-gradient(135deg, #0891b2 0%, #164e63 100%)",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "18px",
+    padding: "16px",
+    cursor: "pointer",
+    boxShadow: "0 12px 24px -8px rgba(8, 145, 178, 0.35)",
+    marginBottom: "14px",
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+  },
+  myJobsIconCircle: {
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    width: "40px",
+    height: "40px",
+    borderRadius: "12px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  myJobsCountBadge: {
+    minWidth: "26px",
+    height: "26px",
+    padding: "0 8px",
+    borderRadius: "13px",
+    backgroundColor: "rgba(255, 255, 255, 0.22)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "13px",
+    fontWeight: "800",
+    flexShrink: 0,
   },
 
   /* 📊 Quick Stats Strip — แถบบางเดียว ลดความเด่นลงจากการ์ดใหญ่แยกชิ้นเดิม แค่ให้เห็นภาพรวมเร็วๆ */
@@ -943,6 +1061,31 @@ const styles = {
     borderRadius: "8px",
     backgroundColor: "#f1f5f9",
     marginBottom: "8px",
+  },
+  projectPagination: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "14px",
+    padding: "10px 14px",
+    borderTop: "1px solid #f1f5f9",
+  },
+  projectPageBtn: {
+    width: "28px",
+    height: "28px",
+    borderRadius: "50%",
+    border: "1px solid #e2e8f0",
+    backgroundColor: "#ffffff",
+    color: "#475569",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 0,
+  },
+  projectPageLabel: {
+    fontSize: "11.5px",
+    fontWeight: "600",
+    color: "#64748b",
   },
 
   /* 👥 Team Overview — เฉพาะแอดมิน */

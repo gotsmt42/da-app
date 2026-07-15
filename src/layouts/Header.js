@@ -19,7 +19,7 @@ import {
 } from "reactstrap";
 import { swalLogout } from "../functions/user";
 import Swal from "sweetalert2";
-import { FaBars } from "react-icons/fa";
+import { FaBars, FaUserCircle, FaSignOutAlt } from "react-icons/fa";
 
 const Header = ({ toggleMobileSidebar }) => {
   const navigate = useNavigate();
@@ -132,16 +132,27 @@ const Header = ({ toggleMobileSidebar }) => {
                 )}
               </DropdownToggle>
               <DropdownMenu end className="modern-dropdown-menu">
-                <DropdownItem header>ข้อมูลผู้ใช้งาน</DropdownItem>
-                <DropdownItem text className="user-display-name">
-                  {user?.username || userData?.name}
-                </DropdownItem>
+                <div className="dropdown-user-summary">
+                  {userData?.imageUrl ? (
+                    <img src={userData.imageUrl} alt="profile" className="dropdown-user-avatar" />
+                  ) : (
+                    <div className="header-avatar-fallback dropdown-user-avatar">{initials}</div>
+                  )}
+                  <div className="dropdown-user-text">
+                    <span className="user-display-name">{user?.username || userData?.name}</span>
+                    <span className="dropdown-user-role">{userData?.role || "User"}</span>
+                  </div>
+                </div>
                 <DropdownItem divider />
                 <Link to={"/account"} style={{ textDecoration: "none" }}>
-                  <DropdownItem>My Account</DropdownItem>
+                  <DropdownItem className="dropdown-item-icon">
+                    <FaUserCircle size={14} /> My Account
+                  </DropdownItem>
                 </Link>
                 <DropdownItem divider />
-                <DropdownItem onClick={handleLogout} style={{ color: '#ef4444' }}>Logout</DropdownItem>
+                <DropdownItem onClick={handleLogout} className="dropdown-item-icon" style={{ color: '#ef4444' }}>
+                  <FaSignOutAlt size={14} /> Logout
+                </DropdownItem>
               </DropdownMenu>
             </Dropdown>
           </div>

@@ -16,6 +16,25 @@ import "bootstrap/dist/css/bootstrap.min.css"; // import Bootstrap CSS
 
 import "@fortawesome/react-fontawesome";
 
+// ✅ "ResizeObserver loop completed with undelivered notifications." เป็นข้อความเตือนที่ไม่เป็นอันตราย
+// เกิดขึ้นเองจากสเปกของเบราว์เซอร์เวลา ResizeObserver (ที่ MUI/FullCalendar ใช้ภายใน) ตอบสนอง resize
+// ไม่ทันภายในหนึ่งเฟรม ไม่ได้บ่งบอกว่าแอปพัง — แต่ webpack-dev-server client overlay (โหลดเป็น entry
+// แยกก่อนบันเดิลแอปเราเสมอ ทำให้ listener ของมัน register ก่อนของเราตลอด, stopImmediatePropagation
+// จากฝั่งเราจึงช้าเกินไปเสมอ ใช้ไม่ได้จริง) จะจับไปโชว์เป็นหน้าจอ error สีแดงเต็มจอ — ปล่อยให้ overlay
+// ขึ้นมาสั้นๆ ตามปกติ แล้วซ่อน DOM element ของมันทันทีแทน (วิธีที่ยืนยันได้ผลจริงกับ CRA 5)
+window.addEventListener("error", (e) => {
+  if (
+    e.message === "ResizeObserver loop completed with undelivered notifications." ||
+    e.message === "ResizeObserver loop limit exceeded"
+  ) {
+    e.stopImmediatePropagation();
+    const overlay = document.getElementById("webpack-dev-server-client-overlay");
+    const overlayDiv = document.getElementById("webpack-dev-server-client-overlay-div");
+    if (overlay) overlay.style.display = "none";
+    if (overlayDiv) overlayDiv.style.display = "none";
+  }
+});
+
 const root = ReactDOM.createRoot(document.getElementById("root"));
 
 

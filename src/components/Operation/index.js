@@ -25,7 +25,7 @@ import {
   Button, Stack, Tooltip, Badge, Fade, Collapse, LinearProgress,
   Tabs, Tab, Divider, useMediaQuery, useTheme, InputAdornment,
   Menu, MenuItem, ListItemIcon, ListItemText, Card, CardContent,
-  Skeleton, Alert, Snackbar, ToggleButton, ToggleButtonGroup,
+  Skeleton, Alert, Snackbar,
   List, ListItem, Pagination,
 } from "@mui/material";
 
@@ -72,6 +72,32 @@ const FAST_MENU_PROPS = {
   disableScrollLock: true,
 };
 
+// ✅ นับความ "ค้างงาน" อิงจากวันที่สิ้นสุดงานตามแผนจริง (end หรือ start ถ้าไม่มี end) เทียบกับวันนี้
+// สองระดับ: เลย 1 สัปดาห์ = เริ่ม "แจ้งเตือน" ให้ทันเห็นก่อน, เลย 2 สัปดาห์ = "ค้างงาน" เต็มตัว
+// (งานที่ปิดแล้ว/กำลังรอผู้ดูแลอนุมัติปิดอยู่แล้ว ไม่ถือว่าค้าง — คืน null)
+const WARNING_DAYS_AFTER_END = 7;   // สัปดาห์แรก
+const OVERDUE_DAYS_AFTER_END = 14;  // 2 สัปดาห์
+
+const getDaysPastDue = (event) => {
+  if (event.status === "ดำเนินการเสร็จสิ้น" || event.closeRequested) return null;
+  const planEnd = event.end
+    ? moment(event.end).subtract(event.allDay ? 1 : 0, "days")
+    : moment(event.start);
+  return moment().startOf("day").diff(planEnd.startOf("day"), "days");
+};
+
+// ✅ "ค้างงาน" ในความหมายรวม (แท็บเดียวที่ฝั่งช่างเห็น) = เลยกำหนดมาแล้วอย่างน้อย 1 สัปดาห์
+// ครอบคลุมทั้งงานที่เพิ่งเข้าเกณฑ์แจ้งเตือน (1-2 สัปดาห์) และงานที่ค้างจริงจัง (2 สัปดาห์ขึ้นไป)
+const isJobFlagged = (event) => {
+  const days = getDaysPastDue(event);
+  return days !== null && days >= WARNING_DAYS_AFTER_END;
+};
+
+const isJobSeverelyOverdue = (event) => {
+  const days = getDaysPastDue(event);
+  return days !== null && days >= OVERDUE_DAYS_AFTER_END;
+};
+
 // ─── Styled Components ────────────────────────────────────────────────
 const GlassCard = styled(Card)(({ theme }) => ({
   background: alpha(theme.palette.background.paper, 0.9),
@@ -113,6 +139,32 @@ const FilterChip = styled(Chip)(({ theme, active }) => ({
   transition: "all 0.15s ease",
   "&:hover": { transform: "scale(1.04)" },
 }));
+
+// ─── StatusGroupCard ────────────────────────────────────────────────────
+// ✅ ปุ่มเลือกกลุ่มสถานะงาน (รอคุณอนุมัติ/กำลังดำเนินการ/ค้างงาน/เสร็จสิ้น) — เดิมใช้ ToggleButtonGroup
+// แบบชิปเล็กๆ เรียงแนวนอน พอจอแคบ (มือถือ) จะห่อบรรทัดมั่วๆ กดยาก เปลี่ยนเป็นการ์ดใหญ่จัดกริด
+// 2 คอลัมน์เสมอ (ฝั่งแอดมิน/manager ขยายเป็น 4 คอลัมน์ในแนวนอนตอนจอกว้างพอ) แตะง่าย เห็นตัวเลขชัด
+const StatusGroupCard = ({ active, onClick, icon, color, label, count, sub }) => (
+  <Box
+    onClick={onClick}
+    sx={{
+      cursor: "pointer", borderRadius: 3, p: 1.5, textAlign: "center",
+      transition: "all 0.15s ease", border: "2px solid",
+      borderColor: active ? color : "divider",
+      bgcolor: active ? alpha(color, 0.08) : "background.paper",
+      minHeight: 92,
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+    }}>
+    {React.cloneElement(icon, { sx: { fontSize: 24, color: active ? color : "text.secondary", mb: 0.5 } })}
+    <Typography fontWeight={800} fontSize="0.8rem" lineHeight={1.25}
+      color={active ? color : "text.primary"}>
+      {label}
+    </Typography>
+    <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25 }}>
+      {count} งาน{sub ? ` · ${sub}` : ""}
+    </Typography>
+  </Box>
+);
 
 const UploadZone = styled(Box)(({ theme, dragging }) => ({
   border: `2px dashed ${dragging ? theme.palette.primary.main : alpha(theme.palette.divider, 0.4)}`,
@@ -2044,25 +2096,28 @@ const Operation = () => {
     const matchStatus = filterStatus ? [event.status_two, event.status_three].includes(filterStatus) : true;
     const matchOP     = filterOP     ? event.status === filterOP     : true;
 
-    // ✅ เบื้องต้น: ตัดงานสถานะ "กำลังรอยืนยัน" ออกทั้งหมดfilteredEvents
-    // (ยกเว้นผู้ใช้ตั้งใจกรองสถานะนี้เองโดยเฉพาะ)
-    const matchNotPending = filterOP === "กำลังรอยืนยัน" ? true : event.status !== "กำลังรอยืนยัน";
+    // ✅ ตัดงานฝั่งช่างให้เหลือแค่กลุ่มที่ต้องติดตาม (ค้างงาน/เสร็จสิ้น) — งานที่กำลังลงมือทำจริง/รออนุมัติ
+    // ย้ายไปจัดการทั้งหมดที่หน้า "งานของฉัน" (technician/jobs) แทน ไม่มี "pending"/"active" ให้เลือก
+    // ในมุมมองของช่างอีกต่อไป — ต้องคำนวณกลุ่มนี้ "ก่อน" matchNotPending เพราะกลุ่ม "ค้างงาน" ต้อง
+    // งดเว้นการตัด "กำลังรอยืนยัน" ออก (ดูเหตุผลด้านล่าง)
+    const isAdminOrManagerRole = ["admin", "manager"].includes(currentUserRole);
+    const group = filterOP ? null : (statusGroup || (isAdminOrManagerRole ? "pending" : "overdue"));
 
-    // ✅ แยกกลุ่มงานให้ชัดเจนเป็น 3 กลุ่มเดียวกันทั้งฝั่งช่างและแอดมิน/manager
-    // (รอคุณ/ผู้ดูแลอนุมัติ / กำลังดำเนินการ-ยืนยันแล้ว / เสร็จสิ้น) — ถ้าผู้ใช้เลือกสถานะเจาะจงไว้แล้ว
-    // (filterOP) ให้ยึดตามนั้นแทน ไม่ต้องกรองซ้ำด้วย toggle นี้ (กันผลลัพธ์ขัดกันจนว่างเปล่า)
-    // ค่า default ต่างกันตาม role: แอดมิน/manager เปิดที่ "รอคุณอนุมัติ" ก่อน (งานด่วนที่ต้องรีวิว)
-    // ส่วนช่างเปิดที่ "กำลังดำเนินการ/ยืนยันแล้ว" ก่อน (งานที่ต้องลงมือทำจริง)
+    // ✅ เดิมตัดงานสถานะ "กำลังรอยืนยัน" ออกทั้งหมดเสมอ (ยกเว้นกรองเจาะจงเอง) แต่งานที่ค้างมานาน
+    // จนเลยกำหนดโดยไม่เคยถูกยืนยันเลยตั้งแต่แรกคืองานที่กลุ่ม "ค้างงาน" ต้องจับให้ได้มากที่สุด —
+    // ตัดออกเสมอทำให้ตัวเลขบน badge (นับจาก isJobFlagged ตรงๆ ไม่รู้จัก exclusion นี้) กับรายการที่
+    // แสดงจริงไม่ตรงกัน (เห็น badge ว่า 3 งาน แต่เปิดมา "ไม่พบรายการ") จึงงดเว้นเฉพาะตอนดูกลุ่มนี้
+    const matchNotPending = (filterOP === "กำลังรอยืนยัน" || group === "overdue")
+      ? true
+      : event.status !== "กำลังรอยืนยัน";
+
     let matchGroup;
-    if (filterOP) {
+    if (!group) {
       matchGroup = true;
-    } else {
-      const isAdminOrManagerRole = ["admin", "manager"].includes(currentUserRole);
-      const group = statusGroup || (isAdminOrManagerRole ? "pending" : "active");
-      if (group === "pending")      matchGroup = event.closeRequested === true && event.status !== "ดำเนินการเสร็จสิ้น";
-      else if (group === "active")  matchGroup = ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(event.status) && !event.closeRequested;
-      else                          matchGroup = event.status === "ดำเนินการเสร็จสิ้น"; // "closed"
-    }
+    } else if (group === "pending")      matchGroup = event.closeRequested === true && event.status !== "ดำเนินการเสร็จสิ้น";
+    else if (group === "active")  matchGroup = ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(event.status) && !event.closeRequested;
+    else if (group === "overdue") matchGroup = isJobFlagged(event);
+    else                          matchGroup = event.status === "ดำเนินการเสร็จสิ้น"; // "closed"
 
     const keyword = search.toLowerCase();
     const matchSearch = keyword
@@ -2082,6 +2137,8 @@ const Operation = () => {
   const closedCount   = useMemo(() => events.filter(e => e.status === "ดำเนินการเสร็จสิ้น").length, [events]);
   const pendingCount  = useMemo(() => events.filter(e => e.closeRequested === true && e.status !== "ดำเนินการเสร็จสิ้น").length, [events]);
   const inProgressCount  = useMemo(() => events.filter(e => ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(e.status) && !e.closeRequested).length, [events]);
+  const overdueCount     = useMemo(() => events.filter(isJobFlagged).length, [events]);
+  const severeOverdueCount = useMemo(() => events.filter(isJobSeverelyOverdue).length, [events]);
 
   // ✅ จัดกลุ่ม event ที่เป็น "งานเดียวกัน" เข้าด้วยกัน กันงานที่ต้องเข้าหลายวันแบบไม่ติดกัน
   // (เช่น PM ครั้งที่ 1 แบ่งเข้า 3 วันเว้นระยะ) ถูกนับ/แสดงเป็นคนละงานแยกกัน
@@ -2339,6 +2396,10 @@ const Operation = () => {
     isAdminOrManager ? "admin" : "technician"
   );
 
+  // ✅ ฝั่งช่างเหลือแค่ "ค้างงาน" กับ "เสร็จสิ้น" (รอผู้ดูแลอนุมัติ/กำลังดำเนินการ ย้ายไปจัดการที่
+  // หน้า "งานของฉัน" หมดแล้ว) จึง default ไปที่ "overdue" แทน "pending" ที่ไม่มีให้เลือกอีกต่อไป
+  const effectiveGroup = statusGroup || (isAdminOrManager ? "pending" : "overdue");
+
   return (
     <Box sx={{ px: { xs: 1, sm: 2, md: 3 }, py: 3, maxWidth: 1400, mx: "auto" }}>
 
@@ -2350,21 +2411,25 @@ const Operation = () => {
             {loading ? "กำลังโหลด..." : `${sortedEvents.length} รายการ${activeFilterCount > 0 ? ` · กรอง ${activeFilterCount} เงื่อนไข` : ""}`}
           </Typography>
         </Box>
+        {/* ✅ ปุ่มวงกลม ขนาด 40px ให้แตะง่ายขึ้นบนมือถือ (เดิม size="small" เล็กไปสำหรับนิ้วมือ)
+            เข้าธีมเดียวกับปุ่มวงกลมที่ใช้ทั่วแอป (bell button ใน Dashboard/Header) */}
         <Stack direction="row" gap={1}>
           <Tooltip title="รีเฟรช">
-            <IconButton onClick={() => fetchEventsFromDB()} size="small"
-              sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2 }}>
+            <IconButton onClick={() => fetchEventsFromDB()}
+              sx={{ border: "1px solid", borderColor: "divider", borderRadius: "50%", width: 40, height: 40 }}>
               <Refresh fontSize="small" />
             </IconButton>
           </Tooltip>
           {/* Notification bell — ทุก role เห็น แต่เนื้อหาต่างกันตามฝั่ง (ดูคอมเมนต์ใน NotificationBell) */}
           <NotificationBell notifications={notifications} unread={unread} onItemClick={markRead} />
-          <Tooltip title="Export CSV (รวมเวลาเข้า/ออก + สรุปงาน)">
-            <IconButton onClick={handleExportCSV} size="small"
-              sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2 }}>
-              <Download fontSize="small" />
-            </IconButton>
-          </Tooltip>
+          {isAdminOrManager && (
+            <Tooltip title="Export CSV (รวมเวลาเข้า/ออก + สรุปงาน)">
+              <IconButton onClick={handleExportCSV}
+                sx={{ border: "1px solid", borderColor: "divider", borderRadius: "50%", width: 40, height: 40 }}>
+                <Download fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
         </Stack>
       </Stack>
 
@@ -2387,47 +2452,39 @@ const Operation = () => {
         </Tabs>
       </Box>
 
-      {/* ✅ แยกกลุ่มงานให้เห็นชัดเจนเป็น 3 กลุ่มเดียวกันทั้งฝั่งช่างและแอดมิน/manager
-          (รอคุณ/ผู้ดูแลอนุมัติ / กำลังดำเนินการ-ยืนยันแล้ว / เสร็จสิ้น)
-          (ใช้ร่วมกันทั้ง Tab รายการงาน/Timeline — Dashboard ดูภาพรวมทั้งหมดอยู่แล้วจึงไม่ต้องมี) */}
-      {activeTab !== 2 && (() => {
-        // ค่า default ต่างกันตาม role: แอดมิน/manager เปิดที่ "รอคุณอนุมัติ" ก่อน
-        // ส่วนช่างเปิดที่ "กำลังดำเนินการ/ยืนยันแล้ว" ก่อน (ตรงกับงานที่ต้องลงมือทำจริง)
-        const effectiveGroup = statusGroup || (isAdminOrManager ? "pending" : "active");
-        return (
-        <ToggleButtonGroup
-          value={effectiveGroup}
-          exclusive
-          onChange={(_, v) => { if (v) setStatusGroup(v); }}
-          size="small"
-          sx={{ mb: 3, flexWrap: "wrap" }}>
-          <ToggleButton value="pending" sx={{ textTransform: "none", fontWeight: 700, px: 2, gap: 1 }}>
-            <HourglassTop sx={{ fontSize: 18 }} /> {isAdminOrManager ? "รอคุณอนุมัติ" : "รอผู้ดูแลอนุมัติ"}
-            <Chip label={pendingCount} size="small" sx={{
-              height: 20, fontSize: "0.68rem", ml: 0.75, fontWeight: 700,
-              bgcolor: effectiveGroup === "pending" ? "rgba(255,255,255,0.28)" : alpha("#f59e0b", 0.12),
-              color: effectiveGroup === "pending" ? "inherit" : "#f59e0b",
-            }} />
-          </ToggleButton>
-          <ToggleButton value="active" sx={{ textTransform: "none", fontWeight: 700, px: 2, gap: 1 }}>
-            <PendingActions sx={{ fontSize: 18 }} /> กำลังดำเนินการ/ยืนยันแล้ว
-            <Chip label={inProgressCount} size="small" sx={{
-              height: 20, fontSize: "0.68rem", ml: 0.75, fontWeight: 700,
-              bgcolor: effectiveGroup === "active" ? "rgba(255,255,255,0.28)" : alpha("#8b5cf6", 0.12),
-              color: effectiveGroup === "active" ? "inherit" : "#8b5cf6",
-            }} />
-          </ToggleButton>
-          <ToggleButton value="closed" sx={{ textTransform: "none", fontWeight: 700, px: 2, gap: 1 }}>
-            <CheckCircle sx={{ fontSize: 18 }} /> งานที่เสร็จสิ้น
-            <Chip label={closedCount} size="small" sx={{
-              height: 20, fontSize: "0.68rem", ml: 0.75, fontWeight: 700,
-              bgcolor: effectiveGroup === "closed" ? "rgba(255,255,255,0.28)" : alpha("#10b981", 0.12),
-              color: effectiveGroup === "closed" ? "inherit" : "#10b981",
-            }} />
-          </ToggleButton>
-        </ToggleButtonGroup>
-        );
-      })()}
+      {/* ✅ แอดมิน/manager: กลุ่มงาน 4 ตัวเลือก (รอคุณอนุมัติ / กำลังดำเนินการ / ค้างงาน / เสร็จสิ้น)
+          ฝั่งช่าง: เหลือแค่ "ค้างงาน" กับ "เสร็จสิ้น" (งานที่กำลังทำ/รออนุมัติ ย้ายไปหน้า "งานของฉัน" หมดแล้ว)
+          เดิมใช้ ToggleButtonGroup แบบชิปเล็กเรียงแนวนอน จอมือถือห่อบรรทัดมั่วๆ กดยาก เปลี่ยนเป็น
+          การ์ดใหญ่จัดกริด 2 คอลัมน์เสมอบนจอแคบ (แอดมินขยายเป็น 4 คอลัมน์แนวนอนตอนจอกว้างพอ) */}
+      {activeTab !== 2 && (
+        <Box sx={{
+          display: "grid",
+          gridTemplateColumns: isAdminOrManager ? { xs: "1fr 1fr", sm: "repeat(4, 1fr)" } : "1fr 1fr",
+          gap: 1.25, mb: 3,
+        }}>
+          {isAdminOrManager && (
+            <>
+              <StatusGroupCard
+                active={effectiveGroup === "pending"} onClick={() => setStatusGroup("pending")}
+                icon={<HourglassTop />} color="#f59e0b" label="รอคุณอนุมัติ" count={pendingCount}
+              />
+              <StatusGroupCard
+                active={effectiveGroup === "active"} onClick={() => setStatusGroup("active")}
+                icon={<PendingActions />} color="#8b5cf6" label="กำลังดำเนินการ/ยืนยันแล้ว" count={inProgressCount}
+              />
+            </>
+          )}
+          <StatusGroupCard
+            active={effectiveGroup === "overdue"} onClick={() => setStatusGroup("overdue")}
+            icon={<Warning />} color="#ef4444" label="ค้างงาน" count={overdueCount}
+            sub={severeOverdueCount > 0 ? `${severeOverdueCount} เกิน 2 สัปดาห์` : undefined}
+          />
+          <StatusGroupCard
+            active={effectiveGroup === "closed"} onClick={() => setStatusGroup("closed")}
+            icon={<CheckCircle />} color="#10b981" label="เสร็จสิ้น" count={closedCount}
+          />
+        </Box>
+      )}
 
       {loading && <LinearProgress sx={{ borderRadius: 1, mb: 2 }} />}
 
@@ -2473,27 +2530,46 @@ const Operation = () => {
             </Box>
           ) : (
             <>
-              {pagedGroups.map(sessions => (
-                <JobGroupBlock
-                  key={sessions[0].jobGroupId || sessions[0]._id}
-                  sessions={sessions}
-                  currentUserRole={currentUserRole}
-                  employee={employee}
-                  onStatusUpdate={handleStatusUpdate}
-                  onDocNoUpdate={handleDocNoUpdate}
-                  onInputUpdate={handleInputUpdate}
-                  onFileUpload={handleFileUpload}
-                  onDeleteFile={(eid, type, fileId) => { setPendingDelete({ id: eid, type, fileId }); setConfirmOpen(true); }}
-                  onPreview={(url, name) => { setPreviewUrl(url); setPreviewFileName(name); }}
-                  onDelete={handleDeleteRow}
-                  onApproveClose={handleApproveClose}
-                  onRejectClose={handleRejectClose}
-                  uploadingState={uploadingState}
-                  isUploadingState={isUploadingState}
-                  uploadProgressState={uploadProgressState}
-                  uploadingFileSizeState={uploadingFileSizeState}
-                />
-              ))}
+              {pagedGroups.map(sessions => {
+                // ✅ ในมุมมอง "ค้างงาน" ให้เห็นความรุนแรงต่างกันชัดๆ ก่อนเปิดการ์ด — เลย 1 สัปดาห์
+                // = แจ้งเตือนสีเหลือง (ให้ทันเห็นก่อน), เลย 2 สัปดาห์ = ค้างงานเต็มตัวสีแดง
+                const daysPastDue = effectiveGroup === "overdue" ? getDaysPastDue(sessions[0]) : null;
+                const severeOverdue = daysPastDue !== null && daysPastDue >= OVERDUE_DAYS_AFTER_END;
+                return (
+                  <Box key={sessions[0].jobGroupId || sessions[0]._id} sx={{ mb: 0.5 }}>
+                    {daysPastDue !== null && (
+                      <Chip
+                        size="small"
+                        icon={severeOverdue ? <Warning sx={{ fontSize: 14 }} /> : <HourglassTop sx={{ fontSize: 14 }} />}
+                        label={severeOverdue ? `ค้างงาน ${daysPastDue} วัน` : `แจ้งเตือน · เลยกำหนด ${daysPastDue} วัน`}
+                        sx={{
+                          mb: 0.75, fontWeight: 700, fontSize: "0.7rem", height: 24,
+                          bgcolor: severeOverdue ? alpha("#ef4444", 0.12) : alpha("#f59e0b", 0.12),
+                          color: severeOverdue ? "#ef4444" : "#f59e0b",
+                        }}
+                      />
+                    )}
+                    <JobGroupBlock
+                      sessions={sessions}
+                      currentUserRole={currentUserRole}
+                      employee={employee}
+                      onStatusUpdate={handleStatusUpdate}
+                      onDocNoUpdate={handleDocNoUpdate}
+                      onInputUpdate={handleInputUpdate}
+                      onFileUpload={handleFileUpload}
+                      onDeleteFile={(eid, type, fileId) => { setPendingDelete({ id: eid, type, fileId }); setConfirmOpen(true); }}
+                      onPreview={(url, name) => { setPreviewUrl(url); setPreviewFileName(name); }}
+                      onDelete={handleDeleteRow}
+                      onApproveClose={handleApproveClose}
+                      onRejectClose={handleRejectClose}
+                      uploadingState={uploadingState}
+                      isUploadingState={isUploadingState}
+                      uploadProgressState={uploadProgressState}
+                      uploadingFileSizeState={uploadingFileSizeState}
+                    />
+                  </Box>
+                );
+              })}
 
               <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" justifyContent="space-between"
                 gap={1.5} sx={{ mt: 2, mb: 1 }}>

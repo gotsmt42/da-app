@@ -99,8 +99,8 @@ const Sidebar = ({ handleMenuClick }) => {
 
   return (
     <div className="sidebar-container">
-      {/* ส่วนหัว: โปรไฟล์ผู้ใช้ */}
-      <div className="profilebg" style={{ background: `linear-gradient(rgba(30, 41, 59, 0.4), rgba(15, 23, 42, 0.95))` }}>
+      {/* ส่วนหัว: โปรไฟล์ผู้ใช้ — การ์ดลอยตัวสไตล์เดียวกับหน้าอื่นๆ ในแอป แทนแถบไล่เฉดเดิม */}
+      <div className="profilebg">
         <div className="p-2 d-flex align-items-center gap-3">
           <Link to={"/account"} onClick={handleItemClick}>
             {userData?.imageUrl ? (
@@ -206,18 +206,21 @@ const Sidebar = ({ handleMenuClick }) => {
                   <span className="nav-text">Employee</span>
                 </Link>
               </NavItem>
-              <NavItem>
-                <Link
-                  to="/about"
-                  className={`nav-link ${location.pathname === "/about" ? "active" : ""}`}
-                  onClick={handleItemClick}
-                >
-                  <i className="bi bi-sliders nav-icon"></i>
-                  <span className="nav-text">Settings</span>
-                </Link>
-              </NavItem>
             </>
           )}
+
+          {/* ✅ ทุกสิทธิ์ (รวมช่าง) เข้าหน้าตั้งค่าได้ — ตัวหน้า Settings.js เองเป็นคนซ่อน
+              ส่วน "การจัดการระบบ" ไว้เฉพาะแอดมินอีกชั้นหนึ่งอยู่แล้ว */}
+          <NavItem>
+            <Link
+              to="/about"
+              className={`nav-link ${location.pathname === "/about" ? "active" : ""}`}
+              onClick={handleItemClick}
+            >
+              <i className="bi bi-sliders nav-icon"></i>
+              <span className="nav-text">Settings</span>
+            </Link>
+          </NavItem>
 
           {/* ปุ่มออกจากระบบ */}
           <NavItem className="mt-2">

@@ -23,7 +23,17 @@
       "Bash(curl -s -o /dev/null -w '%{http_code}\\\\n' -X POST -H 'Authorization: Bearer __CMDSUB_OUTPUT__' -H 'Content-Type: application/json' -d '{\"name\":\"hack\"}' http://localhost:5000/api/jobtype)",
       "Bash(node --check models/Customer.js)",
       "Skill(dataviz)",
-      "Skill(dataviz:*)"
+      "Skill(dataviz:*)",
+      "Bash(node --check routes/file.js)",
+      "PowerShell(node --check \"C:\\\\Users\\\\Admin\\\\Desktop\\\\da-app-server\\\\routes\\\\file.js\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5000/api/files)",
+      "Read(//tmp/**)",
+      "Bash(curl -s -H 'Authorization: Bearer __TRACKED_VAR__' http://localhost:5000/api/files)",
+      "Bash(rm -f /tmp/tok.txt)",
+      "Bash(node --check services/OverdueReminder.js)"
+    ],
+    "additionalDirectories": [
+      "\\tmp"
     ]
   }
 }
