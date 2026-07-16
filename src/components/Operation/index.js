@@ -50,7 +50,7 @@ import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { AdapterMoment } from "@mui/x-date-pickers/AdapterMoment";
 
 // Router
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 
 // Styled
 import { styled, alpha } from "@mui/material/styles";
@@ -72,31 +72,70 @@ const FAST_MENU_PROPS = {
   disableScrollLock: true,
 };
 
-// ✅ นับความ "ค้างงาน" อิงจากวันที่สิ้นสุดงานตามแผนจริง (end หรือ start ถ้าไม่มี end) เทียบกับวันนี้
-// สองระดับ: เลย 1 สัปดาห์ = เริ่ม "แจ้งเตือน" ให้ทันเห็นก่อน, เลย 2 สัปดาห์ = "ค้างงาน" เต็มตัว
-// (งานที่ปิดแล้ว/กำลังรอผู้ดูแลอนุมัติปิดอยู่แล้ว ไม่ถือว่าค้าง — คืน null)
+// ✅ นับความ "ค้างงาน" อิงจากวันที่สิ้นสุดงานตามแผนจริงเทียบกับวันนี้ สองระดับ: เลย 1 สัปดาห์ =
+// เริ่ม "แจ้งเตือน" ให้ทันเห็นก่อน, เลย 2 สัปดาห์ = "ค้างงาน" เต็มตัว (งานที่ปิดแล้ว/รออนุมัติปิด
+// อยู่แล้ว ไม่ถือว่าค้าง)
 const WARNING_DAYS_AFTER_END = 7;   // สัปดาห์แรก
 const OVERDUE_DAYS_AFTER_END = 14;  // 2 สัปดาห์
 
-const getDaysPastDue = (event) => {
-  if (event.status === "ดำเนินการเสร็จสิ้น" || event.closeRequested) return null;
-  const planEnd = event.end
-    ? moment(event.end).subtract(event.allDay ? 1 : 0, "days")
-    : moment(event.start);
-  return moment().startOf("day").diff(planEnd.startOf("day"), "days");
+// ✅ ลายเซ็นเดียวกับที่ใช้จัดกลุ่มงานหลายวันไม่ติดกันในหน้านี้ (jobGroupId ก่อน ไม่มีก็ fallback
+// ไปจับคู่ company/site/title/system/team/time — เทียบ getJobSignature ในคอมโพเนนต์หลัก)
+const getOverdueGroupKey = (ev) => {
+  if (ev.jobGroupId) return `gid:${ev.jobGroupId}`;
+  return ["company", "site", "title", "system", "team", "time"]
+    .map((k) => (ev[k] || "").toString().trim().toLowerCase())
+    .join("|");
+};
+
+// ✅ งานที่เข้าหลายวันไม่ติดกัน (ผูกกันด้วย jobGroupId/ลายเซ็นเดียวกัน) ต้องคิด "ค้างงาน" จากวันสุดท้าย
+// ของทั้งชุดเท่านั้น — ไม่ใช่คิดแยกทีละแถว เพราะแถวที่วันที่ผ่านไปแล้วแต่ยังไม่ใช่วันสุดท้ายของงาน
+// ยังไม่ถือว่าเลยกำหนดจริง คืน Map<eventId, {days, groupKey}|null> (null = ปิดแล้ว/ขอปิดแล้ว)
+// เก็บ groupKey ไว้ด้วยเพื่อให้ตัวนับ (badge) นับเป็น "จำนวนงาน" ได้ถูกต้อง ไม่ใช่นับทุกแถวซ้ำเป็นคนละงาน
+// ต้องสร้างจาก events ทั้งหมด (ไม่ผ่านตัวกรองอื่นมาก่อน) เพื่อให้ทุกกลุ่มงานครบทุกแถวเสมอ
+const buildDaysPastDueMap = (allEvents) => {
+  const bySignature = new Map();
+  allEvents.forEach((e) => {
+    const key = getOverdueGroupKey(e);
+    if (!bySignature.has(key)) bySignature.set(key, []);
+    bySignature.get(key).push(e);
+  });
+
+  const map = new Map();
+  bySignature.forEach((sessions, groupKey) => {
+    let lastPlanEnd = null;
+    sessions.forEach((e) => {
+      const end = e.end
+        ? moment(e.end).subtract(e.allDay ? 1 : 0, "days")
+        : moment(e.start);
+      if (!lastPlanEnd || end.isAfter(lastPlanEnd)) lastPlanEnd = end;
+    });
+    const days = moment().startOf("day").diff(lastPlanEnd.startOf("day"), "days");
+    sessions.forEach((e) => {
+      const exempt = e.status === "ดำเนินการเสร็จสิ้น" || e.closeRequested;
+      map.set(e._id, exempt ? null : { days, groupKey });
+    });
+  });
+  return map;
+};
+
+// ✅ นับจำนวน "งาน" ที่เข้าเกณฑ์ (จัดกลุ่มก่อนนับ ไม่ใช่นับทุกแถว) — งานหลายวันไม่ติดกัน 3 แถว
+// ที่จริงคือ "งานเดียว" ต้องนับเป็น 1 ให้ตรงกับที่การ์ดแสดงจริง (1 การ์ดต่อ 1 งาน)
+const countFlaggedJobs = (allEvents, daysPastDueMap, thresholdCheck) => {
+  const seen = new Set();
+  let count = 0;
+  allEvents.forEach((e) => {
+    const entry = daysPastDueMap.get(e._id);
+    if (!entry || !thresholdCheck(entry.days) || seen.has(entry.groupKey)) return;
+    seen.add(entry.groupKey);
+    count++;
+  });
+  return count;
 };
 
 // ✅ "ค้างงาน" ในความหมายรวม (แท็บเดียวที่ฝั่งช่างเห็น) = เลยกำหนดมาแล้วอย่างน้อย 1 สัปดาห์
 // ครอบคลุมทั้งงานที่เพิ่งเข้าเกณฑ์แจ้งเตือน (1-2 สัปดาห์) และงานที่ค้างจริงจัง (2 สัปดาห์ขึ้นไป)
-const isJobFlagged = (event) => {
-  const days = getDaysPastDue(event);
-  return days !== null && days >= WARNING_DAYS_AFTER_END;
-};
-
-const isJobSeverelyOverdue = (event) => {
-  const days = getDaysPastDue(event);
-  return days !== null && days >= OVERDUE_DAYS_AFTER_END;
-};
+const isFlaggedDays = (days) => days !== null && days !== undefined && days >= WARNING_DAYS_AFTER_END;
+const isSevereDays  = (days) => days !== null && days !== undefined && days >= OVERDUE_DAYS_AFTER_END;
 
 // ─── Styled Components ────────────────────────────────────────────────
 const GlassCard = styled(Card)(({ theme }) => ({
@@ -2000,6 +2039,7 @@ const Operation = () => {
   moment.locale("th");
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const theme    = useTheme();
   const isMobile = useMediaQuery("(max-width:600px)");
 
@@ -2022,6 +2062,14 @@ const Operation = () => {
   const [filterStatus,  setFilterStatus]  = useState("");
   const [filterOP,      setFilterOP]      = useState("");
   const [filterTeam,    setFilterTeam]    = useState("");
+
+  // ✅ รองรับ deep-link มาจาก Dashboard (การ์ด "สรุปสถานะงาน") ให้เจาะจงสถานะที่กดมาได้ทันที
+  // ผ่าน query param ?status=... แทนที่จะเด้งมาหน้า Operation เฉยๆ แล้วต้องกรองเองซ้ำอีกที
+  useEffect(() => {
+    const statusParam = searchParams.get("status");
+    if (statusParam) setFilterOP(statusParam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [page,     setPage]     = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -2086,6 +2134,10 @@ const Operation = () => {
     [id, events]
   );
 
+  // ✅ สร้างจาก events ทั้งหมด (ก่อนตัวกรองอื่น) เสมอ เพื่อให้งานหลายวันไม่ติดกันถูกจัดกลุ่มครบ
+  // ทุกแถว แล้วคิดค้างจากวันสุดท้ายของทั้งชุด ไม่ใช่แยกทีละแถว
+  const daysPastDueMap = useMemo(() => buildDaysPastDueMap(events), [events]);
+
   const filteredEvents = useMemo(() => {
   if (id && selectedEvent) return [selectedEvent];
   return events.filter(event => {
@@ -2105,7 +2157,7 @@ const Operation = () => {
 
     // ✅ เดิมตัดงานสถานะ "กำลังรอยืนยัน" ออกทั้งหมดเสมอ (ยกเว้นกรองเจาะจงเอง) แต่งานที่ค้างมานาน
     // จนเลยกำหนดโดยไม่เคยถูกยืนยันเลยตั้งแต่แรกคืองานที่กลุ่ม "ค้างงาน" ต้องจับให้ได้มากที่สุด —
-    // ตัดออกเสมอทำให้ตัวเลขบน badge (นับจาก isJobFlagged ตรงๆ ไม่รู้จัก exclusion นี้) กับรายการที่
+    // ตัดออกเสมอทำให้ตัวเลขบน badge (นับจาก isFlaggedDays ตรงๆ ไม่รู้จัก exclusion นี้) กับรายการที่
     // แสดงจริงไม่ตรงกัน (เห็น badge ว่า 3 งาน แต่เปิดมา "ไม่พบรายการ") จึงงดเว้นเฉพาะตอนดูกลุ่มนี้
     const matchNotPending = (filterOP === "กำลังรอยืนยัน" || group === "overdue")
       ? true
@@ -2116,7 +2168,7 @@ const Operation = () => {
       matchGroup = true;
     } else if (group === "pending")      matchGroup = event.closeRequested === true && event.status !== "ดำเนินการเสร็จสิ้น";
     else if (group === "active")  matchGroup = ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(event.status) && !event.closeRequested;
-    else if (group === "overdue") matchGroup = isJobFlagged(event);
+    else if (group === "overdue") matchGroup = isFlaggedDays(daysPastDueMap.get(event._id)?.days);
     else                          matchGroup = event.status === "ดำเนินการเสร็จสิ้น"; // "closed"
 
     const keyword = search.toLowerCase();
@@ -2128,7 +2180,7 @@ const Operation = () => {
 
     return matchMonth && matchType && matchSystem && matchStatus && matchOP && matchTeam && matchSearch && matchNotPending && matchGroup;
   });
-}, [id, selectedEvent, events, dateSearch, filterType, filterSystem, filterStatus, filterOP, filterTeam, search, statusGroup, currentUserRole]);
+}, [id, selectedEvent, events, dateSearch, filterType, filterSystem, filterStatus, filterOP, filterTeam, search, statusGroup, currentUserRole, daysPastDueMap]);
 
   const sortedEvents      = useMemo(() => filteredEvents.slice().sort((a, b) => new Date(b.start) - new Date(a.start)), [filteredEvents]);
   const activeFilterCount = [filterType, filterSystem, filterStatus, filterOP, search.trim(), filterTeam].filter(Boolean).length;
@@ -2137,8 +2189,8 @@ const Operation = () => {
   const closedCount   = useMemo(() => events.filter(e => e.status === "ดำเนินการเสร็จสิ้น").length, [events]);
   const pendingCount  = useMemo(() => events.filter(e => e.closeRequested === true && e.status !== "ดำเนินการเสร็จสิ้น").length, [events]);
   const inProgressCount  = useMemo(() => events.filter(e => ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(e.status) && !e.closeRequested).length, [events]);
-  const overdueCount     = useMemo(() => events.filter(isJobFlagged).length, [events]);
-  const severeOverdueCount = useMemo(() => events.filter(isJobSeverelyOverdue).length, [events]);
+  const overdueCount     = useMemo(() => countFlaggedJobs(events, daysPastDueMap, isFlaggedDays), [events, daysPastDueMap]);
+  const severeOverdueCount = useMemo(() => countFlaggedJobs(events, daysPastDueMap, isSevereDays), [events, daysPastDueMap]);
 
   // ✅ จัดกลุ่ม event ที่เป็น "งานเดียวกัน" เข้าด้วยกัน กันงานที่ต้องเข้าหลายวันแบบไม่ติดกัน
   // (เช่น PM ครั้งที่ 1 แบ่งเข้า 3 วันเว้นระยะ) ถูกนับ/แสดงเป็นคนละงานแยกกัน
@@ -2391,7 +2443,7 @@ const Operation = () => {
   };
 
   const isAdminOrManager = ["admin", "manager"].includes(currentUserRole);
-  const { notifications, unread, markRead } = useEventNotifications(
+  const { notifications, unread, markRead, markAllRead } = useEventNotifications(
     events,
     isAdminOrManager ? "admin" : "technician"
   );
@@ -2421,7 +2473,7 @@ const Operation = () => {
             </IconButton>
           </Tooltip>
           {/* Notification bell — ทุก role เห็น แต่เนื้อหาต่างกันตามฝั่ง (ดูคอมเมนต์ใน NotificationBell) */}
-          <NotificationBell notifications={notifications} unread={unread} onItemClick={markRead} />
+          <NotificationBell notifications={notifications} unread={unread} onItemClick={markRead} onMarkAllRead={markAllRead} />
           {isAdminOrManager && (
             <Tooltip title="Export CSV (รวมเวลาเข้า/ออก + สรุปงาน)">
               <IconButton onClick={handleExportCSV}
@@ -2533,11 +2585,11 @@ const Operation = () => {
               {pagedGroups.map(sessions => {
                 // ✅ ในมุมมอง "ค้างงาน" ให้เห็นความรุนแรงต่างกันชัดๆ ก่อนเปิดการ์ด — เลย 1 สัปดาห์
                 // = แจ้งเตือนสีเหลือง (ให้ทันเห็นก่อน), เลย 2 สัปดาห์ = ค้างงานเต็มตัวสีแดง
-                const daysPastDue = effectiveGroup === "overdue" ? getDaysPastDue(sessions[0]) : null;
-                const severeOverdue = daysPastDue !== null && daysPastDue >= OVERDUE_DAYS_AFTER_END;
+                const daysPastDue = effectiveGroup === "overdue" ? (daysPastDueMap.get(sessions[0]._id)?.days ?? null) : null;
+                const severeOverdue = isSevereDays(daysPastDue);
                 return (
                   <Box key={sessions[0].jobGroupId || sessions[0]._id} sx={{ mb: 0.5 }}>
-                    {daysPastDue !== null && (
+                    {daysPastDue !== null && daysPastDue !== undefined && (
                       <Chip
                         size="small"
                         icon={severeOverdue ? <Warning sx={{ fontSize: 14 }} /> : <HourglassTop sx={{ fontSize: 14 }} />}

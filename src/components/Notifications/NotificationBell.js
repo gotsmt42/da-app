@@ -9,10 +9,11 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
-  Notifications, NotificationsActive, HourglassTop, CheckCircle, Cancel, Chat,
+  Notifications, NotificationsActive, HourglassTop, CheckCircle, Cancel, Chat, Assignment,
 } from "@mui/icons-material";
 
 const NOTI_META = {
+  new_job: { icon: <Assignment sx={{ fontSize: 16 }} />, color: "#6366f1" },
   close_requested: { icon: <HourglassTop sx={{ fontSize: 16 }} />, color: "#f59e0b" },
   close_approved: { icon: <CheckCircle sx={{ fontSize: 16 }} />, color: "#10b981" },
   close_rejected: { icon: <Cancel sx={{ fontSize: 16 }} />, color: "#ef4444" },
@@ -22,11 +23,15 @@ const NOTI_META = {
 // ✅ UI ล้วน (presentational) ใช้ร่วมกันได้ทุกที่ที่มี useEventNotifications อยู่แล้ว
 // (หน้า Operation ที่มี events ในสโตร์อยู่แล้ว, และ Header ที่ fetch events เองเพื่อให้เห็น
 // แจ้งเตือนได้ทุกหน้า ไม่ใช่แค่ตอนเปิดหน้า Operation ค้างไว้)
-const NotificationBell = ({ notifications, unread, onItemClick, dark = false }) => {
+const NotificationBell = ({ notifications, unread, onItemClick, onMarkAllRead, dark = false }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const navigate = useNavigate();
 
-  const handleOpen = (e) => setAnchorEl(e.currentTarget);
+  // ✅ เปิดกล่องแจ้งเตือน = ถือว่าเห็นทั้งหมดแล้ว เคลียร์ badge ทันทีโดยไม่ต้องกดทีละรายการ
+  const handleOpen = (e) => {
+    setAnchorEl(e.currentTarget);
+    if (onMarkAllRead) onMarkAllRead();
+  };
   const handleClose = () => setAnchorEl(null);
 
   const handleNotificationClick = (n) => {

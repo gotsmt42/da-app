@@ -33,6 +33,7 @@ import useEventNotifications from "../hooks/useEventNotifications";
 
 // 🔔 ไอคอน/สีของแจ้งเตือนแต่ละประเภท (คู่กับ NotificationBell แต่ใช้ react-icons ให้เข้าธีมมือถือของหน้านี้)
 const NOTI_META = {
+  new_job: { icon: <FaClipboardList size={13} />, color: "#6366f1" },
   close_requested: { icon: <FaHourglassHalf size={13} />, color: "#f59e0b" },
   close_approved: { icon: <FaCheckCircle size={13} />, color: "#10b981" },
   close_rejected: { icon: <FaTimesCircle size={13} />, color: "#ef4444" },
@@ -69,7 +70,7 @@ const Dashboard = () => {
   const [users, setUsers] = useState([]);
   const [events, setEvents] = useState([]);
 
-  const { notifications, unread, markRead } = useEventNotifications(
+  const { notifications, unread, markRead, markAllRead } = useEventNotifications(
     events,
     isAdminOrManager ? "admin" : "technician"
   );
@@ -149,12 +150,32 @@ const Dashboard = () => {
   // ไม่ใช่นับแค่ 1 วันหลังกำหนดแบบเดิมซึ่งจะเห็นตัวเลขไม่ตรงกับที่ไปเปิดหน้า Operation จริง
   const myActiveJobsCount = events.filter((e) => ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(e.status) && !e.closeRequested).length;
   const myPendingApprovalCount = events.filter((e) => e.closeRequested && e.status !== "ดำเนินการเสร็จสิ้น").length;
-  const myOverdueCount = events.filter((e) => {
-    if (e.status === "ดำเนินการเสร็จสิ้น" || e.closeRequested) return false;
-    const planEnd = e.end ? moment(e.end).subtract(e.allDay ? 1 : 0, "days") : moment(e.start || e.date);
-    const daysPastDue = moment().startOf("day").diff(planEnd.startOf("day"), "days");
-    return daysPastDue >= 7;
-  }).length;
+
+  // ✅ งานที่เข้าหลายวันไม่ติดกัน (ผูกด้วย jobGroupId เดียวกัน) ต้องนับเป็น "1 งาน" และคิดค้างจากวันสุดท้าย
+  // ของทั้งชุด ไม่ใช่นับ/คิดแยกทีละแถว (เทียบ pattern เดียวกับที่ใช้ในหน้า Operation)
+  const myOverdueCount = (() => {
+    const bySignature = new Map();
+    events.forEach((e) => {
+      const key = e.jobGroupId
+        ? `gid:${e.jobGroupId}`
+        : ["company", "site", "title", "system", "team", "time"].map((k) => (e[k] || "").toString().trim().toLowerCase()).join("|");
+      if (!bySignature.has(key)) bySignature.set(key, []);
+      bySignature.get(key).push(e);
+    });
+    let count = 0;
+    bySignature.forEach((sessions) => {
+      const anyOpen = sessions.some((e) => e.status !== "ดำเนินการเสร็จสิ้น" && !e.closeRequested);
+      if (!anyOpen) return;
+      let lastPlanEnd = null;
+      sessions.forEach((e) => {
+        const end = e.end ? moment(e.end).subtract(e.allDay ? 1 : 0, "days") : moment(e.start || e.date);
+        if (!lastPlanEnd || end.isAfter(lastPlanEnd)) lastPlanEnd = end;
+      });
+      const daysPastDue = moment().startOf("day").diff(lastPlanEnd.startOf("day"), "days");
+      if (daysPastDue >= 7) count++;
+    });
+    return count;
+  })();
   const myJobsSummary = (() => {
     const parts = [];
     if (myActiveJobsCount > 0) parts.push(`${myActiveJobsCount} งานที่ต้องทำ`);
@@ -283,13 +304,20 @@ const Dashboard = () => {
         <FaArrowRight size={13} className="arrow-bounce" style={{ opacity: 0.8, flexShrink: 0 }} />
       </div>
 
-      {/* ─── SECTION 3: QUICK STATS STRIP (ลดความเด่นลง เอาไว้แค่ให้เห็นภาพรวมเร็วๆ) ─── */}
+      {/* ─── SECTION 3: QUICK STATS STRIP — เดิมทั้งแถบกดแล้วเด้งไป /operation เฉยๆ ไม่ว่าจะกด
+          สถานะไหนก็ตาม (ไม่เจาะจง) เปลี่ยนเป็นแต่ละสถานะลิงก์ไปกรองหน้า Operation ให้ตรงตัวเลย
+          ผ่าน query param ?status=... (Operation อ่านค่านี้แล้ว pre-select ให้อัตโนมัติ) ─── */}
       <h5 style={styles.sectionTitle}>สรุปสถานะงาน</h5>
-      <div style={styles.statsStrip} onClick={() => navigate("/operation")} className="metric-card-hover">
+      <div style={styles.statsStrip}>
         {statItems.map((item, i) => {
           const meta = getStatusMeta(item.status);
           return (
-            <div key={i} style={{ ...styles.statSegment, borderLeft: i === 0 ? "none" : "1px solid #eef1f5" }}>
+            <Link
+              key={i}
+              to={`/operation?status=${encodeURIComponent(item.status)}`}
+              style={{ ...styles.statSegment, borderLeft: i === 0 ? "none" : "1px solid #eef1f5" }}
+              className="metric-card-hover"
+            >
               <span style={{ ...styles.statDot, backgroundColor: meta.color }} />
               {loading ? (
                 <span style={styles.skeletonInline} className="skeleton-pulse" />
@@ -297,7 +325,7 @@ const Dashboard = () => {
                 <span style={styles.statNumberSm}>{item.count}</span>
               )}
               <span style={styles.statLabelSm}>{item.label}</span>
-            </div>
+            </Link>
           );
         })}
       </div>
@@ -305,7 +333,11 @@ const Dashboard = () => {
       {/* ─── SECTION 4: TODAY'S JOBS (ข้อมูลจริงจาก CalendarEvent ของวันนี้) ─── */}
       <div style={styles.notiHeaderRow}>
         <h5 style={{ ...styles.sectionTitle, marginBottom: 0 }}>งานวันนี้ · {moment().locale("th").format("D MMM")}</h5>
-        <Link to="/operation" style={styles.viewAllLink}>ดูการดำเนินงานทั้งหมด <FaChevronRight size={9} /></Link>
+        {/* ✅ เดิมเป็นแค่ข้อความมีขีดเส้นใต้ ไม่ชัดว่าเป็นปุ่มกดได้ — ทำเป็นชิปปุ่มมีพื้นหลัง/ขอบ
+            ให้เห็นชัดว่าแตะได้ และเข้าธีมสีแดงแบรนด์เดียวกับที่อื่นในหน้านี้ */}
+        <Link to="/operation" style={styles.viewAllBtn} className="metric-card-hover">
+          ดูการดำเนินงานทั้งหมด <FaChevronRight size={9} />
+        </Link>
       </div>
       {loading ? (
         <div style={styles.todayScrollRow}>
@@ -368,16 +400,21 @@ const Dashboard = () => {
       {/* ─── SECTION 5: NOTIFICATIONS WIDGET ─── */}
       <div id="noti-section" style={styles.notiHeaderRow}>
         <h5 style={{ ...styles.sectionTitle, marginBottom: 0 }}>การแจ้งเตือนล่าสุด</h5>
-        {unread > 0 && <span style={styles.notiUnreadBadge}>{unread} ใหม่</span>}
+        {/* ✅ ระบุให้ชัดว่าคือ "ยังไม่ได้อ่าน" (ไม่ใช่ตัวเลขลึกลับ) และ cap ไว้ที่ 99+ กันเลขบวมล้นบรรทัด
+            ถ้าเคยเจอบั๊กแจ้งเตือนย้อนหลังจำนวนมากพร้อมกัน (แก้ต้นตอที่ useEventNotifications แล้ว) */}
+        {unread > 0 && <span style={styles.notiUnreadBadge}>{unread > 99 ? "99+" : unread} รายการยังไม่ได้อ่าน</span>}
       </div>
-      <div style={styles.notiCard}>
+      {/* ✅ เดิมโชว์แค่ 4 รายการล่าสุดแบบตัดทิ้ง เลื่อนดูรายการเก่ากว่านั้นไม่ได้เลย — เปลี่ยนเป็น
+          กล่องเลื่อนดูได้ตลอด (scroll) แสดงครบทุกรายการ พร้อม onScroll ที่ถือว่า "เลื่อนดูแล้ว = อ่านแล้ว"
+          เคลียร์ badge ให้อัตโนมัติโดยไม่ต้องกดเข้าไปทีละอัน (รายการที่อ่านแล้วยังอยู่ต่ออีก 7 วันก่อนถูกลบ) */}
+      <div style={{ ...styles.notiCard, maxHeight: "340px", overflowY: "auto" }} onScroll={markAllRead}>
         {notifications.length === 0 ? (
           <div style={styles.notiEmpty}>
             <FaBell size={22} style={{ opacity: 0.25, marginBottom: "6px" }} />
             <p style={{ margin: 0, fontSize: "12px", color: "#94a3b8" }}>ยังไม่มีการแจ้งเตือน</p>
           </div>
         ) : (
-          notifications.slice(0, 4).map((n, i) => {
+          notifications.map((n, i) => {
             const meta = NOTI_META[n.type] || NOTI_META.close_requested;
             return (
               <div
@@ -389,7 +426,7 @@ const Dashboard = () => {
                 className="noti-row-hover"
                 style={{
                   ...styles.notiRow,
-                  borderBottom: i < Math.min(notifications.length, 4) - 1 ? "1px solid #f1f5f9" : "none",
+                  borderBottom: i < notifications.length - 1 ? "1px solid #f1f5f9" : "none",
                   opacity: n.read ? 0.55 : 1
                 }}
               >
@@ -748,7 +785,6 @@ const styles = {
     border: "1px solid #eef1f5",
     padding: "10px 4px",
     marginBottom: "20px",
-    cursor: "pointer",
   },
   statSegment: {
     flex: 1,
@@ -756,7 +792,9 @@ const styles = {
     flexDirection: "column",
     alignItems: "center",
     gap: "3px",
-    padding: "0 4px",
+    padding: "6px 4px",
+    textDecoration: "none",
+    borderRadius: "8px",
   },
   statDot: {
     width: "6px",
@@ -859,14 +897,19 @@ const styles = {
     overflow: "hidden",
     textOverflow: "ellipsis",
   },
-  viewAllLink: {
+  viewAllBtn: {
     fontSize: "11px",
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#dc2626",
     textDecoration: "none",
     display: "flex",
     alignItems: "center",
-    gap: "3px",
+    gap: "4px",
+    backgroundColor: "rgba(220, 38, 38, 0.08)",
+    border: "1px solid rgba(220, 38, 38, 0.18)",
+    borderRadius: "20px",
+    padding: "6px 12px",
+    flexShrink: 0,
   },
 
   /* 🔔 Notifications Widget */

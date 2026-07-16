@@ -30,7 +30,14 @@
       "Read(//tmp/**)",
       "Bash(curl -s -H 'Authorization: Bearer __TRACKED_VAR__' http://localhost:5000/api/files)",
       "Bash(rm -f /tmp/tok.txt)",
-      "Bash(node --check services/OverdueReminder.js)"
+      "Bash(node --check services/OverdueReminder.js)",
+      "Bash(npx react-scripts *)",
+      "Bash(echo \"EXIT CODE: $?\")",
+      "Bash(tail -30 /tmp/build_output.txt)",
+      "Bash(curl -s -o /dev/null -w \"existing server on :5000 -> HTTP %{http_code}\\\\n\" http://localhost:5000/api/files)",
+      "Bash(curl -s -o /dev/null -w 'HTTP %{http_code}\\\\n' -H 'Authorization: Bearer __TRACKED_VAR__' http://localhost:5000/api/events/event-op)",
+      "Bash(curl -s -o /dev/null -w 'HTTP %{http_code}\\\\n' -H 'Authorization: Bearer __TRACKED_VAR__' http://localhost:5000/api/files)",
+      "Bash(curl -s -o /dev/null -w 'HTTP %{http_code}\\\\n' -H 'Authorization: Bearer __TRACKED_VAR__' http://localhost:5000/api/customer)"
     ],
     "additionalDirectories": [
       "\\tmp"

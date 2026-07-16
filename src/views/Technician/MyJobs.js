@@ -1,11 +1,14 @@
 /**
- * MyJobs.js — v2 ("งานของฉัน" สำหรับช่าง)
+ * MyJobs.js — v3 ("งานของฉัน" สำหรับช่าง)
  *
  * ✅ เดิมหน้านี้ผูกกับ WorkOrderService/คอลเลกชัน "workorders" ที่ไม่เคยถูกใช้งานจริงในระบบ
  *    (ว่างเปล่าเสมอ) ทำให้หน้านี้ใช้งานไม่ได้เลยตั้งแต่แรก — ระบบงานจริงคือ CalendarEvent
  *    ผ่าน EventService.getEventOp() (scope ตาม role ที่ backend อยู่แล้ว ช่างเห็นแค่งานตัวเอง)
  *    ตัวการ์ดงานใช้ TechnicianJobCard ตัวเดียวกับที่ใช้ในหน้า Operation จริง (เอกสารประจำงาน,
  *    ขอปิดงาน, สรุปงาน, คุยกับแอดมิน, ประวัติกิจกรรม) ครบทุกฟีเจอร์ ไม่ต้องมีหน้ารายละเอียดแยก
+ * ✅ v3: งานที่เข้าหลายวันไม่ติดกัน (ผูกด้วย jobGroupId เดียวกัน) รวมเป็นการ์ดเดียวผ่าน
+ *    JobGroupCard แทนที่จะแสดงแยกซ้ำกันทุกวัน (เทียบ pattern เดียวกับ JobGroupBlock ในหน้า
+ *    Operation ฝั่งแอดมิน)
  */
 
 import { useEffect, useMemo, useState, useCallback, cloneElement } from "react";
@@ -16,11 +19,13 @@ import TechnicianJobCard from "../../components/Technician/TechnicianJobPanel";
 import {
   Box, Stack, Typography, TextField, InputAdornment, IconButton,
   Chip, Skeleton, Dialog, DialogTitle, DialogContent, Divider,
-  Tooltip, Button, Snackbar, Alert, LinearProgress,
+  Tooltip, Button, Snackbar, Alert, LinearProgress, Collapse,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import {
   Search, Clear, Refresh, WorkOutline, HourglassTop, TaskAlt,
   Download, Close, PictureAsPdf, FolderOpen, Image, Article, InsertDriveFile, AttachFile,
+  CalendarMonth, ExpandMore, ExpandLess,
 } from "@mui/icons-material";
 
 // ─── file-type helpers (เหมือนกับที่ใช้ใน Operation/ServiceReportFiles) ───
@@ -150,6 +155,112 @@ const FilePreviewDialog = ({ previewUrl, previewFileName, onClose }) => {
   );
 };
 
+// ─── JobGroupCard ───────────────────────────────────────────────────────
+// ✅ งานที่เข้าหลายวันไม่ติดกัน (ผูกกันด้วย jobGroupId เดียวกัน หรือลายเซ็น company/site/title/
+// system/team/time เดียวกันสำหรับงานเก่าก่อนมี jobGroupId) เดิมแสดงเป็นการ์ดแยกซ้ำกันทุกวัน —
+// รวมเป็นการ์ดเดียว วันล่าสุด (sessions[0]) ถือเอกสารประจำงาน/ขอปิดงานของทั้งกลุ่ม ส่วนวันอื่นซ่อน
+// ส่วนนี้ไป กดขยายเพื่อดู/จัดการแต่ละวันแยกกันได้ตามเดิม (เทียบ pattern เดียวกับ JobGroupBlock
+// ที่ใช้ในหน้า Operation ฝั่งแอดมิน)
+const getJobSignature = (ev) => {
+  if (ev.jobGroupId) return `gid:${ev.jobGroupId}`;
+  return ["company", "site", "title", "system", "team", "time"]
+    .map((k) => (ev[k] || "").toString().trim().toLowerCase())
+    .join("|");
+};
+
+const JobGroupCard = ({ sessions, ...cardProps }) => {
+  const [expanded, setExpanded] = useState(false);
+  const isGrouped = sessions.length > 1;
+  const anchorId = sessions[0]._id;
+
+  const renderCard = (event) => (
+    <TechnicianJobCard
+      key={event._id}
+      event={event}
+      {...cardProps}
+      hideDocuments={isGrouped && event._id !== anchorId}
+      noOuterCard={isGrouped}
+    />
+  );
+
+  if (!isGrouped) return renderCard(sessions[0]);
+
+  const head = sessions[0];
+  const sortedByStart = sessions.slice().sort((a, b) => new Date(a.start) - new Date(b.start));
+  const latestEndSession = sessions.reduce((latest, s) =>
+    new Date(s.end || s.start) > new Date(latest.end || latest.start) ? s : latest
+  );
+  const rangeStart = moment(sortedByStart[0].start).locale("th").format("DD MMM");
+  const rangeEnd = moment(latestEndSession.end || latestEndSession.start)
+    .subtract(latestEndSession.allDay ? 1 : 0, "days")
+    .locale("th").format("DD MMM YYYY");
+
+  // ✅ นับ "จำนวนวันเข้างานจริง" รวมทุกวันในแต่ละช่วง ไม่ใช่แค่จำนวนช่วง/แถวที่ลงไว้
+  const dayEnd = (s) => moment(s.end || s.start).subtract(s.allDay ? 1 : 0, "days").startOf("day");
+  const totalWorkDays = sessions.reduce((sum, s) => {
+    const days = dayEnd(s).diff(moment(s.start).startOf("day"), "days") + 1;
+    return sum + Math.max(days, 1);
+  }, 0);
+
+  return (
+    <Box sx={{
+      borderRadius: 4, border: "1px solid", borderColor: alpha("#8b5cf6", 0.3),
+      bgcolor: "background.paper", overflow: "hidden",
+      boxShadow: "0 2px 16px rgba(0,0,0,0.06)",
+    }}>
+      <Box
+        onClick={() => setExpanded((p) => !p)}
+        sx={{
+          p: 2, cursor: "pointer", background: alpha("#8b5cf6", 0.04),
+          borderBottom: expanded ? "1px solid" : "none", borderColor: alpha("#8b5cf6", 0.2),
+        }}>
+        <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
+          <CalendarMonth sx={{ fontSize: 18, color: "#8b5cf6" }} />
+          <Typography variant="body2" fontWeight={700} color="#8b5cf6">
+            {head.company && head.site ? `${head.company} · ${head.site}` : (head.company || head.site)}
+            {head.title && ` — ${head.title}`}{head.system && ` · ${head.system}`}
+          </Typography>
+          <Chip label={`เข้างาน ${totalWorkDays} วัน`} size="small"
+            sx={{ height: 20, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha("#8b5cf6", 0.15), color: "#8b5cf6" }} />
+          <Typography variant="caption" color="text.secondary">📅 {rangeStart} – {rangeEnd}</Typography>
+          <IconButton size="small" sx={{ ml: "auto" }} onClick={(e) => { e.stopPropagation(); setExpanded((p) => !p); }}>
+            {expanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+          </IconButton>
+        </Stack>
+        <Stack direction="row" gap={0.5} flexWrap="wrap" sx={{ mt: 0.75 }}>
+          {sortedByStart.map((s) => {
+            const sStart = moment(s.start);
+            const sEnd = dayEnd(s);
+            const chipLabel = sStart.isSame(sEnd, "day")
+              ? sStart.locale("th").format("DD MMM")
+              : `${sStart.locale("th").format("DD")}-${sEnd.locale("th").format("DD MMM")}`;
+            return (
+              <Chip key={s._id} label={chipLabel} size="small"
+                variant={s._id === anchorId ? "filled" : "outlined"}
+                sx={{
+                  height: 20, fontSize: "0.68rem", borderColor: alpha("#8b5cf6", 0.35),
+                  bgcolor: s._id === anchorId ? alpha("#8b5cf6", 0.2) : "transparent",
+                  color: "#8b5cf6", fontWeight: s._id === anchorId ? 700 : 400,
+                }} />
+            );
+          })}
+        </Stack>
+        <Typography variant="caption" color="text.disabled" sx={{ display: "block", mt: 0.5 }}>
+          📄 เอกสารประจำงาน/ขอปิดงาน ใช้ร่วมกันที่วันที่ {moment(head.start).locale("th").format("DD MMM")} (วันล่าสุด)
+        </Typography>
+      </Box>
+      <Collapse in={expanded}>
+        {sessions.map((event, i) => (
+          <Box key={event._id}>
+            {i > 0 && <Divider />}
+            {renderCard(event)}
+          </Box>
+        ))}
+      </Collapse>
+    </Box>
+  );
+};
+
 // ─── กลุ่มสถานะแท็บ ───
 const GROUPS = [
   { key: "active", label: "งานที่ต้องทำ", icon: <WorkOutline sx={{ fontSize: 15 }} />, color: "#3b82f6" },
@@ -225,6 +336,20 @@ export default function MyJobs() {
         : moment(a.start).valueOf() - moment(b.start).valueOf()
     );
   }, [events, group, search]);
+
+  // ✅ รวมงานที่เข้าหลายวันไม่ติดกัน (jobGroupId/ลายเซ็นเดียวกัน) เป็นการ์ดเดียว แทนที่จะแยกโชว์
+  // ซ้ำกันทุกวัน — ลำดับกลุ่มยึดตามลำดับที่ปรากฏครั้งแรกใน filteredJobs (เรียงตามวันที่อยู่แล้ว)
+  const jobGroups = useMemo(() => {
+    const map = new Map();
+    filteredJobs.forEach((ev) => {
+      const key = getJobSignature(ev);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(ev);
+    });
+    return [...map.values()].map((sessions) =>
+      sessions.slice().sort((a, b) => new Date(b.start) - new Date(a.start))
+    );
+  }, [filteredJobs]);
 
   const handleInputUpdate = useCallback(async (id, data) => {
     try {
@@ -359,10 +484,10 @@ export default function MyJobs() {
         </Box>
       ) : (
         <Stack spacing={2}>
-          {filteredJobs.map((job) => (
-            <TechnicianJobCard
-              key={job._id}
-              event={job}
+          {jobGroups.map((sessions) => (
+            <JobGroupCard
+              key={sessions[0].jobGroupId || sessions[0]._id}
+              sessions={sessions}
               onInputUpdate={handleInputUpdate}
               onFileUpload={handleFileUpload}
               onDeleteFile={handleDeleteFile}

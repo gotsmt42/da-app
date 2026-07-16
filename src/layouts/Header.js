@@ -36,7 +36,7 @@ const Header = ({ toggleMobileSidebar }) => {
   const isTechnician = userData?.role?.toLowerCase() === "technician";
   const isAdminOrManager = ["admin", "manager"].includes(userData?.role?.toLowerCase());
 
-  const { notifications, unread, markRead } = useEventNotifications(
+  const { notifications, unread, markRead, markAllRead } = useEventNotifications(
     events,
     isAdminOrManager ? "admin" : "technician"
   );
@@ -113,7 +113,7 @@ const Header = ({ toggleMobileSidebar }) => {
         {/* ✅ ปุ่มเปิด/ปิด push notification ย้ายไปอยู่ที่หน้า Settings แล้ว (เดิมมีทั้งที่นี่และ
             ที่ Settings ทำให้สับสนว่าอันไหนคือจุดควบคุมจริง) */}
         <div className="d-flex align-items-center gap-2">
-          <NotificationBell notifications={notifications} unread={unread} onItemClick={markRead} dark />
+          <NotificationBell notifications={notifications} unread={unread} onItemClick={markRead} onMarkAllRead={markAllRead} dark />
 
           <div className="profile-img">
             <Dropdown isOpen={dropdownOpen} toggle={toggle}>
