@@ -594,14 +594,11 @@ const TechnicianJobCard = ({
   };
 
   // ── อัปโหลด/ลบไฟล์เอกสาร (แนบได้หลายไฟล์พร้อมกัน) ───────────────────
+  // ⚠️ ไม่บันทึก activityLog ที่นี่แล้ว — onFileUpload/onDeleteFile ทั้งคู่ชี้ไปที่ handler
+  // เดียวกันกับฝั่งแอดมิน (ผ่าน JobGroupBlock) ซึ่งย้ายการบันทึก activityLog ไปรวมไว้ที่นั่น
+  // แทน (Operation/index.js) เพื่อให้ครอบคลุมทั้งสองฝั่งจากจุดเดียว ไม่ซ้ำซ้อนกัน
   const handleDocFileUpload = (filesOrFileList, type) => {
-    const fileArray = Array.from(filesOrFileList);
     onFileUpload(filesOrFileList, event._id, type);
-    const label = DOCUMENT_TYPES.find(d => d.type === type)?.label || type;
-    const detail = fileArray.length > 1
-      ? `${label}: ${fileArray.length} ไฟล์ (${fileArray.map(f => f.name).join(", ")})`
-      : `${label}: ${fileArray[0]?.name}`;
-    pushLog("file_uploaded", detail);
   };
 
   const handleDocFileDelete = (type, fileId) => {
@@ -881,8 +878,10 @@ const TechnicianJobCard = ({
                   sx={{ textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 0.5, mb: 1 }}>
                   <History sx={{ fontSize: 14 }} /> ประวัติกิจกรรม ({event.activityLog.length})
                 </Typography>
+                {/* ✅ เดิมโชว์แค่ 5 รายการล่าสุด (แต่ป้ายจำนวนข้างบนนับทั้งหมด ทำให้ดูเหมือนหายไป)
+                    ตอนนี้โชว์ครบทุกรายการ ให้ตรงกับที่ป้ายบอกไว้ และเห็นครบเหมือนฝั่งแอดมิน */}
                 <Stack spacing={0.75} sx={{ pl: 1.5, borderLeft: "2px solid", borderColor: "divider" }}>
-                  {[...(event.activityLog)].reverse().slice(0, 5).map((log, i) => (
+                  {[...(event.activityLog)].reverse().map((log, i) => (
                     <Stack key={i} direction="row" gap={0.75} alignItems="center" flexWrap="wrap">
                       <Typography variant="caption" color="text.disabled">
                         {moment(log.timestamp).format("HH:mm")}
@@ -890,6 +889,7 @@ const TechnicianJobCard = ({
                       <Typography variant="caption" fontWeight={600} color="text.secondary">
                         {log.action === "note_saved"             ? "บันทึกสรุปงาน"
                         : log.action === "file_uploaded"          ? "อัปโหลดไฟล์"
+                        : log.action === "file_deleted"           ? "ลบไฟล์"
                         : log.action === "document_checked"       ? "ทำเครื่องหมายเอกสาร"
                         : log.action === "document_applicable_set" ? "ระบุมี/ไม่มีเอกสาร"
                         : log.action === "close_requested"        ? "ขอปิดงาน"

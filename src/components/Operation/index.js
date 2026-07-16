@@ -278,6 +278,16 @@ const ACTION_META = {
   close_rejected: { label: "ไม่อนุมัติปิดงาน",    icon: <Cancel sx={{ fontSize: 13 }} />,      color: "#ef4444" },
   document_checked:        { label: "ทำเครื่องหมายเอกสาร", icon: <CheckCircle sx={{ fontSize: 13 }} />, color: "#3b82f6" },
   document_applicable_set: { label: "ระบุมี/ไม่มีเอกสาร",   icon: <TaskAlt sx={{ fontSize: 13 }} />,     color: "#8b5cf6" },
+  // ✅ เดิมไม่มี entry นี้ ทำให้ log การลบไฟล์ (ถ้ามี) โชว์เป็น "file_deleted" ดิบๆ แทนป้ายภาษาไทย
+  file_deleted:   { label: "ลบไฟล์",            icon: <Delete sx={{ fontSize: 13 }} />,      color: "#ef4444" },
+};
+
+// ✅ ใช้แปะป้ายชนิดเอกสารในประวัติกิจกรรม (อัปโหลด/ลบไฟล์) ให้อ่านง่าย ตรงกับ label ที่ใช้ในฟอร์มจริง
+const DOC_TYPE_LABELS = {
+  report: "Service Report",
+  quotation: "ใบเสนอราคา",
+  invoice: "ใบวางบิล",
+  completion: "ใบส่งมอบงาน",
 };
 
 // ─── Helper Functions ─────────────────────────────────────────────────
@@ -2364,15 +2374,33 @@ const Operation = () => {
     });
   };
 
+  // ✅ เดิมไม่บันทึก activityLog เลยตอนลบไฟล์ (ทั้งฝั่งช่างและแอดมิน) ทำให้ "ประวัติการทำงาน"
+  // ไม่เห็นว่าใครลบไฟล์อะไรไปบ้าง — หาเชื่อไฟล์ไว้ก่อนลบ (หลังลบแล้วจะหาไม่เจอในไฟล์ list อีก)
+  // แล้วบันทึกลง activityLog ของ event นั้นด้วย
   const handleDeleteFile = useCallback(async (eventId, type, fileId) => {
     try {
+      const target = events.find(e => e._id === eventId);
+      const deletedFile = (target?.[`${type}Files`] || []).find(f => f._id === fileId);
+
       await EventService.DeleteFile(eventId, type, fileId);
+
+      const payload    = JSON.parse(localStorage.getItem("payload") || "{}");
+      const actorName  = payload?.name || payload?.username || "ผู้ใช้งาน";
+      const label      = DOC_TYPE_LABELS[type] || type;
+      const newLog = {
+        action: "file_deleted",
+        detail: deletedFile?.fileName ? `${label}: ${deletedFile.fileName}` : label,
+        userName: actorName,
+        timestamp: new Date().toISOString(),
+      };
+      await EventService.UpdateEvent(eventId, { activityLog: [...(target?.activityLog || []), newLog] });
+
       setSnackbar({ open: true, msg: "ลบไฟล์เรียบร้อย", severity: "success" });
       await fetchEventsFromDB(true);
     } catch {
       setSnackbar({ open: true, msg: "ลบไฟล์ไม่สำเร็จ", severity: "error" });
     }
-  }, []);
+  }, [events]);
 
   // ✅ รองรับแนบหลายไฟล์พร้อมกัน (FileList หรือ array ของ File) — อัปโหลดทีละไฟล์ตามลำดับ
   const handleFileUpload = useCallback(async (fileOrFiles, eventId, type) => {
@@ -2383,6 +2411,7 @@ const Operation = () => {
     setIsUploadingState(p => ({ ...p, [type]: true }));
 
     let successCount = 0;
+    const uploadedNames = [];
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
@@ -2396,8 +2425,29 @@ const Operation = () => {
           },
         });
         successCount++;
+        uploadedNames.push(file.name);
       }
       setSnackbar({ open: true, msg: `อัปโหลด ${successCount} ไฟล์เรียบร้อย`, severity: "success" });
+
+      // ✅ บันทึกลง activityLog ว่าใครอัปโหลดไฟล์อะไรไปบ้าง — เดิมฝั่งแอดมินไม่มีการบันทึกเลย
+      // (ฝั่งช่างเคยบันทึกเองแยกอีกชั้นที่ TechnicianJobPanel.js ซึ่งย้ายมารวมไว้ที่นี่แทน
+      // เพื่อให้ครอบคลุมทั้งสองฝั่งด้วยจุดเดียว ไม่ต้องบันทึกซ้ำซ้อน)
+      if (uploadedNames.length > 0) {
+        const target    = events.find(e => e._id === eventId);
+        const payload    = JSON.parse(localStorage.getItem("payload") || "{}");
+        const actorName  = payload?.name || payload?.username || "ผู้ใช้งาน";
+        const label      = DOC_TYPE_LABELS[type] || type;
+        const detail = uploadedNames.length > 1
+          ? `${label}: ${uploadedNames.length} ไฟล์ (${uploadedNames.join(", ")})`
+          : `${label}: ${uploadedNames[0]}`;
+        const newLog = {
+          action: "file_uploaded",
+          detail,
+          userName: actorName,
+          timestamp: new Date().toISOString(),
+        };
+        await EventService.UpdateEvent(eventId, { activityLog: [...(target?.activityLog || []), newLog] });
+      }
     } catch {
       setSnackbar({
         open: true,
@@ -2413,7 +2463,7 @@ const Operation = () => {
         setUploadProgressState(p => ({ ...p, [type]: 0 }));
       }, 800);
     }
-  }, []);
+  }, [events]);
 
   const handleExportCSV = () => {
     const headers = [
