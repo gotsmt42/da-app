@@ -11,6 +11,13 @@ const buildNewJobDetail = (ev) => {
   return `${place ? place + " · " : ""}📅 ${dateLabel} 🕐 ${timeLabel}`;
 };
 
+// ✅ event-op endpoint แนบ ev.user (คนที่สร้าง event นี้ ตัด password ออกแล้ว) มาให้อยู่แล้ว
+// ใช้บอกชื่อคนเพิ่มแผนงานในแจ้งเตือน "งานใหม่" แทนที่จะบอกแค่ว่า "มีงานใหม่เข้าระบบ" เฉยๆ
+const getCreatorName = (ev) => {
+  const name = [ev.user?.fname, ev.user?.lname].filter(Boolean).join(" ");
+  return name || ev.user?.username || null;
+};
+
 const READ_RETENTION_MS = 7 * 24 * 60 * 60 * 1000; // เก็บรายการที่ "อ่านแล้ว" ไว้ 7 วัน ก่อนลบทิ้ง
 const HARD_CAP = 200; // กันลิสต์บวมไม่มีที่สิ้นสุดในกรณีสุดโต่ง (ปกติ read-based pruning จะกันไว้ก่อนถึงตรงนี้อยู่แล้ว)
 
@@ -77,10 +84,11 @@ export default function useEventNotifications(events, role = "admin") {
         // เปิดแอพย้อนมาดูทีหลังจะไม่เห็นประวัติ) — ตรวจจับ event id ที่เพิ่งปรากฏครั้งแรกในรายการ
         // (ไม่เคยเห็นมาก่อนใน snapshot รอบที่แล้ว = เพิ่งถูกเพิ่มเข้าระบบจริงๆ)
         if (!prev) {
+          const creatorName = getCreatorName(ev);
           newNoti.push({
             id: ev._id + "_newjob_" + (ev.createdAt || ev._id),
             type: "new_job",
-            message: "มีงานใหม่เข้าระบบ",
+            message: creatorName ? `${creatorName} เพิ่มงานใหม่เข้าระบบ` : "มีงานใหม่เข้าระบบ",
             detail: `${ev.title || "งาน"} · ${buildNewJobDetail(ev)}`,
             // ✅ ใช้ createdAt (เวลาที่ถูกสร้างจริงใน DB) ไม่ใช่ ev.start/ev.date (วันนัดหมายของงาน) —
             // เดิมถ้า createdAt หายไป จะ fallback ไปใช้วันนัดหมายซึ่งอาจเป็นวันในอดีต/อนาคตไกลๆ
@@ -105,10 +113,11 @@ export default function useEventNotifications(events, role = "admin") {
         // งาน id ไหนที่เพิ่งปรากฏครั้งแรก คือ "เพิ่งถูกสร้าง/มอบหมายมาให้ฉัน" ไม่ว่าจะเพิ่งสร้างใหม่
         // หรือถูกโอนมาจากคนอื่นก็ตาม
         if (!prev) {
+          const creatorName = getCreatorName(ev);
           newNoti.push({
             id: ev._id + "_newjob_" + (ev.createdAt || ev._id),
             type: "new_job",
-            message: "คุณได้รับมอบหมายงานใหม่",
+            message: creatorName ? `${creatorName} มอบหมายงานใหม่ให้คุณ` : "คุณได้รับมอบหมายงานใหม่",
             detail: `${ev.title || "งาน"} · ${buildNewJobDetail(ev)}`,
             // ✅ ใช้ createdAt (เวลาที่ถูกสร้างจริงใน DB) ไม่ใช่ ev.start/ev.date (วันนัดหมายของงาน) —
             // เดิมถ้า createdAt หายไป จะ fallback ไปใช้วันนัดหมายซึ่งอาจเป็นวันในอดีต/อนาคตไกลๆ

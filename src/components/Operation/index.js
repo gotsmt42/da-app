@@ -14,9 +14,14 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import EventService from "../../services/EventService";
 import AuthService from "../../services/authService";
+import JobTypeService from "../../services/JobTypeService";
+import SystemTypeService from "../../services/SystemTypeService";
 import Swal from "sweetalert2";
 import moment from "moment";
 import "moment/locale/th";
+import {
+  buildDaysPastDueMap, isFlaggedDays, isSevereDays, countFlaggedJobs,
+} from "../../utils/overdueJobs";
 
 // MUI Core
 import {
@@ -72,70 +77,9 @@ const FAST_MENU_PROPS = {
   disableScrollLock: true,
 };
 
-// ✅ นับความ "ค้างงาน" อิงจากวันที่สิ้นสุดงานตามแผนจริงเทียบกับวันนี้ สองระดับ: เลย 1 สัปดาห์ =
-// เริ่ม "แจ้งเตือน" ให้ทันเห็นก่อน, เลย 2 สัปดาห์ = "ค้างงาน" เต็มตัว (งานที่ปิดแล้ว/รออนุมัติปิด
-// อยู่แล้ว ไม่ถือว่าค้าง)
-const WARNING_DAYS_AFTER_END = 7;   // สัปดาห์แรก
-const OVERDUE_DAYS_AFTER_END = 14;  // 2 สัปดาห์
-
-// ✅ ลายเซ็นเดียวกับที่ใช้จัดกลุ่มงานหลายวันไม่ติดกันในหน้านี้ (jobGroupId ก่อน ไม่มีก็ fallback
-// ไปจับคู่ company/site/title/system/team/time — เทียบ getJobSignature ในคอมโพเนนต์หลัก)
-const getOverdueGroupKey = (ev) => {
-  if (ev.jobGroupId) return `gid:${ev.jobGroupId}`;
-  return ["company", "site", "title", "system", "team", "time"]
-    .map((k) => (ev[k] || "").toString().trim().toLowerCase())
-    .join("|");
-};
-
-// ✅ งานที่เข้าหลายวันไม่ติดกัน (ผูกกันด้วย jobGroupId/ลายเซ็นเดียวกัน) ต้องคิด "ค้างงาน" จากวันสุดท้าย
-// ของทั้งชุดเท่านั้น — ไม่ใช่คิดแยกทีละแถว เพราะแถวที่วันที่ผ่านไปแล้วแต่ยังไม่ใช่วันสุดท้ายของงาน
-// ยังไม่ถือว่าเลยกำหนดจริง คืน Map<eventId, {days, groupKey}|null> (null = ปิดแล้ว/ขอปิดแล้ว)
-// เก็บ groupKey ไว้ด้วยเพื่อให้ตัวนับ (badge) นับเป็น "จำนวนงาน" ได้ถูกต้อง ไม่ใช่นับทุกแถวซ้ำเป็นคนละงาน
-// ต้องสร้างจาก events ทั้งหมด (ไม่ผ่านตัวกรองอื่นมาก่อน) เพื่อให้ทุกกลุ่มงานครบทุกแถวเสมอ
-const buildDaysPastDueMap = (allEvents) => {
-  const bySignature = new Map();
-  allEvents.forEach((e) => {
-    const key = getOverdueGroupKey(e);
-    if (!bySignature.has(key)) bySignature.set(key, []);
-    bySignature.get(key).push(e);
-  });
-
-  const map = new Map();
-  bySignature.forEach((sessions, groupKey) => {
-    let lastPlanEnd = null;
-    sessions.forEach((e) => {
-      const end = e.end
-        ? moment(e.end).subtract(e.allDay ? 1 : 0, "days")
-        : moment(e.start);
-      if (!lastPlanEnd || end.isAfter(lastPlanEnd)) lastPlanEnd = end;
-    });
-    const days = moment().startOf("day").diff(lastPlanEnd.startOf("day"), "days");
-    sessions.forEach((e) => {
-      const exempt = e.status === "ดำเนินการเสร็จสิ้น" || e.closeRequested;
-      map.set(e._id, exempt ? null : { days, groupKey });
-    });
-  });
-  return map;
-};
-
-// ✅ นับจำนวน "งาน" ที่เข้าเกณฑ์ (จัดกลุ่มก่อนนับ ไม่ใช่นับทุกแถว) — งานหลายวันไม่ติดกัน 3 แถว
-// ที่จริงคือ "งานเดียว" ต้องนับเป็น 1 ให้ตรงกับที่การ์ดแสดงจริง (1 การ์ดต่อ 1 งาน)
-const countFlaggedJobs = (allEvents, daysPastDueMap, thresholdCheck) => {
-  const seen = new Set();
-  let count = 0;
-  allEvents.forEach((e) => {
-    const entry = daysPastDueMap.get(e._id);
-    if (!entry || !thresholdCheck(entry.days) || seen.has(entry.groupKey)) return;
-    seen.add(entry.groupKey);
-    count++;
-  });
-  return count;
-};
-
-// ✅ "ค้างงาน" ในความหมายรวม (แท็บเดียวที่ฝั่งช่างเห็น) = เลยกำหนดมาแล้วอย่างน้อย 1 สัปดาห์
-// ครอบคลุมทั้งงานที่เพิ่งเข้าเกณฑ์แจ้งเตือน (1-2 สัปดาห์) และงานที่ค้างจริงจัง (2 สัปดาห์ขึ้นไป)
-const isFlaggedDays = (days) => days !== null && days !== undefined && days >= WARNING_DAYS_AFTER_END;
-const isSevereDays  = (days) => days !== null && days !== undefined && days >= OVERDUE_DAYS_AFTER_END;
+// ✅ ตรรกะ "ค้างงาน" (คิดจากวันสุดท้ายของงานที่เข้าหลายวันไม่ติดกัน ไม่ใช่คิดแยกทีละแถว) ย้ายไปรวมไว้ที่
+// src/utils/overdueJobs.js แล้ว เพราะต้องใช้ตรรกะเดียวกันซ้ำในหลายหน้า (Dashboard, MyJobs) —
+// ดูรายละเอียดคอมเมนต์ที่ไฟล์นั้นแทน
 
 // ─── Styled Components ────────────────────────────────────────────────
 const GlassCard = styled(Card)(({ theme }) => ({
@@ -246,8 +190,10 @@ const PulseDot = styled(Box)(({ color = "#10b981" }) => ({
 }));
 
 // ─── Constants ────────────────────────────────────────────────────────
-const TYPE_LIST    = ["PM", "Service", "Inspection", "ตรวจเช็คปัญหา", "สำรวจระบบ"];
-const SYSTEM_LIST  = ["Fire Alarm", "CCTV", "Fire Pump"];
+// ✅ เดิม TYPE_LIST/SYSTEM_LIST ล็อกไว้ตายตัวแค่ 5/3 ชนิด ไม่ตรงกับข้อมูลจริงในระบบเลย (จริงๆ มี
+// ประเภทงาน 13 แบบ, ระบบ 4 แบบ ผ่านตาราง JobType/SystemType ที่จัดการได้จากหน้า "ประเภทงาน/ระบบ")
+// ย้ายไปดึงจาก JobTypeService/SystemTypeService แบบไดนามิกแทน (ดู typeOptions/systemOptions
+// ในคอมโพเนนต์หลัก) ให้ตัวกรองตรงกับข้อมูลจริงเสมอ ไม่ต้องแก้โค้ดทุกครั้งที่มีคนเพิ่มประเภท/ระบบใหม่
 const STATUS_BILLING = ["วางบิลแล้ว", "เก็บเงินแล้ว"];
 const OP_LIST      = ["กำลังรอยืนยัน", "ยืนยันแล้ว", "กำลังดำเนินการ", "ดำเนินการเสร็จสิ้น"];
 
@@ -1735,6 +1681,7 @@ const FilterPanel = ({
   search, onSearch, filterType, onFilterType, filterSystem, onFilterSystem,
   filterStatus, onFilterStatus, filterOP, onFilterOP, filterTeam, onFilterTeam,
   showAll, onToggleShowAll, selectedDate, onDateChange, onClearAll, activeCount,
+  typeOptions, systemOptions,
 }) => {
   const [open, setOpen] = useState(false);
   return (
@@ -1816,10 +1763,10 @@ const FilterPanel = ({
             <Box>
               <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 1, display: "block" }}>ประเภทงาน</Typography>
               <Stack direction="row" flexWrap="wrap" gap={0.75}>
-                {TYPE_LIST.map(t => (
+                {typeOptions.map(t => (
                   <FilterChip key={t} label={t} size="small"
                     active={filterType === t ? 1 : 0}
-                    icon={TYPE_ICON[t]}
+                    icon={TYPE_ICON[t] || <Build fontSize="small" />}
                     onClick={() => onFilterType(filterType === t ? "" : t)}
                     variant={filterType === t ? "filled" : "outlined"}
                     color={filterType === t ? "success" : "default"}
@@ -1830,7 +1777,7 @@ const FilterPanel = ({
             <Box>
               <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 1, display: "block" }}>ระบบ</Typography>
               <Stack direction="row" flexWrap="wrap" gap={0.75}>
-                {SYSTEM_LIST.map(s => (
+                {systemOptions.map(s => (
                   <FilterChip key={s} label={s} size="small"
                     active={filterSystem === s ? 1 : 0}
                     onClick={() => onFilterSystem(filterSystem === s ? "" : s)}
@@ -2073,11 +2020,20 @@ const Operation = () => {
   const [filterOP,      setFilterOP]      = useState("");
   const [filterTeam,    setFilterTeam]    = useState("");
 
-  // ✅ รองรับ deep-link มาจาก Dashboard (การ์ด "สรุปสถานะงาน") ให้เจาะจงสถานะที่กดมาได้ทันที
-  // ผ่าน query param ?status=... แทนที่จะเด้งมาหน้า Operation เฉยๆ แล้วต้องกรองเองซ้ำอีกที
+  // ✅ เดิมตัวกรอง "ประเภทงาน"/"ระบบ" ล็อกไว้ตายตัวแค่ 5/3 ชนิด ไม่ตรงกับข้อมูลจริง (ตาราง
+  // JobType/SystemType มีมากกว่านั้น และแก้ไขได้จากหน้า "ประเภทงาน/ระบบ") ดึงมาแบบไดนามิกแทน
+  // เทียบ pattern เดียวกับที่หน้า Event ใช้ (fetchLookupOptions)
+  const [typeOptions,   setTypeOptions]   = useState([]);
+  const [systemOptions, setSystemOptions] = useState([]);
+
+  // ✅ รองรับ deep-link มาจาก Dashboard (การ์ด "สรุปสถานะงาน") และหน้า "ภาพรวมทีมช่าง"
+  // (กดการ์ดช่างคนหนึ่ง) ให้เจาะจงสถานะ/ช่างที่กดมาได้ทันที ผ่าน query param ?status=...&team=...
+  // แทนที่จะเด้งมาหน้า Operation เฉยๆ แล้วต้องกรองเองซ้ำอีกที
   useEffect(() => {
     const statusParam = searchParams.get("status");
+    const teamParam = searchParams.get("team");
     if (statusParam) setFilterOP(statusParam);
+    if (teamParam) setFilterTeam(teamParam);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -2104,6 +2060,7 @@ const Operation = () => {
   useEffect(() => {
     fetchEventsFromDB();
     fetchEmployee();
+    fetchLookupOptions();
   }, [id]);
 
   // ── Auto-refresh ทุก 15 วินาที (ทุก role ที่ล็อกอินอยู่) ──────────────
@@ -2135,6 +2092,15 @@ const Operation = () => {
     } catch (err) { console.error(err); }
   };
 
+  const fetchLookupOptions = async () => {
+    const [jobTypes, systemTypes] = await Promise.all([
+      JobTypeService.getAll().catch(() => ({ items: [] })),
+      SystemTypeService.getAll().catch(() => ({ items: [] })),
+    ]);
+    setTypeOptions((jobTypes?.items || []).map((t) => t.name).sort());
+    setSystemOptions((systemTypes?.items || []).map((s) => s.name).sort());
+  };
+
   const dateSearch = !showAll ? selectedDate : "";
 
   // ✅ อ้างอิงจาก events (state ที่อัปเดตสดทุกครั้งที่แก้ไข) แทนการเก็บ snapshot แยก
@@ -2147,6 +2113,10 @@ const Operation = () => {
   // ✅ สร้างจาก events ทั้งหมด (ก่อนตัวกรองอื่น) เสมอ เพื่อให้งานหลายวันไม่ติดกันถูกจัดกลุ่มครบ
   // ทุกแถว แล้วคิดค้างจากวันสุดท้ายของทั้งชุด ไม่ใช่แยกทีละแถว
   const daysPastDueMap = useMemo(() => buildDaysPastDueMap(events), [events]);
+
+  // ✅ ต้องคำนวณก่อน filteredEvents (ใช้ตัดสิน default group ด้านล่าง) — ย้ายขึ้นมาจากที่เดิม
+  // ที่อยู่ถัดจาก filteredEvents เพราะตอนนั้นยังไม่ต้องใช้ค่านี้ตอนกรอง
+  const pendingCount = useMemo(() => events.filter(e => e.closeRequested === true && e.status !== "ดำเนินการเสร็จสิ้น").length, [events]);
 
   const filteredEvents = useMemo(() => {
   if (id && selectedEvent) return [selectedEvent];
@@ -2163,7 +2133,11 @@ const Operation = () => {
     // ในมุมมองของช่างอีกต่อไป — ต้องคำนวณกลุ่มนี้ "ก่อน" matchNotPending เพราะกลุ่ม "ค้างงาน" ต้อง
     // งดเว้นการตัด "กำลังรอยืนยัน" ออก (ดูเหตุผลด้านล่าง)
     const isAdminOrManagerRole = ["admin", "manager"].includes(currentUserRole);
-    const group = filterOP ? null : (statusGroup || (isAdminOrManagerRole ? "pending" : "overdue"));
+    // ✅ เดิม default ไปที่ "pending" (รอคุณอนุมัติ) เสมอสำหรับแอดมิน/manager แม้ไม่มีงานรออนุมัติเลย
+    // ทำให้เปิดหน้ามาเจอ "ไม่พบรายการ" ว่างเปล่าโดยไม่มีอะไรผิดพลาดจริง — ถ้าไม่มีคำขอปิดงานรออยู่
+    // ให้ default ไปโชว์ "กำลังดำเนินการ/ยืนยันแล้ว" แทน ซึ่งมักจะมีงานอยู่จริงให้เห็นทันที
+    const defaultGroup = pendingCount > 0 ? "pending" : "active";
+    const group = filterOP ? null : (statusGroup || (isAdminOrManagerRole ? defaultGroup : "overdue"));
 
     // ✅ เดิมตัดงานสถานะ "กำลังรอยืนยัน" ออกทั้งหมดเสมอ (ยกเว้นกรองเจาะจงเอง) แต่งานที่ค้างมานาน
     // จนเลยกำหนดโดยไม่เคยถูกยืนยันเลยตั้งแต่แรกคืองานที่กลุ่ม "ค้างงาน" ต้องจับให้ได้มากที่สุด —
@@ -2190,14 +2164,13 @@ const Operation = () => {
 
     return matchMonth && matchType && matchSystem && matchStatus && matchOP && matchTeam && matchSearch && matchNotPending && matchGroup;
   });
-}, [id, selectedEvent, events, dateSearch, filterType, filterSystem, filterStatus, filterOP, filterTeam, search, statusGroup, currentUserRole, daysPastDueMap]);
+}, [id, selectedEvent, events, dateSearch, filterType, filterSystem, filterStatus, filterOP, filterTeam, search, statusGroup, currentUserRole, daysPastDueMap, pendingCount]);
 
   const sortedEvents      = useMemo(() => filteredEvents.slice().sort((a, b) => new Date(b.start) - new Date(a.start)), [filteredEvents]);
   const activeFilterCount = [filterType, filterSystem, filterStatus, filterOP, search.trim(), filterTeam].filter(Boolean).length;
 
   // นับจำนวนงานแต่ละกลุ่มไว้โชว์บน toggle — อ้างอิงจาก events ทั้งหมด ไม่ผ่านตัวกรองอื่น
   const closedCount   = useMemo(() => events.filter(e => e.status === "ดำเนินการเสร็จสิ้น").length, [events]);
-  const pendingCount  = useMemo(() => events.filter(e => e.closeRequested === true && e.status !== "ดำเนินการเสร็จสิ้น").length, [events]);
   const inProgressCount  = useMemo(() => events.filter(e => ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(e.status) && !e.closeRequested).length, [events]);
   const overdueCount     = useMemo(() => countFlaggedJobs(events, daysPastDueMap, isFlaggedDays), [events, daysPastDueMap]);
   const severeOverdueCount = useMemo(() => countFlaggedJobs(events, daysPastDueMap, isSevereDays), [events, daysPastDueMap]);
@@ -2500,7 +2473,9 @@ const Operation = () => {
 
   // ✅ ฝั่งช่างเหลือแค่ "ค้างงาน" กับ "เสร็จสิ้น" (รอผู้ดูแลอนุมัติ/กำลังดำเนินการ ย้ายไปจัดการที่
   // หน้า "งานของฉัน" หมดแล้ว) จึง default ไปที่ "overdue" แทน "pending" ที่ไม่มีให้เลือกอีกต่อไป
-  const effectiveGroup = statusGroup || (isAdminOrManager ? "pending" : "overdue");
+  // ✅ แอดมิน/manager: ถ้าไม่มีงานรอคุณอนุมัติเลย ให้การ์ด "กำลังดำเนินการ/ยืนยันแล้ว" ติดสว่างเป็นค่า
+  // เริ่มต้นแทน "รอคุณอนุมัติ" ที่ว่างเปล่า ให้ตรงกับรายการที่แสดงจริงด้านล่าง (ดู defaultGroup ข้างบน)
+  const effectiveGroup = statusGroup || (isAdminOrManager ? (pendingCount > 0 ? "pending" : "active") : "overdue");
 
   return (
     <Box sx={{ px: { xs: 1, sm: 2, md: 3 }, py: 3, maxWidth: 1400, mx: "auto" }}>
@@ -2616,6 +2591,7 @@ const Operation = () => {
             filterStatus={filterStatus} onFilterStatus={setFilterStatus}
             filterOP={filterOP} onFilterOP={setFilterOP}
             filterTeam={filterTeam} onFilterTeam={setFilterTeam}
+            typeOptions={typeOptions} systemOptions={systemOptions}
             showAll={showAll} onToggleShowAll={v => { setShowAll(v); if (v) setSelectedDate(""); }}
             selectedDate={selectedDate} onDateChange={d => { setSelectedDate(d); setShowAll(false); }}
             onClearAll={() => { setFilterType(""); setFilterSystem(""); setFilterStatus(""); setFilterOP(""); setFilterTeam(""); setSearch(""); }}
@@ -2704,6 +2680,7 @@ const Operation = () => {
             filterStatus={filterStatus} onFilterStatus={setFilterStatus}
             filterOP={filterOP} onFilterOP={setFilterOP}
             filterTeam={filterTeam} onFilterTeam={setFilterTeam}
+            typeOptions={typeOptions} systemOptions={systemOptions}
             showAll={showAll} onToggleShowAll={v => { setShowAll(v); if (v) setSelectedDate(""); }}
             selectedDate={selectedDate} onDateChange={d => { setSelectedDate(d); setShowAll(false); }}
             onClearAll={() => { setFilterType(""); setFilterSystem(""); setFilterStatus(""); setFilterOP(""); setFilterTeam(""); setSearch(""); }}

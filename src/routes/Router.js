@@ -22,6 +22,7 @@ const Account = lazy(() => import("../components/User/Employee/Account.js"));
 const Product = lazy(() => import("../views/ui/Product"));
 const StockProduct = lazy(() => import("../views/ui/StockProduct"));
 const WorkTypeSystem = lazy(() => import("../views/ui/WorkTypeSystem.js"));
+const TeamWorkload = lazy(() => import("../views/ui/TeamWorkload.js"));
 const Files = lazy(() => import("../views/ui/Files"));
 const FileUpload = lazy(() => import("../views/ui/FileUpload"));
 const EventCalendar = lazy(() => import("../views/ui/EventCalendar.js"));
@@ -142,6 +143,17 @@ const ThemeRoutes = [
           </AdminRoute>
         ),
         title: "Work Type",
+      },
+      {
+        // ✅ ไม่ห่อด้วย AdminRoute เพราะหน้านี้ต้องให้ "manager" เข้าได้ด้วย (AdminRoute เดิมรับแค่ admin)
+        // ตัวคอมโพเนนต์เองเช็ค role แล้ว redirect กลับ /dashboard ถ้าไม่ใช่ admin/manager
+        path: "team-workload",
+        element: (
+          <Suspense fallback={<div>Loading...</div>}>
+            <TeamWorkload />
+          </Suspense>
+        ),
+        title: "Team Workload",
       },
       {
         path: "employee",

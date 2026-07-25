@@ -19,6 +19,7 @@ const Sidebar = ({ handleMenuClick }) => {
 
   const isAdmin = userData?.role?.toLowerCase() === "admin";
   const isTechnician = userData?.role?.toLowerCase() === "technician";
+  const isAdminOrManager = ["admin", "manager"].includes(userData?.role?.toLowerCase());
 
   const [user, setUser] = useState({});
 
@@ -52,6 +53,13 @@ const Sidebar = ({ handleMenuClick }) => {
   // ✅ เดิมประกาศไว้แต่ไม่เคย render เลย — ช่างจึงไม่มีทางกดเข้า "งานของฉัน" จาก sidebar ได้เลย
   const technicianMenu = [
     { title: "งานของฉัน", href: "/technician/jobs", icon: "bi-tools" },
+  ];
+
+  // ✅ เฉพาะแอดมิน/manager — สรุปภาพรวมงานของช่างแต่ละคนแยกกันชัดเจน (เดิมไม่มีทางเห็นได้เลย
+  // นอกจากไล่กรองเองทีละคนในหน้า Operation) ใช้ isAdminOrManager แทน isAdmin เพราะ AdminRoute
+  // เดิมไม่รองรับ manager แต่หน้านี้ตั้งใจให้ manager เข้าถึงได้ด้วย
+  const managerMenu = [
+    { title: "ภาพรวมทีมช่าง", href: "/team-workload", icon: "bi-people-fill" },
   ];
 
   // ✅ เดิม submenu จะปิดเสมอตอนโหลดหน้าใหม่ ต่อให้กำลังอยู่ในหน้าลูกของมันอยู่ก็ตาม
@@ -175,6 +183,14 @@ const Sidebar = ({ handleMenuClick }) => {
             <>
               <div className="admin-divider-label">งานของฉัน</div>
               {technicianMenu.map((item, idx) => renderLink(item, `tech-${idx}`))}
+            </>
+          )}
+
+          {/* ✅ เฉพาะแอดมิน/manager — เข้าดูภาพรวมงานแยกรายช่างได้จาก sidebar โดยตรง */}
+          {isAdminOrManager && (
+            <>
+              <div className="admin-divider-label">ทีมงาน</div>
+              {managerMenu.map((item, idx) => renderLink(item, `mgr-${idx}`))}
             </>
           )}
         </Nav>

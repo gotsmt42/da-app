@@ -16,6 +16,7 @@ import moment from "moment";
 import "moment/locale/th";
 import EventService from "../../services/EventService";
 import TechnicianJobCard from "../../components/Technician/TechnicianJobPanel";
+import { buildDaysPastDueMap, isFlaggedDays, isSevereDays, getOverdueGroupKey } from "../../utils/overdueJobs";
 import {
   Box, Stack, Typography, TextField, InputAdornment, IconButton,
   Chip, Skeleton, Dialog, DialogTitle, DialogContent, Divider,
@@ -23,7 +24,7 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
-  Search, Clear, Refresh, WorkOutline, HourglassTop, TaskAlt,
+  Search, Clear, Refresh, WorkOutline, HourglassTop, TaskAlt, Warning,
   Download, Close, PictureAsPdf, FolderOpen, Image, Article, InsertDriveFile, AttachFile,
   CalendarMonth, ExpandMore, ExpandLess,
 } from "@mui/icons-material";
@@ -160,14 +161,7 @@ const FilePreviewDialog = ({ previewUrl, previewFileName, onClose }) => {
 // system/team/time เดียวกันสำหรับงานเก่าก่อนมี jobGroupId) เดิมแสดงเป็นการ์ดแยกซ้ำกันทุกวัน —
 // รวมเป็นการ์ดเดียว วันล่าสุด (sessions[0]) ถือเอกสารประจำงาน/ขอปิดงานของทั้งกลุ่ม ส่วนวันอื่นซ่อน
 // ส่วนนี้ไป กดขยายเพื่อดู/จัดการแต่ละวันแยกกันได้ตามเดิม (เทียบ pattern เดียวกับ JobGroupBlock
-// ที่ใช้ในหน้า Operation ฝั่งแอดมิน)
-const getJobSignature = (ev) => {
-  if (ev.jobGroupId) return `gid:${ev.jobGroupId}`;
-  return ["company", "site", "title", "system", "team", "time"]
-    .map((k) => (ev[k] || "").toString().trim().toLowerCase())
-    .join("|");
-};
-
+// ที่ใช้ในหน้า Operation ฝั่งแอดมิน) — ใช้ getOverdueGroupKey จาก util กลางแทนฟังก์ชันซ้ำของตัวเอง
 const JobGroupCard = ({ sessions, ...cardProps }) => {
   const [expanded, setExpanded] = useState(false);
   const isGrouped = sessions.length > 1;
@@ -264,15 +258,22 @@ const JobGroupCard = ({ sessions, ...cardProps }) => {
 // ─── กลุ่มสถานะแท็บ ───
 const GROUPS = [
   { key: "active", label: "งานที่ต้องทำ", icon: <WorkOutline sx={{ fontSize: 15 }} />, color: "#3b82f6" },
+  // ✅ เดิมไม่มีทางเห็นงานค้างแยกจากงานทั่วไปเลยในหน้านี้ (ต้องไปเปิดหน้า Operation ต่างหาก) —
+  // เพิ่มแท็บนี้โดยตรง ใช้เกณฑ์เดียวกับหน้า Operation เป๊ะๆ (เลยกำหนด 1 สัปดาห์ขึ้นไป, งานหลายวัน
+  // ไม่ติดกันนับเป็น 1 งาน คิดจากวันสุดท้าย) ผ่าน util กลาง
+  { key: "overdue", label: "ค้างงาน", icon: <Warning sx={{ fontSize: 15 }} />, color: "#ef4444" },
   { key: "pending", label: "รอแอดมินอนุมัติ", icon: <HourglassTop sx={{ fontSize: 15 }} />, color: "#f59e0b" },
   { key: "closed", label: "เสร็จสิ้น", icon: <TaskAlt sx={{ fontSize: 15 }} />, color: "#10b981" },
 ];
 
-const matchesGroup = (event, group) => {
+const matchesGroup = (event, group, daysPastDueMap) => {
   if (group === "pending") return event.closeRequested === true && event.status !== "ดำเนินการเสร็จสิ้น";
   if (group === "closed") return event.status === "ดำเนินการเสร็จสิ้น";
-  // active: งานที่ยืนยันแล้ว/กำลังดำเนินการ และยังไม่ได้ขอปิด
-  return ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(event.status) && !event.closeRequested;
+  const isOverdue = isFlaggedDays(daysPastDueMap.get(event._id)?.days);
+  if (group === "overdue") return isOverdue;
+  // active: งานที่ยืนยันแล้ว/กำลังดำเนินการ, ยังไม่ได้ขอปิด, และยังไม่เข้าเกณฑ์ค้างงาน
+  // (ค้างงานแยกไปแท็บ "ค้างงาน" โดยเฉพาะแล้ว ไม่ต้องซ้ำสองที่)
+  return ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(event.status) && !event.closeRequested && !isOverdue;
 };
 
 export default function MyJobs() {
@@ -312,20 +313,25 @@ export default function MyJobs() {
     return () => clearInterval(interval);
   }, [fetchJobs]);
 
+  // ✅ ต้องคำนวณจาก events ทั้งหมด (ไม่ผ่านตัวกรองอื่นมาก่อน) เพื่อให้ทุกกลุ่มงานครบทุกแถวเสมอ
+  // เทียบ pattern เดียวกับหน้า Operation
+  const daysPastDueMap = useMemo(() => buildDaysPastDueMap(events), [events]);
+
   const groupCounts = useMemo(() => {
-    const counts = { active: 0, pending: 0, closed: 0 };
+    const counts = { active: 0, overdue: 0, pending: 0, closed: 0 };
     events.forEach((e) => {
-      if (matchesGroup(e, "active")) counts.active += 1;
-      else if (matchesGroup(e, "pending")) counts.pending += 1;
-      else if (matchesGroup(e, "closed")) counts.closed += 1;
+      if (matchesGroup(e, "active", daysPastDueMap)) counts.active += 1;
+      else if (matchesGroup(e, "overdue", daysPastDueMap)) counts.overdue += 1;
+      else if (matchesGroup(e, "pending", daysPastDueMap)) counts.pending += 1;
+      else if (matchesGroup(e, "closed", daysPastDueMap)) counts.closed += 1;
     });
     return counts;
-  }, [events]);
+  }, [events, daysPastDueMap]);
 
   const filteredJobs = useMemo(() => {
     const keyword = search.trim().toLowerCase();
     const list = events.filter((e) => {
-      if (!matchesGroup(e, group)) return false;
+      if (!matchesGroup(e, group, daysPastDueMap)) return false;
       if (!keyword) return true;
       return [e.company, e.site, e.title, e.system, e.docNo]
         .some((v) => (v || "").toLowerCase().includes(keyword));
@@ -335,14 +341,14 @@ export default function MyJobs() {
         ? moment(b.start).valueOf() - moment(a.start).valueOf()
         : moment(a.start).valueOf() - moment(b.start).valueOf()
     );
-  }, [events, group, search]);
+  }, [events, group, search, daysPastDueMap]);
 
   // ✅ รวมงานที่เข้าหลายวันไม่ติดกัน (jobGroupId/ลายเซ็นเดียวกัน) เป็นการ์ดเดียว แทนที่จะแยกโชว์
   // ซ้ำกันทุกวัน — ลำดับกลุ่มยึดตามลำดับที่ปรากฏครั้งแรกใน filteredJobs (เรียงตามวันที่อยู่แล้ว)
   const jobGroups = useMemo(() => {
     const map = new Map();
     filteredJobs.forEach((ev) => {
-      const key = getJobSignature(ev);
+      const key = getOverdueGroupKey(ev);
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(ev);
     });
@@ -484,19 +490,38 @@ export default function MyJobs() {
         </Box>
       ) : (
         <Stack spacing={2}>
-          {jobGroups.map((sessions) => (
-            <JobGroupCard
-              key={sessions[0].jobGroupId || sessions[0]._id}
-              sessions={sessions}
-              onInputUpdate={handleInputUpdate}
-              onFileUpload={handleFileUpload}
-              onDeleteFile={handleDeleteFile}
-              onPreview={(url, name) => { setPreviewUrl(url); setPreviewFileName(name); }}
-              uploadingState={uploadingState}
-              isUploadingState={isUploadingState}
-              uploadProgressState={uploadProgressState}
-            />
-          ))}
+          {jobGroups.map((sessions) => {
+            // ✅ ในแท็บ "ค้างงาน" ให้เห็นความรุนแรงต่างกันชัดๆ ก่อนเปิดการ์ด (เทียบ pattern เดียวกับ
+            // หน้า Operation) — เลย 1 สัปดาห์ = แจ้งเตือนสีเหลือง, เลย 2 สัปดาห์ = ค้างงานเต็มตัวสีแดง
+            const daysPastDue = group === "overdue" ? daysPastDueMap.get(sessions[0]._id)?.days ?? null : null;
+            const severeOverdue = isSevereDays(daysPastDue);
+            return (
+              <Box key={sessions[0].jobGroupId || sessions[0]._id}>
+                {daysPastDue !== null && (
+                  <Chip
+                    size="small"
+                    icon={severeOverdue ? <Warning sx={{ fontSize: 14 }} /> : <HourglassTop sx={{ fontSize: 14 }} />}
+                    label={severeOverdue ? `ค้างงาน ${daysPastDue} วัน` : `แจ้งเตือน · เลยกำหนด ${daysPastDue} วัน`}
+                    sx={{
+                      mb: 0.75, fontWeight: 700, fontSize: "0.7rem", height: 24,
+                      bgcolor: severeOverdue ? alpha("#ef4444", 0.12) : alpha("#f59e0b", 0.12),
+                      color: severeOverdue ? "#ef4444" : "#f59e0b",
+                    }}
+                  />
+                )}
+                <JobGroupCard
+                  sessions={sessions}
+                  onInputUpdate={handleInputUpdate}
+                  onFileUpload={handleFileUpload}
+                  onDeleteFile={handleDeleteFile}
+                  onPreview={(url, name) => { setPreviewUrl(url); setPreviewFileName(name); }}
+                  uploadingState={uploadingState}
+                  isUploadingState={isUploadingState}
+                  uploadProgressState={uploadProgressState}
+                />
+              </Box>
+            );
+          })}
         </Stack>
       )}
 

@@ -37,7 +37,13 @@
       "Bash(curl -s -o /dev/null -w \"existing server on :5000 -> HTTP %{http_code}\\\\n\" http://localhost:5000/api/files)",
       "Bash(curl -s -o /dev/null -w 'HTTP %{http_code}\\\\n' -H 'Authorization: Bearer __TRACKED_VAR__' http://localhost:5000/api/events/event-op)",
       "Bash(curl -s -o /dev/null -w 'HTTP %{http_code}\\\\n' -H 'Authorization: Bearer __TRACKED_VAR__' http://localhost:5000/api/files)",
-      "Bash(curl -s -o /dev/null -w 'HTTP %{http_code}\\\\n' -H 'Authorization: Bearer __TRACKED_VAR__' http://localhost:5000/api/customer)"
+      "Bash(curl -s -o /dev/null -w 'HTTP %{http_code}\\\\n' -H 'Authorization: Bearer __TRACKED_VAR__' http://localhost:5000/api/customer)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(cd \"c:\\\\Users\\\\Admin\\\\Desktop\\\\da-app\" && rm -rf build/ && rm -f /tmp/build2.txt /tmp/build_output.txt)",
+      "Bash(rm -rf build/ /tmp/build4.txt)",
+      "Bash(rm -rf build/ /tmp/build9.txt)",
+      "Bash(rm -rf build/ /tmp/build10.txt)",
+      "Bash(rm -rf build/ /tmp/build13.txt)"
     ],
     "additionalDirectories": [
       "\\tmp"

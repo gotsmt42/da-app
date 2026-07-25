@@ -26,7 +26,18 @@ import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 
 import { useAuth } from "./AuthContext";
 
-const BRAND_GRADIENT = "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+// ✅ เดิมใช้ม่วง-น้ำเงิน (#667eea → #764ba2) ไม่ตรงกับธีมสีแดงที่ใช้จริงทั้งแอปข้างใน
+// (sidebar/หัวข้อ/ปุ่มเน้นสีต่างๆ ล้วนอิงจากสีแดงโลโก้เดียวกัน — ดู --accent-color ใน Sidebar.css)
+// ใช้เฉดเดียวกันเป๊ะเพื่อให้หน้า Login เป็นธีมต่อเนื่องกับข้างในตั้งแต่แรกเห็น
+const BRAND_GRADIENT = "linear-gradient(135deg, #dc2626 0%, #7f1d1d 100%)";
+const ACCENT = "#dc2626";
+
+// ✅ ให้ input/checkbox ที่โฟกัสใช้สีแดงเดียวกัน แทน primary สีน้ำเงินเริ่มต้นของ MUI
+// (ไม่งั้นตอนคลิกช่องกรอกจะขึ้นกรอบสีน้ำเงินขัดกับปุ่ม/แบรนด์สีแดงข้างๆ)
+const redFieldSx = {
+  "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: ACCENT },
+  "& .MuiInputLabel-root.Mui-focused": { color: ACCENT },
+};
 
 const FEATURES = [
   { icon: <EventAvailableOutlinedIcon />, label: "จัดการแผนงานและตารางเข้างาน" },
@@ -119,7 +130,7 @@ const Login = () => {
         justifyContent: "center",
         p: { xs: 2, sm: 3 },
         background:
-          "radial-gradient(circle at 15% 15%, #eef1fd 0%, transparent 45%), radial-gradient(circle at 85% 85%, #f3ecfb 0%, transparent 45%), #f4f5f9",
+          "radial-gradient(circle at 15% 15%, #fef2f2 0%, transparent 45%), radial-gradient(circle at 85% 85%, #fee2e2 0%, transparent 45%), #f4f5f9",
       }}
     >
       <Paper
@@ -130,7 +141,7 @@ const Login = () => {
           display: "flex",
           borderRadius: 4,
           overflow: "hidden",
-          boxShadow: "0 24px 60px -20px rgba(76, 60, 150, 0.35)",
+          boxShadow: "0 24px 60px -20px rgba(127, 29, 29, 0.35)",
         }}
       >
         {/* Left brand panel */}
@@ -173,16 +184,16 @@ const Login = () => {
           <Box sx={{ position: "relative", zIndex: 1 }}>
             <Box
               component="img"
-              src="/logo-light-2.png"
+              src="/logo-dark-2.png"
               alt="DA App"
-              sx={{ height: 40, mb: 5, filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.15))" }}
+              sx={{ height: 320, mb: -10, filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.15))" }}
             />
             <Typography variant="h4" sx={{ fontWeight: 700, mb: 1.5, lineHeight: 1.3 }}>
-              ระบบบริหารจัดการ
-              <br />
-              งานบริการภาคสนาม
+              ระบบบริหารจัดการช่าง
+              {/* <br />
+              งานบริการภาคสนาม */}
             </Typography>
-            <Typography variant="body1" sx={{ opacity: 0.85, maxWidth: 320 }}>
+            <Typography variant="body1" sx={{ opacity: 0.85, mb: 2, maxWidth: 320 }}>
               เชื่อมต่อทีมช่างและฝ่ายบริหารไว้ในที่เดียว บริหารงานได้ง่าย รวดเร็ว และแม่นยำ
             </Typography>
           </Box>
@@ -226,9 +237,9 @@ const Login = () => {
         >
           <Box
             component="img"
-            src="/logo-dark-2.png"
+            src="/logo-light-2.png"
             alt="DA App"
-            sx={{ height: 32, mb: 3, display: { xs: "block", md: "none" } }}
+            sx={{ height: 380, mb: -10, display: { xs: "block", md: "none" } }}
           />
 
           <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
@@ -248,7 +259,7 @@ const Login = () => {
               error={Boolean(errors.username)}
               helperText={errors.username}
               autoComplete="username"
-              sx={{ mb: 2.5 }}
+              sx={{ mb: 2.5, ...redFieldSx }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -268,6 +279,7 @@ const Login = () => {
               error={Boolean(errors.password)}
               helperText={errors.password}
               autoComplete="current-password"
+              sx={redFieldSx}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -301,6 +313,7 @@ const Login = () => {
                     size="small"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
+                    sx={{ color: "text.secondary", "&.Mui-checked": { color: ACCENT } }}
                   />
                 }
                 label={<Typography variant="body2">จดจำฉัน</Typography>}
@@ -309,7 +322,7 @@ const Login = () => {
                 variant="body2"
                 onClick={handleForgotPassword}
                 sx={{
-                  color: "#667eea",
+                  color: ACCENT,
                   cursor: "pointer",
                   fontWeight: 500,
                   "&:hover": { textDecoration: "underline" },
@@ -331,10 +344,10 @@ const Login = () => {
                 fontSize: "0.95rem",
                 textTransform: "none",
                 background: BRAND_GRADIENT,
-                boxShadow: "0 10px 25px -8px rgba(102, 126, 234, 0.6)",
+                boxShadow: "0 10px 25px -8px rgba(220, 38, 38, 0.5)",
                 "&:hover": {
                   background: BRAND_GRADIENT,
-                  boxShadow: "0 12px 28px -6px rgba(102, 126, 234, 0.75)",
+                  boxShadow: "0 12px 28px -6px rgba(220, 38, 38, 0.65)",
                 },
                 "&.Mui-disabled": {
                   background: BRAND_GRADIENT,
