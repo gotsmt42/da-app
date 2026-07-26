@@ -262,6 +262,30 @@
 .unscheduled-add-btn:hover { opacity: 0.9; }
 .unscheduled-add-btn:active { transform: scale(0.96); }
 
+/* ✅ เดิมทุกอย่าง (‹ label › +เพิ่มงาน) เบียดกันแถวเดียวบนจอมือถือ ไม่มีที่พอ label เลยตัดขึ้น
+   บรรทัดใหม่ดูรก — จัดใหม่เป็น 2 แถว: แถวบน ‹ label › แถวล่างปุ่ม "+เพิ่มงาน" เต็มความกว้าง
+   ⚠️ เดิมเคยใช้ ellipsis ตัดข้อความ label ถ้ายาวเกิน แต่ต้องการให้เห็นข้อมูลครบทุกตัวอักษร
+   เสมอ (ไม่ตัดทิ้ง) จึงปล่อยให้ตัดขึ้นบรรทัดใหม่ได้ตามปกติแทน ไม่ใช้ ellipsis อีกต่อไป */
+@media (max-width: 576px) {
+  .unscheduled-panel-header {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .unscheduled-month-label {
+    font-size: 12px;
+  }
+  .unscheduled-month-nav {
+    width: 28px;
+    height: 28px;
+  }
+  .unscheduled-add-btn {
+    flex: 1 1 100%;
+    order: 10;
+    justify-content: center;
+    padding: 7px 14px;
+  }
+}
+
 .unscheduled-empty {
   padding: 18px 8px;
   text-align: center;
@@ -330,6 +354,11 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.draft-card-time {
+  font-size: 11px;
+  color: #94a3b8;
 }
 
 .draft-card-team {

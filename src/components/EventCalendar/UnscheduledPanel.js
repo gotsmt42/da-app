@@ -126,11 +126,12 @@ const UnscheduledPanel = forwardRef(function UnscheduledPanel(
                 </span>
                 <div className="draft-card-body">
                   <div className="draft-card-title">
-                    {d.title} {d.system ? `· ${d.system}` : ""} {d.time ? `· ครั้งที่ ${d.time}` : ""}
+                    {d.title} {d.system ? `· ${d.system}` : ""}
                   </div>
                   <div className="draft-card-sub">
                     {[d.company, d.site].filter(Boolean).join(" · ")}
                   </div>
+                  {d.time && <div className="draft-card-time">🔢 ครั้งที่ {d.time}</div>}
                   {d.team && <div className="draft-card-team">👷 {d.team}</div>}
                 </div>
                 <div className="draft-card-actions">
@@ -140,7 +141,7 @@ const UnscheduledPanel = forwardRef(function UnscheduledPanel(
                     onClick={() => onScheduleClick(d)}
                     title="เลือกวันที่ลงตาราง"
                   >
-                    <FontAwesomeIcon icon={faCalendarCheck} /> ลงตาราง
+                    <FontAwesomeIcon icon={faCalendarCheck} /> +
                   </button>
                   <div className="draft-card-more">
                     <button

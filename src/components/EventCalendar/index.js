@@ -603,6 +603,18 @@ function EventCalendar() {
     const { value: formValues } = await Swal.fire({
       title: "เลือกวันที่ลงตาราง",
       html: `
+        <style>
+          /* ✅ เดิมช่อง วันที่เริ่ม/สิ้นสุด และ เวลาเริ่ม/สิ้นสุด เรียงข้างกันตายตัวด้วย flex
+             ทำให้บนจอมือถือแคบๆ ช่องแคบเกินไปจน input วันที่ล้นขอบจอ (input[type=date] ของ
+             เบราว์เซอร์มีความกว้างขั้นต่ำของตัวเองบีบต่อไม่ได้) — สลับเป็นเรียงซ้อนกันทีละแถว
+             เต็มความกว้างแทนเมื่อจอแคบ ให้พอดีจอเสมอ ไม่มีการล้น/ตัด */
+          .swal-schedule-row-2col { display:flex; gap:8px; margin-bottom:12px; }
+          .swal-schedule-row-2col > div { flex:1; text-align:left; min-width:0; }
+          @media (max-width: 480px) {
+            .swal-schedule-row-2col { flex-direction: column; gap: 10px; }
+          }
+        </style>
+
         <div style="text-align:left; font-size:13px; color:#64748b; margin-bottom:14px;">
           ${draft.title || "งาน"} · ${[draft.company, draft.site].filter(Boolean).join(" · ")}
         </div>
@@ -613,12 +625,12 @@ function EventCalendar() {
         </label>
 
         <div id="swal-schedule-single-section">
-          <div style="display:flex; gap:8px; margin-bottom:12px;">
-            <div style="flex:1; text-align:left;">
+          <div class="swal-schedule-row-2col">
+            <div>
               <label style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">📅 วันที่เริ่ม</label>
               <input id="swal-schedule-start-date" type="date" class="swal2-input" style="margin:0; width:100%; box-sizing:border-box;" value="${defaultDate}">
             </div>
-            <div style="flex:1; text-align:left;">
+            <div>
               <label style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">📅 วันที่สิ้นสุด</label>
               <input id="swal-schedule-end-date" type="date" class="swal2-input" style="margin:0; width:100%; box-sizing:border-box;" value="${defaultDate}">
             </div>
@@ -630,12 +642,12 @@ function EventCalendar() {
           <button type="button" id="swal-schedule-add-date-btn" style="margin-bottom:12px; padding:8px 14px; border:1px solid #e2e8f0; background:#f1f5f9; border-radius:6px; font-size:12.5px; font-weight:700; color:#475569; cursor:pointer;">➕ เพิ่มช่วงวันที่</button>
         </div>
 
-        <div style="display:flex; gap:8px; margin-bottom:12px;">
-          <div style="flex:1; text-align:left;">
+        <div class="swal-schedule-row-2col">
+          <div>
             <label style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">🕐 เวลาเริ่ม</label>
             <input id="swal-schedule-start-time" type="text" class="swal2-input" placeholder="เช่น 08:30" style="margin:0; width:100%; box-sizing:border-box;" value="${draft.startTime || ""}">
           </div>
-          <div style="flex:1; text-align:left;">
+          <div>
             <label style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">🕔 เวลาสิ้นสุด</label>
             <input id="swal-schedule-end-time" type="text" class="swal2-input" placeholder="เช่น 17:00" style="margin:0; width:100%; box-sizing:border-box;" value="${draft.endTime || ""}">
           </div>

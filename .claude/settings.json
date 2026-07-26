@@ -60,11 +60,13 @@
       "Read(//c//**)",
       "Read(//c/tmp_fc_test/**)",
       "Bash(\"/c/Program Files/Google/Chrome/Application/chrome.exe\" --headless --disable-gpu --allow-file-access-from-files --screenshot=\"C:\\\\tmp_fc_test\\\\fc-test2.png\" --window-size=375,500 --hide-scrollbars \"file:///C:/tmp_fc_test/fc-test.html\")",
-      "Bash(rm -rf build/ *)"
+      "Bash(rm -rf build/ *)",
+      "Read(//c/tmp_fc_test2/**)"
     ],
     "additionalDirectories": [
       "\\tmp",
-      "C:\\tmp_fc_test"
+      "C:\\tmp_fc_test",
+      "C:\\tmp_fc_test3"
     ]
   }
 }

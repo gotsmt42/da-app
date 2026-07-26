@@ -314,7 +314,7 @@ const Dashboard = () => {
       {/* ─── SECTION 2: CTA BANNER PAIR — เดิมเป็นแบนเนอร์เต็มความกว้างแค่ปฏิทินอันเดียว ส่วนปุ่ม
           "ดูการดำเนินงานทั้งหมด" ไปหลบเป็นชิปเล็กๆ อยู่ข้างหัวข้อ "งานวันนี้" คนละจุดคนละน้ำหนัก
           แบ่งครึ่งเป็น 2 การ์ดเท่ากัน ให้ทั้งคู่เด่นเท่ากันและกดถึงจากจุดเดียวกันด้านบนสุด ─── */}
-      <div style={styles.heroPairGrid}>
+      <div style={styles.heroPairGrid} >
         <div onClick={() => navigate("/event")} style={styles.heroPairCard} className="action-hero-btn">
           <div style={styles.heroIconCircle}>
             <FaCalendarAlt size={16} />
@@ -835,23 +835,22 @@ const styles = {
     gap: "10px",
     minWidth: 0,
   },
+  // ✅ เดิม whiteSpace:nowrap + ellipsis ตัดข้อความ "แผนงานทั้งหมด"/"การดำเนินงาน" ให้เหลือ
+  // "แผนงานที..." บนจอแคบ (การ์ดครึ่งจอ) — ลดขนาดตัวอักษรลงนิด + ปล่อยให้ตัดขึ้นบรรทัดใหม่ได้
+  // แทน (ไม่ ellipsis อีกต่อไป) ให้เห็นข้อความเต็มเสมอทุกขนาดจอ
   heroPairTitle: {
-    fontSize: "12.5px",
+    fontSize: "12px",
     fontWeight: "800",
     margin: 0,
     color: "#ffffff",
     letterSpacing: "-0.2px",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
+    lineHeight: 1.2,
   },
   heroPairSub: {
-    fontSize: "10px",
+    fontSize: "9.5px",
     color: "rgba(255, 255, 255, 0.75)",
     margin: "2px 0 0 0",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
+    lineHeight: 1.2,
   },
   heroIconCircle: {
     backgroundColor: "rgba(255, 255, 255, 0.15)",
