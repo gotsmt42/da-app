@@ -458,10 +458,22 @@
 .fc .fc-today-button:hover:not(:disabled) {
   background-color: rgba(220, 38, 38, 0.14);
 }
+/* ✅ ปุ่ม "วันนี้" ตอน disabled (อยู่ในเดือนปัจจุบันอยู่แล้ว) เดิมพึ่งแค่ .fc-button-primary:disabled
+   {opacity:0.4} ทำให้สีแดงอ่อนอยู่แล้วยิ่งจางจนอ่านตัวหนังสือแทบไม่ออก — ให้ดีไซน์ disabled
+   ของตัวเองแทน สีเทากลางๆ ที่ยังอ่านออกชัดเจน */
+.fc .fc-today-button:disabled {
+  opacity: 1;
+  background-color: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+}
 
 .fc .fc-toolbar-title {
   font-weight: 800;
   color: #0f172a;
+  /* ✅ เดิมไม่ได้กำหนด font-size เลย จึงใช้ค่า default ของ FullCalendar (h2 ขนาดใหญ่มาก)
+     ทำให้ "มกราคม 2570" ดูใหญ่เทอะทะทุกขนาดจอ ไม่ใช่แค่บนมือถือ */
+  font-size: 1.5rem;
 }
 
 /* ✅ FullCalendar เองไม่ได้ตั้ง display:flex ให้ .fc-toolbar-chunk เลย (มีแค่ .fc-toolbar ที่เป็น
@@ -472,6 +484,21 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* ✅ เดิมไม่ได้กำหนดขนาด prev/next ไว้เลยนอก media query มือถือ ทำให้บนจอกว้างขึ้นมาหน่อย (เช่น
+   แท็บเล็ต) ใช้ปุ่ม default ของ FullCalendar ซึ่งจุดกึ่งกลางไอคอน "‹"/"›" ไม่ตรงกันพอดี (แต่ละ
+   glyph กว้างไม่เท่ากัน บวก padding เดิมที่ไม่ได้ตั้งใจให้เป็นวงกลมสมมาตร) — บังคับเป็นวงกลม
+   ขนาดคงที่ ให้จุดศูนย์กลางไอคอนซ้าย-ขวาสมมาตรกันเป๊ะทุกขนาดจอ */
+.fc .fc-prev-button,
+.fc .fc-next-button {
+  width: 82px;
+  height: 42px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10%;
 }
 
 
@@ -528,8 +555,8 @@
   display: inline-block;
   color: #fff;
   text-decoration: none;
-  padding: 7px 4px !important;
-  font-size: 12.5px;
+  padding: 5px 4px !important;
+  font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 0.02em;
 }
@@ -594,8 +621,11 @@
 
   .fc-col-header-cell-cushion {
     /* ✅ ต้อง override ที่ cushion (ตัวจริงที่คุม font-size) ไม่ใช่ cell เฉยๆ ตั้งแต่ย้าย
-       font-size ไปไว้ที่ cushion แทนแล้ว (ดูกฎด้านบน) */
-    font-size: 12px !important;
+       font-size ไปไว้ที่ cushion แทนแล้ว (ดูกฎด้านบน)
+       ⚠️ เดิมตั้งไว้ 12px ซึ่งใหญ่กว่าค่า desktop (11.5px) เสียอีก กลายเป็นมือถือมีตัวอักษร
+       หัวตารางใหญ่กว่าจอใหญ่ ทั้งที่ควรเล็กกว่า — ลดลงให้เล็กกว่า desktop จริงๆ */
+    font-size: 10px !important;
+    padding: 4px 3px !important;
   }
   .fc-col-header-cell,
   .fc-day-header {

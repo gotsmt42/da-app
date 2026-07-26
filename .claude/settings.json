@@ -47,10 +47,24 @@
       "Bash(node -c routes/calendarEvent.js)",
       "Bash(node -c models/Events.js)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5000/)",
-      "Bash(curl -s http://localhost:5000/api)"
+      "Bash(curl -s http://localhost:5000/api)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/)",
+      "Bash(npx --no-install playwright --version)",
+      "Bash(where chromium-cli *)",
+      "Bash(where chrome *)",
+      "Read(//c/Program Files/Google/Chrome/Application/**)",
+      "Read(//c/Program Files \\\\\\(x86\\\\\\)/Google/Chrome/**)",
+      "Bash(mkdir -p /c/tmp_fc_test)",
+      "Bash(cp \"C:/Users/Admin/AppData/Local/Temp/claude/c--Users-Admin-Desktop-da-app/81d0e784-f8b5-4bb0-9dfd-94a8fd4fa19d/scratchpad/fc-test.html\" /c/tmp_fc_test/fc-test.html)",
+      "Bash(\"/c/Program Files/Google/Chrome/Application/chrome.exe\" --headless --disable-gpu --allow-file-access-from-files --screenshot=\"C:\\\\tmp_fc_test\\\\fc-test.png\" --window-size=375,500 --hide-scrollbars \"file:///C:/tmp_fc_test/fc-test.html\")",
+      "Read(//c//**)",
+      "Read(//c/tmp_fc_test/**)",
+      "Bash(\"/c/Program Files/Google/Chrome/Application/chrome.exe\" --headless --disable-gpu --allow-file-access-from-files --screenshot=\"C:\\\\tmp_fc_test\\\\fc-test2.png\" --window-size=375,500 --hide-scrollbars \"file:///C:/tmp_fc_test/fc-test.html\")",
+      "Bash(rm -rf build/ *)"
     ],
     "additionalDirectories": [
-      "\\tmp"
+      "\\tmp",
+      "C:\\tmp_fc_test"
     ]
   }
 }

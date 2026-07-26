@@ -1377,36 +1377,43 @@ function EventCalendar() {
               width: 100%;
         font-size: 12px !important; /* ✅ ปรับขนาดฟอนต์ให้เล็กลงสำหรับมือถือ */
             }
-            /* ✅ เดิม font-size 1.2em + ลูกศรกว้าง 76px บีบพื้นที่จนข้อความ "กรกฎาคม 2569"
-               ล้นไปขึ้นบรรทัดที่ 2 (ดูไม่สวย/เบี้ยว) — ลดขนาดตัวอักษรลงนิด + บังคับบรรทัดเดียว
-               (ย่อด้วย ellipsis แทนการตัดขึ้นบรรทัดใหม่ ถ้าพื้นที่ไม่พอจริงๆ) */
+            /* ✅ บั๊ก: ตอนแก้ desktop ก่อนหน้านี้ ใช้ selector ".fc .fc-toolbar-title"/".fc
+               .fc-prev-button" (2 คลาส) ซึ่ง specificity สูงกว่า selector มือถือแค่ 1 คลาสตรงนี้
+               (".fc-toolbar-title"/".fc-prev-button") — เลยทับกฎมือถือทิ้งไปเงียบๆ ต่อให้อยู่ใน
+               media query ก็ตาม (specificity ชนะ media query เสมอ) เพิ่ม !important กันไว้แน่นอน
+               ✅ ทดสอบจริงผ่าน headless screenshot (แยก harness นอกแอพ) แล้วว่าขนาดชุดนี้
+               อ่านง่าย ไม่เล็กเกินไป ก่อนค่อยเอามาใส่ในแอพจริง */
             .fc-toolbar-title {
               flex: 1;
               min-width: 0;
               text-align: center;
-              font-size: 1.05em;
+              font-size: 1.5em !important;
               margin: 0;
               white-space: nowrap;
               overflow: hidden;
               text-overflow: ellipsis;
             }
-            /* ✅ ปุ่มเลื่อนเดือน (prev/next) อยู่ขนาบ title ในกลุ่มกลางเดียวกัน — title flex:1
-               ดันปุ่มทั้งคู่ไปชิดขอบซ้าย/ขวาของแถว — ยืดเป็นทรงยาว (ไม่ใช่วงกลมแคบๆ) ให้มีพื้นที่
-               แตะกว้างขึ้นในแนวนอน โดยความสูงยังกระชับพอดีนิ้วมือ (ไม่ใหญ่เทอะทะ)
-               ✅ ลดขนาดลงอีกรอบเหลือ 30px ให้ title มีพื้นที่มากขึ้นไม่ล้นบรรทัด */
             .fc-prev-button,
             .fc-next-button {
               flex-shrink: 0;
-              width: 30px;
-              height: 30px;
-              padding: 0;
+              width: 55px !important;
+              height: 32px !important;
+              padding: 0 !important;
+              display: flex !important;
+              align-items: center !important;
+              justify-content: center !important;
+              border-radius: 16px;
+              touch-action: manipulation;
+            }
+            .fc-prev-button .fc-icon,
+            .fc-next-button .fc-icon {
               display: flex;
               align-items: center;
               justify-content: center;
-              border-radius: 15px;
-              touch-action: manipulation;
+              width: 100%;
+              line-height: 1;
+              margin: 0;
             }
-            /* ✅ ลดขนาดลงอีกนิดจากเดิม 34px ให้กระชับขึ้นอีก ยังคงเต็มความกว้างแถวไว้เหมือนเดิม */
             .fc-today-button {
               flex-shrink: 0;
               width: 100%;
@@ -1426,6 +1433,10 @@ function EventCalendar() {
               justify-content: center;
               width: 100%;
               margin-top: 5px;
+            }
+            .fc-col-header-cell-cushion {
+              font-size: 11px !important;
+              padding: 6px 3px !important;
             }
           }
 .fc-event-locked {
