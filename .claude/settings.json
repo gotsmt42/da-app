@@ -43,7 +43,11 @@
       "Bash(rm -rf build/ /tmp/build4.txt)",
       "Bash(rm -rf build/ /tmp/build9.txt)",
       "Bash(rm -rf build/ /tmp/build10.txt)",
-      "Bash(rm -rf build/ /tmp/build13.txt)"
+      "Bash(rm -rf build/ /tmp/build13.txt)",
+      "Bash(node -c routes/calendarEvent.js)",
+      "Bash(node -c models/Events.js)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5000/)",
+      "Bash(curl -s http://localhost:5000/api)"
     ],
     "additionalDirectories": [
       "\\tmp"

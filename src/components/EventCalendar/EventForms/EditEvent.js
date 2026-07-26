@@ -200,6 +200,23 @@ function injectStyles() {
       display: flex; align-items: center; justify-content: center;
     }
 
+    /* ── ลูกทีมเพิ่มเติม (คนที่ 2, 3, ... แสดงผลอย่างเดียว ไม่กระทบสิทธิ์) ── */
+    .ee-team-member-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .ee-team-member-row select {
+      flex: 1; box-sizing: border-box;
+      border: 1.5px solid #e2e8f0; border-radius: 7px;
+      padding: 7px 10px; font-size: 13px; color: #1e293b;
+      background: #fff; font-family: inherit;
+    }
+    .ee-team-member-row select:focus {
+      outline: none; border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37,99,235,.10);
+    }
+    .ee-team-member-remove {
+      flex-shrink: 0; width: 30px; height: 30px; padding: 0 !important;
+      display: flex; align-items: center; justify-content: center;
+    }
+
     /* ── Color inline row ── */
     .ee-color-inline {
       display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
@@ -257,6 +274,7 @@ function injectStyles() {
     .ee-btn-info      { background: #0ea5e9; color: #fff; }
     .ee-btn-operation { background: linear-gradient(135deg,#7c3aed,#4f46e5); color: #fff; }
     .ee-btn-danger    { background: #ef4444; color: #fff; }
+    .ee-btn-warning   { background: #f59e0b; color: #fff; }
     .ee-btn-ghost     { background: #e2e8f0; color: #475569; }
 
     @media(max-width:640px) {
@@ -307,6 +325,7 @@ export const getEditEvent = async ({
   setLoading,
   generateWorkPermitPDF,
   handleDeleteEvent,
+  handleUnscheduleEvent,
   EventService,
   CustomerService,
   AuthService,
@@ -327,6 +346,7 @@ export const getEditEvent = async ({
   const eventSite = ev.extendedProps?.site || "";
   const eventSystem = ev.extendedProps?.system || "";
   const eventTeam = ev.extendedProps?.team || "";
+  const eventTeamMembers = ev.extendedProps?.teamMembers || [];
   const eventTime = ev.extendedProps?.time || "";
   const eventFontSize = ev.extendedProps?.fontSize;
   const eventStart = moment(ev.start);
@@ -471,6 +491,11 @@ export const getEditEvent = async ({
     )
     .join("");
 
+  // ✅ ตัวเลือกดิบไม่ฝัง selected มาด้วย ใช้กับแถวลูกทีมเพิ่มเติมที่ต้อง render แยกทีละแถวเอง
+  const plainTeamOpts = employeeList
+    .map((e) => `<option value="${e.fname}">${e.fname}</option>`)
+    .join("");
+
   const cfg0 = STATUS_CONFIG[eventStatus] || STATUS_CONFIG["กำลังรอยืนยัน"];
 
   const html = `
@@ -534,6 +559,13 @@ export const getEditEvent = async ({
         <label>👷 ทีม</label>
         <select id="editTeam"><option value="" disabled selected>${eventTeam || "—"}</option>${teamOpts}</select>
       </div>
+    </div>
+
+    <!-- ✅ ลูกทีมเพิ่มเติม (คนที่ 2, 3, ...) — แสดงผลอย่างเดียว ไม่กระทบสิทธิ์แก้ไข/แจ้งเตือน -->
+    <div class="ee-field" style="margin-bottom:14px;">
+      <label>👥 ลูกทีมเพิ่มเติม (ถ้ามี)</label>
+      <div id="ee-teamMembersList"></div>
+      <button type="button" class="ee-btn ee-btn-ghost" id="ee-addTeamMemberBtn" style="margin-top:2px;">➕ เพิ่มลูกทีม</button>
     </div>
 
     <hr class="ee-divider">
@@ -617,6 +649,7 @@ export const getEditEvent = async ({
 
     <!-- 🔴 ซ้าย: อันตราย -->
     <div class="ee-btn-group ee-btn-group-left">
+      ${canDeleteEvent ? `<button class="ee-btn ee-btn-warning" id="btnUnschedule">↩️ ย้ายไปแผนล่วงหน้า</button>` : ""}
       ${canDeleteEvent ? `<button class="ee-btn ee-btn-danger" id="btnDelete">🗑 ลบแผนงาน</button>` : ""}
     </div>
 
@@ -727,6 +760,22 @@ export const getEditEvent = async ({
 
       const getVal = (id) => document.getElementById(id)?.value?.trim() || "";
 
+      /* ── ลูกทีมเพิ่มเติม (คนที่ 2, 3, ... แสดงผลอย่างเดียว ไม่กระทบสิทธิ์) ── */
+      const teamMembersList = document.getElementById("ee-teamMembersList");
+      const addTeamMemberRow = (prefillName = "") => {
+        const row = document.createElement("div");
+        row.className = "ee-team-member-row";
+        row.innerHTML = `
+          <select class="ee-team-member-select"><option value="">— เลือกลูกทีม —</option>${plainTeamOpts}</select>
+          <button type="button" class="ee-btn ee-btn-ghost ee-team-member-remove" title="ลบออก">✕</button>
+        `;
+        if (prefillName) row.querySelector(".ee-team-member-select").value = prefillName;
+        row.querySelector(".ee-team-member-remove").addEventListener("click", () => row.remove());
+        teamMembersList.appendChild(row);
+      };
+      eventTeamMembers.forEach((m) => addTeamMemberRow(m?.name || ""));
+      document.getElementById("ee-addTeamMemberBtn")?.addEventListener("click", () => addTeamMemberRow());
+
       /* ── งานหลายวัน (เหมือนหน้า Add ทุกอย่าง) — สลับ single/multi + ค้างค่าเดิมไว้ให้แก้ง่าย ── */
       const multiToggle   = document.getElementById("ee-multiDateToggle");
       const singleSection = document.getElementById("ee-singleDateSection");
@@ -787,6 +836,15 @@ export const getEditEvent = async ({
 
       // ✅ ฟิลด์ร่วมของงาน (ไม่รวมวันที่) — ใช้ทั้งโหมดวันเดียวและโหมดหลายวัน
       // เวลาแก้ข้อมูลงาน (บริษัท/ไซต์/ทีม/สถานะ ฯลฯ) ในโหมดหลายวัน จะ apply กับทุกช่วงวันที่ในกลุ่มเดียวกัน
+      // ✅ ลูกทีมเพิ่มเติม — เก็บทั้งชื่อ+userId (แสดงผลอย่างเดียว ไม่กระทบสิทธิ์) กันซ้ำชื่อ
+      // เดียวกันเผลอเพิ่มหลายแถว และตัดแถวที่ยังไม่ได้เลือกใครออก
+      const getTeamMembers = () =>
+        [...document.querySelectorAll(".ee-team-member-select")]
+          .map((sel) => sel.value)
+          .filter(Boolean)
+          .filter((name, idx, arr) => arr.indexOf(name) === idx)
+          .map((name) => ({ userId: teamToId.get(name) || "", name }));
+
       const buildSharedFields = () => ({
         docNo: getVal("editdocNo"),
         company: getVal("editCompany"),
@@ -796,6 +854,7 @@ export const getEditEvent = async ({
         time: getVal("editTime"),
         team: getVal("editTeam"),
         resPerson: teamToId.get(getVal("editTeam")) || "",
+        teamMembers: getTeamMembers(),
         textColor: inputText.value,
         backgroundColor: inputBg.value,
         fontSize: eventFontSize,
@@ -985,6 +1044,15 @@ export const getEditEvent = async ({
       document.getElementById("btnDelete")?.addEventListener("click", () => {
         Swal.close();
         handleDeleteEvent(eventId);
+      });
+
+      /* ✅ ย้ายกลับไปเป็นงานวางแผนล่วงหน้า (unscheduled) — สำหรับงานที่ลงตารางไปแล้วแต่อยาก
+         เอาวันที่ออกก่อน กลับไปอยู่ในแผงงานล่วงหน้าเหมือนเดิม โดยไม่ต้องลบทิ้งทั้งงาน
+         handleUnscheduleEvent เปิด Swal ยืนยันของตัวเองอยู่แล้ว จึงปิด modal นี้ก่อนเรียก
+         (แพทเทิร์นเดียวกับ btnDelete ด้านบน) */
+      document.getElementById("btnUnschedule")?.addEventListener("click", () => {
+        Swal.close();
+        handleUnscheduleEvent(eventId);
       });
 
       /* View operation */

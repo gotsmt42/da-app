@@ -191,6 +191,235 @@
 }
 
 /* ==========================================================================
+   UNSCHEDULED PANEL — งานวางแผนล่วงหน้า (ยังไม่ลงตาราง) แยกเป็นเดือนๆ
+   ลากการ์ดไปวางบนปฏิทิน หรือกดปุ่ม "ลงตาราง" เลือกวันที่เองก็ได้
+   ========================================================================== */
+.unscheduled-panel {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 12px;
+  animation: filterPanelIn 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+/* ✅ ไฮไลต์ให้เห็นชัดว่าเป็น drop-zone ได้ ระหว่างกำลังลากงานออกจากปฏิทินจริง (eventDragStart) */
+.unscheduled-panel--drop-target {
+  border: 2px dashed #dc2626;
+  background: #fef2f2;
+  box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.08);
+}
+
+.unscheduled-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.unscheduled-month-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.unscheduled-month-label span { color: #64748b; font-weight: 600; }
+
+.unscheduled-month-nav {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.unscheduled-month-nav:hover { border-color: #dc2626; color: #dc2626; }
+.unscheduled-month-nav:active { transform: scale(0.94); }
+
+.unscheduled-add-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  background: linear-gradient(135deg, #dc2626 0%, #7f1d1d 100%);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  touch-action: manipulation;
+}
+.unscheduled-add-btn:hover { opacity: 0.9; }
+.unscheduled-add-btn:active { transform: scale(0.96); }
+
+.unscheduled-empty {
+  padding: 18px 8px;
+  text-align: center;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.unscheduled-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+@media (min-width: 577px) {
+  .unscheduled-list {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ✅ จอใหญ่ (เดสก์ท็อป) มีพื้นที่กว้างพอ แสดง 3 คอลัมน์แทน 2 ให้เห็นงานได้มากขึ้นโดยไม่ต้องเลื่อน */
+@media (min-width: 992px) {
+  .unscheduled-list {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.draft-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: grab;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.draft-card:hover { border-color: #fca5a5; box-shadow: 0 2px 8px rgba(220, 38, 38, 0.08); }
+.draft-card:active { cursor: grabbing; }
+
+.draft-card-grip {
+  flex-shrink: 0;
+  color: #cbd5e1;
+  font-size: 12px;
+}
+
+.draft-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.draft-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.draft-card-sub {
+  font-size: 11.5px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.draft-card-team {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.draft-card-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.draft-card-btn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.15s ease;
+  touch-action: manipulation;
+}
+.draft-card-btn:active { transform: scale(0.92); }
+
+/* ✅ ปุ่มหลักที่ใช้บ่อยสุด — แสดงตรงๆ พร้อมคำ "ลงตาราง" ให้กดง่ายชัดเจน ไม่ต้องเดาไอคอน
+   ต่างจาก แก้ไข/ลบ ที่ซ่อนไว้หลังปุ่ม "⋮" เพราะใช้ไม่บ่อยเท่า */
+.draft-card-btn--schedule-full {
+  width: auto;
+  height: 28px;
+  padding: 0 10px;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #0891b2, #0e7490);
+  border-color: transparent;
+}
+.draft-card-btn--schedule-full:hover { opacity: 0.9; }
+
+.draft-card-more {
+  position: relative;
+}
+
+.draft-card-btn--more { color: #64748b; }
+.draft-card-btn--more:hover { background: rgba(100, 116, 139, 0.1); border-color: rgba(100, 116, 139, 0.3); }
+
+/* ✅ position:fixed (คำนวณ top/right เป็น inline style จาก bounding rect ตอนกด ดู
+   UnscheduledPanel.js) แทน absolute เดิม — กันโดน .unscheduled-list ที่มี overflow-y:auto
+   ตัดเมนูขาดถ้าการ์ดอยู่ใกล้ขอบล่างของพื้นที่เลื่อน กางขึ้นด้านบนเสมอ ไม่ผูกกับ container แล้ว */
+.draft-card-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 110px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: filterPanelIn 0.12s ease;
+}
+
+.draft-card-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  text-align: left;
+  touch-action: manipulation;
+}
+.draft-card-menu-item:hover { background: #f1f5f9; }
+.draft-card-menu-item--danger { color: #dc2626; }
+.draft-card-menu-item--danger:hover { background: rgba(220, 38, 38, 0.08); }
+
+/* ==========================================================================
    FULLCALENDAR TOOLBAR — ปุ่ม prev/next/today/มุมมอง เดิมใช้สีฟ้า default ของ
    FullCalendar เอง ปรับให้เข้าธีมแดงของแบรนด์เดียวกับส่วนอื่นของแอป
    ========================================================================== */
@@ -235,6 +464,16 @@
   color: #0f172a;
 }
 
+/* ✅ FullCalendar เองไม่ได้ตั้ง display:flex ให้ .fc-toolbar-chunk เลย (มีแค่ .fc-toolbar ที่เป็น
+   flex row ของ 3 chunk) — เดิมตอนแต่ละ chunk มีแค่ปุ่มเดียว/กลุ่มเดียวเลยดูปกติ แต่พอใส่ title
+   กับปุ่ม next ไว้ chunk เดียวกัน (ให้ลูกศรขวาชิดปี) กลายเป็น block ซ้อนกันคนละบรรทัดแทน
+   (title เป็น h2 ที่เป็น block-level) ต้องบังคับ flex ให้ chunk เอง ถึงจะเรียงแนวนอนถูก */
+.fc .fc-toolbar-chunk {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 
 .fc-event {
  
@@ -276,15 +515,23 @@
   height: 10px;
 }
 
+/* ✅ เดิมสีกรมท่าเข้ม (#1a2530) ไม่ตรงกับธีมสีแดงจากโลโก้ที่ใช้ทั่วแอป — เปลี่ยนเป็นไล่เฉดแดง
+   เดียวกับปุ่ม/แบรนด์อื่นๆ พร้อมขยายขนาดตัวอักษร/ระยะห่างให้ดูโปร่งและสวยงามขึ้นเล็กน้อย */
 .fc-col-header-cell,
-.fc-day-header,
-.fc-col-header-cell-cushion {
-  /* เลือกส่วนหัวของวัน */
-  background-color: #1a2530;
-  color: #fff; /* ตั้งค่าสีข้อความเป็นสีขาว */
-  text-decoration: none; /* ลบขีดเส้นใต้ของข้อความ */
+.fc-day-header {
+  background: linear-gradient(135deg, #dc2626 0%, #7f1d1d 100%);
+  border-color: rgba(255, 255, 255, 0.15);
+  text-decoration: none;
+}
 
-  
+.fc-col-header-cell-cushion {
+  display: inline-block;
+  color: #fff;
+  text-decoration: none;
+  padding: 10px 4px !important;
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .fc-daygrid-day-number {
@@ -312,9 +559,11 @@
   cursor: grabbing;
 }
 
+/* ✅ เดิมเหลืองอ่อน (#f7f1cf) ไม่ตรงกับธีมสีแดง — เปลี่ยนเป็นแดงอ่อนแทน พร้อมเส้นขอบซ้ายสีแดง
+   เข้มเป็นจุดสังเกตชัดเจนว่า "วันนี้" โดยไม่ต้องใช้สีอื่นนอกธีม */
 .fc-day-today {
-  background-color: #f7f1cf !important; 
-
+  background-color: #fef2f2 !important;
+  box-shadow: inset 3px 0 0 #dc2626;
 }
 
 .fc-day-other {
@@ -343,10 +592,14 @@
     font-size: 12px; /* ปรับขนาดตัวหนังสือลงเมื่อหน้าจอเล็ก */
   }
 
+  .fc-col-header-cell-cushion {
+    /* ✅ ต้อง override ที่ cushion (ตัวจริงที่คุม font-size) ไม่ใช่ cell เฉยๆ ตั้งแต่ย้าย
+       font-size ไปไว้ที่ cushion แทนแล้ว (ดูกฎด้านบน) */
+    font-size: 12px !important;
+  }
   .fc-col-header-cell,
   .fc-day-header {
     /* เลือกส่วนหัวของวัน */
-    font-size: 12px; /* ปรับขนาดตัวหนังสือลงเมื่อหน้าจอเล็ก */
     text-decoration: none;
   }
 }

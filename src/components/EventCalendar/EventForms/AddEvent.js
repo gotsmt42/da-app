@@ -132,6 +132,23 @@ function injectAddStyles() {
       display: flex; align-items: center; justify-content: center;
     }
 
+    /* ── ลูกทีมเพิ่มเติม (คนที่ 2, 3, ... แสดงผลอย่างเดียว ไม่กระทบสิทธิ์) ── */
+    .ae-team-member-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .ae-team-member-row select {
+      flex: 1; box-sizing: border-box;
+      border: 1.5px solid #e2e8f0; border-radius: 8px;
+      padding: 9px 12px; font-size: 14px; color: #1e293b;
+      background: #fff; font-family: inherit;
+    }
+    .ae-team-member-row select:focus {
+      outline: none; border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+    }
+    .ae-team-member-remove {
+      flex-shrink: 0; width: 34px; height: 34px; padding: 0 !important;
+      display: flex; align-items: center; justify-content: center;
+    }
+
     /* ── Color row ── */
     .ae-color-row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin-bottom: 0; }
     .ae-color-item { display: flex; align-items: center; gap: 8px; }
@@ -292,6 +309,14 @@ export const getAddEvent = async ({
       </div>
     </div>
 
+    <!-- ✅ ลูกทีมเพิ่มเติม (คนที่ 2, 3, ...) — แสดงผลอย่างเดียวว่าใครช่วยทำงานนี้บ้าง
+         ไม่กระทบสิทธิ์แก้ไข/แจ้งเตือน/นับงานค้าง ซึ่งยังผูกกับ "ทีม" (ช่างหลัก) ด้านบนเหมือนเดิม -->
+    <div class="ae-field" style="margin-bottom:16px;">
+      <label>👥 ลูกทีมเพิ่มเติม (ถ้ามี)</label>
+      <div id="ae-teamMembersList"></div>
+      <button type="button" class="ae-btn ae-btn-ghost" id="ae-addTeamMemberBtn" style="margin-top:2px;">➕ เพิ่มลูกทีม</button>
+    </div>
+
     <hr class="ae-divider">
 
     <!-- section 2 -->
@@ -394,6 +419,20 @@ export const getAddEvent = async ({
       mkTs("#eventTime",    "เลือกครั้งที่", 4);
       mkTs("#eventTeam",    "เลือกหรือพิมพ์ชื่อทีม");
 
+      /* ── ลูกทีมเพิ่มเติม (คนที่ 2, 3, ... แสดงผลอย่างเดียว ไม่กระทบสิทธิ์แก้ไข/แจ้งเตือน) ── */
+      const teamMembersList = document.getElementById("ae-teamMembersList");
+      const addTeamMemberRow = () => {
+        const row = document.createElement("div");
+        row.className = "ae-team-member-row";
+        row.innerHTML = `
+          <select class="ae-team-member-select"><option value="">— เลือกลูกทีม —</option>${teamOpts}</select>
+          <button type="button" class="ae-btn ae-btn-ghost ae-team-member-remove" title="ลบออก">✕</button>
+        `;
+        row.querySelector(".ae-team-member-remove").addEventListener("click", () => row.remove());
+        teamMembersList.appendChild(row);
+      };
+      document.getElementById("ae-addTeamMemberBtn")?.addEventListener("click", () => addTeamMemberRow());
+
       /* ── งานเข้าหลายวันไม่ติดกัน (multi-date) ── */
       // ✅ แต่ละแถว = "ช่วงวันที่" หนึ่งช่วง (เริ่ม–สิ้นสุด) เช่น 6-7 และ 9-10
       // เพิ่มได้หลายช่วง แต่ละช่วงถือเป็นงานเดียวกันทั้งหมด (ผูกด้วย jobGroupId เดียวกัน)
@@ -487,6 +526,14 @@ export const getAddEvent = async ({
         btn.textContent = "⏳ กำลังบันทึก...";
 
         try {
+          // ✅ ลูกทีมเพิ่มเติม — เก็บทั้งชื่อ+userId (แสดงผลอย่างเดียว ไม่กระทบสิทธิ์) กันซ้ำชื่อ
+          // เดียวกันเผลอเพิ่มหลายแถว และตัดแถวที่ยังไม่ได้เลือกใครออก
+          const teamMembers = [...document.querySelectorAll(".ae-team-member-select")]
+            .map((sel) => sel.value)
+            .filter(Boolean)
+            .filter((name, idx, arr) => arr.indexOf(name) === idx)
+            .map((name) => ({ userId: teamToId.get(name) || "", name }));
+
           const payload = {
             company:         getVal("eventCompany"),
             site,
@@ -495,6 +542,7 @@ export const getAddEvent = async ({
             time:            getVal("eventTime"),
             team:            getVal("eventTeam"),
             resPerson:       teamToId.get(getVal("eventTeam")) || "",
+            teamMembers,
             backgroundColor: document.getElementById("backgroundColorPicker")?.value,
             textColor:       document.getElementById("textColorPicker")?.value,
             fontSize:        getVal("fontSize") || "8",

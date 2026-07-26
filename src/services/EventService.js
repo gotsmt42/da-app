@@ -162,6 +162,58 @@ async Upload(id, file, type, config = {}) {
       throw error;
     }
   },
+  // ✅ งาน "วางแผนล่วงหน้า" (ยังไม่ลงตาราง) — จัดกลุ่มตามเดือนที่ตั้งใจ (plannedMonth)
+  async AddDraftEvent(draft) {
+    try {
+      const response = await API.post(`/events/draft`, draft);
+      return response.data.event;
+    } catch (error) {
+      console.error("Error creating draft event:", error);
+      throw error;
+    }
+  },
+
+  async GetDraftEvents() {
+    try {
+      const response = await API.get(`/events/drafts`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching draft events:", error);
+      throw error;
+    }
+  },
+
+  async ScheduleDraftEvent(id, scheduleData) {
+    try {
+      const response = await API.put(`/events/${id}/schedule`, scheduleData);
+      return response.data.event;
+    } catch (error) {
+      console.error("Error scheduling draft event:", error);
+      throw error;
+    }
+  },
+
+  async UpdateDraftEvent(id, draft) {
+    try {
+      const response = await API.put(`/events/${id}/draft`, draft);
+      return response.data.event;
+    } catch (error) {
+      console.error("Error updating draft event:", error);
+      throw error;
+    }
+  },
+
+  // ✅ ย้ายงานที่ลงตารางแล้วกลับไปเป็นงานวางแผนล่วงหน้า (ยังไม่ลงตาราง)
+  async UnscheduleEvent(id, plannedMonth) {
+    try {
+      const response = await API.put(`/events/${id}/unschedule`, { plannedMonth });
+      return response.data.event;
+    } catch (error) {
+      console.error("Error unscheduling event:", error);
+      throw error;
+    }
+  },
+
   async DeleteEvent(id) {
     try {
       const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token

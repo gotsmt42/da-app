@@ -239,7 +239,7 @@ const Login = () => {
             component="img"
             src="/logo-light-2.png"
             alt="DA App"
-            sx={{ height: 380, mb: -10, display: { xs: "block", md: "none" } }}
+            sx={{ height: "auto", mb: -10, display: { xs: "block", md: "none" } }}
           />
 
           <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>

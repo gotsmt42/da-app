@@ -29,6 +29,7 @@ import {
   faCheckDouble,
   faFilter,
   faXmark,
+  faLayerGroup,
 } from "@fortawesome/free-solid-svg-icons"; // Import ไอคอนต่างๆ
 
 import CustomerService from "../../services/CustomerService";
@@ -70,8 +71,11 @@ import { getEventDrop } from "./EventForms/EventDrop";
 import { getEventResize } from "./EventForms/EventResize";
 import { getFetchEvents } from "./EventForms/FetchEvents";
 import { getDeleteEvent } from "./EventForms/DeleteEvent";
+import { getAddDraftEvent } from "./EventForms/AddDraftEvent";
 
 import { getGeneratePDF } from "./Functions/GenPDF";
+
+import UnscheduledPanel from "./UnscheduledPanel";
 
 // ✅ คำอธิบายสถานะแบบยาว (ใช้เป็น tooltip ของไอคอนสถานะบน event)
 const STATUS_DESCRIPTIONS = {
@@ -133,8 +137,10 @@ function EventCalendar() {
   const [events, setEvents] = useState([]);
 
   const [defaultTextColor, setDefaultTextColor] = useState("#FFFFFF"); // สีข้อความเริ่มต้น
+  // ✅ เดิมส้ม #FF5733 ไม่ตรงกับธีมสีแดงที่ใช้จริงทั้งแอป (ปุ่ม/sidebar/แบรนด์) — ใช้สีแดงเดียวกัน
+  // เป็นค่าเริ่มต้นของสีพื้นหลังแผนงานใหม่แทน (ผู้ใช้ยังเปลี่ยนเองได้ผ่าน color picker ตามปกติ)
   const [defaultBackgroundColor, setDefaultBackgroundColor] =
-    useState("#FF5733"); // สีพื้นหลังเริ่มต้น
+    useState("#dc2626"); // สีพื้นหลังเริ่มต้น
 
   const [defaultFontSize, setDefaultFontSize] = useState(8); //
 
@@ -147,10 +153,24 @@ function EventCalendar() {
   const [selectedSystem, setSelectedSystem] = useState(""); // "" = ทุกระบบ (event.system)
   const [showFilterPanel, setShowFilterPanel] = useState(false); // ✅ ซ่อนตัวกรองไว้ ไม่ให้เกะกะจอมือถือโดย default
 
+  // ✅ งาน "วางแผนล่วงหน้า" (ยังไม่ลงตาราง) — เก็บแยกจาก events ปกติเสมอ (backend ก็แยก query ให้
+  // อยู่แล้ว) จัดกลุ่มดูทีละเดือนผ่าน draftMonth เริ่มที่เดือนปัจจุบัน
+  const [drafts, setDrafts] = useState([]);
+  const [draftsLoading, setDraftsLoading] = useState(false);
+  const [showDraftsPanel, setShowDraftsPanel] = useState(false);
+  const [draftMonth, setDraftMonth] = useState(moment().format("YYYY-MM"));
+
   const calendarRef = useRef(null);
+  // ✅ ใช้เช็คว่าตอนลากงานจากปฏิทินจริงออกมา (eventDragStop) ปล่อยเมาส์ทับแผงนี้หรือเปล่า
+  // ถ้าใช่ = ลากกลับไปเป็นงานวางแผนล่วงหน้า (ดู handleEventDragStop ด้านล่าง)
+  const draftsPanelRef = useRef(null);
+  // ✅ เปิดแผงงานล่วงหน้าให้อัตโนมัติแค่ตอนโหลดครั้งแรกสุดถ้ามีงานอยู่จริง (ดู fetchDrafts) —
+  // ป้องกันไม่ให้ auto เปิดซ้ำทับการปิดเองของผู้ใช้ทุกครั้งที่ fetch ใหม่ (เช่น silent refresh 30s)
+  const hasAutoOpenedDraftsRef = useRef(false);
 
   useEffect(() => {
     fetchEventsFromDB();
+    fetchDrafts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -159,6 +179,7 @@ function EventCalendar() {
   useEffect(() => {
     const interval = setInterval(() => {
       fetchEventsFromDB(true);
+      fetchDrafts(true);
     }, 30000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -255,10 +276,12 @@ function EventCalendar() {
     }
   };
 
+  // ✅ เดิมแดงสด/ฟ้า/เทา ไม่ตรงกับธีมสีแดงจากโลโก้ที่ใช้ทั่วแอป — ปรับให้อยู่ในโทนแดงเดียวกันหมด
+  // แต่ยังไล่เฉดอ่อน-เข้มต่างกันพอให้แยกประเภทวันหยุดออกจากกันได้อยู่
   const HOLIDAY_COLORS = {
-    public: "#FF0000", // วันหยุดราชการ
-    bank: "#1E90FF", // วันหยุดธนาคาร
-    default: "#8A8A8A", // อื่น ๆ
+    public: "#dc2626", // วันหยุดราชการ — แดงหลักของธีม
+    bank: "#7f1d1d", // วันหยุดธนาคาร — แดงเข้ม (ปลายไล่เฉดเดียวกับปุ่ม/แบรนด์)
+    default: "#f87171", // อื่น ๆ — แดงอ่อน
   };
 
   const mapHolidayType = (type) => {
@@ -337,6 +360,27 @@ function EventCalendar() {
     });
   };
 
+  // ✅ งานวางแผนล่วงหน้า (unscheduled) — backend กรองแยกไว้จาก events ปกติแล้ว (ดู GET /events/drafts)
+  const fetchDrafts = async (silent = false) => {
+    if (!silent) setDraftsLoading(true);
+    try {
+      const res = await EventService.GetDraftEvents();
+      const list = Array.isArray(res?.drafts) ? res.drafts : [];
+      setDrafts(list);
+      // ✅ เปิดแผงงานล่วงหน้าอัตโนมัติแค่ครั้งแรกสุดที่โหลดสำเร็จ ถ้ามีงานอยู่จริง — หลังจากนั้น
+      // ผู้ใช้เปิด/ปิดเองได้ตามปกติโดยไม่ถูก auto เปิดทับซ้ำอีกตอน refresh รอบถัดๆ ไป
+      if (!hasAutoOpenedDraftsRef.current) {
+        hasAutoOpenedDraftsRef.current = true;
+        if (list.length > 0) setShowDraftsPanel(true);
+      }
+    } catch (error) {
+      console.error("❌ Error fetching draft events:", error);
+      if (!silent) setDrafts([]);
+    } finally {
+      if (!silent) setDraftsLoading(false);
+    }
+  };
+
   const saveEventToDB = async (newEvent) => {
     await getSaveEventToDB({ newEvent, EventService });
   };
@@ -376,6 +420,7 @@ function EventCalendar() {
       setLoading,
       generateWorkPermitPDF,
       handleDeleteEvent,
+      handleUnscheduleEvent: handleUnscheduleViaButton,
       EventService,
       CustomerService,
       AuthService,
@@ -402,6 +447,48 @@ function EventCalendar() {
     });
   };
 
+  // ✅ ย้ายงานที่ลงตารางไปแล้วกลับไปเป็น "วางแผนล่วงหน้า" — ใช้ร่วมกันทั้ง 2 ทาง (ปุ่มใน
+  // EditEvent.js / ลากวางบนแผงงานล่วงหน้า) แค่ต่างกันตรงจะถามเดือน/ยืนยันก่อนหรือไม่
+  const unscheduleEvent = async (id, plannedMonth) => {
+    try {
+      await EventService.UnscheduleEvent(id, plannedMonth);
+      await Promise.all([fetchEventsFromDB(), fetchDrafts()]);
+      Swal.fire({
+        title: "ย้ายไปแผนล่วงหน้าสำเร็จ ✅",
+        icon: "success",
+        timer: 1200,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      console.error("❌ Error unscheduling event:", error);
+      Swal.fire("❌ ย้ายไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+    }
+  };
+
+  // ✅ ปุ่ม "ย้ายไปแผนล่วงหน้า" ใน EditEvent.js — ให้เลือกเดือน/ปีที่ตั้งใจเองก่อนเสมอ (ไม่ auto
+  // เดาจากวันที่เดิมของงานเหมือนก่อนหน้านี้) การเลือกเดือนแล้วกด "ย้าย" ก็ถือเป็นการยืนยันในตัว
+  // อยู่แล้ว จึงไม่ต้องมีกล่องยืนยัน "แน่ใจไหม" ซ้อนอีกชั้นก่อนหน้านั้น
+  const handleUnscheduleViaButton = async (id) => {
+    const { value: plannedMonth } = await Swal.fire({
+      title: "ย้ายไปแผนวางล่วงหน้าเดือนไหน?",
+      input: "month",
+      inputValue: moment().format("YYYY-MM"),
+      showCancelButton: true,
+      confirmButtonText: "ย้าย",
+      cancelButtonText: "ยกเลิก",
+      confirmButtonColor: "#f59e0b",
+      inputValidator: (value) => (!value ? "กรุณาเลือกเดือน/ปี" : undefined),
+    });
+    if (!plannedMonth) return;
+    await unscheduleEvent(id, plannedMonth);
+  };
+
+  // ✅ ลากงานจากปฏิทินมาวางบนแผงงานล่วงหน้าโดยตรง — ไม่ต้องถามอะไรเลยตามที่ขอ (การลากมาวาง
+  // เองคือการยืนยันความตั้งใจอยู่แล้ว) ใช้เดือนของวันที่เดิมของงานเป็นค่าเริ่มต้นแทน
+  const handleUnscheduleViaDrag = async (id) => {
+    await unscheduleEvent(id);
+  };
+
   const handleEventDrop = async (arg) => {
     await getEventDrop({
       arg,
@@ -422,6 +509,312 @@ function EventCalendar() {
       EventService,
       moment,
     });
+  };
+
+  const handleAddDraft = async () => {
+    await getAddDraftEvent({
+      defaultMonth: draftMonth,
+      // ✅ ถ้าใส่วันที่มาด้วยตอนบันทึก จะถูกลงตารางทันที (ย้ายจาก drafts ไปเป็น event จริง)
+      // ต้อง refresh ทั้งคู่เผื่อกรณีนั้น ไม่ใช่แค่ fetchDrafts อย่างเดียว
+      onSaved: () => Promise.all([fetchDrafts(), fetchEventsFromDB()]),
+      CustomerService,
+      AuthService,
+      JobTypeService,
+      SystemTypeService,
+      EventService,
+      Swal,
+      TomSelect,
+      moment,
+    });
+  };
+
+  const handleEditDraftClick = async (draft) => {
+    await getAddDraftEvent({
+      defaultMonth: draftMonth,
+      existingDraft: draft,
+      // ✅ ถ้าใส่วันที่มาด้วยตอนบันทึก จะถูกลงตารางทันที (ย้ายจาก drafts ไปเป็น event จริง)
+      // ต้อง refresh ทั้งคู่เผื่อกรณีนั้น ไม่ใช่แค่ fetchDrafts อย่างเดียว
+      onSaved: () => Promise.all([fetchDrafts(), fetchEventsFromDB()]),
+      CustomerService,
+      AuthService,
+      JobTypeService,
+      SystemTypeService,
+      EventService,
+      Swal,
+      TomSelect,
+      moment,
+    });
+  };
+
+  // ✅ ใช้ทั้งตอนกดปุ่ม "ลงตาราง" เลือกวันที่เอง และตอนลากการ์ดวางบนปฏิทิน (handleEventReceive)
+  // ✅ end ต้อง +1 วันเสมอ (เหมือน AddEvent.js) เพราะ event เป็น allDay:true โดย default —
+  // FullCalendar ถือว่า end ของ all-day event เป็นแบบ exclusive ถ้าไม่ +1 งาน 1 วันจะโชว์ผิด/ไม่ขึ้นเลย
+  // ✅ รองรับ dateRanges (งานเข้าหลายวันไม่ติดกัน) เป็นทางเลือกแทน startDate/endDate เดี่ยว —
+  // backend /schedule เองก็รองรับ dates[] อยู่แล้ว (ดู POST / ที่สร้างงานหลายวันแบบเดียวกัน)
+  const scheduleDraft = async (draftId, { startDate, endDate, dateRanges, startTime, endTime, team, resPerson, teamMembers } = {}) => {
+    try {
+      const payload = { startTime, endTime, team, resPerson, teamMembers };
+      if (Array.isArray(dateRanges) && dateRanges.length > 0) {
+        payload.dates = dateRanges.map((r) => ({
+          start: r.start,
+          end: moment(r.end).add(1, "days").format("YYYY-MM-DD"),
+          date: r.start,
+        }));
+      } else {
+        const effectiveEnd = endDate || startDate;
+        payload.date = startDate;
+        payload.start = startDate;
+        payload.end = moment(effectiveEnd).add(1, "days").format("YYYY-MM-DD");
+      }
+      await EventService.ScheduleDraftEvent(draftId, payload);
+      await Promise.all([fetchEventsFromDB(), fetchDrafts()]);
+      Swal.fire({
+        title: "ลงตารางสำเร็จ ✅",
+        icon: "success",
+        timer: 1200,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      console.error("❌ Error scheduling draft event:", error);
+      Swal.fire("❌ ลงตารางไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+    }
+  };
+
+  // ✅ กล่อง "ลงตาราง" รวมทุกอย่างที่ตัดออกจากฟอร์มเพิ่ม/แก้ไขงานล่วงหน้าไว้ที่นี่แทน — วันที่เริ่ม/
+  // สิ้นสุด (แยกกันเหมือนฟอร์มเพิ่มงานปกติ ไม่ใช่วันเดียวอีกต่อไป), เวลาเริ่ม/สิ้นสุด, และทีม
+  // SweetAlert2 รองรับ input เดียวผ่าน `input` option ตรงๆ ไม่ได้ ต้องประกอบเป็น html เองแล้ว
+  // อ่านค่าใน preConfirm แทน
+  const handleScheduleDraftClick = async (draft) => {
+    const defaultDate = moment(draft.plannedMonth, "YYYY-MM").startOf("month").format("YYYY-MM-DD");
+    const teamToId = new Map(employeeList.map((e) => [e.fname, e._id]));
+    const teamOpts = employeeList
+      .map((e) => `<option value="${e.fname}"${e.fname === draft.team ? " selected" : ""}>${e.fname}</option>`)
+      .join("");
+
+    const rangeRowHtml = (startVal = "", endVal = "") => `
+      <div class="swal-schedule-range-row" style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
+        <input type="date" class="swal-schedule-range-start" style="flex:1; box-sizing:border-box; padding:9px 12px; border:1px solid #d9d9d9; border-radius:4px; font-size:14px;" value="${startVal}">
+        <span style="flex-shrink:0; color:#94a3b8; font-weight:700;">–</span>
+        <input type="date" class="swal-schedule-range-end" style="flex:1; box-sizing:border-box; padding:9px 12px; border:1px solid #d9d9d9; border-radius:4px; font-size:14px;" value="${endVal || startVal}">
+        <button type="button" class="swal-schedule-range-remove" style="flex-shrink:0; width:34px; height:34px; border:1px solid #e2e8f0; background:#f1f5f9; border-radius:6px; cursor:pointer;">✕</button>
+      </div>
+    `;
+
+    const { value: formValues } = await Swal.fire({
+      title: "เลือกวันที่ลงตาราง",
+      html: `
+        <div style="text-align:left; font-size:13px; color:#64748b; margin-bottom:14px;">
+          ${draft.title || "งาน"} · ${[draft.company, draft.site].filter(Boolean).join(" · ")}
+        </div>
+
+        <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; color:#374151; margin-bottom:12px; cursor:pointer;">
+          <input type="checkbox" id="swal-schedule-multi-toggle" style="width:auto; cursor:pointer;">
+          🗓️ งานนี้ต้องเข้างานหลายวัน (ไม่ติดกันก็ได้) — ถือเป็นงานเดียวกัน
+        </label>
+
+        <div id="swal-schedule-single-section">
+          <div style="display:flex; gap:8px; margin-bottom:12px;">
+            <div style="flex:1; text-align:left;">
+              <label style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">📅 วันที่เริ่ม</label>
+              <input id="swal-schedule-start-date" type="date" class="swal2-input" style="margin:0; width:100%; box-sizing:border-box;" value="${defaultDate}">
+            </div>
+            <div style="flex:1; text-align:left;">
+              <label style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">📅 วันที่สิ้นสุด</label>
+              <input id="swal-schedule-end-date" type="date" class="swal2-input" style="margin:0; width:100%; box-sizing:border-box;" value="${defaultDate}">
+            </div>
+          </div>
+        </div>
+
+        <div id="swal-schedule-multi-section" style="display:none; text-align:left;">
+          <div id="swal-schedule-multi-list" style="margin-bottom:8px;"></div>
+          <button type="button" id="swal-schedule-add-date-btn" style="margin-bottom:12px; padding:8px 14px; border:1px solid #e2e8f0; background:#f1f5f9; border-radius:6px; font-size:12.5px; font-weight:700; color:#475569; cursor:pointer;">➕ เพิ่มช่วงวันที่</button>
+        </div>
+
+        <div style="display:flex; gap:8px; margin-bottom:12px;">
+          <div style="flex:1; text-align:left;">
+            <label style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">🕐 เวลาเริ่ม</label>
+            <input id="swal-schedule-start-time" type="text" class="swal2-input" placeholder="เช่น 08:30" style="margin:0; width:100%; box-sizing:border-box;" value="${draft.startTime || ""}">
+          </div>
+          <div style="flex:1; text-align:left;">
+            <label style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">🕔 เวลาสิ้นสุด</label>
+            <input id="swal-schedule-end-time" type="text" class="swal2-input" placeholder="เช่น 17:00" style="margin:0; width:100%; box-sizing:border-box;" value="${draft.endTime || ""}">
+          </div>
+        </div>
+        <div style="text-align:left; margin-bottom:12px;">
+          <label style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">👷 ทีม</label>
+          <select id="swal-schedule-team" class="swal2-select" style="margin:0; width:100%; box-sizing:border-box; padding:9px 12px; border:1px solid #d9d9d9; border-radius:4px;">
+            <option value="">— ไม่ระบุ —</option>
+            ${teamOpts}
+          </select>
+        </div>
+
+        <div style="text-align:left;">
+          <label style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">👥 ลูกทีมเพิ่มเติม (ถ้ามี)</label>
+          <div id="swal-schedule-team-members-list" style="margin-bottom:6px;"></div>
+          <button type="button" id="swal-schedule-add-team-member-btn" style="padding:8px 14px; border:1px solid #e2e8f0; background:#f1f5f9; border-radius:6px; font-size:12.5px; font-weight:700; color:#475569; cursor:pointer;">➕ เพิ่มลูกทีม</button>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: "📅 ลงตาราง",
+      cancelButtonText: "ยกเลิก",
+      focusConfirm: false,
+      didOpen: () => {
+        const multiToggle  = document.getElementById("swal-schedule-multi-toggle");
+        const singleSection = document.getElementById("swal-schedule-single-section");
+        const multiSection  = document.getElementById("swal-schedule-multi-section");
+        const multiList     = document.getElementById("swal-schedule-multi-list");
+
+        const addRow = (startVal = "", endVal = "") => {
+          const wrapper = document.createElement("div");
+          wrapper.innerHTML = rangeRowHtml(startVal, endVal);
+          const row = wrapper.firstElementChild;
+          row.querySelector(".swal-schedule-range-remove").addEventListener("click", () => {
+            if (multiList.children.length > 1) row.remove();
+          });
+          multiList.appendChild(row);
+        };
+        addRow(defaultDate, defaultDate);
+
+        document.getElementById("swal-schedule-add-date-btn")?.addEventListener("click", () => addRow());
+
+        multiToggle?.addEventListener("change", () => {
+          const isMulti = multiToggle.checked;
+          singleSection.style.display = isMulti ? "none" : "";
+          multiSection.style.display  = isMulti ? "" : "none";
+        });
+
+        // ✅ ลูกทีมเพิ่มเติม (คนที่ 2, 3, ... แสดงผลอย่างเดียว ไม่กระทบสิทธิ์แก้ไข/แจ้งเตือน)
+        const teamMembersList = document.getElementById("swal-schedule-team-members-list");
+        const addTeamMemberRow = (prefillName = "") => {
+          const wrapper = document.createElement("div");
+          wrapper.innerHTML = `
+            <div class="swal-schedule-team-member-row" style="display:flex; gap:6px; align-items:center; margin-bottom:6px;">
+              <select class="swal-schedule-team-member-select" style="flex:1; box-sizing:border-box; padding:9px 12px; border:1px solid #d9d9d9; border-radius:4px; font-size:14px;">
+                <option value="">— เลือกลูกทีม —</option>
+                ${teamOpts.replace(/ selected/g, "")}
+              </select>
+              <button type="button" class="swal-schedule-team-member-remove" style="flex-shrink:0; width:34px; height:34px; border:1px solid #e2e8f0; background:#f1f5f9; border-radius:6px; cursor:pointer;">✕</button>
+            </div>
+          `;
+          const row = wrapper.firstElementChild;
+          if (prefillName) row.querySelector(".swal-schedule-team-member-select").value = prefillName;
+          row.querySelector(".swal-schedule-team-member-remove").addEventListener("click", () => row.remove());
+          teamMembersList.appendChild(row);
+        };
+        (draft.teamMembers || []).forEach((m) => addTeamMemberRow(m?.name || ""));
+        document.getElementById("swal-schedule-add-team-member-btn")?.addEventListener("click", () => addTeamMemberRow());
+      },
+      preConfirm: () => {
+        const isMultiDate = Boolean(document.getElementById("swal-schedule-multi-toggle")?.checked);
+        const team = document.getElementById("swal-schedule-team")?.value || "";
+        const teamMembers = [...document.querySelectorAll(".swal-schedule-team-member-select")]
+          .map((sel) => sel.value)
+          .filter(Boolean)
+          .filter((name, idx, arr) => arr.indexOf(name) === idx)
+          .map((name) => ({ userId: teamToId.get(name) || "", name }));
+
+        const common = {
+          startTime: document.getElementById("swal-schedule-start-time")?.value || "",
+          endTime: document.getElementById("swal-schedule-end-time")?.value || "",
+          team,
+          resPerson: teamToId.get(team) || "",
+          teamMembers,
+        };
+
+        if (isMultiDate) {
+          const rows = [...document.querySelectorAll(".swal-schedule-range-row")];
+          const dateRanges = [];
+          for (const row of rows) {
+            const s = row.querySelector(".swal-schedule-range-start")?.value;
+            const e = row.querySelector(".swal-schedule-range-end")?.value || s;
+            if (!s) continue;
+            if (moment(e).isBefore(moment(s))) {
+              Swal.showValidationMessage("แต่ละช่วงวันที่ วันสิ้นสุดต้องไม่ก่อนวันเริ่ม");
+              return false;
+            }
+            dateRanges.push({ start: s, end: e });
+          }
+          if (dateRanges.length === 0) {
+            Swal.showValidationMessage("กรุณาเลือกอย่างน้อย 1 ช่วงวันที่");
+            return false;
+          }
+          return { ...common, dateRanges };
+        }
+
+        const startDate = document.getElementById("swal-schedule-start-date")?.value;
+        const endDate   = document.getElementById("swal-schedule-end-date")?.value || startDate;
+        if (!startDate) {
+          Swal.showValidationMessage("กรุณาเลือกวันที่เริ่ม");
+          return false;
+        }
+        if (moment(endDate).isBefore(moment(startDate))) {
+          Swal.showValidationMessage("วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม");
+          return false;
+        }
+        return { ...common, startDate, endDate };
+      },
+    });
+    if (formValues) {
+      await scheduleDraft(draft._id, formValues);
+    }
+  };
+
+  const handleDeleteDraftClick = async (draft) => {
+    const result = await Swal.fire({
+      title: "ลบงานวางแผนล่วงหน้านี้?",
+      text: `${draft.title || "งาน"} · ${[draft.company, draft.site].filter(Boolean).join(" · ")}`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "ลบ",
+      cancelButtonText: "ยกเลิก",
+      confirmButtonColor: "#dc2626",
+    });
+    if (!result.isConfirmed) return;
+    try {
+      await EventService.DeleteEvent(draft._id);
+      await fetchDrafts();
+    } catch (error) {
+      console.error("❌ Error deleting draft event:", error);
+      Swal.fire("❌ ลบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+    }
+  };
+
+  // ✅ เรียกเมื่อลากการ์ดจาก UnscheduledPanel มาวางบนปฏิทิน (FullCalendar Draggable + droppable
+  // จับคู่กันเอง) — FullCalendar จะสร้าง event ชั่วคราวให้ก่อน ต้องลบทิ้งเสมอไม่ว่าผลจะเป็นอย่างไร
+  // เพราะของจริงจะมาจาก fetchEventsFromDB() หลัง schedule สำเร็จแทน
+  const handleEventReceive = async (info) => {
+    const draftId = info.event.extendedProps?.draftId;
+    const dateStr = info.event.startStr;
+    info.event.remove();
+    if (!draftId) return;
+    await scheduleDraft(draftId, { startDate: dateStr });
+  };
+
+  // ✅ ระหว่างลากงานจากปฏิทินจริง ไฮไลต์แผงงานล่วงหน้าไว้เป็น drop-zone ให้เห็นชัดว่าลากมาวางตรงนี้ได้
+  const handleEventDragStart = () => {
+    draftsPanelRef.current?.classList.add("unscheduled-panel--drop-target");
+  };
+
+  // ✅ ลากงานที่ลงตารางแล้วออกจากปฏิทิน มาปล่อยทับแผงงานล่วงหน้า = ย้ายกลับไปเป็น unscheduled
+  // (FullCalendar เองจะ revert ตำแหน่ง event กลับที่เดิมให้อัตโนมัติเพราะไม่ใช่ช่องวันที่ที่ถูกต้อง
+  // เราแค่เรียก API ย้ายสถานะจริงแล้ว fetch ใหม่ทับ ไม่ต้องยุ่งกับตำแหน่ง event บนปฏิทินเอง)
+  const handleEventDragStop = (info) => {
+    draftsPanelRef.current?.classList.remove("unscheduled-panel--drop-target");
+
+    const panelEl = draftsPanelRef.current;
+    if (!panelEl || info.event.extendedProps?.isHoliday) return;
+
+    const rect = panelEl.getBoundingClientRect();
+    const { clientX, clientY } = info.jsEvent;
+    const isOverPanel =
+      clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+    if (!isOverPanel) return;
+
+    if (!canEditEvent(info.event.extendedProps)) {
+      Swal.fire("❌ คุณไม่มีสิทธิ์แก้ไขแผนงานนี้");
+      return;
+    }
+    handleUnscheduleViaDrag(info.event.id);
   };
 
   const options = {
@@ -484,7 +877,9 @@ function EventCalendar() {
         const isWeekend = [6, 7].includes(date.isoWeekday());
         const isSameMonth = date.month() === currentMonth;
 
-        cell.style.backgroundColor = isWeekend && isSameMonth ? "#FFFFF4" : "";
+        // ✅ เดิมเหลืองอ่อน (#FFFFF4) ไม่ตรงกับธีมสีแดง — เปลี่ยนเป็นแดงอ่อนแบบเดียวกับที่ใช้กับ
+        // เซลล์ "วันนี้" (ถ้าตรงกับวันนี้พอดี .fc-day-today จะ !important ทับสีนี้เองอยู่แล้ว)
+        cell.style.backgroundColor = isWeekend && isSameMonth ? "#fef2f2" : "";
       });
     });
   }, []);
@@ -520,6 +915,12 @@ function EventCalendar() {
   const technicianOptions = useMemo(
     () => employeeList.filter((u) => u.role?.toLowerCase() === "technician"),
     [employeeList],
+  );
+
+  // ✅ กรอง drafts ที่ดึงมาทั้งหมดให้เหลือเฉพาะเดือนที่กำลังเปิดดูอยู่ในแผงงานล่วงหน้า
+  const draftsForMonth = useMemo(
+    () => drafts.filter((d) => d.plannedMonth === draftMonth),
+    [drafts, draftMonth],
   );
 
   const activeFilterCount = [selectedTechnician, selectedStatus, selectedJobType, selectedSystem].filter(Boolean).length;
@@ -616,6 +1017,15 @@ function EventCalendar() {
           {activeFilterCount > 0 && <span className="filter-badge">{activeFilterCount}</span>}
         </button>
 
+        <button
+          className={`filter-toggle-btn ${showDraftsPanel ? "filter-toggle-btn--open" : ""} ${drafts.length > 0 ? "filter-toggle-btn--active" : ""}`}
+          onClick={() => setShowDraftsPanel((p) => !p)}
+          title="งานวางแผนล่วงหน้า (ยังไม่ลงตาราง)"
+        >
+          <FontAwesomeIcon icon={faLayerGroup} />
+          {drafts.length > 0 && <span className="filter-badge">{drafts.length}</span>}
+        </button>
+
         <button className="toolbar-icon-btn toolbar-icon-btn--pdf" onClick={generatePdf} title="สร้าง PDF">
           <FontAwesomeIcon icon={faFilePdf} />
         </button>
@@ -710,6 +1120,24 @@ function EventCalendar() {
           )}
         </div>
       )}
+
+      {/* ✅ งานวางแผนล่วงหน้า (ยังไม่ลงตาราง) แยกเป็นเดือนๆ — ลากการ์ดวางบนปฏิทิน หรือกดปุ่ม
+          "ลงตาราง" เลือกวันที่เองก็ได้ ตาม requirement: บันทึกไว้ก่อนว่ามีงานนี้แน่ๆ เดือนนี้
+          แต่ยังไม่รู้วันที่เป๊ะ ไม่ต้องลงตารางทันที */}
+      {showDraftsPanel && (
+        <UnscheduledPanel
+          ref={draftsPanelRef}
+          drafts={draftsForMonth}
+          loading={draftsLoading}
+          month={draftMonth}
+          onMonthChange={setDraftMonth}
+          onAddClick={handleAddDraft}
+          onEditClick={handleEditDraftClick}
+          onScheduleClick={handleScheduleDraftClick}
+          onDeleteClick={handleDeleteDraftClick}
+        />
+      )}
+
       <div
         id="content-id"
         className="calendar-wrapper"
@@ -736,6 +1164,9 @@ function EventCalendar() {
           selectable={true} // ✅ เปิดให้ทุกคนเลือกวันได้
           droppable={true}
           dateClick={handleAddEvent}
+          eventReceive={handleEventReceive}
+          eventDragStart={handleEventDragStart}
+          eventDragStop={handleEventDragStop}
           eventClick={(arg) => {
             if (arg.event.extendedProps?.isHoliday) {
               Swal.fire("❌ ข้อมูลวันหยุดไม่สามารถแก้ไขได้");
@@ -781,6 +1212,11 @@ function EventCalendar() {
           selectMirror={true}
           weekends={true}
           contentHeight="auto"
+          // ✅ ให้แถบหัววัน (อาทิตย์-เสาร์) ล็อกค้างด้านบนตอนเลื่อนจอลง เห็นว่าคอลัมน์ไหนคือวันไหน
+          // ได้ตลอด — ใช้ position:sticky ที่ FullCalendar ทำมาให้ในตัวอยู่แล้ว (ผ่าน
+          // .fc-scrollgrid-section-sticky) ทำงานได้แม้ contentHeight="auto" (ไม่มี scroll
+          // container ภายในของตัวเอง) เพราะ sticky อิงกับ scroll ของหน้าเว็บทั้งหน้าได้เหมือนกัน
+          stickyHeaderDates={true}
           showNonCurrentDates={false} // ✅ ไม่แสดงวันของเดือนก่อนและหลัง
           firstDay={0} // ✅ กำหนดให้วันอาทิตย์เป็นวันแรกของสัปดาห์
           eventContent={(arg) => {
@@ -790,6 +1226,7 @@ function EventCalendar() {
               time = "",
               site = "",
               team = "",
+              teamMembers = [],
               startTime = "",
               endTime = "",
               status,
@@ -799,7 +1236,12 @@ function EventCalendar() {
             // ✅ สร้าง display string แบบมีเงื่อนไข
             const siteDisplay = site ? `- โครงการ : ${site}` : "";
             const timeDisplay = time ? `- ครั้งที่ : ${time}` : "";
-            const teamDisplay = team ? `- ทีม : ${team}` : "";
+            // ✅ รวมช่างหลัก (team) + ลูกทีมเพิ่มเติม (teamMembers) เป็นรายชื่อเดียว ให้เห็นครบ
+            // ทุกคนที่ช่วยทำงานนี้ในบรรทัดเดียวกัน แทนที่จะเห็นแค่ช่างหลักคนเดียวเหมือนเดิม
+            const allTeamNames = [team, ...teamMembers.map((m) => m?.name)]
+              .filter(Boolean)
+              .filter((name, idx, arr) => arr.indexOf(name) === idx);
+            const teamDisplay = allTeamNames.length ? `- ทีม : ${allTeamNames.join(", ")}` : "";
 
             const systemDisplay = system ? `- ระบบ : ${system}` : "";
 
@@ -862,9 +1304,12 @@ function EventCalendar() {
     `,
             };
           }}
+          // ✅ เดิมแยกลูกศรซ้าย (prev) ไว้ไกลจาก title+next มากๆ ดูเหมือนคนละชุดกัน กดสลับ
+          // ซ้าย-ขวาสับสน — รวมทั้งคู่ไว้ขนาบ title ในกลุ่มกลางเดียวกัน "‹ กรกฎาคม 2569 ›"
+          // ให้เห็นชัดว่าเป็นชุดเลื่อนเดือนเดียวกัน กดง่ายขึ้นโดยเฉพาะจอมือถือ
           headerToolbar={{
-            left: "prev,next",
-            center: "title",
+            left: "",
+            center: "prev title next",
             right: "today",
           }}
           footerToolbar={{
@@ -910,8 +1355,9 @@ function EventCalendar() {
             const isSameMonth = date.month() === currentMonth; // ตรวจสอบว่าเป็นของเดือนปัจจุบันหรือไม่
 
             // ✅ ไฮไลต์วันเสาร์-อาทิตย์ เฉพาะวันที่อยู่ในเดือนปัจจุบัน
+            // ✅ เดิมเหลืองอ่อนไม่ตรงธีม เปลี่ยนเป็นแดงอ่อนแบบเดียวกับ handleHighlightWeekends
             if ((isSaturday || isSunday) && isSameMonth) {
-              info.el.style.backgroundColor = "#FFFFF4"; // สีเหลืองอ่อน
+              info.el.style.backgroundColor = "#fef2f2"; // แดงอ่อน (ธีมแอพ)
             }
           }}
 
@@ -927,28 +1373,45 @@ function EventCalendar() {
               gap: 8px;
             }
             .fc-toolbar-chunk {
-              display: flex;
-              justify-content: space-between;
+              justify-content: center;
               width: 100%;
         font-size: 12px !important; /* ✅ ปรับขนาดฟอนต์ให้เล็กลงสำหรับมือถือ */
             }
             .fc-toolbar-title {
               flex: 1;
               text-align: center;
-              font-size: 1.5em;
+              font-size: 1.2em;
               margin: 0;
             }
-            .fc-button {
-              flex: 1;
-              min-width: 0;
-              margin: 2px;
-            }
-            .fc-button-group {
+            /* ✅ ปุ่มเลื่อนเดือน (prev/next) อยู่ขนาบ title ในกลุ่มกลางเดียวกัน — title flex:1
+               ดันปุ่มทั้งคู่ไปชิดขอบซ้าย/ขวาของแถว — ยืดเป็นทรงยาว (ไม่ใช่วงกลมแคบๆ) ให้มีพื้นที่
+               แตะกว้างขึ้นในแนวนอน โดยความสูงยังกระชับพอดีนิ้วมือ (ไม่ใหญ่เทอะทะ) */
+            .fc-prev-button,
+            .fc-next-button {
+              flex-shrink: 0;
+              width: 76px;
+              height: 40px;
+              padding: 0;
               display: flex;
-              width: 100%;
+              align-items: center;
+              justify-content: center;
+              border-radius: 20px;
+              touch-action: manipulation;
             }
-            .fc-button-group .fc-button {
-              flex: 1;
+            /* ✅ ลดขนาดลงอีกนิดจากเดิม 34px ให้กระชับขึ้นอีก ยังคงเต็มความกว้างแถวไว้เหมือนเดิม */
+            .fc-today-button {
+              flex-shrink: 0;
+              width: 100%;
+              min-height: 28px;
+              padding: 4px 10px;
+              font-size: 12px;
+              border-radius: 8px;
+              touch-action: manipulation;
+            }
+            .fc-button:not(.fc-prev-button):not(.fc-next-button):not(.fc-today-button) {
+              flex-shrink: 0;
+              padding: 6px 10px;
+              touch-action: manipulation;
             }
             .fc-footer-toolbar {
               display: flex;
@@ -958,7 +1421,8 @@ function EventCalendar() {
             }
           }
 .fc-event-locked {
-      opacity: 0.7;
+      /* ✅ เดิม opacity 0.7 จางเกินไปจนสีตัดกับพื้นหลังไม่ชัด อ่านยาก — เพิ่มความเข้มขึ้น */
+      opacity: 0.88;
       filter: grayscale(10%);
     }
 
