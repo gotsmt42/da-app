@@ -76,3 +76,19 @@ export const resolveAssignedTechnician = (sessions, userById, userByFname) => {
   for (const e of sessions) if (e.userId && userById.has(e.userId.toString())) return userById.get(e.userId.toString());
   return null;
 };
+
+// ✅ คำนวณว่า event หนึ่งควรตรงกับ "แท็บกลุ่มสถานะ" ไหนในหน้า Operation (pending/active/
+// overdue/closed) — ต้องตรงกับตรรกะจริงใน Operation/index.js (ดู filteredEvents) เป๊ะๆ ไม่งั้น
+// ลิงก์จากที่อื่น (Dashboard, Customer, การแจ้งเตือน ฯลฯ) จะพาไปหน้า Operation แล้วแท็บที่
+// ไฮไลต์ไม่ตรงกับงานที่กำลังดูอยู่จริง (เช่น กดงาน "เสร็จสิ้น" แต่แท็บ "รอคุณอนุมัติ" ติดสว่างแทน)
+// isOverdue: ส่งมาจากจุดที่รู้อยู่แล้วว่างานนี้ค้างงาน (เช่นคำนวณจาก buildDaysPastDueMap ไว้ก่อนแล้ว)
+export const resolveOperationGroup = (job, isOverdue = false) => {
+  if (!job) return "";
+  if (isOverdue) return "overdue";
+  if (job.status === "ดำเนินการเสร็จสิ้น") return "closed";
+  if (job.closeRequested) return "pending";
+  if (["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(job.status)) return "active";
+  // "กำลังรอยืนยัน" (ยังไม่ยืนยันงานเลย) ไม่มีแท็บกลุ่มไหนตรงกับสถานะนี้โดยตรง — ปล่อยว่างไว้
+  // ดีกว่าให้แท็บที่ไม่ตรงความจริงติดสว่างขึ้นมาแทน
+  return "";
+};

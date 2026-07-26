@@ -22,6 +22,10 @@ import "moment/locale/th";
 // ✅ forwardRef: ให้ EventCalendar/index.js เอา DOM node ของแผงนี้ไปเช็ค bounding rect ตอนลาก
 // event จากปฏิทินจริงออกมา (eventDragStop) ว่าปล่อยเมาส์ทับแผงนี้หรือเปล่า ถ้าใช่ = ลากกลับมา
 // เป็นงานวางแผนล่วงหน้า (ดู handleEventDragStop ในไฟล์หลัก)
+// ✅ เดิมโชว์ทุกใบพร้อมกันแล้วเลื่อนดูเอง (overflow-y:auto) — ถ้ามีงานเยอะเลื่อนหายาก โดยเฉพาะ
+// บนมือถือ เปลี่ยนเป็นแบ่งหน้าแทนเมื่อเกิน 5 ใบ
+const PAGE_SIZE = 4;
+
 const UnscheduledPanel = forwardRef(function UnscheduledPanel(
   {
     drafts,
@@ -36,6 +40,18 @@ const UnscheduledPanel = forwardRef(function UnscheduledPanel(
   panelRef,
 ) {
   const listRef = useRef(null);
+  const [page, setPage] = useState(1);
+
+  // ✅ กลับไปหน้า 1 ทุกครั้งที่เปลี่ยนเดือน — ไม่งั้นสลับเดือนไปมาอาจค้างอยู่หน้าที่ไม่มีจริง
+  // ในเดือนใหม่ (เช่น เดือนก่อนมี 3 หน้า อยู่หน้า 3 แล้วสลับมาเดือนที่มีแค่ 1 หน้า)
+  useEffect(() => {
+    setPage(1);
+  }, [month]);
+
+  const totalPages = Math.max(1, Math.ceil(drafts.length / PAGE_SIZE));
+  // ✅ กันหน้าปัจจุบันเกินจำนวนหน้าจริง (เช่น ลบใบสุดท้ายของหน้าสุดท้ายทิ้งไป)
+  const safePage = Math.min(page, totalPages);
+  const pagedDrafts = drafts.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
   // ✅ เดิมมี 3 ปุ่มเรียงกัน (แก้ไข/ลงตาราง/ลบ) แน่นเกินไปบนการ์ดแคบๆ โดยเฉพาะจอมือถือ —
   // เหลือแค่ "ลงตาราง" (ปุ่มหลักที่ใช้บ่อยสุด) ให้กดตรงๆ ส่วน แก้ไข/ลบ ซ่อนไว้ใน "⋮" แทน
   //
@@ -67,7 +83,7 @@ const UnscheduledPanel = forwardRef(function UnscheduledPanel(
       eventData: (el) => JSON.parse(el.getAttribute("data-event") || "{}"),
     });
     return () => draggable.destroy();
-  }, [drafts]);
+  }, [drafts, safePage]);
 
   const monthLabel = moment(month, "YYYY-MM").locale("th").format("MMMM YYYY");
 
@@ -106,7 +122,7 @@ const UnscheduledPanel = forwardRef(function UnscheduledPanel(
         </div>
       ) : (
         <div className="unscheduled-list" ref={listRef}>
-          {drafts.map((d) => {
+          {pagedDrafts.map((d) => {
             const eventData = {
               title: `[${d.title || "งาน"}] ${d.site || ""}`,
               backgroundColor: d.backgroundColor || "#dc2626",
@@ -126,13 +142,16 @@ const UnscheduledPanel = forwardRef(function UnscheduledPanel(
                 </span>
                 <div className="draft-card-body">
                   <div className="draft-card-title">
-                    {d.title} {d.system ? `· ${d.system}` : ""}
+                    [{d.title}] 
+                  </div>
+                    <div className="draft-card-sub">
+                    💻{d.system ? `: ${d.system}` : ""}
                   </div>
                   <div className="draft-card-sub">
-                    {[d.company, d.site].filter(Boolean).join(" · ")}
+                    🏢: {[d.site].filter(Boolean).join(" · ")}
                   </div>
-                  {d.time && <div className="draft-card-time">🔢 ครั้งที่ {d.time}</div>}
-                  {d.team && <div className="draft-card-team">👷 {d.team}</div>}
+                  {d.time && <div className="draft-card-time">🔢: ครั้งที่ {d.time}</div>}
+                  {d.team && <div className="draft-card-team">👷ทีม : {d.team}</div>}
                 </div>
                 <div className="draft-card-actions">
                   <button
@@ -190,6 +209,31 @@ const UnscheduledPanel = forwardRef(function UnscheduledPanel(
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* ✅ แบ่งหน้าแทนการเลื่อนดูยาวๆ เมื่อมีงานเกิน PAGE_SIZE ใบในเดือนนี้ */}
+      {drafts.length > PAGE_SIZE && (
+        <div className="unscheduled-pagination">
+          <button
+            type="button"
+            className="unscheduled-page-nav"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={safePage <= 1}
+            title="หน้าก่อนหน้า"
+          >
+            <FontAwesomeIcon icon={faChevronLeft} />
+          </button>
+          <span className="unscheduled-page-label">หน้า {safePage} / {totalPages}</span>
+          <button
+            type="button"
+            className="unscheduled-page-nav"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={safePage >= totalPages}
+            title="หน้าถัดไป"
+          >
+            <FontAwesomeIcon icon={faChevronRight} />
+          </button>
         </div>
       )}
     </div>

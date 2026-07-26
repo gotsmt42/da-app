@@ -2029,11 +2029,17 @@ const Operation = () => {
   // ✅ รองรับ deep-link มาจาก Dashboard (การ์ด "สรุปสถานะงาน") และหน้า "ภาพรวมทีมช่าง"
   // (กดการ์ดช่างคนหนึ่ง) ให้เจาะจงสถานะ/ช่างที่กดมาได้ทันที ผ่าน query param ?status=...&team=...
   // แทนที่จะเด้งมาหน้า Operation เฉยๆ แล้วต้องกรองเองซ้ำอีกที
+  // ✅ เพิ่ม ?group=... — ใช้ตอนกดงานจาก "งานค้างของช่าง" ใน Dashboard (ลิงก์ไป /operation/:id
+  // ตรงๆ) ซึ่ง id จะกรองให้เหลืองานนั้นงานเดียวถูกต้องอยู่แล้ว แต่ "แถบสถานะ" (StatusGroupCard)
+  // เดิมไม่รู้ว่างานนี้อยู่กลุ่ม "ค้างงาน" เลยขึ้นไฮไลต์แถบผิด (ปัญหา/กำลังดำเนินการ) ไม่ตรงกับ
+  // งานที่กำลังดูอยู่จริง — ให้ตั้ง statusGroup ตาม ?group= ทันทีเพื่อให้แถบที่ไฮไลต์ตรงกับงานจริง
   useEffect(() => {
     const statusParam = searchParams.get("status");
     const teamParam = searchParams.get("team");
+    const groupParam = searchParams.get("group");
     if (statusParam) setFilterOP(statusParam);
     if (teamParam) setFilterTeam(teamParam);
+    if (groupParam) setStatusGroup(groupParam);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -2475,7 +2481,12 @@ const Operation = () => {
   // หน้า "งานของฉัน" หมดแล้ว) จึง default ไปที่ "overdue" แทน "pending" ที่ไม่มีให้เลือกอีกต่อไป
   // ✅ แอดมิน/manager: ถ้าไม่มีงานรอคุณอนุมัติเลย ให้การ์ด "กำลังดำเนินการ/ยืนยันแล้ว" ติดสว่างเป็นค่า
   // เริ่มต้นแทน "รอคุณอนุมัติ" ที่ว่างเปล่า ให้ตรงกับรายการที่แสดงจริงด้านล่าง (ดู defaultGroup ข้างบน)
-  const effectiveGroup = statusGroup || (isAdminOrManager ? (pendingCount > 0 ? "pending" : "active") : "overdue");
+  // ✅ ยกเว้น: ถ้ามาจากลิงก์เจาะจงสถานะ (?status=... ตั้ง filterOP ไว้) แต่ไม่ได้ระบุ ?group= มาด้วย
+  // อย่า fallback ไปเดาแท็บ default ให้ — เพราะ filterOP กรองผลลัพธ์ตรงๆ อยู่แล้ว (ไม่ผ่าน group เลย
+  // ดู matchGroup ด้านบน) ถ้าแท็บ default ติดสว่างทั้งที่ไม่ตรงกับรายการที่เห็นจริงจะยิ่งทำให้สับสน
+  const effectiveGroup =
+    statusGroup ||
+    (filterOP ? "" : isAdminOrManager ? (pendingCount > 0 ? "pending" : "active") : "overdue");
 
   return (
     <Box sx={{ px: { xs: 1, sm: 2, md: 3 }, py: 3, maxWidth: 1400, mx: "auto" }}>

@@ -61,7 +61,10 @@
       "Read(//c/tmp_fc_test/**)",
       "Bash(\"/c/Program Files/Google/Chrome/Application/chrome.exe\" --headless --disable-gpu --allow-file-access-from-files --screenshot=\"C:\\\\tmp_fc_test\\\\fc-test2.png\" --window-size=375,500 --hide-scrollbars \"file:///C:/tmp_fc_test/fc-test.html\")",
       "Bash(rm -rf build/ *)",
-      "Read(//c/tmp_fc_test2/**)"
+      "Read(//c/tmp_fc_test2/**)",
+      "Bash(grep -an 'to={`/operation\\\\|to=\"/operation' \"c:/Users/Admin/Desktop/da-app/src/views/ui/TeamWorkload.js\")",
+      "Bash(grep -rn 'to={`/operation' \"c:/Users/Admin/Desktop/da-app/src/views/Technician/\")",
+      "Bash(tasklist //FI \"IMAGENAME eq node.exe\")"
     ],
     "additionalDirectories": [
       "\\tmp",

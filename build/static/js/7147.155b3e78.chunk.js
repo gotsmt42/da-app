@@ -1,0 +1,2 @@
+"use strict";(self.webpackChunkda_app=self.webpackChunkda_app||[]).push([[7147],{57147:(e,a,s)=>{s.r(a),s.d(a,{default:()=>c});s(65043);var n=s(73216),p=s(35920),t=s(70579);const c=e=>{let{children:a}=e;const{isLoggedIn:s}=(0,p.A)();return s?a:(0,t.jsx)(n.C5,{to:"/login",replace:!0})}}}]);
+//# sourceMappingURL=7147.155b3e78.chunk.js.map

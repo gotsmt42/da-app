@@ -26,6 +26,7 @@ import EventService from "../../../services/EventService";
 import Swal from "sweetalert2";
 import moment from "moment";
 import "moment/locale/th";
+import { resolveOperationGroup } from "../../../utils/overdueJobs";
 
 import {
   Modal, TextField, Button, Snackbar, Alert, Box, Stack, Typography, Avatar,
@@ -401,7 +402,10 @@ const CustomerCard = ({ row, events, onEdit, onDelete, onCopy }) => {
                           <Stack
                             key={job.id || job._id}
                             direction="row" alignItems="center" gap={1.25}
-                            onClick={() => navigate(`/operation/${job.id || job._id}`)}
+                            onClick={() => {
+                              const jobGroup = resolveOperationGroup(job);
+                              navigate(`/operation/${job.id || job._id}${jobGroup ? `?group=${jobGroup}` : ""}`);
+                            }}
                             sx={{ px: 1.5, py: 1, cursor: "pointer", "&:hover": { bgcolor: alpha("#000", 0.02) } }}
                           >
                             <AssignmentIcon sx={{ fontSize: 15, color: colorFromName(job.title || ""), flexShrink: 0 }} />

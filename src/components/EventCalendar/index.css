@@ -310,8 +310,41 @@
 /* ✅ จอใหญ่ (เดสก์ท็อป) มีพื้นที่กว้างพอ แสดง 3 คอลัมน์แทน 2 ให้เห็นงานได้มากขึ้นโดยไม่ต้องเลื่อน */
 @media (min-width: 992px) {
   .unscheduled-list {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
   }
+}
+
+/* ✅ แบ่งหน้าแทนเลื่อนดูยาวๆ เมื่องานในเดือนนั้นเกิน 5 ใบ (ดู PAGE_SIZE ใน UnscheduledPanel.js) */
+.unscheduled-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.unscheduled-page-nav {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.unscheduled-page-nav:hover:not(:disabled) { border-color: #dc2626; color: #dc2626; }
+.unscheduled-page-nav:active:not(:disabled) { transform: scale(0.94); }
+.unscheduled-page-nav:disabled { opacity: 0.35; cursor: default; }
+
+.unscheduled-page-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
 }
 
 .draft-card {

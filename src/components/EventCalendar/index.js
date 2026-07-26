@@ -896,6 +896,24 @@ function EventCalendar() {
     });
   }, []);
 
+  // ✅ เดิมเดือนที่แสดงในปฏิทินจริง กับเดือนที่เปิดดูในแผงงานล่วงหน้าเป็นคนละ state แยกกันเลย
+  // เลื่อนเดือนฝั่งไหนก็ไม่กระทบอีกฝั่ง สับสนว่าทำไมดูกันคนละเดือน — sync ให้เป็นเดือนเดียวกันเสมอ
+  // ⚠️ ใช้ info.view.currentStart ที่ FullCalendar ส่งมาให้เอง แทน calendarRef.current.getApi()
+  // — ตอน mount ครั้งแรก datesSet จะยิงจาก componentDidMount ภายในก่อนที่ React จะ assign ref
+  // ให้ calendarRef เสร็จ (ref ยังเป็น null อยู่) ทำให้ .getApi() พังทันทีถ้าอ่านจาก ref ตรงๆ
+  const handleDatesSet = useCallback((info) => {
+    handleHighlightWeekends();
+    const calendarMonth = moment(info.view.currentStart).format("YYYY-MM");
+    setDraftMonth((prev) => (prev === calendarMonth ? prev : calendarMonth));
+  }, [handleHighlightWeekends]);
+
+  // ✅ ทิศทางกลับกัน: เลื่อนเดือนจากปุ่ม ‹ › ของแผงงานล่วงหน้าเอง ก็ต้องพาปฏิทินจริงตามไปเดือน
+  // เดียวกันด้วย (handleDatesSet ด้านบนจะ sync draftMonth ให้ตรงกันเองอัตโนมัติหลังจากนี้)
+  const handleDraftMonthChange = useCallback((newMonth) => {
+    setDraftMonth(newMonth);
+    calendarRef.current?.getApi()?.gotoDate(moment(newMonth, "YYYY-MM").format("YYYY-MM-DD"));
+  }, []);
+
   const [employeeList, setEmployeeList] = useState([]);
   const [jobTypeOptions, setJobTypeOptions] = useState([]);
   const [systemOptions, setSystemOptions] = useState([]);
@@ -1142,7 +1160,7 @@ function EventCalendar() {
           drafts={draftsForMonth}
           loading={draftsLoading}
           month={draftMonth}
-          onMonthChange={setDraftMonth}
+          onMonthChange={handleDraftMonthChange}
           onAddClick={handleAddDraft}
           onEditClick={handleEditDraftClick}
           onScheduleClick={handleScheduleDraftClick}
@@ -1342,7 +1360,7 @@ function EventCalendar() {
               click: () => calendarRef.current.getApi().today(),
             },
           }}
-          datesSet={handleHighlightWeekends} // ✅ อัปเดตสีวันเสาร์-อาทิตย์เมื่อเปลี่ยนเดือน
+          datesSet={handleDatesSet} // ✅ อัปเดตสีวันเสาร์-อาทิตย์ + sync เดือนกับแผงงานล่วงหน้า
           buttonText={{
             today: "วันนี้",
             month: "เดือน",

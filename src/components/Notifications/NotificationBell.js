@@ -20,6 +20,15 @@ const NOTI_META = {
   comment: { icon: <Chat sx={{ fontSize: 16 }} />, color: "#3b82f6" },
 };
 
+// ✅ แจ้งเตือนไม่มี job object เต็มๆ ติดมาด้วย (มีแค่ eventId) แต่ประเภทแจ้งเตือนบอกกลุ่มสถานะ
+// ได้ตรงๆ อยู่แล้ว — ใช้ map นี้แทนการเดา เพื่อให้กดแจ้งเตือนแล้วแท็บในหน้า Operation ตรงกับ
+// งานจริง (เช่น close_requested ต้องเป็นงานที่ "รอคุณอนุมัติ" เสมอ)
+const NOTI_GROUP = {
+  close_requested: "pending",
+  close_approved: "closed",
+  close_rejected: "active",
+};
+
 // ✅ UI ล้วน (presentational) ใช้ร่วมกันได้ทุกที่ที่มี useEventNotifications อยู่แล้ว
 // (หน้า Operation ที่มี events ในสโตร์อยู่แล้ว, และ Header ที่ fetch events เองเพื่อให้เห็น
 // แจ้งเตือนได้ทุกหน้า ไม่ใช่แค่ตอนเปิดหน้า Operation ค้างไว้)
@@ -37,7 +46,10 @@ const NotificationBell = ({ notifications, unread, onItemClick, onMarkAllRead, d
   const handleNotificationClick = (n) => {
     if (onItemClick) onItemClick(n.id);
     setAnchorEl(null);
-    if (n.eventId) navigate(`/operation/${n.eventId}`);
+    if (n.eventId) {
+      const group = NOTI_GROUP[n.type];
+      navigate(`/operation/${n.eventId}${group ? `?group=${group}` : ""}`);
+    }
   };
 
   return (
