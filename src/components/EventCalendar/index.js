@@ -1377,25 +1377,33 @@ function EventCalendar() {
               width: 100%;
         font-size: 12px !important; /* ✅ ปรับขนาดฟอนต์ให้เล็กลงสำหรับมือถือ */
             }
+            /* ✅ เดิม font-size 1.2em + ลูกศรกว้าง 76px บีบพื้นที่จนข้อความ "กรกฎาคม 2569"
+               ล้นไปขึ้นบรรทัดที่ 2 (ดูไม่สวย/เบี้ยว) — ลดขนาดตัวอักษรลงนิด + บังคับบรรทัดเดียว
+               (ย่อด้วย ellipsis แทนการตัดขึ้นบรรทัดใหม่ ถ้าพื้นที่ไม่พอจริงๆ) */
             .fc-toolbar-title {
               flex: 1;
+              min-width: 0;
               text-align: center;
-              font-size: 1.2em;
+              font-size: 1.05em;
               margin: 0;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
             }
             /* ✅ ปุ่มเลื่อนเดือน (prev/next) อยู่ขนาบ title ในกลุ่มกลางเดียวกัน — title flex:1
                ดันปุ่มทั้งคู่ไปชิดขอบซ้าย/ขวาของแถว — ยืดเป็นทรงยาว (ไม่ใช่วงกลมแคบๆ) ให้มีพื้นที่
-               แตะกว้างขึ้นในแนวนอน โดยความสูงยังกระชับพอดีนิ้วมือ (ไม่ใหญ่เทอะทะ) */
+               แตะกว้างขึ้นในแนวนอน โดยความสูงยังกระชับพอดีนิ้วมือ (ไม่ใหญ่เทอะทะ)
+               ✅ ลดขนาดลงอีกรอบเหลือ 30px ให้ title มีพื้นที่มากขึ้นไม่ล้นบรรทัด */
             .fc-prev-button,
             .fc-next-button {
               flex-shrink: 0;
-              width: 76px;
-              height: 40px;
+              width: 30px;
+              height: 30px;
               padding: 0;
               display: flex;
               align-items: center;
               justify-content: center;
-              border-radius: 20px;
+              border-radius: 15px;
               touch-action: manipulation;
             }
             /* ✅ ลดขนาดลงอีกนิดจากเดิม 34px ให้กระชับขึ้นอีก ยังคงเต็มความกว้างแถวไว้เหมือนเดิม */
