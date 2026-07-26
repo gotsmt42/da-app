@@ -1,5 +1,6 @@
 import Toastify from "toastify-js";
 import "toastify-js/src/toastify.css";
+import { resolveOperationGroup } from "../../../utils/overdueJobs";
 
 function injectStyles() {
   const existing = document.getElementById("edit-event-styles");
@@ -1059,7 +1060,8 @@ export const getEditEvent = async ({
       document
         .getElementById("btnViewSchedule")
         ?.addEventListener("click", () => {
-          navigate(`/operation/${eventId}`);
+          const jobGroup = resolveOperationGroup({ status: eventStatus });
+          navigate(`/operation/${eventId}${jobGroup ? `?group=${jobGroup}` : ""}`);
           Swal.close();
         });
 

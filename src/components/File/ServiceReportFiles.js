@@ -4,6 +4,7 @@ import moment from "moment";
 import "moment/locale/th";
 
 import EventService from "../../services/EventService";
+import { resolveOperationGroup } from "../../utils/overdueJobs";
 
 import {
   Box, Paper, Stack, Chip, Typography, TextField, InputAdornment,
@@ -307,7 +308,10 @@ const ServiceReportFiles = () => {
                       </IconButton>
                     </Tooltip>
                     <Tooltip title="ไปที่หน้าดำเนินงาน">
-                      <IconButton component={Link} to={`/operation/${f.eventId}`}>
+                      <IconButton
+                        component={Link}
+                        to={`/operation/${f.eventId}${resolveOperationGroup({ status: f.status }) ? `?group=${resolveOperationGroup({ status: f.status })}` : ""}`}
+                      >
                         <OpenInNew fontSize="small" />
                       </IconButton>
                     </Tooltip>

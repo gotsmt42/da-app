@@ -2484,9 +2484,19 @@ const Operation = () => {
   // ✅ ยกเว้น: ถ้ามาจากลิงก์เจาะจงสถานะ (?status=... ตั้ง filterOP ไว้) แต่ไม่ได้ระบุ ?group= มาด้วย
   // อย่า fallback ไปเดาแท็บ default ให้ — เพราะ filterOP กรองผลลัพธ์ตรงๆ อยู่แล้ว (ไม่ผ่าน group เลย
   // ดู matchGroup ด้านบน) ถ้าแท็บ default ติดสว่างทั้งที่ไม่ตรงกับรายการที่เห็นจริงจะยิ่งทำให้สับสน
-  const effectiveGroup =
+  // ✅ เดียวกันกับตอนเปิดงานเจาะจงตัวเดียว (/operation/:id) — งานบางสถานะ (เช่น "กำลังรอยืนยัน"
+  // ที่พบบ่อยในงานที่ "กำลังจะถึง" จาก Dashboard) ไม่มีแท็บกลุ่มไหนตรงกับสถานะนี้เลย (ดู
+  // resolveOperationGroup) ทำให้ลิงก์ไม่ได้ส่ง ?group= มาด้วย ถ้ายัง fallback ไปเดาแท็บ default
+  // จะติดสว่างผิดแท็บเหมือนเดิม — มี id แปลว่ากำลังดูงานเจาะจงตัวเดียวอยู่แล้ว ไม่ควรเดาแท็บกลุ่ม
+const effectiveGroup =
     statusGroup ||
-    (filterOP ? "" : isAdminOrManager ? (pendingCount > 0 ? "pending" : "active") : "overdue");
+    (filterOP || id
+      ? ""
+      : isAdminOrManager
+        ? pendingCount > 0
+          ? "pending"
+          : "active"
+        : "overdue");
 
   return (
     <Box sx={{ px: { xs: 1, sm: 2, md: 3 }, py: 3, maxWidth: 1400, mx: "auto" }}>
@@ -2622,8 +2632,10 @@ const Operation = () => {
               {pagedGroups.map(sessions => {
                 // ✅ ในมุมมอง "ค้างงาน" ให้เห็นความรุนแรงต่างกันชัดๆ ก่อนเปิดการ์ด — เลย 1 สัปดาห์
                 // = แจ้งเตือนสีเหลือง (ให้ทันเห็นก่อน), เลย 2 สัปดาห์ = ค้างงานเต็มตัวสีแดง
-                const daysPastDue = effectiveGroup === "overdue" ? (daysPastDueMap.get(sessions[0]._id)?.days ?? null) : null;
+                const daysPastDueRaw = effectiveGroup === "overdue" ? (daysPastDueMap.get(sessions[0]._id)?.days ?? null) : null;
+                const daysPastDue = isFlaggedDays(daysPastDueRaw) ? daysPastDueRaw : null;
                 const severeOverdue = isSevereDays(daysPastDue);
+                
                 return (
                   <Box key={sessions[0].jobGroupId || sessions[0]._id} sx={{ mb: 0.5 }}>
                     {daysPastDue !== null && daysPastDue !== undefined && (
