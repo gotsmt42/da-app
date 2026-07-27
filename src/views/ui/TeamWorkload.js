@@ -138,9 +138,11 @@ export default function TeamWorkload() {
         if (!earliestStart || start.isBefore(earliestStart)) earliestStart = start;
       });
       const daysPastDue = moment().startOf("day").diff(lastPlanEnd.startOf("day"), "days");
-      if (daysPastDue >= WARNING_DAYS_AFTER_END) {
+      // ✅ ใช้ > แทน >= — วันที่ครบพอดี 7/14 วันยังไม่ถือว่า "เกิน" (เทียบเกณฑ์เดียวกับ isFlaggedDays/
+      // isSevereDays ใน utils/overdueJobs.js)
+      if (daysPastDue > WARNING_DAYS_AFTER_END) {
         entry.overdue += 1;
-        if (daysPastDue >= SEVERE_DAYS_AFTER_END) entry.severeOverdue += 1;
+        if (daysPastDue > SEVERE_DAYS_AFTER_END) entry.severeOverdue += 1;
       } else if (!entry.nextJob || earliestStart.isBefore(entry.nextJob.start)) {
         const head = sessions[0];
         entry.nextJob = { start: earliestStart, title: head.title, company: head.company, site: head.site };

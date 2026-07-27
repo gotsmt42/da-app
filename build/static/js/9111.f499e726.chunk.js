@@ -1,2 +1,0 @@
-"use strict";(self.webpackChunkda_app=self.webpackChunkda_app||[]).push([[9111],{79111:(a,e,r)=>{r.r(e),r.d(e,{default:()=>o});var d=r(73216),l=r(35920),s=r(70579);const o=a=>{var e;let{children:r}=a;const{userData:o}=(0,l.A)();return"admin"===(null===o||void 0===o||null===(e=o.role)||void 0===e?void 0:e.toLowerCase())?r:(0,s.jsx)(d.C5,{to:"/dashboard",replace:!0})}}}]);
-//# sourceMappingURL=9111.f499e726.chunk.js.map

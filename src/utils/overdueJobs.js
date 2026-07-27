@@ -50,8 +50,11 @@ export const buildDaysPastDueMap = (allEvents) => {
   return map;
 };
 
-export const isFlaggedDays = (days) => days !== null && days !== undefined && days >= WARNING_DAYS_AFTER_END;
-export const isSevereDays = (days) => days !== null && days !== undefined && days >= OVERDUE_DAYS_AFTER_END;
+// ✅ "เกิน" 1/2 สัปดาห์ ต้องนับวันที่ล่วงเลยมาแล้วจริงๆ เท่านั้น — วันที่ครบพอดี 7/14 วัน (เช่น
+// งานครบกำหนดเมื่อ 14 วันก่อนพอดิบพอดี) ยังไม่ถือว่า "เกิน" 2 สัปดาห์ ต้องเลยมาอีกอย่างน้อย 1 วัน
+// (>15+) ถึงจะนับ ใช้ > แทน >= เพื่อไม่ให้วันที่ครบพอดีถูกนับเป็น "เกิน" ก่อนเวลาจริง
+export const isFlaggedDays = (days) => days !== null && days !== undefined && days > WARNING_DAYS_AFTER_END;
+export const isSevereDays = (days) => days !== null && days !== undefined && days > OVERDUE_DAYS_AFTER_END;
 
 // ✅ นับจำนวน "งาน" ที่เข้าเกณฑ์ (จัดกลุ่มก่อนนับ ไม่ใช่นับทุกแถว) — งานหลายวันไม่ติดกัน 3 แถว
 // ที่จริงคือ "งานเดียว" ต้องนับเป็น 1 ให้ตรงกับที่การ์ดแสดงจริง (1 การ์ดต่อ 1 งาน)
@@ -62,6 +65,22 @@ export const countFlaggedJobs = (allEvents, daysPastDueMap, thresholdCheck) => {
     const entry = daysPastDueMap.get(e._id);
     if (!entry || !thresholdCheck(entry.days) || seen.has(entry.groupKey)) return;
     seen.add(entry.groupKey);
+    count++;
+  });
+  return count;
+};
+
+// ✅ นับจำนวน "งาน" ที่เข้าเงื่อนไข predicate (จัดกลุ่มก่อนนับเหมือน countFlaggedJobs) — ใช้กับ
+// เงื่อนไขทั่วไปที่ไม่ได้อิง daysPastDueMap (เช่น "รอคุณอนุมัติ"/"เสร็จสิ้น"/"กำลังดำเนินการ")
+// งานที่เข้าหลายวันไม่ติดกัน (jobGroupId เดียวกัน) ต้องนับเป็น 1 งานเสมอ ไม่ใช่นับทุกแถว/ทุกวัน
+export const countDistinctJobs = (allEvents, predicate) => {
+  const seen = new Set();
+  let count = 0;
+  allEvents.forEach((e) => {
+    if (!predicate(e)) return;
+    const key = getOverdueGroupKey(e);
+    if (seen.has(key)) return;
+    seen.add(key);
     count++;
   });
   return count;

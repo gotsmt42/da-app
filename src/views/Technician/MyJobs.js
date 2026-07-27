@@ -196,26 +196,27 @@ const JobGroupCard = ({ sessions, ...cardProps }) => {
     return sum + Math.max(days, 1);
   }, 0);
 
+  // ✅ เปลี่ยนจากม่วง (#8b5cf6) เป็นสีธีมแอพ (แดง) ให้ตรงกับธีมสีของทั้งแอพ
   return (
     <Box sx={{
-      borderRadius: 4, border: "1px solid", borderColor: alpha("#8b5cf6", 0.3),
+      borderRadius: 4, border: "1px solid", borderColor: alpha("#dc2626", 0.3),
       bgcolor: "background.paper", overflow: "hidden",
       boxShadow: "0 2px 16px rgba(0,0,0,0.06)",
     }}>
       <Box
         onClick={() => setExpanded((p) => !p)}
         sx={{
-          p: 2, cursor: "pointer", background: alpha("#8b5cf6", 0.04),
-          borderBottom: expanded ? "1px solid" : "none", borderColor: alpha("#8b5cf6", 0.2),
+          p: 2, cursor: "pointer", background: alpha("#dc2626", 0.04),
+          borderBottom: expanded ? "1px solid" : "none", borderColor: alpha("#dc2626", 0.2),
         }}>
         <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
-          <CalendarMonth sx={{ fontSize: 18, color: "#8b5cf6" }} />
-          <Typography variant="body2" fontWeight={700} color="#8b5cf6">
+          <CalendarMonth sx={{ fontSize: 18, color: "#dc2626" }} />
+          <Typography variant="body2" fontWeight={700} color="#dc2626">
             {head.company && head.site ? `${head.company} · ${head.site}` : (head.company || head.site)}
             {head.title && ` — ${head.title}`}{head.system && ` · ${head.system}`}
           </Typography>
           <Chip label={`เข้างาน ${totalWorkDays} วัน`} size="small"
-            sx={{ height: 20, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha("#8b5cf6", 0.15), color: "#8b5cf6" }} />
+            sx={{ height: 20, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha("#dc2626", 0.15), color: "#dc2626" }} />
           <Typography variant="caption" color="text.secondary">📅 {rangeStart} – {rangeEnd}</Typography>
           <IconButton size="small" sx={{ ml: "auto" }} onClick={(e) => { e.stopPropagation(); setExpanded((p) => !p); }}>
             {expanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
@@ -232,9 +233,9 @@ const JobGroupCard = ({ sessions, ...cardProps }) => {
               <Chip key={s._id} label={chipLabel} size="small"
                 variant={s._id === anchorId ? "filled" : "outlined"}
                 sx={{
-                  height: 20, fontSize: "0.68rem", borderColor: alpha("#8b5cf6", 0.35),
-                  bgcolor: s._id === anchorId ? alpha("#8b5cf6", 0.2) : "transparent",
-                  color: "#8b5cf6", fontWeight: s._id === anchorId ? 700 : 400,
+                  height: 20, fontSize: "0.68rem", borderColor: alpha("#dc2626", 0.35),
+                  bgcolor: s._id === anchorId ? alpha("#dc2626", 0.2) : "transparent",
+                  color: "#dc2626", fontWeight: s._id === anchorId ? 700 : 400,
                 }} />
             );
           })}
@@ -317,9 +318,18 @@ export default function MyJobs() {
   // เทียบ pattern เดียวกับหน้า Operation
   const daysPastDueMap = useMemo(() => buildDaysPastDueMap(events), [events]);
 
+  // ✅ เดิมนับทุกแถว event ดิบ — งานที่เข้าหลายวันไม่ติดกัน (jobGroupId เดียวกัน) ตอนนี้อัปเดตทั้ง
+  // กลุ่มพร้อมกันแล้ว (ขอปิดงาน/อนุมัติ/ไม่อนุมัติ ดู handleRequestClose, handleStatusUpdate) ทำให้
+  // ตัวเลขบนแท็บเพี้ยนสูงกว่าจำนวนงานจริง (1 งานเข้า 3 วัน ขึ้นเป็น "3 งาน") — จัดกลุ่มด้วย
+  // getOverdueGroupKey ก่อนนับ นับแค่ 1 ครั้งต่อกลุ่ม (ทุกวันในกลุ่มเดียวกันควรมีสถานะตรงกันอยู่แล้ว
+  // จากการ propagate ทั้งกลุ่มทุกครั้งที่อัปเดต จึงใช้แถวไหนของกลุ่มมาตัดสินก็ได้ผลลัพธ์เดียวกัน)
   const groupCounts = useMemo(() => {
     const counts = { active: 0, overdue: 0, pending: 0, closed: 0 };
+    const seen = new Set();
     events.forEach((e) => {
+      const key = getOverdueGroupKey(e);
+      if (seen.has(key)) return;
+      seen.add(key);
       if (matchesGroup(e, "active", daysPastDueMap)) counts.active += 1;
       else if (matchesGroup(e, "overdue", daysPastDueMap)) counts.overdue += 1;
       else if (matchesGroup(e, "pending", daysPastDueMap)) counts.pending += 1;
@@ -367,6 +377,26 @@ export default function MyJobs() {
     }
   }, []);
 
+  // ✅ งานที่เข้าหลายวัน (ผูกด้วย jobGroupId เดียวกัน) ถือเป็นงานเดียวกัน — action บางอย่าง (เช่น
+  // "ขอปิดงาน") ต้องอัปเดตทุกวันในกลุ่มพร้อมกัน ไม่งั้นวันที่กดขอไปจะแยกไปอยู่คนละแท็บกับวันที่เหลือ
+  // ในกลุ่มเดียวกัน (เทียบ pattern เดียวกับ getGroupEventIds/handleStatusUpdate ในหน้า Operation)
+  const getGroupEventIds = useCallback((id) => {
+    const target = events.find((e) => e._id === id);
+    if (!target?.jobGroupId) return [id];
+    return events.filter((e) => e.jobGroupId === target.jobGroupId).map((e) => e._id);
+  }, [events]);
+
+  const handleStatusUpdate = useCallback(async (id, updates) => {
+    try {
+      const ids = getGroupEventIds(id);
+      await Promise.all(ids.map((gid) => EventService.UpdateEvent(gid, updates)));
+      setEvents((prev) => prev.map((e) => (ids.includes(e._id) ? { ...e, ...updates } : e)));
+    } catch (err) {
+      console.error(err);
+      setSnackbar({ open: true, msg: "บันทึกไม่สำเร็จ", severity: "error" });
+    }
+  }, [getGroupEventIds]);
+
   const handleDeleteFile = useCallback(async (eventId, type, fileId) => {
     try {
       await EventService.DeleteFile(eventId, type, fileId);
@@ -389,10 +419,15 @@ export default function MyJobs() {
       for (let i = 0; i < files.length; i++) {
         setUploadProgressState((p) => ({ ...p, [type]: 0 }));
         await EventService.Upload(eventId, files[i], type, {
+          // ✅ เดิมหลอดโหลดขึ้น 100% ทันทีที่ส่งไฟล์ครบ (upload transfer เสร็จ) แต่เซิร์ฟเวอร์อาจยัง
+          // ประมวลผลต่ออยู่ ทำให้หลอดโหลดเต็ม 100 ทั้งที่ยังไม่เสร็จจริง — จำกัดไว้ที่ 99% ระหว่างส่ง
+          // ไฟล์ แล้วค่อยขึ้น 100% ตอน await resolve จริงๆ (เซิร์ฟเวอร์ตอบกลับมาแล้ว)
           onUploadProgress: (pe) => {
-            setUploadProgressState((p) => ({ ...p, [type]: Math.round((pe.loaded * 100) / pe.total) }));
+            const pct = Math.round((pe.loaded * 100) / pe.total);
+            setUploadProgressState((p) => ({ ...p, [type]: Math.min(pct, 99) }));
           },
         });
+        setUploadProgressState((p) => ({ ...p, [type]: 100 }));
         successCount++;
       }
       setSnackbar({ open: true, msg: `อัปโหลด ${successCount} ไฟล์เรียบร้อย`, severity: "success" });
@@ -493,7 +528,10 @@ export default function MyJobs() {
           {jobGroups.map((sessions) => {
             // ✅ ในแท็บ "ค้างงาน" ให้เห็นความรุนแรงต่างกันชัดๆ ก่อนเปิดการ์ด (เทียบ pattern เดียวกับ
             // หน้า Operation) — เลย 1 สัปดาห์ = แจ้งเตือนสีเหลือง, เลย 2 สัปดาห์ = ค้างงานเต็มตัวสีแดง
-            const daysPastDue = group === "overdue" ? daysPastDueMap.get(sessions[0]._id)?.days ?? null : null;
+            // ✅ เช็คซ้ำด้วย isFlaggedDays อีกชั้น (เทียบ pattern เดียวกับหน้า Operation) กันป้าย
+            // "เลยกำหนด" ติดลบไร้ความหมายหลุดมาแสดง ถ้าวันที่คำนวณได้ดันไม่เข้าเกณฑ์ค้างจริง
+            const daysPastDueRaw = group === "overdue" ? daysPastDueMap.get(sessions[0]._id)?.days ?? null : null;
+            const daysPastDue = isFlaggedDays(daysPastDueRaw) ? daysPastDueRaw : null;
             const severeOverdue = isSevereDays(daysPastDue);
             return (
               <Box key={sessions[0].jobGroupId || sessions[0]._id}>
@@ -512,6 +550,7 @@ export default function MyJobs() {
                 <JobGroupCard
                   sessions={sessions}
                   onInputUpdate={handleInputUpdate}
+                  onStatusUpdate={handleStatusUpdate}
                   onFileUpload={handleFileUpload}
                   onDeleteFile={handleDeleteFile}
                   onPreview={(url, name) => { setPreviewUrl(url); setPreviewFileName(name); }}

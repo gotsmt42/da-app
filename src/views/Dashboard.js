@@ -33,6 +33,7 @@ import {
   isFlaggedDays,
   isSevereDays,
   countFlaggedJobs,
+  countDistinctJobs,
   resolveAssignedTechnician,
   resolveOperationGroup,
 } from "../utils/overdueJobs";
@@ -110,8 +111,10 @@ const Dashboard = () => {
     fetchAllDashboardData();
   }, []);
 
+  // ✅ นับแบบจัดกลุ่มก่อน (countDistinctJobs) ไม่ใช่นับทุกแถว event ดิบ — งานที่เข้าหลายวันไม่ติดกัน
+  // (jobGroupId เดียวกัน) ต้องนับเป็น 1 งานเสมอ ไม่งั้นการ์ดสรุปสถานะจะขึ้นตัวเลขสูงเกินจริง
   const countStatus = (status) =>
-    events.filter((e) => e.status === status).length;
+    countDistinctJobs(events, (e) => e.status === status);
 
   // 📊 สถิติงานหลัก 4 สถานะ — การ์ดใหญ่แยกจากกัน แทนแถบเล็กๆ ฝังในปุ่มเดิม
   // ✅ เพิ่ม group ต่อรายการ — ให้ตรงกับแท็บ (StatusGroupCard) จริงในหน้า Operation เวลากดเข้าไป
@@ -195,13 +198,16 @@ const Dashboard = () => {
   // เกณฑ์เดียวกับที่ใช้แบ่งกลุ่มในหน้า Operation/งานของฉัน (active/pending/overdue) — "ค้างเกินกำหนด"
   // ที่นี่นับด้วยเกณฑ์เดียวกับแท็บ "ค้างงาน" ของ Operation (เลย 1 สัปดาห์ขึ้นไป) ตัวเลขจะได้ตรงกัน
   // ไม่ใช่นับแค่ 1 วันหลังกำหนดแบบเดิมซึ่งจะเห็นตัวเลขไม่ตรงกับที่ไปเปิดหน้า Operation จริง
-  const myActiveJobsCount = events.filter(
-    (e) =>
-      ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(e.status) && !e.closeRequested,
-  ).length;
-  const myPendingApprovalCount = events.filter(
+  // ✅ นับแบบจัดกลุ่มก่อน (ไม่ใช่นับทุกแถว) — งานที่เข้าหลายวันไม่ติดกัน (jobGroupId เดียวกัน) นับ
+  // เป็น 1 งานเสมอ ไม่งั้นตัวเลขจะเพี้ยนสูงกว่าจำนวนงานจริง (เทียบเหตุผลเดียวกับหน้า Operation/MyJobs)
+  const myActiveJobsCount = countDistinctJobs(
+    events,
+    (e) => ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(e.status) && !e.closeRequested,
+  );
+  const myPendingApprovalCount = countDistinctJobs(
+    events,
     (e) => e.closeRequested && e.status !== "ดำเนินการเสร็จสิ้น",
-  ).length;
+  );
 
   // ✅ ใช้ util กลาง (src/utils/overdueJobs.js) แทนโค้ดจัดกลุ่ม/คิดค้างแบบ inline เดิม — ตรรกะ
   // เดียวกับที่หน้า Operation ใช้เป๊ะๆ (งานหลายวันไม่ติดกันนับเป็น 1 งาน คิดค้างจากวันสุดท้าย)

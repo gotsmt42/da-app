@@ -20,8 +20,9 @@ import Swal from "sweetalert2";
 import moment from "moment";
 import "moment/locale/th";
 import {
-  buildDaysPastDueMap, isFlaggedDays, isSevereDays, countFlaggedJobs,
+  buildDaysPastDueMap, isFlaggedDays, isSevereDays, countFlaggedJobs, countDistinctJobs, getOverdueGroupKey,
 } from "../../utils/overdueJobs";
+import { formatEventDateRange } from "../../utils/formatDateRange";
 
 // MUI Core
 import {
@@ -39,14 +40,14 @@ import {
   Search, FilterList, Clear, Dashboard, Timeline, TableChart,
   Upload, Download, Delete, Visibility, Close, CheckCircle,
   PendingActions, Build, Assignment, Notifications, MoreVert,
-  CalendarMonth, Group, Warning, TrendingUp, Description,
+  CalendarMonth, Warning, TrendingUp, Description,
   CloudUpload, InsertDriveFile, Image, PictureAsPdf, Article,
   Refresh, ArrowUpward, ArrowDownward, Circle, ExpandMore,
   ExpandLess, FolderOpen, AttachFile, Login, Logout, Edit,
   NoteAdd, History, Person, AccessTime, FiberManualRecord,
   TaskAlt, HourglassTop, Cancel,
   Send, Chat, Link as LinkIcon,
-  Print, Share,
+  Print, Share, RequestQuote, ReceiptLong, AssignmentTurnedIn,
 } from "@mui/icons-material";
 
 // MUI Date Picker
@@ -484,24 +485,35 @@ const LiveTrackingPanel = ({ events, onRefresh, lastRefreshed }) => {
 // ลิสต์หลักที่มีการแบ่งหน้า/กรองอยู่ — อนุมัติ/ไม่อนุมัติได้จากพาแนลนี้เลย
 // อ้างอิงจาก events ทั้งหมด (ไม่ผ่านตัวกรอง/pagination ของตาราง)
 // ═══════════════════════════════════════════════════════════════════════
-const ClosureRequestsPanel = ({ events, onApprove, onReject }) => {
+const ClosureRequestsPanel = ({ events, onReject }) => {
+  const navigate = useNavigate();
   const [expanded,     setExpanded]     = useState(true);
   const [busyId,       setBusyId]       = useState(null);
   const [rejectTarget, setRejectTarget] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
 
-  const pending = useMemo(
-    () => events
+  // ✅ งานที่เข้าหลายวันไม่ติดกัน (ผูกด้วย jobGroupId เดียวกัน) ตอนขอปิดงานตอนนี้ตั้ง
+  // closeRequested:true ให้ทุกวันในกลุ่มพร้อมกันแล้ว (ดู handleRequestClose ใน
+  // TechnicianJobPanel.js) — ถ้าไม่จัดกลุ่มตรงนี้ด้วย จะเห็นงานเดียวกันโผล่ซ้ำเป็นหลายแถวเท่า
+  // จำนวนวันที่เข้างาน ต้องกดอนุมัติทีละแถว ทั้งที่จริงเป็นงานเดียว รวมเป็น 1 แถวต่อ 1 งาน แทน
+  // (เทียบ pattern เดียวกับ JobGroupBlock) กดอนุมัติ/ไม่อนุมัติทีเดียวจบทั้งกลุ่ม
+  const pendingGroups = useMemo(() => {
+    const map = new Map();
+    events
       .filter(e => e.closeRequested)
-      .sort((a, b) => new Date(b.closeRequestedAt || 0) - new Date(a.closeRequestedAt || 0)),
-    [events]
-  );
+      .forEach(e => {
+        const key = getOverdueGroupKey(e);
+        if (!map.has(key)) map.set(key, []);
+        map.get(key).push(e);
+      });
+    return [...map.values()]
+      .map(sessions => sessions.slice().sort((a, b) => new Date(b.start) - new Date(a.start)))
+      .sort((a, b) => new Date(b[0].closeRequestedAt || 0) - new Date(a[0].closeRequestedAt || 0));
+  }, [events]);
 
-  const handleApprove = async (id) => {
-    setBusyId(id);
-    await onApprove(id);
-    setBusyId(null);
-  };
+  // ✅ ไม่มีคำขอปิดงานรออยู่เลย = ไม่ต้องโชว์การ์ดนี้ทิ้งไว้เปล่าๆ (เดิมโชว์ตลอดพร้อมข้อความ
+  // "ยังไม่มีคำขอปิดงาน...") กินพื้นที่ด้านบนสุดของหน้าโดยไม่มีอะไรให้ทำ ซ่อนไปเลยดีกว่า
+  if (pendingGroups.length === 0) return null;
 
   const handleRejectConfirm = async () => {
     if (!rejectTarget) return;
@@ -517,12 +529,12 @@ const ClosureRequestsPanel = ({ events, onApprove, onReject }) => {
       <CardContent sx={{ p: 2.5 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between" mb={expanded ? 2 : 0}>
           <Stack direction="row" alignItems="center" gap={1}>
-            <PulseDot color={pending.length > 0 ? "#f59e0b" : "#6b7280"} />
+            <PulseDot color="#f59e0b" />
             <Typography variant="subtitle2" fontWeight={700}>
               งานที่ช่างขอปิด · รอตรวจสอบ
             </Typography>
             <Chip
-              label={`${pending.length} งาน`}
+              label={`${pendingGroups.length} งาน`}
               size="small"
               sx={{
                 height: 20, fontSize: "0.68rem", fontWeight: 700,
@@ -536,15 +548,19 @@ const ClosureRequestsPanel = ({ events, onApprove, onReject }) => {
         </Stack>
 
         <Collapse in={expanded}>
-          {pending.length === 0 ? (
-            <Box sx={{ textAlign: "center", py: 3, color: "text.disabled" }}>
-              <TaskAlt sx={{ fontSize: 36, opacity: 0.25, mb: 0.5 }} />
-              <Typography variant="body2">ยังไม่มีคำขอปิดงานที่รอตรวจสอบ</Typography>
-            </Box>
-          ) : (
             <Stack spacing={1.5}>
-              {pending.map(ev => (
-                <Box key={ev._id} sx={{
+              {pendingGroups.map(sessions => {
+                const ev = sessions[0];
+                const isGrouped = sessions.length > 1;
+                // ✅ นับ "จำนวนวันเข้างานจริง" รวมทุกวันในแต่ละช่วง (เทียบ pattern เดียวกับ
+                // JobGroupBlock) ให้แอดมินเห็นก่อนกดอนุมัติว่างานนี้จริงๆ เข้ากี่วัน ไม่ใช่แค่ 1 วัน
+                const dayEnd = s => moment(s.end || s.start).subtract(s.allDay ? 1 : 0, "days").startOf("day");
+                const totalWorkDays = sessions.reduce((sum, s) => {
+                  const days = dayEnd(s).diff(moment(s.start).startOf("day"), "days") + 1;
+                  return sum + Math.max(days, 1);
+                }, 0);
+                return (
+                <Box key={ev.jobGroupId || ev._id} sx={{
                   p: 1.5, borderRadius: 2, border: "1px solid",
                   borderColor: alpha("#f59e0b", 0.25), background: alpha("#f59e0b", 0.03),
                 }}>
@@ -552,9 +568,15 @@ const ClosureRequestsPanel = ({ events, onApprove, onReject }) => {
                     <Stack direction="row" alignItems="flex-start" gap={1.5} flex={1} minWidth={0}>
                       <HourglassTop sx={{ fontSize: 18, color: "#f59e0b", mt: 0.3, flexShrink: 0 }} />
                       <Box flex={1} minWidth={0}>
-                        <Typography fontWeight={700} fontSize="0.875rem" noWrap>
-                          {companySite(ev.company, ev.site)}
-                        </Typography>
+                        <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap">
+                          <Typography fontWeight={700} fontSize="0.875rem" noWrap>
+                            {companySite(ev.company, ev.site)}
+                          </Typography>
+                          {isGrouped && (
+                            <Chip label={`เข้างาน ${totalWorkDays} วัน`} size="small"
+                              sx={{ height: 18, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha("#dc2626", 0.15), color: "#dc2626" }} />
+                          )}
+                        </Stack>
                         <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
                           {ev.closeRequestedBy || "ช่าง"} ขอปิดงาน
                           {ev.closeRequestedAt && ` · ${moment(ev.closeRequestedAt).locale("th").fromNow()}`}
@@ -570,13 +592,24 @@ const ClosureRequestsPanel = ({ events, onApprove, onReject }) => {
                         )}
                       </Box>
                     </Stack>
-                    <Stack direction="row" gap={0.75} flexShrink={0} sx={{ width: { xs: "100%", sm: "auto" } }}>
+                    {/* ✅ ปุ่ม "ตรวจสอบ" — เดิมพาไปหน้า Operation แบบเจาะจงงานตัวเดียว (/operation/:id)
+                        เปลี่ยนเป็นพาไปที่ "รายการงานทั้งหมด" ในแท็บ "รอคุณอนุมัติ" แล้วเลื่อนจอ +
+                        ไฮไลต์กรอบกระพริบไปที่งานนั้นแทน ให้เห็นบริบทงานอื่นๆ ที่รอตรวจสอบด้วยกัน ไม่ใช่
+                        เห็นแค่งานเดียวโดดๆ (ดู highlightId/scroll effect ในคอมโพเนนต์หลัก Operation)
+                        ✅ ตัดปุ่ม "อนุมัติ" ออกจากพาแนลนี้ตามที่ขอ — ต้องกด "ตรวจสอบ" ไปดูรายละเอียด
+                        เต็มๆ ก่อนเท่านั้น (อนุมัติได้จากการ์ดงานจริงแทน) กัน "อนุมัติมั่ว" โดยไม่ได้ดู */}
+                    <Stack direction="row" gap={0.75} flexShrink={0} flexWrap="wrap" sx={{ width: { xs: "100%", sm: "auto" } }}>
                       <Button size="small" color="warning" variant="contained"
-                        startIcon={<TaskAlt sx={{ fontSize: 15 }} />}
-                        disabled={busyId === ev._id}
-                        onClick={() => handleApprove(ev._id)}
+                        startIcon={<Visibility sx={{ fontSize: 15 }} />}
+                        // ✅ ต่อ &t=<timestamp> ต่อท้ายเสมอ — เดิมกด "ตรวจสอบ" งานเดิมซ้ำ (หลังกด
+                        // ครั้งแรกไปแล้ว) จะได้ URL เหมือนเดิมทุกตัวอักษร (ถ้ายังไม่ได้เปลี่ยนหน้า/
+                        // กรองอะไรเลย) react-router มองว่าเป็นการนำทางไปที่เดิม ไม่ถือเป็นการเปลี่ยน
+                        // location ใหม่ ทำให้ effect ที่ฟัง searchParams ไม่ทำงานซ้ำ ต้องรีเฟรชก่อน
+                        // ถึงจะกดซ้ำได้ — ใส่ timestamp ให้ query string ไม่ซ้ำกันทุกครั้งที่กด
+                        // การันตีว่าเป็น navigation ใหม่เสมอ ไม่ว่าจะกดงานเดิมกี่ครั้งก็ตาม
+                        onClick={() => navigate(`/operation?group=pending&highlight=${ev._id}&t=${Date.now()}`)}
                         sx={{ flex: { xs: 1, sm: "initial" }, borderRadius: 2, textTransform: "none", fontWeight: 700 }}>
-                        อนุมัติ
+                        ตรวจสอบ
                       </Button>
                       <Button size="small" color="error" variant="outlined"
                         startIcon={<Cancel sx={{ fontSize: 15 }} />}
@@ -588,9 +621,9 @@ const ClosureRequestsPanel = ({ events, onApprove, onReject }) => {
                     </Stack>
                   </Stack>
                 </Box>
-              ))}
+                );
+              })}
             </Stack>
-          )}
         </Collapse>
       </CardContent>
 
@@ -1018,6 +1051,15 @@ const TimelineView = ({ events }) => {
 
 // ─── FileUploadSection ────────────────────────────────────────────────
 // เอกสารแต่ละชนิดแนบได้หลายไฟล์ (files คือ array) — เพิ่ม/ลบทีละไฟล์ได้อิสระ
+// ✅ ไอคอน/สีเฉพาะของเอกสารแต่ละชนิด (เทียบ pattern เดียวกับ DOCUMENT_TYPES ใน
+// TechnicianJobPanel.js) ให้หัวข้อแต่ละช่องแยกออกจากกันชัดเจนด้วยตา ไม่ต้องอ่านชื่อก็จำได้
+const DOC_TYPE_META = {
+  report:     { icon: Description,        color: "#3b82f6" },
+  quotation:  { icon: RequestQuote,       color: "#ef4444" },
+  invoice:    { icon: ReceiptLong,        color: "#f59e0b" },
+  completion: { icon: AssignmentTurnedIn, color: "#07941a" },
+};
+
 const FileUploadSection = ({
   eventId, type, label, files, applicable,
   onUpload, onDelete, onPreview,
@@ -1045,15 +1087,37 @@ const FileUploadSection = ({
   // ช่างระบุไว้แล้วว่างานนี้ "ไม่มี" เอกสารชนิดนี้ (ใบเสนอราคา/ใบวางบิล/ใบส่งมอบงาน)
   const notApplicable = applicable === false && !hasFiles;
 
+  // ✅ เดิมหัวข้อเป็นตัวหนังสือพิมพ์ใหญ่เรียบๆ สีเดียวกันหมดทุกประเภท แยกด้วยตายาก โดยเฉพาะเวลามอง
+  // เร็วๆ — เพิ่มไอคอนวงกลมสีเฉพาะตัว + ตัวหนังสือหัวข้อเด่นขึ้น + ชิปนับจำนวนไฟล์สีเดียวกับไอคอน
+  // ให้แต่ละประเภทเอกสารจำได้ทันทีด้วยสี ไม่ต้องอ่านชื่อ
+  const meta = DOC_TYPE_META[type] || { icon: Description, color: "#6b7280" };
+  const TypeIcon = meta.icon;
+
   return (
     <Box>
-      <Typography variant="caption" fontWeight={700} color="text.secondary"
-        sx={{ textTransform: "uppercase", letterSpacing: 0.5, mb: 1, display: "block" }}>
-        {label} {hasFiles && `(${fileList.length})`}
-      </Typography>
+      <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1.25 }}>
+        <Box sx={{
+          width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          bgcolor: alpha(meta.color, 0.12), color: meta.color,
+        }}>
+          <TypeIcon sx={{ fontSize: 16 }} />
+        </Box>
+        <Typography variant="subtitle2" fontWeight={800} sx={{ flex: 1, minWidth: 0 }} noWrap>
+          {label}
+        </Typography>
+        {hasFiles && (
+          <Chip label={fileList.length} size="small" sx={{
+            height: 20, minWidth: 20, fontWeight: 700, fontSize: "0.7rem",
+            bgcolor: alpha(meta.color, 0.15), color: meta.color,
+          }} />
+        )}
+      </Stack>
 
+      {/* ✅ ถ้ามีไฟล์เยอะ (เช่น 6+ ไฟล์) จำกัดความสูงแล้วเลื่อนดูแทน ไม่ให้รายการยาวจนดันเนื้อหา
+          ส่วนอื่นไปไกล ทำให้หน้าดูไม่เป็นระบบเวลาไฟล์เยอะ */}
       {hasFiles && (
-        <Stack spacing={0.75} sx={{ mb: uploading || canEdit ? 1 : 0 }}>
+        <Stack spacing={0.75} sx={{ mb: uploading || canEdit ? 1 : 0, maxHeight: 260, overflowY: "auto", pr: 0.5 }}>
           {fileList.map(f => (
             <Stack key={f._id || f.fileUrl} direction="row" alignItems="center" gap={0.5} sx={{
               p: 1.25, borderRadius: 2, border: "1px solid", borderColor: "divider",
@@ -1248,6 +1312,22 @@ const CommentThread = ({ comments = [], onSend, myRole }) => {
   );
 };
 
+// ─── InfoLine ─────────────────────────────────────────────────────────
+// ✅ เดิมแต่ละบรรทัด "ไอคอน ป้ายกำกับ : ค่า" เป็นข้อความยาวเส้นเดียว พอค่ายาว (เช่นชื่อโครงการ)
+// บนจอมือถือแคบๆ จะตัดขึ้นบรรทัดใหม่แบบมั่วๆ (บางทีตัดกลางป้ายกำกับ/ตัดกลางวันที่) ดูไม่เป็นระเบียบ
+// แยกป้ายกำกับ (ไม่ตัดคำ) ออกจากค่า (ตัดคำ/ขึ้นบรรทัดใหม่ได้อิสระ) ด้วย flex row — ค่าที่ยาวจะ
+// ขึ้นบรรทัดใหม่แบบชิดใต้ตัวมันเองเท่านั้น ไม่ดึงป้ายกำกับหรือคำอื่นๆ ตามไปด้วย
+const InfoLine = ({ icon, label, children }) => (
+  <Stack direction="row" spacing={0.5} sx={{ alignItems: "flex-start" }}>
+    <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0, whiteSpace: "nowrap" }}>
+      {icon} {label} :
+    </Typography>
+    <Typography variant="caption" color="text.secondary" sx={{ minWidth: 0 }}>
+      {children}
+    </Typography>
+  </Stack>
+);
+
 // ─── EventRowCard ─────────────────────────────────────────────────────
 const EventRowCard = ({
   event, employee, onStatusUpdate, onDocNoUpdate, onInputUpdate,
@@ -1276,6 +1356,10 @@ const EventRowCard = ({
   // ยังต้องแนบ/แก้ไฟล์แยกเฉพาะวันนี้ได้เหมือนเดิมถ้าจำเป็น จึงเปิดให้กดดูเพิ่มเติมได้เสมอ
   const [showDocsOverride, setShowDocsOverride] = useState(false);
   const theme  = useTheme();
+  // ✅ จอกว้างพอ (≥900px) เปิดรายละเอียดงาน (เอกสาร/คุยกับช่าง/ประวัติ) แบบ Dialog ทับขึ้นมาแทน
+  // การกางลงในหน้า (Collapse) — เดิมกางแล้วเนื้อหายาวๆ ดันการ์ดอื่นในคอลัมน์เดียวกันลงมา ต้อง
+  // เลื่อนจอตาม ทั้งที่จอกว้างเปิดลอยทับได้เลยโดยไม่กระทบตำแหน่งการ์ดอื่น (มือถือยังกางลงแบบเดิม)
+  const isDesktop = useMediaQuery("(min-width:900px)");
   const canEdit = ["admin", "manager", "user"].includes(currentUserRole);
   const isAdminOrManager = ["admin", "manager"].includes(currentUserRole);
 
@@ -1300,7 +1384,21 @@ const EventRowCard = ({
 
   const handleDocSave = () => { onDocNoUpdate(event._id, docNo); setEditingDoc(false); };
 
+  // ✅ ป้องกันกดผิด/กดพลาด — กดแล้วงานเข้าสถานะ "ดำเนินการเสร็จสิ้น" ทันที (และถ้าเป็นงานกลุ่มเข้า
+  // หลายวัน จะมีผลกับทุกวันในกลุ่มพร้อมกัน) แก้คืนไม่ได้ง่ายๆ ควรให้ยืนยันก่อนอีกชั้น (เทียบ pattern
+  // เดียวกับตอนช่างกดขอปิดงานใน TechnicianJobPanel.js)
   const handleApprove = async () => {
+    const confirm = await Swal.fire({
+      title: "ยืนยันอนุมัติปิดงาน?",
+      text: "งานนี้จะเข้าสถานะ \"ดำเนินการเสร็จสิ้น\" ทันที",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "อนุมัติปิดงาน",
+      cancelButtonText: "ยกเลิก",
+      confirmButtonColor: "#10b981",
+    });
+    if (!confirm.isConfirmed) return;
+
     setApproving(true);
     await onApproveClose(event._id);
     setLocalStatus("ดำเนินการเสร็จสิ้น");
@@ -1315,10 +1413,131 @@ const EventRowCard = ({
     setRejectReason("");
   };
 
+  // ✅ เนื้อหารายละเอียดงาน (เอกสาร/คุยกับช่าง/ประวัติ) แยกเป็นตัวแปรเดียว ใช้ร่วมกันทั้งแบบกางลง
+  // ในหน้า (Collapse บนมือถือ) และแบบ Dialog ทับขึ้นมา (จอกว้าง) ไม่ต้องเขียนซ้ำสองที่
+  // ✅ เดิม 4 ช่องเอกสาร (Service Report/ใบเสนอราคา/ใบวางบิล/ใบส่งมอบงาน) วางเป็น 2 คอลัมน์ (sm={6})
+  // พอช่องไหนมีไฟล์เยอะ (เช่น Service Report 6 ไฟล์) จะสูงกว่าอีกฝั่งมาก ทำให้เห็นพื้นที่ว่างเปล่า
+  // ข้างๆ เยอะผิดปกติ ดูไม่เป็นระบบ — เปลี่ยนเป็นคอลัมน์เดียวเรียงลงมาทั้งหมด (xs={12} เสมอ) แทน
+  // ไม่มีปัญหาคอลัมน์สูงไม่เท่ากันให้กวนตาอีก (เทียบเหตุผลเดียวกับที่แก้การ์ดงานกรุ๊ปก่อนหน้านี้)
+  const expandedContent = (
+    <Grid container spacing={2}>
+      {event.workNote && (
+        <Grid item xs={12}>
+          <Typography variant="caption" fontWeight={700} color="text.secondary"
+            sx={{ textTransform: "uppercase", letterSpacing: 0.5, display: "block", mb: 0.5 }}>
+            สรุปงานที่ทำ (ช่าง)
+          </Typography>
+          <Box sx={{
+            p: 1.5, borderRadius: 2, border: "1px solid",
+            borderColor: alpha("#3b82f6", 0.25), background: alpha("#3b82f6", 0.04),
+          }}>
+            <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: "pre-line", lineHeight: 1.7 }}>
+              {event.workNote}
+            </Typography>
+          </Box>
+        </Grid>
+      )}
+
+      {hideDocuments && !showDocsOverride && (
+        <Grid item xs={12}>
+          <Button size="small" onClick={() => setShowDocsOverride(true)}
+            sx={{ textTransform: "none", fontSize: "0.75rem", color: "text.secondary" }}>
+            📄 เอกสารหลักอยู่ที่การ์ดวันล่าสุด — กดเพื่อแนบ/แก้ไฟล์แยกเฉพาะวันนี้
+          </Button>
+        </Grid>
+      )}
+      {(!hideDocuments || showDocsOverride) && (
+        <Grid item xs={12}>
+        <FileUploadSection
+          eventId={event._id} type="report" label="Service Report"
+          files={event.reportFiles}
+          onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
+          uploading={isUploadingState.report && uploadingState.report === event._id}
+          progress={uploadProgressState.report}
+          uploading_size={uploadingFileSizeState.report}
+          currentUserRole={currentUserRole}
+        />
+      </Grid>
+      )}
+      {(!hideDocuments || showDocsOverride) && (
+      <Grid item xs={12}>
+        <FileUploadSection
+          eventId={event._id} type="quotation" label="ใบเสนอราคา"
+          files={event.quotationFiles}
+          applicable={event.quotationApplicable}
+          onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
+          uploading={isUploadingState.quotation && uploadingState.quotation === event._id}
+          progress={uploadProgressState.quotation}
+          uploading_size={uploadingFileSizeState.quotation}
+          currentUserRole={currentUserRole}
+        />
+      </Grid>
+      )}
+
+      {(!hideDocuments || showDocsOverride) && (
+       <Grid item xs={12}>
+        <FileUploadSection
+          eventId={event._id} type="invoice" label="ใบวางบิล"
+          files={event.invoiceFiles}
+          applicable={event.invoiceApplicable}
+          onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
+          uploading={isUploadingState.invoice && uploadingState.invoice === event._id}
+          progress={uploadProgressState.invoice}
+          uploading_size={uploadingFileSizeState.invoice}
+          currentUserRole={currentUserRole}
+        />
+      </Grid>
+      )}
+
+      {(!hideDocuments || showDocsOverride) && (
+       <Grid item xs={12}>
+        <FileUploadSection
+          eventId={event._id} type="completion" label="ใบส่งมอบงาน"
+          files={event.completionFiles}
+          applicable={event.completionApplicable}
+          onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
+          uploading={isUploadingState.completion && uploadingState.completion === event._id}
+          progress={uploadProgressState.completion}
+          uploading_size={uploadingFileSizeState.completion}
+          currentUserRole={currentUserRole}
+        />
+      </Grid>
+      )}
+
+      {/* คุยกับช่าง (เช่น ตอบคำขอใบเสนอราคา) */}
+      <Grid item xs={12}>
+        <Divider sx={{ mb: 1.5 }} />
+        <Typography variant="caption" fontWeight={700} color="text.secondary"
+          sx={{ textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 0.5, mb: 1 }}>
+          <Chat sx={{ fontSize: 14 }} /> คุยกับช่าง{(event.comments || []).length > 0 && ` (${event.comments.length})`}
+        </Typography>
+        <CommentThread comments={event.comments} onSend={handleSendComment} myRole={currentUserRole} />
+      </Grid>
+
+      {event.activityLog?.length > 0 && (
+        <Grid item xs={12}>
+          <Divider sx={{ mb: 1.5 }} />
+          <ActivityLogMini logs={event.activityLog} />
+        </Grid>
+      )}
+    </Grid>
+  );
+
   const Wrapper = noOuterCard ? React.Fragment : GlassCard;
+  // ✅ เดิมตั้ง transform:"none" ทับค่า default ของ GlassCard (ยกการ์ดขึ้นตอน hover) ทำให้ hover
+  // แทบไม่รู้สึกอะไรเลยนอกจากเงาจางๆ ผู้ใช้ไม่รู้ว่ากดได้ — ใส่ animation ยกขึ้น + เงาเข้มขึ้น +
+  // เส้นขอบเน้นสีชัดเจนตอน hover ให้เห็นชัดว่าเป็นการ์ดที่กดได้ (ทั้งการ์ดคลิกได้เพื่อดูรายละเอียด)
   const wrapperProps = noOuterCard
     ? {}
-    : { sx: { mb: 1.5, "&:hover": { transform: "none", boxShadow: `0 4px 20px ${alpha(theme.palette.common.black, 0.08)}` } } };
+    : { sx: {
+        mb: 1.5,
+        transition: "transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease",
+        "&:hover": {
+          transform: "translateY(-3px)",
+          boxShadow: `0 10px 28px ${alpha(theme.palette.common.black, 0.16)}`,
+          borderColor: alpha(theme.palette.primary.main, 0.3),
+        },
+      } };
 
   return (
     <Wrapper {...wrapperProps}>
@@ -1332,15 +1551,26 @@ const EventRowCard = ({
           sx={{ cursor: "pointer" }}
         >
           <Stack direction="row" alignItems="flex-start" gap={1.5} flex={1} minWidth={0}>
+            {/* ✅ ลดขนาดลงบนจอมือถือ (จอกว้างยังคง 40px เท่าเดิม) — การ์ดตอนนี้เนื้อหากระชับขึ้นแล้ว
+                วงกลมไอคอนใหญ่แบบเดิมเลยดูไม่สมส่วนเมื่อเทียบกับตัวหนังสือที่เหลือ */}
             <Avatar sx={{
-              width: 40, height: 40, flexShrink: 0, fontSize: "0.8rem", fontWeight: 700,
+              width: { xs: 32, sm: 40 }, height: { xs: 32, sm: 40 }, flexShrink: 0, fontSize: "0.8rem", fontWeight: 700,
               background: OP_COLOR[localStatus] ? alpha(OP_COLOR[localStatus], 0.15) : alpha(theme.palette.grey[500], 0.15),
               color: OP_COLOR[localStatus] || theme.palette.text.secondary,
             }}>
-              {TYPE_ICON[event.title] || <Build />}
+              {React.cloneElement(TYPE_ICON[event.title] || <Build />, {
+                fontSize: "inherit",
+                sx: { fontSize: { xs: 16, sm: 20 } },
+              })}
             </Avatar>
             <Box minWidth={0} flex={1}>
-              <Stack direction="row" flexWrap="wrap" alignItems="center" gap={0.5} mb={0.5}>
+              {/* ✅ จัดใหม่ให้เป็นรายการ "ไอคอน + ป้ายกำกับ : ค่า" เรียงทีละบรรทัดเรียบๆ (เทียบสไตล์
+                  การ์ดงานวางแผนล่วงหน้า) แทนแถว chip เดิม (สถานะ/ชื่องาน/ระบบ/ทีม ปนกันแถวเดียว
+                  ดูรกเวลาจอแคบ) — StatusBadge + วันที่ (ย่อแล้ว) ไว้แถวบนสุดด้วยกัน ใช้พื้นที่กว้างๆ
+                  ข้างสถานะที่เคยเว้นว่างไว้ให้เกิดประโยชน์ คู่กับไอคอนเอกสาร/กิจกรรมทางขวา —
+                  ระบบ/ครั้งที่ วางคู่กัน 2 คอลัมน์ (ทั้งสองสั้น ไม่ต้องแยกคนละบรรทัดให้เปลืองที่)
+                  ส่วนทีมย้ายไปไว้ล่างสุดของรายการ */}
+              <Stack direction="row" alignItems="center" gap={1} mb={0.5} flexWrap="wrap">
                 <Tooltip title="เปลี่ยนสถานะ">
                   <Box onClick={e => { e.stopPropagation(); canEdit && setAnchorEl(e.currentTarget); }} sx={{ cursor: canEdit ? "pointer" : "default" }}>
                     <StatusBadge color={OP_COLOR[localStatus]}>
@@ -1348,48 +1578,65 @@ const EventRowCard = ({
                     </StatusBadge>
                   </Box>
                 </Tooltip>
-                {event.title  && <Chip label={event.title}  size="small" variant="outlined" sx={{ fontSize: "0.7rem", height: 22, maxWidth: 130 }} />}
-                {event.system && <Chip label={event.system} size="small" variant="outlined" color="secondary" sx={{ fontSize: "0.7rem", height: 22, maxWidth: 130 }} />}
-                {event.team   && <Chip icon={<Group sx={{ fontSize: "14px !important" }} />} label={event.team} size="small" variant="outlined" sx={{ fontSize: "0.7rem", height: 22, maxWidth: 150 }} />}
-                {/* ✅ ย้ายไอคอนเอกสาร/กิจกรรมมาไว้แถวเดียวกับ chip (wrap ได้ตามธรรมชาติ)
-                    แทนที่จะปักไว้คงที่ทางขวาสุดของแถวหัวข้อ ซึ่งไปแย่งพื้นที่ปีบให้ชื่องาน/ทีมถูกตัดคำบนจอมือถือ */}
-                <Stack direction="row" alignItems="center" gap={0.6} sx={{ ml: "auto", flexShrink: 0 }}>
-                  {event.reportFiles?.length > 0     && <Tooltip title={`Service Report: ${event.reportFiles.length} ไฟล์`}><Description sx={{ fontSize: 17, color: "#3b82f6", opacity: 0.8 }} /></Tooltip>}
-                  {event.quotationFiles?.length > 0  && <Tooltip title={`ใบเสนอราคา: ${event.quotationFiles.length} ไฟล์`}><Description sx={{ fontSize: 17, color: "#ef4444", opacity: 0.8 }} /></Tooltip>}
-                  {event.invoiceFiles?.length > 0    && <Tooltip title={`ใบวางบิล: ${event.invoiceFiles.length} ไฟล์`}><Description sx={{ fontSize: 17, color: "#f59e0b", opacity: 0.8 }} /></Tooltip>}
-                  {event.completionFiles?.length > 0 && <Tooltip title={`ใบส่งมอบงาน: ${event.completionFiles.length} ไฟล์`}><Description sx={{ fontSize: 17, color: "#07941a", opacity: 0.8 }} /></Tooltip>}
-                  {event.activityLog?.length > 0 && (
-                    <Tooltip title={`${event.activityLog.length} กิจกรรม`}>
-                      <History sx={{ fontSize: 17, color: "#f59e0b", opacity: 0.8 }} />
-                    </Tooltip>
+                {/* ✅ ย่อช่วงวันที่ให้กระชับ (ดู formatEventDateRange) — ถ้าอยู่ปีเดียวกัน/เดือนเดียวกัน
+                    ไม่ต้องพิมพ์เดือนปีซ้ำสองรอบ กันตัดขึ้นบรรทัดใหม่แบบขาดกลางวันที่บนจอแคบด้วย */}
+                <Typography variant="caption" color="text.secondary" fontWeight={600} noWrap>
+                  📅 {formatEventDateRange(event)}
+                </Typography>
+              </Stack>
+
+              {/* ✅ ไอคอนเอกสาร/กิจกรรม แยกเป็นบรรทัดของตัวเองเต็มความกว้าง ชิดขวา — เดิมพยายามยัด
+                  ไว้แถวเดียวกับป้ายสถานะ/ลอยไปแถวบนสุดฝั่งขวาซึ่งไปเบียด/ทับกับป้ายสถานะบนจอแคบ
+                  (ความกว้างไม่พอ) อยู่คนละบรรทัดเต็มความกว้างการ์ดแบบนี้รับประกันว่าไม่ทับกันแน่นอน
+                  ไม่ว่าป้ายสถานะ/วันที่จะยาวแค่ไหน — เปลี่ยนไอคอนเอกสารแต่ละชนิดให้ไม่ซ้ำกัน (เทียบ
+                  pattern เดียวกับ DOCUMENT_TYPES ใน TechnicianJobPanel.js) และคั่นกลุ่ม "เอกสาร" กับ
+                  "กิจกรรม/ข้อความ/กลุ่มงาน" ด้วยเส้นแบ่งบางๆ ให้อ่านง่าย ไม่ปนกันรก */}
+              {(event.reportFiles?.length > 0 || event.quotationFiles?.length > 0 || event.invoiceFiles?.length > 0 || event.completionFiles?.length > 0 || event.activityLog?.length > 0 || event.comments?.length > 0 || event.jobGroupId) && (
+                <Stack direction="row" alignItems="center" justifyContent="flex-end" gap={0.7}
+                  divider={<Divider orientation="vertical" flexItem sx={{ height: 14, my: "auto" }} />}
+                  sx={{ mb: 0.5 }}>
+                  {(event.reportFiles?.length > 0 || event.quotationFiles?.length > 0 || event.invoiceFiles?.length > 0 || event.completionFiles?.length > 0) && (
+                    <Stack direction="row" alignItems="center" gap={0.5}>
+                      {event.reportFiles?.length > 0     && <Tooltip title={`Service Report: ${event.reportFiles.length} ไฟล์`}><Description sx={{ fontSize: 16, color: "#3b82f6", opacity: 0.85 }} /></Tooltip>}
+                      {event.quotationFiles?.length > 0  && <Tooltip title={`ใบเสนอราคา: ${event.quotationFiles.length} ไฟล์`}><RequestQuote sx={{ fontSize: 16, color: "#ef4444", opacity: 0.85 }} /></Tooltip>}
+                      {event.invoiceFiles?.length > 0    && <Tooltip title={`ใบวางบิล: ${event.invoiceFiles.length} ไฟล์`}><ReceiptLong sx={{ fontSize: 16, color: "#f59e0b", opacity: 0.85 }} /></Tooltip>}
+                      {event.completionFiles?.length > 0 && <Tooltip title={`ใบส่งมอบงาน: ${event.completionFiles.length} ไฟล์`}><AssignmentTurnedIn sx={{ fontSize: 16, color: "#07941a", opacity: 0.85 }} /></Tooltip>}
+                    </Stack>
                   )}
-                  {event.comments?.length > 0 && (
-                    <Tooltip title={`${event.comments.length} ข้อความ`}>
-                      <Chat sx={{ fontSize: 17, color: "#3b82f6", opacity: 0.8 }} />
-                    </Tooltip>
-                  )}
-                  {event.jobGroupId && (
-                    <Tooltip title="งานนี้เป็นส่วนหนึ่งของงานหลายวัน (กลุ่มเดียวกัน)">
-                      <LinkIcon sx={{ fontSize: 17, color: "#8b5cf6", opacity: 0.8 }} />
-                    </Tooltip>
+                  {(event.activityLog?.length > 0 || event.comments?.length > 0 || event.jobGroupId) && (
+                    <Stack direction="row" alignItems="center" gap={0.5}>
+                      {event.activityLog?.length > 0 && (
+                        <Tooltip title={`${event.activityLog.length} กิจกรรม`}>
+                          <History sx={{ fontSize: 16, color: "text.disabled" }} />
+                        </Tooltip>
+                      )}
+                      {event.comments?.length > 0 && (
+                        <Tooltip title={`${event.comments.length} ข้อความ`}>
+                          <Chat sx={{ fontSize: 16, color: "text.disabled" }} />
+                        </Tooltip>
+                      )}
+                      {event.jobGroupId && (
+                        <Tooltip title="งานนี้เป็นส่วนหนึ่งของงานหลายวัน (กลุ่มเดียวกัน)">
+                          <LinkIcon sx={{ fontSize: 16, color: "text.disabled" }} />
+                        </Tooltip>
+                      )}
+                    </Stack>
                   )}
                 </Stack>
-              </Stack>
-              <Typography fontWeight={700} fontSize="0.95rem" noWrap>
-                {companySite(event.company, event.site)}
-              </Typography>
-              <Stack direction="row" flexWrap="wrap" gap={1} mt={0.3}>
-                <Typography variant="caption" color="text.secondary">
-                  📅 {moment(event.start).locale("th").format("DD MMM YYYY")}
-                  {/* ✅ event.end ของงานแบบ allDay ถูกบวกไป 1 วันตอนบันทึก (ค่า end แบบ exclusive ของ FullCalendar)
-                      ต้องลบ 1 วันคืนตอนแสดงผล ไม่งั้นวันที่ที่โชว์ในหน้า operation จะเพี้ยนไม่ตรงกับหน้า event
-                      และแสดงแค่วันที่ ไม่รวมเวลา เพราะเวลาจริงที่ผู้ใช้กรอกอยู่ใน startTime/endTime แยกต่างหาก */}
-                  {event.end && ` — ${moment(event.end).subtract(event.allDay ? 1 : 0, "days").locale("th").format("DD MMM YYYY")}`}
+              )}
+
+              {event.title && (
+                <Typography fontWeight={700} fontSize="0.95rem" noWrap>
+                  [{event.title}]
                 </Typography>
+              )}
+              <Stack spacing={0.3} sx={{ mt: 0.4 }}>
+                {event.system && <InfoLine icon="💻" label="ระบบ">{event.system}</InfoLine>}
+                <InfoLine icon="🏢" label="โครงการ">{companySite(event.company, event.site)}</InfoLine>
+                {/* ✅ ย้ายมาไว้ถัดจากโครงการตามที่ขอ (เดิมอยู่คู่กับระบบด้านบนสุด) */}
+                {event.time && <InfoLine icon="🔢" label="ครั้งที่">{event.time}</InfoLine>}
                 {(event.startTime || event.endTime) && (
-                  <Typography variant="caption" color="text.secondary">
-                    🕐 {event.startTime || "-"} — {event.endTime || "-"}
-                  </Typography>
+                  <InfoLine icon="🕐" label="เวลา">{event.startTime || "-"} — {event.endTime || "-"}</InfoLine>
                 )}
                 {/* ✅ ถ้ายังไม่มีเลขเอกสาร ซ่อนช่อง "ใส่เลขที่เอกสาร" ไว้ตอนพับการ์ด — เดิมโชว์ทุกการ์ด
                     ในลิสต์ตลอดเวลาแม้ยังไม่มีข้อมูล ดูรกเวลามีงานหลายรายการ ให้กดขยายก่อนค่อยใส่ */}
@@ -1404,14 +1651,29 @@ const EventRowCard = ({
                       <Button size="small" color="inherit" onClick={() => setEditingDoc(false)} sx={{ minWidth: "auto", p: 0.5, fontSize: "0.7rem" }}>ยกเลิก</Button>
                     </Stack>
                   ) : (
-                    <Typography variant="caption"
-                      color={event.docNo ? "text.secondary" : "text.disabled"}
-                      onClick={e => { e.stopPropagation(); canEdit && setEditingDoc(true); }}
-                      sx={{ cursor: canEdit ? "pointer" : "default", "&:hover": canEdit ? { color: "primary.main", textDecoration: "underline" } : {} }}>
-                      📄 {event.docNo || "ใส่เลขที่เอกสาร"}
-                    </Typography>
+                    <Stack direction="row" spacing={0.5}
+                      sx={{ alignItems: "flex-start", cursor: canEdit ? "pointer" : "default" }}
+                      onClick={e => { e.stopPropagation(); canEdit && setEditingDoc(true); }}>
+                      <Typography variant="caption" color={event.docNo ? "text.secondary" : "text.disabled"} sx={{ flexShrink: 0, whiteSpace: "nowrap", "&:hover": canEdit ? { color: "primary.main", textDecoration: "underline" } : {} }}>
+                        📄 เอกสาร :
+                      </Typography>
+                      <Typography variant="caption" color={event.docNo ? "text.secondary" : "text.disabled"} sx={{ minWidth: 0, "&:hover": canEdit ? { color: "primary.main", textDecoration: "underline" } : {} }}>
+                        {event.docNo || "ใส่เลขที่เอกสาร"}
+                      </Typography>
+                    </Stack>
                   )
                 )}
+                {/* ✅ ทีม อยู่ล่างสุดของรายการ — เพิ่มชื่อลูกทีมเพิ่มเติม (teamMembers) ต่อท้ายชื่อทีม/
+                    หัวหน้าทีมด้วย (เดิมมีแค่ event.team ตัวเดียว ไม่เห็นลูกทีมที่เพิ่มมาเลย) กันชื่อซ้ำ
+                    ด้วย filter dedupe (เทียบ pattern เดียวกับ teamDisplay ใน EventCalendar/index.js) */}
+                {(() => {
+                  const teamNames = [event.team, ...(event.teamMembers || []).map(m => m?.name)]
+                    .filter(Boolean)
+                    .filter((name, idx, arr) => arr.indexOf(name) === idx);
+                  return teamNames.length > 0 && (
+                    <InfoLine icon="👷" label="ทีม">{teamNames.join(", ")}</InfoLine>
+                  );
+                })()}
               </Stack>
               {/* เวลาเข้า/ออก */}
               {(event.checkedInAt || event.checkedOutAt) && (
@@ -1432,12 +1694,10 @@ const EventRowCard = ({
               )}
             </Box>
           </Stack>
+          {/* ✅ ตัดไอคอนลูกศรบอกสถานะกาง/พับออกไปเลยตามที่ขอ (ดูรกเกินไป) — ทั้งแถว Header ยังคงกด
+              เพื่อดูรายละเอียดได้เหมือนเดิม (ไอคอนเอกสาร/กิจกรรมย้ายไปอยู่คนละบรรทัดเต็มความกว้าง
+              ด้านล่างแทน — ดูเหตุผลที่ "แถวไอคอนเอกสาร/กิจกรรม" กันไม่ให้ไปเบียด/ทับกับป้ายสถานะ) */}
           <Stack direction="row" gap={0.5} flexShrink={0}>
-            {/* ✅ ไม่มี onClick ของตัวเองแล้ว — แค่ไอคอนบอกสถานะกาง/พับ ตัวกดจริงคือทั้งแถว Header
-                ด้านบน (คลิกบับเบิลขึ้นมาถึงเอง) กันปัญหาเดิมที่กดซ้อนกับ handler บนแล้วพับคืนทันที */}
-            <IconButton sx={{ p: 1, pointerEvents: "none" }}>
-              {expanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
-            </IconButton>
             {canEdit && (
               <IconButton onClick={e => { e.stopPropagation(); setMoreAnchorEl(e.currentTarget); }} sx={{ p: 1 }}>
                 <MoreVert fontSize="small" />
@@ -1456,8 +1716,13 @@ const EventRowCard = ({
         </Menu>
 
         {/* แจ้งเตือนคำขอปิดงานจากช่าง (ยังไม่อนุมัติ) — ใช้ Box แทน Alert action slot
-            เพราะ Alert วางข้อความ+ปุ่มแถวเดียวกันแล้วทับ/ล้นกันบนจอมือถือ */}
-        {event.closeRequested && localStatus !== "ดำเนินการเสร็จสิ้น" && (
+            เพราะ Alert วางข้อความ+ปุ่มแถวเดียวกันแล้วทับ/ล้นกันบนจอมือถือ
+            ✅ งานที่เข้าหลายวัน (กลุ่มเดียวกัน) ตอนขอปิดงานตอนนี้ตั้ง closeRequested:true ให้ทุกวัน
+            ในกลุ่มพร้อมกัน (ดู handleRequestClose) — ถ้าไม่ซ่อนตรงนี้ด้วย แต่ละวันในกลุ่มจะโชว์กล่อง
+            อนุมัติ/ไม่อนุมัติซ้ำกันทุกวัน ทั้งที่กดปุ่มไหนก็ปิดทั้งกลุ่มเหมือนกันหมด (onApproveClose/
+            onRejectClose resolve ทั้งกลุ่มอยู่แล้ว) จึงโชว์แค่การ์ดตัวแทนของกลุ่มพอ (เทียบ pattern
+            เดียวกับ hideDocuments ที่ซ่อนเอกสารประจำงานในการ์ดรายวันที่เหลือ) */}
+        {!hideDocuments && event.closeRequested && localStatus !== "ดำเนินการเสร็จสิ้น" && (
           <Box sx={{
             mt: 1.5, p: 1.5, borderRadius: 2,
             bgcolor: alpha("#f59e0b", 0.08),
@@ -1489,8 +1754,9 @@ const EventRowCard = ({
           </Box>
         )}
 
-        {/* ประวัติการไม่อนุมัติล่าสุด (ถ้ายังไม่มีการขอปิดงานใหม่เข้ามา) */}
-        {!event.closeRequested && event.closeRejectReason && localStatus !== "ดำเนินการเสร็จสิ้น" && (
+        {/* ประวัติการไม่อนุมัติล่าสุด (ถ้ายังไม่มีการขอปิดงานใหม่เข้ามา) — ซ่อนในการ์ดรายวันที่เหลือ
+            ของกลุ่มเหมือนกัน (ดูเหตุผลด้านบน) เพราะไม่อนุมัติก็ propagate ไปทั้งกลุ่มเหมือนกันแล้ว */}
+        {!hideDocuments && !event.closeRequested && event.closeRejectReason && localStatus !== "ดำเนินการเสร็จสิ้น" && (
           <Box sx={{
             mt: 1.5, p: 1.5, borderRadius: 2,
             bgcolor: alpha("#ef4444", 0.08),
@@ -1551,127 +1817,28 @@ const EventRowCard = ({
           ))}
         </Menu>
 
-        {/* Expanded */}
-        <Collapse in={expanded}>
-          <Divider sx={{ my: 2 }} />
-          <Grid container spacing={2}>
-            {event.workNote && (
-              <Grid item xs={12}>
-                <Typography variant="caption" fontWeight={700} color="text.secondary"
-                  sx={{ textTransform: "uppercase", letterSpacing: 0.5, display: "block", mb: 0.5 }}>
-                  สรุปงานที่ทำ (ช่าง)
-                </Typography>
-                <Box sx={{
-                  p: 1.5, borderRadius: 2, border: "1px solid",
-                  borderColor: alpha("#3b82f6", 0.25), background: alpha("#3b82f6", 0.04),
-                }}>
-                  <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: "pre-line", lineHeight: 1.7 }}>
-                    {event.workNote}
-                  </Typography>
-                </Box>
-              </Grid>
-            )}
-
-                        {hideDocuments && !showDocsOverride && (
-              <Grid item xs={12}>
-                <Button size="small" onClick={() => setShowDocsOverride(true)}
-                  sx={{ textTransform: "none", fontSize: "0.75rem", color: "text.secondary" }}>
-                  📄 เอกสารหลักอยู่ที่การ์ดวันล่าสุด — กดเพื่อแนบ/แก้ไฟล์แยกเฉพาะวันนี้
-                </Button>
-              </Grid>
-            )}
-            {(!hideDocuments || showDocsOverride) && (
-              <Grid item xs={12} sm={6}>
-              <FileUploadSection
-                eventId={event._id} type="report" label="Service Report"
-                files={event.reportFiles}
-                onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
-                uploading={isUploadingState.report && uploadingState.report === event._id}
-                progress={uploadProgressState.report}
-                uploading_size={uploadingFileSizeState.report}
-                currentUserRole={currentUserRole}
-              />
-            </Grid>
-            )}
-            {(!hideDocuments || showDocsOverride) && (
-            <Grid item xs={12} sm={6}>
-              <FileUploadSection
-                eventId={event._id} type="quotation" label="ใบเสนอราคา"
-                files={event.quotationFiles}
-                applicable={event.quotationApplicable}
-                onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
-                uploading={isUploadingState.quotation && uploadingState.quotation === event._id}
-                progress={uploadProgressState.quotation}
-                uploading_size={uploadingFileSizeState.quotation}
-                currentUserRole={currentUserRole}
-              />
-            </Grid>
-            )}
-
-            {(!hideDocuments || showDocsOverride) && (
-             <Grid item xs={12} sm={6}>
-              <FileUploadSection
-                eventId={event._id} type="invoice" label="ใบวางบิล"
-                files={event.invoiceFiles}
-                applicable={event.invoiceApplicable}
-                onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
-                uploading={isUploadingState.invoice && uploadingState.invoice === event._id}
-                progress={uploadProgressState.invoice}
-                uploading_size={uploadingFileSizeState.invoice}
-                currentUserRole={currentUserRole}
-              />
-            </Grid>
-            )}
-
-            {(!hideDocuments || showDocsOverride) && (
-             <Grid item xs={12} sm={6}>
-              <FileUploadSection
-                eventId={event._id} type="completion" label="ใบส่งมอบงาน"
-                files={event.completionFiles}
-                applicable={event.completionApplicable}
-                onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
-                uploading={isUploadingState.completion && uploadingState.completion === event._id}
-                progress={uploadProgressState.completion}
-                uploading_size={uploadingFileSizeState.completion}
-                currentUserRole={currentUserRole}
-              />
-            </Grid>
-            )}
-
-            {/* <Grid item xs={12}>
-              <Stack direction="row" flexWrap="wrap" gap={1} alignItems="center">
-                <Typography variant="caption" fontWeight={700} color="text.secondary">การเงิน:</Typography>
-                {STATUS_BILLING.map(s => (
-                  <Chip key={s} label={s} size="small"
-                    clickable={canEdit}
-                    variant={[event.status_two, event.status_three].includes(s) ? "filled" : "outlined"}
-                    color={s === "เก็บเงินแล้ว" ? "success" : "warning"}
-                    onClick={() => canEdit && onInputUpdate(event._id, { status_two: s, status_three: s })}
-                    sx={{ fontSize: "0.72rem" }}
-                  />
-                ))}
-              </Stack>
-            </Grid> */}
-
-            {/* คุยกับช่าง (เช่น ตอบคำขอใบเสนอราคา) */}
-            <Grid item xs={12}>
-              <Divider sx={{ mb: 1.5 }} />
-              <Typography variant="caption" fontWeight={700} color="text.secondary"
-                sx={{ textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 0.5, mb: 1 }}>
-                <Chat sx={{ fontSize: 14 }} /> คุยกับช่าง{(event.comments || []).length > 0 && ` (${event.comments.length})`}
-              </Typography>
-              <CommentThread comments={event.comments} onSend={handleSendComment} myRole={currentUserRole} />
-            </Grid>
-
-            {event.activityLog?.length > 0 && (
-              <Grid item xs={12}>
-                <Divider sx={{ mb: 1.5 }} />
-                <ActivityLogMini logs={event.activityLog} />
-              </Grid>
-            )}
-          </Grid>
-        </Collapse>
+        {/* Expanded — เปิดเป็น Dialog ทับขึ้นมาเสมอ ไม่ว่าจอเล็ก/ใหญ่ ไม่ต้องกางลงดันการ์ดอื่น/
+            เลื่อนจอตามอีกต่อไป — จอเล็ก (มือถือ) เปิดแบบเต็มจอ (fullScreen) แทนกล่องลอย */}
       </CardContent>
+
+      <Dialog open={expanded} onClose={() => setExpanded(false)} fullWidth maxWidth="md" fullScreen={!isDesktop}>
+          <DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography fontWeight={800} fontSize="1rem" noWrap>
+                {companySite(event.company, event.site)}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                เอกสาร/คุยกับช่าง/ประวัติ
+              </Typography>
+            </Box>
+            <IconButton size="small" onClick={() => setExpanded(false)}>
+              <Close fontSize="small" />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent dividers>
+            {expandedContent}
+          </DialogContent>
+        </Dialog>
     </Wrapper>
   );
 };
@@ -1931,21 +2098,22 @@ const JobGroupBlock = ({ sessions, currentUserRole, ...cardProps }) => {
 
   // ✅ รวมงานทั้งกลุ่ม (หัวข้อ + ทุกวัน) ไว้ใน GlassCard ใบเดียวกันเลย (ไม่ใช่การ์ดแยกคนละใบ)
   // แต่ละวันคั่นด้วย Divider แทน — เพื่อให้เห็นชัดว่าเป็น "งานเดียวกัน" จริงๆ ไม่ใช่แค่จัดกลุ่มแยกกันไว้
+  // ✅ เปลี่ยนจากม่วง (#8b5cf6) เป็นสีธีมแอพ (แดง) ให้ตรงกับธีมสีของทั้งแอพ
   return (
-    <GlassCard sx={{ mb: 2, border: "1px solid", borderColor: alpha("#8b5cf6", 0.3) }}>
+    <GlassCard sx={{ mb: 2, border: "1px solid", borderColor: alpha("#dc2626", 0.3) }}>
       <Box
         onClick={() => setExpanded(p => !p)}
         sx={{
-          p: 2, cursor: "pointer", background: alpha("#8b5cf6", 0.04),
-          borderBottom: expanded ? "1px solid" : "none", borderColor: alpha("#8b5cf6", 0.2),
+          p: 2, cursor: "pointer", background: alpha("#dc2626", 0.04),
+          borderBottom: expanded ? "1px solid" : "none", borderColor: alpha("#dc2626", 0.2),
         }}>
         <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
-          <CalendarMonth sx={{ fontSize: 18, color: "#8b5cf6" }} />
-          <Typography variant="body2" fontWeight={700} color="#8b5cf6">
+          <CalendarMonth sx={{ fontSize: 18, color: "#dc2626" }} />
+          <Typography variant="body2" fontWeight={700} color="#dc2626">
             {companySite(head.company, head.site)} — {head.title}{head.system && ` · ${head.system}`}{head.time && ` ครั้งที่ ${head.time}`}
           </Typography>
           <Chip label={`เข้างาน ${totalWorkDays} วัน`} size="small"
-            sx={{ height: 20, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha("#8b5cf6", 0.15), color: "#8b5cf6" }} />
+            sx={{ height: 20, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha("#dc2626", 0.15), color: "#dc2626" }} />
           <Typography variant="caption" color="text.secondary">
             📅 {rangeStart} – {rangeEnd}
           </Typography>
@@ -1965,9 +2133,9 @@ const JobGroupBlock = ({ sessions, currentUserRole, ...cardProps }) => {
               variant={s._id === anchorId ? "filled" : "outlined"}
               sx={{
                 height: 20, fontSize: "0.68rem",
-                borderColor: alpha("#8b5cf6", 0.35),
-                bgcolor: s._id === anchorId ? alpha("#8b5cf6", 0.2) : "transparent",
-                color: "#8b5cf6", fontWeight: s._id === anchorId ? 700 : 400,
+                borderColor: alpha("#dc2626", 0.35),
+                bgcolor: s._id === anchorId ? alpha("#dc2626", 0.2) : "transparent",
+                color: "#dc2626", fontWeight: s._id === anchorId ? 700 : 400,
               }} />
             );
           })}
@@ -2043,8 +2211,42 @@ const Operation = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ✅ ?highlight=<id> (+ ?group=) — ใช้ตอนกดปุ่ม "ตรวจสอบ" จากพาแนล "งานที่ช่างขอปิด" พาไปที่
+  // รายการงานทั้งหมด (ไม่ใช่ /operation/:id ที่กรองเหลือแค่งานเดียวโดดๆ) แล้วเลื่อนจอ + ไฮไลต์กรอบ
+  // กระพริบไปที่งานนั้นแทน — ต้องแยกเป็น effect ของตัวเอง (deps: [searchParams] ไม่ใช่ mount-only
+  // แบบด้านบน) เพราะ ClosureRequestsPanel อยู่ในหน้า Operation หน้าเดียวกันอยู่แล้ว กด "ตรวจสอบ"
+  // ซ้ำจึงแค่เปลี่ยน query param โดยไม่ remount หน้าใหม่ ถ้าใช้ effect แบบ mount-only ([]) จะไม่
+  // ทำงานซ้ำเลย ต้องรีเฟรชหน้าเองก่อนถึงจะเห็นผล (ตามที่ผู้ใช้เจอ)
+  // ✅ ต้องล้างตัวกรองอื่นๆ ที่อาจค้างมาจากก่อนหน้าด้วย (เช่นมาจาก Dashboard ด้วย ?status=...&group=...
+  // ทำให้ filterOP/statusGroup ค้างค่าเดิมอยู่) เพราะ filterOP ที่ค้างอยู่จะ bypass การกรองตาม
+  // group ไปเลย (ดู matchGroup) ทำให้งานที่จะไฮไลต์หลุดจากรายการที่กรองอยู่ กด "ตรวจสอบ" แล้วไม่
+  // เจองาน/ไม่เลื่อนให้เหมือนที่ผู้ใช้เจอ — ล้างทุกตัวกรอง + เปิด "ทั้งหมด" (ไม่จำกัดเดือน) ให้แน่ใจ
+  // ว่างานที่จะไฮไลต์จะอยู่ในรายการที่กรองแล้วเสมอ ไม่ว่าก่อนหน้านี้จะมาจากหน้าไหนด้วยตัวกรองอะไรมา
+  useEffect(() => {
+    const groupParam = searchParams.get("group");
+    const highlightParam = searchParams.get("highlight");
+    if (highlightParam) {
+      setFilterType("");
+      setFilterSystem("");
+      setFilterStatus("");
+      setFilterOP("");
+      setFilterTeam("");
+      setSearch("");
+      setShowAll(true);
+      if (groupParam) setStatusGroup(groupParam);
+      // ✅ เก็บเป็น "<id>|<nonce>" ไม่ใช่ id เฉยๆ — กันเคสกดปุ่ม "ตรวจสอบ" งานเดิมซ้ำติดๆ กัน
+      // (ก่อนที่ไฮไลต์ครั้งก่อนจะจางหายไปครบ 3 วิ) ถ้าเก็บแค่ id เฉยๆ ค่าจะเหมือนเดิมทุกตัวอักษร
+      // React จะมองว่าไม่มีอะไรเปลี่ยน (bail out) ไม่ trigger effect เลื่อนจอซ้ำให้ — ต่อ nonce
+      // (จาก ?t=) เข้าไปด้วยการันตีว่าค่า state เปลี่ยนจริงทุกครั้งที่กด ไม่ว่าจะกดงานเดิมกี่ครั้ง
+      setHighlightId(`${highlightParam}|${searchParams.get("t") || Date.now()}`);
+    }
+  }, [searchParams]);
+
   const [page,     setPage]     = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(5);
+  const [highlightId, setHighlightId] = useState("");
+  // ✅ ส่วน id จริงล้วนๆ (ตัด nonce ทิ้ง) ใช้เทียบ/หา DOM element จริง
+  const highlightJobId = highlightId ? highlightId.split("|")[0] : "";
 
   const [previewUrl,       setPreviewUrl]        = useState(null);
   const [previewFileName,  setPreviewFileName]   = useState("");
@@ -2052,6 +2254,7 @@ const Operation = () => {
   const [pendingDelete,    setPendingDelete]      = useState(null);
   const [snackbar,         setSnackbar]           = useState({ open: false, msg: "", severity: "success" });
   const [currentUserRole,  setCurrentUserRole]    = useState("");
+  const isAdminOrManager = ["admin", "manager"].includes(currentUserRole);
 
   const [uploadingState,         setUploadingState]         = useState({ quotation: null, report: null, invoice: null, completion: null });
   const [uploadProgressState,    setUploadProgressState]    = useState({ quotation: 0, report: 0, invoice: 0, completion:0 });
@@ -2122,7 +2325,36 @@ const Operation = () => {
 
   // ✅ ต้องคำนวณก่อน filteredEvents (ใช้ตัดสิน default group ด้านล่าง) — ย้ายขึ้นมาจากที่เดิม
   // ที่อยู่ถัดจาก filteredEvents เพราะตอนนั้นยังไม่ต้องใช้ค่านี้ตอนกรอง
-  const pendingCount = useMemo(() => events.filter(e => e.closeRequested === true && e.status !== "ดำเนินการเสร็จสิ้น").length, [events]);
+  // ✅ เดิมนับทุกแถว event ดิบ — งานที่เข้าหลายวันไม่ติดกัน (jobGroupId เดียวกัน) ขอปิดพร้อมกันทั้ง
+  // กลุ่มแล้ว (ดู handleRequestClose) ทำให้ตัวเลขนี้เพี้ยนสูงกว่าจำนวนงานจริง (เช่น 1 งานเข้า 3 วัน
+  // ขึ้นเป็น "3 งาน") ใช้ countDistinctJobs จัดกลุ่มก่อนนับแทน ให้ตรงกับจำนวนงานจริงที่เห็นในพาแนล
+  const pendingCount = useMemo(
+    () => countDistinctJobs(events, e => e.closeRequested === true && e.status !== "ดำเนินการเสร็จสิ้น"),
+    [events]
+  );
+
+  // ✅ ฝั่งช่างเหลือแค่ "ค้างงาน" กับ "เสร็จสิ้น" (รอผู้ดูแลอนุมัติ/กำลังดำเนินการ ย้ายไปจัดการที่
+  // หน้า "งานของฉัน" หมดแล้ว) จึง default ไปที่ "overdue" แทน "pending" ที่ไม่มีให้เลือกอีกต่อไป
+  // ✅ แอดมิน/manager: ถ้าไม่มีงานรอคุณอนุมัติเลย ให้การ์ด "กำลังดำเนินการ/ยืนยันแล้ว" ติดสว่างเป็นค่า
+  // เริ่มต้นแทน "รอคุณอนุมัติ" ที่ว่างเปล่า ให้ตรงกับรายการที่แสดงจริงด้านล่าง (ดู defaultGroup ข้างล่าง)
+  // ✅ ยกเว้น: ถ้ามาจากลิงก์เจาะจงสถานะ (?status=... ตั้ง filterOP ไว้) แต่ไม่ได้ระบุ ?group= มาด้วย
+  // อย่า fallback ไปเดาแท็บ default ให้ — เพราะ filterOP กรองผลลัพธ์ตรงๆ อยู่แล้ว (ไม่ผ่าน group เลย
+  // ดู matchGroup ด้านล่าง) ถ้าแท็บ default ติดสว่างทั้งที่ไม่ตรงกับรายการที่เห็นจริงจะยิ่งทำให้สับสน
+  // ✅ เดียวกันกับตอนเปิดงานเจาะจงตัวเดียว (/operation/:id) — งานบางสถานะ (เช่น "กำลังรอยืนยัน"
+  // ที่พบบ่อยในงานที่ "กำลังจะถึง" จาก Dashboard) ไม่มีแท็บกลุ่มไหนตรงกับสถานะนี้เลย (ดู
+  // resolveOperationGroup) ทำให้ลิงก์ไม่ได้ส่ง ?group= มาด้วย ถ้ายัง fallback ไปเดาแท็บ default
+  // จะติดสว่างผิดแท็บเหมือนเดิม — มี id แปลว่ากำลังดูงานเจาะจงตัวเดียวอยู่แล้ว ไม่ควรเดาแท็บกลุ่ม
+  // ✅ ย้ายมาไว้ก่อน sortedEvents (เดิมอยู่ท้ายไฟล์ใกล้ render) เพราะตอนนี้ sortedEvents ต้องรู้ว่า
+  // กำลังดูแท็บ "ค้างงาน" อยู่หรือเปล่า เพื่อเรียงงานตามความรุนแรง (วันที่ค้างมากสุดก่อน) แทน
+  const effectiveGroup =
+    statusGroup ||
+    (filterOP || id
+      ? ""
+      : isAdminOrManager
+        ? pendingCount > 0
+          ? "pending"
+          : "active"
+        : "overdue");
 
   const filteredEvents = useMemo(() => {
   if (id && selectedEvent) return [selectedEvent];
@@ -2149,7 +2381,11 @@ const Operation = () => {
     // จนเลยกำหนดโดยไม่เคยถูกยืนยันเลยตั้งแต่แรกคืองานที่กลุ่ม "ค้างงาน" ต้องจับให้ได้มากที่สุด —
     // ตัดออกเสมอทำให้ตัวเลขบน badge (นับจาก isFlaggedDays ตรงๆ ไม่รู้จัก exclusion นี้) กับรายการที่
     // แสดงจริงไม่ตรงกัน (เห็น badge ว่า 3 งาน แต่เปิดมา "ไม่พบรายการ") จึงงดเว้นเฉพาะตอนดูกลุ่มนี้
-    const matchNotPending = (filterOP === "กำลังรอยืนยัน" || group === "overdue")
+    // ✅ กลุ่ม "pending" (รอคุณอนุมัติ) เจอบั๊กเดียวกัน — งานที่ช่างขอปิดตั้งแต่ยังไม่เคยถูกยืนยัน
+    // สถานะเลย (status ยังเป็น "กำลังรอยืนยัน" อยู่ แต่ closeRequested:true แล้ว) ถูกตัดออกจากรายการ
+    // ทั้งที่ pendingCount/ClosureRequestsPanel นับรวมงานนี้ไว้แล้ว ทำให้เห็น badge "2 งาน" แต่เปิด
+    // แท็บมาแล้วเจอ "ไม่พบรายการ" ว่างเปล่า ต้องงดเว้นตัดออกในกลุ่มนี้ด้วยเช่นกัน
+    const matchNotPending = (filterOP === "กำลังรอยืนยัน" || group === "overdue" || group === "pending")
       ? true
       : event.status !== "กำลังรอยืนยัน";
 
@@ -2172,12 +2408,29 @@ const Operation = () => {
   });
 }, [id, selectedEvent, events, dateSearch, filterType, filterSystem, filterStatus, filterOP, filterTeam, search, statusGroup, currentUserRole, daysPastDueMap, pendingCount]);
 
-  const sortedEvents      = useMemo(() => filteredEvents.slice().sort((a, b) => new Date(b.start) - new Date(a.start)), [filteredEvents]);
+  // ✅ แท็บ "ค้างงาน" เดิมเรียงตามวันที่เริ่มงานเหมือนแท็บอื่นๆ ทำให้ป้าย "เลยกำหนด X วัน" โผล่มาแบบ
+  // สลับมั่วไม่มีลำดับ (เช่น 10, 14, 13, 20 วัน สลับกันไปมา) ดูยากว่างานไหนควรรีบทำก่อน — เรียง
+  // ตามจำนวนวันที่ค้างมากสุดก่อนแทนเฉพาะแท็บนี้ ให้เห็นชัดว่างานไหนเร่งด่วนที่สุดอยู่บนสุดเสมอ
+  // (แท็บอื่นยังเรียงตามวันที่เริ่มงานล่าสุดก่อนเหมือนเดิม)
+  const sortedEvents = useMemo(() => {
+    if (effectiveGroup === "overdue") {
+      return filteredEvents.slice().sort((a, b) => {
+        const daysA = daysPastDueMap.get(a._id)?.days ?? 0;
+        const daysB = daysPastDueMap.get(b._id)?.days ?? 0;
+        return daysB - daysA;
+      });
+    }
+    return filteredEvents.slice().sort((a, b) => new Date(b.start) - new Date(a.start));
+  }, [filteredEvents, effectiveGroup, daysPastDueMap]);
   const activeFilterCount = [filterType, filterSystem, filterStatus, filterOP, search.trim(), filterTeam].filter(Boolean).length;
 
   // นับจำนวนงานแต่ละกลุ่มไว้โชว์บน toggle — อ้างอิงจาก events ทั้งหมด ไม่ผ่านตัวกรองอื่น
-  const closedCount   = useMemo(() => events.filter(e => e.status === "ดำเนินการเสร็จสิ้น").length, [events]);
-  const inProgressCount  = useMemo(() => events.filter(e => ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(e.status) && !e.closeRequested).length, [events]);
+  // ✅ ใช้ countDistinctJobs จัดกลุ่มก่อนนับเหมือนกัน (เทียบเหตุผลเดียวกับ pendingCount ด้านบน)
+  const closedCount   = useMemo(() => countDistinctJobs(events, e => e.status === "ดำเนินการเสร็จสิ้น"), [events]);
+  const inProgressCount  = useMemo(
+    () => countDistinctJobs(events, e => ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(e.status) && !e.closeRequested),
+    [events]
+  );
   const overdueCount     = useMemo(() => countFlaggedJobs(events, daysPastDueMap, isFlaggedDays), [events, daysPastDueMap]);
   const severeOverdueCount = useMemo(() => countFlaggedJobs(events, daysPastDueMap, isSevereDays), [events, daysPastDueMap]);
 
@@ -2222,6 +2475,27 @@ const Operation = () => {
     () => jobGroups.slice((page - 1) * pageSize, page * pageSize),
     [jobGroups, page, pageSize]
   );
+
+  // ✅ ?highlight=<id> (จากปุ่ม "ตรวจสอบ" ในพาแนล "งานที่ช่างขอปิด") — งานที่ต้องการอาจไม่ได้อยู่
+  // หน้าแรกของรายการ (แบ่งหน้าอยู่) ต้องหาก่อนว่างานนี้อยู่หน้าไหนแล้วกระโดดไปหน้านั้นให้อัตโนมัติ
+  useEffect(() => {
+    if (!highlightJobId || jobGroups.length === 0) return;
+    const idx = jobGroups.findIndex(sessions => sessions.some(s => s._id === highlightJobId));
+    if (idx === -1) return;
+    const targetPage = Math.floor(idx / pageSize) + 1;
+    setPage(p => (p === targetPage ? p : targetPage));
+  }, [highlightJobId, jobGroups, pageSize]);
+
+  // ✅ พอเปลี่ยนไปหน้าที่ถูกต้องแล้ว (pagedGroups อัปเดต) ค่อยเลื่อนจอไปหาการ์ดนั้นจริงๆ แล้วเคลียร์
+  // highlightId ทิ้งหลังจากนั้นสักพัก ให้กรอบไฮไลต์กระพริบแค่ชั่วคราว ไม่ค้างตลอดไป
+  useEffect(() => {
+    if (!highlightJobId) return;
+    const el = document.getElementById(`job-card-${highlightJobId}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    const timer = setTimeout(() => setHighlightId(""), 3000);
+    return () => clearTimeout(timer);
+  }, [highlightId, highlightJobId, pagedGroups]);
 
   // ✅ งานที่เข้าหลายวัน (ผูกด้วย jobGroupId เดียวกัน) ถือเป็นงานเดียวกัน — แก้ไขจากวันไหน
   // ในกลุ่มก็ควรอ้างอิง id เดียวกันทั้งหมด เพื่อแก้ไขทุกวันในกลุ่มพร้อมกันในคราวเดียว
@@ -2285,6 +2559,10 @@ const Operation = () => {
   }, [events, getGroupEventIds]);
 
   // ไม่อนุมัติคำขอปิดงานจากช่าง → เปิดให้ช่างแก้ไขแล้วขอปิดงานใหม่ได้ พร้อมเหตุผล/comment แจ้งช่าง
+  // ✅ ตอนขอปิดงาน (handleRequestClose ใน TechnicianJobPanel.js) ตอนนี้ตั้ง closeRequested:true
+  // ให้ทุกวันในกลุ่มเดียวกันพร้อมกันแล้ว (ผ่าน onStatusUpdate/getGroupEventIds) — ตอนไม่อนุมัติก็ต้อง
+  // เคลียร์ closeRequested คืนให้ครบทุกวันในกลุ่มเดียวกันด้วย ไม่งั้นวันที่เหลือจะค้าง closeRequested:true
+  // ตลอดไปโดยไม่มีทางให้ช่างขอปิดใหม่ได้อีก (ปุ่ม "ขอปิดงานอีกครั้ง" โชว์แค่การ์ดตัวแทนของกลุ่มเท่านั้น)
   const handleRejectClose = useCallback(async (id, reason) => {
     try {
       const payload   = JSON.parse(localStorage.getItem("payload") || "{}");
@@ -2299,22 +2577,32 @@ const Operation = () => {
         timestamp: now,
       };
 
-      const updates = {
+      const sharedUpdates = {
         closeRequested: false,
         closeRejectedAt: now,
         closeRejectedBy: adminName,
         closeRejectReason: reason || "",
-        activityLog: [...(target?.activityLog || []), newLog],
       };
 
-      await EventService.UpdateEvent(id, updates);
-      setEvents(prev => prev.map(e => e._id === id ? { ...e, ...updates } : e));
+      const ids = getGroupEventIds(id);
+      await Promise.all(ids.map(gid => {
+        const data = gid === id
+          ? { ...sharedUpdates, activityLog: [...(target?.activityLog || []), newLog] }
+          : sharedUpdates;
+        return EventService.UpdateEvent(gid, data);
+      }));
+      setEvents(prev => prev.map(e => {
+        if (!ids.includes(e._id)) return e;
+        return e._id === id
+          ? { ...e, ...sharedUpdates, activityLog: [...(e.activityLog || []), newLog] }
+          : { ...e, ...sharedUpdates };
+      }));
       setSnackbar({ open: true, msg: "ไม่อนุมัติคำขอปิดงานแล้ว", severity: "success" });
     } catch (err) {
       console.error(err);
       setSnackbar({ open: true, msg: "ดำเนินการไม่สำเร็จ", severity: "error" });
     }
-  }, [events]);
+  }, [events, getGroupEventIds]);
 
   const handleDocNoUpdate = useCallback((id, newDocNo) => {
     const ids = getGroupEventIds(id);
@@ -2399,10 +2687,16 @@ const Operation = () => {
         setUploadProgressState(p => ({ ...p, [type]: 0 }));
 
         await EventService.Upload(eventId, file, type, {
+          // ✅ เดิมหลอดโหลดขึ้น 100% ทันทีที่เบราว์เซอร์ส่งไฟล์ครบ (upload transfer เสร็จ) แต่
+          // เซิร์ฟเวอร์อาจยังประมวลผลต่อ (เขียนไฟล์/อัปโหลดขึ้น storage) อยู่ ทำให้หลอดโหลดเต็ม
+          // 100 ทั้งที่ยังไม่เสร็จจริง ต้องรอ — จำกัดไว้ที่ 99% ระหว่างส่งไฟล์ แล้วค่อยขึ้น 100%
+          // ตอน await resolve จริงๆ (เซิร์ฟเวอร์ตอบกลับมาแล้ว) ให้ตรงกับสถานะจริง
           onUploadProgress: pe => {
-            setUploadProgressState(p => ({ ...p, [type]: Math.round((pe.loaded * 100) / pe.total) }));
+            const pct = Math.round((pe.loaded * 100) / pe.total);
+            setUploadProgressState(p => ({ ...p, [type]: Math.min(pct, 99) }));
           },
         });
+        setUploadProgressState(p => ({ ...p, [type]: 100 }));
         successCount++;
         uploadedNames.push(file.name);
       }
@@ -2471,32 +2765,10 @@ const Operation = () => {
     setSnackbar({ open: true, msg: "Export CSV เรียบร้อย", severity: "success" });
   };
 
-  const isAdminOrManager = ["admin", "manager"].includes(currentUserRole);
   const { notifications, unread, markRead, markAllRead } = useEventNotifications(
     events,
     isAdminOrManager ? "admin" : "technician"
   );
-
-  // ✅ ฝั่งช่างเหลือแค่ "ค้างงาน" กับ "เสร็จสิ้น" (รอผู้ดูแลอนุมัติ/กำลังดำเนินการ ย้ายไปจัดการที่
-  // หน้า "งานของฉัน" หมดแล้ว) จึง default ไปที่ "overdue" แทน "pending" ที่ไม่มีให้เลือกอีกต่อไป
-  // ✅ แอดมิน/manager: ถ้าไม่มีงานรอคุณอนุมัติเลย ให้การ์ด "กำลังดำเนินการ/ยืนยันแล้ว" ติดสว่างเป็นค่า
-  // เริ่มต้นแทน "รอคุณอนุมัติ" ที่ว่างเปล่า ให้ตรงกับรายการที่แสดงจริงด้านล่าง (ดู defaultGroup ข้างบน)
-  // ✅ ยกเว้น: ถ้ามาจากลิงก์เจาะจงสถานะ (?status=... ตั้ง filterOP ไว้) แต่ไม่ได้ระบุ ?group= มาด้วย
-  // อย่า fallback ไปเดาแท็บ default ให้ — เพราะ filterOP กรองผลลัพธ์ตรงๆ อยู่แล้ว (ไม่ผ่าน group เลย
-  // ดู matchGroup ด้านบน) ถ้าแท็บ default ติดสว่างทั้งที่ไม่ตรงกับรายการที่เห็นจริงจะยิ่งทำให้สับสน
-  // ✅ เดียวกันกับตอนเปิดงานเจาะจงตัวเดียว (/operation/:id) — งานบางสถานะ (เช่น "กำลังรอยืนยัน"
-  // ที่พบบ่อยในงานที่ "กำลังจะถึง" จาก Dashboard) ไม่มีแท็บกลุ่มไหนตรงกับสถานะนี้เลย (ดู
-  // resolveOperationGroup) ทำให้ลิงก์ไม่ได้ส่ง ?group= มาด้วย ถ้ายัง fallback ไปเดาแท็บ default
-  // จะติดสว่างผิดแท็บเหมือนเดิม — มี id แปลว่ากำลังดูงานเจาะจงตัวเดียวอยู่แล้ว ไม่ควรเดาแท็บกลุ่ม
-const effectiveGroup =
-    statusGroup ||
-    (filterOP || id
-      ? ""
-      : isAdminOrManager
-        ? pendingCount > 0
-          ? "pending"
-          : "active"
-        : "overdue");
 
   return (
     <Box sx={{ px: { xs: 1, sm: 2, md: 3 }, py: 3, maxWidth: 1400, mx: "auto" }}>
@@ -2530,6 +2802,16 @@ const effectiveGroup =
           )}
         </Stack>
       </Stack>
+
+      {/* ✅ ย้ายมาไว้บนสุดของหน้า (เหนือแท็บ/การ์ดสรุปสถานะทั้งหมด) ให้แอดมิน/manager เห็นคำขอ
+          ปิดงานที่รอตรวจสอบทันทีที่เปิดหน้า ไม่ต้องเลื่อนหา — และ ClosureRequestsPanel เองจะไม่
+          render อะไรเลยถ้าไม่มีคำขอค้างอยู่ (return null) จึงไม่กินพื้นที่เวลาไม่มีงานรอตรวจสอบ */}
+      {isAdminOrManager && (
+        <ClosureRequestsPanel
+          events={events}
+          onReject={handleRejectClose}
+        />
+      )}
 
       {selectedEvent && (
         <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}
@@ -2589,20 +2871,14 @@ const effectiveGroup =
       {/* TAB 0: TABLE */}
       {activeTab === 0 && (
         <>
-          {/* ClosureRequestsPanel + LiveTrackingPanel แสดงเฉพาะ admin/manager */}
+          {/* LiveTrackingPanel แสดงเฉพาะ admin/manager (ClosureRequestsPanel ย้ายขึ้นไปไว้บนสุด
+              ของหน้าแล้ว เห็นได้ทุกแท็บ ไม่ใช่แค่แท็บ "รายการงาน") */}
           {isAdminOrManager && (
-            <>
-              <ClosureRequestsPanel
-                events={events}
-                onApprove={handleApproveClose}
-                onReject={handleRejectClose}
-              />
-              <LiveTrackingPanel
-                events={events}
-                onRefresh={() => fetchEventsFromDB(true)}
-                lastRefreshed={lastRefreshed}
-              />
-            </>
+            <LiveTrackingPanel
+              events={events}
+              onRefresh={() => fetchEventsFromDB(true)}
+              lastRefreshed={lastRefreshed}
+            />
           )}
 
           <FilterPanel
@@ -2629,15 +2905,36 @@ const effectiveGroup =
             </Box>
           ) : (
             <>
+              {/* ✅ กลับมาเป็นคอลัมน์เดียว — เดิมลองแบ่ง 2 คอลัมน์บนจอกว้าง แต่การ์ดงานกรุ๊ป (เข้า
+                  หลายวันไม่ติดกัน) โชว์แถบวันที่ย่อย + "เข้างาน N วัน" เพิ่มมาตั้งแต่ตอนพับอยู่ ทำให้
+                  สูงกว่าการ์ดงานวันเดียวเสมอ วางคู่กันแล้วดูไม่เท่ากัน/ไม่สวย คอลัมน์เดียวเรียงยาวลงมา
+                  แทนจะเนียนตากว่า ไม่มีปัญหาความสูงไม่เท่ากันให้กวนตาอีก */}
               {pagedGroups.map(sessions => {
                 // ✅ ในมุมมอง "ค้างงาน" ให้เห็นความรุนแรงต่างกันชัดๆ ก่อนเปิดการ์ด — เลย 1 สัปดาห์
                 // = แจ้งเตือนสีเหลือง (ให้ทันเห็นก่อน), เลย 2 สัปดาห์ = ค้างงานเต็มตัวสีแดง
                 const daysPastDueRaw = effectiveGroup === "overdue" ? (daysPastDueMap.get(sessions[0]._id)?.days ?? null) : null;
                 const daysPastDue = isFlaggedDays(daysPastDueRaw) ? daysPastDueRaw : null;
                 const severeOverdue = isSevereDays(daysPastDue);
-                
+                // ✅ งานที่ถูกส่งมาไฮไลต์จากปุ่ม "ตรวจสอบ" (ดู highlightId effect ด้านบน) — ใส่ id
+                // ให้ scrollIntoView หาเจอ พร้อมกรอบกระพริบชั่วคราวช่วยให้เห็นชัดว่าเป็นงานไหน
+                const isHighlighted = sessions.some(s => s._id === highlightJobId);
+
                 return (
-                  <Box key={sessions[0].jobGroupId || sessions[0]._id} sx={{ mb: 0.5 }}>
+                  <Box key={sessions[0].jobGroupId || sessions[0]._id}
+                    id={isHighlighted ? `job-card-${highlightJobId}` : undefined}
+                    sx={{
+                      mb: 2, minWidth: 0,
+                      ...(isHighlighted && {
+                        borderRadius: 3,
+                        outline: "3px solid #f59e0b",
+                        outlineOffset: 2,
+                        animation: "highlightPulse 0.9s ease-in-out 3",
+                        "@keyframes highlightPulse": {
+                          "0%, 100%": { outlineColor: alpha("#f59e0b", 1) },
+                          "50%": { outlineColor: alpha("#f59e0b", 0.15) },
+                        },
+                      }),
+                    }}>
                     {daysPastDue !== null && daysPastDue !== undefined && (
                       <Chip
                         size="small"
@@ -2679,13 +2976,18 @@ const effectiveGroup =
                   onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
                   sx={{ width: 110, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
                   SelectProps={{ native: true }}>
-                  {[10, 20, 50, 100].map(n => <option key={n} value={n}>{n} รายการ</option>)}
+                  {[5, 10, 20, 50, 100].map(n => <option key={n} value={n}>{n} รายการ</option>)}
                 </TextField>
+                {/* ✅ เดิม size="small" บนมือถือทำให้ปุ่มเลขหน้าเล็กเกินไป กดยาก/กดพลาด — ใช้ "large"
+                    แทนบนมือถือ (ตรงข้ามกับเดิม) ให้ปุ่มโตพอกดง่ายด้วยนิ้ว จอกว้างยังใช้ "medium" เท่าเดิม */}
                 <Pagination
                   count={totalPages} page={page}
                   onChange={(_, v) => setPage(v)}
-                  color="primary" shape="rounded" size={isMobile ? "small" : "medium"}
+                  color="primary" shape="rounded" size={isMobile ? "large" : "medium"}
                   showFirstButton showLastButton
+                  sx={isMobile ? {
+                    "& .MuiPaginationItem-root": { minWidth: 40, height: 40, fontSize: "1rem" },
+                  } : undefined}
                 />
               </Stack>
             </>
