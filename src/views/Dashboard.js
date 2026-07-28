@@ -37,6 +37,7 @@ import {
   countDistinctJobs,
   resolveAssignedTechnician,
   resolveOperationGroup,
+  getOverdueGroupKey,
 } from "../utils/overdueJobs";
 
 // 🎨 สีและไอคอนประจำสถานะงาน — ใช้ร่วมกันทั้ง Quick Stats และการ์ดงานวันนี้
@@ -283,6 +284,33 @@ const Dashboard = () => {
       .map((c) => ({ ...c, jobs: c.jobs.sort((a, b) => b.days - a.days) }))
       .sort((a, b) => b.count - a.count);
   }, [isAdminOrManager, users, events, daysPastDueMap]);
+
+  // ⚠️ ใบเสนอราคาที่ส่งลูกค้าไปแล้วเกิน 7 วัน ยังไม่มีผล (เฉพาะแอดมิน/manager) — เดิมไม่มีทางเห็น
+  // ได้เลยจาก Dashboard ต้องเข้าไปเปิดหน้า /quotations เองแล้วไล่หาทีละใบ ย่อมาโชว์เป็นกล่องแจ้งเตือน
+  // แทน (โชว์เฉพาะตอนมีจริงเท่านั้น ไม่มีก็ไม่ต้องมีกล่องว่างให้รกตา) — จัดกลุ่มงานหลายวันไม่ติดกันด้วย
+  // getOverdueGroupKey เหมือนจุดอื่นๆ ในไฟล์นี้ กันนับซ้ำ (quotationSentAt ถูก propagate เท่ากันทั้ง
+  // กลุ่มอยู่แล้วตอนกดจากหน้า /quotations จึงใช้ค่าจาก session ไหนของกลุ่มมาคิดก็ได้ผลลัพธ์เดียวกัน)
+  const QUOTATION_FOLLOWUP_DAYS = 7;
+  const staleQuotations = useMemo(() => {
+    if (!isAdminOrManager) return [];
+    const bySignature = new Map();
+    events.forEach((e) => {
+      if (e.quotationStatus !== "sent" || !e.quotationSentAt) return;
+      const key = getOverdueGroupKey(e);
+      if (!bySignature.has(key)) bySignature.set(key, e);
+    });
+    const today = moment().startOf("day");
+    return [...bySignature.values()]
+      .map((head) => ({
+        id: head._id,
+        title: head.title,
+        company: head.company,
+        site: head.site,
+        days: today.diff(moment(head.quotationSentAt).startOf("day"), "days"),
+      }))
+      .filter((q) => q.days > QUOTATION_FOLLOWUP_DAYS)
+      .sort((a, b) => b.days - a.days);
+  }, [isAdminOrManager, events]);
 
   // 📌 งานวางแผนล่วงหน้า (เฉพาะแอดมิน/manager) — เรียงตามเดือนที่ตั้งใจใกล้สุดก่อน แบ่งหน้าแทน
   // การโชว์แค่ไม่กี่รายการตายตัว ให้เห็นได้ครบทุกใบจากตรงนี้เลยโดยไม่ต้องออกไปหน้า "แผนงาน"
@@ -638,6 +666,54 @@ const Dashboard = () => {
       >
         ดูภาพรวมทีมช่างทั้งหมด <FaChevronRight size={9} />
       </Link>
+
+      {/* ─── ใบเสนอราคาที่ต้องติดตาม (ส่งลูกค้าไปแล้วเกิน 7 วัน ยังไม่มีผล) — โชว์เฉพาะตอนมีจริง
+      เป็นกล่องแจ้งเตือน (โทนส้ม/แดง) วางไว้เหนือ "งานวางแผนล่วงหน้า" ให้เห็นก่อน กดแต่ละแถวแล้วเด้ง
+      เข้าไปที่หน้า /quotations พร้อมเปิดรายละเอียดงานนั้นให้เลยทันที (ดู ?jobId= ใน QuotationTracking.js) ─── */}
+      {staleQuotations.length > 0 && (
+        <>
+          <h5 style={{ ...styles.sectionTitle, marginTop: "16px" }}>
+            ⚠️ ใบเสนอราคาที่ต้องติดตาม
+          </h5>
+          <div style={styles.quotationAlertCard}>
+            <div style={{ padding: "6px 0" }}>
+              {staleQuotations.slice(0, 5).map((q) => (
+                <Link
+                  key={q.id}
+                  to={`/quotations?jobId=${q.id}`}
+                  style={styles.sideJobRow}
+                  className="metric-card-hover"
+                >
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={styles.sideJobName}>{q.title || "งาน"}</span>
+                    <span style={styles.sideJobDetail}>
+                      {[q.company, q.site].filter(Boolean).join(" · ")}
+                    </span>
+                  </span>
+                  <span style={styles.quotationAlertBadge}>
+                    เกิน {q.days} วัน
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+          {staleQuotations.length > 5 && (
+            <Link
+              to="/quotations"
+              style={{
+                ...styles.viewAllBtn,
+                color: "#c2410c",
+                backgroundColor: "rgba(249, 115, 22, 0.1)",
+                border: "1px solid rgba(249, 115, 22, 0.25)",
+              }}
+              className="metric-card-hover"
+            >
+              ดูใบเสนอราคาที่ต้องติดตามทั้งหมด ({staleQuotations.length}){" "}
+              <FaChevronRight size={9} />
+            </Link>
+          )}
+        </>
+      )}
 
       {/* ─── งานวางแผนล่วงหน้า (drafts) — เดิมไม่มีทางเห็นได้เลยนอกจากเข้าไปเปิดหน้า "แผนงาน"
       เอง ย่อมาโชว์เป็นแถบข้างต่อจาก "งานค้างของช่าง" แทนพื้นที่ว่างที่เหลือด้านล่าง ─── */}
@@ -1927,6 +2003,27 @@ const styles = {
     justifyContent: "center",
     flexShrink: 0,
   },
+
+  /* ⚠️ กล่องแจ้งเตือนใบเสนอราคาที่ต้องติดตาม (Dashboard sidebar) — โทนส้ม แยกจาก
+     notiCard ปกติ (ขาว/เทา) ให้เด่นชัดว่าเป็นเรื่องด่วนที่ต้องรีบดู */
+  quotationAlertCard: {
+    backgroundColor: "#fff7ed",
+    borderRadius: "14px",
+    border: "1px solid rgba(249, 115, 22, 0.3)",
+    marginBottom: "10px",
+    overflow: "hidden",
+  },
+  quotationAlertBadge: {
+    fontSize: "10.5px",
+    fontWeight: "800",
+    color: "#c2410c",
+    backgroundColor: "rgba(249, 115, 22, 0.15)",
+    padding: "3px 9px",
+    borderRadius: "11px",
+    flexShrink: 0,
+    whiteSpace: "nowrap",
+  },
+
   // ✅ กางออกมาแสดงรายชื่องานค้างจริงของช่างคนนั้น เมื่อกดที่แถวชื่อ — พื้นหลังจางกว่าแถวหลัก
   // ให้เห็นว่าเป็นรายการย่อยที่ซ้อนอยู่ข้างใน ไม่ใช่แถวระดับเดียวกัน
   sideJobDropdown: {

@@ -25,7 +25,7 @@
  */
 
 import { useEffect, useState, useCallback, useMemo, useRef, memo } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import moment from "moment";
 import "moment/locale/th";
 import { alpha } from "@mui/material/styles";
@@ -89,7 +89,6 @@ const STATUS_ACTIONS = [
   { action: "send",    label: "ส่งใบเสนอราคาให้ลูกค้าแล้ว", icon: <Send sx={{ fontSize: 16 }} />,      color: "#3b82f6" },
   { action: "approve", label: "ลูกค้าอนุมัติ",                icon: <CheckCircle sx={{ fontSize: 16 }} />, color: "#10b981" },
   { action: "reject",  label: "ลูกค้าปฏิเสธ",                 icon: <Cancel sx={{ fontSize: 16 }} />,      color: "#94a3b8" },
-  { action: "revise",  label: "ลูกค้าขอแก้ไข",                icon: <Autorenew sx={{ fontSize: 16 }} />,   color: "#8b5cf6" },
 ];
 
 // ─── ช่องกรอกมูลค่างานแบบกดแก้ตรงจุด (เทียบ pattern เดียวกับ docNo ในหน้า Operation) ───
@@ -327,6 +326,11 @@ const QuotationDetailDialog = ({ job, currentUserRole, onClose, onAction, onAmou
   const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
   const navigate = useNavigate();
   const isAdminOrManager = ["admin", "manager"].includes(currentUserRole);
+  // ✅ ช่างแก้ไขสถานะงานของตัวเองได้ด้วย (ไม่ใช่แค่ดู) — backend อนุญาตอยู่แล้ว (เจ้าของ/ผู้ได้รับ
+  // มอบหมายแก้ไข event ตัวเองได้เสมอ ดู PUT /:id) และ /quotations ก็ scope ให้ช่างเห็นแค่งานตัวเอง
+  // อยู่แล้วด้วย (getEventOp) เลยไม่ต้องกันเพิ่มฝั่งนี้ — ยกเว้นมูลค่างาน (AmountEditor) ที่ยังเป็น
+  // สิทธิ์ admin/manager เท่านั้นเหมือนเดิม (ไม่ได้ถูกขอให้เปลี่ยน)
+  const canEditStatus = isAdminOrManager || currentUserRole === "technician";
 
   if (!job) return null;
   const anchor = job.sessions[0];
@@ -360,7 +364,7 @@ const QuotationDetailDialog = ({ job, currentUserRole, onClose, onAction, onAmou
       <DialogContent sx={{ p: 2 }}>
         {/* ✅ ป้ายสถานะ + ปุ่มเปลี่ยนสถานะ รวมเป็นปุ่มเดียวแล้ว (ดู StatusEditMenu) ไม่ต้องแยกสองจุด */}
         <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" sx={{ mb: 1.5 }}>
-          {isAdminOrManager ? (
+          {canEditStatus ? (
             <StatusEditMenu meta={meta} onSelect={(action) => onAction(job, action)} />
           ) : (
             <Chip size="small" icon={meta.icon} label={meta.label} sx={{
@@ -389,8 +393,9 @@ const QuotationDetailDialog = ({ job, currentUserRole, onClose, onAction, onAmou
             />
           </Grid>
 
-          {/* ปุ่มดำเนินการตามสถานะปัจจุบัน — เปลี่ยนสถานะ/มูลค่างานเป็นสิทธิ์ admin/manager เท่านั้น */}
-          {isAdminOrManager && (
+          {/* ปุ่มดำเนินการตามสถานะปัจจุบัน — เปลี่ยนสถานะได้ทั้ง admin/manager และช่าง (เจ้าของงาน)
+              ส่วนมูลค่างานยังเป็นสิทธิ์ admin/manager เท่านั้น (ดู AmountEditor ด้านบน) */}
+          {canEditStatus && (
             <Grid item xs={12}>
               <Stack direction="row" gap={1} flexWrap="wrap">
                 {groupKey === "not_sent" && (
@@ -399,7 +404,10 @@ const QuotationDetailDialog = ({ job, currentUserRole, onClose, onAction, onAmou
                     ส่งใบเสนอราคาให้ลูกค้าแล้ว
                   </Button>
                 )}
-                {(groupKey === "sent" || groupKey === "follow_up") && (
+                {/* ✅ "ลูกค้าขอแก้ไข" ตัดออกจากตัวเลือกแล้ว (ไม่มีใครใช้) — งานเก่าที่เคยถูกตั้งไว้เป็น
+                    สถานะนี้ (ก่อนตัดออก) ก็ใช้ปุ่มชุดเดียวกับ "รอลูกค้าตอบ" นี้ต่อได้เลย ไม่ต้องมี
+                    เส้นทางแยกอีกต่อไป */}
+                {(groupKey === "sent" || groupKey === "follow_up" || groupKey === "revising") && (
                   <>
                     <Button size="small" variant="contained" color="success" startIcon={<CheckCircle fontSize="small" />}
                       onClick={() => onAction(job, "approve")} sx={{ textTransform: "none", borderRadius: 2 }}>
@@ -409,17 +417,7 @@ const QuotationDetailDialog = ({ job, currentUserRole, onClose, onAction, onAmou
                       onClick={() => onAction(job, "reject")} sx={{ textTransform: "none", borderRadius: 2 }}>
                       ลูกค้าปฏิเสธ
                     </Button>
-                    <Button size="small" variant="outlined" startIcon={<Autorenew fontSize="small" />}
-                      onClick={() => onAction(job, "revise")} sx={{ textTransform: "none", borderRadius: 2 }}>
-                      ลูกค้าขอแก้ไข
-                    </Button>
                   </>
-                )}
-                {groupKey === "revising" && (
-                  <Button size="small" variant="contained" startIcon={<Send fontSize="small" />}
-                    onClick={() => onAction(job, "send")} sx={{ textTransform: "none", borderRadius: 2 }}>
-                    ส่งใบเสนอราคาใหม่ให้ลูกค้าแล้ว
-                  </Button>
                 )}
                 {(groupKey === "approved" || groupKey === "rejected") && (anchor.quotationDecisionBy || anchor.quotationDecisionAt) && (
                   <Typography variant="caption" color="text.secondary">
@@ -428,23 +426,9 @@ const QuotationDetailDialog = ({ job, currentUserRole, onClose, onAction, onAmou
                   </Typography>
                 )}
                 {groupKey === "waiting_file" && (
-                  <Typography variant="caption" color="text.disabled">รอช่างแนบไฟล์ใบเสนอราคาก่อน</Typography>
+                  <Typography variant="caption" color="text.disabled">รอแนบไฟล์ใบเสนอราคาก่อน</Typography>
                 )}
               </Stack>
-            </Grid>
-          )}
-
-          {/* ช่างไม่มีปุ่มเปลี่ยนสถานะ แต่ยังเห็นผลตัดสิน/เหตุผลรอไฟล์ได้ */}
-          {!isAdminOrManager && (groupKey === "approved" || groupKey === "rejected") && (
-            <Grid item xs={12}>
-              <Typography variant="caption" color="text.secondary">
-                {meta.label}{anchor.quotationDecisionAt ? ` · ${moment(anchor.quotationDecisionAt).locale("th").format("DD MMM YYYY HH:mm")}` : ""}
-              </Typography>
-            </Grid>
-          )}
-          {!isAdminOrManager && groupKey === "waiting_file" && (
-            <Grid item xs={12}>
-              <Typography variant="caption" color="text.disabled">รอแนบไฟล์ใบเสนอราคาก่อน</Typography>
             </Grid>
           )}
 
@@ -568,6 +552,9 @@ export default function QuotationTracking() {
   const role = userData?.role?.toLowerCase();
   const isAdminOrManager = ["admin", "manager"].includes(role);
   const canAccess = ["admin", "manager", "technician"].includes(role);
+  // ✅ deep-link จาก Dashboard (กล่องแจ้งเตือน "ใบเสนอราคาที่ต้องติดตามด่วน") — เปิด Dialog
+  // รายละเอียดงานนั้นให้อัตโนมัติผ่าน ?jobId=<eventId> แทนที่จะให้ผู้ใช้ไล่หาเองในรายการ
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [events, setEvents] = useState([]);
   const [users, setUsers] = useState([]);
@@ -648,6 +635,20 @@ export default function QuotationTracking() {
     const updated = quotationJobs.find((j) => j.sessions.some((s) => s._id === anchorId));
     if (updated) setDetailJob(updated);
   }, [quotationJobs]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ✅ เปิด Dialog อัตโนมัติเมื่อมาจาก deep-link ?jobId= (Dashboard) — รอจน quotationJobs โหลดเสร็จ
+  // ก่อนค่อยหา แล้วลบ query param ทิ้งทันทีไม่ให้เปิดซ้ำเวลาผู้ใช้ปิด Dialog เองแล้ว events รีเฟรชใหม่
+  useEffect(() => {
+    const jobId = searchParams.get("jobId");
+    if (!jobId || quotationJobs.length === 0) return;
+    const target = quotationJobs.find((j) => j.sessions.some((s) => s._id === jobId));
+    if (target) setDetailJob(target);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("jobId");
+      return next;
+    }, { replace: true });
+  }, [quotationJobs, searchParams, setSearchParams]);
 
   // ✅ หาว่างานนี้เป็นของช่างคนไหน (ใช้ util กลางเดียวกับ TeamWorkload.js) — เฉพาะ admin/manager
   // ที่โหลดรายชื่อผู้ใช้ไว้แล้ว (technician ไม่ได้โหลด users จึงได้ techId ว่างเปล่าเสมอ ซึ่งไม่มีผล
@@ -735,7 +736,10 @@ export default function QuotationTracking() {
       setSnackbar({ open: true, msg: "บันทึกเรียบร้อย", severity: "success" });
     } catch (err) {
       console.error(err);
-      setSnackbar({ open: true, msg: "บันทึกไม่สำเร็จ", severity: "error" });
+      // ✅ โชว์ข้อความจริงจาก backend (เช่น "งานนี้ปิดแล้ว ไม่สามารถแก้ไขได้") แทนข้อความรวมๆ เดิม
+      // ที่บอกแค่ "บันทึกไม่สำเร็จ" ทำให้ผู้ใช้เดาสาเหตุไม่ออกว่าติดขัดตรงไหน
+      const apiMsg = err?.response?.data?.message || err?.response?.data?.err;
+      setSnackbar({ open: true, msg: apiMsg || "บันทึกไม่สำเร็จ", severity: "error" });
     }
   }, [fetchJobs]);
 
@@ -755,8 +759,6 @@ export default function QuotationTracking() {
       send:    { fields: { quotationStatus: "sent", quotationSentAt: now, quotationDecisionAt: null, quotationDecisionBy: null }, log: ["quotation_sent", "ส่งใบเสนอราคาให้ลูกค้า"] },
       approve: { fields: { quotationStatus: "approved", quotationDecisionAt: now, quotationDecisionBy: actorName }, log: ["quotation_approved", "ลูกค้าอนุมัติใบเสนอราคา"] },
       reject:  { fields: { quotationStatus: "rejected", quotationDecisionAt: now, quotationDecisionBy: actorName }, log: ["quotation_rejected", "ลูกค้าปฏิเสธใบเสนอราคา"] },
-      revise:  { fields: { quotationStatus: "revising", quotationDecisionAt: now, quotationDecisionBy: actorName }, log: ["quotation_revising", "ลูกค้าขอแก้ไขใบเสนอราคา"] },
-      reopen:  { fields: { quotationStatus: "sent", quotationSentAt: now, quotationDecisionAt: null, quotationDecisionBy: null }, log: ["quotation_sent", "แก้ไขผลลัพธ์ — เปิดติดตามใหม่"] },
     };
     const def = ACTION_MAP[action];
     if (!def) return;
@@ -778,7 +780,8 @@ export default function QuotationTracking() {
       setSnackbar({ open: true, msg: "บันทึกการติดตามเรียบร้อย", severity: "success" });
     } catch (err) {
       console.error(err);
-      setSnackbar({ open: true, msg: "บันทึกการติดตามไม่สำเร็จ", severity: "error" });
+      const apiMsg = err?.response?.data?.message || err?.response?.data?.err;
+      setSnackbar({ open: true, msg: apiMsg || "บันทึกการติดตามไม่สำเร็จ", severity: "error" });
     }
   }, [fetchJobs]);
 
