@@ -158,6 +158,41 @@ const fileTypeIcon = (fileName) => {
   return <AttachFile sx={{ color: "#6b7280", fontSize: 16 }} />;
 };
 
+// ✅ perf: แยกแถวไฟล์ออกมาเป็นคอมโพเนนต์ของตัวเอง + React.memo — เดิมแถวไฟล์อยู่ใน .map() ในตัว
+// DocumentFileList เอง พอ auto-refresh ทุก 15 วิ แทนที่ events ทั้งก้อนด้วย object ใหม่ (แม้ข้อมูลจริง
+// ไม่เปลี่ยน) ทุกแถวไฟล์ต้อง re-render ใหม่หมด — งานที่มีไฟล์เยอะ (เช่น 9 ไฟล์ตามภาพที่ผู้ใช้ส่งมา)
+// นี่คือส่วนที่หนักที่สุด เทียบด้วยค่าจริง (_id/fileUrl/fileName) ไม่ใช่ reference ของ object ไฟล์
+// (เปลี่ยนทุก poll อยู่แล้วแม้เนื้อหาเดิม) — onPreview/onOpenMenu ต้องเป็น stable reference จากต้นทาง
+const FileRow = React.memo(
+  ({ file: f, onPreview, onOpenMenu }) => (
+    <Stack direction="row" alignItems="center" gap={0.5} sx={{
+      p: 1, borderRadius: 1.5, bgcolor: alpha("#6b7280", 0.06),
+    }}>
+      {fileTypeIcon(f.fileName)}
+      <Typography variant="caption" color="text.secondary" noWrap flex={1} sx={{ fontSize: "0.8rem" }}
+        onClick={() => onPreview(f.fileUrl, f.fileName)} style={{ cursor: "pointer" }}>
+        {f.fileName}
+      </Typography>
+      <Tooltip title="ดูไฟล์">
+        <IconButton onClick={() => onPreview(f.fileUrl, f.fileName)} sx={{ p: 1 }}>
+          <Visibility sx={{ fontSize: 18 }} />
+        </IconButton>
+      </Tooltip>
+      <Tooltip title="เพิ่มเติม">
+        <IconButton onClick={e => onOpenMenu(e.currentTarget, f)} sx={{ p: 1 }}>
+          <MoreVert sx={{ fontSize: 18 }} />
+        </IconButton>
+      </Tooltip>
+    </Stack>
+  ),
+  (prev, next) =>
+    prev.file._id === next.file._id &&
+    prev.file.fileUrl === next.file.fileUrl &&
+    prev.file.fileName === next.file.fileName &&
+    prev.onPreview === next.onPreview &&
+    prev.onOpenMenu === next.onOpenMenu,
+);
+
 // ─── DocumentFileList ─────────────────────────────────────────────────
 // รายการไฟล์ที่แนบ (แนบได้หลายไฟล์) + ปุ่มเพิ่มไฟล์อีก (ใช้ร่วมกันทั้ง required เสมอ และ "มี")
 const DocumentFileList = ({ type, files, isUploading, uploadProgress, onFileUpload, onDeleteFile, onPreview, isLocked }) => {
@@ -168,35 +203,21 @@ const DocumentFileList = ({ type, files, isUploading, uploadProgress, onFileUplo
   // รวมเป็นเมนูเดียว เหลือแค่ปุ่มดูไฟล์ (บ่อยสุด) + ปุ่ม "⋮" ที่มีดาวน์โหลด/พิมพ์/แชร์ LINE/ลบ
   const [fileMenu, setFileMenu] = useState(null); // { el, file }
   const closeFileMenu = () => setFileMenu(null);
+  // ✅ perf: stable reference ให้ FileRow ที่ memo ไว้เทียบ props ได้จริง
+  const handleOpenFileMenu = useCallback((el, file) => setFileMenu({ el, file }), []);
 
   const handleFileChange = (e) => {
     if (e.target.files?.length) onFileUpload(e.target.files, type);
   };
 
+  // ✅ perf: จำกัดความสูง+เลื่อนดูแทนตอนมีไฟล์เยอะ (เดิมไม่มี ลิสต์ยาวๆ ดันความสูงทั้งหน้า/Dialog
+  // ไปเรื่อยๆ) เทียบ pattern เดียวกับ FileUploadSection ในหน้า Operation
   return (
     <Box>
       {fileList.length > 0 && (
-        <Stack spacing={0.5} sx={{ mb: 0.5 }}>
+        <Stack spacing={0.5} sx={{ mb: 0.5, maxHeight: 260, overflowY: "auto", pr: 0.5 }}>
           {fileList.map(f => (
-            <Stack key={f._id || f.fileUrl} direction="row" alignItems="center" gap={0.5} sx={{
-              p: 1, borderRadius: 1.5, bgcolor: alpha("#6b7280", 0.06),
-            }}>
-              {fileTypeIcon(f.fileName)}
-              <Typography variant="caption" color="text.secondary" noWrap flex={1} sx={{ fontSize: "0.8rem" }}
-                onClick={() => onPreview(f.fileUrl, f.fileName)} style={{ cursor: "pointer" }}>
-                {f.fileName}
-              </Typography>
-              <Tooltip title="ดูไฟล์">
-                <IconButton onClick={() => onPreview(f.fileUrl, f.fileName)} sx={{ p: 1 }}>
-                  <Visibility sx={{ fontSize: 18 }} />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="เพิ่มเติม">
-                <IconButton onClick={e => setFileMenu({ el: e.currentTarget, file: f })} sx={{ p: 1 }}>
-                  <MoreVert sx={{ fontSize: 18 }} />
-                </IconButton>
-              </Tooltip>
-            </Stack>
+            <FileRow key={f._id || f.fileUrl} file={f} onPreview={onPreview} onOpenMenu={handleOpenFileMenu} />
           ))}
         </Stack>
       )}
@@ -1054,16 +1075,25 @@ const TechnicianJobCard = ({
       </CardContent>
 
       <Dialog open={expanded} onClose={() => setExpanded(false)} fullWidth maxWidth="sm" fullScreen={!isDesktop}>
-          <DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+          <DialogTitle sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}>
             <Box sx={{ minWidth: 0 }}>
+              {/* ✅ สลับตำแหน่ง: ประเภทงานขึ้นเป็นหัวข้อหลัก (ไม่ใส่ label "ประเภท" เพราะเป็นหัวข้อ
+                  อยู่แล้วเหมือนที่โครงการเคยอยู่ตำแหน่งนี้), โครงการย้ายลงไปอยู่แถวข้อมูลแทน */}
               <Typography fontWeight={800} fontSize="1rem" noWrap>
-                {event.company && event.site
-                  ? `${event.company} · ${event.site}`
-                  : (event.company || event.site || "ไม่ระบุบริษัท/ไซต์")}
+                {event.title || "ไม่ระบุประเภทงาน"}
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 สรุปงานที่ทำ · คุยกับแอดมิน
               </Typography>
+              {(event.company || event.site || event.system || event.time) && (
+                <Stack direction="row" gap={2} flexWrap="wrap" sx={{ mt: 0.5 }}>
+                  <InfoLine icon="🏢" label="โครงการ">
+                    {event.company && event.site ? `${event.company} · ${event.site}` : (event.company || event.site || "ไม่ระบุบริษัท/ไซต์")}
+                  </InfoLine>
+                  {event.system && <InfoLine icon="💻" label="ระบบ">{event.system}</InfoLine>}
+                  {event.time && <InfoLine icon="🔢" label="ครั้งที่">{event.time}</InfoLine>}
+                </Stack>
+              )}
             </Box>
             <IconButton size="small" onClick={() => setExpanded(false)}>
               <Close fontSize="small" />
@@ -1076,16 +1106,23 @@ const TechnicianJobCard = ({
 
       {!hideDocuments && (
         <Dialog open={docsExpanded} onClose={() => setDocsExpanded(false)} fullWidth maxWidth="sm" fullScreen={!isDesktop}>
-          <DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+          <DialogTitle sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}>
             <Box sx={{ minWidth: 0 }}>
               <Typography fontWeight={800} fontSize="1rem" noWrap>
-                {event.company && event.site
-                  ? `${event.company} · ${event.site}`
-                  : (event.company || event.site || "ไม่ระบุบริษัท/ไซต์")}
+                {event.title || "ไม่ระบุประเภทงาน"}
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 เอกสารประจำงาน ({completedDocCount}/{DOCUMENT_TYPES.length})
               </Typography>
+              {(event.company || event.site || event.system || event.time) && (
+                <Stack direction="row" gap={2} flexWrap="wrap" sx={{ mt: 0.5 }}>
+                  <InfoLine icon="🏢" label="โครงการ">
+                    {event.company && event.site ? `${event.company} · ${event.site}` : (event.company || event.site || "ไม่ระบุบริษัท/ไซต์")}
+                  </InfoLine>
+                  {event.system && <InfoLine icon="💻" label="ระบบ">{event.system}</InfoLine>}
+                  {event.time && <InfoLine icon="🔢" label="ครั้งที่">{event.time}</InfoLine>}
+                </Stack>
+              )}
             </Box>
             <IconButton size="small" onClick={() => setDocsExpanded(false)}>
               <Close fontSize="small" />

@@ -23,6 +23,7 @@ const Product = lazy(() => import("../views/ui/Product"));
 const StockProduct = lazy(() => import("../views/ui/StockProduct"));
 const WorkTypeSystem = lazy(() => import("../views/ui/WorkTypeSystem.js"));
 const TeamWorkload = lazy(() => import("../views/ui/TeamWorkload.js"));
+const QuotationTracking = lazy(() => import("../views/ui/QuotationTracking.js"));
 const Files = lazy(() => import("../views/ui/Files"));
 const FileUpload = lazy(() => import("../views/ui/FileUpload"));
 const EventCalendar = lazy(() => import("../views/ui/EventCalendar.js"));
@@ -154,6 +155,17 @@ const ThemeRoutes = [
           </Suspense>
         ),
         title: "Team Workload",
+      },
+      {
+        // ✅ ไม่ห่อด้วย AdminRoute เพราะ manager ต้องเข้าได้ด้วย เหมือน team-workload ด้านบน —
+        // ตัวคอมโพเนนต์เองเช็ค role แล้ว redirect กลับ /dashboard ถ้าไม่ใช่ admin/manager
+        path: "quotations",
+        element: (
+          <Suspense fallback={<div>Loading...</div>}>
+            <QuotationTracking />
+          </Suspense>
+        ),
+        title: "Quotation Tracking",
       },
       {
         path: "employee",

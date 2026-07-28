@@ -4,7 +4,7 @@ import { Link, useLocation } from "react-router-dom";
 import AuthService from "../services/authService";
 import "./Sidebar.css";
 import Swal from "sweetalert2";
-import { swalLogout } from "../functions/user";
+import { swalLogout, hasValidAvatar } from "../functions/user";
 import { useAuth } from "../auth/AuthContext";
 
 // ✅ Sidebar เป็น presentational ล้วนๆ ไม่จัดการ เปิด/ปิด บนมือถือเองอีกต่อไป
@@ -53,6 +53,7 @@ const Sidebar = ({ handleMenuClick }) => {
   // ✅ เดิมประกาศไว้แต่ไม่เคย render เลย — ช่างจึงไม่มีทางกดเข้า "งานของฉัน" จาก sidebar ได้เลย
   const technicianMenu = [
     { title: "งานของฉัน", href: "/technician/jobs", icon: "bi-tools" },
+    { title: "ติดตามใบเสนอราคา", href: "/quotations", icon: "bi-file-earmark-text" },
   ];
 
   // ✅ เฉพาะแอดมิน/manager — สรุปภาพรวมงานของช่างแต่ละคนแยกกันชัดเจน (เดิมไม่มีทางเห็นได้เลย
@@ -60,6 +61,7 @@ const Sidebar = ({ handleMenuClick }) => {
   // เดิมไม่รองรับ manager แต่หน้านี้ตั้งใจให้ manager เข้าถึงได้ด้วย
   const managerMenu = [
     { title: "ภาพรวมทีมช่าง", href: "/team-workload", icon: "bi-people-fill" },
+    { title: "ติดตามใบเสนอราคา", href: "/quotations", icon: "bi-file-earmark-text" },
   ];
 
   // ✅ เดิม submenu จะปิดเสมอตอนโหลดหน้าใหม่ ต่อให้กำลังอยู่ในหน้าลูกของมันอยู่ก็ตาม
@@ -111,7 +113,7 @@ const Sidebar = ({ handleMenuClick }) => {
       <div className="profilebg">
         <div className="p-2 d-flex align-items-center gap-3">
           <Link to={"/account"} onClick={handleItemClick}>
-            {userData?.imageUrl ? (
+            {hasValidAvatar(userData?.imageUrl) ? (
               <img
                 src={userData.imageUrl}
                 alt="user"

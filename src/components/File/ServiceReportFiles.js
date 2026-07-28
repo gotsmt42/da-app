@@ -5,6 +5,7 @@ import "moment/locale/th";
 
 import EventService from "../../services/EventService";
 import { resolveOperationGroup } from "../../utils/overdueJobs";
+import { getOptimizedImageUrl } from "../../utils/cloudinaryImage";
 
 import {
   Box, Paper, Stack, Chip, Typography, TextField, InputAdornment,
@@ -118,7 +119,7 @@ const FilePreviewDialog = ({ previewUrl, previewFileName, onClose }) => {
       <Divider />
       <DialogContent sx={{ p: 0 }}>
         {type === "image" && (
-          <img src={previewUrl} alt={previewFileName} style={{ maxWidth: "100%", maxHeight: 780, display: "block", margin: "0 auto", padding: 16 }} />
+          <img src={getOptimizedImageUrl(previewUrl)} alt={previewFileName} style={{ maxWidth: "100%", maxHeight: 780, display: "block", margin: "0 auto", padding: 16 }} />
         )}
         {type === "pdf" && (
           pdfLoading ? (

@@ -17,6 +17,7 @@ import "moment/locale/th";
 import EventService from "../../services/EventService";
 import TechnicianJobCard from "../../components/Technician/TechnicianJobPanel";
 import { buildDaysPastDueMap, isFlaggedDays, isSevereDays, getOverdueGroupKey } from "../../utils/overdueJobs";
+import { getOptimizedImageUrl } from "../../utils/cloudinaryImage";
 import {
   Box, Stack, Typography, TextField, InputAdornment, IconButton,
   Chip, Skeleton, Dialog, DialogTitle, DialogContent, Divider,
@@ -118,7 +119,7 @@ const FilePreviewDialog = ({ previewUrl, previewFileName, onClose }) => {
       <Divider />
       <DialogContent sx={{ p: 0 }}>
         {type === "image" && (
-          <img src={previewUrl} alt={previewFileName}
+          <img src={getOptimizedImageUrl(previewUrl)} alt={previewFileName}
             style={{ maxWidth: "100%", maxHeight: 780, display: "block", margin: "0 auto", padding: 16 }} />
         )}
         {type === "pdf" && (
@@ -287,6 +288,9 @@ export default function MyJobs() {
 
   const [previewUrl, setPreviewUrl] = useState(null);
   const [previewFileName, setPreviewFileName] = useState("");
+  // ✅ perf: reference คงที่ — จำเป็นให้แถวไฟล์ที่ memo ไว้ (เทียบ props ด้วย reference) bail out
+  // re-render ได้จริง ไม่งั้น prop นี้เปลี่ยนทุกครั้งที่ MyJobs re-render ทำให้ memo ไม่มีผลอะไรเลย
+  const handlePreviewFile = useCallback((url, name) => { setPreviewUrl(url); setPreviewFileName(name); }, []);
 
   const [uploadingState, setUploadingState] = useState({ quotation: null, report: null, invoice: null, completion: null });
   const [uploadProgressState, setUploadProgressState] = useState({ quotation: 0, report: 0, invoice: 0, completion: 0 });
@@ -553,7 +557,7 @@ export default function MyJobs() {
                   onStatusUpdate={handleStatusUpdate}
                   onFileUpload={handleFileUpload}
                   onDeleteFile={handleDeleteFile}
-                  onPreview={(url, name) => { setPreviewUrl(url); setPreviewFileName(name); }}
+                  onPreview={handlePreviewFile}
                   uploadingState={uploadingState}
                   isUploadingState={isUploadingState}
                   uploadProgressState={uploadProgressState}

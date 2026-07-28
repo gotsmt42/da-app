@@ -140,6 +140,29 @@ async Upload(id, file, type, config = {}) {
 },
 
 
+  async AddQuotationFollowUp(id, { note, file }) {
+    try {
+      const userData = await AuthService.getUserData();
+      if (!userData) throw new Error("User not authenticated");
+
+      const formData = new FormData();
+      formData.append("note", note);
+      if (file) formData.append("file", file);
+
+      const response = await API.put(`/events/${id}/quotation-followup`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          Authorization: `Bearer ${userData.token}`,
+        },
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error("Error adding quotation follow-up:", error);
+      throw error;
+    }
+  },
+
   async DeleteFile(id, type, fileId) {
     try {
       const userData = await AuthService.getUserData(); // ดึง Token

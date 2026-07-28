@@ -22,6 +22,7 @@ import "moment/locale/th";
 import {
   buildDaysPastDueMap, isFlaggedDays, isSevereDays, countFlaggedJobs, countDistinctJobs, getOverdueGroupKey,
 } from "../../utils/overdueJobs";
+import { getOptimizedImageUrl } from "../../utils/cloudinaryImage";
 import { formatEventDateRange } from "../../utils/formatDateRange";
 
 // MUI Core
@@ -83,7 +84,10 @@ const FAST_MENU_PROPS = {
 // ดูรายละเอียดคอมเมนต์ที่ไฟล์นั้นแทน
 
 // ─── Styled Components ────────────────────────────────────────────────
-const GlassCard = styled(Card)(({ theme }) => ({
+// ✅ export GlassCard/StatCard/FileUploadSection/CommentThread — เดิมเป็น local const ใช้แค่ในไฟล์นี้
+// เพิ่ม export ให้หน้าใหม่ (เช่น /quotations) เรียกใช้ซ้ำได้โดยไม่ต้อง copy โค้ด UI ไฟล์แนบ/คอมเมนต์
+// (ซึ่งมี logic เมนู "⋮"/แชร์/พิมพ์ค่อนข้างซับซ้อน) ไปวางซ้ำอีกที่ — ไม่กระทบพฤติกรรมเดิมในไฟล์นี้เลย
+export const GlassCard = styled(Card)(({ theme }) => ({
   background: alpha(theme.palette.background.paper, 0.9),
   backdropFilter: "blur(10px)",
   borderRadius: 16,
@@ -96,7 +100,7 @@ const GlassCard = styled(Card)(({ theme }) => ({
   },
 }));
 
-const StatCard = styled(GlassCard)(({ color }) => ({
+export const StatCard = styled(GlassCard)(({ color }) => ({
   position: "relative",
   overflow: "hidden",
   "&::before": {
@@ -227,6 +231,12 @@ const ACTION_META = {
   document_applicable_set: { label: "ระบุมี/ไม่มีเอกสาร",   icon: <TaskAlt sx={{ fontSize: 13 }} />,     color: "#8b5cf6" },
   // ✅ เดิมไม่มี entry นี้ ทำให้ log การลบไฟล์ (ถ้ามี) โชว์เป็น "file_deleted" ดิบๆ แทนป้ายภาษาไทย
   file_deleted:   { label: "ลบไฟล์",            icon: <Delete sx={{ fontSize: 13 }} />,      color: "#ef4444" },
+  // ✅ ระบบติดตามใบเสนอราคา (หน้า /quotations) — บันทึกลง activityLog เดียวกับที่ใช้อยู่แล้ว
+  quotation_sent:     { label: "ส่งใบเสนอราคาให้ลูกค้า",   icon: <RequestQuote sx={{ fontSize: 13 }} />, color: "#3b82f6" },
+  quotation_approved: { label: "ลูกค้าอนุมัติใบเสนอราคา",  icon: <CheckCircle sx={{ fontSize: 13 }} />,  color: "#10b981" },
+  quotation_rejected: { label: "ลูกค้าปฏิเสธใบเสนอราคา",   icon: <Cancel sx={{ fontSize: 13 }} />,       color: "#ef4444" },
+  quotation_revising: { label: "แก้ไขใบเสนอราคาใหม่",      icon: <Edit sx={{ fontSize: 13 }} />,         color: "#f59e0b" },
+  quotation_followup: { label: "บันทึกการติดตามลูกค้า",    icon: <History sx={{ fontSize: 13 }} />,      color: "#3b82f6" },
 };
 
 // ✅ ใช้แปะป้ายชนิดเอกสารในประวัติกิจกรรม (อัปโหลด/ลบไฟล์) ให้อ่านง่าย ตรงกับ label ที่ใช้ในฟอร์มจริง
@@ -1060,7 +1070,42 @@ const DOC_TYPE_META = {
   completion: { icon: AssignmentTurnedIn, color: "#07941a" },
 };
 
-const FileUploadSection = ({
+// ✅ perf: แยกแถวไฟล์ออกมาเป็นคอมโพเนนต์ของตัวเอง + React.memo — เดิมแถวไฟล์ทั้งหมดอยู่ใน .map()
+// ในตัว FileUploadSection เอง พอ auto-refresh ทุก 15 วิ แทนที่ events ทั้งก้อนด้วย object ใหม่
+// (แม้ข้อมูลจริงจะไม่เปลี่ยน) ทุกแถวไฟล์ (Tooltip×2 + IconButton×2 ต่อแถว) ต้อง re-render ใหม่หมดทุกครั้ง
+// งานที่มีไฟล์เยอะๆ (เช่น 9 ไฟล์ใน Service Report จากภาพที่ผู้ใช้ส่งมา) นี่คือส่วนที่หนักที่สุดของการ์ด
+// เทียบด้วยค่าจริง (_id/fileUrl/fileName) ไม่ใช่ reference ของ object ไฟล์ (ซึ่งเปลี่ยนทุก poll อยู่แล้ว
+// แม้เนื้อหาเดิม) — ต้องรับ onPreview/onOpenMenu แบบ stable reference (useCallback ที่ต้นทาง) ไม่งั้น
+// memo จะไม่มีผลอะไรเลยเพราะ props เปลี่ยนทุกครั้งอยู่ดี
+const FileRow = React.memo(
+  ({ file: f, onPreview, onOpenMenu }) => (
+    <Stack direction="row" alignItems="center" gap={0.5} sx={{
+      p: 1.25, borderRadius: 2, border: "1px solid", borderColor: "divider",
+      background: t => alpha(t.palette.success.main, 0.04),
+    }}>
+      {fileTypeIcon(f.fileName)}
+      <Box flex={1} minWidth={0} onClick={() => onPreview(f.fileUrl, f.fileName)} sx={{ cursor: "pointer" }}>
+        <Typography variant="caption" fontWeight={600} noWrap sx={{ fontSize: "0.8rem", display: "block" }}>{f.fileName}</Typography>
+      </Box>
+      <Tooltip title="ดูไฟล์">
+        <IconButton onClick={() => onPreview(f.fileUrl, f.fileName)} sx={{ p: 1 }}><Visibility sx={{ fontSize: 20 }} /></IconButton>
+      </Tooltip>
+      <Tooltip title="เพิ่มเติม">
+        <IconButton onClick={e => onOpenMenu(e.currentTarget, f)} sx={{ p: 1 }}>
+          <MoreVert sx={{ fontSize: 20 }} />
+        </IconButton>
+      </Tooltip>
+    </Stack>
+  ),
+  (prev, next) =>
+    prev.file._id === next.file._id &&
+    prev.file.fileUrl === next.file.fileUrl &&
+    prev.file.fileName === next.file.fileName &&
+    prev.onPreview === next.onPreview &&
+    prev.onOpenMenu === next.onOpenMenu,
+);
+
+export const FileUploadSection = ({
   eventId, type, label, files, applicable,
   onUpload, onDelete, onPreview,
   uploading, progress, uploading_size, currentUserRole,
@@ -1074,6 +1119,9 @@ const FileUploadSection = ({
   // รวมเป็นเมนูเดียว เหลือแค่ปุ่มดูไฟล์ (บ่อยสุด) + ปุ่ม "⋮" แยกต่างหาก
   const [fileMenu, setFileMenu] = useState(null); // { el, file }
   const closeFileMenu = () => setFileMenu(null);
+  // ✅ perf: stable reference ให้ FileRow ที่ memo ไว้เทียบ props ได้จริง (setFileMenu จาก useState
+  // เป็น stable อยู่แล้ว ห่อด้วย useCallback deps [] เฉยๆ เพื่อความชัดเจน)
+  const handleOpenFileMenu = useCallback((el, file) => setFileMenu({ el, file }), []);
 
   const fileList = files || [];
   const hasFiles = fileList.length > 0;
@@ -1119,23 +1167,7 @@ const FileUploadSection = ({
       {hasFiles && (
         <Stack spacing={0.75} sx={{ mb: uploading || canEdit ? 1 : 0, maxHeight: 260, overflowY: "auto", pr: 0.5 }}>
           {fileList.map(f => (
-            <Stack key={f._id || f.fileUrl} direction="row" alignItems="center" gap={0.5} sx={{
-              p: 1.25, borderRadius: 2, border: "1px solid", borderColor: "divider",
-              background: t => alpha(t.palette.success.main, 0.04),
-            }}>
-              {fileTypeIcon(f.fileName)}
-              <Box flex={1} minWidth={0} onClick={() => onPreview(f.fileUrl, f.fileName)} sx={{ cursor: "pointer" }}>
-                <Typography variant="caption" fontWeight={600} noWrap sx={{ fontSize: "0.8rem", display: "block" }}>{f.fileName}</Typography>
-              </Box>
-              <Tooltip title="ดูไฟล์">
-                <IconButton onClick={() => onPreview(f.fileUrl, f.fileName)} sx={{ p: 1 }}><Visibility sx={{ fontSize: 20 }} /></IconButton>
-              </Tooltip>
-              <Tooltip title="เพิ่มเติม">
-                <IconButton onClick={e => setFileMenu({ el: e.currentTarget, file: f })} sx={{ p: 1 }}>
-                  <MoreVert sx={{ fontSize: 20 }} />
-                </IconButton>
-              </Tooltip>
-            </Stack>
+            <FileRow key={f._id || f.fileUrl} file={f} onPreview={onPreview} onOpenMenu={handleOpenFileMenu} />
           ))}
         </Stack>
       )}
@@ -1247,7 +1279,7 @@ const FileUploadSection = ({
 // ─── CommentThread ────────────────────────────────────────────────────
 // คุยโต้ตอบกับช่าง (เช่น ตอบคำขอใบเสนอราคา) แยกจาก activityLog ที่เป็น log อัตโนมัติ
 // myRole ใช้กำหนดว่าข้อความฝั่งไหนคือ "ของเรา" (จัดชิดขวา) — ฝั่งแอดมิน: role !== "technician"
-const CommentThread = ({ comments = [], onSend, myRole }) => {
+export const CommentThread = ({ comments = [], onSend, myRole }) => {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
 
@@ -1822,14 +1854,23 @@ const EventRowCard = ({
       </CardContent>
 
       <Dialog open={expanded} onClose={() => setExpanded(false)} fullWidth maxWidth="md" fullScreen={!isDesktop}>
-          <DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+          <DialogTitle sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}>
             <Box sx={{ minWidth: 0 }}>
+              {/* ✅ สลับตำแหน่ง: ประเภทงานขึ้นเป็นหัวข้อหลัก (ไม่ใส่ label "ประเภท" เพราะเป็นหัวข้อ
+                  อยู่แล้วเหมือนที่โครงการเคยอยู่ตำแหน่งนี้), โครงการย้ายลงไปอยู่แถวข้อมูลแทน */}
               <Typography fontWeight={800} fontSize="1rem" noWrap>
-                {companySite(event.company, event.site)}
+                {event.title || "ไม่ระบุประเภทงาน"}
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 เอกสาร/คุยกับช่าง/ประวัติ
               </Typography>
+              {(event.company || event.site || event.system || event.time) && (
+                <Stack direction="row" gap={2} flexWrap="wrap" sx={{ mt: 0.5 }}>
+                  <InfoLine icon="🏢" label="โครงการ">{companySite(event.company, event.site)}</InfoLine>
+                  {event.system && <InfoLine icon="💻" label="ระบบ">{event.system}</InfoLine>}
+                  {event.time && <InfoLine icon="🔢" label="ครั้งที่">{event.time}</InfoLine>}
+                </Stack>
+              )}
             </Box>
             <IconButton size="small" onClick={() => setExpanded(false)}>
               <Close fontSize="small" />
@@ -1975,7 +2016,9 @@ const FilterPanel = ({
 };
 
 // ─── FilePreviewDialog ────────────────────────────────────────────────
-const FilePreviewDialog = ({ previewUrl, previewFileName, onClose }) => {
+// ✅ export เพิ่ม (เทียบ pattern เดียวกับ GlassCard/StatCard/FileUploadSection/CommentThread ด้านบน)
+// ให้หน้าอื่น (เช่น /quotations) เปิด preview ไฟล์ในหน้าเดิมได้เลย แทนที่จะต้อง window.open แท็บใหม่
+export const FilePreviewDialog = ({ previewUrl, previewFileName, onClose }) => {
   const type = getFileType(previewFileName || previewUrl || "");
 
   // PDF: โหลดเป็น blob เองแล้วใช้ตัวแสดงผล PDF ในตัวของเบราว์เซอร์
@@ -2024,7 +2067,7 @@ const FilePreviewDialog = ({ previewUrl, previewFileName, onClose }) => {
       </DialogTitle>
       <Divider />
       <DialogContent sx={{ p: 0 }}>
-        {type === "image" && <img src={previewUrl} alt={previewFileName} style={{ maxWidth: "100%", maxHeight: 780, display: "block", margin: "0 auto", padding: 16 }} />}
+        {type === "image" && <img src={getOptimizedImageUrl(previewUrl)} alt={previewFileName} style={{ maxWidth: "100%", maxHeight: 780, display: "block", margin: "0 auto", padding: 16 }} />}
         {type === "pdf" && (
           pdfLoading ? (
             <Box sx={{ textAlign: "center", py: 8, color: "text.secondary" }}>
@@ -2250,6 +2293,10 @@ const Operation = () => {
 
   const [previewUrl,       setPreviewUrl]        = useState(null);
   const [previewFileName,  setPreviewFileName]   = useState("");
+  // ✅ perf: reference คงที่ (ไม่สร้าง arrow function ใหม่ทุก render) — จำเป็นสำหรับให้ FileRow ที่
+  // memo ไว้ (เทียบ props ด้วย reference) bail out re-render ได้จริง ไม่งั้น prop นี้เปลี่ยนทุกครั้ง
+  // ทำให้ memo ไม่มีผลอะไรเลย
+  const handlePreviewFile = useCallback((url, name) => { setPreviewUrl(url); setPreviewFileName(name); }, []);
   const [confirmOpen,      setConfirmOpen]        = useState(false);
   const [pendingDelete,    setPendingDelete]      = useState(null);
   const [snackbar,         setSnackbar]           = useState({ open: false, msg: "", severity: "success" });
@@ -2420,7 +2467,14 @@ const Operation = () => {
         return daysB - daysA;
       });
     }
-    return filteredEvents.slice().sort((a, b) => new Date(b.start) - new Date(a.start));
+    // ✅ แท็บ "เสร็จสิ้น" ให้เอางานล่าสุดขึ้นก่อน (ใหม่ไปเก่า) — ต่างจากแท็บอื่นที่เรียงเก่าไปใหม่
+    // เพราะงานที่ปิดแล้วอยากเห็นงานที่เพิ่งเสร็จล่าสุดก่อน ไม่ใช่งานเก่าที่ปิดไปนานแล้ว
+    if (effectiveGroup === "closed") {
+      return filteredEvents.slice().sort((a, b) => new Date(b.start) - new Date(a.start));
+    }
+    // ✅ เรียงจากวันเก่าสุด (ก่อนวันปัจจุบัน) ไล่ไปจนถึงอนาคต — งานที่ค้าง/ใกล้ถึงกำหนดอยู่บนสุด
+    // เดิมเรียงจากวันลงงานล่าสุดก่อน (ใหม่ไปเก่า) ทำให้งานที่ลงวันในอนาคตไกลๆ แซงหน้างานที่ควรทำก่อน
+    return filteredEvents.slice().sort((a, b) => new Date(a.start) - new Date(b.start));
   }, [filteredEvents, effectiveGroup, daysPastDueMap]);
   const activeFilterCount = [filterType, filterSystem, filterStatus, filterOP, search.trim(), filterTeam].filter(Boolean).length;
 
@@ -2956,7 +3010,7 @@ const Operation = () => {
                       onInputUpdate={handleInputUpdate}
                       onFileUpload={handleFileUpload}
                       onDeleteFile={(eid, type, fileId) => { setPendingDelete({ id: eid, type, fileId }); setConfirmOpen(true); }}
-                      onPreview={(url, name) => { setPreviewUrl(url); setPreviewFileName(name); }}
+                      onPreview={handlePreviewFile}
                       onDelete={handleDeleteRow}
                       onApproveClose={handleApproveClose}
                       onRejectClose={handleRejectClose}

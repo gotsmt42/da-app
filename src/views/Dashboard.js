@@ -18,6 +18,7 @@ import {
   FaChevronLeft,
   FaUserFriends,
   FaCheckDouble,
+  FaFileInvoiceDollar,
 } from "react-icons/fa";
 import { useEffect, useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -200,6 +201,18 @@ const Dashboard = () => {
   // ไม่ใช่นับแค่ 1 วันหลังกำหนดแบบเดิมซึ่งจะเห็นตัวเลขไม่ตรงกับที่ไปเปิดหน้า Operation จริง
   // ✅ นับแบบจัดกลุ่มก่อน (ไม่ใช่นับทุกแถว) — งานที่เข้าหลายวันไม่ติดกัน (jobGroupId เดียวกัน) นับ
   // เป็น 1 งานเสมอ ไม่งั้นตัวเลขจะเพี้ยนสูงกว่าจำนวนงานจริง (เทียบเหตุผลเดียวกับหน้า Operation/MyJobs)
+  // ✅ ใช้ util กลาง (src/utils/overdueJobs.js) แทนโค้ดจัดกลุ่ม/คิดค้างแบบ inline เดิม — ตรรกะ
+  // เดียวกับที่หน้า Operation ใช้เป๊ะๆ (งานหลายวันไม่ติดกันนับเป็น 1 งาน คิดค้างจากวันสุดท้าย)
+  // ✅ ต้องคำนวณก่อน myActiveJobsCount เพราะ "งานที่ต้องทำ" ต้องตัดงานที่ค้างออกไปแล้ว (ดูด้านล่าง)
+  const daysPastDueMap = buildDaysPastDueMap(events);
+  const myOverdueCount = countFlaggedJobs(
+    events,
+    daysPastDueMap,
+    isFlaggedDays,
+  );
+
+  // ✅ ตามที่ผู้ใช้ยืนยัน — "งานที่ต้องทำ" นับรวมงานค้างเกินกำหนดไว้ด้วยเหมือนเดิม (ไม่ตัด
+  // !isFlaggedDays ออกเหมือนที่เคยลองแก้) แม้จะไม่ mutually-exclusive กับ "ค้างเกินกำหนด" ก็ตาม
   const myActiveJobsCount = countDistinctJobs(
     events,
     (e) => ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(e.status) && !e.closeRequested,
@@ -208,21 +221,15 @@ const Dashboard = () => {
     events,
     (e) => e.closeRequested && e.status !== "ดำเนินการเสร็จสิ้น",
   );
-
-  // ✅ ใช้ util กลาง (src/utils/overdueJobs.js) แทนโค้ดจัดกลุ่ม/คิดค้างแบบ inline เดิม — ตรรกะ
-  // เดียวกับที่หน้า Operation ใช้เป๊ะๆ (งานหลายวันไม่ติดกันนับเป็น 1 งาน คิดค้างจากวันสุดท้าย)
-  const daysPastDueMap = buildDaysPastDueMap(events);
-  const myOverdueCount = countFlaggedJobs(
-    events,
-    daysPastDueMap,
-    isFlaggedDays,
-  );
+  // ✅ เพิ่มจำนวนงานที่เสร็จสิ้นแล้วเข้าไปในสรุปด้วย (เดิมมีแค่ ต้องทำ/รออนุมัติ/ค้างเกินกำหนด)
+  const myClosedCount = countStatus("ดำเนินการเสร็จสิ้น");
   const myJobsSummary = (() => {
     const parts = [];
     if (myActiveJobsCount > 0) parts.push(`${myActiveJobsCount} งานที่ต้องทำ`);
     if (myPendingApprovalCount > 0)
       parts.push(`${myPendingApprovalCount} รอตรวจอนุมัติ`);
     if (myOverdueCount > 0) parts.push(`⚠️ ${myOverdueCount} ค้างเกินกำหนด`);
+    if (myClosedCount > 0) parts.push(`✅ ${myClosedCount} เสร็จสิ้น`);
     return parts.length > 0 ? parts.join(" · ") : "ไม่มีงานค้างในตอนนี้ 🎉";
   })();
 
@@ -378,6 +385,8 @@ const Dashboard = () => {
       color: "#475569",
       badge: files.length,
     },
+    // ✅ "ติดตามใบเสนอราคา" ย้ายขึ้นไปเป็นแบนเนอร์ hero ใหญ่เหนือ "สรุปสถานะงาน" แทนแล้ว (ตามที่ขอ)
+    // ไม่ต้องมีซ้ำเป็นไอคอนเล็กๆ ที่นี่อีก (เทียบเหตุผลเดียวกับ "งานของฉัน" ด้านบน)
     // ✅ "งานของฉัน" ของช่างถูกย้ายขึ้นไปเป็นแบนเนอร์ hero เด่นๆ ด้านบนแทนแล้ว (ดู SECTION 2)
     // ไม่ต้องมีซ้ำเป็นไอคอนเล็กๆ ที่นี่อีก
     // ✅ ใช้ isAdminOrManager แทน isAdmin เพราะหน้า "ภาพรวมทีมช่าง" ตั้งใจให้ manager เข้าถึงได้ด้วย
@@ -833,6 +842,28 @@ const Dashboard = () => {
                   <p style={styles.heroPairSub}>ดูทั้งหมด</p>
                 </div>
               </div>
+            </div>
+
+            {/* ─── SECTION 2.5: "ติดตามใบเสนอราคา" BIG BANNER — เดิมเป็นไอคอนเล็กๆ ในทางลัด ยกขึ้นมา
+          เป็นแบนเนอร์เต็มความกว้างเหนือ "สรุปสถานะงาน" ให้เด่นตามที่ขอ ทุกสิทธิ์เข้าถึงได้
+          (admin/manager/ช่าง เหมือนหน้า /quotations เอง) ใช้สีส้มแยกจากกลุ่มสีอื่นทั้งหมด ─── */}
+            <div
+              onClick={() => navigate("/quotations")}
+              style={styles.quotationBanner}
+              className="action-hero-btn"
+            >
+              <div style={styles.myJobsIconCircle}>
+                <FaFileInvoiceDollar size={18} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h3 style={styles.heroBtnTitle}>ติดตามใบเสนอราคา</h3>
+                <p style={styles.heroBtnSub}>ดูสถานะ · อนุมัติ/ปฏิเสธ · ติดตามลูกค้า</p>
+              </div>
+              <FaArrowRight
+                size={13}
+                className="arrow-bounce"
+                style={{ opacity: 0.8, flexShrink: 0 }}
+              />
             </div>
 
             {/* ─── SECTION 3: QUICK STATS — การ์ด 4 ใบแถวเดียว (ไอคอนบน ตัวเลข/label ล่าง จัดกึ่งกลาง)
@@ -1428,6 +1459,23 @@ const styles = {
     fontSize: "13px",
     fontWeight: "800",
     flexShrink: 0,
+  },
+
+  /* 🟠 "ติดตามใบเสนอราคา" hero — โครงสไตล์เดียวกับ myJobsBanner (icon circle/title/sub/arrow)
+     แค่เปลี่ยนเป็นโทนส้มให้แยกจากกลุ่มสีอื่น (แดง=แผนงาน, น้ำเงิน=การดำเนินงาน, ฟ้า=งานของฉัน) */
+  quotationBanner: {
+    width: "100%",
+    background: "linear-gradient(135deg, #f97316 0%, #9a3412 100%)",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "16px",
+    padding: "14px",
+    cursor: "pointer",
+    boxShadow: "0 8px 18px -8px rgba(249, 115, 22, 0.35)",
+    marginBottom: "16px",
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
   },
 
   /* 📊 Quick Stats — เดิมแบ่ง 2x2 (2 แถว) ตามที่ขอให้เหลือ "แถวเดียวพอ" เปลี่ยนเป็น 4 คอลัมน์

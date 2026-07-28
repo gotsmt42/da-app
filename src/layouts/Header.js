@@ -17,7 +17,7 @@ import {
   DropdownItem,
   Button,
 } from "reactstrap";
-import { swalLogout } from "../functions/user";
+import { swalLogout, hasValidAvatar } from "../functions/user";
 import Swal from "sweetalert2";
 import { FaBars, FaUserCircle, FaSignOutAlt } from "react-icons/fa";
 
@@ -118,7 +118,7 @@ const Header = ({ toggleMobileSidebar }) => {
           <div className="profile-img">
             <Dropdown isOpen={dropdownOpen} toggle={toggle}>
               <DropdownToggle color="transparent" style={{ padding: 0, border: 'none' }}>
-                {userData?.imageUrl ? (
+                {hasValidAvatar(userData?.imageUrl) ? (
                   <img
                     src={userData.imageUrl}
                     alt="profile"
@@ -133,7 +133,7 @@ const Header = ({ toggleMobileSidebar }) => {
               </DropdownToggle>
               <DropdownMenu end className="modern-dropdown-menu">
                 <div className="dropdown-user-summary">
-                  {userData?.imageUrl ? (
+                  {hasValidAvatar(userData?.imageUrl) ? (
                     <img src={userData.imageUrl} alt="profile" className="dropdown-user-avatar" />
                   ) : (
                     <div className="header-avatar-fallback dropdown-user-avatar">{initials}</div>
