@@ -990,12 +990,13 @@ export const getEditEvent = async ({
       // ทำให้ครั้งถัดไปต้องพิมพ์ใหม่ซ้ำอีก ไม่โผล่เป็นตัวเลือกให้เลือก — upsert เข้าตารางกลาง
       // ถ้ายังไม่มีชื่อนี้อยู่ก่อน (best-effort เฉยๆ ไม่ให้กระทบการบันทึกแผนงานหลักถ้าล้มเหลว)
       const upsertLookups = async (title, system) => {
-        if (title && !jobTypes?.items?.some((t) => t.name === title)) {
-          await JobTypeService.add(title).catch(() => {});
-        }
-        if (system && !systemTypes?.items?.some((s) => s.name === system)) {
-          await SystemTypeService.add(system).catch(() => {});
-        }
+        // ✅ ไม่พึ่งพากันเลย รวมเป็น Promise.all แทนรอทีละอัน
+        await Promise.all([
+          (title && !jobTypes?.items?.some((t) => t.name === title))
+            ? JobTypeService.add(title).catch(() => {}) : null,
+          (system && !systemTypes?.items?.some((s) => s.name === system))
+            ? SystemTypeService.add(system).catch(() => {}) : null,
+        ]);
       };
 
       /* Save */
@@ -1053,8 +1054,7 @@ export const getEditEvent = async ({
                 timer: 1200,
                 showConfirmButton: false,
               });
-              await fetchEventsFromDB();
-              await fetchLookupOptions?.(); // ✅ รีเฟรชตัวเลือกตัวกรองให้เห็นประเภทงาน/ระบบที่เพิ่งพิมพ์ใหม่ทันที
+              await Promise.all([fetchEventsFromDB(), fetchLookupOptions?.()]); // ✅ รีเฟรชตัวเลือกตัวกรองให้เห็นประเภทงาน/ระบบที่เพิ่งพิมพ์ใหม่ทันที
             } catch (err) {
               setLoading(false);
               // ✅ err.message ของ axios เป็นข้อความทั่วไป (เช่น "Request failed with status code 409")
@@ -1128,8 +1128,7 @@ export const getEditEvent = async ({
               timer: 1200,
               showConfirmButton: false,
             });
-            await fetchEventsFromDB();
-            await fetchLookupOptions?.(); // ✅ รีเฟรชตัวเลือกตัวกรองให้เห็นประเภทงาน/ระบบที่เพิ่งพิมพ์ใหม่ทันที
+            await Promise.all([fetchEventsFromDB(), fetchLookupOptions?.()]); // ✅ รีเฟรชตัวเลือกตัวกรองให้เห็นประเภทงาน/ระบบที่เพิ่งพิมพ์ใหม่ทันที
           } catch (err) {
             setLoading(false);
             // ✅ err.message ของ axios เป็นข้อความทั่วไป ไม่ใช่ข้อความ Thai ที่ backend ส่งมา — ดูคอมเมนต์

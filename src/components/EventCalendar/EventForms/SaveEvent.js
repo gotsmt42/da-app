@@ -5,14 +5,12 @@ export const getSaveEventToDB = async ({ newEvent, EventService }) => {
   const hasSingleDate = newEvent?.start && newEvent?.end && newEvent?.date;
   const hasMultiDates  = Array.isArray(newEvent?.dates) && newEvent.dates.length > 0;
   if (!hasSingleDate && !hasMultiDates) {
-    console.warn("⚠️ ข้อมูลไม่ครบ:", newEvent);
-    return null; // ไม่ต้อง throw error เพื่อให้ flow ไม่สะดุด
+    throw new Error("ข้อมูลวันที่ไม่ครบ ไม่สามารถบันทึกได้");
   }
 
-  try {
-    return await EventService.AddEvent(newEvent);
-  } catch (error) {
-    console.error("❌ บันทึกแผนงานไม่สำเร็จ:", error.message);
-    return null; // ส่งค่า null แทนการ throw เพื่อให้ caller จัดการได้เร็ว
-  }
+  // ✅ เดิม catch แล้ว return null แทนการ throw ("ไม่ต้องให้ flow สะดุด") ทำให้ error จริงจาก backend
+  // (เช่น 409 ช่างชนกัน) ไปไม่ถึง caller เลย — AddEvent.js ไม่เช็ค return value จึงขึ้น "บันทึกสำเร็จ"
+  // ทั้งที่ไม่ได้บันทึกจริง ปล่อยให้ error หลุดขึ้นไปให้ caller (ที่มี try/catch + showSaveError อยู่แล้ว)
+  // จัดการแทน
+  return EventService.AddEvent(newEvent);
 };

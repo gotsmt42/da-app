@@ -26,17 +26,54 @@
     left: 0;
     visibility: visible;
     display: block;
+    /* ✅ อนิเมชันตอนย่อ/ขยายแถบให้ลื่นไม่กระตุก */
+    transition: width 0.25s ease, min-width 0.25s ease;
+  }
+
+  /* ✅ ย่อแถบเหลือแค่ไอคอน — Sidebar.js เพิ่ม class "collapsed" ให้ทั้ง <aside> นี้และ
+     .sidebar-container ข้างในพร้อมกัน (ดู Sidebar.css สำหรับกฎซ่อนตัวหนังสือ/จัดกึ่งกลางไอคอน) */
+  .sidebarArea.desktopSidebar.collapsed {
+    width: 76px;
+    min-width: 76px;
   }
 
   .contentArea {
-    /* ใช้ flex-grow และ flex-basis แทน calc เพื่อให้ขยายเต็มพื้นที่ที่เหลือได้อย่างสมบูรณ์ */
+    /* ใช้ flex-grow และ flex-basis แทน calc เพื่อให้ขยายเต็มพื้นที่ที่เหลือได้อย่างสมบูรณ์ —
+       เมื่อ sidebar ย่อแคบลง พื้นที่ตรงนี้ก็ขยายเต็มขึ้นเองอัตโนมัติเพราะเป็น flex:1 อยู่แล้ว */
     flex: 1;
-    min-width: 0; 
+    min-width: 0;
     display: flex;
     flex-direction: column;
     background-color: #f8fafc; /* เติมสีพื้นหลังให้อ่อนโยนสบายตา */
   }
 
+  /* ✅ ปุ่มย่อ/ขยายแถบ — วงกลมลอยคาบเกี่ยวขอบขวาของ sidebar กับ content (pattern ที่คุ้นตาจาก
+     แอปทั่วไป เช่น VSCode/แดชบอร์ดต่างๆ) ต้อง position:relative บน <aside> อยู่แล้วเป็นทุนเดิม
+     (จาก .sidebarArea.desktopSidebar ด้านบน) จึงใช้ position:absolute อิงกับมันได้ตรงๆ */
+  .sidebar-collapse-toggle {
+    position: absolute;
+    top: 72px;
+    right: -12px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    background: #ffffff;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 20;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.15);
+    transition: background-color 0.15s, color 0.15s, transform 0.15s;
+    padding: 0;
+  }
+  .sidebar-collapse-toggle:hover {
+    background: #dc2626;
+    color: #ffffff;
+    transform: scale(1.08);
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -112,6 +149,15 @@
    -------------------------------------------------------------------------- */
 .contentArea.wide-table-mode {
   width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* --------------------------------------------------------------------------
+   SIDEBAR COLLAPSED (ย่อแถบข้าง) — ปลดล็อก max-width:1300px (_container.scss) ให้ทุกหน้า
+   ไม่ใช่แค่ปฏิทิน/ภาพรวมสัญญาที่ปลดล็อกไว้ก่อนแล้วด้านบน เพราะพอย่อแถบข้างแล้วพื้นที่ที่ได้คืนมา
+   ควรให้ "ทุกหน้า" ใช้ประโยชน์ได้ ไม่ใช่กลายเป็นขอบว่างๆ สองข้างเพิ่มขึ้นเฉยๆ (เช่นหน้า Dashboard)
+   -------------------------------------------------------------------------- */
+.contentArea.sidebarCollapsed {
   max-width: 100% !important;
 }
 

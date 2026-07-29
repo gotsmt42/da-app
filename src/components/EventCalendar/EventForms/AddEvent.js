@@ -1,3 +1,5 @@
+import { countUsedRounds } from "../../../utils/contractRounds";
+
 /* ─────────────────────────────────────────────
    STYLE INJECTION  (shared with EditEvent — skip if already injected)
 ───────────────────────────────────────────── */
@@ -309,10 +311,10 @@ export const getAddEvent = async ({
     }
     contractMap.get(e.contractGroupId).visits.push(e);
   });
-  // ✅ นับเฉพาะ "ครั้ง" ที่มีเลขจริงแล้ว (ทั้งลงตารางแล้วและแผนงานที่จองไว้) — ไม่นับ "ฉบับร่าง" ว่างเปล่า
-  // ของสัญญาที่เพิ่งสร้างยังไม่มีครั้งไหนเลย (ไม่มี time) กันนับเกินจริง
+  // ✅ นับจาก "จำนวนครั้งที่ไม่ซ้ำกัน" (countUsedRounds) ไม่ใช่นับจำนวน document ดิบ — ครั้งที่เข้างาน
+  // ไม่ต่อเนื่อง (เว้นช่วงแล้วกลับมาเข้าอีก) จะมีหลาย document ต่อ 1 ครั้ง นับตรงๆ จะเกินจริง
   contractMap.forEach((c) => {
-    c.usedVisits = c.visits.filter((v) => v.time !== undefined && v.time !== null && v.time !== "").length;
+    c.usedVisits = countUsedRounds(c.visits);
   });
   const contractList = [...contractMap.values()].sort((a, b) =>
     (a.company || "").localeCompare(b.company || "", "th") || (a.site || "").localeCompare(b.site || "", "th")
@@ -906,30 +908,32 @@ export const getAddEvent = async ({
                 date:  arg.dateStr,
               };
 
-          /* upsert customer */
+          /* upsert customer/jobType/systemType — เดิมยิงทีละตัวรอทีละอันไม่จำเป็น (3 request ไม่ได้
+             พึ่งพากันเลย) รวมเป็น Promise.all เดียวลดเวลารอทั้งหมดเหลือเท่าตัวที่ช้าที่สุดตัวเดียว */
           // ✅ .catch(() => {}) กันไว้ — ฝั่ง backend ตอนนี้มี unique index (cCompany+cSite) กันซ้ำ
           // จริงจังแล้ว ถ้า "existing" ด้านบนพลาดเพราะ snapshot เก่า (เช่น listener ยิงซ้ำ) แล้ว
           // backend ตีกลับ 409 ไม่ควรทำให้การบันทึกแผนงานทั้งฟอร์มพังไปด้วย แค่ข้ามการเพิ่มโครงการซ้ำ
           const existing = customers.userCustomers.find(
             (c) => c.cCompany === payload.company && c.cSite === payload.site
           );
+          const upsertPromises = [];
           if (!existing) {
-            await CustomerService.AddCustomer({
+            upsertPromises.push(CustomerService.AddCustomer({
               cCompany: payload.company ?? "",
               cSite:    payload.site    ?? "",
-            }).catch(() => {});
+            }).catch(() => {}));
           }
-
           // ✅ TomSelect ของช่องประเภทงาน/ระบบเปิด create:true ไว้ (พิมพ์ค่าใหม่ที่ไม่มีในลิสต์ได้)
           // เดิมค่าที่พิมพ์ใหม่ถูกบันทึกแค่ในตัวแผนงานนี้ ไม่เคยเข้าตารางกลาง "ประเภทงาน"/"ระบบ"
           // เลย ทำให้ครั้งถัดไปต้องพิมพ์ใหม่ซ้ำอีก ไม่โผล่เป็นตัวเลือกให้เลือก — upsert เข้าตาราง
           // กลางเหมือนที่ทำกับลูกค้า/โครงการด้านบน ถ้ายังไม่มีชื่อนี้อยู่ก่อน
           if (!jobTypes?.items?.some((t) => t.name === title)) {
-            await JobTypeService.add(title).catch(() => {});
+            upsertPromises.push(JobTypeService.add(title).catch(() => {}));
           }
           if (!systemTypes?.items?.some((s) => s.name === system)) {
-            await SystemTypeService.add(system).catch(() => {});
+            upsertPromises.push(SystemTypeService.add(system).catch(() => {}));
           }
+          await Promise.all(upsertPromises);
 
           // ⚠️ เดิม optimistic-add newEvent เข้า state ตรงนี้ก่อน แต่ newEvent ไม่มี id/ _id เลย
           // (ยังไม่ถูกบันทึกจริง) ทำให้ถ้า saveEventToDB ด้านล่างล้มเหลว จะมี event ผีค้างอยู่ใน
@@ -939,8 +943,7 @@ export const getAddEvent = async ({
           setDefaultTextColor(payload.textColor);
           setDefaultBackgroundColor(payload.backgroundColor);
           setDefaultFontSize(payload.fontSize);
-          await fetchEventsFromDB();
-          await fetchLookupOptions?.(); // ✅ รีเฟรชตัวเลือกตัวกรองให้เห็นประเภทงาน/ระบบที่เพิ่งพิมพ์ใหม่ทันที
+          await Promise.all([fetchEventsFromDB(), fetchLookupOptions?.()]); // ✅ รีเฟรชตัวเลือกตัวกรองให้เห็นประเภทงาน/ระบบที่เพิ่งพิมพ์ใหม่ทันที
           stopSaving();
 
           Swal.fire({

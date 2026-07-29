@@ -5,7 +5,7 @@ import Header from "./Header";
 import { Container } from "reactstrap";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import Footer from "./Footer";
-import { FaArrowLeft } from "react-icons/fa";
+import { FaArrowLeft, FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { IconButton } from "@mui/material";
 import Swal from "sweetalert2";
 import PushService from "../services/PushService";
@@ -16,6 +16,12 @@ const FullLayout = () => {
   const sidebarRef = useRef(null);
   const [isMobile, setIsMobile] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // ควบคุมเปิดปิดบนมือถือ
+  // ✅ ย่อ/ขยายแถบข้าง — เฉพาะจอคอม (มือถือใช้กลไก isSidebarOpen แบบเลื่อนเข้า/ออกแยกกันคนละเรื่อง)
+  // จำค่าไว้ที่ localStorage ให้คงอยู่ข้ามการออกจากหน้า/รีเฟรช เทียบ pattern เดียวกับที่ใช้จำความกว้าง
+  // คอลัมน์ในหน้า ContractOverview.js
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
+    () => localStorage.getItem("sidebar.collapsed") === "1"
+  );
   const [isScrollingUp, setIsScrollingUp] = useState(false);
   const [lastScrollTop, setLastScrollTop] = useState(0);
   const [touchStartY, setTouchStartY] = useState(null);
@@ -60,6 +66,14 @@ const FullLayout = () => {
 
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
+  };
+
+  const toggleSidebarCollapse = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem("sidebar.collapsed", next ? "1" : "0");
+      return next;
+    });
   };
 
   const handleMenuClick = () => {
@@ -152,15 +166,29 @@ const FullLayout = () => {
       <div className="pageWrapper">
         {/* แถบ Sidebar หลัก */}
         <aside
-          className={`sidebarArea shadow ${isMobile ? (isSidebarOpen ? "showSidebar" : "hideSidebar") : "desktopSidebar"}`}
+          className={`sidebarArea shadow ${isMobile ? (isSidebarOpen ? "showSidebar" : "hideSidebar") : "desktopSidebar"} ${!isMobile && isSidebarCollapsed ? "collapsed" : ""}`}
           ref={sidebarRef}
         >
-          <Sidebar handleMenuClick={handleMenuClick} />
+          <Sidebar handleMenuClick={handleMenuClick} isCollapsed={!isMobile && isSidebarCollapsed} />
+
+          {/* ✅ ปุ่มย่อ/ขยายแถบ — เฉพาะจอคอม (d-lg-flex) ปุ่มแฮมเบอร์เกอร์ที่ Header เป็นคนละเรื่อง
+              (ใช้เฉพาะมือถือ เปิด/ปิดแบบเลื่อนเข้าออก ไม่ใช่ย่อ/ขยายแบบนี้) */}
+          <button
+            type="button"
+            className="sidebar-collapse-toggle d-none d-lg-flex"
+            onClick={toggleSidebarCollapse}
+            title={isSidebarCollapsed ? "ขยายแถบเมนู" : "ย่อแถบเมนู"}
+          >
+            {isSidebarCollapsed ? <FaChevronRight size={12} /> : <FaChevronLeft size={12} />}
+          </button>
         </aside>
 
-        {/* พื้นที่แสดง Content ฝั่งขวา */}
-        <div 
-          className={`contentArea ${isCalendarPage ? "calendar-mode" : ""} ${isWideTablePage ? "wide-table-mode" : ""} ${isMobile && isSidebarOpen ? "blur-content" : ""}`}
+        {/* พื้นที่แสดง Content ฝั่งขวา — เดิม .contentArea ล็อก max-width:1300px กึ่งกลางจอไว้เสมอ
+            (ดู _container.scss) ทุกหน้า ไม่ใช่แค่ปฏิทิน/ภาพรวมสัญญา ทำให้พอย่อแถบข้างแล้วพื้นที่ที่ได้
+            คืนมากลายเป็นขอบว่างๆ สองข้างเฉยๆ แทนที่จะให้เนื้อหาขยายใช้จริง — เติม class นี้ให้ทุกหน้า
+            ปลดล็อก max-width ตอนย่อแถบเหมือนกันหมด ไม่ต้องรอเป็นหน้าพิเศษเฉพาะที่ทำไว้ก่อนหน้านี้ */}
+        <div
+          className={`contentArea ${isCalendarPage ? "calendar-mode" : ""} ${isWideTablePage ? "wide-table-mode" : ""} ${!isMobile && isSidebarCollapsed ? "sidebarCollapsed" : ""} ${isMobile && isSidebarOpen ? "blur-content" : ""}`}
           onClick={isMobile && isSidebarOpen ? () => setIsSidebarOpen(false) : null}
         >
           {!isDashboard && (

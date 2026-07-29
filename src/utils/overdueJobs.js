@@ -23,7 +23,10 @@ export const getOverdueGroupKey = (ev) => {
 
 // ✅ งานที่เข้าหลายวันไม่ติดกันต้องคิด "ค้างงาน" จากวันสุดท้ายของทั้งชุดเท่านั้น ไม่ใช่คิดแยกทีละแถว
 // เพราะแถวที่วันที่ผ่านไปแล้วแต่ยังไม่ใช่วันสุดท้ายของงาน ยังไม่ถือว่าเลยกำหนดจริง
-// คืน Map<eventId, {days, groupKey}|null> (null = ปิดแล้ว/ขอปิดแล้ว ไม่ถือว่าค้าง)
+// คืน Map<eventId, {days, groupKey}|null> (null = ปิดแล้ว/ขอปิดแล้ว/ยังไม่ยืนยัน ไม่ถือว่าค้าง)
+// ✅ งานที่ยังไม่ผ่าน "ยืนยัน" (สถานะยังเป็น "กำลังรอยืนยัน" อยู่) ไม่นับเป็น "ค้างงาน" — ยังไม่มีใคร
+// รับงานนี้จริงจังเลยด้วยซ้ำ ปัญหาคือ "ยังไม่ยืนยัน" ซึ่งเป็นเรื่องคนละเรื่องกับ "รับงานแล้วแต่ทำไม่ทัน"
+// (ต้องยืนยันก่อนถึงจะเริ่มนับว่าค้างได้ — ดูสรุป "รอยืนยัน" แยกต่างหากสำหรับเคสนี้แทน)
 export const buildDaysPastDueMap = (allEvents) => {
   const bySignature = new Map();
   allEvents.forEach((e) => {
@@ -43,7 +46,7 @@ export const buildDaysPastDueMap = (allEvents) => {
     });
     const days = moment().startOf("day").diff(lastPlanEnd.startOf("day"), "days");
     sessions.forEach((e) => {
-      const exempt = e.status === "ดำเนินการเสร็จสิ้น" || e.closeRequested;
+      const exempt = e.status === "ดำเนินการเสร็จสิ้น" || e.closeRequested || e.status === "กำลังรอยืนยัน";
       map.set(e._id, exempt ? null : { days, groupKey });
     });
   });

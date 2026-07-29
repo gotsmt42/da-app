@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import AuthService from "../services/authService";
 import EventService from "../services/EventService";
@@ -8,9 +8,9 @@ import NotificationBell from "../components/Notifications/NotificationBell";
 import './Header.css';
 import {
   Navbar,
+  NavbarBrand,
   Nav,
   NavItem,
-  NavbarBrand,
   Dropdown,
   DropdownToggle,
   DropdownMenu,
@@ -19,21 +19,27 @@ import {
 } from "reactstrap";
 import { swalLogout, hasValidAvatar } from "../functions/user";
 import Swal from "sweetalert2";
-import { FaBars, FaUserCircle, FaSignOutAlt } from "react-icons/fa";
+import Badge from "@mui/material/Badge";
+import { countOverdueContracts } from "../utils/contractOverdue";
+// ✅ ไอคอน 3 เมนูกลางตรงกับที่ Dashboard.js/Sidebar.js ใช้จริงสำหรับหน้าเดียวกันเป๊ะๆ
+// (FaWrench="การดำเนินงาน", FaFileContract="ภาพรวมสัญญา", FaFileInvoiceDollar="ติดตามใบเสนอราคา")
+import { FaBars, FaUserCircle, FaSignOutAlt, FaWrench, FaFileContract, FaFileInvoiceDollar } from "react-icons/fa";
 
 const Header = ({ toggleMobileSidebar }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const isActive = (path) => location.pathname === path || location.pathname.startsWith(`${path}/`);
   const [user, setUser] = useState({});
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   // ✅ ดึง events เองที่นี่ (แยกจากหน้า Operation) เพื่อให้กระดิ่งแจ้งเตือนเห็นได้ทุกหน้า
   // ไม่ใช่แค่ตอนเปิดหน้า Operation ค้างไว้เท่านั้น — poll ทุก 30s เหมือนหน้าอื่นๆ ในระบบ
   const [events, setEvents] = useState([]);
+  // ✅ แผนงานล่วงหน้า (unscheduled) ของสัญญา — ต้องรวมด้วยตอนเช็ค "เกินกำหนดวางแผนรอบถัดไป" กัน
+  // สัญญาที่จองรอบถัดไปไว้ล่วงหน้าแล้วถูกนับเป็น "เกินกำหนด" ผิดๆ (เทียบ pattern เดียวกับ
+  // ContractOverview.js fetchData) — ดึงเฉพาะแอดมิน/manager เพราะป้ายนี้โชว์แค่สองสิทธิ์นี้เท่านั้น
+  const [contractDrafts, setContractDrafts] = useState([]);
 
   const { userData, logout } = useAuth();
-  const isTechnician = userData?.role?.toLowerCase() === "technician";
   const isAdminOrManager = ["admin", "manager"].includes(userData?.role?.toLowerCase());
 
   const { notifications, unread, markRead, markAllRead } = useEventNotifications(
@@ -67,6 +73,20 @@ const Header = ({ toggleMobileSidebar }) => {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    if (!isAdminOrManager) return;
+    EventService.GetDraftEvents()
+      .then((res) => setContractDrafts(res?.drafts || []))
+      .catch(() => {}); // เงียบไว้เหมือนกัน — แค่ป้ายสรุปจำนวน ไม่ใช่ข้อมูลหลักของหน้านี้
+  }, [isAdminOrManager]);
+
+  // ✅ จำนวนสัญญาที่รอบล่าสุดผ่านมาเกิน 3 เดือนแล้วแต่ยังไม่ได้วางแผนรอบถัดไป — ใช้ตรรกะเดียวกับ
+  // ป้ายแจ้งเตือนในตาราง ContractOverview.js เป๊ะๆ (ดู utils/contractOverdue.js)
+  const overdueContractCount = useMemo(
+    () => (isAdminOrManager ? countOverdueContracts([...events, ...contractDrafts]) : 0),
+    [isAdminOrManager, events, contractDrafts]
+  );
+
   const toggle = () => setDropdownOpen((prevState) => !prevState);
 
   const handleLogout = async () => {
@@ -90,24 +110,52 @@ const Header = ({ toggleMobileSidebar }) => {
           </div>
         </NavbarBrand>
 
-        {/* ตรงกลาง: รายการเมนูลิงก์ */}
+        {/* ✅ เดิมมีเมนู Dashboard/Event/เอกสารทั้งหมด อยู่ตรงนี้ แต่ซ้ำกับข้อมูลในหน้า Dashboard เลยตัด
+            ออกไปก่อนหน้านี้ — ตอนนี้เพิ่มกลับมาเฉพาะ 3 เมนูที่ใช้บ่อยและไม่มีใน sidebar เห็นง่ายๆ ระหว่าง
+            ทำงาน (การดำเนินงาน/ภาพรวมสัญญา/ติดตามใบเสนอราคา) แทน ให้กระชับ ไม่รกเหมือนของเดิมที่มี 4 เมนู */}
         <Nav className="navbar-nav mx-auto d-none d-lg-flex" navbar>
           <NavItem>
-            <Link to="/dashboard" className={`nav-link ${isActive("/dashboard") ? "active" : ""}`}>Dashboard</Link>
+            <Link
+              to="/operation"
+              className={`nav-link d-flex align-items-center gap-2 ${location.pathname.startsWith("/operation") ? "active" : ""}`}
+            >
+              <FaWrench size={13} /> การดำเนินงาน
+            </Link>
           </NavItem>
-          <NavItem>
-            <Link to="/event" className={`nav-link ${isActive("/event") ? "active" : ""}`}>Event</Link>
-          </NavItem>
-          <NavItem>
-            <Link to="/files" className={`nav-link ${isActive("/files") ? "active" : ""}`}>เอกสารทั้งหมด</Link>
-          </NavItem>
-          {/* ✅ เดิม comment ทิ้งไว้ — ช่างไม่มีทางกดเข้า "งานของฉัน" จาก Header ได้เลย */}
-          {isTechnician && (
+          {isAdminOrManager && (
             <NavItem>
-              <Link to="/technician/jobs" className={`nav-link ${isActive("/technician") ? "active" : ""}`}>งานของฉัน</Link>
+              <Link
+                to="/contracts"
+                className={`nav-link d-flex align-items-center gap-2 ${location.pathname.startsWith("/contracts") ? "active" : ""}`}
+              >
+                <FaFileContract size={13} /> ภาพรวมสัญญา
+              </Link>
             </NavItem>
           )}
+          <NavItem>
+            <Link
+              to="/quotations"
+              className={`nav-link d-flex align-items-center gap-2 ${location.pathname.startsWith("/quotations") ? "active" : ""}`}
+            >
+              <FaFileInvoiceDollar size={13} /> ติดตามใบเสนอราคา
+            </Link>
+          </NavItem>
         </Nav>
+
+        {/* ✅ จอมือถือ: Nav ด้านบนถูกซ่อนไว้ (d-none d-lg-flex) เหลือพื้นที่ว่างกลางแถบ — ใส่ทางลัด
+            "ภาพรวมสัญญา" พร้อมป้ายจำนวนสัญญาที่เกินกำหนดวางแผนรอบถัดไปแทนที่จะปล่อยว่างเปล่า
+            (เฉพาะแอดมิน/manager เหมือนเมนูเดียวกันในแถบบนจอกว้าง/Sidebar) */}
+        {isAdminOrManager && (
+          <Link to="/contracts" className="header-contract-pill d-flex d-lg-none align-items-center gap-1 mx-auto">
+            <Badge
+              badgeContent={overdueContractCount} color="error" max={9} overlap="circular"
+              sx={{ "& .MuiBadge-badge": { fontSize: "8px", minWidth: 14, height: 14, padding: "0 3px" } }}
+            >
+              <FaFileContract size={12} />
+            </Badge>
+            <span>ภาพรวมสัญญา</span>
+          </Link>
+        )}
 
         {/* ฝั่งขวา: แจ้งเตือน + รูปโปรไฟล์ผู้ใช้งาน + ปุ่มแฮมเบอร์เกอร์ */}
         {/* ✅ ปุ่มเปิด/ปิด push notification ย้ายไปอยู่ที่หน้า Settings แล้ว (เดิมมีทั้งที่นี่และ

@@ -162,8 +162,13 @@
   color: var(--accent-color) !important;
 }
 
-/* ไอคอนหน้าเมนู */
+/* ไอคอนหน้าเมนู — ✅ เดิมเป็นตัวอักษร bootstrap-icons (<i>) เปลี่ยนมาห่อ SVG จาก react-icons/fa
+   แทน (ให้ตรงกับชุดไอคอนที่ Dashboard.js ใช้จริง) — เพิ่ม inline-flex ให้ SVG อยู่กึ่งกลางแนวตั้ง
+   พอดีเป๊ะเหมือนตัวอักษรไอคอนเดิม ไม่มีปัญหา baseline เยื้อง */
 .nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 18px;
   margin-right: 14px;
   flex-shrink: 0;
@@ -254,3 +259,60 @@
 /* ✅ ไม่ต้องมี breakpoint แยกของตัวเองอีกแล้ว — การสลับ mobile/desktop (off-canvas vs
    เต็มพื้นที่ถาวร) ทั้งหมดถูกควบคุมโดย FullLayout.css ที่ breakpoint 992px จุดเดียวแล้ว
    (เดิมไฟล์นี้ใช้ 1200px ซึ่งไม่ตรงกัน ทำให้ช่วง 993–1199px แสดงผลขัดกันเอง) */
+
+/* --------------------------------------------------------------------------
+   COLLAPSED (ย่อแถบเหลือแค่ไอคอน) — เฉพาะจอคอม, FullLayout.js เป็นคนเติม class "collapsed"
+   ให้ทั้ง <aside> (กำหนดความกว้างที่ FullLayout.css) และ .sidebar-container นี้พร้อมกัน
+   -------------------------------------------------------------------------- */
+.sidebar-container.collapsed .nav-text,
+.sidebar-container.collapsed .admin-divider-label,
+.sidebar-container.collapsed .arrow-icon,
+.sidebar-container.collapsed .user-name,
+.sidebar-container.collapsed .user-role-badge {
+  display: none;
+}
+
+/* ปุ่ม/ลิงก์เมนู — จัดไอคอนให้อยู่กึ่งกลางแทนชิดซ้าย เพราะไม่มีตัวหนังสือให้ดันแล้ว */
+.sidebar-container.collapsed .nav-link,
+.sidebar-container.collapsed button.menu-dropdown-btn {
+  justify-content: center;
+  padding: 11px 0 !important;
+}
+.sidebar-container.collapsed .nav-icon {
+  margin-right: 0;
+}
+
+/* แถบสีทึบบอกตำแหน่ง active — เดิม left:-14px ยื่นออกนอกแถบแคบๆ ได้ ย่อระยะเข้ามาชิดขอบพอดี */
+.sidebar-container.collapsed .nav-link.active::before {
+  left: -8px;
+}
+
+/* ✅ การ์ดโปรไฟล์ — เดิมแค่ปรับ padding/justify-content เฉยๆ แต่ margin ซ้าย-ขวา 14px เดิม (ตั้งใจ
+   ไว้สำหรับแถบกว้าง 260px) ไม่ได้ลดตาม ทำให้การ์ดเหลือกว้างพอๆ กับรูปโปรไฟล์ 48px พอดี ดูเป็นกล่อง
+   สี่เหลี่ยมมนใหญ่ๆ อึดอัด ไม่ใช่วงกลมรูปโปรไฟล์ลอยตัวสวยๆ — ย่อ margin/รูปโปรไฟล์ลงให้เข้ากับแถบ
+   แคบด้วย และซ่อนช่องชื่อ/บทบาทที่ว่างเปล่าทั้งบล็อกไปเลย (ไม่ใช่แค่ตัวหนังสือข้างใน) กัน gap เหลือ
+   เป็นช่องว่างแปลกๆ */
+.sidebar-container.collapsed .profilebg {
+  margin: 12px 10px 6px 10px;
+  padding: 10px 4px;
+  border-radius: 14px;
+}
+.sidebar-container.collapsed .profilebg > div {
+  justify-content: center;
+  gap: 0 !important;
+}
+.sidebar-container.collapsed .profilebg .text-truncate {
+  display: none;
+}
+.sidebar-container.collapsed .profile-img,
+.sidebar-container.collapsed .profile-img-fallback {
+  width: 34px !important;
+  height: 34px !important;
+  font-size: 13px;
+}
+
+/* หมวดย่อย submenu (เช่น "แผนงาน") — โหมดย่อไม่กาง Collapse ให้เห็นอยู่แล้ว (Sidebar.js สลับ
+   ไปพาไปหน้า default ตรงๆ แทน) แต่กันไว้เผื่อกรณี state ค้าง ไม่ให้โผล่มาแทรกในแถบแคบๆ */
+.sidebar-container.collapsed .submenu-wrapper {
+  display: none;
+}

@@ -6,13 +6,29 @@ import "./Sidebar.css";
 import Swal from "sweetalert2";
 import { swalLogout, hasValidAvatar } from "../functions/user";
 import { useAuth } from "../auth/AuthContext";
+// ✅ ใช้ไอคอนชุดเดียวกับที่ Dashboard.js ใช้จริง (react-icons/fa) แทน bootstrap-icons เดิม — เดิม
+// สองที่นี้ใช้คนละชุดไอคอนกันคนละความหมาย (เช่น "แผนงานทั้งหมด" หน้า Dashboard กับ "แผนงาน" ใน
+// sidebar เป็นหน้าเดียวกันแต่ไอคอนคนละแบบ) ทำให้ผู้ใช้จำไม่ได้ว่าไอคอนไหนคือเมนูไหนบ้าง
+import {
+  FaTachometerAlt,
+  FaCalendarAlt,
+  FaFileContract,
+  FaClipboardList,
+  FaFileAlt,
+  FaFileInvoiceDollar,
+  FaUserFriends,
+  FaBuilding,
+  FaUsers,
+  FaCog,
+  FaSignOutAlt,
+} from "react-icons/fa";
 
 // ✅ Sidebar เป็น presentational ล้วนๆ ไม่จัดการ เปิด/ปิด บนมือถือเองอีกต่อไป
 // (เดิมมี state `isOpen` + ปุ่ม toggle + overlay ของตัวเอง ซ้ำซ้อนกับกลไกของ FullLayout.js
 // ที่คุม <aside className="sidebarArea showSidebar/hideSidebar/desktopSidebar"> อยู่แล้ว
 // ทั้งสองระบบแยกกันคนละ state ทำให้ปุ่มเปิดปิดที่ Header ไม่ตรงกับที่ Sidebar คาดหวังเสมอไป
 // ตอนนี้ FullLayout เป็นเจ้าของ state เพียงจุดเดียว — Sidebar แค่ render เนื้อหาข้างใน)
-const Sidebar = ({ handleMenuClick }) => {
+const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
   const [collapsedMenu, setCollapsedMenu] = useState({});
   const location = useLocation();
   const { userData, logout } = useAuth();
@@ -35,34 +51,48 @@ const Sidebar = ({ handleMenuClick }) => {
     getUserData();
   }, []);
 
-  // โครงสร้างเมนูหลัก (เพิ่มตัวอย่าง Sub-menu ในแผนงานให้เห็นวิธีใช้)
+  // ✅ จัดหมวดใหม่ให้ตรงกับความหมายจริง — เดิม "ภาพรวมสัญญา"/"ติดตามใบเสนอราคา" ถูกยัดรวมไว้ใต้
+  // หัวข้อ "ทีมงาน" ทั้งที่ไม่เกี่ยวกับทีมช่างเลย (เป็นงาน/เอกสารติดตาม) ตอนนี้แยกเป็น 3 หมวดชัดเจน:
+  // "งาน" (แผนงาน/สัญญา/งานของฉัน), "เอกสาร" (ไฟล์/ใบเสนอราคา), "ทีมงาน" (เฉพาะภาพรวมทีมช่างจริงๆ)
   const navigation = [
-    { title: "Dashboard", href: "/dashboard", icon: "bi-grid-1x2-fill" },
+    { title: "Dashboard", href: "/dashboard", icon: <FaTachometerAlt /> },
+  ];
+
+  // ✅ หมวด "งาน" — แผนงาน/ปฏิทินอยู่นี่เหมือนเดิม เพิ่มภาพรวมสัญญา (admin/manager) และงานของฉัน
+  // (ช่าง) เข้ามาด้วย เพราะเป็นเรื่อง "งาน" ทั้งคู่ ไม่ใช่เรื่องทีม — ไอคอนตรงกับการ์ดทางลัดหน้า
+  // Dashboard.js ทุกตัว (FaCalendarAlt="แผนงานทั้งหมด", FaClipboardList="งานของฉัน" ฯลฯ)
+  const workMenu = [
     {
       title: "แผนงาน",
       href: "/event",
-      icon: "bi-calendar-event-fill",
+      icon: <FaCalendarAlt />,
       items: [
         { title: "ตารางงานทั้งหมด", href: "/event" },
         { title: "การดำเนินงาน", href: "/operation" },
       ],
     },
-    { title: "เอกสารทั้งหมด", href: "/files", icon: "bi-file-earmark-text-fill" },
   ];
-
+  const workMenuManager = [
+    { title: "ภาพรวมสัญญา", href: "/contracts", icon: <FaFileContract /> },
+  ];
   // ✅ เดิมประกาศไว้แต่ไม่เคย render เลย — ช่างจึงไม่มีทางกดเข้า "งานของฉัน" จาก sidebar ได้เลย
-  const technicianMenu = [
-    { title: "งานของฉัน", href: "/technician/jobs", icon: "bi-tools" },
-    { title: "ติดตามใบเสนอราคา", href: "/quotations", icon: "bi-file-earmark-text" },
+  const workMenuTechnician = [
+    { title: "งานของฉัน", href: "/technician/jobs", icon: <FaClipboardList /> },
   ];
 
-  // ✅ เฉพาะแอดมิน/manager — สรุปภาพรวมงานของช่างแต่ละคนแยกกันชัดเจน (เดิมไม่มีทางเห็นได้เลย
-  // นอกจากไล่กรองเองทีละคนในหน้า Operation) ใช้ isAdminOrManager แทน isAdmin เพราะ AdminRoute
-  // เดิมไม่รองรับ manager แต่หน้านี้ตั้งใจให้ manager เข้าถึงได้ด้วย
-  const managerMenu = [
-    { title: "ภาพรวมทีมช่าง", href: "/team-workload", icon: "bi-people-fill" },
-    { title: "ภาพรวมสัญญา", href: "/contracts", icon: "bi-file-earmark-ruled" },
-    { title: "ติดตามใบเสนอราคา", href: "/quotations", icon: "bi-file-earmark-text" },
+  // ✅ หมวด "เอกสาร" — ติดตามใบเสนอราคาย้ายมาจาก "ทีมงาน" เดิม เพราะเป็นเรื่องเอกสารติดตาม
+  // ไม่ใช่เรื่องทีม เห็นได้ทั้งช่างและแอดมิน/manager เหมือนเดิม
+  const documentsMenu = [
+    { title: "เอกสารทั้งหมด", href: "/files", icon: <FaFileAlt /> },
+  ];
+  const documentsMenuShared = [
+    { title: "ติดตามใบเสนอราคา", href: "/quotations", icon: <FaFileInvoiceDollar /> },
+  ];
+
+  // ✅ หมวด "ทีมงาน" — เหลือแค่ภาพรวมทีมช่างจริงๆ (เฉพาะแอดมิน/manager) สรุปภาพรวมงานของช่าง
+  // แต่ละคนแยกกันชัดเจน (เดิมไม่มีทางเห็นได้เลยนอกจากไล่กรองเองทีละคนในหน้า Operation)
+  const teamMenu = [
+    { title: "ภาพรวมทีมช่าง", href: "/team-workload", icon: <FaUserFriends /> },
   ];
 
   // ✅ เดิม submenu จะปิดเสมอตอนโหลดหน้าใหม่ ต่อให้กำลังอยู่ในหน้าลูกของมันอยู่ก็ตาม
@@ -99,17 +129,62 @@ const Sidebar = ({ handleMenuClick }) => {
     <NavItem key={key}>
       <Link
         to={item.href}
+        title={item.title}
         className={`nav-link ${location.pathname === item.href ? "active" : ""}`}
         onClick={handleItemClick}
       >
-        <i className={`bi ${item.icon} nav-icon`}></i>
+        <span className="nav-icon">{item.icon}</span>
         <span className="nav-text">{item.title}</span>
       </Link>
     </NavItem>
   );
 
+  // ✅ เมนูแม่ที่มีลูก (ตอนนี้มีแค่ "แผนงาน") — ตอนย่อแถบไม่มีที่พอให้กาง submenu ใน rail แคบๆ
+  // ได้เลย กดแล้วพาไปหน้า default (href ของแม่) ตรงๆ แทน ต้องขยายแถบก่อนถึงจะเข้าเมนูลูกอื่นได้
+  const renderParentWithItems = (navi, index) => (
+    <NavItem key={index}>
+      {isCollapsed ? (
+        <Link
+          to={navi.href}
+          title={navi.title}
+          className={`nav-link ${isParentActive(navi) || location.pathname === navi.href ? "active" : ""}`}
+          onClick={handleItemClick}
+        >
+          <span className="nav-icon">{navi.icon}</span>
+          <span className="nav-text">{navi.title}</span>
+        </Link>
+      ) : (
+        <>
+          <button
+            className={`nav-link menu-dropdown-btn ${isMenuOpen(navi, index) ? "expanded" : ""} ${isParentActive(navi) ? "parent-active" : ""}`}
+            onClick={() => toggleNavbar(index)}
+          >
+            <span className="nav-icon">{navi.icon}</span>
+            <span className="nav-text">{navi.title}</span>
+            <i className={`bi bi-chevron-right arrow-icon ${isMenuOpen(navi, index) ? "rotate" : ""}`}></i>
+          </button>
+          <Collapse isOpen={isMenuOpen(navi, index)}>
+            <div className="submenu-wrapper">
+              {navi.items.map((item, idx) => (
+                <Link
+                  key={idx}
+                  className={`nav-link submenu-link ${location.pathname === item.href ? "active" : ""}`}
+                  to={item.href}
+                  onClick={handleItemClick}
+                >
+                  <i className="bi bi-circle submenu-dot"></i>
+                  <span className="nav-text">{item.title}</span>
+                </Link>
+              ))}
+            </div>
+          </Collapse>
+        </>
+      )}
+    </NavItem>
+  );
+
   return (
-    <div className="sidebar-container">
+    <div className={`sidebar-container ${isCollapsed ? "collapsed" : ""}`}>
       {/* ส่วนหัว: โปรไฟล์ผู้ใช้ — การ์ดลอยตัวสไตล์เดียวกับหน้าอื่นๆ ในแอป แทนแถบไล่เฉดเดิม */}
       <div className="profilebg">
         <div className="p-2 d-flex align-items-center gap-3">
@@ -137,63 +212,28 @@ const Sidebar = ({ handleMenuClick }) => {
         </div>
       </div>
 
-      {/* ตรงกลาง: รายการเมนูหลัก */}
+      {/* ตรงกลาง: รายการเมนูหลัก — จัดหมวดใหม่เป็น งาน/เอกสาร/ทีมงาน ให้ตรงความหมายจริง */}
       <div className="sidebar-content">
         <Nav vertical className="sidebarNav">
-          {navigation.map((navi, index) => (
-            <NavItem key={index}>
-              {navi.items ? (
-                <>
-                  <button
-                    className={`nav-link menu-dropdown-btn ${isMenuOpen(navi, index) ? "expanded" : ""} ${isParentActive(navi) ? "parent-active" : ""}`}
-                    onClick={() => toggleNavbar(index)}
-                  >
-                    <i className={`bi ${navi.icon} nav-icon`}></i>
-                    <span className="nav-text">{navi.title}</span>
-                    <i className={`bi bi-chevron-right arrow-icon ${isMenuOpen(navi, index) ? "rotate" : ""}`}></i>
-                  </button>
-                  <Collapse isOpen={isMenuOpen(navi, index)}>
-                    <div className="submenu-wrapper">
-                      {navi.items.map((item, idx) => (
-                        <Link
-                          key={idx}
-                          className={`nav-link submenu-link ${location.pathname === item.href ? "active" : ""}`}
-                          to={item.href}
-                          onClick={handleItemClick}
-                        >
-                          <i className="bi bi-circle submenu-dot"></i>
-                          <span className="nav-text">{item.title}</span>
-                        </Link>
-                      ))}
-                    </div>
-                  </Collapse>
-                </>
-              ) : (
-                <Link
-                  to={navi.href}
-                  className={`nav-link ${location.pathname === navi.href ? "active" : ""}`}
-                  onClick={handleItemClick}
-                >
-                  <i className={`bi ${navi.icon} nav-icon`}></i>
-                  <span className="nav-text">{navi.title}</span>
-                </Link>
-              )}
-            </NavItem>
-          ))}
+          {navigation.map((item, idx) => renderLink(item, `nav-${idx}`))}
 
-          {/* ✅ เมนูเฉพาะช่าง — เดิมมีตัวแปรไว้แต่ไม่เคยแสดงผลจริง */}
-          {isTechnician && (
-            <>
-              <div className="admin-divider-label">งานของฉัน</div>
-              {technicianMenu.map((item, idx) => renderLink(item, `tech-${idx}`))}
-            </>
-          )}
+          {/* หมวด "งาน" — แผนงาน/ปฏิทิน + ภาพรวมสัญญา (admin/manager) + งานของฉัน (ช่าง) */}
+          <div className="admin-divider-label">งาน</div>
+          {workMenu.map((navi, index) => renderParentWithItems(navi, `work-${index}`))}
+          {isAdminOrManager && workMenuManager.map((item, idx) => renderLink(item, `work-mgr-${idx}`))}
+          {isTechnician && workMenuTechnician.map((item, idx) => renderLink(item, `work-tech-${idx}`))}
+
+          {/* หมวด "เอกสาร" — เอกสารทั้งหมด + ติดตามใบเสนอราคา (เห็นได้ทั้งช่างและแอดมิน/manager) */}
+          <div className="admin-divider-label">เอกสาร</div>
+          {documentsMenu.map((item, idx) => renderLink(item, `doc-${idx}`))}
+          {(isTechnician || isAdminOrManager) &&
+            documentsMenuShared.map((item, idx) => renderLink(item, `doc-shared-${idx}`))}
 
           {/* ✅ เฉพาะแอดมิน/manager — เข้าดูภาพรวมงานแยกรายช่างได้จาก sidebar โดยตรง */}
           {isAdminOrManager && (
             <>
               <div className="admin-divider-label">ทีมงาน</div>
-              {managerMenu.map((item, idx) => renderLink(item, `mgr-${idx}`))}
+              {teamMenu.map((item, idx) => renderLink(item, `team-${idx}`))}
             </>
           )}
         </Nav>
@@ -208,20 +248,22 @@ const Sidebar = ({ handleMenuClick }) => {
               <NavItem>
                 <Link
                   to="/customer"
+                  title="Customer"
                   className={`nav-link ${location.pathname === "/customer" ? "active" : ""}`}
                   onClick={handleItemClick}
                 >
-                  <i className="bi bi-building-fill-gear nav-icon"></i>
+                  <span className="nav-icon"><FaBuilding /></span>
                   <span className="nav-text">Customer</span>
                 </Link>
               </NavItem>
               <NavItem>
                 <Link
                   to="/employee"
+                  title="Employee"
                   className={`nav-link ${location.pathname === "/employee" ? "active" : ""}`}
                   onClick={handleItemClick}
                 >
-                  <i className="bi bi-people-fill nav-icon"></i>
+                  <span className="nav-icon"><FaUsers /></span>
                   <span className="nav-text">Employee</span>
                 </Link>
               </NavItem>
@@ -233,18 +275,19 @@ const Sidebar = ({ handleMenuClick }) => {
           <NavItem>
             <Link
               to="/about"
+              title="Settings"
               className={`nav-link ${location.pathname === "/about" ? "active" : ""}`}
               onClick={handleItemClick}
             >
-              <i className="bi bi-sliders nav-icon"></i>
+              <span className="nav-icon"><FaCog /></span>
               <span className="nav-text">Settings</span>
             </Link>
           </NavItem>
 
-          {/* ปุ่มออกจากระบบ */}
+          {/* ปุ่มออกจากระบบ — ไอคอนตัวเดียวกับที่ Header.js ใช้ตรงเมนู Logout ในดรอปดาวน์โปรไฟล์ */}
           <NavItem className="mt-2">
-            <Link className="nav-link logout-link" onClick={handleLogout}>
-              <i className="bi bi-box-arrow-right nav-icon"></i>
+            <Link className="nav-link logout-link" title="Logout" onClick={handleLogout}>
+              <span className="nav-icon"><FaSignOutAlt /></span>
               <span className="nav-text">LOGOUT</span>
             </Link>
           </NavItem>

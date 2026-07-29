@@ -1,17 +1,11 @@
 // productService.js
 import API from "../API/axiosInstance";
-import AuthService from "./authService";
 
 const EventService = {
   async getEvents() {
     try {
-      const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token
-      if (userData) {
-        // const response = await API.get(`/product?search=${searchTerm}`); // เรียกข้อมูลสินค้าโดยใช้ ID ของผู้ใช้
-        const response = await API.get(`/events`); // เรียกข้อมูลสินค้าโดยใช้ ID ของผู้ใช้
-
-        return response.data;
-      }
+      const response = await API.get(`/events`);
+      return response.data;
     } catch (error) {
       console.error("Error fetching user events:", error);
       throw error;
@@ -19,13 +13,8 @@ const EventService = {
   },
   async getEventOp() {
     try {
-      const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token
-      if (userData) {
-        // const response = await API.get(`/product?search=${searchTerm}`); // เรียกข้อมูลสินค้าโดยใช้ ID ของผู้ใช้
-        const response = await API.get(`/events/event-op`); // เรียกข้อมูลสินค้าโดยใช้ ID ของผู้ใช้
-
-        return response.data;
-      }
+      const response = await API.get(`/events/event-op`);
+      return response.data;
     } catch (error) {
       console.error("Error fetching user events:", error);
       throw error;
@@ -34,11 +23,8 @@ const EventService = {
 
   async GetServiceReportFiles() {
     try {
-      const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token
-      if (userData) {
-        const response = await API.get(`/events/documents`);
-        return response.data;
-      }
+      const response = await API.get(`/events/documents`);
+      return response.data;
     } catch (error) {
       console.error("Error fetching service report files:", error);
       throw error;
@@ -47,11 +33,8 @@ const EventService = {
 
   async GetEventById(id) {
     try {
-      const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token
-      if (userData) {
-        const response = await API.get(`/events/${id}`); // ดึง event ตาม id
-        return response.data;
-      }
+      const response = await API.get(`/events/${id}`); // ดึง event ตาม id
+      return response.data;
     } catch (error) {
       console.error("Error fetching event by ID:", error);
       throw error;
@@ -60,10 +43,7 @@ const EventService = {
 
   async LineNotify(description) {
     try {
-      const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token
-      if (userData) {
-        await API.post(`/events/linenotify`, description);
-      }
+      await API.post(`/events/linenotify`, description);
     } catch (error) {
       console.error("Error fetching user linenotify:", error);
       throw error;
@@ -71,13 +51,8 @@ const EventService = {
   },
   async AddEvent(newEvent) {
     try {
-      const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token
-
-      if (userData) {
-        const response = await API.post(`/events`, newEvent); // เพิ่มข้อมูลสินค้า
-
-        return response.data.events;
-      }
+      const response = await API.post(`/events`, newEvent); // เพิ่มข้อมูลสินค้า
+      return response.data.events;
     } catch (error) {
       console.error("Error fetching Event:", error);
       throw error;
@@ -86,13 +61,8 @@ const EventService = {
 
   async UpdateEvent(id, updatedEvent) {
     try {
-      const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token
-
-      if (userData) {
-        const response = await API.put(`/events/${id}`, updatedEvent); // เพิ่มข้อมูลสินค้า
-
-        return response.data;
-      }
+      const response = await API.put(`/events/${id}`, updatedEvent); // เพิ่มข้อมูลสินค้า
+      return response.data;
     } catch (error) {
       console.error("Error fetching user event:", error);
       throw error;
@@ -101,59 +71,46 @@ const EventService = {
 
   async updateDocumentStatus(id, documentSent, documentFile) {
     try {
-      const userData = await AuthService.getUserData();
-      if (userData) {
-        const response = await API.put(`/events/${id}`, {
-          documentSent,
-          documentFile,
-        });
-        return response.data;
-      }
+      const response = await API.put(`/events/${id}`, {
+        documentSent,
+        documentFile,
+      });
+      return response.data;
     } catch (error) {
       console.error("Error updating document status:", error);
       throw error;
     }
   },
 
-async Upload(id, file, type, config = {}) {
-  try {
-    const userData = await AuthService.getUserData();
-    if (!userData) throw new Error("User not authenticated");
+  // ✅ Authorization header ผูกมากับทุก request อยู่แล้วผ่าน axios interceptor (axiosInstance.js
+  // อ่าน token จาก localStorage ให้อัตโนมัติ) — เดิมดึง userData มาแค่เพื่อหยิบ .token มาใส่ header
+  // ซ้ำอีกชั้น เป็น request เปล่าประโยชน์ที่ยิงก่อนทุกครั้ง (ดับเบิลจำนวน request ทั้งหมดของหน้านี้)
+  async Upload(id, file, type, config = {}) {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", type);
 
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("type", type);
+      const response = await API.put(`/events/upload/${id}`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+        ...config, // ✅ รองรับ onUploadProgress หรืออื่น ๆ
+      });
 
-    const response = await API.put(`/events/upload/${id}`, formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-        Authorization: `Bearer ${userData.token}`,
-      },
-      ...config, // ✅ รองรับ onUploadProgress หรืออื่น ๆ
-    });
-
-    return response.data;
-  } catch (error) {
-    console.error("Error uploading file:", error);
-    throw error;
-  }
-},
-
+      return response.data;
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      throw error;
+    }
+  },
 
   async AddQuotationFollowUp(id, { note, file }) {
     try {
-      const userData = await AuthService.getUserData();
-      if (!userData) throw new Error("User not authenticated");
-
       const formData = new FormData();
       formData.append("note", note);
       if (file) formData.append("file", file);
 
       const response = await API.put(`/events/${id}/quotation-followup`, formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-          Authorization: `Bearer ${userData.token}`,
-        },
+        headers: { "Content-Type": "multipart/form-data" },
       });
 
       return response.data;
@@ -165,20 +122,7 @@ async Upload(id, file, type, config = {}) {
 
   async DeleteFile(id, type, fileId) {
     try {
-      const userData = await AuthService.getUserData(); // ดึง Token
-
-      if (!userData) throw new Error("User not authenticated");
-
-      const response = await API.put(
-        `/events/delete-file/${id}`,
-        { type, fileId },
-        {
-          headers: {
-            Authorization: `Bearer ${userData.token}`,
-          },
-        }
-      );
-
+      const response = await API.put(`/events/delete-file/${id}`, { type, fileId });
       return response.data;
     } catch (error) {
       console.error("Error deleting file:", error);
@@ -261,16 +205,20 @@ async Upload(id, file, type, config = {}) {
     }
   },
 
+  async DeleteContract(contractGroupId) {
+    try {
+      const response = await API.delete(`/events/contract/${contractGroupId}`);
+      return response.data;
+    } catch (error) {
+      console.error("Error deleting contract:", error);
+      throw error;
+    }
+  },
+
   async DeleteEvent(id) {
     try {
-      const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token
-      if (userData) {
-        const response = await API.delete(`/events/${id}`); // ลบข้อมูลสินค้า
-
-        console.log("Delete Event Success", response.data);
-
-        // return response.data.userProducts;
-      }
+      await API.delete(`/events/${id}`); // ลบข้อมูลสินค้า
+      console.log("Delete Event Success");
     } catch (error) {
       console.error("Error Delete event:", error);
       throw error;

@@ -8,7 +8,7 @@
  * ฟีเจอร์นี้) ถูกจัดเป็นสัญญา 1 ครั้งของตัวเอง ไม่หายไปจากตาราง
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, Link } from "react-router-dom";
 import moment from "moment";
 import "moment/locale/th";
@@ -17,12 +17,12 @@ import {
   Box, Stack, Typography, TextField, InputAdornment, IconButton, Tooltip,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Skeleton,
   Dialog, DialogTitle, DialogContent, DialogActions, ToggleButtonGroup, ToggleButton,
-  Button, Autocomplete, Alert, Chip, Checkbox, Pagination, useMediaQuery,
+  Button, Autocomplete, Alert, Chip, Checkbox, Pagination, useMediaQuery, Badge,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
   Search, Refresh, Download, FolderOpen, Add, Close,
-  PlaylistAdd, MergeType, GroupWork,
+  PlaylistAdd, MergeType, GroupWork, DeleteOutline, WarningAmber,
 } from "@mui/icons-material";
 import { CSVLink } from "react-csv";
 import { useAuth } from "../../auth/AuthContext";
@@ -33,6 +33,8 @@ import JobTypeService from "../../services/JobTypeService";
 import SystemTypeService from "../../services/SystemTypeService";
 import { formatEventDateRange } from "../../utils/formatDateRange";
 import { resolveOperationGroup } from "../../utils/overdueJobs";
+import { countUsedRounds } from "../../utils/contractRounds";
+import { groupEventsByContract, nextVisitOverdueInfo } from "../../utils/contractOverdue";
 
 const ACCENT = "#dc2626";
 
@@ -59,19 +61,85 @@ const STATUS_COLOR = {
 // ว่าอันไหนกดได้ — ใช้ตัวกลมจางๆ แทน ให้ต่างจากลิงก์ชัดเจนขึ้น
 const Dash = () => <Box component="span" sx={{ color: "text.disabled", opacity: 0.6 }}>–</Box>;
 
+// ✅ "สถานะสัญญา" — เทียบ contractEnd กับวันนี้ ช่วยเตือนต่ออายุล่วงหน้า แทนต้องไล่เช็คคอลัมน์
+// "สิ้นสุด" เองทีละแถว ใช้ทั้งในตารางและไฟล์ CSV ที่ส่งออก (ใช้ฟังก์ชันเดียวกัน กันข้อมูลไม่ตรงกัน)
+const contractStatusInfo = (c) => {
+  if (!c.isRealContract || !c.contractEnd) return null;
+  const daysLeft = moment(c.contractEnd).startOf("day").diff(moment().startOf("day"), "days");
+  if (daysLeft < 0) return { label: "หมดอายุแล้ว", color: "#dc2626" };
+  if (daysLeft <= 60) return { label: `ใกล้หมดอายุ · ${daysLeft} วัน`, color: "#f59e0b" };
+  return { label: "มีผลบังคับใช้", color: "#10b981" };
+};
+
 // ✅ ยืด/หดความกว้างคอลัมน์ได้เองเหมือน Excel — เดิม fix ความกว้างตายตัวทุกคอลัมน์ (CELL_TRUNCATE)
 // พอชื่อบริษัท/โครงการยาวๆ ก็โดนตัดด้วย ... เสมอ ต้อง hover ดู tooltip ทุกครั้ง ให้ผู้ใช้ลากขยายเองได้
-// ตามที่ต้องการแทน (ความกว้างแต่ละคอลัมน์เก็บไว้ที่ colWidths state เฉพาะตอนเปิดหน้านี้ ไม่บันทึกถาวร)
+// ตามที่ต้องการแทน — เก็บลง localStorage ด้วย (ไม่ใช่แค่ state ในหน้านี้) จะได้จำค่าที่ปรับไว้ข้ามการ
+// ออกจากหน้า/ปิดแท็บ/เปิดใหม่ ไม่ต้องมาลากปรับความกว้างซ้ำทุกครั้งที่กลับเข้ามาดู
 const DEFAULT_COL_WIDTHS = {
   checkbox: 42, actions: 50,
+  contractNo: 120, quotationNo: 120,
   company: 170, site: 170, system: 110, title: 170,
-  contractNo: 120, quotationNo: 120, contractStart: 100, contractEnd: 100,
-  visitCount: 80, progress: 90, jobValue: 100, team: 120,
+  contractStart: 100, contractEnd: 100,
+  visitCount: 80, jobValue: 100, status: 130, progress: 90, team: 120,
+};
+const COL_WIDTHS_STORAGE_KEY = "contractOverview.colWidths";
+const loadStoredColWidths = () => {
+  try {
+    const raw = localStorage.getItem(COL_WIDTHS_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
 };
 const VISIT_COL_DEFAULT_WIDTH = 110;
 const MIN_COL_WIDTH = 50;
 
-const ResizableTh = ({ width, align = "left", children, onResize }) => {
+const AUTO_FIT_PADDING = 20; // ✅ กันเนื้อหาแนบขอบเซลล์พอดีเป๊ะจนดูอึดอัดหลัง auto-fit
+const AUTO_FIT_MAX_WIDTH = 420;
+
+const ResizableTh = ({ width, align = "left", children, onResize, rowSpan = 1, columnKey, tableRef }) => {
+  // ✅ ดับเบิลคลิก/แตะ 2 ครั้งที่ขอบคอลัมน์ = ปรับความกว้างพอดีเนื้อหาอัตโนมัติเหมือน Excel
+  // ⚠️ เดิมวัดจาก cell.scrollWidth ตรงๆ (เซลล์จริงในตาราง table-layout:fixed) แต่ table-layout:fixed
+  // "ล็อก" ความกว้างคอลัมน์ไว้แล้วตามที่กำหนด ทำให้ scrollWidth มักได้แค่ค่าความกว้างปัจจุบันของเซลล์เอง
+  // (ไม่ใช่ความกว้างเนื้อหาจริงที่ล้นออกมา) — ผลคือกดดับเบิลคลิกกี่ทีก็ได้แค่ "ความกว้างเดิม + padding"
+  // บวกเพิ่มไปเรื่อยๆ ไม่เคยลู่เข้าค่าที่พอดีจริงสักที (bug ที่ผู้ใช้เจอ "ขยายขึ้นเรื่อยๆ")
+  // ✅ แก้โดย clone เซลล์ออกมานอกตาราง ปลดล็อกความกว้าง (width:auto, whiteSpace:nowrap) แล้วค่อยวัด
+  // scrollWidth ของตัวโคลน ซึ่งไม่ติดข้อจำกัดของ table-layout:fixed อีกต่อไป จึงได้ความกว้างเนื้อหาจริง
+  // ล้วนๆ ตามจำนวนตัวอักษร/ไอคอนข้างในเป๊ะๆ ทุกครั้งไม่ว่าจะกดกี่รอบก็ตาม (idempotent)
+  const handleAutoFit = () => {
+    const table = tableRef?.current;
+    if (!table || !columnKey) return;
+    const cells = table.querySelectorAll(`[data-col-key="${columnKey}"]`);
+    let maxWidth = 0;
+    cells.forEach((cell) => {
+      // ✅ ไม่ก็อปปี้ font/padding มาใส่เป็น inline style เอง (ของเดิมทำแบบนั้นแล้วพัง) — cloneNode
+      // เก็บ class ของ MUI ไว้ครบอยู่แล้ว (เป็น global stylesheet ใช้ได้แม้ย้าย DOM ไปไหนก็ตาม) แค่
+      // override เฉพาะคุณสมบัติที่ "ล็อกความกว้างไว้" เท่านั้นก็พอ ปล่อยให้ font/padding มาจาก class เดิม
+      // เป๊ะๆ — ที่ผ่านมาก็อปปี้ shorthand "font" มาด้วย ซึ่งบางเบราว์เซอร์/เว็บวิวมือถือคำนวณ
+      // getComputedStyle().font ไม่ครบ (คืนค่าว่าง/ผิด) ทำให้ตัวโคลนวัดความกว้างผิดเพี้ยนไปเลย
+      const clone = cell.cloneNode(true);
+      Object.assign(clone.style, {
+        display: "inline-block",
+        position: "fixed",
+        visibility: "hidden",
+        pointerEvents: "none",
+        top: "-9999px",
+        left: "-9999px",
+        width: "auto",
+        minWidth: "0",
+        maxWidth: "none",
+        whiteSpace: "nowrap",
+      });
+      document.body.appendChild(clone);
+      maxWidth = Math.max(maxWidth, clone.scrollWidth);
+      document.body.removeChild(clone);
+    });
+    if (maxWidth > 0) {
+      onResize(Math.min(AUTO_FIT_MAX_WIDTH, Math.max(MIN_COL_WIDTH, Math.ceil(maxWidth) + AUTO_FIT_PADDING)));
+    }
+  };
+
   // ✅ เดิมรองรับแค่ mousedown/mousemove (ลากด้วยเมาส์) — จอมือถือ/แท็บเล็ตไม่มีเมาส์ ลากปรับความกว้าง
   // คอลัมน์ไม่ได้เลย ต้องฟัง touch event คู่กันด้วยเพื่อให้ลากด้วยนิ้วได้เหมือนกัน (เทียบ pattern เดียวกัน
   // เกือบทั้งหมด แค่อ่านพิกัดจาก e.touches[0].clientX แทน e.clientX)
@@ -93,29 +161,64 @@ const ResizableTh = ({ width, align = "left", children, onResize }) => {
     window.addEventListener("touchmove", onTouchMove, { passive: false });
     window.addEventListener("touchend", cleanup);
   };
-  const handleMouseDown = (e) => { e.preventDefault(); e.stopPropagation(); startDrag(e.clientX); };
+  // ✅ เช็คดับเบิลคลิก/แตะเองจากช่วงเวลาระหว่าง 2 ครั้งกด แทนพึ่ง native "onDoubleClick" event ล้วนๆ —
+  // ของเดิมใช้ onDoubleClick แยกต่างหากแต่ไม่ทำงาน (ทุก mousedown เริ่ม drag session ของตัวเองก่อนเสมอ
+  // ซึ่งไปรบกวนจังหวะที่เบราว์เซอร์ใช้ตัดสิน dblclick) เช็คเองจากเวลาที่ผ่านไปชัวร์กว่า ไม่ต้องพึ่งเบราว์เซอร์
+  const lastMouseDownRef = useRef(0);
+  const lastTouchRef = useRef(0);
+  const handleMouseDown = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const now = Date.now();
+    if (now - lastMouseDownRef.current < 400) {
+      lastMouseDownRef.current = 0;
+      handleAutoFit();
+      return;
+    }
+    lastMouseDownRef.current = now;
+    startDrag(e.clientX);
+  };
   const handleTouchStart = (e) => {
     e.stopPropagation();
+    const now = Date.now();
+    // ✅ หน้าจอมือถือแตะแม่นน้อยกว่าเมาส์คลิก ให้เวลาห่างระหว่าง 2 แตะกว้างกว่าฝั่งเมาส์หน่อย (500ms)
+    // กันเผลอแตะไม่ทันจังหวะแล้วโดนตีความเป็นลากแทน
+    if (now - lastTouchRef.current < 500) {
+      lastTouchRef.current = 0;
+      handleAutoFit();
+      return;
+    }
+    lastTouchRef.current = now;
     if (e.touches[0]) startDrag(e.touches[0].clientX);
   };
   return (
     <TableCell
       align={align}
+      rowSpan={rowSpan}
+      data-col-key={columnKey}
       sx={{ position: "relative", width, minWidth: width, maxWidth: width, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", userSelect: "none" }}
     >
       {children}
-      <Box
-        onMouseDown={handleMouseDown}
-        onTouchStart={handleTouchStart}
-        sx={{
-          // ✅ กว้างขึ้นจาก 8 → 16px บนพื้นที่แตะ (แต่มองด้วยตายังแคบเท่าเดิม เพราะ hover สีจะแสดงแค่
-          // แถบกลางบางๆ) นิ้วมือกดเจาะจงจุดแคบๆ ยากกว่าเมาส์เยอะ ต้องมี hit-area ใหญ่กว่านี้ถึงจะกดโดน
-          position: "absolute", top: 0, right: -8, bottom: 0, width: 16, cursor: "col-resize", zIndex: 3,
-          touchAction: "none",
-          "&:hover": { bgcolor: alpha("#dc2626", 0.5) },
-          "&:active": { bgcolor: alpha("#dc2626", 0.6) },
-        }}
-      />
+      <Tooltip title="ลากเพื่อปรับความกว้าง · ดับเบิลคลิก/แตะ 2 ครั้งเพื่อพอดีอัตโนมัติ" enterDelay={500}>
+        <Box
+          onMouseDown={handleMouseDown}
+          onTouchStart={handleTouchStart}
+          sx={{
+            // ✅ กว้างขึ้นจาก 8 → 24px บนพื้นที่แตะ (แต่มองด้วยตายังแคบเท่าเดิม เพราะ hover สีจะแสดงแค่
+            // แถบกลางบางๆ) นิ้วมือกดเจาะจงจุดแคบๆ ยากกว่าเมาส์เยอะ ต้องมี hit-area ใหญ่กว่านี้ถึงจะกดโดน
+            // ทุกครั้ง — เดิม 16px บนจอมือถือยังพลาดง่าย โดยเฉพาะตอนต้องแตะซ้ำ 2 ครั้งให้ตรงจุดเดิม
+            position: "absolute", top: 0, right: -12, bottom: 0, width: 24, cursor: "col-resize", zIndex: 3,
+            touchAction: "none",
+            display: "flex", justifyContent: "center",
+            // ✅ เส้นแบ่งบางๆ ตลอดเวลา (ไม่ใช่แค่ตอน hover) ให้เห็นชัดว่าคอลัมน์นี้ลากขยายได้ — ของเดิม
+            // ต้องเอาเมาส์ไปชี้ถึงจะรู้ว่ามีจุดลากตรงนี้อยู่ ดูไม่ออกเลยตอนแรก
+            "&::after": { content: '""', width: "1px", height: "60%", alignSelf: "center", bgcolor: alpha("#0f172a", 0.12), transition: "background-color .15s" },
+            "&:hover": { bgcolor: alpha("#dc2626", 0.5) },
+            "&:hover::after": { bgcolor: ACCENT },
+            "&:active": { bgcolor: alpha("#dc2626", 0.6) },
+          }}
+        />
+      </Tooltip>
     </TableCell>
   );
 };
@@ -126,12 +229,12 @@ const ResizableTh = ({ width, align = "left", children, onResize }) => {
 // identity ใหม่ ทำให้ React มองเป็นคนละคอมโพเนนต์แล้ว unmount/remount ช่องที่กำลังพิมพ์อยู่ (โฟกัสหลุด)
 const EditableCell = ({
   value, editing, editValue, editType = "text", editOptions, width, align, editable, saving,
-  formatDisplay, title, onStartEdit, onChangeValue, onCommit, onCancel,
+  formatDisplay, title, onStartEdit, onChangeValue, onCommit, onCancel, columnKey,
 }) => {
   const baseSx = { width, maxWidth: width, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
 
   if (!editable) {
-    return <TableCell align={align} title={title} sx={baseSx}>{formatDisplay ? formatDisplay(value) : (value || <Dash />)}</TableCell>;
+    return <TableCell align={align} title={title} data-col-key={columnKey} sx={baseSx}>{formatDisplay ? formatDisplay(value) : (value || <Dash />)}</TableCell>;
   }
 
   if (!editing) {
@@ -139,9 +242,10 @@ const EditableCell = ({
       <TableCell
         align={align}
         title={title || "คลิกเพื่อแก้ไข"}
+        data-col-key={columnKey}
         onClick={onStartEdit}
         sx={{
-          ...baseSx, cursor: "pointer",
+          ...baseSx, cursor: "pointer", transition: "background-color .12s, box-shadow .12s",
           "&:hover": { bgcolor: alpha(ACCENT, 0.07), boxShadow: `inset 0 0 0 1px ${alpha(ACCENT, 0.35)}` },
         }}
       >
@@ -151,7 +255,7 @@ const EditableCell = ({
   }
 
   return (
-    <TableCell align={align} sx={{ width, p: "2px 4px" }}>
+    <TableCell align={align} data-col-key={columnKey} sx={{ width, p: "2px 4px" }}>
       {editType === "select" ? (
         <TextField
           select autoFocus size="small" fullWidth value={editValue} disabled={saving}
@@ -241,70 +345,34 @@ export default function ContractOverview() {
 
   // ✅ จัดกลุ่มด้วย contractGroupId — งานเก่าที่ยังไม่มี (สร้างก่อนมีฟีเจอร์สัญญา) fallback เป็น
   // สัญญา 1 ครั้งของตัวเอง (key เฉพาะ _id) เทียบ pattern เดียวกับ getGroupKey ใน overdueJobs.js
-  const contracts = useMemo(() => {
-    const map = new Map();
-    events.forEach((e) => {
-      const key = e.contractGroupId || `nogid:${e._id}`;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key).push(e);
-    });
-    return [...map.values()]
-      .map((visits) => {
-        const sorted = visits.slice().sort((a, b) => (Number(a.time) || 0) - (Number(b.time) || 0));
-        const head = sorted[0];
-        const teamNames = [head.team, ...(head.teamMembers || []).map((m) => m?.name)]
-          .filter(Boolean)
-          .filter((name, idx, arr) => arr.indexOf(name) === idx);
-        return {
-          key: head.contractGroupId || `nogid:${head._id}`,
-          isRealContract: Boolean(head.contractGroupId),
-          company: head.company,
-          site: head.site,
-          system: head.system,
-          title: head.title,
-          contractNo: head.contractNo,
-          quotationNo: head.quotationNo,
-          contractStart: head.contractStart,
-          contractEnd: head.contractEnd,
-          visitCount: head.visitCount || sorted.length,
-          jobValue: head.jobValue,
-          team: teamNames.join(", ") || "-",
-          visits: sorted,
-        };
-      })
-      .sort((a, b) =>
-        (a.company || "").localeCompare(b.company || "", "th") ||
-        (a.site || "").localeCompare(b.site || "", "th")
-      );
-  }, [events]);
-
-  const maxVisitCount = useMemo(
-    () => contracts.reduce((max, c) => Math.max(max, c.visitCount || 0), 1),
-    [contracts]
-  );
-  const visitColumns = useMemo(
-    () => Array.from({ length: maxVisitCount }, (_, i) => i + 1),
-    [maxVisitCount]
+  // ✅ ย้าย logic จัดกลุ่มไปไว้ที่ utils/contractOverdue.js แล้ว (ใช้ซ้ำที่ Header.js ด้วยสำหรับป้าย
+  // สรุปจำนวนสัญญาเกินกำหนดบนมือถือ) กันตรรกะเพี้ยนไม่ตรงกันระหว่างสองจุด
+  const contracts = useMemo(
+    () =>
+      groupEventsByContract(events).sort(
+        (a, b) =>
+          (a.company || "").localeCompare(b.company || "", "th") ||
+          (a.site || "").localeCompare(b.site || "", "th")
+      ),
+    [events]
   );
 
   // ✅ เลือกจัดกลุ่มเป็นสัญญาได้เฉพาะตอนมองเห็นงานเก่าที่ยังไม่จัดกลุ่ม (แท็บ "งานเก่า.../ทั้งหมด")
   // แท็บ "สัญญา" ล้วนๆ ไม่มีอะไรให้เลือกจัดกลุ่มอยู่แล้ว (ทุกแถวมีสัญญาอยู่แล้วทั้งหมด)
   const showCheckboxes = viewFilter !== "contracts";
 
-  // ✅ ความกว้างคอลัมน์ที่ผู้ใช้ลากปรับเอง (key เฉพาะที่ต่างจากค่าเริ่มต้นเท่านั้น)
-  const [colWidths, setColWidths] = useState({});
+  // ✅ ความกว้างคอลัมน์ที่ผู้ใช้ลากปรับเอง (key เฉพาะที่ต่างจากค่าเริ่มต้นเท่านั้น) — โหลดจาก
+  // localStorage ตอนเปิดหน้า (lazy initializer) แล้วบันทึกกลับทุกครั้งที่ปรับ จะได้จำค่าไว้ข้ามการออก
+  // จากหน้า/รีเฟรช ไม่ใช่แค่ระหว่างที่ยังเปิดหน้านี้ค้างอยู่เหมือนเดิม
+  const [colWidths, setColWidths] = useState(loadStoredColWidths);
   const colWidth = (key) => colWidths[key] ?? DEFAULT_COL_WIDTHS[key] ?? VISIT_COL_DEFAULT_WIDTH;
-  const handleColResize = (key) => (w) => setColWidths((prev) => ({ ...prev, [key]: w }));
-  const totalTableWidth = useMemo(() => {
-    let total = colWidth("actions") + (showCheckboxes ? colWidth("checkbox") : 0);
-    [
-      "company", "site", "system", "title", "contractNo", "quotationNo",
-      "contractStart", "contractEnd", "visitCount", "progress", "jobValue", "team",
-    ].forEach((k) => { total += colWidth(k); });
-    visitColumns.forEach((n) => { total += colWidth(`visit_${n}`); });
-    return total;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [colWidths, showCheckboxes, visitColumns]);
+  const handleColResize = (key) => (w) => setColWidths((prev) => {
+    const next = { ...prev, [key]: w };
+    try { localStorage.setItem(COL_WIDTHS_STORAGE_KEY, JSON.stringify(next)); } catch {}
+    return next;
+  });
+  // ✅ ใช้หา DOM ของตารางจริงตอนดับเบิลคลิกขอบคอลัมน์เพื่อวัดความกว้างเนื้อหาที่แท้จริง (auto-fit)
+  const tableRef = useRef(null);
 
   const realContractCount = useMemo(() => contracts.filter((c) => c.isRealContract).length, [contracts]);
   const hiddenJobCount = contracts.length - realContractCount;
@@ -339,13 +407,19 @@ export default function ContractOverview() {
     return [...map.values()].filter((g) => g.items.length >= 2).sort((a, b) => b.items.length - a.items.length);
   }, [contracts]);
 
-  // ✅ ตัวเลือกปีสำหรับกรองตาราง — ดึงจากปีที่มีข้อมูลจริงเท่านั้น เรียงปีล่าสุดก่อน
+  // ✅ ตัวเลือกปีสำหรับกรองตาราง — ดึงจากปีที่มีข้อมูลจริง บวกปีปัจจุบันเสมอ (แม้ยังไม่มีสัญญาปีนี้เลย
+  // ก็ตาม) เพราะเป็นค่าเริ่มต้นของตัวกรองด้านล่าง กันกรณี dropdown ไม่มีปีปัจจุบันให้เลือกตั้งแต่แรก
+  const currentYear = moment().year();
   const availableYears = useMemo(() => {
-    const years = new Set();
+    const years = new Set([currentYear]);
     contracts.forEach((c) => { const y = contractYear(c); if (y) years.add(y); });
     return [...years].sort((a, b) => b - a);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contracts]);
-  const [yearFilter, setYearFilter] = useState("all");
+  // ✅ ค่าเริ่มต้นแสดงปีปัจจุบันก่อนเสมอ (ไม่ใช่ "ทุกปี" เหมือนเดิม) เปลี่ยนดูปีอื่นได้จาก dropdown
+  const [yearFilter, setYearFilter] = useState(String(currentYear));
+  // ✅ กรองตามผู้รับผิดชอบ — แยกจากช่องค้นหาข้อความอิสระ ให้เลือกจากรายชื่อจริงได้เลย ไม่ต้องพิมพ์เอง
+  const [teamFilter, setTeamFilter] = useState("all");
 
   const [selectedIds, setSelectedIds] = useState(new Set());
   const selectedContracts = useMemo(() => contracts.filter((c) => selectedIds.has(c.key)), [contracts, selectedIds]);
@@ -371,6 +445,11 @@ export default function ContractOverview() {
     if (yearFilter !== "all") {
       base = base.filter((c) => String(contractYear(c)) === String(yearFilter));
     }
+    // ✅ กรองตามผู้รับผิดชอบแบบเจาะจง (เลือกจากรายชื่อจริง) แยกจากช่องค้นหาข้อความอิสระด้านบน —
+    // c.team อาจเป็นชื่อหลายคนต่อกันด้วย ", " (ทีมงาน/ลูกทีมเพิ่มเติม) ใช้ includes เทียบเป็นสตริงย่อยพอ
+    if (teamFilter !== "all") {
+      base = base.filter((c) => (c.team || "").includes(teamFilter));
+    }
     const kw = search.trim().toLowerCase();
     if (!kw) return base;
     return base.filter((c) =>
@@ -378,13 +457,35 @@ export default function ContractOverview() {
         .some((v) => (v || "").toLowerCase().includes(kw))
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contracts, search, viewFilter, yearFilter]);
+  }, [contracts, search, viewFilter, yearFilter, teamFilter]);
+
+  // ✅ นับจาก `filtered` (ไม่ใช่ `contracts` ทั้งก้อนแบบเดิม) — เดิมถ้ามีสัญญาไหนสักอันในระบบที่มี
+  // จำนวนครั้งเยอะ (เช่น 24) ตารางจะโชว์คอลัมน์ "ครั้งที่ 1-24" ตลอด แม้กรองปี/ค้นหาจนเหลือแต่สัญญา
+  // 2-4 ครั้งอยู่ก็ตาม กว้างเกินจำเป็นและไม่ตรงกับสิ่งที่กรองไว้จริง
+  const maxVisitCount = useMemo(
+    () => filtered.reduce((max, c) => Math.max(max, c.visitCount || 0), 1),
+    [filtered]
+  );
+  const visitColumns = useMemo(
+    () => Array.from({ length: maxVisitCount }, (_, i) => i + 1),
+    [maxVisitCount]
+  );
+  const totalTableWidth = useMemo(() => {
+    let total = colWidth("actions") + (showCheckboxes ? colWidth("checkbox") : 0);
+    [
+      "contractNo", "quotationNo", "company", "site", "system", "title",
+      "contractStart", "contractEnd", "visitCount", "jobValue", "status", "progress", "team",
+    ].forEach((k) => { total += colWidth(k); });
+    visitColumns.forEach((n) => { total += colWidth(`visit_${n}`); });
+    return total;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colWidths, showCheckboxes, visitColumns]);
 
   // ✅ แสดงแค่หน้าละ 20 แถว — เดิมโชว์ทุกแถวรวดเดียว (สูงสุดเป็นร้อย) ต้องเลื่อนในกรอบตารางยาวๆ
   // ตลอดเวลา ตัดเป็นหน้าให้สั้นกระชับแทน (ตัวกรอง/ค้นหายังใช้กับข้อมูลทั้งหมดเหมือนเดิม แค่ตัดแสดงผล)
   const PAGE_SIZE = 20;
   const [page, setPage] = useState(1);
-  useEffect(() => { setPage(1); }, [search, viewFilter, yearFilter]);
+  useEffect(() => { setPage(1); }, [search, viewFilter, yearFilter, teamFilter]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pagedRows = useMemo(
     () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
@@ -393,22 +494,27 @@ export default function ContractOverview() {
 
   const csvData = useMemo(
     () => filtered.map((c) => {
+      const st = contractStatusInfo(c);
       const row = {
+        เลขที่สัญญา: c.contractNo || "",
+        ใบเสนอราคา: c.quotationNo || "",
         บริษัท: c.company || "",
         โครงการ: c.site || "",
         ระบบ: c.system || "",
         ประเภทงาน: c.title || "",
-        เลขที่สัญญา: c.contractNo || "",
-        ใบเสนอราคา: c.quotationNo || "",
         วันที่เริ่มสัญญา: c.contractStart ? moment(c.contractStart).format("YYYY-MM-DD") : "",
         วันที่สิ้นสุดสัญญา: c.contractEnd ? moment(c.contractEnd).format("YYYY-MM-DD") : "",
         จำนวนครั้ง: c.visitCount || "",
+        "มูลค่างาน/1ปี": c.jobValue ?? "",
+        สถานะสัญญา: st?.label || "",
       };
+      // ✅ นับเฉพาะครั้งที่ลงตารางจริงเหมือนตารางในหน้านี้ (เดิม CSV รวมแผนงานล่วงหน้าที่ยังไม่มีวันที่
+      // จริงเข้าไปด้วย ทำให้ export ไม่ตรงกับสิ่งที่ตารางแสดงจริง)
       visitColumns.forEach((n) => {
-        const visit = c.visits.find((v) => Number(v.time) === n);
-        row[`ครั้งที่${n}`] = visit ? formatEventDateRange(visit) : "";
+        const visit = c.visits.find((v) => !v.unscheduled && Number(v.time) === n);
+        const pendingDraft = !visit && c.visits.find((v) => v.unscheduled && Number(v.time) === n);
+        row[`ครั้งที่${n}`] = visit ? formatEventDateRange(visit) : pendingDraft ? "รอวางแผน" : "";
       });
-      row["มูลค่างาน"] = c.jobValue ?? "";
       row["ผู้รับผิดชอบ"] = c.team;
       return row;
     }),
@@ -442,8 +548,42 @@ export default function ContractOverview() {
   const teamOptions = useMemo(() => lookups.employees.map((e) => e.fname).filter(Boolean), [lookups.employees]);
   const teamToId = useMemo(() => new Map(lookups.employees.map((e) => [e.fname, e._id])), [lookups.employees]);
 
+  // ✅ แนะนำเลขที่สัญญาถัดไปให้อัตโนมัติ (ตัวอักษรนำหน้า + ลำดับ + ปี พ.ศ. เช่น FAPTY02-2569) จากเลขที่
+  // สัญญาจริงที่มีอยู่แล้วในระบบ — ขึ้นปีใหม่เริ่มนับ 01 ใหม่ ยังแก้ไขเองได้เสมอ (แค่ค่าเริ่มต้นในช่อง
+  // ไม่ได้บังคับรูปแบบ) ถ้ายังไม่เคยมีสัญญารูปแบบนี้มาก่อนเลย fallback ไปใช้ตัวอักษรนำหน้า "FAPTY"
+  const CONTRACT_NO_PATTERN = /^([A-Za-z]+)(\d+)-(\d{4})$/;
+  const suggestNextContractNo = () => {
+    const buddhistYear = moment().year() + 543;
+    const parsed = contracts
+      .filter((c) => c.isRealContract && c.contractNo)
+      .map((c) => {
+        const m = c.contractNo.trim().match(CONTRACT_NO_PATTERN);
+        return m ? { prefix: m[1], seq: Number(m[2]), width: m[2].length, year: Number(m[3]) } : null;
+      })
+      .filter(Boolean);
+    const thisYear = parsed.filter((p) => p.year === buddhistYear);
+    if (thisYear.length > 0) {
+      const top = thisYear.reduce((a, b) => (b.seq > a.seq ? b : a));
+      return `${top.prefix}${String(top.seq + 1).padStart(top.width, "0")}-${buddhistYear}`;
+    }
+    const latest = parsed.sort((a, b) => b.year - a.year || b.seq - a.seq)[0];
+    const prefix = latest?.prefix || "FAPTY";
+    const width = latest?.width || 2;
+    return `${prefix}${String(1).padStart(width, "0")}-${buddhistYear}`;
+  };
+
+  // ✅ เลขที่สัญญาห้ามซ้ำกับสัญญาอื่น (ไม่นับตัวเอง) — เช็คฝั่ง client ก่อนเพื่อ feedback ทันที ไม่ต้องรอ
+  // round-trip ไป backend (ซึ่งเช็คซ้ำอีกชั้นอยู่แล้วเป็นตัวที่เชื่อถือได้จริง กัน race)
+  const isContractNoTaken = (contractNo, excludeContractGroupId) => {
+    const trimmed = (contractNo || "").trim();
+    if (!trimmed) return false;
+    return contracts.some((c) =>
+      c.isRealContract && c.contractNo && c.contractNo.trim() === trimmed && c.key !== excludeContractGroupId
+    );
+  };
+
   const openAddDialog = () => {
-    setForm(emptyForm);
+    setForm({ ...emptyForm, contractNo: suggestNextContractNo() });
     setFormError("");
     setAddOpen(true);
   };
@@ -459,6 +599,10 @@ export default function ContractOverview() {
     if (!form.system.trim()) { setFormError("กรุณาระบุระบบงาน"); return; }
     const visitCount = Number(form.visitCount);
     if (!visitCount || visitCount < 1) { setFormError("กรุณาระบุจำนวนครั้งทั้งหมดของสัญญา"); return; }
+    if (isContractNoTaken(form.contractNo)) {
+      setFormError(`เลขที่สัญญา "${form.contractNo.trim()}" ถูกใช้ไปแล้ว กรุณาตรวจสอบ`);
+      return;
+    }
 
     setSaving(true);
     try {
@@ -519,7 +663,7 @@ export default function ContractOverview() {
   // ✅ เดิมทุกทางเข้าสร้าง "ทั้งสัญญา" ในทีเดียวเท่านั้น (ต้องรู้ครบทุกวันที่ตั้งแต่แรก) ทั้งที่จริง
   // งานส่วนใหญ่ทยอยรู้วันที่ทีละครั้งตลอดปี — เพิ่มปุ่มนี้ให้เติมทีละครั้งได้ โดย backend จะกันไม่ให้
   // เกินจำนวน visitCount ที่ระบุไว้ตอนสร้างสัญญา (ดู POST /events)
-  const [addVisitTarget, setAddVisitTarget] = useState(null); // contract object จาก `contracts`
+  const [addVisitTarget, setAddVisitTarget] = useState(null); // { contract, extendRound } | null — extendRound: null = เพิ่มครั้งใหม่, N = ต่อวันที่ไม่ต่อเนื่องให้ครั้งที่ N
   const [newVisitStart, setNewVisitStart] = useState("");
   const [newVisitEnd, setNewVisitEnd] = useState("");
   const [newVisitTeam, setNewVisitTeam] = useState("");
@@ -527,10 +671,20 @@ export default function ContractOverview() {
   const [addVisitSaving, setAddVisitSaving] = useState(false);
 
   const openAddVisitDialog = (contract) => {
-    setAddVisitTarget(contract);
+    setAddVisitTarget({ contract, extendRound: null });
     setNewVisitStart("");
     setNewVisitEnd("");
     setNewVisitTeam(contract.team === "-" ? "" : (contract.visits[0]?.team || ""));
+    setAddVisitError("");
+  };
+  // ✅ ต่อวันที่เข้างานไม่ต่อเนื่อง (เว้นช่วงแล้วกลับมาเข้าอีก) ให้ "ครั้งเดิม" ที่มีอยู่แล้ว — แยกจาก
+  // "+ เพิ่มครั้งถัดไป" ด้านบนซึ่งเป็นการเพิ่มครั้งใหม่ ดูรายละเอียดที่ handleAddVisitSubmit
+  const openExtendVisitDialog = (contract, roundNumber) => {
+    const roundVisits = contract.visits.filter((v) => !v.unscheduled && Number(v.time) === roundNumber);
+    setAddVisitTarget({ contract, extendRound: roundNumber });
+    setNewVisitStart("");
+    setNewVisitEnd("");
+    setNewVisitTeam(roundVisits[0]?.team || (contract.team === "-" ? "" : contract.team));
     setAddVisitError("");
   };
   const closeAddVisitDialog = () => { if (!addVisitSaving) setAddVisitTarget(null); };
@@ -545,14 +699,61 @@ export default function ContractOverview() {
     setAddVisitSaving(true);
     setAddVisitError("");
     try {
-      const c = addVisitTarget;
+      const { contract: c, extendRound } = addVisitTarget;
+      const endDate = moment(newVisitEnd || newVisitStart).add(1, "days").format("YYYY-MM-DD");
+
+      if (extendRound != null) {
+        // ✅ ต่อวันที่ไม่ต่อเนื่องให้ "ครั้งเดิม" (extendRound) ไม่ใช่ครั้งใหม่ — ต้องผูก jobGroupId
+        // เดียวกันกับ document เดิมของครั้งนี้ ถ้าครั้งนี้ยังไม่เคยถูกต่อมาก่อน (ยังไม่มี jobGroupId)
+        // ต้องย้อนกลับไปใส่ jobGroupId ให้ document เดิมก่อน (เทียบ pattern เดียวกับ EditEvent.js
+        // ที่ใช้ทำแบบนี้กับงานทั่วไปอยู่แล้ว — ดูคอมเมนต์ backend PUT /:id "ใช้ตอนแก้ไข event เดี่ยว
+        // แล้วเพิ่มวันที่อื่นให้กลายเป็นงานเดียวกันภายหลัง") backend เช็คว่า jobGroupId ตรงกับของเดิม
+        // ถึงจะไม่ถือว่าเป็นครั้งซ้ำ/เกินโควตา (ดู POST /events)
+        const roundVisits = c.visits.filter((v) => !v.unscheduled && Number(v.time) === extendRound);
+        const holder = roundVisits.find((v) => v.jobGroupId) || roundVisits[0];
+        const jobGroupId = holder.jobGroupId || `${holder._id}-${Date.now()}`;
+        if (!holder.jobGroupId) {
+          await EventService.UpdateEvent(holder._id, { jobGroupId });
+        }
+        const payload = {
+          company: c.company || "",
+          site: c.site || "",
+          title: c.title || "",
+          system: c.system || "",
+          time: String(extendRound),
+          team: newVisitTeam,
+          resPerson: teamToId.get(newVisitTeam) || "",
+          teamMembers: [],
+          backgroundColor: "#3788d8",
+          textColor: "#ffffff",
+          fontSize: 8,
+          startTime: "",
+          endTime: "",
+          isContractBatch: true,
+          contractGroupId: c.key,
+          jobGroupId,
+          contractNo: c.contractNo || "",
+          quotationNo: c.quotationNo || "",
+          contractStart: c.contractStart || "",
+          contractEnd: c.contractEnd || "",
+          visitCount: c.visitCount,
+          jobValue: c.jobValue,
+          dates: [{ start: newVisitStart, end: endDate, date: newVisitStart }],
+        };
+        await EventService.AddEvent(payload);
+        setAddVisitSaving(false);
+        setAddVisitTarget(null);
+        Swal.fire({ title: `เพิ่มวันที่ต่อเนื่องให้ครั้งที่ ${extendRound} สำเร็จ ✅`, icon: "success", timer: 1200, showConfirmButton: false });
+        await fetchData();
+        return;
+      }
+
       // ✅ สัญญาที่เพิ่งสร้างแบบฉบับร่าง (ยังไม่มีครั้งไหนลงตารางเลย) จะมี record เดียวเป็น
       // unscheduled:true ปนอยู่ใน visits — ต้องนับ "ครั้งถัดไป" จากครั้งที่ลงตารางจริงเท่านั้น
       // ไม่นับฉบับร่างเป็นครั้งที่ 1 ไปเลย (มันยังไม่ใช่ครั้งจริงจนกว่าจะใส่วันที่)
       const realVisits = c.visits.filter((v) => !v.unscheduled);
       const placeholder = c.visits.find((v) => v.unscheduled);
-      const nextIndex = realVisits.length + 1;
-      const endDate = moment(newVisitEnd || newVisitStart).add(1, "days").format("YYYY-MM-DD");
+      const nextIndex = countUsedRounds(realVisits) + 1;
 
       if (placeholder) {
         // ✅ แปลงฉบับร่างเดิม (record เดียวกัน) ให้กลายเป็นครั้งที่ 1 จริง แทนการสร้าง record ใหม่ —
@@ -621,6 +822,10 @@ export default function ContractOverview() {
   const handleMergeSubmit = async () => {
     setMergeError("");
     if (selectedContracts.length === 0) { setMergeError("กรุณาเลือกงานอย่างน้อย 1 รายการ"); return; }
+    if (isContractNoTaken(mergeForm.contractNo)) {
+      setMergeError(`เลขที่สัญญา "${mergeForm.contractNo.trim()}" ถูกใช้ไปแล้ว กรุณาตรวจสอบ`);
+      return;
+    }
     setMergeSaving(true);
     try {
       // ✅ งานเก่า (isRealContract=false) แต่ละ "สัญญา" ในตารางคือ 1 event เดียว (fallback key
@@ -674,6 +879,12 @@ export default function ContractOverview() {
     // ✅ ไม่เปลี่ยนแปลงจากเดิมเลย ไม่ต้องยิง API เปล่าๆ
     if (rawValue === String(editOriginalValue(c, field))) { setEditingCell(null); return; }
 
+    if (field === "contractNo" && isContractNoTaken(rawValue, c.key)) {
+      Swal.fire({ title: "แก้ไขไม่สำเร็จ", text: `เลขที่สัญญา "${rawValue.trim()}" ถูกใช้ไปแล้ว กรุณาตรวจสอบ`, icon: "error" });
+      setEditingCell(null);
+      return;
+    }
+
     setEditSaving(true);
     try {
       const payload = {};
@@ -693,6 +904,48 @@ export default function ContractOverview() {
       setEditingCell(null);
     } finally {
       setEditSaving(false);
+    }
+  };
+
+  // ── ลบสัญญา/งานทิ้ง ─────────────────────────────────────────────────────
+  // ✅ สัญญาจริง (isRealContract) ลบทั้งก้อนทีเดียวผ่าน DELETE /contract/:contractGroupId (ทุกครั้งที่
+  // ผูก contractGroupId เดียวกันหายไปพร้อมกัน) ส่วนแถวงานเก่าที่ยังไม่จัดกลุ่ม (isRealContract=false)
+  // คือ event เดี่ยวๆ อยู่แล้ว ลบผ่าน DeleteEvent ตัวเดียวพอ — ทั้งคู่ยืนยันก่อนลบเสมอ เพราะลบแล้ว
+  // กู้คืนไม่ได้ และเตือนเป็นพิเศษถ้ามีครั้งที่ "ดำเนินการเสร็จสิ้น" แล้วปนอยู่ (ประวัติงานจริงจะหายไปด้วย)
+  const handleDeleteContract = async (c) => {
+    const doneCount = c.visits.filter((v) => v.status === "ดำเนินการเสร็จสิ้น").length;
+    const result = await Swal.fire({
+      icon: "warning",
+      title: c.isRealContract ? "ลบสัญญานี้ทั้งหมด?" : "ลบงานนี้?",
+      html: `
+        <div style="text-align:left;font-size:13px;">
+          <b>${c.company || "-"} · ${c.site || "-"}</b><br/>
+          ${c.title} · ${c.system}<br/>
+          ${c.isRealContract ? `จะลบทั้งสัญญา ${c.visits.length} รายการ (ทุกครั้งที่)` : "จะลบงานนี้ 1 รายการ"}
+          ${doneCount > 0 ? `<br/><b style="color:#dc2626;">⚠️ มี ${doneCount} ครั้งที่ดำเนินการเสร็จสิ้นแล้ว จะถูกลบไปด้วย</b>` : ""}
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: "ลบ",
+      confirmButtonColor: "#dc2626",
+      cancelButtonText: "ยกเลิก",
+    });
+    if (!result.isConfirmed) return;
+    try {
+      if (c.isRealContract) {
+        await EventService.DeleteContract(c.key);
+      } else {
+        await EventService.DeleteEvent(c.visits[0]._id);
+      }
+      if (selectedIds.has(c.key)) toggleSelect(c);
+      Swal.fire({ title: "ลบสำเร็จ ✅", icon: "success", timer: 1200, showConfirmButton: false });
+      await fetchData();
+    } catch (err) {
+      Swal.fire({
+        title: "ลบไม่สำเร็จ",
+        text: err?.response?.data?.message || err.message,
+        icon: "error",
+      });
     }
   };
 
@@ -832,6 +1085,17 @@ export default function ContractOverview() {
           <option value="all">ทุกปี</option>
           {availableYears.map((y) => <option key={y} value={y}>{y}</option>)}
         </TextField>
+        {/* ✅ กรองตามผู้รับผิดชอบเจาะจงจากรายชื่อจริง — แยกจากช่องค้นหาข้อความด้านบนซึ่งพิมพ์ค้นหาแบบ
+            อิสระ (บางส่วน/สะกดผิดก็เจอ) ส่วนอันนี้เลือกจาก dropdown ให้ตรงเป๊ะไม่ต้องพิมพ์เอง */}
+        <TextField
+          select size="small" label="ผู้รับผิดชอบ" value={teamFilter}
+          onChange={(e) => setTeamFilter(e.target.value)}
+          SelectProps={{ native: true }}
+          sx={{ width: { xs: "100%", sm: 170 }, flexShrink: 0, "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: "background.paper" } }}
+        >
+          <option value="all">ทุกคน</option>
+          {teamOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+        </TextField>
       </Stack>
 
       {loading ? (
@@ -859,6 +1123,7 @@ export default function ContractOverview() {
           }}
         >
           <Table
+            ref={tableRef}
             size="small"
             sx={{
               tableLayout: "fixed", width: totalTableWidth,
@@ -866,33 +1131,53 @@ export default function ContractOverview() {
               // (เห็นกรอบแดงเป็นก้อนๆ ตอนเลื่อน) — ตอนนี้แสดงแค่ 20 แถวต่อหน้าอยู่แล้ว ตารางไม่สูงจน
               // ต้อง sticky หัวอีกต่อไป ตัด stickyHeader ออก แล้วใช้ borderCollapse ปกติแทนก็พอ ไม่เพี้ยน
               borderCollapse: "collapse",
-              "& th, & td": { border: "1px solid", borderColor: alpha("#0f172a", 0.12) },
+              "& th, & td": { border: "1px solid", borderColor: alpha("#0f172a", 0.1) },
+              "& td": { py: 0.75 },
             }}
           >
             <TableHead>
-              <TableRow sx={{ "& th": { fontWeight: 700, bgcolor: "#fef2f2", borderBottom: `2px solid ${ACCENT} !important`, color: "#7f1d1d" } }}>
-                {showCheckboxes && <TableCell padding="checkbox" sx={{ width: colWidth("checkbox") }} />}
-                <ResizableTh width={colWidth("company")} onResize={handleColResize("company")}>บริษัท</ResizableTh>
-                <ResizableTh width={colWidth("site")} onResize={handleColResize("site")}>โครงการ</ResizableTh>
-                <ResizableTh width={colWidth("system")} onResize={handleColResize("system")}>ระบบ</ResizableTh>
-                <ResizableTh width={colWidth("title")} onResize={handleColResize("title")}>ประเภทงาน</ResizableTh>
-                <ResizableTh width={colWidth("contractNo")} onResize={handleColResize("contractNo")}>เลขที่สัญญา</ResizableTh>
-                <ResizableTh width={colWidth("quotationNo")} onResize={handleColResize("quotationNo")}>ใบเสนอราคา</ResizableTh>
-                <ResizableTh width={colWidth("contractStart")} onResize={handleColResize("contractStart")}>เริ่มสัญญา</ResizableTh>
-                <ResizableTh width={colWidth("contractEnd")} onResize={handleColResize("contractEnd")}>สิ้นสุด</ResizableTh>
-                <ResizableTh width={colWidth("visitCount")} align="center" onResize={handleColResize("visitCount")}>จำนวนครั้ง</ResizableTh>
-                <ResizableTh width={colWidth("progress")} align="center" onResize={handleColResize("progress")}>ความคืบหน้า</ResizableTh>
+              {/* ✅ หัวตาราง 2 แถว เทียบเค้าโครงเอกสารอ้างอิง Excel ที่ใช้ติดตามสัญญาอยู่แล้ว — กลุ่ม
+                  "อ้างอิงเอกสารเลขที่" (เลขที่สัญญา/ใบเสนอราคา) กับ "ระยะเวลา" (เริ่มสัญญา/สิ้นสุด)
+                  ใช้ colSpan คลุม 2 คอลัมน์ย่อยแถวล่าง ส่วนคอลัมน์อื่นที่ไม่มีกลุ่มใช้ rowSpan คลุม 2 แถว */}
+              <TableRow sx={{ "& th": { fontWeight: 700, bgcolor: "#fef2f2", borderBottom: `2px solid ${ACCENT} !important`, color: "#7f1d1d", letterSpacing: "0.01em" } }}>
+                {showCheckboxes && <TableCell padding="checkbox" rowSpan={2} sx={{ width: colWidth("checkbox") }} />}
+                <TableCell align="center" colSpan={2}>เลขที่เอกสาร</TableCell>
+                <ResizableTh width={colWidth("company")} rowSpan={2} columnKey="company" tableRef={tableRef} onResize={handleColResize("company")}>บริษัท</ResizableTh>
+                <ResizableTh width={colWidth("site")} rowSpan={2} columnKey="site" tableRef={tableRef} onResize={handleColResize("site")}>โครงการ</ResizableTh>
+                <ResizableTh width={colWidth("system")} rowSpan={2} columnKey="system" tableRef={tableRef} onResize={handleColResize("system")}>ระบบ</ResizableTh>
+                <ResizableTh width={colWidth("title")} rowSpan={2} columnKey="title" tableRef={tableRef} onResize={handleColResize("title")}>ประเภทงาน</ResizableTh>
+                <TableCell align="center" colSpan={2}>ระยะเวลา</TableCell>
+                <ResizableTh width={colWidth("visitCount")} align="center" rowSpan={2} columnKey="visitCount" tableRef={tableRef} onResize={handleColResize("visitCount")}>จำนวนครั้ง</ResizableTh>
+                <ResizableTh width={colWidth("jobValue")} align="right" rowSpan={2} columnKey="jobValue" tableRef={tableRef} onResize={handleColResize("jobValue")}>มูลค่างาน/1ปี</ResizableTh>
+                <ResizableTh width={colWidth("status")} align="center" rowSpan={2} columnKey="status" tableRef={tableRef} onResize={handleColResize("status")}>สถานะสัญญา</ResizableTh>
+                <ResizableTh width={colWidth("progress")} align="center" rowSpan={2} columnKey="progress" tableRef={tableRef} onResize={handleColResize("progress")}>ความคืบหน้า</ResizableTh>
                 {visitColumns.map((n) => (
-                  <ResizableTh key={n} width={colWidth(`visit_${n}`)} align="center" onResize={handleColResize(`visit_${n}`)}>ครั้งที่ {n}</ResizableTh>
+                  <ResizableTh key={n} width={colWidth(`visit_${n}`)} align="center" rowSpan={2} columnKey={`visit_${n}`} tableRef={tableRef} onResize={handleColResize(`visit_${n}`)}>ครั้งที่ {n}</ResizableTh>
                 ))}
-                <ResizableTh width={colWidth("jobValue")} align="right" onResize={handleColResize("jobValue")}>มูลค่างาน</ResizableTh>
-                <ResizableTh width={colWidth("team")} onResize={handleColResize("team")}>ผู้รับผิดชอบ</ResizableTh>
-                <TableCell align="center" sx={{ width: colWidth("actions") }} />
+                <ResizableTh width={colWidth("team")} rowSpan={2} columnKey="team" tableRef={tableRef} onResize={handleColResize("team")}>ผู้รับผิดชอบ</ResizableTh>
+                <TableCell align="center" rowSpan={2} sx={{ width: colWidth("actions") }} />
+              </TableRow>
+              <TableRow sx={{ "& th": { fontWeight: 700, bgcolor: "#fef2f2", borderBottom: `2px solid ${ACCENT} !important`, color: "#7f1d1d", letterSpacing: "0.01em" } }}>
+                <ResizableTh width={colWidth("contractNo")} columnKey="contractNo" tableRef={tableRef} onResize={handleColResize("contractNo")}>สัญญา</ResizableTh>
+                <ResizableTh width={colWidth("quotationNo")} columnKey="quotationNo" tableRef={tableRef} onResize={handleColResize("quotationNo")}>ใบเสนอราคา</ResizableTh>
+                <ResizableTh width={colWidth("contractStart")} columnKey="contractStart" tableRef={tableRef} onResize={handleColResize("contractStart")}>เริ่มต้น</ResizableTh>
+                <ResizableTh width={colWidth("contractEnd")} columnKey="contractEnd" tableRef={tableRef} onResize={handleColResize("contractEnd")}>สิ้นสุด</ResizableTh>
               </TableRow>
             </TableHead>
             <TableBody>
-              {pagedRows.map((c, idx) => (
-                <TableRow key={c.key} hover sx={{ bgcolor: idx % 2 ? "action.hover" : "transparent" }}>
+              {pagedRows.map((c, idx) => {
+                // ✅ "ครั้งถัดไปที่ว่าง" — ใช้ตัดสินว่าจะโชว์ปุ่ม "+ เพิ่มครั้งถัดไป" ในช่องครั้งที่ไหน
+                // (ย้ายมาจากคอลัมน์ actions แยกต่างหาก มาไว้ในช่องครั้งที่ของมันเองเลย พอเพิ่มสำเร็จแล้ว
+                // ปุ่มจะขยับไปโผล่ที่ช่องครั้งถัดไปเองอัตโนมัติ เพราะคำนวณจากจำนวนครั้งที่ใช้ไปแล้วสดๆ ทุกครั้ง)
+                const nextOpenRound = c.isRealContract
+                  ? countUsedRounds(c.visits.filter((v) => !v.unscheduled)) + 1
+                  : null;
+                const overdueInfo = nextVisitOverdueInfo(c);
+                return (
+                <TableRow
+                  key={c.key} hover
+                  sx={{ bgcolor: idx % 2 ? alpha("#0f172a", 0.02) : "transparent", transition: "background-color .12s" }}
+                >
                   {showCheckboxes && (
                     <TableCell padding="checkbox" sx={{ width: colWidth("checkbox") }}>
                       {!c.isRealContract && (
@@ -906,12 +1191,8 @@ export default function ContractOverview() {
                       )}
                     </TableCell>
                   )}
-                  <TableCell sx={{ width: colWidth("company"), maxWidth: colWidth("company"), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.company}>{c.company || <Dash />}</TableCell>
-                  <TableCell sx={{ width: colWidth("site"), maxWidth: colWidth("site"), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.site}>{c.site || <Dash />}</TableCell>
-                  <TableCell sx={{ width: colWidth("system"), maxWidth: colWidth("system"), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.system}>{c.system || <Dash />}</TableCell>
-                  <TableCell sx={{ width: colWidth("title"), maxWidth: colWidth("title"), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.title}>{c.title || <Dash />}</TableCell>
                   <EditableCell
-                    editable={c.isRealContract}
+                    editable={c.isRealContract} columnKey="contractNo"
                     editing={editingCell?.key === c.key && editingCell?.field === "contractNo"}
                     value={c.contractNo} editValue={editValue} saving={editSaving}
                     width={colWidth("contractNo")} title={c.contractNo}
@@ -922,7 +1203,7 @@ export default function ContractOverview() {
                     onCancel={cancelEdit}
                   />
                   <EditableCell
-                    editable={c.isRealContract}
+                    editable={c.isRealContract} columnKey="quotationNo"
                     editing={editingCell?.key === c.key && editingCell?.field === "quotationNo"}
                     value={c.quotationNo} editValue={editValue} saving={editSaving}
                     width={colWidth("quotationNo")} title={c.quotationNo}
@@ -931,8 +1212,12 @@ export default function ContractOverview() {
                     onCommit={() => commitEdit(c)}
                     onCancel={cancelEdit}
                   />
+                  <TableCell data-col-key="company" sx={{ width: colWidth("company"), maxWidth: colWidth("company"), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.company}>{c.company || <Dash />}</TableCell>
+                  <TableCell data-col-key="site" sx={{ width: colWidth("site"), maxWidth: colWidth("site"), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.site}>{c.site || <Dash />}</TableCell>
+                  <TableCell data-col-key="system" sx={{ width: colWidth("system"), maxWidth: colWidth("system"), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.system}>{c.system || <Dash />}</TableCell>
+                  <TableCell data-col-key="title" sx={{ width: colWidth("title"), maxWidth: colWidth("title"), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.title}>{c.title || <Dash />}</TableCell>
                   <EditableCell
-                    editable={c.isRealContract}
+                    editable={c.isRealContract} columnKey="contractStart"
                     editing={editingCell?.key === c.key && editingCell?.field === "contractStart"}
                     value={c.contractStart} editValue={editValue} editType="date" saving={editSaving}
                     width={colWidth("contractStart")}
@@ -943,7 +1228,7 @@ export default function ContractOverview() {
                     onCancel={cancelEdit}
                   />
                   <EditableCell
-                    editable={c.isRealContract}
+                    editable={c.isRealContract} columnKey="contractEnd"
                     editing={editingCell?.key === c.key && editingCell?.field === "contractEnd"}
                     value={c.contractEnd} editValue={editValue} editType="date" saving={editSaving}
                     width={colWidth("contractEnd")}
@@ -954,19 +1239,76 @@ export default function ContractOverview() {
                     onCancel={cancelEdit}
                   />
                   <EditableCell
-                    editable={c.isRealContract}
+                    editable={c.isRealContract} columnKey="visitCount"
                     editing={editingCell?.key === c.key && editingCell?.field === "visitCount"}
                     value={c.visitCount} editValue={editValue} editType="number" saving={editSaving}
                     width={colWidth("visitCount")} align="center"
+                    // ✅ เตือนถ้ารอบล่าสุดผ่านมาเกิน 3 เดือนแล้วแต่ยังไม่ได้ลงแผนงานครั้งถัดไปเลย — วงกลม
+                    // สีแดงทึบ (ไม่ใช่แค่ไอคอนสีแดงบนพื้นขาว) ให้เห็นชัดแม้เป็นภาพนิ่ง ไม่ต้องรอดูอนิเมชัน
+                    formatDisplay={(v) => (
+                      <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
+                        <span>{v || <Dash />}</span>
+                        {overdueInfo && (
+                          <Tooltip title={`รอบล่าสุด ${overdueInfo.lastVisitDate.format("DD/MM/YYYY")} — เกินกำหนดรอบถัดไปแล้ว ${overdueInfo.monthsOverdue} เดือน ยังไม่ได้ลงแผนงานครั้งถัดไป`}>
+                            <Box
+                              component="span"
+                              sx={{
+                                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                                width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
+                                bgcolor: "#dc2626", color: "#fff",
+                                animation: "contractOverviewPulse 1.6s ease-in-out infinite",
+                                "@keyframes contractOverviewPulse": {
+                                  "0%, 100%": { boxShadow: `0 0 0 0 ${alpha("#dc2626", 0.5)}` },
+                                  "50%": { boxShadow: `0 0 0 4px ${alpha("#dc2626", 0)}` },
+                                },
+                              }}
+                            >
+                              <WarningAmber sx={{ fontSize: 12 }} />
+                            </Box>
+                          </Tooltip>
+                        )}
+                      </Stack>
+                    )}
                     onStartEdit={() => beginEdit(c, "visitCount")}
                     onChangeValue={setEditValue}
                     onCommit={() => commitEdit(c)}
                     onCancel={cancelEdit}
                   />
-                  <TableCell align="center" sx={{ width: colWidth("progress") }}>
+                  <EditableCell
+                    editable={c.isRealContract} columnKey="jobValue"
+                    editing={editingCell?.key === c.key && editingCell?.field === "jobValue"}
+                    value={c.jobValue} editValue={editValue} editType="number" saving={editSaving}
+                    width={colWidth("jobValue")} align="right"
+                    formatDisplay={(v) => (v != null && v !== "" ? Number(v).toLocaleString() : <Dash />)}
+                    onStartEdit={() => beginEdit(c, "jobValue")}
+                    onChangeValue={setEditValue}
+                    onCommit={() => commitEdit(c)}
+                    onCancel={cancelEdit}
+                  />
+                  <TableCell data-col-key="status" align="center" sx={{ width: colWidth("status") }}>
                     {(() => {
-                      const doneCount = c.visits.filter((v) => v.status === "ดำเนินการเสร็จสิ้น").length;
-                      const total = c.visitCount || c.visits.length;
+                      const st = contractStatusInfo(c);
+                      return st ? (
+                        <Chip
+                          label={st.label} size="small"
+                          sx={{ height: 20, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha(st.color, 0.12), color: st.color }}
+                        />
+                      ) : <Dash />;
+                    })()}
+                  </TableCell>
+                  <TableCell data-col-key="progress" align="center" sx={{ width: colWidth("progress") }}>
+                    {(() => {
+                      // ✅ นับความคืบหน้าเป็น "ครั้ง" ไม่ใช่ document — ครั้งที่เข้างานไม่ต่อเนื่อง (หลาย
+                      // document ต่อครั้ง) นับว่า "เสร็จ" ก็ต่อเมื่อทุก document ของครั้งนั้นเสร็จหมดแล้ว
+                      const byRound = new Map();
+                      c.visits.filter((v) => !v.unscheduled).forEach((v) => {
+                        const key = String(v.time);
+                        if (!byRound.has(key)) byRound.set(key, []);
+                        byRound.get(key).push(v);
+                      });
+                      let doneCount = 0;
+                      byRound.forEach((docs) => { if (docs.every((d) => d.status === "ดำเนินการเสร็จสิ้น")) doneCount += 1; });
+                      const total = c.visitCount || countUsedRounds(c.visits);
                       const chipColor = doneCount === 0 ? "#9ca3af" : doneCount >= total ? STATUS_COLOR["ดำเนินการเสร็จสิ้น"] : "#f59e0b";
                       return (
                         <Chip
@@ -977,29 +1319,79 @@ export default function ContractOverview() {
                     })()}
                   </TableCell>
                   {visitColumns.map((n) => {
-                    const withinCount = n <= (c.visitCount || c.visits.length);
+                    const withinCount = n <= (c.visitCount || countUsedRounds(c.visits));
                     if (!withinCount) {
-                      return <TableCell key={n} align="center" sx={{ width: colWidth(`visit_${n}`), bgcolor: "action.hover" }} />;
+                      return <TableCell key={n} data-col-key={`visit_${n}`} align="center" sx={{ width: colWidth(`visit_${n}`), bgcolor: "action.hover" }} />;
                     }
                     // ✅ นับว่า "ถึงรอบแล้ว" เฉพาะครั้งที่ลงตารางจริงเท่านั้น (!unscheduled) — ถ้าเป็นแค่
                     // แผนงานล่วงหน้าที่จองครั้งนี้ไว้ (ยังไม่มีวันที่จริง) ให้ยังถือว่า "ว่าง" อยู่ในตาราง
                     // สัญญานี้ แต่โชว์ป้ายบอกว่ากำลังรอวางแผนอยู่ แทนที่จะเป็นขีดว่างเฉยๆ กันสับสนว่ายังไม่ได้จอง
-                    const visit = c.visits.find((v) => !v.unscheduled && Number(v.time) === n);
-                    const pendingDraft = !visit && c.visits.find((v) => v.unscheduled && Number(v.time) === n);
+                    // ✅ ครั้งที่เข้างานไม่ต่อเนื่อง (เว้นช่วงแล้วกลับมาเข้าอีก) จะมีมากกว่า 1 document ต่อ
+                    // ครั้ง — ใช้ filter หาทุกอันแทน find อันเดียว โชว์ซ้อนกันเป็นแถวในเซลล์เดียว
+                    // ✅ เรียงตามวันที่เข้างานจริง (เก่า→ใหม่) เสมอ — เดิมโชว์ตามลำดับที่ document ถูกสร้าง
+                    // (เช่น ต่อวันที่ย้อนหลังทีหลัง) ทำให้วันที่ในเซลล์เดียวกันโผล่สลับก่อนหลังไม่ตรงความจริง
+                    // ดูเหมือนข้อมูลมั่ว/ไม่ได้จัดกลุ่มให้ ทั้งที่จริงเป็นงานเดียวกัน (jobGroupId เดียวกัน) แค่โชว์ผิดลำดับ
+                    const roundVisits = c.visits
+                      .filter((v) => !v.unscheduled && Number(v.time) === n)
+                      .sort((a, b) => new Date(a.start || a.date) - new Date(b.start || b.date));
+                    const pendingDraft = roundVisits.length === 0 && c.visits.find((v) => v.unscheduled && Number(v.time) === n);
                     return (
-                      <TableCell key={n} align="center" sx={{ width: colWidth(`visit_${n}`), overflow: "hidden" }}>
-                        {visit ? (
-                          <Link
-                            to={`/operation/${visit._id}${resolveOperationGroup(visit) ? `?group=${resolveOperationGroup(visit)}` : ""}`}
-                            style={{ color: STATUS_COLOR[visit.status] || ACCENT, fontWeight: 600, textDecoration: "none", fontSize: "0.78rem", whiteSpace: "nowrap" }}
-                          >
-                            {formatEventDateRange(visit)}
-                          </Link>
+                      <TableCell key={n} data-col-key={`visit_${n}`} align="center" sx={{ width: colWidth(`visit_${n}`), overflow: "hidden" }}>
+                        {roundVisits.length > 0 ? (
+                          <Stack spacing={0.25} alignItems="center">
+                            {roundVisits.map((visit) => (
+                              <Link
+                                key={visit._id}
+                                to={`/operation/${visit._id}${resolveOperationGroup(visit) ? `?group=${resolveOperationGroup(visit)}` : ""}`}
+                                style={{ color: STATUS_COLOR[visit.status] || ACCENT, fontWeight: 600, textDecoration: "none", fontSize: "0.78rem", whiteSpace: "nowrap" }}
+                              >
+                                {formatEventDateRange(visit)}
+                              </Link>
+                            ))}
+                            {c.isRealContract && (
+                              <Tooltip title="เพิ่มวันที่ต่อเนื่อง (เข้างานไม่ติดกัน)">
+                                <IconButton size="small" onClick={() => openExtendVisitDialog(c, n)} sx={{ p: 0.25, color: "text.disabled", "&:hover": { color: ACCENT } }}>
+                                  <Add sx={{ fontSize: 14 }} />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                          </Stack>
                         ) : pendingDraft ? (
                           <Tooltip title="วางแผนล่วงหน้าไว้แล้ว ยังไม่ได้ลงวันที่จริง">
                             <Box component="span" sx={{ fontSize: "0.72rem", color: "#b45309", fontWeight: 600, whiteSpace: "nowrap" }}>
                               📌 รอวางแผน
                             </Box>
+                          </Tooltip>
+                        ) : c.isRealContract && n === nextOpenRound ? (
+                          // ✅ ปุ่ม "+ เพิ่มครั้งถัดไป" ย้ายมาอยู่ในช่องของครั้งที่มันเองเลย (เดิมอยู่ในคอลัมน์
+                          // actions แยกต่างหาก มองไม่ออกว่ากดแล้วจะไปเพิ่มครั้งที่เท่าไหร่) พอเพิ่มสำเร็จแล้ว
+                          // nextOpenRound จะขยับไปครั้งถัดไปเอง ปุ่มก็เลยย้ายไปโผล่ที่ช่องนั้นแทนอัตโนมัติ —
+                          // ถ้าเลยกำหนด 3 เดือนแล้วด้วย (overdueInfo) ให้พื้นหลังปุ่มทึบแดงเห็นชัดแม้เป็น
+                          // ภาพนิ่ง (ของเดิมแค่เปลี่ยนสีไอคอน ซึ่งเป็นสีแดงเดียวกับปุ่มปกติอยู่แล้ว มองไม่ออก
+                          // ว่าต่างกันตรงไหน) + จุดแจ้งเตือนมุมขวาบนกะพริบเบาๆ เสริมอีกชั้น
+                          <Tooltip title={overdueInfo ? `เกินกำหนดแล้ว ${overdueInfo.monthsOverdue} เดือน — กดเพื่อเพิ่มครั้งที่ ${n}` : `เพิ่มครั้งที่ ${n}`}>
+                            <Badge
+                              color="error" variant="dot" invisible={!overdueInfo}
+                              sx={{
+                                "& .MuiBadge-dot": {
+                                  animation: "contractOverviewPulse 1.4s ease-in-out infinite",
+                                  "@keyframes contractOverviewPulse": {
+                                    "0%, 100%": { transform: "scale(1)", opacity: 1 },
+                                    "50%": { transform: "scale(1.5)", opacity: 0.6 },
+                                  },
+                                },
+                              }}
+                            >
+                              <IconButton
+                                size="small" onClick={() => openAddVisitDialog(c)}
+                                sx={overdueInfo ? {
+                                  color: "#fff", bgcolor: "#dc2626",
+                                  "&:hover": { bgcolor: "#b91c1c" },
+                                } : { color: ACCENT }}
+                              >
+                                <PlaylistAdd fontSize="small" />
+                              </IconButton>
+                            </Badge>
                           </Tooltip>
                         ) : (
                           <Dash />
@@ -1008,18 +1400,7 @@ export default function ContractOverview() {
                     );
                   })}
                   <EditableCell
-                    editable={c.isRealContract}
-                    editing={editingCell?.key === c.key && editingCell?.field === "jobValue"}
-                    value={c.jobValue} editValue={editValue} editType="number" saving={editSaving}
-                    width={colWidth("jobValue")} align="right"
-                    formatDisplay={(v) => (v != null && v !== "" ? Number(v).toLocaleString() : <Dash />)}
-                    onStartEdit={() => beginEdit(c, "jobValue")}
-                    onChangeValue={setEditValue}
-                    onCommit={() => commitEdit(c)}
-                    onCancel={cancelEdit}
-                  />
-                  <EditableCell
-                    editable={c.isRealContract}
+                    editable={c.isRealContract} columnKey="team"
                     editing={editingCell?.key === c.key && editingCell?.field === "team"}
                     value={c.team === "-" ? "" : c.team} editValue={editValue} editType="select" editOptions={teamOptions} saving={editSaving}
                     width={colWidth("team")} title={c.team}
@@ -1029,16 +1410,15 @@ export default function ContractOverview() {
                     onCancel={cancelEdit}
                   />
                   <TableCell align="center" sx={{ width: colWidth("actions") }}>
-                    {c.isRealContract && c.visits.length < (c.visitCount || 0) && (
-                      <Tooltip title={`เพิ่มครั้งที่ ${c.visits.filter((v) => !v.unscheduled).length + 1}`}>
-                        <IconButton size="small" onClick={() => openAddVisitDialog(c)} sx={{ color: ACCENT }}>
-                          <PlaylistAdd fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    )}
+                    <Tooltip title={c.isRealContract ? "ลบสัญญานี้ทั้งหมด" : "ลบงานนี้"}>
+                      <IconButton size="small" onClick={() => handleDeleteContract(c)} sx={{ color: "text.disabled", "&:hover": { color: ACCENT } }}>
+                        <DeleteOutline fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </TableContainer>
@@ -1108,8 +1488,12 @@ export default function ContractOverview() {
 
             <Typography variant="caption" fontWeight={700} color="text.secondary">ข้อมูลสัญญา</Typography>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-              <TextField fullWidth size="small" label="เลขที่สัญญา" value={form.contractNo}
-                onChange={(e) => setField("contractNo")(e.target.value)} />
+              <TextField
+                fullWidth size="small" label="เลขที่สัญญา" value={form.contractNo}
+                onChange={(e) => setField("contractNo")(e.target.value)}
+                error={isContractNoTaken(form.contractNo)}
+                helperText={isContractNoTaken(form.contractNo) ? "เลขที่นี้ถูกใช้ไปแล้ว" : "ระบบแนะนำให้อัตโนมัติ แก้ไขเองได้"}
+              />
               <TextField fullWidth size="small" label="เลขที่ใบเสนอราคา" value={form.quotationNo}
                 onChange={(e) => setField("quotationNo")(e.target.value)} />
             </Stack>
@@ -1148,7 +1532,9 @@ export default function ContractOverview() {
 
       <Dialog open={Boolean(addVisitTarget)} onClose={closeAddVisitDialog} fullWidth maxWidth="xs" fullScreen={isMobile}>
         <DialogTitle sx={{ fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          เพิ่มครั้งที่ {addVisitTarget ? addVisitTarget.visits.filter((v) => !v.unscheduled).length + 1 : ""} จาก {addVisitTarget?.visitCount}
+          {addVisitTarget?.extendRound != null
+            ? `เพิ่มวันที่ต่อเนื่อง — ครั้งที่ ${addVisitTarget.extendRound}`
+            : `เพิ่มครั้งที่ ${addVisitTarget ? countUsedRounds(addVisitTarget.contract.visits.filter((v) => !v.unscheduled)) + 1 : ""} จาก ${addVisitTarget?.contract?.visitCount ?? ""}`}
           <IconButton size="small" onClick={closeAddVisitDialog}><Close fontSize="small" /></IconButton>
         </DialogTitle>
         <DialogContent dividers>
@@ -1156,11 +1542,19 @@ export default function ContractOverview() {
             {addVisitError && <Alert severity="error">{addVisitError}</Alert>}
             {addVisitTarget && (
               <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: alpha(ACCENT, 0.06) }}>
-                <Typography variant="body2" fontWeight={700}>{addVisitTarget.company || "-"} · {addVisitTarget.site || "-"}</Typography>
+                <Typography variant="body2" fontWeight={700}>{addVisitTarget.contract.company || "-"} · {addVisitTarget.contract.site || "-"}</Typography>
                 <Typography variant="caption" color="text.secondary">
-                  {addVisitTarget.title} · {addVisitTarget.system}
-                  {addVisitTarget.contractNo ? ` · เลขที่สัญญา ${addVisitTarget.contractNo}` : ""}
+                  {addVisitTarget.contract.title} · {addVisitTarget.contract.system}
+                  {addVisitTarget.contract.contractNo ? ` · เลขที่สัญญา ${addVisitTarget.contract.contractNo}` : ""}
                 </Typography>
+                {addVisitTarget.extendRound != null && (
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+                    วันที่เดิมของครั้งนี้: {addVisitTarget.contract.visits
+                      .filter((v) => !v.unscheduled && Number(v.time) === addVisitTarget.extendRound)
+                      .map((v) => formatEventDateRange(v))
+                      .join(", ")}
+                  </Typography>
+                )}
               </Box>
             )}
             <Stack direction="row" spacing={1.5}>
@@ -1211,8 +1605,12 @@ export default function ContractOverview() {
               ระบบจะเรียง "ครั้งที่" ให้อัตโนมัติตามวันที่เข้างานจริงของแต่ละงานที่เลือก (เก่าสุด → ใหม่สุด)
             </Alert>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-              <TextField fullWidth size="small" label="เลขที่สัญญา" value={mergeForm.contractNo}
-                onChange={(e) => setMergeField("contractNo")(e.target.value)} />
+              <TextField
+                fullWidth size="small" label="เลขที่สัญญา" value={mergeForm.contractNo}
+                onChange={(e) => setMergeField("contractNo")(e.target.value)}
+                error={isContractNoTaken(mergeForm.contractNo)}
+                helperText={isContractNoTaken(mergeForm.contractNo) ? "เลขที่นี้ถูกใช้ไปแล้ว" : ""}
+              />
               <TextField fullWidth size="small" label="เลขที่ใบเสนอราคา" value={mergeForm.quotationNo}
                 onChange={(e) => setMergeField("quotationNo")(e.target.value)} />
             </Stack>

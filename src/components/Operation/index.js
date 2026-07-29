@@ -32,7 +32,7 @@ import {
   Button, Stack, Tooltip, Badge, Fade, Collapse, LinearProgress,
   Tabs, Tab, Divider, useMediaQuery, useTheme, InputAdornment,
   Menu, MenuItem, ListItemIcon, ListItemText, Card, CardContent,
-  Skeleton, Alert, Snackbar,
+  Skeleton, Alert, Snackbar, Popover,
   List, ListItem, Pagination,
 } from "@mui/material";
 
@@ -1362,7 +1362,7 @@ const InfoLine = ({ icon, label, children }) => (
 
 // ─── EventRowCard ─────────────────────────────────────────────────────
 const EventRowCard = ({
-  event, employee, onStatusUpdate, onDocNoUpdate, onInputUpdate,
+  event, employee, onStatusUpdate, onDocNoUpdate, onInputUpdate, onDateUpdate,
   onFileUpload, onDeleteFile, onPreview, onDelete, onApproveClose, onRejectClose,
   uploadingState, isUploadingState, uploadProgressState, uploadingFileSizeState,
   currentUserRole,
@@ -1380,6 +1380,14 @@ const EventRowCard = ({
   // ✅ เมนู "⋮" ของการ์ดงาน — เดิมปุ่มลบงานเป็นไอคอนสีแดงโชว์ตลอดเวลาข้างปุ่มพับ/กาง ดูรกและเสี่ยงกดพลาด
   const [moreAnchorEl, setMoreAnchorEl] = useState(null);
   const [localStatus,setLocalStatus]= useState(event.status || "");
+  // ✅ งานกลุ่มเดียวกัน (jobGroupId) เปลี่ยนสถานะพร้อมกันทุกวันจริงอยู่แล้วที่ฝั่ง state/DB (ดู
+  // handleStatusUpdate/getGroupEventIds) แต่ localStatus เป็น state ของการ์ดตัวเอง เดิม sync แค่
+  // ตอน mount ครั้งเดียว (useState initial value) พอ event.status ของ "การ์ดอื่นในกลุ่มเดียวกัน"
+  // อัปเดตจาก props ใหม่ การ์ดนั้นๆ ไม่รู้ตัวเลยว่าเปลี่ยนไปแล้ว ต้องรีเฟรชหน้าถึงจะเห็นตรงกัน —
+  // ต้องซิงก์ตาม event.status ทุกครั้งที่ prop เปลี่ยนจริงๆ ไม่ใช่แค่ตอน mount
+  useEffect(() => {
+    setLocalStatus(event.status || "");
+  }, [event.status]);
   const [approving,  setApproving]  = useState(false);
   const [rejecting,      setRejecting]      = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
@@ -1415,6 +1423,47 @@ const EventRowCard = ({
   };
 
   const handleDocSave = () => { onDocNoUpdate(event._id, docNo); setEditingDoc(false); };
+
+  // ── แก้ไขวันที่เข้างาน — แก้เฉพาะวันนี้ (session นี้) เท่านั้น ไม่ใช่ทั้งกลุ่ม เพราะงานที่เข้า
+  // หลายวันไม่ติดกัน (jobGroupId เดียวกัน) แต่ละวันมีวันที่ของตัวเองไม่เหมือนกันโดยตั้งใจ — ต่างจาก
+  // สถานะที่ต้องเหมือนกันทั้งกลุ่ม (ดู handleStatusUpdate) พอบันทึกแล้ว onDateUpdate จะอัปเดต events
+  // state ที่ใช้ร่วมกันทั้งแอป ทำให้หน้านี้/ภาพรวมสัญญา/ปฏิทิน เห็นวันที่ใหม่ตรงกันทันทีที่โหลดข้อมูลใหม่
+  const [dateAnchorEl, setDateAnchorEl] = useState(null);
+  const [editStart, setEditStart] = useState(null);
+  const [editEnd, setEditEnd] = useState(null);
+  const [dateSaving, setDateSaving] = useState(false);
+  const [dateError, setDateError] = useState("");
+
+  const openDateEdit = (e) => {
+    e.stopPropagation();
+    if (!canEdit) return;
+    setEditStart(moment(event.start));
+    setEditEnd(moment(event.end).subtract(event.allDay ? 1 : 0, "days"));
+    setDateError("");
+    setDateAnchorEl(e.currentTarget);
+  };
+  const closeDateEdit = () => { if (!dateSaving) setDateAnchorEl(null); };
+
+  const handleDateSave = async () => {
+    if (!editStart || !editStart.isValid()) { setDateError("กรุณาระบุวันที่เข้างาน"); return; }
+    const effectiveEnd = (editEnd && editEnd.isValid()) ? editEnd : editStart;
+    if (effectiveEnd.isBefore(editStart, "day")) { setDateError("วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม"); return; }
+    setDateSaving(true);
+    setDateError("");
+    try {
+      const s = editStart.format("YYYY-MM-DD");
+      await onDateUpdate(event._id, {
+        start: s,
+        end: moment(effectiveEnd).add(event.allDay ? 1 : 0, "days").format("YYYY-MM-DD"),
+        date: s,
+      });
+      setDateSaving(false);
+      setDateAnchorEl(null);
+    } catch (err) {
+      setDateSaving(false);
+      setDateError(err?.response?.data?.message || "แก้ไขวันที่ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+    }
+  };
 
   // ✅ ป้องกันกดผิด/กดพลาด — กดแล้วงานเข้าสถานะ "ดำเนินการเสร็จสิ้น" ทันที (และถ้าเป็นงานกลุ่มเข้า
   // หลายวัน จะมีผลกับทุกวันในกลุ่มพร้อมกัน) แก้คืนไม่ได้ง่ายๆ ควรให้ยืนยันก่อนอีกชั้น (เทียบ pattern
@@ -1611,11 +1660,58 @@ const EventRowCard = ({
                   </Box>
                 </Tooltip>
                 {/* ✅ ย่อช่วงวันที่ให้กระชับ (ดู formatEventDateRange) — ถ้าอยู่ปีเดียวกัน/เดือนเดียวกัน
-                    ไม่ต้องพิมพ์เดือนปีซ้ำสองรอบ กันตัดขึ้นบรรทัดใหม่แบบขาดกลางวันที่บนจอแคบด้วย */}
-                <Typography variant="caption" color="text.secondary" fontWeight={600} noWrap>
-                  📅 {formatEventDateRange(event)}
-                </Typography>
+                    ไม่ต้องพิมพ์เดือนปีซ้ำสองรอบ กันตัดขึ้นบรรทัดใหม่แบบขาดกลางวันที่บนจอแคบด้วย —
+                    กดแก้ไขวันที่ได้ตรงนี้เลย (เทียบ pattern เดียวกับป้ายสถานะด้านซ้าย) */}
+                <Tooltip title={canEdit ? "แก้ไขวันที่เข้างาน" : ""}>
+                  <Box
+                    onClick={openDateEdit}
+                    sx={{
+                      display: "flex", alignItems: "center", gap: 0.5,
+                      px: 0.75, py: 0.25, borderRadius: 1.5,
+                      cursor: canEdit ? "pointer" : "default",
+                      transition: "background-color 0.15s ease",
+                      "&:hover": canEdit ? { bgcolor: alpha(theme.palette.primary.main, 0.08) } : {},
+                    }}
+                  >
+                    <Typography variant="caption" color="text.secondary" fontWeight={600} noWrap>
+                      📅 {formatEventDateRange(event)}
+                    </Typography>
+                    {canEdit && <Edit sx={{ fontSize: 12, color: "text.disabled" }} />}
+                  </Box>
+                </Tooltip>
               </Stack>
+
+              <Popover
+                open={Boolean(dateAnchorEl)}
+                anchorEl={dateAnchorEl}
+                onClose={closeDateEdit}
+                onClick={(e) => e.stopPropagation()}
+                anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+                transformOrigin={{ vertical: "top", horizontal: "left" }}
+                PaperProps={{ sx: { borderRadius: 3, boxShadow: `0 12px 32px ${alpha(theme.palette.common.black, 0.18)}` } }}
+              >
+                <LocalizationProvider dateAdapter={AdapterMoment}>
+                  <Stack spacing={1.5} sx={{ p: 2, width: 260 }}>
+                    <Typography variant="subtitle2" fontWeight={700}>แก้ไขวันที่เข้างาน</Typography>
+                    <DatePicker
+                      label="วันที่เริ่ม" value={editStart} onChange={setEditStart}
+                      renderInput={(params) => <TextField {...params} size="small" fullWidth />}
+                    />
+                    <DatePicker
+                      label="วันที่สิ้นสุด" value={editEnd} onChange={setEditEnd}
+                      minDate={editStart || undefined}
+                      renderInput={(params) => <TextField {...params} size="small" fullWidth />}
+                    />
+                    {dateError && <Alert severity="error" sx={{ py: 0, fontSize: "0.75rem" }}>{dateError}</Alert>}
+                    <Stack direction="row" justifyContent="flex-end" gap={1}>
+                      <Button size="small" onClick={closeDateEdit} disabled={dateSaving}>ยกเลิก</Button>
+                      <Button size="small" variant="contained" onClick={handleDateSave} disabled={dateSaving}>
+                        {dateSaving ? "กำลังบันทึก..." : "บันทึก"}
+                      </Button>
+                    </Stack>
+                  </Stack>
+                </LocalizationProvider>
+              </Popover>
 
               {/* ✅ ไอคอนเอกสาร/กิจกรรม แยกเป็นบรรทัดของตัวเองเต็มความกว้าง ชิดขวา — เดิมพยายามยัด
                   ไว้แถวเดียวกับป้ายสถานะ/ลอยไปแถวบนสุดฝั่งขวาซึ่งไปเบียด/ทับกับป้ายสถานะบนจอแคบ
@@ -2404,7 +2500,15 @@ const Operation = () => {
         : "overdue");
 
   const filteredEvents = useMemo(() => {
-  if (id && selectedEvent) return [selectedEvent];
+  // ✅ เดิม return แค่ [selectedEvent] ตัวเดียว — งานที่เข้าหลายวันไม่ติดกัน (ผูกด้วย jobGroupId
+  // เดียวกัน) พอกดจากลิงก์เจาะจงวันใดวันหนึ่ง (เช่นจาก ContractOverview.js ช่องครั้งที่) จะเห็น
+  // แค่วันนั้นวันเดียวโดดๆ ไม่ถูกจัดกลุ่มเป็นงานเดียวกันเหมือนตอนดูจากรายการหลัก ต้องดึงทุก session
+  // ที่มี jobGroupId เดียวกันมาด้วย ให้ jobGroups ด้านล่างจัดกลุ่มการ์ดได้ถูกต้องเหมือนกันทุกทาง
+  if (id && selectedEvent) {
+    return selectedEvent.jobGroupId
+      ? events.filter(e => e.jobGroupId === selectedEvent.jobGroupId)
+      : [selectedEvent];
+  }
   return events.filter(event => {
     const matchMonth  = dateSearch ? moment(event.start).format("YYYY-MM") === dateSearch : true;
     const matchType   = filterType   ? event.title  === filterType   : true;
@@ -2567,6 +2671,14 @@ const Operation = () => {
       setEvents(prev => prev.map(e => (ids.includes(e._id) ? { ...e, ...updates } : e)));
     } catch (err) { console.error(err); }
   }, [getGroupEventIds]);
+
+  // ✅ แก้ไขวันที่เข้างาน — ต่างจาก handleStatusUpdate ตรงที่แก้ "เฉพาะวันนั้น" (id เดียว) ไม่ใช่ทั้งกลุ่ม
+  // เพราะงานที่เข้าหลายวันไม่ติดกัน (jobGroupId เดียวกัน) แต่ละวันมีวันที่ของตัวเองไม่เหมือนกันโดย
+  // ตั้งใจ — ปล่อยให้ error ลอยขึ้นไปให้ EventRowCard จับเองเพื่อโชว์ข้อความจาก backend (เช่นช่างชนกัน)
+  const handleDateUpdate = useCallback(async (id, updates) => {
+    await EventService.UpdateEvent(id, updates);
+    setEvents(prev => prev.map(e => (e._id === id ? { ...e, ...updates } : e)));
+  }, []);
 
   // อนุมัติคำขอปิดงานจากช่าง → เปลี่ยนสถานะเป็น "ดำเนินการเสร็จสิ้น"
   // ✅ ถ้างานนี้เข้าหลายวัน (กลุ่มเดียวกัน) ให้ปิดทุกวันในกลุ่มพร้อมกัน — งานที่ถือว่าเสร็จแล้ว
@@ -3006,6 +3118,7 @@ const Operation = () => {
                       currentUserRole={currentUserRole}
                       employee={employee}
                       onStatusUpdate={handleStatusUpdate}
+                      onDateUpdate={handleDateUpdate}
                       onDocNoUpdate={handleDocNoUpdate}
                       onInputUpdate={handleInputUpdate}
                       onFileUpload={handleFileUpload}

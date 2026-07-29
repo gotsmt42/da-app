@@ -1,3 +1,5 @@
+import { countUsedRounds } from "../../../utils/contractRounds";
+
 /* ─────────────────────────────────────────────
    STYLE INJECTION — งานวางแผนล่วงหน้า (ยังไม่ลงตาราง)
    โครงเดียวกับ AddEvent.js แต่ตัดส่วนวันที่/เวลา/ทีมออกทั้งหมด (ย้ายไปอยู่ในกล่อง "ลงตาราง"
@@ -187,14 +189,15 @@ export const getAddDraftEvent = async ({
         visitCount: e.visitCount || 0,
         jobValue: e.jobValue,
         team: e.team || "",
-        usedVisits: 0,
+        visits: [],
       });
     }
-    // ✅ นับเฉพาะ "ครั้ง" ที่มีเลขจริงแล้ว (ทั้งลงตารางแล้วและแผนงานที่จองไว้) — ไม่นับ "ฉบับร่าง" ว่างเปล่า
-    // ของสัญญาที่เพิ่งสร้างยังไม่มีครั้งไหนเลย (ไม่มี time) ไม่งั้นครั้งที่ 1 จะถูกข้ามไปเป็นครั้งที่ 2 ทันที
-    if (e.time !== undefined && e.time !== null && e.time !== "") {
-      contractMap.get(e.contractGroupId).usedVisits += 1;
-    }
+    contractMap.get(e.contractGroupId).visits.push(e);
+  });
+  // ✅ นับจาก "จำนวนครั้งที่ไม่ซ้ำกัน" (countUsedRounds) ไม่ใช่นับจำนวน document ดิบ — ครั้งที่เข้างาน
+  // ไม่ต่อเนื่อง (เว้นช่วงแล้วกลับมาเข้าอีก) จะมีหลาย document ต่อ 1 ครั้ง นับตรงๆ จะเกินจริง
+  contractMap.forEach((c) => {
+    c.usedVisits = countUsedRounds(c.visits);
   });
   const contractList = [...contractMap.values()].sort((a, b) =>
     (a.company || "").localeCompare(b.company || "", "th") || (a.site || "").localeCompare(b.site || "", "th")

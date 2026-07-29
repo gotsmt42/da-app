@@ -8,6 +8,9 @@ const apiSecret = process.env.REACT_APP_SECRET;
 const API = axios.create({
   baseURL: apiUrl,
   withCredentials: true, // ✅ ถูกที่
+  // ✅ เดิมไม่มี timeout เลย — request ที่ค้าง/ช้าผิดปกติจะหมุนรอไม่จบ ปุ่ม "กำลังบันทึก..." ค้างตลอด
+  // ไม่มี error ให้เห็นจนกว่าผู้ใช้จะรอไม่ไหวแล้วออกจากหน้าไปเอง
+  timeout: 20000,
   headers: {
     "Content-Type": "application/json",
     "X-API-Key": apiKey,

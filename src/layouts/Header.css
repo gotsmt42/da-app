@@ -193,6 +193,37 @@
 
   /* ปิดการแสดงผลเมนูข้อความตรงกลาง */
   .navbar-nav {
-    display: none !important; 
+    display: none !important;
+  }
+}
+
+/* ✅ ทางลัด "ภาพรวมสัญญา" เฉพาะจอมือถือ — เติมพื้นที่ว่างกลางแถบที่เกิดจากการซ่อน .navbar-nav ด้านบน
+   ทรงพิลล์โปร่งแสงบนพื้นเข้มของ header ให้ดูกลมกลืนกับธีม ไม่โดดออกมาเป็นปุ่มทึบ */
+.header-contract-pill {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 4px 10px;
+  color: #e2e8f0 !important;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-decoration: none !important;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+}
+
+.header-contract-pill:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #ffffff !important;
+}
+
+/* จอแคบมากๆ (เช่น iPhone SE) ตัดข้อความเหลือแค่ไอคอน+ป้ายจำนวน กันดันโลโก้/ไอคอนขวาจนล้น */
+@media (max-width: 360px) {
+  .header-contract-pill span {
+    display: none;
+  }
+  .header-contract-pill {
+    padding: 4px 8px;
   }
 }
