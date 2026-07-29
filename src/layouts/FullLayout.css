@@ -105,6 +105,16 @@
   margin: 0 !important;
 }
 
+/* --------------------------------------------------------------------------
+   WIDE TABLE MODE (หน้าภาพรวมสัญญา) — ปลดล็อก .contentArea (max-width: 1300px
+   ใน _container.scss) แต่คง padding ปกติของ Container ไว้ (ต่างจาก calendar-mode
+   ที่ตัด padding ออกหมด) เพราะตารางสัญญายังอยากมีระยะขอบให้ดูไม่ติดขอบจอเกินไป
+   -------------------------------------------------------------------------- */
+.contentArea.wide-table-mode {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
 /* ซ่อนปุ่มย้อนกลับตามเงื่อนไขเดิม */
 @media (min-width: 768px) {
   .back-button {

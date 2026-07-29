@@ -61,6 +61,7 @@ const Sidebar = ({ handleMenuClick }) => {
   // เดิมไม่รองรับ manager แต่หน้านี้ตั้งใจให้ manager เข้าถึงได้ด้วย
   const managerMenu = [
     { title: "ภาพรวมทีมช่าง", href: "/team-workload", icon: "bi-people-fill" },
+    { title: "ภาพรวมสัญญา", href: "/contracts", icon: "bi-file-earmark-ruled" },
     { title: "ติดตามใบเสนอราคา", href: "/quotations", icon: "bi-file-earmark-text" },
   ];
 

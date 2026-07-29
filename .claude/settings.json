@@ -64,7 +64,8 @@
       "Read(//c/tmp_fc_test2/**)",
       "Bash(grep -an 'to={`/operation\\\\|to=\"/operation' \"c:/Users/Admin/Desktop/da-app/src/views/ui/TeamWorkload.js\")",
       "Bash(grep -rn 'to={`/operation' \"c:/Users/Admin/Desktop/da-app/src/views/Technician/\")",
-      "Bash(tasklist //FI \"IMAGENAME eq node.exe\")"
+      "Bash(tasklist //FI \"IMAGENAME eq node.exe\")",
+      "Bash(grep -iE \"compiled|failed|error\" /tmp/build_output.txt | head -20)"
     ],
     "additionalDirectories": [
       "\\tmp",

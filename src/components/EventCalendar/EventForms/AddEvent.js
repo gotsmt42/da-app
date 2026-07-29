@@ -100,6 +100,62 @@ function injectAddStyles() {
     /* ── Divider ── */
     .ae-divider { border: none; border-top: 1px solid #e2e8f0; margin: 16px 0; }
 
+    /* ── สัญญาแบบหลายครั้ง ── */
+    .ae-contract-box {
+      background: #fef2f2; border: 1.5px solid #fecaca; border-radius: 10px;
+      padding: 14px 16px 4px; margin-bottom: 16px;
+    }
+
+    /* ── ขั้นตอนที่ 1: เลือกประเภทงาน (การ์ดวิทยุ) ── */
+    .ae-jobtype-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+    @media(max-width:600px) { .ae-jobtype-toggle { grid-template-columns: 1fr; } }
+    .ae-jobtype-option { position: relative; cursor: pointer; }
+    .ae-jobtype-option input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .ae-jobtype-card {
+      display: flex; align-items: center; gap: 10px;
+      border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 12px 14px;
+      background: #fff; transition: border-color .15s, background .15s;
+    }
+    .ae-jobtype-icon { font-size: 22px; line-height: 1; }
+    .ae-jobtype-title { font-size: 13px; font-weight: 700; color: #1e293b; }
+    .ae-jobtype-desc { font-size: 11px; color: #64748b; }
+    .ae-jobtype-option input:checked + .ae-jobtype-card {
+      border-color: #dc2626; background: #fef2f2;
+    }
+    .ae-jobtype-option input:checked + .ae-jobtype-card .ae-jobtype-title { color: #b91c1c; }
+    .ae-jobtype-option input:disabled + .ae-jobtype-card {
+      opacity: .5; cursor: not-allowed;
+    }
+    .ae-jobtype-note {
+      font-size: 11px; color: #b91c1c; margin: -12px 0 16px; display: none;
+    }
+
+    /* ── เลือกสัญญาที่มีอยู่แล้ว (โหมด "งานตามสัญญา") ── */
+    .ae-contract-pick-info {
+      background: #fef2f2; border: 1.5px solid #fecaca; border-radius: 10px;
+      padding: 12px 14px; margin-bottom: 16px; font-size: 13px; color: #374151; display: none;
+    }
+    .ae-contract-pick-info b { color: #b91c1c; }
+    .ae-contract-pick-info .ae-cpi-sub { font-size: 12px; color: #64748b; margin-top: 2px; }
+
+    /* ── ตาราง "เลือกครั้งที่" — สถานะรายครั้งตรงกับตาราง ContractOverview.js เป๊ะๆ ── */
+    .ae-round-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .ae-round-chip {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 42px; height: 32px; padding: 0 10px; border-radius: 8px;
+      font-size: 12px; font-weight: 700; border: 1.5px solid #e2e8f0;
+      background: #fff; color: #64748b; font-family: inherit;
+    }
+    button.ae-round-chip--open {
+      cursor: pointer; color: #1e293b; transition: border-color .15s, background .15s;
+    }
+    button.ae-round-chip--open:hover { border-color: #dc2626; }
+    .ae-round-chip--selected {
+      border-color: #dc2626 !important; background: #fef2f2 !important; color: #b91c1c !important;
+    }
+    .ae-round-chip--scheduled { border-color: #bbf7d0; background: #f0fdf4; color: #15803d; cursor: not-allowed; }
+    .ae-round-chip--pending { border-color: #fde68a; background: #fffbeb; color: #b45309; cursor: not-allowed; }
+
     /* ── Date badge (แสดงวันที่คลิก) ── */
     .ae-date-badge {
       display: inline-flex; align-items: center; gap: 6px;
@@ -205,6 +261,8 @@ let isSavingEvent = false;
 ───────────────────────────────────────────── */
 export const getAddEvent = async ({
   arg,
+  events,
+  drafts, // ✅ แผนงานล่วงหน้าที่ค้างอยู่ — อาจจองครั้งที่ของสัญญาไปแล้วเหมือนกัน ต้องรวมมานับด้วย
   defaultTextColor,
   defaultBackgroundColor,
   setDefaultTextColor,
@@ -222,6 +280,49 @@ export const getAddEvent = async ({
   moment,
 }) => {
   injectAddStyles();
+
+  // ✅ ขั้นตอนที่ 1 ของฟอร์ม (งานทั่วไป/งานตามสัญญา) ต้องรู้ว่าตอนนี้มีสัญญาอะไรอยู่แล้วบ้าง เพื่อให้
+  // เลือกได้เฉพาะจากรายการนี้เท่านั้น (พิมพ์เพิ่มเองไม่ได้) กันพิมพ์ชื่อบริษัท/โครงการเพี้ยนจากของเดิม
+  // แม้แค่ตัวเดียวก็ทำให้กลายเป็นคนละสัญญาไปเลย — group จาก events (ที่ลงตารางแล้ว) รวมกับ drafts
+  // (แผนงานล่วงหน้าที่ค้างอยู่ ซึ่งอาจจองครั้งที่ไปแล้วเหมือนกัน) ตาม contractGroupId เทียบ pattern
+  // เดียวกับ `contracts` ใน ContractOverview.js — เก็บ visits ดิบไว้ทั้งก้อนด้วย เพื่อใช้ตัดสิน
+  // สถานะรายครั้ง (ลงตารางแล้ว/รอวางแผน/ว่าง) ในตาราง "เลือกครั้งที่" ด้านล่าง ไม่ใช่แค่นับจำนวนเฉยๆ
+  const contractMap = new Map();
+  [...(events || []), ...(drafts || [])].forEach((e) => {
+    if (!e.contractGroupId) return;
+    if (!contractMap.has(e.contractGroupId)) {
+      contractMap.set(e.contractGroupId, {
+        key: e.contractGroupId,
+        company: e.company || "",
+        site: e.site || "",
+        system: e.system || "",
+        title: e.title || "",
+        contractNo: e.contractNo || "",
+        quotationNo: e.quotationNo || "",
+        contractStart: e.contractStart || "",
+        contractEnd: e.contractEnd || "",
+        visitCount: e.visitCount || 0,
+        jobValue: e.jobValue,
+        team: e.team || "",
+        visits: [],
+      });
+    }
+    contractMap.get(e.contractGroupId).visits.push(e);
+  });
+  // ✅ นับเฉพาะ "ครั้ง" ที่มีเลขจริงแล้ว (ทั้งลงตารางแล้วและแผนงานที่จองไว้) — ไม่นับ "ฉบับร่าง" ว่างเปล่า
+  // ของสัญญาที่เพิ่งสร้างยังไม่มีครั้งไหนเลย (ไม่มี time) กันนับเกินจริง
+  contractMap.forEach((c) => {
+    c.usedVisits = c.visits.filter((v) => v.time !== undefined && v.time !== null && v.time !== "").length;
+  });
+  const contractList = [...contractMap.values()].sort((a, b) =>
+    (a.company || "").localeCompare(b.company || "", "th") || (a.site || "").localeCompare(b.site || "", "th")
+  );
+  // ✅ สัญญาที่ครบจำนวนครั้งแล้ว (usedVisits >= visitCount) เลือกไม่ได้อยู่แล้ว (backend บล็อก) —
+  // ไม่ต้องเอามาโชว์ในรายการเลือกให้รกตา ตัดออกตั้งแต่ตอนสร้างตัวเลือกเลย ไม่ใช่แค่ปิด disabled ไว้
+  const selectableContracts = contractList.filter((c) => c.usedVisits < c.visitCount);
+  // ✅ แสดงชื่อบริษัท/โครงการแบบตัดส่วนที่ไม่มีข้อมูลออก แทนที่จะขึ้น "-" ค้างไว้ให้ดูเหมือนข้อมูลพัง
+  // (เช่น สัญญาที่ไม่เคยกรอกชื่อบริษัทไว้ เดิมจะโชว์ "- · Centara Grand Mirage" ดูแปลกๆ)
+  const contractDisplayName = (c) => [c.company, c.site].filter(Boolean).join(" · ") || "(ไม่ระบุชื่อ)";
 
   // ✅ เดิม titleOpts/systemOpts เป็น array ฝังโค้ดตายตัว แก้ไขเองไม่ได้นอกจากแก้โค้ด —
   // ดึงจากตาราง "ประเภทงาน"/"ระบบ" ที่จัดการได้จริงผ่านหน้า /worktype (Settings) แทน
@@ -259,6 +360,17 @@ export const getAddEvent = async ({
   const teamOpts = employeeList
     .map((e) => `<option value="${e.fname}">${e.fname}</option>`).join("");
 
+  // ✅ ตัวเลือกสัญญาที่มีอยู่แล้ว — ให้เลือกได้เท่านั้น พิมพ์เพิ่มเองไม่ได้ (ต่างจากช่องอื่นในฟอร์มนี้ที่
+  // เปิด create:true ไว้) กันบริษัท/โครงการ/เลขที่สัญญาเพี้ยนจากของเดิมแม้แค่ตัวเดียว ซึ่งจะทำให้
+  // กลายเป็นคนละสัญญาไปเลยในระบบ — เอาเฉพาะสัญญาที่ยังเลือกได้จริง (selectableContracts ตัดสัญญา
+  // ที่ครบจำนวนครั้งแล้วออกไปแล้ว) ไม่ต้องกันด้วย disabled อีกชั้นเพราะไม่มีตัวไหนครบแล้วหลงเหลืออยู่
+  const contractOpts = selectableContracts
+    .map((c) => {
+      const label = `${contractDisplayName(c)} · ${c.title} (${c.contractNo || "ไม่มีเลขที่"})`;
+      return `<option value="${c.key}">${label}</option>`;
+    })
+    .join("");
+
   const html = `
 <div id="ae-modal-inner">
 
@@ -277,94 +389,158 @@ export const getAddEvent = async ({
     <!-- date badge -->
     <div class="ae-date-badge">📅 วันที่เลือก: ${displayDate}</div>
 
-    <!-- section 1 -->
-    <p class="ae-section-label">ข้อมูลโครงการ</p>
-    <div class="ae-grid ae-grid-3">
-      <div class="ae-field">
-        <label>🏢 ชื่อบริษัท</label>
-        <select id="eventCompany"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${companyOpts}</select>
-      </div>
-      <div class="ae-field">
-        <label><span class="req">*</span> ชื่อโครงการ</label>
-        <select id="eventSite"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${siteOpts}</select>
-      </div>
-      <div class="ae-field">
-        <label><span class="req">*</span> ประเภทงาน</label>
-        <select id="eventTitle"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${titleOpts}</select>
-      </div>
+    <!-- ขั้นตอนที่ 1: เลือกประเภทงาน -->
+    <p class="ae-section-label">ขั้นตอนที่ 1 — ประเภทงาน</p>
+    <div class="ae-jobtype-toggle">
+      <label class="ae-jobtype-option">
+        <input type="radio" name="ae-jobType" id="ae-jobTypeGeneral" value="general" checked>
+        <div class="ae-jobtype-card">
+          <div class="ae-jobtype-icon">📌</div>
+          <div>
+            <div class="ae-jobtype-title">งานทั่วไป</div>
+            <div class="ae-jobtype-desc">งานครั้งเดียว ไม่ผูกกับสัญญา</div>
+          </div>
+        </div>
+      </label>
+      <label class="ae-jobtype-option">
+        <input type="radio" name="ae-jobType" id="ae-jobTypeContract" value="contract" ${selectableContracts.length === 0 ? "disabled" : ""}>
+        <div class="ae-jobtype-card">
+          <div class="ae-jobtype-icon">🔁</div>
+          <div>
+            <div class="ae-jobtype-title">งานตามสัญญา</div>
+            <div class="ae-jobtype-desc">เพิ่มครั้งถัดไปของสัญญาที่มีอยู่แล้ว</div>
+          </div>
+        </div>
+      </label>
     </div>
+    ${selectableContracts.length === 0
+      ? `<p class="ae-jobtype-note" style="display:block;">${
+          contractList.length === 0
+            ? `ยังไม่มีสัญญาในระบบ — สร้างสัญญาใหม่ได้ที่หน้า "ภาพรวมสัญญา" ก่อน`
+            : `สัญญาที่มีอยู่ครบจำนวนครั้งหมดแล้ว — สร้างสัญญาใหม่ได้ที่หน้า "ภาพรวมสัญญา"`
+        }</p>`
+      : ""}
 
-    <div class="ae-grid ae-grid-3">
-      <div class="ae-field">
-        <label><span class="req">*</span> ระบบงาน</label>
-        <select id="eventSystem"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${systemOpts}</select>
+    <!-- โหมด "งานทั่วไป" -->
+    <div id="ae-generalSection">
+      <p class="ae-section-label">ข้อมูลโครงการ</p>
+      <div class="ae-grid ae-grid-3">
+        <div class="ae-field">
+          <label>🏢 ชื่อบริษัท</label>
+          <select id="eventCompany"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${companyOpts}</select>
+        </div>
+        <div class="ae-field">
+          <label><span class="req">*</span> ชื่อโครงการ</label>
+          <select id="eventSite"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${siteOpts}</select>
+        </div>
+        <div class="ae-field">
+          <label><span class="req">*</span> ประเภทงาน</label>
+          <select id="eventTitle"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${titleOpts}</select>
+        </div>
       </div>
-      <div class="ae-field">
-        <label>🔢 ครั้งที่</label>
-        <select id="eventTime"><option selected disabled value="">— เลือก —</option>${timeOpts}</select>
+
+      <div class="ae-grid ae-grid-3">
+        <div class="ae-field">
+          <label><span class="req">*</span> ระบบงาน</label>
+          <select id="eventSystem"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${systemOpts}</select>
+        </div>
+        <div class="ae-field">
+          <label>🔢 ครั้งที่</label>
+          <select id="eventTime"><option selected disabled value="">— เลือก —</option>${timeOpts}</select>
+        </div>
+        <div class="ae-field">
+          <label>👷 ทีม</label>
+          <select id="eventTeam"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${teamOpts}</select>
+        </div>
       </div>
-      <div class="ae-field">
-        <label>👷 ทีม</label>
-        <select id="eventTeam"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${teamOpts}</select>
+
+      <!-- ✅ ลูกทีมเพิ่มเติม (คนที่ 2, 3, ...) — แสดงผลอย่างเดียวว่าใครช่วยทำงานนี้บ้าง
+           ไม่กระทบสิทธิ์แก้ไข/แจ้งเตือน/นับงานค้าง ซึ่งยังผูกกับ "ทีม" (ช่างหลัก) ด้านบนเหมือนเดิม -->
+      <div class="ae-field" style="margin-bottom:16px;">
+        <label>👥 ลูกทีมเพิ่มเติม (ถ้ามี)</label>
+        <div id="ae-teamMembersList"></div>
+        <button type="button" class="ae-btn ae-btn-ghost" id="ae-addTeamMemberBtn" style="margin-top:2px;">➕ เพิ่มลูกทีม</button>
       </div>
-    </div>
 
-    <!-- ✅ ลูกทีมเพิ่มเติม (คนที่ 2, 3, ...) — แสดงผลอย่างเดียวว่าใครช่วยทำงานนี้บ้าง
-         ไม่กระทบสิทธิ์แก้ไข/แจ้งเตือน/นับงานค้าง ซึ่งยังผูกกับ "ทีม" (ช่างหลัก) ด้านบนเหมือนเดิม -->
-    <div class="ae-field" style="margin-bottom:16px;">
-      <label>👥 ลูกทีมเพิ่มเติม (ถ้ามี)</label>
-      <div id="ae-teamMembersList"></div>
-      <button type="button" class="ae-btn ae-btn-ghost" id="ae-addTeamMemberBtn" style="margin-top:2px;">➕ เพิ่มลูกทีม</button>
-    </div>
+      <hr class="ae-divider">
 
-    <hr class="ae-divider">
+      <p class="ae-section-label">วันที่ & เวลา</p>
 
-    <!-- section 2 -->
-    <p class="ae-section-label">วันที่ & เวลา</p>
+      <label class="ae-checkbox-row">
+        <input type="checkbox" id="ae-multiDateToggle">
+        🗓️ งานนี้ต้องเข้างานหลายวัน (ไม่ติดกันก็ได้) — ถือเป็นงานเดียวกัน
+      </label>
 
-    <label class="ae-checkbox-row">
-      <input type="checkbox" id="ae-multiDateToggle">
-      🗓️ งานนี้ต้องเข้างานหลายวัน (ไม่ติดกันก็ได้) — ถือเป็นงานเดียวกัน
-    </label>
+      <div id="ae-singleDateSection">
+        <div class="ae-grid ae-grid-2">
+          <div class="ae-field">
+            <label>📅 วันที่เริ่ม</label>
+            <input id="start" type="date" value="${arg.dateStr}">
+          </div>
+          <div class="ae-field">
+            <label>📅 วันที่สิ้นสุด</label>
+            <input id="end" type="date" value="${arg.dateStr}">
+          </div>
+        </div>
+      </div>
 
-    <div id="ae-singleDateSection">
+      <div id="ae-multiDateSection" style="display:none;">
+        <div id="ae-multiDateList"></div>
+        <button type="button" class="ae-btn ae-btn-ghost" id="ae-addDateBtn" style="margin-bottom:16px;">➕ เพิ่มช่วงวันที่</button>
+      </div>
+
       <div class="ae-grid ae-grid-2">
         <div class="ae-field">
-          <label>📅 วันที่เริ่ม</label>
-          <input id="start" type="date" value="${arg.dateStr}">
+          <label>🕐 เวลาเริ่ม</label>
+          <input id="startTime" type="text" placeholder="เช่น 08:30">
         </div>
         <div class="ae-field">
-          <label>📅 วันที่สิ้นสุด</label>
-          <input id="end" type="date" value="${arg.dateStr}">
+          <label>🕔 เวลาสิ้นสุด</label>
+          <input id="endTime" type="text" placeholder="เช่น 17:00">
+        </div>
+      </div>
+
+      <!-- colors -->
+      <div class="ae-color-row">
+        <div class="ae-color-item">
+          <label>🎨 สีพื้นหลัง</label>
+          <input id="backgroundColorPicker" type="color" value="${defaultBackgroundColor}">
+        </div>
+        <div class="ae-color-item">
+          <label>✏️ สีข้อความ</label>
+          <input id="textColorPicker" type="color" value="${defaultTextColor}">
         </div>
       </div>
     </div>
 
-    <div id="ae-multiDateSection" style="display:none;">
-      <div id="ae-multiDateList"></div>
-      <button type="button" class="ae-btn ae-btn-ghost" id="ae-addDateBtn" style="margin-bottom:16px;">➕ เพิ่มช่วงวันที่</button>
-    </div>
+    <!-- โหมด "งานตามสัญญา" -->
+    <div id="ae-contractPickSection" style="display:none;">
+      <p class="ae-section-label">ขั้นตอนที่ 2 — เลือกสัญญา</p>
+      <div class="ae-field" style="margin-bottom:16px;">
+        <label><span class="req">*</span> เลือกสัญญา</label>
+        <select id="ae-contractPick"><option value="" selected disabled>— เลือกสัญญา —</option>${contractOpts}</select>
+      </div>
 
-    <div class="ae-grid ae-grid-2">
-      <div class="ae-field">
-        <label>🕐 เวลาเริ่ม</label>
-        <input id="startTime" type="text" placeholder="เช่น 08:30">
-      </div>
-      <div class="ae-field">
-        <label>🕔 เวลาสิ้นสุด</label>
-        <input id="endTime" type="text" placeholder="เช่น 17:00">
-      </div>
-    </div>
+      <div class="ae-contract-pick-info" id="ae-contractPickInfo"></div>
 
-    <!-- colors -->
-    <div class="ae-color-row">
-      <div class="ae-color-item">
-        <label>🎨 สีพื้นหลัง</label>
-        <input id="backgroundColorPicker" type="color" value="${defaultBackgroundColor}">
+      <p class="ae-section-label">ขั้นตอนที่ 3 — เลือกครั้งที่จะลงวันที่</p>
+      <div class="ae-round-grid" id="ae-roundGrid"></div>
+      <input type="hidden" id="ae-selectedRound" value="">
+
+      <p class="ae-section-label">ขั้นตอนที่ 4 — วันที่เข้างาน</p>
+      <div class="ae-grid ae-grid-2">
+        <div class="ae-field">
+          <label><span class="req">*</span> วันที่เริ่ม</label>
+          <input id="ae-cpStart" type="date" value="${arg.dateStr}">
+        </div>
+        <div class="ae-field">
+          <label>วันที่สิ้นสุด</label>
+          <input id="ae-cpEnd" type="date" value="${arg.dateStr}">
+        </div>
       </div>
-      <div class="ae-color-item">
-        <label>✏️ สีข้อความ</label>
-        <input id="textColorPicker" type="color" value="${defaultTextColor}">
+      <div class="ae-field" style="margin-bottom:16px;">
+        <label>👷 ผู้รับผิดชอบ</label>
+        <select id="ae-cpTeam"><option value="">— เลือกหรือพิมพ์ —</option>${teamOpts}</select>
       </div>
     </div>
 
@@ -466,6 +642,88 @@ export const getAddEvent = async ({
         multiSection.style.display  = isMulti ? "" : "none";
       });
 
+      /* ── ขั้นตอนที่ 1: งานทั่วไป vs งานตามสัญญา — สลับ section ทั้งก้อน ไม่ใช่แค่ box ย่อยแบบเดิม ── */
+      const generalSection     = document.getElementById("ae-generalSection");
+      const contractPickSection = document.getElementById("ae-contractPickSection");
+      const jobTypeRadios = [...document.querySelectorAll('input[name="ae-jobType"]')];
+      jobTypeRadios.forEach((radio) => {
+        radio.addEventListener("change", () => {
+          const isContract = radio.value === "contract" && radio.checked;
+          if (!radio.checked) return;
+          generalSection.style.display = isContract ? "none" : "";
+          contractPickSection.style.display = isContract ? "" : "none";
+        });
+      });
+
+      /* ── เลือกสัญญาที่มีอยู่แล้ว — create:false เพราะห้ามพิมพ์เพิ่มเอง ต้องเลือกจากที่มีจริงเท่านั้น ── */
+      let contractTs = null;
+      try {
+        contractTs = new TomSelect("#ae-contractPick", {
+          create: false,
+          maxOptions: selectableContracts.length || 5,
+          placeholder: "ค้นหาบริษัท/โครงการ/เลขที่สัญญา...",
+          sortField: { field: "text", direction: "asc" },
+        });
+      } catch { contractTs = null; }
+      mkTs("#ae-cpTeam", "เลือกหรือพิมพ์ชื่อทีม");
+
+      const contractPickInfo = document.getElementById("ae-contractPickInfo");
+      const cpTeamSelect = document.getElementById("ae-cpTeam");
+      const roundGrid = document.getElementById("ae-roundGrid");
+      const selectedRoundInput = document.getElementById("ae-selectedRound");
+
+      // ✅ สร้างตาราง "เลือกครั้งที่" ตามสถานะจริงของแต่ละครั้ง (ลงตารางแล้ว/รอวางแผน/ว่าง) — เทียบ
+      // pattern เดียวกับคอลัมน์ "ครั้งที่ N" ใน ContractOverview.js เป๊ะๆ กันตัวเลขไม่ตรงกับความจริง
+      // เช่น ถ้าครั้งที่ 2 เคยลบทิ้งไป ตารางนี้ต้องโชว์ว่าง (ไม่ใช่ข้ามไปเสนอครั้งที่ 5 เพราะนับจำนวนดิบ)
+      const renderRoundGrid = (c) => {
+        if (!roundGrid || !selectedRoundInput) return;
+        selectedRoundInput.value = "";
+        if (!c || !c.visitCount) { roundGrid.innerHTML = ""; return; }
+        let defaultOpen = null;
+        const rounds = Array.from({ length: c.visitCount }, (_, i) => i + 1);
+        roundGrid.innerHTML = rounds.map((n) => {
+          const scheduled = c.visits.find((v) => !v.unscheduled && Number(v.time) === n);
+          if (scheduled) {
+            const dateLabel = moment(scheduled.start || scheduled.date).format("DD MMM YY");
+            return `<span class="ae-round-chip ae-round-chip--scheduled" title="ลงตารางแล้ว — ${dateLabel}">✅ ${n}</span>`;
+          }
+          const pending = c.visits.find((v) => v.unscheduled && Number(v.time) === n);
+          if (pending) {
+            return `<span class="ae-round-chip ae-round-chip--pending" title="มีแผนงานล่วงหน้าจองครั้งนี้ไว้แล้ว — ไปลงวันที่จริงที่แผงงานล่วงหน้าแทน">📌 ${n}</span>`;
+          }
+          if (defaultOpen === null) defaultOpen = n;
+          return `<button type="button" class="ae-round-chip ae-round-chip--open" data-round="${n}">${n}</button>`;
+        }).join("");
+        selectedRoundInput.value = defaultOpen || "";
+        roundGrid.querySelectorAll(".ae-round-chip--open").forEach((btn) => {
+          if (Number(btn.dataset.round) === defaultOpen) btn.classList.add("ae-round-chip--selected");
+          btn.addEventListener("click", () => {
+            roundGrid.querySelectorAll(".ae-round-chip--open").forEach((b) => b.classList.remove("ae-round-chip--selected"));
+            btn.classList.add("ae-round-chip--selected");
+            selectedRoundInput.value = btn.dataset.round;
+          });
+        });
+      };
+
+      const showContractInfo = (contractId) => {
+        const c = contractMap.get(contractId);
+        if (!c) { contractPickInfo.style.display = "none"; renderRoundGrid(null); return; }
+        contractPickInfo.innerHTML = `
+          <div><b>${contractDisplayName(c)}</b></div>
+          <div class="ae-cpi-sub">${c.title} · ${c.system}${c.contractNo ? ` · เลขที่สัญญา ${c.contractNo}` : ""}</div>
+          <div class="ae-cpi-sub">ผู้รับผิดชอบเดิม: ${c.team || "ไม่ระบุ"}</div>
+        `;
+        contractPickInfo.style.display = "block";
+        renderRoundGrid(c);
+        // ✅ ตั้งผู้รับผิดชอบเริ่มต้นตามของสัญญาเดิมไว้ก่อน แก้เป็นคนอื่นได้ถ้าครั้งนี้เปลี่ยนคนทำ
+        if (cpTeamSelect) {
+          cpTeamSelect.value = c.team || "";
+          cpTeamSelect.dispatchEvent(new Event("change"));
+        }
+      };
+      document.getElementById("ae-contractPick")?.addEventListener("change", (e) => showContractInfo(e.target.value));
+      contractTs?.on("change", (val) => showContractInfo(val));
+
       /* buttons */
       document.getElementById("ae-btnCancel")?.addEventListener("click", () => Swal.close());
 
@@ -479,6 +737,92 @@ export const getAddEvent = async ({
           return raw === PLACEHOLDER ? "" : raw;
         };
 
+        const btn = clickEvt.currentTarget;
+        const originalLabel = btn.textContent;
+        const startSaving = () => {
+          isSavingEvent = true;
+          btn.disabled = true;
+          btn.style.opacity = "0.7";
+          btn.textContent = "⏳ กำลังบันทึก...";
+        };
+        const stopSaving = () => {
+          isSavingEvent = false;
+          btn.disabled = false;
+          btn.style.opacity = "1";
+          btn.textContent = originalLabel;
+        };
+        // ✅ err.message ของ axios เป็นข้อความทั่วไป (เช่น "Request failed with status code 409")
+        // ไม่ใช่ข้อความ Thai ที่ backend ตั้งใจส่งมา (เช่น รายละเอียดงานที่ชนกัน/ครบจำนวนครั้งแล้ว)
+        // ต้องอ่านจาก response.data.message ก่อนเสมอ ไม่งั้นข้อความแจ้งเตือนจะไปไม่ถึงผู้ใช้เลย
+        const showSaveError = (error) => {
+          console.error("❌ Error saving event:", error);
+          stopSaving();
+          Swal.showValidationMessage(error?.response?.data?.message || "บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+        };
+
+        const jobType = document.querySelector('input[name="ae-jobType"]:checked')?.value || "general";
+
+        /* ── ขั้นตอนที่ 1 = "งานตามสัญญา": เลือกจากสัญญาที่มีอยู่แล้วเท่านั้น เพิ่มแค่ครั้งถัดไป ── */
+        if (jobType === "contract") {
+          const contractId = getVal("ae-contractPick");
+          if (!contractId) { Swal.showValidationMessage("กรุณาเลือกสัญญา"); return; }
+          const c = contractMap.get(contractId);
+          if (!c) { Swal.showValidationMessage("ไม่พบสัญญาที่เลือก กรุณาเลือกใหม่"); return; }
+          if (c.usedVisits >= c.visitCount) {
+            Swal.showValidationMessage("สัญญานี้ครบตามจำนวนครั้งที่กำหนดไว้แล้ว");
+            return;
+          }
+          // ✅ อ่านครั้งที่จากตาราง "เลือกครั้งที่" ที่ผู้ใช้กดเลือกไว้ แทนการนับจำนวน+1 แบบเดิม —
+          // กันเคสครั้งกลางๆ เคยถูกลบทิ้งไปแล้ว ตัวเลขจะได้ตรงกับที่ตาราง ContractOverview.js แสดงจริง
+          const selectedRound = Number(getVal("ae-selectedRound"));
+          if (!selectedRound) { Swal.showValidationMessage("กรุณาเลือกครั้งที่ที่ต้องการลงวันที่"); return; }
+
+          const cpStart = getVal("ae-cpStart");
+          const cpEnd = getVal("ae-cpEnd") || cpStart;
+          if (!cpStart) { Swal.showValidationMessage("กรุณาระบุวันที่เข้างาน"); return; }
+          if (moment(cpEnd).isBefore(moment(cpStart))) {
+            Swal.showValidationMessage("วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม");
+            return;
+          }
+
+          startSaving();
+          try {
+            const cpTeam = getVal("ae-cpTeam") || c.team;
+            const nextIndex = selectedRound;
+            const newEvent = {
+              company: c.company, site: c.site, title: c.title, system: c.system,
+              time: String(nextIndex),
+              team: cpTeam, resPerson: teamToId.get(cpTeam) || "",
+              teamMembers: [],
+              backgroundColor: defaultBackgroundColor, textColor: defaultTextColor, fontSize: "8",
+              startTime: "", endTime: "",
+              isContractBatch: true,
+              contractGroupId: c.key,
+              contractNo: c.contractNo, quotationNo: c.quotationNo,
+              contractStart: c.contractStart, contractEnd: c.contractEnd,
+              visitCount: c.visitCount, jobValue: c.jobValue,
+              dates: [{
+                start: cpStart,
+                end: moment(cpEnd).add(1, "days").format("YYYY-MM-DD"),
+                date: cpStart,
+              }],
+            };
+            await saveEventToDB(newEvent);
+            await fetchEventsFromDB();
+            stopSaving();
+            Swal.fire({
+              title: `เพิ่มครั้งที่ ${nextIndex} สำเร็จ ✅`,
+              icon: "success",
+              timer: 1200,
+              showConfirmButton: false,
+            });
+          } catch (error) {
+            showSaveError(error);
+          }
+          return;
+        }
+
+        /* ── "งานทั่วไป" (เดิม) ── */
         const site   = getVal("eventSite");
         const title  = getVal("eventTitle");
         const system = getVal("eventSystem");
@@ -517,13 +861,7 @@ export const getAddEvent = async ({
           }
         }
 
-        // ✅ กันกดซ้ำระหว่างบันทึก + ให้เห็นว่ากำลังทำงานอยู่
-        isSavingEvent = true;
-        const btn = clickEvt.currentTarget;
-        const originalLabel = btn.textContent;
-        btn.disabled = true;
-        btn.style.opacity = "0.7";
-        btn.textContent = "⏳ กำลังบันทึก...";
+        startSaving();
 
         try {
           // ✅ ลูกทีมเพิ่มเติม — เก็บทั้งชื่อ+userId (แสดงผลอย่างเดียว ไม่กระทบสิทธิ์) กันซ้ำชื่อ
@@ -603,7 +941,7 @@ export const getAddEvent = async ({
           setDefaultFontSize(payload.fontSize);
           await fetchEventsFromDB();
           await fetchLookupOptions?.(); // ✅ รีเฟรชตัวเลือกตัวกรองให้เห็นประเภทงาน/ระบบที่เพิ่งพิมพ์ใหม่ทันที
-          isSavingEvent = false;
+          stopSaving();
 
           Swal.fire({
             title: "บันทึกแผนงานสำเร็จ ✅",
@@ -612,12 +950,7 @@ export const getAddEvent = async ({
             showConfirmButton: false,
           });
         } catch (error) {
-          console.error("❌ Error saving event:", error);
-          isSavingEvent = false;
-          btn.disabled = false;
-          btn.style.opacity = "1";
-          btn.textContent = originalLabel;
-          Swal.showValidationMessage("บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+          showSaveError(error);
         }
       });
     },

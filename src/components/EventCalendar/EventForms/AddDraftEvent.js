@@ -75,6 +75,34 @@ function injectAddDraftStyles() {
 
     .ade-divider { border: none; border-top: 1px solid #e2e8f0; margin: 16px 0; }
 
+    /* ── ขั้นตอนที่ 1: เลือกประเภทงาน (การ์ดวิทยุ) — โครงเดียวกับ AddEvent.js ── */
+    .ade-jobtype-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+    @media(max-width:600px) { .ade-jobtype-toggle { grid-template-columns: 1fr; } }
+    .ade-jobtype-option { position: relative; cursor: pointer; }
+    .ade-jobtype-option input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .ade-jobtype-card {
+      display: flex; align-items: center; gap: 10px;
+      border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 12px 14px;
+      background: #fff; transition: border-color .15s, background .15s;
+    }
+    .ade-jobtype-icon { font-size: 22px; line-height: 1; }
+    .ade-jobtype-title { font-size: 13px; font-weight: 700; color: #1e293b; }
+    .ade-jobtype-desc { font-size: 11px; color: #64748b; }
+    .ade-jobtype-option input:checked + .ade-jobtype-card {
+      border-color: #dc2626; background: #fef2f2;
+    }
+    .ade-jobtype-option input:checked + .ade-jobtype-card .ade-jobtype-title { color: #b91c1c; }
+    .ade-jobtype-option input:disabled + .ade-jobtype-card { opacity: .5; cursor: not-allowed; }
+    .ade-jobtype-note { font-size: 11px; color: #b91c1c; margin: -12px 0 16px; display: none; }
+    .ade-lock-note { font-size: 11px; color: #b91c1c; margin: -6px 0 12px; }
+
+    .ade-contract-pick-info {
+      background: #fef2f2; border: 1.5px solid #fecaca; border-radius: 10px;
+      padding: 12px 14px; margin-bottom: 16px; font-size: 13px; color: #374151; display: none;
+    }
+    .ade-contract-pick-info b { color: #b91c1c; }
+    .ade-contract-pick-info .ade-cpi-sub { font-size: 12px; color: #64748b; margin-top: 2px; }
+
     .ade-month-badge {
       display: inline-flex; align-items: center; gap: 6px;
       background: #fef2f2; border: 1px solid #fecaca;
@@ -120,6 +148,8 @@ let isSavingDraft = false;
 export const getAddDraftEvent = async ({
   defaultMonth, // "YYYY-MM" — เดือนที่กำลังเปิดดูอยู่ในแผงงานล่วงหน้า ใช้เป็นค่าเริ่มต้น
   existingDraft, // ✅ ถ้าส่งมา = โหมดแก้ไข (prefill ค่าเดิม + เรียก UpdateDraftEvent แทน AddDraftEvent)
+  events, // ✅ งานที่ลงตารางแล้ว — ใช้หาสัญญาที่มีอยู่แล้วสำหรับขั้นตอน "งานตามสัญญา" (เหมือน AddEvent.js)
+  drafts, // ✅ แผนงานล่วงหน้าอื่นที่ค้างอยู่ — อาจจองครั้งที่ของสัญญาเดียวกันไปแล้ว ต้องรวมมานับด้วย
   onSaved,
   CustomerService,
   AuthService,
@@ -133,6 +163,49 @@ export const getAddDraftEvent = async ({
   injectAddDraftStyles();
 
   const isEditMode = Boolean(existingDraft);
+  // ✅ แก้ไขงานที่ผูกสัญญาอยู่แล้ว ไม่ให้สลับกลับเป็นงานทั่วไป/เปลี่ยนบริษัท-โครงการ-ประเภทงาน-ระบบ-ครั้งที่
+  // ได้อีก (เผื่อแก้แล้วไม่ตรงกับครั้งอื่นในสัญญาเดียวกัน) เหมือน pattern เดียวกับ EditEvent.js
+  const isContractLinked = isEditMode && Boolean(existingDraft?.contractGroupId);
+
+  // ✅ ขั้นตอนที่ 1 (งานทั่วไป/งานตามสัญญา) ต้องรู้ว่าตอนนี้มีสัญญาอะไรอยู่แล้วบ้าง — group จาก events
+  // (ลงตารางแล้ว) รวมกับ drafts (แผนงานล่วงหน้าอื่นที่ค้างอยู่ ซึ่งอาจจองครั้งที่ไปแล้วเหมือนกัน) เพื่อคำนวณ
+  // "ครั้งที่ถัดไป" ถูกต้อง ไม่ชนกับที่จองไปแล้วไม่ว่าจะลงตารางแล้วหรือยังเป็นแค่แผนงานก็ตาม
+  const contractMap = new Map();
+  [...(events || []), ...(drafts || [])].forEach((e) => {
+    if (!e.contractGroupId) return;
+    if (!contractMap.has(e.contractGroupId)) {
+      contractMap.set(e.contractGroupId, {
+        key: e.contractGroupId,
+        company: e.company || "",
+        site: e.site || "",
+        system: e.system || "",
+        title: e.title || "",
+        contractNo: e.contractNo || "",
+        quotationNo: e.quotationNo || "",
+        contractStart: e.contractStart || "",
+        contractEnd: e.contractEnd || "",
+        visitCount: e.visitCount || 0,
+        jobValue: e.jobValue,
+        team: e.team || "",
+        usedVisits: 0,
+      });
+    }
+    // ✅ นับเฉพาะ "ครั้ง" ที่มีเลขจริงแล้ว (ทั้งลงตารางแล้วและแผนงานที่จองไว้) — ไม่นับ "ฉบับร่าง" ว่างเปล่า
+    // ของสัญญาที่เพิ่งสร้างยังไม่มีครั้งไหนเลย (ไม่มี time) ไม่งั้นครั้งที่ 1 จะถูกข้ามไปเป็นครั้งที่ 2 ทันที
+    if (e.time !== undefined && e.time !== null && e.time !== "") {
+      contractMap.get(e.contractGroupId).usedVisits += 1;
+    }
+  });
+  const contractList = [...contractMap.values()].sort((a, b) =>
+    (a.company || "").localeCompare(b.company || "", "th") || (a.site || "").localeCompare(b.site || "", "th")
+  );
+  const selectableContracts = contractList.filter((c) => c.usedVisits < c.visitCount);
+  const contractOpts = selectableContracts
+    .map((c) => {
+      const label = `${c.company || "-"} · ${c.site || "-"} · ${c.title} (${c.contractNo || "ไม่มีเลขที่"}) — ${c.usedVisits}/${c.visitCount} ครั้ง`;
+      return `<option value="${c.key}">${label}</option>`;
+    })
+    .join("");
 
   const [customers, , jobTypes, systemTypes] = await Promise.all([
     CustomerService.getCustomers(),
@@ -172,31 +245,81 @@ export const getAddDraftEvent = async ({
   <div id="ade-body">
     <div class="ade-month-badge">📌 เดือนที่ตั้งใจ: ${monthLabel}</div>
 
-    <p class="ade-section-label">ข้อมูลโครงการ</p>
-    <div class="ade-grid ade-grid-3">
-      <div class="ade-field">
-        <label>🏢 ชื่อบริษัท</label>
-        <select id="adeCompany"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${companyOpts}</select>
+    ${isEditMode ? "" : `
+    <p class="ade-section-label">ขั้นตอนที่ 1 — ประเภทงาน</p>
+    <div class="ade-jobtype-toggle">
+      <label class="ade-jobtype-option">
+        <input type="radio" name="ade-jobType" id="ade-jobTypeGeneral" value="general" checked>
+        <div class="ade-jobtype-card">
+          <div class="ade-jobtype-icon">📌</div>
+          <div>
+            <div class="ade-jobtype-title">งานทั่วไป</div>
+            <div class="ade-jobtype-desc">งานครั้งเดียว ไม่ผูกกับสัญญา</div>
+          </div>
+        </div>
+      </label>
+      <label class="ade-jobtype-option">
+        <input type="radio" name="ade-jobType" id="ade-jobTypeContract" value="contract" ${selectableContracts.length === 0 ? "disabled" : ""}>
+        <div class="ade-jobtype-card">
+          <div class="ade-jobtype-icon">🔁</div>
+          <div>
+            <div class="ade-jobtype-title">งานตามสัญญา</div>
+            <div class="ade-jobtype-desc">วางแผนครั้งถัดไปของสัญญาที่มีอยู่แล้ว</div>
+          </div>
+        </div>
+      </label>
+    </div>
+    ${selectableContracts.length === 0
+      ? `<p class="ade-jobtype-note" style="display:block;">${
+          contractList.length === 0
+            ? `ยังไม่มีสัญญาในระบบ — สร้างสัญญาใหม่ได้ที่หน้า "ภาพรวมสัญญา" ก่อน`
+            : `สัญญาที่มีอยู่ครบจำนวนครั้งหมดแล้ว — สร้างสัญญาใหม่ได้ที่หน้า "ภาพรวมสัญญา"`
+        }</p>`
+      : ""}
+    `}
+
+    <div id="ade-generalSection">
+      ${isContractLinked ? `
+      <p class="ade-lock-note">
+        🔒 งานนี้เป็นส่วนหนึ่งของสัญญา — ล็อกบริษัท/โครงการ/ประเภทงาน/ระบบ/ครั้งที่ไว้ไม่ให้แก้ตรงนี้
+        กันข้อมูลไม่ตรงกับครั้งอื่นในสัญญาเดียวกัน
+      </p>
+      ` : ""}
+      <p class="ade-section-label">ข้อมูลโครงการ</p>
+      <div class="ade-grid ade-grid-3">
+        <div class="ade-field">
+          <label>🏢 ชื่อบริษัท</label>
+          <select id="adeCompany" ${isContractLinked ? "disabled" : ""}><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${companyOpts}</select>
+        </div>
+        <div class="ade-field">
+          <label><span class="req">*</span> ชื่อโครงการ</label>
+          <select id="adeSite" ${isContractLinked ? "disabled" : ""}><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${siteOpts}</select>
+        </div>
+        <div class="ade-field">
+          <label><span class="req">*</span> ประเภทงาน</label>
+          <select id="adeTitle" ${isContractLinked ? "disabled" : ""}><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${titleOpts}</select>
+        </div>
       </div>
-      <div class="ade-field">
-        <label><span class="req">*</span> ชื่อโครงการ</label>
-        <select id="adeSite"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${siteOpts}</select>
-      </div>
-      <div class="ade-field">
-        <label><span class="req">*</span> ประเภทงาน</label>
-        <select id="adeTitle"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${titleOpts}</select>
+
+      <div class="ade-grid ade-grid-2">
+        <div class="ade-field">
+          <label><span class="req">*</span> ระบบงาน</label>
+          <select id="adeSystem" ${isContractLinked ? "disabled" : ""}><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${systemOpts}</select>
+        </div>
+        <div class="ade-field">
+          <label>🔢 ครั้งที่</label>
+          <select id="adeTime" ${isContractLinked ? "disabled" : ""}><option selected disabled value="">— เลือก —</option>${timeOpts}</select>
+        </div>
       </div>
     </div>
 
-    <div class="ade-grid ade-grid-2">
-      <div class="ade-field">
-        <label><span class="req">*</span> ระบบงาน</label>
-        <select id="adeSystem"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${systemOpts}</select>
+    <div id="ade-contractPickSection" style="display:none;">
+      <p class="ade-section-label">ขั้นตอนที่ 2 — เลือกสัญญา</p>
+      <div class="ade-field" style="margin-bottom:16px;">
+        <label><span class="req">*</span> เลือกสัญญา</label>
+        <select id="ade-contractPick"><option value="" selected disabled>— เลือกสัญญา —</option>${contractOpts}</select>
       </div>
-      <div class="ade-field">
-        <label>🔢 ครั้งที่</label>
-        <select id="adeTime"><option selected disabled value="">— เลือก —</option>${timeOpts}</select>
-      </div>
+      <div class="ade-contract-pick-info" id="ade-contractPickInfo"></div>
     </div>
 
     <hr class="ade-divider">
@@ -248,6 +371,45 @@ export const getAddDraftEvent = async ({
         mkTs("#adeSystem",  "เลือกหรือพิมพ์ระบบงาน");
         mkTs("#adeTime",    "เลือกครั้งที่", 4);
 
+        /* ── ขั้นตอนที่ 1: งานทั่วไป vs งานตามสัญญา — สลับ section ทั้งก้อน (เฉพาะตอนสร้างใหม่ ไม่มี
+           radio นี้เลยตอนแก้ไข ดูเงื่อนไข isEditMode ตอน render HTML — forEach ด้านล่างเลย no-op ไปเอง) ── */
+        const generalSection = document.getElementById("ade-generalSection");
+        const contractPickSection = document.getElementById("ade-contractPickSection");
+        const jobTypeRadios = [...document.querySelectorAll('input[name="ade-jobType"]')];
+        jobTypeRadios.forEach((radio) => {
+          radio.addEventListener("change", () => {
+            if (!radio.checked) return;
+            const isContract = radio.value === "contract";
+            generalSection.style.display = isContract ? "none" : "";
+            contractPickSection.style.display = isContract ? "" : "none";
+          });
+        });
+
+        /* ── เลือกสัญญาที่มีอยู่แล้ว — create:false ห้ามพิมพ์เพิ่มเอง ต้องเลือกจากที่มีจริงเท่านั้น ── */
+        let contractTs = null;
+        try {
+          contractTs = new TomSelect("#ade-contractPick", {
+            create: false,
+            maxOptions: selectableContracts.length || 5,
+            placeholder: "ค้นหาบริษัท/โครงการ/เลขที่สัญญา...",
+            sortField: { field: "text", direction: "asc" },
+          });
+        } catch { contractTs = null; }
+
+        const contractPickInfo = document.getElementById("ade-contractPickInfo");
+        const showContractInfo = (contractId) => {
+          const c = contractMap.get(contractId);
+          if (!c || !contractPickInfo) { if (contractPickInfo) contractPickInfo.style.display = "none"; return; }
+          contractPickInfo.innerHTML = `
+            <div><b>${c.company || "-"} · ${c.site || "-"}</b></div>
+            <div class="ade-cpi-sub">${c.title} · ${c.system}${c.contractNo ? ` · เลขที่สัญญา ${c.contractNo}` : ""}</div>
+            <div class="ade-cpi-sub">ครั้งที่ ${c.usedVisits + 1} จาก ${c.visitCount}</div>
+          `;
+          contractPickInfo.style.display = "block";
+        };
+        document.getElementById("ade-contractPick")?.addEventListener("change", (e) => showContractInfo(e.target.value));
+        contractTs?.on("change", (val) => showContractInfo(val));
+
         document.getElementById("ade-btnCancel")?.addEventListener("click", () => Swal.close());
 
         document.getElementById("ade-btnConfirm")?.addEventListener("click", async (clickEvt) => {
@@ -259,6 +421,64 @@ export const getAddDraftEvent = async ({
             return raw === PLACEHOLDER ? "" : raw;
           };
 
+          const jobType = document.querySelector('input[name="ade-jobType"]:checked')?.value || "general";
+
+          /* ── ขั้นตอนที่ 1 = "งานตามสัญญา": เลือกจากสัญญาที่มีอยู่แล้วเท่านั้น วางแผนแค่ครั้งถัดไป ── */
+          if (jobType === "contract") {
+            const contractId = getVal("ade-contractPick");
+            if (!contractId) { Swal.showValidationMessage("กรุณาเลือกสัญญา"); return; }
+            const c = contractMap.get(contractId);
+            if (!c) { Swal.showValidationMessage("ไม่พบสัญญาที่เลือก กรุณาเลือกใหม่"); return; }
+            if (c.usedVisits >= c.visitCount) {
+              Swal.showValidationMessage("สัญญานี้ครบตามจำนวนครั้งที่กำหนดไว้แล้ว");
+              return;
+            }
+            const cPlannedMonth = getVal("adeMonth");
+            if (!cPlannedMonth) { Swal.showValidationMessage("กรุณาระบุเดือนที่ตั้งใจ"); return; }
+
+            isSavingDraft = true;
+            const cBtn = clickEvt.currentTarget;
+            const cOriginalLabel = cBtn.textContent;
+            cBtn.disabled = true;
+            cBtn.style.opacity = "0.7";
+            cBtn.textContent = "⏳ กำลังบันทึก...";
+
+            try {
+              const nextIndex = c.usedVisits + 1;
+              const contractPayload = {
+                isContractBatch: true,
+                contractGroupId: c.key,
+                contractNo: c.contractNo, quotationNo: c.quotationNo,
+                contractStart: c.contractStart, contractEnd: c.contractEnd,
+                visitCount: c.visitCount, jobValue: c.jobValue,
+                company: c.company, site: c.site, title: c.title, system: c.system,
+                team: c.team,
+                time: String(nextIndex),
+                plannedMonth: cPlannedMonth,
+              };
+              await EventService.AddDraftEvent(contractPayload);
+              isSavingDraft = false;
+
+              Swal.fire({
+                title: `เพิ่มครั้งที่ ${nextIndex} เป็นแผนงานล่วงหน้าสำเร็จ ✅`,
+                icon: "success",
+                timer: 1200,
+                showConfirmButton: false,
+              });
+              await onSaved?.();
+              resolve(true);
+            } catch (error) {
+              console.error("❌ Error saving contract draft event:", error);
+              isSavingDraft = false;
+              cBtn.disabled = false;
+              cBtn.style.opacity = "1";
+              cBtn.textContent = cOriginalLabel;
+              Swal.showValidationMessage(error?.response?.data?.message || "บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+            }
+            return;
+          }
+
+          /* ── "งานทั่วไป" (เดิม) ── */
           const site   = getVal("adeSite");
           const title  = getVal("adeTitle");
           const system = getVal("adeSystem");

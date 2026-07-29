@@ -374,16 +374,17 @@ const ShowFiles = () => {
             "& .Mui-selected": { color: `${COLOR.accentDeep} !important` },
           }}
         >
-          <Tab icon={<FolderOpen sx={{ fontSize: 20 }} />} iconPosition="start" label="ไฟล์ทั่วไป" />
+          {/* ✅ ย้าย "เอกสารประจำงาน" มาเป็นแท็บแรก (ใช้งานบ่อยกว่า "ไฟล์ทั่วไป") ตามที่ขอ */}
           <Tab
             icon={<Description sx={{ fontSize: 20 }} />}
             iconPosition="start"
             label="เอกสารประจำงาน (Service Report)"
           />
+          <Tab icon={<FolderOpen sx={{ fontSize: 20 }} />} iconPosition="start" label="ไฟล์ทั่วไป" />
         </Tabs>
       </Paper>
 
-      {activeTab === 1 ? (
+      {activeTab === 0 ? (
         <ServiceReportFiles />
       ) : (
         <Box>

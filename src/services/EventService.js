@@ -237,6 +237,30 @@ async Upload(id, file, type, config = {}) {
     }
   },
 
+  // ✅ แก้ไขข้อมูลสัญญา (contractNo/quotationNo/contractStart/contractEnd/visitCount/jobValue)
+  // พร้อมกันทุก "ครั้ง" ที่อยู่ในสัญญาเดียวกัน (contractGroupId) — กันข้อมูลเพี้ยนไม่ตรงกันระหว่างครั้ง
+  async UpdateContractFields(contractGroupId, payload) {
+    try {
+      const response = await API.put(`/events/contract/${contractGroupId}`, payload);
+      return response.data;
+    } catch (error) {
+      console.error("Error updating contract fields:", error);
+      throw error;
+    }
+  },
+
+  // ✅ รวมงานเก่า (ที่ยังไม่มี contractGroupId) ที่เลือกไว้ให้กลายเป็นสัญญาเดียวกัน — ดูรายละเอียด
+  // การจัดเรียง "ครั้งที่" อัตโนมัติที่ PUT /events/contract/merge
+  async MergeIntoContract(payload) {
+    try {
+      const response = await API.put(`/events/contract/merge`, payload);
+      return response.data;
+    } catch (error) {
+      console.error("Error merging events into contract:", error);
+      throw error;
+    }
+  },
+
   async DeleteEvent(id) {
     try {
       const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token

@@ -122,7 +122,13 @@ const FullLayout = () => {
   const isDashboard = location.pathname === "/dashboard";
   
   // ตรวจจับ URL หน้าปฏิทินเพื่อปลดล็อกโหมดเต็มหน้าจอ
-  const isCalendarPage = location.pathname === "/event" || location.pathname === "/calendar" || location.pathname === "/"; 
+  const isCalendarPage = location.pathname === "/event" || location.pathname === "/calendar" || location.pathname === "/";
+
+  // ✅ หน้า "ภาพรวมสัญญา" เป็นตารางกว้างหลายคอลัมน์ (ปรับความกว้างคอลัมน์เองได้) — ถูก .contentArea
+  // (max-width: 1300px, กึ่งกลางจอ ดูใน _container.scss) บีบพื้นที่ทิ้งไปเยอะบนจอกว้าง ทั้งที่ตาราง
+  // ต้องการพื้นที่แนวนอนมากที่สุดเท่าที่จะทำได้ ใช้ปลดล็อกแบบเดียวกับหน้าปฏิทิน แต่คงระยะขอบ (p-4)
+  // ปกติไว้ (ไม่ใช้ p-0 m-0 เหมือนปฏิทิน เพราะหน้านี้ยังอยากมีระยะขอบให้ดูไม่ติดขอบจอเกินไป)
+  const isWideTablePage = location.pathname === "/contracts";
 
   const handleTouchStart = (e) => {
     setTouchStartY(e.touches[0].clientY);
@@ -154,7 +160,7 @@ const FullLayout = () => {
 
         {/* พื้นที่แสดง Content ฝั่งขวา */}
         <div 
-          className={`contentArea ${isCalendarPage ? "calendar-mode" : ""} ${isMobile && isSidebarOpen ? "blur-content" : ""}`}
+          className={`contentArea ${isCalendarPage ? "calendar-mode" : ""} ${isWideTablePage ? "wide-table-mode" : ""} ${isMobile && isSidebarOpen ? "blur-content" : ""}`}
           onClick={isMobile && isSidebarOpen ? () => setIsSidebarOpen(false) : null}
         >
           {!isDashboard && (

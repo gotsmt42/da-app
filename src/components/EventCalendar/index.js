@@ -389,6 +389,9 @@ function EventCalendar() {
     await getAddEvent({
       arg,
       events,
+      // ✅ ต้องส่ง drafts ด้วย เพื่อให้ตาราง "เลือกครั้งที่" เห็นครั้งที่ถูกจองไว้เป็นแผนงานล่วงหน้าอยู่แล้ว
+      // ไม่ใช่แค่ครั้งที่ลงตารางแล้ว ไม่งั้นจะเสนอครั้งที่ซ้ำกับที่จองไว้ (ชนกับเช็คซ้ำฝั่ง backend)
+      drafts,
       setEvents,
       defaultTextColor,
       defaultBackgroundColor,
@@ -514,6 +517,10 @@ function EventCalendar() {
   const handleAddDraft = async () => {
     await getAddDraftEvent({
       defaultMonth: draftMonth,
+      // ✅ ต้องส่ง events + drafts ให้ครบ เพื่อให้ขั้นตอน "งานตามสัญญา" หาสัญญาที่มีอยู่แล้ว และคำนวณ
+      // "ครั้งที่ถัดไป" ถูกต้อง (ไม่ชนกับครั้งที่จองไปแล้วไม่ว่าจะลงตารางแล้วหรือยังเป็นแค่แผนงานก็ตาม)
+      events,
+      drafts,
       // ✅ ถ้าใส่วันที่มาด้วยตอนบันทึก จะถูกลงตารางทันที (ย้ายจาก drafts ไปเป็น event จริง)
       // ต้อง refresh ทั้งคู่เผื่อกรณีนั้น ไม่ใช่แค่ fetchDrafts อย่างเดียว
       onSaved: () => Promise.all([fetchDrafts(), fetchEventsFromDB()]),
@@ -532,6 +539,8 @@ function EventCalendar() {
     await getAddDraftEvent({
       defaultMonth: draftMonth,
       existingDraft: draft,
+      events,
+      drafts,
       // ✅ ถ้าใส่วันที่มาด้วยตอนบันทึก จะถูกลงตารางทันที (ย้ายจาก drafts ไปเป็น event จริง)
       // ต้อง refresh ทั้งคู่เผื่อกรณีนั้น ไม่ใช่แค่ fetchDrafts อย่างเดียว
       onSaved: () => Promise.all([fetchDrafts(), fetchEventsFromDB()]),

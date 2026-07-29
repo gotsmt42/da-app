@@ -379,6 +379,16 @@ export const getEditEvent = async ({
   // ตลอดเวลา (ระบบแก้ไขพร้อมกันทั้งกลุ่มเลยไม่เคยทำงานจริงเลยตั้งแต่สร้างมา) ต้องอ่าน e.jobGroupId
   // (top-level) แทน
   const eventJobGroupId = ev.extendedProps?.jobGroupId || "";
+  // ✅ สัญญาแบบหลายครั้ง — คนละแนวคิดกับ jobGroupId ด้านบน (ผูก "ครั้งที่" ต่างกันของสัญญาเดียวกัน
+  // ไม่ใช่วันไม่ติดกันของครั้งเดียว) ข้อมูลสัญญาพวกนี้ต้อง copy เหมือนกันทุก "ครั้ง" ในสัญญาเดียวกัน
+  // แก้ตรงนี้แล้วต้องอัปเดตพร้อมกันทุก record ผ่าน UpdateContractFields ไม่ใช่ UpdateEvent เดี่ยวๆ
+  const eventContractGroupId = ev.extendedProps?.contractGroupId || "";
+  const eventContractNo      = ev.extendedProps?.contractNo || "";
+  const eventQuotationNo     = ev.extendedProps?.quotationNo || "";
+  const eventContractStart   = ev.extendedProps?.contractStart ? moment(ev.extendedProps.contractStart).format("YYYY-MM-DD") : "";
+  const eventContractEnd     = ev.extendedProps?.contractEnd ? moment(ev.extendedProps.contractEnd).format("YYYY-MM-DD") : "";
+  const eventVisitCount      = ev.extendedProps?.visitCount || "";
+  const eventJobValue        = ev.extendedProps?.jobValue ?? "";
   const siblingEvents = (events || [])
     .filter((e) => !e.extendedProps?.isHoliday && e.id !== eventId)
     .filter((e) => eventJobGroupId && e.jobGroupId === eventJobGroupId)
@@ -492,6 +502,25 @@ export const getEditEvent = async ({
     )
     .join("");
 
+  // ✅ เดิมช่อง select ทุกช่อง (บริษัท/โครงการ/ประเภทงาน/ระบบ/ครั้งที่/ทีม) ใช้ placeholder option
+  // (value="") ที่ทั้ง "selected" ทั้งใส่ค่าจริงเป็น "—" กันไว้ตอนไม่มีค่า — พอมี TomSelect
+  // plugin "remove_button" (ดู mkTs ด้านล่าง) ทำให้ตัว placeholder นี้ถูกเรนเดอร์เป็น chip
+  // ที่มีปุ่ม × ให้กดลบได้เหมือนเป็นค่าจริง ทั้งที่จริงๆ ยังไม่มีค่าเลย (ดูเหมือนข้อมูลเพี้ยนเป็น
+  // "—" ทั้งที่ควรว่างเปล่า) — เปลี่ยนให้ placeholder ไม่ selected อีกต่อไป ปล่อยให้ TomSelect
+  // แสดง placeholder ของตัวเองแทน (เหมือน AddEvent.js) และถ้าค่าจริงไม่อยู่ในลิสต์ตัวเลือก
+  // มาตรฐาน (เช่น พิมพ์เองไว้ก่อนหน้านี้) ต้องแทรก option ที่ตรงกับค่านั้นแบบ selected ไว้เอง
+  // ไม่งั้นค่าจริงจะหายไปจากช่องตอนเปิดหน้าแก้ไข
+  const customOption = (val, list) =>
+    val && !list.includes(val) ? `<option value="${val}" selected>${val}</option>` : "";
+  const companyValues = res.userCustomers.map((c) => c.cCompany);
+  const siteValues = res.userCustomers.map((c) => c.cSite);
+  const titleValues = (jobTypes?.items || []).map((t) => t.name);
+  const systemValues = (systemTypes?.items || []).map((s) => s.name);
+  const teamValues = employeeList.map((e) => e.fname);
+  // ✅ ตัวเลือก "ครั้งที่" เดิม fix ไว้แค่ 1-4 ทั้งที่ตอนนี้สัญญาเข้าได้สูงสุด 24 ครั้ง/ปี — งานที่เป็น
+  // ครั้งที่ 5 ขึ้นไปต้องแทรกค่าจริงเข้าไปด้วย customOption ไม่งั้นช่องนี้จะว่างเปล่าตอนเปิดแก้ไข
+  const timeValues = ["1", "2", "3", "4"];
+
   // ✅ ตัวเลือกดิบไม่ฝัง selected มาด้วย ใช้กับแถวลูกทีมเพิ่มเติมที่ต้อง render แยกทีละแถวเอง
   const plainTeamOpts = employeeList
     .map((e) => `<option value="${e.fname}">${e.fname}</option>`)
@@ -533,32 +562,38 @@ export const getEditEvent = async ({
 
     <!-- section: โครงการ -->
     <p class="ee-section-label">ข้อมูลโครงการ</p>
+    ${eventContractGroupId ? `
+    <p style="font-size:11px;color:#b91c1c;margin:-6px 0 10px;">
+      🔒 งานนี้เป็นส่วนหนึ่งของสัญญา — ล็อกบริษัท/โครงการ/ประเภทงาน/ระบบ/ครั้งที่ไว้ไม่ให้แก้ตรงนี้
+      กันข้อมูลไม่ตรงกับครั้งอื่นในสัญญาเดียวกัน (แก้ "ผู้รับผิดชอบ" ของครั้งนี้ได้ตามปกติ)
+    </p>
+    ` : ""}
     <div class="ee-grid ee-grid-3">
       <div class="ee-field">
         <label>🏢 ชื่อบริษัท</label>
-        <select id="editCompany"><option value="" disabled selected>${eventCompany || "—"}</option>${custOpt("company")}</select>
+        <select id="editCompany" ${eventContractGroupId ? "disabled" : ""}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventCompany, companyValues)}${custOpt("company")}</select>
       </div>
       <div class="ee-field">
         <label><span class="req">*</span> ชื่อโครงการ</label>
-        <select id="editSite"><option value="" disabled selected>${eventSite || "—"}</option>${custOpt("site")}</select>
+        <select id="editSite" ${eventContractGroupId ? "disabled" : ""}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventSite, siteValues)}${custOpt("site")}</select>
       </div>
       <div class="ee-field">
         <label><span class="req">*</span> ประเภทงาน</label>
-        <select id="editTitle"><option value="" disabled selected>${eventTitle || "—"}</option>${titleOpts}</select>
+        <select id="editTitle" ${eventContractGroupId ? "disabled" : ""}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventTitle, titleValues)}${titleOpts}</select>
       </div>
     </div>
     <div class="ee-grid ee-grid-3">
       <div class="ee-field">
         <label><span class="req">*</span> ระบบงาน</label>
-        <select id="editSystem"><option value="" disabled selected>${eventSystem || "—"}</option>${systemOpts}</select>
+        <select id="editSystem" ${eventContractGroupId ? "disabled" : ""}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventSystem, systemValues)}${systemOpts}</select>
       </div>
       <div class="ee-field">
         <label>🔢 ครั้งที่</label>
-        <select id="editTime"><option value="" disabled selected>${eventTime || "—"}</option>${timeOpts}</select>
+        <select id="editTime" ${eventContractGroupId ? "disabled" : ""}><option value="" disabled>— เลือก —</option>${customOption(eventTime, timeValues)}${timeOpts}</select>
       </div>
       <div class="ee-field">
         <label>👷 ทีม</label>
-        <select id="editTeam"><option value="" disabled selected>${eventTeam || "—"}</option>${teamOpts}</select>
+        <select id="editTeam"><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventTeam, teamValues)}${teamOpts}</select>
       </div>
     </div>
 
@@ -642,6 +677,41 @@ export const getEditEvent = async ({
       <textarea id="editDescription" placeholder="กรอกรายละเอียดงาน..."></textarea>
       <div class="ee-char-count" id="charCount">0 ตัวอักษร</div>
     </div>
+
+    ${eventContractGroupId ? `
+    <hr class="ee-divider">
+    <p class="ee-section-label">ข้อมูลสัญญา (แก้ที่นี่จะอัปเดตทุก "ครั้งที่" ในสัญญานี้พร้อมกัน)</p>
+    <div class="ee-grid ee-grid-2">
+      <div class="ee-field">
+        <label>📄 เลขที่สัญญา</label>
+        <input id="editContractNo" type="text" value="${eventContractNo}" placeholder="เช่น FAPTY17-2568">
+      </div>
+      <div class="ee-field">
+        <label>🧾 เลขที่ใบเสนอราคา</label>
+        <input id="editQuotationNo" type="text" value="${eventQuotationNo}" placeholder="เช่น QT2024100049">
+      </div>
+    </div>
+    <div class="ee-grid ee-grid-2">
+      <div class="ee-field">
+        <label>📅 วันที่เริ่มสัญญา</label>
+        <input id="editContractStart" type="date" value="${eventContractStart}">
+      </div>
+      <div class="ee-field">
+        <label>📅 วันที่สิ้นสุดสัญญา</label>
+        <input id="editContractEnd" type="date" value="${eventContractEnd}">
+      </div>
+    </div>
+    <div class="ee-grid ee-grid-2">
+      <div class="ee-field">
+        <label>🔢 จำนวนครั้ง</label>
+        <input id="editVisitCount" type="number" value="${eventVisitCount}" placeholder="เช่น 4">
+      </div>
+      <div class="ee-field">
+        <label>💰 มูลค่างาน</label>
+        <input id="editJobValue" type="number" value="${eventJobValue}" placeholder="เช่น 86000">
+      </div>
+    </div>
+    ` : ""}
 
   </div>
 
@@ -728,17 +798,22 @@ export const getEditEvent = async ({
       });
 
       /* TomSelect */
-      const mkTs = (id) => {
+      // ⚠️ เดิมมี plugins: ["remove_button"] ซึ่งเติมปุ่ม × ให้ "ทุก item ปัจจุบัน" ไม่ว่าจะเป็นค่า
+      // จริงหรือ placeholder ที่ยังไม่ได้เลือกอะไรเลย — <select> เปล่าตาม HTML spec จะเลือก option
+      // แรกในลิสต์ให้อัตโนมัติเสมอถ้าไม่มี option ไหน selected ชัดเจน (คือ placeholder "—
+      // เลือกหรือพิมพ์ —" พอดี) ทำให้ปุ่ม × โผล่บน placeholder เหมือนมันเป็นค่าที่เลือกไว้จริง —
+      // AddEvent.js ไม่มีปัญหานี้เพราะไม่ได้ใช้ plugin นี้เลย ตัดออกให้ตรงกันไปเลย
+      const mkTs = (id, placeholder = "") => {
         try {
           return new TomSelect(id, {
             create: true,
             persist: false,
             closeAfterSelect: true,
+            placeholder,
             // ⚠️ selectOnTab: true ทำให้แค่กด Tab ผ่านช่องนี้ (โดยไม่ได้ตั้งใจเลือกอะไรเลย)
             // ก็จะเลือก option ที่ถูก highlight ค้างอยู่ให้อัตโนมัติ (เช่น ตัวเลือกแรกในลิสต์
             // หรือข้อความที่พิมพ์ค้างไว้ในช่อง create) ทำให้ "ครั้งที่"/"ทีม" มีค่าขึ้นมาเองทั้งที่ไม่ได้เลือก
             selectOnTab: false,
-            plugins: ["remove_button"],
             // ✅ ไม่งั้น TomSelect จะทิ้ง <option value=""> (placeholder ตอนไม่มีค่า)
             // แล้วเผลอเลือก option แรกที่มีค่าจริงให้เองอัตโนมัติ
             allowEmptyOption: true,
@@ -750,14 +825,21 @@ export const getEditEvent = async ({
           return null;
         }
       };
-      [
-        "#editCompany",
-        "#editSite",
-        "#editTitle",
-        "#editSystem",
-        "#editTime",
-        "#editTeam",
-      ].forEach(mkTs);
+      // ✅ ใส่ placeholder ข้อความจริงให้ TomSelect แสดงเองตอนไม่มีค่า (เทียบ pattern เดียวกับ
+      // AddEvent.js) แทนการพึ่ง option ปลอมที่เคยทำให้เข้าใจผิดว่ามีค่าเป็น "—" อยู่ (ดูคอมเมนต์
+      // ตรง customOption ด้านบน) — ล้างค่าทิ้งอีกชั้นถ้าค่าจริงว่างเปล่า กัน <select> เผลอเลือก
+      // option แรก (placeholder) ให้เองตาม HTML spec จนกลายเป็น item ค้างอยู่ในกล่อง
+      const mkTsCleared = (id, placeholder, currentVal) => {
+        const ts = mkTs(id, placeholder);
+        if (ts && !currentVal) ts.clear(true);
+        return ts;
+      };
+      mkTsCleared("#editCompany", "เลือกหรือพิมพ์ชื่อบริษัท", eventCompany);
+      mkTsCleared("#editSite",    "เลือกหรือพิมพ์ชื่อโครงการ", eventSite);
+      mkTsCleared("#editTitle",   "เลือกหรือพิมพ์ประเภทงาน", eventTitle);
+      mkTsCleared("#editSystem",  "เลือกหรือพิมพ์ระบบงาน", eventSystem);
+      mkTsCleared("#editTime",    "เลือกครั้งที่", eventTime);
+      mkTsCleared("#editTeam",    "เลือกหรือพิมพ์ชื่อทีม", eventTeam);
 
       const getVal = (id) => document.getElementById(id)?.value?.trim() || "";
 
@@ -867,6 +949,18 @@ export const getEditEvent = async ({
         endTime: getVal("editEndTime"),
       });
 
+      // ✅ ข้อมูลสัญญา — คืนค่า null ถ้างานนี้ไม่ได้อยู่ในสัญญาแบบหลายครั้ง (ไม่มี input พวกนี้ให้อ่าน)
+      // ต้องอัปเดตผ่าน UpdateContractFields (updateMany ตาม contractGroupId) แยกจาก UpdateEvent/
+      // AddEvent เดี่ยวๆ ด้านล่าง ไม่งั้นแก้แค่ "ครั้งที่" นี้ครั้งเดียว ครั้งอื่นในสัญญาจะไม่อัปเดตตาม
+      const buildContractFields = () => (eventContractGroupId ? {
+        contractNo:    getVal("editContractNo"),
+        quotationNo:   getVal("editQuotationNo"),
+        contractStart: getVal("editContractStart"),
+        contractEnd:   getVal("editContractEnd"),
+        visitCount:    getVal("editVisitCount") ? Number(getVal("editVisitCount")) : undefined,
+        jobValue:      getVal("editJobValue") ? Number(getVal("editJobValue")) : undefined,
+      } : null);
+
       const buildPayload = () => {
         const endInput = getVal("editEnd");
         // ⚠️ เดิม fallback ไปที่ eventEnd.toISOString() ตรงๆ เวลาช่องวันที่สิ้นสุดว่าง
@@ -948,6 +1042,10 @@ export const getEditEvent = async ({
             try {
               await upsertLookups(payload.title, payload.system);
               await EventService.UpdateEvent(eventId, payload);
+              const contractFields = buildContractFields();
+              if (contractFields) {
+                await EventService.UpdateContractFields(eventContractGroupId, contractFields);
+              }
               setLoading(false);
               Swal.fire({
                 title: "บันทึกสำเร็จ ✅",
@@ -959,9 +1057,12 @@ export const getEditEvent = async ({
               await fetchLookupOptions?.(); // ✅ รีเฟรชตัวเลือกตัวกรองให้เห็นประเภทงาน/ระบบที่เพิ่งพิมพ์ใหม่ทันที
             } catch (err) {
               setLoading(false);
+              // ✅ err.message ของ axios เป็นข้อความทั่วไป (เช่น "Request failed with status code 409")
+              // ไม่ใช่ข้อความ Thai ที่ backend ตั้งใจส่งมา (เช่น รายละเอียดงานที่ชนกัน) ต้องอ่านจาก
+              // response.data.message ก่อนเสมอ ไม่งั้นข้อความแจ้งเตือนช่างชนกันจะไปไม่ถึงผู้ใช้เลย
               Swal.fire({
                 title: "เกิดข้อผิดพลาด",
-                text: err.message,
+                text: err?.response?.data?.message || err.message,
                 icon: "error",
               });
             } finally {
@@ -1016,6 +1117,10 @@ export const getEditEvent = async ({
                 await EventService.AddEvent(rangeData);
               }
             }
+            const contractFields = buildContractFields();
+            if (contractFields) {
+              await EventService.UpdateContractFields(eventContractGroupId, contractFields);
+            }
             setLoading(false);
             Swal.fire({
               title: "บันทึกสำเร็จ ✅",
@@ -1027,9 +1132,11 @@ export const getEditEvent = async ({
             await fetchLookupOptions?.(); // ✅ รีเฟรชตัวเลือกตัวกรองให้เห็นประเภทงาน/ระบบที่เพิ่งพิมพ์ใหม่ทันที
           } catch (err) {
             setLoading(false);
+            // ✅ err.message ของ axios เป็นข้อความทั่วไป ไม่ใช่ข้อความ Thai ที่ backend ส่งมา — ดูคอมเมนต์
+            // เดียวกันในโหมดวันเดียวด้านบน
             Swal.fire({
               title: "เกิดข้อผิดพลาด",
-              text: err.message,
+              text: err?.response?.data?.message || err.message,
               icon: "error",
             });
           } finally {
