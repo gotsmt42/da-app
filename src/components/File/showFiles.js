@@ -378,7 +378,7 @@ const ShowFiles = () => {
           <Tab
             icon={<Description sx={{ fontSize: 20 }} />}
             iconPosition="start"
-            label="เอกสารประจำงาน (Service Report)"
+            label="เอกสารประจำงาน"
           />
           <Tab icon={<FolderOpen sx={{ fontSize: 20 }} />} iconPosition="start" label="ไฟล์ทั่วไป" />
         </Tabs>

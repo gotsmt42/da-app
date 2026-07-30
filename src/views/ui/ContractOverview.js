@@ -18,13 +18,14 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Skeleton,
   Dialog, DialogTitle, DialogContent, DialogActions, ToggleButtonGroup, ToggleButton,
   Button, Autocomplete, Alert, Chip, Checkbox, Pagination, useMediaQuery, Badge,
+  TableSortLabel, Menu, MenuItem, ListItemIcon, ListItemText,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
   Search, Refresh, Download, FolderOpen, Add, Close,
   PlaylistAdd, MergeType, GroupWork, DeleteOutline, WarningAmber,
-  AddLink, LinkOff, CheckCircle, CheckCircleOutline,
-  CalendarMonth, PersonOutline,
+  AddLink, LinkOff, Build, Engineering,
+  CalendarMonth, PersonOutline, Category, Assignment, Description, HourglassEmpty, Apps,
 } from "@mui/icons-material";
 import { CSVLink } from "react-csv";
 import { useAuth } from "../../auth/AuthContext";
@@ -98,9 +99,8 @@ const VISIT_COL_DEFAULT_WIDTH = 110;
 const MIN_COL_WIDTH = 50;
 
 const AUTO_FIT_PADDING = 20; // ✅ กันเนื้อหาแนบขอบเซลล์พอดีเป๊ะจนดูอึดอัดหลัง auto-fit
-const AUTO_FIT_MAX_WIDTH = 420;
 
-const ResizableTh = ({ width, align = "left", children, onResize, rowSpan = 1, columnKey, tableRef }) => {
+const ResizableTh = ({ width, align = "left", children, onResize, rowSpan = 1, columnKey, tableRef, sortable = false, sortDirection = null, onSort }) => {
   // ✅ ดับเบิลคลิก/แตะ 2 ครั้งที่ขอบคอลัมน์ = ปรับความกว้างพอดีเนื้อหาอัตโนมัติเหมือน Excel
   // ⚠️ เดิมวัดจาก cell.scrollWidth ตรงๆ (เซลล์จริงในตาราง table-layout:fixed) แต่ table-layout:fixed
   // "ล็อก" ความกว้างคอลัมน์ไว้แล้วตามที่กำหนด ทำให้ scrollWidth มักได้แค่ค่าความกว้างปัจจุบันของเซลล์เอง
@@ -138,30 +138,79 @@ const ResizableTh = ({ width, align = "left", children, onResize, rowSpan = 1, c
       document.body.removeChild(clone);
     });
     if (maxWidth > 0) {
-      onResize(Math.min(AUTO_FIT_MAX_WIDTH, Math.max(MIN_COL_WIDTH, Math.ceil(maxWidth) + AUTO_FIT_PADDING)));
+      // ⚠️ BUG ที่แก้ (auto-fit ไม่สมบูรณ์เมื่อข้อมูลยาว): เดิม clamp ไว้ที่ 420px เสมอ พอชื่อบริษัท/
+      // โครงการยาวเกิน 420px (หลังบวก padding) auto-fit จะหยุดที่ 420 ทุกครั้ง ข้อความยังโดนตัด ...
+      // อยู่ดีทั้งที่กดจัดพอดีอัตโนมัติไปแล้ว — ตารางเลื่อนแนวนอนได้อยู่แล้ว (overflowX บน
+      // TableContainer) จึงไม่จำเป็นต้อง cap ความกว้างสูงสุดเลย ปล่อยให้กว้างเท่าที่เนื้อหาต้องการจริง
+      onResize(Math.max(MIN_COL_WIDTH, Math.ceil(maxWidth) + AUTO_FIT_PADDING));
     }
   };
 
   // ✅ เดิมรองรับแค่ mousedown/mousemove (ลากด้วยเมาส์) — จอมือถือ/แท็บเล็ตไม่มีเมาส์ ลากปรับความกว้าง
   // คอลัมน์ไม่ได้เลย ต้องฟัง touch event คู่กันด้วยเพื่อให้ลากด้วยนิ้วได้เหมือนกัน (เทียบ pattern เดียวกัน
   // เกือบทั้งหมด แค่อ่านพิกัดจาก e.touches[0].clientX แทน e.clientX)
+  // ⚠️ ประวัติการแก้ (3 รอบ กว่าจะได้ตัวที่ถูกต้อง):
+  // 1) เดิมเรียก onResize (setState) ทุก mousemove จริง + เขียน localStorage ทุกครั้งด้วย → กระตุกมาก
+  // 2) ลองเซ็ต element.style.width ตรงบนเซลล์ระหว่างลาก (ไม่ผ่าน React เลย) — inline style ที่เซ็ตตรงๆ
+  //    แบบนั้นมี specificity สูงกว่า class ที่ MUI sx สร้างเสมอ พอลากคอลัมน์ไหนไปแล้ว inline style จะ
+  //    "ค้าง" ถาวร ทำให้ auto-fit ครั้งต่อไปสั่ง React อัปเดต class ใหม่แล้วหน้าจอไม่ขยับตาม (ต้องรีเฟรช
+  //    หน้าใหม่ DOM ถึงจะไม่มี inline style ค้างอีก) — bug ที่ผู้ใช้เจอ "กดไม่ได้เลย ต้องรีเฟรชถึงจะอัปเดต"
+  // 3) ลองย้อนกลับมาเรียก onResize (setState) ทุกเฟรมของ requestAnimationFrame แทน (ไม่แตะ DOM ตรงๆ)
+  //    ปลอดภัยจากบั๊กข้อ 2 ก็จริง แต่ทุกครั้งที่ setState ทำให้ทั้งตาราง (10 แถว x กว่า 15 คอลัมน์) ต้อง
+  //    re-render ใหม่ ซ้ำยังต้องให้ MUI/emotion สร้าง CSS class ใหม่ให้ทุกเซลล์ที่ความกว้างเปลี่ยนทุกเฟรม
+  //    ด้วย (serialize/hash/insertRule) รวมกันหนักเกินจะทัน 60fps จริง กลายเป็น "หน่วงมาก" แทน
+  // ✅ ทางแก้ที่ถูกต้อง (รอบนี้): ย้ายไปใช้ CSS custom property (--col-<key> / --col-total ตั้งไว้ที่
+  // <Table> เดียว ดู tableCssVars ในคอมโพเนนต์หลัก) ทุกเซลล์อ้างอิงความกว้างผ่าน var(--col-<key>) ซึ่งเป็น
+  // "ค่าคงที่" ในมุมมองของ sx (ไม่เปลี่ยนตามตัวเลขจริงเลย) — ระหว่างลากจึงเซ็ต custom property ตรงบน DOM
+  // ของ <table> เองได้เลย (ไม่ผ่าน React re-render สักครั้ง เร็วกว่าตั้งเยอะ แค่ 2 บรรทัด setProperty ต่อ
+  // เฟรม) โดยไม่ชนกับบั๊กข้อ 2 อีกเลย เพราะทั้งการเขียนสดตอนลาก และตอน React re-render จริงหลัง commit
+  // (ผ่าน style prop ของ <Table>) ต่างก็เขียนไปที่ custom property "ตัวเดียวกันเป๊ะ" ไม่ใช่ inline style
+  // ปะทะ class แบบข้อ 2 — แล้วค่อยเรียก onResize (setState + localStorage) แค่ครั้งเดียวตอนปล่อยเมาส์/นิ้ว
   const startDrag = (startClientX) => {
     const startWidth = width;
-    const applyDelta = (clientX) => onResize(Math.max(MIN_COL_WIDTH, startWidth + (clientX - startClientX)));
-    const onMouseMove = (e) => applyDelta(e.clientX);
+    const table = tableRef?.current;
+    const startTotalWidthPx = table ? table.getBoundingClientRect().width : 0;
+    let rafId = null;
+    let lastClientX = startClientX;
+
+    const computeWidth = (clientX) => Math.max(MIN_COL_WIDTH, startWidth + (clientX - startClientX));
+    const applyLive = (clientX) => {
+      const newWidth = computeWidth(clientX);
+      if (table && columnKey) {
+        table.style.setProperty(`--col-${columnKey}`, `${newWidth}px`);
+        table.style.setProperty("--col-total", `${startTotalWidthPx + (newWidth - startWidth)}px`);
+      }
+      return newWidth;
+    };
+    const scheduleUpdate = (clientX) => {
+      lastClientX = clientX;
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        applyLive(lastClientX);
+      });
+    };
+    const commit = () => {
+      if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+      const finalWidth = applyLive(lastClientX);
+      if (finalWidth !== startWidth) onResize(finalWidth);
+    };
+    const onMouseMove = (e) => scheduleUpdate(e.clientX);
     const onTouchMove = (e) => {
-      if (e.touches[0]) { e.preventDefault(); applyDelta(e.touches[0].clientX); }
+      if (e.touches[0]) { e.preventDefault(); scheduleUpdate(e.touches[0].clientX); }
     };
     const cleanup = () => {
       window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", cleanup);
+      window.removeEventListener("mouseup", onMouseUp);
       window.removeEventListener("touchmove", onTouchMove);
-      window.removeEventListener("touchend", cleanup);
+      window.removeEventListener("touchend", onTouchEnd);
     };
+    const onMouseUp = () => { cleanup(); commit(); };
+    const onTouchEnd = () => { cleanup(); commit(); };
     window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", cleanup);
+    window.addEventListener("mouseup", onMouseUp);
     window.addEventListener("touchmove", onTouchMove, { passive: false });
-    window.addEventListener("touchend", cleanup);
+    window.addEventListener("touchend", onTouchEnd);
   };
   // ✅ เช็คดับเบิลคลิก/แตะเองจากช่วงเวลาระหว่าง 2 ครั้งกด แทนพึ่ง native "onDoubleClick" event ล้วนๆ —
   // ของเดิมใช้ onDoubleClick แยกต่างหากแต่ไม่ทำงาน (ทุก mousedown เริ่ม drag session ของตัวเองก่อนเสมอ
@@ -193,14 +242,33 @@ const ResizableTh = ({ width, align = "left", children, onResize, rowSpan = 1, c
     lastTouchRef.current = now;
     if (e.touches[0]) startDrag(e.touches[0].clientX);
   };
+  // ✅ อ้างอิงความกว้างผ่าน CSS var เสมอ (string คงที่ต่อ columnKey ไม่ขึ้นกับตัวเลข width จริงเลย) —
+  // กัน emotion ต้องสร้าง class ใหม่ทุกครั้งที่ลาก/auto-fit แม้แต่ตอน commit เข้า React state จริงก็ตาม
+  const cssWidth = `var(--col-${columnKey}, ${DEFAULT_COL_WIDTHS[columnKey] ?? VISIT_COL_DEFAULT_WIDTH}px)`;
   return (
     <TableCell
       align={align}
       rowSpan={rowSpan}
       data-col-key={columnKey}
-      sx={{ position: "relative", width, minWidth: width, maxWidth: width, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", userSelect: "none" }}
+      sx={{ position: "relative", width: cssWidth, minWidth: cssWidth, maxWidth: cssWidth, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", userSelect: "none" }}
     >
-      {children}
+      {/* ✅ คลิกที่ป้ายชื่อคอลัมน์ (ไม่ใช่แถบลากขอบขวา) เพื่อเรียงลำดับ — คลิกแรก = น้อยไปมาก, คลิกซ้ำ
+          = มากไปน้อย, คลิกอีกที = เลิกเรียง ใช้ TableSortLabel ของ MUI แทนลูกศรมือทำเอง ให้หน้าตา/
+          พฤติกรรมตรงตามมาตรฐาน MUI ทั้งแอป (ไอคอนหมุนเปลี่ยนทิศทาง + ไฮไลต์สีตอนกำลังเรียงอยู่) */}
+      {sortable ? (
+        <TableSortLabel
+          active={sortDirection !== null}
+          direction={sortDirection || "asc"}
+          onClick={() => onSort(columnKey)}
+          sx={{
+            "&.MuiTableSortLabel-root": { color: "inherit" },
+            "&.Mui-active": { color: ACCENT },
+            "& .MuiTableSortLabel-icon": { color: `${ACCENT} !important` },
+          }}
+        >
+          {children}
+        </TableSortLabel>
+      ) : children}
       <Tooltip title="ลากเพื่อปรับความกว้าง · ดับเบิลคลิก/แตะ 2 ครั้งเพื่อพอดีอัตโนมัติ" enterDelay={500}>
         <Box
           onMouseDown={handleMouseDown}
@@ -305,8 +373,11 @@ export default function ContractOverview() {
   // ✅ ตัวเลือกฟอร์ม "เพิ่มสัญญาใหม่" — ดึงพร้อมกับ events ตอนเปิดหน้า ไม่ต้องรอกดปุ่มเพิ่มก่อนค่อยโหลด
   const [lookups, setLookups] = useState({ customers: [], employees: [], jobTypes: [], systemTypes: [] });
 
-  const fetchData = async () => {
-    setLoading(true);
+  // ✅ silent=true — ไม่ขึ้น <Skeleton> ทับตารางทั้งหน้า (ใช้ตอน sync ข้อมูลเงียบๆ หลังจากที่หน้าจอ
+  // อัปเดตค่าที่แก้ไปแล้วแบบ optimistic ไปก่อนหน้านี้แล้ว — ไม่ใช่ตอนโหลดหน้าครั้งแรกซึ่งยังไม่มีอะไร
+  // ให้โชว์อยู่ก่อน จึงยัง setLoading(true) ตามปกติ)
+  const fetchData = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       // ✅ สัญญาที่เพิ่งสร้างแบบ "ฉบับร่าง" (ยังไม่ลงวันที่เข้างานเลย) เป็น unscheduled:true ซึ่ง
       // getEventOp() (event-op) กรองทิ้งเสมอ — ต้องดึง drafts มารวมด้วย ไม่งั้นสัญญาที่เพิ่งสร้างจะ
@@ -318,9 +389,9 @@ export default function ContractOverview() {
       setEvents([...(res?.userEvents || []), ...(draftsRes?.drafts || [])]);
     } catch (err) {
       console.error("Error fetching contract overview:", err);
-      setEvents([]);
+      if (!silent) setEvents([]);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -362,22 +433,47 @@ export default function ContractOverview() {
   // ✅ เลือกจัดกลุ่มเป็นสัญญาได้เฉพาะตอนมองเห็นงานเก่าที่ยังไม่จัดกลุ่ม (แท็บ "งานเก่า.../ทั้งหมด")
   // แท็บ "สัญญา" ล้วนๆ ไม่มีอะไรให้เลือกจัดกลุ่มอยู่แล้ว (ทุกแถวมีสัญญาอยู่แล้วทั้งหมด)
   const showCheckboxes = viewFilter !== "contracts";
-  // ✅ ซ่อนคอลัมน์ "เลขที่เอกสาร" (สัญญา/ใบเสนอราคา) ตอนดูแท็บที่ไม่ใช่สัญญาจริง — งานเก่าที่ยังไม่
-  // จัดกลุ่ม/งานทั่วไปไม่มีเลขที่สัญญา/ใบเสนอราคาอยู่แล้ว (เป็น "-" ทุกแถวเสมอ) โชว์ไว้มีแต่จะรกตาราง
-  const showDocNoColumns = viewFilter !== "ungrouped" && viewFilter !== "general";
+  // ✅ ซ่อนคอลัมน์ที่เป็นข้อมูลระดับสัญญาล้วนๆ (เลขที่เอกสาร/ระยะเวลา/จำนวนครั้ง/มูลค่างาน/สถานะสัญญา)
+  // ตอนดูแท็บที่ไม่ใช่สัญญาจริงทั้งคู่ ("ยังไม่จัดกลุ่ม" และ "งานทั่วไป") — แถวพวกนี้เป็น "-" ว่างเปล่า
+  // ทุกช่องเสมอไม่ว่าจะยืนยันเป็นงานทั่วไปแล้วหรือยัง (isConfirmedGeneral ไม่เกี่ยวอะไรกับ contractGroupId
+  // เลย) ⚠️ เดิมให้แท็บ "งานทั่วไป" ยังคงโชว์ไว้ต่างจากแท็บ "ยังไม่จัดกลุ่ม" แต่พบว่าข้อมูลที่โชว์
+  // (เช่น "จำนวนครั้ง 1") เป็นค่าที่คำนวณมั่วจากตรรกะของสัญญา ไม่ใช่ข้อมูลจริงที่มีใครกรอกไว้เลย รกตา
+  // และดูเหมือนมีข้อมูลสัญญาทั้งที่จริงไม่มี ต้องซ่อนเหมือนกันทั้ง 2 แท็บ
+  const hideContractOnlyColumns = viewFilter === "ungrouped" || viewFilter === "general" || viewFilter === "project";
+  // ✅ หัวตารางปกติมี 2 แถว (กลุ่ม "เลขที่เอกสาร"/"ระยะเวลา" คลุม 2 คอลัมน์ย่อยแถวล่าง) แต่ตอนซ่อน
+  // คอลัมน์ระดับสัญญาทั้งหมดจะไม่มีแถวที่ 2 เหลือให้ colSpan ครอบแล้ว เหลือหัวตารางแค่แถวเดียว
+  const headerRowSpan = hideContractOnlyColumns ? 1 : 2;
 
   // ✅ ความกว้างคอลัมน์ที่ผู้ใช้ลากปรับเอง (key เฉพาะที่ต่างจากค่าเริ่มต้นเท่านั้น) — โหลดจาก
   // localStorage ตอนเปิดหน้า (lazy initializer) แล้วบันทึกกลับทุกครั้งที่ปรับ จะได้จำค่าไว้ข้ามการออก
   // จากหน้า/รีเฟรช ไม่ใช่แค่ระหว่างที่ยังเปิดหน้านี้ค้างอยู่เหมือนเดิม
   const [colWidths, setColWidths] = useState(loadStoredColWidths);
   const colWidth = (key) => colWidths[key] ?? DEFAULT_COL_WIDTHS[key] ?? VISIT_COL_DEFAULT_WIDTH;
+  // ⚠️ BUG ที่แก้ (ลากหน่วงมาก): เดิมช่วงลากอัปเดต React state (setColWidths) ทุกเฟรมของ
+  // requestAnimationFrame อยู่ดี (แค่เลื่อนแค่การเขียน localStorage ไปตอนปล่อยเมาส์แทน) — แต่ทุกครั้งที่
+  // setColWidths ทำให้ทั้งตาราง re-render ใหม่ (10 แถว x กว่า 15 คอลัมน์) และเลขความกว้างที่เปลี่ยนทุก
+  // เฟรมยังทำให้ MUI (emotion) ต้องสร้าง CSS class ใหม่ให้ทุกเซลล์ที่ความกว้างเปลี่ยนซ้ำๆ ทุกเฟรมด้วย
+  // (serialize/hash/insertRule) รวมกันแล้วหนักเกินจะทัน 60fps จริงๆ ต่อให้ throttle ด้วย rAF แล้วก็ตาม —
+  // ย้ายไปใช้ CSS custom property (--col-<key> / --col-total) แทน ตั้งค่าครั้งเดียวผ่าน style ของ
+  // <Table> (ดู tableCssVars ด้านล่าง) ให้ทุกเซลล์อ้างอิงผ่าน var(--col-<key>) คงที่ (ไม่เปลี่ยน class เลย
+  // ไม่ว่าค่าจะเท่าไหร่) ส่วนระหว่างลากสดๆ ให้ ResizableTh เซ็ต custom property ตรงบน DOM ของ <table> เอง
+  // (ไม่ผ่าน React re-render เลยสักครั้ง) แล้วค่อยเรียก onResize (setState+localStorage) แค่ครั้งเดียว
+  // ตอนปล่อยเมาส์/นิ้วเท่านั้น — ไม่มีการ re-render ระหว่างลากอีกต่อไป ลื่นจริง ไม่มีบั๊กเดิมที่เคยเจอตอน
+  // เปลี่ยนไปแตะ DOM ตรงๆ ด้วย (ดูคอมเมนต์ที่ ResizableTh) เพราะรอบนี้ทั้งการเขียนสดและการ re-render จริง
+  // ตอน commit ต่างก็เขียนค่าไปที่ custom property ตัวเดียวกันเป๊ะๆ ไม่ใช่ inline style ปะทะ class อีกแล้ว
   const handleColResize = (key) => (w) => setColWidths((prev) => {
     const next = { ...prev, [key]: w };
     try { localStorage.setItem(COL_WIDTHS_STORAGE_KEY, JSON.stringify(next)); } catch {}
     return next;
   });
-  // ✅ ใช้หา DOM ของตารางจริงตอนดับเบิลคลิกขอบคอลัมน์เพื่อวัดความกว้างเนื้อหาที่แท้จริง (auto-fit)
+  // ✅ ใช้หา DOM ของตารางจริงตอนดับเบิลคลิกขอบคอลัมน์เพื่อวัดความกว้างเนื้อหาที่แท้จริง (auto-fit) และ
+  // ตอนลากเพื่อเซ็ต custom property สดๆ ตรงบน DOM (ดูด้านบน)
   const tableRef = useRef(null);
+  // ✅ ค่าคงที่ต่อคีย์คอลัมน์ (ไม่อิงตัวเลขความกว้างปัจจุบันเลย) ให้ sx ที่ใช้ var() นี้เหมือนเดิมทุก
+  // re-render ไม่ว่าความกว้างจริงจะเปลี่ยนไปแค่ไหน — กัน emotion สร้าง class ใหม่ทุกครั้งที่ resize
+  // (ค่าความกว้างจริงมาจาก custom property ที่ตั้งไว้ที่ <Table> ล้วนๆ เลขที่ใส่ไว้ตรงนี้เป็นแค่ fallback
+  // เผื่อกรณีขอบเขต ไม่ได้ถูกใช้จริงตามปกติ)
+  const colVar = (key) => `var(--col-${key}, ${DEFAULT_COL_WIDTHS[key] ?? VISIT_COL_DEFAULT_WIDTH}px)`;
 
   // ── จัดกลุ่มงานเก่าให้เป็นสัญญา ─────────────────────────────────────────
   const jobSignature = (c) => [c.company, c.site, c.system, c.title].map((v) => (v || "").trim().toLowerCase()).join("|");
@@ -398,7 +494,10 @@ export default function ContractOverview() {
     // ✅ คัดเฉพาะงานประเภท "PM" — งานที่เข้าซ้ำเป็นรอบๆ ตามสัญญาจริงมักเป็น PM แทบทั้งหมด ส่วนงาน
     // ประเภทอื่น (Service/สำรวจหน้างาน/ติดตั้งอุปกรณ์ ฯลฯ) ส่วนใหญ่เป็นงานครั้งเดียวจบ ไม่ใช่สัญญา
     // แนะนำไปก็มีแต่จะกลุ่มมั่วๆ ที่ไม่ได้เป็นสัญญาเดียวกันจริง
-    const legacy = contracts.filter((c) => !c.isRealContract && (c.title || "").trim() === "PM");
+    // ⚠️ BUG ที่แก้: เดิมแนะนำงานที่ถูกยืนยันเป็น "งานทั่วไป" แล้วด้วย (isConfirmedGeneral=true) ทั้งที่
+    // แอดมินตัดสินใจไปแล้วว่าไม่ใช่สัญญา ไม่ควรมีระบบมาแนะนำย้อนแย้งซ้ำอีก — ตัดออก เหลือแนะนำเฉพาะงาน
+    // ที่ยังไม่มีใครตัดสินใจอะไรเลย ("ยังไม่จัดกลุ่ม")
+    const legacy = contracts.filter((c) => !c.isRealContract && !c.isConfirmedGeneral && !c.isConfirmedProject && (c.title || "").trim() === "PM");
     const map = new Map();
     legacy.forEach((c) => {
       const year = contractYear(c) || "ไม่ระบุปี";
@@ -422,6 +521,9 @@ export default function ContractOverview() {
   const [yearFilter, setYearFilter] = useState(String(currentYear));
   // ✅ กรองตามผู้รับผิดชอบ — แยกจากช่องค้นหาข้อความอิสระ ให้เลือกจากรายชื่อจริงได้เลย ไม่ต้องพิมพ์เอง
   const [teamFilter, setTeamFilter] = useState("all");
+  // ✅ กรองตามประเภทงาน (เช่น PM/Service/ติดตั้ง ฯลฯ) — เพิ่มตามที่ผู้ใช้ขอ เทียบ pattern เดียวกับ
+  // ตัวกรองปี/ผู้รับผิดชอบด้านบนทุกประการ (เลือกจากรายชื่อประเภทงานจริงในระบบ ไม่ต้องพิมพ์เอง)
+  const [titleFilter, setTitleFilter] = useState("all");
 
   const [selectedIds, setSelectedIds] = useState(new Set());
   const selectedContracts = useMemo(() => contracts.filter((c) => selectedIds.has(c.key)), [contracts, selectedIds]);
@@ -456,6 +558,9 @@ export default function ContractOverview() {
     if (teamFilter !== "all") {
       base = base.filter((c) => (c.team || "").includes(teamFilter));
     }
+    if (titleFilter !== "all") {
+      base = base.filter((c) => (c.title || "") === titleFilter);
+    }
     const kw = search.trim().toLowerCase();
     if (!kw) return base;
     return base.filter((c) =>
@@ -471,38 +576,51 @@ export default function ContractOverview() {
   const realContractCount = useMemo(
     () => applyCommonFilters(contracts.filter((c) => c.isRealContract)).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, teamFilter, search]
+    [contracts, yearFilter, teamFilter, titleFilter, search]
   );
   const hiddenJobCount = useMemo(
-    () => applyCommonFilters(contracts.filter((c) => !c.isRealContract && !c.isConfirmedGeneral)).length,
+    () => applyCommonFilters(contracts.filter((c) => !c.isRealContract && !c.isConfirmedGeneral && !c.isConfirmedProject)).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, teamFilter, search]
+    [contracts, yearFilter, teamFilter, titleFilter, search]
   );
   const confirmedGeneralCount = useMemo(
     () => applyCommonFilters(contracts.filter((c) => !c.isRealContract && c.isConfirmedGeneral)).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, teamFilter, search]
+    [contracts, yearFilter, teamFilter, titleFilter, search]
+  );
+  const confirmedProjectCount = useMemo(
+    () => applyCommonFilters(contracts.filter((c) => !c.isRealContract && c.isConfirmedProject)).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [contracts, yearFilter, teamFilter, titleFilter, search]
   );
   const allFilteredCount = useMemo(
     () => applyCommonFilters(contracts).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, teamFilter, search]
+    [contracts, yearFilter, teamFilter, titleFilter, search]
   );
 
   const filtered = useMemo(() => {
     const base = viewFilter === "all" ? contracts
-      : viewFilter === "ungrouped" ? contracts.filter((c) => !c.isRealContract && !c.isConfirmedGeneral)
+      : viewFilter === "ungrouped" ? contracts.filter((c) => !c.isRealContract && !c.isConfirmedGeneral && !c.isConfirmedProject)
       : viewFilter === "general" ? contracts.filter((c) => !c.isRealContract && c.isConfirmedGeneral)
+      : viewFilter === "project" ? contracts.filter((c) => !c.isRealContract && c.isConfirmedProject)
       : contracts.filter((c) => c.isRealContract);
     return applyCommonFilters(base);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contracts, search, viewFilter, yearFilter, teamFilter]);
+  }, [contracts, search, viewFilter, yearFilter, teamFilter, titleFilter]);
 
   // ✅ นับจาก `filtered` (ไม่ใช่ `contracts` ทั้งก้อนแบบเดิม) — เดิมถ้ามีสัญญาไหนสักอันในระบบที่มี
   // จำนวนครั้งเยอะ (เช่น 24) ตารางจะโชว์คอลัมน์ "ครั้งที่ 1-24" ตลอด แม้กรองปี/ค้นหาจนเหลือแต่สัญญา
   // 2-4 ครั้งอยู่ก็ตาม กว้างเกินจำเป็นและไม่ตรงกับสิ่งที่กรองไว้จริง
+  // ✅ แถวที่ไม่ใช่สัญญาจริง (งานทั่วไป/ยังไม่จัดกลุ่ม) ไม่มี visitCount ให้ใช้ (ดู groupEventsByContract)
+  // แต่ยังต้องดึง "ครั้งที่" จริงที่บันทึกไว้ในแต่ละ document (field time) มานับด้วย ไม่งั้นงานที่เคย
+  // เลือก "ครั้งที่ 2" ไว้ตอนเพิ่มงานจะไม่มีคอลัมน์ให้แสดงเลย (ตารางมีแค่คอลัมน์เท่าที่สัญญาอื่นต้องการ)
+  const rowMaxRound = (c) => c.isRealContract
+    ? (c.visitCount || countUsedRounds(c.visits))
+    : Math.max(1, ...c.visits.map((v) => Number(v.time) || 1));
   const maxVisitCount = useMemo(
-    () => filtered.reduce((max, c) => Math.max(max, c.visitCount || 0), 1),
+    () => filtered.reduce((max, c) => Math.max(max, rowMaxRound(c)), 1),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [filtered]
   );
   const visitColumns = useMemo(
@@ -511,24 +629,86 @@ export default function ContractOverview() {
   );
   const totalTableWidth = useMemo(() => {
     let total = colWidth("actions") + (showCheckboxes ? colWidth("checkbox") : 0);
-    [
-      "contractNo", "quotationNo", "company", "site", "system", "title",
-      "contractStart", "contractEnd", "visitCount", "jobValue", "status", "progress", "team",
-    ].forEach((k) => { total += colWidth(k); });
+    const contractOnlyKeys = ["contractNo", "quotationNo", "contractStart", "contractEnd", "visitCount", "jobValue", "status"];
+    ["company", "site", "system", "title", "progress", "team"].forEach((k) => { total += colWidth(k); });
+    if (!hideContractOnlyColumns) {
+      contractOnlyKeys.forEach((k) => { total += colWidth(k); });
+    }
     visitColumns.forEach((n) => { total += colWidth(`visit_${n}`); });
     return total;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [colWidths, showCheckboxes, visitColumns]);
+  }, [colWidths, showCheckboxes, visitColumns, hideContractOnlyColumns]);
+  // ✅ ค่าความกว้างจริงของทุกคอลัมน์ ตั้งเป็น CSS custom property ไว้ที่ <Table> ตัวเดียว (ผ่าน style
+  // prop ปกติของ React) ให้ทุกเซลล์ลูกอ้างอิงผ่าน var(--col-<key>) — เห็นผลทันทีทุกครั้งที่ colWidths
+  // เปลี่ยนจริง (โหลดจาก localStorage ตอนเปิดหน้า/auto-fit/commit ท้ายการลาก) โดยไม่ต้องแตะ sx ของเซลล์
+  // แต่ละใบเลยสักคอลัมน์ — ดู handleColResize/colVar ด้านบนสำหรับเหตุผลที่ย้ายมาใช้กลไกนี้แทนตัวเลขตรงๆ
+  const tableCssVars = useMemo(() => {
+    const vars = { "--col-total": `${totalTableWidth}px` };
+    ["contractNo", "quotationNo", "company", "site", "system", "title", "contractStart", "contractEnd", "visitCount", "jobValue", "status", "progress", "team"].forEach((k) => {
+      vars[`--col-${k}`] = `${colWidth(k)}px`;
+    });
+    visitColumns.forEach((n) => { vars[`--col-visit_${n}`] = `${colWidth(`visit_${n}`)}px`; });
+    return vars;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colWidths, totalTableWidth, visitColumns]);
+
+  // ✅ เรียงลำดับตารางได้ด้วยการคลิกหัวตารางแต่ละช่อง (เฉพาะคอลัมน์ข้อมูลตรงๆ ที่เทียบค่าเดียวได้ —
+  // ไม่รวม "สถานะสัญญา"/"คืบหน้า"/"ครั้งที่ N" ซึ่งเป็นค่าที่คำนวณจากหลายฟิลด์ ไม่มีค่าเดี่ยวให้เรียง)
+  // คลิกครั้งแรก = น้อยไปมาก (asc) คลิกซ้ำคอลัมน์เดิม = มากไปน้อย (desc) คลิกอีกทีเลิกเรียง กลับไป
+  // เรียงตามลำดับเดิม (ชื่อบริษัท/โครงการ จาก `contracts`) — ดู ResizableTh ที่ห่อ TableSortLabel ไว้
+  // ✅ ค่าเริ่มต้นเรียงตาม "เลขที่สัญญา" น้อยไปมากอัตโนมัติเลย (FAPTY01, FAPTY02, ...) แทนที่จะปล่อย
+  // ไม่เรียงอะไรเลยแบบเดิม — เลขรันตามลำดับความยาวหลักเท่ากัน (padStart เดียวกับตอนแนะนำเลขถัดไป)
+  // ทำให้ localeCompare ธรรมดาก็เรียงถูกลำดับเป๊ะอยู่แล้วโดยไม่ต้องแยกฟังก์ชันแกะตัวเลขเอง
+  const [sortConfig, setSortConfig] = useState({ key: "contractNo", direction: "asc" });
+  const handleSortClick = (key) => {
+    setSortConfig((prev) => {
+      if (prev.key !== key) return { key, direction: "asc" };
+      if (prev.direction === "asc") return { key, direction: "desc" };
+      return { key: null, direction: "asc" };
+    });
+  };
+  const SORT_VALUE_GETTERS = {
+    contractNo: (c) => c.contractNo || "",
+    quotationNo: (c) => c.quotationNo || "",
+    company: (c) => c.company || "",
+    site: (c) => c.site || "",
+    system: (c) => c.system || "",
+    title: (c) => c.title || "",
+    contractStart: (c) => (c.contractStart ? new Date(c.contractStart).getTime() : null),
+    contractEnd: (c) => (c.contractEnd ? new Date(c.contractEnd).getTime() : null),
+    visitCount: (c) => (c.visitCount != null && c.visitCount !== "" ? Number(c.visitCount) : null),
+    jobValue: (c) => (c.jobValue != null && c.jobValue !== "" ? Number(c.jobValue) : null),
+    team: (c) => (c.team === "-" ? "" : c.team || ""),
+  };
+  const sortedFiltered = useMemo(() => {
+    const getValue = sortConfig.key && SORT_VALUE_GETTERS[sortConfig.key];
+    if (!getValue) return filtered;
+    const dir = sortConfig.direction === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      const va = getValue(a);
+      const vb = getValue(b);
+      // ✅ แถวที่ไม่มีข้อมูลในคอลัมน์นี้ ("-"/ว่าง) ให้ตกไปอยู่ท้ายสุดเสมอไม่ว่าจะเรียงทิศทางไหน
+      // กันแถวว่างกระโดดขึ้นไปปนบนสุดตอนเรียง "มากไปน้อย" ซึ่งดูสับสน
+      const aEmpty = va === null || va === "";
+      const bEmpty = vb === null || vb === "";
+      if (aEmpty && bEmpty) return 0;
+      if (aEmpty) return 1;
+      if (bEmpty) return -1;
+      if (typeof va === "number" && typeof vb === "number") return (va - vb) * dir;
+      return String(va).localeCompare(String(vb), "th") * dir;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered, sortConfig]);
 
   // ✅ แสดงแค่หน้าละ 10 แถว — เดิมโชว์ทุกแถวรวดเดียว (สูงสุดเป็นร้อย) ต้องเลื่อนในกรอบตารางยาวๆ
   // ตลอดเวลา ตัดเป็นหน้าให้สั้นกระชับแทน (ตัวกรอง/ค้นหายังใช้กับข้อมูลทั้งหมดเหมือนเดิม แค่ตัดแสดงผล)
   const PAGE_SIZE = 10;
   const [page, setPage] = useState(1);
-  useEffect(() => { setPage(1); }, [search, viewFilter, yearFilter, teamFilter]);
+  useEffect(() => { setPage(1); }, [search, viewFilter, yearFilter, teamFilter, titleFilter, sortConfig]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pagedRows = useMemo(
-    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [filtered, page]
+    () => sortedFiltered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [sortedFiltered, page]
   );
 
   const csvData = useMemo(
@@ -549,10 +729,15 @@ export default function ContractOverview() {
       };
       // ✅ นับเฉพาะครั้งที่ลงตารางจริงเหมือนตารางในหน้านี้ (เดิม CSV รวมแผนงานล่วงหน้าที่ยังไม่มีวันที่
       // จริงเข้าไปด้วย ทำให้ export ไม่ตรงกับสิ่งที่ตารางแสดงจริง)
+      // ⚠️ BUG ที่แก้: เดิมใช้ .find() (เจอแค่ 1 document) และเทียบ Number(v.time)===n ตรงๆ ไม่มี
+      // fallback เหมือนตาราง — งานทั่วไปที่ time ว่าง หรือครั้งที่เข้างานไม่ต่อเนื่อง (หลาย document
+      // ต่อครั้ง) จะ export ออกมาไม่ตรงกับที่ตารางแสดงจริง (ตกหล่น/ว่างเปล่าทั้งที่ตารางมีข้อมูล)
       visitColumns.forEach((n) => {
-        const visit = c.visits.find((v) => !v.unscheduled && Number(v.time) === n);
-        const pendingDraft = !visit && c.visits.find((v) => v.unscheduled && Number(v.time) === n);
-        row[`ครั้งที่${n}`] = visit ? formatEventDateRange(visit) : pendingDraft ? "รอวางแผน" : "";
+        const visits = c.visits.filter((v) => !v.unscheduled && (Number(v.time) || 1) === n);
+        const pendingDraft = visits.length === 0 && c.visits.find((v) => v.unscheduled && (Number(v.time) || 1) === n);
+        row[`ครั้งที่${n}`] = visits.length > 0
+          ? visits.map((v) => formatEventDateRange(v)).join(", ")
+          : pendingDraft ? "รอวางแผน" : "";
       });
       row["ผู้รับผิดชอบ"] = c.team;
       return row;
@@ -688,7 +873,7 @@ export default function ContractOverview() {
         timer: 2000,
         showConfirmButton: false,
       });
-      await fetchData();
+      await fetchData(true);
       await fetchLookups();
     } catch (err) {
       setSaving(false);
@@ -783,7 +968,7 @@ export default function ContractOverview() {
         setAddVisitSaving(false);
         setAddVisitTarget(null);
         Swal.fire({ title: `เพิ่มวันที่ต่อเนื่องให้ครั้งที่ ${extendRound} สำเร็จ ✅`, icon: "success", timer: 1200, showConfirmButton: false });
-        await fetchData();
+        await fetchData(true);
         return;
       }
 
@@ -836,7 +1021,7 @@ export default function ContractOverview() {
       setAddVisitSaving(false);
       setAddVisitTarget(null);
       Swal.fire({ title: `เพิ่มครั้งที่ ${nextIndex} สำเร็จ ✅`, icon: "success", timer: 1200, showConfirmButton: false });
-      await fetchData();
+      await fetchData(true);
     } catch (err) {
       setAddVisitSaving(false);
       setAddVisitError(err?.response?.data?.message || "บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
@@ -867,23 +1052,26 @@ export default function ContractOverview() {
     }
     setMergeSaving(true);
     try {
-      // ✅ งานเก่า (isRealContract=false) แต่ละ "สัญญา" ในตารางคือ 1 event เดียว (fallback key
-      // ผูกตาม _id) จึงดึง event id ตัวแรกของแต่ละแถวที่เลือกมาส่งให้ backend ได้ตรงๆ
-      const eventIds = selectedContracts.map((c) => c.visits[0]._id);
+      // ⚠️ BUG ที่แก้: เดิมส่ง event id ตัวแรกของแต่ละแถวเท่านั้น (สมมติว่า 1 แถว = 1 event เดียวเสมอ)
+      // แต่ตอนนี้ "งานทั่วไป" ที่เข้าหลายวันไม่ติดกัน (jobGroupId เดียวกัน) รวมเป็น 1 แถวที่มีหลาย
+      // document แล้ว (ดู groupEventsByContract) — ถ้าส่งแค่ document แรก วันอื่นๆ ของงานเดียวกันจะ
+      // ไม่ถูกย้ายเข้าสัญญาใหม่ไปด้วย กลายเป็นข้อมูลค้างคาแยกกันคนละที่ ต้องส่งเป็น "กลุ่มของ id ต่อแถว"
+      // (rounds) แทน ให้ backend รู้ว่า document ไหนควรอยู่ "ครั้งที่" เดียวกัน ไม่ใช่คนละครั้ง
+      const rounds = selectedContracts.map((c) => c.visits.map((v) => v._id));
       await EventService.MergeIntoContract({
-        eventIds,
+        rounds,
         contractNo: mergeForm.contractNo.trim(),
         quotationNo: mergeForm.quotationNo.trim(),
         contractStart: mergeForm.contractStart,
         contractEnd: mergeForm.contractEnd,
-        visitCount: mergeForm.visitCount ? Number(mergeForm.visitCount) : eventIds.length,
+        visitCount: mergeForm.visitCount ? Number(mergeForm.visitCount) : rounds.length,
         jobValue: mergeForm.jobValue ? Number(mergeForm.jobValue) : undefined,
       });
       setMergeSaving(false);
       setMergeOpen(false);
       clearSelection();
       Swal.fire({ title: "จัดกลุ่มเป็นสัญญาสำเร็จ ✅", icon: "success", timer: 1200, showConfirmButton: false });
-      await fetchData();
+      await fetchData(true);
     } catch (err) {
       setMergeSaving(false);
       setMergeError(err?.response?.data?.message || "บันทึกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
@@ -924,23 +1112,29 @@ export default function ContractOverview() {
       return;
     }
 
+    const payload = {};
+    if (field === "jobValue" || field === "visitCount") payload[field] = rawValue ? Number(rawValue) : undefined;
+    else if (field === "team") { payload.team = rawValue; payload.resPerson = teamToId.get(rawValue) || ""; }
+    else payload[field] = rawValue;
+
+    // ⚠️ BUG ที่แก้: เดิม await fetchData() หลังบันทึกทุกครั้ง — ตั้ง loading=true ทำให้ทั้งตารางเปลี่ยน
+    // เป็น <Skeleton> วาบให้เห็น แล้วค่อยเรนเดอร์ใหม่ทั้งหมด (เสียตำแหน่ง scroll/แถวที่กำลังดูอยู่) ทั้งที่
+    // จริงๆ รู้ผลลัพธ์อยู่แล้วจากค่าที่พิมพ์เอง — อัปเดตค่าใน state ทันทีแบบ optimistic แทน (เหมือน
+    // Excel/Notion กดแล้วเห็นผลทันที) เก็บ snapshot เดิมไว้เผื่อ backend ปฏิเสธ (เช่นแก้พร้อมกันจาก
+    // อีกที่แล้วชนกัน) ค่อย revert คืนเฉพาะตอนนั้น ไม่ต้องรีเฟรชทั้งตารางในเคสบันทึกสำเร็จปกติเลย
+    const snapshot = events;
+    setEvents((prev) => prev.map((e) => (e.contractGroupId === c.key ? { ...e, ...payload } : e)));
+    setEditingCell(null);
     setEditSaving(true);
     try {
-      const payload = {};
-      if (field === "jobValue" || field === "visitCount") payload[field] = rawValue ? Number(rawValue) : undefined;
-      else if (field === "team") { payload.team = rawValue; payload.resPerson = teamToId.get(rawValue) || ""; }
-      else payload[field] = rawValue;
-
       await EventService.UpdateContractFields(c.key, payload);
-      setEditingCell(null);
-      await fetchData();
     } catch (err) {
+      setEvents(snapshot);
       Swal.fire({
         title: "แก้ไขไม่สำเร็จ",
         text: err?.response?.data?.message || err.message,
         icon: "error",
       });
-      setEditingCell(null);
     } finally {
       setEditSaving(false);
     }
@@ -948,9 +1142,11 @@ export default function ContractOverview() {
 
   // ── ลบสัญญา/งานทิ้ง ─────────────────────────────────────────────────────
   // ✅ สัญญาจริง (isRealContract) ลบทั้งก้อนทีเดียวผ่าน DELETE /contract/:contractGroupId (ทุกครั้งที่
-  // ผูก contractGroupId เดียวกันหายไปพร้อมกัน) ส่วนแถวงานเก่าที่ยังไม่จัดกลุ่ม (isRealContract=false)
-  // คือ event เดี่ยวๆ อยู่แล้ว ลบผ่าน DeleteEvent ตัวเดียวพอ — ทั้งคู่ยืนยันก่อนลบเสมอ เพราะลบแล้ว
-  // กู้คืนไม่ได้ และเตือนเป็นพิเศษถ้ามีครั้งที่ "ดำเนินการเสร็จสิ้น" แล้วปนอยู่ (ประวัติงานจริงจะหายไปด้วย)
+  // ผูก contractGroupId เดียวกันหายไปพร้อมกัน) ส่วนแถวงานทั่วไป/ยังไม่จัดกลุ่ม (isRealContract=false)
+  // อาจมีมากกว่า 1 document ต่อแถวได้แล้ว (งานเข้าหลายวันไม่ติดกัน ผูกด้วย jobGroupId — ดู
+  // groupEventsByContract) ต้องลบทุก document ในกลุ่มพร้อมกัน ไม่ใช่แค่ document แรก ไม่งั้นวันอื่นๆ
+  // ของงานเดียวกันจะค้างอยู่ในระบบทั้งที่ตั้งใจลบทั้งงาน — ทั้งคู่ยืนยันก่อนลบเสมอ เพราะลบแล้วกู้คืนไม่ได้
+  // และเตือนเป็นพิเศษถ้ามีครั้งที่ "ดำเนินการเสร็จสิ้น" แล้วปนอยู่ (ประวัติงานจริงจะหายไปด้วย)
   const handleDeleteContract = async (c) => {
     const doneCount = c.visits.filter((v) => v.status === "ดำเนินการเสร็จสิ้น").length;
     const result = await Swal.fire({
@@ -960,7 +1156,7 @@ export default function ContractOverview() {
         <div style="text-align:left;font-size:13px;">
           <b>${c.company || "-"} · ${c.site || "-"}</b><br/>
           ${c.title} · ${c.system}<br/>
-          ${c.isRealContract ? `จะลบทั้งสัญญา ${c.visits.length} รายการ (ทุกครั้งที่)` : "จะลบงานนี้ 1 รายการ"}
+          ${c.visits.length > 1 ? `จะลบทั้งหมด ${c.visits.length} วัน (งานเดียวกัน)` : "จะลบงานนี้ 1 รายการ"}
           ${doneCount > 0 ? `<br/><b style="color:#dc2626;">⚠️ มี ${doneCount} ครั้งที่ดำเนินการเสร็จสิ้นแล้ว จะถูกลบไปด้วย</b>` : ""}
         </div>
       `,
@@ -974,11 +1170,11 @@ export default function ContractOverview() {
       if (c.isRealContract) {
         await EventService.DeleteContract(c.key);
       } else {
-        await EventService.DeleteEvent(c.visits[0]._id);
+        await Promise.all(c.visits.map((v) => EventService.DeleteEvent(v._id)));
       }
       if (selectedIds.has(c.key)) toggleSelect(c);
       Swal.fire({ title: "ลบสำเร็จ ✅", icon: "success", timer: 1200, showConfirmButton: false });
-      await fetchData();
+      await fetchData(true);
     } catch (err) {
       Swal.fire({
         title: "ลบไม่สำเร็จ",
@@ -1031,14 +1227,17 @@ export default function ContractOverview() {
     setAttachSaving(true);
     setAttachError("");
     try {
+      // ✅ ส่งทุก document ในแถว (ไม่ใช่แค่ตัวแรก) ให้ backend ย้ายเข้าสัญญาพร้อมกันทั้งหมด — งานทั่วไป
+      // ที่เข้าหลายวันไม่ติดกัน (ผูกด้วย jobGroupId) ต้องย้ายไปเป็น "ครั้งเดียวกัน" ในสัญญาใหม่ทุกวัน
+      // ไม่ใช่แค่วันแรก ไม่งั้นวันอื่นจะค้างเป็นงานทั่วไปแยกจากสัญญาที่เพิ่งย้ายไป
       await EventService.AttachToContract(attachContractId, {
-        eventId: attachTarget.visits[0]._id,
+        eventIds: attachTarget.visits.map((v) => v._id),
         time: attachRound,
       });
       setAttachSaving(false);
       setAttachTarget(null);
       Swal.fire({ title: "ย้ายเข้าสัญญาสำเร็จ ✅", icon: "success", timer: 1200, showConfirmButton: false });
-      await fetchData();
+      await fetchData(true);
     } catch (err) {
       setAttachSaving(false);
       setAttachError(err?.response?.data?.message || "ย้ายเข้าสัญญาไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
@@ -1067,7 +1266,7 @@ export default function ContractOverview() {
     try {
       await EventService.DetachFromContract(c.key, { time: n });
       Swal.fire({ title: "แยกออกจากสัญญาสำเร็จ ✅", icon: "success", timer: 1200, showConfirmButton: false });
-      await fetchData();
+      await fetchData(true);
     } catch (err) {
       Swal.fire({
         title: "แยกออกไม่สำเร็จ",
@@ -1077,16 +1276,27 @@ export default function ContractOverview() {
     }
   };
 
-  // ✅ ยืนยัน/ยกเลิกยืนยันว่างานนี้เป็น "งานทั่วไป" จริงๆ — ค่าเริ่มต้นของงานที่ไม่มี contractGroupId
-  // คือ "ยังไม่จัดกลุ่ม" เสมอ (แท็บ "งานเก่าในระบบที่ยังไม่จัดกลุ่ม") จนกว่าจะกดยืนยันตรงนี้ ถึงจะย้าย
-  // ไปแท็บ "งานทั่วไป" — กดซ้ำเพื่อยกเลิกยืนยันได้เช่นกัน (ย้ายกลับไปกอง "ยังไม่จัดกลุ่ม" เหมือนเดิม)
-  const handleToggleGeneral = async (c) => {
+  // ✅ จัดหมวดหมู่งานที่ไม่มี contractGroupId — "" (ยังไม่จัดกลุ่ม) / "general" (งานทั่วไป) / "project"
+  // (งานโปรเจค) ค่าเริ่มต้นคือ "ยังไม่จัดกลุ่ม" เสมอ (แท็บ "งานเก่าในระบบที่ยังไม่จัดกลุ่ม") จนกว่าจะ
+  // เลือกจากเมนูนี้ — ใช้เมนูเดียว 3 ตัวเลือกแทนปุ่มยืนยัน/ยกเลิกแยกกัน กันปุ่มรกช่อง actions เกินไป
+  // ตอนมี 3 หมวดหมู่ให้เลือก (เดิมมีแค่ 2 สถานะ ใช้ปุ่มเดียวสลับ true/false พอ)
+  const [classifyMenuAnchor, setClassifyMenuAnchor] = useState(null);
+  const [classifyMenuTarget, setClassifyMenuTarget] = useState(null);
+  const openClassifyMenu = (e, c) => { setClassifyMenuAnchor(e.currentTarget); setClassifyMenuTarget(c); };
+  const closeClassifyMenu = () => { setClassifyMenuAnchor(null); setClassifyMenuTarget(null); };
+
+  // ✅ 1 แถวอาจมีหลาย document ได้แล้ว (งานเข้าหลายวันไม่ติดกัน ผูกด้วย jobGroupId) ต้องจัดหมวดหมู่
+  // พร้อมกันทุกวันในงานเดียวกัน ไม่งั้นบางวันจะอยู่คนละหมวดกับอีกวัน ทั้งที่จริงเป็นงานเดียวกัน
+  const handleClassify = async (classification) => {
+    const c = classifyMenuTarget;
+    closeClassifyMenu();
+    if (!c) return;
     try {
-      await EventService.MarkAsGeneral(c.visits[0]._id, !c.isConfirmedGeneral);
-      await fetchData();
+      await Promise.all(c.visits.map((v) => EventService.ClassifyJob(v._id, classification)));
+      await fetchData(true);
     } catch (err) {
       Swal.fire({
-        title: c.isConfirmedGeneral ? "ยกเลิกยืนยันไม่สำเร็จ" : "ยืนยันไม่สำเร็จ",
+        title: "จัดหมวดหมู่ไม่สำเร็จ",
         text: err?.response?.data?.message || err.message,
         icon: "error",
       });
@@ -1102,12 +1312,23 @@ export default function ContractOverview() {
           ปุ่มรีเฟรช + ปุ่มส่งออกรวมกัน ทำให้ล้นขอบจอ/ปุ่มถูกตัด สลับเป็นซ้อนกันคนละแถวบนจอแคบแทน
           (ชื่อหน้า/จำนวนอยู่แถวบน ปุ่มต่างๆ อยู่แถวล่าง เต็มความกว้าง) */}
       <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "stretch", sm: "flex-start" }} justifyContent="space-between" gap={1.25} sx={{ mb: 2 }}>
-        <Box>
-          <Typography variant="h6" fontWeight={800}>ภาพรวมงาน</Typography>
-          <Typography variant="caption" color="text.secondary">
-            {loading ? "กำลังโหลด..." : `${filtered.length} ${viewFilter === "contracts" ? "สัญญา" : "งาน"}`}
-          </Typography>
-        </Box>
+        <Stack direction="row" alignItems="center" gap={1.25}>
+          {/* ✅ ไอคอนป้ายหัวข้อ — ให้หน้านี้มีจุดเด่นตั้งแต่แวบแรก เทียบ pattern การ์ดหัวข้อสีพื้นหลัง
+              วงกลมที่ใช้ทั่วไปในแอป (Dashboard/Operation) แทนตัวหนังสือเปล่าๆ */}
+          <Box sx={{
+            width: 40, height: 40, borderRadius: 2.5, flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            bgcolor: alpha(ACCENT, 0.1), color: ACCENT,
+          }}>
+            <Assignment sx={{ fontSize: 22 }} />
+          </Box>
+          <Box>
+            <Typography variant="h6" fontWeight={800}>ภาพรวมงาน</Typography>
+            <Typography variant="caption" color="text.secondary">
+              {loading ? "กำลังโหลด..." : `${filtered.length} ${viewFilter === "contracts" ? "สัญญา" : "งาน"}`}
+            </Typography>
+          </Box>
+        </Stack>
         <Stack direction="row" gap={1}>
           <Button
             variant="contained"
@@ -1118,7 +1339,15 @@ export default function ContractOverview() {
             เพิ่มสัญญาใหม่
           </Button>
           <Tooltip title="รีเฟรช">
-            <IconButton onClick={() => { fetchData(); fetchLookups(); }} sx={{ border: "1px solid", borderColor: "divider", borderRadius: "50%", flexShrink: 0 }}>
+            <IconButton
+              onClick={() => { fetchData(); fetchLookups(); }}
+              sx={{
+                border: "1px solid", borderColor: "divider", borderRadius: "50%", flexShrink: 0,
+                transition: "background-color .15s, border-color .15s, color .15s, transform .15s",
+                "&:hover": { bgcolor: alpha(ACCENT, 0.08), borderColor: alpha(ACCENT, 0.4), color: ACCENT },
+                "&:active": { transform: "rotate(180deg)" },
+              }}
+            >
               <Refresh sx={{ fontSize: 20 }} />
             </IconButton>
           </Tooltip>
@@ -1154,10 +1383,24 @@ export default function ContractOverview() {
             onChange={(_, v) => v && setViewFilter(v)}
             sx={{ flexWrap: "nowrap", width: "max-content" }}
           >
-            <ToggleButton value="contracts" sx={VIEW_TAB_SX}>สัญญา ({realContractCount})</ToggleButton>
-            <ToggleButton value="general" sx={VIEW_TAB_SX}>งานทั่วไป ({confirmedGeneralCount})</ToggleButton>
-            <ToggleButton value="ungrouped" sx={VIEW_TAB_SX}>งานเก่าในระบบที่ยังไม่จัดกลุ่ม ({hiddenJobCount})</ToggleButton>
-            <ToggleButton value="all" sx={VIEW_TAB_SX}>ทั้งหมด ({allFilteredCount})</ToggleButton>
+            {/* ✅ ใส่ไอคอนหน้าแต่ละแท็บ — สแกนหาแท็บที่ต้องการได้เร็วขึ้นด้วยสายตา ไม่ต้องอ่านตัวหนังสือ
+                ทีละคำ ไอคอน/สีตรงกับที่ใช้ในเมนู "จัดหมวดหมู่งาน" ของแต่ละแถวเป๊ะๆ (เขียว=ทั่วไป,
+                น้ำเงิน=โปรเจค) ให้จำง่ายว่าไอคอนแบบไหนคือหมวดไหน */}
+            <ToggleButton value="contracts" sx={VIEW_TAB_SX}>
+              <Description sx={{ fontSize: 15, mr: 0.5 }} /> งานสัญญา / งานรายปี ({realContractCount})
+            </ToggleButton>
+            <ToggleButton value="general" sx={VIEW_TAB_SX}>
+              <Build sx={{ fontSize: 15, mr: 0.5, color: "#10b981" }} /> งานทั่วไป ({confirmedGeneralCount})
+            </ToggleButton>
+            <ToggleButton value="project" sx={VIEW_TAB_SX}>
+              <Engineering sx={{ fontSize: 15, mr: 0.5, color: "#3b82f6" }} /> งานโปรเจค ({confirmedProjectCount})
+            </ToggleButton>
+            <ToggleButton value="ungrouped" sx={VIEW_TAB_SX}>
+              <HourglassEmpty sx={{ fontSize: 15, mr: 0.5 }} /> งานเก่าในระบบที่ยังไม่จัดกลุ่ม ({hiddenJobCount})
+            </ToggleButton>
+            <ToggleButton value="all" sx={VIEW_TAB_SX}>
+              <Apps sx={{ fontSize: 15, mr: 0.5 }} /> ทั้งหมด ({allFilteredCount})
+            </ToggleButton>
           </ToggleButtonGroup>
         </Box>
       )}
@@ -1214,12 +1457,86 @@ export default function ContractOverview() {
           placeholder="ค้นหาบริษัท / โครงการ / เลขที่สัญญา / ผู้รับผิดชอบ..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: "background.paper" } }}
+          sx={{
+            "& .MuiOutlinedInput-root": {
+              borderRadius: 2.5, bgcolor: "background.paper",
+              "&.Mui-focused fieldset": { borderColor: ACCENT, borderWidth: 1.5 },
+            },
+          }}
           InputProps={{
             startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 19, color: "text.disabled" }} /></InputAdornment>,
+            // ✅ ปุ่มล้างคำค้นหา — เดิมต้องลากเมาส์เลือกข้อความแล้วลบเองทีละตัว โผล่เฉพาะตอนมีคำค้นหา
+            // อยู่จริง (ไม่โผล่ค้างเป็นปุ่มเปล่าๆ ตอนช่องว่าง)
+            endAdornment: search ? (
+              <InputAdornment position="end">
+                <IconButton size="small" onClick={() => setSearch("")} edge="end">
+                  <Close sx={{ fontSize: 16 }} />
+                </IconButton>
+              </InputAdornment>
+            ) : undefined,
           }}
         />
-        {/* ✅ กรองตารางตามปีของสัญญา (อิงวันที่เริ่มสัญญา ไม่งั้นอิงวันที่ครั้งแรก) — เดิมต้องไล่สโครล
+    {/* ✅ กรองตามประเภทงาน (PM/Service/ติดตั้ง ฯลฯ) — เพิ่มตามที่ผู้ใช้ขอ เทียบ pattern เดียวกับ
+            ตัวกรองปี/ผู้รับผิดชอบด้านบนเป๊ะๆ (เลือกจากรายชื่อประเภทงานจริงที่ตั้งค่าไว้ในระบบ) */}
+
+         <TextField
+          select size="small" label="ประเภทงาน" value={titleFilter}
+          onChange={(e) => setTitleFilter(e.target.value)}
+          SelectProps={{ native: true }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Category sx={{ fontSize: 18, color: titleFilter !== "all" ? ACCENT : "text.disabled" }} />
+              </InputAdornment>
+            ),
+          }}
+          sx={{
+            width: { xs: "100%", sm: 170 }, flexShrink: 0,
+            "& .MuiOutlinedInput-root": {
+              borderRadius: 2.5,
+              bgcolor: titleFilter !== "all" ? alpha(ACCENT, 0.06) : "background.paper",
+              "& fieldset": titleFilter !== "all" ? { borderColor: alpha(ACCENT, 0.45) } : {},
+              "&:hover fieldset": titleFilter !== "all" ? { borderColor: ACCENT } : {},
+            },
+            "& .MuiInputLabel-root": titleFilter !== "all" ? { color: ACCENT, fontWeight: 700 } : {},
+          }}
+        >
+          <option value="all">ทุกประเภท</option>
+          {titleOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+        </TextField>
+        
+        {/* ✅ กรองตามผู้รับผิดชอบเจาะจงจากรายชื่อจริง — แยกจากช่องค้นหาข้อความด้านบนซึ่งพิมพ์ค้นหาแบบ
+            อิสระ (บางส่วน/สะกดผิดก็เจอ) ส่วนอันนี้เลือกจาก dropdown ให้ตรงเป๊ะไม่ต้องพิมพ์เอง —
+            เน้นสีเหมือนช่องปีด้านบนตอนเลือกคนใดคนหนึ่งอยู่ (ไม่ใช่ "ทุกคน") ให้ชัดเจนสอดคล้องกัน */}
+        <TextField
+          select size="small" label="ผู้รับผิดชอบ" value={teamFilter}
+          onChange={(e) => setTeamFilter(e.target.value)}
+          SelectProps={{ native: true }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <PersonOutline sx={{ fontSize: 18, color: teamFilter !== "all" ? ACCENT : "text.disabled" }} />
+              </InputAdornment>
+            ),
+          }}
+          sx={{
+            width: { xs: "100%", sm: 185 }, flexShrink: 0,
+            "& .MuiOutlinedInput-root": {
+              borderRadius: 2.5,
+              bgcolor: teamFilter !== "all" ? alpha(ACCENT, 0.06) : "background.paper",
+              "& fieldset": teamFilter !== "all" ? { borderColor: alpha(ACCENT, 0.45) } : {},
+              "&:hover fieldset": teamFilter !== "all" ? { borderColor: ACCENT } : {},
+            },
+            "& .MuiInputLabel-root": teamFilter !== "all" ? { color: ACCENT, fontWeight: 700 } : {},
+          }}
+        >
+          <option value="all">ทุกคน</option>
+          {teamOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+        </TextField>
+       
+       
+
+            {/* ✅ กรองตารางตามปีของสัญญา (อิงวันที่เริ่มสัญญา ไม่งั้นอิงวันที่ครั้งแรก) — เดิมต้องไล่สโครล
             หาเองว่าปีไหนมีสัญญาอะไรบ้าง ทั้งที่สัญญาส่วนใหญ่ต่ออายุปีต่อปี ดูทีละปีจะเจอเร็วกว่า */}
         {/* ✅ เน้นสีตอนกรองปีเจาะจงอยู่ (ไม่ใช่ "ทุกปี") ให้เห็นชัดว่ากำลังดูข้อมูลแค่ปีเดียว ไม่ใช่ทั้งหมด
             — เดิมหน้าตาเหมือนช่องเปล่าๆ ทั่วไป มองไม่ออกว่ามีตัวกรองทำงานอยู่ (ทั้งที่ค่าเริ่มต้นล็อก
@@ -1249,49 +1566,27 @@ export default function ContractOverview() {
           <option value="all">ทุกปี</option>
           {availableYears.map((y) => <option key={y} value={y}>{y}</option>)}
         </TextField>
-        {/* ✅ กรองตามผู้รับผิดชอบเจาะจงจากรายชื่อจริง — แยกจากช่องค้นหาข้อความด้านบนซึ่งพิมพ์ค้นหาแบบ
-            อิสระ (บางส่วน/สะกดผิดก็เจอ) ส่วนอันนี้เลือกจาก dropdown ให้ตรงเป๊ะไม่ต้องพิมพ์เอง —
-            เน้นสีเหมือนช่องปีด้านบนตอนเลือกคนใดคนหนึ่งอยู่ (ไม่ใช่ "ทุกคน") ให้ชัดเจนสอดคล้องกัน */}
-        <TextField
-          select size="small" label="ผู้รับผิดชอบ" value={teamFilter}
-          onChange={(e) => setTeamFilter(e.target.value)}
-          SelectProps={{ native: true }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <PersonOutline sx={{ fontSize: 18, color: teamFilter !== "all" ? ACCENT : "text.disabled" }} />
-              </InputAdornment>
-            ),
-          }}
-          sx={{
-            width: { xs: "100%", sm: 185 }, flexShrink: 0,
-            "& .MuiOutlinedInput-root": {
-              borderRadius: 2.5,
-              bgcolor: teamFilter !== "all" ? alpha(ACCENT, 0.06) : "background.paper",
-              "& fieldset": teamFilter !== "all" ? { borderColor: alpha(ACCENT, 0.45) } : {},
-              "&:hover fieldset": teamFilter !== "all" ? { borderColor: ACCENT } : {},
-            },
-            "& .MuiInputLabel-root": teamFilter !== "all" ? { color: ACCENT, fontWeight: 700 } : {},
-          }}
-        >
-          <option value="all">ทุกคน</option>
-          {teamOptions.map((name) => <option key={name} value={name}>{name}</option>)}
-        </TextField>
       </Stack>
 
       {loading ? (
         <Skeleton variant="rounded" height={280} sx={{ borderRadius: 3 }} />
       ) : filtered.length === 0 ? (
-        <Box sx={{ textAlign: "center", py: 8, color: "text.disabled" }}>
-          <FolderOpen sx={{ fontSize: 48, opacity: 0.3, mb: 1 }} />
-          <Typography variant="body2">
+        <Paper variant="outlined" sx={{ textAlign: "center", py: 6, borderRadius: 3, borderStyle: "dashed" }}>
+          <Box sx={{
+            width: 64, height: 64, borderRadius: "50%", mx: "auto", mb: 1.5,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            bgcolor: alpha(ACCENT, 0.06), color: alpha(ACCENT, 0.6),
+          }}>
+            <FolderOpen sx={{ fontSize: 30 }} />
+          </Box>
+          <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 420, mx: "auto", px: 2 }}>
             {search
               ? "ไม่พบสัญญาที่ตรงกับคำค้นหา"
               : hiddenJobCount > 0
               ? "ยังไม่มีสัญญาแบบหลายครั้ง — กดแท็บ \"งานเก่าในระบบที่ยังไม่จัดกลุ่ม\" ด้านบนเพื่อดูงานที่มีอยู่ หรือสร้างงานใหม่แบบ \"สัญญาแบบหลายครั้ง\" จากหน้าปฏิทิน"
               : "ยังไม่มีข้อมูลสัญญา"}
           </Typography>
-        </Box>
+        </Paper>
       ) : (
         <TableContainer
           component={Paper} variant="outlined"
@@ -1306,8 +1601,9 @@ export default function ContractOverview() {
           <Table
             ref={tableRef}
             size="small"
+            style={tableCssVars}
             sx={{
-              tableLayout: "fixed", width: totalTableWidth,
+              tableLayout: "fixed", width: "var(--col-total, 100%)",
               // ✅ เดิมใช้ stickyHeader + borderCollapse "separate" คู่กัน ทำให้หัวตารางเรนเดอร์เพี้ยน
               // (เห็นกรอบแดงเป็นก้อนๆ ตอนเลื่อน) — ตอนนี้แสดงแค่ 20 แถวต่อหน้าอยู่แล้ว ตารางไม่สูงจน
               // ต้อง sticky หัวอีกต่อไป ตัด stickyHeader ออก แล้วใช้ borderCollapse ปกติแทนก็พอ ไม่เพี้ยน
@@ -1319,31 +1615,41 @@ export default function ContractOverview() {
             <TableHead>
               {/* ✅ หัวตาราง 2 แถว เทียบเค้าโครงเอกสารอ้างอิง Excel ที่ใช้ติดตามสัญญาอยู่แล้ว — กลุ่ม
                   "อ้างอิงเอกสารเลขที่" (เลขที่สัญญา/ใบเสนอราคา) กับ "ระยะเวลา" (เริ่มสัญญา/สิ้นสุด)
-                  ใช้ colSpan คลุม 2 คอลัมน์ย่อยแถวล่าง ส่วนคอลัมน์อื่นที่ไม่มีกลุ่มใช้ rowSpan คลุม 2 แถว */}
+                  ใช้ colSpan คลุม 2 คอลัมน์ย่อยแถวล่าง ส่วนคอลัมน์อื่นที่ไม่มีกลุ่มใช้ rowSpan คลุม 2 แถว —
+                  แต่ตอนซ่อนคอลัมน์ระดับสัญญาทั้งหมด (hideContractOnlyColumns) แถวที่ 2 จะไม่มีอะไรเหลือ
+                  เลย ไม่ต้อง render แถวนั้นอีกต่อไป เหลือหัวตารางแค่แถวเดียว (rowSpan ก็ต้องลดเหลือ 1 ตาม) */}
               <TableRow sx={{ "& th": { fontWeight: 700, bgcolor: "#fef2f2", borderBottom: `2px solid ${ACCENT} !important`, color: "#7f1d1d", letterSpacing: "0.01em" } }}>
-                {showCheckboxes && <TableCell padding="checkbox" rowSpan={2} sx={{ width: colWidth("checkbox") }} />}
-                <TableCell align="center" colSpan={2}>เลขที่เอกสาร</TableCell>
-                <ResizableTh width={colWidth("company")} rowSpan={2} columnKey="company" tableRef={tableRef} onResize={handleColResize("company")}>บริษัท</ResizableTh>
-                <ResizableTh width={colWidth("site")} rowSpan={2} columnKey="site" tableRef={tableRef} onResize={handleColResize("site")}>โครงการ</ResizableTh>
-                <ResizableTh width={colWidth("system")} rowSpan={2} columnKey="system" tableRef={tableRef} onResize={handleColResize("system")}>ระบบ</ResizableTh>
-                <ResizableTh width={colWidth("title")} rowSpan={2} columnKey="title" tableRef={tableRef} onResize={handleColResize("title")}>ประเภทงาน</ResizableTh>
-                <TableCell align="center" colSpan={2}>ระยะเวลา</TableCell>
-                <ResizableTh width={colWidth("visitCount")} align="center" rowSpan={2} columnKey="visitCount" tableRef={tableRef} onResize={handleColResize("visitCount")}>จำนวนครั้ง</ResizableTh>
-                <ResizableTh width={colWidth("jobValue")} align="right" rowSpan={2} columnKey="jobValue" tableRef={tableRef} onResize={handleColResize("jobValue")}>มูลค่างาน/1ปี</ResizableTh>
-                <ResizableTh width={colWidth("status")} align="center" rowSpan={2} columnKey="status" tableRef={tableRef} onResize={handleColResize("status")}>สถานะสัญญา</ResizableTh>
-                <ResizableTh width={colWidth("progress")} align="center" rowSpan={2} columnKey="progress" tableRef={tableRef} onResize={handleColResize("progress")}>คืบหน้า</ResizableTh>
+                {showCheckboxes && <TableCell padding="checkbox" rowSpan={headerRowSpan} sx={{ width: colWidth("checkbox") }} />}
+                {!hideContractOnlyColumns && <TableCell align="center" colSpan={2}>เลขที่เอกสาร</TableCell>}
+                <ResizableTh width={colWidth("company")} rowSpan={headerRowSpan} columnKey="company" tableRef={tableRef} onResize={handleColResize("company")} sortable sortDirection={sortConfig.key === "company" ? sortConfig.direction : null} onSort={handleSortClick}>บริษัท</ResizableTh>
+                <ResizableTh width={colWidth("site")} rowSpan={headerRowSpan} columnKey="site" tableRef={tableRef} onResize={handleColResize("site")} sortable sortDirection={sortConfig.key === "site" ? sortConfig.direction : null} onSort={handleSortClick}>โครงการ</ResizableTh>
+                <ResizableTh width={colWidth("system")} rowSpan={headerRowSpan} columnKey="system" tableRef={tableRef} onResize={handleColResize("system")} sortable sortDirection={sortConfig.key === "system" ? sortConfig.direction : null} onSort={handleSortClick}>ระบบ</ResizableTh>
+                <ResizableTh width={colWidth("title")} rowSpan={headerRowSpan} columnKey="title" tableRef={tableRef} onResize={handleColResize("title")} sortable sortDirection={sortConfig.key === "title" ? sortConfig.direction : null} onSort={handleSortClick}>ประเภทงาน</ResizableTh>
+                {!hideContractOnlyColumns && <TableCell align="center" colSpan={2}>ระยะเวลา</TableCell>}
+                {!hideContractOnlyColumns && (
+                  <ResizableTh width={colWidth("visitCount")} align="center" rowSpan={headerRowSpan} columnKey="visitCount" tableRef={tableRef} onResize={handleColResize("visitCount")} sortable sortDirection={sortConfig.key === "visitCount" ? sortConfig.direction : null} onSort={handleSortClick}>จำนวนครั้ง</ResizableTh>
+                )}
+                {!hideContractOnlyColumns && (
+                  <ResizableTh width={colWidth("jobValue")} align="right" rowSpan={headerRowSpan} columnKey="jobValue" tableRef={tableRef} onResize={handleColResize("jobValue")} sortable sortDirection={sortConfig.key === "jobValue" ? sortConfig.direction : null} onSort={handleSortClick}>มูลค่างาน</ResizableTh>
+                )}
+                {!hideContractOnlyColumns && (
+                  <ResizableTh width={colWidth("status")} align="center" rowSpan={headerRowSpan} columnKey="status" tableRef={tableRef} onResize={handleColResize("status")}>สถานะสัญญา</ResizableTh>
+                )}
+                <ResizableTh width={colWidth("progress")} align="center" rowSpan={headerRowSpan} columnKey="progress" tableRef={tableRef} onResize={handleColResize("progress")}>คืบหน้า</ResizableTh>
                 {visitColumns.map((n) => (
-                  <ResizableTh key={n} width={colWidth(`visit_${n}`)} align="center" rowSpan={2} columnKey={`visit_${n}`} tableRef={tableRef} onResize={handleColResize(`visit_${n}`)}>ครั้งที่ {n}</ResizableTh>
+                  <ResizableTh key={n} width={colWidth(`visit_${n}`)} align="center" rowSpan={headerRowSpan} columnKey={`visit_${n}`} tableRef={tableRef} onResize={handleColResize(`visit_${n}`)}>ครั้งที่ {n}</ResizableTh>
                 ))}
-                <ResizableTh width={colWidth("team")} rowSpan={2} columnKey="team" tableRef={tableRef} onResize={handleColResize("team")}>ผู้รับผิดชอบ</ResizableTh>
-                <TableCell align="center" rowSpan={2} sx={{ width: colWidth("actions") }} />
+                <ResizableTh width={colWidth("team")} rowSpan={headerRowSpan} columnKey="team" tableRef={tableRef} onResize={handleColResize("team")} sortable sortDirection={sortConfig.key === "team" ? sortConfig.direction : null} onSort={handleSortClick}>ผู้รับผิดชอบ</ResizableTh>
+                <TableCell align="center" rowSpan={headerRowSpan} sx={{ width: colWidth("actions") }} />
               </TableRow>
+              {!hideContractOnlyColumns && (
               <TableRow sx={{ "& th": { fontWeight: 700, bgcolor: "#fef2f2", borderBottom: `2px solid ${ACCENT} !important`, color: "#7f1d1d", letterSpacing: "0.01em" } }}>
-                <ResizableTh width={colWidth("contractNo")} columnKey="contractNo" tableRef={tableRef} onResize={handleColResize("contractNo")}>สัญญา</ResizableTh>
-                <ResizableTh width={colWidth("quotationNo")} columnKey="quotationNo" tableRef={tableRef} onResize={handleColResize("quotationNo")}>ใบเสนอราคา</ResizableTh>
-                <ResizableTh width={colWidth("contractStart")} columnKey="contractStart" tableRef={tableRef} onResize={handleColResize("contractStart")}>เริ่มต้น</ResizableTh>
-                <ResizableTh width={colWidth("contractEnd")} columnKey="contractEnd" tableRef={tableRef} onResize={handleColResize("contractEnd")}>สิ้นสุด</ResizableTh>
+                <ResizableTh width={colWidth("contractNo")} columnKey="contractNo" tableRef={tableRef} onResize={handleColResize("contractNo")} sortable sortDirection={sortConfig.key === "contractNo" ? sortConfig.direction : null} onSort={handleSortClick}>สัญญา</ResizableTh>
+                <ResizableTh width={colWidth("quotationNo")} columnKey="quotationNo" tableRef={tableRef} onResize={handleColResize("quotationNo")} sortable sortDirection={sortConfig.key === "quotationNo" ? sortConfig.direction : null} onSort={handleSortClick}>ใบเสนอราคา</ResizableTh>
+                <ResizableTh width={colWidth("contractStart")} columnKey="contractStart" tableRef={tableRef} onResize={handleColResize("contractStart")} sortable sortDirection={sortConfig.key === "contractStart" ? sortConfig.direction : null} onSort={handleSortClick}>เริ่มต้น</ResizableTh>
+                <ResizableTh width={colWidth("contractEnd")} columnKey="contractEnd" tableRef={tableRef} onResize={handleColResize("contractEnd")} sortable sortDirection={sortConfig.key === "contractEnd" ? sortConfig.direction : null} onSort={handleSortClick}>สิ้นสุด</ResizableTh>
               </TableRow>
+              )}
             </TableHead>
             <TableBody>
               {pagedRows.map((c, idx) => {
@@ -1372,11 +1678,13 @@ export default function ContractOverview() {
                       )}
                     </TableCell>
                   )}
+                  {!hideContractOnlyColumns && (
+                  <>
                   <EditableCell
                     editable={c.isRealContract} columnKey="contractNo"
                     editing={editingCell?.key === c.key && editingCell?.field === "contractNo"}
                     value={c.contractNo} editValue={editValue} saving={editSaving}
-                    width={colWidth("contractNo")} title={c.contractNo}
+                    width={colVar("contractNo")} title={c.contractNo}
                     formatDisplay={(v) => (v ? <span style={{ color: ACCENT, fontWeight: 600 }}>{v}</span> : <Dash />)}
                     onStartEdit={() => beginEdit(c, "contractNo")}
                     onChangeValue={setEditValue}
@@ -1387,21 +1695,25 @@ export default function ContractOverview() {
                     editable={c.isRealContract} columnKey="quotationNo"
                     editing={editingCell?.key === c.key && editingCell?.field === "quotationNo"}
                     value={c.quotationNo} editValue={editValue} saving={editSaving}
-                    width={colWidth("quotationNo")} title={c.quotationNo}
+                    width={colVar("quotationNo")} title={c.quotationNo}
                     onStartEdit={() => beginEdit(c, "quotationNo")}
                     onChangeValue={setEditValue}
                     onCommit={() => commitEdit(c)}
                     onCancel={cancelEdit}
                   />
-                  <TableCell data-col-key="company" sx={{ width: colWidth("company"), maxWidth: colWidth("company"), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.company}>{c.company || <Dash />}</TableCell>
-                  <TableCell data-col-key="site" sx={{ width: colWidth("site"), maxWidth: colWidth("site"), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.site}>{c.site || <Dash />}</TableCell>
-                  <TableCell data-col-key="system" sx={{ width: colWidth("system"), maxWidth: colWidth("system"), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.system}>{c.system || <Dash />}</TableCell>
-                  <TableCell data-col-key="title" sx={{ width: colWidth("title"), maxWidth: colWidth("title"), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.title}>{c.title || <Dash />}</TableCell>
+                  </>
+                  )}
+                  <TableCell data-col-key="company" sx={{ width: colVar("company"), maxWidth: colVar("company"), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.company}>{c.company || <Dash />}</TableCell>
+                  <TableCell data-col-key="site" sx={{ width: colVar("site"), maxWidth: colVar("site"), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.site}>{c.site || <Dash />}</TableCell>
+                  <TableCell data-col-key="system" sx={{ width: colVar("system"), maxWidth: colVar("system"), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.system}>{c.system || <Dash />}</TableCell>
+                  <TableCell data-col-key="title" sx={{ width: colVar("title"), maxWidth: colVar("title"), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.title}>{c.title || <Dash />}</TableCell>
+                  {!hideContractOnlyColumns && (
+                  <>
                   <EditableCell
                     editable={c.isRealContract} columnKey="contractStart"
                     editing={editingCell?.key === c.key && editingCell?.field === "contractStart"}
                     value={c.contractStart} editValue={editValue} editType="date" saving={editSaving}
-                    width={colWidth("contractStart")}
+                    width={colVar("contractStart")}
                     formatDisplay={(v) => (v ? moment(v).format("DD/MM/YYYY") : <Dash />)}
                     onStartEdit={() => beginEdit(c, "contractStart")}
                     onChangeValue={setEditValue}
@@ -1412,7 +1724,7 @@ export default function ContractOverview() {
                     editable={c.isRealContract} columnKey="contractEnd"
                     editing={editingCell?.key === c.key && editingCell?.field === "contractEnd"}
                     value={c.contractEnd} editValue={editValue} editType="date" saving={editSaving}
-                    width={colWidth("contractEnd")}
+                    width={colVar("contractEnd")}
                     formatDisplay={(v) => (v ? moment(v).format("DD/MM/YYYY") : <Dash />)}
                     onStartEdit={() => beginEdit(c, "contractEnd")}
                     onChangeValue={setEditValue}
@@ -1423,7 +1735,7 @@ export default function ContractOverview() {
                     editable={c.isRealContract} columnKey="visitCount"
                     editing={editingCell?.key === c.key && editingCell?.field === "visitCount"}
                     value={c.visitCount} editValue={editValue} editType="number" saving={editSaving}
-                    width={colWidth("visitCount")} align="center"
+                    width={colVar("visitCount")} align="center"
                     // ✅ เตือนถ้ารอบล่าสุดผ่านมาเกิน 3 เดือนแล้วแต่ยังไม่ได้ลงแผนงานครั้งถัดไปเลย — วงกลม
                     // สีแดงทึบ (ไม่ใช่แค่ไอคอนสีแดงบนพื้นขาว) ให้เห็นชัดแม้เป็นภาพนิ่ง ไม่ต้องรอดูอนิเมชัน
                     formatDisplay={(v) => (
@@ -1459,14 +1771,14 @@ export default function ContractOverview() {
                     editable={c.isRealContract} columnKey="jobValue"
                     editing={editingCell?.key === c.key && editingCell?.field === "jobValue"}
                     value={c.jobValue} editValue={editValue} editType="number" saving={editSaving}
-                    width={colWidth("jobValue")} align="right"
+                    width={colVar("jobValue")} align="right"
                     formatDisplay={(v) => (v != null && v !== "" ? Number(v).toLocaleString() : <Dash />)}
                     onStartEdit={() => beginEdit(c, "jobValue")}
                     onChangeValue={setEditValue}
                     onCommit={() => commitEdit(c)}
                     onCancel={cancelEdit}
                   />
-                  <TableCell data-col-key="status" align="center" sx={{ width: colWidth("status") }}>
+                  <TableCell data-col-key="status" align="center" sx={{ width: colVar("status") }}>
                     {(() => {
                       const st = contractStatusInfo(c);
                       return st ? (
@@ -1477,8 +1789,24 @@ export default function ContractOverview() {
                       ) : <Dash />;
                     })()}
                   </TableCell>
-                  <TableCell data-col-key="progress" align="center" sx={{ width: colWidth("progress") }}>
+                  </>
+                  )}
+                  <TableCell data-col-key="progress" align="center" sx={{ width: colVar("progress") }}>
                     {(() => {
+                      // ⚠️ BUG ที่แก้: แถวที่ไม่ใช่สัญญาจริง (งานทั่วไป/ยังไม่จัดกลุ่ม) ไม่มีแนวคิด "ครั้งที่"
+                      // แบบสัญญาเลย เป็น "งานเดียว" เสมอ — ของเดิมยังใช้ตรรกะนับ "ครั้ง" จาก time เหมือน
+                      // สัญญา ถ้า time ว่าง (ไม่เคยมีใครกรอก) total จะกลายเป็น 0 โชว์ป้าย "X/0" เพี้ยนๆ
+                      // เทียบสถานะของงานนั้นตรงๆ แทน ไม่ต้องพึ่งตรรกะนับครั้งเลย
+                      if (!c.isRealContract) {
+                        const isDone = c.visits.length > 0 && c.visits.every((v) => v.status === "ดำเนินการเสร็จสิ้น");
+                        const chipColor = isDone ? STATUS_COLOR["ดำเนินการเสร็จสิ้น"] : "#9ca3af";
+                        return (
+                          <Chip
+                            label={isDone ? "1/1" : "0/1"} size="small"
+                            sx={{ height: 20, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha(chipColor, 0.12), color: chipColor }}
+                          />
+                        );
+                      }
                       // ✅ นับความคืบหน้าเป็น "ครั้ง" ไม่ใช่ document — ครั้งที่เข้างานไม่ต่อเนื่อง (หลาย
                       // document ต่อครั้ง) นับว่า "เสร็จ" ก็ต่อเมื่อทุก document ของครั้งนั้นเสร็จหมดแล้ว
                       const byRound = new Map();
@@ -1500,9 +1828,13 @@ export default function ContractOverview() {
                     })()}
                   </TableCell>
                   {visitColumns.map((n) => {
-                    const withinCount = n <= (c.visitCount || countUsedRounds(c.visits));
+                    // ✅ แถวที่ไม่ใช่สัญญาจริง (งานทั่วไป/ยังไม่จัดกลุ่ม) ไม่มี visitCount ให้เทียบ (ดู
+                    // groupEventsByContract) ใช้ rowMaxRound (คำนวณจาก field time จริงของแต่ละ document
+                    // แทน — งานที่เคยเลือก "ครั้งที่ 2" ไว้ตอนเพิ่มงานจะไปโผล่ที่คอลัมน์ "ครั้งที่ 2" จริงๆ
+                    // ไม่ใช่ถูกบังคับไปช่อง 1 เสมอเหมือนเดิม)
+                    const withinCount = n <= rowMaxRound(c);
                     if (!withinCount) {
-                      return <TableCell key={n} data-col-key={`visit_${n}`} align="center" sx={{ width: colWidth(`visit_${n}`), bgcolor: "action.hover" }} />;
+                      return <TableCell key={n} data-col-key={`visit_${n}`} align="center" sx={{ width: colVar(`visit_${n}`), bgcolor: "action.hover" }} />;
                     }
                     // ✅ นับว่า "ถึงรอบแล้ว" เฉพาะครั้งที่ลงตารางจริงเท่านั้น (!unscheduled) — ถ้าเป็นแค่
                     // แผนงานล่วงหน้าที่จองครั้งนี้ไว้ (ยังไม่มีวันที่จริง) ให้ยังถือว่า "ว่าง" อยู่ในตาราง
@@ -1512,12 +1844,14 @@ export default function ContractOverview() {
                     // ✅ เรียงตามวันที่เข้างานจริง (เก่า→ใหม่) เสมอ — เดิมโชว์ตามลำดับที่ document ถูกสร้าง
                     // (เช่น ต่อวันที่ย้อนหลังทีหลัง) ทำให้วันที่ในเซลล์เดียวกันโผล่สลับก่อนหลังไม่ตรงความจริง
                     // ดูเหมือนข้อมูลมั่ว/ไม่ได้จัดกลุ่มให้ ทั้งที่จริงเป็นงานเดียวกัน (jobGroupId เดียวกัน) แค่โชว์ผิดลำดับ
+                    // ✅ "Number(v.time) || 1" — งานที่ไม่เคยเลือก "ครั้งที่" เลย (time ว่าง) ให้ตกไปอยู่
+                    // ช่อง "ครั้งที่ 1" เป็นค่าเริ่มต้น แทนที่จะหายไปเลยไม่โชว์ที่ไหนสักช่อง
                     const roundVisits = c.visits
-                      .filter((v) => !v.unscheduled && Number(v.time) === n)
+                      .filter((v) => !v.unscheduled && (Number(v.time) || 1) === n)
                       .sort((a, b) => new Date(a.start || a.date) - new Date(b.start || b.date));
-                    const pendingDraft = roundVisits.length === 0 && c.visits.find((v) => v.unscheduled && Number(v.time) === n);
+                    const pendingDraft = roundVisits.length === 0 && c.visits.find((v) => v.unscheduled && (Number(v.time) || 1) === n);
                     return (
-                      <TableCell key={n} data-col-key={`visit_${n}`} align="center" sx={{ width: colWidth(`visit_${n}`), overflow: "hidden" }}>
+                      <TableCell key={n} data-col-key={`visit_${n}`} align="center" sx={{ width: colVar(`visit_${n}`), overflow: "hidden" }}>
                         {roundVisits.length > 0 ? (
                           <Stack spacing={0.25} alignItems="center">
                             {roundVisits.map((visit) => (
@@ -1532,12 +1866,18 @@ export default function ContractOverview() {
                             {c.isRealContract && (
                               <Stack direction="row" spacing={0.25}>
                                 <Tooltip title="เพิ่มวันที่ต่อเนื่อง (เข้างานไม่ติดกัน)">
-                                  <IconButton size="small" onClick={() => openExtendVisitDialog(c, n)} sx={{ p: 0.25, color: "text.disabled", "&:hover": { color: ACCENT } }}>
+                                  <IconButton
+                                    size="small" onClick={() => openExtendVisitDialog(c, n)}
+                                    sx={{ p: 0.25, color: "text.disabled", transition: "background-color .15s, color .15s", "&:hover": { color: ACCENT, bgcolor: alpha(ACCENT, 0.1) } }}
+                                  >
                                     <Add sx={{ fontSize: 14 }} />
                                   </IconButton>
                                 </Tooltip>
                                 <Tooltip title="แยกครั้งนี้ออกจากสัญญา (ย้ายเป็นงานเก่าที่ยังไม่จัดกลุ่ม)">
-                                  <IconButton size="small" onClick={() => handleDetachRound(c, n)} sx={{ p: 0.25, color: "text.disabled", "&:hover": { color: ACCENT } }}>
+                                  <IconButton
+                                    size="small" onClick={() => handleDetachRound(c, n)}
+                                    sx={{ p: 0.25, color: "text.disabled", transition: "background-color .15s, color .15s", "&:hover": { color: ACCENT, bgcolor: alpha(ACCENT, 0.1) } }}
+                                  >
                                     <LinkOff sx={{ fontSize: 14 }} />
                                   </IconButton>
                                 </Tooltip>
@@ -1605,32 +1945,47 @@ export default function ContractOverview() {
                     editable={c.isRealContract} columnKey="team"
                     editing={editingCell?.key === c.key && editingCell?.field === "team"}
                     value={c.team === "-" ? "" : c.team} editValue={editValue} editType="select" editOptions={teamOptions} saving={editSaving}
-                    width={colWidth("team")} title={c.team}
+                    width={colVar("team")} title={c.team}
                     onStartEdit={() => beginEdit(c, "team")}
                     onChangeValue={setEditValue}
                     onCommit={() => commitEdit(c)}
                     onCancel={cancelEdit}
                   />
                   <TableCell align="center" sx={{ width: colWidth("actions") }}>
+                    {/* ✅ เพิ่ม hover เป็นพื้นวงกลมสี (ไม่ใช่แค่เปลี่ยนสีตัวไอคอนเฉยๆ) ให้รู้สึกเหมือนปุ่มกด
+                        ได้จริงชัดเจนขึ้น เทียบ pattern ปุ่มไอคอนวงกลมมาตรฐาน Material Design */}
                     {!c.isRealContract && (
-                      <Tooltip title={c.isConfirmedGeneral ? "ยืนยันเป็นงานทั่วไปแล้ว — กดเพื่อยกเลิก" : "ยืนยันเป็นงานทั่วไป"}>
+                      <Tooltip title="จัดหมวดหมู่งาน (ทั่วไป/โปรเจค)">
                         <IconButton
-                          size="small" onClick={() => handleToggleGeneral(c)}
-                          sx={{ color: c.isConfirmedGeneral ? "#10b981" : "text.disabled", "&:hover": { color: "#10b981" } }}
+                          size="small" onClick={(e) => openClassifyMenu(e, c)}
+                          sx={{
+                            color: c.isConfirmedGeneral ? "#10b981" : c.isConfirmedProject ? "#3b82f6" : "text.disabled",
+                            transition: "background-color .15s, color .15s",
+                            "&:hover": {
+                              color: c.isConfirmedProject ? "#3b82f6" : "#10b981",
+                              bgcolor: alpha(c.isConfirmedProject ? "#3b82f6" : "#10b981", 0.1),
+                            },
+                          }}
                         >
-                          {c.isConfirmedGeneral ? <CheckCircle fontSize="small" /> : <CheckCircleOutline fontSize="small" />}
+                          {c.isConfirmedGeneral ? <Build fontSize="small" /> : c.isConfirmedProject ? <Engineering fontSize="small" /> : <HourglassEmpty fontSize="small" />}
                         </IconButton>
                       </Tooltip>
                     )}
                     {!c.isRealContract && (
-                      <Tooltip title="ย้ายเข้าสัญญาที่มีอยู่แล้ว">
-                        <IconButton size="small" onClick={() => openAttachDialog(c)} sx={{ color: "text.disabled", "&:hover": { color: ACCENT } }}>
+                      <Tooltip title="ย้ายเข้างานสัญญา / งานรายปี">
+                        <IconButton
+                          size="small" onClick={() => openAttachDialog(c)}
+                          sx={{ color: "text.disabled", transition: "background-color .15s, color .15s", "&:hover": { color: ACCENT, bgcolor: alpha(ACCENT, 0.1) } }}
+                        >
                           <AddLink fontSize="small" />
                         </IconButton>
                       </Tooltip>
                     )}
                     <Tooltip title={c.isRealContract ? "ลบสัญญานี้ทั้งหมด" : "ลบงานนี้"}>
-                      <IconButton size="small" onClick={() => handleDeleteContract(c)} sx={{ color: "text.disabled", "&:hover": { color: ACCENT } }}>
+                      <IconButton
+                        size="small" onClick={() => handleDeleteContract(c)}
+                        sx={{ color: "text.disabled", transition: "background-color .15s, color .15s", "&:hover": { color: ACCENT, bgcolor: alpha(ACCENT, 0.1) } }}
+                      >
                         <DeleteOutline fontSize="small" />
                       </IconButton>
                     </Tooltip>
@@ -1656,6 +2011,23 @@ export default function ContractOverview() {
           />
         </Stack>
       )}
+
+      {/* ✅ เมนูจัดหมวดหมู่งานทั่วไป/โปรเจค — Menu ตัวเดียวใช้ร่วมกันทุกแถว (ตำแหน่งขยับตาม anchorEl
+          ที่กดล่าสุด) เทียบ pattern มาตรฐาน MUI แทนเปิด Dialog เต็มจอสำหรับแค่เลือก 1 ใน 3 ตัวเลือก */}
+      <Menu anchorEl={classifyMenuAnchor} open={Boolean(classifyMenuAnchor)} onClose={closeClassifyMenu}>
+        <MenuItem selected={!classifyMenuTarget?.isConfirmedGeneral && !classifyMenuTarget?.isConfirmedProject} onClick={() => handleClassify("")}>
+          <ListItemIcon><HourglassEmpty fontSize="small" sx={{ color: "text.disabled" }} /></ListItemIcon>
+          <ListItemText>ยังไม่จัดกลุ่ม</ListItemText>
+        </MenuItem>
+        <MenuItem selected={Boolean(classifyMenuTarget?.isConfirmedGeneral)} onClick={() => handleClassify("general")}>
+          <ListItemIcon><Build fontSize="small" sx={{ color: "#10b981" }} /></ListItemIcon>
+          <ListItemText>งานทั่วไป</ListItemText>
+        </MenuItem>
+        <MenuItem selected={Boolean(classifyMenuTarget?.isConfirmedProject)} onClick={() => handleClassify("project")}>
+          <ListItemIcon><Engineering fontSize="small" sx={{ color: "#3b82f6" }} /></ListItemIcon>
+          <ListItemText>งานโปรเจค</ListItemText>
+        </MenuItem>
+      </Menu>
 
       <Dialog open={addOpen} onClose={closeAddDialog} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle sx={{ fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "space-between" }}>

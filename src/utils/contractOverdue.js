@@ -8,26 +8,35 @@ import { countUsedRounds } from "./contractRounds";
  * ที่เดียวกันตัวเดียวกับ overdueJobs.js เพื่อกันตรรกะเพี้ยนไม่ตรงกันระหว่างสองจุด
  */
 
-// ✅ งานเก่าที่ยังไม่มี contractGroupId (สร้างก่อนมีฟีเจอร์สัญญา) fallback เป็นสัญญา 1 ครั้งของตัวเอง
+// ✅ งานเก่าที่ยังไม่มี contractGroupId (สร้างก่อนมีฟีเจอร์สัญญา) fallback เป็นสัญญา 1 ครั้งของตัวเอง —
+// ⚠️ BUG ที่แก้: เดิม fallback ไปที่ _id ของตัวเองตรงๆ เสมอ ทำให้ "งานทั่วไป" ที่เข้าหลายวันไม่ติดกัน
+// (ผูกกันด้วย jobGroupId เดียวกันอยู่แล้ว — Operation จัดกลุ่มถูกอยู่แล้วโดยใช้ jobGroupId นี้) โผล่เป็น
+// หลายแถวแยกกันในตารางนี้ ทั้งที่จริงเป็นงานเดียวกัน — ต้อง fallback ไปที่ jobGroupId ก่อน ถ้ามี
 export const groupEventsByContract = (events) => {
   const map = new Map();
   events.forEach((e) => {
-    const key = e.contractGroupId || `nogid:${e._id}`;
+    const key = e.contractGroupId || (e.jobGroupId ? `jgid:${e.jobGroupId}` : `nogid:${e._id}`);
     if (!map.has(key)) map.set(key, []);
     map.get(key).push(e);
   });
-  return [...map.values()].map((visits) => {
+  return [...map.entries()].map(([key, visits]) => {
     const sorted = visits.slice().sort((a, b) => (Number(a.time) || 0) - (Number(b.time) || 0));
     const head = sorted[0];
     const teamNames = [head.team, ...(head.teamMembers || []).map((m) => m?.name)]
       .filter(Boolean)
       .filter((name, idx, arr) => arr.indexOf(name) === idx);
+    // ✅ งานที่ไม่มี contractGroupId มี 3 หมวดหมู่: "" (ยังไม่จัดกลุ่ม — ค่าเริ่มต้น) / "general"
+    // (งานทั่วไป) / "project" (งานโปรเจค) ต่อเมื่อกดยืนยันผ่านหน้า "ภาพรวมงาน" เท่านั้น (ดู
+    // PUT /events/:id/classify) — เดิมมีแค่ isConfirmedGeneral (true/false) ก่อนเพิ่มหมวด "โปรเจค"
+    // fallback มาอ่านค่าเก่านี้ด้วยถ้า jobClassification ยังไม่เคยถูกตั้งเลย กันข้อมูลที่ยืนยันไปแล้ว
+    // ก่อนหน้านี้หายไป
+    const jobClassification = head.jobClassification || (head.isConfirmedGeneral ? "general" : "");
     return {
-      key: head.contractGroupId || `nogid:${head._id}`,
+      key,
       isRealContract: Boolean(head.contractGroupId),
-      // ✅ งานที่ไม่มี contractGroupId เป็น "งานทั่วไป" ที่ถูกยืนยันแล้ว (เทียบกับ "ยังไม่จัดกลุ่ม" ซึ่ง
-      // เป็นค่าเริ่มต้น) ต่อเมื่อกดยืนยันผ่านหน้า "ภาพรวมงาน" เท่านั้น (ดู PUT /events/:id/general)
-      isConfirmedGeneral: Boolean(head.isConfirmedGeneral),
+      jobClassification,
+      isConfirmedGeneral: jobClassification === "general",
+      isConfirmedProject: jobClassification === "project",
       company: head.company,
       site: head.site,
       system: head.system,
@@ -36,7 +45,12 @@ export const groupEventsByContract = (events) => {
       quotationNo: head.quotationNo,
       contractStart: head.contractStart,
       contractEnd: head.contractEnd,
-      visitCount: head.visitCount || sorted.length,
+      // ⚠️ BUG ที่แก้: เดิม fallback ไป sorted.length เสมอเวลา head.visitCount ไม่มีค่า — ตอนนี้งาน
+      // ทั่วไปที่เข้าหลายวันไม่ติดกัน (ผูกด้วย jobGroupId) รวมเป็นแถวเดียวที่มีได้มากกว่า 1 document แล้ว
+      // (ดู key ด้านบน) ทำให้ visitCount กลายเป็น 2, 3, ... ทั้งที่ไม่ใช่สัญญาเลย แล้วไปดันคอลัมน์
+      // "ครั้งที่ 2" ให้โผล่ขึ้นมาทั้งตาราง (maxVisitCount คำนวณรวมทุกแถวในหน้าที่กรองอยู่) — visitCount
+      // มีความหมายเฉพาะสัญญาจริงเท่านั้น แถวที่ไม่ใช่สัญญาไม่ควรมีค่านี้เลย
+      visitCount: head.contractGroupId ? (head.visitCount || sorted.length) : undefined,
       jobValue: head.jobValue,
       team: teamNames.join(", ") || "-",
       visits: sorted,

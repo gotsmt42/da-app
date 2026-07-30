@@ -238,13 +238,14 @@ const EventService = {
     }
   },
 
-  // ✅ ยืนยัน/ยกเลิกยืนยันว่างานนี้เป็น "งานทั่วไป" จริงๆ (ก่อนกดจะโชว์เป็น "ยังไม่จัดกลุ่ม" เสมอ)
-  async MarkAsGeneral(id, isConfirmedGeneral) {
+  // ✅ จัดหมวดหมู่งานที่ไม่มี contractGroupId — classification: "" (ยังไม่จัดกลุ่ม) / "general"
+  // (งานทั่วไป) / "project" (งานโปรเจค) — ก่อนจัดจะโชว์เป็น "ยังไม่จัดกลุ่ม" เสมอ
+  async ClassifyJob(id, classification) {
     try {
-      const response = await API.put(`/events/${id}/general`, { isConfirmedGeneral });
+      const response = await API.put(`/events/${id}/classify`, { classification });
       return response.data;
     } catch (error) {
-      console.error("Error marking event as general:", error);
+      console.error("Error classifying event:", error);
       throw error;
     }
   },
