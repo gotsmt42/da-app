@@ -146,6 +146,25 @@ function injectStyles() {
       text-transform: uppercase; color: #94a3b8; margin: 0 0 6px;
     }
 
+    /* ── กล่องข้อมูลสัญญา — แยกโทนสีจากส่วนอื่นชัดเจน (ม่วง-น้ำเงิน) ให้เห็นตั้งแต่แวบแรกว่าเป็นข้อมูล
+       ระดับ "ทั้งสัญญา" ไม่ใช่แค่ครั้งที่นี้ครั้งเดียว (อยู่บนสุดของฟอร์ม กดเข้ามาก็เจอเลย) ── */
+    .ee-contract-box {
+      background: linear-gradient(135deg, #eef2ff, #f5f3ff);
+      border: 1.5px solid #c7d2fe; border-radius: 12px;
+      padding: 14px 16px 6px; margin-bottom: 16px;
+    }
+    .ee-contract-box-label {
+      font-size: 12.5px; font-weight: 700; color: #4338ca;
+      margin: 0 0 10px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    }
+    .ee-contract-box-label span {
+      font-size: 11px; font-weight: 500; color: #6366f1;
+    }
+    .ee-contract-box .ee-field input {
+      background: #fff; border-color: #ddd6fe;
+    }
+    .ee-contract-box .ee-field label { color: #4c1d95; }
+
     /* ── Grid ── */
     .ee-grid   { display: grid; gap: 8px; margin-bottom: 8px; }
     .ee-grid-2 { grid-template-columns: 1fr 1fr; }
@@ -200,6 +219,19 @@ function injectStyles() {
       flex-shrink: 0; width: 30px; height: 30px; padding: 0 !important;
       display: flex; align-items: center; justify-content: center;
     }
+    /* ✅ แถบยืนยันลบช่วงวันที่ — เดิมใช้ window.confirm() ของเบราว์เซอร์ (หน้าตาไม่ตรงธีมแอปเลย)
+       เปลี่ยนเป็นแถบในฟอร์มแทน ไม่ใช้ Swal.fire ซ้อนเพราะ modal นี้เป็น Swal อยู่แล้ว เปิดอีกอันจะ
+       ไปแทนที่/ปิด modal เดิมทั้งอัน (ข้อมูลแถวอื่นที่ยังไม่บันทึกจะหายไปด้วย) */
+    .ee-row-confirm-bar {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+      background: #fef2f2; border: 1.5px solid #fecaca; border-radius: 8px;
+      padding: 8px 12px; margin: -2px 0 10px; font-size: 12.5px; font-weight: 600; color: #991b1b;
+      animation: eeRowConfirmIn .15s ease;
+    }
+    @keyframes eeRowConfirmIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+    .ee-row-confirm-bar .ee-row-confirm-sub { font-weight: 500; color: #b91c1c; }
+    .ee-row-confirm-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .ee-row-confirm-actions .ee-btn { padding: 5px 12px; font-size: 12px; height: auto; }
 
     /* ── ลูกทีมเพิ่มเติม (คนที่ 2, 3, ... แสดงผลอย่างเดียว ไม่กระทบสิทธิ์) ── */
     .ee-team-member-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
@@ -547,6 +579,41 @@ export const getEditEvent = async ({
   <!-- ── Body ── -->
   <div id="ee-body">
 
+    <!-- ✅ ข้อมูลสัญญา — ย้ายมาไว้บนสุด (เดิมอยู่ล่างสุด ต้องเลื่อนจอไปดู) เพราะเป็นข้อมูลอ้างอิงหลักของ
+         "ครั้งที่" นี้ที่มักต้องเช็คก่อนแก้อย่างอื่น ใส่กล่องพื้นหลังโทนม่วง-น้ำเงินแยกจากส่วนอื่นชัดเจน
+         ให้เห็นตั้งแต่แวบแรกว่าเป็นข้อมูล "ทั้งสัญญา" ไม่ใช่แค่ครั้งนี้ครั้งเดียว -->
+    ${eventContractGroupId ? `
+    <div class="ee-contract-box">
+      <p class="ee-contract-box-label">📑 ข้อมูลสัญญา <span>แก้ที่นี่จะอัปเดตทุก "ครั้งที่" ในสัญญานี้พร้อมกัน</span></p>
+      <div class="ee-grid ee-grid-3">
+        <div class="ee-field">
+          <label>📄 เลขที่สัญญา</label>
+          <input id="editContractNo" type="text" value="${eventContractNo}" placeholder="เช่น FAPTY17-2568">
+        </div>
+        <div class="ee-field">
+          <label>🧾 เลขที่ใบเสนอราคา</label>
+          <input id="editQuotationNo" type="text" value="${eventQuotationNo}" placeholder="เช่น QT2024100049">
+        </div>
+        <div class="ee-field">
+          <label>🔢 จำนวนครั้ง</label>
+          <input id="editVisitCount" type="number" value="${eventVisitCount}" placeholder="เช่น 4">
+        </div>
+        <div class="ee-field">
+          <label>📅 วันที่เริ่มสัญญา</label>
+          <input id="editContractStart" type="date" value="${eventContractStart}">
+        </div>
+        <div class="ee-field">
+          <label>📅 วันที่สิ้นสุดสัญญา</label>
+          <input id="editContractEnd" type="date" value="${eventContractEnd}">
+        </div>
+        <div class="ee-field">
+          <label>💰 มูลค่างาน</label>
+          <input id="editJobValue" type="number" value="${eventJobValue}" placeholder="เช่น 86000">
+        </div>
+      </div>
+    </div>
+    ` : ""}
+
     <!-- Status bar -->
     <div id="ee-status-bar">
       <div id="ee-status-bar-left">
@@ -677,41 +744,6 @@ export const getEditEvent = async ({
       <textarea id="editDescription" placeholder="กรอกรายละเอียดงาน..."></textarea>
       <div class="ee-char-count" id="charCount">0 ตัวอักษร</div>
     </div>
-
-    ${eventContractGroupId ? `
-    <hr class="ee-divider">
-    <p class="ee-section-label">ข้อมูลสัญญา (แก้ที่นี่จะอัปเดตทุก "ครั้งที่" ในสัญญานี้พร้อมกัน)</p>
-    <div class="ee-grid ee-grid-2">
-      <div class="ee-field">
-        <label>📄 เลขที่สัญญา</label>
-        <input id="editContractNo" type="text" value="${eventContractNo}" placeholder="เช่น FAPTY17-2568">
-      </div>
-      <div class="ee-field">
-        <label>🧾 เลขที่ใบเสนอราคา</label>
-        <input id="editQuotationNo" type="text" value="${eventQuotationNo}" placeholder="เช่น QT2024100049">
-      </div>
-    </div>
-    <div class="ee-grid ee-grid-2">
-      <div class="ee-field">
-        <label>📅 วันที่เริ่มสัญญา</label>
-        <input id="editContractStart" type="date" value="${eventContractStart}">
-      </div>
-      <div class="ee-field">
-        <label>📅 วันที่สิ้นสุดสัญญา</label>
-        <input id="editContractEnd" type="date" value="${eventContractEnd}">
-      </div>
-    </div>
-    <div class="ee-grid ee-grid-2">
-      <div class="ee-field">
-        <label>🔢 จำนวนครั้ง</label>
-        <input id="editVisitCount" type="number" value="${eventVisitCount}" placeholder="เช่น 4">
-      </div>
-      <div class="ee-field">
-        <label>💰 มูลค่างาน</label>
-        <input id="editJobValue" type="number" value="${eventJobValue}" placeholder="เช่น 86000">
-      </div>
-    </div>
-    ` : ""}
 
   </div>
 
@@ -877,7 +909,7 @@ export const getEditEvent = async ({
           <input type="date" class="ee-range-end" value="${endValue || startValue}">
           <button type="button" class="ee-btn ee-btn-ghost ee-multi-date-remove" title="ลบช่วงนี้ออก">✕</button>
         `;
-        row.querySelector(".ee-multi-date-remove").addEventListener("click", async () => {
+        row.querySelector(".ee-multi-date-remove").addEventListener("click", () => {
           // ต้องเหลืออย่างน้อย 1 แถวเสมอ กันผู้ใช้ลบจนหมด
           if (multiDateList.children.length <= 1) return;
           const rowEventId = row.dataset.eventId;
@@ -886,15 +918,38 @@ export const getEditEvent = async ({
             row.remove();
             return;
           }
-          // แถวนี้ผูกกับ event ที่มีอยู่จริงแล้ว ต้องยืนยันก่อนลบจริง (ลบเฉพาะช่วงนี้ ช่วงอื่นไม่กระทบ)
-          if (!window.confirm("ลบช่วงวันที่นี้ออกจากงาน? (ลบเฉพาะช่วงนี้ ช่วงอื่นของงานเดียวกันจะไม่หายไป)")) return;
-          try {
-            await EventService.DeleteEvent(rowEventId);
-            row.remove();
-            await fetchEventsFromDB();
-          } catch {
-            Swal.showValidationMessage("ลบช่วงวันที่นี้ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
-          }
+          // แถวนี้ผูกกับ event ที่มีอยู่จริงแล้ว ต้องยืนยันก่อนลบจริง (ลบเฉพาะช่วงนี้ ช่วงอื่นไม่กระทบ) —
+          // ใช้แถบยืนยันในฟอร์มแทน window.confirm() ของเบราว์เซอร์ (ให้ตรงธีมแอป) และไม่ใช้ Swal.fire
+          // ซ้อนเพราะจะไปแทนที่ modal แก้ไขงานที่เปิดอยู่ทั้งอัน (ดูคอมเมนต์ที่ CSS .ee-row-confirm-bar)
+          const already = row.nextElementSibling;
+          if (already && already.classList.contains("ee-row-confirm-bar")) { already.remove(); return; }
+          document.querySelectorAll(".ee-row-confirm-bar").forEach((el) => el.remove());
+
+          const confirmBar = document.createElement("div");
+          confirmBar.className = "ee-row-confirm-bar";
+          confirmBar.innerHTML = `
+            <span>⚠️ ลบช่วงวันที่นี้ออกจากงาน? <span class="ee-row-confirm-sub">(ช่วงอื่นของงานเดียวกันจะไม่หายไป)</span></span>
+            <div class="ee-row-confirm-actions">
+              <button type="button" class="ee-btn ee-btn-ghost ee-row-confirm-no">ยกเลิก</button>
+              <button type="button" class="ee-btn ee-btn-danger ee-row-confirm-yes">ลบช่วงนี้</button>
+            </div>
+          `;
+          row.after(confirmBar);
+          confirmBar.querySelector(".ee-row-confirm-no").addEventListener("click", () => confirmBar.remove());
+          confirmBar.querySelector(".ee-row-confirm-yes").addEventListener("click", async () => {
+            const yesBtn = confirmBar.querySelector(".ee-row-confirm-yes");
+            yesBtn.disabled = true;
+            yesBtn.textContent = "กำลังลบ...";
+            try {
+              await EventService.DeleteEvent(rowEventId);
+              confirmBar.remove();
+              row.remove();
+              await fetchEventsFromDB();
+            } catch {
+              Swal.showValidationMessage("ลบช่วงวันที่นี้ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+              confirmBar.remove();
+            }
+          });
         });
         multiDateList.appendChild(row);
       };
@@ -1103,9 +1158,26 @@ export const getEditEvent = async ({
             // โดนเข้าใจผิดว่าเป็นงานหลายวันทั้งที่จริงมีวันเดียว)
             const shouldGroup = ranges.length > 1 || Boolean(eventJobGroupId);
             const groupId = shouldGroup ? (eventJobGroupId || `${eventId}-${Date.now()}`) : "";
+            // ⚠️ BUG ที่แก้: shared (buildSharedFields) ไม่มี contractGroupId/isContractBatch เลย —
+            // ตอนกดติ๊กโหมด "เข้าหลายวันไม่ติดกัน" แล้วเพิ่มแถวใหม่จากหน้าแก้ไขงานที่ผูกกับสัญญาอยู่แล้ว
+            // (เช่น ครั้งที่ 1 ของสัญญา ต้องการต่อวันที่ไม่ต่อเนื่องอีกวัน) แถวใหม่ที่สร้างจะหลุดออกจาก
+            // สัญญาไปเลย (ไม่มี contractGroupId) กลายเป็นงานลอยแยกเดี่ยว ไม่ถูกนับเป็นส่วนหนึ่งของ
+            // "ครั้งที่ 1" อีกต่อไป ทั้งที่ผู้ใช้ตั้งใจแค่ต่อวันที่ให้ครั้งเดิม — ต้องแนบข้อมูลสัญญากลับไปด้วย
+            // ทุกแถวใหม่ ถ้างานที่กำลังแก้ไขอยู่นี้ผูกกับสัญญาอยู่ (eventContractGroupId)
+            const contractCarryFields = eventContractGroupId ? {
+              isContractBatch: true,
+              contractGroupId: eventContractGroupId,
+              contractNo: eventContractNo,
+              quotationNo: eventQuotationNo,
+              contractStart: eventContractStart,
+              contractEnd: eventContractEnd,
+              visitCount: eventVisitCount,
+              jobValue: eventJobValue,
+            } : {};
             for (const r of ranges) {
               const rangeData = {
                 ...shared,
+                ...contractCarryFields,
                 ...(groupId ? { jobGroupId: groupId } : {}),
                 start: r.start,
                 end: moment(r.end).add(1, "days").format("YYYY-MM-DD"),

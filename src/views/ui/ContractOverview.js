@@ -23,6 +23,8 @@ import { alpha } from "@mui/material/styles";
 import {
   Search, Refresh, Download, FolderOpen, Add, Close,
   PlaylistAdd, MergeType, GroupWork, DeleteOutline, WarningAmber,
+  AddLink, LinkOff, CheckCircle, CheckCircleOutline,
+  CalendarMonth, PersonOutline,
 } from "@mui/icons-material";
 import { CSVLink } from "react-csv";
 import { useAuth } from "../../auth/AuthContext";
@@ -360,6 +362,9 @@ export default function ContractOverview() {
   // ✅ เลือกจัดกลุ่มเป็นสัญญาได้เฉพาะตอนมองเห็นงานเก่าที่ยังไม่จัดกลุ่ม (แท็บ "งานเก่า.../ทั้งหมด")
   // แท็บ "สัญญา" ล้วนๆ ไม่มีอะไรให้เลือกจัดกลุ่มอยู่แล้ว (ทุกแถวมีสัญญาอยู่แล้วทั้งหมด)
   const showCheckboxes = viewFilter !== "contracts";
+  // ✅ ซ่อนคอลัมน์ "เลขที่เอกสาร" (สัญญา/ใบเสนอราคา) ตอนดูแท็บที่ไม่ใช่สัญญาจริง — งานเก่าที่ยังไม่
+  // จัดกลุ่ม/งานทั่วไปไม่มีเลขที่สัญญา/ใบเสนอราคาอยู่แล้ว (เป็น "-" ทุกแถวเสมอ) โชว์ไว้มีแต่จะรกตาราง
+  const showDocNoColumns = viewFilter !== "ungrouped" && viewFilter !== "general";
 
   // ✅ ความกว้างคอลัมน์ที่ผู้ใช้ลากปรับเอง (key เฉพาะที่ต่างจากค่าเริ่มต้นเท่านั้น) — โหลดจาก
   // localStorage ตอนเปิดหน้า (lazy initializer) แล้วบันทึกกลับทุกครั้งที่ปรับ จะได้จำค่าไว้ข้ามการออก
@@ -373,9 +378,6 @@ export default function ContractOverview() {
   });
   // ✅ ใช้หา DOM ของตารางจริงตอนดับเบิลคลิกขอบคอลัมน์เพื่อวัดความกว้างเนื้อหาที่แท้จริง (auto-fit)
   const tableRef = useRef(null);
-
-  const realContractCount = useMemo(() => contracts.filter((c) => c.isRealContract).length, [contracts]);
-  const hiddenJobCount = contracts.length - realContractCount;
 
   // ── จัดกลุ่มงานเก่าให้เป็นสัญญา ─────────────────────────────────────────
   const jobSignature = (c) => [c.company, c.site, c.system, c.title].map((v) => (v || "").trim().toLowerCase()).join("|");
@@ -438,10 +440,14 @@ export default function ContractOverview() {
   const selectGroup = (group) => setSelectedIds(new Set(group.map((c) => c.key)));
   const clearSelection = () => setSelectedIds(new Set());
 
-  const filtered = useMemo(() => {
-    let base = viewFilter === "all" ? contracts
-      : viewFilter === "ungrouped" ? contracts.filter((c) => !c.isRealContract)
-      : contracts.filter((c) => c.isRealContract);
+  // ⚠️ BUG ที่แก้: เดิมเลขบนแท็บ ("สัญญา (N)"/"งานทั่วไป (N)"/"ทั้งหมด (N)") นับจาก `contracts` ดิบ
+  // ทั้งก้อน ไม่ผ่านตัวกรองปี/ผู้รับผิดชอบ/คำค้นหาเลย ในขณะที่ตัวเลขใต้หัวข้อ ("N งาน") กับการแบ่งหน้า
+  // (pagination) นับจาก `filtered` ซึ่งผ่านตัวกรองครบ — พอ yearFilter ค่าเริ่มต้นล็อกปีปัจจุบันไว้อยู่แล้ว
+  // (ดู yearFilter ด้านบน) ตัวเลขสองชุดนี้เลยไม่ตรงกันเสมอ (แท็บบอก 98 แต่ตารางโชว์แค่ 11 ตามปีที่กรอง)
+  // ทำให้ดูเหมือนแบ่งหน้าพัง — ทางแก้คือให้ตัวเลขบนแท็บผ่านตัวกรองชุดเดียวกันกับ `filtered` ด้วย ต่างกัน
+  // แค่ "กลุ่มประเภท" (สัญญา/งานทั่วไป/ทั้งหมด) ก่อนนับ ให้ตัวเลขทุกจุดในหน้านี้ตรงกันเสมอ
+  const applyCommonFilters = (list) => {
+    let base = list;
     if (yearFilter !== "all") {
       base = base.filter((c) => String(contractYear(c)) === String(yearFilter));
     }
@@ -456,6 +462,39 @@ export default function ContractOverview() {
       [c.company, c.site, c.system, c.title, c.contractNo, c.quotationNo, c.team]
         .some((v) => (v || "").toLowerCase().includes(kw))
     );
+  };
+
+  // ✅ งานที่ไม่มี contractGroupId แบ่งเป็น 2 กลุ่มจริงๆ ไม่ใช่กองเดียวกันอีกต่อไป — ค่าเริ่มต้นคือ
+  // "ยังไม่จัดกลุ่ม" (isConfirmedGeneral ยังไม่ true) จนกว่าจะกดยืนยันเป็น "งานทั่วไป" เอง (หรือย้ายเข้า
+  // สัญญา ซึ่งจะทำให้ isRealContract=true แทน) กันงานเก่าที่ยังไม่มีใครไล่ดูจริงๆ ถูกเข้าใจผิดว่าเป็น
+  // "งานทั่วไป" ที่ยืนยันแล้วทั้งที่จริงยังไม่มีใครตรวจสอบเลย
+  const realContractCount = useMemo(
+    () => applyCommonFilters(contracts.filter((c) => c.isRealContract)).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [contracts, yearFilter, teamFilter, search]
+  );
+  const hiddenJobCount = useMemo(
+    () => applyCommonFilters(contracts.filter((c) => !c.isRealContract && !c.isConfirmedGeneral)).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [contracts, yearFilter, teamFilter, search]
+  );
+  const confirmedGeneralCount = useMemo(
+    () => applyCommonFilters(contracts.filter((c) => !c.isRealContract && c.isConfirmedGeneral)).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [contracts, yearFilter, teamFilter, search]
+  );
+  const allFilteredCount = useMemo(
+    () => applyCommonFilters(contracts).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [contracts, yearFilter, teamFilter, search]
+  );
+
+  const filtered = useMemo(() => {
+    const base = viewFilter === "all" ? contracts
+      : viewFilter === "ungrouped" ? contracts.filter((c) => !c.isRealContract && !c.isConfirmedGeneral)
+      : viewFilter === "general" ? contracts.filter((c) => !c.isRealContract && c.isConfirmedGeneral)
+      : contracts.filter((c) => c.isRealContract);
+    return applyCommonFilters(base);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contracts, search, viewFilter, yearFilter, teamFilter]);
 
@@ -481,9 +520,9 @@ export default function ContractOverview() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [colWidths, showCheckboxes, visitColumns]);
 
-  // ✅ แสดงแค่หน้าละ 20 แถว — เดิมโชว์ทุกแถวรวดเดียว (สูงสุดเป็นร้อย) ต้องเลื่อนในกรอบตารางยาวๆ
+  // ✅ แสดงแค่หน้าละ 10 แถว — เดิมโชว์ทุกแถวรวดเดียว (สูงสุดเป็นร้อย) ต้องเลื่อนในกรอบตารางยาวๆ
   // ตลอดเวลา ตัดเป็นหน้าให้สั้นกระชับแทน (ตัวกรอง/ค้นหายังใช้กับข้อมูลทั้งหมดเหมือนเดิม แค่ตัดแสดงผล)
-  const PAGE_SIZE = 20;
+  const PAGE_SIZE = 10;
   const [page, setPage] = useState(1);
   useEffect(() => { setPage(1); }, [search, viewFilter, yearFilter, teamFilter]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -949,6 +988,111 @@ export default function ContractOverview() {
     }
   };
 
+  // ── ย้ายงานเข้า/ออกจากสัญญา (แก้ไขกรณีจัดกลุ่มผิด) ──────────────────────────
+  // ✅ ทิศทาง "เข้า": เลือกงานทั่วไป (isRealContract=false) แล้วเลือกสัญญาที่มีอยู่แล้ว + ครั้งที่ว่าง
+  // ต่างจาก "จัดกลุ่มเป็นสัญญา" (handleMergeSubmit) ที่สร้างสัญญาใหม่เสมอ — ตัวนี้ผูกเข้ากับสัญญาเดิม
+  const [attachTarget, setAttachTarget] = useState(null); // งานทั่วไป (c) ที่กำลังจะย้ายเข้าสัญญา
+  const [attachContractId, setAttachContractId] = useState("");
+  const [attachRound, setAttachRound] = useState("");
+  const [attachSaving, setAttachSaving] = useState(false);
+  const [attachError, setAttachError] = useState("");
+
+  const openAttachDialog = (c) => {
+    setAttachTarget(c);
+    setAttachContractId("");
+    setAttachRound("");
+    setAttachError("");
+  };
+  const closeAttachDialog = () => { if (!attachSaving) setAttachTarget(null); };
+
+  // ✅ เลือกได้เฉพาะสัญญาจริงที่ยังมีครั้งว่างเหลืออยู่ — เต็มแล้วไม่มีที่ให้ย้ายเข้า
+  const attachableContracts = useMemo(
+    () => contracts.filter((x) => x.isRealContract && countUsedRounds(x.visits) < x.visitCount),
+    [contracts]
+  );
+  const selectedAttachContract = useMemo(
+    () => attachableContracts.find((x) => x.key === attachContractId) || null,
+    [attachableContracts, attachContractId]
+  );
+  // ✅ สถานะรายครั้งของสัญญาปลายทาง (ว่าง/ลงตารางแล้ว/รอวางแผน) เทียบ pattern เดียวกับ renderRoundGrid
+  // ใน AddEvent.js — เลือกย้ายเข้าได้เฉพาะครั้งที่ "ว่าง" เท่านั้น
+  const attachRoundOptions = useMemo(() => {
+    if (!selectedAttachContract) return [];
+    return Array.from({ length: selectedAttachContract.visitCount }, (_, i) => i + 1).map((n) => {
+      const scheduled = selectedAttachContract.visits.some((v) => !v.unscheduled && Number(v.time) === n);
+      const pending = selectedAttachContract.visits.some((v) => v.unscheduled && Number(v.time) === n);
+      return { n, status: scheduled ? "scheduled" : pending ? "pending" : "open" };
+    });
+  }, [selectedAttachContract]);
+
+  const handleAttachSubmit = async () => {
+    if (!attachContractId) { setAttachError("กรุณาเลือกสัญญาปลายทาง"); return; }
+    if (!attachRound) { setAttachError("กรุณาเลือกครั้งที่"); return; }
+    setAttachSaving(true);
+    setAttachError("");
+    try {
+      await EventService.AttachToContract(attachContractId, {
+        eventId: attachTarget.visits[0]._id,
+        time: attachRound,
+      });
+      setAttachSaving(false);
+      setAttachTarget(null);
+      Swal.fire({ title: "ย้ายเข้าสัญญาสำเร็จ ✅", icon: "success", timer: 1200, showConfirmButton: false });
+      await fetchData();
+    } catch (err) {
+      setAttachSaving(false);
+      setAttachError(err?.response?.data?.message || "ย้ายเข้าสัญญาไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+    }
+  };
+
+  // ✅ ทิศทาง "ออก": แยกครั้งที่ N ออกจากสัญญา กลับไปเป็นงานเก่าที่ยังไม่จัดกลุ่ม (ต้องกดยืนยันแยกอีกที
+  // ถึงจะกลายเป็น "งานทั่วไป" จริงๆ) — ทำงานกับทั้งครั้ง (ทุก record ที่
+  // แชร์ contractGroupId+time เดียวกัน) ในคำขอเดียว ไม่ใช่แค่ record เดียว เผื่อครั้งนี้เข้างานไม่ต่อเนื่อง
+  const handleDetachRound = async (c, n) => {
+    const result = await Swal.fire({
+      icon: "warning",
+      title: `แยกครั้งที่ ${n} ออกจากสัญญา?`,
+      html: `
+        <div style="text-align:left;font-size:13px;">
+          <b>${c.company || "-"} · ${c.site || "-"}</b><br/>
+          งานนี้จะกลายเป็น "งานเก่าในระบบที่ยังไม่จัดกลุ่ม" แยกจากสัญญานี้ — ข้อมูลวันที่/สถานะ/ประวัติงานยังอยู่ครบ ไม่ถูกลบ
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: "แยกออก",
+      confirmButtonColor: "#dc2626",
+      cancelButtonText: "ยกเลิก",
+    });
+    if (!result.isConfirmed) return;
+    try {
+      await EventService.DetachFromContract(c.key, { time: n });
+      Swal.fire({ title: "แยกออกจากสัญญาสำเร็จ ✅", icon: "success", timer: 1200, showConfirmButton: false });
+      await fetchData();
+    } catch (err) {
+      Swal.fire({
+        title: "แยกออกไม่สำเร็จ",
+        text: err?.response?.data?.message || err.message,
+        icon: "error",
+      });
+    }
+  };
+
+  // ✅ ยืนยัน/ยกเลิกยืนยันว่างานนี้เป็น "งานทั่วไป" จริงๆ — ค่าเริ่มต้นของงานที่ไม่มี contractGroupId
+  // คือ "ยังไม่จัดกลุ่ม" เสมอ (แท็บ "งานเก่าในระบบที่ยังไม่จัดกลุ่ม") จนกว่าจะกดยืนยันตรงนี้ ถึงจะย้าย
+  // ไปแท็บ "งานทั่วไป" — กดซ้ำเพื่อยกเลิกยืนยันได้เช่นกัน (ย้ายกลับไปกอง "ยังไม่จัดกลุ่ม" เหมือนเดิม)
+  const handleToggleGeneral = async (c) => {
+    try {
+      await EventService.MarkAsGeneral(c.visits[0]._id, !c.isConfirmedGeneral);
+      await fetchData();
+    } catch (err) {
+      Swal.fire({
+        title: c.isConfirmedGeneral ? "ยกเลิกยืนยันไม่สำเร็จ" : "ยืนยันไม่สำเร็จ",
+        text: err?.response?.data?.message || err.message,
+        icon: "error",
+      });
+    }
+  };
+
   // ✅ กันช่างเปิดหน้านี้ตรงๆ ผ่าน URL — เทียบ pattern เดียวกับ TeamWorkload.js
   if (!loading && !isAdminOrManager) return <Navigate to="/dashboard" replace />;
 
@@ -959,9 +1103,9 @@ export default function ContractOverview() {
           (ชื่อหน้า/จำนวนอยู่แถวบน ปุ่มต่างๆ อยู่แถวล่าง เต็มความกว้าง) */}
       <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "stretch", sm: "flex-start" }} justifyContent="space-between" gap={1.25} sx={{ mb: 2 }}>
         <Box>
-          <Typography variant="h6" fontWeight={800}>ภาพรวมสัญญา</Typography>
+          <Typography variant="h6" fontWeight={800}>ภาพรวมงาน</Typography>
           <Typography variant="caption" color="text.secondary">
-            {loading ? "กำลังโหลด..." : `${filtered.length} สัญญา`}
+            {loading ? "กำลังโหลด..." : `${filtered.length} ${viewFilter === "contracts" ? "สัญญา" : "งาน"}`}
           </Typography>
         </Box>
         <Stack direction="row" gap={1}>
@@ -1011,8 +1155,9 @@ export default function ContractOverview() {
             sx={{ flexWrap: "nowrap", width: "max-content" }}
           >
             <ToggleButton value="contracts" sx={VIEW_TAB_SX}>สัญญา ({realContractCount})</ToggleButton>
+            <ToggleButton value="general" sx={VIEW_TAB_SX}>งานทั่วไป ({confirmedGeneralCount})</ToggleButton>
             <ToggleButton value="ungrouped" sx={VIEW_TAB_SX}>งานเก่าในระบบที่ยังไม่จัดกลุ่ม ({hiddenJobCount})</ToggleButton>
-            <ToggleButton value="all" sx={VIEW_TAB_SX}>ทั้งหมด ({contracts.length})</ToggleButton>
+            <ToggleButton value="all" sx={VIEW_TAB_SX}>ทั้งหมด ({allFilteredCount})</ToggleButton>
           </ToggleButtonGroup>
         </Box>
       )}
@@ -1076,22 +1221,58 @@ export default function ContractOverview() {
         />
         {/* ✅ กรองตารางตามปีของสัญญา (อิงวันที่เริ่มสัญญา ไม่งั้นอิงวันที่ครั้งแรก) — เดิมต้องไล่สโครล
             หาเองว่าปีไหนมีสัญญาอะไรบ้าง ทั้งที่สัญญาส่วนใหญ่ต่ออายุปีต่อปี ดูทีละปีจะเจอเร็วกว่า */}
+        {/* ✅ เน้นสีตอนกรองปีเจาะจงอยู่ (ไม่ใช่ "ทุกปี") ให้เห็นชัดว่ากำลังดูข้อมูลแค่ปีเดียว ไม่ใช่ทั้งหมด
+            — เดิมหน้าตาเหมือนช่องเปล่าๆ ทั่วไป มองไม่ออกว่ามีตัวกรองทำงานอยู่ (ทั้งที่ค่าเริ่มต้นล็อก
+            ปีปัจจุบันไว้ตั้งแต่แรกอยู่แล้ว ไม่ใช่ "ทุกปี") */}
         <TextField
           select size="small" label="ปี" value={yearFilter}
           onChange={(e) => setYearFilter(e.target.value)}
           SelectProps={{ native: true }}
-          sx={{ width: { xs: "100%", sm: 140 }, flexShrink: 0, "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: "background.paper" } }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <CalendarMonth sx={{ fontSize: 18, color: yearFilter !== "all" ? ACCENT : "text.disabled" }} />
+              </InputAdornment>
+            ),
+          }}
+          sx={{
+            width: { xs: "100%", sm: 155 }, flexShrink: 0,
+            "& .MuiOutlinedInput-root": {
+              borderRadius: 2.5,
+              bgcolor: yearFilter !== "all" ? alpha(ACCENT, 0.06) : "background.paper",
+              "& fieldset": yearFilter !== "all" ? { borderColor: alpha(ACCENT, 0.45) } : {},
+              "&:hover fieldset": yearFilter !== "all" ? { borderColor: ACCENT } : {},
+            },
+            "& .MuiInputLabel-root": yearFilter !== "all" ? { color: ACCENT, fontWeight: 700 } : {},
+          }}
         >
           <option value="all">ทุกปี</option>
           {availableYears.map((y) => <option key={y} value={y}>{y}</option>)}
         </TextField>
         {/* ✅ กรองตามผู้รับผิดชอบเจาะจงจากรายชื่อจริง — แยกจากช่องค้นหาข้อความด้านบนซึ่งพิมพ์ค้นหาแบบ
-            อิสระ (บางส่วน/สะกดผิดก็เจอ) ส่วนอันนี้เลือกจาก dropdown ให้ตรงเป๊ะไม่ต้องพิมพ์เอง */}
+            อิสระ (บางส่วน/สะกดผิดก็เจอ) ส่วนอันนี้เลือกจาก dropdown ให้ตรงเป๊ะไม่ต้องพิมพ์เอง —
+            เน้นสีเหมือนช่องปีด้านบนตอนเลือกคนใดคนหนึ่งอยู่ (ไม่ใช่ "ทุกคน") ให้ชัดเจนสอดคล้องกัน */}
         <TextField
           select size="small" label="ผู้รับผิดชอบ" value={teamFilter}
           onChange={(e) => setTeamFilter(e.target.value)}
           SelectProps={{ native: true }}
-          sx={{ width: { xs: "100%", sm: 170 }, flexShrink: 0, "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: "background.paper" } }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <PersonOutline sx={{ fontSize: 18, color: teamFilter !== "all" ? ACCENT : "text.disabled" }} />
+              </InputAdornment>
+            ),
+          }}
+          sx={{
+            width: { xs: "100%", sm: 185 }, flexShrink: 0,
+            "& .MuiOutlinedInput-root": {
+              borderRadius: 2.5,
+              bgcolor: teamFilter !== "all" ? alpha(ACCENT, 0.06) : "background.paper",
+              "& fieldset": teamFilter !== "all" ? { borderColor: alpha(ACCENT, 0.45) } : {},
+              "&:hover fieldset": teamFilter !== "all" ? { borderColor: ACCENT } : {},
+            },
+            "& .MuiInputLabel-root": teamFilter !== "all" ? { color: ACCENT, fontWeight: 700 } : {},
+          }}
         >
           <option value="all">ทุกคน</option>
           {teamOptions.map((name) => <option key={name} value={name}>{name}</option>)}
@@ -1150,7 +1331,7 @@ export default function ContractOverview() {
                 <ResizableTh width={colWidth("visitCount")} align="center" rowSpan={2} columnKey="visitCount" tableRef={tableRef} onResize={handleColResize("visitCount")}>จำนวนครั้ง</ResizableTh>
                 <ResizableTh width={colWidth("jobValue")} align="right" rowSpan={2} columnKey="jobValue" tableRef={tableRef} onResize={handleColResize("jobValue")}>มูลค่างาน/1ปี</ResizableTh>
                 <ResizableTh width={colWidth("status")} align="center" rowSpan={2} columnKey="status" tableRef={tableRef} onResize={handleColResize("status")}>สถานะสัญญา</ResizableTh>
-                <ResizableTh width={colWidth("progress")} align="center" rowSpan={2} columnKey="progress" tableRef={tableRef} onResize={handleColResize("progress")}>ความคืบหน้า</ResizableTh>
+                <ResizableTh width={colWidth("progress")} align="center" rowSpan={2} columnKey="progress" tableRef={tableRef} onResize={handleColResize("progress")}>คืบหน้า</ResizableTh>
                 {visitColumns.map((n) => (
                   <ResizableTh key={n} width={colWidth(`visit_${n}`)} align="center" rowSpan={2} columnKey={`visit_${n}`} tableRef={tableRef} onResize={handleColResize(`visit_${n}`)}>ครั้งที่ {n}</ResizableTh>
                 ))}
@@ -1349,16 +1530,37 @@ export default function ContractOverview() {
                               </Link>
                             ))}
                             {c.isRealContract && (
-                              <Tooltip title="เพิ่มวันที่ต่อเนื่อง (เข้างานไม่ติดกัน)">
-                                <IconButton size="small" onClick={() => openExtendVisitDialog(c, n)} sx={{ p: 0.25, color: "text.disabled", "&:hover": { color: ACCENT } }}>
-                                  <Add sx={{ fontSize: 14 }} />
-                                </IconButton>
-                              </Tooltip>
+                              <Stack direction="row" spacing={0.25}>
+                                <Tooltip title="เพิ่มวันที่ต่อเนื่อง (เข้างานไม่ติดกัน)">
+                                  <IconButton size="small" onClick={() => openExtendVisitDialog(c, n)} sx={{ p: 0.25, color: "text.disabled", "&:hover": { color: ACCENT } }}>
+                                    <Add sx={{ fontSize: 14 }} />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="แยกครั้งนี้ออกจากสัญญา (ย้ายเป็นงานเก่าที่ยังไม่จัดกลุ่ม)">
+                                  <IconButton size="small" onClick={() => handleDetachRound(c, n)} sx={{ p: 0.25, color: "text.disabled", "&:hover": { color: ACCENT } }}>
+                                    <LinkOff sx={{ fontSize: 14 }} />
+                                  </IconButton>
+                                </Tooltip>
+                              </Stack>
                             )}
                           </Stack>
                         ) : pendingDraft ? (
-                          <Tooltip title="วางแผนล่วงหน้าไว้แล้ว ยังไม่ได้ลงวันที่จริง">
-                            <Box component="span" sx={{ fontSize: "0.72rem", color: "#b45309", fontWeight: 600, whiteSpace: "nowrap" }}>
+                          // ✅ กดได้เลย — พาไปหน้าปฏิทิน เจาะจงงานนี้ในแผงงานล่วงหน้าเลย (เดิมโชว์
+                          // แค่ตัวหนังสือเฉยๆ กดไม่ได้ ต้องไปไล่หาเองว่าอยู่เดือนไหน/หน้าไหน) เห็นชัดว่า
+                          // กดได้จากพื้นหลังชิป + ขีดเส้นใต้ตอน hover เหมือนลิงก์อื่นในตารางนี้
+                          <Tooltip title="วางแผนล่วงหน้าไว้แล้ว ยังไม่ได้ลงวันที่จริง — กดเพื่อไปดูงานนี้">
+                            <Box
+                              component={Link}
+                              to={`/event?draft=${pendingDraft._id}${pendingDraft.plannedMonth ? `&month=${pendingDraft.plannedMonth}` : ""}`}
+                              sx={{
+                                fontSize: "0.72rem", color: "#b45309", fontWeight: 600, whiteSpace: "nowrap",
+                                textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 0.4,
+                                px: 0.75, py: 0.25, borderRadius: 1.5, bgcolor: alpha("#f59e0b", 0.1),
+                                border: "1px solid", borderColor: alpha("#f59e0b", 0.3),
+                                transition: "background-color 0.15s ease, border-color 0.15s ease",
+                                "&:hover": { bgcolor: alpha("#f59e0b", 0.2), borderColor: "#b45309", textDecoration: "underline" },
+                              }}
+                            >
                               📌 รอวางแผน
                             </Box>
                           </Tooltip>
@@ -1410,6 +1612,23 @@ export default function ContractOverview() {
                     onCancel={cancelEdit}
                   />
                   <TableCell align="center" sx={{ width: colWidth("actions") }}>
+                    {!c.isRealContract && (
+                      <Tooltip title={c.isConfirmedGeneral ? "ยืนยันเป็นงานทั่วไปแล้ว — กดเพื่อยกเลิก" : "ยืนยันเป็นงานทั่วไป"}>
+                        <IconButton
+                          size="small" onClick={() => handleToggleGeneral(c)}
+                          sx={{ color: c.isConfirmedGeneral ? "#10b981" : "text.disabled", "&:hover": { color: "#10b981" } }}
+                        >
+                          {c.isConfirmedGeneral ? <CheckCircle fontSize="small" /> : <CheckCircleOutline fontSize="small" />}
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    {!c.isRealContract && (
+                      <Tooltip title="ย้ายเข้าสัญญาที่มีอยู่แล้ว">
+                        <IconButton size="small" onClick={() => openAttachDialog(c)} sx={{ color: "text.disabled", "&:hover": { color: ACCENT } }}>
+                          <AddLink fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                     <Tooltip title={c.isRealContract ? "ลบสัญญานี้ทั้งหมด" : "ลบงานนี้"}>
                       <IconButton size="small" onClick={() => handleDeleteContract(c)} sx={{ color: "text.disabled", "&:hover": { color: ACCENT } }}>
                         <DeleteOutline fontSize="small" />
@@ -1581,6 +1800,81 @@ export default function ContractOverview() {
             sx={{ bgcolor: ACCENT, textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#b91c1c" } }}
           >
             {addVisitSaving ? "กำลังบันทึก..." : "บันทึก"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ✅ ย้ายงานทั่วไปเข้าสัญญาที่มีอยู่แล้ว — แก้ไขกรณีจัดกลุ่มผิด (สร้างเป็นงานเดี่ยวทั้งที่จริง
+          ควรอยู่ในสัญญานี้) ต่างจากปุ่ม "จัดกลุ่มเป็นสัญญา" ที่สร้างสัญญาใหม่เสมอ */}
+      <Dialog open={Boolean(attachTarget)} onClose={closeAttachDialog} fullWidth maxWidth="xs" fullScreen={isMobile}>
+        <DialogTitle sx={{ fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          ย้ายเข้าสัญญาที่มีอยู่แล้ว
+          <IconButton size="small" onClick={closeAttachDialog}><Close fontSize="small" /></IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={2} sx={{ mt: 0.5 }}>
+            {attachTarget && (
+              <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: alpha(ACCENT, 0.06) }}>
+                <Typography variant="body2" fontWeight={700}>{attachTarget.company || "-"} · {attachTarget.site || "-"}</Typography>
+                <Typography variant="caption" color="text.secondary">{attachTarget.title} · {attachTarget.system}</Typography>
+              </Box>
+            )}
+            {attachError && <Alert severity="error">{attachError}</Alert>}
+            <TextField
+              select fullWidth size="small" label="เลือกสัญญาปลายทาง"
+              value={attachContractId}
+              onChange={(e) => { setAttachContractId(e.target.value); setAttachRound(""); }}
+              SelectProps={{ native: true }}
+              InputLabelProps={{ shrink: true }}
+            >
+              <option value="">— เลือกสัญญา —</option>
+              {attachableContracts.map((x) => (
+                <option key={x.key} value={x.key}>
+                  {[x.company, x.site].filter(Boolean).join(" · ") || "(ไม่ระบุชื่อ)"}{x.contractNo ? ` · ${x.contractNo}` : ""}
+                </option>
+              ))}
+            </TextField>
+            {selectedAttachContract && (
+              <Box>
+                <Typography variant="caption" fontWeight={700} color="text.secondary">
+                  เลือกครั้งที่ — ครั้งที่ลงตารางแล้ว (✅) เลือกได้เหมือนกัน จะต่อเป็นงานเดียวกัน (ไม่นับเป็นครั้งใหม่)
+                </Typography>
+                <Stack direction="row" gap={1} flexWrap="wrap" sx={{ mt: 0.75 }}>
+                  {attachRoundOptions.map((opt) => {
+                    const selectable = opt.status === "open" || opt.status === "scheduled";
+                    return (
+                    <Tooltip
+                      key={opt.n}
+                      title={opt.status === "scheduled" ? "ลงตารางแล้ว — เลือกเพื่อต่อเป็นงานเดียวกัน (ไม่นับครั้งใหม่)"
+                        : opt.status === "pending" ? "มีแผนงานล่วงหน้าจองไว้แล้ว ยังไม่มีวันที่จริง — เลือกไม่ได้"
+                        : "ครั้งว่าง"}
+                    >
+                      <span>
+                        <Chip
+                          label={opt.status === "scheduled" ? `✅ ${opt.n}` : opt.status === "pending" ? `📌 ${opt.n}` : opt.n}
+                          clickable={selectable}
+                          disabled={!selectable}
+                          onClick={() => selectable && setAttachRound(String(opt.n))}
+                          color={String(attachRound) === String(opt.n) ? "error" : "default"}
+                          variant={String(attachRound) === String(opt.n) ? "filled" : "outlined"}
+                          sx={{ fontWeight: 700 }}
+                        />
+                      </span>
+                    </Tooltip>
+                    );
+                  })}
+                </Stack>
+              </Box>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={closeAttachDialog} disabled={attachSaving} sx={{ textTransform: "none" }}>ยกเลิก</Button>
+          <Button
+            variant="contained" onClick={handleAttachSubmit} disabled={attachSaving || !attachContractId || !attachRound}
+            sx={{ bgcolor: ACCENT, textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#b91c1c" } }}
+          >
+            {attachSaving ? "กำลังบันทึก..." : "ย้ายเข้าสัญญา"}
           </Button>
         </DialogActions>
       </Dialog>

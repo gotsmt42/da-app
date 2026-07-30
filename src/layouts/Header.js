@@ -128,7 +128,7 @@ const Header = ({ toggleMobileSidebar }) => {
                 to="/contracts"
                 className={`nav-link d-flex align-items-center gap-2 ${location.pathname.startsWith("/contracts") ? "active" : ""}`}
               >
-                <FaFileContract size={13} /> ภาพรวมสัญญา
+                <FaFileContract size={13} /> ภาพรวมงาน
               </Link>
             </NavItem>
           )}
@@ -153,7 +153,7 @@ const Header = ({ toggleMobileSidebar }) => {
             >
               <FaFileContract size={12} />
             </Badge>
-            <span>ภาพรวมสัญญา</span>
+            <span>ภาพรวมงาน</span>
           </Link>
         )}
 

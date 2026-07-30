@@ -177,7 +177,7 @@ const ThemeRoutes = [
             <ContractOverview />
           </Suspense>
         ),
-        title: "Contract Overview",
+        title: "Job Overview",
       },
       {
         path: "employee",

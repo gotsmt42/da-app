@@ -5,7 +5,7 @@ import React, {
   useMemo,
   useCallback,
 } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
@@ -106,6 +106,7 @@ const faIconToSvg = (iconDef, { size = 12, color = "#000000" } = {}) => {
 
 function EventCalendar() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const { userData } = useAuth(); // ✅ เปลี่ยนจาก user → userData
   const isAdmin = userData?.role?.toLowerCase() === "admin"; // ✅ รองรับ case-insensitive
@@ -159,6 +160,9 @@ function EventCalendar() {
   const [draftsLoading, setDraftsLoading] = useState(false);
   const [showDraftsPanel, setShowDraftsPanel] = useState(false);
   const [draftMonth, setDraftMonth] = useState(moment().format("YYYY-MM"));
+  // ✅ ?draft=<id>&month=YYYY-MM — ใช้ตอนกดลิงก์ "📌 รอวางแผน" จากตาราง ภาพรวมสัญญา (ContractOverview.js)
+  // พาไปเจาะจงงานนั้นในแผงงานล่วงหน้าเลย แทนที่จะต้องมาไล่หาเองว่าอยู่เดือนไหน/หน้าไหน
+  const [highlightDraftId, setHighlightDraftId] = useState("");
 
   const calendarRef = useRef(null);
   // ✅ ใช้เช็คว่าตอนลากงานจากปฏิทินจริงออกมา (eventDragStop) ปล่อยเมาส์ทับแผงนี้หรือเปล่า
@@ -173,6 +177,22 @@ function EventCalendar() {
     fetchDrafts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ✅ ?draft=<id>&month=YYYY-MM (+ ?t=nonce กันกดลิงก์ซ้ำงานเดิมไม่เห็นผล) — เปิดแผงงานล่วงหน้า
+  // สลับไปเดือนที่ถูกต้องให้อัตโนมัติ แล้วส่ง highlightDraftId ลงไปให้ UnscheduledPanel เลื่อนจอ/
+  // ไฮไลต์การ์ดนั้นเอง (ดู UnscheduledPanel.js) — deps: [searchParams] ไม่ใช่ mount-only เพราะกดลิงก์
+  // ซ้ำจากหน้าเดิม (React Router ไม่ remount) ต้องทำงานซ้ำได้ทุกครั้งที่ query เปลี่ยน
+  useEffect(() => {
+    const draftParam = searchParams.get("draft");
+    const monthParam = searchParams.get("month");
+    if (!draftParam) return;
+    setShowDraftsPanel(true);
+    if (monthParam && /^\d{4}-\d{2}$/.test(monthParam)) {
+      setDraftMonth(monthParam);
+      calendarRef.current?.getApi()?.gotoDate(moment(monthParam, "YYYY-MM").format("YYYY-MM-DD"));
+    }
+    setHighlightDraftId(`${draftParam}|${searchParams.get("t") || Date.now()}`);
+  }, [searchParams]);
 
   // ✅ Realtime: รีเฟรชข้อมูลเงียบๆ ทุก 30 วินาที เพื่อให้เห็นการเปลี่ยนแปลง
   // จากคนอื่น (เพิ่ม/แก้ไข/ลบ event) โดยไม่ต้องกดรีเฟรชหน้าเอง
@@ -406,6 +426,7 @@ function EventCalendar() {
       AuthService,
       JobTypeService,
       SystemTypeService,
+      EventService,
       Swal,
       TomSelect,
       moment,
@@ -1174,6 +1195,7 @@ function EventCalendar() {
           onEditClick={handleEditDraftClick}
           onScheduleClick={handleScheduleDraftClick}
           onDeleteClick={handleDeleteDraftClick}
+          highlightDraftId={highlightDraftId}
         />
       )}
 

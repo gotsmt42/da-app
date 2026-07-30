@@ -36,11 +36,16 @@ const UnscheduledPanel = forwardRef(function UnscheduledPanel(
     onEditClick,
     onScheduleClick,
     onDeleteClick,
+    highlightDraftId, // ✅ "<id>|<nonce>" — มาจากลิงก์ "📌 รอวางแผน" ในตาราง ContractOverview.js
   },
   panelRef,
 ) {
   const listRef = useRef(null);
   const [page, setPage] = useState(1);
+  // ✅ แยก nonce ออกจาก id — กันเคสกดลิงก์งานเดิมซ้ำติดๆ กัน (ก่อนไฮไลต์ครั้งก่อนจะจางหายไปครบ)
+  // ถ้าใช้แค่ id เฉยๆ ค่าจะเหมือนเดิมทุกตัวอักษร React จะมองว่าไม่มีอะไรเปลี่ยน ไม่ trigger effect ซ้ำ
+  const highlightId = highlightDraftId ? highlightDraftId.split("|")[0] : "";
+  const [activeHighlight, setActiveHighlight] = useState("");
 
   // ✅ กลับไปหน้า 1 ทุกครั้งที่เปลี่ยนเดือน — ไม่งั้นสลับเดือนไปมาอาจค้างอยู่หน้าที่ไม่มีจริง
   // ในเดือนใหม่ (เช่น เดือนก่อนมี 3 หน้า อยู่หน้า 3 แล้วสลับมาเดือนที่มีแค่ 1 หน้า)
@@ -52,6 +57,31 @@ const UnscheduledPanel = forwardRef(function UnscheduledPanel(
   // ✅ กันหน้าปัจจุบันเกินจำนวนหน้าจริง (เช่น ลบใบสุดท้ายของหน้าสุดท้ายทิ้งไป)
   const safePage = Math.min(page, totalPages);
   const pagedDrafts = drafts.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  // ✅ งานที่ถูกลิงก์มาเจาะจง (จากปุ่ม "📌 รอวางแผน" ในตาราง ภาพรวมสัญญา) อาจไม่ได้อยู่หน้าแรกของ
+  // เดือนนี้ (แบ่งหน้าอยู่) — หาก่อนว่าอยู่หน้าไหนแล้วกระโดดไปหน้านั้นให้อัตโนมัติ (ทำงานหลัง effect
+  // รีเซ็ตหน้ากลับ 1 ตอนเปลี่ยนเดือนด้านบนเสมอ เพราะประกาศไว้ทีหลัง)
+  useEffect(() => {
+    if (!highlightId || drafts.length === 0) return;
+    const idx = drafts.findIndex((d) => d._id === highlightId);
+    if (idx === -1) return;
+    const targetPage = Math.floor(idx / PAGE_SIZE) + 1;
+    setPage((p) => (p === targetPage ? p : targetPage));
+  }, [highlightId, drafts]);
+
+  // ✅ พอเปลี่ยนไปหน้าที่ถูกต้องแล้ว (pagedDrafts มีการ์ดนี้อยู่จริง) ค่อยเลื่อนจอไปหาการ์ดนั้น แล้วให้
+  // กรอบไฮไลต์กะพริบชั่วคราว 3 วิ ไม่ค้างตลอดไป — deps ใช้ highlightDraftId (ตัวเต็มที่มี nonce ต่อท้าย)
+  // ไม่ใช่ highlightId เฉยๆ กันเคสกดลิงก์งานเดิมซ้ำติดๆ กันแล้วไม่มีอะไรเปลี่ยนจน effect ไม่ทำงานซ้ำ
+  useEffect(() => {
+    if (!highlightId) return;
+    const el = document.getElementById(`draft-card-${highlightId}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    setActiveHighlight(highlightId);
+    const timer = setTimeout(() => setActiveHighlight(""), 3000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightDraftId, pagedDrafts]);
   // ✅ เดิมมี 3 ปุ่มเรียงกัน (แก้ไข/ลงตาราง/ลบ) แน่นเกินไปบนการ์ดแคบๆ โดยเฉพาะจอมือถือ —
   // เหลือแค่ "ลงตาราง" (ปุ่มหลักที่ใช้บ่อยสุด) ให้กดตรงๆ ส่วน แก้ไข/ลบ ซ่อนไว้ใน "⋮" แทน
   //
@@ -130,10 +160,12 @@ const UnscheduledPanel = forwardRef(function UnscheduledPanel(
               extendedProps: { draftId: d._id },
             };
             const isMenuOpen = menuState?.id === d._id;
+            const isHighlighted = activeHighlight === d._id;
             return (
               <div
                 key={d._id}
-                className="draft-card"
+                id={`draft-card-${d._id}`}
+                className={`draft-card ${isHighlighted ? "draft-card--highlighted" : ""}`}
                 data-event={JSON.stringify(eventData)}
                 title="ลากไปวางบนวันที่ต้องการในปฏิทิน"
               >

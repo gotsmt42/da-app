@@ -361,6 +361,18 @@
 .draft-card:hover { border-color: #fca5a5; box-shadow: 0 2px 8px rgba(220, 38, 38, 0.08); }
 .draft-card:active { cursor: grabbing; }
 
+/* ✅ ไฮไลต์ชั่วคราว (3 วิ) — ใช้ตอนกดลิงก์ "📌 รอวางแผน" จากตาราง ภาพรวมสัญญา พาเจาะจงมาที่การ์ดนี้ */
+.draft-card--highlighted {
+  border-color: #f59e0b !important;
+  border-width: 2px;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.22) !important;
+  animation: draftCardHighlightPulse 0.9s ease-in-out 3;
+}
+@keyframes draftCardHighlightPulse {
+  0%, 100% { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.22); }
+  50% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0.08); }
+}
+
 .draft-card-grip {
   flex-shrink: 0;
   color: #cbd5e1;

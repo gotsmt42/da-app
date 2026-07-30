@@ -141,21 +141,52 @@ function injectAddStyles() {
     .ae-contract-pick-info .ae-cpi-sub { font-size: 12px; color: #64748b; margin-top: 2px; }
 
     /* ── ตาราง "เลือกครั้งที่" — สถานะรายครั้งตรงกับตาราง ContractOverview.js เป๊ะๆ ── */
-    .ae-round-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .ae-round-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
     .ae-round-chip {
+      position: relative;
       display: inline-flex; align-items: center; justify-content: center;
       min-width: 42px; height: 32px; padding: 0 10px; border-radius: 8px;
       font-size: 12px; font-weight: 700; border: 1.5px solid #e2e8f0;
       background: #fff; color: #64748b; font-family: inherit;
     }
     button.ae-round-chip--open {
-      cursor: pointer; color: #1e293b; transition: border-color .15s, background .15s;
+      cursor: pointer; color: #1e293b; transition: border-color .15s, background .15s, box-shadow .15s, transform .15s;
     }
     button.ae-round-chip--open:hover { border-color: #dc2626; }
+    /* ✅ เดิมแค่เปลี่ยนสีขอบ/พื้นหลังบางๆ มองไม่ออกชัดว่าอันไหนถูกเลือกอยู่ (โดยเฉพาะครั้งที่ลงตาราง
+       แล้วซึ่งเป็นสีเขียวอยู่แล้วเหมือนกันทุกอัน) — เพิ่มขอบหนา 2px + วงแหวนเรืองแสงรอบตัว (box-shadow)
+       + ขยายขนาดเล็กน้อย (scale) + เครื่องหมาย ✓ มุมขวาบน ให้เห็นชัดเจนไม่ต้องเพ่ง */
     .ae-round-chip--selected {
-      border-color: #dc2626 !important; background: #fef2f2 !important; color: #b91c1c !important;
+      border: 2px solid #dc2626 !important; background: #fef2f2 !important; color: #b91c1c !important;
+      box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.18); transform: scale(1.08);
     }
-    .ae-round-chip--scheduled { border-color: #bbf7d0; background: #f0fdf4; color: #15803d; cursor: not-allowed; }
+    /* ✅ ครั้งที่ลงตารางแล้วยังกดได้ — ใช้ตอนงานเข้าไม่ต่อเนื่อง (เว้นช่วงแล้วกลับมาเข้าครั้งเดิมอีก)
+       เดิมเป็น <span> กดไม่ได้เลย บังคับให้ต้องข้ามไปครั้งถัดไปเสมอทั้งที่ตั้งใจจะต่อวันที่ให้ครั้งเดิม */
+    .ae-round-chip--scheduled { border-color: #bbf7d0; background: #f0fdf4; color: #15803d; }
+    button.ae-round-chip--scheduled {
+      cursor: pointer; transition: border-color .15s, background .15s, box-shadow .15s, transform .15s;
+    }
+    button.ae-round-chip--scheduled:hover { border-color: #15803d; background: #dcfce7; }
+    .ae-round-chip--selected-extend {
+      border: 2px solid #15803d !important; background: #bbf7d0 !important; color: #14532d !important;
+      box-shadow: 0 0 0 4px rgba(21, 128, 61, 0.2); transform: scale(1.08);
+    }
+    .ae-round-chip--selected::after,
+    .ae-round-chip--selected-extend::after {
+      content: "✓"; position: absolute; top: -7px; right: -7px;
+      width: 16px; height: 16px; border-radius: 50%; color: #fff;
+      font-size: 10px; font-weight: 900; line-height: 16px; text-align: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,.3);
+    }
+    .ae-round-chip--selected::after { background: #dc2626; }
+    .ae-round-chip--selected-extend::after { background: #15803d; }
+    /* ✅ สรุปเป็นข้อความชัดๆ อีกชั้นใต้ตาราง กันพลาดกรณีสีเดียวกันหลายอันดูแยกยาก */
+    .ae-round-picked-hint {
+      font-size: 12.5px; font-weight: 600; margin: 0 0 16px; min-height: 18px;
+    }
+    .ae-round-chip--selected-extend {
+      border-color: #15803d !important; background: #dcfce7 !important; color: #14532d !important;
+    }
     .ae-round-chip--pending { border-color: #fde68a; background: #fffbeb; color: #b45309; cursor: not-allowed; }
 
     /* ── Date badge (แสดงวันที่คลิก) ── */
@@ -277,6 +308,7 @@ export const getAddEvent = async ({
   AuthService,
   JobTypeService,
   SystemTypeService,
+  EventService,
   Swal,
   TomSelect,
   moment,
@@ -418,8 +450,8 @@ export const getAddEvent = async ({
     ${selectableContracts.length === 0
       ? `<p class="ae-jobtype-note" style="display:block;">${
           contractList.length === 0
-            ? `ยังไม่มีสัญญาในระบบ — สร้างสัญญาใหม่ได้ที่หน้า "ภาพรวมสัญญา" ก่อน`
-            : `สัญญาที่มีอยู่ครบจำนวนครั้งหมดแล้ว — สร้างสัญญาใหม่ได้ที่หน้า "ภาพรวมสัญญา"`
+            ? `ยังไม่มีสัญญาในระบบ — สร้างสัญญาใหม่ได้ที่หน้า "ภาพรวมงาน" ก่อน`
+            : `สัญญาที่มีอยู่ครบจำนวนครั้งหมดแล้ว — สร้างสัญญาใหม่ได้ที่หน้า "ภาพรวมงาน"`
         }</p>`
       : ""}
 
@@ -527,6 +559,7 @@ export const getAddEvent = async ({
 
       <p class="ae-section-label">ขั้นตอนที่ 3 — เลือกครั้งที่จะลงวันที่</p>
       <div class="ae-round-grid" id="ae-roundGrid"></div>
+      <p class="ae-round-picked-hint" id="ae-roundPickedHint"></p>
       <input type="hidden" id="ae-selectedRound" value="">
 
       <p class="ae-section-label">ขั้นตอนที่ 4 — วันที่เข้างาน</p>
@@ -677,32 +710,56 @@ export const getAddEvent = async ({
       // ✅ สร้างตาราง "เลือกครั้งที่" ตามสถานะจริงของแต่ละครั้ง (ลงตารางแล้ว/รอวางแผน/ว่าง) — เทียบ
       // pattern เดียวกับคอลัมน์ "ครั้งที่ N" ใน ContractOverview.js เป๊ะๆ กันตัวเลขไม่ตรงกับความจริง
       // เช่น ถ้าครั้งที่ 2 เคยลบทิ้งไป ตารางนี้ต้องโชว์ว่าง (ไม่ใช่ข้ามไปเสนอครั้งที่ 5 เพราะนับจำนวนดิบ)
+      // ✅ ครั้งที่ลงตารางแล้ว (scheduled) ยังกดเลือกได้ — ไม่ใช่แค่ครั้งที่ว่างเท่านั้น เพราะงานที่เข้า
+      // ไม่ต่อเนื่อง (เว้นช่วงแล้วกลับมาเข้าครั้งเดิมอีก) ต้อง "ต่อวันที่ให้ครั้งเดิม" ได้ ไม่ใช่ถูกบังคับ
+      // เลื่อนไปครั้งถัดไปเสมอเพราะครั้งที่ต้องการถูกล็อกไว้กดไม่ได้ (ดู handler ปุ่มยืนยันด้านล่างที่
+      // เช็ค selectedRoundInput.dataset.extend เพื่อตัดสินว่าจะสร้างครั้งใหม่หรือต่อวันที่ให้ครั้งเดิม)
+      const roundPickedHint = document.getElementById("ae-roundPickedHint");
+      // ✅ สรุปตัวเลือกปัจจุบันเป็นข้อความชัดๆ อีกชั้น กันเคส chip สีเขียวเหมือนกันหลายอัน (ครั้งที่ลง
+      // ตารางแล้ว) มองแยกไม่ออกว่าอันไหนถูกเลือกอยู่จริงจากสีอย่างเดียว
+      const updateRoundPickedHint = (round, isExtend) => {
+        if (!roundPickedHint) return;
+        if (!round) { roundPickedHint.textContent = ""; return; }
+        roundPickedHint.textContent = isExtend
+          ? `✅ กำลังเพิ่มวันที่ไม่ต่อเนื่องให้ "ครั้งที่ ${round}" (ครั้งเดิม ไม่นับเป็นครั้งใหม่)`
+          : `🆕 กำลังจะสร้าง "ครั้งที่ ${round}" เป็นครั้งใหม่`;
+        roundPickedHint.style.color = isExtend ? "#15803d" : "#b91c1c";
+      };
+
       const renderRoundGrid = (c) => {
         if (!roundGrid || !selectedRoundInput) return;
         selectedRoundInput.value = "";
-        if (!c || !c.visitCount) { roundGrid.innerHTML = ""; return; }
+        selectedRoundInput.dataset.extend = "0";
+        if (!c || !c.visitCount) { roundGrid.innerHTML = ""; updateRoundPickedHint(null); return; }
         let defaultOpen = null;
         const rounds = Array.from({ length: c.visitCount }, (_, i) => i + 1);
         roundGrid.innerHTML = rounds.map((n) => {
           const scheduled = c.visits.find((v) => !v.unscheduled && Number(v.time) === n);
           if (scheduled) {
             const dateLabel = moment(scheduled.start || scheduled.date).format("DD MMM YY");
-            return `<span class="ae-round-chip ae-round-chip--scheduled" title="ลงตารางแล้ว — ${dateLabel}">✅ ${n}</span>`;
+            return `<button type="button" class="ae-round-chip ae-round-chip--scheduled" data-round="${n}" data-extend="1" title="ลงตารางแล้ว — ${dateLabel} · กดเพื่อเพิ่มวันที่ไม่ต่อเนื่องให้ครั้งนี้">✅ ${n}</button>`;
           }
           const pending = c.visits.find((v) => v.unscheduled && Number(v.time) === n);
           if (pending) {
             return `<span class="ae-round-chip ae-round-chip--pending" title="มีแผนงานล่วงหน้าจองครั้งนี้ไว้แล้ว — ไปลงวันที่จริงที่แผงงานล่วงหน้าแทน">📌 ${n}</span>`;
           }
           if (defaultOpen === null) defaultOpen = n;
-          return `<button type="button" class="ae-round-chip ae-round-chip--open" data-round="${n}">${n}</button>`;
+          return `<button type="button" class="ae-round-chip ae-round-chip--open" data-round="${n}" data-extend="0">${n}</button>`;
         }).join("");
         selectedRoundInput.value = defaultOpen || "";
-        roundGrid.querySelectorAll(".ae-round-chip--open").forEach((btn) => {
-          if (Number(btn.dataset.round) === defaultOpen) btn.classList.add("ae-round-chip--selected");
-          btn.addEventListener("click", () => {
-            roundGrid.querySelectorAll(".ae-round-chip--open").forEach((b) => b.classList.remove("ae-round-chip--selected"));
+        updateRoundPickedHint(defaultOpen, false);
+        roundGrid.querySelectorAll(".ae-round-chip--open, .ae-round-chip--scheduled").forEach((btn) => {
+          if (btn.classList.contains("ae-round-chip--open") && Number(btn.dataset.round) === defaultOpen) {
             btn.classList.add("ae-round-chip--selected");
+          }
+          btn.addEventListener("click", () => {
+            roundGrid.querySelectorAll(".ae-round-chip--open, .ae-round-chip--scheduled").forEach((b) =>
+              b.classList.remove("ae-round-chip--selected", "ae-round-chip--selected-extend")
+            );
+            btn.classList.add(btn.dataset.extend === "1" ? "ae-round-chip--selected-extend" : "ae-round-chip--selected");
             selectedRoundInput.value = btn.dataset.round;
+            selectedRoundInput.dataset.extend = btn.dataset.extend;
+            updateRoundPickedHint(btn.dataset.round, btn.dataset.extend === "1");
           });
         });
       };
@@ -764,20 +821,25 @@ export const getAddEvent = async ({
 
         const jobType = document.querySelector('input[name="ae-jobType"]:checked')?.value || "general";
 
-        /* ── ขั้นตอนที่ 1 = "งานตามสัญญา": เลือกจากสัญญาที่มีอยู่แล้วเท่านั้น เพิ่มแค่ครั้งถัดไป ── */
+        /* ── ขั้นตอนที่ 1 = "งานตามสัญญา": เลือกจากสัญญาที่มีอยู่แล้วเท่านั้น เพิ่มครั้งถัดไป
+           หรือ "ต่อวันที่ไม่ต่อเนื่อง" ให้ครั้งที่ลงตารางแล้วก็ได้ (ดู renderRoundGrid ด้านบน) ── */
         if (jobType === "contract") {
           const contractId = getVal("ae-contractPick");
           if (!contractId) { Swal.showValidationMessage("กรุณาเลือกสัญญา"); return; }
           const c = contractMap.get(contractId);
           if (!c) { Swal.showValidationMessage("ไม่พบสัญญาที่เลือก กรุณาเลือกใหม่"); return; }
-          if (c.usedVisits >= c.visitCount) {
-            Swal.showValidationMessage("สัญญานี้ครบตามจำนวนครั้งที่กำหนดไว้แล้ว");
-            return;
-          }
           // ✅ อ่านครั้งที่จากตาราง "เลือกครั้งที่" ที่ผู้ใช้กดเลือกไว้ แทนการนับจำนวน+1 แบบเดิม —
           // กันเคสครั้งกลางๆ เคยถูกลบทิ้งไปแล้ว ตัวเลขจะได้ตรงกับที่ตาราง ContractOverview.js แสดงจริง
           const selectedRound = Number(getVal("ae-selectedRound"));
           if (!selectedRound) { Swal.showValidationMessage("กรุณาเลือกครั้งที่ที่ต้องการลงวันที่"); return; }
+          // ✅ isExtend = ผู้ใช้กดเลือกครั้งที่ "ลงตารางแล้ว" (chip สีเขียว) ตั้งใจต่อวันที่ไม่ต่อเนื่อง
+          // ให้ครั้งเดิม ไม่ใช่เพิ่มครั้งใหม่ — ไม่กินโควตาจำนวนครั้งเพิ่ม จึงต้องข้ามเช็ค usedVisits
+          // ด้านล่าง (ครั้งสุดท้ายของสัญญาที่ครบจำนวนแล้วก็ยังต่อวันที่ไม่ต่อเนื่องให้ได้)
+          const isExtend = document.getElementById("ae-selectedRound")?.dataset.extend === "1";
+          if (!isExtend && c.usedVisits >= c.visitCount) {
+            Swal.showValidationMessage("สัญญานี้ครบตามจำนวนครั้งที่กำหนดไว้แล้ว");
+            return;
+          }
 
           const cpStart = getVal("ae-cpStart");
           const cpEnd = getVal("ae-cpEnd") || cpStart;
@@ -791,6 +853,21 @@ export const getAddEvent = async ({
           try {
             const cpTeam = getVal("ae-cpTeam") || c.team;
             const nextIndex = selectedRound;
+
+            // ✅ ต่อวันที่ไม่ต่อเนื่องให้ "ครั้งเดิม" — ต้องผูก jobGroupId เดียวกันกับ document เดิมของ
+            // ครั้งนี้ (ถ้ายังไม่เคยถูกต่อมาก่อนก็ย้อนกลับไปใส่ jobGroupId ให้ document เดิมก่อน) เทียบ
+            // pattern เดียวกับ ContractOverview.js openExtendVisitDialog/handleAddVisitSubmit เป๊ะๆ
+            // backend เช็คว่า jobGroupId ตรงกับของเดิมถึงจะไม่ถือว่าเป็นครั้งซ้ำ/เกินโควตา (ดู POST /events)
+            let jobGroupId;
+            if (isExtend) {
+              const roundVisits = c.visits.filter((v) => !v.unscheduled && Number(v.time) === nextIndex);
+              const holder = roundVisits.find((v) => v.jobGroupId) || roundVisits[0];
+              jobGroupId = holder?.jobGroupId || `${holder?._id}-${Date.now()}`;
+              if (holder && !holder.jobGroupId) {
+                await EventService.UpdateEvent(holder._id, { jobGroupId });
+              }
+            }
+
             const newEvent = {
               company: c.company, site: c.site, title: c.title, system: c.system,
               time: String(nextIndex),
@@ -800,6 +877,7 @@ export const getAddEvent = async ({
               startTime: "", endTime: "",
               isContractBatch: true,
               contractGroupId: c.key,
+              ...(jobGroupId ? { jobGroupId } : {}),
               contractNo: c.contractNo, quotationNo: c.quotationNo,
               contractStart: c.contractStart, contractEnd: c.contractEnd,
               visitCount: c.visitCount, jobValue: c.jobValue,
@@ -813,7 +891,7 @@ export const getAddEvent = async ({
             await fetchEventsFromDB();
             stopSaving();
             Swal.fire({
-              title: `เพิ่มครั้งที่ ${nextIndex} สำเร็จ ✅`,
+              title: isExtend ? `เพิ่มวันที่ต่อเนื่องให้ครั้งที่ ${nextIndex} สำเร็จ ✅` : `เพิ่มครั้งที่ ${nextIndex} สำเร็จ ✅`,
               icon: "success",
               timer: 1200,
               showConfirmButton: false,

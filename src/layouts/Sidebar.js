@@ -73,7 +73,7 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
     },
   ];
   const workMenuManager = [
-    { title: "ภาพรวมสัญญา", href: "/contracts", icon: <FaFileContract /> },
+    { title: "ภาพรวมงาน", href: "/contracts", icon: <FaFileContract /> },
   ];
   // ✅ เดิมประกาศไว้แต่ไม่เคย render เลย — ช่างจึงไม่มีทางกดเข้า "งานของฉัน" จาก sidebar ได้เลย
   const workMenuTechnician = [

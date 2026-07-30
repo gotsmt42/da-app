@@ -25,6 +25,9 @@ export const groupEventsByContract = (events) => {
     return {
       key: head.contractGroupId || `nogid:${head._id}`,
       isRealContract: Boolean(head.contractGroupId),
+      // ✅ งานที่ไม่มี contractGroupId เป็น "งานทั่วไป" ที่ถูกยืนยันแล้ว (เทียบกับ "ยังไม่จัดกลุ่ม" ซึ่ง
+      // เป็นค่าเริ่มต้น) ต่อเมื่อกดยืนยันผ่านหน้า "ภาพรวมงาน" เท่านั้น (ดู PUT /events/:id/general)
+      isConfirmedGeneral: Boolean(head.isConfirmedGeneral),
       company: head.company,
       site: head.site,
       system: head.system,

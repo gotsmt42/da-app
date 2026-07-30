@@ -215,6 +215,40 @@ const EventService = {
     }
   },
 
+  // ✅ ย้าย "งานทั่วไป" (ยังไม่มี contractGroupId) เข้าเป็นครั้งที่ N ของสัญญาที่มีอยู่แล้ว —
+  // ใช้แก้ไขกรณีจัดกลุ่มผิด (สร้างเป็นงานเดี่ยวทั้งที่จริงควรอยู่ในสัญญานี้)
+  async AttachToContract(contractGroupId, payload) {
+    try {
+      const response = await API.put(`/events/contract/${contractGroupId}/attach`, payload);
+      return response.data;
+    } catch (error) {
+      console.error("Error attaching event to contract:", error);
+      throw error;
+    }
+  },
+
+  // ✅ แยกครั้งที่ N ออกจากสัญญา กลับไปเป็นงานทั่วไปเดี่ยวๆ — ใช้แก้ไขกรณีจัดกลุ่มผิดในทิศทางกลับกัน
+  async DetachFromContract(contractGroupId, payload) {
+    try {
+      const response = await API.put(`/events/contract/${contractGroupId}/detach`, payload);
+      return response.data;
+    } catch (error) {
+      console.error("Error detaching round from contract:", error);
+      throw error;
+    }
+  },
+
+  // ✅ ยืนยัน/ยกเลิกยืนยันว่างานนี้เป็น "งานทั่วไป" จริงๆ (ก่อนกดจะโชว์เป็น "ยังไม่จัดกลุ่ม" เสมอ)
+  async MarkAsGeneral(id, isConfirmedGeneral) {
+    try {
+      const response = await API.put(`/events/${id}/general`, { isConfirmedGeneral });
+      return response.data;
+    } catch (error) {
+      console.error("Error marking event as general:", error);
+      throw error;
+    }
+  },
+
   async DeleteEvent(id) {
     try {
       await API.delete(`/events/${id}`); // ลบข้อมูลสินค้า

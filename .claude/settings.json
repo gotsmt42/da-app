@@ -67,7 +67,8 @@
       "Bash(tasklist //FI \"IMAGENAME eq node.exe\")",
       "Bash(grep -iE \"compiled|failed|error\" /tmp/build_output.txt | head -20)",
       "Bash(node --check utils/scheduleConflict.js)",
-      "Bash(grep -A10 \"src\\\\\\\\\\\\\\\\layouts\\\\\\\\\\\\\\\\FullLayout.js\\\\|src\\\\\\\\\\\\\\\\layouts\\\\\\\\\\\\\\\\Sidebar.js\" /tmp/build_output_sidebar.txt)"
+      "Bash(grep -A10 \"src\\\\\\\\\\\\\\\\layouts\\\\\\\\\\\\\\\\FullLayout.js\\\\|src\\\\\\\\\\\\\\\\layouts\\\\\\\\\\\\\\\\Sidebar.js\" /tmp/build_output_sidebar.txt)",
+      "Bash(rm -rf \"C:\\\\Users\\\\Admin\\\\Desktop\\\\da-app\\\\build\" && rm -f /tmp/build_out8.txt && echo done)"
     ],
     "additionalDirectories": [
       "\\tmp",
