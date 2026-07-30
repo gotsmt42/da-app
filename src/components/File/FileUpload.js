@@ -6,6 +6,7 @@ import FileService from "../../services/FileService";
 import Swal from "sweetalert2";
 import { ThreeDots } from "react-loader-spinner";
 import { getFileIcon, getFileIconColor } from "../../functions/CustomFile";
+import { escapeHtml } from "../../utils/escapeHtml";
 
 import CreatableSelect from "react-select/creatable";
 const MAX_FILE_SIZE_MB = 500;
@@ -124,8 +125,10 @@ const FileUpload = () => {
         Swal.fire({
           icon: "success",
           title: "อัพโหลดสำเร็จ",
+          // ⚠️ ป้องกัน stored XSS — ชื่อไฟล์ตั้งเองได้อิสระ (ผู้ใช้เปลี่ยนชื่อไฟล์ก่อนอัพโหลดได้) ต้อง
+          // escape ก่อนต่อเป็น HTML string เสมอ
           html: response.data.data
-            .map((file) => `<a href="files">${file.filename}</a>`)
+            .map((file) => `<a href="files">${escapeHtml(file.filename)}</a>`)
             .join("<br>"),
         });
 

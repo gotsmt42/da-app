@@ -38,6 +38,7 @@ import { formatEventDateRange } from "../../utils/formatDateRange";
 import { resolveOperationGroup } from "../../utils/overdueJobs";
 import { countUsedRounds } from "../../utils/contractRounds";
 import { groupEventsByContract, nextVisitOverdueInfo } from "../../utils/contractOverdue";
+import { escapeHtml } from "../../utils/escapeHtml";
 
 const ACCENT = "#dc2626";
 
@@ -337,6 +338,28 @@ const EditableCell = ({
           <option value="">— ไม่ระบุ —</option>
           {(editOptions || []).map((o) => <option key={o} value={o}>{o}</option>)}
         </TextField>
+      ) : editType === "autocomplete" ? (
+        // ✅ เลือกจากรายชื่อที่มีอยู่แล้วในระบบได้ (กันพิมพ์ผิด/สะกดต่างกันจนกลายเป็นคนละชื่อ) หรือจะ
+        // พิมพ์เอาใหม่เองก็ได้ (freeSolo — ไม่บังคับต้องมีในรายการเดิม เผื่อเป็นระบบ/ประเภทงานใหม่จริงๆ
+        // ที่ยังไม่เคยมีใครกรอกไว้) เทียบ pattern เดียวกับฟอร์ม "เพิ่มสัญญาใหม่" ด้านล่างเป๊ะๆ
+        <Autocomplete
+          freeSolo autoFocus size="small" fullWidth disabled={saving}
+          options={editOptions || []}
+          inputValue={editValue}
+          onInputChange={(_, v) => onChangeValue(v)}
+          renderInput={(params) => (
+            <TextField
+              {...params}
+              autoFocus
+              onBlur={onCommit}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.preventDefault(); onCommit(); }
+                if (e.key === "Escape") onCancel();
+              }}
+              sx={{ "& .MuiOutlinedInput-input": { py: 0.5, fontSize: "0.8rem" } }}
+            />
+          )}
+        />
       ) : (
         <TextField
           autoFocus size="small" fullWidth type={editType} disabled={saving}
@@ -527,9 +550,17 @@ export default function ContractOverview() {
 
   const [selectedIds, setSelectedIds] = useState(new Set());
   const selectedContracts = useMemo(() => contracts.filter((c) => selectedIds.has(c.key)), [contracts, selectedIds]);
-  // ✅ ล็อกไว้ว่าต้องเลือกงานที่ company/site/system/title ตรงกับตัวแรกที่เลือกเท่านั้น — กันรวมงาน
-  // คนละเรื่องเข้าเป็น "สัญญา" เดียวกันโดยไม่ตั้งใจ ซึ่งจะทำให้ข้อมูลสัญญาเพี้ยน
-  const lockedSignature = selectedContracts.length > 0 ? jobSignature(selectedContracts[0]) : null;
+  // ⚠️ BUG ที่แก้ (จัดกลุ่มงานเก่ายากมากเพราะตั้งชื่อไม่ตรงกัน): เดิมล็อกไว้ว่าต้องเลือกงานที่
+  // company/site/system/title ตรงกับตัวแรกที่เลือก "เป๊ะๆ" เท่านั้น (checkbox ของงานอื่นโดน disabled ไป
+  // เลย) ตั้งใจกันรวมงานคนละเรื่องเข้าเป็น "สัญญา" เดียวกันโดยไม่ตั้งใจ — แต่งานเก่าในระบบจำนวนมากที่
+  // "ควรเป็นสัญญาเดียวกันจริงๆ" กลับพิมพ์ชื่อบริษัท/โครงการ/ประเภทงานไม่ตรงกันเป๊ะ (สะกดต่างกันเล็กน้อย/
+  // เว้นวรรคไม่เท่ากัน ฯลฯ) ทำให้ล็อกนี้กลายเป็นตัวบล็อกการจัดกลุ่มจริงเสียเอง ทั้งที่สุดท้ายผู้ใช้ต้อง
+  // กรอกข้อมูลบริษัท/โครงการ/ประเภทงาน/ระบบที่จะใช้ร่วมกันทั้งกลุ่มในฟอร์ม "จัดกลุ่มเป็นสัญญา" อยู่แล้ว
+  // (ดู mergeForm/handleMergeSubmit ด้านล่าง ซึ่งเซ็ตค่าเดียวกันทับทุกงานที่เลือกอยู่แล้ว) — เลิกบล็อกแล้ว
+  // เปลี่ยนเป็นแค่เตือนแทน (ดู hasMixedSelection ที่ใช้แสดงคำเตือนใต้แถบ "เลือกไว้ N งาน") ให้เลือกงานที่
+  // รู้อยู่แล้วว่าเป็นสัญญาเดียวกันจริงได้อิสระ โดยไม่ต้องไล่แก้ชื่อให้ตรงกันทีละงานก่อน
+  const firstSelectedSignature = selectedContracts.length > 0 ? jobSignature(selectedContracts[0]) : null;
+  const hasMixedSelection = selectedContracts.length > 1 && selectedContracts.some((c) => jobSignature(c) !== firstSelectedSignature);
 
   const toggleSelect = (c) => {
     setSelectedIds((prev) => {
@@ -1050,6 +1081,27 @@ export default function ContractOverview() {
       setMergeError(`เลขที่สัญญา "${mergeForm.contractNo.trim()}" ถูกใช้ไปแล้ว กรุณาตรวจสอบ`);
       return;
     }
+    // ✅ ยืนยันอีกชั้นเฉพาะตอนงานที่เลือกชื่อไม่ตรงกัน (hasMixedSelection) — เดิมปลดล็อกให้เลือกงานชื่อ
+    // ไม่ตรงกันมารวมเป็นสัญญาเดียวกันได้แล้ว (กันจัดกลุ่มงานเก่ายากเกินไป ดู firstSelectedSignature/
+    // hasMixedSelection ด้านบน) แต่พอไม่มีอะไรกันเลยก็เผลอกดพลาดรวมงานคนละเรื่องกันจริงๆ เข้าด้วยกันได้
+    // ง่ายขึ้นเหมือนกัน (เดิมระบบกันไว้ให้อัตโนมัติ) เพิ่มยืนยันชัดๆ อีกทีเฉพาะกรณีนี้กันพลาด
+    if (hasMixedSelection) {
+      const confirmResult = await Swal.fire({
+        icon: "warning",
+        title: "ชื่อของงานที่เลือกไม่ตรงกันทั้งหมด",
+        html: `
+          <div style="text-align:left;font-size:13px;">
+            มี ${selectedContracts.length} งานที่เลือกไว้ ซึ่งชื่อบริษัท/โครงการ/ประเภทงาน/ระบบไม่ตรงกันทั้งหมด<br/>
+            ยืนยันว่าทั้งหมดนี้เป็น <b>สัญญาเดียวกันจริง</b> ใช่หรือไม่?
+          </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: "ใช่ เป็นสัญญาเดียวกันจริง",
+        confirmButtonColor: "#dc2626",
+        cancelButtonText: "ยกเลิก",
+      });
+      if (!confirmResult.isConfirmed) return;
+    }
     setMergeSaving(true);
     try {
       // ⚠️ BUG ที่แก้: เดิมส่ง event id ตัวแรกของแต่ละแถวเท่านั้น (สมมติว่า 1 แถว = 1 event เดียวเสมอ)
@@ -1085,6 +1137,10 @@ export default function ContractOverview() {
   const [editValue, setEditValue] = useState("");
   const [editSaving, setEditSaving] = useState(false);
 
+  // ✅ บริษัท/โครงการ/ระบบ/ประเภทงาน แก้ไขได้ทุกแถว (ทั้งสัญญาจริงและงานทั่วไป/โปรเจค/ยังไม่จัดกลุ่ม)
+  // ต่างจากฟิลด์อื่น (เลขที่สัญญา/มูลค่างาน/ฯลฯ) ที่มีความหมายเฉพาะสัญญาจริงเท่านั้น — ดู BASIC_INFO_FIELDS
+  const BASIC_INFO_FIELDS = new Set(["company", "site", "system", "title"]);
+
   const editOriginalValue = (c, field) => {
     if (field === "contractStart" || field === "contractEnd") return c[field] ? moment(c[field]).format("YYYY-MM-DD") : "";
     if (field === "team") return c.team === "-" ? "" : c.team;
@@ -1092,7 +1148,8 @@ export default function ContractOverview() {
   };
 
   const beginEdit = (c, field) => {
-    if (!c.isRealContract || editSaving) return;
+    if (editSaving) return;
+    if (!c.isRealContract && !BASIC_INFO_FIELDS.has(field)) return;
     setEditingCell({ key: c.key, field });
     setEditValue(String(editOriginalValue(c, field)));
   };
@@ -1111,6 +1168,13 @@ export default function ContractOverview() {
       setEditingCell(null);
       return;
     }
+    // ✅ บริษัท/โครงการ/ระบบ/ประเภทงาน เป็นข้อมูลระบุตัวงาน (ใช้ค้นหา/กรอง/จัดกลุ่มทั่วทั้งแอป) ห้ามลบ
+    // จนว่างเปล่า ไม่งั้นงานนี้จะหาไม่เจอที่ไหนเลยหลังบันทึก
+    if (BASIC_INFO_FIELDS.has(field) && !rawValue.trim()) {
+      Swal.fire({ title: "แก้ไขไม่สำเร็จ", text: "ห้ามเว้นว่าง กรุณากรอกข้อมูล", icon: "error" });
+      setEditingCell(null);
+      return;
+    }
 
     const payload = {};
     if (field === "jobValue" || field === "visitCount") payload[field] = rawValue ? Number(rawValue) : undefined;
@@ -1122,12 +1186,22 @@ export default function ContractOverview() {
     // จริงๆ รู้ผลลัพธ์อยู่แล้วจากค่าที่พิมพ์เอง — อัปเดตค่าใน state ทันทีแบบ optimistic แทน (เหมือน
     // Excel/Notion กดแล้วเห็นผลทันที) เก็บ snapshot เดิมไว้เผื่อ backend ปฏิเสธ (เช่นแก้พร้อมกันจาก
     // อีกที่แล้วชนกัน) ค่อย revert คืนเฉพาะตอนนั้น ไม่ต้องรีเฟรชทั้งตารางในเคสบันทึกสำเร็จปกติเลย
+    // ⚠️ BUG ที่แก้: เดิม match ด้วย e.contractGroupId === c.key เท่านั้น ใช้ไม่ได้กับแถวที่ไม่ใช่สัญญาจริง
+    // (c.key เป็น "jgid:.../nogid:..." ไม่ตรงกับ contractGroupId ของ document ไหนเลย) — match ด้วย _id
+    // ที่อยู่ใน c.visits โดยตรงแทน ใช้ได้ทั้งสัญญาจริงและงานทั่วไป/โปรเจค/ยังไม่จัดกลุ่มเหมือนกันหมด
     const snapshot = events;
-    setEvents((prev) => prev.map((e) => (e.contractGroupId === c.key ? { ...e, ...payload } : e)));
+    const visitIdSet = new Set(c.visits.map((v) => String(v._id)));
+    setEvents((prev) => prev.map((e) => (visitIdSet.has(String(e._id)) ? { ...e, ...payload } : e)));
     setEditingCell(null);
     setEditSaving(true);
     try {
-      await EventService.UpdateContractFields(c.key, payload);
+      // ✅ บริษัท/โครงการ/ระบบ/ประเภทงาน อัปเดตผ่าน eventIds ตรงๆ (ใช้ได้ทุกแถว) ส่วนฟิลด์อื่นที่มี
+      // ความหมายเฉพาะสัญญาจริงยังผ่าน contractGroupId เหมือนเดิม (ฟิลด์เหล่านี้แก้ได้แค่แถวสัญญาจริงอยู่แล้ว)
+      if (BASIC_INFO_FIELDS.has(field)) {
+        await EventService.UpdateBasicInfo(c.visits.map((v) => v._id), payload);
+      } else {
+        await EventService.UpdateContractFields(c.key, payload);
+      }
     } catch (err) {
       setEvents(snapshot);
       Swal.fire({
@@ -1154,8 +1228,8 @@ export default function ContractOverview() {
       title: c.isRealContract ? "ลบสัญญานี้ทั้งหมด?" : "ลบงานนี้?",
       html: `
         <div style="text-align:left;font-size:13px;">
-          <b>${c.company || "-"} · ${c.site || "-"}</b><br/>
-          ${c.title} · ${c.system}<br/>
+          <b>${escapeHtml(c.company) || "-"} · ${escapeHtml(c.site) || "-"}</b><br/>
+          ${escapeHtml(c.title)} · ${escapeHtml(c.system)}<br/>
           ${c.visits.length > 1 ? `จะลบทั้งหมด ${c.visits.length} วัน (งานเดียวกัน)` : "จะลบงานนี้ 1 รายการ"}
           ${doneCount > 0 ? `<br/><b style="color:#dc2626;">⚠️ มี ${doneCount} ครั้งที่ดำเนินการเสร็จสิ้นแล้ว จะถูกลบไปด้วย</b>` : ""}
         </div>
@@ -1206,6 +1280,13 @@ export default function ContractOverview() {
     () => contracts.filter((x) => x.isRealContract && countUsedRounds(x.visits) < x.visitCount),
     [contracts]
   );
+  // ✅ เรียงตามเลขที่สัญญา (ตัวเลข/ตัวอักษรปนกันก็เรียงถูก เช่น FAPTY01, FAPTY02, ... FAPTY10 — ใช้
+  // { numeric: true } ให้เทียบเลขที่ฝังอยู่ในสตริงตามค่าจริง ไม่ใช่เทียบทีละตัวอักษรแบบ "10" มาก่อน "2")
+  // ให้รายการในช่องค้นหาด้านล่าง (Autocomplete) ไล่ดูง่ายเป็นระเบียบ แทนที่จะเรียงตามลำดับที่ดึงมาจาก DB
+  const sortedAttachableContracts = useMemo(
+    () => [...attachableContracts].sort((a, b) => (a.contractNo || "").localeCompare(b.contractNo || "", "th", { numeric: true })),
+    [attachableContracts]
+  );
   const selectedAttachContract = useMemo(
     () => attachableContracts.find((x) => x.key === attachContractId) || null,
     [attachableContracts, attachContractId]
@@ -1253,7 +1334,7 @@ export default function ContractOverview() {
       title: `แยกครั้งที่ ${n} ออกจากสัญญา?`,
       html: `
         <div style="text-align:left;font-size:13px;">
-          <b>${c.company || "-"} · ${c.site || "-"}</b><br/>
+          <b>${escapeHtml(c.company) || "-"} · ${escapeHtml(c.site) || "-"}</b><br/>
           งานนี้จะกลายเป็น "งานเก่าในระบบที่ยังไม่จัดกลุ่ม" แยกจากสัญญานี้ — ข้อมูลวันที่/สถานะ/ประวัติงานยังอยู่ครบ ไม่ถูกลบ
         </div>
       `,
@@ -1440,6 +1521,17 @@ export default function ContractOverview() {
       {selectedIds.size > 0 && (
         <Paper variant="outlined" sx={{ p: 1.25, mb: 2, borderRadius: 3, display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap", bgcolor: alpha(ACCENT, 0.06), borderColor: alpha(ACCENT, 0.4) }}>
           <Typography variant="body2" fontWeight={700} sx={{ flex: 1 }}>เลือกไว้ {selectedIds.size} งาน</Typography>
+          {/* ✅ ไม่บล็อกการเลือกงานชื่อไม่ตรงกันอีกต่อไป (ดูเหตุผลที่ hasMixedSelection ด้านบน) แต่ยัง
+              เตือนไว้ให้รู้ตัว กันเผลอเลือกงานคนละเรื่องกันจริงๆ มารวมเป็นสัญญาเดียวกันโดยไม่ได้ตั้งใจ */}
+          {hasMixedSelection && (
+            <Typography
+              variant="caption"
+              sx={{ width: "100%", display: "flex", alignItems: "center", gap: 0.5, color: "#b45309", fontWeight: 600 }}
+            >
+              <WarningAmber sx={{ fontSize: 14 }} />
+              ชื่อบริษัท/โครงการ/ประเภทงาน/ระบบของงานที่เลือกไม่ตรงกันทั้งหมด — ระบบจะรวมเป็นสัญญาเดียว โดยใช้ข้อมูลที่กรอกในขั้นตอนถัดไปแทนของเดิมทุกงาน
+            </Typography>
+          )}
           <Button size="small" onClick={clearSelection} sx={{ textTransform: "none" }}>ล้างการเลือก</Button>
           <Button
             size="small" variant="contained" startIcon={<MergeType sx={{ fontSize: 16 }} />}
@@ -1476,10 +1568,9 @@ export default function ContractOverview() {
             ) : undefined,
           }}
         />
-    {/* ✅ กรองตามประเภทงาน (PM/Service/ติดตั้ง ฯลฯ) — เพิ่มตามที่ผู้ใช้ขอ เทียบ pattern เดียวกับ
-            ตัวกรองปี/ผู้รับผิดชอบด้านบนเป๊ะๆ (เลือกจากรายชื่อประเภทงานจริงที่ตั้งค่าไว้ในระบบ) */}
-
-         <TextField
+        {/* ✅ กรองตามประเภทงาน (PM/Service/ติดตั้ง ฯลฯ) — เทียบ pattern เดียวกับตัวกรองผู้รับผิดชอบ/ปี
+            ด้านล่างเป๊ะๆ (เลือกจากรายชื่อประเภทงานจริงที่ตั้งค่าไว้ในระบบ) */}
+        <TextField
           select size="small" label="ประเภทงาน" value={titleFilter}
           onChange={(e) => setTitleFilter(e.target.value)}
           SelectProps={{ native: true }}
@@ -1504,7 +1595,6 @@ export default function ContractOverview() {
           <option value="all">ทุกประเภท</option>
           {titleOptions.map((name) => <option key={name} value={name}>{name}</option>)}
         </TextField>
-        
         {/* ✅ กรองตามผู้รับผิดชอบเจาะจงจากรายชื่อจริง — แยกจากช่องค้นหาข้อความด้านบนซึ่งพิมพ์ค้นหาแบบ
             อิสระ (บางส่วน/สะกดผิดก็เจอ) ส่วนอันนี้เลือกจาก dropdown ให้ตรงเป๊ะไม่ต้องพิมพ์เอง —
             เน้นสีเหมือนช่องปีด้านบนตอนเลือกคนใดคนหนึ่งอยู่ (ไม่ใช่ "ทุกคน") ให้ชัดเจนสอดคล้องกัน */}
@@ -1533,10 +1623,7 @@ export default function ContractOverview() {
           <option value="all">ทุกคน</option>
           {teamOptions.map((name) => <option key={name} value={name}>{name}</option>)}
         </TextField>
-       
-       
-
-            {/* ✅ กรองตารางตามปีของสัญญา (อิงวันที่เริ่มสัญญา ไม่งั้นอิงวันที่ครั้งแรก) — เดิมต้องไล่สโครล
+        {/* ✅ กรองตารางตามปีของสัญญา (อิงวันที่เริ่มสัญญา ไม่งั้นอิงวันที่ครั้งแรก) — เดิมต้องไล่สโครล
             หาเองว่าปีไหนมีสัญญาอะไรบ้าง ทั้งที่สัญญาส่วนใหญ่ต่ออายุปีต่อปี ดูทีละปีจะเจอเร็วกว่า */}
         {/* ✅ เน้นสีตอนกรองปีเจาะจงอยู่ (ไม่ใช่ "ทุกปี") ให้เห็นชัดว่ากำลังดูข้อมูลแค่ปีเดียว ไม่ใช่ทั้งหมด
             — เดิมหน้าตาเหมือนช่องเปล่าๆ ทั่วไป มองไม่ออกว่ามีตัวกรองทำงานอยู่ (ทั้งที่ค่าเริ่มต้นล็อก
@@ -1671,7 +1758,6 @@ export default function ContractOverview() {
                         <Checkbox
                           size="small"
                           checked={selectedIds.has(c.key)}
-                          disabled={Boolean(lockedSignature) && lockedSignature !== jobSignature(c) && !selectedIds.has(c.key)}
                           onChange={() => toggleSelect(c)}
                           sx={{ p: 0.5, "&.Mui-checked": { color: ACCENT } }}
                         />
@@ -1703,10 +1789,49 @@ export default function ContractOverview() {
                   />
                   </>
                   )}
-                  <TableCell data-col-key="company" sx={{ width: colVar("company"), maxWidth: colVar("company"), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.company}>{c.company || <Dash />}</TableCell>
-                  <TableCell data-col-key="site" sx={{ width: colVar("site"), maxWidth: colVar("site"), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.site}>{c.site || <Dash />}</TableCell>
-                  <TableCell data-col-key="system" sx={{ width: colVar("system"), maxWidth: colVar("system"), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.system}>{c.system || <Dash />}</TableCell>
-                  <TableCell data-col-key="title" sx={{ width: colVar("title"), maxWidth: colVar("title"), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.title}>{c.title || <Dash />}</TableCell>
+                  {/* ✅ บริษัท/โครงการ/ระบบ/ประเภทงาน — แก้ไข inline ได้ทุกแถวแล้ว (editable ไม่ผูกกับ
+                      c.isRealContract เหมือนฟิลด์สัญญาอื่นๆ) เทียบ pattern เดียวกับ EditableCell ที่ใช้
+                      กับคอลัมน์อื่นในตารางนี้ทุกประการ */}
+                  <EditableCell
+                    editable columnKey="company"
+                    editing={editingCell?.key === c.key && editingCell?.field === "company"}
+                    value={c.company} editValue={editValue} saving={editSaving}
+                    width={colVar("company")} title={c.company}
+                    onStartEdit={() => beginEdit(c, "company")}
+                    onChangeValue={setEditValue}
+                    onCommit={() => commitEdit(c)}
+                    onCancel={cancelEdit}
+                  />
+                  <EditableCell
+                    editable columnKey="site"
+                    editing={editingCell?.key === c.key && editingCell?.field === "site"}
+                    value={c.site} editValue={editValue} saving={editSaving}
+                    width={colVar("site")} title={c.site}
+                    onStartEdit={() => beginEdit(c, "site")}
+                    onChangeValue={setEditValue}
+                    onCommit={() => commitEdit(c)}
+                    onCancel={cancelEdit}
+                  />
+                  <EditableCell
+                    editable columnKey="system" editType="autocomplete" editOptions={systemOptions}
+                    editing={editingCell?.key === c.key && editingCell?.field === "system"}
+                    value={c.system} editValue={editValue} saving={editSaving}
+                    width={colVar("system")} title={c.system}
+                    onStartEdit={() => beginEdit(c, "system")}
+                    onChangeValue={setEditValue}
+                    onCommit={() => commitEdit(c)}
+                    onCancel={cancelEdit}
+                  />
+                  <EditableCell
+                    editable columnKey="title" editType="autocomplete" editOptions={titleOptions}
+                    editing={editingCell?.key === c.key && editingCell?.field === "title"}
+                    value={c.title} editValue={editValue} saving={editSaving}
+                    width={colVar("title")} title={c.title}
+                    onStartEdit={() => beginEdit(c, "title")}
+                    onChangeValue={setEditValue}
+                    onCommit={() => commitEdit(c)}
+                    onCancel={cancelEdit}
+                  />
                   {!hideContractOnlyColumns && (
                   <>
                   <EditableCell
@@ -2192,20 +2317,34 @@ export default function ContractOverview() {
               </Box>
             )}
             {attachError && <Alert severity="error">{attachError}</Alert>}
-            <TextField
-              select fullWidth size="small" label="เลือกสัญญาปลายทาง"
-              value={attachContractId}
-              onChange={(e) => { setAttachContractId(e.target.value); setAttachRound(""); }}
-              SelectProps={{ native: true }}
-              InputLabelProps={{ shrink: true }}
-            >
-              <option value="">— เลือกสัญญา —</option>
-              {attachableContracts.map((x) => (
-                <option key={x.key} value={x.key}>
-                  {[x.company, x.site].filter(Boolean).join(" · ") || "(ไม่ระบุชื่อ)"}{x.contractNo ? ` · ${x.contractNo}` : ""}
-                </option>
-              ))}
-            </TextField>
+            {/* ✅ พิมพ์ค้นหาได้เลย (บริษัท/โครงการ/ประเภทงาน/ระบบงาน/เลขที่สัญญา — Autocomplete กรองจาก
+                getOptionLabel ให้อัตโนมัติ) แทน native <select> เดิมที่ต้องไล่สโครลหาเองทีละบรรทัดเวลามี
+                สัญญาเยอะๆ — รายการเรียงตามเลขที่สัญญาให้แล้ว (sortedAttachableContracts) และแต่ละตัวเลือก
+                โชว์ 2 บรรทัด (ชื่อบริษัท/โครงการ + ประเภทงาน·ระบบงาน·เลขที่สัญญา·จำนวนครั้งที่ว่างเหลือ)
+                ให้เห็นชัดเจนสวยงามกว่าบรรทัดเดียว — ⚠️ เดิมไม่โชว์ประเภทงาน/ระบบงานเลย เลือกยากตอนมีหลาย
+                สัญญาของบริษัท/โครงการเดียวกันแต่คนละระบบ (เช่น Fire Alarm กับ CCTV) แยกไม่ออกว่าอันไหน */}
+            <Autocomplete
+              fullWidth size="small"
+              options={sortedAttachableContracts}
+              value={selectedAttachContract}
+              onChange={(_, v) => { setAttachContractId(v?.key || ""); setAttachRound(""); }}
+              getOptionLabel={(x) => `${[x.company, x.site].filter(Boolean).join(" · ") || "(ไม่ระบุชื่อ)"} · ${x.title || "-"} · ${x.system || "-"}${x.contractNo ? ` · ${x.contractNo}` : ""}`}
+              isOptionEqualToValue={(a, b) => a.key === b.key}
+              noOptionsText="ไม่พบสัญญาที่ตรงกับคำค้นหา"
+              renderOption={(props, x) => (
+                <Box component="li" {...props} sx={{ display: "flex !important", flexDirection: "column", alignItems: "flex-start !important", gap: 0.25, py: "6px !important" }}>
+                  <Typography variant="body2" fontWeight={700}>
+                    {[x.company, x.site].filter(Boolean).join(" · ") || "(ไม่ระบุชื่อ)"}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {x.title || "-"} · {x.system || "-"} · {x.contractNo ? `เลขที่ ${x.contractNo}` : "ไม่มีเลขที่สัญญา"} · เหลือ {x.visitCount - countUsedRounds(x.visits)} ครั้ง
+                  </Typography>
+                </Box>
+              )}
+              renderInput={(params) => (
+                <TextField {...params} label="เลือกสัญญาปลายทาง" placeholder="พิมพ์ค้นหาบริษัท/โครงการ/ประเภทงาน/ระบบงาน/เลขที่สัญญา" InputLabelProps={{ shrink: true }} />
+              )}
+            />
             {selectedAttachContract && (
               <Box>
                 <Typography variant="caption" fontWeight={700} color="text.secondary">

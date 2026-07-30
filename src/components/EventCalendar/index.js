@@ -50,6 +50,7 @@ import { CSVLink } from "react-csv";
 import "./index.css";
 
 import API from "../../API/axiosInstance";
+import { escapeHtml } from "../../utils/escapeHtml";
 
 import thLocale from "@fullcalendar/core/locales/th"; // นำเข้า locale ภาษาไทย
 
@@ -516,6 +517,7 @@ function EventCalendar() {
   const handleEventDrop = async (arg) => {
     await getEventDrop({
       arg,
+      events, // ✅ ใช้เช็คแจ้งเตือนทีมชนกันแบบไม่บล็อกหลังบันทึกสำเร็จ (ดู EventDrop.js)
       fetchEventsFromDB,
       setEvents,
 
@@ -528,9 +530,11 @@ function EventCalendar() {
   const handleEventResize = async (arg) => {
     await getEventResize({
       arg,
+      events, // ✅ ใช้เช็คแจ้งเตือนทีมชนกันแบบไม่บล็อกหลังบันทึกสำเร็จ (ดู EventResize.js)
       fetchEventsFromDB,
       setEvents,
       EventService,
+      Swal,
       moment,
     });
   };
@@ -617,8 +621,11 @@ function EventCalendar() {
   const handleScheduleDraftClick = async (draft) => {
     const defaultDate = moment(draft.plannedMonth, "YYYY-MM").startOf("month").format("YYYY-MM-DD");
     const teamToId = new Map(employeeList.map((e) => [e.fname, e._id]));
+    // ✅ ป้องกัน stored XSS — ชื่อ/บริษัท/โครงการที่ผู้ใช้พิมพ์เองต้อง escape ก่อนต่อเป็น HTML string
+    // เสมอ ไม่งั้นถ้ามีใครตั้งชื่อเป็น เช่น "><img src=x onerror="..."> จะยิง JavaScript ทันทีที่มีใคร
+    // เปิดกล่อง "ลงตาราง" ของงานนั้นดู
     const teamOpts = employeeList
-      .map((e) => `<option value="${e.fname}"${e.fname === draft.team ? " selected" : ""}>${e.fname}</option>`)
+      .map((e) => `<option value="${escapeHtml(e.fname)}"${e.fname === draft.team ? " selected" : ""}>${escapeHtml(e.fname)}</option>`)
       .join("");
 
     const rangeRowHtml = (startVal = "", endVal = "") => `
@@ -646,7 +653,7 @@ function EventCalendar() {
         </style>
 
         <div style="text-align:left; font-size:13px; color:#64748b; margin-bottom:14px;">
-          ${draft.title || "งาน"} · ${[draft.company, draft.site].filter(Boolean).join(" · ")}
+          ${escapeHtml(draft.title) || "งาน"} · ${escapeHtml([draft.company, draft.site].filter(Boolean).join(" · "))}
         </div>
 
         <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; color:#374151; margin-bottom:12px; cursor:pointer;">
@@ -675,11 +682,11 @@ function EventCalendar() {
         <div class="swal-schedule-row-2col">
           <div>
             <label style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">🕐 เวลาเริ่ม</label>
-            <input id="swal-schedule-start-time" type="text" class="swal2-input" placeholder="เช่น 08:30" style="margin:0; width:100%; box-sizing:border-box;" value="${draft.startTime || ""}">
+            <input id="swal-schedule-start-time" type="text" class="swal2-input" placeholder="เช่น 08:30" style="margin:0; width:100%; box-sizing:border-box;" value="${escapeHtml(draft.startTime)}">
           </div>
           <div>
             <label style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">🕔 เวลาสิ้นสุด</label>
-            <input id="swal-schedule-end-time" type="text" class="swal2-input" placeholder="เช่น 17:00" style="margin:0; width:100%; box-sizing:border-box;" value="${draft.endTime || ""}">
+            <input id="swal-schedule-end-time" type="text" class="swal2-input" placeholder="เช่น 17:00" style="margin:0; width:100%; box-sizing:border-box;" value="${escapeHtml(draft.endTime)}">
           </div>
         </div>
         <div style="text-align:left; margin-bottom:12px;">
@@ -1295,24 +1302,27 @@ function EventCalendar() {
             } = extendedProps;
 
             // ✅ สร้าง display string แบบมีเงื่อนไข
-            const siteDisplay = site ? `- โครงการ : ${site}` : "";
-            const timeDisplay = time ? `- ครั้งที่ : ${time}` : "";
+            // ⚠️ ป้องกัน stored XSS — ทุกฟิลด์ตรงนี้ (โครงการ/ระบบ/ทีม/เวลา/ชื่องาน) เป็นข้อความที่
+            // ผู้ใช้พิมพ์เองได้ทั้งหมด แล้วถูกใช้เป็น eventContent แบบ raw HTML ของ FullCalendar
+            // (render ให้ "ทุกคน" ที่เปิดปฏิทินเห็น ไม่ต้องคลิกอะไรเลย) ต้อง escape ก่อนเสมอ
+            const siteDisplay = site ? `- โครงการ : ${escapeHtml(site)}` : "";
+            const timeDisplay = time ? `- ครั้งที่ : ${escapeHtml(time)}` : "";
             // ✅ รวมช่างหลัก (team) + ลูกทีมเพิ่มเติม (teamMembers) เป็นรายชื่อเดียว ให้เห็นครบ
             // ทุกคนที่ช่วยทำงานนี้ในบรรทัดเดียวกัน แทนที่จะเห็นแค่ช่างหลักคนเดียวเหมือนเดิม
             const allTeamNames = [team, ...teamMembers.map((m) => m?.name)]
               .filter(Boolean)
               .filter((name, idx, arr) => arr.indexOf(name) === idx);
-            const teamDisplay = allTeamNames.length ? `- ทีม : ${allTeamNames.join(", ")}` : "";
+            const teamDisplay = allTeamNames.length ? `- ทีม : ${allTeamNames.map(escapeHtml).join(", ")}` : "";
 
-            const systemDisplay = system ? `- ระบบ : ${system}` : "";
+            const systemDisplay = system ? `- ระบบ : ${escapeHtml(system)}` : "";
 
             const timeRangeDisplay =
               startTime && endTime
-                ? `เวลา : ${startTime} - ${endTime}`
+                ? `เวลา : ${escapeHtml(startTime)} - ${escapeHtml(endTime)}`
                 : startTime
-                ? `- เริ่มเวลา : ${startTime}`
+                ? `- เริ่มเวลา : ${escapeHtml(startTime)}`
                 : endTime
-                ? `- สิ้นสุดเวลา : ${endTime}`
+                ? `- สิ้นสุดเวลา : ${escapeHtml(endTime)}`
                 : "";
 
             const isSmallScreen = window.innerWidth < 576;
@@ -1349,7 +1359,7 @@ function EventCalendar() {
               html: `
                 <div style="position: relative; display: flex; align-items: center; padding: ${badgePadding}; width: 100%;">
                   <div style="font-size: ${fontSize}; line-height: 2; padding: 0px; flex: 1; min-width: 0;">
-                    <div>[ ${title} ]  </div>
+                    <div>[ ${escapeHtml(title)} ]  </div>
 
                     <div> ${systemDisplay} </div>
                     <div> ${siteDisplay}</div>

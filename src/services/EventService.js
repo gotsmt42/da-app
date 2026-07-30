@@ -238,6 +238,18 @@ const EventService = {
     }
   },
 
+  // ✅ แก้ไขบริษัท/โครงการ/ระบบ/ประเภทงาน พร้อมกันทุก document ของ "แถว" เดียวกัน (ทั้งสัญญาจริงและ
+  // งานทั่วไป/โปรเจค/ยังไม่จัดกลุ่ม) — ใช้กับการแก้ไข inline ในตาราง "ภาพรวมงาน"
+  async UpdateBasicInfo(eventIds, payload) {
+    try {
+      const response = await API.put(`/events/basic-info`, { eventIds, ...payload });
+      return response.data;
+    } catch (error) {
+      console.error("Error updating basic info:", error);
+      throw error;
+    }
+  },
+
   // ✅ จัดหมวดหมู่งานที่ไม่มี contractGroupId — classification: "" (ยังไม่จัดกลุ่ม) / "general"
   // (งานทั่วไป) / "project" (งานโปรเจค) — ก่อนจัดจะโชว์เป็น "ยังไม่จัดกลุ่ม" เสมอ
   async ClassifyJob(id, classification) {

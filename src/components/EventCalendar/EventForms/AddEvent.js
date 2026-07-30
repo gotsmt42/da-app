@@ -1,4 +1,10 @@
 import { countUsedRounds } from "../../../utils/contractRounds";
+import { escapeHtml } from "../../../utils/escapeHtml";
+
+// ✅ ป้องกัน stored XSS — ค่าที่ผู้ใช้พิมพ์เอง (ชื่อบริษัท/โครงการ/ประเภทงาน/ระบบ/ทีม ฯลฯ) ต้อง escape
+// ก่อนต่อเป็น HTML string เสมอ ไม่งั้นถ้ามีใครตั้งชื่อเป็น เช่น "><img src=x onerror="..."> จะยิง
+// JavaScript ทันทีที่มีใครเปิดฟอร์มนี้ดู
+const optionHtml = (value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`;
 
 /* ─────────────────────────────────────────────
    STYLE INJECTION  (shared with EditEvent — skip if already injected)
@@ -109,7 +115,9 @@ function injectAddStyles() {
     }
 
     /* ── ขั้นตอนที่ 1: เลือกประเภทงาน (การ์ดวิทยุ) ── */
-    .ae-jobtype-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+    /* ✅ เพิ่มตัวเลือกที่ 3 "งานโปรเจค" (เดิมมีแค่ 2 ใบ) — 3 คอลัมน์บนจอกว้าง ยุบเหลือคอลัมน์เดียวบน
+       มือถือเหมือนเดิม เทียบไอคอน/สีเดียวกับหน้า "ภาพรวมงาน" และฟอร์ม AddDraftEvent.js ให้ตรงกันทั้งแอป */
+    .ae-jobtype-toggle { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 18px; }
     @media(max-width:600px) { .ae-jobtype-toggle { grid-template-columns: 1fr; } }
     .ae-jobtype-option { position: relative; cursor: pointer; }
     .ae-jobtype-option input { position: absolute; opacity: 0; width: 0; height: 0; }
@@ -138,7 +146,26 @@ function injectAddStyles() {
       padding: 12px 14px; margin-bottom: 16px; font-size: 13px; color: #374151; display: none;
     }
     .ae-contract-pick-info b { color: #b91c1c; }
-    .ae-contract-pick-info .ae-cpi-sub { font-size: 12px; color: #64748b; margin-top: 2px; }
+    .ae-contract-pick-info .ae-cpi-sub { font-size: 12px; color: #64748b; margin-top: 2px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+    /* ✅ ตัวเลือกสัญญาใน dropdown (TomSelect render.option/item) — เดิมโชว์เป็นข้อความบรรทัดเดียวยาวๆ
+       "บริษัท · โครงการ · ประเภทงาน (เลขที่)" อ่านยาก ไล่สายตาหาไม่ออกว่าอันไหนคืออันไหน — แยกเป็น 2
+       บรรทัด (ชื่อบริษัท/โครงการ ตัวหนาใหญ่ก่อน แล้วรายละเอียดย่อยเบาๆ ด้านล่าง) พร้อมป้าย "เหลือ N
+       ครั้ง" แยกออกมาให้เห็นชัด เทียบ pattern เดียวกับตัวเลือกสัญญาในหน้า "ภาพรวมงาน" และฟอร์ม
+       AddDraftEvent.js ให้ตรงกันทั้งแอป */
+    .ae-contract-option { padding: 1px 0; }
+    .ae-contract-option-main { font-size: 13px; font-weight: 700; color: #1e293b; }
+    .ae-contract-option-sub { font-size: 11.5px; color: #64748b; margin-top: 2px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .ae-contract-option-badge,
+    .ae-cpi-badge {
+      display: inline-flex; align-items: center; flex-shrink: 0;
+      background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;
+      border-radius: 20px; padding: 1px 9px; font-size: 10.5px; font-weight: 700; white-space: nowrap;
+    }
+    .swal-add-event .ts-dropdown .option.active .ae-contract-option-badge,
+    .swal-add-event .ts-dropdown .option.active .ae-cpi-badge {
+      background: #fff; border-color: #fff;
+    }
 
     /* ── ตาราง "เลือกครั้งที่" — สถานะรายครั้งตรงกับตาราง ContractOverview.js เป๊ะๆ ── */
     .ae-round-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
@@ -375,24 +402,21 @@ export const getAddEvent = async ({
 
   /* ── options ── */
   const companyOpts = customers.userCustomers
-    .map((c) => `<option value="${c.cCompany}">${c.cCompany}</option>`)
+    .map((c) => optionHtml(c.cCompany))
     .join("");
 
   const siteOpts = customers.userCustomers
-    .map((c) => `<option value="${c.cSite}">${c.cSite}</option>`)
+    .map((c) => optionHtml(c.cSite))
     .join("");
 
   const titleOpts = (jobTypes?.items || [])
-    .map((t) => `<option value="${t.name}">${t.name}</option>`).join("");
+    .map((t) => optionHtml(t.name)).join("");
 
   const systemOpts = (systemTypes?.items || [])
-    .map((s) => `<option value="${s.name}">${s.name}</option>`).join("");
-
-  const timeOpts = ["1","2","3","4"]
-    .map((t) => `<option value="${t}">${t}</option>`).join("");
+    .map((s) => optionHtml(s.name)).join("");
 
   const teamOpts = employeeList
-    .map((e) => `<option value="${e.fname}">${e.fname}</option>`).join("");
+    .map((e) => optionHtml(e.fname)).join("");
 
   // ✅ ตัวเลือกสัญญาที่มีอยู่แล้ว — ให้เลือกได้เท่านั้น พิมพ์เพิ่มเองไม่ได้ (ต่างจากช่องอื่นในฟอร์มนี้ที่
   // เปิด create:true ไว้) กันบริษัท/โครงการ/เลขที่สัญญาเพี้ยนจากของเดิมแม้แค่ตัวเดียว ซึ่งจะทำให้
@@ -400,7 +424,7 @@ export const getAddEvent = async ({
   // ที่ครบจำนวนครั้งแล้วออกไปแล้ว) ไม่ต้องกันด้วย disabled อีกชั้นเพราะไม่มีตัวไหนครบแล้วหลงเหลืออยู่
   const contractOpts = selectableContracts
     .map((c) => {
-      const label = `${contractDisplayName(c)} · ${c.title} (${c.contractNo || "ไม่มีเลขที่"})`;
+      const label = `${escapeHtml(contractDisplayName(c))} · ${escapeHtml(c.title)} (${c.contractNo ? escapeHtml(c.contractNo) : "ไม่มีเลขที่"})`;
       return `<option value="${c.key}">${label}</option>`;
     })
     .join("");
@@ -429,10 +453,20 @@ export const getAddEvent = async ({
       <label class="ae-jobtype-option">
         <input type="radio" name="ae-jobType" id="ae-jobTypeGeneral" value="general" checked>
         <div class="ae-jobtype-card">
-          <div class="ae-jobtype-icon">📌</div>
+          <div class="ae-jobtype-icon">🔧</div>
           <div>
             <div class="ae-jobtype-title">งานทั่วไป</div>
             <div class="ae-jobtype-desc">งานครั้งเดียว ไม่ผูกกับสัญญา</div>
+          </div>
+        </div>
+      </label>
+      <label class="ae-jobtype-option">
+        <input type="radio" name="ae-jobType" id="ae-jobTypeProject" value="project">
+        <div class="ae-jobtype-card">
+          <div class="ae-jobtype-icon">🏗️</div>
+          <div>
+            <div class="ae-jobtype-title">งานโปรเจค</div>
+            <div class="ae-jobtype-desc">งานโปรเจคเดี่ยว ไม่ผูกกับสัญญา</div>
           </div>
         </div>
       </label>
@@ -473,14 +507,13 @@ export const getAddEvent = async ({
         </div>
       </div>
 
-      <div class="ae-grid ae-grid-3">
+      <!-- ✅ "ครั้งที่" มีความหมายเฉพาะงานตามสัญญาเท่านั้น (รอบที่ N ของสัญญา — โหมด "งานตามสัญญา" ใช้
+           ตาราง "เลือกครั้งที่" แยกต่างหากอยู่แล้ว ไม่ได้ใช้ช่องนี้เลย) งานทั่วไป/งานโปรเจค เป็นงานเดี่ยวๆ
+           ไม่มีแนวคิด "ครั้งที่" จึงตัดช่องนี้ออก เหลือ 2 ช่องพอดี -->
+      <div class="ae-grid ae-grid-2">
         <div class="ae-field">
           <label><span class="req">*</span> ระบบงาน</label>
           <select id="eventSystem"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${systemOpts}</select>
-        </div>
-        <div class="ae-field">
-          <label>🔢 ครั้งที่</label>
-          <select id="eventTime"><option selected disabled value="">— เลือก —</option>${timeOpts}</select>
         </div>
         <div class="ae-field">
           <label>👷 ทีม</label>
@@ -627,7 +660,6 @@ export const getAddEvent = async ({
       mkTs("#eventSite",    "เลือกหรือพิมพ์ชื่อโครงการ");
       mkTs("#eventTitle",   "เลือกหรือพิมพ์ประเภทงาน");
       mkTs("#eventSystem",  "เลือกหรือพิมพ์ระบบงาน");
-      mkTs("#eventTime",    "เลือกครั้งที่", 4);
       mkTs("#eventTeam",    "เลือกหรือพิมพ์ชื่อทีม");
 
       /* ── ลูกทีมเพิ่มเติม (คนที่ 2, 3, ... แสดงผลอย่างเดียว ไม่กระทบสิทธิ์แก้ไข/แจ้งเตือน) ── */
@@ -690,7 +722,31 @@ export const getAddEvent = async ({
         });
       });
 
-      /* ── เลือกสัญญาที่มีอยู่แล้ว — create:false เพราะห้ามพิมพ์เพิ่มเอง ต้องเลือกจากที่มีจริงเท่านั้น ── */
+      /* ── เลือกสัญญาที่มีอยู่แล้ว — create:false เพราะห้ามพิมพ์เพิ่มเอง ต้องเลือกจากที่มีจริงเท่านั้น ──
+         ⚠️ เดิม dropdown โชว์แค่ข้อความยาวบรรทัดเดียว "บริษัท · โครงการ · ประเภทงาน (เลขที่)" อ่านยาก
+         ไล่สายตาหาสัญญาที่ต้องการไม่ออกเวลามีสัญญาเยอะๆ — ใช้ render.option/item ของ TomSelect วาด HTML
+         เอง แยกชื่อบริษัท/โครงการ (ตัวหนาใหญ่) ออกจากรายละเอียดย่อย (เบาๆ) พร้อมป้าย "เหลือ N ครั้ง"
+         แยกให้เห็นชัด — escape() ที่ TomSelect ส่งมาให้ป้องกัน HTML injection จากชื่อที่ผู้ใช้เคยพิมพ์เอง */
+      const renderContractOption = (data, escape) => {
+        const c = contractMap.get(data.value);
+        if (!c) return `<div class="ae-contract-option">${escape(data.text)}</div>`;
+        const remaining = c.visitCount - c.usedVisits;
+        return `
+          <div class="ae-contract-option">
+            <div class="ae-contract-option-main">${escape(contractDisplayName(c))}</div>
+            <div class="ae-contract-option-sub">
+              <span>${escape(c.title)} · ${escape(c.system)}${c.contractNo ? ` · เลขที่ ${escape(c.contractNo)}` : ""}</span>
+              <span class="ae-contract-option-badge">เหลือ ${remaining} ครั้ง</span>
+            </div>
+          </div>`;
+      };
+      // ✅ "item" (ค่าที่เลือกแล้ว โชว์ย่อในกล่องค้นหาเอง) ให้กระชับบรรทัดเดียว ต่างจาก "option" (รายการ
+      // ใน dropdown) ที่โชว์ได้เต็ม 2 บรรทัด — ไม่งั้นกล่องค้นหาจะสูงเกินจำเป็น
+      const renderContractItem = (data, escape) => {
+        const c = contractMap.get(data.value);
+        if (!c) return `<div>${escape(data.text)}</div>`;
+        return `<div>${escape(contractDisplayName(c))}${c.contractNo ? ` · ${escape(c.contractNo)}` : ""}</div>`;
+      };
       let contractTs = null;
       try {
         contractTs = new TomSelect("#ae-contractPick", {
@@ -698,6 +754,7 @@ export const getAddEvent = async ({
           maxOptions: selectableContracts.length || 5,
           placeholder: "ค้นหาบริษัท/โครงการ/เลขที่สัญญา...",
           sortField: { field: "text", direction: "asc" },
+          render: { option: renderContractOption, item: renderContractItem },
         });
       } catch { contractTs = null; }
       mkTs("#ae-cpTeam", "เลือกหรือพิมพ์ชื่อทีม");
@@ -768,9 +825,9 @@ export const getAddEvent = async ({
         const c = contractMap.get(contractId);
         if (!c) { contractPickInfo.style.display = "none"; renderRoundGrid(null); return; }
         contractPickInfo.innerHTML = `
-          <div><b>${contractDisplayName(c)}</b></div>
-          <div class="ae-cpi-sub">${c.title} · ${c.system}${c.contractNo ? ` · เลขที่สัญญา ${c.contractNo}` : ""}</div>
-          <div class="ae-cpi-sub">ผู้รับผิดชอบเดิม: ${c.team || "ไม่ระบุ"}</div>
+          <div><b>${escapeHtml(contractDisplayName(c))}</b></div>
+          <div class="ae-cpi-sub">${escapeHtml(c.title)} · ${escapeHtml(c.system)}${c.contractNo ? ` · เลขที่สัญญา ${escapeHtml(c.contractNo)}` : ""}<span class="ae-cpi-badge">เหลือ ${c.visitCount - c.usedVisits} ครั้ง</span></div>
+          <div class="ae-cpi-sub">ผู้รับผิดชอบเดิม: ${c.team ? escapeHtml(c.team) : "ไม่ระบุ"}</div>
         `;
         contractPickInfo.style.display = "block";
         renderRoundGrid(c);
@@ -957,7 +1014,6 @@ export const getAddEvent = async ({
             site,
             title,
             system,
-            time:            getVal("eventTime"),
             team:            getVal("eventTeam"),
             resPerson:       teamToId.get(getVal("eventTeam")) || "",
             teamMembers,
@@ -966,6 +1022,9 @@ export const getAddEvent = async ({
             fontSize:        getVal("fontSize") || "8",
             startTime:       getVal("startTime"),
             endTime:         getVal("endTime"),
+            // ✅ ตั้งหมวดหมู่ "งานทั่วไป"/"งานโปรเจค" ให้เลยตั้งแต่ตอนสร้าง (ตามที่เลือกไว้ในขั้นตอนที่ 1)
+            // แทนที่จะปล่อยว่างไว้แล้วต้องไปกดจัดหมวดหมู่ย้อนหลังทีหลังในหน้า "ภาพรวมงาน" เสมอ
+            jobClassification: jobType === "project" ? "project" : "general",
           };
 
           // ✅ งานหลายช่วงวันที่ไม่ติดกัน: ส่ง dates[] แทน start/end/date เดี่ยว — backend จะสร้าง

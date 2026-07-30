@@ -1,6 +1,15 @@
 import Toastify from "toastify-js";
 import "toastify-js/src/toastify.css";
 import { resolveOperationGroup } from "../../../utils/overdueJobs";
+import { countUsedRounds } from "../../../utils/contractRounds";
+import { escapeHtml } from "../../../utils/escapeHtml";
+
+// ✅ ป้องกัน stored XSS — ค่าที่ผู้ใช้พิมพ์เอง (ชื่อบริษัท/โครงการ/ประเภทงาน/ระบบ/ทีม ฯลฯ) ต้อง escape
+// ก่อนต่อเป็น HTML string เสมอ ไม่งั้นถ้ามีใครตั้งชื่อเป็น เช่น "><img src=x onerror="..."> จะยิง
+// JavaScript ทันทีที่มีใครเปิดฟอร์มนี้ดู — ใช้ helper 2 ตัวนี้แทนต่อ string ตรงๆ ทุกจุด
+const optionHtml = (value, selected) =>
+  `<option value="${escapeHtml(value)}"${selected ? " selected" : ""}>${escapeHtml(value)}</option>`;
+const attrHtml = (value) => escapeHtml(value);
 
 function injectStyles() {
   const existing = document.getElementById("edit-event-styles");
@@ -309,6 +318,7 @@ function injectStyles() {
     .ee-btn-danger    { background: #ef4444; color: #fff; }
     .ee-btn-warning   { background: #f59e0b; color: #fff; }
     .ee-btn-ghost     { background: #e2e8f0; color: #475569; }
+    .ee-btn-attach    { background: #dc2626; color: #fff; }
 
     @media(max-width:640px) {
       #ee-action-bar { flex-direction: column; gap: 8px; }
@@ -327,6 +337,84 @@ function injectStyles() {
       border-color: #2563eb !important;
       box-shadow: 0 0 0 3px rgba(37,99,235,.10) !important;
     }
+  `;
+  document.head.appendChild(style);
+}
+
+// ✅ ป๊อปอัพเล็กๆ แยกต่างหากสำหรับ "ย้ายเข้าสัญญาที่มีอยู่แล้ว" (เปิดจากหน้าแก้ไขงาน) — ไม่ใช้
+// scope .swal-edit-event ร่วมกับฟอร์มแก้ไขหลัก เพราะ header ของฟอร์มหลัก (#ee-status-header) ผูกกับสี
+// ตามสถานะงานเฉพาะ ไม่เหมาะเอามาใช้ซ้ำกับป๊อปอัพนี้ — สไตล์เทียบ pattern เดียวกับไดอะล็อก
+// "ย้ายเข้าสัญญาที่มีอยู่แล้ว" ในหน้า "ภาพรวมงาน" (ContractOverview.js) และตัวเลือกสัญญาการ์ด 2 บรรทัด
+// เทียบ pattern เดียวกับ AddEvent.js/AddDraftEvent.js ให้ตรงกันทั้งแอป
+function injectAttachStyles() {
+  if (document.getElementById("ee-attach-styles")) return;
+  const style = document.createElement("style");
+  style.id = "ee-attach-styles";
+  style.textContent = `
+    .swal-ee-attach.swal2-popup {
+      padding: 0 !important; border-radius: 16px !important; overflow: hidden !important;
+      width: min(94vw, 480px) !important; font-family: 'Inter', system-ui, sans-serif !important;
+      box-shadow: 0 25px 60px rgba(10,22,40,.35) !important;
+    }
+    .swal-ee-attach .swal2-html-container { margin: 0 !important; padding: 0 !important; overflow: hidden !important; }
+    .swal-ee-attach .swal2-title, .swal-ee-attach .swal2-actions, .swal-ee-attach .swal2-footer { display: none !important; }
+    .swal-ee-attach .swal2-close {
+      position: absolute; top: 14px; right: 16px; z-index: 99;
+      width: 32px; height: 32px; border-radius: 50%;
+      background: rgba(255,255,255,.15) !important; color: #fff !important;
+      font-size: 18px; display: flex; align-items: center; justify-content: center;
+      transition: background .2s;
+    }
+    .swal-ee-attach .swal2-close:hover { background: rgba(255,255,255,.30) !important; }
+    #eea-header { padding: 18px 22px 16px; display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg, #dc2626, #7f1d1d); }
+    #eea-header-icon { font-size: 24px; line-height: 1; }
+    #eea-header-info h3 { margin: 0; font-size: 16px; font-weight: 700; color: #fff; }
+    #eea-header-info small { font-size: 12px; color: rgba(255,255,255,.75); }
+    #eea-body { padding: 20px 22px; background: #f8fafc; }
+    #eea-body label { font-size: 12px; font-weight: 600; color: #374151; display: block; margin-bottom: 5px; }
+    #eea-body select {
+      width: 100%; box-sizing: border-box; border: 1.5px solid #e2e8f0; border-radius: 8px;
+      padding: 9px 12px; font-size: 14px; color: #1e293b; background: #fff; font-family: inherit;
+    }
+    .eea-round-label { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #64748b; margin: 18px 0 8px; }
+    .eea-round-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+    .eea-chip {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 40px; height: 32px; padding: 0 10px; border-radius: 8px;
+      font-size: 12px; font-weight: 700; border: 1.5px solid #e2e8f0; background: #fff; color: #64748b; font-family: inherit;
+    }
+    button.eea-chip { cursor: pointer; transition: border-color .15s, background .15s, transform .15s; }
+    button.eea-chip:hover { border-color: #dc2626; }
+    .eea-chip--selected { border: 2px solid #dc2626 !important; background: #fef2f2 !important; color: #b91c1c !important; transform: scale(1.06); }
+    .eea-chip--scheduled { border-color: #bbf7d0; background: #f0fdf4; color: #15803d; }
+    .eea-chip--pending { border-color: #fde68a; background: #fffbeb; color: #b45309; cursor: not-allowed; }
+    .eea-hint { font-size: 12px; color: #64748b; margin: 8px 0 0; }
+    /* ✅ ตัวเลือกสัญญาใน dropdown (TomSelect render.option/item) — 2 บรรทัด (ชื่อบริษัท/โครงการตัวหนา
+       + รายละเอียดย่อยพร้อมป้าย "เหลือ N ครั้ง") เทียบ pattern เดียวกับ AddEvent.js/AddDraftEvent.js/
+       ContractOverview.js ให้ตรงกันทั้งแอป */
+    .eea-contract-option { padding: 1px 0; }
+    .eea-contract-option-main { font-size: 13px; font-weight: 700; color: #1e293b; }
+    .eea-contract-option-sub { font-size: 11.5px; color: #64748b; margin-top: 2px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .eea-contract-option-badge {
+      display: inline-flex; align-items: center; flex-shrink: 0;
+      background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;
+      border-radius: 20px; padding: 1px 9px; font-size: 10.5px; font-weight: 700; white-space: nowrap;
+    }
+    .swal-ee-attach .ts-dropdown .option.active .eea-contract-option-badge { background: #fff; border-color: #fff; }
+    #eea-actions { display: flex; gap: 10px; justify-content: flex-end; padding: 14px 22px 18px; background: #f1f5f9; border-top: 1px solid #e2e8f0; }
+    .eea-btn {
+      display: inline-flex; align-items: center; gap: 6px; border: none; border-radius: 9px;
+      padding: 9px 18px; font-size: 13px; font-weight: 700; cursor: pointer;
+      transition: opacity .15s, transform .1s; font-family: inherit;
+    }
+    .eea-btn:hover { opacity: .88; transform: translateY(-1px); }
+    .eea-btn-ghost   { background: #e2e8f0; color: #475569; }
+    .eea-btn-success { background: #dc2626; color: #fff; }
+    .swal-ee-attach .ts-wrapper .ts-control {
+      border: 1.5px solid #e2e8f0 !important; border-radius: 8px !important;
+      padding: 8px 12px !important; font-size: 14px !important; min-height: 40px;
+    }
+    .swal-ee-attach .ts-wrapper.focus .ts-control { border-color: #dc2626 !important; }
   `;
   document.head.appendChild(style);
 }
@@ -446,6 +534,32 @@ export const getEditEvent = async ({
   // ถ้าสถานะถูกเลื่อนไปไกลกว่านั้นแล้ว (กำลังดำเนินการ/ดำเนินการเสร็จสิ้น) ให้แสดงค่าจริงไว้ แต่แก้ไม่ได้
   const canEditStatus = isAdminOrManagerUser || TECH_EDITABLE_STATUSES.includes(eventStatus);
 
+  // ✅ "ย้ายเข้าสัญญาที่มีอยู่แล้ว" — ย้ายมาจากหน้า "ภาพรวมงาน" (ContractOverview.js openAttachDialog)
+  // ให้แก้ไขกรณีจัดกลุ่มผิดได้ตรงจากหน้าแก้ไขงานเลย ไม่ต้องสลับไปหน้าภาพรวมงานทุกครั้ง — เฉพาะงานที่ยัง
+  // ไม่ผูกสัญญาอยู่แล้ว (!eventContractGroupId) และเฉพาะแอดมิน/manager เทียบสิทธิ์เดียวกับหน้าภาพรวมงาน
+  // ✅ events ที่ได้มาเป็น state ดิบ (ไม่ใช่ FullCalendar Event API object) ฟิลด์ต่างๆ จึงอยู่ top-level
+  // เหมือนกับที่ siblingEvents ด้านบนใช้ e.jobGroupId/e.id ตรงๆ (ไม่ใช่ e.extendedProps.xxx)
+  const contractMap = new Map();
+  (events || []).forEach((e) => {
+    if (!e.contractGroupId) return;
+    if (!contractMap.has(e.contractGroupId)) {
+      contractMap.set(e.contractGroupId, {
+        key: e.contractGroupId,
+        company: e.company || "", site: e.site || "", system: e.system || "", title: e.title || "",
+        contractNo: e.contractNo || "", quotationNo: e.quotationNo || "",
+        visitCount: e.visitCount || 0, jobValue: e.jobValue, team: e.team || "",
+        visits: [],
+      });
+    }
+    contractMap.get(e.contractGroupId).visits.push(e);
+  });
+  contractMap.forEach((c) => { c.usedVisits = countUsedRounds(c.visits); });
+  const attachableContracts = [...contractMap.values()]
+    .filter((c) => c.usedVisits < c.visitCount)
+    .sort((a, b) => (a.company || "").localeCompare(b.company || "", "th") || (a.site || "").localeCompare(b.site || "", "th"));
+  const contractDisplayName = (c) => [c.company, c.site].filter(Boolean).join(" · ") || "(ไม่ระบุชื่อ)";
+  const canAttachToContract = isAdminOrManagerUser && !eventContractGroupId && attachableContracts.length > 0;
+
   const formattedEnd = eventAllDay
     ? moment(eventEnd).subtract(1, "days").format("YYYY-MM-DD")
     : moment(eventEnd).format("YYYY-MM-DD");
@@ -491,10 +605,7 @@ export const getEditEvent = async ({
     : [eventStatus];
 
   const statusOptions = selectableStatuses
-    .map(
-      (s) =>
-        `<option value="${s}" ${eventStatus === s ? "selected" : ""}>${s}</option>`,
-    )
+    .map((s) => optionHtml(s, eventStatus === s))
     .join("");
 
   const custOpt = (field) =>
@@ -502,36 +613,24 @@ export const getEditEvent = async ({
       .map((c) => {
         const val = field === "company" ? c.cCompany : c.cSite;
         const current = field === "company" ? eventCompany : eventSite;
-        return `<option value="${val}" ${current === val ? "selected" : ""}>${val}</option>`;
+        return optionHtml(val, current === val);
       })
       .join("");
 
   const titleOpts = (jobTypes?.items || [])
-    .map(
-      (t) =>
-        `<option value="${t.name}" ${eventTitle === t.name ? "selected" : ""}>${t.name}</option>`,
-    )
+    .map((t) => optionHtml(t.name, eventTitle === t.name))
     .join("");
 
   const systemOpts = (systemTypes?.items || [])
-    .map(
-      (s) =>
-        `<option value="${s.name}" ${eventSystem === s.name ? "selected" : ""}>${s.name}</option>`,
-    )
+    .map((s) => optionHtml(s.name, eventSystem === s.name))
     .join("");
 
   const timeOpts = ["1", "2", "3", "4"]
-    .map(
-      (t) =>
-        `<option value="${t}" ${eventTime === t ? "selected" : ""}>${t}</option>`,
-    )
+    .map((t) => optionHtml(t, eventTime === t))
     .join("");
 
   const teamOpts = employeeList
-    .map(
-      (e) =>
-        `<option value="${e.fname}" ${eventTeam === e.fname ? "selected" : ""}>${e.fname}</option>`,
-    )
+    .map((e) => optionHtml(e.fname, eventTeam === e.fname))
     .join("");
 
   // ✅ เดิมช่อง select ทุกช่อง (บริษัท/โครงการ/ประเภทงาน/ระบบ/ครั้งที่/ทีม) ใช้ placeholder option
@@ -543,7 +642,7 @@ export const getEditEvent = async ({
   // มาตรฐาน (เช่น พิมพ์เองไว้ก่อนหน้านี้) ต้องแทรก option ที่ตรงกับค่านั้นแบบ selected ไว้เอง
   // ไม่งั้นค่าจริงจะหายไปจากช่องตอนเปิดหน้าแก้ไข
   const customOption = (val, list) =>
-    val && !list.includes(val) ? `<option value="${val}" selected>${val}</option>` : "";
+    val && !list.includes(val) ? optionHtml(val, true) : "";
   const companyValues = res.userCustomers.map((c) => c.cCompany);
   const siteValues = res.userCustomers.map((c) => c.cSite);
   const titleValues = (jobTypes?.items || []).map((t) => t.name);
@@ -555,7 +654,7 @@ export const getEditEvent = async ({
 
   // ✅ ตัวเลือกดิบไม่ฝัง selected มาด้วย ใช้กับแถวลูกทีมเพิ่มเติมที่ต้อง render แยกทีละแถวเอง
   const plainTeamOpts = employeeList
-    .map((e) => `<option value="${e.fname}">${e.fname}</option>`)
+    .map((e) => optionHtml(e.fname, false))
     .join("");
 
   const cfg0 = STATUS_CONFIG[eventStatus] || STATUS_CONFIG["กำลังรอยืนยัน"];
@@ -567,10 +666,10 @@ export const getEditEvent = async ({
   <div id="ee-status-header" style="background:${cfg0.bg}">
     <div id="ee-status-icon">${cfg0.icon}</div>
     <div id="ee-status-title">
-      <h3><span >${eventTitle} · ${eventSystem} ${eventTime ? `· ครั้งที่ ${eventTime}` : ""}</span></h3>
+      <h3><span >${attrHtml(eventTitle)} · ${attrHtml(eventSystem)} ${eventTime ? `· ครั้งที่ ${attrHtml(eventTime)}` : ""}</span></h3>
       <div class="ee-header-meta">
-        <span class="ee-tag">📍 ${eventSite || "—"}</span>
-        ${eventTeam ? `<span class="ee-tag">👷 ${eventTeam}</span>` : ""}
+        <span class="ee-tag">📍 ${attrHtml(eventSite) || "—"}</span>
+        ${eventTeam ? `<span class="ee-tag">👷 ${attrHtml(eventTeam)}</span>` : ""}
       </div>
     </div>
     <button id="ee-close-btn" title="ปิด">✕</button>
@@ -588,11 +687,11 @@ export const getEditEvent = async ({
       <div class="ee-grid ee-grid-3">
         <div class="ee-field">
           <label>📄 เลขที่สัญญา</label>
-          <input id="editContractNo" type="text" value="${eventContractNo}" placeholder="เช่น FAPTY17-2568">
+          <input id="editContractNo" type="text" value="${attrHtml(eventContractNo)}" placeholder="เช่น FAPTY17-2568">
         </div>
         <div class="ee-field">
           <label>🧾 เลขที่ใบเสนอราคา</label>
-          <input id="editQuotationNo" type="text" value="${eventQuotationNo}" placeholder="เช่น QT2024100049">
+          <input id="editQuotationNo" type="text" value="${attrHtml(eventQuotationNo)}" placeholder="เช่น QT2024100049">
         </div>
         <div class="ee-field">
           <label>🔢 จำนวนครั้ง</label>
@@ -703,11 +802,11 @@ export const getEditEvent = async ({
     <div class="ee-grid ee-grid-2">
       <div class="ee-field">
         <label>🕐 เวลาเริ่ม</label>
-        <input id="editStartTime" type="text" placeholder="เช่น 08:30" value="${eventStartTime}">
+        <input id="editStartTime" type="text" placeholder="เช่น 08:30" value="${attrHtml(eventStartTime)}">
       </div>
       <div class="ee-field">
         <label>🕔 เวลาสิ้นสุด</label>
-        <input id="editEndTime" type="text" placeholder="เช่น 17:00" value="${eventEndTime}">
+        <input id="editEndTime" type="text" placeholder="เช่น 17:00" value="${attrHtml(eventEndTime)}">
       </div>
     </div>
 
@@ -732,11 +831,11 @@ export const getEditEvent = async ({
     <div class="ee-grid ee-grid-2">
       <div class="ee-field">
         <label>📄 เลขที่อ้างอิง (Doc No.)</label>
-        <input id="editdocNo" type="text" value="${evendocNo}" placeholder="เช่น DOC-2026-001">
+        <input id="editdocNo" type="text" value="${attrHtml(evendocNo)}" placeholder="เช่น DOC-2026-001">
       </div>
       <div class="ee-field">
         <label>📝 ชื่อเรื่อง (Subject)</label>
-        <input id="editSubject" type="text" value="${eventSubject}" placeholder="ระบุชื่อเรื่อง">
+        <input id="editSubject" type="text" value="${attrHtml(eventSubject)}" placeholder="ระบุชื่อเรื่อง">
       </div>
     </div>
     <div class="ee-field">
@@ -756,8 +855,10 @@ export const getEditEvent = async ({
       ${canDeleteEvent ? `<button class="ee-btn ee-btn-danger" id="btnDelete">🗑 ลบแผนงาน</button>` : ""}
     </div>
 
-    <!-- 🔵 กลาง: นำทาง & เอกสาร -->
+    <!-- 🔵 กลาง: นำทาง & เอกสาร (ย้ายเข้าสัญญาไม่ใช่การกระทำอันตราย — ไม่ควรอยู่กลุ่มซ้ายกับลบ/ย้ายไป
+         แผนล่วงหน้า ย้ายมาไว้กลุ่มนี้แทนให้สื่อความหมายตรงกว่า) -->
     <div class="ee-btn-group ee-btn-group-center">
+      ${canAttachToContract ? `<button class="ee-btn ee-btn-attach" id="btnAttachContract">🔗 ย้ายเข้าสัญญา</button>` : ""}
       ${canViewOperation ? `<button class="ee-btn ee-btn-operation" id="btnViewSchedule">📊 ดูการดำเนินงาน</button>` : ""}
       <button class="ee-btn ee-btn-info"      id="btnGeneratePDF">📄 ออกใบแจ้งเข้างาน</button>
     </div>
@@ -772,6 +873,139 @@ export const getEditEvent = async ({
 
 </div>
 `;
+
+  // ✅ ป๊อปอัพ "ย้ายเข้าสัญญาที่มีอยู่แล้ว" — เทียบ pattern เดียวกับ ContractOverview.js
+  // openAttachDialog/handleAttachSubmit ทุกประการ แค่ย้ายมาเปิดจากหน้าแก้ไขงานได้เลยแทน (ดูปุ่ม
+  // btnAttachContract ใน action bar ด้านบน) ย้ายทั้งกลุ่ม jobGroupId (ทุกวันของงานเดียวกัน) พร้อมกัน
+  // ไม่ใช่แค่วันที่กำลังแก้ไขอยู่วันเดียว กันวันอื่นตกค้างเป็นงานทั่วไปแยกจากสัญญาที่เพิ่งย้ายไป
+  const openAttachContractDialog = () => {
+    injectAttachStyles();
+    const contractOptsHtml = attachableContracts
+      .map((c) => `<option value="${c.key}">${escapeHtml(contractDisplayName(c))} · ${escapeHtml(c.title)} (${c.contractNo ? escapeHtml(c.contractNo) : "ไม่มีเลขที่"})</option>`)
+      .join("");
+
+    const attachHtml = `
+      <div id="eea-header">
+        <div id="eea-header-icon">🔗</div>
+        <div id="eea-header-info">
+          <h3>ย้ายเข้าสัญญาที่มีอยู่แล้ว</h3>
+          <small>${attrHtml(eventCompany) || "-"} · ${attrHtml(eventSite) || "-"} · ${attrHtml(eventTitle)}${siblingEvents.length > 0 ? ` · ${siblingEvents.length + 1} วัน` : ""}</small>
+        </div>
+      </div>
+      <div id="eea-body">
+        <label>เลือกสัญญาปลายทาง</label>
+        <select id="eeaContractPick"><option value="" selected disabled>— เลือกสัญญา —</option>${contractOptsHtml}</select>
+        <p class="eea-round-label" id="eeaRoundLabel" style="display:none;">เลือกครั้งที่</p>
+        <div class="eea-round-grid" id="eeaRoundGrid"></div>
+        <p class="eea-hint" id="eeaRoundHint"></p>
+        <input type="hidden" id="eeaSelectedRound" value="">
+      </div>
+      <div id="eea-actions">
+        <button type="button" class="eea-btn eea-btn-ghost" id="eeaCancel">ยกเลิก</button>
+        <button type="button" class="eea-btn eea-btn-success" id="eeaConfirm">ย้ายเข้าสัญญา</button>
+      </div>
+    `;
+
+    Swal.fire({
+      html: attachHtml,
+      showConfirmButton: false,
+      showCancelButton: false,
+      showCloseButton: true,
+      customClass: { popup: "swal-ee-attach" },
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      didOpen: () => {
+        const renderContractOption = (data, escape) => {
+          const c = contractMap.get(data.value);
+          if (!c) return `<div class="eea-contract-option">${escape(data.text)}</div>`;
+          const remaining = c.visitCount - c.usedVisits;
+          return `
+            <div class="eea-contract-option">
+              <div class="eea-contract-option-main">${escape(contractDisplayName(c))}</div>
+              <div class="eea-contract-option-sub">
+                <span>${escape(c.title)} · ${escape(c.system)}${c.contractNo ? ` · เลขที่ ${escape(c.contractNo)}` : ""}</span>
+                <span class="eea-contract-option-badge">เหลือ ${remaining} ครั้ง</span>
+              </div>
+            </div>`;
+        };
+        const renderContractItem = (data, escape) => {
+          const c = contractMap.get(data.value);
+          if (!c) return `<div>${escape(data.text)}</div>`;
+          return `<div>${escape(contractDisplayName(c))}${c.contractNo ? ` · ${escape(c.contractNo)}` : ""}</div>`;
+        };
+        let attachTs = null;
+        try {
+          attachTs = new TomSelect("#eeaContractPick", {
+            create: false,
+            maxOptions: attachableContracts.length || 5,
+            placeholder: "ค้นหาบริษัท/โครงการ/เลขที่สัญญา...",
+            sortField: { field: "text", direction: "asc" },
+            render: { option: renderContractOption, item: renderContractItem },
+          });
+        } catch { attachTs = null; }
+
+        const roundLabel = document.getElementById("eeaRoundLabel");
+        const roundGrid = document.getElementById("eeaRoundGrid");
+        const roundHint = document.getElementById("eeaRoundHint");
+        const roundInput = document.getElementById("eeaSelectedRound");
+
+        const renderRounds = (contractId) => {
+          const c = contractMap.get(contractId);
+          roundInput.value = "";
+          roundHint.textContent = "";
+          if (!c) { roundLabel.style.display = "none"; roundGrid.innerHTML = ""; return; }
+          roundLabel.style.display = "block";
+          const rounds = Array.from({ length: c.visitCount }, (_, i) => i + 1);
+          roundGrid.innerHTML = rounds.map((n) => {
+            const scheduled = c.visits.some((v) => !v.unscheduled && Number(v.time) === n);
+            const pending = c.visits.some((v) => v.unscheduled && Number(v.time) === n);
+            if (pending) return `<span class="eea-chip eea-chip--pending" title="มีแผนงานล่วงหน้าจองไว้แล้ว — เลือกไม่ได้">📌 ${n}</span>`;
+            if (scheduled) return `<button type="button" class="eea-chip eea-chip--scheduled" data-round="${n}" title="ลงตารางแล้ว — กดเพื่อรวมเป็นงานเดียวกัน (ไม่นับครั้งใหม่)">✅ ${n}</button>`;
+            return `<button type="button" class="eea-chip eea-chip--open" data-round="${n}">${n}</button>`;
+          }).join("");
+          roundGrid.querySelectorAll("button.eea-chip").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              roundGrid.querySelectorAll("button.eea-chip").forEach((b) => b.classList.remove("eea-chip--selected"));
+              btn.classList.add("eea-chip--selected");
+              roundInput.value = btn.dataset.round;
+              roundHint.textContent = `จะย้ายเข้าเป็นครั้งที่ ${btn.dataset.round}`;
+            });
+          });
+        };
+        document.getElementById("eeaContractPick")?.addEventListener("change", (e) => renderRounds(e.target.value));
+        attachTs?.on("change", (val) => renderRounds(val));
+
+        document.getElementById("eeaCancel")?.addEventListener("click", () => Swal.close());
+
+        document.getElementById("eeaConfirm")?.addEventListener("click", async (clickEvt) => {
+          const contractId = document.getElementById("eeaContractPick")?.value;
+          const round = roundInput.value;
+          if (!contractId) { Swal.showValidationMessage("กรุณาเลือกสัญญาปลายทาง"); return; }
+          if (!round) { Swal.showValidationMessage("กรุณาเลือกครั้งที่"); return; }
+
+          const btn = clickEvt.currentTarget;
+          const originalLabel = btn.textContent;
+          btn.disabled = true;
+          btn.style.opacity = "0.7";
+          btn.textContent = "⏳ กำลังบันทึก...";
+
+          try {
+            const idsToMove = [eventId, ...siblingEvents.map((e) => e.id)];
+            await EventService.AttachToContract(contractId, { eventIds: idsToMove, time: round });
+            Swal.close();
+            await fetchEventsFromDB();
+            Swal.fire({ title: "ย้ายเข้าสัญญาสำเร็จ ✅", icon: "success", timer: 1200, showConfirmButton: false });
+          } catch (error) {
+            console.error("❌ Error attaching event to contract:", error);
+            btn.disabled = false;
+            btn.style.opacity = "1";
+            btn.textContent = originalLabel;
+            Swal.showValidationMessage(error?.response?.data?.message || "ย้ายเข้าสัญญาไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+          }
+        });
+      },
+    });
+  };
 
   Swal.fire({
     html,
@@ -1232,6 +1466,14 @@ export const getEditEvent = async ({
       document.getElementById("btnUnschedule")?.addEventListener("click", () => {
         Swal.close();
         handleUnscheduleEvent(eventId);
+      });
+
+      /* ✅ ย้ายเข้าสัญญาที่มีอยู่แล้ว — เปิดป๊อปอัพเล็กแยกต่างหาก (ไม่ใช้ scope เดียวกับฟอร์มแก้ไขหลัก
+         ดู injectAttachStyles ด้านบน) ปิด modal แก้ไขนี้ก่อนเหมือน pattern เดียวกับ btnDelete/
+         btnUnschedule ด้านบน กันซ้อนกัน 2 ชั้น */
+      document.getElementById("btnAttachContract")?.addEventListener("click", () => {
+        Swal.close();
+        openAttachContractDialog();
       });
 
       /* View operation */

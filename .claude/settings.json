@@ -69,7 +69,9 @@
       "Bash(node --check utils/scheduleConflict.js)",
       "Bash(grep -A10 \"src\\\\\\\\\\\\\\\\layouts\\\\\\\\\\\\\\\\FullLayout.js\\\\|src\\\\\\\\\\\\\\\\layouts\\\\\\\\\\\\\\\\Sidebar.js\" /tmp/build_output_sidebar.txt)",
       "Bash(rm -rf \"C:\\\\Users\\\\Admin\\\\Desktop\\\\da-app\\\\build\" && rm -f /tmp/build_out8.txt && echo done)",
-      "Bash(rm -rf \"C:\\\\Users\\\\Admin\\\\Desktop\\\\da-app\\\\build\" && rm -f /tmp/build_out19.txt && echo done)"
+      "Bash(rm -rf \"C:\\\\Users\\\\Admin\\\\Desktop\\\\da-app\\\\build\" && rm -f /tmp/build_out19.txt && echo done)",
+      "Bash(rm -rf \"c:/Users/Admin/Desktop/da-app/build\" && rm -f /tmp/build_out36.txt && echo done)",
+      "Bash(awk 'NR==554,NR==672' \"C:/Users/Admin/Desktop/da-app-server/routes/calendarEvent.js\")"
     ],
     "additionalDirectories": [
       "\\tmp",

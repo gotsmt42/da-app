@@ -1,5 +1,8 @@
+import { showTeamOverlapWarning } from "../../../utils/teamOverlapWarning";
+
 export const getEventDrop = async ({
   arg,
+  events,
   fetchEventsFromDB,
   setEvents,
   EventService,
@@ -48,6 +51,9 @@ export const getEventDrop = async ({
 
     // แล้วรีเฟรชเงียบ ๆ เพื่อให้ตรงกับข้อมูลจริงบนเซิร์ฟเวอร์เสมอ (เผื่อมีผลข้างเคียงอื่น)
     await fetchEventsFromDB(true);
+
+    // ✅ ไม่บล็อกแล้ว (เดิม backend เช็คช่างชนกันแล้วปฏิเสธ ตัดออกไปแล้ว) แต่ยังแจ้งเตือนเบาๆ ให้รู้ตัว
+    showTeamOverlapWarning({ Swal, moment, events, movedEvent: event, start, end });
 
     console.log(`✅ Event ${event.id} updated`);
   } catch (error) {
