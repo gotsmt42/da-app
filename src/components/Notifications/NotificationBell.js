@@ -17,6 +17,10 @@ const NOTI_META = {
   close_requested: { icon: <HourglassTop sx={{ fontSize: 16 }} />, color: "#f59e0b" },
   close_approved: { icon: <CheckCircle sx={{ fontSize: 16 }} />, color: "#10b981" },
   close_rejected: { icon: <Cancel sx={{ fontSize: 16 }} />, color: "#ef4444" },
+  // ✅ อนุมัติ/ไม่อนุมัติ "งาน" เอง (ตอนสร้าง/แก้ไข) — คนละเรื่องกับ close_* ด้านบนซึ่งเป็นการขอปิดงาน
+  approval_requested: { icon: <HourglassTop sx={{ fontSize: 16 }} />, color: "#eab308" },
+  approval_approved: { icon: <CheckCircle sx={{ fontSize: 16 }} />, color: "#10b981" },
+  approval_rejected: { icon: <Cancel sx={{ fontSize: 16 }} />, color: "#ef4444" },
   comment: { icon: <Chat sx={{ fontSize: 16 }} />, color: "#3b82f6" },
 };
 

@@ -46,7 +46,12 @@ export const buildDaysPastDueMap = (allEvents) => {
     });
     const days = moment().startOf("day").diff(lastPlanEnd.startOf("day"), "days");
     sessions.forEach((e) => {
-      const exempt = e.status === "ดำเนินการเสร็จสิ้น" || e.closeRequested || e.status === "กำลังรอยืนยัน";
+      // ✅ งานที่ยังรออนุมัติ/ถูกปฏิเสธ (approvalStatus) ก็ไม่ควรนับว่า "ค้างงาน" เหมือนกัน — ยังไม่ผ่าน
+      // อนุมัติเลยด้วยซ้ำ จะโทษผู้สร้างว่าค้างงานไม่ได้ (เทียบ pattern เดียวกับ "กำลังรอยืนยัน" ด้านบน)
+      // ไม่ import getApprovalState จาก utils/approvalStatus.js มาใช้ตรงนี้เพราะไฟล์นั้น import
+      // getOverdueGroupKey จากไฟล์นี้อยู่แล้ว (import วนกลับไม่ได้) จึงเช็ค field ตรงๆ แทน
+      const exempt = e.status === "ดำเนินการเสร็จสิ้น" || e.closeRequested || e.status === "กำลังรอยืนยัน"
+        || (e.approvalStatus && e.approvalStatus !== "approved");
       map.set(e._id, exempt ? null : { days, groupKey });
     });
   });

@@ -3,6 +3,7 @@ import "toastify-js/src/toastify.css";
 import { resolveOperationGroup } from "../../../utils/overdueJobs";
 import { countUsedRounds } from "../../../utils/contractRounds";
 import { escapeHtml } from "../../../utils/escapeHtml";
+import { getApprovalState } from "../../../utils/approvalStatus";
 
 // ✅ ป้องกัน stored XSS — ค่าที่ผู้ใช้พิมพ์เอง (ชื่อบริษัท/โครงการ/ประเภทงาน/ระบบ/ทีม ฯลฯ) ต้อง escape
 // ก่อนต่อเป็น HTML string เสมอ ไม่งั้นถ้ามีใครตั้งชื่อเป็น เช่น "><img src=x onerror="..."> จะยิง
@@ -155,6 +156,30 @@ function injectStyles() {
       text-transform: uppercase; color: #94a3b8; margin: 0 0 6px;
     }
 
+    /* ── กล่องสถานะอนุมัติ — อยู่บนสุดของฟอร์ม เหนือกล่องข้อมูลสัญญาด้วยซ้ำ เพราะเป็นข้อเท็จจริงที่
+       สำคัญที่สุดของงานนี้ตอนยังไม่ approved (เทียบสีเดียวกับกล่องคำขอปิดงานในหน้า Operation/index.js
+       ให้ธีมสีตรงกันทั้งแอป — amber=รออนุมัติ, red=ไม่อนุมัติ) ── */
+    .ee-approval-box {
+      border-radius: 12px; padding: 12px 16px; margin-bottom: 16px;
+      font-size: 12.5px; line-height: 1.6;
+    }
+    .ee-approval-box--pending {
+      background: #fffbeb; border: 1.5px solid #fde68a; color: #92400e;
+    }
+    .ee-approval-box--rejected {
+      background: #fef2f2; border: 1.5px solid #fecaca; color: #991b1b;
+    }
+    .ee-approval-box b { display: block; font-size: 13.5px; margin-bottom: 4px; }
+    .ee-approval-box .ee-approval-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .ee-approval-reason-bar {
+      display: none; margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgba(0,0,0,.15);
+    }
+    .ee-approval-reason-bar textarea {
+      width: 100%; box-sizing: border-box; min-height: 60px; resize: vertical;
+      border: 1.5px solid #fca5a5; border-radius: 8px; padding: 8px 10px;
+      font-size: 12.5px; font-family: inherit; margin-bottom: 8px;
+    }
+
     /* ── กล่องข้อมูลสัญญา — แยกโทนสีจากส่วนอื่นชัดเจน (ม่วง-น้ำเงิน) ให้เห็นตั้งแต่แวบแรกว่าเป็นข้อมูล
        ระดับ "ทั้งสัญญา" ไม่ใช่แค่ครั้งที่นี้ครั้งเดียว (อยู่บนสุดของฟอร์ม กดเข้ามาก็เจอเลย) ── */
     .ee-contract-box {
@@ -254,6 +279,8 @@ function injectStyles() {
       outline: none; border-color: #2563eb;
       box-shadow: 0 0 0 3px rgba(37,99,235,.10);
     }
+    .swal-edit-event .ee-team-member-row .ts-wrapper { flex: 1 1 auto; min-width: 0; width: auto; }
+    .swal-edit-event .ee-team-member-row .ts-control { min-height: 34px; }
     .ee-team-member-remove {
       flex-shrink: 0; width: 30px; height: 30px; padding: 0 !important;
       display: flex; align-items: center; justify-content: center;
@@ -508,7 +535,15 @@ export const getEditEvent = async ({
   const eventContractStart   = ev.extendedProps?.contractStart ? moment(ev.extendedProps.contractStart).format("YYYY-MM-DD") : "";
   const eventContractEnd     = ev.extendedProps?.contractEnd ? moment(ev.extendedProps.contractEnd).format("YYYY-MM-DD") : "";
   const eventVisitCount      = ev.extendedProps?.visitCount || "";
+  const eventIntervalMonths  = ev.extendedProps?.intervalMonths || "";
   const eventJobValue        = ev.extendedProps?.jobValue ?? "";
+  // ✅ งานที่สร้างโดยคนที่ไม่ใช่แอดมิน/manager (ช่าง/เซล) ต้องรอการอนุมัติก่อน — ดู PUT /events/:id/approval
+  const eventApprovalState     = getApprovalState(ev.extendedProps);
+  const eventApprovalRequestedBy = ev.extendedProps?.approvalRequestedBy || "";
+  const eventApprovalRequestedAt = ev.extendedProps?.approvalRequestedAt || "";
+  const eventApprovalDecidedBy   = ev.extendedProps?.approvalDecidedBy || "";
+  const eventApprovalDecidedAt   = ev.extendedProps?.approvalDecidedAt || "";
+  const eventApprovalRejectReason = ev.extendedProps?.approvalRejectReason || "";
   const siblingEvents = (events || [])
     .filter((e) => !e.extendedProps?.isHoliday && e.id !== eventId)
     .filter((e) => eventJobGroupId && e.jobGroupId === eventJobGroupId)
@@ -678,6 +713,35 @@ export const getEditEvent = async ({
   <!-- ── Body ── -->
   <div id="ee-body">
 
+    <!-- ✅ สถานะอนุมัติ — อยู่บนสุดของฟอร์ม เหนือกล่องสัญญาด้วยซ้ำ เพราะเป็นข้อเท็จจริงสำคัญที่สุดของ
+         งานนี้ตอนยังไม่ approved (งานที่สร้างโดยคนที่ไม่ใช่แอดมิน/manager ต้องรอการอนุมัติก่อน) -->
+    ${eventApprovalState === "pending" ? `
+    <div class="ee-approval-box ee-approval-box--pending">
+      <b>⏳ งานนี้ยังรออนุมัติ</b>
+      ${eventApprovalRequestedBy ? `${attrHtml(eventApprovalRequestedBy)} ส่งงานนี้เข้าระบบ` : "รอการอนุมัติ"}${eventApprovalRequestedAt ? ` เมื่อ ${moment(eventApprovalRequestedAt).locale("th").format("D MMM YYYY HH:mm")}` : ""}
+      ${isAdminOrManagerUser ? `
+      <div class="ee-approval-actions">
+        <button type="button" class="ee-btn ee-btn-success" id="btnApproveJob">✅ อนุมัติงาน</button>
+        <button type="button" class="ee-btn ee-btn-danger" id="btnRejectJob">❌ ไม่อนุมัติ</button>
+      </div>
+      <div class="ee-approval-reason-bar" id="eeRejectReasonBar">
+        <textarea id="eeRejectReasonInput" placeholder="ระบุเหตุผลที่ไม่อนุมัติ (ถ้ามี)..."></textarea>
+        <div class="ee-approval-actions" style="margin-top:0;">
+          <button type="button" class="ee-btn ee-btn-danger" id="btnConfirmRejectJob">ยืนยันไม่อนุมัติ</button>
+          <button type="button" class="ee-btn ee-btn-ghost" id="btnCancelRejectJob">ยกเลิก</button>
+        </div>
+      </div>
+      ` : `<div style="margin-top:6px;">รอแอดมิน/manager ตรวจสอบและอนุมัติ</div>`}
+    </div>
+    ` : eventApprovalState === "rejected" ? `
+    <div class="ee-approval-box ee-approval-box--rejected">
+      <b>❌ งานนี้ไม่ได้รับการอนุมัติ</b>
+      ${eventApprovalDecidedBy ? `${attrHtml(eventApprovalDecidedBy)} ไม่อนุมัติ` : "ไม่ได้รับการอนุมัติ"}${eventApprovalDecidedAt ? ` เมื่อ ${moment(eventApprovalDecidedAt).locale("th").format("D MMM YYYY HH:mm")}` : ""}
+      ${eventApprovalRejectReason ? `<div style="margin-top:4px;"><b style="font-size:12.5px;">เหตุผล:</b> ${attrHtml(eventApprovalRejectReason)}</div>` : ""}
+      <div style="margin-top:6px;">${isAdminOrManagerUser ? "แก้ไขข้อมูลแล้วบันทึก หรือลบทิ้งได้เลย" : "แก้ไขข้อมูลแล้วกดบันทึก ระบบจะส่งขออนุมัติใหม่ให้อัตโนมัติ"}</div>
+    </div>
+    ` : ""}
+
     <!-- ✅ ข้อมูลสัญญา — ย้ายมาไว้บนสุด (เดิมอยู่ล่างสุด ต้องเลื่อนจอไปดู) เพราะเป็นข้อมูลอ้างอิงหลักของ
          "ครั้งที่" นี้ที่มักต้องเช็คก่อนแก้อย่างอื่น ใส่กล่องพื้นหลังโทนม่วง-น้ำเงินแยกจากส่วนอื่นชัดเจน
          ให้เห็นตั้งแต่แวบแรกว่าเป็นข้อมูล "ทั้งสัญญา" ไม่ใช่แค่ครั้งนี้ครั้งเดียว -->
@@ -694,8 +758,8 @@ export const getEditEvent = async ({
           <input id="editQuotationNo" type="text" value="${attrHtml(eventQuotationNo)}" placeholder="เช่น QT2024100049">
         </div>
         <div class="ee-field">
-          <label>🔢 จำนวนครั้ง</label>
-          <input id="editVisitCount" type="number" value="${eventVisitCount}" placeholder="เช่น 4">
+          <label>🔁 เข้าทุกกี่เดือน</label>
+          <input id="editIntervalMonths" type="number" min="1" max="24" value="${eventIntervalMonths}" placeholder="เช่น 3">
         </div>
         <div class="ee-field">
           <label>📅 วันที่เริ่มสัญญา</label>
@@ -704,6 +768,10 @@ export const getEditEvent = async ({
         <div class="ee-field">
           <label>📅 วันที่สิ้นสุดสัญญา</label>
           <input id="editContractEnd" type="date" value="${eventContractEnd}">
+        </div>
+        <div class="ee-field">
+          <label>🔢 จำนวนครั้ง</label>
+          <input id="editVisitCount" type="number" value="${eventVisitCount}" placeholder="เช่น 4">
         </div>
         <div class="ee-field">
           <label>💰 มูลค่างาน</label>
@@ -1018,6 +1086,9 @@ export const getEditEvent = async ({
     // ต้องกดปุ่ม "ปิด" (✕) หรือ "ยกเลิก" อย่างชัดเจนเท่านั้น
     allowOutsideClick: false,
     allowEscapeKey: false,
+    // ✅ Swal ลบ DOM ของ popup ทิ้งทั้งก้อนตอนปิด แต่ document/window listener ของทุก TomSelect
+    // ในฟอร์มยังค้างอยู่ (รวมแถวลูกทีมที่ผู้ใช้ไม่ได้กด ✕ เอง) — เก็บกวาดให้ครบทีเดียวตอนปิด
+    willClose: (popup) => popup.querySelectorAll(".tomselected").forEach((el) => el.tomselect?.destroy()),
 
     didOpen: () => {
       /* color pickers */
@@ -1111,6 +1182,32 @@ export const getEditEvent = async ({
 
       /* ── ลูกทีมเพิ่มเติม (คนที่ 2, 3, ... แสดงผลอย่างเดียว ไม่กระทบสิทธิ์) ── */
       const teamMembersList = document.getElementById("ee-teamMembersList");
+      const mkTeamMemberTs = (el, prefillName) => {
+        try {
+          const ts = new TomSelect(el, {
+            create: true,
+            persist: false,
+            closeAfterSelect: true,
+            selectOnTab: false,
+            placeholder: "เลือกหรือพิมพ์ชื่อลูกทีม",
+            allowEmptyOption: true,
+            // ⚠️ ไม่ต้องก็อป onItemAdd (บังคับเลือกได้ทีละคน) มาจาก mkTs ด้านบน — <select> ที่ไม่มี
+            // attribute multiple ถูก TomSelect ตั้ง maxItems:1 / mode:"single" ให้เองอยู่แล้ว
+          });
+          if (prefillName) {
+            // ✅ ชื่อลูกทีมเดิมที่ไม่มีอยู่ในลิสต์พนักงานแล้ว (ลาออก/เคยพิมพ์เองไว้) ต้อง addOption
+            // ก่อน ไม่งั้น setValue จะเงียบๆ ไม่ทำอะไรเลย (addItem คืนทันทีถ้าค่านั้นไม่มีใน options)
+            // แล้วชื่อเดิมจะหายไปจากฟอร์มโดยไม่มีใครรู้ตัว (addOption คืน false เฉยๆ ถ้ามีอยู่แล้ว
+            // เรียกซ้ำได้ปลอดภัย)
+            ts.addOption({ value: prefillName, text: prefillName });
+            ts.setValue(prefillName, true); // true = silent ไม่ยิง change (ค่าใน <select> ยังถูก sync)
+          } else {
+            ts.clear(true);
+          }
+          return ts;
+        } catch { return null; }
+      };
+
       const addTeamMemberRow = (prefillName = "") => {
         const row = document.createElement("div");
         row.className = "ee-team-member-row";
@@ -1118,9 +1215,12 @@ export const getEditEvent = async ({
           <select class="ee-team-member-select"><option value="">— เลือกลูกทีม —</option>${plainTeamOpts}</select>
           <button type="button" class="ee-btn ee-btn-ghost ee-team-member-remove" title="ลบออก">✕</button>
         `;
-        if (prefillName) row.querySelector(".ee-team-member-select").value = prefillName;
-        row.querySelector(".ee-team-member-remove").addEventListener("click", () => row.remove());
-        teamMembersList.appendChild(row);
+        teamMembersList.appendChild(row); // ต้อง append ก่อน init (ดูคอมเมนต์ใน AddEvent.js)
+        const ts = mkTeamMemberTs(row.querySelector(".ee-team-member-select"), prefillName);
+        row.querySelector(".ee-team-member-remove").addEventListener("click", () => {
+          ts?.destroy();
+          row.remove();
+        });
       };
       eventTeamMembers.forEach((m) => addTeamMemberRow(m?.name || ""));
       document.getElementById("ee-addTeamMemberBtn")?.addEventListener("click", () => addTeamMemberRow());
@@ -1242,12 +1342,15 @@ export const getEditEvent = async ({
       // ต้องอัปเดตผ่าน UpdateContractFields (updateMany ตาม contractGroupId) แยกจาก UpdateEvent/
       // AddEvent เดี่ยวๆ ด้านล่าง ไม่งั้นแก้แค่ "ครั้งที่" นี้ครั้งเดียว ครั้งอื่นในสัญญาจะไม่อัปเดตตาม
       const buildContractFields = () => (eventContractGroupId ? {
-        contractNo:    getVal("editContractNo"),
-        quotationNo:   getVal("editQuotationNo"),
-        contractStart: getVal("editContractStart"),
-        contractEnd:   getVal("editContractEnd"),
-        visitCount:    getVal("editVisitCount") ? Number(getVal("editVisitCount")) : undefined,
-        jobValue:      getVal("editJobValue") ? Number(getVal("editJobValue")) : undefined,
+        contractNo:     getVal("editContractNo"),
+        quotationNo:    getVal("editQuotationNo"),
+        contractStart:  getVal("editContractStart"),
+        contractEnd:    getVal("editContractEnd"),
+        visitCount:     getVal("editVisitCount") ? Number(getVal("editVisitCount")) : undefined,
+        // ✅ ระยะห่างระหว่างรอบ — ข้อมูลอ้างอิงอิสระ ไม่ผูก/บังคับกับ visitCount ด้านบน (ใช้แค่เตือน
+        // "เกินกำหนดรอบถัดไป" ดู utils/contractOverdue.js)
+        intervalMonths: getVal("editIntervalMonths") ? Number(getVal("editIntervalMonths")) : undefined,
+        jobValue:       getVal("editJobValue") ? Number(getVal("editJobValue")) : undefined,
       } : null);
 
       const buildPayload = () => {
@@ -1406,6 +1509,7 @@ export const getEditEvent = async ({
               contractStart: eventContractStart,
               contractEnd: eventContractEnd,
               visitCount: eventVisitCount,
+              intervalMonths: eventIntervalMonths,
               jobValue: eventJobValue,
             } : {};
             for (const r of ranges) {
@@ -1474,6 +1578,48 @@ export const getEditEvent = async ({
       document.getElementById("btnAttachContract")?.addEventListener("click", () => {
         Swal.close();
         openAttachContractDialog();
+      });
+
+      /* ✅ อนุมัติ/ไม่อนุมัติงาน — ปุ่มอยู่ในฟอร์มเดียวกันเลย ไม่เปิด Swal ซ้อน (ดูคอมเมนต์เตือนเรื่อง
+         nested Swal ด้านบน) reject ใช้แถบ textarea เลื่อนลงมาแทน (#eeRejectReasonBar) แทนการเปิด
+         popup ยืนยันซ้อนอีกชั้น ปุ่มพวกนี้มีเฉพาะตอน admin/manager ดูงานที่ยังรออนุมัติเท่านั้น */
+      document.getElementById("btnApproveJob")?.addEventListener("click", async (clickEvt) => {
+        const btn = clickEvt.currentTarget;
+        btn.disabled = true;
+        try {
+          await EventService.DecideApproval(eventId, "approve");
+          Swal.close();
+          await fetchEventsFromDB();
+          Swal.fire({ title: "อนุมัติงานแล้ว ✅", icon: "success", timer: 1200, showConfirmButton: false });
+        } catch (error) {
+          console.error("❌ Error approving job:", error);
+          btn.disabled = false;
+          Swal.showValidationMessage(error?.response?.data?.message || "อนุมัติไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+        }
+      });
+
+      const eeRejectReasonBar = document.getElementById("eeRejectReasonBar");
+      document.getElementById("btnRejectJob")?.addEventListener("click", () => {
+        if (eeRejectReasonBar) eeRejectReasonBar.style.display = "block";
+        document.getElementById("eeRejectReasonInput")?.focus();
+      });
+      document.getElementById("btnCancelRejectJob")?.addEventListener("click", () => {
+        if (eeRejectReasonBar) eeRejectReasonBar.style.display = "none";
+      });
+      document.getElementById("btnConfirmRejectJob")?.addEventListener("click", async (clickEvt) => {
+        const reason = document.getElementById("eeRejectReasonInput")?.value || "";
+        const btn = clickEvt.currentTarget;
+        btn.disabled = true;
+        try {
+          await EventService.DecideApproval(eventId, "reject", reason);
+          Swal.close();
+          await fetchEventsFromDB();
+          Swal.fire({ title: "ไม่อนุมัติงานแล้ว ❌", icon: "success", timer: 1200, showConfirmButton: false });
+        } catch (error) {
+          console.error("❌ Error rejecting job:", error);
+          btn.disabled = false;
+          Swal.showValidationMessage(error?.response?.data?.message || "ดำเนินการไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+        }
       });
 
       /* View operation */

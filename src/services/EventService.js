@@ -262,6 +262,18 @@ const EventService = {
     }
   },
 
+  // ✅ อนุมัติ/ไม่อนุมัติงานที่ช่าง/เซล (ใครก็ตามที่ไม่ใช่แอดมิน/manager) เป็นคนสร้าง — decision:
+  // "approve" | "reject", reason ใช้เฉพาะตอน reject (ไม่บังคับ)
+  async DecideApproval(id, decision, reason) {
+    try {
+      const response = await API.put(`/events/${id}/approval`, { decision, reason });
+      return response.data;
+    } catch (error) {
+      console.error("Error deciding job approval:", error);
+      throw error;
+    }
+  },
+
   async DeleteEvent(id) {
     try {
       await API.delete(`/events/${id}`); // ลบข้อมูลสินค้า

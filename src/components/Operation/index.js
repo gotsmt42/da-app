@@ -22,6 +22,7 @@ import "moment/locale/th";
 import {
   buildDaysPastDueMap, isFlaggedDays, isSevereDays, countFlaggedJobs, countDistinctJobs, getOverdueGroupKey,
 } from "../../utils/overdueJobs";
+import { getApprovalState, isPendingApproval, isRejected } from "../../utils/approvalStatus";
 import { getOptimizedImageUrl } from "../../utils/cloudinaryImage";
 import { formatEventDateRange } from "../../utils/formatDateRange";
 
@@ -724,7 +725,10 @@ const DashboardStats = ({ events }) => {
     const thisMonth = events.filter(e => moment(e.start).format("YYYY-MM") === moment().format("YYYY-MM")).length;
     // ✅ อิงจากฟีเจอร์ "ขอปิดงาน" ที่ใช้งานจริงตอนนี้ (แทนสถานะวางบิล/เก็บเงินแบบเก่าที่ไม่มีช่องให้กรอกแล้ว)
     const pendingClose = events.filter(e => e.closeRequested && e.status !== "ดำเนินการเสร็จสิ้น").length;
-    return { total, byStatus, thisMonth, pendingClose };
+    // ✅ นับแยกจากงานที่ "ค้างงาน" ปกติ — นี่คืองานที่ช่าง/เซล (ไม่ใช่แอดมิน/manager) สร้างแล้วยังรอ
+    // อนุมัติจาก PUT /:id/approval เดียวกับที่ EditEvent.js ใช้อนุมัติ/ไม่อนุมัติ
+    const pendingApproval = countDistinctJobs(events, isPendingApproval);
+    return { total, byStatus, thisMonth, pendingClose, pendingApproval };
   }, [events]);
 
   const cards = [
@@ -736,6 +740,8 @@ const DashboardStats = ({ events }) => {
       sub: `คิดเป็น ${stats.total ? Math.round((stats.byStatus["ดำเนินการเสร็จสิ้น"] / stats.total) * 100) : 0}% ของงานทั้งหมด` },
     { label: "คำขออนุมัติปิดงาน", value: stats.pendingClose, color: "linear-gradient(135deg,#f59e0b,#d97706)", icon: <TaskAlt />,
       sub: stats.pendingClose > 0 ? "ช่างขอปิดงาน รอตรวจสอบ" : "ไม่มีงานรออนุมัติ" },
+    { label: "งานรออนุมัติ", value: stats.pendingApproval, color: "linear-gradient(135deg,#eab308,#a16207)", icon: <HourglassTop />,
+      sub: stats.pendingApproval > 0 ? "ช่าง/เซลส่งงานใหม่ รอตรวจสอบ" : "ไม่มีงานรออนุมัติ" },
   ];
 
   return (
@@ -1659,6 +1665,24 @@ const EventRowCard = ({
                     </StatusBadge>
                   </Box>
                 </Tooltip>
+                {/* ✅ ป้ายรออนุมัติ/ไม่อนุมัติ — แค่บอกสถานะเฉยๆ (ไม่มีปุ่มกดที่นี่ ตัดสินใจได้ที่
+                    EditEvent.js ในปฏิทินเท่านั้น กันสองจุดแย่งกันตัดสินใจงานเดียวกัน) */}
+                {isPendingApproval(event) && (
+                  <Tooltip title="รอแอดมิน/manager อนุมัติ (อนุมัติ/ไม่อนุมัติได้ที่ปฏิทิน)">
+                    <Chip size="small" label="⏳ รออนุมัติ" sx={{
+                      height: 22, fontSize: "0.7rem", fontWeight: 700,
+                      bgcolor: alpha("#f59e0b", 0.15), color: "#92400e",
+                    }} />
+                  </Tooltip>
+                )}
+                {isRejected(event) && (
+                  <Tooltip title={event.approvalRejectReason ? `เหตุผล: ${event.approvalRejectReason}` : "ไม่ได้รับการอนุมัติ"}>
+                    <Chip size="small" label="❌ ไม่อนุมัติ" sx={{
+                      height: 22, fontSize: "0.7rem", fontWeight: 700,
+                      bgcolor: alpha("#ef4444", 0.15), color: "#991b1b",
+                    }} />
+                  </Tooltip>
+                )}
                 {/* ✅ ย่อช่วงวันที่ให้กระชับ (ดู formatEventDateRange) — ถ้าอยู่ปีเดียวกัน/เดือนเดียวกัน
                     ไม่ต้องพิมพ์เดือนปีซ้ำสองรอบ กันตัดขึ้นบรรทัดใหม่แบบขาดกลางวันที่บนจอแคบด้วย —
                     กดแก้ไขวันที่ได้ตรงนี้เลย (เทียบ pattern เดียวกับป้ายสถานะด้านซ้าย) */}
@@ -1936,13 +1960,25 @@ const EventRowCard = ({
             เปลี่ยนสถานะ
           </Typography>
           <Divider />
-          {OP_LIST.map(s => (
-            <MenuItem key={s} onClick={() => handleStatusChange(s)} selected={localStatus === s}
-              sx={{ gap: 1.5, py: 1.25, minHeight: 44 }}>
-              <Circle sx={{ fontSize: 8, color: OP_COLOR[s] }} />
-              <Typography variant="body2" fontWeight={localStatus === s ? 700 : 400}>{s}</Typography>
-            </MenuItem>
-          ))}
+          {OP_LIST.map(s => {
+            // ✅ ตรงกับ operational guard ฝั่ง backend (PUT /:id) — ห้ามปิดงาน ("ดำเนินการเสร็จสิ้น")
+            // จนกว่าจะได้รับการอนุมัติก่อน ถ้าไม่ใช่ admin/manager ("กำลังดำเนินการ" ยังกดได้ตามปกติ
+            // เพราะตัวจับเวลาอัตโนมัติที่ปฏิทินต้องเปลี่ยนสถานะนี้ได้เสมอ ดูคอมเมนต์เดียวกันฝั่ง backend)
+            const blockedByApproval = s === "ดำเนินการเสร็จสิ้น" && !isAdminOrManager && getApprovalState(event) !== "approved";
+            const item = (
+              <MenuItem key={s} onClick={() => !blockedByApproval && handleStatusChange(s)} selected={localStatus === s}
+                disabled={blockedByApproval}
+                sx={{ gap: 1.5, py: 1.25, minHeight: 44 }}>
+                <Circle sx={{ fontSize: 8, color: OP_COLOR[s] }} />
+                <Typography variant="body2" fontWeight={localStatus === s ? 700 : 400}>{s}</Typography>
+              </MenuItem>
+            );
+            return blockedByApproval ? (
+              <Tooltip key={s} title="งานนี้ยังไม่ได้รับการอนุมัติ ปิดงานไม่ได้จนกว่าแอดมิน/manager จะอนุมัติก่อน" placement="right">
+                <span>{item}</span>
+              </Tooltip>
+            ) : item;
+          })}
         </Menu>
 
         {/* Expanded — เปิดเป็น Dialog ทับขึ้นมาเสมอ ไม่ว่าจอเล็ก/ใหญ่ ไม่ต้องกางลงดันการ์ดอื่น/
@@ -2669,7 +2705,12 @@ const Operation = () => {
       const ids = getGroupEventIds(id);
       await Promise.all(ids.map(gid => EventService.UpdateEvent(gid, updates)));
       setEvents(prev => prev.map(e => (ids.includes(e._id) ? { ...e, ...updates } : e)));
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+      // ✅ ตอนนี้ backend ปฏิเสธ (403) การเปลี่ยนเป็น "ดำเนินการเสร็จสิ้น" สำหรับงานที่ยังรออนุมัติ
+      // (ดู PUT /:id operational guard) — เดิม error หายเงียบๆ ไม่มีอะไรบอกผู้ใช้เลยว่าทำไมสถานะไม่เปลี่ยน
+      setSnackbar({ open: true, msg: err?.response?.data?.message || "เปลี่ยนสถานะไม่สำเร็จ", severity: "error" });
+    }
   }, [getGroupEventIds]);
 
   // ✅ แก้ไขวันที่เข้างาน — ต่างจาก handleStatusUpdate ตรงที่แก้ "เฉพาะวันนั้น" (id เดียว) ไม่ใช่ทั้งกลุ่ม

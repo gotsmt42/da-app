@@ -13,6 +13,7 @@ import {
   FaTachometerAlt,
   FaCalendarAlt,
   FaFileContract,
+  FaClipboardCheck,
   FaClipboardList,
   FaFileAlt,
   FaFileInvoiceDollar,
@@ -74,6 +75,9 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
   ];
   const workMenuManager = [
     { title: "ภาพรวมงาน", href: "/contracts", icon: <FaFileContract /> },
+    // ✅ อนุมัติ/ไม่อนุมัติแผนงานที่ช่าง/เซลส่งมา — อยู่หมวด "งาน" เพราะเป็นเรื่องงาน ไม่ใช่ภาพรวมทีม
+    // (ดูคอมเมนต์ที่ teamMenu ด้านล่าง อธิบายว่าทำไมหมวดนั้นเหลือแค่ภาพรวมทีมช่างจริงๆ)
+    { title: "แผนงานรออนุมัติ", href: "/pending-approvals", icon: <FaClipboardCheck /> },
   ];
   // ✅ เดิมประกาศไว้แต่ไม่เคย render เลย — ช่างจึงไม่มีทางกดเข้า "งานของฉัน" จาก sidebar ได้เลย
   const workMenuTechnician = [

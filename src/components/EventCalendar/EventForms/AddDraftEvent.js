@@ -134,6 +134,13 @@ function injectAddDraftStyles() {
       color: #991b1b; border-radius: 20px; padding: 4px 14px;
       font-size: 12px; font-weight: 600; margin-bottom: 16px;
     }
+    /* ✅ แจ้งเตือนล่วงหน้าให้ช่าง/เซล (ไม่ใช่ admin/manager) รู้ว่าแผนงานนี้ต้องรออนุมัติก่อน —
+       ไม่ได้บล็อกอะไร แค่ตั้งความคาดหวังไว้ก่อนกดบันทึก */
+    .ade-approval-note {
+      display: block; background: #fffbeb; border: 1.5px solid #fde68a;
+      color: #92400e; border-radius: 10px; padding: 8px 14px;
+      font-size: 12px; font-weight: 600; margin-bottom: 16px;
+    }
 
     #ade-action-bar {
       display: flex; gap: 10px; flex-wrap: wrap;
@@ -175,6 +182,7 @@ export const getAddDraftEvent = async ({
   existingDraft, // ✅ ถ้าส่งมา = โหมดแก้ไข (prefill ค่าเดิม + เรียก UpdateDraftEvent แทน AddDraftEvent)
   events, // ✅ งานที่ลงตารางแล้ว — ใช้หาสัญญาที่มีอยู่แล้วสำหรับขั้นตอน "งานตามสัญญา" (เหมือน AddEvent.js)
   drafts, // ✅ แผนงานล่วงหน้าอื่นที่ค้างอยู่ — อาจจองครั้งที่ของสัญญาเดียวกันไปแล้ว ต้องรวมมานับด้วย
+  userData, // ✅ ใช้เช็คว่าเป็น admin/manager หรือไม่ — ถ้าไม่ใช่ ต้องโชว์ข้อความแจ้งว่างานจะรออนุมัติ
   onSaved,
   CustomerService,
   AuthService,
@@ -186,6 +194,10 @@ export const getAddDraftEvent = async ({
   moment,
 }) => {
   injectAddDraftStyles();
+
+  // ✅ ผู้ใช้ที่ไม่ใช่ admin/manager สร้าง/แก้แผนงานได้เหมือนเดิมทุกอย่าง แค่งานจะถูกแท็ก "รออนุมัติ"
+  // ฝั่ง backend อัตโนมัติ (ดู POST /events/draft, PUT /:id/draft) — ตรงนี้ใช้แค่โชว์ข้อความแจ้งล่วงหน้า
+  const isAdminOrManagerUser = ["admin", "manager"].includes(userData?.role?.toLowerCase());
 
   const isEditMode = Boolean(existingDraft);
   // ✅ แก้ไขงานที่ผูกสัญญาอยู่แล้ว ไม่ให้สลับกลับเป็นงานทั่วไป/เปลี่ยนบริษัท-โครงการ-ประเภทงาน-ระบบ-ครั้งที่
@@ -210,6 +222,7 @@ export const getAddDraftEvent = async ({
         contractStart: e.contractStart || "",
         contractEnd: e.contractEnd || "",
         visitCount: e.visitCount || 0,
+        intervalMonths: e.intervalMonths,
         jobValue: e.jobValue,
         team: e.team || "",
         visits: [],
@@ -273,6 +286,8 @@ export const getAddDraftEvent = async ({
 
   <div id="ade-body">
     <div class="ade-month-badge">📌 เดือนที่ตั้งใจ: ${monthLabel}</div>
+
+    ${!isAdminOrManagerUser ? `<div class="ade-approval-note">⏳ แผนงานนี้จะขึ้นแสดงทันที แต่ต้องรอแอดมิน/manager อนุมัติก่อน จึงจะถือว่ายืนยันสมบูรณ์</div>` : ""}
 
     ${isEditMode ? "" : `
     <p class="ade-section-label">ขั้นตอนที่ 1 — ประเภทงาน</p>
@@ -522,7 +537,7 @@ export const getAddDraftEvent = async ({
                 contractGroupId: c.key,
                 contractNo: c.contractNo, quotationNo: c.quotationNo,
                 contractStart: c.contractStart, contractEnd: c.contractEnd,
-                visitCount: c.visitCount, jobValue: c.jobValue,
+                visitCount: c.visitCount, intervalMonths: c.intervalMonths, jobValue: c.jobValue,
                 company: c.company, site: c.site, title: c.title, system: c.system,
                 team: c.team,
                 time: String(nextIndex),

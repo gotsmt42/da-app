@@ -85,10 +85,15 @@ export default function useEventNotifications(events, role = "admin") {
         // (ไม่เคยเห็นมาก่อนใน snapshot รอบที่แล้ว = เพิ่งถูกเพิ่มเข้าระบบจริงๆ)
         if (!prev) {
           const creatorName = getCreatorName(ev);
+          // ✅ งานที่ช่าง/เซล (ไม่ใช่ admin/manager) สร้างจะถูกแท็ก "รออนุมัติ" อัตโนมัติ (ดู
+          // utils/approvalStatus.js) — แยกข้อความ/type ให้ชัดว่าเป็นงานที่ต้องอนุมัติ ไม่ใช่งานปกติ
+          const needsApproval = ev.approvalStatus === "pending";
           newNoti.push({
             id: ev._id + "_newjob_" + (ev.createdAt || ev._id),
-            type: "new_job",
-            message: creatorName ? `${creatorName} เพิ่มงานใหม่เข้าระบบ` : "มีงานใหม่เข้าระบบ",
+            type: needsApproval ? "approval_requested" : "new_job",
+            message: needsApproval
+              ? (creatorName ? `${creatorName} ส่งงานใหม่รออนุมัติ` : "มีงานใหม่รออนุมัติ")
+              : (creatorName ? `${creatorName} เพิ่มงานใหม่เข้าระบบ` : "มีงานใหม่เข้าระบบ"),
             detail: `${ev.title || "งาน"} · ${buildNewJobDetail(ev)}`,
             // ✅ ใช้ createdAt (เวลาที่ถูกสร้างจริงใน DB) ไม่ใช่ ev.start/ev.date (วันนัดหมายของงาน) —
             // เดิมถ้า createdAt หายไป จะ fallback ไปใช้วันนัดหมายซึ่งอาจเป็นวันในอดีต/อนาคตไกลๆ
@@ -105,6 +110,19 @@ export default function useEventNotifications(events, role = "admin") {
             message: `${ev.closeRequestedBy || "ช่าง"} ขอปิดงาน`,
             detail: `${ev.company} · ${ev.site}`,
             time: ev.closeRequestedAt || new Date().toISOString(),
+            eventId: ev._id,
+          });
+        }
+        // ✅ งานที่ถูกไม่อนุมัติไปแล้ว ถูกแก้ไขแล้วส่งกลับเข้าคิวรออนุมัติใหม่โดยอัตโนมัติ (ดู
+        // APPROVAL_RESUBMIT_FIELDS ที่ PUT /:id) — ต่างจากตอนสร้างใหม่ (!prev ด้านบน) ตรงที่นี่คือ
+        // งานเดิมที่เคยเห็นมาก่อนแล้ว จึงต้องเช็คด้วย isNewTimestamp เทียบ approvalRequestedAt แทน
+        if (prev && ev.approvalStatus === "pending" && isNewTimestamp(ev.approvalRequestedAt, prev.approvalRequestedAt)) {
+          newNoti.push({
+            id: ev._id + "_approvalreq_" + ev.approvalRequestedAt,
+            type: "approval_requested",
+            message: `${ev.approvalRequestedBy || "ผู้ใช้"} ส่งงานขออนุมัติใหม่`,
+            detail: `${ev.title || "งาน"} · ${ev.company} · ${ev.site}`,
+            time: ev.approvalRequestedAt,
             eventId: ev._id,
           });
         }
@@ -146,6 +164,31 @@ export default function useEventNotifications(events, role = "admin") {
             time: ev.closeRejectedAt,
             eventId: ev._id,
           });
+        }
+        // ✅ แจ้งผลอนุมัติ/ไม่อนุมัติงานที่ตัวเองส่งเข้าระบบ (ต่างจาก close_approved/close_rejected
+        // ด้านบนซึ่งเป็นเรื่อง "ขอปิดงาน" — นี่คือ "อนุมัติให้งานนี้มีตัวตนในระบบ" ตั้งแต่แรก ดู
+        // PUT /:id/approval) — ใช้ timestamp เดียวกัน (approvalDecidedAt) เทียบทั้งสองผล แยกด้วย
+        // approvalStatus ปัจจุบันว่าเป็นผลอนุมัติหรือไม่อนุมัติ
+        if (isNewTimestamp(ev.approvalDecidedAt, prev?.approvalDecidedAt)) {
+          if (ev.approvalStatus === "approved") {
+            newNoti.push({
+              id: ev._id + "_apprvok_" + ev.approvalDecidedAt,
+              type: "approval_approved",
+              message: "แอดมินอนุมัติงานนี้แล้ว",
+              detail: `${ev.title || "งาน"} · ${ev.company} · ${ev.site}`,
+              time: ev.approvalDecidedAt,
+              eventId: ev._id,
+            });
+          } else if (ev.approvalStatus === "rejected") {
+            newNoti.push({
+              id: ev._id + "_apprvno_" + ev.approvalDecidedAt,
+              type: "approval_rejected",
+              message: "แอดมินไม่อนุมัติงานนี้",
+              detail: ev.approvalRejectReason ? `${ev.company} · ${ev.site}: ${ev.approvalRejectReason}` : `${ev.company} · ${ev.site}`,
+              time: ev.approvalDecidedAt,
+              eventId: ev._id,
+            });
+          }
         }
         // ข้อความใหม่จากแอดมิน/manager (comments เก็บมาทั้งชุดเสมอ จึงเทียบจำนวนแทน)
         const comments = ev.comments || [];

@@ -1,11 +1,12 @@
 import moment from "moment";
-import { countUsedRounds } from "./contractRounds";
+import { countUsedRounds, DEFAULT_INTERVAL_MONTHS } from "./contractRounds";
 
 /**
  * contractOverdue.js — จัดกลุ่ม event ด้วย contractGroupId ให้เป็น "สัญญา" (1 แถว/สัญญา) และเช็คว่า
- * รอบล่าสุดผ่านมาเกิน 3 เดือนแล้วแต่ยังไม่ได้วางแผนรอบถัดไปหรือยัง — เดิมโค้ดชุดนี้อยู่ใน
- * ContractOverview.js อย่างเดียว พอต้องใช้ซ้ำอีกจุด (ป้ายสรุปจำนวนที่ Header บนมือถือ) ย้ายมารวมไว้
- * ที่เดียวกันตัวเดียวกับ overdueJobs.js เพื่อกันตรรกะเพี้ยนไม่ตรงกันระหว่างสองจุด
+ * รอบล่าสุดผ่านมาเกินระยะห่างระหว่างรอบ (intervalMonths ต่อสัญญา ค่าเริ่มต้น 3 เดือนถ้าไม่ได้ระบุ) แล้ว
+ * แต่ยังไม่ได้วางแผนรอบถัดไปหรือยัง — เดิมโค้ดชุดนี้อยู่ใน ContractOverview.js อย่างเดียว พอต้องใช้ซ้ำ
+ * อีกจุด (ป้ายสรุปจำนวนที่ Header บนมือถือ) ย้ายมารวมไว้ที่เดียวกันตัวเดียวกับ overdueJobs.js เพื่อกัน
+ * ตรรกะเพี้ยนไม่ตรงกันระหว่างสองจุด
  */
 
 // ✅ งานเก่าที่ยังไม่มี contractGroupId (สร้างก่อนมีฟีเจอร์สัญญา) fallback เป็นสัญญา 1 ครั้งของตัวเอง —
@@ -51,6 +52,7 @@ export const groupEventsByContract = (events) => {
       // "ครั้งที่ 2" ให้โผล่ขึ้นมาทั้งตาราง (maxVisitCount คำนวณรวมทุกแถวในหน้าที่กรองอยู่) — visitCount
       // มีความหมายเฉพาะสัญญาจริงเท่านั้น แถวที่ไม่ใช่สัญญาไม่ควรมีค่านี้เลย
       visitCount: head.contractGroupId ? (head.visitCount || sorted.length) : undefined,
+      intervalMonths: head.contractGroupId ? head.intervalMonths : undefined,
       jobValue: head.jobValue,
       team: teamNames.join(", ") || "-",
       visits: sorted,
@@ -71,11 +73,14 @@ export const nextVisitOverdueInfo = (c) => {
     const d = moment(v.end || v.start);
     return !latest || d.isAfter(latest) ? d : latest;
   }, null);
-  const dueDate = lastVisitDate.clone().add(3, "months");
+  const intervalMonths = Number(c.intervalMonths) || DEFAULT_INTERVAL_MONTHS;
+  const dueDate = lastVisitDate.clone().add(intervalMonths, "months");
   if (dueDate.isAfter(moment())) return null;
   return {
     monthsOverdue: Math.max(1, moment().diff(dueDate, "months") + 1),
     lastVisitDate,
+    intervalMonths,
+    dueDate,
   };
 };
 

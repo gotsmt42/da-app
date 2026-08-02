@@ -223,6 +223,13 @@ function injectAddStyles() {
       color: #166534; border-radius: 20px; padding: 4px 14px;
       font-size: 12px; font-weight: 600; margin-bottom: 16px;
     }
+    /* ✅ แจ้งเตือนล่วงหน้าให้ช่าง/เซล (ไม่ใช่ admin/manager) รู้ว่างานที่กำลังจะสร้างต้องรออนุมัติก่อน
+       ไม่ได้บล็อกอะไร แค่ตั้งความคาดหวังไว้ก่อนกดบันทึก */
+    .ae-approval-note {
+      display: block; background: #fffbeb; border: 1.5px solid #fde68a;
+      color: #92400e; border-radius: 10px; padding: 8px 14px;
+      font-size: 12px; font-weight: 600; margin-bottom: 16px;
+    }
 
     /* ── Multi-date (งานเข้าหลายวันไม่ติดกัน) ── */
     .ae-checkbox-row {
@@ -260,6 +267,12 @@ function injectAddStyles() {
       outline: none; border-color: #2563eb;
       box-shadow: 0 0 0 3px rgba(37,99,235,.12);
     }
+    /* ✅ TomSelect ซ่อน &lt;select&gt; ตัวจริง (.ts-hidden-accessible) แล้วแทรก .ts-wrapper เป็น
+       sibling ถัดไปในแถวเดียวกัน — ต้องสั่ง flex ให้ wrapper แทน select เดิม ไม่งั้นกล่องจะแคบเท่า
+       เนื้อหาแล้วปุ่ม ✕ ลอยไปติดกลางแถว ใช้ 3 คลาสเพื่อชนะกฎ .swal-add-event .ts-wrapper{width:100%}
+       ด้านบนในไฟล์นี้ */
+    .swal-add-event .ae-team-member-row .ts-wrapper { flex: 1 1 auto; min-width: 0; width: auto; }
+    .swal-add-event .ae-team-member-row .ts-control { min-height: 38px; }
     .ae-team-member-remove {
       flex-shrink: 0; width: 34px; height: 34px; padding: 0 !important;
       display: flex; align-items: center; justify-content: center;
@@ -323,6 +336,7 @@ export const getAddEvent = async ({
   arg,
   events,
   drafts, // ✅ แผนงานล่วงหน้าที่ค้างอยู่ — อาจจองครั้งที่ของสัญญาไปแล้วเหมือนกัน ต้องรวมมานับด้วย
+  userData, // ✅ ใช้เช็คว่าเป็น admin/manager หรือไม่ — ถ้าไม่ใช่ ต้องโชว์ข้อความแจ้งว่างานจะรออนุมัติ
   defaultTextColor,
   defaultBackgroundColor,
   setDefaultTextColor,
@@ -341,6 +355,10 @@ export const getAddEvent = async ({
   moment,
 }) => {
   injectAddStyles();
+
+  // ✅ ผู้ใช้ที่ไม่ใช่ admin/manager สร้างงานได้เหมือนเดิมทุกอย่าง แค่งานจะถูกแท็ก "รออนุมัติ" ฝั่ง
+  // backend อัตโนมัติ (ดู POST /events) — ตรงนี้ใช้แค่โชว์ข้อความแจ้งล่วงหน้าเฉยๆ ไม่ได้บล็อกอะไร
+  const isAdminOrManagerUser = ["admin", "manager"].includes(userData?.role?.toLowerCase());
 
   // ✅ ขั้นตอนที่ 1 ของฟอร์ม (งานทั่วไป/งานตามสัญญา) ต้องรู้ว่าตอนนี้มีสัญญาอะไรอยู่แล้วบ้าง เพื่อให้
   // เลือกได้เฉพาะจากรายการนี้เท่านั้น (พิมพ์เพิ่มเองไม่ได้) กันพิมพ์ชื่อบริษัท/โครงการเพี้ยนจากของเดิม
@@ -363,6 +381,7 @@ export const getAddEvent = async ({
         contractStart: e.contractStart || "",
         contractEnd: e.contractEnd || "",
         visitCount: e.visitCount || 0,
+        intervalMonths: e.intervalMonths,
         jobValue: e.jobValue,
         team: e.team || "",
         visits: [],
@@ -446,6 +465,8 @@ export const getAddEvent = async ({
 
     <!-- date badge -->
     <div class="ae-date-badge">📅 วันที่เลือก: ${displayDate}</div>
+
+    ${!isAdminOrManagerUser ? `<div class="ae-approval-note">⏳ งานนี้จะขึ้นแสดงทันที แต่ต้องรอแอดมิน/manager อนุมัติก่อน จึงจะถือว่ายืนยันสมบูรณ์</div>` : ""}
 
     <!-- ขั้นตอนที่ 1: เลือกประเภทงาน -->
     <p class="ae-section-label">ขั้นตอนที่ 1 — ประเภทงาน</p>
@@ -638,6 +659,10 @@ export const getAddEvent = async ({
     // ต้องกดปุ่ม "ยกเลิก" หรือปุ่มปิด (✕) อย่างชัดเจนเท่านั้น
     allowOutsideClick: false,
     allowEscapeKey: false,
+    // ✅ Swal ลบ DOM ของ popup ทิ้งทั้งก้อนตอนปิด แต่ document/window listener ของทุก TomSelect
+    // ในฟอร์มยังค้างอยู่ (รวมแถวลูกทีมที่ผู้ใช้ไม่ได้กด ✕ เอง) — เก็บกวาดให้ครบทีเดียวตอนปิด
+    // TomSelect เก็บอินสแตนซ์ไว้ที่ el.tomselect และติดคลาส .tomselected ให้เองเสมอ
+    willClose: (popup) => popup.querySelectorAll(".tomselected").forEach((el) => el.tomselect?.destroy()),
 
     didOpen: () => {
       /* TomSelect */
@@ -664,6 +689,27 @@ export const getAddEvent = async ({
 
       /* ── ลูกทีมเพิ่มเติม (คนที่ 2, 3, ... แสดงผลอย่างเดียว ไม่กระทบสิทธิ์แก้ไข/แจ้งเตือน) ── */
       const teamMembersList = document.getElementById("ae-teamMembersList");
+
+      // ✅ TomSelect บนแถวที่สร้างด้วย JS ทีหลัง — ต่างจาก mkTs ด้านบนตรงที่ต้องส่ง "element" ตรงๆ
+      // ไม่ใช่ selector string เพราะแต่ละแถวไม่มี id ประจำตัว มีแต่ class ซ้ำกันทุกแถว (TomSelect
+      // รับ HTMLElement ได้อยู่แล้ว)
+      const mkTeamMemberTs = (el) => {
+        try {
+          const ts = new TomSelect(el, {
+            create: true, // ✅ พิมพ์ชื่อที่ไม่มีในลิสต์เพิ่มเองได้ (ตามที่ผู้ใช้ขอ)
+            maxOptions: 7, // เท่ากับ mkTs ของช่อง "ทีม" ในฟอร์มเดียวกัน
+            placeholder: "เลือกหรือพิมพ์ชื่อลูกทีม",
+            sortField: { field: "text", direction: "asc" },
+            allowEmptyOption: true,
+          });
+          // ✅ <select> ที่ไม่มี option ไหน selected เลย เบราว์เซอร์จะเลือก option แรก
+          // ("— เลือกลูกทีม —") ให้เองตาม HTML spec แล้ว TomSelect ก็หยิบมาแสดงเป็นค่าที่เลือกไว้
+          // ทั้งที่ยังว่างเปล่า — เคลียร์ทิ้งให้ขึ้น placeholder จริงแทน (เทียบ mkTsCleared ใน EditEvent.js)
+          ts.clear(true);
+          return ts;
+        } catch { return null; }
+      };
+
       const addTeamMemberRow = () => {
         const row = document.createElement("div");
         row.className = "ae-team-member-row";
@@ -671,8 +717,17 @@ export const getAddEvent = async ({
           <select class="ae-team-member-select"><option value="">— เลือกลูกทีม —</option>${teamOpts}</select>
           <button type="button" class="ae-btn ae-btn-ghost ae-team-member-remove" title="ลบออก">✕</button>
         `;
-        row.querySelector(".ae-team-member-remove").addEventListener("click", () => row.remove());
+        // ⚠️ ต้อง appendChild ก่อนแล้วค่อย new TomSelect — TomSelect อ่าน getComputedStyle ของ
+        // element ตอน construct ซึ่งบน element ที่ยังไม่อยู่ใน document จะได้ค่าผิดเพี้ยน
         teamMembersList.appendChild(row);
+        const ts = mkTeamMemberTs(row.querySelector(".ae-team-member-select"));
+        row.querySelector(".ae-team-member-remove").addEventListener("click", () => {
+          // ✅ ต้อง destroy ก่อนลบแถว — TomSelect ผูก listener ไว้ที่ document (mousedown) และ
+          // window (scroll/resize) ต่ออินสแตนซ์ ซึ่งถูกถอดออกใน destroy() เท่านั้น ถ้าลบแถวเฉยๆ
+          // listener จะค้างอยู่ตลอดอายุหน้าโดยจับ DOM ที่ถูกลบไปแล้ว
+          ts?.destroy();
+          row.remove();
+        });
       };
       document.getElementById("ae-addTeamMemberBtn")?.addEventListener("click", () => addTeamMemberRow());
 
@@ -937,7 +992,7 @@ export const getAddEvent = async ({
               ...(jobGroupId ? { jobGroupId } : {}),
               contractNo: c.contractNo, quotationNo: c.quotationNo,
               contractStart: c.contractStart, contractEnd: c.contractEnd,
-              visitCount: c.visitCount, jobValue: c.jobValue,
+              visitCount: c.visitCount, intervalMonths: c.intervalMonths, jobValue: c.jobValue,
               dates: [{
                 start: cpStart,
                 end: moment(cpEnd).add(1, "days").format("YYYY-MM-DD"),

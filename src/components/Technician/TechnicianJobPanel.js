@@ -16,6 +16,7 @@ import moment from "moment";
 import "moment/locale/th";
 import Swal from "sweetalert2";
 import { formatEventDateRange } from "../../utils/formatDateRange";
+import { isApproved } from "../../utils/approvalStatus";
 import {
   Box, Card, CardContent, Typography, Stack, Chip, Avatar,
   Button, IconButton, TextField, Collapse, Divider, LinearProgress,
@@ -679,7 +680,9 @@ const TechnicianJobCard = ({
   // ✅ อิงวันที่จริงของวันนี้ (startOf("day") ตัดเวลาออก เทียบแค่วันที่) — ปิดงานได้ตั้งแต่วันลงงาน
   // วันสุดท้ายเลย (ไม่ต้องรอเลยไปอีกวัน) แค่ห้ามปิดก่อนถึงวันนั้น (isBefore ไม่รวมวันสุดท้ายเอง)
   const isBeforeLastWorkDay = moment().startOf("day").isBefore(lastWorkDay);
-  const canRequestClose = completedDocCount === DOCUMENT_TYPES.length && !isNotConfirmed && !isBeforeLastWorkDay;
+  // ✅ งานที่ยังรออนุมัติ/ถูกปฏิเสธ (ดู approvalStatus) ยังไม่ควรขอปิดได้ — เทียบ operational guard
+  // ตัวเดียวกันฝั่ง backend (PUT /:id) กันกดขอปิดแล้วโดน 403 เงียบๆ โดยไม่รู้สาเหตุ
+  const canRequestClose = completedDocCount === DOCUMENT_TYPES.length && !isNotConfirmed && !isBeforeLastWorkDay && isApproved(event);
   // ❌ งานที่ admin ปิดแล้ว (ดำเนินการเสร็จสิ้น) ช่างแก้ไข/ลบ/อัปโหลดไฟล์ไม่ได้อีก
   const isLocked = event.status === "ดำเนินการเสร็จสิ้น";
 
@@ -1055,6 +1058,18 @@ const TechnicianJobCard = ({
               <Warning sx={{ fontSize: 15, color: "#ef4444" }} />
               <Typography variant="caption" fontWeight={700} color="#ef4444">
                 ขอปิดงานได้ตั้งแต่วันที่ {lastWorkDay.locale("th").format("DD MMM YYYY")} เป็นต้นไป
+              </Typography>
+            </Stack>
+          </Box>
+        ) : !isApproved(event) ? (
+          <Box sx={{
+            mt: 1.5, p: 1.25, borderRadius: 2,
+            bgcolor: alpha("#f59e0b", 0.08), border: "1px solid", borderColor: alpha("#f59e0b", 0.25),
+          }}>
+            <Stack direction="row" alignItems="center" gap={0.5}>
+              <HourglassTop sx={{ fontSize: 15, color: "#f59e0b" }} />
+              <Typography variant="caption" fontWeight={700} color="#f59e0b">
+                งานนี้ยังไม่ได้รับการอนุมัติจากแอดมิน/manager ต้องรอผลอนุมัติก่อนจึงจะขอปิดงานได้
               </Typography>
             </Stack>
           </Box>

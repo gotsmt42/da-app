@@ -122,6 +122,19 @@
   border: 2px solid #ffffff;
 }
 
+/* ── ปุ่ม "N ต้องอนุมัติ" — เด่นตลอดเวลา (ไม่ต้องรอ hover/active เหมือนปุ่มอื่น) เพราะเป็นเรื่องที่
+   ต้องรีบดู ไม่ใช่แค่ตัวกรองทั่วไป — สีอำพัน (amber) ตรงกับป้าย "⏳ รออนุมัติ" บนการ์ดปฏิทิน/legend ── */
+.filter-toggle-btn--approval-pending {
+  background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%);
+  border-color: transparent;
+  color: #fff;
+  font-size: 17px;
+}
+.filter-badge--approval-pending {
+  background-color: #ffffff;
+  color: #b45309;
+}
+
 /* ── แผงตัวกรอง — พับซ่อนไว้ default กดปุ่มช่องแว่นขยายด้านบนถึงเปิด ── */
 .event-filter-panel {
   display: grid;
@@ -411,6 +424,29 @@
   color: #94a3b8;
 }
 
+/* ✅ ป้ายสถานะอนุมัติบนการ์ด — ธีมสีตรงกับปฏิทินหลัก (amber=รออนุมัติ, red=ไม่อนุมัติ) */
+.draft-card-approval {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-bottom: 3px;
+  color: #fff;
+}
+.draft-card-approval--pending { background: #f59e0b; }
+.draft-card-approval--rejected { background: #ef4444; }
+.draft-card-reject-reason {
+  font-size: 11px;
+  color: #b91c1c;
+  margin-top: 2px;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+/* ✅ ขอบซ้ายสีเข้มขึ้นเล็กน้อยให้เห็นชัดตั้งแต่ระยะไกล ไม่ต้องอ่านป้ายข้อความก่อน */
+.draft-card--pending { border-left: 3px solid #f59e0b; }
+.draft-card--rejected { border-left: 3px solid #ef4444; }
+
 .draft-card-actions {
   flex-shrink: 0;
   display: flex;
@@ -492,6 +528,84 @@
 .draft-card-menu-item:hover { background: #f1f5f9; }
 .draft-card-menu-item--danger { color: #dc2626; }
 .draft-card-menu-item--danger:hover { background: rgba(220, 38, 38, 0.08); }
+.draft-card-menu-item--approve { color: #059669; }
+.draft-card-menu-item--approve:hover { background: rgba(5, 150, 105, 0.08); }
+
+/* ==========================================================================
+   CALENDAR LAYOUT — ปฏิทิน + คอลัมน์งานวางแผนล่วงหน้า (เปิด/ปิดได้จากปุ่ม layer-group)
+   เดิมแผงงานล่วงหน้าเป็นบล็อกเต็มความกว้างวางทับอยู่เหนือปฏิทิน ดันปฏิทินลงไปจนต้องเลื่อนจอ
+   ทุกครั้งที่เปิด — จอใหญ่มีที่พอ ย้ายไปอยู่คอลัมน์ข้างขวาแทน ปฏิทินย่อความกว้างรับเอง
+   ========================================================================== */
+.calendar-layout {
+  display: flex;
+  flex-direction: column; /* มือถือ/แท็บเล็ต: เรียงบนล่างเหมือนเดิม */
+  gap: 0;
+}
+
+/* ⚠️ min-width:0 คือหัวใจของทั้งบล็อกนี้ — flex item มี min-width:auto เป็นค่า default ซึ่งแปลว่า
+   "ห้ามเล็กกว่าเนื้อหาข้างใน" ตาราง FullCalendar มี min-content width ของตัวเองพอสมควร ถ้าไม่เขียน
+   บรรทัดนี้ ปฏิทินจะไม่ยอมย่อ ดันคอลัมน์ข้างขวาแบนหรือทะลุขอบกรอบออกไปแทน */
+.calendar-wrapper {
+  flex: 1 1 0;
+  min-width: 0;
+  width: 100%;
+}
+
+.calendar-drafts-col { width: 100%; }
+
+@media (min-width: 992px) {
+  .calendar-layout { flex-direction: row; align-items: flex-start; }
+  .calendar-layout--with-drafts { gap: 16px; }
+
+  .calendar-drafts-col {
+    order: 2; /* DOM วาง aside ไว้ก่อน (มือถือจะได้อยู่บนปฏิทินเหมือนเดิมโดยไม่ต้องเขียน order เพิ่ม)
+                 จอใหญ่ค่อยสลับไปอยู่ขวา ใกล้ปุ่มที่กดเปิดมัน */
+    flex: 0 0 280px;
+    width: 280px;
+    align-self: flex-start;
+    position: sticky; /* sticky ไม่สร้าง containing block ให้ position:fixed จึงไม่กระทบ
+                          เมนู "⋮" ของการ์ด (ต่างจาก transform — ห้ามใช้เด็ดขาด ดูคอมเมนต์ล่าง) */
+    top: 12px;
+    overflow: hidden; /* ใช้ตอนอนิเมชัน "wipe-in" ตอนเปิด */
+    animation: draftsColIn 0.22s ease;
+  }
+
+  /* ✅ ล็อกความกว้างของแผงข้างในไว้คงที่ ให้ตอนอนิเมชันคอลัมน์ค่อยๆ กว้างขึ้น ตัวหนังสือข้างในไม่
+     ต้องคำนวณ/ตัดบรรทัดใหม่ตามไปทุกเฟรม (ดูเป็นแบบ "เลื่อนเปิดม่าน" ไม่ใช่ยืด-หด) */
+  .calendar-drafts-col > .unscheduled-panel { width: 280px; margin-bottom: 0 !important; }
+
+  /* ✅ คอลัมน์แคบ 1 ใบต่อแถวเสมอ — ทับกฎ .unscheduled-list ที่ตั้ง 4 คอลัมน์ไว้ที่ ≥992px
+     (2 คลาส ชนะ 1 คลาส ด้วย specificity ไม่ต้องใช้ !important และไม่ต้องสนใจลำดับในไฟล์) */
+  .calendar-drafts-col .unscheduled-list {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    max-height: calc(100vh - 220px); /* คอลัมน์สูงเต็มจอแล้ว ไม่ต้องบีบเหลือ 320px จนต้องเลื่อนซ้อนกัน */
+  }
+
+  .calendar-drafts-col .unscheduled-panel {
+    box-shadow: 0 2px 14px rgba(15, 23, 42, 0.06);
+  }
+
+  @media (min-width: 1200px) {
+    .calendar-drafts-col { flex-basis: 320px; width: 320px; }
+    .calendar-drafts-col > .unscheduled-panel { width: 320px; }
+  }
+}
+
+/* ⚠️ ห้ามใส่ transform / filter / will-change / contain กับ .calendar-drafts-col หรือบรรพบุรุษของมัน
+   เด็ดขาด — element พวกนี้จะกลายเป็น containing block ของ position:fixed ทำให้เมนู "⋮" ของการ์ด
+   (ที่ตั้งใจใช้ fixed เพื่อหนี overflow:auto ของ .unscheduled-list ดู UnscheduledPanel.js) เพี้ยน
+   ตำแหน่งทันที จึงเลือกอนิเมต width/opacity เท่านั้น ไม่ใช้ translateX */
+@keyframes draftsColIn {
+  from { flex-basis: 0; width: 0; opacity: 0; }
+  to   { flex-basis: 280px; width: 280px; opacity: 1; }
+}
+@media (min-width: 1200px) {
+  @keyframes draftsColIn {
+    from { flex-basis: 0; width: 0; opacity: 0; }
+    to   { flex-basis: 320px; width: 3200px; opacity: 1; }
+  }
+}
 
 /* ==========================================================================
    FULLCALENDAR TOOLBAR — ปุ่ม prev/next/today/มุมมอง เดิมใช้สีฟ้า default ของ

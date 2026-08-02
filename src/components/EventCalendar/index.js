@@ -51,6 +51,7 @@ import "./index.css";
 
 import API from "../../API/axiosInstance";
 import { escapeHtml } from "../../utils/escapeHtml";
+import { getApprovalState, isPendingApproval, countPendingJobs } from "../../utils/approvalStatus";
 
 import thLocale from "@fullcalendar/core/locales/th"; // นำเข้า locale ภาษาไทย
 
@@ -139,10 +140,12 @@ function EventCalendar() {
   const [events, setEvents] = useState([]);
 
   const [defaultTextColor, setDefaultTextColor] = useState("#FFFFFF"); // สีข้อความเริ่มต้น
-  // ✅ เดิมส้ม #FF5733 ไม่ตรงกับธีมสีแดงที่ใช้จริงทั้งแอป (ปุ่ม/sidebar/แบรนด์) — ใช้สีแดงเดียวกัน
-  // เป็นค่าเริ่มต้นของสีพื้นหลังแผนงานใหม่แทน (ผู้ใช้ยังเปลี่ยนเองได้ผ่าน color picker ตามปกติ)
+  // ⚠️ เดิมใช้สีแดง #dc2626 (สีแบรนด์หลัก) เป็นค่าเริ่มต้น แต่สีแดงตอนนี้ถูกใช้สื่อความหมายอื่นไปแล้ว
+  // ในปฏิทิน (กรอบประ = "ไม่อนุมัติ", วันหยุดราชการ) ทำให้งานใหม่ที่ยังไม่ได้เปลี่ยนสีเองปนกับสอง
+  // อย่างนั้นจนแยกไม่ออกว่าคืองานอะไรกันแน่ — เปลี่ยนเป็นสีม่วงคราม #6366f1 แทน (สีเดียวกับไอคอน
+  // แจ้งเตือน "งานใหม่" ใน NotificationBell.js) ให้สื่อว่า "งานใหม่" ตรงกันทั้งแอป ไม่ชนความหมายเดิม
   const [defaultBackgroundColor, setDefaultBackgroundColor] =
-    useState("#dc2626"); // สีพื้นหลังเริ่มต้น
+    useState("#6366f1"); // สีพื้นหลังเริ่มต้น
 
   const [defaultFontSize, setDefaultFontSize] = useState(8); //
 
@@ -153,6 +156,7 @@ function EventCalendar() {
   const [selectedStatus, setSelectedStatus] = useState(""); // "" = ทุกสถานะ
   const [selectedJobType, setSelectedJobType] = useState(""); // "" = ทุกประเภทงาน (event.title)
   const [selectedSystem, setSelectedSystem] = useState(""); // "" = ทุกระบบ (event.system)
+  const [selectedApproval, setSelectedApproval] = useState(""); // "" = ทุกสถานะอนุมัติ / "pending" / "rejected"
   const [showFilterPanel, setShowFilterPanel] = useState(false); // ✅ ซ่อนตัวกรองไว้ ไม่ให้เกะกะจอมือถือโดย default
 
   // ✅ งาน "วางแผนล่วงหน้า" (ยังไม่ลงตาราง) — เก็บแยกจาก events ปกติเสมอ (backend ก็แยก query ให้
@@ -195,6 +199,16 @@ function EventCalendar() {
     setHighlightDraftId(`${draftParam}|${searchParams.get("t") || Date.now()}`);
   }, [searchParams]);
 
+  // ✅ FullCalendar v6 มี ResizeObserver ของตัวเองบน .fc คอยจับขนาด container ที่เปลี่ยนอยู่แล้ว
+  // แต่โค้ดชุดนี้ไม่เคยถูกทดสอบกับการ "ย่อความกว้าง container ด้วย CSS" มาก่อน (เดิมปฏิทินกว้างเต็ม
+  // จอเสมอ) — ตอนนี้เปิด/ปิดคอลัมน์งานวางแผนล่วงหน้าทำให้ .calendar-wrapper แคบ/กว้างขึ้นได้ สั่ง
+  // updateSize() ซ้ำอีกชั้นหลังอนิเมชัน CSS จบ (~0.22s) กันตารางวัน/ความสูงแถวค้างค่าความกว้างเดิม
+  // เป็นการเรียกที่ราคาถูกมาก เรียกเกินไม่มีผลเสีย ครอบคลุมทุกจุดที่ setShowDraftsPanel(true/false)
+  useEffect(() => {
+    const t = setTimeout(() => calendarRef.current?.getApi()?.updateSize(), 260);
+    return () => clearTimeout(t);
+  }, [showDraftsPanel]);
+
   // ✅ Realtime: รีเฟรชข้อมูลเงียบๆ ทุก 30 วินาที เพื่อให้เห็นการเปลี่ยนแปลง
   // จากคนอื่น (เพิ่ม/แก้ไข/ลบ event) โดยไม่ต้องกดรีเฟรชหน้าเอง
   useEffect(() => {
@@ -220,7 +234,11 @@ function EventCalendar() {
       return (
         eventStartDate === today &&
         !event.manualStatus &&
-        event.status === "ยืนยันแล้ว"
+        event.status === "ยืนยันแล้ว" &&
+        // ✅ งานที่ยังรออนุมัติ/ถูกปฏิเสธ ไม่ควรถูกดันสถานะอัตโนมัติ — ทำให้ดูเหมือนงานกำลังดำเนินการ
+        // จริงทั้งที่ยังไม่ผ่านการอนุมัติเลย (backend อนุญาตให้ผ่านสถานะนี้อยู่แล้ว แต่ไม่ควรสับสน
+        // ป้าย "⏳ รออนุมัติ" ที่โชว์อยู่บนการ์ด)
+        getApprovalState(event) === "approved"
       );
     });
 
@@ -413,6 +431,8 @@ function EventCalendar() {
       // ✅ ต้องส่ง drafts ด้วย เพื่อให้ตาราง "เลือกครั้งที่" เห็นครั้งที่ถูกจองไว้เป็นแผนงานล่วงหน้าอยู่แล้ว
       // ไม่ใช่แค่ครั้งที่ลงตารางแล้ว ไม่งั้นจะเสนอครั้งที่ซ้ำกับที่จองไว้ (ชนกับเช็คซ้ำฝั่ง backend)
       drafts,
+      // ✅ ใช้โชว์ข้อความแจ้งช่าง/เซลว่างานที่สร้างจะต้องรออนุมัติก่อน (ดู isAdminOrManagerUser ในฟอร์ม)
+      userData,
       setEvents,
       defaultTextColor,
       defaultBackgroundColor,
@@ -546,6 +566,8 @@ function EventCalendar() {
       // "ครั้งที่ถัดไป" ถูกต้อง (ไม่ชนกับครั้งที่จองไปแล้วไม่ว่าจะลงตารางแล้วหรือยังเป็นแค่แผนงานก็ตาม)
       events,
       drafts,
+      // ✅ ใช้โชว์ข้อความแจ้งช่าง/เซลว่างานที่สร้างจะต้องรออนุมัติก่อน (ดู isAdminOrManagerUser ในฟอร์ม)
+      userData,
       // ✅ ถ้าใส่วันที่มาด้วยตอนบันทึก จะถูกลงตารางทันที (ย้ายจาก drafts ไปเป็น event จริง)
       // ต้อง refresh ทั้งคู่เผื่อกรณีนั้น ไม่ใช่แค่ fetchDrafts อย่างเดียว
       onSaved: () => Promise.all([fetchDrafts(), fetchEventsFromDB()]),
@@ -566,6 +588,8 @@ function EventCalendar() {
       existingDraft: draft,
       events,
       drafts,
+      // ✅ ใช้โชว์ข้อความแจ้งช่าง/เซลว่างานที่แก้ไขจะรออนุมัติใหม่ (ดู isAdminOrManagerUser ในฟอร์ม)
+      userData,
       // ✅ ถ้าใส่วันที่มาด้วยตอนบันทึก จะถูกลงตารางทันที (ย้ายจาก drafts ไปเป็น event จริง)
       // ต้อง refresh ทั้งคู่เผื่อกรณีนั้น ไม่ใช่แค่ fetchDrafts อย่างเดียว
       onSaved: () => Promise.all([fetchDrafts(), fetchEventsFromDB()]),
@@ -624,8 +648,12 @@ function EventCalendar() {
     // ✅ ป้องกัน stored XSS — ชื่อ/บริษัท/โครงการที่ผู้ใช้พิมพ์เองต้อง escape ก่อนต่อเป็น HTML string
     // เสมอ ไม่งั้นถ้ามีใครตั้งชื่อเป็น เช่น "><img src=x onerror="..."> จะยิง JavaScript ทันทีที่มีใคร
     // เปิดกล่อง "ลงตาราง" ของงานนั้นดู
-    const teamOpts = employeeList
-      .map((e) => `<option value="${escapeHtml(e.fname)}"${e.fname === draft.team ? " selected" : ""}>${escapeHtml(e.fname)}</option>`)
+    // ✅ ไม่ฝัง selected ในตัวเลือกดิบ (เทียบ plainTeamOpts ใน EditEvent.js) — ทั้งช่อง "ทีม" หลักและ
+    // แถว "ลูกทีมเพิ่มเติม" ตอนนี้เป็น TomSelect ทั้งคู่ ตั้งค่าเริ่มต้นผ่าน ts.setValue(...) แทน เดิม
+    // ใช้ teamOpts.replace(/ selected/g,"") ตัด attribute ออกสำหรับแถวลูกทีม ซึ่งจะพังทันทีถ้ามีชื่อ
+    // พนักงานคนไหนมีคำว่า " selected" อยู่ในชื่อจริง
+    const plainTeamOpts = employeeList
+      .map((e) => `<option value="${escapeHtml(e.fname)}">${escapeHtml(e.fname)}</option>`)
       .join("");
 
     const rangeRowHtml = (startVal = "", endVal = "") => `
@@ -650,11 +678,34 @@ function EventCalendar() {
           @media (max-width: 480px) {
             .swal-schedule-row-2col { flex-direction: column; gap: 10px; }
           }
+          /* ✅ ช่อง "ทีม"/"ลูกทีมเพิ่มเติม" ในกล่องนี้เป็น TomSelect เหมือนฟอร์มเพิ่ม/แก้ไขงาน
+             (พิมพ์เพิ่มชื่อเองได้) — สไตล์ .ts-control ให้หน้าตาเหมือน input อื่นๆ ในกล่องนี้ */
+          .swal-schedule-team-member-row { display:flex; gap:6px; align-items:center; margin-bottom:6px; }
+          .swal-schedule-team-member-row .ts-wrapper { flex:1 1 auto; min-width:0; }
+          .swal-schedule-ts .ts-control {
+            border: 1px solid #d9d9d9 !important; border-radius: 4px !important;
+            padding: 7px 10px !important; font-size: 14px !important; min-height: 38px;
+            box-shadow: none !important;
+          }
+          .swal-schedule-ts.focus .ts-control {
+            border-color: #dc2626 !important; box-shadow: 0 0 0 3px rgba(220,38,38,.10) !important;
+          }
+          /* ✅ .swal2-html-container ของ Swal ตั้ง overflow:auto ไว้ (ต่างจากฟอร์มเพิ่ม/แก้ไขงานที่
+             override เป็น hidden แล้วคุม scroll เอง) — dropdown ที่กางอยู่ในกล่องจะโดนตัดขาดทันที
+             เพราะช่อง "ลูกทีม" อยู่ล่างสุดของป๊อปอัพพอดี จึงย้าย dropdown ไปแขวนที่ body แทน
+             (dropdownParent:"body") แล้วดัน z-index ให้สูงกว่า .swal2-container (1060) */
+          .ts-dropdown.swal-schedule-ts-dropdown { z-index: 1100; }
         </style>
 
         <div style="text-align:left; font-size:13px; color:#64748b; margin-bottom:14px;">
           ${escapeHtml(draft.title) || "งาน"} · ${escapeHtml([draft.company, draft.site].filter(Boolean).join(" · "))}
         </div>
+
+        ${isPendingApproval(draft) ? `
+        <div style="text-align:left; font-size:12.5px; color:#92400e; background:#fef3c7; border:1px solid #fde68a; border-radius:8px; padding:8px 12px; margin-bottom:14px;">
+          ⏳ งานนี้ยังรออนุมัติ — ลงตารางได้ตามปกติ แต่จะยังขึ้นเป็น "รออนุมัติ" บนปฏิทินจนกว่าแอดมิน/manager จะอนุมัติ
+        </div>
+        ` : ""}
 
         <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; color:#374151; margin-bottom:12px; cursor:pointer;">
           <input type="checkbox" id="swal-schedule-multi-toggle" style="width:auto; cursor:pointer;">
@@ -691,9 +742,9 @@ function EventCalendar() {
         </div>
         <div style="text-align:left; margin-bottom:12px;">
           <label style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">👷 ทีม</label>
-          <select id="swal-schedule-team" class="swal2-select" style="margin:0; width:100%; box-sizing:border-box; padding:9px 12px; border:1px solid #d9d9d9; border-radius:4px;">
+          <select id="swal-schedule-team">
             <option value="">— ไม่ระบุ —</option>
-            ${teamOpts}
+            ${plainTeamOpts}
           </select>
         </div>
 
@@ -732,27 +783,64 @@ function EventCalendar() {
           multiSection.style.display  = isMulti ? "" : "none";
         });
 
+        // ✅ TomSelect ตัวแรกของไฟล์นี้ — ให้ช่อง "ทีม" กับ "ลูกทีมเพิ่มเติม" ในกล่องนี้ค้นหา/พิมพ์เพิ่ม
+        // เองได้เหมือนช่องเดียวกันในฟอร์มเพิ่ม/แก้ไขงาน (AddEvent/EditEvent) ที่ทำไว้แล้ว
+        const mkScheduleTs = (el, placeholder, prefillName = "") => {
+          if (!el) return null;
+          try {
+            const ts = new TomSelect(el, {
+              create: true,
+              maxOptions: 7,
+              placeholder,
+              sortField: { field: "text", direction: "asc" },
+              allowEmptyOption: true,
+              dropdownParent: "body", // ดูเหตุผลใน <style> ด้านบน
+              wrapperClass: "ts-wrapper swal-schedule-ts",
+              dropdownClass: "ts-dropdown swal-schedule-ts-dropdown",
+            });
+            if (prefillName) {
+              ts.addOption({ value: prefillName, text: prefillName });
+              ts.setValue(prefillName, true);
+            } else {
+              ts.clear(true);
+            }
+            return ts;
+          } catch { return null; }
+        };
+
+        // ช่อง "ทีม" (ช่างหลัก) — prefill ด้วยทีมเดิมของแผนงานนี้
+        mkScheduleTs(document.getElementById("swal-schedule-team"), "เลือกหรือพิมพ์ชื่อทีม", draft.team || "");
+
         // ✅ ลูกทีมเพิ่มเติม (คนที่ 2, 3, ... แสดงผลอย่างเดียว ไม่กระทบสิทธิ์แก้ไข/แจ้งเตือน)
         const teamMembersList = document.getElementById("swal-schedule-team-members-list");
         const addTeamMemberRow = (prefillName = "") => {
           const wrapper = document.createElement("div");
           wrapper.innerHTML = `
-            <div class="swal-schedule-team-member-row" style="display:flex; gap:6px; align-items:center; margin-bottom:6px;">
-              <select class="swal-schedule-team-member-select" style="flex:1; box-sizing:border-box; padding:9px 12px; border:1px solid #d9d9d9; border-radius:4px; font-size:14px;">
+            <div class="swal-schedule-team-member-row">
+              <select class="swal-schedule-team-member-select">
                 <option value="">— เลือกลูกทีม —</option>
-                ${teamOpts.replace(/ selected/g, "")}
+                ${plainTeamOpts}
               </select>
               <button type="button" class="swal-schedule-team-member-remove" style="flex-shrink:0; width:34px; height:34px; border:1px solid #e2e8f0; background:#f1f5f9; border-radius:6px; cursor:pointer;">✕</button>
             </div>
           `;
           const row = wrapper.firstElementChild;
-          if (prefillName) row.querySelector(".swal-schedule-team-member-select").value = prefillName;
-          row.querySelector(".swal-schedule-team-member-remove").addEventListener("click", () => row.remove());
-          teamMembersList.appendChild(row);
+          teamMembersList.appendChild(row); // ต้อง append ก่อน init (ดูคอมเมนต์ใน AddEvent.js)
+          const ts = mkScheduleTs(row.querySelector(".swal-schedule-team-member-select"), "เลือกหรือพิมพ์ชื่อลูกทีม", prefillName);
+          row.querySelector(".swal-schedule-team-member-remove").addEventListener("click", () => {
+            // ✅ dropdownParent:"body" ทำให้ dropdown ไม่ได้เป็นลูกของแถวนี้อีกต่อไป — ต้อง destroy()
+            // ก่อนเสมอ ไม่งั้น dropdown จะค้างอยู่ใน body ตลอดไปหลังลบแถว (ต่างจาก AddEvent/EditEvent
+            // ที่ dropdown อยู่ในแถวเอง row.remove() เฉยๆ ยังพอเก็บกวาดฝั่ง DOM ให้ได้บางส่วน)
+            ts?.destroy();
+            row.remove();
+          });
         };
         (draft.teamMembers || []).forEach((m) => addTeamMemberRow(m?.name || ""));
         document.getElementById("swal-schedule-add-team-member-btn")?.addEventListener("click", () => addTeamMemberRow());
       },
+      // ✅ dropdownParent:"body" ต้องเก็บกวาดตอนปิดกล่องเสมอ (ไม่ใช่แค่ตอนกด ✕ ทีละแถว) ไม่งั้น
+      // dropdown ที่ค้างอยู่ใน body จะกลายเป็น orphan element ถาวรทันทีที่ทั้งกล่องถูกปิด
+      willClose: (popup) => popup.querySelectorAll(".tomselected").forEach((el) => el.tomselect?.destroy()),
       preConfirm: () => {
         const isMultiDate = Boolean(document.getElementById("swal-schedule-multi-toggle")?.checked);
         const team = document.getElementById("swal-schedule-team")?.value || "";
@@ -825,6 +913,39 @@ function EventCalendar() {
     } catch (error) {
       console.error("❌ Error deleting draft event:", error);
       Swal.fire("❌ ลบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+    }
+  };
+
+  // ✅ อนุมัติ/ไม่อนุมัติแผนงานที่ยังไม่มีวันที่ (ยังเป็น draft อยู่) — เรียกจาก UnscheduledPanel
+  // (ปุ่ม "อนุมัติ/ไม่อนุมัติ" ในเมนู "···" ของแต่ละการ์ด) เฉพาะแอดมิน/manager เท่านั้นที่เห็นปุ่มนี้
+  // (ดู isAdminOrManager ที่ส่งเป็น prop) ฝั่ง backend เช็คสิทธิ์ซ้ำอีกชั้นอยู่แล้วเป็นตัวที่เชื่อถือได้จริง
+  const handleDecideDraftApproval = async (draft, decision) => {
+    let reason;
+    if (decision === "reject") {
+      const { value, isConfirmed } = await Swal.fire({
+        title: "ระบุเหตุผลที่ไม่อนุมัติ (ถ้ามี)",
+        input: "textarea",
+        inputPlaceholder: "เช่น ข้อมูลไม่ครบ/ซ้ำกับงานอื่น...",
+        showCancelButton: true,
+        confirmButtonText: "ไม่อนุมัติ",
+        confirmButtonColor: "#dc2626",
+        cancelButtonText: "ยกเลิก",
+      });
+      if (!isConfirmed) return;
+      reason = value;
+    }
+    try {
+      await EventService.DecideApproval(draft._id, decision, reason);
+      await fetchDrafts(true);
+      Swal.fire({
+        title: decision === "approve" ? "อนุมัติแล้ว ✅" : "ไม่อนุมัติแล้ว ❌",
+        icon: "success",
+        timer: 1200,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      console.error("❌ Error deciding approval:", error);
+      Swal.fire("❌ ดำเนินการไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
     }
   };
 
@@ -990,7 +1111,15 @@ function EventCalendar() {
     [drafts, draftMonth],
   );
 
-  const activeFilterCount = [selectedTechnician, selectedStatus, selectedJobType, selectedSystem].filter(Boolean).length;
+  // ✅ ยอดรวม "งานรออนุมัติ" — แอดมิน/manager เห็นทั้งระบบ (มีสิทธิ์อนุมัติได้ทุกงาน) คนอื่นเห็นแค่ของ
+  // ตัวเอง กันโชว์ตัวเลขที่กดอนุมัติเองไม่ได้อยู่ดี ดูแล้วงงว่าทำไมกดไม่ได้ — นับรวมทั้งงานที่มีวันที่แล้ว
+  // (events) และแผนงานล่วงหน้าที่ยังไม่มีวันที่ (drafts) เข้าด้วยกัน
+  const pendingApprovalCount = useMemo(
+    () => countPendingJobs(events, drafts, { userId, isAdminOrManager }),
+    [events, drafts, userId, isAdminOrManager]
+  );
+
+  const activeFilterCount = [selectedTechnician, selectedStatus, selectedJobType, selectedSystem, selectedApproval].filter(Boolean).length;
   const hasActiveFilters = Boolean(searchTerm) || activeFilterCount > 0;
   const clearFilters = () => {
     setSearchTerm("");
@@ -998,6 +1127,7 @@ function EventCalendar() {
     setSelectedStatus("");
     setSelectedJobType("");
     setSelectedSystem("");
+    setSelectedApproval("");
   };
 
   const filteredCalendarEvents = useMemo(() => {
@@ -1032,10 +1162,11 @@ function EventCalendar() {
       const matchesStatus = !selectedStatus || event.status === selectedStatus;
       const matchesJobType = !selectedJobType || event.title === selectedJobType;
       const matchesSystem = !selectedSystem || event.system === selectedSystem;
+      const matchesApproval = !selectedApproval || getApprovalState(event) === selectedApproval;
 
-      return matchesKeyword && matchesTechnician && matchesStatus && matchesJobType && matchesSystem;
+      return matchesKeyword && matchesTechnician && matchesStatus && matchesJobType && matchesSystem && matchesApproval;
     });
-  }, [events, searchTerm, employeeList, selectedTechnician, selectedStatus, selectedJobType, selectedSystem, technicianOptions]);
+  }, [events, searchTerm, employeeList, selectedTechnician, selectedStatus, selectedJobType, selectedSystem, selectedApproval, technicianOptions]);
 
   const getStatusIcon = useCallback((status) => {
     const icons = {
@@ -1092,6 +1223,25 @@ function EventCalendar() {
           <FontAwesomeIcon icon={faLayerGroup} />
           {drafts.length > 0 && <span className="filter-badge">{drafts.length}</span>}
         </button>
+
+        {/* ✅ ปุ่ม "N ต้องอนุมัติ" — ซ่อนไปเลยตอนไม่มีอะไรรออนุมัติ (เทียบ pattern เดียวกับ
+            ClosureRequestsPanel ในหน้า Operation ที่ return null ตอนไม่มีคำขอ) กดแล้วกรองตารางเหลือ
+            เฉพาะงานรออนุมัติทันที พร้อมเปิดแผงงานล่วงหน้าด้วย (ให้เห็นทั้งงานที่มีวันที่แล้วและแผนงานที่
+            ยังไม่มีวันที่พร้อมกันในมุมมองเดียว) */}
+        {pendingApprovalCount > 0 && (
+          <button
+            className="filter-toggle-btn filter-toggle-btn--approval-pending"
+            onClick={() => {
+              setSelectedApproval("pending");
+              setShowFilterPanel(true);
+              setShowDraftsPanel(true);
+            }}
+            title="งานรออนุมัติ"
+          >
+            ⏳
+            <span className="filter-badge filter-badge--approval-pending">{pendingApprovalCount}</span>
+          </button>
+        )}
 
         <button className="toolbar-icon-btn toolbar-icon-btn--pdf" onClick={generatePdf} title="สร้าง PDF">
           <FontAwesomeIcon icon={faFilePdf} />
@@ -1180,6 +1330,16 @@ function EventCalendar() {
             ))}
           </select>
 
+          <select
+            className="event-filter-select"
+            value={selectedApproval}
+            onChange={(e) => setSelectedApproval(e.target.value)}
+          >
+            <option value="">ทุกสถานะอนุมัติ</option>
+            <option value="pending">⏳ รออนุมัติ</option>
+            <option value="rejected">❌ ไม่อนุมัติ</option>
+          </select>
+
           {hasActiveFilters && (
             <button className="event-filter-clear" onClick={clearFilters}>
               <FontAwesomeIcon icon={faXmark} /> ล้างตัวกรองทั้งหมด
@@ -1190,27 +1350,31 @@ function EventCalendar() {
 
       {/* ✅ งานวางแผนล่วงหน้า (ยังไม่ลงตาราง) แยกเป็นเดือนๆ — ลากการ์ดวางบนปฏิทิน หรือกดปุ่ม
           "ลงตาราง" เลือกวันที่เองก็ได้ ตาม requirement: บันทึกไว้ก่อนว่ามีงานนี้แน่ๆ เดือนนี้
-          แต่ยังไม่รู้วันที่เป๊ะ ไม่ต้องลงตารางทันที */}
-      {showDraftsPanel && (
-        <UnscheduledPanel
-          ref={draftsPanelRef}
-          drafts={draftsForMonth}
-          loading={draftsLoading}
-          month={draftMonth}
-          onMonthChange={handleDraftMonthChange}
-          onAddClick={handleAddDraft}
-          onEditClick={handleEditDraftClick}
-          onScheduleClick={handleScheduleDraftClick}
-          onDeleteClick={handleDeleteDraftClick}
-          highlightDraftId={highlightDraftId}
-        />
-      )}
+          แต่ยังไม่รู้วันที่เป๊ะ ไม่ต้องลงตารางทันที
+          ✅ ปฏิทิน + คอลัมน์นี้เรียงข้างกันบนจอใหญ่ (≥992px) — กดปุ่มด้านบนเพื่อเปิด/ปิด ปฏิทินย่อ
+          ความกว้างให้เองอัตโนมัติ (ดู .calendar-layout ใน index.css) จอเล็กกว่านั้นไม่มีที่พอวาง
+          ข้างกัน กลับไปเรียงบนล่างเหมือนเดิม (เดิมแผงนี้ดันปฏิทินลงมาทุกครั้งที่เปิด) */}
+      <div className={`calendar-layout ${showDraftsPanel ? "calendar-layout--with-drafts" : ""}`}>
+        {showDraftsPanel && (
+          <aside className="calendar-drafts-col">
+            <UnscheduledPanel
+              ref={draftsPanelRef}
+              drafts={draftsForMonth}
+              loading={draftsLoading}
+              month={draftMonth}
+              onMonthChange={handleDraftMonthChange}
+              onAddClick={handleAddDraft}
+              onEditClick={handleEditDraftClick}
+              onScheduleClick={handleScheduleDraftClick}
+              onDeleteClick={handleDeleteDraftClick}
+              highlightDraftId={highlightDraftId}
+              isAdminOrManager={isAdminOrManager}
+              onDecideApproval={handleDecideDraftApproval}
+            />
+          </aside>
+        )}
 
-      <div
-        id="content-id"
-        className="calendar-wrapper"
-        style={{ flex: 1, width: "100%" }}
-      >
+        <div id="content-id" className="calendar-wrapper">
         <FullCalendar
           ref={calendarRef}
           locales={[thLocale]} // ใช้งานภาษาไทย
@@ -1299,7 +1463,9 @@ function EventCalendar() {
               endTime = "",
               status,
               jobGroupId,
+              approvalStatus,
             } = extendedProps;
+            const approvalState = approvalStatus || "approved";
 
             // ✅ สร้าง display string แบบมีเงื่อนไข
             // ⚠️ ป้องกัน stored XSS — ทุกฟิลด์ตรงนี้ (โครงการ/ระบบ/ทีม/เวลา/ชื่องาน) เป็นข้อความที่
@@ -1355,10 +1521,18 @@ function EventCalendar() {
               ? `<div title="งานนี้เป็นส่วนหนึ่งของงานหลายวัน (กลุ่มเดียวกัน)" style="position:absolute; top:0px; left:3px; font-size:${badgeIconPx}px; line-height:1; z-index:10;">🔗</div>`
               : "";
 
+            // ✅ ป้าย "รออนุมัติ/ไม่อนุมัติ" — เป็นบรรทัดแรกสุดของการ์ด ไม่ใช่ไอคอนมุมเล็กๆ อีกอันเพราะ
+            // การ์ดมีไอคอนมุมอยู่แล้ว 2 จุด (สถานะ/กลุ่มงานหลายวัน) เพิ่มอีกจุดจะอ่านยากเกินไปบนจอเล็ก —
+            // นี่คือข้อมูลสำคัญที่สุดของการ์ดตอนที่ยังไม่ approved จึงควรเห็นชัดสุดเป็นบรรทัดแรก
+            const approvalPillHtml = approvalState !== "approved"
+              ? `<div style="display:inline-block; font-size:0.72em; font-weight:700; padding:0 5px; border-radius:4px; margin-bottom:2px; background:${approvalState === "pending" ? "rgba(245,158,11,.9)" : "rgba(239,68,68,.9)"}; color:#fff;">${approvalState === "pending" ? "⏳ รออนุมัติ" : "❌ ไม่อนุมัติ"}</div>`
+              : "";
+
             return {
               html: `
                 <div style="position: relative; display: flex; align-items: center; padding: ${badgePadding}; width: 100%;">
                   <div style="font-size: ${fontSize}; line-height: 2; padding: 0px; flex: 1; min-width: 0;">
+                    ${approvalPillHtml}
                     <div>[ ${escapeHtml(title)} ]  </div>
 
                     <div> ${systemDisplay} </div>
@@ -1415,9 +1589,13 @@ function EventCalendar() {
             timeGridWeek: { dayMaxEventRows: window.innerWidth >= 576 ? 7 : 7 },
             timeGridDay: { dayMaxEventRows: window.innerWidth >= 576 ? 7 : 7 },
           }}
-          eventClassNames={(arg) =>
-            !canEditEvent(arg.event.extendedProps) ? ["fc-event-locked"] : []
-          }
+          eventClassNames={(arg) => {
+            const classes = !canEditEvent(arg.event.extendedProps) ? ["fc-event-locked"] : [];
+            const approvalState = getApprovalState(arg.event);
+            if (approvalState === "pending") classes.push("fc-event-pending-approval");
+            else if (approvalState === "rejected") classes.push("fc-event-rejected-approval");
+            return classes;
+          }}
           dayCellDidMount={(info) => {
             const date = moment(info.date); // แปลงเป็น moment object
             const currentMonth = moment(info.view.currentStart).month(); // เดือนปัจจุบันที่กำลังแสดงในปฏิทิน
@@ -1516,6 +1694,27 @@ function EventCalendar() {
       filter: grayscale(10%);
     }
 
+/* ✅ งานที่ยังรออนุมัติ — เทาลง + ลายทแยงบางๆ ให้ดูออกทันทีว่า "ยังไม่ยืนยันจริง" โดยไม่ต้องอ่านป้าย
+   ข้อความก่อน (ดู approvalPillHtml ใน eventContent สำหรับป้ายข้อความ) */
+.fc-event-pending-approval {
+      opacity: 0.82;
+      filter: grayscale(70%);
+      background-image: repeating-linear-gradient(
+        45deg,
+        rgba(255,255,255,.35),
+        rgba(255,255,255,.35) 6px,
+        transparent 6px,
+        transparent 12px
+      ) !important;
+    }
+/* ✅ งานที่ไม่ผ่านการอนุมัติ — กรอบแดงประ ให้ต่างจาก "รออนุมัติ" (เทา/ลายทแยง) ชัดเจน ไม่ปนกัน */
+.fc-event-rejected-approval {
+      opacity: 0.82;
+      filter: grayscale(40%);
+      outline: 2px dashed #ef4444;
+      outline-offset: -2px;
+    }
+
 .legend-item {
       display: flex;
       align-items: center;
@@ -1585,7 +1784,16 @@ function EventCalendar() {
               />
               <span>งานสีจาง = ไม่ใช่งานของคุณ (ดูได้ แต่แก้ไขไม่ได้)</span>
             </div>
+            <div className="legend-item" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span>⏳</span>
+              <span>รออนุมัติ — แอดมิน/manager ยังไม่ได้อนุมัติ ทำงานต่อได้แต่ยังปิดงานไม่ได้</span>
+            </div>
+            <div className="legend-item" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span>❌</span>
+              <span>ไม่อนุมัติ — แก้ไขข้อมูลแล้วบันทึก ระบบจะส่งขออนุมัติใหม่ให้อัตโนมัติ</span>
+            </div>
           </div>
+        </div>
         </div>
       </div>
 

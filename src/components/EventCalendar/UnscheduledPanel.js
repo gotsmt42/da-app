@@ -13,6 +13,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import moment from "moment";
 import "moment/locale/th";
+import { isPendingApproval, isRejected } from "../../utils/approvalStatus";
 
 // ✅ งาน "วางแผนล่วงหน้า" (ยังไม่ลงตาราง) แยกเป็นแผงต่างหาก ไม่ปนกับปฏิทินจริง — เพราะยังไม่มี
 // วันที่แน่นอน (backend ก็กันไม่ให้ปนอยู่แล้ว ดู unscheduled: {$ne:true} ใน GET /events)
@@ -37,6 +38,8 @@ const UnscheduledPanel = forwardRef(function UnscheduledPanel(
     onScheduleClick,
     onDeleteClick,
     highlightDraftId, // ✅ "<id>|<nonce>" — มาจากลิงก์ "📌 รอวางแผน" ในตาราง ContractOverview.js
+    isAdminOrManager, // ✅ ใช้โชว์ปุ่ม "อนุมัติ/ไม่อนุมัติ" เฉพาะแอดมิน/manager เท่านั้น
+    onDecideApproval, // (draft, decision) => void — decision: "approve" | "reject"
   },
   panelRef,
 ) {
@@ -129,7 +132,7 @@ const UnscheduledPanel = forwardRef(function UnscheduledPanel(
           <FontAwesomeIcon icon={faChevronLeft} />
         </button>
         <div className="unscheduled-month-label">
-          📌 งานวางแผนล่วงหน้า <span>· {monthLabel}</span>
+          📌 แผนล่วงหน้า <span>· {monthLabel}</span>
         </div>
         <button
           type="button"
@@ -161,11 +164,13 @@ const UnscheduledPanel = forwardRef(function UnscheduledPanel(
             };
             const isMenuOpen = menuState?.id === d._id;
             const isHighlighted = activeHighlight === d._id;
+            const pending = isPendingApproval(d);
+            const rejected = isRejected(d);
             return (
               <div
                 key={d._id}
                 id={`draft-card-${d._id}`}
-                className={`draft-card ${isHighlighted ? "draft-card--highlighted" : ""}`}
+                className={`draft-card ${isHighlighted ? "draft-card--highlighted" : ""} ${pending ? "draft-card--pending" : ""} ${rejected ? "draft-card--rejected" : ""}`}
                 data-event={JSON.stringify(eventData)}
                 title="ลากไปวางบนวันที่ต้องการในปฏิทิน"
               >
@@ -173,8 +178,12 @@ const UnscheduledPanel = forwardRef(function UnscheduledPanel(
                   <FontAwesomeIcon icon={faGripVertical} />
                 </span>
                 <div className="draft-card-body">
+                  {/* ✅ ป้ายสถานะอนุมัติ — บรรทัดแรกสุดของการ์ด เทียบ pattern เดียวกับป้ายบนปฏิทินหลัก
+                      (EventCalendar/index.js eventContent) ให้ธีมสี/ตำแหน่งตรงกันทั้งแอป */}
+                  {pending && <div className="draft-card-approval draft-card-approval--pending">⏳ รออนุมัติ</div>}
+                  {rejected && <div className="draft-card-approval draft-card-approval--rejected">❌ ไม่อนุมัติ</div>}
                   <div className="draft-card-title">
-                    [{d.title}] 
+                    [{d.title}]
                   </div>
                     <div className="draft-card-sub">
                     💻{d.system ? `: ${d.system}` : ""}
@@ -184,13 +193,18 @@ const UnscheduledPanel = forwardRef(function UnscheduledPanel(
                   </div>
                   {d.time && <div className="draft-card-time">🔢: ครั้งที่ {d.time}</div>}
                   {d.team && <div className="draft-card-team">👷ทีม : {d.team}</div>}
+                  {/* ✅ เหตุผลไม่อนุมัติ — เก็บไว้เป็นประวัติให้เห็นเป็นบริบท เทียบ pattern เดียวกับกล่อง
+                      ประวัติปฏิเสธคำขอปิดงานในหน้า Operation/index.js */}
+                  {rejected && d.approvalRejectReason && (
+                    <div className="draft-card-reject-reason">เหตุผล: {d.approvalRejectReason}</div>
+                  )}
                 </div>
                 <div className="draft-card-actions">
                   <button
                     type="button"
                     className="draft-card-btn draft-card-btn--schedule-full"
                     onClick={() => onScheduleClick(d)}
-                    title="เลือกวันที่ลงตาราง"
+                    title={pending ? "ลงตารางได้ แต่จะยังขึ้นเป็น '⏳ รออนุมัติ' จนกว่าแอดมินจะอนุมัติ" : "เลือกวันที่ลงตาราง"}
                   >
                     <FontAwesomeIcon icon={faCalendarCheck} /> +
                   </button>
@@ -220,6 +234,27 @@ const UnscheduledPanel = forwardRef(function UnscheduledPanel(
                         }}
                         onClick={(e) => e.stopPropagation()}
                       >
+                        {/* ✅ อนุมัติ/ไม่อนุมัติ — เฉพาะแอดมิน/manager และเฉพาะตอนยัง "pending" เท่านั้น
+                            (เทียบ pattern เดียวกับปุ่มแก้ไข/ลบที่มีอยู่แล้ว ใส่ในเมนู "···" เดียวกัน
+                            แทนที่จะเพิ่มปุ่มลอยอีกชุดจนการ์ดแคบเกินไปบนมือถือ) */}
+                        {isAdminOrManager && pending && (
+                          <>
+                            <button
+                              type="button"
+                              className="draft-card-menu-item draft-card-menu-item--approve"
+                              onClick={() => { setMenuState(null); onDecideApproval(d, "approve"); }}
+                            >
+                              ✅ อนุมัติ
+                            </button>
+                            <button
+                              type="button"
+                              className="draft-card-menu-item draft-card-menu-item--danger"
+                              onClick={() => { setMenuState(null); onDecideApproval(d, "reject"); }}
+                            >
+                              ❌ ไม่อนุมัติ
+                            </button>
+                          </>
+                        )}
                         <button
                           type="button"
                           className="draft-card-menu-item"

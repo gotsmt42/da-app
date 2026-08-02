@@ -36,7 +36,7 @@ import JobTypeService from "../../services/JobTypeService";
 import SystemTypeService from "../../services/SystemTypeService";
 import { formatEventDateRange } from "../../utils/formatDateRange";
 import { resolveOperationGroup } from "../../utils/overdueJobs";
-import { countUsedRounds } from "../../utils/contractRounds";
+import { countUsedRounds, visitsPerYear } from "../../utils/contractRounds";
 import { groupEventsByContract, nextVisitOverdueInfo } from "../../utils/contractOverdue";
 import { escapeHtml } from "../../utils/escapeHtml";
 
@@ -83,8 +83,8 @@ const DEFAULT_COL_WIDTHS = {
   checkbox: 42, actions: 50,
   contractNo: 120, quotationNo: 120,
   company: 170, site: 170, system: 110, title: 170,
-  contractStart: 100, contractEnd: 100,
-  visitCount: 80, jobValue: 100, status: 130, progress: 90, team: 120,
+  contractStart: 100, contractEnd: 100, intervalMonths: 96,
+  visitCount: 92, jobValue: 100, status: 130, progress: 90, team: 120,
 };
 const COL_WIDTHS_STORAGE_KEY = "contractOverview.colWidths";
 const loadStoredColWidths = () => {
@@ -660,7 +660,7 @@ export default function ContractOverview() {
   );
   const totalTableWidth = useMemo(() => {
     let total = colWidth("actions") + (showCheckboxes ? colWidth("checkbox") : 0);
-    const contractOnlyKeys = ["contractNo", "quotationNo", "contractStart", "contractEnd", "visitCount", "jobValue", "status"];
+    const contractOnlyKeys = ["contractNo", "quotationNo", "contractStart", "contractEnd", "intervalMonths", "visitCount", "jobValue", "status"];
     ["company", "site", "system", "title", "progress", "team"].forEach((k) => { total += colWidth(k); });
     if (!hideContractOnlyColumns) {
       contractOnlyKeys.forEach((k) => { total += colWidth(k); });
@@ -675,7 +675,7 @@ export default function ContractOverview() {
   // แต่ละใบเลยสักคอลัมน์ — ดู handleColResize/colVar ด้านบนสำหรับเหตุผลที่ย้ายมาใช้กลไกนี้แทนตัวเลขตรงๆ
   const tableCssVars = useMemo(() => {
     const vars = { "--col-total": `${totalTableWidth}px` };
-    ["contractNo", "quotationNo", "company", "site", "system", "title", "contractStart", "contractEnd", "visitCount", "jobValue", "status", "progress", "team"].forEach((k) => {
+    ["contractNo", "quotationNo", "company", "site", "system", "title", "contractStart", "contractEnd", "intervalMonths", "visitCount", "jobValue", "status", "progress", "team"].forEach((k) => {
       vars[`--col-${k}`] = `${colWidth(k)}px`;
     });
     visitColumns.forEach((n) => { vars[`--col-visit_${n}`] = `${colWidth(`visit_${n}`)}px`; });
@@ -707,6 +707,7 @@ export default function ContractOverview() {
     title: (c) => c.title || "",
     contractStart: (c) => (c.contractStart ? new Date(c.contractStart).getTime() : null),
     contractEnd: (c) => (c.contractEnd ? new Date(c.contractEnd).getTime() : null),
+    intervalMonths: (c) => (c.intervalMonths != null && c.intervalMonths !== "" ? Number(c.intervalMonths) : null),
     visitCount: (c) => (c.visitCount != null && c.visitCount !== "" ? Number(c.visitCount) : null),
     jobValue: (c) => (c.jobValue != null && c.jobValue !== "" ? Number(c.jobValue) : null),
     team: (c) => (c.team === "-" ? "" : c.team || ""),
@@ -754,6 +755,8 @@ export default function ContractOverview() {
         ประเภทงาน: c.title || "",
         วันที่เริ่มสัญญา: c.contractStart ? moment(c.contractStart).format("YYYY-MM-DD") : "",
         วันที่สิ้นสุดสัญญา: c.contractEnd ? moment(c.contractEnd).format("YYYY-MM-DD") : "",
+        "รอบเข้า (เดือน)": c.intervalMonths || "",
+        "เข้าปีละ (ครั้ง)": visitsPerYear(c.intervalMonths) || "",
         จำนวนครั้ง: c.visitCount || "",
         "มูลค่างาน/1ปี": c.jobValue ?? "",
         สถานะสัญญา: st?.label || "",
@@ -781,7 +784,7 @@ export default function ContractOverview() {
   // (ดู AddEvent.js) — เพิ่มฟอร์มแบบเดียวกันไว้ในหน้านี้เลย ให้เพิ่มสัญญาใหม่ได้โดยไม่ต้องสลับหน้า
   const emptyForm = {
     company: "", site: "", title: "", system: "", team: "",
-    contractNo: "", quotationNo: "", contractStart: "", contractEnd: "", visitCount: "", jobValue: "",
+    contractNo: "", quotationNo: "", contractStart: "", contractEnd: "", visitCount: "", intervalMonths: "", jobValue: "",
   };
   const [addOpen, setAddOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -789,6 +792,10 @@ export default function ContractOverview() {
   const [form, setForm] = useState(emptyForm);
 
   const setField = (field) => (val) => setForm((f) => ({ ...f, [field]: val }));
+
+  // ✅ แค่ข้อมูลอ้างอิงเฉยๆ ไม่ผูก/บังคับกับจำนวนครั้งจริง (visitCount ยังต้องกรอกเองอิสระเสมอ เพราะ
+  // งานจริงเลื่อน/ชนกันได้ตลอด) ใช้แค่เป็นเกณฑ์เตือน "เกินกำหนดรอบถัดไป" เท่านั้น
+  const intervalPreviewText = "ไม่บังคับ — ใช้เตือนเมื่อเกินกำหนดรอบถัดไปเท่านั้น ไม่เกี่ยวกับจำนวนครั้งด้านบน";
 
   const companyOptions = useMemo(
     () => [...new Set(lookups.customers.map((c) => c.cCompany).filter(Boolean))],
@@ -854,6 +861,14 @@ export default function ContractOverview() {
     if (!form.system.trim()) { setFormError("กรุณาระบุระบบงาน"); return; }
     const visitCount = Number(form.visitCount);
     if (!visitCount || visitCount < 1) { setFormError("กรุณาระบุจำนวนครั้งทั้งหมดของสัญญา"); return; }
+    // ✅ ไม่บังคับ — เว้นว่างได้ ไม่กระทบจำนวนครั้งด้านบน แค่ใช้เตือน "เกินกำหนดรอบถัดไป" ถ้าระบุมา
+    if (form.intervalMonths) {
+      const n = Number(form.intervalMonths);
+      if (!n || n < 1 || n > 24) {
+        setFormError("ระยะห่างระหว่างรอบต้องอยู่ระหว่าง 1-24 เดือน");
+        return;
+      }
+    }
     if (isContractNoTaken(form.contractNo)) {
       setFormError(`เลขที่สัญญา "${form.contractNo.trim()}" ถูกใช้ไปแล้ว กรุณาตรวจสอบ`);
       return;
@@ -877,6 +892,7 @@ export default function ContractOverview() {
         contractStart: form.contractStart,
         contractEnd: form.contractEnd,
         visitCount,
+        intervalMonths: form.intervalMonths ? Number(form.intervalMonths) : undefined,
         jobValue: form.jobValue ? Number(form.jobValue) : undefined,
       };
 
@@ -992,6 +1008,7 @@ export default function ContractOverview() {
           contractStart: c.contractStart || "",
           contractEnd: c.contractEnd || "",
           visitCount: c.visitCount,
+          intervalMonths: c.intervalMonths,
           jobValue: c.jobValue,
           dates: [{ start: newVisitStart, end: endDate, date: newVisitStart }],
         };
@@ -1043,6 +1060,7 @@ export default function ContractOverview() {
           contractStart: c.contractStart || "",
           contractEnd: c.contractEnd || "",
           visitCount: c.visitCount,
+          intervalMonths: c.intervalMonths,
           jobValue: c.jobValue,
           dates: [{ start: newVisitStart, end: endDate, date: newVisitStart }],
         };
@@ -1060,7 +1078,7 @@ export default function ContractOverview() {
   };
 
   // ── จัดกลุ่มงานเก่าที่เลือกไว้ ให้กลายเป็นสัญญาเดียวกัน ──────────────────────
-  const emptyMergeForm = { contractNo: "", quotationNo: "", contractStart: "", contractEnd: "", visitCount: "", jobValue: "" };
+  const emptyMergeForm = { contractNo: "", quotationNo: "", contractStart: "", contractEnd: "", visitCount: "", intervalMonths: "", jobValue: "" };
   const [mergeOpen, setMergeOpen] = useState(false);
   const [mergeForm, setMergeForm] = useState(emptyMergeForm);
   const [mergeError, setMergeError] = useState("");
@@ -1116,6 +1134,7 @@ export default function ContractOverview() {
         quotationNo: mergeForm.quotationNo.trim(),
         contractStart: mergeForm.contractStart,
         contractEnd: mergeForm.contractEnd,
+        intervalMonths: mergeForm.intervalMonths ? Number(mergeForm.intervalMonths) : undefined,
         visitCount: mergeForm.visitCount ? Number(mergeForm.visitCount) : rounds.length,
         jobValue: mergeForm.jobValue ? Number(mergeForm.jobValue) : undefined,
       });
@@ -1175,9 +1194,19 @@ export default function ContractOverview() {
       setEditingCell(null);
       return;
     }
+    // ✅ ตรวจฝั่งจอก่อนยิง API (ข้อความเดียวกับที่ backend เช็คซ้ำอีกชั้น) ให้ผู้ใช้เห็นผลทันทีไม่ต้องรอ
+    // round-trip — ระยะห่างระหว่างรอบเป็นข้อมูลอ้างอิงอิสระ ไม่เกี่ยวกับจำนวนครั้งจริง (visitCount)
+    if (field === "intervalMonths" && rawValue) {
+      const n = Number(rawValue);
+      if (!n || n < 1 || n > 24) {
+        Swal.fire({ title: "แก้ไขไม่สำเร็จ", text: "ระยะห่างระหว่างรอบต้องอยู่ระหว่าง 1-24 เดือน", icon: "error" });
+        setEditingCell(null);
+        return;
+      }
+    }
 
     const payload = {};
-    if (field === "jobValue" || field === "visitCount") payload[field] = rawValue ? Number(rawValue) : undefined;
+    if (field === "jobValue" || field === "visitCount" || field === "intervalMonths") payload[field] = rawValue ? Number(rawValue) : undefined;
     else if (field === "team") { payload.team = rawValue; payload.resPerson = teamToId.get(rawValue) || ""; }
     else payload[field] = rawValue;
 
@@ -1712,7 +1741,7 @@ export default function ContractOverview() {
                 <ResizableTh width={colWidth("site")} rowSpan={headerRowSpan} columnKey="site" tableRef={tableRef} onResize={handleColResize("site")} sortable sortDirection={sortConfig.key === "site" ? sortConfig.direction : null} onSort={handleSortClick}>โครงการ</ResizableTh>
                 <ResizableTh width={colWidth("system")} rowSpan={headerRowSpan} columnKey="system" tableRef={tableRef} onResize={handleColResize("system")} sortable sortDirection={sortConfig.key === "system" ? sortConfig.direction : null} onSort={handleSortClick}>ระบบ</ResizableTh>
                 <ResizableTh width={colWidth("title")} rowSpan={headerRowSpan} columnKey="title" tableRef={tableRef} onResize={handleColResize("title")} sortable sortDirection={sortConfig.key === "title" ? sortConfig.direction : null} onSort={handleSortClick}>ประเภทงาน</ResizableTh>
-                {!hideContractOnlyColumns && <TableCell align="center" colSpan={2}>ระยะเวลา</TableCell>}
+                {!hideContractOnlyColumns && <TableCell align="center" colSpan={3}>ระยะเวลา</TableCell>}
                 {!hideContractOnlyColumns && (
                   <ResizableTh width={colWidth("visitCount")} align="center" rowSpan={headerRowSpan} columnKey="visitCount" tableRef={tableRef} onResize={handleColResize("visitCount")} sortable sortDirection={sortConfig.key === "visitCount" ? sortConfig.direction : null} onSort={handleSortClick}>จำนวนครั้ง</ResizableTh>
                 )}
@@ -1735,6 +1764,7 @@ export default function ContractOverview() {
                 <ResizableTh width={colWidth("quotationNo")} columnKey="quotationNo" tableRef={tableRef} onResize={handleColResize("quotationNo")} sortable sortDirection={sortConfig.key === "quotationNo" ? sortConfig.direction : null} onSort={handleSortClick}>ใบเสนอราคา</ResizableTh>
                 <ResizableTh width={colWidth("contractStart")} columnKey="contractStart" tableRef={tableRef} onResize={handleColResize("contractStart")} sortable sortDirection={sortConfig.key === "contractStart" ? sortConfig.direction : null} onSort={handleSortClick}>เริ่มต้น</ResizableTh>
                 <ResizableTh width={colWidth("contractEnd")} columnKey="contractEnd" tableRef={tableRef} onResize={handleColResize("contractEnd")} sortable sortDirection={sortConfig.key === "contractEnd" ? sortConfig.direction : null} onSort={handleSortClick}>สิ้นสุด</ResizableTh>
+                <ResizableTh width={colWidth("intervalMonths")} align="center" columnKey="intervalMonths" tableRef={tableRef} onResize={handleColResize("intervalMonths")} sortable sortDirection={sortConfig.key === "intervalMonths" ? sortConfig.direction : null} onSort={handleSortClick}>รอบเข้า (เดือน)</ResizableTh>
               </TableRow>
               )}
             </TableHead>
@@ -1857,36 +1887,60 @@ export default function ContractOverview() {
                     onCancel={cancelEdit}
                   />
                   <EditableCell
+                    editable={c.isRealContract} columnKey="intervalMonths"
+                    editing={editingCell?.key === c.key && editingCell?.field === "intervalMonths"}
+                    value={c.intervalMonths} editValue={editValue} editType="number" saving={editSaving}
+                    width={colVar("intervalMonths")} align="center"
+                    title={c.intervalMonths ? undefined : "ยังไม่ได้ระบุ — ระบบใช้ค่าเริ่มต้น 3 เดือนในการเตือนรอบถัดไป"}
+                    formatDisplay={(v) => (v ? `ทุก ${v} เดือน` : <Dash />)}
+                    onStartEdit={() => beginEdit(c, "intervalMonths")}
+                    onChangeValue={setEditValue}
+                    onCommit={() => commitEdit(c)}
+                    onCancel={cancelEdit}
+                  />
+                  <EditableCell
                     editable={c.isRealContract} columnKey="visitCount"
                     editing={editingCell?.key === c.key && editingCell?.field === "visitCount"}
                     value={c.visitCount} editValue={editValue} editType="number" saving={editSaving}
                     width={colVar("visitCount")} align="center"
-                    // ✅ เตือนถ้ารอบล่าสุดผ่านมาเกิน 3 เดือนแล้วแต่ยังไม่ได้ลงแผนงานครั้งถัดไปเลย — วงกลม
-                    // สีแดงทึบ (ไม่ใช่แค่ไอคอนสีแดงบนพื้นขาว) ให้เห็นชัดแม้เป็นภาพนิ่ง ไม่ต้องรอดูอนิเมชัน
-                    formatDisplay={(v) => (
-                      <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
-                        <span>{v || <Dash />}</span>
-                        {overdueInfo && (
-                          <Tooltip title={`รอบล่าสุด ${overdueInfo.lastVisitDate.format("DD/MM/YYYY")} — เกินกำหนดรอบถัดไปแล้ว ${overdueInfo.monthsOverdue} เดือน ยังไม่ได้ลงแผนงานครั้งถัดไป`}>
-                            <Box
-                              component="span"
-                              sx={{
-                                display: "inline-flex", alignItems: "center", justifyContent: "center",
-                                width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
-                                bgcolor: "#dc2626", color: "#fff",
-                                animation: "contractOverviewPulse 1.6s ease-in-out infinite",
-                                "@keyframes contractOverviewPulse": {
-                                  "0%, 100%": { boxShadow: `0 0 0 0 ${alpha("#dc2626", 0.5)}` },
-                                  "50%": { boxShadow: `0 0 0 4px ${alpha("#dc2626", 0)}` },
-                                },
-                              }}
-                            >
-                              <WarningAmber sx={{ fontSize: 12 }} />
-                            </Box>
-                          </Tooltip>
-                        )}
-                      </Stack>
-                    )}
+                    // ✅ เตือนถ้ารอบล่าสุดผ่านมาเกินระยะห่างระหว่างรอบที่กำหนดไว้แล้วแต่ยังไม่ได้ลงแผนงาน
+                    // ครั้งถัดไปเลย — วงกลมสีแดงทึบ (ไม่ใช่แค่ไอคอนสีแดงบนพื้นขาว) ให้เห็นชัดแม้เป็นภาพนิ่ง
+                    // ไม่ต้องรอดูอนิเมชัน บรรทัดที่ 2 โชว์ "ปีละ N ครั้ง" เฉพาะตอนระยะห่างหารลงตัว (แค่
+                    // ค่าอ้างอิงเฉยๆ ไม่ได้ผูก/บังคับกับจำนวนครั้งจริงที่แก้ไขในช่องนี้ได้อิสระ)
+                    formatDisplay={(v) => {
+                      const perYear = visitsPerYear(c.intervalMonths);
+                      return (
+                        <Stack spacing={0} alignItems="center">
+                          <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
+                            <span>{v || <Dash />}</span>
+                            {overdueInfo && (
+                              <Tooltip title={`รอบล่าสุด ${overdueInfo.lastVisitDate.format("DD/MM/YYYY")} — ต้องเข้ารอบถัดไปภายใน ${overdueInfo.intervalMonths} เดือน เกินกำหนดแล้ว ${overdueInfo.monthsOverdue} เดือน ยังไม่ได้ลงแผนงานครั้งถัดไป`}>
+                                <Box
+                                  component="span"
+                                  sx={{
+                                    display: "inline-flex", alignItems: "center", justifyContent: "center",
+                                    width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
+                                    bgcolor: "#dc2626", color: "#fff",
+                                    animation: "contractOverviewPulse 1.6s ease-in-out infinite",
+                                    "@keyframes contractOverviewPulse": {
+                                      "0%, 100%": { boxShadow: `0 0 0 0 ${alpha("#dc2626", 0.5)}` },
+                                      "50%": { boxShadow: `0 0 0 4px ${alpha("#dc2626", 0)}` },
+                                    },
+                                  }}
+                                >
+                                  <WarningAmber sx={{ fontSize: 12 }} />
+                                </Box>
+                              </Tooltip>
+                            )}
+                          </Stack>
+                          {/* {v && perYear && (
+                            <Typography variant="caption" sx={{ fontSize: "0.66rem", lineHeight: 1.1, color: "text.secondary" }}>
+                              ปีละ {perYear} ครั้ง
+                            </Typography>
+                          )} */}
+                        </Stack>
+                      );
+                    }}
                     onStartEdit={() => beginEdit(c, "visitCount")}
                     onChangeValue={setEditValue}
                     onCommit={() => commitEdit(c)}
@@ -2225,6 +2279,14 @@ export default function ContractOverview() {
               <TextField fullWidth size="small" type="number" label="มูลค่างาน" value={form.jobValue}
                 onChange={(e) => setField("jobValue")(e.target.value)} />
             </Stack>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+              {/* ✅ ระยะห่างระหว่างรอบ — ข้อมูลอ้างอิงอิสระ ไม่บังคับ ไม่ผูก/บังคับกับ "จำนวนครั้งทั้งหมด"
+                  ด้านบน (งานจริงเลื่อน/ชนกันได้เสมอ จำนวนครั้งจริงต้องให้ผู้ใช้เป็นคนกำหนดเองเท่านั้น) —
+                  ใช้แค่เตือน "เกินกำหนดรอบถัดไป" ในตาราง/พุชแจ้งเตือน */}
+              <TextField fullWidth size="small" type="number" label="เข้าทุกกี่เดือน" value={form.intervalMonths}
+                onChange={(e) => setField("intervalMonths")(e.target.value)} inputProps={{ min: 1, max: 24 }}
+                helperText={intervalPreviewText} />
+            </Stack>
 
             {/* ✅ ไม่ต้องระบุวันที่เข้างานเลยตอนนี้ — บันทึกเป็นฉบับร่างไว้ก่อน แล้วไปเพิ่มวันที่เข้างาน
                 ทีละครั้งทีหลังที่ปุ่ม "+" ในตาราง เมื่อรู้วันที่จริงแล้ว (กันต้องเดา/กรอกวันที่ที่ยัง
@@ -2433,6 +2495,13 @@ export default function ContractOverview() {
               />
               <TextField fullWidth size="small" type="number" label="มูลค่างาน" value={mergeForm.jobValue}
                 onChange={(e) => setMergeField("jobValue")(e.target.value)} />
+            </Stack>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+              <TextField
+                fullWidth size="small" type="number" label="เข้าทุกกี่เดือน" value={mergeForm.intervalMonths}
+                onChange={(e) => setMergeField("intervalMonths")(e.target.value)} inputProps={{ min: 1, max: 24 }}
+                helperText="ไม่บังคับ — ใช้เตือนเมื่อเกินกำหนดรอบถัดไปเท่านั้น"
+              />
             </Stack>
           </Stack>
         </DialogContent>

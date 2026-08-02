@@ -23,6 +23,7 @@ const Product = lazy(() => import("../views/ui/Product"));
 const StockProduct = lazy(() => import("../views/ui/StockProduct"));
 const WorkTypeSystem = lazy(() => import("../views/ui/WorkTypeSystem.js"));
 const TeamWorkload = lazy(() => import("../views/ui/TeamWorkload.js"));
+const PendingApprovals = lazy(() => import("../views/ui/PendingApprovals.js"));
 const QuotationTracking = lazy(() => import("../views/ui/QuotationTracking.js"));
 const ContractOverview = lazy(() => import("../views/ui/ContractOverview.js"));
 const Files = lazy(() => import("../views/ui/Files"));
@@ -178,6 +179,17 @@ const ThemeRoutes = [
           </Suspense>
         ),
         title: "Job Overview",
+      },
+      {
+        // ✅ ไม่ห่อด้วย AdminRoute เพราะ manager ต้องเข้าได้ด้วย เหมือน team-workload/quotations/
+        // contracts ด้านบน — ตัวคอมโพเนนต์เองเช็ค role แล้ว redirect กลับ /dashboard ถ้าไม่ใช่
+        path: "pending-approvals",
+        element: (
+          <Suspense fallback={<div>Loading...</div>}>
+            <PendingApprovals />
+          </Suspense>
+        ),
+        title: "Pending Approvals",
       },
       {
         path: "employee",
