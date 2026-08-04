@@ -36,11 +36,16 @@ const Header = ({ toggleMobileSidebar }) => {
   const [events, setEvents] = useState([]);
   // ✅ แผนงานล่วงหน้า (unscheduled) ของสัญญา — ต้องรวมด้วยตอนเช็ค "เกินกำหนดวางแผนรอบถัดไป" กัน
   // สัญญาที่จองรอบถัดไปไว้ล่วงหน้าแล้วถูกนับเป็น "เกินกำหนด" ผิดๆ (เทียบ pattern เดียวกับ
-  // ContractOverview.js fetchData) — ดึงเฉพาะแอดมิน/manager เพราะป้ายนี้โชว์แค่สองสิทธิ์นี้เท่านั้น
+  // ContractOverview.js fetchData) — ดึงให้ทุกสิทธิ์ที่เข้าหน้า "ภาพรวมงาน" ได้ (admin/manager/technician)
+  // เพราะป้ายนี้โชว์ให้ทุกคนเห็นจำนวนของตัวเองแล้ว ไม่ใช่แค่แอดมิน/manager อีกต่อไป — backend กรองข้อมูล
+  // ตาม role ให้อยู่แล้ว (GET /events/drafts) ช่างจึงได้เห็นแค่จำนวนของตัวเองเท่านั้นเหมือนหน้า "ภาพรวมงาน"
   const [contractDrafts, setContractDrafts] = useState([]);
 
   const { userData, logout } = useAuth();
   const isAdminOrManager = ["admin", "manager"].includes(userData?.role?.toLowerCase());
+  // ✅ หน้า "ภาพรวมงาน" เปิดให้ช่างเข้าดูงานของตัวเองได้แล้ว (ดู ContractOverview.js canView) —
+  // ปุ่มทางลัดในนี้ต้องเปิดให้ตรงกันด้วย ไม่ใช่แค่แอดมิน/manager เหมือนเดิม
+  const canViewContracts = ["admin", "manager", "technician"].includes(userData?.role?.toLowerCase());
 
   const { notifications, unread, markRead, markAllRead } = useEventNotifications(
     events,
@@ -74,17 +79,19 @@ const Header = ({ toggleMobileSidebar }) => {
   }, []);
 
   useEffect(() => {
-    if (!isAdminOrManager) return;
+    if (!canViewContracts) return;
     EventService.GetDraftEvents()
       .then((res) => setContractDrafts(res?.drafts || []))
       .catch(() => {}); // เงียบไว้เหมือนกัน — แค่ป้ายสรุปจำนวน ไม่ใช่ข้อมูลหลักของหน้านี้
-  }, [isAdminOrManager]);
+  }, [canViewContracts]);
 
   // ✅ จำนวนสัญญาที่รอบล่าสุดผ่านมาเกิน 3 เดือนแล้วแต่ยังไม่ได้วางแผนรอบถัดไป — ใช้ตรรกะเดียวกับ
-  // ป้ายแจ้งเตือนในตาราง ContractOverview.js เป๊ะๆ (ดู utils/contractOverdue.js)
+  // ป้ายแจ้งเตือนในตาราง ContractOverview.js เป๊ะๆ (ดู utils/contractOverdue.js) — events/contractDrafts
+  // ถูกกรองตาม role มาจาก backend แล้ว (admin/manager เห็นทั้งหมด ช่างเห็นแค่ของตัวเอง) จึงคำนวณตรงๆ
+  // ได้เลยไม่ต้องแยกเงื่อนไข role ที่นี่อีก
   const overdueContractCount = useMemo(
-    () => (isAdminOrManager ? countOverdueContracts([...events, ...contractDrafts]) : 0),
-    [isAdminOrManager, events, contractDrafts]
+    () => (canViewContracts ? countOverdueContracts([...events, ...contractDrafts]) : 0),
+    [canViewContracts, events, contractDrafts]
   );
 
   const toggle = () => setDropdownOpen((prevState) => !prevState);
@@ -122,7 +129,7 @@ const Header = ({ toggleMobileSidebar }) => {
               <FaWrench size={13} /> การดำเนินงาน
             </Link>
           </NavItem>
-          {isAdminOrManager && (
+          {canViewContracts && (
             <NavItem>
               <Link
                 to="/contracts"
@@ -143,9 +150,9 @@ const Header = ({ toggleMobileSidebar }) => {
         </Nav>
 
         {/* ✅ จอมือถือ: Nav ด้านบนถูกซ่อนไว้ (d-none d-lg-flex) เหลือพื้นที่ว่างกลางแถบ — ใส่ทางลัด
-            "ภาพรวมสัญญา" พร้อมป้ายจำนวนสัญญาที่เกินกำหนดวางแผนรอบถัดไปแทนที่จะปล่อยว่างเปล่า
-            (เฉพาะแอดมิน/manager เหมือนเมนูเดียวกันในแถบบนจอกว้าง/Sidebar) */}
-        {isAdminOrManager && (
+            "ภาพรวมงาน" พร้อมป้ายจำนวนสัญญาที่เกินกำหนดวางแผนรอบถัดไปแทนที่จะปล่อยว่างเปล่า — เปิดให้
+            ช่างเห็นด้วยเหมือนแอดมิน/manager (เห็นแค่ของตัวเอง เทียบ pattern เดียวกับเมนูบนจอกว้าง/Sidebar) */}
+        {canViewContracts && (
           <Link to="/contracts" className="header-contract-pill d-flex d-lg-none align-items-center gap-1 mx-auto">
             <Badge
               badgeContent={overdueContractCount} color="error" max={9} overlap="circular"

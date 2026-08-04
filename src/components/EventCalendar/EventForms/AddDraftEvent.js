@@ -123,10 +123,15 @@ function injectAddDraftStyles() {
       background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;
       border-radius: 20px; padding: 1px 9px; font-size: 10.5px; font-weight: 700; white-space: nowrap;
     }
-    .swal-add-draft .ts-dropdown .option.active .ade-contract-option-badge,
-    .swal-add-draft .ts-dropdown .option.active .ade-cpi-badge {
+    /* ⚠️ ไม่ใส่ .swal-add-draft นำหน้า — dropdown ถูกย้ายไปแปะที่ <body> ตรงๆ ผ่าน dropdownParent:"body"
+       (กัน overflow-y:auto ของพื้นที่เลื่อนตัดขอบ) จึงไม่ได้เป็นลูกของ .swal-add-draft อีกต่อไป */
+    .ts-dropdown .option.active .ade-contract-option-badge,
+    .ts-dropdown .option.active .ade-cpi-badge {
       background: #fff; border-color: #fff;
     }
+    /* ⚠️ TomSelect z-index เริ่มต้น (10) ต่ำกว่า SweetAlert2 container (1060) มาก — พอ dropdown ย้ายไป
+       แปะที่ <body> จะกลายเป็น sibling กับ popup ของ Swal เอง ต้องดันให้สูงกว่าเสมอไม่งั้นโดนซ่อนอยู่หลัง modal */
+    .ts-dropdown { z-index: 100000 !important; }
 
     .ade-month-badge {
       display: inline-flex; align-items: center; gap: 6px;
@@ -238,7 +243,21 @@ export const getAddDraftEvent = async ({
   const contractList = [...contractMap.values()].sort((a, b) =>
     (a.company || "").localeCompare(b.company || "", "th") || (a.site || "").localeCompare(b.site || "", "th")
   );
-  const selectableContracts = contractList.filter((c) => c.usedVisits < c.visitCount);
+  // ✅ ช่างเลือกได้แค่สัญญาของตัวเองเท่านั้น — เป็นสิทธิ์ของ "ผู้รับผิดชอบ" โดยเฉพาะ ไม่ใช่ "ทีมที่เข้างาน"
+  // เทียบ pattern เดียวกับ AddEvent.js เป๊ะๆ (ดูคอมเมนต์ละเอียดที่นั่น)
+  const isMyContract = (c) =>
+    isAdminOrManagerUser ||
+    c.visits.some((v) => {
+      const effectiveId = v.responsiblePersonId || v.resPerson;
+      const effectiveName = v.responsiblePerson || v.team;
+      return (
+        (effectiveId && effectiveId === userData?.userId) ||
+        (effectiveName && effectiveName === userData?.fname) ||
+        v.userId === userData?.userId
+      );
+    });
+  const contractListForUser = contractList.filter(isMyContract);
+  const selectableContracts = contractListForUser.filter((c) => c.usedVisits < c.visitCount);
   const contractOpts = selectableContracts
     .map((c) => {
       const label = `${escapeHtml(c.company) || "-"} · ${escapeHtml(c.site) || "-"} · ${escapeHtml(c.title)} (${c.contractNo ? escapeHtml(c.contractNo) : "ไม่มีเลขที่"}) — ${c.usedVisits}/${c.visitCount} ครั้ง`;
@@ -325,9 +344,13 @@ export const getAddDraftEvent = async ({
     </div>
     ${selectableContracts.length === 0
       ? `<p class="ade-jobtype-note" style="display:block;">${
-          contractList.length === 0
-            ? `ยังไม่มีสัญญาในระบบ — สร้างสัญญาใหม่ได้ที่หน้า "ภาพรวมงาน" ก่อน`
-            : `สัญญาที่มีอยู่ครบจำนวนครั้งหมดแล้ว — สร้างสัญญาใหม่ได้ที่หน้า "ภาพรวมงาน"`
+          contractListForUser.length === 0
+            ? (isAdminOrManagerUser
+                ? `ยังไม่มีสัญญาในระบบ — สร้างสัญญาใหม่ได้ที่หน้า "ภาพรวมงาน" ก่อน`
+                : `คุณยังไม่มีสัญญาที่มอบหมายให้ตัวเอง — ติดต่อแอดมิน/manager ให้เพิ่มสัญญาก่อน`)
+            : (isAdminOrManagerUser
+                ? `สัญญาที่มีอยู่ครบจำนวนครั้งหมดแล้ว — สร้างสัญญาใหม่ได้ที่หน้า "ภาพรวมงาน"`
+                : `สัญญาของคุณครบจำนวนครั้งหมดแล้ว — ติดต่อแอดมิน/manager`)
         }</p>`
       : ""}
     `}
@@ -420,6 +443,7 @@ export const getAddDraftEvent = async ({
               placeholder,
               sortField: { field: "text", direction: "asc" },
               allowEmptyOption: true,
+              dropdownParent: "body", // ✅ กันพื้นที่เลื่อน (overflow-y:auto) ตัดขอบ dropdown
             });
           } catch { return null; }
         };
@@ -480,6 +504,7 @@ export const getAddDraftEvent = async ({
             placeholder: "ค้นหาบริษัท/โครงการ/เลขที่สัญญา...",
             sortField: { field: "text", direction: "asc" },
             render: { option: renderContractOption, item: renderContractItem },
+            dropdownParent: "body", // ✅ กันพื้นที่เลื่อน (overflow-y:auto) ตัดขอบ dropdown
           });
         } catch { contractTs = null; }
 

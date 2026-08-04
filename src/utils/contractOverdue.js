@@ -26,6 +26,17 @@ export const groupEventsByContract = (events) => {
     const teamNames = [head.team, ...(head.teamMembers || []).map((m) => m?.name)]
       .filter(Boolean)
       .filter((name, idx, arr) => arr.indexOf(name) === idx);
+    // ✅ หัวหน้าทีมเข้างาน (ตัวจริงตัวเดียว = head.team) แยกจากลูกทีม (ผู้ช่วย ไม่มีผลต่อสิทธิ์/แจ้งเตือน)
+    // ให้ชัดเจน — team ด้านล่างยังเป็น string รวมทุกคนไว้เหมือนเดิม (ใช้ค้นหา/กรอง/CSV อยู่แล้วทั่วแอป
+    // ห้ามเปลี่ยนความหมาย) สองฟิลด์นี้เพิ่มมาแยกต่างหากให้ UI แสดงผล "หัวหน้า vs ลูกทีม" ชัดเจนขึ้นเท่านั้น
+    // (ดู ContractOverview.js คอลัมน์ "ทีมที่เข้างาน" — ใช้ตัวนี้ prefill ตอนกดแก้ไขด้วย กัน bug เดิมที่
+    // ค่าเริ่มต้นเป็น string รวมหลายชื่อ ไม่ตรงกับตัวเลือกไหนใน dropdown เลย ทำให้กล่องเลือกว่างเปล่า)
+    const teamLeaderName = head.team || "";
+    const teamMemberNames = (head.teamMembers || [])
+      .map((m) => m?.name)
+      .filter(Boolean)
+      .filter((name, idx, arr) => arr.indexOf(name) === idx)
+      .filter((name) => name !== teamLeaderName);
     // ✅ งานที่ไม่มี contractGroupId มี 3 หมวดหมู่: "" (ยังไม่จัดกลุ่ม — ค่าเริ่มต้น) / "general"
     // (งานทั่วไป) / "project" (งานโปรเจค) ต่อเมื่อกดยืนยันผ่านหน้า "ภาพรวมงาน" เท่านั้น (ดู
     // PUT /events/:id/classify) — เดิมมีแค่ isConfirmedGeneral (true/false) ก่อนเพิ่มหมวด "โปรเจค"
@@ -42,6 +53,10 @@ export const groupEventsByContract = (events) => {
       site: head.site,
       system: head.system,
       title: head.title,
+      // ✅ เลขที่อ้างอิงเอกสารทั่วไป (PO/ใบสั่งงาน ฯลฯ) — คนละอันกับ contractNo/quotationNo ด้านล่าง
+      // ที่มีความหมายเฉพาะสัญญาจริงเท่านั้น ตัวนี้ใช้ได้กับงานทั่วไป/โปรเจคด้วย (ดู ContractOverview.js
+      // คอลัมน์ "เอกสารเลขที่" ที่โชว์แทนที่ contractNo/quotationNo ตอนดูแท็บงานทั่วไป/โปรเจค)
+      docNo: head.docNo,
       contractNo: head.contractNo,
       quotationNo: head.quotationNo,
       contractStart: head.contractStart,
@@ -55,6 +70,15 @@ export const groupEventsByContract = (events) => {
       intervalMonths: head.contractGroupId ? head.intervalMonths : undefined,
       jobValue: head.jobValue,
       team: teamNames.join(", ") || "-",
+      teamLeaderName,
+      teamMemberNames,
+      // ✅ "ผู้รับผิดชอบ" — ฟิลด์อิสระแยกจาก "team" ด้านบนโดยสมบูรณ์แล้ว (team คือใครเข้างานจริงใน
+      // แต่ละครั้ง เปลี่ยนได้ทุกครั้งที่มอบหมายทีมอื่นไปทำแทน แต่คนที่รับผิดชอบงาน/ลูกค้ารายนี้โดยรวม
+      // ไม่ควรเปลี่ยนตาม) แก้ไขแยกได้เองที่หน้า "ภาพรวมงาน" (ดู PUT /basic-info,
+      // /contract/:contractGroupId ฝั่ง backend) — งานเก่าที่ยังไม่เคยตั้งค่านี้เลย fallback ไปใช้
+      // ค่า team เดิมที่คุ้นเคยอยู่แล้วแทนว่างเปล่า (ตามที่ขอ) พอแก้ไขครั้งแรกจะกลายเป็นค่าอิสระทันที
+      responsiblePerson: head.responsiblePerson || head.team || "",
+      responsiblePersonId: head.responsiblePersonId || head.resPerson || "",
       visits: sorted,
     };
   });
@@ -69,8 +93,14 @@ export const nextVisitOverdueInfo = (c) => {
   if (countUsedRounds(c.visits) >= c.visitCount) return null;
   const realVisits = c.visits.filter((v) => !v.unscheduled);
   if (realVisits.length === 0) return null;
+  // ⚠️ BUG ที่แก้: เดิมใช้ v.end ตรงๆ — แต่ end ของงาน allDay ถูกบวกไป 1 วันตอนบันทึกเสมอ (ค่า end
+  // แบบ exclusive ของ FullCalendar) ทำให้ "รอบล่าสุด" ที่โชว์ในป้ายเตือนเพี้ยนไปวันหนึ่งเสมอ (เช่น เข้างาน
+  // จริงวันที่ 2 แต่ป้ายขึ้นวันที่ 3) ต้องลบ 1 วันคืนก่อนเทียบ เหมือน formatEventDateRange
+  // (utils/formatDateRange.js) ที่ใช้แสดงวันที่เข้างานที่อื่นในหน้านี้อยู่แล้ว
   const lastVisitDate = realVisits.reduce((latest, v) => {
-    const d = moment(v.end || v.start);
+    const d = v.end
+      ? moment(v.end).subtract(v.allDay ? 1 : 0, "days")
+      : moment(v.start);
     return !latest || d.isAfter(latest) ? d : latest;
   }, null);
   const intervalMonths = Number(c.intervalMonths) || DEFAULT_INTERVAL_MONTHS;

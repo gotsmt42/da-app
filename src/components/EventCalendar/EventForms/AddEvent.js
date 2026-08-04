@@ -166,10 +166,18 @@ function injectAddStyles() {
       background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;
       border-radius: 20px; padding: 1px 9px; font-size: 10.5px; font-weight: 700; white-space: nowrap;
     }
-    .swal-add-event .ts-dropdown .option.active .ae-contract-option-badge,
-    .swal-add-event .ts-dropdown .option.active .ae-cpi-badge {
+    /* ⚠️ ไม่ใส่ .swal-add-event นำหน้า — ตอนนี้ dropdown ถูกย้ายไปแปะที่ <body> ตรงๆ ผ่าน
+       dropdownParent:"body" (กัน #ae-body ตัดขอบ ดูคอมเมนต์ที่ mkTs) จึงไม่ได้เป็นลูกของ
+       .swal-add-event อีกต่อไป — ชื่อคลาส ae-contract-option-badge/ae-cpi-badge เจาะจงพอแล้วไม่ชนกับที่อื่น */
+    .ts-dropdown .option.active .ae-contract-option-badge,
+    .ts-dropdown .option.active .ae-cpi-badge {
       background: #fff; border-color: #fff;
     }
+    /* ⚠️ TomSelect ตั้ง z-index: 10 มาเป็นค่าเริ่มต้น (ดู tom-select.css) ซึ่งต่ำกว่า z-index ของ
+       SweetAlert2 container (1060) มาก — พอ dropdown ถูกย้ายไปแปะที่ <body> (dropdownParent:"body")
+       จะกลายเป็น sibling กับ popup ของ Swal เอง แล้วโดนซ่อนอยู่หลัง modal ทันที (คลิกไม่ได้/มองไม่เห็น
+       เลย) ต้องดันให้สูงกว่า 1060 เสมอ */
+    .ts-dropdown { z-index: 100000 !important; }
 
     /* ── ตาราง "เลือกครั้งที่" — สถานะรายครั้งตรงกับตาราง ContractOverview.js เป๊ะๆ ── */
     .ae-round-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
@@ -398,6 +406,10 @@ export const getAddEvent = async ({
         intervalMonths: e.intervalMonths,
         jobValue: e.jobValue,
         team: e.team || "",
+        // ✅ ใช้เป็นค่า fallback ตอนเพิ่ม "ครั้งที่" ใหม่ให้สัญญานี้ ถ้าไม่ได้เลือกหัวหน้าทีมเข้างานเอง
+        // (ดู cpTeam ด้านล่าง) — คนละแนวคิดกับ team ด้านบน (ผู้รับผิดชอบอาจไม่ได้เข้างานเอง)
+        responsiblePerson: e.responsiblePerson || "",
+        responsiblePersonId: e.responsiblePersonId || "",
         visits: [],
       });
     }
@@ -411,9 +423,28 @@ export const getAddEvent = async ({
   const contractList = [...contractMap.values()].sort((a, b) =>
     (a.company || "").localeCompare(b.company || "", "th") || (a.site || "").localeCompare(b.site || "", "th")
   );
+  // ✅ ช่างเลือกได้แค่สัญญาของตัวเองเท่านั้น — ผู้ใช้ต้องการให้เป็นสิทธิ์ของ "ผู้รับผิดชอบ" โดยเฉพาะแล้ว
+  // (ไม่ใช่ "ทีมที่เข้างาน" เหมือนเดิมอีกต่อไป — หัวหน้าทีมเข้างานไม่มีสิทธิ์ค้นหา/เพิ่มครั้งใหม่ในสัญญา
+  // ที่ตัวเองไม่ได้เป็นผู้รับผิดชอบ) — ใช้ "ผู้รับผิดชอบตัวจริง" (fallback ไปที่ resPerson/team เฉพาะครั้ง
+  // ที่ยังไม่เคยตั้งค่าผู้รับผิดชอบแยกไว้เลย เทียบ pattern เดียวกับ isEffectiveResponsiblePerson ฝั่ง
+  // backend) บวกคนที่เพิ่มครั้งนั้นๆ เอง (userId) — admin/manager ยังเห็น/เลือกได้ทุกสัญญาเหมือนเดิม
+  // กรองแค่รายการที่ป้อนเข้า dropdown ให้เลือกเท่านั้น ไม่แตะ contractMap เอง (ยัง lookup ได้ครบทุกสัญญา
+  // ปลอดภัยเพราะ id ที่เลือกได้จริงมาจากรายการที่กรองแล้ว)
+  const isMyContract = (c) =>
+    isAdminOrManagerUser ||
+    c.visits.some((v) => {
+      const effectiveId = v.responsiblePersonId || v.resPerson;
+      const effectiveName = v.responsiblePerson || v.team;
+      return (
+        (effectiveId && effectiveId === userData?.userId) ||
+        (effectiveName && effectiveName === userData?.fname) ||
+        v.userId === userData?.userId
+      );
+    });
+  const contractListForUser = contractList.filter(isMyContract);
   // ✅ สัญญาที่ครบจำนวนครั้งแล้ว (usedVisits >= visitCount) เลือกไม่ได้อยู่แล้ว (backend บล็อก) —
   // ไม่ต้องเอามาโชว์ในรายการเลือกให้รกตา ตัดออกตั้งแต่ตอนสร้างตัวเลือกเลย ไม่ใช่แค่ปิด disabled ไว้
-  const selectableContracts = contractList.filter((c) => c.usedVisits < c.visitCount);
+  const selectableContracts = contractListForUser.filter((c) => c.usedVisits < c.visitCount);
   // ✅ แสดงชื่อบริษัท/โครงการแบบตัดส่วนที่ไม่มีข้อมูลออก แทนที่จะขึ้น "-" ค้างไว้ให้ดูเหมือนข้อมูลพัง
   // (เช่น สัญญาที่ไม่เคยกรอกชื่อบริษัทไว้ เดิมจะโชว์ "- · Centara Grand Mirage" ดูแปลกๆ)
   const contractDisplayName = (c) => [c.company, c.site].filter(Boolean).join(" · ") || "(ไม่ระบุชื่อ)";
@@ -520,9 +551,13 @@ export const getAddEvent = async ({
     </div>
     ${selectableContracts.length === 0
       ? `<p class="ae-jobtype-note" style="display:block;">${
-          contractList.length === 0
-            ? `ยังไม่มีสัญญาในระบบ — สร้างสัญญาใหม่ได้ที่หน้า "ภาพรวมงาน" ก่อน`
-            : `สัญญาที่มีอยู่ครบจำนวนครั้งหมดแล้ว — สร้างสัญญาใหม่ได้ที่หน้า "ภาพรวมงาน"`
+          contractListForUser.length === 0
+            ? (isAdminOrManagerUser
+                ? `ยังไม่มีสัญญาในระบบ — สร้างสัญญาใหม่ได้ที่หน้า "ภาพรวมงาน" ก่อน`
+                : `คุณยังไม่มีสัญญาที่มอบหมายให้ตัวเอง — ติดต่อแอดมิน/manager ให้เพิ่มสัญญาก่อน`)
+            : (isAdminOrManagerUser
+                ? `สัญญาที่มีอยู่ครบจำนวนครั้งหมดแล้ว — สร้างสัญญาใหม่ได้ที่หน้า "ภาพรวมงาน"`
+                : `สัญญาของคุณครบจำนวนครั้งหมดแล้ว — ติดต่อแอดมิน/manager`)
         }</p>`
       : ""}
 
@@ -644,8 +679,9 @@ export const getAddEvent = async ({
         </div>
       </div>
       <div class="ae-field" style="margin-bottom:16px;">
-        <label>👷 ผู้รับผิดชอบ</label>
+        <label>👷 หัวหน้าทีมเข้างาน</label>
         <select id="ae-cpTeam"><option value="">— เลือกหรือพิมพ์ —</option>${teamOpts}</select>
+        <p style="font-size:11px;color:#94a3b8;margin:4px 0 0;">ถ้าไม่เลือก ระบบจะลงผู้รับผิดชอบของสัญญานี้เป็นหัวหน้าทีมเข้างานให้อัตโนมัติ</p>
       </div>
     </div>
 
@@ -693,6 +729,12 @@ export const getAddEvent = async ({
             // (placeholder ที่ตั้งใจให้ว่างไว้) แล้วเผลอเลือก option แรกที่มีค่าจริงให้เองอัตโนมัติ
             // ทำให้ "ครั้งที่" กับ "ทีม" มีค่าขึ้นมาเองทั้งที่ไม่ได้เลือก
             allowEmptyOption: true,
+            // ⚠️ BUG ที่แก้: ไม่ใส่ dropdownParent — dropdown เดิม render อยู่ใน DOM เดียวกับ input
+            // ซึ่งอยู่ใน #ae-body (overflow-y:auto) — ช่องที่อยู่ใกล้ขอบล่างของพื้นที่เลื่อน (เช่น
+            // "หัวหน้าทีมเข้างาน" ในขั้นตอนสัญญา) จะโดน container ตัดขอบ เลื่อนลงไปเลือกตัวเลือกที่อยู่
+            // ต่ำกว่าไม่ได้เลย — "body" ทำให้ dropdown หลุดออกจาก DOM ที่ถูกตัดขอบ ไปแปะไว้ที่ <body>
+            // แทน ไม่โดน overflow ของ modal จำกัดอีก
+            dropdownParent: "body",
           });
         } catch { return null; }
       };
@@ -717,6 +759,7 @@ export const getAddEvent = async ({
             placeholder: "เลือกหรือพิมพ์ชื่อลูกทีม",
             sortField: { field: "text", direction: "asc" },
             allowEmptyOption: true,
+            dropdownParent: "body", // ✅ กันโดน #ae-body (overflow-y:auto) ตัดขอบ — เทียบ pattern เดียวกับ mkTs ด้านบน
           });
           // ✅ <select> ที่ไม่มี option ไหน selected เลย เบราว์เซอร์จะเลือก option แรก
           // ("— เลือกลูกทีม —") ให้เองตาม HTML spec แล้ว TomSelect ก็หยิบมาแสดงเป็นค่าที่เลือกไว้
@@ -833,6 +876,7 @@ export const getAddEvent = async ({
           placeholder: "ค้นหาบริษัท/โครงการ/เลขที่สัญญา...",
           sortField: { field: "text", direction: "asc" },
           render: { option: renderContractOption, item: renderContractItem },
+          dropdownParent: "body", // ✅ กันโดน #ae-body (overflow-y:auto) ตัดขอบ — เทียบ pattern เดียวกับ mkTs ด้านบน
         });
       } catch { contractTs = null; }
       mkTs("#ae-cpTeam", "เลือกหรือพิมพ์ชื่อทีม");
@@ -905,13 +949,14 @@ export const getAddEvent = async ({
         contractPickInfo.innerHTML = `
           <div><b>${escapeHtml(contractDisplayName(c))}</b></div>
           <div class="ae-cpi-sub">${escapeHtml(c.title)} · ${escapeHtml(c.system)}${c.contractNo ? ` · เลขที่สัญญา ${escapeHtml(c.contractNo)}` : ""}<span class="ae-cpi-badge">เหลือ ${c.visitCount - c.usedVisits} ครั้ง</span></div>
-          <div class="ae-cpi-sub">ผู้รับผิดชอบเดิม: ${c.team ? escapeHtml(c.team) : "ไม่ระบุ"}</div>
+          <div class="ae-cpi-sub">หัวหน้าทีมเข้างานเดิม: ${c.team ? escapeHtml(c.team) : "ไม่ระบุ"}${c.responsiblePerson ? ` · ผู้รับผิดชอบ: ${escapeHtml(c.responsiblePerson)}` : ""}</div>
         `;
         contractPickInfo.style.display = "block";
         renderRoundGrid(c);
-        // ✅ ตั้งผู้รับผิดชอบเริ่มต้นตามของสัญญาเดิมไว้ก่อน แก้เป็นคนอื่นได้ถ้าครั้งนี้เปลี่ยนคนทำ
+        // ✅ ตั้งหัวหน้าทีมเข้างานเริ่มต้นตามของสัญญาเดิมไว้ก่อน แก้เป็นคนอื่นได้ถ้าครั้งนี้เปลี่ยนคนทำ —
+        // ถ้าสัญญานี้ไม่เคยระบุทีมไว้เลย (c.team ว่าง) fallback ไปใช้ "ผู้รับผิดชอบ" ของสัญญาแทน ตามที่ขอ
         if (cpTeamSelect) {
-          cpTeamSelect.value = c.team || "";
+          cpTeamSelect.value = c.team || c.responsiblePerson || "";
           cpTeamSelect.dispatchEvent(new Event("change"));
         }
       };
@@ -986,7 +1031,9 @@ export const getAddEvent = async ({
 
           startSaving();
           try {
-            const cpTeam = getVal("ae-cpTeam") || c.team;
+            // ✅ ไม่ได้เลือกหัวหน้าทีมเข้างานเอง → fallback ไปที่ทีมเดิมของสัญญา แล้วค่อย fallback ต่อไป
+            // ที่ "ผู้รับผิดชอบ" ของสัญญาถ้าไม่เคยมีทีมมาก่อนเลย (ตามที่ขอ — กันครั้งใหม่ไม่มีใครรับผิดชอบเลย)
+            const cpTeam = getVal("ae-cpTeam") || c.team || c.responsiblePerson;
             const nextIndex = selectedRound;
 
             // ✅ ต่อวันที่ไม่ต่อเนื่องให้ "ครั้งเดิม" — ต้องผูก jobGroupId เดียวกันกับ document เดิมของ

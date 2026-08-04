@@ -113,7 +113,6 @@ function EventCalendar() {
   const [searchParams] = useSearchParams();
 
   const { userData } = useAuth(); // ✅ เปลี่ยนจาก user → userData
-  const isAdmin = userData?.role?.toLowerCase() === "admin"; // ✅ รองรับ case-insensitive
   const isAdminOrManager = ["admin", "manager"].includes(
     userData?.role?.toLowerCase(),
   );
@@ -124,18 +123,25 @@ function EventCalendar() {
   const isJobLocked = (extendedProps) =>
     extendedProps?.status === "ดำเนินการเสร็จสิ้น" && !isAdminOrManager;
 
-  // ✅ แก้ไขได้ถ้า: เป็น admin, เป็นคนเพิ่ม event เอง, หรือได้รับมอบหมาย
+  // ✅ แก้ไขได้ถ้า: เป็น admin/manager, เป็นคนเพิ่ม event เอง, ได้รับมอบหมายเข้างาน
   // (resPerson ตรงกับ ID ตัวเอง หรือ team ตรงกับชื่อตัวเอง — เผื่อ event เก่าที่ยังไม่มี resPerson)
-  // ❌ ยกเว้น: งานที่ admin ปิดแล้ว (ดำเนินการเสร็จสิ้น) ช่างแก้ไขไม่ได้อีก มีแค่ admin/manager เท่านั้น
+  // หรือเป็น "ผู้รับผิดชอบ" ของงานนี้ (responsiblePersonId/responsiblePerson — คนละแนวคิดกับทีมที่เข้างาน
+  // ด้านบน อาจไม่ได้เข้างานเองแต่ยังรับผิดชอบอยู่) — ⚠️ BUG ที่แก้: เดิมเช็คแค่ isAdmin (ไม่รวม manager)
+  // ทำให้ manager เปิดแก้ไขงานที่ไม่ใช่ของตัวเองไม่ได้เลย ทั้งที่ทุกจุดอื่นในแอปให้สิทธิ์ manager เท่า admin
+  // เดิมยังไม่เช็ค responsiblePerson เลยด้วย ทำให้คนที่ถูกตั้งเป็น "ผู้รับผิดชอบ" (แต่ไม่ได้อยู่ใน
+  // team/resPerson ของครั้งนี้) เปิดหน้าแก้ไขงานตัวเองไม่ได้เลย
+  // ❌ ยกเว้น: งานที่ปิดแล้ว (ดำเนินการเสร็จสิ้น) ช่างแก้ไขไม่ได้อีก มีแค่ admin/manager เท่านั้น
   const canEditEvent = (extendedProps) => {
     if (isJobLocked(extendedProps)) {
       return false;
     }
     return (
-      isAdmin ||
+      isAdminOrManager ||
       extendedProps?.userId === userId ||
       (extendedProps?.resPerson && extendedProps.resPerson === userId) ||
-      (extendedProps?.team && extendedProps.team === userData?.fname)
+      (extendedProps?.team && extendedProps.team === userData?.fname) ||
+      (extendedProps?.responsiblePersonId && extendedProps.responsiblePersonId === userId) ||
+      (extendedProps?.responsiblePerson && extendedProps.responsiblePerson === userData?.fname)
     );
   };
 

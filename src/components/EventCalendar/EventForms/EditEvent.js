@@ -469,7 +469,12 @@ function injectAttachStyles() {
       background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;
       border-radius: 20px; padding: 1px 9px; font-size: 10.5px; font-weight: 700; white-space: nowrap;
     }
-    .swal-ee-attach .ts-dropdown .option.active .eea-contract-option-badge { background: #fff; border-color: #fff; }
+    /* ⚠️ ไม่ใส่ .swal-ee-attach นำหน้า — dropdown ถูกย้ายไปแปะที่ <body> ตรงๆ ผ่าน dropdownParent:"body"
+       (กัน swal2-html-container ที่ overflow:hidden ตัดขอบ) จึงไม่ได้เป็นลูกของ .swal-ee-attach แล้ว */
+    .ts-dropdown .option.active .eea-contract-option-badge { background: #fff; border-color: #fff; }
+    /* ⚠️ TomSelect z-index เริ่มต้น (10) ต่ำกว่า SweetAlert2 container (1060) มาก — พอ dropdown ย้ายไป
+       แปะที่ <body> จะกลายเป็น sibling กับ popup ของ Swal เอง ต้องดันให้สูงกว่าเสมอไม่งั้นโดนซ่อนอยู่หลัง modal */
+    .ts-dropdown { z-index: 100000 !important; }
     #eea-actions { display: flex; gap: 10px; justify-content: flex-end; padding: 14px 22px 18px; background: #f1f5f9; border-top: 1px solid #e2e8f0; }
     .eea-btn {
       display: inline-flex; align-items: center; gap: 6px; border: none; border-radius: 9px;
@@ -538,6 +543,10 @@ export const getEditEvent = async ({
   const eventSystem = ev.extendedProps?.system || "";
   const eventTeam = ev.extendedProps?.team || "";
   const eventTeamMembers = ev.extendedProps?.teamMembers || [];
+  // ✅ "ผู้รับผิดชอบ" — คนละแนวคิดกับ team ด้านบน (team คือใครเข้างานจริง อาจไม่ใช่คนที่รับผิดชอบ
+  // สัญญา/ลูกค้ารายนี้โดยรวมเสมอไป) ใช้เช็คสิทธิ์ดูการดำเนินงาน/แก้ไขหัวหน้าทีม-ลูกทีม ด้านล่าง
+  const eventResponsiblePerson = ev.extendedProps?.responsiblePerson || "";
+  const eventResponsiblePersonId = ev.extendedProps?.responsiblePersonId || "";
   const eventTime = ev.extendedProps?.time || "";
   const eventFontSize = ev.extendedProps?.fontSize;
   const eventStart = moment(ev.start);
@@ -601,17 +610,31 @@ export const getEditEvent = async ({
   const hasSiblings = siblingEvents.length > 0;
   const eventResPerson = ev.extendedProps?.resPerson || "";
 
-  // ✅ ปุ่ม "ดูการดำเนินงาน" ให้กดได้เมื่อ: เป็น admin, เป็นคนเพิ่ม event เอง,
-  // หรือได้รับมอบหมาย (resPerson ตรงกับตัวเอง "หรือ" team ตรงกับชื่อตัวเอง — อย่างใดอย่างหนึ่งพอ)
-  const isAdminUser   = userData?.role?.toLowerCase() === "admin";
   const isAdminOrManagerUser = ["admin", "manager"].includes(userData?.role?.toLowerCase());
   const isOwnerUser    = Boolean(userId) && userId.toString() === userData?.userId?.toString();
-  const isAssignedUser =
-    (eventResPerson && eventResPerson === userData?.userId) ||
-    (eventTeam && eventTeam === userData?.fname);
+  // ✅ "ผู้รับผิดชอบตัวจริง" (effective) — fallback ไปที่ team/resPerson เฉพาะงานที่ยังไม่เคยตั้งค่า
+  // ผู้รับผิดชอบแยกไว้เลย (เทียบ pattern เดียวกับ isEffectiveResponsiblePerson ฝั่ง backend เป๊ะๆ) กัน
+  // งานเก่า/งานที่ยังไม่ได้มอบหมายผู้รับผิดชอบชัดเจน หายจากสิทธิ์กลุ่มนี้ไปกะทันหัน
+  const effectiveResponsibleId = eventResponsiblePersonId || eventResPerson;
+  const effectiveResponsibleName = eventResponsiblePerson || eventTeam;
+  const isEffectiveResponsiblePerson =
+    (effectiveResponsibleId && effectiveResponsibleId === userData?.userId) ||
+    (effectiveResponsibleName && effectiveResponsibleName === userData?.fname);
+  // ✅ "ผู้รับผิดชอบ" ตัวจริงที่ถูกตั้งค่าไว้ชัดเจนเท่านั้น (ไม่ fallback ไปที่ทีมที่เข้างาน) — ใช้กับสิทธิ์
+  // ใหม่ที่ต้องมอบหมายให้ "ผู้รับผิดชอบ" โดยเฉพาะเท่านั้น เช่น แก้ไขหัวหน้าทีม/ลูกทีม ด้านล่าง
+  const isRawResponsiblePerson =
+    (eventResponsiblePersonId && eventResponsiblePersonId === userData?.userId) ||
+    (eventResponsiblePerson && eventResponsiblePerson === userData?.fname);
+  // ✅ "การดำเนินงาน" (check-in/check-out/ปิดงาน/ติดตามใบเสนอราคา ฯลฯ) เป็นสิทธิ์ของ "ผู้รับผิดชอบ"
+  // โดยเฉพาะแล้ว ไม่ใช่ "ทีมที่เข้างาน" อีกต่อไป (หัวหน้าทีมเข้างานไม่มีสิทธิ์จัดการส่วนนี้) — เจ้าของ
+  // (คนสร้างงาน)/ผู้รับผิดชอบ (แบบ fallback ด้านบน)/admin/manager กดดูได้
   const canViewOperation =
-    (isAdminUser || isOwnerUser || isAssignedUser) &&
+    (isAdminOrManagerUser || isOwnerUser || isEffectiveResponsiblePerson) &&
     eventStatus !== "กำลังรอยืนยัน"; // งานที่ยังไม่ยืนยัน ยังไม่มีอะไรให้ดูในหน้าดำเนินงาน
+  // ✅ หัวหน้าทีม/ลูกทีม แก้ไขได้เพิ่มจากเดิม (admin/manager เท่านั้น) — ให้ "ผู้รับผิดชอบ" จัดการเองได้ด้วย
+  // (ใช้ raw ไม่ fallback — ต้องถูกมอบหมายเป็นผู้รับผิดชอบไว้ชัดเจนก่อน ไม่ใช่แค่บังเอิญเป็นทีมที่เข้างาน
+  // อยู่แล้ว ไม่งั้นจะกลายเป็นย้อนแย้งกับสิทธิ์ "ทีมที่เข้างานแก้ไขได้แค่วันที่/เวลา/สถานะ" ที่เพิ่งจำกัดไว้)
+  const canEditTeamAssignment = isAdminOrManagerUser || isRawResponsiblePerson;
   // ❌ งานที่ admin ปิดแล้ว (ดำเนินการเสร็จสิ้น) ช่างลบไม่ได้อีก มีแค่ admin/manager เท่านั้น
   const canDeleteEvent = isAdminOrManagerUser || eventStatus !== "ดำเนินการเสร็จสิ้น";
   // ❌ งานที่ปิดแล้ว (ดำเนินการเสร็จสิ้น) ห้าม "ย้ายไปแผนล่วงหน้า" เด็ดขาด ไม่มีข้อยกเว้นแม้แต่ admin/
@@ -682,10 +705,12 @@ export const getEditEvent = async ({
   const inputBg = Object.assign(document.createElement("input"), {
     type: "color",
     value: ev.backgroundColor || "#3b82f6",
+    disabled: !isAdminOrManagerUser,
   });
   const inputText = Object.assign(document.createElement("input"), {
     type: "color",
     value: ev.textColor || "#ffffff",
+    disabled: !isAdminOrManagerUser,
   });
 
   // ✅ admin/manager เลือกได้ครบทุกสถานะเสมอ; ช่างเลือกได้แค่ 2 สถานะแรกถ้ายังไม่ถูกเลื่อนสถานะ
@@ -790,6 +815,7 @@ export const getEditEvent = async ({
       <div class="ee-header-meta">
         <span class="ee-tag">📍 ${attrHtml(eventSite) || "—"}</span>
         ${eventTeam ? `<span class="ee-tag">👷 ${attrHtml(eventTeam)}</span>` : ""}
+        ${eventResponsiblePerson && eventResponsiblePerson !== eventTeam ? `<span class="ee-tag">🧑‍💼 ผู้รับผิดชอบ: ${attrHtml(eventResponsiblePerson)}</span>` : ""}
         ${eventJobClassMeta ? `<span class="ee-tag">${eventJobClassMeta.emoji} ${attrHtml(eventJobClassMeta.label)}</span>` : ""}
       </div>
     </div>
@@ -883,52 +909,62 @@ export const getEditEvent = async ({
 
     <!-- section: โครงการ -->
     <p class="ee-section-label">ข้อมูลโครงการ</p>
-    ${eventContractGroupId ? `
+    <!-- ✅ ช่างทั่วไปแก้ไขข้อมูลส่วนนี้ไม่ได้ (เดิมแก้ได้ครบทุกช่อง) — คงไว้แค่ "วันที่/เวลา" และ
+         "สถานะงาน" ตามที่ผู้ใช้ยืนยันไว้ ยกเว้น "หัวหน้าทีมเข้างาน"/"ลูกทีม" ที่ "ผู้รับผิดชอบ" ของงานนี้
+         แก้ไขได้ด้วย (canEditTeamAssignment ด้านบน) ส่วนที่เหลือ (บริษัท/โครงการ/ประเภทงาน/ระบบ ฯลฯ)
+         แก้ได้เฉพาะแอดมิน/manager เท่านั้นเสมอ -->
+    ${!isAdminOrManagerUser ? `
+    <p style="font-size:11px;color:#64748b;margin:-6px 0 10px;">
+      🔒 ดูได้อย่างเดียว — แก้ไขได้เฉพาะแอดมิน/manager เท่านั้น (ช่างแก้ไขได้เฉพาะ "วันที่/เวลา" และ "สถานะงาน" ด้านล่าง${canEditTeamAssignment ? ` และ "หัวหน้าทีมเข้างาน"/"ลูกทีม" ในฐานะผู้รับผิดชอบงานนี้` : ""})
+    </p>
+    ` : eventContractGroupId ? `
     <p style="font-size:11px;color:#b91c1c;margin:-6px 0 10px;">
       🔒 งานนี้เป็นส่วนหนึ่งของสัญญา — ล็อกบริษัท/โครงการ/ประเภทงาน/ระบบ/ครั้งที่ไว้ไม่ให้แก้ตรงนี้
-      กันข้อมูลไม่ตรงกับครั้งอื่นในสัญญาเดียวกัน (แก้ "ผู้รับผิดชอบ" ของครั้งนี้ได้ตามปกติ)
+      กันข้อมูลไม่ตรงกับครั้งอื่นในสัญญาเดียวกัน
     </p>
     ` : ""}
     <div class="ee-grid ee-grid-3">
       <div class="ee-field">
         <label>🏢 ชื่อบริษัท</label>
-        <select id="editCompany" ${eventContractGroupId ? "disabled" : ""}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventCompany, companyValues)}${custOpt("company")}</select>
+        <select id="editCompany" ${eventContractGroupId || !isAdminOrManagerUser ? "disabled" : ""}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventCompany, companyValues)}${custOpt("company")}</select>
       </div>
       <div class="ee-field">
         <label><span class="req">*</span> ชื่อโครงการ</label>
-        <select id="editSite" ${eventContractGroupId ? "disabled" : ""}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventSite, siteValues)}${custOpt("site")}</select>
+        <select id="editSite" ${eventContractGroupId || !isAdminOrManagerUser ? "disabled" : ""}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventSite, siteValues)}${custOpt("site")}</select>
       </div>
       <div class="ee-field">
         <label><span class="req">*</span> ประเภทงาน</label>
-        <select id="editTitle" ${eventContractGroupId ? "disabled" : ""}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventTitle, titleValues)}${titleOpts}</select>
+        <select id="editTitle" ${eventContractGroupId || !isAdminOrManagerUser ? "disabled" : ""}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventTitle, titleValues)}${titleOpts}</select>
       </div>
     </div>
     <div class="ee-grid ee-grid-3">
       <div class="ee-field">
         <label><span class="req">*</span> ระบบงาน</label>
-        <select id="editSystem" ${eventContractGroupId ? "disabled" : ""}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventSystem, systemValues)}${systemOpts}</select>
+        <select id="editSystem" ${eventContractGroupId || !isAdminOrManagerUser ? "disabled" : ""}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventSystem, systemValues)}${systemOpts}</select>
       </div>
       <div class="ee-field">
         <label>🔢 ครั้งที่</label>
-        <select id="editTime" ${eventContractGroupId ? "disabled" : ""}><option value="" disabled>— เลือก —</option>${customOption(eventTime, timeValues)}${timeOpts}</select>
+        <select id="editTime" ${eventContractGroupId || !isAdminOrManagerUser ? "disabled" : ""}><option value="" disabled>— เลือก —</option>${customOption(eventTime, timeValues)}${timeOpts}</select>
       </div>
       <div class="ee-field">
-        <label>👷 ทีม</label>
-        <select id="editTeam"><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventTeam, teamValues)}${teamOpts}</select>
+        <label>👷 หัวหน้าทีมเข้างาน ${!isAdminOrManagerUser && canEditTeamAssignment ? `<span style="font-size:10.5px;font-weight:600;color:#16a34a;">✏️ แก้ไขได้ (ผู้รับผิดชอบ)</span>` : ""}</label>
+        <select id="editTeam" ${canEditTeamAssignment ? "" : "disabled"}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventTeam, teamValues)}${teamOpts}</select>
       </div>
     </div>
 
-    <!-- ✅ ลูกทีมเพิ่มเติม (คนที่ 2, 3, ...) — แสดงผลอย่างเดียว ไม่กระทบสิทธิ์แก้ไข/แจ้งเตือน -->
+    <!-- ✅ ลูกทีม (คนที่ 2, 3, ...) — แสดงผลอย่างเดียว ไม่กระทบสิทธิ์แก้ไข/แจ้งเตือน — แก้ไข/เพิ่ม/ลบ
+         ได้เฉพาะแอดมิน/manager หรือ "ผู้รับผิดชอบ" ของงานนี้ (canEditTeamAssignment) เหมือนหัวหน้าทีม
+         ด้านบน — ช่างทีมอื่นที่ไม่ใช่ผู้รับผิดชอบเห็นรายชื่อได้แต่แก้ไม่ได้ -->
     <div class="ee-field" style="margin-bottom:14px;">
-      <label>👥 ลูกทีมเพิ่มเติม (ถ้ามี)</label>
+      <label>👥 ลูกทีม (ถ้ามี)</label>
       <div id="ee-teamMembersList"></div>
-      <button type="button" class="ee-btn ee-btn-ghost" id="ee-addTeamMemberBtn" style="margin-top:2px;">➕ เพิ่มลูกทีม</button>
+      ${canEditTeamAssignment ? `<button type="button" class="ee-btn ee-btn-ghost" id="ee-addTeamMemberBtn" style="margin-top:2px;">➕ เพิ่มลูกทีม</button>` : ""}
     </div>
 
     <hr class="ee-divider">
 
     <!-- section: วันที่ & เวลา — เหมือนหน้า Add เลย ค้างวันที่/ช่วงวันที่เดิมไว้ให้แก้ง่าย -->
-    <p class="ee-section-label">วันที่ & เวลา</p>
+    <p class="ee-section-label">วันที่ & เวลา ${!isAdminOrManagerUser ? `<span style="font-size:10.5px;font-weight:600;color:#16a34a;">✏️ แก้ไขได้</span>` : ""}</p>
 
     <label class="ee-checkbox-row">
       <input type="checkbox" id="ee-multiDateToggle" ${hasSiblings ? "checked" : ""}>
@@ -986,16 +1022,16 @@ export const getEditEvent = async ({
     <div class="ee-grid ee-grid-2">
       <div class="ee-field">
         <label>📄 เลขที่อ้างอิง (Doc No.)</label>
-        <input id="editdocNo" type="text" value="${attrHtml(evendocNo)}" placeholder="เช่น DOC-2026-001">
+        <input id="editdocNo" type="text" value="${attrHtml(evendocNo)}" placeholder="เช่น DOC-2026-001" ${isAdminOrManagerUser ? "" : "disabled"}>
       </div>
       <div class="ee-field">
         <label>📝 ชื่อเรื่อง (Subject)</label>
-        <input id="editSubject" type="text" value="${attrHtml(eventSubject)}" placeholder="ระบุชื่อเรื่อง">
+        <input id="editSubject" type="text" value="${attrHtml(eventSubject)}" placeholder="ระบุชื่อเรื่อง" ${isAdminOrManagerUser ? "" : "disabled"}>
       </div>
     </div>
     <div class="ee-field">
       <label>📋 รายละเอียดงาน (Description)</label>
-      <textarea id="editDescription" placeholder="กรอกรายละเอียดงาน..."></textarea>
+      <textarea id="editDescription" placeholder="กรอกรายละเอียดงาน..." ${isAdminOrManagerUser ? "" : "disabled"}></textarea>
       <div class="ee-char-count" id="charCount">0 ตัวอักษร</div>
     </div>
 
@@ -1106,6 +1142,7 @@ export const getEditEvent = async ({
             placeholder: "ค้นหาบริษัท/โครงการ/เลขที่สัญญา...",
             sortField: { field: "text", direction: "asc" },
             render: { option: renderContractOption, item: renderContractItem },
+            dropdownParent: "body", // ✅ กัน swal2-html-container (overflow:hidden) ตัดขอบ dropdown
           });
         } catch { attachTs = null; }
 
@@ -1194,16 +1231,18 @@ export const getEditEvent = async ({
         height: "32px",
         border: "1.5px solid #e2e8f0",
         borderRadius: "7px",
-        cursor: "pointer",
+        cursor: isAdminOrManagerUser ? "pointer" : "not-allowed",
         padding: "2px",
+        opacity: isAdminOrManagerUser ? "1" : "0.6",
       });
       Object.assign(inputText.style, {
         width: "40px",
         height: "32px",
         border: "1.5px solid #e2e8f0",
         borderRadius: "7px",
-        cursor: "pointer",
+        cursor: isAdminOrManagerUser ? "pointer" : "not-allowed",
         padding: "2px",
+        opacity: isAdminOrManagerUser ? "1" : "0.6",
       });
       document.getElementById("ee-bg-picker").appendChild(inputBg);
       document.getElementById("ee-txt-picker").appendChild(inputText);
@@ -1254,6 +1293,11 @@ export const getEditEvent = async ({
             onItemAdd() {
               if (this.items.length > 1) this.removeItem(this.items[0], true);
             },
+            // ⚠️ BUG ที่แก้: ไม่ใส่ dropdownParent — dropdown เดิม render อยู่ใน #ee-body
+            // (overflow-y:auto) ช่องที่อยู่ใกล้ขอบล่างของพื้นที่เลื่อน (เช่น "หัวหน้าทีมเข้างาน")
+            // จะโดน container ตัดขอบ เลื่อนลงไปเลือกตัวเลือกที่อยู่ต่ำกว่าไม่ได้เลย — "body" ทำให้
+            // dropdown หลุดออกจาก DOM ที่ถูกตัดขอบ ไปแปะไว้ที่ <body> แทน
+            dropdownParent: "body",
           });
         } catch {
           return null;
@@ -1290,6 +1334,7 @@ export const getEditEvent = async ({
             allowEmptyOption: true,
             // ⚠️ ไม่ต้องก็อป onItemAdd (บังคับเลือกได้ทีละคน) มาจาก mkTs ด้านบน — <select> ที่ไม่มี
             // attribute multiple ถูก TomSelect ตั้ง maxItems:1 / mode:"single" ให้เองอยู่แล้ว
+            dropdownParent: "body", // ✅ กัน #ee-body (overflow-y:auto) ตัดขอบ — เทียบ pattern เดียวกับ mkTs ด้านบน
           });
           if (prefillName) {
             // ✅ ชื่อลูกทีมเดิมที่ไม่มีอยู่ในลิสต์พนักงานแล้ว (ลาออก/เคยพิมพ์เองไว้) ต้อง addOption
@@ -1301,6 +1346,9 @@ export const getEditEvent = async ({
           } else {
             ts.clear(true);
           }
+          // ✅ ลูกทีมแก้ไข/เพิ่ม/ลบได้เฉพาะแอดมิน/manager หรือ "ผู้รับผิดชอบ" ของงานนี้ — ช่างทีมอื่นเห็น
+          // รายชื่อได้แต่แตะไม่ได้ (เทียบสิทธิ์เดียวกับหัวหน้าทีมด้านบน — canEditTeamAssignment)
+          if (!canEditTeamAssignment) ts.disable();
           return ts;
         } catch { return null; }
       };
@@ -1310,11 +1358,11 @@ export const getEditEvent = async ({
         row.className = "ee-team-member-row";
         row.innerHTML = `
           <select class="ee-team-member-select"><option value="">— เลือกลูกทีม —</option>${plainTeamOpts}</select>
-          <button type="button" class="ee-btn ee-btn-ghost ee-team-member-remove" title="ลบออก">✕</button>
+          ${canEditTeamAssignment ? `<button type="button" class="ee-btn ee-btn-ghost ee-team-member-remove" title="ลบออก">✕</button>` : ""}
         `;
         teamMembersList.appendChild(row); // ต้อง append ก่อน init (ดูคอมเมนต์ใน AddEvent.js)
         const ts = mkTeamMemberTs(row.querySelector(".ee-team-member-select"), prefillName);
-        row.querySelector(".ee-team-member-remove").addEventListener("click", () => {
+        row.querySelector(".ee-team-member-remove")?.addEventListener("click", () => {
           ts?.destroy();
           row.remove();
         });
