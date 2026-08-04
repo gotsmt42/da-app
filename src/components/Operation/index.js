@@ -25,6 +25,8 @@ import {
 import { getApprovalState, isPendingApproval, isRejected } from "../../utils/approvalStatus";
 import { getOptimizedImageUrl } from "../../utils/cloudinaryImage";
 import { formatEventDateRange } from "../../utils/formatDateRange";
+import { formatRoundLabel } from "../../utils/contractRounds";
+import { classifyJob, getJobClassMeta } from "../../utils/jobClassification";
 
 // MUI Core
 import {
@@ -1675,6 +1677,21 @@ const EventRowCard = ({
                     }} />
                   </Tooltip>
                 )}
+                {/* ✅ ป้ายประเภทงาน — โชว์เฉพาะ "โปรเจค"/"สัญญา" (กรณีพิเศษ) ไม่โชว์ "ทั่วไป" ที่นี่ กัน
+                    การ์ดรกเกินไป (ต่างจากปฏิทินที่ใช้แถบสีขอบบางๆ ซึ่งเบากว่า โชว์ครบ 3 แบบได้ ดู
+                    fc-event-type-* ใน EventCalendar/index.js) เทียบ pattern เดียวกับป้ายรออนุมัติ/
+                    ไม่อนุมัติด้านบนที่โชว์เฉพาะกรณีพิเศษเหมือนกัน */}
+                {(() => {
+                  const jobClass = classifyJob(event);
+                  if (jobClass !== "project" && jobClass !== "contract") return null;
+                  const meta = getJobClassMeta(jobClass);
+                  return (
+                    <Chip size="small" label={`${meta.emoji} ${meta.label}`} sx={{
+                      height: 22, fontSize: "0.7rem", fontWeight: 700,
+                      bgcolor: alpha(meta.color, 0.15), color: meta.color,
+                    }} />
+                  );
+                })()}
                 {isRejected(event) && (
                   <Tooltip title={event.approvalRejectReason ? `เหตุผล: ${event.approvalRejectReason}` : "ไม่ได้รับการอนุมัติ"}>
                     <Chip size="small" label="❌ ไม่อนุมัติ" sx={{
@@ -1786,7 +1803,7 @@ const EventRowCard = ({
                 {event.system && <InfoLine icon="💻" label="ระบบ">{event.system}</InfoLine>}
                 <InfoLine icon="🏢" label="โครงการ">{companySite(event.company, event.site)}</InfoLine>
                 {/* ✅ ย้ายมาไว้ถัดจากโครงการตามที่ขอ (เดิมอยู่คู่กับระบบด้านบนสุด) */}
-                {event.time && <InfoLine icon="🔢" label="ครั้งที่">{event.time}</InfoLine>}
+                {event.time && <InfoLine icon="🔢" label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount)}</InfoLine>}
                 {(event.startTime || event.endTime) && (
                   <InfoLine icon="🕐" label="เวลา">{event.startTime || "-"} — {event.endTime || "-"}</InfoLine>
                 )}
@@ -2000,7 +2017,7 @@ const EventRowCard = ({
                 <Stack direction="row" gap={2} flexWrap="wrap" sx={{ mt: 0.5 }}>
                   <InfoLine icon="🏢" label="โครงการ">{companySite(event.company, event.site)}</InfoLine>
                   {event.system && <InfoLine icon="💻" label="ระบบ">{event.system}</InfoLine>}
-                  {event.time && <InfoLine icon="🔢" label="ครั้งที่">{event.time}</InfoLine>}
+                  {event.time && <InfoLine icon="🔢" label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount)}</InfoLine>}
                 </Stack>
               )}
             </Box>
@@ -2285,7 +2302,7 @@ const JobGroupBlock = ({ sessions, currentUserRole, ...cardProps }) => {
         <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
           <CalendarMonth sx={{ fontSize: 18, color: "#dc2626" }} />
           <Typography variant="body2" fontWeight={700} color="#dc2626">
-            {companySite(head.company, head.site)} — {head.title}{head.system && ` · ${head.system}`}{head.time && ` ครั้งที่ ${head.time}`}
+            {companySite(head.company, head.site)} — {head.title}{head.system && ` · ${head.system}`}{head.time && ` ครั้งที่ ${formatRoundLabel(head.time, head.visitCount)}`}
           </Typography>
           <Chip label={`เข้างาน ${totalWorkDays} วัน`} size="small"
             sx={{ height: 20, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha("#dc2626", 0.15), color: "#dc2626" }} />

@@ -1,5 +1,6 @@
 import moment from "moment";
 import "moment/locale/th";
+import { formatRoundLabel } from "../../../utils/contractRounds";
 
 export const getGeneratePDF = async ({
   jsPDF,
@@ -77,7 +78,7 @@ export const getGeneratePDF = async ({
     : `โครงการ ${event.extendedProps.site} `;
     
     const timeText = event.extendedProps.time
-      ? `ครั้งที่ ${event.extendedProps.time} `
+      ? `ครั้งที่ ${formatRoundLabel(event.extendedProps.time, event.extendedProps.visitCount)} `
       : ``;
           const docNoText = event.extendedProps.docNo
       ? `อ้างอิงเลขที่เอกสาร: ${event.extendedProps.docNo} `

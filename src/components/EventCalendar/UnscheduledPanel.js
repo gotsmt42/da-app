@@ -5,6 +5,7 @@ import {
   faPlus,
   faPen,
   faTrash,
+  faCopy,
   faCalendarCheck,
   faGripVertical,
   faChevronLeft,
@@ -37,6 +38,7 @@ const UnscheduledPanel = forwardRef(function UnscheduledPanel(
     onEditClick,
     onScheduleClick,
     onDeleteClick,
+    onCopyClick, // (draft) => void — คัดลอกงานนี้ไปวางเป็นงานใหม่บนปฏิทิน (ดู index.js handleCopyEvent)
     highlightDraftId, // ✅ "<id>|<nonce>" — มาจากลิงก์ "📌 รอวางแผน" ในตาราง ContractOverview.js
     isAdminOrManager, // ✅ ใช้โชว์ปุ่ม "อนุมัติ/ไม่อนุมัติ" เฉพาะแอดมิน/manager เท่านั้น
     onDecideApproval, // (draft, decision) => void — decision: "approve" | "reject"
@@ -262,6 +264,18 @@ const UnscheduledPanel = forwardRef(function UnscheduledPanel(
                         >
                           <FontAwesomeIcon icon={faPen} /> แก้ไข
                         </button>
+                        {/* ✅ คัดลอกไปวางเป็นงานใหม่บนปฏิทิน — เฉพาะแผนงานทั่วไป ไม่ใช่งานผูกสัญญา
+                            (เทียบ pattern เดียวกับ canCopyEvent ใน EditEvent.js กันตัวนับ "ครั้งที่"
+                            ของสัญญาเดิมสับสน) */}
+                        {!d.contractGroupId && (
+                          <button
+                            type="button"
+                            className="draft-card-menu-item"
+                            onClick={() => { setMenuState(null); onCopyClick?.(d); }}
+                          >
+                            <FontAwesomeIcon icon={faCopy} /> คัดลอก
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="draft-card-menu-item draft-card-menu-item--danger"

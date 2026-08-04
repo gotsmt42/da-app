@@ -14,6 +14,15 @@ export const countUsedRounds = (visits) => {
   return rounds.size;
 };
 
+// ✅ ป้ายกำกับ "ครั้งที่" ของงานสัญญา — แสดงเป็น "1/3" (ครั้งที่ปัจจุบัน/จำนวนครั้งทั้งหมดตามสัญญา) แทน
+// "1" เฉยๆ ให้เห็นสัดส่วนความคืบหน้าทันทีโดยไม่ต้องเปิดไปดูหน้าภาพรวมสัญญา — visitCount มาจากค่าที่
+// บันทึกไว้ในตัวงานเองตอนสร้าง (ดู AddEvent.js/EditEvent.js) ไม่ต้องไป join กับ record อื่น งานที่ไม่ใช่
+// งานสัญญา (ไม่มี visitCount) ยังคงโชว์แค่เลขครั้งเฉยๆ เหมือนเดิม
+export const formatRoundLabel = (time, visitCount) => {
+  if (time === undefined || time === null || time === "") return "";
+  return visitCount ? `${time}/${visitCount}` : `${time}`;
+};
+
 export const DEFAULT_INTERVAL_MONTHS = 3;
 
 // ✅ "เข้าปีละกี่ครั้ง" — แค่ค่าที่ช่วยให้อ่านระยะห่างระหว่างรอบเข้าใจง่ายขึ้น (ไม่ผูก/บังคับกับจำนวน

@@ -52,6 +52,8 @@ import "./index.css";
 import API from "../../API/axiosInstance";
 import { escapeHtml } from "../../utils/escapeHtml";
 import { getApprovalState, isPendingApproval, countPendingJobs } from "../../utils/approvalStatus";
+import { formatRoundLabel } from "../../utils/contractRounds";
+import { classifyJob, JOB_CLASS_META } from "../../utils/jobClassification";
 
 import thLocale from "@fullcalendar/core/locales/th"; // นำเข้า locale ภาษาไทย
 
@@ -168,6 +170,11 @@ function EventCalendar() {
   // ✅ ?draft=<id>&month=YYYY-MM — ใช้ตอนกดลิงก์ "📌 รอวางแผน" จากตาราง ภาพรวมสัญญา (ContractOverview.js)
   // พาไปเจาะจงงานนั้นในแผงงานล่วงหน้าเลย แทนที่จะต้องมาไล่หาเองว่าอยู่เดือนไหน/หน้าไหน
   const [highlightDraftId, setHighlightDraftId] = useState("");
+
+  // ✅ คัดลอก/วาง event — เก็บเป็น state เฉยๆ (ไม่ persist ข้าม reload) คัดลอกจากงานที่ลงตารางแล้ว
+  // (ปุ่มใน EditEvent.js) หรือจากแผนงานล่วงหน้า (เมนู "···" ใน UnscheduledPanel.js) ก็ได้ ค้างอยู่ได้
+  // จนกว่าจะกดยกเลิกเอง หรือคัดลอกทับด้วยงานอื่น — ไม่ auto clear หลังวางครั้งเดียว เพื่อวางซ้ำได้หลายวัน
+  const [clipboardEvent, setClipboardEvent] = useState(null);
 
   const calendarRef = useRef(null);
   // ✅ ใช้เช็คว่าตอนลากงานจากปฏิทินจริงออกมา (eventDragStop) ปล่อยเมาส์ทับแผงนี้หรือเปล่า
@@ -424,6 +431,21 @@ function EventCalendar() {
     await getSaveEventToDB({ newEvent, EventService });
   };
 
+  // ✅ ใช้ทั้งจากปุ่ม "คัดลอกงานนี้" ใน EditEvent.js และเมนู "···" ของแผนงานล่วงหน้าใน
+  // UnscheduledPanel.js — เก็บ template ของงานไว้ใน state แล้วแจ้งเตือนสั้นๆ ว่าคัดลอกแล้ว
+  // ผู้ใช้กดวันที่บนปฏิทินต่อเพื่อ "วาง" (ดู handleAddEvent ด้านล่าง ส่ง sourceEvent เข้าฟอร์มเพิ่มงาน)
+  const handleCopyEvent = (sourceEvent) => {
+    setClipboardEvent(sourceEvent);
+    Swal.fire({
+      toast: true,
+      position: "top",
+      icon: "success",
+      title: "คัดลอกงานแล้ว — คลิกวันที่ที่ต้องการวาง",
+      showConfirmButton: false,
+      timer: 2500,
+    });
+  };
+
   const handleAddEvent = async (arg) => {
     await getAddEvent({
       arg,
@@ -442,6 +464,8 @@ function EventCalendar() {
       saveEventToDB,
       fetchEventsFromDB,
       fetchLookupOptions,
+      // ✅ มีงานที่คัดลอกไว้อยู่ไหม (คลิปบอร์ด) — ถ้ามี ฟอร์มจะ prefill ให้จากตรงนี้ (ดู getAddEvent)
+      sourceEvent: clipboardEvent,
 
       CustomerService,
       AuthService,
@@ -466,6 +490,7 @@ function EventCalendar() {
       generateWorkPermitPDF,
       handleDeleteEvent,
       handleUnscheduleEvent: handleUnscheduleViaButton,
+      onCopyEvent: handleCopyEvent,
       EventService,
       CustomerService,
       AuthService,
@@ -540,6 +565,9 @@ function EventCalendar() {
       events, // ✅ ใช้เช็คแจ้งเตือนทีมชนกันแบบไม่บล็อกหลังบันทึกสำเร็จ (ดู EventDrop.js)
       fetchEventsFromDB,
       setEvents,
+      // ✅ ใช้เฉพาะตอนกด Alt/Cmd ค้างไว้ระหว่างลาก (ก๊อปปี้ไปสร้างเป็นงานใหม่ — ดู isCopyDrag ใน EventDrop.js)
+      saveEventToDB,
+      userData, // ✅ ใช้ตั้งชื่อผู้ทำรายการใน activityLog ตอนย้ายวันที่ (ดู EventDrop.js)
 
       EventService,
       Swal,
@@ -553,6 +581,7 @@ function EventCalendar() {
       events, // ✅ ใช้เช็คแจ้งเตือนทีมชนกันแบบไม่บล็อกหลังบันทึกสำเร็จ (ดู EventResize.js)
       fetchEventsFromDB,
       setEvents,
+      userData, // ✅ ใช้ตั้งชื่อผู้ทำรายการใน activityLog ตอนปรับขนาดวันที่ (ดู EventResize.js)
       EventService,
       Swal,
       moment,
@@ -984,6 +1013,13 @@ function EventCalendar() {
       Swal.fire("❌ คุณไม่มีสิทธิ์แก้ไขแผนงานนี้");
       return;
     }
+    // ❌ งานที่ปิดแล้ว (ดำเนินการเสร็จสิ้น) ห้ามย้ายกลับไปแผนล่วงหน้าเด็ดขาด ไม่มีข้อยกเว้นแม้แต่ admin/
+    // manager — เทียบ pattern เดียวกับ canUnscheduleEvent ใน EditEvent.js/backend PUT /:id/unschedule
+    // (canEditEvent ด้านบนไม่กันเคสนี้ เพราะ admin/manager ผ่าน canEditEvent เสมอไม่ว่างานจะปิดหรือไม่)
+    if (info.event.extendedProps?.status === "ดำเนินการเสร็จสิ้น") {
+      Swal.fire("❌ งานนี้ปิดแล้ว ไม่สามารถย้ายกลับไปแผนล่วงหน้าได้");
+      return;
+    }
     handleUnscheduleViaDrag(info.event.id);
   };
 
@@ -1264,7 +1300,9 @@ function EventCalendar() {
                     // ⚠️ event.extendedProps มีแค่ userId/lastModifiedBy/startTime/endTime เท่านั้น
                     // (ดู FetchEvents.js) ไม่มี time/team อยู่ในนั้นเลย ต้องอ่านจาก event.time/event.team
                     // (top-level) โดยตรง ไม่งั้นสองคอลัมน์นี้จะว่างเปล่าทุกแถวใน Excel/CSV ที่ export ออกไป
-                    ครั้งที่: event.time ? `'${event.time}` : "",
+                    // ✅ "1/3" (ครั้งที่/จำนวนครั้งทั้งหมด) เหมือนจุดอื่นๆ — เติม ' นำหน้าไว้เสมอกัน Excel
+                    // ตีความ "1/3" เป็นวันที่ (1 มี.ค.) ให้อัตโนมัติ ซึ่งเคยเป็นปัญหาแม้กับเลขครั้งเดี่ยวๆ
+                    ครั้งที่: event.time ? `'${formatRoundLabel(event.time, event.visitCount)}` : "",
                     ทีมงาน: event.team ?? "",
 
                     เวลาเริ่ม: event.extendedProps?.startTime ?? "",
@@ -1279,6 +1317,25 @@ function EventCalendar() {
           </button>
         </CSVLink>
       </div>
+
+      {/* ✅ แถบแจ้ง "กำลังคัดลอกงาน" — โชว์ตราบใดที่ clipboardEvent ยังมีค่าอยู่ (ค้างได้จนกว่าจะกด
+          ยกเลิกเอง หรือคัดลอกทับ เพื่อวางซ้ำได้หลายวันโดยไม่ต้องคัดลอกใหม่ทุกครั้ง) กดวันที่บนปฏิทิน
+          เพื่อวาง (ดู handleAddEvent → sourceEvent) */}
+      {clipboardEvent && (
+        <div className="ec-clipboard-banner">
+          <span className="ec-clipboard-banner-text">
+            📋 พร้อมวาง: <b>{clipboardEvent.title || "งาน"}</b>
+            {clipboardEvent.site ? ` · ${clipboardEvent.site}` : ""} — คลิกวันที่ในปฏิทินเพื่อวางงานนี้
+          </span>
+          <button
+            type="button"
+            className="ec-clipboard-banner-cancel"
+            onClick={() => setClipboardEvent(null)}
+          >
+            ✕ ยกเลิก
+          </button>
+        </div>
+      )}
 
       {/* ✅ แผงตัวกรอง — พับซ่อนไว้ default กดปุ่มช่องแว่นขยาย/漏斗ด้านบนถึงเปิด แยกประเภทงาน/ระบบ
           เพิ่มจากเดิมที่มีแค่ช่าง/สถานะ ให้ค้นหางานตามหมวดได้ครบขึ้น */}
@@ -1367,6 +1424,7 @@ function EventCalendar() {
               onEditClick={handleEditDraftClick}
               onScheduleClick={handleScheduleDraftClick}
               onDeleteClick={handleDeleteDraftClick}
+              onCopyClick={handleCopyEvent}
               highlightDraftId={highlightDraftId}
               isAdminOrManager={isAdminOrManager}
               onDecideApproval={handleDecideDraftApproval}
@@ -1456,6 +1514,7 @@ function EventCalendar() {
             const {
               system = "",
               time = "",
+              visitCount = "",
               site = "",
               team = "",
               teamMembers = [],
@@ -1472,7 +1531,10 @@ function EventCalendar() {
             // ผู้ใช้พิมพ์เองได้ทั้งหมด แล้วถูกใช้เป็น eventContent แบบ raw HTML ของ FullCalendar
             // (render ให้ "ทุกคน" ที่เปิดปฏิทินเห็น ไม่ต้องคลิกอะไรเลย) ต้อง escape ก่อนเสมอ
             const siteDisplay = site ? `- โครงการ : ${escapeHtml(site)}` : "";
-            const timeDisplay = time ? `- ครั้งที่ : ${escapeHtml(time)}` : "";
+            // ✅ โชว์ "1/3" (ครั้งที่/จำนวนครั้งทั้งหมดของสัญญา) แทน "1" เฉยๆ — เห็นสัดส่วนความคืบหน้า
+            // ทันทีจากหน้าปฏิทินโดยไม่ต้องเปิดไปดูหน้าภาพรวมสัญญา งานที่ไม่ใช่งานสัญญา (ไม่มี visitCount)
+            // ยังโชว์แค่เลขครั้งเฉยๆ เหมือนเดิม (ดู formatRoundLabel)
+            const timeDisplay = time ? `- ครั้งที่ : ${escapeHtml(formatRoundLabel(time, visitCount))}` : "";
             // ✅ รวมช่างหลัก (team) + ลูกทีมเพิ่มเติม (teamMembers) เป็นรายชื่อเดียว ให้เห็นครบ
             // ทุกคนที่ช่วยทำงานนี้ในบรรทัดเดียวกัน แทนที่จะเห็นแค่ช่างหลักคนเดียวเหมือนเดิม
             const allTeamNames = [team, ...teamMembers.map((m) => m?.name)]
@@ -1594,6 +1656,11 @@ function EventCalendar() {
             const approvalState = getApprovalState(arg.event);
             if (approvalState === "pending") classes.push("fc-event-pending-approval");
             else if (approvalState === "rejected") classes.push("fc-event-rejected-approval");
+            // ✅ แถบสีขอบซ้ายบอกประเภทงาน (ทั่วไป/โปรเจค/สัญญา) — ใช้ className แทนการเพิ่มไอคอนมุม
+            // อีกจุด (การ์ดมีไอคอนมุม 2 จุด + ป้ายรออนุมัติอยู่แล้ว เพิ่มอีกจะรกเกินไป) กวาดตาดูทั้งเดือน
+            // แยกประเภทได้ทันทีโดยไม่ต้องอ่านข้อความ ไม่ทับซ้อนกับสิ่งที่มีอยู่แล้วเพราะอยู่คนละตำแหน่ง
+            const jobClass = classifyJob(arg.event.extendedProps);
+            if (jobClass) classes.push(`fc-event-type-${jobClass}`);
             return classes;
           }}
           dayCellDidMount={(info) => {
@@ -1715,82 +1782,125 @@ function EventCalendar() {
       outline-offset: -2px;
     }
 
-.legend-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 14px;
-    }
+/* ✅ แถบสีขอบซ้ายบอกประเภทงาน — บางๆ ไม่แย่งพื้นที่จากไอคอนมุม/ป้ายรออนุมัติที่มีอยู่แล้ว
+   (ดู eventClassNames ด้านบน และป้ายอธิบายสีใน .ec-legend-panel กลุ่ม "ประเภทงาน" ด้านล่างของหน้า) */
+.fc-event-type-contract { border-left: 4px solid ${JOB_CLASS_META.contract.color} !important; }
+.fc-event-type-project  { border-left: 4px solid ${JOB_CLASS_META.project.color} !important; }
+.fc-event-type-general  { border-left: 4px solid ${JOB_CLASS_META.general.color} !important; }
 
-    .legend-color {
-      width: 14px;
-      height: 14px;
-      border-radius: 3px;
-    }
+/* ✅ แผงคำอธิบายสัญลักษณ์ — ออกแบบใหม่ทั้งหมด (เดิมยัดทุกอย่าง 11 รายการ เป็นแถว flex-wrap เดียว
+   ปนกันไม่มีหัวข้อ อ่านยาก/รกตามที่ผู้ใช้ทัก) แยกเป็นกลุ่มตามความหมาย (สถานะ/การอนุมัติ/ประเภทงาน/
+   อื่นๆ) แต่ละกลุ่มมีหัวข้อกำกับ + รายการเรียงเป็นคอลัมน์อ่านง่าย คั่นด้วยเส้นแบ่งบนจอกว้าง */
+.ec-legend-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 0;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px 4px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.03);
+}
+.ec-legend-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 168px;
+  flex: 1;
+  padding: 0 18px;
+}
+.ec-legend-group + .ec-legend-group {
+  border-left: 1px solid #f1f5f9;
+}
+.ec-legend-group-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+}
+.ec-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #334155;
+  line-height: 1.4;
+}
+.ec-legend-item .ec-legend-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+}
+.ec-legend-swatch {
+  display: inline-block;
+  flex-shrink: 0;
+  border-radius: 3px;
+}
 
-    @media (max-width: 768px) {
-      .color-legend-container {
-        justify-content: left; /* ✅ จัดตรงกลางในหน้าจอเล็ก */
-      }
-
-      .color-legend {
-        justify-content: left;
-        flex-direction: column;
-        font-size: 12px;
-        gap: 10px;
-      }
-    }
+@media (max-width: 768px) {
+  .ec-legend-panel { flex-direction: column; gap: 14px; padding: 12px 14px; }
+  .ec-legend-group { padding: 0 0 12px; border-left: none !important; }
+  .ec-legend-group + .ec-legend-group { border-top: 1px solid #f1f5f9; padding-top: 12px; }
+}
         `}
         </style>
-        {/* ✅ คำอธิบายสถานะแผนงาน (Legend) */}
-        <div
-          className="color-legend-container"
-          style={{
-            display: "flex",
-            justifyContent: "left",
-            alignItems: "flex-start",
-            flexWrap: "wrap",
-            padding: "8px",
-            borderRadius: "8px",
-            width: "100%",
-          }}
-        >
-          <div
-            className="color-legend"
-            style={{ display: "flex", gap: "15px", flexWrap: "wrap" }}
-          >
+        {/* ✅ คำอธิบายสัญลักษณ์ — แยกเป็น 4 กลุ่มตามความหมาย (สถานะ/การอนุมัติ/ประเภทงาน/อื่นๆ) แทน
+            แถวเดียวยัดรวมกันแบบเดิม (11 รายการปนกันไม่มีหัวข้อ อ่านยาก) แต่ละกลุ่มมีหัวข้อกำกับชัดเจน */}
+        <div className="ec-legend-panel">
+          <div className="ec-legend-group">
+            <div className="ec-legend-group-title">สถานะงาน</div>
             {statusLegend.map((status) => (
-              <div
-                key={status.label}
-                className="legend-item"
-                style={{ display: "flex", alignItems: "center", gap: "8px" }}
-              >
-                <FontAwesomeIcon
-                  icon={status.icon}
-                  style={{ color: status.color }}
-                />
+              <div key={status.label} className="ec-legend-item">
+                <span className="ec-legend-icon">
+                  <FontAwesomeIcon icon={status.icon} style={{ color: status.color }} />
+                </span>
                 <span>{status.label}</span>
               </div>
             ))}
-            <div
-              className="legend-item"
-              style={{ display: "flex", alignItems: "center", gap: "8px", opacity: 0.7, filter: "grayscale(10%)" }}
-            >
-              <span
-                style={{
-                  display: "inline-block", width: 14, height: 14, borderRadius: 3,
-                  background: "#8A8A8A",
-                }}
-              />
-              <span>งานสีจาง = ไม่ใช่งานของคุณ (ดูได้ แต่แก้ไขไม่ได้)</span>
-            </div>
-            <div className="legend-item" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span>⏳</span>
+          </div>
+
+          <div className="ec-legend-group">
+            <div className="ec-legend-group-title">การอนุมัติ</div>
+            <div className="ec-legend-item">
+              <span className="ec-legend-icon">⏳</span>
               <span>รออนุมัติ — แอดมิน/manager ยังไม่ได้อนุมัติ ทำงานต่อได้แต่ยังปิดงานไม่ได้</span>
             </div>
-            <div className="legend-item" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span>❌</span>
+            <div className="ec-legend-item">
+              <span className="ec-legend-icon">❌</span>
               <span>ไม่อนุมัติ — แก้ไขข้อมูลแล้วบันทึก ระบบจะส่งขออนุมัติใหม่ให้อัตโนมัติ</span>
+            </div>
+          </div>
+
+          {/* ✅ อธิบายแถบสีขอบซ้าย (ประเภทงาน) — คู่กับ eventClassNames/fc-event-type-* ด้านบน */}
+          <div className="ec-legend-group">
+            <div className="ec-legend-group-title">ประเภทงาน</div>
+            {Object.entries(JOB_CLASS_META).map(([key, meta]) => (
+              <div key={key} className="ec-legend-item">
+                <span className="ec-legend-icon">
+                  <span className="ec-legend-swatch" style={{ width: 4, height: 14, background: meta.color }} />
+                </span>
+                <span>{meta.emoji} {meta.label}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="ec-legend-group">
+            <div className="ec-legend-group-title">อื่นๆ</div>
+            <div className="ec-legend-item">
+              <span className="ec-legend-icon">
+                <span className="ec-legend-swatch" style={{ width: 14, height: 14, background: "#8A8A8A", opacity: .7 }} />
+              </span>
+              <span>งานสีจาง = ไม่ใช่งานของคุณ (ดูได้ แต่แก้ไขไม่ได้)</span>
+            </div>
+            {/* ✅ บอกวิธีก๊อปปี้งานด้วยการลาก — ท่านี้ไม่มีปุ่มให้เห็นเลย (เป็น gesture ล้วนๆ) ถ้าไม่บอก
+                ไว้ตรงนี้ไม่มีทางรู้ได้เองว่าใช้งานได้ — ใช้ Alt ไม่ใช่ Ctrl เพราะ @fullcalendar/interaction
+                ตัดการลากทิ้งทันทีถ้ากด Ctrl ค้างไว้ตอนกดเมาส์ลง (ดูคอมเมนต์ละเอียดใน EventDrop.js) */}
+            <div className="ec-legend-item">
+              <span className="ec-legend-icon">💡</span>
+              <span>กด Alt (หรือ Cmd บน Mac) ค้างไว้แล้วลากงาน เพื่อก๊อปปี้ไปวันอื่น</span>
             </div>
           </div>
         </div>

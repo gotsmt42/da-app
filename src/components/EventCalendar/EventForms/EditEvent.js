@@ -1,9 +1,11 @@
 import Toastify from "toastify-js";
 import "toastify-js/src/toastify.css";
 import { resolveOperationGroup } from "../../../utils/overdueJobs";
-import { countUsedRounds } from "../../../utils/contractRounds";
+import { countUsedRounds, formatRoundLabel } from "../../../utils/contractRounds";
 import { escapeHtml } from "../../../utils/escapeHtml";
 import { getApprovalState } from "../../../utils/approvalStatus";
+import { getActivityLogMeta } from "../../../utils/activityLogMeta";
+import { classifyJob, getJobClassMeta } from "../../../utils/jobClassification";
 
 // ✅ ป้องกัน stored XSS — ค่าที่ผู้ใช้พิมพ์เอง (ชื่อบริษัท/โครงการ/ประเภทงาน/ระบบ/ทีม ฯลฯ) ต้อง escape
 // ก่อนต่อเป็น HTML string เสมอ ไม่งั้นถ้ามีใครตั้งชื่อเป็น เช่น "><img src=x onerror="..."> จะยิง
@@ -56,6 +58,17 @@ function injectStyles() {
       transition: background .15s; line-height: 1;
     }
     #ee-close-btn:hover { background: rgba(255,255,255,.32); }
+
+    /* ✅ ปุ่มคัดลอก — แยกตำแหน่งออกจากแถบปุ่มด้านล่างโดยตั้งใจ (ไม่ปนกับ ดูการดำเนินงาน/ออกใบแจ้งเข้างาน
+       ที่เป็นแถวยาวด้านล่าง) มาไว้ที่หัว modal แทนให้เห็นชัด กดง่าย ไม่หลงในแถวปุ่มอื่น */
+    #ee-copy-btn {
+      width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+      background: rgba(255,255,255,.18); border: 1.5px solid rgba(255,255,255,.30);
+      color: #fff; font-size: 14px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .15s; line-height: 1;
+    }
+    #ee-copy-btn:hover { background: rgba(255,255,255,.32); }
 
     /* ── Status header ── */
     #ee-status-header {
@@ -198,6 +211,35 @@ function injectStyles() {
       background: #fff; border-color: #ddd6fe;
     }
     .ee-contract-box .ee-field label { color: #4c1d95; }
+    /* ✅ ดูอย่างเดียวสำหรับช่าง — เทาจาง + cursor not-allowed ให้ดูออกชัดว่าแก้ไม่ได้ ไม่ใช่แค่ลืมกรอก */
+    .ee-contract-box .ee-field input:disabled {
+      background: #f1f5f9; color: #64748b; border-color: #e2e8f0;
+      cursor: not-allowed; opacity: 0.85;
+    }
+
+    /* ── บันทึกประวัติ (activityLog) — เทียบ pattern เดียวกับ ActivityLogMini ในหน้า Operation
+       ย่อ/กางได้เหมือนกัน แค่ implement เป็น vanilla HTML/CSS แทน React component เพราะฟอร์มนี้
+       ทั้งฟอร์ม build เป็น HTML string ให้ SweetAlert2 ไม่ใช่ JSX ── */
+    .ee-log-toggle {
+      width: 100%; text-align: left; background: none; border: none;
+      color: #475569; font-size: 12.5px; font-weight: 700; cursor: pointer;
+      padding: 4px 0; display: flex; align-items: center; justify-content: space-between;
+    }
+    .ee-log-toggle:hover { color: #1e293b; }
+    .ee-log-list {
+      margin-top: 6px; padding-left: 10px; border-left: 2px solid #e2e8f0;
+      display: flex; flex-direction: column; gap: 10px; max-height: 240px; overflow-y: auto;
+    }
+    .ee-log-item { position: relative; display: flex; gap: 8px; }
+    .ee-log-dot {
+      position: absolute; left: -15px; top: 4px;
+      width: 8px; height: 8px; border-radius: 50%; border: 2px solid #fff;
+      box-shadow: 0 0 0 1px #e2e8f0;
+    }
+    .ee-log-body { flex: 1; min-width: 0; }
+    .ee-log-head { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 12px; }
+    .ee-log-meta { color: #94a3b8; font-size: 11px; }
+    .ee-log-detail { color: #94a3b8; font-size: 11px; font-style: italic; margin-top: 1px; }
 
     /* ── Grid ── */
     .ee-grid   { display: grid; gap: 8px; margin-bottom: 8px; }
@@ -474,6 +516,7 @@ export const getEditEvent = async ({
   generateWorkPermitPDF,
   handleDeleteEvent,
   handleUnscheduleEvent,
+  onCopyEvent,
   EventService,
   CustomerService,
   AuthService,
@@ -537,6 +580,12 @@ export const getEditEvent = async ({
   const eventVisitCount      = ev.extendedProps?.visitCount || "";
   const eventIntervalMonths  = ev.extendedProps?.intervalMonths || "";
   const eventJobValue        = ev.extendedProps?.jobValue ?? "";
+  // ✅ บันทึกประวัติ — เดิมมีแค่ในหน้า Operation (ActivityLogMini) หน้า /event เองยังไม่เคยแสดงเลย
+  // ทั้งที่ activityLog บันทึกลงงานทุกตัวเหมือนกันอยู่แล้ว ดึงมาแสดงแบบเดียวกัน (ย่อ/กางได้) ที่นี่ด้วย
+  const eventActivityLog = ev.extendedProps?.activityLog || [];
+  // ✅ ป้ายบอกประเภทงาน (ทั่วไป/โปรเจค/สัญญา) — ใช้ classifier เดียวกับปฏิทิน (ดู index.js
+  // eventClassNames/fc-event-type-*) กันสองจุดตัดสินไม่ตรงกัน
+  const eventJobClassMeta = getJobClassMeta(classifyJob(ev.extendedProps));
   // ✅ งานที่สร้างโดยคนที่ไม่ใช่แอดมิน/manager (ช่าง/เซล) ต้องรอการอนุมัติก่อน — ดู PUT /events/:id/approval
   const eventApprovalState     = getApprovalState(ev.extendedProps);
   const eventApprovalRequestedBy = ev.extendedProps?.approvalRequestedBy || "";
@@ -565,6 +614,12 @@ export const getEditEvent = async ({
     eventStatus !== "กำลังรอยืนยัน"; // งานที่ยังไม่ยืนยัน ยังไม่มีอะไรให้ดูในหน้าดำเนินงาน
   // ❌ งานที่ admin ปิดแล้ว (ดำเนินการเสร็จสิ้น) ช่างลบไม่ได้อีก มีแค่ admin/manager เท่านั้น
   const canDeleteEvent = isAdminOrManagerUser || eventStatus !== "ดำเนินการเสร็จสิ้น";
+  // ❌ งานที่ปิดแล้ว (ดำเนินการเสร็จสิ้น) ห้าม "ย้ายไปแผนล่วงหน้า" เด็ดขาด ไม่มีข้อยกเว้นแม้แต่ admin/
+  // manager (ต่างจาก canDeleteEvent ด้านบน) เพราะ unschedule เคลียร์ date/start/end ทิ้งโดยไม่แตะ
+  // status เลย ถ้าปล่อยให้ทำกับงานที่เสร็จแล้วได้ จะได้ "แผนงานล่วงหน้า" ที่ status ยังเป็น "เสร็จสิ้น"
+  // ค้างอยู่ ซึ่งเป็นสถานะขัดแย้งกันเองที่ไม่ควรเกิดขึ้นได้เลย (เทียบ pattern เดียวกับฝั่ง backend
+  // PUT /:id/unschedule ที่ปิดเด็ดขาดเหมือนกัน)
+  const canUnscheduleEvent = eventStatus !== "ดำเนินการเสร็จสิ้น";
   // ✅ ช่างแก้ไขสถานะเองได้แค่ตอนยังอยู่ในช่วง กำลังรอยืนยัน/ยืนยันแล้ว เท่านั้น
   // ถ้าสถานะถูกเลื่อนไปไกลกว่านั้นแล้ว (กำลังดำเนินการ/ดำเนินการเสร็จสิ้น) ให้แสดงค่าจริงไว้ แต่แก้ไม่ได้
   const canEditStatus = isAdminOrManagerUser || TECH_EDITABLE_STATUSES.includes(eventStatus);
@@ -594,6 +649,9 @@ export const getEditEvent = async ({
     .sort((a, b) => (a.company || "").localeCompare(b.company || "", "th") || (a.site || "").localeCompare(b.site || "", "th"));
   const contractDisplayName = (c) => [c.company, c.site].filter(Boolean).join(" · ") || "(ไม่ระบุชื่อ)";
   const canAttachToContract = isAdminOrManagerUser && !eventContractGroupId && attachableContracts.length > 0;
+  // ✅ คัดลอกงานนี้ไปวางเป็นงานใหม่ — เฉพาะงานทั่วไป ไม่ใช่งานผูกสัญญา (คัดลอกงานสัญญาจะทำให้ตัวนับ
+  // "ครั้งที่" ที่ใช้ไปแล้วของสัญญาเดิมสับสน/เพี้ยนได้ ดู countUsedRounds ด้านบน)
+  const canCopyEvent = !eventContractGroupId;
 
   const formattedEnd = eventAllDay
     ? moment(eventEnd).subtract(1, "days").format("YYYY-MM-DD")
@@ -694,6 +752,33 @@ export const getEditEvent = async ({
 
   const cfg0 = STATUS_CONFIG[eventStatus] || STATUS_CONFIG["กำลังรอยืนยัน"];
 
+  // ✅ บันทึกประวัติ — ใหม่ล่าสุดขึ้นก่อน เทียบ pattern เดียวกับ ActivityLogMini ใน Operation/index.js
+  // (reverse ทั้งชุดก่อน map) ย่อไว้เป็นค่าเริ่มต้นเสมอ (ไม่ auto กางออก) กันฟอร์มยาวเกินจำเป็นตอนเปิดมา
+  // ครั้งแรก — กดปุ่มหัวข้อเพื่อกาง/ยุบเอง (toggle ผ่าน style.display เหมือน eeRejectReasonBar ด้านล่าง)
+  const activityLogHtml = eventActivityLog
+    .slice()
+    .reverse()
+    .map((log) => {
+      const meta = getActivityLogMeta(log.action);
+      const detailHtml = log.detail
+        ? `<div class="ee-log-detail">${escapeHtml(log.detail)}</div>`
+        : "";
+      const byHtml = log.userName ? ` · ${escapeHtml(log.userName)}` : "";
+      const whenHtml = log.timestamp ? ` · ${moment(log.timestamp).locale("th").format("DD MMM HH:mm")}` : "";
+      return `
+        <div class="ee-log-item">
+          <span class="ee-log-dot" style="background:${meta.color}"></span>
+          <div class="ee-log-body">
+            <div class="ee-log-head">
+              <span style="color:${meta.color}">${meta.emoji} <b>${escapeHtml(meta.label)}</b></span>
+              <span class="ee-log-meta">${byHtml}${whenHtml}</span>
+            </div>
+            ${detailHtml}
+          </div>
+        </div>`;
+    })
+    .join("");
+
   const html = `
 <div id="ee-modal-inner">
 
@@ -701,12 +786,14 @@ export const getEditEvent = async ({
   <div id="ee-status-header" style="background:${cfg0.bg}">
     <div id="ee-status-icon">${cfg0.icon}</div>
     <div id="ee-status-title">
-      <h3><span >${attrHtml(eventTitle)} · ${attrHtml(eventSystem)} ${eventTime ? `· ครั้งที่ ${attrHtml(eventTime)}` : ""}</span></h3>
+      <h3><span >${attrHtml(eventTitle)} · ${attrHtml(eventSystem)} ${eventTime ? `· ครั้งที่ ${attrHtml(formatRoundLabel(eventTime, eventVisitCount))}` : ""}</span></h3>
       <div class="ee-header-meta">
         <span class="ee-tag">📍 ${attrHtml(eventSite) || "—"}</span>
         ${eventTeam ? `<span class="ee-tag">👷 ${attrHtml(eventTeam)}</span>` : ""}
+        ${eventJobClassMeta ? `<span class="ee-tag">${eventJobClassMeta.emoji} ${attrHtml(eventJobClassMeta.label)}</span>` : ""}
       </div>
     </div>
+    ${canCopyEvent ? `<button id="ee-copy-btn" title="คัดลอกงานนี้">📋</button>` : ""}
     <button id="ee-close-btn" title="ปิด">✕</button>
   </div>
 
@@ -747,35 +834,35 @@ export const getEditEvent = async ({
          ให้เห็นตั้งแต่แวบแรกว่าเป็นข้อมูล "ทั้งสัญญา" ไม่ใช่แค่ครั้งนี้ครั้งเดียว -->
     ${eventContractGroupId ? `
     <div class="ee-contract-box">
-      <p class="ee-contract-box-label">📑 ข้อมูลสัญญา <span>แก้ที่นี่จะอัปเดตทุก "ครั้งที่" ในสัญญานี้พร้อมกัน</span></p>
+      <p class="ee-contract-box-label">📑 ข้อมูลสัญญา <span>${isAdminOrManagerUser ? `แก้ที่นี่จะอัปเดตทุก "ครั้งที่" ในสัญญานี้พร้อมกัน` : `ดูได้อย่างเดียว — แก้ไขได้เฉพาะแอดมิน/manager เท่านั้น`}</span></p>
       <div class="ee-grid ee-grid-3">
         <div class="ee-field">
           <label>📄 เลขที่สัญญา</label>
-          <input id="editContractNo" type="text" value="${attrHtml(eventContractNo)}" placeholder="เช่น FAPTY17-2568">
+          <input id="editContractNo" type="text" value="${attrHtml(eventContractNo)}" placeholder="เช่น FAPTY17-2568" ${isAdminOrManagerUser ? "" : "disabled"}>
         </div>
         <div class="ee-field">
           <label>🧾 เลขที่ใบเสนอราคา</label>
-          <input id="editQuotationNo" type="text" value="${attrHtml(eventQuotationNo)}" placeholder="เช่น QT2024100049">
+          <input id="editQuotationNo" type="text" value="${attrHtml(eventQuotationNo)}" placeholder="เช่น QT2024100049" ${isAdminOrManagerUser ? "" : "disabled"}>
         </div>
         <div class="ee-field">
           <label>🔁 เข้าทุกกี่เดือน</label>
-          <input id="editIntervalMonths" type="number" min="1" max="24" value="${eventIntervalMonths}" placeholder="เช่น 3">
+          <input id="editIntervalMonths" type="number" min="1" max="24" value="${eventIntervalMonths}" placeholder="เช่น 3" ${isAdminOrManagerUser ? "" : "disabled"}>
         </div>
         <div class="ee-field">
           <label>📅 วันที่เริ่มสัญญา</label>
-          <input id="editContractStart" type="date" value="${eventContractStart}">
+          <input id="editContractStart" type="date" value="${eventContractStart}" ${isAdminOrManagerUser ? "" : "disabled"}>
         </div>
         <div class="ee-field">
           <label>📅 วันที่สิ้นสุดสัญญา</label>
-          <input id="editContractEnd" type="date" value="${eventContractEnd}">
+          <input id="editContractEnd" type="date" value="${eventContractEnd}" ${isAdminOrManagerUser ? "" : "disabled"}>
         </div>
         <div class="ee-field">
           <label>🔢 จำนวนครั้ง</label>
-          <input id="editVisitCount" type="number" value="${eventVisitCount}" placeholder="เช่น 4">
+          <input id="editVisitCount" type="number" value="${eventVisitCount}" placeholder="เช่น 4" ${isAdminOrManagerUser ? "" : "disabled"}>
         </div>
         <div class="ee-field">
           <label>💰 มูลค่างาน</label>
-          <input id="editJobValue" type="number" value="${eventJobValue}" placeholder="เช่น 86000">
+          <input id="editJobValue" type="number" value="${eventJobValue}" placeholder="เช่น 86000" ${isAdminOrManagerUser ? "" : "disabled"}>
         </div>
       </div>
     </div>
@@ -912,6 +999,16 @@ export const getEditEvent = async ({
       <div class="ee-char-count" id="charCount">0 ตัวอักษร</div>
     </div>
 
+    ${eventActivityLog.length > 0 ? `
+    <hr class="ee-divider">
+    <button type="button" id="btnToggleLog" class="ee-log-toggle">
+      📜 บันทึกประวัติ (${eventActivityLog.length}) <span id="eeLogToggleIcon">▾</span>
+    </button>
+    <div id="eeLogList" class="ee-log-list" style="display:none;">
+      ${activityLogHtml}
+    </div>
+    ` : ""}
+
   </div>
 
   <!-- ── Action bar (แยก 3 กลุ่มชัดเจน) ── -->
@@ -919,7 +1016,7 @@ export const getEditEvent = async ({
 
     <!-- 🔴 ซ้าย: อันตราย -->
     <div class="ee-btn-group ee-btn-group-left">
-      ${canDeleteEvent ? `<button class="ee-btn ee-btn-warning" id="btnUnschedule">↩️ ย้ายไปแผนล่วงหน้า</button>` : ""}
+      ${canUnscheduleEvent ? `<button class="ee-btn ee-btn-warning" id="btnUnschedule">↩️ ย้ายไปแผนล่วงหน้า</button>` : ""}
       ${canDeleteEvent ? `<button class="ee-btn ee-btn-danger" id="btnDelete">🗑 ลบแผนงาน</button>` : ""}
     </div>
 
@@ -1339,9 +1436,12 @@ export const getEditEvent = async ({
       });
 
       // ✅ ข้อมูลสัญญา — คืนค่า null ถ้างานนี้ไม่ได้อยู่ในสัญญาแบบหลายครั้ง (ไม่มี input พวกนี้ให้อ่าน)
+      // หรือถ้าไม่ใช่ admin/manager (ช่องพวกนี้ตอนนี้เป็น disabled สำหรับช่างแล้ว — ดูอย่างเดียว แก้ไม่ได้
+      // ไม่ควรยิง UpdateContractFields ไปเลยด้วยซ้ำ เพราะ backend บล็อกอยู่แล้ว (403) จะกลายเป็น error
+      // toast หลอกๆ ทั้งที่ส่วนอื่นที่ช่างแก้ได้จริง (เช่น comment/สถานะ) บันทึกสำเร็จไปแล้วก่อนหน้านั้น)
       // ต้องอัปเดตผ่าน UpdateContractFields (updateMany ตาม contractGroupId) แยกจาก UpdateEvent/
       // AddEvent เดี่ยวๆ ด้านล่าง ไม่งั้นแก้แค่ "ครั้งที่" นี้ครั้งเดียว ครั้งอื่นในสัญญาจะไม่อัปเดตตาม
-      const buildContractFields = () => (eventContractGroupId ? {
+      const buildContractFields = () => (isAdminOrManagerUser && eventContractGroupId ? {
         contractNo:     getVal("editContractNo"),
         quotationNo:    getVal("editQuotationNo"),
         contractStart:  getVal("editContractStart"),
@@ -1375,6 +1475,74 @@ export const getEditEvent = async ({
           start: moment(getVal("editStart")).toISOString(),
           end,
         };
+      };
+
+      // ✅ บันทึกประวัติอัตโนมัติ — เทียบค่าฟอร์มตอนบันทึกกับค่าเดิมตอนเปิด modal (eventTeam/eventStatus/
+      // ฯลฯ ที่ destructure ไว้ด้านบนสุดของไฟล์) แล้วสร้าง log เฉพาะฟิลด์ที่เปลี่ยนจริง — เดิมหน้านี้
+      // ไม่เคยบันทึกประวัติอะไรเลยทั้งที่เป็นจุดที่แก้ไขงานบ่อยที่สุด (เปลี่ยนทีม/สถานะ/โครงการ ฯลฯ)
+      // ต่างจากหน้า Operation ที่มี ActivityLogMini ครบอยู่แล้ว — แยก entry ต่อฟิลด์ "สำคัญ" (ทีม/สถานะ/
+      // โครงการ/ระบบ/ประเภทงาน/วันที่) ให้เห็นชัดว่าเปลี่ยนอะไร ส่วนฟิลด์ปลีกย่อย (เอกสาร/สี/เวลา) รวม
+      // เป็น entry เดียว กันประวัติรกเกินไปต่อการบันทึก 1 ครั้ง
+      const actorName = [userData?.fname, userData?.lname].filter(Boolean).join(" ") || userData?.username || "ผู้ใช้งาน";
+      const buildChangeLogEntries = (fields) => {
+        const now = new Date().toISOString();
+        const entries = [];
+        const push = (action, detail) => entries.push({ action, detail, userName: actorName, timestamp: now });
+
+        if ((fields.team || "") !== eventTeam) {
+          push("team_changed", eventTeam
+            ? `เปลี่ยนทีมจาก "${eventTeam}" เป็น "${fields.team || "-"}"`
+            : `มอบหมายทีม "${fields.team}"`);
+        }
+        // ✅ ลูกทีมเพิ่มเติม — คนละแนวคิดกับ "ทีม" หลักด้านบน (แค่แสดงผล ไม่กระทบสิทธิ์/แจ้งเตือน) แต่
+        // ก็เป็นการเปลี่ยนแปลงที่ควรเห็นในประวัติเหมือนกัน — เทียบเป็น "ชุดรายชื่อ" (เรียงลำดับก่อนเทียบ)
+        // ไม่สนลำดับที่เลือกในฟอร์ม กันนับว่าเปลี่ยนทั้งที่แค่สลับลำดับคนเดิม
+        const oldMemberNames = (eventTeamMembers || []).map((m) => m.name).filter(Boolean).sort();
+        const newMemberNames = (fields.teamMembers || []).map((m) => m.name).filter(Boolean).sort();
+        const memberNamesChanged =
+          oldMemberNames.length !== newMemberNames.length ||
+          oldMemberNames.some((name, i) => name !== newMemberNames[i]);
+        if (memberNamesChanged) {
+          push("team_members_changed", newMemberNames.length > 0
+            ? `เปลี่ยนลูกทีมเป็น ${newMemberNames.join(", ")}`
+            : "นำลูกทีมออกทั้งหมด");
+        }
+        if ((fields.status || "") !== eventStatus) {
+          push("status_changed", `เปลี่ยนสถานะจาก "${eventStatus}" เป็น "${fields.status}"`);
+        }
+        if ((fields.company || "") !== eventCompany || (fields.site || "") !== eventSite) {
+          push("project_changed", `เปลี่ยนโครงการเป็น "${[fields.company, fields.site].filter(Boolean).join(" · ") || "-"}"`);
+        }
+        if ((fields.system || "") !== eventSystem) {
+          push("system_changed", `เปลี่ยนระบบจาก "${eventSystem}" เป็น "${fields.system}"`);
+        }
+        if ((fields.title || "") !== eventTitle) {
+          push("title_changed", `เปลี่ยนประเภทงานจาก "${eventTitle}" เป็น "${fields.title}"`);
+        }
+        // ✅ fields.start/end มาได้ทั้งรูปแบบ ISO (โหมดวันเดียว, exclusive end +1 วัน) และ YYYY-MM-DD
+        // (โหมดหลายวัน) — normalize กลับเป็น inclusive YYYY-MM-DD ทั้งคู่ก่อนเทียบกับ eventStart/
+        // formattedEnd (ค่าเดิมตอนเปิด modal ซึ่งเป็น inclusive อยู่แล้ว) ให้เทียบกันตรงๆ ได้
+        if (fields.start) {
+          const newStartDay = moment(fields.start).format("YYYY-MM-DD");
+          const newEndDay = fields.end
+            ? moment(fields.end).subtract(eventAllDay ? 1 : 0, "days").format("YYYY-MM-DD")
+            : newStartDay;
+          if (newStartDay !== eventStart.format("YYYY-MM-DD") || newEndDay !== formattedEnd) {
+            push("schedule_changed", `เปลี่ยนวันที่เป็น ${newStartDay}${newEndDay !== newStartDay ? ` – ${newEndDay}` : ""}`);
+          }
+        }
+        const detailsChanged =
+          (fields.docNo || "") !== evendocNo ||
+          (fields.subject || "") !== eventSubject ||
+          (fields.description || "") !== eventDescription ||
+          (fields.startTime || "") !== (eventStartTime || "") ||
+          (fields.endTime || "") !== (eventEndTime || "") ||
+          (fields.backgroundColor || "") !== (ev.backgroundColor || "") ||
+          (fields.textColor || "") !== (ev.textColor || "");
+        if (detailsChanged) {
+          push("details_updated", "แก้ไขรายละเอียดงาน (เอกสาร/สี/เวลา ฯลฯ)");
+        }
+        return entries;
       };
 
       // ✅ TomSelect ของช่องประเภทงาน/ระบบเปิด create:true ไว้ (พิมพ์ค่าใหม่ที่ไม่มีในลิสต์ได้)
@@ -1434,6 +1602,8 @@ export const getEditEvent = async ({
             setLoading(true);
             try {
               await upsertLookups(payload.title, payload.system);
+              const changeEntries = buildChangeLogEntries(payload);
+              if (changeEntries.length > 0) payload.activityLog = [...eventActivityLog, ...changeEntries];
               await EventService.UpdateEvent(eventId, payload);
               const contractFields = buildContractFields();
               if (contractFields) {
@@ -1521,6 +1691,13 @@ export const getEditEvent = async ({
                 end: moment(r.end).add(1, "days").format("YYYY-MM-DD"),
                 date: r.start,
               };
+              // ✅ บันทึกประวัติเฉพาะแถวที่ตรงกับ record ที่กำลังเปิดแก้ไขอยู่จริง (eventId) — แถวอื่นๆ
+              // ในกลุ่มไม่มี snapshot ค่าเดิมของตัวเองให้เทียบ (eventTeam/eventStatus/ฯลฯ ด้านบนเป็นของ
+              // record นี้ record เดียว) และแถวที่เพิ่งสร้างใหม่ (ไม่มี eventIdAttr) ยังไม่มีประวัติมาก่อน
+              if (r.eventIdAttr === eventId) {
+                const changeEntries = buildChangeLogEntries(rangeData);
+                if (changeEntries.length > 0) rangeData.activityLog = [...eventActivityLog, ...changeEntries];
+              }
               if (r.eventIdAttr) {
                 await EventService.UpdateEvent(r.eventIdAttr, rangeData);
               } else {
@@ -1580,6 +1757,24 @@ export const getEditEvent = async ({
         openAttachContractDialog();
       });
 
+      /* ✅ คัดลอกงานนี้ — เก็บ template ของงาน (ไม่รวมวันที่/สถานะ/สัญญา) ไว้ที่คลิปบอร์ดฝั่ง index.js
+         แล้วปิด modal นี้ทันที ให้ผู้ใช้ไปคลิกวันที่บนปฏิทินที่ต้องการวางต่อ (ดู onCopyEvent/getAddEvent)
+         — ปุ่มนี้อยู่ที่หัว modal แยกจากแถบปุ่มด้านล่างโดยตั้งใจ (ตอนนี้มีทาง Ctrl/Cmd+ลากด้วยแล้ว
+         ปุ่มนี้เป็นทางเลือกสำรอง ไม่ใช่ทางหลัก จึงไม่ควรเด่นเท่าแถบปุ่มการกระทำหลักด้านล่าง) */
+      document.getElementById("ee-copy-btn")?.addEventListener("click", () => {
+        Swal.close();
+        onCopyEvent?.({
+          company: eventCompany,
+          site: eventSite,
+          title: eventTitle,
+          system: eventSystem,
+          team: eventTeam,
+          teamMembers: (eventTeamMembers || []).map((m) => m.name).filter(Boolean),
+          backgroundColor: ev.backgroundColor || "#3b82f6",
+          textColor: ev.textColor || "#ffffff",
+        });
+      });
+
       /* ✅ อนุมัติ/ไม่อนุมัติงาน — ปุ่มอยู่ในฟอร์มเดียวกันเลย ไม่เปิด Swal ซ้อน (ดูคอมเมนต์เตือนเรื่อง
          nested Swal ด้านบน) reject ใช้แถบ textarea เลื่อนลงมาแทน (#eeRejectReasonBar) แทนการเปิด
          popup ยืนยันซ้อนอีกชั้น ปุ่มพวกนี้มีเฉพาะตอน admin/manager ดูงานที่ยังรออนุมัติเท่านั้น */
@@ -1596,6 +1791,16 @@ export const getEditEvent = async ({
           btn.disabled = false;
           Swal.showValidationMessage(error?.response?.data?.message || "อนุมัติไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
         }
+      });
+
+      /* ✅ บันทึกประวัติ — ย่อ/กางเหมือน ActivityLogMini (ปุ่มเดียว toggle ทั้ง list + หมุนลูกศร) */
+      document.getElementById("btnToggleLog")?.addEventListener("click", () => {
+        const list = document.getElementById("eeLogList");
+        const icon = document.getElementById("eeLogToggleIcon");
+        if (!list) return;
+        const isOpen = list.style.display !== "none";
+        list.style.display = isOpen ? "none" : "flex";
+        if (icon) icon.textContent = isOpen ? "▾" : "▴";
       });
 
       const eeRejectReasonBar = document.getElementById("eeRejectReasonBar");

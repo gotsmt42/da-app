@@ -6,6 +6,7 @@ export const getEventResize = async ({
   fetchEventsFromDB,
   setEvents,
   EventService,
+  userData, // ✅ ใช้ตั้งชื่อผู้ทำรายการใน activityLog (ดู logEntry ด้านล่าง)
   Swal,
   moment,
 }) => {
@@ -38,6 +39,20 @@ export const getEventResize = async ({
     console.log("⏸️ ไม่มีการเปลี่ยนแปลงขนาด ไม่ต้องอัปเดต");
     return;
   }
+
+  // ✅ บันทึกประวัติ — เดิมการลากขยาย/ย่อวันที่งานไม่เคยถูกบันทึกลง activityLog เลย ทำให้ประวัติของงาน
+  // มีช่องโหว่ (เห็นแค่ที่แก้ผ่านฟอร์ม ไม่เห็นที่ลากปรับบนปฏิทินโดยตรง) เทียบ pattern เดียวกับ
+  // buildChangeLogEntries ใน EditEvent.js
+  const actorName = [userData?.fname, userData?.lname].filter(Boolean).join(" ") || userData?.username || "ผู้ใช้งาน";
+  updatedEvent.activityLog = [
+    ...(event.extendedProps?.activityLog || []),
+    {
+      action: "schedule_changed",
+      detail: `ลากปรับวันที่เป็น ${start}${end !== start ? ` – ${end}` : ""}`,
+      userName: actorName,
+      timestamp: new Date().toISOString(),
+    },
+  ];
 
   try {
     await EventService.UpdateEvent(event.id, updatedEvent);

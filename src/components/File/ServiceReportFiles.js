@@ -6,6 +6,7 @@ import "moment/locale/th";
 import EventService from "../../services/EventService";
 import { resolveOperationGroup } from "../../utils/overdueJobs";
 import { getOptimizedImageUrl } from "../../utils/cloudinaryImage";
+import { formatRoundLabel } from "../../utils/contractRounds";
 import { printFile, shareFile, shareToLine, isMobileDevice } from "../../functions/fileActions";
 
 import {
@@ -335,7 +336,7 @@ const ServiceReportFiles = () => {
               <InfoLine icon="🏢" label="โครงการ">
                 {f.company && f.site ? `${f.company} · ${f.site}` : (f.company || f.site || "ไม่ระบุบริษัท/ไซต์")}
               </InfoLine>
-              {f.time && <InfoLine icon="🔢" label="ครั้งที่">{f.time}</InfoLine>}
+              {f.time && <InfoLine icon="🔢" label="ครั้งที่">{formatRoundLabel(f.time, f.visitCount)}</InfoLine>}
               {f.docNo && <InfoLine icon="📄" label="เอกสาร">{f.docNo}</InfoLine>}
               {(() => {
                 const teamNames = [f.team, ...(f.teamMembers || []).map((m) => m?.name)]

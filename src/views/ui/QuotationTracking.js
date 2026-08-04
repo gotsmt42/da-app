@@ -47,6 +47,7 @@ import { GlassCard, StatCard, FileUploadSection, CommentThread, FilePreviewDialo
 import { getOverdueGroupKey, resolveAssignedTechnician } from "../../utils/overdueJobs";
 import { WARNING_DAYS_AFTER_SENT, getDaysSinceSent, resolveQuotationGroup } from "../../utils/quotationTracking";
 import { formatEventDateRange } from "../../utils/formatDateRange";
+import { formatRoundLabel } from "../../utils/contractRounds";
 
 const STATUS_META = {
   waiting_file: { label: "รอช่างแนบไฟล์",   color: "#6b7280", icon: <AttachFile sx={{ fontSize: 14 }} /> },
@@ -186,7 +187,7 @@ const QuotationCard = memo(({ job, onOpen }) => {
               <InfoLine icon="🏢" label="โครงการ">
                 {anchor.company && anchor.site ? `${anchor.company} · ${anchor.site}` : (anchor.company || anchor.site || "ไม่ระบุโครงการ")}
               </InfoLine>
-              {anchor.time && <InfoLine icon="🔢" label="ครั้งที่">{anchor.time}</InfoLine>}
+              {anchor.time && <InfoLine icon="🔢" label="ครั้งที่">{formatRoundLabel(anchor.time, anchor.visitCount)}</InfoLine>}
               {anchor.team && <InfoLine icon="👷" label="ทีม">{anchor.team}</InfoLine>}
               {anchor.docNo && <InfoLine icon="📄" label="เอกสาร">{anchor.docNo}</InfoLine>}
             </Stack>
@@ -355,7 +356,7 @@ const QuotationDetailDialog = ({ job, currentUserRole, onClose, onAction, onAmou
         {(anchor.system || anchor.time || anchor.docNo) && (
           <Stack direction="row" gap={2} flexWrap="wrap" sx={{ mt: 1 }}>
             {anchor.system && <InfoLine icon="💻" label="ระบบ">{anchor.system}</InfoLine>}
-            {anchor.time && <InfoLine icon="🔢" label="ครั้งที่">{anchor.time}</InfoLine>}
+            {anchor.time && <InfoLine icon="🔢" label="ครั้งที่">{formatRoundLabel(anchor.time, anchor.visitCount)}</InfoLine>}
             {anchor.docNo && <InfoLine icon="📄" label="เอกสาร">{anchor.docNo}</InfoLine>}
           </Stack>
         )}

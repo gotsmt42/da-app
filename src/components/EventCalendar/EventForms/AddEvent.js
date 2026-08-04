@@ -1,10 +1,14 @@
 import { countUsedRounds } from "../../../utils/contractRounds";
 import { escapeHtml } from "../../../utils/escapeHtml";
+import { showTeamOverlapWarning } from "../../../utils/teamOverlapWarning";
 
 // ✅ ป้องกัน stored XSS — ค่าที่ผู้ใช้พิมพ์เอง (ชื่อบริษัท/โครงการ/ประเภทงาน/ระบบ/ทีม ฯลฯ) ต้อง escape
 // ก่อนต่อเป็น HTML string เสมอ ไม่งั้นถ้ามีใครตั้งชื่อเป็น เช่น "><img src=x onerror="..."> จะยิง
 // JavaScript ทันทีที่มีใครเปิดฟอร์มนี้ดู
-const optionHtml = (value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`;
+// ✅ current (optional): ค่าที่ต้องการให้ selected ไว้ตอนเปิดฟอร์ม — ใช้ตอนวางจากงานที่คัดลอกไว้
+// (sourceEvent) เทียบ pattern เดียวกับ opt() ใน AddDraftEvent.js ที่ prefill โหมดแก้ไขแผนงานอยู่แล้ว
+const optionHtml = (value, current) =>
+  `<option value="${escapeHtml(value)}"${current && current === value ? " selected" : ""}>${escapeHtml(value)}</option>`;
 
 /* ─────────────────────────────────────────────
    STYLE INJECTION  (shared with EditEvent — skip if already injected)
@@ -230,6 +234,13 @@ function injectAddStyles() {
       color: #92400e; border-radius: 10px; padding: 8px 14px;
       font-size: 12px; font-weight: 600; margin-bottom: 16px;
     }
+    /* ✅ แจ้งว่าฟอร์มนี้ prefill มาจากงานที่คัดลอกไว้ — โทนฟ้าแยกจากอำพันด้านบน (ไม่ใช่คำเตือน
+       แค่บอกที่มาของข้อมูล) เทียบสีเดียวกับ .ec-clipboard-banner ใน index.css */
+    .ae-copy-note {
+      display: block; background: #eff6ff; border: 1.5px solid #bfdbfe;
+      color: #1e3a8a; border-radius: 10px; padding: 8px 14px;
+      font-size: 12px; font-weight: 600; margin-bottom: 16px;
+    }
 
     /* ── Multi-date (งานเข้าหลายวันไม่ติดกัน) ── */
     .ae-checkbox-row {
@@ -345,6 +356,9 @@ export const getAddEvent = async ({
   saveEventToDB,
   fetchEventsFromDB,
   fetchLookupOptions,
+  // ✅ งานที่คัดลอกไว้ (คลิปบอร์ด) — ถ้ามี ฟอร์มนี้จะ prefill company/site/title/system/team/สี ให้
+  // เลย (ยังแก้ไขได้ทุกช่องตามปกติก่อนบันทึก) ดู index.js handleCopyEvent/handleAddEvent
+  sourceEvent,
   CustomerService,
   AuthService,
   JobTypeService,
@@ -421,21 +435,21 @@ export const getAddEvent = async ({
 
   /* ── options ── */
   const companyOpts = customers.userCustomers
-    .map((c) => optionHtml(c.cCompany))
+    .map((c) => optionHtml(c.cCompany, sourceEvent?.company))
     .join("");
 
   const siteOpts = customers.userCustomers
-    .map((c) => optionHtml(c.cSite))
+    .map((c) => optionHtml(c.cSite, sourceEvent?.site))
     .join("");
 
   const titleOpts = (jobTypes?.items || [])
-    .map((t) => optionHtml(t.name)).join("");
+    .map((t) => optionHtml(t.name, sourceEvent?.title)).join("");
 
   const systemOpts = (systemTypes?.items || [])
-    .map((s) => optionHtml(s.name)).join("");
+    .map((s) => optionHtml(s.name, sourceEvent?.system)).join("");
 
   const teamOpts = employeeList
-    .map((e) => optionHtml(e.fname)).join("");
+    .map((e) => optionHtml(e.fname, sourceEvent?.team)).join("");
 
   // ✅ ตัวเลือกสัญญาที่มีอยู่แล้ว — ให้เลือกได้เท่านั้น พิมพ์เพิ่มเองไม่ได้ (ต่างจากช่องอื่นในฟอร์มนี้ที่
   // เปิด create:true ไว้) กันบริษัท/โครงการ/เลขที่สัญญาเพี้ยนจากของเดิมแม้แค่ตัวเดียว ซึ่งจะทำให้
@@ -465,6 +479,8 @@ export const getAddEvent = async ({
 
     <!-- date badge -->
     <div class="ae-date-badge">📅 วันที่เลือก: ${displayDate}</div>
+
+    ${sourceEvent ? `<div class="ae-copy-note">📋 วางจากงานที่คัดลอกไว้ — ปรับข้อมูลได้ตามต้องการก่อนบันทึก</div>` : ""}
 
     ${!isAdminOrManagerUser ? `<div class="ae-approval-note">⏳ งานนี้จะขึ้นแสดงทันที แต่ต้องรอแอดมิน/manager อนุมัติก่อน จึงจะถือว่ายืนยันสมบูรณ์</div>` : ""}
 
@@ -592,11 +608,11 @@ export const getAddEvent = async ({
       <div class="ae-color-row">
         <div class="ae-color-item">
           <label>🎨 สีพื้นหลัง</label>
-          <input id="backgroundColorPicker" type="color" value="${defaultBackgroundColor}">
+          <input id="backgroundColorPicker" type="color" value="${sourceEvent?.backgroundColor || defaultBackgroundColor}">
         </div>
         <div class="ae-color-item">
           <label>✏️ สีข้อความ</label>
-          <input id="textColorPicker" type="color" value="${defaultTextColor}">
+          <input id="textColorPicker" type="color" value="${sourceEvent?.textColor || defaultTextColor}">
         </div>
       </div>
     </div>
@@ -710,7 +726,9 @@ export const getAddEvent = async ({
         } catch { return null; }
       };
 
-      const addTeamMemberRow = () => {
+      // ✅ presetName (optional): ใช้ตอนวางจากงานที่คัดลอกไว้ — ต้อง setValue หลัง ts.clear(true)
+      // ใน mkTeamMemberTs เสมอ (ไม่งั้นค่าที่ตั้งไว้จะถูกเคลียร์ทิ้งทันที)
+      const addTeamMemberRow = (presetName) => {
         const row = document.createElement("div");
         row.className = "ae-team-member-row";
         row.innerHTML = `
@@ -721,6 +739,7 @@ export const getAddEvent = async ({
         // element ตอน construct ซึ่งบน element ที่ยังไม่อยู่ใน document จะได้ค่าผิดเพี้ยน
         teamMembersList.appendChild(row);
         const ts = mkTeamMemberTs(row.querySelector(".ae-team-member-select"));
+        if (presetName) ts?.setValue(presetName, true);
         row.querySelector(".ae-team-member-remove").addEventListener("click", () => {
           // ✅ ต้อง destroy ก่อนลบแถว — TomSelect ผูก listener ไว้ที่ document (mousedown) และ
           // window (scroll/resize) ต่ออินสแตนซ์ ซึ่งถูกถอดออกใน destroy() เท่านั้น ถ้าลบแถวเฉยๆ
@@ -730,6 +749,10 @@ export const getAddEvent = async ({
         });
       };
       document.getElementById("ae-addTeamMemberBtn")?.addEventListener("click", () => addTeamMemberRow());
+
+      // ✅ วางจากงานที่คัดลอกไว้ — เติมแถวลูกทีมให้ตามที่มีอยู่ในงานต้นทาง (ถ้ามี — งานที่คัดลอกจาก
+      // แผนงานล่วงหน้าจะไม่มีฟิลด์นี้เลย ก็แค่ไม่เติมแถวใดๆ เหมือนสร้างงานใหม่ปกติ)
+      (sourceEvent?.teamMembers || []).forEach((name) => { if (name) addTeamMemberRow(name); });
 
       /* ── งานเข้าหลายวันไม่ติดกัน (multi-date) ── */
       // ✅ แต่ละแถว = "ช่วงวันที่" หนึ่งช่วง (เริ่ม–สิ้นสุด) เช่น 6-7 และ 9-10
@@ -1144,6 +1167,19 @@ export const getAddEvent = async ({
             timer: 1200,
             showConfirmButton: false,
           });
+
+          // ✅ เดิมเช็คแค่ตอนลาก/ขยายงาน (EventDrop.js/EventResize.js) ไม่เคยเช็คตอนสร้างงานใหม่เลย —
+          // ตอนนี้สร้าง/วางงานบ่อยขึ้นจากฟีเจอร์คัดลอก โอกาสที่ทีมเดียวกันชนกันเองจึงสูงขึ้นด้วย ไม่บล็อก
+          // การบันทึก แค่แจ้งเตือนเบาๆ ให้รู้ตัวเหมือน pattern เดิม — เฉพาะกรณีวันเดียว (ไม่รองรับ
+          // งานหลายช่วงวันที่ไม่ติดกัน ซึ่งไม่มี start/end เดี่ยวให้เทียบ)
+          if (!isMultiDate) {
+            showTeamOverlapWarning({
+              Swal, moment, events,
+              movedEvent: { id: "new", extendedProps: { resPerson: newEvent.resPerson, team: newEvent.team } },
+              start: newEvent.start,
+              end: newEvent.end,
+            });
+          }
         } catch (error) {
           showSaveError(error);
         }

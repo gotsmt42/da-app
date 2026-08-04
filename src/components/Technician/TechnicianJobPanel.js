@@ -17,6 +17,7 @@ import "moment/locale/th";
 import Swal from "sweetalert2";
 import { formatEventDateRange } from "../../utils/formatDateRange";
 import { isApproved } from "../../utils/approvalStatus";
+import { formatRoundLabel } from "../../utils/contractRounds";
 import {
   Box, Card, CardContent, Typography, Stack, Chip, Avatar,
   Button, IconButton, TextField, Collapse, Divider, LinearProgress,
@@ -910,7 +911,7 @@ const TechnicianJobCard = ({
                     : (event.company || event.site || "ไม่ระบุบริษัท/ไซต์")}
                 </InfoLine>
                 {/* ✅ ย้ายมาไว้ถัดจากโครงการตามที่ขอ (เดิมอยู่คู่กับระบบด้านบนสุด) */}
-                {event.time && <InfoLine icon="🔢" label="ครั้งที่">{event.time}</InfoLine>}
+                {event.time && <InfoLine icon="🔢" label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount)}</InfoLine>}
                 {(event.startTime || event.endTime) && (
                   <InfoLine icon="🕐" label="เวลา">{event.startTime || "-"} — {event.endTime || "-"}</InfoLine>
                 )}
@@ -1106,7 +1107,7 @@ const TechnicianJobCard = ({
                     {event.company && event.site ? `${event.company} · ${event.site}` : (event.company || event.site || "ไม่ระบุบริษัท/ไซต์")}
                   </InfoLine>
                   {event.system && <InfoLine icon="💻" label="ระบบ">{event.system}</InfoLine>}
-                  {event.time && <InfoLine icon="🔢" label="ครั้งที่">{event.time}</InfoLine>}
+                  {event.time && <InfoLine icon="🔢" label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount)}</InfoLine>}
                 </Stack>
               )}
             </Box>
@@ -1135,7 +1136,7 @@ const TechnicianJobCard = ({
                     {event.company && event.site ? `${event.company} · ${event.site}` : (event.company || event.site || "ไม่ระบุบริษัท/ไซต์")}
                   </InfoLine>
                   {event.system && <InfoLine icon="💻" label="ระบบ">{event.system}</InfoLine>}
-                  {event.time && <InfoLine icon="🔢" label="ครั้งที่">{event.time}</InfoLine>}
+                  {event.time && <InfoLine icon="🔢" label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount)}</InfoLine>}
                 </Stack>
               )}
             </Box>
