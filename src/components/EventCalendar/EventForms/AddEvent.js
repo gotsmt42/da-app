@@ -718,7 +718,14 @@ export const getAddEvent = async ({
 
     didOpen: () => {
       /* TomSelect */
-      const mkTs = (id, placeholder = "", maxOptions = 7) => {
+      // ⚠️ BUG ที่แก้: maxOptions เดิม default แค่ 7 — บริษัท/โครงการ/ประเภทงาน/ระบบ/ทีม ที่มีมากกว่า 7
+      // รายการ (เกิดขึ้นได้ง่ายมากในระบบจริงที่ใช้งานมาสักพัก) จะโดนตัดไม่แสดงในรายการให้เลือกเลย ทำให้
+      // ดูเหมือน "หาไม่เจอ/เลือกไม่ได้" ทั้งที่ข้อมูลมีอยู่จริง (อาการ "บางทีใช้ไม่ได้" ที่ผู้ใช้แจ้ง — เกิด
+      // เฉพาะตอนลิสต์/ผลค้นหายาวเกิน 7 เท่านั้น จึงดูเหมือนเกิดแค่บางที) — ยกเลิก default ต่ำๆ นี้ทิ้ง
+      // ใช้ค่าเริ่มต้นเดียวกับที่ TomSelect ให้มาเอง (50) แล้วยังส่งความยาวลิสต์จริงมาที่แต่ละช่องด้านล่าง
+      // อีกชั้น (เทียบ pattern เดียวกับ contractTs/attachTs ที่ใช้ selectableContracts.length มาตั้งแต่แรก)
+      // รับประกันว่าไม่มีทางถูกตัดรายการทิ้งไม่ว่าลิสต์จะยาวแค่ไหนก็ตาม
+      const mkTs = (id, placeholder = "", maxOptions = 50) => {
         try {
           return new TomSelect(id, {
             create: true,
@@ -739,11 +746,11 @@ export const getAddEvent = async ({
         } catch { return null; }
       };
 
-      mkTs("#eventCompany", "เลือกหรือพิมพ์ชื่อบริษัท");
-      mkTs("#eventSite",    "เลือกหรือพิมพ์ชื่อโครงการ");
-      mkTs("#eventTitle",   "เลือกหรือพิมพ์ประเภทงาน");
-      mkTs("#eventSystem",  "เลือกหรือพิมพ์ระบบงาน");
-      mkTs("#eventTeam",    "เลือกหรือพิมพ์ชื่อทีม");
+      mkTs("#eventCompany", "เลือกหรือพิมพ์ชื่อบริษัท", customers.userCustomers.length || 50);
+      mkTs("#eventSite",    "เลือกหรือพิมพ์ชื่อโครงการ", customers.userCustomers.length || 50);
+      mkTs("#eventTitle",   "เลือกหรือพิมพ์ประเภทงาน", (jobTypes?.items || []).length || 50);
+      mkTs("#eventSystem",  "เลือกหรือพิมพ์ระบบงาน", (systemTypes?.items || []).length || 50);
+      mkTs("#eventTeam",    "เลือกหรือพิมพ์ชื่อทีม", employeeList.length || 50);
 
       /* ── ลูกทีมเพิ่มเติม (คนที่ 2, 3, ... แสดงผลอย่างเดียว ไม่กระทบสิทธิ์แก้ไข/แจ้งเตือน) ── */
       const teamMembersList = document.getElementById("ae-teamMembersList");
@@ -755,7 +762,7 @@ export const getAddEvent = async ({
         try {
           const ts = new TomSelect(el, {
             create: true, // ✅ พิมพ์ชื่อที่ไม่มีในลิสต์เพิ่มเองได้ (ตามที่ผู้ใช้ขอ)
-            maxOptions: 7, // เท่ากับ mkTs ของช่อง "ทีม" ในฟอร์มเดียวกัน
+            maxOptions: employeeList.length || 50, // ⚠️ เดิม fix ไว้ 7 ตัดรายชื่อพนักงานที่มีเกิน 7 คนทิ้ง
             placeholder: "เลือกหรือพิมพ์ชื่อลูกทีม",
             sortField: { field: "text", direction: "asc" },
             allowEmptyOption: true,
@@ -879,7 +886,7 @@ export const getAddEvent = async ({
           dropdownParent: "body", // ✅ กันโดน #ae-body (overflow-y:auto) ตัดขอบ — เทียบ pattern เดียวกับ mkTs ด้านบน
         });
       } catch { contractTs = null; }
-      mkTs("#ae-cpTeam", "เลือกหรือพิมพ์ชื่อทีม");
+      mkTs("#ae-cpTeam", "เลือกหรือพิมพ์ชื่อทีม", employeeList.length || 50);
 
       const contractPickInfo = document.getElementById("ae-contractPickInfo");
       const cpTeamSelect = document.getElementById("ae-cpTeam");

@@ -406,6 +406,15 @@ function injectStyles() {
       border-color: #2563eb !important;
       box-shadow: 0 0 0 3px rgba(37,99,235,.10) !important;
     }
+    /* 🐛 BUG ที่แก้: ไฟล์นี้มี style function แยก 2 ตัว (injectStyles ของฟอร์มหลัก vs
+       injectAttachStyles ของป๊อปอัพ "แนบเข้าสัญญาที่มีอยู่") — เดิมกฎ z-index นี้ถูกใส่ไว้แค่ใน
+       injectAttachStyles เท่านั้น ฟอร์มหลักเลยไม่มีเลย ทำให้ dropdown ของทุกช่อง (บริษัท/โครงการ/
+       ประเภทงาน/ระบบ/ครั้งที่/ทีม/ลูกทีม) เปิดจริงแต่ไปโผล่ "หลัง" ตัว modal เพราะ TomSelect ค่า
+       z-index เริ่มต้น (10) ต่ำกว่า SweetAlert2 container (~1060) มาก พอ dropdownParent:"body" ย้าย
+       dropdown ไปแปะที่ <body> ก็เลยโดนซ่อนอยู่หลัง modal มองไม่เห็น/กดไม่ได้ทุกช่อง (อาการ "กดแล้ว
+       ไม่ขึ้น") — ดันให้สูงกว่าเสมอ เทียบ pattern เดียวกับ AddEvent.js/AddDraftEvent.js/
+       EventCalendar/index.js/injectAttachStyles ด้านล่างในไฟล์นี้เอง */
+    .ts-dropdown { z-index: 100000 !important; }
   `;
   document.head.appendChild(style);
 }

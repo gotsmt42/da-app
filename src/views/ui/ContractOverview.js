@@ -441,7 +441,10 @@ export default function ContractOverview() {
   const [searchParams] = useSearchParams();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  // ✅ ?q= — เปิดมาพร้อมค้นหาคำที่กำหนดไว้ล่วงหน้าได้เลย (เทียบ pattern เดียวกับ ?view=overdue ด้านล่าง)
+  // ใช้กับลิงก์ "เจาะจง" จาก Dashboard.js ที่กดจากรายการสัญญาเลยกำหนดตัวใดตัวหนึ่ง ให้เด้งมาที่แท็บ
+  // เลยกำหนด + ค้นหาชื่อบริษัท/โครงการนั้นให้ทันที แทนที่จะเปิดมาเจอทั้งลิสต์แล้วต้องมานั่งหาเอง
+  const [search, setSearch] = useState(() => searchParams.get("q") || "");
   // ✅ งานส่วนใหญ่ในระบบยังเป็นงานเก่าที่ยังไม่ได้จัดกลุ่มเป็นสัญญา (สร้างก่อนมีฟีเจอร์นี้) เดิม fallback
   // ให้ทุกงานเก่าขึ้นเป็น "สัญญา" 1 แถวของตัวเอง ทำให้ตารางท่วมไปด้วยแถวที่ไม่มีข้อมูลสัญญาจริงเลย
   // (ขึ้น "-" เกือบทุกช่อง) ดูรก/ไม่มีประโยชน์ — ใช้แท็บสลับมุมมองแทน switch เดียว (เทียบ pattern
@@ -916,6 +919,13 @@ export default function ContractOverview() {
   const emptyForm = {
     company: "", site: "", title: "", system: "", team: "",
     contractNo: "", quotationNo: "", contractStart: "", contractEnd: "", visitCount: "", intervalMonths: "", jobValue: "",
+    // ✅ วันที่เข้างานครั้งที่ 1 — ไม่บังคับ (บางสัญญายังไม่รู้วันที่แน่นอนตอนสร้าง) กรอกมาจะลงตารางเป็น
+    // ครั้งที่ 1 จริงทันที ไม่กรอกจะบันทึกเป็นฉบับร่าง (unscheduled) — ฉบับร่างของสัญญาจะไม่โผล่ใน
+    // แผงงานล่วงหน้าของหน้าปฏิทินเลย (ดู visibleDrafts ใน EventCalendar/index.js) กันไม่ให้ถูกลบทิ้ง
+    // แบบไม่ตั้งใจจากที่นั่นจนสัญญาทั้งอันหายไปจากตาราง (ดู groupEventsByContract) — จัดการ/เพิ่มวันที่
+    // ครั้งที่ 1 ได้ที่ปุ่ม + ในตารางนี้เท่านั้น (ยังมี safeguard คำเตือนซ้ำอีกชั้นที่ handleDeleteDraftClick
+    // เผื่อกรณีอื่นที่เข้าถึงฉบับร่างนี้ได้)
+    firstVisitStart: "", firstVisitEnd: "",
   };
   const [addOpen, setAddOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -982,9 +992,8 @@ export default function ContractOverview() {
   };
   const closeAddDialog = () => { if (!saving) setAddOpen(false); };
 
-  // ✅ ไม่ต้องระบุวันที่เข้างานเลยตอนสร้างสัญญา — บันทึกเป็น "ฉบับร่าง" (unscheduled) ที่มีแค่ข้อมูล
-  // สัญญาไว้ก่อน ยังไม่มีครั้งไหนลงตารางจริงสักครั้ง แล้วค่อยไปกด "+ เพิ่มครั้งถัดไป" ทีละครั้งทีหลัง
-  // เมื่อรู้วันที่จริงแล้ว (ดู handleAddVisitSubmit ด้านล่างที่แปลงฉบับร่างนี้เป็นครั้งที่ 1 จริง)
+  // ✅ วันที่เข้างานครั้งที่ 1 ไม่บังคับกรอกตอนสร้างสัญญา (ตามที่ผู้ใช้ยืนยัน — บางสัญญายังไม่รู้วันที่
+  // แน่นอน) กรอกมาจะลงตารางจริงทันที ไม่กรอกจะบันทึกเป็นฉบับร่างไปเพิ่มวันที่ทีหลังได้ตามปกติ
   const handleAddSubmit = async () => {
     setFormError("");
     if (!form.site.trim())   { setFormError("กรุณาระบุชื่อโครงการ"); return; }
@@ -1006,6 +1015,12 @@ export default function ContractOverview() {
     }
     if (isContractNoTaken(form.contractNo)) {
       setFormError(`เลขที่สัญญา "${form.contractNo.trim()}" ถูกใช้ไปแล้ว กรุณาตรวจสอบ`);
+      return;
+    }
+    // ✅ วันที่เข้างานครั้งที่ 1 ไม่บังคับ (ตามที่ผู้ใช้ยืนยัน — บางสัญญายังไม่รู้วันที่แน่นอนตอนสร้าง)
+    // แต่ถ้ากรอกมา ต้องถูกต้อง (สิ้นสุดไม่ก่อนเริ่ม)
+    if (form.firstVisitEnd && moment(form.firstVisitEnd).isBefore(moment(form.firstVisitStart))) {
+      setFormError("วันที่สิ้นสุดครั้งที่ 1 ต้องไม่ก่อนวันที่เริ่ม");
       return;
     }
 
@@ -1044,15 +1059,32 @@ export default function ContractOverview() {
         await SystemTypeService.add(payload.system).catch(() => {});
       }
 
-      await EventService.AddDraftEvent(payload);
+      // ✅ มีวันที่ → ลงตารางเป็นครั้งที่ 1 จริงทันที (เทียบ pattern เดียวกับ openAddVisitDialog/
+      // handleAddVisitSubmit ในไฟล์นี้เป๊ะๆ) ไม่มีวันที่ → บันทึกเป็นฉบับร่าง (unscheduled) เหมือนเดิม
+      // ⚠️ กรณีฉบับร่าง: ถ้าถูกลบทิ้งตอนยังไม่มีครั้งไหนลงตารางเลย สัญญาทั้งอันจะหายไปจากตาราง
+      // "ภาพรวมงาน" ทันที (ไม่เหลือ document ไหนผูก contractGroupId นี้เลย) — เตือนไว้ชัดเจนแยกจาก
+      // คำเตือนปกติแล้วที่ handleDeleteDraftClick (EventCalendar/index.js) กันลบพลาดโดยไม่รู้ตัว
+      if (form.firstVisitStart) {
+        await EventService.AddEvent({
+          ...payload,
+          time: "1",
+          dates: [{
+            start: form.firstVisitStart,
+            end: moment(form.firstVisitEnd || form.firstVisitStart).add(1, "days").format("YYYY-MM-DD"),
+            date: form.firstVisitStart,
+          }],
+        });
+      } else {
+        await EventService.AddDraftEvent(payload);
+      }
 
       setSaving(false);
       setAddOpen(false);
       Swal.fire({
-        title: "บันทึกสัญญา (ฉบับร่าง) สำเร็จ ✅",
-        text: "ไปเพิ่มวันที่เข้างานครั้งแรกได้ที่ปุ่ม + ในตาราง",
+        title: "บันทึกสัญญาใหม่สำเร็จ ✅",
+        text: form.firstVisitStart ? undefined : "ยังไม่ได้ระบุวันที่เข้างาน — ไปเพิ่มวันที่ครั้งที่ 1 ได้ที่ปุ่ม + ในตารางเมื่อรู้วันที่จริง",
         icon: "success",
-        timer: 2000,
+        timer: form.firstVisitStart ? 1500 : 2500,
         showConfirmButton: false,
       });
       await fetchData(true);
@@ -2914,13 +2946,23 @@ export default function ContractOverview() {
                 helperText={intervalPreviewText} />
             </Stack>
 
-            {/* ✅ ไม่ต้องระบุวันที่เข้างานเลยตอนนี้ — บันทึกเป็นฉบับร่างไว้ก่อน แล้วไปเพิ่มวันที่เข้างาน
-                ทีละครั้งทีหลังที่ปุ่ม "+" ในตาราง เมื่อรู้วันที่จริงแล้ว (กันต้องเดา/กรอกวันที่ที่ยัง
-                ไม่แน่นอนไปก่อน แล้วต้องมาแก้ทีหลังอยู่ดี) */}
-            <Alert severity="info" sx={{ fontSize: "0.8rem" }}>
-              ยังไม่ต้องระบุวันที่เข้างาน — บันทึกสัญญาไว้ก่อน แล้วไปเพิ่มวันที่แต่ละครั้งทีหลังได้ที่ปุ่ม
-              "+ เพิ่มครั้งถัดไป" ในตารางเมื่อรู้วันที่จริง
-            </Alert>
+            {/* ✅ ไม่บังคับ — เว้นว่างได้ถ้ายังไม่รู้วันที่เข้างานแน่นอน (บันทึกเป็นฉบับร่างไปเพิ่มวันที่
+                ทีหลังได้ที่ปุ่ม "+" ในตารางตามปกติ) กรอกมาจะลงตารางเป็นครั้งที่ 1 จริงทันที */}
+            <Typography variant="caption" fontWeight={700} color="text.secondary">วันที่เข้างานครั้งที่ 1 (ถ้ารู้แล้ว)</Typography>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+              <TextField fullWidth size="small" type="date" label="วันที่เริ่ม" InputLabelProps={{ shrink: true }}
+                value={form.firstVisitStart} onChange={(e) => setField("firstVisitStart")(e.target.value)} />
+              <TextField fullWidth size="small" type="date" label="วันที่สิ้นสุด" InputLabelProps={{ shrink: true }}
+                value={form.firstVisitEnd} onChange={(e) => setField("firstVisitEnd")(e.target.value)}
+                helperText="เว้นว่าง = วันเดียวกับวันที่เริ่ม" disabled={!form.firstVisitStart} />
+            </Stack>
+            {!form.firstVisitStart && (
+              <Alert severity="info" sx={{ fontSize: "0.8rem" }}>
+                ยังไม่ระบุ = บันทึกสัญญาไว้ก่อน (จะไม่โผล่ในแผงงานล่วงหน้าของหน้าปฏิทิน — จัดการที่หน้านี้
+                เท่านั้น) แล้วไปเพิ่มวันที่เข้างานครั้งที่ 1 ทีหลังได้ที่ปุ่ม "+ เพิ่มครั้งถัดไป" ในตาราง
+                เมื่อรู้วันที่จริง
+              </Alert>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>

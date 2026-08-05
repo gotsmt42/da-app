@@ -421,9 +421,11 @@ function EventCalendar() {
       setDrafts(list);
       // ✅ เปิดแผงงานล่วงหน้าอัตโนมัติแค่ครั้งแรกสุดที่โหลดสำเร็จ ถ้ามีงานอยู่จริง — หลังจากนั้น
       // ผู้ใช้เปิด/ปิดเองได้ตามปกติโดยไม่ถูก auto เปิดทับซ้ำอีกตอน refresh รอบถัดๆ ไป
+      // ✅ ไม่นับฉบับร่างของสัญญา (มี contractGroupId) — ไม่โผล่ในแผงนี้อยู่แล้ว (ดู visibleDrafts)
+      // จึงไม่ควรเป็นเหตุให้เปิดแผงอัตโนมัติด้วย
       if (!hasAutoOpenedDraftsRef.current) {
         hasAutoOpenedDraftsRef.current = true;
-        if (list.length > 0) setShowDraftsPanel(true);
+        if (list.some((d) => !d.contractGroupId)) setShowDraftsPanel(true);
       }
     } catch (error) {
       console.error("❌ Error fetching draft events:", error);
@@ -823,9 +825,11 @@ function EventCalendar() {
         const mkScheduleTs = (el, placeholder, prefillName = "") => {
           if (!el) return null;
           try {
+            // ⚠️ เดิม fix ไว้ 7 ตัดรายชื่อพนักงานที่มีเกิน 7 คนทิ้งไปเงียบๆ (ห้องสมุด TomSelect ค่า
+            // default จริงคือ 50 อยู่แล้ว) ทำให้ค้นหา/เลือกทีมหรือลูกทีม "หาไม่เจอ" เป็นบางที
             const ts = new TomSelect(el, {
               create: true,
-              maxOptions: 7,
+              maxOptions: employeeList.length || 50,
               placeholder,
               sortField: { field: "text", direction: "asc" },
               allowEmptyOption: true,
@@ -932,12 +936,25 @@ function EventCalendar() {
   };
 
   const handleDeleteDraftClick = async (draft) => {
+    // ⚠️ กันลบสัญญาทั้งอันไปโดยไม่ตั้งใจ — สัญญาที่เพิ่งสร้างไว้แบบยังไม่ระบุวันที่เข้างาน (ดูฟอร์ม
+    // "เพิ่มสัญญาใหม่" ใน ContractOverview.js) มี document เดียวในระบบคือฉบับร่างนี้ ถ้าลบทิ้งตอนยังไม่มี
+    // ครั้งไหนลงตารางจริงเลย (ไม่มีทั้งใน events ที่ลงตารางแล้ว และไม่มีฉบับร่างอื่นค้างอยู่ผูก
+    // contractGroupId เดียวกัน) จะไม่เหลือ record ไหนผูกสัญญานี้เลย สัญญาทั้งอันจะหายไปจากตาราง
+    // "ภาพรวมงาน" ทันที (ดู groupEventsByContract) — ต้องเตือนแยกให้ชัดเจนกว่าคำเตือนลบงานปกติ
+    const isSoleContractRecord = Boolean(draft.contractGroupId) && ![...events, ...drafts].some(
+      (e) => String(e._id) !== String(draft._id) && e.contractGroupId === draft.contractGroupId
+    );
+
     const result = await Swal.fire({
-      title: "ลบงานวางแผนล่วงหน้านี้?",
-      text: `${draft.title || "งาน"} · ${[draft.company, draft.site].filter(Boolean).join(" · ")}`,
+      title: isSoleContractRecord ? "⚠️ ลบแล้วสัญญาทั้งอันจะหายไปจากตาราง!" : "ลบงานวางแผนล่วงหน้านี้?",
+      html: isSoleContractRecord
+        ? `นี่เป็นครั้งเดียวที่เหลืออยู่ของสัญญานี้${draft.contractNo ? ` (เลขที่สัญญา ${draft.contractNo})` : ""} —
+           ลบแล้วสัญญา <b>${[draft.company, draft.site].filter(Boolean).join(" · ") || "งานนี้"}</b>
+           จะหายไปจากหน้า "ภาพรวมงาน" ทั้งหมดทันที (ต้องสร้างสัญญาใหม่ถ้าจะใช้อีก)`
+        : `${draft.title || "งาน"} · ${[draft.company, draft.site].filter(Boolean).join(" · ")}`,
       icon: "warning",
       showCancelButton: true,
-      confirmButtonText: "ลบ",
+      confirmButtonText: isSoleContractRecord ? "เข้าใจแล้ว ลบเลย" : "ลบ",
       cancelButtonText: "ยกเลิก",
       confirmButtonColor: "#dc2626",
     });
@@ -1147,10 +1164,22 @@ function EventCalendar() {
     [employeeList],
   );
 
+  // ⚠️ แก้ตามที่ผู้ใช้ขอ: ฉบับร่างของ "สัญญา" (มี contractGroupId — สร้างจากฟอร์ม "เพิ่มสัญญาใหม่" ใน
+  // ContractOverview.js ตอนยังไม่ระบุวันที่เข้างานครั้งที่ 1) ไม่ควรโผล่ปนอยู่ในแผงงานล่วงหน้าของหน้า
+  // ปฏิทินนี้เลย — เพราะแผงนี้ออกแบบไว้ให้ลบ/ลากลงตารางได้อย่างอิสระสำหรับงานทั่วไป/โปรเจคที่ยังไม่มี
+  // วันที่ ถ้ามีคนกดลบฉบับร่างของสัญญาจากตรงนี้โดยไม่รู้ว่าเป็นตัวยึดของทั้งสัญญา จะทำให้สัญญาทั้งอัน
+  // หายไปจากหน้า "ภาพรวมงาน" ทันที — ให้ไปเพิ่มวันที่ครั้งที่ 1 ผ่านปุ่ม "+" ในตาราง "ภาพรวมงาน" แทน
+  // เท่านั้น (ดู openAddVisitDialog ที่นั่น) ฉบับร่างของสัญญายังคงอยู่ในระบบ/นับรวมในตารางตามปกติ แค่ไม่
+  // แสดงในแผงนี้เท่านั้น
+  const visibleDrafts = useMemo(
+    () => drafts.filter((d) => !d.contractGroupId),
+    [drafts],
+  );
+
   // ✅ กรอง drafts ที่ดึงมาทั้งหมดให้เหลือเฉพาะเดือนที่กำลังเปิดดูอยู่ในแผงงานล่วงหน้า
   const draftsForMonth = useMemo(
-    () => drafts.filter((d) => d.plannedMonth === draftMonth),
-    [drafts, draftMonth],
+    () => visibleDrafts.filter((d) => d.plannedMonth === draftMonth),
+    [visibleDrafts, draftMonth],
   );
 
   // ✅ ยอดรวม "งานรออนุมัติ" — แอดมิน/manager เห็นทั้งระบบ (มีสิทธิ์อนุมัติได้ทุกงาน) คนอื่นเห็นแค่ของ
@@ -1276,12 +1305,12 @@ function EventCalendar() {
         </button>
 
         <button
-          className={`filter-toggle-btn ${showDraftsPanel ? "filter-toggle-btn--open" : ""} ${drafts.length > 0 ? "filter-toggle-btn--active" : ""}`}
+          className={`filter-toggle-btn ${showDraftsPanel ? "filter-toggle-btn--open" : ""} ${visibleDrafts.length > 0 ? "filter-toggle-btn--active" : ""}`}
           onClick={() => setShowDraftsPanel((p) => !p)}
           title="งานวางแผนล่วงหน้า (ยังไม่ลงตาราง)"
         >
           <FontAwesomeIcon icon={faLayerGroup} />
-          {drafts.length > 0 && <span className="filter-badge">{drafts.length}</span>}
+          {visibleDrafts.length > 0 && <span className="filter-badge">{visibleDrafts.length}</span>}
         </button>
 
         {/* ✅ ปุ่ม "N ต้องอนุมัติ" — ซ่อนไปเลยตอนไม่มีอะไรรออนุมัติ (เทียบ pattern เดียวกับ

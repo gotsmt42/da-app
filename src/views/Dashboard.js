@@ -39,6 +39,10 @@ import {
   resolveOperationGroup,
   getOverdueGroupKey,
 } from "../utils/overdueJobs";
+// ✅ ตรรกะ "เลยกำหนด/คงค้าง" เดียวกับหน้า "ภาพรวมงาน" (ContractOverview.js) เป๊ะๆ — ย้ายมารวมไว้ที่
+// utils/contractOverdue.js แล้วตั้งแต่ก่อนหน้านี้ (ใช้ซ้ำที่ Header.js ด้วยสำหรับป้ายบนแถบเมนู) กันตรรกะ
+// เพี้ยนไม่ตรงกันระหว่างจุดต่างๆ
+import { groupEventsByContract, nextVisitOverdueInfo } from "../utils/contractOverdue";
 
 // 🎨 สีและไอคอนประจำสถานะงาน — ใช้ร่วมกันทั้ง Quick Stats และการ์ดงานวันนี้
 // ✅ เก็บเป็น "component" ไม่ใช่ element ที่ render ไว้แล้ว เพื่อให้เรียกใช้คนละขนาดได้ตามบริบท
@@ -67,6 +71,9 @@ const Dashboard = () => {
   const isAdmin = role === "admin";
   const isAdminOrManager = ["admin", "manager"].includes(role);
   const isTechnician = role === "technician";
+  // ✅ หน้า "ภาพรวมงาน" เปิดให้ช่างเข้าดูสัญญาของตัวเองได้แล้ว (ดู ContractOverview.js canView /
+  // Header.js canViewContracts) — วิดเจ็ต "สัญญาที่เลยกำหนด/คงค้าง" ด้านล่างต้องเปิดให้ตรงกันด้วย
+  const canViewContracts = ["admin", "manager", "technician"].includes(role);
 
   const [loading, setLoading] = useState(false);
   const [files, setFiles] = useState([]);
@@ -332,6 +339,81 @@ const Dashboard = () => {
     (draftsSafePage - 1) * DRAFTS_PAGE_SIZE,
     draftsSafePage * DRAFTS_PAGE_SIZE,
   );
+
+  // ⏰ สัญญาที่ "เลยกำหนดเข้ารอบถัดไป/คงค้าง" — ดึงมาจากหน้า "ภาพรวมงาน" (ContractOverview.js) ตรงๆ
+  // ใช้ groupEventsByContract + nextVisitOverdueInfo ตัวเดียวกันเป๊ะๆ (utils/contractOverdue.js) กัน
+  // ตรรกะเพี้ยนไม่ตรงกัน — รวม drafts (แผนงานล่วงหน้า) เข้าไปด้วยเหมือนที่ ContractOverview.js เองทำ
+  // เพราะ getEventOp() กรอง unscheduled ทิ้งเสมอ ไม่งั้นสัญญาที่จองรอบถัดไปไว้ล่วงหน้าแล้วจะถูกนับผิดว่า
+  // ยังเลยกำหนดอยู่ — events/drafts ถูกกรองตาม role มาจาก backend แล้ว (แอดมิน/manager เห็นทั้งหมด
+  // ช่างเห็นแค่ของตัวเอง) จึงคำนวณตรงๆ ได้เลยไม่ต้องแยกเงื่อนไข role ที่นี่อีก
+  const overdueContracts = useMemo(() => {
+    if (!canViewContracts) return [];
+    return groupEventsByContract([...events, ...drafts])
+      .filter((c) => c.isRealContract)
+      .map((c) => {
+        const info = nextVisitOverdueInfo(c);
+        return info ? { ...c, overdueInfo: info } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.overdueInfo.monthsOverdue - a.overdueInfo.monthsOverdue);
+  }, [canViewContracts, events, drafts]);
+
+  // ✅ ดึง JSX ของบล็อก "สัญญาที่เลยกำหนด/คงค้าง" ออกมาเป็นตัวแปรเดียว ใช้ซ้ำได้ 2 จุด — จอกว้าง
+  // (≥960px) วางไว้ในคอลัมน์หลักฝั่งซ้าย (เทียบ pattern เดียวกับ dashboard-desktop-only/
+  // dashboard-mobile-only ใน <style> ด้านล่าง) ส่วนจอมือถือ (แอดมิน/manager) ย้ายไปแทรกอยู่เหนือ
+  // "งานวางแผนล่วงหน้า" ในแถบข้างแทน (ดู sidebarContent) ตามที่ผู้ใช้ขอ — ไม่ใช้ตัวแปรเดียวกันซ้ำ
+  // ตำแหน่งเดิมเพราะ sidebarContent ถูกใช้ render ทั้งจอมือถือ/จอกว้าง (คนละคอลัมน์กัน) ถ้าใส่ตรงๆ
+  // ในนั้นจะไปโผล่ซ้ำที่แถบข้างฝั่งขวาของจอกว้างด้วย ทั้งที่ต้องการให้จอกว้างอยู่ฝั่งซ้ายเท่านั้น
+  const overdueContractsBlock =
+    canViewContracts && overdueContracts.length > 0 ? (
+      <>
+        <h5 style={styles.sectionTitle}>⏰ สัญญาที่เลยกำหนด / คงค้าง</h5>
+        <div style={styles.contractOverdueCard}>
+          <div style={{ padding: "6px 0" }}>
+            {overdueContracts.slice(0, 5).map((c) => (
+              <Link
+                // ✅ ลิงก์เจาะจง — เด้งตรงไปแท็บ "เลยกำหนด/คงค้าง" พร้อมค้นหาชื่อบริษัท/
+                // โครงการนั้นให้ทันที (ดู ?q= ใน ContractOverview.js) แทนที่จะเปิดมาเจอทั้ง
+                // ลิสต์แล้วต้องมานั่งหาเอง
+                key={c.key}
+                to={`/contracts?view=overdue&q=${encodeURIComponent(c.company || c.site || "")}`}
+                style={styles.sideJobRow}
+                className="metric-card-hover"
+              >
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={styles.sideJobName}>
+                    {[c.company, c.site].filter(Boolean).join(" · ") ||
+                      c.title ||
+                      "สัญญา"}
+                  </span>
+                  <span style={styles.sideJobDetail}>
+                    {[c.title, c.system].filter(Boolean).join(" · ")}
+                  </span>
+                </span>
+                <span style={styles.contractOverdueBadge}>
+                  เกิน {c.overdueInfo.monthsOverdue} ด.
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+        {overdueContracts.length > 5 && (
+          <Link
+            to="/contracts?view=overdue"
+            style={{
+              ...styles.viewAllBtn,
+              color: "#b91c1c",
+              backgroundColor: "rgba(220, 38, 38, 0.08)",
+              border: "1px solid rgba(220, 38, 38, 0.25)",
+            }}
+            className="metric-card-hover"
+          >
+            ดูสัญญาที่เลยกำหนดทั้งหมด ({overdueContracts.length}){" "}
+            <FaChevronRight size={9} />
+          </Link>
+        )}
+      </>
+    ) : null;
 
   // 🏆 โครงการที่มีงานมากที่สุด (ทั้งหมด แบ่งหน้า) — จัดกลุ่มงานตาม บริษัท+โครงการ (company+site) เพราะ
   // Event ไม่มี customerId อ้างอิงตรงๆ (เทียบ pattern เดียวกับที่ Customer/index.js ใช้ผูกประวัติงาน)
@@ -713,6 +795,14 @@ const Dashboard = () => {
             </Link>
           )}
         </>
+      )}
+
+      {/* ─── สัญญาที่เลยกำหนด/คงค้าง — สำเนาสำหรับจอมือถือเท่านั้น (ดู .dashboard-mobile-only ใน
+      <style> ด้านล่าง) ตามที่ผู้ใช้ขอให้อยู่เหนือ "งานวางแผนล่วงหน้า" พอดี — sidebarContent ก้อนนี้
+      render ซ้ำทั้งจอมือถือ/จอกว้าง (คนละคอลัมน์) ถ้าไม่ครอบด้วยคลาสนี้จะไปโผล่ซ้ำที่แถบข้างฝั่งขวา
+      ของจอกว้างด้วย ทั้งที่จอกว้างต้องการให้อยู่ฝั่งซ้ายที่เดียว (ดู SECTION 5.5 ในคอลัมน์หลัก) ─── */}
+      {overdueContractsBlock && (
+        <div className="dashboard-mobile-only">{overdueContractsBlock}</div>
       )}
 
       {/* ─── งานวางแผนล่วงหน้า (drafts) — เดิมไม่มีทางเห็นได้เลยนอกจากเข้าไปเปิดหน้า "แผนงาน"
@@ -1098,6 +1188,19 @@ const Dashboard = () => {
           )}
 
           <div className="dashboard-main">
+            {/* ─── SECTION 5.5: สัญญาที่เลยกำหนด/คงค้าง (จากหน้า "ภาพรวมงาน") — เปิดให้ทุกสิทธิ์ที่
+          เข้าหน้า "ภาพรวมงาน" ได้เห็น (แอดมิน/manager/ช่าง) เพราะช่างก็มีสัญญาที่ตัวเองรับผิดชอบ
+          เลยกำหนดได้เหมือนกัน — ✅ ตามที่ผู้ใช้ขอ: จอกว้าง (แอดมิน/manager) วางไว้ตรงนี้ (คอลัมน์หลัก
+          ฝั่งซ้าย) แต่จอมือถือย้ายไปแทรกอยู่เหนือ "งานวางแผนล่วงหน้า" ในแถบข้างแทน (ดู sidebarContent)
+          เลยต้องซ่อนสำเนานี้บนจอมือถือด้วย .dashboard-desktop-only กันโชว์ซ้ำ 2 ที่ — ส่วนช่าง (ไม่มี
+          sidebarContent ให้แทรกด้วย เพราะทั้งก้อนนั้นเฉพาะแอดมิน/manager) ยังคงเห็นสำเนานี้ตามปกติ
+          ทั้งจอมือถือ/จอกว้างเหมือนเดิม ไม่ต้องซ่อน ─── */}
+            {isAdminOrManager ? (
+              <div className="dashboard-desktop-only">{overdueContractsBlock}</div>
+            ) : (
+              overdueContractsBlock
+            )}
+
             {/* ─── SECTION 6: TOP PROJECTS (เฉพาะแอดมิน/manager — events scope ตาม role มีความหมาย
           เป็น "ภาพรวมทั้งบริษัท" จริงๆ แค่กับสองสิทธิ์นี้เท่านั้น) ─── */}
             {isAdminOrManager && (
@@ -1312,6 +1415,17 @@ const Dashboard = () => {
         .dashboard-side--desktop {
           display: none;
         }
+        /* ✅ คู่คลาสสลับแสดง/ซ่อนตามความกว้างจอ — เทียบ pattern เดียวกับ dashboard-side--mobile/
+           --desktop ด้านบน แต่ใช้กับ "เนื้อหาชิ้นเดียวที่ต้อง render ซ้ำ 2 จุดคนละตำแหน่ง" แทนทั้ง
+           แถบข้าง (เช่น "สัญญาที่เลยกำหนด/คงค้าง" ที่จอมือถือให้อยู่เหนือ "งานวางแผนล่วงหน้า" ในแถบข้าง
+           แต่จอกว้างให้อยู่คอลัมน์หลักฝั่งซ้ายแทน) ไม่ผูกกับ width/sticky ของแถบข้างเหมือนคู่บน เพื่อไม่ให้
+           กระทบ layout ของจุดที่เอาไปใช้ */
+        .dashboard-mobile-only {
+          display: block;
+        }
+        .dashboard-desktop-only {
+          display: none;
+        }
         @media (min-width: 960px) {
           .dashboard-layout {
             display: flex;
@@ -1323,6 +1437,12 @@ const Dashboard = () => {
           }
           .dashboard-side--mobile {
             display: none;
+          }
+          .dashboard-mobile-only {
+            display: none;
+          }
+          .dashboard-desktop-only {
+            display: block;
           }
           .dashboard-side--desktop {
             display: block;
@@ -2018,6 +2138,27 @@ const styles = {
     fontWeight: "800",
     color: "#c2410c",
     backgroundColor: "rgba(249, 115, 22, 0.15)",
+    padding: "3px 9px",
+    borderRadius: "11px",
+    flexShrink: 0,
+    whiteSpace: "nowrap",
+  },
+
+  /* ⏰ กล่องแจ้งเตือนสัญญาที่เลยกำหนด/คงค้าง (Dashboard เนื้อหาหลัก) — โทนแดง แยกจาก
+     quotationAlertCard (ส้ม) เทียบสีเดียวกับป้ายเตือน "เลยกำหนด" ในหน้า ContractOverview.js เอง
+     (#dc2626) ให้เห็นชัดว่าเป็นคนละเรื่องกัน (ใบเสนอราคา vs รอบเข้างานสัญญา) */
+  contractOverdueCard: {
+    backgroundColor: "#fef2f2",
+    borderRadius: "14px",
+    border: "1px solid rgba(220, 38, 38, 0.3)",
+    marginBottom: "10px",
+    overflow: "hidden",
+  },
+  contractOverdueBadge: {
+    fontSize: "10.5px",
+    fontWeight: "800",
+    color: "#b91c1c",
+    backgroundColor: "rgba(220, 38, 38, 0.12)",
     padding: "3px 9px",
     borderRadius: "11px",
     flexShrink: 0,

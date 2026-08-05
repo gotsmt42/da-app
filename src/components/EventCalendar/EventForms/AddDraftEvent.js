@@ -435,7 +435,10 @@ export const getAddDraftEvent = async ({
       allowEscapeKey: false,
 
       didOpen: () => {
-        const mkTs = (id, placeholder = "", maxOptions = 7) => {
+        const mkTs = (id, placeholder = "", maxOptions = 50) => {
+          // ⚠️ เดิม fix ไว้ 7 ตัดรายชื่อ/ตัวเลือกที่มีเกิน 7 รายการทิ้งไปเงียบๆ (ห้องสมุด TomSelect
+          // ค่า default จริงคือ 50 อยู่แล้ว) ทำให้ dropdown บริษัท/โครงการ/ประเภทงาน/ระบบงาน "หาไม่เจอ"
+          // เป็นบางที เวลารายการมีมากกว่า 7 รายการ — ผู้เรียกควรส่ง length ของรายการจริงมาแทน
           try {
             return new TomSelect(id, {
               create: true,
@@ -448,10 +451,10 @@ export const getAddDraftEvent = async ({
           } catch { return null; }
         };
 
-        mkTs("#adeCompany", "เลือกหรือพิมพ์ชื่อบริษัท");
-        mkTs("#adeSite",    "เลือกหรือพิมพ์ชื่อโครงการ");
-        mkTs("#adeTitle",   "เลือกหรือพิมพ์ประเภทงาน");
-        mkTs("#adeSystem",  "เลือกหรือพิมพ์ระบบงาน");
+        mkTs("#adeCompany", "เลือกหรือพิมพ์ชื่อบริษัท", customers.userCustomers.length || 50);
+        mkTs("#adeSite",    "เลือกหรือพิมพ์ชื่อโครงการ", customers.userCustomers.length || 50);
+        mkTs("#adeTitle",   "เลือกหรือพิมพ์ประเภทงาน", (jobTypes?.items || []).length || 50);
+        mkTs("#adeSystem",  "เลือกหรือพิมพ์ระบบงาน", (systemTypes?.items || []).length || 50);
         // ✅ ช่อง "ครั้งที่" ตัดออกไปแล้วสำหรับงานทั่วไป/งานโปรเจค (เหลือเฉพาะตอนแก้ไขงานที่ผูกสัญญา
         // อยู่แล้ว — ดู isContractLinked ตอน render HTML) เช็คว่ามี element อยู่จริงก่อนค่อย init TomSelect
         if (document.getElementById("adeTime")) mkTs("#adeTime", "เลือกครั้งที่", 4);
