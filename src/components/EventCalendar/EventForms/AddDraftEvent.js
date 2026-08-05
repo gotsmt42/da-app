@@ -623,6 +623,14 @@ export const getAddDraftEvent = async ({
             // เสมอ ไม่ควรเอามาทับหมวดหมู่เดิมที่มีอยู่แล้วของ draft นั้น)
             if (!isEditMode) {
               payload.jobClassification = jobType === "project" ? "project" : "general";
+              // ✅ คนที่เพิ่มแผนงานทั่วไป/โปรเจคเองเป็นผู้รับผิดชอบงานนั้นทันทีโดยอัตโนมัติ (งานตามสัญญา
+              // ยังคงให้ admin/manager มอบหมายเองผ่านหน้า "ภาพรวมงาน" เหมือนเดิม ไม่ตั้งตรงนี้) — ทีมที่
+              // เข้างานจริงยังเลือกได้ตามปกติตอนกดลงตารางจริง (ดู scheduleDraft/swal-schedule-team ใน
+              // EventCalendar/index.js) เพราะ draft ยังไม่รู้วันที่แน่นอน จึงยังไม่มีช่องเลือกทีมตรงนี้
+              if (jobType !== "contract") {
+                payload.responsiblePerson = userData?.fname || "";
+                payload.responsiblePersonId = userData?.userId || "";
+              }
             }
 
             const existing = customers.userCustomers.find(

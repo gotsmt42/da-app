@@ -37,6 +37,12 @@ export const groupEventsByContract = (events) => {
       .filter(Boolean)
       .filter((name, idx, arr) => arr.indexOf(name) === idx)
       .filter((name) => name !== teamLeaderName);
+    // ✅ ทุกคนที่เคยเข้างาน "ครั้งไหนก็ได้" ของสัญญานี้ (ไม่ใช่แค่ครั้งที่ 1 เหมือน teamLeaderName/
+    // teamMemberNames ด้านบน) — แต่ละครั้งอาจเข้าโดยคนละทีมกัน ใช้ค้นหา/กรองในหน้า "ภาพรวมงาน" ให้
+    // เจอสัญญานี้ได้แม้ค้นหาชื่อคนที่เข้าครั้งอื่นๆ ที่ไม่ใช่ครั้งแรก
+    const allRoundTeamNames = [...new Set(
+      sorted.flatMap((v) => [v.team, ...(v.teamMembers || []).map((m) => m?.name)]).filter(Boolean)
+    )];
     // ✅ งานที่ไม่มี contractGroupId มี 3 หมวดหมู่: "" (ยังไม่จัดกลุ่ม — ค่าเริ่มต้น) / "general"
     // (งานทั่วไป) / "project" (งานโปรเจค) ต่อเมื่อกดยืนยันผ่านหน้า "ภาพรวมงาน" เท่านั้น (ดู
     // PUT /events/:id/classify) — เดิมมีแค่ isConfirmedGeneral (true/false) ก่อนเพิ่มหมวด "โปรเจค"
@@ -72,6 +78,7 @@ export const groupEventsByContract = (events) => {
       team: teamNames.join(", ") || "-",
       teamLeaderName,
       teamMemberNames,
+      allRoundTeamNames,
       // ✅ "ผู้รับผิดชอบ" — ฟิลด์อิสระแยกจาก "team" ด้านบนโดยสมบูรณ์แล้ว (team คือใครเข้างานจริงใน
       // แต่ละครั้ง เปลี่ยนได้ทุกครั้งที่มอบหมายทีมอื่นไปทำแทน แต่คนที่รับผิดชอบงาน/ลูกค้ารายนี้โดยรวม
       // ไม่ควรเปลี่ยนตาม) แก้ไขแยกได้เองที่หน้า "ภาพรวมงาน" (ดู PUT /basic-info,
@@ -79,6 +86,11 @@ export const groupEventsByContract = (events) => {
       // ค่า team เดิมที่คุ้นเคยอยู่แล้วแทนว่างเปล่า (ตามที่ขอ) พอแก้ไขครั้งแรกจะกลายเป็นค่าอิสระทันที
       responsiblePerson: head.responsiblePerson || head.team || "",
       responsiblePersonId: head.responsiblePersonId || head.resPerson || "",
+      // ✅ ค่าที่ตั้งไว้ตรงๆ เท่านั้น (ไม่ fallback ไปที่ team เหมือนสองฟิลด์ด้านบน) — ใช้เช็คสิทธิ์ใหม่ที่
+      // ต้อง "มอบหมายผู้รับผิดชอบไว้ชัดเจนก่อน" เท่านั้นถึงจะได้ (เช่น แก้ไขทีมของแต่ละครั้งในตารางนี้ —
+      // ดู beginRoundTeamEdit) ตรงกับที่ backend เช็คแบบเข้มงวดเหมือนกันทุกประการ (ไม่ fallback)
+      rawResponsiblePersonId: head.responsiblePersonId || "",
+      rawResponsiblePerson: head.responsiblePerson || "",
       visits: sorted,
     };
   });

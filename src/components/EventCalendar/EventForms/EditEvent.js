@@ -611,6 +611,11 @@ export const getEditEvent = async ({
   const eventResPerson = ev.extendedProps?.resPerson || "";
 
   const isAdminOrManagerUser = ["admin", "manager"].includes(userData?.role?.toLowerCase());
+  // ✅ งานที่ยังรออนุมัติ (ไม่ใช่ "ถูกปฏิเสธ" — เคสนั้นยังต้องแก้ไขได้เพื่อส่งขออนุมัติใหม่ตามปกติ) —
+  // ช่าง/ผู้รับผิดชอบเปิดดูได้อย่างเดียว แก้ไข/ทำอะไรไม่ได้เลยจนกว่าแอดมิน/manager จะตัดสินใจก่อน
+  // (ตามที่ผู้ใช้ยืนยัน) ล็อกทุกช่อง/ปุ่มที่ปกติช่างแก้ไข/กดได้ (วันที่-เวลา/สถานะ/ทีม/คัดลอก/ลบ/
+  // ย้ายไปแผนล่วงหน้า) เหลือแค่ดูข้อมูล + ปุ่มปิด — admin/manager ไม่ถูกจำกัดเลย ยังทำงานได้ตามปกติ
+  const isPendingForTech = eventApprovalState === "pending" && !isAdminOrManagerUser;
   const isOwnerUser    = Boolean(userId) && userId.toString() === userData?.userId?.toString();
   // ✅ "ผู้รับผิดชอบตัวจริง" (effective) — fallback ไปที่ team/resPerson เฉพาะงานที่ยังไม่เคยตั้งค่า
   // ผู้รับผิดชอบแยกไว้เลย (เทียบ pattern เดียวกับ isEffectiveResponsiblePerson ฝั่ง backend เป๊ะๆ) กัน
@@ -634,18 +639,22 @@ export const getEditEvent = async ({
   // ✅ หัวหน้าทีม/ลูกทีม แก้ไขได้เพิ่มจากเดิม (admin/manager เท่านั้น) — ให้ "ผู้รับผิดชอบ" จัดการเองได้ด้วย
   // (ใช้ raw ไม่ fallback — ต้องถูกมอบหมายเป็นผู้รับผิดชอบไว้ชัดเจนก่อน ไม่ใช่แค่บังเอิญเป็นทีมที่เข้างาน
   // อยู่แล้ว ไม่งั้นจะกลายเป็นย้อนแย้งกับสิทธิ์ "ทีมที่เข้างานแก้ไขได้แค่วันที่/เวลา/สถานะ" ที่เพิ่งจำกัดไว้)
-  const canEditTeamAssignment = isAdminOrManagerUser || isRawResponsiblePerson;
+  const canEditTeamAssignment = isAdminOrManagerUser || (isRawResponsiblePerson && !isPendingForTech);
   // ❌ งานที่ admin ปิดแล้ว (ดำเนินการเสร็จสิ้น) ช่างลบไม่ได้อีก มีแค่ admin/manager เท่านั้น
-  const canDeleteEvent = isAdminOrManagerUser || eventStatus !== "ดำเนินการเสร็จสิ้น";
+  // ❌ งานที่ยังรออนุมัติ ช่างก็ลบเองไม่ได้เช่นกัน (isPendingForTech) — ทำอะไรไม่ได้เลยจนกว่าจะอนุมัติ/
+  // ไม่อนุมัติก่อน
+  const canDeleteEvent = isAdminOrManagerUser || (eventStatus !== "ดำเนินการเสร็จสิ้น" && !isPendingForTech);
   // ❌ งานที่ปิดแล้ว (ดำเนินการเสร็จสิ้น) ห้าม "ย้ายไปแผนล่วงหน้า" เด็ดขาด ไม่มีข้อยกเว้นแม้แต่ admin/
   // manager (ต่างจาก canDeleteEvent ด้านบน) เพราะ unschedule เคลียร์ date/start/end ทิ้งโดยไม่แตะ
   // status เลย ถ้าปล่อยให้ทำกับงานที่เสร็จแล้วได้ จะได้ "แผนงานล่วงหน้า" ที่ status ยังเป็น "เสร็จสิ้น"
   // ค้างอยู่ ซึ่งเป็นสถานะขัดแย้งกันเองที่ไม่ควรเกิดขึ้นได้เลย (เทียบ pattern เดียวกับฝั่ง backend
-  // PUT /:id/unschedule ที่ปิดเด็ดขาดเหมือนกัน)
-  const canUnscheduleEvent = eventStatus !== "ดำเนินการเสร็จสิ้น";
+  // PUT /:id/unschedule ที่ปิดเด็ดขาดเหมือนกัน) — ช่างงานรออนุมัติก็ทำไม่ได้เหมือนกัน (isPendingForTech)
+  // แต่ admin/manager ยังทำได้เสมอไม่ว่าจะรออนุมัติหรือไม่ (ไม่มี isAdminOrManagerUser bypass ตรงนี้ตั้งแต่แรกอยู่แล้ว)
+  const canUnscheduleEvent = eventStatus !== "ดำเนินการเสร็จสิ้น" && (isAdminOrManagerUser || !isPendingForTech);
   // ✅ ช่างแก้ไขสถานะเองได้แค่ตอนยังอยู่ในช่วง กำลังรอยืนยัน/ยืนยันแล้ว เท่านั้น
   // ถ้าสถานะถูกเลื่อนไปไกลกว่านั้นแล้ว (กำลังดำเนินการ/ดำเนินการเสร็จสิ้น) ให้แสดงค่าจริงไว้ แต่แก้ไม่ได้
-  const canEditStatus = isAdminOrManagerUser || TECH_EDITABLE_STATUSES.includes(eventStatus);
+  // ❌ งานที่ยังรออนุมัติ ช่างเปลี่ยนสถานะเองไม่ได้เช่นกัน (isPendingForTech) — ต้องรออนุมัติก่อน
+  const canEditStatus = isAdminOrManagerUser || (TECH_EDITABLE_STATUSES.includes(eventStatus) && !isPendingForTech);
 
   // ✅ "ย้ายเข้าสัญญาที่มีอยู่แล้ว" — ย้ายมาจากหน้า "ภาพรวมงาน" (ContractOverview.js openAttachDialog)
   // ให้แก้ไขกรณีจัดกลุ่มผิดได้ตรงจากหน้าแก้ไขงานเลย ไม่ต้องสลับไปหน้าภาพรวมงานทุกครั้ง — เฉพาะงานที่ยัง
@@ -674,7 +683,8 @@ export const getEditEvent = async ({
   const canAttachToContract = isAdminOrManagerUser && !eventContractGroupId && attachableContracts.length > 0;
   // ✅ คัดลอกงานนี้ไปวางเป็นงานใหม่ — เฉพาะงานทั่วไป ไม่ใช่งานผูกสัญญา (คัดลอกงานสัญญาจะทำให้ตัวนับ
   // "ครั้งที่" ที่ใช้ไปแล้วของสัญญาเดิมสับสน/เพี้ยนได้ ดู countUsedRounds ด้านบน)
-  const canCopyEvent = !eventContractGroupId;
+  // ❌ ช่างงานรออนุมัติทำอะไรไม่ได้เลยเช่นกัน (isPendingForTech) — admin/manager ยังคัดลอกได้เสมอ
+  const canCopyEvent = !eventContractGroupId && (isAdminOrManagerUser || !isPendingForTech);
 
   const formattedEnd = eventAllDay
     ? moment(eventEnd).subtract(1, "days").format("YYYY-MM-DD")
@@ -844,7 +854,7 @@ export const getEditEvent = async ({
           <button type="button" class="ee-btn ee-btn-ghost" id="btnCancelRejectJob">ยกเลิก</button>
         </div>
       </div>
-      ` : `<div style="margin-top:6px;">รอแอดมิน/manager ตรวจสอบและอนุมัติ</div>`}
+      ` : `<div style="margin-top:6px;">รอแอดมิน/manager ตรวจสอบและอนุมัติ — ระหว่างนี้ดูข้อมูลได้อย่างเดียว แก้ไข/ลบ/เปลี่ยนสถานะไม่ได้จนกว่าจะอนุมัติหรือไม่อนุมัติก่อน</div>`}
     </div>
     ` : eventApprovalState === "rejected" ? `
     <div class="ee-approval-box ee-approval-box--rejected">
@@ -964,10 +974,15 @@ export const getEditEvent = async ({
     <hr class="ee-divider">
 
     <!-- section: วันที่ & เวลา — เหมือนหน้า Add เลย ค้างวันที่/ช่วงวันที่เดิมไว้ให้แก้ง่าย -->
-    <p class="ee-section-label">วันที่ & เวลา ${!isAdminOrManagerUser ? `<span style="font-size:10.5px;font-weight:600;color:#16a34a;">✏️ แก้ไขได้</span>` : ""}</p>
+    <p class="ee-section-label">วันที่ & เวลา ${!isAdminOrManagerUser && !isPendingForTech ? `<span style="font-size:10.5px;font-weight:600;color:#16a34a;">✏️ แก้ไขได้</span>` : ""}</p>
+    ${isPendingForTech ? `
+    <p style="font-size:11px;color:#b45309;margin:-6px 0 10px;">
+      🔒 งานนี้ยังรออนุมัติ — ดูได้อย่างเดียว แก้ไขไม่ได้จนกว่าแอดมิน/manager จะอนุมัติหรือไม่อนุมัติก่อน
+    </p>
+    ` : ""}
 
     <label class="ee-checkbox-row">
-      <input type="checkbox" id="ee-multiDateToggle" ${hasSiblings ? "checked" : ""}>
+      <input type="checkbox" id="ee-multiDateToggle" ${hasSiblings ? "checked" : ""} ${isPendingForTech ? "disabled" : ""}>
       🗓️ งานนี้ต้องเข้างานหลายวัน (ไม่ติดกันก็ได้) — ถือเป็นงานเดียวกัน
       ${hasSiblings ? `<span style="color:#94a3b8;font-weight:500;">(มีอยู่แล้ว ${siblingEvents.length + 1} วัน)</span>` : ""}
     </label>
@@ -976,28 +991,28 @@ export const getEditEvent = async ({
       <div class="ee-grid ee-grid-2">
         <div class="ee-field">
           <label>📅 วันที่เริ่ม</label>
-          <input id="editStart" type="date" value="${eventStart.format("YYYY-MM-DD")}">
+          <input id="editStart" type="date" value="${eventStart.format("YYYY-MM-DD")}" ${isPendingForTech ? "disabled" : ""}>
         </div>
         <div class="ee-field">
           <label>📅 วันที่สิ้นสุด</label>
-          <input id="editEnd" type="date" value="${formattedEnd}">
+          <input id="editEnd" type="date" value="${formattedEnd}" ${isPendingForTech ? "disabled" : ""}>
         </div>
       </div>
     </div>
 
     <div id="ee-multiDateSection" style="${hasSiblings ? "" : "display:none;"}">
       <div id="ee-multiDateList"></div>
-      <button type="button" class="ee-btn ee-btn-ghost" id="ee-addDateBtn" style="margin-bottom:12px;">➕ เพิ่มช่วงวันที่</button>
+      ${isPendingForTech ? "" : `<button type="button" class="ee-btn ee-btn-ghost" id="ee-addDateBtn" style="margin-bottom:12px;">➕ เพิ่มช่วงวันที่</button>`}
     </div>
 
     <div class="ee-grid ee-grid-2">
       <div class="ee-field">
         <label>🕐 เวลาเริ่ม</label>
-        <input id="editStartTime" type="text" placeholder="เช่น 08:30" value="${attrHtml(eventStartTime)}">
+        <input id="editStartTime" type="text" placeholder="เช่น 08:30" value="${attrHtml(eventStartTime)}" ${isPendingForTech ? "disabled" : ""}>
       </div>
       <div class="ee-field">
         <label>🕔 เวลาสิ้นสุด</label>
-        <input id="editEndTime" type="text" placeholder="เช่น 17:00" value="${attrHtml(eventEndTime)}">
+        <input id="editEndTime" type="text" placeholder="เช่น 17:00" value="${attrHtml(eventEndTime)}" ${isPendingForTech ? "disabled" : ""}>
       </div>
     </div>
 
@@ -1064,10 +1079,11 @@ export const getEditEvent = async ({
       <button class="ee-btn ee-btn-info"      id="btnGeneratePDF">📄 ออกใบแจ้งเข้างาน</button>
     </div>
 
-    <!-- 🟢 ขวา: ยืนยัน -->
+    <!-- 🟢 ขวา: ยืนยัน — งานรออนุมัติที่ช่างเปิดดู ไม่มีอะไรให้บันทึก (ทุกช่องถูกล็อกหมดแล้ว) จึงไม่ต้อง
+         โชว์ปุ่มบันทึกที่กดแล้วไม่มีผลอะไรเลย (ป้องกันความสับสน/error หลอกๆ) เหลือแค่ปุ่มปิดอย่างเดียว -->
     <div class="ee-btn-group ee-btn-group-right">
       <button class="ee-btn ee-btn-ghost"   id="btnCancel">✕ ปิด</button>
-      <button class="ee-btn ee-btn-success" id="btnConfirm">💾 บันทึก</button>
+      ${isPendingForTech ? "" : `<button class="ee-btn ee-btn-success" id="btnConfirm">💾 บันทึก</button>`}
     </div>
 
   </div>
@@ -1383,12 +1399,12 @@ export const getEditEvent = async ({
         row.className = "ee-multi-date-row";
         if (eventIdAttr) row.dataset.eventId = eventIdAttr;
         row.innerHTML = `
-          <input type="date" class="ee-range-start" value="${startValue}">
+          <input type="date" class="ee-range-start" value="${startValue}" ${isPendingForTech ? "disabled" : ""}>
           <span class="ee-range-sep">–</span>
-          <input type="date" class="ee-range-end" value="${endValue || startValue}">
-          <button type="button" class="ee-btn ee-btn-ghost ee-multi-date-remove" title="ลบช่วงนี้ออก">✕</button>
+          <input type="date" class="ee-range-end" value="${endValue || startValue}" ${isPendingForTech ? "disabled" : ""}>
+          ${isPendingForTech ? "" : `<button type="button" class="ee-btn ee-btn-ghost ee-multi-date-remove" title="ลบช่วงนี้ออก">✕</button>`}
         `;
-        row.querySelector(".ee-multi-date-remove").addEventListener("click", () => {
+        row.querySelector(".ee-multi-date-remove")?.addEventListener("click", () => {
           // ต้องเหลืออย่างน้อย 1 แถวเสมอ กันผู้ใช้ลบจนหมด
           if (multiDateList.children.length <= 1) return;
           const rowEventId = row.dataset.eventId;

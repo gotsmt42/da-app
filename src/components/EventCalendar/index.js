@@ -1230,6 +1230,24 @@ function EventCalendar() {
     { label: "ดำเนินการเสร็จสิ้น", color: "#18b007", icon: faCheckDouble },
   ];
 
+  // ✅ เดิมมี 2 dropdown แยกกัน ("ทุกสถานะ" กับ "ทุกสถานะอนุมัติ") ผู้ใช้ต้องเช็ค 2 ที่ถึงจะรู้ว่างานไหน
+  // ต้องดูแล — รวมเป็นตัวเดียวให้เลือกสถานะงาน "หรือ" สถานะอนุมัติจากช่องเดียวกัน ยังคงเก็บเป็น 2 state
+  // (selectedStatus/selectedApproval) เหมือนเดิมข้างในเพื่อไม่แตะตรรกะกรอง (matchesStatus/matchesApproval
+  // ด้านบน) ใช้ prefix แยกว่าค่าที่เลือกเป็นสถานะงานหรือสถานะอนุมัติแค่ตอนแสดงผล/รับ event เท่านั้น
+  const combinedStatusValue = selectedApproval ? `approval:${selectedApproval}` : selectedStatus ? `status:${selectedStatus}` : "";
+  const handleCombinedStatusChange = (val) => {
+    if (val.startsWith("approval:")) {
+      setSelectedApproval(val.slice("approval:".length));
+      setSelectedStatus("");
+    } else if (val.startsWith("status:")) {
+      setSelectedStatus(val.slice("status:".length));
+      setSelectedApproval("");
+    } else {
+      setSelectedStatus("");
+      setSelectedApproval("");
+    }
+  };
+
 
   return (
     <div className="modern-calendar-container">
@@ -1360,15 +1378,20 @@ function EventCalendar() {
             ))}
           </select>
 
+          {/* ✅ รวมสถานะงาน + สถานะอนุมัติไว้ในช่องเดียวกัน (เดิมแยกเป็น 2 dropdown คนละที่ ต้องเช็ค
+              2 จุดถึงจะรู้ว่างานไหนต้องดูแล) — ใช้ prefix "status:"/"approval:" แยกประเภทค่าที่เลือก
+              แล้วแปลงกลับเป็น selectedStatus/selectedApproval ตามเดิม (ดู handleCombinedStatusChange) */}
           <select
             className="event-filter-select"
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
+            value={combinedStatusValue}
+            onChange={(e) => handleCombinedStatusChange(e.target.value)}
           >
             <option value="">ทุกสถานะ</option>
             {statusLegend.map((s) => (
-              <option key={s.label} value={s.label}>{s.label}</option>
+              <option key={s.label} value={`status:${s.label}`}>{s.label}</option>
             ))}
+            <option value="approval:pending">⏳ รออนุมัติ</option>
+            <option value="approval:rejected">❌ ไม่อนุมัติ</option>
           </select>
 
           <select
@@ -1391,16 +1414,6 @@ function EventCalendar() {
             {systemOptions.map((s) => (
               <option key={s} value={s}>{s}</option>
             ))}
-          </select>
-
-          <select
-            className="event-filter-select"
-            value={selectedApproval}
-            onChange={(e) => setSelectedApproval(e.target.value)}
-          >
-            <option value="">ทุกสถานะอนุมัติ</option>
-            <option value="pending">⏳ รออนุมัติ</option>
-            <option value="rejected">❌ ไม่อนุมัติ</option>
           </select>
 
           {hasActiveFilters && (
