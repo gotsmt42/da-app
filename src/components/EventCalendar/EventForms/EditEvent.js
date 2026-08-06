@@ -207,6 +207,18 @@ function injectStyles() {
     .ee-contract-box-label span {
       font-size: 11px; font-weight: 500; color: #6366f1;
     }
+    /* ✅ ทางเชื่อมกลับไปหน้า "ภาพรวมงาน" — วางท้ายกล่องข้อมูลสัญญา ใช้โทนสีเดียวกับกล่อง (ม่วง-คราม)
+       ให้ดูเป็นส่วนหนึ่งของกล่องนี้ ไม่ใช่ปุ่มแปลกปลอมที่หลุดมาจากที่อื่น */
+    .ee-contract-link {
+      display: inline-flex; align-items: center; gap: 5px;
+      margin: 2px 0 10px; padding: 5px 11px;
+      font-size: 12px; font-weight: 700; text-decoration: none;
+      color: #4338ca; background: #fff;
+      border: 1.5px solid #c7d2fe; border-radius: 8px;
+      transition: background .15s, border-color .15s, transform .1s;
+    }
+    .ee-contract-link:hover { background: #eef2ff; border-color: #818cf8; color: #3730a3; }
+    .ee-contract-link:active { transform: translateY(1px); }
     .ee-contract-box .ee-field input {
       background: #fff; border-color: #ddd6fe;
     }
@@ -910,6 +922,17 @@ export const getEditEvent = async ({
           <input id="editJobValue" type="number" value="${eventJobValue}" placeholder="เช่น 86000" ${isAdminOrManagerUser ? "" : "disabled"}>
         </div>
       </div>
+      <!-- ✅ ทางเชื่อมกลับไปหน้า "ภาพรวมงาน" — เดิมลิงก์ระหว่างสองหน้านี้เป็นทางเดียวล้วนๆ (ภาพรวมงาน
+           กดเข้ามาดูงาน/ปฏิทินได้ แต่จากปฏิทินไม่มีทางกลับไปดู "ทั้งสัญญา" เลย ต้องออกไปเปิดหน้านั้นเอง
+           แล้วค้นหาสัญญาซ้ำอีกรอบ) — กล่องนี้บอกอยู่แล้วว่าเป็นข้อมูล "ทั้งสัญญา" จึงเป็นที่ที่เหมาะที่สุด
+           ⚠️ ต้องส่ง year=all ไปด้วยเสมอ ไม่งั้นตัวกรองปีของหน้าปลายทาง (ค่าเริ่มต้น = ปีปัจจุบัน) จะซ่อน
+           สัญญาของปีอื่นทิ้ง เปิดไปแล้วเจอตารางว่างทั้งที่สัญญามีอยู่จริง (ดู ?year= ใน ContractOverview.js)
+           ค้นด้วยเลขที่สัญญาก่อน ถ้ายังไม่มีเลขที่ค่อย fallback ไปใช้ชื่อบริษัท/โครงการแทน -->
+      <a class="ee-contract-link"
+         href="/contracts?year=all&q=${encodeURIComponent(eventContractNo || eventCompany || eventSite || "")}"
+         title="เปิดหน้าภาพรวมงาน พร้อมค้นหาสัญญานี้ให้อัตโนมัติ">
+        📊 ดูสัญญานี้ในภาพรวมงาน
+      </a>
     </div>
     ` : ""}
 

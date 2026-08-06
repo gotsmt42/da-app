@@ -77,6 +77,58 @@
   transform: scale(0.94);
 }
 
+/* ✅ กลุ่มปุ่มย่อ/ขยายปฏิทิน — ทรงเดียวกับ .toolbar-icon-btn (สูง 40px ขอบมน) แต่รวม 3 ปุ่มไว้ในกรอบ
+   เดียวกันแบบ segmented control ให้เห็นชัดว่าเป็นชุดควบคุมเดียวกัน ไม่ใช่ปุ่มแยก 3 อัน */
+.ec-zoom-group {
+  display: inline-flex;
+  align-items: stretch;
+  height: 40px;
+  flex-shrink: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+  background-color: #ffffff;
+}
+.ec-zoom-btn,
+.ec-zoom-level {
+  border: none;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  touch-action: manipulation;
+  font-family: inherit;
+}
+.ec-zoom-btn {
+  width: 34px;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1;
+}
+/* ✅ ตัวเลข % คั่นกลาง กดเพื่อรีเซ็ตกลับ 100% — เส้นคั่นบางๆ ให้แยกออกจากปุ่ม +/− ได้ด้วยตา */
+.ec-zoom-level {
+  min-width: 52px;
+  padding: 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  border-left: 1px solid #e2e8f0;
+  border-right: 1px solid #e2e8f0;
+}
+.ec-zoom-btn:hover:not(:disabled),
+.ec-zoom-level:hover {
+  background-color: rgba(220, 38, 38, 0.08);
+  color: #dc2626;
+}
+.ec-zoom-btn:active:not(:disabled),
+.ec-zoom-level:active {
+  background-color: rgba(220, 38, 38, 0.16);
+}
+/* ✅ สุดทางแล้ว — จางลงและกดไม่ได้ ให้รู้ว่าย่อ/ขยายต่อไม่ได้อีก ไม่ใช่ปุ่มเสีย */
+.ec-zoom-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
 .toolbar-icon-btn--pdf {
   color: #dc2626;
   border-color: rgba(220, 38, 38, 0.25);

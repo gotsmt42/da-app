@@ -36,18 +36,26 @@ export const getFetchEvents = async ({
           lastModifiedBy: event.lastModifiedBy, // ✅ เพิ่มเข้า extendedProps
           startTime: event.extendedProps?.startTime ?? rawStartTime ?? "",
           endTime: event.extendedProps?.endTime ?? rawEndTime ?? "",
+          // ✅ ลำดับการแสดงในช่องวันเดียวกัน — งานอยู่หลังวันหยุดเสมอ (ดู eventOrder ใน index.js)
+          sortPriority: 1,
         },
       };
     });
 
 
     // แปลงข้อมูลวันหยุด (ถ้ามี)
+    // 🐛 BUG ที่แก้ (วันหยุดหายไปในวันที่มีงานเยอะ): วันหยุดถูกต่อท้าย array หลังงานทั้งหมด และปฏิทิน
+    // จำกัดไว้ 7 แถวต่อช่องวัน (dayMaxEventRows) ที่เหลือยุบเป็น "+N more" — วันไหนมีงานเกิน 7 รายการ
+    // วันหยุดจึงถูกดันเข้าไปซ่อนในป๊อปอัพ "+N" มองไม่เห็นเลยว่าวันนั้นเป็นวันหยุด ทั้งที่เป็นข้อมูลที่ต้อง
+    // เห็นก่อนงานด้วยซ้ำ (ใช้ตัดสินใจว่าจะนัดงานวันนั้นดีไหม)
+    // ✅ ให้ค่าลำดับต่ำกว่างานเสมอ แล้วบังคับเรียงด้วย eventOrder ที่ <FullCalendar> (ดู index.js)
     const holidayEvents = Array.isArray(thaiHolidays)
       ? thaiHolidays.map((holiday) => ({
           ...holiday,
           extendedProps: {
             ...holiday.extendedProps,
             fontSize: defaultFontSize.extendedProps || "12",
+            sortPriority: 0,
           },
         }))
       : [];

@@ -41,7 +41,6 @@ import {
   AddLink, LinkOff, Build, Engineering, ExpandMore, ExpandLess,
   CalendarMonth, PersonOutline, Category, Assignment, Description, HourglassEmpty, Apps,
 } from "@mui/icons-material";
-import { CSVLink } from "react-csv";
 import { useAuth } from "../../auth/AuthContext";
 import EventService from "../../services/EventService";
 import CustomerService from "../../services/CustomerService";
@@ -82,6 +81,17 @@ const STATUS_COLOR = {
 // ✅ ช่องว่างเดิมใช้ "-" สีเทาเฉยๆ แต่ปนกับ "-" ที่เป็นลิงก์ (สีแดง) ในคอลัมน์ครั้งที่ N ดูแยกยาก
 // ว่าอันไหนกดได้ — ใช้ตัวกลมจางๆ แทน ให้ต่างจากลิงก์ชัดเจนขึ้น
 const Dash = () => <Box component="span" sx={{ color: "text.disabled", opacity: 0.6 }}>–</Box>;
+
+// ✅ "ผู้รับผิดชอบ" ที่ยังไม่เคยมอบหมาย — เดิมช่องนี้ fallback ไปแสดงชื่อ "หัวหน้าทีมเข้างานของครั้งที่ 1"
+// แทน ทำให้ดูเหมือนมอบหมายไว้แล้วทั้งที่ยังไม่เคย และเปลี่ยนตามทุกครั้งที่แก้ทีม (ดู groupEventsByContract
+// ใน utils/contractOverdue.js) — ตัด fallback ออกแล้ว จึงต้องมีสถานะว่างที่ "สื่อความหมาย" แทนขีดเปล่าๆ
+// ให้รู้ว่าเป็นงานที่ยังต้องไปมอบหมายเพิ่ม ไม่ใช่ข้อมูลหาย
+const unassignedResponsibleDisplay = (v) =>
+  v || (
+    <Box component="span" sx={{ color: "#b45309", fontSize: "0.72rem", fontWeight: 600, whiteSpace: "nowrap" }}>
+      ยังไม่มอบหมาย
+    </Box>
+  );
 
 // ✅ "สถานะงาน" — แทนที่คอลัมน์ "คืบหน้า" เดิม (เลข X/Y เฉยๆ ไม่รู้ว่าตอนนี้อยู่ขั้นไหนจริงๆ) อิงจาก
 // event ที่ "เกี่ยวข้องที่สุดตอนนี้" ของแต่ละแถวโดยตรง (ครั้งที่ลงตารางจริงล่าสุด ไม่นับแผนงานล่วงหน้าที่
@@ -622,7 +632,12 @@ export default function ContractOverview() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contracts]);
   // ✅ ค่าเริ่มต้นแสดงปีปัจจุบันก่อนเสมอ (ไม่ใช่ "ทุกปี" เหมือนเดิม) เปลี่ยนดูปีอื่นได้จาก dropdown
-  const [yearFilter, setYearFilter] = useState(String(currentYear));
+  // ✅ ?year= — จำเป็นสำหรับ "ลิงก์เจาะจงข้ามหน้า" (เช่นปุ่ม "ดูในภาพรวมงาน" จากฟอร์มแก้ไขงานในปฏิทิน):
+  // ตัวกรองปีตั้งค่าเริ่มต้นเป็นปีปัจจุบันไว้เอง ถ้าลิงก์มาหาสัญญาของปีอื่นแล้วไม่ได้สั่งปิดตัวกรองปีมาด้วย
+  // จะเปิดมาเจอตารางว่างเปล่าทันที ทั้งที่สัญญานั้นมีอยู่จริง — ลิงก์ข้ามหน้าจึงส่ง year=all มาเสมอ
+  const [yearFilter, setYearFilter] = useState(
+    () => searchParams.get("year") || String(currentYear)
+  );
   // ✅ จำนวนแถวที่ยัง "ระบุปีไม่ได้" (สัญญาเปล่าที่ยังไม่กรอกวันที่เริ่มสัญญา/ยังไม่ลงวันที่เข้างานเลย) —
   // แถวพวกนี้แสดงในทุกปีอยู่แล้ว (ดู applyCommonFilters) แต่มีตัวเลือกแยกไว้ให้กรองดูเฉพาะกลุ่มนี้ได้ด้วย
   // เผื่อต้องการไล่เก็บตกว่ามีสัญญาไหนค้างยังไม่ได้ลงวันที่บ้าง — โผล่เฉพาะตอนมีจริงเท่านั้น กันรกตัวเลือก
@@ -631,8 +646,14 @@ export default function ContractOverview() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [contracts]
   );
+  // ✅ จำนวนงานที่ยังไม่เคยมอบหมายผู้รับผิดชอบ — ใช้เป็นตัวเลือกในตัวกรองผู้รับผิดชอบ ให้ไล่เก็บงานที่
+  // ตกหล่นได้ในคลิกเดียว (เดิมต้องไล่ดูทีละแถวเอง) โผล่เฉพาะตอนมีจริงเท่านั้น
+  const unassignedResponsibleCount = useMemo(
+    () => contracts.filter((c) => !c.responsiblePerson).length,
+    [contracts]
+  );
   // ✅ กรองตามผู้รับผิดชอบ — แยกจากช่องค้นหาข้อความอิสระ ให้เลือกจากรายชื่อจริงได้เลย ไม่ต้องพิมพ์เอง
-  const [teamFilter, setTeamFilter] = useState("all");
+  const [responsibleFilter, setResponsibleFilter] = useState("all");
   // ✅ กรองตามประเภทงาน (เช่น PM/Service/ติดตั้ง ฯลฯ) — เพิ่มตามที่ผู้ใช้ขอ เทียบ pattern เดียวกับ
   // ตัวกรองปี/ผู้รับผิดชอบด้านบนทุกประการ (เลือกจากรายชื่อประเภทงานจริงในระบบ ไม่ต้องพิมพ์เอง)
   const [titleFilter, setTitleFilter] = useState("all");
@@ -709,11 +730,19 @@ export default function ContractOverview() {
         return y === null || String(y) === String(yearFilter);
       });
     }
-    // ✅ กรองตามทีมที่เข้างานแบบเจาะจง (เลือกจากรายชื่อจริง) แยกจากช่องค้นหาข้อความอิสระด้านบน —
-    // เช็คกับ allRoundTeamNames (ทุกคนที่เคยเข้างานครั้งไหนก็ได้ของสัญญานี้) แทน c.team (แค่ครั้งที่ 1)
-    // เพราะแต่ละครั้งอาจเข้าโดยคนละทีมกัน กรองแบบเดิมจะตกหล่นสัญญาที่คนนี้เข้าแค่ครั้งหลังๆ ไป
-    if (teamFilter !== "all") {
-      base = base.filter((c) => (c.allRoundTeamNames || []).includes(teamFilter));
+    // ✅ กรองตาม "ผู้รับผิดชอบงาน" (เจ้าของงานโดยรวม) — เดิมตัวกรองนี้กรองตาม "ทีมที่เข้างาน"
+    // (allRoundTeamNames = ทุกคนที่เคยเข้างานครั้งไหนก็ได้) ซึ่งเป็นคนละเรื่องกันโดยสิ้นเชิง: ทีมเปลี่ยน
+    // ได้ทุกครั้งที่เข้างาน ส่วนผู้รับผิดชอบคือคนที่ติดตามงานนี้ทั้งหมด — การกรอง "งานของใคร" ในหน้านี้
+    // ต้องหมายถึงผู้รับผิดชอบเสมอ (ตรงกับที่หน้าอื่นๆ ใช้ตัดสินสิทธิ์/การมองเห็นทั้งแอป) ไม่งั้นเลือกชื่อ
+    // คนหนึ่งแล้วได้สัญญาที่เขาแค่ไปช่วยเข้างานครั้งเดียวติดมาด้วย ทั้งที่ไม่ได้รับผิดชอบสัญญานั้นเลย
+    // ⚠️ ช่องค้นหาข้อความอิสระด้านบนยังค้นทั้งผู้รับผิดชอบและชื่อทีมทุกครั้งเหมือนเดิม (ดูท้ายฟังก์ชันนี้)
+    // — ตัวกรองนี้เจาะจงเฉพาะผู้รับผิดชอบเท่านั้น
+    if (responsibleFilter === "unassigned") {
+      // ✅ ตัวเลือกพิเศษ — ไล่เก็บสัญญาที่ยังไม่เคยมอบหมายผู้รับผิดชอบ (ขึ้น "ยังไม่มอบหมาย" ในตาราง)
+      // ซึ่งเดิมไม่มีทางกรองหาได้เลย ต้องไล่ดูทีละแถวเอง
+      base = base.filter((c) => !c.responsiblePerson);
+    } else if (responsibleFilter !== "all") {
+      base = base.filter((c) => c.responsiblePerson === responsibleFilter);
     }
     if (titleFilter !== "all") {
       base = base.filter((c) => (c.title || "") === titleFilter);
@@ -737,27 +766,27 @@ export default function ContractOverview() {
   const realContractCount = useMemo(
     () => applyCommonFilters(contracts.filter((c) => c.isRealContract)).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, teamFilter, titleFilter, search]
+    [contracts, yearFilter, responsibleFilter, titleFilter, search]
   );
   const hiddenJobCount = useMemo(
     () => applyCommonFilters(contracts.filter((c) => !c.isRealContract && !c.isConfirmedGeneral && !c.isConfirmedProject)).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, teamFilter, titleFilter, search]
+    [contracts, yearFilter, responsibleFilter, titleFilter, search]
   );
   const confirmedGeneralCount = useMemo(
     () => applyCommonFilters(contracts.filter((c) => !c.isRealContract && c.isConfirmedGeneral)).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, teamFilter, titleFilter, search]
+    [contracts, yearFilter, responsibleFilter, titleFilter, search]
   );
   const confirmedProjectCount = useMemo(
     () => applyCommonFilters(contracts.filter((c) => !c.isRealContract && c.isConfirmedProject)).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, teamFilter, titleFilter, search]
+    [contracts, yearFilter, responsibleFilter, titleFilter, search]
   );
   const allFilteredCount = useMemo(
     () => applyCommonFilters(contracts).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, teamFilter, titleFilter, search]
+    [contracts, yearFilter, responsibleFilter, titleFilter, search]
   );
   // ✅ สัญญาที่ "เลยกำหนดเข้ารอบถัดไป/คงค้าง" — รอบล่าสุดผ่านมาเกินระยะห่างที่กำหนด (intervalMonths)
   // แล้วแต่ยังไม่มีวันที่/แผนงานล่วงหน้าของรอบถัดไปเลย (ดู nextVisitOverdueInfo) เดิมมีแค่ badge เตือน
@@ -765,7 +794,7 @@ export default function ContractOverview() {
   const overdueCount = useMemo(
     () => applyCommonFilters(contracts.filter((c) => c.isRealContract && nextVisitOverdueInfo(c))).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, teamFilter, titleFilter, search]
+    [contracts, yearFilter, responsibleFilter, titleFilter, search]
   );
 
   const filtered = useMemo(() => {
@@ -777,7 +806,7 @@ export default function ContractOverview() {
       : contracts.filter((c) => c.isRealContract);
     return applyCommonFilters(base);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contracts, search, viewFilter, yearFilter, teamFilter, titleFilter]);
+  }, [contracts, search, viewFilter, yearFilter, responsibleFilter, titleFilter]);
 
   // ✅ นับจาก `filtered` (ไม่ใช่ `contracts` ทั้งก้อนแบบเดิม) — เดิมถ้ามีสัญญาไหนสักอันในระบบที่มี
   // จำนวนครั้งเยอะ (เช่น 24) ตารางจะโชว์คอลัมน์ "ครั้งที่ 1-24" ตลอด แม้กรองปี/ค้นหาจนเหลือแต่สัญญา
@@ -883,7 +912,7 @@ export default function ContractOverview() {
   // ให้สั้นกระชับแทน (ตัวกรอง/ค้นหายังใช้กับข้อมูลทั้งหมดเหมือนเดิม แค่ตัดแสดงผล)
   const PAGE_SIZE = isMobile ? 5 : 10;
   const [page, setPage] = useState(1);
-  useEffect(() => { setPage(1); }, [search, viewFilter, yearFilter, teamFilter, titleFilter, sortConfig, isMobile]);
+  useEffect(() => { setPage(1); }, [search, viewFilter, yearFilter, responsibleFilter, titleFilter, sortConfig, isMobile]);
   // ✅ ป้องกันพลาด: ล้างการเลือกทุกครั้งที่สลับแท็บมุมมอง — เดิมการเลือกค้างข้ามแท็บได้ (checkbox มีเฉพาะ
   // บางแท็บ ดู showCheckboxes) ทำให้เลือกงานไว้ในแท็บหนึ่ง สลับไปอีกแท็บที่มองไม่เห็นแถวพวกนั้นแล้ว แต่แถบ
   // "เลือกไว้ N งาน" ยังลอยอยู่ + กด "จัดกลุ่มเป็นสัญญา" ได้ทันที = รวมงานที่มองไม่เห็นอยู่ตรงหน้าเข้าด้วยกัน
@@ -902,48 +931,6 @@ export default function ContractOverview() {
     [sortedFiltered, safePage, PAGE_SIZE]
   );
 
-  const csvData = useMemo(
-    () => filtered.map((c) => {
-      const st = contractStatusInfo(c);
-      const row = {
-        เลขที่สัญญา: c.contractNo || "",
-        ใบเสนอราคา: c.quotationNo || "",
-        เอกสารเลขที่: c.docNo || "",
-        บริษัท: c.company || "",
-        โครงการ: c.site || "",
-        ระบบ: c.system || "",
-        ประเภทงาน: c.title || "",
-        วันที่เริ่มสัญญา: c.contractStart ? moment(c.contractStart).format("YYYY-MM-DD") : "",
-        วันที่สิ้นสุดสัญญา: c.contractEnd ? moment(c.contractEnd).format("YYYY-MM-DD") : "",
-        "รอบเข้า (เดือน)": c.intervalMonths || "",
-        "เข้าปีละ (ครั้ง)": visitsPerYear(c.intervalMonths) || "",
-        จำนวนครั้ง: c.visitCount || "",
-        "มูลค่างาน/1ปี": c.jobValue ?? "",
-        สถานะสัญญา: st?.label || "",
-      };
-      // ✅ นับเฉพาะครั้งที่ลงตารางจริงเหมือนตารางในหน้านี้ (เดิม CSV รวมแผนงานล่วงหน้าที่ยังไม่มีวันที่
-      // จริงเข้าไปด้วย ทำให้ export ไม่ตรงกับสิ่งที่ตารางแสดงจริง)
-      // ⚠️ BUG ที่แก้: เดิมใช้ .find() (เจอแค่ 1 document) และเทียบ Number(v.time)===n ตรงๆ ไม่มี
-      // fallback เหมือนตาราง — งานทั่วไปที่ time ว่าง หรือครั้งที่เข้างานไม่ต่อเนื่อง (หลาย document
-      // ต่อครั้ง) จะ export ออกมาไม่ตรงกับที่ตารางแสดงจริง (ตกหล่น/ว่างเปล่าทั้งที่ตารางมีข้อมูล)
-      visitColumns.forEach((n) => {
-        const visits = c.visits.filter((v) => !v.unscheduled && (Number(v.time) || 1) === n);
-        const pendingDraft = visits.length === 0 && c.visits.find((v) => v.unscheduled && (Number(v.time) || 1) === n);
-        // ✅ ใส่ทีมของครั้งนั้นๆ กำกับไว้ในวงเล็บด้วย (ไม่ใช่แค่ทีมของครั้งที่ 1) เพราะแต่ละครั้งอาจเข้า
-        // โดยคนละทีมกันจริง — ไม่มีคอลัมน์ "ทีมที่เข้างาน" สรุปรวมแยกต่างหากอีกแล้ว (ตัดออกพร้อมกับ
-        // คอลัมน์ในตาราง ซ้ำซ้อนกับ "หัวหน้าทีมเข้างาน"/"ลูกทีม" ด้านล่างอยู่แล้ว)
-        row[`ครั้งที่${n}`] = visits.length > 0
-          ? visits.map((v) => `${formatEventDateRange(v)}${v.team ? ` (${v.team})` : ""}`).join(", ")
-          : pendingDraft ? "รอวางแผน" : "";
-      });
-      row["หัวหน้าทีมเข้างาน (ครั้งที่ 1)"] = c.teamLeaderName || "";
-      row["ลูกทีม (ครั้งที่ 1)"] = (c.teamMemberNames || []).join(", ");
-      row["ผู้รับผิดชอบ"] = c.responsiblePerson || "";
-      return row;
-    }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filtered, visitColumns]
-  );
 
   // ✅ สรุปว่าตอนนี้มีตัวกรองอะไรทำงานอยู่บ้าง — ใช้อธิบายตอนตารางว่าง (กันเข้าใจผิดว่าข้อมูลหาย) และ
   // ผูกกับปุ่ม "ล้างตัวกรองทั้งหมด" ให้กลับมาเห็นข้อมูลได้ในคลิกเดียว ไม่ต้องไล่รีเซ็ตเองทีละช่อง
@@ -952,30 +939,67 @@ export default function ContractOverview() {
     const labels = [];
     if (search.trim()) labels.push(`ค้นหา "${search.trim()}"`);
     if (titleFilter !== "all") labels.push(`ประเภทงาน ${titleFilter}`);
-    if (teamFilter !== "all") labels.push(`ทีม ${teamFilter}`);
+    if (responsibleFilter === "unassigned") labels.push("ยังไม่มอบหมายผู้รับผิดชอบ");
+    else if (responsibleFilter !== "all") labels.push(`ผู้รับผิดชอบ ${responsibleFilter}`);
     if (yearFilter === "none") labels.push("ยังไม่ระบุปี");
     else if (yearFilter !== "all") labels.push(`ปี ${yearFilter}`);
     return labels;
-  }, [search, titleFilter, teamFilter, yearFilter]);
+  }, [search, titleFilter, responsibleFilter, yearFilter]);
   const hasActiveFilters = activeFilterLabels.length > 0;
   const clearAllFilters = () => {
     setSearch("");
     setTitleFilter("all");
-    setTeamFilter("all");
+    setResponsibleFilter("all");
     setYearFilter("all");
   };
 
   // ✅ ชื่อไฟล์ที่ส่งออกบอกได้ในตัวว่าเป็นข้อมูลชุดไหน ณ วันไหน — เดิมเป็น "contracts.csv" ตายตัวเสมอ
   // ส่งออกหลายแท็บ/หลายปีมาเทียบกันทีก็ทับกันเองในโฟลเดอร์ดาวน์โหลดทุกครั้ง (contracts (1).csv,
   // contracts (2).csv ...) แยกไม่ออกว่าไฟล์ไหนคืออะไร ต้องเปิดดูทีละไฟล์เอง
-  const csvFilename = useMemo(() => {
+  const exportLabels = useMemo(() => {
     const viewLabel = {
       contracts: "งานสัญญา", overdue: "เลยกำหนด", general: "งานทั่วไป",
       project: "งานโปรเจค", ungrouped: "ยังไม่จัดกลุ่ม", all: "ทั้งหมด",
     }[viewFilter] || "ทั้งหมด";
     const yearLabel = yearFilter === "all" ? "ทุกปี" : yearFilter === "none" ? "ยังไม่ระบุปี" : yearFilter;
-    return `ภาพรวมงาน-${viewLabel}-${yearLabel}-${moment().format("YYYYMMDD")}.csv`;
+    return { viewLabel, yearLabel };
   }, [viewFilter, yearFilter]);
+
+  // ✅ สร้างไฟล์ Excel จริง (.xlsx) — ดูเหตุผลที่ต้องเลิกใช้ CSV และรายละเอียดการจัดรูปแบบทั้งหมดที่
+  // src/views/ui/contractExcelExport.js — ส่งฟังก์ชันที่หน้าจอใช้อยู่ (contractStatusInfo/
+  // formatEventDateRange/visitsPerYear) เข้าไปด้วย เพื่อให้ข้อมูลในไฟล์ตรงกับที่เห็นบนจอเป๊ะๆ เสมอ
+  const [exporting, setExporting] = useState(false);
+  const handleExportExcel = async () => {
+    if (exporting || filtered.length === 0) return;
+    setExporting(true);
+    try {
+      // โหลดโมดูลตอนกดจริงเท่านั้น (exceljs เป็นไลบรารีก้อนใหญ่) — ไม่ให้ไปถ่วงเวลาโหลดหน้าของทุกคน
+      // ที่แค่เข้ามาดูตาราง ทั้งที่ส่วนใหญ่ไม่ได้กดส่งออกทุกครั้ง
+      const { exportContractsToExcel } = await import("./contractExcelExport");
+      await exportContractsToExcel({
+        rows: sortedFiltered, // ✅ ใช้ลำดับเดียวกับที่เรียงอยู่บนจอ ไม่ใช่ลำดับดิบ
+        visitColumns,
+        meta: {
+          fileName: `ภาพรวมงาน-${exportLabels.viewLabel}-${exportLabels.yearLabel}-${moment().format("YYYYMMDD")}.xlsx`,
+          viewLabel: exportLabels.viewLabel,
+          yearLabel: exportLabels.yearLabel,
+          filterSummary: hasActiveFilters ? `ตัวกรอง: ${activeFilterLabels.join(" · ")}` : "ไม่ได้กรองเพิ่มเติม",
+          exportedAt: moment().format("DD/MM/YYYY HH:mm"),
+        },
+        contractStatusInfo,
+        formatEventDateRange,
+        visitsPerYear,
+      });
+    } catch (err) {
+      Swal.fire({
+        title: "ส่งออกไม่สำเร็จ",
+        text: err?.message || "กรุณาลองใหม่อีกครั้ง",
+        icon: "error",
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // ── ฟอร์ม "เพิ่มสัญญาใหม่" ─────────────────────────────────────────────
   // ✅ เดิมต้องออกจากหน้านี้ไปเปิดปฏิทินแล้วคลิกวันที่เพื่อสร้างงานแบบ "สัญญาแบบหลายครั้ง" เท่านั้น
@@ -1630,6 +1654,18 @@ export default function ContractOverview() {
   // เฉพาะ admin/manager ทุกฟิลด์ ต้องผ่านการตรวจสอบจากส่วนกลางก่อนเสมอ — เทียบ backend PUT /basic-info)
   const canEditGeneralJob = (c) => !c.isRealContract && canEditRoundTeam(c);
 
+  // 🐛 BUG ที่แก้ (แถวสัญญาจริงแก้ บริษัท/โครงการ/ระบบ/ประเภทงาน/เอกสาร ไม่ได้เลยแม้แต่แอดมิน):
+  // ช่องพวกนี้เคยใช้ canEditGeneralJob(c) เป็นด่านเดียว ซึ่งนิยามไว้ว่า "ไม่ใช่สัญญาจริง และเป็นผู้รับผิดชอบ"
+  // — ตัวนี้ถูกเพิ่มมาทีหลังเพื่อ "ขยายสิทธิ์" ให้ผู้รับผิดชอบงานทั่วไป/โปรเจคแก้งานตัวเองได้ แต่กลับถูกเอา
+  // ไปแทนที่ด่านเดิม (isAdminOrManager) ทั้งหมด ผลคือแอดมิน/manager เสียสิทธิ์แก้ 4 ฟิลด์นี้บนแถวสัญญา
+  // จริงไปโดยไม่ตั้งใจ — ขัดกับทั้ง canEditField (กติกากลางในไฟล์นี้ที่ระบุว่า 4 ฟิลด์นี้ "แก้ได้ทุกแถว
+  // เสมอ") และฝั่ง backend (PUT /basic-info บล็อกเฉพาะคนที่ไม่ใช่แอดมิน/manager เท่านั้น)
+  // ✅ รวมสองกติกาเข้าด้วยกันให้ถูกต้อง: แอดมิน/manager แก้ได้ทุกแถว "หรือ" ผู้รับผิดชอบแก้งานทั่วไป/
+  // โปรเจคของตัวเองได้ แล้วยังผ่าน canEditField อีกชั้นเพื่อคุมว่าฟิลด์นั้นใช้ได้กับแถวประเภทนี้ไหม
+  // (เช่น docNo ใช้ได้เฉพาะแถวที่จัดหมวดหมู่แล้ว ไม่ใช่แถว "ยังไม่จัดกลุ่ม")
+  const canEditBasicField = (c, field) =>
+    canEditField(c, field) && (isAdminOrManager || canEditGeneralJob(c));
+
   const beginRoundTeamEdit = (visit, c) => {
     if (roundTeamSaving || !canEditRoundTeam(c)) return;
     setRoundTeamEdit({ visitId: visit._id, value: visit.team || "" });
@@ -1893,12 +1929,12 @@ export default function ContractOverview() {
           )}
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <EditableCell
-              Wrapper={Box} editable={canEditGeneralJob(c)} value={c.company} width="100%"
+              Wrapper={Box} editable={canEditBasicField(c, "company")} value={c.company} width="100%"
               formatDisplay={(v) => <Typography sx={{ fontWeight: 800, fontSize: "0.98rem", lineHeight: 1.25, wordBreak: "break-word" }}>{v || <Dash />}</Typography>}
               {...fp("company")}
             />
             <EditableCell
-              Wrapper={Box} editable={canEditGeneralJob(c)} value={c.site} width="100%"
+              Wrapper={Box} editable={canEditBasicField(c, "site")} value={c.site} width="100%"
               formatDisplay={(v) => <Typography sx={{ fontSize: "0.82rem", color: "text.secondary", wordBreak: "break-word" }}>{v || <Dash />}</Typography>}
               {...fp("site")}
             />
@@ -1931,8 +1967,8 @@ export default function ContractOverview() {
         {/* ✅ ประเภทงาน/ระบบ — เดิมโชว์เคียงข้างกันแบบไม่มีป้ายกำกับเลย (แยกไม่ออกว่าอันไหนคืออันไหน)
             สลับเป็น FieldRow มีป้ายชัดเจนเหมือนฟิลด์อื่นในการ์ด และสลับลำดับให้ "ประเภทงาน" (ตัวระบุงาน
             หลัก เช่น PM) ขึ้นก่อน "ระบบ" (รายละเอียดย่อย เช่น Fire Alarm) ตามที่ขอ */}
-        <FieldRow label="ประเภทงาน" editable={canEditGeneralJob(c)} editType="autocomplete" editOptions={titleOptions} value={c.title} title={c.title} {...fp("title")} />
-        <FieldRow label="ระบบ" editable={canEditGeneralJob(c)} editType="autocomplete" editOptions={systemOptions} value={c.system} title={c.system} {...fp("system")} />
+        <FieldRow label="ประเภทงาน" editable={canEditBasicField(c, "title")} editType="autocomplete" editOptions={titleOptions} value={c.title} title={c.title} {...fp("title")} />
+        <FieldRow label="ระบบ" editable={canEditBasicField(c, "system")} editType="autocomplete" editOptions={systemOptions} value={c.system} title={c.system} {...fp("system")} />
 
         {/* เอกสาร: เลขที่สัญญา/ใบเสนอราคา (สัญญาจริง) หรือเลขที่เอกสาร (งานทั่วไป/โปรเจค) */}
         {c.isRealContract ? (
@@ -1941,7 +1977,7 @@ export default function ContractOverview() {
             <FieldRow label="ใบเสนอราคา" editable={isAdminOrManager} value={c.quotationNo} {...fp("quotationNo")} />
           </>
         ) : (
-          <FieldRow label="เลขที่เอกสาร" editable={canEditGeneralJob(c) && canEditField(c, "docNo")} value={c.docNo} {...fp("docNo")} />
+          <FieldRow label="เลขที่เอกสาร" editable={canEditBasicField(c, "docNo")} value={c.docNo} {...fp("docNo")} />
         )}
 
         {/* ครั้งที่เข้างาน — แสดง/แก้ไขทีมของแต่ละครั้งแยกกัน (canEditRoundTeam) — พับ/กางแยกอีกชั้นจาก
@@ -2073,7 +2109,7 @@ export default function ContractOverview() {
         )}
 
         {/* ผู้รับผิดชอบ — ฟิลด์อิสระจากทีมที่เข้างานทุกครั้งด้านบนโดยสมบูรณ์ */}
-        <FieldRow label="ผู้รับผิดชอบ" editable={isAdminOrManager && canEditField(c, "responsiblePerson")} editType="select" editOptions={teamOptions} value={c.responsiblePerson} {...fp("responsiblePerson")} />
+        <FieldRow label="ผู้รับผิดชอบ" editable={isAdminOrManager && canEditField(c, "responsiblePerson")} editType="select" editOptions={teamOptions} value={c.responsiblePerson} formatDisplay={unassignedResponsibleDisplay} {...fp("responsiblePerson")} />
 
         {/* ปุ่มจัดการ — เฉพาะแอดมิน/manager เทียบ pattern เดียวกับคอลัมน์ actions ในตารางเดสก์ท็อป */}
         {isAdminOrManager && (
@@ -2163,22 +2199,25 @@ export default function ContractOverview() {
               <Refresh sx={{ fontSize: 20 }} />
             </IconButton>
           </Tooltip>
-          {/* ✅ ห้ามเอา MUI IconButton/Tooltip ไปห่อ CSVLink ตรงๆ — CSVLink (react-csv) ไม่ได้ forward
-              ref ให้ลูกอย่างถูกต้อง ทำให้ TouchRipple ของ IconButton หา DOM node ไม่เจอ เกิด error
-              "Cannot read properties of undefined (reading 'addEventListener')" ตอนกลับมาโชว์ผลจาก
-              Suspense — ใช้ <button> ธรรมดาแทน เหมือน pattern ที่ใช้งานได้จริงใน EventCalendar/index.js */}
-          <CSVLink
-            data={csvData}
-            filename={csvFilename}
-            title="ส่งออก Excel/CSV"
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "center",
-              width: 40, height: 40, borderRadius: "50%", flexShrink: 0,
-              border: `1px solid ${alpha(ACCENT, 0.4)}`, color: ACCENT, textDecoration: "none",
-            }}
-          >
-            <Download sx={{ fontSize: 20 }} />
-          </CSVLink>
+          {/* ✅ เปลี่ยนจาก CSV เป็นไฟล์ Excel (.xlsx) จริง — CSV เป็นข้อความล้วนตามนิยาม ใส่สี/ตัวหนา/
+              เส้นขอบ/ความกว้างคอลัมน์/ตรึงหัวตารางไม่ได้เลยแม้แต่อย่างเดียว (ดู contractExcelExport.js)
+              ตอนนี้จึงไม่ต้องระวังปัญหา ref ของ CSVLink อีกต่อไป ใช้ IconButton ปกติได้เหมือนปุ่มอื่น */}
+          <Tooltip title="ส่งออกเป็นไฟล์ Excel (.xlsx)">
+            <span>
+              <IconButton
+                onClick={handleExportExcel}
+                disabled={exporting || filtered.length === 0}
+                sx={{
+                  border: "1px solid", borderColor: alpha(ACCENT, 0.4), borderRadius: "50%",
+                  color: ACCENT, flexShrink: 0,
+                  transition: "background-color .15s, border-color .15s",
+                  "&:hover": { bgcolor: alpha(ACCENT, 0.08), borderColor: ACCENT },
+                }}
+              >
+                <Download sx={{ fontSize: 20 }} />
+              </IconButton>
+            </span>
+          </Tooltip>
         </Stack>
       </Stack>
 
@@ -2375,17 +2414,17 @@ export default function ContractOverview() {
           {titleOptions.map((name) => <option key={name} value={name}>{name}</option>)}
         </TextField>
         {/* ✅ ซ่อนสำหรับช่าง — ข้อมูลที่ช่างเห็นถูกกรองเหลือแค่งานของตัวเองมาจาก backend อยู่แล้วเสมอ
-            (ดู canView/isAdminOrManager ด้านบน) ตัวกรอง "ทีมที่เข้างาน" มีประโยชน์แค่ตอนแอดมิน/manager
-            ที่เห็นงานของทุกคนต้องกรองหาเฉพาะบางคน — สำหรับช่างมีแต่ชื่อตัวเองให้เลือกอยู่แล้ว มีแต่จะรก */}
+            (ดู canView/isAdminOrManager ด้านบน) ตัวกรองนี้มีประโยชน์แค่ตอนแอดมิน/manager ที่เห็นงานของ
+            ทุกคนต้องกรองหาเฉพาะบางคน — สำหรับช่างมีแต่ชื่อตัวเองให้เลือกอยู่แล้ว มีแต่จะรก */}
         {isAdminOrManager && (
           <TextField
-            select size="small" label="ทีมที่เข้างาน" value={teamFilter}
-            onChange={(e) => setTeamFilter(e.target.value)}
+            select size="small" label="ผู้รับผิดชอบงาน" value={responsibleFilter}
+            onChange={(e) => setResponsibleFilter(e.target.value)}
             SelectProps={{ native: true }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <PersonOutline sx={{ fontSize: 18, color: teamFilter !== "all" ? ACCENT : "text.disabled" }} />
+                  <PersonOutline sx={{ fontSize: 18, color: responsibleFilter !== "all" ? ACCENT : "text.disabled" }} />
                 </InputAdornment>
               ),
             }}
@@ -2393,14 +2432,18 @@ export default function ContractOverview() {
               width: { xs: "100%", sm: 185 }, flexShrink: 0,
               "& .MuiOutlinedInput-root": {
                 borderRadius: 2.5,
-                bgcolor: teamFilter !== "all" ? alpha(ACCENT, 0.06) : "background.paper",
-                "& fieldset": teamFilter !== "all" ? { borderColor: alpha(ACCENT, 0.45) } : {},
-                "&:hover fieldset": teamFilter !== "all" ? { borderColor: ACCENT } : {},
+                bgcolor: responsibleFilter !== "all" ? alpha(ACCENT, 0.06) : "background.paper",
+                "& fieldset": responsibleFilter !== "all" ? { borderColor: alpha(ACCENT, 0.45) } : {},
+                "&:hover fieldset": responsibleFilter !== "all" ? { borderColor: ACCENT } : {},
               },
-              "& .MuiInputLabel-root": teamFilter !== "all" ? { color: ACCENT, fontWeight: 700 } : {},
+              "& .MuiInputLabel-root": responsibleFilter !== "all" ? { color: ACCENT, fontWeight: 700 } : {},
             }}
           >
             <option value="all">ทุกคน</option>
+            {/* ✅ ไล่เก็บสัญญาที่ยังไม่เคยมอบหมายผู้รับผิดชอบ — โผล่เฉพาะตอนมีจริง (กันตัวเลือกรก) */}
+            {unassignedResponsibleCount > 0 && (
+              <option value="unassigned">— ยังไม่มอบหมาย ({unassignedResponsibleCount}) —</option>
+            )}
             {teamOptions.map((name) => <option key={name} value={name}>{name}</option>)}
           </TextField>
         )}
@@ -2621,7 +2664,7 @@ export default function ContractOverview() {
                       "ยังไม่จัดกลุ่ม" เหมือน "ผู้รับผิดชอบ" ด้านล่าง (ดู canEditField) */}
                   {hideContractOnlyColumns && (
                     <EditableCell
-                      editable={canEditGeneralJob(c) && canEditField(c, "docNo")} columnKey="docNo"
+                      editable={canEditBasicField(c, "docNo")} columnKey="docNo"
                       editing={editingCell?.key === c.key && editingCell?.field === "docNo"}
                       value={c.docNo} editValue={editValue} saving={editSaving}
                       width={colVar("docNo")} title={c.docNo}
@@ -2635,7 +2678,7 @@ export default function ContractOverview() {
                       เพิ่ม "ผู้รับผิดชอบ" ของงานทั่วไป/งานโปรเจคที่ตัวเองรับผิดชอบด้วย (canEditGeneralJob
                       คืน false ให้งานตามสัญญาจริงเสมอ ยังคงเฉพาะ admin/manager เท่านั้น) */}
                   <EditableCell
-                    editable={canEditGeneralJob(c)} columnKey="company"
+                    editable={canEditBasicField(c, "company")} columnKey="company"
                     editing={editingCell?.key === c.key && editingCell?.field === "company"}
                     value={c.company} editValue={editValue} saving={editSaving}
                     width={colVar("company")} title={c.company}
@@ -2645,7 +2688,7 @@ export default function ContractOverview() {
                     onCancel={cancelEdit}
                   />
                   <EditableCell
-                    editable={canEditGeneralJob(c)} columnKey="site"
+                    editable={canEditBasicField(c, "site")} columnKey="site"
                     editing={editingCell?.key === c.key && editingCell?.field === "site"}
                     value={c.site} editValue={editValue} saving={editSaving}
                     width={colVar("site")} title={c.site}
@@ -2655,7 +2698,7 @@ export default function ContractOverview() {
                     onCancel={cancelEdit}
                   />
                   <EditableCell
-                    editable={canEditGeneralJob(c)} columnKey="system" editType="autocomplete" editOptions={systemOptions}
+                    editable={canEditBasicField(c, "system")} columnKey="system" editType="autocomplete" editOptions={systemOptions}
                     editing={editingCell?.key === c.key && editingCell?.field === "system"}
                     value={c.system} editValue={editValue} saving={editSaving}
                     width={colVar("system")} title={c.system}
@@ -2665,7 +2708,7 @@ export default function ContractOverview() {
                     onCancel={cancelEdit}
                   />
                   <EditableCell
-                    editable={canEditGeneralJob(c)} columnKey="title" editType="autocomplete" editOptions={titleOptions}
+                    editable={canEditBasicField(c, "title")} columnKey="title" editType="autocomplete" editOptions={titleOptions}
                     editing={editingCell?.key === c.key && editingCell?.field === "title"}
                     value={c.title} editValue={editValue} saving={editSaving}
                     width={colVar("title")} title={c.title}
@@ -2720,7 +2763,7 @@ export default function ContractOverview() {
                     // ไม่ต้องรอดูอนิเมชัน
                     // ✅ เก็บกวาด: เดิมมีบรรทัดที่ 2 โชว์ "ปีละ N ครั้ง" แต่ถูกคอมเมนต์ปิดไว้ เหลือแต่ตัวแปร
                     // perYear ที่คำนวณทิ้งเปล่าๆ ทุก render (ยังเป็น lint warning ค้างอยู่ด้วย) — ลบออกทั้งคู่
-                    // ค่า "เข้าปีละ (ครั้ง)" ยังอยู่ครบในไฟล์ CSV ที่ส่งออกเหมือนเดิม (ดู csvData)
+                    // ค่า "เข้าปีละ (ครั้ง)" ยังอยู่ครบในไฟล์ Excel ที่ส่งออกเหมือนเดิม (ดู contractExcelExport.js)
                     formatDisplay={(v) => {
                       return (
                         <Stack spacing={0} alignItems="center">
@@ -2975,7 +3018,9 @@ export default function ContractOverview() {
                     editable={isAdminOrManager && canEditField(c, "responsiblePerson")} columnKey="responsiblePerson"
                     editing={editingCell?.key === c.key && editingCell?.field === "responsiblePerson"}
                     value={c.responsiblePerson} editValue={editValue} editType="select" editOptions={teamOptions} saving={editSaving}
-                    width={colVar("responsiblePerson")} title={c.responsiblePerson}
+                    width={colVar("responsiblePerson")}
+                    title={c.responsiblePerson || "ยังไม่ได้มอบหมายผู้รับผิดชอบ"}
+                    formatDisplay={unassignedResponsibleDisplay}
                     onStartEdit={() => beginEdit(c, "responsiblePerson")}
                     onChangeValue={setEditValue}
                     onCommit={() => commitEdit(c)}
@@ -3385,8 +3430,9 @@ export default function ContractOverview() {
                 onChange={(e) => setMergeField("visitCount")(e.target.value)} inputProps={{ min: 1, max: MAX_VISIT_COUNT }}
                 helperText={`ค่าเริ่มต้น = จำนวนงานที่เลือก (${selectedContracts.length}) — สูงสุด ${MAX_VISIT_COUNT} ครั้ง`}
               />
+              {/* ✅ min:0 ให้ตรงกับฟอร์ม "เพิ่มสัญญาใหม่" (มีการตรวจฝั่ง JS อยู่แล้วทั้งคู่) */}
               <TextField fullWidth size="small" type="number" label="มูลค่างาน" value={mergeForm.jobValue}
-                onChange={(e) => setMergeField("jobValue")(e.target.value)} />
+                onChange={(e) => setMergeField("jobValue")(e.target.value)} inputProps={{ min: 0 }} />
             </Stack>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
               <TextField

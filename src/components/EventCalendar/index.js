@@ -108,9 +108,34 @@ const faIconToSvg = (iconDef, { size = 12, color = "#000000" } = {}) => {
   return `<svg viewBox="0 0 ${width} ${height}" style="width:${size}px;height:${size}px;display:block;">${pathsHtml}</svg>`;
 };
 
+// ✅ ระดับการย่อ/ขยายปฏิทิน — ไล่ทีละ 15-25% ให้เห็นความต่างชัดในแต่ละก้าวโดยไม่ต้องกดหลายที
+// ย่อได้ถึง 70% (กวาดดูทั้งเดือนรวดเดียว) และขยายได้ถึง 175% (อ่านรายละเอียดในการ์ดบนมือถือได้จริง)
+const ZOOM_LEVELS = [0.7, 0.85, 1, 1.25, 1.5, 1.75];
+const ZOOM_DEFAULT_INDEX = 2; // = 100%
+const ZOOM_STORAGE_KEY = "eventCalendar.zoom";
+
 function EventCalendar() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
+  // ✅ จำระดับซูมไว้ข้ามการเปิด-ปิดหน้า/รีเฟรช — ผู้ใช้ที่ต้องขยายเป็นประจำ (จอเล็ก/สายตายาว) จะได้ไม่
+  // ต้องมากดตั้งใหม่ทุกครั้ง เทียบ pattern เดียวกับความกว้างคอลัมน์ในหน้า "ภาพรวมงาน"
+  const [zoomIndex, setZoomIndex] = useState(() => {
+    try {
+      const saved = Number(localStorage.getItem(ZOOM_STORAGE_KEY));
+      return Number.isInteger(saved) && saved >= 0 && saved < ZOOM_LEVELS.length ? saved : ZOOM_DEFAULT_INDEX;
+    } catch {
+      return ZOOM_DEFAULT_INDEX;
+    }
+  });
+  const changeZoom = (step) =>
+    setZoomIndex((prev) => Math.min(ZOOM_LEVELS.length - 1, Math.max(0, prev + step)));
+  useEffect(() => {
+    try { localStorage.setItem(ZOOM_STORAGE_KEY, String(zoomIndex)); } catch {}
+    // ✅ ปฏิทินต้องคำนวณความสูงแถว/ความกว้างคอลัมน์ใหม่หลังขนาดเปลี่ยน ไม่งั้นตารางค้างสัดส่วนเดิม
+    const t = setTimeout(() => calendarRef.current?.getApi()?.updateSize(), 60);
+    return () => clearTimeout(t);
+  }, [zoomIndex]);
 
   const { userData } = useAuth(); // ✅ เปลี่ยนจาก user → userData
   const isAdminOrManager = ["admin", "manager"].includes(
@@ -296,7 +321,13 @@ function EventCalendar() {
     const calendarEl = document.querySelector(".fc-view-harness");
     if (!calendarEl) return;
 
-    const hammer = new Hammer(calendarEl);
+    // 🐛 BUG ที่แก้ (ซูมด้วยการหุบ/กางนิ้วบนปฏิทินไม่ได้เลย): Hammer ตั้ง CSS touch-action ให้ element
+    // เองอัตโนมัติตาม recognizer ที่ใช้ (ค่าเริ่มต้น touchAction:"compute") — พอมี swipe แนวนอน มันจะ
+    // เซ็ตเป็น "pan-y" ซึ่ง "ไม่รวม pinch-zoom" เบราว์เซอร์จึงบล็อกการซูมทั้งพื้นที่ปฏิทิน ทั้งที่ viewport
+    // meta ของแอปไม่ได้ห้ามซูมไว้เลย (ไม่มี user-scalable=no) — ผู้ใช้เลยซูมดูรายละเอียดงานบนมือถือไม่ได้
+    // ✅ สั่ง touchAction:"pan-y pinch-zoom" ตรงๆ — ยังกันการเลื่อนแนวนอนไปรบกวน swipe เปลี่ยนเดือน
+    // เหมือนเดิม แต่คืนสิทธิ์ให้เบราว์เซอร์จัดการ pinch-zoom ตามปกติ
+    const hammer = new Hammer(calendarEl, { touchAction: "pan-y pinch-zoom" });
     hammer.on("swipeleft", () => calendarRef.current?.getApi().next());
     hammer.on("swiperight", () => calendarRef.current?.getApi().prev());
 
@@ -1313,6 +1344,35 @@ function EventCalendar() {
           {visibleDrafts.length > 0 && <span className="filter-badge">{visibleDrafts.length}</span>}
         </button>
 
+        {/* ✅ ปุ่มย่อ/ขยายปฏิทินในตัว — บนจอมือถือช่องวันกว้างแค่ ~60px ข้อความในการ์ดงานต้องถูกตัดด้วย
+            "…" เสมอ อ่านรายละเอียดไม่ออก การหุบ/กางนิ้ว (pinch-zoom) ของเบราว์เซอร์ช่วยได้ก็จริง (แก้ให้
+            ใช้ได้แล้ว ดู Hammer touchAction ด้านบน) แต่มันซูมทั้งหน้ารวมแถบเครื่องมือ/เมนู ทำให้ต้องเลื่อน
+            จอไปมาหาสิ่งที่ต้องการ — ปุ่มนี้ขยายเฉพาะตัวปฏิทิน แถบเครื่องมืออยู่กับที่ กดง่ายกว่าและแม่นกว่า
+            จำค่าไว้ใน localStorage ด้วย ไม่ต้องตั้งใหม่ทุกครั้งที่เปิดหน้า */}
+        <div className="ec-zoom-group" role="group" aria-label="ย่อ/ขยายปฏิทิน">
+          <button
+            type="button" className="ec-zoom-btn"
+            onClick={() => changeZoom(-1)} disabled={zoomIndex === 0}
+            title="ย่อปฏิทิน"
+          >
+            −
+          </button>
+          <button
+            type="button" className="ec-zoom-level"
+            onClick={() => setZoomIndex(ZOOM_DEFAULT_INDEX)}
+            title="กดเพื่อกลับไปขนาดปกติ (100%)"
+          >
+            {Math.round(ZOOM_LEVELS[zoomIndex] * 100)}%
+          </button>
+          <button
+            type="button" className="ec-zoom-btn"
+            onClick={() => changeZoom(1)} disabled={zoomIndex === ZOOM_LEVELS.length - 1}
+            title="ขยายปฏิทิน"
+          >
+            +
+          </button>
+        </div>
+
         {/* ✅ ปุ่ม "N ต้องอนุมัติ" — ซ่อนไปเลยตอนไม่มีอะไรรออนุมัติ (เทียบ pattern เดียวกับ
             ClosureRequestsPanel ในหน้า Operation ที่ return null ตอนไม่มีคำขอ) กดแล้วกรองตารางเหลือ
             เฉพาะงานรออนุมัติทันที พร้อมเปิดแผงงานล่วงหน้าด้วย (ให้เห็นทั้งงานที่มีวันที่แล้วและแผนงานที่
@@ -1480,7 +1540,18 @@ function EventCalendar() {
           </aside>
         )}
 
-        <div id="content-id" className="calendar-wrapper">
+        {/* ✅ ย่อ/ขยายเฉพาะตัวปฏิทิน (แถบเครื่องมือ/ตัวกรองด้านบนคงขนาดเดิมเสมอ) — ใช้ CSS zoom แทน
+            transform: scale เพราะ zoom "จัด layout ใหม่จริง" ความกว้าง/ความสูงและการเลื่อนจอจึงถูกต้อง
+            ตามขนาดใหม่ ส่วน transform: scale แค่ยืดภาพทำให้พื้นที่เลื่อน/ตำแหน่งกดเพี้ยนไปจากที่ตาเห็น
+            ⚠️ ตอนซูมเข้า ปฏิทินจะกว้างเกินจอ ต้องเปิดให้เลื่อนแนวนอนได้ ไม่งั้นข้อมูลฝั่งขวาจะเข้าไม่ถึง */}
+        <div
+          id="content-id"
+          className="calendar-wrapper"
+          style={{
+            zoom: ZOOM_LEVELS[zoomIndex],
+            ...(zoomIndex > ZOOM_DEFAULT_INDEX ? { overflowX: "auto", WebkitOverflowScrolling: "touch" } : {}),
+          }}
+        >
         <FullCalendar
           ref={calendarRef}
           locales={[thLocale]} // ใช้งานภาษาไทย
