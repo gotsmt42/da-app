@@ -38,10 +38,17 @@ const NOTI_GROUP = {
 // แจ้งเตือนได้ทุกหน้า ไม่ใช่แค่ตอนเปิดหน้า Operation ค้างไว้)
 const NotificationBell = ({ notifications, unread, onItemClick, onMarkAllRead, dark = false }) => {
   const [anchorEl, setAnchorEl] = useState(null);
+  // 🐛 BUG ที่แก้ (เปิดมาแล้วแยกไม่ออกว่าอันไหนใหม่): กดเปิดปุ๊บ markAllRead ทำงานทันที ทุกรายการเลย
+  // จางลงเหลือ opacity 0.5 + ตัวหนังสือบางพร้อมกันหมดในเสี้ยววินาที — สิ่งที่ผู้ใช้เปิดมาเพื่อจะดู
+  // ("มีอะไรใหม่บ้าง") หายไปก่อนที่จะได้อ่านเสียอีก
+  // ✅ จำไว้ว่าตอนกดเปิด รายการไหนยังไม่อ่านบ้าง แล้วใช้ชุดนั้นตัดสินการแสดงผลตลอดที่กล่องยังเปิดอยู่ —
+  // badge ยังเคลียร์ทันทีเหมือนเดิม (ผู้ใช้รู้ว่าระบบรับรู้แล้ว) แต่ยังเห็นได้ชัดว่าอันไหนคือของใหม่
+  const [unreadAtOpen, setUnreadAtOpen] = useState(() => new Set());
   const navigate = useNavigate();
 
   // ✅ เปิดกล่องแจ้งเตือน = ถือว่าเห็นทั้งหมดแล้ว เคลียร์ badge ทันทีโดยไม่ต้องกดทีละรายการ
   const handleOpen = (e) => {
+    setUnreadAtOpen(new Set(notifications.filter((n) => !n.read).map((n) => n.id)));
     setAnchorEl(e.currentTarget);
     if (onMarkAllRead) onMarkAllRead();
   };
@@ -98,6 +105,8 @@ const NotificationBell = ({ notifications, unread, onItemClick, onMarkAllRead, d
           <List disablePadding sx={{ maxHeight: 360, overflowY: "auto" }}>
             {notifications.map((n, i) => {
               const meta = NOTI_META[n.type] || NOTI_META.close_requested;
+              // ✅ "ใหม่" = ยังไม่อ่านจริง หรือเพิ่งถูกตีเป็นอ่านแล้วตอนกดเปิดกล่องรอบนี้เอง
+              const isNew = !n.read || unreadAtOpen.has(n.id);
               return (
                 <ListItem
                   key={n.id}
@@ -105,7 +114,12 @@ const NotificationBell = ({ notifications, unread, onItemClick, onMarkAllRead, d
                   onClick={() => handleNotificationClick(n)}
                   sx={{
                     py: 1.25, px: 2, cursor: n.eventId ? "pointer" : "default",
-                    opacity: n.read ? 0.5 : 1,
+                    opacity: isNew ? 1 : 0.5,
+                    // ✅ แถบสีบางๆ ด้านซ้าย + พื้นหลังจางๆ เฉพาะรายการใหม่ — กวาดตาผ่านครั้งเดียวก็รู้ว่า
+                    // ต้องดูอันไหนบ้าง ไม่ต้องเทียบความเข้มของตัวหนังสือทีละบรรทัด
+                    borderLeft: "3px solid",
+                    borderLeftColor: isNew ? meta.color : "transparent",
+                    bgcolor: isNew ? alpha(meta.color, 0.04) : "transparent",
                     transition: "opacity 0.2s ease, background-color 0.15s ease",
                     "&:hover": n.eventId ? { bgcolor: (t) => alpha(t.palette.primary.main, 0.06) } : {},
                   }}
@@ -113,15 +127,15 @@ const NotificationBell = ({ notifications, unread, onItemClick, onMarkAllRead, d
                   <ListItemAvatar sx={{ minWidth: 36 }}>
                     <Avatar sx={{
                       width: 30, height: 30,
-                      bgcolor: n.read ? alpha("#6b7280", 0.12) : alpha(meta.color, 0.12),
-                      color: n.read ? "#6b7280" : meta.color,
+                      bgcolor: isNew ? alpha(meta.color, 0.12) : alpha("#6b7280", 0.12),
+                      color: isNew ? meta.color : "#6b7280",
                     }}>
                       {meta.icon}
                     </Avatar>
                   </ListItemAvatar>
                   <ListItemText
                     primary={
-                      <Typography variant="caption" fontWeight={n.read ? 500 : 700}>{n.message}</Typography>
+                      <Typography variant="caption" fontWeight={isNew ? 700 : 500}>{n.message}</Typography>
                     }
                     secondary={
                       <Stack>

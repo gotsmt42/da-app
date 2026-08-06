@@ -136,6 +136,13 @@ export default function PendingApprovals() {
 
   const goToDetail = (head) => {
     if (head.unscheduled) {
+      // ⚠️ ฉบับร่างของ "สัญญา" (มี contractGroupId) ไม่โผล่ในแผงงานล่วงหน้าของปฏิทินแล้ว (ดู
+      // visibleDrafts ใน EventCalendar/index.js) — ลิงก์ ?draft= จะพาไปหน้าที่ไม่มีการ์ดนี้อยู่เลย
+      // ต้องส่งไปหน้า "ภาพรวมงาน" ซึ่งเป็นที่เดียวที่จัดการสัญญาฉบับร่างได้จริงแทน
+      if (head.contractGroupId) {
+        navigate("/contracts");
+        return;
+      }
       navigate(`/event?draft=${head._id}&month=${head.plannedMonth || ""}&t=${Date.now()}`);
     } else {
       navigate(`/operation/${head._id}`);

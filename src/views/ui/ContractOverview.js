@@ -623,6 +623,14 @@ export default function ContractOverview() {
   }, [contracts]);
   // ✅ ค่าเริ่มต้นแสดงปีปัจจุบันก่อนเสมอ (ไม่ใช่ "ทุกปี" เหมือนเดิม) เปลี่ยนดูปีอื่นได้จาก dropdown
   const [yearFilter, setYearFilter] = useState(String(currentYear));
+  // ✅ จำนวนแถวที่ยัง "ระบุปีไม่ได้" (สัญญาเปล่าที่ยังไม่กรอกวันที่เริ่มสัญญา/ยังไม่ลงวันที่เข้างานเลย) —
+  // แถวพวกนี้แสดงในทุกปีอยู่แล้ว (ดู applyCommonFilters) แต่มีตัวเลือกแยกไว้ให้กรองดูเฉพาะกลุ่มนี้ได้ด้วย
+  // เผื่อต้องการไล่เก็บตกว่ามีสัญญาไหนค้างยังไม่ได้ลงวันที่บ้าง — โผล่เฉพาะตอนมีจริงเท่านั้น กันรกตัวเลือก
+  const unknownYearCount = useMemo(
+    () => contracts.filter((c) => contractYear(c) === null).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [contracts]
+  );
   // ✅ กรองตามผู้รับผิดชอบ — แยกจากช่องค้นหาข้อความอิสระ ให้เลือกจากรายชื่อจริงได้เลย ไม่ต้องพิมพ์เอง
   const [teamFilter, setTeamFilter] = useState("all");
   // ✅ กรองตามประเภทงาน (เช่น PM/Service/ติดตั้ง ฯลฯ) — เพิ่มตามที่ผู้ใช้ขอ เทียบ pattern เดียวกับ
@@ -686,8 +694,20 @@ export default function ContractOverview() {
   // แค่ "กลุ่มประเภท" (สัญญา/งานทั่วไป/ทั้งหมด) ก่อนนับ ให้ตัวเลขทุกจุดในหน้านี้ตรงกันเสมอ
   const applyCommonFilters = (list) => {
     let base = list;
-    if (yearFilter !== "all") {
-      base = base.filter((c) => String(contractYear(c)) === String(yearFilter));
+    // 🐛 BUG ที่แก้ (สร้างสัญญาแล้วหายไปเลย): เดิมกรองด้วย String(contractYear(c)) === yearFilter ตรงๆ —
+    // สัญญาที่ยัง "ระบุปีไม่ได้" (ไม่ได้กรอกวันที่เริ่มสัญญา และยังไม่ลงวันที่เข้างานสักครั้ง = สัญญาเปล่า
+    // ที่เพิ่งสร้าง ซึ่งเป็นเรื่องปกติมากตามที่ผู้ใช้ต้องการ) จะได้ contractYear = null → "null" ไม่มีทาง
+    // ตรงกับปีไหนเลย → ถูกซ่อนหายทันทีที่สร้างเสร็จ ทั้งที่ตัวกรองปีตั้งค่าเริ่มต้นเป็นปีปัจจุบันไว้อยู่แล้ว
+    // (ผู้ใช้ไม่ได้ตั้งเอง) = "เพิ่มสัญญาแล้วไม่เห็นในตาราง" โดยไม่มีอะไรบอกสาเหตุเลย
+    // ✅ แถวที่ระบุปีไม่ได้ให้ผ่านตัวกรองปีเสมอ (ไม่มีปีให้ขัดแย้งกับตัวกรอง จึงไม่ควรถูกซ่อน) แล้วเพิ่ม
+    // ตัวเลือก "ยังไม่ระบุปี" ไว้ให้กรองดูเฉพาะกลุ่มนี้ได้ด้วยถ้าต้องการ (ดู unknownYearCount ด้านล่าง)
+    if (yearFilter === "none") {
+      base = base.filter((c) => contractYear(c) === null);
+    } else if (yearFilter !== "all") {
+      base = base.filter((c) => {
+        const y = contractYear(c);
+        return y === null || String(y) === String(yearFilter);
+      });
     }
     // ✅ กรองตามทีมที่เข้างานแบบเจาะจง (เลือกจากรายชื่อจริง) แยกจากช่องค้นหาข้อความอิสระด้านบน —
     // เช็คกับ allRoundTeamNames (ทุกคนที่เคยเข้างานครั้งไหนก็ได้ของสัญญานี้) แทน c.team (แค่ครั้งที่ 1)
@@ -864,10 +884,22 @@ export default function ContractOverview() {
   const PAGE_SIZE = isMobile ? 5 : 10;
   const [page, setPage] = useState(1);
   useEffect(() => { setPage(1); }, [search, viewFilter, yearFilter, teamFilter, titleFilter, sortConfig, isMobile]);
+  // ✅ ป้องกันพลาด: ล้างการเลือกทุกครั้งที่สลับแท็บมุมมอง — เดิมการเลือกค้างข้ามแท็บได้ (checkbox มีเฉพาะ
+  // บางแท็บ ดู showCheckboxes) ทำให้เลือกงานไว้ในแท็บหนึ่ง สลับไปอีกแท็บที่มองไม่เห็นแถวพวกนั้นแล้ว แต่แถบ
+  // "เลือกไว้ N งาน" ยังลอยอยู่ + กด "จัดกลุ่มเป็นสัญญา" ได้ทันที = รวมงานที่มองไม่เห็นอยู่ตรงหน้าเข้าด้วยกัน
+  // โดยไม่มีทางตรวจทานก่อนเลย ซึ่งเป็นการกระทำที่ย้อนกลับเองไม่ได้ง่ายๆ
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { clearSelection(); }, [viewFilter]);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  // 🐛 BUG ที่แก้ (ตารางว่างเปล่าทั้งที่หัวข้อบอกว่ามี N สัญญา): เดิมตัดแถวด้วย `page` ดิบๆ ซึ่งรีเซ็ตเป็น 1
+  // เฉพาะตอนเปลี่ยนตัวกรอง/คำค้นหาเท่านั้น — แต่จำนวนแถวลดลงเองได้อีกหลายทางโดยที่ตัวกรองไม่เปลี่ยนเลย
+  // (auto-refresh ทุก 15 วินาทีแล้วมีคนอื่นลบ/ย้ายงาน, ลบสัญญาเอง, จัดหมวดหมู่แถวออกไปจากแท็บนี้ ฯลฯ)
+  // พอ page ค้างเกินจำนวนหน้าจริง slice จะได้ [] → ตารางว่างเปล่าสนิทโดยไม่มีอะไรอธิบาย ต้องกดเปลี่ยน
+  // ตัวกรองไปมาเองถึงจะกลับมา — clamp ไว้เสมอ (เทียบ pattern เดียวกับ draftsSafePage ใน Dashboard.js)
+  const safePage = Math.min(page, totalPages);
   const pagedRows = useMemo(
-    () => sortedFiltered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [sortedFiltered, page, PAGE_SIZE]
+    () => sortedFiltered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [sortedFiltered, safePage, PAGE_SIZE]
   );
 
   const csvData = useMemo(
@@ -913,11 +945,54 @@ export default function ContractOverview() {
     [filtered, visitColumns]
   );
 
+  // ✅ สรุปว่าตอนนี้มีตัวกรองอะไรทำงานอยู่บ้าง — ใช้อธิบายตอนตารางว่าง (กันเข้าใจผิดว่าข้อมูลหาย) และ
+  // ผูกกับปุ่ม "ล้างตัวกรองทั้งหมด" ให้กลับมาเห็นข้อมูลได้ในคลิกเดียว ไม่ต้องไล่รีเซ็ตเองทีละช่อง
+  // ⚠️ ไม่รวม viewFilter (แท็บมุมมอง) — เป็นการเลือกว่าจะดูอะไรอยู่ ไม่ใช่ "ตัวกรองซ้อน" ที่ควรถูกล้าง
+  const activeFilterLabels = useMemo(() => {
+    const labels = [];
+    if (search.trim()) labels.push(`ค้นหา "${search.trim()}"`);
+    if (titleFilter !== "all") labels.push(`ประเภทงาน ${titleFilter}`);
+    if (teamFilter !== "all") labels.push(`ทีม ${teamFilter}`);
+    if (yearFilter === "none") labels.push("ยังไม่ระบุปี");
+    else if (yearFilter !== "all") labels.push(`ปี ${yearFilter}`);
+    return labels;
+  }, [search, titleFilter, teamFilter, yearFilter]);
+  const hasActiveFilters = activeFilterLabels.length > 0;
+  const clearAllFilters = () => {
+    setSearch("");
+    setTitleFilter("all");
+    setTeamFilter("all");
+    setYearFilter("all");
+  };
+
+  // ✅ ชื่อไฟล์ที่ส่งออกบอกได้ในตัวว่าเป็นข้อมูลชุดไหน ณ วันไหน — เดิมเป็น "contracts.csv" ตายตัวเสมอ
+  // ส่งออกหลายแท็บ/หลายปีมาเทียบกันทีก็ทับกันเองในโฟลเดอร์ดาวน์โหลดทุกครั้ง (contracts (1).csv,
+  // contracts (2).csv ...) แยกไม่ออกว่าไฟล์ไหนคืออะไร ต้องเปิดดูทีละไฟล์เอง
+  const csvFilename = useMemo(() => {
+    const viewLabel = {
+      contracts: "งานสัญญา", overdue: "เลยกำหนด", general: "งานทั่วไป",
+      project: "งานโปรเจค", ungrouped: "ยังไม่จัดกลุ่ม", all: "ทั้งหมด",
+    }[viewFilter] || "ทั้งหมด";
+    const yearLabel = yearFilter === "all" ? "ทุกปี" : yearFilter === "none" ? "ยังไม่ระบุปี" : yearFilter;
+    return `ภาพรวมงาน-${viewLabel}-${yearLabel}-${moment().format("YYYYMMDD")}.csv`;
+  }, [viewFilter, yearFilter]);
+
   // ── ฟอร์ม "เพิ่มสัญญาใหม่" ─────────────────────────────────────────────
   // ✅ เดิมต้องออกจากหน้านี้ไปเปิดปฏิทินแล้วคลิกวันที่เพื่อสร้างงานแบบ "สัญญาแบบหลายครั้ง" เท่านั้น
   // (ดู AddEvent.js) — เพิ่มฟอร์มแบบเดียวกันไว้ในหน้านี้เลย ให้เพิ่มสัญญาใหม่ได้โดยไม่ต้องสลับหน้า
+  // 🐛 BUG ที่แก้ (สัญญาใหม่ไม่เคยมีผู้รับผิดชอบจริงสักใบ): เดิมฟอร์มนี้ให้เลือก "ทีมที่เข้างาน" แล้วส่ง
+  // team/resPerson ระดับสัญญา ซึ่งขัดกับโมเดลที่ตกลงกันไว้ 2 ข้อพร้อมกัน —
+  //   1) "ทีมที่เข้างาน" เป็นของ "แต่ละครั้ง" ไม่ใช่ของทั้งสัญญา (คนละครั้งเข้าคนละทีมได้) จึงตัดคอลัมน์
+  //      ระดับสัญญาออกไปแล้ว แก้ที่ช่อง "ครั้งที่ N" แทน — ฟอร์มนี้ยังตั้งค่าระดับสัญญาอยู่ที่เดียว
+  //   2) ตอนสร้างสัญญา สิ่งที่ admin/manager ต้องมอบหมายคือ "ผู้รับผิดชอบงาน" (คนที่ติดตามงานนี้ทั้งหมด)
+  //      แต่ payload ไม่เคยส่ง responsiblePerson/responsiblePersonId เลย → rawResponsiblePerson ว่าง
+  //      เสมอ → สิทธิ์ที่ต้อง "มอบหมายไว้ชัดเจนก่อน" (แก้ไขทีมรายครั้ง — ดู canEditRoundTeam) ไม่เคย
+  //      ทำงาน และคอลัมน์ "ผู้รับผิดชอบ" ที่เห็นเป็นแค่ค่า fallback จาก team (ดู groupEventsByContract)
+  //      ซึ่งดูเหมือนมอบหมายแล้วทั้งที่ยังไม่เคยมอบหมายจริง
+  // ✅ เปลี่ยนช่องนี้เป็น "ผู้รับผิดชอบงาน" ส่ง responsiblePerson/responsiblePersonId ตรงๆ ส่วนทีมที่เข้างาน
+  // ย้ายไปเป็นช่องแยกที่โผล่เฉพาะตอนระบุวันที่ครั้งที่ 1 (ผูกกับครั้งที่ 1 เท่านั้น ไม่ใช่ทั้งสัญญา)
   const emptyForm = {
-    company: "", site: "", title: "", system: "", team: "",
+    company: "", site: "", title: "", system: "", responsiblePerson: "", firstVisitTeam: "",
     contractNo: "", quotationNo: "", contractStart: "", contractEnd: "", visitCount: "", intervalMonths: "", jobValue: "",
     // ✅ วันที่เข้างานครั้งที่ 1 — ไม่บังคับ (บางสัญญายังไม่รู้วันที่แน่นอนตอนสร้าง) กรอกมาจะลงตารางเป็น
     // ครั้งที่ 1 จริงทันที ไม่กรอกจะบันทึกเป็นฉบับร่าง (unscheduled) — ฉบับร่างของสัญญาจะไม่โผล่ใน
@@ -985,6 +1060,15 @@ export default function ContractOverview() {
     );
   };
 
+  // ✅ ตรวจความถูกต้องสดๆ ระหว่างพิมพ์ — เตือนตรงช่องที่ผิดเลย และปิดปุ่ม "บันทึกสัญญา" ไว้จนกว่าจะครบ
+  // แทนที่จะปล่อยให้กดแล้วค่อยเด้ง error ที่หัวฟอร์ม (ซึ่งบนจอมือถือต้องเลื่อนขึ้นไปอ่านเองว่าพลาดตรงไหน)
+  const hasInvalidContractRange = Boolean(
+    form.contractStart && form.contractEnd && moment(form.contractEnd).isBefore(moment(form.contractStart))
+  );
+  const isAddFormInvalid =
+    !form.site.trim() || !form.title.trim() || !form.system.trim() || !form.visitCount ||
+    hasInvalidContractRange || isContractNoTaken(form.contractNo);
+
   const openAddDialog = () => {
     setForm({ ...emptyForm, contractNo: suggestNextContractNo() });
     setFormError("");
@@ -1017,10 +1101,22 @@ export default function ContractOverview() {
       setFormError(`เลขที่สัญญา "${form.contractNo.trim()}" ถูกใช้ไปแล้ว กรุณาตรวจสอบ`);
       return;
     }
+    // 🐛 BUG ที่แก้: เดิมไม่เคยตรวจว่าวันสิ้นสุดสัญญาต้องไม่ก่อนวันเริ่มสัญญาเลย (ตรวจแค่วันที่ครั้งที่ 1)
+    // สลับวันกันมาก็บันทึกผ่านได้ แล้วสัญญาจะขึ้นป้าย "หมดอายุแล้ว" สีแดงทันทีที่สร้างเสร็จ (ดู
+    // contractStatusInfo) โดยไม่มีอะไรบอกว่าเพราะกรอกวันสลับกัน
+    if (form.contractStart && form.contractEnd && moment(form.contractEnd).isBefore(moment(form.contractStart))) {
+      setFormError("วันที่สิ้นสุดสัญญาต้องไม่ก่อนวันที่เริ่มสัญญา");
+      return;
+    }
     // ✅ วันที่เข้างานครั้งที่ 1 ไม่บังคับ (ตามที่ผู้ใช้ยืนยัน — บางสัญญายังไม่รู้วันที่แน่นอนตอนสร้าง)
     // แต่ถ้ากรอกมา ต้องถูกต้อง (สิ้นสุดไม่ก่อนเริ่ม)
     if (form.firstVisitEnd && moment(form.firstVisitEnd).isBefore(moment(form.firstVisitStart))) {
       setFormError("วันที่สิ้นสุดครั้งที่ 1 ต้องไม่ก่อนวันที่เริ่ม");
+      return;
+    }
+    // 🐛 BUG ที่แก้: มูลค่างานเดิมรับค่าติดลบได้ (type="number" ไม่มี min และไม่เคยตรวจฝั่งจอเลย)
+    if (form.jobValue && Number(form.jobValue) < 0) {
+      setFormError("มูลค่างานต้องไม่ติดลบ");
       return;
     }
 
@@ -1031,8 +1127,11 @@ export default function ContractOverview() {
         site: form.site.trim(),
         title: form.title.trim(),
         system: form.system.trim(),
-        team: form.team,
-        resPerson: teamToId.get(form.team) || "",
+        // ✅ "ผู้รับผิดชอบงาน" — คนที่ติดตามสัญญานี้ทั้งหมด มอบหมายโดย admin/manager ตอนสร้างสัญญา
+        // (ไม่ใช่ทีมที่เข้างานซึ่งเป็นของแต่ละครั้ง ดูคอมเมนต์ที่ emptyForm) ต้องส่งค่าตรงๆ ไม่ผ่าน
+        // fallback เท่านั้น สิทธิ์ที่ผูกกับ "ผู้รับผิดชอบตัวจริง" ถึงจะทำงาน (ดู rawResponsiblePersonId)
+        responsiblePerson: form.responsiblePerson,
+        responsiblePersonId: teamToId.get(form.responsiblePerson) || "",
         backgroundColor: "#3788d8",
         textColor: "#ffffff",
         fontSize: 8,
@@ -1067,6 +1166,10 @@ export default function ContractOverview() {
       if (form.firstVisitStart) {
         await EventService.AddEvent({
           ...payload,
+          // ✅ ทีมที่เข้างานผูกกับ "ครั้งที่ 1" ที่กำลังสร้างนี้เท่านั้น ไม่ใช่ค่าระดับสัญญา — ครั้งถัดๆ ไป
+          // เลือกทีมของตัวเองแยกได้อิสระ (ดู beginRoundTeamEdit ในตาราง / กล่อง "เพิ่มครั้งถัดไป")
+          team: form.firstVisitTeam,
+          resPerson: teamToId.get(form.firstVisitTeam) || "",
           time: "1",
           dates: [{
             start: form.firstVisitStart,
@@ -1075,6 +1178,7 @@ export default function ContractOverview() {
           }],
         });
       } else {
+        // ✅ สัญญาเปล่า — ไม่ส่ง team/resPerson เลย ยังไม่มี "ครั้ง" ไหนให้ผูกทีม (ไปเลือกตอนลงวันที่จริง)
         await EventService.AddDraftEvent(payload);
       }
 
@@ -1082,7 +1186,7 @@ export default function ContractOverview() {
       setAddOpen(false);
       Swal.fire({
         title: "บันทึกสัญญาใหม่สำเร็จ ✅",
-        text: form.firstVisitStart ? undefined : "ยังไม่ได้ระบุวันที่เข้างาน — ไปเพิ่มวันที่ครั้งที่ 1 ได้ที่ปุ่ม + ในตารางเมื่อรู้วันที่จริง",
+        text: form.firstVisitStart ? undefined : 'ยังไม่ได้ระบุวันที่เข้างาน — สัญญาถูกบันทึกเป็น "สัญญาเปล่า" กดชิป "📌 กดเพื่อลงวันที่" ที่ช่องครั้งที่ 1 ในตารางเมื่อรู้วันที่จริง',
         icon: "success",
         timer: form.firstVisitStart ? 1500 : 2500,
         showConfirmButton: false,
@@ -1126,6 +1230,30 @@ export default function ContractOverview() {
     setAddVisitError("");
   };
   const closeAddVisitDialog = () => { if (!addVisitSaving) setAddVisitTarget(null); };
+
+  // ⚠️ BUG ที่แก้: ช่อง "ครั้งที่" ของสัญญาที่ยังเป็นฉบับร่าง (สัญญาเปล่า ยังไม่ลงวันที่) เดิมโชว์ชิป
+  // "📌 รอวางแผน" ที่ลิงก์ไป /event?draft=... เสมอ — แต่ฉบับร่างของสัญญาไม่โผล่ในแผงงานล่วงหน้าของ
+  // ปฏิทินอีกต่อไปแล้ว (ดู visibleDrafts ใน EventCalendar/index.js) ลิงก์นั้นจึงพาไปหน้าที่ไม่มีการ์ดนี้
+  // อยู่เลย = กดแล้วไม่เจออะไร และเพราะชิปนี้ถูกเช็คก่อนปุ่ม "+ เพิ่มครั้งถัดไป" ในลำดับ ternary เดียวกัน
+  // ปุ่ม + ของครั้งที่ 1 จึงไม่มีวันโผล่ให้กดเลย → สัญญาเปล่าที่เพิ่งสร้างกลายเป็นลงวันที่ไม่ได้เลยทั้งใบ
+  // ✅ สัญญา → ให้กดชิปเปิดกล่อง "เพิ่มครั้งที่ 1" ในหน้านี้แทน (handleAddVisitSubmit แปลงฉบับร่างเดิม
+  // เป็นครั้งจริงให้เองผ่าน PUT /:id/schedule ไม่สร้าง record ซ้ำ) ส่วนงานทั่วไป/โปรเจคยังอยู่ในแผงงาน
+  // ล่วงหน้าตามปกติ ใช้ลิงก์เดิมต่อไปได้
+  const pendingDraftChip = (c, pendingDraft) => {
+    if (c.isRealContract) {
+      return isAdminOrManager
+        ? { label: "📌 กดเพื่อลงวันที่", tip: "สัญญานี้ยังไม่ได้ลงวันที่เข้างาน — กดเพื่อระบุวันที่ครั้งที่ 1", props: { onClick: () => openAddVisitDialog(c), sx: { cursor: "pointer" } } }
+        : { label: "📌 รอลงวันที่", tip: "สัญญานี้ยังไม่ได้ลงวันที่เข้างาน (แอดมิน/manager เป็นผู้ระบุ)", props: {} };
+    }
+    return {
+      label: "📌 รอวางแผน",
+      tip: "วางแผนล่วงหน้าไว้แล้ว ยังไม่ได้ลงวันที่จริง — กดเพื่อไปดูงานนี้",
+      props: {
+        component: Link,
+        to: `/event?draft=${pendingDraft._id}${pendingDraft.plannedMonth ? `&month=${pendingDraft.plannedMonth}` : ""}`,
+      },
+    };
+  };
 
   const handleAddVisitSubmit = async () => {
     if (!addVisitTarget) return;
@@ -1271,6 +1399,16 @@ export default function ContractOverview() {
       setMergeError(`จำนวนครั้งทั้งหมดต้องไม่เกิน ${MAX_VISIT_COUNT} ครั้ง`);
       return;
     }
+    // 🐛 BUG ที่แก้: ฟอร์มนี้ขาดการตรวจช่วงวันที่สัญญาเหมือนกัน (เทียบ handleAddSubmit) — กรอกวันสลับกัน
+    // แล้วสัญญาที่จัดกลุ่มเสร็จจะขึ้น "หมดอายุแล้ว" ทันทีโดยไม่รู้สาเหตุ
+    if (mergeForm.contractStart && mergeForm.contractEnd && moment(mergeForm.contractEnd).isBefore(moment(mergeForm.contractStart))) {
+      setMergeError("วันที่สิ้นสุดสัญญาต้องไม่ก่อนวันที่เริ่มสัญญา");
+      return;
+    }
+    if (mergeForm.jobValue && Number(mergeForm.jobValue) < 0) {
+      setMergeError("มูลค่างานต้องไม่ติดลบ");
+      return;
+    }
     // ✅ ยืนยันอีกชั้นเฉพาะตอนงานที่เลือกชื่อไม่ตรงกัน (hasMixedSelection) — เดิมปลดล็อกให้เลือกงานชื่อ
     // ไม่ตรงกันมารวมเป็นสัญญาเดียวกันได้แล้ว (กันจัดกลุ่มงานเก่ายากเกินไป ดู firstSelectedSignature/
     // hasMixedSelection ด้านบน) แต่พอไม่มีอะไรกันเลยก็เผลอกดพลาดรวมงานคนละเรื่องกันจริงๆ เข้าด้วยกันได้
@@ -1406,6 +1544,23 @@ export default function ContractOverview() {
         setEditingCell(null);
         return;
       }
+    }
+    // 🐛 BUG ที่แก้: แก้ไข inline ก็ไม่เคยตรวจช่วงวันที่สัญญาเลย (ทั้งที่เป็นทางที่แก้วันที่บ่อยที่สุด) —
+    // แก้วันสิ้นสุดให้ก่อนวันเริ่มได้ตามใจ แล้วสัญญาจะขึ้น "หมดอายุแล้ว" ทันที เทียบกับอีกฝั่งของช่วงที่
+    // ไม่ได้แก้ (c.contractStart/c.contractEnd ตัวเดิม) ให้ครบทั้งสองทิศทาง
+    if (field === "contractStart" || field === "contractEnd") {
+      const nextStart = field === "contractStart" ? rawValue : (c.contractStart ? moment(c.contractStart).format("YYYY-MM-DD") : "");
+      const nextEnd = field === "contractEnd" ? rawValue : (c.contractEnd ? moment(c.contractEnd).format("YYYY-MM-DD") : "");
+      if (nextStart && nextEnd && moment(nextEnd).isBefore(moment(nextStart))) {
+        Swal.fire({ title: "แก้ไขไม่สำเร็จ", text: "วันที่สิ้นสุดสัญญาต้องไม่ก่อนวันที่เริ่มสัญญา", icon: "error" });
+        setEditingCell(null);
+        return;
+      }
+    }
+    if (field === "jobValue" && rawValue && Number(rawValue) < 0) {
+      Swal.fire({ title: "แก้ไขไม่สำเร็จ", text: "มูลค่างานต้องไม่ติดลบ", icon: "error" });
+      setEditingCell(null);
+      return;
     }
 
     const payload = {};
@@ -1865,13 +2020,22 @@ export default function ContractOverview() {
                         </Box>
                       ))
                     ) : pendingDraft ? (
-                      <Box
-                        component={Link}
-                        to={`/event?draft=${pendingDraft._id}${pendingDraft.plannedMonth ? `&month=${pendingDraft.plannedMonth}` : ""}`}
-                        sx={{ fontSize: "0.75rem", color: "#b45309", fontWeight: 600, textDecoration: "none" }}
-                      >
-                        📌 รอวางแผน
-                      </Box>
+                      (() => {
+                        const chip = pendingDraftChip(c, pendingDraft);
+                        return (
+                          <Tooltip title={chip.tip}>
+                            <Box
+                              {...chip.props}
+                              sx={{
+                                fontSize: "0.75rem", color: "#b45309", fontWeight: 600, textDecoration: "none",
+                                ...(chip.props.sx || {}),
+                              }}
+                            >
+                              {chip.label}
+                            </Box>
+                          </Tooltip>
+                        );
+                      })()
                     ) : isAdminOrManager && c.isRealContract && n === nextOpenRound ? (
                       <IconButton size="small" onClick={() => openAddVisitDialog(c)} sx={{ color: overdueInfo ? "#dc2626" : ACCENT, p: 0.25 }}>
                         <PlaylistAdd fontSize="small" />
@@ -1965,8 +2129,13 @@ export default function ContractOverview() {
           </Box>
           <Box>
             <Typography variant="h6" fontWeight={800}>{isAdminOrManager ? "ภาพรวมงาน" : "ภาพรวมงานของฉัน"}</Typography>
+            {/* ✅ แท็บ "เลยกำหนด/คงค้าง" กรองเฉพาะ isRealContract เหมือนแท็บ "งานสัญญา" ทุกประการ (ดู
+                filtered) แถวทั้งหมดจึงเป็นสัญญา ไม่ใช่ "งาน" — เดิมเช็คแค่ viewFilter==="contracts"
+                ทำให้แท็บนี้ขึ้นหน่วยผิดเป็น "งาน" */}
             <Typography variant="caption" color="text.secondary">
-              {loading ? "กำลังโหลด..." : `${filtered.length} ${viewFilter === "contracts" ? "สัญญา" : "งาน"}`}
+              {loading
+                ? "กำลังโหลด..."
+                : `${filtered.length} ${viewFilter === "contracts" || viewFilter === "overdue" ? "สัญญา" : "งาน"}`}
             </Typography>
           </Box>
         </Stack>
@@ -2000,7 +2169,7 @@ export default function ContractOverview() {
               Suspense — ใช้ <button> ธรรมดาแทน เหมือน pattern ที่ใช้งานได้จริงใน EventCalendar/index.js */}
           <CSVLink
             data={csvData}
-            filename="contracts.csv"
+            filename={csvFilename}
             title="ส่งออก Excel/CSV"
             style={{
               display: "flex", alignItems: "center", justifyContent: "center",
@@ -2123,9 +2292,14 @@ export default function ContractOverview() {
         </Paper>
       )}
 
-      {selectedIds.size > 0 && (
+      {/* 🐛 BUG ที่แก้ (ตัวเลขไม่ตรงกับที่จะถูกจัดกลุ่มจริง): เดิมเช็ค/นับจาก selectedIds ดิบๆ แต่ตอนกด
+          "จัดกลุ่มเป็นสัญญา" ใช้ selectedContracts (กรองเฉพาะแถวที่ยังมีอยู่จริงใน contracts) — พอมีคนอื่น
+          ลบ/ย้าย/จัดหมวดหมู่งานที่เลือกไว้ออกไประหว่างนั้น (auto-refresh ทุก 15 วินาที) id ที่หายไปจะยัง
+          ค้างอยู่ใน selectedIds ทำให้แถบบอก "เลือกไว้ 3 งาน" แต่จริงๆ จะถูกจัดกลุ่มแค่ 2 — และถ้าหายหมด
+          ทุกแถวก็ยังขึ้นแถบค้างอยู่ทั้งที่ไม่เหลืออะไรให้ทำ นับจาก selectedContracts ให้ตรงกับของจริงเสมอ */}
+      {selectedContracts.length > 0 && (
         <Paper variant="outlined" sx={{ p: 1.25, mb: 2, borderRadius: 3, display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap", bgcolor: alpha(ACCENT, 0.06), borderColor: alpha(ACCENT, 0.4) }}>
-          <Typography variant="body2" fontWeight={700} sx={{ flex: 1 }}>เลือกไว้ {selectedIds.size} งาน</Typography>
+          <Typography variant="body2" fontWeight={700} sx={{ flex: 1 }}>เลือกไว้ {selectedContracts.length} งาน</Typography>
           {/* ✅ ไม่บล็อกการเลือกงานชื่อไม่ตรงกันอีกต่อไป (ดูเหตุผลที่ hasMixedSelection ด้านบน) แต่ยัง
               เตือนไว้ให้รู้ตัว กันเผลอเลือกงานคนละเรื่องกันจริงๆ มารวมเป็นสัญญาเดียวกันโดยไม่ได้ตั้งใจ */}
           {hasMixedSelection && (
@@ -2259,6 +2433,10 @@ export default function ContractOverview() {
         >
           <option value="all">ทุกปี</option>
           {availableYears.map((y) => <option key={y} value={y}>{y}</option>)}
+          {/* ✅ สัญญาที่ยังไม่ได้กรอกวันที่เริ่มสัญญาและยังไม่ลงวันที่เข้างานเลย — ปกติจะเห็นอยู่ในทุกปี
+              อยู่แล้ว (ไม่ถูกซ่อน) ตัวเลือกนี้ไว้กรองดูเฉพาะกลุ่มนี้เวลาต้องการไล่เก็บตกว่าเหลือสัญญาไหน
+              ค้างยังไม่ได้ลงวันที่บ้าง */}
+          {unknownYearCount > 0 && <option value="none">ยังไม่ระบุปี ({unknownYearCount})</option>}
         </TextField>
       </Stack>
 
@@ -2273,13 +2451,26 @@ export default function ContractOverview() {
           }}>
             <FolderOpen sx={{ fontSize: 30 }} />
           </Box>
-          <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 420, mx: "auto", px: 2 }}>
-            {search
-              ? "ไม่พบสัญญาที่ตรงกับคำค้นหา"
-              : hiddenJobCount > 0
-              ? "ยังไม่มีสัญญาแบบหลายครั้ง — กดแท็บ \"งานเก่าในระบบที่ยังไม่จัดกลุ่ม\" ด้านบนเพื่อดูงานที่มีอยู่ หรือสร้างงานใหม่แบบ \"สัญญาแบบหลายครั้ง\" จากหน้าปฏิทิน"
-              : "ยังไม่มีข้อมูลสัญญา"}
+          {/* ✅ บอกให้ชัดว่า "ว่างเพราะอะไร" และกดอะไรได้บ้าง — เดิมโทษช่องค้นหาอย่างเดียว ทั้งที่ตัวกรอง
+              ปี/ประเภทงาน/ทีม ก็ทำให้ตารางว่างได้เหมือนกัน (โดยเฉพาะตัวกรองปีซึ่งตั้งค่าเริ่มต้นเป็นปี
+              ปัจจุบันไว้เองตั้งแต่แรก ผู้ใช้ไม่ได้ตั้ง จึงไม่มีทางเดาได้เลยว่าข้อมูลถูกกรองอยู่) — ไล่บอก
+              ตัวกรองที่เปิดอยู่จริงพร้อมปุ่มล้างทั้งหมดในคลิกเดียว กันเข้าใจผิดว่า "ข้อมูลหาย/ระบบพัง" */}
+          <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 460, mx: "auto", px: 2 }}>
+            {hasActiveFilters
+              ? `ไม่พบรายการที่ตรงกับเงื่อนไขที่กรองอยู่ (${activeFilterLabels.join(" · ")})`
+              : viewFilter === "contracts" && hiddenJobCount > 0
+              ? 'ยังไม่มีสัญญาแบบหลายครั้ง — กดแท็บ "งานเก่าในระบบที่ยังไม่จัดกลุ่ม" ด้านบนเพื่อดูงานที่มีอยู่ หรือกด "เพิ่มสัญญาใหม่"'
+              : "ยังไม่มีข้อมูลในมุมมองนี้"}
           </Typography>
+          {hasActiveFilters && (
+            <Button
+              size="small" variant="outlined" onClick={clearAllFilters}
+              startIcon={<Close sx={{ fontSize: 16 }} />}
+              sx={{ mt: 1.5, textTransform: "none", fontWeight: 700, borderRadius: 2, borderColor: alpha(ACCENT, 0.5), color: ACCENT }}
+            >
+              ล้างตัวกรองทั้งหมด
+            </Button>
+          )}
         </Paper>
       ) : isMobile ? (
         <Stack spacing={1.5}>
@@ -2339,7 +2530,14 @@ export default function ContractOverview() {
                 {!hideContractOnlyColumns && (
                   <ResizableTh width={colWidth("status")} align="center" rowSpan={headerRowSpan} columnKey="status" tableRef={tableRef} onResize={handleColResize("status")}>สถานะสัญญา</ResizableTh>
                 )}
-                <ResizableTh width={colWidth("progress")} align="center" rowSpan={headerRowSpan} columnKey="progress" tableRef={tableRef} onResize={handleColResize("progress")}>คืบหน้า</ResizableTh>
+                {/* 🐛 BUG ที่แก้ (หัวคอลัมน์ไม่ตรงกับข้อมูลข้างใน): ช่องนี้แสดง 2 แบบตามชนิดแถว — สัญญาจริง
+                    โชว์ "X/Y ครั้ง" (คืบหน้า) ส่วนงานทั่วไป/โปรเจค/ยังไม่จัดกลุ่มโชว์ป้ายสถานะงาน (ดู
+                    jobStatusInfo ในเซลล์) แต่หัวคอลัมน์เขียน "คืบหน้า" ตายตัวเสมอ — ในแท็บที่มีแต่แถวที่
+                    ไม่ใช่สัญญา (hideContractOnlyColumns) ทุกแถวจึงโชว์สถานะ แต่หัวบอกว่าคืบหน้า อ่านแล้ว
+                    เข้าใจผิดทันที ต้องเปลี่ยนหัวตามชนิดข้อมูลที่แสดงจริงในแท็บนั้นๆ */}
+                <ResizableTh width={colWidth("progress")} align="center" rowSpan={headerRowSpan} columnKey="progress" tableRef={tableRef} onResize={handleColResize("progress")}>
+                  {hideContractOnlyColumns ? "สถานะงาน" : "คืบหน้า"}
+                </ResizableTh>
                 {/* ✅ งานทั่วไป/โปรเจค/ยังไม่จัดกลุ่ม (hideContractOnlyColumns) ไม่มีแนวคิด "หลายครั้ง"
                     แบบสัญญาจริงเลย (แทบทุกแถวมีแค่คอลัมน์เดียวอยู่แล้ว) หัวข้อ "ครั้งที่ 1" จึงดูแปลก/
                     ไม่มีความหมาย — เปลี่ยนเป็น "วันที่เข้างาน" แทนตามที่ผู้ใช้ขอ ส่วนแท็บที่มีสัญญาจริงปนอยู่
@@ -2519,10 +2717,11 @@ export default function ContractOverview() {
                     width={colVar("visitCount")} align="center"
                     // ✅ เตือนถ้ารอบล่าสุดผ่านมาเกินระยะห่างระหว่างรอบที่กำหนดไว้แล้วแต่ยังไม่ได้ลงแผนงาน
                     // ครั้งถัดไปเลย — วงกลมสีแดงทึบ (ไม่ใช่แค่ไอคอนสีแดงบนพื้นขาว) ให้เห็นชัดแม้เป็นภาพนิ่ง
-                    // ไม่ต้องรอดูอนิเมชัน บรรทัดที่ 2 โชว์ "ปีละ N ครั้ง" เฉพาะตอนระยะห่างหารลงตัว (แค่
-                    // ค่าอ้างอิงเฉยๆ ไม่ได้ผูก/บังคับกับจำนวนครั้งจริงที่แก้ไขในช่องนี้ได้อิสระ)
+                    // ไม่ต้องรอดูอนิเมชัน
+                    // ✅ เก็บกวาด: เดิมมีบรรทัดที่ 2 โชว์ "ปีละ N ครั้ง" แต่ถูกคอมเมนต์ปิดไว้ เหลือแต่ตัวแปร
+                    // perYear ที่คำนวณทิ้งเปล่าๆ ทุก render (ยังเป็น lint warning ค้างอยู่ด้วย) — ลบออกทั้งคู่
+                    // ค่า "เข้าปีละ (ครั้ง)" ยังอยู่ครบในไฟล์ CSV ที่ส่งออกเหมือนเดิม (ดู csvData)
                     formatDisplay={(v) => {
-                      const perYear = visitsPerYear(c.intervalMonths);
                       return (
                         <Stack spacing={0} alignItems="center">
                           <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
@@ -2547,11 +2746,6 @@ export default function ContractOverview() {
                               </Tooltip>
                             )}
                           </Stack>
-                          {/* {v && perYear && (
-                            <Typography variant="caption" sx={{ fontSize: "0.66rem", lineHeight: 1.1, color: "text.secondary" }}>
-                              ปีละ {perYear} ครั้ง
-                            </Typography>
-                          )} */}
                         </Stack>
                       );
                     }}
@@ -2712,25 +2906,31 @@ export default function ContractOverview() {
                             )}
                           </Stack>
                         ) : pendingDraft ? (
-                          // ✅ กดได้เลย — พาไปหน้าปฏิทิน เจาะจงงานนี้ในแผงงานล่วงหน้าเลย (เดิมโชว์
-                          // แค่ตัวหนังสือเฉยๆ กดไม่ได้ ต้องไปไล่หาเองว่าอยู่เดือนไหน/หน้าไหน) เห็นชัดว่า
-                          // กดได้จากพื้นหลังชิป + ขีดเส้นใต้ตอน hover เหมือนลิงก์อื่นในตารางนี้
-                          <Tooltip title="วางแผนล่วงหน้าไว้แล้ว ยังไม่ได้ลงวันที่จริง — กดเพื่อไปดูงานนี้">
-                            <Box
-                              component={Link}
-                              to={`/event?draft=${pendingDraft._id}${pendingDraft.plannedMonth ? `&month=${pendingDraft.plannedMonth}` : ""}`}
-                              sx={{
-                                fontSize: "0.72rem", color: "#b45309", fontWeight: 600, whiteSpace: "nowrap",
-                                textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 0.4,
-                                px: 0.75, py: 0.25, borderRadius: 1.5, bgcolor: alpha("#f59e0b", 0.1),
-                                border: "1px solid", borderColor: alpha("#f59e0b", 0.3),
-                                transition: "background-color 0.15s ease, border-color 0.15s ease",
-                                "&:hover": { bgcolor: alpha("#f59e0b", 0.2), borderColor: "#b45309", textDecoration: "underline" },
-                              }}
-                            >
-                              📌 รอวางแผน
-                            </Box>
-                          </Tooltip>
+                          // ✅ กดได้เลย — สัญญาเปิดกล่อง "เพิ่มครั้งที่ 1" ในหน้านี้เลย ส่วนงานทั่วไป/
+                          // โปรเจคพาไปหน้าปฏิทิน เจาะจงการ์ดนั้นในแผงงานล่วงหน้า (ดู pendingDraftChip
+                          // ซึ่งอธิบายเหตุผลที่ต้องแยกปลายทางกันไว้ละเอียดแล้ว) เห็นชัดว่ากดได้จาก
+                          // พื้นหลังชิป + ขีดเส้นใต้ตอน hover เหมือนลิงก์อื่นในตารางนี้
+                          (() => {
+                            const chip = pendingDraftChip(c, pendingDraft);
+                            return (
+                              <Tooltip title={chip.tip}>
+                                <Box
+                                  {...chip.props}
+                                  sx={{
+                                    fontSize: "0.72rem", color: "#b45309", fontWeight: 600, whiteSpace: "nowrap",
+                                    textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 0.4,
+                                    px: 0.75, py: 0.25, borderRadius: 1.5, bgcolor: alpha("#f59e0b", 0.1),
+                                    border: "1px solid", borderColor: alpha("#f59e0b", 0.3),
+                                    transition: "background-color 0.15s ease, border-color 0.15s ease",
+                                    "&:hover": { bgcolor: alpha("#f59e0b", 0.2), borderColor: "#b45309", textDecoration: "underline" },
+                                    ...(chip.props.sx || {}),
+                                  }}
+                                >
+                                  {chip.label}
+                                </Box>
+                              </Tooltip>
+                            );
+                          })()
                         ) : isAdminOrManager && c.isRealContract && n === nextOpenRound ? (
                           // ✅ ปุ่ม "+ เพิ่มครั้งถัดไป" ย้ายมาอยู่ในช่องของครั้งที่มันเองเลย (เดิมอยู่ในคอลัมน์
                           // actions แยกต่างหาก มองไม่ออกว่ากดแล้วจะไปเพิ่มครั้งที่เท่าไหร่) พอเพิ่มสำเร็จแล้ว
@@ -2837,7 +3037,7 @@ export default function ContractOverview() {
       {!loading && filtered.length > PAGE_SIZE && (
         <Stack direction="row" justifyContent="center" sx={{ mt: 2 }}>
           <Pagination
-            count={totalPages} page={page}
+            count={totalPages} page={safePage}
             onChange={(_, v) => setPage(v)}
             color="primary" shape="rounded" size={isMobile ? "large" : "small"}
             sx={{
@@ -2903,11 +3103,15 @@ export default function ContractOverview() {
                 renderInput={(params) => <TextField {...params} label="ระบบงาน *" size="small" />}
               />
             </Stack>
+            {/* ✅ "ผู้รับผิดชอบงาน" ไม่ใช่ "ทีมที่เข้างาน" — คนละเรื่องกันโดยสมบูรณ์ (ดูคอมเมนต์ที่
+                emptyForm) ผู้รับผิดชอบ = คนที่ติดตามสัญญานี้ทั้งหมด (เห็นในหน้าดำเนินงาน/งานคงค้าง/
+                ติดตามใบเสนอราคา และแก้ไขทีมของแต่ละครั้งเองได้) ส่วนทีมที่เข้างานเลือกแยกรายครั้ง */}
             <TextField
-              select fullWidth size="small" label="ทีมที่เข้างาน"
-              value={form.team} onChange={(e) => setField("team")(e.target.value)}
+              select fullWidth size="small" label="ผู้รับผิดชอบงาน"
+              value={form.responsiblePerson} onChange={(e) => setField("responsiblePerson")(e.target.value)}
               SelectProps={{ native: true }}
               InputLabelProps={{ shrink: true }}
+              helperText="คนที่ติดตามสัญญานี้ทั้งหมด — เลือกทีมที่เข้างานแยกรายครั้งได้ในตารางภายหลัง"
             >
               <option value="">— ไม่ระบุ —</option>
               {teamOptions.map((name) => <option key={name} value={name}>{name}</option>)}
@@ -2927,15 +3131,19 @@ export default function ContractOverview() {
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
               <TextField fullWidth size="small" type="date" label="วันที่เริ่มสัญญา" InputLabelProps={{ shrink: true }}
                 value={form.contractStart} onChange={(e) => setField("contractStart")(e.target.value)} />
+              {/* ✅ เตือนทันทีตั้งแต่กรอกผิด ไม่ต้องรอกดบันทึกแล้วค่อยเด้ง error ด้านบนสุดของฟอร์ม
+                  (ซึ่งอยู่ไกลจากช่องที่ผิดจนต้องเลื่อนหาเอง) — ปุ่มบันทึกก็ถูกปิดไปด้วย ดู isAddFormInvalid */}
               <TextField fullWidth size="small" type="date" label="วันที่สิ้นสุดสัญญา" InputLabelProps={{ shrink: true }}
-                value={form.contractEnd} onChange={(e) => setField("contractEnd")(e.target.value)} />
+                value={form.contractEnd} onChange={(e) => setField("contractEnd")(e.target.value)}
+                error={hasInvalidContractRange}
+                helperText={hasInvalidContractRange ? "ต้องไม่ก่อนวันที่เริ่มสัญญา" : ""} />
             </Stack>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
               <TextField fullWidth size="small" type="number" label="จำนวนครั้งทั้งหมด *" value={form.visitCount}
                 onChange={(e) => setField("visitCount")(e.target.value)} inputProps={{ min: 1, max: MAX_VISIT_COUNT }}
                 helperText={`สูงสุด ${MAX_VISIT_COUNT} ครั้ง`} />
               <TextField fullWidth size="small" type="number" label="มูลค่างาน" value={form.jobValue}
-                onChange={(e) => setField("jobValue")(e.target.value)} />
+                onChange={(e) => setField("jobValue")(e.target.value)} inputProps={{ min: 0 }} />
             </Stack>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
               {/* ✅ ระยะห่างระหว่างรอบ — ข้อมูลอ้างอิงอิสระ ไม่บังคับ ไม่ผูก/บังคับกับ "จำนวนครั้งทั้งหมด"
@@ -2956,6 +3164,20 @@ export default function ContractOverview() {
                 value={form.firstVisitEnd} onChange={(e) => setField("firstVisitEnd")(e.target.value)}
                 helperText="เว้นว่าง = วันเดียวกับวันที่เริ่ม" disabled={!form.firstVisitStart} />
             </Stack>
+            {/* ✅ ทีมที่เข้างานเป็นของ "ครั้ง" ไม่ใช่ของสัญญา — จึงโผล่เฉพาะตอนกำลังสร้างครั้งที่ 1 จริง
+                (มีวันที่แล้ว) เท่านั้น ถ้าเป็นสัญญาเปล่ายังไม่มีครั้งไหนให้ผูกทีม ไม่ต้องมีช่องนี้ให้สับสน */}
+            {form.firstVisitStart && (
+              <TextField
+                select fullWidth size="small" label="ทีมที่เข้างานครั้งที่ 1"
+                value={form.firstVisitTeam} onChange={(e) => setField("firstVisitTeam")(e.target.value)}
+                SelectProps={{ native: true }}
+                InputLabelProps={{ shrink: true }}
+                helperText="เฉพาะครั้งที่ 1 — ครั้งถัดไปเลือกทีมของตัวเองแยกได้"
+              >
+                <option value="">— ไม่ระบุ —</option>
+                {teamOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+              </TextField>
+            )}
             {!form.firstVisitStart && (
               <Alert severity="info" sx={{ fontSize: "0.8rem" }}>
                 ยังไม่ระบุ = บันทึกสัญญาไว้ก่อน (จะไม่โผล่ในแผงงานล่วงหน้าของหน้าปฏิทิน — จัดการที่หน้านี้
@@ -2967,8 +3189,10 @@ export default function ContractOverview() {
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button onClick={closeAddDialog} disabled={saving} sx={{ textTransform: "none" }}>ยกเลิก</Button>
+          {/* ✅ ปิดปุ่มไว้จนกว่าจะกรอกครบ/ถูกต้อง — กันกดแล้วเด้ง error ซ้ำๆ โดยไม่รู้ว่าขาดอะไร
+              (ช่องบังคับมี * กำกับอยู่แล้ว เห็นได้ทันทีว่าเหลือช่องไหน) */}
           <Button
-            variant="contained" onClick={handleAddSubmit} disabled={saving}
+            variant="contained" onClick={handleAddSubmit} disabled={saving || isAddFormInvalid}
             sx={{ bgcolor: ACCENT, textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#b91c1c" } }}
           >
             {saving ? "กำลังบันทึก..." : "บันทึกสัญญา"}

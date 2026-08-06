@@ -323,12 +323,22 @@ const Dashboard = () => {
   // การโชว์แค่ไม่กี่รายการตายตัว ให้เห็นได้ครบทุกใบจากตรงนี้เลยโดยไม่ต้องออกไปหน้า "แผนงาน"
   const DRAFTS_PAGE_SIZE = 5;
   const [draftsPage, setDraftsPage] = useState(1);
+  // ⚠️ BUG ที่แก้: ต้องกรองฉบับร่างของ "สัญญา" (มี contractGroupId) ทิ้งให้ตรงกับแผงงานล่วงหน้าใน
+  // ปฏิทิน (ดู visibleDrafts ใน EventCalendar/index.js ซึ่งกรองแบบเดียวกันอยู่แล้ว) — สัญญาที่เพิ่ง
+  // สร้างแบบยังไม่ลงวันที่เป็น record unscheduled ที่ GET /drafts คืนมาด้วยเสมอ ทำให้สัญญาเปล่าโผล่ใน
+  // วิดเจ็ตนี้เหมือนถูก "วางแผนไว้เดือนนั้น" ทั้งที่ผู้ใช้ยังไม่เคยระบุวันที่/เดือนอะไรเลย — สัญญาจัดการที่
+  // หน้า "ภาพรวมงาน" ที่เดียว (ดู overdueContracts ด้านบนซึ่งยังใช้ drafts ดิบเต็มๆ ต่อไป เพราะการนับ
+  // "เลยกำหนดรอบถัดไป" ต้องเห็นรอบที่จองล่วงหน้าไว้ด้วย ไม่งั้นจะนับเกินจริง)
+  const generalDrafts = useMemo(
+    () => drafts.filter((d) => !d.contractGroupId),
+    [drafts],
+  );
   const draftsSorted = useMemo(() => {
     if (!isAdminOrManager) return [];
-    return [...drafts].sort((a, b) =>
+    return [...generalDrafts].sort((a, b) =>
       (a.plannedMonth || "").localeCompare(b.plannedMonth || ""),
     );
-  }, [isAdminOrManager, drafts]);
+  }, [isAdminOrManager, generalDrafts]);
   const draftsTotalPages = Math.max(
     1,
     Math.ceil(draftsSorted.length / DRAFTS_PAGE_SIZE),
@@ -899,13 +909,15 @@ const Dashboard = () => {
         </div>
       )}
 
-      {drafts.length > 0 && (
+      {/* ✅ ใช้ generalDrafts (ตัดฉบับร่างของสัญญาออกแล้ว) ให้ตัวเลขตรงกับรายการที่แสดงจริงด้านบน
+          และตรงกับจำนวนที่จะเห็นจริงเมื่อกดไปหน้า "แผนงาน" (ซึ่งกรองแบบเดียวกัน — ดู visibleDrafts) */}
+      {generalDrafts.length > 0 && (
         <Link
           to="/event"
           style={styles.viewAllBtn}
           className="metric-card-hover"
         >
-          ดูงานวางแผนล่วงหน้าทั้งหมด ({drafts.length}){" "}
+          ดูงานวางแผนล่วงหน้าทั้งหมด ({generalDrafts.length}){" "}
           <FaChevronRight size={9} />
         </Link>
       )}

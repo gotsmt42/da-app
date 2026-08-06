@@ -27,6 +27,34 @@ self.addEventListener("push", (event) => {
   );
 });
 
+// 🐛 BUG ที่แก้ (แจ้งเตือนเงียบหายถาวรโดยไม่มีใครรู้ตัว): เบราว์เซอร์/push service หมุน (rotate)
+// subscription ได้เองเป็นระยะ — endpoint เดิมจะตายทันที ถ้าไม่ต่อ subscription ใหม่แล้วบอก server
+// เครื่องนั้นจะไม่ได้รับ push อีกเลยตลอดไป ทั้งที่ปุ่มในหน้า "ตั้งค่า" ยังขึ้นว่าเปิดอยู่ (เพราะ
+// getSubscription() คืน subscription ตัวใหม่ที่ server ไม่รู้จัก) — ผู้ใช้จะเข้าใจว่าระบบแจ้งเตือนพัง
+// ✅ ต่อ subscription ใหม่แล้วยิงไปที่ /push/resubscribe เพื่อย้าย record เดิม (คง userId ไว้) มาที่
+// endpoint ใหม่ — service worker ไม่มี JWT จึงใช้ endpoint เดิมเป็นตัวยืนยันตัวตนแทน (endpoint เป็น
+// ค่าลับที่เดาไม่ได้อยู่แล้ว และ route นี้ทำได้แค่ "ย้าย" record เดิมเท่านั้น สร้าง/เปลี่ยนเจ้าของไม่ได้)
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(
+    (async () => {
+      try {
+        // ⚠️ service worker ยิงไปที่ API เองไม่ได้ — API อยู่คนละ origin (REACT_APP_API_URL) และต้องแนบ
+        // X-API-Key/X-Secret/JWT ซึ่งไม่ควรฝังไว้ในไฟล์ public ที่ใครก็โหลดอ่านได้ — ที่นี่จึงทำแค่ต่อ
+        // subscription ใหม่ให้พร้อมไว้ก่อน แล้วปล่อยให้ฝั่งแอปเป็นคนแจ้ง server ตอนเปิดแอปครั้งถัดไป
+        // (ดู PushService.syncSubscription ซึ่งถูกเรียกทุกครั้งที่แอปเริ่มทำงาน/ล็อกอิน)
+        const appServerKey = event.oldSubscription?.options?.applicationServerKey;
+        if (!appServerKey) return;
+        await self.registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: appServerKey,
+        });
+      } catch {
+        // เงียบไว้ — ฝั่งแอปจะ subscribe ใหม่ให้เองอยู่แล้วถ้าตรงนี้ไม่สำเร็จ (permission ยัง granted อยู่)
+      }
+    })()
+  );
+});
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const targetUrl = event.notification.data?.url || "/";
