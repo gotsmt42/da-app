@@ -238,6 +238,18 @@ const EventService = {
     }
   },
 
+  // ✅ ย้าย "ครั้งที่ N" ไปเป็นครั้งที่อื่นในสัญญาเดียวกัน — ย้ายยกทั้งครั้ง (ทุก document ของครั้งนั้น
+  // พร้อมกัน วันที่/สถานะ/ทีม/ประวัติงานติดไปครบ) ถ้าปลายทางมีครั้งอยู่แล้วจะ "สลับที่กัน" ไม่ใช่เขียนทับ
+  async MoveContractRound(contractGroupId, payload) {
+    try {
+      const response = await API.put(`/events/contract/${contractGroupId}/move-round`, payload);
+      return response.data;
+    } catch (error) {
+      console.error("Error moving contract round:", error);
+      throw error;
+    }
+  },
+
   // ✅ แก้ไขบริษัท/โครงการ/ระบบ/ประเภทงาน พร้อมกันทุก document ของ "แถว" เดียวกัน (ทั้งสัญญาจริงและ
   // งานทั่วไป/โปรเจค/ยังไม่จัดกลุ่ม) — ใช้กับการแก้ไข inline ในตาราง "ภาพรวมงาน"
   async UpdateBasicInfo(eventIds, payload) {

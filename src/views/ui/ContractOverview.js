@@ -29,17 +29,18 @@ import "moment/locale/th";
 import Swal from "sweetalert2";
 import {
   Box, Stack, Typography, TextField, InputAdornment, IconButton, Tooltip,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Skeleton,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableFooter, TableRow, Paper, Skeleton,
   Dialog, DialogTitle, DialogContent, DialogActions, ToggleButtonGroup, ToggleButton,
   Button, Autocomplete, Alert, Chip, Checkbox, Pagination, useMediaQuery, Badge,
   TableSortLabel, Menu, MenuItem, ListItemIcon, ListItemText, Collapse,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
-  Search, Refresh, Download, FolderOpen, Add, Close,
+  Search, FolderOpen, Add, Close,
   PlaylistAdd, MergeType, GroupWork, DeleteOutline, WarningAmber,
   AddLink, LinkOff, Build, Engineering, ExpandMore, ExpandLess,
-  CalendarMonth, PersonOutline, Category, Assignment, Description, HourglassEmpty, Apps,
+  CalendarMonth, PersonOutline, Category, Assignment, Description, HourglassEmpty, Apps, DeviceHub,
+  SwapHoriz, TableChart, FilterList,
 } from "@mui/icons-material";
 import { useAuth } from "../../auth/AuthContext";
 import EventService from "../../services/EventService";
@@ -54,6 +55,8 @@ import { groupEventsByContract, nextVisitOverdueInfo } from "../../utils/contrac
 import { escapeHtml } from "../../utils/escapeHtml";
 
 const ACCENT = "#dc2626";
+// ✅ สีแบรนด์ของ Excel — ใช้กับปุ่มส่งออกโดยเฉพาะ ให้เห็นปุ๊บรู้ทันทีว่าคือไฟล์ Excel ไม่ต้องอ่าน tooltip
+const EXCEL_GREEN = "#217346";
 // ✅ เพดานจำนวนครั้งของสัญญา — บังคับทุกจุดที่ตั้งค่านี้ (ฟอร์มเพิ่มสัญญา/แก้ไข inline/จัดกลุ่มเป็นสัญญา
 // ทั้งฝั่งจอและฝั่ง backend) และใช้เป็นเพดานตอนคำนวณจำนวนคอลัมน์ "ครั้งที่ N" ของตารางด้วย (กันไว้อีก
 // ชั้น เผื่อมีข้อมูลเก่า/จากที่อื่นที่หลุดรอดมาสูงกว่านี้ — ไม่งั้นตารางทั้งหน้าจะกว้างจนพังได้)
@@ -109,6 +112,31 @@ const jobStatusInfo = (c) => {
   };
 };
 
+// ✅ "คืบหน้า" — สัญญาจริงนับเป็นจำนวนครั้งที่ทำเสร็จแล้ว (X/Y) ส่วนงานทั่วไป/โปรเจค/ยังไม่จัดกลุ่มไม่มี
+// แนวคิด "หลายครั้ง" จึงใช้สถานะของงานตรงๆ แทน — แยกออกมาเป็นฟังก์ชันกลางเพื่อให้ตารางบนจอกับไฟล์ Excel
+// ที่ส่งออกใช้ตรรกะเดียวกันเป๊ะๆ (เดิมเขียนฝังอยู่ในเซลล์ตารางที่เดียว ไฟล์ที่ส่งออกจึงไม่มีคอลัมน์นี้เลย)
+// ⚠️ นับความคืบหน้าเป็น "ครั้ง" ไม่ใช่ document — ครั้งที่เข้างานไม่ต่อเนื่อง (หลาย document ต่อครั้ง)
+// นับว่าเสร็จก็ต่อเมื่อทุก document ของครั้งนั้นเสร็จหมดแล้ว
+const progressInfo = (c, countUsedRoundsFn) => {
+  if (!c.isRealContract) {
+    const info = jobStatusInfo(c);
+    return { label: info.label, color: info.color };
+  }
+  const byRound = new Map();
+  c.visits.filter((v) => !v.unscheduled).forEach((v) => {
+    const key = String(v.time);
+    if (!byRound.has(key)) byRound.set(key, []);
+    byRound.get(key).push(v);
+  });
+  let doneCount = 0;
+  byRound.forEach((docs) => { if (docs.every((d) => d.status === "ดำเนินการเสร็จสิ้น")) doneCount += 1; });
+  const total = c.visitCount || countUsedRoundsFn(c.visits);
+  return {
+    label: `${doneCount}/${total}`,
+    color: doneCount === 0 ? "#9ca3af" : doneCount >= total ? STATUS_COLOR["ดำเนินการเสร็จสิ้น"] : "#f59e0b",
+  };
+};
+
 // ✅ "สถานะสัญญา" — เทียบ contractEnd กับวันนี้ ช่วยเตือนต่ออายุล่วงหน้า แทนต้องไล่เช็คคอลัมน์
 // "สิ้นสุด" เองทีละแถว ใช้ทั้งในตารางและไฟล์ CSV ที่ส่งออก (ใช้ฟังก์ชันเดียวกัน กันข้อมูลไม่ตรงกัน)
 const contractStatusInfo = (c) => {
@@ -130,12 +158,19 @@ const DEFAULT_COL_WIDTHS = {
   contractStart: 100, contractEnd: 100, intervalMonths: 96,
   visitCount: 92, jobValue: 100, status: 130, progress: 90, responsiblePerson: 130,
 };
-const COL_WIDTHS_STORAGE_KEY = "contractOverview.colWidths";
+// ✅ ความกว้างคอลัมน์ "แยกกันทุกแท็บ" — เก็บซ้อนอีกชั้นเป็น { [แท็บ]: { [คอลัมน์]: ความกว้าง } }
+// ⚠️ เดิมเก็บเป็นชุดเดียวใช้ร่วมกันทุกแท็บ ซึ่งใช้งานจริงไม่ได้เลย เพราะแต่ละแท็บมีคอลัมน์ไม่เหมือนกัน
+// (แท็บสัญญามีเลขที่สัญญา/ระยะเวลา/จำนวนครั้ง ส่วนแท็บงานทั่วไปมี "เอกสารเลขที่" มาแทน) ปรับความกว้าง
+// ให้พอดีในแท็บหนึ่งแล้วสลับไปอีกแท็บก็เพี้ยนทันที ต้องมาไล่ปรับใหม่ทุกครั้งที่สลับไปมา
+// ✅ ใช้คีย์ localStorage ใหม่ (…colWidthsByTab) ไม่ทับของเดิม — ค่าเก่าที่เคยปรับไว้จะถูกละทิ้งไปเอง
+// โดยไม่ต้องเขียนโค้ดแปลงข้อมูล (เป็นแค่ค่าความกว้างหน้าจอ ไม่ใช่ข้อมูลผู้ใช้ที่เสียหายไม่ได้) และไม่มี
+// ทางอ่านค่าเก่าผิดรูปแบบมาใช้จนพัง เพราะคนละคีย์กันคนละอันเลย
+const COL_WIDTHS_STORAGE_KEY = "contractOverview.colWidthsByTab";
 const loadStoredColWidths = () => {
   try {
     const raw = localStorage.getItem(COL_WIDTHS_STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : {};
-    return parsed && typeof parsed === "object" ? parsed : {};
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
   } catch {
     return {};
   }
@@ -455,6 +490,11 @@ export default function ContractOverview() {
   // ใช้กับลิงก์ "เจาะจง" จาก Dashboard.js ที่กดจากรายการสัญญาเลยกำหนดตัวใดตัวหนึ่ง ให้เด้งมาที่แท็บ
   // เลยกำหนด + ค้นหาชื่อบริษัท/โครงการนั้นให้ทันที แทนที่จะเปิดมาเจอทั้งลิสต์แล้วต้องมานั่งหาเอง
   const [search, setSearch] = useState(() => searchParams.get("q") || "");
+  // ✅ พับตัวกรอง (ประเภทงาน/ระบบ/ผู้รับผิดชอบ/ปี) ไว้บนจอมือถือ — เดิมกางเรียงเต็มความกว้าง 4-5 ช่อง
+  // ซ้อนกันลงมา กินพื้นที่เกือบเต็มจอก่อนจะถึงข้อมูลจริงสักแถว ต้องเลื่อนผ่านทุกครั้งที่เข้าหน้านี้
+  // ปิดไว้เป็นค่าเริ่มต้นเสมอ (ตัวเลขบนปุ่มบอกอยู่แล้วว่ามีตัวกรองทำงานอยู่กี่ตัว จึงไม่ต้องกางให้เห็น)
+  // — จอใหญ่ไม่ได้รับผลกระทบเลย ยังเรียงอยู่แถวเดียวกับช่องค้นหาเหมือนเดิมทุกประการ
+  const [filtersOpen, setFiltersOpen] = useState(false);
   // ✅ งานส่วนใหญ่ในระบบยังเป็นงานเก่าที่ยังไม่ได้จัดกลุ่มเป็นสัญญา (สร้างก่อนมีฟีเจอร์นี้) เดิม fallback
   // ให้ทุกงานเก่าขึ้นเป็น "สัญญา" 1 แถวของตัวเอง ทำให้ตารางท่วมไปด้วยแถวที่ไม่มีข้อมูลสัญญาจริงเลย
   // (ขึ้น "-" เกือบทุกช่อง) ดูรก/ไม่มีประโยชน์ — ใช้แท็บสลับมุมมองแทน switch เดียว (เทียบ pattern
@@ -561,7 +601,12 @@ export default function ContractOverview() {
   // ✅ ความกว้างคอลัมน์ที่ผู้ใช้ลากปรับเอง (key เฉพาะที่ต่างจากค่าเริ่มต้นเท่านั้น) — โหลดจาก
   // localStorage ตอนเปิดหน้า (lazy initializer) แล้วบันทึกกลับทุกครั้งที่ปรับ จะได้จำค่าไว้ข้ามการออก
   // จากหน้า/รีเฟรช ไม่ใช่แค่ระหว่างที่ยังเปิดหน้านี้ค้างอยู่เหมือนเดิม
-  const [colWidths, setColWidths] = useState(loadStoredColWidths);
+  // ✅ เก็บแยกกันทุกแท็บ (colWidthsByTab[viewFilter]) — ปรับความกว้างในแท็บไหนมีผลเฉพาะแท็บนั้น สลับ
+  // ไปแท็บอื่นได้ความกว้างของแท็บนั้นเองที่เคยปรับไว้ ไม่ลากกันไปมา (ดูเหตุผลเต็มที่ COL_WIDTHS_STORAGE_KEY)
+  const [colWidthsByTab, setColWidthsByTab] = useState(loadStoredColWidths);
+  // ⚠️ ต้องห่อ useMemo — ไม่งั้นได้ object ใหม่ทุก render (กรณี `|| {}`) ทำให้ useMemo ที่รับ colWidths
+  // เป็น dependency ด้านล่าง (totalTableWidth/tableCssVars) คำนวณใหม่ทุก render จนหมดประโยชน์ที่ memo ไว้
+  const colWidths = useMemo(() => colWidthsByTab[viewFilter] || {}, [colWidthsByTab, viewFilter]);
   const colWidth = (key) => colWidths[key] ?? DEFAULT_COL_WIDTHS[key] ?? VISIT_COL_DEFAULT_WIDTH;
   // ⚠️ BUG ที่แก้ (ลากหน่วงมาก): เดิมช่วงลากอัปเดต React state (setColWidths) ทุกเฟรมของ
   // requestAnimationFrame อยู่ดี (แค่เลื่อนแค่การเขียน localStorage ไปตอนปล่อยเมาส์แทน) — แต่ทุกครั้งที่
@@ -575,8 +620,9 @@ export default function ContractOverview() {
   // ตอนปล่อยเมาส์/นิ้วเท่านั้น — ไม่มีการ re-render ระหว่างลากอีกต่อไป ลื่นจริง ไม่มีบั๊กเดิมที่เคยเจอตอน
   // เปลี่ยนไปแตะ DOM ตรงๆ ด้วย (ดูคอมเมนต์ที่ ResizableTh) เพราะรอบนี้ทั้งการเขียนสดและการ re-render จริง
   // ตอน commit ต่างก็เขียนค่าไปที่ custom property ตัวเดียวกันเป๊ะๆ ไม่ใช่ inline style ปะทะ class อีกแล้ว
-  const handleColResize = (key) => (w) => setColWidths((prev) => {
-    const next = { ...prev, [key]: w };
+  const handleColResize = (key) => (w) => setColWidthsByTab((prev) => {
+    // ✅ อัปเดตเฉพาะแท็บที่กำลังเปิดอยู่ ไม่แตะค่าของแท็บอื่นเลย
+    const next = { ...prev, [viewFilter]: { ...(prev[viewFilter] || {}), [key]: w } };
     try { localStorage.setItem(COL_WIDTHS_STORAGE_KEY, JSON.stringify(next)); } catch {}
     return next;
   });
@@ -657,6 +703,10 @@ export default function ContractOverview() {
   // ✅ กรองตามประเภทงาน (เช่น PM/Service/ติดตั้ง ฯลฯ) — เพิ่มตามที่ผู้ใช้ขอ เทียบ pattern เดียวกับ
   // ตัวกรองปี/ผู้รับผิดชอบด้านบนทุกประการ (เลือกจากรายชื่อประเภทงานจริงในระบบ ไม่ต้องพิมพ์เอง)
   const [titleFilter, setTitleFilter] = useState("all");
+  // ✅ กรองตามระบบ (เช่น Fire Alarm/CCTV/Access Control ฯลฯ) — เทียบ pattern เดียวกับตัวกรองประเภทงาน
+  // ด้านบนเป๊ะๆ (เลือกจากรายชื่อระบบจริงที่ตั้งค่าไว้ในระบบ ไม่ต้องพิมพ์เอง) เดิมค้นหาระบบได้แค่ผ่านช่อง
+  // ค้นหาข้อความอิสระ ซึ่งพิมพ์ผิด/สะกดไม่ตรงก็หาไม่เจอ และปนกับผลลัพธ์จากฟิลด์อื่นที่บังเอิญมีคำเดียวกัน
+  const [systemFilter, setSystemFilter] = useState("all");
 
   const [selectedIds, setSelectedIds] = useState(new Set());
   const selectedContracts = useMemo(() => contracts.filter((c) => selectedIds.has(c.key)), [contracts, selectedIds]);
@@ -747,6 +797,9 @@ export default function ContractOverview() {
     if (titleFilter !== "all") {
       base = base.filter((c) => (c.title || "") === titleFilter);
     }
+    if (systemFilter !== "all") {
+      base = base.filter((c) => (c.system || "") === systemFilter);
+    }
     const kw = search.trim().toLowerCase();
     if (!kw) return base;
     // ✅ ค้นหา "ผู้รับผิดชอบ" ด้วย ไม่ใช่แค่ team — คนละฟิลด์กันแล้วตั้งแต่แยกเป็นอิสระ (ดู
@@ -766,27 +819,27 @@ export default function ContractOverview() {
   const realContractCount = useMemo(
     () => applyCommonFilters(contracts.filter((c) => c.isRealContract)).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, responsibleFilter, titleFilter, search]
+    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, search]
   );
   const hiddenJobCount = useMemo(
     () => applyCommonFilters(contracts.filter((c) => !c.isRealContract && !c.isConfirmedGeneral && !c.isConfirmedProject)).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, responsibleFilter, titleFilter, search]
+    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, search]
   );
   const confirmedGeneralCount = useMemo(
     () => applyCommonFilters(contracts.filter((c) => !c.isRealContract && c.isConfirmedGeneral)).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, responsibleFilter, titleFilter, search]
+    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, search]
   );
   const confirmedProjectCount = useMemo(
     () => applyCommonFilters(contracts.filter((c) => !c.isRealContract && c.isConfirmedProject)).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, responsibleFilter, titleFilter, search]
+    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, search]
   );
   const allFilteredCount = useMemo(
     () => applyCommonFilters(contracts).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, responsibleFilter, titleFilter, search]
+    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, search]
   );
   // ✅ สัญญาที่ "เลยกำหนดเข้ารอบถัดไป/คงค้าง" — รอบล่าสุดผ่านมาเกินระยะห่างที่กำหนด (intervalMonths)
   // แล้วแต่ยังไม่มีวันที่/แผนงานล่วงหน้าของรอบถัดไปเลย (ดู nextVisitOverdueInfo) เดิมมีแค่ badge เตือน
@@ -794,7 +847,7 @@ export default function ContractOverview() {
   const overdueCount = useMemo(
     () => applyCommonFilters(contracts.filter((c) => c.isRealContract && nextVisitOverdueInfo(c))).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, responsibleFilter, titleFilter, search]
+    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, search]
   );
 
   const filtered = useMemo(() => {
@@ -806,7 +859,7 @@ export default function ContractOverview() {
       : contracts.filter((c) => c.isRealContract);
     return applyCommonFilters(base);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contracts, search, viewFilter, yearFilter, responsibleFilter, titleFilter]);
+  }, [contracts, search, viewFilter, yearFilter, responsibleFilter, titleFilter, systemFilter]);
 
   // ✅ นับจาก `filtered` (ไม่ใช่ `contracts` ทั้งก้อนแบบเดิม) — เดิมถ้ามีสัญญาไหนสักอันในระบบที่มี
   // จำนวนครั้งเยอะ (เช่น 24) ตารางจะโชว์คอลัมน์ "ครั้งที่ 1-24" ตลอด แม้กรองปี/ค้นหาจนเหลือแต่สัญญา
@@ -830,8 +883,10 @@ export default function ContractOverview() {
   );
   const totalTableWidth = useMemo(() => {
     let total = colWidth("actions") + (showCheckboxes ? colWidth("checkbox") : 0);
-    const contractOnlyKeys = ["contractNo", "quotationNo", "contractStart", "contractEnd", "intervalMonths", "visitCount", "jobValue", "status"];
-    ["company", "site", "system", "title", "progress", "responsiblePerson"].forEach((k) => { total += colWidth(k); });
+    // ✅ jobValue ย้ายออกจาก contractOnlyKeys — แสดงทุกแท็บแล้ว (งานทั่วไป/โปรเจค/ยังไม่จัดกลุ่มก็มี
+    // มูลค่างานของตัวเองได้ ข้อมูลมีอยู่ในฐานข้อมูลอยู่แล้วทุกแถว แค่เดิมไม่ได้แสดงให้เห็น)
+    const contractOnlyKeys = ["contractNo", "quotationNo", "contractStart", "contractEnd", "intervalMonths", "visitCount", "status"];
+    ["company", "site", "system", "title", "jobValue", "progress", "responsiblePerson"].forEach((k) => { total += colWidth(k); });
     if (!hideContractOnlyColumns) {
       contractOnlyKeys.forEach((k) => { total += colWidth(k); });
     } else {
@@ -912,7 +967,7 @@ export default function ContractOverview() {
   // ให้สั้นกระชับแทน (ตัวกรอง/ค้นหายังใช้กับข้อมูลทั้งหมดเหมือนเดิม แค่ตัดแสดงผล)
   const PAGE_SIZE = isMobile ? 5 : 10;
   const [page, setPage] = useState(1);
-  useEffect(() => { setPage(1); }, [search, viewFilter, yearFilter, responsibleFilter, titleFilter, sortConfig, isMobile]);
+  useEffect(() => { setPage(1); }, [search, viewFilter, yearFilter, responsibleFilter, titleFilter, systemFilter, sortConfig, isMobile]);
   // ✅ ป้องกันพลาด: ล้างการเลือกทุกครั้งที่สลับแท็บมุมมอง — เดิมการเลือกค้างข้ามแท็บได้ (checkbox มีเฉพาะ
   // บางแท็บ ดู showCheckboxes) ทำให้เลือกงานไว้ในแท็บหนึ่ง สลับไปอีกแท็บที่มองไม่เห็นแถวพวกนั้นแล้ว แต่แถบ
   // "เลือกไว้ N งาน" ยังลอยอยู่ + กด "จัดกลุ่มเป็นสัญญา" ได้ทันที = รวมงานที่มองไม่เห็นอยู่ตรงหน้าเข้าด้วยกัน
@@ -931,6 +986,44 @@ export default function ContractOverview() {
     [sortedFiltered, safePage, PAGE_SIZE]
   );
 
+  // ✅ สรุปยอดมูลค่างาน — คิดจาก `filtered` (ทุกแถวที่ผ่านตัวกรอง ทุกหน้ารวมกัน) ไม่ใช่แค่ 10 แถวที่เห็น
+  // อยู่ในหน้านี้ เพราะ "ยอดรวมทั้งหมด" ต้องหมายถึงทั้งชุดข้อมูลที่กรองไว้เสมอ ไม่งั้นตัวเลขจะเปลี่ยนไป
+  // มาทุกครั้งที่กดเปลี่ยนหน้า ซึ่งไม่มีความหมายทางบัญชีเลย — ป้ายกำกับใน UI ระบุชัดว่า "ทุกหน้า"
+  // ✅ นับ "ยังไม่ระบุมูลค่า" แยกไว้ด้วย — สำคัญมากต่อความน่าเชื่อถือของยอดรวม เพราะถ้ามีแถวที่ยังไม่ได้
+  // กรอกมูลค่าปนอยู่ ยอดรวมนี้คือ "ยอดเท่าที่กรอกแล้ว" ไม่ใช่ยอดจริงทั้งหมด ต้องบอกให้เห็นตรงๆ ไม่ใช่
+  // ปล่อยให้เข้าใจผิดว่าครบแล้ว (ยอดเงินที่ดูเหมือนสมบูรณ์ทั้งที่ขาดข้อมูลคือความเสี่ยงในการตัดสินใจ)
+  const jobValueSummary = useMemo(() => {
+    let total = 0;
+    let filledCount = 0;
+    filtered.forEach((c) => {
+      const n = Number(c.jobValue);
+      if (c.jobValue !== null && c.jobValue !== undefined && c.jobValue !== "" && !Number.isNaN(n)) {
+        total += n;
+        filledCount += 1;
+      }
+    });
+    return { total, filledCount, missingCount: filtered.length - filledCount, rowCount: filtered.length };
+  }, [filtered]);
+
+  // ✅ จำนวนคอลัมน์ก่อน/หลังช่อง "มูลค่างาน" — ใช้ทำแถวสรุปท้ายตาราง (TableFooter) ให้ยอดรวมตกลงมา
+  // ตรงใต้คอลัมน์มูลค่างานพอดีเสมอ ⚠️ ต้องตรงกับลำดับคอลัมน์จริงในหัวตาราง/แถวข้อมูลเป๊ะๆ ถ้าเพิ่ม/ลด
+  // คอลัมน์ตรงไหนต้องมาปรับตรงนี้ด้วย ไม่งั้นยอดรวมจะเลื่อนไปอยู่ผิดคอลัมน์
+  const footerColSpan = useMemo(() => {
+    const before =
+      (showCheckboxes ? 1 : 0) +
+      (hideContractOnlyColumns ? 1 : 2) +   // docNo | contractNo + quotationNo
+      4 +                                    // company / site / system / title
+      (hideContractOnlyColumns ? 0 : 3) +   // contractStart / contractEnd / intervalMonths
+      (hideContractOnlyColumns ? 0 : 1);    // visitCount
+    const after =
+      (hideContractOnlyColumns ? 0 : 1) +   // status
+      1 +                                    // progress
+      visitColumns.length +
+      1 +                                    // responsiblePerson
+      1;                                     // actions
+    return { before, after };
+  }, [showCheckboxes, hideContractOnlyColumns, visitColumns.length]);
+
 
   // ✅ สรุปว่าตอนนี้มีตัวกรองอะไรทำงานอยู่บ้าง — ใช้อธิบายตอนตารางว่าง (กันเข้าใจผิดว่าข้อมูลหาย) และ
   // ผูกกับปุ่ม "ล้างตัวกรองทั้งหมด" ให้กลับมาเห็นข้อมูลได้ในคลิกเดียว ไม่ต้องไล่รีเซ็ตเองทีละช่อง
@@ -939,19 +1032,47 @@ export default function ContractOverview() {
     const labels = [];
     if (search.trim()) labels.push(`ค้นหา "${search.trim()}"`);
     if (titleFilter !== "all") labels.push(`ประเภทงาน ${titleFilter}`);
+    if (systemFilter !== "all") labels.push(`ระบบ ${systemFilter}`);
     if (responsibleFilter === "unassigned") labels.push("ยังไม่มอบหมายผู้รับผิดชอบ");
     else if (responsibleFilter !== "all") labels.push(`ผู้รับผิดชอบ ${responsibleFilter}`);
     if (yearFilter === "none") labels.push("ยังไม่ระบุปี");
     else if (yearFilter !== "all") labels.push(`ปี ${yearFilter}`);
     return labels;
-  }, [search, titleFilter, responsibleFilter, yearFilter]);
+  }, [search, titleFilter, systemFilter, responsibleFilter, yearFilter]);
   const hasActiveFilters = activeFilterLabels.length > 0;
+  // ✅ จำนวนตัวกรองแบบ dropdown ที่ทำงานอยู่ (ไม่นับช่องค้นหา ซึ่งบนมือถือโชว์อยู่ตลอดอยู่แล้ว) — ใช้เป็น
+  // ตัวเลขบนปุ่ม "ตัวกรอง" ให้รู้ว่ามีตัวกรองซ่อนอยู่กี่ตัวโดยไม่ต้องกางออกมาดู ⚠️ ตัวกรองปีตั้งค่าเริ่มต้น
+  // เป็นปีปัจจุบันไว้เองตั้งแต่แรก (ผู้ใช้ไม่ได้ตั้ง) ตัวเลขนี้จึงขึ้นอย่างน้อย 1 ตั้งแต่เปิดหน้ามา — ตั้งใจ
+  // ให้เป็นแบบนั้น เพราะเป็นจุดที่ผู้ใช้เข้าใจผิดบ่อยที่สุดว่าเห็นข้อมูลครบทุกปีแล้ว
+  const activeDropdownFilterCount = useMemo(
+    () => [titleFilter, systemFilter, responsibleFilter, yearFilter].filter((v) => v !== "all").length,
+    [titleFilter, systemFilter, responsibleFilter, yearFilter]
+  );
   const clearAllFilters = () => {
     setSearch("");
     setTitleFilter("all");
+    setSystemFilter("all");
     setResponsibleFilter("all");
     setYearFilter("all");
   };
+
+  // ✅ ป้ายชื่อแท็บมุมมองปัจจุบันแบบเต็ม — ใช้ในแถบสรุปยอดรวม (ต้องอ่านแล้วเข้าใจทันทีว่ากำลังดูชุดไหน)
+  // ⚠️ ตั้งใจแยกจากตารางชื่อย่อใน exportLabels ด้านล่างซึ่งใช้ตั้ง "ชื่อไฟล์" ที่ส่งออก — ชื่อไฟล์ห้ามมี
+  // "/" (ตัวคั่นพาธ) และควรสั้นกว่านี้ จึงใช้ชื่อย่อคนละชุดกันโดยเจตนา ไม่ใช่ความซ้ำซ้อนที่ควรยุบรวม
+  const VIEW_LABELS = {
+    contracts: "งานสัญญา / งานรายปี", overdue: "เลยกำหนดเข้ารอบถัดไป", general: "งานทั่วไป",
+    project: "งานโปรเจค", ungrouped: "งานเก่าที่ยังไม่จัดกลุ่ม", all: "ทั้งหมด",
+  };
+  // ✅ "ตอนนี้ยอดรวมนี้มาจากอะไรบ้าง" — แจกแจงเงื่อนไขที่กรองอยู่จริงทั้งหมดให้เห็นครบทีละอย่าง (แท็บ
+  // มุมมอง + ตัวกรองทุกช่อง + คำค้นหา) ตามที่ผู้ใช้ขอ — ยอดเงินที่ไม่บอกว่านับจากชุดข้อมูลไหน ตีความ
+  // ผิดได้ง่ายมาก (โดยเฉพาะตัวกรองปีซึ่งตั้งค่าเริ่มต้นเป็นปีปัจจุบันไว้เองตั้งแต่แรก ผู้ใช้ไม่ได้ตั้ง
+  // จึงไม่มีทางเดารู้เลยว่ายอดที่เห็นไม่ได้รวมทุกปี) — ต่างจาก activeFilterLabels ตรงที่รวมแท็บมุมมอง
+  // ด้วยเสมอ เพราะแท็บก็เป็นตัวจำกัดขอบเขตของยอดรวมเหมือนกัน แม้จะไม่ใช่ "ตัวกรองซ้อน" ที่ปุ่มล้างจะล้าง
+  const summaryScopeLabels = useMemo(
+    () => [`แท็บ: ${VIEW_LABELS[viewFilter] || "ทั้งหมด"}`, ...activeFilterLabels],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [viewFilter, activeFilterLabels]
+  );
 
   // ✅ ชื่อไฟล์ที่ส่งออกบอกได้ในตัวว่าเป็นข้อมูลชุดไหน ณ วันไหน — เดิมเป็น "contracts.csv" ตายตัวเสมอ
   // ส่งออกหลายแท็บ/หลายปีมาเทียบกันทีก็ทับกันเองในโฟลเดอร์ดาวน์โหลดทุกครั้ง (contracts (1).csv,
@@ -989,6 +1110,8 @@ export default function ContractOverview() {
         contractStatusInfo,
         formatEventDateRange,
         visitsPerYear,
+        // ✅ ส่งฟังก์ชันกลางตัวเดียวกับที่ตารางบนจอใช้เข้าไป — คอลัมน์ "คืบหน้า" ในไฟล์จึงตรงกับบนจอเสมอ
+        progressLabel: (c) => progressInfo(c, countUsedRounds).label,
       });
     } catch (err) {
       Swal.fire({
@@ -1047,6 +1170,16 @@ export default function ContractOverview() {
   );
   const titleOptions = useMemo(() => lookups.jobTypes.map((t) => t.name), [lookups.jobTypes]);
   const systemOptions = useMemo(() => lookups.systemTypes.map((s) => s.name), [lookups.systemTypes]);
+  // ✅ ตัวเลือกของ "ตัวกรองระบบ" = ระบบที่ตั้งค่าไว้ในระบบ + ระบบที่มีอยู่จริงในข้อมูลแต่ยังไม่ได้ตั้งค่าไว้
+  // ⚠️ ต้องรวม 2 ทางเสมอ เพราะช่องแก้ไข "ระบบ" ในตารางเป็นแบบ freeSolo (พิมพ์ชื่อระบบใหม่เองได้ ไม่บังคับ
+  // เลือกจากรายการ — ดู EditableCell editType="autocomplete") งานเก่าจำนวนมากจึงมีชื่อระบบที่ไม่มีในตาราง
+  // ตั้งค่า ถ้าเอาแต่ lookups.systemTypes มาทำตัวเลือกอย่างเดียว ระบบพวกนั้นจะไม่มีให้เลือกในตัวกรองเลย
+  // = กรองหางานเหล่านั้นไม่ได้ตลอดกาล ทั้งที่มองเห็นอยู่ในตารางตรงหน้า
+  const systemFilterOptions = useMemo(() => {
+    const names = new Set(lookups.systemTypes.map((s) => s.name).filter(Boolean));
+    contracts.forEach((c) => { if (c.system) names.add(c.system); });
+    return [...names].sort((a, b) => String(a).localeCompare(String(b), "th"));
+  }, [lookups.systemTypes, contracts]);
   const teamOptions = useMemo(() => lookups.employees.map((e) => e.fname).filter(Boolean), [lookups.employees]);
   const teamToId = useMemo(() => new Map(lookups.employees.map((e) => [e.fname, e._id])), [lookups.employees]);
 
@@ -1508,11 +1641,17 @@ export default function ContractOverview() {
   //   งานโปรเจค — ไม่ใช่แถว "ยังไม่จัดกลุ่ม" ซึ่งควรไปจัดหมวดหมู่ก่อน ค่อยมอบหมายคน/ผู้รับผิดชอบทีหลัง
   // - team: ไม่มีในนี้แล้ว — ตัดคอลัมน์ "ทีมที่เข้างาน" ระดับสัญญาออกไปตามที่ผู้ใช้ขอ (แต่ละครั้งอาจเข้า
   //   โดยคนละทีมกัน) แก้ไขทีมได้ที่ช่อง "ครั้งที่ N" แทน (ดู beginRoundTeamEdit/commitRoundTeamEdit)
-  // - ฟิลด์ที่เหลือ (เลขที่สัญญา/ใบเสนอราคา/ระยะเวลา/จำนวนครั้ง/มูลค่างาน): เฉพาะสัญญาจริงเท่านั้น
+  // - docNo/responsiblePerson/jobValue: แก้ได้เฉพาะแถวที่ "ตัดสินใจแล้ว" (สัญญาจริง/งานทั่วไป/งานโปรเจค)
+  // - ฟิลด์ที่เหลือ (เลขที่สัญญา/ใบเสนอราคา/ระยะเวลา/จำนวนครั้ง): เฉพาะสัญญาจริงเท่านั้น
+  // 🐛 BUG ที่แก้ (คลิกช่องมูลค่างานในแท็บงานทั่วไป/โปรเจคแล้วไม่มีอะไรเกิดขึ้น): ตอนเปิดให้คอลัมน์
+  // "มูลค่างาน" แสดงทุกแท็บ ตั้ง editable={isAdminOrManager} ที่ตัวเซลล์ไว้แล้ว (ช่องจึงขึ้นเป็นรูปมือ/
+  // ไฮไลต์ตอน hover เหมือนช่องที่แก้ได้ทุกประการ) แต่ลืมแก้ที่นี่ ซึ่ง jobValue ตกมาเข้าเงื่อนไขสุดท้าย
+  // `return c.isRealContract` = false สำหรับงานทั่วไป/โปรเจค → beginEdit ตัดจบเงียบๆ ตั้งแต่บรรทัดแรก
+  // กลายเป็นช่องที่ "ดูเหมือนแก้ได้แต่กดแล้วไม่มีอะไรเกิดขึ้นเลย" ซึ่งแย่กว่าช่องที่ล็อกไว้ชัดเจนเสียอีก
   const isClassifiedRow = (c) => c.isRealContract || c.isConfirmedGeneral || c.isConfirmedProject;
   const canEditField = (c, field) => {
     if (BASIC_INFO_FIELDS.has(field)) return true;
-    if (field === "docNo" || field === "responsiblePerson") return isClassifiedRow(c);
+    if (field === "docNo" || field === "responsiblePerson" || field === "jobValue") return isClassifiedRow(c);
     return c.isRealContract;
   };
 
@@ -1613,10 +1752,13 @@ export default function ContractOverview() {
       // ✅ responsiblePerson: ถ้าเป็นสัญญาจริงยังผูกทุกครั้งพร้อมกันผ่าน contractGroupId เหมือนเดิม
       // (มอบหมายผู้รับผิดชอบทั้งสัญญา) แต่ถ้าเป็นงานทั่วไป/โปรเจค (ไม่มี contractGroupId จริง —
       // c.key เป็นแค่ "jgid:.../nogid:..." ใช้กับ UpdateContractFields ไม่ได้) ต้องผ่าน eventIds ตรงๆ แทน
+      // ✅ jobValue: สัญญาจริงยังผูกทุกครั้งพร้อมกันผ่าน contractGroupId เหมือนเดิม (มูลค่าของทั้งสัญญา)
+      // แต่งานทั่วไป/โปรเจค/ยังไม่จัดกลุ่มไม่มี contractGroupId จริง (c.key เป็นแค่ "jgid:.../nogid:...")
+      // ต้องผ่าน eventIds ตรงๆ แทน — เทียบ pattern เดียวกับ responsiblePerson/docNo บรรทัดล่าง
       const useBasicInfoEndpoint =
         BASIC_INFO_FIELDS.has(field) ||
         field === "docNo" ||
-        (field === "responsiblePerson" && !c.isRealContract);
+        ((field === "responsiblePerson" || field === "jobValue") && !c.isRealContract);
       if (useBasicInfoEndpoint) {
         await EventService.UpdateBasicInfo(c.visits.map((v) => v._id), payload);
       } else {
@@ -1836,6 +1978,71 @@ export default function ContractOverview() {
         text: err?.response?.data?.message || err.message,
         icon: "error",
       });
+    }
+  };
+
+  // ── ย้าย "ครั้งที่ N" ไปครั้งที่อื่นได้อย่างอิสระ ──────────────────────────
+  // ✅ ย้ายยกทั้งครั้ง (วันที่/สถานะ/ทีม/ประวัติงานทุก document ของครั้งนั้นติดไปด้วยครบ ไม่ใช่แค่เลข) —
+  // งานจริงเลื่อน/สลับรอบกันได้เสมอ เดิมแก้ไม่ได้เลยนอกจากลบทิ้งแล้วสร้างใหม่ (ประวัติงานหายหมด)
+  // ✅ ปลายทางที่มีครั้งอยู่แล้ว = สลับที่กัน (ไม่เขียนทับ) ข้อมูลทั้งสองครั้งอยู่ครบเสมอ
+  const [moveRoundTarget, setMoveRoundTarget] = useState(null); // { contract, fromRound } | null
+  const [moveRoundValue, setMoveRoundValue] = useState("");
+  const [moveRoundSaving, setMoveRoundSaving] = useState(false);
+  const openMoveRoundDialog = (contract, fromRound) => {
+    setMoveRoundTarget({ contract, fromRound });
+    setMoveRoundValue("");
+  };
+  const closeMoveRoundDialog = () => { setMoveRoundTarget(null); setMoveRoundValue(""); };
+
+  const handleMoveRoundSubmit = async () => {
+    if (!moveRoundTarget || moveRoundSaving) return;
+    const { contract: c, fromRound } = moveRoundTarget;
+    const to = Number(moveRoundValue);
+    if (!Number.isInteger(to) || to < 1 || to > MAX_VISIT_COUNT) {
+      Swal.fire({ title: "ย้ายไม่สำเร็จ", text: `ครั้งที่ปลายทางต้องอยู่ระหว่าง 1-${MAX_VISIT_COUNT}`, icon: "error" });
+      return;
+    }
+    if (to === fromRound) { closeMoveRoundDialog(); return; }
+
+    // ✅ ถามยืนยันเมื่อปลายทางมีครั้งอยู่แล้ว — บอกให้ชัดว่าจะ "สลับที่กัน" ไม่ใช่ทับข้อมูลหาย
+    const targetVisits = c.visits.filter((v) => !v.unscheduled && Number(v.time) === to);
+    if (targetVisits.length > 0) {
+      const result = await Swal.fire({
+        icon: "question",
+        title: `สลับครั้งที่ ${fromRound} ↔ ${to}?`,
+        html: `
+          <div style="text-align:left;font-size:13px;">
+            ครั้งที่ ${to} มีข้อมูลอยู่แล้ว — ระบบจะ<b>สลับที่กัน</b> ไม่ได้เขียนทับ<br/>
+            ข้อมูลวันที่/สถานะ/ทีม/ประวัติงานของทั้งสองครั้งยังอยู่ครบทุกอย่าง
+          </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: "สลับที่กัน",
+        confirmButtonColor: "#dc2626",
+        cancelButtonText: "ยกเลิก",
+      });
+      if (!result.isConfirmed) return;
+    }
+
+    setMoveRoundSaving(true);
+    try {
+      const res = await EventService.MoveContractRound(c.key, { fromTime: fromRound, toTime: to });
+      closeMoveRoundDialog();
+      // ✅ ดึงข้อมูลใหม่ทั้งชุดหลังย้ายเสร็จ — ครั้งที่ (time) เป็นตัวจัดกลุ่มแถว/เรียงคอลัมน์ทั้งตาราง
+      // แก้ทีเดียวกระทบหลายแถว/หลายคอลัมน์พร้อมกัน อัปเดตเฉพาะจุดแบบ optimistic ไม่ครอบคลุมพอ
+      await fetchData(true);
+      Swal.fire({
+        title: res?.swapped ? `สลับครั้งที่ ${fromRound} ↔ ${to} สำเร็จ ✅` : `ย้ายไปครั้งที่ ${to} สำเร็จ ✅`,
+        icon: "success", timer: 1400, showConfirmButton: false,
+      });
+    } catch (err) {
+      Swal.fire({
+        title: "ย้ายไม่สำเร็จ",
+        text: err?.response?.data?.message || err.message,
+        icon: "error",
+      });
+    } finally {
+      setMoveRoundSaving(false);
     }
   };
 
@@ -2085,6 +2292,10 @@ export default function ContractOverview() {
                       <IconButton size="small" onClick={() => openExtendVisitDialog(c, n)} sx={{ p: 0.25, color: "text.disabled" }}>
                         <Add sx={{ fontSize: 14 }} />
                       </IconButton>
+                      {/* ✅ ย้ายครั้งนี้ไปเป็นครั้งที่อื่นได้อิสระ (ยกทั้งวันที่/สถานะ/ทีม/ประวัติงาน) */}
+                      <IconButton size="small" onClick={() => openMoveRoundDialog(c, n)} sx={{ p: 0.25, color: "text.disabled" }}>
+                        <SwapHoriz sx={{ fontSize: 14 }} />
+                      </IconButton>
                       <IconButton size="small" onClick={() => handleDetachRound(c, n)} sx={{ p: 0.25, color: "text.disabled" }}>
                         <LinkOff sx={{ fontSize: 14 }} />
                       </IconButton>
@@ -2104,9 +2315,12 @@ export default function ContractOverview() {
             <FieldRow label="สิ้นสุดสัญญา" editable={isAdminOrManager} editType="date" value={c.contractEnd} formatDisplay={(v) => (v ? moment(v).format("DD/MM/YYYY") : <Dash />)} {...fp("contractEnd")} />
             <FieldRow label="รอบเข้า" editable={isAdminOrManager} editType="number" value={c.intervalMonths} formatDisplay={(v) => (v ? `ทุก ${v} เดือน` : <Dash />)} {...fp("intervalMonths")} />
             <FieldRow label="จำนวนครั้ง" editable={isAdminOrManager} editType="number" value={c.visitCount} {...fp("visitCount")} />
-            <FieldRow label="มูลค่างาน" editable={isAdminOrManager} editType="number" value={c.jobValue} formatDisplay={(v) => (v != null && v !== "" ? Number(v).toLocaleString() : <Dash />)} {...fp("jobValue")} />
           </>
         )}
+
+        {/* ✅ มูลค่างาน — ย้ายออกมานอกบล็อก c.isRealContract แล้ว จึงแสดงทุกแท็บ (งานทั่วไป/โปรเจค/
+            ยังไม่จัดกลุ่มก็มีมูลค่าของตัวเองได้) ตรงกับคอลัมน์ในตารางฝั่งเดสก์ท็อป */}
+        <FieldRow label="มูลค่างาน" editable={isAdminOrManager && canEditField(c, "jobValue")} editType="number" value={c.jobValue} formatDisplay={(v) => (v != null && v !== "" ? Number(v).toLocaleString() : <Dash />)} {...fp("jobValue")} />
 
         {/* ผู้รับผิดชอบ — ฟิลด์อิสระจากทีมที่เข้างานทุกครั้งด้านบนโดยสมบูรณ์ */}
         <FieldRow label="ผู้รับผิดชอบ" editable={isAdminOrManager && canEditField(c, "responsiblePerson")} editType="select" editOptions={teamOptions} value={c.responsiblePerson} formatDisplay={unassignedResponsibleDisplay} {...fp("responsiblePerson")} />
@@ -2143,6 +2357,129 @@ export default function ContractOverview() {
       </Paper>
     );
   };
+
+  // ✅ ตัวกรอง dropdown ทั้ง 4 ช่อง — แยกเป็นฟังก์ชันเดียวใช้ร่วมกันทั้งจอมือถือ (อยู่ในแผงพับ) และ
+  // จอใหญ่ (เรียงแถวเดียวกับช่องค้นหา) ไม่ก็อปปี้ JSX 2 ชุด กันแก้ที่เดียวแล้วอีกที่ตกหล่น
+  const renderFilterFields = () => (
+    <>
+      {/* ✅ กรองตามประเภทงาน (PM/Service/ติดตั้ง ฯลฯ) — เลือกจากรายชื่อประเภทงานจริงที่ตั้งค่าไว้ในระบบ */}
+      <TextField
+        select size="small" label="ประเภทงาน" value={titleFilter}
+        onChange={(e) => setTitleFilter(e.target.value)}
+        SelectProps={{ native: true }}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <Category sx={{ fontSize: 18, color: titleFilter !== "all" ? ACCENT : "text.disabled" }} />
+            </InputAdornment>
+          ),
+        }}
+        sx={{
+          width: { xs: "100%", sm: 170 }, flexShrink: 0,
+          "& .MuiOutlinedInput-root": {
+            borderRadius: 2.5,
+            bgcolor: titleFilter !== "all" ? alpha(ACCENT, 0.06) : "background.paper",
+            "& fieldset": titleFilter !== "all" ? { borderColor: alpha(ACCENT, 0.45) } : {},
+            "&:hover fieldset": titleFilter !== "all" ? { borderColor: ACCENT } : {},
+          },
+          "& .MuiInputLabel-root": titleFilter !== "all" ? { color: ACCENT, fontWeight: 700 } : {},
+        }}
+      >
+        <option value="all">ทุกประเภท</option>
+        {titleOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+      </TextField>
+      {/* ✅ กรองตามระบบ (Fire Alarm/CCTV/Access Control ฯลฯ) — เดิมหาระบบได้แค่ผ่านช่องค้นหาข้อความ
+          อิสระ ซึ่งพิมพ์ไม่ตรงก็ไม่เจอ และปนกับผลจากฟิลด์อื่นที่บังเอิญมีคำเดียวกัน */}
+      <TextField
+        select size="small" label="ระบบ" value={systemFilter}
+        onChange={(e) => setSystemFilter(e.target.value)}
+        SelectProps={{ native: true }}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <DeviceHub sx={{ fontSize: 18, color: systemFilter !== "all" ? ACCENT : "text.disabled" }} />
+            </InputAdornment>
+          ),
+        }}
+        sx={{
+          width: { xs: "100%", sm: 170 }, flexShrink: 0,
+          "& .MuiOutlinedInput-root": {
+            borderRadius: 2.5,
+            bgcolor: systemFilter !== "all" ? alpha(ACCENT, 0.06) : "background.paper",
+            "& fieldset": systemFilter !== "all" ? { borderColor: alpha(ACCENT, 0.45) } : {},
+            "&:hover fieldset": systemFilter !== "all" ? { borderColor: ACCENT } : {},
+          },
+          "& .MuiInputLabel-root": systemFilter !== "all" ? { color: ACCENT, fontWeight: 700 } : {},
+        }}
+      >
+        <option value="all">ทุกระบบ</option>
+        {systemFilterOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+      </TextField>
+      {/* ✅ ซ่อนสำหรับช่าง — ข้อมูลที่ช่างเห็นถูกกรองเหลือแค่งานของตัวเองมาจาก backend อยู่แล้วเสมอ
+          ตัวกรองนี้มีประโยชน์แค่ตอนแอดมิน/manager ที่เห็นงานของทุกคนต้องกรองหาเฉพาะบางคน */}
+      {isAdminOrManager && (
+        <TextField
+          select size="small" label="ผู้รับผิดชอบงาน" value={responsibleFilter}
+          onChange={(e) => setResponsibleFilter(e.target.value)}
+          SelectProps={{ native: true }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <PersonOutline sx={{ fontSize: 18, color: responsibleFilter !== "all" ? ACCENT : "text.disabled" }} />
+              </InputAdornment>
+            ),
+          }}
+          sx={{
+            width: { xs: "100%", sm: 185 }, flexShrink: 0,
+            "& .MuiOutlinedInput-root": {
+              borderRadius: 2.5,
+              bgcolor: responsibleFilter !== "all" ? alpha(ACCENT, 0.06) : "background.paper",
+              "& fieldset": responsibleFilter !== "all" ? { borderColor: alpha(ACCENT, 0.45) } : {},
+              "&:hover fieldset": responsibleFilter !== "all" ? { borderColor: ACCENT } : {},
+            },
+            "& .MuiInputLabel-root": responsibleFilter !== "all" ? { color: ACCENT, fontWeight: 700 } : {},
+          }}
+        >
+          <option value="all">ทุกคน</option>
+          {/* ✅ ไล่เก็บสัญญาที่ยังไม่เคยมอบหมายผู้รับผิดชอบ — โผล่เฉพาะตอนมีจริง (กันตัวเลือกรก) */}
+          {unassignedResponsibleCount > 0 && (
+            <option value="unassigned">— ยังไม่มอบหมาย ({unassignedResponsibleCount}) —</option>
+          )}
+          {teamOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+        </TextField>
+      )}
+      {/* ✅ กรองตามปีของสัญญา (อิงวันที่เริ่มสัญญา ไม่งั้นอิงวันที่ครั้งแรก) + เน้นสีตอนกรองปีเจาะจงอยู่
+          ให้เห็นชัดว่ากำลังดูข้อมูลแค่ปีเดียว ไม่ใช่ทั้งหมด (ค่าเริ่มต้นล็อกปีปัจจุบันไว้ตั้งแต่แรก) */}
+      <TextField
+        select size="small" label="ปี" value={yearFilter}
+        onChange={(e) => setYearFilter(e.target.value)}
+        SelectProps={{ native: true }}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <CalendarMonth sx={{ fontSize: 18, color: yearFilter !== "all" ? ACCENT : "text.disabled" }} />
+            </InputAdornment>
+          ),
+        }}
+        sx={{
+          width: { xs: "100%", sm: 155 }, flexShrink: 0,
+          "& .MuiOutlinedInput-root": {
+            borderRadius: 2.5,
+            bgcolor: yearFilter !== "all" ? alpha(ACCENT, 0.06) : "background.paper",
+            "& fieldset": yearFilter !== "all" ? { borderColor: alpha(ACCENT, 0.45) } : {},
+            "&:hover fieldset": yearFilter !== "all" ? { borderColor: ACCENT } : {},
+          },
+          "& .MuiInputLabel-root": yearFilter !== "all" ? { color: ACCENT, fontWeight: 700 } : {},
+        }}
+      >
+        <option value="all">ทุกปี</option>
+        {availableYears.map((y) => <option key={y} value={y}>{y}</option>)}
+        {/* ✅ สัญญาที่ยังไม่ได้กรอกวันที่เริ่มสัญญาและยังไม่ลงวันที่เข้างานเลย — ปกติเห็นอยู่ในทุกปีอยู่แล้ว
+            ตัวเลือกนี้ไว้กรองดูเฉพาะกลุ่มนี้เวลาต้องการไล่เก็บตกว่าเหลือสัญญาไหนค้างยังไม่ได้ลงวันที่ */}
+        {unknownYearCount > 0 && <option value="none">ยังไม่ระบุปี ({unknownYearCount})</option>}
+      </TextField>
+    </>
+  );
 
   // ✅ กันคนนอก (role อื่น) เปิดหน้านี้ตรงๆ ผ่าน URL — เทียบ pattern เดียวกับ QuotationTracking.js
   if (!loading && !canView) return <Navigate to="/dashboard" replace />;
@@ -2186,36 +2523,29 @@ export default function ContractOverview() {
               เพิ่มสัญญาใหม่
             </Button>
           )}
-          <Tooltip title="รีเฟรช">
-            <IconButton
-              onClick={() => { fetchData(); fetchLookups(); }}
-              sx={{
-                border: "1px solid", borderColor: "divider", borderRadius: "50%", flexShrink: 0,
-                transition: "background-color .15s, border-color .15s, color .15s, transform .15s",
-                "&:hover": { bgcolor: alpha(ACCENT, 0.08), borderColor: alpha(ACCENT, 0.4), color: ACCENT },
-                "&:active": { transform: "rotate(180deg)" },
-              }}
-            >
-              <Refresh sx={{ fontSize: 20 }} />
-            </IconButton>
-          </Tooltip>
+          {/* ✅ ปุ่ม "รีเฟรช" ถูกตัดออกตามที่ผู้ใช้ขอ — หน้านี้ดึงข้อมูลใหม่เองอัตโนมัติอยู่แล้ว (ดู
+              useEffect ที่ตั้ง interval ไว้) และทุกการแก้ไขในตารางก็ดึงข้อมูลใหม่ให้ทันทีหลังบันทึกสำเร็จ
+              จึงแทบไม่มีกรณีที่ต้องกดรีเฟรชเอง */}
           {/* ✅ เปลี่ยนจาก CSV เป็นไฟล์ Excel (.xlsx) จริง — CSV เป็นข้อความล้วนตามนิยาม ใส่สี/ตัวหนา/
-              เส้นขอบ/ความกว้างคอลัมน์/ตรึงหัวตารางไม่ได้เลยแม้แต่อย่างเดียว (ดู contractExcelExport.js)
-              ตอนนี้จึงไม่ต้องระวังปัญหา ref ของ CSVLink อีกต่อไป ใช้ IconButton ปกติได้เหมือนปุ่มอื่น */}
-          <Tooltip title="ส่งออกเป็นไฟล์ Excel (.xlsx)">
+              เส้นขอบ/ความกว้างคอลัมน์ไม่ได้เลยแม้แต่อย่างเดียว (ดู contractExcelExport.js) */}
+          {/* ✅ เปลี่ยนจากปุ่มไอคอนกลมสีแดง (ไอคอนลูกศรดาวน์โหลดทั่วไป) เป็นปุ่มมีข้อความ "Excel" สีเขียว
+              ตามสีแบรนด์ Excel (#217346) — เดิมเป็นวงกลมสีเดียวกับปุ่มรีเฟรชข้างๆ ดูไม่ออกว่าปุ่มไหนคือ
+              ส่งออก ต้องเอาเมาส์ไปชี้อ่าน tooltip ทุกครั้ง (บนมือถือไม่มี hover ยิ่งเดาไม่ได้เลย) */}
+          <Tooltip title={filtered.length === 0 ? "ไม่มีข้อมูลให้ส่งออก" : `ส่งออก ${filtered.length} รายการที่กรองอยู่เป็นไฟล์ Excel (.xlsx)`}>
             <span>
-              <IconButton
+              <Button
                 onClick={handleExportExcel}
                 disabled={exporting || filtered.length === 0}
+                variant="outlined"
+                startIcon={<TableChart sx={{ fontSize: 18 }} />}
                 sx={{
-                  border: "1px solid", borderColor: alpha(ACCENT, 0.4), borderRadius: "50%",
-                  color: ACCENT, flexShrink: 0,
-                  transition: "background-color .15s, border-color .15s",
-                  "&:hover": { bgcolor: alpha(ACCENT, 0.08), borderColor: ACCENT },
+                  flexShrink: 0, textTransform: "none", fontWeight: 700, borderRadius: 2.5,
+                  color: EXCEL_GREEN, borderColor: alpha(EXCEL_GREEN, 0.5),
+                  "&:hover": { bgcolor: alpha(EXCEL_GREEN, 0.08), borderColor: EXCEL_GREEN },
                 }}
               >
-                <Download sx={{ fontSize: 20 }} />
-              </IconButton>
+                {exporting ? "กำลังสร้าง..." : "Excel"}
+              </Button>
             </span>
           </Tooltip>
         </Stack>
@@ -2361,127 +2691,81 @@ export default function ContractOverview() {
         </Paper>
       )}
 
-      <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} sx={{ mb: 2 }}>
-        <TextField
-          fullWidth size="small"
-          placeholder="ค้นหาบริษัท / โครงการ / เลขที่สัญญา / ผู้รับผิดชอบ..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          sx={{
-            "& .MuiOutlinedInput-root": {
-              borderRadius: 2.5, bgcolor: "background.paper",
-              "&.Mui-focused fieldset": { borderColor: ACCENT, borderWidth: 1.5 },
-            },
-          }}
-          InputProps={{
-            startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 19, color: "text.disabled" }} /></InputAdornment>,
-            // ✅ ปุ่มล้างคำค้นหา — เดิมต้องลากเมาส์เลือกข้อความแล้วลบเองทีละตัว โผล่เฉพาะตอนมีคำค้นหา
-            // อยู่จริง (ไม่โผล่ค้างเป็นปุ่มเปล่าๆ ตอนช่องว่าง)
-            endAdornment: search ? (
-              <InputAdornment position="end">
-                <IconButton size="small" onClick={() => setSearch("")} edge="end">
-                  <Close sx={{ fontSize: 16 }} />
+      {/* ── แถบค้นหา + ตัวกรอง ────────────────────────────────────────────────
+          ✅ จอมือถือ: โชว์แค่ช่องค้นหา + ปุ่ม "ตัวกรอง" (มีตัวเลขบอกจำนวนตัวกรองที่ทำงานอยู่) ส่วน
+          dropdown ทั้ง 4 ช่องพับซ่อนไว้ กดกางเมื่อต้องใช้ — เดิมกางเรียงเต็มความกว้างซ้อนกันลงมาหมด
+          กินพื้นที่เกือบเต็มจอก่อนถึงข้อมูลจริงสักแถว
+          ✅ จอใหญ่: เหมือนเดิมทุกประการ (ช่องค้นหา + ทุก dropdown เรียงแถวเดียวกัน ไม่มีปุ่มพับ) */}
+      <Box sx={{ mb: 2 }}>
+        <Stack direction={{ xs: "column", sm: "row" }} gap={1.5}>
+          <Stack direction="row" gap={1} sx={{ flex: 1, minWidth: 0 }}>
+            <TextField
+              fullWidth size="small"
+              placeholder={isMobile ? "ค้นหางาน..." : "ค้นหาบริษัท / โครงการ / เลขที่สัญญา / ผู้รับผิดชอบ..."}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 2.5, bgcolor: "background.paper",
+                  "&.Mui-focused fieldset": { borderColor: ACCENT, borderWidth: 1.5 },
+                },
+              }}
+              InputProps={{
+                startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 19, color: "text.disabled" }} /></InputAdornment>,
+                // ✅ ปุ่มล้างคำค้นหา — เดิมต้องลากเมาส์เลือกข้อความแล้วลบเองทีละตัว โผล่เฉพาะตอนมีคำค้นหา
+                // อยู่จริง (ไม่โผล่ค้างเป็นปุ่มเปล่าๆ ตอนช่องว่าง)
+                endAdornment: search ? (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setSearch("")} edge="end">
+                      <Close sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </InputAdornment>
+                ) : undefined,
+              }}
+            />
+            {/* ✅ ปุ่มพับ/กางตัวกรอง — เฉพาะจอมือถือ (จอใหญ่มีที่พอให้ทุกช่องอยู่แถวเดียวกันอยู่แล้ว) */}
+            {isMobile && (
+              <Badge
+                badgeContent={activeDropdownFilterCount} color="error"
+                sx={{ "& .MuiBadge-badge": { fontWeight: 700, fontSize: "0.62rem", height: 16, minWidth: 16 } }}
+              >
+                <IconButton
+                  onClick={() => setFiltersOpen((o) => !o)}
+                  aria-label={filtersOpen ? "ซ่อนตัวกรอง" : "แสดงตัวกรอง"}
+                  sx={{
+                    border: "1px solid", borderRadius: 2.5, flexShrink: 0, width: 40, height: 40,
+                    borderColor: filtersOpen || activeDropdownFilterCount > 0 ? alpha(ACCENT, 0.5) : "divider",
+                    color: filtersOpen || activeDropdownFilterCount > 0 ? ACCENT : "text.secondary",
+                    bgcolor: filtersOpen ? alpha(ACCENT, 0.08) : "background.paper",
+                    transition: "background-color .15s, border-color .15s, color .15s",
+                  }}
+                >
+                  <FilterList sx={{ fontSize: 20 }} />
                 </IconButton>
-              </InputAdornment>
-            ) : undefined,
-          }}
-        />
-        {/* ✅ กรองตามประเภทงาน (PM/Service/ติดตั้ง ฯลฯ) — เทียบ pattern เดียวกับตัวกรองผู้รับผิดชอบ/ปี
-            ด้านล่างเป๊ะๆ (เลือกจากรายชื่อประเภทงานจริงที่ตั้งค่าไว้ในระบบ) */}
-        <TextField
-          select size="small" label="ประเภทงาน" value={titleFilter}
-          onChange={(e) => setTitleFilter(e.target.value)}
-          SelectProps={{ native: true }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Category sx={{ fontSize: 18, color: titleFilter !== "all" ? ACCENT : "text.disabled" }} />
-              </InputAdornment>
-            ),
-          }}
-          sx={{
-            width: { xs: "100%", sm: 170 }, flexShrink: 0,
-            "& .MuiOutlinedInput-root": {
-              borderRadius: 2.5,
-              bgcolor: titleFilter !== "all" ? alpha(ACCENT, 0.06) : "background.paper",
-              "& fieldset": titleFilter !== "all" ? { borderColor: alpha(ACCENT, 0.45) } : {},
-              "&:hover fieldset": titleFilter !== "all" ? { borderColor: ACCENT } : {},
-            },
-            "& .MuiInputLabel-root": titleFilter !== "all" ? { color: ACCENT, fontWeight: 700 } : {},
-          }}
-        >
-          <option value="all">ทุกประเภท</option>
-          {titleOptions.map((name) => <option key={name} value={name}>{name}</option>)}
-        </TextField>
-        {/* ✅ ซ่อนสำหรับช่าง — ข้อมูลที่ช่างเห็นถูกกรองเหลือแค่งานของตัวเองมาจาก backend อยู่แล้วเสมอ
-            (ดู canView/isAdminOrManager ด้านบน) ตัวกรองนี้มีประโยชน์แค่ตอนแอดมิน/manager ที่เห็นงานของ
-            ทุกคนต้องกรองหาเฉพาะบางคน — สำหรับช่างมีแต่ชื่อตัวเองให้เลือกอยู่แล้ว มีแต่จะรก */}
-        {isAdminOrManager && (
-          <TextField
-            select size="small" label="ผู้รับผิดชอบงาน" value={responsibleFilter}
-            onChange={(e) => setResponsibleFilter(e.target.value)}
-            SelectProps={{ native: true }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <PersonOutline sx={{ fontSize: 18, color: responsibleFilter !== "all" ? ACCENT : "text.disabled" }} />
-                </InputAdornment>
-              ),
-            }}
-            sx={{
-              width: { xs: "100%", sm: 185 }, flexShrink: 0,
-              "& .MuiOutlinedInput-root": {
-                borderRadius: 2.5,
-                bgcolor: responsibleFilter !== "all" ? alpha(ACCENT, 0.06) : "background.paper",
-                "& fieldset": responsibleFilter !== "all" ? { borderColor: alpha(ACCENT, 0.45) } : {},
-                "&:hover fieldset": responsibleFilter !== "all" ? { borderColor: ACCENT } : {},
-              },
-              "& .MuiInputLabel-root": responsibleFilter !== "all" ? { color: ACCENT, fontWeight: 700 } : {},
-            }}
-          >
-            <option value="all">ทุกคน</option>
-            {/* ✅ ไล่เก็บสัญญาที่ยังไม่เคยมอบหมายผู้รับผิดชอบ — โผล่เฉพาะตอนมีจริง (กันตัวเลือกรก) */}
-            {unassignedResponsibleCount > 0 && (
-              <option value="unassigned">— ยังไม่มอบหมาย ({unassignedResponsibleCount}) —</option>
+              </Badge>
             )}
-            {teamOptions.map((name) => <option key={name} value={name}>{name}</option>)}
-          </TextField>
-        )}
-        {/* ✅ กรองตารางตามปีของสัญญา (อิงวันที่เริ่มสัญญา ไม่งั้นอิงวันที่ครั้งแรก) — เดิมต้องไล่สโครล
-            หาเองว่าปีไหนมีสัญญาอะไรบ้าง ทั้งที่สัญญาส่วนใหญ่ต่ออายุปีต่อปี ดูทีละปีจะเจอเร็วกว่า */}
-        {/* ✅ เน้นสีตอนกรองปีเจาะจงอยู่ (ไม่ใช่ "ทุกปี") ให้เห็นชัดว่ากำลังดูข้อมูลแค่ปีเดียว ไม่ใช่ทั้งหมด
-            — เดิมหน้าตาเหมือนช่องเปล่าๆ ทั่วไป มองไม่ออกว่ามีตัวกรองทำงานอยู่ (ทั้งที่ค่าเริ่มต้นล็อก
-            ปีปัจจุบันไว้ตั้งแต่แรกอยู่แล้ว ไม่ใช่ "ทุกปี") */}
-        <TextField
-          select size="small" label="ปี" value={yearFilter}
-          onChange={(e) => setYearFilter(e.target.value)}
-          SelectProps={{ native: true }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <CalendarMonth sx={{ fontSize: 18, color: yearFilter !== "all" ? ACCENT : "text.disabled" }} />
-              </InputAdornment>
-            ),
-          }}
-          sx={{
-            width: { xs: "100%", sm: 155 }, flexShrink: 0,
-            "& .MuiOutlinedInput-root": {
-              borderRadius: 2.5,
-              bgcolor: yearFilter !== "all" ? alpha(ACCENT, 0.06) : "background.paper",
-              "& fieldset": yearFilter !== "all" ? { borderColor: alpha(ACCENT, 0.45) } : {},
-              "&:hover fieldset": yearFilter !== "all" ? { borderColor: ACCENT } : {},
-            },
-            "& .MuiInputLabel-root": yearFilter !== "all" ? { color: ACCENT, fontWeight: 700 } : {},
-          }}
-        >
-          <option value="all">ทุกปี</option>
-          {availableYears.map((y) => <option key={y} value={y}>{y}</option>)}
-          {/* ✅ สัญญาที่ยังไม่ได้กรอกวันที่เริ่มสัญญาและยังไม่ลงวันที่เข้างานเลย — ปกติจะเห็นอยู่ในทุกปี
-              อยู่แล้ว (ไม่ถูกซ่อน) ตัวเลือกนี้ไว้กรองดูเฉพาะกลุ่มนี้เวลาต้องการไล่เก็บตกว่าเหลือสัญญาไหน
-              ค้างยังไม่ได้ลงวันที่บ้าง */}
-          {unknownYearCount > 0 && <option value="none">ยังไม่ระบุปี ({unknownYearCount})</option>}
-        </TextField>
-      </Stack>
+          </Stack>
+          {/* ✅ บนมือถือห่อ dropdown ทั้งชุดไว้ใน Collapse — จอใหญ่ render ตรงๆ ไม่ผ่าน Collapse เลย
+              (Collapse ที่ in=true ตลอดยังแทรก div ครอบเพิ่มอยู่ดี ซึ่งจะไปทำลายการเรียงแถวของ Stack) */}
+          {isMobile ? (
+            <Collapse in={filtersOpen} unmountOnExit>
+              <Stack gap={1.5} sx={{ pt: 0.5 }}>
+                {renderFilterFields()}
+                {/* ✅ ล้างตัวกรองได้จากในแผงนี้เลย ไม่ต้องไล่ตั้งกลับทีละช่อง (จอใหญ่มีปุ่มนี้อยู่ในกล่อง
+                    "ไม่พบรายการ" อยู่แล้ว แต่บนมือถือกว่าจะเลื่อนไปเจอต้องผ่านการ์ดทั้งหมดก่อน) */}
+                {hasActiveFilters && (
+                  <Button
+                    size="small" onClick={clearAllFilters} startIcon={<Close sx={{ fontSize: 15 }} />}
+                    sx={{ alignSelf: "flex-start", textTransform: "none", color: "text.secondary" }}
+                  >
+                    ล้างตัวกรองทั้งหมด
+                  </Button>
+                )}
+              </Stack>
+            </Collapse>
+          ) : renderFilterFields()}
+        </Stack>
+      </Box>
 
       {loading ? (
         <Skeleton variant="rounded" height={280} sx={{ borderRadius: 3 }} />
@@ -2517,6 +2801,52 @@ export default function ContractOverview() {
         </Paper>
       ) : isMobile ? (
         <Stack spacing={1.5}>
+          {/* ✅ สรุปยอดรวมสำหรับจอมือถือ — ตารางเดสก์ท็อปมีแถวสรุปท้ายตาราง (TableFooter) แต่มุมมอง
+              การ์ดไม่มีที่ให้วาง จึงยกมาไว้เป็นการ์ดสรุปด้านบนสุดแทน ให้เห็นยอดรวมทันทีโดยไม่ต้อง
+              เลื่อนผ่านการ์ดทั้งหมดก่อน — ตัวเลขชุดเดียวกับฝั่งเดสก์ท็อปเป๊ะ (jobValueSummary) */}
+          <Paper
+            variant="outlined"
+            sx={{
+              p: 1.5, borderRadius: 3,
+              bgcolor: alpha(ACCENT, 0.05), borderColor: alpha(ACCENT, 0.35),
+            }}
+          >
+            <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+              <Box>
+                <Typography variant="caption" sx={{ color: "#7f1d1d", fontWeight: 700, display: "block" }}>
+                  รวมมูลค่างานทั้งหมด
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {jobValueSummary.filledCount.toLocaleString()}/{jobValueSummary.rowCount.toLocaleString()} รายการ · ทุกหน้า
+                </Typography>
+              </Box>
+              <Typography sx={{ fontWeight: 800, fontSize: "1.05rem", color: "#7f1d1d", whiteSpace: "nowrap" }}>
+                {jobValueSummary.total.toLocaleString()}
+              </Typography>
+            </Stack>
+            {jobValueSummary.missingCount > 0 && (
+              <Typography
+                variant="caption"
+                sx={{ mt: 0.75, display: "flex", alignItems: "center", gap: 0.5, color: "#b45309", fontWeight: 600 }}
+              >
+                <WarningAmber sx={{ fontSize: 13 }} />
+                ยังไม่ได้กรอกมูลค่า {jobValueSummary.missingCount} รายการ — ยอดนี้เป็นยอดเท่าที่กรอกแล้ว
+              </Typography>
+            )}
+            {/* ✅ แจกแจงขอบเขตของยอดรวม (แท็บ + ตัวกรอง + คำค้นหา) เหมือนฝั่งเดสก์ท็อป */}
+            <Stack direction="row" spacing={0.5} sx={{ mt: 0.75, flexWrap: "wrap", rowGap: 0.5 }}>
+              {summaryScopeLabels.map((label) => (
+                <Chip
+                  key={label} size="small" variant="outlined" label={label}
+                  sx={{
+                    height: 19, fontSize: "0.65rem", fontWeight: 600, maxWidth: "100%",
+                    color: "text.secondary", borderColor: alpha("#0f172a", 0.18),
+                    "& .MuiChip-label": { px: 0.75, overflow: "hidden", textOverflow: "ellipsis" },
+                  }}
+                />
+              ))}
+            </Stack>
+          </Paper>
           {pagedRows.map((c) => renderMobileCard(c))}
         </Stack>
       ) : (
@@ -2567,9 +2897,10 @@ export default function ContractOverview() {
                 {!hideContractOnlyColumns && (
                   <ResizableTh width={colWidth("visitCount")} align="center" rowSpan={headerRowSpan} columnKey="visitCount" tableRef={tableRef} onResize={handleColResize("visitCount")} sortable sortDirection={sortConfig.key === "visitCount" ? sortConfig.direction : null} onSort={handleSortClick}>จำนวนครั้ง</ResizableTh>
                 )}
-                {!hideContractOnlyColumns && (
-                  <ResizableTh width={colWidth("jobValue")} align="right" rowSpan={headerRowSpan} columnKey="jobValue" tableRef={tableRef} onResize={handleColResize("jobValue")} sortable sortDirection={sortConfig.key === "jobValue" ? sortConfig.direction : null} onSort={handleSortClick}>มูลค่างาน</ResizableTh>
-                )}
+                {/* ✅ มูลค่างาน — แสดงทุกแท็บแล้ว (เดิมเฉพาะแท็บสัญญา) งานทั่วไป/โปรเจค/ยังไม่จัดกลุ่ม
+                    ก็มีมูลค่าของตัวเองได้เหมือนกัน ข้อมูลมีอยู่ในฐานข้อมูลทุกแถวอยู่แล้ว แค่เดิมไม่ได้
+                    แสดงให้เห็น — ดูยอดรวมท้ายตาราง (TableFooter) ที่สรุปให้ทุกแท็บเช่นกัน */}
+                <ResizableTh width={colWidth("jobValue")} align="right" rowSpan={headerRowSpan} columnKey="jobValue" tableRef={tableRef} onResize={handleColResize("jobValue")} sortable sortDirection={sortConfig.key === "jobValue" ? sortConfig.direction : null} onSort={handleSortClick}>มูลค่างาน</ResizableTh>
                 {!hideContractOnlyColumns && (
                   <ResizableTh width={colWidth("status")} align="center" rowSpan={headerRowSpan} columnKey="status" tableRef={tableRef} onResize={handleColResize("status")}>สถานะสัญญา</ResizableTh>
                 )}
@@ -2797,8 +3128,13 @@ export default function ContractOverview() {
                     onCommit={() => commitEdit(c)}
                     onCancel={cancelEdit}
                   />
+                  </>
+                  )}
+                  {/* ✅ มูลค่างาน — อยู่นอกบล็อก hideContractOnlyColumns แล้ว จึงแสดงทุกแท็บ (ลำดับ
+                      คอลัมน์ในแท็บสัญญายังเหมือนเดิมเป๊ะ เพราะวางไว้ตำแหน่งเดิมระหว่างจำนวนครั้งกับ
+                      สถานะสัญญา) — แก้ไขได้ทุกแถวสำหรับแอดมิน/manager ไม่จำกัดเฉพาะสัญญาจริงอีกต่อไป */}
                   <EditableCell
-                    editable={isAdminOrManager && c.isRealContract} columnKey="jobValue"
+                    editable={isAdminOrManager && canEditField(c, "jobValue")} columnKey="jobValue"
                     editing={editingCell?.key === c.key && editingCell?.field === "jobValue"}
                     value={c.jobValue} editValue={editValue} editType="number" saving={editSaving}
                     width={colVar("jobValue")} align="right"
@@ -2808,6 +3144,7 @@ export default function ContractOverview() {
                     onCommit={() => commitEdit(c)}
                     onCancel={cancelEdit}
                   />
+                  {!hideContractOnlyColumns && (
                   <TableCell data-col-key="status" align="center" sx={{ width: colVar("status") }}>
                     {(() => {
                       const st = contractStatusInfo(c);
@@ -2819,41 +3156,16 @@ export default function ContractOverview() {
                       ) : <Dash />;
                     })()}
                   </TableCell>
-                  </>
                   )}
                   <TableCell data-col-key="progress" align="center" sx={{ width: colVar("progress") }}>
                     {(() => {
-                      // ⚠️ BUG ที่แก้: แถวที่ไม่ใช่สัญญาจริง (งานทั่วไป/ยังไม่จัดกลุ่ม) ไม่มีแนวคิด "ครั้งที่"
-                      // แบบสัญญาเลย เป็น "งานเดียว" เสมอ — ของเดิมยังใช้ตรรกะนับ "ครั้ง" จาก time เหมือน
-                      // สัญญา ถ้า time ว่าง (ไม่เคยมีใครกรอก) total จะกลายเป็น 0 โชว์ป้าย "X/0" เพี้ยนๆ
-                      // ✅ เปลี่ยนมาโชว์ "สถานะงาน" จริงแทน (อิงจาก event ตรงๆ ดู jobStatusInfo) เฉพาะแถว
-                      // ที่ไม่ใช่สัญญาจริงเท่านั้นตามที่ผู้ใช้ยืนยัน — สัญญาจริงยังคงโชว์ "X/Y ครั้ง" แบบเดิม
-                      // ทุกประการ เพราะนับความคืบหน้าทั้งสัญญาแบบตัวเลขเข้าใจง่ายกว่าสถานะครั้งเดียว
-                      if (!c.isRealContract) {
-                        const info = jobStatusInfo(c);
-                        return (
-                          <Chip
-                            label={info.label} size="small"
-                            sx={{ height: 20, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha(info.color, 0.12), color: info.color }}
-                          />
-                        );
-                      }
-                      // ✅ นับความคืบหน้าเป็น "ครั้ง" ไม่ใช่ document — ครั้งที่เข้างานไม่ต่อเนื่อง (หลาย
-                      // document ต่อครั้ง) นับว่า "เสร็จ" ก็ต่อเมื่อทุก document ของครั้งนั้นเสร็จหมดแล้ว
-                      const byRound = new Map();
-                      c.visits.filter((v) => !v.unscheduled).forEach((v) => {
-                        const key = String(v.time);
-                        if (!byRound.has(key)) byRound.set(key, []);
-                        byRound.get(key).push(v);
-                      });
-                      let doneCount = 0;
-                      byRound.forEach((docs) => { if (docs.every((d) => d.status === "ดำเนินการเสร็จสิ้น")) doneCount += 1; });
-                      const total = c.visitCount || countUsedRounds(c.visits);
-                      const chipColor = doneCount === 0 ? "#9ca3af" : doneCount >= total ? STATUS_COLOR["ดำเนินการเสร็จสิ้น"] : "#f59e0b";
+                      // ✅ ใช้ progressInfo (ฟังก์ชันกลาง) ตัวเดียวกับที่ไฟล์ Excel ที่ส่งออกใช้ กันตัวเลข
+                      // บนจอกับในไฟล์ไม่ตรงกัน — ดูรายละเอียดตรรกะที่นิยามของ progressInfo ด้านบน
+                      const info = progressInfo(c, countUsedRounds);
                       return (
                         <Chip
-                          label={`${doneCount}/${total}`} size="small"
-                          sx={{ height: 20, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha(chipColor, 0.12), color: chipColor }}
+                          label={info.label} size="small"
+                          sx={{ height: 20, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha(info.color, 0.12), color: info.color }}
                         />
                       );
                     })()}
@@ -2935,6 +3247,16 @@ export default function ContractOverview() {
                                     sx={{ p: 0.25, color: "text.disabled", transition: "background-color .15s, color .15s", "&:hover": { color: ACCENT, bgcolor: alpha(ACCENT, 0.1) } }}
                                   >
                                     <Add sx={{ fontSize: 14 }} />
+                                  </IconButton>
+                                </Tooltip>
+                                {/* ✅ ย้ายครั้งนี้ไปเป็นครั้งที่อื่นได้อิสระ (ยกทั้งวันที่/สถานะ/ทีม/
+                                    ประวัติงาน) — ปลายทางที่มีข้อมูลอยู่แล้วจะสลับที่กัน ไม่เขียนทับ */}
+                                <Tooltip title="ย้ายครั้งนี้ไปเป็นครั้งที่อื่น">
+                                  <IconButton
+                                    size="small" onClick={() => openMoveRoundDialog(c, n)}
+                                    sx={{ p: 0.25, color: "text.disabled", transition: "background-color .15s, color .15s", "&:hover": { color: ACCENT, bgcolor: alpha(ACCENT, 0.1) } }}
+                                  >
+                                    <SwapHoriz sx={{ fontSize: 14 }} />
                                   </IconButton>
                                 </Tooltip>
                                 <Tooltip title="แยกครั้งนี้ออกจากสัญญา (ย้ายเป็นงานเก่าที่ยังไม่จัดกลุ่ม)">
@@ -3075,6 +3397,64 @@ export default function ContractOverview() {
                 );
               })}
             </TableBody>
+            {/* ✅ แถวสรุปยอดรวมท้ายตาราง — ยอดรวมของ "ทุกแถวที่ผ่านตัวกรอง" (ทุกหน้ารวมกัน) ไม่ใช่แค่
+                แถวที่เห็นในหน้านี้ จึงระบุกำกับไว้ชัดเจนกันเข้าใจผิด และบอกจำนวนแถวที่ยังไม่ได้กรอก
+                มูลค่าไว้ด้วย เพราะถ้ามีแถวพวกนั้นปนอยู่ ยอดนี้คือ "เท่าที่กรอกแล้ว" ยังไม่ใช่ยอดจริง */}
+            <TableFooter>
+              <TableRow
+                sx={{
+                  bgcolor: alpha(ACCENT, 0.05),
+                  "& td": { borderTop: `2px solid ${alpha(ACCENT, 0.35)}`, borderBottom: "none", py: 1.25 },
+                }}
+              >
+                <TableCell colSpan={footerColSpan.before} align="right" sx={{ fontWeight: 700, color: "#7f1d1d" }}>
+                  <Stack spacing={0.5} alignItems="flex-end">
+                    <Stack direction="row" spacing={1} alignItems="center" justifyContent="flex-end" sx={{ flexWrap: "wrap" }}>
+                      <span>รวมมูลค่างานทั้งหมด</span>
+                      <Chip
+                        size="small"
+                        label={`${jobValueSummary.filledCount.toLocaleString()}/${jobValueSummary.rowCount.toLocaleString()} รายการ · ทุกหน้า`}
+                        sx={{ height: 20, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha(ACCENT, 0.12), color: "#7f1d1d" }}
+                      />
+                      {jobValueSummary.missingCount > 0 && (
+                        <Tooltip title={`มี ${jobValueSummary.missingCount} รายการที่ยังไม่ได้กรอกมูลค่างาน — ยอดรวมนี้จึงเป็นยอดเท่าที่กรอกแล้ว (${jobValueSummary.filledCount} รายการ) ยังไม่ใช่ยอดจริงทั้งหมด`}>
+                          <Chip
+                            size="small" icon={<WarningAmber sx={{ fontSize: 13 }} />}
+                            label={`ยังไม่ระบุมูลค่า ${jobValueSummary.missingCount}`}
+                            sx={{
+                              height: 20, fontSize: "0.68rem", fontWeight: 700, cursor: "help",
+                              bgcolor: alpha("#f59e0b", 0.15), color: "#b45309",
+                              "& .MuiChip-icon": { color: "#b45309" },
+                            }}
+                          />
+                        </Tooltip>
+                      )}
+                    </Stack>
+                    {/* ✅ แจกแจงว่ายอดรวมนี้นับจากชุดข้อมูลไหนบ้าง (แท็บ + ตัวกรองทุกช่อง + คำค้นหา) ตาม
+                        ที่ผู้ใช้ขอ — กันตีความยอดผิดว่าเป็นยอดทั้งระบบ ทั้งที่จริงถูกกรองอยู่ */}
+                    <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="flex-end" sx={{ flexWrap: "wrap", rowGap: 0.5 }}>
+                      {summaryScopeLabels.map((label) => (
+                        <Chip
+                          key={label} size="small" variant="outlined" label={label}
+                          sx={{
+                            height: 19, fontSize: "0.65rem", fontWeight: 600, maxWidth: 260,
+                            color: "text.secondary", borderColor: alpha("#0f172a", 0.18),
+                            "& .MuiChip-label": { px: 0.75, overflow: "hidden", textOverflow: "ellipsis" },
+                          }}
+                        />
+                      ))}
+                    </Stack>
+                  </Stack>
+                </TableCell>
+                <TableCell
+                  align="right"
+                  sx={{ fontWeight: 800, fontSize: "0.95rem", color: "#7f1d1d", whiteSpace: "nowrap" }}
+                >
+                  {jobValueSummary.total.toLocaleString()}
+                </TableCell>
+                <TableCell colSpan={footerColSpan.after} />
+              </TableRow>
+            </TableFooter>
           </Table>
         </TableContainer>
       )}
@@ -3241,6 +3621,78 @@ export default function ContractOverview() {
             sx={{ bgcolor: ACCENT, textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#b91c1c" } }}
           >
             {saving ? "กำลังบันทึก..." : "บันทึกสัญญา"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── ย้าย "ครั้งที่ N" ไปครั้งที่อื่น ──────────────────────────────────── */}
+      {/* ✅ เลือกปลายทางจากรายการครั้งที่ 1..จำนวนครั้งทั้งหมด พร้อมบอกสถานะของแต่ละครั้งกำกับไว้ ให้เห็น
+          ตั้งแต่ก่อนกดว่าปลายทางว่างอยู่หรือมีข้อมูลแล้ว (ถ้ามี = จะสลับที่กัน ไม่ใช่เขียนทับ) */}
+      {/* ⚠️ disableEnforceFocus จำเป็นตรงนี้ เพราะกล่องนี้เป็นจุดเดียวที่ตั้งใจเปิดกล่องยืนยัน
+          (SweetAlert2 — ตอนปลายทางมีข้อมูลอยู่แล้วจึงต้องถามก่อนสลับ) ซ้อนขึ้นมาบน Dialog ที่ยังเปิดค้าง
+          อยู่ — ปกติ MUI Modal จะ "ล็อกโฟกัส" ไว้ในตัวเองเสมอ พอ SweetAlist2 โฟกัสปุ่มของมัน MUI จะดึง
+          โฟกัสกลับมาทันที ทำให้กดปุ่มยืนยันด้วยคีย์บอร์ด (Enter/Tab) ไม่ได้ — ปิดการล็อกโฟกัสเฉพาะกล่องนี้
+          กล่องอื่นในหน้ายังล็อกโฟกัสตามปกติเหมือนเดิม (z-index ที่เคยทำให้กล่องยืนยันไปอยู่ด้านหลัง แก้รวม
+          ไว้ที่ src/index.css แล้ว) */}
+      <Dialog open={Boolean(moveRoundTarget)} onClose={closeMoveRoundDialog} fullWidth maxWidth="xs" fullScreen={isMobile} disableEnforceFocus>
+        <DialogTitle sx={{ fontWeight: 800 }}>
+          ย้ายครั้งที่ {moveRoundTarget?.fromRound} ไปเป็นครั้งที่...
+        </DialogTitle>
+        <DialogContent dividers>
+          {moveRoundTarget && (
+            <Stack spacing={1.5} sx={{ pt: 0.5 }}>
+              <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: alpha(ACCENT, 0.05) }}>
+                <Typography variant="body2" fontWeight={700}>
+                  {moveRoundTarget.contract.company || "-"} · {moveRoundTarget.contract.site || "-"}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {moveRoundTarget.contract.title} · {moveRoundTarget.contract.system}
+                  {moveRoundTarget.contract.contractNo ? ` · เลขที่สัญญา ${moveRoundTarget.contract.contractNo}` : ""}
+                </Typography>
+                <Typography variant="caption" sx={{ display: "block", mt: 0.5, color: "text.secondary" }}>
+                  วันที่ของครั้งที่ {moveRoundTarget.fromRound}:{" "}
+                  {moveRoundTarget.contract.visits
+                    .filter((v) => !v.unscheduled && Number(v.time) === moveRoundTarget.fromRound)
+                    .map((v) => formatEventDateRange(v))
+                    .join(", ") || "-"}
+                </Typography>
+              </Box>
+              <Alert severity="info" sx={{ py: 0.5 }}>
+                ย้ายทั้งวันที่ สถานะ ทีมที่เข้างาน และประวัติงานของครั้งนี้ไปพร้อมกันทั้งหมด — ถ้าครั้งที่ปลายทางมีข้อมูลอยู่แล้ว ระบบจะสลับที่กันให้ ไม่มีข้อมูลไหนถูกลบ
+              </Alert>
+              <TextField
+                select fullWidth size="small" label="ย้ายไปเป็นครั้งที่ *"
+                value={moveRoundValue}
+                onChange={(e) => setMoveRoundValue(e.target.value)}
+                SelectProps={{ native: true }}
+                InputLabelProps={{ shrink: true }}
+              >
+                <option value="">— เลือกครั้งที่ —</option>
+                {Array.from(
+                  { length: Math.min(MAX_VISIT_COUNT, Math.max(Number(moveRoundTarget.contract.visitCount) || 0, rowMaxRound(moveRoundTarget.contract))) },
+                  (_, i) => i + 1
+                )
+                  .filter((n) => n !== moveRoundTarget.fromRound)
+                  .map((n) => {
+                    const occupied = moveRoundTarget.contract.visits.some((v) => !v.unscheduled && Number(v.time) === n);
+                    return (
+                      <option key={n} value={n}>
+                        ครั้งที่ {n} {occupied ? "(มีข้อมูลอยู่แล้ว — จะสลับที่กัน)" : "(ว่าง)"}
+                      </option>
+                    );
+                  })}
+              </TextField>
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeMoveRoundDialog} disabled={moveRoundSaving} sx={{ textTransform: "none" }}>ยกเลิก</Button>
+          <Button
+            variant="contained" onClick={handleMoveRoundSubmit}
+            disabled={moveRoundSaving || !moveRoundValue}
+            sx={{ bgcolor: ACCENT, textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#b91c1c" } }}
+          >
+            {moveRoundSaving ? "กำลังย้าย..." : "ย้าย"}
           </Button>
         </DialogActions>
       </Dialog>
