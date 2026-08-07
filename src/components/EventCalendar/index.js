@@ -1344,35 +1344,6 @@ function EventCalendar() {
           {visibleDrafts.length > 0 && <span className="filter-badge">{visibleDrafts.length}</span>}
         </button>
 
-        {/* ✅ ปุ่มย่อ/ขยายปฏิทินในตัว — บนจอมือถือช่องวันกว้างแค่ ~60px ข้อความในการ์ดงานต้องถูกตัดด้วย
-            "…" เสมอ อ่านรายละเอียดไม่ออก การหุบ/กางนิ้ว (pinch-zoom) ของเบราว์เซอร์ช่วยได้ก็จริง (แก้ให้
-            ใช้ได้แล้ว ดู Hammer touchAction ด้านบน) แต่มันซูมทั้งหน้ารวมแถบเครื่องมือ/เมนู ทำให้ต้องเลื่อน
-            จอไปมาหาสิ่งที่ต้องการ — ปุ่มนี้ขยายเฉพาะตัวปฏิทิน แถบเครื่องมืออยู่กับที่ กดง่ายกว่าและแม่นกว่า
-            จำค่าไว้ใน localStorage ด้วย ไม่ต้องตั้งใหม่ทุกครั้งที่เปิดหน้า */}
-        <div className="ec-zoom-group" role="group" aria-label="ย่อ/ขยายปฏิทิน">
-          <button
-            type="button" className="ec-zoom-btn"
-            onClick={() => changeZoom(-1)} disabled={zoomIndex === 0}
-            title="ย่อปฏิทิน"
-          >
-            −
-          </button>
-          <button
-            type="button" className="ec-zoom-level"
-            onClick={() => setZoomIndex(ZOOM_DEFAULT_INDEX)}
-            title="กดเพื่อกลับไปขนาดปกติ (100%)"
-          >
-            {Math.round(ZOOM_LEVELS[zoomIndex] * 100)}%
-          </button>
-          <button
-            type="button" className="ec-zoom-btn"
-            onClick={() => changeZoom(1)} disabled={zoomIndex === ZOOM_LEVELS.length - 1}
-            title="ขยายปฏิทิน"
-          >
-            +
-          </button>
-        </div>
-
         {/* ✅ ปุ่ม "N ต้องอนุมัติ" — ซ่อนไปเลยตอนไม่มีอะไรรออนุมัติ (เทียบ pattern เดียวกับ
             ClosureRequestsPanel ในหน้า Operation ที่ return null ตอนไม่มีคำขอ) กดแล้วกรองตารางเหลือ
             เฉพาะงานรออนุมัติทันที พร้อมเปิดแผงงานล่วงหน้าด้วย (ให้เห็นทั้งงานที่มีวันที่แล้วและแผนงานที่
