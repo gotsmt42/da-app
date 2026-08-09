@@ -71,7 +71,10 @@
       "Bash(rm -rf \"C:\\\\Users\\\\Admin\\\\Desktop\\\\da-app\\\\build\" && rm -f /tmp/build_out8.txt && echo done)",
       "Bash(rm -rf \"C:\\\\Users\\\\Admin\\\\Desktop\\\\da-app\\\\build\" && rm -f /tmp/build_out19.txt && echo done)",
       "Bash(rm -rf \"c:/Users/Admin/Desktop/da-app/build\" && rm -f /tmp/build_out36.txt && echo done)",
-      "Bash(awk 'NR==554,NR==672' \"C:/Users/Admin/Desktop/da-app-server/routes/calendarEvent.js\")"
+      "Bash(awk 'NR==554,NR==672' \"C:/Users/Admin/Desktop/da-app-server/routes/calendarEvent.js\")",
+      "Bash(grep -o \"fc-event-start[^'\\\\\"]\\\\{0,40\\\\}\" node_modules/@fullcalendar/core/internal-common.js)",
+      "Bash(grep -o \"isStart.\\\\{0,120\\\\}fc-event-start\" node_modules/@fullcalendar/core/internal-common.js)",
+      "Bash(grep -o \"isStart.\\\\{0,60\\\\}\" node_modules/@fullcalendar/core/internal-common.js)"
     ],
     "additionalDirectories": [
       "\\tmp",

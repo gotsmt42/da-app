@@ -660,22 +660,50 @@ export const getEditEvent = async ({
   // ✅ หัวหน้าทีม/ลูกทีม แก้ไขได้เพิ่มจากเดิม (admin/manager เท่านั้น) — ให้ "ผู้รับผิดชอบ" จัดการเองได้ด้วย
   // (ใช้ raw ไม่ fallback — ต้องถูกมอบหมายเป็นผู้รับผิดชอบไว้ชัดเจนก่อน ไม่ใช่แค่บังเอิญเป็นทีมที่เข้างาน
   // อยู่แล้ว ไม่งั้นจะกลายเป็นย้อนแย้งกับสิทธิ์ "ทีมที่เข้างานแก้ไขได้แค่วันที่/เวลา/สถานะ" ที่เพิ่งจำกัดไว้)
-  const canEditTeamAssignment = isAdminOrManagerUser || (isRawResponsiblePerson && !isPendingForTech);
+  // ✅ "ลูกทีม" ที่มีชื่ออยู่ในงานนี้ — เปิดดูรายละเอียดงานได้ (ตามที่ผู้ใช้ขอ) แต่แก้อะไรไม่ได้เลย
+  // ⚠️ ต้องเช็คว่า "ไม่มีสิทธิ์ทางอื่น" ด้วย — คนคนเดียวอาจเป็นทั้งลูกทีมของงานนี้และเป็นเจ้าของงาน/
+  // ผู้รับผิดชอบ/หัวหน้าทีมไปพร้อมกันได้ ถ้าเช็คแค่ว่ามีชื่อในลูกทีมแล้วล็อกทันที จะไปตัดสิทธิ์ที่เขา
+  // มีอยู่เดิมทิ้งโดยไม่ตั้งใจ (เช่นหัวหน้าทีมที่ใส่ชื่อตัวเองไว้ในลูกทีมด้วย จะแก้งานตัวเองไม่ได้อีกเลย)
+  const isListedTeamMember = (eventTeamMembers || []).some(
+    (m) => (m?.userId && m.userId === userData?.userId) || (m?.name && m.name === userData?.fname)
+  );
+  const hasAnyEditRight =
+    isAdminOrManagerUser ||
+    isOwnerUser ||
+    isEffectiveResponsiblePerson ||
+    (eventTeam && eventTeam === userData?.fname) ||
+    (eventResPerson && eventResPerson === userData?.userId);
+  const isTeamMemberViewer = isListedTeamMember && !hasAnyEditRight;
+
+  // ✅ รวมสองกรณี "เปิดดูได้อย่างเดียว" เข้าเป็นตัวเดียว ใช้ล็อกทุกช่อง/ปุ่มที่แก้ข้อมูลได้ทั้งฟอร์ม —
+  // (1) งานรออนุมัติที่ช่างเปิดดู (2) ลูกทีมที่มีชื่อในงาน — พฤติกรรมล็อกเหมือนกันเป๊ะทุกจุด ต่างกัน
+  // แค่ข้อความอธิบายเหตุผลด้านบนฟอร์มเท่านั้น
+  const isViewOnly = isPendingForTech || isTeamMemberViewer;
+
+  const canEditTeamAssignment = isAdminOrManagerUser || (isRawResponsiblePerson && !isViewOnly);
   // ❌ งานที่ admin ปิดแล้ว (ดำเนินการเสร็จสิ้น) ช่างลบไม่ได้อีก มีแค่ admin/manager เท่านั้น
   // ❌ งานที่ยังรออนุมัติ ช่างก็ลบเองไม่ได้เช่นกัน (isPendingForTech) — ทำอะไรไม่ได้เลยจนกว่าจะอนุมัติ/
   // ไม่อนุมัติก่อน
-  const canDeleteEvent = isAdminOrManagerUser || (eventStatus !== "ดำเนินการเสร็จสิ้น" && !isPendingForTech);
+  const canDeleteEvent = isAdminOrManagerUser || (eventStatus !== "ดำเนินการเสร็จสิ้น" && !isViewOnly);
   // ❌ งานที่ปิดแล้ว (ดำเนินการเสร็จสิ้น) ห้าม "ย้ายไปแผนล่วงหน้า" เด็ดขาด ไม่มีข้อยกเว้นแม้แต่ admin/
   // manager (ต่างจาก canDeleteEvent ด้านบน) เพราะ unschedule เคลียร์ date/start/end ทิ้งโดยไม่แตะ
   // status เลย ถ้าปล่อยให้ทำกับงานที่เสร็จแล้วได้ จะได้ "แผนงานล่วงหน้า" ที่ status ยังเป็น "เสร็จสิ้น"
   // ค้างอยู่ ซึ่งเป็นสถานะขัดแย้งกันเองที่ไม่ควรเกิดขึ้นได้เลย (เทียบ pattern เดียวกับฝั่ง backend
   // PUT /:id/unschedule ที่ปิดเด็ดขาดเหมือนกัน) — ช่างงานรออนุมัติก็ทำไม่ได้เหมือนกัน (isPendingForTech)
   // แต่ admin/manager ยังทำได้เสมอไม่ว่าจะรออนุมัติหรือไม่ (ไม่มี isAdminOrManagerUser bypass ตรงนี้ตั้งแต่แรกอยู่แล้ว)
-  const canUnscheduleEvent = eventStatus !== "ดำเนินการเสร็จสิ้น" && (isAdminOrManagerUser || !isPendingForTech);
+  // ✅ เพิ่มตามที่ผู้ใช้ขอ: "ยืนยันแล้ว"/"กำลังดำเนินการ" ก็ห้ามย้ายกลับไปแผนล่วงหน้าเหมือนกัน —
+  // สองสถานะนี้แปลว่างานถูกนัดหมาย/เริ่มลงมือไปแล้วจริง (ลูกค้ารับรู้วันแล้ว หรือช่างเข้าหน้างานแล้ว)
+  // การดึงกลับไปเป็น "แผนล่วงหน้าที่ยังไม่มีวันที่" จะทำให้ประวัติงานขัดแย้งกันเอง แบบเดียวกับเคส
+  // "ดำเนินการเสร็จสิ้น" ที่ปิดไว้อยู่แล้ว — เหลือย้ายได้เฉพาะงานที่ยัง "กำลังรอยืนยัน" เท่านั้น
+  // ⚠️ ปิดสำหรับทุก role รวม admin/manager (เจตนาเดียวกับ "ดำเนินการเสร็จสิ้น") ถ้าจำเป็นต้องย้ายจริงๆ
+  // ให้เปลี่ยนสถานะกลับเป็น "กำลังรอยืนยัน" ก่อน จะได้มีร่องรอยว่าตั้งใจถอยสถานะจริง
+  const UNSCHEDULE_BLOCKED_STATUSES = ["ดำเนินการเสร็จสิ้น", "ยืนยันแล้ว", "กำลังดำเนินการ"];
+  const canUnscheduleEvent =
+    !UNSCHEDULE_BLOCKED_STATUSES.includes(eventStatus) && (isAdminOrManagerUser || !isViewOnly);
   // ✅ ช่างแก้ไขสถานะเองได้แค่ตอนยังอยู่ในช่วง กำลังรอยืนยัน/ยืนยันแล้ว เท่านั้น
   // ถ้าสถานะถูกเลื่อนไปไกลกว่านั้นแล้ว (กำลังดำเนินการ/ดำเนินการเสร็จสิ้น) ให้แสดงค่าจริงไว้ แต่แก้ไม่ได้
   // ❌ งานที่ยังรออนุมัติ ช่างเปลี่ยนสถานะเองไม่ได้เช่นกัน (isPendingForTech) — ต้องรออนุมัติก่อน
-  const canEditStatus = isAdminOrManagerUser || (TECH_EDITABLE_STATUSES.includes(eventStatus) && !isPendingForTech);
+  const canEditStatus = isAdminOrManagerUser || (TECH_EDITABLE_STATUSES.includes(eventStatus) && !isViewOnly);
 
   // ✅ "ย้ายเข้าสัญญาที่มีอยู่แล้ว" — ย้ายมาจากหน้า "ภาพรวมงาน" (ContractOverview.js openAttachDialog)
   // ให้แก้ไขกรณีจัดกลุ่มผิดได้ตรงจากหน้าแก้ไขงานเลย ไม่ต้องสลับไปหน้าภาพรวมงานทุกครั้ง — เฉพาะงานที่ยัง
@@ -705,7 +733,7 @@ export const getEditEvent = async ({
   // ✅ คัดลอกงานนี้ไปวางเป็นงานใหม่ — เฉพาะงานทั่วไป ไม่ใช่งานผูกสัญญา (คัดลอกงานสัญญาจะทำให้ตัวนับ
   // "ครั้งที่" ที่ใช้ไปแล้วของสัญญาเดิมสับสน/เพี้ยนได้ ดู countUsedRounds ด้านบน)
   // ❌ ช่างงานรออนุมัติทำอะไรไม่ได้เลยเช่นกัน (isPendingForTech) — admin/manager ยังคัดลอกได้เสมอ
-  const canCopyEvent = !eventContractGroupId && (isAdminOrManagerUser || !isPendingForTech);
+  const canCopyEvent = !eventContractGroupId && (isAdminOrManagerUser || !isViewOnly);
 
   const formattedEnd = eventAllDay
     ? moment(eventEnd).subtract(1, "days").format("YYYY-MM-DD")
@@ -988,33 +1016,63 @@ export const getEditEvent = async ({
         <label>🔢 ครั้งที่</label>
         <select id="editTime" ${eventContractGroupId || !isAdminOrManagerUser ? "disabled" : ""}><option value="" disabled>— เลือก —</option>${customOption(eventTime, timeValues)}${timeOpts}</select>
       </div>
+      <!-- ✅ มูลค่างานสำหรับ "งานทั่วไป/งานโปรเจค" (งานที่ไม่ได้อยู่ในสัญญา) — เดิมกรอกได้เฉพาะงานสัญญา
+           เท่านั้น (อยู่ในแผงข้อมูลสัญญาด้านบน ซึ่งไม่แสดงเลยถ้างานไม่มี contractGroupId) งานทั่วไป/โปรเจค
+           จึงไม่มีทางระบุมูลค่าจากหน้านี้ได้ ทั้งที่หน้า "ภาพรวมงาน" แสดงคอลัมน์มูลค่างานให้ทุกแท็บแล้ว
+           ⚠️ แสดงเฉพาะงานที่ไม่มีสัญญา — งานสัญญาใช้ช่องในแผงสัญญาด้านบนแทน (ค่าเดียวกันทั้งสัญญา ถ้ามี
+           2 ช่องพร้อมกันจะกลายเป็นแก้คนละทางแล้วทับกันเอง)
+           ✅ เฉพาะแอดมิน/manager เหมือนช่องมูลค่างานทุกจุดในแอป (เป็นข้อมูลการเงิน)
+           ✅ วางไว้ในกลุ่ม "ข้อมูลโครงการ" คู่กับครั้งที่ — เป็นข้อมูลของ "ตัวงาน" เหมือนกัน ไม่ใช่ข้อมูลคน -->
+      ${!eventContractGroupId ? `
       <div class="ee-field">
-        <label>👷 หัวหน้าทีมเข้างาน ${!isAdminOrManagerUser && canEditTeamAssignment ? `<span style="font-size:10.5px;font-weight:600;color:#16a34a;">✏️ แก้ไขได้ (ผู้รับผิดชอบ)</span>` : ""}</label>
-        <select id="editTeam" ${canEditTeamAssignment ? "" : "disabled"}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventTeam, teamValues)}${teamOpts}</select>
+        <label>💰 มูลค่างาน (บาท)</label>
+        <input id="editJobValueSingle" type="number" min="0" step="1" value="${eventJobValue}"
+               placeholder="เช่น 86000" ${isAdminOrManagerUser ? "" : "disabled"}>
+        <span style="font-size:10.5px;color:#94a3b8;">ไม่บังคับ — ใช้รวมยอดในหน้า "ภาพรวมงาน"</span>
       </div>
+      ` : ""}
     </div>
 
-    <!-- ✅ ลูกทีม (คนที่ 2, 3, ...) — แสดงผลอย่างเดียว ไม่กระทบสิทธิ์แก้ไข/แจ้งเตือน — แก้ไข/เพิ่ม/ลบ
-         ได้เฉพาะแอดมิน/manager หรือ "ผู้รับผิดชอบ" ของงานนี้ (canEditTeamAssignment) เหมือนหัวหน้าทีม
-         ด้านบน — ช่างทีมอื่นที่ไม่ใช่ผู้รับผิดชอบเห็นรายชื่อได้แต่แก้ไม่ได้ -->
-    <div class="ee-field" style="margin-bottom:14px;">
-      <label>👥 ลูกทีม (ถ้ามี)</label>
-      <div id="ee-teamMembersList"></div>
-      ${canEditTeamAssignment ? `<button type="button" class="ee-btn ee-btn-ghost" id="ee-addTeamMemberBtn" style="margin-top:2px;">➕ เพิ่มลูกทีม</button>` : ""}
+    <hr class="ee-divider">
+
+    <!-- ✅ แยก "ผู้เข้างาน" ออกมาเป็นหมวดของตัวเอง — เดิมหัวหน้าทีม/ลูกทีมถูกยัดรวมอยู่ในหมวด
+         "ข้อมูลโครงการ" ซึ่งเป็นคนละเรื่องกัน (หมวดนั้นคือข้อมูลระบุตัวงาน: บริษัท/โครงการ/ระบบ/ครั้งที่)
+         ทำให้หมวดเดียวยาวมากและอ่านแล้วหาไม่เจอว่าใครเข้างาน ซ้ำสิทธิ์แก้ไขของสองกลุ่มนี้ก็คนละชุดกัน
+         (ข้อมูลงาน = แอดมิน/manager เท่านั้น, ผู้เข้างาน = ผู้รับผิดชอบแก้ได้ด้วย) แยกออกมาแล้วอธิบาย
+         สิทธิ์ได้ตรงจุด ไม่ต้องเขียนรวมกันในประโยคเดียวให้สับสน -->
+    <p class="ee-section-label">ผู้เข้างาน ${!isAdminOrManagerUser && canEditTeamAssignment ? `<span style="font-size:10.5px;font-weight:600;color:#16a34a;">✏️ แก้ไขได้ (ผู้รับผิดชอบ)</span>` : ""}</p>
+    <div class="ee-grid ee-grid-2">
+      <div class="ee-field">
+        <label>👷 หัวหน้าทีมเข้างาน</label>
+        <select id="editTeam" ${canEditTeamAssignment ? "" : "disabled"}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventTeam, teamValues)}${teamOpts}</select>
+      </div>
+      <!-- ✅ ลูกทีม (คนที่ 2, 3, ...) — แสดงผลอย่างเดียว ไม่กระทบสิทธิ์แก้ไข/แจ้งเตือน — แก้ไข/เพิ่ม/ลบ
+           ได้เฉพาะแอดมิน/manager หรือ "ผู้รับผิดชอบ" ของงานนี้ (canEditTeamAssignment) เหมือนหัวหน้าทีม
+           ⚠️ ลูกทีมที่มีชื่อในงานเปิดดูงานนี้ได้ แต่แก้ไม่ได้ (ดู isTeamMemberViewer ด้านบน) -->
+      <div class="ee-field">
+        <label>👥 ลูกทีม (ถ้ามี)</label>
+        <div id="ee-teamMembersList"></div>
+        ${canEditTeamAssignment ? `<button type="button" class="ee-btn ee-btn-ghost" id="ee-addTeamMemberBtn" style="margin-top:2px;">➕ เพิ่มลูกทีม</button>` : ""}
+      </div>
     </div>
 
     <hr class="ee-divider">
 
     <!-- section: วันที่ & เวลา — เหมือนหน้า Add เลย ค้างวันที่/ช่วงวันที่เดิมไว้ให้แก้ง่าย -->
-    <p class="ee-section-label">วันที่ & เวลา ${!isAdminOrManagerUser && !isPendingForTech ? `<span style="font-size:10.5px;font-weight:600;color:#16a34a;">✏️ แก้ไขได้</span>` : ""}</p>
+    <p class="ee-section-label">วันที่ & เวลา ${!isAdminOrManagerUser && !isViewOnly ? `<span style="font-size:10.5px;font-weight:600;color:#16a34a;">✏️ แก้ไขได้</span>` : ""}</p>
     ${isPendingForTech ? `
     <p style="font-size:11px;color:#b45309;margin:-6px 0 10px;">
       🔒 งานนี้ยังรออนุมัติ — ดูได้อย่างเดียว แก้ไขไม่ได้จนกว่าแอดมิน/manager จะอนุมัติหรือไม่อนุมัติก่อน
     </p>
+    ` : isTeamMemberViewer ? `
+    <p style="font-size:11px;color:#0369a1;margin:-6px 0 10px;">
+      👥 คุณเป็น "ลูกทีม" ของงานนี้ — เปิดดูรายละเอียดได้ทั้งหมด แต่แก้ไขไม่ได้
+      (ต้องให้หัวหน้าทีมที่เข้างาน ผู้รับผิดชอบงาน หรือแอดมิน/manager เป็นผู้แก้)
+    </p>
     ` : ""}
 
     <label class="ee-checkbox-row">
-      <input type="checkbox" id="ee-multiDateToggle" ${hasSiblings ? "checked" : ""} ${isPendingForTech ? "disabled" : ""}>
+      <input type="checkbox" id="ee-multiDateToggle" ${hasSiblings ? "checked" : ""} ${isViewOnly ? "disabled" : ""}>
       🗓️ งานนี้ต้องเข้างานหลายวัน (ไม่ติดกันก็ได้) — ถือเป็นงานเดียวกัน
       ${hasSiblings ? `<span style="color:#94a3b8;font-weight:500;">(มีอยู่แล้ว ${siblingEvents.length + 1} วัน)</span>` : ""}
     </label>
@@ -1023,34 +1081,37 @@ export const getEditEvent = async ({
       <div class="ee-grid ee-grid-2">
         <div class="ee-field">
           <label>📅 วันที่เริ่ม</label>
-          <input id="editStart" type="date" value="${eventStart.format("YYYY-MM-DD")}" ${isPendingForTech ? "disabled" : ""}>
+          <input id="editStart" type="date" value="${eventStart.format("YYYY-MM-DD")}" ${isViewOnly ? "disabled" : ""}>
         </div>
         <div class="ee-field">
           <label>📅 วันที่สิ้นสุด</label>
-          <input id="editEnd" type="date" value="${formattedEnd}" ${isPendingForTech ? "disabled" : ""}>
+          <input id="editEnd" type="date" value="${formattedEnd}" ${isViewOnly ? "disabled" : ""}>
         </div>
       </div>
     </div>
 
     <div id="ee-multiDateSection" style="${hasSiblings ? "" : "display:none;"}">
       <div id="ee-multiDateList"></div>
-      ${isPendingForTech ? "" : `<button type="button" class="ee-btn ee-btn-ghost" id="ee-addDateBtn" style="margin-bottom:12px;">➕ เพิ่มช่วงวันที่</button>`}
+      ${isViewOnly ? "" : `<button type="button" class="ee-btn ee-btn-ghost" id="ee-addDateBtn" style="margin-bottom:12px;">➕ เพิ่มช่วงวันที่</button>`}
     </div>
 
     <div class="ee-grid ee-grid-2">
       <div class="ee-field">
         <label>🕐 เวลาเริ่ม</label>
-        <input id="editStartTime" type="text" placeholder="เช่น 08:30" value="${attrHtml(eventStartTime)}" ${isPendingForTech ? "disabled" : ""}>
+        <input id="editStartTime" type="text" placeholder="เช่น 08:30" value="${attrHtml(eventStartTime)}" ${isViewOnly ? "disabled" : ""}>
       </div>
       <div class="ee-field">
         <label>🕔 เวลาสิ้นสุด</label>
-        <input id="editEndTime" type="text" placeholder="เช่น 17:00" value="${attrHtml(eventEndTime)}" ${isPendingForTech ? "disabled" : ""}>
+        <input id="editEndTime" type="text" placeholder="เช่น 17:00" value="${attrHtml(eventEndTime)}" ${isViewOnly ? "disabled" : ""}>
       </div>
     </div>
 
     <hr class="ee-divider">
 
-    <!-- สี — inline กับส่วนบน -->
+    <!-- ✅ เพิ่มหัวข้อกำกับให้กลุ่มสี — เดิมเป็นบล็อกลอยไม่มีหัวข้อ อยู่คั่นระหว่าง "วันที่ & เวลา" กับ
+         "เอกสาร" อ่านแล้วไม่รู้ว่าสองช่องนี้เป็นของอะไร/มีผลกับอะไร (จริงๆ คือสีของการ์ดงานบนปฏิทิน)
+         และเป็นหมวดเดียวในฟอร์มที่ไม่มีหัวข้อ ทำให้จังหวะการอ่านสะดุด -->
+    <p class="ee-section-label">การแสดงผลบนปฏิทิน</p>
     <div class="ee-color-inline">
       <div class="ee-color-item">
         <span>🎨 สีพื้นหลัง</span>
@@ -1115,7 +1176,7 @@ export const getEditEvent = async ({
          โชว์ปุ่มบันทึกที่กดแล้วไม่มีผลอะไรเลย (ป้องกันความสับสน/error หลอกๆ) เหลือแค่ปุ่มปิดอย่างเดียว -->
     <div class="ee-btn-group ee-btn-group-right">
       <button class="ee-btn ee-btn-ghost"   id="btnCancel">✕ ปิด</button>
-      ${isPendingForTech ? "" : `<button class="ee-btn ee-btn-success" id="btnConfirm">💾 บันทึก</button>`}
+      ${isViewOnly ? "" : `<button class="ee-btn ee-btn-success" id="btnConfirm">💾 บันทึก</button>`}
     </div>
 
   </div>
@@ -1431,10 +1492,10 @@ export const getEditEvent = async ({
         row.className = "ee-multi-date-row";
         if (eventIdAttr) row.dataset.eventId = eventIdAttr;
         row.innerHTML = `
-          <input type="date" class="ee-range-start" value="${startValue}" ${isPendingForTech ? "disabled" : ""}>
+          <input type="date" class="ee-range-start" value="${startValue}" ${isViewOnly ? "disabled" : ""}>
           <span class="ee-range-sep">–</span>
-          <input type="date" class="ee-range-end" value="${endValue || startValue}" ${isPendingForTech ? "disabled" : ""}>
-          ${isPendingForTech ? "" : `<button type="button" class="ee-btn ee-btn-ghost ee-multi-date-remove" title="ลบช่วงนี้ออก">✕</button>`}
+          <input type="date" class="ee-range-end" value="${endValue || startValue}" ${isViewOnly ? "disabled" : ""}>
+          ${isViewOnly ? "" : `<button type="button" class="ee-btn ee-btn-ghost ee-multi-date-remove" title="ลบช่วงนี้ออก">✕</button>`}
         `;
         row.querySelector(".ee-multi-date-remove")?.addEventListener("click", () => {
           // ต้องเหลืออย่างน้อย 1 แถวเสมอ กันผู้ใช้ลบจนหมด
@@ -1517,6 +1578,15 @@ export const getEditEvent = async ({
         title: getVal("editTitle"),
         system: getVal("editSystem"),
         time: getVal("editTime"),
+        // ✅ มูลค่างานของ "งานทั่วไป/งานโปรเจค" — บันทึกไปกับตัวงานเองผ่าน UpdateEvent (backend มี
+        // jobValue อยู่ใน allowedFields ของ PUT /:id อยู่แล้ว) ⚠️ เฉพาะงานที่ไม่มีสัญญาเท่านั้น งาน
+        // สัญญาใช้ช่องในแผงสัญญาซึ่งบันทึกผ่าน UpdateContractFields (อัปเดตพร้อมกันทุกครั้งในสัญญา) —
+        // ถ้าส่งจากสองทางพร้อมกันจะเขียนทับกันเอง จึงต้องส่งทางใดทางหนึ่งเท่านั้น
+        // ⚠️ ส่งเฉพาะตอนแอดมิน/manager (ช่องนี้ disabled สำหรับช่าง getVal จะได้ค่าว่างเสมอ ถ้าส่งไป
+        // ด้วยจะกลายเป็นล้างมูลค่าเดิมทิ้งทุกครั้งที่ช่างกดบันทึกงาน)
+        ...(!eventContractGroupId && isAdminOrManagerUser
+          ? { jobValue: getVal("editJobValueSingle") ? Number(getVal("editJobValueSingle")) : null }
+          : {}),
         team: getVal("editTeam"),
         resPerson: teamToId.get(getVal("editTeam")) || "",
         teamMembers: getTeamMembers(),

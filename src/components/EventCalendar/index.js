@@ -23,7 +23,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"; // Import Font
 import {
   faClockRotateLeft,
   faFileExcel,
-  faFilePdf,
+
   faHourglassHalf,
   faCheck,
   faCheckDouble,
@@ -43,9 +43,9 @@ import moment from "moment";
 
 import { ThreeDots } from "react-loader-spinner";
 
-import generatePDF, { Resolution, Margin } from "react-to-pdf";
 
-import { CSVLink } from "react-csv";
+
+
 
 import "./index.css";
 
@@ -66,7 +66,7 @@ import thSarabunFont from "../../Fonts/THSarabunNew_base64"; // นำเข้�
 import TomSelect from "tom-select";
 import "tom-select/dist/css/tom-select.css";
 
-import Hammer from "hammerjs";
+
 
 import { getAddEvent } from "./EventForms/AddEvent";
 import { getEditEvent } from "./EventForms/EditEvent";
@@ -108,34 +108,17 @@ const faIconToSvg = (iconDef, { size = 12, color = "#000000" } = {}) => {
   return `<svg viewBox="0 0 ${width} ${height}" style="width:${size}px;height:${size}px;display:block;">${pathsHtml}</svg>`;
 };
 
-// ✅ ระดับการย่อ/ขยายปฏิทิน — ไล่ทีละ 15-25% ให้เห็นความต่างชัดในแต่ละก้าวโดยไม่ต้องกดหลายที
-// ย่อได้ถึง 70% (กวาดดูทั้งเดือนรวดเดียว) และขยายได้ถึง 175% (อ่านรายละเอียดในการ์ดบนมือถือได้จริง)
-const ZOOM_LEVELS = [0.7, 0.85, 1, 1.25, 1.5, 1.75];
-const ZOOM_DEFAULT_INDEX = 2; // = 100%
-const ZOOM_STORAGE_KEY = "eventCalendar.zoom";
+// ✅ ปุ่มย่อ/ขยายปฏิทิน (− 100% +) ถูกตัดออกตามที่ผู้ใช้ขอ — บนมือถือใช้การหุบ/กางนิ้ว (pinch-zoom)
+// ของเบราว์เซอร์เองได้อยู่แล้ว (โค้ดปัดเปลี่ยนเดือนด้านล่างตั้งใจไม่แตะ touch-action เลย) และปัดซ้าย-ขวา
+// เพื่อเลื่อนเดือนได้เหมือนเดิม จึงไม่จำเป็นต้องมีปุ่มซูมของตัวเองซ้ำอีกชุด
+// 🐛 BUG ที่แก้ (ปฏิทินค้างขนาดผิดโดยแก้ไม่ได้เลย): ตอนตัดปุ่มออก ตัวแปร zoomIndex ยังโหลดค่าที่เคย
+// บันทึกไว้จาก localStorage อยู่ และ setZoomIndex เหลือแต่ตัวเรียกที่ตายแล้ว — ใครที่เคยกดขยายไว้
+// 175% (หรือย่อไว้ 70%) จะเปิดหน้าปฏิทินมาเจอขนาดนั้นค้างถาวร ไม่มีปุ่มให้กดกลับอีกแล้ว
+// ✅ ตัดสถานะซูมออกทั้งชุด เริ่มที่ 100% เสมอทุกครั้งที่เปิดหน้า (ไม่อ่าน/ไม่เขียน localStorage อีก)
 
 function EventCalendar() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-
-  // ✅ จำระดับซูมไว้ข้ามการเปิด-ปิดหน้า/รีเฟรช — ผู้ใช้ที่ต้องขยายเป็นประจำ (จอเล็ก/สายตายาว) จะได้ไม่
-  // ต้องมากดตั้งใหม่ทุกครั้ง เทียบ pattern เดียวกับความกว้างคอลัมน์ในหน้า "ภาพรวมงาน"
-  const [zoomIndex, setZoomIndex] = useState(() => {
-    try {
-      const saved = Number(localStorage.getItem(ZOOM_STORAGE_KEY));
-      return Number.isInteger(saved) && saved >= 0 && saved < ZOOM_LEVELS.length ? saved : ZOOM_DEFAULT_INDEX;
-    } catch {
-      return ZOOM_DEFAULT_INDEX;
-    }
-  });
-  const changeZoom = (step) =>
-    setZoomIndex((prev) => Math.min(ZOOM_LEVELS.length - 1, Math.max(0, prev + step)));
-  useEffect(() => {
-    try { localStorage.setItem(ZOOM_STORAGE_KEY, String(zoomIndex)); } catch {}
-    // ✅ ปฏิทินต้องคำนวณความสูงแถว/ความกว้างคอลัมน์ใหม่หลังขนาดเปลี่ยน ไม่งั้นตารางค้างสัดส่วนเดิม
-    const t = setTimeout(() => calendarRef.current?.getApi()?.updateSize(), 60);
-    return () => clearTimeout(t);
-  }, [zoomIndex]);
 
   const { userData } = useAuth(); // ✅ เปลี่ยนจาก user → userData
   const isAdminOrManager = ["admin", "manager"].includes(
@@ -169,6 +152,15 @@ function EventCalendar() {
       (extendedProps?.responsiblePerson && extendedProps.responsiblePerson === userData?.fname)
     );
   };
+
+  // ✅ "ลูกทีม" ที่มีชื่ออยู่ในงานนี้ — เปิดดูรายละเอียดงานได้ แต่แก้ไขไม่ได้ (ฟอร์มล็อกให้เองทุกช่อง
+  // ดู isTeamMemberViewer ใน EditEvent.js) จงใจแยกจาก canEditEvent ด้านบน ไม่รวมเข้าไปในนั้น เพราะ
+  // canEditEvent ถูกใช้คุม "การแก้ไข" อีกหลายทาง (ลาก/ย่อขยายงานบนปฏิทิน, ลากไปแผนล่วงหน้า) ซึ่งลูกทีม
+  // ต้องทำไม่ได้ — ถ้าเผลอรวมเข้าไป ลูกทีมจะลากงานเปลี่ยนวันได้ทันทีทั้งที่ตั้งใจให้ดูอย่างเดียว
+  const canViewEventAsTeamMember = (extendedProps) =>
+    (extendedProps?.teamMembers || []).some(
+      (m) => (m?.userId && m.userId === userId) || (m?.name && m.name === userData?.fname)
+    );
 
   const [events, setEvents] = useState([]);
 
@@ -208,6 +200,10 @@ function EventCalendar() {
   const [clipboardEvent, setClipboardEvent] = useState(null);
 
   const calendarRef = useRef(null);
+  // ✅ กล่องครอบปฏิทิน — ใช้เป็นพื้นที่รับการปัดซ้าย-ขวาเปลี่ยนเดือนบนมือถือ ต้องเป็น element ของ React
+  // เอง (ไม่ใช่ element ข้างในที่ FullCalendar สร้าง/ทิ้งใหม่เองตอนสลับมุมมอง) ดูเหตุผลเต็มที่ useEffect
+  // ที่ผูก touch event ด้านล่าง
+  const swipeAreaRef = useRef(null);
   // ✅ ใช้เช็คว่าตอนลากงานจากปฏิทินจริงออกมา (eventDragStop) ปล่อยเมาส์ทับแผงนี้หรือเปล่า
   // ถ้าใช่ = ลากกลับไปเป็นงานวางแผนล่วงหน้า (ดู handleEventDragStop ด้านล่าง)
   const draftsPanelRef = useRef(null);
@@ -316,22 +312,80 @@ function EventCalendar() {
   }, [events]);
 
   useEffect(() => {
-    if (!("ontouchstart" in window)) return;
-
-    const calendarEl = document.querySelector(".fc-view-harness");
+    // 🐛 BUG ที่แก้ (ปัดเปลี่ยนเดือนบนมือถือไม่ทำงานเลย — แก้มาแล้ว 2 รอบยังไม่หาย):
+    // รอบก่อนๆ ใช้ไลบรารี Hammer ซึ่งต้องไปตั้ง CSS touch-action ให้ element ที่มันเกาะอยู่ เพื่อ "ยึด"
+    // การลากแนวนอนมาจากเบราว์เซอร์ — แต่ปฏิทิน FullCalendar มีกล่องเลื่อน (.fc-scroller) ของตัวเอง
+    // ซ้อนอยู่ข้างในหลายชั้น พอนิ้วเริ่มแตะบนกล่องพวกนั้น การลากแนวนอนจะถูกกล่องข้างในกินไปก่อน
+    // Hammer จึงไม่เคยได้รับ swipe เลย ซ้ำการตั้ง touch-action ยังไปรบกวนการหุบ/กางนิ้วซูมอีก
+    // ✅ เลิกใช้ Hammer สำหรับปฏิทิน เปลี่ยนมาอ่าน touch event ตรงๆ แทน โดย:
+    //    1) ไม่ตั้ง touch-action และไม่เรียก preventDefault เลยสักจุด → การเลื่อนขึ้น-ลงและการหุบ/กาง
+    //       นิ้วซูม ยังเป็นหน้าที่ของเบราว์เซอร์ 100% เหมือนตอนไม่มีโค้ดนี้อยู่
+    //    2) ตัดสินว่า "ปัด" หรือไม่ ตอนปล่อยนิ้ว (touchend) จากระยะทางรวม ไม่ใช่ระหว่างลาก → ต่อให้
+    //       กล่องข้างในจะกินการลากไปเลื่อนตัวเองด้วยก็ไม่กระทบ เพราะเราแค่ "ดู" ไม่ได้ไปแย่ง
+    //    3) ฟังแบบ passive:true → เบราว์เซอร์ไม่ต้องรอโค้ดเราตัดสินใจก่อนเลื่อนจอ ไม่หน่วง
+    const calendarEl = swipeAreaRef.current;
     if (!calendarEl) return;
 
-    // 🐛 BUG ที่แก้ (ซูมด้วยการหุบ/กางนิ้วบนปฏิทินไม่ได้เลย): Hammer ตั้ง CSS touch-action ให้ element
-    // เองอัตโนมัติตาม recognizer ที่ใช้ (ค่าเริ่มต้น touchAction:"compute") — พอมี swipe แนวนอน มันจะ
-    // เซ็ตเป็น "pan-y" ซึ่ง "ไม่รวม pinch-zoom" เบราว์เซอร์จึงบล็อกการซูมทั้งพื้นที่ปฏิทิน ทั้งที่ viewport
-    // meta ของแอปไม่ได้ห้ามซูมไว้เลย (ไม่มี user-scalable=no) — ผู้ใช้เลยซูมดูรายละเอียดงานบนมือถือไม่ได้
-    // ✅ สั่ง touchAction:"pan-y pinch-zoom" ตรงๆ — ยังกันการเลื่อนแนวนอนไปรบกวน swipe เปลี่ยนเดือน
-    // เหมือนเดิม แต่คืนสิทธิ์ให้เบราว์เซอร์จัดการ pinch-zoom ตามปกติ
-    const hammer = new Hammer(calendarEl, { touchAction: "pan-y pinch-zoom" });
-    hammer.on("swipeleft", () => calendarRef.current?.getApi().next());
-    hammer.on("swiperight", () => calendarRef.current?.getApi().prev());
+    // ✅ อนิเมชันเลื่อนเข้าตามทิศทางที่ปัด — เดิมเดือนเปลี่ยนแบบตัดภาพทันที ปัดแล้วไม่แน่ใจว่าเปลี่ยนไหม
+    const animate = (dir) => {
+      const viewEl = calendarEl.querySelector(".fc-view-harness");
+      if (!viewEl) return;
+      viewEl.classList.remove("ec-slide-in-left", "ec-slide-in-right");
+      // อ่าน offsetWidth เพื่อบังคับให้เบราว์เซอร์ commit การถอด class ก่อน (reflow) ไม่งั้นการใส่
+      // class เดิมกลับเข้าไปทันทีในเฟรมเดียวกันจะไม่ถูกมองว่าเป็นการเริ่มอนิเมชันใหม่ = ปัดรัวๆ แล้วนิ่ง
+      void viewEl.offsetWidth;
+      viewEl.classList.add(dir === "next" ? "ec-slide-in-left" : "ec-slide-in-right");
+    };
 
-    return () => hammer.destroy();
+    // เกณฑ์ตัดสิน: ต้องลากแนวนอนอย่างน้อย 45px, แนวนอนต้องมากกว่าแนวตั้งชัดเจน (กันเลื่อนอ่านขึ้น-ลง
+    // แล้วเผลอเปลี่ยนเดือน) และต้องจบภายใน 800ms (ลากค้างนานๆ = ตั้งใจเลื่อนดู ไม่ใช่ปัดเปลี่ยนหน้า)
+    const MIN_DISTANCE = 45;
+    const MAX_DURATION = 800;
+    let startX = 0;
+    let startY = 0;
+    let startTime = 0;
+    let tracking = false;
+
+    const onTouchStart = (e) => {
+      // นิ้วเดียวเท่านั้น — 2 นิ้วขึ้นไปคือกำลังหุบ/กางเพื่อซูม ต้องไม่ตีความเป็นการปัดเปลี่ยนเดือน
+      if (e.touches.length !== 1) { tracking = false; return; }
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      startTime = Date.now();
+      tracking = true;
+    };
+    // นิ้วที่ 2 แตะเพิ่มระหว่างทาง (เริ่มซูม) → ยกเลิกการนับเป็นการปัดทันที
+    const onTouchMove = (e) => { if (e.touches.length > 1) tracking = false; };
+    const onTouchEnd = (e) => {
+      if (!tracking) return;
+      tracking = false;
+      const touch = e.changedTouches?.[0];
+      if (!touch) return;
+      const dx = touch.clientX - startX;
+      const dy = touch.clientY - startY;
+      if (Date.now() - startTime > MAX_DURATION) return;
+      if (Math.abs(dx) < MIN_DISTANCE || Math.abs(dx) <= Math.abs(dy) * 1.5) return;
+
+      if (dx < 0) {
+        calendarRef.current?.getApi().next();
+        animate("next");
+      } else {
+        calendarRef.current?.getApi().prev();
+        animate("prev");
+      }
+    };
+
+    const opts = { passive: true };
+    calendarEl.addEventListener("touchstart", onTouchStart, opts);
+    calendarEl.addEventListener("touchmove", onTouchMove, opts);
+    calendarEl.addEventListener("touchend", onTouchEnd, opts);
+    calendarEl.addEventListener("touchcancel", onTouchEnd, opts);
+    return () => {
+      calendarEl.removeEventListener("touchstart", onTouchStart);
+      calendarEl.removeEventListener("touchmove", onTouchMove);
+      calendarEl.removeEventListener("touchend", onTouchEnd);
+      calendarEl.removeEventListener("touchcancel", onTouchEnd);
+    };
   }, []);
 
   const generateWorkPermitPDF = async (event, docNo, subject, description) => {
@@ -1067,62 +1121,63 @@ function EventCalendar() {
       Swal.fire("❌ คุณไม่มีสิทธิ์แก้ไขแผนงานนี้");
       return;
     }
-    // ❌ งานที่ปิดแล้ว (ดำเนินการเสร็จสิ้น) ห้ามย้ายกลับไปแผนล่วงหน้าเด็ดขาด ไม่มีข้อยกเว้นแม้แต่ admin/
-    // manager — เทียบ pattern เดียวกับ canUnscheduleEvent ใน EditEvent.js/backend PUT /:id/unschedule
+    // ❌ ห้ามย้ายกลับไปแผนล่วงหน้าเด็ดขาด ไม่มีข้อยกเว้นแม้แต่ admin/manager สำหรับงานที่ "เสร็จสิ้น/
+    // ยืนยันแล้ว/กำลังดำเนินการ" — เทียบ pattern เดียวกับ canUnscheduleEvent ใน EditEvent.js
     // (canEditEvent ด้านบนไม่กันเคสนี้ เพราะ admin/manager ผ่าน canEditEvent เสมอไม่ว่างานจะปิดหรือไม่)
-    if (info.event.extendedProps?.status === "ดำเนินการเสร็จสิ้น") {
-      Swal.fire("❌ งานนี้ปิดแล้ว ไม่สามารถย้ายกลับไปแผนล่วงหน้าได้");
+    // ⚠️ ต้องกันทางนี้ด้วย ไม่ใช่แค่ซ่อนปุ่มในฟอร์มแก้ไข — การลากการ์ดจากปฏิทินมาวางบนแผงงานล่วงหน้า
+    // เป็นอีกทางหนึ่งที่ทำให้เกิด unschedule ได้ ถ้ากันแค่ปุ่มก็เลี่ยงได้ด้วยการลากอยู่ดี
+    const UNSCHEDULE_BLOCKED_STATUSES = ["ดำเนินการเสร็จสิ้น", "ยืนยันแล้ว", "กำลังดำเนินการ"];
+    const dragStatus = info.event.extendedProps?.status;
+    if (UNSCHEDULE_BLOCKED_STATUSES.includes(dragStatus)) {
+      Swal.fire(`❌ งานสถานะ "${dragStatus}" ไม่สามารถย้ายกลับไปแผนล่วงหน้าได้`);
       return;
     }
     handleUnscheduleViaDrag(info.event.id);
   };
 
-  const options = {
-    // default is `save`
-    method: "save",
-    // default is Resolution.MEDIUM = 3, which should be enough, higher values
-    // increases the image quality but also the size of the PDF, so be careful
-    // using values higher than 10 when having multiple pages generated, it
-    // might cause the page to crash or hang.
-    resolution: Resolution.HIGH,
-    page: {
-      // margin is in MM, default is Margin.NONE = 0
-      margin: Margin.SMALL,
-      // default is 'A4'
-      format: "a4",
-      // default is 'portrait'
-      orientation: "portrait",
-    },
-    canvas: {
-      // default is 'image/jpeg' for better size performance
-      mimeType: "image/png",
-      qualityRatio: 1,
-    },
-    // Customize any value passed to the jsPDF instance and html2canvas
-    // function. You probably will not need this and things can break,
-    // so use with caution.
-    overrides: {
-      // see https://artskydj.github.io/jsPDF/docs/jsPDF.html for more options
-      pdf: {
-        compress: true,
-      },
-      // see https://html2canvas.hertzen.com/configuration for more options
-      canvas: {
-        useCORS: true,
-      },
-    },
-  };
-
-  const generatePdf = async () => {
-    setLoading(true);
-
+  // ✅ ส่งออกงานที่กรองอยู่เป็นไฟล์ Excel (.xlsx) จริงพร้อมสี/หัวตาราง/ตัวกรอง/ยอดรวม — แทน CSV เดิม
+  // ซึ่งเป็นข้อความล้วน ใส่รูปแบบอะไรไม่ได้เลย และ Excel ยังแปลงค่าเองมั่วๆ (ครั้งที่ "1/3" → วันที่)
+  // โหลดโมดูลตอนกดจริงเท่านั้น (exceljs เป็นไลบรารีก้อนใหญ่) ไม่ให้ไปถ่วงเวลาโหลดหน้าปฏิทินของทุกคน
+  const [exportingExcel, setExportingExcel] = useState(false);
+  const handleExportExcel = async () => {
+    if (exportingExcel || filteredCalendarEvents.length === 0) return;
+    setExportingExcel(true);
     try {
-      const getTargetElement = () => document.getElementById("content-id");
+      const { exportCalendarEventsToExcel } = await import("./calendarExcelExport");
+      // ✅ บอกในไฟล์ด้วยว่ายอดนี้มาจากการกรองแบบไหน — กันเปิดไฟล์ย้อนหลังแล้วเข้าใจผิดว่าเป็นงานทั้งระบบ
+      const filterParts = [];
+      if (searchTerm.trim()) filterParts.push(`ค้นหา "${searchTerm.trim()}"`);
+      if (selectedJobType) filterParts.push(`ประเภทงาน ${selectedJobType}`);
+      if (selectedSystem) filterParts.push(`ระบบ ${selectedSystem}`);
+      if (selectedStatus) filterParts.push(`สถานะ ${selectedStatus}`);
+      if (selectedApproval) filterParts.push(`การอนุมัติ ${selectedApproval}`);
+      if (selectedTechnician) {
+        const techName = technicianOptions.find((t) => t._id === selectedTechnician)?.fname;
+        if (techName) filterParts.push(`ช่าง ${techName}`);
+      }
 
-      await generatePDF(getTargetElement, options);
-      setLoading(false);
+      await exportCalendarEventsToExcel({
+        // ✅ เรียงตามวันที่เริ่มเหมือนที่ตาเห็นบนปฏิทิน ไม่ใช่ลำดับดิบที่ดึงมาจากฐานข้อมูล
+        rows: [...filteredCalendarEvents].sort((a, b) => new Date(a.start) - new Date(b.start)),
+        meta: {
+          fileName: `ตารางงาน-${moment().format("YYYYMMDD")}.xlsx`,
+          filterSummary: filterParts.length > 0 ? `ตัวกรอง: ${filterParts.join(" · ")}` : "ไม่ได้กรองเพิ่มเติม",
+          exportedAt: moment().format("DD/MM/YYYY HH:mm"),
+        },
+        // ✅ ส่งฟังก์ชันที่หน้าจอใช้อยู่เข้าไปด้วย เพื่อให้ข้อมูลในไฟล์ตรงกับที่เห็นบนจอเป๊ะๆ เสมอ
+        classifyJob,
+        getApprovalState,
+        formatRoundLabel,
+      });
     } catch (error) {
-      console.log(error);
+      console.error("❌ Error exporting calendar to Excel:", error);
+      Swal.fire({
+        title: "ส่งออกไม่สำเร็จ",
+        text: error?.message || "กรุณาลองใหม่อีกครั้ง",
+        icon: "error",
+      });
+    } finally {
+      setExportingExcel(false);
     }
   };
 
@@ -1363,43 +1418,22 @@ function EventCalendar() {
           </button>
         )}
 
-        <button className="toolbar-icon-btn toolbar-icon-btn--pdf" onClick={generatePdf} title="สร้าง PDF">
-          <FontAwesomeIcon icon={faFilePdf} />
-        </button>
-
-        <CSVLink
-          data={
-            filteredCalendarEvents
-              ? Object.values(filteredCalendarEvents)
-                  .sort((a, b) => new Date(a.start) - new Date(b.start))
-                  .map((event) => ({
-                    วันที่เริ่มต้น: moment(event.start).format("YYYY-MM-DD"),
-                    วันที่สิ้นสุด: event.end
-                      ? moment(event.end).format("YYYY-MM-DD")
-                      : moment(event.start).format("YYYY-MM-DD"),
-                    บริษัท: event.company ?? "",
-                    สถานที่ติดตั้ง: event.site ?? "",
-                    หัวข้อ: event.title ?? "",
-                    ระบบ: event.system ?? "",
-                    // ⚠️ event.extendedProps มีแค่ userId/lastModifiedBy/startTime/endTime เท่านั้น
-                    // (ดู FetchEvents.js) ไม่มี time/team อยู่ในนั้นเลย ต้องอ่านจาก event.time/event.team
-                    // (top-level) โดยตรง ไม่งั้นสองคอลัมน์นี้จะว่างเปล่าทุกแถวใน Excel/CSV ที่ export ออกไป
-                    // ✅ "1/3" (ครั้งที่/จำนวนครั้งทั้งหมด) เหมือนจุดอื่นๆ — เติม ' นำหน้าไว้เสมอกัน Excel
-                    // ตีความ "1/3" เป็นวันที่ (1 มี.ค.) ให้อัตโนมัติ ซึ่งเคยเป็นปัญหาแม้กับเลขครั้งเดี่ยวๆ
-                    ครั้งที่: event.time ? `'${formatRoundLabel(event.time, event.visitCount)}` : "",
-                    ทีมงาน: event.team ?? "",
-
-                    เวลาเริ่ม: event.extendedProps?.startTime ?? "",
-                    เวลาสิ้นสุด: event.extendedProps?.endTime ?? "",
-                  }))
-              : []
+        {/* ✅ ปุ่ม "สร้าง PDF" (จับภาพทั้งหน้าปฏิทินเป็น PDF) ถูกตัดออกตามที่ผู้ใช้ขอ — ได้ไฟล์เป็นรูป
+            ภาพหน้าจอ ค้นหา/คัดลอก/คำนวณต่อไม่ได้เลย ต่างจากไฟล์ Excel ที่เอาไปทำงานต่อได้จริง
+            ⚠️ ไม่เกี่ยวกับ "ใบสั่งงาน (Work Permit) PDF" ในฟอร์มแก้ไขงาน ซึ่งเป็นคนละฟีเจอร์และยังอยู่
+            ครบเหมือนเดิม (ดู generateWorkPermitPDF ที่ส่งเข้า getEditEvent) */}
+        <button
+          className="toolbar-icon-btn toolbar-icon-btn--excel"
+          onClick={handleExportExcel}
+          disabled={exportingExcel || filteredCalendarEvents.length === 0}
+          title={
+            filteredCalendarEvents.length === 0
+              ? "ไม่มีข้อมูลให้ส่งออก"
+              : `ส่งออก ${filteredCalendarEvents.length} รายการที่กรองอยู่เป็นไฟล์ Excel (.xlsx)`
           }
-          filename="events.csv"
         >
-          <button className="toolbar-icon-btn toolbar-icon-btn--excel" title="สร้าง Excel">
-            <FontAwesomeIcon icon={faFileExcel} />
-          </button>
-        </CSVLink>
+          <FontAwesomeIcon icon={faFileExcel} />
+        </button>
       </div>
 
       {/* ✅ แถบแจ้ง "กำลังคัดลอกงาน" — โชว์ตราบใดที่ clipboardEvent ยังมีค่าอยู่ (ค้างได้จนกว่าจะกด
@@ -1511,18 +1545,10 @@ function EventCalendar() {
           </aside>
         )}
 
-        {/* ✅ ย่อ/ขยายเฉพาะตัวปฏิทิน (แถบเครื่องมือ/ตัวกรองด้านบนคงขนาดเดิมเสมอ) — ใช้ CSS zoom แทน
-            transform: scale เพราะ zoom "จัด layout ใหม่จริง" ความกว้าง/ความสูงและการเลื่อนจอจึงถูกต้อง
-            ตามขนาดใหม่ ส่วน transform: scale แค่ยืดภาพทำให้พื้นที่เลื่อน/ตำแหน่งกดเพี้ยนไปจากที่ตาเห็น
-            ⚠️ ตอนซูมเข้า ปฏิทินจะกว้างเกินจอ ต้องเปิดให้เลื่อนแนวนอนได้ ไม่งั้นข้อมูลฝั่งขวาจะเข้าไม่ถึง */}
-        <div
-          id="content-id"
-          className="calendar-wrapper"
-          style={{
-            zoom: ZOOM_LEVELS[zoomIndex],
-            ...(zoomIndex > ZOOM_DEFAULT_INDEX ? { overflowX: "auto", WebkitOverflowScrolling: "touch" } : {}),
-          }}
-        >
+        {/* ✅ ไม่ตั้ง CSS zoom เองอีกต่อไป (ปฏิทินแสดงที่ 100% เสมอตอนเปิดหน้า) — การย่อ/ขยายบนมือถือ
+            ใช้การหุบ/กางนิ้วของเบราว์เซอร์เองแทน ซึ่งไม่ไปยุ่งกับ layout ของปฏิทิน จึงไม่มีปัญหาพื้นที่
+            เลื่อน/ตำแหน่งกดเพี้ยนแบบที่ต้องคอยแก้ตอนตั้ง zoom เอง */}
+        <div id="content-id" className="calendar-wrapper" ref={swipeAreaRef}>
         <FullCalendar
           ref={calendarRef}
           locales={[thLocale]} // ใช้งานภาษาไทย
@@ -1553,11 +1579,14 @@ function EventCalendar() {
               return;
             }
 
-            if (canEditEvent(arg.event.extendedProps)) {
+            // ✅ "ลูกทีม" ที่มีชื่อในงานนี้เปิดดูรายละเอียดได้ด้วย (ตามที่ผู้ใช้ขอ) — เดิมกดแล้วเด้ง
+            // "ไม่มีสิทธิ์" ทันที ทั้งที่เป็นคนที่ต้องไปทำงานนั้นเองและควรเห็นรายละเอียด/วันเวลา/สถานที่
+            // ⚠️ เปิดได้ ≠ แก้ได้ — ฟอร์มจะล็อกทุกช่องให้เองเมื่อผู้ใช้เป็นลูกทีมล้วนๆ (isTeamMemberViewer
+            // ใน EditEvent.js) จึงส่งเข้า handleEditEvent ตัวเดียวกันได้เลย ไม่ต้องทำหน้าจอแยกอีกชุด
+            if (canEditEvent(arg.event.extendedProps) || canViewEventAsTeamMember(arg.event.extendedProps)) {
               handleEditEvent(arg);
-
             } else {
-              Swal.fire("❌ คุณไม่มีสิทธิ์แก้ไขแผนงานนี้");
+              Swal.fire("❌ คุณไม่มีสิทธิ์ดูแผนงานนี้");
             }
           }}
           eventDrop={(arg) => {
@@ -1872,11 +1901,46 @@ function EventCalendar() {
       outline-offset: -2px;
     }
 
+/* ✅ อนิเมชันเลื่อนเข้าตอนปัดเปลี่ยนเดือนบนมือถือ (ดู hammer.on("swipeleft"/"swiperight") ด้านบน) —
+   FullCalendar เปลี่ยนเดือนแบบตัดภาพทันทีไม่มีอนิเมชันมาให้ ปัดแล้วไม่แน่ใจว่าเปลี่ยนไปทางไหน/เปลี่ยนไหม
+   ⚠️ ใช้แค่ transform + opacity (สองอย่างที่เบราว์เซอร์เร่งด้วย GPU ได้) ไม่แตะ width/height/margin
+   ซึ่งจะบังคับให้คำนวณ layout ใหม่ทั้งหน้าทุกเฟรม = กระตุกบนมือถือ
+   ⚠️ ตั้งเวลาไว้สั้น (0.22s) พอให้รู้ทิศทางแต่ไม่หน่วงจนรู้สึกช้าเวลาปัดดูหลายเดือนติดกันเร็วๆ */
+@keyframes ecSlideInLeft {
+  from { transform: translate3d(28px, 0, 0); opacity: 0.35; }
+  to   { transform: translate3d(0, 0, 0);    opacity: 1; }
+}
+@keyframes ecSlideInRight {
+  from { transform: translate3d(-28px, 0, 0); opacity: 0.35; }
+  to   { transform: translate3d(0, 0, 0);     opacity: 1; }
+}
+.ec-slide-in-left  { animation: ecSlideInLeft  0.22s ease-out; }
+.ec-slide-in-right { animation: ecSlideInRight 0.22s ease-out; }
+
+/* ✅ เคารพการตั้งค่าระบบ "ลดการเคลื่อนไหว" (ผู้ใช้บางคนเวียนหัวกับอนิเมชัน) — ยังเปลี่ยนเดือนได้ปกติ
+   แค่ไม่มีอนิเมชันเลื่อน */
+@media (prefers-reduced-motion: reduce) {
+  .ec-slide-in-left, .ec-slide-in-right { animation: none; }
+}
+
 /* ✅ แถบสีขอบซ้ายบอกประเภทงาน — บางๆ ไม่แย่งพื้นที่จากไอคอนมุม/ป้ายรออนุมัติที่มีอยู่แล้ว
-   (ดู eventClassNames ด้านบน และป้ายอธิบายสีใน .ec-legend-panel กลุ่ม "ประเภทงาน" ด้านล่างของหน้า) */
-.fc-event-type-contract { border-left: 4px solid ${JOB_CLASS_META.contract.color} !important; }
-.fc-event-type-project  { border-left: 4px solid ${JOB_CLASS_META.project.color} !important; }
-.fc-event-type-general  { border-left: 4px solid ${JOB_CLASS_META.general.color} !important; }
+   (ดู eventClassNames ด้านบน และป้ายอธิบายสีใน .ec-legend-panel กลุ่ม "ประเภทงาน" ด้านล่างของหน้า)
+
+   🐛 BUG ที่แก้ (งานข้ามเดือน/ข้ามสัปดาห์แสดงเหมือนเป็นคนละงาน): งานที่กินหลายวันติดกันจะถูก
+   FullCalendar "ตัดเป็นท่อน" (segment) ทุกครั้งที่ข้ามบรรทัดสัปดาห์หรือข้ามเดือน — แต่ละท่อนได้
+   className ชุดเดียวกันทั้งหมด เดิมจึงวาดแถบสีขอบซ้ายทึบให้ "ทุกท่อน" เท่ากันหมด ผลคือท่อนที่เป็นแค่
+   ส่วนต่อเนื่องมาจากเดือนก่อน (เช่นงาน 31 ม.ค. – 4 ก.พ. พอเปิดดูเดือน ก.พ. จะเห็นท่อนวันที่ 1–4 ก.พ.)
+   มีแถบสีเต็มขอบซ้ายเหมือนงานที่เพิ่งเริ่มวันนั้นจริงๆ อ่านแล้วนึกว่าเป็นงานใหม่คนละงาน/นับซ้ำ
+   ✅ แถบทึบ = ท่อนที่มี "วันเริ่มงานจริง" อยู่เท่านั้น (FullCalendar ใส่ .fc-event-start ให้เฉพาะท่อนนั้น)
+   ✅ ท่อนต่อเนื่อง = เส้นประจางๆ สีเดียวกัน สื่อว่า "ต่อมาจากก่อนหน้า" ยังบอกประเภทงานได้เหมือนเดิม
+      แต่ไม่ถูกเข้าใจผิดว่าเป็นจุดเริ่มงาน */
+.fc-event-type-contract.fc-event-start { border-left: 4px solid ${JOB_CLASS_META.contract.color} !important; }
+.fc-event-type-project.fc-event-start  { border-left: 4px solid ${JOB_CLASS_META.project.color} !important; }
+.fc-event-type-general.fc-event-start  { border-left: 4px solid ${JOB_CLASS_META.general.color} !important; }
+
+.fc-event-type-contract:not(.fc-event-start) { border-left: 4px dashed ${JOB_CLASS_META.contract.color}80 !important; }
+.fc-event-type-project:not(.fc-event-start)  { border-left: 4px dashed ${JOB_CLASS_META.project.color}80 !important; }
+.fc-event-type-general:not(.fc-event-start)  { border-left: 4px dashed ${JOB_CLASS_META.general.color}80 !important; }
 
 /* ✅ แผงคำอธิบายสัญลักษณ์ — ออกแบบใหม่ทั้งหมด (เดิมยัดทุกอย่าง 11 รายการ เป็นแถว flex-wrap เดียว
    ปนกันไม่มีหัวข้อ อ่านยาก/รกตามที่ผู้ใช้ทัก) แยกเป็นกลุ่มตามความหมาย (สถานะ/การอนุมัติ/ประเภทงาน/
