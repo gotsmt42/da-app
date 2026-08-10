@@ -1934,6 +1934,17 @@ function EventCalendar() {
    ✅ แถบทึบ = ท่อนที่มี "วันเริ่มงานจริง" อยู่เท่านั้น (FullCalendar ใส่ .fc-event-start ให้เฉพาะท่อนนั้น)
    ✅ ท่อนต่อเนื่อง = เส้นประจางๆ สีเดียวกัน สื่อว่า "ต่อมาจากก่อนหน้า" ยังบอกประเภทงานได้เหมือนเดิม
       แต่ไม่ถูกเข้าใจผิดว่าเป็นจุดเริ่มงาน */
+/* ✅ เส้นคั่นขาวบางๆ ประกบด้านในของแถบสีทุกอัน — ผู้ใช้เลือกสีพื้นหลังงานเองได้อิสระ จึงมีโอกาสเลือก
+   สีที่ใกล้เคียงกับสีแถบประเภทงานจนกลืนกันเมื่อไหร่ก็ได้ (เคยเกิดจริงตอนสีสัญญา = สีพื้นหลังเริ่มต้น
+   เป๊ะๆ) เส้นคั่นนี้ทำให้แถบ "แยกออกจากพื้นหลังได้เสมอ" ไม่ว่าพื้นหลังจะเป็นสีอะไรก็ตาม */
+.fc-event-type-contract.fc-event-start,
+.fc-event-type-project.fc-event-start,
+.fc-event-type-general.fc-event-start,
+.fc-event-type-contract:not(.fc-event-start),
+.fc-event-type-project:not(.fc-event-start),
+.fc-event-type-general:not(.fc-event-start) {
+  box-shadow: inset 2px 0 0 rgba(255, 255, 255, 0.75);
+}
 .fc-event-type-contract.fc-event-start { border-left: 4px solid ${JOB_CLASS_META.contract.color} !important; }
 .fc-event-type-project.fc-event-start  { border-left: 4px solid ${JOB_CLASS_META.project.color} !important; }
 .fc-event-type-general.fc-event-start  { border-left: 4px solid ${JOB_CLASS_META.general.color} !important; }
@@ -1941,6 +1952,21 @@ function EventCalendar() {
 .fc-event-type-contract:not(.fc-event-start) { border-left: 4px dashed ${JOB_CLASS_META.contract.color}80 !important; }
 .fc-event-type-project:not(.fc-event-start)  { border-left: 4px dashed ${JOB_CLASS_META.project.color}80 !important; }
 .fc-event-type-general:not(.fc-event-start)  { border-left: 4px dashed ${JOB_CLASS_META.general.color}80 !important; }
+
+/* ✅ จอมือถือ: ช่องวันกว้างแค่ ~55px แถบ 4px + เส้นคั่นขาว 2px = 6px กินความกว้างไปกว่า 10% ของการ์ด
+   เบียดข้อความจนอ่านไม่ออก — ย่อเหลือแถบ 3px + เส้นคั่น 1px (รวม 4px) พอให้เห็นว่าเป็นประเภทไหน
+   โดยไม่แย่งพื้นที่ข้อความ (สีต่างกันชัดอยู่แล้ว ไม่ต้องหนาก็แยกออก) */
+@media (max-width: 575.98px) {
+  .fc-event-type-contract.fc-event-start,
+  .fc-event-type-project.fc-event-start,
+  .fc-event-type-general.fc-event-start,
+  .fc-event-type-contract:not(.fc-event-start),
+  .fc-event-type-project:not(.fc-event-start),
+  .fc-event-type-general:not(.fc-event-start) {
+    border-left-width: 3px !important;
+    box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.75);
+  }
+}
 
 /* ✅ แผงคำอธิบายสัญลักษณ์ — ออกแบบใหม่ทั้งหมด (เดิมยัดทุกอย่าง 11 รายการ เป็นแถว flex-wrap เดียว
    ปนกันไม่มีหัวข้อ อ่านยาก/รกตามที่ผู้ใช้ทัก) แยกเป็นกลุ่มตามความหมาย (สถานะ/การอนุมัติ/ประเภทงาน/

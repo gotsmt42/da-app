@@ -27,6 +27,9 @@ import { getOptimizedImageUrl } from "../../utils/cloudinaryImage";
 import { formatEventDateRange } from "../../utils/formatDateRange";
 import { formatRoundLabel } from "../../utils/contractRounds";
 import { classifyJob, getJobClassMeta } from "../../utils/jobClassification";
+// ✅ ไอคอนไฟล์ Excel — ชุดเดียวกับปุ่มส่งออกในหน้าปฏิทิน/ติดตามใบเสนอราคา (MUI ไม่มีไอคอนนี้)
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faFileExcel } from "@fortawesome/free-solid-svg-icons";
 
 // MUI Core
 import {
@@ -37,11 +40,13 @@ import {
   Menu, MenuItem, ListItemIcon, ListItemText, Card, CardContent,
   Skeleton, Alert, Snackbar, Popover,
   List, ListItem, Pagination,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
+  ToggleButtonGroup, ToggleButton,
 } from "@mui/material";
 
 // MUI Icons
 import {
-  Search, FilterList, Clear, Dashboard, Timeline, TableChart,
+  Search, FilterList, Clear, Timeline, TableChart, ChevronRight, ViewList,
   Upload, Download, Delete, Visibility, Close, CheckCircle,
   PendingActions, Build, Assignment, Notifications, MoreVert,
   CalendarMonth, Warning, TrendingUp, Description,
@@ -716,268 +721,6 @@ const ActivityLogMini = ({ logs = [] }) => {
         </Stack>
       </Collapse>
     </Box>
-  );
-};
-
-// ─── DashboardStats ───────────────────────────────────────────────────
-const DashboardStats = ({ events }) => {
-  const stats = useMemo(() => {
-    const total    = events.length;
-    const byStatus = OP_LIST.reduce((acc, s) => { acc[s] = events.filter(e => e.status === s).length; return acc; }, {});
-    const thisMonth = events.filter(e => moment(e.start).format("YYYY-MM") === moment().format("YYYY-MM")).length;
-    // ✅ อิงจากฟีเจอร์ "ขอปิดงาน" ที่ใช้งานจริงตอนนี้ (แทนสถานะวางบิล/เก็บเงินแบบเก่าที่ไม่มีช่องให้กรอกแล้ว)
-    const pendingClose = events.filter(e => e.closeRequested && e.status !== "ดำเนินการเสร็จสิ้น").length;
-    // ✅ นับแยกจากงานที่ "ค้างงาน" ปกติ — นี่คืองานที่ช่าง/เซล (ไม่ใช่แอดมิน/manager) สร้างแล้วยังรอ
-    // อนุมัติจาก PUT /:id/approval เดียวกับที่ EditEvent.js ใช้อนุมัติ/ไม่อนุมัติ
-    const pendingApproval = countDistinctJobs(events, isPendingApproval);
-    return { total, byStatus, thisMonth, pendingClose, pendingApproval };
-  }, [events]);
-
-  const cards = [
-    { label: "งานทั้งหมด",     value: stats.total, color: "linear-gradient(135deg,#667eea,#764ba2)", icon: <TableChart />,
-      sub: `เดือนนี้ ${stats.thisMonth} งาน` },
-    { label: "กำลังดำเนินการ", value: stats.byStatus["กำลังดำเนินการ"], color: "linear-gradient(135deg,#8b5cf6,#6d28d9)", icon: <PendingActions />,
-      sub: `ยืนยันแล้ว ${stats.byStatus["ยืนยันแล้ว"]} · รอยืนยัน ${stats.byStatus["กำลังรอยืนยัน"]} งาน` },
-    { label: "เสร็จสิ้น",      value: stats.byStatus["ดำเนินการเสร็จสิ้น"], color: "linear-gradient(135deg,#10b981,#059669)", icon: <CheckCircle />,
-      sub: `คิดเป็น ${stats.total ? Math.round((stats.byStatus["ดำเนินการเสร็จสิ้น"] / stats.total) * 100) : 0}% ของงานทั้งหมด` },
-    { label: "คำขออนุมัติปิดงาน", value: stats.pendingClose, color: "linear-gradient(135deg,#f59e0b,#d97706)", icon: <TaskAlt />,
-      sub: stats.pendingClose > 0 ? "ช่างขอปิดงาน รอตรวจสอบ" : "ไม่มีงานรออนุมัติ" },
-    { label: "งานรออนุมัติ", value: stats.pendingApproval, color: "linear-gradient(135deg,#eab308,#a16207)", icon: <HourglassTop />,
-      sub: stats.pendingApproval > 0 ? "ช่าง/เซลส่งงานใหม่ รอตรวจสอบ" : "ไม่มีงานรออนุมัติ" },
-  ];
-
-  return (
-    <Grid container spacing={2} sx={{ mb: 3 }}>
-      {cards.map(c => (
-        <Grid item xs={6} md={3} key={c.label}>
-          <StatCard color={c.color}>
-            <CardContent sx={{ p: 2.5 }}>
-              <Stack direction="row" alignItems="flex-start" justifyContent="space-between">
-                <Box minWidth={0}>
-                  <Typography variant="caption" color="text.secondary" fontWeight={600} letterSpacing={0.5}
-                    sx={{ textTransform: "uppercase", fontSize: "0.7rem", display: "block" }}>
-                    {c.label}
-                  </Typography>
-                  <Typography variant="h4" fontWeight={800} sx={{ my: 0.5, lineHeight: 1 }}>{c.value}</Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>{c.sub}</Typography>
-                </Box>
-                <Box sx={{ p: 1, borderRadius: 2, background: c.color, color: "#fff", display: "flex", flexShrink: 0 }}>
-                  {c.icon}
-                </Box>
-              </Stack>
-            </CardContent>
-          </StatCard>
-        </Grid>
-      ))}
-    </Grid>
-  );
-};
-
-// ─── TechnicianSummary v2 (เพิ่ม workNote รายงาน) ─────────────────────
-const TechnicianSummary = ({ events, selectedDate }) => {
-  const [selectedTech, setSelectedTech] = useState(null);
-
-  const techStats = useMemo(() => {
-    const map = {};
-    events.forEach(ev => {
-      (ev.activityLog || []).forEach(log => {
-        if (!log.userName) return;
-        if (!map[log.userName]) {
-          map[log.userName] = {
-            name: log.userName,
-            notes: 0, filesUploaded: 0, closeRequests: 0,
-            jobs: new Set(),
-            jobDetails: [],
-          };
-        }
-        const m = map[log.userName];
-        // ✅ อ้างอิงตาม action ที่ใช้งานจริงตอนนี้ (ระบบเช็คอิน/เช็คเอาท์เดิมถูกตัดออกไปแล้ว)
-        if (log.action === "note_saved")      m.notes++;
-        if (log.action === "file_uploaded")   m.filesUploaded++;
-        if (log.action === "close_requested") m.closeRequests++;
-        m.jobs.add(ev._id);
-      });
-      // เก็บ job details สำหรับ drill-down
-      (ev.activityLog || []).forEach(log => {
-        if (log.userName && !map[log.userName]?.jobDetails.find(j => j._id === ev._id)) {
-          if (map[log.userName]) {
-            map[log.userName].jobDetails.push({
-              _id:          ev._id,
-              company:      ev.company,
-              site:         ev.site,
-              title:        ev.title,
-              checkedInAt:  ev.checkedInAt,
-              checkedOutAt: ev.checkedOutAt,
-              workNote:     ev.workNote,
-              status:       ev.status,
-              activityLog:  ev.activityLog,
-            });
-          }
-        }
-      });
-    });
-    return Object.values(map).map(m => ({ ...m, jobCount: m.jobs.size }));
-  }, [events]);
-
-  if (techStats.length === 0) {
-    return (
-      <GlassCard sx={{ mb: 3 }}>
-        <CardContent sx={{ p: 2.5, textAlign: "center" }}>
-          <Person sx={{ fontSize: 40, opacity: 0.2 }} />
-          <Typography color="text.disabled" variant="body2">ยังไม่มีข้อมูลการทำงานของช่าง</Typography>
-        </CardContent>
-      </GlassCard>
-    );
-  }
-
-  return (
-    <GlassCard sx={{ mb: 3 }}>
-      <CardContent sx={{ p: 2.5 }}>
-        <Typography variant="subtitle2" fontWeight={700} gutterBottom color="text.secondary">
-          สรุปรายช่าง
-          {selectedDate && ` · ${moment(selectedDate).locale("th").format("MMMM YYYY")}`}
-        </Typography>
-        <Stack spacing={1.5}>
-          {techStats.map(t => (
-            <Box key={t.name}>
-              <Box
-                onClick={() => setSelectedTech(selectedTech === t.name ? null : t.name)}
-                sx={{
-                  p: 1.5, borderRadius: 2, border: "1px solid", borderColor: "divider",
-                  background: theme => alpha(theme.palette.background.paper, 0.6),
-                  cursor: "pointer",
-                  "&:hover": { borderColor: "primary.main" },
-                }}>
-                <Stack direction="row" alignItems="center" gap={1.5} flexWrap="wrap">
-                  <Avatar sx={{
-                    width: 34, height: 34, fontSize: "0.8rem", fontWeight: 700,
-                    bgcolor: theme => alpha(theme.palette.primary.main, 0.12),
-                    color: "primary.main",
-                  }}>
-                    {t.name.charAt(0)}
-                  </Avatar>
-                  <Typography fontWeight={700} fontSize="0.875rem" flex={1}>{t.name}</Typography>
-                  <Stack direction="row" gap={0.75} flexWrap="wrap">
-                    <Chip size="small" label={`${t.jobCount} งาน`} sx={{ height: 22, fontSize: "0.68rem" }} />
-                    <Chip size="small" icon={<CloudUpload sx={{ fontSize: "13px !important" }} />}
-                      label={`${t.filesUploaded} ไฟล์`}
-                      sx={{ height: 22, fontSize: "0.68rem", bgcolor: alpha("#8b5cf6", 0.1), color: "#8b5cf6" }} />
-                    <Chip size="small" icon={<NoteAdd sx={{ fontSize: "13px !important" }} />}
-                      label={`${t.notes} สรุปงาน`}
-                      sx={{ height: 22, fontSize: "0.68rem", bgcolor: alpha("#3b82f6", 0.1), color: "#3b82f6" }} />
-                    {t.closeRequests > 0 && (
-                      <Chip size="small" icon={<TaskAlt sx={{ fontSize: "13px !important" }} />}
-                        label={`${t.closeRequests} ขอปิดงาน`}
-                        sx={{ height: 22, fontSize: "0.68rem", bgcolor: alpha("#10b981", 0.1), color: "#10b981" }} />
-                    )}
-                  </Stack>
-                  {selectedTech === t.name ? <ExpandLess sx={{ fontSize: 18, color: "text.secondary" }} /> : <ExpandMore sx={{ fontSize: 18, color: "text.secondary" }} />}
-                </Stack>
-              </Box>
-
-              {/* Drill-down: jobDetails */}
-              <Collapse in={selectedTech === t.name}>
-                <Stack spacing={1} sx={{ mt: 1, pl: 2 }}>
-                  {t.jobDetails.map(job => {
-                    const dur = job.checkedInAt && job.checkedOutAt
-                      ? moment.duration(moment(job.checkedOutAt).diff(moment(job.checkedInAt))).humanize()
-                      : null;
-                    return (
-                      <Box key={job._id} sx={{
-                        p: 1.25, borderRadius: 2, border: "1px solid",
-                        borderColor: alpha(OP_COLOR[job.status] || "#6b7280", 0.2),
-                        background: alpha(OP_COLOR[job.status] || "#6b7280", 0.03),
-                      }}>
-                        <Stack direction="row" alignItems="flex-start" gap={1}>
-                          <Box sx={{
-                            width: 6, height: 6, borderRadius: "50%", flexShrink: 0, mt: 0.8,
-                            bgcolor: OP_COLOR[job.status] || "#6b7280",
-                          }} />
-                          <Box flex={1} minWidth={0}>
-                            <Typography fontWeight={700} fontSize="0.8rem">
-                              {companySite(job.company, job.site)}
-                            </Typography>
-                            <Stack direction="row" gap={1.5} mt={0.25} flexWrap="wrap">
-                              {job.checkedInAt && (
-                                <Typography variant="caption" color="#8b5cf6">
-                                  <Login sx={{ fontSize: 11 }} /> {moment(job.checkedInAt).format("HH:mm")}
-                                </Typography>
-                              )}
-                              {job.checkedOutAt && (
-                                <Typography variant="caption" color="#10b981">
-                                  <Logout sx={{ fontSize: 11 }} /> {moment(job.checkedOutAt).format("HH:mm")}
-                                </Typography>
-                              )}
-                              {dur && <Typography variant="caption" color="text.disabled">· {dur}</Typography>}
-                            </Stack>
-                            {job.workNote && (
-                              <Typography variant="caption" color="text.secondary"
-                                sx={{ display: "block", mt: 0.5, fontStyle: "italic" }}>
-                                "{job.workNote.slice(0, 120)}{job.workNote.length > 120 ? "…" : ""}"
-                              </Typography>
-                            )}
-                          </Box>
-                          <Chip
-                            label={job.status || "—"}
-                            size="small"
-                            sx={{
-                              height: 20, fontSize: "0.65rem", flexShrink: 0,
-                              bgcolor: alpha(OP_COLOR[job.status] || "#6b7280", 0.12),
-                              color: OP_COLOR[job.status] || "#6b7280",
-                            }}
-                          />
-                        </Stack>
-                      </Box>
-                    );
-                  })}
-                </Stack>
-              </Collapse>
-            </Box>
-          ))}
-        </Stack>
-      </CardContent>
-    </GlassCard>
-  );
-};
-
-// ─── StatusProgressBar ────────────────────────────────────────────────
-const StatusProgressBar = ({ events }) => {
-  const total = events.length || 1;
-  return (
-    <GlassCard sx={{ mb: 3 }}>
-      <CardContent sx={{ p: 2.5 }}>
-        <Typography variant="subtitle2" fontWeight={700} gutterBottom color="text.secondary">
-          ภาพรวมสถานะงาน
-        </Typography>
-        <Stack spacing={1.5}>
-          {OP_LIST.map(status => {
-            const count = events.filter(e => e.status === status).length;
-            const pct   = Math.round((count / total) * 100);
-            return (
-              <Box key={status}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-                  <Stack direction="row" alignItems="center" gap={1}>
-                    <Circle sx={{ fontSize: 8, color: OP_COLOR[status] }} />
-                    <Typography variant="caption" fontWeight={600}>{status}</Typography>
-                  </Stack>
-                  <Typography variant="caption" fontWeight={700} color={OP_COLOR[status]}>
-                    {count} ({pct}%)
-                  </Typography>
-                </Stack>
-                <LinearProgress
-                  variant="determinate" value={pct}
-                  sx={{
-                    height: 6, borderRadius: 3,
-                    bgcolor: alpha(OP_COLOR[status], 0.12),
-                    "& .MuiLinearProgress-bar": { bgcolor: OP_COLOR[status], borderRadius: 3 },
-                  }}
-                />
-              </Box>
-            );
-          })}
-        </Stack>
-      </CardContent>
-    </GlassCard>
   );
 };
 
@@ -2244,6 +1987,84 @@ export const FilePreviewDialog = ({ previewUrl, previewFileName, onClose }) => {
 };
 
 // ═══════════════════════════════════════════════════════════════════════
+// ─── มุมมองตาราง — ทางเลือกของการ์ด สำหรับกวาดดูหลายงานพร้อมกัน/เทียบกัน ─────────────────
+// ✅ การ์ดมีข้อมูลครบและจัดการงานได้ในตัว (เอกสาร/คอมเมนต์/ปุ่ม) แต่พอมี 20-30 งานต้องเลื่อนยาวมาก
+// และเทียบข้ามงานไม่ได้เลย — ตารางตอบโจทย์คนละแบบ กดแถวเพื่อเปิดดูรายละเอียดแบบการ์ดได้เหมือนเดิม
+const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob }) => (
+  <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 3, overflowX: "auto" }}>
+    <Table size="small" sx={{ minWidth: 1000, width: "100%" }}>
+      <TableHead>
+        <TableRow sx={{ "& th": { fontWeight: 700, bgcolor: "#f5f3ff", color: "#4c1d95", whiteSpace: "nowrap" } }}>
+          <TableCell>สถานะ</TableCell>
+          <TableCell>บริษัท / โครงการ</TableCell>
+          <TableCell>ประเภทงาน · ระบบ</TableCell>
+          <TableCell>วันที่เข้างาน</TableCell>
+          <TableCell>ทีมที่เข้างาน</TableCell>
+          <TableCell align="center">ค้าง</TableCell>
+          <TableCell align="center">เอกสาร</TableCell>
+          <TableCell align="center" />
+        </TableRow>
+      </TableHead>
+      <TableBody>
+        {jobGroups.map((job, idx) => {
+          const a = job.sessions[0];
+          const overdueDays = daysPastDueMap.get(a._id)?.days;
+          const isOverdue = isFlaggedDays(overdueDays);
+          const docCount = ["reportFiles", "quotationFiles", "invoiceFiles", "completionFiles"]
+            .reduce((sum, k) => sum + (a[k]?.length || 0), 0);
+          const teamNames = [a.team, ...(a.teamMembers || []).map((m) => m?.name)].filter(Boolean);
+          return (
+            <TableRow key={a._id} hover onClick={() => onOpenJob(job)}
+              sx={{ cursor: "pointer", bgcolor: idx % 2 ? alpha("#0f172a", 0.02) : "transparent" }}>
+              <TableCell sx={{ whiteSpace: "nowrap" }}>
+                <StatusBadge color={OP_COLOR[a.status] || "#6b7280"}>{a.status || "—"}</StatusBadge>
+              </TableCell>
+              <TableCell sx={{ maxWidth: 220 }}>
+                <Typography variant="caption" fontWeight={700} noWrap sx={{ display: "block" }}>{a.company || "-"}</Typography>
+                <Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block" }}>{a.site || "-"}</Typography>
+              </TableCell>
+              <TableCell sx={{ maxWidth: 170 }}>
+                <Typography variant="caption" noWrap sx={{ display: "block" }}>{a.title || "-"}</Typography>
+                <Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block" }}>{a.system || "-"}</Typography>
+              </TableCell>
+              <TableCell sx={{ maxWidth: 200 }}>
+                {/* ✅ งานที่เข้าหลายวันไม่ติดกันโชว์ทุกช่วง + จำนวนช่วง ไม่ใช่แค่วันแรกเหมือนที่เคยเข้าใจผิด */}
+                <Typography variant="caption" sx={{ display: "block" }}>
+                  {formatEventDateRange(a)}
+                </Typography>
+                {job.sessions.length > 1 && (
+                  <Typography variant="caption" color="primary.main" fontWeight={700}>
+                    🔗 อีก {job.sessions.length - 1} ช่วงวัน
+                  </Typography>
+                )}
+              </TableCell>
+              <TableCell sx={{ maxWidth: 160 }}>
+                <Typography variant="caption" noWrap sx={{ display: "block" }}>
+                  {teamNames.length > 0 ? teamNames.join(", ") : "-"}
+                </Typography>
+              </TableCell>
+              <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
+                {isOverdue ? (
+                  <Typography variant="caption" fontWeight={800} color="error.main">{overdueDays} วัน</Typography>
+                ) : (
+                  <Typography variant="caption" color="text.disabled">-</Typography>
+                )}
+              </TableCell>
+              <TableCell align="center">
+                <Typography variant="caption" fontWeight={docCount > 0 ? 700 : 400}
+                  color={docCount > 0 ? "success.main" : "text.disabled"}>
+                  {docCount > 0 ? `${docCount} ไฟล์` : "ยังไม่มี"}
+                </Typography>
+              </TableCell>
+              <TableCell align="center"><ChevronRight sx={{ color: "text.disabled", fontSize: 18 }} /></TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
+  </TableContainer>
+);
+
 // ─── JobGroupBlock ──────────────────────────────────────────────────────
 // การ์ดรวมสำหรับงานที่เข้าหลายวันไม่ติดกัน (ผูกกันด้วย jobGroupId/signature เดียวกัน)
 // โชว์ช่วงวันที่รวมทั้งหมด (เริ่ม–สิ้นสุด) ในหัวการ์ดเดียว + ยุบ/ขยายเพื่อซ่อนการ์ดรายวัน
@@ -2364,6 +2185,15 @@ const Operation = () => {
   const [employee,     setEmployee]     = useState([]);
   const [loading,      setLoading]      = useState(false);
   const [activeTab,    setActiveTab]    = useState(0);
+  // ✅ สลับมุมมองการ์ด/ตาราง — จำค่าไว้ข้ามการเปิดหน้า (แต่ละคนถนัดคนละแบบและมักใช้แบบเดิมตลอด)
+  // เทียบ pattern เดียวกับหน้า "ติดตามใบเสนอราคา"
+  const [viewMode, setViewMode] = useState(() => {
+    try { return localStorage.getItem("operation.viewMode") === "table" ? "table" : "card"; }
+    catch { return "card"; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("operation.viewMode", viewMode); } catch {}
+  }, [viewMode]);
   const [lastRefreshed,setLastRefreshed]= useState(null);
 
   // ✅ แยกกลุ่มงานให้ชัดเจน แทนที่จะปนกันเป็นลิสต์เดียวเรียงตามวันที่อย่างเดียว
@@ -2597,7 +2427,10 @@ const Operation = () => {
     if (!group) {
       matchGroup = true;
     } else if (group === "pending")      matchGroup = event.closeRequested === true && event.status !== "ดำเนินการเสร็จสิ้น";
-    else if (group === "active")  matchGroup = ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(event.status) && !event.closeRequested;
+    // ✅ ตัดงานที่ค้างเกินกำหนดออกจากกลุ่มนี้ ให้ไปอยู่แถบ "ค้างงาน" แถบเดียว (ดูเหตุผลเต็มที่ inProgressCount)
+    else if (group === "active")  matchGroup = ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(event.status)
+      && !event.closeRequested
+      && !isFlaggedDays(daysPastDueMap.get(event._id)?.days);
     else if (group === "overdue") matchGroup = isFlaggedDays(daysPastDueMap.get(event._id)?.days);
     else                          matchGroup = event.status === "ดำเนินการเสร็จสิ้น"; // "closed"
 
@@ -2638,9 +2471,21 @@ const Operation = () => {
   // นับจำนวนงานแต่ละกลุ่มไว้โชว์บน toggle — อ้างอิงจาก events ทั้งหมด ไม่ผ่านตัวกรองอื่น
   // ✅ ใช้ countDistinctJobs จัดกลุ่มก่อนนับเหมือนกัน (เทียบเหตุผลเดียวกับ pendingCount ด้านบน)
   const closedCount   = useMemo(() => countDistinctJobs(events, e => e.status === "ดำเนินการเสร็จสิ้น"), [events]);
+  // 🐛 BUG ที่แก้ (งานค้างโผล่ซ้ำ 2 แถบ): เดิมนับงานสถานะ "ยืนยันแล้ว/กำลังดำเนินการ" ทั้งหมดเข้ากลุ่มนี้
+  // โดยไม่สนว่าเลยกำหนดไปแล้วหรือยัง — งานที่ค้างเกิน 1 สัปดาห์จึงถูกนับ/แสดงทั้งใน "กำลังดำเนินการ"
+  // และ "ค้างงาน" พร้อมกัน ตัวเลขบนการ์ดรวมกันแล้วเกินจำนวนงานจริง และไล่ดูทีละแถบก็เจองานเดิมซ้ำ
+  // ⚠️ อีก 2 กลุ่มไม่มีปัญหานี้อยู่แล้ว — buildDaysPastDueMap ยกเว้นงานที่ปิดแล้ว/ขอปิดแล้วออกจากการนับ
+  // "ค้างงาน" ตั้งแต่ต้นทาง (ดู utils/overdueJobs.js) จึงทับซ้อนกันเฉพาะคู่นี้คู่เดียว
+  // ✅ "ค้างงาน" เป็นกลุ่มที่เร่งด่วนกว่า จึงให้ครองงานนั้นไว้แถบเดียว ส่วนกลุ่มนี้เหลือเฉพาะงานที่ยังอยู่
+  // ในกำหนดจริงๆ — แต่ละงานอยู่แถบเดียวเสมอ ผลรวมของทุกแถบ = จำนวนงานทั้งหมดพอดี
   const inProgressCount  = useMemo(
-    () => countDistinctJobs(events, e => ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(e.status) && !e.closeRequested),
-    [events]
+    () => countDistinctJobs(
+      events,
+      e => ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(e.status)
+        && !e.closeRequested
+        && !isFlaggedDays(daysPastDueMap.get(e._id)?.days),
+    ),
+    [events, daysPastDueMap]
   );
   const overdueCount     = useMemo(() => countFlaggedJobs(events, daysPastDueMap, isFlaggedDays), [events, daysPastDueMap]);
   const severeOverdueCount = useMemo(() => countFlaggedJobs(events, daysPastDueMap, isSevereDays), [events, daysPastDueMap]);
@@ -2962,31 +2807,39 @@ const Operation = () => {
     }
   }, [events]);
 
-  const handleExportCSV = () => {
-    const headers = [
-      "บริษัท", "ไซต์", "ประเภท", "ระบบ", "สถานะ", "เลขเอกสาร",
-      "วันที่เริ่ม", "วันที่สิ้นสุด", "ทีม",
-      "เวลาเข้างาน", "เวลาเสร็จงาน", "สรุปงาน (ช่าง)", "จำนวน log",
-    ];
-    const rows = sortedEvents.map(e => [
-      e.company, e.site, e.title, e.system, e.status, e.docNo,
-      moment(e.start).format("DD/MM/YYYY HH:mm"),
-      e.end ? moment(e.end).subtract(e.allDay ? 1 : 0, "days").format("DD/MM/YYYY HH:mm") : "",
-      e.team,
-      e.checkedInAt  ? moment(e.checkedInAt).format("DD/MM/YYYY HH:mm")  : "",
-      e.checkedOutAt ? moment(e.checkedOutAt).format("DD/MM/YYYY HH:mm") : "",
-      e.workNote || "",
-      (e.activityLog || []).length,
-    ]);
-    const csv = [headers, ...rows]
-      .map(r => r.map(c => `"${(c || "").toString().replace(/"/g, '""')}"`).join(","))
-      .join("\n");
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement("a");
-    a.href = url; a.download = `operation_${moment().format("YYYYMMDD")}.csv`; a.click();
-    URL.revokeObjectURL(url);
-    setSnackbar({ open: true, msg: "Export CSV เรียบร้อย", severity: "success" });
+  // ✅ เปลี่ยนจาก CSV เป็น Excel (.xlsx) จริง — CSV เป็นข้อความล้วน ใส่สี/ตัวหนา/ความกว้างคอลัมน์ไม่ได้
+  // และครอบทุกค่าด้วยเครื่องหมายคำพูดจนกลายเป็นข้อความหมด (วันที่เรียงตามตัวอักษร ตัวเลขรวมยอดไม่ได้)
+  // ⚠️ ส่งออกเป็น "รายงานรายงาน" ไม่ใช่ "แถว event ดิบ" — 1 แถว = 1 งาน (รวมทุกวันของงานเดียวกันไว้
+  // ด้วยกัน) ตรงกับที่ตาเห็นบนหน้าจอ เดิม CSV แตกเป็นหลายแถวต่องานเดียว จนนับจำนวนงานจากไฟล์ไม่ได้
+  const [exporting, setExporting] = useState(false);
+  const handleExportExcel = async () => {
+    if (exporting || jobGroups.length === 0) return;
+    setExporting(true);
+    try {
+      const { exportOperationToExcel, buildOperationFileName } = await import("./operationExcelExport");
+      const groupLabel = {
+        pending: "รอคุณอนุมัติ", active: "กำลังดำเนินการ", overdue: "ค้างงาน", closed: "เสร็จสิ้น",
+      }[effectiveGroup] || "ทั้งหมด";
+      await exportOperationToExcel({
+        // ⚠️ jobGroups เป็น array ของ "array of sessions" ตรงๆ (ดู useMemo ด้านบน) ไม่ใช่ object ที่มี
+        // .sessions — ต้องห่อก่อนส่งเข้าโมดูล export ซึ่งอ่าน job.sessions[0] (ไม่ห่อ = undefined[0])
+        jobs: jobGroups.map((sessions) => ({ sessions })),
+        meta: {
+          fileName: buildOperationFileName(groupLabel),
+          groupLabel: `กลุ่ม: ${groupLabel}`,
+          filterSummary: activeFilterCount > 0 ? `ตัวกรอง ${activeFilterCount} เงื่อนไข` : "ไม่ได้กรองเพิ่มเติม",
+          exportedAt: moment().format("DD/MM/YYYY HH:mm"),
+        },
+        daysPastDueMap,
+        isFlaggedDays,
+        formatEventDateRange,
+      });
+      setSnackbar({ open: true, msg: "ส่งออก Excel เรียบร้อย", severity: "success" });
+    } catch (err) {
+      setSnackbar({ open: true, msg: err?.response?.data?.message || err.message || "ส่งออกไม่สำเร็จ", severity: "error" });
+    } finally {
+      setExporting(false);
+    }
   };
 
   const { notifications, unread, markRead, markAllRead } = useEventNotifications(
@@ -3016,12 +2869,28 @@ const Operation = () => {
           </Tooltip>
           {/* Notification bell — ทุก role เห็น แต่เนื้อหาต่างกันตามฝั่ง (ดูคอมเมนต์ใน NotificationBell) */}
           <NotificationBell notifications={notifications} unread={unread} onItemClick={markRead} onMarkAllRead={markAllRead} />
+          {/* ✅ สลับมุมมองการ์ด ↔ ตาราง — การ์ดอ่านรายละเอียดทีละงานได้ครบ (มีเอกสาร/คอมเมนต์/ปุ่มจัดการ
+              ในตัว) ส่วนตารางไว้กวาดดูหลายงานพร้อมกัน/เทียบกัน เทียบ pattern เดียวกับหน้าติดตามใบเสนอราคา */}
+          <ToggleButtonGroup
+            size="small" exclusive value={viewMode}
+            onChange={(_, v) => v && setViewMode(v)}
+            sx={{ "& .MuiToggleButton-root": { px: 1.25, py: 0.75, borderRadius: 2 } }}
+          >
+            <ToggleButton value="card" title="มุมมองการ์ด"><ViewList sx={{ fontSize: 18 }} /></ToggleButton>
+            <ToggleButton value="table" title="มุมมองตาราง"><TableChart sx={{ fontSize: 18 }} /></ToggleButton>
+          </ToggleButtonGroup>
           {isAdminOrManager && (
-            <Tooltip title="Export CSV (รวมเวลาเข้า/ออก + สรุปงาน)">
-              <IconButton onClick={handleExportCSV}
-                sx={{ border: "1px solid", borderColor: "divider", borderRadius: "50%", width: 40, height: 40 }}>
-                <Download fontSize="small" />
-              </IconButton>
+            <Tooltip title="ส่งออกเป็นไฟล์ Excel (.xlsx)">
+              <span>
+                <IconButton onClick={handleExportExcel} disabled={exporting || jobGroups.length === 0}
+                  sx={{
+                    border: "1px solid", borderRadius: "50%", width: 40, height: 40,
+                    borderColor: alpha("#047857", 0.25), color: "#047857",
+                    "&:hover": { bgcolor: alpha("#047857", 0.08), borderColor: "#047857" },
+                  }}>
+                  <FontAwesomeIcon icon={faFileExcel} style={{ fontSize: 16 }} />
+                </IconButton>
+              </span>
             </Tooltip>
           )}
         </Stack>
@@ -3048,11 +2917,11 @@ const Operation = () => {
       <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
         <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)}
           sx={{ "& .MuiTabs-indicator": { height: 3, borderRadius: "3px 3px 0 0" } }}>
+          {/* ✅ ตัดแท็บ "Dashboard" ออกตามที่ผู้ใช้ขอ — สถิติภาพรวมทั้งหมดที่เคยอยู่ในนั้น (จำนวนงานแยก
+              สถานะ/แถบความคืบหน้า/สรุปรายช่าง) ซ้ำกับหน้า Dashboard หลักของแอปและการ์ดกลุ่มงานด้านล่าง
+              ที่เห็นอยู่แล้วทุกแท็บ — หน้านี้ควรโฟกัสที่ "การดำเนินงานรายงาน" อย่างเดียว */}
           <StyledTab icon={<TableChart fontSize="small" />} iconPosition="start" label="รายการงาน" />
           <StyledTab icon={<Timeline fontSize="small" />}   iconPosition="start" label="Timeline" />
-          {isAdminOrManager && (
-            <StyledTab icon={<Dashboard fontSize="small" />}  iconPosition="start" label="Dashboard" />
-          )}
         </Tabs>
       </Box>
 
@@ -3127,6 +2996,19 @@ const Operation = () => {
               <Typography fontWeight={600}>ไม่พบรายการ</Typography>
               <Typography variant="body2" color="text.disabled">ลองเปลี่ยนเงื่อนไขการค้นหา</Typography>
             </Box>
+          ) : viewMode === "table" ? (
+            /* ✅ มุมมองตาราง — กดแถวแล้วสลับกลับไปมุมมองการ์ดพร้อมไฮไลต์งานนั้น (การ์ดคือที่เดียวที่
+               จัดการงานได้จริง: แนบเอกสาร/เช็คอิน/คอมเมนต์) จึงไม่ทำ dialog ซ้อนอีกชั้นให้ซับซ้อน */
+            <OperationTable
+              jobGroups={pagedGroups.map((sessions) => ({ sessions }))}
+              daysPastDueMap={daysPastDueMap}
+              onOpenJob={(job) => {
+                setViewMode("card");
+                // ⚠️ ต้องเป็นรูปแบบ "<id>|<nonce>" ตามที่ highlightId ใช้ (ดู highlightJobId ด้านบน) —
+                // nonce ทำให้กดงานเดิมซ้ำแล้วไฮไลต์กระพริบใหม่ได้ทุกครั้ง ไม่ใช่ค่าเดิมจนไม่มีอะไรเกิดขึ้น
+                setHighlightId(`${job.sessions[0]._id}|${Date.now()}`);
+              }}
+            />
           ) : (
             <>
               {/* ✅ กลับมาเป็นคอลัมน์เดียว — เดิมลองแบ่ง 2 คอลัมน์บนจอกว้าง แต่การ์ดงานกรุ๊ป (เข้า
@@ -3240,39 +3122,6 @@ const Operation = () => {
         </>
       )}
 
-      {/* TAB 2: DASHBOARD (เฉพาะ admin/manager) */}
-      {activeTab === 2 && isAdminOrManager && (
-        <>
-          <DashboardStats events={events} />
-          <StatusProgressBar events={events} />
-          <TechnicianSummary events={events} selectedDate={selectedDate} />
-          <GlassCard>
-            <CardContent sx={{ p: 2.5 }}>
-              <Typography variant="subtitle2" fontWeight={700} gutterBottom color="text.secondary">
-                งานล่าสุด 5 รายการ
-              </Typography>
-              <Stack spacing={1.5}>
-                {events.slice().sort((a, b) => new Date(b.start) - new Date(a.start)).slice(0, 5).map(e => (
-                  <Stack key={e._id} direction="row" alignItems="center" gap={1.5}>
-                    <Avatar sx={{ width: 32, height: 32,
-                      bgcolor: alpha(OP_COLOR[e.status] || "#6b7280", 0.15),
-                      color: OP_COLOR[e.status] || "#6b7280", fontSize: "0.8rem" }}>
-                      {TYPE_ICON[e.title] || <Build fontSize="small" />}
-                    </Avatar>
-                    <Box flex={1} minWidth={0}>
-                      <Typography variant="caption" fontWeight={700} noWrap>{companySite(e.company, e.site)}</Typography>
-                      <Typography variant="caption" color="text.secondary" display="block">
-                        {moment(e.start).locale("th").fromNow()}
-                      </Typography>
-                    </Box>
-                    <StatusBadge color={OP_COLOR[e.status]}>{e.status || "—"}</StatusBadge>
-                  </Stack>
-                ))}
-              </Stack>
-            </CardContent>
-          </GlassCard>
-        </>
-      )}
 
       {/* File Preview */}
       <FilePreviewDialog

@@ -42,11 +42,14 @@ const APPROVAL_META = {
   rejected: { label: "ไม่อนุมัติ", color: "FFDC2626" },
 };
 
-// 🎨 สีประเภทงาน — ตรงกับ JOB_CLASS_META (utils/jobClassification.js) ที่ใช้วาดแถบสีขอบซ้ายในปฏิทิน
+// 🎨 สีประเภทงาน — ต้องตรงกับ JOB_CLASS_META (utils/jobClassification.js) ที่ใช้วาดแถบสีขอบซ้ายในปฏิทิน
+// ⚠️ อัปเดตพร้อมกันเสมอเมื่อแก้ที่ต้นทาง (ที่นี่เป็น ARGB ของ ExcelJS จึงใช้ค่าเดียวกันตรงๆ ไม่ได้)
+// สัญญาเปลี่ยนจากคราม #6366F1 → ส้ม #F97316 และงานทั่วไปจากเทาอ่อน #94A3B8 → เทาเข้ม #475569
+// เพราะสีเดิมชนกับสีพื้นหลังงานเริ่มต้นในปฏิทินจนแถบมองไม่เห็น (ดูเหตุผลเต็มที่ jobClassification.js)
 const JOB_CLASS_COLOR = {
-  contract: "FF6366F1",
+  contract: "FFF97316",
   project: "FF0D9488",
-  general: "FF94A3B8",
+  general: "FF475569",
 };
 
 const thinBorder = {

@@ -63,18 +63,76 @@ const TYPE_ICON = {
   "สำรวจระบบ":     <Description fontSize="small" />,
 };
 
+// 🐛 ปรับตามที่ผู้ใช้แจ้ง (ช่างงงว่าแต่ละช่องคือเอกสารอะไร ต้องทำอะไรกับมัน): เดิมมีแค่ชื่อเอกสารลอยๆ
+// ("ใบเสนอราคา") กับคำถามกลางๆ ที่ใช้ข้อความเดียวกันหมดทุกชนิด ("งานนี้มีเอกสารนี้หรือไม่?") ซึ่งไม่ได้
+// บอกเลยว่าเป็นใบเสนอราคาของอะไร ใครออก ออกให้ใคร และตอบ "มี/ไม่มี" แล้วจะเกิดอะไรขึ้นต่อ
+// ✅ เพิ่มคำอธิบายสั้นๆ ใต้ชื่อ + คำถาม/ตัวเลือกเฉพาะของเอกสารแต่ละชนิด ให้อ่านแล้วตัดสินใจได้ทันที
+// โดยไม่ต้องเดาหรือไปถามแอดมิน
 const DOCUMENT_TYPES = [
-  { type: "report",     label: "Service Report", color: "#3b82f6", alwaysRequired: true,  icon: <Description sx={{ fontSize: 18 }} /> },
-  { type: "quotation",  label: "ใบเสนอราคา",     color: "#f59e0b", alwaysRequired: false, icon: <RequestQuote sx={{ fontSize: 18 }} /> },
-  { type: "invoice",    label: "ใบวางบิล",       color: "#8b5cf6", alwaysRequired: false, icon: <ReceiptLong sx={{ fontSize: 18 }} /> },
-  { type: "completion", label: "ใบส่งมอบงาน",     color: "#10b981", alwaysRequired: false, icon: <AssignmentTurnedIn sx={{ fontSize: 18 }} /> },
+  {
+    type: "report", label: "Service Report", color: "#3b82f6", alwaysRequired: true,
+    icon: <Description sx={{ fontSize: 18 }} />,
+    desc: "ใบรายงานผลการเข้าปฏิบัติงานครั้งนี้ — ทุกงานต้องแนบก่อนขอปิดงาน",
+  },
+  {
+    type: "quotation", label: "ใบเสนอราคา", color: "#f59e0b", alwaysRequired: false,
+    icon: <RequestQuote sx={{ fontSize: 18 }} />,
+    desc: "ใบเสนอราคาที่ต้องเสนอลูกค้าเพิ่มจากงานนี้ เช่น อะไหล่ที่ต้องเปลี่ยน หรืองานซ่อมเพิ่มเติมที่พบหน้างาน",
+    question: "งานนี้ต้องเสนอราคางานเพิ่มเติมให้ลูกค้าไหม?",
+    yesLabel: "ต้องเสนอราคา",
+    noLabel: "ไม่ต้องเสนอ",
+    noneText: "งานนี้ไม่ต้องเสนอราคาเพิ่ม",
+    uploadHint: "แนบไฟล์ใบเสนอราคาที่ทำให้ลูกค้า — แอดมินจะนำไปติดตามผลกับลูกค้าต่อในหน้า “ติดตามใบเสนอราคา”",
+  },
+  {
+    type: "invoice", label: "ใบวางบิล", color: "#8b5cf6", alwaysRequired: false,
+    icon: <ReceiptLong sx={{ fontSize: 18 }} />,
+    desc: "ใบวางบิล/ใบแจ้งหนี้ที่ต้องวางให้ลูกค้าสำหรับงานครั้งนี้",
+    question: "งานนี้ต้องวางบิลลูกค้าไหม?",
+    yesLabel: "ต้องวางบิล",
+    noLabel: "ไม่ต้องวางบิล",
+    noneText: "งานนี้ไม่ต้องวางบิล",
+    uploadHint: "แนบไฟล์ใบวางบิลที่ส่งให้ลูกค้า",
+  },
+  {
+    type: "completion", label: "ใบส่งมอบงาน", color: "#10b981", alwaysRequired: false,
+    icon: <AssignmentTurnedIn sx={{ fontSize: 18 }} />,
+    desc: "ใบส่งมอบงานที่ลูกค้าเซ็นรับงานเรียบร้อยแล้ว",
+    question: "งานนี้มีใบส่งมอบงานที่ลูกค้าเซ็นรับไหม?",
+    yesLabel: "มี ลูกค้าเซ็นแล้ว",
+    noLabel: "ไม่มี",
+    noneText: "งานนี้ไม่มีใบส่งมอบงาน",
+    uploadHint: "แนบไฟล์/รูปถ่ายใบส่งมอบงานที่ลูกค้าเซ็นแล้ว",
+  },
 ];
 
-// เอกสารชนิดนี้ถือว่า "เสร็จ" แล้วหรือยัง (report ต้องติ๊ก, ที่เหลือ "ไม่มี" หรือ "มี"+มีไฟล์อย่างน้อย 1 ไฟล์)
+// ✅ งาน PM (Preventive Maintenance) = งานตามสัญญาที่ต้องวางบิลและส่งมอบงานทุกครั้งเป็นมาตรฐาน
+// เทียบเกณฑ์เดียวกับที่ ContractOverview.js ใช้จับงาน PM (เทียบชื่อประเภทงานแบบตัดช่องว่าง) — เผื่อ
+// ผู้ใช้พิมพ์ "pm"/"Pm" ด้วย จึงเทียบแบบไม่สนตัวพิมพ์เล็กใหญ่
+const isPMJob = (event) => (event?.title || "").trim().toUpperCase() === "PM";
+
+// ✅ เอกสารชนิดนี้ "บังคับต้องมี" สำหรับงานนี้ไหม — ต่างจากเดิมที่ผูกกับชนิดเอกสารตายตัวอย่างเดียว
+// (report เท่านั้นที่บังคับ) ตอนนี้ขึ้นกับประเภทงานด้วยตามที่ผู้ใช้กำหนด:
+//   • Service Report — บังคับทุกงานเหมือนเดิม
+//   • ใบวางบิล / ใบส่งมอบงาน — บังคับเฉพาะงาน PM (งานอื่นยังเลือก "มี/ไม่มี" ได้ตามเดิม)
+//   • ใบเสนอราคา — ไม่บังคับทุกกรณี (มีงานเพิ่มเติมค่อยเสนอ)
+const isDocRequired = (event, type) => {
+  if (type === "report") return true;
+  if (type === "quotation") return false;
+  return isPMJob(event); // invoice / completion
+};
+
+// เอกสารชนิดนี้ถือว่า "เสร็จ" แล้วหรือยัง
+//   • report: ต้องติ๊กยืนยัน "และ" มีไฟล์
+//   • เอกสารที่บังคับตามประเภทงาน (เช่น ใบวางบิลของงาน PM): ต้องมีไฟล์เท่านั้น ไม่มีทางเลือก "ไม่มี"
+//   • เอกสารที่ไม่บังคับ: ตอบ "ไม่มี" ก็เสร็จ / ตอบ "มี" ต้องแนบไฟล์อย่างน้อย 1 ไฟล์
 const isDocComplete = (event, type) => {
   const hasFiles = (event[`${type}Files`] || []).length > 0;
   // Service Report: บังคับต้องติ๊ก "และ" ต้องแนบไฟล์จริงอย่างน้อย 1 ไฟล์ ถึงจะถือว่าเสร็จ
   if (type === "report") return Boolean(event.documentSentReport) && hasFiles;
+  // ⚠️ ต้องเช็คก่อน applicable เสมอ — งาน PM ที่ช่างเคยกด "ไม่มี" ไว้ตอนที่ยังไม่บังคับ ต้องกลับมา
+  // นับว่ายังไม่เสร็จ ไม่ใช่ผ่านไปเพราะค่าเดิมที่ค้างอยู่ในฐานข้อมูล
+  if (isDocRequired(event, type)) return hasFiles;
   const applicable = event[`${type}Applicable`];
   if (applicable === false) return true;
   if (applicable === true) return hasFiles;
@@ -294,6 +352,9 @@ const DocumentFileList = ({ type, files, isUploading, uploadProgress, onFileUplo
 // ถ้า "มี" ต้องแนบไฟล์ให้ครบถึงจะถือว่าเสร็จ, ถ้า "ไม่มี" ถือว่าเสร็จทันที
 const DocumentChecklistItem = ({
   type, label, color, icon, event, alwaysRequired,
+  // ✅ ข้อความเฉพาะของเอกสารแต่ละชนิด (ดู DOCUMENT_TYPES) — มี fallback กลางๆ ไว้เผื่อชนิดใหม่ที่ยัง
+  // ไม่ได้เขียนข้อความเฉพาะให้ จะได้ไม่ขึ้นช่องว่างเปล่า
+  desc, question, yesLabel, noLabel, noneText, uploadHint,
   onToggleCheck, onSetApplicable, onFileUpload, onDeleteFile, onPreview,
   isUploading, uploadProgress, isLocked,
 }) => {
@@ -302,6 +363,10 @@ const DocumentChecklistItem = ({
   const applicable = event[`${type}Applicable`];
   const complete   = isDocComplete(event, type);
   const checked    = Boolean(event[`documentSent${capitalize(type)}`]);
+  // ✅ "บังคับตามประเภทงาน" — งาน PM ต้องมีใบวางบิล/ใบส่งมอบงานเสมอ (ดู isDocRequired)
+  // ต่างจาก alwaysRequired ของ Service Report ตรงที่ไม่ต้องติ๊กยืนยัน แค่แนบไฟล์ก็พอ จึงต้องแยกเป็น
+  // โหมดที่ 3: ไม่มีปุ่ม "มี/ไม่มี" ให้เลือก (เพราะไม่มีทางเลือก) แต่ก็ไม่มีเช็คบ็อกซ์ให้ติ๊กเหมือน report
+  const requiredByJobType = !alwaysRequired && isDocRequired(event, type);
 
   return (
     <Box sx={{
@@ -327,10 +392,28 @@ const DocumentChecklistItem = ({
         }}>
           {icon}
         </Box>
-        <Typography variant="body2" fontWeight={700} flex={1}
-          color={complete ? color : "text.primary"}>
-          {label}
-        </Typography>
+        {/* ✅ ชื่อเอกสาร + คำอธิบายสั้นๆ ว่าเป็นเอกสารอะไรของงานนี้ — เดิมมีแต่ชื่อลอยๆ ช่างต้องเดาเอง
+            ว่า "ใบเสนอราคา" หมายถึงใบไหน ของอะไร ต้องทำอะไรกับมัน */}
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="body2" fontWeight={700}
+            color={complete ? color : "text.primary"}>
+            {label}
+          </Typography>
+          {desc && (
+            <Typography variant="caption" color="text.secondary"
+              sx={{ display: "block", lineHeight: 1.35, mt: 0.15 }}>
+              {desc}
+            </Typography>
+          )}
+          {/* ✅ บอกให้ชัดว่าทำไมช่องนี้ถึงไม่มีตัวเลือก "ไม่มี" ให้กด — ไม่งั้นช่างจะงงว่าทำไมงานนี้
+              ต่างจากงานอื่น (เดียวกันนี้เป็นเหตุผลเดียวที่ปุ่มหายไป) */}
+          {requiredByJobType && (
+            <Typography variant="caption" fontWeight={700}
+              sx={{ display: "block", mt: 0.3, color: "#b45309", fontSize: "0.68rem" }}>
+              ⚠️ งาน PM ต้องมีเอกสารนี้ทุกครั้ง — แนบไฟล์ก่อนจึงจะขอปิดงานได้
+            </Typography>
+          )}
+        </Box>
         {alwaysRequired ? (
           <Box sx={{
             width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
@@ -361,10 +444,34 @@ const DocumentChecklistItem = ({
             isLocked={isLocked}
           />
         </Box>
+      ) : requiredByJobType ? (
+        /* ✅ บังคับตามประเภทงาน (งาน PM: ใบวางบิล/ใบส่งมอบงาน) — ไม่มีคำถาม "มี/ไม่มี" ให้เลือกเลย
+           เพราะไม่มีทางเลือก ไปที่กล่องแนบไฟล์ตรงๆ พร้อมเตือนถ้ายังไม่แนบ (เทียบ pattern เดียวกับ
+           Service Report ด้านบน แค่ไม่ต้องติ๊กยืนยันเพิ่ม) */
+        <Box sx={{ px: 1.5, pb: 1.5 }}>
+          {!hasFiles && (
+            <Typography variant="caption" color="warning.main" sx={{ display: "block", mb: 0.75, fontWeight: 600 }}>
+              ⚠️ ยังไม่ได้แนบไฟล์ — ต้องแนบก่อนจึงจะขอปิดงานได้
+            </Typography>
+          )}
+          {uploadHint && !hasFiles && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.75, lineHeight: 1.4 }}>
+              {uploadHint}
+            </Typography>
+          )}
+          <DocumentFileList
+            type={type} files={files}
+            isUploading={isUploading} uploadProgress={uploadProgress}
+            onFileUpload={onFileUpload} onDeleteFile={onDeleteFile} onPreview={onPreview}
+            isLocked={isLocked}
+          />
+        </Box>
       ) : applicable === null || applicable === undefined ? (
         <Box sx={{ px: 1.5, pb: 1.5 }}>
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.75 }}>
-            งานนี้มีเอกสารนี้หรือไม่?
+          {/* ✅ คำถามเจาะจงต่อชนิดเอกสาร + ปุ่มที่บอกผลลัพธ์ตรงๆ — เดิมทุกช่องใช้ข้อความเดียวกันหมด
+              ("งานนี้มีเอกสารนี้หรือไม่?" + "มี/ไม่มี") ซึ่งไม่ได้บอกว่ากำลังตอบเรื่องอะไรอยู่ */}
+          <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: "block", mb: 0.75 }}>
+            {question || "งานนี้มีเอกสารนี้หรือไม่?"}
           </Typography>
           <ToggleButtonGroup
             fullWidth exclusive size="small"
@@ -373,25 +480,41 @@ const DocumentChecklistItem = ({
             onChange={(_, val) => { if (val !== null) onSetApplicable(type, val === "yes"); }}
             sx={{ height: 40 }}>
             <ToggleButton value="yes" sx={{ textTransform: "none", fontWeight: 700, fontSize: "0.8rem", gap: 0.5 }}>
-              <CheckCircle sx={{ fontSize: 17 }} /> มี
+              <CheckCircle sx={{ fontSize: 17 }} /> {yesLabel || "มี"}
             </ToggleButton>
             <ToggleButton value="no" sx={{ textTransform: "none", fontWeight: 700, fontSize: "0.8rem", gap: 0.5 }}>
-              <Close sx={{ fontSize: 17 }} /> ไม่มี
+              <Close sx={{ fontSize: 17 }} /> {noLabel || "ไม่มี"}
             </ToggleButton>
           </ToggleButtonGroup>
+          {/* ✅ บอกล่วงหน้าว่าตอบแล้วจะเกิดอะไรต่อ — ลดความลังเลว่าจะกดผิดไหม */}
+          <Typography variant="caption" color="text.disabled" sx={{ display: "block", mt: 0.6, fontSize: "0.68rem" }}>
+            เลือกแล้วเปลี่ยนทีหลังได้ · ตอบครบทุกช่องจึงจะขอปิดงานได้
+          </Typography>
         </Box>
       ) : applicable === false ? (
         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 1.5, pb: 1.5 }}>
-          <Typography variant="caption" color="text.disabled">ไม่มีเอกสารนี้สำหรับงานนี้</Typography>
+          {/* ✅ บอกด้วยคำเดียวกับที่ช่างเพิ่งกดเลือกไป (เช่น "ไม่ต้องเสนอราคาเพิ่ม") ไม่ใช่ประโยคกลางๆ
+              ที่อ่านแล้วนึกไม่ออกว่าเคยตอบอะไรไว้ */}
+          <Typography variant="caption" color="text.disabled">
+            {noneText || "ไม่มีเอกสารนี้สำหรับงานนี้"}
+          </Typography>
           {!isLocked && (
             <Button size="small" onClick={() => onSetApplicable(type, true)}
               sx={{ textTransform: "none", fontSize: "0.75rem", minWidth: "auto" }}>
-              เปลี่ยนเป็นมี
+              แก้เป็นต้องมี
             </Button>
           )}
         </Stack>
       ) : (
         <Box sx={{ px: 1.5, pb: 1.5 }}>
+          {/* ✅ บอกว่าต้องแนบไฟล์อะไร และไฟล์นั้นถูกเอาไปใช้ต่อที่ไหน — เดิมมีแต่กล่องอัปโหลดเปล่าๆ
+              ช่างไม่รู้ว่าแนบแล้วเรื่องจบตรงนี้หรือมีคนเอาไปทำอะไรต่อ */}
+          {uploadHint && !hasFiles && (
+            <Typography variant="caption" color="text.secondary"
+              sx={{ display: "block", mb: 0.75, lineHeight: 1.4 }}>
+              {uploadHint}
+            </Typography>
+          )}
           <DocumentFileList
             type={type} files={files}
             isUploading={isUploading} uploadProgress={uploadProgress}
@@ -401,7 +524,7 @@ const DocumentChecklistItem = ({
           {!hasFiles && !isLocked && (
             <Button size="small" onClick={() => onSetApplicable(type, false)}
               sx={{ textTransform: "none", fontSize: "0.75rem", minWidth: "auto", p: 0, mt: 0.75, color: "text.disabled" }}>
-              เปลี่ยนเป็นไม่มี
+              {noLabel ? `แก้เป็น “${noLabel}”` : "เปลี่ยนเป็นไม่มี"}
             </Button>
           )}
         </Box>
@@ -760,6 +883,12 @@ const TechnicianJobCard = ({
           icon={doc.icon}
           event={event}
           alwaysRequired={doc.alwaysRequired}
+          desc={doc.desc}
+          question={doc.question}
+          yesLabel={doc.yesLabel}
+          noLabel={doc.noLabel}
+          noneText={doc.noneText}
+          uploadHint={doc.uploadHint}
           onToggleCheck={handleToggleDocument}
           onSetApplicable={handleSetApplicable}
           onFileUpload={handleDocFileUpload}

@@ -291,7 +291,45 @@ function injectStyles() {
       margin-bottom: 10px; cursor: pointer;
     }
     .ee-checkbox-row input { width: auto !important; cursor: pointer; }
-    .ee-multi-date-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .ee-multi-date-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+    /* ✅ ป้ายวันที่แบบ "วัน เดือน ปี" อ่านง่าย กำกับท้ายแต่ละช่วง — เดือนเป็นตัวอักษรไทยจึงไม่มีทางอ่าน
+       สลับวัน/เดือนได้ ไม่ว่าเบราว์เซอร์จะแสดง <input type="date"> เป็นรูปแบบไหน (dd/mm หรือ mm/dd
+       ขึ้นกับภาษาของเครื่อง บังคับไม่ได้) — บนจอแคบตกลงมาเป็นบรรทัดของตัวเองเต็มความกว้าง ไม่บีบช่องกรอก */
+    .ee-multi-date-row .ee-range-preview {
+      font-size: 12px; font-weight: 600; color: #4338ca;
+      background: #eef2ff; border: 1px solid #e0e7ff; border-radius: 6px;
+      padding: 3px 8px; white-space: nowrap; flex-shrink: 0;
+    }
+    .ee-multi-date-row .ee-range-preview:empty { display: none; }
+    /* 🐛 BUG ที่แก้ (จอมือถือแถวช่วงวันที่แตกเป็น 3 บรรทัด ปุ่ม ✕ ลอยเดี่ยวๆ ดูเหมือนหน้าพัง):
+       ช่องวันที่ตั้ง flex:1 ไว้ แต่ <input type="date"> มีความกว้างขั้นต่ำในตัวเองจากปฏิทินของเบราว์เซอร์
+       (~145px) สองช่องรวมกันก็เต็มความกว้างจอแล้ว ปุ่ม ✕ กับป้ายวันที่จึงถูกดันตกไปคนละบรรทัด กลายเป็น
+       1 ช่วง = 3 บรรทัด และ ✕ ไปอยู่ซ้ายสุดของบรรทัดตัวเอง ดูไม่ออกว่าเป็นของแถวไหน
+       ✅ จัดใหม่เป็น 2 บรรทัดที่อ่านเป็นก้อนเดียว: บรรทัดบน = ช่องวันที่ + ✕ (ย่อ padding/ตัวอักษร และ
+       ปลดล็อก min-width ให้ย่อได้จริง) บรรทัดล่าง = ป้ายวันที่ไทยชิดซ้าย + ครอบทั้งช่วงด้วยกรอบอ่อนๆ
+       ให้เห็นชัดว่าทั้งสองบรรทัดเป็นของช่วงเดียวกัน */
+    @media (max-width: 640px) {
+      .ee-multi-date-row {
+        gap: 5px;
+        padding: 7px 8px 6px;
+        margin-bottom: 10px;
+        border: 1px solid #e8eaf2;
+        border-radius: 9px;
+        background: #fafbff;
+      }
+      .ee-multi-date-row input[type=date] {
+        min-width: 0;
+        padding: 6px 6px;
+        font-size: 12px;
+      }
+      .ee-multi-date-row .ee-range-sep { font-size: 11px; }
+      .ee-multi-date-remove { flex: 0 0 26px !important; width: 26px; height: 26px; font-size: 12px; }
+      .ee-multi-date-row .ee-range-preview {
+        order: 10; width: 100%; text-align: left;
+        background: transparent; border: none; padding: 2px 2px 0;
+        font-size: 11.5px;
+      }
+    }
     .ee-multi-date-row input[type=date] {
       flex: 1; box-sizing: border-box;
       border: 1.5px solid #e2e8f0; border-radius: 7px;
@@ -303,8 +341,11 @@ function injectStyles() {
       box-shadow: 0 0 0 3px rgba(37,99,235,.10);
     }
     .ee-multi-date-row .ee-range-sep { flex-shrink: 0; color: #94a3b8; font-weight: 700; }
+    /* ✅ ปุ่ม ✕ ต้องเป็นสี่เหลี่ยมจัตุรัสขนาดคงที่เสมอ — ล็อก flex ไว้ทั้งสามค่า (ไม่ยืด/ไม่หด/ฐานคงที่)
+       ไม่ใช่แค่ flex-shrink เพราะปุ่มนี้ใช้คลาส .ee-btn ร่วมกับปุ่มอื่น ถ้ามีกฎไหนตั้ง flex-grow ให้
+       .ee-btn (เช่นกฎของแถบปุ่มล่างบนจอมือถือ) ปุ่มนี้จะยืดกินพื้นที่ของช่องวันที่ข้างๆ ทันที */
     .ee-multi-date-remove {
-      flex-shrink: 0; width: 30px; height: 30px; padding: 0 !important;
+      flex: 0 0 30px !important; width: 30px; height: 30px; padding: 0 !important;
       display: flex; align-items: center; justify-content: center;
     }
     /* ✅ แถบยืนยันลบช่วงวันที่ — เดิมใช้ window.confirm() ของเบราว์เซอร์ (หน้าตาไม่ตรงธีมแอปเลย)
@@ -401,10 +442,22 @@ function injectStyles() {
     .ee-btn-ghost     { background: #e2e8f0; color: #475569; }
     .ee-btn-attach    { background: #dc2626; color: #fff; }
 
+    /* 🐛 BUG ที่แก้ (ปุ่มล่างล้นออกนอกจอ กดไม่ถึง): กลุ่มปุ่มกลางมี 3 ปุ่มข้อความยาว (ย้ายเข้าสัญญา /
+       ดูการดำเนินงาน / ออกใบแจ้งเข้างาน) เรียงแถวเดียวโดยไม่อนุญาตให้ตัดบรรทัด (.ee-btn ตั้ง
+       white-space:nowrap ไว้) รวมกันกว้างเกินจอมือถือ ปุ่มขวาสุดจึงถูกตัดหายไปครึ่งใบ กดไม่ได้เลย
+       ✅ ให้กลุ่มปุ่มตัดบรรทัดได้ + ปุ่มยืดเต็มความกว้างที่เหลือแบ่งกันเอง (flex:1 1 auto) และย่อ
+       padding/ตัวอักษรลงเล็กน้อย — ปุ่มไหนยาวก็ได้บรรทัดของตัวเอง ไม่มีปุ่มไหนถูกตัดอีก */
     @media(max-width:640px) {
-      #ee-action-bar { flex-direction: column; gap: 8px; }
-      .ee-btn-group  { width: 100%; justify-content: center; }
+      #ee-action-bar { flex-direction: column; gap: 8px; padding: 10px 12px 12px; }
+      .ee-btn-group  { width: 100%; justify-content: center; flex-wrap: wrap; }
       .ee-btn-group-center { border: none; border-top: 1px solid #cbd5e1; border-bottom: 1px solid #cbd5e1; padding: 8px 0; }
+      /* ⚠️ ต้องจำกัดขอบเขตด้วย #ee-action-bar เท่านั้น — เขียนเป็น .ee-btn เปล่าๆ จะไปโดนปุ่มอื่นที่ใช้
+         คลาสนี้ร่วมกันด้วย โดยเฉพาะปุ่ม ✕ ลบช่วงวันที่ (class="ee-btn ee-btn-ghost ee-multi-date-remove")
+         ซึ่งพอได้ flex:1 1 auto จะยืดกินพื้นที่จนช่องวันที่ข้างๆ ถูกบีบจนแสดงไม่ครบ */
+      #ee-action-bar .ee-btn {
+        flex: 1 1 auto; min-width: 0; justify-content: center;
+        padding: 9px 10px; font-size: 12px;
+      }
     }
 
     /* ── TomSelect override ── */
@@ -1074,7 +1127,10 @@ export const getEditEvent = async ({
     <label class="ee-checkbox-row">
       <input type="checkbox" id="ee-multiDateToggle" ${hasSiblings ? "checked" : ""} ${isViewOnly ? "disabled" : ""}>
       🗓️ งานนี้ต้องเข้างานหลายวัน (ไม่ติดกันก็ได้) — ถือเป็นงานเดียวกัน
-      ${hasSiblings ? `<span style="color:#94a3b8;font-weight:500;">(มีอยู่แล้ว ${siblingEvents.length + 1} วัน)</span>` : ""}
+      ${/* ✅ ตัวเลขนี้คือจำนวน "ช่วงวันที่" (แต่ละแถวในรายการด้านล่าง) ไม่ใช่จำนวนวันรวม — 1 ช่วงกินได้
+            หลายวัน (เช่น 31 ส.ค. – 4 ก.ย. = 1 ช่วง แต่ 5 วัน) เดิมเขียนว่า "วัน" ทำให้เข้าใจผิดว่า
+            งานนี้เข้าแค่ 4 วันทั้งที่จริงอาจเป็น 20 กว่าวัน */""}
+      ${hasSiblings ? `<span style="color:#94a3b8;font-weight:500;">(มีอยู่แล้ว ${siblingEvents.length + 1} ช่วงวัน)</span>` : ""}
     </label>
 
     <div id="ee-singleDateSection" style="${hasSiblings ? "display:none;" : ""}">
@@ -1199,7 +1255,7 @@ export const getEditEvent = async ({
         <div id="eea-header-icon">🔗</div>
         <div id="eea-header-info">
           <h3>ย้ายเข้าสัญญาที่มีอยู่แล้ว</h3>
-          <small>${attrHtml(eventCompany) || "-"} · ${attrHtml(eventSite) || "-"} · ${attrHtml(eventTitle)}${siblingEvents.length > 0 ? ` · ${siblingEvents.length + 1} วัน` : ""}</small>
+          <small>${attrHtml(eventCompany) || "-"} · ${attrHtml(eventSite) || "-"} · ${attrHtml(eventTitle)}${siblingEvents.length > 0 ? ` · ${siblingEvents.length + 1} ช่วงวัน` : ""}</small>
         </div>
       </div>
       <div id="eea-body">
@@ -1495,8 +1551,27 @@ export const getEditEvent = async ({
           <input type="date" class="ee-range-start" value="${startValue}" ${isViewOnly ? "disabled" : ""}>
           <span class="ee-range-sep">–</span>
           <input type="date" class="ee-range-end" value="${endValue || startValue}" ${isViewOnly ? "disabled" : ""}>
+          <span class="ee-range-preview" title="วันที่ของช่วงนี้ (วัน เดือน ปี)"></span>
           ${isViewOnly ? "" : `<button type="button" class="ee-btn ee-btn-ghost ee-multi-date-remove" title="ลบช่วงนี้ออก">✕</button>`}
         `;
+        // ✅ ป้ายวันที่แบบอ่านง่าย "วัน เดือน ปี" กำกับทุกแถว — ช่อง <input type="date"> แสดงรูปแบบตาม
+        // ภาษา/ภูมิภาคของเบราว์เซอร์แต่ละเครื่อง (บางเครื่องเป็น mm/dd/yyyy) บังคับด้วย HTML/CSS/JS ไม่ได้
+        // เลย จึงเสี่ยงอ่านสลับวัน-เดือนกันโดยไม่รู้ตัว โดยเฉพาะวันที่ ≤ 12 (เช่น 04/08 คือ 4 ส.ค. หรือ
+        // 8 เม.ย.?) — ป้ายนี้เขียนเดือนเป็นตัวอักษรไทย จึงไม่มีทางอ่านสลับได้ไม่ว่าเบราว์เซอร์จะตั้งค่าไว้
+        // อย่างไร พร้อมบอกจำนวนวันของช่วงนั้นให้ตรวจทานง่ายขึ้นอีกชั้น
+        const previewEl = row.querySelector(".ee-range-preview");
+        const refreshPreview = () => {
+          const s = row.querySelector(".ee-range-start")?.value;
+          const e = row.querySelector(".ee-range-end")?.value || s;
+          if (!s) { previewEl.textContent = ""; return; }
+          const ms = moment(s).locale("th");
+          const me = moment(e).locale("th");
+          const days = Math.max(1, me.diff(ms, "days") + 1);
+          previewEl.textContent = ms.isSame(me, "day")
+            ? `${ms.format("D MMM YYYY")}`
+            : `${ms.format("D MMM")} – ${me.format("D MMM YYYY")} (${days} วัน)`;
+        };
+        refreshPreview();
         row.querySelector(".ee-multi-date-remove")?.addEventListener("click", () => {
           // ต้องเหลืออย่างน้อย 1 แถวเสมอ กันผู้ใช้ลบจนหมด
           if (multiDateList.children.length <= 1) return;
@@ -1539,10 +1614,27 @@ export const getEditEvent = async ({
             }
           });
         });
+        // ✅ อัปเดตป้ายวันที่ + จัดเรียงแถวใหม่ทุกครั้งที่มีการเปลี่ยนวันที่ในแถวนี้
+        row.querySelectorAll("input[type=date]").forEach((input) => {
+          input.addEventListener("change", () => { refreshPreview(); sortDateRows(); });
+        });
         multiDateList.appendChild(row);
       };
 
-      // ✅ ค้างวันที่/ช่วงวันที่เดิมไว้เสมอ: แถวแรกคืองานปัจจุบันเอง ตามด้วยวันอื่นๆ ของงานเดียวกัน (ถ้ามี)
+      // 🐛 BUG ที่แก้ (รายการช่วงวันที่เรียงมั่ว): เดิมวาดแถวตามลำดับที่ข้อมูลมาเป๊ะๆ — งานปัจจุบันขึ้นก่อน
+      // เสมอ แล้วต่อด้วยวันอื่นๆ ตามลำดับที่ backend คืนมา (createdAt) ไม่ได้เรียงตามวันที่จริงเลย ทำให้
+      // เห็นเป็น 31/08 → 04/08 → 30/08 → 31/08 สลับไปมา ตรวจทานว่าครบ/ซ้ำ/ตกหล่นไหมแทบไม่ได้
+      // ✅ เรียงตามวันที่เริ่มจากน้อยไปมากเสมอ (รูปแบบ YYYY-MM-DD เทียบเป็นข้อความได้ตรงตามลำดับเวลาอยู่แล้ว)
+      // ทั้งตอนเปิดฟอร์มและทุกครั้งที่แก้วันที่/เพิ่มแถวใหม่ แถวที่ยังไม่ได้กรอกวันที่ให้อยู่ท้ายสุด
+      const sortDateRows = () => {
+        [...multiDateList.querySelectorAll(".ee-multi-date-row")]
+          .map((r) => ({ el: r, key: r.querySelector(".ee-range-start")?.value || "9999-12-31" }))
+          .sort((a, b) => a.key.localeCompare(b.key))
+          // appendChild ย้ายตำแหน่ง element เดิม (ไม่ได้สร้างใหม่) ค่าที่กรอกไว้/event listener จึงอยู่ครบ
+          .forEach(({ el }) => multiDateList.appendChild(el));
+      };
+
+      // ✅ ค้างวันที่/ช่วงวันที่เดิมไว้เสมอ: งานปัจจุบัน + วันอื่นๆ ของงานเดียวกัน (ถ้ามี) แล้วเรียงตามวันที่
       addDateRow(eventStart.format("YYYY-MM-DD"), formattedEnd, eventId);
       siblingEvents.forEach((s) => {
         const sStart = moment(s.start).format("YYYY-MM-DD");
@@ -1551,6 +1643,7 @@ export const getEditEvent = async ({
           : moment(s.end).format("YYYY-MM-DD");
         addDateRow(sStart, sEnd, s.id);
       });
+      sortDateRows();
 
       document.getElementById("ee-addDateBtn")?.addEventListener("click", () => addDateRow());
 
@@ -1848,10 +1941,21 @@ export const getEditEvent = async ({
               intervalMonths: eventIntervalMonths,
               jobValue: eventJobValue,
             } : {};
+            // 🐛 BUG ที่แก้ (วันที่เพิ่มทีหลังหลุดหมวดหมู่ "งานทั่วไป/งานโปรเจค"): shared
+            // (buildSharedFields) ไม่มี jobClassification และ contractCarryFields ก็มีเฉพาะงานสัญญา —
+            // แถวใหม่ที่สร้างจากตรงนี้จึงเกิดมาเป็น "ยังไม่จัดกลุ่ม" เสมอ ทั้งที่วันอื่นของงานเดียวกัน
+            // ถูกจัดเป็น "งานโปรเจค" ไว้แล้ว ทำให้ข้อมูลในงานเดียวกันขัดกันเองแล้วลามไปทุกหน้าที่อ่านค่านี้
+            // (ปฏิทิน/การดำเนินงาน/ภาพรวมงาน) — ต้องหิ้วค่าเดิมไปด้วยทุกแถวใหม่
+            // ⚠️ เฉพาะงานที่ไม่ผูกสัญญาเท่านั้น — งานสัญญาไม่มีแนวคิดหมวดหมู่นี้ (เป็นสัญญาจริงเสมอ)
+            const classCarryFields =
+              !eventContractGroupId && ev.extendedProps?.jobClassification
+                ? { jobClassification: ev.extendedProps.jobClassification }
+                : {};
             for (const r of ranges) {
               const rangeData = {
                 ...shared,
                 ...contractCarryFields,
+                ...classCarryFields,
                 ...(groupId ? { jobGroupId: groupId } : {}),
                 start: r.start,
                 end: moment(r.end).add(1, "days").format("YYYY-MM-DD"),

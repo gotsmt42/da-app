@@ -18,7 +18,7 @@ import {
 import { alpha } from "@mui/material/styles";
 import {
   Search, Clear, Refresh, Groups, PendingActions, Warning, CheckCircle,
-  HourglassTop, CalendarMonth, ArrowForwardIos,
+  HourglassTop, CalendarMonth, ArrowForwardIos, RequestQuote,
 } from "@mui/icons-material";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
@@ -93,9 +93,15 @@ export default function TeamWorkload() {
     const userById = new Map(users.map((u) => [u._id, u]));
     const userByFname = new Map(users.map((u) => [u.fname, u]));
 
-    // ✅ ลำดับความสำคัญเดียวกับที่ backend ใช้ตัดสินว่า "งานนี้ของช่างคนไหน"
-    // (resPerson ตรงๆ → ชื่อทีมตรงกับ fname → คนที่สร้าง event เอง)
+    // 🐛 BUG ที่แก้ (งานไปนับให้ผิดคน): เดิมไล่หาเจ้าของงานจาก resPerson → team → userId เท่านั้น
+    // ไม่รู้จัก "ผู้รับผิดชอบงาน" (responsiblePerson/responsiblePersonId) เลย — ซึ่งเป็นฟิลด์ที่ทั้งระบบ
+    // ใช้ตัดสินว่าใครต้องรับผิดชอบงานนี้ (ทั้งการแจ้งเตือน backend, หน้าภาพรวมงาน, หน้าติดตามใบเสนอราคา)
+    // ผลคือหน้านี้นับงานเข้าให้ "ทีมที่เข้างาน" แทนที่จะเป็นผู้รับผิดชอบ ตัวเลขจึงไม่ตรงกับหน้าอื่น
+    // ✅ ใช้ลำดับเดียวกับ resolveResponsibleUser ฝั่ง backend (services/OverdueReminder.js) เป๊ะๆ:
+    // responsiblePersonId → responsiblePerson → resPerson → team → คนที่สร้างงานเอง
     const resolveTech = (sessions) => {
+      for (const e of sessions) if (e.responsiblePersonId && userById.has(e.responsiblePersonId)) return userById.get(e.responsiblePersonId);
+      for (const e of sessions) if (e.responsiblePerson && userByFname.has(e.responsiblePerson)) return userByFname.get(e.responsiblePerson);
       for (const e of sessions) if (e.resPerson && userById.has(e.resPerson)) return userById.get(e.resPerson);
       for (const e of sessions) if (e.team && userByFname.has(e.team)) return userByFname.get(e.team);
       for (const e of sessions) if (e.userId && userById.has(e.userId)) return userById.get(e.userId);
@@ -103,7 +109,9 @@ export default function TeamWorkload() {
     };
 
     const map = new Map(technicians.map((t) => [t._id, {
-      tech: t, active: 0, pending: 0, overdue: 0, severeOverdue: 0, completedThisMonth: 0, nextJob: null,
+      tech: t, active: 0, pending: 0, overdue: 0, severeOverdue: 0, completedThisMonth: 0,
+      // ✅ ข้อมูลเพิ่มที่ช่วยตัดสินใจได้จริง — เดิมมีแค่จำนวนงาน ไม่รู้ว่าค้างนานแค่ไหน/มีงานติดตามค้างไหม
+      maxOverdueDays: 0, quotationPending: 0, nextJob: null,
     }]));
 
     jobGroups.forEach((sessions) => {
@@ -126,9 +134,6 @@ export default function TeamWorkload() {
         return;
       }
 
-      const isActive = sessions.some((e) => ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(e.status));
-      if (isActive) entry.active += 1;
-
       let lastPlanEnd = null;
       let earliestStart = null;
       sessions.forEach((e) => {
@@ -140,13 +145,36 @@ export default function TeamWorkload() {
       const daysPastDue = moment().startOf("day").diff(lastPlanEnd.startOf("day"), "days");
       // ✅ ใช้ > แทน >= — วันที่ครบพอดี 7/14 วันยังไม่ถือว่า "เกิน" (เทียบเกณฑ์เดียวกับ isFlaggedDays/
       // isSevereDays ใน utils/overdueJobs.js)
-      if (daysPastDue > WARNING_DAYS_AFTER_END) {
+      const isOverdue = daysPastDue > WARNING_DAYS_AFTER_END;
+
+      // 🐛 BUG ที่แก้ (ตัวเลขรวมกันแล้วเกินจำนวนงานจริง): เดิมนับ entry.active++ ก่อนเสมอ แล้วค่อยไปเช็ค
+      // ค้างงานแยกอีกที — งานที่ค้างเกินกำหนดจึงถูกนับทั้งใน "กำลังทำ" และ "ค้างงาน" พร้อมกัน (เห็นได้
+      // จากการ์ดที่ขึ้น "3 กำลังทำ" + "4 ค้างงาน" ทั้งที่มีงานจริงไม่ถึง 7) — เทียบกับที่เพิ่งแก้ในหน้า
+      // "การดำเนินงาน" ด้วยเหตุผลเดียวกัน: งาน 1 งานต้องอยู่กลุ่มเดียวเท่านั้น "ค้างงาน" เร่งด่วนกว่า
+      // จึงให้ครองงานนั้นไว้
+      if (isOverdue) {
         entry.overdue += 1;
         if (daysPastDue > SEVERE_DAYS_AFTER_END) entry.severeOverdue += 1;
-      } else if (!entry.nextJob || earliestStart.isBefore(entry.nextJob.start)) {
-        const head = sessions[0];
-        entry.nextJob = { start: earliestStart, title: head.title, company: head.company, site: head.site };
+        // ✅ เก็บ "ค้างนานสุดกี่วัน" ไว้ด้วย — บอกความรุนแรงได้ตรงกว่าจำนวนงานเฉยๆ
+        if (daysPastDue > entry.maxOverdueDays) entry.maxOverdueDays = daysPastDue;
+      } else if (sessions.some((e) => ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(e.status))) {
+        entry.active += 1;
       }
+
+      // 🐛 BUG ที่แก้ ("งานถัดไป" โชว์วันที่ผ่านมาแล้ว): เดิมเลือกงานที่ start เร็วที่สุดในบรรดางานที่
+      // ยังไม่ค้าง — ซึ่งรวมงานที่เริ่มไปแล้ว/เลยวันมาแล้วแต่ยังไม่ถึงเกณฑ์ค้าง (≤7 วัน) ด้วย จึงขึ้นเป็น
+      // "งานถัดไป: ... 5 ส.ค." ทั้งที่วันนี้ 10 ส.ค. ไปแล้ว — ต้องนับเฉพาะงานที่ยังมาไม่ถึงจริงๆ
+      const today = moment().startOf("day");
+      if (!isOverdue && earliestStart.startOf("day").isSameOrAfter(today)) {
+        if (!entry.nextJob || earliestStart.isBefore(entry.nextJob.start)) {
+          const head = sessions[0];
+          entry.nextJob = { start: earliestStart.clone(), title: head.title, company: head.company, site: head.site };
+        }
+      }
+
+      // ✅ ใบเสนอราคาที่ส่งลูกค้าไปแล้วรอผล — เป็นงานติดตามที่ผู้รับผิดชอบต้องทำต่อ แต่เดิมหน้านี้
+      // ไม่แสดงเลย ทั้งที่เป็นภาระงานจริงของช่างคนนั้น (ดูหน้า "ติดตามใบเสนอราคา")
+      if (sessions.some((e) => e.quotationStatus === "sent")) entry.quotationPending += 1;
     });
 
     return [...map.values()];
@@ -175,7 +203,7 @@ export default function TeamWorkload() {
   if (!loading && !isAdminOrManager) return <Navigate to="/dashboard" replace />;
 
   return (
-    <Box sx={{ px: { xs: 1.5, sm: 2 }, pt: 2, pb: 4, maxWidth: 820, mx: "auto" }}>
+    <Box sx={{ px: { xs: 1.5, sm: 2 }, pt: 2, pb: 4, maxWidth: 1200, mx: "auto" }}>
       <Stack direction="row" alignItems="flex-start" justifyContent="space-between" sx={{ mb: 2 }}>
         <Box>
           <Typography variant="h6" fontWeight={800}>ภาพรวมทีมช่าง</Typography>
@@ -249,7 +277,7 @@ export default function TeamWorkload() {
         </Box>
       ) : (
         <Stack spacing={1.5}>
-          {filtered.map(({ tech, active, pending, overdue, severeOverdue, completedThisMonth, nextJob }) => (
+          {filtered.map(({ tech, active, pending, overdue, severeOverdue, completedThisMonth, maxOverdueDays, quotationPending, nextJob }) => (
             <Box
               key={tech._id}
               onClick={() => navigate(`/operation?team=${encodeURIComponent(tech.fname || "")}`)}
@@ -275,13 +303,21 @@ export default function TeamWorkload() {
                       <Chip size="small" icon={<HourglassTop sx={{ fontSize: 12 }} />} label={`${pending} รออนุมัติ`} sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha("#f59e0b", 0.12), color: "#f59e0b" }} />
                     )}
                     {overdue > 0 && (
-                      <Chip size="small" icon={<Warning sx={{ fontSize: 12 }} />} label={severeOverdue > 0 ? `${overdue} ค้างงาน (${severeOverdue} เกิน 2 สัปดาห์)` : `${overdue} ค้างงาน`}
+                      /* ✅ เพิ่ม "ค้างนานสุดกี่วัน" — บอกความรุนแรงตรงกว่าจำนวนงานเฉยๆ (ค้าง 1 งาน
+                         30 วัน เร่งด่วนกว่าค้าง 3 งาน 8 วัน แต่เดิมดูไม่ออกจากตัวเลขอย่างเดียว) */
+                      <Chip size="small" icon={<Warning sx={{ fontSize: 12 }} />}
+                        label={`${overdue} ค้างงาน${maxOverdueDays > 0 ? ` · นานสุด ${maxOverdueDays} วัน` : ""}${severeOverdue > 0 ? ` (${severeOverdue} เกิน 2 สัปดาห์)` : ""}`}
                         sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha("#ef4444", 0.12), color: "#ef4444" }} />
+                    )}
+                    {/* ✅ ใบเสนอราคารอผลลูกค้า — ภาระงานติดตามที่ผู้รับผิดชอบต้องทำต่อ เดิมหน้านี้ไม่แสดงเลย */}
+                    {quotationPending > 0 && (
+                      <Chip size="small" icon={<RequestQuote sx={{ fontSize: 12 }} />} label={`${quotationPending} ใบเสนอราคารอผล`}
+                        sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha("#8b5cf6", 0.12), color: "#8b5cf6" }} />
                     )}
                     {completedThisMonth > 0 && (
                       <Chip size="small" icon={<CheckCircle sx={{ fontSize: 12 }} />} label={`${completedThisMonth} เสร็จเดือนนี้`} sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha("#10b981", 0.12), color: "#10b981" }} />
                     )}
-                    {active === 0 && pending === 0 && overdue === 0 && completedThisMonth === 0 && (
+                    {active === 0 && pending === 0 && overdue === 0 && completedThisMonth === 0 && quotationPending === 0 && (
                       <Typography variant="caption" color="text.disabled">ไม่มีงานในตอนนี้</Typography>
                     )}
                   </Stack>

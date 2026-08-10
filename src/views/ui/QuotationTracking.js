@@ -3,7 +3,7 @@
  *
  * เดิมช่างอัพโหลดใบเสนอราคาเข้า Operation ได้อยู่แล้ว (quotationFiles/quotationApplicable) แต่ไม่มี
  * ที่ไหนติดตามต่อว่า "ส่งลูกค้าหรือยัง / ลูกค้าตอบว่าอย่างไร / ต้องติดตามไหม" เลย — หน้านี้เพิ่ม
- * lifecycle ให้ครบ: รอช่างแนบไฟล์ → รอส่งลูกค้า → ส่งแล้วรอลูกค้าตอบ (เกิน 3 วันไม่มีผล = ต้องติดตามด่วน)
+ * lifecycle ให้ครบ: รอช่างแนบไฟล์ → รอส่งลูกค้า → ส่งแล้วรอลูกค้าตอบ (ไม่ได้ติดต่อลูกค้าเกิน 7 วัน = ต้องติดตามด่วน)
  * → อนุมัติ/ปฏิเสธ/ขอแก้ไข (วนกลับไปส่งใหม่ได้)
  *
  * ✅ v2: มือถือใช้ยาก — เดิมแท็บกรองสถานะเป็นแถว Chip เลื่อนแนวนอน (ล้นขอบจอ มองแล้วเหมือนตัด)
@@ -12,7 +12,7 @@
  *
  * ✅ v3: เปิดให้ช่างเข้าดู "งานของตัวเอง" ได้ด้วย (เดิม admin/manager เท่านั้น) — ช่างดูสถานะ/ไฟล์
  * (read-only, เหมือนเดิม) และบันทึก "การติดตามลูกค้า" แบบเป็นครั้งๆ (ครั้งที่ 1,2,3... พร้อมแนบ
- * หลักฐานถ้ามี) ได้ แต่การเปลี่ยนสถานะ (ส่ง/อนุมัติ/ปฏิเสธ/แก้ไข) และมูลค่างานยังเป็นสิทธิ์
+ * หลักฐานถ้ามี) ได้ แต่การเปลี่ยนสถานะ (ส่ง/อนุมัติ/ปฏิเสธ/แก้ไข) และมูลค่าใบเสนอราคายังเป็นสิทธิ์
  * admin/manager เท่านั้น (เทียบ pattern เดียวกับ flow ขอปิดงานที่ต้อง admin อนุมัติ) — เพิ่มตัวกรอง
  * "แยกตามช่าง" (admin/manager เท่านั้น) ให้เห็นว่าช่างแต่ละคนมีใบเสนอราคาค้างอยู่เท่าไหร่
  *
@@ -34,18 +34,25 @@ import {
   Tooltip, Skeleton, Snackbar, Alert, Button, Divider, Grid, CardContent,
   Menu, MenuItem, ListItemIcon, ListItemText, Dialog, DialogContent,
   useMediaQuery, useTheme, Pagination,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
+  ToggleButtonGroup, ToggleButton,
 } from "@mui/material";
 import {
   Search, Clear, Refresh, RequestQuote, Send, CheckCircle, Cancel,
   Autorenew, HourglassTop, Warning, ExpandMore, ChevronRight, AttachFile,
   Chat, OpenInNew, PriceCheck, Close, History, Person,
+  ViewList, TableChart, Description,
 } from "@mui/icons-material";
+// ✅ ไอคอนไฟล์ Excel — ใช้ตัวเดียวกับปุ่มส่งออก Excel ในหน้าปฏิทิน (EventCalendar) ให้ทั้งแอปสื่อความหมาย
+// เดียวกัน (MUI ไม่มีไอคอนไฟล์ Excel ในชุดมาตรฐาน จึงใช้ FontAwesome ที่โปรเจกต์ติดตั้งไว้แล้ว)
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faFileExcel } from "@fortawesome/free-solid-svg-icons";
 import { useAuth } from "../../auth/AuthContext";
 import EventService from "../../services/EventService";
 import AuthService from "../../services/authService";
 import { GlassCard, StatCard, FileUploadSection, CommentThread, FilePreviewDialog } from "../../components/Operation";
 import { getOverdueGroupKey, resolveAssignedTechnician } from "../../utils/overdueJobs";
-import { WARNING_DAYS_AFTER_SENT, getDaysSinceSent, resolveQuotationGroup } from "../../utils/quotationTracking";
+import { WARNING_DAYS_AFTER_SENT, getFollowUpInfo, resolveQuotationGroup } from "../../utils/quotationTracking";
 import { formatEventDateRange } from "../../utils/formatDateRange";
 import { formatRoundLabel } from "../../utils/contractRounds";
 
@@ -92,8 +99,15 @@ const STATUS_ACTIONS = [
   { action: "reject",  label: "ลูกค้าปฏิเสธ",                 icon: <Cancel sx={{ fontSize: 16 }} />,      color: "#94a3b8" },
 ];
 
-// ─── ช่องกรอกมูลค่างานแบบกดแก้ตรงจุด (เทียบ pattern เดียวกับ docNo ในหน้า Operation) ───
-const AmountEditor = ({ value, onSave }) => {
+// ─── ช่องกรอก "มูลค่าใบเสนอราคา" แบบกดแก้ตรงจุด (เทียบ pattern เดียวกับ docNo ในหน้า Operation) ───
+// 🐛 ปรับตามที่ผู้ใช้แจ้ง (ราคาที่แสดง/แก้ไข ต้องเป็นราคาของ "ใบเสนอราคา" ไม่ใช่ราคางาน):
+// ค่านี้เก็บที่ฟิลด์ quotationAmount ซึ่งเป็นฟิลด์อิสระจาก jobValue (ราคางานตามสัญญา) อยู่แล้วตั้งแต่แรก
+// — ฝั่งข้อมูลถูกต้องดี แต่ "หน้าจอเรียกมันว่า มูลค่างาน" ซึ่งเป็นคำเดียวกับที่หน้า "ภาพรวมงาน" ใช้เรียก
+// jobValue เป๊ะๆ ผู้ใช้จึงเข้าใจว่าตัวเลขนี้ดึงมาจากราคางานอัตโนมัติ ทั้งที่จริงต้องกรอกเองทุกใบ
+// ✅ เปลี่ยนชื่อให้ตรงความหมาย ("มูลค่าใบเสนอราคา") + เปลี่ยนจากลิงก์ตัวหนังสือเล็กๆ ซ่อนมุมขวา เป็นช่อง
+// กรอกที่เห็นชัดพร้อมป้ายกำกับ เพราะเป็นค่าที่ "ต้องกรอกเพิ่มเอง" ไม่มีทางมาเองได้ ถ้าไม่เด่นก็ไม่มีใครกรอก
+// แล้วยอดรวมในการ์ดสรุปจะต่ำกว่าความจริงโดยไม่มีใครรู้
+const AmountEditor = ({ value, onSave, compact = false }) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value ?? "");
 
@@ -106,24 +120,66 @@ const AmountEditor = ({ value, onSave }) => {
   if (editing) {
     return (
       <Stack direction="row" gap={0.5} alignItems="center" onClick={(e) => e.stopPropagation()}>
-        <TextField size="small" variant="standard" type="number" autoFocus
+        <TextField size="small" type="number" autoFocus
           value={draft} onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && save()}
-          inputProps={{ style: { fontSize: "0.8rem" } }} sx={{ width: 110 }} />
-        <Button size="small" onClick={save} sx={{ minWidth: "auto", p: 0.5, fontSize: "0.7rem" }}>บันทึก</Button>
-        <Button size="small" color="inherit" onClick={() => { setDraft(value ?? ""); setEditing(false); }} sx={{ minWidth: "auto", p: 0.5, fontSize: "0.7rem" }}>ยกเลิก</Button>
+          onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") { setDraft(value ?? ""); setEditing(false); } }}
+          placeholder="0"
+          InputProps={{ startAdornment: <Typography sx={{ mr: 0.5, color: "text.disabled" }}>฿</Typography> }}
+          inputProps={{ min: 0, style: { fontSize: "0.85rem" } }}
+          sx={{ width: 150 }} />
+        <Button size="small" variant="contained" onClick={save} sx={{ textTransform: "none", minWidth: "auto", px: 1.25 }}>บันทึก</Button>
+        <Button size="small" color="inherit" onClick={() => { setDraft(value ?? ""); setEditing(false); }}
+          sx={{ textTransform: "none", minWidth: "auto", px: 1 }}>ยกเลิก</Button>
       </Stack>
     );
   }
+
+  // ✅ โหมดกระชับ (ใช้ในการ์ดรายการ) — แค่แสดงค่า ไม่ต้องมีกรอบ
+  if (compact) {
+    return (
+      <Stack direction="row" gap={0.5} alignItems="center"
+        sx={{ cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); setEditing(true); }}>
+        <PriceCheck sx={{ fontSize: 15, color: "text.disabled" }} />
+        <Typography variant="caption" color={value ? "text.primary" : "warning.main"} fontWeight={700}
+          sx={{ "&:hover": { color: "primary.main", textDecoration: "underline" } }}>
+          {value ? `฿${Number(value).toLocaleString()}` : "กรอกมูลค่าใบเสนอราคา"}
+        </Typography>
+      </Stack>
+    );
+  }
+
+  // ✅ โหมดเต็ม (กล่องรายละเอียด) — ยังไม่กรอก = กล่องสีส้มชวนให้กด ไม่ใช่ข้อความเทาจางที่มองข้ามได้
   return (
-    <Stack direction="row" gap={0.5} alignItems="center"
-      sx={{ cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); setEditing(true); }}>
-      <PriceCheck sx={{ fontSize: 15, color: "text.disabled" }} />
-      <Typography variant="caption" color={value ? "text.primary" : "text.disabled"} fontWeight={600}
-        sx={{ "&:hover": { color: "primary.main", textDecoration: "underline" } }}>
-        {value ? `฿${Number(value).toLocaleString()}` : "ระบุมูลค่างาน"}
+    <Box
+      onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+      sx={{
+        p: 1.25, borderRadius: 2, cursor: "pointer", width: "100%",
+        border: "1px solid",
+        borderColor: value ? "divider" : alpha("#f59e0b", 0.5),
+        bgcolor: value ? "transparent" : alpha("#f59e0b", 0.07),
+        transition: "border-color .15s, background-color .15s",
+        "&:hover": { borderColor: "primary.main" },
+      }}
+    >
+      <Stack direction="row" alignItems="center" gap={1}>
+        <PriceCheck sx={{ fontSize: 18, color: value ? "text.disabled" : "#b45309" }} />
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ display: "block", lineHeight: 1.2 }}>
+            มูลค่าใบเสนอราคา
+          </Typography>
+          <Typography fontWeight={800} fontSize="1rem" color={value ? "text.primary" : "#b45309"} sx={{ lineHeight: 1.3 }}>
+            {value ? `฿${Number(value).toLocaleString()}` : "ยังไม่ระบุ — กดเพื่อกรอก"}
+          </Typography>
+        </Box>
+        <Typography variant="caption" color="primary.main" fontWeight={700} sx={{ flexShrink: 0 }}>
+          {value ? "แก้ไข" : "กรอก"}
+        </Typography>
+      </Stack>
+      {/* ✅ บอกให้ชัดว่าเป็นคนละตัวกับราคางานตามสัญญา กันกรอกผิดช่อง/เข้าใจว่าระบบดึงมาให้เอง */}
+      <Typography variant="caption" color="text.disabled" sx={{ display: "block", mt: 0.4, fontSize: "0.68rem" }}>
+        ราคาที่เสนอลูกค้าในใบนี้ — แยกจาก "มูลค่างาน" ของสัญญาในหน้าภาพรวมงาน
       </Typography>
-    </Stack>
+    </Box>
   );
 };
 
@@ -144,11 +200,15 @@ const InfoLine = ({ icon, label, children }) => (
 // ✅ perf: auto-refresh ทุก 30 วิ แทนที่ events ทั้งก้อนด้วย object ใหม่เสมอ (แม้ข้อมูลจริงไม่เปลี่ยน)
 // memo ไว้เทียบด้วยค่าจริง (updatedAt/groupKey) กันการ์ดที่ไม่มีอะไรเปลี่ยนต้อง re-render ทุก tick —
 // onOpen ต้องเป็น stable reference จากต้นทาง (เป็น setDetailJob ตรงๆ อยู่แล้ว จึง stable โดยธรรมชาติ)
-const QuotationCard = memo(({ job, onOpen }) => {
+const QuotationCard = memo(({ job, onOpen, onPreview }) => {
   const anchor = job.sessions[0];
   const groupKey = job.groupKey;
+  // ✅ ไฟล์ใบเสนอราคาจริง — เดิมต้องเปิดการ์ด → เลื่อนหาส่วนไฟล์ → ค่อยกดดู (3 ขั้น) ทั้งที่เป็นสิ่งที่
+  // อยากดูบ่อยที่สุดในหน้านี้ ตอนนี้กดจากการ์ดได้เลยในขั้นเดียว
+  const quotationFiles = anchor.quotationFiles || [];
   const meta = STATUS_META[groupKey] || STATUS_META.not_sent;
-  const days = getDaysSinceSent(anchor);
+  // ✅ ข้อมูลติดตามครบชุดจาก util กลาง (นับจาก "ติดต่อลูกค้าครั้งล่าสุด" ไม่ใช่วันที่ส่งอย่างเดียว)
+  const followUp = getFollowUpInfo(anchor);
 
   return (
     <GlassCard sx={{ mb: 1.5, border: "1px solid", borderColor: alpha(meta.color, 0.3), cursor: "pointer" }}
@@ -171,9 +231,29 @@ const QuotationCard = memo(({ job, onOpen }) => {
               <Typography variant="caption" color="text.secondary" fontWeight={600} noWrap>
                 📅 {formatEventDateRange(anchor)}
               </Typography>
-              {groupKey === "follow_up" && (
-                <Chip size="small" label={`${days} วัน`} sx={{
+              {/* ✅ เดิมโชว์แค่ "N วัน" เฉยๆ เฉพาะตอนเลยกำหนด ซึ่งนับจากวันที่ส่งเสมอ — ใบที่ตามไปแล้ว
+                  5 ครั้งกับใบที่ปล่อยทิ้งไว้เฉยๆ จึงหน้าตาเหมือนกันเป๊ะ แยกไม่ออกว่าต้องจัดการแบบไหน
+                  ✅ ตอนนี้บอก "เงียบมากี่วันนับจากติดต่อครั้งล่าสุด" (ตรงกับเกณฑ์เตือนจริง) และใบที่ยัง
+                  ไม่ถึงกำหนดก็บอกว่าเหลืออีกกี่วัน ให้วางแผนล่วงหน้าได้ ไม่ใช่รอจนแดงแล้วค่อยรู้ */}
+              {followUp?.needsFollowUp && (
+                <Chip size="small" label={`เงียบ ${followUp.daysSinceLastContact} วัน`} sx={{
                   height: 22, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha("#ef4444", 0.12), color: "#ef4444",
+                }} />
+              )}
+              {followUp && !followUp.needsFollowUp && (
+                <Chip size="small"
+                  label={followUp.daysUntilDue > 0 ? `ตามอีกใน ${followUp.daysUntilDue} วัน` : "ถึงกำหนดตามวันนี้"}
+                  sx={{
+                    height: 22, fontSize: "0.68rem", fontWeight: 600,
+                    bgcolor: alpha(followUp.daysUntilDue > 0 ? "#64748b" : "#f59e0b", 0.1),
+                    color: followUp.daysUntilDue > 0 ? "#64748b" : "#b45309",
+                  }} />
+              )}
+              {/* ✅ เห็นได้ทันทีจากการ์ดว่าเคยตามไปแล้วกี่ครั้ง ไม่ต้องเปิดเข้าไปดูข้างในก่อน */}
+              {followUp?.followUpCount > 0 && (
+                <Chip size="small" label={`☎️ ตามแล้ว ${followUp.followUpCount} ครั้ง`} sx={{
+                  height: 22, fontSize: "0.68rem", fontWeight: 600,
+                  bgcolor: alpha("#0ea5e9", 0.1), color: "#0369a1",
                 }} />
               )}
             </Stack>
@@ -192,11 +272,38 @@ const QuotationCard = memo(({ job, onOpen }) => {
               {anchor.docNo && <InfoLine icon="📄" label="เอกสาร">{anchor.docNo}</InfoLine>}
             </Stack>
 
-            {anchor.quotationAmount ? (
-              <Typography variant="caption" fontWeight={700} sx={{ display: "block", mt: 0.75 }}>
-                ฿{Number(anchor.quotationAmount).toLocaleString()}
+            {/* ✅ เดิมโชว์แค่ตัวเลข "฿86,000" ลอยๆ ไม่มีป้ายกำกับ อ่านแล้วเดาไม่ออกว่าเป็นราคาอะไร
+                (ราคางาน? ราคาใบเสนอราคา?) และถ้ายังไม่กรอกก็ไม่แสดงอะไรเลย จนไม่มีใครรู้ว่าขาดอยู่ —
+                ตอนนี้ติดป้ายชัดเจน และใบที่ยังไม่กรอกขึ้นเตือนเป็นสีส้มให้เห็นตั้งแต่หน้ารายการ */}
+            <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" sx={{ mt: 0.75 }}>
+              <Typography variant="caption">
+                {anchor.quotationAmount ? (
+                  <>
+                    <Box component="span" sx={{ color: "text.secondary" }}>💰 มูลค่าใบเสนอราคา : </Box>
+                    <Box component="span" sx={{ fontWeight: 800 }}>฿{Number(anchor.quotationAmount).toLocaleString()}</Box>
+                  </>
+                ) : (
+                  <Box component="span" sx={{ color: "#b45309", fontWeight: 700 }}>
+                    💰 ยังไม่ระบุมูลค่าใบเสนอราคา
+                  </Box>
+                )}
               </Typography>
-            ) : null}
+              <Box sx={{ flex: 1 }} />
+              {/* ✅ ลิงก์เปิด "ใบเสนอราคาจริง" ตรงจากการ์ด — หยุด event ไม่ให้ลอยไปเปิด Dialog รายละเอียด */}
+              {quotationFiles.length > 0 ? (
+                <Button
+                  size="small" variant="outlined" startIcon={<Description sx={{ fontSize: 15 }} />}
+                  onClick={(e) => { e.stopPropagation(); onPreview(quotationFiles[0].fileUrl, quotationFiles[0].fileName); }}
+                  sx={{ textTransform: "none", borderRadius: 2, fontSize: "0.7rem", py: 0.25 }}
+                >
+                  ดูใบเสนอราคา{quotationFiles.length > 1 ? ` (${quotationFiles.length})` : ""}
+                </Button>
+              ) : (
+                <Chip size="small" label="ยังไม่มีไฟล์" sx={{
+                  height: 20, fontSize: "0.65rem", bgcolor: alpha("#94a3b8", 0.12), color: "#64748b",
+                }} />
+              )}
+            </Stack>
           </Box>
 
           <ChevronRight sx={{ color: "text.disabled", flexShrink: 0, mt: 0.5 }} />
@@ -215,11 +322,112 @@ const QuotationCard = memo(({ job, onOpen }) => {
   );
 });
 
+// ─── มุมมองตาราง — ทางเลือกของการ์ด สำหรับดูหลายรายการพร้อมกัน/เปรียบเทียบ/หายอดรวม ────────
+// ✅ การ์ดอ่านง่ายทีละใบก็จริง แต่พอมี 30-40 ใบต้องเลื่อนยาวมากและเทียบข้ามใบไม่ได้เลย (เช่น อยากรู้ว่า
+// ใบไหนเงียบนานสุด/มูลค่าเท่าไหร่บ้าง) ตารางตอบโจทย์คนละแบบ — ให้สลับได้ตามงานที่กำลังทำอยู่
+const QuotationTable = ({ jobs, onOpen, onPreview }) => (
+  <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 3, overflowX: "auto" }}>
+    {/* ✅ minWidth กันตารางถูกบีบจนอ่านไม่ออกบนจอแคบ (ยังเลื่อนแนวนอนได้) แต่บนจอกว้างให้ยืดเต็มพื้นที่
+        ที่มี ไม่ใช่ค้างอยู่ที่ 1100px แล้วเหลือที่ว่างข้างๆ เปล่าๆ */}
+    <Table size="small" sx={{ minWidth: 1000, width: "100%" }}>
+      <TableHead>
+        <TableRow sx={{ "& th": { fontWeight: 700, bgcolor: "#eff6ff", color: "#1e3a8a", whiteSpace: "nowrap" } }}>
+          <TableCell>สถานะ</TableCell>
+          <TableCell>บริษัท / โครงการ</TableCell>
+          <TableCell>ประเภทงาน · ระบบ</TableCell>
+          <TableCell align="right">มูลค่าใบเสนอราคา</TableCell>
+          <TableCell align="center">ส่งลูกค้า</TableCell>
+          <TableCell align="center">ตามแล้ว</TableCell>
+          <TableCell align="center">เงียบมา</TableCell>
+          <TableCell align="center">ใบเสนอราคา</TableCell>
+          <TableCell align="center" />
+        </TableRow>
+      </TableHead>
+      <TableBody>
+        {jobs.map((job, idx) => {
+          const a = job.sessions[0];
+          const meta = STATUS_META[job.groupKey] || STATUS_META.not_sent;
+          const info = getFollowUpInfo(a);
+          const files = a.quotationFiles || [];
+          return (
+            <TableRow
+              key={a._id} hover
+              onClick={() => onOpen(job)}
+              sx={{ cursor: "pointer", bgcolor: idx % 2 ? alpha("#0f172a", 0.02) : "transparent" }}
+            >
+              <TableCell sx={{ whiteSpace: "nowrap" }}>
+                <Chip size="small" icon={meta.icon} label={meta.label} sx={{
+                  height: 22, fontSize: "0.68rem", fontWeight: 700,
+                  bgcolor: alpha(meta.color, 0.12), color: meta.color, "& .MuiChip-icon": { color: meta.color },
+                }} />
+              </TableCell>
+              <TableCell sx={{ maxWidth: 240 }}>
+                <Typography variant="caption" fontWeight={700} noWrap sx={{ display: "block" }}>
+                  {a.company || "-"}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block" }}>
+                  {a.site || "-"}
+                </Typography>
+              </TableCell>
+              <TableCell sx={{ maxWidth: 180 }}>
+                <Typography variant="caption" noWrap sx={{ display: "block" }}>{a.title || "-"}</Typography>
+                <Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block" }}>{a.system || "-"}</Typography>
+              </TableCell>
+              <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                {a.quotationAmount ? (
+                  <Typography variant="caption" fontWeight={800}>฿{Number(a.quotationAmount).toLocaleString()}</Typography>
+                ) : (
+                  <Typography variant="caption" sx={{ color: "#b45309", fontWeight: 700 }}>ยังไม่ระบุ</Typography>
+                )}
+              </TableCell>
+              <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
+                <Typography variant="caption" color="text.secondary">
+                  {a.quotationSentAt ? moment(a.quotationSentAt).locale("th").format("D MMM YY") : "-"}
+                </Typography>
+              </TableCell>
+              <TableCell align="center">
+                <Typography variant="caption" fontWeight={info?.followUpCount ? 700 : 400}
+                  color={info?.followUpCount ? "success.main" : "text.disabled"}>
+                  {info ? `${info.followUpCount} ครั้ง` : "-"}
+                </Typography>
+              </TableCell>
+              <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
+                {info ? (
+                  <Typography variant="caption" fontWeight={info.needsFollowUp ? 800 : 400}
+                    color={info.needsFollowUp ? "error.main" : "text.secondary"}>
+                    {info.daysSinceLastContact} วัน
+                  </Typography>
+                ) : <Typography variant="caption" color="text.disabled">-</Typography>}
+              </TableCell>
+              <TableCell align="center">
+                {files.length > 0 ? (
+                  <Tooltip title={files[0].fileName || "เปิดใบเสนอราคา"}>
+                    <IconButton size="small" color="primary"
+                      onClick={(e) => { e.stopPropagation(); onPreview(files[0].fileUrl, files[0].fileName); }}>
+                      <Description sx={{ fontSize: 18 }} />
+                    </IconButton>
+                  </Tooltip>
+                ) : (
+                  <Typography variant="caption" color="text.disabled">ไม่มีไฟล์</Typography>
+                )}
+              </TableCell>
+              <TableCell align="center">
+                <ChevronRight sx={{ color: "text.disabled", fontSize: 18 }} />
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
+  </TableContainer>
+);
+
 // ─── ประวัติการติดตามลูกค้า — บันทึกได้ทั้งช่างและแอดมิน/manager (คนที่โทร/คุยกับลูกค้าจริงมักเป็น
 // ช่าง) ครั้งที่นับอัตโนมัติจากจำนวนรายการเดิม (server คำนวณจริง ฝั่งนี้แค่โชว์ผลลัพธ์ที่ได้กลับมา) ───
 const FollowUpSection = ({ job, onSubmit, onPreview }) => {
   const anchor = job.sessions[0];
   const followUps = anchor.quotationFollowUps || [];
+  const followUpInfo = getFollowUpInfo(anchor);
   const [note, setNote] = useState("");
   const [file, setFile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -240,6 +448,34 @@ const FollowUpSection = ({ job, onSubmit, onPreview }) => {
         sx={{ textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 0.5, mb: 1 }}>
         <History sx={{ fontSize: 14 }} /> ประวัติการติดตามลูกค้า{followUps.length > 0 && ` (${followUps.length})`}
       </Typography>
+
+      {/* ✅ สรุปสถานะติดตามให้เห็นชัดในบรรทัดเดียว — ตามที่ผู้ใช้ขอ ("บันทึกผลแล้วให้แสดงให้ชัดเจน และ
+          นับไปอีก 7 วัน") เดิมต้องไล่อ่านรายการประวัติเองแล้วคำนวณในหัวว่าครบกำหนดหรือยัง */}
+      {followUpInfo && (
+        <Box sx={{
+          p: 1.25, mb: 1.5, borderRadius: 2,
+          bgcolor: alpha(followUpInfo.needsFollowUp ? "#ef4444" : "#10b981", 0.07),
+          border: "1px solid",
+          borderColor: alpha(followUpInfo.needsFollowUp ? "#ef4444" : "#10b981", 0.25),
+        }}>
+          <Typography variant="caption" fontWeight={700}
+            sx={{ display: "block", color: followUpInfo.needsFollowUp ? "#b91c1c" : "#047857" }}>
+            {followUpInfo.needsFollowUp
+              ? `⚠️ ถึงเวลาติดตาม — เงียบมา ${followUpInfo.daysSinceLastContact} วันแล้ว`
+              : followUpInfo.daysUntilDue > 0
+                ? `✅ ติดตามแล้ว — ครบกำหนดตามรอบถัดไปอีก ${followUpInfo.daysUntilDue} วัน`
+                : "⏰ ครบกำหนดติดตามรอบถัดไปวันนี้"}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25 }}>
+            {followUpInfo.lastContactIsFollowUp
+              ? `ติดตามล่าสุด ${followUpInfo.lastContactAt.locale("th").format("D MMM YYYY")}`
+              : `ส่งใบเสนอราคา ${followUpInfo.lastContactAt.locale("th").format("D MMM YYYY")}`}
+            {" · "}ครบกำหนด {followUpInfo.dueAt.locale("th").format("D MMM YYYY")}
+            {followUpInfo.daysSinceSent !== followUpInfo.daysSinceLastContact &&
+              ` · ส่งไปแล้วรวม ${followUpInfo.daysSinceSent} วัน`}
+          </Typography>
+        </Box>
+      )}
 
       {followUps.length > 0 && (
         <Stack spacing={1} sx={{ mb: 1.5 }}>
@@ -329,7 +565,7 @@ const QuotationDetailDialog = ({ job, currentUserRole, onClose, onAction, onAmou
   const isAdminOrManager = ["admin", "manager"].includes(currentUserRole);
   // ✅ ช่างแก้ไขสถานะงานของตัวเองได้ด้วย (ไม่ใช่แค่ดู) — backend อนุญาตอยู่แล้ว (เจ้าของ/ผู้ได้รับ
   // มอบหมายแก้ไข event ตัวเองได้เสมอ ดู PUT /:id) และ /quotations ก็ scope ให้ช่างเห็นแค่งานตัวเอง
-  // อยู่แล้วด้วย (getEventOp) เลยไม่ต้องกันเพิ่มฝั่งนี้ — ยกเว้นมูลค่างาน (AmountEditor) ที่ยังเป็น
+  // อยู่แล้วด้วย (getEventOp) เลยไม่ต้องกันเพิ่มฝั่งนี้ — ยกเว้นมูลค่าใบเสนอราคา (AmountEditor) ที่ยังเป็น
   // สิทธิ์ admin/manager เท่านั้นเหมือนเดิม (ไม่ได้ถูกขอให้เปลี่ยน)
   const canEditStatus = isAdminOrManager || currentUserRole === "technician";
 
@@ -373,13 +609,25 @@ const QuotationDetailDialog = ({ job, currentUserRole, onClose, onAction, onAmou
               bgcolor: alpha(meta.color, 0.12), color: meta.color, "& .MuiChip-icon": { color: meta.color },
             }} />
           )}
-          <Box sx={{ flex: 1 }} />
+        </Stack>
+
+        {/* ✅ ย้ายมูลค่าใบเสนอราคาออกจากมุมขวาของแถวสถานะ (เดิมเป็นตัวหนังสือจางๆ เบียดอยู่ท้ายแถว
+            มองข้ามได้ง่ายมาก) มาเป็นบล็อกของตัวเองใต้สถานะ — เป็นข้อมูลสำคัญที่ต้องกรอกเองทุกใบ
+            และเป็นตัวตั้งของยอดรวมในการ์ดสรุปด้านบนของหน้า จึงควรเห็นชัดตั้งแต่เปิดกล่องมา */}
+        <Box sx={{ mb: 1.5 }}>
           {isAdminOrManager ? (
             <AmountEditor value={anchor.quotationAmount} onSave={(v) => onAmountSave(job, v)} />
-          ) : anchor.quotationAmount ? (
-            <Typography variant="caption" fontWeight={700}>฿{Number(anchor.quotationAmount).toLocaleString()}</Typography>
-          ) : null}
-        </Stack>
+          ) : (
+            <Box sx={{ p: 1.25, borderRadius: 2, border: "1px solid", borderColor: "divider" }}>
+              <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ display: "block", lineHeight: 1.2 }}>
+                มูลค่าใบเสนอราคา
+              </Typography>
+              <Typography fontWeight={800} fontSize="1rem" color={anchor.quotationAmount ? "text.primary" : "text.disabled"}>
+                {anchor.quotationAmount ? `฿${Number(anchor.quotationAmount).toLocaleString()}` : "ยังไม่ระบุ"}
+              </Typography>
+            </Box>
+          )}
+        </Box>
 
         <Grid container spacing={2}>
           <Grid item xs={12}>
@@ -395,7 +643,7 @@ const QuotationDetailDialog = ({ job, currentUserRole, onClose, onAction, onAmou
           </Grid>
 
           {/* ปุ่มดำเนินการตามสถานะปัจจุบัน — เปลี่ยนสถานะได้ทั้ง admin/manager และช่าง (เจ้าของงาน)
-              ส่วนมูลค่างานยังเป็นสิทธิ์ admin/manager เท่านั้น (ดู AmountEditor ด้านบน) */}
+              ส่วนมูลค่าใบเสนอราคายังเป็นสิทธิ์ admin/manager เท่านั้น (ดู AmountEditor ด้านบน) */}
           {canEditStatus && (
             <Grid item xs={12}>
               <Stack direction="row" gap={1} flexWrap="wrap">
@@ -567,6 +815,15 @@ export default function QuotationTracking() {
   // ✅ perf: เดิมไม่แบ่งหน้าเลย render ทุกงานที่ผ่านตัวกรองพร้อมกันทั้งหมด ยิ่งงานสะสมเยอะยิ่งหน่วง
   // (เทียบ pattern เดียวกับหน้า Operation ที่แบ่งหน้าอยู่แล้ว) — หน้าละ 10 งาน
   const [page, setPage] = useState(1);
+  // ✅ สลับมุมมองการ์ด/ตาราง — จำค่าไว้ข้ามการเปิดหน้า เพราะแต่ละคนถนัดคนละแบบและมักใช้แบบเดิมตลอด
+  const [viewMode, setViewMode] = useState(() => {
+    try { return localStorage.getItem("quotations.viewMode") === "table" ? "table" : "card"; }
+    catch { return "card"; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("quotations.viewMode", viewMode); } catch {}
+  }, [viewMode]);
+  const [exporting, setExporting] = useState(false);
   const QUOTATIONS_PAGE_SIZE = 10;
   const [detailJob, setDetailJob] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -693,12 +950,21 @@ export default function QuotationTracking() {
     return c;
   }, [techFilteredJobs]);
 
-  const approvedValue = useMemo(
-    () => techFilteredJobs
-      .filter((job) => job.groupKey === "approved")
-      .reduce((sum, job) => sum + (Number(job.sessions[0].quotationAmount) || 0), 0),
-    [techFilteredJobs],
-  );
+  // ✅ ยอดรวมมูลค่าใบเสนอราคาที่ลูกค้าอนุมัติแล้ว — พร้อมนับใบที่ "ยังไม่กรอกมูลค่า" แยกไว้ด้วย
+  // ⚠️ มูลค่าใบเสนอราคาต้องกรอกเองทุกใบ (ไม่ได้ดึงจากราคางานตามสัญญาให้อัตโนมัติ) ใบที่ยังไม่กรอกจึงถูก
+  // นับเป็น 0 ในยอดรวม — เดิมไม่มีอะไรบอกเลย ยอดรวมจึงต่ำกว่าความจริงแบบเงียบๆ และไม่มีใครรู้ว่าขาดกี่ใบ
+  const approvedStats = useMemo(() => {
+    const approved = techFilteredJobs.filter((job) => job.groupKey === "approved");
+    let total = 0;
+    let missing = 0;
+    approved.forEach((job) => {
+      const amount = Number(job.sessions[0].quotationAmount) || 0;
+      if (amount > 0) total += amount;
+      else missing += 1;
+    });
+    return { total, missing };
+  }, [techFilteredJobs]);
+  const approvedValue = approvedStats.total;
 
   const filteredJobs = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -720,10 +986,45 @@ export default function QuotationTracking() {
   useEffect(() => { setPage(1); }, [group, selectedTechId, search]);
 
   const totalPages = Math.max(1, Math.ceil(filteredJobs.length / QUOTATIONS_PAGE_SIZE));
+  // ✅ กันหน้าค้างเกินจำนวนหน้าจริง (auto-refresh ทุก 30 วิ อาจทำให้รายการลดลงจนหน้าปัจจุบันไม่มีข้อมูล
+  // แล้วเห็นหน้าว่างเปล่าโดยไม่มีอะไรอธิบาย — เทียบ pattern เดียวกับ safePage ในหน้า "ภาพรวมงาน")
+  const safePage = Math.min(page, totalPages);
   const pagedJobs = useMemo(
-    () => filteredJobs.slice((page - 1) * QUOTATIONS_PAGE_SIZE, page * QUOTATIONS_PAGE_SIZE),
-    [filteredJobs, page],
+    () => filteredJobs.slice((safePage - 1) * QUOTATIONS_PAGE_SIZE, safePage * QUOTATIONS_PAGE_SIZE),
+    [filteredJobs, safePage],
   );
+
+  // ✅ ส่งออก Excel — ส่งออก "ทุกใบที่ผ่านตัวกรองอยู่" (filteredJobs) ไม่ใช่แค่หน้าที่เปิดอยู่
+  // โหลด exceljs แบบ dynamic ตอนกดจริงเท่านั้น (ไลบรารีก้อนใหญ่) ไม่ให้ถ่วงเวลาโหลดหน้าของทุกคน
+  const handleExportExcel = async () => {
+    if (exporting || filteredJobs.length === 0) return;
+    setExporting(true);
+    try {
+      const { exportQuotationsToExcel, buildQuotationFileName } = await import("./quotationExcelExport");
+      const tabLabel = TAB_META[group]?.label || "ทั้งหมด";
+      const filters = [];
+      if (search.trim()) filters.push(`ค้นหา "${search.trim()}"`);
+      if (selectedTechId) {
+        const t = technicians.find((u) => u._id === selectedTechId);
+        if (t) filters.push(`ผู้รับผิดชอบ ${t.fname || t.username}`);
+      }
+      await exportQuotationsToExcel({
+        jobs: filteredJobs,
+        meta: {
+          fileName: buildQuotationFileName(tabLabel),
+          tabLabel: `หมวด: ${tabLabel}`,
+          filterSummary: filters.length > 0 ? `ตัวกรอง: ${filters.join(" · ")}` : "ไม่ได้กรองเพิ่มเติม",
+          exportedAt: moment().format("DD/MM/YYYY HH:mm"),
+        },
+        getFollowUpInfo,
+        formatEventDateRange,
+      });
+    } catch (err) {
+      setSnackbar({ open: true, msg: err?.message || "ส่งออกไม่สำเร็จ", severity: "error" });
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const updateQuotationFields = useCallback(async (job, fields, logEntry) => {
     try {
@@ -840,17 +1141,28 @@ export default function QuotationTracking() {
   const statCards = [
     { key: "pending", label: TAB_META.pending.label, value: tabCounts.pending,
       color: "linear-gradient(135deg,#3b82f6,#1d4ed8)", icon: <Send />,
-      sub: counts.follow_up > 0 ? `ต้องติดตามด่วน ${counts.follow_up} งาน (เกิน ${WARNING_DAYS_AFTER_SENT} วัน)` : "ยังไม่มีงานต้องติดตามด่วน" },
+      sub: counts.follow_up > 0 ? `ต้องติดตามด่วน ${counts.follow_up} งาน (เงียบเกิน ${WARNING_DAYS_AFTER_SENT} วัน)` : "ยังไม่มีงานต้องติดตามด่วน" },
     { key: "approved", label: TAB_META.approved.label, value: tabCounts.approved,
       color: "linear-gradient(135deg,#10b981,#059669)", icon: <CheckCircle />,
-      sub: `มูลค่ารวม ฿${approvedValue.toLocaleString()}` },
+      // ✅ บอกตรงๆ ว่ายอดรวมยังขาดกี่ใบ แทนที่จะโชว์เลขที่ต่ำกว่าความจริงเฉยๆ (ดู approvedStats)
+      sub: approvedStats.missing > 0
+        ? `มูลค่ารวม ฿${approvedValue.toLocaleString()} · ยังไม่ระบุมูลค่า ${approvedStats.missing} ใบ`
+        : `มูลค่ารวม ฿${approvedValue.toLocaleString()}` },
     { key: "rejected", label: TAB_META.rejected.label, value: tabCounts.rejected,
       color: "linear-gradient(135deg,#94a3b8,#64748b)", icon: <Cancel />,
       sub: "ไม่ผ่านการอนุมัติ" },
   ];
 
+  // ✅ เดิมล็อก maxWidth ไว้ที่ 900px ตายตัว — เหมาะกับตอนที่หน้านี้มีแต่มุมมองการ์ด (การ์ดกว้างเกินไป
+  // จะอ่านยาก) แต่ตอนนี้มีมุมมองตาราง 9 คอลัมน์แล้ว พื้นที่ 900px ทำให้ตารางต้องเลื่อนแนวนอนตลอดทั้งที่
+  // จอเหลือที่ว่างอีกครึ่งจอ — ให้ตารางใช้ความกว้างเต็มที่ ส่วนมุมมองการ์ดยังจำกัดไว้เท่าเดิม เพราะการ์ด
+  // ที่ยืดเต็มจอกว้างๆ จะอ่านยากกว่าเดิม (บรรทัดยาวเกินไป สายตาไล่ไม่ทัน)
   return (
-    <Box sx={{ px: { xs: 1.5, sm: 2 }, pt: 2, pb: 4, maxWidth: 900, mx: "auto" }}>
+    <Box sx={{
+      px: { xs: 1.5, sm: 2 }, pt: 2, pb: 4, mx: "auto",
+      maxWidth: viewMode === "table" ? 1600 : 900,
+      transition: "max-width .2s ease",
+    }}>
       <Stack direction="row" alignItems="flex-start" justifyContent="space-between" sx={{ mb: 2 }}>
         <Box>
           <Typography variant="h6" fontWeight={800}>ติดตามใบเสนอราคา</Typography>
@@ -929,6 +1241,41 @@ export default function QuotationTracking() {
             onChange={setSelectedTechId}
           />
         )}
+        <Box sx={{ flex: 1 }} />
+
+        {/* ✅ สลับมุมมองการ์ด ↔ ตาราง — การ์ดอ่านง่ายทีละใบ ตารางเทียบหลายใบพร้อมกัน/หายอดรวมได้ */}
+        <ToggleButtonGroup
+          size="small" exclusive value={viewMode}
+          onChange={(_, v) => v && setViewMode(v)}
+          sx={{ "& .MuiToggleButton-root": { textTransform: "none", px: 1.25, py: 0.5, borderRadius: 2 } }}
+        >
+          <ToggleButton value="card" title="มุมมองการ์ด">
+            <ViewList sx={{ fontSize: 18 }} />
+          </ToggleButton>
+          <ToggleButton value="table" title="มุมมองตาราง">
+            <TableChart sx={{ fontSize: 18 }} />
+          </ToggleButton>
+        </ToggleButtonGroup>
+
+        {/* ✅ ส่งออก Excel — ส่งออก "ทุกใบที่ผ่านตัวกรองอยู่" ไม่ใช่แค่หน้าที่เปิดอยู่
+            ใช้ไอคอนไฟล์ Excel (FontAwesome) + โทนเขียว #047857 ให้ตรงกับปุ่มส่งออก Excel ในหน้าปฏิทิน
+            (.toolbar-icon-btn--excel) — เดิมเป็นไอคอนลูกศรดาวน์โหลดทั่วไป ดูไม่ออกว่าได้ไฟล์อะไร */}
+        <Tooltip title="ส่งออกเป็นไฟล์ Excel (.xlsx)">
+          <span>
+            <IconButton
+              onClick={handleExportExcel}
+              disabled={exporting || filteredJobs.length === 0}
+              sx={{
+                border: "1px solid", borderRadius: 2,
+                borderColor: alpha("#047857", 0.25), color: "#047857",
+                transition: "background-color .15s, border-color .15s",
+                "&:hover": { bgcolor: alpha("#047857", 0.08), borderColor: "#047857" },
+              }}
+            >
+              <FontAwesomeIcon icon={faFileExcel} style={{ fontSize: 17 }} />
+            </IconButton>
+          </span>
+        </Tooltip>
       </Stack>
 
       {loading ? (
@@ -944,19 +1291,28 @@ export default function QuotationTracking() {
         </Box>
       ) : (
         <>
-          <Stack spacing={0}>
-            {pagedJobs.map((job) => (
-              <QuotationCard
-                key={job.sessions[0].jobGroupId || job.sessions[0]._id}
-                job={job}
-                onOpen={setDetailJob}
-              />
-            ))}
-          </Stack>
+          {viewMode === "table" ? (
+            <QuotationTable
+              jobs={pagedJobs}
+              onOpen={setDetailJob}
+              onPreview={(url, name) => { setPreviewUrl(url); setPreviewFileName(name); }}
+            />
+          ) : (
+            <Stack spacing={0}>
+              {pagedJobs.map((job) => (
+                <QuotationCard
+                  key={job.sessions[0].jobGroupId || job.sessions[0]._id}
+                  job={job}
+                  onOpen={setDetailJob}
+                  onPreview={(url, name) => { setPreviewUrl(url); setPreviewFileName(name); }}
+                />
+              ))}
+            </Stack>
+          )}
           {totalPages > 1 && (
             <Stack alignItems="center" sx={{ mt: 2 }}>
               <Pagination
-                count={totalPages} page={page}
+                count={totalPages} page={safePage}
                 onChange={(_, v) => setPage(v)}
                 color="primary" shape="rounded" size="medium"
                 showFirstButton showLastButton

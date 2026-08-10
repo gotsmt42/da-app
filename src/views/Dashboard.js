@@ -43,6 +43,8 @@ import {
 // utils/contractOverdue.js แล้วตั้งแต่ก่อนหน้านี้ (ใช้ซ้ำที่ Header.js ด้วยสำหรับป้ายบนแถบเมนู) กันตรรกะ
 // เพี้ยนไม่ตรงกันระหว่างจุดต่างๆ
 import { groupEventsByContract, nextVisitOverdueInfo } from "../utils/contractOverdue";
+// ✅ ตรรกะติดตามใบเสนอราคาตัวกลาง — ใช้ร่วมกับหน้า /quotations และฝั่ง server เพื่อให้เกณฑ์/ตัวเลขตรงกัน
+import { getFollowUpInfo } from "../utils/quotationTracking";
 
 // 🎨 สีและไอคอนประจำสถานะงาน — ใช้ร่วมกันทั้ง Quick Stats และการ์ดงานวันนี้
 // ✅ เก็บเป็น "component" ไม่ใช่ element ที่ render ไว้แล้ว เพื่อให้เรียกใช้คนละขนาดได้ตามบริบท
@@ -297,7 +299,10 @@ const Dashboard = () => {
   // แทน (โชว์เฉพาะตอนมีจริงเท่านั้น ไม่มีก็ไม่ต้องมีกล่องว่างให้รกตา) — จัดกลุ่มงานหลายวันไม่ติดกันด้วย
   // getOverdueGroupKey เหมือนจุดอื่นๆ ในไฟล์นี้ กันนับซ้ำ (quotationSentAt ถูก propagate เท่ากันทั้ง
   // กลุ่มอยู่แล้วตอนกดจากหน้า /quotations จึงใช้ค่าจาก session ไหนของกลุ่มมาคิดก็ได้ผลลัพธ์เดียวกัน)
-  const QUOTATION_FOLLOWUP_DAYS = 7;
+  // ⚠️ เดิมกำหนดเกณฑ์วัน + คำนวณเองในไฟล์นี้แยกต่างหาก (7 วัน นับจาก quotationSentAt) ซึ่งไม่ตรงกับหน้า
+  // /quotations (3 วัน) และไม่รู้จักการบันทึกติดตามเลย — ใช้ util กลางตัวเดียวกับหน้านั้นและฝั่ง server
+  // แทนทั้งหมด (ดู utils/quotationTracking.js) ตัวเลข/เงื่อนไขจึงตรงกันทุกจุดเสมอ และการบันทึกติดตาม
+  // 1 ครั้งจะเลื่อนกำหนดออกไปอีก 7 วันเหมือนกันหมด ไม่ใช่เตือนซ้ำทั้งที่เพิ่งตามไปเมื่อวาน
   const staleQuotations = useMemo(() => {
     if (!isAdminOrManager) return [];
     const bySignature = new Map();
@@ -306,16 +311,19 @@ const Dashboard = () => {
       const key = getOverdueGroupKey(e);
       if (!bySignature.has(key)) bySignature.set(key, e);
     });
-    const today = moment().startOf("day");
     return [...bySignature.values()]
-      .map((head) => ({
+      .map((head) => ({ head, info: getFollowUpInfo(head) }))
+      .filter(({ info }) => info?.needsFollowUp)
+      .map(({ head, info }) => ({
         id: head._id,
         title: head.title,
         company: head.company,
         site: head.site,
-        days: today.diff(moment(head.quotationSentAt).startOf("day"), "days"),
+        // ✅ "วัน" ที่โชว์คือจำนวนวันตั้งแต่ติดต่อลูกค้าครั้งล่าสุด (ไม่ใช่ตั้งแต่วันที่ส่ง) ให้ตรงกับ
+        // เกณฑ์ที่ใช้ตัดสินจริง — ไม่งั้นจะเห็นเลข 30 วันทั้งที่เพิ่งตามไปเมื่อ 8 วันก่อน
+        days: info.daysSinceLastContact,
+        followUpCount: info.followUpCount,
       }))
-      .filter((q) => q.days > QUOTATION_FOLLOWUP_DAYS)
       .sort((a, b) => b.days - a.days);
   }, [isAdminOrManager, events]);
 
@@ -781,9 +789,17 @@ const Dashboard = () => {
                     <span style={styles.sideJobDetail}>
                       {[q.company, q.site].filter(Boolean).join(" · ")}
                     </span>
+                    {/* ✅ บอกด้วยว่าเคยตามไปแล้วกี่ครั้ง — เดิมเห็นแค่ "เกิน N วัน" แยกไม่ออกว่าใบนี้
+                        ปล่อยทิ้งไว้เฉยๆ หรือตามอยู่ตลอดแต่ลูกค้ายังไม่ตอบ ซึ่งต้องจัดการคนละแบบ */}
+                    {q.followUpCount > 0 && (
+                      <span style={styles.sideJobDetail}>
+                        ☎️ ตามแล้ว {q.followUpCount} ครั้ง
+                      </span>
+                    )}
                   </span>
+                  {/* ✅ นับจาก "ติดต่อครั้งล่าสุด" ไม่ใช่วันที่ส่ง — ข้อความจึงต้องสื่อให้ตรงกัน */}
                   <span style={styles.quotationAlertBadge}>
-                    เกิน {q.days} วัน
+                    เงียบ {q.days} วัน
                   </span>
                 </Link>
               ))}
