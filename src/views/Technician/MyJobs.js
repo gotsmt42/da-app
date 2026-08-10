@@ -515,18 +515,66 @@ export default function MyJobs() {
           ))}
         </Stack>
       ) : filteredJobs.length === 0 ? (
-        <Box sx={{
-          textAlign: "center", py: 6, px: 2, borderRadius: 4,
-          border: "1px dashed", borderColor: "divider", color: "text.disabled",
-        }}>
-          {GROUPS.find((g) => g.key === group)?.icon &&
-            <Box sx={{ opacity: 0.3, mb: 1 }}>
-              {cloneElement(GROUPS.find((g) => g.key === group).icon, { sx: { fontSize: 40 } })}
-            </Box>}
-          <Typography variant="body2">
-            {search ? "ไม่พบงานที่ตรงกับคำค้นหา" : `ยังไม่มีงานในหมวด "${GROUPS.find((g) => g.key === group)?.label}"`}
-          </Typography>
-        </Box>
+        /* ✅ กล่อง "ไม่มีงาน" เดิมมีแค่ไอคอนจางๆ กับข้อความบรรทัดเดียว แล้วเหลือพื้นที่ว่างทั้งหน้า —
+           ช่างที่เปิดมาเจอหน้านี้จะไม่รู้ว่า "ไม่มีงานจริงๆ" หรือ "งานไปอยู่แท็บอื่น" (เช่นอยู่แท็บ
+           งานที่ต้องทำ 0 งาน ทั้งที่มีงานค้าง 1 งานรออยู่ในอีกแท็บ) ✅ บอกให้ชัดว่าหมวดอื่นมีงานอยู่กี่งาน
+           พร้อมปุ่มกดข้ามไปได้เลย และถ้าไม่เหลืองานที่ไหนจริงๆ ค่อยบอกว่าเคลียร์หมดแล้ว */
+        (() => {
+          const activeGroup = GROUPS.find((g) => g.key === group);
+          // หมวดอื่นที่ยังมีงานค้างอยู่ (ไม่นับ "เสร็จสิ้น" — ไม่ใช่งานที่ต้องลงมือทำแล้ว)
+          const otherWithJobs = GROUPS.filter(
+            (g) => g.key !== group && g.key !== "closed" && groupCounts[g.key] > 0
+          );
+          return (
+            <Box sx={{
+              textAlign: "center", py: 5, px: 2, borderRadius: 4,
+              border: "1px dashed", borderColor: "divider",
+            }}>
+              {activeGroup?.icon && (
+                <Box sx={{ opacity: 0.3, mb: 1, color: "text.disabled" }}>
+                  {cloneElement(activeGroup.icon, { sx: { fontSize: 40 } })}
+                </Box>
+              )}
+              <Typography variant="body2" fontWeight={600} color="text.secondary">
+                {search
+                  ? "ไม่พบงานที่ตรงกับคำค้นหา"
+                  : `ยังไม่มีงานในหมวด "${activeGroup?.label}"`}
+              </Typography>
+
+              {search ? (
+                <Typography variant="caption" color="text.disabled" sx={{ display: "block", mt: 0.5 }}>
+                  ลองพิมพ์ชื่อโครงการ ไซต์ หรือเลขเอกสารให้สั้นลง
+                </Typography>
+              ) : otherWithJobs.length > 0 ? (
+                <>
+                  <Typography variant="caption" color="text.disabled" sx={{ display: "block", mt: 0.5, mb: 1.25 }}>
+                    แต่ยังมีงานรออยู่ในหมวดอื่น — กดเพื่อดูได้เลย
+                  </Typography>
+                  <Stack direction="row" gap={0.75} justifyContent="center" flexWrap="wrap">
+                    {otherWithJobs.map((g) => (
+                      <Chip
+                        key={g.key}
+                        icon={cloneElement(g.icon, { sx: { fontSize: 15 } })}
+                        label={`${g.label} (${groupCounts[g.key]})`}
+                        onClick={() => setGroup(g.key)}
+                        sx={{
+                          fontWeight: 700, fontSize: "0.72rem", cursor: "pointer",
+                          bgcolor: alpha(g.color, 0.12), color: g.color,
+                          "& .MuiChip-icon": { color: g.color },
+                          "&:hover": { bgcolor: alpha(g.color, 0.22) },
+                        }}
+                      />
+                    ))}
+                  </Stack>
+                </>
+              ) : (
+                <Typography variant="caption" color="text.disabled" sx={{ display: "block", mt: 0.5 }}>
+                  เคลียร์งานครบแล้ว 🎉 งานใหม่ที่ถูกมอบหมายจะมาแสดงที่นี่
+                </Typography>
+              )}
+            </Box>
+          );
+        })()
       ) : (
         <Stack spacing={2}>
           {jobGroups.map((sessions) => {

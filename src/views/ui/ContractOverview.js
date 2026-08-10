@@ -151,12 +151,22 @@ const contractStatusInfo = (c) => {
 // พอชื่อบริษัท/โครงการยาวๆ ก็โดนตัดด้วย ... เสมอ ต้อง hover ดู tooltip ทุกครั้ง ให้ผู้ใช้ลากขยายเองได้
 // ตามที่ต้องการแทน — เก็บลง localStorage ด้วย (ไม่ใช่แค่ state ในหน้านี้) จะได้จำค่าที่ปรับไว้ข้ามการ
 // ออกจากหน้า/ปิดแท็บ/เปิดใหม่ ไม่ต้องมาลากปรับความกว้างซ้ำทุกครั้งที่กลับเข้ามาดู
+// ✅ ยุบคอลัมน์ที่เกี่ยวข้องกันให้อยู่ช่องเดียว (ซ้อนเป็น 2 บรรทัด) ตามที่ผู้ใช้ขอ — เดิมตารางมี 18
+// คอลัมน์ ต้องเลื่อนแนวนอนตลอดและหลายคอลัมน์แคบจนหัวข้อโดนตัดเหลือ "ส..." / "ค..." อ่านไม่ออกว่าคืออะไร
+//   เลขที่สัญญา + ใบเสนอราคา        → docRef   (เลขที่เอกสาร)
+//   บริษัท + โครงการ                 → customer (ลูกค้า / โครงการ)
+//   ประเภทงาน + ระบบ                → work     (งาน)
+//   เริ่มต้น + สิ้นสุด + รอบเข้า      → period   (ระยะเวลาสัญญา)
+//   จำนวนครั้ง + คืบหน้า             → progress (ครั้ง / คืบหน้า)
+// เหลือ 9 คอลัมน์ และหัวตารางเหลือแถวเดียว (ไม่ต้องมีหัวข้อกลุ่มคลุม 2 ชั้นอีกต่อไป)
+// ⚠️ ทุกช่องยังแก้ไข inline ได้ครบทุกฟิลด์เหมือนเดิม — EditableCell รับ prop `Wrapper` อยู่แล้ว จึงซ้อน
+// หลายฟิลด์ในเซลล์เดียวได้โดยไม่ต้องแก้ตรรกะการแก้ไขเลย
 const DEFAULT_COL_WIDTHS = {
   checkbox: 42, actions: 50,
-  contractNo: 120, quotationNo: 120, docNo: 150,
-  company: 170, site: 170, system: 110, title: 170,
-  contractStart: 100, contractEnd: 100, intervalMonths: 96,
-  visitCount: 92, jobValue: 100, status: 130, progress: 90, responsiblePerson: 130,
+  docRef: 150, docNo: 150,
+  customer: 230, work: 165,
+  period: 190,
+  jobValue: 110, status: 130, progress: 110, responsiblePerson: 130,
 };
 // ✅ ความกว้างคอลัมน์ "แยกกันทุกแท็บ" — เก็บซ้อนอีกชั้นเป็น { [แท็บ]: { [คอลัมน์]: ความกว้าง } }
 // ⚠️ เดิมเก็บเป็นชุดเดียวใช้ร่วมกันทุกแท็บ ซึ่งใช้งานจริงไม่ได้เลย เพราะแต่ละแท็บมีคอลัมน์ไม่เหมือนกัน
@@ -594,10 +604,6 @@ export default function ContractOverview() {
   // (เช่น "จำนวนครั้ง 1") เป็นค่าที่คำนวณมั่วจากตรรกะของสัญญา ไม่ใช่ข้อมูลจริงที่มีใครกรอกไว้เลย รกตา
   // และดูเหมือนมีข้อมูลสัญญาทั้งที่จริงไม่มี ต้องซ่อนเหมือนกันทั้ง 2 แท็บ
   const hideContractOnlyColumns = viewFilter === "ungrouped" || viewFilter === "general" || viewFilter === "project";
-  // ✅ หัวตารางปกติมี 2 แถว (กลุ่ม "เลขที่เอกสาร"/"ระยะเวลา" คลุม 2 คอลัมน์ย่อยแถวล่าง) แต่ตอนซ่อน
-  // คอลัมน์ระดับสัญญาทั้งหมดจะไม่มีแถวที่ 2 เหลือให้ colSpan ครอบแล้ว เหลือหัวตารางแค่แถวเดียว
-  const headerRowSpan = hideContractOnlyColumns ? 1 : 2;
-
   // ✅ ความกว้างคอลัมน์ที่ผู้ใช้ลากปรับเอง (key เฉพาะที่ต่างจากค่าเริ่มต้นเท่านั้น) — โหลดจาก
   // localStorage ตอนเปิดหน้า (lazy initializer) แล้วบันทึกกลับทุกครั้งที่ปรับ จะได้จำค่าไว้ข้ามการออก
   // จากหน้า/รีเฟรช ไม่ใช่แค่ระหว่างที่ยังเปิดหน้านี้ค้างอยู่เหมือนเดิม
@@ -885,8 +891,12 @@ export default function ContractOverview() {
     let total = colWidth("actions") + (showCheckboxes ? colWidth("checkbox") : 0);
     // ✅ jobValue ย้ายออกจาก contractOnlyKeys — แสดงทุกแท็บแล้ว (งานทั่วไป/โปรเจค/ยังไม่จัดกลุ่มก็มี
     // มูลค่างานของตัวเองได้ ข้อมูลมีอยู่ในฐานข้อมูลอยู่แล้วทุกแถว แค่เดิมไม่ได้แสดงให้เห็น)
-    const contractOnlyKeys = ["contractNo", "quotationNo", "contractStart", "contractEnd", "intervalMonths", "visitCount", "status"];
-    ["company", "site", "system", "title", "jobValue", "progress", "responsiblePerson"].forEach((k) => { total += colWidth(k); });
+    // ✅ ยุบคอลัมน์ที่อ่านคู่กันเสมอให้เหลือช่องเดียว (ดูหัวตาราง/แถวข้อมูล): เลขที่สัญญา+ใบเสนอราคา →
+    // docRef, บริษัท+โครงการ → customer, ประเภทงาน+ระบบ → work, เริ่ม+สิ้นสุด+รอบเข้า → period,
+    // จำนวนครั้งทั้งหมด → รวมอยู่ในป้าย "คืบหน้า" (progress) แล้ว — คีย์ย่อยเดิมไม่มีคอลัมน์ของตัวเองอีก
+    // ต่อไป จึงต้องไม่นับความกว้างซ้ำตรงนี้ ไม่งั้นตารางจะกว้างเกินจริงจนมีที่ว่างค้างท้ายแถว
+    const contractOnlyKeys = ["docRef", "period", "status"];
+    ["customer", "work", "jobValue", "progress", "responsiblePerson"].forEach((k) => { total += colWidth(k); });
     if (!hideContractOnlyColumns) {
       contractOnlyKeys.forEach((k) => { total += colWidth(k); });
     } else {
@@ -904,7 +914,7 @@ export default function ContractOverview() {
   // แต่ละใบเลยสักคอลัมน์ — ดู handleColResize/colVar ด้านบนสำหรับเหตุผลที่ย้ายมาใช้กลไกนี้แทนตัวเลขตรงๆ
   const tableCssVars = useMemo(() => {
     const vars = { "--col-total": `${totalTableWidth}px` };
-    ["contractNo", "quotationNo", "docNo", "company", "site", "system", "title", "contractStart", "contractEnd", "intervalMonths", "visitCount", "jobValue", "status", "progress", "responsiblePerson"].forEach((k) => {
+    ["docRef", "docNo", "customer", "work", "period", "jobValue", "status", "progress", "responsiblePerson"].forEach((k) => {
       vars[`--col-${k}`] = `${colWidth(k)}px`;
     });
     visitColumns.forEach((n) => { vars[`--col-visit_${n}`] = `${colWidth(`visit_${n}`)}px`; });
@@ -1011,10 +1021,9 @@ export default function ContractOverview() {
   const footerColSpan = useMemo(() => {
     const before =
       (showCheckboxes ? 1 : 0) +
-      (hideContractOnlyColumns ? 1 : 2) +   // docNo | contractNo + quotationNo
-      4 +                                    // company / site / system / title
-      (hideContractOnlyColumns ? 0 : 3) +   // contractStart / contractEnd / intervalMonths
-      (hideContractOnlyColumns ? 0 : 1);    // visitCount
+      1 +                                    // docNo | docRef (เลขที่สัญญา+ใบเสนอราคายุบเป็นช่องเดียว)
+      2 +                                    // customer (บริษัท+โครงการ) / work (ประเภทงาน+ระบบ)
+      (hideContractOnlyColumns ? 0 : 1);    // period (เริ่ม+สิ้นสุด+รอบเข้า)
     const after =
       (hideContractOnlyColumns ? 0 : 1) +   // status
       1 +                                    // progress
@@ -2544,7 +2553,7 @@ export default function ContractOverview() {
                   "&:hover": { bgcolor: alpha(EXCEL_GREEN, 0.08), borderColor: EXCEL_GREEN },
                 }}
               >
-                {exporting ? "กำลังสร้าง..." : "Excel"}
+                {exporting ? "กำลังสร้าง..." : "Export Excel"}
               </Button>
             </span>
           </Tooltip>
@@ -2875,41 +2884,45 @@ export default function ContractOverview() {
             }}
           >
             <TableHead>
-              {/* ✅ หัวตาราง 2 แถว เทียบเค้าโครงเอกสารอ้างอิง Excel ที่ใช้ติดตามสัญญาอยู่แล้ว — กลุ่ม
-                  "อ้างอิงเอกสารเลขที่" (เลขที่สัญญา/ใบเสนอราคา) กับ "ระยะเวลา" (เริ่มสัญญา/สิ้นสุด)
-                  ใช้ colSpan คลุม 2 คอลัมน์ย่อยแถวล่าง ส่วนคอลัมน์อื่นที่ไม่มีกลุ่มใช้ rowSpan คลุม 2 แถว —
-                  แต่ตอนซ่อนคอลัมน์ระดับสัญญาทั้งหมด (hideContractOnlyColumns) แถวที่ 2 จะไม่มีอะไรเหลือ
-                  เลย ไม่ต้อง render แถวนั้นอีกต่อไป เหลือหัวตารางแค่แถวเดียว (rowSpan ก็ต้องลดเหลือ 1 ตาม) */}
+              {/* ✅ หัวตารางแถวเดียว — เดิมเป็นหัว 2 ชั้น (กลุ่ม "อ้างอิงเอกสารเลขที่"/"ระยะเวลา" ใช้
+                  colSpan คลุมคอลัมน์ย่อยแถวล่าง ที่เหลือใช้ rowSpan คลุม 2 แถว) ซึ่งเกิดขึ้นเพราะมี 18
+                  คอลัมน์จนต้องจัดกลุ่มให้อ่านรู้เรื่อง พอยุบคอลัมน์ที่อ่านคู่กันเสมอให้เหลือช่องเดียวแล้ว
+                  (ดูคอมเมนต์ที่ DEFAULT_COL_WIDTHS) เหลือ 9 คอลัมน์ หัวชั้นที่ 2 จึงไม่จำเป็นอีกต่อไป —
+                  หัวเดียวจบ กวาดสายตาแนวนอนรอบเดียวก็รู้ว่าคอลัมน์ไหนคืออะไร ⚠️ ลำดับคอลัมน์ตรงนี้ต้อง
+                  ตรงกับแถวข้อมูลและ footerColSpan เป๊ะๆ ถ้าเพิ่ม/ลดต้องไปแก้ทั้ง 3 จุดพร้อมกัน */}
               <TableRow sx={{ "& th": { fontWeight: 700, bgcolor: "#fef2f2", borderBottom: `2px solid ${ACCENT} !important`, color: "#7f1d1d", letterSpacing: "0.01em" } }}>
-                {showCheckboxes && <TableCell padding="checkbox" rowSpan={headerRowSpan} sx={{ width: colWidth("checkbox") }} />}
-                {!hideContractOnlyColumns && <TableCell align="center" colSpan={2}>เลขที่เอกสาร</TableCell>}
-                {/* ✅ โผล่แทนกลุ่ม "เลขที่เอกสาร" (เลขที่สัญญา/ใบเสนอราคา) ตอนดูแท็บงานทั่วไป/โปรเจค/
-                    ยังไม่จัดกลุ่ม (hideContractOnlyColumns) — งานพวกนี้ไม่มีเลขที่สัญญา แต่มีเลขที่เอกสาร
-                    อ้างอิงทั่วไป (PO/ใบสั่งงาน ฯลฯ) แทนได้ ใช้พื้นที่เดิมที่ว่างลงให้เกิดประโยชน์ */}
-                {hideContractOnlyColumns && (
-                  <ResizableTh width={colWidth("docNo")} rowSpan={headerRowSpan} columnKey="docNo" tableRef={tableRef} onResize={handleColResize("docNo")} sortable sortDirection={sortConfig.key === "docNo" ? sortConfig.direction : null} onSort={handleSortClick}>เอกสารเลขที่</ResizableTh>
-                )}
-                <ResizableTh width={colWidth("company")} rowSpan={headerRowSpan} columnKey="company" tableRef={tableRef} onResize={handleColResize("company")} sortable sortDirection={sortConfig.key === "company" ? sortConfig.direction : null} onSort={handleSortClick}>บริษัท</ResizableTh>
-                <ResizableTh width={colWidth("site")} rowSpan={headerRowSpan} columnKey="site" tableRef={tableRef} onResize={handleColResize("site")} sortable sortDirection={sortConfig.key === "site" ? sortConfig.direction : null} onSort={handleSortClick}>โครงการ</ResizableTh>
-                <ResizableTh width={colWidth("system")} rowSpan={headerRowSpan} columnKey="system" tableRef={tableRef} onResize={handleColResize("system")} sortable sortDirection={sortConfig.key === "system" ? sortConfig.direction : null} onSort={handleSortClick}>ระบบ</ResizableTh>
-                <ResizableTh width={colWidth("title")} rowSpan={headerRowSpan} columnKey="title" tableRef={tableRef} onResize={handleColResize("title")} sortable sortDirection={sortConfig.key === "title" ? sortConfig.direction : null} onSort={handleSortClick}>ประเภทงาน</ResizableTh>
-                {!hideContractOnlyColumns && <TableCell align="center" colSpan={3}>ระยะเวลา</TableCell>}
+                {showCheckboxes && <TableCell padding="checkbox" sx={{ width: colWidth("checkbox") }} />}
+                {/* ✅ เลขที่สัญญา + ใบเสนอราคา ยุบเป็นช่องเดียว (ซ้อน 2 บรรทัด) — เรียงตามเลขที่สัญญา
+                    ซึ่งเป็นตัวหลักที่คนใช้ค้นหา/อ้างอิง ส่วนแท็บงานทั่วไป/โปรเจคใช้ "เอกสารเลขที่" แทน */}
                 {!hideContractOnlyColumns && (
-                  <ResizableTh width={colWidth("visitCount")} align="center" rowSpan={headerRowSpan} columnKey="visitCount" tableRef={tableRef} onResize={handleColResize("visitCount")} sortable sortDirection={sortConfig.key === "visitCount" ? sortConfig.direction : null} onSort={handleSortClick}>จำนวนครั้ง</ResizableTh>
+                  <ResizableTh width={colWidth("docRef")} columnKey="docRef" tableRef={tableRef} onResize={handleColResize("docRef")} sortable sortDirection={sortConfig.key === "contractNo" ? sortConfig.direction : null} onSort={() => handleSortClick("contractNo")}>เลขที่เอกสาร</ResizableTh>
+                )}
+                {hideContractOnlyColumns && (
+                  <ResizableTh width={colWidth("docNo")} columnKey="docNo" tableRef={tableRef} onResize={handleColResize("docNo")} sortable sortDirection={sortConfig.key === "docNo" ? sortConfig.direction : null} onSort={handleSortClick}>เอกสารเลขที่</ResizableTh>
+                )}
+                {/* ✅ บริษัท + โครงการ ยุบเป็นช่องเดียว — เป็นข้อมูล "ลูกค้ารายเดียวกัน" ที่อ่านคู่กันเสมอ
+                    (เดิมแยก 2 คอลัมน์ และคอลัมน์บริษัทมักว่างเปล่าทั้งคอลัมน์ กินที่ฟรีๆ) */}
+                <ResizableTh width={colWidth("customer")} columnKey="customer" tableRef={tableRef} onResize={handleColResize("customer")} sortable sortDirection={sortConfig.key === "site" ? sortConfig.direction : null} onSort={() => handleSortClick("site")}>โครงการ / บริษัท</ResizableTh>
+                {/* ✅ ประเภทงาน + ระบบ ยุบเป็นช่องเดียว — ทั้งคู่คือ "งานนี้คืองานอะไร" เหมือนกัน */}
+                <ResizableTh width={colWidth("work")} columnKey="work" tableRef={tableRef} onResize={handleColResize("work")} sortable sortDirection={sortConfig.key === "title" ? sortConfig.direction : null} onSort={() => handleSortClick("title")}>งาน</ResizableTh>
+                {/* ✅ เริ่มต้น + สิ้นสุด + รอบเข้า ยุบเป็นช่องเดียว "ระยะเวลาสัญญา" — เดิมแยก 3 คอลัมน์
+                    แคบๆ จนวันที่โดนตัดเหลือ "01/..." อ่านไม่ได้ทั้งที่เป็นข้อมูลสำคัญ */}
+                {!hideContractOnlyColumns && (
+                  <ResizableTh width={colWidth("period")} columnKey="period" tableRef={tableRef} onResize={handleColResize("period")} sortable sortDirection={sortConfig.key === "contractStart" ? sortConfig.direction : null} onSort={() => handleSortClick("contractStart")}>ระยะเวลาสัญญา</ResizableTh>
                 )}
                 {/* ✅ มูลค่างาน — แสดงทุกแท็บแล้ว (เดิมเฉพาะแท็บสัญญา) งานทั่วไป/โปรเจค/ยังไม่จัดกลุ่ม
                     ก็มีมูลค่าของตัวเองได้เหมือนกัน ข้อมูลมีอยู่ในฐานข้อมูลทุกแถวอยู่แล้ว แค่เดิมไม่ได้
                     แสดงให้เห็น — ดูยอดรวมท้ายตาราง (TableFooter) ที่สรุปให้ทุกแท็บเช่นกัน */}
-                <ResizableTh width={colWidth("jobValue")} align="right" rowSpan={headerRowSpan} columnKey="jobValue" tableRef={tableRef} onResize={handleColResize("jobValue")} sortable sortDirection={sortConfig.key === "jobValue" ? sortConfig.direction : null} onSort={handleSortClick}>มูลค่างาน</ResizableTh>
+                <ResizableTh width={colWidth("jobValue")} align="right" columnKey="jobValue" tableRef={tableRef} onResize={handleColResize("jobValue")} sortable sortDirection={sortConfig.key === "jobValue" ? sortConfig.direction : null} onSort={handleSortClick}>มูลค่างาน</ResizableTh>
                 {!hideContractOnlyColumns && (
-                  <ResizableTh width={colWidth("status")} align="center" rowSpan={headerRowSpan} columnKey="status" tableRef={tableRef} onResize={handleColResize("status")}>สถานะสัญญา</ResizableTh>
+                  <ResizableTh width={colWidth("status")} align="center" columnKey="status" tableRef={tableRef} onResize={handleColResize("status")}>สถานะสัญญา</ResizableTh>
                 )}
                 {/* 🐛 BUG ที่แก้ (หัวคอลัมน์ไม่ตรงกับข้อมูลข้างใน): ช่องนี้แสดง 2 แบบตามชนิดแถว — สัญญาจริง
                     โชว์ "X/Y ครั้ง" (คืบหน้า) ส่วนงานทั่วไป/โปรเจค/ยังไม่จัดกลุ่มโชว์ป้ายสถานะงาน (ดู
                     jobStatusInfo ในเซลล์) แต่หัวคอลัมน์เขียน "คืบหน้า" ตายตัวเสมอ — ในแท็บที่มีแต่แถวที่
                     ไม่ใช่สัญญา (hideContractOnlyColumns) ทุกแถวจึงโชว์สถานะ แต่หัวบอกว่าคืบหน้า อ่านแล้ว
                     เข้าใจผิดทันที ต้องเปลี่ยนหัวตามชนิดข้อมูลที่แสดงจริงในแท็บนั้นๆ */}
-                <ResizableTh width={colWidth("progress")} align="center" rowSpan={headerRowSpan} columnKey="progress" tableRef={tableRef} onResize={handleColResize("progress")}>
+                <ResizableTh width={colWidth("progress")} align="center" columnKey="progress" tableRef={tableRef} onResize={handleColResize("progress")}>
                   {hideContractOnlyColumns ? "สถานะงาน" : "คืบหน้า"}
                 </ResizableTh>
                 {/* ✅ งานทั่วไป/โปรเจค/ยังไม่จัดกลุ่ม (hideContractOnlyColumns) ไม่มีแนวคิด "หลายครั้ง"
@@ -2917,7 +2930,7 @@ export default function ContractOverview() {
                     ไม่มีความหมาย — เปลี่ยนเป็น "วันที่เข้างาน" แทนตามที่ผู้ใช้ขอ ส่วนแท็บที่มีสัญญาจริงปนอยู่
                     ด้วย (ทั้งหมด/สัญญา/เลยกำหนด) ยังคงใช้ "ครั้งที่ N" เหมือนเดิม เพราะมีหลายครั้งจริง */}
                 {visitColumns.map((n) => (
-                  <ResizableTh key={n} width={colWidth(`visit_${n}`)} align="center" rowSpan={headerRowSpan} columnKey={`visit_${n}`} tableRef={tableRef} onResize={handleColResize(`visit_${n}`)}>
+                  <ResizableTh key={n} width={colWidth(`visit_${n}`)} align="center" columnKey={`visit_${n}`} tableRef={tableRef} onResize={handleColResize(`visit_${n}`)}>
                     {hideContractOnlyColumns ? "วันที่เข้างาน" : `ครั้งที่ ${n}`}
                   </ResizableTh>
                 ))}
@@ -2926,18 +2939,9 @@ export default function ContractOverview() {
                     สรุประดับสัญญาซ้ำซ้อนอีก — "ผู้รับผิดชอบ" ด้านล่างเป็นฟิลด์อิสระจากทีมที่เข้างานโดย
                     สมบูรณ์ (คนรับผิดชอบสัญญานี้โดยรวมไม่ควรเปลี่ยนตามทีมที่เข้างานแต่ละครั้ง) ยังคงอยู่
                     เหมือนเดิม แก้ไข inline ได้ตามปกติ (ดู responsiblePerson/responsiblePersonId) */}
-                <ResizableTh width={colWidth("responsiblePerson")} rowSpan={headerRowSpan} columnKey="responsiblePerson" tableRef={tableRef} onResize={handleColResize("responsiblePerson")} sortable sortDirection={sortConfig.key === "responsiblePerson" ? sortConfig.direction : null} onSort={handleSortClick}>ผู้รับผิดชอบ</ResizableTh>
-                <TableCell align="center" rowSpan={headerRowSpan} sx={{ width: colWidth("actions") }} />
+                <ResizableTh width={colWidth("responsiblePerson")} columnKey="responsiblePerson" tableRef={tableRef} onResize={handleColResize("responsiblePerson")} sortable sortDirection={sortConfig.key === "responsiblePerson" ? sortConfig.direction : null} onSort={handleSortClick}>ผู้รับผิดชอบ</ResizableTh>
+                <TableCell align="center" sx={{ width: colWidth("actions") }} />
               </TableRow>
-              {!hideContractOnlyColumns && (
-              <TableRow sx={{ "& th": { fontWeight: 700, bgcolor: "#fef2f2", borderBottom: `2px solid ${ACCENT} !important`, color: "#7f1d1d", letterSpacing: "0.01em" } }}>
-                <ResizableTh width={colWidth("contractNo")} columnKey="contractNo" tableRef={tableRef} onResize={handleColResize("contractNo")} sortable sortDirection={sortConfig.key === "contractNo" ? sortConfig.direction : null} onSort={handleSortClick}>สัญญา</ResizableTh>
-                <ResizableTh width={colWidth("quotationNo")} columnKey="quotationNo" tableRef={tableRef} onResize={handleColResize("quotationNo")} sortable sortDirection={sortConfig.key === "quotationNo" ? sortConfig.direction : null} onSort={handleSortClick}>ใบเสนอราคา</ResizableTh>
-                <ResizableTh width={colWidth("contractStart")} columnKey="contractStart" tableRef={tableRef} onResize={handleColResize("contractStart")} sortable sortDirection={sortConfig.key === "contractStart" ? sortConfig.direction : null} onSort={handleSortClick}>เริ่มต้น</ResizableTh>
-                <ResizableTh width={colWidth("contractEnd")} columnKey="contractEnd" tableRef={tableRef} onResize={handleColResize("contractEnd")} sortable sortDirection={sortConfig.key === "contractEnd" ? sortConfig.direction : null} onSort={handleSortClick}>สิ้นสุด</ResizableTh>
-                <ResizableTh width={colWidth("intervalMonths")} align="center" columnKey="intervalMonths" tableRef={tableRef} onResize={handleColResize("intervalMonths")} sortable sortDirection={sortConfig.key === "intervalMonths" ? sortConfig.direction : null} onSort={handleSortClick}>รอบเข้า (เดือน)</ResizableTh>
-              </TableRow>
-              )}
             </TableHead>
             <TableBody>
               {pagedRows.map((c, idx) => {
@@ -2965,30 +2969,44 @@ export default function ContractOverview() {
                       )}
                     </TableCell>
                   )}
+                  {/* ✅ เลขที่สัญญา + ใบเสนอราคา ซ้อนกันในช่องเดียว — บรรทัดบนคือเลขที่สัญญา (ตัวหลัก
+                      สีแบรนด์ตัวหนา) บรรทัดล่างคือใบเสนอราคา (ตัวเล็กสีจาง) ทั้งคู่ยังคลิกแก้ไขได้แยกกัน
+                      ตามปกติ เพราะ EditableCell รับ Wrapper={Box} ให้เรนเดอร์โดยไม่สร้าง <td> ของตัวเอง */}
                   {!hideContractOnlyColumns && (
-                  <>
-                  <EditableCell
-                    editable={isAdminOrManager && c.isRealContract} columnKey="contractNo"
-                    editing={editingCell?.key === c.key && editingCell?.field === "contractNo"}
-                    value={c.contractNo} editValue={editValue} saving={editSaving}
-                    width={colVar("contractNo")} title={c.contractNo}
-                    formatDisplay={(v) => (v ? <span style={{ color: ACCENT, fontWeight: 600 }}>{v}</span> : <Dash />)}
-                    onStartEdit={() => beginEdit(c, "contractNo")}
-                    onChangeValue={setEditValue}
-                    onCommit={() => commitEdit(c)}
-                    onCancel={cancelEdit}
-                  />
-                  <EditableCell
-                    editable={isAdminOrManager && c.isRealContract} columnKey="quotationNo"
-                    editing={editingCell?.key === c.key && editingCell?.field === "quotationNo"}
-                    value={c.quotationNo} editValue={editValue} saving={editSaving}
-                    width={colVar("quotationNo")} title={c.quotationNo}
-                    onStartEdit={() => beginEdit(c, "quotationNo")}
-                    onChangeValue={setEditValue}
-                    onCommit={() => commitEdit(c)}
-                    onCancel={cancelEdit}
-                  />
-                  </>
+                    <TableCell data-col-key="docRef" sx={{ width: colVar("docRef"), maxWidth: colVar("docRef") }}>
+                      <Stack spacing={0.15}>
+                        <EditableCell
+                          Wrapper={Box}
+                          editable={isAdminOrManager && c.isRealContract} columnKey="contractNo"
+                          editing={editingCell?.key === c.key && editingCell?.field === "contractNo"}
+                          value={c.contractNo} editValue={editValue} saving={editSaving}
+                          title={c.contractNo}
+                          formatDisplay={(v) => (v
+                            ? <span style={{ color: ACCENT, fontWeight: 700 }}>{v}</span>
+                            : <span style={{ color: "#cbd5e1" }}>— ไม่มีเลขที่สัญญา —</span>)}
+                          onStartEdit={() => beginEdit(c, "contractNo")}
+                          onChangeValue={setEditValue}
+                          onCommit={() => commitEdit(c)}
+                          onCancel={cancelEdit}
+                        />
+                        <EditableCell
+                          Wrapper={Box}
+                          editable={isAdminOrManager && c.isRealContract} columnKey="quotationNo"
+                          editing={editingCell?.key === c.key && editingCell?.field === "quotationNo"}
+                          value={c.quotationNo} editValue={editValue} saving={editSaving}
+                          title={c.quotationNo}
+                          formatDisplay={(v) => (
+                            <span style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
+                              {v ? `ใบเสนอราคา ${v}` : "ใบเสนอราคา —"}
+                            </span>
+                          )}
+                          onStartEdit={() => beginEdit(c, "quotationNo")}
+                          onChangeValue={setEditValue}
+                          onCommit={() => commitEdit(c)}
+                          onCancel={cancelEdit}
+                        />
+                      </Stack>
+                    </TableCell>
                   )}
                   {/* ✅ โผล่แทนกลุ่มเลขที่สัญญา/ใบเสนอราคาด้านบนตอนซ่อนคอลัมน์ระดับสัญญา (ดูหัวตาราง) —
                       แก้ไขได้เฉพาะแถวที่จัดหมวดหมู่แล้ว (สัญญาจริง/งานทั่วไป/งานโปรเจค) ไม่ใช่แถว
@@ -3005,130 +3023,134 @@ export default function ContractOverview() {
                       onCancel={cancelEdit}
                     />
                   )}
-                  {/* ✅ บริษัท/โครงการ/ระบบ/ประเภทงาน — แก้ไข inline ได้ทุกแถวสำหรับ admin/manager และ
-                      เพิ่ม "ผู้รับผิดชอบ" ของงานทั่วไป/งานโปรเจคที่ตัวเองรับผิดชอบด้วย (canEditGeneralJob
-                      คืน false ให้งานตามสัญญาจริงเสมอ ยังคงเฉพาะ admin/manager เท่านั้น) */}
-                  <EditableCell
-                    editable={canEditBasicField(c, "company")} columnKey="company"
-                    editing={editingCell?.key === c.key && editingCell?.field === "company"}
-                    value={c.company} editValue={editValue} saving={editSaving}
-                    width={colVar("company")} title={c.company}
-                    onStartEdit={() => beginEdit(c, "company")}
-                    onChangeValue={setEditValue}
-                    onCommit={() => commitEdit(c)}
-                    onCancel={cancelEdit}
-                  />
-                  <EditableCell
-                    editable={canEditBasicField(c, "site")} columnKey="site"
-                    editing={editingCell?.key === c.key && editingCell?.field === "site"}
-                    value={c.site} editValue={editValue} saving={editSaving}
-                    width={colVar("site")} title={c.site}
-                    onStartEdit={() => beginEdit(c, "site")}
-                    onChangeValue={setEditValue}
-                    onCommit={() => commitEdit(c)}
-                    onCancel={cancelEdit}
-                  />
-                  <EditableCell
-                    editable={canEditBasicField(c, "system")} columnKey="system" editType="autocomplete" editOptions={systemOptions}
-                    editing={editingCell?.key === c.key && editingCell?.field === "system"}
-                    value={c.system} editValue={editValue} saving={editSaving}
-                    width={colVar("system")} title={c.system}
-                    onStartEdit={() => beginEdit(c, "system")}
-                    onChangeValue={setEditValue}
-                    onCommit={() => commitEdit(c)}
-                    onCancel={cancelEdit}
-                  />
-                  <EditableCell
-                    editable={canEditBasicField(c, "title")} columnKey="title" editType="autocomplete" editOptions={titleOptions}
-                    editing={editingCell?.key === c.key && editingCell?.field === "title"}
-                    value={c.title} editValue={editValue} saving={editSaving}
-                    width={colVar("title")} title={c.title}
-                    onStartEdit={() => beginEdit(c, "title")}
-                    onChangeValue={setEditValue}
-                    onCommit={() => commitEdit(c)}
-                    onCancel={cancelEdit}
-                  />
+                  {/* ✅ บริษัท + โครงการ ซ้อนในช่องเดียว — บรรทัดบน "โครงการ" (ตัวหลักที่คนจำงานได้)
+                      บรรทัดล่าง "บริษัท" (ตัวเล็กสีจาง) ทั้งคู่คลิกแก้ไขได้แยกกันตามปกติ
+                      ⚠️ สลับลำดับจากเดิม (เดิมบริษัทมาก่อนโครงการ) เพราะจากข้อมูลจริงช่องบริษัทมักว่าง
+                      ทั้งคอลัมน์ ส่วนโครงการมีค่าเสมอ — เอาตัวที่มีข้อมูลจริงขึ้นก่อนจะอ่านง่ายกว่า */}
+                  <TableCell data-col-key="customer" sx={{ width: colVar("customer"), maxWidth: colVar("customer") }}>
+                    <Stack spacing={0.15}>
+                      <EditableCell
+                        Wrapper={Box}
+                        editable={canEditBasicField(c, "site")} columnKey="site"
+                        editing={editingCell?.key === c.key && editingCell?.field === "site"}
+                        value={c.site} editValue={editValue} saving={editSaving}
+                        title={c.site}
+                        formatDisplay={(v) => (v
+                          ? <span style={{ fontWeight: 700, color: "#0f172a" }}>{v}</span>
+                          : <span style={{ color: "#cbd5e1" }}>— ไม่ระบุโครงการ —</span>)}
+                        onStartEdit={() => beginEdit(c, "site")}
+                        onChangeValue={setEditValue}
+                        onCommit={() => commitEdit(c)}
+                        onCancel={cancelEdit}
+                      />
+                      <EditableCell
+                        Wrapper={Box}
+                        editable={canEditBasicField(c, "company")} columnKey="company"
+                        editing={editingCell?.key === c.key && editingCell?.field === "company"}
+                        value={c.company} editValue={editValue} saving={editSaving}
+                        title={c.company}
+                        formatDisplay={(v) => (
+                          <span style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
+                            🏢 {v || "ไม่ระบุบริษัท"}
+                          </span>
+                        )}
+                        onStartEdit={() => beginEdit(c, "company")}
+                        onChangeValue={setEditValue}
+                        onCommit={() => commitEdit(c)}
+                        onCancel={cancelEdit}
+                      />
+                    </Stack>
+                  </TableCell>
+
+                  {/* ✅ ประเภทงาน + ระบบ ซ้อนในช่องเดียว — ทั้งคู่ตอบคำถามเดียวกันว่า "งานนี้คืองานอะไร" */}
+                  <TableCell data-col-key="work" sx={{ width: colVar("work"), maxWidth: colVar("work") }}>
+                    <Stack spacing={0.15}>
+                      <EditableCell
+                        Wrapper={Box}
+                        editable={canEditBasicField(c, "title")} columnKey="title" editType="autocomplete" editOptions={titleOptions}
+                        editing={editingCell?.key === c.key && editingCell?.field === "title"}
+                        value={c.title} editValue={editValue} saving={editSaving}
+                        title={c.title}
+                        formatDisplay={(v) => (v
+                          ? <span style={{ fontWeight: 600, color: "#0f172a" }}>{v}</span>
+                          : <Dash />)}
+                        onStartEdit={() => beginEdit(c, "title")}
+                        onChangeValue={setEditValue}
+                        onCommit={() => commitEdit(c)}
+                        onCancel={cancelEdit}
+                      />
+                      <EditableCell
+                        Wrapper={Box}
+                        editable={canEditBasicField(c, "system")} columnKey="system" editType="autocomplete" editOptions={systemOptions}
+                        editing={editingCell?.key === c.key && editingCell?.field === "system"}
+                        value={c.system} editValue={editValue} saving={editSaving}
+                        title={c.system}
+                        formatDisplay={(v) => (
+                          <span style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
+                            💻 {v || "ไม่ระบุระบบ"}
+                          </span>
+                        )}
+                        onStartEdit={() => beginEdit(c, "system")}
+                        onChangeValue={setEditValue}
+                        onCommit={() => commitEdit(c)}
+                        onCancel={cancelEdit}
+                      />
+                    </Stack>
+                  </TableCell>
+
+                  {/* ✅ เริ่มต้น + สิ้นสุด + รอบเข้า ซ้อนในช่องเดียว "ระยะเวลาสัญญา" — เดิมแยก 3 คอลัมน์
+                      แคบจนวันที่โดนตัดเหลือ "01/..." อ่านไม่ออกทั้งที่เป็นข้อมูลหลักของสัญญา
+                      บรรทัดบน = ช่วงสัญญา (วันเริ่ม–วันสิ้นสุด คลิกแก้ทีละฝั่งได้) บรรทัดล่าง = รอบเข้า */}
                   {!hideContractOnlyColumns && (
-                  <>
-                  <EditableCell
-                    editable={isAdminOrManager && c.isRealContract} columnKey="contractStart"
-                    editing={editingCell?.key === c.key && editingCell?.field === "contractStart"}
-                    value={c.contractStart} editValue={editValue} editType="date" saving={editSaving}
-                    width={colVar("contractStart")}
-                    formatDisplay={(v) => (v ? moment(v).format("DD/MM/YYYY") : <Dash />)}
-                    onStartEdit={() => beginEdit(c, "contractStart")}
-                    onChangeValue={setEditValue}
-                    onCommit={() => commitEdit(c)}
-                    onCancel={cancelEdit}
-                  />
-                  <EditableCell
-                    editable={isAdminOrManager && c.isRealContract} columnKey="contractEnd"
-                    editing={editingCell?.key === c.key && editingCell?.field === "contractEnd"}
-                    value={c.contractEnd} editValue={editValue} editType="date" saving={editSaving}
-                    width={colVar("contractEnd")}
-                    formatDisplay={(v) => (v ? moment(v).format("DD/MM/YYYY") : <Dash />)}
-                    onStartEdit={() => beginEdit(c, "contractEnd")}
-                    onChangeValue={setEditValue}
-                    onCommit={() => commitEdit(c)}
-                    onCancel={cancelEdit}
-                  />
-                  <EditableCell
-                    editable={isAdminOrManager && c.isRealContract} columnKey="intervalMonths"
-                    editing={editingCell?.key === c.key && editingCell?.field === "intervalMonths"}
-                    value={c.intervalMonths} editValue={editValue} editType="number" saving={editSaving}
-                    width={colVar("intervalMonths")} align="center"
-                    title={c.intervalMonths ? undefined : "ยังไม่ได้ระบุ — ระบบใช้ค่าเริ่มต้น 3 เดือนในการเตือนรอบถัดไป"}
-                    formatDisplay={(v) => (v ? `ทุก ${v} เดือน` : <Dash />)}
-                    onStartEdit={() => beginEdit(c, "intervalMonths")}
-                    onChangeValue={setEditValue}
-                    onCommit={() => commitEdit(c)}
-                    onCancel={cancelEdit}
-                  />
-                  <EditableCell
-                    editable={isAdminOrManager && c.isRealContract} columnKey="visitCount"
-                    editing={editingCell?.key === c.key && editingCell?.field === "visitCount"}
-                    value={c.visitCount} editValue={editValue} editType="number" saving={editSaving}
-                    width={colVar("visitCount")} align="center"
-                    // ✅ เตือนถ้ารอบล่าสุดผ่านมาเกินระยะห่างระหว่างรอบที่กำหนดไว้แล้วแต่ยังไม่ได้ลงแผนงาน
-                    // ครั้งถัดไปเลย — วงกลมสีแดงทึบ (ไม่ใช่แค่ไอคอนสีแดงบนพื้นขาว) ให้เห็นชัดแม้เป็นภาพนิ่ง
-                    // ไม่ต้องรอดูอนิเมชัน
-                    // ✅ เก็บกวาด: เดิมมีบรรทัดที่ 2 โชว์ "ปีละ N ครั้ง" แต่ถูกคอมเมนต์ปิดไว้ เหลือแต่ตัวแปร
-                    // perYear ที่คำนวณทิ้งเปล่าๆ ทุก render (ยังเป็น lint warning ค้างอยู่ด้วย) — ลบออกทั้งคู่
-                    // ค่า "เข้าปีละ (ครั้ง)" ยังอยู่ครบในไฟล์ Excel ที่ส่งออกเหมือนเดิม (ดู contractExcelExport.js)
-                    formatDisplay={(v) => {
-                      return (
-                        <Stack spacing={0} alignItems="center">
-                          <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
-                            <span>{v || <Dash />}</span>
-                            {overdueInfo && (
-                              <Tooltip title={`รอบล่าสุด ${overdueInfo.lastVisitDate.format("DD/MM/YYYY")} — ต้องเข้ารอบถัดไปภายใน ${overdueInfo.intervalMonths} เดือน เกินกำหนดแล้ว ${overdueInfo.monthsOverdue} เดือน ยังไม่ได้ลงแผนงานครั้งถัดไป`}>
-                                <Box
-                                  component="span"
-                                  sx={{
-                                    display: "inline-flex", alignItems: "center", justifyContent: "center",
-                                    width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
-                                    bgcolor: "#dc2626", color: "#fff",
-                                    animation: "contractOverviewPulse 1.6s ease-in-out infinite",
-                                    "@keyframes contractOverviewPulse": {
-                                      "0%, 100%": { boxShadow: `0 0 0 0 ${alpha("#dc2626", 0.5)}` },
-                                      "50%": { boxShadow: `0 0 0 4px ${alpha("#dc2626", 0)}` },
-                                    },
-                                  }}
-                                >
-                                  <WarningAmber sx={{ fontSize: 12 }} />
-                                </Box>
-                              </Tooltip>
-                            )}
-                          </Stack>
+                    <TableCell data-col-key="period" sx={{ width: colVar("period"), maxWidth: colVar("period") }}>
+                      <Stack spacing={0.15}>
+                        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexWrap: "nowrap" }}>
+                          <EditableCell
+                            Wrapper={Box}
+                            editable={isAdminOrManager && c.isRealContract} columnKey="contractStart"
+                            editing={editingCell?.key === c.key && editingCell?.field === "contractStart"}
+                            value={c.contractStart} editValue={editValue} editType="date" saving={editSaving}
+                            formatDisplay={(v) => (v
+                              ? <span style={{ fontWeight: 600 }}>{moment(v).format("DD/MM/YY")}</span>
+                              : <Dash />)}
+                            onStartEdit={() => beginEdit(c, "contractStart")}
+                            onChangeValue={setEditValue}
+                            onCommit={() => commitEdit(c)}
+                            onCancel={cancelEdit}
+                          />
+                          <Box component="span" sx={{ color: "text.disabled", flexShrink: 0 }}>–</Box>
+                          <EditableCell
+                            Wrapper={Box}
+                            editable={isAdminOrManager && c.isRealContract} columnKey="contractEnd"
+                            editing={editingCell?.key === c.key && editingCell?.field === "contractEnd"}
+                            value={c.contractEnd} editValue={editValue} editType="date" saving={editSaving}
+                            formatDisplay={(v) => (v
+                              ? <span style={{ fontWeight: 600 }}>{moment(v).format("DD/MM/YY")}</span>
+                              : <Dash />)}
+                            onStartEdit={() => beginEdit(c, "contractEnd")}
+                            onChangeValue={setEditValue}
+                            onCommit={() => commitEdit(c)}
+                            onCancel={cancelEdit}
+                          />
                         </Stack>
-                      );
-                    }}
-                    onStartEdit={() => beginEdit(c, "visitCount")}
-                    onChangeValue={setEditValue}
-                    onCommit={() => commitEdit(c)}
-                    onCancel={cancelEdit}
-                  />
-                  </>
+                        <EditableCell
+                          Wrapper={Box}
+                          editable={isAdminOrManager && c.isRealContract} columnKey="intervalMonths"
+                          editing={editingCell?.key === c.key && editingCell?.field === "intervalMonths"}
+                          value={c.intervalMonths} editValue={editValue} editType="number" saving={editSaving}
+                          title={c.intervalMonths ? undefined : "ยังไม่ได้ระบุ — ระบบใช้ค่าเริ่มต้น 3 เดือนในการเตือนรอบถัดไป"}
+                          formatDisplay={(v) => (
+                            <span style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
+                              🔁 {v ? `เข้าทุก ${v} เดือน` : "ยังไม่ระบุรอบเข้า"}
+                            </span>
+                          )}
+                          onStartEdit={() => beginEdit(c, "intervalMonths")}
+                          onChangeValue={setEditValue}
+                          onCommit={() => commitEdit(c)}
+                          onCancel={cancelEdit}
+                        />
+                      </Stack>
+                    </TableCell>
                   )}
                   {/* ✅ มูลค่างาน — อยู่นอกบล็อก hideContractOnlyColumns แล้ว จึงแสดงทุกแท็บ (ลำดับ
                       คอลัมน์ในแท็บสัญญายังเหมือนเดิมเป๊ะ เพราะวางไว้ตำแหน่งเดิมระหว่างจำนวนครั้งกับ
@@ -3157,16 +3179,41 @@ export default function ContractOverview() {
                     })()}
                   </TableCell>
                   )}
+                  {/* ✅ ยุบคอลัมน์ "จำนวนครั้งทั้งหมด" มารวมกับ "คืบหน้า" — ป้ายคืบหน้าเขียน "เสร็จ/ทั้งหมด"
+                      อยู่แล้ว (ดู progressInfo) ตัวเลขทั้งหมดจึงซ้ำกันทั้งคอลัมน์ ไม่ต้องแยกช่องอีก
+                      สิ่งที่เคยมีเฉพาะช่องนั้นและต้องยกมาด้วยคือจุดแดงเตือน "เลยกำหนดรอบถัดไป" — ย้ายมา
+                      อยู่ข้างป้ายคืบหน้าตรงนี้แทน ความหมายยังคู่กันพอดี (คืบหน้าไปถึงไหน / ค้างรอบไหนอยู่) */}
                   <TableCell data-col-key="progress" align="center" sx={{ width: colVar("progress") }}>
                     {(() => {
                       // ✅ ใช้ progressInfo (ฟังก์ชันกลาง) ตัวเดียวกับที่ไฟล์ Excel ที่ส่งออกใช้ กันตัวเลข
                       // บนจอกับในไฟล์ไม่ตรงกัน — ดูรายละเอียดตรรกะที่นิยามของ progressInfo ด้านบน
                       const info = progressInfo(c, countUsedRounds);
                       return (
-                        <Chip
-                          label={info.label} size="small"
-                          sx={{ height: 20, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha(info.color, 0.12), color: info.color }}
-                        />
+                        <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
+                          <Chip
+                            label={info.label} size="small"
+                            sx={{ height: 20, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha(info.color, 0.12), color: info.color }}
+                          />
+                          {overdueInfo && (
+                            <Tooltip title={`รอบล่าสุด ${overdueInfo.lastVisitDate.format("DD/MM/YYYY")} — ต้องเข้ารอบถัดไปภายใน ${overdueInfo.intervalMonths} เดือน เกินกำหนดแล้ว ${overdueInfo.monthsOverdue} เดือน ยังไม่ได้ลงแผนงานครั้งถัดไป`}>
+                              <Box
+                                component="span"
+                                sx={{
+                                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                                  width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
+                                  bgcolor: "#dc2626", color: "#fff",
+                                  animation: "contractOverviewPulse 1.6s ease-in-out infinite",
+                                  "@keyframes contractOverviewPulse": {
+                                    "0%, 100%": { boxShadow: `0 0 0 0 ${alpha("#dc2626", 0.5)}` },
+                                    "50%": { boxShadow: `0 0 0 4px ${alpha("#dc2626", 0)}` },
+                                  },
+                                }}
+                              >
+                                <WarningAmber sx={{ fontSize: 12 }} />
+                              </Box>
+                            </Tooltip>
+                          )}
+                        </Stack>
                       );
                     })()}
                   </TableCell>

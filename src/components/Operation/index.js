@@ -46,7 +46,7 @@ import {
 
 // MUI Icons
 import {
-  Search, FilterList, Clear, Timeline, TableChart, ChevronRight, ViewList,
+  Search, FilterList, Clear, TableChart, ChevronRight, ViewList,
   Upload, Download, Delete, Visibility, Close, CheckCircle,
   PendingActions, Build, Assignment, Notifications, MoreVert,
   CalendarMonth, Warning, TrendingUp, Description,
@@ -75,6 +75,8 @@ import useEventNotifications from "../../hooks/useEventNotifications";
 import NotificationBell from "../Notifications/NotificationBell";
 import LineIcon from "../icons/LineIcon";
 import { printFile, shareFile, shareToLine, isMobileDevice } from "../../functions/fileActions";
+import PendingApprovalsPanel from "./PendingApprovalsPanel";
+import InfoLine from "../InfoLine";
 
 // ✅ ใช้ตัดสินใจลำดับปุ่มแชร์ในเมนู "⋮" ต่อไฟล์ (ดูเหตุผลใน fileActions.js)
 const IS_MOBILE = isMobileDevice();
@@ -140,25 +142,48 @@ const FilterChip = styled(Chip)(({ theme, active }) => ({
 // ✅ ปุ่มเลือกกลุ่มสถานะงาน (รอคุณอนุมัติ/กำลังดำเนินการ/ค้างงาน/เสร็จสิ้น) — เดิมใช้ ToggleButtonGroup
 // แบบชิปเล็กๆ เรียงแนวนอน พอจอแคบ (มือถือ) จะห่อบรรทัดมั่วๆ กดยาก เปลี่ยนเป็นการ์ดใหญ่จัดกริด
 // 2 คอลัมน์เสมอ (ฝั่งแอดมิน/manager ขยายเป็น 4 คอลัมน์ในแนวนอนตอนจอกว้างพอ) แตะง่าย เห็นตัวเลขชัด
+// ✅ ปรับให้กระชับขึ้นมากบนจอเล็ก — เดิมจัดกลางแนวตั้ง (ไอคอน/ชื่อ/จำนวน ซ้อน 3 ชั้น สูงขั้นต่ำ 92px)
+// พอเป็นกริด 2x2 บนมือถือจึงกินพื้นที่เกือบ 200px ก่อนจะถึงข้อมูลจริงสักรายการ ต้องเลื่อนผ่านทุกครั้ง
+// ✅ จอเล็ก: เรียงแนวนอน (ไอคอน | ชื่อ+จำนวน) สูงแค่ ~62px — เห็นครบเหมือนเดิมแต่ประหยัดที่ราวครึ่งหนึ่ง
+// ✅ จอกว้าง: คงแบบเดิม (จัดกลาง 3 ชั้น) ซึ่งดูสมส่วนอยู่แล้วเมื่อวางเรียง 4 ใบในแถวเดียว
+// ✅ ตัวเลขจำนวนงานทำให้เด่นขึ้น (ตัวหนา+ใหญ่กว่าคำว่า "งาน") — เป็นข้อมูลที่คนมองการ์ดนี้ต้องการจริงๆ
 const StatusGroupCard = ({ active, onClick, icon, color, label, count, sub }) => (
   <Box
     onClick={onClick}
     sx={{
-      cursor: "pointer", borderRadius: 3, p: 1.5, textAlign: "center",
-      transition: "all 0.15s ease", border: "2px solid",
+      cursor: "pointer", borderRadius: 3, transition: "all 0.15s ease", border: "2px solid",
       borderColor: active ? color : "divider",
       bgcolor: active ? alpha(color, 0.08) : "background.paper",
-      minHeight: 92,
-      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+      "&:hover": { borderColor: active ? color : alpha(color, 0.5) },
+      display: "flex",
+      p: { xs: 1.25, sm: 1.5 },
+      minHeight: { xs: 62, sm: 92 },
+      flexDirection: { xs: "row", sm: "column" },
+      alignItems: "center",
+      justifyContent: { xs: "flex-start", sm: "center" },
+      textAlign: { xs: "left", sm: "center" },
+      gap: { xs: 1.25, sm: 0 },
     }}>
-    {React.cloneElement(icon, { sx: { fontSize: 24, color: active ? color : "text.secondary", mb: 0.5 } })}
-    <Typography fontWeight={800} fontSize="0.8rem" lineHeight={1.25}
-      color={active ? color : "text.primary"}>
-      {label}
-    </Typography>
-    <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25 }}>
-      {count} งาน{sub ? ` · ${sub}` : ""}
-    </Typography>
+    {React.cloneElement(icon, {
+      sx: {
+        fontSize: { xs: 22, sm: 24 },
+        color: active ? color : "text.secondary",
+        mb: { xs: 0, sm: 0.5 },
+        flexShrink: 0,
+      },
+    })}
+    <Box sx={{ minWidth: 0 }}>
+      <Typography fontWeight={800} fontSize="0.8rem" lineHeight={1.25}
+        color={active ? color : "text.primary"}>
+        {label}
+      </Typography>
+      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25 }}>
+        <Box component="span" sx={{ fontWeight: 800, fontSize: "0.9rem", color: active ? color : "text.primary" }}>
+          {count}
+        </Box>
+        {" งาน"}{sub ? ` · ${sub}` : ""}
+      </Typography>
+    </Box>
   </Box>
 );
 
@@ -724,92 +749,6 @@ const ActivityLogMini = ({ logs = [] }) => {
   );
 };
 
-// ─── TimelineView ─────────────────────────────────────────────────────
-const TimelineView = ({ events }) => {
-  const grouped = useMemo(() => {
-    const map = {};
-    events.forEach(e => {
-      const key = moment(e.start).format("YYYY-MM");
-      if (!map[key]) map[key] = [];
-      map[key].push(e);
-    });
-    return Object.entries(map).sort(([a], [b]) => b.localeCompare(a));
-  }, [events]);
-
-  return (
-    <Box>
-      {grouped.length === 0 && (
-        <Box sx={{ textAlign: "center", py: 8, color: "text.secondary" }}>
-          <Timeline sx={{ fontSize: 48, opacity: 0.3 }} />
-          <Typography>ไม่มีข้อมูล</Typography>
-        </Box>
-      )}
-      {grouped.map(([month, items]) => (
-        <Box key={month} sx={{ mb: 4 }}>
-          <Stack direction="row" alignItems="center" gap={1.5} sx={{ mb: 2 }}>
-            <CalendarMonth sx={{ color: "primary.main", fontSize: 20 }} />
-            <Typography variant="subtitle1" fontWeight={700}>
-              {moment(month).locale("th").format("MMMM YYYY")}
-            </Typography>
-            <Chip label={items.length} size="small" color="primary" sx={{ height: 20, fontSize: "0.7rem" }} />
-          </Stack>
-          <Stack spacing={1.5} sx={{ pl: 4, borderLeft: "2px solid", borderColor: "divider" }}>
-            {items.map(event => (
-              <Box key={event._id} sx={{ position: "relative" }}>
-                <Box sx={{
-                  position: "absolute", left: -21, top: 12,
-                  width: 8, height: 8, borderRadius: "50%",
-                  bgcolor: OP_COLOR[event.status] || "#6b7280",
-                  border: "2px solid #fff",
-                  boxShadow: "0 0 0 2px " + (OP_COLOR[event.status] || "#6b7280"),
-                }} />
-                <GlassCard sx={{ "&:hover": { transform: "none" } }}>
-                  <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-                    <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between"
-                      alignItems={{ sm: "center" }} gap={1}>
-                      <Box>
-                        <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
-                          <StatusBadge color={OP_COLOR[event.status]}>
-                            <Circle sx={{ fontSize: 6 }} /> {event.status || "ไม่ระบุ"}
-                          </StatusBadge>
-                          <Chip icon={TYPE_ICON[event.title]} label={event.title} size="small" variant="outlined" sx={{ fontSize: "0.7rem", height: 22 }} />
-                          {event.system && <Chip label={event.system} size="small" variant="outlined" color="secondary" sx={{ fontSize: "0.7rem", height: 22 }} />}
-                        </Stack>
-                        <Typography fontWeight={700} sx={{ mt: 0.8 }}>
-                          {companySite(event.company, event.site)}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {moment(event.start).locale("th").format("DD MMM YYYY HH:mm")}
-                          {event.docNo && ` · ${event.docNo}`}
-                        </Typography>
-                        {/* เวลาเข้า/ออกใน timeline */}
-                        {(event.checkedInAt || event.checkedOutAt) && (
-                          <Stack direction="row" gap={1} mt={0.5}>
-                            {event.checkedInAt && (
-                              <Typography variant="caption" color="#8b5cf6">
-                                <Login sx={{ fontSize: 11 }} /> {moment(event.checkedInAt).format("HH:mm")}
-                              </Typography>
-                            )}
-                            {event.checkedOutAt && (
-                              <Typography variant="caption" color="#10b981">
-                                <Logout sx={{ fontSize: 11 }} /> {moment(event.checkedOutAt).format("HH:mm")}
-                              </Typography>
-                            )}
-                          </Stack>
-                        )}
-                      </Box>
-                    </Stack>
-                  </CardContent>
-                </GlassCard>
-              </Box>
-            ))}
-          </Stack>
-        </Box>
-      ))}
-    </Box>
-  );
-};
-
 // ─── FileUploadSection ────────────────────────────────────────────────
 // เอกสารแต่ละชนิดแนบได้หลายไฟล์ (files คือ array) — เพิ่ม/ลบทีละไฟล์ได้อิสระ
 // ✅ ไอคอน/สีเฉพาะของเอกสารแต่ละชนิด (เทียบ pattern เดียวกับ DOCUMENT_TYPES ใน
@@ -1094,22 +1033,6 @@ export const CommentThread = ({ comments = [], onSend, myRole }) => {
     </Box>
   );
 };
-
-// ─── InfoLine ─────────────────────────────────────────────────────────
-// ✅ เดิมแต่ละบรรทัด "ไอคอน ป้ายกำกับ : ค่า" เป็นข้อความยาวเส้นเดียว พอค่ายาว (เช่นชื่อโครงการ)
-// บนจอมือถือแคบๆ จะตัดขึ้นบรรทัดใหม่แบบมั่วๆ (บางทีตัดกลางป้ายกำกับ/ตัดกลางวันที่) ดูไม่เป็นระเบียบ
-// แยกป้ายกำกับ (ไม่ตัดคำ) ออกจากค่า (ตัดคำ/ขึ้นบรรทัดใหม่ได้อิสระ) ด้วย flex row — ค่าที่ยาวจะ
-// ขึ้นบรรทัดใหม่แบบชิดใต้ตัวมันเองเท่านั้น ไม่ดึงป้ายกำกับหรือคำอื่นๆ ตามไปด้วย
-const InfoLine = ({ icon, label, children }) => (
-  <Stack direction="row" spacing={0.5} sx={{ alignItems: "flex-start" }}>
-    <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0, whiteSpace: "nowrap" }}>
-      {icon} {label} :
-    </Typography>
-    <Typography variant="caption" color="text.secondary" sx={{ minWidth: 0 }}>
-      {children}
-    </Typography>
-  </Stack>
-);
 
 // ─── EventRowCard ─────────────────────────────────────────────────────
 const EventRowCard = ({
@@ -1537,12 +1460,15 @@ const EventRowCard = ({
                 </Stack>
               )}
 
+              {/* ✅ ตัดวงเล็บ [ ] ครอบชื่องานออก — ไม่ได้สื่อความหมายอะไร เป็นแค่สัญลักษณ์ส่วนเกินที่
+                  โผล่ทุกการ์ด และเพิ่มน้ำหนัก/ระยะห่างให้ชื่องานเป็น "จุดยึดสายตา" ของการ์ดจริงๆ
+                  (เดิมตัวเล็กใกล้เคียงบรรทัดข้อมูลด้านล่าง เลยจมหายไปกับข้อมูลอื่น) */}
               {event.title && (
-                <Typography fontWeight={700} fontSize="0.95rem" noWrap>
-                  [{event.title}]
+                <Typography fontWeight={800} fontSize="1rem" noWrap sx={{ letterSpacing: "-0.01em" }}>
+                  {event.title}
                 </Typography>
               )}
-              <Stack spacing={0.3} sx={{ mt: 0.4 }}>
+              <Stack spacing={0.35} sx={{ mt: 0.6 }}>
                 {event.system && <InfoLine icon="💻" label="ระบบ">{event.system}</InfoLine>}
                 <InfoLine icon="🏢" label="โครงการ">{companySite(event.company, event.site)}</InfoLine>
                 {/* ✅ ย้ายมาไว้ถัดจากโครงการตามที่ขอ (เดิมอยู่คู่กับระบบด้านบนสุด) */}
@@ -2185,6 +2111,9 @@ const Operation = () => {
   const [employee,     setEmployee]     = useState([]);
   const [loading,      setLoading]      = useState(false);
   const [activeTab,    setActiveTab]    = useState(0);
+  // ✅ จำนวนงานรออนุมัติ — แผง PendingApprovalsPanel ดึงข้อมูลเองแยกจากหน้านี้ (ดูเหตุผลในไฟล์นั้น)
+  // จึงส่งตัวเลขกลับขึ้นมาให้แสดงเป็น badge บนแท็บ ผู้ใช้จะได้รู้ว่ามีงานค้างโดยไม่ต้องกดเข้าไปดูก่อน
+  const [pendingApprovalTabCount, setPendingApprovalTabCount] = useState(0);
   // ✅ สลับมุมมองการ์ด/ตาราง — จำค่าไว้ข้ามการเปิดหน้า (แต่ละคนถนัดคนละแบบและมักใช้แบบเดิมตลอด)
   // เทียบ pattern เดียวกับหน้า "ติดตามใบเสนอราคา"
   const [viewMode, setViewMode] = useState(() => {
@@ -2818,7 +2747,7 @@ const Operation = () => {
     try {
       const { exportOperationToExcel, buildOperationFileName } = await import("./operationExcelExport");
       const groupLabel = {
-        pending: "รอคุณอนุมัติ", active: "กำลังดำเนินการ", overdue: "ค้างงาน", closed: "เสร็จสิ้น",
+        pending: "คำขอปิดงาน", active: "กำลังดำเนินการ", overdue: "ค้างงาน", closed: "เสร็จสิ้น",
       }[effectiveGroup] || "ทั้งหมด";
       await exportOperationToExcel({
         // ⚠️ jobGroups เป็น array ของ "array of sessions" ตรงๆ (ดู useMemo ด้านบน) ไม่ใช่ object ที่มี
@@ -2853,9 +2782,18 @@ const Operation = () => {
       {/* Header */}
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }} flexWrap="wrap" gap={1}>
         <Box>
-          <Typography variant="h5" fontWeight={800} letterSpacing={-0.5}>แผนการดำเนินงาน</Typography>
+          <Typography variant="h5" fontWeight={800} letterSpacing={-0.5}>การดำเนินงาน</Typography>
+          {/* 🐛 BUG ที่แก้ (ตัวเลขใต้หัวข้อไม่ตรงกับสิ่งที่เห็นบนจอ): เดิมโชว์ sortedEvents.length เสมอ
+              ซึ่งเป็นจำนวนงานของแท็บ "รายการงาน" — พอสลับไปแท็บ "รออนุมัติ" ที่มี 0 งาน หัวข้อยังขึ้น
+              "1 รายการ" ค้างอยู่ (จำนวนของอีกแท็บ) อ่านแล้วขัดกันเองทันที
+              ✅ ให้ตัวเลขเปลี่ยนตามแท็บที่เปิดอยู่จริง และซ่อน "กรอง N เงื่อนไข" ตอนอยู่แท็บรออนุมัติ
+              เพราะตัวกรองพวกนั้นไม่มีผลกับแท็บนั้นเลย */}
           <Typography variant="body2" color="text.secondary">
-            {loading ? "กำลังโหลด..." : `${sortedEvents.length} รายการ${activeFilterCount > 0 ? ` · กรอง ${activeFilterCount} เงื่อนไข` : ""}`}
+            {loading
+              ? "กำลังโหลด..."
+              : activeTab === 1
+              ? `${pendingApprovalTabCount} งานรออนุมัติ`
+              : `${sortedEvents.length} รายการ${activeFilterCount > 0 ? ` · กรอง ${activeFilterCount} เงื่อนไข` : ""}`}
           </Typography>
         </Box>
         {/* ✅ ปุ่มวงกลม ขนาด 40px ให้แตะง่ายขึ้นบนมือถือ (เดิม size="small" เล็กไปสำหรับนิ้วมือ)
@@ -2906,11 +2844,44 @@ const Operation = () => {
         />
       )}
 
+      {/* ✅ เดิมเป็นแถบ Alert สีฟ้าเต็มความกว้างเขียนว่า "กรองเฉพาะงาน: ..." ซึ่งกินที่และอ่านแล้วเหมือน
+          คำเตือนว่ามีอะไรผิด ทั้งที่เป็นเรื่องปกติ (กดมาจากลิงก์เจาะจงงาน) — ย่อเหลือแถบเล็กๆ บรรทัดเดียว
+          และเพิ่มปุ่ม "ดูในปฏิทิน" ตามที่ผู้ใช้ขอ เพื่อกระโดดไปดูงานนี้บนปฏิทินแบบเจาะจงวันได้เลย
+          ⚠️ ยังคง "กรองเหลืองานเดียว" ไว้เหมือนเดิม (ไม่ได้เอาออก) เพราะลิงก์ที่พามาที่ /operation/:id
+          มาจากหลายที่ (แจ้งเตือน/แผงรออนุมัติ/ตาราง) ถ้าไม่กรอง งานที่ตั้งใจให้ดูอาจไม่อยู่ในหน้าปัจจุบัน
+          เลย (โดนตัวกรองเดือน/สถานะที่ค้างอยู่คัดออก) กลายเป็นกดลิงก์แล้วไม่เจออะไรเลย */}
       {selectedEvent && (
-        <Alert severity="info" sx={{ mb: 2, borderRadius: 2 }}
-          action={<Button color="inherit" size="small" onClick={() => navigate("/operation")}>แสดงทั้งหมด</Button>}>
-          กรองเฉพาะงาน: <strong>{selectedEvent.title}</strong> · {selectedEvent.system} · {selectedEvent.site}
-        </Alert>
+        <Stack
+          direction="row" alignItems="center" gap={1} flexWrap="wrap"
+          sx={{
+            mb: 2, px: 1.5, py: 1, borderRadius: 2,
+            bgcolor: alpha("#0ea5e9", 0.06), border: "1px solid", borderColor: alpha("#0ea5e9", 0.25),
+          }}
+        >
+          <Typography variant="caption" sx={{ color: "text.secondary", flex: 1, minWidth: 0 }}>
+            กำลังดูเฉพาะงาน <strong style={{ color: "#0f172a" }}>{selectedEvent.title}</strong>
+            {selectedEvent.system ? ` · ${selectedEvent.system}` : ""}
+            {selectedEvent.site ? ` · ${selectedEvent.site}` : ""}
+          </Typography>
+          {/* ✅ ไปดูงานนี้บนปฏิทินแบบเจาะจงวัน — งานที่ยังไม่ลงตารางไม่มีวันที่จริง ส่งไปที่แผง
+              งานล่วงหน้า (?draft=) แทน ซึ่งเป็นที่ที่การ์ดของมันอยู่จริง */}
+          <Button
+            size="small" variant="outlined" startIcon={<CalendarMonth sx={{ fontSize: 15 }} />}
+            onClick={() => {
+              const q = selectedEvent.unscheduled
+                ? `draft=${selectedEvent._id}&month=${selectedEvent.plannedMonth || ""}`
+                : `event=${selectedEvent._id}&date=${moment(selectedEvent.start).format("YYYY-MM-DD")}`;
+              navigate(`/event?${q}&t=${Date.now()}`);
+            }}
+            sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700, flexShrink: 0 }}
+          >
+            ดูในปฏิทิน
+          </Button>
+          <Button size="small" onClick={() => navigate("/operation")}
+            sx={{ borderRadius: 2, textTransform: "none", flexShrink: 0 }}>
+            แสดงทั้งหมด
+          </Button>
+        </Stack>
       )}
 
       {/* Tabs */}
@@ -2919,9 +2890,32 @@ const Operation = () => {
           sx={{ "& .MuiTabs-indicator": { height: 3, borderRadius: "3px 3px 0 0" } }}>
           {/* ✅ ตัดแท็บ "Dashboard" ออกตามที่ผู้ใช้ขอ — สถิติภาพรวมทั้งหมดที่เคยอยู่ในนั้น (จำนวนงานแยก
               สถานะ/แถบความคืบหน้า/สรุปรายช่าง) ซ้ำกับหน้า Dashboard หลักของแอปและการ์ดกลุ่มงานด้านล่าง
-              ที่เห็นอยู่แล้วทุกแท็บ — หน้านี้ควรโฟกัสที่ "การดำเนินงานรายงาน" อย่างเดียว */}
+              ที่เห็นอยู่แล้วทุกแท็บ — หน้านี้ควรโฟกัสที่ "การดำเนินงานรายงาน" อย่างเดียว
+              ✅ ตัดแท็บ "Timeline" ออกตามที่ผู้ใช้ขอเช่นกัน — เป็นการเอางานชุดเดิมมาเรียงตามเดือนเฉยๆ
+              ซึ่งดูได้จากหน้าปฏิทินอยู่แล้ว และไม่มีอะไรให้จัดการงานได้จริงในนั้น (การ์ดในแท็บ
+              "รายการงาน" คือที่เดียวที่แนบเอกสาร/เช็คอิน/คอมเมนต์ได้) */}
           <StyledTab icon={<TableChart fontSize="small" />} iconPosition="start" label="รายการงาน" />
-          <StyledTab icon={<Timeline fontSize="small" />}   iconPosition="start" label="Timeline" />
+          {/* ✅ ย้ายหน้า "แผนงานรออนุมัติ" (เดิมเป็นหน้าแยก /pending-approvals) มาเป็นแท็บที่นี่ตามที่
+              ผู้ใช้ขอ — เป็นงานเดียวกัน (ไล่จัดการงานทีละใบ) แต่เดิมต้องสลับหน้าไปมา และตัวเลข
+              "รอคุณอนุมัติ" ก็โผล่ทั้งการ์ดกลุ่มงานในหน้านี้และหน้านั้นจนดูเหมือนคนละระบบ
+              ⚠️ เฉพาะแอดมิน/manager เท่านั้น (คนอื่นอนุมัติไม่ได้อยู่แล้ว — backend ตอบ 403) จึงต้องเป็น
+              แท็บสุดท้าย ไม่งั้น index ของแท็บจะเลื่อนไม่ตรงกันระหว่าง role */}
+          {isAdminOrManager && (
+            <StyledTab
+              icon={
+                <Badge
+                  badgeContent={pendingApprovalTabCount}
+                  color="warning"
+                  invisible={pendingApprovalTabCount === 0}
+                  sx={{ "& .MuiBadge-badge": { fontSize: "0.6rem", height: 15, minWidth: 15 } }}
+                >
+                  <HourglassTop fontSize="small" />
+                </Badge>
+              }
+              iconPosition="start"
+              label="รออนุมัติ"
+            />
+          )}
         </Tabs>
       </Box>
 
@@ -2929,7 +2923,7 @@ const Operation = () => {
           ฝั่งช่าง: เหลือแค่ "ค้างงาน" กับ "เสร็จสิ้น" (งานที่กำลังทำ/รออนุมัติ ย้ายไปหน้า "งานของฉัน" หมดแล้ว)
           เดิมใช้ ToggleButtonGroup แบบชิปเล็กเรียงแนวนอน จอมือถือห่อบรรทัดมั่วๆ กดยาก เปลี่ยนเป็น
           การ์ดใหญ่จัดกริด 2 คอลัมน์เสมอบนจอแคบ (แอดมินขยายเป็น 4 คอลัมน์แนวนอนตอนจอกว้างพอ) */}
-      {activeTab !== 2 && (
+      {activeTab !== 1 && (
         <Box sx={{
           display: "grid",
           gridTemplateColumns: isAdminOrManager ? { xs: "1fr 1fr", sm: "repeat(4, 1fr)" } : "1fr 1fr",
@@ -2939,7 +2933,7 @@ const Operation = () => {
             <>
               <StatusGroupCard
                 active={effectiveGroup === "pending"} onClick={() => setStatusGroup("pending")}
-                icon={<HourglassTop />} color="#f59e0b" label="รอคุณอนุมัติ" count={pendingCount}
+                icon={<HourglassTop />} color="#f59e0b" label="คำขอปิดงาน" count={pendingCount}
               />
               <StatusGroupCard
                 active={effectiveGroup === "active"} onClick={() => setStatusGroup("active")}
@@ -3103,23 +3097,18 @@ const Operation = () => {
       )}
 
       {/* TAB 1: TIMELINE */}
-      {activeTab === 1 && (
-        <>
-          <FilterPanel
-            search={search} onSearch={setSearch}
-            filterType={filterType} onFilterType={setFilterType}
-            filterSystem={filterSystem} onFilterSystem={setFilterSystem}
-            filterStatus={filterStatus} onFilterStatus={setFilterStatus}
-            filterOP={filterOP} onFilterOP={setFilterOP}
-            filterTeam={filterTeam} onFilterTeam={setFilterTeam}
-            typeOptions={typeOptions} systemOptions={systemOptions}
-            showAll={showAll} onToggleShowAll={v => { setShowAll(v); if (v) setSelectedDate(""); }}
-            selectedDate={selectedDate} onDateChange={d => { setSelectedDate(d); setShowAll(false); }}
-            onClearAll={() => { setFilterType(""); setFilterSystem(""); setFilterStatus(""); setFilterOP(""); setFilterTeam(""); setSearch(""); }}
-            activeCount={activeFilterCount}
+
+      {/* TAB 2: แผนงานรออนุมัติ (เฉพาะแอดมิน/manager — ดูคอมเมนต์ที่แท็บด้านบน)
+          ⚠️ ซ่อนด้วย CSS แทนการ unmount — ตัวเลขบน badge ของแท็บมาจากแผงนี้ ถ้า unmount ทิ้งตอนอยู่แท็บ
+          อื่น badge จะกลับเป็น 0 ทันทีที่สลับแท็บ (และต้องโหลดใหม่ทุกครั้งที่กดกลับเข้ามา) — แผงจะดึง
+          ข้อมูลรอบแรกให้เสมอ แต่หยุดรีเฟรชอัตโนมัติเมื่อไม่ได้เปิดอยู่ (ดู prop active) */}
+      {isAdminOrManager && (
+        <Box sx={{ display: activeTab === 1 ? "block" : "none" }}>
+          <PendingApprovalsPanel
+            active={activeTab === 1}
+            onCountChange={setPendingApprovalTabCount}
           />
-          <TimelineView events={sortedEvents} />
-        </>
+        </Box>
       )}
 
 

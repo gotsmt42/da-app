@@ -233,6 +233,25 @@ function EventCalendar() {
     setHighlightDraftId(`${draftParam}|${searchParams.get("t") || Date.now()}`);
   }, [searchParams]);
 
+  // ✅ ?event=<id>&date=YYYY-MM-DD (+ ?t=nonce) — เปิดปฏิทินไปที่เดือนของงานนั้นแล้วไฮไลต์การ์ดให้เห็น
+  // ชัดสักครู่ ใช้กับปุ่ม "ดูในปฏิทิน" จากหน้าการดำเนินงาน/แผงรออนุมัติ ซึ่งเดิมไม่มีทางลิงก์มาที่ปฏิทิน
+  // แบบเจาะจงงานได้เลย (มีแต่ ?draft= สำหรับงานที่ยังไม่ลงตาราง) ต้องมาไล่หาวันเองทุกครั้ง
+  // ⚠️ deps: [searchParams] เหมือน ?draft= ด้านบน — กดลิงก์ซ้ำงานเดิมต้องทำงานซ้ำได้ (React Router
+  // ไม่ remount หน้าเดิม) จึงต้องมี nonce ใน state ด้วย ไม่งั้นค่าเดิมทำให้ไม่มีอะไรเกิดขึ้น
+  const [highlightEventId, setHighlightEventId] = useState(null);
+  useEffect(() => {
+    const eventParam = searchParams.get("event");
+    if (!eventParam) return undefined;
+    const dateParam = searchParams.get("date");
+    if (dateParam && moment(dateParam, "YYYY-MM-DD", true).isValid()) {
+      calendarRef.current?.getApi()?.gotoDate(dateParam);
+    }
+    setHighlightEventId(eventParam);
+    // ✅ ถอดไฮไลต์เองหลัง 6 วิ — เป็นแค่ตัวช่วย "สะกิดตา" ตอนเพิ่งกดมา ไม่ใช่สถานะถาวรที่ต้องค้างไว้
+    const t = setTimeout(() => setHighlightEventId(null), 6000);
+    return () => clearTimeout(t);
+  }, [searchParams]);
+
   // ✅ FullCalendar v6 มี ResizeObserver ของตัวเองบน .fc คอยจับขนาด container ที่เปลี่ยนอยู่แล้ว
   // แต่โค้ดชุดนี้ไม่เคยถูกทดสอบกับการ "ย่อความกว้าง container ด้วย CSS" มาก่อน (เดิมปฏิทินกว้างเต็ม
   // จอเสมอ) — ตอนนี้เปิด/ปิดคอลัมน์งานวางแผนล่วงหน้าทำให้ .calendar-wrapper แคบ/กว้างขึ้นได้ สั่ง
@@ -1780,6 +1799,10 @@ function EventCalendar() {
             // แยกประเภทได้ทันทีโดยไม่ต้องอ่านข้อความ ไม่ทับซ้อนกับสิ่งที่มีอยู่แล้วเพราะอยู่คนละตำแหน่ง
             const jobClass = classifyJob(arg.event.extendedProps);
             if (jobClass) classes.push(`fc-event-type-${jobClass}`);
+            // ✅ ไฮไลต์งานที่ถูกลิงก์มาเจาะจงจากหน้าอื่น (?event=<id>) — ดูคอมเมนต์ที่ highlightEventId
+            if (highlightEventId && String(arg.event.id) === String(highlightEventId)) {
+              classes.push("fc-event-linked-highlight");
+            }
             return classes;
           }}
           dayCellDidMount={(info) => {
@@ -1900,6 +1923,25 @@ function EventCalendar() {
       outline: 2px dashed #ef4444;
       outline-offset: -2px;
     }
+
+/* ✅ ไฮไลต์งานที่ถูกลิงก์มาเจาะจง (?event=<id> จากหน้าการดำเนินงาน/แผงรออนุมัติ) — วงแหวนสีแบรนด์
+   กะพริบช้าๆ ให้ตาจับได้ทันทีว่างานไหน แล้วหายเองใน 6 วิ (ดู highlightEventId)
+   ⚠️ ใช้ outline ไม่ใช่ border — border จะไปดันขนาดกล่องทำให้การ์ดขยับ/ตารางเลื่อน ส่วน outline
+   วาดทับนอกกรอบโดยไม่กินพื้นที่ layout เลย */
+@keyframes ecLinkedPulse {
+  0%, 100% { outline-color: rgba(220,38,38,.95); box-shadow: 0 0 0 4px rgba(220,38,38,.18); }
+  50%      { outline-color: rgba(220,38,38,.35); box-shadow: 0 0 0 7px rgba(220,38,38,0); }
+}
+.fc-event-linked-highlight {
+  outline: 2px solid rgba(220,38,38,.95);
+  outline-offset: 1px;
+  border-radius: 4px;
+  animation: ecLinkedPulse 1.3s ease-in-out infinite;
+  z-index: 5;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fc-event-linked-highlight { animation: none; }
+}
 
 /* ✅ อนิเมชันเลื่อนเข้าตอนปัดเปลี่ยนเดือนบนมือถือ (ดู hammer.on("swipeleft"/"swiperight") ด้านบน) —
    FullCalendar เปลี่ยนเดือนแบบตัดภาพทันทีไม่มีอนิเมชันมาให้ ปัดแล้วไม่แน่ใจว่าเปลี่ยนไปทางไหน/เปลี่ยนไหม

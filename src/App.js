@@ -5,6 +5,10 @@ import ThemeRoutes from "./routes/Router";
 import CheckConnectionToast from "./routes/CheckConnectionToast";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+// ✅ ครอบทั้งแอปด้วยธีม MUI เพื่อบังคับให้คอมโพเนนต์ MUI ทุกตัวใช้ฟอนต์เดียวกับที่ตั้งไว้ใน index.css
+// (เดิมไม่มี ThemeProvider เลย คอมโพเนนต์ MUI จึงใช้ Roboto ของตัวเองอยู่ ดูเหตุผลเต็มที่ src/theme.js)
+import { ThemeProvider } from "@mui/material/styles";
+import theme from "./theme";
 
 const App = () => {
   const [pageTitle, setPageTitle] = useState([]);
@@ -45,20 +49,20 @@ const findCurrentRoute = (routes, pathname) => {
 };
 
   return (
-    <div className="dark">
-      {/* <title>{`${pageTitle} - DA-APP`}</title> */}
-
-
- <ToastContainer
-        position="top-center"
-        autoClose={false}
-        closeOnClick={false}
-        draggable={false}
-        theme="colored"
-        newestOnTop
-      />
-          {routing}
-    </div>
+    <ThemeProvider theme={theme}>
+      <div className="dark">
+        {/* <title>{`${pageTitle} - DA-APP`}</title> */}
+        <ToastContainer
+          position="top-center"
+          autoClose={false}
+          closeOnClick={false}
+          draggable={false}
+          theme="colored"
+          newestOnTop
+        />
+        {routing}
+      </div>
+    </ThemeProvider>
   );
 };
 

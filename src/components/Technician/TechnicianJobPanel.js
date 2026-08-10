@@ -36,6 +36,7 @@ import {
 } from "@mui/icons-material";
 import LineIcon from "../icons/LineIcon";
 import { printFile, shareFile, shareToLine, isMobileDevice } from "../../functions/fileActions";
+import InfoLine from "../InfoLine";
 
 // ✅ ใช้ตัดสินใจลำดับปุ่มแชร์ในเมนู "⋮" ต่อไฟล์ (ดูเหตุผลใน fileActions.js)
 const IS_MOBILE = isMobileDevice();
@@ -681,20 +682,10 @@ const CommentThread = ({ comments = [], onSend, myRole }) => {
 };
 
 // ─── InfoLine ─────────────────────────────────────────────────────────
-// ✅ เดิมแต่ละบรรทัด "ไอคอน ป้ายกำกับ : ค่า" เป็นข้อความยาวเส้นเดียว พอค่ายาว (เช่นชื่อโครงการ)
-// บนจอมือถือแคบๆ จะตัดขึ้นบรรทัดใหม่แบบมั่วๆ (บางทีตัดกลางป้ายกำกับ/ตัดกลางวันที่) ดูไม่เป็นระเบียบ
-// แยกป้ายกำกับ (ไม่ตัดคำ) ออกจากค่า (ตัดคำ/ขึ้นบรรทัดใหม่ได้อิสระ) ด้วย flex row — ค่าที่ยาวจะ
-// ขึ้นบรรทัดใหม่แบบชิดใต้ตัวมันเองเท่านั้น ไม่ดึงป้ายกำกับหรือคำอื่นๆ ตามไปด้วย
-const InfoLine = ({ icon, label, children }) => (
-  <Stack direction="row" spacing={0.5} sx={{ alignItems: "flex-start" }}>
-    <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0, whiteSpace: "nowrap" }}>
-      {icon} {label} :
-    </Typography>
-    <Typography variant="caption" color="text.secondary" sx={{ minWidth: 0 }}>
-      {children}
-    </Typography>
-  </Stack>
-);
+// ⚠️ InfoLine เดิมของไฟล์นี้ถูกลบออกแล้ว — เป็นสำเนาที่ "ค้างสไตล์เก่า" ไว้ (มีเครื่องหมาย ":" และ
+// ป้ายกำกับกับค่าเป็นสีเทาเดียวกันทั้งคู่ ไม่มีการล็อกความกว้างป้ายกำกับ) ในขณะที่การ์ดงานหน้าอื่นถูก
+// ปรับไปใช้สไตล์ใหม่หมดแล้ว หน้างานของช่างจึงเป็นหน้าเดียวที่แสดงข้อมูลชุดเดียวกันคนละหน้าตากับที่อื่น
+// ✅ เปลี่ยนมาใช้คอมโพเนนต์กลางตัวเดียวกับหน้า "การดำเนินงาน"/"รออนุมัติ" (src/components/InfoLine.js)
 
 // ─── Main: TechnicianJobCard ──────────────────────────────────────────
 const TechnicianJobCard = ({
@@ -1026,12 +1017,14 @@ const TechnicianJobCard = ({
                 )}
               </Stack>
 
+              {/* ✅ ตัดวงเล็บ [ ] ครอบชื่องานออก ให้ตรงกับการ์ดงานหน้าอื่นที่ตัดออกไปแล้ว — ไม่ได้สื่อ
+                  ความหมายอะไร เป็นแค่สัญลักษณ์ส่วนเกินที่โผล่ทุกการ์ด */}
               {event.title && (
-                <Typography fontWeight={800} fontSize="0.95rem">
-                  [{event.title}]
+                <Typography fontWeight={800} fontSize="1rem" sx={{ letterSpacing: "-0.01em" }}>
+                  {event.title}
                 </Typography>
               )}
-              <Stack spacing={0.3} sx={{ mt: 0.4 }}>
+              <Stack spacing={0.35} sx={{ mt: 0.6 }}>
                 {event.system && <InfoLine icon="💻" label="ระบบ">{event.system}</InfoLine>}
                 {/* ✅ เดิม `{company || "—"} · {site || "—"}` โชว์ "— · ไซต์" เป็นขีดลอยๆ เวลาช่องใดช่องหนึ่งว่าง */}
                 <InfoLine icon="🏢" label="โครงการ">

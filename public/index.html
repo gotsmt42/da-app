@@ -15,7 +15,20 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500&display=swap" rel="stylesheet">
+    <!--
+      🐛 BUG ที่แก้ (ตัวหนาทุกจุดในแอปเบลอ/เละ + ตัวอักษรไทยเป็นฟอนต์อะไรก็ไม่รู้):
+      เดิมโหลด Montserrat มาแค่ "น้ำหนักเดียว" (wght@500) แต่โค้ดทั้งแอปใช้ fontWeight 600/700/800
+      อยู่กว่า 180 จุด — เบราว์เซอร์จึงต้อง "ปลอมตัวหนา" (faux bold) ให้เองด้วยการรีดตัวอักษรน้ำหนัก
+      500 ให้อ้วนขึ้น ผลคือหัวข้อ/ตัวเลขทุกจุดดูเบลอและขอบไม่คม
+      ซ้ำร้ายกว่านั้น: Montserrat "ไม่มีตัวอักษรไทยเลยสักตัว" — ข้อความไทยซึ่งเป็นเกือบทั้งแอปจึงตกไปใช้
+      ฟอนต์สำรองของระบบปฏิบัติการ (คนละแบบกันทุกเครื่อง/ทุกมือถือ) แปลว่าหน้าตาแอปที่เห็นจริงไม่เคย
+      ถูกควบคุมเลย
+      ✅ เปลี่ยนเป็น IBM Plex Sans Thai — ออกแบบมาสำหรับ UI/ตารางข้อมูลโดยเฉพาะ อ่านง่ายแม้ตัวเล็ก
+      ไทยกับอังกฤษเป็นชุดเดียวกันจึงเข้ากันสนิท และโหลดครบทุกน้ำหนักที่โค้ดใช้จริง (400/500/600/700)
+      ⚠️ IBM Plex Sans Thai ไม่มีน้ำหนัก 800 — ระบุ 700 เป็นตัวหนาสุด แล้วจุดที่โค้ดขอ 800 เบราว์เซอร์
+      จะ map ลงมาที่ 700 ให้เอง (ยังคมชัดจริง ไม่ใช่ตัวปลอม) ดูคอมเมนต์ที่ src/index.css ประกอบ
+    -->
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!--
       manifest.json provides metadata used when your web app is installed on a
       user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/

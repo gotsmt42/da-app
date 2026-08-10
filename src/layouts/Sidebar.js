@@ -13,7 +13,6 @@ import {
   FaTachometerAlt,
   FaCalendarAlt,
   FaFileContract,
-  FaClipboardCheck,
   FaClipboardList,
   FaFileAlt,
   FaFileInvoiceDollar,
@@ -73,11 +72,11 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
       ],
     },
   ];
+  // ✅ เมนู "แผนงานรออนุมัติ" ถูกตัดออกตามที่ผู้ใช้ขอ — ย้ายไปเป็นแท็บ "รออนุมัติ" ในหน้า "การดำเนินงาน"
+  // แทน (ดู PendingApprovalsPanel.js) เพราะเป็นงานเดียวกันกับการไล่จัดการงานในหน้านั้น ไม่ต้องสลับหน้า
+  // ไปมา และมี badge บอกจำนวนงานค้างบนแท็บให้เห็นตั้งแต่เข้าหน้ามาแล้ว
   const workMenuManager = [
     { title: "ภาพรวมงาน", href: "/contracts", icon: <FaFileContract /> },
-    // ✅ อนุมัติ/ไม่อนุมัติแผนงานที่ช่าง/เซลส่งมา — อยู่หมวด "งาน" เพราะเป็นเรื่องงาน ไม่ใช่ภาพรวมทีม
-    // (ดูคอมเมนต์ที่ teamMenu ด้านล่าง อธิบายว่าทำไมหมวดนั้นเหลือแค่ภาพรวมทีมช่างจริงๆ)
-    { title: "แผนงานรออนุมัติ", href: "/pending-approvals", icon: <FaClipboardCheck /> },
   ];
   // ✅ เดิมประกาศไว้แต่ไม่เคย render เลย — ช่างจึงไม่มีทางกดเข้า "งานของฉัน" จาก sidebar ได้เลย
   // ✅ "ภาพรวมงาน" เดิมเฉพาะแอดมิน/manager (ดู workMenuManager ด้านบน) ตอนนี้ช่างเข้าดูได้ด้วย

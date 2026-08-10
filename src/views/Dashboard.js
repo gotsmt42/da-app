@@ -21,6 +21,7 @@ import {
   FaFileInvoiceDollar,
 } from "react-icons/fa";
 import { useEffect, useState, useMemo } from "react";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import { Link, useNavigate } from "react-router-dom";
 import moment from "moment";
 import "moment/locale/th";
@@ -66,9 +67,38 @@ const getGreeting = () => {
   return "สวัสดีตอนเย็น";
 };
 
+// ✅ ขยายขนาดตัวอักษรของทั้งหน้าให้อัตโนมัติเมื่อดูบนจอคอม
+// ⚠️ ที่มา: สไตล์ทั้งหมดในหน้านี้เป็น inline style ที่ "ระบุขนาดเป็น px ตายตัว" และถูกจูนมาเพื่อจอมือถือ
+// โดยเฉพาะ (ดูคอมเมนต์เดิมที่ heroPairCard — "ให้พอดีครึ่งจอมือถือ") มีตั้งแต่ 8.5px ถึง 12px เป็นส่วนใหญ่
+// พอเปิดบนจอคอมซึ่งกว้างกว่าและนั่งห่างจอมากกว่า ตัวอักษรชุดนี้จึงเล็กจนอ่านยาก และเพราะเป็น inline style
+// จะไปเขียน CSS media query มาทับก็ไม่ได้ (inline style ชนะ CSS เสมอ)
+// ✅ แก้ด้วยการ "คูณขนาดขึ้น" ตอนอยู่บนจอคอม แทนการไล่แก้เลขทีละจุดกว่า 40 จุด (ซึ่งพลาดง่ายและทำให้
+// สัดส่วนที่จูนมาแล้วบนมือถือเสียไปด้วย) — มือถือยังได้ขนาดเดิมเป๊ะทุกตัว ไม่มีอะไรเปลี่ยน
+// ⚠️ บังคับขั้นต่ำ 11px บนจอคอม — ตัวที่เล็กสุด (8.5px) ต่อให้คูณ 1.15 ก็ยังได้แค่ ~9.8px ซึ่งยังเล็ก
+// เกินไปสำหรับภาษาไทยที่มีสระ/วรรณยุกต์ซ้อนบน-ล่าง ต้องมีพื้นที่แนวตั้งมากกว่าภาษาอังกฤษที่ขนาดเท่ากัน
+const DESKTOP_FONT_SCALE = 1.15;
+const DESKTOP_MIN_FONT_PX = 11;
+const scaleStyleFonts = (styleMap, enabled) => {
+  if (!enabled) return styleMap;
+  const out = {};
+  Object.entries(styleMap).forEach(([key, value]) => {
+    if (!value || typeof value !== "object") { out[key] = value; return; }
+    const px = typeof value.fontSize === "string" && value.fontSize.endsWith("px")
+      ? parseFloat(value.fontSize)
+      : null;
+    if (px === null || Number.isNaN(px)) { out[key] = value; return; }
+    const scaled = Math.max(DESKTOP_MIN_FONT_PX, Math.round(px * DESKTOP_FONT_SCALE * 2) / 2);
+    out[key] = { ...value, fontSize: `${scaled}px` };
+  });
+  return out;
+};
+
 const Dashboard = () => {
   const { userData } = useAuth();
   const navigate = useNavigate();
+  // ✅ 900px ขึ้นไปถือว่าเป็นจอคอม/แท็บเล็ตแนวนอน (ตรงกับ breakpoint ที่หน้าอื่นในแอปใช้อยู่แล้ว)
+  const isDesktopScreen = useMediaQuery("(min-width:900px)");
+  const styles = useMemo(() => scaleStyleFonts(baseStyles, isDesktopScreen), [isDesktopScreen]);
   const role = userData?.role?.toLowerCase();
   const isAdmin = role === "admin";
   const isAdminOrManager = ["admin", "manager"].includes(role);
@@ -1538,7 +1568,7 @@ const Dashboard = () => {
 };
 
 // ─── STYLES OBJECT ───
-const styles = {
+const baseStyles = {
   // ✅ เดิมไม่มี maxWidth เลย พอเปิดจอกว้าง (เดสก์ท็อป) ทุกอย่างเลยยืดเต็มจนดูเทอะทะเกินจริง
   // (แบนเนอร์/การ์ดสถิติกว้างเป็น 1900px) จำกัดความกว้างและกึ่งกลางไว้ ยังคง fluid เต็มจอบนมือถือ
   // ✅ ขยับ maxWidth ขึ้นจาก 720 → 1040 เพื่อเผื่อที่ให้แถบข้าง "งานค้างของช่าง" (320px) วางคู่กับ

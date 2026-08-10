@@ -62,8 +62,13 @@ const COLOR = {
   gold: "#B08B3F",
 };
 
-const FONT_DISPLAY = `"IBM Plex Sans Thai", "IBM Plex Sans", "Noto Sans Thai", sans-serif`;
-const FONT_UI = `"Noto Sans Thai", "IBM Plex Sans", sans-serif`;
+// ✅ ใช้ฟอนต์ชุดเดียวกับทั้งแอป (ตัวแปร --app-font ที่ตั้งไว้ใน src/index.css) — เดิมไฟล์นี้ประกาศ
+// ฟอนต์เองแยกต่างหาก และ FONT_UI ยังเป็นคนละตัวกับ FONT_DISPLAY (Noto Sans Thai vs IBM Plex Sans Thai)
+// ทำให้หน้า "เอกสาร" ใช้ฟอนต์ไม่ตรงกับหน้าอื่นในแอป และภายในหน้าเดียวกันเองก็ยังปนกัน 2 แบบ
+// ⚠️ Noto Sans Thai ไม่ได้ถูกโหลดมาด้วยซ้ำ (index.html โหลดแค่ IBM Plex Sans Thai) — ที่ผ่านมาข้อความ
+// ที่ใช้ FONT_UI จึงตกไปใช้ฟอนต์สำรองของระบบมาตลอด
+const FONT_DISPLAY = `var(--app-font)`;
+const FONT_UI = `var(--app-font)`;
 const FONT_MONO = `"IBM Plex Mono", ui-monospace, monospace`;
 
 // ---- File-type visual language ------------------------------------------

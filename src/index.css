@@ -1,5 +1,30 @@
+/* ✅ ฟอนต์หลักของทั้งแอป — IBM Plex Sans Thai (ดูเหตุผลเต็มที่ public/index.html ตรงที่โหลดฟอนต์)
+   ⚠️ ตัวสำรองต้องมีฟอนต์ไทยของแต่ละระบบต่อท้ายด้วย (ไม่ใช่แค่ sans-serif ลอยๆ) — ระหว่างที่ฟอนต์หลัก
+   ยังโหลดไม่เสร็จ หรือเน็ตล่ม ข้อความไทยจะได้ไม่ตกไปใช้ฟอนต์ที่อ่านยาก/ผิดรูปแบบ
+   ⚠️ ตั้งที่ * (ทุก element) ตามเดิม เพราะ MUI ตั้ง font-family ไว้บน class ของตัวเอง ซึ่งมี specificity
+   สูงกว่าการตั้งที่ body อย่างเดียว — ดู theme ที่ src/theme.js ซึ่งบอก MUI ให้ใช้ฟอนต์ชุดเดียวกันนี้ด้วย
+   อีกชั้น (กันคอมโพเนนต์ MUI หลุดไปใช้ Roboto ตามค่าเริ่มต้นของมันเอง) */
+:root {
+  --app-font: "IBM Plex Sans Thai", "IBM Plex Sans", "Noto Sans Thai",
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+}
+
 * {
-  font-family: "Montserrat", sans-serif;
+  font-family: var(--app-font);
+}
+
+/* ✅ ปรับการเรนเดอร์ตัวอักษรให้คมขึ้นบนจอความละเอียดสูง (โดยเฉพาะ macOS ที่ค่าเริ่มต้นหนาเกินจริง)
+   และเปิด kerning/ligature ตามที่ฟอนต์ออกแบบมา ทำให้ระยะห่างตัวอักษรสวยขึ้นโดยไม่ต้องแก้อะไรเพิ่ม */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ✅ ตัวเลขในตาราง/ยอดเงินให้ความกว้างเท่ากันทุกตัว (tabular figures) — ตัวเลขจะเรียงตรงกันเป็นคอลัมน์
+   เวลาอยู่ในตาราง ไม่ขยับไปมาตอนค่าเปลี่ยน อ่านและเทียบยอดง่ายขึ้นมากในหน้าที่มีตัวเลขเยอะ */
+table, .fc, input[type="number"] {
+  font-variant-numeric: tabular-nums;
 }
 
 /* 🐛 BUG ที่แก้ (กล่องยืนยัน SweetAlert2 โผล่ "อยู่ด้านหลัง" กล่องอื่นจนกดไม่ได้):
