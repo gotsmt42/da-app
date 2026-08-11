@@ -191,19 +191,35 @@ const FullLayout = () => {
           className={`contentArea ${isCalendarPage ? "calendar-mode" : ""} ${isWideTablePage ? "wide-table-mode" : ""} ${!isMobile && isSidebarCollapsed ? "sidebarCollapsed" : ""} ${isMobile && isSidebarOpen ? "blur-content" : ""}`}
           onClick={isMobile && isSidebarOpen ? () => setIsSidebarOpen(false) : null}
         >
+          {/* 🐛 BUG ที่แก้ (ระยะบนสุดบนมือถือเยอะเกินจนดูไม่พอดี): ปุ่มย้อนกลับตัวนี้เดิมเป็นลูกศรเปล่าๆ
+              ขนาด 30px ที่มี margin รอบตัว 15px + padding ของ IconButton อีก 8px = กินความสูงราว 76px
+              ลอยอยู่เฉยๆ แล้วยังตามด้วย padding ของ Container (24px) และของตัวหน้าเองอีกชั้น รวมแล้วมี
+              ที่ว่างเกือบ 120px ก่อนจะถึงหัวข้อหน้า ทั้งที่จอมือถือสูงแค่ ~700px
+              ✅ ย่อเป็นปุ่มวงกลมกะทัดรัดขนาดมาตรฐานที่นิ้วยังกดถนัด (36px ตามเกณฑ์พื้นที่แตะขั้นต่ำ) และ
+              ทำให้ "ดูเป็นปุ่ม" จริงๆ (มีพื้น/ขอบ) แทนลูกศรลอยที่ดูเหมือนไอคอนตกแต่ง — ส่วนระยะซ้อนกัน
+              ของ Container แก้ที่ .app-page-container ใน FullLayout.css */}
           {!isDashboard && (
             <div className="back-button">
               <IconButton
                 onClick={() => navigate("/dashboard")}
-                style={{ margin: "15px", fontSize: "30px" }}
+                aria-label="กลับไปหน้าแดชบอร์ด"
+                sx={{
+                  m: "10px 12px 2px", width: 36, height: 36, fontSize: 16,
+                  color: "#475569", bgcolor: "#fff",
+                  border: "1px solid rgba(15,23,42,0.1)",
+                  boxShadow: "0 1px 2px rgba(15,23,42,0.06)",
+                  "&:hover": { bgcolor: "#f8fafc", color: "#dc2626" },
+                }}
               >
                 <FaArrowLeft />
               </IconButton>
             </div>
           )}
 
-          {/* ปรับแก้: ถ้าเป็นหน้าปฏิทิน/หน้าแรก จะใช้ p-0 m-0 เพื่อดึงพื้นที่เต็มความกว้างขอบจอ */}
-          <Container className={isCalendarPage ? "p-0 m-0" : "p-4"} fluid={true}>
+          {/* ปรับแก้: ถ้าเป็นหน้าปฏิทิน/หน้าแรก จะใช้ p-0 m-0 เพื่อดึงพื้นที่เต็มความกว้างขอบจอ
+              ✅ app-page-container — hook สำหรับบีบระยะขอบบนจอมือถือ (ดู FullLayout.css) จอใหญ่ยังได้
+              p-4 เท่าเดิมทุกประการ */}
+          <Container className={isCalendarPage ? "p-0 m-0" : "p-4 app-page-container"} fluid={true}>
             <Outlet />
             <SpeedInsights />
           </Container>

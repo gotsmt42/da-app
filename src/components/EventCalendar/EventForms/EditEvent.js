@@ -783,6 +783,44 @@ export const getEditEvent = async ({
     .sort((a, b) => (a.company || "").localeCompare(b.company || "", "th") || (a.site || "").localeCompare(b.site || "", "th"));
   const contractDisplayName = (c) => [c.company, c.site].filter(Boolean).join(" · ") || "(ไม่ระบุชื่อ)";
   const canAttachToContract = isAdminOrManagerUser && !eventContractGroupId && attachableContracts.length > 0;
+
+  /* ── "ครั้งที่" ของงานสัญญา — ย้ายไปครั้งอื่นที่ยังว่างอยู่ได้ ────────────────────────────
+     ✅ เดิมช่อง "ครั้งที่" ถูก disabled ตายตัวทุกกรณีที่งานมี contractGroupId (ดู editTime) — ลงครั้งที่
+     ผิดตั้งแต่แรกแล้วแก้จากหน้านี้ไม่ได้เลย ต้องไปหน้า "ภาพรวมงาน" แล้วใช้ปุ่มย้ายครั้งที่ในตารางแทน
+     ทั้งที่คนแก้งานอยู่ตรงหน้านี้แล้ว
+     ✅ ตัวเลือกอิงจาก "ข้อมูลสัญญาที่เหลืออยู่จริง" ตามที่ผู้ใช้ขอ ไม่ใช่รายการตายตัว 1-4 เหมือนงานทั่วไป:
+       • จำนวนครั้งทั้งหมดมาจาก visitCount ของสัญญานั้น (สัญญา 8 ครั้ง = เลือกได้ถึงครั้งที่ 8)
+       • ครั้งที่มีงานอื่นลงไว้แล้วจะเลือกไม่ได้ (disabled) แต่ยังโชว์อยู่ให้เห็นว่าไม่ว่างเพราะอะไร —
+         ดีกว่าซ่อนทิ้งจนคนใช้สงสัยว่าครั้งที่หายไปไหน
+       • ครั้งที่ของตัวเองยังเลือกอยู่ได้เสมอ (ไม่งั้นค่าปัจจุบันจะกลายเป็นตัวเลือกที่เลือกไม่ได้)
+     ⚠️ "ครั้งเดียว" มีได้หลายวันที่ (เข้างานไม่ติดกัน ผูกกันด้วย jobGroupId) — พี่น้องใน jobGroup เดียวกัน
+     ต้องไม่ถูกนับว่า "ครั้งนี้ถูกจองแล้ว" โดยตัวมันเอง และตอนบันทึกก็ต้องย้ายไปพร้อมกันทั้งกลุ่ม ซึ่ง
+     buildSharedFields (ที่มี time อยู่แล้ว) ถูก apply กับทุก sibling ในกลุ่มอยู่แล้ว จึงย้ายครบเองอัตโนมัติ */
+  const contractOfEvent = eventContractGroupId ? contractMap.get(eventContractGroupId) : null;
+  const contractTotalRounds = Math.max(0, Number(contractOfEvent?.visitCount) || 0);
+  const roundsTakenByOthers = new Set();
+  if (contractOfEvent) {
+    contractOfEvent.visits.forEach((v) => {
+      const isSelf = String(v.id) === String(eventId);
+      const isSibling = eventJobGroupId && v.jobGroupId === eventJobGroupId;
+      if (isSelf || isSibling) return;
+      roundsTakenByOthers.add(Number(v.time) || 1);
+    });
+  }
+  // ✅ เปิดให้แก้เฉพาะตอนที่รู้จำนวนครั้งของสัญญาจริงๆ เท่านั้น — สัญญาเก่าที่ไม่เคยกรอก visitCount ไว้
+  // ไม่มีข้อมูลพอจะบอกได้ว่า "ครั้งที่เท่าไหร่ยังว่าง" ปล่อยล็อกไว้เหมือนเดิมปลอดภัยกว่าเดา
+  const canEditContractRound = Boolean(eventContractGroupId) && isAdminOrManagerUser && !isViewOnly && contractTotalRounds > 0;
+  const freeRoundCount = canEditContractRound
+    ? Array.from({ length: contractTotalRounds }, (_, i) => i + 1).filter((n) => !roundsTakenByOthers.has(n)).length
+    : 0;
+  const contractRoundOpts = canEditContractRound
+    ? Array.from({ length: contractTotalRounds }, (_, i) => i + 1).map((n) => {
+      const isCurrent = String(n) === String(eventTime || "");
+      const taken = roundsTakenByOthers.has(n);
+      const note = isCurrent ? " · ครั้งปัจจุบัน" : taken ? " · มีงานลงไว้แล้ว" : " · ว่าง";
+      return `<option value="${n}"${isCurrent ? " selected" : ""}${taken && !isCurrent ? " disabled" : ""}>ครั้งที่ ${n}${note}</option>`;
+    }).join("")
+    : "";
   // ✅ คัดลอกงานนี้ไปวางเป็นงานใหม่ — เฉพาะงานทั่วไป ไม่ใช่งานผูกสัญญา (คัดลอกงานสัญญาจะทำให้ตัวนับ
   // "ครั้งที่" ที่ใช้ไปแล้วของสัญญาเดิมสับสน/เพี้ยนได้ ดู countUsedRounds ด้านบน)
   // ❌ ช่างงานรออนุมัติทำอะไรไม่ได้เลยเช่นกัน (isPendingForTech) — admin/manager ยังคัดลอกได้เสมอ
@@ -1065,9 +1103,19 @@ export const getEditEvent = async ({
         <label><span class="req">*</span> ระบบงาน</label>
         <select id="editSystem" ${eventContractGroupId || !isAdminOrManagerUser ? "disabled" : ""}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventSystem, systemValues)}${systemOpts}</select>
       </div>
+      <!-- ✅ งานสัญญา: เลือกครั้งที่ได้จากรายการครั้งที่ยังว่างของสัญญานั้นจริงๆ (ดู contractRoundOpts)
+           งานทั่วไป/โปรเจค: รายการเดิม 1-4 + พิมพ์เองได้ ไม่เปลี่ยนแปลง -->
       <div class="ee-field">
         <label>🔢 ครั้งที่</label>
+        ${canEditContractRound ? `
+        <select id="editTime">${contractRoundOpts}</select>
+        <span style="font-size:10.5px;color:#94a3b8;">
+          สัญญานี้มี ${contractTotalRounds} ครั้ง · ว่างอยู่ ${freeRoundCount} ครั้ง — ย้ายงานนี้ไปครั้งที่ว่างได้เลย
+        </span>
+        ` : `
         <select id="editTime" ${eventContractGroupId || !isAdminOrManagerUser ? "disabled" : ""}><option value="" disabled>— เลือก —</option>${customOption(eventTime, timeValues)}${timeOpts}</select>
+        ${eventContractGroupId ? `<span style="font-size:10.5px;color:#94a3b8;">แก้ครั้งที่ไม่ได้ — สัญญานี้ยังไม่ได้ระบุ "จำนวนครั้งทั้งหมด" ไว้ (กรอกในแผงข้อมูลสัญญาด้านบนก่อน)</span>` : ""}
+        `}
       </div>
       <!-- ✅ มูลค่างานสำหรับ "งานทั่วไป/งานโปรเจค" (งานที่ไม่ได้อยู่ในสัญญา) — เดิมกรอกได้เฉพาะงานสัญญา
            เท่านั้น (อยู่ในแผงข้อมูลสัญญาด้านบน ซึ่งไม่แสดงเลยถ้างานไม่มี contractGroupId) งานทั่วไป/โปรเจค
@@ -1441,7 +1489,9 @@ export const getEditEvent = async ({
       // แรกในลิสต์ให้อัตโนมัติเสมอถ้าไม่มี option ไหน selected ชัดเจน (คือ placeholder "—
       // เลือกหรือพิมพ์ —" พอดี) ทำให้ปุ่ม × โผล่บน placeholder เหมือนมันเป็นค่าที่เลือกไว้จริง —
       // AddEvent.js ไม่มีปัญหานี้เพราะไม่ได้ใช้ plugin นี้เลย ตัดออกให้ตรงกันไปเลย
-      const mkTs = (id, placeholder = "") => {
+      // ✅ overrides — เผื่อบางช่องต้องปิดการพิมพ์ค่าเอง (create:false) เช่น "ครั้งที่" ของงานสัญญา
+      // ซึ่งต้องเลือกได้เฉพาะครั้งที่มีอยู่จริงในสัญญานั้นเท่านั้น
+      const mkTs = (id, placeholder = "", overrides = {}) => {
         try {
           return new TomSelect(id, {
             create: true,
@@ -1463,6 +1513,7 @@ export const getEditEvent = async ({
             // จะโดน container ตัดขอบ เลื่อนลงไปเลือกตัวเลือกที่อยู่ต่ำกว่าไม่ได้เลย — "body" ทำให้
             // dropdown หลุดออกจาก DOM ที่ถูกตัดขอบ ไปแปะไว้ที่ <body> แทน
             dropdownParent: "body",
+            ...overrides,
           });
         } catch {
           return null;
@@ -1481,7 +1532,11 @@ export const getEditEvent = async ({
       mkTsCleared("#editSite",    "เลือกหรือพิมพ์ชื่อโครงการ", eventSite);
       mkTsCleared("#editTitle",   "เลือกหรือพิมพ์ประเภทงาน", eventTitle);
       mkTsCleared("#editSystem",  "เลือกหรือพิมพ์ระบบงาน", eventSystem);
-      mkTsCleared("#editTime",    "เลือกครั้งที่", eventTime);
+      // ⚠️ งานสัญญาต้องเลือกจากรายการครั้งที่ของสัญญาเท่านั้น ห้ามพิมพ์เลขเองเด็ดขาด (create:false) —
+      // พิมพ์ "13" ใส่สัญญา 8 ครั้งได้เมื่อไหร่ ครั้งนั้นจะไม่มีคอลัมน์รองรับในหน้า "ภาพรวมงาน" และไม่ถูก
+      // นับใน countUsedRounds ด้วย กลายเป็นงานที่มีอยู่จริงแต่มองไม่เห็นจากที่ไหนเลย
+      if (canEditContractRound) mkTs("#editTime", "เลือกครั้งที่", { create: false });
+      else mkTsCleared("#editTime", "เลือกครั้งที่", eventTime);
       mkTsCleared("#editTeam",    "เลือกหรือพิมพ์ชื่อทีม", eventTeam);
 
       const getVal = (id) => document.getElementById(id)?.value?.trim() || "";

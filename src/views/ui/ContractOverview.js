@@ -22,7 +22,7 @@
  * (GET /events/event-op, /events/drafts เช็ค resPerson/team/userId ให้อยู่แล้ว) จึงไม่ต้องกรองซ้ำที่นี่
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, Link, useSearchParams } from "react-router-dom";
 import moment from "moment";
 import "moment/locale/th";
@@ -32,7 +32,7 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableFooter, TableRow, Paper, Skeleton,
   Dialog, DialogTitle, DialogContent, DialogActions, ToggleButtonGroup, ToggleButton,
   Button, Autocomplete, Alert, Chip, Checkbox, Pagination, useMediaQuery, Badge,
-  TableSortLabel, Menu, MenuItem, ListItemIcon, ListItemText, Collapse,
+  TableSortLabel, Menu, MenuItem, ListItemIcon, ListItemText, Collapse,Portal
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
@@ -40,7 +40,7 @@ import {
   PlaylistAdd, MergeType, GroupWork, DeleteOutline, WarningAmber,
   AddLink, LinkOff, Build, Engineering, ExpandMore, ExpandLess,
   CalendarMonth, PersonOutline, Category, Assignment, Description, HourglassEmpty, Apps, DeviceHub,
-  SwapHoriz, TableChart, FilterList,
+  SwapHoriz, TableChart, FilterList, ViewAgenda, TableRows, SwipeLeft, ChevronLeft, ChevronRight,
 } from "@mui/icons-material";
 import { useAuth } from "../../auth/AuthContext";
 import EventService from "../../services/EventService";
@@ -61,15 +61,47 @@ const EXCEL_GREEN = "#217346";
 // ทั้งฝั่งจอและฝั่ง backend) และใช้เป็นเพดานตอนคำนวณจำนวนคอลัมน์ "ครั้งที่ N" ของตารางด้วย (กันไว้อีก
 // ชั้น เผื่อมีข้อมูลเก่า/จากที่อื่นที่หลุดรอดมาสูงกว่านี้ — ไม่งั้นตารางทั้งหน้าจะกว้างจนพังได้)
 const MAX_VISIT_COUNT = 12;
+// ✅ จำนวนวันที่ที่โชว์ในเซลล์ "ครั้งที่ N" ก่อนพับที่เหลือ (ดู expandedVisitCells) — 3 พอดีกับความสูงแถว
+// ปกติของแถวอื่นๆ ในตาราง ทำให้ทุกแถวสูงเท่ากันเป็นระเบียบ ไม่มีแถวไหนพุ่งสูงกว่าเพื่อนเป็นเท่าตัว
+const VISIT_CELL_PREVIEW = 3;
 
-// ✅ สไตล์แท็บชิปสลับมุมมอง เทียบ pattern เดียวกับตัวกรองประเภทเอกสารในหน้า "ไฟล์"
-// (ServiceReportFiles.js) ให้ธีมสี/ทรงตรงกันทั้งแอป
+// ── โทนสีกลางของหน้า (เฉดเทาอมฟ้า "slate") ────────────────────────────────────
+// ✅ เดิมหน้านี้ใช้ "สีแดงแบรนด์" เป็นสีพื้นผิวด้วย (หัวตารางพื้นชมพู #fef2f2 + ตัวหนังสือแดงเข้ม + เส้นใต้
+// แดงหนา 2px + แถวสรุปพื้นแดงจาง) ผลคือแดงกลายเป็น "สีพื้นหลัง" ที่เห็นตลอดเวลาจนชินตา พอมีของที่แดง
+// จริงๆ เพราะสำคัญ (เลยกำหนด/หมดอายุ/ยอดรวม) ก็จมหายไปกับพื้น ไม่เหลือน้ำหนักให้เตือนอะไรได้เลย —
+// และเป็นลุคที่ดูเก่าแบบ admin panel ยุคก่อน
+// ✅ หลักใหม่: พื้นผิวทั้งหมดเป็นกลาง (ขาว/เทาอ่อน) เก็บสีแดงไว้ใช้เฉพาะ "จุดที่ต้องการให้สายตาไปหยุด"
+// เท่านั้น — ปุ่มหลัก, แท็บที่เลือกอยู่, ตัวกรองที่ทำงานอยู่, คำเตือน, ยอดรวม
+const SURFACE_SUBTLE = "#f8fafc";   // slate-50  — พื้นหัวตาราง/แถบเครื่องมือ
+const SURFACE_STRIPE = "#fbfcfd";   // แถบสลับสีของแถว (ทึบ ไม่ใช่สีโปร่งแสง — คอลัมน์ที่ตรึงไว้ต้องใช้)
+const BORDER_MAIN = "#e2e8f0";      // slate-200 — เส้นขอบนอก/เส้นใต้หัวตาราง
+const BORDER_SOFT = "#eef2f7";      // เส้นคั่นระหว่างแถว
+const BORDER_HAIR = "#f4f6fa";      // เส้นคั่นระหว่างคอลัมน์ — จางมากจนเกือบไม่เห็น แค่พอเป็นแนวสายตา
+const TEXT_SUB = "#64748b";         // slate-500 — ตัวหนังสือรอง/หัวคอลัมน์
+
+// ✅ สไตล์แท็บสลับมุมมอง — เปลี่ยนจาก "ปุ่มมีกรอบเรียงติดกัน" (ลุคเก่า) เป็น segmented control แบบที่
+// iOS/แอปสมัยใหม่ใช้กัน: รางพื้นเทาอ่อนทรงแคปซูล ตัวที่เลือกอยู่เป็นการ์ดสีขาวลอยขึ้นมามีเงาบางๆ
+// อ่านง่ายกว่าเดิมมากเพราะ "ตัวที่เลือก" ต่างจากพื้นด้วยความสว่าง+เงา ไม่ใช่แค่สีพื้นแดงจางที่ต้องเพ่ง
+// ⚠️ "ตัวที่เลือกอยู่" ใช้สีเข้มเป็นกลาง (ไม่ใช่สีแดงแบรนด์) โดยตั้งใจ — แท็บคือ "ตอนนี้อยู่หน้าไหน"
+// ซึ่งเป็นสถานะการนำทาง ไม่ใช่คำเตือนหรือปุ่มที่อยากให้กด ถ้าย้อมแดงด้วยจะไปแข่งน้ำหนักสายตากับ
+// ปุ่ม "เพิ่มสัญญาใหม่" / ป้าย "หมดอายุแล้ว" / ยอดรวม ที่แดงอยู่แล้ว จนสุดท้ายไม่มีอะไรเด่นสักอย่าง
+// (ปัญหา "สีกลบกันเอง" ที่ผู้ใช้เจอ) — ความต่างระหว่างเลือก/ไม่เลือกมาจากพื้นขาว+เงา+ตัวหนาแทน
+// ซึ่งอ่านออกทันทีอยู่แล้วโดยไม่ต้องพึ่งสี
 const VIEW_TAB_SX = {
-  textTransform: "none", fontSize: "0.8rem", fontWeight: 700, px: 1.5, py: 0.5, whiteSpace: "nowrap",
+  textTransform: "none", fontSize: "0.8rem", fontWeight: 600, px: 1.5, py: 0.6, whiteSpace: "nowrap",
+  border: "none !important", borderRadius: "999px !important", color: TEXT_SUB,
+  transition: "background-color .15s, color .15s, box-shadow .15s",
+  "&:hover": { bgcolor: alpha("#0f172a", 0.04) },
   "&.Mui-selected": {
-    color: ACCENT, bgcolor: alpha(ACCENT, 0.12), borderColor: alpha(ACCENT, 0.4),
-    "&:hover": { bgcolor: alpha(ACCENT, 0.18) },
+    color: "#0f172a", bgcolor: "#fff", fontWeight: 700,
+    boxShadow: "0 1px 2px rgba(15,23,42,0.14), 0 0 0 1px rgba(15,23,42,0.05)",
+    "&:hover": { bgcolor: "#fff" },
   },
+};
+// ✅ รางของ segmented control — ครอบ ToggleButtonGroup ทั้งกลุ่มไว้
+const VIEW_TAB_GROUP_SX = {
+  flexWrap: "nowrap", bgcolor: "#f1f5f9", borderRadius: 999, p: "3px", gap: "2px",
+  "& .MuiToggleButtonGroup-grouped": { m: 0, border: "none" },
 };
 
 // ✅ สีเดียวกับ OP_COLOR ในหน้า Operation/index.js ให้ตรงกันทั้งแอป — ใช้ไล่สีลิงก์ "ครั้งที่ N"
@@ -185,12 +217,43 @@ const loadStoredColWidths = () => {
     return {};
   }
 };
+// ✅ จอมือถือสลับดูได้ 2 รูปแบบ: "การ์ด" (ค่าเริ่มต้น — อ่านทีละงานครบทุกฟิลด์โดยไม่ต้องเลื่อนซ้ายขวา)
+// กับ "ตาราง" (ตารางชุดเดียวกับจอคอมเป๊ะๆ ทั้งคอลัมน์/การแก้ไข inline/ยอดรวมท้ายตาราง — เลื่อนซ้ายขวา
+// เอาเพื่อดูคอลัมน์ที่เกินจอ) ⚠️ ไม่ใช่โค้ดคนละชุด: มุมมองตารางบนมือถือคือ JSX ก้อนเดียวกับจอคอม
+// เพียงแต่เติม sx เฉพาะมือถือเข้าไป (ตัวอักษรเล็กลง + ตรึงคอลัมน์แรกไว้ให้รู้ว่ากำลังอ่านแถวไหนอยู่)
+// จึงไม่มีทางที่ข้อมูล/สิทธิ์แก้ไขของ 2 ฝั่งจะหลุดไม่ตรงกันในอนาคต
+const MOBILE_VIEW_STORAGE_KEY = "contractOverview.mobileView";
+const loadStoredMobileView = () => {
+  try {
+    return localStorage.getItem(MOBILE_VIEW_STORAGE_KEY) === "table" ? "table" : "card";
+  } catch {
+    return "card";
+  }
+};
+// ✅ ความกว้างคอลัมน์ชุดย่อสำหรับ "ตารางบนจอมือถือ" โดยเฉพาะ — ค่าเริ่มต้นของจอคอมถูกตั้งไว้ให้อ่านสบาย
+// บนจอกว้าง พอเอามาใช้บนจอ 375px ตารางจะยาวรวมเกิน 1,300px = ต้องปัดหลายรอบมากกว่าจะเห็นครบ ซึ่งเป็น
+// สาเหตุหลักที่ผู้ใช้บอกว่า "เลื่อนตารางยาก" ชุดนี้บีบให้เหลือราวๆ 900px โดยไม่ตัดคอลัมน์ไหนทิ้งเลย
+// ⚠️ เป็นแค่ "ค่าเริ่มต้นของโหมดมือถือ" — ถ้าผู้ใช้เคยลากปรับความกว้างคอลัมน์นั้นไว้เอง ค่าที่ปรับไว้
+// ยังชนะเสมอ (ดู colWidth) ไม่ไปทับของที่ตั้งใจตั้งไว้
+const MOBILE_COL_WIDTHS = {
+  docRef: 118, docNo: 118,
+  customer: 168, work: 128,
+  period: 148,
+  jobValue: 88, status: 100, progress: 84, responsiblePerson: 104,
+};
 const VISIT_COL_DEFAULT_WIDTH = 110;
+const MOBILE_VISIT_COL_WIDTH = 94;
 const MIN_COL_WIDTH = 50;
 
 const AUTO_FIT_PADDING = 20; // ✅ กันเนื้อหาแนบขอบเซลล์พอดีเป๊ะจนดูอึดอัดหลัง auto-fit
 
-const ResizableTh = ({ width, align = "left", children, onResize, rowSpan = 1, columnKey, tableRef, sortable = false, sortDirection = null, onSort }) => {
+// ✅ resizable=false — ปิดแถบลากปรับความกว้างทั้งหมด ใช้กับ "ตารางบนจอมือถือ" โดยเฉพาะ
+// ⚠️ นี่คือสาเหตุตรงๆ อีกข้อที่ทำให้ปัดเลื่อนตารางบนมือถือยาก: แถบลากเป็น Box กว้าง 24px คร่อมขอบขวา
+// ของหัวคอลัมน์ทุกคอลัมน์ และตั้ง touchAction:"none" ไว้ (จำเป็นสำหรับการลาก) — ผลคือทั้งแถวหัวตาราง
+// มีแถบ "ห้ามเบราว์เซอร์เลื่อน" ขวางอยู่เป็นระยะๆ นิ้วที่ปัดโดนแถบพวกนี้เข้าจะไม่เลื่อนตารางเลย
+// กลายเป็นเริ่มลากปรับความกว้างคอลัมน์แทน ซึ่งบนจอเล็กแทบไม่มีใครตั้งใจจะทำอยู่แล้ว (จิ้มให้ตรง 24px
+// ด้วยนิ้วยากมาก) — ตัดทิ้งไปเลยบนมือถือ แล้วใช้ค่าความกว้างชุดย่อ (MOBILE_COL_WIDTHS) แทน
+const ResizableTh = ({ width, align = "left", children, onResize, rowSpan = 1, columnKey, tableRef, sortable = false, sortDirection = null, onSort, resizable = true }) => {
   // ✅ ดับเบิลคลิก/แตะ 2 ครั้งที่ขอบคอลัมน์ = ปรับความกว้างพอดีเนื้อหาอัตโนมัติเหมือน Excel
   // ⚠️ เดิมวัดจาก cell.scrollWidth ตรงๆ (เซลล์จริงในตาราง table-layout:fixed) แต่ table-layout:fixed
   // "ล็อก" ความกว้างคอลัมน์ไว้แล้วตามที่กำหนด ทำให้ scrollWidth มักได้แค่ค่าความกว้างปัจจุบันของเซลล์เอง
@@ -359,6 +422,7 @@ const ResizableTh = ({ width, align = "left", children, onResize, rowSpan = 1, c
           {children}
         </TableSortLabel>
       ) : children}
+      {resizable && (
       <Tooltip title="ลากเพื่อปรับความกว้าง · ดับเบิลคลิก/แตะ 2 ครั้งเพื่อพอดีอัตโนมัติ" enterDelay={500}>
         <Box
           onMouseDown={handleMouseDown}
@@ -379,6 +443,7 @@ const ResizableTh = ({ width, align = "left", children, onResize, rowSpan = 1, c
           }}
         />
       </Tooltip>
+      )}
     </TableCell>
   );
 };
@@ -604,6 +669,27 @@ export default function ContractOverview() {
   // (เช่น "จำนวนครั้ง 1") เป็นค่าที่คำนวณมั่วจากตรรกะของสัญญา ไม่ใช่ข้อมูลจริงที่มีใครกรอกไว้เลย รกตา
   // และดูเหมือนมีข้อมูลสัญญาทั้งที่จริงไม่มี ต้องซ่อนเหมือนกันทั้ง 2 แท็บ
   const hideContractOnlyColumns = viewFilter === "ungrouped" || viewFilter === "general" || viewFilter === "project";
+
+  // ✅ ปุ่ม/เมนูเลือกมุมมองบนจอมือถือ — แทนแท็บเรียงแถวยาวที่ล้นออกนอกจอจนผู้ใช้ไม่รู้ว่ามีอยู่
+  // (ดูเหตุผลเต็มตรงที่เรนเดอร์แท็บ)
+  const [viewMenuAnchor, setViewMenuAnchor] = useState(null);
+  // ✅ แถบยอดรวมตรึงท้ายจอ — เริ่มพับไว้ให้เตี้ยที่สุด (บังเนื้อหาน้อยที่สุด) แตะกางดูรายละเอียดครบได้
+  // ทุกเมื่อ (ดู renderMobileSummaryBar)
+  const [summaryBarOpen, setSummaryBarOpen] = useState(false);
+
+  // ✅ รูปแบบการแสดงผลบนจอมือถือ (การ์ด/ตาราง) — จำค่าไว้ใน localStorage ให้เปิดหน้านี้ครั้งหน้าได้
+  // มุมมองที่เลือกไว้เลย ไม่ต้องมากดสลับใหม่ทุกครั้ง (ดูเหตุผลเต็มที่ MOBILE_VIEW_STORAGE_KEY)
+  const [mobileView, setMobileView] = useState(loadStoredMobileView);
+  const handleMobileViewChange = (_, next) => {
+    // ⚠️ ToggleButtonGroup ส่ง null มาเมื่อกดปุ่มที่เลือกอยู่ซ้ำ (= ยกเลิกการเลือก) — ต้องเมินทิ้ง
+    // ไม่งั้นจะกลายเป็นสถานะ "ไม่ได้เลือกมุมมองไหนเลย" ซึ่งไม่มีความหมายในบริบทนี้
+    if (!next) return;
+    setMobileView(next);
+    try { localStorage.setItem(MOBILE_VIEW_STORAGE_KEY, next); } catch { /* โหมดส่วนตัว/พื้นที่เต็ม — แค่ไม่จำค่า ไม่ใช่เรื่องคอขาดบาดตาย */ }
+  };
+  // ✅ ใช้ตารางแทนการ์ดก็ต่อเมื่ออยู่บนมือถือ "และ" ผู้ใช้เลือกไว้ — จอใหญ่เป็นตารางเสมออยู่แล้ว
+  const useMobileTable = isMobile && mobileView === "table";
+
   // ✅ ความกว้างคอลัมน์ที่ผู้ใช้ลากปรับเอง (key เฉพาะที่ต่างจากค่าเริ่มต้นเท่านั้น) — โหลดจาก
   // localStorage ตอนเปิดหน้า (lazy initializer) แล้วบันทึกกลับทุกครั้งที่ปรับ จะได้จำค่าไว้ข้ามการออก
   // จากหน้า/รีเฟรช ไม่ใช่แค่ระหว่างที่ยังเปิดหน้านี้ค้างอยู่เหมือนเดิม
@@ -613,7 +699,22 @@ export default function ContractOverview() {
   // ⚠️ ต้องห่อ useMemo — ไม่งั้นได้ object ใหม่ทุก render (กรณี `|| {}`) ทำให้ useMemo ที่รับ colWidths
   // เป็น dependency ด้านล่าง (totalTableWidth/tableCssVars) คำนวณใหม่ทุก render จนหมดประโยชน์ที่ memo ไว้
   const colWidths = useMemo(() => colWidthsByTab[viewFilter] || {}, [colWidthsByTab, viewFilter]);
-  const colWidth = (key) => colWidths[key] ?? DEFAULT_COL_WIDTHS[key] ?? VISIT_COL_DEFAULT_WIDTH;
+  // 🐛 BUG ที่แก้ (ตารางบนมือถือคอลัมน์กว้างมหาศาลจนเห็นทีละคอลัมน์ และหาช่องมูลค่างานไม่เจอ):
+  // เดิมให้ "ค่าที่ผู้ใช้ลากปรับเอง" (colWidths) ชนะเสมอ แม้ตอนดูบนมือถือ — แต่ค่าพวกนั้นถูกลาก/
+  // auto-fit ไว้ตอนอยู่บนจอคอมซึ่งกว้าง 1,400px+ คอลัมน์เดียวอาจกว้างถึง 300-400px ได้สบายๆ
+  // พอเอามาใช้บนจอ 375px ก็กลายเป็นคอลัมน์เดียวกินเต็มจอ ต้องปัดทีละคอลัมน์กว่าจะถึงมูลค่างาน
+  // ✅ บนมือถือใช้ชุดความกว้างของมือถือเสมอ ไม่สนค่าที่เคยลากไว้บนจอคอม — บนมือถือปิดการลากปรับ
+  // ความกว้างอยู่แล้ว (ดู ResizableTh) จึงไม่มีทางที่ผู้ใช้ตั้งใจตั้งค่าไว้สำหรับจอนี้ได้ตั้งแต่ต้น
+  // ⚠️ ค่าที่ลากไว้บนจอคอมไม่ได้ถูกลบทิ้ง — กลับไปดูบนจอคอมเมื่อไหร่ก็ได้ความกว้างเดิมที่ตั้งไว้ครบ
+  const colWidth = (key) => {
+    if (useMobileTable) {
+      return MOBILE_COL_WIDTHS[key]
+        ?? (key.startsWith("visit_") ? MOBILE_VISIT_COL_WIDTH : undefined)
+        ?? DEFAULT_COL_WIDTHS[key]
+        ?? VISIT_COL_DEFAULT_WIDTH;
+    }
+    return colWidths[key] ?? DEFAULT_COL_WIDTHS[key] ?? VISIT_COL_DEFAULT_WIDTH;
+  };
   // ⚠️ BUG ที่แก้ (ลากหน่วงมาก): เดิมช่วงลากอัปเดต React state (setColWidths) ทุกเฟรมของ
   // requestAnimationFrame อยู่ดี (แค่เลื่อนแค่การเขียน localStorage ไปตอนปล่อยเมาส์แทน) — แต่ทุกครั้งที่
   // setColWidths ทำให้ทั้งตาราง re-render ใหม่ (10 แถว x กว่า 15 คอลัมน์) และเลขความกว้างที่เปลี่ยนทุก
@@ -762,6 +863,21 @@ export default function ContractOverview() {
       return next;
     });
   };
+  // ✅ "ครั้งที่ N" ครั้งเดียวมีได้หลายวันที่ (เข้างานไม่ติดกัน — เว้นช่วงแล้วกลับมาเข้าอีก ถือเป็นครั้ง
+  // เดียวกัน ดู openExtendVisitDialog) เดิมโชว์ทุกวันซ้อนกันหมดในเซลล์เดียว งานที่แบ่งเข้า 6-7 ช่วงจะดัน
+  // ให้แถวนั้นสูงกว่าแถวอื่นเป็นเท่าตัว ตารางเลยดูสูงๆ ต่ำๆ ไม่เป็นระเบียบ (ตามที่ผู้ใช้เจอ) — โชว์แค่
+  // VISIT_CELL_PREVIEW วันแรกก่อน ที่เหลือพับไว้หลังปุ่ม "+ อีก N วัน" กดกางดูครบได้ทุกเมื่อ
+  // ⚠️ พับ "ต่อเซลล์" ไม่ใช่ต่อแถว (คีย์ = แถว|ครั้งที่) เพราะแต่ละครั้งในแถวเดียวกันมีจำนวนวันไม่เท่ากัน
+  // กางครั้งที่ 1 ไม่ควรไปกางครั้งที่ 2 ที่ไม่เกี่ยวกันด้วย
+  const [expandedVisitCells, setExpandedVisitCells] = useState(new Set());
+  const toggleVisitCell = (key) => {
+    setExpandedVisitCells((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   // ⚠️ BUG ที่แก้: เดิมเลขบนแท็บ ("สัญญา (N)"/"งานทั่วไป (N)"/"ทั้งหมด (N)") นับจาก `contracts` ดิบ
   // ทั้งก้อน ไม่ผ่านตัวกรองปี/ผู้รับผิดชอบ/คำค้นหาเลย ในขณะที่ตัวเลขใต้หัวข้อ ("N งาน") กับการแบ่งหน้า
@@ -876,10 +992,25 @@ export default function ContractOverview() {
   const rowMaxRound = (c) => c.isRealContract
     ? (c.visitCount || countUsedRounds(c.visits))
     : Math.max(1, ...c.visits.map((v) => Number(v.time) || 1));
+  // 🐛 BUG ที่แก้ (คอลัมน์ "ครั้งที่ N" ว่างเปล่ายาวเป็นพรืดจนเปลืองหน้าจอ): เดิมจำนวนคอลัมน์คำนวณจาก
+  // rowMaxRound ซึ่งคืนค่า visitCount = "จำนวนครั้งที่วางแผนไว้ทั้งสัญญา" — สัญญาเดียวที่ตั้งไว้ 12 ครั้ง
+  // แต่เพิ่งลงจริงไป 1 ครั้ง ก็ลากให้ทั้งตารางต้องมีคอลัมน์ครั้งที่ 1-12 ทันที ทั้งที่ครั้งที่ 3-12 ว่าง
+  // เปล่าทุกแถวไม่มีข้อมูลอะไรเลยสักตัว (ดูภาพที่ผู้ใช้ส่งมา — ครั้งที่ 3 ถึง 11 ว่างหมดทั้งคอลัมน์)
+  // ✅ เปลี่ยนมานับจาก "ครั้งที่มีข้อมูลจริง" แทน แล้วเผื่ออีก 1 ช่องไว้ให้ปุ่ม "+ เพิ่มครั้งถัดไป" เท่านั้น
+  // (ยังกดเพิ่มครั้งถัดไปได้ครบเหมือนเดิมทุกประการ พอเพิ่มแล้วคอลัมน์ถัดไปจะโผล่มาเองอัตโนมัติ) และยัง
+  // ไม่เกิน visitCount ที่ตั้งไว้อยู่ดี
+  const rowVisibleRounds = (c) => {
+    if (!c.isRealContract) return Math.max(1, ...c.visits.map((v) => Number(v.time) || 1));
+    // ⚠️ นับรวมแผนงานล่วงหน้าที่ยังไม่มีวันที่ (unscheduled) ด้วย — ช่องพวกนั้นมีป้าย "รอวางแผน" แสดงอยู่
+    // ถือว่ามีข้อมูลแล้ว ถ้าไม่นับคอลัมน์จะหายไปทั้งที่มีอะไรให้ดู
+    const maxWithData = c.visits.reduce((m, v) => Math.max(m, Number(v.time) || 1), 0);
+    const nextOpenRound = countUsedRounds(c.visits.filter((v) => !v.unscheduled)) + 1;
+    return Math.min(rowMaxRound(c), Math.max(maxWithData, nextOpenRound));
+  };
   const maxVisitCount = useMemo(
     // ✅ Math.min กับ MAX_VISIT_COUNT ไว้อีกชั้น — แม้ทุกจุดตั้งค่าจะเช็ค ≤12 แล้ว เผื่อมีข้อมูลเก่า/
     // นำเข้าจากที่อื่นที่หลุดรอดเกินมา ตารางจะไม่มีทางเรนเดอร์คอลัมน์เกิน MAX_VISIT_COUNT ได้เด็ดขาด
-    () => Math.min(MAX_VISIT_COUNT, filtered.reduce((max, c) => Math.max(max, rowMaxRound(c)), 1)),
+    () => Math.min(MAX_VISIT_COUNT, filtered.reduce((max, c) => Math.max(max, rowVisibleRounds(c)), 1)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [filtered]
   );
@@ -907,7 +1038,7 @@ export default function ContractOverview() {
     visitColumns.forEach((n) => { total += colWidth(`visit_${n}`); });
     return total;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [colWidths, showCheckboxes, visitColumns, hideContractOnlyColumns]);
+  }, [colWidths, showCheckboxes, visitColumns, hideContractOnlyColumns, useMobileTable]);
   // ✅ ค่าความกว้างจริงของทุกคอลัมน์ ตั้งเป็น CSS custom property ไว้ที่ <Table> ตัวเดียว (ผ่าน style
   // prop ปกติของ React) ให้ทุกเซลล์ลูกอ้างอิงผ่าน var(--col-<key>) — เห็นผลทันทีทุกครั้งที่ colWidths
   // เปลี่ยนจริง (โหลดจาก localStorage ตอนเปิดหน้า/auto-fit/commit ท้ายการลาก) โดยไม่ต้องแตะ sx ของเซลล์
@@ -920,7 +1051,66 @@ export default function ContractOverview() {
     visitColumns.forEach((n) => { vars[`--col-visit_${n}`] = `${colWidth(`visit_${n}`)}px`; });
     return vars;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [colWidths, totalTableWidth, visitColumns]);
+  }, [colWidths, totalTableWidth, visitColumns, useMobileTable]);
+
+  // ✅ สไตล์เสริม "เฉพาะตอนดูตารางบนจอมือถือ" — ตัวตารางเป็น JSX ก้อนเดียวกับจอคอมทุกประการ ไม่ได้
+  // เขียนตารางแยกอีกชุด (ดู MOBILE_VIEW_STORAGE_KEY) แค่ทับ sx เพิ่มบางส่วนให้อ่านง่ายขึ้นบนจอแคบ
+  // 🐛 BUG ที่แก้ (ตารางบนมือถือแสดงผลซ้อนทับกันจนอ่านไม่ได้): เดิมตรงนี้ "ตรึงคอลัมน์แรก" ไว้กับขอบซ้าย
+  // ด้วย position:sticky ตั้งใจให้รู้ว่ากำลังอ่านแถวไหนอยู่ตอนเลื่อนไปทางขวา — แต่เซลล์ที่ตรึงต้องมี
+  // พื้นหลังทึบของตัวเองเสมอ ไม่งั้นเนื้อหาคอลัมน์อื่นที่เลื่อนผ่านจะทะลุออกมาซ้อนทับตัวหนังสือของมัน
+  // การทำให้ทึบ "ทุกกรณี" ต้องคุมสีพื้นให้ตรงกันหมดทั้งแถบสลับสี/แถวที่ชี้อยู่/หัวตาราง/แถวสรุป ซึ่ง
+  // เปราะเกินไปสำหรับตารางที่มีคอลัมน์ยืดหยุ่นและซ่อน/แสดงต่างกันในแต่ละแท็บแบบนี้ — ตัดกลไกตรึงออก
+  // ทั้งหมด แล้วใช้ปุ่มลูกศร ‹ › + แถบเลื่อนที่เห็นได้ตลอดเป็นตัวช่วยนำทางแทน (ดู scrollTableBy)
+  // ซึ่งไม่มีการวางเนื้อหาซ้อนกันเลยตั้งแต่ต้น จึงไม่มีทางแสดงผลเพี้ยนแบบนี้ได้อีก
+  const mobileTableSx = useMemo(() => {
+    if (!useMobileTable) return null;
+    return {
+      "& th, & td": { fontSize: "0.76rem", px: 0.75 },
+      // ✅ พื้นแถวทึบ (ไม่ใช่สีโปร่งแสง) — อ่านง่ายกว่าบนจอเล็กที่ตัวหนังสือเล็กอยู่แล้ว
+      "& tbody tr": { bgcolor: "#fff" },
+      "& tbody tr:nth-of-type(even)": { bgcolor: SURFACE_STRIPE },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [useMobileTable]);
+
+  // ── ตัวช่วยเลื่อนตารางแนวนอน ────────────────────────────────────────────────
+  // ✅ ปัญหาที่ผู้ใช้เจอ ("เลื่อนตารางบนมือถือยาก") ไม่ได้มีสาเหตุเดียว แก้ครบทุกข้อดังนี้:
+  //  1. แถบลากปรับความกว้างคอลัมน์ตั้ง touchAction:"none" ขวางอยู่ทั่วแถวหัวตาราง → ปิดทิ้งบนมือถือ
+  //     (ดูคอมเมนต์ที่ ResizableTh)
+  //  2. ตารางกว้างรวมเกิน 1,300px บนจอ 375px → ใช้ความกว้างคอลัมน์ชุดย่อ (ดู MOBILE_COL_WIDTHS)
+  //  3. iOS Safari ตีความการปัดแนวนอนใกล้ขอบจอเป็น "ปัดย้อนกลับหน้าเว็บ" แย่งไปจากตาราง →
+  //     overscrollBehaviorX:"contain" บอกเบราว์เซอร์ว่าการเลื่อนจบที่กล่องนี้ ห้ามส่งต่อ
+  //  4. มือถือซ่อน scrollbar เป็นค่าเริ่มต้น → ไม่มีอะไรบอกเลยว่า "ยังมีคอลัมน์ต่อทางขวาอีกนะ" และไม่รู้
+  //     ว่าตอนนี้เลื่อนมาถึงไหนแล้ว → ทำ scrollbar บางๆ ให้เห็นตลอด + ปุ่มลูกศรกดเลื่อนทีละหน้า
+  // ตัวนี้คือส่วนที่ 4: ติดตามว่ายังเลื่อนไปทางไหนได้อีกบ้าง เพื่อซ่อน/แสดงปุ่มลูกศรให้ตรงความจริง
+  const tableScrollRef = useRef(null);
+  const [tableScroll, setTableScroll] = useState({ canLeft: false, canRight: false });
+  const syncTableScroll = useCallback(() => {
+    const el = tableScrollRef.current;
+    if (!el) return;
+    // ⚠️ เผื่อ 2px — ค่า scrollLeft ของเบราว์เซอร์เป็นทศนิยมได้ (จอ retina/ซูม) ถ้าเทียบเท่ากันเป๊ะๆ
+    // ปุ่มจะกะพริบค้างอยู่ทั้งที่เลื่อนสุดทางแล้ว
+    const canRight = el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
+    const canLeft = el.scrollLeft > 2;
+    setTableScroll((prev) => (prev.canLeft === canLeft && prev.canRight === canRight ? prev : { canLeft, canRight }));
+  }, []);
+  // ✅ ต้องคำนวณใหม่เมื่อ "สิ่งที่ทำให้ตารางกว้างขึ้น/แคบลง" เปลี่ยน ไม่ใช่แค่ตอนเลื่อน — สลับแท็บ
+  // (คอลัมน์ไม่เท่ากัน) / สลับมุมมอง / เปลี่ยนหน้า / ปรับความกว้างคอลัมน์ ล้วนเปลี่ยนความกว้างรวมทั้งนั้น
+  useEffect(() => {
+    syncTableScroll();
+    const el = tableScrollRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return undefined;
+    const ro = new ResizeObserver(syncTableScroll);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [syncTableScroll, useMobileTable, viewFilter, totalTableWidth, loading, filtered.length]);
+  const scrollTableBy = (dir) => {
+    const el = tableScrollRef.current;
+    if (!el) return;
+    // ✅ เลื่อนทีละ 80% ของความกว้างที่เห็น (ไม่ใช่ 100%) — เหลือคอลัมน์เดิมค้างไว้ให้เห็นนิดหน่อย
+    // จะได้รู้ว่าเลื่อนต่อจากตรงไหน ไม่ใช่กระโดดไปจนหลุดบริบททั้งหมด
+    el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: "smooth" });
+  };
 
   // ✅ เรียงลำดับตารางได้ด้วยการคลิกหัวตารางแต่ละช่อง (เฉพาะคอลัมน์ข้อมูลตรงๆ ที่เทียบค่าเดียวได้ —
   // ไม่รวม "สถานะสัญญา"/"คืบหน้า"/"ครั้งที่ N" ซึ่งเป็นค่าที่คำนวณจากหลายฟิลด์ ไม่มีค่าเดี่ยวให้เรียง)
@@ -975,9 +1165,11 @@ export default function ContractOverview() {
   // ✅ แสดงแค่หน้าละ 10 แถว (มือถือ 5 แถว — จอแคบเลื่อนหาปุ่มเปลี่ยนหน้าถี่เกินไปถ้าใช้เลขเดียวกับ
   // จอกว้าง) — เดิมโชว์ทุกแถวรวดเดียว (สูงสุดเป็นร้อย) ต้องเลื่อนในกรอบตารางยาวๆ ตลอดเวลา ตัดเป็นหน้า
   // ให้สั้นกระชับแทน (ตัวกรอง/ค้นหายังใช้กับข้อมูลทั้งหมดเหมือนเดิม แค่ตัดแสดงผล)
-  const PAGE_SIZE = isMobile ? 5 : 10;
+  // ✅ มุมมองตารางบนมือถือใช้ 10 แถวเท่าจอคอม — 1 แถวสูงแค่ไม่กี่สิบพิกเซล (ต่างจากการ์ดที่สูงเกือบเต็มจอ
+  // ต่อ 1 งาน) ถ้ายังตัดที่ 5 แถวจะกลายเป็นตารางสั้นจู๋ที่มีปุ่มเปลี่ยนหน้าถี่กว่าที่ควรเป็นมาก
+  const PAGE_SIZE = isMobile && !useMobileTable ? 5 : 10;
   const [page, setPage] = useState(1);
-  useEffect(() => { setPage(1); }, [search, viewFilter, yearFilter, responsibleFilter, titleFilter, systemFilter, sortConfig, isMobile]);
+  useEffect(() => { setPage(1); }, [search, viewFilter, yearFilter, responsibleFilter, titleFilter, systemFilter, sortConfig, isMobile, useMobileTable]);
   // ✅ ป้องกันพลาด: ล้างการเลือกทุกครั้งที่สลับแท็บมุมมอง — เดิมการเลือกค้างข้ามแท็บได้ (checkbox มีเฉพาะ
   // บางแท็บ ดู showCheckboxes) ทำให้เลือกงานไว้ในแท็บหนึ่ง สลับไปอีกแท็บที่มองไม่เห็นแถวพวกนั้นแล้ว แต่แถบ
   // "เลือกไว้ N งาน" ยังลอยอยู่ + กด "จัดกลุ่มเป็นสัญญา" ได้ทันที = รวมงานที่มองไม่เห็นอยู่ตรงหน้าเข้าด้วยกัน
@@ -1405,10 +1597,13 @@ export default function ContractOverview() {
   // ✅ สัญญา → ให้กดชิปเปิดกล่อง "เพิ่มครั้งที่ 1" ในหน้านี้แทน (handleAddVisitSubmit แปลงฉบับร่างเดิม
   // เป็นครั้งจริงให้เองผ่าน PUT /:id/schedule ไม่สร้าง record ซ้ำ) ส่วนงานทั่วไป/โปรเจคยังอยู่ในแผงงาน
   // ล่วงหน้าตามปกติ ใช้ลิงก์เดิมต่อไปได้
-  const pendingDraftChip = (c, pendingDraft) => {
+  // ⚠️ compact=true (ตารางบนจอมือถือ) — ช่อง "ครั้งที่ N" กว้างแค่ 94px ป้ายเต็ม "📌 กดเพื่อลงวันที่"
+  // ยาวเกินจนถูกตัดกลางคำ อ่านได้แค่ "กดเพื่อลงวัน" ดูเหมือนหน้าพัง — ย่อข้อความให้พอดีช่อง ส่วนคำอธิบาย
+  // เต็มยังอยู่ครบใน tooltip เหมือนเดิม
+  const pendingDraftChip = (c, pendingDraft, compact = false) => {
     if (c.isRealContract) {
       return isAdminOrManager
-        ? { label: "📌 กดเพื่อลงวันที่", tip: "สัญญานี้ยังไม่ได้ลงวันที่เข้างาน — กดเพื่อระบุวันที่ครั้งที่ 1", props: { onClick: () => openAddVisitDialog(c), sx: { cursor: "pointer" } } }
+        ? { label: compact ? "📌 ลงวันที่" : "📌 กดเพื่อลงวันที่", tip: "สัญญานี้ยังไม่ได้ลงวันที่เข้างาน — กดเพื่อระบุวันที่ครั้งที่ 1", props: { onClick: () => openAddVisitDialog(c), sx: { cursor: "pointer" } } }
         : { label: "📌 รอลงวันที่", tip: "สัญญานี้ยังไม่ได้ลงวันที่เข้างาน (แอดมิน/manager เป็นผู้ระบุ)", props: {} };
     }
     return {
@@ -2082,6 +2277,88 @@ export default function ContractOverview() {
     }
   };
 
+  // ── แถบสรุปยอดรวมแบบตรึงท้ายจอ (เฉพาะจอมือถือ) ──────────────────────────────
+  // 🐛 BUG ที่แก้ (ยอดรวมหาไม่เจอ/ไม่ครบบนมือถือ): แถวสรุปท้ายตาราง (TableFooter) ตกไปอยู่ใต้คอลัมน์
+  // "มูลค่างาน" ซึ่งอยู่นอกจอไปทางขวา ต้องปัดไปหาถึงจะเห็น แถมพอปัดไปถึงก็เห็นแค่บางส่วนเพราะข้อความ
+  // ยาวกว่าความกว้างที่เหลือ (ตามภาพที่ผู้ใช้ส่งมา — "างงานทั้งหมด" โดนตัดหัว) ส่วนที่เคยยกมาไว้บนสุด
+  // ก็หายไปทันทีที่เลื่อนดูรายการ
+  // ✅ ตรึงเป็นแถบท้ายจอไปเลย — เห็นยอดตลอดเวลาไม่ว่าจะเลื่อนอยู่ตรงไหน อยู่นอกพื้นที่เลื่อนแนวนอนของ
+  // ตารางด้วย จึงไม่มีทางโดนตัดอีก แตะเพื่อกางดูรายละเอียดที่เหลือได้ครบ (จำนวนที่ยังไม่กรอกมูลค่า +
+  // ขอบเขตของยอด: แท็บ/ตัวกรอง/คำค้นหา) ข้อมูลจึงยังครบเท่าเดิมทุกตัว
+  // ⚠️ ใช้ position:fixed ไม่ใช่ sticky — .pageWrapper ตั้ง overflow-x:hidden ไว้ ซึ่งทำให้ sticky
+  // ยึดกับกล่องนั้นแทนขอบจอแล้วกลายเป็นไม่ตรึงจริง
+  // ⚠️ ตัวเลขมาจาก jobValueSummary ตัวเดียวกับฝั่งเดสก์ท็อปเป๊ะ ไม่ได้คำนวณซ้ำอีกชุด
+  const renderMobileSummaryBar = () => (
+    // 🐛 BUG ที่แก้ (แถบยอดรวมไม่โผล่เลยบนมือถือ): position:fixed จะยึดกับ "ขอบจอ" ก็ต่อเมื่อไม่มี
+    // บรรพบุรุษตัวไหนสร้าง containing block ทับ — ซึ่ง layout ของแอปนี้มีทั้ง .pageWrapper ที่ตั้ง
+    // overflow-x:hidden และ .contentArea ที่มี transition/filter (ตอนเปิดเมนูมือถือจะได้ class
+    // .blur-content ที่ใส่ filter จริงๆ) พอโดนตัวใดตัวหนึ่งจับ แถบก็ไปยึดกับกล่องนั้นแทนแล้วหลุด
+    // ออกนอกพื้นที่ที่มองเห็นไปเลย
+    // ✅ ยิงผ่าน Portal ไปแปะที่ <body> ตรงๆ — พ้นบรรพบุรุษทุกตัวในหน้า จึงไม่มีทางโดนตัด/ย้ายที่
+    // ได้อีกไม่ว่า CSS ของ layout จะเปลี่ยนไปยังไงในอนาคต
+    <Portal>
+    <Paper
+      elevation={0}
+      sx={{
+        position: "fixed", left: 0, right: 0, bottom: 0,
+        // ต่ำกว่า Dialog (1300) และแถบเมนูมือถือ (10000) — ไม่บังของที่ต้องอยู่บนสุด
+        zIndex: 1200,
+        borderRadius: 0, borderTop: `1px solid ${BORDER_MAIN}`,
+        bgcolor: "#fff", boxShadow: "0 -2px 12px rgba(15,23,42,0.1)",
+        px: 2, pt: 1.25, pb: 1.5,
+      }}
+    >
+      <Stack
+        direction="row" alignItems="center" spacing={1}
+        onClick={() => setSummaryBarOpen((o) => !o)}
+        sx={{ cursor: "pointer", userSelect: "none" }}
+      >
+        <Box sx={{ minWidth: 0, flex: 1 }}>
+          <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 700, display: "block", lineHeight: 1.3 }}>
+            รวมมูลค่างานทั้งหมด
+          </Typography>
+          <Typography variant="caption" sx={{ color: "text.disabled" }}>
+            {jobValueSummary.filledCount.toLocaleString()}/{jobValueSummary.rowCount.toLocaleString()} รายการ · ทุกหน้า
+          </Typography>
+        </Box>
+        {/* ✅ จุดเตือนสีส้มตอนมีรายการที่ยังไม่กรอกมูลค่า — บอกตั้งแต่ยังไม่กางว่ายอดนี้ยังไม่ครบ
+            (รายละเอียดเต็มอยู่ในส่วนที่กางออกมา) */}
+        {jobValueSummary.missingCount > 0 && !summaryBarOpen && (
+          <WarningAmber sx={{ fontSize: 17, color: "#b45309", flexShrink: 0 }} />
+        )}
+        <Typography sx={{ fontWeight: 800, fontSize: "1.3rem", color: ACCENT, whiteSpace: "nowrap", letterSpacing: "-0.01em" }}>
+          {jobValueSummary.total.toLocaleString()}
+        </Typography>
+        {summaryBarOpen ? <ExpandMore sx={{ fontSize: 20, color: TEXT_SUB }} /> : <ExpandLess sx={{ fontSize: 20, color: TEXT_SUB }} />}
+      </Stack>
+      <Collapse in={summaryBarOpen}>
+        {jobValueSummary.missingCount > 0 && (
+          <Typography
+            variant="caption"
+            sx={{ mt: 1, display: "flex", alignItems: "center", gap: 0.5, color: "#b45309", fontWeight: 600 }}
+          >
+            <WarningAmber sx={{ fontSize: 13 }} />
+            ยังไม่ได้กรอกมูลค่า {jobValueSummary.missingCount} รายการ — ยอดนี้เป็นยอดเท่าที่กรอกแล้ว
+          </Typography>
+        )}
+        {/* ✅ แจกแจงขอบเขตของยอดรวม (แท็บ + ตัวกรอง + คำค้นหา) เหมือนฝั่งเดสก์ท็อป */}
+        <Stack direction="row" spacing={0.5} sx={{ mt: 0.75, flexWrap: "wrap", rowGap: 0.5 }}>
+          {summaryScopeLabels.map((label) => (
+            <Chip
+              key={label} size="small" variant="outlined" label={label}
+              sx={{
+                height: 19, fontSize: "0.65rem", fontWeight: 600, maxWidth: "100%",
+                color: "text.secondary", borderColor: alpha("#0f172a", 0.18),
+                "& .MuiChip-label": { px: 0.75, overflow: "hidden", textOverflow: "ellipsis" },
+              }}
+            />
+          ))}
+        </Stack>
+      </Collapse>
+    </Paper>
+    </Portal>
+  );
+
   // ── การ์ดสำหรับจอมือถือ (isMobile) ──────────────────────────────────────────
   // ✅ ตารางเดิม (20 กว่าคอลัมน์) ต้องเลื่อนซ้าย-ขวาหลายรอบกว่าจะเห็นข้อมูลครบบนจอแคบ — จัดเรียงข้อมูล
   // เดียวกันทั้งหมดใหม่เป็นการ์ดแนวตั้งแทน (ไม่มีข้อมูลไหนหายไป แค่เปลี่ยนทิศทางการอ่าน) ใช้ FieldRow/
@@ -2106,7 +2383,10 @@ export default function ContractOverview() {
       onCancel: cancelEdit,
     });
     const jobTypeLabel = c.isRealContract ? "งานสัญญา/รายปี" : c.isConfirmedGeneral ? "งานทั่วไป" : c.isConfirmedProject ? "งานโปรเจค" : "ยังไม่จัดกลุ่ม";
-    const jobTypeColor = c.isRealContract ? ACCENT : c.isConfirmedGeneral ? "#10b981" : c.isConfirmedProject ? "#3b82f6" : "#9ca3af";
+    // ⚠️ งานสัญญาใช้สีคราม ไม่ใช่สีแดงแบรนด์ — ป้ายนี้เป็น "หมวดหมู่ของงาน" (ข้อมูลอ้างอิงเฉยๆ) แต่ป้าย
+    // ที่วางติดกันข้างล่างคือ "สถานะสัญญา" ซึ่งแดงจริงตอนหมดอายุ/ใกล้หมดอายุ ถ้าหมวดหมู่แดงด้วยจะเห็น
+    // ป้ายแดง 2 อันซ้อนกันแล้วแยกไม่ออกว่าอันไหนคือคำเตือนที่ต้องรีบจัดการ (ปัญหา "สีกลบกันเอง")
+    const jobTypeColor = c.isRealContract ? "#6366f1" : c.isConfirmedGeneral ? "#10b981" : c.isConfirmedProject ? "#3b82f6" : "#9ca3af";
 
     // ✅ งานทั่วไป/งานโปรเจค (ไม่ใช่สัญญาจริง) เปลี่ยนจาก "คืบหน้า" (X/Y เฉยๆ) เป็น "สถานะงาน" จริง
     // อิงจาก event ตรงๆ (ดู jobStatusInfo) — สัญญาจริงยังคงโชว์ "X/Y ครั้ง" แบบเดิมทุกประการตามที่ยืนยัน
@@ -2132,7 +2412,7 @@ export default function ContractOverview() {
     const isExpanded = expandedCards.has(c.key);
 
     return (
-      <Paper key={c.key} variant="outlined" sx={{ borderRadius: 3, p: 1.5, borderColor: alpha("#0f172a", 0.14), boxShadow: "0 1px 3px rgba(15,23,42,0.06)" }}>
+      <Paper key={c.key} variant="outlined" sx={{ borderRadius: 3, p: 1.75, borderColor: BORDER_MAIN, boxShadow: "0 1px 2px rgba(15,23,42,0.05)" }}>
         {/* หัวการ์ด — ส่วนเดียวที่โชว์เสมอ (บริษัท/โครงการ/ประเภทงาน/สถานะ/คืบหน้า) ที่เหลือกดปุ่มลูกศร
             เพื่อกางดูรายละเอียดเพิ่ม (เทียบ pattern เดียวกับการ์ดงานในหน้า "การดำเนินงาน") กันการ์ด
             ยาวเกินไปตอนมีหลายรายการในหน้าเดียว */}
@@ -2172,7 +2452,9 @@ export default function ContractOverview() {
           <Button
             size="small" onClick={() => toggleCardExpand(c.key)}
             endIcon={isExpanded ? <ExpandLess sx={{ fontSize: 16 }} /> : <ExpandMore sx={{ fontSize: 16 }} />}
-            sx={{ textTransform: "none", fontSize: "0.72rem", fontWeight: 700, color: ACCENT, minWidth: 0, px: 1 }}
+            // ✅ เป็นกลาง ไม่ใช่สีแดง — ปุ่มนี้โผล่ซ้ำทุกใบการ์ด ถ้าย้อมแดงด้วยจะกลายเป็นจุดแดงเรียงลงมา
+            // ทั้งหน้าจนไปกลบป้ายเตือนจริงๆ (เกินกำหนด/หมดอายุแล้ว) ที่อยู่ในการ์ดเดียวกัน
+            sx={{ textTransform: "none", fontSize: "0.72rem", fontWeight: 700, color: TEXT_SUB, minWidth: 0, px: 1, "&:hover": { color: ACCENT } }}
           >
             {isExpanded ? "ย่อ" : "รายละเอียด"}
           </Button>
@@ -2494,7 +2776,9 @@ export default function ContractOverview() {
   if (!loading && !canView) return <Navigate to="/dashboard" replace />;
 
   return (
-    <Box sx={{ px: { xs: 1.5, sm: 2 }, pt: 2, pb: 4 }}>
+    // ✅ จอมือถือแทบไม่ต้องเว้นบนเลย — มีแถวปุ่มย้อนกลับของ layout คั่นให้อยู่แล้ว (ดู FullLayout.css
+    // app-page-container) และขอบซ้าย-ขวาก็ให้ Container ชั้นนอกจัดการพอ ไม่ต้องซ้อนอีกชั้น
+    <Box sx={{ px: { xs: 0, sm: 2 }, pt: { xs: 0.5, sm: 2 }, pb: 4 }}>
       {/* ✅ เดิมบังคับแถวเดียว (direction="row") ตลอด — จอมือถือแคบกว่าปุ่ม "เพิ่มสัญญาใหม่" +
           ปุ่มรีเฟรช + ปุ่มส่งออกรวมกัน ทำให้ล้นขอบจอ/ปุ่มถูกตัด สลับเป็นซ้อนกันคนละแถวบนจอแคบแทน
           (ชื่อหน้า/จำนวนอยู่แถวบน ปุ่มต่างๆ อยู่แถวล่าง เต็มความกว้าง) */}
@@ -2546,11 +2830,15 @@ export default function ContractOverview() {
                 onClick={handleExportExcel}
                 disabled={exporting || filtered.length === 0}
                 variant="outlined"
-                startIcon={<TableChart sx={{ fontSize: 18 }} />}
+                startIcon={<TableChart sx={{ fontSize: 18, color: EXCEL_GREEN }} />}
+                // ✅ เดิมทั้งปุ่มเป็นสีเขียว (ตัวหนังสือ+ขอบ) วางคู่กับปุ่มแดง "เพิ่มสัญญาใหม่" — กลายเป็น
+                // 2 ปุ่มสีจัดขนาดเท่ากันแข่งกันดึงสายตา ทั้งที่ "ส่งออก" เป็นงานรอง ไม่ใช่สิ่งที่คนเปิด
+                // หน้านี้มาทำเป็นอันดับแรก → เหลือสีเขียวไว้แค่ที่ไอคอน (พอให้รู้ว่าเป็น Excel) ส่วนตัว
+                // ปุ่มเป็นกลาง ปล่อยให้ปุ่มแดงเป็นปุ่มหลักที่เด่นที่สุดบนหน้าเพียงตัวเดียว
                 sx={{
                   flexShrink: 0, textTransform: "none", fontWeight: 700, borderRadius: 2.5,
-                  color: EXCEL_GREEN, borderColor: alpha(EXCEL_GREEN, 0.5),
-                  "&:hover": { bgcolor: alpha(EXCEL_GREEN, 0.08), borderColor: EXCEL_GREEN },
+                  color: "text.primary", borderColor: BORDER_MAIN, bgcolor: "background.paper",
+                  "&:hover": { bgcolor: SURFACE_SUBTLE, borderColor: alpha("#0f172a", 0.28) },
                 }}
               >
                 {exporting ? "กำลังสร้าง..." : "Export Excel"}
@@ -2568,71 +2856,118 @@ export default function ContractOverview() {
         </Alert>
       )}
 
-      {/* ✅ สลับมุมมองด้วยแท็บแบบชิป (เทียบ pattern เดียวกับแท็บประเภทเอกสารในหน้า "ไฟล์") แทน switch
-          เปิด/ปิดตัวเดียว — ค่าเริ่มต้นอยู่ที่ "สัญญา" กันตารางรกด้วยงานเก่าเป็นร้อยแถวเหมือนเดิม แต่สลับ
-          ไปดูงานเก่าที่ยังไม่จัดกลุ่มได้ชัดเจนกว่าเดิม (ไม่ต้องเดาว่า switch ตัวนี้หมายถึงอะไร) */}
-      {!loading && (
-        <Box sx={{
-          mb: 2, overflowX: "auto", pb: 0.5, WebkitOverflowScrolling: "touch",
-          "&::-webkit-scrollbar": { height: 4 },
-        }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1, width: "max-content" }}>
-            {/* ✅ แยกเป็น ToggleButtonGroup ต่างหาก ครอบด้วยกรอบร่วม — "เลยกำหนด/คงค้าง" เป็นกลุ่มย่อยของ
-                "งานสัญญา/งานรายปี" เสมอ (ตัวกรองข้างในคือ isRealContract ทั้งคู่ แค่ "เลยกำหนด" กรองซ้ำ
-                เฉพาะที่เกินกำหนดรอบถัดไปด้วย ไม่ใช่หมวดคู่ขนานแบบทั่วไป/โปรเจค/ยังไม่จัดกลุ่ม) เดิมอยู่
-                แถวเดียวกับแท็บอื่นหมดจนดูเหมือนเป็นหมวดแยกอิสระเท่ากัน สับสนว่าเลือกได้พร้อมกันหรือเปล่า
-                ครอบกรอบให้เห็นชัดว่าเป็นคู่เดียวกัน (ใช้คนละ ToggleButtonGroup ได้ปกติ — แค่ผูก value/
-                onChange ตัวเดียวกัน MUI ไม่บังคับว่าต้องอยู่กลุ่มเดียวกันถึงจะ exclusive ร่วมกันได้) */}
-            <ToggleButtonGroup
-              size="small" exclusive value={viewFilter}
-              onChange={(_, v) => v && setViewFilter(v)}
-              sx={{
-                flexWrap: "nowrap",
-                border: "1.5px solid", borderColor: alpha(ACCENT, 0.25), borderRadius: 2.5, p: "2px",
-              }}
-            >
-              {/* ✅ ใส่ไอคอนหน้าแต่ละแท็บ — สแกนหาแท็บที่ต้องการได้เร็วขึ้นด้วยสายตา ไม่ต้องอ่านตัวหนังสือ
-                  ทีละคำ ไอคอน/สีตรงกับที่ใช้ในเมนู "จัดหมวดหมู่งาน" ของแต่ละแถวเป๊ะๆ (เขียว=ทั่วไป,
-                  น้ำเงิน=โปรเจค) ให้จำง่ายว่าไอคอนแบบไหนคือหมวดไหน */}
-              <ToggleButton value="contracts" sx={VIEW_TAB_SX}>
-                <Description sx={{ fontSize: 15, mr: 0.5 }} /> งานสัญญา / งานรายปี ({realContractCount})
-              </ToggleButton>
-              {/* ✅ เดิมซ่อนแท็บนี้ตอน overdueCount=0 กันรก แต่กลับทำให้ผู้ใช้เข้าใจว่าฟีเจอร์นี้หายไป/ไม่มี
-                  (แท็บอื่นๆ ทั้งหมดแสดงตลอดไม่ว่าจะมีข้อมูลกี่รายการ) ตอนนี้แสดงตลอดเหมือนแท็บอื่นให้สม่ำเสมอ
-                  กัน แค่โชว์ (0) เฉยๆ ตอนไม่มีอะไรเกินกำหนด — โทนแดง/ไอคอนเตือนยังคงไว้ให้เด่นกว่าแท็บอื่น */}
-              <ToggleButton value="overdue" sx={VIEW_TAB_SX}>
-                <WarningAmber sx={{ fontSize: 15, mr: 0.5, color: "#dc2626" }} /> เลยกำหนด / คงค้าง ({overdueCount})
-              </ToggleButton>
-            </ToggleButtonGroup>
+      {/* ── สลับมุมมอง ────────────────────────────────────────────────────────
+          🐛 BUG ที่แก้ (ผู้ใช้ไม่รู้ว่ามีแท็บอื่นอยู่): เดิมแท็บทั้ง 6 เรียงเป็นแถวเดียวยาวเกินจอมือถือ
+          แล้วให้ปัดซ้าย-ขวาเอา — บนจอ 375px จึงเห็นแค่แท็บแรกกับครึ่งแท็บที่สอง ที่เหลือ (งานทั่วไป/
+          งานโปรเจค/ยังไม่จัดกลุ่ม/ทั้งหมด) หลุดออกนอกจอโดยไม่มีอะไรบอกเลยว่ามีอยู่ ผู้ใช้ที่ไม่บังเอิญ
+          ปัดโดนจะไม่มีวันรู้ว่าฟีเจอร์พวกนี้มีอยู่จริง
+          ✅ จอมือถือ: เปลี่ยนเป็นปุ่มเดียวเต็มความกว้าง บอกว่าตอนนี้ดูมุมมองไหนอยู่ กดแล้วกางเมนูเห็น
+          ทุกมุมมองพร้อมจำนวนรายการครบในครั้งเดียว ไม่มีอะไรถูกซ่อน
+          ✅ จอใหญ่: ยังเป็นแท็บเรียงแถวเหมือนเดิม (มีที่พอให้เห็นครบอยู่แล้ว จะได้สลับได้ในคลิกเดียว)
+          ⚠️ ทั้ง 2 แบบอ่านจาก VIEW_OPTIONS ชุดเดียวกัน — เพิ่ม/แก้มุมมองที่เดียวแล้วตรงกันทั้งคู่เสมอ */}
+      {!loading && (() => {
+        const viewGroups = [
+          // กลุ่มที่ 1: "เลยกำหนด/คงค้าง" เป็นกลุ่มย่อยของ "งานสัญญา/งานรายปี" เสมอ (ตัวกรองข้างในคือ
+          // isRealContract ทั้งคู่ แค่ "เลยกำหนด" กรองซ้ำเฉพาะที่เกินกำหนดรอบถัดไปด้วย) — ครอบรางเดียว
+          // กันให้เห็นว่าเป็นคู่เดียวกัน ไม่ใช่หมวดคู่ขนานแบบทั่วไป/โปรเจค
+          [
+            // ✅ ไอคอน/สีตรงกับเมนู "จัดหมวดหมู่งาน" ของแต่ละแถวเป๊ะๆ (เขียว=ทั่วไป, น้ำเงิน=โปรเจค)
+            { value: "contracts", label: "งานสัญญา / งานรายปี", count: realContractCount, icon: <Description sx={{ fontSize: 15 }} /> },
+            // ✅ แสดงตลอดแม้ count=0 เหมือนแท็บอื่น — เดิมซ่อนตอนไม่มี ทำให้เข้าใจว่าฟีเจอร์นี้หายไป
+            { value: "overdue", label: "เลยกำหนด / คงค้าง", count: overdueCount, icon: <WarningAmber sx={{ fontSize: 15, color: ACCENT }} /> },
+          ],
+          // กลุ่มที่ 2: หมวดหมู่คู่ขนานจริง (งานหนึ่งเป็นได้แค่หมวดเดียวในกลุ่มนี้)
+          [
+            { value: "general", label: "งานทั่วไป", count: confirmedGeneralCount, icon: <Build sx={{ fontSize: 15, color: "#10b981" }} /> },
+            { value: "project", label: "งานโปรเจค", count: confirmedProjectCount, icon: <Engineering sx={{ fontSize: 15, color: "#3b82f6" }} /> },
+            // ✅ ซ่อนสำหรับช่าง — แท็บนี้มีไว้ช่วยแอดมินหางานเก่าไปจัดหมวดหมู่/รวมเป็นสัญญา (ฟีเจอร์ที่
+            // ช่างกดไม่ได้อยู่แล้ว) ไม่มีประโยชน์กับช่างเลย มีแต่จะรกตัวเลือก
+            ...(isAdminOrManager ? [{ value: "ungrouped", label: "งานเก่าที่ยังไม่จัดกลุ่ม", count: hiddenJobCount, icon: <HourglassEmpty sx={{ fontSize: 15 }} /> }] : []),
+            { value: "all", label: "ทั้งหมด", count: allFilteredCount, icon: <Apps sx={{ fontSize: 15 }} /> },
+          ],
+        ];
+        const allViews = viewGroups.flat();
+        const currentView = allViews.find((v) => v.value === viewFilter) || allViews[0];
 
-            {/* ✅ กลุ่มหมวดหมู่คู่ขนานจริง — แยกจากกันเองชัดเจน (งานหนึ่งเป็นได้แค่หมวดเดียวในกลุ่มนี้)
-                ต่างจากคู่ "งานสัญญา/เลยกำหนด" ด้านบนที่เป็นความสัมพันธ์แบบกลุ่มใหญ่-กลุ่มย่อย */}
-            <ToggleButtonGroup
-              size="small" exclusive value={viewFilter}
-              onChange={(_, v) => v && setViewFilter(v)}
-              sx={{ flexWrap: "nowrap" }}
-            >
-              <ToggleButton value="general" sx={VIEW_TAB_SX}>
-                <Build sx={{ fontSize: 15, mr: 0.5, color: "#10b981" }} /> งานทั่วไป ({confirmedGeneralCount})
-              </ToggleButton>
-              <ToggleButton value="project" sx={VIEW_TAB_SX}>
-                <Engineering sx={{ fontSize: 15, mr: 0.5, color: "#3b82f6" }} /> งานโปรเจค ({confirmedProjectCount})
-              </ToggleButton>
-              {/* ✅ ซ่อนสำหรับช่าง — แท็บนี้มีไว้ช่วยแอดมินหางานเก่าที่ยังไม่จัดกลุ่มไปจัดหมวดหมู่/รวมเป็น
-                  สัญญา (ฟีเจอร์ที่ช่างกดไม่ได้อยู่แล้ว ดู isAdminOrManager gate ที่ปุ่มต่างๆ) ไม่มีประโยชน์
-                  อะไรกับช่างเลย มีแต่จะรกตัวเลือก */}
-              {isAdminOrManager && (
-                <ToggleButton value="ungrouped" sx={VIEW_TAB_SX}>
-                  <HourglassEmpty sx={{ fontSize: 15, mr: 0.5 }} /> งานเก่าในระบบที่ยังไม่จัดกลุ่ม ({hiddenJobCount})
-                </ToggleButton>
-              )}
-              <ToggleButton value="all" sx={VIEW_TAB_SX}>
-                <Apps sx={{ fontSize: 15, mr: 0.5 }} /> ทั้งหมด ({allFilteredCount})
-              </ToggleButton>
-            </ToggleButtonGroup>
+        if (isMobile) {
+          return (
+            <Box sx={{ mb: 2 }}>
+              <Button
+                fullWidth onClick={(e) => setViewMenuAnchor(e.currentTarget)}
+                startIcon={currentView.icon}
+                endIcon={<ExpandMore />}
+                sx={{
+                  justifyContent: "space-between", textTransform: "none", borderRadius: 2.5,
+                  border: "1px solid", borderColor: BORDER_MAIN, bgcolor: "background.paper",
+                  color: "text.primary", fontWeight: 700, py: 1.1, px: 1.5,
+                  "&:hover": { bgcolor: SURFACE_SUBTLE, borderColor: BORDER_MAIN },
+                }}
+              >
+                <Box component="span" sx={{ flex: 1, textAlign: "left", ml: 0.5 }}>
+                  {currentView.label}
+                  <Box component="span" sx={{ ml: 0.75, color: TEXT_SUB, fontWeight: 600 }}>
+                    ({currentView.count})
+                  </Box>
+                </Box>
+              </Button>
+              <Menu
+                open={Boolean(viewMenuAnchor)} anchorEl={viewMenuAnchor}
+                onClose={() => setViewMenuAnchor(null)}
+                // ✅ กว้างเท่าปุ่มพอดี ให้รู้สึกว่าเป็น "ช่องเดียวกันที่กางออกมา" ไม่ใช่เมนูลอยแยก
+                slotProps={{ paper: { sx: { width: viewMenuAnchor?.offsetWidth, borderRadius: 2.5, mt: 0.5 } } }}
+              >
+                {allViews.map((v, idx) => (
+                  <MenuItem
+                    key={v.value}
+                    selected={v.value === viewFilter}
+                    onClick={() => { setViewFilter(v.value); setViewMenuAnchor(null); }}
+                    // ✅ เว้นเส้นคั่นระหว่าง 2 กลุ่ม — สื่อว่า "เลยกำหนด" เป็นกลุ่มย่อยของงานสัญญา
+                    // ส่วนที่เหลือเป็นหมวดคู่ขนาน เหมือนที่จอใหญ่ครอบรางแยกกัน
+                    sx={{
+                      py: 1.1,
+                      ...(idx === viewGroups[0].length ? { borderTop: `1px solid ${BORDER_SOFT}`, mt: 0.5, pt: 1.35 } : {}),
+                      "&.Mui-selected": { bgcolor: alpha(ACCENT, 0.08), "&:hover": { bgcolor: alpha(ACCENT, 0.12) } },
+                    }}
+                  >
+                    <ListItemIcon sx={{ minWidth: 30 }}>{v.icon}</ListItemIcon>
+                    <ListItemText
+                      primary={v.label}
+                      primaryTypographyProps={{ fontSize: "0.86rem", fontWeight: v.value === viewFilter ? 700 : 500 }}
+                    />
+                    <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 700, ml: 1 }}>
+                      {v.count}
+                    </Typography>
+                  </MenuItem>
+                ))}
+              </Menu>
+            </Box>
+          );
+        }
+
+        return (
+          <Box sx={{
+            mb: 2, overflowX: "auto", pb: 0.5, WebkitOverflowScrolling: "touch",
+            "&::-webkit-scrollbar": { height: 4 },
+          }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, width: "max-content" }}>
+              {viewGroups.map((group, gi) => (
+                <ToggleButtonGroup
+                  key={gi} size="small" exclusive value={viewFilter}
+                  onChange={(_, v) => v && setViewFilter(v)}
+                  sx={VIEW_TAB_GROUP_SX}
+                >
+                  {group.map((v) => (
+                    <ToggleButton key={v.value} value={v.value} sx={VIEW_TAB_SX}>
+                      <Box component="span" sx={{ display: "inline-flex", mr: 0.5 }}>{v.icon}</Box>
+                      {v.label} ({v.count})
+                    </ToggleButton>
+                  ))}
+                </ToggleButtonGroup>
+              ))}
+            </Box>
           </Box>
-        </Box>
-      )}
+        );
+      })()}
 
       {/* ✅ ช่วยหางานเก่าที่น่าจะเป็นสัญญาเดียวกันให้ (company/site/system/title ตรงกันเป๊ะ) — เดิม
           ต้องไล่ดูเองทีละแถวจากงานเก่าเป็นร้อยรายการ กดปุ่มเดียวเลือกทั้งกลุ่มแล้วไปกรอกข้อมูลสัญญาต่อได้เลย
@@ -2776,6 +3111,35 @@ export default function ContractOverview() {
         </Stack>
       </Box>
 
+      {/* ── สลับรูปแบบการแสดงผลบนจอมือถือ (การ์ด / ตาราง) ────────────────────────
+          ✅ มุมมอง "การ์ด" อ่านทีละงานได้ครบทุกฟิลด์โดยไม่ต้องเลื่อนซ้ายขวา แต่เทียบข้ามงานยาก
+          (ต้องเลื่อนขึ้นลงทีละใบ) ส่วนมุมมอง "ตาราง" คือตารางชุดเดียวกับจอคอมทุกประการ — เห็นหลายงาน
+          เรียงกันในคราวเดียว เทียบวันที่/สถานะ/มูลค่าข้ามแถวได้ทันที และเรียงลำดับด้วยการแตะหัวคอลัมน์ได้
+          แลกกับต้องเลื่อนซ้ายขวาดูคอลัมน์ที่เกินจอ — ไม่มีอันไหน "ดีกว่า" ตายตัว ให้ผู้ใช้เลือกเองตาม
+          สิ่งที่กำลังจะทำ แล้วจำค่าไว้ให้ (ดู MOBILE_VIEW_STORAGE_KEY)
+          ✅ โชว์จำนวนรายการคู่กันไปเลย จะได้รู้ว่ากำลังดูข้อมูลกี่งานอยู่โดยไม่ต้องเลื่อนไปท้ายสุด */}
+      {isMobile && !loading && filtered.length > 0 && (
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.25 }}>
+          <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
+            {filtered.length.toLocaleString()} รายการ
+          </Typography>
+          <ToggleButtonGroup
+            exclusive size="small" value={mobileView} onChange={handleMobileViewChange}
+            aria-label="รูปแบบการแสดงผล"
+            // ✅ ใช้ทรง segmented control ชุดเดียวกับแท็บมุมมองด้านบน (VIEW_TAB_GROUP_SX/VIEW_TAB_SX)
+            // ให้ "ปุ่มสลับ" ทุกตัวในหน้านี้หน้าตาเหมือนกันหมด ไม่ใช่คนละสไตล์กันคนละที่
+            sx={{ ...VIEW_TAB_GROUP_SX, "& .MuiToggleButton-root": { ...VIEW_TAB_SX, gap: 0.5, px: 1.25 } }}
+          >
+            <ToggleButton value="card" aria-label="มุมมองการ์ด">
+              <ViewAgenda sx={{ fontSize: 16 }} /> การ์ด
+            </ToggleButton>
+            <ToggleButton value="table" aria-label="มุมมองตาราง">
+              <TableRows sx={{ fontSize: 16 }} /> ตาราง
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </Stack>
+      )}
+
       {loading ? (
         <Skeleton variant="rounded" height={280} sx={{ borderRadius: 3 }} />
       ) : filtered.length === 0 ? (
@@ -2808,65 +3172,72 @@ export default function ContractOverview() {
             </Button>
           )}
         </Paper>
-      ) : isMobile ? (
+      ) : isMobile && mobileView === "card" ? (
         <Stack spacing={1.5}>
-          {/* ✅ สรุปยอดรวมสำหรับจอมือถือ — ตารางเดสก์ท็อปมีแถวสรุปท้ายตาราง (TableFooter) แต่มุมมอง
-              การ์ดไม่มีที่ให้วาง จึงยกมาไว้เป็นการ์ดสรุปด้านบนสุดแทน ให้เห็นยอดรวมทันทีโดยไม่ต้อง
-              เลื่อนผ่านการ์ดทั้งหมดก่อน — ตัวเลขชุดเดียวกับฝั่งเดสก์ท็อปเป๊ะ (jobValueSummary) */}
-          <Paper
-            variant="outlined"
-            sx={{
-              p: 1.5, borderRadius: 3,
-              bgcolor: alpha(ACCENT, 0.05), borderColor: alpha(ACCENT, 0.35),
-            }}
-          >
-            <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-              <Box>
-                <Typography variant="caption" sx={{ color: "#7f1d1d", fontWeight: 700, display: "block" }}>
-                  รวมมูลค่างานทั้งหมด
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {jobValueSummary.filledCount.toLocaleString()}/{jobValueSummary.rowCount.toLocaleString()} รายการ · ทุกหน้า
-                </Typography>
-              </Box>
-              <Typography sx={{ fontWeight: 800, fontSize: "1.05rem", color: "#7f1d1d", whiteSpace: "nowrap" }}>
-                {jobValueSummary.total.toLocaleString()}
-              </Typography>
-            </Stack>
-            {jobValueSummary.missingCount > 0 && (
-              <Typography
-                variant="caption"
-                sx={{ mt: 0.75, display: "flex", alignItems: "center", gap: 0.5, color: "#b45309", fontWeight: 600 }}
-              >
-                <WarningAmber sx={{ fontSize: 13 }} />
-                ยังไม่ได้กรอกมูลค่า {jobValueSummary.missingCount} รายการ — ยอดนี้เป็นยอดเท่าที่กรอกแล้ว
-              </Typography>
-            )}
-            {/* ✅ แจกแจงขอบเขตของยอดรวม (แท็บ + ตัวกรอง + คำค้นหา) เหมือนฝั่งเดสก์ท็อป */}
-            <Stack direction="row" spacing={0.5} sx={{ mt: 0.75, flexWrap: "wrap", rowGap: 0.5 }}>
-              {summaryScopeLabels.map((label) => (
-                <Chip
-                  key={label} size="small" variant="outlined" label={label}
-                  sx={{
-                    height: 19, fontSize: "0.65rem", fontWeight: 600, maxWidth: "100%",
-                    color: "text.secondary", borderColor: alpha("#0f172a", 0.18),
-                    "& .MuiChip-label": { px: 0.75, overflow: "hidden", textOverflow: "ellipsis" },
-                  }}
-                />
-              ))}
-            </Stack>
-          </Paper>
+          {/* ✅ การ์ดสรุปยอดรวมถูกย้ายไปเป็นแถบตรึงท้ายจอแล้ว (ดู renderMobileSummaryBar) — เห็นตลอดเวลา
+              ไม่ว่าจะเลื่อนอยู่ตรงไหน ดีกว่าวางไว้บนสุดแล้วหายไปทันทีที่เลื่อนดูรายการ */}
           {pagedRows.map((c) => renderMobileCard(c))}
         </Stack>
       ) : (
+        <>
+        {/* ✅ บอกให้รู้ตั้งแต่แรกว่าตารางกว้างเกินจอและปัดดูต่อได้ — ไม่งั้นคนที่เพิ่งสลับมาโหมดตารางจะ
+            เห็นแค่ 2-3 คอลัมน์แรกแล้วนึกว่าข้อมูลที่เหลือหายไป */}
+        {useMobileTable && (
+          <Stack
+            direction="row" alignItems="center" spacing={0.5}
+            sx={{ mb: 0.75, color: "text.disabled" }}
+          >
+            <SwipeLeft sx={{ fontSize: 15 }} />
+            <Typography variant="caption">
+              ปัดซ้าย-ขวา หรือกดปุ่ม ‹ › เพื่อดูคอลัมน์ที่เหลือ · แตะช่องเพื่อแก้ไข
+            </Typography>
+          </Stack>
+        )}
+        <Box sx={{ position: "relative" }}>
+        {/* ✅ ปุ่มลูกศรเลื่อนตารางทีละหน้า — ตัวช่วยหลักที่แก้ปัญหา "เลื่อนตารางบนมือถือยาก" โดยตรง
+            ปัดนิ้วยังทำได้เหมือนเดิมทุกอย่าง นี่เป็นแค่ทางเลือกที่แน่นอนกว่า (กดโดนก็เลื่อนแน่ๆ ไม่ต้อง
+            ลุ้นว่านิ้วจะปัดโดนแถบไหน หรือเบราว์เซอร์จะแย่งการปัดไปทำอย่างอื่น) และตัวปุ่มเองทำหน้าที่
+            บอกด้วยว่า "ยังมีคอลัมน์ต่อไปทางนั้นอีก" — พอเลื่อนสุดทางแล้วปุ่มด้านนั้นจะหายไปเอง
+            ⚠️ ลอยทับตารางตรงกลางความสูงพอดี จะได้กดถึงโดยไม่ต้องเลื่อนหน้ากลับขึ้นไปข้างบน */}
+        {useMobileTable && [
+          { dir: -1, show: tableScroll.canLeft, side: { left: 4 }, icon: <ChevronLeft />, label: "เลื่อนไปทางซ้าย" },
+          { dir: 1, show: tableScroll.canRight, side: { right: 4 }, icon: <ChevronRight />, label: "เลื่อนไปทางขวา" },
+        ].map((b) => b.show && (
+          <IconButton
+            key={b.dir} onClick={() => scrollTableBy(b.dir)} aria-label={b.label} size="small"
+            sx={{
+              position: "absolute", top: "50%", transform: "translateY(-50%)", ...b.side, zIndex: 5,
+              width: 34, height: 34, bgcolor: "#fff", color: ACCENT,
+              boxShadow: "0 2px 10px rgba(15,23,42,0.22)",
+              "&:hover": { bgcolor: "#fff" },
+            }}
+          >
+            {b.icon}
+          </IconButton>
+        ))}
         <TableContainer
+          ref={tableScrollRef}
+          onScroll={syncTableScroll}
           component={Paper} variant="outlined"
           sx={{
             borderRadius: 3, overflowX: "auto", overflowY: "hidden",
             // ✅ ให้เลื่อนแนวนอนด้วยนิ้วลื่นแบบมือถือ (momentum scroll) บน iOS Safari — เดิมไม่มี ทำให้
             // เลื่อนดูคอลัมน์ที่เกินจอกระตุกๆ ต้องปาดหลายทีกว่าจะเลื่อนได้จริง
             WebkitOverflowScrolling: "touch",
-            borderColor: alpha("#0f172a", 0.14), boxShadow: "0 1px 3px rgba(15,23,42,0.06)",
+            // ✅ กันเบราว์เซอร์เอาการปัดแนวนอนของตารางไปใช้เป็น "ปัดย้อนกลับหน้าเว็บ" (iOS Safari/Chrome
+            // Android ทำแบบนี้เมื่อปัดใกล้ขอบจอ) — เป็นสาเหตุที่ปัดแล้วเหมือนตารางไม่ขยับบ่อยๆ
+            overscrollBehaviorX: "contain",
+            borderColor: BORDER_MAIN, boxShadow: "0 1px 2px rgba(15,23,42,0.05)",
+            // ✅ แถบเลื่อนบางๆ ที่เห็นได้ตลอด — มือถือ/แมคซ่อน scrollbar เป็นค่าเริ่มต้น ทำให้ไม่มีอะไร
+            // บอกเลยว่าตารางยังมีต่อทางขวา และเลื่อนมาถึงไหนแล้ว (ผู้ใช้ถึงรู้สึกว่า "เลื่อนยาก")
+            "&::-webkit-scrollbar": { height: 8 },
+            "&::-webkit-scrollbar-track": { bgcolor: BORDER_SOFT, borderRadius: 999 },
+            "&::-webkit-scrollbar-thumb": {
+              bgcolor: alpha("#0f172a", 0.22), borderRadius: 999,
+              "&:hover": { bgcolor: alpha("#0f172a", 0.35) },
+            },
+            scrollbarWidth: "thin",
+            scrollbarColor: `${alpha("#0f172a", 0.22)} ${BORDER_SOFT}`,
           }}
         >
           <Table
@@ -2874,13 +3245,29 @@ export default function ContractOverview() {
             size="small"
             style={tableCssVars}
             sx={{
-              tableLayout: "fixed", width: "var(--col-total, 100%)",
+              // 🐛 BUG ที่แก้ (หัวตารางไม่เต็มความกว้าง ดูแหว่ง): เดิมบังคับความกว้างตารางเท่ากับผลรวม
+              // ความกว้างคอลัมน์เป๊ะๆ (--col-total) — พอเป็นแท็บที่มีคอลัมน์น้อย (งานทั่วไป/งานโปรเจค/
+              // ยังไม่จัดกลุ่ม ซึ่งซ่อนคอลัมน์ระดับสัญญาไปหลายช่อง) ผลรวมจะน้อยกว่าความกว้างจอ ตารางเลย
+              // จบก่อนถึงขอบขวาของกรอบ เหลือพื้นที่ขาวๆ ค้างไว้ข้างหลังหัวตาราง ดูเหมือนตารางแหว่ง
+              // ✅ max() = "กว้างเท่าผลรวมคอลัมน์ แต่อย่างน้อยต้องเต็มกรอบเสมอ" — ถ้าคอลัมน์รวมกันแล้ว
+              // ยังไม่เต็ม เบราว์เซอร์จะเกลี่ยพื้นที่ที่เหลือให้ทุกคอลัมน์ตามสัดส่วน (table-layout:fixed)
+              // ได้ตารางเต็มกรอบพอดีทุกแท็บ ส่วนแท็บที่คอลัมน์เยอะจนล้นจอก็ยังเลื่อนแนวนอนได้เหมือนเดิม
+              tableLayout: "fixed", width: "max(var(--col-total, 100%), 100%)",
               // ✅ เดิมใช้ stickyHeader + borderCollapse "separate" คู่กัน ทำให้หัวตารางเรนเดอร์เพี้ยน
               // (เห็นกรอบแดงเป็นก้อนๆ ตอนเลื่อน) — ตอนนี้แสดงแค่ 20 แถวต่อหน้าอยู่แล้ว ตารางไม่สูงจน
               // ต้อง sticky หัวอีกต่อไป ตัด stickyHeader ออก แล้วใช้ borderCollapse ปกติแทนก็พอ ไม่เพี้ยน
               borderCollapse: "collapse",
-              "& th, & td": { border: "1px solid", borderColor: alpha("#0f172a", 0.1) },
-              "& td": { py: 0.75 },
+              // ✅ เดิมตีเส้นขอบเข้ม (ดำ 10%) ครบทั้ง 4 ด้านของทุกเซลล์ = ลุค "ตารางสเปรดชีต" ที่ทำให้
+              // หน้าดูเก่าและรกที่สุด เพราะเส้นตารางมีน้ำหนักสายตาแข่งกับตัวข้อมูลเองตลอดเวลา —
+              // เปลี่ยนเป็นเน้น "เส้นคั่นแถวแนวนอน" เป็นหลัก ส่วนเส้นแบ่งคอลัมน์แนวตั้งจางลงจนเกือบ
+              // มองไม่เห็น (เหลือไว้แค่พอเป็นแนวสายตาให้ตัวเลขในคอลัมน์แคบๆ อย่าง "ครั้งที่ N" ไม่ไหลปนกัน)
+              "& th, & td": { border: "none", borderBottom: `1px solid ${BORDER_SOFT}`, borderRight: `1px solid ${BORDER_HAIR}` },
+              "& th:last-of-type, & td:last-of-type": { borderRight: "none" },
+              "& td": { py: 0.85 },
+              // ✅ แถวสุดท้ายก่อนถึงแถวสรุปไม่ต้องมีเส้นใต้ซ้ำกับเส้นคั่นของแถวสรุปเอง
+              "& tbody tr:last-of-type td": { borderBottom: "none" },
+              // ⚠️ ต้องอยู่ล่างสุด — ทับค่าด้านบนบางส่วนตอนดูตารางบนมือถือ (ดู mobileTableSx)
+              ...(mobileTableSx || {}),
             }}
           >
             <TableHead>
@@ -2890,39 +3277,50 @@ export default function ContractOverview() {
                   (ดูคอมเมนต์ที่ DEFAULT_COL_WIDTHS) เหลือ 9 คอลัมน์ หัวชั้นที่ 2 จึงไม่จำเป็นอีกต่อไป —
                   หัวเดียวจบ กวาดสายตาแนวนอนรอบเดียวก็รู้ว่าคอลัมน์ไหนคืออะไร ⚠️ ลำดับคอลัมน์ตรงนี้ต้อง
                   ตรงกับแถวข้อมูลและ footerColSpan เป๊ะๆ ถ้าเพิ่ม/ลดต้องไปแก้ทั้ง 3 จุดพร้อมกัน */}
-              <TableRow sx={{ "& th": { fontWeight: 700, bgcolor: "#fef2f2", borderBottom: `2px solid ${ACCENT} !important`, color: "#7f1d1d", letterSpacing: "0.01em" } }}>
+              {/* ✅ หัวตารางเป็นกลาง (เทาอ่อน + ตัวหนังสือเทาเข้ม) แทนพื้นชมพู+ตัวหนังสือแดงเข้ม+เส้นใต้
+                  แดงหนา 2px แบบเดิม — หัวตารางคือ "ป้ายกำกับ" ไม่ใช่ข้อมูล จึงไม่ควรแย่งสายตาไปจาก
+                  ตัวข้อมูลข้างล่าง สีแดงถูกเก็บไว้ใช้เฉพาะหัวคอลัมน์ที่กำลังเรียงลำดับอยู่ (ดู ResizableTh)
+                  ซึ่งเป็นสถานะที่ผู้ใช้ต้องรู้จริงๆ ว่าตอนนี้ตารางเรียงตามอะไรอยู่ */}
+              <TableRow sx={{ "& th": { fontWeight: 700, fontSize: "0.75rem", bgcolor: SURFACE_SUBTLE, borderBottom: `1px solid ${BORDER_MAIN} !important`, color: TEXT_SUB, letterSpacing: "0.015em" } }}>
                 {showCheckboxes && <TableCell padding="checkbox" sx={{ width: colWidth("checkbox") }} />}
+                {/* 🐛 BUG ที่แก้ (ตารางบนมือถือดูซ้อนกัน อ่านไม่รู้เรื่อง): เดิมตรึงคอลัมน์ "เลขที่เอกสาร"
+                    ไว้ซ้ายสุด แต่ในแท็บงานทั่วไป/โปรเจคช่องนี้แทบไม่มีใครกรอก เป็น "–" ทั้งคอลัมน์ —
+                    กลายเป็นแถบว่างเปล่ากว้าง 118px (เกือบ 1 ใน 3 ของจอ) ตรึงค้างอยู่ แล้วชื่อโครงการ
+                    ที่เป็นข้อมูลจริงกลับถูกบังหายไปข้างหลังตอนเลื่อน = เห็นแต่ตัวหนังสือโดนตัดครึ่ง
+                    ✅ สลับให้ "โครงการ / บริษัท" มาเป็นคอลัมน์แรกและเป็นตัวที่ถูกตรึงแทน เฉพาะตอนดู
+                    ตารางบนมือถือ — คอลัมน์ที่ตรึงต้องเป็นตัวที่บอกว่า "แถวนี้คืองานอะไร" ถึงจะมีประโยชน์
+                    ⚠️ ลำดับตรงนี้ต้องตรงกับแถวข้อมูลเป๊ะๆ (ดูคอมเมนต์เดียวกันในส่วน TableBody) */}
                 {/* ✅ เลขที่สัญญา + ใบเสนอราคา ยุบเป็นช่องเดียว (ซ้อน 2 บรรทัด) — เรียงตามเลขที่สัญญา
                     ซึ่งเป็นตัวหลักที่คนใช้ค้นหา/อ้างอิง ส่วนแท็บงานทั่วไป/โปรเจคใช้ "เอกสารเลขที่" แทน */}
                 {!hideContractOnlyColumns && (
-                  <ResizableTh width={colWidth("docRef")} columnKey="docRef" tableRef={tableRef} onResize={handleColResize("docRef")} sortable sortDirection={sortConfig.key === "contractNo" ? sortConfig.direction : null} onSort={() => handleSortClick("contractNo")}>เลขที่เอกสาร</ResizableTh>
+                  <ResizableTh width={colWidth("docRef")} columnKey="docRef" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("docRef")} sortable sortDirection={sortConfig.key === "contractNo" ? sortConfig.direction : null} onSort={() => handleSortClick("contractNo")}>เลขที่เอกสาร</ResizableTh>
                 )}
                 {hideContractOnlyColumns && (
-                  <ResizableTh width={colWidth("docNo")} columnKey="docNo" tableRef={tableRef} onResize={handleColResize("docNo")} sortable sortDirection={sortConfig.key === "docNo" ? sortConfig.direction : null} onSort={handleSortClick}>เอกสารเลขที่</ResizableTh>
+                  <ResizableTh width={colWidth("docNo")} columnKey="docNo" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("docNo")} sortable sortDirection={sortConfig.key === "docNo" ? sortConfig.direction : null} onSort={handleSortClick}>เอกสารเลขที่</ResizableTh>
                 )}
                 {/* ✅ บริษัท + โครงการ ยุบเป็นช่องเดียว — เป็นข้อมูล "ลูกค้ารายเดียวกัน" ที่อ่านคู่กันเสมอ
                     (เดิมแยก 2 คอลัมน์ และคอลัมน์บริษัทมักว่างเปล่าทั้งคอลัมน์ กินที่ฟรีๆ) */}
-                <ResizableTh width={colWidth("customer")} columnKey="customer" tableRef={tableRef} onResize={handleColResize("customer")} sortable sortDirection={sortConfig.key === "site" ? sortConfig.direction : null} onSort={() => handleSortClick("site")}>โครงการ / บริษัท</ResizableTh>
+                <ResizableTh width={colWidth("customer")} columnKey="customer" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("customer")} sortable sortDirection={sortConfig.key === "site" ? sortConfig.direction : null} onSort={() => handleSortClick("site")}>โครงการ / บริษัท</ResizableTh>
                 {/* ✅ ประเภทงาน + ระบบ ยุบเป็นช่องเดียว — ทั้งคู่คือ "งานนี้คืองานอะไร" เหมือนกัน */}
-                <ResizableTh width={colWidth("work")} columnKey="work" tableRef={tableRef} onResize={handleColResize("work")} sortable sortDirection={sortConfig.key === "title" ? sortConfig.direction : null} onSort={() => handleSortClick("title")}>งาน</ResizableTh>
+                <ResizableTh width={colWidth("work")} columnKey="work" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("work")} sortable sortDirection={sortConfig.key === "title" ? sortConfig.direction : null} onSort={() => handleSortClick("title")}>งาน</ResizableTh>
                 {/* ✅ เริ่มต้น + สิ้นสุด + รอบเข้า ยุบเป็นช่องเดียว "ระยะเวลาสัญญา" — เดิมแยก 3 คอลัมน์
                     แคบๆ จนวันที่โดนตัดเหลือ "01/..." อ่านไม่ได้ทั้งที่เป็นข้อมูลสำคัญ */}
                 {!hideContractOnlyColumns && (
-                  <ResizableTh width={colWidth("period")} columnKey="period" tableRef={tableRef} onResize={handleColResize("period")} sortable sortDirection={sortConfig.key === "contractStart" ? sortConfig.direction : null} onSort={() => handleSortClick("contractStart")}>ระยะเวลาสัญญา</ResizableTh>
+                  <ResizableTh width={colWidth("period")} columnKey="period" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("period")} sortable sortDirection={sortConfig.key === "contractStart" ? sortConfig.direction : null} onSort={() => handleSortClick("contractStart")}>ระยะเวลาสัญญา</ResizableTh>
                 )}
                 {/* ✅ มูลค่างาน — แสดงทุกแท็บแล้ว (เดิมเฉพาะแท็บสัญญา) งานทั่วไป/โปรเจค/ยังไม่จัดกลุ่ม
                     ก็มีมูลค่าของตัวเองได้เหมือนกัน ข้อมูลมีอยู่ในฐานข้อมูลทุกแถวอยู่แล้ว แค่เดิมไม่ได้
                     แสดงให้เห็น — ดูยอดรวมท้ายตาราง (TableFooter) ที่สรุปให้ทุกแท็บเช่นกัน */}
-                <ResizableTh width={colWidth("jobValue")} align="right" columnKey="jobValue" tableRef={tableRef} onResize={handleColResize("jobValue")} sortable sortDirection={sortConfig.key === "jobValue" ? sortConfig.direction : null} onSort={handleSortClick}>มูลค่างาน</ResizableTh>
+                <ResizableTh width={colWidth("jobValue")} align="right" columnKey="jobValue" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("jobValue")} sortable sortDirection={sortConfig.key === "jobValue" ? sortConfig.direction : null} onSort={handleSortClick}>มูลค่างาน</ResizableTh>
                 {!hideContractOnlyColumns && (
-                  <ResizableTh width={colWidth("status")} align="center" columnKey="status" tableRef={tableRef} onResize={handleColResize("status")}>สถานะสัญญา</ResizableTh>
+                  <ResizableTh width={colWidth("status")} align="center" columnKey="status" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("status")}>สถานะสัญญา</ResizableTh>
                 )}
                 {/* 🐛 BUG ที่แก้ (หัวคอลัมน์ไม่ตรงกับข้อมูลข้างใน): ช่องนี้แสดง 2 แบบตามชนิดแถว — สัญญาจริง
                     โชว์ "X/Y ครั้ง" (คืบหน้า) ส่วนงานทั่วไป/โปรเจค/ยังไม่จัดกลุ่มโชว์ป้ายสถานะงาน (ดู
                     jobStatusInfo ในเซลล์) แต่หัวคอลัมน์เขียน "คืบหน้า" ตายตัวเสมอ — ในแท็บที่มีแต่แถวที่
                     ไม่ใช่สัญญา (hideContractOnlyColumns) ทุกแถวจึงโชว์สถานะ แต่หัวบอกว่าคืบหน้า อ่านแล้ว
                     เข้าใจผิดทันที ต้องเปลี่ยนหัวตามชนิดข้อมูลที่แสดงจริงในแท็บนั้นๆ */}
-                <ResizableTh width={colWidth("progress")} align="center" columnKey="progress" tableRef={tableRef} onResize={handleColResize("progress")}>
+                <ResizableTh width={colWidth("progress")} align="center" columnKey="progress" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("progress")}>
                   {hideContractOnlyColumns ? "สถานะงาน" : "คืบหน้า"}
                 </ResizableTh>
                 {/* ✅ งานทั่วไป/โปรเจค/ยังไม่จัดกลุ่ม (hideContractOnlyColumns) ไม่มีแนวคิด "หลายครั้ง"
@@ -2930,7 +3328,7 @@ export default function ContractOverview() {
                     ไม่มีความหมาย — เปลี่ยนเป็น "วันที่เข้างาน" แทนตามที่ผู้ใช้ขอ ส่วนแท็บที่มีสัญญาจริงปนอยู่
                     ด้วย (ทั้งหมด/สัญญา/เลยกำหนด) ยังคงใช้ "ครั้งที่ N" เหมือนเดิม เพราะมีหลายครั้งจริง */}
                 {visitColumns.map((n) => (
-                  <ResizableTh key={n} width={colWidth(`visit_${n}`)} align="center" columnKey={`visit_${n}`} tableRef={tableRef} onResize={handleColResize(`visit_${n}`)}>
+                  <ResizableTh key={n} width={colWidth(`visit_${n}`)} align="center" columnKey={`visit_${n}`} tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize(`visit_${n}`)}>
                     {hideContractOnlyColumns ? "วันที่เข้างาน" : `ครั้งที่ ${n}`}
                   </ResizableTh>
                 ))}
@@ -2939,7 +3337,7 @@ export default function ContractOverview() {
                     สรุประดับสัญญาซ้ำซ้อนอีก — "ผู้รับผิดชอบ" ด้านล่างเป็นฟิลด์อิสระจากทีมที่เข้างานโดย
                     สมบูรณ์ (คนรับผิดชอบสัญญานี้โดยรวมไม่ควรเปลี่ยนตามทีมที่เข้างานแต่ละครั้ง) ยังคงอยู่
                     เหมือนเดิม แก้ไข inline ได้ตามปกติ (ดู responsiblePerson/responsiblePersonId) */}
-                <ResizableTh width={colWidth("responsiblePerson")} columnKey="responsiblePerson" tableRef={tableRef} onResize={handleColResize("responsiblePerson")} sortable sortDirection={sortConfig.key === "responsiblePerson" ? sortConfig.direction : null} onSort={handleSortClick}>ผู้รับผิดชอบ</ResizableTh>
+                <ResizableTh width={colWidth("responsiblePerson")} columnKey="responsiblePerson" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("responsiblePerson")} sortable sortDirection={sortConfig.key === "responsiblePerson" ? sortConfig.direction : null} onSort={handleSortClick}>ผู้รับผิดชอบ</ResizableTh>
                 <TableCell align="center" sx={{ width: colWidth("actions") }} />
               </TableRow>
             </TableHead>
@@ -2952,10 +3350,17 @@ export default function ContractOverview() {
                   ? countUsedRounds(c.visits.filter((v) => !v.unscheduled)) + 1
                   : null;
                 const overdueInfo = nextVisitOverdueInfo(c);
+                // ✅ แถบสลับสีใช้สีทึบ (ไม่ใช่สีดำโปร่งแสง 2% แบบเดิม) — จำเป็นสำหรับคอลัมน์ที่ตรึงไว้
+                // บนมือถือ ซึ่งต้องมีพื้นหลังทึบไม่งั้นเห็นเนื้อหาคอลัมน์อื่นวิ่งทะลุตอนเลื่อน (ดู
+                // mobileTableSx) และตอน hover ใช้สีแดงจางแทนสีเทากลางของ MUI ให้แถวที่ชี้อยู่เด่นขึ้น
                 return (
                 <TableRow
-                  key={c.key} hover
-                  sx={{ bgcolor: idx % 2 ? alpha("#0f172a", 0.02) : "transparent", transition: "background-color .12s" }}
+                  key={c.key}
+                  sx={{
+                    bgcolor: idx % 2 ? SURFACE_STRIPE : "#fff",
+                    transition: "background-color .12s",
+                    "&:hover": { bgcolor: alpha(ACCENT, 0.04) },
+                  }}
                 >
                   {showCheckboxes && (
                     <TableCell padding="checkbox" sx={{ width: colWidth("checkbox") }}>
@@ -3008,7 +3413,7 @@ export default function ContractOverview() {
                       </Stack>
                     </TableCell>
                   )}
-                  {/* ✅ โผล่แทนกลุ่มเลขที่สัญญา/ใบเสนอราคาด้านบนตอนซ่อนคอลัมน์ระดับสัญญา (ดูหัวตาราง) —
+                  {/* ✅ โผล่แทนกลุ่มเลขที่สัญญา/ใบเสนอราคาตอนซ่อนคอลัมน์ระดับสัญญา (ดูหัวตาราง) —
                       แก้ไขได้เฉพาะแถวที่จัดหมวดหมู่แล้ว (สัญญาจริง/งานทั่วไป/งานโปรเจค) ไม่ใช่แถว
                       "ยังไม่จัดกลุ่ม" เหมือน "ผู้รับผิดชอบ" ด้านล่าง (ดู canEditField) */}
                   {hideContractOnlyColumns && (
@@ -3111,7 +3516,7 @@ export default function ContractOverview() {
                             editing={editingCell?.key === c.key && editingCell?.field === "contractStart"}
                             value={c.contractStart} editValue={editValue} editType="date" saving={editSaving}
                             formatDisplay={(v) => (v
-                              ? <span style={{ fontWeight: 600 }}>{moment(v).format("DD/MM/YY")}</span>
+                              ? <span style={{ fontWeight: 600 }}>{moment(v).format("DD/MM/YYYY")}</span>
                               : <Dash />)}
                             onStartEdit={() => beginEdit(c, "contractStart")}
                             onChangeValue={setEditValue}
@@ -3125,7 +3530,7 @@ export default function ContractOverview() {
                             editing={editingCell?.key === c.key && editingCell?.field === "contractEnd"}
                             value={c.contractEnd} editValue={editValue} editType="date" saving={editSaving}
                             formatDisplay={(v) => (v
-                              ? <span style={{ fontWeight: 600 }}>{moment(v).format("DD/MM/YY")}</span>
+                              ? <span style={{ fontWeight: 600 }}>{moment(v).format("DD/MM/YYYY")}</span>
                               : <Dash />)}
                             onStartEdit={() => beginEdit(c, "contractEnd")}
                             onChangeValue={setEditValue}
@@ -3240,11 +3645,17 @@ export default function ContractOverview() {
                       .filter((v) => !v.unscheduled && (Number(v.time) || 1) === n)
                       .sort((a, b) => new Date(a.start || a.date) - new Date(b.start || b.date));
                     const pendingDraft = roundVisits.length === 0 && c.visits.find((v) => v.unscheduled && (Number(v.time) || 1) === n);
+                    // ✅ ครั้งเดียวมีได้หลายวันที่ — โชว์แค่ 3 วันแรกก่อน ที่เหลือพับไว้ กันแถวสูงผิดปกติ
+                    // (ดู VISIT_CELL_PREVIEW) เมื่อกางแล้วปุ่มจะเปลี่ยนเป็น "ย่อ" กลับได้เสมอ
+                    const visitCellKey = `${c.key}|${n}`;
+                    const visitCellExpanded = expandedVisitCells.has(visitCellKey);
+                    const shownVisits = visitCellExpanded ? roundVisits : roundVisits.slice(0, VISIT_CELL_PREVIEW);
+                    const hiddenVisitCount = roundVisits.length - shownVisits.length;
                     return (
                       <TableCell key={n} data-col-key={`visit_${n}`} align="center" sx={{ width: colVar(`visit_${n}`), overflow: "hidden" }}>
                         {roundVisits.length > 0 ? (
                           <Stack spacing={0.25} alignItems="center">
-                            {roundVisits.map((visit) => (
+                            {shownVisits.map((visit) => (
                               <Box key={visit._id} sx={{ textAlign: "center" }}>
                                 <Link
                                   to={`/operation/${visit._id}${resolveOperationGroup(visit) ? `?group=${resolveOperationGroup(visit)}` : ""}`}
@@ -3286,7 +3697,28 @@ export default function ContractOverview() {
                                 )}
                               </Box>
                             ))}
-                            {isAdminOrManager && c.isRealContract && (
+                            {/* ✅ ปุ่มกาง/ย่อรายการวันที่ที่เหลือของครั้งนี้ — บอกจำนวนที่ซ่อนอยู่ให้ชัด
+                                จะได้รู้ว่ายังมีข้อมูลอีก ไม่ใช่ตัดทิ้งเงียบๆ */}
+                            {(hiddenVisitCount > 0 || visitCellExpanded) && (
+                              <Box
+                                component="button" type="button"
+                                onClick={() => toggleVisitCell(visitCellKey)}
+                                sx={{
+                                  border: "none", bgcolor: "transparent", cursor: "pointer", p: 0,
+                                  fontSize: "0.65rem", fontWeight: 700, fontFamily: "inherit",
+                                  color: TEXT_SUB, whiteSpace: "nowrap",
+                                  "&:hover": { color: ACCENT, textDecoration: "underline" },
+                                }}
+                              >
+                                {visitCellExpanded ? "ย่อ" : `+ อีก ${hiddenVisitCount} วัน`}
+                              </Box>
+                            )}
+                            {/* ✅ แถวปุ่มจัดการครั้งนี้ (เพิ่มวันต่อเนื่อง / ย้ายครั้งที่ / แยกออกจากสัญญา)
+                                ⚠️ ไม่แสดงบนตารางจอมือถือ — ช่อง "ครั้งที่ N" กว้างแค่ 94px แต่ต้องใส่
+                                วันที่ + ชื่อทีม + ปุ่มอีก 3 ตัวซ้อนกันลงไป ทำให้เซลล์แน่นจนอ่านวันที่ไม่รู้เรื่อง
+                                (ตามที่ผู้ใช้เจอ) และตัวปุ่มเองก็เล็กแค่ 14px กดด้วยนิ้วแทบไม่โดนอยู่ดี —
+                                ทั้ง 3 อย่างยังทำได้ครบเหมือนเดิมจากมุมมองการ์ดบนมือถือ และจากตารางบนจอคอม */}
+                            {isAdminOrManager && c.isRealContract && !useMobileTable && (
                               <Stack direction="row" spacing={0.25}>
                                 <Tooltip title="เพิ่มวันที่ต่อเนื่อง (เข้างานไม่ติดกัน)">
                                   <IconButton
@@ -3323,7 +3755,7 @@ export default function ContractOverview() {
                           // ซึ่งอธิบายเหตุผลที่ต้องแยกปลายทางกันไว้ละเอียดแล้ว) เห็นชัดว่ากดได้จาก
                           // พื้นหลังชิป + ขีดเส้นใต้ตอน hover เหมือนลิงก์อื่นในตารางนี้
                           (() => {
-                            const chip = pendingDraftChip(c, pendingDraft);
+                            const chip = pendingDraftChip(c, pendingDraft, useMobileTable);
                             return (
                               <Tooltip title={chip.tip}>
                                 <Box
@@ -3446,22 +3878,29 @@ export default function ContractOverview() {
             </TableBody>
             {/* ✅ แถวสรุปยอดรวมท้ายตาราง — ยอดรวมของ "ทุกแถวที่ผ่านตัวกรอง" (ทุกหน้ารวมกัน) ไม่ใช่แค่
                 แถวที่เห็นในหน้านี้ จึงระบุกำกับไว้ชัดเจนกันเข้าใจผิด และบอกจำนวนแถวที่ยังไม่ได้กรอก
-                มูลค่าไว้ด้วย เพราะถ้ามีแถวพวกนั้นปนอยู่ ยอดนี้คือ "เท่าที่กรอกแล้ว" ยังไม่ใช่ยอดจริง */}
+                มูลค่าไว้ด้วย เพราะถ้ามีแถวพวกนั้นปนอยู่ ยอดนี้คือ "เท่าที่กรอกแล้ว" ยังไม่ใช่ยอดจริง
+                ⚠️ ไม่เรนเดอร์บนมือถือ — แถวนี้อยู่ในพื้นที่ที่เลื่อนแนวนอนได้ ยอดจึงตกไปอยู่นอกจอทางขวา
+                และโดนตัดข้อความ (ดู renderMobileSummaryBar) บนมือถือใช้แถบตรึงท้ายจอแทน ซึ่งแสดงยอด
+                ชุดเดียวกันเป๊ะครบทุกตัว — ถ้าปล่อยไว้ทั้งคู่จะกลายเป็นยอดรวมโผล่ 2 ที่ในหน้าเดียว */}
+            {!useMobileTable && (
             <TableFooter>
+              {/* ✅ พื้นแถวสรุปเป็นเทาอ่อนเป็นกลาง (เดิมพื้นแดงจาง + เส้นบนแดงหนา) — เก็บสีแดงไว้ที่
+                  "ตัวเลขยอดรวม" ตัวเดียวพอ ซึ่งเป็นสิ่งที่คนเปิดหน้านี้มาหาจริงๆ ให้เด่นชิ้นเดียวไปเลย
+                  ดีกว่าทำทั้งแถวให้แดงจนตัวเลขไม่ต่างจากตัวหนังสือรอบๆ */}
               <TableRow
                 sx={{
-                  bgcolor: alpha(ACCENT, 0.05),
-                  "& td": { borderTop: `2px solid ${alpha(ACCENT, 0.35)}`, borderBottom: "none", py: 1.25 },
+                  bgcolor: SURFACE_SUBTLE,
+                  "& td": { borderTop: `2px solid ${BORDER_MAIN}`, borderBottom: "none", py: 1.25 },
                 }}
               >
-                <TableCell colSpan={footerColSpan.before} align="right" sx={{ fontWeight: 700, color: "#7f1d1d" }}>
+                <TableCell colSpan={footerColSpan.before} align="right" sx={{ fontWeight: 700, color: "text.primary" }}>
                   <Stack spacing={0.5} alignItems="flex-end">
                     <Stack direction="row" spacing={1} alignItems="center" justifyContent="flex-end" sx={{ flexWrap: "wrap" }}>
                       <span>รวมมูลค่างานทั้งหมด</span>
                       <Chip
                         size="small"
                         label={`${jobValueSummary.filledCount.toLocaleString()}/${jobValueSummary.rowCount.toLocaleString()} รายการ · ทุกหน้า`}
-                        sx={{ height: 20, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha(ACCENT, 0.12), color: "#7f1d1d" }}
+                        sx={{ height: 20, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha("#0f172a", 0.06), color: TEXT_SUB }}
                       />
                       {jobValueSummary.missingCount > 0 && (
                         <Tooltip title={`มี ${jobValueSummary.missingCount} รายการที่ยังไม่ได้กรอกมูลค่างาน — ยอดรวมนี้จึงเป็นยอดเท่าที่กรอกแล้ว (${jobValueSummary.filledCount} รายการ) ยังไม่ใช่ยอดจริงทั้งหมด`}>
@@ -3495,16 +3934,20 @@ export default function ContractOverview() {
                 </TableCell>
                 <TableCell
                   align="right"
-                  sx={{ fontWeight: 800, fontSize: "0.95rem", color: "#7f1d1d", whiteSpace: "nowrap" }}
+                  sx={{ fontWeight: 800, fontSize: "1rem", color: ACCENT, whiteSpace: "nowrap" }}
                 >
                   {jobValueSummary.total.toLocaleString()}
                 </TableCell>
                 <TableCell colSpan={footerColSpan.after} />
               </TableRow>
             </TableFooter>
+            )}
           </Table>
         </TableContainer>
+        </Box>
+        </>
       )}
+
 
       {!loading && filtered.length > PAGE_SIZE && (
         <Stack direction="row" justifyContent="center" sx={{ mt: 2 }}>
@@ -3518,6 +3961,16 @@ export default function ContractOverview() {
             }}
           />
         </Stack>
+      )}
+
+      {/* ✅ แถบยอดรวมตรึงท้ายจอ (มือถือเท่านั้น) — ใช้ร่วมกันทั้งมุมมองการ์ดและมุมมองตาราง
+          ⚠️ ตัวเว้นระยะต้องอยู่ "หลัง" ปุ่มเปลี่ยนหน้า ไม่ใช่ก่อน — ไม่งั้นแถบที่ลอยอยู่ท้ายจอจะไปทับ
+          ปุ่มเปลี่ยนหน้าตอนเลื่อนลงสุด กดเปลี่ยนหน้าไม่ได้เลย */}
+      {isMobile && !loading && filtered.length > 0 && (
+        <>
+          <Box sx={{ height: 84 }} />
+          {renderMobileSummaryBar()}
+        </>
       )}
 
       {/* ✅ เมนูจัดหมวดหมู่งานทั่วไป/โปรเจค — Menu ตัวเดียวใช้ร่วมกันทุกแถว (ตำแหน่งขยับตาม anchorEl
