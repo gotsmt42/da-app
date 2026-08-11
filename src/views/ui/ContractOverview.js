@@ -32,7 +32,7 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableFooter, TableRow, Paper, Skeleton,
   Dialog, DialogTitle, DialogContent, DialogActions, ToggleButtonGroup, ToggleButton,
   Button, Autocomplete, Alert, Chip, Checkbox, Pagination, useMediaQuery, Badge,
-  TableSortLabel, Menu, MenuItem, ListItemIcon, ListItemText, Collapse,Portal
+  TableSortLabel, Menu, MenuItem, ListItemIcon, ListItemText, Collapse,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
@@ -673,9 +673,6 @@ export default function ContractOverview() {
   // ✅ ปุ่ม/เมนูเลือกมุมมองบนจอมือถือ — แทนแท็บเรียงแถวยาวที่ล้นออกนอกจอจนผู้ใช้ไม่รู้ว่ามีอยู่
   // (ดูเหตุผลเต็มตรงที่เรนเดอร์แท็บ)
   const [viewMenuAnchor, setViewMenuAnchor] = useState(null);
-  // ✅ แถบยอดรวมตรึงท้ายจอ — เริ่มพับไว้ให้เตี้ยที่สุด (บังเนื้อหาน้อยที่สุด) แตะกางดูรายละเอียดครบได้
-  // ทุกเมื่อ (ดู renderMobileSummaryBar)
-  const [summaryBarOpen, setSummaryBarOpen] = useState(false);
 
   // ✅ รูปแบบการแสดงผลบนจอมือถือ (การ์ด/ตาราง) — จำค่าไว้ใน localStorage ให้เปิดหน้านี้ครั้งหน้าได้
   // มุมมองที่เลือกไว้เลย ไม่ต้องมากดสลับใหม่ทุกครั้ง (ดูเหตุผลเต็มที่ MOBILE_VIEW_STORAGE_KEY)
@@ -699,22 +696,14 @@ export default function ContractOverview() {
   // ⚠️ ต้องห่อ useMemo — ไม่งั้นได้ object ใหม่ทุก render (กรณี `|| {}`) ทำให้ useMemo ที่รับ colWidths
   // เป็น dependency ด้านล่าง (totalTableWidth/tableCssVars) คำนวณใหม่ทุก render จนหมดประโยชน์ที่ memo ไว้
   const colWidths = useMemo(() => colWidthsByTab[viewFilter] || {}, [colWidthsByTab, viewFilter]);
-  // 🐛 BUG ที่แก้ (ตารางบนมือถือคอลัมน์กว้างมหาศาลจนเห็นทีละคอลัมน์ และหาช่องมูลค่างานไม่เจอ):
-  // เดิมให้ "ค่าที่ผู้ใช้ลากปรับเอง" (colWidths) ชนะเสมอ แม้ตอนดูบนมือถือ — แต่ค่าพวกนั้นถูกลาก/
-  // auto-fit ไว้ตอนอยู่บนจอคอมซึ่งกว้าง 1,400px+ คอลัมน์เดียวอาจกว้างถึง 300-400px ได้สบายๆ
-  // พอเอามาใช้บนจอ 375px ก็กลายเป็นคอลัมน์เดียวกินเต็มจอ ต้องปัดทีละคอลัมน์กว่าจะถึงมูลค่างาน
-  // ✅ บนมือถือใช้ชุดความกว้างของมือถือเสมอ ไม่สนค่าที่เคยลากไว้บนจอคอม — บนมือถือปิดการลากปรับ
-  // ความกว้างอยู่แล้ว (ดู ResizableTh) จึงไม่มีทางที่ผู้ใช้ตั้งใจตั้งค่าไว้สำหรับจอนี้ได้ตั้งแต่ต้น
-  // ⚠️ ค่าที่ลากไว้บนจอคอมไม่ได้ถูกลบทิ้ง — กลับไปดูบนจอคอมเมื่อไหร่ก็ได้ความกว้างเดิมที่ตั้งไว้ครบ
-  const colWidth = (key) => {
-    if (useMobileTable) {
-      return MOBILE_COL_WIDTHS[key]
-        ?? (key.startsWith("visit_") ? MOBILE_VISIT_COL_WIDTH : undefined)
-        ?? DEFAULT_COL_WIDTHS[key]
-        ?? VISIT_COL_DEFAULT_WIDTH;
-    }
-    return colWidths[key] ?? DEFAULT_COL_WIDTHS[key] ?? VISIT_COL_DEFAULT_WIDTH;
-  };
+  // ✅ ลำดับความสำคัญ: ค่าที่ผู้ใช้ลากปรับเอง → ค่าเริ่มต้นชุดมือถือ (เฉพาะตอนดูตารางบนมือถือ) →
+  // ค่าเริ่มต้นชุดจอคอม (ดู MOBILE_COL_WIDTHS สำหรับเหตุผลว่าทำไมมือถือต้องมีชุดของตัวเอง)
+  const colWidth = (key) => (
+    colWidths[key]
+    ?? (useMobileTable ? (MOBILE_COL_WIDTHS[key] ?? (key.startsWith("visit_") ? MOBILE_VISIT_COL_WIDTH : undefined)) : undefined)
+    ?? DEFAULT_COL_WIDTHS[key]
+    ?? VISIT_COL_DEFAULT_WIDTH
+  );
   // ⚠️ BUG ที่แก้ (ลากหน่วงมาก): เดิมช่วงลากอัปเดต React state (setColWidths) ทุกเฟรมของ
   // requestAnimationFrame อยู่ดี (แค่เลื่อนแค่การเขียน localStorage ไปตอนปล่อยเมาส์แทน) — แต่ทุกครั้งที่
   // setColWidths ทำให้ทั้งตาราง re-render ใหม่ (10 แถว x กว่า 15 คอลัมน์) และเลขความกว้างที่เปลี่ยนทุก
@@ -1054,24 +1043,49 @@ export default function ContractOverview() {
   }, [colWidths, totalTableWidth, visitColumns, useMobileTable]);
 
   // ✅ สไตล์เสริม "เฉพาะตอนดูตารางบนจอมือถือ" — ตัวตารางเป็น JSX ก้อนเดียวกับจอคอมทุกประการ ไม่ได้
-  // เขียนตารางแยกอีกชุด (ดู MOBILE_VIEW_STORAGE_KEY) แค่ทับ sx เพิ่มบางส่วนให้อ่านง่ายขึ้นบนจอแคบ
-  // 🐛 BUG ที่แก้ (ตารางบนมือถือแสดงผลซ้อนทับกันจนอ่านไม่ได้): เดิมตรงนี้ "ตรึงคอลัมน์แรก" ไว้กับขอบซ้าย
-  // ด้วย position:sticky ตั้งใจให้รู้ว่ากำลังอ่านแถวไหนอยู่ตอนเลื่อนไปทางขวา — แต่เซลล์ที่ตรึงต้องมี
-  // พื้นหลังทึบของตัวเองเสมอ ไม่งั้นเนื้อหาคอลัมน์อื่นที่เลื่อนผ่านจะทะลุออกมาซ้อนทับตัวหนังสือของมัน
-  // การทำให้ทึบ "ทุกกรณี" ต้องคุมสีพื้นให้ตรงกันหมดทั้งแถบสลับสี/แถวที่ชี้อยู่/หัวตาราง/แถวสรุป ซึ่ง
-  // เปราะเกินไปสำหรับตารางที่มีคอลัมน์ยืดหยุ่นและซ่อน/แสดงต่างกันในแต่ละแท็บแบบนี้ — ตัดกลไกตรึงออก
-  // ทั้งหมด แล้วใช้ปุ่มลูกศร ‹ › + แถบเลื่อนที่เห็นได้ตลอดเป็นตัวช่วยนำทางแทน (ดู scrollTableBy)
-  // ซึ่งไม่มีการวางเนื้อหาซ้อนกันเลยตั้งแต่ต้น จึงไม่มีทางแสดงผลเพี้ยนแบบนี้ได้อีก
+  // เขียนตารางแยกอีกชุด (ดู MOBILE_VIEW_STORAGE_KEY) แค่ทับ sx เพิ่มบางส่วนให้ใช้งานบนจอแคบได้จริง:
+  //  1. "ตรึงคอลัมน์แรก" (เลขที่สัญญา/เอกสารเลขที่ + ช่องติ๊กเลือกถ้ามี) ไว้กับขอบซ้าย — หัวใจของเรื่องนี้
+  //     เลย เพราะพอเลื่อนไปดูคอลัมน์ขวาสุดบนจอ 375px คอลัมน์ที่บอกว่า "นี่คือแถวไหน" จะหลุดออกนอกจอไป
+  //     หมด เหลือแต่ตัวเลขลอยๆ ที่อ่านไม่รู้เรื่องว่าเป็นของงานอะไร
+  //  2. ⚠️ position:sticky ใช้กับ border-collapse:collapse ไม่ได้ — เบราว์เซอร์วาดเส้นขอบเป็นของ
+  //     "ตาราง" ไม่ใช่ของเซลล์ เส้นขอบของเซลล์ที่ตรึงไว้จะเลื่อนหนีไปกับตารางจนดูขาดๆ หายๆ ต้องสลับมาใช้
+  //     border-collapse:separate เฉพาะโหมดนี้ แล้ววาดเส้นเองด้านขวา+ล่างของทุกเซลล์ (ไม่ใช่ครบ 4 ด้าน
+  //     ไม่งั้นเส้นระหว่างเซลล์จะซ้อนกันเป็น 2 เส้นหนาผิดปกติ เพราะไม่มีการยุบขอบให้แล้ว)
+  //  3. พื้นหลังแถบสลับสีต้องเป็นสีทึบ — ของเดิมใช้สีโปร่งแสง 2% ซึ่งพอเอามาตรึงไว้จะเห็นเนื้อหาคอลัมน์
+  //     อื่นวิ่งทะลุผ่านหลังคอลัมน์ที่ตรึงตอนเลื่อน
   const mobileTableSx = useMemo(() => {
     if (!useMobileTable) return null;
+    // ✅ คอลัมน์แรกสุดของแต่ละแท็บไม่เหมือนกัน — แท็บสัญญาคือ "เลขที่เอกสาร" ส่วนแท็บงานทั่วไป/โปรเจค/
+    // ยังไม่จัดกลุ่มคือ "เอกสารเลขที่" (ดูหัวตาราง) ต้องตรึงตัวที่ถูกเรนเดอร์จริงในแท็บนั้นๆ
+    const idColKey = hideContractOnlyColumns ? "docNo" : "docRef";
+    const stickyLeft = showCheckboxes ? colWidth("checkbox") : 0;
+    // ✅ เงาที่ขอบขวาของคอลัมน์ที่ตรึงไว้ — ทำหน้าที่แทน "เส้นขอบ" ให้เห็นว่าคอลัมน์นี้ลอยอยู่เหนือ
+    // เนื้อหาที่กำลังเลื่อนผ่านข้างหลัง (ไม่ใช่แค่คอลัมน์ธรรมดาที่บังเอิญอยู่ซ้ายสุด)
+    const stickyEdge = { boxShadow: `6px 0 8px -6px ${alpha("#0f172a", 0.28)}` };
     return {
-      "& th, & td": { fontSize: "0.76rem", px: 0.75 },
-      // ✅ พื้นแถวทึบ (ไม่ใช่สีโปร่งแสง) — อ่านง่ายกว่าบนจอเล็กที่ตัวหนังสือเล็กอยู่แล้ว
+      borderCollapse: "separate",
+      borderSpacing: 0,
+      "& th, & td": {
+        border: "none",
+        borderRight: `1px solid ${BORDER_HAIR}`,
+        borderBottom: `1px solid ${BORDER_SOFT}`,
+        fontSize: "0.76rem",
+        px: 0.75,
+      },
+      "& thead th": { borderBottom: `1px solid ${BORDER_MAIN}` },
       "& tbody tr": { bgcolor: "#fff" },
       "& tbody tr:nth-of-type(even)": { bgcolor: SURFACE_STRIPE },
+      ...(showCheckboxes && {
+        "& tbody .MuiTableCell-paddingCheckbox": { position: "sticky", left: 0, zIndex: 2, bgcolor: "inherit" },
+        "& thead .MuiTableCell-paddingCheckbox": { position: "sticky", left: 0, zIndex: 3, bgcolor: SURFACE_SUBTLE },
+      }),
+      [`& tbody [data-col-key="${idColKey}"]`]: { position: "sticky", left: stickyLeft, zIndex: 2, bgcolor: "inherit", ...stickyEdge },
+      [`& thead [data-col-key="${idColKey}"]`]: { position: "sticky", left: stickyLeft, zIndex: 3, bgcolor: SURFACE_SUBTLE, ...stickyEdge },
+      // ✅ แถวสรุปยอดรวมท้ายตารางไม่มีคอลัมน์ให้ตรึง (เป็น colSpan ก้อนเดียว) ให้พื้นหลังทึบไว้เฉยๆ
+      "& tfoot td": { bgcolor: SURFACE_SUBTLE },
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [useMobileTable]);
+  }, [useMobileTable, hideContractOnlyColumns, showCheckboxes, colWidths]);
 
   // ── ตัวช่วยเลื่อนตารางแนวนอน ────────────────────────────────────────────────
   // ✅ ปัญหาที่ผู้ใช้เจอ ("เลื่อนตารางบนมือถือยาก") ไม่ได้มีสาเหตุเดียว แก้ครบทุกข้อดังนี้:
@@ -1597,13 +1611,10 @@ export default function ContractOverview() {
   // ✅ สัญญา → ให้กดชิปเปิดกล่อง "เพิ่มครั้งที่ 1" ในหน้านี้แทน (handleAddVisitSubmit แปลงฉบับร่างเดิม
   // เป็นครั้งจริงให้เองผ่าน PUT /:id/schedule ไม่สร้าง record ซ้ำ) ส่วนงานทั่วไป/โปรเจคยังอยู่ในแผงงาน
   // ล่วงหน้าตามปกติ ใช้ลิงก์เดิมต่อไปได้
-  // ⚠️ compact=true (ตารางบนจอมือถือ) — ช่อง "ครั้งที่ N" กว้างแค่ 94px ป้ายเต็ม "📌 กดเพื่อลงวันที่"
-  // ยาวเกินจนถูกตัดกลางคำ อ่านได้แค่ "กดเพื่อลงวัน" ดูเหมือนหน้าพัง — ย่อข้อความให้พอดีช่อง ส่วนคำอธิบาย
-  // เต็มยังอยู่ครบใน tooltip เหมือนเดิม
-  const pendingDraftChip = (c, pendingDraft, compact = false) => {
+  const pendingDraftChip = (c, pendingDraft) => {
     if (c.isRealContract) {
       return isAdminOrManager
-        ? { label: compact ? "📌 ลงวันที่" : "📌 กดเพื่อลงวันที่", tip: "สัญญานี้ยังไม่ได้ลงวันที่เข้างาน — กดเพื่อระบุวันที่ครั้งที่ 1", props: { onClick: () => openAddVisitDialog(c), sx: { cursor: "pointer" } } }
+        ? { label: "📌 กดเพื่อลงวันที่", tip: "สัญญานี้ยังไม่ได้ลงวันที่เข้างาน — กดเพื่อระบุวันที่ครั้งที่ 1", props: { onClick: () => openAddVisitDialog(c), sx: { cursor: "pointer" } } }
         : { label: "📌 รอลงวันที่", tip: "สัญญานี้ยังไม่ได้ลงวันที่เข้างาน (แอดมิน/manager เป็นผู้ระบุ)", props: {} };
     }
     return {
@@ -2277,86 +2288,54 @@ export default function ContractOverview() {
     }
   };
 
-  // ── แถบสรุปยอดรวมแบบตรึงท้ายจอ (เฉพาะจอมือถือ) ──────────────────────────────
-  // 🐛 BUG ที่แก้ (ยอดรวมหาไม่เจอ/ไม่ครบบนมือถือ): แถวสรุปท้ายตาราง (TableFooter) ตกไปอยู่ใต้คอลัมน์
-  // "มูลค่างาน" ซึ่งอยู่นอกจอไปทางขวา ต้องปัดไปหาถึงจะเห็น แถมพอปัดไปถึงก็เห็นแค่บางส่วนเพราะข้อความ
-  // ยาวกว่าความกว้างที่เหลือ (ตามภาพที่ผู้ใช้ส่งมา — "างงานทั้งหมด" โดนตัดหัว) ส่วนที่เคยยกมาไว้บนสุด
-  // ก็หายไปทันทีที่เลื่อนดูรายการ
-  // ✅ ตรึงเป็นแถบท้ายจอไปเลย — เห็นยอดตลอดเวลาไม่ว่าจะเลื่อนอยู่ตรงไหน อยู่นอกพื้นที่เลื่อนแนวนอนของ
-  // ตารางด้วย จึงไม่มีทางโดนตัดอีก แตะเพื่อกางดูรายละเอียดที่เหลือได้ครบ (จำนวนที่ยังไม่กรอกมูลค่า +
-  // ขอบเขตของยอด: แท็บ/ตัวกรอง/คำค้นหา) ข้อมูลจึงยังครบเท่าเดิมทุกตัว
-  // ⚠️ ใช้ position:fixed ไม่ใช่ sticky — .pageWrapper ตั้ง overflow-x:hidden ไว้ ซึ่งทำให้ sticky
-  // ยึดกับกล่องนั้นแทนขอบจอแล้วกลายเป็นไม่ตรึงจริง
-  // ⚠️ ตัวเลขมาจาก jobValueSummary ตัวเดียวกับฝั่งเดสก์ท็อปเป๊ะ ไม่ได้คำนวณซ้ำอีกชุด
-  const renderMobileSummaryBar = () => (
-    // 🐛 BUG ที่แก้ (แถบยอดรวมไม่โผล่เลยบนมือถือ): position:fixed จะยึดกับ "ขอบจอ" ก็ต่อเมื่อไม่มี
-    // บรรพบุรุษตัวไหนสร้าง containing block ทับ — ซึ่ง layout ของแอปนี้มีทั้ง .pageWrapper ที่ตั้ง
-    // overflow-x:hidden และ .contentArea ที่มี transition/filter (ตอนเปิดเมนูมือถือจะได้ class
-    // .blur-content ที่ใส่ filter จริงๆ) พอโดนตัวใดตัวหนึ่งจับ แถบก็ไปยึดกับกล่องนั้นแทนแล้วหลุด
-    // ออกนอกพื้นที่ที่มองเห็นไปเลย
-    // ✅ ยิงผ่าน Portal ไปแปะที่ <body> ตรงๆ — พ้นบรรพบุรุษทุกตัวในหน้า จึงไม่มีทางโดนตัด/ย้ายที่
-    // ได้อีกไม่ว่า CSS ของ layout จะเปลี่ยนไปยังไงในอนาคต
-    <Portal>
+  // ── การ์ดสรุปยอดรวมสำหรับจอมือถือ ──────────────────────────────────────────
+  // ✅ ตารางมีแถวสรุปท้ายตาราง (TableFooter) อยู่แล้ว แต่บนจอมือถือแถวนั้นตกไปอยู่ใต้คอลัมน์ "มูลค่างาน"
+  // ซึ่งอยู่นอกจอไปทางขวา ต้องปัดไปหาถึงจะเห็น ส่วนมุมมองการ์ดก็ไม่มีที่ให้วางแถวสรุปเลย — ทั้ง 2 มุมมอง
+  // จึงยกยอดรวมชุดเดียวกันนี้มาไว้ด้านบนสุดด้วย เห็นทันทีที่เปิดหน้าโดยไม่ต้องเลื่อนหา ⚠️ ตัวเลขมาจาก
+  // jobValueSummary ตัวเดียวกับฝั่งเดสก์ท็อปเป๊ะ ไม่ได้คำนวณซ้ำอีกชุด
+  const renderMobileSummary = () => (
+    // ✅ พื้นการ์ดเป็นเทาอ่อนเป็นกลาง (เดิมพื้นแดงจาง+ขอบแดง) แล้วเน้นสีแดงไว้ที่ "ตัวเลขยอดรวม"
+    // ชิ้นเดียว ให้เป็นสิ่งแรกที่สายตาไปหยุด — ตรงกับแถวสรุปท้ายตารางฝั่งจอคอมที่ปรับแบบเดียวกัน
     <Paper
-      elevation={0}
-      sx={{
-        position: "fixed", left: 0, right: 0, bottom: 0,
-        // ต่ำกว่า Dialog (1300) และแถบเมนูมือถือ (10000) — ไม่บังของที่ต้องอยู่บนสุด
-        zIndex: 1200,
-        borderRadius: 0, borderTop: `1px solid ${BORDER_MAIN}`,
-        bgcolor: "#fff", boxShadow: "0 -2px 12px rgba(15,23,42,0.1)",
-        px: 2, pt: 1.25, pb: 1.5,
-      }}
+      variant="outlined"
+      sx={{ p: 1.75, borderRadius: 3, bgcolor: SURFACE_SUBTLE, borderColor: BORDER_MAIN }}
     >
-      <Stack
-        direction="row" alignItems="center" spacing={1}
-        onClick={() => setSummaryBarOpen((o) => !o)}
-        sx={{ cursor: "pointer", userSelect: "none" }}
-      >
-        <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 700, display: "block", lineHeight: 1.3 }}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+        <Box>
+          <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 700, display: "block" }}>
             รวมมูลค่างานทั้งหมด
           </Typography>
-          <Typography variant="caption" sx={{ color: "text.disabled" }}>
+          <Typography variant="caption" color="text.secondary">
             {jobValueSummary.filledCount.toLocaleString()}/{jobValueSummary.rowCount.toLocaleString()} รายการ · ทุกหน้า
           </Typography>
         </Box>
-        {/* ✅ จุดเตือนสีส้มตอนมีรายการที่ยังไม่กรอกมูลค่า — บอกตั้งแต่ยังไม่กางว่ายอดนี้ยังไม่ครบ
-            (รายละเอียดเต็มอยู่ในส่วนที่กางออกมา) */}
-        {jobValueSummary.missingCount > 0 && !summaryBarOpen && (
-          <WarningAmber sx={{ fontSize: 17, color: "#b45309", flexShrink: 0 }} />
-        )}
-        <Typography sx={{ fontWeight: 800, fontSize: "1.3rem", color: ACCENT, whiteSpace: "nowrap", letterSpacing: "-0.01em" }}>
+        <Typography sx={{ fontWeight: 800, fontSize: "1.25rem", color: ACCENT, whiteSpace: "nowrap", letterSpacing: "-0.01em" }}>
           {jobValueSummary.total.toLocaleString()}
         </Typography>
-        {summaryBarOpen ? <ExpandMore sx={{ fontSize: 20, color: TEXT_SUB }} /> : <ExpandLess sx={{ fontSize: 20, color: TEXT_SUB }} />}
       </Stack>
-      <Collapse in={summaryBarOpen}>
-        {jobValueSummary.missingCount > 0 && (
-          <Typography
-            variant="caption"
-            sx={{ mt: 1, display: "flex", alignItems: "center", gap: 0.5, color: "#b45309", fontWeight: 600 }}
-          >
-            <WarningAmber sx={{ fontSize: 13 }} />
-            ยังไม่ได้กรอกมูลค่า {jobValueSummary.missingCount} รายการ — ยอดนี้เป็นยอดเท่าที่กรอกแล้ว
-          </Typography>
-        )}
-        {/* ✅ แจกแจงขอบเขตของยอดรวม (แท็บ + ตัวกรอง + คำค้นหา) เหมือนฝั่งเดสก์ท็อป */}
-        <Stack direction="row" spacing={0.5} sx={{ mt: 0.75, flexWrap: "wrap", rowGap: 0.5 }}>
-          {summaryScopeLabels.map((label) => (
-            <Chip
-              key={label} size="small" variant="outlined" label={label}
-              sx={{
-                height: 19, fontSize: "0.65rem", fontWeight: 600, maxWidth: "100%",
-                color: "text.secondary", borderColor: alpha("#0f172a", 0.18),
-                "& .MuiChip-label": { px: 0.75, overflow: "hidden", textOverflow: "ellipsis" },
-              }}
-            />
-          ))}
-        </Stack>
-      </Collapse>
+      {jobValueSummary.missingCount > 0 && (
+        <Typography
+          variant="caption"
+          sx={{ mt: 0.75, display: "flex", alignItems: "center", gap: 0.5, color: "#b45309", fontWeight: 600 }}
+        >
+          <WarningAmber sx={{ fontSize: 13 }} />
+          ยังไม่ได้กรอกมูลค่า {jobValueSummary.missingCount} รายการ — ยอดนี้เป็นยอดเท่าที่กรอกแล้ว
+        </Typography>
+      )}
+      {/* ✅ แจกแจงขอบเขตของยอดรวม (แท็บ + ตัวกรอง + คำค้นหา) เหมือนฝั่งเดสก์ท็อป */}
+      <Stack direction="row" spacing={0.5} sx={{ mt: 0.75, flexWrap: "wrap", rowGap: 0.5 }}>
+        {summaryScopeLabels.map((label) => (
+          <Chip
+            key={label} size="small" variant="outlined" label={label}
+            sx={{
+              height: 19, fontSize: "0.65rem", fontWeight: 600, maxWidth: "100%",
+              color: "text.secondary", borderColor: alpha("#0f172a", 0.18),
+              "& .MuiChip-label": { px: 0.75, overflow: "hidden", textOverflow: "ellipsis" },
+            }}
+          />
+        ))}
+      </Stack>
     </Paper>
-    </Portal>
   );
 
   // ── การ์ดสำหรับจอมือถือ (isMobile) ──────────────────────────────────────────
@@ -3174,24 +3153,27 @@ export default function ContractOverview() {
         </Paper>
       ) : isMobile && mobileView === "card" ? (
         <Stack spacing={1.5}>
-          {/* ✅ การ์ดสรุปยอดรวมถูกย้ายไปเป็นแถบตรึงท้ายจอแล้ว (ดู renderMobileSummaryBar) — เห็นตลอดเวลา
-              ไม่ว่าจะเลื่อนอยู่ตรงไหน ดีกว่าวางไว้บนสุดแล้วหายไปทันทีที่เลื่อนดูรายการ */}
+          {renderMobileSummary()}
           {pagedRows.map((c) => renderMobileCard(c))}
         </Stack>
       ) : (
         <>
         {/* ✅ บอกให้รู้ตั้งแต่แรกว่าตารางกว้างเกินจอและปัดดูต่อได้ — ไม่งั้นคนที่เพิ่งสลับมาโหมดตารางจะ
-            เห็นแค่ 2-3 คอลัมน์แรกแล้วนึกว่าข้อมูลที่เหลือหายไป */}
+            เห็นแค่ 2-3 คอลัมน์แรกแล้วนึกว่าข้อมูลที่เหลือหายไป (คอลัมน์แรกถูกตรึงไว้ให้แล้ว จะได้รู้
+            ตลอดว่ากำลังอ่านแถวของงานไหนอยู่ ดู mobileTableSx) */}
         {useMobileTable && (
-          <Stack
-            direction="row" alignItems="center" spacing={0.5}
-            sx={{ mb: 0.75, color: "text.disabled" }}
-          >
-            <SwipeLeft sx={{ fontSize: 15 }} />
-            <Typography variant="caption">
-              ปัดซ้าย-ขวา หรือกดปุ่ม ‹ › เพื่อดูคอลัมน์ที่เหลือ · แตะช่องเพื่อแก้ไข
-            </Typography>
-          </Stack>
+          <>
+            <Box sx={{ mb: 1.5 }}>{renderMobileSummary()}</Box>
+            <Stack
+              direction="row" alignItems="center" spacing={0.5}
+              sx={{ mb: 0.75, color: "text.disabled" }}
+            >
+              <SwipeLeft sx={{ fontSize: 15 }} />
+              <Typography variant="caption">
+                ปัดซ้าย-ขวา หรือกดปุ่ม ‹ › เพื่อดูคอลัมน์ที่เหลือ · แตะช่องเพื่อแก้ไข
+              </Typography>
+            </Stack>
+          </>
         )}
         <Box sx={{ position: "relative" }}>
         {/* ✅ ปุ่มลูกศรเลื่อนตารางทีละหน้า — ตัวช่วยหลักที่แก้ปัญหา "เลื่อนตารางบนมือถือยาก" โดยตรง
@@ -3283,13 +3265,6 @@ export default function ContractOverview() {
                   ซึ่งเป็นสถานะที่ผู้ใช้ต้องรู้จริงๆ ว่าตอนนี้ตารางเรียงตามอะไรอยู่ */}
               <TableRow sx={{ "& th": { fontWeight: 700, fontSize: "0.75rem", bgcolor: SURFACE_SUBTLE, borderBottom: `1px solid ${BORDER_MAIN} !important`, color: TEXT_SUB, letterSpacing: "0.015em" } }}>
                 {showCheckboxes && <TableCell padding="checkbox" sx={{ width: colWidth("checkbox") }} />}
-                {/* 🐛 BUG ที่แก้ (ตารางบนมือถือดูซ้อนกัน อ่านไม่รู้เรื่อง): เดิมตรึงคอลัมน์ "เลขที่เอกสาร"
-                    ไว้ซ้ายสุด แต่ในแท็บงานทั่วไป/โปรเจคช่องนี้แทบไม่มีใครกรอก เป็น "–" ทั้งคอลัมน์ —
-                    กลายเป็นแถบว่างเปล่ากว้าง 118px (เกือบ 1 ใน 3 ของจอ) ตรึงค้างอยู่ แล้วชื่อโครงการ
-                    ที่เป็นข้อมูลจริงกลับถูกบังหายไปข้างหลังตอนเลื่อน = เห็นแต่ตัวหนังสือโดนตัดครึ่ง
-                    ✅ สลับให้ "โครงการ / บริษัท" มาเป็นคอลัมน์แรกและเป็นตัวที่ถูกตรึงแทน เฉพาะตอนดู
-                    ตารางบนมือถือ — คอลัมน์ที่ตรึงต้องเป็นตัวที่บอกว่า "แถวนี้คืองานอะไร" ถึงจะมีประโยชน์
-                    ⚠️ ลำดับตรงนี้ต้องตรงกับแถวข้อมูลเป๊ะๆ (ดูคอมเมนต์เดียวกันในส่วน TableBody) */}
                 {/* ✅ เลขที่สัญญา + ใบเสนอราคา ยุบเป็นช่องเดียว (ซ้อน 2 บรรทัด) — เรียงตามเลขที่สัญญา
                     ซึ่งเป็นตัวหลักที่คนใช้ค้นหา/อ้างอิง ส่วนแท็บงานทั่วไป/โปรเจคใช้ "เอกสารเลขที่" แทน */}
                 {!hideContractOnlyColumns && (
@@ -3413,7 +3388,7 @@ export default function ContractOverview() {
                       </Stack>
                     </TableCell>
                   )}
-                  {/* ✅ โผล่แทนกลุ่มเลขที่สัญญา/ใบเสนอราคาตอนซ่อนคอลัมน์ระดับสัญญา (ดูหัวตาราง) —
+                  {/* ✅ โผล่แทนกลุ่มเลขที่สัญญา/ใบเสนอราคาด้านบนตอนซ่อนคอลัมน์ระดับสัญญา (ดูหัวตาราง) —
                       แก้ไขได้เฉพาะแถวที่จัดหมวดหมู่แล้ว (สัญญาจริง/งานทั่วไป/งานโปรเจค) ไม่ใช่แถว
                       "ยังไม่จัดกลุ่ม" เหมือน "ผู้รับผิดชอบ" ด้านล่าง (ดู canEditField) */}
                   {hideContractOnlyColumns && (
@@ -3713,12 +3688,7 @@ export default function ContractOverview() {
                                 {visitCellExpanded ? "ย่อ" : `+ อีก ${hiddenVisitCount} วัน`}
                               </Box>
                             )}
-                            {/* ✅ แถวปุ่มจัดการครั้งนี้ (เพิ่มวันต่อเนื่อง / ย้ายครั้งที่ / แยกออกจากสัญญา)
-                                ⚠️ ไม่แสดงบนตารางจอมือถือ — ช่อง "ครั้งที่ N" กว้างแค่ 94px แต่ต้องใส่
-                                วันที่ + ชื่อทีม + ปุ่มอีก 3 ตัวซ้อนกันลงไป ทำให้เซลล์แน่นจนอ่านวันที่ไม่รู้เรื่อง
-                                (ตามที่ผู้ใช้เจอ) และตัวปุ่มเองก็เล็กแค่ 14px กดด้วยนิ้วแทบไม่โดนอยู่ดี —
-                                ทั้ง 3 อย่างยังทำได้ครบเหมือนเดิมจากมุมมองการ์ดบนมือถือ และจากตารางบนจอคอม */}
-                            {isAdminOrManager && c.isRealContract && !useMobileTable && (
+                            {isAdminOrManager && c.isRealContract && (
                               <Stack direction="row" spacing={0.25}>
                                 <Tooltip title="เพิ่มวันที่ต่อเนื่อง (เข้างานไม่ติดกัน)">
                                   <IconButton
@@ -3755,7 +3725,7 @@ export default function ContractOverview() {
                           // ซึ่งอธิบายเหตุผลที่ต้องแยกปลายทางกันไว้ละเอียดแล้ว) เห็นชัดว่ากดได้จาก
                           // พื้นหลังชิป + ขีดเส้นใต้ตอน hover เหมือนลิงก์อื่นในตารางนี้
                           (() => {
-                            const chip = pendingDraftChip(c, pendingDraft, useMobileTable);
+                            const chip = pendingDraftChip(c, pendingDraft);
                             return (
                               <Tooltip title={chip.tip}>
                                 <Box
@@ -3878,11 +3848,7 @@ export default function ContractOverview() {
             </TableBody>
             {/* ✅ แถวสรุปยอดรวมท้ายตาราง — ยอดรวมของ "ทุกแถวที่ผ่านตัวกรอง" (ทุกหน้ารวมกัน) ไม่ใช่แค่
                 แถวที่เห็นในหน้านี้ จึงระบุกำกับไว้ชัดเจนกันเข้าใจผิด และบอกจำนวนแถวที่ยังไม่ได้กรอก
-                มูลค่าไว้ด้วย เพราะถ้ามีแถวพวกนั้นปนอยู่ ยอดนี้คือ "เท่าที่กรอกแล้ว" ยังไม่ใช่ยอดจริง
-                ⚠️ ไม่เรนเดอร์บนมือถือ — แถวนี้อยู่ในพื้นที่ที่เลื่อนแนวนอนได้ ยอดจึงตกไปอยู่นอกจอทางขวา
-                และโดนตัดข้อความ (ดู renderMobileSummaryBar) บนมือถือใช้แถบตรึงท้ายจอแทน ซึ่งแสดงยอด
-                ชุดเดียวกันเป๊ะครบทุกตัว — ถ้าปล่อยไว้ทั้งคู่จะกลายเป็นยอดรวมโผล่ 2 ที่ในหน้าเดียว */}
-            {!useMobileTable && (
+                มูลค่าไว้ด้วย เพราะถ้ามีแถวพวกนั้นปนอยู่ ยอดนี้คือ "เท่าที่กรอกแล้ว" ยังไม่ใช่ยอดจริง */}
             <TableFooter>
               {/* ✅ พื้นแถวสรุปเป็นเทาอ่อนเป็นกลาง (เดิมพื้นแดงจาง + เส้นบนแดงหนา) — เก็บสีแดงไว้ที่
                   "ตัวเลขยอดรวม" ตัวเดียวพอ ซึ่งเป็นสิ่งที่คนเปิดหน้านี้มาหาจริงๆ ให้เด่นชิ้นเดียวไปเลย
@@ -3941,13 +3907,11 @@ export default function ContractOverview() {
                 <TableCell colSpan={footerColSpan.after} />
               </TableRow>
             </TableFooter>
-            )}
           </Table>
         </TableContainer>
         </Box>
         </>
       )}
-
 
       {!loading && filtered.length > PAGE_SIZE && (
         <Stack direction="row" justifyContent="center" sx={{ mt: 2 }}>
@@ -3961,16 +3925,6 @@ export default function ContractOverview() {
             }}
           />
         </Stack>
-      )}
-
-      {/* ✅ แถบยอดรวมตรึงท้ายจอ (มือถือเท่านั้น) — ใช้ร่วมกันทั้งมุมมองการ์ดและมุมมองตาราง
-          ⚠️ ตัวเว้นระยะต้องอยู่ "หลัง" ปุ่มเปลี่ยนหน้า ไม่ใช่ก่อน — ไม่งั้นแถบที่ลอยอยู่ท้ายจอจะไปทับ
-          ปุ่มเปลี่ยนหน้าตอนเลื่อนลงสุด กดเปลี่ยนหน้าไม่ได้เลย */}
-      {isMobile && !loading && filtered.length > 0 && (
-        <>
-          <Box sx={{ height: 84 }} />
-          {renderMobileSummaryBar()}
-        </>
       )}
 
       {/* ✅ เมนูจัดหมวดหมู่งานทั่วไป/โปรเจค — Menu ตัวเดียวใช้ร่วมกันทุกแถว (ตำแหน่งขยับตาม anchorEl
