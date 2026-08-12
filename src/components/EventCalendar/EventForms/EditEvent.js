@@ -452,6 +452,48 @@ function injectStyles() {
     .ee-btn-ghost     { background: #e2e8f0; color: #475569; }
     .ee-btn-attach    { background: #dc2626; color: #fff; }
 
+    /* ── ลำดับความสำคัญของปุ่มในแถบล่าง ─────────────────────────────────────
+       🐛 ปัญหาที่แก้ (ปุ่มกลบกลืนกันไปหมด): แถบล่างมีปุ่มสีทึบเรียงกัน 5-6 ปุ่ม (แดง/ม่วง/ฟ้า/เขียว)
+       ขนาดเท่ากันหมด — เมื่อทุกปุ่มตะโกนเท่ากัน ก็เท่ากับไม่มีปุ่มไหนเด่นเลย สายตาต้องไล่อ่านทีละปุ่ม
+       ทุกครั้งกว่าจะเจอปุ่มที่ต้องการ และปุ่มอันตรายอย่าง "ลบแผนงาน" ก็ดูน่ากดพอๆ กับปุ่มบันทึก
+       ✅ เหลือปุ่มสีทึบแค่ตัวเดียวคือ "บันทึก" (สิ่งที่คนเปิดหน้านี้มาทำ) ที่เหลือเป็นพื้นขาวขอบบาง
+       ใช้สีแค่ที่ตัวหนังสือ — ยังแยกออกจากกันได้ด้วยสี/ไอคอน แต่ไม่แย่งความสนใจไปจากปุ่มหลัก
+       ⚠️ จำกัดขอบเขตด้วย #ee-action-bar เท่านั้น — คลาสเดียวกันนี้ถูกใช้กับปุ่มยืนยันในฟอร์มด้วย
+       (อนุมัติงาน / ยืนยันไม่อนุมัติ / ลบช่วงนี้) ซึ่งเป็น "ปุ่มหลักของการตัดสินใจนั้นๆ" ต้องทึบต่อไป */
+    #ee-action-bar .ee-btn {
+      background: #fff; border: 1px solid #e2e8f0;
+      transition: background-color .15s, border-color .15s, color .15s, transform .1s;
+    }
+    /* hover เดิมใช้ opacity ซึ่งพอเป็นปุ่มพื้นขาวจะกลายเป็นซีดจางดูเหมือนปุ่มถูกปิดใช้งาน */
+    #ee-action-bar .ee-btn:hover { opacity: 1; }
+
+    /* ปุ่มหลัก — ปุ่มเดียวในแถบที่เป็นสีทึบ */
+    #ee-action-bar .ee-btn-success {
+      background: #10b981; border-color: #10b981; color: #fff;
+      box-shadow: 0 1px 3px rgba(16,185,129,.4);
+    }
+    #ee-action-bar .ee-btn-success:hover { background: #059669; border-color: #059669; }
+
+    /* เอกสาร/นำทาง — สีอยู่ที่ตัวหนังสือ พื้นขาว */
+    #ee-action-bar .ee-btn-info      { color: #0369a1; }
+    #ee-action-bar .ee-btn-info:hover      { background: #f0f9ff; border-color: #7dd3fc; }
+    #ee-action-bar .ee-btn-delivery  { color: #0f766e; }
+    #ee-action-bar .ee-btn-delivery:hover  { background: #f0fdfa; border-color: #5eead4; }
+    #ee-action-bar .ee-btn-operation { background: #fff; color: #6d28d9; }
+    #ee-action-bar .ee-btn-operation:hover { background: #f5f3ff; border-color: #c4b5fd; }
+    #ee-action-bar .ee-btn-attach    { color: #b91c1c; }
+    #ee-action-bar .ee-btn-attach:hover    { background: #fef2f2; border-color: #fca5a5; }
+
+    /* อันตราย — ต้องหาเจอได้ แต่ไม่ควรเด่นชวนให้กด (ขอบสีอ่อนพอให้รู้ว่าเป็นกลุ่มอันตราย) */
+    #ee-action-bar .ee-btn-danger  { color: #dc2626; border-color: #fecaca; }
+    #ee-action-bar .ee-btn-danger:hover  { background: #fef2f2; border-color: #f87171; }
+    #ee-action-bar .ee-btn-warning { color: #b45309; border-color: #fde68a; }
+    #ee-action-bar .ee-btn-warning:hover { background: #fffbeb; border-color: #fbbf24; }
+
+    /* ปิด — เบาที่สุดในแถบ ไม่ต้องมีขอบด้วยซ้ำ */
+    #ee-action-bar .ee-btn-ghost { background: transparent; border-color: transparent; color: #64748b; }
+    #ee-action-bar .ee-btn-ghost:hover { background: #f1f5f9; color: #0f172a; }
+
     /* 🐛 BUG ที่แก้ (ปุ่มล่างล้นออกนอกจอ กดไม่ถึง): กลุ่มปุ่มกลางมี 3 ปุ่มข้อความยาว (ย้ายเข้าสัญญา /
        ดูการดำเนินงาน / ออกใบแจ้งเข้างาน) เรียงแถวเดียวโดยไม่อนุญาตให้ตัดบรรทัด (.ee-btn ตั้ง
        white-space:nowrap ไว้) รวมกันกว้างเกินจอมือถือ ปุ่มขวาสุดจึงถูกตัดหายไปครึ่งใบ กดไม่ได้เลย
@@ -603,6 +645,10 @@ export const getEditEvent = async ({
   eventInfo,
   setLoading,
   generateWorkPermitPDF,
+  // ✅ ใบส่งมอบงานเป็นคอมโพเนนต์ React (DeliveryNoteDialog) แต่หน้าแก้ไขงานนี้เป็น HTML ล้วนใน
+  // SweetAlert2 จึงเรนเดอร์ Dialog ตรงนี้ไม่ได้ — รับเป็น callback แล้วให้ EventCalendar/index.js
+  // (ซึ่งเป็น React จริง) เป็นคนเปิดกล่องให้แทน
+  onOpenDeliveryNote,
   handleDeleteEvent,
   handleUnscheduleEvent,
   onCopyEvent,
@@ -1290,6 +1336,12 @@ export const getEditEvent = async ({
       ${canAttachToContract ? `<button class="ee-btn ee-btn-attach" id="btnAttachContract">🔗 ย้ายเข้าสัญญา</button>` : ""}
       ${canViewOperation ? `<button class="ee-btn ee-btn-operation" id="btnViewSchedule">📊 ดูการดำเนินงาน</button>` : ""}
       <button class="ee-btn ee-btn-info"      id="btnGeneratePDF">📄 ออกใบแจ้งเข้างาน</button>
+      <!-- ✅ ใบส่งมอบงาน — วางคู่กับ "ใบแจ้งเข้างาน" เพราะเป็นเอกสารคู่กันของงานเดียวกัน คนละหัวคนละท้าย
+           ของงาน (แจ้งก่อนเข้า / ส่งมอบหลังเสร็จ) ใครที่รู้ว่าออกใบแจ้งเข้างานตรงนี้ ก็จะเจอใบส่งมอบ
+           ตรงนี้ด้วยทันทีโดยไม่ต้องบอก
+           ⚠️ เฉพาะแอดมิน/manager — ตรงกับสิทธิ์ที่ backend บังคับตอนขอเลขที่เอกสาร (routes/docNumber.js)
+           ถ้าโชว์ให้ช่างด้วยจะกลายเป็นปุ่มที่กดแล้วขึ้น error ทุกครั้ง -->
+      ${isAdminOrManagerUser && onOpenDeliveryNote ? `<button class="ee-btn ee-btn-delivery" id="btnDeliveryNote">📦 ออกใบส่งมอบงาน</button>` : ""}
     </div>
 
     <!-- 🟢 ขวา: ยืนยัน — งานรออนุมัติที่ช่างเปิดดู ไม่มีอะไรให้บันทึก (ทุกช่องถูกล็อกหมดแล้ว) จึงไม่ต้อง
@@ -2189,6 +2241,17 @@ export const getEditEvent = async ({
       document
         .getElementById("ee-close-btn")
         ?.addEventListener("click", () => Swal.close());
+
+      /* ✅ ออกใบส่งมอบงาน — ปิดหน้าแก้ไขก่อนแล้วค่อยเปิดกล่องออกเอกสาร (React Dialog) ไม่ซ้อนกัน
+         2 ชั้น ซึ่งบนมือถือจะกลายเป็นกล่องซ้อนกล่องจนกดปิดไม่ถูกว่าปิดอันไหนอยู่
+         ⚠️ ส่ง ev (FullCalendar Event object) ไปตรงๆ — buildDeliveryNoteDefaults อ่าน extendedProps
+         ได้อยู่แล้ว ไม่ต้องแปลงร่างข้อมูลก่อน */
+      document
+        .getElementById("btnDeliveryNote")
+        ?.addEventListener("click", () => {
+          Swal.close();
+          onOpenDeliveryNote?.(ev);
+        });
 
       /* Generate PDF */
       document

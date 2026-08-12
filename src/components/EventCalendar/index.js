@@ -70,6 +70,7 @@ import "tom-select/dist/css/tom-select.css";
 
 import { getAddEvent } from "./EventForms/AddEvent";
 import { getEditEvent } from "./EventForms/EditEvent";
+import DeliveryNoteDialog from "../Documents/DeliveryNoteDialog";
 import { getSaveEventToDB } from "./EventForms/SaveEvent";
 import { getEventDrop } from "./EventForms/EventDrop";
 import { getEventResize } from "./EventForms/EventResize";
@@ -600,6 +601,7 @@ function EventCalendar() {
       eventInfo,
       setLoading,
       generateWorkPermitPDF,
+      onOpenDeliveryNote: setDeliveryNoteJob,
       handleDeleteEvent,
       handleUnscheduleEvent: handleUnscheduleViaButton,
       onCopyEvent: handleCopyEvent,
@@ -1158,6 +1160,9 @@ function EventCalendar() {
   // ซึ่งเป็นข้อความล้วน ใส่รูปแบบอะไรไม่ได้เลย และ Excel ยังแปลงค่าเองมั่วๆ (ครั้งที่ "1/3" → วันที่)
   // โหลดโมดูลตอนกดจริงเท่านั้น (exceljs เป็นไลบรารีก้อนใหญ่) ไม่ให้ไปถ่วงเวลาโหลดหน้าปฏิทินของทุกคน
   const [exportingExcel, setExportingExcel] = useState(false);
+  // ✅ งานที่กำลังจะออกใบส่งมอบ — หน้าแก้ไขงาน (SweetAlert2 + HTML ล้วน) เรนเดอร์ React Dialog
+  // เองไม่ได้ จึงส่ง callback เข้าไปให้มันเรียกกลับมาตั้ง state ตัวนี้แทน แล้วเรนเดอร์กล่องที่นี่
+  const [deliveryNoteJob, setDeliveryNoteJob] = useState(null);
   const handleExportExcel = async () => {
     if (exportingExcel || filteredCalendarEvents.length === 0) return;
     setExportingExcel(true);
@@ -2128,6 +2133,15 @@ function EventCalendar() {
         </div>
         </div>
       </div>
+
+      {/* ✅ กล่องออกใบส่งมอบงาน — เปิดจากปุ่มในหน้าแก้ไขงาน (ดู onOpenDeliveryNote) */}
+      {deliveryNoteJob && (
+        <DeliveryNoteDialog
+          open
+          onClose={() => setDeliveryNoteJob(null)}
+          job={deliveryNoteJob}
+        />
+      )}
 
       {loading && (
         <div className="loading-overlay">

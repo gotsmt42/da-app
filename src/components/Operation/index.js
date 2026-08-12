@@ -76,6 +76,7 @@ import NotificationBell from "../Notifications/NotificationBell";
 import LineIcon from "../icons/LineIcon";
 import { printFile, shareFile, shareToLine, isMobileDevice } from "../../functions/fileActions";
 import PendingApprovalsPanel from "./PendingApprovalsPanel";
+import DeliveryNoteDialog from "../Documents/DeliveryNoteDialog";
 import InfoLine from "../InfoLine";
 
 // ✅ ใช้ตัดสินใจลำดับปุ่มแชร์ในเมนู "⋮" ต่อไฟล์ (ดูเหตุผลใน fileActions.js)
@@ -1069,6 +1070,9 @@ const EventRowCard = ({
   // ✅ เอกสารของงานกลุ่มเดียวกันปกติซ่อนไว้ (ใช้ร่วมกันที่การ์ดหลัก) แต่แอดมิน/manager
   // ยังต้องแนบ/แก้ไฟล์แยกเฉพาะวันนี้ได้เหมือนเดิมถ้าจำเป็น จึงเปิดให้กดดูเพิ่มเติมได้เสมอ
   const [showDocsOverride, setShowDocsOverride] = useState(false);
+  // ✅ ใบส่งมอบงาน — จุดหลักที่ควรกดออกเอกสารนี้คือ "ตรงการ์ดงานที่ทำเสร็จแล้ว" เพราะเป็นลำดับ
+  // การทำงานจริง (งานเสร็จ → ส่งมอบเอกสารให้ลูกค้าเซ็นรับ) ไม่ต้องจำเลขงานแล้วไปเปิดหาที่หน้าอื่น
+  const [deliveryNoteOpen, setDeliveryNoteOpen] = useState(false);
   const theme  = useTheme();
   // ✅ จอกว้างพอ (≥900px) เปิดรายละเอียดงาน (เอกสาร/คุยกับช่าง/ประวัติ) แบบ Dialog ทับขึ้นมาแทน
   // การกางลงในหน้า (Collapse) — เดิมกางแล้วเนื้อหายาวๆ ดันการ์ดอื่นในคอลัมน์เดียวกันลงมา ต้อง
@@ -1547,11 +1551,39 @@ const EventRowCard = ({
         {/* เมนู "⋮" ของการ์ดงาน — ปุ่มลบ (เดิมโชว์เป็นไอคอนสีแดงตลอดเวลา) ย้ายมารวมที่นี่ */}
         <Menu {...FAST_MENU_PROPS} anchorEl={moreAnchorEl} open={Boolean(moreAnchorEl)} onClose={() => setMoreAnchorEl(null)}
           PaperProps={{ sx: { borderRadius: 2, boxShadow: "0 8px 32px rgba(0,0,0,0.12)" } }}>
+          {/* ✅ ออกใบส่งมอบงาน — เฉพาะแอดมิน/manager (เป็นเอกสารที่ส่งออกไปหาลูกค้าในนามบริษัท
+              และ backend ก็กันไว้อีกชั้นตอนขอเลขที่เอกสาร ดู routes/docNumber.js)
+              ⚠️ ไม่บังคับว่าต้องปิดงานก่อนถึงจะออกได้ แต่ถ้ายังไม่เสร็จจะมีคำเตือนกำกับในเมนู —
+              เพราะของจริงมีเคสที่ต้องส่งมอบเอกสารบางส่วนก่อนปิดงานทั้งก้อน (เช่น ส่งรายงานให้ตรวจ
+              ก่อนแล้วค่อยปิด) ถ้าล็อกตายจะกลายเป็นทำงานไม่ได้ทั้งที่เป็นขั้นตอนปกติ */}
+          {isAdminOrManager && (
+            <MenuItem
+              onClick={() => { setMoreAnchorEl(null); setDeliveryNoteOpen(true); }}
+              sx={{ gap: 1.5, minHeight: 44 }}
+            >
+              <ListItemIcon><Description fontSize="small" sx={{ color: "#dc2626" }} /></ListItemIcon>
+              <ListItemText
+                primary="ออกใบส่งมอบงาน"
+                secondary={localStatus === "ดำเนินการเสร็จสิ้น" ? undefined : "งานนี้ยังไม่ปิด — ออกได้แต่ตรวจวันที่ให้ดีก่อน"}
+                secondaryTypographyProps={{ fontSize: "0.7rem", color: "#b45309" }}
+              />
+            </MenuItem>
+          )}
           <MenuItem onClick={() => { setMoreAnchorEl(null); onDelete(event._id); }} sx={{ gap: 1.5, minHeight: 44, color: "error.main" }}>
             <ListItemIcon><Delete fontSize="small" color="error" /></ListItemIcon>
             <ListItemText>ลบงานนี้</ListItemText>
           </MenuItem>
         </Menu>
+
+        {/* ⚠️ mount เฉพาะตอนเปิดจริง — การ์ดงานมีเป็นร้อยใบในหน้าเดียว ถ้า mount Dialog ทิ้งไว้ทุกใบ
+            จะเสียทั้งหน่วยความจำและเวลา render โดยไม่ได้ใช้เลยแม้แต่ใบเดียวในกรณีปกติ */}
+        {deliveryNoteOpen && (
+          <DeliveryNoteDialog
+            open={deliveryNoteOpen}
+            onClose={() => setDeliveryNoteOpen(false)}
+            job={event}
+          />
+        )}
 
         {/* แจ้งเตือนคำขอปิดงานจากช่าง (ยังไม่อนุมัติ) — ใช้ Box แทน Alert action slot
             เพราะ Alert วางข้อความ+ปุ่มแถวเดียวกันแล้วทับ/ล้นกันบนจอมือถือ

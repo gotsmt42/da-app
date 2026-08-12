@@ -32,7 +32,7 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableFooter, TableRow, Paper, Skeleton,
   Dialog, DialogTitle, DialogContent, DialogActions, ToggleButtonGroup, ToggleButton,
   Button, Autocomplete, Alert, Chip, Checkbox, Pagination, useMediaQuery, Badge,
-  TableSortLabel, Menu, MenuItem, ListItemIcon, ListItemText, Collapse, CircularProgress,
+  TableSortLabel, Menu, MenuItem, ListItemIcon, ListItemText, Collapse, CircularProgress, Portal,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
@@ -54,6 +54,7 @@ import { resolveOperationGroup } from "../../utils/overdueJobs";
 import { countUsedRounds, visitsPerYear } from "../../utils/contractRounds";
 import { groupEventsByContract, nextVisitOverdueInfo } from "../../utils/contractOverdue";
 import { escapeHtml } from "../../utils/escapeHtml";
+import DeliveryNoteDialog from "../../components/Documents/DeliveryNoteDialog";
 
 const ACCENT = "#dc2626";
 // ✅ สีแบรนด์ของ Excel — ใช้กับปุ่มส่งออกโดยเฉพาะ ให้เห็นปุ๊บรู้ทันทีว่าคือไฟล์ Excel ไม่ต้องอ่าน tooltip
@@ -918,6 +919,9 @@ export default function ContractOverview() {
   // ✅ รูปแบบการแสดงผลบนจอมือถือ (การ์ด/ตาราง) — จำค่าไว้ใน localStorage ให้เปิดหน้านี้ครั้งหน้าได้
   // มุมมองที่เลือกไว้เลย ไม่ต้องมากดสลับใหม่ทุกครั้ง (ดูเหตุผลเต็มที่ MOBILE_VIEW_STORAGE_KEY)
   const [mobileView, setMobileView] = useState(loadStoredMobileView);
+  // ✅ แถบยอดรวมตรึงท้ายจอ เริ่มแบบพับไว้ (ดูเหตุผลที่ renderMobileSummaryBar) — กางแล้วเห็นคำเตือน
+  // ยอดที่ยังกรอกไม่ครบ + ขอบเขตตัวกรองที่ยอดนี้นับมาจาก
+  const [summaryBarOpen, setSummaryBarOpen] = useState(false);
   const handleMobileViewChange = (_, next) => {
     // ⚠️ ToggleButtonGroup ส่ง null มาเมื่อกดปุ่มที่เลือกอยู่ซ้ำ (= ยกเลิกการเลือก) — ต้องเมินทิ้ง
     // ไม่งั้นจะกลายเป็นสถานะ "ไม่ได้เลือกมุมมองไหนเลย" ซึ่งไม่มีความหมายในบริบทนี้
@@ -937,14 +941,22 @@ export default function ContractOverview() {
   // ⚠️ ต้องห่อ useMemo — ไม่งั้นได้ object ใหม่ทุก render (กรณี `|| {}`) ทำให้ useMemo ที่รับ colWidths
   // เป็น dependency ด้านล่าง (totalTableWidth/tableCssVars) คำนวณใหม่ทุก render จนหมดประโยชน์ที่ memo ไว้
   const colWidths = useMemo(() => colWidthsByTab[viewFilter] || {}, [colWidthsByTab, viewFilter]);
-  // ✅ ลำดับความสำคัญ: ค่าที่ผู้ใช้ลากปรับเอง → ค่าเริ่มต้นชุดมือถือ (เฉพาะตอนดูตารางบนมือถือ) →
-  // ค่าเริ่มต้นชุดจอคอม (ดู MOBILE_COL_WIDTHS สำหรับเหตุผลว่าทำไมมือถือต้องมีชุดของตัวเอง)
-  const colWidth = (key) => (
-    colWidths[key]
-    ?? (useMobileTable ? (MOBILE_COL_WIDTHS[key] ?? (key.startsWith("visit_") ? MOBILE_VISIT_COL_WIDTH : undefined)) : undefined)
-    ?? DEFAULT_COL_WIDTHS[key]
-    ?? VISIT_COL_DEFAULT_WIDTH
-  );
+  // 🐛 BUG ที่แก้ (ตารางบนมือถือคอลัมน์กว้างมหาศาลจนเห็นทีละคอลัมน์ และหาช่องมูลค่างานไม่เจอ):
+  // เดิมให้ "ค่าที่ผู้ใช้ลากปรับเอง" (colWidths) ชนะเสมอ แม้ตอนดูบนมือถือ — แต่ค่าพวกนั้นถูกลาก/
+  // ดับเบิลคลิกพอดีเนื้อหาไว้ตอนอยู่บนจอคอมซึ่งกว้าง 1,400px+ คอลัมน์เดียวกว้าง 300-400px ได้สบายๆ
+  // พอเอามาใช้บนจอ 375px ก็กลายเป็นคอลัมน์เดียวกินเต็มจอ ต้องปัดทีละคอลัมน์กว่าจะถึงมูลค่างาน
+  // ✅ บนมือถือใช้ชุดความกว้างของมือถือเสมอ ไม่สนค่าที่เคยลากไว้บนจอคอม — บนมือถือปิดการลากปรับ
+  // ความกว้างอยู่แล้ว (ดู resizable ที่ ResizableTh) จึงไม่มีทางที่ผู้ใช้ตั้งใจตั้งค่าไว้สำหรับจอนี้ตั้งแต่ต้น
+  // ⚠️ ค่าที่ลากไว้บนจอคอมไม่ได้ถูกลบทิ้ง — กลับไปดูบนจอคอมเมื่อไหร่ก็ได้ความกว้างเดิมที่ตั้งไว้ครบ
+  const colWidth = (key) => {
+    if (useMobileTable) {
+      return MOBILE_COL_WIDTHS[key]
+        ?? (key.startsWith("visit_") ? MOBILE_VISIT_COL_WIDTH : undefined)
+        ?? DEFAULT_COL_WIDTHS[key]
+        ?? VISIT_COL_DEFAULT_WIDTH;
+    }
+    return colWidths[key] ?? DEFAULT_COL_WIDTHS[key] ?? VISIT_COL_DEFAULT_WIDTH;
+  };
   // ⚠️ BUG ที่แก้ (ลากหน่วงมาก): เดิมช่วงลากอัปเดต React state (setColWidths) ทุกเฟรมของ
   // requestAnimationFrame อยู่ดี (แค่เลื่อนแค่การเขียน localStorage ไปตอนปล่อยเมาส์แทน) — แต่ทุกครั้งที่
   // setColWidths ทำให้ทั้งตาราง re-render ใหม่ (10 แถว x กว่า 15 คอลัมน์) และเลขความกว้างที่เปลี่ยนทุก
@@ -2530,6 +2542,29 @@ export default function ContractOverview() {
   const openClassifyMenu = (e, c) => { setClassifyMenuAnchor(e.currentTarget); setClassifyMenuTarget(c); };
   const closeClassifyMenu = () => { setClassifyMenuAnchor(null); setClassifyMenuTarget(null); };
 
+  // ── ออกใบส่งมอบงานจากแถวในตาราง ────────────────────────────────────────
+  // ⚠️ แถวในตารางนี้เป็น "ระดับสัญญา" (รวมหลายครั้งเข้าด้วยกัน — ดู groupEventsByContract) ไม่ใช่
+  // งานเดี่ยว จึงต้องเลือกก่อนว่าจะออกใบให้ "ครั้งไหน" — ใช้ครั้งล่าสุดที่ลงตารางจริง (ไม่ใช่แผนงาน
+  // ล่วงหน้าที่ยังไม่มีวันที่) เพราะเป็นครั้งที่เพิ่งทำเสร็จและกำลังจะส่งมอบตามลำดับงานจริง
+  // ✅ ถ้าแถวนั้นยังไม่เคยลงวันที่จริงเลย ก็ยังออกได้ โดยใช้ข้อมูลระดับสัญญาเป็นตัวตั้งแทน
+  // (ผู้ใช้แก้วันที่เองได้ในกล่อง) ดีกว่าปิดปุ่มเงียบๆ จนไม่รู้ว่าทำไมกดไม่ได้
+  const [deliveryNoteJob, setDeliveryNoteJob] = useState(null);
+  const openDeliveryNoteFromRow = () => {
+    const c = classifyMenuTarget;
+    closeClassifyMenu();
+    if (!c) return;
+    const latestVisit = c.visits
+      .filter((v) => !v.unscheduled)
+      .sort((a, b) => new Date(b.start || b.date) - new Date(a.start || a.date))[0];
+    // ⚠️ ต้องหิ้ว contractNo ไปด้วย — ตัวเลือก "อ้างถึง" ในกล่องออกเอกสารสร้างจากเลขเอกสารที่ติดมากับ
+    // งาน (ดู referencePresetsFor) ถ้าไม่ส่งไป สัญญาที่ไม่มีใบเสนอราคาจะไม่มีตัวเลือกให้อ้างอิงเลย
+    setDeliveryNoteJob(latestVisit || {
+      company: c.company, site: c.site, title: c.title, system: c.system,
+      quotationNo: c.quotationNo, contractNo: c.contractNo, docNo: c.docNo,
+      responsiblePerson: c.responsiblePerson,
+    });
+  };
+
   // ✅ 1 แถวอาจมีหลาย document ได้แล้ว (งานเข้าหลายวันไม่ติดกัน ผูกด้วย jobGroupId) ต้องจัดหมวดหมู่
   // พร้อมกันทุกวันในงานเดียวกัน ไม่งั้นบางวันจะอยู่คนละหมวดกับอีกวัน ทั้งที่จริงเป็นงานเดียวกัน
   const handleClassify = async (classification) => {
@@ -2548,54 +2583,83 @@ export default function ContractOverview() {
     }
   };
 
-  // ── การ์ดสรุปยอดรวมสำหรับจอมือถือ ──────────────────────────────────────────
-  // ✅ ตารางมีแถวสรุปท้ายตาราง (TableFooter) อยู่แล้ว แต่บนจอมือถือแถวนั้นตกไปอยู่ใต้คอลัมน์ "มูลค่างาน"
-  // ซึ่งอยู่นอกจอไปทางขวา ต้องปัดไปหาถึงจะเห็น ส่วนมุมมองการ์ดก็ไม่มีที่ให้วางแถวสรุปเลย — ทั้ง 2 มุมมอง
-  // จึงยกยอดรวมชุดเดียวกันนี้มาไว้ด้านบนสุดด้วย เห็นทันทีที่เปิดหน้าโดยไม่ต้องเลื่อนหา ⚠️ ตัวเลขมาจาก
-  // jobValueSummary ตัวเดียวกับฝั่งเดสก์ท็อปเป๊ะ ไม่ได้คำนวณซ้ำอีกชุด
-  const renderMobileSummary = () => (
-    // ✅ พื้นการ์ดเป็นเทาอ่อนเป็นกลาง (เดิมพื้นแดงจาง+ขอบแดง) แล้วเน้นสีแดงไว้ที่ "ตัวเลขยอดรวม"
-    // ชิ้นเดียว ให้เป็นสิ่งแรกที่สายตาไปหยุด — ตรงกับแถวสรุปท้ายตารางฝั่งจอคอมที่ปรับแบบเดียวกัน
-    <Paper
-      variant="outlined"
-      sx={{ p: 1.75, borderRadius: 3, bgcolor: SURFACE_SUBTLE, borderColor: BORDER_MAIN }}
-    >
-      <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-        <Box>
-          <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 700, display: "block" }}>
-            รวมมูลค่างานทั้งหมด
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {jobValueSummary.filledCount.toLocaleString()}/{jobValueSummary.rowCount.toLocaleString()} รายการ · ทุกหน้า
-          </Typography>
-        </Box>
-        <Typography sx={{ fontWeight: 800, fontSize: "1.25rem", color: ACCENT, whiteSpace: "nowrap", letterSpacing: "-0.01em" }}>
-          {formatBaht(jobValueSummary.total)}
-        </Typography>
-      </Stack>
-      {jobValueSummary.missingCount > 0 && (
-        <Typography
-          variant="caption"
-          sx={{ mt: 0.75, display: "flex", alignItems: "center", gap: 0.5, color: "#b45309", fontWeight: 600 }}
+  // ── แถบยอดรวมตรึงท้ายจอ (เฉพาะมือถือ) ──────────────────────────────────────
+  // 🐛 BUG ที่แก้ (ยอดรวมหายไปบนมือถือ): ตารางมีแถวสรุปท้ายตาราง (TableFooter) อยู่แล้ว แต่บนจอมือถือ
+  // แถวนั้นตกไปอยู่ใต้คอลัมน์ "มูลค่างาน" ซึ่งอยู่นอกจอไปทางขวา ต้องปัดไปหาถึงจะเห็น ส่วนมุมมองการ์ด
+  // ก็ไม่มีที่ให้วางแถวสรุปเลย — และเดิมที่เอาไปวางเป็นการ์ดบนสุด ก็หายไปทันทีที่เลื่อนดูรายการ
+  // ✅ ตรึงไว้ท้ายจอแทน เห็นตลอดเวลาไม่ว่าจะเลื่อนอยู่ตรงไหน (ยอดรวมคือสิ่งที่คนเปิดหน้านี้มาดู)
+  // ⚠️ ต้องยิงผ่าน Portal ไปแปะที่ <body> — position:fixed จะยึดกับ "ขอบจอ" ก็ต่อเมื่อไม่มีบรรพบุรุษ
+  // ตัวไหนสร้าง containing block ทับ ซึ่ง layout ของแอปนี้มีทั้ง .pageWrapper (overflow-x:hidden)
+  // และ .contentArea (ได้ class .blur-content ที่ใส่ filter จริงตอนเปิดเมนูมือถือ) พอโดนตัวใดตัวหนึ่ง
+  // จับ แถบก็จะไปยึดกับกล่องนั้นแทนแล้วหลุดออกนอกพื้นที่ที่มองเห็นไปเลย
+  // ⚠️ ตัวเลขมาจาก jobValueSummary ตัวเดียวกับฝั่งเดสก์ท็อปเป๊ะ ไม่ได้คำนวณซ้ำอีกชุด
+  const renderMobileSummaryBar = () => (
+    <Portal>
+      <Paper
+        elevation={0}
+        sx={{
+          position: "fixed", left: 0, right: 0, bottom: 0,
+          // ต่ำกว่า Dialog (1300) และแถบเมนูมือถือ (10000) — ไม่บังของที่ต้องอยู่บนสุด
+          zIndex: 1200,
+          borderRadius: 0, borderTop: `1px solid ${BORDER_MAIN}`,
+          bgcolor: "#fff", boxShadow: "0 -2px 12px rgba(15,23,42,0.1)",
+          px: 2, pt: 1.25, pb: 1.5,
+        }}
+      >
+        {/* ✅ แตะที่แถบเพื่อกาง/ย่อรายละเอียด — แถบตรึงต้องเตี้ยที่สุดเท่าที่จะทำได้ (มันกินพื้นที่จอ
+            ตลอดเวลา) จึงโชว์แค่ยอดรวมกับจำนวนรายการก่อน ส่วนคำเตือน/ขอบเขตตัวกรองพับไว้ให้กดดู */}
+        <Stack
+          direction="row" alignItems="center" spacing={1}
+          onClick={() => setSummaryBarOpen((o) => !o)}
+          sx={{ cursor: "pointer", userSelect: "none" }}
         >
-          <WarningAmber sx={{ fontSize: 13 }} />
-          ยังไม่ได้กรอกมูลค่า {jobValueSummary.missingCount} รายการ — ยอดนี้เป็นยอดเท่าที่กรอกแล้ว
-        </Typography>
-      )}
-      {/* ✅ แจกแจงขอบเขตของยอดรวม (แท็บ + ตัวกรอง + คำค้นหา) เหมือนฝั่งเดสก์ท็อป */}
-      <Stack direction="row" spacing={0.5} sx={{ mt: 0.75, flexWrap: "wrap", rowGap: 0.5 }}>
-        {summaryScopeLabels.map((label) => (
-          <Chip
-            key={label} size="small" variant="outlined" label={label}
-            sx={{
-              height: 19, fontSize: "0.65rem", fontWeight: 600, maxWidth: "100%",
-              color: "text.secondary", borderColor: alpha("#0f172a", 0.18),
-              "& .MuiChip-label": { px: 0.75, overflow: "hidden", textOverflow: "ellipsis" },
-            }}
-          />
-        ))}
-      </Stack>
-    </Paper>
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 700, display: "block", lineHeight: 1.3 }}>
+              รวมมูลค่างานทั้งหมด
+            </Typography>
+            <Typography variant="caption" sx={{ color: "text.disabled" }}>
+              {jobValueSummary.filledCount.toLocaleString()}/{jobValueSummary.rowCount.toLocaleString()} รายการ · ทุกหน้า
+            </Typography>
+          </Box>
+          {/* ✅ เตือนแบบย่อตอนพับอยู่ — ถ้ายอดยังไม่ครบต้องรู้ตั้งแต่ยังไม่ได้กางดู ไม่งั้นเอายอดไปใช้ผิด */}
+          {jobValueSummary.missingCount > 0 && !summaryBarOpen && (
+            <Tooltip title={`ยังไม่ได้กรอกมูลค่า ${jobValueSummary.missingCount} รายการ`}>
+              <WarningAmber sx={{ fontSize: 18, color: "#b45309", flexShrink: 0 }} />
+            </Tooltip>
+          )}
+          <Typography sx={{ fontWeight: 800, fontSize: "1.2rem", color: ACCENT, whiteSpace: "nowrap", letterSpacing: "-0.01em" }}>
+            {formatBaht(jobValueSummary.total)}
+          </Typography>
+          {summaryBarOpen ? <ExpandMore sx={{ fontSize: 20, color: TEXT_SUB }} /> : <ExpandLess sx={{ fontSize: 20, color: TEXT_SUB }} />}
+        </Stack>
+
+        <Collapse in={summaryBarOpen}>
+          {jobValueSummary.missingCount > 0 && (
+            <Typography
+              variant="caption"
+              sx={{ mt: 1, display: "flex", alignItems: "center", gap: 0.5, color: "#b45309", fontWeight: 600 }}
+            >
+              <WarningAmber sx={{ fontSize: 13 }} />
+              ยังไม่ได้กรอกมูลค่า {jobValueSummary.missingCount} รายการ — ยอดนี้เป็นยอดเท่าที่กรอกแล้ว
+            </Typography>
+          )}
+          {/* ✅ แจกแจงขอบเขตของยอดรวม (แท็บ + ตัวกรอง + คำค้นหา) เหมือนฝั่งเดสก์ท็อป — กันตีความยอด
+              ผิดว่าเป็นยอดทั้งระบบ ทั้งที่จริงถูกกรองอยู่ */}
+          <Stack direction="row" spacing={0.5} sx={{ mt: 1, flexWrap: "wrap", rowGap: 0.5 }}>
+            {summaryScopeLabels.map((label) => (
+              <Chip
+                key={label} size="small" variant="outlined" label={label}
+                sx={{
+                  height: 19, fontSize: "0.65rem", fontWeight: 600, maxWidth: "100%",
+                  color: "text.secondary", borderColor: alpha("#0f172a", 0.18),
+                  "& .MuiChip-label": { px: 0.75, overflow: "hidden", textOverflow: "ellipsis" },
+                }}
+              />
+            ))}
+          </Stack>
+        </Collapse>
+      </Paper>
+    </Portal>
   );
 
   // ── การ์ดสำหรับจอมือถือ (isMobile) ──────────────────────────────────────────
@@ -3469,7 +3533,8 @@ export default function ContractOverview() {
         </Paper>
       ) : isMobile && mobileView === "card" ? (
         <Stack spacing={1.5}>
-          {renderMobileSummary()}
+          {/* ✅ ยอดรวมย้ายไปเป็นแถบตรึงท้ายจอแล้ว (ดู renderMobileSummaryBar) — เห็นตลอดเวลาไม่ว่า
+              จะเลื่อนอยู่ตรงไหน ดีกว่าวางไว้บนสุดแล้วหายไปทันทีที่เลื่อนดูรายการ */}
           {pagedRows.map((c) => renderMobileCard(c))}
           {/* ✅ ท้ายรายการการ์ดมีทางเพิ่มสัญญาใหม่เหมือนท้ายตาราง — มุมมองการ์ดไม่มีคอลัมน์ให้กรอกตรงจุด
               จึงเปิดไดอะล็อกแทน (ทางเดียวกับปุ่มด้านบน) ไม่ทำฟอร์มในการ์ดซ้ำอีกชุด */}
@@ -3494,7 +3559,6 @@ export default function ContractOverview() {
             ไปพร้อมกันหมด กด ‹ เพื่อกลับมาคอลัมน์เลขที่เอกสารได้ ดู mobileTableSx) */}
         {useMobileTable && (
           <>
-            <Box sx={{ mb: 1.5 }}>{renderMobileSummary()}</Box>
             <Stack
               direction="row" alignItems="center" spacing={0.5}
               sx={{ mb: 0.75, color: "text.disabled" }}
@@ -4067,7 +4131,12 @@ export default function ContractOverview() {
                                 {visitCellExpanded ? "ย่อ" : `+ อีก ${hiddenVisitCount} วัน`}
                               </Box>
                             )}
-                            {isAdminOrManager && c.isRealContract && (
+                            {/* ✅ แถวปุ่มจัดการครั้งนี้ (เพิ่มวันต่อเนื่อง / ย้ายครั้งที่ / แยกออกจากสัญญา)
+                                ⚠️ ไม่แสดงบนตารางจอมือถือ — ช่อง "ครั้งที่ N" กว้างแค่ 94px แต่ต้องใส่
+                                วันที่ + ชื่อทีม + ปุ่มอีก 3 ตัวซ้อนลงไป ทำให้เซลล์แน่นจนอ่านวันที่ไม่รู้เรื่อง
+                                และตัวปุ่มเองเล็กแค่ 14px กดด้วยนิ้วแทบไม่โดนอยู่ดี — ทั้ง 3 อย่างยังทำได้ครบ
+                                จากมุมมองการ์ดบนมือถือ และจากตารางบนจอคอม */}
+                            {isAdminOrManager && c.isRealContract && !useMobileTable && (
                               <Stack direction="row" spacing={0.25}>
                                 <Tooltip title="เพิ่มวันที่ต่อเนื่อง (เข้างานไม่ติดกัน)">
                                   <IconButton
@@ -4354,6 +4423,16 @@ export default function ContractOverview() {
         </Stack>
       )}
 
+      {/* ✅ แถบยอดรวมตรึงท้ายจอ (มือถือเท่านั้น) — ใช้ร่วมกันทั้งมุมมองการ์ดและมุมมองตาราง
+          ⚠️ ตัวเว้นระยะต้องอยู่ "หลัง" ปุ่มเปลี่ยนหน้า ไม่ใช่ก่อน — ไม่งั้นแถบที่ลอยอยู่ท้ายจอจะไปทับ
+          ปุ่มเปลี่ยนหน้าตอนเลื่อนลงสุด จนกดเปลี่ยนหน้าไม่ได้เลย */}
+      {isMobile && !loading && filtered.length > 0 && (
+        <>
+          <Box sx={{ height: 84 }} />
+          {renderMobileSummaryBar()}
+        </>
+      )}
+
       {/* ✅ เมนูจัดหมวดหมู่งานทั่วไป/โปรเจค — Menu ตัวเดียวใช้ร่วมกันทุกแถว (ตำแหน่งขยับตาม anchorEl
           ที่กดล่าสุด) เทียบ pattern มาตรฐาน MUI แทนเปิด Dialog เต็มจอสำหรับแค่เลือก 1 ใน 3 ตัวเลือก */}
       <Menu anchorEl={classifyMenuAnchor} open={Boolean(classifyMenuAnchor)} onClose={closeClassifyMenu}>
@@ -4369,7 +4448,25 @@ export default function ContractOverview() {
           <ListItemIcon><Engineering fontSize="small" sx={{ color: "#3b82f6" }} /></ListItemIcon>
           <ListItemText>งานโปรเจค</ListItemText>
         </MenuItem>
+        {/* ✅ ออกใบส่งมอบงานจากหน้าภาพรวมงานได้ด้วย — จุดนี้ตอบโจทย์คนละแบบกับ 2 จุดแรก: ใช้ตอน
+            "ไล่ออกเอกสารย้อนหลังทีละงาน" จากตารางรวม (เห็นทุกงานเรียงกันอยู่แล้ว ไม่ต้องเปิดทีละใบ)
+            ⚠️ ใช้ข้อมูลของ "ครั้งล่าสุดที่ลงตารางจริง" เป็นตัวตั้ง เพราะแถวในตารางนี้เป็นระดับสัญญา
+            (รวมหลายครั้ง) ไม่ใช่งานเดี่ยว — วันที่เสร็จของสัญญาทั้งใบไม่มีความหมาย ต้องอิงครั้งจริง */}
+        {isAdminOrManager && (
+          <MenuItem onClick={openDeliveryNoteFromRow}>
+            <ListItemIcon><Description fontSize="small" sx={{ color: ACCENT }} /></ListItemIcon>
+            <ListItemText>ออกใบส่งมอบงาน</ListItemText>
+          </MenuItem>
+        )}
       </Menu>
+
+      {deliveryNoteJob && (
+        <DeliveryNoteDialog
+          open
+          onClose={() => setDeliveryNoteJob(null)}
+          job={deliveryNoteJob}
+        />
+      )}
 
       <Dialog open={addOpen} onClose={closeAddDialog} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle sx={{ fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
