@@ -1,6 +1,12 @@
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 
+// ✅ รูปแบบตัวเลขของช่องจำนวนเงินทุกช่องในไฟล์ที่ส่งออก — เก็บเป็น "ตัวเลขจริง" ใน cell (บวก/ลบ/SUM ต่อ
+// ในไฟล์ได้ตามปกติ) แต่ให้ Excel แสดงผลพร้อมสัญลักษณ์ ฿ นำหน้าเสมอ ตรงกับที่แสดงบนหน้าจอ — เดิมเป็น
+// ตัวเลขเปล่าๆ ที่แยกไม่ออกจากคอลัมน์ "จำนวนครั้ง"/"จำนวนวัน" ที่อยู่ข้างกันในไฟล์เดียวกัน
+const MONEY_FMT = '"฿"#,##0';
+
+
 /**
  * contractExcelExport.js — ส่งออกตาราง "ภาพรวมงาน" เป็นไฟล์ Excel (.xlsx) จริงพร้อมรูปแบบ/สี
  *
@@ -79,7 +85,7 @@ export async function exportContractsToExcel({
     { key: "intervalMonths", header: "รอบเข้า (เดือน)", width: 14, group: "ระยะเวลา", align: "center" },
     { key: "perYear", header: "เข้าปีละ (ครั้ง)", width: 14, group: "ระยะเวลา", align: "center" },
     { key: "visitCount", header: "จำนวนครั้ง", width: 11, group: "ระยะเวลา", align: "center" },
-    { key: "jobValue", header: "มูลค่างาน", width: 15, group: "มูลค่า", align: "right", numFmt: "#,##0" },
+    { key: "jobValue", header: "มูลค่างาน (฿)", width: 15, group: "มูลค่า", align: "right", numFmt: MONEY_FMT },
     { key: "contractStatus", header: "สถานะสัญญา", width: 17, group: "สถานะ", align: "center" },
     // ✅ เพิ่มให้ตรงกับคอลัมน์ "คืบหน้า" ในตารางบนจอ (เดิมไฟล์ที่ส่งออกไม่มีคอลัมน์นี้เลย ทั้งที่บนจอมี) —
     // สัญญาจริงเป็น "X/Y" (ครั้งที่ทำเสร็จ) ส่วนงานทั่วไป/โปรเจคเป็นสถานะงานตรงๆ (ดู progressInfo)
@@ -296,7 +302,7 @@ export async function exportContractsToExcel({
 
     const sumCell = totalRow.getCell(jobValueIdx);
     sumCell.value = { formula: `SUBTOTAL(109,${ws.getColumn(jobValueIdx).letter}${firstDataRow}:${ws.getColumn(jobValueIdx).letter}${lastDataRow})` };
-    sumCell.numFmt = "#,##0";
+    sumCell.numFmt = MONEY_FMT;
     sumCell.font = { name: "Tahoma", size: 11, bold: true, color: { argb: C.headerText } };
     sumCell.alignment = { vertical: "middle", horizontal: "right" };
 

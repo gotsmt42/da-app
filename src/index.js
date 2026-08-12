@@ -12,6 +12,11 @@ import { AuthProvider } from "./auth/AuthContext";
 
 import { StyleSheetManager } from "styled-components";
 
+// ✅ ต้องติดตั้งครั้งเดียวตอนแอปเริ่ม — แก้ dropdown ของ TomSelect (ทุกช่อง "เลือกหรือพิมพ์..." ในฟอร์ม
+// เพิ่ม/แก้ไขงาน) ที่ลอยค้างอยู่กับที่เวลาเลื่อนเนื้อหาในฟอร์ม เพราะมันถูกแปะไว้ที่ <body> ดูรายละเอียด
+// ทั้งหมดที่ src/utils/tomSelectFixes.js — เรียกที่นี่เพราะ TomSelect ถูกสร้างจากหลายไฟล์/หลายจังหวะ
+import { installTomSelectFixes } from "./utils/tomSelectFixes";
+
 import "bootstrap/dist/css/bootstrap.min.css"; // import Bootstrap CSS
 
 import "@fortawesome/react-fontawesome";
@@ -34,6 +39,8 @@ window.addEventListener("error", (e) => {
     if (overlayDiv) overlayDiv.style.display = "none";
   }
 });
+
+installTomSelectFixes();
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 

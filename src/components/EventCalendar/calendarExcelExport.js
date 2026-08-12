@@ -3,6 +3,12 @@ import { saveAs } from "file-saver";
 import moment from "moment";
 import "moment/locale/th";
 
+// ✅ รูปแบบตัวเลขของช่องจำนวนเงินทุกช่องในไฟล์ที่ส่งออก — เก็บเป็น "ตัวเลขจริง" ใน cell (บวก/ลบ/SUM ต่อ
+// ในไฟล์ได้ตามปกติ) แต่ให้ Excel แสดงผลพร้อมสัญลักษณ์ ฿ นำหน้าเสมอ ตรงกับที่แสดงบนหน้าจอ — เดิมเป็น
+// ตัวเลขเปล่าๆ ที่แยกไม่ออกจากคอลัมน์ "จำนวนครั้ง"/"จำนวนวัน" ที่อยู่ข้างกันในไฟล์เดียวกัน
+const MONEY_FMT = '"฿"#,##0';
+
+
 /**
  * calendarExcelExport.js — ส่งออกงานจากหน้าปฏิทิน (Event) เป็นไฟล์ Excel (.xlsx) จริงพร้อมรูปแบบ/สี
  *
@@ -96,7 +102,7 @@ export async function exportCalendarEventsToExcel({
     { key: "title", header: "หัวข้องาน", width: 18, group: "ข้อมูลงาน" },
     { key: "system", header: "ระบบ", width: 16, group: "ข้อมูลงาน" },
     { key: "jobClass", header: "ประเภทงาน", width: 13, group: "ข้อมูลงาน", align: "center" },
-    { key: "jobValue", header: "มูลค่างาน", width: 15, group: "ข้อมูลงาน", align: "right", numFmt: "#,##0" },
+    { key: "jobValue", header: "มูลค่างาน (฿)", width: 15, group: "ข้อมูลงาน", align: "right", numFmt: MONEY_FMT },
     { key: "contractNo", header: "เลขที่สัญญา", width: 18, group: "สัญญา" },
     { key: "round", header: "ครั้งที่", width: 10, group: "สัญญา", align: "center" },
     { key: "status", header: "สถานะงาน", width: 18, group: "สถานะ", align: "center" },
@@ -276,7 +282,7 @@ export async function exportCalendarEventsToExcel({
     const colLetter = ws.getColumn(jobValueIdx).letter;
     const sumCell = totalRow.getCell(jobValueIdx);
     sumCell.value = { formula: `SUBTOTAL(109,${colLetter}${firstDataRow}:${colLetter}${lastDataRow})` };
-    sumCell.numFmt = "#,##0";
+    sumCell.numFmt = MONEY_FMT;
     sumCell.font = { name: "Tahoma", size: 11, bold: true, color: { argb: C.headerText } };
     sumCell.alignment = { vertical: "middle", horizontal: "right" };
 

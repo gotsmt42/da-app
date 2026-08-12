@@ -335,7 +335,7 @@ const QuotationTable = ({ jobs, onOpen, onPreview }) => (
           <TableCell>สถานะ</TableCell>
           <TableCell>บริษัท / โครงการ</TableCell>
           <TableCell>ประเภทงาน · ระบบ</TableCell>
-          <TableCell align="right">มูลค่าใบเสนอราคา</TableCell>
+          <TableCell align="right">มูลค่าใบเสนอราคา (฿)</TableCell>
           <TableCell align="center">ส่งลูกค้า</TableCell>
           <TableCell align="center">ตามแล้ว</TableCell>
           <TableCell align="center">เงียบมา</TableCell>

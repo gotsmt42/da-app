@@ -32,7 +32,7 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableFooter, TableRow, Paper, Skeleton,
   Dialog, DialogTitle, DialogContent, DialogActions, ToggleButtonGroup, ToggleButton,
   Button, Autocomplete, Alert, Chip, Checkbox, Pagination, useMediaQuery, Badge,
-  TableSortLabel, Menu, MenuItem, ListItemIcon, ListItemText, Collapse,
+  TableSortLabel, Menu, MenuItem, ListItemIcon, ListItemText, Collapse, CircularProgress,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
@@ -41,6 +41,7 @@ import {
   AddLink, LinkOff, Build, Engineering, ExpandMore, ExpandLess,
   CalendarMonth, PersonOutline, Category, Assignment, Description, HourglassEmpty, Apps, DeviceHub,
   SwapHoriz, TableChart, FilterList, ViewAgenda, TableRows, SwipeLeft, ChevronLeft, ChevronRight,
+  AddCircleOutline, Check, Autorenew,
 } from "@mui/icons-material";
 import { useAuth } from "../../auth/AuthContext";
 import EventService from "../../services/EventService";
@@ -116,6 +117,13 @@ const STATUS_COLOR = {
 // ✅ ช่องว่างเดิมใช้ "-" สีเทาเฉยๆ แต่ปนกับ "-" ที่เป็นลิงก์ (สีแดง) ในคอลัมน์ครั้งที่ N ดูแยกยาก
 // ว่าอันไหนกดได้ — ใช้ตัวกลมจางๆ แทน ให้ต่างจากลิงก์ชัดเจนขึ้น
 const Dash = () => <Box component="span" sx={{ color: "text.disabled", opacity: 0.6 }}>–</Box>;
+
+// ✅ ตัวเลขเงินทุกจุดในหน้านี้ต้องมี "฿" นำหน้าเสมอ — ในตารางเดียวกันมีทั้ง "จำนวนครั้ง" "ครั้งที่ N"
+// "รอบเข้า (เดือน)" และ "มูลค่างาน" ปนกันอยู่ ตัวเลขเปล่าๆ อย่าง 88,000 กับ 12 จึงแยกด้วยสายตาไม่ออก
+// ว่าช่องไหนคือจำนวนเงิน (โดยเฉพาะบนมือถือที่คอลัมน์หัวตารางเลื่อนหลุดจอไปแล้ว) — ตรงกับที่หน้า
+// "ติดตามใบเสนอราคา" ใช้อยู่ก่อนแล้ว ให้ทั้งแอปอ่านตัวเลขเงินได้แบบเดียวกันหมด
+const hasMoney = (v) => v != null && v !== "" && !Number.isNaN(Number(v));
+const formatBaht = (v) => `฿${Number(v).toLocaleString()}`;
 
 // ✅ "ผู้รับผิดชอบ" ที่ยังไม่เคยมอบหมาย — เดิมช่องนี้ fallback ไปแสดงชื่อ "หัวหน้าทีมเข้างานของครั้งที่ 1"
 // แทน ทำให้ดูเหมือนมอบหมายไว้แล้วทั้งที่ยังไม่เคย และเปลี่ยนตามทุกครั้งที่แก้ทีม (ดู groupEventsByContract
@@ -422,8 +430,12 @@ const ResizableTh = ({ width, align = "left", children, onResize, rowSpan = 1, c
           {children}
         </TableSortLabel>
       ) : children}
+      {/* 🐛 BUG ที่แก้ (คำอธิบายบังข้อมูลแถวแรก): ทูลทิปของ MUI วางไว้ "ด้านล่าง" ตัวที่ชี้เป็นค่าเริ่มต้น
+          ตัวจับปรับความกว้างอยู่ที่หัวตาราง กล่องดำๆ ของทูลทิปจึงไปคลุมทับเซลล์แถวแรกพอดี (ช่องวันที่
+          สัญญา/มูลค่างาน) — แค่เอาเมาส์ผ่านขอบคอลัมน์ก็บังข้อมูลและกดเซลล์แถวแรกไม่ได้ ต้องขยับเมาส์
+          หนีก่อนทุกครั้ง ✅ ย้ายไปแสดงด้านบนหัวตารางแทน ซึ่งเป็นที่ว่างอยู่แล้ว ไม่ทับอะไรเลย */}
       {resizable && (
-      <Tooltip title="ลากเพื่อปรับความกว้าง · ดับเบิลคลิก/แตะ 2 ครั้งเพื่อพอดีอัตโนมัติ" enterDelay={500}>
+      <Tooltip title="ลากเพื่อปรับความกว้าง · ดับเบิลคลิก/แตะ 2 ครั้งเพื่อพอดีอัตโนมัติ" enterDelay={500} placement="top">
         <Box
           onMouseDown={handleMouseDown}
           onTouchStart={handleTouchStart}
@@ -545,6 +557,235 @@ const FieldRow = ({ label, hideIfEmptyReadOnly, ...cellProps }) => {
       <Typography variant="caption" sx={{ width: 96, flexShrink: 0, color: "text.secondary", fontWeight: 700, fontSize: "0.72rem" }}>{label}</Typography>
       <EditableCell Wrapper={Box} width="100%" {...cellProps} />
     </Stack>
+  );
+};
+
+// ✅ 1 ช่องในแถบสรุปหัวการ์ดมือถือ (ประเภทงาน / ระบบ / มูลค่างาน) — ป้ายกำกับตัวเล็กด้านบน ค่าด้านล่าง
+// วางเรียงแนวนอน 3 ช่องจบในบรรทัดเดียว ต่างจาก FieldRow ที่เป็นป้าย-ค่าแนวนอนทีละแถว (ยาวเกินไปถ้าเอามา
+// ไว้ในหัวการ์ดที่ต้องกระชับ) ⚠️ ต้องอยู่ module scope เหมือน EditableCell/FieldRow ไม่งั้นทุก re-render
+// React จะมองเป็นคนละคอมโพเนนต์แล้ว remount ช่องที่กำลังพิมพ์อยู่จนโฟกัสหลุด
+const CardMetaCell = ({ label, align, children }) => (
+  <Box sx={{ minWidth: 0, textAlign: align || "left" }}>
+    <Typography
+      variant="caption"
+      sx={{ display: "block", color: "text.secondary", fontWeight: 700, fontSize: "0.62rem", lineHeight: 1.6, letterSpacing: "0.02em" }}
+    >
+      {label}
+    </Typography>
+    {children}
+  </Box>
+);
+
+// ✅ ค่าเริ่มต้นของ "ฟอร์มสร้างสัญญา" — ใช้ร่วมกันทั้งไดอะล็อก "เพิ่มสัญญาใหม่" และแถวร่างในตาราง
+// ✅ วันที่เข้างานครั้งที่ 1 — ไม่บังคับ (บางสัญญายังไม่รู้วันที่แน่นอนตอนสร้าง) กรอกมาจะลงตารางเป็น
+// ครั้งที่ 1 จริงทันที ไม่กรอกจะบันทึกเป็นฉบับร่าง (unscheduled) — ฉบับร่างของสัญญาจะไม่โผล่ใน
+// แผงงานล่วงหน้าของหน้าปฏิทินเลย (ดู visibleDrafts ใน EventCalendar/index.js) กันไม่ให้ถูกลบทิ้ง
+// แบบไม่ตั้งใจจากที่นั่นจนสัญญาทั้งอันหายไปจากตาราง (ดู groupEventsByContract) — จัดการ/เพิ่มวันที่
+// ครั้งที่ 1 ได้ที่ปุ่ม + ในตารางนี้เท่านั้น (ยังมี safeguard คำเตือนซ้ำอีกชั้นที่ handleDeleteDraftClick
+// เผื่อกรณีอื่นที่เข้าถึงฉบับร่างนี้ได้)
+const EMPTY_CONTRACT_FORM = {
+  company: "", site: "", title: "", system: "", responsiblePerson: "", firstVisitTeam: "",
+  contractNo: "", quotationNo: "", contractStart: "", contractEnd: "", visitCount: "", intervalMonths: "", jobValue: "",
+  firstVisitStart: "", firstVisitEnd: "",
+};
+
+// ✅ ช่องกรอกในแถวร่างใช้ทรง "ขีดเส้นใต้" (variant standard) ไม่ใช่กล่องขอบสี่เหลี่ยม — กล่องมีขอบครบ
+// 4 ด้าน 10 กล่องเรียงกันในแถวเดียวกลายเป็นตารางซ้อนตาราง ตัวหนังสือในกล่องเล็กจนอ่านยากและหน้าตา
+// เหมือนฟอร์มยุคเก่า — แบบขีดเส้นใต้ทำให้ค่าที่กรอกแล้วอ่านเหมือน "ข้อความในตาราง" ปกติ เหลือแค่เส้นประ
+// บางๆ ใต้ช่องไว้บอกว่า "ตรงนี้กรอกได้" แล้วเส้นจะเข้มเป็นสีแบรนด์ตอนโฟกัส
+const INLINE_FIELD_SX = {
+  "& .MuiInput-root": {
+    fontSize: "0.82rem",
+    "&:before": { borderBottom: `1px dashed ${alpha("#0f172a", 0.22)}` },
+    "&:hover:not(.Mui-disabled):before": { borderBottom: `1px solid ${alpha(ACCENT, 0.55)}` },
+    "&:after": { borderBottom: `2px solid ${ACCENT}` },
+  },
+  "& .MuiInput-input": { py: 0.3 },
+  "& input::placeholder": { fontSize: "0.74rem", opacity: 0.75 },
+};
+
+// ─── แถวร่าง "เพิ่มสัญญาใหม่" ท้ายตาราง ────────────────────────────────────
+// ⚠️ ต้องเป็นคอมโพเนนต์แยกที่ module scope และ "ถือค่าที่กำลังพิมพ์ไว้เป็น state ของตัวเอง" ไม่ใช่เขียนลง
+// state ของหน้าหลัก — เดิมทุกตัวอักษรที่พิมพ์ไป setForm ของ ContractOverview ทำให้ทั้งหน้าเรนเดอร์ใหม่
+// (ตาราง 10 แถว × 12 ช่อง ที่แต่ละช่องมี sx ของตัวเอง ซึ่ง MUI ต้องคำนวณ CSS ใหม่ทุกครั้ง) พิมพ์ทีเดียว
+// เลยหน่วงทั้งหน้า — ตอนนี้พิมพ์แล้วเรนเดอร์ใหม่แค่แถวนี้แถวเดียว ส่วนหน้าหลักไม่ถูกแตะเลยจนกว่าจะกดบันทึก
+// ⚠️ อยู่ module scope เหมือน EditableCell/FieldRow ด้วยเหตุผลเดียวกัน — ถ้าประกาศข้างในหน้าหลัก ทุก
+// re-render React จะมองเป็นคนละคอมโพเนนต์แล้ว remount ช่องที่กำลังพิมพ์อยู่จนโฟกัสหลุด
+const InlineAddRow = ({
+  showCheckboxes, hideContractOnlyColumns, visitColumns, totalColCount,
+  siteOptions, companyOptions, titleOptions, systemOptions, teamOptions,
+  suggestContractNo, isContractNoTaken, saving, formError, onSave, onCancel,
+}) => {
+  // เลขที่สัญญาแนะนำคำนวณ "ครั้งเดียวตอนแถวโผล่" (useState initializer) ไม่ใช่ทุก re-render
+  const [draft, setDraft] = useState(() => ({ ...EMPTY_CONTRACT_FORM, contractNo: suggestContractNo() }));
+  const set = (field) => (val) => setDraft((d) => ({ ...d, [field]: val }));
+
+  const badRange = Boolean(draft.contractStart && draft.contractEnd && moment(draft.contractEnd).isBefore(moment(draft.contractStart)));
+  const noTaken = isContractNoTaken(draft.contractNo);
+  // ✅ บอกตรงๆ ว่า "ยังขาดอะไร" แทนที่จะปล่อยให้ปุ่มบันทึกเป็นสีเทาเฉยๆ แล้วต้องเดาเองว่าทำไมกดไม่ได้
+  const missing = [];
+  if (!draft.site.trim()) missing.push("โครงการ");
+  if (!draft.title.trim()) missing.push("ประเภทงาน");
+  if (!draft.system.trim()) missing.push("ระบบ");
+  if (!draft.visitCount) missing.push("จำนวนครั้ง");
+  const blocked = missing.length > 0 || badRange || noTaken;
+
+  // ช่องเลือก/พิมพ์เอง 4 ช่อง (โครงการ/บริษัท/ประเภทงาน/ระบบ) — โครงสร้างเหมือนกันหมด ต่างแค่ตัวเลือก
+  const suggestField = (field, options, placeholder, extraSx, autoFocus) => (
+    <Autocomplete
+      freeSolo fullWidth options={options} inputValue={draft[field]}
+      onInputChange={(_, v) => set(field)(v)}
+      // ปุ่มลูกศรกินที่ในคอลัมน์แคบๆ และไม่จำเป็น — รายการตัวเลือกเด้งเองตอนพิมพ์อยู่แล้ว
+      forcePopupIcon={false}
+      renderInput={(params) => (
+        <TextField {...params} variant="standard" placeholder={placeholder} autoFocus={autoFocus} sx={{ ...INLINE_FIELD_SX, ...extraSx }} />
+      )}
+    />
+  );
+
+  return (
+    <>
+      {/* ⚠️ ช่องที่ไม่ได้กรอกตอนสร้าง (สถานะสัญญา/ครั้งที่ N) ใส่ขีดจางๆ ไว้เฉยๆ — เดิมใส่ข้อความอธิบาย
+          ไว้ในช่องพวกนี้ กลายเป็นตัวหนังสือเล็กๆ กระจายเต็มแถวแย่งสายตาไปจากช่องที่ต้องกรอกจริง */}
+      <TableRow
+        sx={{
+          bgcolor: alpha(ACCENT, 0.035),
+          "& td": { py: 0.75, borderBottom: "none", verticalAlign: "middle" },
+          // แถบสีที่ขอบซ้ายสุด = "แถวนี้ไม่ใช่ข้อมูลจริง กำลังสร้างอยู่" เห็นแวบเดียวก็แยกออก
+          "& td:first-of-type": { boxShadow: `inset 3px 0 0 ${ACCENT}` },
+          // ✅ โผล่มาแบบเลื่อนลงสั้นๆ — ไม่ใช่กระตุกโผล่ทันทีจนดูเหมือนหน้าค้างแล้วเด้ง
+          "@keyframes coDraftIn": { from: { opacity: 0, transform: "translateY(-6px)" }, to: { opacity: 1, transform: "none" } },
+          animation: "coDraftIn .16s ease-out",
+        }}
+      >
+        {showCheckboxes && <TableCell padding="checkbox" />}
+        {!hideContractOnlyColumns && (
+          <TableCell>
+            <TextField
+              fullWidth variant="standard" placeholder="เลขที่สัญญา" value={draft.contractNo}
+              onChange={(e) => set("contractNo")(e.target.value)} error={noTaken}
+              sx={INLINE_FIELD_SX}
+            />
+            <TextField
+              fullWidth variant="standard" placeholder="ใบเสนอราคา" value={draft.quotationNo}
+              onChange={(e) => set("quotationNo")(e.target.value)}
+              sx={{ ...INLINE_FIELD_SX, mt: 0.5 }}
+            />
+          </TableCell>
+        )}
+        {hideContractOnlyColumns && <TableCell><Dash /></TableCell>}
+        <TableCell>
+          {suggestField("site", siteOptions, "โครงการ *", null, true)}
+          {suggestField("company", companyOptions, "บริษัท", { mt: 0.5 })}
+        </TableCell>
+        <TableCell>
+          {suggestField("title", titleOptions, "ประเภทงาน *")}
+          {suggestField("system", systemOptions, "ระบบ *", { mt: 0.5 })}
+        </TableCell>
+        {!hideContractOnlyColumns && (
+          <TableCell>
+            {/* ✅ ช่องวันที่ 2 ช่องซ้อนกันโดยไม่มีป้ายกำกับ = แยกไม่ออกว่าอันไหนเริ่ม อันไหนสิ้นสุด
+                (ทั้งคู่ขึ้น dd/mm/yyyy เหมือนกันเป๊ะตอนยังว่าง) — ติดป้ายสั้นๆ ไว้หน้าช่องเลย */}
+            {[
+              { label: "เริ่ม", field: "contractStart", error: false },
+              { label: "ถึง", field: "contractEnd", error: badRange },
+            ].map((d, i) => (
+              <TextField
+                key={d.field}
+                fullWidth variant="standard" type="date" value={draft[d.field]}
+                onChange={(e) => set(d.field)(e.target.value)} error={d.error}
+                InputProps={{
+                  startAdornment: (
+                    <Box component="span" sx={{ fontSize: "0.68rem", color: "text.disabled", mr: 0.75, flexShrink: 0, width: 20 }}>
+                      {d.label}
+                    </Box>
+                  ),
+                }}
+                sx={{ ...INLINE_FIELD_SX, ...(i > 0 ? { mt: 0.5 } : {}) }}
+              />
+            ))}
+          </TableCell>
+        )}
+        <TableCell>
+          <TextField
+            fullWidth variant="standard" type="number" placeholder="มูลค่า" value={draft.jobValue}
+            onChange={(e) => set("jobValue")(e.target.value)}
+            inputProps={{ min: 0, style: { textAlign: "right" } }}
+            InputProps={{ startAdornment: <InputAdornment position="start" sx={{ mr: 0.25, "& p": { fontSize: "0.8rem" } }}>฿</InputAdornment> }}
+            sx={INLINE_FIELD_SX}
+          />
+        </TableCell>
+        {!hideContractOnlyColumns && <TableCell align="center"><Dash /></TableCell>}
+        {/* คอลัมน์ "คืบหน้า" ของแถวปกติคือ X/Y ครั้ง — ตอนสร้างจึงเป็นที่ของ "Y" (จำนวนครั้งทั้งหมด) */}
+        <TableCell align="center">
+          <TextField
+            fullWidth variant="standard" type="number" placeholder="กี่ครั้ง *" value={draft.visitCount}
+            onChange={(e) => set("visitCount")(e.target.value)}
+            inputProps={{ min: 1, max: MAX_VISIT_COUNT, style: { textAlign: "center" } }}
+            sx={INLINE_FIELD_SX}
+          />
+        </TableCell>
+        {visitColumns.map((n) => <TableCell key={n} align="center"><Dash /></TableCell>)}
+        <TableCell>
+          <TextField
+            select fullWidth variant="standard" value={draft.responsiblePerson}
+            onChange={(e) => set("responsiblePerson")(e.target.value)}
+            SelectProps={{ native: true }}
+            sx={INLINE_FIELD_SX}
+          >
+            <option value="">ผู้รับผิดชอบ</option>
+            {teamOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+          </TextField>
+        </TableCell>
+        <TableCell />
+      </TableRow>
+
+      {/* ✅ แถบสรุป+ปุ่มอยู่ใต้แถว กินความกว้างเต็มตาราง — เดิมยัดปุ่ม ✓/✕ ไว้ในคอลัมน์ "จัดการ" ที่กว้าง
+          แค่ 50px ปุ่มเลยเล็กจิ๋วเบียดกันจนแทบมองไม่เห็นว่ากดตรงไหนถึงจะบันทึก และตอนยังกรอกไม่ครบก็เป็น
+          วงกลมสีเทาที่ไม่บอกอะไรเลย — ย้ายมาเป็นปุ่มมีข้อความเต็มตัว พร้อมบอกว่ายังขาดช่องไหนอยู่ */}
+      <TableRow sx={{ bgcolor: alpha(ACCENT, 0.035), "& td": { borderBottom: `1px solid ${alpha(ACCENT, 0.22)}` } }}>
+        <TableCell colSpan={totalColCount} sx={{ py: 0.75, boxShadow: `inset 3px 0 0 ${ACCENT}` }}>
+          <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "stretch", sm: "center" }} spacing={1}>
+            <Chip
+              size="small" label="สัญญาใหม่ · ยังไม่ได้บันทึก"
+              sx={{ height: 20, fontSize: "0.66rem", fontWeight: 700, bgcolor: alpha(ACCENT, 0.1), color: ACCENT, flexShrink: 0 }}
+            />
+            <Typography
+              variant="caption"
+              sx={{ flex: 1, minWidth: 0, fontSize: "0.7rem", color: formError ? ACCENT : "text.secondary", fontWeight: formError ? 700 : 400 }}
+            >
+              {formError
+                || (noTaken ? "เลขที่สัญญานี้ถูกใช้ไปแล้ว" : "")
+                || (badRange ? "วันที่สิ้นสุดสัญญาต้องไม่ก่อนวันที่เริ่ม" : "")
+                || (missing.length > 0
+                  ? `ยังต้องกรอก: ${missing.join(" · ")}`
+                  : 'พร้อมบันทึกแล้ว — วันที่เข้างานแต่ละครั้งมาลงทีหลังได้ที่ช่อง "ครั้งที่ N"')}
+            </Typography>
+            <Stack direction="row" spacing={0.75} sx={{ flexShrink: 0 }}>
+              <Button
+                size="small" onClick={onCancel} disabled={saving}
+                sx={{ textTransform: "none", fontWeight: 700, fontSize: "0.75rem", color: "text.secondary", minWidth: 0, px: 1.25 }}
+              >
+                ยกเลิก
+              </Button>
+              {/* ⚠️ ปุ่มนี้คือจุดเดียวที่ข้อมูลถูกส่งขึ้นเซิร์ฟเวอร์จริง — ปิดไว้จนกว่าช่องบังคับจะครบและ
+                  ไม่มีค่าที่ขัดกันเอง กันสร้างสัญญาที่ข้อมูลไม่ครบ (หน้าหลักตรวจซ้ำอีกชั้นใน handleAddSubmit) */}
+              <Button
+                size="small" variant="contained" onClick={() => onSave(draft)} disabled={blocked || saving}
+                startIcon={saving ? <CircularProgress size={13} sx={{ color: "inherit" }} /> : <Check sx={{ fontSize: 16 }} />}
+                sx={{
+                  textTransform: "none", fontWeight: 700, fontSize: "0.75rem", borderRadius: 2,
+                  boxShadow: "none", bgcolor: ACCENT, px: 1.75,
+                  "&:hover": { bgcolor: "#b91c1c", boxShadow: "none" },
+                }}
+              >
+                {saving ? "กำลังบันทึก…" : "บันทึกสัญญา"}
+              </Button>
+            </Stack>
+          </Stack>
+        </TableCell>
+      </TableRow>
+    </>
   );
 };
 
@@ -972,160 +1213,6 @@ export default function ContractOverview() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contracts, search, viewFilter, yearFilter, responsibleFilter, titleFilter, systemFilter]);
 
-  // ✅ นับจาก `filtered` (ไม่ใช่ `contracts` ทั้งก้อนแบบเดิม) — เดิมถ้ามีสัญญาไหนสักอันในระบบที่มี
-  // จำนวนครั้งเยอะ (เช่น 24) ตารางจะโชว์คอลัมน์ "ครั้งที่ 1-24" ตลอด แม้กรองปี/ค้นหาจนเหลือแต่สัญญา
-  // 2-4 ครั้งอยู่ก็ตาม กว้างเกินจำเป็นและไม่ตรงกับสิ่งที่กรองไว้จริง
-  // ✅ แถวที่ไม่ใช่สัญญาจริง (งานทั่วไป/ยังไม่จัดกลุ่ม) ไม่มี visitCount ให้ใช้ (ดู groupEventsByContract)
-  // แต่ยังต้องดึง "ครั้งที่" จริงที่บันทึกไว้ในแต่ละ document (field time) มานับด้วย ไม่งั้นงานที่เคย
-  // เลือก "ครั้งที่ 2" ไว้ตอนเพิ่มงานจะไม่มีคอลัมน์ให้แสดงเลย (ตารางมีแค่คอลัมน์เท่าที่สัญญาอื่นต้องการ)
-  const rowMaxRound = (c) => c.isRealContract
-    ? (c.visitCount || countUsedRounds(c.visits))
-    : Math.max(1, ...c.visits.map((v) => Number(v.time) || 1));
-  // 🐛 BUG ที่แก้ (คอลัมน์ "ครั้งที่ N" ว่างเปล่ายาวเป็นพรืดจนเปลืองหน้าจอ): เดิมจำนวนคอลัมน์คำนวณจาก
-  // rowMaxRound ซึ่งคืนค่า visitCount = "จำนวนครั้งที่วางแผนไว้ทั้งสัญญา" — สัญญาเดียวที่ตั้งไว้ 12 ครั้ง
-  // แต่เพิ่งลงจริงไป 1 ครั้ง ก็ลากให้ทั้งตารางต้องมีคอลัมน์ครั้งที่ 1-12 ทันที ทั้งที่ครั้งที่ 3-12 ว่าง
-  // เปล่าทุกแถวไม่มีข้อมูลอะไรเลยสักตัว (ดูภาพที่ผู้ใช้ส่งมา — ครั้งที่ 3 ถึง 11 ว่างหมดทั้งคอลัมน์)
-  // ✅ เปลี่ยนมานับจาก "ครั้งที่มีข้อมูลจริง" แทน แล้วเผื่ออีก 1 ช่องไว้ให้ปุ่ม "+ เพิ่มครั้งถัดไป" เท่านั้น
-  // (ยังกดเพิ่มครั้งถัดไปได้ครบเหมือนเดิมทุกประการ พอเพิ่มแล้วคอลัมน์ถัดไปจะโผล่มาเองอัตโนมัติ) และยัง
-  // ไม่เกิน visitCount ที่ตั้งไว้อยู่ดี
-  const rowVisibleRounds = (c) => {
-    if (!c.isRealContract) return Math.max(1, ...c.visits.map((v) => Number(v.time) || 1));
-    // ⚠️ นับรวมแผนงานล่วงหน้าที่ยังไม่มีวันที่ (unscheduled) ด้วย — ช่องพวกนั้นมีป้าย "รอวางแผน" แสดงอยู่
-    // ถือว่ามีข้อมูลแล้ว ถ้าไม่นับคอลัมน์จะหายไปทั้งที่มีอะไรให้ดู
-    const maxWithData = c.visits.reduce((m, v) => Math.max(m, Number(v.time) || 1), 0);
-    const nextOpenRound = countUsedRounds(c.visits.filter((v) => !v.unscheduled)) + 1;
-    return Math.min(rowMaxRound(c), Math.max(maxWithData, nextOpenRound));
-  };
-  const maxVisitCount = useMemo(
-    // ✅ Math.min กับ MAX_VISIT_COUNT ไว้อีกชั้น — แม้ทุกจุดตั้งค่าจะเช็ค ≤12 แล้ว เผื่อมีข้อมูลเก่า/
-    // นำเข้าจากที่อื่นที่หลุดรอดเกินมา ตารางจะไม่มีทางเรนเดอร์คอลัมน์เกิน MAX_VISIT_COUNT ได้เด็ดขาด
-    () => Math.min(MAX_VISIT_COUNT, filtered.reduce((max, c) => Math.max(max, rowVisibleRounds(c)), 1)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filtered]
-  );
-  const visitColumns = useMemo(
-    () => Array.from({ length: maxVisitCount }, (_, i) => i + 1),
-    [maxVisitCount]
-  );
-  const totalTableWidth = useMemo(() => {
-    let total = colWidth("actions") + (showCheckboxes ? colWidth("checkbox") : 0);
-    // ✅ jobValue ย้ายออกจาก contractOnlyKeys — แสดงทุกแท็บแล้ว (งานทั่วไป/โปรเจค/ยังไม่จัดกลุ่มก็มี
-    // มูลค่างานของตัวเองได้ ข้อมูลมีอยู่ในฐานข้อมูลอยู่แล้วทุกแถว แค่เดิมไม่ได้แสดงให้เห็น)
-    // ✅ ยุบคอลัมน์ที่อ่านคู่กันเสมอให้เหลือช่องเดียว (ดูหัวตาราง/แถวข้อมูล): เลขที่สัญญา+ใบเสนอราคา →
-    // docRef, บริษัท+โครงการ → customer, ประเภทงาน+ระบบ → work, เริ่ม+สิ้นสุด+รอบเข้า → period,
-    // จำนวนครั้งทั้งหมด → รวมอยู่ในป้าย "คืบหน้า" (progress) แล้ว — คีย์ย่อยเดิมไม่มีคอลัมน์ของตัวเองอีก
-    // ต่อไป จึงต้องไม่นับความกว้างซ้ำตรงนี้ ไม่งั้นตารางจะกว้างเกินจริงจนมีที่ว่างค้างท้ายแถว
-    const contractOnlyKeys = ["docRef", "period", "status"];
-    ["customer", "work", "jobValue", "progress", "responsiblePerson"].forEach((k) => { total += colWidth(k); });
-    if (!hideContractOnlyColumns) {
-      contractOnlyKeys.forEach((k) => { total += colWidth(k); });
-    } else {
-      // ✅ คอลัมน์ "เอกสารเลขที่" (docNo) โผล่แทนที่กลุ่มเลขที่สัญญา/ใบเสนอราคาตอนซ่อนคอลัมน์ระดับ
-      // สัญญา (ดูหัวตาราง) — งานทั่วไป/โปรเจคไม่มีเลขที่สัญญา แต่มีเลขที่เอกสารอ้างอิงทั่วไปแทนได้
-      total += colWidth("docNo");
-    }
-    visitColumns.forEach((n) => { total += colWidth(`visit_${n}`); });
-    return total;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [colWidths, showCheckboxes, visitColumns, hideContractOnlyColumns, useMobileTable]);
-  // ✅ ค่าความกว้างจริงของทุกคอลัมน์ ตั้งเป็น CSS custom property ไว้ที่ <Table> ตัวเดียว (ผ่าน style
-  // prop ปกติของ React) ให้ทุกเซลล์ลูกอ้างอิงผ่าน var(--col-<key>) — เห็นผลทันทีทุกครั้งที่ colWidths
-  // เปลี่ยนจริง (โหลดจาก localStorage ตอนเปิดหน้า/auto-fit/commit ท้ายการลาก) โดยไม่ต้องแตะ sx ของเซลล์
-  // แต่ละใบเลยสักคอลัมน์ — ดู handleColResize/colVar ด้านบนสำหรับเหตุผลที่ย้ายมาใช้กลไกนี้แทนตัวเลขตรงๆ
-  const tableCssVars = useMemo(() => {
-    const vars = { "--col-total": `${totalTableWidth}px` };
-    ["docRef", "docNo", "customer", "work", "period", "jobValue", "status", "progress", "responsiblePerson"].forEach((k) => {
-      vars[`--col-${k}`] = `${colWidth(k)}px`;
-    });
-    visitColumns.forEach((n) => { vars[`--col-visit_${n}`] = `${colWidth(`visit_${n}`)}px`; });
-    return vars;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [colWidths, totalTableWidth, visitColumns, useMobileTable]);
-
-  // ✅ สไตล์เสริม "เฉพาะตอนดูตารางบนจอมือถือ" — ตัวตารางเป็น JSX ก้อนเดียวกับจอคอมทุกประการ ไม่ได้
-  // เขียนตารางแยกอีกชุด (ดู MOBILE_VIEW_STORAGE_KEY) แค่ทับ sx เพิ่มบางส่วนให้ใช้งานบนจอแคบได้จริง:
-  //  1. "ตรึงคอลัมน์แรก" (เลขที่สัญญา/เอกสารเลขที่ + ช่องติ๊กเลือกถ้ามี) ไว้กับขอบซ้าย — หัวใจของเรื่องนี้
-  //     เลย เพราะพอเลื่อนไปดูคอลัมน์ขวาสุดบนจอ 375px คอลัมน์ที่บอกว่า "นี่คือแถวไหน" จะหลุดออกนอกจอไป
-  //     หมด เหลือแต่ตัวเลขลอยๆ ที่อ่านไม่รู้เรื่องว่าเป็นของงานอะไร
-  //  2. ⚠️ position:sticky ใช้กับ border-collapse:collapse ไม่ได้ — เบราว์เซอร์วาดเส้นขอบเป็นของ
-  //     "ตาราง" ไม่ใช่ของเซลล์ เส้นขอบของเซลล์ที่ตรึงไว้จะเลื่อนหนีไปกับตารางจนดูขาดๆ หายๆ ต้องสลับมาใช้
-  //     border-collapse:separate เฉพาะโหมดนี้ แล้ววาดเส้นเองด้านขวา+ล่างของทุกเซลล์ (ไม่ใช่ครบ 4 ด้าน
-  //     ไม่งั้นเส้นระหว่างเซลล์จะซ้อนกันเป็น 2 เส้นหนาผิดปกติ เพราะไม่มีการยุบขอบให้แล้ว)
-  //  3. พื้นหลังแถบสลับสีต้องเป็นสีทึบ — ของเดิมใช้สีโปร่งแสง 2% ซึ่งพอเอามาตรึงไว้จะเห็นเนื้อหาคอลัมน์
-  //     อื่นวิ่งทะลุผ่านหลังคอลัมน์ที่ตรึงตอนเลื่อน
-  const mobileTableSx = useMemo(() => {
-    if (!useMobileTable) return null;
-    // ✅ คอลัมน์แรกสุดของแต่ละแท็บไม่เหมือนกัน — แท็บสัญญาคือ "เลขที่เอกสาร" ส่วนแท็บงานทั่วไป/โปรเจค/
-    // ยังไม่จัดกลุ่มคือ "เอกสารเลขที่" (ดูหัวตาราง) ต้องตรึงตัวที่ถูกเรนเดอร์จริงในแท็บนั้นๆ
-    const idColKey = hideContractOnlyColumns ? "docNo" : "docRef";
-    const stickyLeft = showCheckboxes ? colWidth("checkbox") : 0;
-    // ✅ เงาที่ขอบขวาของคอลัมน์ที่ตรึงไว้ — ทำหน้าที่แทน "เส้นขอบ" ให้เห็นว่าคอลัมน์นี้ลอยอยู่เหนือ
-    // เนื้อหาที่กำลังเลื่อนผ่านข้างหลัง (ไม่ใช่แค่คอลัมน์ธรรมดาที่บังเอิญอยู่ซ้ายสุด)
-    const stickyEdge = { boxShadow: `6px 0 8px -6px ${alpha("#0f172a", 0.28)}` };
-    return {
-      borderCollapse: "separate",
-      borderSpacing: 0,
-      "& th, & td": {
-        border: "none",
-        borderRight: `1px solid ${BORDER_HAIR}`,
-        borderBottom: `1px solid ${BORDER_SOFT}`,
-        fontSize: "0.76rem",
-        px: 0.75,
-      },
-      "& thead th": { borderBottom: `1px solid ${BORDER_MAIN}` },
-      "& tbody tr": { bgcolor: "#fff" },
-      "& tbody tr:nth-of-type(even)": { bgcolor: SURFACE_STRIPE },
-      ...(showCheckboxes && {
-        "& tbody .MuiTableCell-paddingCheckbox": { position: "sticky", left: 0, zIndex: 2, bgcolor: "inherit" },
-        "& thead .MuiTableCell-paddingCheckbox": { position: "sticky", left: 0, zIndex: 3, bgcolor: SURFACE_SUBTLE },
-      }),
-      [`& tbody [data-col-key="${idColKey}"]`]: { position: "sticky", left: stickyLeft, zIndex: 2, bgcolor: "inherit", ...stickyEdge },
-      [`& thead [data-col-key="${idColKey}"]`]: { position: "sticky", left: stickyLeft, zIndex: 3, bgcolor: SURFACE_SUBTLE, ...stickyEdge },
-      // ✅ แถวสรุปยอดรวมท้ายตารางไม่มีคอลัมน์ให้ตรึง (เป็น colSpan ก้อนเดียว) ให้พื้นหลังทึบไว้เฉยๆ
-      "& tfoot td": { bgcolor: SURFACE_SUBTLE },
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [useMobileTable, hideContractOnlyColumns, showCheckboxes, colWidths]);
-
-  // ── ตัวช่วยเลื่อนตารางแนวนอน ────────────────────────────────────────────────
-  // ✅ ปัญหาที่ผู้ใช้เจอ ("เลื่อนตารางบนมือถือยาก") ไม่ได้มีสาเหตุเดียว แก้ครบทุกข้อดังนี้:
-  //  1. แถบลากปรับความกว้างคอลัมน์ตั้ง touchAction:"none" ขวางอยู่ทั่วแถวหัวตาราง → ปิดทิ้งบนมือถือ
-  //     (ดูคอมเมนต์ที่ ResizableTh)
-  //  2. ตารางกว้างรวมเกิน 1,300px บนจอ 375px → ใช้ความกว้างคอลัมน์ชุดย่อ (ดู MOBILE_COL_WIDTHS)
-  //  3. iOS Safari ตีความการปัดแนวนอนใกล้ขอบจอเป็น "ปัดย้อนกลับหน้าเว็บ" แย่งไปจากตาราง →
-  //     overscrollBehaviorX:"contain" บอกเบราว์เซอร์ว่าการเลื่อนจบที่กล่องนี้ ห้ามส่งต่อ
-  //  4. มือถือซ่อน scrollbar เป็นค่าเริ่มต้น → ไม่มีอะไรบอกเลยว่า "ยังมีคอลัมน์ต่อทางขวาอีกนะ" และไม่รู้
-  //     ว่าตอนนี้เลื่อนมาถึงไหนแล้ว → ทำ scrollbar บางๆ ให้เห็นตลอด + ปุ่มลูกศรกดเลื่อนทีละหน้า
-  // ตัวนี้คือส่วนที่ 4: ติดตามว่ายังเลื่อนไปทางไหนได้อีกบ้าง เพื่อซ่อน/แสดงปุ่มลูกศรให้ตรงความจริง
-  const tableScrollRef = useRef(null);
-  const [tableScroll, setTableScroll] = useState({ canLeft: false, canRight: false });
-  const syncTableScroll = useCallback(() => {
-    const el = tableScrollRef.current;
-    if (!el) return;
-    // ⚠️ เผื่อ 2px — ค่า scrollLeft ของเบราว์เซอร์เป็นทศนิยมได้ (จอ retina/ซูม) ถ้าเทียบเท่ากันเป๊ะๆ
-    // ปุ่มจะกะพริบค้างอยู่ทั้งที่เลื่อนสุดทางแล้ว
-    const canRight = el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
-    const canLeft = el.scrollLeft > 2;
-    setTableScroll((prev) => (prev.canLeft === canLeft && prev.canRight === canRight ? prev : { canLeft, canRight }));
-  }, []);
-  // ✅ ต้องคำนวณใหม่เมื่อ "สิ่งที่ทำให้ตารางกว้างขึ้น/แคบลง" เปลี่ยน ไม่ใช่แค่ตอนเลื่อน — สลับแท็บ
-  // (คอลัมน์ไม่เท่ากัน) / สลับมุมมอง / เปลี่ยนหน้า / ปรับความกว้างคอลัมน์ ล้วนเปลี่ยนความกว้างรวมทั้งนั้น
-  useEffect(() => {
-    syncTableScroll();
-    const el = tableScrollRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return undefined;
-    const ro = new ResizeObserver(syncTableScroll);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [syncTableScroll, useMobileTable, viewFilter, totalTableWidth, loading, filtered.length]);
-  const scrollTableBy = (dir) => {
-    const el = tableScrollRef.current;
-    if (!el) return;
-    // ✅ เลื่อนทีละ 80% ของความกว้างที่เห็น (ไม่ใช่ 100%) — เหลือคอลัมน์เดิมค้างไว้ให้เห็นนิดหน่อย
-    // จะได้รู้ว่าเลื่อนต่อจากตรงไหน ไม่ใช่กระโดดไปจนหลุดบริบททั้งหมด
-    el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: "smooth" });
-  };
-
   // ✅ เรียงลำดับตารางได้ด้วยการคลิกหัวตารางแต่ละช่อง (เฉพาะคอลัมน์ข้อมูลตรงๆ ที่เทียบค่าเดียวได้ —
   // ไม่รวม "สถานะสัญญา"/"คืบหน้า"/"ครั้งที่ N" ซึ่งเป็นค่าที่คำนวณจากหลายฟิลด์ ไม่มีค่าเดี่ยวให้เรียง)
   // คลิกครั้งแรก = น้อยไปมาก (asc) คลิกซ้ำคอลัมน์เดิม = มากไปน้อย (desc) คลิกอีกทีเลิกเรียง กลับไป
@@ -1176,12 +1263,12 @@ export default function ContractOverview() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtered, sortConfig]);
 
-  // ✅ แสดงแค่หน้าละ 10 แถว (มือถือ 5 แถว — จอแคบเลื่อนหาปุ่มเปลี่ยนหน้าถี่เกินไปถ้าใช้เลขเดียวกับ
-  // จอกว้าง) — เดิมโชว์ทุกแถวรวดเดียว (สูงสุดเป็นร้อย) ต้องเลื่อนในกรอบตารางยาวๆ ตลอดเวลา ตัดเป็นหน้า
-  // ให้สั้นกระชับแทน (ตัวกรอง/ค้นหายังใช้กับข้อมูลทั้งหมดเหมือนเดิม แค่ตัดแสดงผล)
-  // ✅ มุมมองตารางบนมือถือใช้ 10 แถวเท่าจอคอม — 1 แถวสูงแค่ไม่กี่สิบพิกเซล (ต่างจากการ์ดที่สูงเกือบเต็มจอ
-  // ต่อ 1 งาน) ถ้ายังตัดที่ 5 แถวจะกลายเป็นตารางสั้นจู๋ที่มีปุ่มเปลี่ยนหน้าถี่กว่าที่ควรเป็นมาก
-  const PAGE_SIZE = isMobile && !useMobileTable ? 5 : 10;
+  // ✅ แสดงแค่หน้าละ 10 แถว (มือถือ 5 แถวทั้งแบบการ์ดและแบบตาราง — จอแคบต้องเลื่อนลงหาปุ่มเปลี่ยนหน้า
+  // ไกลเกินไปถ้าใช้เลขเดียวกับจอกว้าง) — เดิมโชว์ทุกแถวรวดเดียว (สูงสุดเป็นร้อย) ต้องเลื่อนในกรอบตาราง
+  // ยาวๆ ตลอดเวลา ตัดเป็นหน้าให้สั้นกระชับแทน (ตัวกรอง/ค้นหายังใช้กับข้อมูลทั้งหมดเหมือนเดิม แค่ตัดแสดงผล)
+  // ✅ 5 แถวยังช่วยให้คอลัมน์ "ครั้งที่ N" ของแต่ละหน้าแคบลงอีก เพราะจำนวนคอลัมน์คิดจากแถวในหน้านั้น
+  // (ดู visitColumns) — ยิ่งแถวต่อหน้าน้อย โอกาสที่สัญญาครั้งเยอะๆ จะลากคอลัมน์ว่างมาให้ทั้งหน้าก็ยิ่งน้อย
+  const PAGE_SIZE = isMobile ? 5 : 10;
   const [page, setPage] = useState(1);
   useEffect(() => { setPage(1); }, [search, viewFilter, yearFilter, responsibleFilter, titleFilter, systemFilter, sortConfig, isMobile, useMobileTable]);
   // ✅ ป้องกันพลาด: ล้างการเลือกทุกครั้งที่สลับแท็บมุมมอง — เดิมการเลือกค้างข้ามแท็บได้ (checkbox มีเฉพาะ
@@ -1201,6 +1288,159 @@ export default function ContractOverview() {
     () => sortedFiltered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
     [sortedFiltered, safePage, PAGE_SIZE]
   );
+
+  // ✅ นับจากแถวที่แสดงอยู่จริง (ไม่ใช่ `contracts` ทั้งก้อนแบบเดิม) — เดิมถ้ามีสัญญาไหนสักอันในระบบที่มี
+  // จำนวนครั้งเยอะ (เช่น 24) ตารางจะโชว์คอลัมน์ "ครั้งที่ 1-24" ตลอด แม้กรองปี/ค้นหาจนเหลือแต่สัญญา
+  // 2-4 ครั้งอยู่ก็ตาม กว้างเกินจำเป็นและไม่ตรงกับสิ่งที่กรองไว้จริง
+  // ✅ แถวที่ไม่ใช่สัญญาจริง (งานทั่วไป/ยังไม่จัดกลุ่ม) ไม่มี visitCount ให้ใช้ (ดู groupEventsByContract)
+  // แต่ยังต้องดึง "ครั้งที่" จริงที่บันทึกไว้ในแต่ละ document (field time) มานับด้วย ไม่งั้นงานที่เคย
+  // เลือก "ครั้งที่ 2" ไว้ตอนเพิ่มงานจะไม่มีคอลัมน์ให้แสดงเลย (ตารางมีแค่คอลัมน์เท่าที่สัญญาอื่นต้องการ)
+  const rowMaxRound = (c) => c.isRealContract
+    ? (c.visitCount || countUsedRounds(c.visits))
+    : Math.max(1, ...c.visits.map((v) => Number(v.time) || 1));
+  // 🐛 BUG ที่แก้ (คอลัมน์ "ครั้งที่ N" ว่างเปล่ายาวเป็นพรืดจนเปลืองหน้าจอ): เดิมจำนวนคอลัมน์คำนวณจาก
+  // rowMaxRound ซึ่งคืนค่า visitCount = "จำนวนครั้งที่วางแผนไว้ทั้งสัญญา" — สัญญาเดียวที่ตั้งไว้ 12 ครั้ง
+  // แต่เพิ่งลงจริงไป 1 ครั้ง ก็ลากให้ทั้งตารางต้องมีคอลัมน์ครั้งที่ 1-12 ทันที ทั้งที่ครั้งที่ 3-12 ว่าง
+  // เปล่าทุกแถวไม่มีข้อมูลอะไรเลยสักตัว (ดูภาพที่ผู้ใช้ส่งมา — ครั้งที่ 3 ถึง 11 ว่างหมดทั้งคอลัมน์)
+  // ✅ เปลี่ยนมานับจาก "ครั้งที่มีข้อมูลจริง" แทน แล้วเผื่ออีก 1 ช่องไว้ให้ปุ่ม "+ เพิ่มครั้งถัดไป" เท่านั้น
+  // (ยังกดเพิ่มครั้งถัดไปได้ครบเหมือนเดิมทุกประการ พอเพิ่มแล้วคอลัมน์ถัดไปจะโผล่มาเองอัตโนมัติ) และยัง
+  // ไม่เกิน visitCount ที่ตั้งไว้อยู่ดี
+  const rowVisibleRounds = (c) => {
+    if (!c.isRealContract) return Math.max(1, ...c.visits.map((v) => Number(v.time) || 1));
+    // ⚠️ นับรวมแผนงานล่วงหน้าที่ยังไม่มีวันที่ (unscheduled) ด้วย — ช่องพวกนั้นมีป้าย "รอวางแผน" แสดงอยู่
+    // ถือว่ามีข้อมูลแล้ว ถ้าไม่นับคอลัมน์จะหายไปทั้งที่มีอะไรให้ดู
+    const maxWithData = c.visits.reduce((m, v) => Math.max(m, Number(v.time) || 1), 0);
+    const nextOpenRound = countUsedRounds(c.visits.filter((v) => !v.unscheduled)) + 1;
+    return Math.min(rowMaxRound(c), Math.max(maxWithData, nextOpenRound));
+  };
+  // ✅ Math.min กับ MAX_VISIT_COUNT ไว้อีกชั้น — แม้ทุกจุดตั้งค่าจะเช็ค ≤12 แล้ว เผื่อมีข้อมูลเก่า/
+  // นำเข้าจากที่อื่นที่หลุดรอดเกินมา ตารางจะไม่มีทางเรนเดอร์คอลัมน์เกิน MAX_VISIT_COUNT ได้เด็ดขาด
+  const roundColumnsFor = (rows) => {
+    const max = Math.min(MAX_VISIT_COUNT, rows.reduce((m, c) => Math.max(m, rowVisibleRounds(c)), 1));
+    return Array.from({ length: max }, (_, i) => i + 1);
+  };
+  // 🐛 BUG ที่แก้ (คอลัมน์ "ครั้งที่ N" ว่างทั้งคอลัมน์ในหน้าที่เปิดอยู่): เดิมนับจาก `filtered` = ทุกแถวที่
+  // ผ่านตัวกรอง "ทุกหน้ารวมกัน" — แต่ตารางแสดงทีละ 10 แถว ถ้ามีสัญญาเข้าทุก 3 เดือน (6 ครั้ง) ไปตกอยู่
+  // หน้า 3 ทุกหน้าที่เหลือก็ต้องลากคอลัมน์ครั้งที่ 5-6 ที่ว่างเปล่าทั้งคอลัมน์ติดไปด้วย ทำให้ตารางกว้าง
+  // เกินจำเป็น ต้องเลื่อนผ่านช่องว่างหลายจอกว่าจะถึงคอลัมน์ท้ายๆ อย่าง "ผู้รับผิดชอบ" (ดูภาพที่ผู้ใช้ส่งมา)
+  // ✅ นับจาก `pagedRows` = เฉพาะแถวที่แสดงอยู่ในหน้านี้จริงๆ คอลัมน์จะโผล่/หายเองตามข้อมูลของแต่ละหน้า
+  const visitColumns = useMemo(
+    () => roundColumnsFor(pagedRows),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pagedRows]
+  );
+  // ⚠️ ไฟล์ Excel ส่งออก "ทุกหน้ารวมกัน" (sortedFiltered) จึงต้องใช้จำนวนคอลัมน์ของทั้งชุดข้อมูล ไม่ใช่ของ
+  // หน้าที่บังเอิญเปิดค้างไว้ตอนกดส่งออก ไม่งั้นข้อมูลครั้งที่ของแถวหน้าอื่นจะหายไปจากไฟล์แบบเงียบๆ
+  const exportVisitColumns = useMemo(
+    () => roundColumnsFor(filtered),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filtered]
+  );
+  const totalTableWidth = useMemo(() => {
+    let total = colWidth("actions") + (showCheckboxes ? colWidth("checkbox") : 0);
+    // ✅ jobValue ย้ายออกจาก contractOnlyKeys — แสดงทุกแท็บแล้ว (งานทั่วไป/โปรเจค/ยังไม่จัดกลุ่มก็มี
+    // มูลค่างานของตัวเองได้ ข้อมูลมีอยู่ในฐานข้อมูลอยู่แล้วทุกแถว แค่เดิมไม่ได้แสดงให้เห็น)
+    // ✅ ยุบคอลัมน์ที่อ่านคู่กันเสมอให้เหลือช่องเดียว (ดูหัวตาราง/แถวข้อมูล): เลขที่สัญญา+ใบเสนอราคา →
+    // docRef, บริษัท+โครงการ → customer, ประเภทงาน+ระบบ → work, เริ่ม+สิ้นสุด+รอบเข้า → period,
+    // จำนวนครั้งทั้งหมด → รวมอยู่ในป้าย "คืบหน้า" (progress) แล้ว — คีย์ย่อยเดิมไม่มีคอลัมน์ของตัวเองอีก
+    // ต่อไป จึงต้องไม่นับความกว้างซ้ำตรงนี้ ไม่งั้นตารางจะกว้างเกินจริงจนมีที่ว่างค้างท้ายแถว
+    const contractOnlyKeys = ["docRef", "period", "status"];
+    ["customer", "work", "jobValue", "progress", "responsiblePerson"].forEach((k) => { total += colWidth(k); });
+    if (!hideContractOnlyColumns) {
+      contractOnlyKeys.forEach((k) => { total += colWidth(k); });
+    } else {
+      // ✅ คอลัมน์ "เอกสารเลขที่" (docNo) โผล่แทนที่กลุ่มเลขที่สัญญา/ใบเสนอราคาตอนซ่อนคอลัมน์ระดับ
+      // สัญญา (ดูหัวตาราง) — งานทั่วไป/โปรเจคไม่มีเลขที่สัญญา แต่มีเลขที่เอกสารอ้างอิงทั่วไปแทนได้
+      total += colWidth("docNo");
+    }
+    visitColumns.forEach((n) => { total += colWidth(`visit_${n}`); });
+    return total;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colWidths, showCheckboxes, visitColumns, hideContractOnlyColumns, useMobileTable]);
+  // ✅ ค่าความกว้างจริงของทุกคอลัมน์ ตั้งเป็น CSS custom property ไว้ที่ <Table> ตัวเดียว (ผ่าน style
+  // prop ปกติของ React) ให้ทุกเซลล์ลูกอ้างอิงผ่าน var(--col-<key>) — เห็นผลทันทีทุกครั้งที่ colWidths
+  // เปลี่ยนจริง (โหลดจาก localStorage ตอนเปิดหน้า/auto-fit/commit ท้ายการลาก) โดยไม่ต้องแตะ sx ของเซลล์
+  // แต่ละใบเลยสักคอลัมน์ — ดู handleColResize/colVar ด้านบนสำหรับเหตุผลที่ย้ายมาใช้กลไกนี้แทนตัวเลขตรงๆ
+  const tableCssVars = useMemo(() => {
+    const vars = { "--col-total": `${totalTableWidth}px` };
+    ["docRef", "docNo", "customer", "work", "period", "jobValue", "status", "progress", "responsiblePerson"].forEach((k) => {
+      vars[`--col-${k}`] = `${colWidth(k)}px`;
+    });
+    visitColumns.forEach((n) => { vars[`--col-visit_${n}`] = `${colWidth(`visit_${n}`)}px`; });
+    return vars;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colWidths, totalTableWidth, visitColumns, useMobileTable]);
+
+  // ✅ สไตล์เสริม "เฉพาะตอนดูตารางบนจอมือถือ" — ตัวตารางเป็น JSX ก้อนเดียวกับจอคอมทุกประการ ไม่ได้
+  // เขียนตารางแยกอีกชุด (ดู MOBILE_VIEW_STORAGE_KEY) แค่ย่อขนาดตัวอักษร/ระยะขอบในเซลล์ให้พอดีจอแคบ
+  // ⛔ ไม่ตรึง (freeze) คอลัมน์ใดไว้กับขอบซ้ายแล้ว ตามที่ผู้ใช้ขอ — เดิมตรึงคอลัมน์เลขที่เอกสารไว้ให้รู้ว่า
+  //    กำลังอ่านแถวไหน แต่ผลจริงบนจอแคบคือคอลัมน์ที่ตรึงกินพื้นที่จอไปก้อนหนึ่งตลอดเวลา แถมมีเนื้อหา
+  //    คอลัมน์อื่นวิ่งลอดอยู่ข้างหลังจนดูสับสนว่าตกลงช่องที่เห็นเป็นของคอลัมน์ไหนกันแน่ ตอนนี้ทุกคอลัมน์
+  //    เลื่อนไปพร้อมกันเป็นตารางเดียวตรงไปตรงมา ส่วนการกลับไปดูว่า "แถวนี้คืองานอะไร" กดปุ่ม ‹ เลื่อน
+  //    กลับมาคอลัมน์แรกได้ทันที (ดูปุ่มลูกศรที่ลอยอยู่ข้างตาราง)
+  // ⚠️ พอไม่ตรึงแล้วก็ไม่ต้องสลับไป border-collapse:separate อีก (ที่ต้องสลับเพราะ position:sticky ใช้กับ
+  //    collapse ไม่ได้ เส้นขอบจะเลื่อนหนีไปกับตาราง) ใช้ collapse ของตารางหลักตามเดิมได้เลย เส้นไม่ซ้อนกัน
+  const mobileTableSx = useMemo(() => {
+    if (!useMobileTable) return null;
+    return {
+      // ⚠️ คีย์นี้ทับของตารางหลักทั้งก้อน (ไม่ได้ merge ทีละ property) จึงต้องเขียนเส้นขอบซ้ำให้ครบ
+      // ตามตารางหลัก ไม่งั้นตารางบนมือถือจะกลายเป็นไม่มีเส้นคั่นเลย
+      "& th, & td": {
+        border: "none",
+        borderBottom: `1px solid ${BORDER_SOFT}`,
+        borderRight: `1px solid ${BORDER_HAIR}`,
+        fontSize: "0.76rem",
+        px: 0.75,
+      },
+      "& tfoot td": { bgcolor: SURFACE_SUBTLE },
+    };
+  }, [useMobileTable]);
+
+  // ── ตัวช่วยเลื่อนตารางแนวนอน ────────────────────────────────────────────────
+  // ✅ ปัญหาที่ผู้ใช้เจอ ("เลื่อนตารางบนมือถือยาก") ไม่ได้มีสาเหตุเดียว แก้ครบทุกข้อดังนี้:
+  //  1. แถบลากปรับความกว้างคอลัมน์ตั้ง touchAction:"none" ขวางอยู่ทั่วแถวหัวตาราง → ปิดทิ้งบนมือถือ
+  //     (ดูคอมเมนต์ที่ ResizableTh)
+  //  2. ตารางกว้างรวมเกิน 1,300px บนจอ 375px → ใช้ความกว้างคอลัมน์ชุดย่อ (ดู MOBILE_COL_WIDTHS)
+  //  3. iOS Safari ตีความการปัดแนวนอนใกล้ขอบจอเป็น "ปัดย้อนกลับหน้าเว็บ" แย่งไปจากตาราง →
+  //     overscrollBehaviorX:"contain" บอกเบราว์เซอร์ว่าการเลื่อนจบที่กล่องนี้ ห้ามส่งต่อ
+  //  4. มือถือซ่อน scrollbar เป็นค่าเริ่มต้น → ไม่มีอะไรบอกเลยว่า "ยังมีคอลัมน์ต่อทางขวาอีกนะ" และไม่รู้
+  //     ว่าตอนนี้เลื่อนมาถึงไหนแล้ว → ทำ scrollbar บางๆ ให้เห็นตลอด + ปุ่มลูกศรกดเลื่อนทีละหน้า
+  // ตัวนี้คือส่วนที่ 4: ติดตามว่ายังเลื่อนไปทางไหนได้อีกบ้าง เพื่อซ่อน/แสดงปุ่มลูกศรให้ตรงความจริง
+  const tableScrollRef = useRef(null);
+  const [tableScroll, setTableScroll] = useState({ canLeft: false, canRight: false });
+  const syncTableScroll = useCallback(() => {
+    const el = tableScrollRef.current;
+    if (!el) return;
+    // ⚠️ เผื่อ 2px — ค่า scrollLeft ของเบราว์เซอร์เป็นทศนิยมได้ (จอ retina/ซูม) ถ้าเทียบเท่ากันเป๊ะๆ
+    // ปุ่มจะกะพริบค้างอยู่ทั้งที่เลื่อนสุดทางแล้ว
+    const canRight = el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
+    const canLeft = el.scrollLeft > 2;
+    setTableScroll((prev) => (prev.canLeft === canLeft && prev.canRight === canRight ? prev : { canLeft, canRight }));
+  }, []);
+  // ✅ ต้องคำนวณใหม่เมื่อ "สิ่งที่ทำให้ตารางกว้างขึ้น/แคบลง" เปลี่ยน ไม่ใช่แค่ตอนเลื่อน — สลับแท็บ
+  // (คอลัมน์ไม่เท่ากัน) / สลับมุมมอง / เปลี่ยนหน้า / ปรับความกว้างคอลัมน์ ล้วนเปลี่ยนความกว้างรวมทั้งนั้น
+  useEffect(() => {
+    syncTableScroll();
+    const el = tableScrollRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return undefined;
+    const ro = new ResizeObserver(syncTableScroll);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [syncTableScroll, useMobileTable, viewFilter, totalTableWidth, loading, filtered.length]);
+  // ✅ เปลี่ยนหน้า/สลับแท็บแล้วให้ตารางเลื่อนกลับมาคอลัมน์แรกเสมอ — จำเป็นมากขึ้นตั้งแต่จำนวนคอลัมน์
+  // "ครั้งที่ N" คิดจากแถวในหน้านั้นๆ (ดู visitColumns) เพราะหน้าถัดไปอาจมีคอลัมน์น้อยกว่าหน้าที่เพิ่งดู
+  // อยู่ ถ้าปล่อยให้ค้างอยู่กลางตาราง ผู้ใช้จะเจอหน้าใหม่ที่เปิดมาแล้วเห็นแต่ช่องท้ายๆ หรือช่องว่าง
+  useEffect(() => {
+    const el = tableScrollRef.current;
+    if (el) el.scrollLeft = 0;
+  }, [safePage, viewFilter]);
+  const scrollTableBy = (dir) => {
+    const el = tableScrollRef.current;
+    if (!el) return;
+    // ✅ เลื่อนทีละ 80% ของความกว้างที่เห็น (ไม่ใช่ 100%) — เหลือคอลัมน์เดิมค้างไว้ให้เห็นนิดหน่อย
+    // จะได้รู้ว่าเลื่อนต่อจากตรงไหน ไม่ใช่กระโดดไปจนหลุดบริบททั้งหมด
+    el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: "smooth" });
+  };
 
   // ✅ สรุปยอดมูลค่างาน — คิดจาก `filtered` (ทุกแถวที่ผ่านตัวกรอง ทุกหน้ารวมกัน) ไม่ใช่แค่ 10 แถวที่เห็น
   // อยู่ในหน้านี้ เพราะ "ยอดรวมทั้งหมด" ต้องหมายถึงทั้งชุดข้อมูลที่กรองไว้เสมอ ไม่งั้นตัวเลขจะเปลี่ยนไป
@@ -1314,7 +1554,7 @@ export default function ContractOverview() {
       const { exportContractsToExcel } = await import("./contractExcelExport");
       await exportContractsToExcel({
         rows: sortedFiltered, // ✅ ใช้ลำดับเดียวกับที่เรียงอยู่บนจอ ไม่ใช่ลำดับดิบ
-        visitColumns,
+        visitColumns: exportVisitColumns, // ⚠️ ของทั้งชุด ไม่ใช่ของหน้าที่เปิดอยู่ (ดู exportVisitColumns)
         meta: {
           fileName: `ภาพรวมงาน-${exportLabels.viewLabel}-${exportLabels.yearLabel}-${moment().format("YYYYMMDD")}.xlsx`,
           viewLabel: exportLabels.viewLabel,
@@ -1353,17 +1593,9 @@ export default function ContractOverview() {
   //      ซึ่งดูเหมือนมอบหมายแล้วทั้งที่ยังไม่เคยมอบหมายจริง
   // ✅ เปลี่ยนช่องนี้เป็น "ผู้รับผิดชอบงาน" ส่ง responsiblePerson/responsiblePersonId ตรงๆ ส่วนทีมที่เข้างาน
   // ย้ายไปเป็นช่องแยกที่โผล่เฉพาะตอนระบุวันที่ครั้งที่ 1 (ผูกกับครั้งที่ 1 เท่านั้น ไม่ใช่ทั้งสัญญา)
-  const emptyForm = {
-    company: "", site: "", title: "", system: "", responsiblePerson: "", firstVisitTeam: "",
-    contractNo: "", quotationNo: "", contractStart: "", contractEnd: "", visitCount: "", intervalMonths: "", jobValue: "",
-    // ✅ วันที่เข้างานครั้งที่ 1 — ไม่บังคับ (บางสัญญายังไม่รู้วันที่แน่นอนตอนสร้าง) กรอกมาจะลงตารางเป็น
-    // ครั้งที่ 1 จริงทันที ไม่กรอกจะบันทึกเป็นฉบับร่าง (unscheduled) — ฉบับร่างของสัญญาจะไม่โผล่ใน
-    // แผงงานล่วงหน้าของหน้าปฏิทินเลย (ดู visibleDrafts ใน EventCalendar/index.js) กันไม่ให้ถูกลบทิ้ง
-    // แบบไม่ตั้งใจจากที่นั่นจนสัญญาทั้งอันหายไปจากตาราง (ดู groupEventsByContract) — จัดการ/เพิ่มวันที่
-    // ครั้งที่ 1 ได้ที่ปุ่ม + ในตารางนี้เท่านั้น (ยังมี safeguard คำเตือนซ้ำอีกชั้นที่ handleDeleteDraftClick
-    // เผื่อกรณีอื่นที่เข้าถึงฉบับร่างนี้ได้)
-    firstVisitStart: "", firstVisitEnd: "",
-  };
+  // ⚠️ ตัวค่าเริ่มต้นย้ายไป module scope (EMPTY_CONTRACT_FORM) แล้ว — แถวร่างในตาราง (InlineAddRow)
+  // ซึ่งอยู่นอกคอมโพเนนต์นี้ต้องใช้ชุดเดียวกัน จะได้ไม่มีค่าเริ่มต้น 2 ชุดที่หลุดจากกันได้
+  const emptyForm = EMPTY_CONTRACT_FORM;
   const [addOpen, setAddOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
@@ -1444,50 +1676,77 @@ export default function ContractOverview() {
   const openAddDialog = () => {
     setForm({ ...emptyForm, contractNo: suggestNextContractNo() });
     setFormError("");
+    setInlineAddOpen(false); // ⚠️ ทั้งสองทางใช้ `form` ก้อนเดียวกัน เปิดพร้อมกันไม่ได้ (ดู openInlineAdd)
     setAddOpen(true);
   };
   const closeAddDialog = () => { if (!saving) setAddOpen(false); };
 
+  // ── แถวร่าง "เพิ่มสัญญาใหม่" ท้ายตาราง ──────────────────────────────────
+  // ✅ เดิมทางเดียวที่สร้างสัญญาใหม่ได้คือกดปุ่ม "เพิ่มสัญญาใหม่" มุมขวาบนแล้วกรอกในไดอะล็อกที่มี 12 ช่อง
+  // = ต้อง "ออกจากตาราง" ไปกรอกฟอร์มแยกก่อนเสมอ แล้วค่อยกลับมาไล่หาว่าแถวใหม่ไปโผล่ตรงไหน — แถวร่างนี้
+  // ให้กรอกในตำแหน่งเดียวกับคอลัมน์จริงของมันเลย เห็นทันทีว่าค่าที่กรอกจะไปอยู่ช่องไหนของตาราง
+  // ⚠️ ใช้ state `form` + handleAddSubmit ตัวเดียวกับไดอะล็อกทุกประการ ไม่ได้เขียนตรรกะสร้าง/ตรวจสอบ
+  // ขึ้นใหม่อีกชุด — ทางสร้างสัญญายังมีทางเดียวเสมอ แก้/เพิ่มกฎที่เดียวมีผลทั้งสองทางพร้อมกัน
+  // ⚠️ เปิดได้ทีละทาง: เปิดแถวร่างอยู่แล้วกดปุ่มด้านบนจะปิดแถวร่างให้เอง (และกลับกัน) ไม่งั้นทั้งสองทาง
+  // จะแก้ `form` ก้อนเดียวกันพร้อมกันจนค่าที่พิมพ์ในแถวร่างโผล่ไปอยู่ในไดอะล็อกแบบงงๆ
+  const [inlineAddOpen, setInlineAddOpen] = useState(false);
+  // ⚠️ ไม่แตะ state `form` ของหน้านี้เลย — แถวร่างถือค่าที่กำลังพิมพ์ไว้เองทั้งหมด (ดู InlineAddRow)
+  // แล้วส่งกลับมาทีเดียวตอนกดบันทึก การเปิดแถวจึงเปลี่ยน state แค่ตัวเดียว เรนเดอร์ใหม่รอบเดียวจบ
+  const openInlineAdd = () => {
+    setFormError("");
+    setAddOpen(false);
+    setInlineAddOpen(true);
+  };
+  const closeInlineAdd = () => { if (!saving) { setInlineAddOpen(false); setFormError(""); } };
+  // ✅ สลับแท็บแล้วปิดแถวร่างทิ้งเสมอ — แถวร่างเป็นของ "รายการที่กำลังดูอยู่" ถ้าปล่อยค้างข้ามแท็บ ผู้ใช้
+  // จะเจอแถวที่กรอกไว้ครึ่งหนึ่งโผล่ในบริบทอื่นโดยไม่รู้ที่มา (เทียบเหตุผลเดียวกับ clearSelection)
+  useEffect(() => { setInlineAddOpen(false); }, [viewFilter]);
+  // ✅ แถวร่างนี้สร้าง "สัญญา" — แท็บที่ไม่ได้แสดงสัญญา (งานทั่วไป/งานโปรเจค/ยังไม่จัดกลุ่ม/เลยกำหนด)
+  // ไม่ควรมีให้กด เพราะสัญญาที่เพิ่งบันทึกจะไม่โผล่ในแท็บนั้นเลย (คนละตัวกรอง) ผู้ใช้จะเข้าใจว่าบันทึกไม่ติด
+  const canInlineAdd = isAdminOrManager && (viewFilter === "contracts" || viewFilter === "all");
+  // จำนวนคอลัมน์ทั้งแถว — ใช้กับ colSpan ของแถวปุ่ม "+" และแถวข้อความแจ้งเตือน (ดู footerColSpan)
+  const totalColCount = footerColSpan.before + 1 + footerColSpan.after;
+
   // ✅ วันที่เข้างานครั้งที่ 1 ไม่บังคับกรอกตอนสร้างสัญญา (ตามที่ผู้ใช้ยืนยัน — บางสัญญายังไม่รู้วันที่
   // แน่นอน) กรอกมาจะลงตารางจริงทันที ไม่กรอกจะบันทึกเป็นฉบับร่างไปเพิ่มวันที่ทีหลังได้ตามปกติ
-  const handleAddSubmit = async () => {
+  const handleAddSubmit = async (values = form) => {
     setFormError("");
-    if (!form.site.trim())   { setFormError("กรุณาระบุชื่อโครงการ"); return; }
-    if (!form.title.trim())  { setFormError("กรุณาระบุประเภทงาน"); return; }
-    if (!form.system.trim()) { setFormError("กรุณาระบุระบบงาน"); return; }
-    const visitCount = Number(form.visitCount);
+    if (!values.site.trim())   { setFormError("กรุณาระบุชื่อโครงการ"); return; }
+    if (!values.title.trim())  { setFormError("กรุณาระบุประเภทงาน"); return; }
+    if (!values.system.trim()) { setFormError("กรุณาระบุระบบงาน"); return; }
+    const visitCount = Number(values.visitCount);
     if (!visitCount || visitCount < 1) { setFormError("กรุณาระบุจำนวนครั้งทั้งหมดของสัญญา"); return; }
     // ✅ ห้ามใส่เกิน 12 — สัญญาที่มีจำนวนครั้งเยอะเกินไปจะทำให้ตาราง "ภาพรวมงาน" ต้องเรนเดอร์คอลัมน์
-    // "ครั้งที่ N" เกินจำเป็น (maxVisitCount คำนวณจากค่าสูงสุดของทุกแถวที่กรองอยู่ในตาราง — ตั้งค่านี้
-    // สูงเกินไปแค่สัญญาเดียวก็ทำให้ตารางทั้งหน้ากว้างจนพังได้) เช็คซ้ำฝั่ง backend อีกชั้นด้วย (POST /draft)
+    // "ครั้งที่ N" เกินจำเป็น (visitColumns คำนวณจากค่าสูงสุดของแถวที่แสดงอยู่ในหน้านั้น — ตั้งค่านี้
+    // สูงเกินไปแค่สัญญาเดียวก็ทำให้หน้าที่มีสัญญานั้นกว้างจนพังได้) เช็คซ้ำฝั่ง backend อีกชั้นด้วย (POST /draft)
     if (visitCount > MAX_VISIT_COUNT) { setFormError(`จำนวนครั้งทั้งหมดต้องไม่เกิน ${MAX_VISIT_COUNT} ครั้ง`); return; }
     // ✅ ไม่บังคับ — เว้นว่างได้ ไม่กระทบจำนวนครั้งด้านบน แค่ใช้เตือน "เกินกำหนดรอบถัดไป" ถ้าระบุมา
-    if (form.intervalMonths) {
-      const n = Number(form.intervalMonths);
+    if (values.intervalMonths) {
+      const n = Number(values.intervalMonths);
       if (!n || n < 1 || n > 24) {
         setFormError("ระยะห่างระหว่างรอบต้องอยู่ระหว่าง 1-24 เดือน");
         return;
       }
     }
-    if (isContractNoTaken(form.contractNo)) {
-      setFormError(`เลขที่สัญญา "${form.contractNo.trim()}" ถูกใช้ไปแล้ว กรุณาตรวจสอบ`);
+    if (isContractNoTaken(values.contractNo)) {
+      setFormError(`เลขที่สัญญา "${values.contractNo.trim()}" ถูกใช้ไปแล้ว กรุณาตรวจสอบ`);
       return;
     }
     // 🐛 BUG ที่แก้: เดิมไม่เคยตรวจว่าวันสิ้นสุดสัญญาต้องไม่ก่อนวันเริ่มสัญญาเลย (ตรวจแค่วันที่ครั้งที่ 1)
     // สลับวันกันมาก็บันทึกผ่านได้ แล้วสัญญาจะขึ้นป้าย "หมดอายุแล้ว" สีแดงทันทีที่สร้างเสร็จ (ดู
     // contractStatusInfo) โดยไม่มีอะไรบอกว่าเพราะกรอกวันสลับกัน
-    if (form.contractStart && form.contractEnd && moment(form.contractEnd).isBefore(moment(form.contractStart))) {
+    if (values.contractStart && values.contractEnd && moment(values.contractEnd).isBefore(moment(values.contractStart))) {
       setFormError("วันที่สิ้นสุดสัญญาต้องไม่ก่อนวันที่เริ่มสัญญา");
       return;
     }
     // ✅ วันที่เข้างานครั้งที่ 1 ไม่บังคับ (ตามที่ผู้ใช้ยืนยัน — บางสัญญายังไม่รู้วันที่แน่นอนตอนสร้าง)
     // แต่ถ้ากรอกมา ต้องถูกต้อง (สิ้นสุดไม่ก่อนเริ่ม)
-    if (form.firstVisitEnd && moment(form.firstVisitEnd).isBefore(moment(form.firstVisitStart))) {
+    if (values.firstVisitEnd && moment(values.firstVisitEnd).isBefore(moment(values.firstVisitStart))) {
       setFormError("วันที่สิ้นสุดครั้งที่ 1 ต้องไม่ก่อนวันที่เริ่ม");
       return;
     }
     // 🐛 BUG ที่แก้: มูลค่างานเดิมรับค่าติดลบได้ (type="number" ไม่มี min และไม่เคยตรวจฝั่งจอเลย)
-    if (form.jobValue && Number(form.jobValue) < 0) {
+    if (values.jobValue && Number(values.jobValue) < 0) {
       setFormError("มูลค่างานต้องไม่ติดลบ");
       return;
     }
@@ -1495,26 +1754,26 @@ export default function ContractOverview() {
     setSaving(true);
     try {
       const payload = {
-        company: form.company.trim(),
-        site: form.site.trim(),
-        title: form.title.trim(),
-        system: form.system.trim(),
+        company: values.company.trim(),
+        site: values.site.trim(),
+        title: values.title.trim(),
+        system: values.system.trim(),
         // ✅ "ผู้รับผิดชอบงาน" — คนที่ติดตามสัญญานี้ทั้งหมด มอบหมายโดย admin/manager ตอนสร้างสัญญา
         // (ไม่ใช่ทีมที่เข้างานซึ่งเป็นของแต่ละครั้ง ดูคอมเมนต์ที่ emptyForm) ต้องส่งค่าตรงๆ ไม่ผ่าน
         // fallback เท่านั้น สิทธิ์ที่ผูกกับ "ผู้รับผิดชอบตัวจริง" ถึงจะทำงาน (ดู rawResponsiblePersonId)
-        responsiblePerson: form.responsiblePerson,
-        responsiblePersonId: teamToId.get(form.responsiblePerson) || "",
+        responsiblePerson: values.responsiblePerson,
+        responsiblePersonId: teamToId.get(values.responsiblePerson) || "",
         backgroundColor: "#3788d8",
         textColor: "#ffffff",
         fontSize: 8,
         isContractBatch: true,
-        contractNo: form.contractNo.trim(),
-        quotationNo: form.quotationNo.trim(),
-        contractStart: form.contractStart,
-        contractEnd: form.contractEnd,
+        contractNo: values.contractNo.trim(),
+        quotationNo: values.quotationNo.trim(),
+        contractStart: values.contractStart,
+        contractEnd: values.contractEnd,
         visitCount,
-        intervalMonths: form.intervalMonths ? Number(form.intervalMonths) : undefined,
-        jobValue: form.jobValue ? Number(form.jobValue) : undefined,
+        intervalMonths: values.intervalMonths ? Number(values.intervalMonths) : undefined,
+        jobValue: values.jobValue ? Number(values.jobValue) : undefined,
       };
 
       // ✅ upsert เข้าตารางกลาง (บริษัท/โครงการ/ประเภทงาน/ระบบ) แบบ best-effort เหมือน AddEvent.js
@@ -1535,18 +1794,18 @@ export default function ContractOverview() {
       // ⚠️ กรณีฉบับร่าง: ถ้าถูกลบทิ้งตอนยังไม่มีครั้งไหนลงตารางเลย สัญญาทั้งอันจะหายไปจากตาราง
       // "ภาพรวมงาน" ทันที (ไม่เหลือ document ไหนผูก contractGroupId นี้เลย) — เตือนไว้ชัดเจนแยกจาก
       // คำเตือนปกติแล้วที่ handleDeleteDraftClick (EventCalendar/index.js) กันลบพลาดโดยไม่รู้ตัว
-      if (form.firstVisitStart) {
+      if (values.firstVisitStart) {
         await EventService.AddEvent({
           ...payload,
           // ✅ ทีมที่เข้างานผูกกับ "ครั้งที่ 1" ที่กำลังสร้างนี้เท่านั้น ไม่ใช่ค่าระดับสัญญา — ครั้งถัดๆ ไป
           // เลือกทีมของตัวเองแยกได้อิสระ (ดู beginRoundTeamEdit ในตาราง / กล่อง "เพิ่มครั้งถัดไป")
-          team: form.firstVisitTeam,
-          resPerson: teamToId.get(form.firstVisitTeam) || "",
+          team: values.firstVisitTeam,
+          resPerson: teamToId.get(values.firstVisitTeam) || "",
           time: "1",
           dates: [{
-            start: form.firstVisitStart,
-            end: moment(form.firstVisitEnd || form.firstVisitStart).add(1, "days").format("YYYY-MM-DD"),
-            date: form.firstVisitStart,
+            start: values.firstVisitStart,
+            end: moment(values.firstVisitEnd || values.firstVisitStart).add(1, "days").format("YYYY-MM-DD"),
+            date: values.firstVisitStart,
           }],
         });
       } else {
@@ -1556,11 +1815,12 @@ export default function ContractOverview() {
 
       setSaving(false);
       setAddOpen(false);
+      setInlineAddOpen(false); // ✅ ปิดแถวร่างท้ายตารางด้วย — ฟังก์ชันนี้ใช้ร่วมกันทั้ง 2 ทางเข้า
       Swal.fire({
         title: "บันทึกสัญญาใหม่สำเร็จ ✅",
-        text: form.firstVisitStart ? undefined : 'ยังไม่ได้ระบุวันที่เข้างาน — สัญญาถูกบันทึกเป็น "สัญญาเปล่า" กดชิป "📌 กดเพื่อลงวันที่" ที่ช่องครั้งที่ 1 ในตารางเมื่อรู้วันที่จริง',
+        text: values.firstVisitStart ? undefined : 'ยังไม่ได้ระบุวันที่เข้างาน — สัญญาถูกบันทึกเป็น "สัญญาเปล่า" กดชิป "📌 กดเพื่อลงวันที่" ที่ช่องครั้งที่ 1 ในตารางเมื่อรู้วันที่จริง',
         icon: "success",
-        timer: form.firstVisitStart ? 1500 : 2500,
+        timer: values.firstVisitStart ? 1500 : 2500,
         showConfirmButton: false,
       });
       await fetchData(true);
@@ -1914,7 +2174,7 @@ export default function ContractOverview() {
       }
     }
     // ✅ ห้ามใส่จำนวนครั้งทั้งหมดเกิน 12 — เทียบ pattern เดียวกับ intervalMonths ด้านบน กันตาราง
-    // เรนเดอร์คอลัมน์ "ครั้งที่ N" เกินจำเป็นจนหน้าพัง (ดู maxVisitCount ด้านล่าง)
+    // เรนเดอร์คอลัมน์ "ครั้งที่ N" เกินจำเป็นจนหน้าพัง (ดู visitColumns / roundColumnsFor)
     if (field === "visitCount" && rawValue) {
       const n = Number(rawValue);
       if (!n || n < 1 || n > MAX_VISIT_COUNT) {
@@ -2310,7 +2570,7 @@ export default function ContractOverview() {
           </Typography>
         </Box>
         <Typography sx={{ fontWeight: 800, fontSize: "1.25rem", color: ACCENT, whiteSpace: "nowrap", letterSpacing: "-0.01em" }}>
-          {jobValueSummary.total.toLocaleString()}
+          {formatBaht(jobValueSummary.total)}
         </Typography>
       </Stack>
       {jobValueSummary.missingCount > 0 && (
@@ -2392,9 +2652,10 @@ export default function ContractOverview() {
 
     return (
       <Paper key={c.key} variant="outlined" sx={{ borderRadius: 3, p: 1.75, borderColor: BORDER_MAIN, boxShadow: "0 1px 2px rgba(15,23,42,0.05)" }}>
-        {/* หัวการ์ด — ส่วนเดียวที่โชว์เสมอ (บริษัท/โครงการ/ประเภทงาน/สถานะ/คืบหน้า) ที่เหลือกดปุ่มลูกศร
-            เพื่อกางดูรายละเอียดเพิ่ม (เทียบ pattern เดียวกับการ์ดงานในหน้า "การดำเนินงาน") กันการ์ด
-            ยาวเกินไปตอนมีหลายรายการในหน้าเดียว */}
+        {/* หัวการ์ด — ส่วนที่โชว์เสมอ: บริษัท/โครงการ + หมวดหมู่งาน(สัญญา/ทั่วไป/โปรเจค) + สถานะสัญญา
+            แล้วต่อด้วยแถบสรุป ประเภทงาน/ระบบ/มูลค่างาน และแถวคืบหน้า — ครบพอให้ตัดสินใจได้ว่าใบไหน
+            คืองานที่กำลังหาโดยไม่ต้องกางสักใบ ที่เหลือกด "รายละเอียด" เพื่อกางดูเพิ่ม (เทียบ pattern
+            เดียวกับการ์ดงานในหน้า "การดำเนินงาน") กันการ์ดยาวเกินไปตอนมีหลายรายการในหน้าเดียว */}
         <Stack direction="row" alignItems="flex-start" spacing={1} sx={{ mb: isExpanded ? 0.5 : 0 }}>
           {showCheckboxes && isSelectableForMerge(c) && (
             <Checkbox
@@ -2420,6 +2681,53 @@ export default function ContractOverview() {
           </Stack>
         </Stack>
 
+        {/* ✅ แถบสรุปหัวการ์ด — "ประเภทงาน / ระบบ / มูลค่างาน" ต้องเห็นทันทีโดยไม่ต้องกด "รายละเอียด"
+            เดิม 3 ฟิลด์นี้อยู่ในส่วนที่พับไว้ทั้งหมด การ์ดที่ยังพับอยู่จึงบอกได้แค่ชื่อโครงการกับความคืบหน้า
+            มองไม่ออกเลยว่าเป็นงานอะไร ระบบไหน มูลค่าเท่าไหร่ ต้องกางทีละใบถึงจะรู้ (ดูภาพที่ผู้ใช้ส่งมา)
+            ⚠️ ใช้ EditableCell ตัวเดียวกับที่เคยอยู่ในส่วนพับ พร้อมเงื่อนไขสิทธิ์เดิมเป๊ะๆ จึงยังแตะแก้ไขได้
+            ตรงนี้เลย — และเป็นการ "ย้าย" ไม่ใช่ "เพิ่ม" (ลบ FieldRow เดิมในส่วนพับออกแล้ว) กันข้อมูล
+            เดียวกันโผล่ซ้ำ 2 ที่ในการ์ดใบเดียว ซึ่งจะทำให้การ์ดยาวขึ้นโดยไม่ได้ข้อมูลเพิ่ม */}
+        <Box
+          sx={{
+            mt: 1, px: 1, py: 0.75, borderRadius: 2, bgcolor: alpha("#0f172a", 0.025),
+            display: "grid",
+            // minmax(0,…) จำเป็นทั้ง 3 ช่อง — ไม่งั้นช่องที่ข้อความยาว (เช่นระบบ "Fire Alarm & CCTV")
+            // จะดันความกว้างขั้นต่ำของตัวเองจนกริดล้นออกนอกการ์ดแทนที่จะตัดด้วย ellipsis
+            // ⚠️ ช่องมูลค่ามีพื้นขั้นต่ำ 84px — ตอนแตะแก้ไขจะกลายเป็นช่องกรอกตัวเลข ถ้าปล่อยให้กว้าง
+            // ตามเนื้อหา (auto ล้วน) ช่องกรอกจะหดจนพิมพ์เลขหลักหมื่นแล้วมองไม่เห็นตัวที่พิมพ์
+            gridTemplateColumns: "minmax(0,1fr) minmax(0,1.1fr) minmax(84px,auto)",
+            columnGap: 1, alignItems: "start",
+          }}
+        >
+          <CardMetaCell label="ประเภทงาน">
+            <EditableCell
+              Wrapper={Box} width="100%" editable={canEditBasicField(c, "title")} editType="autocomplete" editOptions={titleOptions}
+              value={c.title} title={c.title}
+              formatDisplay={(v) => <Typography component="span" sx={{ fontSize: "0.82rem", fontWeight: 700, lineHeight: 1.35 }}>{v || <Dash />}</Typography>}
+              {...fp("title")}
+            />
+          </CardMetaCell>
+          <CardMetaCell label="ระบบ">
+            <EditableCell
+              Wrapper={Box} width="100%" editable={canEditBasicField(c, "system")} editType="autocomplete" editOptions={systemOptions}
+              value={c.system} title={c.system}
+              formatDisplay={(v) => <Typography component="span" sx={{ fontSize: "0.82rem", lineHeight: 1.35, color: v ? "text.primary" : undefined }}>{v || <Dash />}</Typography>}
+              {...fp("system")}
+            />
+          </CardMetaCell>
+          <CardMetaCell label="มูลค่างาน" align="right">
+            <EditableCell
+              Wrapper={Box} width="100%" editable={isAdminOrManager && canEditField(c, "jobValue")} editType="number" value={c.jobValue}
+              // ✅ ยังไม่กรอกมูลค่า = บอกตรงๆ ด้วยสีส้มเตือน ไม่ใช่ขีด "–" เงียบๆ ให้เข้าใจว่าเป็นงานไม่มี
+              // มูลค่า — ตรงกับคำเตือน "ยังไม่ได้กรอกมูลค่า N รายการ" ในกล่องสรุปยอดรวมด้านบนของหน้า
+              formatDisplay={(v) => (hasMoney(v)
+                ? <Typography component="span" sx={{ fontSize: "0.88rem", fontWeight: 800, letterSpacing: "-0.01em" }}>{formatBaht(v)}</Typography>
+                : <Typography component="span" sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#b45309" }}>ยังไม่ระบุ</Typography>)}
+              {...fp("jobValue")}
+            />
+          </CardMetaCell>
+        </Box>
+
         <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.75 }}>
           <Chip label={progressLabel} size="small" sx={{ height: 20, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha(progressColor, 0.12), color: progressColor }} />
           {overdueInfo && (
@@ -2441,11 +2749,8 @@ export default function ContractOverview() {
 
         <Collapse in={isExpanded}>
         <Box sx={{ mt: 1 }}>
-        {/* ✅ ประเภทงาน/ระบบ — เดิมโชว์เคียงข้างกันแบบไม่มีป้ายกำกับเลย (แยกไม่ออกว่าอันไหนคืออันไหน)
-            สลับเป็น FieldRow มีป้ายชัดเจนเหมือนฟิลด์อื่นในการ์ด และสลับลำดับให้ "ประเภทงาน" (ตัวระบุงาน
-            หลัก เช่น PM) ขึ้นก่อน "ระบบ" (รายละเอียดย่อย เช่น Fire Alarm) ตามที่ขอ */}
-        <FieldRow label="ประเภทงาน" editable={canEditBasicField(c, "title")} editType="autocomplete" editOptions={titleOptions} value={c.title} title={c.title} {...fp("title")} />
-        <FieldRow label="ระบบ" editable={canEditBasicField(c, "system")} editType="autocomplete" editOptions={systemOptions} value={c.system} title={c.system} {...fp("system")} />
+        {/* ⚠️ "ประเภทงาน"/"ระบบ" ไม่ได้อยู่ตรงนี้แล้ว — ย้ายขึ้นไปอยู่แถบสรุปหัวการ์ดที่เห็นตลอดโดยไม่ต้อง
+            กางการ์ด (ดูคอมเมนต์ที่แถบสรุป) แก้ไขได้เหมือนเดิมทุกประการที่ตำแหน่งใหม่ */}
 
         {/* เอกสาร: เลขที่สัญญา/ใบเสนอราคา (สัญญาจริง) หรือเลขที่เอกสาร (งานทั่วไป/โปรเจค) */}
         {c.isRealContract ? (
@@ -2588,9 +2893,8 @@ export default function ContractOverview() {
           </>
         )}
 
-        {/* ✅ มูลค่างาน — ย้ายออกมานอกบล็อก c.isRealContract แล้ว จึงแสดงทุกแท็บ (งานทั่วไป/โปรเจค/
-            ยังไม่จัดกลุ่มก็มีมูลค่าของตัวเองได้) ตรงกับคอลัมน์ในตารางฝั่งเดสก์ท็อป */}
-        <FieldRow label="มูลค่างาน" editable={isAdminOrManager && canEditField(c, "jobValue")} editType="number" value={c.jobValue} formatDisplay={(v) => (v != null && v !== "" ? Number(v).toLocaleString() : <Dash />)} {...fp("jobValue")} />
+        {/* ⚠️ "มูลค่างาน" ย้ายขึ้นไปอยู่แถบสรุปหัวการ์ดแล้วเช่นกัน (แสดงทุกแท็บเหมือนเดิม ไม่ได้จำกัดแค่
+            สัญญาจริง เพราะงานทั่วไป/โปรเจค/ยังไม่จัดกลุ่มก็มีมูลค่าของตัวเองได้ ตรงกับคอลัมน์ฝั่งเดสก์ท็อป) */}
 
         {/* ผู้รับผิดชอบ — ฟิลด์อิสระจากทีมที่เข้างานทุกครั้งด้านบนโดยสมบูรณ์ */}
         <FieldRow label="ผู้รับผิดชอบ" editable={isAdminOrManager && canEditField(c, "responsiblePerson")} editType="select" editOptions={teamOptions} value={c.responsiblePerson} formatDisplay={unassignedResponsibleDisplay} {...fp("responsiblePerson")} />
@@ -3150,17 +3454,44 @@ export default function ContractOverview() {
               ล้างตัวกรองทั้งหมด
             </Button>
           )}
+          {/* ✅ ตารางว่าง = ไม่มีแถวให้แถวร่างท้ายตารางไปเกาะ (ตอนไม่มีข้อมูลจะเรนเดอร์กล่องนี้แทนทั้งตาราง)
+              ต้องมีทางเริ่มต้นสร้างสัญญาแรกจากตรงนี้ด้วย ไม่งั้นหน้าจอที่ว่างเปล่าจะไม่มีอะไรให้ทำต่อเลย
+              ⚠️ ไม่โชว์ตอนที่ว่างเพราะตัวกรอง — สิ่งที่ต้องทำตอนนั้นคือล้างตัวกรอง ไม่ใช่สร้างสัญญาใหม่ */}
+          {canInlineAdd && !hasActiveFilters && (
+            <Button
+              size="small" variant="contained" onClick={openAddDialog}
+              startIcon={<AddCircleOutline sx={{ fontSize: 18 }} />}
+              sx={{ mt: 1.5, textTransform: "none", fontWeight: 700, borderRadius: 2, bgcolor: ACCENT, "&:hover": { bgcolor: "#b91c1c" } }}
+            >
+              เพิ่มสัญญาใหม่
+            </Button>
+          )}
         </Paper>
       ) : isMobile && mobileView === "card" ? (
         <Stack spacing={1.5}>
           {renderMobileSummary()}
           {pagedRows.map((c) => renderMobileCard(c))}
+          {/* ✅ ท้ายรายการการ์ดมีทางเพิ่มสัญญาใหม่เหมือนท้ายตาราง — มุมมองการ์ดไม่มีคอลัมน์ให้กรอกตรงจุด
+              จึงเปิดไดอะล็อกแทน (ทางเดียวกับปุ่มด้านบน) ไม่ทำฟอร์มในการ์ดซ้ำอีกชุด */}
+          {canInlineAdd && (
+            <Button
+              fullWidth onClick={openAddDialog}
+              startIcon={<AddCircleOutline sx={{ fontSize: 20 }} />}
+              sx={{
+                textTransform: "none", fontWeight: 700, fontSize: "0.85rem", color: ACCENT,
+                py: 1.5, borderRadius: 3, border: `1px dashed ${alpha(ACCENT, 0.4)}`,
+                "&:hover": { bgcolor: alpha(ACCENT, 0.05), borderColor: ACCENT },
+              }}
+            >
+              เพิ่มสัญญาใหม่
+            </Button>
+          )}
         </Stack>
       ) : (
         <>
         {/* ✅ บอกให้รู้ตั้งแต่แรกว่าตารางกว้างเกินจอและปัดดูต่อได้ — ไม่งั้นคนที่เพิ่งสลับมาโหมดตารางจะ
-            เห็นแค่ 2-3 คอลัมน์แรกแล้วนึกว่าข้อมูลที่เหลือหายไป (คอลัมน์แรกถูกตรึงไว้ให้แล้ว จะได้รู้
-            ตลอดว่ากำลังอ่านแถวของงานไหนอยู่ ดู mobileTableSx) */}
+            เห็นแค่ 2-3 คอลัมน์แรกแล้วนึกว่าข้อมูลที่เหลือหายไป (ไม่มีคอลัมน์ตรึงแล้ว ทุกคอลัมน์เลื่อน
+            ไปพร้อมกันหมด กด ‹ เพื่อกลับมาคอลัมน์เลขที่เอกสารได้ ดู mobileTableSx) */}
         {useMobileTable && (
           <>
             <Box sx={{ mb: 1.5 }}>{renderMobileSummary()}</Box>
@@ -3286,7 +3617,7 @@ export default function ContractOverview() {
                 {/* ✅ มูลค่างาน — แสดงทุกแท็บแล้ว (เดิมเฉพาะแท็บสัญญา) งานทั่วไป/โปรเจค/ยังไม่จัดกลุ่ม
                     ก็มีมูลค่าของตัวเองได้เหมือนกัน ข้อมูลมีอยู่ในฐานข้อมูลทุกแถวอยู่แล้ว แค่เดิมไม่ได้
                     แสดงให้เห็น — ดูยอดรวมท้ายตาราง (TableFooter) ที่สรุปให้ทุกแท็บเช่นกัน */}
-                <ResizableTh width={colWidth("jobValue")} align="right" columnKey="jobValue" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("jobValue")} sortable sortDirection={sortConfig.key === "jobValue" ? sortConfig.direction : null} onSort={handleSortClick}>มูลค่างาน</ResizableTh>
+                <ResizableTh width={colWidth("jobValue")} align="right" columnKey="jobValue" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("jobValue")} sortable sortDirection={sortConfig.key === "jobValue" ? sortConfig.direction : null} onSort={handleSortClick}>มูลค่างาน (฿)</ResizableTh>
                 {!hideContractOnlyColumns && (
                   <ResizableTh width={colWidth("status")} align="center" columnKey="status" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("status")}>สถานะสัญญา</ResizableTh>
                 )}
@@ -3325,9 +3656,9 @@ export default function ContractOverview() {
                   ? countUsedRounds(c.visits.filter((v) => !v.unscheduled)) + 1
                   : null;
                 const overdueInfo = nextVisitOverdueInfo(c);
-                // ✅ แถบสลับสีใช้สีทึบ (ไม่ใช่สีดำโปร่งแสง 2% แบบเดิม) — จำเป็นสำหรับคอลัมน์ที่ตรึงไว้
-                // บนมือถือ ซึ่งต้องมีพื้นหลังทึบไม่งั้นเห็นเนื้อหาคอลัมน์อื่นวิ่งทะลุตอนเลื่อน (ดู
-                // mobileTableSx) และตอน hover ใช้สีแดงจางแทนสีเทากลางของ MUI ให้แถวที่ชี้อยู่เด่นขึ้น
+                // ✅ แถบสลับสีใช้สีทึบ (ไม่ใช่สีดำโปร่งแสง 2% แบบเดิม) — บนจอมือถือที่ตัวหนังสือเล็กและ
+                // ต้องเลื่อนแนวนอน แถบสลับสีที่จางเกินไปจะช่วยไล่สายตาตามแถวไม่ได้จริง และตอน hover
+                // ใช้สีแดงจางแทนสีเทากลางของ MUI ให้แถวที่ชี้อยู่เด่นขึ้น
                 return (
                 <TableRow
                   key={c.key}
@@ -3480,49 +3811,97 @@ export default function ContractOverview() {
 
                   {/* ✅ เริ่มต้น + สิ้นสุด + รอบเข้า ซ้อนในช่องเดียว "ระยะเวลาสัญญา" — เดิมแยก 3 คอลัมน์
                       แคบจนวันที่โดนตัดเหลือ "01/..." อ่านไม่ออกทั้งที่เป็นข้อมูลหลักของสัญญา
-                      บรรทัดบน = ช่วงสัญญา (วันเริ่ม–วันสิ้นสุด คลิกแก้ทีละฝั่งได้) บรรทัดล่าง = รอบเข้า */}
+                      🐛 BUG ที่แก้ (คลิกแก้วันที่สัญญายาก): เดิมวางวันเริ่ม–วันสิ้นสุดไว้ "บรรทัดเดียวกัน"
+                      คั่นด้วยขีด ทั้งคู่จึงได้ความกว้างแค่ครึ่งช่อง (~85px) ผลคือ 3 อย่างพร้อมกัน —
+                        1) ตัวเลขปีโดนตัดเป็น "01/01/2..." อ่านไม่ออกว่าปีอะไร
+                        2) พื้นที่ให้คลิกเล็กมากและอยู่ชิดขอบคอลัมน์ (ที่มีตัวปรับความกว้างคอลัมน์คร่อมอยู่)
+                           กดพลาดไปโดนตัวปรับความกว้างแทนบ่อย
+                        3) พอคลิกติดแล้ว ช่องเลือกวันที่ (input type=date) ถูกบีบให้แคบกว่าตัวมันเองต้องการ
+                           ปุ่มปฏิทินเลยหลุดออกนอกช่อง กดเลือกวันไม่ได้จริง
+                      ✅ แยกเป็นคนละบรรทัด ติดป้าย "เริ่ม"/"ถึง" ไว้หน้าแต่ละอัน — แต่ละวันได้ความกว้าง
+                      เต็มช่อง อ่านครบ คลิกได้ทั้งแถบ และตอนแก้ไขช่องวันที่ก็กว้างพอให้กดปฏิทินได้จริง */}
                   {!hideContractOnlyColumns && (
                     <TableCell data-col-key="period" sx={{ width: colVar("period"), maxWidth: colVar("period") }}>
                       <Stack spacing={0.15}>
-                        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexWrap: "nowrap" }}>
-                          <EditableCell
-                            Wrapper={Box}
-                            editable={isAdminOrManager && c.isRealContract} columnKey="contractStart"
-                            editing={editingCell?.key === c.key && editingCell?.field === "contractStart"}
-                            value={c.contractStart} editValue={editValue} editType="date" saving={editSaving}
-                            formatDisplay={(v) => (v
-                              ? <span style={{ fontWeight: 600 }}>{moment(v).format("DD/MM/YYYY")}</span>
-                              : <Dash />)}
-                            onStartEdit={() => beginEdit(c, "contractStart")}
-                            onChangeValue={setEditValue}
-                            onCommit={() => commitEdit(c)}
-                            onCancel={cancelEdit}
-                          />
-                          <Box component="span" sx={{ color: "text.disabled", flexShrink: 0 }}>–</Box>
-                          <EditableCell
-                            Wrapper={Box}
-                            editable={isAdminOrManager && c.isRealContract} columnKey="contractEnd"
-                            editing={editingCell?.key === c.key && editingCell?.field === "contractEnd"}
-                            value={c.contractEnd} editValue={editValue} editType="date" saving={editSaving}
-                            formatDisplay={(v) => (v
-                              ? <span style={{ fontWeight: 600 }}>{moment(v).format("DD/MM/YYYY")}</span>
-                              : <Dash />)}
-                            onStartEdit={() => beginEdit(c, "contractEnd")}
-                            onChangeValue={setEditValue}
-                            onCommit={() => commitEdit(c)}
-                            onCancel={cancelEdit}
-                          />
-                        </Stack>
+                        {[
+                          { field: "contractStart", label: "เริ่ม", value: c.contractStart, tip: "วันเริ่มสัญญา — คลิกเพื่อแก้ไข", start: true },
+                          { field: "contractEnd", label: "ถึง", value: c.contractEnd, tip: "วันสิ้นสุดสัญญา — คลิกเพื่อแก้ไข", start: false },
+                        // alignItems="stretch" — ให้แถบคลิกสูงเต็มบรรทัด (ไม่ใช่สูงเท่าตัวหนังสือ)
+                        // พื้นที่กดจึงเป็นสี่เหลี่ยมเต็มๆ ไม่ใช่เส้นบางๆ ที่ต้องเล็งให้ตรงตัวเลข
+                        ].map((d) => (
+                          <Stack key={d.field} direction="row" alignItems="stretch" spacing={0.6} sx={{ minHeight: 21 }}>
+                            {/* ✅ จุดกลมเล็กๆ หน้าบรรทัด — จุดทึบ = จุดเริ่ม, จุดกลวง = จุดจบ อ่านเป็น
+                                "ไทม์ไลน์" ได้ทันทีโดยไม่ต้องอ่านตัวหนังสือ (ป้าย "เริ่ม/ถึง" ยังอยู่ครบ
+                                สำหรับคนที่อยากอ่านให้แน่ใจ) — แทนที่จะเป็นตัวหนังสือเทาลอยๆ 2 บรรทัด */}
+                            <Box sx={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+                              <Box
+                                sx={{
+                                  width: 6, height: 6, borderRadius: "50%",
+                                  bgcolor: d.start ? alpha(ACCENT, 0.75) : "transparent",
+                                  border: d.start ? "none" : `1.5px solid ${alpha(ACCENT, 0.5)}`,
+                                }}
+                              />
+                            </Box>
+                            <Box
+                              component="span"
+                              sx={{ width: 22, flexShrink: 0, fontSize: "0.63rem", color: "text.disabled", display: "flex", alignItems: "center", letterSpacing: "0.01em" }}
+                            >
+                              {d.label}
+                            </Box>
+                            {/* กล่องนี้ทำให้ EditableCell ยืดเต็มพื้นที่ที่เหลือ = แถบคลิกกว้างเต็มช่อง
+                                (ไม่ใช่กว้างเท่าตัวหนังสือเหมือนเดิม ซึ่งเป็นเป้าที่เล็กเกินไปสำหรับนิ้ว) */}
+                            <Box sx={{ flex: 1, minWidth: 0, display: "flex", "& > *": { flex: 1, display: "flex", alignItems: "center" } }}>
+                              <EditableCell
+                                Wrapper={Box} width="100%"
+                                editable={isAdminOrManager && c.isRealContract} columnKey={d.field}
+                                editing={editingCell?.key === c.key && editingCell?.field === d.field}
+                                value={d.value} editValue={editValue} editType="date" saving={editSaving}
+                                title={isAdminOrManager && c.isRealContract ? d.tip : undefined}
+                                // ✅ tabular-nums = ตัวเลขทุกตัวกว้างเท่ากัน วันเริ่ม/วันจบจึงเรียงตรงกัน
+                                // เป๊ะทุกหลัก (11/08 กับ 14/08 ไม่เหลื่อมกันเหมือนฟอนต์ปกติ) — รายละเอียด
+                                // เล็กๆ ที่ทำให้ตารางตัวเลขดูเป็นระเบียบขึ้นมาก
+                                formatDisplay={(v) => (v
+                                  ? (
+                                    <Box component="span" sx={{ fontWeight: 600, fontSize: "0.8rem", fontVariantNumeric: "tabular-nums", letterSpacing: "-0.01em" }}>
+                                      {moment(v).format("DD/MM/YYYY")}
+                                    </Box>
+                                  )
+                                  : isAdminOrManager && c.isRealContract
+                                  // ✅ ช่องว่างที่กดได้ควรบอกว่า "กดแล้วได้อะไร" — เดิมเป็นขีด "–" เฉยๆ
+                                  // ดูเหมือนข้อมูลหายมากกว่าจะเป็นที่ให้กรอก
+                                  ? <Box component="span" sx={{ fontSize: "0.72rem", color: "text.disabled", fontStyle: "italic" }}>ระบุวันที่</Box>
+                                  : <Dash />)}
+                                onStartEdit={() => beginEdit(c, d.field)}
+                                onChangeValue={setEditValue}
+                                onCommit={() => commitEdit(c)}
+                                onCancel={cancelEdit}
+                              />
+                            </Box>
+                          </Stack>
+                        ))}
                         <EditableCell
                           Wrapper={Box}
                           editable={isAdminOrManager && c.isRealContract} columnKey="intervalMonths"
                           editing={editingCell?.key === c.key && editingCell?.field === "intervalMonths"}
                           value={c.intervalMonths} editValue={editValue} editType="number" saving={editSaving}
                           title={c.intervalMonths ? undefined : "ยังไม่ได้ระบุ — ระบบใช้ค่าเริ่มต้น 3 เดือนในการเตือนรอบถัดไป"}
+                          // ✅ รอบเข้าเป็นป้ายเล็กๆ มีพื้นหลังอ่อน + ไอคอนจริง แทนอีโมจิ 🔁 ที่เรนเดอร์
+                          // ต่างกันไปในแต่ละเครื่อง (บนวินโดวส์ขึ้นเป็นกล่องสี่เหลี่ยมสีน้ำเงินทึบๆ ดูแปลกปลอม
+                          // ไม่เข้ากับอะไรเลย) — ป้ายนี้แยกตัวเองออกจาก "วันที่" ด้านบนชัดเจนโดยไม่ต้องมีเส้นคั่น
                           formatDisplay={(v) => (
-                            <span style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
-                              🔁 {v ? `เข้าทุก ${v} เดือน` : "ยังไม่ระบุรอบเข้า"}
-                            </span>
+                            <Box
+                              component="span"
+                              sx={{
+                                display: "inline-flex", alignItems: "center", gap: 0.4, mt: 0.15,
+                                px: 0.6, py: 0.1, borderRadius: 1,
+                                bgcolor: alpha("#0f172a", v ? 0.05 : 0.03),
+                                color: v ? "text.secondary" : "text.disabled",
+                                fontSize: "0.67rem", fontWeight: v ? 600 : 400, whiteSpace: "nowrap",
+                              }}
+                            >
+                              <Autorenew sx={{ fontSize: 12 }} />
+                              {v ? `ทุก ${v} เดือน` : "ยังไม่ระบุรอบเข้า"}
+                            </Box>
                           )}
                           onStartEdit={() => beginEdit(c, "intervalMonths")}
                           onChangeValue={setEditValue}
@@ -3540,7 +3919,7 @@ export default function ContractOverview() {
                     editing={editingCell?.key === c.key && editingCell?.field === "jobValue"}
                     value={c.jobValue} editValue={editValue} editType="number" saving={editSaving}
                     width={colVar("jobValue")} align="right"
-                    formatDisplay={(v) => (v != null && v !== "" ? Number(v).toLocaleString() : <Dash />)}
+                    formatDisplay={(v) => (hasMoney(v) ? formatBaht(v) : <Dash />)}
                     onStartEdit={() => beginEdit(c, "jobValue")}
                     onChangeValue={setEditValue}
                     onCommit={() => commitEdit(c)}
@@ -3845,6 +4224,54 @@ export default function ContractOverview() {
                 </TableRow>
                 );
               })}
+
+              {/* ✅ แถวสุดท้ายของตาราง = ทางลัดสร้างสัญญาใหม่ "ในตาราง" (ดูคอมเมนต์ที่ openInlineAdd)
+                  ปิดอยู่ = แถวปุ่ม + บางๆ เต็มความกว้าง / เปิดอยู่ = แถวร่างที่กรอกได้ตรงคอลัมน์จริง
+                  ⚠️ ต้องยังไม่ถือว่าเป็นข้อมูลจริงจนกว่าจะกด "บันทึก" — ระหว่างกรอกยังไม่มีอะไรถูกส่งไป
+                  ที่เซิร์ฟเวอร์เลยสักฟิลด์ (ต่างจากช่องแก้ไขในแถวปกติที่บันทึกทันทีเมื่อออกจากช่อง) */}
+              {canInlineAdd && !inlineAddOpen && (
+                <TableRow sx={{ "& td": { borderBottom: "none" } }}>
+                  <TableCell colSpan={totalColCount} sx={{ p: 0 }}>
+                    <Button
+                      fullWidth onClick={openInlineAdd}
+                      startIcon={<AddCircleOutline sx={{ fontSize: 19 }} />}
+                      sx={{
+                        justifyContent: "flex-start", textTransform: "none", fontWeight: 700,
+                        fontSize: "0.8rem", color: alpha(ACCENT, 0.85), py: 1, px: 1.5, borderRadius: 0,
+                        // เส้นประ = "ช่องว่างที่รอให้เติม" ไม่ใช่แถวข้อมูลจริง — แยกออกจากแถวข้างบนชัดเจน
+                        borderTop: `1px dashed ${alpha(ACCENT, 0.3)}`,
+                        transition: "background-color .15s, color .15s",
+                        "&:hover": { bgcolor: alpha(ACCENT, 0.06), color: ACCENT },
+                      }}
+                    >
+                      เพิ่มสัญญาใหม่ในตาราง
+                      <Box component="span" sx={{ ml: 1, fontWeight: 400, fontSize: "0.72rem", color: "text.disabled" }}>
+                        กรอกในตารางได้เลย
+                      </Box>
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              )}
+
+              {canInlineAdd && inlineAddOpen && (
+                <InlineAddRow
+                  showCheckboxes={showCheckboxes}
+                  hideContractOnlyColumns={hideContractOnlyColumns}
+                  visitColumns={visitColumns}
+                  totalColCount={totalColCount}
+                  siteOptions={siteOptions}
+                  companyOptions={companyOptions}
+                  titleOptions={titleOptions}
+                  systemOptions={systemOptions}
+                  teamOptions={teamOptions}
+                  suggestContractNo={suggestNextContractNo}
+                  isContractNoTaken={isContractNoTaken}
+                  saving={saving}
+                  formError={formError}
+                  onSave={handleAddSubmit}
+                  onCancel={closeInlineAdd}
+                />
+              )}
             </TableBody>
             {/* ✅ แถวสรุปยอดรวมท้ายตาราง — ยอดรวมของ "ทุกแถวที่ผ่านตัวกรอง" (ทุกหน้ารวมกัน) ไม่ใช่แค่
                 แถวที่เห็นในหน้านี้ จึงระบุกำกับไว้ชัดเจนกันเข้าใจผิด และบอกจำนวนแถวที่ยังไม่ได้กรอก
@@ -3902,7 +4329,7 @@ export default function ContractOverview() {
                   align="right"
                   sx={{ fontWeight: 800, fontSize: "1rem", color: ACCENT, whiteSpace: "nowrap" }}
                 >
-                  {jobValueSummary.total.toLocaleString()}
+                  {formatBaht(jobValueSummary.total)}
                 </TableCell>
                 <TableCell colSpan={footerColSpan.after} />
               </TableRow>
@@ -4021,8 +4448,11 @@ export default function ContractOverview() {
               <TextField fullWidth size="small" type="number" label="จำนวนครั้งทั้งหมด *" value={form.visitCount}
                 onChange={(e) => setField("visitCount")(e.target.value)} inputProps={{ min: 1, max: MAX_VISIT_COUNT }}
                 helperText={`สูงสุด ${MAX_VISIT_COUNT} ครั้ง`} />
-              <TextField fullWidth size="small" type="number" label="มูลค่างาน" value={form.jobValue}
-                onChange={(e) => setField("jobValue")(e.target.value)} inputProps={{ min: 0 }} />
+              {/* ✅ ฿ นำหน้าช่องกรอก — บอกหน่วยตั้งแต่ตอนกรอก ไม่ต้องเดาว่าใส่เป็นบาทหรือหลักพัน
+                  (เทียบ pattern เดียวกับช่อง "มูลค่าใบเสนอราคา" ในหน้าติดตามใบเสนอราคา) */}
+              <TextField fullWidth size="small" type="number" label="มูลค่างาน (บาท)" value={form.jobValue}
+                onChange={(e) => setField("jobValue")(e.target.value)} inputProps={{ min: 0 }}
+                InputProps={{ startAdornment: <InputAdornment position="start">฿</InputAdornment> }} />
             </Stack>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
               {/* ✅ ระยะห่างระหว่างรอบ — ข้อมูลอ้างอิงอิสระ ไม่บังคับ ไม่ผูก/บังคับกับ "จำนวนครั้งทั้งหมด"
@@ -4071,7 +4501,7 @@ export default function ContractOverview() {
           {/* ✅ ปิดปุ่มไว้จนกว่าจะกรอกครบ/ถูกต้อง — กันกดแล้วเด้ง error ซ้ำๆ โดยไม่รู้ว่าขาดอะไร
               (ช่องบังคับมี * กำกับอยู่แล้ว เห็นได้ทันทีว่าเหลือช่องไหน) */}
           <Button
-            variant="contained" onClick={handleAddSubmit} disabled={saving || isAddFormInvalid}
+            variant="contained" onClick={() => handleAddSubmit()} disabled={saving || isAddFormInvalid}
             sx={{ bgcolor: ACCENT, textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#b91c1c" } }}
           >
             {saving ? "กำลังบันทึก..." : "บันทึกสัญญา"}
@@ -4337,8 +4767,9 @@ export default function ContractOverview() {
                 helperText={`ค่าเริ่มต้น = จำนวนงานที่เลือก (${selectedContracts.length}) — สูงสุด ${MAX_VISIT_COUNT} ครั้ง`}
               />
               {/* ✅ min:0 ให้ตรงกับฟอร์ม "เพิ่มสัญญาใหม่" (มีการตรวจฝั่ง JS อยู่แล้วทั้งคู่) */}
-              <TextField fullWidth size="small" type="number" label="มูลค่างาน" value={mergeForm.jobValue}
-                onChange={(e) => setMergeField("jobValue")(e.target.value)} inputProps={{ min: 0 }} />
+              <TextField fullWidth size="small" type="number" label="มูลค่างาน (บาท)" value={mergeForm.jobValue}
+                onChange={(e) => setMergeField("jobValue")(e.target.value)} inputProps={{ min: 0 }}
+                InputProps={{ startAdornment: <InputAdornment position="start">฿</InputAdornment> }} />
             </Stack>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
               <TextField

@@ -3,6 +3,12 @@ import { saveAs } from "file-saver";
 import moment from "moment";
 import "moment/locale/th";
 
+// ✅ รูปแบบตัวเลขของช่องจำนวนเงินทุกช่องในไฟล์ที่ส่งออก — เก็บเป็น "ตัวเลขจริง" ใน cell (บวก/ลบ/SUM ต่อ
+// ในไฟล์ได้ตามปกติ) แต่ให้ Excel แสดงผลพร้อมสัญลักษณ์ ฿ นำหน้าเสมอ ตรงกับที่แสดงบนหน้าจอ — เดิมเป็น
+// ตัวเลขเปล่าๆ ที่แยกไม่ออกจากคอลัมน์ "จำนวนครั้ง"/"จำนวนวัน" ที่อยู่ข้างกันในไฟล์เดียวกัน
+const MONEY_FMT = '"฿"#,##0';
+
+
 /**
  * quotationExcelExport.js — ส่งออกรายการ "ติดตามใบเสนอราคา" เป็นไฟล์ Excel (.xlsx) พร้อมรูปแบบ/สี
  * เทียบ pattern เดียวกับ contractExcelExport.js / calendarExcelExport.js ให้ทั้งแอปได้ไฟล์หน้าตาชุดเดียวกัน
@@ -62,7 +68,7 @@ export async function exportQuotationsToExcel({ jobs, meta, getFollowUpInfo, for
 
   const cols = [
     { key: "status", header: "สถานะ", width: 18, group: "สถานะใบเสนอราคา", align: "center" },
-    { key: "amount", header: "มูลค่าใบเสนอราคา", width: 18, group: "สถานะใบเสนอราคา", align: "right", numFmt: "#,##0" },
+    { key: "amount", header: "มูลค่าใบเสนอราคา (฿)", width: 18, group: "สถานะใบเสนอราคา", align: "right", numFmt: MONEY_FMT },
     { key: "company", header: "บริษัท", width: 24, group: "ข้อมูลงาน" },
     { key: "site", header: "โครงการ", width: 24, group: "ข้อมูลงาน" },
     { key: "title", header: "ประเภทงาน", width: 16, group: "ข้อมูลงาน" },
@@ -213,7 +219,7 @@ export async function exportQuotationsToExcel({ jobs, meta, getFollowUpInfo, for
     labelCell.alignment = { vertical: "middle", horizontal: "right" };
     const totalCell = sumRow.getCell(amountColIdx);
     totalCell.value = total;
-    totalCell.numFmt = "#,##0";
+    totalCell.numFmt = MONEY_FMT;
     totalCell.font = { name: "Tahoma", size: 11, bold: true, color: { argb: C.titleText } };
     totalCell.alignment = { vertical: "middle", horizontal: "right" };
     for (let k = 1; k <= lastCol; k += 1) {

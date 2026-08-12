@@ -280,6 +280,16 @@ function injectStyles() {
     }
     .ee-field textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
     .ee-char-count { font-size: 10px; color: #94a3b8; text-align: right; margin-top: 2px; }
+    /* ✅ ช่องกรอกจำนวนเงิน — มี ฿ ติดอยู่ในกรอบเดียวกับช่องกรอก บอกหน่วยตั้งแต่ตอนพิมพ์ ไม่ต้องเดาว่า
+       ใส่เป็นบาทหรือหลักพัน (เทียบ pattern เดียวกับช่องมูลค่าในหน้า "ภาพรวมงาน"/"ติดตามใบเสนอราคา")
+       ⚠️ ตัว ฿ ลอยทับอยู่บนช่องกรอก ไม่ได้เป็น element แยกที่ดันช่องให้แคบลง — ตัวเลขจึงเยื้องเข้ามา
+       ด้วย padding-left แทน กันตัวเลขทับสัญลักษณ์ */
+    .ee-money-input { position: relative; display: block; }
+    .ee-money-input .ee-money-symbol {
+      position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+      font-size: 13px; font-weight: 700; color: #94a3b8; pointer-events: none;
+    }
+    .ee-money-input input { padding-left: 24px !important; }
 
     /* ── Divider ── */
     .ee-divider { border: none; border-top: 1px solid #e2e8f0; margin: 10px 0; }
@@ -1037,8 +1047,11 @@ export const getEditEvent = async ({
           <input id="editVisitCount" type="number" value="${eventVisitCount}" placeholder="เช่น 4" ${isAdminOrManagerUser ? "" : "disabled"}>
         </div>
         <div class="ee-field">
-          <label>💰 มูลค่างาน</label>
-          <input id="editJobValue" type="number" value="${eventJobValue}" placeholder="เช่น 86000" ${isAdminOrManagerUser ? "" : "disabled"}>
+          <label>💰 มูลค่างาน (บาท)</label>
+          <div class="ee-money-input">
+            <span class="ee-money-symbol">฿</span>
+            <input id="editJobValue" type="number" value="${eventJobValue}" placeholder="เช่น 86000" ${isAdminOrManagerUser ? "" : "disabled"}>
+          </div>
         </div>
       </div>
       <!-- ✅ ทางเชื่อมกลับไปหน้า "ภาพรวมงาน" — เดิมลิงก์ระหว่างสองหน้านี้เป็นทางเดียวล้วนๆ (ภาพรวมงาน
@@ -1127,8 +1140,11 @@ export const getEditEvent = async ({
       ${!eventContractGroupId ? `
       <div class="ee-field">
         <label>💰 มูลค่างาน (บาท)</label>
-        <input id="editJobValueSingle" type="number" min="0" step="1" value="${eventJobValue}"
-               placeholder="เช่น 86000" ${isAdminOrManagerUser ? "" : "disabled"}>
+        <div class="ee-money-input">
+          <span class="ee-money-symbol">฿</span>
+          <input id="editJobValueSingle" type="number" min="0" step="1" value="${eventJobValue}"
+                 placeholder="เช่น 86000" ${isAdminOrManagerUser ? "" : "disabled"}>
+        </div>
         <span style="font-size:10.5px;color:#94a3b8;">ไม่บังคับ — ใช้รวมยอดในหน้า "ภาพรวมงาน"</span>
       </div>
       ` : ""}
@@ -1523,21 +1539,25 @@ export const getEditEvent = async ({
       // AddEvent.js) แทนการพึ่ง option ปลอมที่เคยทำให้เข้าใจผิดว่ามีค่าเป็น "—" อยู่ (ดูคอมเมนต์
       // ตรง customOption ด้านบน) — ล้างค่าทิ้งอีกชั้นถ้าค่าจริงว่างเปล่า กัน <select> เผลอเลือก
       // option แรก (placeholder) ให้เองตาม HTML spec จนกลายเป็น item ค้างอยู่ในกล่อง
-      const mkTsCleared = (id, placeholder, currentVal) => {
-        const ts = mkTs(id, placeholder);
+      const mkTsCleared = (id, placeholder, currentVal, overrides = {}) => {
+        const ts = mkTs(id, placeholder, overrides);
         if (ts && !currentVal) ts.clear(true);
         return ts;
       };
-      mkTsCleared("#editCompany", "เลือกหรือพิมพ์ชื่อบริษัท", eventCompany);
-      mkTsCleared("#editSite",    "เลือกหรือพิมพ์ชื่อโครงการ", eventSite);
-      mkTsCleared("#editTitle",   "เลือกหรือพิมพ์ประเภทงาน", eventTitle);
-      mkTsCleared("#editSystem",  "เลือกหรือพิมพ์ระบบงาน", eventSystem);
+      // ⚠️ BUG ที่แก้: ไม่เคยตั้ง maxOptions เลย ทำให้ใช้ค่าเริ่มต้นของ TomSelect (50) — รายชื่อบริษัท/
+      // โครงการที่มีเกิน 50 รายการจะถูกตัดทิ้งเงียบๆ โดยไม่มีอะไรบอก ผู้ใช้เลื่อนหาเท่าไหร่ก็ไม่เจอ
+      // แล้วสุดท้ายพิมพ์ชื่อใหม่เอง (create:true) กลายเป็นบริษัทซ้ำที่สะกดต่างกันอีกรายการในระบบ —
+      // ผูกกับจำนวนตัวเลือกจริงของแต่ละช่อง (เทียบ pattern เดียวกับ AddEvent.js/AddDraftEvent.js)
+      mkTsCleared("#editCompany", "เลือกหรือพิมพ์ชื่อบริษัท", eventCompany, { maxOptions: companyValues.length || 50 });
+      mkTsCleared("#editSite",    "เลือกหรือพิมพ์ชื่อโครงการ", eventSite, { maxOptions: siteValues.length || 50 });
+      mkTsCleared("#editTitle",   "เลือกหรือพิมพ์ประเภทงาน", eventTitle, { maxOptions: titleValues.length || 50 });
+      mkTsCleared("#editSystem",  "เลือกหรือพิมพ์ระบบงาน", eventSystem, { maxOptions: systemValues.length || 50 });
       // ⚠️ งานสัญญาต้องเลือกจากรายการครั้งที่ของสัญญาเท่านั้น ห้ามพิมพ์เลขเองเด็ดขาด (create:false) —
       // พิมพ์ "13" ใส่สัญญา 8 ครั้งได้เมื่อไหร่ ครั้งนั้นจะไม่มีคอลัมน์รองรับในหน้า "ภาพรวมงาน" และไม่ถูก
       // นับใน countUsedRounds ด้วย กลายเป็นงานที่มีอยู่จริงแต่มองไม่เห็นจากที่ไหนเลย
-      if (canEditContractRound) mkTs("#editTime", "เลือกครั้งที่", { create: false });
-      else mkTsCleared("#editTime", "เลือกครั้งที่", eventTime);
-      mkTsCleared("#editTeam",    "เลือกหรือพิมพ์ชื่อทีม", eventTeam);
+      if (canEditContractRound) mkTs("#editTime", "เลือกครั้งที่", { create: false, maxOptions: 24 });
+      else mkTsCleared("#editTime", "เลือกครั้งที่", eventTime, { maxOptions: 24 });
+      mkTsCleared("#editTeam",    "เลือกหรือพิมพ์ชื่อทีม", eventTeam, { maxOptions: teamValues.length || 50 });
 
       const getVal = (id) => document.getElementById(id)?.value?.trim() || "";
 
@@ -1552,6 +1572,7 @@ export const getEditEvent = async ({
             selectOnTab: false,
             placeholder: "เลือกหรือพิมพ์ชื่อลูกทีม",
             allowEmptyOption: true,
+            maxOptions: employeeList.length || 50, // ⚠️ ค่าเริ่มต้น 50 ตัดรายชื่อพนักงานที่เกินทิ้งเงียบๆ
             // ⚠️ ไม่ต้องก็อป onItemAdd (บังคับเลือกได้ทีละคน) มาจาก mkTs ด้านบน — <select> ที่ไม่มี
             // attribute multiple ถูก TomSelect ตั้ง maxItems:1 / mode:"single" ให้เองอยู่แล้ว
             dropdownParent: "body", // ✅ กัน #ee-body (overflow-y:auto) ตัดขอบ — เทียบ pattern เดียวกับ mkTs ด้านบน
