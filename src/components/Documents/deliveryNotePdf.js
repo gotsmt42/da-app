@@ -31,15 +31,34 @@ export const ISSUER = {
   stamp: "/stamp.png",
 };
 
-const PAGE = { w: 210, h: 297, left: 22, right: 22 };
-const CONTENT_W = PAGE.w - PAGE.left - PAGE.right;
-// ระยะจากขอบซ้ายถึงคอลัมน์ "ค่า" ของบล็อกหัวจดหมาย (เลขที่/วันที่/เรื่อง/โครงการ/เรียน/อ้างถึง)
-const LABEL_VALUE_X = PAGE.left + 26;
-// ✅ ระยะบรรทัด — TH Sarabun ที่ 14pt ตัวสูงกว่าฟอนต์ละตินขนาดเดียวกัน (มีสระบน/วรรณยุกต์อีก 2 ชั้น
-// และสระล่างอีก 1 ชั้น) ระยะ 6mm เดิมทำให้วรรณยุกต์ของบรรทัดล่างเกือบชนสระล่างของบรรทัดบน อ่านแล้ว
-// รู้สึกอึดอัดแน่นไปหมด — 6.6mm ให้ช่องไฟหายใจได้พอดีโดยไม่เปลืองหน้ากระดาษ
-const LINE_H = 6.6;
-const INDENT = 14; // ระยะเยื้องย่อหน้าแรกตามแบบหนังสือราชการ
+// ✅ ค่าเลย์เอาต์กระดาษ export ออกไปให้เอกสารชนิดอื่นใช้ร่วมกัน (ดู workNoticePdf.js) — เอกสารของบริษัท
+// ต้องมีขอบกระดาษ/ระยะบรรทัด/ตำแหน่งคอลัมน์เท่ากันทุกชนิด ไม่งั้นวางเรียงกันแล้วเห็นได้ทันทีว่าคนละแบบ
+export const PAGE = { w: 210, h: 297, left: 22, right: 22 };
+export const CONTENT_W = PAGE.w - PAGE.left - PAGE.right;
+// ⚠️ ค่าตายตัวเดิม 2 ตัวถูกเลิกใช้แล้วทั้งคู่ (เก็บคอมเมนต์ไว้กันเผลอใส่กลับมา):
+//   • LABEL_VALUE_X (คอลัมน์ค่า = ขอบซ้าย+26mm) — ห่างจากป้ายเกินจริงเกือบ 15mm ทุกบรรทัด
+//   • INDENT (ระยะเยื้องย่อหน้า 14mm) — คนละแนวกับคอลัมน์ค่า ทำให้ใบหนึ่งมีแนวเริ่มถึง 3 แนว
+// ✅ ทั้งคู่ถูกแทนด้วย letterIndentFor ด้านล่าง ซึ่งให้ "แนวเดียว" ที่คำนวณจากความกว้างฟอนต์จริง
+// ✅ ระยะบรรทัดก็ไม่ตายตัวแล้วเช่นกัน — ขึ้นกับขนาดตัวอักษรที่เลือกตอนบีบให้จบหน้าเดียว (ดู SCALES)
+// TH Sarabun ที่ 14pt ใช้ระยะ 6.6mm เป็นค่าปกติ (ตัวสูงกว่าฟอนต์ละตินขนาดเดียวกันเพราะมีสระบน/
+// วรรณยุกต์อีก 2 ชั้นและสระล่างอีก 1 ชั้น — 6mm ทำให้วรรณยุกต์บรรทัดล่างเกือบชนสระล่างของบรรทัดบน)
+
+/**
+ * ป้ายหัวจดหมายมาตรฐานของเอกสารบริษัท — เอกสารทุกชนิดใช้ชุดเดียวกัน
+ */
+export const LETTER_LABELS = ["เลขที่", "วันที่", "เรื่อง", "โครงการ", "เรียน", "อ้างถึง"];
+
+/**
+ * ✅ "แนวเยื้อง" เส้นเดียวของทั้งใบ — ใช้เป็นทั้งตำแหน่งคอลัมน์ค่าของหัวจดหมาย, ระยะเยื้องย่อหน้าแรก,
+ * จุดเริ่มของรายการ (สิ่งที่ส่งมาด้วย / กำหนดการรายวัน) และบรรทัดคำลงท้าย
+ * 🐛 ที่แก้ (บรรทัดเริ่มไม่ตรงกัน ดูไม่เป็นมืออาชีพ): เดิมมีแนวเริ่มถึง 3 แนวในใบเดียว — ขอบซ้าย 22mm,
+ * ย่อหน้า 36mm (22+INDENT) และคอลัมน์ค่า 48mm (22+26) ตาแทบไม่มีเส้นนำให้ไล่ตาม
+ * ✅ ยุบเหลือ 2 แนว: ขอบซ้าย กับแนวเยื้องเส้นนี้ — ทุกอย่างที่ "ไม่ใช่ป้าย/ไม่ใช่บรรทัดต่อของย่อหน้า"
+ * เริ่มตรงกันหมด ⚠️ คิดจากป้ายที่ยาวที่สุดจริงๆ ที่ขนาดฟอนต์ปัจจุบัน (จึงต้องเรียกหลัง setFontSize)
+ * ไม่ใช่ค่าตายตัว — เอกสารที่ย่อขนาดตัวอักษรลงจะได้แนวเยื้องที่พอดีกับตัวมันเองเสมอ
+ */
+export const letterIndentFor = (doc, labels = LETTER_LABELS) =>
+  Math.max(...labels.map((l) => doc.getTextWidth(l))) + 6;
 
 /**
  * ✅ เว้นวรรคระหว่างภาษาไทยกับอังกฤษ/ตัวเลขให้อัตโนมัติ
@@ -217,7 +236,7 @@ export const thaiFullDate = (d) => {
  * ⚠️ ภาษาไทยไม่มีเว้นวรรคระหว่างคำ ก้อนคำไทยยาวๆ ก้อนเดียวจึงอาจกว้างเกินบรรทัดได้ — กรณีนั้น
  * fallback ไปใช้ splitTextToSize หั่นก้อนนั้นต่อ (ยอมให้ตัดกลางคำ ดีกว่าปล่อยให้ล้นออกนอกกระดาษ)
  */
-const wrapParagraph = (doc, text, firstWidth, restWidth) => {
+export const wrapParagraph = (doc, text, firstWidth, restWidth) => {
   const words = String(text || "").split(/\s+/).filter(Boolean);
   const lines = [];
   let cur = "";
@@ -232,10 +251,13 @@ const wrapParagraph = (doc, text, firstWidth, restWidth) => {
     // ก้อนคำเดียวยังกว้างเกินบรรทัด → หั่นก้อนนั้นเอง
     if (doc.getTextWidth(w) > limitFor()) {
       const chunks = doc.splitTextToSize(w, limitFor());
-      chunks.forEach((ch, i) => {
-        if (i === chunks.length - 1) cur = ch;
-        else lines.push(ch);
-      });
+      // ⚠️ ใช้ for ธรรมดาไม่ใช่ forEach — callback ที่ประกาศในลูปแล้วเขียนค่าลงตัวแปร `cur` ของลูปชั้นนอก
+      // เป็นรูปแบบที่ผิดพลาดง่าย (ESLint no-loop-func เตือนไว้) ถึงตรงนี้จะทำงานถูกอยู่แล้วเพราะ forEach
+      // ทำงานแบบ synchronous ก็ตาม — เขียนเป็นลูปตรงๆ ชัดเจนกว่าและไม่ต้องพึ่งข้อเท็จจริงข้อนั้น
+      for (let i = 0; i < chunks.length; i += 1) {
+        if (i === chunks.length - 1) cur = chunks[i];
+        else lines.push(chunks[i]);
+      }
     } else {
       cur = w;
     }
@@ -350,21 +372,23 @@ export const buildDeliveryNoteBody = (f) => {
 };
 
 /**
- * สร้างไฟล์ PDF ใบส่งมอบงาน
- * @param {object} opts.jsPDF          — constructor (ส่งเข้ามาแทน import ตรง เทียบ pattern เดียวกับ GenPDF.js)
- * @param {string} opts.thSarabunFont  — ฟอนต์ TH Sarabun แบบ base64 (จำเป็น ไม่งั้นภาษาไทยกลายเป็นสี่เหลี่ยม)
- * @param {object} opts.form           — ค่าที่ผู้ใช้ยืนยันแล้วจากกล่องออกเอกสาร
- * @param {"open"|"download"} opts.mode — เปิดดูในแท็บใหม่ หรือดาวน์โหลดไฟล์เลย
+ * ✅ เปิดเอกสาร jsPDF พร้อมฟอนต์ไทย — แยกออกมาเพราะเอกสารทุกชนิดต้องทำ 4 บรรทัดนี้เหมือนกันเป๊ะ และถ้า
+ * ลืมโหลดฟอนต์ TH Sarabun ภาษาไทยทั้งใบจะกลายเป็นสี่เหลี่ยมทันที (พลาดง่ายมากตอนเพิ่มเอกสารชนิดใหม่)
  */
-export const generateDeliveryNotePdf = async ({ jsPDF, thSarabunFont, form, mode = "open" }) => {
-  moment.locale("th");
-
+export const createDocument = (jsPDF, thSarabunFont) => {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "A4" });
   doc.addFileToVFS("THSarabun.ttf", thSarabunFont);
   doc.addFont("THSarabun.ttf", "THSarabun", "normal");
   doc.setFont("THSarabun");
+  return doc;
+};
 
-  // ── หัวกระดาษ ────────────────────────────────────────────────────────────
+/**
+ * ✅ หัวกระดาษ (โลโก้ + ชื่อบริษัท ไทย/อังกฤษ + ที่อยู่ + เลขผู้เสียภาษี) — ใช้ร่วมกันทุกชนิดเอกสาร
+ * ย้ายที่อยู่/เบอร์ทีเดียวแล้วเปลี่ยนครบทุกใบ ไม่ต้องไล่แก้ทีละไฟล์แล้วลืมไปใบหนึ่ง
+ * @returns {number} พิกัด y หลังวาดหัวกระดาษเสร็จ (ตัวเรียกเอาไปวางเนื้อหาต่อ)
+ */
+export const drawLetterhead = (doc) => {
   const centerX = PAGE.w / 2;
   let y = 12;
   try {
@@ -391,149 +415,16 @@ export const generateDeliveryNotePdf = async ({ jsPDF, thSarabunFont, form, mode
   doc.text(ISSUER.address, centerX, y, { align: "center" });
   y += 4.6;
   doc.text(ISSUER.taxId, centerX, y, { align: "center" });
+  return y;
+};
 
-  // ── บล็อกหัวจดหมาย (ป้าย : ค่า) ──────────────────────────────────────────
-  y += 14;
-  doc.setFontSize(14);
-  const VALUE_W = PAGE.w - PAGE.right - LABEL_VALUE_X;
-
-  // ✅ เขียนคู่ "ป้าย + ค่า" โดยตัดบรรทัดค่าที่ยาวเกินให้เองและเลื่อน y ต่อให้ถูก (ชื่อโครงการ/ที่อยู่
-  // ลูกค้าของจริงยาวไม่เท่ากันเลย จะกะระยะตายตัวไม่ได้)
-  const row = (label, value) => {
-    const text = spaceThaiLatin(value);
-    if (!text) return;
-    const lines = doc.splitTextToSize(text, VALUE_W);
-    if (label) doc.text(label, PAGE.left, y);
-    lines.forEach((ln, i) => doc.text(ln, LABEL_VALUE_X, y + i * LINE_H));
-    y += lines.length * LINE_H;
-  };
-  // 🐛 BUG ที่แก้ (ระยะเว้นหายไปเมื่อช่องว่าง): เดิมระยะเว้นถูกผูกไว้กับ row() เป็น option — แต่ row()
-  // จะ return ทันทีถ้าค่าว่าง ระยะเว้นจึงหายไปด้วย ผลคือใบที่ไม่ได้กรอก "อ้างถึง" (ซึ่งเป็นกรณีปกติ)
-  // หัวข้อ "สิ่งที่ส่งมาด้วย" จะขึ้นไปติดบรรทัด "เรียน" พอดีเป๊ะ ดูเหมือนจัดหน้าพลาด (เห็นในใบจริง)
-  // ✅ แยกออกมาเป็นคำสั่งเว้นระยะของตัวเอง ไม่ผูกกับว่าแถวไหนมีค่าหรือไม่มี
-  const gap = (mm) => { y += mm; };
-
-  row("เลขที่", form.docNumber);
-  row("วันที่", thaiFullDate(form.issuedAt));
-  row("เรื่อง", form.subject);
-  // "โครงการ" มี 3 บรรทัดย่อย: ชื่อโครงการ / บริษัทลูกค้า / ที่อยู่ — ป้ายอยู่แค่บรรทัดแรก
-  row("โครงการ", form.site);
-  row("", form.customerCompany);
-  row("", form.customerAddress);
-  // ✅ เลขประจำตัวผู้เสียภาษีต่อท้ายที่อยู่ — ตำแหน่งมาตรฐานของเอกสารธุรกิจไทย (อยู่ใต้ที่อยู่ผู้รับเสมอ)
-  row("", form.customerTaxId ? `เลขประจำตัวผู้เสียภาษี ${form.customerTaxId}` : "");
-  gap(LINE_H);
-  row("เรียน", form.attention);
-  row("อ้างถึง", form.reference);
-
-  // ── สิ่งที่ส่งมาด้วย ──────────────────────────────────────────────────────
-  const attachments = (form.attachments || []).filter((a) => (a.text || "").trim());
-  if (attachments.length > 0) {
-    gap(LINE_H);
-    doc.text("สิ่งที่ส่งมาด้วย", PAGE.left, y);
-    y += LINE_H;
-    attachments.forEach((a, i) => {
-      // ✅ เลขลำดับอยู่คอลัมน์ของตัวเอง แล้วข้อความเยื้องเข้าไปอีกชั้น — บรรทัดที่ 2 ของรายการยาวๆ
-      // จะเรียงตรงกับบรรทัดแรก ไม่ไหลกลับไปชนใต้ตัวเลข (แบบเดิมเยื้องทั้งก้อนเท่ากันหมด)
-      const num = `${i + 1}.`;
-      const text = spaceThaiLatin(`${a.text}${a.qty ? ` จำนวน ${a.qty}` : ""}`);
-      const numX = PAGE.left + 10;
-      const textX = numX + 7;
-      const lines = doc.splitTextToSize(text, PAGE.w - PAGE.right - textX);
-      doc.text(num, numX, y);
-      lines.forEach((ln, li) => doc.text(ln, textX, y + li * LINE_H));
-      y += lines.length * LINE_H;
-    });
-  }
-
-  // ── เนื้อความ ────────────────────────────────────────────────────────────
-  // ✅ ย่อหน้าแรกเยื้องเข้ามาตามแบบหนังสือราชการ — jsPDF ไม่มี text-indent จึงตัดบรรทัดเองด้วย
-  // wrapParagraph (บรรทัดแรกแคบลงเท่าระยะเยื้อง บรรทัดที่เหลือเต็มความกว้าง)
-  // 🐛 BUG ที่แก้: เดิมตัดบรรทัดแรกแล้วใช้ .slice(first.length) หาเนื้อความที่เหลือ — ซึ่งเชื่อว่า
-  // ข้อความที่ jsPDF ตัดออกมาจะตรงกับต้นฉบับทีละตัวอักษรเป๊ะๆ (ไม่จริง มันตัด/รวบช่องว่างใหม่)
-  // ผลคือเนื้อความอาจขาดหรือซ้ำคำตรงรอยต่อบรรทัดแรกได้
-  gap(LINE_H * 1.5);
-  const body = spaceThaiLatin(form.body);
-  if (body) {
-    const lines = wrapParagraph(doc, body, CONTENT_W - INDENT, CONTENT_W);
-    lines.forEach((ln, i) => {
-      doc.text(ln, PAGE.left + (i === 0 ? INDENT : 0), y);
-      y += LINE_H;
-    });
-  }
-
-  gap(LINE_H * 1.5);
-  doc.text("จึงเรียนมาเพื่อทราบและโปรดพิจารณา", PAGE.left + INDENT, y);
-
-  // ── ส่วนลงนาม ────────────────────────────────────────────────────────────
-  // ✅ ตรึงไว้ล่างกระดาษเสมอ ไม่ลอยตามความยาวเนื้อความ — เอกสารทางการต้องมีที่เซ็นอยู่ตำแหน่งเดียวกัน
-  // ทุกใบ เพื่อให้ปั๊ม/เซ็น/สแกนเก็บเข้าแฟ้มได้เป็นระเบียบเหมือนกันหมด
-  // ⚠️ กันเนื้อความยาวเกินจนไปทับส่วนลงนาม — ถ้าชนขึ้นหน้าใหม่ให้เลย (ดีกว่าตัวหนังสือทับกันจนอ่านไม่ได้)
-  // 🐛 BUG ที่แก้ (ตราประทับทับชื่อผู้ลงนาม): เดิมวางตราไว้กึ่งกลางฝั่งขวาที่ระยะ +10 ซึ่งความสูงจริง
-  // ของรูปตรา (คำนวณตามสัดส่วนภาพ) ยาวลงมาถึงราว +30 พอดีกับบรรทัด "( ชื่อ )" ที่ +26.5 — ตราเลย
-  // ทับชื่อจนอ่านไม่ออกทั้งคู่ และไม่เหลือที่ว่างให้เซ็นชื่อจริงเลยสักนิด
-  // ✅ จัดใหม่เป็น 3 ชั้นชัดเจน: คำลงท้าย → ช่องว่างสำหรับเซ็น (มีเส้นประให้เซ็นทับ) → ชื่อ/ตำแหน่ง/บริษัท
-  // แล้วย้ายตราไปไว้ "มุมซ้ายบนของช่องเซ็น" ซึ่งเป็นพื้นที่ว่างที่ไม่มีตัวหนังสือใดๆ อยู่ — ตรงกับ
-  // ธรรมเนียมเอกสารไทยที่ประทับตราไว้ข้างลายเซ็น ไม่ใช่ทับลายเซ็น
-  const boxH = 54;
-  const boxW = 80;
-  const boxY = PAGE.h - 26 - boxH;
-  if (y > boxY - LINE_H) doc.addPage();
-
-  // ฝั่งซ้าย: กรอบให้ลูกค้าลงนามตรวจสอบและรับเอกสาร
-  doc.setLineWidth(0.5);
-  doc.rect(PAGE.left, boxY, boxW, boxH);
-  const leftCenter = PAGE.left + boxW / 2;
-  doc.setFontSize(13.5);
-  doc.text("ลงนามตรวจสอบและรับเอกสาร", leftCenter, boxY + 8, { align: "center" });
-  doc.setFontSize(13);
-  // เว้นช่องว่าง +11 ถึง +24 ไว้ให้เซ็นชื่อ แล้วค่อยมีเส้นประรองรับ
-  doc.text("............................................", leftCenter, boxY + 26, { align: "center" });
-  doc.text("(____________________________)", leftCenter, boxY + 33, { align: "center" });
-  doc.text("วันที่ _______ / _______ / _______", leftCenter, boxY + 40, { align: "center" });
-  // ✅ ชื่อบริษัทลูกค้าใต้กรอบ — ตัดบรรทัดเองเพราะชื่อนิติบุคคลไทยยาวเกินกรอบได้ง่ายมาก
-  doc.setFontSize(11.5);
-  const custLines = doc.splitTextToSize(spaceThaiLatin(form.customerCompany), boxW - 4);
-  custLines.slice(0, 2).forEach((ln, i) => {
-    doc.text(ln, leftCenter, boxY + 46 + i * 4.6, { align: "center" });
-  });
-
-  // ฝั่งขวา: ขอแสดงความนับถือ → ช่องเซ็น (+ตราประทับมุมซ้าย) → ชื่อ/ตำแหน่ง/บริษัท
-  // ✅ จัดให้ "กึ่งกลางฝั่งขวา" อยู่ระดับสายตาเดียวกับกรอบฝั่งซ้าย — 2 ฝั่งจึงดูสมดุลเป็นคู่กัน
-  const rightCenter = PAGE.w - PAGE.right - boxW / 2;
-  doc.setFontSize(13.5);
-  doc.text("ขอแสดงความนับถือ", rightCenter, boxY + 8, { align: "center" });
-
-  // ✅ ตราประทับ — มุมซ้ายของช่องเซ็น จบก่อนถึงเส้นประที่ +26 จึงไม่มีทางทับทั้งลายเซ็นและชื่อ
-  try {
-    const sp = doc.getImageProperties(ISSUER.stamp);
-    const sw = 24;
-    const sh = (sp.height / sp.width) * sw;
-    // ⚠️ ยึด "ขอบล่าง" ของตราไว้ที่ +24.5 แล้วคำนวณขอบบนย้อนขึ้นไป — ความสูงของตราขึ้นกับสัดส่วน
-    // ของไฟล์รูปซึ่งเปลี่ยนได้ถ้าวันหนึ่งมีการเปลี่ยนไฟล์ตรา ถ้ายึดขอบบนแบบเดิมแล้วรูปสูงขึ้น
-    // ตราจะไหลลงไปทับเส้นเซ็นอีก (ซึ่งคือบั๊กเดิมเป๊ะๆ)
-    doc.addImage(ISSUER.stamp, "PNG", rightCenter - boxW / 2 + 2, boxY + 24.5 - sh, sw, sh);
-  } catch {
-    // ไม่มีไฟล์ตราประทับก็ออกเอกสารได้ตามปกติ (เว้นที่ว่างไว้ให้ประทับตรามือแทน)
-  }
-
-  doc.setFontSize(13);
-  doc.text("............................................", rightCenter, boxY + 26, { align: "center" });
-  doc.text(`( ${spaceThaiLatin(form.signerName) || "____________________________"} )`, rightCenter, boxY + 33, { align: "center" });
-  doc.text(spaceThaiLatin(form.signerPosition), rightCenter, boxY + 40, { align: "center" });
-  doc.setFontSize(11.5);
-  const issuerLines = doc.splitTextToSize(ISSUER.nameTh, boxW + 12);
-  issuerLines.slice(0, 2).forEach((ln, i) => {
-    doc.text(ln, rightCenter, boxY + 46 + i * 4.6, { align: "center" });
-  });
-
-  // ── ส่งออก ───────────────────────────────────────────────────────────────
-  // ⚠️ ชื่อไฟล์ต้องกรองอักขระที่ใช้ในชื่อไฟล์ไม่ได้ออกก่อน (เลขที่เอกสารมี "/" อยู่เสมอ —
-  // ถ้าไม่แทนที่ เบราว์เซอร์บางตัวจะตีความเป็นโฟลเดอร์แล้วดาวน์โหลดล้มเหลวเงียบๆ)
-  const safeName = `ใบส่งมอบงาน ${form.docNumber || ""} ${form.site || ""}`
-    .replace(/[/\\:*?"<>|]/g, "-")
-    .trim();
-
+/**
+ * ✅ ส่งไฟล์ออก (เปิดแท็บใหม่ / ดาวน์โหลด) + คืนหน่วยความจำ — ใช้ร่วมกันทุกชนิดเอกสาร
+ * ⚠️ ชื่อไฟล์ต้องกรองอักขระที่ใช้ในชื่อไฟล์ไม่ได้ออกก่อน (เลขที่เอกสารมี "/" อยู่เสมอ — ถ้าไม่แทนที่
+ * เบราว์เซอร์บางตัวจะตีความเป็นโฟลเดอร์แล้วดาวน์โหลดล้มเหลวเงียบๆ)
+ */
+export const outputDocument = (doc, rawName, mode = "open") => {
+  const safeName = String(rawName || "เอกสาร").replace(/[/\\:*?"<>|]/g, "-").trim();
   const blob = doc.output("blob");
   const url = URL.createObjectURL(blob);
   if (mode === "download") {
@@ -547,6 +438,200 @@ export const generateDeliveryNotePdf = async ({ jsPDF, thSarabunFont, form, mode
   // ✅ คืนหน่วยความจำหลังเบราว์เซอร์อ่านไฟล์เสร็จ — เดิม GenPDF.js ไม่เคย revoke เลย เปิดหลายใบ
   // ติดกันแล้ว blob ค้างในหน่วยความจำจนกว่าจะปิดแท็บ
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
-
   return safeName;
+};
+
+/**
+ * สร้างไฟล์ PDF ใบส่งมอบงาน
+ * @param {object} opts.jsPDF          — constructor (ส่งเข้ามาแทน import ตรง เทียบ pattern เดียวกับ GenPDF.js)
+ * @param {string} opts.thSarabunFont  — ฟอนต์ TH Sarabun แบบ base64 (จำเป็น ไม่งั้นภาษาไทยกลายเป็นสี่เหลี่ยม)
+ * @param {object} opts.form           — ค่าที่ผู้ใช้ยืนยันแล้วจากกล่องออกเอกสาร
+ * @param {"open"|"download"} opts.mode — เปิดดูในแท็บใหม่ หรือดาวน์โหลดไฟล์เลย
+ */
+export const generateDeliveryNotePdf = async ({ jsPDF, thSarabunFont, form, mode = "open" }) => {
+  moment.locale("th");
+
+  const doc = createDocument(jsPDF, thSarabunFont);
+
+  // ── หัวกระดาษ ────────────────────────────────────────────────────────────
+  const headerY = drawLetterhead(doc);
+
+  // ── ส่วนลงนามถูกตรึงไว้ล่างกระดาษเสมอ — เนื้อหาทั้งหมดต้องจบก่อนถึงเส้นนี้ ────────────────
+  // ✅ มี 2 ขนาด: ปกติ กับ "บีบ" ใช้เป็นตัวช่วยสุดท้ายก่อนยอมขึ้นหน้า 2 (เหมือนใบแจ้งเข้างาน)
+  const boxW = 80;
+  const SIGN_VARIANTS = [
+    { boxH: 54, bottom: 26 },
+    { boxH: 46, bottom: 16 },
+  ];
+
+  /**
+   * ✅ วางเนื้อหาทั้งใบ — draw:false = "วัดความสูง" เฉยๆ, draw:true = วาดจริง
+   * ⚠️ ใบส่งมอบงานควรจบหน้าเดียวเหมือนใบแจ้งเข้างาน (ลูกค้าเซ็นรับแล้วเก็บเข้าแฟ้มใบเดียวจบ และกรอบ
+   * ลงนามต้องอยู่หน้าเดียวกับรายการสิ่งที่ส่งมาด้วย) แต่ความยาวจริงเดาไม่ได้ — ขึ้นกับที่อยู่ลูกค้า
+   * ยาวแค่ไหนและมีสิ่งที่ส่งมาด้วยกี่รายการ จึงวัดก่อนแล้วเลือกขนาดใหญ่ที่สุดที่ยังจบหน้าเดียว
+   */
+  const layout = ({ fs: fontSize, lh, draw }) => {
+    doc.setFontSize(fontSize);
+    let y = headerY + lh * 1.6;
+    const put = (text, x, yy, opt) => { if (draw) doc.text(text, x, yy, opt); };
+    const gap = (mm) => { y += mm; };
+
+    // ✅ แนวเยื้องเส้นเดียวของทั้งใบ — คอลัมน์ค่าของหัวจดหมาย, ย่อหน้าแรก, รายการสิ่งที่ส่งมาด้วย และ
+    // บรรทัดคำลงท้าย เริ่มตรงกันหมด (ดูเหตุผลเต็มที่ letterIndentFor)
+    const indent = letterIndentFor(doc);
+    const valueX = PAGE.left + indent;
+    const VALUE_W = PAGE.w - PAGE.right - valueX;
+
+    // ✅ เขียนคู่ "ป้าย + ค่า" โดยตัดบรรทัดค่าที่ยาวเกินให้เองและเลื่อน y ต่อให้ถูก (ชื่อโครงการ/ที่อยู่
+    // ลูกค้าของจริงยาวไม่เท่ากันเลย จะกะระยะตายตัวไม่ได้)
+    const row = (label, value) => {
+      const text = spaceThaiLatin(value);
+      if (!text) return;
+      const ls = doc.splitTextToSize(text, VALUE_W);
+      if (label) put(label, PAGE.left, y);
+      ls.forEach((ln, i) => put(ln, valueX, y + i * lh));
+      y += ls.length * lh;
+    };
+
+    row("เลขที่", form.docNumber);
+    row("วันที่", thaiFullDate(form.issuedAt));
+    row("เรื่อง", form.subject);
+    // "โครงการ" มี 3 บรรทัดย่อย: ชื่อโครงการ / บริษัทลูกค้า / ที่อยู่ — ป้ายอยู่แค่บรรทัดแรก
+    row("โครงการ", form.site);
+    row("", form.customerCompany);
+    row("", form.customerAddress);
+    // ✅ เลขประจำตัวผู้เสียภาษีต่อท้ายที่อยู่ — ตำแหน่งมาตรฐานของเอกสารธุรกิจไทย (อยู่ใต้ที่อยู่ผู้รับเสมอ)
+    row("", form.customerTaxId ? `เลขประจำตัวผู้เสียภาษี ${form.customerTaxId}` : "");
+    // 🐛 BUG ที่แก้ (ระยะเว้นหายไปเมื่อช่องว่าง): เดิมระยะเว้นถูกผูกไว้กับ row() เป็น option — แต่ row()
+    // จะ return ทันทีถ้าค่าว่าง ระยะเว้นจึงหายไปด้วย ผลคือใบที่ไม่ได้กรอก "อ้างถึง" (ซึ่งเป็นกรณีปกติ)
+    // หัวข้อ "สิ่งที่ส่งมาด้วย" จะขึ้นไปติดบรรทัด "เรียน" พอดีเป๊ะ ดูเหมือนจัดหน้าพลาด (เห็นในใบจริง)
+    // ✅ ครึ่งบรรทัดพอ — เต็มบรรทัดกลายเป็นช่องโหว่กลางบล็อก โดยเฉพาะใบที่ไม่ได้กรอกบริษัท/ที่อยู่ลูกค้า
+    gap(lh * 0.55);
+    row("เรียน", form.attention);
+    row("อ้างถึง", form.reference);
+
+    // ── สิ่งที่ส่งมาด้วย ──────────────────────────────────────────────────
+    // 🐛 ที่แก้ (บรรทัดเริ่มไม่ตรงกัน): เดิมเลขลำดับอยู่คอลัมน์หนึ่งแล้วข้อความเยื้องเข้าไปอีก 7mm —
+    // กลายเป็นแนวเริ่มที่ 3 ของใบ (22 / 39.2 / 46.2mm) ✅ รวมเลขลำดับกับข้อความเป็นก้อนเดียวเริ่มที่
+    // แนวเยื้องเดียวกับทุกส่วน แล้วให้บรรทัดที่ 2 เป็นต้นไปเยื้องเข้าเล็กน้อยให้ตรงกับข้อความหลังเลข
+    const attachments = (form.attachments || []).filter((a) => (a.text || "").trim());
+    if (attachments.length > 0) {
+      gap(lh * 0.55);
+      put("สิ่งที่ส่งมาด้วย", PAGE.left, y);
+      y += lh;
+      const HANG = 5;
+      attachments.forEach((a, i) => {
+        const text = spaceThaiLatin(`${i + 1}. ${a.text}${a.qty ? ` จำนวน ${a.qty}` : ""}`);
+        wrapParagraph(doc, text, VALUE_W, VALUE_W - HANG).forEach((ln, li) => {
+          put(ln, valueX + (li === 0 ? 0 : HANG), y);
+          y += lh;
+        });
+      });
+    }
+
+    // ── เนื้อความ ──────────────────────────────────────────────────────────
+    // ✅ ย่อหน้าแรกเยื้องเข้ามาตามแบบหนังสือราชการ — jsPDF ไม่มี text-indent จึงตัดบรรทัดเองด้วย
+    // wrapParagraph (บรรทัดแรกแคบลงเท่าระยะเยื้อง บรรทัดที่เหลือเต็มความกว้าง)
+    // 🐛 BUG ที่แก้: เดิมตัดบรรทัดแรกแล้วใช้ .slice(first.length) หาเนื้อความที่เหลือ — ซึ่งเชื่อว่า
+    // ข้อความที่ jsPDF ตัดออกมาจะตรงกับต้นฉบับทีละตัวอักษรเป๊ะๆ (ไม่จริง มันตัด/รวบช่องว่างใหม่)
+    // ผลคือเนื้อความอาจขาดหรือซ้ำคำตรงรอยต่อบรรทัดแรกได้
+    gap(lh * 1.5);
+    const body = spaceThaiLatin(form.body);
+    if (body) {
+      wrapParagraph(doc, body, CONTENT_W - indent, CONTENT_W).forEach((ln, i) => {
+        put(ln, PAGE.left + (i === 0 ? indent : 0), y);
+        y += lh;
+      });
+    }
+
+    gap(lh * 0.8);
+    put("จึงเรียนมาเพื่อทราบและโปรดพิจารณา", PAGE.left + indent, y);
+    y += lh;
+    return y;
+  };
+
+  // ✅ ไล่ขนาดจากปกติ (14pt) ลงไปจนถึงเล็กสุดที่ยังอ่านสบาย (12pt) — ชุดเดียวกับใบแจ้งเข้างาน
+  const SCALES = [
+    { fs: 14, lh: 6.6 },
+    { fs: 13.5, lh: 6.3 },
+    { fs: 13, lh: 6.0 },
+    { fs: 12.5, lh: 5.7 },
+    { fs: 12, lh: 5.4 },
+  ];
+  const measured = SCALES.map((s) => ({ ...s, height: layout({ ...s, draw: false }) }));
+  let chosen = { ...measured[measured.length - 1], ...SIGN_VARIANTS[SIGN_VARIANTS.length - 1] };
+  outer: for (const v of SIGN_VARIANTS) {
+    for (const m of measured) {
+      if (m.height <= PAGE.h - v.bottom - v.boxH - 3) { chosen = { ...m, ...v }; break outer; }
+    }
+  }
+  const { boxH, bottom } = chosen;
+  const boxY = PAGE.h - bottom - boxH;
+  const endY = layout({ ...chosen, draw: true });
+
+  // ── ส่วนลงนาม ────────────────────────────────────────────────────────────
+  // ✅ ตรึงไว้ล่างกระดาษเสมอ ไม่ลอยตามความยาวเนื้อความ — เอกสารทางการต้องมีที่เซ็นอยู่ตำแหน่งเดียวกัน
+  // ทุกใบ เพื่อให้ปั๊ม/เซ็น/สแกนเก็บเข้าแฟ้มได้เป็นระเบียบเหมือนกันหมด
+  // ⚠️ กันเนื้อความยาวเกินจนไปทับส่วนลงนาม — ถ้าชนขึ้นหน้าใหม่ให้เลย (ดีกว่าตัวหนังสือทับกันจนอ่านไม่ได้)
+  // 🐛 BUG ที่แก้ (ตราประทับทับชื่อผู้ลงนาม): เดิมวางตราไว้กึ่งกลางฝั่งขวาที่ระยะ +10 ซึ่งความสูงจริง
+  // ของรูปตรา (คำนวณตามสัดส่วนภาพ) ยาวลงมาถึงราว +30 พอดีกับบรรทัด "( ชื่อ )" ที่ +26.5 — ตราเลย
+  // ทับชื่อจนอ่านไม่ออกทั้งคู่ และไม่เหลือที่ว่างให้เซ็นชื่อจริงเลยสักนิด
+  // ✅ จัดใหม่เป็น 3 ชั้นชัดเจน: คำลงท้าย → ช่องว่างสำหรับเซ็น (มีเส้นประให้เซ็นทับ) → ชื่อ/ตำแหน่ง/บริษัท
+  // แล้วย้ายตราไปไว้ "มุมซ้ายบนของช่องเซ็น" ซึ่งเป็นพื้นที่ว่างที่ไม่มีตัวหนังสือใดๆ อยู่ — ตรงกับ
+  // ธรรมเนียมเอกสารไทยที่ประทับตราไว้ข้างลายเซ็น ไม่ใช่ทับลายเซ็น
+  // ⚠️ ปกติจะไม่ถึงตรงนี้แล้ว เพราะขั้นตอนวัดด้านบนย่อขนาดให้พอดีหน้าเดียวไว้ก่อน — แต่ถ้าเนื้อหายาวจริงๆ
+  // จนเล็กสุด (12pt + กรอบแบบบีบ) ยังไม่พอ ก็ต้องขึ้นหน้าใหม่ ดีกว่าปล่อยให้ทับกรอบลงนามจนอ่านไม่ได้
+  if (endY > boxY - 3) doc.addPage();
+
+  // ฝั่งซ้าย: กรอบให้ลูกค้าลงนามตรวจสอบและรับเอกสาร
+  doc.setLineWidth(0.5);
+  doc.rect(PAGE.left, boxY, boxW, boxH);
+  const leftCenter = PAGE.left + boxW / 2;
+  doc.setFontSize(13.5);
+  doc.text("ลงนามตรวจสอบและรับเอกสาร", leftCenter, boxY + boxH * 0.15, { align: "center" });
+  doc.setFontSize(13);
+  // เว้นช่องว่างครึ่งบนของกรอบไว้ให้เซ็นชื่อ แล้วค่อยมีเส้นประรองรับ
+  // ⚠️ ตำแหน่งอิงสัดส่วนของความสูงกรอบ ไม่ใช่ระยะตายตัว — กรอบแบบบีบ (46mm) จะย่อระยะทุกบรรทัด
+  // ตามไปเอง ไม่หลุดออกนอกกรอบ (ดู SIGN_VARIANTS)
+  doc.text("............................................", leftCenter, boxY + boxH * 0.48, { align: "center" });
+  doc.text("(____________________________)", leftCenter, boxY + boxH * 0.61, { align: "center" });
+  doc.text("วันที่ _______ / _______ / _______", leftCenter, boxY + boxH * 0.74, { align: "center" });
+  // ✅ ชื่อบริษัทลูกค้าใต้กรอบ — ตัดบรรทัดเองเพราะชื่อนิติบุคคลไทยยาวเกินกรอบได้ง่ายมาก
+  doc.setFontSize(11.5);
+  const custLines = doc.splitTextToSize(spaceThaiLatin(form.customerCompany), boxW - 4);
+  custLines.slice(0, 2).forEach((ln, i) => {
+    doc.text(ln, leftCenter, boxY + boxH * 0.85 + i * 4.6, { align: "center" });
+  });
+
+  // ฝั่งขวา: ขอแสดงความนับถือ → ช่องเซ็น (+ตราประทับมุมซ้าย) → ชื่อ/ตำแหน่ง/บริษัท
+  // ✅ จัดให้ "กึ่งกลางฝั่งขวา" อยู่ระดับสายตาเดียวกับกรอบฝั่งซ้าย — 2 ฝั่งจึงดูสมดุลเป็นคู่กัน
+  const rightCenter = PAGE.w - PAGE.right - boxW / 2;
+  doc.setFontSize(13.5);
+  doc.text("ขอแสดงความนับถือ", rightCenter, boxY + boxH * 0.15, { align: "center" });
+
+  // ✅ ตราประทับ — มุมซ้ายของช่องเซ็น จบก่อนถึงเส้นประที่ +26 จึงไม่มีทางทับทั้งลายเซ็นและชื่อ
+  try {
+    const sp = doc.getImageProperties(ISSUER.stamp);
+    const sw = 24;
+    const sh = (sp.height / sp.width) * sw;
+    // ⚠️ ยึด "ขอบล่าง" ของตราไว้ที่ +24.5 แล้วคำนวณขอบบนย้อนขึ้นไป — ความสูงของตราขึ้นกับสัดส่วน
+    // ของไฟล์รูปซึ่งเปลี่ยนได้ถ้าวันหนึ่งมีการเปลี่ยนไฟล์ตรา ถ้ายึดขอบบนแบบเดิมแล้วรูปสูงขึ้น
+    // ตราจะไหลลงไปทับเส้นเซ็นอีก (ซึ่งคือบั๊กเดิมเป๊ะๆ)
+    doc.addImage(ISSUER.stamp, "PNG", rightCenter - boxW / 2 + 2, boxY + boxH * 0.45 - sh, sw, sh);
+  } catch {
+    // ไม่มีไฟล์ตราประทับก็ออกเอกสารได้ตามปกติ (เว้นที่ว่างไว้ให้ประทับตรามือแทน)
+  }
+
+  doc.setFontSize(13);
+  doc.text("............................................", rightCenter, boxY + boxH * 0.48, { align: "center" });
+  doc.text(`( ${spaceThaiLatin(form.signerName) || "____________________________"} )`, rightCenter, boxY + boxH * 0.61, { align: "center" });
+  doc.text(spaceThaiLatin(form.signerPosition), rightCenter, boxY + boxH * 0.74, { align: "center" });
+  doc.setFontSize(11.5);
+  const issuerLines = doc.splitTextToSize(ISSUER.nameTh, boxW + 12);
+  issuerLines.slice(0, 2).forEach((ln, i) => {
+    doc.text(ln, rightCenter, boxY + boxH * 0.85 + i * 4.6, { align: "center" });
+  });
+
+  // ── ส่งออก ───────────────────────────────────────────────────────────────
+  return outputDocument(doc, `ใบส่งมอบงาน ${form.docNumber || ""} ${form.site || ""}`, mode);
 };

@@ -59,10 +59,8 @@ import thLocale from "@fullcalendar/core/locales/th"; // นำเข้า loca
 
 import { useAuth } from "../../auth/AuthContext"; // ✅ ดึงข้อมูล Auth
 
-import { jsPDF } from "jspdf";
-
-import thSarabunFont from "../../Fonts/THSarabunNew_base64"; // นำเข้า base64 font
-
+// ⚠️ jsPDF / ฟอนต์ไทย ไม่ได้ถูก import ที่นี่แล้ว — ย้ายไปอยู่ในกล่องออกเอกสารแต่ละชนิด
+// (WorkNoticeDialog / DeliveryNoteDialog) ซึ่งเป็นที่เดียวที่สร้าง PDF จริง
 import TomSelect from "tom-select";
 import "tom-select/dist/css/tom-select.css";
 
@@ -71,14 +69,13 @@ import "tom-select/dist/css/tom-select.css";
 import { getAddEvent } from "./EventForms/AddEvent";
 import { getEditEvent } from "./EventForms/EditEvent";
 import DeliveryNoteDialog from "../Documents/DeliveryNoteDialog";
+import WorkNoticeDialog from "../Documents/WorkNoticeDialog";
 import { getSaveEventToDB } from "./EventForms/SaveEvent";
 import { getEventDrop } from "./EventForms/EventDrop";
 import { getEventResize } from "./EventForms/EventResize";
 import { getFetchEvents } from "./EventForms/FetchEvents";
 import { getDeleteEvent } from "./EventForms/DeleteEvent";
 import { getAddDraftEvent } from "./EventForms/AddDraftEvent";
-
-import { getGeneratePDF } from "./Functions/GenPDF";
 
 import UnscheduledPanel from "./UnscheduledPanel";
 
@@ -408,30 +405,9 @@ function EventCalendar() {
     };
   }, []);
 
-  const generateWorkPermitPDF = async (event, docNo, subject, description) => {
-    try {
-      setLoading(true);
-      await getGeneratePDF({
-        jsPDF,
-        thSarabunFont,
-        event,
-        moment,
-        docNo,
-        subject,
-        description,
-        userData,
-      });
-    } catch (error) {
-      Swal.fire({
-        title: "สร้าง PDF ไม่สำเร็จ",
-        text: error.message || "โปรดลองอีกครั้ง",
-        icon: "error",
-        showConfirmButton: true,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  // ⚠️ generateWorkPermitPDF (+ Functions/GenPDF.js) ถูกลบทิ้งแล้ว — ใบแจ้งเข้าปฏิบัติงานย้ายไปออก
+  // ผ่านกล่อง WorkNoticeDialog แบบเดียวกับใบส่งมอบงาน (ดู workNoticeJob ด้านล่าง) ซึ่งแก้ไขทุกช่องได้
+  // ก่อนออกจริง ต่างจากของเดิมที่ยิง PDF ออกทันทีจาก toast ที่หายเองใน 5 วินาที
 
   // ✅ เดิมแดงสด/ฟ้า/เทา ไม่ตรงกับธีมสีแดงจากโลโก้ที่ใช้ทั่วแอป — ปรับให้อยู่ในโทนแดงเดียวกันหมด
   // แต่ยังไล่เฉดอ่อน-เข้มต่างกันพอให้แยกประเภทวันหยุดออกจากกันได้อยู่
@@ -600,7 +576,7 @@ function EventCalendar() {
       fetchLookupOptions,
       eventInfo,
       setLoading,
-      generateWorkPermitPDF,
+      onOpenWorkNotice: setWorkNoticeJob,
       onOpenDeliveryNote: setDeliveryNoteJob,
       handleDeleteEvent,
       handleUnscheduleEvent: handleUnscheduleViaButton,
@@ -1163,6 +1139,8 @@ function EventCalendar() {
   // ✅ งานที่กำลังจะออกใบส่งมอบ — หน้าแก้ไขงาน (SweetAlert2 + HTML ล้วน) เรนเดอร์ React Dialog
   // เองไม่ได้ จึงส่ง callback เข้าไปให้มันเรียกกลับมาตั้ง state ตัวนี้แทน แล้วเรนเดอร์กล่องที่นี่
   const [deliveryNoteJob, setDeliveryNoteJob] = useState(null);
+  // ✅ งานที่กำลังจะออกใบแจ้งเข้าปฏิบัติงาน — กลไกเดียวกับ deliveryNoteJob ทุกประการ
+  const [workNoticeJob, setWorkNoticeJob] = useState(null);
   const handleExportExcel = async () => {
     if (exportingExcel || filteredCalendarEvents.length === 0) return;
     setExportingExcel(true);
@@ -2140,6 +2118,21 @@ function EventCalendar() {
           open
           onClose={() => setDeliveryNoteJob(null)}
           job={deliveryNoteJob}
+        />
+      )}
+
+      {/* ✅ กล่องออกใบแจ้งเข้าปฏิบัติงาน — เปิดจากปุ่มในหน้าแก้ไขงานเหมือนกัน (ดู onOpenWorkNotice)
+          ⚠️ ส่ง userData เข้าไปเป็น "ผู้ออกเอกสาร" — ใบแจ้งเข้างานต้องมีชื่อ+เบอร์คนที่ลูกค้าติดต่อกลับได้
+          เมื่อไม่สะดวกตามกำหนดการ (ของเดิมก็ใช้ userData เหมือนกัน แค่แก้ไขไม่ได้)
+          ⚠️ canUseRunningNumber — เลขเดินหน้าของบริษัทออกได้เฉพาะ admin/manager (server บังคับอยู่แล้ว)
+          ถ้าไม่ส่งค่านี้ ช่างจะเห็นเลขล่วงหน้าแล้วกดออกไม่ได้เพราะโดน 403 ตอนกินเลขจริง */}
+      {workNoticeJob && (
+        <WorkNoticeDialog
+          open
+          onClose={() => setWorkNoticeJob(null)}
+          job={workNoticeJob}
+          issuer={userData}
+          canUseRunningNumber={isAdminOrManager}
         />
       )}
 

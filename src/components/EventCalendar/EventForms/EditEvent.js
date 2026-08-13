@@ -1,5 +1,6 @@
-import Toastify from "toastify-js";
-import "toastify-js/src/toastify.css";
+// ⚠️ เดิมไฟล์นี้ import toastify-js + CSS ของมัน ไว้ใช้ทำ toast ยืนยันก่อนออกใบแจ้งเข้างานที่เดียว
+// พอย้ายไปใช้กล่อง WorkNoticeDialog แล้วจึงตัดออก — และไฟล์นี้เป็นที่เดียวในแอปที่ใช้ toastify-js
+// (ที่อื่นใช้ react-toastify ซึ่งเป็นคนละไลบรารีและนำเข้า CSS ของตัวเองที่ App.js อยู่แล้ว)
 import { resolveOperationGroup } from "../../../utils/overdueJobs";
 import { countUsedRounds, formatRoundLabel } from "../../../utils/contractRounds";
 import { escapeHtml } from "../../../utils/escapeHtml";
@@ -644,10 +645,10 @@ export const getEditEvent = async ({
   fetchLookupOptions,
   eventInfo,
   setLoading,
-  generateWorkPermitPDF,
-  // ✅ ใบส่งมอบงานเป็นคอมโพเนนต์ React (DeliveryNoteDialog) แต่หน้าแก้ไขงานนี้เป็น HTML ล้วนใน
-  // SweetAlert2 จึงเรนเดอร์ Dialog ตรงนี้ไม่ได้ — รับเป็น callback แล้วให้ EventCalendar/index.js
-  // (ซึ่งเป็น React จริง) เป็นคนเปิดกล่องให้แทน
+  // ✅ กล่องออกเอกสารทั้ง 2 ชนิดเป็นคอมโพเนนต์ React (WorkNoticeDialog / DeliveryNoteDialog) แต่หน้า
+  // แก้ไขงานนี้เป็น HTML ล้วนใน SweetAlert2 จึงเรนเดอร์ Dialog ตรงนี้ไม่ได้ — รับเป็น callback แล้วให้
+  // EventCalendar/index.js (ซึ่งเป็น React จริง) เป็นคนเปิดกล่องให้แทน
+  onOpenWorkNotice,
   onOpenDeliveryNote,
   handleDeleteEvent,
   handleUnscheduleEvent,
@@ -1298,14 +1299,11 @@ export const getEditEvent = async ({
         <label>📄 เลขที่อ้างอิง (Doc No.)</label>
         <input id="editdocNo" type="text" value="${attrHtml(evendocNo)}" placeholder="เช่น DOC-2026-001" ${isAdminOrManagerUser ? "" : "disabled"}>
       </div>
-      <div class="ee-field">
-        <label>📝 ชื่อเรื่อง (Subject)</label>
-        <input id="editSubject" type="text" value="${attrHtml(eventSubject)}" placeholder="ระบุชื่อเรื่อง" ${isAdminOrManagerUser ? "" : "disabled"}>
-      </div>
+
     </div>
     <div class="ee-field">
       <label>📋 รายละเอียดงาน (Description)</label>
-      <textarea id="editDescription" placeholder="กรอกรายละเอียดงาน..." ${isAdminOrManagerUser ? "" : "disabled"}></textarea>
+      <textarea id="editDescription" rows="8" placeholder="กรอกรายละเอียดงาน..." ${isAdminOrManagerUser ? "" : "disabled"}></textarea>
       <div class="ee-char-count" id="charCount">0 ตัวอักษร</div>
     </div>
 
@@ -2253,69 +2251,21 @@ export const getEditEvent = async ({
           onOpenDeliveryNote?.(ev);
         });
 
-      /* Generate PDF */
+      /* ✅ ออกใบแจ้งเข้าปฏิบัติงาน — ทำแบบเดียวกับใบส่งมอบงานเป๊ะๆ: ปิดหน้าแก้ไขก่อนแล้วค่อยเปิดกล่อง
+         ออกเอกสาร (React Dialog) ไม่ซ้อนกัน 2 ชั้น
+         🐛 ของเดิมเป็น toast สีน้ำเงินที่ถามว่า "บันทึกข้อมูลก่อนออกใบแจ้งเข้างาน?" ซึ่งมีปัญหาหลายชั้น:
+           1. toast ตั้ง duration 5000 — กดไม่ทันใน 5 วินาทีก็หายไปเฉยๆ ต้องกดปุ่มใหม่ตั้งแต่ต้น
+           2. ปุ่มข้างในถูกผูก event ด้วย setTimeout(...,100) หลังโชว์ toast — ถ้าเครื่องช้ากว่านั้น
+              (หรือ toast ถูกปิดก่อน) ปุ่มจะกดแล้วไม่มีอะไรเกิดขึ้นเลยโดยไม่มีอะไรฟ้อง
+           3. เนื้อหาเอกสารแก้อะไรไม่ได้เลยนอกจาก 3 ช่องที่บังเอิญมีในฟอร์มนี้ (เลขที่/ชื่อเรื่อง/รายละเอียด)
+              ผู้รับ ("เรียน") ถูกฝังตายเป็น "ผู้จัดการโครงการ <ชื่อโครงการ>" เสมอ
+         ✅ ตอนนี้ทุกช่องแก้ได้ในกล่องก่อนออกจริง และไม่ต้องบันทึกงานก่อนอีกแล้ว เพราะเนื้อหาเอกสาร
+         ไม่ได้ผูกกับฟิลด์ของงานอีกต่อไป (กล่องอ่านค่าตั้งต้นจากตัวงาน แล้วให้แก้ในกล่องได้ทั้งหมด) */
       document
         .getElementById("btnGeneratePDF")
         ?.addEventListener("click", () => {
-          const payload = buildPayload();
-          const toast = Toastify({
-            text: `<div style="text-align:center;font-family:system-ui">
-            <div style="margin-bottom:8px;font-weight:600">บันทึกข้อมูลก่อนออกใบแจ้งเข้างาน?</div>
-            <button id="toast-ok" style="margin-right:8px;padding:5px 14px;background:#fff;color:#1d4ed8;border:none;border-radius:6px;font-weight:700;cursor:pointer">ตกลง</button>
-            <button id="toast-no" style="padding:5px 14px;background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:6px;cursor:pointer">ยกเลิก</button>
-          </div>`,
-            duration: 5000,
-            gravity: "top",
-            position: "center",
-            backgroundColor: "#1d4ed8",
-            escapeMarkup: false,
-          });
-          toast.showToast();
-          setTimeout(() => {
-            document
-              .getElementById("toast-ok")
-              ?.addEventListener("click", async () => {
-                toast.hideToast();
-                if (!payload.subject) {
-                  Toastify({
-                    text: "กรุณากรอกชื่อเรื่อง",
-                    duration: 3000,
-                    backgroundColor: "#ef4444",
-                    gravity: "top",
-                    position: "center",
-                  }).showToast();
-                  return;
-                }
-                try {
-                  await EventService.UpdateEvent(eventId, payload);
-                  await fetchEventsFromDB();
-                  Toastify({
-                    text: "✅ บันทึกแล้ว กำลังสร้าง PDF...",
-                    duration: 2000,
-                    backgroundColor: "#10b981",
-                    gravity: "top",
-                    position: "center",
-                  }).showToast();
-                  await generateWorkPermitPDF(
-                    ev,
-                    payload.docNo,
-                    payload.subject,
-                    payload.description,
-                  );
-                } catch {
-                  Toastify({
-                    text: "❌ เกิดข้อผิดพลาด",
-                    duration: 3000,
-                    backgroundColor: "#ef4444",
-                    gravity: "top",
-                    position: "center",
-                  }).showToast();
-                }
-              });
-            document
-              .getElementById("toast-no")
-              ?.addEventListener("click", () => toast.hideToast());
-          }, 100);
+          Swal.close();
+          onOpenWorkNotice?.(ev);
         });
     },
   });
