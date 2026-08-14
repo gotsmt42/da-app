@@ -16,6 +16,7 @@ import {
   FaClipboardList,
   FaFileAlt,
   FaFileInvoiceDollar,
+  FaFileSignature,
   FaUserFriends,
   FaBuilding,
   FaUsers,
@@ -93,6 +94,8 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
   ];
   const documentsMenuShared = [
     { title: "ติดตามใบเสนอราคา", href: "/quotations", icon: <FaFileInvoiceDollar /> },
+    // ✅ ทะเบียนเอกสารที่ออกแล้ว (ใบแจ้งเข้างาน/ใบส่งมอบงาน) — อยู่หมวดเอกสารเดียวกัน
+    { title: "ทะเบียนเอกสาร", href: "/issued-documents", icon: <FaFileSignature /> },
   ];
 
   // ✅ หมวด "ทีมงาน" — เหลือแค่ภาพรวมทีมช่างจริงๆ (เฉพาะแอดมิน/manager) สรุปภาพรวมงานของช่าง

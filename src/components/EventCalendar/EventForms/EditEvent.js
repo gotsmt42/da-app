@@ -684,7 +684,9 @@ export const getEditEvent = async ({
   const eventEnd = moment(ev.end);
   const eventAllDay = ev.allDay;
   const eventStatus = ev.extendedProps?.status || "กำลังรอยืนยัน";
-  const eventSubject = ev.extendedProps?.subject || "";
+  // ⚠️ ไม่มี eventSubject แล้ว — ช่อง "ชื่อเรื่อง (Subject)" ถูกตัดออกจากฟอร์มเพราะไม่ได้ใช้งานจริง
+  // (หัวเรื่องของเอกสารมีช่องของตัวเองอยู่ในกล่องออกใบแจ้งเข้างาน/ใบส่งมอบงานแล้ว) ค่าเดิมในฐานข้อมูล
+  // ยังอยู่ครบ ไม่ได้ถูกลบ — แค่ไม่แสดง/ไม่แก้จากหน้านี้อีกต่อไป
   const eventDescription = ev.extendedProps?.description || "";
   // ✅ normalize เผื่อข้อมูลเก่าที่กรอกเป็น text อิสระมาก่อน (เช่น "8.00" ใช้จุดแทนโคลอน ไม่มีเลขศูนย์นำหน้า)
   // ตอนนี้เปลี่ยนช่องเป็น <input type="time"> ซึ่งรับได้แค่รูปแบบ HH:mm มาตรฐานเท่านั้น
@@ -1294,12 +1296,11 @@ export const getEditEvent = async ({
 
     <!-- section: เอกสาร -->
     <p class="ee-section-label">เอกสาร</p>
-    <div class="ee-grid ee-grid-2">
-      <div class="ee-field">
-        <label>📄 เลขที่อ้างอิง (Doc No.)</label>
-        <input id="editdocNo" type="text" value="${attrHtml(evendocNo)}" placeholder="เช่น DOC-2026-001" ${isAdminOrManagerUser ? "" : "disabled"}>
-      </div>
-
+    <!-- ⚠️ เดิมเป็นกริด 2 คอลัมน์คู่กับช่อง "ชื่อเรื่อง" ที่ถูกตัดออกไปแล้ว — เหลือช่องเดียวในกริด 2 ช่อง
+         ทำให้ช่องกินแค่ครึ่งซ้ายและมีที่ว่างค้างครึ่งขวาทั้งแถว จึงเอาออกจากกริดให้เต็มความกว้างไปเลย -->
+    <div class="ee-field">
+      <label>📄 เลขที่อ้างอิง (Doc No.)</label>
+      <input id="editdocNo" type="text" value="${attrHtml(evendocNo)}" placeholder="เช่น DOC-2026-001" ${isAdminOrManagerUser ? "" : "disabled"}>
     </div>
     <div class="ee-field">
       <label>📋 รายละเอียดงาน (Description)</label>
@@ -1814,7 +1815,11 @@ export const getEditEvent = async ({
         fontSize: eventFontSize,
         status: getVal("editStatus"),
         manualStatus: true,
-        subject: getVal("editSubject"),
+        // 🐛 BUG ที่แก้ (บันทึกทีไรค่าเดิมหายทุกที): ช่อง "ชื่อเรื่อง (Subject)" ถูกตัดออกจากฟอร์มแล้ว
+        // เพราะไม่ได้ใช้ (ใบแจ้งเข้างาน/ใบส่งมอบงานมีช่อง "เรื่อง" ของตัวเองในกล่องออกเอกสาร) — แต่
+        // payload ยังส่ง subject: getVal("editSubject") อยู่ ซึ่งอ่านจาก element ที่ไม่มีแล้วจึงได้ ""
+        // เสมอ = กดบันทึกทีไรก็ล้างค่า subject เดิมในฐานข้อมูลทิ้งทุกครั้งโดยไม่มีใครรู้
+        // ✅ ตัดออกจาก payload ไปเลย — backend อัปเดตเฉพาะฟิลด์ที่ส่งมา (allowedFields) ค่าเดิมจึงคงอยู่
         description: getVal("editDescription"),
         startTime: getVal("editStartTime"),
         endTime: getVal("editEndTime"),
@@ -1918,7 +1923,7 @@ export const getEditEvent = async ({
         }
         const detailsChanged =
           (fields.docNo || "") !== evendocNo ||
-          (fields.subject || "") !== eventSubject ||
+          // ⚠️ ไม่เทียบ subject แล้ว — ไม่มีช่องนี้ในฟอร์มและไม่ได้ส่งไปกับ payload อีกต่อไป
           (fields.description || "") !== eventDescription ||
           (fields.startTime || "") !== (eventStartTime || "") ||
           (fields.endTime || "") !== (eventEndTime || "") ||

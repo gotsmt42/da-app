@@ -24,6 +24,7 @@ const StockProduct = lazy(() => import("../views/ui/StockProduct"));
 const WorkTypeSystem = lazy(() => import("../views/ui/WorkTypeSystem.js"));
 const TeamWorkload = lazy(() => import("../views/ui/TeamWorkload.js"));
 const QuotationTracking = lazy(() => import("../views/ui/QuotationTracking.js"));
+const IssuedDocuments = lazy(() => import("../views/ui/IssuedDocuments.js"));
 const ContractOverview = lazy(() => import("../views/ui/ContractOverview.js"));
 const Files = lazy(() => import("../views/ui/Files"));
 const FileUpload = lazy(() => import("../views/ui/FileUpload"));
@@ -167,6 +168,17 @@ const ThemeRoutes = [
           </Suspense>
         ),
         title: "Quotation Tracking",
+      },
+      {
+        // ✅ เปิดให้ทุก role เข้าดูได้ — ช่างต้องตามหาใบที่เคยออกให้งานของตัวเองได้ ส่วนการเปลี่ยนสถานะ/
+        // แก้บันทึก ยังเป็นสิทธิ์ admin/manager เท่านั้น (ทั้งฝั่งจอและฝั่ง server)
+        path: "issued-documents",
+        element: (
+          <Suspense fallback={<div>Loading...</div>}>
+            <IssuedDocuments />
+          </Suspense>
+        ),
+        title: "Issued Documents",
       },
       {
         // ✅ ไม่ห่อด้วย AdminRoute เพราะ manager ต้องเข้าได้ด้วย เหมือน team-workload/quotations ด้านบน —

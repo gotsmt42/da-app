@@ -419,26 +419,35 @@ export const drawLetterhead = (doc) => {
 };
 
 /**
- * ✅ ส่งไฟล์ออก (เปิดแท็บใหม่ / ดาวน์โหลด) + คืนหน่วยความจำ — ใช้ร่วมกันทุกชนิดเอกสาร
+ * ✅ ส่งไฟล์ออก — ใช้ร่วมกันทุกชนิดเอกสาร รองรับ 3 โหมด:
+ *   "open"     เปิดดูในแท็บใหม่
+ *   "download" ดาวน์โหลดไฟล์ทันที
+ *   "blob"     ไม่ทำอะไรกับไฟล์เลย แค่คืน blob/url กลับไปให้ผู้เรียกเอาไปใช้ต่อ
+ *              ✅ โหมดนี้คือหัวใจของ "ดูตัวอย่างก่อนออกเอกสาร" — กล่องพรีวิวเอา url ไปแสดงใน <iframe>
+ *              และเอา blob ไปสร้าง File สำหรับปุ่มแชร์ (navigator.share) โดยไม่ต้องเปิดแท็บ/ดาวน์โหลดก่อน
  * ⚠️ ชื่อไฟล์ต้องกรองอักขระที่ใช้ในชื่อไฟล์ไม่ได้ออกก่อน (เลขที่เอกสารมี "/" อยู่เสมอ — ถ้าไม่แทนที่
  * เบราว์เซอร์บางตัวจะตีความเป็นโฟลเดอร์แล้วดาวน์โหลดล้มเหลวเงียบๆ)
+ * @returns {{ blob: Blob, url: string, fileName: string, safeName: string }}
  */
 export const outputDocument = (doc, rawName, mode = "open") => {
   const safeName = String(rawName || "เอกสาร").replace(/[/\\:*?"<>|]/g, "-").trim();
+  const fileName = `${safeName}.pdf`;
   const blob = doc.output("blob");
   const url = URL.createObjectURL(blob);
   if (mode === "download") {
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${safeName}.pdf`;
+    link.download = fileName;
     link.click();
-  } else {
+  } else if (mode !== "blob") {
     window.open(url, "_blank");
   }
   // ✅ คืนหน่วยความจำหลังเบราว์เซอร์อ่านไฟล์เสร็จ — เดิม GenPDF.js ไม่เคย revoke เลย เปิดหลายใบ
   // ติดกันแล้ว blob ค้างในหน่วยความจำจนกว่าจะปิดแท็บ
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
-  return safeName;
+  // ⚠️ โหมด "blob" ต้องไม่ revoke เอง — กล่องพรีวิวยังถือ url นี้ค้างไว้แสดงอยู่ (จะนานแค่ไหนก็ได้
+  // แล้วแต่ผู้ใช้จะดูนานเท่าไร) ผู้เรียกเป็นคนรับผิดชอบ revoke เองตอนปิดกล่อง/สร้างไฟล์ใหม่ทับ
+  if (mode !== "blob") setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  return { blob, url, fileName, safeName };
 };
 
 /**

@@ -17,7 +17,7 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
-  Close, Add, DeleteOutline, PictureAsPdf, Download, Description, Refresh, Search,
+  Close, Add, DeleteOutline, Visibility, Description, Refresh, Search,
 } from "@mui/icons-material";
 import { jsPDF } from "jspdf";
 import thSarabunFont from "../../Fonts/THSarabunNew_base64";
@@ -28,6 +28,8 @@ import {
   REPORT_NOUN_PRESETS, spaceThaiLatin, resolveJobFields,
   ATTENTION_PRESETS, SIGNER_POSITION_PRESETS, subjectPresetsFor, referencePresetsFor,
 } from "./deliveryNotePdf";
+import DocumentPreviewDialog from "./DocumentPreviewDialog";
+import IssuedDocumentService from "../../services/IssuedDocumentService";
 
 const ACCENT = "#dc2626";
 const SURFACE_SUBTLE = "#f8fafc";
@@ -53,6 +55,10 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
   const [error, setError] = useState("");
   // ✅ เก็บทะเบียนลูกค้าทั้งก้อนไว้ให้ช่อง "ค้นหาลูกค้า" ใช้ — โหลดครั้งเดียวตอนเปิดกล่อง
   const [customerList, setCustomerList] = useState([]);
+  // ✅ ขั้นตอนดูตัวอย่างก่อนออกจริง — preview เก็บไฟล์ที่กำลังแสดง, issued บอกว่ากินเลขจริงไปแล้วหรือยัง
+  const [preview, setPreview] = useState(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [issued, setIssued] = useState(false);
 
   // ✅ ตั้งค่าเริ่มต้นใหม่ทุกครั้งที่เปิดกล่อง — ไม่ค้างค่าของงานก่อนหน้าไว้ (กล่องนี้ถูกใช้ซ้ำกับทุกงาน
   // ในหน้าเดียวกัน ถ้าไม่รีเซ็ตจะเปิดงาน B แล้วเห็นข้อมูลงาน A ค้างอยู่)
@@ -154,7 +160,27 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
     return m;
   }, [form]);
 
-  const handleIssue = async (mode) => {
+  // ── ขั้นตอน "ดูตัวอย่าง → ยืนยันออก" (โครงเดียวกับใบแจ้งเข้างาน) ────────────
+  // ⚠️ blob url ต้อง revoke เองทุกครั้งที่สร้างใบใหม่ทับหรือปิดกล่อง — โหมด "blob" ของ outputDocument
+  // ไม่ revoke ให้ (กล่องพรีวิวยังถือ url ค้างไว้แสดงอยู่) ถ้าไม่เก็บกวาดเอง เปิดๆ ปิดๆ หลายรอบจะมี
+  // ไฟล์ค้างในหน่วยความจำสะสมไปเรื่อยๆ จนกว่าจะปิดแท็บ
+  const replacePreview = (next) => setPreview(next);
+
+  // ✅ คืนหน่วยความจำของไฟล์ตัวอย่าง — cleanup ของ effect นี้ทำงานทั้งตอน "สร้างไฟล์ใหม่ทับ" (revoke ตัว
+  // เก่าที่ถูกแทนที่) และตอน "คอมโพเนนต์ถูกถอดออก" (ปิดกล่อง/เปลี่ยนหน้า) ครบทั้ง 2 ทางในที่เดียว
+  // ⚠️ จำเป็นเพราะ outputDocument โหมด "blob" ไม่ revoke ให้เอง (กล่องพรีวิวยังต้องถือ url ไว้แสดง
+  // อยู่ จะนานแค่ไหนก็แล้วแต่ผู้ใช้) ถ้าไม่เก็บกวาด เปิดๆ ปิดๆ หลายรอบจะมีไฟล์ค้างในหน่วยความจำสะสม
+  useEffect(() => {
+    const url = preview?.url;
+    return () => { if (url) URL.revokeObjectURL(url); };
+  }, [preview?.url]);
+
+
+  const buildPdf = (docNumber) =>
+    generateDeliveryNotePdf({ jsPDF, thSarabunFont, form: { ...form, docNumber }, mode: "blob" });
+
+  /** ขั้นที่ 1 — สร้างไฟล์ตัวอย่างด้วย "เลขที่ที่จะได้" โดยยังไม่กินเลขจริง */
+  const handlePreview = async () => {
     if (missing.length > 0) {
       setError(`กรุณากรอก: ${missing.join(" · ")}`);
       return;
@@ -162,18 +188,60 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
     setBusy(true);
     setError("");
     try {
-      // ⚠️ กินเลขจริงตรงนี้เท่านั้น — และต้องได้เลขมาก่อนถึงจะสร้างไฟล์ ถ้าขอเลขไม่สำเร็จต้องไม่ออก
+      const { url, blob, fileName } = await buildPdf(previewNumber || form.docNumber);
+      replacePreview({ url, blob, fileName });
+      setIssued(false);
+      setPreviewOpen(true);
+    } catch {
+      setError("สร้างตัวอย่างเอกสารไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** ขั้นที่ 2 — กินเลขจริงแล้วสร้างไฟล์ใหม่ด้วยเลขนั้น (ไฟล์ตัวอย่างถูกแทนที่ทันที) */
+  const handleConfirm = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      // ⚠️ กินเลขจริงตรงนี้ที่เดียวเท่านั้น — และต้องได้เลขมาก่อนถึงจะสร้างไฟล์ ถ้าขอเลขไม่สำเร็จต้องไม่ออก
       // เอกสารที่ไม่มีเลขที่ออกไป (เอกสารไม่มีเลขอ้างอิงคือเอกสารที่ตามกลับไม่ได้)
       const { docNumber } = await DocNumberService.next("delivery");
+      const { url, blob, fileName } = await buildPdf(docNumber);
       const finalForm = { ...form, docNumber };
-      await generateDeliveryNotePdf({ jsPDF, thSarabunFont, form: finalForm, mode });
+      setForm(finalForm);
+      replacePreview({ url, blob, fileName });
+      setIssued(true);
       onIssued?.(finalForm);
-      onClose?.();
+      // ✅ บันทึกลงทะเบียนเอกสารทันทีที่ออกจริง (ดูหน้า "ทะเบียนเอกสาร")
+      // ⚠️ ไม่ await — ถ้าบันทึกทะเบียนล้มเหลว (เน็ตหลุด/สิทธิ์ไม่พอ) ต้องไม่ทำให้ผู้ใช้เห็นว่า
+      // "ออกเอกสารไม่สำเร็จ" ทั้งที่เลขถูกกินและไฟล์ออกเรียบร้อยไปแล้ว
+      IssuedDocumentService.create({
+        docType: "delivery",
+        docNumber,
+        issuedAt: finalForm.issuedAt,
+        subject: finalForm.subject,
+        site: finalForm.site,
+        customerCompany: finalForm.customerCompany,
+        workLabel: finalForm.workLabel,
+        roundLabel: finalForm.roundLabel,
+        signerName: finalForm.signerName,
+        eventId: job?.id || job?._id || null,
+        contractNo: resolveJobFields(job).contractNo || "",
+        formSnapshot: finalForm,
+      }).catch(() => {});
     } catch (err) {
       setError(err?.response?.data?.message || "ออกเอกสารไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
     } finally {
       setBusy(false);
     }
+  };
+
+  const closeAll = () => {
+    replacePreview(null);
+    setPreviewOpen(false);
+    setIssued(false);
+    onClose?.();
   };
 
   if (!form) return null;
@@ -188,7 +256,7 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
       onClose={(_, reason) => {
         if (busy) return;
         if (reason === "backdropClick" || reason === "escapeKeyDown") return;
-        onClose?.();
+        closeAll();
       }}
       fullWidth maxWidth="md" fullScreen={isMobile}
       PaperProps={{ sx: { borderRadius: isMobile ? 0 : 3 } }}
@@ -218,7 +286,7 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
                   : "ระบบจะออกเลขที่เอกสารให้อัตโนมัติตอนกดออกเอกสาร"}
             </Typography>
           </Box>
-          <IconButton onClick={onClose} disabled={busy}><Close /></IconButton>
+          <IconButton onClick={closeAll} disabled={busy}><Close /></IconButton>
         </Stack>
       </DialogTitle>
 
@@ -470,22 +538,32 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
             sx={{ mr: "auto", fontWeight: 700, bgcolor: alpha("#f59e0b", 0.15), color: "#b45309" }}
           />
         )}
-        <Button onClick={onClose} disabled={busy} sx={{ textTransform: "none" }}>ยกเลิก</Button>
+        <Button onClick={closeAll} disabled={busy} sx={{ textTransform: "none" }}>ยกเลิก</Button>
+        {/* ✅ เหลือปุ่มเดียว: ไปดูตัวอย่างก่อนเสมอ — ปุ่มออกเอกสาร/ดาวน์โหลด/แชร์ ย้ายไปอยู่ในกล่อง
+            ตัวอย่างทั้งหมด (ดู DocumentPreviewDialog) เพื่อไม่ให้มีทางลัด "ออกเลยโดยไม่ได้ดู" หลงเหลือ
+            อยู่เลย — เอกสารใบนี้กินเลขที่เดินหน้าอย่างเดียว ออกผิดแล้วย้อนไม่ได้ */}
         <Button
-          onClick={() => handleIssue("download")} disabled={busy}
-          startIcon={<Download sx={{ fontSize: 18 }} />}
-          sx={{ textTransform: "none", fontWeight: 700 }}
+          variant="contained" onClick={handlePreview} disabled={busy}
+          startIcon={busy ? <CircularProgress size={16} color="inherit" /> : <Visibility sx={{ fontSize: 18 }} />}
+          sx={{ textTransform: "none", fontWeight: 700, bgcolor: ACCENT, borderRadius: 2, boxShadow: "none", px: 2, "&:hover": { bgcolor: "#b91c1c", boxShadow: "none" } }}
         >
-          ดาวน์โหลด
-        </Button>
-        <Button
-          variant="contained" onClick={() => handleIssue("open")} disabled={busy}
-          startIcon={busy ? <CircularProgress size={16} color="inherit" /> : <PictureAsPdf sx={{ fontSize: 18 }} />}
-          sx={{ textTransform: "none", fontWeight: 700, bgcolor: ACCENT, borderRadius: 2, "&:hover": { bgcolor: "#b91c1c" } }}
-        >
-          {busy ? "กำลังออกเอกสาร..." : "ออกเอกสาร"}
+          {busy ? "กำลังสร้างตัวอย่าง..." : "ดูตัวอย่างเอกสาร"}
         </Button>
       </DialogActions>
+
+      {/* ✅ กล่องตัวอย่าง — ซ้อนบนฟอร์ม กด "กลับไปแก้ไข" แล้วข้อมูลที่กรอกไว้ยังอยู่ครบทุกช่อง */}
+      <DocumentPreviewDialog
+        open={previewOpen}
+        title="ใบส่งมอบงาน"
+        accent={ACCENT} accentDark="#b91c1c"
+        preview={preview}
+        issued={issued}
+        docNumber={issued ? form.docNumber : (previewNumber || form.docNumber)}
+        busy={busy} error={error}
+        onBack={() => setPreviewOpen(false)}
+        onConfirm={handleConfirm}
+        onClose={issued ? closeAll : () => setPreviewOpen(false)}
+      />
     </Dialog>
   );
 };

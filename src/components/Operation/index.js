@@ -56,7 +56,7 @@ import {
   NoteAdd, History, Person, AccessTime, FiberManualRecord,
   TaskAlt, HourglassTop, Cancel,
   Send, Chat, Link as LinkIcon,
-  Print, Share, RequestQuote, ReceiptLong, AssignmentTurnedIn,
+  Print, Share, RequestQuote, ReceiptLong, AssignmentTurnedIn, EventAvailable,
 } from "@mui/icons-material";
 
 // MUI Date Picker
@@ -77,6 +77,7 @@ import LineIcon from "../icons/LineIcon";
 import { printFile, shareFile, shareToLine, isMobileDevice } from "../../functions/fileActions";
 import PendingApprovalsPanel from "./PendingApprovalsPanel";
 import DeliveryNoteDialog from "../Documents/DeliveryNoteDialog";
+import WorkNoticeDialog from "../Documents/WorkNoticeDialog";
 import InfoLine from "../InfoLine";
 
 // ✅ ใช้ตัดสินใจลำดับปุ่มแชร์ในเมนู "⋮" ต่อไฟล์ (ดูเหตุผลใน fileActions.js)
@@ -1073,6 +1074,9 @@ const EventRowCard = ({
   // ✅ ใบส่งมอบงาน — จุดหลักที่ควรกดออกเอกสารนี้คือ "ตรงการ์ดงานที่ทำเสร็จแล้ว" เพราะเป็นลำดับ
   // การทำงานจริง (งานเสร็จ → ส่งมอบเอกสารให้ลูกค้าเซ็นรับ) ไม่ต้องจำเลขงานแล้วไปเปิดหาที่หน้าอื่น
   const [deliveryNoteOpen, setDeliveryNoteOpen] = useState(false);
+  // ✅ ใบแจ้งเข้างาน — เอกสารคู่กันของงานเดียวกัน คนละหัวคนละท้ายของงาน (แจ้งก่อนเข้า / ส่งมอบหลังเสร็จ)
+  // ควรอยู่จุดเดียวกันเสมอ ไม่งั้นออกใบหนึ่งได้จากหน้านี้ แต่อีกใบต้องไปเปิดหาที่หน้าปฏิทินแทน
+  const [workNoticeOpen, setWorkNoticeOpen] = useState(false);
   const theme  = useTheme();
   // ✅ จอกว้างพอ (≥900px) เปิดรายละเอียดงาน (เอกสาร/คุยกับช่าง/ประวัติ) แบบ Dialog ทับขึ้นมาแทน
   // การกางลงในหน้า (Collapse) — เดิมกางแล้วเนื้อหายาวๆ ดันการ์ดอื่นในคอลัมน์เดียวกันลงมา ต้อง
@@ -1556,6 +1560,21 @@ const EventRowCard = ({
               ⚠️ ไม่บังคับว่าต้องปิดงานก่อนถึงจะออกได้ แต่ถ้ายังไม่เสร็จจะมีคำเตือนกำกับในเมนู —
               เพราะของจริงมีเคสที่ต้องส่งมอบเอกสารบางส่วนก่อนปิดงานทั้งก้อน (เช่น ส่งรายงานให้ตรวจ
               ก่อนแล้วค่อยปิด) ถ้าล็อกตายจะกลายเป็นทำงานไม่ได้ทั้งที่เป็นขั้นตอนปกติ */}
+          {/* ✅ ใบแจ้งเข้างานมาก่อนใบส่งมอบงานในเมนู — เรียงตามลำดับเวลาที่ใช้จริง (แจ้งก่อนเข้า →
+              ส่งมอบหลังเสร็จ) คนที่กวาดตาหาจะเจอใบที่ต้องใช้ตามจังหวะงานของตัวเองได้เร็วกว่าเรียงมั่ว */}
+          {isAdminOrManager && (
+            <MenuItem
+              onClick={() => { setMoreAnchorEl(null); setWorkNoticeOpen(true); }}
+              sx={{ gap: 1.5, minHeight: 44 }}
+            >
+              <ListItemIcon><EventAvailable fontSize="small" sx={{ color: "#0284c7" }} /></ListItemIcon>
+              <ListItemText
+                primary="ออกใบแจ้งเข้างาน"
+                secondary={localStatus === "ดำเนินการเสร็จสิ้น" ? "งานนี้ปิดแล้ว — ปกติใบนี้ออกก่อนเข้างาน" : undefined}
+                secondaryTypographyProps={{ fontSize: "0.7rem", color: "#b45309" }}
+              />
+            </MenuItem>
+          )}
           {isAdminOrManager && (
             <MenuItem
               onClick={() => { setMoreAnchorEl(null); setDeliveryNoteOpen(true); }}
@@ -1569,6 +1588,7 @@ const EventRowCard = ({
               />
             </MenuItem>
           )}
+          {isAdminOrManager && <Divider sx={{ my: 0.5 }} />}
           <MenuItem onClick={() => { setMoreAnchorEl(null); onDelete(event._id); }} sx={{ gap: 1.5, minHeight: 44, color: "error.main" }}>
             <ListItemIcon><Delete fontSize="small" color="error" /></ListItemIcon>
             <ListItemText>ลบงานนี้</ListItemText>
@@ -1582,6 +1602,14 @@ const EventRowCard = ({
             open={deliveryNoteOpen}
             onClose={() => setDeliveryNoteOpen(false)}
             job={event}
+          />
+        )}
+        {workNoticeOpen && (
+          <WorkNoticeDialog
+            open={workNoticeOpen}
+            onClose={() => setWorkNoticeOpen(false)}
+            job={event}
+            canUseRunningNumber={isAdminOrManager}
           />
         )}
 
@@ -2225,6 +2253,18 @@ const Operation = () => {
     }
   }, [searchParams]);
 
+  // ✅ ?tab=approvals — เปิดหน้านี้มาที่แท็บ "รออนุมัติ" ได้ทันที
+  // 🐛 ที่แก้ (กดแจ้งเตือน "ส่งงานใหม่รออนุมัติ" แล้วมาไม่ถูกที่): แจ้งเตือนชนิดนี้เดิมพามาที่
+  // /operation/<id> ซึ่งเปิดหน้าการดำเนินงานที่แท็บ "รายการงาน" แล้วกรองเหลืองานเดียว — คนที่กดมา
+  // ต้องมากดสลับแท็บ "รออนุมัติ" เองอีกทีถึงจะกดอนุมัติ/ไม่อนุมัติได้ ทั้งที่สิ่งเดียวที่ต้องทำต่อจาก
+  // แจ้งเตือนนั้นคือการตัดสินใจอนุมัติ (ปุ่มอนุมัติอยู่ในแท็บนั้นที่เดียว ไม่มีในการ์ดรายการงาน)
+  // ⚠️ ต้องเช็คสิทธิ์ด้วย — แท็บ "รออนุมัติ" ถูกเรนเดอร์เฉพาะแอดมิน/manager (ดู Tabs ด้านล่าง) ถ้า
+  // ตั้ง activeTab=1 ให้ role อื่นจะกลายเป็นแท็บที่ไม่มีอยู่จริง = หน้าว่างเปล่าโดยไม่มีอะไรอธิบาย
+  // ⚠️ deps มี searchParams (ไม่ใช่ mount-only) — กดแจ้งเตือนซ้ำตอนที่อยู่หน้านี้อยู่แล้ว จะเปลี่ยนแค่
+  // query param โดยไม่ remount หน้า (เทียบเหตุผลเดียวกับ effect ของ ?highlight= ด้านบน)
+  // ⚠️ ตัว effect จริงอยู่ใต้จุดที่ประกาศ currentUserRole (ดูด้านล่าง) — เขียนไว้ตรงนั้นเพื่อไม่ให้
+  // อ้างถึงตัวแปรก่อนถูกประกาศ
+
   const [page,     setPage]     = useState(1);
   const [pageSize, setPageSize] = useState(5);
   const [highlightId, setHighlightId] = useState("");
@@ -2242,6 +2282,19 @@ const Operation = () => {
   const [snackbar,         setSnackbar]           = useState({ open: false, msg: "", severity: "success" });
   const [currentUserRole,  setCurrentUserRole]    = useState("");
   const isAdminOrManager = ["admin", "manager"].includes(currentUserRole);
+
+  // ✅ ?tab=approvals — เปิดหน้านี้มาที่แท็บ "รออนุมัติ" ได้ทันที
+  // 🐛 ที่แก้ (กดแจ้งเตือน "ส่งงานใหม่รออนุมัติ" แล้วมาไม่ถูกที่): แจ้งเตือนชนิดนี้เดิมพามาที่
+  // /operation/<id> ซึ่งเปิดที่แท็บ "รายการงาน" แล้วกรองเหลืองานเดียว — คนที่กดมาต้องมาสลับแท็บ
+  // "รออนุมัติ" เองอีกทีถึงจะกดอนุมัติ/ไม่อนุมัติได้ ทั้งที่สิ่งเดียวที่ต้องทำต่อจากแจ้งเตือนนั้นคือ
+  // การตัดสินใจอนุมัติ (ปุ่มอนุมัติอยู่ในแท็บนั้นที่เดียว การ์ดในแท็บรายการงานไม่มีให้)
+  // ⚠️ ต้องเช็คสิทธิ์ด้วย — แท็บ "รออนุมัติ" ถูกเรนเดอร์เฉพาะแอดมิน/manager (ดู Tabs ด้านล่าง) ถ้าตั้ง
+  // activeTab=1 ให้ role อื่นจะกลายเป็นแท็บที่ไม่มีอยู่จริง = เนื้อหาว่างเปล่าโดยไม่มีอะไรอธิบาย
+  // ⚠️ deps มี searchParams (ไม่ใช่ mount-only) — กดแจ้งเตือนซ้ำตอนที่อยู่หน้านี้อยู่แล้วจะเปลี่ยนแค่
+  // query param โดยไม่ remount หน้า (เทียบเหตุผลเดียวกับ effect ของ ?highlight= ด้านบน)
+  useEffect(() => {
+    if (searchParams.get("tab") === "approvals" && isAdminOrManager) setActiveTab(1);
+  }, [searchParams, isAdminOrManager]);
 
   const [uploadingState,         setUploadingState]         = useState({ quotation: null, report: null, invoice: null, completion: null });
   const [uploadProgressState,    setUploadProgressState]    = useState({ quotation: 0, report: 0, invoice: 0, completion:0 });
