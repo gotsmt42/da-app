@@ -105,3 +105,81 @@ export const contractBillingSummary = (visits = [], now = new Date()) => {
     totalCount: real.length,
   };
 };
+
+// ── ระดับ "ครั้งที่ N" ──────────────────────────────────────────────────────
+// ⚠️ 1 ครั้งมีได้หลาย event document (งานเดียวกันแต่เข้าหลายช่วงไม่ต่อเนื่อง เช่น 21 ส.ค. แล้วเว้นไป
+// 31 ส.ค.–4 ก.ย.) แต่ "วางบิลทีเดียวต่อครั้ง" ตามที่บริษัททำจริง — ไม่ใช่วางบิลทุก document
+// ✅ จึงเลือก document ตัวแทน 1 ตัวต่อครั้งไว้ถือใบวางบิล แล้วทุกที่ในระบบอ้างตัวเดียวกันเสมอ
+
+const byVisitDate = (a, b) => new Date(a.start || a.date || 0) - new Date(b.start || b.date || 0);
+
+/**
+ * document ที่ถือใบวางบิลของครั้งนี้
+ * ⚠️ ถ้ามีใบวางบิลอยู่แล้วให้ยึดตัวนั้นก่อนเสมอ ไม่ใช่ยึด "ตัวแรกสุด" ตายตัว — ไม่งั้นเวลามีการเพิ่มวันที่
+ * ย้อนหลังเข้าไปในครั้งเดิม (เกิดขึ้นจริงบ่อย) ตัวแทนจะเปลี่ยนไปเป็น document ใหม่ที่ยังไม่มีใบวางบิล
+ * แล้วใบที่บันทึกไว้จะ "หายไปจากจอ" ทั้งที่ข้อมูลยังอยู่ในฐานข้อมูล
+ */
+export const roundBillingTarget = (roundVisits = []) => {
+  const sorted = [...roundVisits].sort(byVisitDate);
+  return sorted.find((v) => v.billing?.invoicedAt) || sorted[0] || null;
+};
+
+/**
+ * สถานะการวางบิลของ "ครั้งที่ N" ทั้งครั้ง
+ * ⚠️ รวมทุก document ที่มีใบวางบิลในครั้งเดียวกัน ไม่ใช่ดูแค่ตัวแทน — ปกติจะมีแค่ใบเดียวอยู่แล้ว
+ * แต่ถ้าเคยมีการบันทึกไว้หลายใบ (ข้อมูลจากตอนที่ระบบยังวางบิลรายdocument) การดูแค่ตัวแทนจะทำให้เงิน
+ * ที่บันทึกไว้จริงหายไปจากหน้าจอเงียบๆ ซึ่งเป็นความผิดพลาดที่ยอมให้เกิดไม่ได้กับข้อมูลการเงิน
+ * @returns {{...billingStatus, extraInvoices:number, target:object|null}}
+ */
+export const roundBillingStatus = (roundVisits = [], now = new Date()) => {
+  const invoiced = roundVisits.filter((v) => v.billing?.invoicedAt);
+  const target = roundBillingTarget(roundVisits);
+
+  if (invoiced.length === 0) {
+    return { ...billingStatus(null, now), extraInvoices: 0, target };
+  }
+  if (invoiced.length === 1) {
+    return { ...billingStatus(invoiced[0].billing, now), extraInvoices: 0, target: invoiced[0] };
+  }
+
+  // รวมหลายใบในครั้งเดียว (เคสข้อมูลเก่า) — สถานะยึด "อาการหนักสุด" เหมือนที่อื่นในระบบ
+  const parts = invoiced.map((v) => billingStatus(v.billing, now));
+  const worst = parts.reduce((a, b) => (RANK[b.state] < RANK[a.state] ? b : a));
+  return {
+    ...worst,
+    net: round2(parts.reduce((sum, x) => sum + x.net, 0)),
+    paid: round2(parts.reduce((sum, x) => sum + x.paid, 0)),
+    outstanding: round2(parts.reduce((sum, x) => sum + Math.max(0, x.outstanding), 0)),
+    extraInvoices: invoiced.length - 1,
+    target: invoiced[0],
+  };
+};
+
+/**
+ * ยอดวางบิลต่อครั้ง = มูลค่างานทั้งสัญญา ÷ จำนวนครั้งทั้งหมด
+ *
+ * ⚠️ jobValue ที่กรอกในหน้าภาพรวมงานคือ "มูลค่าทั้งสัญญา" ไม่ใช่ต่อครั้ง — สัญญา PM 500,000 บาท
+ * 4 ครั้ง ไม่ได้แปลว่าวางบิลครั้งละ 500,000 การเติมยอดเต็มให้ในฟอร์มจึงผิดเสมอสำหรับสัญญาหลายครั้ง
+ * และผิดแบบที่คนกดบันทึกผ่านได้ง่ายมากเพราะตัวเลขที่เห็นดู "คุ้นตา"
+ *
+ * ⚠️ ครั้งสุดท้ายรับเศษไปทั้งหมด — 500,000 ÷ 3 = 166,666.67 ถ้าใช้ค่าเดียวกันทั้ง 3 ครั้ง ผลรวมจะเป็น
+ * 500,000.01 เกินมูลค่าสัญญา 1 สตางค์ ซึ่งพอเอาไปกระทบยอดกับลูกค้าจะกลายเป็นเรื่อง
+ *
+ * @param {number} jobValue    มูลค่างานทั้งสัญญา
+ * @param {number} visitCount  จำนวนครั้งทั้งหมดตามสัญญา
+ * @param {number} roundNo     ครั้งที่เท่าไร (1-based)
+ * @returns {number|null} null เมื่อข้อมูลไม่พอจะแบ่ง (ให้ผู้เรียก fallback ไปใช้ค่าอื่น)
+ */
+export const perRoundAmount = (jobValue, visitCount, roundNo) => {
+  const total = Number(jobValue);
+  const rounds = Number(visitCount);
+  if (!Number.isFinite(total) || total <= 0) return null;
+  if (!Number.isFinite(rounds) || rounds < 1) return null;
+  if (rounds === 1) return round2(total);
+
+  const per = round2(total / rounds);
+  const n = Number(roundNo);
+  // ครั้งสุดท้ายรับเศษ — ครั้งอื่นได้ค่าเท่ากันหมด
+  if (Number.isFinite(n) && n >= rounds) return round2(total - per * (rounds - 1));
+  return per;
+};

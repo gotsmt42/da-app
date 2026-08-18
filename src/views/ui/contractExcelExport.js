@@ -1,7 +1,8 @@
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 // ✅ ของกลางชุดเดียวกับหน้าจอ — ยอดในไฟล์ต้องตรงกับที่เห็นบนจอเสมอ
-import { contractBillingSummary } from "../../utils/billing";
+import { contractBillingSummary, roundBillingStatus, baht as bahtText } from "../../utils/billing";
+import { JOB_DOC_TYPES, roundDocs } from "../../utils/jobDocTypes";
 
 // ✅ รูปแบบตัวเลขของช่องจำนวนเงินทุกช่องในไฟล์ที่ส่งออก — เก็บเป็น "ตัวเลขจริง" ใน cell (บวก/ลบ/SUM ต่อ
 // ในไฟล์ได้ตามปกติ) แต่ให้ Excel แสดงผลพร้อมสัญลักษณ์ ฿ นำหน้าเสมอ ตรงกับที่แสดงบนหน้าจอ — เดิมเป็น
@@ -100,13 +101,25 @@ export async function exportContractsToExcel({
     { key: "billingInvoiced", header: "ยอดวางบิล (฿)", width: 15, group: "วางบิล / รับเงิน", align: "right", numFmt: MONEY_FMT },
     { key: "billingPaid", header: "รับเงินแล้ว (฿)", width: 15, group: "วางบิล / รับเงิน", align: "right", numFmt: MONEY_FMT },
     { key: "billingOutstanding", header: "ค้างรับ (฿)", width: 15, group: "วางบิล / รับเงิน", align: "right", numFmt: MONEY_FMT },
+    // ✅ จำนวนไฟล์เอกสารแยกตามชนิด รวมทุกครั้งของแถวนั้น — บนจอเห็นเป็นไอคอนรายครั้ง (ดูง่ายเวลาไล่
+    // ทีละงาน) แต่ในไฟล์ต้องเป็น "ตัวเลขต่อคอลัมน์" ถึงจะใช้งานแบบ Excel ได้จริง คือกรอง/เรียง/pivot
+    // เพื่อตอบคำถามอย่าง "งานไหนบ้างที่ยังไม่มีใบส่งมอบงาน" ซึ่งเป็นเหตุผลหลักที่คนส่งออกไฟล์นี้
+    // ⚠️ ที่นี่ใส่ 0 ได้ (ต่างจากคอลัมน์ยอดเงินที่เว้นว่างเมื่อยังไม่วางบิล) เพราะ "ไฟล์ 0 ไฟล์" มี
+    // ความหมายชัดเจนในตัวเอง ไม่กำกวมเหมือน "ยอด 0 บาท" ที่แยกไม่ออกจาก "ยังไม่ได้วางบิล"
+    // ⚠️ ต้องมี "(ไฟล์)" ต่อท้ายเสมอ — ไม่งั้นหัวคอลัมน์นี้จะซ้ำกับคอลัมน์ "ใบเสนอราคา" ในกลุ่ม
+    // เอกสารอ้างอิง (ซึ่งเก็บ "เลขที่" ใบเสนอราคา) หัวข้อเดียวกัน 2 คอลัมน์คนละความหมายในชีตเดียว
+    // ทำให้อ่านผิดและเขียนสูตรอ้างผิดคอลัมน์ได้ง่ายมาก
+    ...JOB_DOC_TYPES.map((t) => ({
+      key: `doc_${t.key}`, header: `${t.label} (ไฟล์)`, width: 16,
+      group: "เอกสารแนบ (จำนวนไฟล์ · รวมทุกครั้ง)", align: "center",
+    })),
   ];
   // ✅ แต่ละครั้งแสดงครบในเซลล์เดียว: วันที่ → 👷 หัวหน้าทีมของครั้งนั้น → 👥 ลูกทีมของครั้งนั้น
   // (เดิมมีแค่วันที่ + หัวหน้าทีม ลูกทีมถูกยุบไปรวมเป็นก้อนเดียวท้ายตาราง แยกไม่ออกว่าใครช่วยครั้งไหน)
   // ⚠️ เปลี่ยนชื่อกลุ่มจาก "วันที่เข้างานแต่ละครั้ง" เป็น "รายละเอียดแต่ละครั้ง" ให้ตรงกับเนื้อหาจริง
   // ที่ไม่ได้มีแค่วันที่อีกต่อไป + ขยายความกว้าง 24 → 30 รองรับรายชื่อลูกทีมที่ยาวขึ้น
   const visitCols = visitColumns.map((n) => ({
-    key: `visit_${n}`, header: `ครั้งที่ ${n}`, width: 30, group: "รายละเอียดแต่ละครั้ง (วันที่ / ทีมที่เข้างาน)", wrap: true,
+    key: `visit_${n}`, header: `ครั้งที่ ${n}`, width: 30, group: "รายละเอียดแต่ละครั้ง (วันที่ / ทีม / วางบิล / เอกสาร)", wrap: true,
   }));
   // ✅ ตัดคอลัมน์ "หัวหน้าทีมเข้างาน (ครั้งที่ 1)" ออกตามที่ผู้ใช้ขอ — ข้อมูลซ้ำซ้อนอยู่แล้ว เพราะหัวหน้า
   // ทีมของ "ทุกครั้ง" แสดงอยู่ในคอลัมน์ครั้งที่ 1..N ทีละครั้งอยู่แล้ว (บรรทัด 👷 ใต้วันที่) ซึ่งถูกต้อง
@@ -205,6 +218,11 @@ export async function exportContractsToExcel({
       // กับยอดบนจอจะไม่ตรงกัน ซึ่งเป็นเรื่องเงินและตรวจสอบย้อนหลังได้ยากมากเมื่อไฟล์ถูกส่งต่อไปแล้ว
       // ⚠️ แถวที่ยังไม่เคยวางบิลเลยเว้นว่าง ไม่ใส่ 0 — 0 บาทกับ "ยังไม่วางบิล" คนละความหมาย และ 0
       // จะไปกวนค่าเฉลี่ย/การกรองใน Excel
+      // จำนวนไฟล์แต่ละชนิดของทั้งแถว (รวมทุกครั้ง) — ตัวเลขล้วนเพื่อให้กรอง/pivot ต่อได้
+      ...Object.fromEntries(JOB_DOC_TYPES.map((t) => [
+        `doc_${t.key}`,
+        (c.visits || []).reduce((sum, v) => sum + (v?.[t.field]?.length || 0), 0),
+      ])),
       ...(() => {
         const bs = contractBillingSummary(c.visits || []);
         if (!bs) return { billingStatus: "", billingInvoiced: "", billingPaid: "", billingOutstanding: "" };
@@ -233,26 +251,50 @@ export async function exportContractsToExcel({
     // ✅ ตรรกะรายครั้งเดียวกับตารางบนจอเป๊ะๆ (นับเฉพาะครั้งที่ลงตารางจริง / "รอวางแผน" ถ้ายังเป็นฉบับร่าง)
     const visitMeta = {};
     visitColumns.forEach((n) => {
-      const visits = c.visits.filter((v) => !v.unscheduled && (Number(v.time) || 1) === n);
+      // ⚠️ เรียงตามวันที่จริงเหมือนบนจอ — เดิมไม่ได้เรียง ทำให้ลำดับวันในเซลล์เดียวกันของไฟล์กับของจอ
+      // ไม่ตรงกันเวลาครั้งนั้นมีหลายช่วง (ผู้ใช้เทียบไฟล์กับจอแล้วนึกว่าข้อมูลคนละชุด)
+      const visits = c.visits
+        .filter((v) => !v.unscheduled && (Number(v.time) || 1) === n)
+        .sort((x, y) => new Date(x.start || x.date) - new Date(y.start || y.date));
       const pendingDraft = visits.length === 0 && c.visits.find((v) => v.unscheduled && (Number(v.time) || 1) === n);
+
       // ✅ แยกลูกทีมของ "แต่ละครั้ง" ไว้ในเซลล์ของครั้งนั้นเอง — เห็นได้ทันทีว่าใครไปช่วยครั้งไหนบ้าง
-      // (เดิมเห็นแค่หัวหน้าทีม ส่วนลูกทีมถูกยุบรวมเป็นก้อนเดียวท้ายตาราง แยกรายครั้งไม่ได้เลย)
       // ⚠️ 1 ครั้งอาจมีหลาย document ได้ (เข้างานหลายวันไม่ติดกัน) จึงวนทีละ document แล้วต่อด้วย \n
-      values[`visit_${n}`] = visits.length > 0
-        ? visits.map((v) => {
-            const members = [...new Set(
-              (v.teamMembers || [])
-                .map((m) => m?.name)
-                .filter(Boolean)
-                .filter((name) => name !== v.team) // กันหัวหน้าทีมโผล่ซ้ำในบรรทัดลูกทีม
-            )];
-            return [
-              formatEventDateRange(v),
-              v.team ? `👷 ${v.team}` : "",
-              members.length > 0 ? `👥 ${members.join(", ")}` : "",
-            ].filter(Boolean).join("\n");
-          }).join("\n")
-        : pendingDraft ? "รอวางแผน" : "";
+      const lines = visits.map((v) => {
+        const members = [...new Set(
+          (v.teamMembers || [])
+            .map((m) => m?.name)
+            .filter(Boolean)
+            .filter((name) => name !== v.team) // กันหัวหน้าทีมโผล่ซ้ำในบรรทัดลูกทีม
+        )];
+        return [
+          formatEventDateRange(v),
+          v.team ? `👷 ${v.team}` : "",
+          members.length > 0 ? `👥 ${members.join(", ")}` : "",
+        ].filter(Boolean).join("\n");
+      });
+
+      // 🐛 BUG ที่แก้ (บรรทัดวางบิลซ้ำหลายรอบในครั้งเดียว): เดิมบรรทัดนี้อยู่ในลูปของแต่ละ document
+      // ครั้งที่เข้างานหลายช่วงจึงมีบรรทัด [บิล] โผล่ซ้ำตามจำนวนช่วง ทั้งที่วางบิลใบเดียวต่อครั้ง —
+      // และไม่ตรงกับหน้าจอที่แสดงป้ายเดียวต่อครั้ง ต้องคิดระดับ "ครั้ง" เหมือนกัน (roundBillingStatus)
+      if (visits.length > 0) {
+        const bst = roundBillingStatus(visits);
+        if (bst.state !== "not_invoiced") {
+          const num = bst.target?.billing?.invoiceNo ? " " + bst.target.billing.invoiceNo : "";
+          lines.push(bst.outstanding > 0
+            ? `[บิล]${num} ${bst.label} · ค้าง ${bahtText(bst.outstanding)}`
+            : `[บิล]${num} ${bst.label}`);
+        }
+
+        // ✅ เอกสารที่ช่างแนบไว้ของครั้งนี้ — ชุดเดียวกับที่หน้าภาพรวมงานแสดงเป็นไอคอน
+        // ⚠️ ครั้งที่ไม่มีเอกสารไม่ต้องขึ้นบรรทัดนี้ ไม่งั้นทุกเซลล์สูงขึ้นอีก 1 บรรทัดโดยไม่ได้ข้อมูลอะไร
+        const docs = roundDocs(visits);
+        if (docs.length > 0) {
+          lines.push(`[เอกสาร] ${docs.map((d) => `${d.label} ${d.files.length}`).join(" · ")}`);
+        }
+      }
+
+      values[`visit_${n}`] = visits.length > 0 ? lines.join("\n") : pendingDraft ? "รอวางแผน" : "";
       visitMeta[n] = visits.length > 0 ? "done" : pendingDraft ? "pending" : "empty";
     });
 

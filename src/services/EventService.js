@@ -116,6 +116,17 @@ const EventService = {
     return res.data;
   },
 
+  /** ให้ AI อ่านยอดจากรูปใบวางบิล — คืนค่ามาเติมในฟอร์มเท่านั้น ไม่ได้บันทึกอะไร */
+  async ScanInvoice(id, fileId) {
+    const res = await API.post(`/events/${id}/billing/scan`, { fileId });
+    return res.data;
+  },
+
+  async BillingScanAvailability() {
+    const res = await API.get("/events/billing/scan-availability");
+    return res.data;
+  },
+
   async DeletePayment(id, paymentId) {
     const res = await API.delete(`/events/${id}/billing/payment/${paymentId}`);
     return res.data;

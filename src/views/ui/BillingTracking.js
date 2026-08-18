@@ -16,17 +16,16 @@ import moment from "moment";
 import "moment/locale/th";
 import {
   Box, Stack, Typography, TextField, InputAdornment, IconButton, Chip, Skeleton,
-  Paper, Dialog, DialogTitle, DialogContent, DialogActions, Button, Tooltip, Divider,
-  ToggleButton, ToggleButtonGroup, useMediaQuery, Pagination, Alert, MenuItem,
+  Paper, Tooltip, ToggleButton, ToggleButtonGroup, useMediaQuery, Pagination,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
-  Search, Clear, Refresh, ReceiptLong, Payments, WarningAmber, CheckCircle,
-  FolderOpen, AddCircleOutline, DeleteOutline, HourglassEmpty,
+  Search, Clear, Refresh, ReceiptLong, WarningAmber, CheckCircle, FolderOpen, HourglassEmpty,
 } from "@mui/icons-material";
 import { useAuth } from "../../auth/AuthContext";
 import EventService from "../../services/EventService";
-import { billingStatus, previewAmounts, paidTotal, baht, round2, BILLING_STATE_META } from "../../utils/billing";
+import BillingDialog from "../../components/Billing/BillingDialog";
+import { billingStatus, baht, round2, BILLING_STATE_META } from "../../utils/billing";
 
 const ACCENT = "#0891b2";
 const TEXT_SUB = "#64748b";
@@ -45,11 +44,6 @@ const TABS = [
   { key: "all", label: "ทั้งหมด" },
 ];
 
-const EMPTY_INVOICE = {
-  invoiceNo: "", invoicedAt: moment().format("YYYY-MM-DD"),
-  creditTermDays: 30, amountBeforeVat: "", vatRate: 7, whtRate: 3, note: "",
-};
-
 export default function BillingTracking() {
   const { userData, loading: authLoading } = useAuth();
   const role = (userData?.role || "").toLowerCase();
@@ -61,11 +55,7 @@ export default function BillingTracking() {
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("attention");
   const [page, setPage] = useState(1);
-  const [target, setTarget] = useState(null);        // งานที่กำลังเปิดกล่องจัดการ
-  const [form, setForm] = useState(EMPTY_INVOICE);
-  const [payForm, setPayForm] = useState({ amount: "", paidAt: moment().format("YYYY-MM-DD"), method: "", note: "" });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [target, setTarget] = useState(null);   // งานที่กำลังเปิดกล่องจัดการ
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -144,81 +134,15 @@ export default function BillingTracking() {
   useEffect(() => { setPage(1); }, [tab, search]);
   const paged = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
-  // ── การจัดการ ─────────────────────────────────────────────────────────
-  const openDialog = (event) => {
-    const b = event.billing || {};
-    setTarget(event);
-    setError("");
-    setForm(b.invoicedAt ? {
-      invoiceNo: b.invoiceNo || "",
-      invoicedAt: moment(b.invoicedAt).format("YYYY-MM-DD"),
-      creditTermDays: b.creditTermDays ?? 30,
-      amountBeforeVat: b.amountBeforeVat ?? "",
-      vatRate: b.vatRate ?? 7,
-      whtRate: b.whtRate ?? 3,
-      note: b.note || "",
-    } : {
-      ...EMPTY_INVOICE,
-      // เติมยอดตั้งต้นจากมูลค่างานที่บันทึกไว้แล้ว — ส่วนใหญ่วางบิลตามยอดนี้ ไม่ต้องพิมพ์ซ้ำ
-      amountBeforeVat: event.jobValue || event.quotationAmount || "",
-    });
-    setPayForm({ amount: "", paidAt: moment().format("YYYY-MM-DD"), method: "", note: "" });
-  };
-
-  const refreshTarget = (updated) => {
+  // ✅ กล่องจัดการเป็นของกลาง (components/Billing/BillingDialog.js) — หน้านี้มีหน้าที่แค่ "เลือกงาน"
+  // แล้วรับ event ตัวใหม่กลับมาอัปเดตลงรายการ ไม่ต้องรู้เรื่องฟอร์ม/ภาษี/การเรียก API เลย
+  const handleSaved = (updated) => {
     setEvents((prev) => prev.map((e) => (e._id === updated._id ? updated : e)));
     setTarget(updated);
   };
 
-  const saveInvoice = async () => {
-    if (!target) return;
-    setSaving(true); setError("");
-    try {
-      const res = await EventService.SaveBilling(target._id, {
-        ...form, amountBeforeVat: Number(form.amountBeforeVat),
-      });
-      refreshTarget(res.event);
-    } catch (err) {
-      setError(err?.response?.data?.message || "บันทึกไม่สำเร็จ");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const addPayment = async () => {
-    if (!target) return;
-    setSaving(true); setError("");
-    try {
-      const res = await EventService.AddPayment(target._id, { ...payForm, amount: Number(payForm.amount) });
-      refreshTarget(res.event);
-      setPayForm({ amount: "", paidAt: moment().format("YYYY-MM-DD"), method: "", note: "" });
-    } catch (err) {
-      setError(err?.response?.data?.message || "บันทึกรับเงินไม่สำเร็จ");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const removePayment = async (paymentId) => {
-    if (!target) return;
-    setSaving(true); setError("");
-    try {
-      const res = await EventService.DeletePayment(target._id, paymentId);
-      refreshTarget(res.event);
-    } catch (err) {
-      setError(err?.response?.data?.message || "ลบรายการไม่สำเร็จ");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   if (authLoading) return null;
   if (!isAdminOrManager) return <Navigate to="/dashboard" replace />;
-
-  const preview = previewAmounts({
-    amountBeforeVat: form.amountBeforeVat, vatRate: form.vatRate, whtRate: form.whtRate,
-  });
-  const targetStatus = target ? billingStatus(target.billing) : null;
 
   return (
     <Box sx={{ p: { xs: 1.5, sm: 2 }, maxWidth: 1400, mx: "auto" }}>
@@ -285,7 +209,7 @@ export default function BillingTracking() {
               const meta = BILLING_STATE_META[status.state];
               return (
                 <Paper
-                  key={e._id} variant="outlined" onClick={() => openDialog(e)}
+                  key={e._id} variant="outlined" onClick={() => setTarget(e)}
                   sx={{
                     p: 1.6, borderRadius: 3, cursor: "pointer", transition: "all .15s",
                     borderLeft: `3px solid ${meta.color}`,
@@ -339,118 +263,11 @@ export default function BillingTracking() {
       )}
 
       {/* ── กล่องจัดการใบวางบิล ─────────────────────────────────────────── */}
-      <Dialog open={Boolean(target)} onClose={() => !saving && setTarget(null)} fullWidth maxWidth="sm" fullScreen={isMobile}>
-        <DialogTitle sx={{ fontWeight: 800, pb: 1 }}>
-          <Typography sx={{ fontWeight: 800, fontSize: "1rem" }} noWrap>{target?.company || "ไม่ระบุลูกค้า"}</Typography>
-          <Typography variant="caption" sx={{ color: TEXT_SUB }}>
-            {[target?.site, target?.title, target?.time ? `ครั้งที่ ${target.time}` : ""].filter(Boolean).join(" · ")}
-          </Typography>
-        </DialogTitle>
-        <DialogContent dividers>
-          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-
-          <Typography sx={{ fontWeight: 800, fontSize: "0.85rem", mb: 1 }}>ข้อมูลใบวางบิล</Typography>
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1.25, mb: 1.5 }}>
-            <TextField size="small" label="เลขที่ใบวางบิล" value={form.invoiceNo}
-              onChange={(e) => setForm((f) => ({ ...f, invoiceNo: e.target.value }))} />
-            <TextField size="small" type="date" label="วันที่วางบิล" InputLabelProps={{ shrink: true }}
-              value={form.invoicedAt} onChange={(e) => setForm((f) => ({ ...f, invoicedAt: e.target.value }))} />
-            <TextField size="small" type="number" label="ยอดก่อน VAT (บาท)" value={form.amountBeforeVat}
-              onChange={(e) => setForm((f) => ({ ...f, amountBeforeVat: e.target.value }))}
-              InputProps={{ startAdornment: <InputAdornment position="start">฿</InputAdornment> }} />
-            <TextField size="small" type="number" label="เครดิตเทอม (วัน)" value={form.creditTermDays}
-              onChange={(e) => setForm((f) => ({ ...f, creditTermDays: e.target.value }))} />
-            <TextField select size="small" label="VAT" value={form.vatRate}
-              onChange={(e) => setForm((f) => ({ ...f, vatRate: e.target.value }))}>
-              <MenuItem value={7}>7%</MenuItem>
-              <MenuItem value={0}>ไม่คิด VAT</MenuItem>
-            </TextField>
-            <TextField select size="small" label="ภาษีหัก ณ ที่จ่าย" value={form.whtRate}
-              onChange={(e) => setForm((f) => ({ ...f, whtRate: e.target.value }))}>
-              <MenuItem value={3}>3% (งานบริการ)</MenuItem>
-              <MenuItem value={1}>1%</MenuItem>
-              <MenuItem value={0}>ไม่หัก</MenuItem>
-            </TextField>
-          </Box>
-
-          {/* ✅ ตัวอย่างยอดระหว่างพิมพ์ — ให้เห็นยอดที่ลูกค้าต้องโอนจริงก่อนกดบันทึก
-              ⚠️ ค่าที่บันทึกจริงคำนวณใหม่ที่ server เสมอ ตรงนี้เป็นแค่ภาพตัวอย่าง */}
-          <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: alpha(ACCENT, 0.05), mb: 1.5 }}>
-            <Stack direction="row" justifyContent="space-between"><Typography variant="body2">ยอดก่อน VAT</Typography><Typography variant="body2">{baht(preview.amountBeforeVat)}</Typography></Stack>
-            <Stack direction="row" justifyContent="space-between"><Typography variant="body2">VAT {form.vatRate}%</Typography><Typography variant="body2">+{baht(preview.vatAmount)}</Typography></Stack>
-            <Stack direction="row" justifyContent="space-between"><Typography variant="body2">หัก ณ ที่จ่าย {form.whtRate}%</Typography><Typography variant="body2">−{baht(preview.whtAmount)}</Typography></Stack>
-            <Divider sx={{ my: 0.75 }} />
-            <Stack direction="row" justifyContent="space-between">
-              <Typography sx={{ fontWeight: 800, fontSize: "0.9rem" }}>ยอดที่ลูกค้าต้องโอน</Typography>
-              <Typography sx={{ fontWeight: 800, fontSize: "0.9rem", color: ACCENT }}>{baht(preview.netAmount)}</Typography>
-            </Stack>
-          </Box>
-          <TextField fullWidth size="small" label="หมายเหตุ" value={form.note} multiline minRows={1}
-            onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))} sx={{ mb: 1 }} />
-          <Button variant="contained" onClick={saveInvoice} disabled={saving || !form.amountBeforeVat}
-            sx={{ bgcolor: ACCENT, textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#0e7490" } }}>
-            {saving ? "กำลังบันทึก..." : target?.billing?.invoicedAt ? "อัปเดตใบวางบิล" : "บันทึกการวางบิล"}
-          </Button>
-
-          {targetStatus && targetStatus.state !== "not_invoiced" && (
-            <>
-              <Divider sx={{ my: 2 }} />
-              <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mb: 1 }}>
-                <Typography sx={{ fontWeight: 800, fontSize: "0.85rem" }}>การรับเงิน</Typography>
-                <Typography variant="caption" sx={{ color: TEXT_SUB }}>
-                  รับแล้ว {baht(paidTotal(target.billing))} / {baht(targetStatus.net)}
-                  {targetStatus.outstanding > 0 && ` · ค้าง ${baht(targetStatus.outstanding)}`}
-                </Typography>
-              </Stack>
-
-              <Stack spacing={0.5} sx={{ mb: 1.5 }}>
-                {(target.billing?.payments || []).map((p) => (
-                  <Stack key={p._id} direction="row" alignItems="center" spacing={1}
-                    sx={{ p: 0.9, borderRadius: 2, bgcolor: alpha("#10b981", 0.06) }}>
-                    <Payments sx={{ fontSize: 15, color: "#10b981" }} />
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography sx={{ fontWeight: 700, fontSize: "0.82rem" }}>{baht(p.amount)}</Typography>
-                      <Typography variant="caption" sx={{ color: TEXT_SUB }}>
-                        {moment(p.paidAt).format("DD/MM/YYYY")}{p.method ? ` · ${p.method}` : ""}{p.recordedByName ? ` · บันทึกโดย ${p.recordedByName}` : ""}
-                      </Typography>
-                    </Box>
-                    <Tooltip title="ลบรายการนี้">
-                      <span>
-                        <IconButton size="small" disabled={saving} onClick={() => removePayment(p._id)}>
-                          <DeleteOutline sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      </span>
-                    </Tooltip>
-                  </Stack>
-                ))}
-                {(target.billing?.payments || []).length === 0 && (
-                  <Typography variant="body2" sx={{ color: TEXT_SUB }}>ยังไม่มีการรับเงิน</Typography>
-                )}
-              </Stack>
-
-              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1.25, mb: 1 }}>
-                <TextField size="small" type="number" label="ยอดรับ (บาท)" value={payForm.amount}
-                  onChange={(e) => setPayForm((f) => ({ ...f, amount: e.target.value }))}
-                  InputProps={{ startAdornment: <InputAdornment position="start">฿</InputAdornment> }} />
-                <TextField size="small" type="date" label="วันที่รับเงิน" InputLabelProps={{ shrink: true }}
-                  value={payForm.paidAt} onChange={(e) => setPayForm((f) => ({ ...f, paidAt: e.target.value }))} />
-                <TextField size="small" label="ช่องทาง (เช่น โอน / เช็ค)" value={payForm.method}
-                  onChange={(e) => setPayForm((f) => ({ ...f, method: e.target.value }))} />
-                <TextField size="small" label="หมายเหตุ" value={payForm.note}
-                  onChange={(e) => setPayForm((f) => ({ ...f, note: e.target.value }))} />
-              </Box>
-              <Button startIcon={<AddCircleOutline sx={{ fontSize: 17 }} />} onClick={addPayment}
-                disabled={saving || !payForm.amount}
-                sx={{ textTransform: "none", fontWeight: 700, color: "#10b981" }}>
-                บันทึกรับเงิน
-              </Button>
-            </>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setTarget(null)} disabled={saving} sx={{ textTransform: "none" }}>ปิด</Button>
-        </DialogActions>
-      </Dialog>
+      <BillingDialog
+        event={target}
+        onClose={() => setTarget(null)}
+        onSaved={handleSaved}
+      />
     </Box>
   );
 }

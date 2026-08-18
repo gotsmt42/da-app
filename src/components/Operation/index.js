@@ -79,6 +79,7 @@ import PendingApprovalsPanel from "./PendingApprovalsPanel";
 import DeliveryNoteDialog from "../Documents/DeliveryNoteDialog";
 import WorkNoticeDialog from "../Documents/WorkNoticeDialog";
 import InfoLine from "../InfoLine";
+import { JOB_DOC_TYPES } from "../../utils/jobDocTypes";
 
 // ✅ ใช้ตัดสินใจลำดับปุ่มแชร์ในเมนู "⋮" ต่อไฟล์ (ดูเหตุผลใน fileActions.js)
 const IS_MOBILE = isMobileDevice();
@@ -275,12 +276,8 @@ const ACTION_META = {
 };
 
 // ✅ ใช้แปะป้ายชนิดเอกสารในประวัติกิจกรรม (อัปโหลด/ลบไฟล์) ให้อ่านง่าย ตรงกับ label ที่ใช้ในฟอร์มจริง
-const DOC_TYPE_LABELS = {
-  report: "Service Report",
-  quotation: "ใบเสนอราคา",
-  invoice: "ใบวางบิล",
-  completion: "ใบส่งมอบงาน",
-};
+
+const DOC_TYPE_LABELS = Object.fromEntries(JOB_DOC_TYPES.map((t) => [t.key, t.label]));
 
 // ─── Helper Functions ─────────────────────────────────────────────────
 const getFileType = (fileName = "") => {
@@ -755,12 +752,12 @@ const ActivityLogMini = ({ logs = [] }) => {
 // เอกสารแต่ละชนิดแนบได้หลายไฟล์ (files คือ array) — เพิ่ม/ลบทีละไฟล์ได้อิสระ
 // ✅ ไอคอน/สีเฉพาะของเอกสารแต่ละชนิด (เทียบ pattern เดียวกับ DOCUMENT_TYPES ใน
 // TechnicianJobPanel.js) ให้หัวข้อแต่ละช่องแยกออกจากกันชัดเจนด้วยตา ไม่ต้องอ่านชื่อก็จำได้
-const DOC_TYPE_META = {
-  report:     { icon: Description,        color: "#3b82f6" },
-  quotation:  { icon: RequestQuote,       color: "#ef4444" },
-  invoice:    { icon: ReceiptLong,        color: "#f59e0b" },
-  completion: { icon: AssignmentTurnedIn, color: "#07941a" },
-};
+// ⚠️ ไม่เก็บสำเนาไอคอน/สีไว้ที่นี่แล้ว — ย้ายไปเป็นต้นฉบับเดียวที่ utils/jobDocTypes.js เพราะหน้า
+// "ภาพรวมงาน" ต้องใช้ชุดเดียวกันด้วย (ถ้าก๊อปไว้คนละที่ วันหนึ่งจะเปลี่ยนสีไม่ครบแล้วผู้ใช้เห็นคนละสี
+// ระหว่าง 2 หน้าโดยไม่มีอะไรฟ้อง)
+const DOC_TYPE_META = Object.fromEntries(
+  JOB_DOC_TYPES.map((t) => [t.key, { icon: t.Icon, color: t.color }])
+);
 
 // ✅ perf: แยกแถวไฟล์ออกมาเป็นคอมโพเนนต์ของตัวเอง + React.memo — เดิมแถวไฟล์ทั้งหมดอยู่ใน .map()
 // ในตัว FileUploadSection เอง พอ auto-refresh ทุก 15 วิ แทนที่ events ทั้งก้อนด้วย object ใหม่

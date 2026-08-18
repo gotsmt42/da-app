@@ -55,6 +55,10 @@ import { countUsedRounds, visitsPerYear } from "../../utils/contractRounds";
 import { groupEventsByContract, nextVisitOverdueInfo, contractStatusInfo, isExpiredContract } from "../../utils/contractOverdue";
 // ✅ สถานะการวางบิล/รับเงิน — ของกลางชุดเดียวกับหน้า "วางบิล / รับเงิน" (/billing) ห้ามคำนวณซ้ำที่นี่
 import { contractBillingSummary, baht as bahtFmt } from "../../utils/billing";
+import BillingDialog from "../../components/Billing/BillingDialog";
+import BillingChip from "../../components/Billing/BillingChip";
+import JobDocsChip from "../../components/JobDocs/JobDocsChip";
+import JobDocsDialog from "../../components/JobDocs/JobDocsDialog";
 import { escapeHtml } from "../../utils/escapeHtml";
 import DeliveryNoteDialog from "../../components/Documents/DeliveryNoteDialog";
 
@@ -227,7 +231,7 @@ const DEFAULT_COL_WIDTHS = {
   docRef: 150, docNo: 150,
   customer: 230, work: 165,
   period: 190,
-  jobValue: 110, status: 130, billing: 140, progress: 110, responsiblePerson: 130,
+  jobValue: 110, status: 130, progress: 110, responsiblePerson: 130,
 };
 // ✅ ความกว้างคอลัมน์ "แยกกันทุกแท็บ" — เก็บซ้อนอีกชั้นเป็น { [แท็บ]: { [คอลัมน์]: ความกว้าง } }
 // ⚠️ เดิมเก็บเป็นชุดเดียวใช้ร่วมกันทุกแท็บ ซึ่งใช้งานจริงไม่ได้เลย เพราะแต่ละแท็บมีคอลัมน์ไม่เหมือนกัน
@@ -270,6 +274,41 @@ const MOBILE_COL_WIDTHS = {
   period: 148,
   jobValue: 88, status: 100, progress: 84, responsiblePerson: 104,
 };
+// ✅ จัดกลุ่ม "งานรายครั้ง" ของแถวหนึ่งไว้ล่วงหน้าครั้งเดียว แล้วแคชไว้ตาม reference ของ c.visits
+//
+// ⚠️ เดิมทุกช่อง "ครั้งที่ N" เรียก c.visits.filter(...).sort(...) เองในตอน render — 1 แถวมีได้ถึง
+// 12 ช่อง แปลว่าไล่อ่าน c.visits ซ้ำ 12 รอบต่อแถว ต่อการ render 1 ครั้ง และหน้านี้ render ใหม่ทั้งหน้า
+// ทุกครั้งที่ state ใดๆ เปลี่ยน (มี useState 58 ตัวในคอมโพเนนต์เดียว) — แค่กดเปิดกล่องก็คำนวณใหม่หมด
+//
+// ✅ WeakMap คีย์ด้วยตัว array เอง: contracts มาจาก useMemo อยู่แล้ว c.visits จึงเป็น reference เดิม
+// ตราบใดที่ข้อมูลไม่เปลี่ยน — พอข้อมูลเปลี่ยน array ใหม่ก็ไม่เจอในแคชแล้วคำนวณใหม่เองอัตโนมัติ
+// (ไม่ต้องเขียนโค้ดล้างแคช ซึ่งเป็นจุดที่พลาดกันบ่อยที่สุดของการทำแคช) และ WeakMap ปล่อยให้ GC เก็บ
+// ข้อมูลเก่าได้เองเมื่อไม่มีใครอ้างถึงแล้ว
+// ✅ ผลพลอยได้ที่สำคัญ: array ที่คืนกลับมามี reference คงที่ข้าม render — memo() ของ BillingChip
+// จึงทำงานได้จริง (ถ้าสร้าง array ใหม่ทุกครั้ง memo จะไม่มีผลเลยเพราะ prop เปลี่ยนตลอด)
+const roundVisitsCache = new WeakMap();
+const EMPTY_ROUND_VISITS = [];
+const visitsByRound = (visits) => {
+  let map = roundVisitsCache.get(visits);
+  if (map) return map;
+  map = new Map();
+  visits.forEach((v) => {
+    if (v.unscheduled) return;
+    const n = Number(v.time) || 1;   // งานที่ไม่เคยเลือกครั้งที่ ให้ตกไปครั้งที่ 1 (เกณฑ์เดิม)
+    if (!map.has(n)) map.set(n, []);
+    map.get(n).push(v);
+  });
+  map.forEach((arr) => arr.sort((a, b) => new Date(a.start || a.date) - new Date(b.start || b.date)));
+  roundVisitsCache.set(visits, map);
+  return map;
+};
+const roundVisitsOf = (c, n) => visitsByRound(c.visits).get(n) || EMPTY_ROUND_VISITS;
+
+/** หัวข้อกล่องเอกสาร — บอกให้ครบว่ากำลังดูเอกสารของงานไหน ครั้งไหน */
+const docsTitleFor = (c, n) =>
+  [c.isRealContract ? `ครั้งที่ ${n}` : null, c.company, c.site, c.title]
+    .filter(Boolean).join(" · ");
+
 const VISIT_COL_DEFAULT_WIDTH = 110;
 const MOBILE_VISIT_COL_WIDTH = 94;
 const MIN_COL_WIDTH = 50;
@@ -822,6 +861,16 @@ export default function ContractOverview() {
 
   const [searchParams] = useSearchParams();
   const [events, setEvents] = useState([]);
+  // ✅ งานรายครั้งที่กำลังเปิดกล่อง "วางบิล / รับเงิน" — จัดการได้จากตารางนี้เลย ไม่ต้องข้ามไปหน้า /billing
+  // ⚠️ เก็บเป็น id ไม่ใช่ object — ตัว object จะเก่าค้างทันทีที่ events ถูกอัปเดตหลังบันทึก ทำให้กล่อง
+  // ยังโชว์ยอดเดิมทั้งที่บันทึกไปแล้ว (ต้องปิดเปิดใหม่ถึงจะเห็น) ซึ่งดูเหมือนบันทึกไม่ติด
+  const [billingTargetId, setBillingTargetId] = useState(null);
+  // ✅ เอกสารของงาน (Service Report / ใบเสนอราคา / ใบวางบิล / ใบส่งมอบงาน) ที่ช่างแนบจากหน้า
+  // การดำเนินงาน — เปิดดูจากตารางนี้ได้เลย ไม่ต้องข้ามหน้าไปหาทีละงาน
+  // ⚠️ เก็บ "ครั้งที่กำลังเปิด" เป็น key ของแถว+เลขครั้ง ไม่ใช่เก็บ array ของ visits ตรงๆ — array จะ
+  // เก่าค้างทันทีที่ข้อมูลอัปเดต ทำให้กล่องยังโชว์ไฟล์ชุดเดิมทั้งที่เพิ่งมีการเปลี่ยนแปลง (บั๊กแบบเดียว
+  // กับที่เจอตอนทำกล่องวางบิล จึงใช้วิธีเดียวกัน)
+  const [docsTarget, setDocsTarget] = useState(null);   // { rowKey, round, title }
   const [loading, setLoading] = useState(true);
   // ✅ ?q= — เปิดมาพร้อมค้นหาคำที่กำหนดไว้ล่วงหน้าได้เลย (เทียบ pattern เดียวกับ ?view=overdue ด้านล่าง)
   // ใช้กับลิงก์ "เจาะจง" จาก Dashboard.js ที่กดจากรายการสัญญาเลยกำหนดตัวใดตัวหนึ่ง ให้เด้งมาที่แท็บ
@@ -904,6 +953,20 @@ export default function ContractOverview() {
   // สัญญา 1 ครั้งของตัวเอง (key เฉพาะ _id) เทียบ pattern เดียวกับ getGroupKey ใน overdueJobs.js
   // ✅ ย้าย logic จัดกลุ่มไปไว้ที่ utils/contractOverdue.js แล้ว (ใช้ซ้ำที่ Header.js ด้วยสำหรับป้าย
   // สรุปจำนวนสัญญาเกินกำหนดบนมือถือ) กันตรรกะเพี้ยนไม่ตรงกันระหว่างสองจุด
+  const billingTarget = useMemo(
+    () => (billingTargetId ? events.find((e) => String(e._id) === String(billingTargetId)) || null : null),
+    [events, billingTargetId],
+  );
+  // ✅ callback คงที่ — ป้ายวางบิลถูก memo ไว้ (components/Billing/BillingChip.js) ถ้าส่งฟังก์ชัน
+  // ที่สร้างใหม่ทุก render เข้าไป memo จะไม่ช่วยอะไรเลย เพราะ prop เปลี่ยนทุกครั้งอยู่ดี
+  const handleOpenBilling = useCallback((target) => setBillingTargetId(target._id), []);
+  const handleCloseDocs = useCallback(() => setDocsTarget(null), []);
+  const handleOpenDocs = useCallback((rowKey, round, title) => setDocsTarget({ rowKey, round, title }), []);
+  const handleCloseBilling = useCallback(() => setBillingTargetId(null), []);
+  const handleBillingSaved = useCallback((updated) => {
+    setEvents((prev) => prev.map((e) => (String(e._id) === String(updated._id) ? { ...e, ...updated } : e)));
+  }, []);
+
   const contracts = useMemo(
     () =>
       groupEventsByContract(events).sort(
@@ -921,6 +984,13 @@ export default function ContractOverview() {
   // มีการเลือกไว้เท่านั้น ซึ่งเป็นไปไม่ได้ถ้าไม่มี checkbox ให้กดตั้งแต่แรก)
   // ⚠️ ไม่โชว์ช่องติ๊กในแท็บ "สัญญาหมดอายุ" — ช่องติ๊กมีไว้เลือกงานเก่าไปรวมเป็นสัญญา แต่แถวในแท็บนี้
   // เป็นสัญญาจริงที่ผูกกลุ่มไปแล้วทุกแถว (isRealContract) เลือกไปก็ทำอะไรต่อไม่ได้ มีแต่กินความกว้าง
+  // ดึงงานของครั้งที่กำลังเปิดกล่องเอกสารอยู่ — คำนวณสดจาก contracts ไม่ใช่ค่าที่เก็บไว้ตอนกด
+  const docsRoundVisits = useMemo(() => {
+    if (!docsTarget) return null;
+    const row = contracts.find((c) => c.key === docsTarget.rowKey);
+    return row ? roundVisitsOf(row, docsTarget.round) : null;
+  }, [docsTarget, contracts]);
+
   const showCheckboxes = isAdminOrManager && viewFilter !== "contracts" && viewFilter !== "expired";
   // ✅ เลือกได้เฉพาะงานที่ยัง "ไม่จัดกลุ่ม" จริงๆ เท่านั้น — งานทั่วไป/งานโปรเจคถูกยืนยันหมวดหมู่ไปแล้ว
   // (isConfirmedGeneral/isConfirmedProject) ไม่ใช่เป้าหมายของ "จัดกลุ่มเป็นสัญญา" อีกต่อไป มี checkbox
@@ -1554,7 +1624,6 @@ export default function ContractOverview() {
       (hideContractOnlyColumns ? 0 : 1);    // period (เริ่ม+สิ้นสุด+รอบเข้า)
     const after =
       (hideContractOnlyColumns ? 0 : 1) +   // status
-      1 +                                    // billing (วางบิล/รับเงิน — แสดงทุกแท็บ)
       1 +                                    // progress
       visitColumns.length +
       1 +                                    // responsiblePerson
@@ -2943,16 +3012,15 @@ export default function ContractOverview() {
           <Collapse in={isRoundsExpanded}>
           <Stack spacing={0.75} sx={{ mt: 0.5 }}>
             {Array.from({ length: rowMaxRound(c) }, (_, i) => i + 1).map((n) => {
-              const roundVisits = c.visits
-                .filter((v) => !v.unscheduled && (Number(v.time) || 1) === n)
-                .sort((a, b) => new Date(a.start || a.date) - new Date(b.start || b.date));
+              const roundVisits = roundVisitsOf(c, n);
               const pendingDraft = roundVisits.length === 0 && c.visits.find((v) => v.unscheduled && (Number(v.time) || 1) === n);
               return (
                 <Stack key={n} direction="row" alignItems="flex-start" spacing={1} sx={{ p: 0.75, borderRadius: 1.5, bgcolor: alpha("#0f172a", 0.025) }}>
                   <Chip label={n} size="small" sx={{ height: 20, minWidth: 20, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha(ACCENT, 0.1), color: ACCENT }} />
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     {roundVisits.length > 0 ? (
-                      roundVisits.map((visit) => (
+                      <>
+                      {roundVisits.map((visit) => (
                         <Box key={visit._id} sx={{ mb: 0.25 }}>
                           <Link
                             to={`/operation/${visit._id}${resolveOperationGroup(visit) ? `?group=${resolveOperationGroup(visit)}` : ""}`}
@@ -2985,7 +3053,25 @@ export default function ContractOverview() {
                             </Typography>
                           )}
                         </Box>
-                      ))
+                      ))}
+                      {/* ✅ ป้ายวางบิลอยู่ท้ายครั้ง 1 อัน (ไม่ใช่ใต้ทุกวันที่) — วางบิลทีเดียวต่อครั้ง */}
+                      <Stack direction="row" alignItems="center" gap={0.75} sx={{ flexWrap: "wrap", mt: 0.25 }}>
+                        <BillingChip
+                          roundVisits={roundVisits}
+                          canManage={isAdminOrManager}
+                          onOpen={handleOpenBilling}
+                          compact={false}
+                        />
+                        <JobDocsChip
+                          roundVisits={roundVisits}
+                          rowKey={c.key}
+                          round={n}
+                          title={docsTitleFor(c, n)}
+                          onOpen={handleOpenDocs}
+                          compact={false}
+                        />
+                      </Stack>
+                      </>
                     ) : pendingDraft ? (
                       (() => {
                         const chip = pendingDraftChip(c, pendingDraft);
@@ -3817,10 +3903,6 @@ export default function ContractOverview() {
                 {!hideContractOnlyColumns && (
                   <ResizableTh width={colWidth("status")} align="center" columnKey="status" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("status")}>สถานะสัญญา</ResizableTh>
                 )}
-                {/* ✅ สถานะการวางบิล/รับเงิน — แสดงทุกแท็บ เพราะงานทั่วไป/โปรเจคก็ต้องวางบิลเหมือนกัน
-                    (ต่างจาก "สถานะสัญญา" ที่มีเฉพาะสัญญาจริง) วางติดกันเพราะเป็นสถานะคู่กันที่คนดูพร้อมกัน:
-                    สัญญายังมีผลอยู่ไหม · เก็บเงินได้หรือยัง */}
-                <ResizableTh width={colWidth("billing")} align="center" columnKey="billing" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("billing")}>วางบิล / รับเงิน</ResizableTh>
                 {/* 🐛 BUG ที่แก้ (หัวคอลัมน์ไม่ตรงกับข้อมูลข้างใน): ช่องนี้แสดง 2 แบบตามชนิดแถว — สัญญาจริง
                     โชว์ "X/Y ครั้ง" (คืบหน้า) ส่วนงานทั่วไป/โปรเจค/ยังไม่จัดกลุ่มโชว์ป้ายสถานะงาน (ดู
                     jobStatusInfo ในเซลล์) แต่หัวคอลัมน์เขียน "คืบหน้า" ตายตัวเสมอ — ในแท็บที่มีแต่แถวที่
@@ -4138,36 +4220,6 @@ export default function ContractOverview() {
                     })()}
                   </TableCell>
                   )}
-                  <TableCell data-col-key="billing" align="center" sx={{ width: colVar("billing") }}>
-                    {(() => {
-                      const bs = contractBillingSummary(c.visits);
-                      if (!bs) return <Dash />;
-                      // ⚠️ ยอด "ค้างรับ" สำคัญกว่าคำว่าสถานะเอง — คนดูตารางนี้เพื่อรู้ว่าเหลือเก็บเท่าไร
-                      // จึงโชว์ยอดเป็นบรรทัดหลัก แล้วให้ป้ายสถานะเป็นสีบอกความเร่งด่วนแทน
-                      const detail = [
-                        `วางบิลแล้ว ${bs.invoicedCount}/${bs.totalCount} ครั้ง`,
-                        bs.net > 0 ? `ยอดวางบิล ${bahtFmt(bs.net)}` : null,
-                        bs.paid > 0 ? `รับแล้ว ${bahtFmt(bs.paid)}` : null,
-                        bs.outstanding > 0 ? `ค้างรับ ${bahtFmt(bs.outstanding)}` : null,
-                      ].filter(Boolean).join(" · ");
-                      return (
-                        <Tooltip title={detail} placement="top">
-                          <Stack spacing={0.25} alignItems="center">
-                            <Chip
-                              label={bs.state === "overdue" && bs.overdueDays > 0 ? `เลยกำหนด ${bs.overdueDays} วัน` : bs.label}
-                              size="small"
-                              sx={{ height: 20, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha(bs.color, 0.12), color: bs.color }}
-                            />
-                            {bs.outstanding > 0 && (
-                              <Typography sx={{ fontSize: "0.7rem", fontWeight: 700, color: bs.color, fontVariantNumeric: "tabular-nums" }}>
-                                ค้าง {bahtFmt(bs.outstanding)}
-                              </Typography>
-                            )}
-                          </Stack>
-                        </Tooltip>
-                      );
-                    })()}
-                  </TableCell>
                   {/* ✅ ยุบคอลัมน์ "จำนวนครั้งทั้งหมด" มารวมกับ "คืบหน้า" — ป้ายคืบหน้าเขียน "เสร็จ/ทั้งหมด"
                       อยู่แล้ว (ดู progressInfo) ตัวเลขทั้งหมดจึงซ้ำกันทั้งคอลัมน์ ไม่ต้องแยกช่องอีก
                       สิ่งที่เคยมีเฉพาะช่องนั้นและต้องยกมาด้วยคือจุดแดงเตือน "เลยกำหนดรอบถัดไป" — ย้ายมา
@@ -4225,9 +4277,7 @@ export default function ContractOverview() {
                     // ดูเหมือนข้อมูลมั่ว/ไม่ได้จัดกลุ่มให้ ทั้งที่จริงเป็นงานเดียวกัน (jobGroupId เดียวกัน) แค่โชว์ผิดลำดับ
                     // ✅ "Number(v.time) || 1" — งานที่ไม่เคยเลือก "ครั้งที่" เลย (time ว่าง) ให้ตกไปอยู่
                     // ช่อง "ครั้งที่ 1" เป็นค่าเริ่มต้น แทนที่จะหายไปเลยไม่โชว์ที่ไหนสักช่อง
-                    const roundVisits = c.visits
-                      .filter((v) => !v.unscheduled && (Number(v.time) || 1) === n)
-                      .sort((a, b) => new Date(a.start || a.date) - new Date(b.start || b.date));
+                    const roundVisits = roundVisitsOf(c, n);
                     const pendingDraft = roundVisits.length === 0 && c.visits.find((v) => v.unscheduled && (Number(v.time) || 1) === n);
                     // ✅ ครั้งเดียวมีได้หลายวันที่ — โชว์แค่ 3 วันแรกก่อน ที่เหลือพับไว้ กันแถวสูงผิดปกติ
                     // (ดู VISIT_CELL_PREVIEW) เมื่อกางแล้วปุ่มจะเปลี่ยนเป็น "ย่อ" กลับได้เสมอ
@@ -4297,6 +4347,25 @@ export default function ContractOverview() {
                                 {visitCellExpanded ? "ย่อ" : `+ อีก ${hiddenVisitCount} วัน`}
                               </Box>
                             )}
+                            {/* ✅ วางบิล "ทีเดียวต่อครั้ง" ไม่ใช่ต่อ document — งานเดียวกันที่เข้าหลายช่วง
+                                ไม่ต่อเนื่อง (เช่น 21 ส.ค. แล้วเว้นไป 31 ส.ค.–4 ก.ย.) ยังเป็นครั้งเดียวกัน
+                                จึงมีใบวางบิลใบเดียว ป้ายนี้จึงอยู่ท้ายรายการวันที่ 1 อัน ไม่ใช่ใต้ทุกวันที่ */}
+                            {/* ✅ วางบิล + เอกสารของครั้งนี้อยู่บรรทัดเดียวกัน — ทั้งคู่คือ "สถานะของครั้งนี้"
+                                เหมือนกัน และรวมบรรทัดช่วยไม่ให้แถวสูงขึ้นอีกชั้น (1 แถวมีได้ 12 ช่อง) */}
+                            <Stack direction="row" alignItems="center" justifyContent="center" gap={0.5} sx={{ flexWrap: "wrap" }}>
+                              <BillingChip
+                                roundVisits={roundVisits}
+                                canManage={isAdminOrManager}
+                                onOpen={handleOpenBilling}
+                              />
+                              <JobDocsChip
+                                roundVisits={roundVisits}
+                                rowKey={c.key}
+                                round={n}
+                                title={docsTitleFor(c, n)}
+                                onOpen={handleOpenDocs}
+                              />
+                            </Stack>
                             {/* ✅ แถวปุ่มจัดการครั้งนี้ (เพิ่มวันต่อเนื่อง / ย้ายครั้งที่ / แยกออกจากสัญญา)
                                 ⚠️ ไม่แสดงบนตารางจอมือถือ — ช่อง "ครั้งที่ N" กว้างแค่ 94px แต่ต้องใส่
                                 วันที่ + ชื่อทีม + ปุ่มอีก 3 ตัวซ้อนลงไป ทำให้เซลล์แน่นจนอ่านวันที่ไม่รู้เรื่อง
@@ -4701,7 +4770,8 @@ export default function ContractOverview() {
         />
       )}
 
-      <Dialog open={addOpen} onClose={closeAddDialog} fullWidth maxWidth="sm" fullScreen={isMobile}>
+      {addOpen && (
+        <Dialog open onClose={closeAddDialog} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle sx={{ fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           เพิ่มสัญญาใหม่
           <IconButton size="small" onClick={closeAddDialog}><Close fontSize="small" /></IconButton>
@@ -4838,6 +4908,7 @@ export default function ContractOverview() {
           </Button>
         </DialogActions>
       </Dialog>
+      )}
 
       {/* ── ย้าย "ครั้งที่ N" ไปครั้งที่อื่น ──────────────────────────────────── */}
       {/* ✅ เลือกปลายทางจากรายการครั้งที่ 1..จำนวนครั้งทั้งหมด พร้อมบอกสถานะของแต่ละครั้งกำกับไว้ ให้เห็น
@@ -4848,7 +4919,8 @@ export default function ContractOverview() {
           โฟกัสกลับมาทันที ทำให้กดปุ่มยืนยันด้วยคีย์บอร์ด (Enter/Tab) ไม่ได้ — ปิดการล็อกโฟกัสเฉพาะกล่องนี้
           กล่องอื่นในหน้ายังล็อกโฟกัสตามปกติเหมือนเดิม (z-index ที่เคยทำให้กล่องยืนยันไปอยู่ด้านหลัง แก้รวม
           ไว้ที่ src/index.css แล้ว) */}
-      <Dialog open={Boolean(moveRoundTarget)} onClose={closeMoveRoundDialog} fullWidth maxWidth="xs" fullScreen={isMobile} disableEnforceFocus>
+      {Boolean(moveRoundTarget) && (
+        <Dialog open onClose={closeMoveRoundDialog} fullWidth maxWidth="xs" fullScreen={isMobile} disableEnforceFocus>
         <DialogTitle sx={{ fontWeight: 800 }}>
           ย้ายครั้งที่ {moveRoundTarget?.fromRound} ไปเป็นครั้งที่...
         </DialogTitle>
@@ -4910,8 +4982,10 @@ export default function ContractOverview() {
           </Button>
         </DialogActions>
       </Dialog>
+      )}
 
-      <Dialog open={Boolean(addVisitTarget)} onClose={closeAddVisitDialog} fullWidth maxWidth="xs" fullScreen={isMobile}>
+      {Boolean(addVisitTarget) && (
+        <Dialog open onClose={closeAddVisitDialog} fullWidth maxWidth="xs" fullScreen={isMobile}>
         <DialogTitle sx={{ fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           {addVisitTarget?.extendRound != null
             ? `เพิ่มวันที่ต่อเนื่อง — ครั้งที่ ${addVisitTarget.extendRound}`
@@ -4965,10 +5039,12 @@ export default function ContractOverview() {
           </Button>
         </DialogActions>
       </Dialog>
+      )}
 
       {/* ✅ ย้ายงานทั่วไปเข้าสัญญาที่มีอยู่แล้ว — แก้ไขกรณีจัดกลุ่มผิด (สร้างเป็นงานเดี่ยวทั้งที่จริง
           ควรอยู่ในสัญญานี้) ต่างจากปุ่ม "จัดกลุ่มเป็นสัญญา" ที่สร้างสัญญาใหม่เสมอ */}
-      <Dialog open={Boolean(attachTarget)} onClose={closeAttachDialog} fullWidth maxWidth="xs" fullScreen={isMobile}>
+      {Boolean(attachTarget) && (
+        <Dialog open onClose={closeAttachDialog} fullWidth maxWidth="xs" fullScreen={isMobile}>
         <DialogTitle sx={{ fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           ย้ายเข้าสัญญาที่มีอยู่แล้ว
           <IconButton size="small" onClick={closeAttachDialog}><Close fontSize="small" /></IconButton>
@@ -5054,8 +5130,10 @@ export default function ContractOverview() {
           </Button>
         </DialogActions>
       </Dialog>
+      )}
 
-      <Dialog open={mergeOpen} onClose={closeMergeDialog} fullWidth maxWidth="sm" fullScreen={isMobile}>
+      {mergeOpen && (
+        <Dialog open onClose={closeMergeDialog} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle sx={{ fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           จัดกลุ่มเป็นสัญญา ({selectedContracts.length} งาน)
           <IconButton size="small" onClick={closeMergeDialog}><Close fontSize="small" /></IconButton>
@@ -5120,12 +5198,14 @@ export default function ContractOverview() {
           </Button>
         </DialogActions>
       </Dialog>
+      )}
 
       {/* ── ประวัติการแก้ไขข้อมูลสัญญา ────────────────────────────────────────
           ✅ ข้อมูลสัญญาแก้ inline ได้จากตารางนี้โดยตรง และทุกครั้งที่แก้มีผลกับ "ทุกครั้งในสัญญา"
           พร้อมกัน (updateMany ฝั่ง server) — คลิกพลาดช่องเดียวก็เปลี่ยนมูลค่างาน/วันหมดอายุทั้งสัญญา
           กล่องนี้คือทางเดียวที่จะตามกลับได้ว่าใครแก้ เมื่อไหร่ จากค่าอะไรเป็นค่าอะไร */}
-      <Dialog open={Boolean(historyContract)} onClose={() => setHistoryContract(null)} fullWidth maxWidth="sm" fullScreen={isMobile}>
+      {Boolean(historyContract) && (
+        <Dialog open onClose={() => setHistoryContract(null)} fullWidth maxWidth="sm" fullScreen={isMobile}>
         <DialogTitle sx={{ fontWeight: 800, pb: 1 }}>
           <Stack direction="row" alignItems="center" spacing={1}>
             <History sx={{ fontSize: 20, color: ACCENT }} />
@@ -5188,6 +5268,23 @@ export default function ContractOverview() {
           <Button onClick={() => setHistoryContract(null)} sx={{ textTransform: "none" }}>ปิด</Button>
         </DialogActions>
       </Dialog>
+      )}
+
+      {/* ✅ กล่อง "วางบิล / รับเงิน" ของงานรายครั้ง — ตัวเดียวกับที่หน้า /billing ใช้ (ของกลาง)
+          จัดการจากตารางนี้ได้เลยโดยไม่ต้องเปลี่ยนหน้า แล้วตารางอัปเดตยอดให้ทันทีที่บันทึกเสร็จ */}
+      <BillingDialog
+        event={billingTarget}
+        onClose={handleCloseBilling}
+        onSaved={handleBillingSaved}
+      />
+
+      {/* ✅ เอกสารของงานรายครั้ง — ดึงข้อมูลสดจาก contracts ทุกครั้งที่ render ไม่ได้เก็บ array ไว้
+          ตอนกด จึงไม่มีทางโชว์ไฟล์ชุดที่เก่าค้าง */}
+      <JobDocsDialog
+        roundVisits={docsRoundVisits}
+        title={docsTarget?.title}
+        onClose={handleCloseDocs}
+      />
     </Box>
   );
 }
