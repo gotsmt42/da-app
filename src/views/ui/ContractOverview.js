@@ -231,7 +231,7 @@ const DEFAULT_COL_WIDTHS = {
   docRef: 150, docNo: 150,
   customer: 230, work: 165,
   period: 190,
-  jobValue: 110, status: 130, progress: 110, responsiblePerson: 130,
+  jobValue: 110, commission: 110, status: 130, progress: 110, responsiblePerson: 130,
 };
 // ✅ ความกว้างคอลัมน์ "แยกกันทุกแท็บ" — เก็บซ้อนอีกชั้นเป็น { [แท็บ]: { [คอลัมน์]: ความกว้าง } }
 // ⚠️ เดิมเก็บเป็นชุดเดียวใช้ร่วมกันทุกแท็บ ซึ่งใช้งานจริงไม่ได้เลย เพราะแต่ละแท็บมีคอลัมน์ไม่เหมือนกัน
@@ -272,7 +272,7 @@ const MOBILE_COL_WIDTHS = {
   docRef: 118, docNo: 118,
   customer: 168, work: 128,
   period: 148,
-  jobValue: 88, status: 100, progress: 84, responsiblePerson: 104,
+  jobValue: 88, commission: 88, status: 100, progress: 84, responsiblePerson: 104,
 };
 // ✅ จัดกลุ่ม "งานรายครั้ง" ของแถวหนึ่งไว้ล่วงหน้าครั้งเดียว แล้วแคชไว้ตาม reference ของ c.visits
 //
@@ -304,10 +304,28 @@ const visitsByRound = (visits) => {
 };
 const roundVisitsOf = (c, n) => visitsByRound(c.visits).get(n) || EMPTY_ROUND_VISITS;
 
+/**
+ * ค่าคอมคิดเป็นกี่ % ของมูลค่างาน — ค่าคำนวณสดเพื่อ "อ่านประกอบ" เท่านั้น ไม่เคยถูกบันทึก
+ * ⚠️ คืน null เมื่อยังไม่มีมูลค่างาน — 0% กับ "คิดไม่ได้เพราะยังไม่รู้มูลค่างาน" คนละความหมายกัน
+ */
+const commissionPct = (c) => {
+  const base = Number(c.jobValue);
+  const com = Number(c.commission);
+  if (!Number.isFinite(base) || base <= 0 || !Number.isFinite(com) || com <= 0) return null;
+  const pct = (com / base) * 100;
+  // ทศนิยม 2 ตำแหน่งเฉพาะตอนที่ปัดเป็นจำนวนเต็มแล้วเพี้ยน — ไม่งั้นได้ "10.00%" รกตา
+  return `${Number.isInteger(pct) ? pct : pct.toFixed(2)}% ของมูลค่างาน`;
+};
+
 /** หัวข้อกล่องเอกสาร — บอกให้ครบว่ากำลังดูเอกสารของงานไหน ครั้งไหน */
 const docsTitleFor = (c, n) =>
   [c.isRealContract ? `ครั้งที่ ${n}` : null, c.company, c.site, c.title]
     .filter(Boolean).join(" · ");
+
+// ⚠️ ต้องอยู่นอก component — เดิมประกาศไว้ข้างในทำให้ได้ Set ตัวใหม่ทุก render ซึ่งไปทำให้
+// useCallback ที่อ้างถึงมันเปลี่ยน reference ทุกครั้งตามไปด้วย แล้ว memo ของแถวตารางก็พังทั้งสาย
+// (ค่าคงที่ล้วน ไม่มีเหตุผลต้องอยู่ใน component ตั้งแต่แรก)
+const BASIC_INFO_FIELDS = new Set(["company", "site", "system", "title"]);
 
 const VISIT_COL_DEFAULT_WIDTH = 110;
 const MOBILE_VISIT_COL_WIDTH = 94;
@@ -527,10 +545,34 @@ const ResizableTh = ({ width, align = "left", children, onResize, rowSpan = 1, c
 // ✅ Wrapper (default TableCell) — ให้ใช้ตัวเดียวกันได้ทั้งในตารางเดสก์ท็อป (TableCell จริง) และการ์ด
 // บนมือถือ (Box ธรรมดา ไม่มี <table> ห่ออยู่) โดยไม่ต้องแยกโค้ด edit/select/autocomplete ซ้ำสองที่ —
 // ดู renderMobileCard ด้านล่างที่เรียกใช้ตัวนี้ซ้ำกับ Wrapper={Box}
+/**
+ * ⚠️ ระหว่างแก้ไข ช่องนี้ถือ "ค่าที่กำลังพิมพ์" ไว้เองใน state ของตัวเอง (draft) ไม่ได้ยิงขึ้นไปให้
+ * คอมโพเนนต์แม่ทุกตัวอักษร
+ *
+ * 🐛 ปัญหาที่แก้ (พิมพ์แล้วหน่วงทั้งหน้า): เดิม value ของ input ผูกกับ state `editValue` ที่อยู่ใน
+ * ContractOverview (ไฟล์ 5,000 บรรทัด มี useState 58 ตัว) — พิมพ์ 1 ตัวอักษร = setState ที่แม่ =
+ * ทั้งหน้า render ใหม่ทั้งหมด: 10 แถว × ~20 ช่อง + Tooltip นับร้อย + กล่องทุกใบ ต่อ "ทุกตัวอักษร"
+ * ✅ ตอนนี้พิมพ์อยู่ในช่องนี้ล้วนๆ แม่ไม่รู้เรื่องเลยจนกว่าจะกด Enter / คลิกออก (onCommit) ซึ่งเป็น
+ * จังหวะที่ต้องยิง API อยู่แล้ว
+ * ⚠️ ยังส่ง onChangeValue ต่อให้แม่ด้วย (ถ้ามี) เพื่อไม่ให้จุดที่ยังอ่าน editValue อยู่พัง — แต่จุดที่
+ * เป็น hot path จริง (ตารางหลัก) ไม่ได้ส่ง onChangeValue มาแล้ว
+ */
 const EditableCell = ({
   value, editing, editValue, editType = "text", editOptions, width, align, editable, saving,
   formatDisplay, title, onStartEdit, onChangeValue, onCommit, onCancel, columnKey, Wrapper = TableCell,
 }) => {
+  const [draft, setDraft] = useState(editValue ?? "");
+  // ⚠️ seed ใหม่ทุกครั้งที่ "เพิ่งเข้าโหมดแก้ไข" เท่านั้น — ถ้า sync ทุกครั้งที่ editValue เปลี่ยน
+  // ค่าที่พิมพ์อยู่จะโดนเขียนทับกลับไปเรื่อยๆ จนพิมพ์ไม่ได้
+  const wasEditing = useRef(false);
+  useEffect(() => {
+    if (editing && !wasEditing.current) setDraft(editValue ?? "");
+    wasEditing.current = editing;
+  }, [editing, editValue]);
+
+  const change = (v) => { setDraft(v); onChangeValue?.(v); };
+  const commit = () => onCommit?.(draft);
+
   const baseSx = { width, maxWidth: width, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", ...(align ? { textAlign: align } : {}) };
 
   if (!editable) {
@@ -558,9 +600,9 @@ const EditableCell = ({
     <Wrapper align={align} data-col-key={columnKey} sx={{ width, p: "2px 4px" }}>
       {editType === "select" ? (
         <TextField
-          select autoFocus size="small" fullWidth value={editValue} disabled={saving}
-          onChange={(e) => onChangeValue(e.target.value)}
-          onBlur={onCommit}
+          select autoFocus size="small" fullWidth value={draft} disabled={saving}
+          onChange={(e) => change(e.target.value)}
+          onBlur={commit}
           SelectProps={{ native: true }}
           sx={{ "& .MuiOutlinedInput-input": { py: 0.5, fontSize: "0.8rem" } }}
         >
@@ -574,15 +616,15 @@ const EditableCell = ({
         <Autocomplete
           freeSolo autoFocus size="small" fullWidth disabled={saving}
           options={editOptions || []}
-          inputValue={editValue}
-          onInputChange={(_, v) => onChangeValue(v)}
+          inputValue={draft}
+          onInputChange={(_, v) => change(v)}
           renderInput={(params) => (
             <TextField
               {...params}
               autoFocus
-              onBlur={onCommit}
+              onBlur={commit}
               onKeyDown={(e) => {
-                if (e.key === "Enter") { e.preventDefault(); onCommit(); }
+                if (e.key === "Enter") { e.preventDefault(); commit(); }
                 if (e.key === "Escape") onCancel();
               }}
               sx={{ "& .MuiOutlinedInput-input": { py: 0.5, fontSize: "0.8rem" } }}
@@ -592,11 +634,11 @@ const EditableCell = ({
       ) : (
         <TextField
           autoFocus size="small" fullWidth type={editType} disabled={saving}
-          value={editValue}
-          onChange={(e) => onChangeValue(e.target.value)}
-          onBlur={onCommit}
+          value={draft}
+          onChange={(e) => change(e.target.value)}
+          onBlur={commit}
           onKeyDown={(e) => {
-            if (e.key === "Enter") { e.preventDefault(); onCommit(); }
+            if (e.key === "Enter") { e.preventDefault(); commit(); }
             if (e.key === "Escape") onCancel();
           }}
           InputLabelProps={editType === "date" ? { shrink: true } : undefined}
@@ -967,6 +1009,7 @@ export default function ContractOverview() {
     setEvents((prev) => prev.map((e) => (String(e._id) === String(updated._id) ? { ...e, ...updated } : e)));
   }, []);
 
+
   const contracts = useMemo(
     () =>
       groupEventsByContract(events).sort(
@@ -1041,7 +1084,7 @@ export default function ContractOverview() {
   // ✅ บนมือถือใช้ชุดความกว้างของมือถือเสมอ ไม่สนค่าที่เคยลากไว้บนจอคอม — บนมือถือปิดการลากปรับ
   // ความกว้างอยู่แล้ว (ดู resizable ที่ ResizableTh) จึงไม่มีทางที่ผู้ใช้ตั้งใจตั้งค่าไว้สำหรับจอนี้ตั้งแต่ต้น
   // ⚠️ ค่าที่ลากไว้บนจอคอมไม่ได้ถูกลบทิ้ง — กลับไปดูบนจอคอมเมื่อไหร่ก็ได้ความกว้างเดิมที่ตั้งไว้ครบ
-  const colWidth = (key) => {
+  const colWidth = useCallback((key) => {
     if (useMobileTable) {
       return MOBILE_COL_WIDTHS[key]
         ?? (key.startsWith("visit_") ? MOBILE_VISIT_COL_WIDTH : undefined)
@@ -1049,7 +1092,7 @@ export default function ContractOverview() {
         ?? VISIT_COL_DEFAULT_WIDTH;
     }
     return colWidths[key] ?? DEFAULT_COL_WIDTHS[key] ?? VISIT_COL_DEFAULT_WIDTH;
-  };
+  }, [colWidths, useMobileTable]);
   // ⚠️ BUG ที่แก้ (ลากหน่วงมาก): เดิมช่วงลากอัปเดต React state (setColWidths) ทุกเฟรมของ
   // requestAnimationFrame อยู่ดี (แค่เลื่อนแค่การเขียน localStorage ไปตอนปล่อยเมาส์แทน) — แต่ทุกครั้งที่
   // setColWidths ทำให้ทั้งตาราง re-render ใหม่ (10 แถว x กว่า 15 คอลัมน์) และเลขความกว้างที่เปลี่ยนทุก
@@ -1378,6 +1421,7 @@ export default function ContractOverview() {
     intervalMonths: (c) => (c.intervalMonths != null && c.intervalMonths !== "" ? Number(c.intervalMonths) : null),
     visitCount: (c) => (c.visitCount != null && c.visitCount !== "" ? Number(c.visitCount) : null),
     jobValue: (c) => (c.jobValue != null && c.jobValue !== "" ? Number(c.jobValue) : null),
+    commission: (c) => (c.commission != null && c.commission !== "" ? Number(c.commission) : null),
     responsiblePerson: (c) => c.responsiblePerson || "",
   };
   const sortedFiltered = useMemo(() => {
@@ -1482,7 +1526,7 @@ export default function ContractOverview() {
     // จำนวนครั้งทั้งหมด → รวมอยู่ในป้าย "คืบหน้า" (progress) แล้ว — คีย์ย่อยเดิมไม่มีคอลัมน์ของตัวเองอีก
     // ต่อไป จึงต้องไม่นับความกว้างซ้ำตรงนี้ ไม่งั้นตารางจะกว้างเกินจริงจนมีที่ว่างค้างท้ายแถว
     const contractOnlyKeys = ["docRef", "period", "status"];
-    ["customer", "work", "jobValue", "progress", "responsiblePerson"].forEach((k) => { total += colWidth(k); });
+    ["customer", "work", "jobValue", "commission", "progress", "responsiblePerson"].forEach((k) => { total += colWidth(k); });
     if (!hideContractOnlyColumns) {
       contractOnlyKeys.forEach((k) => { total += colWidth(k); });
     } else {
@@ -1500,7 +1544,7 @@ export default function ContractOverview() {
   // แต่ละใบเลยสักคอลัมน์ — ดู handleColResize/colVar ด้านบนสำหรับเหตุผลที่ย้ายมาใช้กลไกนี้แทนตัวเลขตรงๆ
   const tableCssVars = useMemo(() => {
     const vars = { "--col-total": `${totalTableWidth}px` };
-    ["docRef", "docNo", "customer", "work", "period", "jobValue", "status", "progress", "responsiblePerson"].forEach((k) => {
+    ["docRef", "docNo", "customer", "work", "period", "jobValue", "commission", "status", "progress", "responsiblePerson"].forEach((k) => {
       vars[`--col-${k}`] = `${colWidth(k)}px`;
     });
     visitColumns.forEach((n) => { vars[`--col-visit_${n}`] = `${colWidth(`visit_${n}`)}px`; });
@@ -1596,6 +1640,23 @@ export default function ContractOverview() {
       }
     });
     return { total, filledCount, missingCount: filtered.length - filledCount, rowCount: filtered.length };
+  }, [filtered]);
+
+  // ✅ ยอดรวมค่าคอม — ใช้ "filtered" ชุดเดียวกับยอดรวมมูลค่างานเป๊ะๆ จะได้อ่านเทียบกันได้ตรงๆ ว่างาน
+  // ชุดนี้มูลค่าเท่านี้ จ่ายคอมไปเท่านี้ คิดเป็นกี่ %
+  // ⚠️ เปอร์เซ็นต์รวมคิดจาก "ผลรวมคอม ÷ ผลรวมมูลค่างาน" ไม่ใช่เฉลี่ยของ % รายแถว — แถวที่มูลค่า
+  // 5 ล้านกับแถวที่มูลค่า 5 หมื่นต้องถ่วงน้ำหนักต่างกัน ไม่งั้นตัวเลขจะเพี้ยนไปคนละเรื่อง
+  const commissionSummary = useMemo(() => {
+    let total = 0;
+    let filledCount = 0;
+    filtered.forEach((c) => {
+      const n = Number(c.commission);
+      if (c.commission !== null && c.commission !== undefined && c.commission !== "" && !Number.isNaN(n)) {
+        total += n;
+        filledCount += 1;
+      }
+    });
+    return { total, filledCount };
   }, [filtered]);
 
   // ✅ จำนวนคอลัมน์ก่อน/หลังช่อง "มูลค่างาน" — ใช้ทำแถวสรุปท้ายตาราง (TableFooter) ให้ยอดรวมตกลงมา
@@ -1808,13 +1869,13 @@ export default function ContractOverview() {
 
   // ✅ เลขที่สัญญาห้ามซ้ำกับสัญญาอื่น (ไม่นับตัวเอง) — เช็คฝั่ง client ก่อนเพื่อ feedback ทันที ไม่ต้องรอ
   // round-trip ไป backend (ซึ่งเช็คซ้ำอีกชั้นอยู่แล้วเป็นตัวที่เชื่อถือได้จริง กัน race)
-  const isContractNoTaken = (contractNo, excludeContractGroupId) => {
+  const isContractNoTaken = useCallback((contractNo, excludeContractGroupId) => {
     const trimmed = (contractNo || "").trim();
     if (!trimmed) return false;
     return contracts.some((c) =>
       c.isRealContract && c.contractNo && c.contractNo.trim() === trimmed && c.key !== excludeContractGroupId
     );
-  };
+  }, [contracts]);
 
   // ✅ ตรวจความถูกต้องสดๆ ระหว่างพิมพ์ — เตือนตรงช่องที่ผิดเลย และปิดปุ่ม "บันทึกสัญญา" ไว้จนกว่าจะครบ
   // แทนที่จะปล่อยให้กดแล้วค่อยเด้ง error ที่หัวฟอร์ม (ซึ่งบนจอมือถือต้องเลื่อนขึ้นไปอ่านเองว่าพลาดตรงไหน)
@@ -1857,7 +1918,9 @@ export default function ContractOverview() {
   // ไม่ควรมีให้กด เพราะสัญญาที่เพิ่งบันทึกจะไม่โผล่ในแท็บนั้นเลย (คนละตัวกรอง) ผู้ใช้จะเข้าใจว่าบันทึกไม่ติด
   const canInlineAdd = isAdminOrManager && (viewFilter === "contracts" || viewFilter === "all");
   // จำนวนคอลัมน์ทั้งแถว — ใช้กับ colSpan ของแถวปุ่ม "+" และแถวข้อความแจ้งเตือน (ดู footerColSpan)
-  const totalColCount = footerColSpan.before + 1 + footerColSpan.after;
+  // ⚠️ +2 = ช่อง "มูลค่างาน" กับ "ค่าคอม" ที่แถวสรุปท้ายตารางเรนเดอร์เป็นเซลล์ของตัวเอง (ไม่ได้อยู่ใน
+  // before/after) ถ้าลืมนับ แถวที่ใช้ colSpan เต็มความกว้างจะสั้นกว่าตารางจริง 2 ช่องแล้วขอบตารางเบี้ยว
+  const totalColCount = footerColSpan.before + 2 + footerColSpan.after;
 
   // ✅ วันที่เข้างานครั้งที่ 1 ไม่บังคับกรอกตอนสร้างสัญญา (ตามที่ผู้ใช้ยืนยัน — บางสัญญายังไม่รู้วันที่
   // แน่นอน) กรอกมาจะลงตารางจริงทันที ไม่กรอกจะบันทึกเป็นฉบับร่างไปเพิ่มวันที่ทีหลังได้ตามปกติ
@@ -2023,7 +2086,7 @@ export default function ContractOverview() {
   // ✅ สัญญา → ให้กดชิปเปิดกล่อง "เพิ่มครั้งที่ 1" ในหน้านี้แทน (handleAddVisitSubmit แปลงฉบับร่างเดิม
   // เป็นครั้งจริงให้เองผ่าน PUT /:id/schedule ไม่สร้าง record ซ้ำ) ส่วนงานทั่วไป/โปรเจคยังอยู่ในแผงงาน
   // ล่วงหน้าตามปกติ ใช้ลิงก์เดิมต่อไปได้
-  const pendingDraftChip = (c, pendingDraft) => {
+  const pendingDraftChip = useCallback((c, pendingDraft) => {
     if (c.isRealContract) {
       return isAdminOrManager
         ? { label: "📌 กดเพื่อลงวันที่", tip: "สัญญานี้ยังไม่ได้ลงวันที่เข้างาน — กดเพื่อระบุวันที่ครั้งที่ 1", props: { onClick: () => openAddVisitDialog(c), sx: { cursor: "pointer" } } }
@@ -2037,7 +2100,7 @@ export default function ContractOverview() {
         to: `/event?draft=${pendingDraft._id}${pendingDraft.plannedMonth ? `&month=${pendingDraft.plannedMonth}` : ""}`,
       },
     };
-  };
+  }, [isAdminOrManager]);
 
   const handleAddVisitSubmit = async () => {
     if (!addVisitTarget) return;
@@ -2259,7 +2322,7 @@ export default function ContractOverview() {
 
   // ✅ บริษัท/โครงการ/ระบบ/ประเภทงาน แก้ไขได้ทุกแถว (ทั้งสัญญาจริงและงานทั่วไป/โปรเจค/ยังไม่จัดกลุ่ม)
   // ต่างจากฟิลด์อื่น (เลขที่สัญญา/มูลค่างาน/ฯลฯ) ที่มีความหมายเฉพาะสัญญาจริงเท่านั้น — ดู BASIC_INFO_FIELDS
-  const BASIC_INFO_FIELDS = new Set(["company", "site", "system", "title"]);
+
 
   // ✅ กติกากลางว่าฟิลด์ไหนแก้ไขได้กับแถวประเภทไหนบ้าง — ใช้ร่วมกันทั้ง editable prop ของ EditableCell
   // (คุมว่าคลิกแก้ไขได้ไหม) และ beginEdit ด้านล่าง กันสองจุดเช็คไม่ตรงกัน:
@@ -2276,29 +2339,37 @@ export default function ContractOverview() {
   // `return c.isRealContract` = false สำหรับงานทั่วไป/โปรเจค → beginEdit ตัดจบเงียบๆ ตั้งแต่บรรทัดแรก
   // กลายเป็นช่องที่ "ดูเหมือนแก้ได้แต่กดแล้วไม่มีอะไรเกิดขึ้นเลย" ซึ่งแย่กว่าช่องที่ล็อกไว้ชัดเจนเสียอีก
   const isClassifiedRow = (c) => c.isRealContract || c.isConfirmedGeneral || c.isConfirmedProject;
-  const canEditField = (c, field) => {
+  const canEditField = useCallback((c, field) => {
     if (BASIC_INFO_FIELDS.has(field)) return true;
-    if (field === "docNo" || field === "responsiblePerson" || field === "jobValue") return isClassifiedRow(c);
+    if (field === "docNo" || field === "responsiblePerson" || field === "jobValue" || field === "commission") return isClassifiedRow(c);
     return c.isRealContract;
-  };
+  }, []);
 
   const editOriginalValue = (c, field) => {
     if (field === "contractStart" || field === "contractEnd") return c[field] ? moment(c[field]).format("YYYY-MM-DD") : "";
     return c[field] ?? "";
   };
 
-  const beginEdit = (c, field) => {
+  const beginEdit = useCallback((c, field) => {
     if (editSaving) return;
     if (!canEditField(c, field)) return;
     setEditingCell({ key: c.key, field });
     setEditValue(String(editOriginalValue(c, field)));
-  };
+  }, [canEditField, editSaving]);
   const cancelEdit = () => { setEditingCell(null); setEditValue(""); };
 
-  const commitEdit = async (c) => {
+  /**
+   * @param {string} [nextValue] ค่าที่ช่องนั้นพิมพ์ไว้ — ส่งมาจาก EditableCell ตอนกด Enter/คลิกออก
+   * ⚠️ ต้องรับค่าเข้ามา ไม่ใช่อ่าน editValue เอง เพราะตอนนี้ตัวที่พิมพ์อยู่ในช่อง (draft) ไม่ได้ sync
+   * ขึ้นมาที่ state ของหน้านี้ทุกตัวอักษรแล้ว (ดูเหตุผลที่ EditableCell) — ถ้ายังอ่าน editValue จะได้
+   * ค่าตั้งต้นตอนเริ่มแก้ไขเสมอ = แก้อะไรก็ไม่บันทึก
+   * ⚠️ fallback ไป editValue ไว้สำหรับจุดที่ยังเรียก commitEdit(c) แบบไม่ส่งค่า (เช่น select ที่
+   * เปลี่ยนค่าแล้ว commit ทันที) ยังทำงานได้เหมือนเดิม
+   */
+  const commitEdit = useCallback(async (c, nextValue) => {
     if (!editingCell || editingCell.key !== c.key) return;
     const field = editingCell.field;
-    const rawValue = editValue;
+    const rawValue = nextValue !== undefined ? nextValue : editValue;
 
     // ✅ ไม่เปลี่ยนแปลงจากเดิมเลย ไม่ต้องยิง API เปล่าๆ
     if (rawValue === String(editOriginalValue(c, field))) { setEditingCell(null); return; }
@@ -2347,6 +2418,10 @@ export default function ContractOverview() {
         return;
       }
     }
+    if (field === "commission" && rawValue && Number(rawValue) < 0) {
+      Swal.fire({ icon: "warning", title: "ค่าคอมมิชชั่นต้องไม่ติดลบ", confirmButtonColor: ACCENT });
+      return;
+    }
     if (field === "jobValue" && rawValue && Number(rawValue) < 0) {
       Swal.fire({ title: "แก้ไขไม่สำเร็จ", text: "มูลค่างานต้องไม่ติดลบ", icon: "error" });
       setEditingCell(null);
@@ -2354,7 +2429,7 @@ export default function ContractOverview() {
     }
 
     const payload = {};
-    if (field === "jobValue" || field === "visitCount" || field === "intervalMonths") payload[field] = rawValue ? Number(rawValue) : undefined;
+    if (field === "jobValue" || field === "commission" || field === "visitCount" || field === "intervalMonths") payload[field] = rawValue ? Number(rawValue) : undefined;
     else if (field === "responsiblePerson") { payload.responsiblePerson = rawValue; payload.responsiblePersonId = teamToId.get(rawValue) || ""; }
     else payload[field] = rawValue;
 
@@ -2385,7 +2460,7 @@ export default function ContractOverview() {
       const useBasicInfoEndpoint =
         BASIC_INFO_FIELDS.has(field) ||
         field === "docNo" ||
-        ((field === "responsiblePerson" || field === "jobValue") && !c.isRealContract);
+        ((field === "responsiblePerson" || field === "jobValue" || field === "commission") && !c.isRealContract);
       if (useBasicInfoEndpoint) {
         await EventService.UpdateBasicInfo(c.visits.map((v) => v._id), payload);
       } else {
@@ -2401,7 +2476,7 @@ export default function ContractOverview() {
     } finally {
       setEditSaving(false);
     }
-  };
+  }, [editValue, editingCell, events, isContractNoTaken, teamToId]);
 
   // ── แก้ไขทีมที่เข้างานของแต่ละ "ครั้ง" แยกทีละ document ────────────────────
   // ✅ ทำไมแยกจาก commitEdit ด้านบน: คอลัมน์ "ทีมที่เข้างาน" ระดับสัญญาแก้แล้วอัปเดตทุกครั้งพร้อมกันผ่าน
@@ -2412,16 +2487,16 @@ export default function ContractOverview() {
   // ใช้ rawResponsiblePersonId/rawResponsiblePerson (ค่าที่ตั้งไว้ตรงๆ ไม่ fallback ไปที่ team) เทียบ
   // pattern เดียวกับ canEditTeamAssignment ใน EditEvent.js เป๊ะๆ — ต้องมอบหมายไว้ชัดเจนก่อนเท่านั้น
   // (backend เช็คแบบเดียวกันเข้มงวดเหมือนกัน ดู PUT /basic-info)
-  const canEditRoundTeam = (c) =>
+  const canEditRoundTeam = useCallback((c) =>
     isAdminOrManager ||
     (c.rawResponsiblePersonId && c.rawResponsiblePersonId === userData?.userId) ||
-    (c.rawResponsiblePerson && c.rawResponsiblePerson === userData?.fname);
+    (c.rawResponsiblePerson && c.rawResponsiblePerson === userData?.fname), [isAdminOrManager, userData?.fname, userData?.userId]);
 
   // ✅ ผู้รับผิดชอบแก้ไขข้อมูลพื้นฐาน (บริษัท/โครงการ/ระบบ/ประเภทงาน/เอกสาร) ของ "งานทั่วไป/งานโปรเจค
   // ที่ตัวเองรับผิดชอบ" ได้ด้วยตามที่ผู้ใช้ขอ — ใช้ identity เดียวกับ canEditRoundTeam เป๊ะๆ (admin/
   // manager หรือผู้รับผิดชอบตัวจริง) แต่บังคับว่าต้องไม่ใช่งานตามสัญญาจริงด้วยเสมอ (สัญญาจริงยังคง
   // เฉพาะ admin/manager ทุกฟิลด์ ต้องผ่านการตรวจสอบจากส่วนกลางก่อนเสมอ — เทียบ backend PUT /basic-info)
-  const canEditGeneralJob = (c) => !c.isRealContract && canEditRoundTeam(c);
+  const canEditGeneralJob = useCallback((c) => !c.isRealContract && canEditRoundTeam(c), [canEditRoundTeam]);
 
   // 🐛 BUG ที่แก้ (แถวสัญญาจริงแก้ บริษัท/โครงการ/ระบบ/ประเภทงาน/เอกสาร ไม่ได้เลยแม้แต่แอดมิน):
   // ช่องพวกนี้เคยใช้ canEditGeneralJob(c) เป็นด่านเดียว ซึ่งนิยามไว้ว่า "ไม่ใช่สัญญาจริง และเป็นผู้รับผิดชอบ"
@@ -2432,16 +2507,16 @@ export default function ContractOverview() {
   // ✅ รวมสองกติกาเข้าด้วยกันให้ถูกต้อง: แอดมิน/manager แก้ได้ทุกแถว "หรือ" ผู้รับผิดชอบแก้งานทั่วไป/
   // โปรเจคของตัวเองได้ แล้วยังผ่าน canEditField อีกชั้นเพื่อคุมว่าฟิลด์นั้นใช้ได้กับแถวประเภทนี้ไหม
   // (เช่น docNo ใช้ได้เฉพาะแถวที่จัดหมวดหมู่แล้ว ไม่ใช่แถว "ยังไม่จัดกลุ่ม")
-  const canEditBasicField = (c, field) =>
-    canEditField(c, field) && (isAdminOrManager || canEditGeneralJob(c));
+  const canEditBasicField = useCallback((c, field) =>
+    canEditField(c, field) && (isAdminOrManager || canEditGeneralJob(c)), [canEditField, canEditGeneralJob, isAdminOrManager]);
 
-  const beginRoundTeamEdit = (visit, c) => {
+  const beginRoundTeamEdit = useCallback((visit, c) => {
     if (roundTeamSaving || !canEditRoundTeam(c)) return;
     setRoundTeamEdit({ visitId: visit._id, value: visit.team || "" });
-  };
+  }, [canEditRoundTeam, roundTeamSaving]);
   const cancelRoundTeamEdit = () => setRoundTeamEdit(null);
 
-  const commitRoundTeamEdit = async (visit, explicitValue) => {
+  const commitRoundTeamEdit = useCallback(async (visit, explicitValue) => {
     if (!roundTeamEdit || roundTeamEdit.visitId !== visit._id) return;
     const rawValue = explicitValue !== undefined ? explicitValue : roundTeamEdit.value;
     if (rawValue === (visit.team || "")) { setRoundTeamEdit(null); return; }
@@ -2463,7 +2538,7 @@ export default function ContractOverview() {
     } finally {
       setRoundTeamSaving(false);
     }
-  };
+  }, [events, roundTeamEdit, teamToId]);
 
   // ── ลบสัญญา/งานทิ้ง ─────────────────────────────────────────────────────
   // ✅ สัญญาจริง (isRealContract) ลบทั้งก้อนทีเดียวผ่าน DELETE /contract/:contractGroupId (ทุกครั้งที่
@@ -2472,7 +2547,7 @@ export default function ContractOverview() {
   // groupEventsByContract) ต้องลบทุก document ในกลุ่มพร้อมกัน ไม่ใช่แค่ document แรก ไม่งั้นวันอื่นๆ
   // ของงานเดียวกันจะค้างอยู่ในระบบทั้งที่ตั้งใจลบทั้งงาน — ทั้งคู่ยืนยันก่อนลบเสมอ เพราะลบแล้วกู้คืนไม่ได้
   // และเตือนเป็นพิเศษถ้ามีครั้งที่ "ดำเนินการเสร็จสิ้น" แล้วปนอยู่ (ประวัติงานจริงจะหายไปด้วย)
-  const handleDeleteContract = async (c) => {
+  const handleDeleteContract = useCallback(async (c) => {
     const doneCount = c.visits.filter((v) => v.status === "ดำเนินการเสร็จสิ้น").length;
     const result = await Swal.fire({
       icon: "warning",
@@ -2507,7 +2582,7 @@ export default function ContractOverview() {
         icon: "error",
       });
     }
-  };
+  }, [selectedIds]);
 
   // ── ย้ายงานเข้า/ออกจากสัญญา (แก้ไขกรณีจัดกลุ่มผิด) ──────────────────────────
   // ✅ ทิศทาง "เข้า": เลือกงานทั่วไป (isRealContract=false) แล้วเลือกสัญญาที่มีอยู่แล้ว + ครั้งที่ว่าง
@@ -2579,7 +2654,7 @@ export default function ContractOverview() {
   // ✅ ทิศทาง "ออก": แยกครั้งที่ N ออกจากสัญญา กลับไปเป็นงานเก่าที่ยังไม่จัดกลุ่ม (ต้องกดยืนยันแยกอีกที
   // ถึงจะกลายเป็น "งานทั่วไป" จริงๆ) — ทำงานกับทั้งครั้ง (ทุก record ที่
   // แชร์ contractGroupId+time เดียวกัน) ในคำขอเดียว ไม่ใช่แค่ record เดียว เผื่อครั้งนี้เข้างานไม่ต่อเนื่อง
-  const handleDetachRound = async (c, n) => {
+  const handleDetachRound = useCallback(async (c, n) => {
     const result = await Swal.fire({
       icon: "warning",
       title: `แยกครั้งที่ ${n} ออกจากสัญญา?`,
@@ -2606,7 +2681,655 @@ export default function ContractOverview() {
         icon: "error",
       });
     }
-  };
+  }, []);
+
+  // ✅ แถวตารางถูก memo ไว้ — หัวใจของการแก้ "กดเปิดอะไรก็หน่วง"
+  //
+  // 🐛 ปัญหาที่แก้: คอมโพเนนต์นี้มี useState 58 ตัวในไฟล์เดียว 5,000+ บรรทัด state ตัวไหนเปลี่ยนก็ตาม
+  // (เปิดกล่องวางบิล/เอกสาร/ประวัติ/เพิ่มสัญญา ฯลฯ) React จะ render ใหม่ทั้งหน้า รวมถึงแถวตารางทั้งหมด
+  // 10 แถว × ~20 ช่อง ที่มี Tooltip/EditableCell นับร้อยตัว ทั้งที่ข้อมูลในแถวไม่ได้เปลี่ยนอะไรเลย
+  //
+  // ✅ พอ useMemo คืน "element array ตัวเดิม" React เทียบ reference แล้วข้ามการ reconcile ทั้ง subtree
+  // ไปเลย — เปิดกล่องจึงไม่แตะแถวตารางอีกต่อไป
+  //
+  // ⚠️ ได้ผลก็ต่อเมื่อ dependency ทุกตัวมี reference คงที่ด้วย — ฟังก์ชันที่ประกาศในตัว component
+  // จะเป็นตัวใหม่ทุก render ถ้าไม่ห่อ useCallback ซึ่งจะทำให้ memo นี้คำนวณใหม่ทุกครั้งและไม่ช่วยอะไรเลย
+  // (ดูรายการ useCallback ด้านบน) · ห้ามใส่ eslint-disable ที่ dependency array นี้เด็ดขาด —
+  // ถ้า dep ขาดจะกลายเป็น "แก้ข้อมูลแล้วตารางไม่อัปเดต" ซึ่งแย่กว่าหน่วงมาก
+  const tableRows = useMemo(() => (
+pagedRows.map((c, idx) => {
+                // ✅ "ครั้งถัดไปที่ว่าง" — ใช้ตัดสินว่าจะโชว์ปุ่ม "+ เพิ่มครั้งถัดไป" ในช่องครั้งที่ไหน
+                // (ย้ายมาจากคอลัมน์ actions แยกต่างหาก มาไว้ในช่องครั้งที่ของมันเองเลย พอเพิ่มสำเร็จแล้ว
+                // ปุ่มจะขยับไปโผล่ที่ช่องครั้งถัดไปเองอัตโนมัติ เพราะคำนวณจากจำนวนครั้งที่ใช้ไปแล้วสดๆ ทุกครั้ง)
+                const nextOpenRound = c.isRealContract
+                  ? countUsedRounds(c.visits.filter((v) => !v.unscheduled)) + 1
+                  : null;
+                const overdueInfo = nextVisitOverdueInfo(c);
+                // ✅ แถบสลับสีใช้สีทึบ (ไม่ใช่สีดำโปร่งแสง 2% แบบเดิม) — บนจอมือถือที่ตัวหนังสือเล็กและ
+                // ต้องเลื่อนแนวนอน แถบสลับสีที่จางเกินไปจะช่วยไล่สายตาตามแถวไม่ได้จริง และตอน hover
+                // ใช้สีแดงจางแทนสีเทากลางของ MUI ให้แถวที่ชี้อยู่เด่นขึ้น
+                return (
+                <TableRow
+                  key={c.key}
+                  sx={{
+                    bgcolor: idx % 2 ? SURFACE_STRIPE : "#fff",
+                    transition: "background-color .12s",
+                    "&:hover": { bgcolor: alpha(ACCENT, 0.04) },
+                  }}
+                >
+                  {showCheckboxes && (
+                    <TableCell padding="checkbox" sx={{ width: colWidth("checkbox") }}>
+                      {isSelectableForMerge(c) && (
+                        <Checkbox
+                          size="small"
+                          checked={selectedIds.has(c.key)}
+                          onChange={() => toggleSelect(c)}
+                          sx={{ p: 0.5, "&.Mui-checked": { color: ACCENT } }}
+                        />
+                      )}
+                    </TableCell>
+                  )}
+                  {/* ✅ เลขที่สัญญา + ใบเสนอราคา ซ้อนกันในช่องเดียว — บรรทัดบนคือเลขที่สัญญา (ตัวหลัก
+                      สีแบรนด์ตัวหนา) บรรทัดล่างคือใบเสนอราคา (ตัวเล็กสีจาง) ทั้งคู่ยังคลิกแก้ไขได้แยกกัน
+                      ตามปกติ เพราะ EditableCell รับ Wrapper={Box} ให้เรนเดอร์โดยไม่สร้าง <td> ของตัวเอง */}
+                  {!hideContractOnlyColumns && (
+                    <TableCell data-col-key="docRef" sx={{ width: colVar("docRef"), maxWidth: colVar("docRef") }}>
+                      <Stack spacing={0.15}>
+                        <EditableCell
+                          Wrapper={Box}
+                          editable={isAdminOrManager && c.isRealContract} columnKey="contractNo"
+                          editing={editingCell?.key === c.key && editingCell?.field === "contractNo"}
+                          value={c.contractNo} editValue={editValue} saving={editSaving}
+                          title={c.contractNo}
+                          formatDisplay={(v) => (v
+                            ? <span style={{ color: ACCENT, fontWeight: 700 }}>{v}</span>
+                            : <span style={{ color: "#cbd5e1" }}>— ไม่มีเลขที่สัญญา —</span>)}
+                          onStartEdit={() => beginEdit(c, "contractNo")}
+                          onCommit={(v) => commitEdit(c, v)}
+                          onCancel={cancelEdit}
+                        />
+                        <EditableCell
+                          Wrapper={Box}
+                          editable={isAdminOrManager && c.isRealContract} columnKey="quotationNo"
+                          editing={editingCell?.key === c.key && editingCell?.field === "quotationNo"}
+                          value={c.quotationNo} editValue={editValue} saving={editSaving}
+                          title={c.quotationNo}
+                          formatDisplay={(v) => (
+                            <span style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
+                              {v ? `ใบเสนอราคา ${v}` : "ใบเสนอราคา —"}
+                            </span>
+                          )}
+                          onStartEdit={() => beginEdit(c, "quotationNo")}
+                          onCommit={(v) => commitEdit(c, v)}
+                          onCancel={cancelEdit}
+                        />
+                      </Stack>
+                    </TableCell>
+                  )}
+                  {/* ✅ โผล่แทนกลุ่มเลขที่สัญญา/ใบเสนอราคาด้านบนตอนซ่อนคอลัมน์ระดับสัญญา (ดูหัวตาราง) —
+                      แก้ไขได้เฉพาะแถวที่จัดหมวดหมู่แล้ว (สัญญาจริง/งานทั่วไป/งานโปรเจค) ไม่ใช่แถว
+                      "ยังไม่จัดกลุ่ม" เหมือน "ผู้รับผิดชอบ" ด้านล่าง (ดู canEditField) */}
+                  {hideContractOnlyColumns && (
+                    <EditableCell
+                      editable={canEditBasicField(c, "docNo")} columnKey="docNo"
+                      editing={editingCell?.key === c.key && editingCell?.field === "docNo"}
+                      value={c.docNo} editValue={editValue} saving={editSaving}
+                      width={colVar("docNo")} title={c.docNo}
+                      onStartEdit={() => beginEdit(c, "docNo")}
+                      onCommit={(v) => commitEdit(c, v)}
+                      onCancel={cancelEdit}
+                    />
+                  )}
+                  {/* ✅ บริษัท + โครงการ ซ้อนในช่องเดียว — บรรทัดบน "โครงการ" (ตัวหลักที่คนจำงานได้)
+                      บรรทัดล่าง "บริษัท" (ตัวเล็กสีจาง) ทั้งคู่คลิกแก้ไขได้แยกกันตามปกติ
+                      ⚠️ สลับลำดับจากเดิม (เดิมบริษัทมาก่อนโครงการ) เพราะจากข้อมูลจริงช่องบริษัทมักว่าง
+                      ทั้งคอลัมน์ ส่วนโครงการมีค่าเสมอ — เอาตัวที่มีข้อมูลจริงขึ้นก่อนจะอ่านง่ายกว่า */}
+                  <TableCell data-col-key="customer" sx={{ width: colVar("customer"), maxWidth: colVar("customer") }}>
+                    <Stack spacing={0.15}>
+                      <EditableCell
+                        Wrapper={Box}
+                        editable={canEditBasicField(c, "site")} columnKey="site"
+                        editing={editingCell?.key === c.key && editingCell?.field === "site"}
+                        value={c.site} editValue={editValue} saving={editSaving}
+                        title={c.site}
+                        formatDisplay={(v) => (v
+                          ? <span style={{ fontWeight: 700, color: "#0f172a" }}>{v}</span>
+                          : <span style={{ color: "#cbd5e1" }}>— ไม่ระบุโครงการ —</span>)}
+                        onStartEdit={() => beginEdit(c, "site")}
+                        onCommit={(v) => commitEdit(c, v)}
+                        onCancel={cancelEdit}
+                      />
+                      <EditableCell
+                        Wrapper={Box}
+                        editable={canEditBasicField(c, "company")} columnKey="company"
+                        editing={editingCell?.key === c.key && editingCell?.field === "company"}
+                        value={c.company} editValue={editValue} saving={editSaving}
+                        title={c.company}
+                        formatDisplay={(v) => (
+                          <span style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
+                            🏢 {v || "ไม่ระบุบริษัท"}
+                          </span>
+                        )}
+                        onStartEdit={() => beginEdit(c, "company")}
+                        onCommit={(v) => commitEdit(c, v)}
+                        onCancel={cancelEdit}
+                      />
+                    </Stack>
+                  </TableCell>
+
+                  {/* ✅ ประเภทงาน + ระบบ ซ้อนในช่องเดียว — ทั้งคู่ตอบคำถามเดียวกันว่า "งานนี้คืองานอะไร" */}
+                  <TableCell data-col-key="work" sx={{ width: colVar("work"), maxWidth: colVar("work") }}>
+                    <Stack spacing={0.15}>
+                      <EditableCell
+                        Wrapper={Box}
+                        editable={canEditBasicField(c, "title")} columnKey="title" editType="autocomplete" editOptions={titleOptions}
+                        editing={editingCell?.key === c.key && editingCell?.field === "title"}
+                        value={c.title} editValue={editValue} saving={editSaving}
+                        title={c.title}
+                        formatDisplay={(v) => (v
+                          ? <span style={{ fontWeight: 600, color: "#0f172a" }}>{v}</span>
+                          : <Dash />)}
+                        onStartEdit={() => beginEdit(c, "title")}
+                        onCommit={(v) => commitEdit(c, v)}
+                        onCancel={cancelEdit}
+                      />
+                      <EditableCell
+                        Wrapper={Box}
+                        editable={canEditBasicField(c, "system")} columnKey="system" editType="autocomplete" editOptions={systemOptions}
+                        editing={editingCell?.key === c.key && editingCell?.field === "system"}
+                        value={c.system} editValue={editValue} saving={editSaving}
+                        title={c.system}
+                        formatDisplay={(v) => (
+                          <span style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
+                            💻 {v || "ไม่ระบุระบบ"}
+                          </span>
+                        )}
+                        onStartEdit={() => beginEdit(c, "system")}
+                        onCommit={(v) => commitEdit(c, v)}
+                        onCancel={cancelEdit}
+                      />
+                    </Stack>
+                  </TableCell>
+
+                  {/* ✅ เริ่มต้น + สิ้นสุด + รอบเข้า ซ้อนในช่องเดียว "ระยะเวลาสัญญา" — เดิมแยก 3 คอลัมน์
+                      แคบจนวันที่โดนตัดเหลือ "01/..." อ่านไม่ออกทั้งที่เป็นข้อมูลหลักของสัญญา
+                      🐛 BUG ที่แก้ (คลิกแก้วันที่สัญญายาก): เดิมวางวันเริ่ม–วันสิ้นสุดไว้ "บรรทัดเดียวกัน"
+                      คั่นด้วยขีด ทั้งคู่จึงได้ความกว้างแค่ครึ่งช่อง (~85px) ผลคือ 3 อย่างพร้อมกัน —
+                        1) ตัวเลขปีโดนตัดเป็น "01/01/2..." อ่านไม่ออกว่าปีอะไร
+                        2) พื้นที่ให้คลิกเล็กมากและอยู่ชิดขอบคอลัมน์ (ที่มีตัวปรับความกว้างคอลัมน์คร่อมอยู่)
+                           กดพลาดไปโดนตัวปรับความกว้างแทนบ่อย
+                        3) พอคลิกติดแล้ว ช่องเลือกวันที่ (input type=date) ถูกบีบให้แคบกว่าตัวมันเองต้องการ
+                           ปุ่มปฏิทินเลยหลุดออกนอกช่อง กดเลือกวันไม่ได้จริง
+                      ✅ แยกเป็นคนละบรรทัด ติดป้าย "เริ่ม"/"ถึง" ไว้หน้าแต่ละอัน — แต่ละวันได้ความกว้าง
+                      เต็มช่อง อ่านครบ คลิกได้ทั้งแถบ และตอนแก้ไขช่องวันที่ก็กว้างพอให้กดปฏิทินได้จริง */}
+                  {!hideContractOnlyColumns && (
+                    <TableCell data-col-key="period" sx={{ width: colVar("period"), maxWidth: colVar("period") }}>
+                      <Stack spacing={0.15}>
+                        {[
+                          { field: "contractStart", label: "เริ่ม", value: c.contractStart, tip: "วันเริ่มสัญญา — คลิกเพื่อแก้ไข", start: true },
+                          { field: "contractEnd", label: "ถึง", value: c.contractEnd, tip: "วันสิ้นสุดสัญญา — คลิกเพื่อแก้ไข", start: false },
+                        // alignItems="stretch" — ให้แถบคลิกสูงเต็มบรรทัด (ไม่ใช่สูงเท่าตัวหนังสือ)
+                        // พื้นที่กดจึงเป็นสี่เหลี่ยมเต็มๆ ไม่ใช่เส้นบางๆ ที่ต้องเล็งให้ตรงตัวเลข
+                        ].map((d) => (
+                          <Stack key={d.field} direction="row" alignItems="stretch" spacing={0.6} sx={{ minHeight: 21 }}>
+                            {/* ✅ จุดกลมเล็กๆ หน้าบรรทัด — จุดทึบ = จุดเริ่ม, จุดกลวง = จุดจบ อ่านเป็น
+                                "ไทม์ไลน์" ได้ทันทีโดยไม่ต้องอ่านตัวหนังสือ (ป้าย "เริ่ม/ถึง" ยังอยู่ครบ
+                                สำหรับคนที่อยากอ่านให้แน่ใจ) — แทนที่จะเป็นตัวหนังสือเทาลอยๆ 2 บรรทัด */}
+                            <Box sx={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+                              <Box
+                                sx={{
+                                  width: 6, height: 6, borderRadius: "50%",
+                                  bgcolor: d.start ? alpha(ACCENT, 0.75) : "transparent",
+                                  border: d.start ? "none" : `1.5px solid ${alpha(ACCENT, 0.5)}`,
+                                }}
+                              />
+                            </Box>
+                            <Box
+                              component="span"
+                              sx={{ width: 22, flexShrink: 0, fontSize: "0.63rem", color: "text.disabled", display: "flex", alignItems: "center", letterSpacing: "0.01em" }}
+                            >
+                              {d.label}
+                            </Box>
+                            {/* กล่องนี้ทำให้ EditableCell ยืดเต็มพื้นที่ที่เหลือ = แถบคลิกกว้างเต็มช่อง
+                                (ไม่ใช่กว้างเท่าตัวหนังสือเหมือนเดิม ซึ่งเป็นเป้าที่เล็กเกินไปสำหรับนิ้ว) */}
+                            <Box sx={{ flex: 1, minWidth: 0, display: "flex", "& > *": { flex: 1, display: "flex", alignItems: "center" } }}>
+                              <EditableCell
+                                Wrapper={Box} width="100%"
+                                editable={isAdminOrManager && c.isRealContract} columnKey={d.field}
+                                editing={editingCell?.key === c.key && editingCell?.field === d.field}
+                                value={d.value} editValue={editValue} editType="date" saving={editSaving}
+                                title={isAdminOrManager && c.isRealContract ? d.tip : undefined}
+                                // ✅ tabular-nums = ตัวเลขทุกตัวกว้างเท่ากัน วันเริ่ม/วันจบจึงเรียงตรงกัน
+                                // เป๊ะทุกหลัก (11/08 กับ 14/08 ไม่เหลื่อมกันเหมือนฟอนต์ปกติ) — รายละเอียด
+                                // เล็กๆ ที่ทำให้ตารางตัวเลขดูเป็นระเบียบขึ้นมาก
+                                formatDisplay={(v) => (v
+                                  ? (
+                                    <Box component="span" sx={{ fontWeight: 600, fontSize: "0.8rem", fontVariantNumeric: "tabular-nums", letterSpacing: "-0.01em" }}>
+                                      {moment(v).format("DD/MM/YYYY")}
+                                    </Box>
+                                  )
+                                  : isAdminOrManager && c.isRealContract
+                                  // ✅ ช่องว่างที่กดได้ควรบอกว่า "กดแล้วได้อะไร" — เดิมเป็นขีด "–" เฉยๆ
+                                  // ดูเหมือนข้อมูลหายมากกว่าจะเป็นที่ให้กรอก
+                                  ? <Box component="span" sx={{ fontSize: "0.72rem", color: "text.disabled", fontStyle: "italic" }}>ระบุวันที่</Box>
+                                  : <Dash />)}
+                                onStartEdit={() => beginEdit(c, d.field)}
+                                onCommit={(v) => commitEdit(c, v)}
+                                onCancel={cancelEdit}
+                              />
+                            </Box>
+                          </Stack>
+                        ))}
+                        <EditableCell
+                          Wrapper={Box}
+                          editable={isAdminOrManager && c.isRealContract} columnKey="intervalMonths"
+                          editing={editingCell?.key === c.key && editingCell?.field === "intervalMonths"}
+                          value={c.intervalMonths} editValue={editValue} editType="number" saving={editSaving}
+                          title={c.intervalMonths ? undefined : "ยังไม่ได้ระบุ — ระบบใช้ค่าเริ่มต้น 3 เดือนในการเตือนรอบถัดไป"}
+                          // ✅ รอบเข้าเป็นป้ายเล็กๆ มีพื้นหลังอ่อน + ไอคอนจริง แทนอีโมจิ 🔁 ที่เรนเดอร์
+                          // ต่างกันไปในแต่ละเครื่อง (บนวินโดวส์ขึ้นเป็นกล่องสี่เหลี่ยมสีน้ำเงินทึบๆ ดูแปลกปลอม
+                          // ไม่เข้ากับอะไรเลย) — ป้ายนี้แยกตัวเองออกจาก "วันที่" ด้านบนชัดเจนโดยไม่ต้องมีเส้นคั่น
+                          formatDisplay={(v) => (
+                            <Box
+                              component="span"
+                              sx={{
+                                display: "inline-flex", alignItems: "center", gap: 0.4, mt: 0.15,
+                                px: 0.6, py: 0.1, borderRadius: 1,
+                                bgcolor: alpha("#0f172a", v ? 0.05 : 0.03),
+                                color: v ? "text.secondary" : "text.disabled",
+                                fontSize: "0.67rem", fontWeight: v ? 600 : 400, whiteSpace: "nowrap",
+                              }}
+                            >
+                              <Autorenew sx={{ fontSize: 12 }} />
+                              {v ? `ทุก ${v} เดือน` : "ยังไม่ระบุรอบเข้า"}
+                            </Box>
+                          )}
+                          onStartEdit={() => beginEdit(c, "intervalMonths")}
+                          onCommit={(v) => commitEdit(c, v)}
+                          onCancel={cancelEdit}
+                        />
+                      </Stack>
+                    </TableCell>
+                  )}
+                  {/* ✅ มูลค่างาน — อยู่นอกบล็อก hideContractOnlyColumns แล้ว จึงแสดงทุกแท็บ (ลำดับ
+                      คอลัมน์ในแท็บสัญญายังเหมือนเดิมเป๊ะ เพราะวางไว้ตำแหน่งเดิมระหว่างจำนวนครั้งกับ
+                      สถานะสัญญา) — แก้ไขได้ทุกแถวสำหรับแอดมิน/manager ไม่จำกัดเฉพาะสัญญาจริงอีกต่อไป */}
+                  <EditableCell
+                    editable={isAdminOrManager && canEditField(c, "jobValue")} columnKey="jobValue"
+                    editing={editingCell?.key === c.key && editingCell?.field === "jobValue"}
+                    value={c.jobValue} editValue={editValue} editType="number" saving={editSaving}
+                    width={colVar("jobValue")} align="right"
+                    formatDisplay={(v) => (hasMoney(v) ? formatBaht(v) : <Dash />)}
+                    onStartEdit={() => beginEdit(c, "jobValue")}
+                    onCommit={(v) => commitEdit(c, v)}
+                    onCancel={cancelEdit}
+                  />
+                  {/* ⚠️ โชว์ % ของมูลค่างานเป็นข้อมูลประกอบเท่านั้น ไม่ได้เก็บลงฐานข้อมูล — ค่าที่ตกลง
+                      กับลูกค้าคือ "จำนวนเงิน" ถ้าเก็บเป็น % แล้ววันหนึ่งมูลค่างานถูกแก้ ค่าคอมจะเปลี่ยน
+                      ตามเองเงียบๆ ทั้งที่ตกลงกันเป็นตัวเงินไปแล้ว (ดูเหตุผลเต็มที่ models/Events.js) */}
+                  <EditableCell
+                    editable={isAdminOrManager && canEditField(c, "commission")} columnKey="commission"
+                    editing={editingCell?.key === c.key && editingCell?.field === "commission"}
+                    value={c.commission} editValue={editValue} editType="number" saving={editSaving}
+                    width={colVar("commission")} align="right"
+                    formatDisplay={(v) => (hasMoney(v) ? (
+                      <Stack spacing={0} alignItems="flex-end">
+                        <Box component="span">{formatBaht(v)}</Box>
+                        {commissionPct(c) && (
+                          <Box component="span" sx={{ fontSize: "0.65rem", color: TEXT_SUB, lineHeight: 1.2 }}>
+                            {commissionPct(c)}
+                          </Box>
+                        )}
+                      </Stack>
+                    ) : <Dash />)}
+                    onStartEdit={() => beginEdit(c, "commission")}
+                    onCommit={(v) => commitEdit(c, v)}
+                    onCancel={cancelEdit}
+                  />
+                  {!hideContractOnlyColumns && (
+                  <TableCell data-col-key="status" align="center" sx={{ width: colVar("status") }}>
+                    {(() => {
+                      const st = contractStatusInfo(c);
+                      return st ? (
+                        <Chip
+                          label={st.label} size="small"
+                          sx={{ height: 20, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha(st.color, 0.12), color: st.color }}
+                        />
+                      ) : <Dash />;
+                    })()}
+                  </TableCell>
+                  )}
+                  {/* ✅ ยุบคอลัมน์ "จำนวนครั้งทั้งหมด" มารวมกับ "คืบหน้า" — ป้ายคืบหน้าเขียน "เสร็จ/ทั้งหมด"
+                      อยู่แล้ว (ดู progressInfo) ตัวเลขทั้งหมดจึงซ้ำกันทั้งคอลัมน์ ไม่ต้องแยกช่องอีก
+                      สิ่งที่เคยมีเฉพาะช่องนั้นและต้องยกมาด้วยคือจุดแดงเตือน "เลยกำหนดรอบถัดไป" — ย้ายมา
+                      อยู่ข้างป้ายคืบหน้าตรงนี้แทน ความหมายยังคู่กันพอดี (คืบหน้าไปถึงไหน / ค้างรอบไหนอยู่) */}
+                  <TableCell data-col-key="progress" align="center" sx={{ width: colVar("progress") }}>
+                    {(() => {
+                      // ✅ ใช้ progressInfo (ฟังก์ชันกลาง) ตัวเดียวกับที่ไฟล์ Excel ที่ส่งออกใช้ กันตัวเลข
+                      // บนจอกับในไฟล์ไม่ตรงกัน — ดูรายละเอียดตรรกะที่นิยามของ progressInfo ด้านบน
+                      const info = progressInfo(c, countUsedRounds);
+                      return (
+                        <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
+                          <Chip
+                            label={info.label} size="small"
+                            sx={{ height: 20, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha(info.color, 0.12), color: info.color }}
+                          />
+                          {overdueInfo && (
+                            <Tooltip title={`รอบล่าสุด ${overdueInfo.lastVisitDate.format("DD/MM/YYYY")} — ต้องเข้ารอบถัดไปภายใน ${overdueInfo.intervalMonths} เดือน เกินกำหนดแล้ว ${overdueInfo.monthsOverdue} เดือน ยังไม่ได้ลงแผนงานครั้งถัดไป`}>
+                              <Box
+                                component="span"
+                                sx={{
+                                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                                  width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
+                                  bgcolor: "#dc2626", color: "#fff",
+                                  animation: "contractOverviewPulse 1.6s ease-in-out infinite",
+                                  "@keyframes contractOverviewPulse": {
+                                    "0%, 100%": { boxShadow: `0 0 0 0 ${alpha("#dc2626", 0.5)}` },
+                                    "50%": { boxShadow: `0 0 0 4px ${alpha("#dc2626", 0)}` },
+                                  },
+                                }}
+                              >
+                                <WarningAmber sx={{ fontSize: 12 }} />
+                              </Box>
+                            </Tooltip>
+                          )}
+                        </Stack>
+                      );
+                    })()}
+                  </TableCell>
+                  {visitColumns.map((n) => {
+                    // ✅ แถวที่ไม่ใช่สัญญาจริง (งานทั่วไป/ยังไม่จัดกลุ่ม) ไม่มี visitCount ให้เทียบ (ดู
+                    // groupEventsByContract) ใช้ rowMaxRound (คำนวณจาก field time จริงของแต่ละ document
+                    // แทน — งานที่เคยเลือก "ครั้งที่ 2" ไว้ตอนเพิ่มงานจะไปโผล่ที่คอลัมน์ "ครั้งที่ 2" จริงๆ
+                    // ไม่ใช่ถูกบังคับไปช่อง 1 เสมอเหมือนเดิม)
+                    const withinCount = n <= rowMaxRound(c);
+                    if (!withinCount) {
+                      return <TableCell key={n} data-col-key={`visit_${n}`} align="center" sx={{ width: colVar(`visit_${n}`), bgcolor: "action.hover" }} />;
+                    }
+                    // ✅ นับว่า "ถึงรอบแล้ว" เฉพาะครั้งที่ลงตารางจริงเท่านั้น (!unscheduled) — ถ้าเป็นแค่
+                    // แผนงานล่วงหน้าที่จองครั้งนี้ไว้ (ยังไม่มีวันที่จริง) ให้ยังถือว่า "ว่าง" อยู่ในตาราง
+                    // สัญญานี้ แต่โชว์ป้ายบอกว่ากำลังรอวางแผนอยู่ แทนที่จะเป็นขีดว่างเฉยๆ กันสับสนว่ายังไม่ได้จอง
+                    // ✅ ครั้งที่เข้างานไม่ต่อเนื่อง (เว้นช่วงแล้วกลับมาเข้าอีก) จะมีมากกว่า 1 document ต่อ
+                    // ครั้ง — ใช้ filter หาทุกอันแทน find อันเดียว โชว์ซ้อนกันเป็นแถวในเซลล์เดียว
+                    // ✅ เรียงตามวันที่เข้างานจริง (เก่า→ใหม่) เสมอ — เดิมโชว์ตามลำดับที่ document ถูกสร้าง
+                    // (เช่น ต่อวันที่ย้อนหลังทีหลัง) ทำให้วันที่ในเซลล์เดียวกันโผล่สลับก่อนหลังไม่ตรงความจริง
+                    // ดูเหมือนข้อมูลมั่ว/ไม่ได้จัดกลุ่มให้ ทั้งที่จริงเป็นงานเดียวกัน (jobGroupId เดียวกัน) แค่โชว์ผิดลำดับ
+                    // ✅ "Number(v.time) || 1" — งานที่ไม่เคยเลือก "ครั้งที่" เลย (time ว่าง) ให้ตกไปอยู่
+                    // ช่อง "ครั้งที่ 1" เป็นค่าเริ่มต้น แทนที่จะหายไปเลยไม่โชว์ที่ไหนสักช่อง
+                    const roundVisits = roundVisitsOf(c, n);
+                    const pendingDraft = roundVisits.length === 0 && c.visits.find((v) => v.unscheduled && (Number(v.time) || 1) === n);
+                    // ✅ ครั้งเดียวมีได้หลายวันที่ — โชว์แค่ 3 วันแรกก่อน ที่เหลือพับไว้ กันแถวสูงผิดปกติ
+                    // (ดู VISIT_CELL_PREVIEW) เมื่อกางแล้วปุ่มจะเปลี่ยนเป็น "ย่อ" กลับได้เสมอ
+                    const visitCellKey = `${c.key}|${n}`;
+                    const visitCellExpanded = expandedVisitCells.has(visitCellKey);
+                    const shownVisits = visitCellExpanded ? roundVisits : roundVisits.slice(0, VISIT_CELL_PREVIEW);
+                    const hiddenVisitCount = roundVisits.length - shownVisits.length;
+                    return (
+                      <TableCell key={n} data-col-key={`visit_${n}`} align="center" sx={{ width: colVar(`visit_${n}`), overflow: "hidden" }}>
+                        {roundVisits.length > 0 ? (
+                          <Stack spacing={0.25} alignItems="center">
+                            {shownVisits.map((visit) => (
+                              <Box key={visit._id} sx={{ textAlign: "center" }}>
+                                <Link
+                                  to={`/operation/${visit._id}${resolveOperationGroup(visit) ? `?group=${resolveOperationGroup(visit)}` : ""}`}
+                                  style={{ color: STATUS_COLOR[visit.status] || ACCENT, fontWeight: 600, textDecoration: "none", fontSize: "0.78rem", whiteSpace: "nowrap" }}
+                                >
+                                  {formatEventDateRange(visit)}
+                                </Link>
+                                {/* ✅ ทีมที่เข้างานของ "ครั้งนี้" โดยเฉพาะ — อิงจาก visit.team ของ
+                                    document นี้ตรงๆ (ข้อมูลเดิมที่มีอยู่แล้ว ไม่ใช่ค่ารวมระดับสัญญา)
+                                    เพราะแต่ละครั้งอาจเข้าโดยคนละทีมกัน แก้ไขแยกทีละครั้งได้เลยที่นี่
+                                    (ไม่ sync กับทีมครั้งอื่น/ผู้รับผิดชอบสัญญา — ดู commitRoundTeamEdit) */}
+                                {roundTeamEdit?.visitId === visit._id ? (
+                                  <TextField
+                                    select autoFocus size="small" variant="standard" value={roundTeamEdit.value}
+                                    disabled={roundTeamSaving}
+                                    onChange={(e) => commitRoundTeamEdit(visit, e.target.value)}
+                                    onBlur={() => commitRoundTeamEdit(visit)}
+                                    onKeyDown={(e) => { if (e.key === "Escape") cancelRoundTeamEdit(); }}
+                                    SelectProps={{ native: true }}
+                                    sx={{ mt: 0.25, width: "100%", "& .MuiInputBase-input": { fontSize: "0.68rem", py: 0.2, textAlign: "center" } }}
+                                  >
+                                    <option value="">— ไม่ระบุ —</option>
+                                    {teamOptions.map((o) => <option key={o} value={o}>{o}</option>)}
+                                  </TextField>
+                                ) : (
+                                  <Typography
+                                    variant="caption"
+                                    onClick={() => beginRoundTeamEdit(visit, c)}
+                                    title={canEditRoundTeam(c) ? "คลิกเพื่อแก้ไขทีมของครั้งนี้" : (visit.team || "")}
+                                    sx={{
+                                      display: "block", fontSize: "0.65rem", lineHeight: 1.3, whiteSpace: "nowrap",
+                                      color: visit.team ? "text.secondary" : "text.disabled",
+                                      cursor: canEditRoundTeam(c) ? "pointer" : "default",
+                                      "&:hover": canEditRoundTeam(c) ? { color: ACCENT, textDecoration: "underline" } : {},
+                                    }}
+                                  >
+                                    👷 {visit.team || (canEditRoundTeam(c) ? "ระบุทีม" : "-")}
+                                  </Typography>
+                                )}
+                              </Box>
+                            ))}
+                            {/* ✅ ปุ่มกาง/ย่อรายการวันที่ที่เหลือของครั้งนี้ — บอกจำนวนที่ซ่อนอยู่ให้ชัด
+                                จะได้รู้ว่ายังมีข้อมูลอีก ไม่ใช่ตัดทิ้งเงียบๆ */}
+                            {(hiddenVisitCount > 0 || visitCellExpanded) && (
+                              <Box
+                                component="button" type="button"
+                                onClick={() => toggleVisitCell(visitCellKey)}
+                                sx={{
+                                  border: "none", bgcolor: "transparent", cursor: "pointer", p: 0,
+                                  fontSize: "0.65rem", fontWeight: 700, fontFamily: "inherit",
+                                  color: TEXT_SUB, whiteSpace: "nowrap",
+                                  "&:hover": { color: ACCENT, textDecoration: "underline" },
+                                }}
+                              >
+                                {visitCellExpanded ? "ย่อ" : `+ อีก ${hiddenVisitCount} วัน`}
+                              </Box>
+                            )}
+                            {/* ✅ วางบิล "ทีเดียวต่อครั้ง" ไม่ใช่ต่อ document — งานเดียวกันที่เข้าหลายช่วง
+                                ไม่ต่อเนื่อง (เช่น 21 ส.ค. แล้วเว้นไป 31 ส.ค.–4 ก.ย.) ยังเป็นครั้งเดียวกัน
+                                จึงมีใบวางบิลใบเดียว ป้ายนี้จึงอยู่ท้ายรายการวันที่ 1 อัน ไม่ใช่ใต้ทุกวันที่ */}
+                            {/* ✅ วางบิล + เอกสารของครั้งนี้อยู่บรรทัดเดียวกัน — ทั้งคู่คือ "สถานะของครั้งนี้"
+                                เหมือนกัน และรวมบรรทัดช่วยไม่ให้แถวสูงขึ้นอีกชั้น (1 แถวมีได้ 12 ช่อง) */}
+                            <Stack direction="row" alignItems="center" justifyContent="center" gap={0.5} sx={{ flexWrap: "wrap" }}>
+                              <BillingChip
+                                roundVisits={roundVisits}
+                                canManage={isAdminOrManager}
+                                onOpen={handleOpenBilling}
+                              />
+                              <JobDocsChip
+                                roundVisits={roundVisits}
+                                rowKey={c.key}
+                                round={n}
+                                title={docsTitleFor(c, n)}
+                                onOpen={handleOpenDocs}
+                              />
+                            </Stack>
+                            {/* ✅ แถวปุ่มจัดการครั้งนี้ (เพิ่มวันต่อเนื่อง / ย้ายครั้งที่ / แยกออกจากสัญญา)
+                                ⚠️ ไม่แสดงบนตารางจอมือถือ — ช่อง "ครั้งที่ N" กว้างแค่ 94px แต่ต้องใส่
+                                วันที่ + ชื่อทีม + ปุ่มอีก 3 ตัวซ้อนลงไป ทำให้เซลล์แน่นจนอ่านวันที่ไม่รู้เรื่อง
+                                และตัวปุ่มเองเล็กแค่ 14px กดด้วยนิ้วแทบไม่โดนอยู่ดี — ทั้ง 3 อย่างยังทำได้ครบ
+                                จากมุมมองการ์ดบนมือถือ และจากตารางบนจอคอม */}
+                            {isAdminOrManager && c.isRealContract && !useMobileTable && (
+                              <Stack direction="row" spacing={0.25}>
+                                <Tooltip title="เพิ่มวันที่ต่อเนื่อง (เข้างานไม่ติดกัน)">
+                                  <IconButton
+                                    size="small" onClick={() => openExtendVisitDialog(c, n)}
+                                    sx={{ p: 0.25, color: "text.disabled", transition: "background-color .15s, color .15s", "&:hover": { color: ACCENT, bgcolor: alpha(ACCENT, 0.1) } }}
+                                  >
+                                    <Add sx={{ fontSize: 14 }} />
+                                  </IconButton>
+                                </Tooltip>
+                                {/* ✅ ย้ายครั้งนี้ไปเป็นครั้งที่อื่นได้อิสระ (ยกทั้งวันที่/สถานะ/ทีม/
+                                    ประวัติงาน) — ปลายทางที่มีข้อมูลอยู่แล้วจะสลับที่กัน ไม่เขียนทับ */}
+                                <Tooltip title="ย้ายครั้งนี้ไปเป็นครั้งที่อื่น">
+                                  <IconButton
+                                    size="small" onClick={() => openMoveRoundDialog(c, n)}
+                                    sx={{ p: 0.25, color: "text.disabled", transition: "background-color .15s, color .15s", "&:hover": { color: ACCENT, bgcolor: alpha(ACCENT, 0.1) } }}
+                                  >
+                                    <SwapHoriz sx={{ fontSize: 14 }} />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="แยกครั้งนี้ออกจากสัญญา (ย้ายเป็นงานเก่าที่ยังไม่จัดกลุ่ม)">
+                                  <IconButton
+                                    size="small" onClick={() => handleDetachRound(c, n)}
+                                    sx={{ p: 0.25, color: "text.disabled", transition: "background-color .15s, color .15s", "&:hover": { color: ACCENT, bgcolor: alpha(ACCENT, 0.1) } }}
+                                  >
+                                    <LinkOff sx={{ fontSize: 14 }} />
+                                  </IconButton>
+                                </Tooltip>
+                              </Stack>
+                            )}
+                          </Stack>
+                        ) : pendingDraft ? (
+                          // ✅ กดได้เลย — สัญญาเปิดกล่อง "เพิ่มครั้งที่ 1" ในหน้านี้เลย ส่วนงานทั่วไป/
+                          // โปรเจคพาไปหน้าปฏิทิน เจาะจงการ์ดนั้นในแผงงานล่วงหน้า (ดู pendingDraftChip
+                          // ซึ่งอธิบายเหตุผลที่ต้องแยกปลายทางกันไว้ละเอียดแล้ว) เห็นชัดว่ากดได้จาก
+                          // พื้นหลังชิป + ขีดเส้นใต้ตอน hover เหมือนลิงก์อื่นในตารางนี้
+                          (() => {
+                            const chip = pendingDraftChip(c, pendingDraft);
+                            return (
+                              <Tooltip title={chip.tip}>
+                                <Box
+                                  {...chip.props}
+                                  sx={{
+                                    fontSize: "0.72rem", color: "#b45309", fontWeight: 600, whiteSpace: "nowrap",
+                                    textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 0.4,
+                                    px: 0.75, py: 0.25, borderRadius: 1.5, bgcolor: alpha("#f59e0b", 0.1),
+                                    border: "1px solid", borderColor: alpha("#f59e0b", 0.3),
+                                    transition: "background-color 0.15s ease, border-color 0.15s ease",
+                                    "&:hover": { bgcolor: alpha("#f59e0b", 0.2), borderColor: "#b45309", textDecoration: "underline" },
+                                    ...(chip.props.sx || {}),
+                                  }}
+                                >
+                                  {chip.label}
+                                </Box>
+                              </Tooltip>
+                            );
+                          })()
+                        ) : isAdminOrManager && c.isRealContract && n === nextOpenRound ? (
+                          // ✅ ปุ่ม "+ เพิ่มครั้งถัดไป" ย้ายมาอยู่ในช่องของครั้งที่มันเองเลย (เดิมอยู่ในคอลัมน์
+                          // actions แยกต่างหาก มองไม่ออกว่ากดแล้วจะไปเพิ่มครั้งที่เท่าไหร่) พอเพิ่มสำเร็จแล้ว
+                          // nextOpenRound จะขยับไปครั้งถัดไปเอง ปุ่มก็เลยย้ายไปโผล่ที่ช่องนั้นแทนอัตโนมัติ —
+                          // ถ้าเลยกำหนด 3 เดือนแล้วด้วย (overdueInfo) ให้พื้นหลังปุ่มทึบแดงเห็นชัดแม้เป็น
+                          // ภาพนิ่ง (ของเดิมแค่เปลี่ยนสีไอคอน ซึ่งเป็นสีแดงเดียวกับปุ่มปกติอยู่แล้ว มองไม่ออก
+                          // ว่าต่างกันตรงไหน) + จุดแจ้งเตือนมุมขวาบนกะพริบเบาๆ เสริมอีกชั้น
+                          <Tooltip title={overdueInfo ? `เกินกำหนดแล้ว ${overdueInfo.monthsOverdue} เดือน — กดเพื่อเพิ่มครั้งที่ ${n}` : `เพิ่มครั้งที่ ${n}`}>
+                            <Badge
+                              color="error" variant="dot" invisible={!overdueInfo}
+                              sx={{
+                                "& .MuiBadge-dot": {
+                                  animation: "contractOverviewPulse 1.4s ease-in-out infinite",
+                                  "@keyframes contractOverviewPulse": {
+                                    "0%, 100%": { transform: "scale(1)", opacity: 1 },
+                                    "50%": { transform: "scale(1.5)", opacity: 0.6 },
+                                  },
+                                },
+                              }}
+                            >
+                              <IconButton
+                                size="small" onClick={() => openAddVisitDialog(c)}
+                                sx={overdueInfo ? {
+                                  color: "#fff", bgcolor: "#dc2626",
+                                  "&:hover": { bgcolor: "#b91c1c" },
+                                } : { color: ACCENT }}
+                              >
+                                <PlaylistAdd fontSize="small" />
+                              </IconButton>
+                            </Badge>
+                          </Tooltip>
+                        ) : (
+                          <Dash />
+                        )}
+                      </TableCell>
+                    );
+                  })}
+                  {/* ✅ คอลัมน์ "ทีมที่เข้างาน" ระดับสัญญาถูกตัดออก (ทีมของแต่ละครั้งแก้ไขได้ในช่อง
+                      "ครั้งที่ N" ด้านบนแล้ว) — "ผู้รับผิดชอบ" ด้านล่างเป็นฟิลด์อิสระ แก้ไข inline
+                      ได้ตามปกติ ไม่ผูก/ไม่ sync กับทีมที่เข้างานเลย (ดูคอมเมนต์ที่หัวตาราง) */}
+                  <EditableCell
+                    editable={isAdminOrManager && canEditField(c, "responsiblePerson")} columnKey="responsiblePerson"
+                    editing={editingCell?.key === c.key && editingCell?.field === "responsiblePerson"}
+                    value={c.responsiblePerson} editValue={editValue} editType="select" editOptions={teamOptions} saving={editSaving}
+                    width={colVar("responsiblePerson")}
+                    title={c.responsiblePerson || "ยังไม่ได้มอบหมายผู้รับผิดชอบ"}
+                    formatDisplay={unassignedResponsibleDisplay}
+                    onStartEdit={() => beginEdit(c, "responsiblePerson")}
+                    onCommit={(v) => commitEdit(c, v)}
+                    onCancel={cancelEdit}
+                  />
+                  <TableCell align="center" sx={{ width: colWidth("actions") }}>
+                    {/* ✅ เพิ่ม hover เป็นพื้นวงกลมสี (ไม่ใช่แค่เปลี่ยนสีตัวไอคอนเฉยๆ) ให้รู้สึกเหมือนปุ่มกด
+                        ได้จริงชัดเจนขึ้น เทียบ pattern ปุ่มไอคอนวงกลมมาตรฐาน Material Design
+                        ✅ ช่างดูอย่างเดียว — คอลัมน์นี้มีแต่ปุ่มแก้ไขข้อมูลล้วนๆ ซ่อนทั้งหมดไว้ในนี้ทีเดียว
+                        แทนที่จะกันทีละปุ่ม (เหลือ TableCell ว่างไว้เฉยๆ กันตัวเลขความกว้างคอลัมน์เพี้ยน) */}
+                    {isAdminOrManager && (
+                      <>
+                        {!c.isRealContract && (
+                          <Tooltip title="จัดหมวดหมู่งาน (ทั่วไป/โปรเจค)">
+                            <IconButton
+                              size="small" onClick={(e) => openClassifyMenu(e, c)}
+                              sx={{
+                                color: c.isConfirmedGeneral ? "#10b981" : c.isConfirmedProject ? "#3b82f6" : "text.disabled",
+                                transition: "background-color .15s, color .15s",
+                                "&:hover": {
+                                  color: c.isConfirmedProject ? "#3b82f6" : "#10b981",
+                                  bgcolor: alpha(c.isConfirmedProject ? "#3b82f6" : "#10b981", 0.1),
+                                },
+                              }}
+                            >
+                              {c.isConfirmedGeneral ? <Build fontSize="small" /> : c.isConfirmedProject ? <Engineering fontSize="small" /> : <HourglassEmpty fontSize="small" />}
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {!c.isRealContract && (
+                          <Tooltip title="ย้ายเข้างานสัญญา / งานรายปี">
+                            <IconButton
+                              size="small" onClick={() => openAttachDialog(c)}
+                              sx={{ color: "text.disabled", transition: "background-color .15s, color .15s", "&:hover": { color: ACCENT, bgcolor: alpha(ACCENT, 0.1) } }}
+                            >
+                              <AddLink fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {/* ✅ ประวัติการแก้ไข — เฉพาะสัญญาจริง เพราะข้อมูลสัญญา (มูลค่า/วันที่/เลขที่)
+                            แก้ได้จากตารางนี้โดยตรงและมีผลกับทุกครั้งในสัญญาพร้อมกัน จึงต้องตามกลับได้
+                            ⚠️ จางลงเมื่อยังไม่เคยมีการแก้ไข — บอกได้ทันทีว่ากดไปก็ไม่มีอะไร */}
+                        {c.isRealContract && (
+                          <Tooltip title={contractEditHistory(c).length > 0
+                            ? `ประวัติการแก้ไขข้อมูลสัญญา (${contractEditHistory(c).length} ครั้ง)`
+                            : "ยังไม่เคยมีการแก้ไขข้อมูลสัญญานี้"}>
+                            <span>
+                              <IconButton
+                                size="small" onClick={() => setHistoryContract(c)}
+                                disabled={contractEditHistory(c).length === 0}
+                                sx={{ color: "text.disabled", transition: "background-color .15s, color .15s", "&:hover": { color: ACCENT, bgcolor: alpha(ACCENT, 0.1) } }}
+                              >
+                                <History fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        )}
+                        <Tooltip title={c.isRealContract ? "ลบสัญญานี้ทั้งหมด" : "ลบงานนี้"}>
+                          <IconButton
+                            size="small" onClick={() => handleDeleteContract(c)}
+                            sx={{ color: "text.disabled", transition: "background-color .15s, color .15s", "&:hover": { color: ACCENT, bgcolor: alpha(ACCENT, 0.1) } }}
+                          >
+                            <DeleteOutline fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </>
+                    )}
+                  </TableCell>
+                </TableRow>
+                );
+              })
+  // 🐛 BUG ที่แก้ (จอขาวทันทีที่เปิดหน้า): dependency array ถูก "ประเมินทุก render" ไม่ใช่ตอน callback
+  // ทำงาน — เดิมมี roundTeamEdit.value อยู่ในนี้ ซึ่ง eslint แนะนำมาตามที่โค้ดเขียนไว้ใน JSX (ตรงนั้น
+  // อยู่ในเงื่อนไข roundTeamEdit?.visitId === ... จึงปลอดภัย) แต่พอย้ายมาอยู่ใน dep array มันไม่มี
+  // เงื่อนไขคุมแล้ว และ roundTeamEdit เริ่มต้นเป็น null → TypeError ตั้งแต่ render แรก
+  // ⚠️ ทุก dep ที่เป็นการเข้าถึงสมาชิกของ state ที่มีโอกาสเป็น null ต้องใช้ ?. เสมอ
+  ), [beginEdit, beginRoundTeamEdit, canEditBasicField, canEditField, canEditRoundTeam, colWidth, commitEdit, commitRoundTeamEdit, editSaving, editValue, editingCell?.field, editingCell?.key, expandedVisitCells, handleDeleteContract, handleDetachRound, handleOpenBilling, handleOpenDocs, hideContractOnlyColumns, isAdminOrManager, pagedRows, pendingDraftChip, roundTeamEdit?.value, roundTeamEdit?.visitId, roundTeamSaving, selectedIds, showCheckboxes, systemOptions, teamOptions, titleOptions, useMobileTable, visitColumns]);
 
   // ── ย้าย "ครั้งที่ N" ไปครั้งที่อื่นได้อย่างอิสระ ──────────────────────────
   // ✅ ย้ายยกทั้งครั้ง (วันที่/สถานะ/ทีม/ประวัติงานทุก document ของครั้งนั้นติดไปด้วยครบ ไม่ใช่แค่เลข) —
@@ -2767,9 +3490,18 @@ export default function ContractOverview() {
               <WarningAmber sx={{ fontSize: 18, color: "#b45309", flexShrink: 0 }} />
             </Tooltip>
           )}
-          <Typography sx={{ fontWeight: 800, fontSize: "1.2rem", color: ACCENT, whiteSpace: "nowrap", letterSpacing: "-0.01em" }}>
-            {formatBaht(jobValueSummary.total)}
-          </Typography>
+          <Stack spacing={0} alignItems="flex-end">
+            <Typography sx={{ fontWeight: 800, fontSize: "1.2rem", color: ACCENT, whiteSpace: "nowrap", letterSpacing: "-0.01em" }}>
+              {formatBaht(jobValueSummary.total)}
+            </Typography>
+            {/* ✅ ยอดรวมค่าคอมอยู่ใต้ยอดมูลค่างานในแถบเดียวกัน — บนมือถือไม่มีแถวสรุปท้ายตารางให้อ่าน
+                ⚠️ โผล่เฉพาะตอนมีค่าคอมจริง ไม่งั้นแถบนี้จะมี ฿0 ห้อยอยู่ตลอดเวลาโดยไม่มีความหมาย */}
+            {commissionSummary.total > 0 && (
+              <Typography sx={{ fontSize: "0.7rem", fontWeight: 700, color: "#7c3aed", whiteSpace: "nowrap" }}>
+                คอม {formatBaht(commissionSummary.total)}
+              </Typography>
+            )}
+          </Stack>
           {summaryBarOpen ? <ExpandMore sx={{ fontSize: 20, color: TEXT_SUB }} /> : <ExpandLess sx={{ fontSize: 20, color: TEXT_SUB }} />}
         </Stack>
 
@@ -2821,8 +3553,7 @@ export default function ContractOverview() {
       editing: editingCell?.key === c.key && editingCell?.field === field,
       editValue, saving: editSaving,
       onStartEdit: () => beginEdit(c, field),
-      onChangeValue: setEditValue,
-      onCommit: () => commitEdit(c),
+      onCommit: (v) => commitEdit(c, v),
       onCancel: cancelEdit,
     });
     const jobTypeLabel = c.isRealContract ? "งานสัญญา/รายปี" : c.isConfirmedGeneral ? "งานทั่วไป" : c.isConfirmedProject ? "งานโปรเจค" : "ยังไม่จัดกลุ่ม";
@@ -3124,6 +3855,16 @@ export default function ContractOverview() {
             <FieldRow label="เริ่มสัญญา" editable={isAdminOrManager} editType="date" value={c.contractStart} formatDisplay={(v) => (v ? moment(v).format("DD/MM/YYYY") : <Dash />)} {...fp("contractStart")} />
             <FieldRow label="สิ้นสุดสัญญา" editable={isAdminOrManager} editType="date" value={c.contractEnd} formatDisplay={(v) => (v ? moment(v).format("DD/MM/YYYY") : <Dash />)} {...fp("contractEnd")} />
             <FieldRow label="รอบเข้า" editable={isAdminOrManager} editType="number" value={c.intervalMonths} formatDisplay={(v) => (v ? `ทุก ${v} เดือน` : <Dash />)} {...fp("intervalMonths")} />
+            {/* ✅ ค่าคอมอยู่ในรายละเอียดที่กางดู ไม่ได้อยู่แถบสรุปหัวการ์ด — แถบนั้นมี 3 ช่องพอดีจอแล้ว
+                (ประเภทงาน/ระบบ/มูลค่างาน) เพิ่มช่องที่ 4 จะแคบจนตัวเลขตกบรรทัดบนมือถือ */}
+            <FieldRow
+              label="ค่าคอมให้ลูกค้า" editable={isAdminOrManager && canEditField(c, "commission")} editType="number"
+              value={c.commission}
+              formatDisplay={(v) => (hasMoney(v)
+                ? <Box component="span">{formatBaht(v)}{commissionPct(c) ? <Box component="span" sx={{ fontSize: "0.72rem", color: TEXT_SUB, ml: 0.5 }}>({commissionPct(c)})</Box> : null}</Box>
+                : <Dash />)}
+              {...fp("commission")}
+            />
             <FieldRow label="จำนวนครั้ง" editable={isAdminOrManager} editType="number" value={c.visitCount} {...fp("visitCount")} />
           </>
         )}
@@ -3899,7 +4640,10 @@ export default function ContractOverview() {
                 {/* ✅ มูลค่างาน — แสดงทุกแท็บแล้ว (เดิมเฉพาะแท็บสัญญา) งานทั่วไป/โปรเจค/ยังไม่จัดกลุ่ม
                     ก็มีมูลค่าของตัวเองได้เหมือนกัน ข้อมูลมีอยู่ในฐานข้อมูลทุกแถวอยู่แล้ว แค่เดิมไม่ได้
                     แสดงให้เห็น — ดูยอดรวมท้ายตาราง (TableFooter) ที่สรุปให้ทุกแท็บเช่นกัน */}
-                <ResizableTh width={colWidth("jobValue")} align="right" columnKey="jobValue" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("jobValue")} sortable sortDirection={sortConfig.key === "jobValue" ? sortConfig.direction : null} onSort={handleSortClick}>มูลค่างาน (฿)</ResizableTh>
+                <ResizableTh width={colWidth("jobValue")} align="center" columnKey="jobValue" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("jobValue")} sortable sortDirection={sortConfig.key === "jobValue" ? sortConfig.direction : null} onSort={handleSortClick}>มูลค่างาน (฿)</ResizableTh>
+                {/* ✅ ค่าคอมมิชชั่นที่จ่ายให้ฝั่งลูกค้า — วางติดมูลค่างานเพราะอ่านคู่กันเสมอ
+                    (คอมเท่านี้จากงานมูลค่าเท่านี้ คิดเป็นกี่ % ดูได้ทันทีโดยไม่ต้องเลื่อนหา) */}
+                <ResizableTh width={colWidth("commission")} align="center" columnKey="commission" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("commission")} sortable sortDirection={sortConfig.key === "commission" ? sortConfig.direction : null} onSort={handleSortClick}>ค่าคอมลูกค้า (฿)</ResizableTh>
                 {!hideContractOnlyColumns && (
                   <ResizableTh width={colWidth("status")} align="center" columnKey="status" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("status")}>สถานะสัญญา</ResizableTh>
                 )}
@@ -3930,622 +4674,7 @@ export default function ContractOverview() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {pagedRows.map((c, idx) => {
-                // ✅ "ครั้งถัดไปที่ว่าง" — ใช้ตัดสินว่าจะโชว์ปุ่ม "+ เพิ่มครั้งถัดไป" ในช่องครั้งที่ไหน
-                // (ย้ายมาจากคอลัมน์ actions แยกต่างหาก มาไว้ในช่องครั้งที่ของมันเองเลย พอเพิ่มสำเร็จแล้ว
-                // ปุ่มจะขยับไปโผล่ที่ช่องครั้งถัดไปเองอัตโนมัติ เพราะคำนวณจากจำนวนครั้งที่ใช้ไปแล้วสดๆ ทุกครั้ง)
-                const nextOpenRound = c.isRealContract
-                  ? countUsedRounds(c.visits.filter((v) => !v.unscheduled)) + 1
-                  : null;
-                const overdueInfo = nextVisitOverdueInfo(c);
-                // ✅ แถบสลับสีใช้สีทึบ (ไม่ใช่สีดำโปร่งแสง 2% แบบเดิม) — บนจอมือถือที่ตัวหนังสือเล็กและ
-                // ต้องเลื่อนแนวนอน แถบสลับสีที่จางเกินไปจะช่วยไล่สายตาตามแถวไม่ได้จริง และตอน hover
-                // ใช้สีแดงจางแทนสีเทากลางของ MUI ให้แถวที่ชี้อยู่เด่นขึ้น
-                return (
-                <TableRow
-                  key={c.key}
-                  sx={{
-                    bgcolor: idx % 2 ? SURFACE_STRIPE : "#fff",
-                    transition: "background-color .12s",
-                    "&:hover": { bgcolor: alpha(ACCENT, 0.04) },
-                  }}
-                >
-                  {showCheckboxes && (
-                    <TableCell padding="checkbox" sx={{ width: colWidth("checkbox") }}>
-                      {isSelectableForMerge(c) && (
-                        <Checkbox
-                          size="small"
-                          checked={selectedIds.has(c.key)}
-                          onChange={() => toggleSelect(c)}
-                          sx={{ p: 0.5, "&.Mui-checked": { color: ACCENT } }}
-                        />
-                      )}
-                    </TableCell>
-                  )}
-                  {/* ✅ เลขที่สัญญา + ใบเสนอราคา ซ้อนกันในช่องเดียว — บรรทัดบนคือเลขที่สัญญา (ตัวหลัก
-                      สีแบรนด์ตัวหนา) บรรทัดล่างคือใบเสนอราคา (ตัวเล็กสีจาง) ทั้งคู่ยังคลิกแก้ไขได้แยกกัน
-                      ตามปกติ เพราะ EditableCell รับ Wrapper={Box} ให้เรนเดอร์โดยไม่สร้าง <td> ของตัวเอง */}
-                  {!hideContractOnlyColumns && (
-                    <TableCell data-col-key="docRef" sx={{ width: colVar("docRef"), maxWidth: colVar("docRef") }}>
-                      <Stack spacing={0.15}>
-                        <EditableCell
-                          Wrapper={Box}
-                          editable={isAdminOrManager && c.isRealContract} columnKey="contractNo"
-                          editing={editingCell?.key === c.key && editingCell?.field === "contractNo"}
-                          value={c.contractNo} editValue={editValue} saving={editSaving}
-                          title={c.contractNo}
-                          formatDisplay={(v) => (v
-                            ? <span style={{ color: ACCENT, fontWeight: 700 }}>{v}</span>
-                            : <span style={{ color: "#cbd5e1" }}>— ไม่มีเลขที่สัญญา —</span>)}
-                          onStartEdit={() => beginEdit(c, "contractNo")}
-                          onChangeValue={setEditValue}
-                          onCommit={() => commitEdit(c)}
-                          onCancel={cancelEdit}
-                        />
-                        <EditableCell
-                          Wrapper={Box}
-                          editable={isAdminOrManager && c.isRealContract} columnKey="quotationNo"
-                          editing={editingCell?.key === c.key && editingCell?.field === "quotationNo"}
-                          value={c.quotationNo} editValue={editValue} saving={editSaving}
-                          title={c.quotationNo}
-                          formatDisplay={(v) => (
-                            <span style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
-                              {v ? `ใบเสนอราคา ${v}` : "ใบเสนอราคา —"}
-                            </span>
-                          )}
-                          onStartEdit={() => beginEdit(c, "quotationNo")}
-                          onChangeValue={setEditValue}
-                          onCommit={() => commitEdit(c)}
-                          onCancel={cancelEdit}
-                        />
-                      </Stack>
-                    </TableCell>
-                  )}
-                  {/* ✅ โผล่แทนกลุ่มเลขที่สัญญา/ใบเสนอราคาด้านบนตอนซ่อนคอลัมน์ระดับสัญญา (ดูหัวตาราง) —
-                      แก้ไขได้เฉพาะแถวที่จัดหมวดหมู่แล้ว (สัญญาจริง/งานทั่วไป/งานโปรเจค) ไม่ใช่แถว
-                      "ยังไม่จัดกลุ่ม" เหมือน "ผู้รับผิดชอบ" ด้านล่าง (ดู canEditField) */}
-                  {hideContractOnlyColumns && (
-                    <EditableCell
-                      editable={canEditBasicField(c, "docNo")} columnKey="docNo"
-                      editing={editingCell?.key === c.key && editingCell?.field === "docNo"}
-                      value={c.docNo} editValue={editValue} saving={editSaving}
-                      width={colVar("docNo")} title={c.docNo}
-                      onStartEdit={() => beginEdit(c, "docNo")}
-                      onChangeValue={setEditValue}
-                      onCommit={() => commitEdit(c)}
-                      onCancel={cancelEdit}
-                    />
-                  )}
-                  {/* ✅ บริษัท + โครงการ ซ้อนในช่องเดียว — บรรทัดบน "โครงการ" (ตัวหลักที่คนจำงานได้)
-                      บรรทัดล่าง "บริษัท" (ตัวเล็กสีจาง) ทั้งคู่คลิกแก้ไขได้แยกกันตามปกติ
-                      ⚠️ สลับลำดับจากเดิม (เดิมบริษัทมาก่อนโครงการ) เพราะจากข้อมูลจริงช่องบริษัทมักว่าง
-                      ทั้งคอลัมน์ ส่วนโครงการมีค่าเสมอ — เอาตัวที่มีข้อมูลจริงขึ้นก่อนจะอ่านง่ายกว่า */}
-                  <TableCell data-col-key="customer" sx={{ width: colVar("customer"), maxWidth: colVar("customer") }}>
-                    <Stack spacing={0.15}>
-                      <EditableCell
-                        Wrapper={Box}
-                        editable={canEditBasicField(c, "site")} columnKey="site"
-                        editing={editingCell?.key === c.key && editingCell?.field === "site"}
-                        value={c.site} editValue={editValue} saving={editSaving}
-                        title={c.site}
-                        formatDisplay={(v) => (v
-                          ? <span style={{ fontWeight: 700, color: "#0f172a" }}>{v}</span>
-                          : <span style={{ color: "#cbd5e1" }}>— ไม่ระบุโครงการ —</span>)}
-                        onStartEdit={() => beginEdit(c, "site")}
-                        onChangeValue={setEditValue}
-                        onCommit={() => commitEdit(c)}
-                        onCancel={cancelEdit}
-                      />
-                      <EditableCell
-                        Wrapper={Box}
-                        editable={canEditBasicField(c, "company")} columnKey="company"
-                        editing={editingCell?.key === c.key && editingCell?.field === "company"}
-                        value={c.company} editValue={editValue} saving={editSaving}
-                        title={c.company}
-                        formatDisplay={(v) => (
-                          <span style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
-                            🏢 {v || "ไม่ระบุบริษัท"}
-                          </span>
-                        )}
-                        onStartEdit={() => beginEdit(c, "company")}
-                        onChangeValue={setEditValue}
-                        onCommit={() => commitEdit(c)}
-                        onCancel={cancelEdit}
-                      />
-                    </Stack>
-                  </TableCell>
-
-                  {/* ✅ ประเภทงาน + ระบบ ซ้อนในช่องเดียว — ทั้งคู่ตอบคำถามเดียวกันว่า "งานนี้คืองานอะไร" */}
-                  <TableCell data-col-key="work" sx={{ width: colVar("work"), maxWidth: colVar("work") }}>
-                    <Stack spacing={0.15}>
-                      <EditableCell
-                        Wrapper={Box}
-                        editable={canEditBasicField(c, "title")} columnKey="title" editType="autocomplete" editOptions={titleOptions}
-                        editing={editingCell?.key === c.key && editingCell?.field === "title"}
-                        value={c.title} editValue={editValue} saving={editSaving}
-                        title={c.title}
-                        formatDisplay={(v) => (v
-                          ? <span style={{ fontWeight: 600, color: "#0f172a" }}>{v}</span>
-                          : <Dash />)}
-                        onStartEdit={() => beginEdit(c, "title")}
-                        onChangeValue={setEditValue}
-                        onCommit={() => commitEdit(c)}
-                        onCancel={cancelEdit}
-                      />
-                      <EditableCell
-                        Wrapper={Box}
-                        editable={canEditBasicField(c, "system")} columnKey="system" editType="autocomplete" editOptions={systemOptions}
-                        editing={editingCell?.key === c.key && editingCell?.field === "system"}
-                        value={c.system} editValue={editValue} saving={editSaving}
-                        title={c.system}
-                        formatDisplay={(v) => (
-                          <span style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
-                            💻 {v || "ไม่ระบุระบบ"}
-                          </span>
-                        )}
-                        onStartEdit={() => beginEdit(c, "system")}
-                        onChangeValue={setEditValue}
-                        onCommit={() => commitEdit(c)}
-                        onCancel={cancelEdit}
-                      />
-                    </Stack>
-                  </TableCell>
-
-                  {/* ✅ เริ่มต้น + สิ้นสุด + รอบเข้า ซ้อนในช่องเดียว "ระยะเวลาสัญญา" — เดิมแยก 3 คอลัมน์
-                      แคบจนวันที่โดนตัดเหลือ "01/..." อ่านไม่ออกทั้งที่เป็นข้อมูลหลักของสัญญา
-                      🐛 BUG ที่แก้ (คลิกแก้วันที่สัญญายาก): เดิมวางวันเริ่ม–วันสิ้นสุดไว้ "บรรทัดเดียวกัน"
-                      คั่นด้วยขีด ทั้งคู่จึงได้ความกว้างแค่ครึ่งช่อง (~85px) ผลคือ 3 อย่างพร้อมกัน —
-                        1) ตัวเลขปีโดนตัดเป็น "01/01/2..." อ่านไม่ออกว่าปีอะไร
-                        2) พื้นที่ให้คลิกเล็กมากและอยู่ชิดขอบคอลัมน์ (ที่มีตัวปรับความกว้างคอลัมน์คร่อมอยู่)
-                           กดพลาดไปโดนตัวปรับความกว้างแทนบ่อย
-                        3) พอคลิกติดแล้ว ช่องเลือกวันที่ (input type=date) ถูกบีบให้แคบกว่าตัวมันเองต้องการ
-                           ปุ่มปฏิทินเลยหลุดออกนอกช่อง กดเลือกวันไม่ได้จริง
-                      ✅ แยกเป็นคนละบรรทัด ติดป้าย "เริ่ม"/"ถึง" ไว้หน้าแต่ละอัน — แต่ละวันได้ความกว้าง
-                      เต็มช่อง อ่านครบ คลิกได้ทั้งแถบ และตอนแก้ไขช่องวันที่ก็กว้างพอให้กดปฏิทินได้จริง */}
-                  {!hideContractOnlyColumns && (
-                    <TableCell data-col-key="period" sx={{ width: colVar("period"), maxWidth: colVar("period") }}>
-                      <Stack spacing={0.15}>
-                        {[
-                          { field: "contractStart", label: "เริ่ม", value: c.contractStart, tip: "วันเริ่มสัญญา — คลิกเพื่อแก้ไข", start: true },
-                          { field: "contractEnd", label: "ถึง", value: c.contractEnd, tip: "วันสิ้นสุดสัญญา — คลิกเพื่อแก้ไข", start: false },
-                        // alignItems="stretch" — ให้แถบคลิกสูงเต็มบรรทัด (ไม่ใช่สูงเท่าตัวหนังสือ)
-                        // พื้นที่กดจึงเป็นสี่เหลี่ยมเต็มๆ ไม่ใช่เส้นบางๆ ที่ต้องเล็งให้ตรงตัวเลข
-                        ].map((d) => (
-                          <Stack key={d.field} direction="row" alignItems="stretch" spacing={0.6} sx={{ minHeight: 21 }}>
-                            {/* ✅ จุดกลมเล็กๆ หน้าบรรทัด — จุดทึบ = จุดเริ่ม, จุดกลวง = จุดจบ อ่านเป็น
-                                "ไทม์ไลน์" ได้ทันทีโดยไม่ต้องอ่านตัวหนังสือ (ป้าย "เริ่ม/ถึง" ยังอยู่ครบ
-                                สำหรับคนที่อยากอ่านให้แน่ใจ) — แทนที่จะเป็นตัวหนังสือเทาลอยๆ 2 บรรทัด */}
-                            <Box sx={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
-                              <Box
-                                sx={{
-                                  width: 6, height: 6, borderRadius: "50%",
-                                  bgcolor: d.start ? alpha(ACCENT, 0.75) : "transparent",
-                                  border: d.start ? "none" : `1.5px solid ${alpha(ACCENT, 0.5)}`,
-                                }}
-                              />
-                            </Box>
-                            <Box
-                              component="span"
-                              sx={{ width: 22, flexShrink: 0, fontSize: "0.63rem", color: "text.disabled", display: "flex", alignItems: "center", letterSpacing: "0.01em" }}
-                            >
-                              {d.label}
-                            </Box>
-                            {/* กล่องนี้ทำให้ EditableCell ยืดเต็มพื้นที่ที่เหลือ = แถบคลิกกว้างเต็มช่อง
-                                (ไม่ใช่กว้างเท่าตัวหนังสือเหมือนเดิม ซึ่งเป็นเป้าที่เล็กเกินไปสำหรับนิ้ว) */}
-                            <Box sx={{ flex: 1, minWidth: 0, display: "flex", "& > *": { flex: 1, display: "flex", alignItems: "center" } }}>
-                              <EditableCell
-                                Wrapper={Box} width="100%"
-                                editable={isAdminOrManager && c.isRealContract} columnKey={d.field}
-                                editing={editingCell?.key === c.key && editingCell?.field === d.field}
-                                value={d.value} editValue={editValue} editType="date" saving={editSaving}
-                                title={isAdminOrManager && c.isRealContract ? d.tip : undefined}
-                                // ✅ tabular-nums = ตัวเลขทุกตัวกว้างเท่ากัน วันเริ่ม/วันจบจึงเรียงตรงกัน
-                                // เป๊ะทุกหลัก (11/08 กับ 14/08 ไม่เหลื่อมกันเหมือนฟอนต์ปกติ) — รายละเอียด
-                                // เล็กๆ ที่ทำให้ตารางตัวเลขดูเป็นระเบียบขึ้นมาก
-                                formatDisplay={(v) => (v
-                                  ? (
-                                    <Box component="span" sx={{ fontWeight: 600, fontSize: "0.8rem", fontVariantNumeric: "tabular-nums", letterSpacing: "-0.01em" }}>
-                                      {moment(v).format("DD/MM/YYYY")}
-                                    </Box>
-                                  )
-                                  : isAdminOrManager && c.isRealContract
-                                  // ✅ ช่องว่างที่กดได้ควรบอกว่า "กดแล้วได้อะไร" — เดิมเป็นขีด "–" เฉยๆ
-                                  // ดูเหมือนข้อมูลหายมากกว่าจะเป็นที่ให้กรอก
-                                  ? <Box component="span" sx={{ fontSize: "0.72rem", color: "text.disabled", fontStyle: "italic" }}>ระบุวันที่</Box>
-                                  : <Dash />)}
-                                onStartEdit={() => beginEdit(c, d.field)}
-                                onChangeValue={setEditValue}
-                                onCommit={() => commitEdit(c)}
-                                onCancel={cancelEdit}
-                              />
-                            </Box>
-                          </Stack>
-                        ))}
-                        <EditableCell
-                          Wrapper={Box}
-                          editable={isAdminOrManager && c.isRealContract} columnKey="intervalMonths"
-                          editing={editingCell?.key === c.key && editingCell?.field === "intervalMonths"}
-                          value={c.intervalMonths} editValue={editValue} editType="number" saving={editSaving}
-                          title={c.intervalMonths ? undefined : "ยังไม่ได้ระบุ — ระบบใช้ค่าเริ่มต้น 3 เดือนในการเตือนรอบถัดไป"}
-                          // ✅ รอบเข้าเป็นป้ายเล็กๆ มีพื้นหลังอ่อน + ไอคอนจริง แทนอีโมจิ 🔁 ที่เรนเดอร์
-                          // ต่างกันไปในแต่ละเครื่อง (บนวินโดวส์ขึ้นเป็นกล่องสี่เหลี่ยมสีน้ำเงินทึบๆ ดูแปลกปลอม
-                          // ไม่เข้ากับอะไรเลย) — ป้ายนี้แยกตัวเองออกจาก "วันที่" ด้านบนชัดเจนโดยไม่ต้องมีเส้นคั่น
-                          formatDisplay={(v) => (
-                            <Box
-                              component="span"
-                              sx={{
-                                display: "inline-flex", alignItems: "center", gap: 0.4, mt: 0.15,
-                                px: 0.6, py: 0.1, borderRadius: 1,
-                                bgcolor: alpha("#0f172a", v ? 0.05 : 0.03),
-                                color: v ? "text.secondary" : "text.disabled",
-                                fontSize: "0.67rem", fontWeight: v ? 600 : 400, whiteSpace: "nowrap",
-                              }}
-                            >
-                              <Autorenew sx={{ fontSize: 12 }} />
-                              {v ? `ทุก ${v} เดือน` : "ยังไม่ระบุรอบเข้า"}
-                            </Box>
-                          )}
-                          onStartEdit={() => beginEdit(c, "intervalMonths")}
-                          onChangeValue={setEditValue}
-                          onCommit={() => commitEdit(c)}
-                          onCancel={cancelEdit}
-                        />
-                      </Stack>
-                    </TableCell>
-                  )}
-                  {/* ✅ มูลค่างาน — อยู่นอกบล็อก hideContractOnlyColumns แล้ว จึงแสดงทุกแท็บ (ลำดับ
-                      คอลัมน์ในแท็บสัญญายังเหมือนเดิมเป๊ะ เพราะวางไว้ตำแหน่งเดิมระหว่างจำนวนครั้งกับ
-                      สถานะสัญญา) — แก้ไขได้ทุกแถวสำหรับแอดมิน/manager ไม่จำกัดเฉพาะสัญญาจริงอีกต่อไป */}
-                  <EditableCell
-                    editable={isAdminOrManager && canEditField(c, "jobValue")} columnKey="jobValue"
-                    editing={editingCell?.key === c.key && editingCell?.field === "jobValue"}
-                    value={c.jobValue} editValue={editValue} editType="number" saving={editSaving}
-                    width={colVar("jobValue")} align="right"
-                    formatDisplay={(v) => (hasMoney(v) ? formatBaht(v) : <Dash />)}
-                    onStartEdit={() => beginEdit(c, "jobValue")}
-                    onChangeValue={setEditValue}
-                    onCommit={() => commitEdit(c)}
-                    onCancel={cancelEdit}
-                  />
-                  {!hideContractOnlyColumns && (
-                  <TableCell data-col-key="status" align="center" sx={{ width: colVar("status") }}>
-                    {(() => {
-                      const st = contractStatusInfo(c);
-                      return st ? (
-                        <Chip
-                          label={st.label} size="small"
-                          sx={{ height: 20, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha(st.color, 0.12), color: st.color }}
-                        />
-                      ) : <Dash />;
-                    })()}
-                  </TableCell>
-                  )}
-                  {/* ✅ ยุบคอลัมน์ "จำนวนครั้งทั้งหมด" มารวมกับ "คืบหน้า" — ป้ายคืบหน้าเขียน "เสร็จ/ทั้งหมด"
-                      อยู่แล้ว (ดู progressInfo) ตัวเลขทั้งหมดจึงซ้ำกันทั้งคอลัมน์ ไม่ต้องแยกช่องอีก
-                      สิ่งที่เคยมีเฉพาะช่องนั้นและต้องยกมาด้วยคือจุดแดงเตือน "เลยกำหนดรอบถัดไป" — ย้ายมา
-                      อยู่ข้างป้ายคืบหน้าตรงนี้แทน ความหมายยังคู่กันพอดี (คืบหน้าไปถึงไหน / ค้างรอบไหนอยู่) */}
-                  <TableCell data-col-key="progress" align="center" sx={{ width: colVar("progress") }}>
-                    {(() => {
-                      // ✅ ใช้ progressInfo (ฟังก์ชันกลาง) ตัวเดียวกับที่ไฟล์ Excel ที่ส่งออกใช้ กันตัวเลข
-                      // บนจอกับในไฟล์ไม่ตรงกัน — ดูรายละเอียดตรรกะที่นิยามของ progressInfo ด้านบน
-                      const info = progressInfo(c, countUsedRounds);
-                      return (
-                        <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
-                          <Chip
-                            label={info.label} size="small"
-                            sx={{ height: 20, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha(info.color, 0.12), color: info.color }}
-                          />
-                          {overdueInfo && (
-                            <Tooltip title={`รอบล่าสุด ${overdueInfo.lastVisitDate.format("DD/MM/YYYY")} — ต้องเข้ารอบถัดไปภายใน ${overdueInfo.intervalMonths} เดือน เกินกำหนดแล้ว ${overdueInfo.monthsOverdue} เดือน ยังไม่ได้ลงแผนงานครั้งถัดไป`}>
-                              <Box
-                                component="span"
-                                sx={{
-                                  display: "inline-flex", alignItems: "center", justifyContent: "center",
-                                  width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
-                                  bgcolor: "#dc2626", color: "#fff",
-                                  animation: "contractOverviewPulse 1.6s ease-in-out infinite",
-                                  "@keyframes contractOverviewPulse": {
-                                    "0%, 100%": { boxShadow: `0 0 0 0 ${alpha("#dc2626", 0.5)}` },
-                                    "50%": { boxShadow: `0 0 0 4px ${alpha("#dc2626", 0)}` },
-                                  },
-                                }}
-                              >
-                                <WarningAmber sx={{ fontSize: 12 }} />
-                              </Box>
-                            </Tooltip>
-                          )}
-                        </Stack>
-                      );
-                    })()}
-                  </TableCell>
-                  {visitColumns.map((n) => {
-                    // ✅ แถวที่ไม่ใช่สัญญาจริง (งานทั่วไป/ยังไม่จัดกลุ่ม) ไม่มี visitCount ให้เทียบ (ดู
-                    // groupEventsByContract) ใช้ rowMaxRound (คำนวณจาก field time จริงของแต่ละ document
-                    // แทน — งานที่เคยเลือก "ครั้งที่ 2" ไว้ตอนเพิ่มงานจะไปโผล่ที่คอลัมน์ "ครั้งที่ 2" จริงๆ
-                    // ไม่ใช่ถูกบังคับไปช่อง 1 เสมอเหมือนเดิม)
-                    const withinCount = n <= rowMaxRound(c);
-                    if (!withinCount) {
-                      return <TableCell key={n} data-col-key={`visit_${n}`} align="center" sx={{ width: colVar(`visit_${n}`), bgcolor: "action.hover" }} />;
-                    }
-                    // ✅ นับว่า "ถึงรอบแล้ว" เฉพาะครั้งที่ลงตารางจริงเท่านั้น (!unscheduled) — ถ้าเป็นแค่
-                    // แผนงานล่วงหน้าที่จองครั้งนี้ไว้ (ยังไม่มีวันที่จริง) ให้ยังถือว่า "ว่าง" อยู่ในตาราง
-                    // สัญญานี้ แต่โชว์ป้ายบอกว่ากำลังรอวางแผนอยู่ แทนที่จะเป็นขีดว่างเฉยๆ กันสับสนว่ายังไม่ได้จอง
-                    // ✅ ครั้งที่เข้างานไม่ต่อเนื่อง (เว้นช่วงแล้วกลับมาเข้าอีก) จะมีมากกว่า 1 document ต่อ
-                    // ครั้ง — ใช้ filter หาทุกอันแทน find อันเดียว โชว์ซ้อนกันเป็นแถวในเซลล์เดียว
-                    // ✅ เรียงตามวันที่เข้างานจริง (เก่า→ใหม่) เสมอ — เดิมโชว์ตามลำดับที่ document ถูกสร้าง
-                    // (เช่น ต่อวันที่ย้อนหลังทีหลัง) ทำให้วันที่ในเซลล์เดียวกันโผล่สลับก่อนหลังไม่ตรงความจริง
-                    // ดูเหมือนข้อมูลมั่ว/ไม่ได้จัดกลุ่มให้ ทั้งที่จริงเป็นงานเดียวกัน (jobGroupId เดียวกัน) แค่โชว์ผิดลำดับ
-                    // ✅ "Number(v.time) || 1" — งานที่ไม่เคยเลือก "ครั้งที่" เลย (time ว่าง) ให้ตกไปอยู่
-                    // ช่อง "ครั้งที่ 1" เป็นค่าเริ่มต้น แทนที่จะหายไปเลยไม่โชว์ที่ไหนสักช่อง
-                    const roundVisits = roundVisitsOf(c, n);
-                    const pendingDraft = roundVisits.length === 0 && c.visits.find((v) => v.unscheduled && (Number(v.time) || 1) === n);
-                    // ✅ ครั้งเดียวมีได้หลายวันที่ — โชว์แค่ 3 วันแรกก่อน ที่เหลือพับไว้ กันแถวสูงผิดปกติ
-                    // (ดู VISIT_CELL_PREVIEW) เมื่อกางแล้วปุ่มจะเปลี่ยนเป็น "ย่อ" กลับได้เสมอ
-                    const visitCellKey = `${c.key}|${n}`;
-                    const visitCellExpanded = expandedVisitCells.has(visitCellKey);
-                    const shownVisits = visitCellExpanded ? roundVisits : roundVisits.slice(0, VISIT_CELL_PREVIEW);
-                    const hiddenVisitCount = roundVisits.length - shownVisits.length;
-                    return (
-                      <TableCell key={n} data-col-key={`visit_${n}`} align="center" sx={{ width: colVar(`visit_${n}`), overflow: "hidden" }}>
-                        {roundVisits.length > 0 ? (
-                          <Stack spacing={0.25} alignItems="center">
-                            {shownVisits.map((visit) => (
-                              <Box key={visit._id} sx={{ textAlign: "center" }}>
-                                <Link
-                                  to={`/operation/${visit._id}${resolveOperationGroup(visit) ? `?group=${resolveOperationGroup(visit)}` : ""}`}
-                                  style={{ color: STATUS_COLOR[visit.status] || ACCENT, fontWeight: 600, textDecoration: "none", fontSize: "0.78rem", whiteSpace: "nowrap" }}
-                                >
-                                  {formatEventDateRange(visit)}
-                                </Link>
-                                {/* ✅ ทีมที่เข้างานของ "ครั้งนี้" โดยเฉพาะ — อิงจาก visit.team ของ
-                                    document นี้ตรงๆ (ข้อมูลเดิมที่มีอยู่แล้ว ไม่ใช่ค่ารวมระดับสัญญา)
-                                    เพราะแต่ละครั้งอาจเข้าโดยคนละทีมกัน แก้ไขแยกทีละครั้งได้เลยที่นี่
-                                    (ไม่ sync กับทีมครั้งอื่น/ผู้รับผิดชอบสัญญา — ดู commitRoundTeamEdit) */}
-                                {roundTeamEdit?.visitId === visit._id ? (
-                                  <TextField
-                                    select autoFocus size="small" variant="standard" value={roundTeamEdit.value}
-                                    disabled={roundTeamSaving}
-                                    onChange={(e) => commitRoundTeamEdit(visit, e.target.value)}
-                                    onBlur={() => commitRoundTeamEdit(visit)}
-                                    onKeyDown={(e) => { if (e.key === "Escape") cancelRoundTeamEdit(); }}
-                                    SelectProps={{ native: true }}
-                                    sx={{ mt: 0.25, width: "100%", "& .MuiInputBase-input": { fontSize: "0.68rem", py: 0.2, textAlign: "center" } }}
-                                  >
-                                    <option value="">— ไม่ระบุ —</option>
-                                    {teamOptions.map((o) => <option key={o} value={o}>{o}</option>)}
-                                  </TextField>
-                                ) : (
-                                  <Typography
-                                    variant="caption"
-                                    onClick={() => beginRoundTeamEdit(visit, c)}
-                                    title={canEditRoundTeam(c) ? "คลิกเพื่อแก้ไขทีมของครั้งนี้" : (visit.team || "")}
-                                    sx={{
-                                      display: "block", fontSize: "0.65rem", lineHeight: 1.3, whiteSpace: "nowrap",
-                                      color: visit.team ? "text.secondary" : "text.disabled",
-                                      cursor: canEditRoundTeam(c) ? "pointer" : "default",
-                                      "&:hover": canEditRoundTeam(c) ? { color: ACCENT, textDecoration: "underline" } : {},
-                                    }}
-                                  >
-                                    👷 {visit.team || (canEditRoundTeam(c) ? "ระบุทีม" : "-")}
-                                  </Typography>
-                                )}
-                              </Box>
-                            ))}
-                            {/* ✅ ปุ่มกาง/ย่อรายการวันที่ที่เหลือของครั้งนี้ — บอกจำนวนที่ซ่อนอยู่ให้ชัด
-                                จะได้รู้ว่ายังมีข้อมูลอีก ไม่ใช่ตัดทิ้งเงียบๆ */}
-                            {(hiddenVisitCount > 0 || visitCellExpanded) && (
-                              <Box
-                                component="button" type="button"
-                                onClick={() => toggleVisitCell(visitCellKey)}
-                                sx={{
-                                  border: "none", bgcolor: "transparent", cursor: "pointer", p: 0,
-                                  fontSize: "0.65rem", fontWeight: 700, fontFamily: "inherit",
-                                  color: TEXT_SUB, whiteSpace: "nowrap",
-                                  "&:hover": { color: ACCENT, textDecoration: "underline" },
-                                }}
-                              >
-                                {visitCellExpanded ? "ย่อ" : `+ อีก ${hiddenVisitCount} วัน`}
-                              </Box>
-                            )}
-                            {/* ✅ วางบิล "ทีเดียวต่อครั้ง" ไม่ใช่ต่อ document — งานเดียวกันที่เข้าหลายช่วง
-                                ไม่ต่อเนื่อง (เช่น 21 ส.ค. แล้วเว้นไป 31 ส.ค.–4 ก.ย.) ยังเป็นครั้งเดียวกัน
-                                จึงมีใบวางบิลใบเดียว ป้ายนี้จึงอยู่ท้ายรายการวันที่ 1 อัน ไม่ใช่ใต้ทุกวันที่ */}
-                            {/* ✅ วางบิล + เอกสารของครั้งนี้อยู่บรรทัดเดียวกัน — ทั้งคู่คือ "สถานะของครั้งนี้"
-                                เหมือนกัน และรวมบรรทัดช่วยไม่ให้แถวสูงขึ้นอีกชั้น (1 แถวมีได้ 12 ช่อง) */}
-                            <Stack direction="row" alignItems="center" justifyContent="center" gap={0.5} sx={{ flexWrap: "wrap" }}>
-                              <BillingChip
-                                roundVisits={roundVisits}
-                                canManage={isAdminOrManager}
-                                onOpen={handleOpenBilling}
-                              />
-                              <JobDocsChip
-                                roundVisits={roundVisits}
-                                rowKey={c.key}
-                                round={n}
-                                title={docsTitleFor(c, n)}
-                                onOpen={handleOpenDocs}
-                              />
-                            </Stack>
-                            {/* ✅ แถวปุ่มจัดการครั้งนี้ (เพิ่มวันต่อเนื่อง / ย้ายครั้งที่ / แยกออกจากสัญญา)
-                                ⚠️ ไม่แสดงบนตารางจอมือถือ — ช่อง "ครั้งที่ N" กว้างแค่ 94px แต่ต้องใส่
-                                วันที่ + ชื่อทีม + ปุ่มอีก 3 ตัวซ้อนลงไป ทำให้เซลล์แน่นจนอ่านวันที่ไม่รู้เรื่อง
-                                และตัวปุ่มเองเล็กแค่ 14px กดด้วยนิ้วแทบไม่โดนอยู่ดี — ทั้ง 3 อย่างยังทำได้ครบ
-                                จากมุมมองการ์ดบนมือถือ และจากตารางบนจอคอม */}
-                            {isAdminOrManager && c.isRealContract && !useMobileTable && (
-                              <Stack direction="row" spacing={0.25}>
-                                <Tooltip title="เพิ่มวันที่ต่อเนื่อง (เข้างานไม่ติดกัน)">
-                                  <IconButton
-                                    size="small" onClick={() => openExtendVisitDialog(c, n)}
-                                    sx={{ p: 0.25, color: "text.disabled", transition: "background-color .15s, color .15s", "&:hover": { color: ACCENT, bgcolor: alpha(ACCENT, 0.1) } }}
-                                  >
-                                    <Add sx={{ fontSize: 14 }} />
-                                  </IconButton>
-                                </Tooltip>
-                                {/* ✅ ย้ายครั้งนี้ไปเป็นครั้งที่อื่นได้อิสระ (ยกทั้งวันที่/สถานะ/ทีม/
-                                    ประวัติงาน) — ปลายทางที่มีข้อมูลอยู่แล้วจะสลับที่กัน ไม่เขียนทับ */}
-                                <Tooltip title="ย้ายครั้งนี้ไปเป็นครั้งที่อื่น">
-                                  <IconButton
-                                    size="small" onClick={() => openMoveRoundDialog(c, n)}
-                                    sx={{ p: 0.25, color: "text.disabled", transition: "background-color .15s, color .15s", "&:hover": { color: ACCENT, bgcolor: alpha(ACCENT, 0.1) } }}
-                                  >
-                                    <SwapHoriz sx={{ fontSize: 14 }} />
-                                  </IconButton>
-                                </Tooltip>
-                                <Tooltip title="แยกครั้งนี้ออกจากสัญญา (ย้ายเป็นงานเก่าที่ยังไม่จัดกลุ่ม)">
-                                  <IconButton
-                                    size="small" onClick={() => handleDetachRound(c, n)}
-                                    sx={{ p: 0.25, color: "text.disabled", transition: "background-color .15s, color .15s", "&:hover": { color: ACCENT, bgcolor: alpha(ACCENT, 0.1) } }}
-                                  >
-                                    <LinkOff sx={{ fontSize: 14 }} />
-                                  </IconButton>
-                                </Tooltip>
-                              </Stack>
-                            )}
-                          </Stack>
-                        ) : pendingDraft ? (
-                          // ✅ กดได้เลย — สัญญาเปิดกล่อง "เพิ่มครั้งที่ 1" ในหน้านี้เลย ส่วนงานทั่วไป/
-                          // โปรเจคพาไปหน้าปฏิทิน เจาะจงการ์ดนั้นในแผงงานล่วงหน้า (ดู pendingDraftChip
-                          // ซึ่งอธิบายเหตุผลที่ต้องแยกปลายทางกันไว้ละเอียดแล้ว) เห็นชัดว่ากดได้จาก
-                          // พื้นหลังชิป + ขีดเส้นใต้ตอน hover เหมือนลิงก์อื่นในตารางนี้
-                          (() => {
-                            const chip = pendingDraftChip(c, pendingDraft);
-                            return (
-                              <Tooltip title={chip.tip}>
-                                <Box
-                                  {...chip.props}
-                                  sx={{
-                                    fontSize: "0.72rem", color: "#b45309", fontWeight: 600, whiteSpace: "nowrap",
-                                    textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 0.4,
-                                    px: 0.75, py: 0.25, borderRadius: 1.5, bgcolor: alpha("#f59e0b", 0.1),
-                                    border: "1px solid", borderColor: alpha("#f59e0b", 0.3),
-                                    transition: "background-color 0.15s ease, border-color 0.15s ease",
-                                    "&:hover": { bgcolor: alpha("#f59e0b", 0.2), borderColor: "#b45309", textDecoration: "underline" },
-                                    ...(chip.props.sx || {}),
-                                  }}
-                                >
-                                  {chip.label}
-                                </Box>
-                              </Tooltip>
-                            );
-                          })()
-                        ) : isAdminOrManager && c.isRealContract && n === nextOpenRound ? (
-                          // ✅ ปุ่ม "+ เพิ่มครั้งถัดไป" ย้ายมาอยู่ในช่องของครั้งที่มันเองเลย (เดิมอยู่ในคอลัมน์
-                          // actions แยกต่างหาก มองไม่ออกว่ากดแล้วจะไปเพิ่มครั้งที่เท่าไหร่) พอเพิ่มสำเร็จแล้ว
-                          // nextOpenRound จะขยับไปครั้งถัดไปเอง ปุ่มก็เลยย้ายไปโผล่ที่ช่องนั้นแทนอัตโนมัติ —
-                          // ถ้าเลยกำหนด 3 เดือนแล้วด้วย (overdueInfo) ให้พื้นหลังปุ่มทึบแดงเห็นชัดแม้เป็น
-                          // ภาพนิ่ง (ของเดิมแค่เปลี่ยนสีไอคอน ซึ่งเป็นสีแดงเดียวกับปุ่มปกติอยู่แล้ว มองไม่ออก
-                          // ว่าต่างกันตรงไหน) + จุดแจ้งเตือนมุมขวาบนกะพริบเบาๆ เสริมอีกชั้น
-                          <Tooltip title={overdueInfo ? `เกินกำหนดแล้ว ${overdueInfo.monthsOverdue} เดือน — กดเพื่อเพิ่มครั้งที่ ${n}` : `เพิ่มครั้งที่ ${n}`}>
-                            <Badge
-                              color="error" variant="dot" invisible={!overdueInfo}
-                              sx={{
-                                "& .MuiBadge-dot": {
-                                  animation: "contractOverviewPulse 1.4s ease-in-out infinite",
-                                  "@keyframes contractOverviewPulse": {
-                                    "0%, 100%": { transform: "scale(1)", opacity: 1 },
-                                    "50%": { transform: "scale(1.5)", opacity: 0.6 },
-                                  },
-                                },
-                              }}
-                            >
-                              <IconButton
-                                size="small" onClick={() => openAddVisitDialog(c)}
-                                sx={overdueInfo ? {
-                                  color: "#fff", bgcolor: "#dc2626",
-                                  "&:hover": { bgcolor: "#b91c1c" },
-                                } : { color: ACCENT }}
-                              >
-                                <PlaylistAdd fontSize="small" />
-                              </IconButton>
-                            </Badge>
-                          </Tooltip>
-                        ) : (
-                          <Dash />
-                        )}
-                      </TableCell>
-                    );
-                  })}
-                  {/* ✅ คอลัมน์ "ทีมที่เข้างาน" ระดับสัญญาถูกตัดออก (ทีมของแต่ละครั้งแก้ไขได้ในช่อง
-                      "ครั้งที่ N" ด้านบนแล้ว) — "ผู้รับผิดชอบ" ด้านล่างเป็นฟิลด์อิสระ แก้ไข inline
-                      ได้ตามปกติ ไม่ผูก/ไม่ sync กับทีมที่เข้างานเลย (ดูคอมเมนต์ที่หัวตาราง) */}
-                  <EditableCell
-                    editable={isAdminOrManager && canEditField(c, "responsiblePerson")} columnKey="responsiblePerson"
-                    editing={editingCell?.key === c.key && editingCell?.field === "responsiblePerson"}
-                    value={c.responsiblePerson} editValue={editValue} editType="select" editOptions={teamOptions} saving={editSaving}
-                    width={colVar("responsiblePerson")}
-                    title={c.responsiblePerson || "ยังไม่ได้มอบหมายผู้รับผิดชอบ"}
-                    formatDisplay={unassignedResponsibleDisplay}
-                    onStartEdit={() => beginEdit(c, "responsiblePerson")}
-                    onChangeValue={setEditValue}
-                    onCommit={() => commitEdit(c)}
-                    onCancel={cancelEdit}
-                  />
-                  <TableCell align="center" sx={{ width: colWidth("actions") }}>
-                    {/* ✅ เพิ่ม hover เป็นพื้นวงกลมสี (ไม่ใช่แค่เปลี่ยนสีตัวไอคอนเฉยๆ) ให้รู้สึกเหมือนปุ่มกด
-                        ได้จริงชัดเจนขึ้น เทียบ pattern ปุ่มไอคอนวงกลมมาตรฐาน Material Design
-                        ✅ ช่างดูอย่างเดียว — คอลัมน์นี้มีแต่ปุ่มแก้ไขข้อมูลล้วนๆ ซ่อนทั้งหมดไว้ในนี้ทีเดียว
-                        แทนที่จะกันทีละปุ่ม (เหลือ TableCell ว่างไว้เฉยๆ กันตัวเลขความกว้างคอลัมน์เพี้ยน) */}
-                    {isAdminOrManager && (
-                      <>
-                        {!c.isRealContract && (
-                          <Tooltip title="จัดหมวดหมู่งาน (ทั่วไป/โปรเจค)">
-                            <IconButton
-                              size="small" onClick={(e) => openClassifyMenu(e, c)}
-                              sx={{
-                                color: c.isConfirmedGeneral ? "#10b981" : c.isConfirmedProject ? "#3b82f6" : "text.disabled",
-                                transition: "background-color .15s, color .15s",
-                                "&:hover": {
-                                  color: c.isConfirmedProject ? "#3b82f6" : "#10b981",
-                                  bgcolor: alpha(c.isConfirmedProject ? "#3b82f6" : "#10b981", 0.1),
-                                },
-                              }}
-                            >
-                              {c.isConfirmedGeneral ? <Build fontSize="small" /> : c.isConfirmedProject ? <Engineering fontSize="small" /> : <HourglassEmpty fontSize="small" />}
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                        {!c.isRealContract && (
-                          <Tooltip title="ย้ายเข้างานสัญญา / งานรายปี">
-                            <IconButton
-                              size="small" onClick={() => openAttachDialog(c)}
-                              sx={{ color: "text.disabled", transition: "background-color .15s, color .15s", "&:hover": { color: ACCENT, bgcolor: alpha(ACCENT, 0.1) } }}
-                            >
-                              <AddLink fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                        {/* ✅ ประวัติการแก้ไข — เฉพาะสัญญาจริง เพราะข้อมูลสัญญา (มูลค่า/วันที่/เลขที่)
-                            แก้ได้จากตารางนี้โดยตรงและมีผลกับทุกครั้งในสัญญาพร้อมกัน จึงต้องตามกลับได้
-                            ⚠️ จางลงเมื่อยังไม่เคยมีการแก้ไข — บอกได้ทันทีว่ากดไปก็ไม่มีอะไร */}
-                        {c.isRealContract && (
-                          <Tooltip title={contractEditHistory(c).length > 0
-                            ? `ประวัติการแก้ไขข้อมูลสัญญา (${contractEditHistory(c).length} ครั้ง)`
-                            : "ยังไม่เคยมีการแก้ไขข้อมูลสัญญานี้"}>
-                            <span>
-                              <IconButton
-                                size="small" onClick={() => setHistoryContract(c)}
-                                disabled={contractEditHistory(c).length === 0}
-                                sx={{ color: "text.disabled", transition: "background-color .15s, color .15s", "&:hover": { color: ACCENT, bgcolor: alpha(ACCENT, 0.1) } }}
-                              >
-                                <History fontSize="small" />
-                              </IconButton>
-                            </span>
-                          </Tooltip>
-                        )}
-                        <Tooltip title={c.isRealContract ? "ลบสัญญานี้ทั้งหมด" : "ลบงานนี้"}>
-                          <IconButton
-                            size="small" onClick={() => handleDeleteContract(c)}
-                            sx={{ color: "text.disabled", transition: "background-color .15s, color .15s", "&:hover": { color: ACCENT, bgcolor: alpha(ACCENT, 0.1) } }}
-                          >
-                            <DeleteOutline fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </>
-                    )}
-                  </TableCell>
-                </TableRow>
-                );
-              })}
+              {tableRows}
 
               {/* ✅ แถวสุดท้ายของตาราง = ทางลัดสร้างสัญญาใหม่ "ในตาราง" (ดูคอมเมนต์ที่ openInlineAdd)
                   ปิดอยู่ = แถวปุ่ม + บางๆ เต็มความกว้าง / เปิดอยู่ = แถวร่างที่กรอกได้ตรงคอลัมน์จริง
@@ -4652,6 +4781,20 @@ export default function ContractOverview() {
                   sx={{ fontWeight: 800, fontSize: "1rem", color: ACCENT, whiteSpace: "nowrap" }}
                 >
                   {formatBaht(jobValueSummary.total)}
+                </TableCell>
+                {/* ✅ ยอดรวมค่าคอมตกลงมาใต้คอลัมน์ค่าคอมพอดี อ่านคู่กับยอดมูลค่างานได้ทันที
+                    ⚠️ % รวมคิดจาก "ผลรวมคอม ÷ ผลรวมมูลค่างาน" ไม่ใช่เฉลี่ยของ % รายแถว */}
+                <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                  <Stack spacing={0} alignItems="flex-end">
+                    <Box component="span" sx={{ fontWeight: 800, fontSize: "1rem", color: "#7c3aed" }}>
+                      {formatBaht(commissionSummary.total)}
+                    </Box>
+                    {commissionSummary.total > 0 && jobValueSummary.total > 0 && (
+                      <Box component="span" sx={{ fontSize: "0.68rem", color: TEXT_SUB, fontWeight: 600 }}>
+                        {((commissionSummary.total / jobValueSummary.total) * 100).toFixed(2)}% ของมูลค่างาน
+                      </Box>
+                    )}
+                  </Stack>
                 </TableCell>
                 <TableCell colSpan={footerColSpan.after} />
               </TableRow>

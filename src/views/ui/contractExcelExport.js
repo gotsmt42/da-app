@@ -90,6 +90,10 @@ export async function exportContractsToExcel({
     { key: "perYear", header: "เข้าปีละ (ครั้ง)", width: 14, group: "ระยะเวลา", align: "center" },
     { key: "visitCount", header: "จำนวนครั้ง", width: 11, group: "ระยะเวลา", align: "center" },
     { key: "jobValue", header: "มูลค่างาน (฿)", width: 15, group: "มูลค่า", align: "right", numFmt: MONEY_FMT },
+    // ✅ ค่าคอมที่จ่ายให้ฝั่งลูกค้า + สัดส่วนเทียบมูลค่างาน — ใส่ % เป็นคอลัมน์แยกให้เรียง/กรองได้
+    // (บนจอโชว์เป็นบรรทัดเล็กใต้ตัวเลข ซึ่งดีเวลาไล่ดูทีละแถว แต่ในไฟล์ต้องเป็นคอลัมน์ถึงจะใช้งานต่อได้)
+    { key: "commission", header: "ค่าคอม (฿)", width: 15, group: "มูลค่า", align: "right", numFmt: MONEY_FMT },
+    { key: "commissionPct", header: "ค่าคอม (% ของมูลค่างาน)", width: 20, group: "มูลค่า", align: "center", numFmt: "0.00%" },
     { key: "contractStatus", header: "สถานะสัญญา", width: 17, group: "สถานะ", align: "center" },
     // ✅ เพิ่มให้ตรงกับคอลัมน์ "คืบหน้า" ในตารางบนจอ (เดิมไฟล์ที่ส่งออกไม่มีคอลัมน์นี้เลย ทั้งที่บนจอมี) —
     // สัญญาจริงเป็น "X/Y" (ครั้งที่ทำเสร็จ) ส่วนงานทั่วไป/โปรเจคเป็นสถานะงานตรงๆ (ดู progressInfo)
@@ -213,6 +217,15 @@ export async function exportContractsToExcel({
       perYear: visitsPerYear(c.intervalMonths) ?? "",
       visitCount: c.visitCount ?? "",
       jobValue: c.jobValue ?? "",
+      commission: c.commission ?? "",
+      // ⚠️ เก็บเป็นสัดส่วน (0.1) ไม่ใช่ 10 — numFmt "0.00%" ของ Excel คูณ 100 ให้เองตอนแสดงผล
+      // ถ้าใส่ 10 ไปตรงๆ จะกลายเป็น 1000% · เว้นว่างเมื่อคำนวณไม่ได้ ไม่ใส่ 0 (0% กับ "ไม่รู้มูลค่างาน"
+      // คนละความหมาย และ 0 จะไปกวนค่าเฉลี่ยตอน pivot)
+      commissionPct: (() => {
+        const base = Number(c.jobValue);
+        const com = Number(c.commission);
+        return Number.isFinite(base) && base > 0 && Number.isFinite(com) && com > 0 ? com / base : "";
+      })(),
       contractStatus: st?.label || "",
       // ⚠️ ใช้ contractBillingSummary ตัวเดียวกับที่ตารางบนจอใช้ — ห้ามคำนวณซ้ำที่นี่ ไม่งั้นยอดในไฟล์
       // กับยอดบนจอจะไม่ตรงกัน ซึ่งเป็นเรื่องเงินและตรวจสอบย้อนหลังได้ยากมากเมื่อไฟล์ถูกส่งต่อไปแล้ว

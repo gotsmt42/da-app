@@ -75,6 +75,7 @@ export const groupEventsByContract = (events) => {
       visitCount: head.contractGroupId ? (head.visitCount || sorted.length) : undefined,
       intervalMonths: head.contractGroupId ? head.intervalMonths : undefined,
       jobValue: head.jobValue,
+      commission: head.commission,   // ค่าคอมให้ลูกค้า — ระดับสัญญาเหมือน jobValue
       team: teamNames.join(", ") || "-",
       teamLeaderName,
       teamMemberNames,
