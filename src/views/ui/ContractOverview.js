@@ -41,7 +41,7 @@ import {
   AddLink, LinkOff, Build, Engineering, ExpandMore, ExpandLess,
   CalendarMonth, PersonOutline, Category, Assignment, Description, HourglassEmpty, Apps, DeviceHub,
   SwapHoriz, TableChart, FilterList, ViewAgenda, TableRows, SwipeLeft, ChevronLeft, ChevronRight,
-  AddCircleOutline, Check, Autorenew,
+  AddCircleOutline, Check, Autorenew, EventBusy, History,
 } from "@mui/icons-material";
 import { useAuth } from "../../auth/AuthContext";
 import EventService from "../../services/EventService";
@@ -52,7 +52,9 @@ import SystemTypeService from "../../services/SystemTypeService";
 import { formatEventDateRange } from "../../utils/formatDateRange";
 import { resolveOperationGroup } from "../../utils/overdueJobs";
 import { countUsedRounds, visitsPerYear } from "../../utils/contractRounds";
-import { groupEventsByContract, nextVisitOverdueInfo } from "../../utils/contractOverdue";
+import { groupEventsByContract, nextVisitOverdueInfo, contractStatusInfo, isExpiredContract } from "../../utils/contractOverdue";
+// ✅ สถานะการวางบิล/รับเงิน — ของกลางชุดเดียวกับหน้า "วางบิล / รับเงิน" (/billing) ห้ามคำนวณซ้ำที่นี่
+import { contractBillingSummary, baht as bahtFmt } from "../../utils/billing";
 import { escapeHtml } from "../../utils/escapeHtml";
 import DeliveryNoteDialog from "../../components/Documents/DeliveryNoteDialog";
 
@@ -180,13 +182,31 @@ const progressInfo = (c, countUsedRoundsFn) => {
 
 // ✅ "สถานะสัญญา" — เทียบ contractEnd กับวันนี้ ช่วยเตือนต่ออายุล่วงหน้า แทนต้องไล่เช็คคอลัมน์
 // "สิ้นสุด" เองทีละแถว ใช้ทั้งในตารางและไฟล์ CSV ที่ส่งออก (ใช้ฟังก์ชันเดียวกัน กันข้อมูลไม่ตรงกัน)
-const contractStatusInfo = (c) => {
-  if (!c.isRealContract || !c.contractEnd) return null;
-  const daysLeft = moment(c.contractEnd).startOf("day").diff(moment().startOf("day"), "days");
-  if (daysLeft < 0) return { label: "หมดอายุแล้ว", color: "#dc2626" };
-  if (daysLeft <= 60) return { label: `ใกล้หมดอายุ · ${daysLeft} วัน`, color: "#f59e0b" };
-  return { label: "มีผลบังคับใช้", color: "#10b981" };
+// ⚠️ contractStatusInfo / isExpiredContract ย้ายไปเป็นของกลางที่ utils/contractOverdue.js แล้ว
+// (หน้า "ภาพรวมลูกค้า" ใช้ชุดเดียวกัน) — ห้ามก๊อปกลับมาไว้ที่นี่ ไม่งั้นเกณฑ์จะเพี้ยนไม่ตรงกันอีก
+
+// ค่าแท็บมุมมองทั้งหมดที่ยอมรับจาก ?view= (กันค่าขยะจาก URL ทำให้ตารางว่างเปล่าโดยไม่รู้สาเหตุ)
+// ✅ ประวัติการแก้ไขข้อมูลสัญญา — ฝั่ง server push activityLog เข้า "ทุกครั้ง" ในสัญญาพร้อมกัน
+// (updateMany) รายการเดียวกันจึงซ้ำอยู่ในทุก visit ต้องรวบแล้วตัดซ้ำก่อนแสดงเสมอ
+// ⚠️ ตัดซ้ำด้วย timestamp+detail+ผู้แก้ ไม่ใช่ _id — subdocument ที่ push พร้อมกันคนละ document
+// ได้ _id คนละตัวเสมอ ตัดด้วย _id จึงไม่มีอะไรถูกตัดเลยสักรายการ
+// ⚠️ ต้องอ่านจากทุก visit ไม่ใช่แค่ visit แรก — ครั้งที่เพิ่มเข้าสัญญาทีหลังจะไม่มีประวัติช่วงก่อนหน้า
+const contractEditHistory = (c) => {
+  const seen = new Set();
+  const out = [];
+  for (const v of c?.visits || []) {
+    for (const log of v?.activityLog || []) {
+      if (log?.action !== "contract_updated") continue;
+      const key = `${new Date(log.timestamp).getTime()}|${log.userId || ""}|${log.detail || ""}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(log);
+    }
+  }
+  return out.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 };
+
+const VIEW_FILTER_VALUES = ["contracts", "overdue", "expired", "general", "project", "ungrouped", "all"];
 
 // ✅ ยืด/หดความกว้างคอลัมน์ได้เองเหมือน Excel — เดิม fix ความกว้างตายตัวทุกคอลัมน์ (CELL_TRUNCATE)
 // พอชื่อบริษัท/โครงการยาวๆ ก็โดนตัดด้วย ... เสมอ ต้อง hover ดู tooltip ทุกครั้ง ให้ผู้ใช้ลากขยายเองได้
@@ -207,7 +227,7 @@ const DEFAULT_COL_WIDTHS = {
   docRef: 150, docNo: 150,
   customer: 230, work: 165,
   period: 190,
-  jobValue: 110, status: 130, progress: 110, responsiblePerson: 130,
+  jobValue: 110, status: 130, billing: 140, progress: 110, responsiblePerson: 130,
 };
 // ✅ ความกว้างคอลัมน์ "แยกกันทุกแท็บ" — เก็บซ้อนอีกชั้นเป็น { [แท็บ]: { [คอลัมน์]: ความกว้าง } }
 // ⚠️ เดิมเก็บเป็นชุดเดียวใช้ร่วมกันทุกแท็บ ซึ่งใช้งานจริงไม่ได้เลย เพราะแต่ละแท็บมีคอลัมน์ไม่เหมือนกัน
@@ -818,8 +838,9 @@ export default function ContractOverview() {
   // เดียวกับแท็บประเภทเอกสารในหน้า "ไฟล์") ค่าเริ่มต้นโชว์เฉพาะสัญญาจริงก่อน กันรกตารางเหมือนเดิม
   // ✅ ?view=overdue — เปิดมาที่แท็บ "เลยกำหนด/คงค้าง" ได้ตรงๆ จากลิงก์แจ้งเตือน push (ดู
   // checkAndNotifyOverdueContracts ฝั่ง backend) แทนที่จะเปิดมาแท็บเริ่มต้นแล้วต้องกดกรองเอง
+  // ⚠️ เดิมรู้จักแค่ ?view=overdue ค่าอื่นตกลง "contracts" หมด — ลิงก์เจาะจงมาที่แท็บอื่นจึงไม่เคยทำงาน
   const [viewFilter, setViewFilter] = useState(
-    () => (searchParams.get("view") === "overdue" ? "overdue" : "contracts")
+    () => (VIEW_FILTER_VALUES.includes(searchParams.get("view")) ? searchParams.get("view") : "contracts")
   ); // "contracts" | "overdue" | "ungrouped" | "all"
 
   // ✅ ตัวเลือกฟอร์ม "เพิ่มสัญญาใหม่" — ดึงพร้อมกับ events ตอนเปิดหน้า ไม่ต้องรอกดปุ่มเพิ่มก่อนค่อยโหลด
@@ -898,7 +919,9 @@ export default function ContractOverview() {
   // ✅ ช่างดูอย่างเดียว ไม่มีทางเลือกงานไปจัดกลุ่มเป็นสัญญาได้ — ปิดตรงนี้จุดเดียวพอ ปิดพ่วงทั้งคอลัมน์
   // checkbox, กล่องแนะนำกลุ่มงานเก่า (showCheckboxes && ...) และแถบ "จัดกลุ่มเป็นสัญญา" (โผล่ต่อเมื่อ
   // มีการเลือกไว้เท่านั้น ซึ่งเป็นไปไม่ได้ถ้าไม่มี checkbox ให้กดตั้งแต่แรก)
-  const showCheckboxes = isAdminOrManager && viewFilter !== "contracts";
+  // ⚠️ ไม่โชว์ช่องติ๊กในแท็บ "สัญญาหมดอายุ" — ช่องติ๊กมีไว้เลือกงานเก่าไปรวมเป็นสัญญา แต่แถวในแท็บนี้
+  // เป็นสัญญาจริงที่ผูกกลุ่มไปแล้วทุกแถว (isRealContract) เลือกไปก็ทำอะไรต่อไม่ได้ มีแต่กินความกว้าง
+  const showCheckboxes = isAdminOrManager && viewFilter !== "contracts" && viewFilter !== "expired";
   // ✅ เลือกได้เฉพาะงานที่ยัง "ไม่จัดกลุ่ม" จริงๆ เท่านั้น — งานทั่วไป/งานโปรเจคถูกยืนยันหมวดหมู่ไปแล้ว
   // (isConfirmedGeneral/isConfirmedProject) ไม่ใช่เป้าหมายของ "จัดกลุ่มเป็นสัญญา" อีกต่อไป มี checkbox
   // ให้เลือกไว้จะสับสน/กดผิดได้ — ตัดออกตามที่ผู้ใช้ขอ ใช้ตัวเดียวกันทั้งตาราง/การ์ดมือถือ กันสองจุด
@@ -1127,7 +1150,9 @@ export default function ContractOverview() {
   // (ดู yearFilter ด้านบน) ตัวเลขสองชุดนี้เลยไม่ตรงกันเสมอ (แท็บบอก 98 แต่ตารางโชว์แค่ 11 ตามปีที่กรอง)
   // ทำให้ดูเหมือนแบ่งหน้าพัง — ทางแก้คือให้ตัวเลขบนแท็บผ่านตัวกรองชุดเดียวกันกับ `filtered` ด้วย ต่างกัน
   // แค่ "กลุ่มประเภท" (สัญญา/งานทั่วไป/ทั้งหมด) ก่อนนับ ให้ตัวเลขทุกจุดในหน้านี้ตรงกันเสมอ
-  const applyCommonFilters = (list) => {
+  // @param {{ignoreYear?: boolean}} opts — ignoreYear ใช้เฉพาะแท็บ "สัญญาหมดอายุ" ที่ต้องมองข้ามปี
+  //   (ดูเหตุผลที่ expiredCount) ตัวกรองอื่นยังมีผลครบทุกตัวตามปกติ
+  const applyCommonFilters = (list, { ignoreYear = false } = {}) => {
     let base = list;
     // 🐛 BUG ที่แก้ (สร้างสัญญาแล้วหายไปเลย): เดิมกรองด้วย String(contractYear(c)) === yearFilter ตรงๆ —
     // สัญญาที่ยัง "ระบุปีไม่ได้" (ไม่ได้กรอกวันที่เริ่มสัญญา และยังไม่ลงวันที่เข้างานสักครั้ง = สัญญาเปล่า
@@ -1136,7 +1161,9 @@ export default function ContractOverview() {
     // (ผู้ใช้ไม่ได้ตั้งเอง) = "เพิ่มสัญญาแล้วไม่เห็นในตาราง" โดยไม่มีอะไรบอกสาเหตุเลย
     // ✅ แถวที่ระบุปีไม่ได้ให้ผ่านตัวกรองปีเสมอ (ไม่มีปีให้ขัดแย้งกับตัวกรอง จึงไม่ควรถูกซ่อน) แล้วเพิ่ม
     // ตัวเลือก "ยังไม่ระบุปี" ไว้ให้กรองดูเฉพาะกลุ่มนี้ได้ด้วยถ้าต้องการ (ดู unknownYearCount ด้านล่าง)
-    if (yearFilter === "none") {
+    if (ignoreYear) {
+      // ข้ามตัวกรองปีไปเลย
+    } else if (yearFilter === "none") {
       base = base.filter((c) => contractYear(c) === null);
     } else if (yearFilter !== "all") {
       base = base.filter((c) => {
@@ -1214,7 +1241,35 @@ export default function ContractOverview() {
     [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, search]
   );
 
+  // ✅ สัญญาที่เลยวันสิ้นสุดมาแล้ว — กลุ่มที่ต้องไล่ต่ออายุ/ปิดงาน เดิมมีแต่ชิปสีแดงเตือนทีละแถว ต้อง
+  // ไล่กวาดสายตาหาเองทั้งตาราง ไม่มีทางกรองดูรวดเดียว
+  // ⚠️ นับ "ทุกปี" เสมอ ไม่ผูกกับตัวกรองปี ต่างจากแท็บอื่นโดยตั้งใจ — สัญญาที่หมดอายุแล้วเกือบทั้งหมด
+  // เริ่มต้นในปีก่อนๆ ถ้านับตามตัวกรองปี (ค่าเริ่มต้น = ปีปัจจุบัน) ตัวเลขจะเป็น 0 แทบตลอดเวลา
+  const expiredCount = useMemo(
+    () => applyCommonFilters(contracts.filter(isExpiredContract), { ignoreYear: true }).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [contracts, responsibleFilter, titleFilter, systemFilter, search]
+  );
+
+  // ✅ สลับแท็บผ่านฟังก์ชันเดียว (ทั้งปุ่มบนจอคอมและเมนูบนมือถือ) เพราะการเข้าแท็บ "สัญญาหมดอายุ" ต้อง
+  // ปลดตัวกรองปีเป็น "ทุกปี" ไปด้วย — ตัวกรองปีตั้งต้นเป็นปีปัจจุบัน แต่สัญญาที่หมดอายุแล้วเกือบทั้งหมด
+  // เริ่มในปีก่อนๆ ถ้าไม่ปลดให้ ผู้ใช้จะกดเข้ามาเจอ "ไม่พบรายการ" ทั้งที่ตัวเลขบนแท็บขึ้นเลขอยู่
+  // ⚠️ ตั้งใจให้ช่อง "ปี" เปลี่ยนเป็น "ทุกปี" ให้เห็นกับตา ไม่ใช่แอบข้ามตัวกรองไว้เบื้องหลัง — ไม่งั้น
+  // ช่องปีจะโชว์ 2569 อยู่ทั้งที่ตารางแสดงทุกปี ซึ่งหลอกตาหนักกว่าเดิม
+  // ✅ กล่องประวัติการแก้ไขสัญญา — เก็บทั้งก้อน c ไว้เลย เพื่อให้หัวกล่องบอกได้ว่าเป็นสัญญาไหน
+  const [historyContract, setHistoryContract] = useState(null);
+
+  const selectView = useCallback((v) => {
+    if (!v) return;
+    setViewFilter(v);
+    if (v === "expired") setYearFilter("all");
+  }, []);
+
   const filtered = useMemo(() => {
+    // ⚠️ แท็บสัญญาหมดอายุข้ามตัวกรองปีเหมือนตอนนับ ไม่งั้นตัวเลขบนแท็บกับจำนวนแถวในตารางจะไม่ตรงกัน
+    if (viewFilter === "expired") {
+      return applyCommonFilters(contracts.filter(isExpiredContract), { ignoreYear: true });
+    }
     const base = viewFilter === "all" ? contracts
       : viewFilter === "overdue" ? contracts.filter((c) => c.isRealContract && nextVisitOverdueInfo(c))
       : viewFilter === "ungrouped" ? contracts.filter((c) => !c.isRealContract && !c.isConfirmedGeneral && !c.isConfirmedProject)
@@ -1476,6 +1531,21 @@ export default function ContractOverview() {
   // ✅ จำนวนคอลัมน์ก่อน/หลังช่อง "มูลค่างาน" — ใช้ทำแถวสรุปท้ายตาราง (TableFooter) ให้ยอดรวมตกลงมา
   // ตรงใต้คอลัมน์มูลค่างานพอดีเสมอ ⚠️ ต้องตรงกับลำดับคอลัมน์จริงในหัวตาราง/แถวข้อมูลเป๊ะๆ ถ้าเพิ่ม/ลด
   // คอลัมน์ตรงไหนต้องมาปรับตรงนี้ด้วย ไม่งั้นยอดรวมจะเลื่อนไปอยู่ผิดคอลัมน์
+  // ✅ สรุปการวางบิล/รับเงินของทุกแถวที่กรองอยู่ (ทุกหน้า ไม่ใช่เฉพาะหน้าที่เปิด) — ชุดข้อมูลเดียวกับ
+  // ยอดรวมมูลค่างานด้านล่างเป๊ะๆ (sortedFiltered) จะได้อ่านเทียบกันได้ตรงๆ ว่า "งานมูลค่าเท่านี้
+  // วางบิลไปแล้วเท่าไร เก็บเงินได้เท่าไร เหลือเก็บเท่าไร"
+  const billingSummary = useMemo(() => sortedFiltered.reduce((acc, c) => {
+    const bs = contractBillingSummary(c.visits);
+    if (!bs) return acc;
+    return {
+      net: acc.net + bs.net,
+      paid: acc.paid + bs.paid,
+      outstanding: acc.outstanding + bs.outstanding,
+      overdueRows: acc.overdueRows + (bs.state === "overdue" ? 1 : 0),
+      notInvoicedRows: acc.notInvoicedRows + (bs.invoicedCount < bs.totalCount ? 1 : 0),
+    };
+  }, { net: 0, paid: 0, outstanding: 0, overdueRows: 0, notInvoicedRows: 0 }), [sortedFiltered]);
+
   const footerColSpan = useMemo(() => {
     const before =
       (showCheckboxes ? 1 : 0) +
@@ -1484,6 +1554,7 @@ export default function ContractOverview() {
       (hideContractOnlyColumns ? 0 : 1);    // period (เริ่ม+สิ้นสุด+รอบเข้า)
     const after =
       (hideContractOnlyColumns ? 0 : 1) +   // status
+      1 +                                    // billing (วางบิล/รับเงิน — แสดงทุกแท็บ)
       1 +                                    // progress
       visitColumns.length +
       1 +                                    // responsiblePerson
@@ -1546,7 +1617,7 @@ export default function ContractOverview() {
   // contracts (2).csv ...) แยกไม่ออกว่าไฟล์ไหนคืออะไร ต้องเปิดดูทีละไฟล์เอง
   const exportLabels = useMemo(() => {
     const viewLabel = {
-      contracts: "งานสัญญา", overdue: "เลยกำหนด", general: "งานทั่วไป",
+      contracts: "งานสัญญา", overdue: "เลยกำหนด", expired: "สัญญาหมดอายุ", general: "งานทั่วไป",
       project: "งานโปรเจค", ungrouped: "ยังไม่จัดกลุ่ม", all: "ทั้งหมด",
     }[viewFilter] || "ทั้งหมด";
     const yearLabel = yearFilter === "all" ? "ทุกปี" : yearFilter === "none" ? "ยังไม่ระบุปี" : yearFilter;
@@ -2742,6 +2813,20 @@ export default function ContractOverview() {
           <Stack alignItems="flex-end" spacing={0.5} sx={{ flexShrink: 0 }}>
             <Chip label={jobTypeLabel} size="small" sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha(jobTypeColor, 0.12), color: jobTypeColor }} />
             {st && <Chip label={st.label} size="small" sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha(st.color, 0.12), color: st.color }} />}
+            {/* ✅ สถานะวางบิล/รับเงินอยู่บนหัวการ์ดเลย ไม่ต้องกางดู — เป็นสิ่งที่ต้องเห็นพร้อมสถานะสัญญา
+                ⚠️ ซ่อนชิป "ยังไม่วางบิล" ทิ้ง เพราะเป็นค่าเริ่มต้นของเกือบทุกแถวในช่วงแรกที่เริ่มใช้ระบบ
+                ถ้าโชว์ทุกใบจะกลายเป็นเสียงรบกวนที่กลบชิปที่มีความหมายจริงจนหมด */}
+            {(() => {
+              const bs = contractBillingSummary(c.visits);
+              if (!bs || bs.state === "not_invoiced") return null;
+              return (
+                <Chip
+                  label={bs.state === "overdue" && bs.overdueDays > 0 ? `เลยกำหนดชำระ ${bs.overdueDays} วัน` : bs.label}
+                  size="small"
+                  sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha(bs.color, 0.12), color: bs.color }}
+                />
+              );
+            })()}
           </Stack>
         </Stack>
 
@@ -2960,6 +3045,37 @@ export default function ContractOverview() {
         {/* ⚠️ "มูลค่างาน" ย้ายขึ้นไปอยู่แถบสรุปหัวการ์ดแล้วเช่นกัน (แสดงทุกแท็บเหมือนเดิม ไม่ได้จำกัดแค่
             สัญญาจริง เพราะงานทั่วไป/โปรเจค/ยังไม่จัดกลุ่มก็มีมูลค่าของตัวเองได้ ตรงกับคอลัมน์ฝั่งเดสก์ท็อป) */}
 
+        {/* ✅ ยอดวางบิล/รับเงิน — โผล่เฉพาะเมื่อเคยวางบิลแล้วจริงเท่านั้น ไม่งั้นการ์ดทุกใบจะมีบล็อกนี้
+            ที่ขึ้น ฿0 ทั้งหมดตั้งแต่วันแรกที่เริ่มใช้ระบบ ซึ่งดูเหมือนตัวเลขพังมากกว่า "ยังไม่มีข้อมูล" */}
+        {(() => {
+          const bs = contractBillingSummary(c.visits);
+          if (!bs || bs.invoicedCount === 0) return null;
+          return (
+            <Box sx={{ mt: 1, p: 1.1, borderRadius: 2, bgcolor: alpha(bs.color, 0.06) }}>
+              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.4 }}>
+                <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: bs.color }}>
+                  วางบิลแล้ว {bs.invoicedCount}/{bs.totalCount} ครั้ง
+                </Typography>
+                <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: bs.color }}>
+                  {bs.state === "overdue" && bs.overdueDays > 0 ? `เลยกำหนด ${bs.overdueDays} วัน` : bs.label}
+                </Typography>
+              </Stack>
+              <Stack direction="row" justifyContent="space-between" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                {[
+                  { k: "ยอดวางบิล", v: bs.net },
+                  { k: "รับแล้ว", v: bs.paid },
+                  { k: "ค้างรับ", v: bs.outstanding },
+                ].map((it) => (
+                  <Box key={it.k} sx={{ textAlign: "center", flex: 1, minWidth: 0 }}>
+                    <Typography sx={{ fontSize: "0.62rem", color: TEXT_SUB }}>{it.k}</Typography>
+                    <Typography sx={{ fontSize: "0.78rem", fontWeight: 800 }} noWrap>{bahtFmt(it.v)}</Typography>
+                  </Box>
+                ))}
+              </Stack>
+            </Box>
+          );
+        })()}
+
         {/* ผู้รับผิดชอบ — ฟิลด์อิสระจากทีมที่เข้างานทุกครั้งด้านบนโดยสมบูรณ์ */}
         <FieldRow label="ผู้รับผิดชอบ" editable={isAdminOrManager && canEditField(c, "responsiblePerson")} editType="select" editOptions={teamOptions} value={c.responsiblePerson} formatDisplay={unassignedResponsibleDisplay} {...fp("responsiblePerson")} />
 
@@ -2981,6 +3097,19 @@ export default function ContractOverview() {
                 <IconButton size="small" onClick={() => openAttachDialog(c)} sx={{ color: "text.disabled" }}>
                   <AddLink fontSize="small" />
                 </IconButton>
+              </Tooltip>
+            )}
+            {c.isRealContract && (
+              <Tooltip title="ประวัติการแก้ไขข้อมูลสัญญา">
+                <span>
+                  <IconButton
+                    size="small" onClick={() => setHistoryContract(c)}
+                    disabled={contractEditHistory(c).length === 0}
+                    sx={{ color: "text.disabled" }}
+                  >
+                    <History fontSize="small" />
+                  </IconButton>
+                </span>
               </Tooltip>
             )}
             <Tooltip title={c.isRealContract ? "ลบสัญญานี้ทั้งหมด" : "ลบงานนี้"}>
@@ -3222,6 +3351,9 @@ export default function ContractOverview() {
             { value: "contracts", label: "งานสัญญา / งานรายปี", count: realContractCount, icon: <Description sx={{ fontSize: 15 }} /> },
             // ✅ แสดงตลอดแม้ count=0 เหมือนแท็บอื่น — เดิมซ่อนตอนไม่มี ทำให้เข้าใจว่าฟีเจอร์นี้หายไป
             { value: "overdue", label: "เลยกำหนด / คงค้าง", count: overdueCount, icon: <WarningAmber sx={{ fontSize: 15, color: ACCENT }} /> },
+            // ✅ สีแดงชุดเดียวกับชิป "หมดอายุแล้ว" ในคอลัมน์สถานะสัญญา — กดจากแท็บแล้วเจอชิปสีเดียวกัน
+            // ทั้งตาราง เชื่อมโยงกันได้ทันทีว่ากำลังดูกลุ่มไหนอยู่
+            { value: "expired", label: "สัญญาหมดอายุ", count: expiredCount, icon: <EventBusy sx={{ fontSize: 15, color: "#dc2626" }} /> },
           ],
           // กลุ่มที่ 2: หมวดหมู่คู่ขนานจริง (งานหนึ่งเป็นได้แค่หมวดเดียวในกลุ่มนี้)
           [
@@ -3267,7 +3399,7 @@ export default function ContractOverview() {
                   <MenuItem
                     key={v.value}
                     selected={v.value === viewFilter}
-                    onClick={() => { setViewFilter(v.value); setViewMenuAnchor(null); }}
+                    onClick={() => { selectView(v.value); setViewMenuAnchor(null); }}
                     // ✅ เว้นเส้นคั่นระหว่าง 2 กลุ่ม — สื่อว่า "เลยกำหนด" เป็นกลุ่มย่อยของงานสัญญา
                     // ส่วนที่เหลือเป็นหมวดคู่ขนาน เหมือนที่จอใหญ่ครอบรางแยกกัน
                     sx={{
@@ -3300,7 +3432,7 @@ export default function ContractOverview() {
               {viewGroups.map((group, gi) => (
                 <ToggleButtonGroup
                   key={gi} size="small" exclusive value={viewFilter}
-                  onChange={(_, v) => v && setViewFilter(v)}
+                  onChange={(_, v) => selectView(v)}
                   sx={VIEW_TAB_GROUP_SX}
                 >
                   {group.map((v) => (
@@ -3685,6 +3817,10 @@ export default function ContractOverview() {
                 {!hideContractOnlyColumns && (
                   <ResizableTh width={colWidth("status")} align="center" columnKey="status" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("status")}>สถานะสัญญา</ResizableTh>
                 )}
+                {/* ✅ สถานะการวางบิล/รับเงิน — แสดงทุกแท็บ เพราะงานทั่วไป/โปรเจคก็ต้องวางบิลเหมือนกัน
+                    (ต่างจาก "สถานะสัญญา" ที่มีเฉพาะสัญญาจริง) วางติดกันเพราะเป็นสถานะคู่กันที่คนดูพร้อมกัน:
+                    สัญญายังมีผลอยู่ไหม · เก็บเงินได้หรือยัง */}
+                <ResizableTh width={colWidth("billing")} align="center" columnKey="billing" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("billing")}>วางบิล / รับเงิน</ResizableTh>
                 {/* 🐛 BUG ที่แก้ (หัวคอลัมน์ไม่ตรงกับข้อมูลข้างใน): ช่องนี้แสดง 2 แบบตามชนิดแถว — สัญญาจริง
                     โชว์ "X/Y ครั้ง" (คืบหน้า) ส่วนงานทั่วไป/โปรเจค/ยังไม่จัดกลุ่มโชว์ป้ายสถานะงาน (ดู
                     jobStatusInfo ในเซลล์) แต่หัวคอลัมน์เขียน "คืบหน้า" ตายตัวเสมอ — ในแท็บที่มีแต่แถวที่
@@ -4002,6 +4138,36 @@ export default function ContractOverview() {
                     })()}
                   </TableCell>
                   )}
+                  <TableCell data-col-key="billing" align="center" sx={{ width: colVar("billing") }}>
+                    {(() => {
+                      const bs = contractBillingSummary(c.visits);
+                      if (!bs) return <Dash />;
+                      // ⚠️ ยอด "ค้างรับ" สำคัญกว่าคำว่าสถานะเอง — คนดูตารางนี้เพื่อรู้ว่าเหลือเก็บเท่าไร
+                      // จึงโชว์ยอดเป็นบรรทัดหลัก แล้วให้ป้ายสถานะเป็นสีบอกความเร่งด่วนแทน
+                      const detail = [
+                        `วางบิลแล้ว ${bs.invoicedCount}/${bs.totalCount} ครั้ง`,
+                        bs.net > 0 ? `ยอดวางบิล ${bahtFmt(bs.net)}` : null,
+                        bs.paid > 0 ? `รับแล้ว ${bahtFmt(bs.paid)}` : null,
+                        bs.outstanding > 0 ? `ค้างรับ ${bahtFmt(bs.outstanding)}` : null,
+                      ].filter(Boolean).join(" · ");
+                      return (
+                        <Tooltip title={detail} placement="top">
+                          <Stack spacing={0.25} alignItems="center">
+                            <Chip
+                              label={bs.state === "overdue" && bs.overdueDays > 0 ? `เลยกำหนด ${bs.overdueDays} วัน` : bs.label}
+                              size="small"
+                              sx={{ height: 20, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha(bs.color, 0.12), color: bs.color }}
+                            />
+                            {bs.outstanding > 0 && (
+                              <Typography sx={{ fontSize: "0.7rem", fontWeight: 700, color: bs.color, fontVariantNumeric: "tabular-nums" }}>
+                                ค้าง {bahtFmt(bs.outstanding)}
+                              </Typography>
+                            )}
+                          </Stack>
+                        </Tooltip>
+                      );
+                    })()}
+                  </TableCell>
                   {/* ✅ ยุบคอลัมน์ "จำนวนครั้งทั้งหมด" มารวมกับ "คืบหน้า" — ป้ายคืบหน้าเขียน "เสร็จ/ทั้งหมด"
                       อยู่แล้ว (ดู progressInfo) ตัวเลขทั้งหมดจึงซ้ำกันทั้งคอลัมน์ ไม่ต้องแยกช่องอีก
                       สิ่งที่เคยมีเฉพาะช่องนั้นและต้องยกมาด้วยคือจุดแดงเตือน "เลยกำหนดรอบถัดไป" — ย้ายมา
@@ -4279,6 +4445,24 @@ export default function ContractOverview() {
                             </IconButton>
                           </Tooltip>
                         )}
+                        {/* ✅ ประวัติการแก้ไข — เฉพาะสัญญาจริง เพราะข้อมูลสัญญา (มูลค่า/วันที่/เลขที่)
+                            แก้ได้จากตารางนี้โดยตรงและมีผลกับทุกครั้งในสัญญาพร้อมกัน จึงต้องตามกลับได้
+                            ⚠️ จางลงเมื่อยังไม่เคยมีการแก้ไข — บอกได้ทันทีว่ากดไปก็ไม่มีอะไร */}
+                        {c.isRealContract && (
+                          <Tooltip title={contractEditHistory(c).length > 0
+                            ? `ประวัติการแก้ไขข้อมูลสัญญา (${contractEditHistory(c).length} ครั้ง)`
+                            : "ยังไม่เคยมีการแก้ไขข้อมูลสัญญานี้"}>
+                            <span>
+                              <IconButton
+                                size="small" onClick={() => setHistoryContract(c)}
+                                disabled={contractEditHistory(c).length === 0}
+                                sx={{ color: "text.disabled", transition: "background-color .15s, color .15s", "&:hover": { color: ACCENT, bgcolor: alpha(ACCENT, 0.1) } }}
+                              >
+                                <History fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        )}
                         <Tooltip title={c.isRealContract ? "ลบสัญญานี้ทั้งหมด" : "ลบงานนี้"}>
                           <IconButton
                             size="small" onClick={() => handleDeleteContract(c)}
@@ -4402,6 +4586,55 @@ export default function ContractOverview() {
                 </TableCell>
                 <TableCell colSpan={footerColSpan.after} />
               </TableRow>
+
+              {/* ✅ แถวสรุปการวางบิล/รับเงิน — อ่านคู่กับยอดมูลค่างานบรรทัดบนได้ทันทีว่า "งานมูลค่าเท่านี้
+                  ออกบิลไปแล้วเท่าไร เก็บได้เท่าไร เหลือเก็บเท่าไร" ซึ่งเดิมไม่มีทางรู้จากหน้านี้เลย
+                  ⚠️ โผล่เฉพาะเมื่อมีการวางบิลจริงแล้วเท่านั้น — ระบบเพิ่งเริ่มใช้ ถ้าโชว์ ฿0 ทุกช่อง
+                  ตั้งแต่วันแรกจะดูเหมือนตัวเลขพัง มากกว่าดูเหมือน "ยังไม่มีข้อมูล" */}
+              {billingSummary.net > 0 && (
+                <TableRow sx={{ bgcolor: SURFACE_SUBTLE, "& td": { borderBottom: "none", py: 1, pt: 0 } }}>
+                  <TableCell colSpan={totalColCount} sx={{ px: 2 }}>
+                    <Stack
+                      direction="row" spacing={1} alignItems="center" justifyContent="flex-end"
+                      sx={{ flexWrap: "wrap", rowGap: 0.5 }}
+                    >
+                      <Typography sx={{ fontWeight: 700, fontSize: "0.78rem", color: TEXT_SUB }}>
+                        วางบิล / รับเงิน (ชุดข้อมูลเดียวกับด้านบน)
+                      </Typography>
+                      {[
+                        { label: "วางบิลแล้ว", value: billingSummary.net, color: ACCENT },
+                        { label: "รับเงินแล้ว", value: billingSummary.paid, color: "#10b981" },
+                        { label: "ค้างรับ", value: billingSummary.outstanding, color: "#f59e0b" },
+                      ].map((it) => (
+                        <Chip
+                          key={it.label} size="small"
+                          label={`${it.label} ${bahtFmt(it.value)}`}
+                          sx={{ height: 22, fontSize: "0.72rem", fontWeight: 700, bgcolor: alpha(it.color, 0.12), color: it.color }}
+                        />
+                      ))}
+                      {billingSummary.overdueRows > 0 && (
+                        <Chip
+                          size="small" icon={<WarningAmber sx={{ fontSize: 13 }} />}
+                          label={`เลยกำหนดชำระ ${billingSummary.overdueRows} รายการ`}
+                          sx={{
+                            height: 22, fontSize: "0.72rem", fontWeight: 700,
+                            bgcolor: alpha("#dc2626", 0.12), color: "#dc2626",
+                            "& .MuiChip-icon": { color: "#dc2626" },
+                          }}
+                        />
+                      )}
+                      {billingSummary.notInvoicedRows > 0 && (
+                        <Tooltip title="รายการที่ยังวางบิลไม่ครบทุกครั้งที่เข้างาน — ยอด 'วางบิลแล้ว' จึงยังไม่ใช่ยอดเต็มของงานชุดนี้">
+                          <Chip
+                            size="small" label={`ยังวางบิลไม่ครบ ${billingSummary.notInvoicedRows} รายการ`}
+                            sx={{ height: 22, fontSize: "0.72rem", fontWeight: 700, cursor: "help", bgcolor: alpha("#64748b", 0.12), color: "#475569" }}
+                          />
+                        </Tooltip>
+                      )}
+                    </Stack>
+                  </TableCell>
+                </TableRow>
+              )}
             </TableFooter>
           </Table>
         </TableContainer>
@@ -4885,6 +5118,74 @@ export default function ContractOverview() {
           >
             {mergeSaving ? "กำลังบันทึก..." : "จัดกลุ่มเป็นสัญญา"}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── ประวัติการแก้ไขข้อมูลสัญญา ────────────────────────────────────────
+          ✅ ข้อมูลสัญญาแก้ inline ได้จากตารางนี้โดยตรง และทุกครั้งที่แก้มีผลกับ "ทุกครั้งในสัญญา"
+          พร้อมกัน (updateMany ฝั่ง server) — คลิกพลาดช่องเดียวก็เปลี่ยนมูลค่างาน/วันหมดอายุทั้งสัญญา
+          กล่องนี้คือทางเดียวที่จะตามกลับได้ว่าใครแก้ เมื่อไหร่ จากค่าอะไรเป็นค่าอะไร */}
+      <Dialog open={Boolean(historyContract)} onClose={() => setHistoryContract(null)} fullWidth maxWidth="sm" fullScreen={isMobile}>
+        <DialogTitle sx={{ fontWeight: 800, pb: 1 }}>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <History sx={{ fontSize: 20, color: ACCENT }} />
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ fontWeight: 800, fontSize: "1rem", lineHeight: 1.3 }}>ประวัติการแก้ไขข้อมูลสัญญา</Typography>
+              {historyContract && (
+                <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {[historyContract.contractNo, historyContract.company, historyContract.site].filter(Boolean).join(" · ") || "ไม่ระบุชื่อสัญญา"}
+                </Typography>
+              )}
+            </Box>
+          </Stack>
+        </DialogTitle>
+        <DialogContent dividers sx={{ px: { xs: 2, sm: 3 } }}>
+          {(() => {
+            const logs = historyContract ? contractEditHistory(historyContract) : [];
+            if (logs.length === 0) {
+              return (
+                <Typography variant="body2" sx={{ color: TEXT_SUB, textAlign: "center", py: 4 }}>
+                  ยังไม่เคยมีการแก้ไขข้อมูลสัญญานี้
+                </Typography>
+              );
+            }
+            return (
+              <Stack sx={{ py: 1 }}>
+                {logs.map((log, i) => (
+                  <Stack key={`${log.timestamp}-${i}`} direction="row" spacing={1.5} sx={{ position: "relative" }}>
+                    {/* เส้นไทม์ไลน์ + จุด — ลากต่อเนื่องทุกรายการยกเว้นรายการสุดท้าย */}
+                    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", pt: 0.5 }}>
+                      <Box sx={{ width: 9, height: 9, borderRadius: "50%", bgcolor: i === 0 ? ACCENT : alpha("#0f172a", 0.25), flexShrink: 0 }} />
+                      {i < logs.length - 1 && <Box sx={{ width: "1px", flex: 1, bgcolor: alpha("#0f172a", 0.12), my: 0.5 }} />}
+                    </Box>
+                    <Box sx={{ flex: 1, minWidth: 0, pb: i < logs.length - 1 ? 2 : 0 }}>
+                      <Stack direction="row" alignItems="baseline" spacing={1} flexWrap="wrap">
+                        <Typography sx={{ fontWeight: 700, fontSize: "0.85rem" }}>{log.userName || "ไม่ทราบชื่อ"}</Typography>
+                        <Typography variant="caption" sx={{ color: TEXT_SUB }}>
+                          {moment(log.timestamp).format("D MMM YYYY HH:mm น.")}
+                        </Typography>
+                      </Stack>
+                      {/* ✅ แยกเป็นบรรทัดละ 1 ฟิลด์ (server ต่อด้วย " · ") — แก้ทีเดียวหลายช่องแล้วยัง
+                          ไล่อ่านทีละช่องได้ ไม่ใช่ข้อความยาวพืดบรรทัดเดียว */}
+                      <Stack sx={{ mt: 0.5 }} spacing={0.35}>
+                        {String(log.detail || "").split(" · ").filter(Boolean).map((line, li) => (
+                          <Typography
+                            key={li} variant="body2"
+                            sx={{ fontSize: "0.82rem", color: "text.secondary", wordBreak: "break-word" }}
+                          >
+                            {line}
+                          </Typography>
+                        ))}
+                      </Stack>
+                    </Box>
+                  </Stack>
+                ))}
+              </Stack>
+            );
+          })()}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setHistoryContract(null)} sx={{ textTransform: "none" }}>ปิด</Button>
         </DialogActions>
       </Dialog>
     </Box>

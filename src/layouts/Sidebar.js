@@ -98,10 +98,19 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
     { title: "ทะเบียนเอกสาร", href: "/issued-documents", icon: <FaFileSignature /> },
   ];
 
+  // ✅ หมวดการเงิน — ครึ่งท้ายของสายงาน (เสนอราคา → ทำงาน → วางบิล → รับเงิน) ที่เดิมขาดไปทั้งท่อน
+  // ⚠️ แยกจากหมวดเอกสารโดยตั้งใจ แม้จะต่อกันในสายงาน — คนที่เข้ามาดูคนละกลุ่มกัน (บัญชี vs ผู้ปฏิบัติงาน)
+  const financeMenu = [
+    { title: "วางบิล / รับเงิน", href: "/billing", icon: <FaFileInvoiceDollar /> },
+  ];
+
   // ✅ หมวด "ทีมงาน" — เหลือแค่ภาพรวมทีมช่างจริงๆ (เฉพาะแอดมิน/manager) สรุปภาพรวมงานของช่าง
   // แต่ละคนแยกกันชัดเจน (เดิมไม่มีทางเห็นได้เลยนอกจากไล่กรองเองทีละคนในหน้า Operation)
   const teamMenu = [
     { title: "ภาพรวมทีมช่าง", href: "/team-workload", icon: <FaUserFriends /> },
+    // ✅ ภาพรวมลูกค้า — รวมสัญญา/งานค้าง/ใบเสนอราคา/เอกสารของลูกค้าแต่ละรายไว้จอเดียว
+    // เดิมต้องเปิด 4 หน้าไล่กรองชื่อลูกค้าเองทุกครั้งที่ลูกค้าโทรมาถาม
+    { title: "ภาพรวมลูกค้า", href: "/customer-overview", icon: <FaBuilding /> },
   ];
 
   // ✅ เดิม submenu จะปิดเสมอตอนโหลดหน้าใหม่ ต่อให้กำลังอยู่ในหน้าลูกของมันอยู่ก็ตาม
@@ -238,7 +247,15 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
           {(isTechnician || isAdminOrManager) &&
             documentsMenuShared.map((item, idx) => renderLink(item, `doc-shared-${idx}`))}
 
-          {/* ✅ เฉพาะแอดมิน/manager — เข้าดูภาพรวมงานแยกรายช่างได้จาก sidebar โดยตรง */}
+          {/* ✅ เฉพาะแอดมิน/manager — ข้อมูลการเงินล้วนๆ (ฝั่ง server ก็กันไว้อีกชั้น ไม่ได้พึ่งการซ่อนเมนู) */}
+          {isAdminOrManager && (
+            <>
+              <div className="admin-divider-label">การเงิน</div>
+              {financeMenu.map((item, idx) => renderLink(item, `fin-${idx}`))}
+            </>
+          )}
+
+          {/* ✅ เฉพาะแอดมิน/manager — เข้าดูภาพรวมงานแยกรายช่าง/รายลูกค้าได้จาก sidebar โดยตรง */}
           {isAdminOrManager && (
             <>
               <div className="admin-divider-label">ทีมงาน</div>

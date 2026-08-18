@@ -1,9 +1,12 @@
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
+// ✅ ของกลางชุดเดียวกับหน้าจอ — ยอดในไฟล์ต้องตรงกับที่เห็นบนจอเสมอ
+import { contractBillingSummary } from "../../utils/billing";
 
 // ✅ รูปแบบตัวเลขของช่องจำนวนเงินทุกช่องในไฟล์ที่ส่งออก — เก็บเป็น "ตัวเลขจริง" ใน cell (บวก/ลบ/SUM ต่อ
 // ในไฟล์ได้ตามปกติ) แต่ให้ Excel แสดงผลพร้อมสัญลักษณ์ ฿ นำหน้าเสมอ ตรงกับที่แสดงบนหน้าจอ — เดิมเป็น
 // ตัวเลขเปล่าๆ ที่แยกไม่ออกจากคอลัมน์ "จำนวนครั้ง"/"จำนวนวัน" ที่อยู่ข้างกันในไฟล์เดียวกัน
+
 const MONEY_FMT = '"฿"#,##0';
 
 
@@ -90,6 +93,13 @@ export async function exportContractsToExcel({
     // ✅ เพิ่มให้ตรงกับคอลัมน์ "คืบหน้า" ในตารางบนจอ (เดิมไฟล์ที่ส่งออกไม่มีคอลัมน์นี้เลย ทั้งที่บนจอมี) —
     // สัญญาจริงเป็น "X/Y" (ครั้งที่ทำเสร็จ) ส่วนงานทั่วไป/โปรเจคเป็นสถานะงานตรงๆ (ดู progressInfo)
     { key: "progress", header: "คืบหน้า / สถานะงาน", width: 18, group: "สถานะ", align: "center" },
+    // ✅ การวางบิล/รับเงิน — ต้องมีในไฟล์ที่ส่งออกด้วย ไม่ใช่มีแต่บนจอ เพราะคนที่ใช้ตัวเลขนี้จริง
+    // (บัญชี/ผู้บริหาร) ทำงานกับไฟล์ Excel เป็นหลัก ไม่ได้เปิดหน้าจอนั่งไล่ดูทีละแถว
+    // ⚠️ 3 ช่องยอดเป็นตัวเลขจริง ไม่ใช่ข้อความ — ต้องเอาไป sum/pivot ต่อในไฟล์ได้
+    { key: "billingStatus", header: "สถานะวางบิล", width: 18, group: "วางบิล / รับเงิน", align: "center" },
+    { key: "billingInvoiced", header: "ยอดวางบิล (฿)", width: 15, group: "วางบิล / รับเงิน", align: "right", numFmt: MONEY_FMT },
+    { key: "billingPaid", header: "รับเงินแล้ว (฿)", width: 15, group: "วางบิล / รับเงิน", align: "right", numFmt: MONEY_FMT },
+    { key: "billingOutstanding", header: "ค้างรับ (฿)", width: 15, group: "วางบิล / รับเงิน", align: "right", numFmt: MONEY_FMT },
   ];
   // ✅ แต่ละครั้งแสดงครบในเซลล์เดียว: วันที่ → 👷 หัวหน้าทีมของครั้งนั้น → 👥 ลูกทีมของครั้งนั้น
   // (เดิมมีแค่วันที่ + หัวหน้าทีม ลูกทีมถูกยุบไปรวมเป็นก้อนเดียวท้ายตาราง แยกไม่ออกว่าใครช่วยครั้งไหน)
@@ -191,6 +201,22 @@ export async function exportContractsToExcel({
       visitCount: c.visitCount ?? "",
       jobValue: c.jobValue ?? "",
       contractStatus: st?.label || "",
+      // ⚠️ ใช้ contractBillingSummary ตัวเดียวกับที่ตารางบนจอใช้ — ห้ามคำนวณซ้ำที่นี่ ไม่งั้นยอดในไฟล์
+      // กับยอดบนจอจะไม่ตรงกัน ซึ่งเป็นเรื่องเงินและตรวจสอบย้อนหลังได้ยากมากเมื่อไฟล์ถูกส่งต่อไปแล้ว
+      // ⚠️ แถวที่ยังไม่เคยวางบิลเลยเว้นว่าง ไม่ใส่ 0 — 0 บาทกับ "ยังไม่วางบิล" คนละความหมาย และ 0
+      // จะไปกวนค่าเฉลี่ย/การกรองใน Excel
+      ...(() => {
+        const bs = contractBillingSummary(c.visits || []);
+        if (!bs) return { billingStatus: "", billingInvoiced: "", billingPaid: "", billingOutstanding: "" };
+        return {
+          billingStatus: bs.state === "overdue" && bs.overdueDays > 0
+            ? `เลยกำหนดชำระ ${bs.overdueDays} วัน`
+            : `${bs.label} (${bs.invoicedCount}/${bs.totalCount} ครั้ง)`,
+          billingInvoiced: bs.invoicedCount > 0 ? bs.net : "",
+          billingPaid: bs.invoicedCount > 0 ? bs.paid : "",
+          billingOutstanding: bs.invoicedCount > 0 ? bs.outstanding : "",
+        };
+      })(),
       progress: progressLabel ? progressLabel(c) : "",
       responsiblePerson: c.responsiblePerson || "— ยังไม่มอบหมาย —",
       // ✅ ลูกทีมจากทุกครั้งของแถวนี้ (ไม่ใช่แค่ครั้งที่ 1 เหมือนเดิม) ตัดชื่อซ้ำ + ตัดชื่อที่เป็นหัวหน้า

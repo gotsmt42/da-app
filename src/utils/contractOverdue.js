@@ -138,3 +138,25 @@ export const nextVisitOverdueInfo = (c) => {
 // โดยไม่ต้องดึง/จัดกลุ่มข้อมูลซ้ำเองที่ปลายทาง
 export const countOverdueContracts = (events) =>
   groupEventsByContract(events).filter((c) => Boolean(nextVisitOverdueInfo(c))).length;
+
+// ✅ "สถานะสัญญา" — เทียบวันสิ้นสุดสัญญากับวันนี้ ใช้ร่วมกันทั้งตาราง "ภาพรวมงาน", ไฟล์ Excel ที่ส่งออก,
+// แท็บ "สัญญาหมดอายุ" และหน้า "ภาพรวมลูกค้า"
+// ⚠️ เกณฑ์ต้องตรงกับฝั่ง server (services/OverdueReminder.js → EXPIRY_WARN_DAYS) เป๊ะๆ ไม่งั้นตัวเลข
+// ในแจ้งเตือนกับที่เห็นบนจอจะไม่ตรงกัน
+// ⚠️ ต้องคืน `state` ที่เป็นคีย์คงที่ ไม่ใช่มีแต่ label — ตัวกรองที่ไปเทียบข้อความ "หมดอายุแล้ว" ตรงๆ
+// จะพังเงียบๆ ทันทีที่มีคนแก้ถ้อยคำ (และ label ของ "ใกล้หมดอายุ" มีจำนวนวันต่อท้าย เทียบไม่ได้ตั้งแต่ต้น)
+export const CONTRACT_EXPIRY_WARN_DAYS = 60;
+
+export const contractStatusInfo = (c) => {
+  if (!c.isRealContract || !c.contractEnd) return null;
+  const daysLeft = moment(c.contractEnd).startOf("day").diff(moment().startOf("day"), "days");
+  if (daysLeft < 0) return { state: "expired", label: "หมดอายุแล้ว", color: "#dc2626", daysLeft };
+  if (daysLeft <= CONTRACT_EXPIRY_WARN_DAYS) return { state: "expiring", label: `ใกล้หมดอายุ · ${daysLeft} วัน`, color: "#f59e0b", daysLeft };
+  return { state: "active", label: "มีผลบังคับใช้", color: "#10b981", daysLeft };
+};
+
+// ✅ "สัญญาหมดอายุ" = เลยวันสิ้นสุดสัญญามาแล้ว (คนละเรื่องกับ nextVisitOverdueInfo ที่ดูรอบเข้างานถัดไป)
+// ⚠️ สัญญาที่ยังไม่กรอกวันสิ้นสุดไม่เข้าเกณฑ์นี้ — ถูกแล้ว เพราะยังไม่รู้ว่าหมดอายุหรือยัง การเดาว่า
+// "ไม่กรอก = หมดอายุ" จะทำให้สัญญาที่ยังใช้งานอยู่โผล่มาผิดกลุ่ม
+export const isExpiredContract = (c) => contractStatusInfo(c)?.state === "expired";
+export const isExpiringContract = (c) => contractStatusInfo(c)?.state === "expiring";

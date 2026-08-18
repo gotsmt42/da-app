@@ -23,6 +23,8 @@ const Product = lazy(() => import("../views/ui/Product"));
 const StockProduct = lazy(() => import("../views/ui/StockProduct"));
 const WorkTypeSystem = lazy(() => import("../views/ui/WorkTypeSystem.js"));
 const TeamWorkload = lazy(() => import("../views/ui/TeamWorkload.js"));
+const CustomerOverview = lazy(() => import("../views/ui/CustomerOverview.js"));
+const BillingTracking = lazy(() => import("../views/ui/BillingTracking.js"));
 const QuotationTracking = lazy(() => import("../views/ui/QuotationTracking.js"));
 const IssuedDocuments = lazy(() => import("../views/ui/IssuedDocuments.js"));
 const ContractOverview = lazy(() => import("../views/ui/ContractOverview.js"));
@@ -157,6 +159,27 @@ const ThemeRoutes = [
           </Suspense>
         ),
         title: "Team Workload",
+      },
+      {
+        // ✅ ไม่ห่อด้วย AdminRoute เพราะ manager ต้องเข้าได้ด้วย เหมือน team-workload ด้านบน —
+        // ตัวคอมโพเนนต์เองเช็ค role แล้ว redirect กลับ /dashboard ถ้าไม่ใช่ admin/manager
+        path: "billing",
+        element: (
+          <Suspense fallback={<div>Loading...</div>}>
+            <BillingTracking />
+          </Suspense>
+        ),
+        title: "Billing Tracking",
+      },
+      {
+        // ✅ ไม่ห่อด้วย AdminRoute เพราะ manager ต้องเข้าได้ด้วย — คอมโพเนนต์เช็ค role เอง
+        path: "customer-overview",
+        element: (
+          <Suspense fallback={<div>Loading...</div>}>
+            <CustomerOverview />
+          </Suspense>
+        ),
+        title: "Customer Overview",
       },
       {
         // ✅ ไม่ห่อด้วย AdminRoute เพราะ manager ต้องเข้าได้ด้วย เหมือน team-workload ด้านบน —

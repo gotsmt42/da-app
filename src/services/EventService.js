@@ -103,6 +103,24 @@ const EventService = {
     }
   },
 
+  // ── การวางบิล / รับเงิน ──────────────────────────────────────────────
+  // ⚠️ ห้ามส่งยอด VAT / หัก ณ ที่จ่าย / ยอดสุทธิ ขึ้นไปเอง — server คำนวณให้เสมอจากยอดก่อนภาษี
+  // กับอัตราภาษี (ดู utils/billing.js ฝั่ง server) ส่งขึ้นไปก็ไม่ถูกใช้
+  async SaveBilling(id, payload) {
+    const res = await API.put(`/events/${id}/billing`, payload);
+    return res.data;
+  },
+
+  async AddPayment(id, payload) {
+    const res = await API.post(`/events/${id}/billing/payment`, payload);
+    return res.data;
+  },
+
+  async DeletePayment(id, paymentId) {
+    const res = await API.delete(`/events/${id}/billing/payment/${paymentId}`);
+    return res.data;
+  },
+
   async AddQuotationFollowUp(id, { note, file }) {
     try {
       const formData = new FormData();
