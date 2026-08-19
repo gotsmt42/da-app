@@ -2242,6 +2242,21 @@ const Operation = () => {
       setSearch("");
       setShowAll(true);
       if (groupParam) setStatusGroup(groupParam);
+      // 🐛 ที่แก้ (กด "ตรวจสอบ" ในพาแนล "งานที่ช่างขอปิด" แล้วไม่มีอะไรเกิดขึ้น เหมือนปุ่มตาย):
+      // ปลายทางของปุ่มนี้คือ "การ์ดงาน" ในรายการ ซึ่ง effect เลื่อนจอหาด้วย id `job-card-<id>` —
+      // แต่ id นั้นถูกใส่ไว้ในที่เดียวเท่านั้น คือการ์ดในแท็บ "รายการงาน" + มุมมองการ์ด ถ้าผู้ใช้อยู่
+      // นอกเงื่อนไขนี้ document.getElementById จะคืน null แล้ว effect return เงียบๆ = กดแล้วไม่มีผล
+      // ทั้งที่ URL/ตัวกรอง/highlightId เปลี่ยนถูกต้องครบหมดแล้ว มี 2 ทางที่หลุดได้:
+      //   1. ค้างอยู่แท็บ "รออนุมัติ" (activeTab === 1) — การ์ดไม่ถูก render เลย
+      //   2. ค้างอยู่มุมมอง "ตาราง" (viewMode === "table") — render เป็น OperationTable ซึ่งไม่มี id นี้
+      //      ⚠️ อันนี้ร้ายกว่า เพราะ viewMode ถูกจำไว้ใน localStorage ("operation.viewMode") จึงค้าง
+      //      ข้ามการรีเฟรช/ปิดเปิดเบราว์เซอร์ — เลือกตารางไว้ครั้งเดียวก็เสียไปตลอด
+      // จึงต้องบังคับกลับมาทั้งสองอย่าง (ตรงกับที่ onOpenJob ของ OperationTable ทำอยู่แล้วเวลากดแถว)
+      // ⚠️ ต้องอยู่ใน effect เดียวกับ setHighlightId — React 18 จะ batch ทุก state เป็น render เดียว
+      // การ์ดจึงถูก commit ลง DOM ก่อนที่ effect เลื่อนจอจะทำงาน (ถ้าแยก effect กัน จังหวะจะสลับกัน
+      // จนหา element ไม่เจอในรอบแรก)
+      setActiveTab(0);
+      setViewMode("card");
       // ✅ เก็บเป็น "<id>|<nonce>" ไม่ใช่ id เฉยๆ — กันเคสกดปุ่ม "ตรวจสอบ" งานเดิมซ้ำติดๆ กัน
       // (ก่อนที่ไฮไลต์ครั้งก่อนจะจางหายไปครบ 3 วิ) ถ้าเก็บแค่ id เฉยๆ ค่าจะเหมือนเดิมทุกตัวอักษร
       // React จะมองว่าไม่มีอะไรเปลี่ยน (bail out) ไม่ trigger effect เลื่อนจอซ้ำให้ — ต่อ nonce
@@ -2355,6 +2370,22 @@ const Operation = () => {
     () => (id ? events.find(e => e._id === id) || null : null),
     [id, events]
   );
+
+  // ✅ แยก "ชื่อหลัก" กับ "แท็กประกอบ" ของงานที่ถูกกรองเจาะจง ไว้ใช้กับแถบแจ้งสถานะการกรองด้านล่าง
+  // เดิมยัดทุกอย่างต่อกันเป็นประโยคเดียว (PM · Fire Alarm · Holiday Inn ...) อ่านแล้วแยกไม่ออกว่า
+  // อะไรคือชื่องาน อะไรคือประเภท — ยกชื่อโครงการ/ไซต์ขึ้นเป็นตัวหลักเพราะเป็นสิ่งที่คนใช้จำงานได้จริง
+  // (ตรงกับที่ ClosureRequestsPanel/การ์ดงานใช้อยู่แล้ว) ที่เหลือลดชั้นลงเป็นแท็บเล็กๆ
+  const focusedJob = useMemo(() => {
+    if (!selectedEvent) return null;
+    const hasPlace = Boolean(selectedEvent.company || selectedEvent.site);
+    const name = hasPlace
+      ? companySite(selectedEvent.company, selectedEvent.site)
+      : (selectedEvent.title || "งานที่เลือก");
+    return {
+      name,
+      tags: [selectedEvent.title, selectedEvent.system].filter(t => t && t !== name),
+    };
+  }, [selectedEvent]);
 
   // ✅ สร้างจาก events ทั้งหมด (ก่อนตัวกรองอื่น) เสมอ เพื่อให้งานหลายวันไม่ติดกันถูกจัดกลุ่มครบ
   // ทุกแถว แล้วคิดค้างจากวันสุดท้ายของทั้งชุด ไม่ใช่แยกทีละแถว
@@ -2934,35 +2965,102 @@ const Operation = () => {
           เลย (โดนตัวกรองเดือน/สถานะที่ค้างอยู่คัดออก) กลายเป็นกดลิงก์แล้วไม่เจออะไรเลย */}
       {selectedEvent && (
         <Stack
-          direction="row" alignItems="center" gap={1} flexWrap="wrap"
+          direction={{ xs: "column", sm: "row" }}
+          alignItems={{ xs: "stretch", sm: "center" }}
+          gap={1.5}
           sx={{
-            mb: 2, px: 1.5, py: 1, borderRadius: 2,
-            bgcolor: alpha("#0ea5e9", 0.06), border: "1px solid", borderColor: alpha("#0ea5e9", 0.25),
+            mb: 2.5, px: { xs: 1.5, sm: 2 }, py: 1.5, borderRadius: 2,
+            bgcolor: alpha("#0ea5e9", 0.07),
+            border: "1px solid", borderColor: alpha("#0ea5e9", 0.3),
+            // ✅ ขอบซ้ายหนา = ภาษาที่คนอ่าน UI เข้าใจตรงกันว่า "นี่คือสถานะที่เปิดค้างอยู่" ไม่ใช่คำเตือน
+            // เดิมทั้งแถบเป็นสีจางมาก (พื้น 6% + ตัวหนังสือ caption สีเทา) จนกลืนไปกับพื้นหลังหน้า
+            borderLeft: "4px solid #0284c7",
+            boxShadow: `0 1px 3px ${alpha("#0ea5e9", 0.14)}`,
           }}
         >
-          <Typography variant="caption" sx={{ color: "text.secondary", flex: 1, minWidth: 0 }}>
-            กำลังดูเฉพาะงาน <strong style={{ color: "#0f172a" }}>{selectedEvent.title}</strong>
-            {selectedEvent.system ? ` · ${selectedEvent.system}` : ""}
-            {selectedEvent.site ? ` · ${selectedEvent.site}` : ""}
-          </Typography>
-          {/* ✅ ไปดูงานนี้บนปฏิทินแบบเจาะจงวัน — งานที่ยังไม่ลงตารางไม่มีวันที่จริง ส่งไปที่แผง
-              งานล่วงหน้า (?draft=) แทน ซึ่งเป็นที่ที่การ์ดของมันอยู่จริง */}
-          <Button
-            size="small" variant="outlined" startIcon={<CalendarMonth sx={{ fontSize: 15 }} />}
-            onClick={() => {
-              const q = selectedEvent.unscheduled
-                ? `draft=${selectedEvent._id}&month=${selectedEvent.plannedMonth || ""}`
-                : `event=${selectedEvent._id}&date=${moment(selectedEvent.start).format("YYYY-MM-DD")}`;
-              navigate(`/event?${q}&t=${Date.now()}`);
+          <Box
+            sx={{
+              width: 36, height: 36, borderRadius: 1.5, flexShrink: 0,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              bgcolor: alpha("#0ea5e9", 0.15), color: "#0284c7",
             }}
-            sx={{ borderRadius: 2, textTransform: "none", fontWeight: 700, flexShrink: 0 }}
           >
-            ดูในปฏิทิน
-          </Button>
-          <Button size="small" onClick={() => navigate("/operation")}
-            sx={{ borderRadius: 2, textTransform: "none", flexShrink: 0 }}>
-            แสดงทั้งหมด
-          </Button>
+            <FilterList sx={{ fontSize: 20 }} />
+          </Box>
+
+          <Box flex={1} minWidth={0}>
+            <Typography
+              sx={{ fontSize: "0.7rem", fontWeight: 800, color: "#0284c7", letterSpacing: 0.4, lineHeight: 1.4 }}
+            >
+              กำลังดูเฉพาะงานนี้
+            </Typography>
+            <Typography
+              title={focusedJob.name}
+              sx={{
+                fontSize: "0.95rem", fontWeight: 700, color: "#0f172a", lineHeight: 1.35,
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              }}
+            >
+              {focusedJob.name}
+            </Typography>
+            {focusedJob.tags.length > 0 && (
+              <Stack direction="row" gap={0.5} flexWrap="wrap" sx={{ mt: 0.5 }}>
+                {focusedJob.tags.map(tag => (
+                  <Chip
+                    key={tag}
+                    label={tag}
+                    size="small"
+                    sx={{
+                      height: 20, fontSize: "0.68rem", fontWeight: 700,
+                      bgcolor: "#fff", color: "#0369a1",
+                      border: "1px solid", borderColor: alpha("#0ea5e9", 0.35),
+                      "& .MuiChip-label": { px: 0.85 },
+                    }}
+                  />
+                ))}
+              </Stack>
+            )}
+          </Box>
+          {/* ✅ "ดูในปฏิทิน" พาไปดูงานนี้บนปฏิทินแบบเจาะจงวัน — งานที่ยังไม่ลงตารางไม่มีวันที่จริง
+              ส่งไปที่แผงงานล่วงหน้า (?draft=) แทน ซึ่งเป็นที่ที่การ์ดของมันอยู่จริง
+              ✅ ให้เป็นปุ่มทึบใบเดียวในแถบนี้ (การกระทำที่พาไปข้างหน้า) ส่วน "แสดงทั้งหมด" คือการ
+              "ล้างตัวกรอง" จึงใช้ไอคอนกากบาทกับน้ำหนักที่เบากว่า ไม่แข่งสายตากัน — เดิมเป็น outlined
+              คู่กับ text ที่ดูน้ำหนักพอๆ กันจนไม่รู้ว่าควรกดอันไหน */}
+          <Stack
+            direction="row" gap={0.75} flexShrink={0}
+            sx={{ width: { xs: "100%", sm: "auto" } }}
+          >
+            <Button
+              size="small" variant="contained" disableElevation
+              startIcon={<CalendarMonth sx={{ fontSize: 16 }} />}
+              onClick={() => {
+                const q = selectedEvent.unscheduled
+                  ? `draft=${selectedEvent._id}&month=${selectedEvent.plannedMonth || ""}`
+                  : `event=${selectedEvent._id}&date=${moment(selectedEvent.start).format("YYYY-MM-DD")}`;
+                navigate(`/event?${q}&t=${Date.now()}`);
+              }}
+              sx={{
+                flex: { xs: 1, sm: "initial" },
+                borderRadius: 2, textTransform: "none", fontWeight: 700, whiteSpace: "nowrap",
+                bgcolor: "#0284c7", "&:hover": { bgcolor: "#0369a1" },
+              }}
+            >
+              ดูในปฏิทิน
+            </Button>
+            <Button
+              size="small" variant="outlined"
+              startIcon={<Close sx={{ fontSize: 16 }} />}
+              onClick={() => navigate("/operation")}
+              sx={{
+                flex: { xs: 1, sm: "initial" },
+                borderRadius: 2, textTransform: "none", fontWeight: 600, whiteSpace: "nowrap",
+                color: "text.secondary", borderColor: alpha("#0ea5e9", 0.35), bgcolor: "#fff",
+                "&:hover": { borderColor: alpha("#0ea5e9", 0.6), bgcolor: alpha("#0ea5e9", 0.04) },
+              }}
+            >
+              แสดงทั้งหมด
+            </Button>
+          </Stack>
         </Stack>
       )}
 
