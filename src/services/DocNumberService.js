@@ -10,9 +10,13 @@ const DocNumberService = {
     const res = await API.get(`/doc-number/peek`, { params: { docType } });
     return res.data;
   },
-  /** ⚠️ กินเลขจริง — เรียกตอนกดออกเอกสารเท่านั้น ห้ามเรียกตอนเปิดกล่อง */
-  async next(docType = "delivery") {
-    const res = await API.post(`/doc-number/next`, { docType });
+  /**
+   * ⚠️ กินเลขจริง — เรียกตอนกดออกเอกสารเท่านั้น ห้ามเรียกตอนเปิดกล่อง
+   * ✅ eventId — ต้องส่งไปด้วยเสมอถ้ามี เพราะผู้ใช้ที่ไม่ใช่ admin/manager จะออกเลขได้เฉพาะงานที่ตัวเอง
+   * เกี่ยวข้องเท่านั้น backend ใช้ค่านี้ตรวจสิทธิ์ (ดู POST /doc-number/next)
+   */
+  async next(docType = "delivery", eventId) {
+    const res = await API.post(`/doc-number/next`, { docType, eventId });
     return res.data;
   },
 };

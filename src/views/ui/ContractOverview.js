@@ -946,9 +946,16 @@ export default function ContractOverview() {
       // ✅ สัญญาที่เพิ่งสร้างแบบ "ฉบับร่าง" (ยังไม่ลงวันที่เข้างานเลย) เป็น unscheduled:true ซึ่ง
       // getEventOp() (event-op) กรองทิ้งเสมอ — ต้องดึง drafts มารวมด้วย ไม่งั้นสัญญาที่เพิ่งสร้างจะ
       // ไม่โผล่ในตารางเลยจนกว่าจะมีครั้งที่ 1 ถูกลงตารางจริง
+      // ✅ scope:"responsible" — หน้านี้เป็น "สรุปภาพรวมความรับผิดชอบ" (มูลค่างาน/คืบหน้า/ยอดรวม)
+      // ช่างจึงต้องเห็นเฉพาะงานที่ระบุตัวเองเป็น "ผู้รับผิดชอบหลัก" ไว้ตรงๆ เท่านั้น ไม่อิงทีมที่เข้างาน
+      // และไม่รวมงานที่ยังไม่มอบหมาย — งานที่แค่ไปช่วยทำแต่ไม่ได้รับผิดชอบ ไม่ควรถูกนับรวมในยอดของตัวเอง
+      // ⚠️ ส่งเฉพาะหน้านี้หน้าเดียว — การดำเนินงาน/งานของฉัน/แดชบอร์ด/ปฏิทิน ยังใช้ตัวกรองเดิมทุกประการ
+      // (ดู strictResponsibleOrClauses ฝั่ง server) ช่างยังเห็นงานที่ตัวเองต้องไปทำครบเหมือนเดิม
+      // ⚠️ แอดมิน/manager ไม่ได้รับผลอะไร — ฝั่ง server เห็นทุกงานอยู่แล้วไม่ว่าจะส่ง scope มาหรือไม่
+      const scopeOpts = { scope: "responsible" };
       const [res, draftsRes] = await Promise.all([
-        EventService.getEventOp().catch(() => ({ userEvents: [] })),
-        EventService.GetDraftEvents().catch(() => ({ drafts: [] })),
+        EventService.getEventOp(scopeOpts).catch(() => ({ userEvents: [] })),
+        EventService.GetDraftEvents(scopeOpts).catch(() => ({ drafts: [] })),
       ]);
       setEvents([...(res?.userEvents || []), ...(draftsRes?.drafts || [])]);
     } catch (err) {
@@ -2429,7 +2436,15 @@ export default function ContractOverview() {
     }
 
     const payload = {};
-    if (field === "jobValue" || field === "commission" || field === "visitCount" || field === "intervalMonths") payload[field] = rawValue ? Number(rawValue) : undefined;
+    // 🐛 BUG ที่แก้ (ลบค่าเงินที่ใส่ผิดไว้ไม่ได้): เดิมช่องว่าง → undefined ซึ่ง JSON.stringify ตัดคีย์นั้น
+    // ทิ้งไปเลยตอนส่ง backend จึงไม่เห็นฟิลด์ → มองว่า "ไม่ได้แก้" → ค่าเดิมค้างอยู่ตลอด ลบไม่ออกสักที
+    // ✅ ส่ง null แทนสำหรับช่องจำนวนเงิน (มูลค่างาน/ค่าคอม) — backend รองรับการล้างค่าด้วย null/"" อยู่แล้ว
+    // ทั้ง 2 route (ดู PUT /basic-info และ PUT /contract/:contractGroupId)
+    // ⚠️ จำนวนครั้ง/ระยะห่างระหว่างรอบยังคงใช้ undefined เหมือนเดิมโดยตั้งใจ — 2 ตัวนี้เป็นโครงสร้างของ
+    // สัญญา (จำนวนคอลัมน์ "ครั้งที่ N" คำนวณจากมัน) ล้างเป็นค่าว่างแล้วตารางจะเพี้ยนทั้งหน้า ไม่ใช่แค่
+    // ช่องเดียวหาย — ถ้าอยากแก้ต้องใส่ตัวเลขใหม่ทับเท่านั้น
+    if (field === "jobValue" || field === "commission") payload[field] = rawValue ? Number(rawValue) : null;
+    else if (field === "visitCount" || field === "intervalMonths") payload[field] = rawValue ? Number(rawValue) : undefined;
     else if (field === "responsiblePerson") { payload.responsiblePerson = rawValue; payload.responsiblePersonId = teamToId.get(rawValue) || ""; }
     else payload[field] = rawValue;
 
@@ -2491,6 +2506,14 @@ export default function ContractOverview() {
     isAdminOrManager ||
     (c.rawResponsiblePersonId && c.rawResponsiblePersonId === userData?.userId) ||
     (c.rawResponsiblePerson && c.rawResponsiblePerson === userData?.fname), [isAdminOrManager, userData?.fname, userData?.userId]);
+
+  // ✅ สิทธิ์แนบไฟล์ในกล่องเอกสาร — อิงจากแถว+ครั้งที่กดเปิดมาจริง (c ไม่อยู่ใน scope ตรงจุดที่เรนเดอร์
+  // กล่อง เพราะกล่องอยู่ระดับหน้า ไม่ได้อยู่ในลูปของแถว)
+  const docsCanUpload = useMemo(() => {
+    if (!docsTarget) return false;
+    const row = contracts.find((c) => c.key === docsTarget.rowKey);
+    return row ? canEditRoundTeam(row) : false;
+  }, [docsTarget, contracts, canEditRoundTeam]);
 
   // ✅ ผู้รับผิดชอบแก้ไขข้อมูลพื้นฐาน (บริษัท/โครงการ/ระบบ/ประเภทงาน/เอกสาร) ของ "งานทั่วไป/งานโปรเจค
   // ที่ตัวเองรับผิดชอบ" ได้ด้วยตามที่ผู้ใช้ขอ — ใช้ identity เดียวกับ canEditRoundTeam เป๊ะๆ (admin/
@@ -3143,6 +3166,7 @@ pagedRows.map((c, idx) => {
                                 round={n}
                                 title={docsTitleFor(c, n)}
                                 onOpen={handleOpenDocs}
+                                canUpload={canEditRoundTeam(c)}
                               />
                             </Stack>
                             {/* ✅ แถวปุ่มจัดการครั้งนี้ (เพิ่มวันต่อเนื่อง / ย้ายครั้งที่ / แยกออกจากสัญญา)
@@ -3150,7 +3174,11 @@ pagedRows.map((c, idx) => {
                                 วันที่ + ชื่อทีม + ปุ่มอีก 3 ตัวซ้อนลงไป ทำให้เซลล์แน่นจนอ่านวันที่ไม่รู้เรื่อง
                                 และตัวปุ่มเองเล็กแค่ 14px กดด้วยนิ้วแทบไม่โดนอยู่ดี — ทั้ง 3 อย่างยังทำได้ครบ
                                 จากมุมมองการ์ดบนมือถือ และจากตารางบนจอคอม */}
-                            {isAdminOrManager && c.isRealContract && !useMobileTable && (
+                            {/* ✅ ผู้รับผิดชอบสัญญานี้จัดการครั้งของตัวเองได้ด้วย (ไม่ใช่แค่ admin/manager)
+                                — ใช้ canEditRoundTeam ซึ่งเป็นนิยาม "ผู้รับผิดชอบตัวจริง" ชุดเดียวกับที่
+                                ใช้คุมการแก้ทีมรายครั้งอยู่แล้ว จะได้ไม่มีนิยามสิทธิ์ 2 ชุดในไฟล์เดียวกัน
+                                ⚠️ "แยกออกจากสัญญา" ยังเป็นของ admin/manager เท่านั้น (ดูปุ่มที่ 3) */}
+                            {canEditRoundTeam(c) && c.isRealContract && !useMobileTable && (
                               <Stack direction="row" spacing={0.25}>
                                 <Tooltip title="เพิ่มวันที่ต่อเนื่อง (เข้างานไม่ติดกัน)">
                                   <IconButton
@@ -3170,14 +3198,19 @@ pagedRows.map((c, idx) => {
                                     <SwapHoriz sx={{ fontSize: 14 }} />
                                   </IconButton>
                                 </Tooltip>
-                                <Tooltip title="แยกครั้งนี้ออกจากสัญญา (ย้ายเป็นงานเก่าที่ยังไม่จัดกลุ่ม)">
-                                  <IconButton
-                                    size="small" onClick={() => handleDetachRound(c, n)}
-                                    sx={{ p: 0.25, color: "text.disabled", transition: "background-color .15s, color .15s", "&:hover": { color: ACCENT, bgcolor: alpha(ACCENT, 0.1) } }}
-                                  >
-                                    <LinkOff sx={{ fontSize: 14 }} />
-                                  </IconButton>
-                                </Tooltip>
+                                {/* ⚠️ เฉพาะ admin/manager — "แยกออกจากสัญญา" ดึงครั้งนั้นออกจากสัญญา
+                                    ไปเป็นงานลอย ซึ่งกระทบทั้งจำนวนครั้งที่ใช้ไป/ความคืบหน้า/ยอดรวมของ
+                                    สัญญาทั้งใบ และย้อนกลับเองไม่ได้ในคลิกเดียว ผู้รับผิดชอบจึงไม่ควรทำเอง */}
+                                {isAdminOrManager && (
+                                  <Tooltip title="แยกครั้งนี้ออกจากสัญญา (ย้ายเป็นงานเก่าที่ยังไม่จัดกลุ่ม)">
+                                    <IconButton
+                                      size="small" onClick={() => handleDetachRound(c, n)}
+                                      sx={{ p: 0.25, color: "text.disabled", transition: "background-color .15s, color .15s", "&:hover": { color: ACCENT, bgcolor: alpha(ACCENT, 0.1) } }}
+                                    >
+                                      <LinkOff sx={{ fontSize: 14 }} />
+                                    </IconButton>
+                                  </Tooltip>
+                                )}
                               </Stack>
                             )}
                           </Stack>
@@ -3799,6 +3832,7 @@ pagedRows.map((c, idx) => {
                           round={n}
                           title={docsTitleFor(c, n)}
                           onOpen={handleOpenDocs}
+                          canUpload={canEditRoundTeam(c)}
                           compact={false}
                         />
                       </Stack>
@@ -3828,7 +3862,9 @@ pagedRows.map((c, idx) => {
                       <Dash />
                     )}
                   </Box>
-                  {isAdminOrManager && c.isRealContract && roundVisits.length > 0 && (
+                  {/* ✅ ผู้รับผิดชอบจัดการครั้งของตัวเองได้ด้วย — กติกาเดียวกับฝั่งตาราง (canEditRoundTeam)
+                      ⚠️ "แยกออกจากสัญญา" ยังเป็นของ admin/manager เท่านั้น */}
+                  {canEditRoundTeam(c) && c.isRealContract && roundVisits.length > 0 && (
                     <Stack direction="row" spacing={0.25}>
                       <IconButton size="small" onClick={() => openExtendVisitDialog(c, n)} sx={{ p: 0.25, color: "text.disabled" }}>
                         <Add sx={{ fontSize: 14 }} />
@@ -3837,9 +3873,11 @@ pagedRows.map((c, idx) => {
                       <IconButton size="small" onClick={() => openMoveRoundDialog(c, n)} sx={{ p: 0.25, color: "text.disabled" }}>
                         <SwapHoriz sx={{ fontSize: 14 }} />
                       </IconButton>
-                      <IconButton size="small" onClick={() => handleDetachRound(c, n)} sx={{ p: 0.25, color: "text.disabled" }}>
-                        <LinkOff sx={{ fontSize: 14 }} />
-                      </IconButton>
+                      {isAdminOrManager && (
+                        <IconButton size="small" onClick={() => handleDetachRound(c, n)} sx={{ p: 0.25, color: "text.disabled" }}>
+                          <LinkOff sx={{ fontSize: 14 }} />
+                        </IconButton>
+                      )}
                     </Stack>
                   )}
                 </Stack>
@@ -5427,6 +5465,8 @@ pagedRows.map((c, idx) => {
         roundVisits={docsRoundVisits}
         title={docsTarget?.title}
         onClose={handleCloseDocs}
+        canUpload={docsCanUpload}
+        onUploaded={() => fetchData(true)}
       />
     </Box>
   );

@@ -14,21 +14,13 @@ const Badges = lazy(() => import("../views/ui/Badges"));
 const Buttons = lazy(() => import("../views/ui/Buttons"));
 const Cards = lazy(() => import("../views/ui/Cards"));
 const Grid = lazy(() => import("../views/ui/Grid"));
-const Customer = lazy(() => import("../views/ui/Customer.js"));
-const Employee = lazy(() => import("../views/ui/Employee.js"));
 const Forms = lazy(() => import("../views/ui/Forms"));
 const Breadcrumbs = lazy(() => import("../views/ui/Breadcrumbs"));
 const Account = lazy(() => import("../components/User/Employee/Account.js"));
 const Product = lazy(() => import("../views/ui/Product"));
 const StockProduct = lazy(() => import("../views/ui/StockProduct"));
 const WorkTypeSystem = lazy(() => import("../views/ui/WorkTypeSystem.js"));
-const TeamWorkload = lazy(() => import("../views/ui/TeamWorkload.js"));
-const CustomerOverview = lazy(() => import("../views/ui/CustomerOverview.js"));
-const BillingTracking = lazy(() => import("../views/ui/BillingTracking.js"));
-const QuotationTracking = lazy(() => import("../views/ui/QuotationTracking.js"));
-const IssuedDocuments = lazy(() => import("../views/ui/IssuedDocuments.js"));
 const ContractOverview = lazy(() => import("../views/ui/ContractOverview.js"));
-const Files = lazy(() => import("../views/ui/Files"));
 const FileUpload = lazy(() => import("../views/ui/FileUpload"));
 const EventCalendar = lazy(() => import("../views/ui/EventCalendar.js"));
 const Operate = lazy(() => import("../views/ui/Operation.js"));
@@ -39,6 +31,16 @@ const PublicRoute = lazy(() => import("./PublicRoute.js"));
 const CheckConnectionToast = lazy(() => import("./CheckConnectionToast.js"));
 
 const MyJobs = lazy(() => import("../views/Technician/MyJobs.js"));
+
+// ✅ หน้ารวม 4 หน้า — ยุบหน้าที่เป็นข้อมูลประเภทเดียวกันให้เหลือหน้าเดียวต่อเรื่อง แล้วแยกด้วยแท็บ
+// (ดูเหตุผลของแต่ละการรวมในหัวไฟล์ของแต่ละตัว) URL เดิมทั้งหมดยัง redirect เข้ามาที่นี่ได้ ลิงก์เก่าไม่พัง
+// ⚠️ Customer / Employee / TeamWorkload / CustomerOverview / BillingTracking / QuotationTracking /
+// IssuedDocuments / Files ไม่ถูก import ที่นี่แล้ว — ย้ายไปโหลดแบบ lazy ภายใน Hub ที่เกี่ยวข้องแทน
+// (Router รู้จักแค่หน้ารวม 4 หน้า ส่วนหน้าย่อยเป็นรายละเอียดภายในของ Hub นั้นๆ)
+const CustomerHub = lazy(() => import("../views/ui/CustomerHub.js"));
+const StaffHub = lazy(() => import("../views/ui/StaffHub.js"));
+const DocumentsHub = lazy(() => import("../views/ui/DocumentsHub.js"));
+const FinanceHub = lazy(() => import("../views/ui/FinanceHub.js"));
 
 
 const ThemeRoutes = [
@@ -127,16 +129,50 @@ const ThemeRoutes = [
         ),
         title: "Grid",
       },
+      // ── หน้ารวม (ยุบหน้าที่เป็นข้อมูลประเภทเดียวกันให้เหลือหน้าเดียวต่อเรื่อง) ──────────
+      // ⚠️ ไม่ห่อด้วย AdminRoute — แต่ละ Hub เช็ค role เองและ "ไม่สร้างแท็บ" ที่ผู้ใช้ไม่มีสิทธิ์เห็น
+      // (manager ต้องเข้าได้ด้วย ซึ่ง AdminRoute เดิมรับแค่ admin) ดูเหตุผลเต็มในหัวไฟล์ของแต่ละ Hub
       {
-        path: "customer",
+        path: "customers",
         element: (
-          <AdminRoute>
-            <Suspense fallback={<div>Loading Customers...</div>}>
-              <Customer />
-            </Suspense>
-          </AdminRoute>
+          <Suspense fallback={<div>Loading...</div>}>
+            <CustomerHub />
+          </Suspense>
         ),
-        title: "Customer",
+        title: "Customers",
+      },
+      {
+        path: "staff",
+        element: (
+          <Suspense fallback={<div>Loading...</div>}>
+            <StaffHub />
+          </Suspense>
+        ),
+        title: "Staff",
+      },
+      {
+        path: "documents",
+        element: (
+          <Suspense fallback={<div>Loading...</div>}>
+            <DocumentsHub />
+          </Suspense>
+        ),
+        title: "Documents",
+      },
+      {
+        path: "finance",
+        element: (
+          <Suspense fallback={<div>Loading...</div>}>
+            <FinanceHub />
+          </Suspense>
+        ),
+        title: "Finance",
+      },
+      {
+        // ✅ URL เดิม — ยังเข้าได้เหมือนเดิม แต่พาไปหน้ารวมพร้อมเปิดแท็บที่ตรงกันให้เลย
+        // (ลิงก์เก่า/บุ๊กมาร์ก/ลิงก์ในแอปที่ยังชี้มาที่นี่จึงไม่พังสักอัน)
+        path: "customer",
+        element: <Navigate to="/customers?tab=registry" replace />,
       },
       {
         path: "worktype",
@@ -150,58 +186,34 @@ const ThemeRoutes = [
         title: "Work Type",
       },
       {
-        // ✅ ไม่ห่อด้วย AdminRoute เพราะหน้านี้ต้องให้ "manager" เข้าได้ด้วย (AdminRoute เดิมรับแค่ admin)
-        // ตัวคอมโพเนนต์เองเช็ค role แล้ว redirect กลับ /dashboard ถ้าไม่ใช่ admin/manager
+        // ✅ URL เดิม — ยังเข้าได้เหมือนเดิม แต่พาไปหน้ารวมพร้อมเปิดแท็บที่ตรงกันให้เลย
+        // (ลิงก์เก่า/บุ๊กมาร์ก/ลิงก์ในแอปที่ยังชี้มาที่นี่จึงไม่พังสักอัน)
         path: "team-workload",
-        element: (
-          <Suspense fallback={<div>Loading...</div>}>
-            <TeamWorkload />
-          </Suspense>
-        ),
-        title: "Team Workload",
+        element: <Navigate to="/staff?tab=workload" replace />,
       },
       {
-        // ✅ ไม่ห่อด้วย AdminRoute เพราะ manager ต้องเข้าได้ด้วย เหมือน team-workload ด้านบน —
-        // ตัวคอมโพเนนต์เองเช็ค role แล้ว redirect กลับ /dashboard ถ้าไม่ใช่ admin/manager
+        // ✅ URL เดิม — ยังเข้าได้เหมือนเดิม แต่พาไปหน้ารวมพร้อมเปิดแท็บที่ตรงกันให้เลย
+        // (ลิงก์เก่า/บุ๊กมาร์ก/ลิงก์ในแอปที่ยังชี้มาที่นี่จึงไม่พังสักอัน)
         path: "billing",
-        element: (
-          <Suspense fallback={<div>Loading...</div>}>
-            <BillingTracking />
-          </Suspense>
-        ),
-        title: "Billing Tracking",
+        element: <Navigate to="/finance?tab=billing" replace />,
       },
       {
-        // ✅ ไม่ห่อด้วย AdminRoute เพราะ manager ต้องเข้าได้ด้วย — คอมโพเนนต์เช็ค role เอง
+        // ✅ URL เดิม — ยังเข้าได้เหมือนเดิม แต่พาไปหน้ารวมพร้อมเปิดแท็บที่ตรงกันให้เลย
+        // (ลิงก์เก่า/บุ๊กมาร์ก/ลิงก์ในแอปที่ยังชี้มาที่นี่จึงไม่พังสักอัน)
         path: "customer-overview",
-        element: (
-          <Suspense fallback={<div>Loading...</div>}>
-            <CustomerOverview />
-          </Suspense>
-        ),
-        title: "Customer Overview",
+        element: <Navigate to="/customers?tab=overview" replace />,
       },
       {
-        // ✅ ไม่ห่อด้วย AdminRoute เพราะ manager ต้องเข้าได้ด้วย เหมือน team-workload ด้านบน —
-        // ตัวคอมโพเนนต์เองเช็ค role แล้ว redirect กลับ /dashboard ถ้าไม่ใช่ admin/manager
+        // ✅ URL เดิม — ยังเข้าได้เหมือนเดิม แต่พาไปหน้ารวมพร้อมเปิดแท็บที่ตรงกันให้เลย
+        // (ลิงก์เก่า/บุ๊กมาร์ก/ลิงก์ในแอปที่ยังชี้มาที่นี่จึงไม่พังสักอัน)
         path: "quotations",
-        element: (
-          <Suspense fallback={<div>Loading...</div>}>
-            <QuotationTracking />
-          </Suspense>
-        ),
-        title: "Quotation Tracking",
+        element: <Navigate to="/finance?tab=quotations" replace />,
       },
       {
-        // ✅ เปิดให้ทุก role เข้าดูได้ — ช่างต้องตามหาใบที่เคยออกให้งานของตัวเองได้ ส่วนการเปลี่ยนสถานะ/
-        // แก้บันทึก ยังเป็นสิทธิ์ admin/manager เท่านั้น (ทั้งฝั่งจอและฝั่ง server)
+        // ✅ URL เดิม — ยังเข้าได้เหมือนเดิม แต่พาไปหน้ารวมพร้อมเปิดแท็บที่ตรงกันให้เลย
+        // (ลิงก์เก่า/บุ๊กมาร์ก/ลิงก์ในแอปที่ยังชี้มาที่นี่จึงไม่พังสักอัน)
         path: "issued-documents",
-        element: (
-          <Suspense fallback={<div>Loading...</div>}>
-            <IssuedDocuments />
-          </Suspense>
-        ),
-        title: "Issued Documents",
+        element: <Navigate to="/documents?tab=issued" replace />,
       },
       {
         // ✅ ไม่ห่อด้วย AdminRoute เพราะ manager ต้องเข้าได้ด้วย เหมือน team-workload/quotations ด้านบน —
@@ -215,15 +227,10 @@ const ThemeRoutes = [
         title: "Job Overview",
       },
       {
+        // ✅ URL เดิม — ยังเข้าได้เหมือนเดิม แต่พาไปหน้ารวมพร้อมเปิดแท็บที่ตรงกันให้เลย
+        // (ลิงก์เก่า/บุ๊กมาร์ก/ลิงก์ในแอปที่ยังชี้มาที่นี่จึงไม่พังสักอัน)
         path: "employee",
-        element: (
-          <AdminRoute>
-            <Suspense fallback={<div>Loading Users...</div>}>
-              <Employee />
-            </Suspense>
-          </AdminRoute>
-        ),
-        title: "Employee",
+        element: <Navigate to="/staff?tab=registry" replace />,
       },
       {
         path: "forms",
@@ -277,15 +284,10 @@ const ThemeRoutes = [
         title: "File Upload",
       },
       {
+        // ✅ URL เดิม — ยังเข้าได้เหมือนเดิม แต่พาไปหน้ารวมพร้อมเปิดแท็บที่ตรงกันให้เลย
+        // (ลิงก์เก่า/บุ๊กมาร์ก/ลิงก์ในแอปที่ยังชี้มาที่นี่จึงไม่พังสักอัน)
         path: "files",
-        element: (
-
-            <Suspense fallback={<div>Loading Files...</div>}>
-              <Files />
-            </Suspense>
-   
-        ),
-        title: "Files",
+        element: <Navigate to="/documents?tab=files" replace />,
       },
       {
         path: "event",

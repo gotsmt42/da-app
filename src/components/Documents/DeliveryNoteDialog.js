@@ -206,7 +206,9 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
     try {
       // ⚠️ กินเลขจริงตรงนี้ที่เดียวเท่านั้น — และต้องได้เลขมาก่อนถึงจะสร้างไฟล์ ถ้าขอเลขไม่สำเร็จต้องไม่ออก
       // เอกสารที่ไม่มีเลขที่ออกไป (เอกสารไม่มีเลขอ้างอิงคือเอกสารที่ตามกลับไม่ได้)
-      const { docNumber } = await DocNumberService.next("delivery");
+      // ⚠️ ส่ง id ของงานไปด้วยเสมอ — ผู้ใช้ที่ไม่ใช่ admin/manager จะออกเลขได้เฉพาะงานที่ตัวเอง
+      // เกี่ยวข้อง backend ใช้ค่านี้ตรวจสิทธิ์ (FullCalendar ใช้ .id ส่วน object ดิบจาก API ใช้ ._id)
+      const { docNumber } = await DocNumberService.next("delivery", job?.id || job?._id);
       const { url, blob, fileName } = await buildPdf(docNumber);
       const finalForm = { ...form, docNumber };
       setForm(finalForm);

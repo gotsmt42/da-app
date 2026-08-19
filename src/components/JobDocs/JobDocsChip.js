@@ -11,6 +11,7 @@
 import { memo } from "react";
 import { Box, Stack, Tooltip } from "@mui/material";
 import { alpha } from "@mui/material/styles";
+import { AttachFile } from "@mui/icons-material";
 import { roundDocs } from "../../utils/jobDocTypes";
 
 /**
@@ -20,9 +21,34 @@ import { roundDocs } from "../../utils/jobDocTypes";
  *                                      state เองทุกครั้ง ไม่งั้นไฟล์ที่เห็นจะเป็นชุดที่เก่าค้างไว้)
  * @param {boolean}  props.compact      true = ตารางเดสก์ท็อป · false = การ์ดมือถือ
  */
-function JobDocsChip({ roundVisits = [], rowKey, round, title, onOpen, compact = true }) {
+function JobDocsChip({ roundVisits = [], rowKey, round, title, onOpen, compact = true, canUpload = false }) {
   const groups = roundDocs(roundVisits);
-  if (groups.length === 0) return null;
+
+  // ✅ ไม่มีเอกสารเลย + เป็นคนที่แนบไฟล์ได้ → โชว์ปุ่มคลิปจางๆ ให้กดเข้าไปแนบได้
+  // ⚠️ จำเป็นต้องมี ไม่งั้น "ครั้งที่ยังไม่มีเอกสาร" จะไม่มีอะไรให้กดเลยสักจุด = แนบไฟล์ครั้งแรก
+  // ไม่ได้ ต้องไปเริ่มที่หน้าการดำเนินงานอยู่ดี ซึ่งขัดกับที่เพิ่งเปิดให้แนบจากตรงนี้ได้
+  // ⚠️ ยังคงหลักเดิมไว้: คนที่แนบไม่ได้ (ช่าง/ผู้ดูอย่างเดียว) เห็น "ไม่มีเอกสาร = ไม่มีอะไรโผล่"
+  // เหมือนเดิมเป๊ะ ตารางจึงไม่รกขึ้นสำหรับคนกลุ่มนั้น
+  if (groups.length === 0) {
+    if (!canUpload) return null;
+    return (
+      <Tooltip title="ยังไม่มีเอกสารของครั้งนี้ — คลิกเพื่อแนบไฟล์" placement="top">
+        <Box
+          component="button" type="button"
+          onClick={(e) => { e.stopPropagation(); onOpen?.(rowKey, round, title); }}
+          sx={{
+            border: "none", bgcolor: "transparent", p: 0.15, m: 0, borderRadius: 1,
+            cursor: "pointer", lineHeight: 1, display: "inline-flex", alignItems: "center",
+            color: "text.disabled", opacity: 0.45,
+            transition: "opacity .15s, background-color .15s",
+            "&:hover": { opacity: 1, bgcolor: alpha("#0f172a", 0.06) },
+          }}
+        >
+          <AttachFile sx={{ fontSize: compact ? 13 : 15 }} />
+        </Box>
+      </Tooltip>
+    );
+  }
 
   const total = groups.reduce((n, g) => n + g.files.length, 0);
   const tip = [

@@ -790,7 +790,27 @@ export const getEditEvent = async ({
   // ✅ รวมสองกรณี "เปิดดูได้อย่างเดียว" เข้าเป็นตัวเดียว ใช้ล็อกทุกช่อง/ปุ่มที่แก้ข้อมูลได้ทั้งฟอร์ม —
   // (1) งานรออนุมัติที่ช่างเปิดดู (2) ลูกทีมที่มีชื่อในงาน — พฤติกรรมล็อกเหมือนกันเป๊ะทุกจุด ต่างกัน
   // แค่ข้อความอธิบายเหตุผลด้านบนฟอร์มเท่านั้น
-  const isViewOnly = isPendingForTech || isTeamMemberViewer;
+  // ✅ งานที่ปิดแล้ว — ช่างเปิดดูย้อนหลังได้ (ดู canViewEvent ใน EventCalendar/index.js) แต่แก้ไม่ได้
+  // ⚠️ ต้องล็อกฟอร์มด้วย ไม่ใช่แค่ปล่อยให้ backend ปฏิเสธตอนกดบันทึก — ไม่งั้นช่างจะพิมพ์แก้ไปทั้งหน้า
+  // แล้วเพิ่งมารู้ตอนกดบันทึกว่าทำไม่ได้ (backend คืน 403 "งานนี้ปิดแล้ว ไม่สามารถแก้ไขได้" ที่ PUT /:id)
+  const isClosedForTech = eventStatus === "ดำเนินการเสร็จสิ้น" && !isAdminOrManagerUser;
+  const isViewOnly = isPendingForTech || isTeamMemberViewer || isClosedForTech;
+
+  // ✅ "ช่างที่มีชื่อในงานนี้" (ทั้งหัวหน้าทีมเข้างานและลูกทีม) แก้ข้อมูลประกอบของงานตัวเองได้
+  // ⚠️ ตั้งใจแยกออกมาเป็นสิทธิ์ของตัวเอง ไม่ไปแก้ isViewOnly — ของพวกนี้เป็น "บันทึกประกอบงาน" ที่คน
+  // หน้างานรู้ดีที่สุดและแก้ผิดก็ไม่กระทบใคร ต่างจากข้อมูลโครงสร้างงาน (บริษัท/โครงการ/ครั้งที่/ทีม/
+  // วันที่) ที่ยังต้องล็อกไว้เหมือนเดิม เพราะกระทบสัญญา/ตารางงานของคนอื่นด้วย
+  const isJobParticipantUser = hasAnyEditRight || isListedTeamMember;
+
+  // ✅ เลขที่อ้างอิงเอกสาร + รายละเอียดงาน — แก้ได้ "แม้งานปิดแล้ว" ตามที่ผู้ใช้ระบุ
+  // เหตุผลที่ต้องยกเว้นให้: เรื่องเอกสารมักตามมาทีหลังงานปิดเสมอ (ได้เลขที่เอกสารจริงตอนวางบิล /
+  // ต้องเติมรายละเอียดที่หน้างานเพิ่มทีหลัง) ถ้าล็อกตายตอนปิดงานจะกลายเป็นต้องรบกวนแอดมินทุกครั้ง
+  // ⚠️ ยังบล็อกงานที่รออนุมัติอยู่ (isPendingForTech) — ช่างแตะอะไรไม่ได้เลยจนกว่าจะอนุมัติ/ไม่อนุมัติ
+  const canEditDocFields = isAdminOrManagerUser || (isJobParticipantUser && !isPendingForTech);
+
+  // ✅ สีบนปฏิทิน — แก้ได้แม้งานปิดแล้วเช่นกัน เพราะเป็นแค่การแสดงผลบนปฏิทิน ไม่กระทบข้อมูลงาน
+  // รายงาน หรือยอดเงินใดๆ เลย (ต่างจากวันที่/ทีม/สถานะ ที่แก้แล้วกระทบของจริง)
+  const canEditColor = canEditDocFields;
 
   const canEditTeamAssignment = isAdminOrManagerUser || (isRawResponsiblePerson && !isViewOnly);
   // ❌ งานที่ admin ปิดแล้ว (ดำเนินการเสร็จสิ้น) ช่างลบไม่ได้อีก มีแค่ admin/manager เท่านั้น
@@ -911,15 +931,16 @@ export const getEditEvent = async ({
       ? `${eventOwner.fname} ${eventOwner.lname}`
       : "ไม่ทราบผู้เพิ่ม");
 
+  // ✅ สีบนปฏิทิน — ช่างที่มีชื่อในงานปรับเองได้แล้ว (ดู canEditColor) เดิมเป็นของ admin/manager เท่านั้น
   const inputBg = Object.assign(document.createElement("input"), {
     type: "color",
     value: ev.backgroundColor || "#3b82f6",
-    disabled: !isAdminOrManagerUser,
+    disabled: !canEditColor,
   });
   const inputText = Object.assign(document.createElement("input"), {
     type: "color",
     value: ev.textColor || "#ffffff",
-    disabled: !isAdminOrManagerUser,
+    disabled: !canEditColor,
   });
 
   // ✅ admin/manager เลือกได้ครบทุกสถานะเสมอ; ช่างเลือกได้แค่ 2 สถานะแรกถ้ายังไม่ถูกเลื่อนสถานะ
@@ -1230,10 +1251,17 @@ export const getEditEvent = async ({
     <p style="font-size:11px;color:#b45309;margin:-6px 0 10px;">
       🔒 งานนี้ยังรออนุมัติ — ดูได้อย่างเดียว แก้ไขไม่ได้จนกว่าแอดมิน/manager จะอนุมัติหรือไม่อนุมัติก่อน
     </p>
+    ` : isClosedForTech ? `
+    <p style="font-size:11px;color:#059669;margin:-6px 0 10px;">
+      ✅ งานนี้ปิดแล้ว — เปิดดูย้อนหลังได้ทั้งหมด แต่แก้ไขไม่ได้ (ถ้าต้องแก้ ให้แจ้งแอดมิน/manager)
+    </p>
     ` : isTeamMemberViewer ? `
     <p style="font-size:11px;color:#0369a1;margin:-6px 0 10px;">
-      👥 คุณเป็น "ลูกทีม" ของงานนี้ — เปิดดูรายละเอียดได้ทั้งหมด แต่แก้ไขไม่ได้
-      (ต้องให้หัวหน้าทีมที่เข้างาน ผู้รับผิดชอบงาน หรือแอดมิน/manager เป็นผู้แก้)
+      👥 คุณเป็น "ลูกทีม" ของงานนี้ — เปิดดูได้ทั้งหมด
+      ${canEditDocFields
+        ? `และแก้ได้เฉพาะ <b>สีบนปฏิทิน · เลขที่อ้างอิงเอกสาร · รายละเอียดงาน</b>
+           ส่วนวันที่/ทีม/ข้อมูลโครงการ ต้องให้หัวหน้าทีมที่เข้างาน ผู้รับผิดชอบงาน หรือแอดมิน/manager เป็นผู้แก้`
+        : `แต่แก้ไขไม่ได้ (ต้องให้หัวหน้าทีมที่เข้างาน ผู้รับผิดชอบงาน หรือแอดมิน/manager เป็นผู้แก้)`}
     </p>
     ` : ""}
 
@@ -1294,17 +1322,18 @@ export const getEditEvent = async ({
 
     <hr class="ee-divider">
 
-    <!-- section: เอกสาร -->
-    <p class="ee-section-label">เอกสาร</p>
+    <!-- section: เอกสาร — ✅ ช่างที่มีชื่อในงาน (หัวหน้าทีม/ลูกทีม) แก้ได้แล้ว และยังแก้ได้แม้งานปิดไปแล้ว
+         (เรื่องเอกสารมักตามมาทีหลังงานปิดเสมอ — ดู canEditDocFields) -->
+    <p class="ee-section-label">เอกสาร ${!isAdminOrManagerUser && canEditDocFields ? `<span style="font-size:10.5px;font-weight:600;color:#16a34a;">✏️ แก้ไขได้</span>` : ""}</p>
     <!-- ⚠️ เดิมเป็นกริด 2 คอลัมน์คู่กับช่อง "ชื่อเรื่อง" ที่ถูกตัดออกไปแล้ว — เหลือช่องเดียวในกริด 2 ช่อง
          ทำให้ช่องกินแค่ครึ่งซ้ายและมีที่ว่างค้างครึ่งขวาทั้งแถว จึงเอาออกจากกริดให้เต็มความกว้างไปเลย -->
     <div class="ee-field">
       <label>📄 เลขที่อ้างอิง (Doc No.)</label>
-      <input id="editdocNo" type="text" value="${attrHtml(evendocNo)}" placeholder="เช่น DOC-2026-001" ${isAdminOrManagerUser ? "" : "disabled"}>
+      <input id="editdocNo" type="text" value="${attrHtml(evendocNo)}" placeholder="เช่น DOC-2026-001" ${canEditDocFields ? "" : "disabled"}>
     </div>
     <div class="ee-field">
       <label>📋 รายละเอียดงาน (Description)</label>
-      <textarea id="editDescription" rows="8" placeholder="กรอกรายละเอียดงาน..." ${isAdminOrManagerUser ? "" : "disabled"}></textarea>
+      <textarea id="editDescription" rows="8" placeholder="กรอกรายละเอียดงาน..." ${canEditDocFields ? "" : "disabled"}></textarea>
       <div class="ee-char-count" id="charCount">0 ตัวอักษร</div>
     </div>
 
@@ -1340,14 +1369,21 @@ export const getEditEvent = async ({
            ตรงนี้ด้วยทันทีโดยไม่ต้องบอก
            ⚠️ เฉพาะแอดมิน/manager — ตรงกับสิทธิ์ที่ backend บังคับตอนขอเลขที่เอกสาร (routes/docNumber.js)
            ถ้าโชว์ให้ช่างด้วยจะกลายเป็นปุ่มที่กดแล้วขึ้น error ทุกครั้ง -->
-      ${isAdminOrManagerUser && onOpenDeliveryNote ? `<button class="ee-btn ee-btn-delivery" id="btnDeliveryNote">📦 ออกใบส่งมอบงาน</button>` : ""}
+      ${/* ✅ ช่างที่มีชื่อในงานออกใบส่งมอบ "ของงานตัวเอง" ได้แล้ว (ตามที่ผู้ใช้ขอ) — เดิมเฉพาะ admin/manager
+            ⚠️ ยังกันงานที่รออนุมัติไว้ (canEditDocFields=false ตอนนั้น) — งานที่ยังไม่ได้รับอนุมัติให้ทำ
+            ยังไม่ควรมีเอกสารส่งมอบออกไปหาลูกค้าเด็ดขาด
+            ⚠️ backend ตรวจซ้ำอีกชั้นว่าคนขอเลขที่เอกสารเกี่ยวข้องกับงานนั้นจริง (ดู POST /doc-number/next) */""}
+      ${canEditDocFields && onOpenDeliveryNote ? `<button class="ee-btn ee-btn-delivery" id="btnDeliveryNote">📦 ออกใบส่งมอบงาน</button>` : ""}
     </div>
 
     <!-- 🟢 ขวา: ยืนยัน — งานรออนุมัติที่ช่างเปิดดู ไม่มีอะไรให้บันทึก (ทุกช่องถูกล็อกหมดแล้ว) จึงไม่ต้อง
          โชว์ปุ่มบันทึกที่กดแล้วไม่มีผลอะไรเลย (ป้องกันความสับสน/error หลอกๆ) เหลือแค่ปุ่มปิดอย่างเดียว -->
     <div class="ee-btn-group ee-btn-group-right">
       <button class="ee-btn ee-btn-ghost"   id="btnCancel">✕ ปิด</button>
-      ${isViewOnly ? "" : `<button class="ee-btn ee-btn-success" id="btnConfirm">💾 บันทึก</button>`}
+      ${/* ⚠️ ลูกทีมเคยไม่มีปุ่มบันทึกเลย (isViewOnly=true) — ตอนนี้แก้สี/เอกสาร/รายละเอียดงานได้แล้ว
+            จึงต้องมีปุ่มให้กดบันทึกด้วย ไม่งั้นแก้ไปก็เก็บไม่ได้ กลายเป็นช่องที่พิมพ์ได้แต่ไร้ประโยชน์
+            ✅ ส่วนงานรออนุมัติยังไม่มีปุ่มเหมือนเดิม (canEditDocFields=false ในกรณีนั้น) */""}
+      ${isViewOnly && !canEditDocFields && !canEditColor ? "" : `<button class="ee-btn ee-btn-success" id="btnConfirm">💾 บันทึก</button>`}
     </div>
 
   </div>
@@ -1843,6 +1879,22 @@ export const getEditEvent = async ({
         jobValue:       getVal("editJobValue") ? Number(getVal("editJobValue")) : undefined,
       } : null);
 
+      // ✅ งานที่ปิดแล้ว + ผู้ใช้เป็นช่าง — ส่งเฉพาะ 4 ฟิลด์ที่อนุญาตจริงเท่านั้น
+      // ⚠️ จำเป็นต้องตัดให้เหลือเท่านี้ ไม่ใช่ส่งทั้งก้อนแล้วหวังให้ backend เมินส่วนเกิน — backend
+      // ตรวจแบบ "ทุกคีย์ที่ส่งมาต้องอยู่ในรายการที่อนุญาต" (ดู CLOSED_JOB_TECH_FIELDS ใน PUT /:id)
+      // ถ้าติดฟิลด์อื่นไปด้วยแม้แต่ตัวเดียวจะโดนปฏิเสธทั้งคำขอ กลายเป็นกดบันทึกแล้วเด้ง 403 ทุกครั้ง
+      // ✅ ผลพลอยได้ที่สำคัญกว่า: การันตีว่าค่าที่ช่างแตะไม่ได้ (วันที่/ทีม/สถานะ/ครั้งที่) จะไม่ถูกเขียน
+      // ทับด้วยค่าที่ค้างอยู่ในฟอร์มโดยไม่ตั้งใจ แม้จะมีบั๊กที่ทำให้ช่องไหนหลุดการล็อกไปก็ตาม
+      // ⚠️ ต้องมี activityLog ด้วย — ประวัติการแก้ไขถูกแนบไปกับ payload เดียวกันตอนบันทึก ถ้าตัดทิ้ง
+      // การแก้ของช่างบนงานที่ปิดแล้วจะไม่เหลือร่องรอยเลยว่าใครแก้อะไรเมื่อไหร่
+      const CLOSED_JOB_ALLOWED = ["docNo", "description", "backgroundColor", "textColor", "fontSize", "activityLog"];
+      const trimForClosedJob = (payload) => {
+        if (!isClosedForTech) return payload;
+        const out = {};
+        CLOSED_JOB_ALLOWED.forEach((k) => { if (payload[k] !== undefined) out[k] = payload[k]; });
+        return out;
+      };
+
       const buildPayload = () => {
         const endInput = getVal("editEnd");
         // ⚠️ เดิม fallback ไปที่ eventEnd.toISOString() ตรงๆ เวลาช่องวันที่สิ้นสุดว่าง
@@ -1994,7 +2046,9 @@ export const getEditEvent = async ({
               await upsertLookups(payload.title, payload.system);
               const changeEntries = buildChangeLogEntries(payload);
               if (changeEntries.length > 0) payload.activityLog = [...eventActivityLog, ...changeEntries];
-              await EventService.UpdateEvent(eventId, payload);
+              // ⚠️ ตัดให้เหลือเฉพาะฟิลด์ที่อนุญาตก่อนส่ง ถ้าเป็นงานที่ปิดแล้วและผู้ใช้เป็นช่าง
+              // (ดูเหตุผลเต็มที่ trimForClosedJob) — งานปกติส่งครบทุกฟิลด์เหมือนเดิมทุกประการ
+              await EventService.UpdateEvent(eventId, trimForClosedJob(payload));
               const contractFields = buildContractFields();
               if (contractFields) {
                 await EventService.UpdateContractFields(eventContractGroupId, contractFields);

@@ -252,7 +252,8 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
       // คือเอกสารที่ตามกลับไม่ได้ (เฉพาะคนที่มีสิทธิ์ออกเลข ส่วนคนอื่นใช้เลขที่กรอกไว้ในช่องตามเดิม)
       let finalNumber = form.docNumber;
       if (canUseRunningNumber) {
-        const res = await DocNumberService.next("notice");
+        // ⚠️ ส่ง id ของงานไปด้วย — backend ใช้ตรวจว่าผู้ขอเลขเกี่ยวข้องกับงานนี้จริง (ดู /doc-number/next)
+        const res = await DocNumberService.next("notice", job?.id || job?._id);
         finalNumber = res.docNumber;
       }
       const { url, blob, fileName } = await buildPdf(finalNumber);

@@ -137,18 +137,21 @@ function EventCalendar() {
   // เดิมยังไม่เช็ค responsiblePerson เลยด้วย ทำให้คนที่ถูกตั้งเป็น "ผู้รับผิดชอบ" (แต่ไม่ได้อยู่ใน
   // team/resPerson ของครั้งนี้) เปิดหน้าแก้ไขงานตัวเองไม่ได้เลย
   // ❌ ยกเว้น: งานที่ปิดแล้ว (ดำเนินการเสร็จสิ้น) ช่างแก้ไขไม่ได้อีก มีแค่ admin/manager เท่านั้น
+  // ✅ "เกี่ยวข้องกับงานนี้ไหม" — เจ้าของงาน / ผู้ถูกมอบหมายเข้างาน / หัวหน้าทีม / ผู้รับผิดชอบ
+  // ⚠️ ไม่รวมลูกทีม (teamMembers) โดยตั้งใจ — ดู canViewEventAsTeamMember ด้านล่าง
+  const isJobParticipant = (extendedProps) =>
+    isAdminOrManager ||
+    extendedProps?.userId === userId ||
+    (extendedProps?.resPerson && extendedProps.resPerson === userId) ||
+    (extendedProps?.team && extendedProps.team === userData?.fname) ||
+    (extendedProps?.responsiblePersonId && extendedProps.responsiblePersonId === userId) ||
+    (extendedProps?.responsiblePerson && extendedProps.responsiblePerson === userData?.fname);
+
   const canEditEvent = (extendedProps) => {
     if (isJobLocked(extendedProps)) {
       return false;
     }
-    return (
-      isAdminOrManager ||
-      extendedProps?.userId === userId ||
-      (extendedProps?.resPerson && extendedProps.resPerson === userId) ||
-      (extendedProps?.team && extendedProps.team === userData?.fname) ||
-      (extendedProps?.responsiblePersonId && extendedProps.responsiblePersonId === userId) ||
-      (extendedProps?.responsiblePerson && extendedProps.responsiblePerson === userData?.fname)
-    );
+    return isJobParticipant(extendedProps);
   };
 
   // ✅ "ลูกทีม" ที่มีชื่ออยู่ในงานนี้ — เปิดดูรายละเอียดงานได้ แต่แก้ไขไม่ได้ (ฟอร์มล็อกให้เองทุกช่อง
@@ -159,6 +162,19 @@ function EventCalendar() {
     (extendedProps?.teamMembers || []).some(
       (m) => (m?.userId && m.userId === userId) || (m?.name && m.name === userData?.fname)
     );
+
+  /**
+   * 🐛 BUG ที่แก้ (บางงานที่มีชื่อตัวเองอยู่ กดเข้าไปดูไม่ได้ เด้ง "คุณไม่มีสิทธิ์ดูแผนงานนี้"):
+   * เดิมใช้ canEditEvent ตัวเดียวตัดสินทั้ง "แก้ได้" และ "เปิดดูได้" — แต่ canEditEvent คืน false ทันที
+   * ถ้างานถูกล็อก (isJobLocked = ปิดงานแล้ว และไม่ใช่ admin/manager) ผลคือช่างที่เป็นหัวหน้าทีม/
+   * ผู้รับผิดชอบ/คนสร้างงานเอง เปิดดูงานที่ "ตัวเองเพิ่งทำเสร็จ" ไม่ได้อีกเลย ทั้งที่ควรย้อนดูวันที่/
+   * รายละเอียด/เอกสารของงานตัวเองได้ตลอด (และมักต้องดูตอนตามเรื่องเอกสาร/วางบิลหลังปิดงานด้วยซ้ำ)
+   * ✅ แยก "เปิดดู" ออกมาเป็นสิทธิ์ของตัวเอง — ใครก็ตามที่เกี่ยวข้องกับงาน (รวมลูกทีม) เปิดดูได้เสมอ
+   * ไม่ว่างานจะปิดแล้วหรือยัง ส่วนการ "แก้ไข" ยังใช้ canEditEvent เดิมที่ล็อกไว้ทุกประการ
+   * ⚠️ ต้องไม่เอาไปใช้คุมการลาก/ย่อขยายงานบนปฏิทินเด็ดขาด — จุดพวกนั้นต้องใช้ canEditEvent เท่านั้น
+   */
+  const canViewEvent = (extendedProps) =>
+    isJobParticipant(extendedProps) || canViewEventAsTeamMember(extendedProps);
 
   const [events, setEvents] = useState([]);
 
@@ -249,6 +265,32 @@ function EventCalendar() {
     const t = setTimeout(() => setHighlightEventId(null), 6000);
     return () => clearTimeout(t);
   }, [searchParams]);
+
+  /**
+   * ✅ เลื่อนหน้าจอไปหางานที่ถูกลิงก์มาให้เอง
+   * 🐛 ที่แก้: เดิมกด "ดูในปฏิทิน" แล้วปฏิทินเปลี่ยนไปเดือนที่ถูกต้องและใส่กรอบกะพริบให้จริง — แต่ไม่มี
+   * อะไรพาสายตาไปถึงงานนั้น ปฏิทินเดือนหนึ่งสูงเกินหนึ่งหน้าจอเสมอ ถ้างานอยู่สัปดาห์ท้ายๆ ก็ตกอยู่ใต้
+   * ขอบจอ ผู้ใช้เห็นแค่ปฏิทินเปล่าๆ แล้วต้องไล่เลื่อนหาเองอยู่ดี = ปุ่มแทบไม่ได้ช่วยอะไร
+   * ⚠️ ต้องรอ FullCalendar เรนเดอร์เดือนใหม่ให้เสร็จก่อนถึงจะหา element เจอ และบางครั้งข้อมูลยังโหลด
+   * ไม่เสร็จด้วยซ้ำ — จึงวนหาซ้ำทุก 100ms แทนการ setTimeout ครั้งเดียวแบบเดาเวลา (เดาสั้นไปก็ไม่เจอ
+   * เดายาวไปก็รู้สึกหน่วง) เจอเมื่อไหร่หยุดทันที และเลิกหาเองหลัง ~3 วิ กันวนไม่จบถ้างานไม่อยู่ในเดือนนั้นจริง
+   * ⚠️ อ้างอิงจาก class ที่ eventClassNames ใส่ให้ (.fc-event-linked-highlight) — เป็นตัวเดียวที่
+   * ผูกกับ "งานที่ถูกไฮไลต์" อยู่แล้ว ไม่ต้องเพิ่ม data attribute ใหม่ให้ทุก event ทั้งปฏิทิน
+   */
+  useEffect(() => {
+    if (!highlightEventId) return undefined;
+    let tries = 0;
+    const timer = setInterval(() => {
+      const el = document.querySelector(".fc-event-linked-highlight");
+      if (el) {
+        clearInterval(timer);
+        el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+      } else if (++tries > 30) {
+        clearInterval(timer);
+      }
+    }, 100);
+    return () => clearInterval(timer);
+  }, [highlightEventId]);
 
   // ✅ FullCalendar v6 มี ResizeObserver ของตัวเองบน .fc คอยจับขนาด container ที่เปลี่ยนอยู่แล้ว
   // แต่โค้ดชุดนี้ไม่เคยถูกทดสอบกับการ "ย่อความกว้าง container ด้วย CSS" มาก่อน (เดิมปฏิทินกว้างเต็ม
@@ -1585,7 +1627,7 @@ function EventCalendar() {
             // "ไม่มีสิทธิ์" ทันที ทั้งที่เป็นคนที่ต้องไปทำงานนั้นเองและควรเห็นรายละเอียด/วันเวลา/สถานที่
             // ⚠️ เปิดได้ ≠ แก้ได้ — ฟอร์มจะล็อกทุกช่องให้เองเมื่อผู้ใช้เป็นลูกทีมล้วนๆ (isTeamMemberViewer
             // ใน EditEvent.js) จึงส่งเข้า handleEditEvent ตัวเดียวกันได้เลย ไม่ต้องทำหน้าจอแยกอีกชุด
-            if (canEditEvent(arg.event.extendedProps) || canViewEventAsTeamMember(arg.event.extendedProps)) {
+            if (canViewEvent(arg.event.extendedProps)) {
               handleEditEvent(arg);
             } else {
               Swal.fire("❌ คุณไม่มีสิทธิ์ดูแผนงานนี้");
@@ -1911,16 +1953,28 @@ function EventCalendar() {
    กะพริบช้าๆ ให้ตาจับได้ทันทีว่างานไหน แล้วหายเองใน 6 วิ (ดู highlightEventId)
    ⚠️ ใช้ outline ไม่ใช่ border — border จะไปดันขนาดกล่องทำให้การ์ดขยับ/ตารางเลื่อน ส่วน outline
    วาดทับนอกกรอบโดยไม่กินพื้นที่ layout เลย */
+/* ⚠️ การ์ดงานมีสีพื้นของตัวเองได้ทุกสี (ผู้ใช้เลือกเอง) — ถ้าใช้แค่วงแหวนสีแดง งานที่พื้นหลังเป็นสีแดง/
+   ส้มอยู่แล้วจะกลืนไปกับกรอบจนแทบมองไม่เห็นว่าอันไหนถูกไฮไลต์ จึงเพิ่ม "วงแหวนขาว" คั่นอีกชั้นระหว่าง
+   ตัวการ์ดกับวงแหวนแดง (box-shadow ซ้อน 2 ชั้น) ทำให้เห็นชัดบนพื้นทุกสีเหมือนกันหมด
+   ⚠️ ยังใช้ outline/box-shadow เท่านั้น ไม่ใช้ border — border จะไปดันขนาดกล่องทำให้การ์ดขยับ/ตารางเลื่อน */
 @keyframes ecLinkedPulse {
-  0%, 100% { outline-color: rgba(220,38,38,.95); box-shadow: 0 0 0 4px rgba(220,38,38,.18); }
-  50%      { outline-color: rgba(220,38,38,.35); box-shadow: 0 0 0 7px rgba(220,38,38,0); }
+  0%, 100% {
+    outline-color: rgba(220,38,38,1);
+    box-shadow: 0 0 0 2px #fff, 0 0 0 6px rgba(220,38,38,.35), 0 2px 10px rgba(220,38,38,.45);
+  }
+  50% {
+    outline-color: rgba(220,38,38,.4);
+    box-shadow: 0 0 0 2px #fff, 0 0 0 10px rgba(220,38,38,0), 0 2px 10px rgba(220,38,38,.15);
+  }
 }
 .fc-event-linked-highlight {
-  outline: 2px solid rgba(220,38,38,.95);
-  outline-offset: 1px;
+  outline: 2px solid rgba(220,38,38,1);
+  outline-offset: 2px;
   border-radius: 4px;
-  animation: ecLinkedPulse 1.3s ease-in-out infinite;
-  z-index: 5;
+  animation: ecLinkedPulse 1.2s ease-in-out infinite;
+  /* ยกขึ้นมาอยู่เหนือการ์ดใบอื่นในช่องวันเดียวกัน ไม่งั้นวงแหวนโดนใบที่วาดทีหลังทับบางส่วน */
+  position: relative;
+  z-index: 6;
 }
 @media (prefers-reduced-motion: reduce) {
   .fc-event-linked-highlight { animation: none; }

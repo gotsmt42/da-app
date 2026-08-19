@@ -17,6 +17,9 @@ import {
   useMediaQuery, CircularProgress,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterMoment } from "@mui/x-date-pickers/AdapterMoment";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { Payments, AddCircleOutline, DeleteOutline, InsertDriveFile, AutoAwesome } from "@mui/icons-material";
 import EventService from "../../services/EventService";
 import FilePreviewDialog from "../Documents/FilePreviewDialog";
@@ -25,7 +28,68 @@ import { billingStatus, previewAmounts, paidTotal, baht, perRoundAmount, BILLING
 
 const ACCENT = "#0891b2";
 const TEXT_SUB = "#64748b";
+const BORDER_MAIN = "#e2e8f0";
+const SURFACE_SUBTLE = "#f8fafc";
 
+/**
+ * ✅ การ์ดครอบแต่ละส่วนของกล่อง — กล่องนี้มี "ฟอร์มอิสระ 2 ชุด" อยู่ในหน้าเดียว (ใบวางบิล กับ การรับเงิน)
+ * ซึ่งแต่ละชุดมีปุ่มบันทึกของตัวเองคนละปุ่ม
+ * 🐛 ที่แก้: เดิมทั้ง 2 ชุดเรียงต่อกันเป็นเนื้อเดียว คั่นด้วยหัวข้อตัวหนาเล็กๆ กับเส้นแบ่งบางๆ แล้วปุ่ม
+ * บันทึกลอยอยู่กลางเนื้อหา ส่วนท้ายกล่องมีแค่ปุ่ม "ปิด" — คนใช้จึงแยกไม่ออกว่าปุ่มไหนบันทึกอะไร และ
+ * เข้าใจผิดว่าปุ่มท้ายกล่องคือปุ่มบันทึกหลัก (กดปิดแล้วข้อมูลที่กรอกหาย)
+ * ✅ ครอบเป็นการ์ดแยกใบ + วางปุ่มของแต่ละใบไว้มุมขวาล่างของใบตัวเอง = เห็นได้ทันทีว่าปุ่มนี้เป็นของ
+ * ส่วนไหน ส่วนท้ายกล่องเหลือแค่ "ปิด" ซึ่งชัดว่าไม่ใช่การบันทึก
+ */
+/**
+ * ✅ ช่องวันที่รูปแบบไทย (วว/ดด/ปปปป)
+ * 🐛 ที่แก้: เดิมใช้ <input type="date"> ซึ่ง "รูปแบบที่แสดง" ถูกกำหนดโดย locale ของเบราว์เซอร์ล้วนๆ
+ * แอปสั่งไม่ได้เลย (ไม่มี attribute/CSS ใดๆ ที่เปลี่ยนได้) — เครื่องที่ตั้ง locale เป็น en-US จึงเห็น
+ * 08/19/2026 (เดือน/วัน/ปี) ซึ่งอ่านสลับกับที่คนไทยคุ้น และอันตรายมากกับเอกสารการเงิน เพราะวันที่อย่าง
+ * 08/09 อ่านได้ 2 แบบโดยไม่มีอะไรบอกว่าอันไหนถูก
+ * ✅ ใช้ DatePicker ของ MUI แทน ซึ่งบังคับรูปแบบได้จริงด้วย inputFormat และแสดงเหมือนกันทุกเครื่อง
+ * ⚠️ state ยังเก็บเป็นสตริง "YYYY-MM-DD" เหมือนเดิมทุกประการ — ไม่แตะทั้งค่าที่ส่งขึ้น server และ
+ * ตรรกะคำนวณวันครบกำหนด แค่เปลี่ยน "วิธีแสดง/วิธีรับ input" เท่านั้น
+ * ⚠️ กันค่าไม่ถูกต้องระหว่างพิมพ์ — ผู้ใช้พิมพ์ค้างกลางทางได้เสมอ ถ้าไม่เช็ค isValid() จะได้สตริง
+ * "Invalid date" หลุดเข้า state แล้วถูกส่งขึ้น server
+ */
+const ThaiDateField = ({ label, value, onChange, ...rest }) => (
+  <DatePicker
+    label={label}
+    value={value ? moment(value, "YYYY-MM-DD") : null}
+    onChange={(v) => onChange(v && v.isValid() ? v.format("YYYY-MM-DD") : "")}
+    inputFormat="DD/MM/YYYY"
+    renderInput={(params) => (
+      <TextField
+        {...params}
+        size="small"
+        fullWidth
+        {...rest}
+        inputProps={{ ...params.inputProps, placeholder: "วว/ดด/ปปปป" }}
+      />
+    )}
+  />
+);
+
+const SectionCard = ({ title, caption, right, children, sx }) => (
+  <Box sx={{ border: `1px solid ${BORDER_MAIN}`, borderRadius: 2.5, overflow: "hidden", ...sx }}>
+    <Stack
+      direction="row" alignItems="center" spacing={1}
+      sx={{ px: 1.75, py: 1.1, bgcolor: SURFACE_SUBTLE, borderBottom: `1px solid ${BORDER_MAIN}` }}
+    >
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Typography sx={{ fontWeight: 800, fontSize: "0.85rem", lineHeight: 1.3 }}>{title}</Typography>
+        {caption && <Typography variant="caption" sx={{ color: TEXT_SUB }}>{caption}</Typography>}
+      </Box>
+      {right}
+    </Stack>
+    <Box sx={{ p: 1.75 }}>{children}</Box>
+  </Box>
+);
+
+// ⚠️ ห้ามเปลี่ยนรูปแบบวันที่ตรงนี้เป็น DD-MM-YYYY เด็ดขาด — นี่คือ "รูปแบบที่เก็บใน state/ส่งขึ้น server"
+// ไม่ใช่รูปแบบที่แสดงบนจอ (รูปแบบที่แสดงคุมด้วย inputFormat ของ ThaiDateField ต่างหาก)
+// ถ้าเก็บเป็น DD-MM-YYYY: moment("19-08-2026", "YYYY-MM-DD") จะได้ปี 2019 — ผิดแบบเงียบๆ ไม่ error
+// และ moment("19-08-2026") ที่ใช้คำนวณวันครบกำหนดชำระจะได้ Invalid date
 const emptyInvoice = () => ({
   invoiceNo: "", invoicedAt: moment().format("YYYY-MM-DD"),
   creditTermDays: 30, amountBeforeVat: "", vatRate: 7, whtRate: 3, note: "",
@@ -170,6 +234,16 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle }) {
     amountBeforeVat: form.amountBeforeVat, vatRate: form.vatRate, whtRate: form.whtRate,
   });
 
+  // ✅ วันครบกำหนดชำระ = วันที่วางบิล + เครดิตเทอม — คำนวณสดจากค่าที่กรอกอยู่ ให้เห็นผลทันทีตอนแก้
+  // เครดิตเทอม (ไม่ต้องบันทึกก่อนถึงจะรู้) ⚠️ วันที่/เครดิตเทอมอาจยังกรอกไม่ครบระหว่างพิมพ์ ต้องเช็ค
+  // isValid() ก่อนเสมอ ไม่งั้นจะโชว์ "Invalid date" ให้คนใช้เห็นกลางกล่องการเงิน
+  const dueDateLabel = (() => {
+    const base = moment(form.invoicedAt);
+    const term = Number(form.creditTermDays);
+    if (!base.isValid() || !Number.isFinite(term) || term < 0) return "";
+    return base.clone().add(term, "days").format("D MMM YYYY");
+  })();
+
   return (
     <Dialog open onClose={() => !saving && onClose?.()} fullWidth maxWidth="sm" fullScreen={isMobile}>
       <DialogTitle sx={{ pb: 1 }}>
@@ -187,6 +261,8 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle }) {
         </Typography>
       </DialogTitle>
 
+      {/* ⚠️ DatePicker ของ MUI ต้องอยู่ใน LocalizationProvider เสมอ ไม่งั้นพังตอน render */}
+      <LocalizationProvider dateAdapter={AdapterMoment}>
       <DialogContent dividers>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
@@ -195,10 +271,11 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle }) {
             แต่เดิมดูได้จากหน้านั้นที่เดียว — คนกรอกยอดวางบิลต้องเปิด 2 หน้าคู่กันเพื่อดูรูปแล้วพิมพ์ยอดตาม
             ✅ ยกมาไว้ในกล่องนี้เลย จะได้ดูรูปกับกรอกยอดอยู่ที่เดียวกัน */}
         {attachments.length > 0 && (
-          <Box sx={{ mb: 2 }}>
-            <Typography sx={{ fontWeight: 800, fontSize: "0.85rem", mb: 0.75 }}>
-              ใบวางบิลที่แนบมา ({attachments.length})
-            </Typography>
+          <SectionCard
+            sx={{ mb: 2 }}
+            title={`ใบวางบิลที่แนบมา (${attachments.length})`}
+            caption="กดที่รูปเพื่อดูขนาดเต็ม แล้วกรอกยอดตามใบจริง"
+          >
             <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 0.5 }}>
               {attachments.map((f) => {
                 const isImage = isImageFile(f);
@@ -238,7 +315,7 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle }) {
                 );
               })}
             </Stack>
-          </Box>
+          </SectionCard>
         )}
 
         {/* ⚠️ ผลจาก AI เป็น "ข้อเสนอให้ตรวจ" ไม่ใช่ค่าที่บันทึกแล้ว — ต้องบอกให้ชัดที่สุดเท่าที่ทำได้
@@ -267,12 +344,15 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle }) {
           </Alert>
         )}
 
-        <Typography sx={{ fontWeight: 800, fontSize: "0.85rem", mb: 1 }}>ข้อมูลใบวางบิล</Typography>
+        <SectionCard
+          title="ข้อมูลใบวางบิล"
+          caption="กรอกยอดก่อน VAT แล้วระบบจะคำนวณยอดที่ลูกค้าต้องโอนให้"
+        >
         <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1.25, mb: 1.5 }}>
           <TextField size="small" label="เลขที่ใบวางบิล" value={form.invoiceNo}
             onChange={(e) => setForm((f) => ({ ...f, invoiceNo: e.target.value }))} />
-          <TextField size="small" type="date" label="วันที่วางบิล" InputLabelProps={{ shrink: true }}
-            value={form.invoicedAt} onChange={(e) => setForm((f) => ({ ...f, invoicedAt: e.target.value }))} />
+          <ThaiDateField label="วันที่วางบิล" value={form.invoicedAt}
+            onChange={(v) => setForm((f) => ({ ...f, invoicedAt: v }))} />
           <TextField size="small" type="number" label="ยอดก่อน VAT" value={form.amountBeforeVat}
             onChange={(e) => setForm((f) => ({ ...f, amountBeforeVat: e.target.value }))}
             helperText={hint}
@@ -293,45 +373,72 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle }) {
           </TextField>
         </Box>
 
-        {/* ✅ ตัวอย่างยอด — ให้เห็นยอดที่ลูกค้าต้องโอนจริงก่อนกดบันทึก (ค่าจริงคำนวณใหม่ที่ server) */}
-        <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: alpha(ACCENT, 0.05), mb: 1.5 }}>
-          {[
-            { k: "ยอดก่อน VAT", v: baht(preview.amountBeforeVat) },
-            { k: `VAT ${form.vatRate}%`, v: `+${baht(preview.vatAmount)}` },
-            { k: `หัก ณ ที่จ่าย ${form.whtRate}%`, v: `−${baht(preview.whtAmount)}` },
-          ].map((r) => (
-            <Stack key={r.k} direction="row" justifyContent="space-between">
-              <Typography variant="body2">{r.k}</Typography>
-              <Typography variant="body2">{r.v}</Typography>
-            </Stack>
-          ))}
-          <Divider sx={{ my: 0.75 }} />
-          <Stack direction="row" justifyContent="space-between">
-            <Typography sx={{ fontWeight: 800, fontSize: "0.9rem" }}>ยอดที่ลูกค้าต้องโอน</Typography>
-            <Typography sx={{ fontWeight: 800, fontSize: "0.9rem", color: ACCENT }}>{baht(preview.netAmount)}</Typography>
+        {/* ✅ ตัวอย่างยอด — ให้เห็นยอดที่ลูกค้าต้องโอนจริงก่อนกดบันทึก (ค่าจริงคำนวณใหม่ที่ server)
+            ✅ จัดลำดับสายตาใหม่: รายการย่อย (ยอดก่อน VAT / VAT / หัก ณ ที่จ่าย) เป็นตัวเล็กสีจาง
+            ส่วน "ยอดที่ลูกค้าต้องโอน" เป็นตัวเลขใหญ่ — เดิมทั้ง 4 บรรทัดขนาดพอๆ กัน ต้องไล่อ่านทีละ
+            บรรทัดกว่าจะรู้ว่าตกลงต้องเก็บเงินเท่าไหร่ ทั้งที่เป็นข้อมูลชิ้นเดียวที่คนเปิดกล่องนี้มาหา */}
+        <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: alpha(ACCENT, 0.06), border: `1px solid ${alpha(ACCENT, 0.2)}`, mb: 1.5 }}>
+          <Stack spacing={0.35}>
+            {[
+              { k: "ยอดก่อน VAT", v: baht(preview.amountBeforeVat) },
+              { k: `VAT ${form.vatRate}%`, v: `+${baht(preview.vatAmount)}` },
+              { k: `หัก ณ ที่จ่าย ${form.whtRate}%`, v: `−${baht(preview.whtAmount)}` },
+            ].map((r) => (
+              <Stack key={r.k} direction="row" justifyContent="space-between">
+                <Typography variant="caption" sx={{ color: TEXT_SUB }}>{r.k}</Typography>
+                <Typography variant="caption" sx={{ color: TEXT_SUB, fontVariantNumeric: "tabular-nums" }}>{r.v}</Typography>
+              </Stack>
+            ))}
           </Stack>
+          <Divider sx={{ my: 1 }} />
+          <Stack direction="row" justifyContent="space-between" alignItems="baseline" spacing={1}>
+            <Typography sx={{ fontWeight: 800, fontSize: "0.85rem" }}>ยอดที่ลูกค้าต้องโอน</Typography>
+            <Typography sx={{ fontWeight: 800, fontSize: "1.35rem", color: ACCENT, letterSpacing: "-0.01em", whiteSpace: "nowrap" }}>
+              {baht(preview.netAmount)}
+            </Typography>
+          </Stack>
+          {/* ✅ วันครบกำหนดชำระ — คำนวณจากวันที่วางบิล + เครดิตเทอมที่กรอกไว้ เดิมกรอกเครดิตเทอม 30 วัน
+              แล้วต้องไปนับปฏิทินเองว่าครบกำหนดวันไหน ทั้งที่เป็นคำถามแรกที่คนตามเก็บเงินต้องตอบ */}
+          {dueDateLabel && (
+            <Typography variant="caption" sx={{ display: "block", textAlign: "right", color: TEXT_SUB, mt: 0.25 }}>
+              ครบกำหนดชำระ {dueDateLabel}
+            </Typography>
+          )}
         </Box>
 
         <TextField fullWidth size="small" label="หมายเหตุ" value={form.note} multiline minRows={1}
-          onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))} sx={{ mb: 1 }} />
-        <Button variant="contained" onClick={saveInvoice} disabled={saving || !form.amountBeforeVat}
-          sx={{ bgcolor: ACCENT, textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#0e7490" } }}>
-          {saving ? "กำลังบันทึก..." : event.billing?.invoicedAt ? "อัปเดตใบวางบิล" : "บันทึกการวางบิล"}
-        </Button>
+          onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))} />
+
+        {/* ปุ่มบันทึกของ "ส่วนใบวางบิล" — อยู่มุมขวาล่างของการ์ดตัวเอง ไม่ปนกับปุ่มของส่วนรับเงิน */}
+        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 1.5 }}>
+          <Button variant="contained" onClick={saveInvoice} disabled={saving || !form.amountBeforeVat}
+            sx={{ bgcolor: ACCENT, textTransform: "none", fontWeight: 700, borderRadius: 2, px: 2.5, "&:hover": { bgcolor: "#0e7490" } }}>
+            {saving ? "กำลังบันทึก..." : event.billing?.invoicedAt ? "อัปเดตใบวางบิล" : "บันทึกการวางบิล"}
+          </Button>
+        </Stack>
+        </SectionCard>
 
         {/* ⚠️ ส่วนรับเงินโผล่หลังวางบิลแล้วเท่านั้น — ก่อนหน้านั้นไม่มียอดให้เทียบว่าครบหรือยัง
             (ฝั่ง server ก็ปฏิเสธด้วย 409 ไม่ได้พึ่งการซ่อนปุ่มอย่างเดียว) */}
         {st.state !== "not_invoiced" && (
-          <>
-            <Divider sx={{ my: 2 }} />
-            <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mb: 1 }}>
-              <Typography sx={{ fontWeight: 800, fontSize: "0.85rem" }}>การรับเงิน</Typography>
-              <Typography variant="caption" sx={{ color: TEXT_SUB }}>
-                รับแล้ว {baht(paidTotal(event.billing))} / {baht(st.net)}
-                {st.outstanding > 0 && ` · ค้าง ${baht(st.outstanding)}`}
-              </Typography>
-            </Stack>
-
+          <SectionCard
+            sx={{ mt: 2 }}
+            title="การรับเงิน"
+            caption={`รับแล้ว ${baht(paidTotal(event.billing))} จาก ${baht(st.net)}`}
+            right={st.outstanding > 0 ? (
+              // ✅ ยอดค้างเป็นป้ายสีแยกออกมา ไม่ใช่ข้อความต่อท้ายบรรทัดเดียวกับยอดที่รับแล้ว —
+              // เป็นตัวเลขที่ต้องตามเก็บ ควรสะดุดตาต่างจากตัวเลขที่จบไปแล้ว
+              <Chip
+                size="small" label={`ค้าง ${baht(st.outstanding)}`}
+                sx={{ height: 22, fontWeight: 800, fontSize: "0.7rem", bgcolor: alpha("#dc2626", 0.1), color: "#dc2626" }}
+              />
+            ) : (
+              <Chip
+                size="small" label="รับครบแล้ว"
+                sx={{ height: 22, fontWeight: 800, fontSize: "0.7rem", bgcolor: alpha("#10b981", 0.12), color: "#059669" }}
+              />
+            )}
+          >
             <Stack spacing={0.5} sx={{ mb: 1.5 }}>
               {(event.billing?.payments || []).map((p) => (
                 <Stack key={p._id} direction="row" alignItems="center" spacing={1}
@@ -361,21 +468,27 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle }) {
               <TextField size="small" type="number" label="ยอดรับ" value={payForm.amount}
                 onChange={(e) => setPayForm((f) => ({ ...f, amount: e.target.value }))}
                 InputProps={{ startAdornment: <InputAdornment position="start">฿</InputAdornment> }} />
-              <TextField size="small" type="date" label="วันที่รับเงิน" InputLabelProps={{ shrink: true }}
-                value={payForm.paidAt} onChange={(e) => setPayForm((f) => ({ ...f, paidAt: e.target.value }))} />
+              <ThaiDateField label="วันที่รับเงิน" value={payForm.paidAt}
+                onChange={(v) => setPayForm((f) => ({ ...f, paidAt: v }))} />
               <TextField size="small" label="ช่องทาง (เช่น โอน / เช็ค)" value={payForm.method}
                 onChange={(e) => setPayForm((f) => ({ ...f, method: e.target.value }))} />
               <TextField size="small" label="หมายเหตุ" value={payForm.note}
                 onChange={(e) => setPayForm((f) => ({ ...f, note: e.target.value }))} />
             </Box>
-            <Button startIcon={<AddCircleOutline sx={{ fontSize: 17 }} />} onClick={addPayment}
-              disabled={saving || !payForm.amount}
-              sx={{ textTransform: "none", fontWeight: 700, color: "#10b981" }}>
-              บันทึกรับเงิน
-            </Button>
-          </>
+            {/* ปุ่มบันทึกของ "ส่วนรับเงิน" — มุมขวาล่างของการ์ดตัวเอง คู่ขนานกับปุ่มของส่วนใบวางบิล
+                ⚠️ ใช้สีเขียว (รับเงิน) ต่างจากสีฟ้า (วางบิล) โดยตั้งใจ — เป็นคนละการกระทำที่ย้อนกลับ
+                คนละแบบ ถ้าสีเหมือนกันจะกดสลับกันได้ง่ายมากเวลารีบ */}
+            <Stack direction="row" justifyContent="flex-end">
+              <Button variant="contained" startIcon={<AddCircleOutline sx={{ fontSize: 17 }} />} onClick={addPayment}
+                disabled={saving || !payForm.amount}
+                sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, px: 2.5, bgcolor: "#10b981", "&:hover": { bgcolor: "#059669" } }}>
+                บันทึกรับเงิน
+              </Button>
+            </Stack>
+          </SectionCard>
         )}
       </DialogContent>
+      </LocalizationProvider>
 
       <DialogActions sx={{ p: 2 }}>
         <Button onClick={() => onClose?.()} disabled={saving} sx={{ textTransform: "none" }}>ปิด</Button>

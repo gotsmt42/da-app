@@ -11,9 +11,15 @@ const EventService = {
       throw error;
     }
   },
-  async getEventOp() {
+  /**
+   * @param {object} [opts]
+   * @param {"responsible"} [opts.scope] — โหมดเข้มงวด: เห็นเฉพาะงานที่ระบุตัวเองเป็น "ผู้รับผิดชอบหลัก"
+   *   ไว้ตรงๆ (ไม่อิงทีมที่เข้างาน/ลูกทีม และไม่รวมงานที่ยังไม่มอบหมาย) — ใช้เฉพาะหน้า "ภาพรวมงาน"
+   *   ตามที่ผู้ใช้ระบุ หน้าอื่นไม่ต้องส่งมา จะได้ตัวกรองเดิมทุกประการ (ดู GET /event-op ฝั่ง server)
+   */
+  async getEventOp(opts = {}) {
     try {
-      const response = await API.get(`/events/event-op`);
+      const response = await API.get(`/events/event-op`, { params: opts.scope ? { scope: opts.scope } : {} });
       return response.data;
     } catch (error) {
       console.error("Error fetching user events:", error);
@@ -169,9 +175,10 @@ const EventService = {
     }
   },
 
-  async GetDraftEvents() {
+  /** @param {object} [opts] — รองรับ scope เดียวกับ getEventOp (ดูคำอธิบายที่นั่น) */
+  async GetDraftEvents(opts = {}) {
     try {
-      const response = await API.get(`/events/drafts`);
+      const response = await API.get(`/events/drafts`, { params: opts.scope ? { scope: opts.scope } : {} });
       return response.data;
     } catch (error) {
       console.error("Error fetching draft events:", error);
