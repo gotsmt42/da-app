@@ -1,62 +1,10 @@
 import { Card, CardBody, CardTitle, CardSubtitle, Table } from "reactstrap";
 import user1 from "../../assets/images/users/user1.jpg";
-import user2 from "../../assets/images/users/user2.jpg";
-import user3 from "../../assets/images/users/user3.jpg";
-import user4 from "../../assets/images/users/user4.jpg";
-import user5 from "../../assets/images/users/user5.jpg";
 import AuthService from "../../services/authService";
 import { useEffect, useState } from "react";
-import API from "../../API/axiosInstance";
 
 import moment from "moment";
 
-const tableData = [
-  {
-    avatar: user1,
-    name: "User Test 1",
-    email: "usertest1@gmail.com",
-    project: "HTML",
-    status: "pending",
-    weeks: "35",
-    budget: "95K",
-  },
-  {
-    avatar: user2,
-    name: "User Test 2",
-    email: "usertest2@gmail.com",
-    project: "Java Script",
-    status: "done",
-    weeks: "35",
-    budget: "95K",
-  },
-  {
-    avatar: user3,
-    name: "User Test 3",
-    email: "usertest3@gmail.com",
-    project: "Type Script",
-    status: "holt",
-    weeks: "35",
-    budget: "95K",
-  },
-  {
-    avatar: user4,
-    name: "User Test 4",
-    email: "usertest4@gmail.com",
-    project: "Express",
-    status: "pending",
-    weeks: "35",
-    budget: "95K",
-  },
-  {
-    avatar: user5,
-    name: "User Test 5",
-    email: "usertest5@gmail.com",
-    project: "React",
-    status: "done",
-    weeks: "35",
-    budget: "95K",
-  },
-];
 
 const ProjectTables = () => {
   const [users, setUsers] = useState([]);

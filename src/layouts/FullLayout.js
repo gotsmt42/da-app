@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useCallback } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
@@ -80,7 +80,7 @@ const FullLayout = () => {
     if (isMobile) setIsSidebarOpen(false); // คลิกเมนูแล้วให้หุบซ่อนบนมือถือ
   };
 
-  const handleScroll = () => {
+  const handleScroll = useCallback(() => {
     const currentScrollTop = window.pageYOffset || document.documentElement.scrollTop;
     setIsScrollingUp(currentScrollTop < lastScrollTop && currentScrollTop > 0);
     setLastScrollTop(currentScrollTop <= 0 ? 0 : currentScrollTop);
@@ -88,12 +88,12 @@ const FullLayout = () => {
     if (currentScrollTop > 0 && isMobile) {
       setIsSidebarOpen(false); // เลือนหน้าจอแล้วให้หุบซ่อน
     }
-  };
+  }, [lastScrollTop, isMobile]);
 
   useEffect(() => {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [lastScrollTop, isMobile]);
+  }, [handleScroll]);
 
   // ✅ ชวนเปิดการแจ้งเตือนแบบ Push ทุกครั้งที่เข้าแอพ ถ้ายังไม่เคยเปิดไว้ — เดิมมีแค่ปุ่ม
   // เปิด/ปิดเงียบๆ ที่ Header ซึ่งผู้ใช้ส่วนใหญ่ไม่รู้ตัวว่ามันมีอยู่เลยไม่เคยกดเปิด ทำให้พลาด

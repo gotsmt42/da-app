@@ -18,25 +18,25 @@ import { StyleSheetManager } from "styled-components";
 import { installTomSelectFixes } from "./utils/tomSelectFixes";
 
 import "bootstrap/dist/css/bootstrap.min.css"; // import Bootstrap CSS
+// ✅ ต้อง import เป็น .css ตรงนี้ ไม่ใช่ @import .scss ที่ assets/scss/style.scss (ดูเหตุผลในไฟล์นั้น)
+// — เป็นทางเดียวที่ Vite จะ resolve ไฟล์ฟอนต์ .woff/.woff2 ของ bootstrap-icons แล้วใส่ลงบันเดิลให้
+import "bootstrap-icons/font/bootstrap-icons.css";
 
 import "@fortawesome/react-fontawesome";
 
 // ✅ "ResizeObserver loop completed with undelivered notifications." เป็นข้อความเตือนที่ไม่เป็นอันตราย
 // เกิดขึ้นเองจากสเปกของเบราว์เซอร์เวลา ResizeObserver (ที่ MUI/FullCalendar ใช้ภายใน) ตอบสนอง resize
-// ไม่ทันภายในหนึ่งเฟรม ไม่ได้บ่งบอกว่าแอปพัง — แต่ webpack-dev-server client overlay (โหลดเป็น entry
-// แยกก่อนบันเดิลแอปเราเสมอ ทำให้ listener ของมัน register ก่อนของเราตลอด, stopImmediatePropagation
-// จากฝั่งเราจึงช้าเกินไปเสมอ ใช้ไม่ได้จริง) จะจับไปโชว์เป็นหน้าจอ error สีแดงเต็มจอ — ปล่อยให้ overlay
-// ขึ้นมาสั้นๆ ตามปกติ แล้วซ่อน DOM element ของมันทันทีแทน (วิธีที่ยืนยันได้ผลจริงกับ CRA 5)
+// ไม่ทันภายในหนึ่งเฟรม ไม่ได้บ่งบอกว่าแอปพัง — กันไม่ให้มันไปโผล่เป็น error ที่ไหน
+// ⚠️ เดิมโค้ดตรงนี้ต้องไปไล่ซ่อน DOM ของ webpack-dev-server overlay ด้วย เพราะ CRA โหลด overlay
+// เป็น entry แยกก่อนบันเดิลแอปเราเสมอ listener ของมันจึง register ก่อนตลอด stopImmediatePropagation
+// จากฝั่งเราไม่ทัน — ย้ายมา Vite แล้วปัญหานั้นหายไปเอง เพราะ Vite ไม่มี overlay ที่ดัก runtime error
+// (overlay ของ Vite ขึ้นเฉพาะตอน build/HMR พัง) จึงเหลือแค่หยุด propagation พอ
 window.addEventListener("error", (e) => {
   if (
     e.message === "ResizeObserver loop completed with undelivered notifications." ||
     e.message === "ResizeObserver loop limit exceeded"
   ) {
     e.stopImmediatePropagation();
-    const overlay = document.getElementById("webpack-dev-server-client-overlay");
-    const overlayDiv = document.getElementById("webpack-dev-server-client-overlay-div");
-    if (overlay) overlay.style.display = "none";
-    if (overlayDiv) overlayDiv.style.display = "none";
   }
 });
 

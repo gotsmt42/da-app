@@ -7,7 +7,6 @@ import EditIcon from "@mui/icons-material/Edit";
 import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import Delete from "@mui/icons-material/Delete";
 import { styled } from "@mui/material/styles";
-import CustomCell from "./customCell";
 
 const StyledMenu = styled((props) => (
   <Menu

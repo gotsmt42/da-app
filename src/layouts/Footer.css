@@ -41,3 +41,9 @@
   background-color: rgba(220, 38, 38, 0.08);
   border-radius: 8px;
 }
+
+/* ชื่อผู้พัฒนา — ไม่ใช่ลิงก์ จึงเน้นด้วยน้ำหนัก/สีแทนการขีดเส้นใต้ */
+.app-footer__author {
+  font-weight: 700;
+  color: #64748b;
+}

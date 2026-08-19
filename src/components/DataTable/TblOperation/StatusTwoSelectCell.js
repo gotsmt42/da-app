@@ -84,7 +84,6 @@ const StatusTwoSelectCell = ({ row, onStatusUpdate }) => {
     });
 
     if (result.isConfirmed) {
-      const updatedEvent = { ...row, status_two: newStatus };
       try {
         await EventService.UpdateEvent(row._id, { status_two: newStatus }); // ✅ ใช้ _id
         setLocalStatus(newStatus);

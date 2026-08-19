@@ -35,7 +35,7 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
   const isTechnician = userData?.role?.toLowerCase() === "technician";
   const isAdminOrManager = ["admin", "manager"].includes(userData?.role?.toLowerCase());
 
-  const [user, setUser] = useState({});
+  const [, setUser] = useState({});
 
   useEffect(() => {
     const getUserData = async () => {

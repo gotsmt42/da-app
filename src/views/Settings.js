@@ -18,7 +18,7 @@ import { useAuth } from "../auth/AuthContext";
 import PushService from "../services/PushService";
 import { swalLogout } from "../functions/user";
 
-const version = process.env.REACT_APP_VERSION;
+const version = import.meta.env.REACT_APP_VERSION;
 
 const Settings = () => {
   const { userData, logout } = useAuth();

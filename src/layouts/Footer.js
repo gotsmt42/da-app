@@ -1,6 +1,6 @@
 import "./Footer.css";
 
-const version = process.env.REACT_APP_VERSION;
+const version = import.meta.env.REACT_APP_VERSION;
 
 const Footer = () => {
   const year = new Date().getFullYear();
@@ -9,7 +9,7 @@ const Footer = () => {
     <footer className="app-footer">
       <div className="app-footer__divider" />
       <p className="app-footer__text">
-        © {year} Development by <a href="" rel="noopener noreferrer">Santisuk</a>
+        © {year} Development by <span className="app-footer__author">Santisuk</span>
         {version && <span className="app-footer__version">v{version}</span>}
       </p>
     </footer>

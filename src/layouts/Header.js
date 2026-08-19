@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import AuthService from "../services/authService";
 import EventService from "../services/EventService";
 import { useAuth } from "../auth/AuthContext";
@@ -26,7 +26,6 @@ import { countOverdueContracts } from "../utils/contractOverdue";
 import { FaBars, FaUserCircle, FaSignOutAlt, FaWrench, FaFileContract, FaFileInvoiceDollar } from "react-icons/fa";
 
 const Header = ({ toggleMobileSidebar }) => {
-  const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState({});
   const [dropdownOpen, setDropdownOpen] = useState(false);

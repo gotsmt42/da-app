@@ -1,17 +1,9 @@
 import { useState, useEffect } from "react";
 import moment from "moment";
-import IconButton from "@mui/material/IconButton";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
-import MenuItem from "@mui/material/MenuItem";
-import EditIcon from "@mui/icons-material/Edit";
-import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
-import Delete from "@mui/icons-material/Delete";
 
 import { useMediaQuery } from "@mui/material";
 
-import { useTheme } from "@mui/material/styles";
 
-import StyledMenu from "../components/StyledMenu";
 
 import DocumentCell from "../components/DocumentCell";
 
@@ -40,10 +32,7 @@ const DataTableColumns = ({
   currentUserRole,
   onInputUpdate
 }) => {
-  const [anchorEl, setAnchorEl] = useState(null);
-  const open = Boolean(anchorEl);
-  const [selectedRowMenu, setSelectedRowMenu] = useState(null);
-  const [isSmallScreen, setIsSmallScreen] = useState(false);
+  const [, setIsSmallScreen] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -56,18 +45,7 @@ const DataTableColumns = ({
     };
   }, []);
 
-  const handleClick = (event, row) => {
-    setSelectedRowMenu(row);
-    setAnchorEl(event.currentTarget);
-    setSelectedRow(row);
-    setEditedData(row);
-  };
 
-  const handleClose = () => {
-    setSelectedRowMenu(null);
-    setAnchorEl(null);
-    setSelectedFile(null);
-  };
 
   const isMobile = useMediaQuery("(max-width:600px)");
   const columns = [

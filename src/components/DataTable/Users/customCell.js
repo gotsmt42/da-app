@@ -1,5 +1,4 @@
 import React from "react";
-import API from "../../../API/axiosInstance";
 
 const customCell = ({ row, isSmallScreen }) => {
   return (

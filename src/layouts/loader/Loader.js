@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
-import { ThreeDots } from "react-loader-spinner";
 
 const Loader = () => {
-  const [loading, setLoading] = useState(true); // เริ่มต้นโหลดเมื่อโหลดหน้าใหม่
+  const [, setLoading] = useState(true); // เริ่มต้นโหลดเมื่อโหลดหน้าใหม่ (JSX ที่อ่านค่านี้ถูกคอมเมนต์ไว้)
 
   // useEffect สำหรับจัดการการโหลดเมื่อโหลดหน้าใหม่
   useEffect(() => {

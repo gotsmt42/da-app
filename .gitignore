@@ -1,1 +1,16 @@
 node_modules
+
+# ผลลัพธ์การ build (Vite เขียนลง build/ เหมือนที่ CRA เคยทำ)
+build
+dist
+
+# ไฟล์ env ที่เป็นของเครื่องใครเครื่องมัน — .env หลักยังถูก track ไว้เหมือนเดิม
+.env.local
+.env.*.local
+
+# แคช/ล็อกของเครื่องมือ
+.vite
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

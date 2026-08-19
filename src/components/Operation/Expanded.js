@@ -1,59 +1,12 @@
 import { useMediaQuery } from "@mui/material";
-import StatusSelectCell from "../DataTable/TblOperation/StatusSelectCell";
-import StatusThreeSelectCell from "../DataTable/TblOperation/StatusThreeSelectCell";
-import StatusTwoSelectCell from "../DataTable/TblOperation/StatusTwoSelectCell";
-import React, { useState, useEffect } from "react";
-import EventService from "../../services/EventService"; // 👈 สำหรับอัปเดตข้อมูล
-import { TextField, Box, CircularProgress } from "@mui/material";
-import Swal from "sweetalert2";
+import React from "react";
 
 import moment from "moment";
 
 const Expanded = ({ data, onStatusUpdate, onDocNoUpdate }) => {
   const isMobile = useMediaQuery("(max-width:600px)");
 
-  const [docNo, setDocNo] = useState(data.docNo || "");
-  const [loading, setLoading] = useState(false);
-  const [initialDocNo, setInitialDocNo] = useState(data.docNo || "");
-  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    setDocNo(data.docNo || "");
-    setInitialDocNo(data.docNo || "");
-  }, [data]);
-
-  const handleAutoUpdate = async () => {
-    if (docNo === initialDocNo) return;
-
-    try {
-      setLoading(true);
-
-      const updated = await EventService.UpdateEvent(data._id, {
-        ...data,
-        docNo,
-      });
-
-      setInitialDocNo(docNo);
-
-      // 🟢 อัปเดตแสดงผลในตารางด้วย
-      if (onStatusUpdate) {
-        onStatusUpdate(data._id, docNo); // 👉 ส่ง id และ docNo ใหม่
-      }
-
-      Swal.fire({
-        toast: true,
-        position: "top-end",
-        icon: "success",
-        title: "บันทึกแล้ว",
-        showConfirmButton: false,
-        timer: 1200,
-      });
-    } catch (err) {
-      Swal.fire("เกิดข้อผิดพลาด", "ไม่สามารถบันทึกเลขที่เอกสารได้", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (!data) return <div>ไม่พบข้อมูล</div>;
 

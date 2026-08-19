@@ -1,14 +1,10 @@
 import {
-    faUpload,
     faFileImage,
     faFilePdf,
     faFileWord,
     faFileExcel,
     faFilePowerpoint,
     faFileUpload,
-    faFileZipper,
-    faBookAtlas,
-    faList,
     faThList,
     
   } from "@fortawesome/free-solid-svg-icons"; // Import ไอคอนต่างๆ

@@ -12,9 +12,7 @@ import {
   FaArrowRight,
   FaClipboardList,
   FaCog,
-  FaMapMarkerAlt,
   FaCogs,
-  FaUserCog,
   FaChevronLeft,
   FaUserFriends,
   FaCheckDouble,
@@ -29,7 +27,6 @@ import AuthService from "../services/authService";
 import CustomerService from "../services/CustomerService";
 import EventService from "../services/EventService";
 import { useAuth } from "../auth/AuthContext";
-import useEventNotifications from "../hooks/useEventNotifications";
 import {
   buildDaysPastDueMap,
   isFlaggedDays,

@@ -15,15 +15,15 @@ import ExpandedStockProduct from "./ExpandedStockProduct";
 
 import moment from "moment"; // Import moment library for date formatting
 import { ThreeDots } from "react-loader-spinner";
-import { FaAd, FaFileExcel, FaMinus, FaPlus, FaSave } from "react-icons/fa";
+import { FaFileExcel, FaMinus, FaPlus, FaSave } from "react-icons/fa";
 import { Link } from "react-router-dom";
-import { Add, Search } from "@mui/icons-material";
+import { Search } from "@mui/icons-material";
 
 const StockProduct = () => {
   const [user, setUser] = useState([]);
   const [selectedRows, setSelectedRows] = useState([]);
   const [toggleCleared, setToggleCleared] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [, setSelectedFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
@@ -33,9 +33,9 @@ const StockProduct = () => {
   const [filter, setFilter] = useState([]);
   const [filterStock, setFilterStock] = useState([]);
 
-  const [rows, setRows] = useState([]);
+  const [, setRows] = useState([]);
   const [expandedRows, setExpandedRows] = useState({});
-  const [selectedRow, setSelectedRow] = useState(null);
+  const [, setSelectedRow] = useState(null);
 
   const [stocks, setStocks] = useState([]);
 
@@ -402,9 +402,6 @@ const StockProduct = () => {
                     >
                       <option value={""}>Search for type product</option>
                       {uniqueType.map((type, idx) => {
-                        const typeProduct = stocks.find(
-                          (stock) => stock.type === type
-                        );
                         return (
                           <option key={idx} value={type}>
                             {type}

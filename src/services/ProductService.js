@@ -92,7 +92,7 @@ const ProductService = {
     try {
       const userData = await AuthService.getUserData(); // ดึงข้อมูลผู้ใช้และ Token
       if (userData) {
-        const response = await API.delete(`/product/${productId}`); // ลบข้อมูลสินค้า
+        await API.delete(`/product/${productId}`); // ลบข้อมูลสินค้า
 
         // console.log("Delete Product Success", response.data);
 

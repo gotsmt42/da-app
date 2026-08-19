@@ -1,9 +1,12 @@
 // 📁 API/axiosInstance.js
 import axios from "axios";
 
-const apiUrl = process.env.REACT_APP_API_URL;
-const apiKey = process.env.REACT_APP_API_KEY;
-const apiSecret = process.env.REACT_APP_SECRET;
+// ⚠️ Vite ไม่มี process ในเบราว์เซอร์ ต้องอ่านผ่าน import.meta.env — ชื่อตัวแปรยังเป็น REACT_APP_
+// เหมือนเดิม เพราะตั้ง envPrefix: "REACT_APP_" ไว้ที่ vite.config.js (.env และตัวแปรบน Vercel
+// จึงไม่ต้องแก้อะไรเลย)
+const apiUrl = import.meta.env.REACT_APP_API_URL;
+const apiKey = import.meta.env.REACT_APP_API_KEY;
+const apiSecret = import.meta.env.REACT_APP_SECRET;
 
 const API = axios.create({
   baseURL: apiUrl,

@@ -89,7 +89,8 @@ const FileUpload = () => {
       // ✅ ตรวจสอบชื่อไฟล์ว่าง
       const invalidFiles = uploadedFiles.filter((item) => {
         const fileNameParts = item.name.split(".");
-        const extension = fileNameParts.pop();
+        // ⚠️ ต้องเรียก pop() ไว้เหมือนเดิม ไม่ใช่แค่ตัวแปรที่ไม่ได้ใช้ — มันตัดนามสกุลออกจาก array ให้เหลือแค่ชื่อไฟล์
+        fileNameParts.pop();
         const baseName = fileNameParts.join(".");
         return !baseName.trim(); // ❌ ถ้าไม่มีชื่อ
       });

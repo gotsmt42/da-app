@@ -1,4 +1,4 @@
-import { Modal, Button } from "react-bootstrap";
+import { Button } from "react-bootstrap";
 import API from "../../../API/axiosInstance";
 import {
   MDBBtn,
@@ -10,8 +10,6 @@ import {
   MDBModalBody,
   MDBModalFooter,
 } from "mdb-react-ui-kit";
-import { useEffect, useState } from "react";
-import ProductService from "../../../services/ProductService";
 
 const InsertProductModal = ({
   show,

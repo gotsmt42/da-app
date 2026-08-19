@@ -1,25 +1,15 @@
 import { useState, useEffect } from "react";
 import moment from "moment";
-import IconButton from "@mui/material/IconButton";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
-import MenuItem from "@mui/material/MenuItem";
-import EditIcon from "@mui/icons-material/Edit";
-import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
-import Delete from "@mui/icons-material/Delete";
-import EventService from "../../../services/EventService";
 
 import ResPersonCell from "../components/ResPersonCell"; // ✅ import component
 
 import StatusSelectCell from "./StatusSelectCell"; // ✅ import component
 import StatusTwoSelectCell from "./StatusTwoSelectCell"; // ✅ import component
-import StatusThreeSelectCell from "./StatusThreeSelectCell"; // ✅ import component
 import { useMediaQuery } from "@mui/material";
 
-import StyledMenu from "../components/StyledMenu";
 
 import DocumentCell from "../components/DocumentCell";
 
-import StatusFileCell from "../components/StatusFileCell";
 
 const DataTableColumns = ({
   setSelectedRow,
@@ -46,10 +36,7 @@ const DataTableColumns = ({
 
   onInputUpdate, // ✅ รับจาก parent
 }) => {
-  const [anchorEl, setAnchorEl] = useState(null);
-  const open = Boolean(anchorEl);
-  const [selectedRowMenu, setSelectedRowMenu] = useState(null);
-  const [isSmallScreen, setIsSmallScreen] = useState(false);
+  const [, setIsSmallScreen] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -62,67 +49,8 @@ const DataTableColumns = ({
     };
   }, []);
 
-  const handleClick = (event, row) => {
-    setSelectedRowMenu(row);
-    setAnchorEl(event.currentTarget);
-    setSelectedRow(row);
-    setEditedData(row);
-  };
 
-  const handleClose = () => {
-    setSelectedRowMenu(null);
-    setAnchorEl(null);
-    setSelectedFile(null);
-  };
 
-  const DocNoCell = ({ row, onDocNoUpdate }) => {
-    const [value, setValue] = useState(row.docNo || "");
-
-    let baseUrl = value;
-    // if (value.startsWith("QT")) baseUrl = QT;
-    // else if (value.startsWith("BL")) baseUrl = BL;
-    // else if (value.startsWith("INV")) baseUrl = INV;
-    // else if (value.startsWith("RE")) baseUrl = RE;
-
-    // ถ้ามี baseUrl → สร้างลิงก์โดยตัด prefix 2 ตัวออก
-    const link = baseUrl ? `${baseUrl}` : null;
-
-    return (
-      <div style={{ display: "flex", gap: "4px" }}>
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onBlur={(e) => onDocNoUpdate(row._id, e.target.value)} // ✅ บันทึกเมื่อ blur
-          placeholder="กรอกเลขที่เอกสาร เช่น QT12345"
-          style={{
-            flex: 1,
-            padding: "6px",
-            fontSize: "0.85em",
-            border: "1px solid #ccc",
-            borderRadius: "4px",
-          }}
-        />
-        {/* ✅ แสดงปุ่ม "เรียกดู" เฉพาะเมื่อมีข้อมูลและตรงกับ prefix */}
-        {link && (
-          <a
-            href={link}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              background: "#1976d2",
-              color: "#fff",
-              padding: "6px 10px",
-              borderRadius: "4px",
-              textDecoration: "none",
-            }}
-          >
-            เรียกดู
-          </a>
-        )}
-      </div>
-    );
-  };
 
   const isMobile = useMediaQuery("(max-width:600px)");
   const columns = [

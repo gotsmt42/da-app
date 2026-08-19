@@ -1,6 +1,13 @@
 @import "variables";
 
-@import "~bootstrap/scss/bootstrap";
-@import "~bootstrap-icons/font/bootstrap-icons.scss";
+// ⚠️ เดิมเขียนเป็น "~bootstrap/..." — เครื่องหมาย ~ เป็นไวยากรณ์เฉพาะของ sass-loader (webpack)
+// ที่แปลว่า "หาใน node_modules" Vite ไม่รู้จักและจะหาไฟล์ไม่เจอ ตัด ~ ออกได้เลยเพราะ Vite
+// resolve ชื่อแพ็กเกจเปล่าๆ ใน @import ของ sass ให้อยู่แล้ว
+@import "bootstrap/scss/bootstrap";
+// ⚠️ bootstrap-icons ย้ายไป import เป็นไฟล์ .css ที่ src/index.js แทน — ห้ามเอากลับมา @import ที่นี่
+// เพราะไฟล์ .scss ของมันอ้างไฟล์ฟอนต์แบบ url("./fonts/...") ซึ่งเป็นพาธเทียบกับตัวมันเองใน
+// node_modules พอ sass รวมร่างเข้ามาในไฟล์นี้ Vite จะ resolve ไม่เจอ (ขึ้น "didn't resolve at build
+// time") ผลคือฟอนต์ไอคอนไม่ถูกใส่ในบันเดิล = ไอคอน bi-* หายทั้งแอป
+
 @import "./layout/sidebar";
 @import "./layout/container";

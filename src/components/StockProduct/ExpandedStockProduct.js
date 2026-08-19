@@ -1,5 +1,4 @@
 import React from "react";
-import moment from "moment";
 import API from "../../API/axiosInstance";
 // Function to format salary as currency
 const formatCurrency = (amount) => {
