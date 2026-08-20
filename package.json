@@ -1,6 +1,6 @@
 {
   "name": "da-app",
-  "version": "0.5.0",
+  "version": "1.7.4",
   "private": true,
   "dependencies": {
     "@date-io/moment": "^3.2.0",

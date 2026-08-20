@@ -1,0 +1,34 @@
+name: CI
+
+# ตรวจโค้ดอัตโนมัติทุกครั้งที่ push ขึ้น main และทุก pull request
+# เดิมไม่มีอะไรตรวจให้เลย — lint/build/test รันเฉพาะตอนที่คนนึกได้ว่าต้องรัน
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # ⚠️ Vite รองรับเฉพาะ Node 18 / 20 / 22+ (เลขคี่เป็นรุ่นทดลอง ใช้ไม่ได้)
+          node-version: 22
+          cache: npm
+
+      # npm ci = ติดตั้งตาม package-lock.json เป๊ะๆ ไม่แก้ lock — เป็นคำสั่งที่ถูกต้องสำหรับ CI
+      - run: npm ci
+
+      # แยกเป็นคนละ step เพื่อให้เห็นชัดว่าพังที่ขั้นไหน
+      # (npm run build เรียก lint อยู่แล้ว แต่ถ้ารวมกันจะดูไม่ออกว่าล้มเพราะ lint หรือเพราะ build)
+      - name: Lint (ห้ามมี warning แม้แต่ตัวเดียว)
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npx vite build

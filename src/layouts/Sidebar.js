@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { Nav, NavItem, Collapse } from "reactstrap";
 import { Link, useLocation } from "react-router-dom";
-import AuthService from "../services/authService";
+import AuthService from "../shared/services/authService";
 import "./Sidebar.css";
 import Swal from "sweetalert2";
-import { swalLogout, hasValidAvatar } from "../functions/user";
-import { useAuth } from "../auth/AuthContext";
+import { swalLogout, hasValidAvatar } from "../shared/utils/user";
+import { useAuth } from "../features/auth/AuthContext";
 // ✅ ใช้ไอคอนชุดเดียวกับที่ Dashboard.js ใช้จริง (react-icons/fa) แทน bootstrap-icons เดิม — เดิม
 // สองที่นี้ใช้คนละชุดไอคอนกันคนละความหมาย (เช่น "แผนงานทั้งหมด" หน้า Dashboard กับ "แผนงาน" ใน
 // sidebar เป็นหน้าเดียวกันแต่ไอคอนคนละแบบ) ทำให้ผู้ใช้จำไม่ได้ว่าไอคอนไหนคือเมนูไหนบ้าง

@@ -3,19 +3,19 @@ import "./index.css";
 import React, { Suspense } from "react";
 import ReactDOM from "react-dom/client";
 import "./assets/scss/style.scss";
-import App from "./App";
-import reportWebVitals from "./reportWebVitals";
+import App from "./app/App";
+import reportWebVitals from "./app/reportWebVitals";
 import { BrowserRouter as Router } from "react-router-dom";
-import Loader from "./layouts/loader/Loader";
+import Loader from "./layouts/Loader";
 
-import { AuthProvider } from "./auth/AuthContext";
+import { AuthProvider } from "./features/auth/AuthContext";
 
 import { StyleSheetManager } from "styled-components";
 
 // ✅ ต้องติดตั้งครั้งเดียวตอนแอปเริ่ม — แก้ dropdown ของ TomSelect (ทุกช่อง "เลือกหรือพิมพ์..." ในฟอร์ม
 // เพิ่ม/แก้ไขงาน) ที่ลอยค้างอยู่กับที่เวลาเลื่อนเนื้อหาในฟอร์ม เพราะมันถูกแปะไว้ที่ <body> ดูรายละเอียด
-// ทั้งหมดที่ src/utils/tomSelectFixes.js — เรียกที่นี่เพราะ TomSelect ถูกสร้างจากหลายไฟล์/หลายจังหวะ
-import { installTomSelectFixes } from "./utils/tomSelectFixes";
+// ทั้งหมดที่ src/shared/utils/tomSelectFixes.js — เรียกที่นี่เพราะ TomSelect ถูกสร้างจากหลายไฟล์/หลายจังหวะ
+import { installTomSelectFixes } from "./shared/utils/tomSelectFixes";
 
 import "bootstrap/dist/css/bootstrap.min.css"; // import Bootstrap CSS
 // ✅ ต้อง import เป็น .css ตรงนี้ ไม่ใช่ @import .scss ที่ assets/scss/style.scss (ดูเหตุผลในไฟล์นั้น)

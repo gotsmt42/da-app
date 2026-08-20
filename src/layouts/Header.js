@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
-import AuthService from "../services/authService";
-import EventService from "../services/EventService";
-import { useAuth } from "../auth/AuthContext";
-import useEventNotifications from "../hooks/useEventNotifications";
-import NotificationBell from "../components/Notifications/NotificationBell";
+import AuthService from "../shared/services/authService";
+import EventService from "../shared/services/EventService";
+import { useAuth } from "../features/auth/AuthContext";
+import useEventNotifications from "../shared/hooks/useEventNotifications";
+import NotificationBell from "../features/notifications/components/NotificationBell";
 import './Header.css';
 import {
   Navbar,
@@ -17,10 +17,10 @@ import {
   DropdownItem,
   Button,
 } from "reactstrap";
-import { swalLogout, hasValidAvatar } from "../functions/user";
+import { swalLogout, hasValidAvatar } from "../shared/utils/user";
 import Swal from "sweetalert2";
 import Badge from "@mui/material/Badge";
-import { countOverdueContracts } from "../utils/contractOverdue";
+import { countOverdueContracts } from "../shared/utils/contractOverdue";
 // ✅ ไอคอน 3 เมนูกลางตรงกับที่ Dashboard.js/Sidebar.js ใช้จริงสำหรับหน้าเดียวกันเป๊ะๆ
 // (FaWrench="การดำเนินงาน", FaFileContract="ภาพรวมสัญญา", FaFileInvoiceDollar="ติดตามใบเสนอราคา")
 import { FaBars, FaUserCircle, FaSignOutAlt, FaWrench, FaFileContract, FaFileInvoiceDollar } from "react-icons/fa";
@@ -85,7 +85,7 @@ const Header = ({ toggleMobileSidebar }) => {
   }, [canViewContracts]);
 
   // ✅ จำนวนสัญญาที่รอบล่าสุดผ่านมาเกิน 3 เดือนแล้วแต่ยังไม่ได้วางแผนรอบถัดไป — ใช้ตรรกะเดียวกับ
-  // ป้ายแจ้งเตือนในตาราง ContractOverview.js เป๊ะๆ (ดู utils/contractOverdue.js) — events/contractDrafts
+  // ป้ายแจ้งเตือนในตาราง ContractOverview.js เป๊ะๆ (ดู shared/utils/contractOverdue.js) — events/contractDrafts
   // ถูกกรองตาม role มาจาก backend แล้ว (admin/manager เห็นทั้งหมด ช่างเห็นแค่ของตัวเอง) จึงคำนวณตรงๆ
   // ได้เลยไม่ต้องแยกเงื่อนไข role ที่นี่อีก
   const overdueContractCount = useMemo(

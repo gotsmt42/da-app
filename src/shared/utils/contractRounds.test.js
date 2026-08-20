@@ -1,0 +1,66 @@
+import { describe, it, expect } from "vitest";
+import { countUsedRounds, formatRoundLabel, visitsPerYear } from "./contractRounds";
+
+/**
+ * เทสต์ชุดนี้มาแทน App.test.js เดิมที่ติดมากับ Create React App (มันหาข้อความ "learn react link"
+ * ซึ่งไม่มีอยู่ในแอปนี้เลย = รันเมื่อไหร่ก็ fail)
+ *
+ * เลือกทดสอบ contractRounds เพราะเป็นฟังก์ชันบริสุทธิ์ที่มีกฎธุรกิจจริงอยู่ข้างใน และเป็นตัวที่พังแล้ว
+ * เห็นผลทันทีกับผู้ใช้ (จำนวนครั้งของสัญญาผิด = ลงงานเกินโควตาได้)
+ */
+describe("countUsedRounds", () => {
+  it("นับตาม 'ครั้งที่' ที่ไม่ซ้ำกัน ไม่ใช่จำนวน document", () => {
+    // ครั้งที่ 2 เข้างาน 2 วันไม่ติดกัน → เป็น 2 document แต่ต้องนับเป็นครั้งเดียว
+    const visits = [{ time: 1 }, { time: 2 }, { time: 2 }, { time: 3 }];
+    expect(countUsedRounds(visits)).toBe(3);
+  });
+
+  it("ข้ามงานที่ยังไม่ระบุครั้งที่ (undefined / null / ค่าว่าง)", () => {
+    expect(countUsedRounds([{ time: 1 }, { time: null }, { time: "" }, {}])).toBe(1);
+  });
+
+  it("มองว่าเลข 2 กับสตริง '2' เป็นครั้งเดียวกัน", () => {
+    expect(countUsedRounds([{ time: 2 }, { time: "2" }])).toBe(1);
+  });
+
+  it("รับ input ที่ไม่ใช่ array ได้โดยไม่ throw", () => {
+    expect(countUsedRounds(undefined)).toBe(0);
+    expect(countUsedRounds(null)).toBe(0);
+  });
+});
+
+describe("formatRoundLabel", () => {
+  it("งานสัญญาโชว์เป็นสัดส่วน ครั้งที่/ทั้งหมด", () => {
+    expect(formatRoundLabel(1, 3)).toBe("1/3");
+  });
+
+  it("งานที่ไม่ใช่งานสัญญา (ไม่มี visitCount) โชว์แค่เลขครั้ง", () => {
+    expect(formatRoundLabel(2, undefined)).toBe("2");
+    expect(formatRoundLabel(2, 0)).toBe("2");
+  });
+
+  it("ไม่มีครั้งที่ → คืนสตริงว่าง ไม่ใช่ 'undefined'", () => {
+    expect(formatRoundLabel(undefined, 3)).toBe("");
+    expect(formatRoundLabel(null, 3)).toBe("");
+    expect(formatRoundLabel("", 3)).toBe("");
+  });
+});
+
+describe("visitsPerYear", () => {
+  it("คืนค่าเฉพาะตอน 12 หารด้วยระยะห่างลงตัว", () => {
+    expect(visitsPerYear(3)).toBe(4);
+    expect(visitsPerYear(6)).toBe(2);
+    expect(visitsPerYear(12)).toBe(1);
+  });
+
+  it("หารไม่ลงตัวคืน null — ยอมไม่โชว์ ดีกว่าโชว์เลขที่สื่อสารผิด (ทุก 5 เดือน = ปีละ 2.4 ครั้ง)", () => {
+    expect(visitsPerYear(5)).toBeNull();
+    expect(visitsPerYear(7)).toBeNull();
+  });
+
+  it("ค่าที่เป็นไปไม่ได้คืน null", () => {
+    expect(visitsPerYear(0)).toBeNull();
+    expect(visitsPerYear(-3)).toBeNull();
+    expect(visitsPerYear(undefined)).toBeNull();
+  });
+});

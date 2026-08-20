@@ -8,7 +8,7 @@ import Footer from "./Footer";
 import { FaArrowLeft, FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { IconButton } from "@mui/material";
 import Swal from "sweetalert2";
-import PushService from "../services/PushService";
+import PushService from "../shared/services/PushService";
 
 import "./FullLayout.css";
 

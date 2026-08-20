@@ -9,5 +9,5 @@
 // node_modules พอ sass รวมร่างเข้ามาในไฟล์นี้ Vite จะ resolve ไม่เจอ (ขึ้น "didn't resolve at build
 // time") ผลคือฟอนต์ไอคอนไม่ถูกใส่ในบันเดิล = ไอคอน bi-* หายทั้งแอป
 
-@import "./layout/sidebar";
-@import "./layout/container";
+@import "./layout/_sidebar.scss";
+@import "./layout/_container.scss";

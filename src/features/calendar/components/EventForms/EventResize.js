@@ -1,0 +1,77 @@
+import { showTeamOverlapWarning } from "@/shared/utils/teamOverlapWarning";
+
+export const getEventResize = async ({
+  arg,
+  events,
+  fetchEventsFromDB,
+  setEvents,
+  EventService,
+  userData, // ✅ ใช้ตั้งชื่อผู้ทำรายการใน activityLog (ดู logEntry ด้านล่าง)
+  Swal,
+  moment,
+}) => {
+  const event = arg.event;
+
+  const start = moment(event.startStr).format("YYYY-MM-DD");
+  const endRaw = moment(event.endStr);
+  const end = event.allDay
+    ? endRaw.format("YYYY-MM-DD")
+    : endRaw.subtract(1, "days").format("YYYY-MM-DD");
+
+  const updatedEvent = {
+    id: event.id,
+    // title: event.title,
+    // textColor: event.textColor,
+    // backgroundColor: event.backgroundColor,
+    // fontSize: event.extendedProps?.fontSize?.toString() || "12",
+    start,
+    end,
+    allDay: event.allDay,
+  };
+
+  // ตรวจสอบว่า event มีการเปลี่ยนแปลงจริงหรือไม่
+  const originalStart = moment(event.extendedProps?.start).format("YYYY-MM-DD");
+  const originalEnd = moment(event.extendedProps?.end).format("YYYY-MM-DD");
+
+  const hasChanged = start !== originalStart || end !== originalEnd;
+
+  if (!hasChanged) {
+    console.log("⏸️ ไม่มีการเปลี่ยนแปลงขนาด ไม่ต้องอัปเดต");
+    return;
+  }
+
+  // ✅ บันทึกประวัติ — เดิมการลากขยาย/ย่อวันที่งานไม่เคยถูกบันทึกลง activityLog เลย ทำให้ประวัติของงาน
+  // มีช่องโหว่ (เห็นแค่ที่แก้ผ่านฟอร์ม ไม่เห็นที่ลากปรับบนปฏิทินโดยตรง) เทียบ pattern เดียวกับ
+  // buildChangeLogEntries ใน EditEvent.js
+  const actorName = [userData?.fname, userData?.lname].filter(Boolean).join(" ") || userData?.username || "ผู้ใช้งาน";
+  updatedEvent.activityLog = [
+    ...(event.extendedProps?.activityLog || []),
+    {
+      action: "schedule_changed",
+      detail: `ลากปรับวันที่เป็น ${start}${end !== start ? ` – ${end}` : ""}`,
+      userName: actorName,
+      timestamp: new Date().toISOString(),
+    },
+  ];
+
+  try {
+    await EventService.UpdateEvent(event.id, updatedEvent);
+
+    // อัปเดตทันทีแบบ optimistic ให้เห็นผลไว ๆ ก่อน
+    setEvents((prevEvents) =>
+      prevEvents.map((e) =>
+        e.id === updatedEvent.id ? { ...e, ...updatedEvent } : e
+      )
+    );
+
+    // แล้วรีเฟรชเงียบ ๆ เพื่อให้ตรงกับข้อมูลจริงบนเซิร์ฟเวอร์เสมอ (เผื่อมีผลข้างเคียงอื่น)
+    await fetchEventsFromDB(true);
+
+    // ✅ ไม่บล็อกแล้ว (เดิม backend เช็คช่างชนกันแล้วปฏิเสธ ตัดออกไปแล้ว) แต่ยังแจ้งเตือนเบาๆ ให้รู้ตัว
+    showTeamOverlapWarning({ Swal, moment, events, movedEvent: event, start, end });
+
+    console.log(`✅ Event ${event.id} resized`);
+  } catch (error) {
+    console.error("❌ Error resizing event:", error);
+  }
+};

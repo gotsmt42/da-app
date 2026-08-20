@@ -1,3 +1,4 @@
+import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
@@ -14,6 +15,17 @@ export default defineConfig({
   plugins: [react()],
 
   envPrefix: "REACT_APP_",
+
+  // ✅ path alias "@" → src/ — ตอนจัดโครงสร้างเป็น feature-based ไฟล์ลึกขึ้น ทำให้เกิด import
+  // แบบ "../../../shared/services/EventService" กว่า 157 จุด ซึ่งอ่านยากและพังทันทีที่ย้ายไฟล์
+  // เขียนเป็น "@/shared/services/EventService" แทน = ตำแหน่งไฟล์ปลายทางชัดเจนโดยไม่ต้องนับ ../
+  // ⚠️ vitest ใช้ resolve.alias ตัวเดียวกันนี้อยู่แล้ว (config อยู่ไฟล์เดียวกัน) ไม่ต้องตั้งซ้ำ
+  // ⚠️ ถ้าเพิ่ม alias ตัวใหม่ ต้องไปเพิ่มใน jsconfig.json ด้วย ไม่งั้น editor จะกด "ไปที่นิยาม" ไม่ได้
+  resolve: {
+    alias: {
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
+    },
+  },
 
   // ⚠️ โปรเจกต์นี้เขียน JSX ไว้ในไฟล์นามสกุล .js (173 ไฟล์) ซึ่ง esbuild จะไม่ parse ให้โดยปริยาย
   // (มันถือว่า .js = JavaScript ธรรมดา) ต้องสั่ง loader เป็น jsx ให้ทั้งตอน transform และตอนที่
