@@ -161,7 +161,19 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle }) {
   }));
 
   const addPayment = async () => {
-    const ok = await run(() => EventService.AddPayment(event._id, { ...payForm, amount: Number(payForm.amount) }));
+    // ⚠️ เช็คซ้ำตรงนี้ด้วย ไม่พึ่งการ disable ปุ่มอย่างเดียว — ปุ่มที่ถูก disable ยังถูกกดผ่าน
+    // keyboard/เครื่องมือ dev ได้ และตัวเลขการเงินที่ผิดแก้ย้อนหลังยาก (ออกใบกำกับภาษีไปแล้ว)
+    // ⚠️ ฝั่ง server ก็ปฏิเสธด้วย 409 เช่นกัน — ตรงนี้มีไว้ให้ผู้ใช้เห็นสาเหตุทันทีโดยไม่ต้องรอ round-trip
+    const amount = Number(payForm.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return setError("ยอดรับต้องมากกว่า 0");
+    }
+    if (amount - st.outstanding > 0.005) {
+      return setError(
+        `รับเงินเกินยอดที่ค้างอยู่ไม่ได้ — ค้าง ${baht(st.outstanding)} แต่กรอก ${baht(amount)}`
+      );
+    }
+    const ok = await run(() => EventService.AddPayment(event._id, { ...payForm, amount }));
     if (ok) setPayForm(emptyPayment());
   };
 
@@ -203,6 +215,35 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle }) {
 
   const st = billingStatus(event.billing);
   const meta = BILLING_STATE_META[st.state];
+
+  /**
+   * ✅ ตรวจยอดรับเงินก่อนให้กดบันทึก — "ห้ามรับเกินยอดที่ค้างอยู่"
+   *
+   * 🐛 เดิมช่องนี้พิมพ์เลขอะไรลงไปก็ได้ กดบันทึกผ่านหมด (ทั้งฝั่งจอและฝั่ง server เช็คแค่ว่า > 0)
+   * บิล 104,000 พิมพ์ 1,040,000 ตกหล่นศูนย์เกินไปหนึ่งตัวก็บันทึกเข้าไปเลย → ยอดรับรวมเกินยอดบิล
+   * → สถานะกลายเป็น "ชำระครบ" ทั้งที่ตัวเลขผิด และรายงานการเงินทั้งระบบเพี้ยนตาม
+   *
+   * ⚠️ เผื่อ 0.005 เพราะยอดสุทธิผ่านการปัดทศนิยม (round2) มาแล้ว — ถ้าเทียบ > ตรงๆ ยอดที่เท่ากัน
+   * เป๊ะอาจถูกมองว่าเกินเพราะความคลาดเคลื่อนของเลขทศนิยม แล้วกดจ่ายเต็มจำนวนไม่ได้เลย
+   */
+  const outstanding = st.outstanding;
+  const isSettled = st.state !== "not_invoiced" && outstanding <= 0;
+  const payAmount = Number(payForm.amount);
+  const hasPayAmount = payForm.amount !== "" && Number.isFinite(payAmount);
+  const payOverpaid = hasPayAmount && payAmount - outstanding > 0.005;
+  const payNotPositive = hasPayAmount && payAmount <= 0;
+  const payInvalid = !hasPayAmount || payOverpaid || payNotPositive;
+
+  /** เติมยอดคงเหลือลงช่องให้ในคลิกเดียว — เคสที่ใช้บ่อยที่สุดคือลูกค้าโอนมาเต็มจำนวน */
+  const fillOutstanding = () => setPayForm((f) => ({ ...f, amount: String(outstanding) }));
+
+  const payHelperText = payOverpaid
+    ? `เกินยอดคงเหลือ ${baht(outstanding)} อยู่ ${baht(payAmount - outstanding)}`
+    : payNotPositive
+      ? "ยอดรับต้องมากกว่า 0"
+      : isSettled
+        ? "รับครบแล้ว ไม่ต้องบันทึกเพิ่ม"
+        : `รับได้สูงสุด ${baht(outstanding)}`;
   const preview = previewAmounts({
     amountBeforeVat: form.amountBeforeVat, vatRate: form.vatRate, whtRate: form.whtRate,
   });
@@ -436,9 +477,33 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle }) {
             </Stack>
 
             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1.25, mb: 1 }}>
+              {/* ✅ ปุ่ม "เต็มจำนวน" อยู่ในช่องเลย ไม่ต้องอ่านยอดคงเหลือจากหัวการ์ดแล้วพิมพ์ตามเอง
+                  (การพิมพ์ตามคือจุดที่ตัวเลขผิดบ่อยที่สุด) — ซ่อนเมื่อรับครบแล้วเพราะไม่มีอะไรให้เติม */}
               <TextField size="small" type="number" label="ยอดรับ" value={payForm.amount}
                 onChange={(e) => setPayForm((f) => ({ ...f, amount: e.target.value }))}
-                InputProps={{ startAdornment: <InputAdornment position="start">฿</InputAdornment> }} />
+                error={payOverpaid || payNotPositive}
+                helperText={payHelperText}
+                inputProps={{ min: 0, max: outstanding, step: "0.01" }}
+                InputProps={{
+                  startAdornment: <InputAdornment position="start">฿</InputAdornment>,
+                  endAdornment: !isSettled && outstanding > 0 && (
+                    <InputAdornment position="end">
+                      <Tooltip title={`ใส่ยอดคงเหลือทั้งหมด ${baht(outstanding)}`}>
+                        <Button
+                          size="small" onClick={fillOutstanding} disabled={saving}
+                          sx={{
+                            minWidth: 0, px: 1, py: 0.25, borderRadius: 1.5,
+                            textTransform: "none", fontWeight: 800, fontSize: "0.7rem",
+                            color: "#059669", bgcolor: alpha("#10b981", 0.1),
+                            "&:hover": { bgcolor: alpha("#10b981", 0.2) },
+                          }}
+                        >
+                          เต็มจำนวน
+                        </Button>
+                      </Tooltip>
+                    </InputAdornment>
+                  ),
+                }} />
               <ThaiDateField label="วันที่รับเงิน" value={payForm.paidAt}
                 onChange={(v) => setPayForm((f) => ({ ...f, paidAt: v }))} />
               <TextField size="small" label="ช่องทาง (เช่น โอน / เช็ค)" value={payForm.method}
@@ -451,7 +516,7 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle }) {
                 คนละแบบ ถ้าสีเหมือนกันจะกดสลับกันได้ง่ายมากเวลารีบ */}
             <Stack direction="row" justifyContent="flex-end">
               <Button variant="contained" startIcon={<AddCircleOutline sx={{ fontSize: 17 }} />} onClick={addPayment}
-                disabled={saving || !payForm.amount}
+                disabled={saving || payInvalid}
                 sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, px: 2.5, bgcolor: "#10b981", "&:hover": { bgcolor: "#059669" } }}>
                 บันทึกรับเงิน
               </Button>
