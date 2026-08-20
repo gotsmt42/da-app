@@ -13,7 +13,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import moment from "moment";
-import "moment/locale/th";
+import "@/shared/utils/momentThaiLocale";
 import {
   Box, Stack, Typography, TextField, InputAdornment, IconButton, Chip, Skeleton,
   Paper, Divider, Dialog, DialogTitle, DialogContent, DialogActions, Button, Tooltip,
@@ -32,6 +32,7 @@ import {
 } from "@/shared/utils/contractOverdue";
 import { buildDaysPastDueMap, isFlaggedDays, getOverdueGroupKey } from "@/shared/utils/overdueJobs";
 import { getFollowUpInfo } from "@/shared/utils/quotationTracking";
+import { formatThai } from "@/shared/utils/thaiDate";
 
 const ACCENT = "#0891b2";
 const TEXT_SUB = "#64748b";
@@ -342,7 +343,7 @@ export default function CustomerOverview() {
               <Typography sx={{ fontWeight: 800, fontSize: "1rem", lineHeight: 1.3 }} noWrap>{selected?.name}</Typography>
               <Typography variant="caption" sx={{ color: TEXT_SUB }}>
                 {selected?.lastActivity
-                  ? `เคลื่อนไหวล่าสุด ${moment(selected.lastActivity).locale("th").format("D MMM YYYY")}`
+                  ? `เคลื่อนไหวล่าสุด ${formatThai(moment(selected.lastActivity).locale("th"), "D MMM YYYY")}`
                   : "ยังไม่มีความเคลื่อนไหว"}
               </Typography>
             </Box>
@@ -371,12 +372,12 @@ export default function CustomerOverview() {
                   {selected.expired.map((c) => (
                     <TrackRow key={`ex-${c.key}`} color="#dc2626" icon={<EventBusy sx={{ fontSize: 15 }} />}
                       title={`สัญญาหมดอายุแล้ว${c.contractNo ? ` · ${c.contractNo}` : ""}`}
-                      sub={`${c.site || "ไม่ระบุโครงการ"} · สิ้นสุด ${moment(c.contractEnd).format("DD/MM/YYYY")}`} />
+                      sub={`${c.site || "ไม่ระบุโครงการ"} · สิ้นสุด ${formatThai(moment(c.contractEnd), "DD/MM/YYYY")}`} />
                   ))}
                   {selected.expiring.map((c) => (
                     <TrackRow key={`eg-${c.key}`} color="#f59e0b" icon={<WarningAmber sx={{ fontSize: 15 }} />}
                       title={`${contractStatusInfo(c)?.label || "ใกล้หมดอายุ"}${c.contractNo ? ` · ${c.contractNo}` : ""}`}
-                      sub={`${c.site || "ไม่ระบุโครงการ"} · สิ้นสุด ${moment(c.contractEnd).format("DD/MM/YYYY")}`} />
+                      sub={`${c.site || "ไม่ระบุโครงการ"} · สิ้นสุด ${formatThai(moment(c.contractEnd), "DD/MM/YYYY")}`} />
                   ))}
                   {selected.overdueRounds.map((c) => (
                     <TrackRow key={`or-${c.key}`} color={ACCENT} icon={<Description sx={{ fontSize: 15 }} />}
@@ -415,7 +416,7 @@ export default function CustomerOverview() {
                       .slice(0, 5)
                       .map((d) => (
                         <Typography key={d._id} variant="body2" sx={{ fontSize: "0.8rem", color: "text.secondary" }}>
-                          {moment(d.issuedAt).format("DD/MM/YY")} · {d.docNumber} · {d.docType === "workNotice" ? "ใบแจ้งเข้างาน" : "ใบส่งมอบงาน"}
+                          {formatThai(moment(d.issuedAt), "DD/MM/YY")} · {d.docNumber} · {d.docType === "workNotice" ? "ใบแจ้งเข้างาน" : "ใบส่งมอบงาน"}
                         </Typography>
                       ))}
                   </Stack>

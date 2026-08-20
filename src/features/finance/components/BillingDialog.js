@@ -17,14 +17,13 @@ import {
   useMediaQuery, CircularProgress,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { AdapterMoment } from "@mui/x-date-pickers/AdapterMoment";
-import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import { Payments, AddCircleOutline, DeleteOutline, InsertDriveFile, AutoAwesome } from "@mui/icons-material";
 import EventService from "@/shared/services/EventService";
 import FilePreviewDialog from "@/features/documents/components/FilePreviewDialog";
 import { isImageFile } from "@/shared/utils/jobDocTypes";
 import { billingStatus, previewAmounts, paidTotal, baht, perRoundAmount, BILLING_STATE_META } from "@/shared/utils/billing";
+import { formatThai } from "@/shared/utils/thaiDate";
 
 const ACCENT = "#0891b2";
 const TEXT_SUB = "#64748b";
@@ -40,35 +39,9 @@ const SURFACE_SUBTLE = "#f8fafc";
  * ✅ ครอบเป็นการ์ดแยกใบ + วางปุ่มของแต่ละใบไว้มุมขวาล่างของใบตัวเอง = เห็นได้ทันทีว่าปุ่มนี้เป็นของ
  * ส่วนไหน ส่วนท้ายกล่องเหลือแค่ "ปิด" ซึ่งชัดว่าไม่ใช่การบันทึก
  */
-/**
- * ✅ ช่องวันที่รูปแบบไทย (วว/ดด/ปปปป)
- * 🐛 ที่แก้: เดิมใช้ <input type="date"> ซึ่ง "รูปแบบที่แสดง" ถูกกำหนดโดย locale ของเบราว์เซอร์ล้วนๆ
- * แอปสั่งไม่ได้เลย (ไม่มี attribute/CSS ใดๆ ที่เปลี่ยนได้) — เครื่องที่ตั้ง locale เป็น en-US จึงเห็น
- * 08/19/2026 (เดือน/วัน/ปี) ซึ่งอ่านสลับกับที่คนไทยคุ้น และอันตรายมากกับเอกสารการเงิน เพราะวันที่อย่าง
- * 08/09 อ่านได้ 2 แบบโดยไม่มีอะไรบอกว่าอันไหนถูก
- * ✅ ใช้ DatePicker ของ MUI แทน ซึ่งบังคับรูปแบบได้จริงด้วย inputFormat และแสดงเหมือนกันทุกเครื่อง
- * ⚠️ state ยังเก็บเป็นสตริง "YYYY-MM-DD" เหมือนเดิมทุกประการ — ไม่แตะทั้งค่าที่ส่งขึ้น server และ
- * ตรรกะคำนวณวันครบกำหนด แค่เปลี่ยน "วิธีแสดง/วิธีรับ input" เท่านั้น
- * ⚠️ กันค่าไม่ถูกต้องระหว่างพิมพ์ — ผู้ใช้พิมพ์ค้างกลางทางได้เสมอ ถ้าไม่เช็ค isValid() จะได้สตริง
- * "Invalid date" หลุดเข้า state แล้วถูกส่งขึ้น server
- */
-const ThaiDateField = ({ label, value, onChange, ...rest }) => (
-  <DatePicker
-    label={label}
-    value={value ? moment(value, "YYYY-MM-DD") : null}
-    onChange={(v) => onChange(v && v.isValid() ? v.format("YYYY-MM-DD") : "")}
-    inputFormat="DD/MM/YYYY"
-    renderInput={(params) => (
-      <TextField
-        {...params}
-        size="small"
-        fullWidth
-        {...rest}
-        inputProps={{ ...params.inputProps, placeholder: "วว/ดด/ปปปป" }}
-      />
-    )}
-  />
-);
+// ⚠️ ช่องวันที่ของกล่องนี้เคยเป็น DatePicker เฉพาะของตัวเอง (ค.ศ.) — ย้ายมาใช้ตัวกลาง
+// ThaiDatePicker ที่เป็น พ.ศ. ทั้งปฏิทิน เพื่อให้เหมือนกันทั้งแอป
+const ThaiDateField = ThaiDatePicker;
 
 const SectionCard = ({ title, caption, right, children, sx }) => (
   <Box sx={{ border: `1px solid ${BORDER_MAIN}`, borderRadius: 2.5, overflow: "hidden", ...sx }}>
@@ -241,7 +214,7 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle }) {
     const base = moment(form.invoicedAt);
     const term = Number(form.creditTermDays);
     if (!base.isValid() || !Number.isFinite(term) || term < 0) return "";
-    return base.clone().add(term, "days").format("D MMM YYYY");
+    return formatThai(base.clone().add(term, "days"), "D MMM YYYY");
   })();
 
   return (
@@ -261,8 +234,6 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle }) {
         </Typography>
       </DialogTitle>
 
-      {/* ⚠️ DatePicker ของ MUI ต้องอยู่ใน LocalizationProvider เสมอ ไม่งั้นพังตอน render */}
-      <LocalizationProvider dateAdapter={AdapterMoment}>
       <DialogContent dividers>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
@@ -447,7 +418,7 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle }) {
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography sx={{ fontWeight: 700, fontSize: "0.82rem" }}>{baht(p.amount)}</Typography>
                     <Typography variant="caption" sx={{ color: TEXT_SUB }}>
-                      {moment(p.paidAt).format("DD/MM/YYYY")}{p.method ? ` · ${p.method}` : ""}{p.recordedByName ? ` · บันทึกโดย ${p.recordedByName}` : ""}
+                      {formatThai(moment(p.paidAt), "DD/MM/YYYY")}{p.method ? ` · ${p.method}` : ""}{p.recordedByName ? ` · บันทึกโดย ${p.recordedByName}` : ""}
                     </Typography>
                   </Box>
                   <Tooltip title="ลบรายการนี้">
@@ -488,7 +459,6 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle }) {
           </SectionCard>
         )}
       </DialogContent>
-      </LocalizationProvider>
 
       <DialogActions sx={{ p: 2 }}>
         <Button onClick={() => onClose?.()} disabled={saving} sx={{ textTransform: "none" }}>ปิด</Button>

@@ -30,6 +30,7 @@ import {
 } from "../utils/deliveryNotePdf";
 import DocumentPreviewDialog from "./DocumentPreviewDialog";
 import IssuedDocumentService from "@/shared/services/IssuedDocumentService";
+import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 
 const ACCENT = "#dc2626";
 const SURFACE_SUBTLE = "#f8fafc";
@@ -429,16 +430,14 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
               renderInput={(params) => <TextField {...params} label="เรื่อง" required />}
             />
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.75}>
-              <TextField
-                size="small" fullWidth type="date" label="วันที่ออกเอกสาร"
-                InputLabelProps={{ shrink: true }}
-                value={form.issuedAt} onChange={setField("issuedAt")}
+              <ThaiDatePicker
+                label="วันที่ออกเอกสาร"
+                value={form.issuedAt} onChange={set("issuedAt")}
                 helperText={`ในเอกสารจะขึ้นเป็น "${thaiFullDate(form.issuedAt)}"`}
               />
-              <TextField
-                size="small" fullWidth type="date" label="วันที่งานเสร็จ"
-                InputLabelProps={{ shrink: true }}
-                value={form.completedAt} onChange={setField("completedAt")}
+              <ThaiDatePicker
+                label="วันที่งานเสร็จ"
+                value={form.completedAt} onChange={set("completedAt")}
                 helperText={`ในเอกสารจะขึ้นเป็น "${thaiFullDate(form.completedAt)}"`}
               />
             </Stack>

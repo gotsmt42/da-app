@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import moment from "moment";
-import "moment/locale/th";
+import { formatThai } from "@/shared/utils/thaiDate";
 
 // ✅ สร้างข้อความรายละเอียดงานพร้อมวันที่/เวลานัดหมาย — ใช้กับแจ้งเตือน "งานใหม่" โดยเฉพาะ
 // เพื่อให้เห็นว่างานนัดไว้เมื่อไหร่ได้ทันทีจากกล่องแจ้งเตือน ไม่ต้องเปิดเข้าไปดูในงานเอง
 const buildNewJobDetail = (ev) => {
-  const dateLabel = moment(ev.start || ev.date).locale("th").format("D MMM YYYY");
+  const dateLabel = formatThai(ev.start || ev.date, "D MMM YYYY");
   const timeLabel = (ev.startTime || ev.endTime) ? `${ev.startTime || "-"}-${ev.endTime || "-"}` : "ทั้งวัน";
   const place = [ev.company, ev.site].filter(Boolean).join(" · ");
   return `${place ? place + " · " : ""}📅 ${dateLabel} 🕐 ${timeLabel}`;

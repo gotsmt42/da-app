@@ -17,8 +17,9 @@
  * ⚠️ พิกัดทั้งหมดเป็นมิลลิเมตร (jsPDF unit:"mm", A4 = 210 x 297)
  */
 import moment from "moment";
-import "moment/locale/th";
+import "@/shared/utils/momentThaiLocale";
 import { formatRoundLabel } from "@/shared/utils/contractRounds";
+import { thaiDateFull } from "@/shared/utils/thaiDate";
 
 // ── ข้อมูลบริษัทผู้ออกเอกสาร ────────────────────────────────────────────────
 // ✅ รวมไว้ที่เดียว — เดิม GenPDF.js ฝังข้อความพวกนี้กระจายอยู่กลางฟังก์ชัน ย้ายที่อยู่/เบอร์ทีต้องไล่หา
@@ -222,11 +223,9 @@ export const referencePresetsFor = (job) => {
 };
 
 /** วันที่แบบไทยเต็ม เช่น "7 สิงหาคม 2569" */
-export const thaiFullDate = (d) => {
-  const m = moment(d);
-  if (!m.isValid()) return "-";
-  return `${m.format("D MMMM")} ${m.year() + 543}`;
-};
+// ⚠️ เดิมคำนวณ พ.ศ. เองตรงนี้ (m.year() + 543) — ย้ายไปใช้ตัวกลางที่ shared/utils/thaiDate แล้ว
+// เพื่อให้ "วันที่ในเอกสาร PDF" กับ "วันที่บนหน้าจอ" มาจากตรรกะเดียวกันเสมอ ไม่มีทางเพี้ยนคนละแบบ
+export const thaiFullDate = (d) => thaiDateFull(d);
 
 /**
  * ตัดบรรทัดย่อหน้า โดยให้บรรทัดแรกแคบลงเท่าระยะเยื้อง

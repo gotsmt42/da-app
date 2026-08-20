@@ -1,4 +1,5 @@
 import moment from "moment"; // Import moment library for date formatting
+import { formatThai } from "@/shared/utils/thaiDate";
 
 const customCell = ({ row, isSmallScreen }) => {
   return (
@@ -7,7 +8,7 @@ const customCell = ({ row, isSmallScreen }) => {
       <div style={{ fontWeight: "bold" }}>[{row.type}] {row.name}</div>
       {/* หากหน้าจอขนาดเล็ก ให้แสดง updatedAt ด้านล่าง */}
       {isSmallScreen && (
-        <span style={{ marginTop: "20px"  }}>แก้ไขล่าสุด{moment(row.updatedAt).format(" DD/MM/YYYY HH:mm:ss")}</span>
+        <span style={{ marginTop: "20px"  }}>แก้ไขล่าสุด{formatThai(moment(row.updatedAt), " DD/MM/YYYY HH:mm:ss")}</span>
       )}
     </div>
   );

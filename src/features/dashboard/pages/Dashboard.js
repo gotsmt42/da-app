@@ -22,7 +22,7 @@ import { useEffect, useState, useMemo } from "react";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { Link, useNavigate } from "react-router-dom";
 import moment from "moment";
-import "moment/locale/th";
+import "@/shared/utils/momentThaiLocale";
 import AuthService from "@/shared/services/authService";
 import CustomerService from "@/shared/services/CustomerService";
 import EventService from "@/shared/services/EventService";
@@ -43,6 +43,7 @@ import {
 import { groupEventsByContract, nextVisitOverdueInfo } from "@/shared/utils/contractOverdue";
 // ✅ ตรรกะติดตามใบเสนอราคาตัวกลาง — ใช้ร่วมกับหน้า /quotations และฝั่ง server เพื่อให้เกณฑ์/ตัวเลขตรงกัน
 import { getFollowUpInfo } from "@/shared/utils/quotationTracking";
+import { formatThai } from "@/shared/utils/thaiDate";
 
 // 🎨 สีและไอคอนประจำสถานะงาน — ใช้ร่วมกันทั้ง Quick Stats และการ์ดงานวันนี้
 // ✅ เก็บเป็น "component" ไม่ใช่ element ที่ render ไว้แล้ว เพื่อให้เรียกใช้คนละขนาดได้ตามบริบท
@@ -904,9 +905,7 @@ const Dashboard = () => {
                 </span>
                 <span style={styles.sideJobBadge}>
                   {d.plannedMonth
-                    ? moment(d.plannedMonth, "YYYY-MM")
-                        .locale("th")
-                        .format("MMM YYYY")
+                    ? formatThai(moment(d.plannedMonth, "YYYY-MM"), "MMM YYYY")
                     : "-"}
                 </span>
               </Link>
@@ -987,7 +986,7 @@ const Dashboard = () => {
               <div>
                 <span style={styles.welcomeSub}>
                   {getGreeting()} ·{" "}
-                  {moment().locale("th").format("D MMMM YYYY")}
+                  {formatThai(moment().locale("th"), "D MMMM YYYY")}
                 </span>
                 <h2 style={styles.welcomeTitle}>
                   {userData?.fname || "ผู้ใช้งาน"}

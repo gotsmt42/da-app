@@ -18,7 +18,7 @@
  *   4. ข้อความทั้งหมดฝังตายในโค้ด แก้ถ้อยคำก่อนออกไม่ได้เลย ("เรียน ผู้จัดการโครงการ X" เสมอ)
  */
 import moment from "moment";
-import "moment/locale/th";
+import "@/shared/utils/momentThaiLocale";
 import { formatRoundLabel } from "@/shared/utils/contractRounds";
 import {
   // ✅ letterIndentFor = แนวเยื้องเส้นเดียวที่ใช้ร่วมกับใบส่งมอบงาน (แทน LABEL_VALUE_X/INDENT แบบตายตัว

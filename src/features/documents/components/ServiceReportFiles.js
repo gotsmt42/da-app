@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import moment from "moment";
-import "moment/locale/th";
+import "@/shared/utils/momentThaiLocale";
 
 import EventService from "@/shared/services/EventService";
 import { resolveOperationGroup } from "@/shared/utils/overdueJobs";
@@ -23,6 +23,7 @@ import {
   Description, RequestQuote, ReceiptLong, AssignmentTurnedIn,
 } from "@mui/icons-material";
 import LineIcon from "@/shared/ui/LineIcon";
+import { formatThai } from "@/shared/utils/thaiDate";
 
 const IS_MOBILE = isMobileDevice();
 
@@ -348,7 +349,7 @@ const ServiceReportFiles = () => {
               })()}
             </Stack>
             <Typography variant="caption" color="text.disabled">
-              อัพโหลดเมื่อ {moment(f.uploadedAt).locale("th").format("DD MMM YYYY HH:mm")}
+              อัพโหลดเมื่อ {formatThai(moment(f.uploadedAt).locale("th"), "DD MMM YYYY HH:mm")}
             </Typography>
           </Box>
           {/* ✅ เดิมมีปุ่มแยกเรียงเต็มแถว (ดูไฟล์/ดาวน์โหลด/ไปที่งาน) ดูรกตาเวลามีไฟล์เยอะ

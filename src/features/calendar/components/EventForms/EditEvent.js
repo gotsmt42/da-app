@@ -7,6 +7,8 @@ import { escapeHtml } from "@/shared/utils/escapeHtml";
 import { getApprovalState } from "@/shared/utils/approvalStatus";
 import { getActivityLogMeta } from "@/shared/utils/activityLogMeta";
 import { classifyJob, getJobClassMeta } from "@/shared/utils/jobClassification";
+import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
+import { formatThai } from "@/shared/utils/thaiDate";
 
 // ✅ ป้องกัน stored XSS — ค่าที่ผู้ใช้พิมพ์เอง (ชื่อบริษัท/โครงการ/ประเภทงาน/ระบบ/ทีม ฯลฯ) ต้อง escape
 // ก่อนต่อเป็น HTML string เสมอ ไม่งั้นถ้ามีใครตั้งชื่อเป็น เช่น "><img src=x onerror="..."> จะยิง
@@ -1061,7 +1063,7 @@ export const getEditEvent = async ({
     ${eventApprovalState === "pending" ? `
     <div class="ee-approval-box ee-approval-box--pending">
       <b>⏳ งานนี้ยังรออนุมัติ</b>
-      ${eventApprovalRequestedBy ? `${attrHtml(eventApprovalRequestedBy)} ส่งงานนี้เข้าระบบ` : "รอการอนุมัติ"}${eventApprovalRequestedAt ? ` เมื่อ ${moment(eventApprovalRequestedAt).locale("th").format("D MMM YYYY HH:mm")}` : ""}
+      ${eventApprovalRequestedBy ? `${attrHtml(eventApprovalRequestedBy)} ส่งงานนี้เข้าระบบ` : "รอการอนุมัติ"}${eventApprovalRequestedAt ? ` เมื่อ ${formatThai(moment(eventApprovalRequestedAt).locale("th"), "D MMM YYYY HH:mm")}` : ""}
       ${isAdminOrManagerUser ? `
       <div class="ee-approval-actions">
         <button type="button" class="ee-btn ee-btn-success" id="btnApproveJob">✅ อนุมัติงาน</button>
@@ -1079,7 +1081,7 @@ export const getEditEvent = async ({
     ` : eventApprovalState === "rejected" ? `
     <div class="ee-approval-box ee-approval-box--rejected">
       <b>❌ งานนี้ไม่ได้รับการอนุมัติ</b>
-      ${eventApprovalDecidedBy ? `${attrHtml(eventApprovalDecidedBy)} ไม่อนุมัติ` : "ไม่ได้รับการอนุมัติ"}${eventApprovalDecidedAt ? ` เมื่อ ${moment(eventApprovalDecidedAt).locale("th").format("D MMM YYYY HH:mm")}` : ""}
+      ${eventApprovalDecidedBy ? `${attrHtml(eventApprovalDecidedBy)} ไม่อนุมัติ` : "ไม่ได้รับการอนุมัติ"}${eventApprovalDecidedAt ? ` เมื่อ ${formatThai(moment(eventApprovalDecidedAt).locale("th"), "D MMM YYYY HH:mm")}` : ""}
       ${eventApprovalRejectReason ? `<div style="margin-top:4px;"><b style="font-size:12.5px;">เหตุผล:</b> ${attrHtml(eventApprovalRejectReason)}</div>` : ""}
       <div style="margin-top:6px;">${isAdminOrManagerUser ? "แก้ไขข้อมูลแล้วบันทึก หรือลบทิ้งได้เลย" : "แก้ไขข้อมูลแล้วกดบันทึก ระบบจะส่งขออนุมัติใหม่ให้อัตโนมัติ"}</div>
     </div>
@@ -1538,9 +1540,16 @@ export const getEditEvent = async ({
     allowEscapeKey: false,
     // ✅ Swal ลบ DOM ของ popup ทิ้งทั้งก้อนตอนปิด แต่ document/window listener ของทุก TomSelect
     // ในฟอร์มยังค้างอยู่ (รวมแถวลูกทีมที่ผู้ใช้ไม่ได้กด ✕ เอง) — เก็บกวาดให้ครบทีเดียวตอนปิด
-    willClose: (popup) => popup.querySelectorAll(".tomselected").forEach((el) => el.tomselect?.destroy()),
+    willClose: (popup) => {
+      // ⚠️ คืนทรัพยากรของปฏิทิน พ.ศ. ที่ mount ไว้ด้วย ไม่งั้น React root จะค้างทุกครั้งที่เปิดกล่อง
+      popup.__thaiDpCleanup?.();
+      popup.querySelectorAll(".tomselected").forEach((el) => el.tomselect?.destroy());
+    },
 
     didOpen: () => {
+      // ✅ เปลี่ยนช่อง <input type="date"> ทุกช่องในกล่องนี้เป็นปฏิทิน พ.ศ. เดือนไทย
+      // (ช่องเดิมถูกซ่อนไว้เป็นตัวเก็บค่า โค้ดที่อ่าน .value ตอนกดบันทึกจึงทำงานเหมือนเดิม)
+      Swal.getPopup().__thaiDpCleanup = mountThaiDatePickers(Swal.getPopup());
       /* color pickers */
       Object.assign(inputBg.style, {
         width: "40px",
@@ -1731,8 +1740,8 @@ export const getEditEvent = async ({
           const me = moment(e).locale("th");
           const days = Math.max(1, me.diff(ms, "days") + 1);
           previewEl.textContent = ms.isSame(me, "day")
-            ? `${ms.format("D MMM YYYY")}`
-            : `${ms.format("D MMM")} – ${me.format("D MMM YYYY")} (${days} วัน)`;
+            ? `${formatThai(ms, "D MMM YYYY")}`
+            : `${ms.format("D MMM")} – ${formatThai(me, "D MMM YYYY")} (${days} วัน)`;
         };
         refreshPreview();
         row.querySelector(".ee-multi-date-remove")?.addEventListener("click", () => {

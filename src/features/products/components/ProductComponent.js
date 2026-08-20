@@ -25,6 +25,8 @@ import moment from "moment"; // Import moment library for date formatting
 import { ThreeDots } from "react-loader-spinner";
 import { FaFileExcel } from "react-icons/fa";
 import { Link } from "react-router-dom";
+import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
+import { formatThai } from "@/shared/utils/thaiDate";
 
 const ProductComponent = () => {
   const [user, setUser] = useState([]);
@@ -80,7 +82,7 @@ const ProductComponent = () => {
   useEffect(() => {
     const result = products.filter((product) => {
       const productName = product.name.toLowerCase();
-      const updatedDate = moment(product.updatedAt).format("DD/MM/YYYY HH:mm"); // Convert updated date to a localized string
+      const updatedDate = formatThai(moment(product.updatedAt), "DD/MM/YYYY HH:mm"); // Convert updated date to a localized string
 
       // Check if the product name or the updated date matches the search term
       return (
@@ -375,12 +377,9 @@ const ProductComponent = () => {
                     </select>
                   </div>
                   <div className="col-md m-2">
-                    <input
-                      style={{ cursor: "pointer" }}
-                      className="form-control"
-                      type="date"
+                    <ThaiDatePicker
                       value={dateSearch}
-                      onChange={(e) => setDateSearch(e.target.value)}
+                      onChange={setDateSearch}
                     />
                   </div>
                 </div>

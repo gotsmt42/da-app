@@ -9,7 +9,7 @@
  */
 import { useRef, useState } from "react";
 import moment from "moment";
-import "moment/locale/th";
+import "@/shared/utils/momentThaiLocale";
 import {
   Box, Stack, Typography, Dialog, DialogTitle, DialogContent, DialogActions,
   Button, Chip, useMediaQuery, TextField, MenuItem, LinearProgress, Alert,
@@ -20,6 +20,7 @@ import { roundDocs, isImageFile, JOB_DOC_TYPES } from "@/shared/utils/jobDocType
 import EventService from "@/shared/services/EventService";
 import { formatEventDateRange } from "@/shared/utils/formatDateRange";
 import FilePreviewDialog from "./FilePreviewDialog";
+import { formatThai } from "@/shared/utils/thaiDate";
 
 const TEXT_SUB = "#64748b";
 
@@ -203,7 +204,7 @@ export default function JobDocsDialog({ roundVisits, title, onClose, canUpload =
         caption={[
           preview?.label,
           preview?.file?._visit && multiVisit ? formatEventDateRange(preview.file._visit) : null,
-          preview?.file?.uploadedAt ? `อัปโหลด ${moment(preview.file.uploadedAt).format("DD/MM/YYYY")}` : null,
+          preview?.file?.uploadedAt ? `อัปโหลด ${formatThai(moment(preview.file.uploadedAt), "DD/MM/YYYY")}` : null,
         ].filter(Boolean).join(" · ")}
         onClose={() => setPreview(null)}
       />

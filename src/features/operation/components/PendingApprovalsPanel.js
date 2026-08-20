@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import moment from "moment";
-import "moment/locale/th";
+import "@/shared/utils/momentThaiLocale";
 import {
   Box, Stack, Typography, Chip, Button, IconButton, Tooltip, Skeleton, Collapse, Divider,
   Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, TextField, MenuItem,
@@ -35,6 +35,7 @@ import { classifyJob, getJobClassMeta } from "@/shared/utils/jobClassification";
 // ✅ ใช้บรรทัดข้อมูลตัวเดียวกับการ์ดงานในแท็บ "รายการงาน" — ข้อมูลชุดเดียวกัน (ระบบ/โครงการ/ครั้งที่/ทีม)
 // จะได้แสดงหน้าตาเหมือนกันเป๊ะทั้งสองแท็บตามที่ผู้ใช้ขอ ไม่ใช่ต่างคนต่างจัดรูปแบบเอง
 import InfoLine from "@/shared/ui/InfoLine";
+import { formatThai } from "@/shared/utils/thaiDate";
 
 export default function PendingApprovalsPanel({ onCountChange, active = true }) {
   const navigate = useNavigate();
@@ -347,7 +348,7 @@ export default function PendingApprovalsPanel({ onCountChange, active = true }) 
             // เข้าเมื่อไหร่" ถึงจะตัดสินใจได้ (ชนงานอื่นไหม/ทันกำหนดไหม) เดิมไม่แสดงเลยสักที่
             // ⚠️ งานที่ยังไม่ลงตาราง (draft) ไม่มีวันที่จริง มีแค่ "เดือนที่ตั้งใจ" (plannedMonth)
             const dateLabel = head.unscheduled
-              ? (head.plannedMonth ? `แผนเดือน ${moment(head.plannedMonth, "YYYY-MM").locale("th").format("MMMM YYYY")}` : "ยังไม่ระบุเดือน")
+              ? (head.plannedMonth ? `แผนเดือน ${formatThai(moment(head.plannedMonth, "YYYY-MM").locale("th"), "MMMM YYYY")}` : "ยังไม่ระบุเดือน")
               : sessions.map((s) => formatEventDateRange(s)).join(", ");
             // ✅ ทีมที่เข้างานจากทุกวันของงานนี้ (แต่ละวันอาจคนละทีม) ตัดชื่อซ้ำออก
             const teamNames = [...new Set(
@@ -516,7 +517,7 @@ export default function PendingApprovalsPanel({ onCountChange, active = true }) 
                 const rCompanySite = [head.company, head.site].filter(Boolean).join(" · ");
                 const rJobClassMeta = getJobClassMeta(classifyJob(head));
                 const rDateLabel = head.unscheduled
-                  ? (head.plannedMonth ? `แผนเดือน ${moment(head.plannedMonth, "YYYY-MM").locale("th").format("MMMM YYYY")}` : "ยังไม่ระบุเดือน")
+                  ? (head.plannedMonth ? `แผนเดือน ${formatThai(moment(head.plannedMonth, "YYYY-MM").locale("th"), "MMMM YYYY")}` : "ยังไม่ระบุเดือน")
                   : sessions.map((s) => formatEventDateRange(s)).join(", ");
                 const rTeamNames = [...new Set(
                   sessions.flatMap((s) => [s.team, ...(s.teamMembers || []).map((m) => m?.name)]).filter(Boolean)

@@ -18,7 +18,7 @@ import JobTypeService from "@/shared/services/JobTypeService";
 import SystemTypeService from "@/shared/services/SystemTypeService";
 import Swal from "sweetalert2";
 import moment from "moment";
-import "moment/locale/th";
+import "@/shared/utils/momentThaiLocale";
 import {
   buildDaysPastDueMap, isFlaggedDays, isSevereDays, countFlaggedJobs, countDistinctJobs, getOverdueGroupKey,
 } from "@/shared/utils/overdueJobs";
@@ -80,6 +80,7 @@ import DeliveryNoteDialog from "@/features/documents/components/DeliveryNoteDial
 import WorkNoticeDialog from "@/features/documents/components/WorkNoticeDialog";
 import InfoLine from "@/shared/ui/InfoLine";
 import { JOB_DOC_TYPES } from "@/shared/utils/jobDocTypes";
+import { formatThai } from "@/shared/utils/thaiDate";
 
 // ✅ ใช้ตัดสินใจลำดับปุ่มแชร์ในเมนู "⋮" ต่อไฟล์ (ดูเหตุผลใน fileActions.js)
 const IS_MOBILE = isMobileDevice();
@@ -2079,9 +2080,11 @@ const JobGroupBlock = ({ sessions, currentUserRole, ...cardProps }) => {
     new Date(s.end || s.start) > new Date(latest.end || latest.start) ? s : latest
   );
   const rangeStart = moment(sortedByStart[0].start).locale("th").format("DD MMM");
-  const rangeEnd = moment(latestEndSession.end || latestEndSession.start)
-    .subtract(latestEndSession.allDay ? 1 : 0, "days")
-    .locale("th").format("DD MMM YYYY");
+  const rangeEnd = formatThai(
+    moment(latestEndSession.end || latestEndSession.start)
+      .subtract(latestEndSession.allDay ? 1 : 0, "days"),
+    "DD MMM YYYY",
+  );
 
   // ✅ นับ "จำนวนวันเข้างานจริง" ตามที่ลงไว้ (รวมทุกวันในแต่ละช่วง เช่น 13-15 = 3 วัน)
   // แทนที่จะนับจำนวนแถว/ช่วงที่ลง (เดิมนับ sessions.length เพียว ๆ ทำให้ 13-15 และ 17-18
@@ -2479,7 +2482,7 @@ const Operation = () => {
     const keyword = search.toLowerCase();
     const matchSearch = keyword
       ? [event.company, event.site, event.title, event.system, event.team, event.docNo,
-         moment(event.start).format("DD/MM/YYYY HH:mm")]
+         formatThai(moment(event.start), "DD/MM/YYYY HH:mm")]
           .map(v => (v || "").toLowerCase()).some(t => t.includes(keyword))
       : true;
 
@@ -2870,7 +2873,7 @@ const Operation = () => {
           fileName: buildOperationFileName(groupLabel),
           groupLabel: `กลุ่ม: ${groupLabel}`,
           filterSummary: activeFilterCount > 0 ? `ตัวกรอง ${activeFilterCount} เงื่อนไข` : "ไม่ได้กรองเพิ่มเติม",
-          exportedAt: moment().format("DD/MM/YYYY HH:mm"),
+          exportedAt: formatThai(moment(), "DD/MM/YYYY HH:mm"),
         },
         daysPastDueMap,
         isFlaggedDays,

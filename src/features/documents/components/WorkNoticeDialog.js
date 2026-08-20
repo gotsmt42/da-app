@@ -36,6 +36,7 @@ import moment from "moment";
 import { resolveJobFields, referencePresetsFor } from "../utils/deliveryNotePdf";
 import DocumentPreviewDialog from "./DocumentPreviewDialog";
 import IssuedDocumentService from "@/shared/services/IssuedDocumentService";
+import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 
 // ✅ สีประจำเอกสารชนิดนี้เป็น "ฟ้า" ไม่ใช่แดงเหมือนใบส่งมอบงาน — ตรงกับสีปุ่ม "📄 ออกใบแจ้งเข้างาน"
 // ในหน้าแก้ไขงาน (.ee-btn-info = #0ea5e9) ผู้ใช้จึงเชื่อมโยงได้ทันทีว่ากล่องนี้มาจากปุ่มไหน และแยกออก
@@ -491,11 +492,11 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
             {(form.dayRows || []).map((r, i) => (
               <Box key={i} sx={{ p: 1.25, borderRadius: 2, border: `1px solid ${BORDER_MAIN}`, bgcolor: SURFACE_SUBTLE }}>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
-                  <TextField
-                    size="small" type="date" label={`วันที่ ${i + 1}`}
-                    InputLabelProps={{ shrink: true }}
-                    sx={{ width: { xs: "100%", sm: 165 }, flexShrink: 0, bgcolor: "#fff" }}
-                    value={r.date} onChange={(e) => updateDay(i, "date", e.target.value)}
+                  <ThaiDatePicker
+                    label={`วันที่ ${i + 1}`}
+                    fullWidth={false}
+                    textFieldProps={{ sx: { width: { xs: "100%", sm: 185 }, flexShrink: 0, bgcolor: "#fff" } }}
+                    value={r.date} onChange={(v) => updateDay(i, "date", v)}
                   />
                   <Autocomplete
                     freeSolo size="small" options={TIME_PRESETS}
@@ -565,10 +566,9 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
                   ? "ระบบออกเลขเดินหน้าให้อัตโนมัติตอนกดออกเอกสาร"
                   : 'ใช้ "เลขที่อ้างอิง (Doc No.)" ของงานนี้ — แก้ไขได้'}
               />
-              <TextField
-                size="small" fullWidth type="date" label="วันที่ออกเอกสาร"
-                InputLabelProps={{ shrink: true }}
-                value={form.issuedAt} onChange={setField("issuedAt")}
+              <ThaiDatePicker
+                label="วันที่ออกเอกสาร"
+                value={form.issuedAt} onChange={set("issuedAt")}
                 helperText={`ในเอกสารจะขึ้นเป็น "${thaiFullDate(form.issuedAt)}"`}
               />
             </Stack>

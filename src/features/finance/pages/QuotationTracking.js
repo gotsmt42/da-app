@@ -27,7 +27,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef, memo } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import moment from "moment";
-import "moment/locale/th";
+import "@/shared/utils/momentThaiLocale";
 import { alpha } from "@mui/material/styles";
 import {
   Box, Stack, Typography, TextField, InputAdornment, IconButton, Chip, Avatar,
@@ -55,6 +55,7 @@ import { getOverdueGroupKey, resolveAssignedTechnician } from "@/shared/utils/ov
 import { WARNING_DAYS_AFTER_SENT, getFollowUpInfo, resolveQuotationGroup } from "@/shared/utils/quotationTracking";
 import { formatEventDateRange } from "@/shared/utils/formatDateRange";
 import { formatRoundLabel } from "@/shared/utils/contractRounds";
+import { formatThai } from "@/shared/utils/thaiDate";
 
 const STATUS_META = {
   waiting_file: { label: "รอช่างแนบไฟล์",   color: "#6b7280", icon: <AttachFile sx={{ fontSize: 14 }} /> },
@@ -382,7 +383,7 @@ const QuotationTable = ({ jobs, onOpen, onPreview }) => (
               </TableCell>
               <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
                 <Typography variant="caption" color="text.secondary">
-                  {a.quotationSentAt ? moment(a.quotationSentAt).locale("th").format("D MMM YY") : "-"}
+                  {a.quotationSentAt ? formatThai(moment(a.quotationSentAt).locale("th"), "D MMM YY") : "-"}
                 </Typography>
               </TableCell>
               <TableCell align="center">
@@ -468,9 +469,9 @@ const FollowUpSection = ({ job, onSubmit, onPreview }) => {
           </Typography>
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25 }}>
             {followUpInfo.lastContactIsFollowUp
-              ? `ติดตามล่าสุด ${followUpInfo.lastContactAt.locale("th").format("D MMM YYYY")}`
-              : `ส่งใบเสนอราคา ${followUpInfo.lastContactAt.locale("th").format("D MMM YYYY")}`}
-            {" · "}ครบกำหนด {followUpInfo.dueAt.locale("th").format("D MMM YYYY")}
+              ? `ติดตามล่าสุด ${formatThai(followUpInfo.lastContactAt.locale("th"), "D MMM YYYY")}`
+              : `ส่งใบเสนอราคา ${formatThai(followUpInfo.lastContactAt.locale("th"), "D MMM YYYY")}`}
+            {" · "}ครบกำหนด {formatThai(followUpInfo.dueAt.locale("th"), "D MMM YYYY")}
             {followUpInfo.daysSinceSent !== followUpInfo.daysSinceLastContact &&
               ` · ส่งไปแล้วรวม ${followUpInfo.daysSinceSent} วัน`}
           </Typography>
@@ -483,7 +484,7 @@ const FollowUpSection = ({ job, onSubmit, onPreview }) => {
             <Box key={f._id || i} sx={{ p: 1.25, borderRadius: 2, border: "1px solid", borderColor: "divider" }}>
               <Stack direction="row" justifyContent="space-between" alignItems="center">
                 <Typography variant="caption" fontWeight={700} color="primary.main">ครั้งที่ {f.attemptNumber}</Typography>
-                <Typography variant="caption" color="text.secondary">{moment(f.contactedAt).locale("th").format("DD MMM YYYY HH:mm")}</Typography>
+                <Typography variant="caption" color="text.secondary">{formatThai(moment(f.contactedAt).locale("th"), "DD MMM YYYY HH:mm")}</Typography>
               </Stack>
               {f.note && <Typography variant="body2" sx={{ mt: 0.5, whiteSpace: "pre-wrap" }}>{f.note}</Typography>}
               <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 0.5 }}>
@@ -671,7 +672,7 @@ const QuotationDetailDialog = ({ job, currentUserRole, onClose, onAction, onAmou
                 {(groupKey === "approved" || groupKey === "rejected") && (anchor.quotationDecisionBy || anchor.quotationDecisionAt) && (
                   <Typography variant="caption" color="text.secondary">
                     {anchor.quotationDecisionBy ? `บันทึกโดย ${anchor.quotationDecisionBy}` : ""}
-                    {anchor.quotationDecisionAt ? ` · ${moment(anchor.quotationDecisionAt).locale("th").format("DD MMM YYYY HH:mm")}` : ""}
+                    {anchor.quotationDecisionAt ? ` · ${formatThai(moment(anchor.quotationDecisionAt).locale("th"), "DD MMM YYYY HH:mm")}` : ""}
                   </Typography>
                 )}
                 {groupKey === "waiting_file" && (
@@ -1014,7 +1015,7 @@ export default function QuotationTracking() {
           fileName: buildQuotationFileName(tabLabel),
           tabLabel: `หมวด: ${tabLabel}`,
           filterSummary: filters.length > 0 ? `ตัวกรอง: ${filters.join(" · ")}` : "ไม่ได้กรองเพิ่มเติม",
-          exportedAt: moment().format("DD/MM/YYYY HH:mm"),
+          exportedAt: formatThai(moment(), "DD/MM/YYYY HH:mm"),
         },
         getFollowUpInfo,
         formatEventDateRange,

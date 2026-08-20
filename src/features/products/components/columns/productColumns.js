@@ -11,6 +11,7 @@ import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import { styled } from "@mui/material/styles";
 import Delete from "@mui/icons-material/Delete";
 import CustomCell from "./productCustomCell";
+import { formatThai } from "@/shared/utils/thaiDate";
 
 const StyledMenu = styled((props) => (
   <Menu
@@ -98,7 +99,7 @@ const DataTableColumns = ({
 
     {
       name: "Updated",
-      selector: (row) => moment(row.updatedAt).format("DD/MM/YYYY HH:mm:ss"),
+      selector: (row) => formatThai(moment(row.updatedAt), "DD/MM/YYYY HH:mm:ss"),
       sortable: true,
     },
     /*

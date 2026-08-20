@@ -13,7 +13,7 @@
 
 import { useEffect, useMemo, useState, useCallback, cloneElement } from "react";
 import moment from "moment";
-import "moment/locale/th";
+import "@/shared/utils/momentThaiLocale";
 import EventService from "@/shared/services/EventService";
 import TechnicianJobCard from "../components/TechnicianJobPanel";
 import { buildDaysPastDueMap, isFlaggedDays, isSevereDays, getOverdueGroupKey } from "@/shared/utils/overdueJobs";
@@ -24,6 +24,7 @@ import {
   Tooltip, Button, Snackbar, Alert, LinearProgress, Collapse,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
+import { formatThai } from "@/shared/utils/thaiDate";
 import {
   Search, Clear, Refresh, WorkOutline, HourglassTop, TaskAlt, Warning,
   Download, Close, PictureAsPdf, FolderOpen, Image, Article, InsertDriveFile, AttachFile,
@@ -186,9 +187,11 @@ const JobGroupCard = ({ sessions, ...cardProps }) => {
     new Date(s.end || s.start) > new Date(latest.end || latest.start) ? s : latest
   );
   const rangeStart = moment(sortedByStart[0].start).locale("th").format("DD MMM");
-  const rangeEnd = moment(latestEndSession.end || latestEndSession.start)
-    .subtract(latestEndSession.allDay ? 1 : 0, "days")
-    .locale("th").format("DD MMM YYYY");
+  const rangeEnd = formatThai(
+    moment(latestEndSession.end || latestEndSession.start)
+      .subtract(latestEndSession.allDay ? 1 : 0, "days"),
+    "DD MMM YYYY",
+  );
 
   // ✅ นับ "จำนวนวันเข้างานจริง" รวมทุกวันในแต่ละช่วง ไม่ใช่แค่จำนวนช่วง/แถวที่ลงไว้
   const dayEnd = (s) => moment(s.end || s.start).subtract(s.allDay ? 1 : 0, "days").startOf("day");

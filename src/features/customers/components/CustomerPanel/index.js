@@ -25,7 +25,7 @@ import CustomerService from "@/shared/services/CustomerService";
 import EventService from "@/shared/services/EventService";
 import Swal from "sweetalert2";
 import moment from "moment";
-import "moment/locale/th";
+import "@/shared/utils/momentThaiLocale";
 import { resolveOperationGroup } from "@/shared/utils/overdueJobs";
 
 import {
@@ -60,6 +60,7 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import CircleIcon from "@mui/icons-material/Circle";
 import FilterAltIcon from "@mui/icons-material/FilterAlt";
+import { formatThai } from "@/shared/utils/thaiDate";
 
 // ─── Styled ─────────────────────────────────────────────────────────────
 const GlassCard = styled(Box)(({ theme }) => ({
@@ -270,7 +271,7 @@ const CustomerCard = ({ row, events, onEdit, onDelete, onCopy }) => {
   const yearGroups = useMemo(() => {
     const byYear = {};
     customerEvents.forEach((e) => {
-      const year = moment(e.start || e.date).format("YYYY");
+      const year = formatThai(moment(e.start || e.date), "YYYY");
       if (!byYear[year]) byYear[year] = { jobs: [], typeCounts: {} };
       byYear[year].jobs.push(e);
       const type = e.title || "ไม่ระบุประเภท";
@@ -416,7 +417,7 @@ const CustomerCard = ({ row, events, onEdit, onDelete, onCopy }) => {
                                 {job.docNo && <Typography variant="caption" color="text.disabled">· #{job.docNo}</Typography>}
                               </Stack>
                               <Typography variant="caption" color="text.secondary">
-                                {moment(job.start || job.date).format("D MMM YYYY")}
+                                {formatThai(moment(job.start || job.date), "D MMM YYYY")}
                                 {job.team && ` · ทีม ${job.team}`}
                               </Typography>
                             </Box>
@@ -667,7 +668,7 @@ const Customer = () => {
 
   const statCards = [
     { label: "ลูกค้าทั้งหมด", value: stats.total, bar: "linear-gradient(135deg,#667eea,#764ba2)", icon: <GroupsIcon />, sub: "บริษัท/โครงการที่ดูแลอยู่" },
-    { label: "เพิ่มเดือนนี้", value: stats.thisMonth, bar: "linear-gradient(135deg,#10b981,#059669)", icon: <CalendarMonthIcon />, sub: moment().format("MMMM YYYY") },
+    { label: "เพิ่มเดือนนี้", value: stats.thisMonth, bar: "linear-gradient(135deg,#10b981,#059669)", icon: <CalendarMonthIcon />, sub: formatThai(moment(), "MMMM YYYY") },
   ];
 
   return (

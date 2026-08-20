@@ -13,7 +13,7 @@
 
 import React, { useState, useRef, useCallback } from "react";
 import moment from "moment";
-import "moment/locale/th";
+import "@/shared/utils/momentThaiLocale";
 import Swal from "sweetalert2";
 import { formatEventDateRange } from "@/shared/utils/formatDateRange";
 import { isApproved } from "@/shared/utils/approvalStatus";
@@ -37,6 +37,7 @@ import {
 import LineIcon from "@/shared/ui/LineIcon";
 import { printFile, shareFile, shareToLine, isMobileDevice } from "@/shared/utils/fileActions";
 import InfoLine from "@/shared/ui/InfoLine";
+import { formatThai } from "@/shared/utils/thaiDate";
 
 // ✅ ใช้ตัดสินใจลำดับปุ่มแชร์ในเมนู "⋮" ต่อไฟล์ (ดูเหตุผลใน fileActions.js)
 const IS_MOBILE = isMobileDevice();
@@ -1180,7 +1181,7 @@ const TechnicianJobCard = ({
             <Stack direction="row" alignItems="center" gap={0.5}>
               <Warning sx={{ fontSize: 15, color: "#ef4444" }} />
               <Typography variant="caption" fontWeight={700} color="#ef4444">
-                ขอปิดงานได้ตั้งแต่วันที่ {lastWorkDay.locale("th").format("DD MMM YYYY")} เป็นต้นไป
+                ขอปิดงานได้ตั้งแต่วันที่ {formatThai(lastWorkDay, "DD MMM YYYY")} เป็นต้นไป
               </Typography>
             </Stack>
           </Box>

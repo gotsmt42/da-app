@@ -1,4 +1,7 @@
 import "./index.css";
+// ⚠️ ต้องมาก่อนทุกอย่าง — ลงทะเบียน locale ไทยให้ moment ตั้งแต่แอปเริ่ม
+// ถ้าลงทะเบียนช้ากว่าหน้าแรกที่ render จะมีจุดที่แสดงเดือนเป็นอังกฤษค้างอยู่
+import "@/shared/utils/momentThaiLocale";
 
 import React, { Suspense } from "react";
 import ReactDOM from "react-dom/client";

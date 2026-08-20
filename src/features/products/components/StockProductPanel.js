@@ -18,6 +18,7 @@ import { ThreeDots } from "react-loader-spinner";
 import { FaFileExcel, FaMinus, FaPlus, FaSave } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import { Search } from "@mui/icons-material";
+import { formatThai } from "@/shared/utils/thaiDate";
 
 const StockProduct = () => {
   const [user, setUser] = useState([]);
@@ -61,7 +62,7 @@ const StockProduct = () => {
     const result = stocks.filter((stock) => {
       const productName = stock.name.toLowerCase();
       const productType = stock.type.toLowerCase();
-      const updatedDate = moment(stock.updatedAt).format("DD/MM/YYYY HH:mm");
+      const updatedDate = formatThai(moment(stock.updatedAt), "DD/MM/YYYY HH:mm");
   
       return (
         productName.includes(search.toLowerCase()) ||

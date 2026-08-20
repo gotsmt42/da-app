@@ -78,6 +78,8 @@ import { getDeleteEvent } from "../EventForms/DeleteEvent";
 import { getAddDraftEvent } from "../EventForms/AddDraftEvent";
 
 import UnscheduledPanel from "../UnscheduledPanel";
+import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
+import { formatThai } from "@/shared/utils/thaiDate";
 
 // ✅ คำอธิบายสถานะแบบยาว (ใช้เป็น tooltip ของไอคอนสถานะบน event)
 const STATUS_DESCRIPTIONS = {
@@ -920,6 +922,9 @@ function EventCalendar() {
       cancelButtonText: "ยกเลิก",
       focusConfirm: false,
       didOpen: () => {
+        // ✅ เปลี่ยนช่อง <input type="date"> ทุกช่องในกล่องนี้เป็นปฏิทิน พ.ศ. เดือนไทย
+        // (ช่องเดิมถูกซ่อนไว้เป็นตัวเก็บค่า โค้ดที่อ่าน .value ตอนกดบันทึกจึงทำงานเหมือนเดิม)
+        Swal.getPopup().__thaiDpCleanup = mountThaiDatePickers(Swal.getPopup());
         const multiToggle  = document.getElementById("swal-schedule-multi-toggle");
         const singleSection = document.getElementById("swal-schedule-single-section");
         const multiSection  = document.getElementById("swal-schedule-multi-section");
@@ -1003,7 +1008,11 @@ function EventCalendar() {
       },
       // ✅ dropdownParent:"body" ต้องเก็บกวาดตอนปิดกล่องเสมอ (ไม่ใช่แค่ตอนกด ✕ ทีละแถว) ไม่งั้น
       // dropdown ที่ค้างอยู่ใน body จะกลายเป็น orphan element ถาวรทันทีที่ทั้งกล่องถูกปิด
-      willClose: (popup) => popup.querySelectorAll(".tomselected").forEach((el) => el.tomselect?.destroy()),
+      willClose: (popup) => {
+        // ⚠️ คืนทรัพยากรของปฏิทิน พ.ศ. ที่ mount ไว้ด้วย ไม่งั้น React root จะค้างทุกครั้งที่เปิดกล่อง
+        popup.__thaiDpCleanup?.();
+        popup.querySelectorAll(".tomselected").forEach((el) => el.tomselect?.destroy());
+      },
       preConfirm: () => {
         const isMultiDate = Boolean(document.getElementById("swal-schedule-multi-toggle")?.checked);
         const team = document.getElementById("swal-schedule-team")?.value || "";
@@ -1206,7 +1215,7 @@ function EventCalendar() {
         meta: {
           fileName: `ตารางงาน-${moment().format("YYYYMMDD")}.xlsx`,
           filterSummary: filterParts.length > 0 ? `ตัวกรอง: ${filterParts.join(" · ")}` : "ไม่ได้กรองเพิ่มเติม",
-          exportedAt: moment().format("DD/MM/YYYY HH:mm"),
+          exportedAt: formatThai(moment(), "DD/MM/YYYY HH:mm"),
         },
         // ✅ ส่งฟังก์ชันที่หน้าจอใช้อยู่เข้าไปด้วย เพื่อให้ข้อมูลในไฟล์ตรงกับที่เห็นบนจอเป๊ะๆ เสมอ
         classifyJob,

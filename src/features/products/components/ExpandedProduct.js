@@ -1,6 +1,7 @@
 import React from "react";
 import moment from "moment";
 import API from "@/shared/api/axiosInstance";
+import { formatThai } from "@/shared/utils/thaiDate";
 
 
 const formatCurrency = (amount) => {
@@ -52,13 +53,13 @@ const ExpandedProduct = ({ data }) => (
           <p className="card-text">
             <small className="text-body-secondary">
               สร้างเมื่อ 
-              {moment(data.createdAt).format("- DD/MM/YYYY  HH:mm:ss ")}
+              {formatThai(moment(data.createdAt), "- DD/MM/YYYY  HH:mm:ss ")}
             </small>
           </p>
           <p className="card-text">
             <small className="text-body-secondary">
               แก้ไขล่าสุด
-              {moment(data.updatedAt).format("- DD/MM/YYYY  HH:mm:ss ")}
+              {formatThai(moment(data.updatedAt), "- DD/MM/YYYY  HH:mm:ss ")}
             </small>
           </p>
         </div>

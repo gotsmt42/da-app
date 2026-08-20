@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
 import moment from "moment";
-import "moment/locale/th";
+import "@/shared/utils/momentThaiLocale";
 import {
   Box, Stack, Typography, TextField, InputAdornment, IconButton, Chip, Skeleton,
   Paper, Tooltip, ToggleButton, ToggleButtonGroup, useMediaQuery, Pagination,
@@ -26,6 +26,7 @@ import { useAuth } from "@/features/auth/AuthContext";
 import EventService from "@/shared/services/EventService";
 import BillingDialog from "../components/BillingDialog";
 import { billingStatus, baht, round2, BILLING_STATE_META } from "@/shared/utils/billing";
+import { formatThai } from "@/shared/utils/thaiDate";
 
 const ACCENT = "#0891b2";
 const TEXT_SUB = "#64748b";
@@ -234,7 +235,7 @@ export default function BillingTracking() {
                             sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha("#0f172a", 0.06), color: TEXT_SUB }} />
                         )}
                         {e.billing?.dueAt && status.state !== "paid" && (
-                          <Chip size="small" label={`ครบกำหนด ${moment(e.billing.dueAt).format("DD/MM/YY")}`}
+                          <Chip size="small" label={`ครบกำหนด ${formatThai(moment(e.billing.dueAt), "DD/MM/YY")}`}
                             sx={{ height: 20, fontSize: "0.65rem", bgcolor: alpha("#0f172a", 0.06), color: TEXT_SUB }} />
                         )}
                       </Stack>

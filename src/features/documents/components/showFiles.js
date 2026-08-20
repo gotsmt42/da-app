@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import FileService from "@/shared/services/FileService";
 import AuthService from "@/shared/services/authService";
 import Swal from "sweetalert2";
@@ -46,6 +46,8 @@ import ArchiveIcon from "@mui/icons-material/Archive";
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
 import CalendarTodayOutlinedIcon from "@mui/icons-material/CalendarTodayOutlined";
 import InventoryOutlinedIcon from "@mui/icons-material/InventoryOutlined";
+import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
+import { formatThai } from "@/shared/utils/thaiDate";
 
 // ---- Design tokens -------------------------------------------------------
 const COLOR = {
@@ -104,7 +106,6 @@ const ShowFiles = () => {
   const [editingRowId, setEditingRowId] = useState(null);
   const [editedName, setEditedName] = useState("");
 
-  const dateInputRef = useRef(null);
 
   useEffect(() => {
     fetchData();
@@ -171,7 +172,6 @@ const ShowFiles = () => {
     setUserSearch("");
     setCategorySearch("");
     setDateSearch("");
-    if (dateInputRef.current) dateInputRef.current.value = "";
   };
 
   const hasActiveFilters = search || userSearch || categorySearch || dateSearch;
@@ -447,14 +447,12 @@ const ShowFiles = () => {
               </Grid>
 
               <Grid item xs={12} sm={6} md={2.5}>
-                <TextField
-                  type="date"
-                  fullWidth
-                  size="small"
-                  inputRef={dateInputRef}
-                  onChange={(e) => setDateSearch(e.target.value)}
-                  sx={{
-                    "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: COLOR.bg },
+                <ThaiDatePicker
+                  label="วันที่อัปเดต"
+                  value={dateSearch}
+                  onChange={setDateSearch}
+                  textFieldProps={{
+                    sx: { "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: COLOR.bg } },
                   }}
                 />
               </Grid>
@@ -767,7 +765,7 @@ const ShowFiles = () => {
                         <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.5 }}>
                           <CalendarTodayOutlinedIcon sx={{ fontSize: 13, color: COLOR.sub }} />
                           <Typography sx={{ fontFamily: FONT_MONO, fontSize: 11.5, color: COLOR.sub }}>
-                            {moment(file.updatedAt).format("DD/MM/YYYY HH:mm")}
+                            {formatThai(moment(file.updatedAt), "DD/MM/YYYY HH:mm")}
                           </Typography>
                         </Stack>
                       </Box>

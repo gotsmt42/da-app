@@ -25,7 +25,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Navigate, Link, useSearchParams } from "react-router-dom";
 import moment from "moment";
-import "moment/locale/th";
+import "@/shared/utils/momentThaiLocale";
 import Swal from "sweetalert2";
 import {
   Box, Stack, Typography, TextField, InputAdornment, IconButton, Tooltip,
@@ -61,6 +61,8 @@ import JobDocsChip from "@/features/documents/components/JobDocsChip";
 import JobDocsDialog from "@/features/documents/components/JobDocsDialog";
 import { escapeHtml } from "@/shared/utils/escapeHtml";
 import DeliveryNoteDialog from "@/features/documents/components/DeliveryNoteDialog";
+import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
+import { thaiDateNumeric, formatThai } from "@/shared/utils/thaiDate";
 
 const ACCENT = "#dc2626";
 // ✅ สีแบรนด์ของ Excel — ใช้กับปุ่มส่งออกโดยเฉพาะ ให้เห็นปุ๊บรู้ทันทีว่าคือไฟล์ Excel ไม่ต้องอ่าน tooltip
@@ -562,6 +564,11 @@ const EditableCell = ({
   formatDisplay, title, onStartEdit, onChangeValue, onCommit, onCancel, columnKey, Wrapper = TableCell,
 }) => {
   const [draft, setDraft] = useState(editValue ?? "");
+  // 🐛 BUG ที่แก้ (กดแล้วปฏิทินเด้งแล้วหายทันที): popup ของ DatePicker ทำให้ช่องกรอกเสียโฟกัส
+  // ทันทีที่เปิด — ถ้าเก็บสถานะนี้ไว้ใน useState ค่าจะยังไม่อัปเดตในรอบ event เดียวกัน (React รวม
+  // setState ไว้) onBlur จึงยังเห็นค่าเก่าแล้วสั่ง commit() ปิดโหมดแก้ไขทิ้ง = ปฏิทินถูก unmount
+  // ทันทีที่เพิ่งเปิด ✅ ref เซ็ตค่าได้ทันทีโดยไม่ต้องรอรอบ render ถัดไป
+  const pickerOpenRef = useRef(false);
   // ⚠️ seed ใหม่ทุกครั้งที่ "เพิ่งเข้าโหมดแก้ไข" เท่านั้น — ถ้า sync ทุกครั้งที่ editValue เปลี่ยน
   // ค่าที่พิมพ์อยู่จะโดนเขียนทับกลับไปเรื่อยๆ จนพิมพ์ไม่ได้
   const wasEditing = useRef(false);
@@ -631,6 +638,29 @@ const EditableCell = ({
             />
           )}
         />
+      ) : editType === "date" ? (
+        // ✅ ปฏิทิน พ.ศ. เต็มรูปแบบแทน <input type="date"> ของเบราว์เซอร์ ซึ่งบังคับให้แสดง พ.ศ.
+        // ไม่ได้ และลำดับวัน/เดือนก็เปลี่ยนไปตามภาษาของเครื่องผู้ใช้ (ดู ThaiDatePicker)
+        // ✅ autoOpen — คลิกช่องในตารางครั้งเดียวต้องได้ปฏิทินเลย ไม่ใช่ต้องคลิกซ้ำอีกทีที่ไอคอน
+        <ThaiDatePicker
+          value={draft}
+          onChange={change}
+          autoOpen
+          onOpen={() => { pickerOpenRef.current = true; }}
+          onClose={() => { pickerOpenRef.current = false; }}
+          // ✅ เลือกวันจากปฏิทินเสร็จ = บันทึกเลย ไม่ต้องให้ผู้ใช้ไปคลิกที่อื่นเพื่อยืนยันอีกที
+          // ⚠️ ส่งค่าที่เพิ่งเลือกเข้า onCommit ตรงๆ ไม่ใช้ draft เพราะ setState ยังไม่ทันมีผล
+          onAccept={(v) => onCommit?.(v && v.isValid() ? v.format("YYYY-MM-DD") : "")}
+          disabled={saving}
+          textFieldProps={{
+            onBlur: () => { if (!pickerOpenRef.current) commit(); },
+            onKeyDown: (e) => {
+              if (e.key === "Enter") { e.preventDefault(); commit(); }
+              if (e.key === "Escape") onCancel();
+            },
+            sx: { "& .MuiOutlinedInput-input": { py: 0.5, fontSize: "0.8rem" } },
+          }}
+        />
       ) : (
         <TextField
           autoFocus size="small" fullWidth type={editType} disabled={saving}
@@ -641,7 +671,6 @@ const EditableCell = ({
             if (e.key === "Enter") { e.preventDefault(); commit(); }
             if (e.key === "Escape") onCancel();
           }}
-          InputLabelProps={editType === "date" ? { shrink: true } : undefined}
           sx={{ "& .MuiOutlinedInput-input": { py: 0.5, fontSize: "0.8rem" } }}
         />
       )}
@@ -792,18 +821,22 @@ const InlineAddRow = ({
               { label: "เริ่ม", field: "contractStart", error: false },
               { label: "ถึง", field: "contractEnd", error: badRange },
             ].map((d, i) => (
-              <TextField
+              <ThaiDatePicker
                 key={d.field}
-                fullWidth variant="standard" type="date" value={draft[d.field]}
-                onChange={(e) => set(d.field)(e.target.value)} error={d.error}
-                InputProps={{
-                  startAdornment: (
-                    <Box component="span" sx={{ fontSize: "0.68rem", color: "text.disabled", mr: 0.75, flexShrink: 0, width: 20 }}>
-                      {d.label}
-                    </Box>
-                  ),
+                variant="standard"
+                value={draft[d.field]}
+                onChange={set(d.field)}
+                error={d.error}
+                textFieldProps={{
+                  InputProps: {
+                    startAdornment: (
+                      <Box component="span" sx={{ fontSize: "0.68rem", color: "text.disabled", mr: 0.75, flexShrink: 0, width: 20 }}>
+                        {d.label}
+                      </Box>
+                    ),
+                  },
+                  sx: { ...INLINE_FIELD_SX, ...(i > 0 ? { mt: 0.5 } : {}) },
                 }}
-                sx={{ ...INLINE_FIELD_SX, ...(i > 0 ? { mt: 0.5 } : {}) }}
               />
             ))}
           </TableCell>
@@ -1780,7 +1813,7 @@ export default function ContractOverview() {
           viewLabel: exportLabels.viewLabel,
           yearLabel: exportLabels.yearLabel,
           filterSummary: hasActiveFilters ? `ตัวกรอง: ${activeFilterLabels.join(" · ")}` : "ไม่ได้กรองเพิ่มเติม",
-          exportedAt: moment().format("DD/MM/YYYY HH:mm"),
+          exportedAt: formatThai(new Date(), "DD/MM/YYYY HH:mm"),
         },
         contractStatusInfo,
         formatEventDateRange,
@@ -2928,7 +2961,7 @@ pagedRows.map((c, idx) => {
                                 formatDisplay={(v) => (v
                                   ? (
                                     <Box component="span" sx={{ fontWeight: 600, fontSize: "0.8rem", fontVariantNumeric: "tabular-nums", letterSpacing: "-0.01em" }}>
-                                      {moment(v).format("DD/MM/YYYY")}
+                                      {thaiDateNumeric(v)}
                                     </Box>
                                   )
                                   : isAdminOrManager && c.isRealContract
@@ -3038,7 +3071,7 @@ pagedRows.map((c, idx) => {
                             sx={{ height: 20, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha(info.color, 0.12), color: info.color }}
                           />
                           {overdueInfo && (
-                            <Tooltip title={`รอบล่าสุด ${overdueInfo.lastVisitDate.format("DD/MM/YYYY")} — ต้องเข้ารอบถัดไปภายใน ${overdueInfo.intervalMonths} เดือน เกินกำหนดแล้ว ${overdueInfo.monthsOverdue} เดือน ยังไม่ได้ลงแผนงานครั้งถัดไป`}>
+                            <Tooltip title={`รอบล่าสุด ${thaiDateNumeric(overdueInfo.lastVisitDate)} — ต้องเข้ารอบถัดไปภายใน ${overdueInfo.intervalMonths} เดือน เกินกำหนดแล้ว ${overdueInfo.monthsOverdue} เดือน ยังไม่ได้ลงแผนงานครั้งถัดไป`}>
                               <Box
                                 component="span"
                                 sx={{
@@ -3713,7 +3746,7 @@ pagedRows.map((c, idx) => {
         <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.75 }}>
           <Chip label={progressLabel} size="small" sx={{ height: 20, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha(progressColor, 0.12), color: progressColor }} />
           {overdueInfo && (
-            <Tooltip title={`รอบล่าสุด ${overdueInfo.lastVisitDate.format("DD/MM/YYYY")} — เกินกำหนดรอบถัดไปแล้ว ${overdueInfo.monthsOverdue} เดือน`}>
+            <Tooltip title={`รอบล่าสุด ${thaiDateNumeric(overdueInfo.lastVisitDate)} — เกินกำหนดรอบถัดไปแล้ว ${overdueInfo.monthsOverdue} เดือน`}>
               <Chip icon={<WarningAmber sx={{ fontSize: 14 }} />} label="เกินกำหนด" size="small" sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha("#dc2626", 0.12), color: "#dc2626" }} />
             </Tooltip>
           )}
@@ -3890,8 +3923,8 @@ pagedRows.map((c, idx) => {
         {/* ระยะเวลา/จำนวนครั้ง/มูลค่างาน — เฉพาะสัญญาจริงเท่านั้น (งานทั่วไป/โปรเจคไม่มีแนวคิดนี้) */}
         {c.isRealContract && (
           <>
-            <FieldRow label="เริ่มสัญญา" editable={isAdminOrManager} editType="date" value={c.contractStart} formatDisplay={(v) => (v ? moment(v).format("DD/MM/YYYY") : <Dash />)} {...fp("contractStart")} />
-            <FieldRow label="สิ้นสุดสัญญา" editable={isAdminOrManager} editType="date" value={c.contractEnd} formatDisplay={(v) => (v ? moment(v).format("DD/MM/YYYY") : <Dash />)} {...fp("contractEnd")} />
+            <FieldRow label="เริ่มสัญญา" editable={isAdminOrManager} editType="date" value={c.contractStart} formatDisplay={(v) => (v ? thaiDateNumeric(v) : <Dash />)} {...fp("contractStart")} />
+            <FieldRow label="สิ้นสุดสัญญา" editable={isAdminOrManager} editType="date" value={c.contractEnd} formatDisplay={(v) => (v ? thaiDateNumeric(v) : <Dash />)} {...fp("contractEnd")} />
             <FieldRow label="รอบเข้า" editable={isAdminOrManager} editType="number" value={c.intervalMonths} formatDisplay={(v) => (v ? `ทุก ${v} เดือน` : <Dash />)} {...fp("intervalMonths")} />
             {/* ✅ ค่าคอมอยู่ในรายละเอียดที่กางดู ไม่ได้อยู่แถบสรุปหัวการ์ด — แถบนั้นมี 3 ช่องพอดีจอแล้ว
                 (ประเภทงาน/ระบบ/มูลค่างาน) เพิ่มช่องที่ 4 จะแคบจนตัวเลขตกบรรทัดบนมือถือ */}
@@ -5016,12 +5049,12 @@ pagedRows.map((c, idx) => {
                 onChange={(e) => setField("quotationNo")(e.target.value)} />
             </Stack>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-              <TextField fullWidth size="small" type="date" label="วันที่เริ่มสัญญา" InputLabelProps={{ shrink: true }}
-                value={form.contractStart} onChange={(e) => setField("contractStart")(e.target.value)} />
+              <ThaiDatePicker label="วันที่เริ่มสัญญา"
+                value={form.contractStart} onChange={setField("contractStart")} />
               {/* ✅ เตือนทันทีตั้งแต่กรอกผิด ไม่ต้องรอกดบันทึกแล้วค่อยเด้ง error ด้านบนสุดของฟอร์ม
                   (ซึ่งอยู่ไกลจากช่องที่ผิดจนต้องเลื่อนหาเอง) — ปุ่มบันทึกก็ถูกปิดไปด้วย ดู isAddFormInvalid */}
-              <TextField fullWidth size="small" type="date" label="วันที่สิ้นสุดสัญญา" InputLabelProps={{ shrink: true }}
-                value={form.contractEnd} onChange={(e) => setField("contractEnd")(e.target.value)}
+              <ThaiDatePicker label="วันที่สิ้นสุดสัญญา"
+                value={form.contractEnd} onChange={setField("contractEnd")}
                 error={hasInvalidContractRange}
                 helperText={hasInvalidContractRange ? "ต้องไม่ก่อนวันที่เริ่มสัญญา" : ""} />
             </Stack>
@@ -5048,10 +5081,10 @@ pagedRows.map((c, idx) => {
                 ทีหลังได้ที่ปุ่ม "+" ในตารางตามปกติ) กรอกมาจะลงตารางเป็นครั้งที่ 1 จริงทันที */}
             <Typography variant="caption" fontWeight={700} color="text.secondary">วันที่เข้างานครั้งที่ 1 (ถ้ารู้แล้ว)</Typography>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-              <TextField fullWidth size="small" type="date" label="วันที่เริ่ม" InputLabelProps={{ shrink: true }}
-                value={form.firstVisitStart} onChange={(e) => setField("firstVisitStart")(e.target.value)} />
-              <TextField fullWidth size="small" type="date" label="วันที่สิ้นสุด" InputLabelProps={{ shrink: true }}
-                value={form.firstVisitEnd} onChange={(e) => setField("firstVisitEnd")(e.target.value)}
+              <ThaiDatePicker label="วันที่เริ่ม"
+                value={form.firstVisitStart} onChange={setField("firstVisitStart")} />
+              <ThaiDatePicker label="วันที่สิ้นสุด"
+                value={form.firstVisitEnd} onChange={setField("firstVisitEnd")}
                 helperText="เว้นว่าง = วันเดียวกับวันที่เริ่ม" disabled={!form.firstVisitStart} />
             </Stack>
             {/* ✅ ทีมที่เข้างานเป็นของ "ครั้ง" ไม่ใช่ของสัญญา — จึงโผล่เฉพาะตอนกำลังสร้างครั้งที่ 1 จริง
@@ -5194,10 +5227,10 @@ pagedRows.map((c, idx) => {
               </Box>
             )}
             <Stack direction="row" spacing={1.5}>
-              <TextField size="small" type="date" fullWidth label="วันที่เริ่ม" InputLabelProps={{ shrink: true }}
-                value={newVisitStart} onChange={(e) => setNewVisitStart(e.target.value)} />
-              <TextField size="small" type="date" fullWidth label="วันที่สิ้นสุด" InputLabelProps={{ shrink: true }}
-                value={newVisitEnd} onChange={(e) => setNewVisitEnd(e.target.value)} />
+              <ThaiDatePicker label="วันที่เริ่ม"
+                value={newVisitStart} onChange={setNewVisitStart} />
+              <ThaiDatePicker label="วันที่สิ้นสุด"
+                value={newVisitEnd} onChange={setNewVisitEnd} />
             </Stack>
             <TextField
               select fullWidth size="small" label="ทีมที่เข้างาน"
@@ -5344,10 +5377,10 @@ pagedRows.map((c, idx) => {
                 onChange={(e) => setMergeField("quotationNo")(e.target.value)} />
             </Stack>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-              <TextField fullWidth size="small" type="date" label="วันที่เริ่มสัญญา" InputLabelProps={{ shrink: true }}
-                value={mergeForm.contractStart} onChange={(e) => setMergeField("contractStart")(e.target.value)} />
-              <TextField fullWidth size="small" type="date" label="วันที่สิ้นสุดสัญญา" InputLabelProps={{ shrink: true }}
-                value={mergeForm.contractEnd} onChange={(e) => setMergeField("contractEnd")(e.target.value)} />
+              <ThaiDatePicker label="วันที่เริ่มสัญญา"
+                value={mergeForm.contractStart} onChange={setMergeField("contractStart")} />
+              <ThaiDatePicker label="วันที่สิ้นสุดสัญญา"
+                value={mergeForm.contractEnd} onChange={setMergeField("contractEnd")} />
             </Stack>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
               <TextField
@@ -5423,7 +5456,7 @@ pagedRows.map((c, idx) => {
                       <Stack direction="row" alignItems="baseline" spacing={1} flexWrap="wrap">
                         <Typography sx={{ fontWeight: 700, fontSize: "0.85rem" }}>{log.userName || "ไม่ทราบชื่อ"}</Typography>
                         <Typography variant="caption" sx={{ color: TEXT_SUB }}>
-                          {moment(log.timestamp).format("D MMM YYYY HH:mm น.")}
+                          {formatThai(log.timestamp, "D MMM YYYY HH:mm [น.]")}
                         </Typography>
                       </Stack>
                       {/* ✅ แยกเป็นบรรทัดละ 1 ฟิลด์ (server ต่อด้วย " · ") — แก้ทีเดียวหลายช่องแล้วยัง

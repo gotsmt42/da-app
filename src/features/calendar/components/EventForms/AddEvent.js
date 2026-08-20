@@ -1,6 +1,8 @@
 import { countUsedRounds } from "@/shared/utils/contractRounds";
 import { escapeHtml } from "@/shared/utils/escapeHtml";
 import { showTeamOverlapWarning } from "@/shared/utils/teamOverlapWarning";
+import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
+import { formatThai } from "@/shared/utils/thaiDate";
 
 // ✅ ป้องกัน stored XSS — ค่าที่ผู้ใช้พิมพ์เอง (ชื่อบริษัท/โครงการ/ประเภทงาน/ระบบ/ทีม ฯลฯ) ต้อง escape
 // ก่อนต่อเป็น HTML string เสมอ ไม่งั้นถ้ามีใครตั้งชื่อเป็น เช่น "><img src=x onerror="..."> จะยิง
@@ -462,7 +464,7 @@ export const getAddEvent = async ({
   // เพื่อให้ technician มองเห็น/จัดการงานของตัวเองในหน้า Operation ได้ถูกต้อง
   const teamToId = new Map(employeeList.map((e) => [e.fname, e._id]));
 
-  const displayDate = moment(arg.dateStr).format("DD MMMM YYYY");
+  const displayDate = formatThai(moment(arg.dateStr), "DD MMMM YYYY");
 
   /* ── options ── */
   const companyOpts = customers.userCustomers
@@ -714,9 +716,16 @@ export const getAddEvent = async ({
     // ✅ Swal ลบ DOM ของ popup ทิ้งทั้งก้อนตอนปิด แต่ document/window listener ของทุก TomSelect
     // ในฟอร์มยังค้างอยู่ (รวมแถวลูกทีมที่ผู้ใช้ไม่ได้กด ✕ เอง) — เก็บกวาดให้ครบทีเดียวตอนปิด
     // TomSelect เก็บอินสแตนซ์ไว้ที่ el.tomselect และติดคลาส .tomselected ให้เองเสมอ
-    willClose: (popup) => popup.querySelectorAll(".tomselected").forEach((el) => el.tomselect?.destroy()),
+    willClose: (popup) => {
+      // ⚠️ คืนทรัพยากรของปฏิทิน พ.ศ. ที่ mount ไว้ด้วย ไม่งั้น React root จะค้างทุกครั้งที่เปิดกล่อง
+      popup.__thaiDpCleanup?.();
+      popup.querySelectorAll(".tomselected").forEach((el) => el.tomselect?.destroy());
+    },
 
     didOpen: () => {
+      // ✅ เปลี่ยนช่อง <input type="date"> ทุกช่องในกล่องนี้เป็นปฏิทิน พ.ศ. เดือนไทย
+      // (ช่องเดิมถูกซ่อนไว้เป็นตัวเก็บค่า โค้ดที่อ่าน .value ตอนกดบันทึกจึงทำงานเหมือนเดิม)
+      Swal.getPopup().__thaiDpCleanup = mountThaiDatePickers(Swal.getPopup());
       /* TomSelect */
       // ⚠️ BUG ที่แก้: maxOptions เดิม default แค่ 7 — บริษัท/โครงการ/ประเภทงาน/ระบบ/ทีม ที่มีมากกว่า 7
       // รายการ (เกิดขึ้นได้ง่ายมากในระบบจริงที่ใช้งานมาสักพัก) จะโดนตัดไม่แสดงในรายการให้เลือกเลย ทำให้
@@ -922,7 +931,7 @@ export const getAddEvent = async ({
         roundGrid.innerHTML = rounds.map((n) => {
           const scheduled = c.visits.find((v) => !v.unscheduled && Number(v.time) === n);
           if (scheduled) {
-            const dateLabel = moment(scheduled.start || scheduled.date).format("DD MMM YY");
+            const dateLabel = formatThai(moment(scheduled.start || scheduled.date), "DD MMM YY");
             return `<button type="button" class="ae-round-chip ae-round-chip--scheduled" data-round="${n}" data-extend="1" title="ลงตารางแล้ว — ${dateLabel} · กดเพื่อเพิ่มวันที่ไม่ต่อเนื่องให้ครั้งนี้">✅ ${n}</button>`;
           }
           const pending = c.visits.find((v) => v.unscheduled && Number(v.time) === n);

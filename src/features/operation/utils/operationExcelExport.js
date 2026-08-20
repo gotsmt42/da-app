@@ -1,7 +1,7 @@
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import moment from "moment";
-import "moment/locale/th";
+import "@/shared/utils/momentThaiLocale";
 
 /**
  * operationExcelExport.js — ส่งออกรายการ "แผนการดำเนินงาน" เป็นไฟล์ Excel (.xlsx) พร้อมรูปแบบ/สี

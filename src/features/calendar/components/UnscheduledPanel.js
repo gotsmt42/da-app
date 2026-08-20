@@ -13,8 +13,9 @@ import {
   faEllipsisVertical,
 } from "@fortawesome/free-solid-svg-icons";
 import moment from "moment";
-import "moment/locale/th";
+import "@/shared/utils/momentThaiLocale";
 import { isPendingApproval, isRejected } from "@/shared/utils/approvalStatus";
+import { formatThai } from "@/shared/utils/thaiDate";
 
 // ✅ งาน "วางแผนล่วงหน้า" (ยังไม่ลงตาราง) แยกเป็นแผงต่างหาก ไม่ปนกับปฏิทินจริง — เพราะยังไม่มี
 // วันที่แน่นอน (backend ก็กันไม่ให้ปนอยู่แล้ว ดู unscheduled: {$ne:true} ใน GET /events)
@@ -120,7 +121,7 @@ const UnscheduledPanel = forwardRef(function UnscheduledPanel(
     return () => draggable.destroy();
   }, [drafts, safePage]);
 
-  const monthLabel = moment(month, "YYYY-MM").locale("th").format("MMMM YYYY");
+  const monthLabel = formatThai(moment(month, "YYYY-MM").locale("th"), "MMMM YYYY");
 
   return (
     <div className="unscheduled-panel mb-3" ref={panelRef}>

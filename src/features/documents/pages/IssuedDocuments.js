@@ -22,8 +22,9 @@ import {
   EditNote, OpenInNew, Inventory2, Visibility,
 } from "@mui/icons-material";
 import { Link } from "react-router-dom";
-import moment from "moment";
-import "moment/locale/th";
+import "@/shared/utils/momentThaiLocale";
+import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
+import { thaiDateNumeric } from "@/shared/utils/thaiDate";
 import Swal from "sweetalert2";
 import { jsPDF } from "jspdf";
 import thSarabunFont from "@/assets/fonts/THSarabunNew_base64";
@@ -57,7 +58,8 @@ const STATUS_META = {
 };
 const STATUS_ORDER = ["issued", "sent", "acknowledged", "cancelled"];
 
-const thaiDate = (d) => (d && moment(d).isValid() ? `${moment(d).format("DD/MM")}/${moment(d).year() + 543}` : "-");
+// ⚠️ เดิมประกอบ พ.ศ. เองตรงนี้ — ย้ายไปใช้ตัวกลางที่ shared/utils/thaiDate แล้ว
+const thaiDate = thaiDateNumeric;
 
 const IssuedDocuments = () => {
   const isMobile = useMediaQuery("(max-width:900px)");
@@ -333,15 +335,15 @@ const IssuedDocuments = () => {
 
         <Collapse in={filtersOpen || Boolean(from || to)}>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ mt: 1.25 }} alignItems={{ sm: "center" }}>
-            <TextField
-              size="small" type="date" label="ออกตั้งแต่วันที่" InputLabelProps={{ shrink: true }}
-              value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }}
-              sx={{ width: { xs: "100%", sm: 200 } }}
+            <ThaiDatePicker
+              label="ออกตั้งแต่วันที่" fullWidth={false}
+              value={from} onChange={(v) => { setFrom(v); setPage(1); }}
+              textFieldProps={{ sx: { width: { xs: "100%", sm: 210 } } }}
             />
-            <TextField
-              size="small" type="date" label="ถึงวันที่" InputLabelProps={{ shrink: true }}
-              value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }}
-              sx={{ width: { xs: "100%", sm: 200 } }}
+            <ThaiDatePicker
+              label="ถึงวันที่" fullWidth={false}
+              value={to} onChange={(v) => { setTo(v); setPage(1); }}
+              textFieldProps={{ sx: { width: { xs: "100%", sm: 210 } } }}
             />
           </Stack>
         </Collapse>

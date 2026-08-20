@@ -1,5 +1,7 @@
 import { countUsedRounds } from "@/shared/utils/contractRounds";
 import { escapeHtml } from "@/shared/utils/escapeHtml";
+import { formatThai } from "@/shared/utils/thaiDate";
+import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 
 /* ─────────────────────────────────────────────
    STYLE INJECTION — งานวางแผนล่วงหน้า (ยังไม่ลงตาราง)
@@ -291,7 +293,7 @@ export const getAddDraftEvent = async ({
     .map((t) => opt(t, existingDraft?.time)).join("");
 
   const monthValue = existingDraft?.plannedMonth || defaultMonth;
-  const monthLabel = moment(monthValue, "YYYY-MM").locale("th").format("MMMM YYYY");
+  const monthLabel = formatThai(moment(monthValue, "YYYY-MM").locale("th"), "MMMM YYYY");
 
   const html = `
 <div id="ade-modal-inner">
@@ -434,7 +436,13 @@ export const getAddDraftEvent = async ({
       allowOutsideClick: false,
       allowEscapeKey: false,
 
+      // ⚠️ คืนทรัพยากรของช่องเลือกเดือนที่ mount ไว้ ไม่งั้น React root จะค้างทุกครั้งที่เปิดกล่อง
+      willClose: (popup) => popup.__thaiDpCleanup?.(),
+
       didOpen: () => {
+        // ✅ ช่อง <input type="month"> ของเบราว์เซอร์แสดง ค.ศ. เสมอ และบังคับเป็นไทยไม่ได้
+        // — แทนด้วยตัวเลือกเดือนของแอปที่เป็น พ.ศ. (ค่าที่เก็บยังเป็น "YYYY-MM" ของ ค.ศ. เหมือนเดิม)
+        Swal.getPopup().__thaiDpCleanup = mountThaiDatePickers(Swal.getPopup());
         const mkTs = (id, placeholder = "", maxOptions = 50) => {
           // ⚠️ เดิม fix ไว้ 7 ตัดรายชื่อ/ตัวเลือกที่มีเกิน 7 รายการทิ้งไปเงียบๆ (ห้องสมุด TomSelect
           // ค่า default จริงคือ 50 อยู่แล้ว) ทำให้ dropdown บริษัท/โครงการ/ประเภทงาน/ระบบงาน "หาไม่เจอ"
