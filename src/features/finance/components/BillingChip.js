@@ -60,8 +60,8 @@ function BillingChip({ roundVisits = [], canManage, onOpen, compact = true }) {
 
   // ── วางบิลแล้ว: ข้อความสั้นบรรทัดเดียว มีจุดสีนำหน้า ───────────────────────
   const text = st.state === "overdue" ? `เลย ${st.overdueDays} วัน`
-    : st.state === "paid" ? "รับครบ"
-      : st.outstanding > 0 ? `ค้าง ${baht(st.outstanding).replace("฿", "")}`
+    : st.state === "paid" ? "เก็บเงินครบ"
+      : st.outstanding > 0 ? `คงค้าง ${baht(st.outstanding).replace("฿", "")}`
         : st.label;
 
   const tip = [
