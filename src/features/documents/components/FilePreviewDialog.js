@@ -10,6 +10,7 @@
 import { Box, Typography, Button, Tooltip, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, useMediaQuery } from "@mui/material";
 import { InsertDriveFile, OpenInNew } from "@mui/icons-material";
 import { isImageFile } from "@/shared/utils/jobDocTypes";
+import { getOptimizedImageUrl } from "@/shared/utils/cloudinaryImage";
 
 const TEXT_SUB = "#64748b";
 
@@ -42,8 +43,16 @@ export default function FilePreviewDialog({ file, caption, onClose }) {
 
       <DialogContent dividers sx={{ p: 1, textAlign: "center" }}>
         {isImageFile(file) ? (
+          // ✅ โหลดผ่าน Cloudinary transformation (f_auto,q_auto,w_...) แทนไฟล์ต้นฉบับ
+          // 🐛 เดิมชี้ที่ file.fileUrl ตรงๆ = ดึงรูปเต็มความละเอียดจากมือถือ (3000-4000px, หลาย MB)
+          // มาย่อด้วย CSS ให้พอดีจอ — เสียแบนด์วิดท์และเวลาไปกับพิกเซลที่ไม่มีวันได้เห็น
+          // ขอกว้างตามขนาดจอจริง (คูณ 2 เผื่อจอความละเอียดสูง) ก็คมพอโดยไฟล์เล็กลงหลายเท่า
+          // ⚠️ decoding="async" กันไม่ให้การ decode รูปใหญ่บล็อกการวาดหน้าจอจนรู้สึกว่ากล่องค้าง
           <Box
-            component="img" src={file.fileUrl} alt={file.fileName}
+            component="img"
+            src={getOptimizedImageUrl(file.fileUrl, { width: isMobile ? 1080 : 1600 })}
+            alt={file.fileName}
+            decoding="async"
             sx={{ maxWidth: "100%", maxHeight: isMobile ? "70vh" : "75vh", objectFit: "contain" }}
           />
         ) : (

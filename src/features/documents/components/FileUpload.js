@@ -9,8 +9,13 @@ import { getFileIcon, getFileIconColor } from "@/shared/utils/CustomFile";
 import { escapeHtml } from "@/shared/utils/escapeHtml";
 
 import CreatableSelect from "react-select/creatable";
-const MAX_FILE_SIZE_MB = 500;
-const MAX_UPLOAD_FILE = 500;
+import { prepareUploadFiles, MAX_UPLOAD_MB, ACCEPT_ALL } from "@/shared/utils/fileUpload";
+
+// ⚠️ เดิมตั้งไว้ 500 MB ซึ่งเท่ากับไม่ได้จำกัดอะไรเลย — ใช้ค่ากลางจาก shared/utils/fileUpload.js
+// ที่ตรงกับเพดานฝั่ง server เพื่อไม่ให้เกิดกรณี "หน้าจอยอมแต่ server ปฏิเสธ"
+const MAX_FILE_SIZE_MB = MAX_UPLOAD_MB;
+// ⚠️ เดิม 500 ไฟล์ต่อครั้ง — server จำกัดไว้ที่ 20 ต้องตรงกัน
+const MAX_UPLOAD_FILE = 20;
 
 const FileUpload = () => {
   const [uploadedFiles, setUploadedFiles] = useState([]);
@@ -42,25 +47,28 @@ const FileUpload = () => {
     }
   }, [uploadedFiles]);
 
-  const onDrop = (acceptedFiles) => {
+  const onDrop = async (acceptedFiles) => {
     setLoading(true);
 
-    // ✅ ไม่ตัด image ออกแล้ว
-    const oversizedFiles = acceptedFiles.filter(
-      (file) => file.size > MAX_FILE_SIZE_MB * 1024 * 1024,
-    );
+    // ✅ ตรวจชนิด/ขนาด แล้วบีบอัดรูปตั้งแต่ตอนเลือกไฟล์ (ไม่ใช่ตอนกดอัปโหลด)
+    // — ผู้ใช้เห็นขนาดจริงหลังบีบในรายการก่อนตัดสินใจกดส่ง และรู้ทันทีถ้าไฟล์ไหนใช้ไม่ได้
+    const { accepted, rejected } = await prepareUploadFiles(acceptedFiles);
 
-    if (oversizedFiles.length > 0) {
+    if (rejected.length > 0) {
       Swal.fire({
         icon: "warning",
-        title: "ไฟล์ใหญ่เกินไป",
-        text: `ไม่สามารถอัพโหลดไฟล์ที่มีขนาดเกิน ${MAX_FILE_SIZE_MB}MB ได้`,
+        title: "มีไฟล์ที่ใช้ไม่ได้",
+        html: rejected
+          .map((r) => `<div style="text-align:left"><b>${escapeHtml(r.name)}</b><br/><small>${escapeHtml(r.message)}</small></div>`)
+          .join("<hr style='margin:6px 0'/>"),
       });
-    } else {
+    }
+
+    if (accepted.length > 0) {
       let newFiles = [];
       const existingFileNames = uploadedFiles.map((file) => file.name);
 
-      acceptedFiles.forEach((file) => {
+      accepted.forEach((file) => {
         let newName = file.name;
         const fileNameParts = file.name.split(".");
         const fileName = fileNameParts.slice(0, -1).join(".");
@@ -178,7 +186,7 @@ const FileUpload = () => {
           transition: "all .15s ease",
         }}
       >
-        <input {...getInputProps()} accept="image/*,application/pdf" />
+        <input {...getInputProps()} accept={ACCEPT_ALL} />
         <FontAwesomeIcon
           icon={faFileImport}
           size="3x"

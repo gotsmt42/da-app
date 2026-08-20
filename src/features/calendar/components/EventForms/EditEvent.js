@@ -119,6 +119,12 @@ function injectStyles() {
       font-size: 10.5px; font-weight: 600; color: rgba(255,255,255,.92);
       white-space: nowrap;
     }
+    /* ป้ายแบบจาง — ใช้กับ "ยังไม่ได้มอบหมายผู้รับผิดชอบ" ให้เห็นว่าเป็นสถานะที่ยังขาด
+       ไม่ใช่ข้อมูลที่กรอกไว้แล้ว แต่ยังอ่านออกบนพื้นสีเข้มของหัวกล่อง */
+    #ee-status-title .ee-tag--muted {
+      background: rgba(255,255,255,.06); border-style: dashed;
+      border-color: rgba(255,255,255,.35); color: rgba(255,255,255,.7);
+    }
     /* ── Status bar (ใน body) ── */
     #ee-status-bar {
       display: flex; align-items: center; justify-content: space-between;
@@ -757,6 +763,21 @@ export const getEditEvent = async ({
   // งานเก่า/งานที่ยังไม่ได้มอบหมายผู้รับผิดชอบชัดเจน หายจากสิทธิ์กลุ่มนี้ไปกะทันหัน
   const effectiveResponsibleId = eventResponsiblePersonId || eventResPerson;
   const effectiveResponsibleName = eventResponsiblePerson || eventTeam;
+
+  /**
+   * ✅ ชื่อผู้รับผิดชอบที่จะโชว์บนหัวกล่อง — ใช้ได้กับงานทุกประเภท
+   *
+   * 🐛 ที่แก้: เดิมเงื่อนไขคือ `eventResponsiblePerson && ... !== eventTeam` ซึ่งแปลว่าจะโชว์เฉพาะงานที่
+   * มีการ "ตั้งผู้รับผิดชอบไว้ชัดเจน" เท่านั้น — ในทางปฏิบัติมีแต่งานสัญญาที่ถูกตั้งค่านี้ ส่วนงานโปรเจค
+   * และงานทั่วไปไม่เคยมีใครกรอก ป้ายนี้จึงไม่เคยขึ้นเลยสักงาน ทั้งที่งานพวกนั้นก็มีคนรับผิดชอบจริง
+   *
+   * ✅ fallback ไปที่ทีมที่เข้างานเมื่อยังไม่เคยตั้งค่า — เกณฑ์เดียวกับ effectiveResponsibleName ที่ใช้
+   * ตัดสินสิทธิ์อยู่แล้ว และตรงกับ isEffectiveResponsiblePerson ฝั่ง backend
+   * ⚠️ แต่ต้องบอกให้รู้ด้วยว่าอันไหน "ตั้งไว้จริง" อันไหน "อนุมานจากทีม" — ไม่งั้นจะเข้าใจผิดว่างานนี้
+   * มอบหมายเรียบร้อยแล้วทั้งที่ยังไม่มีใครถูกตั้งเป็นผู้รับผิดชอบ
+   */
+  const headerResponsibleName = effectiveResponsibleName;
+  const headerResponsibleIsInferred = !eventResponsiblePerson && Boolean(eventTeam);
   const isEffectiveResponsiblePerson =
     (effectiveResponsibleId && effectiveResponsibleId === userData?.userId) ||
     (effectiveResponsibleName && effectiveResponsibleName === userData?.fname);
@@ -1046,8 +1067,10 @@ export const getEditEvent = async ({
       <h3><span >${attrHtml(eventTitle)} · ${attrHtml(eventSystem)} ${eventTime ? `· ครั้งที่ ${attrHtml(formatRoundLabel(eventTime, eventVisitCount))}` : ""}</span></h3>
       <div class="ee-header-meta">
         <span class="ee-tag">📍 ${attrHtml(eventSite) || "—"}</span>
-        ${eventTeam ? `<span class="ee-tag">👷 ${attrHtml(eventTeam)}</span>` : ""}
-        ${eventResponsiblePerson && eventResponsiblePerson !== eventTeam ? `<span class="ee-tag">🧑‍💼 ผู้รับผิดชอบ: ${attrHtml(eventResponsiblePerson)}</span>` : ""}
+        ${eventTeam && eventTeam !== headerResponsibleName ? `<span class="ee-tag">👷 ${attrHtml(eventTeam)}</span>` : ""}
+        ${headerResponsibleName
+          ? `<span class="ee-tag"${headerResponsibleIsInferred ? ' title="งานนี้ยังไม่ได้ระบุผู้รับผิดชอบไว้ชัดเจน — แสดงตามทีมที่เข้างานแทน"' : ""}>🧑‍💼 ผู้รับผิดชอบ: ${attrHtml(headerResponsibleName)}${headerResponsibleIsInferred ? " (ตามทีมที่เข้างาน)" : ""}</span>`
+          : `<span class="ee-tag ee-tag--muted" title="ยังไม่มีใครรับผิดชอบงานนี้">🧑‍💼 ยังไม่ได้มอบหมายผู้รับผิดชอบ</span>`}
         ${eventJobClassMeta ? `<span class="ee-tag">${eventJobClassMeta.emoji} ${attrHtml(eventJobClassMeta.label)}</span>` : ""}
       </div>
     </div>

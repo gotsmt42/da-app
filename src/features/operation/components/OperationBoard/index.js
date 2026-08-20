@@ -136,11 +136,8 @@ const StyledTab = styled(Tab)(({ theme }) => ({
   "&.Mui-selected": { color: theme.palette.primary.main },
 }));
 
-const FilterChip = styled(Chip)(({ theme, active }) => ({
-  fontWeight: active ? 700 : 500,
-  transition: "all 0.15s ease",
-  "&:hover": { transform: "scale(1.04)" },
-}));
+// ⚠️ ลบ FilterChip ออกแล้ว — เดิมใช้กับแผงตัวกรองที่กางชิปทุกตัวเลือกออกมา 23 ชิป ตอนนี้แผงนั้น
+// เปลี่ยนเป็น dropdown 4 ช่องแล้ว (ดู FilterPanel) จึงไม่มีใครใช้อีก
 
 // ─── StatusGroupCard ────────────────────────────────────────────────────
 // ✅ ปุ่มเลือกกลุ่มสถานะงาน (รอคุณอนุมัติ/กำลังดำเนินการ/ค้างงาน/เสร็จสิ้น) — เดิมใช้ ToggleButtonGroup
@@ -1035,6 +1032,27 @@ export const CommentThread = ({ comments = [], onSend, myRole }) => {
 };
 
 // ─── EventRowCard ─────────────────────────────────────────────────────
+/**
+ * ตัวบอกสถานะเอกสาร/กิจกรรมบนหัวการ์ด (ไม่ใช่ปุ่ม — เป็นแค่ตัวชี้ว่ามีอะไรอยู่บ้าง)
+ *
+ * ✅ บนจอกว้างโชว์ "จำนวน" ต่อท้ายไอคอนด้วย — เดิมมีแต่ไอคอนเปล่าๆ ต้องเอาเมาส์ไปจิ้มทีละอัน
+ * ถึงจะรู้ว่ามีกี่ไฟล์ ทั้งที่จอคอมมีที่เหลือเฟือ ทำให้ต้องไล่ hover ทีละการ์ดเวลาไล่ดูงานหลายรายการ
+ * ⚠️ โชว์เฉพาะตอนมากกว่า 1 — เลข "1" ต่อท้ายทุกอันคือ noise เพราะการที่ไอคอนโผล่ก็แปลว่ามีอย่างน้อย 1 อยู่แล้ว
+ * ⚠️ จอแคบยังเป็นไอคอนเปล่าเหมือนเดิม พื้นที่ไม่พอให้ใส่ตัวเลข
+ */
+const DocIndicator = ({ title, icon: Icon, color, count, showCount }) => (
+  <Tooltip title={title}>
+    <Stack direction="row" alignItems="center" gap={0.2}>
+      <Icon sx={{ fontSize: 16, color, opacity: 0.85 }} />
+      {showCount && count > 1 && (
+        <Typography component="span" sx={{ fontSize: "0.68rem", fontWeight: 800, color, lineHeight: 1 }}>
+          {count}
+        </Typography>
+      )}
+    </Stack>
+  </Tooltip>
+);
+
 const EventRowCard = ({
   event, employee, onStatusUpdate, onDocNoUpdate, onInputUpdate, onDateUpdate,
   onFileUpload, onDeleteFile, onPreview, onDelete, onApproveClose, onRejectClose,
@@ -1438,23 +1456,21 @@ const EventRowCard = ({
                   sx={{ mb: 0.5 }}>
                   {(event.reportFiles?.length > 0 || event.quotationFiles?.length > 0 || event.invoiceFiles?.length > 0 || event.completionFiles?.length > 0) && (
                     <Stack direction="row" alignItems="center" gap={0.5}>
-                      {event.reportFiles?.length > 0     && <Tooltip title={`Service Report: ${event.reportFiles.length} ไฟล์`}><Description sx={{ fontSize: 16, color: "#3b82f6", opacity: 0.85 }} /></Tooltip>}
-                      {event.quotationFiles?.length > 0  && <Tooltip title={`ใบเสนอราคา: ${event.quotationFiles.length} ไฟล์`}><RequestQuote sx={{ fontSize: 16, color: "#ef4444", opacity: 0.85 }} /></Tooltip>}
-                      {event.invoiceFiles?.length > 0    && <Tooltip title={`ใบวางบิล: ${event.invoiceFiles.length} ไฟล์`}><ReceiptLong sx={{ fontSize: 16, color: "#f59e0b", opacity: 0.85 }} /></Tooltip>}
-                      {event.completionFiles?.length > 0 && <Tooltip title={`ใบส่งมอบงาน: ${event.completionFiles.length} ไฟล์`}><AssignmentTurnedIn sx={{ fontSize: 16, color: "#07941a", opacity: 0.85 }} /></Tooltip>}
+                      {event.reportFiles?.length > 0     && <DocIndicator title={`Service Report: ${event.reportFiles.length} ไฟล์`}  icon={Description}         color="#3b82f6" count={event.reportFiles.length}     showCount={isDesktop} />}
+                      {event.quotationFiles?.length > 0  && <DocIndicator title={`ใบเสนอราคา: ${event.quotationFiles.length} ไฟล์`} icon={RequestQuote}        color="#ef4444" count={event.quotationFiles.length}  showCount={isDesktop} />}
+                      {event.invoiceFiles?.length > 0    && <DocIndicator title={`ใบวางบิล: ${event.invoiceFiles.length} ไฟล์`}    icon={ReceiptLong}         color="#f59e0b" count={event.invoiceFiles.length}    showCount={isDesktop} />}
+                      {event.completionFiles?.length > 0 && <DocIndicator title={`ใบส่งมอบงาน: ${event.completionFiles.length} ไฟล์`} icon={AssignmentTurnedIn} color="#07941a" count={event.completionFiles.length} showCount={isDesktop} />}
                     </Stack>
                   )}
                   {(event.activityLog?.length > 0 || event.comments?.length > 0 || event.jobGroupId) && (
                     <Stack direction="row" alignItems="center" gap={0.5}>
                       {event.activityLog?.length > 0 && (
-                        <Tooltip title={`${event.activityLog.length} กิจกรรม`}>
-                          <History sx={{ fontSize: 16, color: "text.disabled" }} />
-                        </Tooltip>
+                        <DocIndicator title={`${event.activityLog.length} กิจกรรม`} icon={History}
+                          color="text.disabled" count={event.activityLog.length} showCount={isDesktop} />
                       )}
                       {event.comments?.length > 0 && (
-                        <Tooltip title={`${event.comments.length} ข้อความ`}>
-                          <Chat sx={{ fontSize: 16, color: "text.disabled" }} />
-                        </Tooltip>
+                        <DocIndicator title={`${event.comments.length} ข้อความ`} icon={Chat}
+                          color="text.disabled" count={event.comments.length} showCount={isDesktop} />
                       )}
                       {event.jobGroupId && (
                         <Tooltip title="งานนี้เป็นส่วนหนึ่งของงานหลายวัน (กลุ่มเดียวกัน)">
@@ -1474,9 +1490,27 @@ const EventRowCard = ({
                   {event.title}
                 </Typography>
               )}
-              <Stack spacing={0.35} sx={{ mt: 0.6 }}>
+              {/* ✅ จอกว้างจัดข้อมูลเป็น 2 คอลัมน์ จอแคบเรียงลงมาคอลัมน์เดียวเหมือนเดิม
+                  🐛 ที่แก้: เดิมเรียงลงมาคอลัมน์เดียวทุกขนาดจอ — บนจอคอมการ์ดกว้างเต็มหน้า แต่เนื้อหา
+                  เกาะอยู่ซ้ายมือแค่ ~30% ที่เหลือว่างเปล่า ทำให้การ์ดสูงเกินจำเป็น เห็นงานได้ทีละไม่กี่
+                  รายการต้องเลื่อนตลอด และ "หน้าตาเหมือนจอมือถือที่ถูกยืดออก" ตามที่ผู้ใช้บอก
+                  ⚠️ minmax(0,1fr) ไม่ใช่ 1fr — ไม่งั้นข้อความยาว (ชื่อโครงการ/รายชื่อทีม) จะดัน
+                  คอลัมน์ให้กว้างเกินแล้วตกขอบการ์ด แทนที่จะตัดด้วย ellipsis */}
+              <Box
+                sx={{
+                  mt: 0.6,
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", md: "minmax(0,1fr) minmax(0,1fr)" },
+                  columnGap: 2.5,
+                  rowGap: 0.35,
+                  alignItems: "start",
+                }}
+              >
                 {event.system && <InfoLine icon="💻" label="ระบบ">{event.system}</InfoLine>}
-                <InfoLine icon="🏢" label="โครงการ">{companySite(event.company, event.site)}</InfoLine>
+                {/* ชื่อโครงการเป็นตัวที่ใช้ระบุงานมากที่สุด ให้กินเต็มความกว้างเสมอ ไม่ต้องตัดคำ */}
+                <Box sx={{ gridColumn: { md: "1 / -1" } }}>
+                  <InfoLine icon="🏢" label="โครงการ">{companySite(event.company, event.site)}</InfoLine>
+                </Box>
                 {/* ✅ ย้ายมาไว้ถัดจากโครงการตามที่ขอ (เดิมอยู่คู่กับระบบด้านบนสุด) */}
                 {event.time && <InfoLine icon="🔢" label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount)}</InfoLine>}
                 {(event.startTime || event.endTime) && (
@@ -1515,10 +1549,13 @@ const EventRowCard = ({
                     .filter(Boolean)
                     .filter((name, idx, arr) => arr.indexOf(name) === idx);
                   return teamNames.length > 0 && (
-                    <InfoLine icon="👷" label="ทีม">{teamNames.join(", ")}</InfoLine>
+                    // รายชื่อทีม+ลูกทีมยาวได้เรื่อยๆ ให้กินเต็มความกว้างเช่นกัน
+                    <Box sx={{ gridColumn: { md: "1 / -1" } }}>
+                      <InfoLine icon="👷" label="ทีม">{teamNames.join(", ")}</InfoLine>
+                    </Box>
                   );
                 })()}
-              </Stack>
+              </Box>
               {/* เวลาเข้า/ออก */}
               {(event.checkedInAt || event.checkedOutAt) && (
                 <Stack direction="row" gap={1} mt={0.5} flexWrap="wrap">
@@ -1768,6 +1805,18 @@ const FilterPanel = ({
   typeOptions, systemOptions,
 }) => {
   const [open, setOpen] = useState(false);
+
+  // ✅ รายการตัวกรองที่เปิดอยู่ตอนนี้ — ใช้ทั้งโชว์เป็นชิปถอดได้ และเป็นแหล่งความจริงเดียว
+  // ว่า "กำลังกรองอะไรอยู่บ้าง" (เดิมกระจายอยู่ตามชิปแต่ละกลุ่มซึ่งเห็นได้ต่อเมื่อกางแผงเท่านั้น)
+  const activeFilters = [
+    filterOP && { key: "op", label: "สถานะ", value: filterOP, color: OP_COLOR[filterOP], clear: () => onFilterOP("") },
+    filterType && { key: "type", label: "ประเภท", value: filterType, clear: () => onFilterType("") },
+    filterSystem && { key: "system", label: "ระบบ", value: filterSystem, clear: () => onFilterSystem("") },
+    filterStatus && { key: "billing", label: "การเงิน", value: filterStatus, clear: () => onFilterStatus("") },
+    filterTeam && { key: "team", label: "ทีม", value: filterTeam, clear: () => onFilterTeam("") },
+    search && { key: "search", label: "ค้นหา", value: search, clear: () => onSearch("") },
+  ].filter(Boolean);
+
   return (
     <GlassCard sx={{ mb: 3 }}>
       <CardContent sx={{ p: 2.5 }}>
@@ -1828,64 +1877,88 @@ const FilterPanel = ({
         </Stack>
         <Collapse in={open}>
           <Divider sx={{ my: 2 }} />
-          <Stack spacing={2}>
-            <Box>
-              <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 1, display: "block" }}>สถานะงาน</Typography>
-              <Stack direction="row" flexWrap="wrap" gap={0.75}>
-                {OP_LIST.map(op => (
-                  <FilterChip key={op} label={op} size="small"
-                    active={filterOP === op ? 1 : 0}
-                    onClick={() => onFilterOP(filterOP === op ? "" : op)}
-                    variant={filterOP === op ? "filled" : "outlined"}
-                    sx={{ borderColor: OP_COLOR[op], color: filterOP === op ? "#fff" : OP_COLOR[op],
-                      bgcolor: filterOP === op ? OP_COLOR[op] : "transparent",
-                      "&:hover": { bgcolor: alpha(OP_COLOR[op], 0.12) } }}
-                  />
-                ))}
-              </Stack>
-            </Box>
-            <Box>
-              <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 1, display: "block" }}>ประเภทงาน</Typography>
-              <Stack direction="row" flexWrap="wrap" gap={0.75}>
-                {typeOptions.map(t => (
-                  <FilterChip key={t} label={t} size="small"
-                    active={filterType === t ? 1 : 0}
-                    icon={TYPE_ICON[t] || <Build fontSize="small" />}
-                    onClick={() => onFilterType(filterType === t ? "" : t)}
-                    variant={filterType === t ? "filled" : "outlined"}
-                    color={filterType === t ? "success" : "default"}
-                  />
-                ))}
-              </Stack>
-            </Box>
-            <Box>
-              <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 1, display: "block" }}>ระบบ</Typography>
-              <Stack direction="row" flexWrap="wrap" gap={0.75}>
-                {systemOptions.map(s => (
-                  <FilterChip key={s} label={s} size="small"
-                    active={filterSystem === s ? 1 : 0}
-                    onClick={() => onFilterSystem(filterSystem === s ? "" : s)}
-                    variant={filterSystem === s ? "filled" : "outlined"}
-                    color={filterSystem === s ? "secondary" : "default"}
-                  />
-                ))}
-              </Stack>
-            </Box>
-            <Box>
-              <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ mb: 1, display: "block" }}>การเงิน</Typography>
-              <Stack direction="row" flexWrap="wrap" gap={0.75}>
-                {STATUS_BILLING.map(s => (
-                  <FilterChip key={s} label={s} size="small"
-                    active={filterStatus === s ? 1 : 0}
-                    onClick={() => onFilterStatus(filterStatus === s ? "" : s)}
-                    variant={filterStatus === s ? "filled" : "outlined"}
-                    color={filterStatus === s ? "primary" : "default"}
-                  />
-                ))}
-              </Stack>
-            </Box>
-          </Stack>
+          {/* 🐛 ที่แก้: เดิมกางชิปทุกตัวเลือกออกมาทั้งหมด 4 กลุ่ม (23 ชิป) กินพื้นที่แนวตั้ง ~300px
+              ดันรายการงานตกจอไปเลย และต้องกวาดตาหาทีละชิปว่าตัวไหนคือตัวที่ต้องการ
+              ✅ ทั้ง 4 ตัวกรองเป็นแบบ "เลือกได้ทีละอัน" อยู่แล้ว (กดซ้ำ = ยกเลิก) จึงเป็น dropdown
+              ได้ตรงๆ — เหลือแถวเดียว ~56px และหาตัวเลือกได้จากรายการที่เรียงไว้แทนการกวาดตา
+              ⚠️ คงสีประจำสถานะไว้เป็นจุดสีหน้าตัวเลือก เพราะสีคือข้อมูล (คนใช้จำสถานะจากสีอยู่แล้ว)
+              ไม่ใช่แค่การตกแต่ง */}
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", lg: "repeat(4, 1fr)" },
+              gap: 1.5,
+            }}
+          >
+            <TextField
+              select size="small" label="สถานะงาน" value={filterOP}
+              onChange={(e) => onFilterOP(e.target.value)}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+            >
+              <MenuItem value=""><em>ทั้งหมด</em></MenuItem>
+              {OP_LIST.map((op) => (
+                <MenuItem key={op} value={op}>
+                  <Stack direction="row" alignItems="center" gap={1}>
+                    <Box sx={{ width: 9, height: 9, borderRadius: "50%", bgcolor: OP_COLOR[op], flexShrink: 0 }} />
+                    {op}
+                  </Stack>
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              select size="small" label="ประเภทงาน" value={filterType}
+              onChange={(e) => onFilterType(e.target.value)}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+            >
+              <MenuItem value=""><em>ทั้งหมด</em></MenuItem>
+              {typeOptions.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+            </TextField>
+
+            <TextField
+              select size="small" label="ระบบ" value={filterSystem}
+              onChange={(e) => onFilterSystem(e.target.value)}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+            >
+              <MenuItem value=""><em>ทั้งหมด</em></MenuItem>
+              {systemOptions.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+            </TextField>
+
+            <TextField
+              select size="small" label="การเงิน" value={filterStatus}
+              onChange={(e) => onFilterStatus(e.target.value)}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+            >
+              <MenuItem value=""><em>ทั้งหมด</em></MenuItem>
+              {STATUS_BILLING.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+            </TextField>
+          </Box>
         </Collapse>
+
+        {/* ✅ ตัวกรองที่เปิดอยู่ โชว์เป็นชิปถอดได้ "นอกแผงที่พับได้" — เห็นตลอดแม้พับตัวกรองไปแล้ว
+            🐛 เดิมพอพับแผงลง จะไม่มีทางรู้เลยว่ากำลังกรองอะไรอยู่ (รู้แค่ตัวเลขบน badge ว่ามีกี่ตัว)
+            ทำให้เจอบ่อยว่า "ทำไมงานหาย" ทั้งที่จริงมีตัวกรองค้างอยู่จากครั้งก่อน */}
+        {activeFilters.length > 0 && (
+          <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap" sx={{ mt: 1.5 }}>
+            <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ flexShrink: 0 }}>
+              กรองอยู่:
+            </Typography>
+            {activeFilters.map((f) => (
+              <Chip
+                key={f.key} size="small" label={`${f.label}: ${f.value}`} onDelete={f.clear}
+                sx={{
+                  height: 24, fontWeight: 700, fontSize: "0.72rem",
+                  bgcolor: alpha(f.color || "#0f172a", 0.1), color: f.color || "#334155",
+                  "& .MuiChip-deleteIcon": { fontSize: 15, color: "inherit", opacity: 0.7, "&:hover": { opacity: 1 } },
+                }}
+              />
+            ))}
+            <Button size="small" onClick={onClearAll}
+              sx={{ textTransform: "none", fontWeight: 700, fontSize: "0.72rem", minWidth: 0, px: 1 }}>
+              ล้างทั้งหมด
+            </Button>
+          </Stack>
+        )}
       </CardContent>
     </GlassCard>
   );
@@ -1978,10 +2051,16 @@ const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob }) => (
   <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 3, overflowX: "auto" }}>
     <Table size="small" sx={{ minWidth: 1000, width: "100%" }}>
       <TableHead>
-        <TableRow sx={{ "& th": { fontWeight: 700, bgcolor: "#f5f3ff", color: "#4c1d95", whiteSpace: "nowrap" } }}>
+        {/* ⚠️ เดิมหัวตารางเป็นสีม่วง (#f5f3ff/#4c1d95) ซึ่งไม่มีที่ไหนในแอปใช้สีนี้เลย — ดูเหมือน
+            คอมโพเนนต์ที่ยกมาจากที่อื่นแล้วลืมปรับสี เปลี่ยนเป็นเทาเข้มกลางๆ ให้เข้าชุดกับหัวตาราง
+            ที่อื่นในระบบ และไม่ไปแย่งสายตากับสีสถานะในแต่ละแถวซึ่งเป็นข้อมูลจริงที่ต้องอ่าน */}
+        <TableRow sx={{ "& th": { fontWeight: 800, fontSize: "0.72rem", bgcolor: "#f1f5f9", color: "#334155", whiteSpace: "nowrap", letterSpacing: 0.2 } }}>
           <TableCell>สถานะ</TableCell>
           <TableCell>บริษัท / โครงการ</TableCell>
           <TableCell>ประเภทงาน · ระบบ</TableCell>
+          {/* ✅ เพิ่มคอลัมน์ "ครั้งที่" — การ์ดแสดงอยู่แล้วแต่ตารางไม่มี ทำให้สลับมาดูตารางแล้วข้อมูลหาย
+              เป็นตัวเลขที่จำเป็นกับงานสัญญา (รู้ว่าเข้าไปแล้วกี่ครั้งจากทั้งหมดกี่ครั้ง) */}
+          <TableCell align="center">ครั้งที่</TableCell>
           <TableCell>วันที่เข้างาน</TableCell>
           <TableCell>ทีมที่เข้างาน</TableCell>
           <TableCell align="center">ค้าง</TableCell>
@@ -2010,6 +2089,13 @@ const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob }) => (
               <TableCell sx={{ maxWidth: 170 }}>
                 <Typography variant="caption" noWrap sx={{ display: "block" }}>{a.title || "-"}</Typography>
                 <Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block" }}>{a.system || "-"}</Typography>
+              </TableCell>
+              <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
+                {a.time ? (
+                  <Typography variant="caption" fontWeight={700}>{formatRoundLabel(a.time, a.visitCount)}</Typography>
+                ) : (
+                  <Typography variant="caption" color="text.disabled">-</Typography>
+                )}
               </TableCell>
               <TableCell sx={{ maxWidth: 200 }}>
                 {/* ✅ งานที่เข้าหลายวันไม่ติดกันโชว์ทุกช่วง + จำนวนช่วง ไม่ใช่แค่วันแรกเหมือนที่เคยเข้าใจผิด */}
@@ -2176,9 +2262,19 @@ const Operation = () => {
   const [pendingApprovalTabCount, setPendingApprovalTabCount] = useState(0);
   // ✅ สลับมุมมองการ์ด/ตาราง — จำค่าไว้ข้ามการเปิดหน้า (แต่ละคนถนัดคนละแบบและมักใช้แบบเดิมตลอด)
   // เทียบ pattern เดียวกับหน้า "ติดตามใบเสนอราคา"
+  // 🐛 ที่แก้ (อาการ: "หน้าจอคอมดูเหมือนจอมือถือ / เทอะทะ / ไม่เหมือนเว็บจัดการงานทั่วไป"):
+  // เดิมค่าเริ่มต้นเป็น "การ์ด" ทุกขนาดจอ — การ์ดออกแบบมาสำหรับจอแคบ (ข้อมูลเรียงลงมาเป็นบรรทัด
+  // อ่านทีละใบ) พอเอามาวางบนจอคอมกว้าง 1400px เนื้อหาเกาะอยู่ซ้ายมือ ~25% ที่เหลือว่างเปล่า และ
+  // เห็นงานได้ทีละ 3-4 รายการต่อหนึ่งหน้าจอทั้งที่มี 91 รายการ
+  // ✅ จอกว้างเริ่มที่ "ตาราง" ซึ่งเป็นรูปแบบมาตรฐานของหน้าจัดการงานบนเว็บ — คอลัมน์ตรงกันทุกแถว
+  // กวาดสายตาลงมาเทียบกันได้ เห็นได้ 15-20 รายการต่อหน้าจอ (ตารางมีอยู่แล้ว แค่ไม่เคยเป็นค่าเริ่มต้น)
+  // ⚠️ เคารพค่าที่ผู้ใช้เลือกเองเสมอ — ตรงนี้เปลี่ยนแค่ "ค่าตั้งต้นตอนยังไม่เคยเลือก" เท่านั้น
   const [viewMode, setViewMode] = useState(() => {
-    try { return localStorage.getItem("operation.viewMode") === "table" ? "table" : "card"; }
-    catch { return "card"; }
+    try {
+      const saved = localStorage.getItem("operation.viewMode");
+      if (saved === "table" || saved === "card") return saved;
+    } catch { /* localStorage ใช้ไม่ได้ (โหมดส่วนตัว/ถูกบล็อก) → ตกไปใช้ค่าตามขนาดจอ */ }
+    return typeof window !== "undefined" && window.innerWidth >= 900 ? "table" : "card";
   });
   useEffect(() => {
     try { localStorage.setItem("operation.viewMode", viewMode); } catch {}
@@ -2281,7 +2377,12 @@ const Operation = () => {
   // อ้างถึงตัวแปรก่อนถูกประกาศ
 
   const [page,     setPage]     = useState(1);
-  const [pageSize, setPageSize] = useState(5);
+  // 🐛 เดิมตั้ง 5 รายการ/หน้า ทุกขนาดจอ — มี 91 งานก็ต้องเปิด 19 หน้า ซึ่งบนจอคอมที่มีที่เหลือเฟือ
+  // คือการบังคับให้กดเปลี่ยนหน้าโดยไม่จำเป็น (5 รายการเหมาะกับมือถือที่เลื่อนยาวๆ ไม่ไหวเท่านั้น)
+  // ✅ จอกว้างเริ่มที่ 20 — พอดีกับหนึ่งหน้าจอในมุมมองตาราง ผู้ใช้ยังเปลี่ยนเองได้ที่ช่อง "ต่อหน้า"
+  const [pageSize, setPageSize] = useState(
+    () => (typeof window !== "undefined" && window.innerWidth >= 900 ? 20 : 5)
+  );
   const [highlightId, setHighlightId] = useState("");
   // ✅ ส่วน id จริงล้วนๆ (ตัด nonce ทิ้ง) ใช้เทียบ/หา DOM element จริง
   const highlightJobId = highlightId ? highlightId.split("|")[0] : "";

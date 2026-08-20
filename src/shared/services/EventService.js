@@ -1,5 +1,31 @@
 // productService.js
 import API from "../api/axiosInstance";
+// ✅ ตรวจชนิด/ขนาด + บีบอัดรูป ทำที่ชั้น service เพื่อให้ทุกหน้าที่เรียกได้ประโยชน์เหมือนกันหมด
+// ไม่ต้องไล่ใส่ทีละกล่องอัปโหลด (และไม่มีทางลืมจุดใดจุดหนึ่ง)
+import { prepareUploadFile } from "@/shared/utils/fileUpload";
+
+/**
+ * เตรียม body ของคำขอที่ "อาจจะ" มีไฟล์แนบ
+ *
+ * 🐛 ที่แก้: เดิมส่ง FormData เสมอไม่ว่าจะแนบไฟล์หรือไม่ — แต่ multipart อ่านค่าออกมาเป็น req.body
+ * ได้ก็ต่อเมื่อ route ฝั่ง server มี multer คั่นอยู่ (express.json อ่าน multipart ไม่ได้) พอ route ไหน
+ * ไม่มี multer req.body จะว่าง "ทั้งก้อน" แล้วโผล่เป็น error ที่ชี้ไปผิดที่ เช่น "ยอดรับเงินต้องมากกว่า 0"
+ * ทั้งที่กรอกยอดมาถูกต้อง — หาสาเหตุยากมากเพราะข้อความไม่ได้บอกว่าเป็นเรื่องการ parse
+ * ✅ ไม่มีไฟล์ = ส่ง JSON ธรรมดา ซึ่งอ่านได้ทุกกรณี (multer ปล่อยผ่าน request ที่ไม่ใช่ multipart อยู่แล้ว
+ * จึงใช้ได้กับ route ที่มีและไม่มี multer เหมือนกัน) · มีไฟล์ = multipart ตามเดิม
+ * ⚠️ ต้องระบุ Content-Type เองตอนส่ง FormData เพราะ axiosInstance ตั้ง application/json ไว้เป็นค่าเริ่มต้น
+ */
+const withOptionalFile = async (fields, file, fileField) => {
+  if (!file) return [fields, undefined];
+  const prepared = await prepareUploadFile(file);
+  if (!prepared.ok) throw new Error(prepared.message);
+  const formData = new FormData();
+  Object.entries(fields).forEach(([k, v]) => {
+    if (v !== undefined && v !== null) formData.append(k, v);
+  });
+  formData.append(fileField, prepared.file);
+  return [formData, { headers: { "Content-Type": "multipart/form-data" } }];
+};
 
 const EventService = {
   async getEvents() {
@@ -93,8 +119,11 @@ const EventService = {
   // ซ้ำอีกชั้น เป็น request เปล่าประโยชน์ที่ยิงก่อนทุกครั้ง (ดับเบิลจำนวน request ทั้งหมดของหน้านี้)
   async Upload(id, file, type, config = {}) {
     try {
+      const prepared = await prepareUploadFile(file);
+      if (!prepared.ok) throw new Error(prepared.message);
+
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", prepared.file);
       formData.append("type", type);
 
       const response = await API.put(`/events/upload/${id}`, formData, {
@@ -117,8 +146,24 @@ const EventService = {
     return res.data;
   },
 
-  async AddPayment(id, payload) {
-    const res = await API.post(`/events/${id}/billing/payment`, payload);
+  /**
+   * บันทึกการรับเงิน 1 รายการ (แนบสลิป/ใบเสร็จไปด้วยได้ในคำขอเดียว)
+   *
+   * ⚠️ ไม่มีไฟล์แนบ = ส่ง JSON · มีไฟล์ = multipart (ดูเหตุผลที่ withOptionalFile ด้านบน)
+   */
+  async AddPayment(id, { slip, ...fields }) {
+    const [body, config] = await withOptionalFile(fields, slip, "slip");
+    const res = await API.post(`/events/${id}/billing/payment`, body, config);
+    return res.data;
+  },
+
+  /**
+   * แก้เลขที่ใบเสร็จ / แนบสลิปให้รายการรับเงินที่บันทึกไปแล้ว
+   * ⚠️ แก้ยอดเงิน/วันที่ไม่ได้โดยตั้งใจ (ดูเหตุผลที่ route ฝั่ง server) — ถ้าจะแก้ต้องลบแล้วบันทึกใหม่
+   */
+  async UpdatePayment(id, paymentId, { slip, ...fields }) {
+    const [body, config] = await withOptionalFile(fields, slip, "slip");
+    const res = await API.patch(`/events/${id}/billing/payment/${paymentId}`, body, config);
     return res.data;
   },
 
@@ -142,7 +187,11 @@ const EventService = {
     try {
       const formData = new FormData();
       formData.append("note", note);
-      if (file) formData.append("file", file);
+      if (file) {
+        const prepared = await prepareUploadFile(file);
+        if (!prepared.ok) throw new Error(prepared.message);
+        formData.append("file", prepared.file);
+      }
 
       const response = await API.put(`/events/${id}/quotation-followup`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
