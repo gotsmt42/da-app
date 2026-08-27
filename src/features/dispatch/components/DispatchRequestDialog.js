@@ -1,0 +1,500 @@
+/**
+ * DispatchRequestDialog — ฟอร์มแจ้งงานจากแผนกอื่นมาให้ฝ่ายช่าง
+ *
+ * ⚠️ ผู้แจ้ง (เซล) ไม่ได้เป็นคนเลือกช่างหรือกำหนดวันเอง — เขาไม่รู้ว่าคิวช่างว่างวันไหน
+ * แอดมิน/ผู้จัดการเป็นคนตรวจแล้วจัดลงแผนงานให้ (ดู ReviewDialog.js) ฟอร์มนี้จึงมีหน้าที่เดียว:
+ * เก็บข้อมูลให้ครบพอที่ช่างจะไปทำงานได้โดยไม่ต้องโทรกลับมาถาม
+ *
+ * 🧹 ตัดออกตามที่ผู้ใช้สั่ง:
+ *   • "กำหนดเสร็จ" — ผู้แจ้งกำหนดวันเสร็จไม่ได้อยู่ดี คนกำหนดคือคนจัดคิว การให้กรอกไว้ทำให้เกิด
+ *     ความคาดหวังที่ระบบไม่ได้ผูกพันอะไรด้วยเลย
+ *   • "สิ่งที่ต้องทำ" + "ของที่ต้องเตรียม" (รายการติ๊กทีละข้อ) — แทนด้วย "หมายเหตุเพิ่มเติม"
+ *     ช่องเดียว เพราะของจริงคนแจ้งเป็นเซล ไม่ได้รู้ขั้นตอนหน้างานดีกว่าช่าง การบังคับให้แจกแจง
+ *     เป็นข้อๆ ได้ผลลัพธ์เป็นรายการว่างเปล่าเสียส่วนใหญ่
+ *
+ * ✅ เพิ่ม: ลิงก์ตำแหน่งจริงบน Google Maps — ที่อยู่ที่พิมพ์เป็นตัวหนังสือพาช่างไปผิดที่ได้บ่อยมาก
+ */
+import { useEffect, useMemo, useState } from "react";
+import {
+  Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack, Typography,
+  TextField, IconButton, Chip, Alert, useMediaQuery, ToggleButton, ToggleButtonGroup,
+  Tooltip, InputAdornment, Autocomplete,
+} from "@mui/material";
+import { alpha } from "@mui/material/styles";
+import {
+  AttachFile, Close, Bolt, Assignment, Place, OpenInNew, NoteAlt, Send,
+} from "@mui/icons-material";
+
+import { formatBytes } from "@/shared/utils/fileUpload";
+import CustomerService from "@/shared/services/CustomerService";
+import JobTypeService from "@/shared/services/JobTypeService";
+import SystemTypeService from "@/shared/services/SystemTypeService";
+import DispatchService from "../services/DispatchService";
+import {
+  DISPATCH_ACCENT, TEXT_SUB, BORDER_MAIN,
+  DOC_TYPE_META,
+  DOC_TYPE_ORDER,
+} from "../dispatchMeta";
+
+const empty = () => ({
+  title: "", detail: "", system: "", note: "",
+  company: "", site: "", address: "", mapUrl: "",
+  contactName: "", contactTel: "",
+  priority: "normal",
+});
+
+/**
+ * การ์ดครอบแต่ละกลุ่มของฟอร์ม
+ * ✅ เดิมทั้งฟอร์มเป็นช่องกรอกเรียงต่อกันยาวๆ คั่นด้วยหัวข้อตัวเล็กๆ — มองไม่ออกว่าอะไรเป็นชุดเดียวกัน
+ * และไม่รู้ว่าเหลืออีกกี่กลุ่ม การครอบเป็นการ์ดที่มีสีประจำกลุ่มทำให้กวาดสายตาทีเดียวเห็นโครงทั้งใบ
+ */
+const Section = ({ icon, title, hint, accent, children, sx }) => (
+  <Box
+    sx={{
+      border: "1px solid", borderColor: alpha(accent, 0.3), borderRadius: 2.5,
+      overflow: "hidden", ...sx,
+    }}
+  >
+    <Stack
+      direction="row" alignItems="center" spacing={1}
+      sx={{ px: 1.5, py: 1, bgcolor: alpha(accent, 0.07), borderBottom: "1px solid", borderColor: alpha(accent, 0.22) }}
+    >
+      <Box sx={{ color: accent, display: "flex" }}>{icon}</Box>
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Typography sx={{ fontWeight: 800, fontSize: "0.82rem", lineHeight: 1.3 }}>{title}</Typography>
+        {hint && <Typography variant="caption" sx={{ color: TEXT_SUB }}>{hint}</Typography>}
+      </Box>
+    </Stack>
+    <Box sx={{ p: 1.5 }}>{children}</Box>
+  </Box>
+);
+
+/**
+ * ช่องแบบ "เลือกจากที่มีอยู่ หรือพิมพ์ใหม่" — ชุดเดียวกับที่ฟอร์มของช่างใช้ (TomSelect create:true)
+ *
+ * ⚠️ ต้องเป็น freeSolo เสมอ ห้ามบังคับให้เลือกจากลิสต์อย่างเดียว — ลูกค้า/ระบบ/ประเภทงานใหม่ๆ
+ * เกิดขึ้นตลอดเวลา ถ้าบังคับเลือก คนแจ้งจะติดตรงนี้แล้วไปกรอกมั่วในช่องอื่นแทน
+ * ⚠️ onInputChange (ไม่ใช่ onChange) เป็นตัวเก็บค่า — onChange ยิงเฉพาะตอนเลือกจากลิสต์
+ * ถ้าพึ่งตัวเดียว ค่าที่พิมพ์เองจะหายทั้งหมดตอนกดส่ง
+ */
+const ComboField = ({ label, required, value, onChange, options, placeholder, helperText }) => (
+  <Autocomplete
+    freeSolo autoHighlight selectOnFocus handleHomeEndKeys
+    options={options}
+    // ⚠️ คุมด้วย inputValue ทางเดียว ไม่ส่ง value เข้าไปด้วย —
+    // 🐛 ถ้าส่งทั้ง value และ onInputChange โดยไม่ส่ง inputValue, MUI จะรีเซ็ตข้อความในช่องกลับ
+    // เป็น getOptionLabel(value) ทุกครั้งที่ value เปลี่ยน ซึ่งเกิดขึ้นทุกตัวอักษรที่พิมพ์ ผลคือ
+    // รายการที่กรองไว้กระพริบหาย/เลือกไม่ได้ (เจอตอนพิมพ์ค้นหาชื่อบริษัทแล้วลิสต์ไม่ขึ้นเลย)
+    inputValue={value}
+    onInputChange={(_, v) => onChange(v || "")}
+    renderInput={(params) => (
+      <TextField
+        {...params} size="small" label={label} required={required}
+        placeholder={placeholder} helperText={helperText}
+        FormHelperTextProps={{ sx: { fontSize: "0.68rem", mx: 0 } }}
+      />
+    )}
+  />
+);
+
+export default function DispatchRequestDialog({ open = true, onClose, onCreated }) {
+  const isMobile = useMediaQuery("(max-width:900px)");
+  const [form, setForm] = useState(empty);
+  const [files, setFiles] = useState([]);
+  // ชนิดเอกสารที่จะติดให้ไฟล์ชุดถัดไปที่เลือก — เริ่มที่ใบเสนอราคาเพราะเป็นเอกสารที่แนบบ่อยที่สุด
+  const [nextDocType, setNextDocType] = useState("quotation");
+  // ✅ ตัวเลือกจากตารางกลางชุดเดียวกับฟอร์มของช่าง — ค่าที่แจ้งมาจะถูกเอาไปสร้างเป็นแผนงานจริง
+  // ตอนอนุมัติ ถ้าปล่อยให้พิมพ์อิสระล้วนๆ ชื่อโครงการ/ระบบจะสะกดไม่ตรงกับที่มีอยู่แล้วในระบบ
+  // ทำให้กรองงานตามโครงการหรือระบบไม่เจอในภายหลัง
+  const [customers, setCustomers] = useState([]);
+  const [jobTypes, setJobTypes] = useState([]);
+  const [systems, setSystems] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [warn, setWarn] = useState("");
+
+  // ⚠️ ล้างฟอร์มทุกครั้งที่เปิด — ไม่งั้นแจ้งงานใบที่ 2 จะเห็นข้อมูลของใบแรกค้างอยู่แล้วส่งซ้ำได้ง่ายมาก
+  useEffect(() => {
+    if (!open) return;
+    setError(""); setWarn(""); setFiles([]); setNextDocType("quotation");
+    setForm(empty());
+  }, [open]);
+
+  // ⚠️ โหลดครั้งเดียวตอน mount ไม่ใช่ทุกครั้งที่เปิด — รายการพวกนี้แทบไม่เปลี่ยนระหว่างเซสชัน
+  // และการยิง 3 request ทุกครั้งที่กดเปิดฟอร์มทำให้กล่องเปิดช้าโดยไม่ได้อะไรเพิ่ม
+  useEffect(() => {
+    let alive = true;
+    Promise.all([
+      CustomerService.getCustomers().catch(() => ({ userCustomers: [] })),
+      JobTypeService.getAll().catch(() => ({ items: [] })),
+      SystemTypeService.getAll().catch(() => ({ items: [] })),
+    ]).then(([c, j, sy]) => {
+      if (!alive) return;
+      setCustomers(c?.userCustomers || []);
+      setJobTypes([...new Set((j?.items || []).map((t) => t.name).filter(Boolean))].sort());
+      setSystems([...new Set((sy?.items || []).map((t) => t.name).filter(Boolean))].sort());
+    });
+    return () => { alive = false; };
+  }, []);
+
+  const companyOptions = useMemo(
+    () => [...new Set(customers.map((c) => c.cCompany).filter(Boolean))].sort(),
+    [customers]
+  );
+
+  // ⚠️ โครงการต้องกรองตามบริษัทที่เลือกไว้ — บริษัทเดียวมีหลายสาขา และชื่อสาขาซ้ำกันข้ามบริษัทได้
+  // (เช่น "สำนักงานใหญ่") ถ้าโชว์รวมทุกบริษัทจะเลือกผิดได้ง่ายมาก · ยังไม่เลือกบริษัท = โชว์ทั้งหมด
+  const siteOptions = useMemo(() => {
+    const pool = form.company
+      ? customers.filter((c) => c.cCompany === form.company)
+      : customers;
+    return [...new Set(pool.map((c) => c.cSite).filter(Boolean))].sort();
+  }, [customers, form.company]);
+
+  /**
+   * ✅ เลือกลูกค้า/โครงการที่มีอยู่แล้ว = เติมที่อยู่และผู้ติดต่อให้อัตโนมัติ
+   * ข้อมูลพวกนี้อยู่ในทะเบียนลูกค้าอยู่แล้ว การให้พิมพ์ซ้ำคือการเปิดโอกาสให้พิมพ์ผิด
+   * ⚠️ เติมเฉพาะช่องที่ยังว่าง ไม่ทับของที่คนกรอกไว้เอง — หน้างานเดียวกันอาจมีผู้ติดต่อคนละคน
+   * กับที่อยู่ในทะเบียน และคนแจ้งเป็นคนที่รู้ดีกว่าในกรณีนั้น
+   */
+  const applyCustomer = (company, site) => {
+    const hit = customers.find((c) => c.cCompany === company && c.cSite === site);
+    if (!hit) return;
+    setForm((f) => ({
+      ...f,
+      address: f.address || hit.address || "",
+      contactName: f.contactName || hit.cName || "",
+      contactTel: f.contactTel || hit.tel || "",
+    }));
+  };
+
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  // ⚠️ ตรวจแค่ว่าเป็น URL ที่เปิดได้ไหม ไม่บังคับว่าต้องเป็นโดเมน Google — ลิงก์ย่อ (maps.app.goo.gl)
+  // และแอปแผนที่อื่นก็พาไปที่ถูกต้องเหมือนกัน การบล็อกโดเมนอื่นสร้างปัญหามากกว่าที่แก้
+  const mapUrlValid = (() => {
+    const v = form.mapUrl.trim();
+    if (!v) return null;
+    try { return ["http:", "https:"].includes(new URL(v).protocol); } catch { return false; }
+  })();
+
+  const submit = async () => {
+    if (!form.title.trim()) return setError("กรุณาระบุประเภทงาน");
+    if (!form.site.trim()) return setError("กรุณาระบุโครงการ / สาขา");
+    if (mapUrlValid === false) return setError("ลิงก์แผนที่ไม่ถูกต้อง — ต้องขึ้นต้นด้วย http:// หรือ https://");
+    setSaving(true); setError(""); setWarn("");
+    try {
+      const { dispatch, rejected } = await DispatchService.create({ ...form, files });
+      // ⚠️ ไฟล์ที่ถูกปฏิเสธต้องบอกให้รู้ ไม่ใช่เงียบหายไป — คนส่งจะคิดว่าแนบไปแล้ว
+      if (rejected?.length) {
+        setWarn(`ส่งคำขอสำเร็จ แต่มี ${rejected.length} ไฟล์ที่แนบไม่ได้: ${rejected.map((r) => `${r.name} (${r.message})`).join(", ")}`);
+        setTimeout(() => onCreated?.(dispatch), 3500);
+      } else {
+        onCreated?.(dispatch);
+      }
+    } catch (err) {
+      setError(err?.response?.data?.message || err?.message || "ส่งคำขอไม่สำเร็จ");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!open) return null;
+
+  const urgent = form.priority === "urgent";
+
+  return (
+    <Dialog open onClose={() => !saving && onClose?.()} fullWidth maxWidth="md" fullScreen={isMobile}>
+      <DialogTitle sx={{ pb: 1.25 }}>
+        <Stack direction="row" alignItems="center" spacing={1.25}>
+          <Box
+            sx={{
+              width: 36, height: 36, borderRadius: 2, flexShrink: 0,
+              bgcolor: alpha(DISPATCH_ACCENT, 0.13), color: DISPATCH_ACCENT,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}
+          >
+            <Send sx={{ fontSize: 19 }} />
+          </Box>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography sx={{ fontWeight: 800, fontSize: "1rem" }}>แจ้งงานให้ฝ่ายช่าง</Typography>
+            <Typography variant="caption" sx={{ color: TEXT_SUB }}>
+              กรอกให้ครบ ช่างจะได้ไม่ต้องโทรกลับมาถาม · แอดมินจะตรวจแล้วจัดคิวให้
+            </Typography>
+          </Box>
+        </Stack>
+      </DialogTitle>
+
+      <DialogContent dividers sx={{ bgcolor: "#f8fafc" }}>
+        {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>{error}</Alert>}
+        {warn && <Alert severity="warning" sx={{ mb: 2 }}>{warn}</Alert>}
+
+        {/* ✅ "งานด่วนไหม" ถูกยกขึ้นมาเป็นแถบเต็มความกว้างบนสุด ไม่ใช่ปุ่มเล็กๆ ที่ซ่อนอยู่ข้างช่องวันที่
+            เหมือนเดิม — เป็นข้อมูลชิ้นเดียวในใบที่เปลี่ยนลำดับความสำคัญของทั้งคิว คนตรวจต้องเห็นทันที
+            และคนแจ้งต้องกดได้โดยไม่ต้องมองหา */}
+        <Stack
+          direction="row" alignItems="center" spacing={1.5}
+          sx={{
+            mb: 2, px: 1.5, py: 1.25, borderRadius: 2.5,
+            border: "1px solid", borderColor: urgent ? alpha("#ef4444", 0.4) : BORDER_MAIN,
+            bgcolor: urgent ? alpha("#ef4444", 0.06) : "#fff",
+            transition: "background-color .15s, border-color .15s",
+          }}
+        >
+          <Bolt sx={{ fontSize: 20, color: urgent ? "#dc2626" : TEXT_SUB, flexShrink: 0 }} />
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography sx={{ fontWeight: 800, fontSize: "0.82rem", color: urgent ? "#dc2626" : "inherit" }}>
+              ความเร่งด่วน
+            </Typography>
+            <Typography variant="caption" sx={{ color: TEXT_SUB }}>
+              {urgent ? "จะถูกดันขึ้นหัวคิว และแจ้งเตือนหัวหน้าทันที" : "เข้าคิวตามปกติ"}
+            </Typography>
+          </Box>
+          <ToggleButtonGroup
+            exclusive size="small" value={form.priority}
+            onChange={(_, v) => v && setForm((f) => ({ ...f, priority: v }))}
+            sx={{ flexShrink: 0, bgcolor: "#fff" }}
+          >
+            <ToggleButton value="normal" sx={{ textTransform: "none", fontWeight: 700, px: 2 }}>ปกติ</ToggleButton>
+            <ToggleButton
+              value="urgent"
+              sx={{ textTransform: "none", fontWeight: 800, px: 2, "&.Mui-selected": { bgcolor: "#ef4444", color: "#fff", "&:hover": { bgcolor: "#dc2626" } } }}
+            >
+              ด่วน
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </Stack>
+
+        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 2, alignItems: "start" }}>
+          {/* ── ซ้าย: งาน + หน้างาน ──────────────────────────────────── */}
+          <Box sx={{ minWidth: 0, display: "grid", gap: 2 }}>
+            <Section
+              icon={<Assignment sx={{ fontSize: 18 }} />}
+              title="งานที่ต้องทำ"
+              hint="ช่างอ่านจากตรงนี้เป็นหลัก"
+              accent={DISPATCH_ACCENT}
+              sx={{ bgcolor: "#fff" }}
+            >
+              <Stack spacing={1.25}>
+                {/* ⚠️ ตรงกับช่อง "ประเภทงาน" ในฟอร์มของช่าง (ทั้งคู่ลงที่ event.title) —
+                    ต้องใช้คำเดียวกันและดึงจากตารางเดียวกัน ไม่งั้นงานที่มาจากเซลจะมีชื่อประเภท
+                    คนละชุดกับงานที่ช่างสร้างเอง แล้วกรองรวมกันไม่ได้ */}
+                <ComboField
+                  label="ประเภทงาน" required value={form.title}
+                  onChange={(v) => setForm((f) => ({ ...f, title: v }))}
+                  options={jobTypes}
+                  placeholder="เลือกหรือพิมพ์ประเภทงาน"
+                />
+                <ComboField
+                  label="ระบบ" value={form.system}
+                  onChange={(v) => setForm((f) => ({ ...f, system: v }))}
+                  options={systems}
+                  placeholder="เลือกหรือพิมพ์ชื่อระบบ"
+                />
+                <TextField
+                  size="small" label="รายละเอียดงาน" value={form.detail} onChange={set("detail")}
+                  multiline minRows={3}
+                  placeholder="อธิบายสิ่งที่ต้องทำ สภาพหน้างาน หรือสิ่งที่ลูกค้าขอ"
+                />
+              </Stack>
+            </Section>
+
+            <Section
+              icon={<Place sx={{ fontSize: 18 }} />}
+              title="หน้างาน"
+              hint="ช่างใช้ไปให้ถูกที่และติดต่อได้"
+              accent="#0891b2"
+              sx={{ bgcolor: "#fff" }}
+            >
+              <Stack spacing={1.25}>
+                {/* ✅ ที่แก้ (ผู้ใช้ขอ: "แก้ไขฟอร์มการแจ้งงาน ให้บังคับต้องกรอก จากบริษัท เป็นโครงการ"):
+                    เดิมบังคับ "ลูกค้า / บริษัท" — สลับมาบังคับ "โครงการ / สาขา" แทน เพราะช่างใช้ชื่อ
+                    โครงการเป็นหลักในการไปถึงหน้างานจริง ลูกค้าบางรายไม่มีชื่อบริษัทที่ชัดเจน (บ้านเดี่ยว/
+                    นิติบุคคลอาคารชุด) แต่มีชื่อโครงการเสมอ — ย้ายมาไว้ช่องแรกด้วย เพราะเป็นช่องบังคับ
+                    ควรอยู่จุดที่สายตาเจอก่อน เข้าชุดกับฟอร์มนัดหมายเซลในปฏิทินที่สลับ required แบบ
+                    เดียวกันไปแล้ว */}
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <ComboField
+                      label="โครงการ / สาขา" required value={form.site}
+                      onChange={(v) => { setForm((f) => ({ ...f, site: v })); applyCustomer(form.company, v); }}
+                      options={siteOptions}
+                      placeholder="เลือกหรือพิมพ์ชื่อโครงการ"
+                    />
+                  </Box>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <ComboField
+                      label="ลูกค้า / บริษัท" value={form.company}
+                      onChange={(v) => setForm((f) => ({ ...f, company: v }))}
+                      options={companyOptions}
+                      placeholder="เลือกหรือพิมพ์ชื่อลูกค้า"
+                    />
+                  </Box>
+                </Stack>
+                <TextField size="small" label="ที่อยู่หน้างาน" value={form.address} onChange={set("address")} multiline maxRows={3} />
+
+                {/* ✅ ลิงก์แผนที่ — ที่อยู่ที่พิมพ์เป็นตัวหนังสือพาช่างไปผิดที่ได้บ่อยมาก
+                    (ชื่อโครงการซ้ำกัน ซอยแยกย่อย ตึกไม่มีเลขที่) พิกัดจริงคือสิ่งเดียวที่ไม่กำกวม */}
+                <TextField
+                  size="small" label="ลิงก์ Google Maps" value={form.mapUrl} onChange={set("mapUrl")}
+                  placeholder="วางลิงก์ที่แชร์จากแอป Google Maps"
+                  error={mapUrlValid === false}
+                  helperText={
+                    mapUrlValid === false
+                      ? "ลิงก์ไม่ถูกต้อง — ต้องขึ้นต้นด้วย http:// หรือ https://"
+                      : "เปิด Google Maps → กดที่หมุด → แชร์ → คัดลอกลิงก์ แล้ววางที่นี่"
+                  }
+                  FormHelperTextProps={{ sx: { fontSize: "0.68rem", mx: 0 } }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Place sx={{ fontSize: 17, color: mapUrlValid ? "#059669" : TEXT_SUB }} />
+                      </InputAdornment>
+                    ),
+                    // ปุ่มลองเปิดดู — กันเคสวางลิงก์ผิดอันแล้วไม่มีใครรู้จนช่างไปถึงหน้างาน
+                    endAdornment: mapUrlValid ? (
+                      <InputAdornment position="end">
+                        <Tooltip title="ลองเปิดดูว่าตำแหน่งถูกไหม">
+                          <IconButton
+                            size="small" component="a" href={form.mapUrl.trim()}
+                            target="_blank" rel="noopener noreferrer"
+                            sx={{ color: "#059669" }}
+                          >
+                            <OpenInNew sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        </Tooltip>
+                      </InputAdornment>
+                    ) : null,
+                  }}
+                />
+
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
+                  <TextField size="small" fullWidth label="ผู้ติดต่อหน้างาน" value={form.contactName} onChange={set("contactName")} />
+                  <TextField size="small" fullWidth label="เบอร์โทร" value={form.contactTel} onChange={set("contactTel")} />
+                </Stack>
+              </Stack>
+            </Section>
+          </Box>
+
+          {/* ── ขวา: เอกสาร + หมายเหตุ ───────────────────────────────── */}
+          <Box sx={{ minWidth: 0, display: "grid", gap: 2 }}>
+            <Section
+              icon={<AttachFile sx={{ fontSize: 18 }} />}
+              title="เอกสารประกอบ"
+              hint="ใบเสนอราคา / ใบ PO เป็นหลักฐานว่างานนี้ปิดการขายแล้ว"
+              accent="#059669"
+              sx={{ bgcolor: "#fff" }}
+            >
+              {/* ✅ เลือก "ชนิดเอกสาร" ก่อนแนบ แล้วไฟล์ที่เลือกถัดไปจะได้ป้ายนี้ติดไปด้วย
+                  🐛 เดิมไฟล์ทุกใบเป็นก้อนเดียวกันหมด ช่างต้องเดาจากชื่อไฟล์ว่าอันไหนคือใบ PO
+                  ซึ่งชื่อไฟล์จากมือถือมักเป็น IMG_0142.jpg ที่ไม่บอกอะไรเลย */}
+              <Stack direction="row" spacing={0.5} sx={{ mb: 1.25, flexWrap: "wrap", gap: 0.5 }}>
+                {DOC_TYPE_ORDER.map((k) => {
+                  const m = DOC_TYPE_META[k];
+                  const on = nextDocType === k;
+                  return (
+                    <Chip
+                      key={k} size="small" clickable label={m.label}
+                      onClick={() => setNextDocType(k)}
+                      sx={{
+                        height: 25, fontSize: "0.7rem", fontWeight: 700,
+                        bgcolor: on ? m.color : alpha(m.color, 0.1),
+                        color: on ? "#fff" : m.color,
+                        "&:hover": { bgcolor: on ? m.color : alpha(m.color, 0.22) },
+                      }}
+                    />
+                  );
+                })}
+              </Stack>
+
+              <Button
+                fullWidth size="small" startIcon={<AttachFile sx={{ fontSize: 16 }} />}
+                onClick={() => document.getElementById("dispatch-files-input")?.click()}
+                sx={{
+                  textTransform: "none", fontWeight: 700, borderRadius: 2, py: 1,
+                  color: DOC_TYPE_META[nextDocType].color,
+                  border: "1.5px dashed", borderColor: alpha(DOC_TYPE_META[nextDocType].color, 0.5),
+                  bgcolor: alpha(DOC_TYPE_META[nextDocType].color, 0.04),
+                  "&:hover": {
+                    borderColor: DOC_TYPE_META[nextDocType].color,
+                    bgcolor: alpha(DOC_TYPE_META[nextDocType].color, 0.1),
+                  },
+                }}
+              >
+                {`แนบ${DOC_TYPE_META[nextDocType].label}`}
+              </Button>
+              <input
+                id="dispatch-files-input" hidden type="file" multiple accept="image/*,application/pdf"
+                onChange={(e) => {
+                  const picked = Array.from(e.target.files || []);
+                  e.target.value = "";
+                  setFiles((p) => [...p, ...picked.map((f) => ({ file: f, docType: nextDocType }))].slice(0, 10));
+                }}
+              />
+
+              {files.length > 0 ? (
+                <Stack spacing={0.5} sx={{ mt: 1.25 }}>
+                  {files.map((entry, i) => {
+                    const m = DOC_TYPE_META[entry.docType] || DOC_TYPE_META.other;
+                    return (
+                      <Stack
+                        key={i} direction="row" alignItems="center" spacing={1}
+                        sx={{ px: 1, py: 0.6, borderRadius: 1.5, bgcolor: alpha(m.color, 0.07), border: "1px solid", borderColor: alpha(m.color, 0.25) }}
+                      >
+                        <Chip
+                          size="small" label={m.short}
+                          sx={{ height: 18, minWidth: 34, fontSize: "0.62rem", fontWeight: 800, bgcolor: m.color, color: "#fff", "& .MuiChip-label": { px: 0.6 } }}
+                        />
+                        <Typography variant="body2" sx={{ flex: 1, minWidth: 0, fontSize: "0.78rem" }} noWrap>{entry.file.name}</Typography>
+                        <Typography variant="caption" sx={{ color: TEXT_SUB, flexShrink: 0 }}>{formatBytes(entry.file.size)}</Typography>
+                        <IconButton size="small" onClick={() => setFiles((p) => p.filter((_, x) => x !== i))}>
+                          <Close sx={{ fontSize: 14 }} />
+                        </IconButton>
+                      </Stack>
+                    );
+                  })}
+                  <Typography variant="caption" sx={{ color: TEXT_SUB, mt: 0.25 }}>
+                    แนบแล้ว {files.length}/10 ไฟล์
+                  </Typography>
+                </Stack>
+              ) : (
+                <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", mt: 1 }}>
+                  ยังไม่ได้แนบไฟล์ — เลือกชนิดเอกสารด้านบนก่อน แล้วกดปุ่มแนบ
+                </Typography>
+              )}
+            </Section>
+
+            <Section
+              icon={<NoteAlt sx={{ fontSize: 18 }} />}
+              title="หมายเหตุเพิ่มเติม"
+              hint="สิ่งที่ช่างควรรู้ก่อนไป (ไม่บังคับ)"
+              accent="#8b5cf6"
+              sx={{ bgcolor: "#fff" }}
+            >
+              <TextField
+                fullWidth size="small" multiline minRows={6}
+                value={form.note} onChange={set("note")}
+                placeholder={"เช่น\n• เข้าได้เฉพาะ จ.–ศ. 9:00–17:00\n• ต้องแลกบัตรที่ป้อมยาม\n• ลูกค้าขอให้โทรก่อนเข้า 30 นาที"}
+              />
+            </Section>
+          </Box>
+        </Box>
+      </DialogContent>
+
+      <DialogActions sx={{ p: 2 }}>
+        <Button onClick={() => onClose?.()} disabled={saving} sx={{ textTransform: "none" }}>ยกเลิก</Button>
+        <Box sx={{ flex: 1 }} />
+        <Button
+          variant="contained" onClick={submit} disabled={saving}
+          startIcon={<Send sx={{ fontSize: 17 }} />}
+          sx={{
+            textTransform: "none", fontWeight: 800, borderRadius: 2, px: 3,
+            bgcolor: DISPATCH_ACCENT, "&:hover": { bgcolor: "#d97706" },
+          }}
+        >
+          {saving ? "กำลังส่ง..." : "ส่งให้ฝ่ายช่าง"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}

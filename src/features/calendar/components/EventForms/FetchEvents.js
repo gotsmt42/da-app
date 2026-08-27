@@ -5,13 +5,15 @@ export const getFetchEvents = async ({
   EventService,
   fetchThaiHolidaysFromAPI,
   silent = false,
+  // แผนกที่กำลังเปิดดู — แอดมินสลับไปดูปฏิทินของฝ่ายขายได้ผ่านเมนู "ตารางงานเซล"
+  dept,
 }) => {
   if (!silent) setLoading(true);
 
   try {
     // เรียก API พร้อมกัน
     const [res, thaiHolidays] = await Promise.all([
-      EventService.getEvents(),
+      EventService.getEvents({ dept }),
       fetchThaiHolidaysFromAPI(),
     ]);
 

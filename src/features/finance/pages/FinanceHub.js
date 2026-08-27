@@ -19,6 +19,7 @@ import { Navigate } from "react-router-dom";
 import { RequestQuote, AccountBalanceWallet } from "@mui/icons-material";
 import TabbedPage from "@/shared/ui/TabbedPage";
 import { useAuth } from "@/features/auth/AuthContext";
+import { can } from "@/shared/utils/roles";
 
 const QuotationTracking = lazy(() => import("./QuotationTracking"));
 const BillingTracking = lazy(() => import("./BillingTracking"));
@@ -32,7 +33,7 @@ const FinanceHub = () => {
   //   • ทุก route ที่บันทึกข้อมูลการเงิน/การติดตาม เช็คสิทธิ์ "รายงาน" ซ้ำอีกชั้น
   //     (requireEventFinanceAccess / isJobParticipant)
   // จึงไม่ต้องกันด้วย role ที่นี่อีก — และไม่ควรกัน เพราะจะกลายเป็นกันคนที่มีสิทธิ์จริงออกไปด้วย
-  const canAccess = ["admin", "manager", "technician", "user"].includes(userData?.role?.toLowerCase());
+  const canAccess = can(userData, "viewFinance");
 
   if (!canAccess) return <Navigate to="/dashboard" replace />;
 

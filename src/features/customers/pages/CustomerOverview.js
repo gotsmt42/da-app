@@ -33,6 +33,7 @@ import {
 import { buildDaysPastDueMap, isFlaggedDays, getOverdueGroupKey } from "@/shared/utils/overdueJobs";
 import { getFollowUpInfo } from "@/shared/utils/quotationTracking";
 import { formatThai } from "@/shared/utils/thaiDate";
+import { can } from "@/shared/utils/roles";
 
 const ACCENT = "#0891b2";
 const TEXT_SUB = "#64748b";
@@ -69,7 +70,7 @@ function TrackRow({ color, icon, title, sub }) {
 export default function CustomerOverview() {
   const { userData, loading: authLoading } = useAuth();
   const role = (userData?.role || "").toLowerCase();
-  const isAdminOrManager = ["admin", "manager"].includes(role);
+  const isAdminOrManager = can(role, "manageMasterData");
   const isMobile = useMediaQuery("(max-width:900px)");
   const navigate = useNavigate();
 

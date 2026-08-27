@@ -22,14 +22,18 @@ import { Suspense, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Box, Tabs, Tab, Skeleton } from "@mui/material";
 
-const ACCENT = "#dc2626";
+// สีเริ่มต้น = แดง (สายงานช่าง ซึ่งเป็นเจ้าของหน้าเดิมทั้งหมดที่ใช้คอมโพเนนต์นี้)
+const DEFAULT_ACCENT = "#dc2626";
 const BORDER_MAIN = "#e2e8f0";
 const TEXT_SUB = "#64748b";
 
 /**
  * @param {Array} tabs [{ key, label, icon, render: () => node }] — กรองตามสิทธิ์มาก่อนแล้ว
+ * @param {string} [accent] สีประจำสายงานของหน้านั้น — ฝ่ายขายม่วง ฝ่ายบริการแดง
+ *   ⚠️ ไม่ใช่แค่ความสวยงาม: แอปมี 2 สายงานที่แยกกันจริง สีแถบแท็บคือสัญญาณแรกที่บอกว่าตอนนี้
+ *   อยู่ฝั่งไหน ถ้าทุกหน้าแดงเหมือนกันหมด หน้าฝ่ายขายจะดูเหมือนหน้าของช่าง
  */
-const TabbedPage = ({ tabs }) => {
+const TabbedPage = ({ tabs, accent = DEFAULT_ACCENT }) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const visibleTabs = useMemo(() => (tabs || []).filter(Boolean), [tabs]);
@@ -64,12 +68,21 @@ const TabbedPage = ({ tabs }) => {
             sx={{
               minHeight: 42,
               borderBottom: `1px solid ${BORDER_MAIN}`,
+              // ⚠️ จอแคบต้องให้แท็บครบโดยไม่ต้องเลื่อน — ลดขนาดตัวอักษร/ช่องไฟลงแทนที่จะปล่อยให้
+              // มีปุ่มลูกศรเลื่อนโผล่มา เพราะผู้ใช้ไม่มีทางรู้ว่ามีแท็บซ่อนอยู่ข้างหลัง
               "& .MuiTab-root": {
-                textTransform: "none", fontWeight: 700, fontSize: "0.86rem",
-                minHeight: 42, color: TEXT_SUB, gap: 0.75,
+                textTransform: "none", fontWeight: 700,
+                fontSize: { xs: "0.76rem", sm: "0.86rem" },
+                minHeight: 42, color: TEXT_SUB,
+                gap: { xs: 0.4, sm: 0.75 },
+                minWidth: { xs: 0, sm: 90 },
+                px: { xs: 1, sm: 2 },
               },
-              "& .Mui-selected": { color: `${ACCENT} !important` },
-              "& .MuiTabs-indicator": { backgroundColor: ACCENT, height: 2.5, borderRadius: 2 },
+              // ⚠️ จอแคบซ่อนไอคอนทิ้ง — ข้อความไทยยาวกว่าภาษาอังกฤษมาก พอมีไอคอนด้วยจะเกิน
+              // ความกว้างจอแล้วมีลูกศรเลื่อนโผล่มา ซึ่งผู้ใช้ไม่มีทางรู้ว่ามีแท็บซ่อนอยู่ข้างหลัง
+              "& .MuiTab-iconWrapper": { display: { xs: "none", sm: "inline-flex" } },
+              "& .Mui-selected": { color: `${accent} !important` },
+              "& .MuiTabs-indicator": { backgroundColor: accent, height: 2.5, borderRadius: 2 },
             }}
           >
             {visibleTabs.map((t) => (

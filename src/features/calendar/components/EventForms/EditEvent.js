@@ -9,6 +9,7 @@ import { getActivityLogMeta } from "@/shared/utils/activityLogMeta";
 import { classifyJob, getJobClassMeta } from "@/shared/utils/jobClassification";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 import { formatThai } from "@/shared/utils/thaiDate";
+import { can } from "@/shared/utils/roles";
 
 // ✅ ป้องกัน stored XSS — ค่าที่ผู้ใช้พิมพ์เอง (ชื่อบริษัท/โครงการ/ประเภทงาน/ระบบ/ทีม ฯลฯ) ต้อง escape
 // ก่อนต่อเป็น HTML string เสมอ ไม่งั้นถ้ามีใครตั้งชื่อเป็น เช่น "><img src=x onerror="..."> จะยิง
@@ -751,7 +752,7 @@ export const getEditEvent = async ({
   const hasSiblings = siblingEvents.length > 0;
   const eventResPerson = ev.extendedProps?.resPerson || "";
 
-  const isAdminOrManagerUser = ["admin", "manager"].includes(userData?.role?.toLowerCase());
+  const isAdminOrManagerUser = can(userData, "approveJobs");
   // ✅ งานที่ยังรออนุมัติ (ไม่ใช่ "ถูกปฏิเสธ" — เคสนั้นยังต้องแก้ไขได้เพื่อส่งขออนุมัติใหม่ตามปกติ) —
   // ช่าง/ผู้รับผิดชอบเปิดดูได้อย่างเดียว แก้ไข/ทำอะไรไม่ได้เลยจนกว่าแอดมิน/manager จะตัดสินใจก่อน
   // (ตามที่ผู้ใช้ยืนยัน) ล็อกทุกช่อง/ปุ่มที่ปกติช่างแก้ไข/กดได้ (วันที่-เวลา/สถานะ/ทีม/คัดลอก/ลบ/

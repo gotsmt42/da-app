@@ -18,6 +18,10 @@ export const formatEventDateRange = (event) => {
   // ต้องลบ 1 วันคืนตอนแสดงผล ไม่งั้นวันที่ที่โชว์เพี้ยนไม่ตรงกับหน้า event
   const end = moment(event.end).subtract(event.allDay ? 1 : 0, "days");
 
+  // ⚠️ กันวันที่กลับหัว — งาน allDay ที่เก็บ end เท่ากับ/ก่อน start (ข้อมูลเก่าที่ตกค้างจากตอนที่ยัง
+  // ไม่ได้ normalize ที่โมเดล) พอลบ 1 วันจะกลายเป็น "24 – 23 ส.ค. 2569" ซึ่งอ่านแล้วเหมือนระบบพัง
+  // 🐛 อาการที่ผู้ใช้เจอจริงในหน้า "งานของฉัน" ของช่าง
+  if (!end.isValid() || end.isBefore(start, "day")) return formatThai(start, "DD MMM YYYY");
   if (start.isSame(end, "day")) return formatThai(start, "DD MMM YYYY");
   if (start.year() === end.year()) {
     if (start.month() === end.month()) {

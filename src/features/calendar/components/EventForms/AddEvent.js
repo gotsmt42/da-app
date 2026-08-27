@@ -3,6 +3,7 @@ import { escapeHtml } from "@/shared/utils/escapeHtml";
 import { showTeamOverlapWarning } from "@/shared/utils/teamOverlapWarning";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 import { formatThai } from "@/shared/utils/thaiDate";
+import { can } from "@/shared/utils/roles";
 
 // ✅ ป้องกัน stored XSS — ค่าที่ผู้ใช้พิมพ์เอง (ชื่อบริษัท/โครงการ/ประเภทงาน/ระบบ/ทีม ฯลฯ) ต้อง escape
 // ก่อนต่อเป็น HTML string เสมอ ไม่งั้นถ้ามีใครตั้งชื่อเป็น เช่น "><img src=x onerror="..."> จะยิง
@@ -382,7 +383,7 @@ export const getAddEvent = async ({
 
   // ✅ ผู้ใช้ที่ไม่ใช่ admin/manager สร้างงานได้เหมือนเดิมทุกอย่าง แค่งานจะถูกแท็ก "รออนุมัติ" ฝั่ง
   // backend อัตโนมัติ (ดู POST /events) — ตรงนี้ใช้แค่โชว์ข้อความแจ้งล่วงหน้าเฉยๆ ไม่ได้บล็อกอะไร
-  const isAdminOrManagerUser = ["admin", "manager"].includes(userData?.role?.toLowerCase());
+  const isAdminOrManagerUser = can(userData, "approveJobs");
 
   // ✅ ขั้นตอนที่ 1 ของฟอร์ม (งานทั่วไป/งานตามสัญญา) ต้องรู้ว่าตอนนี้มีสัญญาอะไรอยู่แล้วบ้าง เพื่อให้
   // เลือกได้เฉพาะจากรายการนี้เท่านั้น (พิมพ์เพิ่มเองไม่ได้) กันพิมพ์ชื่อบริษัท/โครงการเพี้ยนจากของเดิม

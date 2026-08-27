@@ -24,6 +24,7 @@ import { countOverdueContracts } from "../shared/utils/contractOverdue";
 // ✅ ไอคอน 3 เมนูกลางตรงกับที่ Dashboard.js/Sidebar.js ใช้จริงสำหรับหน้าเดียวกันเป๊ะๆ
 // (FaWrench="การดำเนินงาน", FaFileContract="ภาพรวมสัญญา", FaFileInvoiceDollar="ติดตามใบเสนอราคา")
 import { FaBars, FaUserCircle, FaSignOutAlt, FaWrench, FaFileContract, FaFileInvoiceDollar } from "react-icons/fa";
+import { can, isRole, ROLES } from "@/shared/utils/roles";
 
 const Header = ({ toggleMobileSidebar }) => {
   const location = useLocation();
@@ -41,14 +42,19 @@ const Header = ({ toggleMobileSidebar }) => {
   const [contractDrafts, setContractDrafts] = useState([]);
 
   const { userData, logout } = useAuth();
-  const isAdminOrManager = ["admin", "manager"].includes(userData?.role?.toLowerCase());
+  const isAdminOrManager = can(userData, "viewAllJobs");
   // ✅ หน้า "ภาพรวมงาน" เปิดให้ช่างเข้าดูงานของตัวเองได้แล้ว (ดู ContractOverview.js canView) —
   // ปุ่มทางลัดในนี้ต้องเปิดให้ตรงกันด้วย ไม่ใช่แค่แอดมิน/manager เหมือนเดิม
-  const canViewContracts = ["admin", "manager", "technician"].includes(userData?.role?.toLowerCase());
+  const canViewContracts = can(userData, "viewContracts");
+  // ✅ ซ่อนเมนูที่ผู้ใช้กดไปแล้วไม่มีอะไรให้ทำ แทนที่จะโชว์ไว้แล้วเจอหน้าว่าง/โดนเด้งกลับ
+  const canViewOperation = can(userData, "editOperation") || can(userData, "receiveDispatch");
+  const isSale = isRole(userData, ROLES.SALE);
+  const canViewQuotations = can(userData, "viewQuotations");
 
   const { notifications, unread, markRead, markAllRead } = useEventNotifications(
     events,
-    isAdminOrManager ? "admin" : "technician"
+    // ⚠️ เซลต้องเป็นสายของตัวเอง ไม่ใช่ตกไปเป็น "technician" (ดูเหตุผลใน hook)
+    isSale ? "sale" : isAdminOrManager ? "admin" : "technician"
   );
 
   useEffect(() => {
@@ -120,6 +126,9 @@ const Header = ({ toggleMobileSidebar }) => {
             ออกไปก่อนหน้านี้ — ตอนนี้เพิ่มกลับมาเฉพาะ 3 เมนูที่ใช้บ่อยและไม่มีใน sidebar เห็นง่ายๆ ระหว่าง
             ทำงาน (การดำเนินงาน/ภาพรวมสัญญา/ติดตามใบเสนอราคา) แทน ให้กระชับ ไม่รกเหมือนของเดิมที่มี 4 เมนู */}
         <Nav className="navbar-nav mx-auto d-none d-lg-flex" navbar>
+          {/* ⚠️ "การดำเนินงาน" เป็นหน้าของสายงานช่าง — เซลกดเข้าไปเห็นแต่งานที่ไม่เกี่ยวกับตัวเอง
+              (server กรองให้เหลือศูนย์รายการอยู่แล้ว) จึงซ่อนไปเลยแทนที่จะให้กดแล้วเจอหน้าว่าง */}
+          {canViewOperation && (
           <NavItem>
             <Link
               to="/operation"
@@ -128,6 +137,7 @@ const Header = ({ toggleMobileSidebar }) => {
               <FaWrench size={13} /> การดำเนินงาน
             </Link>
           </NavItem>
+          )}
           {canViewContracts && (
             <NavItem>
               <Link
@@ -138,6 +148,7 @@ const Header = ({ toggleMobileSidebar }) => {
               </Link>
             </NavItem>
           )}
+          {canViewQuotations && (
           <NavItem>
             <Link
               to="/quotations"
@@ -146,6 +157,7 @@ const Header = ({ toggleMobileSidebar }) => {
               <FaFileInvoiceDollar size={13} /> ติดตามใบเสนอราคา
             </Link>
           </NavItem>
+          )}
         </Nav>
 
         {/* ✅ จอมือถือ: Nav ด้านบนถูกซ่อนไว้ (d-none d-lg-flex) เหลือพื้นที่ว่างกลางแถบ — ใส่ทางลัด
@@ -167,7 +179,7 @@ const Header = ({ toggleMobileSidebar }) => {
         {/* ✅ ปุ่มเปิด/ปิด push notification ย้ายไปอยู่ที่หน้า Settings แล้ว (เดิมมีทั้งที่นี่และ
             ที่ Settings ทำให้สับสนว่าอันไหนคือจุดควบคุมจริง) */}
         <div className="d-flex align-items-center gap-2">
-          <NotificationBell notifications={notifications} unread={unread} onItemClick={markRead} onMarkAllRead={markAllRead} dark />
+          <NotificationBell notifications={notifications} unread={unread} onItemClick={markRead} onMarkAllRead={markAllRead} dark jobBasePath={canViewOperation ? "/operation" : "/event"} />
 
           <div className="profile-img">
             <Dropdown isOpen={dropdownOpen} toggle={toggle}>

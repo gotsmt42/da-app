@@ -2,6 +2,7 @@ import { countUsedRounds } from "@/shared/utils/contractRounds";
 import { escapeHtml } from "@/shared/utils/escapeHtml";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
+import { can } from "@/shared/utils/roles";
 
 /* ─────────────────────────────────────────────
    STYLE INJECTION — งานวางแผนล่วงหน้า (ยังไม่ลงตาราง)
@@ -204,7 +205,7 @@ export const getAddDraftEvent = async ({
 
   // ✅ ผู้ใช้ที่ไม่ใช่ admin/manager สร้าง/แก้แผนงานได้เหมือนเดิมทุกอย่าง แค่งานจะถูกแท็ก "รออนุมัติ"
   // ฝั่ง backend อัตโนมัติ (ดู POST /events/draft, PUT /:id/draft) — ตรงนี้ใช้แค่โชว์ข้อความแจ้งล่วงหน้า
-  const isAdminOrManagerUser = ["admin", "manager"].includes(userData?.role?.toLowerCase());
+  const isAdminOrManagerUser = can(userData, "approveJobs");
 
   const isEditMode = Boolean(existingDraft);
   // ✅ แก้ไขงานที่ผูกสัญญาอยู่แล้ว ไม่ให้สลับกลับเป็นงานทั่วไป/เปลี่ยนบริษัท-โครงการ-ประเภทงาน-ระบบ-ครั้งที่

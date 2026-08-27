@@ -63,6 +63,7 @@ import { escapeHtml } from "@/shared/utils/escapeHtml";
 import DeliveryNoteDialog from "@/features/documents/components/DeliveryNoteDialog";
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import { thaiDateNumeric, formatThai } from "@/shared/utils/thaiDate";
+import { can } from "@/shared/utils/roles";
 
 const ACCENT = "#dc2626";
 // ✅ สีแบรนด์ของ Excel — ใช้กับปุ่มส่งออกโดยเฉพาะ ให้เห็นปุ๊บรู้ทันทีว่าคือไฟล์ Excel ไม่ต้องอ่าน tooltip
@@ -928,11 +929,11 @@ export default function ContractOverview() {
   const isMobile = useMediaQuery("(max-width:600px)");
   const { userData } = useAuth();
   const role = userData?.role?.toLowerCase();
-  const isAdminOrManager = ["admin", "manager"].includes(role);
+  const isAdminOrManager = can(role, "editContracts");
   // ✅ ช่างเข้าดูหน้านี้ได้ด้วย (เห็นแค่งานของตัวเอง — กรองมาจาก backend แล้ว) แต่แก้ไขไม่ได้
   // isAdminOrManager ยังคงคุมทุกจุดที่แก้ไขข้อมูลเหมือนเดิมทั้งหมด เทียบ pattern เดียวกับ
   // QuotationTracking.js (canAccess/isAdminOrManager แยกกัน)
-  const canView = ["admin", "manager", "technician"].includes(role);
+  const canView = can(role, "viewContracts");
 
   const [searchParams] = useSearchParams();
   const [events, setEvents] = useState([]);

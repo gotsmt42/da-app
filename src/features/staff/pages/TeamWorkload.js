@@ -24,6 +24,7 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthContext";
 import EventService from "@/shared/services/EventService";
 import AuthService from "@/shared/services/authService";
+import { can, isRole, ROLES } from "@/shared/utils/roles";
 
 const WARNING_DAYS_AFTER_END = 7;   // เกณฑ์เดียวกับหน้า Operation/งานของฉัน — เลยกำหนด 1 สัปดาห์ = ค้างงาน
 const SEVERE_DAYS_AFTER_END = 14;
@@ -62,7 +63,7 @@ export default function TeamWorkload() {
   const { userData } = useAuth();
   const navigate = useNavigate();
   const role = userData?.role?.toLowerCase();
-  const isAdminOrManager = ["admin", "manager"].includes(role);
+  const isAdminOrManager = can(role, "manageMasterData");
 
   const [events, setEvents] = useState([]);
   const [users, setUsers] = useState([]);
@@ -105,7 +106,7 @@ export default function TeamWorkload() {
   }, [events]);
 
   const statsByTech = useMemo(() => {
-    const technicians = users.filter((u) => (u.role || "").toLowerCase() === "technician");
+    const technicians = users.filter((u) => isRole(u, ROLES.TECHNICIAN));
     const userById = new Map(users.map((u) => [u._id, u]));
     const userByFname = new Map(users.map((u) => [u.fname, u]));
 
@@ -136,7 +137,7 @@ export default function TeamWorkload() {
 
     jobGroups.forEach((sessions) => {
       const tech = resolveTech(sessions);
-      if (!tech || (tech.role || "").toLowerCase() !== "technician") return;
+      if (!tech || !isRole(tech, ROLES.TECHNICIAN)) return;
       const entry = map.get(tech._id);
       if (!entry) return;
 

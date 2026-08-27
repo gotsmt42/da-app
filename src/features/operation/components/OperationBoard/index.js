@@ -75,12 +75,13 @@ import useEventNotifications from "@/shared/hooks/useEventNotifications";
 import NotificationBell from "@/features/notifications/components/NotificationBell";
 import LineIcon from "@/shared/ui/LineIcon";
 import { printFile, shareFile, shareToLine, isMobileDevice } from "@/shared/utils/fileActions";
-import PendingApprovalsPanel from "../PendingApprovalsPanel";
 import DeliveryNoteDialog from "@/features/documents/components/DeliveryNoteDialog";
 import WorkNoticeDialog from "@/features/documents/components/WorkNoticeDialog";
 import InfoLine from "@/shared/ui/InfoLine";
 import { JOB_DOC_TYPES } from "@/shared/utils/jobDocTypes";
 import { formatThai } from "@/shared/utils/thaiDate";
+import { ROLES } from "@/shared/utils/roles";
+import { can } from "@/shared/utils/roles";
 
 // ✅ ใช้ตัดสินใจลำดับปุ่มแชร์ในเมนู "⋮" ต่อไฟล์ (ดูเหตุผลใน fileActions.js)
 const IS_MOBILE = isMobileDevice();
@@ -800,7 +801,7 @@ export const FileUploadSection = ({
   const [dragging, setDragging] = useState(false);
   const inputRef = React.useRef();
   const overrideInputRef = React.useRef();
-  const canEdit  = ["admin", "manager", "user"].includes(currentUserRole);
+  const canEdit  = can(currentUserRole, "editOperation");
 
   // ✅ เมนู "⋮" ต่อไฟล์ — เดิมโชว์ปุ่มดาวน์โหลด/ลบเรียงเป็นไอคอนแยกทุกแถว ดูรกตาเวลามีหลายไฟล์
   // รวมเป็นเมนูเดียว เหลือแค่ปุ่มดูไฟล์ (บ่อยสุด) + ปุ่ม "⋮" แยกต่างหาก
@@ -978,7 +979,7 @@ export const CommentThread = ({ comments = [], onSend, myRole }) => {
     setSending(false);
   };
 
-  const isMine = (c) => (myRole === "technician" ? c.role === "technician" : c.role !== "technician");
+  const isMine = (c) => (myRole === ROLES.TECHNICIAN ? c.role === ROLES.TECHNICIAN : c.role !== ROLES.TECHNICIAN);
 
   return (
     <Box>
@@ -996,7 +997,7 @@ export const CommentThread = ({ comments = [], onSend, myRole }) => {
                 }}>
                   <Stack direction="row" gap={0.75} alignItems="center" sx={{ mb: 0.25 }}>
                     <Typography variant="caption" fontWeight={700} color={mine ? "#3b82f6" : "text.secondary"}>
-                      {c.userName || (c.role === "technician" ? "ช่าง" : "แอดมิน")}
+                      {c.userName || (c.role === ROLES.TECHNICIAN ? "ช่าง" : "แอดมิน")}
                     </Typography>
                     <Typography variant="caption" color="text.disabled">
                       · {moment(c.timestamp).locale("th").format("DD MMM HH:mm")}
@@ -1098,8 +1099,8 @@ const EventRowCard = ({
   // การกางลงในหน้า (Collapse) — เดิมกางแล้วเนื้อหายาวๆ ดันการ์ดอื่นในคอลัมน์เดียวกันลงมา ต้อง
   // เลื่อนจอตาม ทั้งที่จอกว้างเปิดลอยทับได้เลยโดยไม่กระทบตำแหน่งการ์ดอื่น (มือถือยังกางลงแบบเดิม)
   const isDesktop = useMediaQuery("(min-width:900px)");
-  const canEdit = ["admin", "manager", "user"].includes(currentUserRole);
-  const isAdminOrManager = ["admin", "manager"].includes(currentUserRole);
+  const canEdit = can(currentUserRole, "editOperation");
+  const isAdminOrManager = can(currentUserRole, "approveJobs");
 
   // ── Send Comment (คุยกับช่าง เช่น ตอบคำขอใบเสนอราคา) ──────────────────
   const handleSendComment = async (message) => {
@@ -2257,9 +2258,6 @@ const Operation = () => {
   const [employee,     setEmployee]     = useState([]);
   const [loading,      setLoading]      = useState(false);
   const [activeTab,    setActiveTab]    = useState(0);
-  // ✅ จำนวนงานรออนุมัติ — แผง PendingApprovalsPanel ดึงข้อมูลเองแยกจากหน้านี้ (ดูเหตุผลในไฟล์นั้น)
-  // จึงส่งตัวเลขกลับขึ้นมาให้แสดงเป็น badge บนแท็บ ผู้ใช้จะได้รู้ว่ามีงานค้างโดยไม่ต้องกดเข้าไปดูก่อน
-  const [pendingApprovalTabCount, setPendingApprovalTabCount] = useState(0);
   // ✅ สลับมุมมองการ์ด/ตาราง — จำค่าไว้ข้ามการเปิดหน้า (แต่ละคนถนัดคนละแบบและมักใช้แบบเดิมตลอด)
   // เทียบ pattern เดียวกับหน้า "ติดตามใบเสนอราคา"
   // 🐛 ที่แก้ (อาการ: "หน้าจอคอมดูเหมือนจอมือถือ / เทอะทะ / ไม่เหมือนเว็บจัดการงานทั่วไป"):
@@ -2397,7 +2395,7 @@ const Operation = () => {
   const [pendingDelete,    setPendingDelete]      = useState(null);
   const [snackbar,         setSnackbar]           = useState({ open: false, msg: "", severity: "success" });
   const [currentUserRole,  setCurrentUserRole]    = useState("");
-  const isAdminOrManager = ["admin", "manager"].includes(currentUserRole);
+  const isAdminOrManager = can(currentUserRole, "approveJobs");
 
   // ✅ ?tab=approvals — เปิดหน้านี้มาที่แท็บ "รออนุมัติ" ได้ทันที
   // 🐛 ที่แก้ (กดแจ้งเตือน "ส่งงานใหม่รออนุมัติ" แล้วมาไม่ถูกที่): แจ้งเตือนชนิดนี้เดิมพามาที่
@@ -2408,9 +2406,14 @@ const Operation = () => {
   // activeTab=1 ให้ role อื่นจะกลายเป็นแท็บที่ไม่มีอยู่จริง = เนื้อหาว่างเปล่าโดยไม่มีอะไรอธิบาย
   // ⚠️ deps มี searchParams (ไม่ใช่ mount-only) — กดแจ้งเตือนซ้ำตอนที่อยู่หน้านี้อยู่แล้วจะเปลี่ยนแค่
   // query param โดยไม่ remount หน้า (เทียบเหตุผลเดียวกับ effect ของ ?highlight= ด้านบน)
+  // 🧹 ลิงก์เก่า /operation?tab=approvals — แท็บ "รออนุมัติ" ถูกย้ายออกไปเป็นเมนู "คำขอลงงาน" แล้ว
+  // ⚠️ ต้องส่งต่อไปหน้าใหม่ ไม่ใช่ปล่อยให้เงียบ — ลิงก์นี้ถูกใช้จริงจากแจ้งเตือนที่ส่งออกไปแล้ว
+  // และจากบุ๊กมาร์กของผู้ใช้ ถ้าไม่ทำอะไรเลย คนกดจะเจอหน้ารายการงานธรรมดาแล้วหาที่กดอนุมัติไม่เจอ
   useEffect(() => {
-    if (searchParams.get("tab") === "approvals" && isAdminOrManager) setActiveTab(1);
-  }, [searchParams, isAdminOrManager]);
+    if (searchParams.get("tab") === "approvals" && isAdminOrManager) {
+      navigate("/dispatch?tab=approvals", { replace: true });
+    }
+  }, [searchParams, isAdminOrManager, navigate]);
 
   const [uploadingState,         setUploadingState]         = useState({ quotation: null, report: null, invoice: null, completion: null });
   const [uploadProgressState,    setUploadProgressState]    = useState({ quotation: 0, report: 0, invoice: 0, completion:0 });
@@ -2550,7 +2553,7 @@ const Operation = () => {
     // ย้ายไปจัดการทั้งหมดที่หน้า "งานของฉัน" (technician/jobs) แทน ไม่มี "pending"/"active" ให้เลือก
     // ในมุมมองของช่างอีกต่อไป — ต้องคำนวณกลุ่มนี้ "ก่อน" matchNotPending เพราะกลุ่ม "ค้างงาน" ต้อง
     // งดเว้นการตัด "กำลังรอยืนยัน" ออก (ดูเหตุผลด้านล่าง)
-    const isAdminOrManagerRole = ["admin", "manager"].includes(currentUserRole);
+    const isAdminOrManagerRole = can(currentUserRole, "approveJobs");
     // ✅ เดิม default ไปที่ "pending" (รอคุณอนุมัติ) เสมอสำหรับแอดมิน/manager แม้ไม่มีงานรออนุมัติเลย
     // ทำให้เปิดหน้ามาเจอ "ไม่พบรายการ" ว่างเปล่าโดยไม่มีอะไรผิดพลาดจริง — ถ้าไม่มีคำขอปิดงานรออยู่
     // ให้ default ไปโชว์ "กำลังดำเนินการ/ยืนยันแล้ว" แทน ซึ่งมักจะมีงานอยู่จริงให้เห็นทันที
@@ -3008,8 +3011,6 @@ const Operation = () => {
           <Typography variant="body2" color="text.secondary">
             {loading
               ? "กำลังโหลด..."
-              : activeTab === 1
-              ? `${pendingApprovalTabCount} งานรออนุมัติ`
               : `${sortedEvents.length} รายการ${activeFilterCount > 0 ? ` · กรอง ${activeFilterCount} เงื่อนไข` : ""}`}
           </Typography>
         </Box>
@@ -3179,27 +3180,10 @@ const Operation = () => {
               ซึ่งดูได้จากหน้าปฏิทินอยู่แล้ว และไม่มีอะไรให้จัดการงานได้จริงในนั้น (การ์ดในแท็บ
               "รายการงาน" คือที่เดียวที่แนบเอกสาร/เช็คอิน/คอมเมนต์ได้) */}
           <StyledTab icon={<TableChart fontSize="small" />} iconPosition="start" label="รายการงาน" />
-          {/* ✅ ย้ายหน้า "แผนงานรออนุมัติ" (เดิมเป็นหน้าแยก /pending-approvals) มาเป็นแท็บที่นี่ตามที่
-              ผู้ใช้ขอ — เป็นงานเดียวกัน (ไล่จัดการงานทีละใบ) แต่เดิมต้องสลับหน้าไปมา และตัวเลข
-              "รอคุณอนุมัติ" ก็โผล่ทั้งการ์ดกลุ่มงานในหน้านี้และหน้านั้นจนดูเหมือนคนละระบบ
-              ⚠️ เฉพาะแอดมิน/manager เท่านั้น (คนอื่นอนุมัติไม่ได้อยู่แล้ว — backend ตอบ 403) จึงต้องเป็น
-              แท็บสุดท้าย ไม่งั้น index ของแท็บจะเลื่อนไม่ตรงกันระหว่าง role */}
-          {isAdminOrManager && (
-            <StyledTab
-              icon={
-                <Badge
-                  badgeContent={pendingApprovalTabCount}
-                  color="warning"
-                  invisible={pendingApprovalTabCount === 0}
-                  sx={{ "& .MuiBadge-badge": { fontSize: "0.6rem", height: 15, minWidth: 15 } }}
-                >
-                  <HourglassTop fontSize="small" />
-                </Badge>
-              }
-              iconPosition="start"
-              label="รออนุมัติ"
-            />
-          )}
+          {/* 🧹 แท็บ "รออนุมัติ" ถูกย้ายออกไปเป็นเมนู "คำขอลงงาน" แล้วตามที่ผู้ใช้สั่ง —
+              หน้านี้คือการไล่จัดการงานที่ *ผ่านการอนุมัติแล้ว* ส่วนคำขอที่ยังไม่ได้ตัดสินใจเป็นคนละ
+              ขั้นของงาน และมาจาก 2 แผนก (ฝ่ายขาย/ฝ่ายช่าง) ซึ่งควรอยู่รวมกันที่เดียว
+              ดู features/dispatch/pages/JobRequestQueue.js */}
         </Tabs>
       </Box>
 
@@ -3207,6 +3191,7 @@ const Operation = () => {
           ฝั่งช่าง: เหลือแค่ "ค้างงาน" กับ "เสร็จสิ้น" (งานที่กำลังทำ/รออนุมัติ ย้ายไปหน้า "งานของฉัน" หมดแล้ว)
           เดิมใช้ ToggleButtonGroup แบบชิปเล็กเรียงแนวนอน จอมือถือห่อบรรทัดมั่วๆ กดยาก เปลี่ยนเป็น
           การ์ดใหญ่จัดกริด 2 คอลัมน์เสมอบนจอแคบ (แอดมินขยายเป็น 4 คอลัมน์แนวนอนตอนจอกว้างพอ) */}
+      {/* ⚠️ เหลือแท็บเดียวแล้ว (รายการงาน) — เงื่อนไขนี้จึงเป็นจริงเสมอ คงไว้เผื่อเพิ่มแท็บในอนาคต */}
       {activeTab !== 1 && (
         <Box sx={{
           display: "grid",
@@ -3386,14 +3371,7 @@ const Operation = () => {
           ⚠️ ซ่อนด้วย CSS แทนการ unmount — ตัวเลขบน badge ของแท็บมาจากแผงนี้ ถ้า unmount ทิ้งตอนอยู่แท็บ
           อื่น badge จะกลับเป็น 0 ทันทีที่สลับแท็บ (และต้องโหลดใหม่ทุกครั้งที่กดกลับเข้ามา) — แผงจะดึง
           ข้อมูลรอบแรกให้เสมอ แต่หยุดรีเฟรชอัตโนมัติเมื่อไม่ได้เปิดอยู่ (ดู prop active) */}
-      {isAdminOrManager && (
-        <Box sx={{ display: activeTab === 1 ? "block" : "none" }}>
-          <PendingApprovalsPanel
-            active={activeTab === 1}
-            onCountChange={setPendingApprovalTabCount}
-          />
-        </Box>
-      )}
+
 
 
       {/* File Preview */}

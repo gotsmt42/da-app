@@ -26,7 +26,15 @@ const Register = lazy(() => import("@/features/auth/pages/Register.js"));
 const PublicRoute = lazy(() => import("./PublicRoute.js"));
 const CheckConnectionToast = lazy(() => import("./CheckConnectionToast.js"));
 
+// ✅ "งานของฉัน" ของช่าง = งานตามตารางอย่างเดียว
+// 🧹 เคยห่อด้วยแท็บเพื่อเพิ่ม "งานที่ได้รับมอบหมาย" (ใบ Dispatch) — ตัดออกตามที่ผู้ใช้สั่ง
+// เพราะใบที่อนุมัติแล้วถูกสร้างเป็นงานบนปฏิทินจริงอยู่แล้ว จึงโผล่ในงานตามตารางตั้งแต่แรก
+// แท็บที่สองเลยเป็นรายการเดียวกันซ้ำอีกที่ ในรูปแบบที่ปิดงานไม่ได้
 const MyJobs = lazy(() => import("@/features/technician/pages/MyJobs.js"));
+// ✅ งานฝ่ายขาย (ท่อขาย / ปฏิทินนัดหมาย / งานที่ส่งให้ช่าง) — คนละสายงานกับปฏิทินช่างโดยสิ้นเชิง
+const JobRequests = lazy(() => import("@/features/dispatch/pages/JobRequests.js"));
+// ✅ คิวจ่ายงานของแอดมิน — ใบมอบหมายงานข้ามแผนก
+const JobRequestQueue = lazy(() => import("@/features/dispatch/pages/JobRequestQueue.js"));
 
 // ✅ หน้ารวม 4 หน้า — ยุบหน้าที่เป็นข้อมูลประเภทเดียวกันให้เหลือหน้าเดียวต่อเรื่อง แล้วแยกด้วยแท็บ
 // (ดูเหตุผลของแต่ละการรวมในหัวไฟล์ของแต่ละตัว) URL เดิมทั้งหมดยัง redirect เข้ามาที่นี่ได้ ลิงก์เก่าไม่พัง
@@ -258,14 +266,39 @@ const ThemeRoutes = [
 
 
       {
-  path: "technician/jobs",
-  element: (
-    <Suspense fallback={<div>Loading Jobs...</div>}>
-      <MyJobs />
-    </Suspense>
-  ),
-  title: "My Jobs",
-},
+        path: "technician/jobs",
+        element: (
+          <Suspense fallback={<div>Loading Jobs...</div>}>
+            <MyJobs />
+          </Suspense>
+        ),
+        title: "My Jobs",
+      },
+      {
+        // ⚠️ ไม่ห่อด้วย AdminRoute — ตัวหน้าเช็คสิทธิ์เอง (requestDispatch)
+        // ✅ URL เดิม /sales ยังใช้ได้ ไม่ให้ลิงก์/บุ๊กมาร์กเก่าพัง แต่ตอนนี้ชี้ไปหน้า "แจ้งงานให้ช่าง"
+        // ซึ่งเป็นสิ่งเดียวที่เหลือจากหมวดนี้หลังตัดระบบ CRM ออกตามที่ผู้ใช้สั่ง
+        // ⚠️ :id? เหมือน /dispatch — ผู้แจ้งกดแจ้งเตือน "ใบถูกตีกลับ/อนุมัติแล้ว" ต้องเปิดใบนั้นได้เลย
+        path: "sales/:id?",
+        element: (
+          <Suspense fallback={<div>Loading...</div>}>
+            <JobRequests />
+          </Suspense>
+        ),
+        title: "Job Requests",
+      },
+      {
+        // ⚠️ :id? เป็น optional segment — แจ้งเตือนส่งลิงก์มาเป็น /dispatch/<id> เพื่อเปิดใบนั้นเลย
+        // 🐛 ที่แก้: เดิม path เป็น "dispatch" เฉยๆ กดแจ้งเตือนแล้วได้
+        // "No routes matched location" = หน้าว่าง
+        path: "dispatch/:id?",
+        element: (
+          <Suspense fallback={<div>Loading...</div>}>
+            <JobRequestQueue />
+          </Suspense>
+        ),
+        title: "Dispatch",
+      },
 
     ],
   },

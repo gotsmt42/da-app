@@ -38,6 +38,7 @@ import LineIcon from "@/shared/ui/LineIcon";
 import { printFile, shareFile, shareToLine, isMobileDevice } from "@/shared/utils/fileActions";
 import InfoLine from "@/shared/ui/InfoLine";
 import { formatThai } from "@/shared/utils/thaiDate";
+import { ROLES } from "@/shared/utils/roles";
 
 // ✅ ใช้ตัดสินใจลำดับปุ่มแชร์ในเมนู "⋮" ต่อไฟล์ (ดูเหตุผลใน fileActions.js)
 const IS_MOBILE = isMobileDevice();
@@ -629,7 +630,7 @@ const CommentThread = ({ comments = [], onSend, myRole }) => {
     setSending(false);
   };
 
-  const isMine = (c) => (myRole === "technician" ? c.role === "technician" : c.role !== "technician");
+  const isMine = (c) => (myRole === ROLES.TECHNICIAN ? c.role === ROLES.TECHNICIAN : c.role !== ROLES.TECHNICIAN);
 
   return (
     <Box>
@@ -647,7 +648,7 @@ const CommentThread = ({ comments = [], onSend, myRole }) => {
                 }}>
                   <Stack direction="row" gap={0.75} alignItems="center" sx={{ mb: 0.25 }}>
                     <Typography variant="caption" fontWeight={700} color={mine ? "#3b82f6" : "text.secondary"}>
-                      {c.userName || (c.role === "technician" ? "ช่าง" : "แอดมิน")}
+                      {c.userName || (c.role === ROLES.TECHNICIAN ? "ช่าง" : "แอดมิน")}
                     </Typography>
                     <Typography variant="caption" color="text.disabled">
                       · {moment(c.timestamp).locale("th").format("DD MMM HH:mm")}

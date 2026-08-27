@@ -33,6 +33,7 @@ import IssuedDocumentService from "@/shared/services/IssuedDocumentService";
 import { generateWorkNoticePdf } from "../utils/workNoticePdf";
 import { generateDeliveryNotePdf } from "../utils/deliveryNotePdf";
 import DocumentPreviewDialog from "../components/DocumentPreviewDialog";
+import { can } from "@/shared/utils/roles";
 
 const ACCENT = "#dc2626";
 const SURFACE_SUBTLE = "#f8fafc";
@@ -64,7 +65,7 @@ const thaiDate = thaiDateNumeric;
 const IssuedDocuments = () => {
   const isMobile = useMediaQuery("(max-width:900px)");
   const { userData } = useAuth();
-  const canEdit = ["admin", "manager"].includes(userData?.role?.toLowerCase());
+  const canEdit = can(userData, "editDocuments");
 
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);

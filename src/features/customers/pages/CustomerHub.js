@@ -16,6 +16,7 @@ import { Navigate } from "react-router-dom";
 import { Dashboard as DashboardIcon, ListAlt } from "@mui/icons-material";
 import TabbedPage from "@/shared/ui/TabbedPage";
 import { useAuth } from "@/features/auth/AuthContext";
+import { can } from "@/shared/utils/roles";
 
 const CustomerOverview = lazy(() => import("./CustomerOverview"));
 const Customer = lazy(() => import("./Customer"));
@@ -23,8 +24,8 @@ const Customer = lazy(() => import("./Customer"));
 const CustomerHub = () => {
   const { userData } = useAuth();
   const role = userData?.role?.toLowerCase();
-  const isAdmin = role === "admin";
-  const isAdminOrManager = ["admin", "manager"].includes(role);
+  const isAdmin = can(role, "manageAll");
+  const isAdminOrManager = can(role, "manageMasterData");
 
   // ⚠️ กันช่างเปิดหน้านี้ตรงๆ ผ่าน URL — เทียบ pattern เดียวกับที่แต่ละหน้าเดิมทำอยู่แล้ว
   if (!isAdminOrManager) return <Navigate to="/dashboard" replace />;

@@ -17,13 +17,14 @@ import Swal from "sweetalert2";
 import { useAuth } from "@/features/auth/AuthContext";
 import PushService from "@/shared/services/PushService";
 import { swalLogout } from "@/shared/utils/user";
+import { can } from "@/shared/utils/roles";
 
 const version = import.meta.env.REACT_APP_VERSION;
 
 const Settings = () => {
   const { userData, logout } = useAuth();
   const navigate = useNavigate();
-  const isAdmin = userData?.role?.toLowerCase() === "admin";
+  const isAdmin = can(userData, "manageAll");
 
   const [pushSubscribed, setPushSubscribed] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);

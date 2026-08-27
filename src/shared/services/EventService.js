@@ -28,9 +28,16 @@ const withOptionalFile = async (fields, file, fileField) => {
 };
 
 const EventService = {
-  async getEvents() {
+  /**
+   * @param {object} [opts]
+   * @param {"sales"} [opts.dept] เปิดดูปฏิทินของอีกแผนก — เฉพาะแอดมิน/ผู้จัดการเท่านั้นที่
+   *   ฝั่ง server ยอมให้ข้ามแผนก (role อื่นส่งมาก็ไม่มีผล ดู departmentScope)
+   */
+  async getEvents(opts = {}) {
     try {
-      const response = await API.get(`/events`);
+      const response = await API.get(`/events`, {
+        params: opts.dept ? { dept: opts.dept } : {},
+      });
       return response.data;
     } catch (error) {
       console.error("Error fetching user events:", error);
@@ -45,7 +52,12 @@ const EventService = {
    */
   async getEventOp(opts = {}) {
     try {
-      const response = await API.get(`/events/event-op`, { params: opts.scope ? { scope: opts.scope } : {} });
+      const response = await API.get(`/events/event-op`, {
+        params: {
+          ...(opts.scope ? { scope: opts.scope } : {}),
+          ...(opts.dept ? { dept: opts.dept } : {}),
+        },
+      });
       return response.data;
     } catch (error) {
       console.error("Error fetching user events:", error);

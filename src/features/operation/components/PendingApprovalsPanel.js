@@ -12,12 +12,14 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import ViewToggle, { initialViewMode } from "@/shared/ui/ViewToggle";
 import { useNavigate } from "react-router-dom";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import {
   Box, Stack, Typography, Chip, Button, IconButton, Tooltip, Skeleton, Collapse, Divider,
   Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, TextField, MenuItem,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
@@ -44,6 +46,7 @@ export default function PendingApprovalsPanel({ onCountChange, active = true }) 
   const [drafts, setDrafts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState(null);
+  const [viewMode, setViewMode] = useState(() => initialViewMode("pendingApprovals.viewMode"));
   const [showRejected, setShowRejected] = useState(false);
   const [busyKey, setBusyKey] = useState(null);
   const [rejectTarget, setRejectTarget] = useState(null); // sessions[] ของกลุ่มที่กำลังจะไม่อนุมัติ
@@ -74,6 +77,11 @@ export default function PendingApprovalsPanel({ onCountChange, active = true }) 
   // หน้ามา ไม่งั้นจะขึ้น 0 จนกว่าจะกดเข้ามาดูเอง ซึ่งทำให้ badge ไร้ประโยชน์ (จุดประสงค์คือบอกว่ามีงาน
   // ค้างโดยไม่ต้องกดเข้าไปดู)
   useEffect(() => { fetchData(); }, []);
+
+  // ⚠️ จำมุมมองที่เลือกไว้ข้ามการเปิดหน้า (แบบแผนเดียวกับคิวคำขอจากฝ่ายขาย)
+  useEffect(() => {
+    try { localStorage.setItem("pendingApprovals.viewMode", viewMode); } catch { /* storage ปิดอยู่ */ }
+  }, [viewMode]);
   useEffect(() => {
     (async () => {
       try {
@@ -232,15 +240,23 @@ export default function PendingApprovalsPanel({ onCountChange, active = true }) 
         <Typography variant="caption" color="text.secondary">
           {lastRefreshed ? `อัปเดตล่าสุด ${moment(lastRefreshed).locale("th").format("HH:mm:ss")}` : "กำลังโหลด..."}
         </Typography>
-        <Tooltip title="รีเฟรช">
-          <IconButton
-            onClick={() => fetchData()}
-            size="small"
-            sx={{ border: "1px solid", borderColor: "divider", borderRadius: "50%" }}
-          >
-            <Refresh sx={{ fontSize: 18 }} />
-          </IconButton>
-        </Tooltip>
+        <Stack direction="row" alignItems="center" spacing={1}>
+          {/* ✅ มุมมองตาราง — ชุดเดียวกับคิวคำขอจากฝ่ายขาย ให้สองแท็บทำงานเหมือนกัน
+              ⚠️ โชว์เฉพาะตอนมีงานจริง ไม่งั้นจะมีปุ่มสลับมุมมองลอยอยู่เหนือข้อความ
+              "เคลียร์ครบแล้ว" ซึ่งไม่มีอะไรให้สลับดู */}
+          {pendingGroups.length > 0 && (
+            <ViewToggle value={viewMode} onChange={setViewMode} accent="#f59e0b" />
+          )}
+          <Tooltip title="รีเฟรช">
+            <IconButton
+              onClick={() => fetchData()}
+              size="small"
+              sx={{ border: "1px solid", borderColor: "divider", borderRadius: "50%" }}
+            >
+              <Refresh sx={{ fontSize: 18 }} />
+            </IconButton>
+          </Tooltip>
+        </Stack>
       </Stack>
 
       {/* ✅ สรุปภาพรวม — ออกแบบใหม่ทั้งหมด
@@ -335,7 +351,90 @@ export default function PendingApprovalsPanel({ onCountChange, active = true }) 
         <Stack spacing={1.5}>
           {[1, 2, 3].map((i) => <Skeleton key={i} variant="rounded" height={110} sx={{ borderRadius: 3 }} />)}
         </Stack>
-      ) : pendingGroups.length === 0 ? null : (
+      ) : pendingGroups.length === 0 ? null : viewMode === "table" ? (
+        /* ✅ มุมมองตาราง — กวาดสายตาเทียบกันได้ทีละหลายงาน และกดอนุมัติ/ไม่อนุมัติได้ในแถวเลย
+           ⚠️ ปุ่มต้อง stopPropagation ทุกตัว — ทั้งแถวเป็นพื้นที่กดได้ (เปิดงาน) ถ้าไม่หยุด
+           การกด "อนุมัติ" จะเปิดหน้ารายละเอียดงานตามมาทันทีจนดูเหมือนกดไม่ติด
+           ⚠️ overflowX: auto ที่ตัวห่อ ไม่ใช่ที่หน้าเพจ — ไม่งั้นจอแคบจะเลื่อนทั้งหน้าไปข้างๆ */
+        <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2.5, overflowX: "auto" }}>
+          <Table size="small" sx={{ minWidth: 760 }}>
+            <TableHead>
+              <TableRow sx={{ bgcolor: "#fffbeb" }}>
+                {["งาน", "โครงการ / ไซต์", "ประเภท", "วันที่", "ทีมที่เข้างาน", ""].map((h, i) => (
+                  <TableCell key={i} sx={{ fontWeight: 800, fontSize: "0.74rem", color: "text.secondary", whiteSpace: "nowrap" }}>{h}</TableCell>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {pendingGroups.map((sessions) => {
+                const head = sessions[0];
+                const key = getOverdueGroupKey(head);
+                const busy = busyKey === key;
+                const companySite = [head.company, head.site].filter(Boolean).join(" · ");
+                const jcMeta = getJobClassMeta(classifyJob(head));
+                const dateLabel = head.unscheduled
+                  ? (head.plannedMonth ? `แผนเดือน ${formatThai(moment(head.plannedMonth, "YYYY-MM").locale("th"), "MMM YYYY")}` : "ยังไม่ระบุเดือน")
+                  : sessions.map((x) => formatEventDateRange(x)).join(", ");
+                const teamNames = [...new Set(
+                  sessions.flatMap((x) => [x.team, ...(x.teamMembers || []).map((m) => m?.name)]).filter(Boolean)
+                )];
+                return (
+                  <TableRow key={key} hover sx={{ "&:last-child td": { border: 0 } }}>
+                    <TableCell sx={{ maxWidth: 240 }}>
+                      <Typography sx={{ fontWeight: 700, fontSize: "0.8rem" }} noWrap>{head.title || "งาน"}</Typography>
+                      {head.system && (
+                        <Typography variant="caption" sx={{ color: "text.secondary" }} noWrap>{head.system}</Typography>
+                      )}
+                    </TableCell>
+                    <TableCell sx={{ maxWidth: 220, fontSize: "0.78rem" }}>
+                      <Typography variant="body2" sx={{ fontSize: "0.78rem" }} noWrap>{companySite || "ไม่ระบุ"}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      {/* ⚠️ งานเก่าบางใบไม่มีข้อมูลประเภท (สร้างก่อนมีฟิลด์นี้) — ต้องมีป้าย
+                          "ไม่ระบุ" ไม่ปล่อยช่องว่าง ไม่งั้นจะดูเหมือนตารางโหลดข้อมูลไม่ครบ */}
+                      {jcMeta ? (
+                        <Chip
+                          size="small" label={jcMeta.label}
+                          sx={{ height: 19, fontSize: "0.63rem", fontWeight: 700, bgcolor: alpha(jcMeta.color, 0.14), color: jcMeta.color }}
+                        />
+                      ) : (
+                        <Typography variant="caption" sx={{ color: "text.disabled" }}>ไม่ระบุ</Typography>
+                      )}
+                      {head.unscheduled && (
+                        <Chip size="small" label="ยังไม่ลงตาราง" sx={{ ml: 0.4, height: 19, fontSize: "0.63rem", fontWeight: 700, bgcolor: alpha("#0891b2", 0.14), color: "#0e7490" }} />
+                      )}
+                    </TableCell>
+                    <TableCell sx={{ fontSize: "0.75rem", color: "text.secondary", whiteSpace: "nowrap" }}>{dateLabel}</TableCell>
+                    <TableCell sx={{ fontSize: "0.75rem", color: "text.secondary", maxWidth: 150 }}>
+                      <Typography variant="caption" noWrap sx={{ display: "block" }}>
+                        {teamNames.length ? teamNames.join(", ") : "— ยังไม่มอบหมาย"}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                      <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                        <Button
+                          size="small" color="success" variant="contained" disabled={busy}
+                          onClick={(e) => { e.stopPropagation(); handleApprove(sessions); }}
+                          sx={{ textTransform: "none", fontWeight: 700, borderRadius: 1.5, minWidth: 0, px: 1.25 }}
+                        >
+                          อนุมัติ
+                        </Button>
+                        <Button
+                          size="small" color="error" variant="outlined" disabled={busy}
+                          onClick={(e) => { e.stopPropagation(); setRejectTarget(sessions); setRejectReason(""); }}
+                          sx={{ textTransform: "none", fontWeight: 700, borderRadius: 1.5, minWidth: 0, px: 1.25 }}
+                        >
+                          ไม่อนุมัติ
+                        </Button>
+                      </Stack>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      ) : (
         <Stack spacing={1.5}>
           {pendingGroups.map((sessions) => {
             const head = sessions[0];

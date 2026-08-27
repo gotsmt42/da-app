@@ -56,6 +56,7 @@ import { WARNING_DAYS_AFTER_SENT, getFollowUpInfo, resolveQuotationGroup } from 
 import { formatEventDateRange } from "@/shared/utils/formatDateRange";
 import { formatRoundLabel } from "@/shared/utils/contractRounds";
 import { formatThai } from "@/shared/utils/thaiDate";
+import { can, isRole, ROLES } from "@/shared/utils/roles";
 
 const STATUS_META = {
   waiting_file: { label: "รอช่างแนบไฟล์",   color: "#6b7280", icon: <AttachFile sx={{ fontSize: 14 }} /> },
@@ -563,7 +564,7 @@ const QuotationDetailDialog = ({ job, currentUserRole, onClose, onAction, onAmou
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
   const navigate = useNavigate();
-  const isAdminOrManager = ["admin", "manager"].includes(currentUserRole);
+  const isAdminOrManager = can(currentUserRole, "editFinance");
   // ✅ ช่างแก้ไขสถานะงานของตัวเองได้ด้วย (ไม่ใช่แค่ดู) — backend อนุญาตอยู่แล้ว (เจ้าของ/ผู้ได้รับ
   // มอบหมายแก้ไข event ตัวเองได้เสมอ ดู PUT /:id) และ /quotations ก็ scope ให้ช่างเห็นแค่งานตัวเอง
   // อยู่แล้วด้วย (getEventOp) เลยไม่ต้องกันเพิ่มฝั่งนี้ — ยกเว้นมูลค่าใบเสนอราคา (AmountEditor) ที่ยังเป็น
@@ -800,8 +801,8 @@ const TechnicianFilterButton = ({ technicians, selectedId, counts, totalCount, o
 export default function QuotationTracking() {
   const { userData } = useAuth();
   const role = userData?.role?.toLowerCase();
-  const isAdminOrManager = ["admin", "manager"].includes(role);
-  const canAccess = ["admin", "manager", "technician"].includes(role);
+  const isAdminOrManager = can(role, "editFinance");
+  const canAccess = can(role, "viewQuotations");
   // ✅ deep-link จาก Dashboard (กล่องแจ้งเตือน "ใบเสนอราคาที่ต้องติดตามด่วน") — เปิด Dialog
   // รายละเอียดงานนั้นให้อัตโนมัติผ่าน ?jobId=<eventId> แทนที่จะให้ผู้ใช้ไล่หาเองในรายการ
   const [searchParams, setSearchParams] = useSearchParams();
@@ -912,7 +913,7 @@ export default function QuotationTracking() {
   // ✅ หาว่างานนี้เป็นของช่างคนไหน (ใช้ util กลางเดียวกับ TeamWorkload.js) — เฉพาะ admin/manager
   // ที่โหลดรายชื่อผู้ใช้ไว้แล้ว (technician ไม่ได้โหลด users จึงได้ techId ว่างเปล่าเสมอ ซึ่งไม่มีผล
   // เพราะ selectedTechId ก็เป็น null ตลอดสำหรับ role นี้อยู่แล้ว — ดูตัวกรองด้านล่าง)
-  const technicians = useMemo(() => users.filter((u) => (u.role || "").toLowerCase() === "technician"), [users]);
+  const technicians = useMemo(() => users.filter((u) => isRole(u, ROLES.TECHNICIAN)), [users]);
 
   const jobsWithTech = useMemo(() => {
     const userById = new Map(users.map((u) => [u._id?.toString(), u]));

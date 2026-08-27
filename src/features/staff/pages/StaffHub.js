@@ -13,6 +13,7 @@ import { Navigate } from "react-router-dom";
 import { InsertChart, ListAlt } from "@mui/icons-material";
 import TabbedPage from "@/shared/ui/TabbedPage";
 import { useAuth } from "@/features/auth/AuthContext";
+import { can } from "@/shared/utils/roles";
 
 const TeamWorkload = lazy(() => import("./TeamWorkload"));
 const Employee = lazy(() => import("./Employee"));
@@ -20,8 +21,8 @@ const Employee = lazy(() => import("./Employee"));
 const StaffHub = () => {
   const { userData } = useAuth();
   const role = userData?.role?.toLowerCase();
-  const isAdmin = role === "admin";
-  const isAdminOrManager = ["admin", "manager"].includes(role);
+  const isAdmin = can(role, "manageAll");
+  const isAdminOrManager = can(role, "manageMasterData");
 
   if (!isAdminOrManager) return <Navigate to="/dashboard" replace />;
 

@@ -36,7 +36,12 @@ const NOTI_GROUP = {
 // ✅ UI ล้วน (presentational) ใช้ร่วมกันได้ทุกที่ที่มี useEventNotifications อยู่แล้ว
 // (หน้า Operation ที่มี events ในสโตร์อยู่แล้ว, และ Header ที่ fetch events เองเพื่อให้เห็น
 // แจ้งเตือนได้ทุกหน้า ไม่ใช่แค่ตอนเปิดหน้า Operation ค้างไว้)
-const NotificationBell = ({ notifications, unread, onItemClick, onMarkAllRead, dark = false }) => {
+/**
+ * @param {string} [jobBasePath] หน้าปลายทางเมื่อกดแจ้งเตือนที่ผูกกับงาน
+ *   ⚠️ ฝ่ายขายเข้าหน้า "การดำเนินงาน" ไม่ได้ (ดู pages/Operation.js) — ถ้ายังพาไปที่นั่น
+ *   จะเด้งกลับทันทีจนดูเหมือนกดแจ้งเตือนไม่ติด ต้องพาไปปฏิทินของเขาแทน
+ */
+const NotificationBell = ({ notifications, unread, onItemClick, onMarkAllRead, dark = false, jobBasePath = "/operation" }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   // 🐛 BUG ที่แก้ (เปิดมาแล้วแยกไม่ออกว่าอันไหนใหม่): กดเปิดปุ๊บ markAllRead ทำงานทันที ทุกรายการเลย
   // จางลงเหลือ opacity 0.5 + ตัวหนังสือบางพร้อมกันหมดในเสี้ยววินาที — สิ่งที่ผู้ใช้เปิดมาเพื่อจะดู
@@ -58,6 +63,8 @@ const NotificationBell = ({ notifications, unread, onItemClick, onMarkAllRead, d
     if (onItemClick) onItemClick(n.id);
     setAnchorEl(null);
     if (n.eventId) {
+      // ⚠️ หน้าที่ไม่ใช่ "การดำเนินงาน" ไม่มีแนวคิดเรื่องกลุ่มสถานะ (?group=) จึงส่งเฉพาะตอนไปหน้านั้น
+      if (jobBasePath !== "/operation") { navigate(jobBasePath); return; }
       const group = NOTI_GROUP[n.type];
       navigate(`/operation/${n.eventId}${group ? `?group=${group}` : ""}`);
     }

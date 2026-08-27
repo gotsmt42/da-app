@@ -55,6 +55,7 @@ import MilitaryTechIcon from "@mui/icons-material/MilitaryTech";
 import VpnKeyIcon from "@mui/icons-material/VpnKey";
 
 import { useAuth } from "@/features/auth/AuthContext";
+import { ALL_ROLES, ROLE_LABEL, ROLES, isRole } from "@/shared/utils/roles";
 
 // ─── Styled (ให้ตรงกับ Customer/index.js) ───────────────────────────────
 const GlassCard = styled(Box)(({ theme }) => ({
@@ -252,9 +253,9 @@ const EmployeeFormModal = ({ open, mode, data, onChange, onClose, onSubmit, isSm
                 value={data.role || ""} onChange={onChange}
                 sx={{ borderRadius: 2 }}
               >
-                <MenuItem value="admin">Admin</MenuItem>
-                <MenuItem value="technician">Technician</MenuItem>
-                <MenuItem value="editor">Editor</MenuItem>
+                {ALL_ROLES.map((r) => (
+                  <MenuItem key={r} value={r}>{ROLE_LABEL[r]}</MenuItem>
+                ))}
               </Select>
             </FormControl>
           </Grid>
@@ -530,7 +531,7 @@ const Employee = () => {
       setAlert({ open: true, message: "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร!", severity: "error" });
       return false;
     }
-    if (!["admin", "technician", "editor"].includes(role)) {
+    if (!ALL_ROLES.includes(role)) {
       setAlert({ open: true, message: "กรุณาเลือกสิทธิ์ของผู้ใช้!", severity: "error" });
       return false;
     }
@@ -554,7 +555,7 @@ const Employee = () => {
       setAlert({ open: true, message: "เบอร์โทรต้องเป็นตัวเลข 10 หลัก!", severity: "error" });
       return false;
     }
-    if (!["admin", "technician", "editor"].includes(role)) {
+    if (!ALL_ROLES.includes(role)) {
       setAlert({ open: true, message: "กรุณาเลือกสิทธิ์ของผู้ใช้!", severity: "error" });
       return false;
     }
@@ -755,15 +756,15 @@ const Employee = () => {
 
   const stats = useMemo(() => {
     const total = users.length;
-    const admin = users.filter(u => u.role === "admin").length;
-    const staff = users.filter(u => u.role === "technician" || u.role === "editor").length;
+    const admin = users.filter((u) => isRole(u, ROLES.ADMIN, ROLES.MANAGER)).length;
+    const staff = users.filter((u) => isRole(u, ROLES.TECHNICIAN, ROLES.SALE)).length;
     return { total, admin, staff };
   }, [users]);
 
   const statCards = [
     { label: "ผู้ใช้ทั้งหมด", value: stats.total, bar: "linear-gradient(135deg,#667eea,#764ba2)", icon: <GroupsIcon />, sub: "บัญชีในระบบทั้งหมด" },
-    { label: "ผู้ดูแลระบบ", value: stats.admin, bar: "linear-gradient(135deg,#ef4444,#dc2626)", icon: <ShieldIcon />, sub: "สิทธิ์ Admin" },
-    { label: "ทีมงาน", value: stats.staff, bar: "linear-gradient(135deg,#3b82f6,#8b5cf6)", icon: <EngineeringIcon />, sub: "Technician / Editor" },
+    { label: "ผู้ดูแลระบบ", value: stats.admin, bar: "linear-gradient(135deg,#ef4444,#dc2626)", icon: <ShieldIcon />, sub: "แอดมิน / ผู้จัดการ" },
+    { label: "ทีมงาน", value: stats.staff, bar: "linear-gradient(135deg,#3b82f6,#8b5cf6)", icon: <EngineeringIcon />, sub: "ช่าง / เซล" },
   ];
 
   const visibleHeadCells = HEAD_CELLS.filter(c => !isSmallScreen || !["tel", "role"].includes(c.id));

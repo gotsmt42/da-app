@@ -6,6 +6,7 @@ import {
   FaFileAlt,
   FaWrench,
   FaChevronRight,
+
   FaClock,
   FaCheckCircle,
   FaExclamationCircle,
@@ -25,6 +26,7 @@ import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import AuthService from "@/shared/services/authService";
 import CustomerService from "@/shared/services/CustomerService";
+import SalesDashboard from "@/features/sales/SalesDashboard";
 import EventService from "@/shared/services/EventService";
 import { useAuth } from "@/features/auth/AuthContext";
 import {
@@ -44,6 +46,7 @@ import { groupEventsByContract, nextVisitOverdueInfo } from "@/shared/utils/cont
 // ✅ ตรรกะติดตามใบเสนอราคาตัวกลาง — ใช้ร่วมกับหน้า /quotations และฝั่ง server เพื่อให้เกณฑ์/ตัวเลขตรงกัน
 import { getFollowUpInfo } from "@/shared/utils/quotationTracking";
 import { formatThai } from "@/shared/utils/thaiDate";
+import { can, isRole, roleLabel, ROLES } from "@/shared/utils/roles";
 
 // 🎨 สีและไอคอนประจำสถานะงาน — ใช้ร่วมกันทั้ง Quick Stats และการ์ดงานวันนี้
 // ✅ เก็บเป็น "component" ไม่ใช่ element ที่ render ไว้แล้ว เพื่อให้เรียกใช้คนละขนาดได้ตามบริบท
@@ -98,12 +101,39 @@ const Dashboard = () => {
   const isDesktopScreen = useMediaQuery("(min-width:900px)");
   const styles = useMemo(() => scaleStyleFonts(baseStyles, isDesktopScreen), [isDesktopScreen]);
   const role = userData?.role?.toLowerCase();
-  const isAdmin = role === "admin";
-  const isAdminOrManager = ["admin", "manager"].includes(role);
-  const isTechnician = role === "technician";
+  const isAdmin = can(role, "manageAll");
+  const isAdminOrManager = can(role, "viewAllJobs");
+  const isTechnician = isRole(role, ROLES.TECHNICIAN);
   // ✅ หน้า "ภาพรวมงาน" เปิดให้ช่างเข้าดูสัญญาของตัวเองได้แล้ว (ดู ContractOverview.js canView /
   // Header.js canViewContracts) — วิดเจ็ต "สัญญาที่เลยกำหนด/คงค้าง" ด้านล่างต้องเปิดให้ตรงกันด้วย
-  const canViewContracts = ["admin", "manager", "technician"].includes(role);
+  const canViewContracts = can(role, "viewContracts");
+  // ✅ เซล — สายงานคนละสายกับช่าง จึงต้องมีทางลัดของตัวเองแทนที่จะเห็นทางลัดของงานช่างที่กดไปก็ทำอะไรไม่ได้
+  const isSale = isRole(role, ROLES.SALE);
+  const canSell = can(role, "createSalesPlan");
+  const canAssignDispatch = can(role, "assignDispatch");
+  // ⚠️ เกณฑ์เดียวกับ Sidebar.js/Header.js — เมนู/การ์ดของสายบริการต้องซ่อนพร้อมกันทุกที่
+  const canViewOperation = can(role, "editOperation") || can(role, "receiveDispatch");
+  const canViewQuotations = can(role, "viewQuotations");
+
+  /**
+   * ชุดสีประจำสายงานของผู้ใช้คนนี้
+   * ✅ ม่วง = ฝ่ายขาย · แดง = ฝ่ายบริการ (สีแบรนด์เดิมของแอป)
+   * ⚠️ ใช้ชุดเดียวกับหัวปฏิทิน แถบแท็บ และเมนู — ถ้าหน้าแรกยังแดงอยู่ที่เดียวจะขัดกับทุกหน้าที่
+   * เซลเปิดต่อจากนี้ และทำให้ "รู้ทันทีว่าอยู่สายไหน" ที่ตั้งใจไว้ไม่เกิดขึ้นจริง
+   */
+  const accent = isSale
+    ? { main: "#8b5cf6", deep: "#5b21b6", soft: "rgba(139,92,246,0.12)" }
+    : { main: "#dc2626", deep: "#7f1d1d", soft: "rgba(220,38,38,0.10)" };
+
+  /**
+   * ⚠️ ปลายทางของ "งานหนึ่งงาน" ต่างกันตามสายงาน — เซลไม่มีสิทธิ์เข้าหน้า "การดำเนินงาน"
+   * (ดู pages/Operation.js ที่เด้งกลับ) ถ้ายังลิงก์ไปที่นั่นอยู่ กดแล้วจะเด้งกลับทันที
+   * ดูเหมือนกดไม่ติด — พาไปปฏิทินของตัวเองซึ่งเป็นที่ที่นัดของเขาอยู่จริงแทน
+   */
+  const jobLink = (id, group) =>
+    isSale
+      ? "/event"
+      : `/operation/${id}${group ? `?group=${group}` : ""}`;
 
   const [loading, setLoading] = useState(false);
   const [files, setFiles] = useState([]);
@@ -148,6 +178,8 @@ const Dashboard = () => {
     };
 
     fetchAllDashboardData();
+    // ⚠️ ผูกกับ canSell — role มาจาก AuthContext ซึ่งอาจยังไม่พร้อมตอน mount รอบแรก
+    // ถ้าใช้ [] เฉยๆ เซลที่โหลดหน้าใหม่จะไม่ได้ข้อมูลการขายเลยจนกว่าจะกดรีเฟรช
   }, []);
 
   // ✅ นับแบบจัดกลุ่มก่อน (countDistinctJobs) ไม่ใช่นับทุกแถว event ดิบ — งานที่เข้าหลายวันไม่ติดกัน
@@ -472,7 +504,9 @@ const Dashboard = () => {
       if (!e.company && !e.site) return;
       // ✅ เก็บ company/site แยกไว้ (ไม่ใช่แค่รวมเป็นข้อความเดียว) เพื่อส่งเป็น query param
       // ไปกรองหน้า /customer ให้ตรงตัวเป๊ะๆ ตอนกดแถวโครงการ
-      const key = `${e.company || ""} ${e.site || ""}`;
+      // ⚠️ คั่นด้วย \u0000 (อักขระที่เป็นไปไม่ได้ในชื่อบริษัท/โครงการ) กันคีย์ชนกันเวลาชื่อมีอักขระพิเศษ
+      // ⚠️ ต้องเขียนเป็น escape ห้ามฝัง NUL ดิบลงไฟล์ — จะทำให้ grep มองไฟล์นี้เป็น binary แล้วข้ามทั้งไฟล์
+      const key = `${e.company || ""}\u0000${e.site || ""}`;
       if (!counts[key])
         counts[key] = {
           company: e.company || "",
@@ -522,25 +556,62 @@ const Dashboard = () => {
 
   // 🚀 ทางลัดแบบไอคอน (คล้ายหน้าจอโฮมของแอปมือถือ) ปรับตามสิทธิ์ผู้ใช้
   const quickActions = [
-    {
-      title: "แผนงานทั้งหมด",
-      icon: <FaCalendarAlt size={20} />,
-      link: "/event",
-      color: "#dc2626",
-    },
-    {
-      title: "การดำเนินงาน",
-      icon: <FaWrench size={20} />,
-      link: "/operation",
-      color: "#b91c1c",
-    },
-    {
-      title: "เอกสารทั้งหมด",
-      icon: <FaFileAlt size={20} />,
-      link: "/files",
-      color: "#475569",
-      badge: files.length,
-    },
+    // ⚠️ ทางลัด 2 ตัวนี้เป็นของสายงานช่าง — เซลกดไปก็ไม่มีอะไรให้ทำ (เห็นแต่งานที่ตัวเองไม่เกี่ยว)
+    // จึงซ่อนจากเซล แล้วใส่ทางลัดของสายขายแทนด้านล่าง
+    ...(isSale
+      ? []
+      : [
+          {
+            title: "แผนงานทั้งหมด",
+            icon: <FaCalendarAlt size={20} />,
+            link: "/event",
+            color: "#dc2626",
+          },
+          {
+            title: "การดำเนินงาน",
+            icon: <FaWrench size={20} />,
+            link: "/operation",
+            color: "#b91c1c",
+          },
+        ]),
+    ...(canSell
+      ? [
+          {
+            title: "แผนงานของฉัน",
+            icon: <FaClipboardList size={20} />,
+            // 🧹 เดิมชี้ ?tab=pipeline ซึ่งเป็นแท็บของระบบ CRM ที่ถูกตัดออกไปแล้ว
+            link: "/event",
+            color: "#8b5cf6",
+          },
+          {
+            title: "แจ้งงานให้ช่าง",
+            icon: <FaWrench size={20} />,
+            // 🧹 เดิมชี้ ?tab=calendar ซึ่งเป็นแท็บของระบบ CRM ที่ถูกตัดออกไปแล้ว
+            link: "/sales",
+            color: "#a855f7",
+          },
+        ]
+      : []),
+    ...(canAssignDispatch
+      ? [
+          {
+            title: "ใบมอบหมายงาน",
+            icon: <FaWrench size={20} />,
+            link: "/dispatch",
+            color: "#f59e0b",
+          },
+        ]
+      : []),
+    // ⚠️ เอกสารทั้งหมด = ไฟล์แนบของงานช่าง (ใบเสนอราคา/รายงาน/ใบวางบิล) — เซลไม่ได้ใช้
+    ...(isSale
+      ? []
+      : [{
+          title: "เอกสารทั้งหมด",
+          icon: <FaFileAlt size={20} />,
+          link: "/files",
+          color: "#475569",
+          badge: files.length,
+        }]),
     // ✅ "ติดตามใบเสนอราคา" ย้ายขึ้นไปเป็นแบนเนอร์ hero ใหญ่เหนือ "สรุปสถานะงาน" แทนแล้ว (ตามที่ขอ)
     // ไม่ต้องมีซ้ำเป็นไอคอนเล็กๆ ที่นี่อีก (เทียบเหตุผลเดียวกับ "งานของฉัน" ด้านบน)
     // ✅ "งานของฉัน" ของช่างถูกย้ายขึ้นไปเป็นแบนเนอร์ hero เด่นๆ ด้านบนแทนแล้ว (ดู SECTION 2)
@@ -966,6 +1037,10 @@ const Dashboard = () => {
     </>
   ) : null;
 
+  // ✅ ฝ่ายขายใช้หน้าแรกของตัวเองทั้งหน้า ไม่ใช่หน้าของช่างที่ถูกตัดส่วนออกทีละชิ้นจนโหวง
+  // ⚠️ วางไว้ตรงนี้ (หลัง hook ทั้งหมด) โดยตั้งใจ — early return ก่อน hook จะผิด rules of hooks
+  if (isSale) return <SalesDashboard />;
+
   return (
     <Container fluid style={styles.container}>
       {/* ─── LAYOUT: จอกว้างพอ (≥960px) แบ่ง 2 คอลัมน์ เนื้อหาหลัก + แถบข้าง "งานค้างของช่าง"
@@ -992,8 +1067,47 @@ const Dashboard = () => {
                   {userData?.fname || "ผู้ใช้งาน"}
                 </h2>
               </div>
-              <span style={styles.roleBadge}>{userData?.role || "User"}</span>
+              {/* ✅ ป้ายบทบาทรับสีประจำสายงาน — จุดเดียวที่บอกว่า "คุณเป็นใคร" บนหน้าแรก
+                  ควรเป็นตัวแรกที่สื่อสารสีของสายงานนั้น */}
+              <span
+                style={{
+                  ...styles.roleBadge,
+                  color: accent.main,
+                  borderColor: accent.main,
+                  backgroundColor: accent.soft,
+                }}
+              >
+                {roleLabel(role)}
+              </span>
             </div>
+
+            {/* ─── SECTION 1.4: "งานขาย" HERO (เฉพาะเซล) — คู่ขนานกับแบนเนอร์ "งานของฉัน" ของช่าง
+          เซลเปิดแอปมาเพื่อดูท่อขายกับนัดหมายของตัวเอง ไม่ใช่ตารางงานช่าง จึงต้องเป็นสิ่งแรกที่เห็น ─── */}
+            {isSale && (
+              <div
+                onClick={() => navigate("/sales")}
+                // ⚠️ ม่วง = สายขาย · ฟ้า = สายบริการ ใช้สีเดียวกับแถบแท็บและกระดานดีลทั้งหมด
+                style={{
+                  ...styles.myJobsBanner,
+                  background: "linear-gradient(135deg, #8b5cf6 0%, #5b21b6 100%)",
+                  boxShadow: "0 8px 18px -8px rgba(139, 92, 246, 0.4)",
+                }}
+                className="action-hero-btn"
+              >
+                <div style={styles.myJobsIconCircle}>
+                  <FaClipboardList size={19} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <h3 style={styles.heroBtnTitle}>งานขายของฉัน</h3>
+                  <p style={styles.heroBtnSub}>กรอกฟอร์มแจ้งงาน · ติดตามว่าช่างทำถึงไหน</p>
+                </div>
+                <FaArrowRight
+                  size={13}
+                  className="arrow-bounce"
+                  style={{ opacity: 0.8, flexShrink: 0 }}
+                />
+              </div>
+            )}
 
             {/* ─── SECTION 1.5: "งานของฉัน" HERO (เฉพาะช่าง) — ให้เด่นและละเอียดกว่าไอคอนเล็กๆ เดิม
           วางไว้บนสุด (ก่อนแบนเนอร์ปฏิทินทั่วไป) เพราะเป็นสิ่งที่ช่างต้องใช้งานทุกวันมากที่สุด ─── */}
@@ -1028,6 +1142,9 @@ const Dashboard = () => {
             {/* ─── SECTION 2: CTA BANNER PAIR — เดิมเป็นแบนเนอร์เต็มความกว้างแค่ปฏิทินอันเดียว ส่วนปุ่ม
           "ดูการดำเนินงานทั้งหมด" ไปหลบเป็นชิปเล็กๆ อยู่ข้างหัวข้อ "งานวันนี้" คนละจุดคนละน้ำหนัก
           แบ่งครึ่งเป็น 2 การ์ดเท่ากัน ให้ทั้งคู่เด่นเท่ากันและกดถึงจากจุดเดียวกันด้านบนสุด ─── */}
+            {/* ⚠️ การ์ดคู่นี้เป็นของสายงานช่าง (ปฏิทินงาน + หน้าการดำเนินงาน) — เซลกดไปก็เห็นแต่
+                งานที่ไม่เกี่ยวกับตัวเอง ใช้เกณฑ์เดียวกับ Sidebar.js/Header.js เพื่อให้ซ่อน/โผล่พร้อมกัน */}
+            {canViewOperation && (
             <div style={styles.heroPairGrid}>
               <div
                 onClick={() => navigate("/event")}
@@ -1063,10 +1180,12 @@ const Dashboard = () => {
                 </div>
               </div>
             </div>
+            )}
 
-            {/* ─── SECTION 2.5: "ติดตามใบเสนอราคา" BIG BANNER — เดิมเป็นไอคอนเล็กๆ ในทางลัด ยกขึ้นมา
-          เป็นแบนเนอร์เต็มความกว้างเหนือ "สรุปสถานะงาน" ให้เด่นตามที่ขอ ทุกสิทธิ์เข้าถึงได้
-          (admin/manager/ช่าง เหมือนหน้า /quotations เอง) ใช้สีส้มแยกจากกลุ่มสีอื่นทั้งหมด ─── */}
+            {/* ─── SECTION 2.5: "ติดตามใบเสนอราคา" BIG BANNER
+          ⚠️ เฉพาะคนที่มีสิทธิ์จริง — ฝ่ายขายถูกตัดออกตามที่ผู้ใช้สั่ง (การติดตามใบเสนอราคาที่นี่
+          ผูกกับงานของช่าง ไม่ใช่ดีลที่เซลกำลังปิด) เดิมโชว์ทุก role แล้วเซลกดเข้าไปเจอหน้าว่าง ─── */}
+            {canViewQuotations && (
             <div
               onClick={() => navigate("/quotations")}
               style={styles.quotationBanner}
@@ -1085,11 +1204,14 @@ const Dashboard = () => {
                 style={{ opacity: 0.8, flexShrink: 0 }}
               />
             </div>
+            )}
 
             {/* ─── SECTION 3: QUICK STATS — การ์ด 4 ใบแถวเดียว (ไอคอนบน ตัวเลข/label ล่าง จัดกึ่งกลาง)
           แต่ละใบมีไอคอนเฉพาะของสถานะนั้นจริงๆ (ไม่ใช่จุดสีลอยๆ แบบเดิม) — ยังลิงก์ไปกรองหน้า
           Operation ตรงสถานะเหมือนเดิมผ่าน ?status=... ─── */}
-            <h5 style={styles.sectionTitle}>สรุปสถานะงาน</h5>
+            {/* ⚠️ เซลเรียกสิ่งเหล่านี้ว่า "นัดหมาย" ไม่ใช่ "งาน" — คำที่ใช้ต้องตรงกับฟอร์มที่เขากรอก
+                (AddSalesAppointment) ไม่งั้นตัวเลขชุดเดียวกันถูกเรียกคนละชื่อในสองหน้าจอ */}
+            <h5 style={styles.sectionTitle}>{isSale ? "สรุปนัดหมายของฉัน" : "สรุปสถานะงาน"}</h5>
             <div style={styles.statsGrid}>
               {statItems.map((item, i) => {
                 const meta = getStatusMeta(item.status);
@@ -1097,7 +1219,11 @@ const Dashboard = () => {
                 return (
                   <Link
                     key={i}
-                    to={`/operation?status=${encodeURIComponent(item.status)}${item.group ? `&group=${item.group}` : ""}`}
+                    to={
+                      isSale
+                        ? "/event"
+                        : `/operation?status=${encodeURIComponent(item.status)}${item.group ? `&group=${item.group}` : ""}`
+                    }
                     style={styles.statTile}
                     className="metric-card-hover"
                   >
@@ -1130,7 +1256,7 @@ const Dashboard = () => {
             {/* ✅ ปุ่ม "ดูการดำเนินงานทั้งหมด" ย้ายขึ้นไปเป็นการ์ดครึ่งหนึ่งของ SECTION 2 ด้านบนแล้ว
           (เด่นกว่าเดิมมาก) ไม่ต้องมีชิปเล็กๆ ซ้ำอีกจุดที่นี่ */}
             <h5 style={styles.sectionTitle}>
-              งานวันนี้ · {moment().locale("th").format("D MMM")}
+              {isSale ? "นัดหมายวันนี้" : "งานวันนี้"} · {moment().locale("th").format("D MMM")}
             </h5>
             {loading ? (
               <div style={styles.todayScrollRow}>
@@ -1153,7 +1279,7 @@ const Dashboard = () => {
                     style={{ opacity: 0.25, marginBottom: "6px" }}
                   />
                   <p style={{ margin: 0, fontSize: "12px", color: "#94a3b8" }}>
-                    ไม่มีงานที่นัดหมายไว้ในวันนี้
+                    {isSale ? "วันนี้ยังไม่มีนัดหมาย — กดที่ปฏิทินเพื่อเพิ่มนัดใหม่" : "ไม่มีงานที่นัดหมายไว้ในวันนี้"}
                   </p>
                 </div>
               </div>
@@ -1168,11 +1294,7 @@ const Dashboard = () => {
                       key={job._id}
                       style={styles.todayJobCard}
                       className="metric-card-hover"
-                      onClick={() =>
-                        navigate(
-                          `/operation/${job._id}${jobGroup ? `?group=${jobGroup}` : ""}`,
-                        )
-                      }
+                      onClick={() => navigate(jobLink(job._id, jobGroup))}
                     >
                       <div
                         style={{

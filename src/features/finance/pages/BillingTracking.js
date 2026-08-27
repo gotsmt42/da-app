@@ -27,6 +27,7 @@ import EventService from "@/shared/services/EventService";
 import BillingDialog from "../components/BillingDialog";
 import { billingStatus, baht, round2, BILLING_STATE_META } from "@/shared/utils/billing";
 import { formatThai } from "@/shared/utils/thaiDate";
+import { can } from "@/shared/utils/roles";
 
 const ACCENT = "#0891b2";
 const TEXT_SUB = "#64748b";
@@ -52,7 +53,7 @@ export default function BillingTracking() {
   // หัวหน้าทีม หรือลูกทีม ⚠️ ไม่ต้องกรองข้อมูลเองในหน้านี้ เพราะ getEventOp() ฝั่ง server คืนเฉพาะ
   // งานที่ผู้ใช้คนนั้นมีชื่ออยู่ให้อยู่แล้ว (ดู GET /event-op) และทุก route ที่บันทึกข้อมูลการเงินก็เช็ค
   // สิทธิ์รายงานซ้ำอีกชั้น (requireEventFinanceAccess) — ฝั่งจอจึงไม่ต้องกันซ้ำและไม่ควรกันด้วย role
-  const canAccess = ["admin", "manager", "technician", "user"].includes(role);
+  const canAccess = can(role, "viewFinance");
   const isMobile = useMediaQuery("(max-width:900px)");
 
   const [events, setEvents] = useState([]);

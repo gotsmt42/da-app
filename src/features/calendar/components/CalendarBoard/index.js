@@ -67,6 +67,9 @@ import "tom-select/dist/css/tom-select.css";
 
 
 import { getAddEvent } from "../EventForms/AddEvent";
+import { getAddSalesAppointment } from "../EventForms/AddSalesAppointment";
+import { getEditSalesAppointment } from "../EventForms/EditSalesAppointment";
+import { SALES_APPOINTMENT_TYPES, SALES_STATUSES, toSalesStatus } from "../../salesAppointmentTypes";
 import { getEditEvent } from "../EventForms/EditEvent";
 import DeliveryNoteDialog from "@/features/documents/components/DeliveryNoteDialog";
 import WorkNoticeDialog from "@/features/documents/components/WorkNoticeDialog";
@@ -80,6 +83,8 @@ import { getAddDraftEvent } from "../EventForms/AddDraftEvent";
 import UnscheduledPanel from "../UnscheduledPanel";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 import { formatThai } from "@/shared/utils/thaiDate";
+import { isRole, ROLES, DEPARTMENT } from "@/shared/utils/roles";
+import { can } from "@/shared/utils/roles";
 
 // ✅ คำอธิบายสถานะแบบยาว (ใช้เป็น tooltip ของไอคอนสถานะบน event)
 const STATUS_DESCRIPTIONS = {
@@ -121,9 +126,35 @@ function EventCalendar() {
   const [searchParams] = useSearchParams();
 
   const { userData } = useAuth(); // ✅ เปลี่ยนจาก user → userData
-  const isAdminOrManager = ["admin", "manager"].includes(
-    userData?.role?.toLowerCase(),
-  );
+  // ✅ เซลใช้ฟอร์ม/ชุดสีคนละชุดกับช่าง — เช็คจาก ROLES ตัวกลาง ไม่เขียนสตริงสด
+  const isSaleUser = (userData?.role || "").toLowerCase() === ROLES.SALE;
+
+  /**
+   * แผนกที่กำลังเปิดดูอยู่ — มาจาก ?dept=sales (เมนู "ตารางงานเซล" ของแอดมิน)
+   * ⚠️ ตัวนี้เปลี่ยนแค่ "ดูของใคร" ไม่ได้เปลี่ยนสิทธิ์ — ฝั่ง server ยอมให้ข้ามแผนกเฉพาะ
+   * แอดมิน/ผู้จัดการ (ดู departmentScope) role อื่นเติม query เองก็ไม่มีผล
+   */
+  const viewingDept = searchParams.get("dept") === "sales" ? "sales" : undefined;
+  const viewingSalesCalendar = viewingDept === "sales";
+  // ✅ ใช้จุดเดียวคุมทั้งแผงตัวกรองและตรรกะกรอง — เดิมแยกเช็คคนละที่ (isSaleUser ที่ฟอร์ม
+  // เพิ่ม/แก้ไข, isSaleUser || viewingSalesCalendar ที่ legend) พอเพิ่มแผงตัวกรองอีกจุดจะเสี่ยง
+  // ลืมจุดใดจุดหนึ่งอีก
+  const isSalesView = isSaleUser || viewingSalesCalendar;
+
+  /**
+   * งานชิ้นนี้เป็น "นัดหมายของฝ่ายขาย" หรือไม่ — ตัดสินจาก department ของตัวงานเสมอ
+   *
+   * 🐛 ที่แก้ (ผู้ใช้แจ้ง: แอดมินกดแก้ไขนัดของเซลแล้วได้ฟอร์มของช่าง): เดิมเช็คจาก isSaleUser
+   * = "คนที่ล็อกอินอยู่เป็นเซลไหม" ซึ่งตอบผิดคำถาม แอดมิน/ผู้จัดการเปิดเมนู "ตารางงานเซล" แล้วกด
+   * นัดหนึ่งอัน ระบบก็ยังยัดฟอร์มของช่าง (มีสัญญา/ครั้งที่/ทีมเข้างาน/ออกใบส่งของ) ให้ ซึ่งพอกด
+   * บันทึกจะเขียนทับ title/สี/สถานะของนัดด้วยค่าของงานช่าง
+   * ✅ ถามว่า "งานนี้เป็นของแผนกไหน" แทน — คำตอบเดียวกันไม่ว่าใครเป็นคนเปิด
+   */
+  const isSalesEvent = (ev) => {
+    const dept = ev?.department ?? ev?.extendedProps?.department;
+    return String(dept || "") === DEPARTMENT.SALES;
+  };
+  const isAdminOrManager = can(userData, "editAnyJob");
 
   const userId = userData?.userId; // หรือ field ที่เก็บ id ของ user
 
@@ -227,11 +258,13 @@ function EventCalendar() {
   // ป้องกันไม่ให้ auto เปิดซ้ำทับการปิดเองของผู้ใช้ทุกครั้งที่ fetch ใหม่ (เช่น silent refresh 30s)
   const hasAutoOpenedDraftsRef = useRef(false);
 
+  // ⚠️ deps มี viewingDept — สลับเมนู "ตารางงานช่าง" ↔ "ตารางงานเซล" เปลี่ยนแค่ query param
+  // โดยไม่ remount หน้า ถ้าไม่ใส่ deps ปฏิทินจะค้างข้อมูลของแผนกเดิมจนกว่าจะรีเฟรช
   useEffect(() => {
     fetchEventsFromDB();
     fetchDrafts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [viewingDept]);
 
   // ✅ ?draft=<id>&month=YYYY-MM (+ ?t=nonce กันกดลิงก์ซ้ำงานเดิมไม่เห็นผล) — เปิดแผงงานล่วงหน้า
   // สลับไปเดือนที่ถูกต้องให้อัตโนมัติ แล้วส่ง highlightDraftId ลงไปให้ UnscheduledPanel เลื่อนจอ/
@@ -534,11 +567,21 @@ function EventCalendar() {
       EventService,
       fetchThaiHolidaysFromAPI,
       silent,
+      dept: viewingDept,
     });
   };
 
   // ✅ งานวางแผนล่วงหน้า (unscheduled) — backend กรองแยกไว้จาก events ปกติแล้ว (ดู GET /events/drafts)
+  //
+  // 🐛 ที่แก้ (ผู้ใช้แจ้ง: "แผนล่วงหน้า ยังอิงของช่าง"): ฟังก์ชันนี้ไม่เคยส่ง dept ไปกับ
+  // request เลย ตอนแอดมินเปิดเมนู "ตารางงานเซล" (?dept=sales) คำขอจึงยังใช้ scope ค่าเริ่มต้น
+  // ของแอดมิน (ฝ่ายบริการ) แผงนี้เลยโชว์แผนงานล่วงหน้าของช่างทับอยู่บนปฏิทินเซล
+  // ✅ ที่จริงแล้วนัดหมายของเซลไม่มีแนวคิด "วางแผนล่วงหน้าไม่ระบุวันที่" อยู่เลย (ฟอร์ม
+  // AddSalesAppointment ต้องเลือกวันที่เสมอตั้งแต่ตอนสร้าง ไม่เคยสร้าง unscheduled:true) —
+  // ไม่ใช่แค่กรองแผนกให้ถูก แต่ตัดการเรียก/แสดงทั้งแผงทิ้งไปเลยตอนอยู่ในโลกฝ่ายขาย กันไม่ให้
+  // ข้อมูลฝ่ายช่างหลุดเข้ามาในเซสชันของเซล และกันปุ่มที่กดแล้วไม่มีวันมีอะไรให้เห็น
   const fetchDrafts = async (silent = false) => {
+    if (isSalesView) { setDrafts([]); setShowDraftsPanel(false); return; }
     if (!silent) setDraftsLoading(true);
     try {
       const res = await EventService.GetDraftEvents();
@@ -580,6 +623,20 @@ function EventCalendar() {
   };
 
   const handleAddEvent = async (arg) => {
+    // ✅ เซลได้ฟอร์ม "นัดหมาย" ของตัวเอง ไม่ใช่ฟอร์มงานของช่าง
+    // ⚠️ ฟอร์มของช่างเริ่มด้วยขั้นตอน "ประเภทงาน: งานทั่วไป/โปรเจค/ตามสัญญา" แล้วต่อด้วย ระบบ/ทีม/
+    // ครั้งที่/สัญญา ซึ่งไม่มีความหมายกับงานขายเลยสักช่อง (ดูเหตุผลเต็มที่ AddSalesAppointment.js)
+    // ⚠️ แอดมินที่เปิดเมนู "ตารางงานเซล" (?dept=sales) ก็ต้องได้ฟอร์มนัดหมาย ไม่ใช่ฟอร์มงานช่าง
+    // — ปฏิทินที่กำลังเปิดอยู่คือตัวบอกว่ากำลังจะสร้างของแผนกไหน
+    if (isSaleUser || viewingSalesCalendar) {
+      await getAddSalesAppointment({
+        arg, userData, saveEventToDB, fetchEventsFromDB, Swal, moment,
+        // ⚠️ ต้องส่ง department ไปด้วย — ฝั่ง server เดาจาก role ของผู้สร้าง ซึ่งกับแอดมินจะได้
+        // "ฝ่ายบริการ" เสมอ นัดที่แอดมินสร้างจึงไปโผล่ในปฏิทินช่าง
+        department: DEPARTMENT.SALES,
+      });
+      return;
+    }
     await getAddEvent({
       arg,
       events,
@@ -612,6 +669,15 @@ function EventCalendar() {
   };
 
   const handleEditEvent = async (eventInfo) => {
+    // ✅ เซลได้ฟอร์มแก้ไข "นัดหมาย" คู่แฝดของฟอร์มเพิ่ม ไม่ใช่ฟอร์มงานของช่าง
+    // ⚠️ ฟอร์มของช่างมีแผงสัญญา/เอกสาร 4 ชนิด/ทีมเข้างาน/คำขอปิดงาน ซึ่งไม่มีอะไรเกี่ยวกับนัดของเซล
+    const src = events.find((e) => String(e._id) === String(eventInfo?.event?.id));
+    if (isSaleUser || isSalesEvent(src) || isSalesEvent(eventInfo?.event)) {
+      await getEditSalesAppointment({
+        eventInfo, events, EventService, fetchEventsFromDB, handleDeleteEvent, Swal, moment,
+      });
+      return;
+    }
     await getEditEvent({
       navigate,
       events,
@@ -1299,7 +1365,14 @@ function EventCalendar() {
 
   // ✅ ช่างเทคนิคทั้งหมด — ใช้สร้าง dropdown ค้นหางานของช่างแต่ละคน (resPerson เก็บเป็น _id)
   const technicianOptions = useMemo(
-    () => employeeList.filter((u) => u.role?.toLowerCase() === "technician"),
+    () => employeeList.filter((u) => isRole(u, ROLES.TECHNICIAN)),
+    [employeeList],
+  );
+
+  // ✅ รายชื่อเซล — ใช้แทน technicianOptions ตอนแอดมิน/ผู้จัดการเปิดเมนู "ตารางงานเซล" กรองดูของ
+  // เซลแต่ละคน (เซลเองเห็นแค่นัดของตัวเองอยู่แล้วจากขอบเขตฝั่ง server ไม่ต้องมีตัวกรองนี้)
+  const salespersonOptions = useMemo(
+    () => employeeList.filter((u) => isRole(u, ROLES.SALE)),
     [employeeList],
   );
 
@@ -1329,7 +1402,13 @@ function EventCalendar() {
     [events, drafts, userId, isAdminOrManager]
   );
 
-  const activeFilterCount = [selectedTechnician, selectedStatus, selectedJobType, selectedSystem, selectedApproval].filter(Boolean).length;
+  // ⚠️ selectedSystem/selectedApproval ไม่มีช่องให้กรอกในแผงของฝ่ายขาย (ดู JSX ด้านล่าง) แต่ค่าเดิม
+  // อาจค้างมาจากตอนเปิดปฏิทินช่างก่อนสลับมา (คนละ query string บนหน้าเดียวกัน ไม่ได้ remount) —
+  // ไม่นับรวมตอนอยู่ในโลกฝ่ายขาย ไม่งั้น badge จำนวนตัวกรองจะขึ้นเลขที่ไม่ตรงกับที่เห็นบนจอ
+  const activeFilterCount = [
+    selectedTechnician, selectedStatus, selectedJobType,
+    ...(isSalesView ? [] : [selectedSystem, selectedApproval]),
+  ].filter(Boolean).length;
   const hasActiveFilters = Boolean(searchTerm) || activeFilterCount > 0;
   const clearFilters = () => {
     setSearchTerm("");
@@ -1364,19 +1443,30 @@ function EventCalendar() {
         ownerName, // ✅ เพิ่มชื่อเจ้าของเข้าไปในเงื่อนไข search
       ].some((field) => field.toLowerCase().includes(keyword));
 
-      const matchesTechnician =
-        !selectedTechnician ||
-        event.resPerson === selectedTechnician ||
-        (!event.resPerson && selectedTechnicianName && event.team === selectedTechnicianName);
+      // 🐛 ที่แก้ (ผู้ใช้แจ้ง: "อัปเดตสถานะแล้วดูเพี้ยนๆ"): นัดของเซลไม่มี resPerson/team/system
+      // และสถานะเป็นคนละชุดกับงานช่าง (นัดหมายแล้ว/เข้าพบแล้ว/... ไม่ใช่ กำลังรอยืนยัน/ยืนยันแล้ว/...)
+      // — ตัวกรองเดิมเทียบกับคำศัพท์ของช่างเสมอ นัดของเซลจึงไม่ตรงเงื่อนไขไหนเลยเวลาเลือกกรอง
+      // ✅ แยกเทียบตามโลกที่กำลังดูอยู่ — matchesTechnician กลายเป็น "กรองตามเซล" โดยเทียบ userId
+      // (นัดของเซลผูกกับ userId ของผู้สร้าง ไม่ใช่ resPerson/team ซึ่งเป็นแนวคิดของงานช่าง)
+      const matchesTechnician = isSalesView
+        ? !selectedTechnician || String(event.userId || "") === String(selectedTechnician)
+        : !selectedTechnician ||
+          event.resPerson === selectedTechnician ||
+          (!event.resPerson && selectedTechnicianName && event.team === selectedTechnicianName);
 
-      const matchesStatus = !selectedStatus || event.status === selectedStatus;
+      const matchesStatus = isSalesView
+        ? !selectedStatus || toSalesStatus(event.status) === selectedStatus
+        : !selectedStatus || event.status === selectedStatus;
       const matchesJobType = !selectedJobType || event.title === selectedJobType;
-      const matchesSystem = !selectedSystem || event.system === selectedSystem;
-      const matchesApproval = !selectedApproval || getApprovalState(event) === selectedApproval;
+      // ⚠️ นัดของเซลไม่มีแนวคิด "ระบบ"/"การอนุมัติ" เลย (ดูคอมเมนต์ที่ core.js ฝั่ง server —
+      // เซลไม่ต้องรออนุมัติ) ตัวกรองสองอันนี้จึงไม่มีให้เลือกในแผงของเซล (ดู JSX ด้านล่าง) แต่
+      // ยังต้องส่งผ่านเสมอเป็น true กัน state เก่าจากตอนสลับมาจากปฏิทินช่างค้างกรองอยู่แบบไม่รู้ตัว
+      const matchesSystem = isSalesView || !selectedSystem || event.system === selectedSystem;
+      const matchesApproval = isSalesView || !selectedApproval || getApprovalState(event) === selectedApproval;
 
       return matchesKeyword && matchesTechnician && matchesStatus && matchesJobType && matchesSystem && matchesApproval;
     });
-  }, [events, searchTerm, employeeList, selectedTechnician, selectedStatus, selectedJobType, selectedSystem, selectedApproval, technicianOptions]);
+  }, [events, searchTerm, employeeList, selectedTechnician, selectedStatus, selectedJobType, selectedSystem, selectedApproval, technicianOptions, isSalesView]);
 
   const getStatusIcon = useCallback((status) => {
     const icons = {
@@ -1417,6 +1507,128 @@ function EventCalendar() {
   };
 
 
+  /**
+   * 🐛 ที่แก้ (ผู้ใช้แจ้งซ้ำ: "ยัง resized ไม่ได้เลย ถ้างานไหนมีใส่เวลา" / "ไม่มี icon ลากขึ้นเลย"):
+   * ไล่เข้าไปดูซอร์สของ FullCalemdar เองแล้ว (@fullcalendar/core/internal-common.js) พบว่าไม่ใช่
+   * config ที่ตั้งพลาด แต่เป็นข้อจำกัดที่ฝังอยู่ในอัลกอริทึมของมันเอง: มุมมองเดือน (dayGrid) ตัดสินว่า
+   * event "จบที่ขอบวัน" (isEnd) โดยเทียบ event.end กับขอบเที่ยงคืนของวันนั้นตรงๆ
+   * (isEnd = normalRange.end === slicedRange.end) — งาน allDay เก็บ end เป็นเที่ยงคืนอยู่แล้วเสมอ
+   * จึงตรงกันเป๊ะ ได้ isEnd:true ทุกครั้ง แต่งานที่มีเวลา (เช่นจบ 16:30) ไม่มีวันตรงกับเที่ยงคืนเลย
+   * isEnd จึงเป็น false เสมอ → ไม่มีการ์ดไหนได้ handle ลากขยายจากมุมมองเดือนเลยไม่ว่าจะตั้งค่าอะไร
+   * ยืนยันจริงด้วยการเทียบ: สลับไปมุมมอง "สัปดาห์" (timeGrid) นัดเดียวกันมี resize handle ทันที
+   * เพราะมุมมองนั้นไม่ได้ตัดสินจากขอบเที่ยงคืนแบบนี้ — เทียบกับปฏิทินทั่วไป (Google Calendar ฯลฯ)
+   * ก็ลากปรับเวลานัดในมุมมองเดือนไม่ได้เหมือนกัน ต้องสลับไปสัปดาห์/วันเท่านั้น
+   *
+   * ✅ ผู้ใช้ยืนยันว่าต้องการใช้งานในมุมมองเดือนได้จริง — สร้าง handle ลากขยายของตัวเองแยกต่างหาก
+   * (ไม่พึ่ง eventResize ของ FullCalendar เลย) เฉพาะงานที่มีเวลา (allDay:false) เท่านั้น โดย:
+   *   1) วาดแท่งจับเล็กๆ ที่ขอบขวาของการ์ดเองใน eventContent ด้านล่าง (data-ec-resize="1")
+   *   2) ฟัง pointer event ที่ document ทั้งก้อน (ไม่ใช่ต่อการ์ด) เพราะการ์ดถูกสร้าง/ทำลายใหม่ตลอด
+   *      เวลา FullCalendar re-render — ผูกครั้งเดียวที่นี่ ไม่ต้อง cleanup/attach ซ้ำทุกครั้ง
+   *   3) ระหว่างลาก หาช่องวันที่ใต้เมาส์ด้วย elementFromPoint แล้วไฮไลต์ไว้ให้เห็นว่าจะปล่อยตรงไหน
+   *   4) ปล่อยเมาส์ = ขยาย "วันสิ้นสุด" ไปแตะช่องนั้น — กลายเป็นงานข้ามวัน (allDay:true) เหมือนงาน
+   *      ของช่างที่ลากขยายในมุมมองเดือนได้ปกติอยู่แล้ว (เวลาที่กรอกไว้ยังอยู่ครบ กลายเป็นข้อมูล
+   *      อ้างอิงเวลาเข้า/เลิกแต่ละวันแทน ไม่ใช่ตัวกำหนดกรอบเวลาบนปฏิทินอีกต่อไป — เทียบพฤติกรรม
+   *      เดียวกับตอนสร้าง/แก้ไขนัดหลายวันในฟอร์ม ดู AddSalesAppointment.js/EditSalesAppointment.js)
+   *   5) ลากไปวันเดียวกับที่เริ่มอยู่แล้ว = ไม่ทำอะไร (ยังเป็นนัดตรงเวลาเหมือนเดิม) ลากไปวันก่อนวันเริ่ม
+   *      ไม่ได้เลย (เตือนแล้วไม่ทำอะไร)
+   */
+  useEffect(() => {
+    let drag = null; // { eventId, moved }
+
+    const findDayCell = (x, y) =>
+      document.elementFromPoint(x, y)?.closest?.(".fc-daygrid-day[data-date]") || null;
+
+    const clearHighlight = () => {
+      document.querySelectorAll(".ec-day-drop-target").forEach((el) => el.classList.remove("ec-day-drop-target"));
+    };
+
+    const getPoint = (e) => (e.touches?.[0] || e.changedTouches?.[0] || e);
+
+    // 🐛 ที่แก้ (ทดสอบจริงแล้วพบ): ลากจากแท่งจับนี้ กลับกลายเป็นลากทั้งการ์ดไปวันใหม่แทนการขยาย —
+    // เพราะ mousedown ตัวเดียวกันไปโดน listener ลากทั้งการ์ดของ FullCalendar เองด้วย (ปกติมันกัน
+    // ตัวเองด้วยการเช็ค elementClosest(target, '.fc-event-resizer') แต่ handle ของเราคนละคลาส มันจึง
+    // ไม่รู้จัก) — จะยืมคลาส .fc-event-resizer ของมันมาใช้ก็เสี่ยงชนกับระบบ resize จริงของมันเองอีกที
+    // (เช็คแค่ selector ไม่เช็คว่า resizable จริงไหม) ✅ ทางที่ปลอดภัยกว่า: ดัก mousedown ที่ document
+    // ใน "capture phase" (ก่อนจะไหลลงไปถึง element เป้าหมายด้วยซ้ำ) แล้ว stopPropagation() ตรงนั้น
+    // เลย — event จะไม่มีวันไปถึง listener ของ FullCalendar ที่ผูกอยู่ลึกกว่าเราเลย ไม่ต้องพึ่ง
+    // ชื่อคลาสภายในของไลบรารีที่อาจเปลี่ยนได้ในเวอร์ชันถัดไป
+    const onDown = (e) => {
+      const handle = e.target.closest?.('[data-ec-resize="1"]');
+      if (!handle) return;
+      e.preventDefault();
+      e.stopPropagation();
+      drag = { eventId: handle.dataset.eventId, moved: false };
+      document.body.style.userSelect = "none";
+    };
+
+    const onMove = (e) => {
+      if (!drag) return;
+      drag.moved = true;
+      const { clientX, clientY } = getPoint(e);
+      clearHighlight();
+      findDayCell(clientX, clientY)?.classList.add("ec-day-drop-target");
+    };
+
+    const onUp = async (e) => {
+      if (!drag) return;
+      const { eventId, moved } = drag;
+      drag = null;
+      document.body.style.userSelect = "";
+      clearHighlight();
+      if (!moved) return; // แค่กดเฉยๆ ไม่ได้ลาก ไม่ต้องทำอะไร (กันชนกับการคลิกเปิดฟอร์มแก้ไข)
+
+      const { clientX, clientY } = getPoint(e);
+      const cell = findDayCell(clientX, clientY);
+      const targetDateStr = cell?.getAttribute("data-date");
+      if (!targetDateStr) return;
+
+      const ev = events.find((x) => String(x._id) === String(eventId));
+      if (!ev) return;
+      const startDateStr = moment(ev.start).format("YYYY-MM-DD");
+      if (moment(targetDateStr).isBefore(startDateStr)) {
+        Swal.fire({
+          toast: true, position: "top", icon: "warning",
+          title: "ลากไปก่อนวันเริ่มไม่ได้", showConfirmButton: false, timer: 2000,
+        });
+        return;
+      }
+      if (targetDateStr === startDateStr) return; // ลากกลับที่เดิม ไม่มีอะไรเปลี่ยน
+
+      try {
+        await EventService.UpdateEvent(eventId, {
+          allDay: true,
+          start: startDateStr,
+          end: moment(targetDateStr).add(1, "day").format("YYYY-MM-DD"), // exclusive ตามแบบแผนทั้งแอป
+        });
+        await fetchEventsFromDB();
+        Swal.fire({
+          toast: true, position: "top", icon: "success",
+          title: `ขยายเป็น ${moment(startDateStr).locale("th").format("D MMM")} – ${moment(targetDateStr).locale("th").format("D MMM YYYY")}`,
+          showConfirmButton: false, timer: 2200,
+        });
+      } catch (err) {
+        Swal.fire("เกิดข้อผิดพลาด", err?.response?.data?.message || "ขยายวันที่ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง", "error");
+      }
+    };
+
+    // ⚠️ true = capture phase — ต้องดักก่อน FullCalendar เสมอ (ดูเหตุผลเต็มที่ onDown ด้านบน)
+    document.addEventListener("mousedown", onDown, true);
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    document.addEventListener("touchstart", onDown, { capture: true, passive: false });
+    document.addEventListener("touchmove", onMove, { passive: true });
+    document.addEventListener("touchend", onUp);
+    return () => {
+      document.removeEventListener("mousedown", onDown, true);
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.removeEventListener("touchstart", onDown, true);
+      document.removeEventListener("touchmove", onMove);
+      document.removeEventListener("touchend", onUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events]);
+
   return (
     <div className="modern-calendar-container">
       {/* ✅ แถบเดียวกระชับ: ค้นหา + ปุ่มตัวกรอง (มี badge บอกจำนวนที่เลือกไว้) + Export
@@ -1443,14 +1655,18 @@ function EventCalendar() {
           {activeFilterCount > 0 && <span className="filter-badge">{activeFilterCount}</span>}
         </button>
 
-        <button
-          className={`filter-toggle-btn ${showDraftsPanel ? "filter-toggle-btn--open" : ""} ${visibleDrafts.length > 0 ? "filter-toggle-btn--active" : ""}`}
-          onClick={() => setShowDraftsPanel((p) => !p)}
-          title="งานวางแผนล่วงหน้า (ยังไม่ลงตาราง)"
-        >
-          <FontAwesomeIcon icon={faLayerGroup} />
-          {visibleDrafts.length > 0 && <span className="filter-badge">{visibleDrafts.length}</span>}
-        </button>
+        {/* ⚠️ นัดหมายของเซลไม่มีแนวคิด "วางแผนล่วงหน้าไม่ระบุวันที่" เลย (ดู fetchDrafts) —
+            ปุ่มนี้จึงไม่มีความหมายในโลกฝ่ายขาย ซ่อนไปเลยแทนที่จะโชว์ปุ่มที่กดแล้วว่างเปล่าตลอด */}
+        {!isSalesView && (
+          <button
+            className={`filter-toggle-btn ${showDraftsPanel ? "filter-toggle-btn--open" : ""} ${visibleDrafts.length > 0 ? "filter-toggle-btn--active" : ""}`}
+            onClick={() => setShowDraftsPanel((p) => !p)}
+            title="งานวางแผนล่วงหน้า (ยังไม่ลงตาราง)"
+          >
+            <FontAwesomeIcon icon={faLayerGroup} />
+            {visibleDrafts.length > 0 && <span className="filter-badge">{visibleDrafts.length}</span>}
+          </button>
+        )}
 
         {/* ✅ ปุ่ม "N ต้องอนุมัติ" — ซ่อนไปเลยตอนไม่มีอะไรรออนุมัติ (เทียบ pattern เดียวกับ
             ClosureRequestsPanel ในหน้า Operation ที่ return null ตอนไม่มีคำขอ) กดแล้วกรองตารางเหลือ
@@ -1512,56 +1728,106 @@ function EventCalendar() {
           เพิ่มจากเดิมที่มีแค่ช่าง/สถานะ ให้ค้นหางานตามหมวดได้ครบขึ้น */}
       {showFilterPanel && (
         <div className="event-filter-panel mb-3">
-          <select
-            className="event-filter-select"
-            value={selectedTechnician}
-            onChange={(e) => setSelectedTechnician(e.target.value)}
-          >
-            <option value="">ช่างทุกคน</option>
-            {technicianOptions.map((tech) => (
-              <option key={tech._id} value={tech._id}>
-                {tech.fname ? `${tech.fname} ${tech.lname || ""}`.trim() : tech.username}
-              </option>
-            ))}
-          </select>
+          {/* 🐛 ที่แก้ (ผู้ใช้แจ้ง: "อัปเดตสถานะแล้วดูเพี้ยนๆ"): แผงนี้เดิมใช้ตัวเลือกของงานช่างเสมอ
+              ไม่ว่าจะเปิดปฏิทินไหน — ปฏิทินเซลจึงมี "ช่างทุกคน" / สถานะช่าง (กำลังรอยืนยัน ฯลฯ) /
+              ประเภทงานช่าง (จาก JobType) / ระบบ ซึ่งไม่มีสักอันที่ตรงกับนัดหมายของเซลเลย เลือกกรอง
+              แล้วไม่มีอะไรตรงเงื่อนไข ดูเหมือนตัวกรองพัง
+              ✅ แยกชุดตัวเลือกตาม isSalesView ให้ตรงกับคำศัพท์ของแผนกที่กำลังดูอยู่จริง */}
+          {isSalesView ? (
+            <>
+              {/* คนเดียวเห็นนัดตัวเองอยู่แล้วจากขอบเขตฝั่ง server — ตัวกรองนี้มีความหมายเฉพาะตอน
+                  แอดมิน/ผู้จัดการเปิดดูรวมของทุกเซล */}
+              {viewingSalesCalendar && (
+                <select
+                  className="event-filter-select"
+                  value={selectedTechnician}
+                  onChange={(e) => setSelectedTechnician(e.target.value)}
+                >
+                  <option value="">เซลทุกคน</option>
+                  {salespersonOptions.map((sp) => (
+                    <option key={sp._id} value={sp._id}>
+                      {sp.fname ? `${sp.fname} ${sp.lname || ""}`.trim() : sp.username}
+                    </option>
+                  ))}
+                </select>
+              )}
 
-          {/* ✅ รวมสถานะงาน + สถานะอนุมัติไว้ในช่องเดียวกัน (เดิมแยกเป็น 2 dropdown คนละที่ ต้องเช็ค
-              2 จุดถึงจะรู้ว่างานไหนต้องดูแล) — ใช้ prefix "status:"/"approval:" แยกประเภทค่าที่เลือก
-              แล้วแปลงกลับเป็น selectedStatus/selectedApproval ตามเดิม (ดู handleCombinedStatusChange) */}
-          <select
-            className="event-filter-select"
-            value={combinedStatusValue}
-            onChange={(e) => handleCombinedStatusChange(e.target.value)}
-          >
-            <option value="">ทุกสถานะ</option>
-            {statusLegend.map((s) => (
-              <option key={s.label} value={`status:${s.label}`}>{s.label}</option>
-            ))}
-            <option value="approval:pending">⏳ รออนุมัติ</option>
-            <option value="approval:rejected">❌ ไม่อนุมัติ</option>
-          </select>
+              <select
+                className="event-filter-select"
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+              >
+                <option value="">ทุกสถานะนัดหมาย</option>
+                {SALES_STATUSES.map((st) => (
+                  <option key={st.key} value={st.key}>{st.icon} {st.key}</option>
+                ))}
+              </select>
 
-          <select
-            className="event-filter-select"
-            value={selectedJobType}
-            onChange={(e) => setSelectedJobType(e.target.value)}
-          >
-            <option value="">ทุกประเภทงาน</option>
-            {jobTypeOptions.map((t) => (
-              <option key={t} value={t}>{t}</option>
-            ))}
-          </select>
+              <select
+                className="event-filter-select"
+                value={selectedJobType}
+                onChange={(e) => setSelectedJobType(e.target.value)}
+              >
+                <option value="">ทุกประเภทนัดหมาย</option>
+                {SALES_APPOINTMENT_TYPES.map((t) => (
+                  <option key={t.key} value={t.key}>{t.icon} {t.key}</option>
+                ))}
+              </select>
+            </>
+          ) : (
+            <>
+              <select
+                className="event-filter-select"
+                value={selectedTechnician}
+                onChange={(e) => setSelectedTechnician(e.target.value)}
+              >
+                <option value="">ช่างทุกคน</option>
+                {technicianOptions.map((tech) => (
+                  <option key={tech._id} value={tech._id}>
+                    {tech.fname ? `${tech.fname} ${tech.lname || ""}`.trim() : tech.username}
+                  </option>
+                ))}
+              </select>
 
-          <select
-            className="event-filter-select"
-            value={selectedSystem}
-            onChange={(e) => setSelectedSystem(e.target.value)}
-          >
-            <option value="">ทุกระบบ</option>
-            {systemOptions.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
+              {/* ✅ รวมสถานะงาน + สถานะอนุมัติไว้ในช่องเดียวกัน (เดิมแยกเป็น 2 dropdown คนละที่ ต้องเช็ค
+                  2 จุดถึงจะรู้ว่างานไหนต้องดูแล) — ใช้ prefix "status:"/"approval:" แยกประเภทค่าที่เลือก
+                  แล้วแปลงกลับเป็น selectedStatus/selectedApproval ตามเดิม (ดู handleCombinedStatusChange) */}
+              <select
+                className="event-filter-select"
+                value={combinedStatusValue}
+                onChange={(e) => handleCombinedStatusChange(e.target.value)}
+              >
+                <option value="">ทุกสถานะ</option>
+                {statusLegend.map((s) => (
+                  <option key={s.label} value={`status:${s.label}`}>{s.label}</option>
+                ))}
+                <option value="approval:pending">⏳ รออนุมัติ</option>
+                <option value="approval:rejected">❌ ไม่อนุมัติ</option>
+              </select>
+
+              <select
+                className="event-filter-select"
+                value={selectedJobType}
+                onChange={(e) => setSelectedJobType(e.target.value)}
+              >
+                <option value="">ทุกประเภทงาน</option>
+                {jobTypeOptions.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+
+              <select
+                className="event-filter-select"
+                value={selectedSystem}
+                onChange={(e) => setSelectedSystem(e.target.value)}
+              >
+                <option value="">ทุกระบบ</option>
+                {systemOptions.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </>
+          )}
 
           {hasActiveFilters && (
             <button className="event-filter-clear" onClick={clearFilters}>
@@ -1577,8 +1843,10 @@ function EventCalendar() {
           ✅ ปฏิทิน + คอลัมน์นี้เรียงข้างกันบนจอใหญ่ (≥992px) — กดปุ่มด้านบนเพื่อเปิด/ปิด ปฏิทินย่อ
           ความกว้างให้เองอัตโนมัติ (ดู .calendar-layout ใน index.css) จอเล็กกว่านั้นไม่มีที่พอวาง
           ข้างกัน กลับไปเรียงบนล่างเหมือนเดิม (เดิมแผงนี้ดันปฏิทินลงมาทุกครั้งที่เปิด) */}
-      <div className={`calendar-layout ${showDraftsPanel ? "calendar-layout--with-drafts" : ""}`}>
-        {showDraftsPanel && (
+      <div className={`calendar-layout ${showDraftsPanel && !isSalesView ? "calendar-layout--with-drafts" : ""}`}>
+        {/* ⚠️ กันซ้ำอีกชั้น (ปุ่มเปิดถูกซ่อนไปแล้วด้านบน) เผื่อ showDraftsPanel ยังค้างค่า true
+            จากตอนอยู่ปฏิทินช่างก่อนสลับมา — คนละ query string บนหน้าเดียวกัน ไม่ได้ remount */}
+        {showDraftsPanel && !isSalesView && (
           <aside className="calendar-drafts-col">
             <UnscheduledPanel
               ref={draftsPanelRef}
@@ -1601,7 +1869,13 @@ function EventCalendar() {
         {/* ✅ ไม่ตั้ง CSS zoom เองอีกต่อไป (ปฏิทินแสดงที่ 100% เสมอตอนเปิดหน้า) — การย่อ/ขยายบนมือถือ
             ใช้การหุบ/กางนิ้วของเบราว์เซอร์เองแทน ซึ่งไม่ไปยุ่งกับ layout ของปฏิทิน จึงไม่มีปัญหาพื้นที่
             เลื่อน/ตำแหน่งกดเพี้ยนแบบที่ต้องคอยแก้ตอนตั้ง zoom เอง */}
-        <div id="content-id" className="calendar-wrapper" ref={swipeAreaRef}>
+        {/* ⚠️ ec-sales เปลี่ยนสีหัวตารางเป็นม่วง (ดู index.css) — ปฏิทินตัวเดียวกันถูกใช้
+            ทั้งฝ่ายช่างและฝ่ายขาย สีคือสิ่งที่บอกทันทีว่ากำลังดูปฏิทินของสายงานไหน */}
+        <div
+          id="content-id"
+          className={"calendar-wrapper" + (isSaleUser || viewingSalesCalendar ? " ec-sales" : "")}
+          ref={swipeAreaRef}
+        >
         <FullCalendar
           ref={calendarRef}
           locales={[thLocale]} // ใช้งานภาษาไทย
@@ -1614,6 +1888,13 @@ function EventCalendar() {
             listPlugin,
           ]}
           initialView="dayGridMonth"
+          // 🐛 ที่แก้ (ผู้ใช้แจ้ง: "ใส่เวลาแล้วสีจะเพี้ยน"): ค่า default ของ FullCalendar
+          // (eventDisplay: "auto") วาดงานที่มีเวลาเจาะจง (allDay: false — กรณีปกติของนัดหมายเซล
+          // ที่ระบุเวลานัด) เป็นสไตล์ "list-item" (จุดกลมเล็กๆ + เวลา พื้นหลังโปร่งใส) แทนที่จะเป็น
+          // แท่งสีทึบแบบงาน allDay — สีพื้นหลังที่ตั้งไว้ (เช่น #d946ef ของ "นำเสนอ/เสนอราคา") จึง
+          // หายไปเหลือแต่กรอบสีน้ำเงิน default ทั้งที่ backgroundColor ที่บันทึกในฐานข้อมูลถูกต้องอยู่แล้ว
+          // ✅ บังคับ "block" ทุกงานเสมอ ไม่ว่าจะมีเวลาหรือไม่ — สีจึงสม่ำเสมอทั้งปฏิทิน
+          eventDisplay="block"
           // editable={isAdmin}
           // selectable={isAdmin}
           // droppable={isAdmin}
@@ -1762,6 +2043,13 @@ function EventCalendar() {
               ? `<div style="display:inline-block; font-size:0.72em; font-weight:700; padding:0 5px; border-radius:4px; margin-bottom:2px; background:${approvalState === "pending" ? "rgba(245,158,11,.9)" : "rgba(239,68,68,.9)"}; color:#fff;">${approvalState === "pending" ? "⏳ รออนุมัติ" : "❌ ไม่อนุมัติ"}</div>`
               : "";
 
+            // ✅ แท่งจับลากขยายของเราเอง — เฉพาะงานที่มีเวลา (allDay:false) เพราะงาน allDay ลากขยาย
+            // ด้วย eventResize ของ FullCalendar ได้อยู่แล้วตามปกติ (ดูเหตุผลเต็มที่ useEffect ด้านบน
+            // ที่ผูก mousedown/touchstart ไว้ที่ document ทั้งก้อน — data-ec-resize เป็นตัวเชื่อม)
+            const resizeHandleHtml = !arg.event.allDay && canEditEvent(extendedProps)
+              ? `<div class="ec-timed-resize-handle" data-ec-resize="1" data-event-id="${escapeHtml(String(arg.event.id))}" title="ลากเพื่อขยายข้ามวัน"></div>`
+              : "";
+
             return {
               html: `
                 <div style="position: relative; display: flex; align-items: center; padding: ${badgePadding}; width: 100%;">
@@ -1779,6 +2067,7 @@ function EventCalendar() {
                 </div>
                   ${badgeHtml}
                   ${groupBadgeHtml}
+                  ${resizeHandleHtml}
                 </div>
     `,
             };
@@ -2056,6 +2345,40 @@ function EventCalendar() {
   }
 }
 
+/* ✅ แท่งจับลากขยาย "งานที่มีเวลา" ของเราเอง (ดู useEffect ที่ผูก mousedown/touchstart ไว้ที่
+   document) — มุมมองเดือนของ FullCalendar ไม่มี handle ให้งานที่มีเวลาโดยธรรมชาติของมันเอง
+   (ดูเหตุผลเต็มที่ตรง useEffect) จึงต้องวาดเองตรงนี้แทน วางที่ขอบขวาของการ์ด กว้างพอกดง่ายบนมือถือ
+   แต่ไม่บังเนื้อหา */
+.ec-timed-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  cursor: ew-resize;
+  z-index: 6;
+  touch-action: none;
+}
+.ec-timed-resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 3px;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 55%;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.55);
+}
+.ec-timed-resize-handle:hover::after {
+  background: rgba(255, 255, 255, 0.95);
+}
+/* ✅ ไฮไลต์ช่องวันที่ปลายทางระหว่างลาก — feedback ว่าปล่อยแล้วจะไปจบที่วันไหน */
+.fc-daygrid-day.ec-day-drop-target {
+  background: rgba(139, 92, 246, 0.14) !important;
+  box-shadow: inset 0 0 0 2px #8b5cf6;
+}
+
 /* ✅ แผงคำอธิบายสัญลักษณ์ — ออกแบบใหม่ทั้งหมด (เดิมยัดทุกอย่าง 11 รายการ เป็นแถว flex-wrap เดียว
    ปนกันไม่มีหัวข้อ อ่านยาก/รกตามที่ผู้ใช้ทัก) แยกเป็นกลุ่มตามความหมาย (สถานะ/การอนุมัติ/ประเภทงาน/
    อื่นๆ) แต่ละกลุ่มมีหัวข้อกำกับ + รายการเรียงเป็นคอลัมน์อ่านง่าย คั่นด้วยเส้นแบ่งบนจอกว้าง */
@@ -2115,8 +2438,47 @@ function EventCalendar() {
 }
         `}
         </style>
-        {/* ✅ คำอธิบายสัญลักษณ์ — แยกเป็น 4 กลุ่มตามความหมาย (สถานะ/การอนุมัติ/ประเภทงาน/อื่นๆ) แทน
-            แถวเดียวยัดรวมกันแบบเดิม (11 รายการปนกันไม่มีหัวข้อ อ่านยาก) แต่ละกลุ่มมีหัวข้อกำกับชัดเจน */}
+        {/* ✅ คำอธิบายสัญลักษณ์ — คนละชุดตามสายงาน
+            ⚠️ ฝ่ายขายไม่มี "การอนุมัติ" (นัดของตัวเองไม่ต้องรออนุมัติ) และไม่มี "งานสัญญา/
+            งานโปรเจค" (เป็นแนวคิดของงานช่างล้วนๆ) การโชว์ให้เซลเห็นคือคำอธิบายของสิ่งที่
+            ไม่มีวันเกิดขึ้นในปฏิทินของเขา */}
+        {isSaleUser || viewingSalesCalendar ? (
+          <div className="ec-legend-panel">
+            <div className="ec-legend-group">
+              <div className="ec-legend-group-title">ประเภทนัดหมาย</div>
+              {SALES_APPOINTMENT_TYPES.map((t) => (
+                <div key={t.key} className="ec-legend-item">
+                  <span className="ec-legend-icon">
+                    <span className="ec-legend-swatch" style={{ width: 14, height: 14, background: t.color }} />
+                  </span>
+                  <span>{t.icon} {t.key}</span>
+                </div>
+              ))}
+            </div>
+            {/* ✅ สถานะของฝ่ายขายเอง — คนละชุดกับสถานะงานช่าง (ดู SALES_STATUSES)
+                แก้ได้จากในกล่องแก้ไขนัดหมาย */}
+            <div className="ec-legend-group">
+              <div className="ec-legend-group-title">สถานะนัดหมาย</div>
+              {SALES_STATUSES.map((st) => (
+                <div key={st.key} className="ec-legend-item">
+                  <span className="ec-legend-icon">{st.icon}</span>
+                  <span>{st.key} — {st.hint}</span>
+                </div>
+              ))}
+            </div>
+            <div className="ec-legend-group">
+              <div className="ec-legend-group-title">อื่นๆ</div>
+              <div className="ec-legend-item">
+                <span className="ec-legend-icon">💡</span>
+                <span>กดวันที่บนปฏิทินเพื่อเพิ่มนัดหมายใหม่</span>
+              </div>
+              <div className="ec-legend-item">
+                <span className="ec-legend-icon">🔒</span>
+                <span>ปฏิทินนี้เห็นเฉพาะนัดของฝ่ายขาย ไม่ปนกับตารางงานช่าง</span>
+              </div>
+            </div>
+          </div>
+        ) : (
         <div className="ec-legend-panel">
           <div className="ec-legend-group">
             <div className="ec-legend-group-title">สถานะงาน</div>
@@ -2172,6 +2534,7 @@ function EventCalendar() {
             </div>
           </div>
         </div>
+        )}
         </div>
       </div>
 

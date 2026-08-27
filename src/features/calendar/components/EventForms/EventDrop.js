@@ -83,11 +83,19 @@ export const getEventDrop = async ({
     return;
   }
 
-  const start = moment(event.start).format("YYYY-MM-DD");
-  const endRaw = moment(event.end);
-  const end = event.allDay
-    ? endRaw.format("YYYY-MM-DD")
-    : endRaw.subtract(1, "days").format("YYYY-MM-DD");
+  // 🐛 ที่แก้ (ผู้ใช้แจ้ง: ลากนัดไปวันใหม่แล้ว error 500 "Cast to date failed... Invalid date"):
+  // เดิมลบ 1 วันออกจาก end เสมอไม่ว่า allDay หรือไม่ — กฎ "end แบบ exclusive" (ลบ 1 วันคืน) มีไว้
+  // ใช้กับงาน "ทั้งวัน" เท่านั้น (ธรรมเนียมทั้งแอป) งานที่มีเวลาเป๊ะ (allDay:false — นัดของฝ่ายขายที่
+  // ลงเวลาตรงๆ) ไม่มีแนวคิดนี้เลย ยิ่งไปกว่านั้น event.end บางเหตุการณ์เป็น null ได้ (FullCalendar
+  // คืนแบบนี้เอง) พอเอาไป .subtract() บน moment ที่ไม่ valid จะได้สตริง "Invalid Date" ส่งให้ Mongoose
+  // cast เป็น Date ไม่ได้ → 500 ทันที ที่ผ่านมาไม่เคยเจอเพราะงานของช่างแทบทั้งหมดเป็น allDay:true
+  // จนกระทั่งมีนัดของเซลที่ลงเวลาเป๊ะ (allDay:false) จริงจึงมาเจอ branch นี้เป็นครั้งแรก
+  const isAllDayEvt = Boolean(event.allDay);
+  const endSrc = event.end || event.start; // ✅ กัน end เป็น null เสมอ
+  const startM = moment(event.start);
+  const endM = moment(endSrc);
+  const start = isAllDayEvt ? startM.format("YYYY-MM-DD") : startM.toISOString();
+  const end = isAllDayEvt ? endM.format("YYYY-MM-DD") : endM.toISOString();
 
   const updatedEvent = {
     id: event.id,
@@ -100,11 +108,12 @@ export const getEventDrop = async ({
     allDay: event.allDay,
   };
 
-  // ตรวจสอบว่า event มีการเปลี่ยนแปลงจริงหรือไม่
-  const originalStart = moment(event.extendedProps?.start).format("YYYY-MM-DD");
-  const originalEnd = moment(event.extendedProps?.end).format("YYYY-MM-DD");
+  // ตรวจสอบว่า event มีการเปลี่ยนแปลงจริงหรือไม่ — เทียบด้วย timestamp เต็ม (ไม่ใช่แค่วันที่) กันพลาด
+  // ตอนงานมีเวลา ซึ่งอาจเปลี่ยนแค่เวลาในวันเดียวกัน (เทียบแค่ YYYY-MM-DD จะมองว่า "ไม่เปลี่ยน")
+  const originalStartMs = moment(event.extendedProps?.start).valueOf();
+  const originalEndMs = moment(event.extendedProps?.end || event.extendedProps?.start).valueOf();
 
-  const hasChanged = start !== originalStart || end !== originalEnd;
+  const hasChanged = startM.valueOf() !== originalStartMs || endM.valueOf() !== originalEndMs;
 
   if (!hasChanged) {
     console.log("⏸️ ไม่มีการเปลี่ยนแปลงวันที่ ไม่ต้องอัปเดต");
@@ -113,12 +122,17 @@ export const getEventDrop = async ({
 
   // ✅ บันทึกประวัติ — เดิมการลากย้ายวันที่งานไม่เคยถูกบันทึกลง activityLog เลย เทียบ pattern
   // เดียวกับ EventResize.js/buildChangeLogEntries ใน EditEvent.js
+  // ⚠️ ข้อความประวัติต้องอ่านง่ายเสมอ ไม่ว่า start/end ด้านบนจะเป็น "YYYY-MM-DD" (allDay) หรือ
+  // ISO datetime เต็ม (งานมีเวลา) — จัดรูปแบบแยกจากค่าที่ส่งขึ้น server
+  const logDateFmt = isAllDayEvt ? "D MMM YYYY" : "D MMM YYYY HH:mm";
+  const startLabel = startM.locale("th").format(logDateFmt);
+  const endLabel = endM.locale("th").format(logDateFmt);
   const actorName = [userData?.fname, userData?.lname].filter(Boolean).join(" ") || userData?.username || "ผู้ใช้งาน";
   updatedEvent.activityLog = [
     ...(event.extendedProps?.activityLog || []),
     {
       action: "schedule_changed",
-      detail: `ลากย้ายวันที่เป็น ${start}${end !== start ? ` – ${end}` : ""}`,
+      detail: `ลากย้ายวันที่เป็น ${startLabel}${endLabel !== startLabel ? ` – ${endLabel}` : ""}`,
       userName: actorName,
       timestamp: new Date().toISOString(),
     },
