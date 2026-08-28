@@ -671,6 +671,13 @@ export const getEditEvent = async ({
   TomSelect,
   moment,
   userData,
+  /**
+   * ✅ โหมด "ดูอย่างเดียวจริงๆ" — ปิดทุกทางที่แก้ข้อมูลได้ ไม่มีข้อยกเว้น
+   * ใช้กับเซลที่เปิดดูตารางงานช่าง (?dept=service — ดู isServiceObserver ที่ CalendarBoard)
+   * ⚠️ ต่างจาก isViewOnly เดิมตรงที่ isViewOnly ยังเปิดให้แก้สี/เอกสารได้ (canEditDocFields)
+   * ซึ่งเป็นของคนที่อยู่ในงานจริง — เซลไม่ได้อยู่ในงาน จึงต้องปิดให้หมดจริงๆ
+   */
+  readOnly = false,
 }) => {
   injectStyles();
 
@@ -818,7 +825,7 @@ export const getEditEvent = async ({
   // ⚠️ ต้องล็อกฟอร์มด้วย ไม่ใช่แค่ปล่อยให้ backend ปฏิเสธตอนกดบันทึก — ไม่งั้นช่างจะพิมพ์แก้ไปทั้งหน้า
   // แล้วเพิ่งมารู้ตอนกดบันทึกว่าทำไม่ได้ (backend คืน 403 "งานนี้ปิดแล้ว ไม่สามารถแก้ไขได้" ที่ PUT /:id)
   const isClosedForTech = eventStatus === "ดำเนินการเสร็จสิ้น" && !isAdminOrManagerUser;
-  const isViewOnly = isPendingForTech || isTeamMemberViewer || isClosedForTech;
+  const isViewOnly = readOnly || isPendingForTech || isTeamMemberViewer || isClosedForTech;
 
   // ✅ "ช่างที่มีชื่อในงานนี้" (ทั้งหัวหน้าทีมเข้างานและลูกทีม) แก้ข้อมูลประกอบของงานตัวเองได้
   // ⚠️ ตั้งใจแยกออกมาเป็นสิทธิ์ของตัวเอง ไม่ไปแก้ isViewOnly — ของพวกนี้เป็น "บันทึกประกอบงาน" ที่คน
@@ -830,17 +837,17 @@ export const getEditEvent = async ({
   // เหตุผลที่ต้องยกเว้นให้: เรื่องเอกสารมักตามมาทีหลังงานปิดเสมอ (ได้เลขที่เอกสารจริงตอนวางบิล /
   // ต้องเติมรายละเอียดที่หน้างานเพิ่มทีหลัง) ถ้าล็อกตายตอนปิดงานจะกลายเป็นต้องรบกวนแอดมินทุกครั้ง
   // ⚠️ ยังบล็อกงานที่รออนุมัติอยู่ (isPendingForTech) — ช่างแตะอะไรไม่ได้เลยจนกว่าจะอนุมัติ/ไม่อนุมัติ
-  const canEditDocFields = isAdminOrManagerUser || (isJobParticipantUser && !isPendingForTech);
+  const canEditDocFields = !readOnly && (isAdminOrManagerUser || (isJobParticipantUser && !isPendingForTech));
 
   // ✅ สีบนปฏิทิน — แก้ได้แม้งานปิดแล้วเช่นกัน เพราะเป็นแค่การแสดงผลบนปฏิทิน ไม่กระทบข้อมูลงาน
   // รายงาน หรือยอดเงินใดๆ เลย (ต่างจากวันที่/ทีม/สถานะ ที่แก้แล้วกระทบของจริง)
   const canEditColor = canEditDocFields;
 
-  const canEditTeamAssignment = isAdminOrManagerUser || (isRawResponsiblePerson && !isViewOnly);
+  const canEditTeamAssignment = !readOnly && (isAdminOrManagerUser || (isRawResponsiblePerson && !isViewOnly));
   // ❌ งานที่ admin ปิดแล้ว (ดำเนินการเสร็จสิ้น) ช่างลบไม่ได้อีก มีแค่ admin/manager เท่านั้น
   // ❌ งานที่ยังรออนุมัติ ช่างก็ลบเองไม่ได้เช่นกัน (isPendingForTech) — ทำอะไรไม่ได้เลยจนกว่าจะอนุมัติ/
   // ไม่อนุมัติก่อน
-  const canDeleteEvent = isAdminOrManagerUser || (eventStatus !== "ดำเนินการเสร็จสิ้น" && !isViewOnly);
+  const canDeleteEvent = !readOnly && (isAdminOrManagerUser || (eventStatus !== "ดำเนินการเสร็จสิ้น" && !isViewOnly));
   // ❌ งานที่ปิดแล้ว (ดำเนินการเสร็จสิ้น) ห้าม "ย้ายไปแผนล่วงหน้า" เด็ดขาด ไม่มีข้อยกเว้นแม้แต่ admin/
   // manager (ต่างจาก canDeleteEvent ด้านบน) เพราะ unschedule เคลียร์ date/start/end ทิ้งโดยไม่แตะ
   // status เลย ถ้าปล่อยให้ทำกับงานที่เสร็จแล้วได้ จะได้ "แผนงานล่วงหน้า" ที่ status ยังเป็น "เสร็จสิ้น"
@@ -855,11 +862,11 @@ export const getEditEvent = async ({
   // ให้เปลี่ยนสถานะกลับเป็น "กำลังรอยืนยัน" ก่อน จะได้มีร่องรอยว่าตั้งใจถอยสถานะจริง
   const UNSCHEDULE_BLOCKED_STATUSES = ["ดำเนินการเสร็จสิ้น", "ยืนยันแล้ว", "กำลังดำเนินการ"];
   const canUnscheduleEvent =
-    !UNSCHEDULE_BLOCKED_STATUSES.includes(eventStatus) && (isAdminOrManagerUser || !isViewOnly);
+    !readOnly && !UNSCHEDULE_BLOCKED_STATUSES.includes(eventStatus) && (isAdminOrManagerUser || !isViewOnly);
   // ✅ ช่างแก้ไขสถานะเองได้แค่ตอนยังอยู่ในช่วง กำลังรอยืนยัน/ยืนยันแล้ว เท่านั้น
   // ถ้าสถานะถูกเลื่อนไปไกลกว่านั้นแล้ว (กำลังดำเนินการ/ดำเนินการเสร็จสิ้น) ให้แสดงค่าจริงไว้ แต่แก้ไม่ได้
   // ❌ งานที่ยังรออนุมัติ ช่างเปลี่ยนสถานะเองไม่ได้เช่นกัน (isPendingForTech) — ต้องรออนุมัติก่อน
-  const canEditStatus = isAdminOrManagerUser || (TECH_EDITABLE_STATUSES.includes(eventStatus) && !isViewOnly);
+  const canEditStatus = !readOnly && (isAdminOrManagerUser || (TECH_EDITABLE_STATUSES.includes(eventStatus) && !isViewOnly));
 
   // ✅ "ย้ายเข้าสัญญาที่มีอยู่แล้ว" — ย้ายมาจากหน้า "ภาพรวมงาน" (ContractOverview.js openAttachDialog)
   // ให้แก้ไขกรณีจัดกลุ่มผิดได้ตรงจากหน้าแก้ไขงานเลย ไม่ต้องสลับไปหน้าภาพรวมงานทุกครั้ง — เฉพาะงานที่ยัง
@@ -885,7 +892,7 @@ export const getEditEvent = async ({
     .filter((c) => c.usedVisits < c.visitCount)
     .sort((a, b) => (a.company || "").localeCompare(b.company || "", "th") || (a.site || "").localeCompare(b.site || "", "th"));
   const contractDisplayName = (c) => [c.company, c.site].filter(Boolean).join(" · ") || "(ไม่ระบุชื่อ)";
-  const canAttachToContract = isAdminOrManagerUser && !eventContractGroupId && attachableContracts.length > 0;
+  const canAttachToContract = !readOnly && isAdminOrManagerUser && !eventContractGroupId && attachableContracts.length > 0;
 
   /* ── "ครั้งที่" ของงานสัญญา — ย้ายไปครั้งอื่นที่ยังว่างอยู่ได้ ────────────────────────────
      ✅ เดิมช่อง "ครั้งที่" ถูก disabled ตายตัวทุกกรณีที่งานมี contractGroupId (ดู editTime) — ลงครั้งที่
@@ -912,7 +919,7 @@ export const getEditEvent = async ({
   }
   // ✅ เปิดให้แก้เฉพาะตอนที่รู้จำนวนครั้งของสัญญาจริงๆ เท่านั้น — สัญญาเก่าที่ไม่เคยกรอก visitCount ไว้
   // ไม่มีข้อมูลพอจะบอกได้ว่า "ครั้งที่เท่าไหร่ยังว่าง" ปล่อยล็อกไว้เหมือนเดิมปลอดภัยกว่าเดา
-  const canEditContractRound = Boolean(eventContractGroupId) && isAdminOrManagerUser && !isViewOnly && contractTotalRounds > 0;
+  const canEditContractRound = !readOnly && Boolean(eventContractGroupId) && isAdminOrManagerUser && !isViewOnly && contractTotalRounds > 0;
   const freeRoundCount = canEditContractRound
     ? Array.from({ length: contractTotalRounds }, (_, i) => i + 1).filter((n) => !roundsTakenByOthers.has(n)).length
     : 0;
@@ -927,7 +934,7 @@ export const getEditEvent = async ({
   // ✅ คัดลอกงานนี้ไปวางเป็นงานใหม่ — เฉพาะงานทั่วไป ไม่ใช่งานผูกสัญญา (คัดลอกงานสัญญาจะทำให้ตัวนับ
   // "ครั้งที่" ที่ใช้ไปแล้วของสัญญาเดิมสับสน/เพี้ยนได้ ดู countUsedRounds ด้านบน)
   // ❌ ช่างงานรออนุมัติทำอะไรไม่ได้เลยเช่นกัน (isPendingForTech) — admin/manager ยังคัดลอกได้เสมอ
-  const canCopyEvent = !eventContractGroupId && (isAdminOrManagerUser || !isViewOnly);
+  const canCopyEvent = !readOnly && !eventContractGroupId && (isAdminOrManagerUser || !isViewOnly);
 
   const formattedEnd = eventAllDay
     ? moment(eventEnd).subtract(1, "days").format("YYYY-MM-DD")
@@ -1273,7 +1280,12 @@ export const getEditEvent = async ({
 
     <!-- section: วันที่ & เวลา — เหมือนหน้า Add เลย ค้างวันที่/ช่วงวันที่เดิมไว้ให้แก้ง่าย -->
     <p class="ee-section-label">วันที่ & เวลา ${!isAdminOrManagerUser && !isViewOnly ? `<span style="font-size:10.5px;font-weight:600;color:#16a34a;">✏️ แก้ไขได้</span>` : ""}</p>
-    ${isPendingForTech ? `
+    ${readOnly ? `
+    <p style="font-size:11px;color:#6d28d9;margin:-6px 0 10px;">
+      👁️ คุณกำลังดู ตารางงานของช่าง — เปิดดูรายละเอียดได้ทั้งหมด แต่แก้ไขไม่ได้
+      (ถ้าต้องการให้ช่างเข้างาน ให้เปิด <b>ใบแจ้งงาน</b>)
+    </p>
+    ` : isPendingForTech ? `
     <p style="font-size:11px;color:#b45309;margin:-6px 0 10px;">
       🔒 งานนี้ยังรออนุมัติ — ดูได้อย่างเดียว แก้ไขไม่ได้จนกว่าแอดมิน/manager จะอนุมัติหรือไม่อนุมัติก่อน
     </p>
@@ -1389,7 +1401,9 @@ export const getEditEvent = async ({
     <div class="ee-btn-group ee-btn-group-center">
       ${canAttachToContract ? `<button class="ee-btn ee-btn-attach" id="btnAttachContract">🔗 ย้ายเข้าสัญญา</button>` : ""}
       ${canViewOperation ? `<button class="ee-btn ee-btn-operation" id="btnViewSchedule">📊 ดูการดำเนินงาน</button>` : ""}
-      <button class="ee-btn ee-btn-info"      id="btnGeneratePDF">📄 ออกใบแจ้งเข้างาน</button>
+      ${/* ⚠️ โหมดดูอย่างเดียว (เซลเปิดดูตารางช่าง) — ออกเอกสารของงานคนอื่นไม่ได้
+            เดิมปุ่มนี้ไม่มีการตรวจสิทธิ์เลยสักชั้น (โชว์ทุกคนที่เปิดฟอร์มได้) */""}
+      ${readOnly ? "" : `<button class="ee-btn ee-btn-info"      id="btnGeneratePDF">📄 ออกใบแจ้งเข้างาน</button>`}
       <!-- ✅ ใบส่งมอบงาน — วางคู่กับ "ใบแจ้งเข้างาน" เพราะเป็นเอกสารคู่กันของงานเดียวกัน คนละหัวคนละท้าย
            ของงาน (แจ้งก่อนเข้า / ส่งมอบหลังเสร็จ) ใครที่รู้ว่าออกใบแจ้งเข้างานตรงนี้ ก็จะเจอใบส่งมอบ
            ตรงนี้ด้วยทันทีโดยไม่ต้องบอก

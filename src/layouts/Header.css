@@ -197,9 +197,11 @@
   }
 }
 
-/* ✅ ทางลัด "ภาพรวมสัญญา" เฉพาะจอมือถือ — เติมพื้นที่ว่างกลางแถบที่เกิดจากการซ่อน .navbar-nav ด้านบน
-   ทรงพิลล์โปร่งแสงบนพื้นเข้มของ header ให้ดูกลมกลืนกับธีม ไม่โดดออกมาเป็นปุ่มทึบ */
-.header-contract-pill {
+/* ✅ ทางลัด "สิ่งที่ใช้บ่อยที่สุดของแต่ละสายงาน" เฉพาะจอมือถือ — เติมพื้นที่ว่างกลางแถบที่เกิดจากการซ่อน .navbar-nav ด้านบน
+   ทรงพิลล์โปร่งแสงบนพื้นเข้มของ header ให้ดูกลมกลืนกับธีม ไม่โดดออกมาเป็นปุ่มทึบ
+   ⚠️ เดิมชื่อ header-contract-pill เฉพาะ "ภาพรวมสัญญา" — เปลี่ยนชื่อให้กลางเพราะ
+   ตอนนี้ใช้ร่วมกับ "ตารางงานช่าง" ของเซลด้วย (ดู Header.js — มีได้ทีละอันตามสายงาน) */
+.header-shortcut-pill {
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 999px;
@@ -212,7 +214,7 @@
   white-space: nowrap;
 }
 
-.header-contract-pill:hover {
+.header-shortcut-pill:hover {
   background: rgba(255, 255, 255, 0.15);
   border-color: rgba(255, 255, 255, 0.22);
   color: #ffffff !important;
@@ -220,10 +222,22 @@
 
 /* จอแคบมากๆ (เช่น iPhone SE) ตัดข้อความเหลือแค่ไอคอน+ป้ายจำนวน กันดันโลโก้/ไอคอนขวาจนล้น */
 @media (max-width: 360px) {
-  .header-contract-pill span {
+  .header-shortcut-pill span {
     display: none;
   }
-  .header-contract-pill {
+  .header-shortcut-pill {
     padding: 4px 8px;
   }
+}
+
+/* ✅ ลูกศรของปุ่มเลือกตารางงาน (จอกว้าง/มือถือ) — หมุนกลับหัวตอนเมนูเปิดอยู่ ให้รู้สึกว่า "กำลังเปิด/
+   ปิดอยู่จริง" เหมือน select ทั่วไป ไม่ใช่แค่ไอคอนตกแต่งเฉยๆ */
+.schedule-toggle-caret {
+  margin-left: 2px;
+  opacity: 0.75;
+  transition: transform 0.18s ease;
+}
+
+.schedule-toggle-caret--open {
+  transform: rotate(180deg);
 }

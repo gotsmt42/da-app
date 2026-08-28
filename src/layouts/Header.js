@@ -23,13 +23,79 @@ import Badge from "@mui/material/Badge";
 import { countOverdueContracts } from "../shared/utils/contractOverdue";
 // ✅ ไอคอน 3 เมนูกลางตรงกับที่ Dashboard.js/Sidebar.js ใช้จริงสำหรับหน้าเดียวกันเป๊ะๆ
 // (FaWrench="การดำเนินงาน", FaFileContract="ภาพรวมสัญญา", FaFileInvoiceDollar="ติดตามใบเสนอราคา")
-import { FaBars, FaUserCircle, FaSignOutAlt, FaWrench, FaFileContract, FaFileInvoiceDollar } from "react-icons/fa";
-import { can, isRole, ROLES } from "@/shared/utils/roles";
+import {
+  FaBars, FaUserCircle, FaSignOutAlt, FaWrench, FaFileContract, FaFileInvoiceDollar, FaCalendarAlt,
+  FaChevronDown, FaCheck, FaBriefcase,
+} from "react-icons/fa";
+import { can, isRole, ROLES, DEPARTMENT } from "@/shared/utils/roles";
+
+/**
+ * ✅ ตัวเลือกของ dropdown "ตารางงาน" — ต่างกันตาม role เพราะ query ?dept= มีความหมายไม่เหมือนกัน
+ * (ดู departmentScope ฝั่ง server) ต้องเป็นชุดเดียวกับที่ Sidebar.js ใช้อยู่แล้วเป๊ะๆ ไม่งั้นผู้ใช้จะ
+ * เจอ 2 ที่ที่ควรจะเหมือนกันแต่ตัวเลือกไม่ตรงกัน
+ *   • แอดมิน/manager: "/event" เฉยๆ = ตารางงานช่าง (ค่าเริ่มต้นของแผนกบริการ) ·
+ *     "/event?dept=sales" = ตารางงานเซล (ข้ามแผนกไปดูของฝ่ายขาย) — คู่เดียวกับ workMenu ของ
+ *     isAdminOrManager ใน Sidebar.js
+ *   • เซล: "/event" เฉยๆ = แผนงานของฉัน (นัดหมายของตัวเอง) · "/event?dept=service" = ตารางงานช่าง
+ *     (ขอดูอย่างเดียวข้ามแผนกมาฝั่งบริการ ตามสิทธิ์ viewServiceCalendar)
+ * ⚠️ แอดมินไม่มีแนวคิด "แผนงานของฉัน" แยกจาก "ตารางงานช่าง" เพราะแอดมินไม่ได้เป็นคนลงตารางเข้างานเอง
+ * — ใช้ตัวเลือกชุดของเซลกับแอดมินไม่ได้ (ผิดความหมาย ไม่ใช่แค่ผิดคำ)
+ */
+const scheduleOptionsFor = (isAdminOrManagerRole) =>
+  isAdminOrManagerRole
+    ? {
+        primary: { label: "ตารางงานช่าง", href: "/event", icon: FaWrench },
+        secondary: { label: "ตารางงานเซล", href: "/event?dept=sales", icon: FaBriefcase, dept: "sales" },
+      }
+    : {
+        primary: { label: "แผนงานของฉัน", href: "/event", icon: FaCalendarAlt },
+        secondary: {
+          label: "ตารางงานช่าง", href: `/event?dept=${DEPARTMENT.SERVICE}`, icon: FaWrench,
+          dept: DEPARTMENT.SERVICE,
+        },
+      };
+
+/**
+ * ✅ เมนูเลือกตารางงาน — ใช้ซ้ำทั้งปุ่มจอกว้าง (ใน .navbar-nav) และ pill จอมือถือ เนื้อหาข้างใน
+ * เหมือนกันเป๊ะ ต่างแค่ปุ่มเปิด (toggle) ที่อยู่คนละที่คนละหน้าตา
+ *
+ * ⚠️ ต้องอยู่ module scope (นอกฟังก์ชัน Header) ไม่ใช่ประกาศเป็น component ซ้อนอยู่ข้างในเด็ดขาด —
+ * ถ้าซ้อนอยู่ข้างใน ทุกครั้งที่ Header re-render (event แจ้งเตือนเข้าใหม่ทุก 30 วิ) จะได้ function
+ * identity ใหม่ React จะมองเป็นคนละคอมโพเนนต์แล้ว unmount/remount เมนูทิ้ง ถ้าผู้ใช้เปิดเมนูค้างอยู่
+ * พอดีจังหวะนั้นเมนูจะปิดตัวเองเงียบๆ (เทียบปัญหาเดียวกับ EditableCell ที่ ContractOverview.js)
+ */
+const ScheduleDropdownMenu = ({ options, isSecondaryActive }) => {
+  const PrimaryIcon = options.primary.icon;
+  const SecondaryIcon = options.secondary.icon;
+  return (
+    <DropdownMenu end className="modern-dropdown-menu">
+      <Link to={options.primary.href} style={{ textDecoration: "none" }}>
+        <DropdownItem className="dropdown-item-icon">
+          <PrimaryIcon size={14} />
+          <span>{options.primary.label}</span>
+          {!isSecondaryActive && <FaCheck size={11} style={{ marginLeft: "auto", color: "#16a34a" }} />}
+        </DropdownItem>
+      </Link>
+      <Link to={options.secondary.href} style={{ textDecoration: "none" }}>
+        <DropdownItem className="dropdown-item-icon">
+          <SecondaryIcon size={14} />
+          <span>{options.secondary.label}</span>
+          {isSecondaryActive && <FaCheck size={11} style={{ marginLeft: "auto", color: "#16a34a" }} />}
+        </DropdownItem>
+      </Link>
+    </DropdownMenu>
+  );
+};
 
 const Header = ({ toggleMobileSidebar }) => {
   const location = useLocation();
   const [user, setUser] = useState({});
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  // ✅ แยก state คนละตัวกับปุ่มจอกว้าง/มือถือ — ทั้งคู่มีอยู่ใน DOM พร้อมกันเสมอ (สลับด้วย CSS
+  // d-none/d-lg-flex ไม่ใช่ conditional render) ถ้าใช้ state ตัวเดียวกัน เปิดปุ่มหนึ่งจะพาอีกปุ่ม
+  // เปิดตามไปด้วยเวลาจอเปลี่ยนขนาดผ่าน breakpoint พอดี
+  const [scheduleMenuOpenDesktop, setScheduleMenuOpenDesktop] = useState(false);
+  const [scheduleMenuOpenMobile, setScheduleMenuOpenMobile] = useState(false);
 
   // ✅ ดึง events เองที่นี่ (แยกจากหน้า Operation) เพื่อให้กระดิ่งแจ้งเตือนเห็นได้ทุกหน้า
   // ไม่ใช่แค่ตอนเปิดหน้า Operation ค้างไว้เท่านั้น — poll ทุก 30s เหมือนหน้าอื่นๆ ในระบบ
@@ -50,6 +116,18 @@ const Header = ({ toggleMobileSidebar }) => {
   const canViewOperation = can(userData, "editOperation") || can(userData, "receiveDispatch");
   const isSale = isRole(userData, ROLES.SALE);
   const canViewQuotations = can(userData, "viewQuotations");
+  // ✅ ทางลัด "ตารางงานช่าง" (ดูอย่างเดียว) — เซลไม่เข้าเงื่อนไข canViewOperation/canViewContracts/
+  // canViewQuotations เลยสักข้อ พื้นที่กลาง header จึงว่างเปล่าทั้งจอกว้างและจอมือถือมาตลอด
+  const canViewService = can(userData, "viewServiceCalendar");
+  // ⚠️ ทั้งสองลิงก์ใช้ path "/event" เหมือนกัน ต่างกันแค่ query — เช็ค search แยกจาก pathname
+  // ไม่งั้นจะไฮไลต์ "active" พร้อมกันทั้งคู่ไม่ว่าเซลกำลังดูปฏิทินของตัวเองหรือของช่างอยู่
+  // ✅ ตัวเลือกของ dropdown "ตารางงาน" ต่างกันตาม role (ดูเหตุผลที่ scheduleOptionsFor ด้านบนไฟล์)
+  const scheduleOptions = scheduleOptionsFor(isAdminOrManager);
+  const isOnEventPage = location.pathname.startsWith("/event");
+  const isSecondaryScheduleActive = isOnEventPage && location.search.includes(`dept=${scheduleOptions.secondary.dept}`);
+  // ✅ ป้ายบนปุ่มสลับตามตัวเลือกปัจจุบันเหมือน <select> จริง — อยู่หน้าอื่นที่ไม่ใช่ปฏิทินเลยก็ยัง
+  // ต้องมีค่าเริ่มต้นให้แสดง จึงเผื่อตัวเลือกหลัก (primary) ไว้เป็นค่าตั้งต้นเสมอ
+  const scheduleLabel = isSecondaryScheduleActive ? scheduleOptions.secondary.label : scheduleOptions.primary.label;
 
   const { notifications, unread, markRead, markAllRead } = useEventNotifications(
     events,
@@ -158,13 +236,38 @@ const Header = ({ toggleMobileSidebar }) => {
             </Link>
           </NavItem>
           )}
+          {/* ✅ ทางลัดตารางงาน — สลับดูได้จากปุ่มเดียว ไม่ต้องเปิด sidebar ก่อน (ของเดิมเป็นลิงก์
+              ตายตัวไปทางเดียว ผู้ใช้ขอให้ทำเป็นตัวเลือกแทน) ตัวเลือกต่างกันตาม role — ดู scheduleOptionsFor
+              ✅ แอดมิน/manager เห็นด้วย (canViewService ครอบคลุมทั้ง 2 role นี้อยู่แล้ว) เดิมมีแค่ลิงก์
+              เดียวตายตัวเป็นของเซล พอเป็นแอดมินแล้วไม่มีอะไรให้กดในนี้เลย — ตอนนี้ได้ตัวเลือกที่ถูกต้อง
+              ตรงกับที่ Sidebar.js ให้แอดมินอยู่แล้ว (ตารางงานช่าง/ตารางงานเซล) */}
+          {canViewService && (
+          <NavItem>
+            <Dropdown isOpen={scheduleMenuOpenDesktop} toggle={() => setScheduleMenuOpenDesktop((o) => !o)}>
+              <DropdownToggle
+                tag="button" type="button"
+                className={`nav-link d-flex align-items-center gap-2 ${isOnEventPage ? "active" : ""}`}
+                style={{ background: "transparent", border: "none", fontFamily: "inherit", cursor: "pointer" }}
+              >
+                <FaCalendarAlt size={13} />
+                <span>{scheduleLabel}</span>
+                <FaChevronDown
+                  size={9}
+                  className={`schedule-toggle-caret ${scheduleMenuOpenDesktop ? "schedule-toggle-caret--open" : ""}`}
+                />
+              </DropdownToggle>
+              <ScheduleDropdownMenu options={scheduleOptions} isSecondaryActive={isSecondaryScheduleActive} />
+            </Dropdown>
+          </NavItem>
+          )}
         </Nav>
 
-        {/* ✅ จอมือถือ: Nav ด้านบนถูกซ่อนไว้ (d-none d-lg-flex) เหลือพื้นที่ว่างกลางแถบ — ใส่ทางลัด
-            "ภาพรวมงาน" พร้อมป้ายจำนวนสัญญาที่เกินกำหนดวางแผนรอบถัดไปแทนที่จะปล่อยว่างเปล่า — เปิดให้
-            ช่างเห็นด้วยเหมือนแอดมิน/manager (เห็นแค่ของตัวเอง เทียบ pattern เดียวกับเมนูบนจอกว้าง/Sidebar) */}
-        {canViewContracts && (
-          <Link to="/contracts" className="header-contract-pill d-flex d-lg-none align-items-center gap-1 mx-auto">
+        {/* ✅ จอมือถือ: Nav ด้านบนถูกซ่อนไว้ (d-none d-lg-flex) เหลือพื้นที่ว่างกลางแถบ — ใส่ทางลัดหลัก
+            ของแต่ละสายงานแทนที่จะปล่อยว่างเปล่า มีได้ทีละอันเท่านั้น (พื้นที่กลางแถบแคบเกินจะใส่ 2 อัน)
+            ✅ สายบริการ (แอดมิน/manager/ช่าง) → "ภาพรวมงาน" พร้อมป้ายจำนวนสัญญาที่เกินกำหนดวางแผนรอบถัดไป
+            ✅ เซล (ไม่มี canViewContracts) → "ตารางงานช่าง" แทน ไม่งั้นจะไม่มีทางลัดอะไรเลยบนจอมือถือ */}
+        {canViewContracts ? (
+          <Link to="/contracts" className="header-shortcut-pill d-flex d-lg-none align-items-center gap-1 mx-auto">
             <Badge
               badgeContent={overdueContractCount} color="error" max={9} overlap="circular"
               sx={{ "& .MuiBadge-badge": { fontSize: "8px", minWidth: 14, height: 14, padding: "0 3px" } }}
@@ -173,7 +276,26 @@ const Header = ({ toggleMobileSidebar }) => {
             </Badge>
             <span>ภาพรวมงาน</span>
           </Link>
-        )}
+        ) : canViewService ? (
+          <Dropdown
+            isOpen={scheduleMenuOpenMobile} toggle={() => setScheduleMenuOpenMobile((o) => !o)}
+            className="d-flex d-lg-none mx-auto"
+          >
+            <DropdownToggle
+              tag="button" type="button"
+              className="header-shortcut-pill d-flex align-items-center gap-1"
+              style={{ fontFamily: "inherit", cursor: "pointer" }}
+            >
+              <FaCalendarAlt size={12} />
+              <span>{scheduleLabel}</span>
+              <FaChevronDown
+                size={8}
+                className={`schedule-toggle-caret ${scheduleMenuOpenMobile ? "schedule-toggle-caret--open" : ""}`}
+              />
+            </DropdownToggle>
+            <ScheduleDropdownMenu options={scheduleOptions} isSecondaryActive={isSecondaryScheduleActive} />
+          </Dropdown>
+        ) : null}
 
         {/* ฝั่งขวา: แจ้งเตือน + รูปโปรไฟล์ผู้ใช้งาน + ปุ่มแฮมเบอร์เกอร์ */}
         {/* ✅ ปุ่มเปิด/ปิด push notification ย้ายไปอยู่ที่หน้า Settings แล้ว (เดิมมีทั้งที่นี่และ

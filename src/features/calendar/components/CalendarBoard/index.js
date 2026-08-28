@@ -134,12 +134,29 @@ function EventCalendar() {
    * ⚠️ ตัวนี้เปลี่ยนแค่ "ดูของใคร" ไม่ได้เปลี่ยนสิทธิ์ — ฝั่ง server ยอมให้ข้ามแผนกเฉพาะ
    * แอดมิน/ผู้จัดการ (ดู departmentScope) role อื่นเติม query เองก็ไม่มีผล
    */
-  const viewingDept = searchParams.get("dept") === "sales" ? "sales" : undefined;
+  const requestedDept = searchParams.get("dept");
+  /**
+   * ✅ เซลเปิดดู "ตารางงานช่าง" ได้ (?dept=service) — อ่านอย่างเดียว ตามที่ผู้ใช้สั่ง
+   * เหตุผล: เซลต้องรู้ว่าช่างว่างวันไหน/ติดงานที่ไหนอยู่ ก่อนไปรับปากลูกค้าเรื่องวันเข้างาน
+   * ⚠️ "ผู้เยี่ยมชม" เท่านั้น — ไม่ได้เป็นเจ้าของงานไหนเลย จึงต้องล็อกทุกทางที่แก้ข้อมูลได้
+   * (เพิ่มงาน / ลากเปลี่ยนวัน / ย่อขยาย / ฟอร์มแก้ไข) ดูจุดที่ใช้ isServiceObserver ด้านล่าง
+   * ⚠️ ฝั่ง server กันไว้อีกชั้นอยู่แล้ว (PUT/DELETE ต้องเป็นเจ้าของ/ผู้ถูกมอบหมาย ไม่งั้น 403)
+   * การล็อกฝั่งจอนี้มีไว้ให้ผู้ใช้ "ไม่กรอกเสียเที่ยว" ไม่ใช่เพื่อความปลอดภัย
+   */
+  const isServiceObserver =
+    requestedDept === DEPARTMENT.SERVICE && can(userData, "viewServiceCalendar") && isSaleUser;
+  const viewingDept =
+    requestedDept === "sales" ? "sales" : isServiceObserver ? DEPARTMENT.SERVICE : undefined;
   const viewingSalesCalendar = viewingDept === "sales";
-  // ✅ ใช้จุดเดียวคุมทั้งแผงตัวกรองและตรรกะกรอง — เดิมแยกเช็คคนละที่ (isSaleUser ที่ฟอร์ม
-  // เพิ่ม/แก้ไข, isSaleUser || viewingSalesCalendar ที่ legend) พอเพิ่มแผงตัวกรองอีกจุดจะเสี่ยง
-  // ลืมจุดใดจุดหนึ่งอีก
-  const isSalesView = isSaleUser || viewingSalesCalendar;
+  // ✅ จุดเดียวที่ตอบว่า "ตอนนี้กำลังดูโลกของฝ่ายขายอยู่ไหม" — คุมทั้งแถบสี/ป้ายอธิบายสี/
+  // แผงตัวกรอง/ฟอร์มเพิ่ม-แก้ไข/แผงงานล่วงหน้า
+  // 🐛 BUG ที่แก้ (ผู้ใช้แจ้ง: เซลเปิด ?dept=service แล้วแถบสียังเป็นชุดของงานขาย):
+  // แม้จะมีตัวนี้ไว้กันลืมแล้ว แต่ 3 จุด (คลาส ec-sales ที่เปลี่ยนชุดสีทั้งตาราง, แผงป้ายอธิบายสี
+  // และฟอร์มเพิ่ม) ยังเขียน isSaleUser || viewingSalesCalendar สดอยู่ จึงตอบว่า "ใช่" กับเซล
+  // ที่กำลังดูตารางช่าง — ต้องใช้ isSalesView ทุกจุด ห้ามเขียนเงื่อนไขสดซ้ำอีก
+  // ⚠️ เซลที่กำลังเปิดดูตารางช่างอยู่ ต้องได้มุมมองของ "งานช่าง" (ป้ายสี/ตัวกรอง/ฟอร์ม) ไม่ใช่ของงานขาย
+  // — ไม่งั้นจะเห็นป้ายสถานะของงานขายทับอยู่บนงานช่างซึ่งคนละชุดกันคนละความหมาย
+  const isSalesView = (isSaleUser && !isServiceObserver) || viewingSalesCalendar;
 
   /**
    * งานชิ้นนี้เป็น "นัดหมายของฝ่ายขาย" หรือไม่ — ตัดสินจาก department ของตัวงานเสมอ
@@ -206,8 +223,10 @@ function EventCalendar() {
    * ไม่ว่างานจะปิดแล้วหรือยัง ส่วนการ "แก้ไข" ยังใช้ canEditEvent เดิมที่ล็อกไว้ทุกประการ
    * ⚠️ ต้องไม่เอาไปใช้คุมการลาก/ย่อขยายงานบนปฏิทินเด็ดขาด — จุดพวกนั้นต้องใช้ canEditEvent เท่านั้น
    */
+  // ✅ เซลที่เปิดดูตารางช่าง เปิดดูได้ทุกงาน (แต่แก้ไม่ได้เลย — ดู isServiceObserver)
+  // ⚠️ ห้ามเอาไปรวมใน canEditEvent เด็ดขาด เพราะตัวนั้นคุมการลาก/ย่อขยายงานบนปฏิทินด้วย
   const canViewEvent = (extendedProps) =>
-    isJobParticipant(extendedProps) || canViewEventAsTeamMember(extendedProps);
+    isServiceObserver || isJobParticipant(extendedProps) || canViewEventAsTeamMember(extendedProps);
 
   const [events, setEvents] = useState([]);
 
@@ -581,7 +600,10 @@ function EventCalendar() {
   // ไม่ใช่แค่กรองแผนกให้ถูก แต่ตัดการเรียก/แสดงทั้งแผงทิ้งไปเลยตอนอยู่ในโลกฝ่ายขาย กันไม่ให้
   // ข้อมูลฝ่ายช่างหลุดเข้ามาในเซสชันของเซล และกันปุ่มที่กดแล้วไม่มีวันมีอะไรให้เห็น
   const fetchDrafts = async (silent = false) => {
-    if (isSalesView) { setDrafts([]); setShowDraftsPanel(false); return; }
+    // ⚠️ เซลที่เปิดดูตารางช่างก็ไม่ต้องดึงเหมือนกัน — GET /drafts ยังกรองตามแผนกของผู้ขอ
+    // ถ้าดึงมาจะได้ "แผนล่วงหน้าของฝ่ายขาย" มาโผล่ในตารางช่าง ซึ่งผิดแผนกชัดๆ
+    // ✅ อีกทั้งแผนงานล่วงหน้ายังไม่มีวันที่ จึงไม่ช่วยตอบคำถามเดียวที่เซลเปิดมาดู: "ช่างว่างวันไหน"
+    if (isSalesView || isServiceObserver) { setDrafts([]); setShowDraftsPanel(false); return; }
     if (!silent) setDraftsLoading(true);
     try {
       const res = await EventService.GetDraftEvents();
@@ -623,12 +645,24 @@ function EventCalendar() {
   };
 
   const handleAddEvent = async (arg) => {
+    // ❌ เซลที่เปิดดูตารางช่างอยู่ สร้างงานให้ช่างไม่ได้ — เป็นมุมมองอ่านอย่างเดียวล้วนๆ
+    // ⚠️ ถ้าอยากให้ช่างไปทำงานให้ ต้องผ่าน "ใบแจ้งงาน" (/dispatch) ซึ่งเป็นทางที่ออกแบบไว้ให้ข้ามแผนก
+    // และมีขั้นตอนอนุมัติ/มอบหมายครบ — บอกทางไปให้เลย ไม่ใช่แค่ปฏิเสธเฉยๆ
+    if (isServiceObserver) {
+      Swal.fire({
+        icon: "info",
+        title: "ดูได้อย่างเดียว",
+        text: 'ตารางงานช่างเปิดให้ดูเพื่อเช็ควันว่างเท่านั้น — ถ้าต้องการให้ช่างเข้างาน ให้เปิด "ใบแจ้งงาน"',
+        confirmButtonText: "เข้าใจแล้ว",
+      });
+      return;
+    }
     // ✅ เซลได้ฟอร์ม "นัดหมาย" ของตัวเอง ไม่ใช่ฟอร์มงานของช่าง
     // ⚠️ ฟอร์มของช่างเริ่มด้วยขั้นตอน "ประเภทงาน: งานทั่วไป/โปรเจค/ตามสัญญา" แล้วต่อด้วย ระบบ/ทีม/
     // ครั้งที่/สัญญา ซึ่งไม่มีความหมายกับงานขายเลยสักช่อง (ดูเหตุผลเต็มที่ AddSalesAppointment.js)
     // ⚠️ แอดมินที่เปิดเมนู "ตารางงานเซล" (?dept=sales) ก็ต้องได้ฟอร์มนัดหมาย ไม่ใช่ฟอร์มงานช่าง
     // — ปฏิทินที่กำลังเปิดอยู่คือตัวบอกว่ากำลังจะสร้างของแผนกไหน
-    if (isSaleUser || viewingSalesCalendar) {
+    if (isSalesView) {
       await getAddSalesAppointment({
         arg, userData, saveEventToDB, fetchEventsFromDB, Swal, moment,
         // ⚠️ ต้องส่ง department ไปด้วย — ฝั่ง server เดาจาก role ของผู้สร้าง ซึ่งกับแอดมินจะได้
@@ -672,7 +706,9 @@ function EventCalendar() {
     // ✅ เซลได้ฟอร์มแก้ไข "นัดหมาย" คู่แฝดของฟอร์มเพิ่ม ไม่ใช่ฟอร์มงานของช่าง
     // ⚠️ ฟอร์มของช่างมีแผงสัญญา/เอกสาร 4 ชนิด/ทีมเข้างาน/คำขอปิดงาน ซึ่งไม่มีอะไรเกี่ยวกับนัดของเซล
     const src = events.find((e) => String(e._id) === String(eventInfo?.event?.id));
-    if (isSaleUser || isSalesEvent(src) || isSalesEvent(eventInfo?.event)) {
+    // ⚠️ เซลที่เปิดดูตารางช่างอยู่ ต้องได้ฟอร์มของงานช่าง (แบบอ่านอย่างเดียว) ไม่ใช่ฟอร์มนัดหมาย
+    // — งานที่กดเปิดเป็นงานของช่าง ไม่ใช่นัดของตัวเอง
+    if ((isSaleUser && !isServiceObserver) || isSalesEvent(src) || isSalesEvent(eventInfo?.event)) {
       await getEditSalesAppointment({
         eventInfo, events, EventService, fetchEventsFromDB, handleDeleteEvent, Swal, moment,
       });
@@ -682,6 +718,8 @@ function EventCalendar() {
       navigate,
       events,
       setEvents,
+      // ✅ เซลที่เข้ามาดูตารางช่าง — เปิดดูรายละเอียดได้ครบ แต่แก้อะไรไม่ได้เลยสักช่อง
+      readOnly: isServiceObserver,
       fetchEventsFromDB,
       fetchLookupOptions,
       eventInfo,
@@ -1657,7 +1695,7 @@ function EventCalendar() {
 
         {/* ⚠️ นัดหมายของเซลไม่มีแนวคิด "วางแผนล่วงหน้าไม่ระบุวันที่" เลย (ดู fetchDrafts) —
             ปุ่มนี้จึงไม่มีความหมายในโลกฝ่ายขาย ซ่อนไปเลยแทนที่จะโชว์ปุ่มที่กดแล้วว่างเปล่าตลอด */}
-        {!isSalesView && (
+        {!isSalesView && !isServiceObserver && (
           <button
             className={`filter-toggle-btn ${showDraftsPanel ? "filter-toggle-btn--open" : ""} ${visibleDrafts.length > 0 ? "filter-toggle-btn--active" : ""}`}
             onClick={() => setShowDraftsPanel((p) => !p)}
@@ -1873,7 +1911,7 @@ function EventCalendar() {
             ทั้งฝ่ายช่างและฝ่ายขาย สีคือสิ่งที่บอกทันทีว่ากำลังดูปฏิทินของสายงานไหน */}
         <div
           id="content-id"
-          className={"calendar-wrapper" + (isSaleUser || viewingSalesCalendar ? " ec-sales" : "")}
+          className={"calendar-wrapper" + (isSalesView ? " ec-sales" : "")}
           ref={swipeAreaRef}
         >
         <FullCalendar
@@ -2442,7 +2480,7 @@ function EventCalendar() {
             ⚠️ ฝ่ายขายไม่มี "การอนุมัติ" (นัดของตัวเองไม่ต้องรออนุมัติ) และไม่มี "งานสัญญา/
             งานโปรเจค" (เป็นแนวคิดของงานช่างล้วนๆ) การโชว์ให้เซลเห็นคือคำอธิบายของสิ่งที่
             ไม่มีวันเกิดขึ้นในปฏิทินของเขา */}
-        {isSaleUser || viewingSalesCalendar ? (
+        {isSalesView ? (
           <div className="ec-legend-panel">
             <div className="ec-legend-group">
               <div className="ec-legend-group-title">ประเภทนัดหมาย</div>

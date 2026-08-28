@@ -6,7 +6,7 @@ import "./Sidebar.css";
 import Swal from "sweetalert2";
 import { swalLogout, hasValidAvatar } from "../shared/utils/user";
 import { useAuth } from "../features/auth/AuthContext";
-import { can, isRole, roleLabel, ROLES } from "@/shared/utils/roles";
+import { can, isRole, roleLabel, ROLES, DEPARTMENT } from "@/shared/utils/roles";
 // ✅ ใช้ไอคอนชุดเดียวกับที่ Dashboard.js ใช้จริง (react-icons/fa) แทน bootstrap-icons เดิม — เดิม
 // สองที่นี้ใช้คนละชุดไอคอนกันคนละความหมาย (เช่น "แผนงานทั้งหมด" หน้า Dashboard กับ "แผนงาน" ใน
 // sidebar เป็นหน้าเดียวกันแต่ไอคอนคนละแบบ) ทำให้ผู้ใช้จำไม่ได้ว่าไอคอนไหนคือเมนูไหนบ้าง
@@ -116,7 +116,21 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
           { title: "ตารางงานเซล", href: "/event?dept=sales" },
         ],
       }]
-    : [{ title: canViewOperation ? "ตารางงาน" : "แผนงานของฉัน", href: "/event", icon: <FaCalendarAlt /> }];
+    : can(userData, "viewServiceCalendar")
+      ? [{
+          // ✅ เซล — เห็น 2 ปฏิทิน: ของตัวเอง (แก้ได้) และของช่าง (ดูอย่างเดียว)
+          // เหตุผล: ต้องเช็คว่าช่างว่างวันไหนก่อนไปรับปากลูกค้าเรื่องวันเข้างาน
+          // ⚠️ ตารางงานช่างเป็นมุมมองอ่านอย่างเดียวล้วนๆ — กดเข้าไปดูรายละเอียดได้ แต่แก้ไม่ได้เลย
+          // (ดู isServiceObserver ที่ CalendarBoard และ readOnly ที่ EditEvent)
+          title: "แผนงาน",
+          href: "/event",
+          icon: <FaCalendarAlt />,
+          items: [
+            { title: "แผนงานของฉัน", href: "/event" },
+            { title: "ตารางงานช่าง (ดูอย่างเดียว)", href: `/event?dept=${DEPARTMENT.SERVICE}` },
+          ],
+        }]
+      : [{ title: canViewOperation ? "ตารางงาน" : "แผนงานของฉัน", href: "/event", icon: <FaCalendarAlt /> }];
 
   // ✅ "การดำเนินงาน" แยกออกมาเป็นเมนูระดับบนสุดตามที่ผู้ใช้สั่ง — เดิมซ่อนอยู่ในเมนูย่อยของ
   // "แผนงาน" ทั้งที่เป็นหน้าที่ใช้บ่อยที่สุดของฝ่ายช่าง (ไล่จัดการงานทีละใบ) และเป็นคนละเรื่องกับ

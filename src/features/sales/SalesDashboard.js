@@ -22,13 +22,14 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
-  Add, Engineering, EventAvailable, TrendingUp, ArrowForward, Place, AccessTime,
+  Add, Engineering, EventAvailable, TrendingUp, ArrowForward, Place, AccessTime, LockOutlined,
 } from "@mui/icons-material";
 
 import { useAuth } from "@/features/auth/AuthContext";
 import EventService from "@/shared/services/EventService";
 import DispatchService from "@/features/dispatch/services/DispatchService";
 import { formatThai } from "@/shared/utils/thaiDate";
+import { can, DEPARTMENT } from "@/shared/utils/roles";
 import {
   SALES_TYPE_META, salesEventColors, salesStatusMeta,
 } from "@/features/calendar/salesAppointmentTypes";
@@ -38,6 +39,9 @@ const ACCENT = "#8b5cf6";
 const ACCENT_DEEP = "#5b21b6";
 const TEXT_SUB = "#64748b";
 const BORDER = "#e2e8f0";
+// ✅ สีสายบริการ (ตรงกับ ROLE_COLOR[technician] และปุ่ม/ป้ายฝั่งช่างทั้งแอป) — จงใจให้ต่างจากม่วง
+// ของเซลด้านบน ผู้ใช้เห็นสีแล้วรู้ทันทีว่าบล็อกนี้ "ไม่ใช่ของฉัน" กำลังดูของอีกแผนกอยู่
+const SERVICE_ACCENT = "#0891b2";
 
 const greeting = () => {
   const h = new Date().getHours();
@@ -82,20 +86,39 @@ export default function SalesDashboard() {
   const { userData } = useAuth();
   const [events, setEvents] = useState([]);
   const [dispatches, setDispatches] = useState([]);
+  const [serviceEvents, setServiceEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // ✅ เผื่อวันหลังถอดสิทธิ์นี้ออกจากเซล — บล็อกทั้งก้อนหายไปเงียบๆ แทนที่จะค้างเป็นกล่องว่างตลอดกาล
+  // (ตัวข้อมูลจริงถูกกันไว้ที่ server อยู่แล้ว นี่แค่ไม่ยิง request ทิ้งเปล่าๆ ฝั่งจอ)
+  const canViewService = can(userData, "viewServiceCalendar");
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [ev, dp] = await Promise.all([
+    const [ev, dp, sv] = await Promise.all([
       EventService.getEventOp().catch(() => ({ userEvents: [] })),
       DispatchService.list().catch(() => []),
+      canViewService
+        ? EventService.getEventOp({ dept: DEPARTMENT.SERVICE }).catch(() => ({ userEvents: [] }))
+        : Promise.resolve({ userEvents: [] }),
     ]);
     setEvents(ev?.userEvents || []);
     setDispatches(Array.isArray(dp) ? dp : []);
+    setServiceEvents(sv?.userEvents || []);
     setLoading(false);
-  }, []);
+  }, [canViewService]);
 
   useEffect(() => { load(); }, [load]);
+
+  /**
+   * ตารางงานช่าง — "ดูอย่างเดียว" ตามสิทธิ์ viewServiceCalendar (ดู roles.js / CalendarBoard.js)
+   * เซลต้องรู้ว่าช่างว่างวันไหนก่อนไปรับปากลูกค้าเรื่องวันเข้างาน แต่ปุ่มทางลัดนี้ตั้งใจไม่แสดง
+   * รายละเอียดรายงาน — บอกแค่ตัวเลขวันนี้พอ กดเข้าไปดูรายละเอียดที่ปฏิทินเต็มแทน
+   */
+  const serviceTodayCount = useMemo(
+    () => serviceEvents.filter((e) => moment(e.start || e.date).isSame(moment(), "day")).length,
+    [serviceEvents]
+  );
 
   /**
    * นัดหมายข้างหน้า 14 วัน จัดกลุ่มตามวัน
@@ -212,6 +235,65 @@ export default function SalesDashboard() {
           </Stack>
         </Stack>
       </Box>
+
+      {/* ── ตารางงานช่าง (ดูอย่างเดียว) ────────────────────────────────────
+          ✅ ที่แก้ (ผู้ใช้ขอ): ย้ายขึ้นมาไว้ใต้หัวหน้าเพจทันที — เดิมอยู่ล่างสุดของหน้า ต้องเลื่อนผ่าน
+          ตัวเลข/นัดหมาย/งานที่ส่งให้ช่างก่อนถึงจะเจอ (บนมือถือคือเลื่อนเกือบสุดจอ) ทั้งที่เป็นสิ่งที่
+          เซลต้องเช็คบ่อยพอๆ กับปุ่ม "เพิ่มนัดหมาย"/"แจ้งงานให้ช่าง" ด้านบน — ตอนนี้อยู่ติดกันเป็นชุด
+          เดียวกัน เห็นครบภายในหน้าจอแรกโดยไม่ต้องเลื่อนเลย
+          🐛 ที่แก้ก่อนหน้า: เดิมเป็นแถบการ์ดรายละเอียด 8 ใบ (ชื่องาน/สถานที่/เวลา/ผู้รับผิดชอบ) ซึ่ง
+          ข้อมูลเยอะเกินไปสำหรับสิ่งที่เป็นแค่ "ทางลัด" ไปดูอีกหน้า ไม่ใช่เนื้อหาหลักของแดชบอร์ดนี้
+          ✅ ยุบเหลือปุ่มเดียว ใหญ่ กดง่าย เห็นชัด — บอกแค่ "วันนี้ช่างมีงานกี่งาน" (ตัวเลขเดียว ไม่ใช่
+          รายการ) แล้วให้กดเข้าไปดูรายละเอียดที่ปฏิทินเต็มแทน
+          ✅ คนละสีกับปุ่มด้านบนโดยตั้งใจ (ฟ้า-เขียวของสายบริการ แทนม่วงของเซล) — ให้เห็นปุ๊บรู้ว่า
+          นี่คือทางลัดไปข้อมูลของ "อีกแผนก" ไม่ใช่นัดหมายของตัวเอง */}
+      {canViewService && (
+        <Box
+          onClick={() => navigate(`/event?dept=${DEPARTMENT.SERVICE}`)}
+          sx={{
+            mb: 2.5, p: 2, borderRadius: 3, cursor: "pointer",
+            display: "flex", alignItems: "center", gap: 1.5,
+            bgcolor: "#fff", border: "1px solid", borderColor: alpha(SERVICE_ACCENT, 0.25),
+            transition: "transform .15s, box-shadow .15s, border-color .15s",
+            "&:hover": {
+              transform: "translateY(-2px)", borderColor: SERVICE_ACCENT,
+              boxShadow: `0 8px 22px -12px ${alpha(SERVICE_ACCENT, 0.55)}`,
+            },
+          }}
+        >
+          <Box
+            sx={{
+              width: 44, height: 44, borderRadius: 2.5, flexShrink: 0,
+              bgcolor: alpha(SERVICE_ACCENT, 0.12), color: SERVICE_ACCENT,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}
+          >
+            <Engineering sx={{ fontSize: 22 }} />
+          </Box>
+
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.15 }}>
+              <Typography sx={{ fontWeight: 800, fontSize: "0.95rem" }}>ตารางงานช่าง</Typography>
+              <Chip
+                size="small" icon={<LockOutlined sx={{ fontSize: "12px !important" }} />}
+                label="ดูอย่างเดียว"
+                sx={{
+                  height: 18, fontSize: "0.6rem", fontWeight: 700,
+                  bgcolor: alpha(SERVICE_ACCENT, 0.1), color: SERVICE_ACCENT,
+                  "& .MuiChip-icon": { color: "inherit", ml: "5px" },
+                }}
+              />
+            </Stack>
+            <Typography variant="caption" sx={{ color: TEXT_SUB }}>
+              {serviceTodayCount > 0
+                ? `วันนี้ช่างมีงาน ${serviceTodayCount} งาน`
+                : "เช็ควันว่างของช่างก่อนนัดลูกค้า"}
+            </Typography>
+          </Box>
+
+          <ArrowForward sx={{ color: SERVICE_ACCENT, flexShrink: 0 }} />
+        </Box>
+      )}
 
       {/* ── ตัวเลขที่ต้องรู้ ───────────────────────────────────────────── */}
       <Stack direction="row" spacing={1.5} sx={{ mb: 2.5, flexWrap: "wrap", gap: 1.5 }}>
@@ -450,6 +532,7 @@ export default function SalesDashboard() {
           )}
         </Box>
       </Box>
+
     </Box>
   );
 }

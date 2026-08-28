@@ -85,6 +85,17 @@ export const CAPABILITIES = {
   requestDispatch: [ROLES.ADMIN, ROLES.MANAGER, ROLES.SALE],
   assignDispatch: [ROLES.ADMIN, ROLES.MANAGER],
   receiveDispatch: [ROLES.TECHNICIAN],
+
+  /**
+   * เปิดดู "ตารางงานช่าง" ได้ทั้งแผนก แม้ตัวเองไม่ได้อยู่ในงานเลย — อ่านอย่างเดียวเท่านั้น
+   *
+   * ✅ เซลต้องรู้ว่าช่างว่างวันไหน/ไปที่ไหนอยู่ ก่อนจะไปรับปากลูกค้าเรื่องวันเข้างาน
+   * ⚠️ สิทธิ์ "ดู" ล้วนๆ ไม่มีสิทธิ์เขียนตามมา — ฝั่ง server ยังกันไว้ทุกด่านเหมือนเดิม (PUT /:id
+   * ต้องเป็น editAnyJob / เจ้าของงาน / ผู้ถูกมอบหมาย ไม่งั้น 403) ซึ่งเซลไม่เข้าเงื่อนไขไหนเลย
+   * ⚠️ ฝั่งหน้าจอยังต้องล็อกฟอร์มให้ครบด้วย (ดู readOnly ที่ EditEvent.js) — ไม่ใช่เพื่อความปลอดภัย
+   * แต่เพื่อไม่ให้ผู้ใช้กรอกไปทั้งหน้าแล้วเพิ่งมารู้ตอนกดบันทึกว่าทำไม่ได้
+   */
+  viewServiceCalendar: [ROLES.ADMIN, ROLES.MANAGER, ROLES.SALE],
 };
 
 export const ALL_CAPABILITIES = Object.keys(CAPABILITIES);

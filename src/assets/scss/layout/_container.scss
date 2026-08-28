@@ -1,10 +1,21 @@
 .pageWrapper {
   min-height: 100vh;
 }
+/**
+ * 🐛 BUG ที่แก้ (ผู้ใช้แจ้ง: "ตอนยืดหด sidebar content ไม่ยืดตาม"): เดิม max-width:1300px + margin:auto
+ * ตายตัวตรงนี้ ถูกปลดล็อกเป็น max-width:100% เฉพาะตอน "ย่อ" แถบข้าง (ดู .contentArea.sidebarCollapsed
+ * ใน FullLayout.css) แต่ไม่เคยปลดล็อกตอน "ขยาย" แถบกลับ — บนจอกว้าง (วัดจริง 1920px) ผลคือช่องว่าง
+ * ด้านซ้ายของเนื้อหาบวมไป 209px ตอนขยายแถบ เทียบกับ 24px ตอนย่อแถบ (วัดจริงด้วย Playwright ทั้งสอง
+ * สถานะ) ผู้ใช้จึงเห็นเนื้อหา "ไม่ขยับตาม" เวลาสลับ ทั้งที่ .contentArea เป็น flex:1 อยู่แล้วซึ่ง
+ * ควรคำนวณความกว้างที่เหลือให้เองอัตโนมัติโดยไม่ต้องมี max-width มาแย่งบังคับอีกชั้น
+ * ✅ ตัด max-width/margin ที่นี่ทิ้ง ให้ flex-grow:1 เป็นตัวกำหนดความกว้างแหล่งเดียวเสมอ ไม่ว่าจะย่อ
+ * หรือขยายแถบ — หน้าที่อยากมี "ความกว้างอ่านง่าย" ของตัวเอง (เช่น TeamWorkload/BillingTracking/
+ * CustomerOverview) มี maxWidth+mx:"auto" ในกล่องของตัวเองอยู่แล้ว ไม่ต้องพึ่งกฎกลางตรงนี้ซ้ำ
+ * ⚠️ .sidebarCollapsed / .calendar-mode / .wide-table-mode ใน FullLayout.css ยังตั้ง max-width:100%
+ * ไว้เหมือนเดิม — กลายเป็น no-op ที่ไม่ผิดอะไร (ของเดิมเป็น 100% อยู่แล้วหลังแก้ตรงนี้) เก็บไว้ไม่ต้องลบ
+ */
 .contentArea {
   flex-grow: 1;
-  max-width: 1300px;
-  margin: 0 auto;
 }
 .card {
   box-shadow: $card-box-shadow;
