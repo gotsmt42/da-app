@@ -51,7 +51,7 @@ import JobTypeService from "@/shared/services/JobTypeService";
 import SystemTypeService from "@/shared/services/SystemTypeService";
 import { formatEventDateRange } from "@/shared/utils/formatDateRange";
 import { resolveOperationGroup } from "@/shared/utils/overdueJobs";
-import { countUsedRounds, visitsPerYear } from "@/shared/utils/contractRounds";
+import { countUsedRounds, visitsPerYear, INTERVAL_MONTHS_PRESETS } from "@/shared/utils/contractRounds";
 import { groupEventsByContract, nextVisitOverdueInfo, contractStatusInfo, isExpiredContract } from "@/shared/utils/contractOverdue";
 // ✅ สถานะการวางบิล/รับเงิน — ของกลางชุดเดียวกับหน้า "วางบิล / รับเงิน" (/billing) ห้ามคำนวณซ้ำที่นี่
 import { contractBillingSummary, baht as bahtFmt } from "@/shared/utils/billing";
@@ -545,6 +545,45 @@ const ResizableTh = ({ width, align = "left", children, onResize, rowSpan = 1, c
 // เป็นสัญญาจริง (isRealContract) เท่านั้น เพราะอิงจากการอัปเดตผ่าน contractGroupId ซึ่งงานเก่าที่ยัง
 // ไม่จัดกลุ่มไม่มี — ต้องอยู่นอกคอมโพเนนต์หลัก (module scope) ไม่งั้นทุก re-render จะได้ function
 // identity ใหม่ ทำให้ React มองเป็นคนละคอมโพเนนต์แล้ว unmount/remount ช่องที่กำลังพิมพ์อยู่ (โฟกัสหลุด)
+/**
+ * ✅ ตัวเลือกด่วน "เข้าปีละกี่ครั้ง" — กดชิปแล้วตั้งค่า "รอบเข้า" (intervalMonths) ให้ทันที แทนที่จะ
+ * ต้องคิดเลขเองว่า "ปีละ 4 ครั้ง" ต้องกรอกเลขเดือนเท่าไหร่ (ตามที่ผู้ใช้ขอ: "แก้ไขจำนวนครั้งที่เข้า
+ * ต่อปีได้ด้วย") ใช้ร่วมกันทั้งช่องแก้ไขในตาราง/การ์ด (ผ่าน editType="intervalMonths" ใน EditableCell)
+ * และฟอร์ม "เพิ่มสัญญาใหม่"/"ย้ายเข้าสัญญาที่มีอยู่" — ทุกจุดพูดหน่วยเดียวกัน
+ *
+ * ⚠️ ไม่ได้แทนที่ช่องกรอกจำนวนเดือนแบบตัวเลขทิ้ง — ตั้งใจวางคู่กัน: ชิปเป็นทางลัดสำหรับ 6 รอบที่พบบ่อย
+ * ที่สุด (ปีละ 12/6/4/3/2/1 ครั้ง) ส่วนช่องตัวเลขข้างล่างยังกรอกรอบที่ไม่ลงตัว (เช่น ทุก 5 เดือน) ได้
+ * เหมือนเดิมทุกประการ — สัญญาบางฉบับมีรอบเข้าไม่ปกติจริงๆ (ดูคอมเมนต์ที่ visitsPerYear())
+ * ⚠️ ต้องอยู่ module scope เหมือน EditableCell/FieldRow ด้านล่าง ไม่งั้นทุก re-render ของ
+ * ContractOverview จะได้ function identity ใหม่ ทำให้ React unmount/remount ชิปทิ้งทุกครั้ง
+ * (โฟกัส/hover state หลุด แม้ไม่ใช่ input ที่พิมพ์อยู่ก็เสียความลื่นไหลโดยไม่จำเป็น)
+ */
+const IntervalMonthsQuickPicks = ({ value, onPick, disabled, size = "small" }) => (
+  <Stack direction="row" spacing={0.5} sx={{ flexWrap: "wrap", gap: 0.5 }}>
+    {INTERVAL_MONTHS_PRESETS.map((p) => {
+      const selected = String(value) === String(p.months);
+      return (
+        <Chip
+          key={p.months}
+          label={`ปีละ ${p.perYear} ครั้ง`}
+          size={size}
+          disabled={disabled}
+          onClick={() => onPick(String(p.months))}
+          title={p.label}
+          sx={{
+            fontSize: size === "small" ? "0.68rem" : "0.72rem",
+            fontWeight: 700,
+            height: size === "small" ? 22 : 26,
+            bgcolor: selected ? ACCENT : alpha(ACCENT, 0.08),
+            color: selected ? "#fff" : ACCENT,
+            "&:hover": { bgcolor: selected ? ACCENT : alpha(ACCENT, 0.16) },
+          }}
+        />
+      );
+    })}
+  </Stack>
+);
+
 // ✅ Wrapper (default TableCell) — ให้ใช้ตัวเดียวกันได้ทั้งในตารางเดสก์ท็อป (TableCell จริง) และการ์ด
 // บนมือถือ (Box ธรรมดา ไม่มี <table> ห่ออยู่) โดยไม่ต้องแยกโค้ด edit/select/autocomplete ซ้ำสองที่ —
 // ดู renderMobileCard ด้านล่างที่เรียกใช้ตัวนี้ซ้ำกับ Wrapper={Box}
@@ -662,6 +701,28 @@ const EditableCell = ({
             sx: { "& .MuiOutlinedInput-input": { py: 0.5, fontSize: "0.8rem" } },
           }}
         />
+      ) : editType === "intervalMonths" ? (
+        // ✅ "รอบเข้า" — ชิปเลือกด่วนเป็นจำนวนครั้ง/ปี วางคู่กับช่องกรอกจำนวนเดือนแบบเดิม (ดูเหตุผลที่
+        // IntervalMonthsQuickPicks ด้านบนไฟล์) กดชิปแล้วบันทึกทันทีโดยไม่ต้องกดออกจากช่องก่อน
+        <Stack spacing={0.5}>
+          <TextField
+            autoFocus size="small" fullWidth type="number" disabled={saving}
+            value={draft}
+            onChange={(e) => change(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { e.preventDefault(); commit(); }
+              if (e.key === "Escape") onCancel();
+            }}
+            inputProps={{ min: 1, max: 24 }}
+            sx={{ "& .MuiOutlinedInput-input": { py: 0.5, fontSize: "0.8rem" } }}
+          />
+          <IntervalMonthsQuickPicks
+            value={draft}
+            disabled={saving}
+            onPick={(months) => { change(months); onCommit?.(months); }}
+          />
+        </Stack>
       ) : (
         <TextField
           autoFocus size="small" fullWidth type={editType} disabled={saving}
@@ -2981,11 +3042,13 @@ pagedRows.map((c, idx) => {
                           Wrapper={Box}
                           editable={isAdminOrManager && c.isRealContract} columnKey="intervalMonths"
                           editing={editingCell?.key === c.key && editingCell?.field === "intervalMonths"}
-                          value={c.intervalMonths} editValue={editValue} editType="number" saving={editSaving}
+                          value={c.intervalMonths} editValue={editValue} editType="intervalMonths" saving={editSaving}
                           title={c.intervalMonths ? undefined : "ยังไม่ได้ระบุ — ระบบใช้ค่าเริ่มต้น 3 เดือนในการเตือนรอบถัดไป"}
                           // ✅ รอบเข้าเป็นป้ายเล็กๆ มีพื้นหลังอ่อน + ไอคอนจริง แทนอีโมจิ 🔁 ที่เรนเดอร์
                           // ต่างกันไปในแต่ละเครื่อง (บนวินโดวส์ขึ้นเป็นกล่องสี่เหลี่ยมสีน้ำเงินทึบๆ ดูแปลกปลอม
                           // ไม่เข้ากับอะไรเลย) — ป้ายนี้แยกตัวเองออกจาก "วันที่" ด้านบนชัดเจนโดยไม่ต้องมีเส้นคั่น
+                          // ✅ โชว์ "ปีละ N ครั้ง" ต่อท้ายด้วยเมื่อหารลงตัว (ผู้ใช้ขอให้ดูจำนวนครั้ง/ปีได้
+                          // ตรงนี้เลย ไม่ต้องเปิด Excel export ถึงจะเห็น — เดิมค่านี้คำนวณแต่ไม่เคยแสดงบนจอ)
                           formatDisplay={(v) => (
                             <Box
                               component="span"
@@ -2998,7 +3061,9 @@ pagedRows.map((c, idx) => {
                               }}
                             >
                               <Autorenew sx={{ fontSize: 12 }} />
-                              {v ? `ทุก ${v} เดือน` : "ยังไม่ระบุรอบเข้า"}
+                              {v
+                                ? `ทุก ${v} เดือน${visitsPerYear(v) ? ` (ปีละ ${visitsPerYear(v)} ครั้ง)` : ""}`
+                                : "ยังไม่ระบุรอบเข้า"}
                             </Box>
                           )}
                           onStartEdit={() => beginEdit(c, "intervalMonths")}
@@ -3926,7 +3991,11 @@ pagedRows.map((c, idx) => {
           <>
             <FieldRow label="เริ่มสัญญา" editable={isAdminOrManager} editType="date" value={c.contractStart} formatDisplay={(v) => (v ? thaiDateNumeric(v) : <Dash />)} {...fp("contractStart")} />
             <FieldRow label="สิ้นสุดสัญญา" editable={isAdminOrManager} editType="date" value={c.contractEnd} formatDisplay={(v) => (v ? thaiDateNumeric(v) : <Dash />)} {...fp("contractEnd")} />
-            <FieldRow label="รอบเข้า" editable={isAdminOrManager} editType="number" value={c.intervalMonths} formatDisplay={(v) => (v ? `ทุก ${v} เดือน` : <Dash />)} {...fp("intervalMonths")} />
+            <FieldRow
+              label="รอบเข้า" editable={isAdminOrManager} editType="intervalMonths" value={c.intervalMonths}
+              formatDisplay={(v) => (v ? `ทุก ${v} เดือน${visitsPerYear(v) ? ` (ปีละ ${visitsPerYear(v)} ครั้ง)` : ""}` : <Dash />)}
+              {...fp("intervalMonths")}
+            />
             {/* ✅ ค่าคอมอยู่ในรายละเอียดที่กางดู ไม่ได้อยู่แถบสรุปหัวการ์ด — แถบนั้นมี 3 ช่องพอดีจอแล้ว
                 (ประเภทงาน/ระบบ/มูลค่างาน) เพิ่มช่องที่ 4 จะแคบจนตัวเลขตกบรรทัดบนมือถือ */}
             <FieldRow
@@ -5069,13 +5138,17 @@ pagedRows.map((c, idx) => {
                 onChange={(e) => setField("jobValue")(e.target.value)} inputProps={{ min: 0 }}
                 InputProps={{ startAdornment: <InputAdornment position="start">฿</InputAdornment> }} />
             </Stack>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+            <Stack spacing={0.75}>
               {/* ✅ ระยะห่างระหว่างรอบ — ข้อมูลอ้างอิงอิสระ ไม่บังคับ ไม่ผูก/บังคับกับ "จำนวนครั้งทั้งหมด"
                   ด้านบน (งานจริงเลื่อน/ชนกันได้เสมอ จำนวนครั้งจริงต้องให้ผู้ใช้เป็นคนกำหนดเองเท่านั้น) —
                   ใช้แค่เตือน "เกินกำหนดรอบถัดไป" ในตาราง/พุชแจ้งเตือน */}
               <TextField fullWidth size="small" type="number" label="เข้าทุกกี่เดือน" value={form.intervalMonths}
                 onChange={(e) => setField("intervalMonths")(e.target.value)} inputProps={{ min: 1, max: 24 }}
                 helperText={intervalPreviewText} />
+              {/* ✅ ทางลัด "เข้าปีละกี่ครั้ง" — กดแล้วกรอกเลขเดือนด้านบนให้อัตโนมัติ ไม่ต้องคิดเลขเอง
+                  (ตามที่ผู้ใช้ขอ: "แก้ไขจำนวนครั้งที่เข้าต่อปีได้ด้วย") ยังพิมพ์เลขเดือนเองตรงๆ ได้ปกติ
+                  สำหรับรอบที่ไม่ลงตัว (เช่น ทุก 5 เดือน) */}
+              <IntervalMonthsQuickPicks value={form.intervalMonths} onPick={setField("intervalMonths")} />
             </Stack>
 
             {/* ✅ ไม่บังคับ — เว้นว่างได้ถ้ายังไม่รู้วันที่เข้างานแน่นอน (บันทึกเป็นฉบับร่างไปเพิ่มวันที่
@@ -5394,12 +5467,14 @@ pagedRows.map((c, idx) => {
                 onChange={(e) => setMergeField("jobValue")(e.target.value)} inputProps={{ min: 0 }}
                 InputProps={{ startAdornment: <InputAdornment position="start">฿</InputAdornment> }} />
             </Stack>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+            <Stack spacing={0.75}>
               <TextField
                 fullWidth size="small" type="number" label="เข้าทุกกี่เดือน" value={mergeForm.intervalMonths}
                 onChange={(e) => setMergeField("intervalMonths")(e.target.value)} inputProps={{ min: 1, max: 24 }}
                 helperText="ไม่บังคับ — ใช้เตือนเมื่อเกินกำหนดรอบถัดไปเท่านั้น"
               />
+              {/* ✅ ทางลัด "เข้าปีละกี่ครั้ง" — เหมือนกับฟอร์ม "เพิ่มสัญญาใหม่" ทุกประการ */}
+              <IntervalMonthsQuickPicks value={mergeForm.intervalMonths} onPick={setMergeField("intervalMonths")} />
             </Stack>
           </Stack>
         </DialogContent>

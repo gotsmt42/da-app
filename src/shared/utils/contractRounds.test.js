@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { countUsedRounds, formatRoundLabel, visitsPerYear } from "./contractRounds";
+import { countUsedRounds, formatRoundLabel, visitsPerYear, INTERVAL_MONTHS_PRESETS } from "./contractRounds";
 
 /**
  * เทสต์ชุดนี้มาแทน App.test.js เดิมที่ติดมากับ Create React App (มันหาข้อความ "learn react link"
@@ -62,5 +62,24 @@ describe("visitsPerYear", () => {
     expect(visitsPerYear(0)).toBeNull();
     expect(visitsPerYear(-3)).toBeNull();
     expect(visitsPerYear(undefined)).toBeNull();
+  });
+});
+
+describe("INTERVAL_MONTHS_PRESETS", () => {
+  it("มีครบ 6 ตัวเลือก เรียงจากถี่ไปห่าง", () => {
+    expect(INTERVAL_MONTHS_PRESETS.map((p) => p.months)).toEqual([1, 2, 3, 4, 6, 12]);
+  });
+
+  it("สมมาตรกับ visitsPerYear() เสมอ — แปลงไปแปลงกลับต้องได้ค่าเดิม", () => {
+    INTERVAL_MONTHS_PRESETS.forEach((p) => {
+      expect(visitsPerYear(p.months)).toBe(p.perYear);
+      expect(12 / p.perYear).toBe(p.months);
+    });
+  });
+
+  it("ป้ายกำกับพูดเป็นภาษาไทยธรรมชาติ ไม่ใช่ 'ทุก 1 เดือน'/'ทุก 12 เดือน'", () => {
+    expect(INTERVAL_MONTHS_PRESETS.find((p) => p.months === 1).label).toBe("ทุกเดือน (ปีละ 12 ครั้ง)");
+    expect(INTERVAL_MONTHS_PRESETS.find((p) => p.months === 12).label).toBe("ทุกปี (ปีละ 1 ครั้ง)");
+    expect(INTERVAL_MONTHS_PRESETS.find((p) => p.months === 3).label).toBe("ทุก 3 เดือน (ปีละ 4 ครั้ง)");
   });
 });
