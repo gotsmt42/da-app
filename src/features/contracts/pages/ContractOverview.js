@@ -180,7 +180,17 @@ const progressInfo = (c, countUsedRoundsFn) => {
   });
   let doneCount = 0;
   byRound.forEach((docs) => { if (docs.every((d) => d.status === "ดำเนินการเสร็จสิ้น")) doneCount += 1; });
-  const total = c.visitCount || countUsedRoundsFn(c.visits);
+  // 🐛 BUG ที่แก้ (ผู้ใช้แจ้งซ้ำ 2 รอบพร้อมภาพ: "ยังเพี้ยน...ทั้งที่จะเป็น 0/3" — รอบเข้าโชว์ "ปีละ 3
+  // ครั้ง" (intervalMonths=4) ชัดเจน แต่คืบหน้ายังค้าง 0/4): เดิม total ยึด c.visitCount เป็นหลักเสมอ
+  // ซึ่งเป็นค่าที่บันทึกแยกต่างหาก — sync ตอน commit แก้ intervalMonths ผ่านเซลล์นี้เท่านั้น (ดู
+  // commitEdit) สัญญาเก่าที่ตั้ง intervalMonths ไว้ก่อนมีฟีเจอร์นี้ หรือที่กรอกผ่านช่องอื่นโดยไม่เคยกดแก้
+  // ตรงนี้เลยสักครั้ง จึงยังค้างค่าเก่าที่ไม่ตรงกับรอบเข้าที่โชว์อยู่ตรงหน้า ดูเหมือนฟีเจอร์ไม่ทำงานทั้งที่
+  // อีกจุดก็ทำงานถูกอยู่
+  // ✅ ให้ "รอบเข้า" (intervalMonths) เป็นตัวกำหนด total ก่อนเสมอเมื่อหารลงตัว (สัญญาที่นี่ทั้งหมดเป็น
+  // สัญญารายปี — ปีละ N ครั้งก็คือจำนวนครั้งทั้งหมดของสัญญานั้นแหละ) วิธีนี้แก้ตรงกันทั้งจอทันทีไม่ว่า
+  // สัญญาจะเก่าหรือใหม่ โดยไม่ต้องไล่แก้ทีละใบ/ไม่ต้องยิง API เขียนทับข้อมูลเดิม — หารไม่ลงตัว (เช่น
+  // ทุก 5 เดือน) หรือยังไม่ระบุรอบเข้าเลย ถึง fallback ไปที่ visitCount ที่บันทึกไว้เหมือนเดิม
+  const total = visitsPerYear(c.intervalMonths) || c.visitCount || countUsedRoundsFn(c.visits);
   return {
     label: `${doneCount}/${total}`,
     color: doneCount === 0 ? "#9ca3af" : doneCount >= total ? STATUS_COLOR["ดำเนินการเสร็จสิ้น"] : "#f59e0b",
@@ -331,7 +341,15 @@ const docsTitleFor = (c, n) =>
 const BASIC_INFO_FIELDS = new Set(["company", "site", "system", "title"]);
 
 const VISIT_COL_DEFAULT_WIDTH = 110;
-const MOBILE_VISIT_COL_WIDTH = 94;
+// 🐛 BUG ที่แก้ (ผู้ใช้แจ้งพร้อมภาพ: ตารางบนมือถือ "ไม่เพี้ยน" — วันที่ขาดตัวเลข "20 – 26 ส.ค. 2569"
+// เห็นเป็น "0 – 26 ส.ค. 2569", ชื่อทีมชนกับป้ายวางบิล/เอกสารจนอ่านไม่ออก): เดิม 94px แคบเกินไปสำหรับ
+// เนื้อหาจริงในเซลล์ "ครั้งที่ N" (วันที่ช่วงเดือนเดียวกันยาวสุดถึง "DD – DD MMM YYYY" ~18 ตัวอักษร +
+// ชื่อทีม + ชิปวางบิล/เอกสาร) — ข้อความจัดกึ่งกลาง (align="center") ทับ overflow:hidden พอกว้างไม่พอ
+// เบราว์เซอร์ตัดจากทั้ง 2 ฝั่งของกึ่งกลางเท่าๆ กัน (ไม่ใช่ตัดท้ายแบบมี "..." ให้เห็น) ตัวเลขต้นวันที่
+// จึงหายไปเงียบๆ โดยไม่มีสัญญาณว่าถูกตัด ✅ ขยายให้พอกับเนื้อหาจริง — โหมดตารางบนมือถือเลื่อนซ้าย-ขวา
+// อยู่แล้วเป็นปกติ (มีปุ่มลูกศร + คำแนะนำ "ปัดซ้าย-ขวา" อยู่แล้ว) กว้างขึ้นอีกหน่อยต่อคอลัมน์จึงไม่เสียอะไร
+// แลกกับอ่านออกครบทุกตัวอักษรจริงๆ
+const MOBILE_VISIT_COL_WIDTH = 132;
 const MIN_COL_WIDTH = 50;
 
 const AUTO_FIT_PADDING = 20; // ✅ กันเนื้อหาแนบขอบเซลล์พอดีเป๊ะจนดูอึดอัดหลัง auto-fit
@@ -569,6 +587,16 @@ const IntervalMonthsQuickPicks = ({ value, onPick, disabled, size = "small" }) =
           size={size}
           disabled={disabled}
           onClick={() => onPick(String(p.months))}
+          // 🐛 BUG ที่แก้ (กดชิปในตาราง/การ์ดแล้วไม่บันทึกเลย): ช่องกรอกจำนวนเดือนที่วางคู่กันมี
+          // onBlur={commit} — คลิกชิปทำให้ช่องนั้นเสียโฟกัส "ก่อน" event คลิกของชิปเองจะยิง (ลำดับ
+          // เบราว์เซอร์ปกติ: mousedown ที่ปุ่มอื่นสั่ง blur ทันที ก่อน click จะเกิดด้วยซ้ำ) — onBlur
+          // เห็นค่าเดิมที่ยังไม่เปลี่ยน (draft ค่าเก่า) จึงมองว่า "ไม่มีอะไรเปลี่ยน" แล้วปิดโหมดแก้ไขทิ้ง
+          // (commitEdit เซ็ต editingCell=null) ก่อนที่ onClick ของชิปจะยิง onCommit ค่าใหม่จริงตามมา —
+          // commitEdit เช็ค editingCell ที่ null ไปแล้วนั้น จึง return ทันทีแบบเงียบๆ ไม่บันทึกอะไรเลย
+          // ✅ preventDefault ตอน mousedown กันไม่ให้โฟกัสหลุดจากช่องกรอกเลยตั้งแต่ต้น (เทคนิคมาตรฐาน
+          // เดียวกับที่ MUI Autocomplete ใช้กันตัวเลือกใน dropdown ปิดตัวเองตอนคลิก) — onClick ของชิป
+          // ยังทำงานตามปกติ แค่ไม่มี blur แทรกมาก่อนอีกต่อไป
+          onMouseDown={(e) => e.preventDefault()}
           title={p.label}
           sx={{
             fontSize: size === "small" ? "0.68rem" : "0.72rem",
@@ -1918,9 +1946,14 @@ export default function ContractOverview() {
 
   const setField = (field) => (val) => setForm((f) => ({ ...f, [field]: val }));
 
-  // ✅ แค่ข้อมูลอ้างอิงเฉยๆ ไม่ผูก/บังคับกับจำนวนครั้งจริง (visitCount ยังต้องกรอกเองอิสระเสมอ เพราะ
-  // งานจริงเลื่อน/ชนกันได้ตลอด) ใช้แค่เป็นเกณฑ์เตือน "เกินกำหนดรอบถัดไป" เท่านั้น
-  const intervalPreviewText = "ไม่บังคับ — ใช้เตือนเมื่อเกินกำหนดรอบถัดไปเท่านั้น ไม่เกี่ยวกับจำนวนครั้งด้านบน";
+  // ✅ พิมพ์เลขเดือนเอง = ข้อมูลอ้างอิงอิสระ ไม่แตะ "จำนวนครั้งทั้งหมด" ด้านบน (งานจริงเลื่อน/ชนกันได้
+  // ตลอด ผู้ใช้ต้องกำหนดจำนวนครั้งจริงเองได้เสมอ) — แต่ถ้ากดปุ่มลัด "ปีละ N ครั้ง" ด้านล่าง จะเซ็ต
+  // "จำนวนครั้งทั้งหมด" ให้ตรงกันไปด้วยในคลิกเดียว (ตามที่ผู้ใช้ขอ: "ตรงคืบหน้าให้สอดคล้องกับจำนวนรอบ
+  // ด้วย" — ดู pickInterval ด้านล่าง) ยังแก้ตัวเลขทั้งสองช่องเองทับได้ตามปกติหลังกดถ้าไม่ตรงกรณี
+  const intervalPreviewText = "ไม่บังคับ — พิมพ์เลขเองไม่กระทบจำนวนครั้งด้านบน กดปุ่มลัดด้านล่างจะปรับให้ตรงกันอัตโนมัติ";
+  // ✅ ปุ่มลัด "ปีละ N ครั้ง" เซ็ตทั้ง intervalMonths และ visitCount ให้สอดคล้องกันในคลิกเดียว —
+  // แยกออกมาเพราะใช้ซ้ำกับฟอร์ม "ย้ายเข้าสัญญาที่มีอยู่" ด้านล่างด้วย (pickMergeInterval)
+  const pickInterval = (months) => setForm((f) => ({ ...f, intervalMonths: months, visitCount: String(visitsPerYear(months) || f.visitCount) }));
 
   const companyOptions = useMemo(
     () => [...new Set(lookups.customers.map((c) => c.cCompany).filter(Boolean))],
@@ -2335,6 +2368,10 @@ export default function ContractOverview() {
   };
   const closeMergeDialog = () => { if (!mergeSaving) setMergeOpen(false); };
   const setMergeField = (field) => (val) => setMergeForm((f) => ({ ...f, [field]: val }));
+  // ✅ เหมือน pickInterval ของฟอร์ม "เพิ่มสัญญาใหม่" — กดปุ่มลัด "ปีละ N ครั้ง" เซ็ตทั้ง intervalMonths
+  // และ visitCount ให้ตรงกันในคลิกเดียว (ทับค่าเริ่มต้น visitCount ที่ตั้งจากจำนวนงานที่เลือกไว้ตอนเปิด
+  // ฟอร์มได้ตามปกติ — ผู้ใช้พิมพ์ทับเองแยกได้เสมออยู่แล้วถ้าไม่ตรงกรณี)
+  const pickMergeInterval = (months) => setMergeForm((f) => ({ ...f, intervalMonths: months, visitCount: String(visitsPerYear(months) || f.visitCount) }));
 
   const handleMergeSubmit = async () => {
     setMergeError("");
@@ -2508,6 +2545,22 @@ export default function ContractOverview() {
         return;
       }
     }
+    // ✅ ตามที่ผู้ใช้ขอ ("ตรงคืบหน้าให้สอดคล้องกับจำนวนรอบด้วย"): แก้ "รอบเข้า" เป็นค่าที่หารลงตัว (เช่น
+    // ทุก 3 เดือน = ปีละ 4 ครั้ง — ไม่ว่าจะพิมพ์เลขเองหรือกดชิปลัดก็ตาม เพราะทั้งสองทางจบที่ onCommit
+    // เดียวกัน) ให้ปรับ "จำนวนครั้งทั้งหมด" (visitCount) ตามไปในคราวเดียวกันเสมอ ไม่มีข้อยกเว้น — ไม่งั้น
+    // คอลัมน์ "คืบหน้า" (X/Y ซึ่ง Y=visitCount) จะค้างเลขเดิมที่ไม่สัมพันธ์กับรอบที่เพิ่งตั้งใหม่เลย
+    // 🐛 BUG ที่แก้ (ผู้ใช้แจ้ง: "ยังเพี้ยนไม่สมบูรณ์" พร้อมภาพ — ตั้งรอบใหม่เป็น "ปีละ 1 ครั้ง" แต่คืบหน้า
+    // ยังค้างเป็น "2/6" เหมือนเดิม): เดิมมีเงื่อนไขกันไว้ "ไม่ sync ถ้าจำนวนที่ใช้ไปแล้ว > ค่าใหม่" (กลัว
+    // คืบหน้ากลายเป็น 5/4 เกิน 100%) แต่ผลคือทำให้ค่าไม่ตรงกันแบบเงียบๆ ซึ่งดูเหมือนฟีเจอร์นี้ไม่ทำงาน
+    // เลยพอเจอเคสนี้เข้า — ผู้ใช้ขอ "สอดคล้องกันเสมอ" ไม่ใช่ "สอดคล้องกันเฉพาะบางกรณี" ตัดเงื่อนไขกันทิ้ง
+    // ✅ คืบหน้าเกิน 100% (เช่น 2/1) ไม่ใช่ปัญหาจริง — progressInfo ด้านบนไฟล์ถือว่า doneCount >= total
+    // คือ "เสร็จแล้ว" (ขึ้นสีเขียวเหมือนกัน) อยู่แล้ว ไม่มีอะไรพังหรือดูผิดปกติเกินจำเป็น
+    // ⚠️ รอบที่หารไม่ลงตัว (เช่น ทุก 5 เดือน) ไม่มี perYear ที่ชัดเจนให้ sync — ปล่อย visitCount เดิม
+    let syncedVisitCount;
+    if (field === "intervalMonths" && rawValue) {
+      const perYear = visitsPerYear(rawValue);
+      if (perYear) syncedVisitCount = perYear;
+    }
     // 🐛 BUG ที่แก้: แก้ไข inline ก็ไม่เคยตรวจช่วงวันที่สัญญาเลย (ทั้งที่เป็นทางที่แก้วันที่บ่อยที่สุด) —
     // แก้วันสิ้นสุดให้ก่อนวันเริ่มได้ตามใจ แล้วสัญญาจะขึ้น "หมดอายุแล้ว" ทันที เทียบกับอีกฝั่งของช่วงที่
     // ไม่ได้แก้ (c.contractStart/c.contractEnd ตัวเดิม) ให้ครบทั้งสองทิศทาง
@@ -2542,6 +2595,7 @@ export default function ContractOverview() {
     else if (field === "visitCount" || field === "intervalMonths") payload[field] = rawValue ? Number(rawValue) : undefined;
     else if (field === "responsiblePerson") { payload.responsiblePerson = rawValue; payload.responsiblePersonId = teamToId.get(rawValue) || ""; }
     else payload[field] = rawValue;
+    if (syncedVisitCount !== undefined) payload.visitCount = syncedVisitCount;
 
     // ⚠️ BUG ที่แก้: เดิม await fetchData() หลังบันทึกทุกครั้ง — ตั้ง loading=true ทำให้ทั้งตารางเปลี่ยน
     // เป็น <Skeleton> วาบให้เห็น แล้วค่อยเรนเดอร์ใหม่ทั้งหมด (เสียตำแหน่ง scroll/แถวที่กำลังดูอยู่) ทั้งที่
@@ -3696,24 +3750,11 @@ pagedRows.map((c, idx) => {
 
     // ✅ งานทั่วไป/งานโปรเจค (ไม่ใช่สัญญาจริง) เปลี่ยนจาก "คืบหน้า" (X/Y เฉยๆ) เป็น "สถานะงาน" จริง
     // อิงจาก event ตรงๆ (ดู jobStatusInfo) — สัญญาจริงยังคงโชว์ "X/Y ครั้ง" แบบเดิมทุกประการตามที่ยืนยัน
-    let progressLabel, progressColor;
-    if (!c.isRealContract) {
-      const info = jobStatusInfo(c);
-      progressLabel = info.label;
-      progressColor = info.color;
-    } else {
-      const byRound = new Map();
-      c.visits.filter((v) => !v.unscheduled).forEach((v) => {
-        const key = String(v.time);
-        if (!byRound.has(key)) byRound.set(key, []);
-        byRound.get(key).push(v);
-      });
-      let doneCount = 0;
-      byRound.forEach((docs) => { if (docs.every((d) => d.status === "ดำเนินการเสร็จสิ้น")) doneCount += 1; });
-      const total = c.visitCount || countUsedRounds(c.visits);
-      progressLabel = `${doneCount}/${total}`;
-      progressColor = doneCount === 0 ? "#9ca3af" : doneCount >= total ? STATUS_COLOR["ดำเนินการเสร็จสิ้น"] : "#f59e0b";
-    }
+    // 🐛 BUG ที่แก้: เดิมก๊อปตรรกะคำนวณ total/doneCount ของ progressInfo() มาเขียนซ้ำไว้ที่นี่อีกชุด —
+    // พอแก้สูตร total ที่ progressInfo() (ให้ยึดรอบเข้าก่อนเมื่อหารลงตัว) ที่นี่จะไม่รู้ด้วยเลย การ์ดมือถือ
+    // กับตารางเดสก์ท็อปเลยโชว์ "คืบหน้า" ไม่ตรงกันได้ทันที ✅ เรียก progressInfo() ตัวเดียวกันแทน กันเกิด
+    // จุดที่ 2 แบบนี้ซ้ำอีกในอนาคต (ไฟล์ Excel ที่ส่งออกก็เรียกตัวนี้อยู่แล้ว ดู progressLabel ด้านบนไฟล์)
+    const { label: progressLabel, color: progressColor } = progressInfo(c, countUsedRounds);
 
     const isExpanded = expandedCards.has(c.key);
 
@@ -5139,16 +5180,18 @@ pagedRows.map((c, idx) => {
                 InputProps={{ startAdornment: <InputAdornment position="start">฿</InputAdornment> }} />
             </Stack>
             <Stack spacing={0.75}>
-              {/* ✅ ระยะห่างระหว่างรอบ — ข้อมูลอ้างอิงอิสระ ไม่บังคับ ไม่ผูก/บังคับกับ "จำนวนครั้งทั้งหมด"
-                  ด้านบน (งานจริงเลื่อน/ชนกันได้เสมอ จำนวนครั้งจริงต้องให้ผู้ใช้เป็นคนกำหนดเองเท่านั้น) —
-                  ใช้แค่เตือน "เกินกำหนดรอบถัดไป" ในตาราง/พุชแจ้งเตือน */}
+              {/* ✅ ระยะห่างระหว่างรอบ — พิมพ์เลขเดือนเองตรงๆ = ข้อมูลอ้างอิงอิสระ ไม่บังคับ ไม่แตะ
+                  "จำนวนครั้งทั้งหมด" ด้านบน (งานจริงเลื่อน/ชนกันได้เสมอ จำนวนครั้งจริงยังกำหนดเองแยกได้
+                  เสมอ) ใช้แค่เตือน "เกินกำหนดรอบถัดไป" ในตาราง/พุชแจ้งเตือน — แต่ถ้ากดปุ่มลัด "ปีละ N
+                  ครั้ง" ด้านล่างแทน จะปรับ "จำนวนครั้งทั้งหมด" ให้ตรงกันไปในตัว (ดู pickInterval) */}
               <TextField fullWidth size="small" type="number" label="เข้าทุกกี่เดือน" value={form.intervalMonths}
                 onChange={(e) => setField("intervalMonths")(e.target.value)} inputProps={{ min: 1, max: 24 }}
                 helperText={intervalPreviewText} />
               {/* ✅ ทางลัด "เข้าปีละกี่ครั้ง" — กดแล้วกรอกเลขเดือนด้านบนให้อัตโนมัติ ไม่ต้องคิดเลขเอง
                   (ตามที่ผู้ใช้ขอ: "แก้ไขจำนวนครั้งที่เข้าต่อปีได้ด้วย") ยังพิมพ์เลขเดือนเองตรงๆ ได้ปกติ
-                  สำหรับรอบที่ไม่ลงตัว (เช่น ทุก 5 เดือน) */}
-              <IntervalMonthsQuickPicks value={form.intervalMonths} onPick={setField("intervalMonths")} />
+                  สำหรับรอบที่ไม่ลงตัว (เช่น ทุก 5 เดือน) — กดปุ่มลัดยังปรับ "จำนวนครั้งทั้งหมด" ด้านบนให้
+                  ตรงกันไปด้วยในตัว (ดู pickInterval) */}
+              <IntervalMonthsQuickPicks value={form.intervalMonths} onPick={pickInterval} />
             </Stack>
 
             {/* ✅ ไม่บังคับ — เว้นว่างได้ถ้ายังไม่รู้วันที่เข้างานแน่นอน (บันทึกเป็นฉบับร่างไปเพิ่มวันที่
@@ -5471,10 +5514,12 @@ pagedRows.map((c, idx) => {
               <TextField
                 fullWidth size="small" type="number" label="เข้าทุกกี่เดือน" value={mergeForm.intervalMonths}
                 onChange={(e) => setMergeField("intervalMonths")(e.target.value)} inputProps={{ min: 1, max: 24 }}
-                helperText="ไม่บังคับ — ใช้เตือนเมื่อเกินกำหนดรอบถัดไปเท่านั้น"
+                helperText="ไม่บังคับ — พิมพ์เลขเองไม่กระทบจำนวนครั้งด้านบน กดปุ่มลัดด้านล่างจะปรับให้ตรงกันอัตโนมัติ"
               />
-              {/* ✅ ทางลัด "เข้าปีละกี่ครั้ง" — เหมือนกับฟอร์ม "เพิ่มสัญญาใหม่" ทุกประการ */}
-              <IntervalMonthsQuickPicks value={mergeForm.intervalMonths} onPick={setMergeField("intervalMonths")} />
+              {/* ✅ ทางลัด "เข้าปีละกี่ครั้ง" — เหมือนกับฟอร์ม "เพิ่มสัญญาใหม่" ทุกประการ กดแล้วปรับ
+                  "จำนวนครั้งทั้งหมด" ด้านบนให้ตรงกันไปด้วย (ทับค่าเริ่มต้นจากจำนวนงานที่เลือกได้ ดู
+                  pickMergeInterval) */}
+              <IntervalMonthsQuickPicks value={mergeForm.intervalMonths} onPick={pickMergeInterval} />
             </Stack>
           </Stack>
         </DialogContent>
