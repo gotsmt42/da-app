@@ -17,13 +17,12 @@ import "@/shared/utils/momentThaiLocale";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack, Typography,
   Chip, IconButton, Checkbox, Avatar, Alert, CircularProgress,
-  TextField, useMediaQuery,
+  TextField, Tooltip, useMediaQuery,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
   AttachFile, InsertDriveFile, Person, Bolt, Schedule, LocationOn, Phone,
   Close, GroupAdd, FactCheck,
-  Place,
   OpenInNew,
   NoteAlt,
   EventAvailable,
@@ -35,6 +34,7 @@ import {
 import FilePreviewDialog from "@/features/documents/components/FilePreviewDialog";
 import { isImageFile } from "@/shared/utils/jobDocTypes";
 import { formatThai } from "@/shared/utils/thaiDate";
+import { mapSearchUrl, GoogleMapsPin } from "@/shared/ui/SiteMapLink";
 import usePermissions from "@/shared/hooks/usePermissions";
 import { useAuth } from "@/features/auth/AuthContext";
 import DispatchService from "../services/DispatchService";
@@ -110,6 +110,8 @@ export default function DispatchDialog({ dispatchId, onClose, onSaved }) {
   const [reviewMode, setReviewMode] = useState(null);
   const [askCancel, setAskCancel] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  // ✅ โหมดแก้ลิงก์แผนที่ในกล่องนี้ (null = ไม่ได้แก้อยู่)
+  const [mapDraft, setMapDraft] = useState(null);
 
   const fileRef = useRef(null);
 
@@ -143,6 +145,13 @@ export default function DispatchDialog({ dispatchId, onClose, onSaved }) {
    */
   const canOpenOperation = can("editOperation") || can("receiveDispatch");
   const isRequester = String(d?.requestedBy?.userId || "") === myId;
+  /**
+   * ✅ ที่เพิ่ม (ผู้ใช้ขอ: "แอดโลเคชั่นลงระบบได้ง่ายๆ แก้ได้ทั้งเซล และแอดมิน")
+   * เดิมพิกัดใส่ได้เฉพาะตอนกรอกฟอร์มครั้งแรก — ใบที่ส่งไปแล้วแต่ลืมใส่ ไม่มีทางเติมทีหลังเลย
+   * ⚠️ ตรงกับสิทธิ์ฝั่ง server (PATCH /api/dispatch/:id/map) เป๊ะ: ผู้แจ้ง หรือ คนจ่ายงาน
+   * ⚠️ ต้องประกาศหลัง isRequester — ไม่งั้นอ่านค่าก่อนถูกกำหนด (TDZ)
+   */
+  const canEditMap = isRequester || canAssign;
   const me = (d?.assignees || []).find((a) => String(a.userId) === myId);
   const meta = d ? DISPATCH_STATUS_META[d.status] : null;
   // ⚠️ "ปิดแล้ว" = ยกเลิกใบ หรือ งานจริงในตารางเสร็จสิ้นแล้ว
@@ -502,12 +511,14 @@ export default function DispatchDialog({ dispatchId, onClose, onSaved }) {
                     ตอนนี้ถึงไหนแล้ว* ส่วนฝั่งซ้ายตอบว่า *งานอะไร ต้องรู้อะไร มีเอกสารอะไร*
                     ⚠️ และช่วยให้จำนวนการ์ดสองฝั่งใกล้เคียงกัน ไม่เทไปข้างเดียวจนดูเยื้อง */}
                 <Section
-                  icon={<Place sx={{ fontSize: 17 }} />}
+                  icon={<GoogleMapsPin size={17} />}
                   title="หน้างาน"
                   accent="#0891b2"
                   // ⚠️ ชื่อโครงการถูกยกไปเป็นหัวข้อหลักของกล่องแล้ว การ์ดนี้จึงเหลือแค่ "ข้อมูลไปถึงหน้างาน"
                   // (ที่อยู่/ผู้ติดต่อ/แผนที่/กำหนดเสร็จ) — ถ้าไม่มีสักอย่างต้องไม่เรนเดอร์การ์ดหัวข้อเปล่าๆ ทิ้งไว้
-                  empty={!d.customer?.address && !d.customer?.contactName && !d.customer?.contactTel && !d.customer?.mapUrl && !d.dueAt}
+                  // ⚠️ ถ้าผู้ใช้มีสิทธิ์เพิ่มพิกัด ต้องโชว์การ์ดเสมอ ไม่งั้นใบที่ยังไม่มีข้อมูลหน้างานเลย
+                  // จะไม่มีที่ให้กดเพิ่มพิกัด (ซึ่งเป็นกรณีที่ต้องใช้ฟีเจอร์นี้มากที่สุด)
+                  empty={!canEditMap && !d.customer?.address && !d.customer?.contactName && !d.customer?.contactTel && !d.customer?.mapUrl && !d.dueAt}
                 >
                   {/* 🧹 "โครงการ" ถูกยกไปเป็นหัวข้อหลักของกล่องแล้ว ไม่ต้องซ้ำอีกที่นี่ */}
                   <Stack spacing={0.5}>
@@ -522,24 +533,83 @@ export default function DispatchDialog({ dispatchId, onClose, onSaved }) {
 
                   </Stack>
 
-                  {/* ✅ ปุ่มนำทาง — ช่างเปิดใบนี้จากมือถือตอนกำลังจะออกรถ ปุ่มเดียวจบ
+                  {/* ── ตำแหน่งบนแผนที่ ────────────────────────────────────────
+                      ✅ ปุ่มนำทาง — ช่างเปิดใบนี้จากมือถือตอนกำลังจะออกรถ ปุ่มเดียวจบ
                       ⚠️ rel="noopener noreferrer" จำเป็นเสมอกับ target="_blank" ที่ชี้โดเมนภายนอก */}
-                  {d.customer?.mapUrl && (
-                    <Button
-                      fullWidth size="small" component="a"
-                      href={d.customer.mapUrl}
-                      target="_blank" rel="noopener noreferrer"
-                      startIcon={<Place sx={{ fontSize: 17 }} />}
-                      endIcon={<OpenInNew sx={{ fontSize: 14 }} />}
-                      sx={{
-                        mt: 1.25, textTransform: "none", fontWeight: 800, borderRadius: 2, py: 0.8,
-                        color: "#047857", bgcolor: alpha("#10b981", 0.1),
-                        border: "1px solid", borderColor: alpha("#10b981", 0.35),
-                        "&:hover": { bgcolor: alpha("#10b981", 0.2) },
-                      }}
-                    >
-                      เปิดแผนที่นำทาง
-                    </Button>
+                  {mapDraft === null ? (
+                    <Stack direction="row" spacing={0.75} sx={{ mt: 1.25 }}>
+                      {d.customer?.mapUrl ? (
+                        <Button
+                          fullWidth size="small" component="a"
+                          href={d.customer.mapUrl}
+                          target="_blank" rel="noopener noreferrer"
+                          startIcon={<GoogleMapsPin size={17} />}
+                          endIcon={<OpenInNew sx={{ fontSize: 14 }} />}
+                          sx={{
+                            textTransform: "none", fontWeight: 700, borderRadius: 2, py: 0.8,
+                            color: "#047857", bgcolor: alpha("#10b981", 0.1),
+                            border: "1px solid", borderColor: alpha("#10b981", 0.3),
+                            "&:hover": { bgcolor: alpha("#10b981", 0.18) },
+                          }}
+                        >
+                          เปิดแผนที่นำทาง
+                        </Button>
+                      ) : (
+                        /* ยังไม่มีพิกัด — ให้ปุ่มค้นหาแทน จะได้ไม่ต้องออกไปเปิดแอปเองแล้วพิมพ์ชื่อซ้ำ */
+                        <Button
+                          fullWidth size="small" component="a" target="_blank" rel="noopener noreferrer"
+                          // ⚠️ ค้นด้วย "ชื่อโครงการ" อย่างเดียวตามที่ผู้ใช้สั่ง (ดู mapSearchUrl)
+                          href={mapSearchUrl(d.customer?.site, d.customer?.company)}
+                          startIcon={<GoogleMapsPin size={17} />}
+                          endIcon={<OpenInNew sx={{ fontSize: 14 }} />}
+                          sx={{
+                            textTransform: "none", fontWeight: 700, borderRadius: 2, py: 0.8,
+                            color: TEXT_SUB, border: "1px solid", borderColor: BORDER_MAIN,
+                            "&:hover": { bgcolor: SURFACE_SUBTLE },
+                          }}
+                        >
+                          ค้นหาตำแหน่งใน Google Maps
+                        </Button>
+                      )}
+                      {canEditMap && !isClosed && (
+                        <Tooltip title={d.customer?.mapUrl ? "แก้ลิงก์แผนที่" : "เพิ่มลิงก์แผนที่"}>
+                          <IconButton
+                            size="small" onClick={() => setMapDraft(d.customer?.mapUrl || "")}
+                            sx={{ border: "1px solid", borderColor: BORDER_MAIN, borderRadius: 2, color: TEXT_SUB, flexShrink: 0 }}
+                          >
+                            <GoogleMapsPin size={16} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                    </Stack>
+                  ) : (
+                    /* โหมดวางลิงก์ — ช่องเดียว + ปุ่มบันทึก ไม่ต้องเปิดกล่องซ้อนอีกชั้น */
+                    <Box sx={{ mt: 1.25 }}>
+                      <TextField
+                        size="small" fullWidth autoFocus value={mapDraft}
+                        onChange={(e) => setMapDraft(e.target.value)}
+                        placeholder="วางลิงก์ที่แชร์จาก Google Maps"
+                        helperText="กดค้นหาด้านบน → เจอตำแหน่งแล้วกด แชร์ → คัดลอกลิงก์ → วางที่นี่ · เว้นว่างเพื่อลบลิงก์"
+                        FormHelperTextProps={{ sx: { fontSize: "0.68rem", mx: 0 } }}
+                      />
+                      <Stack direction="row" spacing={0.75} justifyContent="flex-end" sx={{ mt: 1 }}>
+                        <Button
+                          size="small" onClick={() => setMapDraft(null)} disabled={busy}
+                          sx={{ textTransform: "none", color: TEXT_SUB }}
+                        >
+                          ยกเลิก
+                        </Button>
+                        <Button
+                          size="small" variant="contained" disabled={busy}
+                          onClick={async () => {
+                            if (await run(() => DispatchService.setMapUrl(d._id, mapDraft.trim()))) setMapDraft(null);
+                          }}
+                          sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, boxShadow: "none" }}
+                        >
+                          บันทึกตำแหน่ง
+                        </Button>
+                      </Stack>
+                    </Box>
                   )}
                 </Section>
 

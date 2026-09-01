@@ -12,6 +12,16 @@ const CustomerService = {
     }
   },
 
+  /**
+   * ตั้ง/แก้/ลบ "ลิงก์ตำแหน่งบน Google Maps" ของโครงการ (ผูกกับ cCompany + cSite)
+   * ⚠️ ส่ง mapUrl เป็นสตริงว่าง = ตั้งใจลบพิกัดทิ้ง (ฝั่ง server แยกจากกรณี "ลิงก์ผิด" แล้ว)
+   * ⚠️ ด่านสิทธิ์อยู่ที่ server — แอดมิน/ผู้จัดการ หรือช่างที่มีงานอยู่ที่โครงการนั้นจริงเท่านั้น
+   */
+  async setSiteMapUrl({ company, site, mapUrl }) {
+    const { data } = await API.patch(`/customer/map`, { company, site, mapUrl });
+    return data.customer;
+  },
+
   async AddCustomer(formData) {
     try {
       const response = await API.post(`/customer`, formData);

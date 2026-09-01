@@ -78,6 +78,10 @@ import { printFile, shareFile, shareToLine, isMobileDevice } from "@/shared/util
 import DeliveryNoteDialog from "@/features/documents/components/DeliveryNoteDialog";
 import WorkNoticeDialog from "@/features/documents/components/WorkNoticeDialog";
 import InfoLine from "@/shared/ui/InfoLine";
+// ✅ ตำแหน่งหน้างานบน Google Maps — ตัวเดียวกับที่ระบบใบแจ้งงานใช้ (ดูหัวไฟล์ SiteMapLink.js)
+// ⚠️ หน้านี้ใช้แค่ hook ไม่ใช้ตัวคอมโพเนนต์ — ลิงก์แผนที่ผูกไว้กับ "ชื่อโครงการ" บนการ์ดเลย
+// ไม่มีปุ่ม/กล่องของตัวเอง (ดูเหตุผลตรงจุดที่ใช้)
+import { useSiteMapUrl, GoogleMapsPin } from "@/shared/ui/SiteMapLink";
 import { JOB_DOC_TYPES } from "@/shared/utils/jobDocTypes";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { ROLES } from "@/shared/utils/roles";
@@ -1094,6 +1098,8 @@ const EventRowCard = ({
   // ✅ ใบแจ้งเข้างาน — เอกสารคู่กันของงานเดียวกัน คนละหัวคนละท้ายของงาน (แจ้งก่อนเข้า / ส่งมอบหลังเสร็จ)
   // ควรอยู่จุดเดียวกันเสมอ ไม่งั้นออกใบหนึ่งได้จากหน้านี้ แต่อีกใบต้องไปเปิดหาที่หน้าปฏิทินแทน
   const [workNoticeOpen, setWorkNoticeOpen] = useState(false);
+  // พิกัดหน้างานของโครงการนี้ — อ่านจากแคชกลาง (ทั้งหน้ายิงโหลดทะเบียนลูกค้าครั้งเดียว ไม่ใช่ต่อการ์ด)
+  const { href: mapHref, saved: hasSiteMap } = useSiteMapUrl(event.company, event.site);
   const theme  = useTheme();
   // ✅ จอกว้างพอ (≥900px) เปิดรายละเอียดงาน (เอกสาร/คุยกับช่าง/ประวัติ) แบบ Dialog ทับขึ้นมาแทน
   // การกางลงในหน้า (Collapse) — เดิมกางแล้วเนื้อหายาวๆ ดันการ์ดอื่นในคอลัมน์เดียวกันลงมา ต้อง
@@ -1508,9 +1514,47 @@ const EventRowCard = ({
                 }}
               >
                 {event.system && <InfoLine icon="💻" label="ระบบ">{event.system}</InfoLine>}
-                {/* ชื่อโครงการเป็นตัวที่ใช้ระบุงานมากที่สุด ให้กินเต็มความกว้างเสมอ ไม่ต้องตัดคำ */}
+                {/* ชื่อโครงการเป็นตัวที่ใช้ระบุงานมากที่สุด ให้กินเต็มความกว้างเสมอ ไม่ต้องตัดคำ
+                    ✅ ชื่อโครงการ = ลิงก์แผนที่ในตัว (ผู้ใช้ขอ: "ให้กดผ่านชื่อโครงการเลย และไม่ต้องมีแก้ไข
+                    แบบนี้ดูรก") — เดิมมีกล่อง "ค้นหาตำแหน่งใน Maps" เต็มความกว้าง + ปุ่มดินสอแยกอีกปุ่ม
+                    วางคั่นกลางการ์ด กินที่เท่าข้อมูลจริง 2 บรรทัดต่อการ์ด พอลิสต์มีหลายงานเลยเห็นแต่กล่อง
+                    ⚠️ ที่ผูกกับชื่อโครงการได้พอดีเพราะพิกัดถูกเก็บ "ต่อโครงการ" (ไม่ใช่ต่องาน) ชื่อที่กด
+                    จึงตรงกับสิ่งที่จะเปิดเป๊ะ ไม่ต้องมีป้ายอธิบายเพิ่ม
+                    ⚠️ การแก้พิกัดยังทำได้ที่ฟอร์มแก้ไขงานและหน้าภาพรวมสัญญาเหมือนเดิม — ตัดออกเฉพาะ
+                    หน้านี้ซึ่งเป็นหน้า "ดูงาน/นำทาง" ไม่ใช่หน้าตั้งค่าข้อมูลโครงการ */}
                 <Box sx={{ gridColumn: { md: "1 / -1" } }}>
-                  <InfoLine icon="🏢" label="โครงการ">{companySite(event.company, event.site)}</InfoLine>
+                  <InfoLine icon="🏢" label="โครงการ">
+                    <Box
+                      component="a"
+                      href={mapHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      // การ์ดทั้งใบกดเพื่อกาง/ยุบ — ถ้าไม่กั้นไว้ กดลิงก์ทีการ์ดจะกางตามไปด้วยทุกครั้ง
+                      onClick={(e) => e.stopPropagation()}
+                      title={hasSiteMap
+                        ? "เปิดแผนที่นำทางไปหน้างาน"
+                        : "ยังไม่มีพิกัดบันทึกไว้ — เปิดค้นหาชื่อโครงการใน Google Maps"}
+                      sx={{
+                        color: "inherit",
+                        textDecoration: "none",
+                        // เส้นใต้ประ = บอกว่ากดได้โดยไม่ต้องทำให้เป็นสีลิงก์ทั้งบรรทัด (ชื่อโครงการยังต้อง
+                        // อ่านเป็นข้อมูลของการ์ดอยู่ ไม่ใช่กลายเป็นปุ่ม)
+                        borderBottom: "1px dashed",
+                        borderColor: "divider",
+                        "&:hover": { color: "primary.main", borderColor: "primary.main" },
+                      }}
+                    >
+                      {companySite(event.company, event.site)}
+                      {/* หมุดแดงตัวเดียวกับทุกหน้า — บอกว่าชื่อนี้กดแล้วไป Google Maps (เดิมเป็นอีโมจิ
+                          📍/🔍 ซึ่งสื่อได้แค่ "ตำแหน่ง/ค้นหา" ไม่ได้บอกว่าเป็นบริการไหน) */}
+                      <Box
+                        component="span"
+                        sx={{ ml: 0.5, display: "inline-flex", verticalAlign: "-2px" }}
+                      >
+                        <GoogleMapsPin size={13} />
+                      </Box>
+                    </Box>
+                  </InfoLine>
                 </Box>
                 {/* ✅ ย้ายมาไว้ถัดจากโครงการตามที่ขอ (เดิมอยู่คู่กับระบบด้านบนสุด) */}
                 {event.time && <InfoLine icon="🔢" label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount)}</InfoLine>}
@@ -2076,7 +2120,9 @@ const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob }) => (
           const isOverdue = isFlaggedDays(overdueDays);
           const docCount = ["reportFiles", "quotationFiles", "invoiceFiles", "completionFiles"]
             .reduce((sum, k) => sum + (a[k]?.length || 0), 0);
-          const teamNames = [a.team, ...(a.teamMembers || []).map((m) => m?.name)].filter(Boolean);
+          // ⚠️ ตัดชื่อซ้ำออก — หัวหน้าทีม (team) มักถูกใส่ไว้ใน teamMembers ด้วย ทำให้ขึ้นเป็น
+          // "Santisuk, Santisuk" เหมือนมี 2 คนทั้งที่เป็นคนเดียว (เห็นชัดขึ้นหลังชื่อทุกที่ใช้ชื่อต้นเหมือนกันแล้ว)
+          const teamNames = [...new Set([a.team, ...(a.teamMembers || []).map((m) => m?.name)].filter(Boolean))];
           return (
             <TableRow key={a._id} hover onClick={() => onOpenJob(job)}
               sx={{ cursor: "pointer", bgcolor: idx % 2 ? alpha("#0f172a", 0.02) : "transparent" }}>

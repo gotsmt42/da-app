@@ -42,6 +42,30 @@ export default defineConfig({
   server: {
     port: 3000,
     open: false,
+
+    /**
+     * ✅ proxy /api → backend (ใช้เฉพาะตอน dev เท่านั้น ไม่กระทบ build/production)
+     *
+     * มีไว้เพื่อ "เปิดทดสอบจากมือถือ" โดยเฉพาะ — เดิมหน้าเว็บยิง API ไปที่
+     * http://localhost:5000 แบบเต็ม URL ซึ่งพอเปิดจากมือถือ คำว่า localhost จะหมายถึง
+     * *ตัวมือถือเอง* ไม่ใช่เครื่องที่รันเซิร์ฟเวอร์ → เรียก API ไม่ถึงเลยสักเส้น
+     *
+     * ให้หน้าเว็บเรียกแบบ path เดียวกัน (/api/...) แล้ว Vite เป็นคนต่อไปหา backend ให้แทน
+     * ผลพลอยได้ที่สำคัญ: เบราว์เซอร์มองว่าเป็น origin เดียวกัน จึง **ไม่ต้องแตะ CORS ฝั่ง server**
+     * (ALLOWED_ORIGINS มีแค่ localhost:3000 ถ้าเปิดด้วย IP ในวง LAN จะโดน CORS บล็อกทันที)
+     *
+     * ⚠️ ใช้คู่กับโหมด mobile เท่านั้น (ดู .env.mobile ที่ตั้ง REACT_APP_API_URL=/api)
+     * โหมดปกติยังยิงไปที่ localhost:5000 ตรงๆ เหมือนเดิมทุกประการ
+     */
+    proxy: {
+      "/api": {
+        // ⚠️ ต้องเป็น [::1] (IPv6) ไม่ใช่ 127.0.0.1 — เครื่องนี้มีบริการอื่น (NFNGateway ของ
+        // Facilities Monitoring) จองพอร์ต 5000 บน IPv4 อยู่ ส่วน backend ผูกกับ IPv6 (::)
+        // ถ้าชี้ IPv4 จะไปโดนบริการนั้นแล้วได้ ECONNRESET ทุก request โดยไม่มีอะไรบอกว่าทำไม
+        target: "http://[::1]:5000",
+        changeOrigin: true,
+      },
+    },
   },
 
   build: {

@@ -10,6 +10,8 @@ import { classifyJob, getJobClassMeta } from "@/shared/utils/jobClassification";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { can } from "@/shared/utils/roles";
+// ✅ พิกัดหน้างาน — ใช้ตัวช่วยชุดเดียวกับหน้าอื่น (ดูหัวไฟล์ SiteMapLink.js)
+import { mapSearchUrl, googleMapsPinSvg } from "@/shared/ui/SiteMapLink";
 
 // ✅ ป้องกัน stored XSS — ค่าที่ผู้ใช้พิมพ์เอง (ชื่อบริษัท/โครงการ/ประเภทงาน/ระบบ/ทีม ฯลฯ) ต้อง escape
 // ก่อนต่อเป็น HTML string เสมอ ไม่งั้นถ้ามีใครตั้งชื่อเป็น เช่น "><img src=x onerror="..."> จะยิง
@@ -208,14 +210,35 @@ function injectStyles() {
     .ee-contract-box {
       background: linear-gradient(135deg, #eef2ff, #f5f3ff);
       border: 1.5px solid #c7d2fe; border-radius: 12px;
-      padding: 14px 16px 6px; margin-bottom: 16px;
+      padding: 0 16px; margin-bottom: 16px;
     }
+    /* กางอยู่ค่อยมี padding ล่าง — ตอนพับจะได้เป็นแถบบางๆ แถวเดียว ไม่มีช่องว่างลอย */
+    .ee-contract-box[open] { padding: 0 16px 6px; }
+
     .ee-contract-box-label {
       font-size: 12.5px; font-weight: 700; color: #4338ca;
-      margin: 0 0 10px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+      margin: 0; padding: 12px 0; cursor: pointer;
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      list-style: none; user-select: none;
     }
-    .ee-contract-box-label span {
+    /* ซ่อนสามเหลี่ยมมาตรฐานของ <details> แล้ววาดเองให้เข้ากับดีไซน์ (Safari ใช้ ::-webkit-details-marker) */
+    .ee-contract-box-label::-webkit-details-marker { display: none; }
+    .ee-contract-box-label::after {
+      content: "⌄"; margin-left: auto; font-size: 15px; line-height: 1;
+      color: #6366f1; transition: transform .18s;
+    }
+    .ee-contract-box[open] .ee-contract-box-label::after { transform: rotate(180deg); }
+
+    /* สรุปย่อบนหัวข้อ — เห็นเลขที่สัญญา/จำนวนครั้งได้โดยไม่ต้องกาง */
+    .ee-contract-peek {
+      font-size: 11.5px; font-weight: 600; color: #4f46e5;
+      background: rgba(99, 102, 241, .12); border-radius: 999px; padding: 2px 8px;
+    }
+    .ee-contract-peek:empty { display: none; }
+    .ee-contract-hint { font-size: 10.5px; font-weight: 500; color: #818cf8; }
+    .ee-contract-note {
       font-size: 11px; font-weight: 500; color: #6366f1;
+      margin: 0 0 10px;
     }
     /* ✅ ทางเชื่อมกลับไปหน้า "ภาพรวมงาน" — วางท้ายกล่องข้อมูลสัญญา ใช้โทนสีเดียวกับกล่อง (ม่วง-คราม)
        ให้ดูเป็นส่วนหนึ่งของกล่องนี้ ไม่ใช่ปุ่มแปลกปลอมที่หลุดมาจากที่อื่น */
@@ -270,6 +293,23 @@ function injectStyles() {
     .ee-grid-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
     @media(max-width:600px) { .ee-grid-2,.ee-grid-3,.ee-grid-4 { grid-template-columns: 1fr; } }
 
+/* ── แถว "วันที่" และแถว "เวลา" บนมือถือ ────────────────────────────────────────────────
+       เดิมกฎยุบ 1 คอลัมน์ด้านบนกิน .ee-grid-2 ทุกตัวรวมกลุ่มนี้ด้วย วันที่เริ่ม/วันที่สิ้นสุด/เวลาเริ่ม/
+       เวลาสิ้นสุด จึงกลายเป็น 4 แถวเต็มความกว้าง กินเกือบทั้งจอทั้งที่แต่ละช่องใส่ข้อความสั้นมาก
+       ✅ คงไว้ 2 คอลัมน์: แถวบน = วันที่เริ่ม|วันที่สิ้นสุด แถวล่าง = เวลาเริ่ม|เวลาสิ้นสุด (4 แถว → 2 แถว)
+       ค่าที่ต้องเทียบกัน (เริ่ม–สิ้นสุด) อยู่ระดับสายตาเดียวกัน ตรวจทานได้โดยไม่ต้องเลื่อนจอ */
+    .ee-grid-datetime { grid-template-columns: 1fr 1fr; }
+    @media(max-width:600px) {
+      /* ชนะกฎยุบ 1 คอลัมน์ด้านบนด้วย specificity (2 class ชนะ 1 class) */
+      .ee-grid.ee-grid-datetime { grid-template-columns: 1fr 1fr; gap: 8px; }
+      /* จำเป็นทั้งคู่: ไม่งั้นความกว้างขั้นต่ำในตัวของช่องกรอกจะดันคอลัมน์จนล้นจอ */
+      .ee-grid-datetime .ee-field { min-width: 0; }
+      .ee-grid-datetime .ee-field input { min-width: 0; }
+      .ee-grid-datetime .ee-field label { white-space: nowrap; }
+    }
+    /* แคบกว่านี้ (ต่ำกว่า ~360px) สองช่องเบียดจนอ่านวันที่ไม่ครบ — คลี่เป็นคอลัมน์เดียว */
+    @media(max-width:359px) { .ee-grid.ee-grid-datetime { grid-template-columns: 1fr; } }
+
     /* ── Field ── */
     .ee-field { display: flex; flex-direction: column; gap: 3px; }
     .ee-field label {
@@ -311,47 +351,45 @@ function injectStyles() {
       margin-bottom: 10px; cursor: pointer;
     }
     .ee-checkbox-row input { width: auto !important; cursor: pointer; }
-    .ee-multi-date-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
-    /* ✅ ป้ายวันที่แบบ "วัน เดือน ปี" อ่านง่าย กำกับท้ายแต่ละช่วง — เดือนเป็นตัวอักษรไทยจึงไม่มีทางอ่าน
-       สลับวัน/เดือนได้ ไม่ว่าเบราว์เซอร์จะแสดง <input type="date"> เป็นรูปแบบไหน (dd/mm หรือ mm/dd
-       ขึ้นกับภาษาของเครื่อง บังคับไม่ได้) — บนจอแคบตกลงมาเป็นบรรทัดของตัวเองเต็มความกว้าง ไม่บีบช่องกรอก */
-    .ee-multi-date-row .ee-range-preview {
-      font-size: 12px; font-weight: 600; color: #4338ca;
-      background: #eef2ff; border: 1px solid #e0e7ff; border-radius: 6px;
-      padding: 3px 8px; white-space: nowrap; flex-shrink: 0;
+    /* ── การ์ด "ช่วงวันที่" ของงานหลายวัน ────────────────────────────────────────────────────
+       🐛 อาการเดิม (ผู้ใช้: "ดูไม่เป็นระเบียบ และสับสน"): 1 ช่วง = แถว flex ยาวๆ ที่ปล่อยให้ตกบรรทัดเอง
+       บนมือถือจึงกลายเป็น [ช่องวันที่เริ่ม] [–] / [ช่องวันที่สิ้นสุด] [✕] / [ป้ายสรุป] — ขีดคั่น "–"
+       ไปค้างท้ายบรรทัดแรกจนดูเหมือนปุ่มลบ, ปุ่ม ✕ ไปอยู่ท้ายบรรทัดที่สองจนดูเหมือนลบเฉพาะวันสิ้นสุด,
+       และไม่มีอะไรบอกว่าช่องบน/ล่างคืออะไร ต้องเดาจากลำดับเอง พอมีหลายช่วงก็แยกไม่ออกว่าอันไหนคืออันไหน
+       ✅ จัดใหม่เป็นการ์ดที่มีโครงตายตัว ไม่พึ่งการตกบรรทัด:
+          หัวการ์ด = เลขช่วง + สรุปวันแบบไทย + ปุ่มลบ (ชิดขวา ชัดว่าเป็นของทั้งช่วง)
+          ตัวการ์ด = "เริ่ม" / "ถึง" กำกับหน้าช่องทุกช่อง อ่านได้โดยไม่ต้องเดาจากตำแหน่ง */
+    .ee-multi-date-row {
+      border: 1.5px solid #e6e9f2; border-radius: 10px; background: #fbfcff;
+      padding: 8px 10px 10px; margin-bottom: 10px;
     }
-    .ee-multi-date-row .ee-range-preview:empty { display: none; }
-    /* 🐛 BUG ที่แก้ (จอมือถือแถวช่วงวันที่แตกเป็น 3 บรรทัด ปุ่ม ✕ ลอยเดี่ยวๆ ดูเหมือนหน้าพัง):
-       ช่องวันที่ตั้ง flex:1 ไว้ แต่ <input type="date"> มีความกว้างขั้นต่ำในตัวเองจากปฏิทินของเบราว์เซอร์
-       (~145px) สองช่องรวมกันก็เต็มความกว้างจอแล้ว ปุ่ม ✕ กับป้ายวันที่จึงถูกดันตกไปคนละบรรทัด กลายเป็น
-       1 ช่วง = 3 บรรทัด และ ✕ ไปอยู่ซ้ายสุดของบรรทัดตัวเอง ดูไม่ออกว่าเป็นของแถวไหน
-       ✅ จัดใหม่เป็น 2 บรรทัดที่อ่านเป็นก้อนเดียว: บรรทัดบน = ช่องวันที่ + ✕ (ย่อ padding/ตัวอักษร และ
-       ปลดล็อก min-width ให้ย่อได้จริง) บรรทัดล่าง = ป้ายวันที่ไทยชิดซ้าย + ครอบทั้งช่วงด้วยกรอบอ่อนๆ
-       ให้เห็นชัดว่าทั้งสองบรรทัดเป็นของช่วงเดียวกัน */
-    @media (max-width: 640px) {
-      .ee-multi-date-row {
-        gap: 5px;
-        padding: 7px 8px 6px;
-        margin-bottom: 10px;
-        border: 1px solid #e8eaf2;
-        border-radius: 9px;
-        background: #fafbff;
-      }
-      .ee-multi-date-row input[type=date] {
-        min-width: 0;
-        padding: 6px 6px;
-        font-size: 12px;
-      }
-      .ee-multi-date-row .ee-range-sep { font-size: 11px; }
-      .ee-multi-date-remove { flex: 0 0 26px !important; width: 26px; height: 26px; font-size: 12px; }
-      .ee-multi-date-row .ee-range-preview {
-        order: 10; width: 100%; text-align: left;
-        background: transparent; border: none; padding: 2px 2px 0;
-        font-size: 11.5px;
-      }
+    .ee-range-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    /* เลขช่วง — ตัวเดียวที่ทำให้ "ช่วงที่ 2" ต่างจาก "ช่วงที่ 3" ได้ด้วยตาเปล่าเวลามีหลายช่วง */
+    .ee-range-no {
+      flex-shrink: 0; font-size: 11px; font-weight: 800; color: #4338ca;
+      background: #eef2ff; border: 1px solid #e0e7ff; border-radius: 999px;
+      padding: 2px 9px; white-space: nowrap;
+    }
+    /* ✅ ป้ายสรุปเป็น "วัน เดือน ปี" ภาษาไทย — ช่อง <input type=date> แสดงรูปแบบตามภาษาของเครื่อง
+       (บางเครื่อง mm/dd/yyyy) บังคับไม่ได้ จึงเสี่ยงอ่านสลับวัน-เดือนโดยไม่รู้ตัวเมื่อวันที่ ≤ 12
+       (04/08 คือ 4 ส.ค. หรือ 8 เม.ย.?) — เดือนเป็นตัวอักษรไทยจึงไม่มีทางอ่านสลับได้ */
+    .ee-range-preview {
+      flex: 1; min-width: 0; font-size: 11.5px; font-weight: 600; color: #64748b;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      /* ⚠️ ต้องสั่งเอง — .swal2-html-container ตั้ง text-align:center ไว้ ถ้าไม่ทับ ข้อความสรุปของแต่ละ
+         การ์ดจะเริ่มคนละตำแหน่งตามความยาวข้อความ (สั้นบ้างยาวบ้าง) กวาดตาลงมาแล้วไม่เป็นแถวเดียวกัน */
+      text-align: left;
+    }
+    /* ช่วงที่ยังไม่ได้เลือกวันที่ — ข้อความจางกว่าเพื่อไม่ให้แข่งกับช่วงที่กรอกแล้ว แต่ยังต้อง "มีอยู่"
+       เพื่อกันช่องนี้ยุบ (ดูเหตุผลที่ refreshPreview) */
+    .ee-range-preview--empty { color: #b6c0cf; font-weight: 500; }
+    .ee-range-body { display: flex; align-items: center; gap: 8px; }
+    .ee-range-field { display: flex; align-items: center; gap: 7px; flex: 1; min-width: 0; }
+    .ee-range-cap {
+      flex-shrink: 0; width: 26px; font-size: 11px; font-weight: 700; color: #94a3b8;
     }
     .ee-multi-date-row input[type=date] {
-      flex: 1; box-sizing: border-box;
+      flex: 1 1 auto; min-width: 0; box-sizing: border-box;
       border: 1.5px solid #e2e8f0; border-radius: 7px;
       padding: 7px 10px; font-size: 13px; color: #1e293b;
       background: #fff; font-family: inherit;
@@ -360,13 +398,25 @@ function injectStyles() {
       outline: none; border-color: #2563eb;
       box-shadow: 0 0 0 3px rgba(37,99,235,.10);
     }
-    .ee-multi-date-row .ee-range-sep { flex-shrink: 0; color: #94a3b8; font-weight: 700; }
+    .ee-range-sep { flex-shrink: 0; color: #cbd5e1; font-weight: 700; font-size: 13px; }
+    /* จอแคบ: วางช่องเริ่ม/ถึงซ้อนกันเป็นบรรทัดละช่อง — สองช่องเรียงข้างกันที่ความกว้างนี้เหลือช่องละ
+       ~130px ซึ่งปฏิทินของเบราว์เซอร์แสดงวันที่ไม่ครบ · ป้าย "เริ่ม/ถึง" ทำหน้าที่แทนลูกศรได้อยู่แล้ว
+       ลูกศรแนวนอนกลางคอลัมน์แนวตั้งจะกลายเป็นสัญลักษณ์ที่ไม่ได้ชี้อะไร จึงซ่อนไป */
+    @media (max-width: 640px) {
+      .ee-range-body { flex-direction: column; align-items: stretch; gap: 6px; }
+      .ee-range-sep { display: none; }
+      .ee-multi-date-row input[type=date] { padding: 7px 8px; font-size: 12.5px; }
+    }
     /* ✅ ปุ่ม ✕ ต้องเป็นสี่เหลี่ยมจัตุรัสขนาดคงที่เสมอ — ล็อก flex ไว้ทั้งสามค่า (ไม่ยืด/ไม่หด/ฐานคงที่)
        ไม่ใช่แค่ flex-shrink เพราะปุ่มนี้ใช้คลาส .ee-btn ร่วมกับปุ่มอื่น ถ้ามีกฎไหนตั้ง flex-grow ให้
        .ee-btn (เช่นกฎของแถบปุ่มล่างบนจอมือถือ) ปุ่มนี้จะยืดกินพื้นที่ของช่องวันที่ข้างๆ ทันที */
     .ee-multi-date-remove {
-      flex: 0 0 30px !important; width: 30px; height: 30px; padding: 0 !important;
+      flex: 0 0 28px !important; width: 28px; height: 28px; padding: 0 !important;
+      font-size: 12px; line-height: 1;
       display: flex; align-items: center; justify-content: center;
+      /* ✅ ตรึงไว้ขวาสุดของหัวการ์ดเสมอ ไม่ว่าข้อความสรุปด้านซ้ายจะยาวแค่ไหนหรือไม่มีเลย —
+         ปุ่มลบต้องอยู่ที่เดิมทุกใบ ไม่งั้นกวาดตาลงมาแล้วตำแหน่งปุ่มเต้นไปมาทีละการ์ด */
+      margin-left: auto;
     }
     /* ✅ แถบยืนยันลบช่วงวันที่ — เดิมใช้ window.confirm() ของเบราว์เซอร์ (หน้าตาไม่ตรงธีมแอปเลย)
        เปลี่ยนเป็นแถบในฟอร์มแทน ไม่ใช้ Swal.fire ซ้อนเพราะ modal นี้เป็น Swal อยู่แล้ว เปิดอีกอันจะ
@@ -477,6 +527,54 @@ function injectStyles() {
     /* hover เดิมใช้ opacity ซึ่งพอเป็นปุ่มพื้นขาวจะกลายเป็นซีดจางดูเหมือนปุ่มถูกปิดใช้งาน */
     #ee-action-bar .ee-btn:hover { opacity: 1; }
 
+    /* ✅ ปุ่มแผนที่ในแถบล่าง — เป็น <a> ไม่ใช่ <button> จึงต้องจัดให้สูง/จัดกึ่งกลางเท่าปุ่มอื่นเอง */
+    #ee-action-bar .ee-btn-map {
+      display: inline-flex; align-items: center; justify-content: center;
+      text-decoration: none; color: #047857;
+      background: rgba(16, 185, 129, .10); border-color: rgba(16, 185, 129, .35);
+    }
+    #ee-action-bar .ee-btn-map:hover { background: rgba(16, 185, 129, .2); }
+
+    /* ── เมนู "เพิ่มเติม" ────────────────────────────────────────────────────
+       ✅ ที่ทำ (ผู้ใช้แจ้ง "ปุ่มดูรกเกินไป"): เก็บปุ่มที่ทำนานๆ ครั้งไว้ในเมนู เพื่อให้แถบล่างเหลือ
+       เฉพาะสิ่งที่คนเปิดฟอร์มนี้มาทำจริง — และให้ "ลบแผนงาน" อยู่ท้ายสุดในเมนู ห่างจากปุ่มที่กดบ่อย
+       ⚠️ วางลอยด้วย position:absolute อ้างอิง #ee-action-bar ซึ่งเป็น position:sticky อยู่แล้ว
+       (sticky เป็นค่า positioned จึงเป็น containing block ให้ absolute ได้ ไม่ต้องเพิ่ม relative) */
+    #ee-action-bar .ee-btn-more { color: #475569; }
+    #ee-action-bar .ee-btn-more:hover { background: #f1f5f9; border-color: #cbd5e1; }
+
+    #ee-more-menu {
+      position: absolute; bottom: calc(100% + 8px); left: 12px; right: 12px;
+      max-width: 300px; z-index: 30;
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, .16);
+      padding: 6px; display: flex; flex-direction: column; gap: 2px;
+    }
+    .ee-more-item {
+      display: flex; align-items: center; gap: 10px;
+      width: 100%; text-align: left;
+      background: transparent; border: none; border-radius: 8px;
+      padding: 11px 12px; font-size: 13px; font-weight: 600; color: #334155;
+      font-family: inherit; cursor: pointer;
+    }
+    .ee-more-item span { font-size: 15px; line-height: 1; }
+    .ee-more-item:hover { background: #f1f5f9; }
+    /* ปุ่มอันตราย — คั่นเส้นบางๆ แยกออกจากกลุ่มปกติ กันกดพลาด */
+    .ee-more-item--danger {
+      color: #dc2626; margin-top: 4px; padding-top: 12px;
+      border-top: 1px solid #f1f5f9;
+    }
+    .ee-more-item--danger:hover { background: #fef2f2; }
+
+    /* ✅ ชิปชื่อโครงการบน header ที่กดเปิดแผนที่ได้ — ต้องดูออกว่ากดได้ ไม่ใช่ป้ายเฉยๆ
+       (ชิปอื่นบน header เป็นข้อความล้วน ถ้าหน้าตาเหมือนกันเป๊ะจะไม่มีใครรู้ว่าอันนี้กดได้) */
+    .ee-tag--link {
+      text-decoration: none; cursor: pointer;
+      transition: background .15s, border-color .15s;
+    }
+    .ee-tag--link:hover { background: rgba(255, 255, 255, .38); }
+    .ee-tag-go { opacity: .8; font-weight: 700; margin-left: 2px; }
+
     /* ปุ่มหลัก — ปุ่มเดียวในแถบที่เป็นสีทึบ */
     #ee-action-bar .ee-btn-success {
       background: #10b981; border-color: #10b981; color: #fff;
@@ -511,15 +609,24 @@ function injectStyles() {
        padding/ตัวอักษรลงเล็กน้อย — ปุ่มไหนยาวก็ได้บรรทัดของตัวเอง ไม่มีปุ่มไหนถูกตัดอีก */
     @media(max-width:640px) {
       #ee-action-bar { flex-direction: column; gap: 8px; padding: 10px 12px 12px; }
-      .ee-btn-group  { width: 100%; justify-content: center; flex-wrap: wrap; }
+      .ee-btn-group  { width: 100%; justify-content: center; }
       .ee-btn-group-center { border: none; border-top: 1px solid #cbd5e1; border-bottom: 1px solid #cbd5e1; padding: 8px 0; }
+
+      /* ✅ แถบล่างเหลือปุ่มคงที่ 2 ฝั่งแล้ว (แผนที่ + เพิ่มเติม / ปิด + บันทึก) ไม่มีปุ่มแบบมีเงื่อนไข
+         หลงเหลือ ตำแหน่งจึงคงที่เองโดยธรรมชาติ ไม่ต้องจองช่องใน grid เหมือนเดิมอีก */
+      .ee-btn-group-left { display: flex; gap: 6px; }
+      #ee-action-bar .ee-btn-group-left .ee-btn { flex: 1 1 0; }
+
       /* ⚠️ ต้องจำกัดขอบเขตด้วย #ee-action-bar เท่านั้น — เขียนเป็น .ee-btn เปล่าๆ จะไปโดนปุ่มอื่นที่ใช้
          คลาสนี้ร่วมกันด้วย โดยเฉพาะปุ่ม ✕ ลบช่วงวันที่ (class="ee-btn ee-btn-ghost ee-multi-date-remove")
          ซึ่งพอได้ flex:1 1 auto จะยืดกินพื้นที่จนช่องวันที่ข้างๆ ถูกบีบจนแสดงไม่ครบ */
       #ee-action-bar .ee-btn {
-        flex: 1 1 auto; min-width: 0; justify-content: center;
+        min-width: 0; justify-content: center;
         padding: 9px 10px; font-size: 12px;
       }
+      /* กลุ่มขวา (ปิด/บันทึก) ยังเป็น flex — ปุ่มคงที่ 2 ตัวเสมอ ไม่มีเงื่อนไข จึงไม่ต้องจองช่อง */
+      .ee-btn-group-right { display: flex; gap: 6px; }
+      #ee-action-bar .ee-btn-group-right .ee-btn { flex: 1 1 auto; }
     }
 
     /* ── TomSelect override ── */
@@ -1024,6 +1131,24 @@ export const getEditEvent = async ({
     val && !list.includes(val) ? optionHtml(val, true) : "";
   const companyValues = res.userCustomers.map((c) => c.cCompany);
   const siteValues = res.userCustomers.map((c) => c.cSite);
+
+  /**
+   * ✅ ที่เพิ่ม (ผู้ใช้ขอ: "ทุกหน้าที่มีงาน ให้ดู/แก้ google maps ได้ แยกตามสิทธิเดิม")
+   * พิกัดเก็บที่ทะเบียนลูกค้า (ผูกกับ cCompany + cSite) ไม่ใช่ที่ตัวงาน — โครงการเดิมอยู่ที่เดิมเสมอ
+   * ⚠️ จับคู่ด้วยบริษัท+โครงการก่อน ถ้าไม่เจอค่อยลองด้วยชื่อโครงการอย่างเดียว (งานเก่าหลายใบ
+   * ไม่ได้กรอกชื่อบริษัทไว้ ถ้าบังคับให้ตรงทั้งคู่จะหาพิกัดไม่เจอทั้งที่มีบันทึกไว้แล้ว)
+   */
+  const savedMapUrl =
+    (res.userCustomers.find((c) => c.cCompany === eventCompany && c.cSite === eventSite)
+      || res.userCustomers.find((c) => c.cSite === eventSite))?.mapUrl || "";
+  // ลิงก์ค้นหาใน Maps จากชื่อที่งานนี้มีอยู่แล้ว — ไม่ต้องออกไปเปิดแอปแล้วพิมพ์ชื่อโครงการซ้ำเอง
+  const mapSearchHref = mapSearchUrl(eventSite, eventCompany);
+
+  // มีอะไรให้ใส่ในเมนู "เพิ่มเติม" ไหม — ถ้าไม่มีเลย (เช่น เซลเปิดดูอย่างเดียว) ก็ไม่ต้องมีปุ่มเมนู
+  const hasMoreActions = Boolean(
+    canViewOperation || !readOnly || (canEditDocFields && onOpenDeliveryNote)
+      || canAttachToContract || canUnscheduleEvent || canDeleteEvent
+  );
   const titleValues = (jobTypes?.items || []).map((t) => t.name);
   const systemValues = (systemTypes?.items || []).map((s) => s.name);
   const teamValues = employeeList.map((e) => e.fname);
@@ -1074,7 +1199,16 @@ export const getEditEvent = async ({
     <div id="ee-status-title">
       <h3><span >${attrHtml(eventTitle)} · ${attrHtml(eventSystem)} ${eventTime ? `· ครั้งที่ ${attrHtml(formatRoundLabel(eventTime, eventVisitCount))}` : ""}</span></h3>
       <div class="ee-header-meta">
-        <span class="ee-tag">📍 ${attrHtml(eventSite) || "—"}</span>
+        ${/* ✅ ที่แก้ (ผู้ใช้ขอ: "หน้า event อยากให้แสดงให้เห็นง่ายกว่านี้ เช่น header หรือ footer"):
+             เดิมลิงก์แผนที่ถูกฝังอยู่กลางฟอร์ม ระหว่าง "ครั้งที่" กับ "ผู้เข้างาน" ต้องเลื่อนหาถึงจะเจอ
+             — ทั้งที่บน header มีชิป 📍 ชื่อโครงการอยู่แล้ว แค่กดไม่ได้เฉยๆ
+             ✅ ทำชิปเดิมให้กดได้เลย ไม่ต้องเพิ่มอะไรใหม่บน header (ไม่เพิ่มความรก)
+             มีพิกัดบันทึกไว้ = เปิดนำทางทันที · ยังไม่มี = พาไปค้นหาใน Maps ให้ */""}
+        <a class="ee-tag ee-tag--link" id="ee-mapChip"
+           href="${attrHtml(savedMapUrl || mapSearchHref)}" target="_blank" rel="noopener noreferrer"
+           title="${savedMapUrl ? "เปิดแผนที่นำทางไปหน้างาน" : "ยังไม่มีพิกัดบันทึกไว้ — กดเพื่อค้นหาใน Google Maps"}">
+          ${googleMapsPinSvg(13)} ${attrHtml(eventSite) || "—"} <span class="ee-tag-go">${savedMapUrl ? "นำทาง ↗" : "ค้นหา ↗"}</span>
+        </a>
         ${eventTeam && eventTeam !== headerResponsibleName ? `<span class="ee-tag">👷 ${attrHtml(eventTeam)}</span>` : ""}
         ${headerResponsibleName
           ? `<span class="ee-tag"${headerResponsibleIsInferred ? ' title="งานนี้ยังไม่ได้ระบุผู้รับผิดชอบไว้ชัดเจน — แสดงตามทีมที่เข้างานแทน"' : ""}>🧑‍💼 ผู้รับผิดชอบ: ${attrHtml(headerResponsibleName)}${headerResponsibleIsInferred ? " (ตามทีมที่เข้างาน)" : ""}</span>`
@@ -1122,8 +1256,22 @@ export const getEditEvent = async ({
          "ครั้งที่" นี้ที่มักต้องเช็คก่อนแก้อย่างอื่น ใส่กล่องพื้นหลังโทนม่วง-น้ำเงินแยกจากส่วนอื่นชัดเจน
          ให้เห็นตั้งแต่แวบแรกว่าเป็นข้อมูล "ทั้งสัญญา" ไม่ใช่แค่ครั้งนี้ครั้งเดียว -->
     ${eventContractGroupId ? `
-    <div class="ee-contract-box">
-      <p class="ee-contract-box-label">📑 ข้อมูลสัญญา <span>${isAdminOrManagerUser ? `แก้ที่นี่จะอัปเดตทุก "ครั้งที่" ในสัญญานี้พร้อมกัน` : `ดูได้อย่างเดียว — แก้ไขได้เฉพาะแอดมิน/manager เท่านั้น`}</span></p>
+    ${/* ✅ ที่แก้ (ผู้ใช้แจ้ง: "ข้อมูลสัญญาให้ย่อขยายได้ ดูรก ปกติไม่ค่อยได้เปิดดู ทำให้ปิด default"):
+         เดิมกล่องนี้กางอยู่เสมอและอยู่บนสุด กินเต็มหน้าจอแรกบนมือถือ (7 ช่องกรอก) ทั้งที่คนเปิดฟอร์มนี้
+         ส่วนใหญ่มาแก้ "วันที่/สถานะ/ทีม" ของครั้งนี้ ไม่ได้มาแก้ข้อมูลระดับสัญญาซึ่งนานๆ แก้ที
+         ✅ ใช้ <details> ของเบราว์เซอร์ตรงๆ — พับได้โดยไม่ต้องเขียน JS เพิ่มสักบรรทัด และยังทำงาน
+         ได้แม้ JS ส่วนอื่นพัง · หัวข้อสรุปเลขที่สัญญา/จำนวนครั้งให้เห็นเลยโดยไม่ต้องกาง
+         ⚠️ ไม่ใส่ open — ปิดเป็นค่าเริ่มต้นตามที่ผู้ใช้สั่ง */""}
+    <details class="ee-contract-box">
+      <summary class="ee-contract-box-label">
+        <span class="ee-contract-sum">📑 ข้อมูลสัญญา</span>
+        <span class="ee-contract-peek">${[
+          eventContractNo ? attrHtml(eventContractNo) : null,
+          eventVisitCount ? `${attrHtml(String(eventVisitCount))} ครั้ง` : null,
+        ].filter(Boolean).join(" · ")}</span>
+        <span class="ee-contract-hint">${isAdminOrManagerUser ? "แตะเพื่อดู/แก้" : "แตะเพื่อดู"}</span>
+      </summary>
+      <p class="ee-contract-note">${isAdminOrManagerUser ? `แก้ที่นี่จะอัปเดตทุก "ครั้งที่" ในสัญญานี้พร้อมกัน` : `ดูได้อย่างเดียว — แก้ไขได้เฉพาะแอดมิน/manager เท่านั้น`}</p>
       <div class="ee-grid ee-grid-3">
         <div class="ee-field">
           <label>📄 เลขที่สัญญา</label>
@@ -1168,7 +1316,7 @@ export const getEditEvent = async ({
          title="เปิดหน้าภาพรวมงาน พร้อมค้นหาสัญญานี้ให้อัตโนมัติ">
         📊 ดูสัญญานี้ในภาพรวมงาน
       </a>
-    </div>
+    </details>
     ` : ""}
 
     <!-- Status bar -->
@@ -1253,6 +1401,41 @@ export const getEditEvent = async ({
       ` : ""}
     </div>
 
+    <!-- ── ตำแหน่งหน้างานบน Google Maps ─────────────────────────────────────
+         ✅ ที่เพิ่ม (ผู้ใช้ขอ: "ทุกหน้าที่มีงาน ให้ดู/แก้ google maps ได้ แยกตามสิทธิเดิม")
+         พิกัดผูกกับ "โครงการ" (ทะเบียนลูกค้า) ไม่ใช่กับงานใบเดียว — แก้ที่นี่ทีเดียว ทุกงานของ
+         โครงการนั้นได้พิกัดพร้อมกัน และครั้งหน้าที่ลงงานใหม่ก็มีให้เลย ไม่ต้องหาซ้ำ
+         ⚠️ สิทธิ์แก้ = ชุดเดียวกับข้อมูลโครงการอื่นๆ ในหมวดนี้ (แอดมิน/manager) ส่วนช่างกด
+         "ค้นหาตำแหน่ง" เพื่อไปดูเองได้ตามปกติ -->
+    ${/* 🧹 เดิมตรงนี้มีทั้งปุ่มเปิดแผนที่และปุ่มแก้ — ปุ่ม "เปิด" ถูกยกไปไว้บน header (ชิปโครงการ)
+         และแถบปุ่มด้านล่างแล้ว ซึ่งเห็นง่ายกว่ามาก เหลือไว้เฉพาะ "ปุ่มแก้" สำหรับแอดมิน/manager
+         ซึ่งเป็นงานที่ทำนานๆ ครั้ง จึงไม่ต้องเด่น */""}
+    ${isAdminOrManagerUser ? `
+    <div class="ee-field" style="margin-bottom:4px;">
+      ${/* หมุดแดงตัวเดียวกับปุ่ม/ชิปเปิดแผนที่ — หัวข้อนี้กับปุ่มพวกนั้นพูดถึงข้อมูลชุดเดียวกัน
+            ⚠️ ปุ่ม "บันทึกพิกัด/แก้ลิงก์" ด้านล่างยังใช้อีโมจิ เพราะเป็นการ "แก้ข้อมูล" ไม่ใช่เปิด
+            Google Maps และข้อความของมันถูกเขียนทับด้วย textContent ตอนบันทึก (SVG จะหาย) */""}
+      <label>${googleMapsPinSvg(14)} ตำแหน่งหน้างาน (Google Maps)</label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button type="button" id="ee-mapEdit"
+                style="padding:7px 12px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;
+                       color:#64748b;background:#fff;border:1px solid #e2e8f0;">
+          ${savedMapUrl ? "✏️ แก้ลิงก์แผนที่" : "📍 บันทึกพิกัดของโครงการนี้"}
+        </button>
+        <span style="font-size:11px;color:#94a3b8;">
+          ${savedMapUrl ? "มีพิกัดแล้ว — กดชิปชื่อโครงการด้านบนเพื่อนำทาง" : "ยังไม่มีพิกัด — ช่างต้องหาเอง"}
+        </span>
+      </div>
+      <div id="ee-mapEditor" style="display:none;margin-top:8px;">
+        <input id="ee-mapInput" type="url" placeholder="วางลิงก์ที่แชร์จาก Google Maps" value="${escapeHtml(savedMapUrl)}">
+        <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
+          <span id="ee-mapMsg" style="font-size:11px;color:#94a3b8;flex:1;">เปิดลิงก์ค้นหาด้านบน → กด แชร์ → คัดลอกลิงก์ → วางที่นี่ · เว้นว่างเพื่อลบ</span>
+          <button type="button" id="ee-mapCancel" style="padding:5px 10px;border-radius:7px;font-size:12px;color:#64748b;background:#fff;border:1px solid #e2e8f0;cursor:pointer;">ยกเลิก</button>
+          <button type="button" id="ee-mapSave" style="padding:5px 12px;border-radius:7px;font-size:12px;font-weight:700;color:#fff;background:#0891b2;border:none;cursor:pointer;">บันทึก</button>
+        </div>
+      </div>
+    </div>` : ""}
+
     <hr class="ee-divider">
 
     <!-- ✅ แยก "ผู้เข้างาน" ออกมาเป็นหมวดของตัวเอง — เดิมหัวหน้าทีม/ลูกทีมถูกยัดรวมอยู่ในหมวด
@@ -1313,7 +1496,7 @@ export const getEditEvent = async ({
     </label>
 
     <div id="ee-singleDateSection" style="${hasSiblings ? "display:none;" : ""}">
-      <div class="ee-grid ee-grid-2">
+      <div class="ee-grid ee-grid-datetime">
         <div class="ee-field">
           <label>📅 วันที่เริ่ม</label>
           <input id="editStart" type="date" value="${eventStart.format("YYYY-MM-DD")}" ${isViewOnly ? "disabled" : ""}>
@@ -1330,7 +1513,7 @@ export const getEditEvent = async ({
       ${isViewOnly ? "" : `<button type="button" class="ee-btn ee-btn-ghost" id="ee-addDateBtn" style="margin-bottom:12px;">➕ เพิ่มช่วงวันที่</button>`}
     </div>
 
-    <div class="ee-grid ee-grid-2">
+    <div class="ee-grid ee-grid-datetime">
       <div class="ee-field">
         <label>🕐 เวลาเริ่ม</label>
         <input id="editStartTime" type="text" placeholder="เช่น 08:30" value="${attrHtml(eventStartTime)}" ${isViewOnly ? "disabled" : ""}>
@@ -1390,31 +1573,37 @@ export const getEditEvent = async ({
   <!-- ── Action bar (แยก 3 กลุ่มชัดเจน) ── -->
   <div id="ee-action-bar">
 
-    <!-- 🔴 ซ้าย: อันตราย -->
+    ${/* ── แถบล่าง: เหลือเฉพาะที่ใช้บ่อยจริง ─────────────────────────────────
+         🐛 ปัญหาที่แก้ (ผู้ใช้แจ้ง "ปุ่มดูรกเกินไป"): เดิมยัดปุ่มไว้ในแถบล่างสูงสุด 9 ปุ่ม
+         (ย้ายไปแผนล่วงหน้า/ลบ/ย้ายเข้าสัญญา/แผนที่/ดูการดำเนินงาน/ใบแจ้งเข้างาน/ใบส่งมอบ/ปิด/บันทึก)
+         บนจอมือถือกินพื้นที่ 3-4 แถวและต้องอ่านทุกปุ่มทุกครั้งกว่าจะเจอตัวที่ต้องการ
+         ซ้ำ "ลบแผนงาน" ยังนั่งอยู่ข้างปุ่มที่กดบ่อย เสี่ยงกดพลาดโดยไม่จำเป็น
+
+         ✅ เหลือในแถบแค่สิ่งที่คนเปิดฟอร์มนี้มาทำจริงๆ: ปิด · บันทึก · แผนที่ (นำทางไปหน้างาน)
+         ที่เหลือย้ายเข้าเมนู "⋯ เพิ่มเติม" — เป็นงานที่ทำนานๆ ครั้ง (ออกเอกสาร/ย้ายสัญญา/ลบ)
+         ⚠️ ผลพลอยได้: ปุ่มในแถบไม่มีตัวไหนเป็นแบบมีเงื่อนไขอีกแล้ว ตำแหน่งจึง "อยู่จุดเดิมเสมอ"
+         โดยธรรมชาติ ไม่ต้องพึ่งการจองช่องใน grid อีกต่อไป
+         ⚠️ id ของปุ่มทุกตัวคงเดิมเป๊ะ — ตัวจัดการ event ที่ผูกด้วย id อยู่แล้วจึงทำงานต่อได้ทันที */""}
     <div class="ee-btn-group ee-btn-group-left">
-      ${canUnscheduleEvent ? `<button class="ee-btn ee-btn-warning" id="btnUnschedule">↩️ ย้ายไปแผนล่วงหน้า</button>` : ""}
-      ${canDeleteEvent ? `<button class="ee-btn ee-btn-danger" id="btnDelete">🗑 ลบแผนงาน</button>` : ""}
+      ${/* ⚠️ ไอคอนกับข้อความต้องแยก span — ตอนบันทึกพิกัดเสร็จเราอัปเดตเฉพาะข้อความ ถ้าเขียนรวมกัน
+            แล้วสั่ง textContent ทับ SVG หมุดจะถูกลบหายไปทันทีที่กดบันทึกครั้งแรก */""}
+      <a class="ee-btn ee-btn-map" id="btnOpenMap"
+         href="${attrHtml(savedMapUrl || mapSearchHref)}" target="_blank" rel="noopener noreferrer">
+        ${googleMapsPinSvg(15)}<span id="ee-mapBtnText">${savedMapUrl ? "นำทาง (Google Maps)" : "ค้นหาใน Google Maps"}</span>
+      </a>
+      ${hasMoreActions ? `<button class="ee-btn ee-btn-more" id="btnMoreActions" aria-expanded="false">⋯ เพิ่มเติม</button>` : ""}
     </div>
 
-    <!-- 🔵 กลาง: นำทาง & เอกสาร (ย้ายเข้าสัญญาไม่ใช่การกระทำอันตราย — ไม่ควรอยู่กลุ่มซ้ายกับลบ/ย้ายไป
-         แผนล่วงหน้า ย้ายมาไว้กลุ่มนี้แทนให้สื่อความหมายตรงกว่า) -->
-    <div class="ee-btn-group ee-btn-group-center">
-      ${canAttachToContract ? `<button class="ee-btn ee-btn-attach" id="btnAttachContract">🔗 ย้ายเข้าสัญญา</button>` : ""}
-      ${canViewOperation ? `<button class="ee-btn ee-btn-operation" id="btnViewSchedule">📊 ดูการดำเนินงาน</button>` : ""}
-      ${/* ⚠️ โหมดดูอย่างเดียว (เซลเปิดดูตารางช่าง) — ออกเอกสารของงานคนอื่นไม่ได้
-            เดิมปุ่มนี้ไม่มีการตรวจสิทธิ์เลยสักชั้น (โชว์ทุกคนที่เปิดฟอร์มได้) */""}
-      ${readOnly ? "" : `<button class="ee-btn ee-btn-info"      id="btnGeneratePDF">📄 ออกใบแจ้งเข้างาน</button>`}
-      <!-- ✅ ใบส่งมอบงาน — วางคู่กับ "ใบแจ้งเข้างาน" เพราะเป็นเอกสารคู่กันของงานเดียวกัน คนละหัวคนละท้าย
-           ของงาน (แจ้งก่อนเข้า / ส่งมอบหลังเสร็จ) ใครที่รู้ว่าออกใบแจ้งเข้างานตรงนี้ ก็จะเจอใบส่งมอบ
-           ตรงนี้ด้วยทันทีโดยไม่ต้องบอก
-           ⚠️ เฉพาะแอดมิน/manager — ตรงกับสิทธิ์ที่ backend บังคับตอนขอเลขที่เอกสาร (routes/docNumber.js)
-           ถ้าโชว์ให้ช่างด้วยจะกลายเป็นปุ่มที่กดแล้วขึ้น error ทุกครั้ง -->
-      ${/* ✅ ช่างที่มีชื่อในงานออกใบส่งมอบ "ของงานตัวเอง" ได้แล้ว (ตามที่ผู้ใช้ขอ) — เดิมเฉพาะ admin/manager
-            ⚠️ ยังกันงานที่รออนุมัติไว้ (canEditDocFields=false ตอนนั้น) — งานที่ยังไม่ได้รับอนุมัติให้ทำ
-            ยังไม่ควรมีเอกสารส่งมอบออกไปหาลูกค้าเด็ดขาด
-            ⚠️ backend ตรวจซ้ำอีกชั้นว่าคนขอเลขที่เอกสารเกี่ยวข้องกับงานนั้นจริง (ดู POST /doc-number/next) */""}
-      ${canEditDocFields && onOpenDeliveryNote ? `<button class="ee-btn ee-btn-delivery" id="btnDeliveryNote">📦 ออกใบส่งมอบงาน</button>` : ""}
-    </div>
+    ${hasMoreActions ? `
+    <!-- เมนูเพิ่มเติม — ซ่อนไว้จนกว่าจะกด · เรียงจาก "ใช้บ่อย → อันตราย" ให้ปุ่มลบอยู่ท้ายสุดเสมอ -->
+    <div id="ee-more-menu" hidden>
+      ${canViewOperation ? `<button class="ee-more-item" id="btnViewSchedule"><span>📊</span> ดูการดำเนินงาน</button>` : ""}
+      ${readOnly ? "" : `<button class="ee-more-item" id="btnGeneratePDF"><span>📄</span> ออกใบแจ้งเข้างาน</button>`}
+      ${canEditDocFields && onOpenDeliveryNote ? `<button class="ee-more-item" id="btnDeliveryNote"><span>📦</span> ออกใบส่งมอบงาน</button>` : ""}
+      ${canAttachToContract ? `<button class="ee-more-item" id="btnAttachContract"><span>🔗</span> ย้ายเข้าสัญญา</button>` : ""}
+      ${canUnscheduleEvent ? `<button class="ee-more-item" id="btnUnschedule"><span>↩️</span> ย้ายไปแผนล่วงหน้า</button>` : ""}
+      ${canDeleteEvent ? `<button class="ee-more-item ee-more-item--danger" id="btnDelete"><span>🗑</span> ลบแผนงาน</button>` : ""}
+    </div>` : ""}
 
     <!-- 🟢 ขวา: ยืนยัน — งานรออนุมัติที่ช่างเปิดดู ไม่มีอะไรให้บันทึก (ทุกช่องถูกล็อกหมดแล้ว) จึงไม่ต้อง
          โชว์ปุ่มบันทึกที่กดแล้วไม่มีผลอะไรเลย (ป้องกันความสับสน/error หลอกๆ) เหลือแค่ปุ่มปิดอย่างเดียว -->
@@ -1585,6 +1774,89 @@ export const getEditEvent = async ({
     },
 
     didOpen: () => {
+      /**
+       * ── เมนู "เพิ่มเติม" ในแถบล่าง ──────────────────────────────────────
+       * ⚠️ ฟอร์มนี้เป็น HTML ล้วนใน SweetAlert ไม่ใช่ React จึงผูก listener เองตรงนี้
+       * ⚠️ ปิดเมนูเมื่อกดที่อื่น/กด Esc/กดรายการในเมนู — ไม่งั้นเมนูค้างทับปุ่มบันทึกอยู่
+       * ⚠️ ไม่ stopPropagation ตอนกดรายการในเมนู — ตัวจัดการจริงของแต่ละปุ่ม (ลบ/ออกเอกสาร ฯลฯ)
+       * ผูกด้วย id เหมือนเดิม ต้องปล่อยให้ event วิ่งไปถึงตามปกติ
+       */
+      const moreBtn = document.getElementById("btnMoreActions");
+      const moreMenu = document.getElementById("ee-more-menu");
+      if (moreBtn && moreMenu) {
+        const closeMenu = () => {
+          moreMenu.hidden = true;
+          moreBtn.setAttribute("aria-expanded", "false");
+        };
+        moreBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const willOpen = moreMenu.hidden;
+          moreMenu.hidden = !willOpen;
+          moreBtn.setAttribute("aria-expanded", String(willOpen));
+        });
+        moreMenu.addEventListener("click", () => { closeMenu(); });
+        document.addEventListener("click", (e) => {
+          if (!moreMenu.hidden && !moreMenu.contains(e.target) && e.target !== moreBtn) closeMenu();
+        });
+        document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMenu(); });
+      }
+
+      /**
+       * ── ปุ่มจัดการพิกัดหน้างาน ────────────────────────────────────────
+       * ⚠️ ฟอร์มนี้เป็น HTML ล้วนใน SweetAlert ไม่ใช่ React จึงต้องผูก listener เองตรงนี้
+       * ⚠️ ปุ่มจะมีก็ต่อเมื่อเป็นแอดมิน/manager (ดู isAdminOrManagerUser ในตัว markup)
+       * — เช็ค null ทุกตัวก่อนใช้เสมอ ไม่งั้นฟอร์มทั้งใบพังสำหรับช่าง
+       */
+      const mapEditBtn = document.getElementById("ee-mapEdit");
+      const mapEditor = document.getElementById("ee-mapEditor");
+      const mapInput = document.getElementById("ee-mapInput");
+      const mapMsg = document.getElementById("ee-mapMsg");
+      // ⚠️ ปุ่ม/ลิงก์เปิดแผนที่ตอนนี้มี 2 จุด (ชิปบน header + ปุ่มในแถบล่าง) — บันทึกแล้วต้อง
+      // อัปเดตทั้งคู่ ไม่งั้นจุดที่ไม่ได้อัปเดตจะยังพาไปหน้าค้นหาเดิมทั้งที่บันทึกพิกัดไปแล้ว
+      const mapTargets = [
+        document.getElementById("ee-mapChip"),
+        document.getElementById("btnOpenMap"),
+      ].filter(Boolean);
+      if (mapEditBtn && mapEditor && mapInput) {
+        mapEditBtn.addEventListener("click", () => {
+          mapEditor.style.display = mapEditor.style.display === "none" ? "block" : "none";
+        });
+        document.getElementById("ee-mapCancel")?.addEventListener("click", () => {
+          mapEditor.style.display = "none";
+        });
+        document.getElementById("ee-mapSave")?.addEventListener("click", async () => {
+          const value = mapInput.value.trim();
+          if (mapMsg) { mapMsg.textContent = "กำลังบันทึก..."; mapMsg.style.color = "#94a3b8"; }
+          try {
+            const saved = await CustomerService.setSiteMapUrl({
+              company: eventCompany, site: eventSite, mapUrl: value,
+            });
+            const url = saved?.mapUrl || "";
+            // อัปเดตทันทีทั้งชิปบน header และปุ่มในแถบล่าง ไม่ต้องปิดฟอร์มแล้วเปิดใหม่
+            for (const el of mapTargets) {
+              el.href = url || mapSearchHref;
+              if (el.id === "btnOpenMap") {
+                // อัปเดตเฉพาะ span ข้อความ — หมุด Google Maps เป็น SVG อยู่ข้างๆ ต้องไม่ถูกเขียนทับ
+                const t = el.querySelector("#ee-mapBtnText");
+                if (t) t.textContent = url ? "นำทาง (Google Maps)" : "ค้นหาใน Google Maps";
+              } else {
+                const go = el.querySelector(".ee-tag-go");
+                if (go) go.textContent = url ? "นำทาง ↗" : "ค้นหา ↗";
+                el.title = url ? "เปิดแผนที่นำทางไปหน้างาน" : "ยังไม่มีพิกัดบันทึกไว้ — กดเพื่อค้นหาใน Google Maps";
+              }
+            }
+            mapEditBtn.textContent = url ? "✏️ แก้ลิงก์แผนที่" : "📍 บันทึกพิกัดของโครงการนี้";
+            if (mapMsg) { mapMsg.textContent = url ? "บันทึกพิกัดแล้ว" : "ลบพิกัดแล้ว"; mapMsg.style.color = "#059669"; }
+            setTimeout(() => { mapEditor.style.display = "none"; }, 900);
+          } catch (err) {
+            if (mapMsg) {
+              mapMsg.textContent = err?.response?.data?.message || "บันทึกพิกัดไม่สำเร็จ";
+              mapMsg.style.color = "#dc2626";
+            }
+          }
+        });
+      }
+
       // ✅ เปลี่ยนช่อง <input type="date"> ทุกช่องในกล่องนี้เป็นปฏิทิน พ.ศ. เดือนไทย
       // (ช่องเดิมถูกซ่อนไว้เป็นตัวเก็บค่า โค้ดที่อ่าน .value ตอนกดบันทึกจึงทำงานเหมือนเดิม)
       Swal.getPopup().__thaiDpCleanup = mountThaiDatePickers(Swal.getPopup());
@@ -1758,11 +2030,22 @@ export const getEditEvent = async ({
         row.className = "ee-multi-date-row";
         if (eventIdAttr) row.dataset.eventId = eventIdAttr;
         row.innerHTML = `
-          <input type="date" class="ee-range-start" value="${startValue}" ${isViewOnly ? "disabled" : ""}>
-          <span class="ee-range-sep">–</span>
-          <input type="date" class="ee-range-end" value="${endValue || startValue}" ${isViewOnly ? "disabled" : ""}>
-          <span class="ee-range-preview" title="วันที่ของช่วงนี้ (วัน เดือน ปี)"></span>
-          ${isViewOnly ? "" : `<button type="button" class="ee-btn ee-btn-ghost ee-multi-date-remove" title="ลบช่วงนี้ออก">✕</button>`}
+          <div class="ee-range-head">
+            <span class="ee-range-no"></span>
+            <span class="ee-range-preview" title="วันที่ของช่วงนี้ (วัน เดือน ปี)"></span>
+            ${isViewOnly ? "" : `<button type="button" class="ee-btn ee-btn-ghost ee-multi-date-remove" title="ลบทั้งช่วงนี้ออกจากงาน">✕</button>`}
+          </div>
+          <div class="ee-range-body">
+            <div class="ee-range-field">
+              <span class="ee-range-cap">เริ่ม</span>
+              <input type="date" class="ee-range-start" value="${startValue}" ${isViewOnly ? "disabled" : ""}>
+            </div>
+            <span class="ee-range-sep" aria-hidden="true">→</span>
+            <div class="ee-range-field">
+              <span class="ee-range-cap">ถึง</span>
+              <input type="date" class="ee-range-end" value="${endValue || startValue}" ${isViewOnly ? "disabled" : ""}>
+            </div>
+          </div>
         `;
         // ✅ ป้ายวันที่แบบอ่านง่าย "วัน เดือน ปี" กำกับทุกแถว — ช่อง <input type="date"> แสดงรูปแบบตาม
         // ภาษา/ภูมิภาคของเบราว์เซอร์แต่ละเครื่อง (บางเครื่องเป็น mm/dd/yyyy) บังคับด้วย HTML/CSS/JS ไม่ได้
@@ -1773,13 +2056,22 @@ export const getEditEvent = async ({
         const refreshPreview = () => {
           const s = row.querySelector(".ee-range-start")?.value;
           const e = row.querySelector(".ee-range-end")?.value || s;
-          if (!s) { previewEl.textContent = ""; return; }
+          // ⚠️ ต้องมีข้อความเสมอแม้ยังไม่ได้เลือกวันที่ — เดิมปล่อยว่างแล้วซ่อนด้วย :empty ทำให้ตัวคั่น
+          // flex:1 หายไป ปุ่ม ✕ เลยเลื่อนมาชิดป้ายเลขช่วง กลายเป็นการ์ดที่กรอกแล้วกับยังไม่กรอกวาง
+          // ปุ่มคนละตำแหน่ง ดูเป็นคนละแบบทั้งที่เป็นของอย่างเดียวกัน
+          // ✅ บอกไปเลยว่ายังไม่ได้เลือก — ได้ทั้งความสูง/ตำแหน่งที่คงที่ และรู้ว่าเหลือช่วงไหนต้องกรอก
+          if (!s) {
+            previewEl.textContent = "ยังไม่ได้เลือกวันที่";
+            previewEl.classList.add("ee-range-preview--empty");
+            return;
+          }
+          previewEl.classList.remove("ee-range-preview--empty");
           const ms = moment(s).locale("th");
           const me = moment(e).locale("th");
           const days = Math.max(1, me.diff(ms, "days") + 1);
           previewEl.textContent = ms.isSame(me, "day")
-            ? `${formatThai(ms, "D MMM YYYY")}`
-            : `${ms.format("D MMM")} – ${formatThai(me, "D MMM YYYY")} (${days} วัน)`;
+            ? `${formatThai(ms, "D MMM YYYY")} · 1 วัน`
+            : `${ms.format("D MMM")} – ${formatThai(me, "D MMM YYYY")} · ${days} วัน`;
         };
         refreshPreview();
         row.querySelector(".ee-multi-date-remove")?.addEventListener("click", () => {
@@ -1789,6 +2081,7 @@ export const getEditEvent = async ({
           if (!rowEventId) {
             // แถวใหม่ที่ยังไม่กดบันทึก ยังไม่ถูกสร้างจริง ลบออกจากฟอร์มได้เลย
             row.remove();
+            sortDateRows(); // เดินเลขช่วงใหม่ ไม่งั้นเหลือ "ช่วงที่ 1, 3"
             return;
           }
           // แถวนี้ผูกกับ event ที่มีอยู่จริงแล้ว ต้องยืนยันก่อนลบจริง (ลบเฉพาะช่วงนี้ ช่วงอื่นไม่กระทบ) —
@@ -1817,6 +2110,7 @@ export const getEditEvent = async ({
               await EventService.DeleteEvent(rowEventId);
               confirmBar.remove();
               row.remove();
+              sortDateRows(); // เดินเลขช่วงใหม่หลังลบ
               await fetchEventsFromDB();
             } catch {
               Swal.showValidationMessage("ลบช่วงวันที่นี้ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
@@ -1842,6 +2136,15 @@ export const getEditEvent = async ({
           .sort((a, b) => a.key.localeCompare(b.key))
           // appendChild ย้ายตำแหน่ง element เดิม (ไม่ได้สร้างใหม่) ค่าที่กรอกไว้/event listener จึงอยู่ครบ
           .forEach(({ el }) => multiDateList.appendChild(el));
+        // ⚠️ ต้องเดินเลขที่นี่เท่านั้น ไม่ใช่ตอนสร้างแถว — ลำดับที่เห็นถูกจัดใหม่ทุกครั้งที่แก้วันที่
+        // ถ้าเดินเลขตอนสร้าง เลขจะค้างอยู่กับแถวเดิมแล้วกลายเป็น "ช่วงที่ 3, 1, 2" เรียงลงมา
+        // ซึ่งสับสนกว่าไม่มีเลขเสียอีก · ซ่อนเลขเมื่อมีช่วงเดียว (ไม่มีอะไรให้แยกแยะ)
+        const rows = [...multiDateList.querySelectorAll(".ee-multi-date-row")];
+        rows.forEach((r, i) => {
+          const badge = r.querySelector(".ee-range-no");
+          if (!badge) return;
+          badge.textContent = rows.length > 1 ? `ช่วงที่ ${i + 1}` : "ช่วงวันที่";
+        });
       };
 
       // ✅ ค้างวันที่/ช่วงวันที่เดิมไว้เสมอ: งานปัจจุบัน + วันอื่นๆ ของงานเดียวกัน (ถ้ามี) แล้วเรียงตามวันที่
@@ -1855,7 +2158,7 @@ export const getEditEvent = async ({
       });
       sortDateRows();
 
-      document.getElementById("ee-addDateBtn")?.addEventListener("click", () => addDateRow());
+      document.getElementById("ee-addDateBtn")?.addEventListener("click", () => { addDateRow(); sortDateRows(); });
 
       multiToggle?.addEventListener("change", () => {
         const isMulti = multiToggle.checked;

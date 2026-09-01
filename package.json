@@ -56,7 +56,8 @@
     "build": "npm run lint && vite build",
     "preview": "vite preview",
     "lint": "eslint src --ext .js,.jsx --max-warnings 0",
-    "test": "vitest run"
+    "test": "vitest run",
+    "dev:mobile": "vite --mode mobile --host"
   },
   "eslintConfig": {
     "extends": [

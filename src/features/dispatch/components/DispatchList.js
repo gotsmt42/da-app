@@ -340,6 +340,18 @@ const DispatchTable = ({ rows, onOpen }) => (
 /** คิวคำขอมีแค่ 2 สถานะนี้ — ที่เหลือเป็นหน้าที่ของ "หน้าการดำเนินงาน" */
 const QUEUE_STATUSES = ["requested", "assigned"];
 
+/**
+ * ข้อความในคอลัมน์ที่ยังไม่มีใบ
+ * ✅ ที่แก้ (ผู้ใช้แจ้งว่า "ดูโล้นๆ เวลาไม่มีงาน"): เดิมเป็นคำว่า "ไม่มีรายการ" ลอยอยู่กลางอากาศ
+ * ไม่มีอะไรยึด พอคอลัมน์ข้างๆ มีการ์ด กระดานเลยดูเอียงข้างเหมือนโหลดไม่ครบ
+ * ⚠️ เขียนข้อความแยกตามคอลัมน์ — "ไม่มีรายการ" เหมือนกันทั้งสองฝั่งไม่ได้บอกอะไรเลย
+ * ส่วนคอลัมน์ "รอลงแผนงาน" ที่ว่างคือ *ข่าวดี* (เคลียร์หมดแล้ว) ควรสื่อแบบนั้น ไม่ใช่เหมือนข้อมูลหาย
+ */
+const COLUMN_EMPTY_TEXT = {
+  requested: "เคลียร์หมดแล้ว — ไม่มีคำขอรอตัดสินใจ",
+  assigned: "ยังไม่มีใบที่ลงแผนงาน",
+};
+
 export default function DispatchList({ mode = "board", myId = "" }) {
   const isDesktop = useMediaQuery("(min-width:900px)");
   const [rows, setRows] = useState([]);
@@ -491,7 +503,9 @@ export default function DispatchList({ mode = "board", myId = "" }) {
             // เหลือเป็นหัวข้อตัวหนังสือ + จำนวน วางบนพื้นหน้าเปล่าๆ ให้การ์ดเป็นพระเอกแทน
             return (
               <Box key={status} sx={{ mb: isDesktop ? 0 : 2.5 }}>
-                <Stack direction="row" alignItems="center" spacing={0.75} sx={{ px: 0.25, mb: 1 }}>
+                {/* ⚠️ คอลัมน์ที่นับได้ 0 ให้หรี่หัวข้อลง — สายตาจะได้ไปเกาะคอลัมน์ที่มีงานจริงก่อน
+                    (ถ้าเข้มเท่ากันหมด กระดานจะดูเหมือนมีของสองกองทั้งที่กองหนึ่งว่าง) */}
+                <Stack direction="row" alignItems="center" spacing={0.75} sx={{ px: 0.25, mb: 1, opacity: list.length === 0 ? 0.55 : 1 }}>
                   <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: m.color, flexShrink: 0 }} />
                   <Typography sx={{ fontWeight: 700, fontSize: "0.8rem", color: "#0f172a" }}>{m.label}</Typography>
                   <Typography sx={{ fontWeight: 700, fontSize: "0.78rem", color: TEXT_SUB }}>{list.length}</Typography>
@@ -499,7 +513,17 @@ export default function DispatchList({ mode = "board", myId = "" }) {
                 <Stack spacing={1.25}>
                   {list.map((d) => <DispatchCard key={d._id} d={d} onOpen={(x) => setOpenId(x._id)} myId={myId} />)}
                   {list.length === 0 && (
-                    <Typography variant="caption" sx={{ color: TEXT_SUB, textAlign: "center", py: 2 }}>ไม่มีรายการ</Typography>
+                    <Box
+                      sx={{
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        minHeight: 104, px: 2, borderRadius: 2.5, textAlign: "center",
+                        border: "1px dashed", borderColor: BORDER_MAIN, bgcolor: SURFACE_SUBTLE,
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ color: TEXT_SUB }}>
+                        {COLUMN_EMPTY_TEXT[status] || "ไม่มีรายการ"}
+                      </Typography>
+                    </Box>
                   )}
                 </Stack>
               </Box>

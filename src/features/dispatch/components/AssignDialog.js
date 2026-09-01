@@ -98,7 +98,12 @@ export default function AssignDialog({ open, dispatch, onClose, onAssigned }) {
               const checked = selected.includes(id);
               // 🧹 ป้าย "สถานะรายคน" ถูกตัดออกแล้ว — ความคืบหน้าจริงอยู่ที่สถานะงานในตารางงาน
               const alreadyOn = Boolean(progressOf(id));
-              const name = [u.fname, u.lname].filter(Boolean).join(" ") || u.username;
+              // 🐛 ที่แก้ (ผู้ใช้แจ้งว่า "หน้านี้มีนามสกุล หน้าอื่นๆไม่มี"): เดิมโชว์ "ชื่อ + นามสกุล"
+              // อยู่หน้าเดียวในระบบ ที่เหลือ (ฟอร์มของช่าง/หน้าภาระงาน/การ์ดงาน) ใช้ชื่อต้นล้วน
+              // ⚠️ ไม่ใช่แค่เรื่องความสวยงาม — ชื่อที่เลือกตรงนี้ถูกเขียนลงฟิลด์ team/responsiblePerson
+              // ของแผนงานจริง ซึ่งทั้งระบบใช้ "ชื่อต้น" เป็นคีย์จับคู่คน (ดู personName() ฝั่ง server)
+              // ถ้าโชว์คนละแบบกับที่บันทึก คนกดจะไม่มีทางรู้ว่าค่าที่บันทึกจริงคืออะไร
+              const name = String(u.fname || "").trim() || u.username;
               return (
                 <Stack
                   key={id} direction="row" alignItems="center" spacing={1}

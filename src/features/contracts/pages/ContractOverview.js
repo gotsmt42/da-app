@@ -46,6 +46,8 @@ import {
 import { useAuth } from "@/features/auth/AuthContext";
 import EventService from "@/shared/services/EventService";
 import CustomerService from "@/shared/services/CustomerService";
+// ✅ ตำแหน่งหน้างานบน Google Maps — ตัวเดียวกับหน้าการดำเนินงาน/ปฏิทิน (ดูหัวไฟล์ SiteMapLink.js)
+import SiteMapLink from "@/shared/ui/SiteMapLink";
 import AuthService from "@/shared/services/authService";
 import JobTypeService from "@/shared/services/JobTypeService";
 import SystemTypeService from "@/shared/services/SystemTypeService";
@@ -1975,7 +1977,13 @@ export default function ContractOverview() {
     contracts.forEach((c) => { if (c.system) names.add(c.system); });
     return [...names].sort((a, b) => String(a).localeCompare(String(b), "th"));
   }, [lookups.systemTypes, contracts]);
-  const teamOptions = useMemo(() => lookups.employees.map((e) => e.fname).filter(Boolean), [lookups.employees]);
+  // ⚠️ ตัดชื่อซ้ำออกเสมอ — ทั้งระบบใช้ "ชื่อต้น" เป็นคีย์ระบุคน พนักงาน 2 คนที่ชื่อต้นเหมือนกัน
+  // จึงยุบเป็นตัวเลือกเดียวโดยธรรมชาติ ถ้าไม่ตัดซ้ำจะได้ <option> คีย์ซ้ำ (React เตือน และตัวเลือก
+  // ซ้ำกันสองบรรทัดที่กดแล้วให้ผลเหมือนกัน) — เรียงตามตัวอักษรไทยให้หาง่ายด้วย
+  const teamOptions = useMemo(
+    () => [...new Set(lookups.employees.map((e) => e.fname).filter(Boolean))].sort((x, y) => x.localeCompare(y, "th")),
+    [lookups.employees]
+  );
   const teamToId = useMemo(() => new Map(lookups.employees.map((e) => [e.fname, e._id])), [lookups.employees]);
 
   // ✅ แนะนำเลขที่สัญญาถัดไปให้อัตโนมัติ (ตัวอักษรนำหน้า + ลำดับ + ปี พ.ศ. เช่น FAPTY02-2569) จากเลขที่
@@ -2971,21 +2979,31 @@ pagedRows.map((c, idx) => {
                         onCommit={(v) => commitEdit(c, v)}
                         onCancel={cancelEdit}
                       />
-                      <EditableCell
-                        Wrapper={Box}
-                        editable={canEditBasicField(c, "company")} columnKey="company"
-                        editing={editingCell?.key === c.key && editingCell?.field === "company"}
-                        value={c.company} editValue={editValue} saving={editSaving}
-                        title={c.company}
-                        formatDisplay={(v) => (
-                          <span style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
-                            🏢 {v || "ไม่ระบุบริษัท"}
-                          </span>
-                        )}
-                        onStartEdit={() => beginEdit(c, "company")}
-                        onCommit={(v) => commitEdit(c, v)}
-                        onCancel={cancelEdit}
-                      />
+                      {/* ✅ ที่เพิ่ม (ผู้ใช้ขอ: "หน้าภาพรวมงานด้วย เพิ่มให้สวยงาม และกดดูได้ง่าย")
+                          ⚠️ ใช้โหมด compact — ตารางนี้คอลัมน์กว้างจำกัดและปรับขนาดได้ ถ้าใส่ปุ่มเต็ม
+                          แบบหน้าอื่นจะดันความกว้างจนตารางเสียทรง · เหลือหมุดเล็กๆ: เขียว = มีพิกัดแล้ว
+                          กดเปิดนำทางทันที · เทา = ยังไม่มี กดแล้วไปค้นหาใน Maps ให้เลย
+                          ⚠️ สิทธิ์แก้ = editContracts ของหน้านี้เอง ไม่ตั้งเกณฑ์ใหม่ */}
+                      <Stack direction="row" alignItems="center" spacing={0.5}>
+                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                          <EditableCell
+                            Wrapper={Box}
+                            editable={canEditBasicField(c, "company")} columnKey="company"
+                            editing={editingCell?.key === c.key && editingCell?.field === "company"}
+                            value={c.company} editValue={editValue} saving={editSaving}
+                            title={c.company}
+                            formatDisplay={(v) => (
+                              <span style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
+                                🏢 {v || "ไม่ระบุบริษัท"}
+                              </span>
+                            )}
+                            onStartEdit={() => beginEdit(c, "company")}
+                            onCommit={(v) => commitEdit(c, v)}
+                            onCancel={cancelEdit}
+                          />
+                        </Box>
+                        <SiteMapLink compact company={c.company} site={c.site} canEdit={isAdminOrManager} />
+                      </Stack>
                     </Stack>
                   </TableCell>
 
@@ -3782,6 +3800,11 @@ pagedRows.map((c, idx) => {
               formatDisplay={(v) => <Typography sx={{ fontSize: "0.82rem", color: "text.secondary", wordBreak: "break-word" }}>{v || <Dash />}</Typography>}
               {...fp("site")}
             />
+            {/* ✅ การ์ดมือถือ — ใช้ปุ่มเต็ม (ไม่ใช่ compact) เพราะบนมือถือคือจังหวะที่กำลังจะออกรถ
+                ต้องแตะง่ายที่สุด ต่างจากตารางบนจอคอมที่พื้นที่จำกัดกว่า */}
+            <Box sx={{ mt: 0.75 }}>
+              <SiteMapLink company={c.company} site={c.site} canEdit={isAdminOrManager} />
+            </Box>
           </Box>
           <Stack alignItems="flex-end" spacing={0.5} sx={{ flexShrink: 0 }}>
             <Chip label={jobTypeLabel} size="small" sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha(jobTypeColor, 0.12), color: jobTypeColor }} />

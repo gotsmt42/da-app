@@ -140,6 +140,15 @@ const DispatchService = {
   },
 
   /** ⚠️ ยกเลิก ไม่ใช่ลบ — ใบที่จ่ายงานไปแล้วต้องเหลือร่องรอย (ดูเหตุผลที่ routes/dispatch.js) */
+  /**
+   * เพิ่ม/แก้/ลบ ลิงก์ตำแหน่งบน Google Maps ของใบที่ส่งไปแล้ว
+   * ⚠️ ส่งสตริงว่างมา = ตั้งใจลบลิงก์ทิ้ง (ฝั่ง server แยกกรณีนี้ออกจาก "ลิงก์ผิด" แล้ว)
+   */
+  async setMapUrl(id, mapUrl) {
+    const { data } = await API.patch(`/dispatch/${id}/map`, { mapUrl });
+    return data.dispatch;
+  },
+
   async cancel(id, reason) {
     const res = await API.post(`/dispatch/${id}/cancel`, { reason });
     return res.data.dispatch;

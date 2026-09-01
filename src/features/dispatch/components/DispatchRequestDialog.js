@@ -22,7 +22,7 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
-  AttachFile, Close, Assignment, Place, OpenInNew, NoteAlt, Send,
+  AttachFile, Close, Assignment, OpenInNew, NoteAlt, Send,
   Lock, Description as DescriptionIcon,
 } from "@mui/icons-material";
 
@@ -30,6 +30,7 @@ import { formatBytes } from "@/shared/utils/fileUpload";
 import CustomerService from "@/shared/services/CustomerService";
 import EventService from "@/shared/services/EventService";
 import { DEPARTMENT } from "@/shared/utils/roles";
+import { mapSearchUrl, GoogleMapsPin } from "@/shared/ui/SiteMapLink";
 import JobTypeService from "@/shared/services/JobTypeService";
 import SystemTypeService from "@/shared/services/SystemTypeService";
 import DispatchService from "../services/DispatchService";
@@ -206,6 +207,8 @@ export default function DispatchRequestDialog({ open = true, onClose, onCreated 
       address: f.address || hit.address || "",
       contactName: f.contactName || hit.cName || "",
       contactTel: f.contactTel || hit.tel || "",
+      // ✅ พิกัดที่เคยบันทึกไว้กับโครงการนี้ — โครงการเดิมอยู่ที่เดิมเสมอ ไม่ต้องไปหาลิงก์ใหม่ทุกครั้ง
+      mapUrl: f.mapUrl || hit.mapUrl || "",
     }));
   };
 
@@ -495,7 +498,7 @@ export default function DispatchRequestDialog({ open = true, onClose, onCreated 
             </Section>
 
             <Section
-              icon={<Place sx={{ fontSize: 18 }} />}
+              icon={<GoogleMapsPin size={18} />}
               title="หน้างาน"
               hint="ช่างใช้ไปให้ถูกที่และติดต่อได้"
               accent="#0891b2"
@@ -539,7 +542,28 @@ export default function DispatchRequestDialog({ open = true, onClose, onCreated 
                 <TextField size="small" label="ที่อยู่หน้างาน" value={form.address} onChange={set("address")} multiline maxRows={3} />
 
                 {/* ✅ ลิงก์แผนที่ — ที่อยู่ที่พิมพ์เป็นตัวหนังสือพาช่างไปผิดที่ได้บ่อยมาก
-                    (ชื่อโครงการซ้ำกัน ซอยแยกย่อย ตึกไม่มีเลขที่) พิกัดจริงคือสิ่งเดียวที่ไม่กำกวม */}
+                    (ชื่อโครงการซ้ำกัน ซอยแยกย่อย ตึกไม่มีเลขที่) พิกัดจริงคือสิ่งเดียวที่ไม่กำกวม
+                    ✅ ที่เพิ่ม (ผู้ใช้ขอ: "กดลิงก์เปิด google map เพื่อหาตำแหน่ง แล้วแอดลงระบบง่ายๆ"):
+                    ปุ่มค้นหาที่เปิด Google Maps พร้อมคำค้นจากชื่อโครงการ/บริษัท/ที่อยู่ที่กรอกไว้แล้ว
+                    — เดิมต้องออกจากฟอร์มไปเปิดแอปเอง พิมพ์ชื่อโครงการซ้ำอีกรอบ แล้วค่อยกลับมาวาง */}
+                {(form.site || form.company || form.address) && (
+                  <Button
+                    size="small" variant="outlined"
+                    component="a" target="_blank" rel="noopener noreferrer"
+                    // ⚠️ ค้นด้วย "ชื่อโครงการ" อย่างเดียวตามที่ผู้ใช้สั่ง — ต่อชื่อบริษัท/ที่อยู่เข้าไปด้วย
+                    // ทำให้ Google Maps หาไม่เจอบ่อย (ชื่อนิติบุคคลไม่ใช่ชื่อที่ปักหมุดบนแผนที่)
+                    href={mapSearchUrl(form.site, form.company)}
+                    startIcon={<GoogleMapsPin size={16} />}
+                    endIcon={<OpenInNew sx={{ fontSize: 13 }} />}
+                    sx={{
+                      textTransform: "none", fontWeight: 600, borderRadius: 2, alignSelf: "flex-start",
+                      color: "#0e7490", borderColor: alpha("#0891b2", 0.4),
+                      "&:hover": { borderColor: "#0891b2", bgcolor: alpha("#0891b2", 0.06) },
+                    }}
+                  >
+                    ค้นหาตำแหน่งใน Google Maps
+                  </Button>
+                )}
                 <TextField
                   size="small" label="ลิงก์ Google Maps" value={form.mapUrl} onChange={set("mapUrl")}
                   placeholder="วางลิงก์ที่แชร์จากแอป Google Maps"
@@ -547,13 +571,13 @@ export default function DispatchRequestDialog({ open = true, onClose, onCreated 
                   helperText={
                     mapUrlValid === false
                       ? "ลิงก์ไม่ถูกต้อง — ต้องขึ้นต้นด้วย http:// หรือ https://"
-                      : "เปิด Google Maps → กดที่หมุด → แชร์ → คัดลอกลิงก์ แล้ววางที่นี่"
+                      : "กดปุ่มค้นหาด้านบน → เจอตำแหน่งแล้วกด แชร์ → คัดลอกลิงก์ → วางที่ช่องนี้"
                   }
                   FormHelperTextProps={{ sx: { fontSize: "0.68rem", mx: 0 } }}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
-                        <Place sx={{ fontSize: 17, color: mapUrlValid ? "#059669" : TEXT_SUB }} />
+                        <GoogleMapsPin size={16} />
                       </InputAdornment>
                     ),
                     // ปุ่มลองเปิดดู — กันเคสวางลิงก์ผิดอันแล้วไม่มีใครรู้จนช่างไปถึงหน้างาน

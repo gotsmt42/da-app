@@ -93,6 +93,23 @@ function injectAddStyles() {
     .ae-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
     @media(max-width:600px) { .ae-grid-2,.ae-grid-3 { grid-template-columns: 1fr; } }
 
+    /* ── แถว "วันที่" และแถว "เวลา" บนมือถือ ────────────────────────────────────────────────
+       เดิมกฎยุบ 1 คอลัมน์ด้านบนกิน .ae-grid-2 ทุกตัวรวมกลุ่มนี้ด้วย วันที่เริ่ม/วันที่สิ้นสุด/เวลาเริ่ม/
+       เวลาสิ้นสุด จึงกลายเป็น 4 แถวเต็มความกว้าง กินเกือบทั้งจอทั้งที่แต่ละช่องใส่ข้อความสั้นมาก
+       ✅ คงไว้ 2 คอลัมน์: แถวบน = วันที่เริ่ม|วันที่สิ้นสุด แถวล่าง = เวลาเริ่ม|เวลาสิ้นสุด (4 แถว → 2 แถว)
+       ค่าที่ต้องเทียบกัน (เริ่ม–สิ้นสุด) อยู่ระดับสายตาเดียวกัน ตรวจทานได้โดยไม่ต้องเลื่อนจอ */
+    .ae-grid-datetime { grid-template-columns: 1fr 1fr; }
+    @media(max-width:600px) {
+      /* ชนะกฎยุบ 1 คอลัมน์ด้านบนด้วย specificity (2 class ชนะ 1 class) */
+      .ae-grid.ae-grid-datetime { grid-template-columns: 1fr 1fr; gap: 8px; }
+      /* จำเป็นทั้งคู่: ไม่งั้นความกว้างขั้นต่ำในตัวของช่องกรอกจะดันคอลัมน์จนล้นจอ */
+      .ae-grid-datetime .ae-field { min-width: 0; }
+      .ae-grid-datetime .ae-field input { min-width: 0; }
+      .ae-grid-datetime .ae-field label { white-space: nowrap; }
+    }
+    /* แคบกว่านี้ (ต่ำกว่า ~360px) สองช่องเบียดจนอ่านวันที่ไม่ครบ — คลี่เป็นคอลัมน์เดียว */
+    @media(max-width:359px) { .ae-grid.ae-grid-datetime { grid-template-columns: 1fr; } }
+
     /* ── Field ── */
     .ae-field { display: flex; flex-direction: column; gap: 5px; }
     .ae-field label {
@@ -100,17 +117,20 @@ function injectAddStyles() {
       display: flex; align-items: center; gap: 4px;
     }
     .ae-field label .req { color: #ef4444; font-size: 13px; }
-    .ae-field select, .ae-field input {
+    .ae-field select, .ae-field input, .ae-field textarea {
       width: 100%; box-sizing: border-box;
       border: 1.5px solid #e2e8f0; border-radius: 8px;
       padding: 9px 12px; font-size: 14px; color: #1e293b;
       background: #fff; transition: border-color .2s, box-shadow .2s;
       font-family: inherit;
     }
-    .ae-field select:focus, .ae-field input:focus {
+    .ae-field select:focus, .ae-field input:focus, .ae-field textarea:focus {
       outline: none; border-color: #2563eb;
       box-shadow: 0 0 0 3px rgba(37,99,235,.12);
     }
+    /* ยืดได้เฉพาะแนวตั้ง — ลากขยายแนวนอนได้เมื่อไหร่ ช่องจะล้นออกนอกกล่องบนมือถือทันที */
+    .ae-field textarea { resize: vertical; line-height: 1.5; }
+    .ae-char-count { font-size: 10px; color: #94a3b8; text-align: right; margin-top: 2px; }
 
     /* ── Divider ── */
     .ae-divider { border: none; border-top: 1px solid #e2e8f0; margin: 16px 0; }
@@ -614,7 +634,7 @@ export const getAddEvent = async ({
       </label>
 
       <div id="ae-singleDateSection">
-        <div class="ae-grid ae-grid-2">
+        <div class="ae-grid ae-grid-datetime">
           <div class="ae-field">
             <label>📅 วันที่เริ่ม</label>
             <input id="start" type="date" value="${arg.dateStr}">
@@ -631,7 +651,7 @@ export const getAddEvent = async ({
         <button type="button" class="ae-btn ae-btn-ghost" id="ae-addDateBtn" style="margin-bottom:16px;">➕ เพิ่มช่วงวันที่</button>
       </div>
 
-      <div class="ae-grid ae-grid-2">
+      <div class="ae-grid ae-grid-datetime">
         <div class="ae-field">
           <label>🕐 เวลาเริ่ม</label>
           <input id="startTime" type="text" placeholder="เช่น 08:30">
@@ -671,7 +691,7 @@ export const getAddEvent = async ({
       <input type="hidden" id="ae-selectedRound" value="">
 
       <p class="ae-section-label">ขั้นตอนที่ 4 — วันที่เข้างาน</p>
-      <div class="ae-grid ae-grid-2">
+      <div class="ae-grid ae-grid-datetime">
         <div class="ae-field">
           <label><span class="req">*</span> วันที่เริ่ม</label>
           <input id="ae-cpStart" type="date" value="${arg.dateStr}">
@@ -686,6 +706,24 @@ export const getAddEvent = async ({
         <select id="ae-cpTeam"><option value="">— เลือกหรือพิมพ์ —</option>${teamOpts}</select>
         <p style="font-size:11px;color:#94a3b8;margin:4px 0 0;">ถ้าไม่เลือก ระบบจะลงผู้รับผิดชอบของสัญญานี้เป็นหัวหน้าทีมเข้างานให้อัตโนมัติ</p>
       </div>
+    </div>
+
+    ${/* ── เอกสาร ────────────────────────────────────────────────────────────────────────
+          ให้ตรงกับฟอร์มแก้ไขงาน ซึ่งมีสองช่องนี้มาตลอด — เดิมกรอกได้เฉพาะตอน "แก้ไข" เท่านั้น คนที่มี
+          เลขที่เอกสาร/รายละเอียดอยู่ในมือตั้งแต่ตอนสร้างจึงต้องกดบันทึกแล้วเปิดงานเดิมขึ้นมาแก้ซ้ำอีกรอบ
+          ⚠️ วางไว้นอกทั้ง #ae-generalSection และ #ae-contractPickSection เพื่อให้ใช้ได้ทั้งสองโหมด
+          (ทั้งสองโหมดสร้าง event ด้วย field ชุดเดียวกัน backend รับ docNo/description ตั้งแต่ POST อยู่แล้ว)
+          ทั้งคู่ไม่บังคับกรอก — เรื่องเอกสารมักตามมาทีหลัง จึงยังเว้นว่างแล้วมาเติมภายหลังได้ */""}
+    <hr class="ae-divider">
+    <p class="ae-section-label">เอกสาร <span style="font-size:10.5px;font-weight:500;color:#94a3b8;">(ไม่บังคับ)</span></p>
+    <div class="ae-field" style="margin-bottom:12px;">
+      <label>📄 เลขที่อ้างอิง (Doc No.)</label>
+      <input id="docNo" type="text" placeholder="เช่น DOC-2026-001">
+    </div>
+    <div class="ae-field" style="margin-bottom:16px;">
+      <label>📋 รายละเอียดงาน (Description)</label>
+      <textarea id="description" rows="5" placeholder="กรอกรายละเอียดงาน..."></textarea>
+      <div class="ae-char-count" id="ae-charCount">0 ตัวอักษร</div>
     </div>
 
     <!-- hidden fontSize -->
@@ -898,6 +936,15 @@ export const getAddEvent = async ({
       } catch { contractTs = null; }
       mkTs("#ae-cpTeam", "เลือกหรือพิมพ์ชื่อทีม", employeeList.length || 50);
 
+      // ตัวนับตัวอักษรของช่องรายละเอียดงาน — ให้เหมือนฟอร์มแก้ไขงาน
+      const descEl = document.getElementById("description");
+      const descCountEl = document.getElementById("ae-charCount");
+      if (descEl && descCountEl) {
+        descEl.addEventListener("input", () => {
+          descCountEl.textContent = `${descEl.value.length} ตัวอักษร`;
+        });
+      }
+
       const contractPickInfo = document.getElementById("ae-contractPickInfo");
       const cpTeamSelect = document.getElementById("ae-cpTeam");
       const roundGrid = document.getElementById("ae-roundGrid");
@@ -1069,6 +1116,7 @@ export const getAddEvent = async ({
 
             const newEvent = {
               company: c.company, site: c.site, title: c.title, system: c.system,
+              docNo: getVal("docNo"), description: getVal("description"),
               time: String(nextIndex),
               team: cpTeam, resPerson: teamToId.get(cpTeam) || "",
               teamMembers: [],
@@ -1156,6 +1204,8 @@ export const getAddEvent = async ({
             site,
             title,
             system,
+            docNo:           getVal("docNo"),
+            description:     getVal("description"),
             team:            getVal("eventTeam"),
             resPerson:       teamToId.get(getVal("eventTeam")) || "",
             teamMembers,
