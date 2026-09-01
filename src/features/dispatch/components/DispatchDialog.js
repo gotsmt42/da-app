@@ -35,12 +35,6 @@ import {
 import FilePreviewDialog from "@/features/documents/components/FilePreviewDialog";
 import { isImageFile } from "@/shared/utils/jobDocTypes";
 import { formatThai } from "@/shared/utils/thaiDate";
-// ✅ ที่แก้ (ผู้ใช้ขอ: "มุมมองตารางด้วย ให้สอดคล้อง"): กล่องนี้คือหน้าที่เปิดขึ้นเวลากดจากการ์ด/แถว
-// ตาราง — เดิมมี "ระบบ" โผล่แค่เป็น Chip เปล่าๆ ไม่มีป้ายกำกับ (อ่านไม่ออกว่าคือฟิลด์อะไรถ้าไม่คุ้น)
-// ส่วน "โครงการ" ไม่ถูกแสดงเป็นฟิลด์ชัดเจนที่ไหนเลยในเนื้อหา (มีแค่ในบรรทัดหัวกล่องที่ยัดรวมกับ
-// เลขที่ใบ/ชื่อผู้ขอ/วันที่) ทำให้เปิดกล่องนี้แล้วข้อมูลชุดเดียวกันดูไม่สอดคล้องกับที่การ์ด/ตาราง
-// เพิ่งปรับให้ชัดเจนไปแล้ว — ใช้ InfoLine ตัวเดียวกันให้เป็นภาษาเดียวกันทั้งแอป
-import InfoLine from "@/shared/ui/InfoLine";
 import usePermissions from "@/shared/hooks/usePermissions";
 import { useAuth } from "@/features/auth/AuthContext";
 import DispatchService from "../services/DispatchService";
@@ -58,18 +52,29 @@ import {
  * อ่านเป็นระบบเดียว
  * ⚠️ คืน null เมื่อไม่มีเนื้อหา — การ์ดหัวข้อเปล่าๆ แย่กว่าไม่มีการ์ดเลย
  */
+/**
+ * ✅ ที่แก้ (ผู้ใช้แจ้งว่า "ดูรกตามาก"): เดิมการ์ดแต่ละใบมี "สีประจำส่วน" ของตัวเอง — รายละเอียดงาน
+ * ส้ม · หมายเหตุม่วง · เอกสารเขียว · ผู้รับงานฟ้า · หน้างานฟ้าเข้ม · สถานะฟ้า — ทั้งขอบการ์ด พื้น
+ * หัวการ์ด และเส้นคั่น ผลคือเปิดกล่องมาเจอ 5-6 สีพร้อมกันเหมือนรุ้ง ทั้งที่สีพวกนั้นไม่ได้แปลว่าอะไรเลย
+ * (ไม่ใช่สถานะ ไม่ใช่ความสำคัญ เป็นแค่การตกแต่ง) แล้วไปกลบสีที่มีความหมายจริงคือสถานะของงาน
+ *
+ * ✅ ตอนนี้ทุกการ์ดเป็นสีเดียวกันหมด: ขาว ขอบเทา หัวข้อดำ — เหลือสีเฉพาะที่ "ไอคอน" ดวงเล็กๆ
+ * พอให้แยกส่วนออกจากกันด้วยการกวาดตา โดยไม่กลายเป็นพื้นสีทั้งแถบ
+ */
 const Section = ({ icon, title, right, accent, children, empty }) =>
   empty ? null : (
-    <Box sx={{ border: "1px solid", borderColor: alpha(accent, 0.28), borderRadius: 2.5, overflow: "hidden" }}>
+    // ⚠️ height: 100% — การ์ดต้องสูงเต็มช่อง grid ที่ได้รับ ไม่งั้นช่องยืดแต่ตัวการ์ดไม่ยืด
+    // ขอบล่างของการ์ดในแถวเดียวกันก็จะยังไม่ตรงกัน (ต้นเหตุที่ผู้ใช้เห็นว่า "เยื้อง")
+    <Box sx={{ height: "100%", border: "1px solid", borderColor: BORDER_MAIN, borderRadius: 2.5, overflow: "hidden", bgcolor: "#fff" }}>
       <Stack
         direction="row" alignItems="center" spacing={1}
-        sx={{ px: 1.5, py: 0.75, minHeight: 42, bgcolor: alpha(accent, 0.07), borderBottom: "1px solid", borderColor: alpha(accent, 0.2) }}
+        sx={{ px: 1.5, py: 0.9, minHeight: 40 }}
       >
         <Box sx={{ color: accent, display: "flex" }}>{icon}</Box>
-        <Typography sx={{ fontWeight: 800, fontSize: "0.8rem", flex: 1, minWidth: 0 }}>{title}</Typography>
+        <Typography sx={{ fontWeight: 700, fontSize: "0.8rem", flex: 1, minWidth: 0, color: "#0f172a" }}>{title}</Typography>
         {right}
       </Stack>
-      <Box sx={{ p: 1.5 }}>{children}</Box>
+      <Box sx={{ px: 1.5, pb: 1.5 }}>{children}</Box>
     </Box>
   );
 
@@ -129,6 +134,14 @@ export default function DispatchDialog({ dispatchId, onClose, onSaved }) {
   if (!dispatchId) return null;
 
   const canAssign = can("assignDispatch");
+  /**
+   * 🐛 ที่แก้ (ผู้ใช้แจ้งว่า "ปุ่มเปิดหน้าดำเนินงานไม่มีจริงในของเซล"): ปุ่มนี้เคยโผล่ให้ทุกคนที่เห็นใบ
+   * รวมถึงเซล — แต่หน้า /operation เตะเซลออกไป /event ทันที (ดู features/operation/pages/Operation.js
+   * บรรทัด "if (isSale) return <Navigate to='/event' />") เซลจึงกดแล้วเด้งไปหน้าอื่นโดยไม่มีคำอธิบาย
+   * ⚠️ ใช้เกณฑ์เดียวกับเมนูด้านซ้าย (canViewOperation ใน Sidebar.js) — ถ้าเข้าหน้านั้นไม่ได้ ก็ไม่ควร
+   * มีปุ่มพาไป
+   */
+  const canOpenOperation = can("editOperation") || can("receiveDispatch");
   const isRequester = String(d?.requestedBy?.userId || "") === myId;
   const me = (d?.assignees || []).find((a) => String(a.userId) === myId);
   const meta = d ? DISPATCH_STATUS_META[d.status] : null;
@@ -152,64 +165,42 @@ export default function DispatchDialog({ dispatchId, onClose, onSaved }) {
               กล่อง เทียบ pattern เดียวกับหัวกล่องของ EditEvent.js/AddSalesAppointment.js ที่ไล่สีตาม
               สถานะ/ประเภทงานอยู่แล้ว — ให้กล่องนี้เข้าชุดกับทั้งแอปในที่สุด */}
           <DialogTitle sx={{ p: 0 }}>
-            <Box
-              sx={{
-                position: "relative", p: 2.25, pr: 6.5,
-                background: `linear-gradient(135deg, ${meta.color}, color-mix(in srgb, ${meta.color} 65%, black))`,
-                color: "#fff",
-              }}
-            >
-              <Stack direction="row" alignItems="flex-start" spacing={1.5}>
-                <Box
-                  sx={{
-                    width: 44, height: 44, borderRadius: 2.5, flexShrink: 0,
-                    bgcolor: alpha("#fff", 0.18), display: "flex", alignItems: "center", justifyContent: "center",
-                    border: "1.5px solid", borderColor: alpha("#fff", 0.3),
-                  }}
-                >
-                  <Assignment sx={{ fontSize: 22 }} />
-                </Box>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Stack direction="row" alignItems="center" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 0.25 }}>
-                    <Typography sx={{ fontWeight: 800, fontSize: "1.05rem", minWidth: 0, textShadow: "0 1px 2px rgba(0,0,0,.15)" }}>
-                      {d.title}
-                    </Typography>
-                    <Chip
-                      size="small" label={meta.label}
-                      sx={{ height: 21, fontSize: "0.66rem", fontWeight: 800, bgcolor: alpha("#fff", 0.22), color: "#fff" }}
-                    />
-                    {d.priority === "urgent" && (
-                      <Chip
-                        size="small" icon={<Bolt sx={{ fontSize: 13 }} />} label="ด่วน"
-                        sx={{ height: 21, fontSize: "0.66rem", fontWeight: 800, bgcolor: alpha("#fff", 0.22), color: "#fff", "& .MuiChip-icon": { color: "inherit" } }}
-                      />
-                    )}
-                  </Stack>
-                  <Typography variant="caption" sx={{ color: alpha("#fff", 0.88), display: "block" }}>
-                    {[
-                      d.dispatchNo,
-                      d.customer?.company,
-                      d.customer?.site !== d.customer?.company ? d.customer?.site : null,
-                      d.requestedBy?.name ? `แจ้งโดย ${d.requestedBy.name}` : null,
-                      d.requestedAt ? formatThai(moment(d.requestedAt), "D MMM YY") : null,
-                    ].filter(Boolean).join(" · ")}
-                  </Typography>
-                </Box>
+            {/* ✅ หัวกล่องเป็นพื้นขาว — เดิมเป็นแถบไล่สีตามสถานะเต็มความกว้าง ซึ่งบวกกับการ์ดสีรุ้ง
+                ข้างในทำให้กล่องเดียวมีสีเกิน 6 สี · ตอนนี้สถานะสื่อด้วยจุดสี + ตัวอักษรเหมือนในลิสต์
+                (ภาษาเดียวกันทั้งแอป) และชื่อโครงการถูกยกเป็นหัวข้อหลักแทนประเภทงาน ให้ตรงกับการ์ด */}
+            <Box sx={{ position: "relative", p: 2.25, pr: 6.5, borderBottom: "1px solid", borderColor: BORDER_MAIN }}>
+              <Stack direction="row" alignItems="center" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 0.4 }}>
+                <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: meta.color, flexShrink: 0 }} />
+                <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: meta.color }}>{meta.label}</Typography>
+                {d.priority === "urgent" && (
+                  <>
+                    <Box sx={{ width: 3, height: 3, borderRadius: "50%", bgcolor: TEXT_SUB }} />
+                    <Bolt sx={{ fontSize: 14, color: "#dc2626" }} />
+                    <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: "#dc2626" }}>ด่วน</Typography>
+                  </>
+                )}
               </Stack>
+              <Typography sx={{ fontWeight: 800, fontSize: "1.05rem", color: "#0f172a", lineHeight: 1.35 }}>
+                {companySite(d.customer?.company, d.customer?.site)}
+              </Typography>
+              <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", mt: 0.15 }}>
+                {[
+                  [d.title, d.system].filter(Boolean).join(" · "),
+                  d.dispatchNo,
+                  d.requestedBy?.name ? `แจ้งโดย ${d.requestedBy.name}` : null,
+                  d.requestedAt ? formatThai(moment(d.requestedAt), "D MMM YY") : null,
+                ].filter(Boolean).join(" · ")}
+              </Typography>
               <IconButton
                 onClick={() => !busy && onClose?.()}
-                sx={{
-                  position: "absolute", top: 12, right: 12,
-                  color: "#fff", bgcolor: alpha("#fff", 0.16),
-                  "&:hover": { bgcolor: alpha("#fff", 0.28) },
-                }}
+                sx={{ position: "absolute", top: 12, right: 12, color: TEXT_SUB }}
               >
                 <Close sx={{ fontSize: 18 }} />
               </IconButton>
             </Box>
           </DialogTitle>
 
-          <DialogContent dividers sx={{ borderTop: "none" }}>
+          <DialogContent dividers sx={{ borderTop: "none", bgcolor: SURFACE_SUBTLE }}>
             {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>{error}</Alert>}
             {d.status === "cancelled" && (
               <Alert severity="warning" sx={{ mb: 2 }}>ใบนี้ถูกยกเลิกแล้ว — {d.cancelReason}</Alert>
@@ -315,24 +306,34 @@ export default function DispatchDialog({ dispatchId, onClose, onSaved }) {
               </Alert>
             )}
 
-            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" }, gap: 2, alignItems: "start" }}>
+            {/* ✅ ที่แก้ (ผู้ใช้แจ้งว่า "ยังดูเยื้องๆ ไม่สวย"): เดิมเป็น 2 คอลัมน์ที่ต่างคนต่างเรียงการ์ด
+                ลงมา (alignItems: start) — พอการ์ดใบแรกซ้าย/ขวาสูงไม่เท่ากัน การ์ดใบที่สองของสองฝั่ง
+                ก็เริ่มที่ความสูงต่างกัน กลายเป็นขั้นบันไดเยื้องกันทั้งกล่อง
+                ✅ เปลี่ยนเป็น grid แถวเดียวกันทั้งสองฝั่ง (alignItems: stretch) — การ์ดที่อยู่แถว
+                เดียวกันสูงเท่ากันเสมอ ขอบล่างตรงกันทุกแถว
+                ⚠️ Section จึงต้องสูงเต็มช่องที่ได้รับ (height: 100%) ไม่งั้นจะยืดแค่ช่อง ไม่ใช่ตัวการ์ด */}
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" }, gap: 2, alignItems: "stretch" }}>
               {/* ── ซ้าย: รายละเอียดงาน · หน้างาน ─────────────────────────
                   🐛 ที่แก้ (จัดวางไม่สวย): เดิมเป็นกล่องเดียวรวมทุกอย่าง (ที่อยู่/เบอร์/ผู้ขอ/รายละเอียด)
                   — ใบที่ไม่ได้กรอกที่อยู่หรือเบอร์ (เกิดบ่อยมาก) เหลือแค่บรรทัดเดียว แล้วคอลัมน์ซ้าย
                   ว่างโหวงเทียบกับขวา ดูเหมือนหน้าจอโหลดไม่ครบ
                   ✅ แยกเป็นการ์ดตามความหมาย และการ์ดที่ไม่มีเนื้อหาจะไม่ถูกเรนเดอร์เลย */}
-              <Box sx={{ minWidth: 0, display: "grid", gap: 2, alignContent: "start" }}>
                 <Section
                   icon={<Assignment sx={{ fontSize: 17 }} />}
                   title="รายละเอียดงาน"
                   accent={DISPATCH_ACCENT}
-                  empty={!d.detail && !d.system}
+                  empty={!d.detail && !d.contract?.groupId}
                 >
-                  {d.system && (
-                    <Box sx={{ mb: d.detail ? 1 : 0 }}>
-                      <InfoLine icon="💻" label="ระบบ">{d.system}</InfoLine>
-                    </Box>
+                  {/* ✅ ใบที่ผูกกับสัญญาต้องบอกให้ชัดตั้งแต่บรรทัดแรก — คนอนุมัติตัดสินใจต่างกัน
+                      สิ้นเชิงระหว่าง "งานครั้งเดียว" กับ "ครั้งถัดไปของสัญญาที่ลูกค้าจ่ายไปแล้ว"
+                      (ครั้งที่จริงถูกกำหนดตอนอนุมัติ ดู POST /:id/approve ฝั่ง server) */}
+                  {d.contract?.groupId && (
+                    <Typography variant="caption" sx={{ display: "block", mb: 0.75, color: "#0e7490", fontWeight: 700 }}>
+                      งานตามสัญญา · เลขที่ {d.contract.no || "—"}
+                      {d.contract.visitCount ? " · ทั้งหมด " + d.contract.visitCount + " ครั้ง" : ""}
+                    </Typography>
                   )}
+                  {/* 🧹 "ระบบ" ถูกย้ายไปรวมกับประเภทงานในบรรทัดใต้หัวกล่องแล้ว ไม่ต้องซ้ำอีกที่นี่ */}
                   {d.detail && (
                     <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{d.detail}</Typography>
                   )}
@@ -441,10 +442,7 @@ export default function DispatchDialog({ dispatchId, onClose, onSaved }) {
                   <Typography variant="caption" sx={{ color: TEXT_SUB }}>ไม่มีไฟล์แนบ</Typography>
                 )}
                 </Section>
-              </Box>
 
-              {/* ── ขวา: ผู้รับงาน + สถานะงานจริง ───────────────────────── */}
-              <Box sx={{ minWidth: 0, display: "grid", gap: 2, alignContent: "start" }}>
                 <Section
                   icon={<Person sx={{ fontSize: 17 }} />}
                   title={`ผู้รับงาน${d.assignees?.length ? ` (${d.assignees.length} คน)` : ""}`}
@@ -507,13 +505,12 @@ export default function DispatchDialog({ dispatchId, onClose, onSaved }) {
                   icon={<Place sx={{ fontSize: 17 }} />}
                   title="หน้างาน"
                   accent="#0891b2"
-                  // ⚠️ empty ไม่รวม company/site แล้ว — โครงการมีค่าเสมอ (บังคับกรอกตั้งแต่ฟอร์ม)
-                  // การ์ดนี้จึงไม่มีวันว่างเปล่าจริงๆ อีกต่อไป แต่คง condition เดิมไว้เผื่อใบเก่ามาก
-                  // ที่ยังไม่เคยผ่านการบังคับกรอกนี้
-                  empty={!d.customer?.address && !d.customer?.contactName && !d.customer?.contactTel && !d.customer?.mapUrl && !d.dueAt && !d.customer?.company && !d.customer?.site}
+                  // ⚠️ ชื่อโครงการถูกยกไปเป็นหัวข้อหลักของกล่องแล้ว การ์ดนี้จึงเหลือแค่ "ข้อมูลไปถึงหน้างาน"
+                  // (ที่อยู่/ผู้ติดต่อ/แผนที่/กำหนดเสร็จ) — ถ้าไม่มีสักอย่างต้องไม่เรนเดอร์การ์ดหัวข้อเปล่าๆ ทิ้งไว้
+                  empty={!d.customer?.address && !d.customer?.contactName && !d.customer?.contactTel && !d.customer?.mapUrl && !d.dueAt}
                 >
+                  {/* 🧹 "โครงการ" ถูกยกไปเป็นหัวข้อหลักของกล่องแล้ว ไม่ต้องซ้ำอีกที่นี่ */}
                   <Stack spacing={0.5}>
-                    <InfoLine icon="🏢" label="โครงการ">{companySite(d.customer?.company, d.customer?.site)}</InfoLine>
                     <Row icon={<LocationOn sx={{ fontSize: 15 }} />}>{d.customer?.address}</Row>
                     <Row icon={<Phone sx={{ fontSize: 15 }} />}>
                       {d.customer?.contactName ? `${d.customer.contactName}${d.customer.contactTel ? ` · ${d.customer.contactTel}` : ""}` : d.customer?.contactTel}
@@ -572,21 +569,21 @@ export default function DispatchDialog({ dispatchId, onClose, onSaved }) {
                         {d.job.responsiblePerson ? ` · ${d.job.responsiblePerson}` : ""}
                       </Typography>
                     )}
-                    <Button
-                      fullWidth size="small" onClick={() => navigate(`/operation/${d.eventId}`)}
-                      startIcon={<OpenInNew sx={{ fontSize: 15 }} />}
-                      sx={{
-                        textTransform: "none", fontWeight: 700, borderRadius: 2,
-                        color: jobStatusColor(d.job.status),
-                        bgcolor: alpha(jobStatusColor(d.job.status), 0.1),
-                        "&:hover": { bgcolor: alpha(jobStatusColor(d.job.status), 0.2) },
-                      }}
-                    >
-                      เปิดในหน้าการดำเนินงาน
-                    </Button>
+                    {canOpenOperation && (
+                      <Button
+                        fullWidth size="small" onClick={() => navigate(`/operation/${d.eventId}`)}
+                        startIcon={<OpenInNew sx={{ fontSize: 15 }} />}
+                        sx={{
+                          textTransform: "none", fontWeight: 700, borderRadius: 2,
+                          color: TEXT_SUB, border: "1px solid", borderColor: BORDER_MAIN,
+                          "&:hover": { bgcolor: SURFACE_SUBTLE },
+                        }}
+                      >
+                        เปิดในหน้าการดำเนินงาน
+                      </Button>
+                    )}
                   </Section>
                 )}
-              </Box>
             </Box>
 
             <input
@@ -599,9 +596,7 @@ export default function DispatchDialog({ dispatchId, onClose, onSaved }) {
             />
           </DialogContent>
 
-          {/* ✅ ยกพื้นแถบล่างให้ต่างจากเนื้อหาขาว — ให้รู้สึกเป็น "แถบปุ่มปิดท้าย" ที่ลอยอยู่เสมอ
-              ไม่ใช่ปุ่มลอยจางๆ ต่อท้ายเนื้อหาเฉยๆ เข้าชุดกับหัวกล่องสีที่เพิ่งเปลี่ยน */}
-          <DialogActions sx={{ p: 2, bgcolor: SURFACE_SUBTLE, borderTop: "1px solid", borderTopColor: BORDER_MAIN }}>
+          <DialogActions sx={{ p: 2, borderTop: "1px solid", borderTopColor: BORDER_MAIN }}>
             {(isRequester || canAssign) && !isClosed && (
               askCancel ? (
                 <Stack direction="row" spacing={1} sx={{ flex: 1 }} alignItems="center">

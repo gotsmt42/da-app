@@ -22,11 +22,14 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
-  AttachFile, Close, Bolt, Assignment, Place, OpenInNew, NoteAlt, Send,
+  AttachFile, Close, Assignment, Place, OpenInNew, NoteAlt, Send,
+  Lock, Description as DescriptionIcon,
 } from "@mui/icons-material";
 
 import { formatBytes } from "@/shared/utils/fileUpload";
 import CustomerService from "@/shared/services/CustomerService";
+import EventService from "@/shared/services/EventService";
+import { DEPARTMENT } from "@/shared/utils/roles";
 import JobTypeService from "@/shared/services/JobTypeService";
 import SystemTypeService from "@/shared/services/SystemTypeService";
 import DispatchService from "../services/DispatchService";
@@ -41,31 +44,58 @@ const empty = () => ({
   company: "", site: "", address: "", mapUrl: "",
   contactName: "", contactTel: "",
   priority: "normal",
+  // ✅ ผูกกับสัญญาที่มีอยู่จริง — ว่าง = งานทั่วไป (ดูโหมด "งานตามสัญญา" ในฟอร์ม)
+  contractGroupId: "",
 });
+
+/**
+ * ช่องที่ค่ามาจากสัญญา แก้เองไม่ได้
+ * ⚠️ ต้องล็อกจริงๆ ไม่ใช่แค่เติมค่าให้แล้วปล่อยแก้ได้ — บริษัท/โครงการที่เพี้ยนไปแม้แต่ตัวเดียวจะทำให้
+ * งานหลุดออกจากสัญญากลายเป็นคนละกลุ่มทันที (เหตุผลเดียวกับที่ฟอร์มของช่างใช้ select แบบเลือกอย่างเดียว)
+ */
+const LockedField = ({ label, value }) => (
+  <TextField
+    size="small" label={label} value={value || "—"} fullWidth
+    InputProps={{
+      readOnly: true,
+      endAdornment: (
+        <InputAdornment position="end">
+          <Tooltip title="ค่านี้มาจากสัญญาที่เลือก แก้ที่นี่ไม่ได้">
+            <Lock sx={{ fontSize: 15, color: TEXT_SUB }} />
+          </Tooltip>
+        </InputAdornment>
+      ),
+    }}
+    sx={{ "& .MuiOutlinedInput-root": { bgcolor: alpha("#64748b", 0.06) } }}
+  />
+);
 
 /**
  * การ์ดครอบแต่ละกลุ่มของฟอร์ม
  * ✅ เดิมทั้งฟอร์มเป็นช่องกรอกเรียงต่อกันยาวๆ คั่นด้วยหัวข้อตัวเล็กๆ — มองไม่ออกว่าอะไรเป็นชุดเดียวกัน
  * และไม่รู้ว่าเหลืออีกกี่กลุ่ม การครอบเป็นการ์ดที่มีสีประจำกลุ่มทำให้กวาดสายตาทีเดียวเห็นโครงทั้งใบ
  */
+/**
+ * ✅ ที่แก้ (ผู้ใช้แจ้งว่า "ดูรกตามาก"): เดิมการ์ดแต่ละกลุ่มมีสีประจำตัว (งานส้ม · หน้างานฟ้า ·
+ * เอกสารเขียว · หมายเหตุม่วง) ทั้งขอบ พื้นหัวการ์ด และเส้นคั่น — เปิดฟอร์มมาเจอ 4 สีพร้อมกัน
+ * ทั้งที่สีไม่ได้สื่ออะไร และแข่งกับช่องกรอกซึ่งเป็นสิ่งที่ต้องโฟกัสจริง
+ * ✅ การ์ดขาวขอบเทาเหมือนกันหมด เหลือสีที่ไอคอนดวงเดียว — ชุดเดียวกับ DispatchDialog
+ */
 const Section = ({ icon, title, hint, accent, children, sx }) => (
   <Box
     sx={{
-      border: "1px solid", borderColor: alpha(accent, 0.3), borderRadius: 2.5,
-      overflow: "hidden", ...sx,
+      border: "1px solid", borderColor: BORDER_MAIN, borderRadius: 2.5,
+      overflow: "hidden", bgcolor: "#fff", ...sx,
     }}
   >
-    <Stack
-      direction="row" alignItems="center" spacing={1}
-      sx={{ px: 1.5, py: 1, bgcolor: alpha(accent, 0.07), borderBottom: "1px solid", borderColor: alpha(accent, 0.22) }}
-    >
+    <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 1.5, pt: 1.25, pb: 0.5 }}>
       <Box sx={{ color: accent, display: "flex" }}>{icon}</Box>
       <Box sx={{ minWidth: 0, flex: 1 }}>
-        <Typography sx={{ fontWeight: 800, fontSize: "0.82rem", lineHeight: 1.3 }}>{title}</Typography>
+        <Typography sx={{ fontWeight: 700, fontSize: "0.82rem", lineHeight: 1.3, color: "#0f172a" }}>{title}</Typography>
         {hint && <Typography variant="caption" sx={{ color: TEXT_SUB }}>{hint}</Typography>}
       </Box>
     </Stack>
-    <Box sx={{ p: 1.5 }}>{children}</Box>
+    <Box sx={{ px: 1.5, pb: 1.5, pt: 1 }}>{children}</Box>
   </Box>
 );
 
@@ -109,6 +139,11 @@ export default function DispatchRequestDialog({ open = true, onClose, onCreated 
   const [customers, setCustomers] = useState([]);
   const [jobTypes, setJobTypes] = useState([]);
   const [systems, setSystems] = useState([]);
+  // ✅ งานทั่วไป vs งานตามสัญญา — ขั้นตอนแรกเดียวกับฟอร์มของช่าง (ดู AddEvent.js "ขั้นตอนที่ 1")
+  const [jobMode, setJobMode] = useState("general");
+  const [contracts, setContracts] = useState([]);
+  const [contractsLoading, setContractsLoading] = useState(true);
+  const [pickedContract, setPickedContract] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [warn, setWarn] = useState("");
@@ -117,6 +152,7 @@ export default function DispatchRequestDialog({ open = true, onClose, onCreated 
   useEffect(() => {
     if (!open) return;
     setError(""); setWarn(""); setFiles([]); setNextDocType("quotation");
+    setJobMode("general"); setPickedContract(null);
     setForm(empty());
   }, [open]);
 
@@ -128,11 +164,16 @@ export default function DispatchRequestDialog({ open = true, onClose, onCreated 
       CustomerService.getCustomers().catch(() => ({ userCustomers: [] })),
       JobTypeService.getAll().catch(() => ({ items: [] })),
       SystemTypeService.getAll().catch(() => ({ items: [] })),
-    ]).then(([c, j, sy]) => {
+      // ✅ สัญญาที่ยังเพิ่มครั้งได้ — ต้องส่ง dept: service เพราะผู้แจ้งเป็นฝ่ายขาย กำลังขอดูข้าม
+      // แผนกมาฝั่งช่าง (สิทธิ์ viewServiceCalendar) ถ้าไม่ส่งจะได้รายการว่างเสมอ
+      EventService.getContracts({ dept: DEPARTMENT.SERVICE }).catch(() => ({ contracts: [] })),
+    ]).then(([c, j, sy, ct]) => {
       if (!alive) return;
       setCustomers(c?.userCustomers || []);
       setJobTypes([...new Set((j?.items || []).map((t) => t.name).filter(Boolean))].sort());
       setSystems([...new Set((sy?.items || []).map((t) => t.name).filter(Boolean))].sort());
+      setContracts(ct?.contracts || []);
+      setContractsLoading(false);
     });
     return () => { alive = false; };
   }, []);
@@ -170,6 +211,43 @@ export default function DispatchRequestDialog({ open = true, onClose, onCreated 
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
+  const contractLabel = (c) =>
+    [c.company, c.site].filter(Boolean).join(" · ") || "(ไม่ระบุชื่อ)";
+
+  /**
+   * เลือกสัญญา = ยึดข้อมูลระบุตัวงานจากสัญญาทั้งชุด (บริษัท/โครงการ/ประเภทงาน/ระบบ)
+   * ⚠️ ทับของเดิมทั้งหมด ไม่ใช่เติมเฉพาะช่องว่าง (ต่างจาก applyCustomer ด้านบนโดยตั้งใจ) —
+   * ครั้งถัดไปของสัญญาต้องเป็น "งานเดียวกันกับครั้งก่อนๆ" เป๊ะ ถ้าปล่อยให้ต่างได้ก็ไม่ใช่สัญญาเดียวกัน
+   */
+  const pickContract = (c) => {
+    setPickedContract(c);
+    if (!c) {
+      setForm((f) => ({ ...f, contractGroupId: "" }));
+      return;
+    }
+    setForm((f) => ({
+      ...f,
+      contractGroupId: c.key,
+      company: c.company || "",
+      site: c.site || "",
+      title: c.title || "",
+      system: c.system || "",
+    }));
+  };
+
+  /** สลับโหมด — ออกจากโหมดสัญญาต้องล้างการผูกทิ้ง ไม่งั้นใบจะยังผูกสัญญาอยู่ทั้งที่จอไม่โชว์แล้ว */
+  const changeMode = (mode) => {
+    if (!mode || mode === jobMode) return;
+    setJobMode(mode);
+    setError("");
+    if (mode === "general") {
+      setPickedContract(null);
+      setForm((f) => ({ ...f, contractGroupId: "" }));
+    }
+  };
+
+  const isContractMode = jobMode === "contract";
+
   // ⚠️ ตรวจแค่ว่าเป็น URL ที่เปิดได้ไหม ไม่บังคับว่าต้องเป็นโดเมน Google — ลิงก์ย่อ (maps.app.goo.gl)
   // และแอปแผนที่อื่นก็พาไปที่ถูกต้องเหมือนกัน การบล็อกโดเมนอื่นสร้างปัญหามากกว่าที่แก้
   const mapUrlValid = (() => {
@@ -179,6 +257,7 @@ export default function DispatchRequestDialog({ open = true, onClose, onCreated 
   })();
 
   const submit = async () => {
+    if (isContractMode && !form.contractGroupId) return setError("กรุณาเลือกสัญญาที่ต้องการเพิ่มครั้งถัดไป");
     if (!form.title.trim()) return setError("กรุณาระบุประเภทงาน");
     if (!form.site.trim()) return setError("กรุณาระบุโครงการ / สาขา");
     if (mapUrlValid === false) return setError("ลิงก์แผนที่ไม่ถูกต้อง — ต้องขึ้นต้นด้วย http:// หรือ https://");
@@ -206,23 +285,12 @@ export default function DispatchRequestDialog({ open = true, onClose, onCreated 
   return (
     <Dialog open onClose={() => !saving && onClose?.()} fullWidth maxWidth="md" fullScreen={isMobile}>
       <DialogTitle sx={{ pb: 1.25 }}>
-        <Stack direction="row" alignItems="center" spacing={1.25}>
-          <Box
-            sx={{
-              width: 36, height: 36, borderRadius: 2, flexShrink: 0,
-              bgcolor: alpha(DISPATCH_ACCENT, 0.13), color: DISPATCH_ACCENT,
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}
-          >
-            <Send sx={{ fontSize: 19 }} />
-          </Box>
-          <Box sx={{ minWidth: 0 }}>
-            <Typography sx={{ fontWeight: 800, fontSize: "1rem" }}>แจ้งงานให้ฝ่ายช่าง</Typography>
-            <Typography variant="caption" sx={{ color: TEXT_SUB }}>
-              กรอกให้ครบ ช่างจะได้ไม่ต้องโทรกลับมาถาม · แอดมินจะตรวจแล้วจัดคิวให้
-            </Typography>
-          </Box>
-        </Stack>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography sx={{ fontWeight: 800, fontSize: "1rem", color: "#0f172a" }}>แจ้งงานให้ฝ่ายช่าง</Typography>
+          <Typography variant="caption" sx={{ color: TEXT_SUB }}>
+            กรอกให้ครบ ช่างจะได้ไม่ต้องโทรกลับมาถาม · แอดมินจะตรวจแล้วจัดคิวให้
+          </Typography>
+        </Box>
       </DialogTitle>
 
       <DialogContent dividers sx={{ bgcolor: "#f8fafc" }}>
@@ -232,18 +300,14 @@ export default function DispatchRequestDialog({ open = true, onClose, onCreated 
         {/* ✅ "งานด่วนไหม" ถูกยกขึ้นมาเป็นแถบเต็มความกว้างบนสุด ไม่ใช่ปุ่มเล็กๆ ที่ซ่อนอยู่ข้างช่องวันที่
             เหมือนเดิม — เป็นข้อมูลชิ้นเดียวในใบที่เปลี่ยนลำดับความสำคัญของทั้งคิว คนตรวจต้องเห็นทันที
             และคนแจ้งต้องกดได้โดยไม่ต้องมองหา */}
+        {/* ✅ แถวความเร่งด่วนแบบเรียบ — เดิมเป็นกล่องมีขอบ+พื้นสีแดงตอนเลือก "ด่วน" ซึ่งกินพื้นที่
+            เต็มความกว้างเหนือฟอร์มทั้งที่เป็นตัวเลือกเดียว */}
         <Stack
           direction="row" alignItems="center" spacing={1.5}
-          sx={{
-            mb: 2, px: 1.5, py: 1.25, borderRadius: 2.5,
-            border: "1px solid", borderColor: urgent ? alpha("#ef4444", 0.4) : BORDER_MAIN,
-            bgcolor: urgent ? alpha("#ef4444", 0.06) : "#fff",
-            transition: "background-color .15s, border-color .15s",
-          }}
+          sx={{ mb: 2, px: 0.25 }}
         >
-          <Bolt sx={{ fontSize: 20, color: urgent ? "#dc2626" : TEXT_SUB, flexShrink: 0 }} />
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography sx={{ fontWeight: 800, fontSize: "0.82rem", color: urgent ? "#dc2626" : "inherit" }}>
+            <Typography sx={{ fontWeight: 700, fontSize: "0.82rem", color: urgent ? "#dc2626" : "#0f172a" }}>
               ความเร่งด่วน
             </Typography>
             <Typography variant="caption" sx={{ color: TEXT_SUB }}>
@@ -276,21 +340,152 @@ export default function DispatchRequestDialog({ open = true, onClose, onCreated 
               sx={{ bgcolor: "#fff" }}
             >
               <Stack spacing={1.25}>
+                {/* ── ขั้นตอนที่ 1: งานทั่วไป หรือ ครั้งถัดไปของสัญญา ──────────────────
+                    ✅ ที่เพิ่ม (ผู้ใช้ขอ: "ถ้าจะลงงานสัญญา ให้เอาสัญญาที่มีอยู่จริงมาเลือกแบบของช่าง"):
+                    เดิมใบแจ้งงานจากเซลถูกสร้างเป็นงานทั่วไปเสมอ งานที่จริงๆ เป็นครั้งที่ N ของสัญญา
+                    จึงหลุดออกจากสัญญาไปเป็นงานลอย — นับครั้งไม่ตรงและไม่โผล่ในหน้า "ภาพรวมงาน"
+                    ⚠️ วางเป็นขั้นตอนแรกสุดเหมือนของช่าง เพราะเป็นตัวตัดสินว่าช่องที่เหลือต้องกรอกเอง
+                    หรือมาจากสัญญา ถ้าไปวางทีหลังคนจะกรอกไปแล้วค่อยโดนทับ */}
+                <ToggleButtonGroup
+                  exclusive fullWidth size="small" value={jobMode}
+                  onChange={(_, v) => changeMode(v)}
+                  sx={{
+                    "& .MuiToggleButton-root": {
+                      textTransform: "none", fontWeight: 700, py: 0.85, lineHeight: 1.3,
+                      flexDirection: "column", gap: 0.15,
+                    },
+                    "& .Mui-selected": {
+                      bgcolor: alpha(DISPATCH_ACCENT, 0.16) + " !important",
+                      color: "#b45309",
+                      borderColor: alpha(DISPATCH_ACCENT, 0.5) + " !important",
+                    },
+                  }}
+                >
+                  <ToggleButton value="general">
+                    งานทั่วไป
+                    <Typography component="span" variant="caption" sx={{ color: TEXT_SUB, fontWeight: 600 }}>
+                      งานครั้งเดียว ไม่ผูกสัญญา
+                    </Typography>
+                  </ToggleButton>
+                  <ToggleButton value="contract">
+                    งานตามสัญญา
+                    <Typography component="span" variant="caption" sx={{ color: TEXT_SUB, fontWeight: 600 }}>
+                      ครั้งถัดไปของสัญญาที่มีอยู่
+                    </Typography>
+                  </ToggleButton>
+                </ToggleButtonGroup>
+
+                {isContractMode && (
+                  <>
+                    {/* ⚠️ เลือกได้อย่างเดียว พิมพ์เพิ่มเองไม่ได้ (ไม่มี freeSolo ต่างจากช่องอื่นในฟอร์มนี้)
+                        — สัญญาต้องเป็นตัวที่มีอยู่จริงเท่านั้น พิมพ์เองแล้วสะกดต่างแม้ตัวเดียวจะกลาย
+                        เป็นสัญญาคนละฉบับทันที (เหตุผลเดียวกับ create:false ในฟอร์มของช่าง) */}
+                    <Autocomplete
+                      options={contracts}
+                      loading={contractsLoading}
+                      value={pickedContract}
+                      onChange={(_, v) => pickContract(v)}
+                      getOptionLabel={(c) =>
+                        contractLabel(c) + " · " + (c.title || "") + " (" + (c.contractNo || "ไม่มีเลขที่") + ")"
+                      }
+                      isOptionEqualToValue={(o, v) => o.key === v?.key}
+                      noOptionsText={contractsLoading ? "กำลังโหลดสัญญา..." : "ไม่มีสัญญาที่ยังเพิ่มครั้งได้"}
+                      renderOption={(props, c) => {
+                        const { key, ...rest } = props;
+                        return (
+                          <Box component="li" key={key} {...rest} sx={{ display: "block !important", py: 1 }}>
+                            <Typography sx={{ fontWeight: 700, fontSize: "0.83rem", lineHeight: 1.35 }}>
+                              {contractLabel(c)}
+                            </Typography>
+                            <Stack direction="row" spacing={0.6} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: 0.35 }}>
+                              <Chip
+                                size="small" label={c.contractNo || "ไม่มีเลขที่"}
+                                sx={{ height: 17, fontSize: "0.6rem", fontWeight: 700, bgcolor: alpha(DISPATCH_ACCENT, 0.14), color: "#b45309" }}
+                              />
+                              {c.title && <Typography variant="caption" sx={{ color: TEXT_SUB }}>{c.title}</Typography>}
+                              {c.system && <Typography variant="caption" sx={{ color: TEXT_SUB }}>· {c.system}</Typography>}
+                              <Box sx={{ flex: 1 }} />
+                              {/* จำนวนครั้งที่เหลือ — ตัวเลขที่ตัดสินใจได้ทันทีว่าสัญญานี้ยังใส่งานได้ไหม */}
+                              <Typography variant="caption" sx={{ fontWeight: 800, color: "#0891b2" }}>
+                                เหลือ {(c.visitCount || 0) - (c.usedVisits || 0)}/{c.visitCount || 0} ครั้ง
+                              </Typography>
+                            </Stack>
+                          </Box>
+                        );
+                      }}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params} size="small" label="เลือกสัญญา" required
+                          placeholder="ค้นหาจากชื่อโครงการ / เลขที่สัญญา"
+                          helperText={
+                            !contractsLoading && contracts.length === 0
+                              ? "ยังไม่มีสัญญาที่เพิ่มครั้งได้ — สร้างสัญญาใหม่ได้ที่หน้า ภาพรวมงาน"
+                              : "ครั้งที่จะถูกกำหนดให้อัตโนมัติตอนแอดมินอนุมัติ"
+                          }
+                          FormHelperTextProps={{ sx: { fontSize: "0.68rem", mx: 0 } }}
+                        />
+                      )}
+                    />
+
+                    {/* สรุปสัญญาที่เลือก — ยืนยันให้เห็นชัดว่ากำลังต่อครั้งที่เท่าไรของฉบับไหน */}
+                    {pickedContract && (
+                      <Box
+                        sx={{
+                          p: 1.25, borderRadius: 2,
+                          bgcolor: alpha("#0891b2", 0.06),
+                          border: "1px solid", borderColor: alpha("#0891b2", 0.28),
+                        }}
+                      >
+                        <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.5 }}>
+                          <DescriptionIcon sx={{ fontSize: 15, color: "#0e7490" }} />
+                          <Typography sx={{ fontWeight: 800, fontSize: "0.78rem", color: "#0e7490", flex: 1, minWidth: 0 }} noWrap>
+                            {contractLabel(pickedContract)}
+                          </Typography>
+                          <Chip
+                            size="small"
+                            label={"จะเป็นครั้งที่ " + (pickedContract.nextRound || "-") + "/" + (pickedContract.visitCount || 0)}
+                            sx={{ height: 19, fontSize: "0.63rem", fontWeight: 800, bgcolor: "#0891b2", color: "#fff" }}
+                          />
+                        </Stack>
+                        <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }}>
+                          เลขที่ {pickedContract.contractNo || "—"} · ลงไปแล้ว {pickedContract.usedVisits || 0} จาก {pickedContract.visitCount || 0} ครั้ง
+                          {pickedContract.responsiblePerson ? " · ผู้รับผิดชอบ " + pickedContract.responsiblePerson : ""}
+                        </Typography>
+                      </Box>
+                    )}
+                  </>
+                )}
+
                 {/* ⚠️ ตรงกับช่อง "ประเภทงาน" ในฟอร์มของช่าง (ทั้งคู่ลงที่ event.title) —
                     ต้องใช้คำเดียวกันและดึงจากตารางเดียวกัน ไม่งั้นงานที่มาจากเซลจะมีชื่อประเภท
-                    คนละชุดกับงานที่ช่างสร้างเอง แล้วกรองรวมกันไม่ได้ */}
-                <ComboField
-                  label="ประเภทงาน" required value={form.title}
-                  onChange={(v) => setForm((f) => ({ ...f, title: v }))}
-                  options={jobTypes}
-                  placeholder="เลือกหรือพิมพ์ประเภทงาน"
-                />
-                <ComboField
-                  label="ระบบ" value={form.system}
-                  onChange={(v) => setForm((f) => ({ ...f, system: v }))}
-                  options={systems}
-                  placeholder="เลือกหรือพิมพ์ชื่อระบบ"
-                />
+                    คนละชุดกับงานที่ช่างสร้างเอง แล้วกรองรวมกันไม่ได้
+                    ⚠️ โหมดสัญญาล็อกไว้ — ครั้งถัดไปต้องเป็นงานประเภท/ระบบเดียวกับครั้งก่อนๆ
+                    (ฟอร์มของช่างในโหมดสัญญาก็ไม่ให้แก้สองช่องนี้เหมือนกัน) */}
+                {isContractMode ? (
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <LockedField label="ประเภทงาน" value={form.title} />
+                    </Box>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <LockedField label="ระบบ" value={form.system} />
+                    </Box>
+                  </Stack>
+                ) : (
+                  <>
+                    <ComboField
+                      label="ประเภทงาน" required value={form.title}
+                      onChange={(v) => setForm((f) => ({ ...f, title: v }))}
+                      options={jobTypes}
+                      placeholder="เลือกหรือพิมพ์ประเภทงาน"
+                    />
+                    <ComboField
+                      label="ระบบ" value={form.system}
+                      onChange={(v) => setForm((f) => ({ ...f, system: v }))}
+                      options={systems}
+                      placeholder="เลือกหรือพิมพ์ชื่อระบบ"
+                    />
+                  </>
+                )}
                 <TextField
                   size="small" label="รายละเอียดงาน" value={form.detail} onChange={set("detail")}
                   multiline minRows={3}
@@ -313,22 +508,32 @@ export default function DispatchRequestDialog({ open = true, onClose, onCreated 
                     นิติบุคคลอาคารชุด) แต่มีชื่อโครงการเสมอ — ย้ายมาไว้ช่องแรกด้วย เพราะเป็นช่องบังคับ
                     ควรอยู่จุดที่สายตาเจอก่อน เข้าชุดกับฟอร์มนัดหมายเซลในปฏิทินที่สลับ required แบบ
                     เดียวกันไปแล้ว */}
+                {/* ⚠️ โหมดสัญญาล็อกสองช่องนี้ — บริษัท/โครงการคือสิ่งที่ระบุว่า "เป็นสัญญาฉบับไหน"
+                    ถ้าปล่อยให้แก้ได้ ครั้งใหม่จะหลุดออกจากกลุ่มสัญญาเดิมทันทีโดยไม่มีอะไรเตือน */}
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
+                    {isContractMode ? (
+                      <LockedField label="โครงการ / สาขา" value={form.site} />
+                    ) : (
                     <ComboField
                       label="โครงการ / สาขา" required value={form.site}
                       onChange={(v) => { setForm((f) => ({ ...f, site: v })); applyCustomer(form.company, v); }}
                       options={siteOptions}
                       placeholder="เลือกหรือพิมพ์ชื่อโครงการ"
                     />
+                    )}
                   </Box>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
+                    {isContractMode ? (
+                      <LockedField label="ลูกค้า / บริษัท" value={form.company} />
+                    ) : (
                     <ComboField
                       label="ลูกค้า / บริษัท" value={form.company}
                       onChange={(v) => setForm((f) => ({ ...f, company: v }))}
                       options={companyOptions}
                       placeholder="เลือกหรือพิมพ์ชื่อลูกค้า"
                     />
+                    )}
                   </Box>
                 </Stack>
                 <TextField size="small" label="ที่อยู่หน้างาน" value={form.address} onChange={set("address")} multiline maxRows={3} />
@@ -482,7 +687,8 @@ export default function DispatchRequestDialog({ open = true, onClose, onCreated 
       </DialogContent>
 
       <DialogActions sx={{ p: 2 }}>
-        <Button onClick={() => onClose?.()} disabled={saving} sx={{ textTransform: "none" }}>ยกเลิก</Button>
+        {/* ⚠️ จอมือถือ: ปุ่มยืนยันต้องกว้างและอยู่ขวาสุดแบบแอปมือถือ ส่วน "ยกเลิก" เป็นตัวรอง */}
+        <Button onClick={() => onClose?.()} disabled={saving} sx={{ textTransform: "none", color: TEXT_SUB }}>ยกเลิก</Button>
         <Box sx={{ flex: 1 }} />
         <Button
           variant="contained" onClick={submit} disabled={saving}

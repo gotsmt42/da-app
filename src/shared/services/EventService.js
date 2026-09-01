@@ -65,6 +65,23 @@ const EventService = {
     }
   },
 
+  /**
+   * รายชื่อ "สัญญาที่ยังเพิ่มครั้งได้" — ใช้ในฟอร์มที่ต้องให้เลือกสัญญาที่มีอยู่จริง
+   * ⚠️ ส่ง dept: "service" มาด้วยเสมอเมื่อเรียกจากฝั่งฝ่ายขาย — เซลอ่านสัญญาของฝ่ายช่างได้เฉพาะ
+   * เมื่อขอข้ามแผนกมาชัดเจนเท่านั้น (สิทธิ์ viewServiceCalendar ดู shared.js ฝั่ง server)
+   */
+  async getContracts(opts = {}) {
+    try {
+      const response = await API.get(`/events/contracts`, {
+        params: { ...(opts.dept ? { dept: opts.dept } : {}) },
+      });
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching contracts:", error);
+      throw error;
+    }
+  },
+
   async GetServiceReportFiles() {
     try {
       const response = await API.get(`/events/documents`);

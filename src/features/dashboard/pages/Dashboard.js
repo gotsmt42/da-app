@@ -12,6 +12,8 @@ import {
   FaExclamationCircle,
   FaArrowRight,
   FaClipboardList,
+  FaClipboardCheck,
+  FaPaperPlane,
   FaCog,
   FaCogs,
   FaChevronLeft,
@@ -109,7 +111,6 @@ const Dashboard = () => {
   const canViewContracts = can(role, "viewContracts");
   // ✅ เซล — สายงานคนละสายกับช่าง จึงต้องมีทางลัดของตัวเองแทนที่จะเห็นทางลัดของงานช่างที่กดไปก็ทำอะไรไม่ได้
   const isSale = isRole(role, ROLES.SALE);
-  const canSell = can(role, "createSalesPlan");
   const canAssignDispatch = can(role, "assignDispatch");
   // ⚠️ เกณฑ์เดียวกับ Sidebar.js/Header.js — เมนู/การ์ดของสายบริการต้องซ่อนพร้อมกันทุกที่
   const canViewOperation = can(role, "editOperation") || can(role, "receiveDispatch");
@@ -178,8 +179,10 @@ const Dashboard = () => {
     };
 
     fetchAllDashboardData();
-    // ⚠️ ผูกกับ canSell — role มาจาก AuthContext ซึ่งอาจยังไม่พร้อมตอน mount รอบแรก
-    // ถ้าใช้ [] เฉยๆ เซลที่โหลดหน้าใหม่จะไม่ได้ข้อมูลการขายเลยจนกว่าจะกดรีเฟรช
+    // 🧹 คอมเมนต์เดิมตรงนี้บอกว่า "ผูกกับ canSell เพราะเซลต้องรอ role พร้อมก่อนถึงจะได้ข้อมูลการขาย"
+    // — เป็นของตกค้างจากสมัยที่ยังมีระบบ CRM ซึ่งถูกตัดออกไปแล้ว ตอนนี้ไม่มีการดึงข้อมูลแยกตาม role
+    // เลยสักจุด (getEventOp/GetDraftEvents ถูกกรองตามผู้ใช้ที่ฝั่ง server อยู่แล้ว) โหลดรอบเดียว
+    // ตอน mount จึงถูกต้อง และ deps ว่างคือสิ่งที่ตั้งใจจริง
   }, []);
 
   // ✅ นับแบบจัดกลุ่มก่อน (countDistinctJobs) ไม่ใช่นับทุกแถว event ดิบ — งานที่เข้าหลายวันไม่ติดกัน
@@ -574,18 +577,31 @@ const Dashboard = () => {
             color: "#b91c1c",
           },
         ]),
-    ...(canSell
+    /**
+     * ทางลัดของสายขาย — **เฉพาะ role เซลเท่านั้น**
+     *
+     * 🐛 ที่แก้ (ผู้ใช้แจ้งว่าแสดงผิด): เดิมใช้ canSell (สิทธิ์ createSalesPlan = แอดมิน/ผู้จัดการ/เซล)
+     * ทำให้แอดมินเห็นทางลัดสองตัวนี้ด้วย เกิดปัญหา 2 อย่างพร้อมกัน
+     *   1) "แผนงานของฉัน" ชี้ไป /event เหมือนกับ "แผนงานทั้งหมด" ที่แอดมินเห็นอยู่แล้วเป๊ะๆ —
+     *      กลายเป็นปุ่ม 2 ปุ่มไปหน้าเดียวกันแต่ชื่อขัดกันเอง ("ทั้งหมด" กับ "ของฉัน")
+     *   2) "แจ้งงานให้ช่าง" ขัดกับเมนูด้านซ้าย ซึ่งกำหนดให้โผล่เฉพาะเซลไปแล้ว —
+     *      แอดมินจึงเห็นทางลัดที่ไม่มีอยู่ในเมนูของตัวเอง
+     * ✅ ใช้ isSale ให้ตรงกับ Sidebar.js (เงื่อนไข isSaleUser) — เกณฑ์เดียวกันทั้งสองที่
+     */
+    ...(isSale
       ? [
           {
             title: "แผนงานของฉัน",
-            icon: <FaClipboardList size={20} />,
+            icon: <FaCalendarAlt size={20} />,
             // 🧹 เดิมชี้ ?tab=pipeline ซึ่งเป็นแท็บของระบบ CRM ที่ถูกตัดออกไปแล้ว
             link: "/event",
             color: "#8b5cf6",
           },
           {
+            // ⚠️ ไอคอนต้องตรงกับเมนูด้านซ้าย (FaPaperPlane = "ส่ง/แจ้งออกไป") — เดิมใช้ FaWrench
+            // ซ้ำกับ "การดำเนินงาน" และ "ใบมอบหมายงาน" กลายเป็นประแจ 3 ตัวที่หมายถึงคนละเรื่อง
             title: "แจ้งงานให้ช่าง",
-            icon: <FaWrench size={20} />,
+            icon: <FaPaperPlane size={20} />,
             // 🧹 เดิมชี้ ?tab=calendar ซึ่งเป็นแท็บของระบบ CRM ที่ถูกตัดออกไปแล้ว
             link: "/sales",
             color: "#a855f7",
@@ -595,8 +611,12 @@ const Dashboard = () => {
     ...(canAssignDispatch
       ? [
           {
-            title: "ใบมอบหมายงาน",
-            icon: <FaWrench size={20} />,
+            // 🧹 ที่แก้: เดิมชื่อ "ใบมอบหมายงาน" ซึ่งเป็นชื่อเก่าที่เลิกใช้แล้ว — ทั้งเมนูด้านซ้ายและ
+            // หัวข้อของหน้าจริงเปลี่ยนเป็น "คำขอลงงาน" ไปแล้ว (ของในคิวคือ "คำขอ" ที่ยังไม่ได้
+            // ตัดสินใจ ยังไม่เป็นใบมอบหมายจนกว่าจะอนุมัติ) ปล่อยชื่อไม่ตรงกันไว้ทำให้ดูเหมือนคนละหน้า
+            // ⚠️ ไอคอนใช้ FaClipboardCheck ตรงกับเมนูด้านซ้าย ไม่ใช่ FaWrench ที่ซ้ำกับหน้าอื่น
+            title: "คำขอลงงาน",
+            icon: <FaClipboardCheck size={20} />,
             link: "/dispatch",
             color: "#f59e0b",
           },

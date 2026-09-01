@@ -15,13 +15,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import {
-  Box, Stack, Typography, Chip, IconButton, Tooltip, TextField, MenuItem,
+  Box, Stack, Typography, IconButton, Tooltip, TextField, MenuItem,
   CircularProgress, Alert, AvatarGroup, Avatar, useMediaQuery,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
-  Refresh, Search, Bolt, Schedule, Inbox, Storefront, Description, Place,
+  Refresh, Search, Bolt, Schedule, Inbox, Description, Place,
   CalendarMonth,
 } from "@mui/icons-material";
 
@@ -29,10 +29,6 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { DEPARTMENT, DEPARTMENT_LABEL, departmentOf } from "@/shared/utils/roles";
 import ViewToggle, { initialViewMode } from "@/shared/ui/ViewToggle";
-// ✅ ใช้ InfoLine ตัวเดียวกับหน้าการดำเนินงาน (Operation/PendingApprovalsPanel) — ผู้ใช้ขอให้หน้านี้
-// "แสดงข้อมูลชัดเจนเหมือนหน้าการดำเนินงาน" การใช้คอมโพเนนต์กลางตัวเดียวกันรับประกันว่าหน้าตาเหมือน
-// กันเป๊ะ ไม่ใช่แค่ก๊อปสไตล์ตามแล้วหลุดไม่ตรงกันภายหลัง (ดูคอมเมนต์ในตัวไฟล์ InfoLine.js เอง)
-import InfoLine from "@/shared/ui/InfoLine";
 import DispatchService from "../services/DispatchService";
 import DispatchDialog from "./DispatchDialog";
 import {
@@ -76,144 +72,133 @@ const statusBadge = (d) => {
   return m ? { label: m.label, color: m.color } : { label: d.status, color: TEXT_SUB };
 };
 
+/**
+ * การ์ดใบแจ้งงาน
+ *
+ * ✅ ที่แก้ (ผู้ใช้แจ้งว่า "ดูรกตามาก"): เดิมการ์ดใบเดียวมี 8 องค์ประกอบและ 4 สีพร้อมกัน —
+ * แถบสีซ้าย + ชิปแผนก + ชื่อผู้แจ้ง + ชื่องาน + บรรทัด "🏢 โครงการ" + "💻 ระบบ" (มีอิโมจิและ
+ * ป้ายกำกับ) + รายละเอียด + ป้ายสถานะพื้นสี + avatar ลอย + แถบพื้นสีฟ้าท้ายการ์ด
+ * ตาไม่รู้จะเกาะตรงไหนเพราะทุกอย่างเด่นเท่ากันหมด
+ *
+ * ✅ ลำดับสายตาใหม่ เหลือ 3 ชั้นชัดเจน:
+ *   1. ชื่อโครงการ (ตัวหนา) — สิ่งที่คนใช้จำงานได้จริง
+ *   2. ประเภทงาน · ระบบ (บรรทัดเดียว สีจาง) — เดิมแยก 2 บรรทัดพร้อมป้ายกำกับ+อิโมจิ
+ *   3. ข้อมูลประกอบ (วันเข้างาน/ผู้รับงาน) สีจาง ท้ายการ์ด
+ * สีเหลือทางเดียวคือ "สถานะ" (จุดเล็ก + ตัวอักษร) — ไม่ใช้พื้นสีทับอีก
+ * ⚠️ แถบสีซ้ายยังอยู่ แต่บางลงเหลือ 3px — เป็นตัวช่วยกวาดสายตาทั้งลิสต์ที่ได้ผลจริงโดยไม่กินพื้นที่
+ */
 const DispatchCard = ({ d, onOpen, myId }) => {
   const meta = statusBadge(d);
   const overdue = d.dueAt && moment(d.dueAt).isBefore(moment(), "day")
     && d.status !== "cancelled" && d.job?.status !== "ดำเนินการเสร็จสิ้น";
-  const checkDone = (d.checklist || []).filter((c) => c.done).length;
+  // ประเภทงาน · ระบบ — รวมเป็นบรรทัดเดียว ไม่ต้องมีป้ายกำกับ (บริบทชัดอยู่แล้ว)
+  const typeLine = [d.title, d.system].filter(Boolean).join(" · ");
 
   return (
     <Box
       onClick={() => onOpen(d)}
       sx={{
         position: "relative", overflow: "hidden",
-        pl: 2.25, pr: 1.75, py: 1.75, borderRadius: 3, cursor: "pointer", bgcolor: "#fff",
-        border: "1px solid", borderColor: d.priority === "urgent" ? alpha("#ef4444", 0.35) : BORDER_MAIN,
-        boxShadow: "0 1px 2px rgba(15, 23, 42, .05)",
-        transition: "transform .15s, box-shadow .15s, border-color .15s",
+        pl: 2, pr: 1.75, py: 1.6, borderRadius: 2.5, cursor: "pointer", bgcolor: "#fff",
+        border: "1px solid", borderColor: BORDER_MAIN,
+        transition: "border-color .15s, box-shadow .15s",
         "&:hover": {
-          borderColor: DISPATCH_ACCENT,
-          boxShadow: `0 10px 24px -10px ${alpha(DISPATCH_ACCENT, 0.45)}`,
-          transform: "translateY(-2px)",
+          borderColor: alpha(meta.color, 0.5),
+          boxShadow: "0 4px 12px -6px rgba(15, 23, 42, .18)",
         },
       }}
     >
-      {/* ✅ แถบสีซ้าย = สถานะจริงของงาน — กวาดตาดูทั้งลิสต์รู้ทันทีว่าใบไหนอยู่ขั้นไหน
-          ไม่ต้องอ่านป้ายข้อความทีละใบ (เทียบ pattern เดียวกับแถบประเภทงานบนปฏิทิน) */}
-      <Box sx={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 4, bgcolor: meta.color }} />
+      <Box sx={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, bgcolor: meta.color }} />
 
-      <Stack direction="row" alignItems="flex-start" spacing={1} sx={{ mb: 0.6 }}>
+      {/* ── บรรทัดบน: ชื่อโครงการ + สถานะ ───────────────────────────── */}
+      <Stack direction="row" alignItems="flex-start" spacing={1}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          {/* ✅ ป้าย "มาจากแผนกไหน + ใครส่ง" อยู่บรรทัดบนสุด ก่อนชื่องานด้วยซ้ำ —
-              คนจัดคิวเปิดหน้านี้มาเพื่อไล่ตัดสินใจทีละใบ คำถามแรกคือ "ใครขอ" เพราะมันบอกว่า
-              ต้องคุยกับใครถ้าข้อมูลไม่พอ เดิมชื่อคนขอถูกซ่อนอยู่ในกล่องรายละเอียดที่ต้องกดเปิดก่อน */}
-          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: 0.5 }}>
-            <Chip
-              size="small"
-              icon={<Storefront sx={{ fontSize: 11 }} />}
-              label={requesterDept(d)}
-              sx={{
-                height: 18, fontSize: "0.62rem", fontWeight: 800,
-                bgcolor: alpha("#8b5cf6", 0.12), color: "#7c3aed",
-                "& .MuiChip-icon": { color: "inherit", ml: 0.4 },
-                "& .MuiChip-label": { px: 0.6 },
-              }}
-            />
-            <Typography variant="caption" sx={{ color: TEXT_SUB, minWidth: 0, fontWeight: 600 }} noWrap>
-              {d.requestedBy?.name || "ไม่ทราบผู้ขอ"}
-            </Typography>
-          </Stack>
-          {/* ✅ ที่แก้ (ผู้ใช้ขอ: "แสดงข้อมูลให้ชัดเจน เหมือนกับหน้าการดำเนินงาน เช่น แสดงชื่อโครงการ
-              ประเภท ระบบ ... ไม่วางจุดมั่วๆ"): ชื่องาน (d.title) คือ "ประเภทงาน" อยู่แล้วในตัว
-              (ตรงกับที่ฟอร์มแจ้งงานเรียกช่องนี้ว่า "ประเภทงาน") จึงคงไว้เป็นหัวข้อหลักไม่มี label กำกับ
-              เหมือนที่หน้าการดำเนินงานทำกับ event.title — ส่วนบรรทัด company·site เดิมที่โชว์ลอยๆ
-              ไม่มีป้ายกำกับ ถูกแทนด้วย InfoLine (ไอคอน+ป้าย+ค่า) ตัวเดียวกับหน้าการดำเนินงานเป๊ะ
-              พร้อมเพิ่ม "ระบบ" ที่หายไปทั้งหมดจากการ์ดเดิม (มีอยู่ในข้อมูลจริงแต่ไม่เคยถูกแสดงที่ไหนเลย) */}
-          <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", lineHeight: 1.35, color: "#0f172a" }} noWrap>
-            {d.title}
+          <Typography sx={{ fontWeight: 700, fontSize: "0.9rem", lineHeight: 1.4, color: "#0f172a" }} noWrap>
+            {companySite(d.customer?.company, d.customer?.site)}
           </Typography>
-          <Stack spacing={0.3} sx={{ mt: 0.4 }}>
-            <InfoLine icon="🏢" label="โครงการ">{companySite(d.customer?.company, d.customer?.site)}</InfoLine>
-            {d.system && <InfoLine icon="💻" label="ระบบ">{d.system}</InfoLine>}
-          </Stack>
+          {typeLine && (
+            <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", mt: 0.15 }} noWrap>
+              {typeLine}
+            </Typography>
+          )}
         </Box>
-        {/* ✅ ป้ายสถานะแบบมีจุดนำหน้า — อ่านง่ายกว่าตัวหนังสือสีล้วน โดยเฉพาะสถานะที่สีใกล้เคียงกัน */}
-        <Stack
-          direction="row" alignItems="center" spacing={0.5} flexShrink={0}
-          sx={{
-            height: 22, pl: 0.9, pr: 1, borderRadius: 999,
-            bgcolor: alpha(meta.color, 0.12),
-          }}
-        >
-          <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: meta.color, flexShrink: 0 }} />
-          <Typography sx={{ fontSize: "0.66rem", fontWeight: 800, color: meta.color, whiteSpace: "nowrap" }}>
+        {/* สถานะ = จุด + ตัวอักษร ไม่มีพื้นสี — อ่านออกเท่าเดิมแต่เบากว่ามาก */}
+        <Stack direction="row" alignItems="center" spacing={0.6} flexShrink={0} sx={{ mt: 0.2 }}>
+          <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: meta.color, flexShrink: 0 }} />
+          <Typography sx={{ fontSize: "0.7rem", fontWeight: 700, color: meta.color, whiteSpace: "nowrap" }}>
             {meta.label}
           </Typography>
         </Stack>
       </Stack>
 
-      {/* ✅ รายละเอียดย่อ 2 บรรทัด — พอให้ตัดสินใจได้ว่าต้องเปิดอ่านเต็มไหม
-          เดิมการ์ดมีแต่ชื่องานกับชื่อลูกค้า ต้องเปิดทีละใบถึงจะรู้ว่างานคืออะไรจริงๆ */}
+      {/* ── รายละเอียดย่อ — บรรทัดเดียวพอให้ตัดสินใจว่าจะเปิดอ่านไหม ──── */}
       {(d.detail || d.note) && (
         <Typography
           variant="body2"
           sx={{
-            color: TEXT_SUB, fontSize: "0.78rem", mb: 0.85, lineHeight: 1.5,
-            display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
-            overflow: "hidden",
+            color: TEXT_SUB, fontSize: "0.78rem", mt: 0.6, lineHeight: 1.5,
+            display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
           }}
         >
           {d.detail || d.note}
         </Typography>
       )}
 
-      <Stack direction="row" alignItems="center" spacing={0.75} flexWrap="wrap" useFlexGap>
-        {/* เอกสารการค้าที่แนบมา — เป็นสัญญาณว่างานนี้ปิดการขายจริงแล้ว ต้องเห็นตั้งแต่ในการ์ด */}
-        {(d.attachments || []).some((f) => DOC_TYPE_META[f.docType]?.commercial) && (
+      {/* ── ท้ายการ์ด: ข้อมูลประกอบทั้งหมดรวมบรรทัดเดียว สีจาง ────────── */}
+      <Stack
+        direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap
+        sx={{ mt: 1, pt: 1, borderTop: "1px solid", borderColor: alpha(BORDER_MAIN, 0.9) }}
+      >
+        {d.priority === "urgent" && (
+          <Stack direction="row" alignItems="center" spacing={0.3}>
+            <Bolt sx={{ fontSize: 13, color: "#dc2626" }} />
+            <Typography variant="caption" sx={{ fontWeight: 800, color: "#dc2626" }}>ด่วน</Typography>
+          </Stack>
+        )}
+        {d.job?.start ? (
+          <Stack direction="row" alignItems="center" spacing={0.4} sx={{ minWidth: 0 }}>
+            <CalendarMonth sx={{ fontSize: 13, color: TEXT_SUB, flexShrink: 0 }} />
+            <Typography variant="caption" sx={{ color: "#334155", fontWeight: 600 }} noWrap>
+              {formatThai(moment(d.job.start), "D MMM")}
+              {d.job.responsiblePerson ? ` · ${d.job.responsiblePerson}` : ""}
+            </Typography>
+          </Stack>
+        ) : (
+          <Typography variant="caption" sx={{ color: TEXT_SUB, fontStyle: "italic" }}>
+            ยังไม่ได้ลงวันเข้างาน
+          </Typography>
+        )}
+        {d.dueAt && (
+          <Stack direction="row" alignItems="center" spacing={0.3}>
+            <Schedule sx={{ fontSize: 13, color: overdue ? "#dc2626" : TEXT_SUB }} />
+            <Typography variant="caption" sx={{ color: overdue ? "#dc2626" : TEXT_SUB, fontWeight: overdue ? 700 : 500 }}>
+              {formatThai(moment(d.dueAt), "D MMM")}
+            </Typography>
+          </Stack>
+        )}
+        <Box sx={{ flex: 1 }} />
+        {/* ไอคอนบอกว่ามีเอกสาร/พิกัด — ไม่ต้องเป็นชิปมีพื้นสีอีกต่อไป */}
+        {(d.attachments || []).some((x) => DOC_TYPE_META[x.docType]?.commercial) && (
           <Tooltip title="มีใบเสนอราคา / ใบ PO แนบมาด้วย">
-            <Chip
-              size="small" icon={<Description sx={{ fontSize: 12 }} />} label="มีเอกสาร"
-              sx={{ height: 20, fontSize: "0.64rem", fontWeight: 700, bgcolor: alpha("#059669", 0.12), color: "#047857", "& .MuiChip-icon": { color: "inherit", ml: 0.5 } }}
-            />
+            <Description sx={{ fontSize: 14, color: TEXT_SUB }} />
           </Tooltip>
         )}
         {d.customer?.mapUrl && (
           <Tooltip title="มีลิงก์แผนที่นำทาง">
-            <Chip
-              size="small" icon={<Place sx={{ fontSize: 12 }} />} label="มีพิกัด"
-              sx={{ height: 20, fontSize: "0.64rem", fontWeight: 700, bgcolor: alpha("#0891b2", 0.12), color: "#0e7490", "& .MuiChip-icon": { color: "inherit", ml: 0.5 } }}
-            />
+            <Place sx={{ fontSize: 14, color: TEXT_SUB }} />
           </Tooltip>
         )}
-        {d.priority === "urgent" && (
-          <Chip size="small" icon={<Bolt sx={{ fontSize: 12 }} />} label="ด่วน" sx={{ height: 20, fontSize: "0.64rem", fontWeight: 800, bgcolor: alpha("#ef4444", 0.12), color: "#dc2626", "& .MuiChip-icon": { color: "inherit", ml: 0.5 } }} />
-        )}
-        {d.dueAt && (
-          <Tooltip title={overdue ? "เลยกำหนดเสร็จแล้ว" : "กำหนดเสร็จ"}>
-            <Chip
-              size="small" icon={<Schedule sx={{ fontSize: 12 }} />}
-              label={formatThai(moment(d.dueAt), "D MMM")}
-              sx={{ height: 20, fontSize: "0.64rem", fontWeight: 700, bgcolor: alpha(overdue ? "#ef4444" : "#64748b", 0.1), color: overdue ? "#dc2626" : TEXT_SUB, "& .MuiChip-icon": { color: "inherit", ml: 0.5 } }}
-            />
-          </Tooltip>
-        )}
-        {d.checklist?.length > 0 && (
-          <Typography variant="caption" sx={{ color: checkDone === d.checklist.length ? "#059669" : TEXT_SUB, fontWeight: 700 }}>
-            ✓ {checkDone}/{d.checklist.length}
-          </Typography>
-        )}
-        <Box sx={{ flex: 1 }} />
-        {/* ⚠️ โชว์ผู้รับงานเป็นรายคน ไม่ยุบเป็นตัวเลขเดียว — ต้องเห็นว่าใครถูกมอบหมายบ้าง
-            🧹 เดิมสีกับ tooltip อ้าง "สถานะรายคน" (รอรับทราบ/รับทราบแล้ว/...) ซึ่งถูกตัดออกแล้ว
-            ความคืบหน้าจริงอ่านจากสถานะงานในตารางงาน (ป้ายมุมขวาบนของการ์ด) ที่เดียว */}
         {d.assignees?.length > 0 && (
           <Tooltip title={d.assignees.map((a) => a.name).join(", ")}>
-            <AvatarGroup max={4} sx={{ "& .MuiAvatar-root": { width: 24, height: 24, fontSize: "0.64rem", fontWeight: 800, border: "1.5px solid #fff" } }}>
+            <AvatarGroup
+              max={3}
+              sx={{ "& .MuiAvatar-root": { width: 20, height: 20, fontSize: "0.58rem", fontWeight: 700, border: "1.5px solid #fff" } }}
+            >
               {d.assignees.map((a) => (
                 <Avatar
                   key={a.userId}
                   sx={{
-                    bgcolor: alpha(DISPATCH_ACCENT, 0.2), color: "#b45309",
+                    bgcolor: alpha("#64748b", 0.16), color: "#475569",
                     outline: String(a.userId) === myId ? `2px solid ${DISPATCH_ACCENT}` : "none",
                   }}
                 >
@@ -225,36 +210,9 @@ const DispatchCard = ({ d, onOpen, myId }) => {
         )}
       </Stack>
 
-      {/* ── ผลลัพธ์ที่ผู้แจ้งอยากรู้จริง: "ช่างจะไปวันไหน ใครไป" ───────────────
-          🧹 มาแทนหลอดความคืบหน้า "เสร็จแล้ว 0 จาก N คน" ที่ถูกตัดออกตามที่ผู้ใช้แจ้งว่าดูไม่เข้าใจ
-          — หลอดนั้นนับจากสถานะรายคน (รับทราบ/เริ่ม/เสร็จ) ซึ่งถูกยกเลิกไปแล้ว จึงค้างที่ 0 ตลอด
-          และสื่อผิดว่างานไม่คืบหน้าทั้งที่ช่างอาจทำเสร็จไปแล้ว
-          ✅ ยกเป็นแถบพื้นสีอ่อนแทนเส้นประ — เด่นขึ้นเป็นคำตอบสุดท้ายของการ์ด ไม่ใช่ท้ายบรรทัดจางๆ */}
-      {d.job?.start && (
-        <Stack
-          direction="row" alignItems="center" spacing={0.75}
-          sx={{
-            mt: 1.1, px: 1, py: 0.6, borderRadius: 1.75,
-            bgcolor: alpha(jobStatusColor(d.job.status), 0.07),
-          }}
-        >
-          <CalendarMonth sx={{ fontSize: 14, color: jobStatusColor(d.job.status), flexShrink: 0 }} />
-          <Typography variant="caption" sx={{ color: "#334155", fontWeight: 600, minWidth: 0 }} noWrap>
-            เข้างาน {formatThai(moment(d.job.start), "D MMM")}
-            {d.job.responsiblePerson ? ` · ${d.job.responsiblePerson}` : ""}
-          </Typography>
-        </Stack>
-      )}
-
       {/* ใบที่ถูกตีกลับ — เหตุผลต้องอยู่บนการ์ด ไม่ต้องเปิดเข้าไปอ่าน */}
       {d.status === "rejected" && d.rejectedReason && (
-        <Typography
-          variant="caption"
-          sx={{
-            display: "block", mt: 1.1, px: 1, py: 0.6, borderRadius: 1.75,
-            bgcolor: alpha("#ef4444", 0.07), color: "#dc2626", fontWeight: 600,
-          }}
-        >
+        <Typography variant="caption" sx={{ display: "block", mt: 0.85, color: "#dc2626", fontWeight: 600 }}>
           ต้องแก้ไข: {d.rejectedReason}
         </Typography>
       )}
@@ -279,14 +237,15 @@ const DispatchTable = ({ rows, onOpen }) => (
   >
     <Table size="small" sx={{ minWidth: 820 }}>
       <TableHead>
-        <TableRow sx={{ bgcolor: alpha(DISPATCH_ACCENT, 0.06) }}>
+        {/* ✅ หัวตารางเป็นเทาเรียบ — เดิมพื้นส้มอ่อน + เส้นใต้ส้มหนา 2px ดึงสายตาไปจากข้อมูลจริง */}
+        <TableRow sx={{ bgcolor: SURFACE_SUBTLE }}>
           {["งาน", "ลูกค้า / หน้างาน", "จากแผนก", "ผู้ขอ", "สถานะ", "ผู้รับงาน", "แจ้งเมื่อ"].map((h) => (
             <TableCell
               key={h}
               sx={{
                 fontWeight: 800, fontSize: "0.72rem", color: "#334155", textTransform: "uppercase",
-                letterSpacing: ".04em", whiteSpace: "nowrap", py: 1.4,
-                borderBottom: "2px solid", borderBottomColor: alpha(DISPATCH_ACCENT, 0.25),
+                letterSpacing: ".04em", whiteSpace: "nowrap", py: 1.25,
+                borderBottom: "1px solid", borderBottomColor: BORDER_MAIN,
               }}
             >
               {h}
@@ -301,14 +260,14 @@ const DispatchTable = ({ rows, onOpen }) => (
             <TableRow
               key={d._id} hover onClick={() => onOpen(d)}
               sx={{
+                // ✅ ตัดการสลับสีพื้นแถวคู่/คี่ออก — มีเส้นคั่นแถวอยู่แล้ว การมีทั้งสองอย่างทำให้ลายตา
                 cursor: "pointer", "&:last-child td": { border: 0 },
-                bgcolor: i % 2 === 1 ? alpha(SURFACE_SUBTLE, 0.6) : "transparent",
-                "& td": { borderColor: BORDER_MAIN, py: 1.35 },
+                "& td": { borderColor: BORDER_MAIN, py: 1.3 },
                 transition: "background-color .12s",
-                "&:hover": { bgcolor: alpha(DISPATCH_ACCENT, 0.07) },
+                "&:hover": { bgcolor: SURFACE_SUBTLE },
               }}
             >
-              <TableCell sx={{ maxWidth: 260, borderLeft: "4px solid", borderLeftColor: m.color }}>
+              <TableCell sx={{ maxWidth: 260, borderLeft: "3px solid", borderLeftColor: m.color }}>
                 <Stack direction="row" alignItems="center" spacing={0.5}>
                   {d.priority === "urgent" && <Bolt sx={{ fontSize: 14, color: "#dc2626", flexShrink: 0 }} />}
                   <Typography sx={{ fontWeight: 700, fontSize: "0.82rem", minWidth: 0, color: "#0f172a" }} noWrap>{d.title}</Typography>
@@ -320,14 +279,17 @@ const DispatchTable = ({ rows, onOpen }) => (
                     {d.system}
                   </Typography>
                 )}
-                <Stack direction="row" spacing={0.4} sx={{ mt: 0.35 }}>
-                  {(d.attachments || []).some((f) => DOC_TYPE_META[f.docType]?.commercial) && (
-                    <Chip size="small" icon={<Description sx={{ fontSize: 10 }} />} label="เอกสาร" sx={{ height: 16, fontSize: "0.58rem", fontWeight: 700, bgcolor: alpha("#059669", 0.12), color: "#047857", "& .MuiChip-icon": { color: "inherit", ml: 0.3 }, "& .MuiChip-label": { px: 0.5 } }} />
-                  )}
-                  {d.customer?.mapUrl && (
-                    <Chip size="small" icon={<Place sx={{ fontSize: 10 }} />} label="พิกัด" sx={{ height: 16, fontSize: "0.58rem", fontWeight: 700, bgcolor: alpha("#0891b2", 0.12), color: "#0e7490", "& .MuiChip-icon": { color: "inherit", ml: 0.3 }, "& .MuiChip-label": { px: 0.5 } }} />
-                  )}
-                </Stack>
+                {/* ✅ เดิมเป็นชิปพื้นสีเขียว/ฟ้า 2 ใบ — เหลือไอคอนเทาเล็กๆ อ่านได้เท่าเดิมแต่ไม่แย่งสายตา */}
+                {((d.attachments || []).some((x) => DOC_TYPE_META[x.docType]?.commercial) || d.customer?.mapUrl) && (
+                  <Stack direction="row" spacing={0.6} sx={{ mt: 0.3 }}>
+                    {(d.attachments || []).some((x) => DOC_TYPE_META[x.docType]?.commercial) && (
+                      <Tooltip title="มีใบเสนอราคา / ใบ PO"><Description sx={{ fontSize: 13, color: TEXT_SUB }} /></Tooltip>
+                    )}
+                    {d.customer?.mapUrl && (
+                      <Tooltip title="มีลิงก์แผนที่"><Place sx={{ fontSize: 13, color: TEXT_SUB }} /></Tooltip>
+                    )}
+                  </Stack>
+                )}
               </TableCell>
               <TableCell sx={{ maxWidth: 220 }}>
                 <Typography variant="body2" sx={{ fontSize: "0.78rem", fontWeight: 600 }} noWrap>{d.customer?.company}</Typography>
@@ -337,33 +299,19 @@ const DispatchTable = ({ rows, onOpen }) => (
                   <Typography variant="caption" sx={{ color: TEXT_SUB }} noWrap>{d.customer.site}</Typography>
                 )}
               </TableCell>
-              <TableCell>
-                <Chip
-                  size="small" label={requesterDept(d)}
-                  sx={{ height: 20, fontSize: "0.64rem", fontWeight: 700, bgcolor: alpha("#8b5cf6", 0.12), color: "#7c3aed" }}
-                />
+              {/* ✅ เดิมเป็นชิปม่วง + วงกลมอักษรย่อสีม่วง = สีม่วง 2 จุดต่อแถว ทั้งที่เป็นข้อมูลรอง
+                  เหลือตัวหนังสือเรียบๆ อ่านง่ายกว่าและไม่แข่งกับสีสถานะซึ่งเป็นข้อมูลที่ต้องอ่านจริง */}
+              <TableCell sx={{ whiteSpace: "nowrap", fontSize: "0.74rem", color: TEXT_SUB }}>
+                {requesterDept(d)}
               </TableCell>
-              <TableCell sx={{ whiteSpace: "nowrap" }}>
-                <Stack direction="row" alignItems="center" spacing={0.75}>
-                  <Box
-                    sx={{
-                      width: 22, height: 22, borderRadius: "50%", flexShrink: 0,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      bgcolor: alpha("#8b5cf6", 0.16), color: "#6d28d9", fontSize: "0.62rem", fontWeight: 800,
-                    }}
-                  >
-                    {(d.requestedBy?.name || "?").charAt(0)}
-                  </Box>
-                  <Typography sx={{ fontSize: "0.76rem", fontWeight: 600, color: "#334155" }}>{d.requestedBy?.name || "-"}</Typography>
-                </Stack>
+              <TableCell sx={{ whiteSpace: "nowrap", fontSize: "0.76rem", color: "#334155" }}>
+                {d.requestedBy?.name || "-"}
               </TableCell>
               <TableCell>
-                <Stack
-                  direction="row" alignItems="center" spacing={0.6}
-                  sx={{ height: 22, pl: 0.9, pr: 1, borderRadius: 999, bgcolor: alpha(m.color, 0.12), width: "fit-content" }}
-                >
-                  <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: m.color, flexShrink: 0 }} />
-                  <Typography sx={{ fontSize: "0.68rem", fontWeight: 800, color: m.color, whiteSpace: "nowrap" }}>{m.label}</Typography>
+                {/* จุด + ตัวอักษร ไม่มีพื้นสี — แบบเดียวกับการ์ด */}
+                <Stack direction="row" alignItems="center" spacing={0.6}>
+                  <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: m.color, flexShrink: 0 }} />
+                  <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: m.color, whiteSpace: "nowrap" }}>{m.label}</Typography>
                 </Stack>
               </TableCell>
               <TableCell sx={{ fontSize: "0.76rem", color: TEXT_SUB, maxWidth: 160 }}>
@@ -475,13 +423,15 @@ export default function DispatchList({ mode = "board", myId = "" }) {
     <Box>
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>{error}</Alert>}
 
-      {/* ✅ แถบเครื่องมือยกเป็นแผงลอยขอบมนพื้นอ่อน แทนที่จะปล่อยลอยบนพื้นหลังหน้าเปล่าๆ —
-          ให้ความรู้สึกเป็น "ชุดควบคุมเดียวกัน" ทันสมัยขึ้น ไม่ใช่ input แยกชิ้นวางเรียงกัน */}
-      <Stack
-        direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap
+      {/* ✅ ที่แก้ (รกตา): เดิมแถบเครื่องมือถูกครอบด้วยกล่องพื้นเทา+ขอบอีกชั้น กลายเป็น "กล่องซ้อน
+          กล่อง" (กล่องเครื่องมือ → ช่องค้นหาที่มีขอบของตัวเอง) และซ้อนกับแถบแท็บ/แถบคำอธิบาย
+          ด้านบนรวมเป็น 3 ชั้นก่อนถึงเนื้อหาจริง — ปล่อยให้ลอยบนพื้นหน้าเลย เหลือชั้นเดียว */}
+      {/* ⚠️ จอมือถือ: ช่องค้นหากินเต็มแถวบนสุด แล้วตัวกรอง/สลับมุมมอง/รีเฟรช อยู่แถวเดียวกันด้านล่าง
+          — เดิมทุกชิ้นแย่งพื้นที่แถวเดียวกันแล้วตกบรรทัดทีละชิ้น กลายเป็น 3 แถวเรียงเหลื่อมกัน */}
+      <Box
         sx={{
-          mb: 2, p: 1, borderRadius: 3,
-          bgcolor: SURFACE_SUBTLE, border: "1px solid", borderColor: BORDER_MAIN,
+          mb: 2, display: "flex", gap: 1, alignItems: "center",
+          flexDirection: { xs: "column", sm: "row" },
         }}
       >
         <TextField
@@ -489,51 +439,46 @@ export default function DispatchList({ mode = "board", myId = "" }) {
           onChange={(e) => setSearch(e.target.value)}
           InputProps={{ startAdornment: <Search sx={{ fontSize: 18, color: TEXT_SUB, mr: 0.75 }} /> }}
           sx={{
-            minWidth: 220, flex: "1 1 220px", maxWidth: 360,
+            width: { xs: "100%", sm: "auto" },
+            minWidth: { sm: 220 }, flex: { sm: "1 1 220px" }, maxWidth: { sm: 360 },
             "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: "#fff" },
           }}
         />
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ width: { xs: "100%", sm: "auto" }, flex: { sm: 1 } }}>
         {/* 🧹 คิวคำขอไม่มีตัวกรองสถานะแล้ว — เหลือ 2 สถานะที่แสดงเป็น 2 คอลัมน์อยู่แล้วทั้งคู่
             ตัวกรองที่ทุกตัวเลือกให้ผลเหมือนเดิมคือปุ่มที่กดแล้วไม่มีอะไรเกิดขึ้น */}
-        {mode !== "board" && (
-          <TextField
-            select size="small" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
-            sx={{ minWidth: 160, "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: "#fff" } }}
-          >
-            <MenuItem value="open">ที่ยังไม่เสร็จ</MenuItem>
-            <MenuItem value="all">ทั้งหมด</MenuItem>
-          </TextField>
-        )}
-        <Box sx={{ flex: 1 }} />
-        <ViewToggle value={viewMode} onChange={setViewMode} accent={DISPATCH_ACCENT} />
-        <Tooltip title="โหลดข้อมูลใหม่">
-          <IconButton
-            size="small" onClick={load}
-            sx={{ bgcolor: "#fff", border: "1px solid", borderColor: BORDER_MAIN, "&:hover": { bgcolor: alpha(DISPATCH_ACCENT, 0.08), borderColor: DISPATCH_ACCENT } }}
-          >
-            <Refresh sx={{ fontSize: 19 }} />
-          </IconButton>
-        </Tooltip>
-      </Stack>
+          {mode !== "board" && (
+            <TextField
+              select size="small" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+              sx={{ minWidth: 150, "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: "#fff" } }}
+            >
+              <MenuItem value="open">ที่ยังไม่เสร็จ</MenuItem>
+              <MenuItem value="all">ทั้งหมด</MenuItem>
+            </TextField>
+          )}
+          <Box sx={{ flex: 1 }} />
+          <ViewToggle value={viewMode} onChange={setViewMode} accent={DISPATCH_ACCENT} />
+          <Tooltip title="โหลดข้อมูลใหม่">
+            <IconButton
+              size="small" onClick={load}
+              sx={{ color: TEXT_SUB, "&:hover": { bgcolor: SURFACE_SUBTLE } }}
+            >
+              <Refresh sx={{ fontSize: 19 }} />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+      </Box>
 
+      {/* ✅ หน้าว่างแบบเรียบ — เดิมมีทั้งเส้นประ พื้นเทา และวงกลมสีส้ม สำหรับ "ไม่มีอะไรเลย" */}
       {filtered.length === 0 ? (
-        <Box
-          sx={{
-            py: 7, textAlign: "center", borderRadius: 3,
-            border: "1.5px dashed", borderColor: BORDER_MAIN, bgcolor: SURFACE_SUBTLE,
-          }}
-        >
-          <Box
-            sx={{
-              width: 56, height: 56, borderRadius: "50%", mx: "auto", mb: 1.5,
-              bgcolor: alpha(DISPATCH_ACCENT, 0.1), color: DISPATCH_ACCENT,
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}
-          >
-            <Inbox sx={{ fontSize: 28 }} />
-          </Box>
-          <Typography sx={{ fontWeight: 800 }}>{search ? "ไม่พบรายการที่ค้นหา" : empty.title}</Typography>
-          {!search && <Typography variant="caption" sx={{ color: TEXT_SUB }}>{empty.sub}</Typography>}
+        <Box sx={{ py: 8, textAlign: "center" }}>
+          <Inbox sx={{ fontSize: 36, color: alpha(TEXT_SUB, 0.5), mb: 1 }} />
+          <Typography sx={{ fontWeight: 700, color: "#334155" }}>
+            {search ? "ไม่พบรายการที่ค้นหา" : empty.title}
+          </Typography>
+          {!search && (
+            <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", mt: 0.5 }}>{empty.sub}</Typography>
+          )}
         </Box>
       ) : viewMode === "table" ? (
         <DispatchTable rows={filtered} onOpen={(x) => setOpenId(x._id)} />
@@ -541,17 +486,17 @@ export default function DispatchList({ mode = "board", myId = "" }) {
         <Box sx={{ display: isDesktop ? "grid" : "block", gridTemplateColumns: `repeat(${grouped.length}, minmax(240px, 1fr))`, gap: 2, alignItems: "start" }}>
           {grouped.map(([status, list]) => {
             const m = DISPATCH_STATUS_META[status];
+            // ✅ ที่แก้ (รกตา): เดิมคอลัมน์เป็นกล่องพื้นเทามีขอบ + หัวคอลัมน์พื้นสีอีกชั้น + ชิปตัวเลข
+            // พื้นสีอีกใบ = สีเดียวกัน 3 ระดับซ้อนกันเหนือการ์ดที่มีแถบสีของตัวเองอยู่แล้ว
+            // เหลือเป็นหัวข้อตัวหนังสือ + จำนวน วางบนพื้นหน้าเปล่าๆ ให้การ์ดเป็นพระเอกแทน
             return (
-              <Box key={status} sx={{ mb: isDesktop ? 0 : 2, borderRadius: 3, border: "1px solid", borderColor: BORDER_MAIN, bgcolor: SURFACE_SUBTLE, overflow: "hidden" }}>
-                <Stack
-                  direction="row" alignItems="center" spacing={0.9}
-                  sx={{ px: 1.5, py: 1.15, bgcolor: alpha(m.color, 0.08), borderBottom: "1px solid", borderColor: alpha(m.color, 0.2) }}
-                >
-                  <Box sx={{ width: 4, height: 18, borderRadius: 3, bgcolor: m.color, flexShrink: 0 }} />
-                  <Typography sx={{ fontWeight: 800, fontSize: "0.82rem", flex: 1, color: "#0f172a" }}>{m.label}</Typography>
-                  <Chip size="small" label={list.length} sx={{ height: 21, minWidth: 28, fontSize: "0.7rem", fontWeight: 800, bgcolor: alpha(m.color, 0.18), color: m.color }} />
+              <Box key={status} sx={{ mb: isDesktop ? 0 : 2.5 }}>
+                <Stack direction="row" alignItems="center" spacing={0.75} sx={{ px: 0.25, mb: 1 }}>
+                  <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: m.color, flexShrink: 0 }} />
+                  <Typography sx={{ fontWeight: 700, fontSize: "0.8rem", color: "#0f172a" }}>{m.label}</Typography>
+                  <Typography sx={{ fontWeight: 700, fontSize: "0.78rem", color: TEXT_SUB }}>{list.length}</Typography>
                 </Stack>
-                <Stack spacing={1.25} sx={{ p: 1.25 }}>
+                <Stack spacing={1.25}>
                   {list.map((d) => <DispatchCard key={d._id} d={d} onOpen={(x) => setOpenId(x._id)} myId={myId} />)}
                   {list.length === 0 && (
                     <Typography variant="caption" sx={{ color: TEXT_SUB, textAlign: "center", py: 2 }}>ไม่มีรายการ</Typography>

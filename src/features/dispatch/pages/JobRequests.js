@@ -24,7 +24,7 @@ import { useAuth } from "@/features/auth/AuthContext";
 import usePermissions from "@/shared/hooks/usePermissions";
 import DispatchList from "../components/DispatchList";
 import DispatchRequestDialog from "../components/DispatchRequestDialog";
-import { SALES_ACCENT } from "../dispatchMeta";
+import { SALES_ACCENT, TEXT_SUB } from "../dispatchMeta";
 
 const ACCENT_DEEP = "#5b21b6"; // ✅ เทียบสีเดียวกับ SalesDashboard.js — ไล่ระดับม่วงเข้มขึ้นจากขอบขวาล่าง
 
@@ -40,53 +40,50 @@ export default function JobRequests() {
 
   return (
     <Box sx={{ p: { xs: 1.5, sm: 2.5 }, maxWidth: 1500, mx: "auto" }}>
-      {/* ── Hero — เข้าชุดกับ SalesDashboard.js (ไล่สีม่วง + วงกลมจางตกแต่ง) ───── */}
-      <Box
-        sx={{
-          position: "relative", overflow: "hidden",
-          borderRadius: 4, p: { xs: 2, sm: 2.75 }, mb: 2.5,
-          background: `linear-gradient(135deg, ${SALES_ACCENT} 0%, ${ACCENT_DEEP} 100%)`,
-          color: "#fff",
-        }}
+      {/* ── หัวหน้าเพจ ────────────────────────────────────────────────────
+          ✅ ที่แก้ (ผู้ใช้แจ้งว่า "ดูรกตามาก"): เดิมเป็นแถบไล่สีม่วงเต็มความกว้าง สูง ~90px พร้อม
+          วงกลมตกแต่ง 2 วง — เป็นก้อนสีที่หนักที่สุดบนหน้าทั้งที่เป็นแค่ "ป้ายชื่อหน้า" ไม่ใช่ข้อมูล
+          และไปแข่งกับสีสถานะในการ์ดซึ่งเป็นสิ่งที่ต้องอ่านจริง
+          ✅ เหลือหัวข้อธรรมดา + ไอคอนสีจาง + ปุ่มหลักหนึ่งปุ่ม — สีม่วงยังอยู่แต่ใช้เป็น "จุดเน้น"
+          (ไอคอน+ปุ่ม) แทนที่จะเป็น "พื้นหลัง" ทั้งแถบ
+          ⚠️ จอมือถือ: ปุ่มกินเต็มความกว้างและอยู่ใต้หัวข้อ — แตะง่ายแบบแอปมือถือ */}
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        alignItems={{ xs: "stretch", sm: "center" }}
+        spacing={{ xs: 1.5, sm: 2 }}
+        sx={{ mb: 2.5 }}
       >
-        <Box sx={{ position: "absolute", right: -40, top: -60, width: 200, height: 200, borderRadius: "50%", bgcolor: alpha("#fff", 0.08) }} />
-        <Box sx={{ position: "absolute", right: 60, bottom: -80, width: 140, height: 140, borderRadius: "50%", bgcolor: alpha("#fff", 0.06) }} />
-
-        <Stack
-          direction={{ xs: "column", sm: "row" }} alignItems={{ sm: "center" }} spacing={2}
-          sx={{ position: "relative" }}
-        >
+        <Stack direction="row" alignItems="center" spacing={1.5} sx={{ flex: 1, minWidth: 0 }}>
           <Box
             sx={{
-              width: 52, height: 52, borderRadius: "50%", flexShrink: 0,
-              bgcolor: alpha("#fff", 0.16), display: "flex", alignItems: "center", justifyContent: "center",
-              border: "1.5px solid", borderColor: alpha("#fff", 0.3),
+              width: 40, height: 40, borderRadius: 2, flexShrink: 0,
+              bgcolor: alpha(SALES_ACCENT, 0.12), color: SALES_ACCENT,
+              display: "flex", alignItems: "center", justifyContent: "center",
             }}
           >
-            <Engineering sx={{ fontSize: 26 }} />
+            <Engineering sx={{ fontSize: 21 }} />
           </Box>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography sx={{ fontWeight: 800, fontSize: { xs: "1.2rem", sm: "1.4rem" }, lineHeight: 1.2 }}>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography sx={{ fontWeight: 800, fontSize: { xs: "1.15rem", sm: "1.3rem" }, lineHeight: 1.25, color: "#0f172a" }}>
               แจ้งงานให้ช่าง
             </Typography>
-            <Typography variant="body2" sx={{ opacity: 0.9, mt: 0.25 }}>
-              กรอกรายละเอียดงาน แนบรูปหน้างาน แล้วแอดมินจะเลือกช่างและนัดวันให้
+            <Typography variant="caption" sx={{ color: TEXT_SUB }}>
+              กรอกรายละเอียดงาน แล้วแอดมินจะเลือกช่างและนัดวันให้
             </Typography>
           </Box>
-          <Button
-            variant="contained" startIcon={<Add sx={{ fontSize: 18 }} />}
-            onClick={() => setFormOpen(true)}
-            sx={{
-              textTransform: "none", fontWeight: 800, borderRadius: 2.5, px: 2.5, flexShrink: 0,
-              bgcolor: "#fff", color: ACCENT_DEEP,
-              width: { xs: "100%", sm: "auto" },
-              "&:hover": { bgcolor: alpha("#fff", 0.9) },
-            }}
-          >
-            แจ้งงานใหม่
-          </Button>
         </Stack>
-      </Box>
+        <Button
+          variant="contained" startIcon={<Add sx={{ fontSize: 18 }} />}
+          onClick={() => setFormOpen(true)}
+          sx={{
+            textTransform: "none", fontWeight: 700, borderRadius: 2, px: 2.5, py: 1, flexShrink: 0,
+            bgcolor: SALES_ACCENT, boxShadow: "none",
+            "&:hover": { bgcolor: ACCENT_DEEP, boxShadow: "none" },
+          }}
+        >
+          แจ้งงานใหม่
+        </Button>
+      </Stack>
 
       <DispatchList
         key={reloadKey}
