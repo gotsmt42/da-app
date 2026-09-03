@@ -20,13 +20,16 @@
  *   2. ดักเหตุการณ์ที่ทำให้ช่องขยับในจอทั้งหมด (รวม scroll ของ element ด้วย capture) แล้วสั่งคำนวณใหม่
  *   3. ใส่สไตล์กลางให้ dropdown "ดูเป็นของช่องนั้นจริงๆ" — เงา/ขอบชัดขึ้น + ไฮไลต์ตัวเลือกที่ชี้อยู่ +
  *      ติ๊กถูกที่ค่าที่เลือกไว้ปัจจุบัน (กันเลือกผิดเพราะแยกไม่ออกว่าตอนนี้ช่องนี้มีค่าอะไรอยู่)
- *   4. บนมือถือ: แตะครั้งแรก = เห็นรายการอย่างเดียว (คีย์บอร์ดไม่เด้ง) แตะซ้ำอีกทีถึงจะพิมพ์ค้นหาได้
+ *   4. บนมือถือ: แตะครั้งแรก = เห็นรายการอย่างเดียว (คีย์บอร์ดไม่เด้ง) · แตะช่องซ้ำ หรือกดแถบ
+ *      "⌨️ แตะเพื่อพิมพ์ค้นหา" ท้ายกล่อง = พิมพ์ค้นหาได้
  *      ⚠️ อาการเดิม: TomSelect โฟกัสช่องพิมพ์ทันทีที่แตะ คีย์บอร์ดมือถือจึงเด้งขึ้นมากินครึ่งจอล่างทุกครั้ง
  *      แล้วบังรายการตัวเลือกที่เพิ่งเปิดพอดี — คนใช้ต้องกดปิดคีย์บอร์ดก่อนถึงจะเห็นว่ามีอะไรให้เลือก
  *      ทั้งที่ส่วนใหญ่แค่อยากกดเลือกจากรายการเฉยๆ ไม่ได้ตั้งใจจะพิมพ์
  *      ✅ ล็อกช่องพิมพ์เป็น readOnly + inputMode:"none" ตั้งแต่จังหวะ pointerdown (ก่อน TomSelect
- *      โฟกัส) เบราว์เซอร์จึงไม่เรียกคีย์บอร์ดขึ้นมา แต่ dropdown ยังเปิดตามปกติ — แตะซ้ำอีกครั้งขณะ
- *      รายการเปิดอยู่ถึงจะปลดล็อกให้พิมพ์ได้
+ *      โฟกัส) เบราว์เซอร์จึงไม่เรียกคีย์บอร์ดขึ้นมา แต่ dropdown ยังเปิดตามปกติ
+ *      ✅ การ "ปลดล็อกให้พิมพ์" ทำในจังหวะ click แบบ synchronous เท่านั้น (ดู unlockTypingNow /
+ *      onClickCapture) — ของเดิมหน่วงด้วย setTimeout ทำให้ iOS/PWA ไม่ยอมเปิดคีย์บอร์ดให้เลย
+ *      จนพิมพ์ค้นหาไม่ได้สักช่อง ซึ่งเป็นอาการที่ผู้ใช้แจ้งเข้ามา
  *
  * ⚠️ ทำไมต้องเป็น listener กลางตัวเดียวที่ window แทนที่จะไปแก้ทีละจุดที่สร้าง TomSelect:
  * ในแอปนี้สร้าง TomSelect อยู่ 10 จุดกระจาย 4 ไฟล์ (ฟอร์มเพิ่ม/แก้ไข/แผนล่วงหน้า/ลงตาราง) และหลายจุด
@@ -139,14 +142,18 @@ const injectDropdownStyles = () => {
     .ts-dropdown .no-results { padding: 10px 12px; font-size: 12.5px; color: #94a3b8; }
     .ts-dropdown .create { padding: 8px 12px !important; font-size: 12.5px; color: #0f172a; }
     .ts-dropdown .create strong { color: #2563eb; }
-    /* ✅ ป้ายท้ายกล่อง ขึ้นเฉพาะตอนที่ช่องยัง "ล็อกไม่ให้พิมพ์" อยู่ (แตะครั้งแรกบนมือถือ) — บอกทางออก
-       ให้คนที่อยากค้นหาแทนที่จะไล่เลื่อนหาเอง พอปลดล็อกแล้วคลาสถูกถอด ป้ายก็หายไปเอง */
-    .ts-dropdown.ts-tap-to-type::after {
-      content: "⌨️ แตะช่องอีกครั้งเพื่อพิมพ์ค้นหา";
-      display: block; padding: 7px 12px;
-      font-size: 11px; color: #64748b; background: #f8fafc;
-      border-top: 1px solid #e2e8f0;
+    /* ✅ แถบ "แตะเพื่อพิมพ์ค้นหา" ท้ายกล่อง ขึ้นเฉพาะตอนที่ช่องยังล็อกไม่ให้พิมพ์อยู่ (แตะครั้งแรกบนมือถือ)
+       🐛 BUG ที่แก้ (ผู้ใช้แจ้ง: "ในแอพมือถือ...ไม่สามารถกดพิมพ์ได้"): เดิมเป็น ::after ซึ่งเป็น
+       pseudo-element — แตะไม่ได้จริง เป็นได้แค่ข้อความบอกใบ้เฉยๆ คนที่อ่านแล้วพยายามแตะตรงป้ายจะไม่มี
+       อะไรเกิดขึ้นเลย ✅ เปลี่ยนเป็น element จริง (ดู ensureTypeHint) กดได้ตรงๆ เป็นทางที่ 2 ที่ชัดเจน
+       นอกจากการแตะช่องซ้ำ */
+    .ts-type-hint {
+      display: block; padding: 8px 12px; cursor: pointer;
+      font-size: 11.5px; font-weight: 600; color: #1d4ed8; background: #eff6ff;
+      border-top: 1px solid #dbeafe; text-align: center;
+      -webkit-tap-highlight-color: transparent;
     }
+    .ts-type-hint:active { background: #dbeafe; }
   `;
   document.head.appendChild(style);
 };
@@ -160,13 +167,35 @@ const isTouchDevice = () => {
 };
 
 /** หา instance จาก element ที่ถูกแตะ — ไล่จาก .tomselected เพราะ element เดิมเป็น "พี่น้อง" ของ
- *  wrapper ไม่ใช่ลูก (ดูคำเตือนที่ getOpenInstance ด้านบน) */
+ *  wrapper ไม่ใช่ลูก (ดูคำเตือนที่ getOpenInstance ด้านบน)
+ *  ⚠️ ต้องเช็ค dropdown ด้วย ไม่ใช่แค่ wrapper — dropdownParent:"body" ทำให้กล่องรายการ (และแถบ
+ *  "แตะเพื่อพิมพ์" ที่อยู่ข้างใน) ไม่ได้เป็นลูกของ wrapper อีกต่อไป */
 const instanceFromNode = (node) => {
   for (const el of document.querySelectorAll(".tomselected")) {
     const ts = el.tomselect;
-    if (ts?.wrapper?.contains(node)) return ts;
+    if (ts?.wrapper?.contains(node) || ts?.dropdown?.contains(node)) return ts;
   }
   return null;
+};
+
+const HINT_CLASS = "ts-type-hint";
+
+/**
+ * แถบ "แตะเพื่อพิมพ์ค้นหา" ท้ายกล่องรายการ — element จริงที่กดได้ (ไม่ใช่ ::after เหมือนเดิม)
+ * ⚠️ ต้องเป็นลูกของ ts.dropdown ไม่ใช่ ts.dropdown_content — refreshOptions() ของ TomSelect เขียนทับ
+ * innerHTML ของ dropdown_content ทุกครั้งที่กรอง/เปิดใหม่ ถ้าใส่ไว้ข้างในแถบจะหายทันทีที่เริ่มพิมพ์
+ */
+const ensureTypeHint = (ts, show) => {
+  const dd = ts?.dropdown;
+  if (!dd) return;
+  const existing = dd.querySelector(`.${HINT_CLASS}`);
+  if (!show) { existing?.remove(); return; }
+  if (existing) return;
+  const hint = document.createElement("div");
+  hint.className = HINT_CLASS;
+  hint.setAttribute("role", "button");
+  hint.textContent = "⌨️ แตะเพื่อพิมพ์ค้นหา";
+  dd.appendChild(hint);
 };
 
 const setTyping = (ts, allowed) => {
@@ -177,51 +206,90 @@ const setTyping = (ts, allowed) => {
   input.readOnly = !allowed;
   input.inputMode = allowed ? "text" : "none";
   input.dataset.tsTyping = allowed ? "1" : "0";
-  // ป้ายบอกวิธีใช้ท้ายกล่อง — ไม่งั้นคนใช้ไม่มีทางรู้ว่าแตะซ้ำแล้วพิมพ์ค้นหาได้
-  ts.dropdown?.classList?.toggle("ts-tap-to-type", !allowed);
+  // แถบบอกวิธีใช้ท้ายกล่อง — ไม่งั้นคนใช้ไม่มีทางรู้ว่าพิมพ์ค้นหาได้
+  ensureTypeHint(ts, !allowed);
 };
+
+/**
+ * ปลดล็อกให้พิมพ์ + เรียกคีย์บอร์ดขึ้นมาให้ได้จริง
+ *
+ * 🐛 BUG ที่แก้ (ผู้ใช้แจ้ง: "ฟอร์มใน event ที่เป็น select...ในแอพมือถือ หรือที่ลงเป็นแบบแอพ ไม่สามารถ
+ * กดพิมพ์ได้"): เดิมโค้ดตรงนี้เรียก input.focus() ใน setTimeout(...,0) ซึ่งพังบน iOS/PWA 2 ชั้นพร้อมกัน
+ *   1. setTimeout ทำให้หลุดออกจาก "บริบทที่ผู้ใช้แตะ" (user activation) — iOS เรียกคีย์บอร์ดให้เฉพาะตอน
+ *      โฟกัสเกิดขึ้น "แบบ synchronous" ในจังหวะ gesture เท่านั้น หน่วงแม้ 0ms ก็ถูกปฏิเสธ
+ *   2. ต่อให้ไม่หน่วง ช่องนั้นก็ถูกโฟกัสค้างอยู่แล้วตั้งแต่แตะครั้งแรก — focus() ซ้ำบน element ที่โฟกัส
+ *      อยู่แล้วเป็น no-op และการแค่ปลด readOnly ทีหลังไม่ทำให้คีย์บอร์ดเด้งขึ้นมาเอง
+ * ผลรวมคือบน iPhone/PWA พิมพ์ค้นหาไม่ได้เลยสักครั้ง (Android รอดเพราะผ่อนปรนกว่า)
+ *
+ * ✅ ต้อง blur → focus ใหม่ "แบบ synchronous ในจังหวะแตะ" ถึงจะนับเป็นการโฟกัสครั้งใหม่จริง
+ * ⚠️ blur ตรงๆ ไม่ได้ — onBlur ของ TomSelect สั่ง close() ปิดกล่องทิ้ง ✅ ตั้ง isFocused=false ก่อน
+ * เพราะ onBlur มี guard "if (!self.isFocused) return;" อยู่บรรทัดแรกๆ (ดู source ของ tom-select)
+ * จึงคืนออกไปทันทีโดยไม่ปิดกล่อง — จากนั้น focus() จะวิ่งเข้า onFocus ที่เปิดกล่องกลับให้เองตามปกติ
+ */
+const unlockTypingNow = (ts) => {
+  const input = ts?.control_input;
+  if (!input) return;
+  setTyping(ts, true);
+  try {
+    ts.isFocused = false;
+    input.blur();
+    input.focus({ preventScroll: true });
+    ts.isFocused = true;
+    if (!ts.isOpen) ts.open();
+  } catch { /* instance ถูกทำลายไปแล้ว */ }
+};
+
+// instance ที่ "ขอปลดล็อกให้พิมพ์" ไว้ตอน pointerdown แล้วรอไปทำจริงตอน click (ดูเหตุผลที่ onClickCapture)
+let pendingUnlock = null;
 
 const onTapControl = (e) => {
   if (!isTouchDevice()) return; // เดสก์ท็อปไม่มีคีย์บอร์ดมาบัง — พิมพ์ได้ทันทีเหมือนเดิม
   const node = e.target;
-  if (!node?.closest) return;
-  // แตะที่ปุ่มลบชิป (×) ไม่นับเป็นการเปิดช่อง
-  if (node.closest(".ts-dropdown") || node.closest(".remove")) return;
+  if (!node?.closest) { pendingUnlock = null; return; }
+
+  // ── แตะแถบ "แตะเพื่อพิมพ์ค้นหา" ในกล่องรายการ → ทางลัดที่ชัดเจนกว่าการแตะช่องซ้ำ ──
+  if (node.closest(`.${HINT_CLASS}`)) {
+    pendingUnlock = instanceFromNode(node);
+    return;
+  }
+  // แตะตัวเลือกในกล่อง/ปุ่มลบชิป (×) ไม่ใช่การขอพิมพ์
+  if (node.closest(".ts-dropdown") || node.closest(".remove")) { pendingUnlock = null; return; }
+
   const control = node.closest(".ts-control");
-  if (!control) return;
+  if (!control) { pendingUnlock = null; return; }
 
   const ts = instanceFromNode(control);
-  if (!ts?.control_input) return;
+  if (!ts?.control_input) { pendingUnlock = null; return; }
 
   if (ts.isOpen && ts.control_input.dataset.tsTyping !== "1") {
-    // ── แตะครั้งที่ 2 ขณะรายการเปิดอยู่ → ปลดล็อกให้พิมพ์ ──
-    setTyping(ts, true);
-    // 🐛 BUG ที่แก้ (แตะครั้งที่ 2 แล้วรายการหายทั้งกล่อง): เคยเรียก blur() แล้ว focus() ใหม่เพื่อ
-    // กระตุ้นให้คีย์บอร์ดเด้ง — ใช้ไม่ได้เลย เพราะ onBlur ของ TomSelect สั่ง close() แบบตายตัว และ
-    // รีเซ็ต ignoreFocus เป็น false ในตัวมันเองก่อนถึงบรรทัดนั้นด้วย จึงกันด้วย ignoreFocus ไม่ได้
-    // ✅ ไม่ต้อง blur เลย: ช่องถูกโฟกัสค้างอยู่แล้วตั้งแต่แตะครั้งแรก และเราปลดล็อก readOnly ทันใน
-    // จังหวะ pointerdown — เบราว์เซอร์จึงเห็นการแตะที่ "ช่องซึ่งโฟกัสอยู่และแก้ไขได้" ซึ่งเป็นเคส
-    // มาตรฐานที่ Android/iOS เรียกคีย์บอร์ดขึ้นมาให้เองอยู่แล้ว (เคสเดียวกับแตะช่องที่กดซ่อน
-    // คีย์บอร์ดไปแล้วให้มันกลับขึ้นมา)
-    setTimeout(() => {
-      const input = ts.control_input;
-      if (!input) return;
-      try {
-        input.focus();
-        // เผื่อ TomSelect สลับเป็นปิดเองจากการแตะซ้ำ — จุดประสงค์ของการแตะครั้งนี้คือ "ขอพิมพ์"
-        // ไม่ใช่ "ขอปิด" รายการจึงต้องยังอยู่
-        if (!ts.isOpen) ts.open();
-      } catch { /* instance ถูกทำลายไปแล้ว */ }
-    }, 0);
+    // ── แตะครั้งที่ 2 ขณะรายการเปิดอยู่ = ขอพิมพ์ ──
+    // ⚠️ ยังปลดล็อกที่นี่ไม่ได้ ต้องรอ click — เพราะ TomSelect ผูก handler ไว้ที่ 'click' ของ control
+    // ซึ่งสั่ง blur() ปิดกล่องทิ้งเมื่อแตะซ้ำขณะเปิดอยู่ (onClick: if (isFocused && isOpen) self.blur())
+    // ถ้าปลดล็อก+โฟกัสตอน pointerdown มันจะโดนปิดตามหลังทุกครั้ง
+    pendingUnlock = ts;
     return;
   }
 
+  pendingUnlock = null;
   if (!ts.isOpen) {
     // ── แตะครั้งแรก (หรือเปิดใหม่หลังปิดไป) → ล็อกไว้ก่อน ให้เห็นรายการเต็มๆ โดยคีย์บอร์ดไม่เด้ง ──
     // ต้องทำใน pointerdown/touchstart ซึ่งวิ่ง "ก่อน" TomSelect สั่งโฟกัสช่องพิมพ์ ถ้าไปตั้งใน focusin
     // เบราว์เซอร์ตัดสินใจเรียกคีย์บอร์ดไปแล้ว สายเกินแก้
     setTyping(ts, false);
   }
+};
+
+/**
+ * ปลดล็อกจริงในจังหวะ click — ต้องเป็น capture ที่ window เพื่อให้วิ่ง "ก่อน" handler ของ TomSelect
+ * ที่ผูกไว้ที่ตัว control แล้ว stopPropagation ทิ้ง ไม่ให้ onClick() ของมันได้ทำงาน (ไม่งั้นมันจะ
+ * blur() ปิดกล่องทันที) — click เป็นบริบท user gesture ที่ iOS ยอมเปิดคีย์บอร์ดให้เช่นกัน
+ */
+const onClickCapture = (e) => {
+  const ts = pendingUnlock;
+  pendingUnlock = null;
+  if (!ts || !isTouchDevice()) return;
+  e.stopPropagation();
+  unlockTypingNow(ts);
 };
 
 export function installTomSelectFixes() {
@@ -258,6 +326,8 @@ export function installTomSelectFixes() {
   ["pointerdown", "touchstart"].forEach((evt) => {
     window.addEventListener(evt, onTapControl, { capture: true, passive: true });
   });
+  // ⚠️ passive:false — ตัวนี้ต้องเรียก stopPropagation ได้จริง (ดูเหตุผลที่ onClickCapture)
+  window.addEventListener("click", onClickCapture, { capture: true });
 
   // capture:true — ต้องดักตอน scroll ของ "element ข้างใน" (เช่นเนื้อหาในกล่อง modal ที่ overflow-y:auto)
   // ด้วย ไม่ใช่แค่ scroll ของทั้งหน้า เพราะ scroll event ของ element ไม่ bubble ขึ้นมาถึง window
