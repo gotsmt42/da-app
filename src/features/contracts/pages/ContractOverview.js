@@ -41,7 +41,7 @@ import {
   AddLink, LinkOff, Build, Engineering, ExpandMore, ExpandLess,
   CalendarMonth, PersonOutline, Category, Assignment, Description, HourglassEmpty, Apps, DeviceHub,
   SwapHoriz, TableChart, FilterList, ViewAgenda, TableRows, SwipeLeft, ChevronLeft, ChevronRight,
-  AddCircleOutline, Check, Autorenew, EventBusy, History,
+  AddCircleOutline, Check, Autorenew, EventBusy, History, Apartment,
 } from "@mui/icons-material";
 import { useAuth } from "@/features/auth/AuthContext";
 import EventService from "@/shared/services/EventService";
@@ -54,7 +54,7 @@ import SystemTypeService from "@/shared/services/SystemTypeService";
 import { formatEventDateRange } from "@/shared/utils/formatDateRange";
 import { resolveOperationGroup } from "@/shared/utils/overdueJobs";
 import { countUsedRounds, visitsPerYear, INTERVAL_MONTHS_PRESETS } from "@/shared/utils/contractRounds";
-import { groupEventsByContract, nextVisitOverdueInfo, contractStatusInfo, isExpiredContract } from "@/shared/utils/contractOverdue";
+import { groupEventsByContract, nextVisitOverdueInfo, contractStatusInfo, isExpiredContract, contractCompleteness } from "@/shared/utils/contractOverdue";
 // ✅ สถานะการวางบิล/รับเงิน — ของกลางชุดเดียวกับหน้า "วางบิล / รับเงิน" (/billing) ห้ามคำนวณซ้ำที่นี่
 import { contractBillingSummary, baht as bahtFmt } from "@/shared/utils/billing";
 import BillingDialog from "@/features/finance/components/BillingDialog";
@@ -65,7 +65,7 @@ import { escapeHtml } from "@/shared/utils/escapeHtml";
 import DeliveryNoteDialog from "@/features/documents/components/DeliveryNoteDialog";
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import { thaiDateNumeric, formatThai } from "@/shared/utils/thaiDate";
-import { can } from "@/shared/utils/roles";
+import { can, DEPARTMENT, DEPARTMENT_LABEL } from "@/shared/utils/roles";
 
 const ACCENT = "#dc2626";
 // ✅ สีแบรนด์ของ Excel — ใช้กับปุ่มส่งออกโดยเฉพาะ ให้เห็นปุ๊บรู้ทันทีว่าคือไฟล์ Excel ไม่ต้องอ่าน tooltip
@@ -124,6 +124,110 @@ const STATUS_COLOR = {
   "ยืนยันแล้ว": "#3b82f6",
   "กำลังดำเนินการ": "#8b5cf6",
   "ดำเนินการเสร็จสิ้น": "#10b981",
+};
+
+/**
+ * 🏢 ป้ายกำกับแผนกเจ้าของสัญญา — สีประจำสายงานชุดเดียวกับที่ใช้ทั้งแอป (แดง = สายบริการ/ช่าง · ม่วง = สายขาย)
+ * ดูหัวปฏิทิน/แถบแท็บ/แดชบอร์ด ที่ใช้คู่สีเดียวกันนี้อยู่แล้ว — คนใช้จำสีได้ทันทีโดยไม่ต้องอ่านตัวหนังสือ
+ * ⚠️ เป็น "ข้อมูลประกอบ" ล้วนๆ ไว้ดู/กรอง/ออกรายงานในหน้านี้เท่านั้น ไม่มีผลกับหน้าอื่นเลยแม้แต่หน้าเดียว
+ * — เก็บแยกเป็นฟิลด์ departmentTag คนละตัวกับฟิลด์ department ที่คุมว่างานไปโผล่ในปฏิทิน/หน้าการ
+ * ดำเนินงานของใคร (departmentScope ฝั่ง server) ติดป้ายว่าเป็นของฝ่ายขายแล้วช่างยังเห็นงานครบเหมือนเดิม
+ */
+const DEPARTMENT_META = {
+  [DEPARTMENT.SERVICE]: { label: DEPARTMENT_LABEL[DEPARTMENT.SERVICE], short: "บริการ", color: "#dc2626", bg: "rgba(220,38,38,0.10)" },
+  [DEPARTMENT.SALES]: { label: DEPARTMENT_LABEL[DEPARTMENT.SALES], short: "ขาย", color: "#8b5cf6", bg: "rgba(139,92,246,0.12)" },
+};
+// ⚠️ งานเก่าที่ยังไม่เคยติดป้ายไม่มีค่าเก็บไว้ — ถือเป็น "ฝ่ายบริการ" ตามที่ผู้ใช้สั่งให้ตั้งต้นเป็น Services
+// ทั้งหมดก่อน จึงไม่ต้อง migrate ข้อมูลเดิมสักใบ และตัวกรอง "ฝ่ายบริการ" ก็ยังเจองานเก่าครบ
+const departmentMeta = (v) => DEPARTMENT_META[v || DEPARTMENT.SERVICE] || DEPARTMENT_META[DEPARTMENT.SERVICE];
+const DEPARTMENT_OPTIONS = Object.entries(DEPARTMENT_META).map(([value, m]) => ({ value, label: m.label }));
+
+/**
+ * ✅ "ช่องสถานะสัญญาแถวนี้ควรขึ้นว่าอะไร" — ของกลางที่ทั้งตาราง การ์ดมือถือ ตัวกรอง ช่องค้นหา และไฟล์
+ * Excel ใช้ร่วมกัน ทั้ง 5 จุดจึงพูดตรงกันเสมอโดยอัตโนมัติ
+ *
+ * ลำดับความสำคัญ (บนลงล่าง):
+ *   1. หมายเหตุที่คนกรอกพิมพ์เอง — คนย่อมรู้สถานะจริงดีกว่าสูตรที่ดูแค่วันที่ในสัญญา
+ *   2. สถานะอัตโนมัติจากวันสิ้นสุดสัญญา (หมดอายุ / ใกล้หมดอายุ / มีผลบังคับใช้)
+ *   3. "ข้อมูลไม่ครบ" — คำนวณสถานะไม่ได้เพราะยังไม่ได้กรอกวันสิ้นสุด (หรือช่องจำเป็นอื่นๆ)
+ *   4. ไม่มีสถานะจริงๆ (แถวที่ไม่ใช่สัญญาและข้อมูลครบแล้ว)
+ * ⚠️ ข้อ 3 สำคัญ: เดิมกรณีนี้ขึ้นเป็นขีดว่างเฉยๆ ซึ่งแยกไม่ออกจากข้อ 4 เลย คนกรอกจึงไม่มีทางรู้ว่า
+ * ต้องไปเติมอะไรตรงไหน (ดู contractCompleteness ใน shared/utils/contractOverdue.js)
+ */
+const CONTRACT_STATUS_KIND = {
+  note: { color: "#0f172a", bg: "rgba(15,23,42,0.08)" },
+  incomplete: { color: "#b45309", bg: "rgba(245,158,11,0.14)" },
+};
+/**
+ * ✅ "สถานะจริง" ของแถวนี้มีอะไรบ้าง — คืนเป็น "หลายค่า" ได้โดยตั้งใจ ใช้กับตัวกรอง/การนับเท่านั้น
+ *
+ * ⚠️ ต่างจาก statusDisplay ด้านล่างซึ่งเลือกมาแสดงได้ค่าเดียว (หมายเหตุที่พิมพ์เองทับสถานะอัตโนมัติ) —
+ * ถ้าเอาตรรกะ "ทับ" อันนั้นมาใช้กับตัวกรองด้วย สัญญาที่หมดอายุแล้วแต่บังเอิญมีคนพิมพ์หมายเหตุไว้จะ
+ * หลุดออกจากตัวกรอง "หมดอายุแล้ว" ทั้งที่มันหมดอายุจริง — ซึ่งเป็นการซ่อนของที่ต้องรีบต่อสัญญา
+ * ✅ "มีหมายเหตุที่พิมพ์เอง" จึงเป็นแท็กเสริมที่ติดเพิ่มได้ ไม่ใช่กลุ่มที่ดึงแถวออกจากกลุ่มอื่น
+ */
+const statusKinds = (c) => {
+  const st = contractStatusInfo(c);
+  const kinds = [];
+  if (st) kinds.push(st.state);
+  else if (contractCompleteness(c).missing.length > 0) kinds.push("incomplete");
+  if ((c.statusNote || "").trim()) kinds.push("note");
+  return kinds;
+};
+
+const statusDisplay = (c) => {
+  const note = (c.statusNote || "").trim();
+  if (note) {
+    // ⚠️ หมายเหตุทับ "ข้อความ" ที่แสดง แต่ห้ามทับ "ความจริง" — ถ้าสัญญาหมดอายุ/ใกล้หมดอายุอยู่จริง
+    // ต้องยังมีร่องรอยให้เห็น ไม่งั้นการพิมพ์หมายเหตุกลายเป็นการซ่อนวันหมดอายุไปจากสายตาทั้งตาราง
+    const auto = contractStatusInfo(c);
+    const warn = auto && (auto.state === "expired" || auto.state === "expiring") ? auto : null;
+    return {
+      kind: "note", label: note,
+      color: CONTRACT_STATUS_KIND.note.color, bg: CONTRACT_STATUS_KIND.note.bg,
+      missing: contractCompleteness(c).missing, auto: warn,
+    };
+  }
+  const st = contractStatusInfo(c);
+  const { missing } = contractCompleteness(c);
+  if (st) return { kind: st.state, label: st.label, color: st.color, bg: alpha(st.color, 0.12), missing };
+  if (missing.length > 0) {
+    return {
+      kind: "incomplete", label: "ข้อมูลไม่ครบ",
+      color: CONTRACT_STATUS_KIND.incomplete.color, bg: CONTRACT_STATUS_KIND.incomplete.bg, missing,
+    };
+  }
+  return { kind: "none", label: "", color: TEXT_SUB, bg: "transparent", missing: [] };
+};
+// ตัวเลือกของตัวกรอง "สถานะสัญญา" — เทียบด้วย kind ซึ่งเป็นคีย์คงที่ ไม่ใช่ข้อความที่แก้ถ้อยคำเมื่อไหร่
+// ตัวกรองก็พังเงียบๆ (label ของ "ใกล้หมดอายุ" มีจำนวนวันต่อท้ายด้วย เทียบข้อความไม่ได้ตั้งแต่ต้น)
+const STATUS_FILTER_OPTIONS = [
+  { value: "active", label: "มีผลบังคับใช้" },
+  { value: "expiring", label: "ใกล้หมดอายุ" },
+  { value: "expired", label: "หมดอายุแล้ว" },
+  { value: "incomplete", label: "ข้อมูลไม่ครบ" },
+  { value: "note", label: "มีหมายเหตุที่พิมพ์เอง" },
+];
+
+// ✅ ป้ายแผนก 1 ชิ้น — ใช้ตัวเดียวกันทั้งตารางเดสก์ท็อปและการ์ดมือถือ ไม่ก๊อป JSX ไปวางสองที่
+// (ก๊อปแล้วมีวันหนึ่งที่แก้สีที่เดียวลืมอีกที่ แล้วสองหน้าจอแสดงคนละแบบโดยไม่มีใครรู้)
+const DepartmentPill = ({ value }) => {
+  const meta = departmentMeta(value);
+  return (
+    <Box
+      component="span"
+      sx={{
+        display: "inline-flex", alignItems: "center", gap: 0.4,
+        px: 0.9, py: 0.25, borderRadius: 999,
+        bgcolor: meta.bg, color: meta.color,
+        fontSize: "0.7rem", fontWeight: 800, whiteSpace: "nowrap",
+        border: `1px solid ${alpha(meta.color, 0.28)}`,
+      }}
+    >
+      <Apartment sx={{ fontSize: 12 }} />
+      {meta.label}
+    </Box>
+  );
 };
 
 // ✅ ช่องว่างเดิมใช้ "-" สีเทาเฉยๆ แต่ปนกับ "-" ที่เป็นลิงก์ (สีแดง) ในคอลัมน์ครั้งที่ N ดูแยกยาก
@@ -246,7 +350,8 @@ const DEFAULT_COL_WIDTHS = {
   docRef: 150, docNo: 150,
   customer: 230, work: 165,
   period: 190,
-  jobValue: 110, commission: 110, status: 130, progress: 110, responsiblePerson: 130,
+  jobValue: 110, commission: 110, status: 168, progress: 110, responsiblePerson: 130,
+  departmentTag: 112,
 };
 // ✅ ความกว้างคอลัมน์ "แยกกันทุกแท็บ" — เก็บซ้อนอีกชั้นเป็น { [แท็บ]: { [คอลัมน์]: ความกว้าง } }
 // ⚠️ เดิมเก็บเป็นชุดเดียวใช้ร่วมกันทุกแท็บ ซึ่งใช้งานจริงไม่ได้เลย เพราะแต่ละแท็บมีคอลัมน์ไม่เหมือนกัน
@@ -288,6 +393,7 @@ const MOBILE_COL_WIDTHS = {
   customer: 168, work: 128,
   period: 148,
   jobValue: 88, commission: 88, status: 100, progress: 84, responsiblePerson: 104,
+  departmentTag: 92,
 };
 // ✅ จัดกลุ่ม "งานรายครั้ง" ของแถวหนึ่งไว้ล่วงหน้าครั้งเดียว แล้วแคชไว้ตาม reference ของ c.visits
 //
@@ -631,7 +737,14 @@ const IntervalMonthsQuickPicks = ({ value, onPick, disabled, size = "small" }) =
  */
 const EditableCell = ({
   value, editing, editValue, editType = "text", editOptions, width, align, editable, saving,
-  formatDisplay, title, onStartEdit, onChangeValue, onCommit, onCancel, columnKey, Wrapper = TableCell,
+  formatDisplay, title, onStartEdit, onChangeValue, onCommit, onCancel, columnKey, Wrapper = TableCell, placeholder,
+  // ✅ allowEmpty=false — ช่องที่ "ต้องมีค่าเสมอ" (เช่น แผนก ซึ่ง server ปฏิเสธค่าว่างอยู่แล้ว) ไม่ต้องมี
+  // ตัวเลือก "— ไม่ระบุ —" ให้เลือกไปแล้วเจอ error กลับมา
+  allowEmpty = true,
+  // ✅ noClip — ปิดการตัดข้อความบรรทัดเดียว (nowrap + ellipsis) สำหรับช่องที่ "ข้อความคือเนื้อหา" จริงๆ
+  // เช่นรายชื่อช่องที่ยังไม่ได้กรอกในการ์ดมือถือ ซึ่งถ้าโดนตัดเหลือ "..." ก็เท่ากับไม่ได้บอกอะไรเลย
+  // ⚠️ ไม่เปิดเป็นค่าเริ่มต้น — ตารางเดสก์ท็อปต้องคุมความสูงแถวให้เท่ากันทุกแถว ไม่งั้นกวาดสายตาไม่ได้
+  noClip = false,
 }) => {
   const [draft, setDraft] = useState(editValue ?? "");
   // 🐛 BUG ที่แก้ (กดแล้วปฏิทินเด้งแล้วหายทันที): popup ของ DatePicker ทำให้ช่องกรอกเสียโฟกัส
@@ -650,7 +763,11 @@ const EditableCell = ({
   const change = (v) => { setDraft(v); onChangeValue?.(v); };
   const commit = () => onCommit?.(draft);
 
-  const baseSx = { width, maxWidth: width, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", ...(align ? { textAlign: align } : {}) };
+  const baseSx = {
+    width, maxWidth: width,
+    ...(noClip ? {} : { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }),
+    ...(align ? { textAlign: align } : {}),
+  };
 
   if (!editable) {
     return <Wrapper align={align} title={title} data-col-key={columnKey} sx={baseSx}>{formatDisplay ? formatDisplay(value) : (value || <Dash />)}</Wrapper>;
@@ -683,8 +800,15 @@ const EditableCell = ({
           SelectProps={{ native: true }}
           sx={{ "& .MuiOutlinedInput-input": { py: 0.5, fontSize: "0.8rem" } }}
         >
-          <option value="">— ไม่ระบุ —</option>
-          {(editOptions || []).map((o) => <option key={o} value={o}>{o}</option>)}
+          {allowEmpty && <option value="">— ไม่ระบุ —</option>}
+          {/* ✅ รองรับทั้งรายการสตริงเปล่าๆ (ค่าที่แสดง = ค่าที่บันทึก เช่น ชื่อทีม) และแบบ
+              { value, label } (ค่าที่บันทึกกับป้ายที่คนอ่านคนละอัน เช่น แผนก: "sales" → "ฝ่ายขาย")
+              — ห้ามบันทึกป้ายภาษาไทยลงฐานข้อมูลเด็ดขาด server รับเฉพาะค่าใน enum เท่านั้น */}
+          {(editOptions || []).map((o) => {
+            const val = typeof o === "object" ? o.value : o;
+            const label = typeof o === "object" ? o.label : o;
+            return <option key={val} value={val}>{label}</option>;
+          })}
         </TextField>
       ) : editType === "autocomplete" ? (
         // ✅ เลือกจากรายชื่อที่มีอยู่แล้วในระบบได้ (กันพิมพ์ผิด/สะกดต่างกันจนกลายเป็นคนละชื่อ) หรือจะ
@@ -757,6 +881,7 @@ const EditableCell = ({
         <TextField
           autoFocus size="small" fullWidth type={editType} disabled={saving}
           value={draft}
+          placeholder={placeholder}
           onChange={(e) => change(e.target.value)}
           onBlur={commit}
           onKeyDown={(e) => {
@@ -882,6 +1007,10 @@ const InlineAddRow = ({
         }}
       >
         {showCheckboxes && <TableCell padding="checkbox" />}
+        {/* ✅ แผนกของแถวที่กำลังสร้าง — ตั้งต้นเป็นฝ่ายบริการเสมอตามค่าเริ่มต้นของทั้งระบบ เปลี่ยนทีหลัง
+            ได้ด้วยการคลิกที่ป้ายในแถวปกติ (ไม่ทำเป็นช่องกรอกตรงนี้ เพราะแถวสร้างใหม่ควรถามเฉพาะข้อมูล
+            ที่ "ต้องรู้ตั้งแต่แรก" เท่านั้น) ⚠️ ต้องมีช่องนี้ไว้ ไม่งั้นคอลัมน์ทั้งแถวเลื่อนไป 1 ช่อง */}
+        <TableCell align="center"><DepartmentPill value={DEPARTMENT.SERVICE} /></TableCell>
         {!hideContractOnlyColumns && (
           <TableCell>
             <TextField
@@ -1315,6 +1444,23 @@ export default function ContractOverview() {
     () => contracts.filter((c) => !c.responsiblePerson).length,
     [contracts]
   );
+  // ✅ จำนวนสัญญาต่อแผนก — โชว์ในตัวเลือกของตัวกรองแผนกเลย ให้รู้ตั้งแต่ยังไม่กดว่าแต่ละแผนกมีกี่รายการ
+  // ⚠️ นับจาก contracts ทั้งชุด (ก่อนตัวกรองอื่น) โดยตั้งใจ — ตัวเลขนี้ตอบว่า "ทั้งระบบมีของแผนกนี้กี่อัน"
+  // ไม่ใช่ "เหลือกี่อันหลังกรองอย่างอื่นแล้ว" ซึ่งจะกลายเป็น 0 สลับไปมาจนอ่านไม่รู้เรื่อง
+  // ✅ จำนวนสัญญาต่อสถานะ — เทียบ pattern เดียวกับ departmentCounts (นับจากชุดเต็มก่อนตัวกรองอื่น)
+  const statusCounts = useMemo(() => {
+    const counts = {};
+    contracts.forEach((c) => { statusKinds(c).forEach((k) => { counts[k] = (counts[k] || 0) + 1; }); });
+    return counts;
+  }, [contracts]);
+  const departmentCounts = useMemo(() => {
+    const counts = {};
+    contracts.forEach((c) => {
+      const key = c.departmentTag || DEPARTMENT.SERVICE;
+      counts[key] = (counts[key] || 0) + 1;
+    });
+    return counts;
+  }, [contracts]);
   // ✅ กรองตามผู้รับผิดชอบ — แยกจากช่องค้นหาข้อความอิสระ ให้เลือกจากรายชื่อจริงได้เลย ไม่ต้องพิมพ์เอง
   const [responsibleFilter, setResponsibleFilter] = useState("all");
   // ✅ กรองตามประเภทงาน (เช่น PM/Service/ติดตั้ง ฯลฯ) — เพิ่มตามที่ผู้ใช้ขอ เทียบ pattern เดียวกับ
@@ -1324,6 +1470,13 @@ export default function ContractOverview() {
   // ด้านบนเป๊ะๆ (เลือกจากรายชื่อระบบจริงที่ตั้งค่าไว้ในระบบ ไม่ต้องพิมพ์เอง) เดิมค้นหาระบบได้แค่ผ่านช่อง
   // ค้นหาข้อความอิสระ ซึ่งพิมพ์ผิด/สะกดไม่ตรงก็หาไม่เจอ และปนกับผลลัพธ์จากฟิลด์อื่นที่บังเอิญมีคำเดียวกัน
   const [systemFilter, setSystemFilter] = useState("all");
+  // ✅ กรองตามป้ายกำกับแผนกเจ้าของสัญญา (ฝ่ายบริการ/ฝ่ายขาย) — ตามที่ผู้ใช้ขอให้ "ค้นหาแยกได้ชัดเจน"
+  // ⚠️ กรองจากป้ายที่ติดไว้ในหน้านี้ล้วนๆ ไม่เกี่ยวกับขอบเขตการมองเห็นของ role ใดๆ ทั้งสิ้น
+  const [departmentFilter, setDepartmentFilter] = useState("all");
+  // ✅ กรองตามสถานะสัญญา — ตามที่ผู้ใช้ขอให้ "ค้นหาสถานะสัญญาได้ด้วย" เดิมสถานะเป็นค่าคำนวณที่เห็นได้
+  // อย่างเดียว ไล่หาสัญญาที่ใกล้หมดอายุต้องกวาดตาดูทีละแถวเอง (แท็บ "สัญญาหมดอายุ" ครอบเฉพาะที่หมด
+  // ไปแล้ว ไม่ครอบที่กำลังจะหมด ซึ่งเป็นกลุ่มที่ต้องรีบต่อสัญญาจริงๆ)
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const [selectedIds, setSelectedIds] = useState(new Set());
   const selectedContracts = useMemo(() => contracts.filter((c) => selectedIds.has(c.key)), [contracts, selectedIds]);
@@ -1436,16 +1589,34 @@ export default function ContractOverview() {
     if (systemFilter !== "all") {
       base = base.filter((c) => (c.system || "") === systemFilter);
     }
+    // ✅ กรองตามแผนก — เทียบผ่านค่าที่ fallback แล้วเสมอ ไม่เทียบ c.departmentTag ดิบ เพราะงานเก่าที่ยังไม่มี
+    // ฟิลด์นี้ต้องนับเป็น "ฝ่ายบริการ" (ตรงกับ default ของ schema และตัวกรองฝั่ง server) ไม่งั้นเลือก
+    // "ฝ่ายบริการ" แล้วงานเก่าทั้งระบบจะหายหมดทั้งที่หน้าจอแสดงว่าเป็นฝ่ายบริการอยู่
+    if (departmentFilter !== "all") {
+      base = base.filter((c) => (c.departmentTag || DEPARTMENT.SERVICE) === departmentFilter);
+    }
+    // ✅ กรองตามสถานะสัญญา — เทียบด้วย kind ซึ่งเป็นคีย์คงที่ (ดู statusDisplay) ไม่ใช่ข้อความบนจอ
+    if (statusFilter !== "all") {
+      base = base.filter((c) => statusKinds(c).includes(statusFilter));
+    }
     const kw = search.trim().toLowerCase();
     if (!kw) return base;
     // ✅ ค้นหา "ผู้รับผิดชอบ" ด้วย ไม่ใช่แค่ team — คนละฟิลด์กันแล้วตั้งแต่แยกเป็นอิสระ (ดู
     // groupEventsByContract ใน shared/utils/contractOverdue.js) — allRoundTeamNames ครอบคลุมทุกครั้ง ไม่ใช่
     // แค่ทีมของครั้งที่ 1 เหมือน c.team เดิม
-    return base.filter((c) =>
-      [c.company, c.site, c.system, c.title, c.contractNo, c.quotationNo, c.responsiblePerson]
+    // ✅ ค้นด้วยชื่อแผนกได้ด้วย (พิมพ์ "ขาย" แล้วเจอสัญญาของฝ่ายขายทั้งหมด) — ค้นจาก "ป้ายภาษาไทย"
+    // ที่เห็นบนจอ ไม่ใช่ค่าดิบ "sales" ที่ผู้ใช้ไม่มีทางรู้ว่าต้องพิมพ์อะไร
+    // ✅ ค้นสถานะสัญญาได้ด้วย — พิมพ์ "หมดอายุ"/"ใกล้หมด"/"ข้อมูลไม่ครบ" หรือข้อความในหมายเหตุที่
+    // พิมพ์เองไว้ ก็เจอทั้งชุด ค้นจาก "ข้อความที่เห็นบนจอ" ตัวเดียวกับที่ตารางแสดง (statusDisplay)
+    // ไม่ใช่ค่าดิบภายใน ผู้ใช้จึงพิมพ์ตามที่ตาเห็นได้เลยโดยไม่ต้องรู้ว่าเบื้องหลังเก็บเป็นอะไร
+    // ✅ รวมรายชื่อช่องที่ยังไม่ได้กรอกเข้าไปด้วย (เช่นพิมพ์ "มูลค่างาน" เจอทุกแถวที่ยังไม่ใส่มูลค่า)
+    return base.filter((c) => {
+      const sd = statusDisplay(c);
+      return [c.company, c.site, c.system, c.title, c.contractNo, c.quotationNo, c.responsiblePerson,
+        departmentMeta(c.departmentTag).label, sd.label, contractStatusInfo(c)?.label, ...(sd.missing || [])]
         .some((v) => (v || "").toLowerCase().includes(kw)) ||
-      (c.allRoundTeamNames || []).some((name) => name.toLowerCase().includes(kw))
-    );
+        (c.allRoundTeamNames || []).some((name) => name.toLowerCase().includes(kw));
+    });
   };
 
   // ✅ งานที่ไม่มี contractGroupId แบ่งเป็น 2 กลุ่มจริงๆ ไม่ใช่กองเดียวกันอีกต่อไป — ค่าเริ่มต้นคือ
@@ -1455,27 +1626,27 @@ export default function ContractOverview() {
   const realContractCount = useMemo(
     () => applyCommonFilters(contracts.filter((c) => c.isRealContract)).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, search]
+    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, search]
   );
   const hiddenJobCount = useMemo(
     () => applyCommonFilters(contracts.filter((c) => !c.isRealContract && !c.isConfirmedGeneral && !c.isConfirmedProject)).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, search]
+    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, search]
   );
   const confirmedGeneralCount = useMemo(
     () => applyCommonFilters(contracts.filter((c) => !c.isRealContract && c.isConfirmedGeneral)).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, search]
+    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, search]
   );
   const confirmedProjectCount = useMemo(
     () => applyCommonFilters(contracts.filter((c) => !c.isRealContract && c.isConfirmedProject)).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, search]
+    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, search]
   );
   const allFilteredCount = useMemo(
     () => applyCommonFilters(contracts).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, search]
+    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, search]
   );
   // ✅ สัญญาที่ "เลยกำหนดเข้ารอบถัดไป/คงค้าง" — รอบล่าสุดผ่านมาเกินระยะห่างที่กำหนด (intervalMonths)
   // แล้วแต่ยังไม่มีวันที่/แผนงานล่วงหน้าของรอบถัดไปเลย (ดู nextVisitOverdueInfo) เดิมมีแค่ badge เตือน
@@ -1483,7 +1654,7 @@ export default function ContractOverview() {
   const overdueCount = useMemo(
     () => applyCommonFilters(contracts.filter((c) => c.isRealContract && nextVisitOverdueInfo(c))).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, search]
+    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, search]
   );
 
   // ✅ สัญญาที่เลยวันสิ้นสุดมาแล้ว — กลุ่มที่ต้องไล่ต่ออายุ/ปิดงาน เดิมมีแต่ชิปสีแดงเตือนทีละแถว ต้อง
@@ -1493,7 +1664,7 @@ export default function ContractOverview() {
   const expiredCount = useMemo(
     () => applyCommonFilters(contracts.filter(isExpiredContract), { ignoreYear: true }).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, responsibleFilter, titleFilter, systemFilter, search]
+    [contracts, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, search]
   );
 
   // ✅ สลับแท็บผ่านฟังก์ชันเดียว (ทั้งปุ่มบนจอคอมและเมนูบนมือถือ) เพราะการเข้าแท็บ "สัญญาหมดอายุ" ต้อง
@@ -1523,7 +1694,7 @@ export default function ContractOverview() {
       : contracts.filter((c) => c.isRealContract);
     return applyCommonFilters(base);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contracts, search, viewFilter, yearFilter, responsibleFilter, titleFilter, systemFilter]);
+  }, [contracts, search, viewFilter, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter]);
 
   // ✅ เรียงลำดับตารางได้ด้วยการคลิกหัวตารางแต่ละช่อง (เฉพาะคอลัมน์ข้อมูลตรงๆ ที่เทียบค่าเดียวได้ —
   // ไม่รวม "สถานะสัญญา"/"คืบหน้า"/"ครั้งที่ N" ซึ่งเป็นค่าที่คำนวณจากหลายฟิลด์ ไม่มีค่าเดี่ยวให้เรียง)
@@ -1555,6 +1726,16 @@ export default function ContractOverview() {
     jobValue: (c) => (c.jobValue != null && c.jobValue !== "" ? Number(c.jobValue) : null),
     commission: (c) => (c.commission != null && c.commission !== "" ? Number(c.commission) : null),
     responsiblePerson: (c) => c.responsiblePerson || "",
+    // เรียงด้วย "ป้ายภาษาไทย" ไม่ใช่ค่าดิบ — ผู้ใช้คาดหวังลำดับตามที่ตาเห็น (ขาย ก่อน บริการ) ไม่ใช่
+    // ตามค่าที่เก็บในฐานข้อมูล (sales ก่อน service ซึ่งบังเอิญตรงกันในกรณีนี้ แต่จะเพี้ยนทันทีถ้าเพิ่มแผนกใหม่)
+    departmentTag: (c) => departmentMeta(c.departmentTag).label,
+    // ⚠️ เรียงตาม "ความเร่งด่วน" ไม่ใช่ตามตัวอักษรของข้อความ — หมดอายุแล้วต้องมาก่อนใกล้หมดอายุเสมอ
+    // ถ้าเรียงตามข้อความ "ข้อมูลไม่ครบ" จะมาก่อน "หมดอายุแล้ว" ซึ่งกลับหัวกลับหางกับสิ่งที่คนอยากเห็น
+    status: (c) => {
+      const order = { expired: 0, incomplete: 1, expiring: 2, note: 3, active: 4, none: 5 };
+      const sd = statusDisplay(c);
+      return `${order[sd.kind] ?? 9}${sd.label}`;
+    },
   };
   const sortedFiltered = useMemo(() => {
     const getValue = sortConfig.key && SORT_VALUE_GETTERS[sortConfig.key];
@@ -1812,6 +1993,7 @@ export default function ContractOverview() {
   const footerColSpan = useMemo(() => {
     const before =
       (showCheckboxes ? 1 : 0) +
+      1 +                                    // departmentTag (ป้ายกำกับแผนก — คอลัมน์แรกสุด)
       1 +                                    // docNo | docRef (เลขที่สัญญา+ใบเสนอราคายุบเป็นช่องเดียว)
       2 +                                    // customer (บริษัท+โครงการ) / work (ประเภทงาน+ระบบ)
       (hideContractOnlyColumns ? 0 : 1);    // period (เริ่ม+สิ้นสุด+รอบเข้า)
@@ -1837,16 +2019,20 @@ export default function ContractOverview() {
     else if (responsibleFilter !== "all") labels.push(`ผู้รับผิดชอบ ${responsibleFilter}`);
     if (yearFilter === "none") labels.push("ยังไม่ระบุปี");
     else if (yearFilter !== "all") labels.push(`ปี ${yearFilter}`);
+    if (departmentFilter !== "all") labels.push(`แผนก ${departmentMeta(departmentFilter).label}`);
+    if (statusFilter !== "all") {
+      labels.push(`สถานะ ${STATUS_FILTER_OPTIONS.find((o) => o.value === statusFilter)?.label || statusFilter}`);
+    }
     return labels;
-  }, [search, titleFilter, systemFilter, responsibleFilter, yearFilter]);
+  }, [search, titleFilter, systemFilter, responsibleFilter, yearFilter, departmentFilter, statusFilter]);
   const hasActiveFilters = activeFilterLabels.length > 0;
   // ✅ จำนวนตัวกรองแบบ dropdown ที่ทำงานอยู่ (ไม่นับช่องค้นหา ซึ่งบนมือถือโชว์อยู่ตลอดอยู่แล้ว) — ใช้เป็น
   // ตัวเลขบนปุ่ม "ตัวกรอง" ให้รู้ว่ามีตัวกรองซ่อนอยู่กี่ตัวโดยไม่ต้องกางออกมาดู ⚠️ ตัวกรองปีตั้งค่าเริ่มต้น
   // เป็นปีปัจจุบันไว้เองตั้งแต่แรก (ผู้ใช้ไม่ได้ตั้ง) ตัวเลขนี้จึงขึ้นอย่างน้อย 1 ตั้งแต่เปิดหน้ามา — ตั้งใจ
   // ให้เป็นแบบนั้น เพราะเป็นจุดที่ผู้ใช้เข้าใจผิดบ่อยที่สุดว่าเห็นข้อมูลครบทุกปีแล้ว
   const activeDropdownFilterCount = useMemo(
-    () => [titleFilter, systemFilter, responsibleFilter, yearFilter].filter((v) => v !== "all").length,
-    [titleFilter, systemFilter, responsibleFilter, yearFilter]
+    () => [titleFilter, systemFilter, responsibleFilter, yearFilter, departmentFilter, statusFilter].filter((v) => v !== "all").length,
+    [titleFilter, systemFilter, responsibleFilter, yearFilter, departmentFilter, statusFilter]
   );
   const clearAllFilters = () => {
     setSearch("");
@@ -1854,6 +2040,8 @@ export default function ContractOverview() {
     setSystemFilter("all");
     setResponsibleFilter("all");
     setYearFilter("all");
+    setDepartmentFilter("all");
+    setStatusFilter("all");
   };
 
   // ✅ ป้ายชื่อแท็บมุมมองปัจจุบันแบบเต็ม — ใช้ในแถบสรุปยอดรวม (ต้องอ่านแล้วเข้าใจทันทีว่ากำลังดูชุดไหน)
@@ -1912,6 +2100,15 @@ export default function ContractOverview() {
         visitsPerYear,
         // ✅ ส่งฟังก์ชันกลางตัวเดียวกับที่ตารางบนจอใช้เข้าไป — คอลัมน์ "คืบหน้า" ในไฟล์จึงตรงกับบนจอเสมอ
         progressLabel: (c) => progressInfo(c, countUsedRounds).label,
+        // ✅ ข้อความสถานะและรายชื่อช่องที่ยังไม่ได้กรอก — ฟังก์ชันกลางตัวเดียวกับที่ตาราง/การ์ดมือถือใช้
+        // ไฟล์ที่ส่งออกจึงเขียนเหมือนที่เห็นบนจอทุกตัวอักษร รวมถึงหมายเหตุที่คนพิมพ์ทับไว้เองด้วย
+        // ⚠️ ในไฟล์ที่ส่งออกไม่มี tooltip/จุดสีให้ชี้ดู — ถ้าหมายเหตุที่พิมพ์เองบังสถานะจริงไว้ ต้องเขียน
+        // สถานะจริงต่อท้ายในวงเล็บตรงๆ ไม่งั้นเจ้านายอ่านรายงานแล้วไม่มีทางรู้ว่าสัญญานี้หมดอายุไปแล้ว
+        statusLabel: (c) => {
+          const sd = statusDisplay(c);
+          return sd.auto ? `${sd.label} (${sd.auto.label})` : sd.label;
+        },
+        missingFields: (c) => contractCompleteness(c).missing.join(" · "),
       });
     } catch (err) {
       Swal.fire({
@@ -2488,12 +2685,19 @@ export default function ContractOverview() {
   const isClassifiedRow = (c) => c.isRealContract || c.isConfirmedGeneral || c.isConfirmedProject;
   const canEditField = useCallback((c, field) => {
     if (BASIC_INFO_FIELDS.has(field)) return true;
-    if (field === "docNo" || field === "responsiblePerson" || field === "jobValue" || field === "commission") return isClassifiedRow(c);
+    // ✅ ป้ายกำกับแผนก: ติดได้ทุกแถวที่จัดหมวดหมู่แล้ว (สัญญาจริงส่งผ่าน contractGroupId ส่วนงานทั่วไป/
+    // โปรเจคส่งผ่าน eventIds — ดู useBasicInfoEndpoint ใน commitEdit) แถว "ยังไม่จัดกลุ่ม" ยังไม่ให้ติด
+    // เพราะยังไม่รู้ด้วยซ้ำว่ามันคืองานอะไร ควรจัดหมวดหมู่ให้เรียบร้อยก่อน
+    if (field === "docNo" || field === "responsiblePerson" || field === "jobValue" || field === "commission"
+      || field === "departmentTag" || field === "statusNote") return isClassifiedRow(c);
     return c.isRealContract;
   }, []);
 
   const editOriginalValue = (c, field) => {
     if (field === "contractStart" || field === "contractEnd") return c[field] ? moment(c[field]).format("YYYY-MM-DD") : "";
+    // ⚠️ document เก่าไม่มีฟิลด์นี้เลย (เพิ่งเพิ่มทีหลัง) ต้องอ่านเป็น "ฝ่ายบริการ" ให้ตรงกับที่แสดงในตาราง
+    // ไม่งั้นการเลือก "ฝ่ายบริการ" บนแถวเก่าจะไม่ถูกมองว่า "ไม่ได้แก้" แล้วยิง PUT ทิ้งเปล่าๆ
+    if (field === "departmentTag") return c.departmentTag || DEPARTMENT.SERVICE;
     return c[field] ?? "";
   };
 
@@ -2632,7 +2836,8 @@ export default function ContractOverview() {
       const useBasicInfoEndpoint =
         BASIC_INFO_FIELDS.has(field) ||
         field === "docNo" ||
-        ((field === "responsiblePerson" || field === "jobValue" || field === "commission") && !c.isRealContract);
+        ((field === "responsiblePerson" || field === "jobValue" || field === "commission"
+          || field === "departmentTag" || field === "statusNote") && !c.isRealContract);
       if (useBasicInfoEndpoint) {
         await EventService.UpdateBasicInfo(c.visits.map((v) => v._id), payload);
       } else {
@@ -2909,6 +3114,26 @@ pagedRows.map((c, idx) => {
                       )}
                     </TableCell>
                   )}
+                  {/* ✅ ป้ายกำกับแผนกเจ้าของสัญญา — สีประจำสายงาน (แดง=บริการ · ม่วง=ขาย) ชุดเดียวกับทั้งแอป
+                      กดที่ป้ายเพื่อเปลี่ยนแผนกได้เลย (แอดมิน/manager) — เป็นข้อมูลประกอบของหน้านี้ล้วนๆ
+                      ไม่กระทบปฏิทิน/หน้าการดำเนินงานของใครทั้งสิ้น (ดู DEPARTMENT_META ด้านบน) */}
+                  <TableCell data-col-key="departmentTag" align="center" sx={{ width: colVar("departmentTag") }}>
+                    <EditableCell
+                      Wrapper={Box} align="center"
+                      editable={isAdminOrManager} columnKey="departmentTag"
+                      editType="select" editOptions={DEPARTMENT_OPTIONS} allowEmpty={false}
+                      editing={editingCell?.key === c.key && editingCell?.field === "departmentTag"}
+                      value={c.departmentTag || DEPARTMENT.SERVICE} editValue={editValue} saving={editSaving}
+                      title={isAdminOrManager
+                        ? `แผนก${departmentMeta(c.departmentTag).label} — คลิกเพื่อเปลี่ยนแผนก`
+                        : `แผนก${departmentMeta(c.departmentTag).label}`}
+                      formatDisplay={(v) => <DepartmentPill value={v} />}
+                      onStartEdit={() => beginEdit(c, "departmentTag")}
+                      onCommit={(v) => commitEdit(c, v)}
+                      onCancel={cancelEdit}
+                    />
+                  </TableCell>
+
                   {/* ✅ เลขที่สัญญา + ใบเสนอราคา ซ้อนกันในช่องเดียว — บรรทัดบนคือเลขที่สัญญา (ตัวหลัก
                       สีแบรนด์ตัวหนา) บรรทัดล่างคือใบเสนอราคา (ตัวเล็กสีจาง) ทั้งคู่ยังคลิกแก้ไขได้แยกกัน
                       ตามปกติ เพราะ EditableCell รับ Wrapper={Box} ให้เรนเดอร์โดยไม่สร้าง <td> ของตัวเอง */}
@@ -3180,16 +3405,58 @@ pagedRows.map((c, idx) => {
                     onCommit={(v) => commitEdit(c, v)}
                     onCancel={cancelEdit}
                   />
+                  {/* ✅ สถานะสัญญา — ระบบเติมข้อความให้อัตโนมัติ (หมดอายุ/ใกล้หมดอายุ/มีผลบังคับใช้ หรือ
+                      "ข้อมูลไม่ครบ" พร้อมบอกว่าขาดช่องไหน) และ "คลิกพิมพ์ทับได้" ตามที่ผู้ใช้ขอ — บางสถานะ
+                      จริงในการทำงาน เช่น "รอลูกค้าเซ็นกลับ" ระบบไม่มีทางเดาเองได้จากวันที่ในสัญญา
+                      ⚠️ ปล่อยช่องให้ว่าง = กลับไปใช้ข้อความอัตโนมัติ (ไม่ได้แปลว่า "ไม่มีสถานะ") */}
                   {!hideContractOnlyColumns && (
                   <TableCell data-col-key="status" align="center" sx={{ width: colVar("status") }}>
                     {(() => {
-                      const st = contractStatusInfo(c);
-                      return st ? (
-                        <Chip
-                          label={st.label} size="small"
-                          sx={{ height: 20, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha(st.color, 0.12), color: st.color }}
+                      const sd = statusDisplay(c);
+                      const hint = sd.missing.length > 0 ? `ยังไม่ได้กรอก: ${sd.missing.join(" · ")}` : "";
+                      return (
+                        <EditableCell
+                          Wrapper={Box} align="center"
+                          editable={isAdminOrManager} columnKey="statusNote"
+                          editing={editingCell?.key === c.key && editingCell?.field === "statusNote"}
+                          value={c.statusNote || ""} editValue={editValue} saving={editSaving}
+                          placeholder="พิมพ์หมายเหตุสถานะ"
+                          title={[
+                            sd.kind === "note" ? "หมายเหตุที่พิมพ์เอง" : sd.label || "ยังไม่มีสถานะ",
+                            hint,
+                            isAdminOrManager ? "คลิกเพื่อพิมพ์แก้ไข (เว้นว่างเพื่อกลับไปใช้ข้อความอัตโนมัติ)" : "",
+                          ].filter(Boolean).join("\n")}
+                          formatDisplay={() => (sd.kind === "none" ? <Dash /> : (
+                            <Stack direction="row" spacing={0.4} alignItems="center" justifyContent="center">
+                              <Chip
+                                label={sd.label} size="small"
+                                sx={{
+                                  height: 20, maxWidth: "100%", fontSize: "0.7rem", fontWeight: 700,
+                                  bgcolor: sd.bg, color: sd.color,
+                                  "& .MuiChip-label": { px: 0.9, overflow: "hidden", textOverflow: "ellipsis" },
+                                }}
+                              />
+                              {/* ⚠️ ยังเตือน "ข้อมูลไม่ครบ" ต่อแม้จะคำนวณสถานะได้แล้ว/พิมพ์หมายเหตุทับไว้ —
+                                  ช่องที่ขาดไม่ได้หายไปไหนเพราะมีคนพิมพ์หมายเหตุ ถ้าซ่อนตรงนี้จะกลายเป็น
+                                  ว่าการพิมพ์หมายเหตุ "กลบ" ของที่ยังไม่ได้กรอกไปเงียบๆ */}
+                              {sd.missing.length > 0 && sd.kind !== "incomplete" && (
+                                <Tooltip title={hint}>
+                                  <WarningAmber sx={{ fontSize: 14, color: "#b45309" }} />
+                                </Tooltip>
+                              )}
+                              {/* จุดสีบอกสถานะจริงที่ระบบคำนวณได้ ตอนที่หมายเหตุพิมพ์เองบังข้อความไว้ */}
+                              {sd.auto && (
+                                <Tooltip title={`ระบบคำนวณจากวันสิ้นสุดสัญญาว่า: ${sd.auto.label}`}>
+                                  <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: sd.auto.color, flexShrink: 0 }} />
+                                </Tooltip>
+                              )}
+                            </Stack>
+                          ))}
+                          onStartEdit={() => beginEdit(c, "statusNote")}
+                          onCommit={(v) => commitEdit(c, v)}
+                          onCancel={cancelEdit}
                         />
-                      ) : <Dash />;
+                      );
                     })()}
                   </TableCell>
                   )}
@@ -3748,7 +4015,6 @@ pagedRows.map((c, idx) => {
       ? countUsedRounds(c.visits.filter((v) => !v.unscheduled)) + 1
       : null;
     const overdueInfo = nextVisitOverdueInfo(c);
-    const st = contractStatusInfo(c);
     const isRoundsExpanded = expandedRounds.has(c.key);
     const latestVisit = c.visits
       .filter((v) => !v.unscheduled)
@@ -3807,8 +4073,27 @@ pagedRows.map((c, idx) => {
             </Box>
           </Box>
           <Stack alignItems="flex-end" spacing={0.5} sx={{ flexShrink: 0 }}>
+            {/* ✅ ป้ายแผนกอยู่บนหัวการ์ดเลย ไม่ต้องกางดู — ตรงกับที่เดสก์ท็อปวางแผนกเป็นคอลัมน์แรกสุด
+                (แก้ค่าได้ที่แถว "แผนก" ในส่วนรายละเอียดที่กางออกมา) */}
+            <DepartmentPill value={c.departmentTag} />
             <Chip label={jobTypeLabel} size="small" sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha(jobTypeColor, 0.12), color: jobTypeColor }} />
-            {st && <Chip label={st.label} size="small" sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha(st.color, 0.12), color: st.color }} />}
+            {/* 🐛 BUG ที่แก้: ชิปนี้เคยอ่านจาก contractStatusInfo ตรงๆ ผลคือ (1) แถวที่ข้อมูลยังไม่ครบ
+                ไม่มีชิปอะไรขึ้นเลย เงียบสนิทจนแยกไม่ออกจาก "ไม่มีสถานะ" และ (2) หมายเหตุที่คนพิมพ์ทับไว้
+                ไม่ถูกนำมาแสดง หัวการ์ดมือถือกับตารางเดสก์ท็อปจึงบอกสถานะคนละอย่างของแถวเดียวกัน
+                ✅ ใช้ statusDisplay ตัวเดียวกับทุกที่ — ทั้งแอปพูดตรงกันเสมอ */}
+            {(() => {
+              const sd = statusDisplay(c);
+              return sd.kind === "none" ? null : (
+                <Chip
+                  label={sd.label} size="small"
+                  sx={{
+                    height: 20, maxWidth: 160, fontSize: "0.65rem", fontWeight: 700,
+                    bgcolor: sd.bg, color: sd.color,
+                    "& .MuiChip-label": { overflow: "hidden", textOverflow: "ellipsis" },
+                  }}
+                />
+              );
+            })()}
             {/* ✅ สถานะวางบิล/รับเงินอยู่บนหัวการ์ดเลย ไม่ต้องกางดู — เป็นสิ่งที่ต้องเห็นพร้อมสถานะสัญญา
                 ⚠️ ซ่อนชิป "ยังไม่วางบิล" ทิ้ง เพราะเป็นค่าเริ่มต้นของเกือบทุกแถวในช่วงแรกที่เริ่มใช้ระบบ
                 ถ้าโชว์ทุกใบจะกลายเป็นเสียงรบกวนที่กลบชิปที่มีความหมายจริงจนหมด */}
@@ -3906,6 +4191,53 @@ pagedRows.map((c, idx) => {
         ) : (
           <FieldRow label="เลขที่เอกสาร" editable={canEditBasicField(c, "docNo")} value={c.docNo} {...fp("docNo")} />
         )}
+
+        {/* ✅ ป้ายกำกับแผนก — ตัวเดียวกับคอลัมน์ "แผนก" ของตารางเดสก์ท็อปเป๊ะๆ (ป้าย/สี/สิทธิ์แก้ไข)
+            มือถือจึงไม่ได้ข้อมูลน้อยกว่าเดสก์ท็อป ซึ่งเป็นกติกาของการ์ดมือถือทั้งใบในหน้านี้ */}
+        <FieldRow
+          label="แผนก"
+          editable={isAdminOrManager && canEditField(c, "departmentTag")}
+          editType="select" editOptions={DEPARTMENT_OPTIONS} allowEmpty={false}
+          value={c.departmentTag || DEPARTMENT.SERVICE}
+          formatDisplay={(v) => <DepartmentPill value={v} />}
+          {...fp("departmentTag")}
+        />
+
+        {/* ✅ สถานะสัญญา — ข้อความอัตโนมัติ + พิมพ์ทับได้ เหมือนคอลัมน์เดียวกันบนตารางเดสก์ท็อปเป๊ะๆ
+            (ใช้ statusDisplay ตัวเดียวกัน ข้อความจึงตรงกันทั้ง 2 หน้าจอเสมอ) */}
+        {(() => {
+          const sd = statusDisplay(c);
+          const hint = sd.missing.length > 0 ? `ยังไม่ได้กรอก: ${sd.missing.join(" · ")}` : "";
+          return (
+            <FieldRow
+              label="สถานะสัญญา" noClip
+              editable={isAdminOrManager && canEditField(c, "statusNote")}
+              value={c.statusNote || ""}
+              placeholder="พิมพ์หมายเหตุสถานะ"
+              title={hint}
+              formatDisplay={() => (sd.kind === "none" ? <Dash /> : (
+                <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap">
+                  <Chip
+                    label={sd.label} size="small"
+                    sx={{ height: 20, fontSize: "0.7rem", fontWeight: 700, bgcolor: sd.bg, color: sd.color }}
+                  />
+                  {/* บนมือถือไม่มี hover ให้ชี้ดู tooltip — เขียนรายชื่อช่องที่ขาดออกมาตรงๆ เลย */}
+                  {hint && (
+                    <Typography variant="caption" sx={{ color: "#b45309", fontSize: "0.66rem", lineHeight: 1.4 }}>
+                      {hint}
+                    </Typography>
+                  )}
+                  {sd.auto && (
+                    <Typography variant="caption" sx={{ color: sd.auto.color, fontSize: "0.66rem", fontWeight: 700 }}>
+                      ({sd.auto.label})
+                    </Typography>
+                  )}
+                </Stack>
+              ))}
+              {...fp("statusNote")}
+            />
+          );
+        })()}
 
         {/* ครั้งที่เข้างาน — แสดง/แก้ไขทีมของแต่ละครั้งแยกกัน (canEditRoundTeam) — พับ/กางแยกอีกชั้นจาก
             การ์ดหลัก (expandedRounds) เพราะสัญญาที่มีหลายครั้ง (สูงสุด 12) ทำให้ยาวเกินไปถ้าโชว์ตลอด
@@ -4213,6 +4545,73 @@ pagedRows.map((c, idx) => {
       >
         <option value="all">ทุกระบบ</option>
         {systemFilterOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+      </TextField>
+      {/* ✅ กรองตามป้ายกำกับแผนก — ตามที่ผู้ใช้ขอให้ "ค้นหาแยกได้ชัดเจน" ระหว่างงานฝ่ายบริการกับฝ่ายขาย
+          ✅ เปิดให้ทุก role ที่เข้าหน้านี้ได้ใช้ (ไม่ใช่แค่แอดมิน) — ป้ายนี้เป็นข้อมูลประกอบของแถวที่เห็นอยู่
+          ตรงหน้าอยู่แล้ว การกรองจึงไม่ได้เปิดเผยอะไรใหม่ ต่างจาก "สิทธิ์แก้ป้าย" ที่ยังจำกัดแอดมิน/manager
+          ✅ ติดจำนวนจริงต่อแผนกไว้ในตัวเลือกเลย — รู้ตั้งแต่ยังไม่กดว่าแต่ละแผนกมีกี่สัญญา ไม่ต้องลองกด
+          ทีละอันเพื่อดูว่ามีข้อมูลไหม (เทียบ pattern เดียวกับ "ยังไม่มอบหมาย" ของตัวกรองผู้รับผิดชอบ) */}
+      <TextField
+        select size="small" label="แผนก" value={departmentFilter}
+        onChange={(e) => setDepartmentFilter(e.target.value)}
+        SelectProps={{ native: true }}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <Apartment sx={{ fontSize: 18, color: departmentFilter !== "all" ? departmentMeta(departmentFilter).color : "text.disabled" }} />
+            </InputAdornment>
+          ),
+        }}
+        sx={{
+          width: { xs: "100%", sm: 165 }, flexShrink: 0,
+          "& .MuiOutlinedInput-root": {
+            borderRadius: 2.5,
+            bgcolor: departmentFilter !== "all" ? departmentMeta(departmentFilter).bg : "background.paper",
+            "& fieldset": departmentFilter !== "all" ? { borderColor: alpha(departmentMeta(departmentFilter).color, 0.45) } : {},
+            "&:hover fieldset": departmentFilter !== "all" ? { borderColor: departmentMeta(departmentFilter).color } : {},
+          },
+          "& .MuiInputLabel-root": departmentFilter !== "all" ? { color: departmentMeta(departmentFilter).color, fontWeight: 700 } : {},
+        }}
+      >
+        <option value="all">ทุกแผนก</option>
+        {DEPARTMENT_OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label} ({departmentCounts[o.value] || 0})
+          </option>
+        ))}
+      </TextField>
+      {/* ✅ กรองตามสถานะสัญญา — ตามที่ผู้ใช้ขอให้ "ค้นหาสถานะสัญญาได้ด้วย"
+          ⚠️ กรองด้วย kind (คีย์คงที่) ไม่ใช่ข้อความบนจอ — ดูเหตุผลที่ STATUS_FILTER_OPTIONS
+          ✅ "ข้อมูลไม่ครบ" เป็นตัวเลือกหนึ่งในนี้ด้วย จึงไล่เก็บสัญญาที่ยังกรอกไม่ครบทั้งหมดได้ในคลิกเดียว
+          ซึ่งเป็นงานที่เดิมทำไม่ได้เลยนอกจากกวาดตาดูทีละแถว */}
+      <TextField
+        select size="small" label="สถานะสัญญา" value={statusFilter}
+        onChange={(e) => setStatusFilter(e.target.value)}
+        SelectProps={{ native: true }}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <Autorenew sx={{ fontSize: 18, color: statusFilter !== "all" ? ACCENT : "text.disabled" }} />
+            </InputAdornment>
+          ),
+        }}
+        sx={{
+          width: { xs: "100%", sm: 190 }, flexShrink: 0,
+          "& .MuiOutlinedInput-root": {
+            borderRadius: 2.5,
+            bgcolor: statusFilter !== "all" ? alpha(ACCENT, 0.06) : "background.paper",
+            "& fieldset": statusFilter !== "all" ? { borderColor: alpha(ACCENT, 0.45) } : {},
+            "&:hover fieldset": statusFilter !== "all" ? { borderColor: ACCENT } : {},
+          },
+          "& .MuiInputLabel-root": statusFilter !== "all" ? { color: ACCENT, fontWeight: 700 } : {},
+        }}
+      >
+        <option value="all">ทุกสถานะ</option>
+        {STATUS_FILTER_OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label} ({statusCounts[o.value] || 0})
+          </option>
+        ))}
       </TextField>
       {/* ✅ ซ่อนสำหรับช่าง — ข้อมูลที่ช่างเห็นถูกกรองเหลือแค่งานของตัวเองมาจาก backend อยู่แล้วเสมอ
           ตัวกรองนี้มีประโยชน์แค่ตอนแอดมิน/manager ที่เห็นงานของทุกคนต้องกรองหาเฉพาะบางคน */}
@@ -4824,6 +5223,11 @@ pagedRows.map((c, idx) => {
                   ซึ่งเป็นสถานะที่ผู้ใช้ต้องรู้จริงๆ ว่าตอนนี้ตารางเรียงตามอะไรอยู่ */}
               <TableRow sx={{ "& th": { fontWeight: 700, fontSize: "0.75rem", bgcolor: SURFACE_SUBTLE, borderBottom: `1px solid ${BORDER_MAIN} !important`, color: TEXT_SUB, letterSpacing: "0.015em" } }}>
                 {showCheckboxes && <TableCell padding="checkbox" sx={{ width: colWidth("checkbox") }} />}
+                {/* ✅ ป้ายกำกับแผนก — คอลัมน์แรกสุดตามที่ผู้ใช้ขอ เป็นการ "แบ่งสายงาน" ที่กว้างที่สุดของ
+                    ทั้งตาราง (งานนี้เป็นของสายไหน) จึงควรอ่านเจอก่อนรายละเอียดของงานแต่ละใบ และเมื่อกด
+                    เรียงคอลัมน์นี้ ตารางจะจัดกลุ่มตามแผนกให้ทั้งชุดโดยที่ป้ายสียังอยู่ริมซ้ายเรียงเป็นแถบเดียว
+                    ⚠️ ลำดับคอลัมน์ต้องตรงกับแถวข้อมูลและ footerColSpan เป๊ะๆ (ดูคอมเมนต์หัวตารางด้านบน) */}
+                <ResizableTh width={colWidth("departmentTag")} align="center" columnKey="departmentTag" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("departmentTag")} sortable sortDirection={sortConfig.key === "departmentTag" ? sortConfig.direction : null} onSort={handleSortClick}>แผนก</ResizableTh>
                 {/* ✅ เลขที่สัญญา + ใบเสนอราคา ยุบเป็นช่องเดียว (ซ้อน 2 บรรทัด) — เรียงตามเลขที่สัญญา
                     ซึ่งเป็นตัวหลักที่คนใช้ค้นหา/อ้างอิง ส่วนแท็บงานทั่วไป/โปรเจคใช้ "เอกสารเลขที่" แทน */}
                 {!hideContractOnlyColumns && (
@@ -4850,7 +5254,7 @@ pagedRows.map((c, idx) => {
                     (คอมเท่านี้จากงานมูลค่าเท่านี้ คิดเป็นกี่ % ดูได้ทันทีโดยไม่ต้องเลื่อนหา) */}
                 <ResizableTh width={colWidth("commission")} align="center" columnKey="commission" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("commission")} sortable sortDirection={sortConfig.key === "commission" ? sortConfig.direction : null} onSort={handleSortClick}>ค่าคอมลูกค้า (฿)</ResizableTh>
                 {!hideContractOnlyColumns && (
-                  <ResizableTh width={colWidth("status")} align="center" columnKey="status" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("status")}>สถานะสัญญา</ResizableTh>
+                  <ResizableTh width={colWidth("status")} align="center" columnKey="status" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("status")} sortable sortDirection={sortConfig.key === "status" ? sortConfig.direction : null} onSort={handleSortClick}>สถานะสัญญา</ResizableTh>
                 )}
                 {/* 🐛 BUG ที่แก้ (หัวคอลัมน์ไม่ตรงกับข้อมูลข้างใน): ช่องนี้แสดง 2 แบบตามชนิดแถว — สัญญาจริง
                     โชว์ "X/Y ครั้ง" (คืบหน้า) ส่วนงานทั่วไป/โปรเจค/ยังไม่จัดกลุ่มโชว์ป้ายสถานะงาน (ดู

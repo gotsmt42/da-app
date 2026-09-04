@@ -3,6 +3,8 @@ import { saveAs } from "file-saver";
 // ✅ ของกลางชุดเดียวกับหน้าจอ — ยอดในไฟล์ต้องตรงกับที่เห็นบนจอเสมอ
 import { contractBillingSummary, roundBillingStatus, baht as bahtText } from "@/shared/utils/billing";
 import { JOB_DOC_TYPES, roundDocs } from "@/shared/utils/jobDocTypes";
+// ✅ ป้ายแผนกชุดเดียวกับหน้าจอ — ไฟล์ที่ส่งออกต้องเรียกชื่อแผนกเหมือนที่คนกรอกเห็นบนจอเป๊ะๆ
+import { DEPARTMENT, DEPARTMENT_LABEL } from "@/shared/utils/roles";
 
 // ✅ รูปแบบตัวเลขของช่องจำนวนเงินทุกช่องในไฟล์ที่ส่งออก — เก็บเป็น "ตัวเลขจริง" ใน cell (บวก/ลบ/SUM ต่อ
 // ในไฟล์ได้ตามปกติ) แต่ให้ Excel แสดงผลพร้อมสัญลักษณ์ ฿ นำหน้าเสมอ ตรงกับที่แสดงบนหน้าจอ — เดิมเป็น
@@ -37,7 +39,14 @@ const C = {
   muted: "FF94A3B8",
   visitDone: "FF059669",    // ครั้งที่ลงตารางแล้ว
   visitPending: "FFB45309",  // รอวางแผน
+  // ป้ายแผนก — คู่สีเดียวกับบนหน้าจอ (แดง = สายบริการ/ช่าง · ม่วง = สายขาย)
+  deptService: "FFDC2626",
+  deptSales: "FF8B5CF6",
 };
+
+// ✅ สีตัวหนังสือของคอลัมน์ "แผนก" — งานเก่าที่ยังไม่เคยติดป้ายถือเป็นฝ่ายบริการเหมือนบนหน้าจอ
+const deptColor = (v) => (v === DEPARTMENT.SALES ? C.deptSales : C.deptService);
+const deptLabel = (v) => DEPARTMENT_LABEL[v || DEPARTMENT.SERVICE] || DEPARTMENT_LABEL[DEPARTMENT.SERVICE];
 
 const thinBorder = {
   top: { style: "thin", color: { argb: C.border } },
@@ -64,10 +73,17 @@ export async function exportContractsToExcel({
   formatEventDateRange,
   visitsPerYear,
   progressLabel,
+  statusLabel,
+  missingFields,
 }) {
   const wb = new ExcelJS.Workbook();
   wb.creator = "DA-APP";
   wb.created = new Date();
+
+  // ✅ ชีต "สรุปสำหรับผู้บริหาร" ถูกสร้างก่อนชีตข้อมูลดิบโดยตั้งใจ — Excel เรียงแท็บตามลำดับที่สร้าง
+  // และเปิดไฟล์มาที่แท็บแรกเสมอ คนที่เปิดไฟล์จึงเจอ "สรุป" ก่อน ไม่ใช่เจอตาราง 20+ คอลัมน์แล้วต้อง
+  // ไปหาเองว่าสรุปอยู่ไหน (ตามที่ผู้ใช้ขอให้ "ดูสรุปข้อมูลง่ายที่สุด")
+  buildSummarySheet(wb, { rows, meta, contractStatusInfo, missingFields });
 
   // ✅ ไม่ตรึง (freeze) แถว/คอลัมน์ใดๆ ตามที่ผู้ใช้ขอ — เดิมตรึงหัวตาราง 5 แถวแรก + 4 คอลัมน์แรกไว้เสมอ
   // ซึ่งทำให้เลื่อนดูข้อมูลแล้วรู้สึกติดขัด/แบ่งจอเป็นสองส่วน ตอนนี้เลื่อนได้อิสระทั้งแผ่นเหมือนตารางปกติ
@@ -77,6 +93,9 @@ export async function exportContractsToExcel({
 
   // ── นิยามคอลัมน์ (ลำดับ/ความกว้าง/การจัดวาง) ────────────────────────────
   const baseCols = [
+    // ✅ แผนกอยู่หน้าสุดตามที่ผู้ใช้ขอ — ตรงกับลำดับคอลัมน์บนหน้าจอ (ไฟล์กับจออ่านเรียงเหมือนกันเป๊ะ)
+    // และเป็นตัวแบ่งสายงานที่กว้างที่สุด เจ้านายกวาดตาคอลัมน์แรกก็แยกงานบริการ/งานขายออกได้ทันที
+    { key: "departmentTag", header: "แผนก", width: 12, group: "แผนก", align: "center" },
     { key: "contractNo", header: "เลขที่สัญญา", width: 18, group: "เอกสารอ้างอิง" },
     { key: "quotationNo", header: "ใบเสนอราคา", width: 18, group: "เอกสารอ้างอิง" },
     { key: "docNo", header: "เอกสารเลขที่", width: 18, group: "เอกสารอ้างอิง" },
@@ -94,7 +113,11 @@ export async function exportContractsToExcel({
     // (บนจอโชว์เป็นบรรทัดเล็กใต้ตัวเลข ซึ่งดีเวลาไล่ดูทีละแถว แต่ในไฟล์ต้องเป็นคอลัมน์ถึงจะใช้งานต่อได้)
     { key: "commission", header: "ค่าคอม (฿)", width: 15, group: "มูลค่า", align: "right", numFmt: MONEY_FMT },
     { key: "commissionPct", header: "ค่าคอม (% ของมูลค่างาน)", width: 20, group: "มูลค่า", align: "center", numFmt: "0.00%" },
-    { key: "contractStatus", header: "สถานะสัญญา", width: 17, group: "สถานะ", align: "center" },
+    { key: "contractStatus", header: "สถานะสัญญา", width: 22, group: "สถานะ", align: "center", wrap: true },
+    // ✅ ช่องที่ยังไม่ได้กรอกของแถวนั้น — ตามที่ผู้ใช้ขอให้ "สถานะสัญญาถ้ายังไม่สมบูรณ์ ให้มีข้อความบอก"
+    // ⚠️ ต้องเป็นคอลัมน์แยก ไม่ใช่ต่อท้ายในช่องสถานะ — เจ้านายกรองคอลัมน์นี้ด้วย AutoFilter เพื่อดึงเฉพาะ
+    // งานที่ข้อมูลยังไม่ครบออกมาสั่งงานต่อได้ทันที ถ้าปนอยู่ในช่องเดียวกับสถานะจะกรองแยกไม่ได้เลย
+    { key: "missingFields", header: "ข้อมูลที่ยังไม่ครบ", width: 30, group: "สถานะ", wrap: true },
     // ✅ เพิ่มให้ตรงกับคอลัมน์ "คืบหน้า" ในตารางบนจอ (เดิมไฟล์ที่ส่งออกไม่มีคอลัมน์นี้เลย ทั้งที่บนจอมี) —
     // สัญญาจริงเป็น "X/Y" (ครั้งที่ทำเสร็จ) ส่วนงานทั่วไป/โปรเจคเป็นสถานะงานตรงๆ (ดู progressInfo)
     { key: "progress", header: "คืบหน้า / สถานะงาน", width: 18, group: "สถานะ", align: "center" },
@@ -202,6 +225,7 @@ export async function exportContractsToExcel({
   rows.forEach((c, rIdx) => {
     const st = contractStatusInfo(c);
     const values = {
+      departmentTag: deptLabel(c.departmentTag),
       contractNo: c.contractNo || "",
       quotationNo: c.quotationNo || "",
       docNo: c.docNo || "",
@@ -226,7 +250,10 @@ export async function exportContractsToExcel({
         const com = Number(c.commission);
         return Number.isFinite(base) && base > 0 && Number.isFinite(com) && com > 0 ? com / base : "";
       })(),
-      contractStatus: st?.label || "",
+      // ✅ ข้อความเดียวกับที่เห็นบนหน้าจอเป๊ะๆ (หมายเหตุที่พิมพ์เอง > สถานะอัตโนมัติ > "ข้อมูลไม่ครบ")
+      // — ส่งฟังก์ชันกลางจากหน้าจอเข้ามา ไม่คำนวณซ้ำที่นี่ กันไฟล์กับจอพูดไม่ตรงกัน
+      contractStatus: statusLabel ? statusLabel(c) : (st?.label || ""),
+      missingFields: missingFields ? missingFields(c) : "",
       // ⚠️ ใช้ contractBillingSummary ตัวเดียวกับที่ตารางบนจอใช้ — ห้ามคำนวณซ้ำที่นี่ ไม่งั้นยอดในไฟล์
       // กับยอดบนจอจะไม่ตรงกัน ซึ่งเป็นเรื่องเงินและตรวจสอบย้อนหลังได้ยากมากเมื่อไฟล์ถูกส่งต่อไปแล้ว
       // ⚠️ แถวที่ยังไม่เคยวางบิลเลยเว้นว่าง ไม่ใส่ 0 — 0 บาทกับ "ยังไม่วางบิล" คนละความหมาย และ 0
@@ -338,11 +365,19 @@ export async function exportContractsToExcel({
       if (colDef.key === "contractStart" || colDef.key === "contractEnd") cell.numFmt = "dd/mm/yyyy";
 
       // 🎨 ระบายสีตามความหมายของข้อมูล — จุดที่ CSV ทำไม่ได้เลย และเป็นเหตุผลหลักที่ต้องเปลี่ยนรูปแบบไฟล์
-      if (colDef.key === "contractStatus" && st) {
-        const argb = st.label === "หมดอายุแล้ว" ? C.expired
-          : st.label.startsWith("ใกล้หมดอายุ") ? C.nearExpiry
-          : C.active;
+      // 🎨 สีของช่องสถานะ — ⚠️ ตัดสินจาก st (ค่าคำนวณ) ไม่ใช่จากข้อความในเซลล์ เพราะข้อความอาจเป็น
+      // หมายเหตุที่คนพิมพ์เองซึ่งจะมีคำว่าอะไรก็ได้ · ไม่มี st = ข้อมูลไม่ครบ ใช้สีเตือนสีเดียวกับบนจอ
+      if (colDef.key === "contractStatus") {
+        const argb = st
+          ? (st.label === "หมดอายุแล้ว" ? C.expired : st.label.startsWith("ใกล้หมดอายุ") ? C.nearExpiry : C.active)
+          : (values.missingFields ? C.nearExpiry : C.muted);
         cell.font = { name: "Tahoma", size: 10, bold: true, color: { argb } };
+      }
+      if (colDef.key === "missingFields" && values.missingFields) {
+        cell.font = { name: "Tahoma", size: 10, color: { argb: C.nearExpiry } };
+      }
+      if (colDef.key === "departmentTag") {
+        cell.font = { name: "Tahoma", size: 10, bold: true, color: { argb: deptColor(c.departmentTag) } };
       }
       if (colDef.key === "responsiblePerson" && !c.responsiblePerson) {
         cell.font = { name: "Tahoma", size: 10, italic: true, color: { argb: C.muted } };
@@ -362,30 +397,41 @@ export async function exportContractsToExcel({
 
   // ── แถวสรุปยอดรวมท้ายตาราง ───────────────────────────────────────────────
   // ✅ ให้ตรงกับแถวสรุปยอดรวมที่เพิ่มเข้าไปในตารางบนจอ — เดิมไฟล์ที่ส่งออกไม่มียอดรวมเลย ต้องไปรวมเอง
-  // ใน Excel ทุกครั้ง ⚠️ ใช้สูตร SUM() จริง (ไม่ใช่ตัวเลขนิ่งที่คำนวณมาจาก JS) เพื่อให้ยอดอัปเดตตามเอง
-  // ถ้าผู้ใช้ไปแก้ตัวเลขมูลค่างานต่อในไฟล์ หรือกรองด้วย AutoFilter แล้วดูเฉพาะบางแถว
+  // ใน Excel ทุกครั้ง ⚠️ ใช้สูตร SUBTOTAL() จริง (ไม่ใช่ตัวเลขนิ่งที่คำนวณมาจาก JS) เพื่อให้ยอดอัปเดต
+  // ตามเองถ้าผู้ใช้ไปแก้ตัวเลขต่อในไฟล์ และ "ไม่นับแถวที่ถูก AutoFilter ซ่อนอยู่" — เจ้านายกรองดูเฉพาะ
+  // ฝ่ายขาย/เฉพาะปีนี้แล้วยอดท้ายตารางจะเปลี่ยนตามให้ทันที ไม่ต้องส่งออกไฟล์ใหม่
+  // 🐛 BUG ที่แก้: เดิมรวมให้แค่คอลัมน์ "มูลค่างาน" คอลัมน์เดียว ทั้งที่คอลัมน์ค่าคอม/ยอดวางบิล/รับเงิน
+  // แล้ว/ค้างรับ ล้วนเป็นตัวเลขที่ต้องดูยอดรวมทั้งนั้น — และเป็นตัวเลขชุดที่เจ้านายถามถึงมากที่สุดด้วยซ้ำ
   if (rows.length > 0) {
-    const jobValueIdx = cols.findIndex((c) => c.key === "jobValue") + 1;
     const firstDataRow = HEADER_ROW + 1;
     const lastDataRow = HEADER_ROW + rows.length;
-    const totalRow = ws.getRow(lastDataRow + 1);
+    const totalRowIdx = lastDataRow + 1;
+    const totalRow = ws.getRow(totalRowIdx);
+    const SUM_KEYS = ["jobValue", "commission", "billingInvoiced", "billingPaid", "billingOutstanding"];
+    const firstSumIdx = Math.min(...SUM_KEYS.map((k) => cols.findIndex((c) => c.key === k) + 1));
+
     const filledCount = rows.filter((r) => r.jobValue !== null && r.jobValue !== undefined && r.jobValue !== "" && !Number.isNaN(Number(r.jobValue))).length;
     const missingCount = rows.length - filledCount;
 
-    // ป้ายกำกับ — merge ตั้งแต่คอลัมน์แรกจนถึงก่อนคอลัมน์มูลค่างาน ให้ยอดตกลงใต้คอลัมน์ของมันพอดี
-    if (jobValueIdx > 1) ws.mergeCells(lastDataRow + 1, 1, lastDataRow + 1, jobValueIdx - 1);
+    // ป้ายกำกับ — merge ตั้งแต่คอลัมน์แรกจนถึงก่อนคอลัมน์ยอดแรกสุด ให้ยอดตกลงใต้คอลัมน์ของมันพอดี
+    if (firstSumIdx > 1) ws.mergeCells(totalRowIdx, 1, totalRowIdx, firstSumIdx - 1);
     const labelCell = totalRow.getCell(1);
     labelCell.value = missingCount > 0
-      ? `รวมมูลค่างานทั้งหมด (${filledCount}/${rows.length} รายการที่ระบุมูลค่าแล้ว · อีก ${missingCount} รายการยังไม่ได้กรอก)`
-      : `รวมมูลค่างานทั้งหมด (${rows.length} รายการ)`;
+      ? `รวมทั้งหมด ${rows.length} รายการ (ระบุมูลค่างานแล้ว ${filledCount} · ยังไม่ได้กรอกอีก ${missingCount})`
+      : `รวมทั้งหมด ${rows.length} รายการ`;
     labelCell.font = { name: "Tahoma", size: 10, bold: true, color: { argb: C.headerText } };
     labelCell.alignment = { vertical: "middle", horizontal: "right" };
 
-    const sumCell = totalRow.getCell(jobValueIdx);
-    sumCell.value = { formula: `SUBTOTAL(109,${ws.getColumn(jobValueIdx).letter}${firstDataRow}:${ws.getColumn(jobValueIdx).letter}${lastDataRow})` };
-    sumCell.numFmt = MONEY_FMT;
-    sumCell.font = { name: "Tahoma", size: 11, bold: true, color: { argb: C.headerText } };
-    sumCell.alignment = { vertical: "middle", horizontal: "right" };
+    SUM_KEYS.forEach((key) => {
+      const idx = cols.findIndex((c) => c.key === key) + 1;
+      if (idx <= 0) return;
+      const letter = ws.getColumn(idx).letter;
+      const cell = totalRow.getCell(idx);
+      cell.value = { formula: `SUBTOTAL(109,${letter}${firstDataRow}:${letter}${lastDataRow})` };
+      cell.numFmt = MONEY_FMT;
+      cell.font = { name: "Tahoma", size: 11, bold: true, color: { argb: C.headerText } };
+      cell.alignment = { vertical: "middle", horizontal: "right" };
+    });
 
     // พื้นหลัง/ขอบให้ครบทั้งแถว ไม่งั้นแถวสรุปจะดูขาดเป็นช่วงๆ
     for (let k = 1; k <= lastCol; k += 1) {
@@ -401,4 +447,240 @@ export async function exportContractsToExcel({
     new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
     meta.fileName
   );
+}
+
+/**
+ * ชีต "สรุปสำหรับผู้บริหาร" — หน้าแรกที่เจ้านายเปิดดู
+ *
+ * ⚠️ ทำไมต้องมี: ชีตข้อมูลดิบมี 20+ คอลัมน์ × N แถว ซึ่งถูกต้องและครบถ้วนสำหรับคนทำงาน แต่คนที่ต้อง
+ * ตัดสินใจไม่ได้อยากไล่อ่านทีละแถว เขาถามอยู่ไม่กี่คำถาม: ทั้งหมดกี่งาน มูลค่าเท่าไหร่ เก็บเงินได้แล้ว
+ * เท่าไหร่ ค้างอยู่เท่าไหร่ ของแผนกไหนบ้าง และมีอะไรที่ต้องรีบจัดการไหม — ชีตนี้ตอบครบในหน้าเดียว
+ *
+ * ⚠️ ทุกตัวเลขที่นี่คำนวณจาก rows ชุดเดียวกับชีตข้อมูลดิบ (ที่ผ่านตัวกรองเดียวกับหน้าจอมาแล้ว) จึงตรง
+ * กันเสมอทั้ง 2 ชีตและตรงกับหน้าจอด้วย — ห้ามดึงข้อมูลจากที่อื่นมาคำนวณเด็ดขาด
+ */
+function buildSummarySheet(wb, { rows, meta, contractStatusInfo, missingFields }) {
+  const ws = wb.addWorksheet("สรุปสำหรับผู้บริหาร", {
+    pageSetup: { orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
+  });
+  ws.columns = [
+    { width: 34 }, { width: 16 }, { width: 18 }, { width: 18 }, { width: 18 }, { width: 18 },
+  ];
+
+  // ── รวบรวมตัวเลขทั้งหมดในรอบเดียว ──────────────────────────────────────
+  const blank = () => ({ count: 0, jobValue: 0, commission: 0, invoiced: 0, paid: 0, outstanding: 0 });
+  const add = (acc, r) => {
+    const bs = contractBillingSummary(r.visits || []);
+    acc.count += 1;
+    acc.jobValue += Number(r.jobValue) || 0;
+    acc.commission += Number(r.commission) || 0;
+    if (bs && bs.invoicedCount > 0) {
+      acc.invoiced += bs.net || 0;
+      acc.paid += bs.paid || 0;
+      acc.outstanding += bs.outstanding || 0;
+    }
+    return acc;
+  };
+
+  const total = blank();
+  const byDept = {};
+  const byStatus = {};
+  const byTitle = {};
+  let noJobValue = 0;
+  let overdueBilling = 0;
+  let incompleteRows = 0;
+
+  rows.forEach((r) => {
+    add(total, r);
+    const dk = r.departmentTag || DEPARTMENT.SERVICE;
+    byDept[dk] = add(byDept[dk] || blank(), r);
+    // ⚠️ จัดกลุ่มด้วย "สถานะจริงของสัญญา" ไม่ใช่ข้อความที่แสดงบนจอ — 2 เหตุผล:
+    //   1) ป้าย "ใกล้หมดอายุ · 12 วัน" มีจำนวนวันต่อท้าย ถ้าจัดกลุ่มตามข้อความจะแตกเป็นคนละกลุ่มทุกสัญญา
+    //   2) หมายเหตุที่คนพิมพ์เองเป็นข้อความอิสระ จะกลายเป็นกลุ่มละ 1 รายการเต็มไปหมดจนอ่านไม่รู้เรื่อง
+    // (หมายเหตุยังอ่านได้ครบรายรายการที่ชีตข้อมูลดิบ — ที่นี่คือ "สรุป" จึงต้องยุบเป็นกลุ่มที่นับได้)
+    const rst = contractStatusInfo(r);
+    const sk = rst
+      ? (rst.state === "expiring" ? "ใกล้หมดอายุ" : rst.label)
+      : (missingFields && missingFields(r) ? "ข้อมูลไม่ครบ" : "— ไม่มีสถานะสัญญา —");
+    byStatus[sk] = add(byStatus[sk] || blank(), r);
+    const tk = r.title || "— ไม่ระบุประเภทงาน —";
+    byTitle[tk] = add(byTitle[tk] || blank(), r);
+    if (!Number(r.jobValue)) noJobValue += 1;
+    if (missingFields && missingFields(r)) incompleteRows += 1;
+    const bs = contractBillingSummary(r.visits || []);
+    if (bs?.state === "overdue") overdueBilling += 1;
+  });
+
+  // ── ตัวช่วยวาด ─────────────────────────────────────────────────────────
+  let row = 1;
+  const setTitle = (text, size, color) => {
+    ws.mergeCells(row, 1, row, 6);
+    const cell = ws.getCell(row, 1);
+    cell.value = text;
+    cell.font = { name: "Tahoma", size, bold: true, color: { argb: color } };
+    cell.alignment = { vertical: "middle", horizontal: "left" };
+    ws.getRow(row).height = size + 12;
+    row += 1;
+  };
+  const sectionHead = (text) => {
+    ws.mergeCells(row, 1, row, 6);
+    const cell = ws.getCell(row, 1);
+    cell.value = text;
+    cell.font = { name: "Tahoma", size: 11, bold: true, color: { argb: C.headerText } };
+    cell.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+    for (let k = 1; k <= 6; k += 1) {
+      ws.getCell(row, k).fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.groupBg } };
+      ws.getCell(row, k).border = thinBorder;
+    }
+    ws.getRow(row).height = 20;
+    row += 1;
+  };
+  // หัวตารางย่อยของแต่ละหมวด — ชุดคอลัมน์เดียวกันหมดทุกหมวด อ่านซ้ำได้โดยไม่ต้องเรียนรู้ใหม่
+  const BREAKDOWN_HEAD = ["", "จำนวนงาน", "มูลค่างาน (฿)", "วางบิลแล้ว (฿)", "รับเงินแล้ว (฿)", "ค้างรับ (฿)"];
+  const headRow = (firstLabel) => {
+    BREAKDOWN_HEAD.forEach((h, i) => {
+      const cell = ws.getCell(row, i + 1);
+      cell.value = i === 0 ? firstLabel : h;
+      cell.font = { name: "Tahoma", size: 10, bold: true, color: { argb: C.headerText } };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.headerBg } };
+      cell.alignment = { vertical: "middle", horizontal: i === 0 ? "left" : "center", wrapText: true };
+      cell.border = thinBorder;
+    });
+    ws.getRow(row).height = 22;
+    row += 1;
+  };
+  const dataRow = (label, v, { bold = false, labelColor = null, zebra = false } = {}) => {
+    const cells = [label, v.count, v.jobValue, v.invoiced, v.paid, v.outstanding];
+    cells.forEach((val, i) => {
+      const cell = ws.getCell(row, i + 1);
+      cell.value = val;
+      cell.font = {
+        name: "Tahoma", size: 10, bold: bold || i === 0,
+        color: { argb: i === 0 && labelColor ? labelColor : "FF0F172A" },
+      };
+      cell.alignment = { vertical: "middle", horizontal: i === 0 ? "left" : i === 1 ? "center" : "right" };
+      cell.border = thinBorder;
+      if (i >= 2) cell.numFmt = MONEY_FMT;
+      if (zebra) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.zebra } };
+    });
+    row += 1;
+  };
+  const spacer = () => { ws.getRow(row).height = 8; row += 1; };
+
+  // ── หัวเรื่อง ──────────────────────────────────────────────────────────
+  setTitle("สรุปภาพรวมงาน — สำหรับผู้บริหาร", 16, C.titleText);
+  ws.mergeCells(row, 1, row, 6);
+  const sub = ws.getCell(row, 1);
+  sub.value = `มุมมอง: ${meta.viewLabel}  ·  ปี: ${meta.yearLabel}  ·  ${meta.filterSummary}  ·  ส่งออก ${meta.exportedAt}`;
+  sub.font = { name: "Tahoma", size: 10, color: { argb: C.subtitleText } };
+  ws.getRow(row).height = 18;
+  row += 2;
+
+  // ── แถบตัวเลขหลัก (KPI) ────────────────────────────────────────────────
+  // ✅ 5 ตัวเลขที่ตอบคำถามของเจ้านายได้ทั้งหมดในบรรทัดเดียว วางไว้บนสุดก่อนตารางย่อยใดๆ — เปิดไฟล์มา
+  // เห็นทันทีโดยไม่ต้องเลื่อนหรืออ่านตารางเลยสักช่อง (ตารางแยกหมวดข้างล่างคือ "แล้วมันมาจากไหน")
+  // ⚠️ ป้ายกำกับอยู่แถวบน ตัวเลขอยู่แถวล่าง — อ่านเป็นคู่จากซ้ายไปขวา ไม่ใช่ตารางที่ต้องไล่หัวคอลัมน์
+  const KPI = [
+    ["จำนวนงานทั้งหมด", rows.length, null, C.titleText],
+    ["มูลค่างานรวม", total.jobValue, MONEY_FMT, C.titleText],
+    ["วางบิลแล้ว", total.invoiced, MONEY_FMT, C.visitDone],
+    ["รับเงินแล้ว", total.paid, MONEY_FMT, C.active],
+    ["ค้างรับ", total.outstanding, MONEY_FMT, total.outstanding > 0 ? C.expired : C.muted],
+  ];
+  KPI.forEach(([label], i) => {
+    const cell = ws.getCell(row, i + 1);
+    cell.value = label;
+    cell.font = { name: "Tahoma", size: 9, bold: true, color: { argb: C.subtitleText } };
+    cell.alignment = { vertical: "middle", horizontal: "center" };
+    cell.border = { ...thinBorder, bottom: { style: "none" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.zebra } };
+  });
+  ws.getRow(row).height = 18;
+  row += 1;
+  KPI.forEach(([, value, fmt, color], i) => {
+    const cell = ws.getCell(row, i + 1);
+    cell.value = value;
+    if (fmt) cell.numFmt = fmt;
+    cell.font = { name: "Tahoma", size: 14, bold: true, color: { argb: color } };
+    cell.alignment = { vertical: "middle", horizontal: "center" };
+    cell.border = { ...thinBorder, top: { style: "none" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.zebra } };
+  });
+  ws.getRow(row).height = 30;
+  row += 2;
+
+  // ── ตัวเลขรวมทั้งหมด ────────────────────────────────────────────────────
+  sectionHead("ภาพรวมทั้งหมด");
+  headRow("รายการ");
+  dataRow(`ทั้งหมด (${rows.length} รายการ)`, total, { bold: true });
+  spacer();
+
+  // ── แยกตามแผนก (คำถามแรกที่เจ้านายถามเสมอ จึงวางเป็นหมวดแรก) ──────────
+  sectionHead("แยกตามแผนก");
+  headRow("แผนก");
+  Object.entries(byDept)
+    .sort((a, b) => b[1].jobValue - a[1].jobValue)
+    .forEach(([k, v], i) => dataRow(deptLabel(k), v, { labelColor: deptColor(k), zebra: i % 2 === 1 }));
+  spacer();
+
+  // ── แยกตามสถานะสัญญา ───────────────────────────────────────────────────
+  sectionHead("แยกตามสถานะสัญญา");
+  headRow("สถานะ");
+  Object.entries(byStatus)
+    .sort((a, b) => b[1].count - a[1].count)
+    .forEach(([k, v], i) => {
+      const color = k === "หมดอายุแล้ว" ? C.expired
+        : k.startsWith("ใกล้หมดอายุ") ? C.nearExpiry
+        : k === "ข้อมูลไม่ครบ" ? C.nearExpiry
+        : k.startsWith("—") ? C.muted
+        : C.active;
+      dataRow(k, v, { labelColor: color, zebra: i % 2 === 1 });
+    });
+  spacer();
+
+  // ── แยกตามประเภทงาน — เห็นว่ารายได้มาจากงานแบบไหนเป็นหลัก ────────────
+  sectionHead("แยกตามประเภทงาน");
+  headRow("ประเภทงาน");
+  Object.entries(byTitle)
+    .sort((a, b) => b[1].jobValue - a[1].jobValue)
+    .forEach(([k, v], i) => dataRow(k, v, { zebra: i % 2 === 1 }));
+  spacer();
+
+  // ── สิ่งที่ต้องจัดการ — ไม่ใช่ตัวเลขสวยๆ แต่เป็นของที่ค้างอยู่จริงและมีคนต้องไปตาม ────
+  // ⚠️ ตั้งใจวางไว้ท้ายสุดแต่ใช้สีเตือน — ถ้าเอาไว้บนสุดจะกลายเป็นว่ารายงานเปิดมาเจอแต่ปัญหาก่อน
+  // ทั้งที่ส่วนใหญ่ปกติดี แต่ถ้าไม่ใส่เลยก็เท่ากับซ่อนของที่ต้องรีบทำ
+  sectionHead("สิ่งที่ต้องติดตาม");
+  const alerts = [
+    ["ข้อมูลสัญญายังไม่ครบ", incompleteRows, "รายการ", incompleteRows > 0 ? C.nearExpiry : C.muted],
+    ["ยังไม่ได้กรอกมูลค่างาน", noJobValue, "รายการ", noJobValue > 0 ? C.nearExpiry : C.muted],
+    ["วางบิลแล้วเลยกำหนดชำระ", overdueBilling, "รายการ", overdueBilling > 0 ? C.expired : C.muted],
+    ["ยอดค้างรับรวม", total.outstanding, "฿", total.outstanding > 0 ? C.expired : C.muted],
+  ];
+  alerts.forEach(([label, value, unit, color], i) => {
+    const l = ws.getCell(row, 1);
+    l.value = label;
+    l.font = { name: "Tahoma", size: 10, bold: true, color: { argb: "FF0F172A" } };
+    l.alignment = { vertical: "middle", horizontal: "left" };
+    l.border = thinBorder;
+    ws.mergeCells(row, 2, row, 3);
+    const v = ws.getCell(row, 2);
+    v.value = unit === "฿" ? value : `${value.toLocaleString("th-TH")} ${unit}`;
+    if (unit === "฿") v.numFmt = MONEY_FMT;
+    v.font = { name: "Tahoma", size: 11, bold: true, color: { argb: color } };
+    v.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+    for (let k = 2; k <= 6; k += 1) ws.getCell(row, k).border = thinBorder;
+    if (i % 2 === 1) {
+      for (let k = 1; k <= 6; k += 1) {
+        ws.getCell(row, k).fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.zebra } };
+      }
+    }
+    row += 1;
+  });
+
+  spacer();
+  ws.mergeCells(row, 1, row, 6);
+  const note = ws.getCell(row, 1);
+  note.value = "ตัวเลขทั้งหมดคำนวณจากรายการในชีต \"ภาพรวมงาน\" ชุดเดียวกัน (ผ่านตัวกรองเดียวกับที่เห็นบนหน้าจอ) — ดูรายละเอียดรายรายการได้ที่ชีตนั้น";
+  note.font = { name: "Tahoma", size: 9, italic: true, color: { argb: C.subtitleText } };
+  note.alignment = { vertical: "middle", horizontal: "left", wrapText: true };
 }

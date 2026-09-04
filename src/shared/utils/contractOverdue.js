@@ -59,6 +59,16 @@ export const groupEventsByContract = (events) => {
       site: head.site,
       system: head.system,
       title: head.title,
+      // ✅ ป้ายกำกับแผนกเจ้าของงาน — ข้อมูลประกอบสำหรับดู/กรอง/ออกรายงานในหน้าภาพรวมงานเท่านั้น
+      // ⚠️ คนละตัวกับ head.department ที่คุมว่าใครเห็นงานนี้บ้าง (departmentScope ฝั่ง server) — ตั้งใจ
+      // ไม่อ่านตัวนั้นมาแสดง เพราะการแก้ป้ายในตารางต้องไม่ทำให้งานหลุดจากปฏิทิน/หน้าดำเนินงานของช่าง
+      // ⚠️ งานเก่าที่ยังไม่เคยติดป้ายไม่มีค่าเก็บไว้เลย fallback เป็น "service" ให้ตรงกับที่ตารางแสดง
+      // ไม่งั้นจะขึ้น "ไม่ระบุ" เต็มไปหมด และตัวกรอง "ฝ่ายบริการ" จะกรองงานเก่าทิ้งทั้งหมด
+      departmentTag: head.departmentTag || "service",
+      // ✅ หมายเหตุสถานะสัญญาที่คนกรอกพิมพ์เอง — ทับข้อความสถานะอัตโนมัติในคอลัมน์ "สถานะสัญญา"
+      // ⚠️ ตั้งใจให้เป็น "ทับ" ไม่ใช่ "ต่อท้าย" — สถานะต้องอ่านได้คำตอบเดียวต่อแถว ถ้าโชว์ทั้งข้อความ
+      // อัตโนมัติและข้อความที่พิมพ์เองพร้อมกันแล้วสองอันขัดกัน คนอ่านจะไม่รู้ว่าต้องเชื่ออันไหน
+      statusNote: head.statusNote || "",
       // ✅ เลขที่อ้างอิงเอกสารทั่วไป (PO/ใบสั่งงาน ฯลฯ) — คนละอันกับ contractNo/quotationNo ด้านล่าง
       // ที่มีความหมายเฉพาะสัญญาจริงเท่านั้น ตัวนี้ใช้ได้กับงานทั่วไป/โปรเจคด้วย (ดู ContractOverview.js
       // คอลัมน์ "เอกสารเลขที่" ที่โชว์แทนที่ contractNo/quotationNo ตอนดูแท็บงานทั่วไป/โปรเจค)
@@ -161,3 +171,36 @@ export const contractStatusInfo = (c) => {
 // "ไม่กรอก = หมดอายุ" จะทำให้สัญญาที่ยังใช้งานอยู่โผล่มาผิดกลุ่ม
 export const isExpiredContract = (c) => contractStatusInfo(c)?.state === "expired";
 export const isExpiringContract = (c) => contractStatusInfo(c)?.state === "expiring";
+
+/**
+ * ✅ "สัญญานี้ข้อมูลครบหรือยัง" — ของกลางที่ทั้งหน้าจอและไฟล์ Excel ที่ส่งออกใช้ร่วมกัน
+ *
+ * ⚠️ ทำไมต้องมี: contractStatusInfo คืน null เมื่อยังไม่กรอกวันสิ้นสุดสัญญา ช่อง "สถานะสัญญา" จึงขึ้น
+ * เป็นขีดว่างเฉยๆ ซึ่งอ่านได้ 2 แบบและแยกไม่ออกเลยว่าเป็นแบบไหน: "ระบบยังไม่รู้เพราะข้อมูลขาด" กับ
+ * "งานนี้ไม่มีสถานะ" — คนกรอกจึงไม่มีทางรู้ว่าต้องไปเติมอะไร ตอนนี้บอกตรงๆ ว่าขาดช่องไหนบ้าง
+ *
+ * ⚠️ เกณฑ์แยกตามชนิดของแถวโดยตั้งใจ — งานทั่วไป/โปรเจคไม่มีเลขที่สัญญา/วันเริ่ม-สิ้นสุด/จำนวนรอบ
+ * อยู่แล้วตามธรรมชาติของมัน ถ้าเอาเกณฑ์ของสัญญาจริงไปจับ ทุกแถวจะขึ้นเตือนพร้อมกันหมดทั้งตารางจน
+ * คำเตือนหมดความหมาย (คนจะเลิกอ่านแล้วมองข้ามของที่ขาดจริงไปด้วย)
+ */
+const REQUIRED_CONTRACT = [
+  { key: "contractNo", label: "เลขที่สัญญา", missing: (c) => !c.contractNo },
+  { key: "contractStart", label: "วันเริ่มสัญญา", missing: (c) => !c.contractStart },
+  { key: "contractEnd", label: "วันสิ้นสุดสัญญา", missing: (c) => !c.contractEnd },
+  { key: "visitCount", label: "จำนวนครั้ง/รอบเข้า", missing: (c) => !(Number(c.visitCount) > 0 || Number(c.intervalMonths) > 0) },
+  { key: "jobValue", label: "มูลค่างาน", missing: (c) => !(Number(c.jobValue) > 0) },
+  { key: "responsiblePerson", label: "ผู้รับผิดชอบงาน", missing: (c) => !c.responsiblePerson },
+];
+// งานทั่วไป/โปรเจค — เหลือเฉพาะ 2 ช่องที่ต้องมีจริงๆ ไม่ว่างานชนิดไหน (ใครดูแล และคิดเงินเท่าไหร่)
+const REQUIRED_GENERAL = REQUIRED_CONTRACT.filter((f) => f.key === "jobValue" || f.key === "responsiblePerson");
+
+export const contractCompleteness = (c) => {
+  // ⚠️ แถว "ยังไม่จัดกลุ่ม" ไม่ตรวจ — มันถูกป้ายว่ายังไม่จัดกลุ่มอยู่แล้วซึ่งเป็นงานที่ต้องทำก่อน
+  // การไปบอกเพิ่มว่า "ข้อมูลไม่ครบ" ตรงนั้นเป็นการเตือนเรื่องเดียวกันซ้ำสองรอบ
+  if (!c || (!c.isRealContract && !c.isConfirmedGeneral && !c.isConfirmedProject)) {
+    return { complete: true, missing: [], summary: "" };
+  }
+  const rules = c.isRealContract ? REQUIRED_CONTRACT : REQUIRED_GENERAL;
+  const missing = rules.filter((f) => f.missing(c)).map((f) => f.label);
+  return { complete: missing.length === 0, missing, summary: missing.join(" · ") };
+};
