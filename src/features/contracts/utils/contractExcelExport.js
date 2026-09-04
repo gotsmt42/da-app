@@ -75,6 +75,7 @@ export async function exportContractsToExcel({
   progressLabel,
   statusLabel,
   missingFields,
+  durationYears,
 }) {
   const wb = new ExcelJS.Workbook();
   wb.creator = "DA-APP";
@@ -83,7 +84,7 @@ export async function exportContractsToExcel({
   // ✅ ชีต "สรุปสำหรับผู้บริหาร" ถูกสร้างก่อนชีตข้อมูลดิบโดยตั้งใจ — Excel เรียงแท็บตามลำดับที่สร้าง
   // และเปิดไฟล์มาที่แท็บแรกเสมอ คนที่เปิดไฟล์จึงเจอ "สรุป" ก่อน ไม่ใช่เจอตาราง 20+ คอลัมน์แล้วต้อง
   // ไปหาเองว่าสรุปอยู่ไหน (ตามที่ผู้ใช้ขอให้ "ดูสรุปข้อมูลง่ายที่สุด")
-  buildSummarySheet(wb, { rows, meta, contractStatusInfo, missingFields });
+  buildSummarySheet(wb, { rows, meta, contractStatusInfo, missingFields, durationYears });
 
   // ✅ ไม่ตรึง (freeze) แถว/คอลัมน์ใดๆ ตามที่ผู้ใช้ขอ — เดิมตรึงหัวตาราง 5 แถวแรก + 4 คอลัมน์แรกไว้เสมอ
   // ซึ่งทำให้เลื่อนดูข้อมูลแล้วรู้สึกติดขัด/แบ่งจอเป็นสองส่วน ตอนนี้เลื่อนได้อิสระทั้งแผ่นเหมือนตารางปกติ
@@ -105,6 +106,9 @@ export async function exportContractsToExcel({
     { key: "title", header: "ประเภทงาน", width: 16, group: "ข้อมูลงาน" },
     { key: "contractStart", header: "เริ่มสัญญา", width: 13, group: "ระยะเวลา", align: "center" },
     { key: "contractEnd", header: "สิ้นสุดสัญญา", width: 13, group: "ระยะเวลา", align: "center" },
+    // ✅ อายุสัญญาเป็นจำนวนปี — สัญญา 2-3 ปีมีเงื่อนไขต่างจากปีต่อปีชัดเจน ต้องแยก/pivot ได้ในไฟล์ด้วย
+    // ไม่ใช่ให้เจ้านายมานั่งลบวันที่เอาเองทีละแถว (เทียบคอลัมน์เดียวกับตัวกรอง "อายุสัญญา" บนหน้าจอ)
+    { key: "durationYears", header: "อายุสัญญา (ปี)", width: 13, group: "ระยะเวลา", align: "center" },
     { key: "intervalMonths", header: "รอบเข้า (เดือน)", width: 14, group: "ระยะเวลา", align: "center" },
     { key: "perYear", header: "เข้าปีละ (ครั้ง)", width: 14, group: "ระยะเวลา", align: "center" },
     { key: "visitCount", header: "จำนวนครั้ง", width: 11, group: "ระยะเวลา", align: "center" },
@@ -161,6 +165,9 @@ export async function exportContractsToExcel({
   const tailCols = [
     { key: "responsiblePerson", header: "ผู้รับผิดชอบงาน", width: 20, group: "ผู้เกี่ยวข้อง" },
     { key: "teamMembers", header: "ลูกทีมทั้งหมด (รวมทุกครั้ง — ไว้ค้นหา/กรอง)", width: 30, group: "ผู้เกี่ยวข้อง", wrap: true },
+    // ✅ หมายเหตุที่คนทำงานจดไว้เอง — วางท้ายสุดเพราะยาวไม่แน่นอน ถ้าแทรกกลางตารางจะดันคอลัมน์ที่ต้อง
+    // กวาดสายตาเทียบกันทุกแถวให้เลื่อนหนีไปทางขวา (ตรงกับตำแหน่งคอลัมน์เดียวกันบนหน้าจอ)
+    { key: "remark", header: "หมายเหตุ", width: 36, group: "หมายเหตุ", wrap: true },
   ];
   const cols = [...baseCols, ...visitCols, ...tailCols];
   ws.columns = cols.map((c) => ({ key: c.key, width: c.width }));
@@ -237,6 +244,9 @@ export async function exportContractsToExcel({
       // ล้วน เรียงตามตัวอักษรเท่านั้น) รูปแบบการแสดงผลกำหนดผ่าน numFmt ด้านล่าง
       contractStart: c.contractStart ? new Date(c.contractStart) : "",
       contractEnd: c.contractEnd ? new Date(c.contractEnd) : "",
+      // ⚠️ เว้นว่างเมื่อคำนวณไม่ได้ (ยังไม่กรอกวันเริ่ม/สิ้นสุด) ไม่ใส่ 0 — 0 ปีไม่มีความหมายและจะไป
+      // กวนค่าเฉลี่ย/การกรองใน Excel เหมือนกรณีคอลัมน์ยอดเงินที่เว้นว่างไว้ด้วยเหตุผลเดียวกัน
+      durationYears: durationYears ? (durationYears(c) ?? "") : "",
       intervalMonths: c.intervalMonths ?? "",
       perYear: visitsPerYear(c.intervalMonths) ?? "",
       visitCount: c.visitCount ?? "",
@@ -287,6 +297,7 @@ export async function exportContractsToExcel({
             .filter((name) => name !== v.team)
         )
       )].join(", "),
+      remark: c.remark || "",
     };
     // ✅ ตรรกะรายครั้งเดียวกับตารางบนจอเป๊ะๆ (นับเฉพาะครั้งที่ลงตารางจริง / "รอวางแผน" ถ้ายังเป็นฉบับร่าง)
     const visitMeta = {};
@@ -459,7 +470,7 @@ export async function exportContractsToExcel({
  * ⚠️ ทุกตัวเลขที่นี่คำนวณจาก rows ชุดเดียวกับชีตข้อมูลดิบ (ที่ผ่านตัวกรองเดียวกับหน้าจอมาแล้ว) จึงตรง
  * กันเสมอทั้ง 2 ชีตและตรงกับหน้าจอด้วย — ห้ามดึงข้อมูลจากที่อื่นมาคำนวณเด็ดขาด
  */
-function buildSummarySheet(wb, { rows, meta, contractStatusInfo, missingFields }) {
+function buildSummarySheet(wb, { rows, meta, contractStatusInfo, missingFields, durationYears }) {
   const ws = wb.addWorksheet("สรุปสำหรับผู้บริหาร", {
     pageSetup: { orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
   });
@@ -486,6 +497,7 @@ function buildSummarySheet(wb, { rows, meta, contractStatusInfo, missingFields }
   const byDept = {};
   const byStatus = {};
   const byTitle = {};
+  const byDuration = {};
   let noJobValue = 0;
   let overdueBilling = 0;
   let incompleteRows = 0;
@@ -505,6 +517,9 @@ function buildSummarySheet(wb, { rows, meta, contractStatusInfo, missingFields }
     byStatus[sk] = add(byStatus[sk] || blank(), r);
     const tk = r.title || "— ไม่ระบุประเภทงาน —";
     byTitle[tk] = add(byTitle[tk] || blank(), r);
+    const dy = durationYears ? durationYears(r) : null;
+    const dyk = dy ? `สัญญา ${dy} ปี` : "— ยังไม่ระบุอายุสัญญา —";
+    byDuration[dyk] = add(byDuration[dyk] || blank(), r);
     if (!Number(r.jobValue)) noJobValue += 1;
     if (missingFields && missingFields(r)) incompleteRows += 1;
     const bs = contractBillingSummary(r.visits || []);
@@ -636,6 +651,15 @@ function buildSummarySheet(wb, { rows, meta, contractStatusInfo, missingFields }
         : C.active;
       dataRow(k, v, { labelColor: color, zebra: i % 2 === 1 });
     });
+  spacer();
+
+  // ── แยกตามอายุสัญญา — สัญญายาวคือรายได้ที่ผูกไว้แล้วหลายปี ต่างจากงานปีต่อปีที่ต้องลุ้นต่อทุกปี ──
+  sectionHead("แยกตามอายุสัญญา");
+  headRow("อายุสัญญา");
+  Object.entries(byDuration)
+    // เรียงตามจำนวนปีจากน้อยไปมาก (แกะเลขจากป้าย) กลุ่ม "ยังไม่ระบุ" ไม่มีเลขจึงตกไปอยู่ท้ายสุดเสมอ
+    .sort((a, b) => (parseInt(a[0].replace(/\D/g, ""), 10) || 99) - (parseInt(b[0].replace(/\D/g, ""), 10) || 99))
+    .forEach(([k, v], i) => dataRow(k, v, { labelColor: k.startsWith("—") ? C.muted : null, zebra: i % 2 === 1 }));
   spacer();
 
   // ── แยกตามประเภทงาน — เห็นว่ารายได้มาจากงานแบบไหนเป็นหลัก ────────────

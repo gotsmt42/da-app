@@ -41,7 +41,7 @@ import {
   AddLink, LinkOff, Build, Engineering, ExpandMore, ExpandLess,
   CalendarMonth, PersonOutline, Category, Assignment, Description, HourglassEmpty, Apps, DeviceHub,
   SwapHoriz, TableChart, FilterList, ViewAgenda, TableRows, SwipeLeft, ChevronLeft, ChevronRight,
-  AddCircleOutline, Check, Autorenew, EventBusy, History, Apartment,
+  AddCircleOutline, Check, Autorenew, EventBusy, History, Apartment, Timelapse,
 } from "@mui/icons-material";
 import { useAuth } from "@/features/auth/AuthContext";
 import EventService from "@/shared/services/EventService";
@@ -201,6 +201,28 @@ const statusDisplay = (c) => {
 };
 // ตัวเลือกของตัวกรอง "สถานะสัญญา" — เทียบด้วย kind ซึ่งเป็นคีย์คงที่ ไม่ใช่ข้อความที่แก้ถ้อยคำเมื่อไหร่
 // ตัวกรองก็พังเงียบๆ (label ของ "ใกล้หมดอายุ" มีจำนวนวันต่อท้ายด้วย เทียบข้อความไม่ได้ตั้งแต่ต้น)
+/**
+ * ✅ ช่วงเวลาสำเร็จรูป — เลือกจาก dropdown ทีเดียวจบ ไม่ต้องกดปฏิทิน 2 ครั้งทุกครั้งที่อยากดูเดือนนี้/ปีนี้
+ *
+ * ⚠️ คำนวณช่วงตอน "กรองจริง" ทุกครั้ง ไม่ใช่ตอนกดเลือกแล้วเก็บวันที่ตายตัวไว้ — ถ้าเก็บไว้ ผู้ใช้ที่เปิด
+ * หน้าค้างข้ามเที่ยงคืน/ข้ามเดือนจะเห็น "เดือนปัจจุบัน" ที่ค้างอยู่ที่เดือนเก่าโดยไม่รู้ตัว
+ * ⚠️ "ปีหน้า" มีไว้เพราะหน้านี้เป็นเรื่องสัญญาโดยเฉพาะ — คำถามที่ถูกถามบ่อยที่สุดคือ "ปีหน้ามีสัญญา
+ * อะไรที่ยังมีผลอยู่บ้าง" (ใช้วางแผนต่อสัญญา/กำลังคน) ซึ่งเป็นคำถามเกี่ยวกับอนาคต ต่างจากรายงาน
+ * ทั่วไปที่มองย้อนหลังอย่างเดียว
+ */
+// ✅ ค่าพิเศษของตัวกรอง "ช่วงเวลา" — ที่เหลือเป็นเลขปีตรงๆ (ดู availableYears)
+// ⚠️ ตัวกรอง "ปี" กับ "ช่วงเวลาสัญญา" เคยเป็น 2 ช่องแยกกัน ซึ่งซ้ำซ้อนกันเอง (ทั้งคู่คือ "จะดูช่วงไหน")
+// และขัดกันได้ด้วย เช่นเลือกปี 2569 แต่เลือกช่วงเป็นปีหน้า แล้วได้ตารางว่างโดยไม่มีอะไรอธิบาย —
+// ยุบเหลือช่องเดียวตามที่ผู้ใช้สั่ง: เลือกปีก็ได้ หรือเลือก "เลือกช่วงวันที่เอง…" เพื่อกรอกช่วงเองก็ได้
+const YEAR_FILTER_ALL = "all";
+const YEAR_FILTER_NONE = "none";      // ยังไม่ระบุปี (ไม่มีวันสัญญาและไม่เคยลงวันที่เข้างานเลย)
+const YEAR_FILTER_CUSTOM = "custom";  // กรอกช่วงวันที่เอง (ใช้คู่กับ dateFrom/dateTo)
+// คืนช่วงที่จะใช้กรองจริงตอนเลือก "เลือกช่วงวันที่เอง…" — null = ยังไม่ได้กรอกวันไหนเลย จึงยังไม่กรอง
+const resolveCustomRange = (from, to) => {
+  if (!from && !to) return null;
+  return { from: from ? moment(from).startOf("day") : null, to: to ? moment(to).endOf("day") : null };
+};
+
 const STATUS_FILTER_OPTIONS = [
   { value: "active", label: "มีผลบังคับใช้" },
   { value: "expiring", label: "ใกล้หมดอายุ" },
@@ -350,7 +372,7 @@ const DEFAULT_COL_WIDTHS = {
   docRef: 150, docNo: 150,
   customer: 230, work: 165,
   period: 190,
-  jobValue: 110, commission: 110, status: 168, progress: 110, responsiblePerson: 130,
+  jobValue: 110, commission: 110, status: 168, progress: 110, responsiblePerson: 130, remark: 190,
   departmentTag: 112,
 };
 // ✅ ความกว้างคอลัมน์ "แยกกันทุกแท็บ" — เก็บซ้อนอีกชั้นเป็น { [แท็บ]: { [คอลัมน์]: ความกว้าง } }
@@ -1093,6 +1115,9 @@ const InlineAddRow = ({
             {teamOptions.map((name) => <option key={name} value={name}>{name}</option>)}
           </TextField>
         </TableCell>
+        {/* ✅ ช่องหมายเหตุของแถวที่กำลังสร้าง — เว้นไว้ก่อนได้ กรอกทีหลังในแถวปกติก็ได้
+            ⚠️ ต้องมีช่องนี้ไว้เสมอ ไม่งั้นคอลัมน์ทั้งแถวเลื่อนไป 1 ช่อง (เทียบช่องแผนกที่ต้นแถว) */}
+        <TableCell><Dash /></TableCell>
         <TableCell />
       </TableRow>
 
@@ -1386,10 +1411,48 @@ export default function ContractOverview() {
 
   // ✅ "ปี" ของสัญญา — อิงวันที่เริ่มสัญญาก่อน (ถ้ามี) ไม่งั้น fallback ไปดูวันที่ของครั้งแรกที่มีจริง
   // ใช้ทั้งกรองปีในตาราง และเช็คว่างานเก่า 2 งานควรนับเป็นสัญญาเดียวกันไหม (ต้องปีเดียวกันด้วย)
+  /**
+   * ✅ "ช่วงเวลาของงานนี้" — ของกลางที่ตัวกรองปี / อายุสัญญา / ช่วงวันที่ ใช้ร่วมกันทั้งหมด
+   *
+   * ⚠️ ต้อง fallback ไปหาวันที่เข้างานจริงเสมอเมื่อยังไม่ได้กรอกวันสัญญา — งานทั่วไป/โปรเจคไม่มีวันเริ่ม/
+   * สิ้นสุดสัญญาตามธรรมชาติของมัน ถ้าดูแค่ 2 ฟิลด์นั้นงานพวกนี้จะกลายเป็น "ไม่มีช่วงเวลา" ทั้งหมด แล้ว
+   * หลุดจากตัวกรองช่วงวันที่ไปทั้งแท็บ ทั้งที่มันมีวันเข้างานจริงอยู่ชัดเจน
+   */
+  const contractPeriod = (c) => {
+    const visitDates = (c.visits || []).map((v) => v.start).filter(Boolean).sort();
+    const start = c.contractStart || visitDates[0] || null;
+    const end = c.contractEnd || visitDates[visitDates.length - 1] || start;
+    return start ? { start: moment(start), end: moment(end || start) } : null;
+  };
+
+  // 🐛 BUG ที่แก้ (สัญญา 2-3 ปี หายไปจากปีกลาง): เดิมคืน "ปีที่เริ่ม" ปีเดียว สัญญา 01/2569–12/2571
+  // จึงโผล่เฉพาะตอนเลือกปี 2569 เท่านั้น พอเลือก 2570/2571 หายไปเลยทั้งที่สัญญายังมีผลอยู่จริงในปีนั้น
+  // ✅ คืน "ทุกปีที่สัญญาครอบคลุม" แทน — ตัวกรองปีจะเจอสัญญาหลายปีได้ครบทุกปีที่มันยังมีผลอยู่
+  const contractYears = (c) => {
+    const p = contractPeriod(c);
+    if (!p) return [];
+    const from = p.start.year();
+    const to = Math.max(from, p.end.year());
+    const out = [];
+    for (let y = from; y <= to; y += 1) out.push(y);
+    return out;
+  };
+  // ปีเริ่มต้นของสัญญา — ยังจำเป็นสำหรับที่ที่ต้องการ "ปีเดียว" จริงๆ (เช่นจับกลุ่มงานเก่าที่ยังไม่ผูกสัญญา)
   const contractYear = (c) => {
-    if (c.contractStart) return moment(c.contractStart).year();
-    if (c.visits[0]?.start) return moment(c.visits[0].start).year();
-    return null;
+    const p = contractPeriod(c);
+    return p ? p.start.year() : null;
+  };
+
+  // ✅ อายุสัญญาเป็น "จำนวนปี" — ตามที่ผู้ใช้ขอให้แยกค้นหาได้ เพราะสัญญา 2 ปี/3 ปี มีเงื่อนไขการดูแล
+  // และการวางบิลต่างจากสัญญาปีต่อปีอย่างสิ้นเชิง แต่เดิมดูรวมกันหมดในตารางเดียวโดยไม่มีทางแยก
+  // ⚠️ คิดจากจำนวนเดือนแล้วปัดขึ้น ไม่ใช่ลบปีกัน — สัญญา 01/01/2569–31/12/2569 (11.97 เดือน) ต้องได้
+  // 1 ปี ส่วน 01/07/2569–30/06/2571 (23.97 เดือน) ต้องได้ 2 ปี ซึ่งการลบปีกันตรงๆ จะได้ 1 กับ 2 ผิดทั้งคู่
+  const contractDurationYears = (c) => {
+    const p = contractPeriod(c);
+    if (!p || !c.contractStart || !c.contractEnd) return null;
+    const months = p.end.diff(p.start, "months", true);
+    if (!(months > 0)) return null;
+    return Math.max(1, Math.round(months / 12));
   };
 
   // ✅ งานเก่าที่ company/site/system/title ตรงกันเป๊ะ "และ" อยู่ปีเดียวกัน (≥2 งาน) น่าจะเป็นสัญญา
@@ -1412,6 +1475,7 @@ export default function ContractOverview() {
       map.get(sig).items.push(c);
     });
     return [...map.values()].filter((g) => g.items.length >= 2).sort((a, b) => b.items.length - a.items.length);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contracts]);
 
   // ✅ ตัวเลือกปีสำหรับกรองตาราง — ดึงจากปีที่มีข้อมูลจริง บวกปีปัจจุบันเสมอ (แม้ยังไม่มีสัญญาปีนี้เลย
@@ -1419,16 +1483,18 @@ export default function ContractOverview() {
   const currentYear = moment().year();
   const availableYears = useMemo(() => {
     const years = new Set([currentYear]);
-    contracts.forEach((c) => { const y = contractYear(c); if (y) years.add(y); });
+    contracts.forEach((c) => { contractYears(c).forEach((y) => years.add(y)); });
     return [...years].sort((a, b) => b - a);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contracts]);
-  // ✅ ค่าเริ่มต้นแสดงปีปัจจุบันก่อนเสมอ (ไม่ใช่ "ทุกปี" เหมือนเดิม) เปลี่ยนดูปีอื่นได้จาก dropdown
-  // ✅ ?year= — จำเป็นสำหรับ "ลิงก์เจาะจงข้ามหน้า" (เช่นปุ่ม "ดูในภาพรวมงาน" จากฟอร์มแก้ไขงานในปฏิทิน):
-  // ตัวกรองปีตั้งค่าเริ่มต้นเป็นปีปัจจุบันไว้เอง ถ้าลิงก์มาหาสัญญาของปีอื่นแล้วไม่ได้สั่งปิดตัวกรองปีมาด้วย
-  // จะเปิดมาเจอตารางว่างเปล่าทันที ทั้งที่สัญญานั้นมีอยู่จริง — ลิงก์ข้ามหน้าจึงส่ง year=all มาเสมอ
+  // ✅ ค่าเริ่มต้นคือ "ทุกช่วงเวลา" ตามที่ผู้ใช้สั่ง — เดิมล็อกเป็นปีปัจจุบันให้เองตั้งแต่เปิดหน้ามา ซึ่ง
+  // เป็นตัวกรองที่ผู้ใช้ไม่ได้ตั้งเองแต่ซ่อนข้อมูลไปแล้ว จุดนี้ทำให้เข้าใจผิดบ่อยที่สุดในหน้านี้ว่า
+  // "เห็นครบทุกอย่างแล้ว" ทั้งที่สัญญาของปีอื่นถูกกรองทิ้งไปเงียบๆ — เปิดมาเห็นครบก่อน แล้วค่อยกรองเอง
+  // ✅ ?year= — ยังรองรับเหมือนเดิมสำหรับ "ลิงก์เจาะจงข้ามหน้า" (เช่นปุ่ม "ดูในภาพรวมงาน" จากฟอร์ม
+  // แก้ไขงานในปฏิทิน) ที่ส่ง year=all มาเพื่อกันไม่ให้ตัวกรองปีบังสัญญาที่ลิงก์ชี้มา — ตอนนี้ค่าเริ่มต้น
+  // เป็น all อยู่แล้วจึงไม่จำเป็นเท่าเดิม แต่คงไว้เพื่อให้ลิงก์เก่าที่ส่ง year=<ปี> มายังทำงานได้ถูกต้อง
   const [yearFilter, setYearFilter] = useState(
-    () => searchParams.get("year") || String(currentYear)
+    () => searchParams.get("year") || YEAR_FILTER_ALL
   );
   // ✅ จำนวนแถวที่ยัง "ระบุปีไม่ได้" (สัญญาเปล่าที่ยังไม่กรอกวันที่เริ่มสัญญา/ยังไม่ลงวันที่เข้างานเลย) —
   // แถวพวกนี้แสดงในทุกปีอยู่แล้ว (ดู applyCommonFilters) แต่มีตัวเลือกแยกไว้ให้กรองดูเฉพาะกลุ่มนี้ได้ด้วย
@@ -1438,29 +1504,6 @@ export default function ContractOverview() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [contracts]
   );
-  // ✅ จำนวนงานที่ยังไม่เคยมอบหมายผู้รับผิดชอบ — ใช้เป็นตัวเลือกในตัวกรองผู้รับผิดชอบ ให้ไล่เก็บงานที่
-  // ตกหล่นได้ในคลิกเดียว (เดิมต้องไล่ดูทีละแถวเอง) โผล่เฉพาะตอนมีจริงเท่านั้น
-  const unassignedResponsibleCount = useMemo(
-    () => contracts.filter((c) => !c.responsiblePerson).length,
-    [contracts]
-  );
-  // ✅ จำนวนสัญญาต่อแผนก — โชว์ในตัวเลือกของตัวกรองแผนกเลย ให้รู้ตั้งแต่ยังไม่กดว่าแต่ละแผนกมีกี่รายการ
-  // ⚠️ นับจาก contracts ทั้งชุด (ก่อนตัวกรองอื่น) โดยตั้งใจ — ตัวเลขนี้ตอบว่า "ทั้งระบบมีของแผนกนี้กี่อัน"
-  // ไม่ใช่ "เหลือกี่อันหลังกรองอย่างอื่นแล้ว" ซึ่งจะกลายเป็น 0 สลับไปมาจนอ่านไม่รู้เรื่อง
-  // ✅ จำนวนสัญญาต่อสถานะ — เทียบ pattern เดียวกับ departmentCounts (นับจากชุดเต็มก่อนตัวกรองอื่น)
-  const statusCounts = useMemo(() => {
-    const counts = {};
-    contracts.forEach((c) => { statusKinds(c).forEach((k) => { counts[k] = (counts[k] || 0) + 1; }); });
-    return counts;
-  }, [contracts]);
-  const departmentCounts = useMemo(() => {
-    const counts = {};
-    contracts.forEach((c) => {
-      const key = c.departmentTag || DEPARTMENT.SERVICE;
-      counts[key] = (counts[key] || 0) + 1;
-    });
-    return counts;
-  }, [contracts]);
   // ✅ กรองตามผู้รับผิดชอบ — แยกจากช่องค้นหาข้อความอิสระ ให้เลือกจากรายชื่อจริงได้เลย ไม่ต้องพิมพ์เอง
   const [responsibleFilter, setResponsibleFilter] = useState("all");
   // ✅ กรองตามประเภทงาน (เช่น PM/Service/ติดตั้ง ฯลฯ) — เพิ่มตามที่ผู้ใช้ขอ เทียบ pattern เดียวกับ
@@ -1477,6 +1520,12 @@ export default function ContractOverview() {
   // อย่างเดียว ไล่หาสัญญาที่ใกล้หมดอายุต้องกวาดตาดูทีละแถวเอง (แท็บ "สัญญาหมดอายุ" ครอบเฉพาะที่หมด
   // ไปแล้ว ไม่ครอบที่กำลังจะหมด ซึ่งเป็นกลุ่มที่ต้องรีบต่อสัญญาจริงๆ)
   const [statusFilter, setStatusFilter] = useState("all");
+  // ✅ กรองตามอายุสัญญาเป็นจำนวนปี — ดูเหตุผลที่ contractDurationYears
+  const [durationFilter, setDurationFilter] = useState("all");
+  // ✅ ช่วงวันที่ที่กรอกเอง — ใช้เฉพาะตอนตัวกรองช่วงเวลาเป็น "เลือกช่วงวันที่เอง…" เท่านั้น
+  // ⚠️ เก็บเป็นสตริง YYYY-MM-DD เหมือนช่องวันที่อื่นทั้งหน้า (ThaiDatePicker รับ/คืนรูปแบบนี้)
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const [selectedIds, setSelectedIds] = useState(new Set());
   const selectedContracts = useMemo(() => contracts.filter((c) => selectedIds.has(c.key)), [contracts, selectedIds]);
@@ -1550,7 +1599,11 @@ export default function ContractOverview() {
   // แค่ "กลุ่มประเภท" (สัญญา/งานทั่วไป/ทั้งหมด) ก่อนนับ ให้ตัวเลขทุกจุดในหน้านี้ตรงกันเสมอ
   // @param {{ignoreYear?: boolean}} opts — ignoreYear ใช้เฉพาะแท็บ "สัญญาหมดอายุ" ที่ต้องมองข้ามปี
   //   (ดูเหตุผลที่ expiredCount) ตัวกรองอื่นยังมีผลครบทุกตัวตามปกติ
-  const applyCommonFilters = (list, { ignoreYear = false } = {}) => {
+  // @param {string} [skip] ชื่อตัวกรองที่จะข้ามไปไม่ใช้ในรอบนี้ — ใช้ตอนนับจำนวนต่อตัวเลือกของตัวกรองนั้น
+  //   เอง (faceted count): เลข "ฝ่ายขาย (7)" ต้องหมายถึง "ถ้ากดฝ่ายขายจะเหลือ 7 แถว" จึงต้องกรองด้วย
+  //   ตัวกรองอื่นทุกตัว "ยกเว้นตัวมันเอง" — ถ้ากรองด้วยตัวเองด้วย พอเลือกฝ่ายบริการอยู่ ตัวเลขของ
+  //   ฝ่ายขายจะกลายเป็น 0 ทันที ทั้งที่มีของอยู่จริง
+  const applyCommonFilters = (list, { ignoreYear = false, skip } = {}) => {
     let base = list;
     // 🐛 BUG ที่แก้ (สร้างสัญญาแล้วหายไปเลย): เดิมกรองด้วย String(contractYear(c)) === yearFilter ตรงๆ —
     // สัญญาที่ยัง "ระบุปีไม่ได้" (ไม่ได้กรอกวันที่เริ่มสัญญา และยังไม่ลงวันที่เข้างานสักครั้ง = สัญญาเปล่า
@@ -1561,13 +1614,41 @@ export default function ContractOverview() {
     // ตัวเลือก "ยังไม่ระบุปี" ไว้ให้กรองดูเฉพาะกลุ่มนี้ได้ด้วยถ้าต้องการ (ดู unknownYearCount ด้านล่าง)
     if (ignoreYear) {
       // ข้ามตัวกรองปีไปเลย
-    } else if (yearFilter === "none") {
-      base = base.filter((c) => contractYear(c) === null);
-    } else if (yearFilter !== "all") {
+    } else if (yearFilter === YEAR_FILTER_NONE) {
+      base = base.filter((c) => contractYears(c).length === 0);
+    } else if (yearFilter === YEAR_FILTER_CUSTOM) {
+      // ✅ ช่วงวันที่ที่กรอกเอง = "ช่วงของตัวสัญญาเอง" ตามที่ผู้ใช้ระบุ — ช่อง "จากวันที่" เทียบกับ
+      // วันเริ่มสัญญา และช่อง "ถึงวันที่" เทียบกับวันสิ้นสุดสัญญา สัญญาจะติดมาก็ต่อเมื่อทั้งวันเริ่ม
+      // และวันสิ้นสุด "อยู่ในช่วงที่กรอก" ทั้งคู่ (ไม่ใช่แค่คาบเกี่ยวกันบางส่วน)
+      // 🐛 BUG ที่แก้: เดิมใช้เกณฑ์ "ช่วงซ้อนทับกัน" (overlap) — ค้น 01/01/2570–06/02/2570 แล้วได้
+      // สัญญา 01/04/2569–31/03/2570 ติดมาด้วย เพราะมันคาบช่วงนั้นอยู่ ทั้งที่ไม่ได้เริ่มหรือจบในช่วง
+      // ที่ถามเลยสักวัน ซึ่งไม่ตรงกับที่ผู้ใช้ต้องการ (ถามหา "สัญญาที่เริ่ม-จบ ในช่วงนี้")
+      // ⚠️ กรอกช่องเดียวก็ใช้ได้: กรอกแต่ "จากวันที่" = สัญญาที่เริ่มตั้งแต่วันนั้นเป็นต้นไป (ไม่สนวันจบ)
+      // กรอกแต่ "ถึงวันที่" = สัญญาที่สิ้นสุดภายในวันนั้น (ไม่สนวันเริ่ม)
+      // ⚠️ แถวที่ไม่มีวันที่เลยถูกตัดออกโดยตั้งใจ — ต่างจากการเลือกปีที่ปล่อยผ่าน เพราะการถาม
+      // ช่วงวันที่เจาะจงคือการถามคำถามที่แถวเหล่านั้นตอบไม่ได้
+      const range = resolveCustomRange(dateFrom, dateTo);
+      if (range) {
+        base = base.filter((c) => {
+          const p = contractPeriod(c);
+          if (!p) return false;
+          if (range.from && p.start.isBefore(range.from)) return false;
+          if (range.to && p.end.isAfter(range.to)) return false;
+          return true;
+        });
+      }
+    } else if (yearFilter !== YEAR_FILTER_ALL) {
+      // ✅ สัญญาหลายปีต้องโผล่ในทุกปีที่มันยังมีผลอยู่ (ดู contractYears) ไม่ใช่แค่ปีที่เซ็นสัญญา
       base = base.filter((c) => {
-        const y = contractYear(c);
-        return y === null || String(y) === String(yearFilter);
+        const ys = contractYears(c);
+        return ys.length === 0 || ys.some((y) => String(y) === String(yearFilter));
       });
+    }
+    // ✅ กรองตามอายุสัญญา (1 ปี / 2 ปี / 3 ปี ...) — ตามที่ผู้ใช้ขอให้ "แยกค้นหางานต่อปี"
+    if (durationFilter !== "all" && skip !== "duration") {
+      base = durationFilter === "none"
+        ? base.filter((c) => contractDurationYears(c) === null)
+        : base.filter((c) => String(contractDurationYears(c)) === String(durationFilter));
     }
     // ✅ กรองตาม "ผู้รับผิดชอบงาน" (เจ้าของงานโดยรวม) — เดิมตัวกรองนี้กรองตาม "ทีมที่เข้างาน"
     // (allRoundTeamNames = ทุกคนที่เคยเข้างานครั้งไหนก็ได้) ซึ่งเป็นคนละเรื่องกันโดยสิ้นเชิง: ทีมเปลี่ยน
@@ -1576,7 +1657,9 @@ export default function ContractOverview() {
     // คนหนึ่งแล้วได้สัญญาที่เขาแค่ไปช่วยเข้างานครั้งเดียวติดมาด้วย ทั้งที่ไม่ได้รับผิดชอบสัญญานั้นเลย
     // ⚠️ ช่องค้นหาข้อความอิสระด้านบนยังค้นทั้งผู้รับผิดชอบและชื่อทีมทุกครั้งเหมือนเดิม (ดูท้ายฟังก์ชันนี้)
     // — ตัวกรองนี้เจาะจงเฉพาะผู้รับผิดชอบเท่านั้น
-    if (responsibleFilter === "unassigned") {
+    if (skip === "responsible") {
+      // ข้ามตัวกรองผู้รับผิดชอบไปทั้งก้อน (ดู skip ที่หัวฟังก์ชัน)
+    } else if (responsibleFilter === "unassigned") {
       // ✅ ตัวเลือกพิเศษ — ไล่เก็บสัญญาที่ยังไม่เคยมอบหมายผู้รับผิดชอบ (ขึ้น "ยังไม่มอบหมาย" ในตาราง)
       // ซึ่งเดิมไม่มีทางกรองหาได้เลย ต้องไล่ดูทีละแถวเอง
       base = base.filter((c) => !c.responsiblePerson);
@@ -1592,11 +1675,11 @@ export default function ContractOverview() {
     // ✅ กรองตามแผนก — เทียบผ่านค่าที่ fallback แล้วเสมอ ไม่เทียบ c.departmentTag ดิบ เพราะงานเก่าที่ยังไม่มี
     // ฟิลด์นี้ต้องนับเป็น "ฝ่ายบริการ" (ตรงกับ default ของ schema และตัวกรองฝั่ง server) ไม่งั้นเลือก
     // "ฝ่ายบริการ" แล้วงานเก่าทั้งระบบจะหายหมดทั้งที่หน้าจอแสดงว่าเป็นฝ่ายบริการอยู่
-    if (departmentFilter !== "all") {
+    if (departmentFilter !== "all" && skip !== "department") {
       base = base.filter((c) => (c.departmentTag || DEPARTMENT.SERVICE) === departmentFilter);
     }
     // ✅ กรองตามสถานะสัญญา — เทียบด้วย kind ซึ่งเป็นคีย์คงที่ (ดู statusDisplay) ไม่ใช่ข้อความบนจอ
-    if (statusFilter !== "all") {
+    if (statusFilter !== "all" && skip !== "status") {
       base = base.filter((c) => statusKinds(c).includes(statusFilter));
     }
     const kw = search.trim().toLowerCase();
@@ -1613,7 +1696,7 @@ export default function ContractOverview() {
     return base.filter((c) => {
       const sd = statusDisplay(c);
       return [c.company, c.site, c.system, c.title, c.contractNo, c.quotationNo, c.responsiblePerson,
-        departmentMeta(c.departmentTag).label, sd.label, contractStatusInfo(c)?.label, ...(sd.missing || [])]
+        departmentMeta(c.departmentTag).label, sd.label, contractStatusInfo(c)?.label, c.remark, ...(sd.missing || [])]
         .some((v) => (v || "").toLowerCase().includes(kw)) ||
         (c.allRoundTeamNames || []).some((name) => name.toLowerCase().includes(kw));
     });
@@ -1626,27 +1709,27 @@ export default function ContractOverview() {
   const realContractCount = useMemo(
     () => applyCommonFilters(contracts.filter((c) => c.isRealContract)).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, search]
+    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo, search]
   );
   const hiddenJobCount = useMemo(
     () => applyCommonFilters(contracts.filter((c) => !c.isRealContract && !c.isConfirmedGeneral && !c.isConfirmedProject)).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, search]
+    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo, search]
   );
   const confirmedGeneralCount = useMemo(
     () => applyCommonFilters(contracts.filter((c) => !c.isRealContract && c.isConfirmedGeneral)).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, search]
+    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo, search]
   );
   const confirmedProjectCount = useMemo(
     () => applyCommonFilters(contracts.filter((c) => !c.isRealContract && c.isConfirmedProject)).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, search]
+    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo, search]
   );
   const allFilteredCount = useMemo(
     () => applyCommonFilters(contracts).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, search]
+    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo, search]
   );
   // ✅ สัญญาที่ "เลยกำหนดเข้ารอบถัดไป/คงค้าง" — รอบล่าสุดผ่านมาเกินระยะห่างที่กำหนด (intervalMonths)
   // แล้วแต่ยังไม่มีวันที่/แผนงานล่วงหน้าของรอบถัดไปเลย (ดู nextVisitOverdueInfo) เดิมมีแค่ badge เตือน
@@ -1654,7 +1737,7 @@ export default function ContractOverview() {
   const overdueCount = useMemo(
     () => applyCommonFilters(contracts.filter((c) => c.isRealContract && nextVisitOverdueInfo(c))).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, search]
+    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo, search]
   );
 
   // ✅ สัญญาที่เลยวันสิ้นสุดมาแล้ว — กลุ่มที่ต้องไล่ต่ออายุ/ปิดงาน เดิมมีแต่ชิปสีแดงเตือนทีละแถว ต้อง
@@ -1664,7 +1747,7 @@ export default function ContractOverview() {
   const expiredCount = useMemo(
     () => applyCommonFilters(contracts.filter(isExpiredContract), { ignoreYear: true }).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, search]
+    [contracts, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo, search]
   );
 
   // ✅ สลับแท็บผ่านฟังก์ชันเดียว (ทั้งปุ่มบนจอคอมและเมนูบนมือถือ) เพราะการเข้าแท็บ "สัญญาหมดอายุ" ต้อง
@@ -1681,20 +1764,80 @@ export default function ContractOverview() {
     if (v === "expired") setYearFilter("all");
   }, []);
 
-  const filtered = useMemo(() => {
-    // ⚠️ แท็บสัญญาหมดอายุข้ามตัวกรองปีเหมือนตอนนับ ไม่งั้นตัวเลขบนแท็บกับจำนวนแถวในตารางจะไม่ตรงกัน
-    if (viewFilter === "expired") {
-      return applyCommonFilters(contracts.filter(isExpiredContract), { ignoreYear: true });
-    }
-    const base = viewFilter === "all" ? contracts
+  // ✅ "แถวทั้งหมดของแท็บที่เปิดอยู่" ก่อนตัวกรองย่อยใดๆ — แยกออกมาเป็นของกลางเพราะมี 2 คนใช้:
+  // ตัวตาราง (filtered) และตัวนับจำนวนในตัวเลือกของตัวกรองแต่ละอัน ทั้งคู่ต้องอิงแท็บเดียวกันเสมอ
+  const viewBase = useMemo(() => {
+    if (viewFilter === "expired") return contracts.filter(isExpiredContract);
+    return viewFilter === "all" ? contracts
       : viewFilter === "overdue" ? contracts.filter((c) => c.isRealContract && nextVisitOverdueInfo(c))
       : viewFilter === "ungrouped" ? contracts.filter((c) => !c.isRealContract && !c.isConfirmedGeneral && !c.isConfirmedProject)
       : viewFilter === "general" ? contracts.filter((c) => !c.isRealContract && c.isConfirmedGeneral)
       : viewFilter === "project" ? contracts.filter((c) => !c.isRealContract && c.isConfirmedProject)
       : contracts.filter((c) => c.isRealContract);
-    return applyCommonFilters(base);
+  }, [contracts, viewFilter]);
+
+  const filtered = useMemo(() => {
+    // ⚠️ แท็บสัญญาหมดอายุข้ามตัวกรองปีเหมือนตอนนับ ไม่งั้นตัวเลขบนแท็บกับจำนวนแถวในตารางจะไม่ตรงกัน
+    return applyCommonFilters(viewBase, { ignoreYear: viewFilter === "expired" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contracts, search, viewFilter, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter]);
+  }, [viewBase, search, viewFilter, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo]);
+
+  // ✅ จำนวนต่อตัวเลือกของตัวกรอง "แผนก" และ "สถานะสัญญา" — โชว์ในตัวเลือกเลย ให้รู้ตั้งแต่ยังไม่กด
+  // 🐛 BUG ที่แก้ (ตัวเลขไม่ตรงกับที่เห็นในตาราง): เดิมนับจาก contracts ทั้งชุดของทั้งระบบ ไม่สนใจว่า
+  // กำลังเปิดแท็บไหนหรือกรองอะไรค้างไว้ — เปิดแท็บ "งานสัญญา" ที่มี 12 แถว แต่ตัวเลือกกลับขึ้น
+  // "ฝ่ายบริการ (455)" ซึ่งไม่ตรงกับอะไรบนหน้าจอเลยสักตัว
+  // ✅ ตอนนี้อิงจาก "แถบที่เปิดอยู่" + ตัวกรองอื่นที่ตั้งไว้ทั้งหมด ยกเว้นตัวมันเอง (ดู skip ที่
+  // applyCommonFilters) ตัวเลขจึงอ่านได้ตรงตัวว่า "ถ้ากดอันนี้จะเหลือกี่แถว" และรวมกันแล้วเท่ากับ
+  // จำนวนแถวที่เห็นอยู่จริงเสมอ
+  const departmentCounts = useMemo(() => {
+    const counts = {};
+    applyCommonFilters(viewBase, { ignoreYear: viewFilter === "expired", skip: "department" })
+      .forEach((c) => {
+        const key = c.departmentTag || DEPARTMENT.SERVICE;
+        counts[key] = (counts[key] || 0) + 1;
+      });
+    return counts;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewBase, search, viewFilter, yearFilter, responsibleFilter, titleFilter, systemFilter, statusFilter, durationFilter, dateFrom, dateTo]);
+
+  // ⚠️ 1 แถวติดได้หลายสถานะพร้อมกัน (เช่น "หมดอายุแล้ว" + "มีหมายเหตุที่พิมพ์เอง" — ดู statusKinds)
+  // ผลรวมของทุกตัวเลือกจึงมากกว่าจำนวนแถวได้ ซึ่งถูกต้องแล้วและตั้งใจ: แต่ละตัวเลขยังตอบคำถามเดิม
+  // ว่า "ถ้ากดอันนี้จะเหลือกี่แถว" ได้ตรงตัวอยู่
+  const statusCounts = useMemo(() => {
+    const counts = {};
+    applyCommonFilters(viewBase, { ignoreYear: viewFilter === "expired", skip: "status" })
+      .forEach((c) => { statusKinds(c).forEach((k) => { counts[k] = (counts[k] || 0) + 1; }); });
+    return counts;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewBase, search, viewFilter, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, durationFilter, dateFrom, dateTo]);
+
+  // ✅ ตัวเลือกของตัวกรอง "อายุสัญญา" — สร้างจากอายุที่มีอยู่จริงในแท็บนี้เท่านั้น ไม่ hardcode 1/2/3 ปี
+  // ไว้ตายตัว (ที่ไหนมีสัญญา 5 ปีก็ต้องเลือกได้ ที่ไหนมีแต่ปีต่อปีก็ไม่ต้องมีตัวเลือกที่กดแล้วว่างเปล่า)
+  const durationOptions = useMemo(() => {
+    const counts = {};
+    let none = 0;
+    applyCommonFilters(viewBase, { ignoreYear: viewFilter === "expired", skip: "duration" })
+      .forEach((c) => {
+        const d = contractDurationYears(c);
+        if (d === null) none += 1;
+        else counts[d] = (counts[d] || 0) + 1;
+      });
+    return {
+      years: Object.keys(counts).map(Number).sort((a, b) => a - b).map((y) => ({ value: String(y), label: `${y} ปี`, count: counts[y] })),
+      none,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewBase, search, viewFilter, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, dateFrom, dateTo]);
+
+  // ✅ จำนวนงานที่ยังไม่เคยมอบหมายผู้รับผิดชอบ — ตัวเลือกในตัวกรองผู้รับผิดชอบ ให้ไล่เก็บงานที่ตกหล่น
+  // ได้ในคลิกเดียว (เดิมต้องไล่ดูทีละแถวเอง) โผล่เฉพาะตอนมีจริง — นับแบบเดียวกับ 2 ตัวด้านบนเป๊ะๆ
+  // (อิงแท็บที่เปิดอยู่ + ตัวกรองอื่น ยกเว้นตัวกรองผู้รับผิดชอบเอง) ตัวเลขทั้งแถวเครื่องมือจึงพูดตรงกัน
+  const unassignedResponsibleCount = useMemo(
+    () => applyCommonFilters(viewBase, { ignoreYear: viewFilter === "expired", skip: "responsible" })
+      .filter((c) => !c.responsiblePerson).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [viewBase, search, viewFilter, yearFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo]
+  );
 
   // ✅ เรียงลำดับตารางได้ด้วยการคลิกหัวตารางแต่ละช่อง (เฉพาะคอลัมน์ข้อมูลตรงๆ ที่เทียบค่าเดียวได้ —
   // ไม่รวม "สถานะสัญญา"/"คืบหน้า"/"ครั้งที่ N" ซึ่งเป็นค่าที่คำนวณจากหลายฟิลด์ ไม่มีค่าเดี่ยวให้เรียง)
@@ -1729,6 +1872,7 @@ export default function ContractOverview() {
     // เรียงด้วย "ป้ายภาษาไทย" ไม่ใช่ค่าดิบ — ผู้ใช้คาดหวังลำดับตามที่ตาเห็น (ขาย ก่อน บริการ) ไม่ใช่
     // ตามค่าที่เก็บในฐานข้อมูล (sales ก่อน service ซึ่งบังเอิญตรงกันในกรณีนี้ แต่จะเพี้ยนทันทีถ้าเพิ่มแผนกใหม่)
     departmentTag: (c) => departmentMeta(c.departmentTag).label,
+    remark: (c) => c.remark || "",
     // ⚠️ เรียงตาม "ความเร่งด่วน" ไม่ใช่ตามตัวอักษรของข้อความ — หมดอายุแล้วต้องมาก่อนใกล้หมดอายุเสมอ
     // ถ้าเรียงตามข้อความ "ข้อมูลไม่ครบ" จะมาก่อน "หมดอายุแล้ว" ซึ่งกลับหัวกลับหางกับสิ่งที่คนอยากเห็น
     status: (c) => {
@@ -2002,6 +2146,7 @@ export default function ContractOverview() {
       1 +                                    // progress
       visitColumns.length +
       1 +                                    // responsiblePerson
+      1 +                                    // remark (หมายเหตุ)
       1;                                     // actions
     return { before, after };
   }, [showCheckboxes, hideContractOnlyColumns, visitColumns.length]);
@@ -2017,22 +2162,34 @@ export default function ContractOverview() {
     if (systemFilter !== "all") labels.push(`ระบบ ${systemFilter}`);
     if (responsibleFilter === "unassigned") labels.push("ยังไม่มอบหมายผู้รับผิดชอบ");
     else if (responsibleFilter !== "all") labels.push(`ผู้รับผิดชอบ ${responsibleFilter}`);
-    if (yearFilter === "none") labels.push("ยังไม่ระบุปี");
-    else if (yearFilter !== "all") labels.push(`ปี ${yearFilter}`);
+    if (yearFilter === YEAR_FILTER_NONE) labels.push("ยังไม่ระบุปี");
+    else if (yearFilter === YEAR_FILTER_CUSTOM) {
+      // ⚠️ แสดงเป็น พ.ศ. ให้ตรงกับที่กรอกในช่อง (ทั้งหน้าใช้ พ.ศ. หมด) ไม่ใช่ ค.ศ. ที่เก็บอยู่เบื้องหลัง
+      if (dateFrom && dateTo) labels.push(`สัญญาช่วง ${thaiDateNumeric(dateFrom)} – ${thaiDateNumeric(dateTo)}`);
+      else if (dateFrom) labels.push(`เริ่มสัญญาตั้งแต่ ${thaiDateNumeric(dateFrom)}`);
+      else if (dateTo) labels.push(`สิ้นสุดสัญญาภายใน ${thaiDateNumeric(dateTo)}`);
+    }
+    // ⚠️ ป้ายนี้ต้องเป็น พ.ศ. เหมือนที่โชว์ใน dropdown (ค่าที่เก็บเป็น ค.ศ. — ดูคอมเมนต์ที่ตัวเลือกปี)
+    else if (yearFilter !== YEAR_FILTER_ALL) labels.push(`ปี ${Number(yearFilter) + 543}`);
     if (departmentFilter !== "all") labels.push(`แผนก ${departmentMeta(departmentFilter).label}`);
     if (statusFilter !== "all") {
       labels.push(`สถานะ ${STATUS_FILTER_OPTIONS.find((o) => o.value === statusFilter)?.label || statusFilter}`);
     }
+    if (durationFilter === "none") labels.push("ยังไม่ระบุอายุสัญญา");
+    else if (durationFilter !== "all") labels.push(`สัญญา ${durationFilter} ปี`);
     return labels;
-  }, [search, titleFilter, systemFilter, responsibleFilter, yearFilter, departmentFilter, statusFilter]);
+  }, [search, titleFilter, systemFilter, responsibleFilter, yearFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo]);
   const hasActiveFilters = activeFilterLabels.length > 0;
   // ✅ จำนวนตัวกรองแบบ dropdown ที่ทำงานอยู่ (ไม่นับช่องค้นหา ซึ่งบนมือถือโชว์อยู่ตลอดอยู่แล้ว) — ใช้เป็น
-  // ตัวเลขบนปุ่ม "ตัวกรอง" ให้รู้ว่ามีตัวกรองซ่อนอยู่กี่ตัวโดยไม่ต้องกางออกมาดู ⚠️ ตัวกรองปีตั้งค่าเริ่มต้น
-  // เป็นปีปัจจุบันไว้เองตั้งแต่แรก (ผู้ใช้ไม่ได้ตั้ง) ตัวเลขนี้จึงขึ้นอย่างน้อย 1 ตั้งแต่เปิดหน้ามา — ตั้งใจ
-  // ให้เป็นแบบนั้น เพราะเป็นจุดที่ผู้ใช้เข้าใจผิดบ่อยที่สุดว่าเห็นข้อมูลครบทุกปีแล้ว
+  // ตัวเลขบนปุ่ม "ตัวกรอง" ให้รู้ว่ามีตัวกรองซ่อนอยู่กี่ตัวโดยไม่ต้องกางออกมาดู — ตอนนี้ตัวกรองทุกตัว
+  // เริ่มต้นที่ "ทุก…" หมด ตัวเลขนี้จึงเป็น 0 ตอนเปิดหน้ามาเสมอ และทุกครั้งที่ขึ้นเลข = ผู้ใช้กดเอง
   const activeDropdownFilterCount = useMemo(
-    () => [titleFilter, systemFilter, responsibleFilter, yearFilter, departmentFilter, statusFilter].filter((v) => v !== "all").length,
-    [titleFilter, systemFilter, responsibleFilter, yearFilter, departmentFilter, statusFilter]
+    () => [titleFilter, systemFilter, responsibleFilter, yearFilter, departmentFilter, statusFilter, durationFilter]
+      .filter((v) => v !== "all").length
+      // ⚠️ เลือก "เลือกช่วงวันที่เอง…" ค้างไว้แต่ยังไม่กรอกวันไหนเลย = ยังไม่ได้กรองอะไร
+      // (ตรงกับ applyCommonFilters ที่ข้ามการกรองไปในกรณีนั้น) — yearFilter เองถูกนับไปแล้วด้านบน
+      - ((yearFilter === YEAR_FILTER_CUSTOM && !resolveCustomRange(dateFrom, dateTo)) ? 1 : 0),
+    [titleFilter, systemFilter, responsibleFilter, yearFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo]
   );
   const clearAllFilters = () => {
     setSearch("");
@@ -2042,6 +2199,9 @@ export default function ContractOverview() {
     setYearFilter("all");
     setDepartmentFilter("all");
     setStatusFilter("all");
+    setDurationFilter("all");
+    setDateFrom("");
+    setDateTo("");
   };
 
   // ✅ ป้ายชื่อแท็บมุมมองปัจจุบันแบบเต็ม — ใช้ในแถบสรุปยอดรวม (ต้องอ่านแล้วเข้าใจทันทีว่ากำลังดูชุดไหน)
@@ -2070,7 +2230,12 @@ export default function ContractOverview() {
       contracts: "งานสัญญา", overdue: "เลยกำหนด", expired: "สัญญาหมดอายุ", general: "งานทั่วไป",
       project: "งานโปรเจค", ungrouped: "ยังไม่จัดกลุ่ม", all: "ทั้งหมด",
     }[viewFilter] || "ทั้งหมด";
-    const yearLabel = yearFilter === "all" ? "ทุกปี" : yearFilter === "none" ? "ยังไม่ระบุปี" : yearFilter;
+    // ⚠️ เป็น พ.ศ. ให้ตรงกับที่เลือกบนหน้าจอ — ชื่อไฟล์กับหัวรายงานต้องอ่านแล้วตรงกับตัวเลือกที่กดไป
+    // ไม่งั้นเจ้านายเปิดไฟล์มาเห็น "2026" ทั้งที่บนจอเลือก "2569" แล้วสงสัยว่าส่งไฟล์ผิดปีมาให้หรือเปล่า
+    const yearLabel = yearFilter === YEAR_FILTER_ALL ? "ทุกช่วงเวลา"
+      : yearFilter === YEAR_FILTER_NONE ? "ยังไม่ระบุปี"
+      : yearFilter === YEAR_FILTER_CUSTOM ? "ช่วงที่เลือกเอง"
+      : String(Number(yearFilter) + 543);
     return { viewLabel, yearLabel };
   }, [viewFilter, yearFilter]);
 
@@ -2109,6 +2274,7 @@ export default function ContractOverview() {
           return sd.auto ? `${sd.label} (${sd.auto.label})` : sd.label;
         },
         missingFields: (c) => contractCompleteness(c).missing.join(" · "),
+        durationYears: contractDurationYears,
       });
     } catch (err) {
       Swal.fire({
@@ -2689,7 +2855,7 @@ export default function ContractOverview() {
     // โปรเจคส่งผ่าน eventIds — ดู useBasicInfoEndpoint ใน commitEdit) แถว "ยังไม่จัดกลุ่ม" ยังไม่ให้ติด
     // เพราะยังไม่รู้ด้วยซ้ำว่ามันคืองานอะไร ควรจัดหมวดหมู่ให้เรียบร้อยก่อน
     if (field === "docNo" || field === "responsiblePerson" || field === "jobValue" || field === "commission"
-      || field === "departmentTag" || field === "statusNote") return isClassifiedRow(c);
+      || field === "departmentTag" || field === "statusNote" || field === "remark") return isClassifiedRow(c);
     return c.isRealContract;
   }, []);
 
@@ -2837,7 +3003,7 @@ export default function ContractOverview() {
         BASIC_INFO_FIELDS.has(field) ||
         field === "docNo" ||
         ((field === "responsiblePerson" || field === "jobValue" || field === "commission"
-          || field === "departmentTag" || field === "statusNote") && !c.isRealContract);
+          || field === "departmentTag" || field === "statusNote" || field === "remark") && !c.isRealContract);
       if (useBasicInfoEndpoint) {
         await EventService.UpdateBasicInfo(c.visits.map((v) => v._id), payload);
       } else {
@@ -3729,6 +3895,22 @@ pagedRows.map((c, idx) => {
                     onCommit={(v) => commitEdit(c, v)}
                     onCancel={cancelEdit}
                   />
+                  {/* ✅ หมายเหตุ — คลิกพิมพ์ได้เลยเหมือนช่องอื่น ข้อความยาวถูกตัดด้วย … แต่ยังอ่านเต็มได้
+                      จาก tooltip (และการ์ดมือถือแสดงเต็มไม่ตัด) */}
+                  <EditableCell
+                    editable={isAdminOrManager && canEditField(c, "remark")} columnKey="remark"
+                    editing={editingCell?.key === c.key && editingCell?.field === "remark"}
+                    value={c.remark} editValue={editValue} saving={editSaving}
+                    width={colVar("remark")}
+                    placeholder="พิมพ์หมายเหตุ"
+                    title={c.remark || (isAdminOrManager ? "คลิกเพื่อเพิ่มหมายเหตุ" : "ไม่มีหมายเหตุ")}
+                    formatDisplay={(v) => (v
+                      ? <Box component="span" sx={{ fontSize: "0.78rem", color: "text.secondary" }}>{v}</Box>
+                      : <Dash />)}
+                    onStartEdit={() => beginEdit(c, "remark")}
+                    onCommit={(v) => commitEdit(c, v)}
+                    onCancel={cancelEdit}
+                  />
                   <TableCell align="center" sx={{ width: colWidth("actions") }}>
                     {/* ✅ เพิ่ม hover เป็นพื้นวงกลมสี (ไม่ใช่แค่เปลี่ยนสีตัวไอคอนเฉยๆ) ให้รู้สึกเหมือนปุ่มกด
                         ได้จริงชัดเจนขึ้น เทียบ pattern ปุ่มไอคอนวงกลมมาตรฐาน Material Design
@@ -4442,6 +4624,18 @@ pagedRows.map((c, idx) => {
 
         {/* ผู้รับผิดชอบ — ฟิลด์อิสระจากทีมที่เข้างานทุกครั้งด้านบนโดยสมบูรณ์ */}
         <FieldRow label="ผู้รับผิดชอบ" editable={isAdminOrManager && canEditField(c, "responsiblePerson")} editType="select" editOptions={teamOptions} value={c.responsiblePerson} formatDisplay={unassignedResponsibleDisplay} {...fp("responsiblePerson")} />
+        {/* ✅ หมายเหตุ — noClip เพราะข้อความคือเนื้อหาทั้งหมดของช่องนี้ ถ้าโดนตัดเหลือ "..." บนมือถือ
+            (ซึ่งไม่มี hover ให้ชี้ดู tooltip) ก็เท่ากับไม่ได้บอกอะไรเลย */}
+        <FieldRow
+          label="หมายเหตุ" noClip
+          editable={isAdminOrManager && canEditField(c, "remark")}
+          value={c.remark}
+          placeholder="พิมพ์หมายเหตุ"
+          formatDisplay={(v) => (v
+            ? <Typography variant="body2" sx={{ fontSize: "0.8rem", color: "text.secondary", whiteSpace: "pre-wrap" }}>{v}</Typography>
+            : <Dash />)}
+          {...fp("remark")}
+        />
 
         {/* ปุ่มจัดการ — เฉพาะแอดมิน/manager เทียบ pattern เดียวกับคอลัมน์ actions ในตารางเดสก์ท็อป */}
         {isAdminOrManager && (
@@ -4646,11 +4840,56 @@ pagedRows.map((c, idx) => {
           {teamOptions.map((name) => <option key={name} value={name}>{name}</option>)}
         </TextField>
       )}
-      {/* ✅ กรองตามปีของสัญญา (อิงวันที่เริ่มสัญญา ไม่งั้นอิงวันที่ครั้งแรก) + เน้นสีตอนกรองปีเจาะจงอยู่
-          ให้เห็นชัดว่ากำลังดูข้อมูลแค่ปีเดียว ไม่ใช่ทั้งหมด (ค่าเริ่มต้นล็อกปีปัจจุบันไว้ตั้งแต่แรก) */}
+      {/* ✅ กรองตามอายุสัญญา (1 ปี / 2 ปี / 3 ปี ...) — ตามที่ผู้ใช้ขอให้ "แยกค้นหางานต่อปี" เพราะสัญญา
+          หลายปีมีเงื่อนไขการดูแล/วางบิลต่างจากสัญญาปีต่อปีชัดเจน แต่เดิมปนกันอยู่ในตารางเดียวโดยไม่มี
+          ทางแยกดูเลย ⚠️ ตัวเลือกสร้างจากอายุที่มีอยู่จริงในแท็บนี้เท่านั้น (ดู durationOptions)
+          — กดตัวเลือกไหนก็ต้องมีข้อมูลเสมอ ไม่มีตัวเลือกที่กดแล้วว่างเปล่า */}
+      {(durationOptions.years.length > 0 || durationOptions.none > 0) && (
+        <TextField
+          select size="small" label="อายุสัญญา" value={durationFilter}
+          onChange={(e) => setDurationFilter(e.target.value)}
+          SelectProps={{ native: true }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Timelapse sx={{ fontSize: 18, color: durationFilter !== "all" ? ACCENT : "text.disabled" }} />
+              </InputAdornment>
+            ),
+          }}
+          sx={{
+            width: { xs: "100%", sm: 172 }, flexShrink: 0,
+            "& .MuiOutlinedInput-root": {
+              borderRadius: 2.5,
+              bgcolor: durationFilter !== "all" ? alpha(ACCENT, 0.06) : "background.paper",
+              "& fieldset": durationFilter !== "all" ? { borderColor: alpha(ACCENT, 0.45) } : {},
+              "&:hover fieldset": durationFilter !== "all" ? { borderColor: ACCENT } : {},
+            },
+            "& .MuiInputLabel-root": durationFilter !== "all" ? { color: ACCENT, fontWeight: 700 } : {},
+          }}
+        >
+          <option value="all">ทุกอายุสัญญา</option>
+          {durationOptions.years.map((o) => (
+            <option key={o.value} value={o.value}>{o.label} ({o.count})</option>
+          ))}
+          {durationOptions.none > 0 && <option value="none">ยังไม่ระบุ ({durationOptions.none})</option>}
+        </TextField>
+      )}
+      {/* ✅ ตัวกรองช่วงเวลา — ช่องเดียวคุมทั้ง "เลือกปี" และ "เลือกช่วงวันที่เอง"
+          🐛 BUG ที่แก้: เดิมแยกเป็น 2 ช่อง ("ปี" กับ "ช่วงเวลาสัญญา") ซึ่งซ้ำซ้อนกันเอง — ทั้งคู่ตอบคำถาม
+          เดียวกันว่า "จะดูช่วงไหน" และตั้งขัดกันได้ด้วย (เลือกปี 2569 แต่เลือกช่วงเป็นปีหน้า แล้วได้ตาราง
+          ว่างเปล่าโดยไม่มีอะไรอธิบายว่าเพราะอะไร) ยุบเหลือช่องเดียวตามที่ผู้ใช้สั่ง
+          ✅ สัญญาหลายปีโผล่ครบทุกปีที่ยังมีผล ไม่ใช่แค่ปีที่เซ็น (ดู contractYears)
+          ⚠️ ค่าเริ่มต้นล็อกปีปัจจุบันไว้ตั้งแต่แรก + เน้นสีตอนกรองอยู่ ให้เห็นชัดว่ากำลังดูแค่ช่วงเดียว
+          ไม่ใช่ทั้งหมด ซึ่งเป็นจุดที่ผู้ใช้เข้าใจผิดบ่อยที่สุดในหน้านี้ */}
       <TextField
-        select size="small" label="ปี" value={yearFilter}
-        onChange={(e) => setYearFilter(e.target.value)}
+        select size="small" label="ช่วงเวลา" value={yearFilter}
+        onChange={(e) => {
+          const v = e.target.value;
+          setYearFilter(v);
+          // ⚠️ ออกจากโหมดกรอกช่วงเองเมื่อไหร่ ต้องล้างวันที่ที่ค้างไว้ทิ้งด้วย ไม่งั้นกดกลับมาอีกครั้ง
+          // จะเจอวันเก่าค้างอยู่แล้วตารางกรองทันทีโดยที่ผู้ใช้ไม่ได้สั่ง
+          if (v !== YEAR_FILTER_CUSTOM) { setDateFrom(""); setDateTo(""); }
+        }}
         SelectProps={{ native: true }}
         InputProps={{
           startAdornment: (
@@ -4660,7 +4899,7 @@ pagedRows.map((c, idx) => {
           ),
         }}
         sx={{
-          width: { xs: "100%", sm: 155 }, flexShrink: 0,
+          width: { xs: "100%", sm: 178 }, flexShrink: 0,
           "& .MuiOutlinedInput-root": {
             borderRadius: 2.5,
             bgcolor: yearFilter !== "all" ? alpha(ACCENT, 0.06) : "background.paper",
@@ -4670,12 +4909,72 @@ pagedRows.map((c, idx) => {
           "& .MuiInputLabel-root": yearFilter !== "all" ? { color: ACCENT, fontWeight: 700 } : {},
         }}
       >
-        <option value="all">ทุกปี</option>
-        {availableYears.map((y) => <option key={y} value={y}>{y}</option>)}
+        <option value={YEAR_FILTER_ALL}>ทุกช่วงเวลา</option>
+        {/* ⚠️ ติดป้าย "(ปีปัจจุบัน)" ไว้ที่ปีนี้ — เดิมตัวกรองตั้งค่าเริ่มต้นเป็นปีปัจจุบันให้เองโดยผู้ใช้ไม่ได้
+            เลือก ถ้าไม่บอกว่าปีไหนคือปีปัจจุบัน คนจะไม่รู้ว่าตัวเลขที่ค้างอยู่นั้นคือค่าเริ่มต้นหรือตัวเองเผลอกด */}
+        {/* ⚠️ แสดงเป็น พ.ศ. แต่ "ค่าที่เก็บยังเป็น ค.ศ." โดยตั้งใจ — ทั้งหน้าเทียบปีจาก contractYears()
+            ซึ่งอ่านจาก moment().year() (ค.ศ.) และลิงก์ข้ามหน้าที่ส่ง ?year= มาก็เป็น ค.ศ. ถ้าเปลี่ยนค่า
+            เป็น พ.ศ. ด้วยจะไม่ตรงกับอะไรเลยแล้วตารางว่างทุกครั้งที่เลือกปี — แปลงเฉพาะตอนแสดงผลเท่านั้น
+            (วันที่ทุกจุดในหน้านี้แสดงเป็น พ.ศ. อยู่แล้ว ตัวเลือกปีจึงต้องเป็น พ.ศ. ให้ตรงกัน) */}
+        {availableYears.map((y) => (
+          <option key={y} value={y}>{y === currentYear ? `${y + 543} (ปีปัจจุบัน)` : y + 543}</option>
+        ))}
         {/* ✅ สัญญาที่ยังไม่ได้กรอกวันที่เริ่มสัญญาและยังไม่ลงวันที่เข้างานเลย — ปกติเห็นอยู่ในทุกปีอยู่แล้ว
             ตัวเลือกนี้ไว้กรองดูเฉพาะกลุ่มนี้เวลาต้องการไล่เก็บตกว่าเหลือสัญญาไหนค้างยังไม่ได้ลงวันที่ */}
-        {unknownYearCount > 0 && <option value="none">ยังไม่ระบุปี ({unknownYearCount})</option>}
+        {unknownYearCount > 0 && <option value={YEAR_FILTER_NONE}>ยังไม่ระบุปี ({unknownYearCount})</option>}
+        <option value={YEAR_FILTER_CUSTOM}>เลือกช่วงวันที่เอง…</option>
       </TextField>
+
+      {yearFilter === YEAR_FILTER_CUSTOM && (
+        <Stack
+          direction="row" alignItems="center" spacing={0.75}
+          sx={{
+            width: { xs: "100%", sm: "auto" }, flexShrink: 0,
+            px: 1, py: 0.25, borderRadius: 2.5,
+            border: "1px solid",
+            borderColor: (dateFrom || dateTo) ? alpha(ACCENT, 0.45) : "divider",
+            bgcolor: (dateFrom || dateTo) ? alpha(ACCENT, 0.06) : "background.paper",
+          }}
+        >
+          <ThaiDatePicker
+            value={dateFrom}
+            onChange={setDateFrom}
+            label="เริ่มสัญญาตั้งแต่"
+            textFieldProps={{
+              variant: "standard",
+              InputProps: { disableUnderline: true },
+              // ⚠️ ต้องบังคับ shrink — ช่องวันที่ที่ยังว่างจะโชว์ placeholder "วว/ดด/ปปปป" ของตัวเอง
+              // ซึ่ง MUI ไม่นับว่า "มีค่า" ป้ายกำกับจึงไม่ยกขึ้นแล้วไปทับตัวหนังสือในช่องจนอ่านไม่ออกทั้งคู่
+              InputLabelProps: { shrink: true },
+              sx: { width: { xs: "50%", sm: 132 }, "& input": { fontSize: "0.8rem", py: 0.5 } },
+            }}
+          />
+          <Box component="span" sx={{ color: "text.disabled", fontSize: "0.8rem", flexShrink: 0, pt: 1.2 }}>–</Box>
+          <ThaiDatePicker
+            value={dateTo}
+            onChange={setDateTo}
+            label="สิ้นสุดภายใน"
+            minDate={dateFrom || undefined}
+            textFieldProps={{
+              variant: "standard",
+              InputProps: { disableUnderline: true },
+              // ⚠️ ต้องบังคับ shrink — ช่องวันที่ที่ยังว่างจะโชว์ placeholder "วว/ดด/ปปปป" ของตัวเอง
+              // ซึ่ง MUI ไม่นับว่า "มีค่า" ป้ายกำกับจึงไม่ยกขึ้นแล้วไปทับตัวหนังสือในช่องจนอ่านไม่ออกทั้งคู่
+              InputLabelProps: { shrink: true },
+              sx: { width: { xs: "50%", sm: 132 }, "& input": { fontSize: "0.8rem", py: 0.5 } },
+            }}
+          />
+          {(dateFrom || dateTo) && (
+            <IconButton
+              size="small" title="ล้างช่วงวันที่"
+              onClick={() => { setDateFrom(""); setDateTo(""); }}
+              sx={{ p: 0.25, flexShrink: 0, mt: 1 }}
+            >
+              <Close sx={{ fontSize: 15 }} />
+            </IconButton>
+          )}
+        </Stack>
+      )}
     </>
   );
 
@@ -4951,8 +5250,12 @@ pagedRows.map((c, idx) => {
           กินพื้นที่เกือบเต็มจอก่อนถึงข้อมูลจริงสักแถว
           ✅ จอใหญ่: เหมือนเดิมทุกประการ (ช่องค้นหา + ทุก dropdown เรียงแถวเดียวกัน ไม่มีปุ่มพับ) */}
       <Box sx={{ mb: 2 }}>
-        <Stack direction={{ xs: "column", sm: "row" }} gap={1.5}>
-          <Stack direction="row" gap={1} sx={{ flex: 1, minWidth: 0 }}>
+        {/* 🐛 BUG ที่แก้ (ตัวกรองล้นออกนอกจอ): แถวนี้ไม่เคยตั้ง flexWrap ไว้ พอตัวกรองเพิ่มขึ้นเรื่อยๆ
+            (แผนก/สถานะ/อายุสัญญา/ช่วงวันที่) ช่องท้ายๆ จะดันทะลุขอบขวาออกไปนอกจอจนกดไม่ได้เลย
+            ✅ ให้ห่อลงบรรทัดใหม่แทนเมื่อพื้นที่ไม่พอ — ช่องค้นหายังกินพื้นที่ที่เหลือของบรรทัดแรกเหมือนเดิม
+            แต่มีความกว้างขั้นต่ำกันไม่ให้ถูกบีบจนพิมพ์ไม่ได้ */}
+        <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} sx={{ flexWrap: { sm: "wrap" } }}>
+          <Stack direction="row" gap={1} sx={{ flex: 1, minWidth: { sm: 260 } }}>
             <TextField
               fullWidth size="small"
               placeholder={isMobile ? "ค้นหางาน..." : "ค้นหาบริษัท / โครงการ / เลขที่สัญญา / ผู้รับผิดชอบ..."}
@@ -5279,6 +5582,12 @@ pagedRows.map((c, idx) => {
                     สมบูรณ์ (คนรับผิดชอบสัญญานี้โดยรวมไม่ควรเปลี่ยนตามทีมที่เข้างานแต่ละครั้ง) ยังคงอยู่
                     เหมือนเดิม แก้ไข inline ได้ตามปกติ (ดู responsiblePerson/responsiblePersonId) */}
                 <ResizableTh width={colWidth("responsiblePerson")} columnKey="responsiblePerson" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("responsiblePerson")} sortable sortDirection={sortConfig.key === "responsiblePerson" ? sortConfig.direction : null} onSort={handleSortClick}>ผู้รับผิดชอบ</ResizableTh>
+                {/* ✅ หมายเหตุ — บันทึกอิสระของงานนั้น (เช่น "ลูกค้าขอเลื่อนรอบ 2" / "ต้องแจ้ง รปภ. ล่วงหน้า")
+                    ⚠️ คนละช่องกับ "สถานะสัญญา" ที่พิมพ์ทับได้โดยตั้งใจ — ถ้าใช้ช่องเดียวกัน การจดโน้ต
+                    ธรรมดาจะไปกลบสถานะหมดอายุ/ใกล้หมดอายุบนหน้าจอทันที (ดู statusDisplay)
+                    ⚠️ วางท้ายสุดก่อนคอลัมน์ปุ่ม เพราะเป็นข้อมูลเสริมที่ยาวไม่แน่นอน ไม่ควรไปดันคอลัมน์
+                    หลักที่ต้องกวาดสายตาเทียบกันทุกแถวให้เลื่อนหนีไปทางขวา */}
+                <ResizableTh width={colWidth("remark")} columnKey="remark" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("remark")} sortable sortDirection={sortConfig.key === "remark" ? sortConfig.direction : null} onSort={handleSortClick}>หมายเหตุ</ResizableTh>
                 <TableCell align="center" sx={{ width: colWidth("actions") }} />
               </TableRow>
             </TableHead>
