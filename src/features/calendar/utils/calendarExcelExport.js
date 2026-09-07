@@ -110,6 +110,11 @@ export async function exportCalendarEventsToExcel({
     { key: "team", header: "หัวหน้าทีมเข้างาน", width: 20, group: "ผู้เกี่ยวข้อง" },
     { key: "teamMembers", header: "ลูกทีม", width: 28, group: "ผู้เกี่ยวข้อง", wrap: true },
     { key: "responsiblePerson", header: "ผู้รับผิดชอบงาน", width: 20, group: "ผู้เกี่ยวข้อง" },
+    // ✅ ผู้ติดต่อหน้างาน — คนของลูกค้าที่ต้องโทรหาเมื่อไปถึง (คนละฝั่งกับผู้รับผิดชอบซึ่งเป็นคนของเรา)
+    // ⚠️ เบอร์เก็บเป็นข้อความ ไม่ใช่ตัวเลข — เบอร์ที่ขึ้นต้นด้วย 0 จะโดน Excel ตัดศูนย์หน้าทิ้งทันที
+    // ถ้าถูกตีเป็นตัวเลข และ "081-234-5678" จะกลายเป็นสูตรลบ
+    { key: "contactName", header: "ผู้ติดต่อหน้างาน", width: 18, group: "ผู้เกี่ยวข้อง" },
+    { key: "contactTel", header: "เบอร์ผู้ติดต่อ", width: 16, group: "ผู้เกี่ยวข้อง" },
   ];
   ws.columns = cols.map((c) => ({ key: c.key, width: c.width }));
   const lastCol = cols.length;
@@ -214,6 +219,8 @@ export async function exportCalendarEventsToExcel({
       team: ev.team || "",
       teamMembers: memberNames.join(", "),
       responsiblePerson: ev.responsiblePerson || "— ยังไม่มอบหมาย —",
+      contactName: ev.contactName || "",
+      contactTel: ev.contactTel || "",
     };
 
     const row = ws.addRow(values);

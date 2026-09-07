@@ -38,7 +38,9 @@ const TH_LOCALE_TEXT = {
   openPreviousView: "ย้อนกลับ",
   openNextView: "ถัดไป",
   calendarViewSwitchingButtonAriaLabel: (view) =>
-    view === "year" ? "กำลังเลือกปี — กดเพื่อกลับไปเลือกวัน" : "กำลังเลือกวัน — กดเพื่อเลือกปี",
+    view === "year" ? "กำลังเลือกปี — กดเพื่อกลับไปเลือกวัน"
+      : view === "month" ? "กำลังเลือกเดือน — กดเพื่อกลับไปเลือกวัน"
+      : "กำลังเลือกวัน — กดเพื่อเลือกปีและเดือน",
   inputModeToggleButtonAriaLabel: (isKeyboardInputOpen) =>
     isKeyboardInputOpen ? "สลับไปเลือกจากปฏิทิน" : "สลับไปพิมพ์วันที่เอง",
   start: "เริ่ม",
@@ -175,6 +177,17 @@ export default function ThaiDatePicker({
     <LocalizationProvider dateAdapter={adapter} adapterLocale="th" localeText={TH_LOCALE_TEXT}>
       <DatePicker
         label={label}
+        /**
+         * 🐛 BUG ที่แก้ (เลือกเดือนยากมาก): ค่าเริ่มต้นของ MUI v5 คือ views = ["year", "day"] เท่านั้น —
+         * ไม่มีหน้าจอเลือกเดือนเลย กดหัวปฏิทินได้แค่ "เลือกปี" แล้วเด้งกลับมาหน้าวันของเดือนเดิม
+         * ต้องมากดลูกศร ‹ › ทีละเดือนเอาเอง ซึ่งช้ามากเวลาต้องข้ามหลายเดือน (เช่นตั้งวันสิ้นสุดสัญญา
+         * ที่อยู่อีก 11 เดือนข้างหน้า = กด 11 ครั้ง)
+         * ✅ ใส่หน้าจอ "เลือกเดือน" คั่นกลาง — กดหัวปฏิทิน → เลือกปี → เลือกเดือน → เลือกวัน จบใน 3 แตะ
+         * ⚠️ ลำดับใน array คือลำดับที่ MUI เดินหน้าไปหลังเลือกแต่ละชั้น ห้ามสลับ (year → month → day)
+         * ⚠️ วางไว้ก่อน {...rest} เพื่อให้ที่เรียกใช้ยังส่ง views/openTo ของตัวเองมาทับได้ตามต้องการ
+         */
+        views={["year", "month", "day"]}
+        openTo="day"
         open={open}
         onOpen={() => { setOpen(true); onOpen?.(); }}
         onClose={() => { setOpen(false); onClose?.(); }}

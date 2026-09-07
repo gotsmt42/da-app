@@ -60,9 +60,9 @@ import {
 } from "@mui/icons-material";
 
 // MUI Date Picker
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import { AdapterMoment } from "@mui/x-date-pickers/AdapterMoment";
+// ✅ ปฏิทิน พ.ศ. ของแอป — มีหน้าจอเลือกปี→เดือน→วัน ครบ (ดู ThaiDatePickerInner)
+import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
+import TelLink from "@/shared/components/TelLink";
 
 // Router
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
@@ -1428,17 +1428,25 @@ const EventRowCard = ({
                 transformOrigin={{ vertical: "top", horizontal: "left" }}
                 PaperProps={{ sx: { borderRadius: 3, boxShadow: `0 12px 32px ${alpha(theme.palette.common.black, 0.18)}` } }}
               >
-                <LocalizationProvider dateAdapter={AdapterMoment}>
-                  <Stack spacing={1.5} sx={{ p: 2, width: 260 }}>
+                {/* ✅ ไม่ต้องมี LocalizationProvider ห่อแล้ว — ThaiDatePicker ห่อ provider (พร้อม adapter
+                    พ.ศ. และข้อความไทย) มาให้ในตัวอยู่แล้วทุกช่อง */}
+                <Stack spacing={1.5} sx={{ p: 2, width: 260 }}>
                     <Typography variant="subtitle2" fontWeight={700}>แก้ไขวันที่เข้างาน</Typography>
-                    <DatePicker
-                      label="วันที่เริ่ม" value={editStart} onChange={setEditStart}
-                      renderInput={(params) => <TextField {...params} size="small" fullWidth />}
+                    {/* 🐛 BUG ที่แก้: 2 ช่องนี้เคยเป็น DatePicker ดิบของ MUI + AdapterMoment ธรรมดา —
+                        ปฏิทินจึงขึ้นเป็น ค.ศ. ต่างจากทั้งแอปที่เป็น พ.ศ. หมด และไม่มีหน้าจอเลือกเดือนด้วย
+                        (ต้องกดลูกศรทีละเดือน) ✅ เปลี่ยนมาใช้ ThaiDatePicker ตัวกลางเหมือนที่อื่นทั้งแอป
+                        ⚠️ ThaiDatePicker รับ/คืนค่าเป็นสตริง "YYYY-MM-DD" ไม่ใช่ moment — แปลงตรงนี้
+                        ให้ state ข้างนอกยังเป็น moment เหมือนเดิม (handleDateSave เรียก .format/.isValid) */}
+                    <ThaiDatePicker
+                      label="วันที่เริ่ม"
+                      value={editStart && editStart.isValid() ? editStart.format("YYYY-MM-DD") : ""}
+                      onChange={(v) => setEditStart(v ? moment(v, "YYYY-MM-DD") : null)}
                     />
-                    <DatePicker
-                      label="วันที่สิ้นสุด" value={editEnd} onChange={setEditEnd}
-                      minDate={editStart || undefined}
-                      renderInput={(params) => <TextField {...params} size="small" fullWidth />}
+                    <ThaiDatePicker
+                      label="วันที่สิ้นสุด"
+                      value={editEnd && editEnd.isValid() ? editEnd.format("YYYY-MM-DD") : ""}
+                      onChange={(v) => setEditEnd(v ? moment(v, "YYYY-MM-DD") : null)}
+                      minDate={editStart && editStart.isValid() ? editStart.format("YYYY-MM-DD") : undefined}
                     />
                     {dateError && <Alert severity="error" sx={{ py: 0, fontSize: "0.75rem" }}>{dateError}</Alert>}
                     <Stack direction="row" justifyContent="flex-end" gap={1}>
@@ -1447,8 +1455,7 @@ const EventRowCard = ({
                         {dateSaving ? "กำลังบันทึก..." : "บันทึก"}
                       </Button>
                     </Stack>
-                  </Stack>
-                </LocalizationProvider>
+                </Stack>
               </Popover>
 
               {/* ✅ ไอคอนเอกสาร/กิจกรรม แยกเป็นบรรทัดของตัวเองเต็มความกว้าง ชิดขวา — เดิมพยายามยัด
@@ -1556,6 +1563,19 @@ const EventRowCard = ({
                     </Box>
                   </InfoLine>
                 </Box>
+                {/* ✅ ผู้ติดต่อหน้างาน — วางถัดจากโครงการทันที เพราะเป็นข้อมูล "ไปถึงแล้วโทรหาใคร"
+                    ที่ต้องอ่านคู่กับ "ไปที่ไหน" เสมอ ⚠️ เบอร์กดโทรออกได้เลย (TelLink) ซึ่งเป็นเหตุผล
+                    หลักที่ต้องมีในหน้านี้ — ช่างเปิดจากมือถือตอนกำลังจะออกรถ/ถึงหน้างาน
+                    ⚠️ ซ่อนทั้งบรรทัดถ้ายังไม่มีข้อมูล ไม่โชว์เป็นช่องว่าง — การ์ดนี้เรียงกันหลายสิบใบ
+                    ในหน้าเดียว บรรทัดว่างทุกใบจะกินพื้นที่มากกว่าข้อมูลจริงที่มีอยู่ */}
+                {(event.contactName || event.contactTel) && (
+                  <InfoLine icon="🙍" label="ผู้ติดต่อ">
+                    <Stack direction="row" gap={0.75} alignItems="center" flexWrap="wrap">
+                      {event.contactName && <span>{event.contactName}</span>}
+                      {event.contactTel && <TelLink tel={event.contactTel} />}
+                    </Stack>
+                  </InfoLine>
+                )}
                 {/* ✅ ย้ายมาไว้ถัดจากโครงการตามที่ขอ (เดิมอยู่คู่กับระบบด้านบนสุด) */}
                 {event.time && <InfoLine icon="🔢" label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount)}</InfoLine>}
                 {(event.startTime || event.endTime) && (
@@ -1825,6 +1845,14 @@ const EventRowCard = ({
               {(event.company || event.site || event.system || event.time) && (
                 <Stack direction="row" gap={2} flexWrap="wrap" sx={{ mt: 0.5 }}>
                   <InfoLine icon="🏢" label="โครงการ">{companySite(event.company, event.site)}</InfoLine>
+                  {(event.contactName || event.contactTel) && (
+                    <InfoLine icon="🙍" label="ผู้ติดต่อ">
+                      <Stack direction="row" gap={0.75} alignItems="center" flexWrap="wrap">
+                        {event.contactName && <span>{event.contactName}</span>}
+                        {event.contactTel && <TelLink tel={event.contactTel} />}
+                      </Stack>
+                    </InfoLine>
+                  )}
                   {event.system && <InfoLine icon="💻" label="ระบบ">{event.system}</InfoLine>}
                   {event.time && <InfoLine icon="🔢" label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount)}</InfoLine>}
                 </Stack>
@@ -1887,17 +1915,19 @@ const FilterPanel = ({
               sx={{ borderRadius: 2, textTransform: "none", fontSize: "0.78rem" }}>
               ทั้งหมด
             </Button>
+            {/* ✅ ตัวเลือกเดือน — ใช้ ThaiDatePicker เหมือนกันทั้งแอป ปีจึงเป็น พ.ศ. ตรงกับที่อื่น
+                (เดิมเป็น DatePicker ดิบ + AdapterMoment ธรรมดา ขึ้นเป็น ค.ศ. อยู่จุดเดียวในหน้านี้)
+                ⚠️ ช่องนี้เก็บค่าเป็น "YYYY-MM" (ระดับเดือน) จึงต้องส่ง valueFormat/inputFormat เอง —
+                ค่าเริ่มต้นของ ThaiDatePicker เป็นระดับวัน (YYYY-MM-DD / วว/ดด/ปปปป) */}
             {!showAll && (
-              <LocalizationProvider dateAdapter={AdapterMoment}>
-                <DatePicker
-                  views={["year", "month"]} openTo="month" label="เดือน"
-                  value={selectedDate ? moment(selectedDate) : null}
-                  onChange={v => onDateChange(moment(v).format("YYYY-MM"))}
-                  renderInput={params => (
-                    <TextField {...params} size="small" sx={{ width: 160, "& .MuiOutlinedInput-root": { borderRadius: 2 } }} />
-                  )}
-                />
-              </LocalizationProvider>
+              <ThaiDatePicker
+                views={["year", "month"]} openTo="month" label="เดือน"
+                valueFormat="YYYY-MM" inputFormat="MM/YYYY"
+                value={selectedDate || ""}
+                onChange={(v) => { if (v) onDateChange(v); }}
+                fullWidth={false}
+                textFieldProps={{ sx: { width: 160, "& .MuiOutlinedInput-root": { borderRadius: 2 } } }}
+              />
             )}
             {showAll && (
               <Button size="small" variant="outlined"
@@ -2102,6 +2132,8 @@ const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob }) => (
         <TableRow sx={{ "& th": { fontWeight: 800, fontSize: "0.72rem", bgcolor: "#f1f5f9", color: "#334155", whiteSpace: "nowrap", letterSpacing: 0.2 } }}>
           <TableCell>สถานะ</TableCell>
           <TableCell>บริษัท / โครงการ</TableCell>
+          {/* ✅ ผู้ติดต่อหน้างาน — วางถัดจากโครงการ อ่านเป็นชุดเดียวกันว่า "ไปที่ไหน แล้วโทรหาใคร" */}
+          <TableCell>ผู้ติดต่อ</TableCell>
           <TableCell>ประเภทงาน · ระบบ</TableCell>
           {/* ✅ เพิ่มคอลัมน์ "ครั้งที่" — การ์ดแสดงอยู่แล้วแต่ตารางไม่มี ทำให้สลับมาดูตารางแล้วข้อมูลหาย
               เป็นตัวเลขที่จำเป็นกับงานสัญญา (รู้ว่าเข้าไปแล้วกี่ครั้งจากทั้งหมดกี่ครั้ง) */}
@@ -2132,6 +2164,20 @@ const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob }) => (
               <TableCell sx={{ maxWidth: 220 }}>
                 <Typography variant="caption" fontWeight={700} noWrap sx={{ display: "block" }}>{a.company || "-"}</Typography>
                 <Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block" }}>{a.site || "-"}</Typography>
+              </TableCell>
+              {/* ⚠️ หยุด event ไม่ให้ลอยขึ้นไปที่ onClick ของทั้งแถว (ซึ่งเปิดกล่องรายละเอียดงาน) —
+                  TelLink หยุดให้อยู่แล้ว แต่พื้นที่ว่างรอบๆ ในเซลล์ยังคลิกทะลุได้ */}
+              <TableCell sx={{ maxWidth: 160 }}>
+                {(a.contactName || a.contactTel) ? (
+                  <>
+                    <Typography variant="caption" fontWeight={700} noWrap sx={{ display: "block" }}>
+                      {a.contactName || "-"}
+                    </Typography>
+                    {a.contactTel && <TelLink tel={a.contactTel} size="0.72rem" />}
+                  </>
+                ) : (
+                  <Typography variant="caption" color="text.disabled">—</Typography>
+                )}
               </TableCell>
               <TableCell sx={{ maxWidth: 170 }}>
                 <Typography variant="caption" noWrap sx={{ display: "block" }}>{a.title || "-"}</Typography>
@@ -2632,6 +2678,7 @@ const Operation = () => {
     const keyword = search.toLowerCase();
     const matchSearch = keyword
       ? [event.company, event.site, event.title, event.system, event.team, event.docNo,
+         event.contactName, event.contactTel,
          formatThai(moment(event.start), "DD/MM/YYYY HH:mm")]
           .map(v => (v || "").toLowerCase()).some(t => t.includes(keyword))
       : true;

@@ -289,6 +289,10 @@ function injectStyles() {
     /* ── Grid ── */
     .ee-grid   { display: grid; gap: 8px; margin-bottom: 8px; }
     .ee-grid-2 { grid-template-columns: 1fr 1fr; }
+    /* ✅ 4 คอลัมน์สำหรับกลุ่ม "ข้อมูลโครงการ" — เหตุผลเดียวกับ .ae-grid-4 ใน AddEvent.js
+       ⚠️ กฎยุบ 1 คอลัมน์ที่ ≤600px ด้านล่างครอบตัวนี้ด้วยอยู่แล้ว */
+    .ee-grid-4 { grid-template-columns: repeat(4, 1fr); }
+    @media(max-width:1100px) { .ee-grid-4 { grid-template-columns: 1fr 1fr; } }
     .ee-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
     .ee-grid-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
     @media(max-width:600px) { .ee-grid-2,.ee-grid-3,.ee-grid-4 { grid-template-columns: 1fr; } }
@@ -792,6 +796,11 @@ export const getEditEvent = async ({
   const eventId = ev.id;
   const eventTitle = ev.title;
   const evendocNo = ev.extendedProps?.docNo || "";
+  // ✅ ผู้ติดต่อหน้างาน — งานที่มาจากใบแจ้งงานของฝ่ายขายมีค่านี้ติดมาแล้วตั้งแต่ตอนอนุมัติ
+  // (ดู routes/dispatch.js ฝั่ง server) ส่วนงานที่ช่างสร้างเองกรอกได้จาก AddEvent/ที่นี่
+  // ⚠️ ค่าจริงของ "งานสัญญา" ถูกเติมทีหลังจากสัญญา (ดู contractContact ด้านล่าง) — ประกาศไว้ด้วย let
+  let evenContactName = ev.extendedProps?.contactName || "";
+  let evenContactTel = ev.extendedProps?.contactTel || "";
   const eventCompany = ev.extendedProps?.company || "";
   const eventSite = ev.extendedProps?.site || "";
   const eventSystem = ev.extendedProps?.system || "";
@@ -989,10 +998,17 @@ export const getEditEvent = async ({
         company: e.company || "", site: e.site || "", system: e.system || "", title: e.title || "",
         contractNo: e.contractNo || "", quotationNo: e.quotationNo || "",
         visitCount: e.visitCount || 0, jobValue: e.jobValue, team: e.team || "",
+        // ✅ ผู้ติดต่อระดับสัญญา — เก็บค่าแรกที่ "มีข้อมูลจริง" จากครั้งไหนก็ได้ในสัญญา (ดู forEach ล่าง)
+        contactName: "", contactTel: "",
         visits: [],
       });
     }
-    contractMap.get(e.contractGroupId).visits.push(e);
+    const cm = contractMap.get(e.contractGroupId);
+    cm.visits.push(e);
+    // ⚠️ ต้องไล่หาจาก "ทุกครั้ง" ไม่ใช่อ่านจากครั้งแรกอย่างเดียว — สัญญาเก่าที่ผู้ติดต่อถูกกรอกไว้ตอน
+    // แก้ครั้งใดครั้งหนึ่งก่อนมีฟีเจอร์นี้ (หรือมาจากใบแจ้งงานที่ผูกเข้าสัญญาทีหลัง) จะมีค่าอยู่แค่ครั้งเดียว
+    if (!cm.contactName && e.contactName) cm.contactName = e.contactName;
+    if (!cm.contactTel && e.contactTel) cm.contactTel = e.contactTel;
   });
   contractMap.forEach((c) => { c.usedVisits = countUsedRounds(c.visits); });
   const attachableContracts = [...contractMap.values()]
@@ -1014,6 +1030,22 @@ export const getEditEvent = async ({
      ต้องไม่ถูกนับว่า "ครั้งนี้ถูกจองแล้ว" โดยตัวมันเอง และตอนบันทึกก็ต้องย้ายไปพร้อมกันทั้งกลุ่ม ซึ่ง
      buildSharedFields (ที่มี time อยู่แล้ว) ถูก apply กับทุก sibling ในกลุ่มอยู่แล้ว จึงย้ายครบเองอัตโนมัติ */
   const contractOfEvent = eventContractGroupId ? contractMap.get(eventContractGroupId) : null;
+  /**
+   * ✅ งานสัญญา — ผู้ติดต่อเป็นข้อมูล "ระดับสัญญา" ไม่ใช่รายครั้ง (ลูกค้ารายเดียวกัน ติดต่อคนเดียวกัน
+   * ทุกครั้งที่เข้าไป) จึงดึงมาจากสัญญาเมื่อครั้งนี้ยังไม่มีค่าของตัวเอง แล้วบันทึกกลับทั้งสัญญาพร้อมกัน
+   * (ดู buildContractFields) เหมือนเลขที่สัญญา/วันที่/จำนวนครั้ง/มูลค่างาน
+   * ⚠️ ครั้งนี้ที่มีค่าของตัวเองอยู่แล้วชนะเสมอ — ไม่เขียนทับด้วยค่าจากสัญญา เผื่อกรณีที่ตั้งใจระบุ
+   * ผู้ประสานงานเฉพาะรอบนั้นไว้ก่อนหน้านี้ (ข้อมูลที่มีอยู่จริงสำคัญกว่าความสม่ำเสมอเสมอ)
+   */
+  if (contractOfEvent) {
+    if (!evenContactName) evenContactName = contractOfEvent.contactName || "";
+    if (!evenContactTel) evenContactTel = contractOfEvent.contactTel || "";
+  }
+  // ✅ งานสัญญา: ผู้ติดต่อแก้ได้เฉพาะแอดมิน/manager เหมือนข้อมูลสัญญาอื่นๆ — เพราะแก้ทีเดียวกระทบ
+  // ทุกครั้งในสัญญา (updateMany ฝั่ง server ซึ่งกันไว้ที่ 403 อยู่แล้วถ้าไม่ใช่แอดมิน/manager)
+  // ✅ งานทั่วไป/โปรเจค: ช่างที่มีชื่อในงานแก้เองได้ตามเดิม (canEditDocFields)
+  // ⚠️ ต้องมี !readOnly ด้วย — โหมดดูอย่างเดียวต้องล็อกทุกช่องจริงๆ ไม่ใช่แค่ช่องของช่าง
+  const canEditContact = eventContractGroupId ? (!readOnly && isAdminOrManagerUser) : canEditDocFields;
   const contractTotalRounds = Math.max(0, Number(contractOfEvent?.visitCount) || 0);
   const roundsTakenByOthers = new Set();
   if (contractOfEvent) {
@@ -1348,7 +1380,7 @@ export const getEditEvent = async ({
       กันข้อมูลไม่ตรงกับครั้งอื่นในสัญญาเดียวกัน
     </p>
     ` : ""}
-    <div class="ee-grid ee-grid-3">
+    <div class="ee-grid ee-grid-4">
       <div class="ee-field">
         <label>🏢 ชื่อบริษัท</label>
         <select id="editCompany" ${eventContractGroupId || !isAdminOrManagerUser ? "disabled" : ""}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventCompany, companyValues)}${custOpt("company")}</select>
@@ -1357,12 +1389,25 @@ export const getEditEvent = async ({
         <label><span class="req">*</span> ชื่อโครงการ</label>
         <select id="editSite" ${eventContractGroupId || !isAdminOrManagerUser ? "disabled" : ""}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventSite, siteValues)}${custOpt("site")}</select>
       </div>
+      <!-- ✅ ผู้ติดต่อหน้างาน วางต่อจากชื่อโครงการทันที — อ่านเป็นชุดเดียวกันว่า "งานนี้อยู่ที่ไหน
+           แล้วไปถึงต้องโทรหาใคร" ⚠️ ใช้ด่านสิทธิ์ชุดเดียวกับเอกสาร (canEditDocFields) โดยตั้งใจ:
+           ช่างที่มีชื่อในงานแก้ได้เอง และแก้ได้แม้งานปิดแล้ว เพราะเบอร์ติดต่อเปลี่ยนได้เรื่อยๆ และเป็น
+           ข้อมูลติดต่อล้วนๆ ไม่กระทบข้อมูลงาน/ยอดเงิน/รายงาน (ฝั่ง server เปิดให้เหมือนกัน — ดู
+           CLOSED_JOB_TECH_FIELDS ใน routes/calendarEvent/core.js) -->
+      <div class="ee-field">
+        <label>🙍 ผู้ติดต่อหน้างาน</label>
+        <input id="editContactName" type="text" value="${attrHtml(evenContactName)}" placeholder="ชื่อคนที่ต้องติดต่อเมื่อไปถึง" ${canEditContact ? "" : "disabled"}>
+      </div>
+      <div class="ee-field">
+        <label>📞 เบอร์โทร</label>
+        <input id="editContactTel" type="tel" inputmode="tel" value="${attrHtml(evenContactTel)}" placeholder="เช่น 081-234-5678" ${canEditContact ? "" : "disabled"}>
+      </div>
+    </div>
+    <div class="ee-grid ee-grid-3">
       <div class="ee-field">
         <label><span class="req">*</span> ประเภทงาน</label>
         <select id="editTitle" ${eventContractGroupId || !isAdminOrManagerUser ? "disabled" : ""}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventTitle, titleValues)}${titleOpts}</select>
       </div>
-    </div>
-    <div class="ee-grid ee-grid-3">
       <div class="ee-field">
         <label><span class="req">*</span> ระบบงาน</label>
         <select id="editSystem" ${eventContractGroupId || !isAdminOrManagerUser ? "disabled" : ""}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventSystem, systemValues)}${systemOpts}</select>
@@ -1756,7 +1801,8 @@ export const getEditEvent = async ({
 
   Swal.fire({
     html,
-    width: "1100px",
+    // ✅ กว้างขึ้นให้พอดีกับกริด 4 คอลัมน์ของกลุ่ม "ข้อมูลโครงการ" (ดู .ee-grid-4) — เท่ากับ AddEvent.js
+    width: "1320px",
     showConfirmButton: false,
     showCancelButton: false,
     showCloseButton: false,
@@ -2179,6 +2225,12 @@ export const getEditEvent = async ({
 
       const buildSharedFields = () => ({
         docNo: getVal("editdocNo"),
+        // ⚠️ งานสัญญาไม่ส่งผู้ติดต่อมาทางนี้ — ไปทาง UpdateContractFields แทน (ดู buildContractFields)
+        // ถ้าส่งทั้งสองทางพร้อมกัน สองคำขอจะเขียนทับกันเองแบบไม่แน่นอนว่าอันไหนถึงก่อน
+        ...(eventContractGroupId ? {} : {
+          contactName: getVal("editContactName"),
+          contactTel: getVal("editContactTel"),
+        }),
         company: getVal("editCompany"),
         site: getVal("editSite"),
         title: getVal("editTitle"),
@@ -2227,6 +2279,10 @@ export const getEditEvent = async ({
         // "เกินกำหนดรอบถัดไป" ดู shared/utils/contractOverdue.js)
         intervalMonths: getVal("editIntervalMonths") ? Number(getVal("editIntervalMonths")) : undefined,
         jobValue:       getVal("editJobValue") ? Number(getVal("editJobValue")) : undefined,
+        // ✅ ผู้ติดต่อหน้างานของทั้งสัญญา — แก้ครั้งเดียวอัปเดตทุก "ครั้งที่" พร้อมกัน ตรงกับข้อความ
+        // ที่เขียนกำกับไว้บนแผงสัญญา และตรงกับที่หน้าภาพรวมงานทำอยู่แล้ว (UpdateContractFields)
+        contactName:    getVal("editContactName"),
+        contactTel:     getVal("editContactTel"),
       } : null);
 
       // ✅ งานที่ปิดแล้ว + ผู้ใช้เป็นช่าง — ส่งเฉพาะ 4 ฟิลด์ที่อนุญาตจริงเท่านั้น
@@ -2237,7 +2293,9 @@ export const getEditEvent = async ({
       // ทับด้วยค่าที่ค้างอยู่ในฟอร์มโดยไม่ตั้งใจ แม้จะมีบั๊กที่ทำให้ช่องไหนหลุดการล็อกไปก็ตาม
       // ⚠️ ต้องมี activityLog ด้วย — ประวัติการแก้ไขถูกแนบไปกับ payload เดียวกันตอนบันทึก ถ้าตัดทิ้ง
       // การแก้ของช่างบนงานที่ปิดแล้วจะไม่เหลือร่องรอยเลยว่าใครแก้อะไรเมื่อไหร่
-      const CLOSED_JOB_ALLOWED = ["docNo", "description", "backgroundColor", "textColor", "fontSize", "activityLog"];
+      // ⚠️ ต้องตรงกับ CLOSED_JOB_TECH_FIELDS ฝั่ง server เป๊ะๆ (routes/calendarEvent/core.js) —
+      // contactName/contactTel เปิดให้แก้หลังปิดงานด้วยเหตุผลเดียวกับ docNo/description
+      const CLOSED_JOB_ALLOWED = ["docNo", "description", "contactName", "contactTel", "backgroundColor", "textColor", "fontSize", "activityLog"];
       const trimForClosedJob = (payload) => {
         if (!isClosedForTech) return payload;
         const out = {};

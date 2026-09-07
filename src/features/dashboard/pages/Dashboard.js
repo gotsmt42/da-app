@@ -436,7 +436,7 @@ const Dashboard = () => {
         return info ? { ...c, overdueInfo: info } : null;
       })
       .filter(Boolean)
-      .sort((a, b) => b.overdueInfo.monthsOverdue - a.overdueInfo.monthsOverdue);
+      .sort((a, b) => a.overdueInfo.monthsUntilDue - b.overdueInfo.monthsUntilDue);
   }, [canViewContracts, events, drafts]);
 
   // ✅ ดึง JSX ของบล็อก "สัญญาที่เลยกำหนด/คงค้าง" ออกมาเป็นตัวแปรเดียว ใช้ซ้ำได้ 2 จุด — จอกว้าง
@@ -471,8 +471,16 @@ const Dashboard = () => {
                     {[c.title, c.system].filter(Boolean).join(" · ")}
                   </span>
                 </span>
-                <span style={styles.contractOverdueBadge}>
-                  เกิน {c.overdueInfo.monthsOverdue} ด.
+                {/* ✅ ป้ายบอกสถานะจริง (ถึงรอบแล้ว / เกิน N ด. / ใกล้ถึงรอบ) พร้อมสีตามระดับความเร่งด่วน
+                    — เดิมเขียน "เกิน N ด." ตายตัวทุกใบ ซึ่งจะกลายเป็น "เกิน 0 ด." สำหรับรอบที่เพิ่งถึง
+                    กำหนดเดือนนี้ และไม่มีทางแยกออกจากรอบที่ยังมาไม่ถึงได้เลย */}
+                <span
+                  style={{
+                    ...styles.contractOverdueBadge,
+                    ...(c.overdueInfo.state === "due_soon" ? styles.contractDueSoonBadge : null),
+                  }}
+                >
+                  {c.overdueInfo.shortLabel}
                 </span>
               </Link>
             ))}
@@ -2349,6 +2357,11 @@ const baseStyles = {
     border: "1px solid rgba(220, 38, 38, 0.3)",
     marginBottom: "10px",
     overflow: "hidden",
+  },
+  // ป้ายสีส้มสำหรับรอบที่ "จะถึงในอีก 1 เดือน" — ทับเฉพาะสีบน contractOverdueBadge ที่เหลือใช้ร่วมกัน
+  contractDueSoonBadge: {
+    color: "#b45309",
+    backgroundColor: "rgba(245, 158, 11, 0.14)",
   },
   contractOverdueBadge: {
     fontSize: "10.5px",

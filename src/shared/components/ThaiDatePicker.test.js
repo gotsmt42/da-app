@@ -64,6 +64,38 @@ describe("ThaiDatePicker DOM", () => {
     console.log("  aria-labels:", JSON.stringify(labels.slice(0, 6)));
     expect(labels.some((l) => /เดือนก่อนหน้า|เดือนถัดไป/.test(l))).toBe(true);
   });
+
+  /**
+   * ⚠️ ค่าเริ่มต้นของ MUI v5 คือ views = ["year", "day"] — ไม่มีหน้าจอเลือกเดือนเลย ต้องกดลูกศร
+   * ทีละเดือนเอาเอง (ผู้ใช้แจ้งว่า "เลือกเดือนยากมาก") เทสต์นี้ล็อกไว้ว่าต้องมีขั้น "เลือกเดือน" เสมอ
+   */
+  it("กดหัวปฏิทินแล้วเลือกปี → ต้องมีหน้าจอเลือกเดือนต่อ (ไม่เด้งกลับไปหน้าวันทันที)", () => {
+    render(<ThaiDatePicker label="x" value="2026-08-11" onChange={() => {}} />);
+    fireEvent.click(screen.getByRole("textbox"));
+
+    // หัวปฏิทิน "สิงหาคม 2569 ▾" — กดเพื่อสลับไปหน้าเลือกปี
+    const header = [...document.querySelectorAll("[aria-label]")]
+      .find((e) => /กดเพื่อเลือกปี/.test(e.getAttribute("aria-label")));
+    expect(header).toBeTruthy();
+    fireEvent.click(header);
+
+    const years = [...document.querySelectorAll(".PrivatePickersYear-yearButton, button")]
+      .map((b) => b.textContent.trim()).filter((t) => /^25\d\d$/.test(t));
+    console.log("  years shown:", JSON.stringify(years.slice(0, 4)));
+    expect(years.length).toBeGreaterThan(0);
+    expect(years).toContain("2569");
+
+    // เลือกปี 2570 → ต้องเข้าหน้า "เลือกเดือน" ต่อ ไม่ใช่เด้งกลับไปหน้าวัน
+    const y2570 = [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "2570");
+    fireEvent.click(y2570);
+
+    const monthBtns = [...document.querySelectorAll(".MuiMonthPicker-root button, .PrivatePickersMonth-root")]
+      .map((b) => b.textContent.trim()).filter(Boolean);
+    console.log("  months shown:", JSON.stringify(monthBtns.slice(0, 4)), "total:", monthBtns.length);
+    expect(monthBtns.length).toBe(12);
+    // ชื่อเดือนต้องเป็นภาษาไทย
+    expect(monthBtns.join(" ")).toMatch(/ม\.?ค\.?|มกราคม/);
+  });
 });
 
 describe("mountThaiDatePickers (ฟอร์ม SweetAlert)", () => {

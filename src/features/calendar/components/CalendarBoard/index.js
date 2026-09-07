@@ -2014,6 +2014,8 @@ function EventCalendar() {
               status,
               jobGroupId,
               approvalStatus,
+              contactName = "",
+              contactTel = "",
             } = extendedProps;
             const approvalState = approvalStatus || "approved";
 
@@ -2034,6 +2036,20 @@ function EventCalendar() {
             const teamDisplay = allTeamNames.length ? `- ทีม : ${allTeamNames.map(escapeHtml).join(", ")}` : "";
 
             const systemDisplay = system ? `- ระบบ : ${escapeHtml(system)}` : "";
+
+            // ✅ ผู้ติดต่อหน้างานบนการ์ดในปฏิทิน — เห็นได้โดยไม่ต้องเปิดงานขึ้นมาก่อน
+            // ⚠️ เบอร์เป็นลิงก์ tel: จริง กดโทรออกได้เลยจากปฏิทิน (สำคัญกับช่างที่เปิดจากมือถือ) —
+            // ต้อง stopPropagation ไม่งั้น FullCalendar จะจับเป็น eventClick แล้วเปิดหน้าแก้ไขงานแทน
+            // ⚠️ escape ทุกค่าเหมือนฟิลด์อื่นในบล็อกนี้ — เป็นข้อความที่ผู้ใช้พิมพ์เองแล้วถูก render
+            // เป็น raw HTML ให้ทุกคนที่เปิดปฏิทินเห็น (ดูคอมเมนต์ XSS ด้านบน)
+            const telDial = String(contactTel).replace(/[^\d+]/g, "");
+            const contactDisplay = (contactName || contactTel)
+              ? `- ผู้ติดต่อ : ${contactName ? escapeHtml(contactName) : ""}${
+                  contactTel
+                    ? ` <a href="tel:${escapeHtml(telDial)}" onclick="event.stopPropagation()" style="color:inherit;text-decoration:underline;">📞 ${escapeHtml(contactTel)}</a>`
+                    : ""
+                }`
+              : "";
 
             const timeRangeDisplay =
               startTime && endTime
@@ -2101,6 +2117,7 @@ function EventCalendar() {
 
 
                 <div>${teamDisplay}</div>
+                  ${contactDisplay ? `<div>${contactDisplay}</div>` : ""}
                   ${timeRangeDisplay ? `<div>${timeRangeDisplay}</div>` : ""}
                 </div>
                   ${badgeHtml}

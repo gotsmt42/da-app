@@ -26,7 +26,7 @@ function injectAddStyles() {
       padding: 0 !important;
       border-radius: 16px !important;
       overflow: hidden !important;
-      width: min(98vw, 1100px) !important;
+      width: min(98vw, 1320px) !important;
       max-height: 95vh !important;
       display: flex !important;
       flex-direction: column !important;
@@ -91,7 +91,13 @@ function injectAddStyles() {
     .ae-grid { display: grid; gap: 12px; margin-bottom: 16px; }
     .ae-grid-2 { grid-template-columns: 1fr 1fr; }
     .ae-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
-    @media(max-width:600px) { .ae-grid-2,.ae-grid-3 { grid-template-columns: 1fr; } }
+    /* ✅ 4 คอลัมน์สำหรับกลุ่ม "ข้อมูลโครงการ" — ช่องพวกนี้เป็นช่องสั้นทั้งหมด (เลือกจากรายการ/ชื่อ/เบอร์)
+       เรียง 3 คอลัมน์แล้วเหลือที่ว่างครึ่งแถวเปล่าๆ อยู่ตลอดในจอกว้าง แถวก็ยาวลงไปเรื่อยๆ ต้องเลื่อนหา
+       ⚠️ ยุบเป็น 2 คอลัมน์ที่จอกลาง (≤1100px) ก่อนค่อยเหลือ 1 คอลัมน์ที่จอมือถือ — ข้ามจาก 4 เหลือ 1
+       ทีเดียวทำให้แท็บเล็ตแนวตั้งได้ฟอร์มยาวเป็นหางว่าวทั้งที่มีที่ว่างพอวาง 2 ช่องสบายๆ */
+    .ae-grid-4 { grid-template-columns: repeat(4, 1fr); }
+    @media(max-width:1100px) { .ae-grid-4 { grid-template-columns: 1fr 1fr; } }
+    @media(max-width:600px) { .ae-grid-2,.ae-grid-3,.ae-grid-4 { grid-template-columns: 1fr; } }
 
     /* ── แถว "วันที่" และแถว "เวลา" บนมือถือ ────────────────────────────────────────────────
        เดิมกฎยุบ 1 คอลัมน์ด้านบนกิน .ae-grid-2 ทุกตัวรวมกลุ่มนี้ด้วย วันที่เริ่ม/วันที่สิ้นสุด/เวลาเริ่ม/
@@ -587,7 +593,7 @@ export const getAddEvent = async ({
     <!-- โหมด "งานทั่วไป" -->
     <div id="ae-generalSection">
       <p class="ae-section-label">ข้อมูลโครงการ</p>
-      <div class="ae-grid ae-grid-3">
+      <div class="ae-grid ae-grid-4">
         <div class="ae-field">
           <label>🏢 ชื่อบริษัท</label>
           <select id="eventCompany"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${companyOpts}</select>
@@ -597,15 +603,23 @@ export const getAddEvent = async ({
           <select id="eventSite"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${siteOpts}</select>
         </div>
         <div class="ae-field">
-          <label><span class="req">*</span> ประเภทงาน</label>
-          <select id="eventTitle"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${titleOpts}</select>
+          <label>🙍 ผู้ติดต่อหน้างาน</label>
+          <input id="contactName" type="text" placeholder="ชื่อคนที่ต้องติดต่อเมื่อไปถึง">
+        </div>
+        <div class="ae-field">
+          <label>📞 เบอร์โทร</label>
+          <input id="contactTel" type="tel" inputmode="tel" placeholder="เช่น 081-234-5678">
         </div>
       </div>
 
       <!-- ✅ "ครั้งที่" มีความหมายเฉพาะงานตามสัญญาเท่านั้น (รอบที่ N ของสัญญา — โหมด "งานตามสัญญา" ใช้
            ตาราง "เลือกครั้งที่" แยกต่างหากอยู่แล้ว ไม่ได้ใช้ช่องนี้เลย) งานทั่วไป/งานโปรเจค เป็นงานเดี่ยวๆ
            ไม่มีแนวคิด "ครั้งที่" จึงตัดช่องนี้ออก เหลือ 2 ช่องพอดี -->
-      <div class="ae-grid ae-grid-2">
+      <div class="ae-grid ae-grid-3">
+        <div class="ae-field">
+          <label><span class="req">*</span> ประเภทงาน</label>
+          <select id="eventTitle"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${titleOpts}</select>
+        </div>
         <div class="ae-field">
           <label><span class="req">*</span> ระบบงาน</label>
           <select id="eventSystem"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${systemOpts}</select>
@@ -796,6 +810,32 @@ export const getAddEvent = async ({
 
       mkTs("#eventCompany", "เลือกหรือพิมพ์ชื่อบริษัท", customers.userCustomers.length || 50);
       mkTs("#eventSite",    "เลือกหรือพิมพ์ชื่อโครงการ", customers.userCustomers.length || 50);
+
+      /**
+       * ✅ เติมผู้ติดต่อจากทะเบียนลูกค้าให้อัตโนมัติเมื่อเลือกบริษัท/โครงการ
+       *
+       * ⚠️ เติมเฉพาะช่องที่ "ยังว่าง" เท่านั้น — ห้ามเขียนทับสิ่งที่ผู้ใช้พิมพ์ไปแล้วเด็ดขาด เพราะงานนี้
+       * อาจต้องประสานกับคนละคนกับผู้ติดต่อหลักของโครงการ (เทียบ pattern เดียวกับ applyCustomer ใน
+       * DispatchRequestDialog.js ที่ใช้ f.contactName || hit.cName เหมือนกัน)
+       * ⚠️ จับคู่ด้วย "บริษัท + โครงการ" ทั้งคู่ ไม่ใช่โครงการอย่างเดียว — ชื่อโครงการซ้ำกันข้ามบริษัทได้
+       */
+      const applyCustomerContact = () => {
+        const company = document.getElementById("eventCompany")?.value || "";
+        const site = document.getElementById("eventSite")?.value || "";
+        if (!site) return;
+        const hit = customers.userCustomers.find(
+          (c) => (c.cCompany || "") === company && (c.cSite || "") === site
+        );
+        if (!hit) return;
+        const nameEl = document.getElementById("contactName");
+        const telEl = document.getElementById("contactTel");
+        if (nameEl && !nameEl.value.trim() && hit.cName) nameEl.value = hit.cName;
+        if (telEl && !telEl.value.trim() && hit.tel) telEl.value = hit.tel;
+      };
+      ["eventCompany", "eventSite"].forEach((id) => {
+        // ⚠️ TomSelect ยิง event "change" บน <select> เดิมที่ซ่อนไว้ ไม่ใช่บนกล่องที่มองเห็น
+        document.getElementById(id)?.addEventListener("change", applyCustomerContact);
+      });
       mkTs("#eventTitle",   "เลือกหรือพิมพ์ประเภทงาน", (jobTypes?.items || []).length || 50);
       mkTs("#eventSystem",  "เลือกหรือพิมพ์ระบบงาน", (systemTypes?.items || []).length || 50);
       mkTs("#eventTeam",    "เลือกหรือพิมพ์ชื่อทีม", employeeList.length || 50);
@@ -1117,6 +1157,7 @@ export const getAddEvent = async ({
             const newEvent = {
               company: c.company, site: c.site, title: c.title, system: c.system,
               docNo: getVal("docNo"), description: getVal("description"),
+              contactName: getVal("contactName"), contactTel: getVal("contactTel"),
               time: String(nextIndex),
               team: cpTeam, resPerson: teamToId.get(cpTeam) || "",
               teamMembers: [],
@@ -1206,6 +1247,8 @@ export const getAddEvent = async ({
             system,
             docNo:           getVal("docNo"),
             description:     getVal("description"),
+            contactName:     getVal("contactName"),
+            contactTel:      getVal("contactTel"),
             team:            getVal("eventTeam"),
             resPerson:       teamToId.get(getVal("eventTeam")) || "",
             teamMembers,

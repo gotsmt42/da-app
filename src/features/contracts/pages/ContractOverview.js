@@ -54,7 +54,7 @@ import SystemTypeService from "@/shared/services/SystemTypeService";
 import { formatEventDateRange } from "@/shared/utils/formatDateRange";
 import { resolveOperationGroup } from "@/shared/utils/overdueJobs";
 import { countUsedRounds, visitsPerYear, INTERVAL_MONTHS_PRESETS } from "@/shared/utils/contractRounds";
-import { groupEventsByContract, nextVisitOverdueInfo, contractStatusInfo, isExpiredContract, contractCompleteness } from "@/shared/utils/contractOverdue";
+import { groupEventsByContract, nextVisitOverdueInfo, isRoundOverdue, contractStatusInfo, isExpiredContract, contractCompleteness } from "@/shared/utils/contractOverdue";
 // ✅ สถานะการวางบิล/รับเงิน — ของกลางชุดเดียวกับหน้า "วางบิล / รับเงิน" (/billing) ห้ามคำนวณซ้ำที่นี่
 import { contractBillingSummary, baht as bahtFmt } from "@/shared/utils/billing";
 import BillingDialog from "@/features/finance/components/BillingDialog";
@@ -64,6 +64,7 @@ import JobDocsDialog from "@/features/documents/components/JobDocsDialog";
 import { escapeHtml } from "@/shared/utils/escapeHtml";
 import DeliveryNoteDialog from "@/features/documents/components/DeliveryNoteDialog";
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
+import TelLink from "@/shared/components/TelLink";
 import { thaiDateNumeric, formatThai } from "@/shared/utils/thaiDate";
 import { can, DEPARTMENT, DEPARTMENT_LABEL } from "@/shared/utils/roles";
 
@@ -372,7 +373,7 @@ const DEFAULT_COL_WIDTHS = {
   docRef: 150, docNo: 150,
   customer: 230, work: 165,
   period: 190,
-  jobValue: 110, commission: 110, status: 168, progress: 110, responsiblePerson: 130, remark: 190,
+  jobValue: 110, commission: 110, statusProgress: 175, responsiblePerson: 130, contact: 150, remark: 190,
   departmentTag: 112,
 };
 // ✅ ความกว้างคอลัมน์ "แยกกันทุกแท็บ" — เก็บซ้อนอีกชั้นเป็น { [แท็บ]: { [คอลัมน์]: ความกว้าง } }
@@ -414,7 +415,7 @@ const MOBILE_COL_WIDTHS = {
   docRef: 118, docNo: 118,
   customer: 168, work: 128,
   period: 148,
-  jobValue: 88, commission: 88, status: 100, progress: 84, responsiblePerson: 104,
+  jobValue: 88, commission: 88, statusProgress: 108, responsiblePerson: 104, contact: 118,
   departmentTag: 92,
 };
 // ✅ จัดกลุ่ม "งานรายครั้ง" ของแถวหนึ่งไว้ล่วงหน้าครั้งเดียว แล้วแคชไว้ตาม reference ของ c.visits
@@ -482,7 +483,12 @@ const VISIT_COL_DEFAULT_WIDTH = 110;
 const MOBILE_VISIT_COL_WIDTH = 132;
 const MIN_COL_WIDTH = 50;
 
-const AUTO_FIT_PADDING = 20; // ✅ กันเนื้อหาแนบขอบเซลล์พอดีเป๊ะจนดูอึดอัดหลัง auto-fit
+const AUTO_FIT_PADDING = 12; // ✅ กันเนื้อหาแนบขอบเซลล์พอดีเป๊ะจนดูอึดอัดหลัง auto-fit
+// ✅ เพดานความกว้างของ auto-fit — กดจัดพอดีอัตโนมัติแล้วต้องไม่ได้คอลัมน์ยักษ์ที่ดันคอลัมน์อื่นตกจอ
+// ⚠️ ประวัติ: เคย cap ไว้ 420px → ถูกถอดออกเพราะชื่อบริษัท/โครงการยาวๆ โดนตัดทั้งที่เพิ่งกด auto-fit
+// แต่พอไม่มีเพดานเลย คอลัมน์เดียวก็กว้างได้เป็นพันพิกเซลจากแถวเดียวที่ข้อความยาวผิดปกติ ซึ่งแย่กว่า
+// ✅ ทางสายกลาง: มีเพดานที่กว้างพอสำหรับข้อความปกติ (ยาวกว่านี้ยังลากขยายเองได้ และมี tooltip ให้อ่านเต็ม)
+const AUTO_FIT_MAX_WIDTH = 260;
 
 // ✅ resizable=false — ปิดแถบลากปรับความกว้างทั้งหมด ใช้กับ "ตารางบนจอมือถือ" โดยเฉพาะ
 // ⚠️ นี่คือสาเหตุตรงๆ อีกข้อที่ทำให้ปัดเลื่อนตารางบนมือถือยาก: แถบลากเป็น Box กว้าง 24px คร่อมขอบขวา
@@ -518,21 +524,23 @@ const ResizableTh = ({ width, align = "left", children, onResize, rowSpan = 1, c
         pointerEvents: "none",
         top: "-9999px",
         left: "-9999px",
-        width: "auto",
+        // 🐛 BUG ที่แก้ (auto-fit ได้คอลัมน์กว้างเกินจริงมาก): เดิมบังคับ whiteSpace:"nowrap" ทั้งเซลล์
+        // — เซลล์ที่เนื้อหาซ้อนหลายบรรทัดอยู่แล้วโดยตั้งใจ (ครั้งที่ N = วันที่ + 👷 ทีม + 👥 ลูกทีม,
+        // โครงการ/บริษัท, สถานะ/คืบหน้า) จะถูกยืดออกเป็นบรรทัดเดียวยาวเหยียดตอนวัด แล้วเอาความยาว
+        // ของ "ทุกบรรทัดต่อกัน" มาเป็นความกว้างคอลัมน์ ทั้งที่บนจอจริงมันขึ้นบรรทัดอยู่แล้ว
+        // ✅ width:"max-content" ให้แต่ละบรรทัดกว้างเท่าที่ตัวเองต้องการ แล้วกล่องกว้างเท่าบรรทัดที่ยาวที่สุด
+        // ซึ่งคือความกว้างที่ "พอดี" จริงๆ — และให้ผลเท่ากับ nowrap เป๊ะๆ สำหรับเซลล์บรรทัดเดียว
+        width: "max-content",
         minWidth: "0",
         maxWidth: "none",
-        whiteSpace: "nowrap",
       });
       document.body.appendChild(clone);
       maxWidth = Math.max(maxWidth, clone.scrollWidth);
       document.body.removeChild(clone);
     });
     if (maxWidth > 0) {
-      // ⚠️ BUG ที่แก้ (auto-fit ไม่สมบูรณ์เมื่อข้อมูลยาว): เดิม clamp ไว้ที่ 420px เสมอ พอชื่อบริษัท/
-      // โครงการยาวเกิน 420px (หลังบวก padding) auto-fit จะหยุดที่ 420 ทุกครั้ง ข้อความยังโดนตัด ...
-      // อยู่ดีทั้งที่กดจัดพอดีอัตโนมัติไปแล้ว — ตารางเลื่อนแนวนอนได้อยู่แล้ว (overflowX บน
-      // TableContainer) จึงไม่จำเป็นต้อง cap ความกว้างสูงสุดเลย ปล่อยให้กว้างเท่าที่เนื้อหาต้องการจริง
-      onResize(Math.max(MIN_COL_WIDTH, Math.ceil(maxWidth) + AUTO_FIT_PADDING));
+      const fitted = Math.ceil(maxWidth) + AUTO_FIT_PADDING;
+      onResize(Math.min(AUTO_FIT_MAX_WIDTH, Math.max(MIN_COL_WIDTH, fitted)));
     }
   };
 
@@ -1093,8 +1101,9 @@ const InlineAddRow = ({
             sx={INLINE_FIELD_SX}
           />
         </TableCell>
-        {!hideContractOnlyColumns && <TableCell align="center"><Dash /></TableCell>}
-        {/* คอลัมน์ "คืบหน้า" ของแถวปกติคือ X/Y ครั้ง — ตอนสร้างจึงเป็นที่ของ "Y" (จำนวนครั้งทั้งหมด) */}
+        {/* ✅ ช่อง "สถานะ / คืบหน้า" (ยุบเป็นช่องเดียวแล้ว) — แถวที่กำลังสร้างยังไม่มีสถานะให้แสดง
+            ช่องนี้จึงเป็นที่ของ "จำนวนครั้งทั้งหมด" ซึ่งเป็นตัวส่วนของป้ายคืบหน้า X/Y ในแถวปกติ
+            ⚠️ ต้องเป็น 1 ช่องเท่านั้น ให้ตรงกับหัวตาราง/แถวข้อมูล ไม่งั้นคอลัมน์ทั้งแถวเลื่อน */}
         <TableCell align="center">
           <TextField
             fullWidth variant="standard" type="number" placeholder="กี่ครั้ง *" value={draft.visitCount}
@@ -1115,6 +1124,9 @@ const InlineAddRow = ({
             {teamOptions.map((name) => <option key={name} value={name}>{name}</option>)}
           </TextField>
         </TableCell>
+        {/* ✅ ช่องผู้ติดต่อของแถวที่กำลังสร้าง — กรอกทีหลังในแถวปกติได้ (ฟอร์มสร้างควรถามเฉพาะข้อมูล
+            ที่ต้องรู้ตั้งแต่แรกเท่านั้น) ⚠️ ต้องมีช่องนี้ไว้ ไม่งั้นคอลัมน์ทั้งแถวเลื่อนไป 1 ช่อง */}
+        <TableCell><Dash /></TableCell>
         {/* ✅ ช่องหมายเหตุของแถวที่กำลังสร้าง — เว้นไว้ก่อนได้ กรอกทีหลังในแถวปกติก็ได้
             ⚠️ ต้องมีช่องนี้ไว้เสมอ ไม่งั้นคอลัมน์ทั้งแถวเลื่อนไป 1 ช่อง (เทียบช่องแผนกที่ต้นแถว) */}
         <TableCell><Dash /></TableCell>
@@ -1696,7 +1708,8 @@ export default function ContractOverview() {
     return base.filter((c) => {
       const sd = statusDisplay(c);
       return [c.company, c.site, c.system, c.title, c.contractNo, c.quotationNo, c.responsiblePerson,
-        departmentMeta(c.departmentTag).label, sd.label, contractStatusInfo(c)?.label, c.remark, ...(sd.missing || [])]
+        departmentMeta(c.departmentTag).label, sd.label, contractStatusInfo(c)?.label, c.remark,
+        c.contactName, c.contactTel, ...(sd.missing || [])]
         .some((v) => (v || "").toLowerCase().includes(kw)) ||
         (c.allRoundTeamNames || []).some((name) => name.toLowerCase().includes(kw));
     });
@@ -1731,11 +1744,13 @@ export default function ContractOverview() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo, search]
   );
-  // ✅ สัญญาที่ "เลยกำหนดเข้ารอบถัดไป/คงค้าง" — รอบล่าสุดผ่านมาเกินระยะห่างที่กำหนด (intervalMonths)
+  // ✅ สัญญาที่ "เลยกำหนดเข้ารอบถัดไป/คงค้าง" — ถึงเดือนที่ต้องเข้ารอบถัดไปแล้ว (นับจากรอบล่าสุด +
+  // intervalMonths — ดู nextVisitOverdueInfo) ⚠️ นับเฉพาะที่ถึง/เลยกำหนดจริงเท่านั้น ไม่รวมคำเตือน
+  // สีส้ม "จะถึงในอีก 1 เดือน" ซึ่งยังไม่ใช่งานค้าง (ดู isRoundOverdue)
   // แล้วแต่ยังไม่มีวันที่/แผนงานล่วงหน้าของรอบถัดไปเลย (ดู nextVisitOverdueInfo) เดิมมีแค่ badge เตือน
   // ทีละแถวในตาราง ไม่มีทางกรองดูเฉพาะกลุ่มนี้รวดเดียวเลย — เพิ่มเป็นแท็บมุมมองแยกต่างหาก
   const overdueCount = useMemo(
-    () => applyCommonFilters(contracts.filter((c) => c.isRealContract && nextVisitOverdueInfo(c))).length,
+    () => applyCommonFilters(contracts.filter((c) => c.isRealContract && isRoundOverdue(c))).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo, search]
   );
@@ -1769,7 +1784,7 @@ export default function ContractOverview() {
   const viewBase = useMemo(() => {
     if (viewFilter === "expired") return contracts.filter(isExpiredContract);
     return viewFilter === "all" ? contracts
-      : viewFilter === "overdue" ? contracts.filter((c) => c.isRealContract && nextVisitOverdueInfo(c))
+      : viewFilter === "overdue" ? contracts.filter((c) => c.isRealContract && isRoundOverdue(c))
       : viewFilter === "ungrouped" ? contracts.filter((c) => !c.isRealContract && !c.isConfirmedGeneral && !c.isConfirmedProject)
       : viewFilter === "general" ? contracts.filter((c) => !c.isRealContract && c.isConfirmedGeneral)
       : viewFilter === "project" ? contracts.filter((c) => !c.isRealContract && c.isConfirmedProject)
@@ -1873,6 +1888,7 @@ export default function ContractOverview() {
     // ตามค่าที่เก็บในฐานข้อมูล (sales ก่อน service ซึ่งบังเอิญตรงกันในกรณีนี้ แต่จะเพี้ยนทันทีถ้าเพิ่มแผนกใหม่)
     departmentTag: (c) => departmentMeta(c.departmentTag).label,
     remark: (c) => c.remark || "",
+    contact: (c) => c.contactName || c.contactTel || "",
     // ⚠️ เรียงตาม "ความเร่งด่วน" ไม่ใช่ตามตัวอักษรของข้อความ — หมดอายุแล้วต้องมาก่อนใกล้หมดอายุเสมอ
     // ถ้าเรียงตามข้อความ "ข้อมูลไม่ครบ" จะมาก่อน "หมดอายุแล้ว" ซึ่งกลับหัวกลับหางกับสิ่งที่คนอยากเห็น
     status: (c) => {
@@ -1982,8 +1998,10 @@ export default function ContractOverview() {
     // docRef, บริษัท+โครงการ → customer, ประเภทงาน+ระบบ → work, เริ่ม+สิ้นสุด+รอบเข้า → period,
     // จำนวนครั้งทั้งหมด → รวมอยู่ในป้าย "คืบหน้า" (progress) แล้ว — คีย์ย่อยเดิมไม่มีคอลัมน์ของตัวเองอีก
     // ต่อไป จึงต้องไม่นับความกว้างซ้ำตรงนี้ ไม่งั้นตารางจะกว้างเกินจริงจนมีที่ว่างค้างท้ายแถว
-    const contractOnlyKeys = ["docRef", "period", "status"];
-    ["customer", "work", "jobValue", "commission", "progress", "responsiblePerson"].forEach((k) => { total += colWidth(k); });
+    // ⚠️ statusProgress ไม่อยู่ใน contractOnlyKeys — ช่องนี้แสดงทุกแท็บ (แถบงานทั่วไป/โปรเจคซ่อนแค่
+    // "บรรทัดสถานะสัญญา" ข้างในเท่านั้น ตัวช่องยังอยู่เพราะบรรทัดคืบหน้าใช้ได้กับทุกแถว)
+    const contractOnlyKeys = ["docRef", "period"];
+    ["customer", "work", "jobValue", "commission", "statusProgress", "responsiblePerson", "contact", "departmentTag", "remark"].forEach((k) => { total += colWidth(k); });
     if (!hideContractOnlyColumns) {
       contractOnlyKeys.forEach((k) => { total += colWidth(k); });
     } else {
@@ -2001,7 +2019,7 @@ export default function ContractOverview() {
   // แต่ละใบเลยสักคอลัมน์ — ดู handleColResize/colVar ด้านบนสำหรับเหตุผลที่ย้ายมาใช้กลไกนี้แทนตัวเลขตรงๆ
   const tableCssVars = useMemo(() => {
     const vars = { "--col-total": `${totalTableWidth}px` };
-    ["docRef", "docNo", "customer", "work", "period", "jobValue", "commission", "status", "progress", "responsiblePerson"].forEach((k) => {
+    ["docRef", "docNo", "customer", "work", "period", "jobValue", "commission", "statusProgress", "responsiblePerson", "contact", "departmentTag", "remark"].forEach((k) => {
       vars[`--col-${k}`] = `${colWidth(k)}px`;
     });
     visitColumns.forEach((n) => { vars[`--col-visit_${n}`] = `${colWidth(`visit_${n}`)}px`; });
@@ -2142,10 +2160,10 @@ export default function ContractOverview() {
       2 +                                    // customer (บริษัท+โครงการ) / work (ประเภทงาน+ระบบ)
       (hideContractOnlyColumns ? 0 : 1);    // period (เริ่ม+สิ้นสุด+รอบเข้า)
     const after =
-      (hideContractOnlyColumns ? 0 : 1) +   // status
-      1 +                                    // progress
+      1 +                                    // statusProgress (สถานะสัญญา + คืบหน้า ยุบเป็นช่องเดียว)
       visitColumns.length +
       1 +                                    // responsiblePerson
+      1 +                                    // contact (ผู้ติดต่อหน้างาน)
       1 +                                    // remark (หมายเหตุ)
       1;                                     // actions
     return { before, after };
@@ -2855,7 +2873,8 @@ export default function ContractOverview() {
     // โปรเจคส่งผ่าน eventIds — ดู useBasicInfoEndpoint ใน commitEdit) แถว "ยังไม่จัดกลุ่ม" ยังไม่ให้ติด
     // เพราะยังไม่รู้ด้วยซ้ำว่ามันคืองานอะไร ควรจัดหมวดหมู่ให้เรียบร้อยก่อน
     if (field === "docNo" || field === "responsiblePerson" || field === "jobValue" || field === "commission"
-      || field === "departmentTag" || field === "statusNote" || field === "remark") return isClassifiedRow(c);
+      || field === "departmentTag" || field === "statusNote" || field === "remark"
+      || field === "contactName" || field === "contactTel") return isClassifiedRow(c);
     return c.isRealContract;
   }, []);
 
@@ -3003,7 +3022,8 @@ export default function ContractOverview() {
         BASIC_INFO_FIELDS.has(field) ||
         field === "docNo" ||
         ((field === "responsiblePerson" || field === "jobValue" || field === "commission"
-          || field === "departmentTag" || field === "statusNote" || field === "remark") && !c.isRealContract);
+          || field === "departmentTag" || field === "statusNote" || field === "remark"
+          || field === "contactName" || field === "contactTel") && !c.isRealContract);
       if (useBasicInfoEndpoint) {
         await EventService.UpdateBasicInfo(c.visits.map((v) => v._id), payload);
       } else {
@@ -3543,7 +3563,7 @@ pagedRows.map((c, idx) => {
                     editable={isAdminOrManager && canEditField(c, "jobValue")} columnKey="jobValue"
                     editing={editingCell?.key === c.key && editingCell?.field === "jobValue"}
                     value={c.jobValue} editValue={editValue} editType="number" saving={editSaving}
-                    width={colVar("jobValue")} align="right"
+                    width={colVar("jobValue")} align="center"
                     formatDisplay={(v) => (hasMoney(v) ? formatBaht(v) : <Dash />)}
                     onStartEdit={() => beginEdit(c, "jobValue")}
                     onCommit={(v) => commitEdit(c, v)}
@@ -3556,9 +3576,9 @@ pagedRows.map((c, idx) => {
                     editable={isAdminOrManager && canEditField(c, "commission")} columnKey="commission"
                     editing={editingCell?.key === c.key && editingCell?.field === "commission"}
                     value={c.commission} editValue={editValue} editType="number" saving={editSaving}
-                    width={colVar("commission")} align="right"
+                    width={colVar("commission")} align="center"
                     formatDisplay={(v) => (hasMoney(v) ? (
-                      <Stack spacing={0} alignItems="flex-end">
+                      <Stack spacing={0} alignItems="center">
                         <Box component="span">{formatBaht(v)}</Box>
                         {commissionPct(c) && (
                           <Box component="span" sx={{ fontSize: "0.65rem", color: TEXT_SUB, lineHeight: 1.2 }}>
@@ -3571,98 +3591,106 @@ pagedRows.map((c, idx) => {
                     onCommit={(v) => commitEdit(c, v)}
                     onCancel={cancelEdit}
                   />
-                  {/* ✅ สถานะสัญญา — ระบบเติมข้อความให้อัตโนมัติ (หมดอายุ/ใกล้หมดอายุ/มีผลบังคับใช้ หรือ
-                      "ข้อมูลไม่ครบ" พร้อมบอกว่าขาดช่องไหน) และ "คลิกพิมพ์ทับได้" ตามที่ผู้ใช้ขอ — บางสถานะ
-                      จริงในการทำงาน เช่น "รอลูกค้าเซ็นกลับ" ระบบไม่มีทางเดาเองได้จากวันที่ในสัญญา
-                      ⚠️ ปล่อยช่องให้ว่าง = กลับไปใช้ข้อความอัตโนมัติ (ไม่ได้แปลว่า "ไม่มีสถานะ") */}
-                  {!hideContractOnlyColumns && (
-                  <TableCell data-col-key="status" align="center" sx={{ width: colVar("status") }}>
-                    {(() => {
-                      const sd = statusDisplay(c);
-                      const hint = sd.missing.length > 0 ? `ยังไม่ได้กรอก: ${sd.missing.join(" · ")}` : "";
-                      return (
-                        <EditableCell
-                          Wrapper={Box} align="center"
-                          editable={isAdminOrManager} columnKey="statusNote"
-                          editing={editingCell?.key === c.key && editingCell?.field === "statusNote"}
-                          value={c.statusNote || ""} editValue={editValue} saving={editSaving}
-                          placeholder="พิมพ์หมายเหตุสถานะ"
-                          title={[
-                            sd.kind === "note" ? "หมายเหตุที่พิมพ์เอง" : sd.label || "ยังไม่มีสถานะ",
-                            hint,
-                            isAdminOrManager ? "คลิกเพื่อพิมพ์แก้ไข (เว้นว่างเพื่อกลับไปใช้ข้อความอัตโนมัติ)" : "",
-                          ].filter(Boolean).join("\n")}
-                          formatDisplay={() => (sd.kind === "none" ? <Dash /> : (
-                            <Stack direction="row" spacing={0.4} alignItems="center" justifyContent="center">
-                              <Chip
-                                label={sd.label} size="small"
-                                sx={{
-                                  height: 20, maxWidth: "100%", fontSize: "0.7rem", fontWeight: 700,
-                                  bgcolor: sd.bg, color: sd.color,
-                                  "& .MuiChip-label": { px: 0.9, overflow: "hidden", textOverflow: "ellipsis" },
-                                }}
-                              />
-                              {/* ⚠️ ยังเตือน "ข้อมูลไม่ครบ" ต่อแม้จะคำนวณสถานะได้แล้ว/พิมพ์หมายเหตุทับไว้ —
-                                  ช่องที่ขาดไม่ได้หายไปไหนเพราะมีคนพิมพ์หมายเหตุ ถ้าซ่อนตรงนี้จะกลายเป็น
-                                  ว่าการพิมพ์หมายเหตุ "กลบ" ของที่ยังไม่ได้กรอกไปเงียบๆ */}
-                              {sd.missing.length > 0 && sd.kind !== "incomplete" && (
-                                <Tooltip title={hint}>
-                                  <WarningAmber sx={{ fontSize: 14, color: "#b45309" }} />
-                                </Tooltip>
-                              )}
-                              {/* จุดสีบอกสถานะจริงที่ระบบคำนวณได้ ตอนที่หมายเหตุพิมพ์เองบังข้อความไว้ */}
-                              {sd.auto && (
-                                <Tooltip title={`ระบบคำนวณจากวันสิ้นสุดสัญญาว่า: ${sd.auto.label}`}>
-                                  <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: sd.auto.color, flexShrink: 0 }} />
-                                </Tooltip>
-                              )}
-                            </Stack>
-                          ))}
-                          onStartEdit={() => beginEdit(c, "statusNote")}
-                          onCommit={(v) => commitEdit(c, v)}
-                          onCancel={cancelEdit}
-                        />
-                      );
-                    })()}
-                  </TableCell>
-                  )}
-                  {/* ✅ ยุบคอลัมน์ "จำนวนครั้งทั้งหมด" มารวมกับ "คืบหน้า" — ป้ายคืบหน้าเขียน "เสร็จ/ทั้งหมด"
-                      อยู่แล้ว (ดู progressInfo) ตัวเลขทั้งหมดจึงซ้ำกันทั้งคอลัมน์ ไม่ต้องแยกช่องอีก
-                      สิ่งที่เคยมีเฉพาะช่องนั้นและต้องยกมาด้วยคือจุดแดงเตือน "เลยกำหนดรอบถัดไป" — ย้ายมา
-                      อยู่ข้างป้ายคืบหน้าตรงนี้แทน ความหมายยังคู่กันพอดี (คืบหน้าไปถึงไหน / ค้างรอบไหนอยู่) */}
-                  <TableCell data-col-key="progress" align="center" sx={{ width: colVar("progress") }}>
-                    {(() => {
-                      // ✅ ใช้ progressInfo (ฟังก์ชันกลาง) ตัวเดียวกับที่ไฟล์ Excel ที่ส่งออกใช้ กันตัวเลข
-                      // บนจอกับในไฟล์ไม่ตรงกัน — ดูรายละเอียดตรรกะที่นิยามของ progressInfo ด้านบน
-                      const info = progressInfo(c, countUsedRounds);
-                      return (
-                        <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
-                          <Chip
-                            label={info.label} size="small"
-                            sx={{ height: 20, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha(info.color, 0.12), color: info.color }}
+                  {/* ✅ "สถานะ / คืบหน้า" ยุบเป็นช่องเดียวตามที่ผู้ใช้ขอ — เดิมแยก 2 คอลัมน์ที่มีแต่ป้าย
+                      สั้นๆ อันเดียวต่อช่อง กินความกว้างไปเปล่าๆ ทั้งที่อ่านคู่กันเสมออยู่แล้ว ("สัญญานี้
+                      สถานะยังไงอยู่ · แล้วทำไปถึงไหนแล้ว") ตอนนี้ซ้อน 2 บรรทัดในช่องเดียว กวาดสายตา
+                      ลงล่างทีเดียวจบ เทียบ pattern เดียวกับ docRef/customer/work/period ที่ยุบไปแล้ว
+                      ⚠️ แถบงานทั่วไป/โปรเจคไม่มี "สถานะสัญญา" (hideContractOnlyColumns) — ซ่อนเฉพาะ
+                      บรรทัดบน ไม่ซ่อนทั้งช่อง เพราะบรรทัดคืบหน้าใช้ได้กับทุกแถว */}
+                  <TableCell data-col-key="statusProgress" align="center" sx={{ width: colVar("statusProgress") }}>
+                    <Stack spacing={0.35} alignItems="center">
+                      {/* ── บรรทัดบน: สถานะสัญญา — ระบบเติมข้อความให้อัตโนมัติ (หมดอายุ/ใกล้หมดอายุ/
+                          มีผลบังคับใช้ หรือ "ข้อมูลไม่ครบ" พร้อมบอกว่าขาดช่องไหน) และ "คลิกพิมพ์ทับได้"
+                          ตามที่ผู้ใช้ขอ — บางสถานะจริงในการทำงาน เช่น "รอลูกค้าเซ็นกลับ" ระบบไม่มีทาง
+                          เดาเองได้จากวันที่ในสัญญา ⚠️ ปล่อยช่องว่าง = กลับไปใช้ข้อความอัตโนมัติ */}
+                      {!hideContractOnlyColumns && (() => {
+                        const sd = statusDisplay(c);
+                        const hint = sd.missing.length > 0 ? `ยังไม่ได้กรอก: ${sd.missing.join(" · ")}` : "";
+                        return (
+                          <EditableCell
+                            Wrapper={Box} align="center" width="100%"
+                            editable={isAdminOrManager} columnKey="statusNote"
+                            editing={editingCell?.key === c.key && editingCell?.field === "statusNote"}
+                            value={c.statusNote || ""} editValue={editValue} saving={editSaving}
+                            placeholder="พิมพ์หมายเหตุสถานะ"
+                            title={[
+                              sd.kind === "note" ? "หมายเหตุที่พิมพ์เอง" : sd.label || "ยังไม่มีสถานะ",
+                              hint,
+                              isAdminOrManager ? "คลิกเพื่อพิมพ์แก้ไข (เว้นว่างเพื่อกลับไปใช้ข้อความอัตโนมัติ)" : "",
+                            ].filter(Boolean).join("\n")}
+                            formatDisplay={() => (sd.kind === "none" ? <Dash /> : (
+                              <Stack direction="row" spacing={0.4} alignItems="center" justifyContent="center">
+                                <Chip
+                                  label={sd.label} size="small"
+                                  sx={{
+                                    height: 20, maxWidth: "100%", fontSize: "0.7rem", fontWeight: 700,
+                                    bgcolor: sd.bg, color: sd.color,
+                                    "& .MuiChip-label": { px: 0.9, overflow: "hidden", textOverflow: "ellipsis" },
+                                  }}
+                                />
+                                {/* ⚠️ ยังเตือน "ข้อมูลไม่ครบ" ต่อแม้จะคำนวณสถานะได้แล้ว/พิมพ์หมายเหตุทับไว้ —
+                                    ช่องที่ขาดไม่ได้หายไปไหนเพราะมีคนพิมพ์หมายเหตุ ถ้าซ่อนตรงนี้จะกลายเป็น
+                                    ว่าการพิมพ์หมายเหตุ "กลบ" ของที่ยังไม่ได้กรอกไปเงียบๆ */}
+                                {sd.missing.length > 0 && sd.kind !== "incomplete" && (
+                                  <Tooltip title={hint}>
+                                    <WarningAmber sx={{ fontSize: 14, color: "#b45309" }} />
+                                  </Tooltip>
+                                )}
+                                {/* จุดสีบอกสถานะจริงที่ระบบคำนวณได้ ตอนที่หมายเหตุพิมพ์เองบังข้อความไว้ */}
+                                {sd.auto && (
+                                  <Tooltip title={`ระบบคำนวณจากวันสิ้นสุดสัญญาว่า: ${sd.auto.label}`}>
+                                    <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: sd.auto.color, flexShrink: 0 }} />
+                                  </Tooltip>
+                                )}
+                              </Stack>
+                            ))}
+                            onStartEdit={() => beginEdit(c, "statusNote")}
+                            onCommit={(v) => commitEdit(c, v)}
+                            onCancel={cancelEdit}
                           />
-                          {overdueInfo && (
-                            <Tooltip title={`รอบล่าสุด ${thaiDateNumeric(overdueInfo.lastVisitDate)} — ต้องเข้ารอบถัดไปภายใน ${overdueInfo.intervalMonths} เดือน เกินกำหนดแล้ว ${overdueInfo.monthsOverdue} เดือน ยังไม่ได้ลงแผนงานครั้งถัดไป`}>
-                              <Box
-                                component="span"
-                                sx={{
-                                  display: "inline-flex", alignItems: "center", justifyContent: "center",
-                                  width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
-                                  bgcolor: "#dc2626", color: "#fff",
-                                  animation: "contractOverviewPulse 1.6s ease-in-out infinite",
-                                  "@keyframes contractOverviewPulse": {
-                                    "0%, 100%": { boxShadow: `0 0 0 0 ${alpha("#dc2626", 0.5)}` },
-                                    "50%": { boxShadow: `0 0 0 4px ${alpha("#dc2626", 0)}` },
-                                  },
-                                }}
-                              >
-                                <WarningAmber sx={{ fontSize: 12 }} />
-                              </Box>
-                            </Tooltip>
-                          )}
-                        </Stack>
-                      );
-                    })()}
+                        );
+                      })()}
+
+                      {/* ── บรรทัดล่าง: คืบหน้า (เสร็จ/ทั้งหมด) + จุดเตือนรอบเข้างานถัดไป
+                          ✅ ใช้ progressInfo (ฟังก์ชันกลาง) ตัวเดียวกับที่ไฟล์ Excel ที่ส่งออกใช้ กันตัวเลข
+                          บนจอกับในไฟล์ไม่ตรงกัน — ดูรายละเอียดตรรกะที่นิยามของ progressInfo ด้านบน */}
+                      {(() => {
+                        const info = progressInfo(c, countUsedRounds);
+                        return (
+                          <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="center">
+                            <Chip
+                              label={info.label} size="small"
+                              sx={{ height: 20, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha(info.color, 0.12), color: info.color }}
+                            />
+                            {/* ✅ สีตามสถานะจริง — แดง = ถึงเดือนที่ต้องเข้างานแล้ว/เลยมาแล้ว · ส้ม = จะถึง
+                                ในอีก 1 เดือน (ดู nextVisitOverdueInfo) ⚠️ กะพริบเฉพาะสีแดงเท่านั้น สีส้มเป็น
+                                การเตือนล่วงหน้าที่ยังไม่ต้องรีบ ถ้ากะพริบด้วยจะกลายเป็นจุดกะพริบเต็มหน้าจน
+                                คนเลิกสนใจของที่เลยกำหนดจริงไปด้วย */}
+                            {overdueInfo && (
+                              <Tooltip title={`รอบล่าสุด ${thaiDateNumeric(overdueInfo.lastVisitDate)} — ต้องเข้ารอบถัดไปภายใน ${overdueInfo.intervalMonths} เดือน (ครบกำหนด ${thaiDateNumeric(overdueInfo.dueDate)}) · ${overdueInfo.label} ยังไม่ได้ลงแผนงานครั้งถัดไป`}>
+                                <Box
+                                  component="span"
+                                  sx={{
+                                    display: "inline-flex", alignItems: "center", justifyContent: "center",
+                                    width: 18, height: 18, borderRadius: "50%", flexShrink: 0,
+                                    bgcolor: overdueInfo.color, color: "#fff",
+                                    ...(overdueInfo.state === "overdue" ? {
+                                      animation: "contractOverviewPulse 1.6s ease-in-out infinite",
+                                      "@keyframes contractOverviewPulse": {
+                                        "0%, 100%": { boxShadow: `0 0 0 0 ${alpha(overdueInfo.color, 0.5)}` },
+                                        "50%": { boxShadow: `0 0 0 4px ${alpha(overdueInfo.color, 0)}` },
+                                      },
+                                    } : {}),
+                                  }}
+                                >
+                                  <WarningAmber sx={{ fontSize: 12 }} />
+                                </Box>
+                              </Tooltip>
+                            )}
+                          </Stack>
+                        );
+                      })()}
+                    </Stack>
                   </TableCell>
                   {visitColumns.map((n) => {
                     // ✅ แถวที่ไม่ใช่สัญญาจริง (งานทั่วไป/ยังไม่จัดกลุ่ม) ไม่มี visitCount ให้เทียบ (ดู
@@ -3848,12 +3876,13 @@ pagedRows.map((c, idx) => {
                           // ✅ ปุ่ม "+ เพิ่มครั้งถัดไป" ย้ายมาอยู่ในช่องของครั้งที่มันเองเลย (เดิมอยู่ในคอลัมน์
                           // actions แยกต่างหาก มองไม่ออกว่ากดแล้วจะไปเพิ่มครั้งที่เท่าไหร่) พอเพิ่มสำเร็จแล้ว
                           // nextOpenRound จะขยับไปครั้งถัดไปเอง ปุ่มก็เลยย้ายไปโผล่ที่ช่องนั้นแทนอัตโนมัติ —
-                          // ถ้าเลยกำหนด 3 เดือนแล้วด้วย (overdueInfo) ให้พื้นหลังปุ่มทึบแดงเห็นชัดแม้เป็น
+                          // ถ้าถึง/เลยกำหนดรอบถัดไปแล้วด้วย (overdueInfo) ให้พื้นหลังปุ่มทึบแดงเห็นชัดแม้เป็น
                           // ภาพนิ่ง (ของเดิมแค่เปลี่ยนสีไอคอน ซึ่งเป็นสีแดงเดียวกับปุ่มปกติอยู่แล้ว มองไม่ออก
                           // ว่าต่างกันตรงไหน) + จุดแจ้งเตือนมุมขวาบนกะพริบเบาๆ เสริมอีกชั้น
-                          <Tooltip title={overdueInfo ? `เกินกำหนดแล้ว ${overdueInfo.monthsOverdue} เดือน — กดเพื่อเพิ่มครั้งที่ ${n}` : `เพิ่มครั้งที่ ${n}`}>
+                          <Tooltip title={overdueInfo ? `${overdueInfo.label} — กดเพื่อเพิ่มครั้งที่ ${n}` : `เพิ่มครั้งที่ ${n}`}>
                             <Badge
-                              color="error" variant="dot" invisible={!overdueInfo}
+                              color={overdueInfo?.state === "due_soon" ? "warning" : "error"}
+                              variant="dot" invisible={!overdueInfo}
                               sx={{
                                 "& .MuiBadge-dot": {
                                   animation: "contractOverviewPulse 1.4s ease-in-out infinite",
@@ -3866,10 +3895,12 @@ pagedRows.map((c, idx) => {
                             >
                               <IconButton
                                 size="small" onClick={() => openAddVisitDialog(c)}
-                                sx={overdueInfo ? {
-                                  color: "#fff", bgcolor: "#dc2626",
+                                // ⚠️ พื้นทึบเฉพาะตอนเลยกำหนดจริง — สีส้มใช้แค่ย้อมตัวไอคอน ไม่ทำเป็นปุ่มทึบ
+                                // เพราะปุ่มทึบคือ "ต้องกดเดี๋ยวนี้" ซึ่งยังไม่ใช่สำหรับรอบที่จะถึงเดือนหน้า
+                                sx={overdueInfo?.state === "overdue" ? {
+                                  color: "#fff", bgcolor: overdueInfo.color,
                                   "&:hover": { bgcolor: "#b91c1c" },
-                                } : { color: ACCENT }}
+                                } : { color: overdueInfo?.color || ACCENT }}
                               >
                                 <PlaylistAdd fontSize="small" />
                               </IconButton>
@@ -3895,6 +3926,39 @@ pagedRows.map((c, idx) => {
                     onCommit={(v) => commitEdit(c, v)}
                     onCancel={cancelEdit}
                   />
+                  {/* ✅ ผู้ติดต่อหน้างาน — ชื่อบรรทัดบน เบอร์บรรทัดล่าง แก้ไขแยกกันได้ทั้งคู่
+                      ✅ เบอร์เป็นลิงก์ tel: กดโทรออกได้ทันทีจากมือถือ/แท็บเล็ตที่ช่างใช้หน้างาน
+                      ⚠️ ปุ่มโทรต้อง stopPropagation ไม่งั้นคลิกแล้วเข้าโหมดแก้ไขแทนที่จะโทรออก */}
+                  <TableCell data-col-key="contact" sx={{ width: colVar("contact"), maxWidth: colVar("contact") }}>
+                    <Stack spacing={0.15}>
+                      <EditableCell
+                        Wrapper={Box} width="100%"
+                        editable={isAdminOrManager && canEditField(c, "contactName")} columnKey="contactName"
+                        editing={editingCell?.key === c.key && editingCell?.field === "contactName"}
+                        value={c.contactName} editValue={editValue} saving={editSaving}
+                        placeholder="ชื่อผู้ติดต่อ"
+                        title={c.contactName || "ยังไม่มีชื่อผู้ติดต่อ"}
+                        formatDisplay={(v) => (v
+                          ? <Box component="span" sx={{ fontSize: "0.78rem", fontWeight: 600 }}>{v}</Box>
+                          : <Dash />)}
+                        onStartEdit={() => beginEdit(c, "contactName")}
+                        onCommit={(v) => commitEdit(c, v)}
+                        onCancel={cancelEdit}
+                      />
+                      <EditableCell
+                        Wrapper={Box} width="100%"
+                        editable={isAdminOrManager && canEditField(c, "contactTel")} columnKey="contactTel"
+                        editing={editingCell?.key === c.key && editingCell?.field === "contactTel"}
+                        value={c.contactTel} editValue={editValue} saving={editSaving}
+                        placeholder="เบอร์โทร"
+                        title={c.contactTel ? `โทร ${c.contactTel}` : "ยังไม่มีเบอร์ติดต่อ"}
+                        formatDisplay={(v) => (v ? <TelLink tel={v} /> : <Dash />)}
+                        onStartEdit={() => beginEdit(c, "contactTel")}
+                        onCommit={(v) => commitEdit(c, v)}
+                        onCancel={cancelEdit}
+                      />
+                    </Stack>
+                  </TableCell>
                   {/* ✅ หมายเหตุ — คลิกพิมพ์ได้เลยเหมือนช่องอื่น ข้อความยาวถูกตัดด้วย … แต่ยังอ่านเต็มได้
                       จาก tooltip (และการ์ดมือถือแสดงเต็มไม่ตัด) */}
                   <EditableCell
@@ -4343,8 +4407,12 @@ pagedRows.map((c, idx) => {
         <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.75 }}>
           <Chip label={progressLabel} size="small" sx={{ height: 20, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha(progressColor, 0.12), color: progressColor }} />
           {overdueInfo && (
-            <Tooltip title={`รอบล่าสุด ${thaiDateNumeric(overdueInfo.lastVisitDate)} — เกินกำหนดรอบถัดไปแล้ว ${overdueInfo.monthsOverdue} เดือน`}>
-              <Chip icon={<WarningAmber sx={{ fontSize: 14 }} />} label="เกินกำหนด" size="small" sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha("#dc2626", 0.12), color: "#dc2626" }} />
+            <Tooltip title={`รอบล่าสุด ${thaiDateNumeric(overdueInfo.lastVisitDate)} — ครบกำหนดรอบถัดไป ${thaiDateNumeric(overdueInfo.dueDate)}`}>
+              {/* ป้ายบอกสถานะตรงๆ แทนคำว่า "เกินกำหนด" คำเดียว — บนมือถือไม่มี hover ให้ชี้ดูรายละเอียด */}
+              <Chip
+                icon={<WarningAmber sx={{ fontSize: 14 }} />} label={overdueInfo.shortLabel} size="small"
+                sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha(overdueInfo.color, 0.12), color: overdueInfo.color, "& .MuiChip-icon": { color: overdueInfo.color } }}
+              />
             </Tooltip>
           )}
           <Box sx={{ flex: 1 }} />
@@ -4624,6 +4692,24 @@ pagedRows.map((c, idx) => {
 
         {/* ผู้รับผิดชอบ — ฟิลด์อิสระจากทีมที่เข้างานทุกครั้งด้านบนโดยสมบูรณ์ */}
         <FieldRow label="ผู้รับผิดชอบ" editable={isAdminOrManager && canEditField(c, "responsiblePerson")} editType="select" editOptions={teamOptions} value={c.responsiblePerson} formatDisplay={unassignedResponsibleDisplay} {...fp("responsiblePerson")} />
+        {/* ✅ ผู้ติดต่อหน้างาน — เบอร์กดโทรออกได้ทันที ซึ่งเป็นเหตุผลหลักที่ต้องมีบนมือถือ
+            (ช่างเปิดจากรถ/หน้างานแล้วโทรได้เลย ไม่ต้องจดเบอร์แล้วไปพิมพ์ในแอปโทรศัพท์เอง) */}
+        <FieldRow
+          label="ผู้ติดต่อ"
+          editable={isAdminOrManager && canEditField(c, "contactName")}
+          value={c.contactName}
+          placeholder="ชื่อผู้ติดต่อ"
+          {...fp("contactName")}
+        />
+        <FieldRow
+          label="เบอร์โทร"
+          editable={isAdminOrManager && canEditField(c, "contactTel")}
+          value={c.contactTel}
+          placeholder="เบอร์โทร"
+          formatDisplay={(v) => (v ? <TelLink tel={v} /> : <Dash />)}
+          {...fp("contactTel")}
+        />
+
         {/* ✅ หมายเหตุ — noClip เพราะข้อความคือเนื้อหาทั้งหมดของช่องนี้ ถ้าโดนตัดเหลือ "..." บนมือถือ
             (ซึ่งไม่มี hover ให้ชี้ดู tooltip) ก็เท่ากับไม่ได้บอกอะไรเลย */}
         <FieldRow
@@ -5556,16 +5642,11 @@ pagedRows.map((c, idx) => {
                 {/* ✅ ค่าคอมมิชชั่นที่จ่ายให้ฝั่งลูกค้า — วางติดมูลค่างานเพราะอ่านคู่กันเสมอ
                     (คอมเท่านี้จากงานมูลค่าเท่านี้ คิดเป็นกี่ % ดูได้ทันทีโดยไม่ต้องเลื่อนหา) */}
                 <ResizableTh width={colWidth("commission")} align="center" columnKey="commission" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("commission")} sortable sortDirection={sortConfig.key === "commission" ? sortConfig.direction : null} onSort={handleSortClick}>ค่าคอมลูกค้า (฿)</ResizableTh>
-                {!hideContractOnlyColumns && (
-                  <ResizableTh width={colWidth("status")} align="center" columnKey="status" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("status")} sortable sortDirection={sortConfig.key === "status" ? sortConfig.direction : null} onSort={handleSortClick}>สถานะสัญญา</ResizableTh>
-                )}
-                {/* 🐛 BUG ที่แก้ (หัวคอลัมน์ไม่ตรงกับข้อมูลข้างใน): ช่องนี้แสดง 2 แบบตามชนิดแถว — สัญญาจริง
-                    โชว์ "X/Y ครั้ง" (คืบหน้า) ส่วนงานทั่วไป/โปรเจค/ยังไม่จัดกลุ่มโชว์ป้ายสถานะงาน (ดู
-                    jobStatusInfo ในเซลล์) แต่หัวคอลัมน์เขียน "คืบหน้า" ตายตัวเสมอ — ในแท็บที่มีแต่แถวที่
-                    ไม่ใช่สัญญา (hideContractOnlyColumns) ทุกแถวจึงโชว์สถานะ แต่หัวบอกว่าคืบหน้า อ่านแล้ว
-                    เข้าใจผิดทันที ต้องเปลี่ยนหัวตามชนิดข้อมูลที่แสดงจริงในแท็บนั้นๆ */}
-                <ResizableTh width={colWidth("progress")} align="center" columnKey="progress" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("progress")}>
-                  {hideContractOnlyColumns ? "สถานะงาน" : "คืบหน้า"}
+                {/* ✅ หัวเดียวคุม 2 บรรทัด (สถานะสัญญา / คืบหน้า) — เรียงตามสถานะสัญญาซึ่งเป็นบรรทัดบน
+                    และเป็นตัวที่คนใช้เรียงหาจริง (ไล่หาสัญญาที่หมดอายุ/ข้อมูลไม่ครบ)
+                    ⚠️ ลำดับคอลัมน์ต้องตรงกับแถวข้อมูลและ footerColSpan เป๊ะๆ */}
+                <ResizableTh width={colWidth("statusProgress")} align="center" columnKey="statusProgress" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("statusProgress")} sortable sortDirection={sortConfig.key === "status" ? sortConfig.direction : null} onSort={() => handleSortClick("status")}>
+                  {hideContractOnlyColumns ? "สถานะงาน" : "สถานะ / คืบหน้า"}
                 </ResizableTh>
                 {/* ✅ งานทั่วไป/โปรเจค/ยังไม่จัดกลุ่ม (hideContractOnlyColumns) ไม่มีแนวคิด "หลายครั้ง"
                     แบบสัญญาจริงเลย (แทบทุกแถวมีแค่คอลัมน์เดียวอยู่แล้ว) หัวข้อ "ครั้งที่ 1" จึงดูแปลก/
@@ -5582,6 +5663,10 @@ pagedRows.map((c, idx) => {
                     สมบูรณ์ (คนรับผิดชอบสัญญานี้โดยรวมไม่ควรเปลี่ยนตามทีมที่เข้างานแต่ละครั้ง) ยังคงอยู่
                     เหมือนเดิม แก้ไข inline ได้ตามปกติ (ดู responsiblePerson/responsiblePersonId) */}
                 <ResizableTh width={colWidth("responsiblePerson")} columnKey="responsiblePerson" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("responsiblePerson")} sortable sortDirection={sortConfig.key === "responsiblePerson" ? sortConfig.direction : null} onSort={handleSortClick}>ผู้รับผิดชอบ</ResizableTh>
+                {/* ✅ ผู้ติดต่อหน้างาน — ชื่อ + เบอร์ซ้อน 2 บรรทัดในช่องเดียว (อ่านคู่กันเสมอ)
+                    วางติด "ผู้รับผิดชอบ" เพราะเป็นข้อมูล "คน" เหมือนกัน แต่คนละฝั่ง: ผู้รับผิดชอบคือคน
+                    ของเรา ส่วนผู้ติดต่อคือคนของลูกค้าที่ต้องโทรหาเมื่อไปถึงหน้างาน */}
+                <ResizableTh width={colWidth("contact")} columnKey="contact" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("contact")} sortable sortDirection={sortConfig.key === "contact" ? sortConfig.direction : null} onSort={handleSortClick}>ผู้ติดต่อ</ResizableTh>
                 {/* ✅ หมายเหตุ — บันทึกอิสระของงานนั้น (เช่น "ลูกค้าขอเลื่อนรอบ 2" / "ต้องแจ้ง รปภ. ล่วงหน้า")
                     ⚠️ คนละช่องกับ "สถานะสัญญา" ที่พิมพ์ทับได้โดยตั้งใจ — ถ้าใช้ช่องเดียวกัน การจดโน้ต
                     ธรรมดาจะไปกลบสถานะหมดอายุ/ใกล้หมดอายุบนหน้าจอทันที (ดู statusDisplay)

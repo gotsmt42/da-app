@@ -28,7 +28,7 @@ import { useAuth } from "@/features/auth/AuthContext";
 import EventService from "@/shared/services/EventService";
 import IssuedDocumentService from "@/shared/services/IssuedDocumentService";
 import {
-  groupEventsByContract, nextVisitOverdueInfo, contractStatusInfo,
+  groupEventsByContract, isRoundOverdue, contractStatusInfo,
 } from "@/shared/utils/contractOverdue";
 import { buildDaysPastDueMap, isFlaggedDays, getOverdueGroupKey } from "@/shared/utils/overdueJobs";
 import { getFollowUpInfo } from "@/shared/utils/quotationTracking";
@@ -139,7 +139,9 @@ export default function CustomerOverview() {
         const st = contractStatusInfo(c);
         if (st?.state === "expired") b.expired.push(c);
         else if (st?.state === "expiring") b.expiring.push(c);
-        if (nextVisitOverdueInfo(c)) b.overdueRounds.push(c);
+        // ⚠️ นับเฉพาะที่เลยกำหนดจริง — ตัวเลขนี้อยู่ใต้ป้าย "เลยกำหนด" ถ้ารวมรอบที่ยังมาไม่ถึง
+        // (คำเตือนสีส้ม) เข้าไปด้วย ตัวเลขจะโป่งขึ้นทั้งที่ไม่มีงานค้างเพิ่มขึ้นจริงสักงาน
+        if (isRoundOverdue(c)) b.overdueRounds.push(c);
       }
     });
 
