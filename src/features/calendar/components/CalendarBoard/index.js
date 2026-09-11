@@ -103,6 +103,41 @@ const STATUS_DESCRIPTIONS = {
 // จะไม่ถูกเรียกซ้ำเมื่อ "ข้อมูล" ของ event เปลี่ยน (เช่น status) โดยที่ element ยังอยู่
 // การฝัง SVG ไว้ใน eventContent (ที่ FullCalendar เรียกทุกครั้งที่ re-render event) ทำให้
 // ไอคอนอัปเดตทันทีตาม status ใหม่ โดยไม่ต้องรีเฟรชหน้า
+/**
+ * readableOn(fg, bg) — คืนสี fg ที่ "อ่านออกแน่นอน" บนพื้น bg (คอนทราสต์ ≥ 4.5:1 ตามเกณฑ์ WCAG AA)
+ *
+ * ⚠️ จำเป็นเพราะป้ายประเภทงานใช้ "สีของงานเอง" เป็นสีตัวอักษร ซึ่งผู้ใช้เลือกได้อิสระทุกสี — สีอ่อนๆ
+ * หรือสีกลางๆ บางสีวางบนป้ายพื้นขาวแล้วจางจนแทบมองไม่เห็น (วัดจริง: ฟ้าอมเขียว #0891b2 ได้ 3.7:1)
+ * ✅ ไล่ผสมกับดำ (หรือขาวถ้าพื้นเข้ม) ทีละขั้นจนผ่านเกณฑ์ — ยังคง "เฉดสีเดิม" ไว้ จึงยังบอกประเภทงาน
+ * ด้วยสีได้เหมือนเดิม แค่เข้ม/อ่อนขึ้นเท่าที่จำเป็น
+ */
+const readableOn = (fg, bg) => {
+  const toRgb = (c) => {
+    const m = String(c).trim();
+    if (m.startsWith("#")) {
+      const h = m.slice(1);
+      const f = h.length === 3 ? h.split("").map((x) => x + x).join("") : h;
+      if (f.length < 6) return null;
+      return [0, 2, 4].map((i) => parseInt(f.slice(i, i + 2), 16));
+    }
+    const n = m.match(/\d+(\.\d+)?/g);
+    return n && n.length >= 3 ? n.slice(0, 3).map(Number) : null;
+  };
+  const lum = (rgb) =>
+    rgb
+      .map((v) => { const s = v / 255; return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4); })
+      .reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
+  const ratio = (a, b) => { const l1 = lum(a), l2 = lum(b); const [hi, lo] = l1 > l2 ? [l1, l2] : [l2, l1]; return (hi + 0.05) / (lo + 0.05); };
+  const f = toRgb(fg), b = toRgb(bg);
+  if (!f || !b) return fg;
+  // พื้นสว่าง → ไล่ให้ตัวอักษรเข้มขึ้น · พื้นเข้ม → ไล่ให้สว่างขึ้น
+  const target = lum(b) > 0.5 ? [0, 0, 0] : [255, 255, 255];
+  let cur = f;
+  for (let i = 0; i < 12 && ratio(cur, b) < 4.5; i++) {
+    cur = cur.map((v, k) => Math.round(v + (target[k] - v) * 0.12));
+  }
+  return `rgb(${cur[0]}, ${cur[1]}, ${cur[2]})`;
+};
 const faIconToSvg = (iconDef, { color = "#000000" } = {}) => {
   if (!iconDef?.icon) return "";
   const [width, height, , , svgPathData] = iconDef.icon;
@@ -2169,6 +2204,11 @@ function EventCalendar() {
         items,
         // จำความสูงจริงของแต่ละใบไว้ ใช้คำนวณว่าลากผ่านใบไหนไปแล้วบ้าง
         rects: items.map((el) => el.getBoundingClientRect()),
+        // 🐛 BUG ที่แก้ (ลากจัดลำดับแล้วการ์ดซ้อนทับกัน): เดิมเลื่อนใบอื่นด้วย "ความสูงของใบที่ลาก"
+        // เพียวๆ แต่ getBoundingClientRect().height ไม่รวม margin ระหว่างใบ — พอมีการเว้นระยะให้ป้าย
+        // ที่ยื่นพ้นขอบ (10px บนมือถือ / 17px บนจอคอม) ระยะเลื่อนจึงสั้นกว่าที่ว่างจริงเท่านั้นพอดี
+        // ใบที่ขยับมาแทนเลยไปทับใบข้างเคียงระหว่างลาก
+        // ✅ วัด "ช่องว่างจริงระหว่างใบ" จาก rect สองใบแรกแล้วบวกเข้าไป — ได้ที่ว่างที่ใบนั้นกินจริงๆ
         from: items.indexOf(harness),
         to: items.indexOf(harness),
         moved: false,
@@ -2186,6 +2226,11 @@ function EventCalendar() {
 
       // ตำแหน่งกึ่งกลางของใบที่กำลังลาก แล้วหาว่าควรไปแทรกที่ช่องไหน
       const r = drag.rects[drag.from];
+      // ที่ว่างที่ใบนี้กินจริง = ความสูงของมัน + ช่องว่างระหว่างใบ (ดูคอมเมนต์ตอนสร้าง drag)
+      const gap = drag.rects.length > 1
+        ? Math.max(0, drag.rects[1].top - drag.rects[0].bottom)
+        : 0;
+      const slot = r.height + gap;
       const centre = r.top + r.height / 2 + dy;
       let to = 0;
       drag.rects.forEach((rr, i) => {
@@ -2201,8 +2246,8 @@ function EventCalendar() {
           return;
         }
         let shift = 0;
-        if (drag.from < drag.to && i > drag.from && i <= drag.to) shift = -drag.rects[drag.from].height;
-        if (drag.from > drag.to && i >= drag.to && i < drag.from) shift = drag.rects[drag.from].height;
+        if (drag.from < drag.to && i > drag.from && i <= drag.to) shift = -slot;
+        if (drag.from > drag.to && i >= drag.to && i < drag.from) shift = slot;
         el.style.transition = "transform .18s cubic-bezier(.4, 0, .2, 1)";
         el.style.transform = shift ? `translateY(${shift}px)` : "";
       });
@@ -2656,7 +2701,7 @@ function EventCalendar() {
           showNonCurrentDates={false} // ✅ ไม่แสดงวันของเดือนก่อนและหลัง
           firstDay={0} // ✅ กำหนดให้วันอาทิตย์เป็นวันแรกของสัปดาห์
           eventContent={(arg) => {
-            const { title, extendedProps, textColor } = arg.event;
+            const { title, extendedProps, textColor, backgroundColor } = arg.event;
             const {
               system = "",
               time = "",
@@ -2683,29 +2728,36 @@ function EventCalendar() {
             // ⚠️ วัดจริงที่จอ 412px: ตัวคั่นเหล่านี้กินความกว้าง ~7px ต่อแถว บนคอลัมน์ 47px
             // คือ 15% — พอที่จะดันข้อความให้ตกบรรทัดเพิ่มอีก 1 บรรทัด โดยไม่ได้ให้ข้อมูลเพิ่มขึ้นเลย
             // ⚠️ บนจอคอมและมุมมอง "รายการ" ยังแสดงตัวคั่นครบเหมือนเดิมทุกประการ
-            // ⚠️ <wbr> หลังเครื่องหมาย : คือ "จุดที่ขึ้นบรรทัดใหม่ได้ถ้าจำเป็น" — ไม่ใช่การบังคับ
+            // 🐛 BUG ที่แก้ (ไอคอนกับค่าอยู่คนละบรรทัดบนคอลัมน์แคบ): เคยมี <wbr> คั่นหลังเครื่องหมาย :
+            // เพื่อเป็น "จุดที่ขึ้นบรรทัดใหม่ได้ถ้าจำเป็น" — แต่เบราว์เซอร์ถือว่า <wbr> เป็นจุดตัดที่ใช้ได้
+            // แม้ตั้ง white-space:nowrap ไว้แล้ว (ไม่เหมือนช่องว่างธรรมดาที่ nowrap กดไว้ได้) ค่าจึงตก
+            // ไปบรรทัดใหม่ทิ้งไอคอนไว้ลอยๆ บรรทัดบน — เอาออกแล้วใช้ช่องว่างจริงเป็นจุดตัดแทน
+            // ซึ่งให้ผลเหมือนกันตอนที่อนุญาตให้ห่อบรรทัด (จอคอม/โหมดขยาย) แต่ nowrap กดไว้ได้จริง
             // บนคอลัมน์แคบ เบราว์เซอร์จะเลือกตัดตรงนี้ก่อนเสมอ — ได้ "หัวข้อ:" / "ค่า" อ่านง่าย
             // แทนที่จะหั่นกลางคำเป็น "โครงการ:Am" / "azon" — แต่แถวที่สั้นพออยู่แล้วก็ยังคง 1 บรรทัดเหมือนเดิม
             // โครงสร้าง: [ขีดนำ] [หัวข้อ :] [ช่องว่าง] [ค่า]
             // ✅ แยก .ec-card-k (หัวข้อ) กับ .ec-card-v (ค่า) เพื่อให้ CSS ทำน้ำหนักต่างกันได้
             // ปัญหาที่แก้: เดิมทั้งแถวเป็นตัวหนังสือน้ำหนัก/สีเดียวกันหมด การ์ดหนึ่งใบจึงเป็นก้อนข้อความ
             // ทึบๆ ตาไม่มีจุดเกาะ ต้องอ่านไล่ทีละตัวถึงจะรู้ว่าบรรทัดไหนคืออะไร — ช้าและล้า
-            const detailRow = (label, value) =>
-              `<span class="ec-card-deco">- </span><span class="ec-card-k">${label}<span class="ec-card-deco"> </span>:</span><span class="ec-card-deco"> </span><wbr><span class="ec-card-v">${value}</span>`;
+            // ⚠️ ไอคอนชุดเดียวกับที่หน้า "การดำเนินงาน" ใช้กำกับข้อมูลชุดนี้อยู่แล้ว (ดู InfoLine ที่
+            //    OperationBoard) — คนใช้เห็นความหมายเดียวกันทั้งสองหน้า ไม่ต้องจำสองชุด
+            // ⚠️ title บนทั้งแถว = คำเต็มเสมอ แม้ในโหมดที่ย่อเหลือไอคอน (แตะค้าง/ชี้เมาส์ก็รู้)
+            const detailRow = (label, value, icon = "") =>
+              `<span class="ec-card-deco">- </span><span class="ec-card-k" title="${label}"><span class="ec-card-ico" aria-hidden="true">${icon}</span><span class="ec-card-kw">${label}<span class="ec-card-deco"> </span>:</span></span><span class="ec-card-deco"> </span><span class="ec-card-v">${value}</span>`;
 
-            const siteDisplay = site ? detailRow("โครงการ", escapeHtml(site)) : "";
+            const siteDisplay = site ? detailRow("โครงการ", escapeHtml(site), "🏢") : "";
             // ✅ โชว์ "1/3" (ครั้งที่/จำนวนครั้งทั้งหมดของสัญญา) แทน "1" เฉยๆ — เห็นสัดส่วนความคืบหน้า
             // ทันทีจากหน้าปฏิทินโดยไม่ต้องเปิดไปดูหน้าภาพรวมสัญญา งานที่ไม่ใช่งานสัญญา (ไม่มี visitCount)
             // ยังโชว์แค่เลขครั้งเฉยๆ เหมือนเดิม (ดู formatRoundLabel)
-            const timeDisplay = time ? detailRow("ครั้งที่", escapeHtml(formatRoundLabel(time, visitCount))) : "";
+            const timeDisplay = time ? detailRow("ครั้งที่", escapeHtml(formatRoundLabel(time, visitCount)), "🔢") : "";
             // ✅ รวมช่างหลัก (team) + ลูกทีมเพิ่มเติม (teamMembers) เป็นรายชื่อเดียว ให้เห็นครบ
             // ทุกคนที่ช่วยทำงานนี้ในบรรทัดเดียวกัน แทนที่จะเห็นแค่ช่างหลักคนเดียวเหมือนเดิม
             const allTeamNames = [team, ...teamMembers.map((m) => m?.name)]
               .filter(Boolean)
               .filter((name, idx, arr) => arr.indexOf(name) === idx);
-            const teamDisplay = allTeamNames.length ? detailRow("ทีม", allTeamNames.map(escapeHtml).join(", ")) : "";
+            const teamDisplay = allTeamNames.length ? detailRow("ทีม", allTeamNames.map(escapeHtml).join(", "), "👷") : "";
 
-            const systemDisplay = system ? detailRow("ระบบ", escapeHtml(system)) : "";
+            const systemDisplay = system ? detailRow("ระบบ", escapeHtml(system), "💻") : "";
 
             // ✅ ผู้ติดต่อหน้างานบนการ์ดในปฏิทิน — เห็นได้โดยไม่ต้องเปิดงานขึ้นมาก่อน
             // ⚠️ เบอร์เป็นลิงก์ tel: จริง กดโทรออกได้เลยจากปฏิทิน (สำคัญกับช่างที่เปิดจากมือถือ) —
@@ -2716,18 +2768,23 @@ function EventCalendar() {
             // ⚠️ ชื่อกับเบอร์แยกคนละบรรทัดโดยตั้งใจ — ต่อท้ายกันแล้วบรรทัดยาวเกินความกว้างแท่งงาน
             // เบอร์จะถูกดันไปขึ้นบรรทัดใหม่เองแบบครึ่งๆ กลางๆ (ตัวเลขแยกจากชื่อโดยไม่มีป้ายกำกับ)
             // อ่านแล้วงงว่าเลขนั้นคืออะไร — แยกเป็นบรรทัดของตัวเองพร้อมไอคอนโทรจึงชัดเจนกว่า
-            const contactDisplay = contactName ? detailRow("ผู้ติดต่อ", escapeHtml(contactName)) : "";
+            const contactDisplay = contactName ? detailRow("ผู้ติดต่อ", escapeHtml(contactName), "📇") : "";
             const contactTelDisplay = contactTel
-              ? `<a href="tel:${escapeHtml(telDial)}" onclick="event.stopPropagation()" style="color:inherit;text-decoration:underline;"><span class="ec-card-deco">📞 </span><span class="ec-card-v">${escapeHtml(contactTel)}</span></a>`
+              // 🐛 BUG ที่แก้ (บนมือถือเบอร์โทรไม่มีไอคอนนำเลย เห็นเป็นตัวเลขลอยๆ ไม่รู้ว่าเลขอะไร):
+              // เดิมใส่ 📞 ไว้ใน .ec-card-deco ซึ่งเป็นคลาสของ "ตัวคั่นที่ตัดทิ้งได้" และถูกซ่อนทั้งหมด
+              // ตอนคอลัมน์แคบ — ไอคอนจึงหายไปพร้อมขีดนำ/ช่องว่าง ทั้งที่มันคือตัวบอกความหมายของแถว
+              // ✅ ใช้ detailRow ตัวเดียวกับแถวอื่น ไอคอนอยู่ใน .ec-card-ico ซึ่งเป็นตัวที่ "แทนคำกำกับ"
+              // ตอนแคบ จึงแสดงเสมอ และได้ป้ายคำเต็มบนจอคอมฟรีไปด้วย
+              ? `<a href="tel:${escapeHtml(telDial)}" onclick="event.stopPropagation()" style="color:inherit;text-decoration:underline;">${detailRow("เบอร์ติดต่อ", escapeHtml(contactTel), "📞")}</a>`
               : "";
 
             const timeRangeDisplay =
               startTime && endTime
-                ? detailRow("เวลา", `${escapeHtml(startTime)} - ${escapeHtml(endTime)}`)
+                ? detailRow("เวลา", `${escapeHtml(startTime)} - ${escapeHtml(endTime)}`, "🕐")
                 : startTime
-                ? detailRow("เริ่มเวลา", escapeHtml(startTime))
+                ? detailRow("เริ่มเวลา", escapeHtml(startTime), "🕐")
                 : endTime
-                ? detailRow("สิ้นสุดเวลา", escapeHtml(endTime))
+                ? detailRow("สิ้นสุดเวลา", escapeHtml(endTime), "🕐")
                 : "";
 
             // ✅ ไอคอนสถานะ — คำนวณใหม่ทุกครั้งที่ event นี้ re-render (เช่นหลังบันทึกแก้ไข)
@@ -2736,7 +2793,9 @@ function EventCalendar() {
             // ให้ไอคอนที่ลอย absolute อยู่ ตอนนี้ไอคอนอยู่ในแถวหัวการ์ดตามปกติ ไม่ต้องเผื่ออะไรอีก
 
             const icon = getStatusIcon(status);
-            const iconColor = textColor || "#000000";
+            // ⚠️ ไอคอนสถานะอยู่บน "ป้ายไอคอน" ที่พื้นเป็นสีตัวหนังสือของงาน (ดู badgeChipStyle) ถ้ายังใช้
+            // สีตัวหนังสือเหมือนเดิมจะกลายเป็นสีเดียวกับพื้นป้าย = หายไปเลย — ต้องสลับเป็นสีการ์ดแทน
+            const iconColor = textColor || "#ffffff";
             const statusTitle = STATUS_DESCRIPTIONS[status] || "สถานะไม่ระบุ";
 
             // 🐛 BUG ที่แก้ (การ์ดดูมั่ว ไอคอนลอยกระจาย): เดิมไอคอนสถานะ/กลุ่มงานเป็น position:absolute
@@ -2745,17 +2804,38 @@ function EventCalendar() {
             // ที่ลอยอยู่กลางแท่ง ไม่ใช่มุมแท่งจริง ผลคือไอคอนไปโผล่กลางแท่งห่างจากข้อความแบบไร้ระเบียบ
             // ✅ ย้ายมาเป็น "แถวหัวการ์ด" แบบ flex ปกติ: [ไอคอนกลุ่ม] ชื่องาน [ไอคอนสถานะ] [ปุ่มพับ/กาง]
             // เรียงชิดซ้าย-ขวาอย่างเป็นระเบียบทุกใบ ไม่ว่าแท่งจะกว้างแค่ไหน
+            // ✅ ป้าย "ประเภทงาน" ให้เด่นด้วยการ "สลับสี" ของงานนั้นเอง: พื้นป้าย = สีตัวหนังสือของงาน
+            // ตัวอักษรบนป้าย = สีพื้นหลังของงาน
+            // ⚠️ ห้ามใช้สีตายตัว — พื้นหลังการ์ดเป็นสีที่ผู้ใช้เลือกเองได้ทุกสี และ textColor ก็ตั้งเองได้
+            // (ขาว/ดำ) สีตายตัวจะกลืนหายไปกับพื้นทันทีที่ใครสักคนเลือกสีใกล้เคียงกัน · การสลับสีจาก
+            // คู่สีของงานเองจึงคอนทราสต์สูงเสมอโดยอัตโนมัติ ไม่ว่าจะเลือกสีอะไรมา
+            const chipBg = textColor || "#ffffff";
+            // ⚠️ สีพื้นหลังงานบางสี (เช่นฟ้าอมเขียวของงานสัญญา) วางบนพื้นขาวแล้วคอนทราสต์ได้แค่ ~3.7:1
+            // ซึ่งต่ำกว่าเกณฑ์อ่านออก 4.5:1 — ป้ายจะดูจางจนไม่เด่นสมกับที่ตั้งใจ · ปรับความเข้มให้ผ่าน
+            // เกณฑ์เสมอแทนที่จะหวังว่าผู้ใช้จะเลือกสีที่พอดีเอง (เลือกได้อิสระทุกสีอยู่แล้ว)
+            const typeChipStyle = `background:${escapeHtml(chipBg)};color:${escapeHtml(readableOn(backgroundColor || "#3788d8", chipBg))};`;
+
+            // ป้ายไอคอนมุมขวาบน — ใช้ "สีเดียวกับการ์ด" เป็นพื้น ไอคอนใช้สีตัวหนังสือตามปกติ
+            // ⚠️ เคยลองใช้พื้นขาว (สลับสีแบบป้ายประเภทงาน) แล้วมันเด่นเกินจนดูเป็นก้อนแปลกปลอมลอยอยู่
+            // เหนือการ์ด ไม่กลมกลืน — พอใช้สีการ์ด ครึ่งล่างที่ทับการ์ดจะกลืนหายไปสนิท เหลือเห็นเป็น
+            // "ติ่งมนๆ ที่งอกออกมาจากมุมการ์ด" ซึ่งอ่านออกว่าเป็นของการ์ดใบนั้นทันที
+            const badgeChipStyle = `--ec-badge-bg:${escapeHtml(backgroundColor || "#3788d8")};--ec-badge-fg:${escapeHtml(iconColor)};`;
+
             const badgeHtml = icon
               ? `<span class="ec-card-icon" title="${statusTitle}">${faIconToSvg(
                   icon,
-                  { color: iconColor },
+                  // ⚠️ currentColor ไม่ใช่สีตายตัว — ไอคอนตัวเดียวกันถูกใช้ 2 บริบทที่ต้องการสีคนละแบบ:
+                  //   จอคอม = วางบนพื้นการ์ดโดยตรง ต้องเป็นสีตัวหนังสือของงาน (ขาว)
+                  //   มือถือ = วางบนป้ายพื้นสีตัวหนังสือ ต้องสลับเป็นสีการ์ด ไม่งั้นขาวบนขาว = หายไป
+                  // ปล่อยให้ CSS เป็นคนกำหนดผ่าน color จึงคุมได้ทั้งสองบริบทโดยไม่ต้องวาดไอคอนสองชุด
+                  { color: "currentColor" },
                 )}</span>`
               : "";
 
             // ✅ สัญลักษณ์บอกว่างานนี้เป็นส่วนหนึ่งของ "งานหลายวัน" (ผูกกับ jobGroupId เดียวกัน)
             // กันผู้ใช้สับสนว่าทำไมมี event หน้าตาเหมือนกันโผล่คนละวันในปฏิทิน
             const groupBadgeHtml = jobGroupId
-              ? `<span class="ec-card-icon" title="งานนี้เป็นส่วนหนึ่งของงานหลายวัน (กลุ่มเดียวกัน)">🔗</span>`
+              ? `<span class="ec-card-icon ec-card-group" title="งานนี้เป็นส่วนหนึ่งของงานหลายวัน (กลุ่มเดียวกัน)">🔗</span>`
               : "";
 
             // ✅ ป้าย "รออนุมัติ/ไม่อนุมัติ" — เป็นบรรทัดแรกสุดของการ์ด ไม่ใช่ไอคอนมุมเล็กๆ อีกอันเพราะ
@@ -2777,8 +2857,24 @@ function EventCalendar() {
             // ส่วนรายละเอียด = ระบบ · ครั้งที่ · ทีม · ผู้ติดต่อ · เวลา — กางดูเมื่อต้องการ
             // ⚠️ วันหยุดไม่ต้องมีปุ่มพับ/กาง (ไม่มีรายละเอียดอะไรให้กาง) — เช็คที่ hasDetail
             const eventIdStr = String(arg.event.id);
-            const detailRows = [systemDisplay, timeDisplay, teamDisplay, contactDisplay, contactTelDisplay, timeRangeDisplay]
-              .filter(Boolean);
+            // ⚠️ แถว "ทีม" ต้องแยกคลาสไว้ — บนมือถือมันถูกย้ายไปแสดงเป็นป้ายล่างกึ่งกลางแทน (ดู
+            // .ec-card-team) จึงต้องซ่อนแถวนี้ทิ้งไม่ให้ซ้ำกัน · จอคอม/มุมมองรายการยังใช้แถวนี้ตามปกติ
+            // ✅ ป้าย "ทีมที่เข้างาน" เกาะขอบล่างกึ่งกลางการ์ด — คู่กับป้ายไอคอนที่ขอบบนขวา
+            // ⚠️ ใช้คู่สีเดียวกับป้ายบน (--ec-badge-bg/fg) ครึ่งบนที่ทับการ์ดจึงกลืนหายไปสนิท
+            // เหลือเห็นเป็นติ่งมนๆ ที่ขอบล่าง อ่านออกว่าเป็นของการ์ดใบนั้น
+            // ⚠️ title เก็บรายชื่อเต็มไว้ — ป้ายกว้างจำกัด ชื่อยาวจะถูกตัดด้วย ellipsis
+            const teamBadgeHtml = allTeamNames.length
+              ? `<span class="ec-card-team" style="${badgeChipStyle}" title="ทีมที่เข้างาน: ${escapeHtml(allTeamNames.join(", "))}"><span class="ec-card-team-ico" aria-hidden="true">👷</span>${escapeHtml(allTeamNames.join(", "))}</span>`
+              : "";
+
+            const detailRows = [
+              [systemDisplay, ""],
+              [timeDisplay, ""],
+              [teamDisplay, " ec-card-row--team"],
+              [contactDisplay, ""],
+              [contactTelDisplay, ""],
+              [timeRangeDisplay, ""],
+            ].filter(([html]) => html);
             const hasDetail = detailRows.length > 0;
             const isExpanded = isCardExpanded(eventIdStr);
 
@@ -2814,20 +2910,27 @@ function EventCalendar() {
               html: `
                 <div class="ec-card${isExpanded ? " is-expanded" : ""}" data-ec-card="${escapeHtml(eventIdStr)}">
                   <div class="ec-card-head">
+                    ${/* ⚠️ ลำดับใน DOM นี้ถูกจัดเพื่อ "โหมดลอยขวา (float)" บนมือถือโดยเฉพาะ — ตัวที่ float
+                          ก่อนจะไปอยู่ขวาสุด เรียง toggle → สถานะ → กลุ่มงาน จึงได้ภาพ [🔗][✓][▲] ตามที่ต้องการ
+                          ⚠️ บนจอคอมใช้ flex ซึ่งไม่สนใจลำดับ DOM แต่ดู order ที่ตั้งไว้ใน CSS แทน
+                          (ดู .ec-card-grip/.ec-card-title/... ที่กำหนด order ไว้) ลำดับเดิมจึงไม่เพี้ยน */""}
                     ${reorderGripHtml}
-                    ${groupBadgeHtml}
-                    <div class="ec-card-title" title="${escapeHtml(title)}"><span class="ec-card-deco">[ </span>${escapeHtml(title)}<span class="ec-card-deco"> ]</span></div>
-                    ${badgeHtml}
-                    ${toggleHtml}
+                    ${/* ⚠️ ต้องห่อเป็นกล่องเดียว ไม่ใช่ปล่อยลอยทีละตัว — พื้นหลังของป้ายต้องเป็นผืนเดียว
+                          ต่อเนื่องกัน ถ้าให้แต่ละไอคอนมีพื้นของตัวเองจะกลายเป็น 3 ก้อนเรียงกันดูรก
+                          ⚠️ ลำดับใน DOM คือ toggle → สถานะ → กลุ่มงาน แล้วพลิกด้วย row-reverse ใน CSS
+                          จึงเห็นเป็น [🔗][✓][▲] โดยที่ปุ่มพับอยู่ขวาสุดตามตำแหน่งที่คนคุ้นเคย */""}
+                    <span class="ec-card-badges" style="${badgeChipStyle}">${toggleHtml}${badgeHtml}${groupBadgeHtml}</span>
+                    <div class="ec-card-title" title="${escapeHtml(title)}"><span class="ec-card-deco">[ </span><span class="ec-card-type" style="${typeChipStyle}">${escapeHtml(title)}</span><span class="ec-card-deco"> ]</span></div>
                   </div>
                   ${approvalPillHtml}
                   ${siteDisplay ? `<div class="ec-card-site">${siteDisplay}</div>` : ""}
                   ${hasDetail ? `
                   <div class="ec-card-detail">
                     <div class="ec-card-detail-inner">
-                      ${detailRows.map((r) => `<div class="ec-card-row">${r}</div>`).join("")}
+                      ${detailRows.map(([r, cls]) => `<div class="ec-card-row${cls}">${r}</div>`).join("")}
                     </div>
                   </div>` : ""}
+                  ${teamBadgeHtml}
                   ${resizeHandleHtml}
                 </div>
     `,
@@ -3104,8 +3207,10 @@ function EventCalendar() {
 .fc-event-type-general:not(.fc-event-start)  { border-left: 4px dashed ${JOB_CLASS_META.general.color}80 !important; }
 
 /* ✅ จอมือถือ: ช่องวันกว้างแค่ ~55px แถบ 4px + เส้นคั่นขาว 2px = 6px กินความกว้างไปกว่า 10% ของการ์ด
-   เบียดข้อความจนอ่านไม่ออก — ย่อเหลือแถบ 3px + เส้นคั่น 1px (รวม 4px) พอให้เห็นว่าเป็นประเภทไหน
-   โดยไม่แย่งพื้นที่ข้อความ (สีต่างกันชัดอยู่แล้ว ไม่ต้องหนาก็แยกออก) */
+   เบียดข้อความจนอ่านไม่ออก — ย่อเหลือแถบ 2px + เส้นคั่น 1px (รวม 3px) พอให้เห็นว่าเป็นประเภทไหน
+   โดยไม่แย่งพื้นที่ข้อความ (สีต่างกันชัดอยู่แล้ว ไม่ต้องหนาก็แยกออก)
+   ⚠️ เส้นคั่นขาว 1px ตัดออกไม่ได้ — ผู้ใช้เลือกสีพื้นหลังงานเองได้ ถ้าเลือกสีใกล้กับสีประเภทงาน
+   แถบจะกลืนหายไปกับพื้นหลังทันที (เคยเกิดจริง) เส้นนี้ทำให้แถบแยกออกได้เสมอไม่ว่าพื้นจะสีอะไร */
 @media (max-width: 575.98px) {
   .fc-event-type-contract.fc-event-start,
   .fc-event-type-project.fc-event-start,
@@ -3113,7 +3218,7 @@ function EventCalendar() {
   .fc-event-type-contract:not(.fc-event-start),
   .fc-event-type-project:not(.fc-event-start),
   .fc-event-type-general:not(.fc-event-start) {
-    border-left-width: 3px !important;
+    border-left-width: 2px !important;
     box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.75);
   }
 }

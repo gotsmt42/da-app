@@ -142,6 +142,16 @@
   margin: 0 !important;
 }
 
+/* ✅ จอมือถือ: บีบขอบให้เหลือน้อยที่สุด — ปฏิทินเดือนหารความกว้างที่เหลือด้วย 7 ทุกพิกเซลที่คืนได้
+   จึงกลายเป็นความกว้างคอลัมน์โดยตรง (ดูกฎคู่กันที่ .modern-calendar-container ใน CalendarBoard/index.css
+   — ต้องลดทั้งสองชั้น ไม่งั้นอีกชั้นยังกินที่อยู่) */
+@media (max-width: 768px) {
+  .contentArea.calendar-mode .container-fluid {
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+  }
+}
+
 /* --------------------------------------------------------------------------
    WIDE TABLE MODE (หน้าภาพรวมสัญญา) — ปลดล็อก .contentArea (max-width: 1300px
    ใน _container.scss) แต่คง padding ปกติของ Container ไว้ (ต่างจาก calendar-mode
