@@ -103,14 +103,17 @@ const STATUS_DESCRIPTIONS = {
 // จะไม่ถูกเรียกซ้ำเมื่อ "ข้อมูล" ของ event เปลี่ยน (เช่น status) โดยที่ element ยังอยู่
 // การฝัง SVG ไว้ใน eventContent (ที่ FullCalendar เรียกทุกครั้งที่ re-render event) ทำให้
 // ไอคอนอัปเดตทันทีตาม status ใหม่ โดยไม่ต้องรีเฟรชหน้า
-const faIconToSvg = (iconDef, { size = 12, color = "#000000" } = {}) => {
+const faIconToSvg = (iconDef, { color = "#000000" } = {}) => {
   if (!iconDef?.icon) return "";
   const [width, height, , , svgPathData] = iconDef.icon;
   const paths = Array.isArray(svgPathData) ? svgPathData : [svgPathData];
   const pathsHtml = paths
     .map((d) => `<path fill="${color}" d="${d}"></path>`)
     .join("");
-  return `<svg viewBox="0 0 ${width} ${height}" style="width:${size}px;height:${size}px;display:block;">${pathsHtml}</svg>`;
+  // ⚠️ ขนาดเป็น 1em โดยตั้งใจ — ไอคอนโตตาม font-size ของ .ec-card-icon ซึ่งมาจากตัวแปร --ec-icon
+  // ที่กำหนดไว้ "จุดเดียว" ใน index.css  เดิมส่งเป็น px จาก JS ทำให้ขนาดไอคอนถูกคุมคนละที่กับขนาด
+  // ตัวหนังสือ เวลาจะย่อ/ขยายต้องตามแก้ 2 ไฟล์ และลืมแก้ฝั่งใดฝั่งหนึ่งได้ง่ายมาก
+  return `<svg viewBox="0 0 ${width} ${height}" style="width:1em;height:1em;display:block;">${pathsHtml}</svg>`;
 };
 
 // ✅ ปุ่มย่อ/ขยายปฏิทิน (− 100% +) ถูกตัดออกตามที่ผู้ใช้ขอ — บนมือถือใช้การหุบ/กางนิ้ว (pinch-zoom)
@@ -120,6 +123,67 @@ const faIconToSvg = (iconDef, { size = 12, color = "#000000" } = {}) => {
 // บันทึกไว้จาก localStorage อยู่ และ setZoomIndex เหลือแต่ตัวเรียกที่ตายแล้ว — ใครที่เคยกดขยายไว้
 // 175% (หรือย่อไว้ 70%) จะเปิดหน้าปฏิทินมาเจอขนาดนั้นค้างถาวร ไม่มีปุ่มให้กดกลับอีกแล้ว
 // ✅ ตัดสถานะซูมออกทั้งชุด เริ่มที่ 100% เสมอทุกครั้งที่เปิดหน้า (ไม่อ่าน/ไม่เขียน localStorage อีก)
+
+/**
+ * 🗂️ การ์ดงานในปฏิทิน "พับ/กางได้" + จำค่าที่ผู้ใช้เลือกไว้
+ *
+ * ⚠️ ปัญหาที่แก้: การ์ดหนึ่งใบมีได้ถึง 7 บรรทัด (ชื่องาน · โครงการ · ระบบ · ครั้งที่ · ทีม · ผู้ติดต่อ ·
+ * เวลา) วันไหนมีงาน 3-4 งานคือเต็มช่องวันจนอ่านอะไรไม่ออก
+ *
+ * ✅ ค่าเริ่มต้น = "กางไว้" (เห็นรายละเอียดครบ) ตามที่ผู้ใช้สั่ง — คนส่วนใหญ่เปิดปฏิทินมาเพื่อดูว่างาน
+ * แต่ละใบคืออะไร การให้พับไว้ก่อนแปลว่าต้องกดทุกใบก่อนถึงจะได้ข้อมูลที่ต้องการจริงๆ
+ * ✅ ถ้ากดปิด = ปิดค้างยาว จำไว้ข้ามการเปิด-ปิดแอป และ "แยกตามผู้ใช้" (คนละคนคนละค่า ใช้เครื่อง
+ * เดียวกันก็ไม่ปนกัน)
+ *
+ * ⚠️ โครงสร้างที่เก็บเป็น "ค่าเริ่มต้น + รายการยกเว้น" ไม่ใช่ลิสต์ของการ์ดที่กางไว้ทั้งหมด:
+ * ถ้าเก็บเป็นลิสต์ตรงๆ ทุกครั้งที่กางการ์ดใหม่ลิสต์จะยาวขึ้นเรื่อยๆ ไม่มีที่สิ้นสุด (งานเก่าที่ถูกลบไปแล้ว
+ * ก็ยังค้างอยู่ในนั้นตลอดไป) ✅ แบบนี้เก็บเฉพาะ "ใบที่ต่างจากค่าเริ่มต้น" และการกดกาง/ย่อทั้งหมดจะ
+ * ล้างรายการยกเว้นทิ้งทุกครั้ง ขนาดจึงคุมได้เองโดยธรรมชาติ (มี cap กันไว้อีกชั้นตอนบันทึก)
+ *
+ * ⚠️ ยังต้องเก็บสถานะไว้ "นอก React" เหมือนเดิม: eventContent ของ FullCalendar ถูกเรียกใหม่ทุกครั้ง
+ * ที่ events เปลี่ยน ซึ่งเกิดทุก 30 วินาทีจาก background polling — ถ้าเก็บใน state การ toggle แต่ละครั้ง
+ * จะ re-render ปฏิทินทั้งอัน (กระตุก) และการ์ดที่เพิ่งกางอาจถูกรีเซ็ตกลางคัน
+ */
+const CARD_PREF_KEY_PREFIX = "eventCalendar.cardState.";
+// กันรายการยกเว้นบวมข้ามปี — เกินนี้ตัดตัวเก่าสุดทิ้ง (เป็นแค่ค่าความชอบในการแสดงผล ไม่ใช่ข้อมูลงาน)
+const CARD_PREF_MAX_EXCEPTIONS = 300;
+
+const cardPrefs = { def: true, ex: new Set(), key: null };
+
+const loadCardPrefs = (userId) => {
+  cardPrefs.key = CARD_PREF_KEY_PREFIX + (userId || "anonymous");
+  cardPrefs.def = true;
+  cardPrefs.ex = new Set();
+  try {
+    const raw = localStorage.getItem(cardPrefs.key);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (typeof parsed?.def === "boolean") cardPrefs.def = parsed.def;
+    if (Array.isArray(parsed?.ex)) cardPrefs.ex = new Set(parsed.ex.map(String));
+  } catch {
+    /* ค่าที่เก็บไว้เสีย/อ่านไม่ได้ — ใช้ค่าเริ่มต้นไปเลย ไม่ควรทำให้ปฏิทินพังเพราะเรื่องแค่นี้ */
+  }
+};
+
+const saveCardPrefs = () => {
+  if (!cardPrefs.key) return;
+  try {
+    const ex = [...cardPrefs.ex].slice(-CARD_PREF_MAX_EXCEPTIONS);
+    localStorage.setItem(cardPrefs.key, JSON.stringify({ def: cardPrefs.def, ex }));
+  } catch {
+    /* โควตาเต็ม/โหมดส่วนตัว — ไม่บันทึกก็ยังใช้งานได้ปกติในรอบนี้ */
+  }
+};
+
+/** การ์ดใบนี้ควรกางอยู่ไหม = ค่าเริ่มต้น XOR อยู่ในรายการยกเว้น */
+const isCardExpanded = (id) => cardPrefs.def !== cardPrefs.ex.has(String(id));
+
+/** จำว่าใบนี้ถูกตั้งเป็นกาง/ย่อ — ถ้าตรงกับค่าเริ่มต้นอยู่แล้วก็ถอดออกจากรายการยกเว้น */
+const rememberCardState = (id, expanded) => {
+  const key = String(id);
+  if (expanded === cardPrefs.def) cardPrefs.ex.delete(key);
+  else cardPrefs.ex.add(key);
+};
 
 function EventCalendar() {
   const navigate = useNavigate();
@@ -249,6 +313,63 @@ function EventCalendar() {
   const [selectedSystem, setSelectedSystem] = useState(""); // "" = ทุกระบบ (event.system)
   const [selectedApproval, setSelectedApproval] = useState(""); // "" = ทุกสถานะอนุมัติ / "pending" / "rejected"
   const [showFilterPanel, setShowFilterPanel] = useState(false); // ✅ ซ่อนตัวกรองไว้ ไม่ให้เกะกะจอมือถือโดย default
+  // ✅ ใช้แค่สลับหน้าตา/ข้อความของปุ่ม "กาง/ย่อทั้งหมด" เท่านั้น — สถานะจริงของแต่ละการ์ดอยู่ใน DOM
+  // และ cardPrefs (ดู toggleAllCards) ที่ตั้งใจไม่ผูกกับ React เพื่อไม่ให้ปฏิทิน re-render
+  // ⚠️ ต้อง loadCardPrefs ก่อนอ่านค่า — useState initializer ทำงานก่อน useEffect ทุกตัว และ
+  // eventContent ก็ถูกเรียกตั้งแต่ render แรก ถ้าโหลดใน useEffect จะได้ค่า default ผิดไปหนึ่งจังหวะ
+  // (การ์ดกางแวบหนึ่งแล้วค่อยพับ) ซึ่งเห็นได้ชัดมาก
+  /**
+   * 📱 ความกว้างคอลัมน์ของปฏิทินเดือนบนมือถือ (px ต่อ 1 วัน) + ปุ่มย่อ/ขยาย
+   *
+   * 🐛 ปัญหาที่แก้: จอ ~390px หาร 7 วัน = คอลัมน์ละ ~50px — ไม่ว่าจะลดขนาดตัวหนังสือแค่ไหน
+   * ข้อความก็ถูกหั่นทีละตัวอักษรจนการ์ดสูง 300px อ่านไม่ออกอยู่ดี เพราะปัญหาคือ "ความกว้างไม่พอ"
+   * ไม่ใช่ "ตัวหนังสือใหญ่ไป"
+   * ✅ ให้ตารางมีความกว้างขั้นต่ำของตัวเอง แล้วปัดเลื่อนดูแนวนอนได้ — คอลัมน์กว้างพอให้อ่านรายละเอียด
+   * ครบทุกบรรทัดจริงๆ แล้วให้ผู้ใช้ปรับเองได้ว่าจะเอากว้าง (อ่านง่าย) หรือแคบ (เห็นหลายวันพร้อมกัน)
+   * ⚠️ จำค่าไว้ต่อผู้ใช้ — คนละคนถนัดคนละแบบ และคนเดิมไม่ควรต้องมาปรับใหม่ทุกครั้งที่เปิดแอป
+   */
+  const MOBILE_COL_KEY = "eventCalendar.mobileZoom.";
+  /**
+   * ระดับการซูมของตารางเดือนบนมือถือ — ระดับแรก (0) คือ "พอดีจอ"
+   *
+   * 🐛 ปัญหาที่แก้: เดิมค่าเริ่มต้นบังคับคอลัมน์กว้าง 108px ทำให้ตารางกว้างเกินจอตั้งแต่เปิดมา ต้องปัด
+   * ซ้าย-ขวาตลอดเวลา และการ์ดของวันที่อยู่ริมจอถูกตัดครึ่งค้างไว้ ("เลยหน้าจอ")
+   * ✅ ค่าเริ่มต้น = 0 = ไม่บังคับความกว้างเลย ตารางจึงพอดีจอเป๊ะ เห็นครบ 7 วันโดยไม่ต้องปัด
+   * ✅ อยากอ่านรายละเอียดชัดๆ ค่อยกด + ทีละระดับ (แล้วค่อยปัดดู) — เลือกเองได้ตามสถานการณ์
+   * ⚠️ เก็บเป็น "ระดับ" ไม่ใช่ตัวเลข px — ระดับ 0 ต้องหมายถึงพอดีจอเสมอไม่ว่าจอกว้างเท่าไหร่
+   */
+  const MOBILE_ZOOM_STEPS = [0, 95, 120, 150, 185, 220];
+  const [mobileZoom, setMobileZoom] = useState(() => {
+    try {
+      const raw = localStorage.getItem(MOBILE_COL_KEY + (userData?.userId || "anonymous"));
+      const n = Number(raw);
+      if (Number.isInteger(n) && n >= 0 && n < MOBILE_ZOOM_STEPS.length) return n;
+    } catch { /* อ่านไม่ได้ก็ใช้ค่าเริ่มต้น */ }
+    return 0; // พอดีจอ
+  });
+  const mobileColW = MOBILE_ZOOM_STEPS[mobileZoom];
+  const changeMobileCol = (dir) => {
+    setMobileZoom((prev) => {
+      const next = Math.min(MOBILE_ZOOM_STEPS.length - 1, Math.max(0, prev + dir));
+      try {
+        localStorage.setItem(MOBILE_COL_KEY + (userData?.userId || "anonymous"), String(next));
+      } catch { /* โควตาเต็ม/โหมดส่วนตัว — ใช้งานรอบนี้ได้ตามปกติ */ }
+      // ⚠️ ความกว้างเปลี่ยน = ความสูงของทุกการ์ดเปลี่ยนตาม ต้องให้ปฏิทินวัด/จัดแถวใหม่
+      requestAnimationFrame(() => calendarRef.current?.getApi()?.updateSize());
+      return next;
+    });
+  };
+
+  const [allCardsExpanded, setAllCardsExpanded] = useState(() => {
+    loadCardPrefs(userData?.userId);
+    return cardPrefs.def;
+  });
+  // ✅ สลับผู้ใช้ (ล็อกเอาต์แล้วเข้าใหม่คนละคนบนเครื่องเดียวกัน) ต้องได้ค่าของคนใหม่ ไม่ใช่ค่าที่ค้างจาก
+  // คนก่อนหน้า — initializer ด้านบนทำงานครั้งเดียวตอน mount เท่านั้น จึงต้องมีตัวนี้คู่กัน
+  useEffect(() => {
+    loadCardPrefs(userData?.userId);
+    setAllCardsExpanded(cardPrefs.def);
+  }, [userData?.userId]);
 
   // ✅ งาน "วางแผนล่วงหน้า" (ยังไม่ลงตาราง) — เก็บแยกจาก events ปกติเสมอ (backend ก็แยก query ให้
   // อยู่แล้ว) จัดกลุ่มดูทีละเดือนผ่าน draftMonth เริ่มที่เดือนปัจจุบัน
@@ -266,6 +387,9 @@ function EventCalendar() {
   const [clipboardEvent, setClipboardEvent] = useState(null);
 
   const calendarRef = useRef(null);
+  // ตัวช่วย "เปลี่ยนสถานะการ์ดแล้วจัดแถวใหม่พร้อมอนิเมชัน" — ถูกเซ็ตค่าจริงใน useEffect ของปุ่มพับ/กาง
+  // (ต้องอยู่ใน ref เพราะ toggleAllCards อยู่คนละ scope กับตัวช่วยที่ประกาศไว้ใน useEffect นั้น)
+  const ecReflowRef = useRef((fn) => fn());
   // ✅ กล่องครอบปฏิทิน — ใช้เป็นพื้นที่รับการปัดซ้าย-ขวาเปลี่ยนเดือนบนมือถือ ต้องเป็น element ของ React
   // เอง (ไม่ใช่ element ข้างในที่ FullCalendar สร้าง/ทิ้งใหม่เองตอนสลับมุมมอง) ดูเหตุผลเต็มที่ useEffect
   // ที่ผูก touch event ด้านล่าง
@@ -459,9 +583,29 @@ function EventCalendar() {
     let startTime = 0;
     let tracking = false;
 
+    // 🐛 BUG ที่แก้ (ซูมขยายปฏิทินแล้วปัดเลื่อนดูทีไร เปลี่ยนเดือนหนีทุกที): ตั้งแต่ตารางเดือนบนมือถือ
+    // มีความกว้างของตัวเอง (ปัดเลื่อนดูแนวนอนได้ — ดู --ec-m-col) การลากแนวนอนมีความหมาย 2 อย่าง
+    // ทับกัน คือ "เลื่อนดูวันอื่นในสัปดาห์" กับ "เปลี่ยนเดือน" ซึ่งผู้ใช้ตั้งใจอย่างแรกแทบทุกครั้ง
+    // ✅ ถ้าเริ่มลากในกล่องที่เลื่อนแนวนอนได้ ให้ถือว่าการลากนั้นเป็นของกล่อง ไม่ใช่การเปลี่ยนเดือน —
+    // เปลี่ยนเดือนใช้ปุ่ม ‹ › ที่อยู่บนหัวปฏิทินตรงนั้นอยู่แล้ว ชัดเจนกว่าและไม่พลาด
+    // ⚠️ ยังปัดเปลี่ยนเดือนได้ตามปกติทุกที่ที่ไม่มีอะไรให้เลื่อนแนวนอน (จอคอม/มุมมองรายการ/ย่อจน
+    // ตารางพอดีจอ) — พฤติกรรมเดิมจึงไม่หายไปไหน
+    const scrollableXAt = (target) => {
+      let el = target;
+      while (el && el !== calendarEl) {
+        if (el.scrollWidth - el.clientWidth > 4) {
+          const ox = getComputedStyle(el).overflowX;
+          if (ox === "auto" || ox === "scroll") return el;
+        }
+        el = el.parentElement;
+      }
+      return null;
+    };
+
     const onTouchStart = (e) => {
       // นิ้วเดียวเท่านั้น — 2 นิ้วขึ้นไปคือกำลังหุบ/กางเพื่อซูม ต้องไม่ตีความเป็นการปัดเปลี่ยนเดือน
       if (e.touches.length !== 1) { tracking = false; return; }
+      if (scrollableXAt(e.target)) { tracking = false; return; }
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
       startTime = Date.now();
@@ -1591,6 +1735,17 @@ function EventCalendar() {
     // เลย — event จะไม่มีวันไปถึง listener ของ FullCalendar ที่ผูกอยู่ลึกกว่าเราเลย ไม่ต้องพึ่ง
     // ชื่อคลาสภายในของไลบรารีที่อาจเปลี่ยนได้ในเวอร์ชันถัดไป
     const onDown = (e) => {
+      // ⚠️ กดที่ปุ่มพับ/กางการ์ด ต้องไม่เริ่มลากงาน — หยุดตั้งแต่ capture phase เหมือน data-ec-resize
+      // (ดูเหตุผลเต็มที่คอมเมนต์ด้านบน) ไม่งั้นแค่แตะปุ่มก็กลายเป็นลากงานย้ายวันทันทีบนทัชสกรีน
+      if (e.target.closest?.('[data-ec-toggle="1"]')) {
+        e.stopPropagation();
+        return;
+      }
+      // ปุ่มจับลากจัดลำดับมีตัวจัดการของตัวเอง (ดู useEffect "ลากจัดลำดับงานในวันเดียวกัน")
+      if (e.target.closest?.('[data-ec-grip="1"]')) {
+        e.stopPropagation();
+        return;
+      }
       const handle = e.target.closest?.('[data-ec-resize="1"]');
       if (!handle) return;
       e.preventDefault();
@@ -1667,8 +1822,486 @@ function EventCalendar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [events]);
 
+  /**
+   * ปุ่มพับ/กางการ์ดงาน — ดักคลิกที่ document แล้วสลับคลาสบน DOM ตรงๆ
+   *
+   * ⚠️ ต้องดักใน capture phase + stopPropagation — ถ้าปล่อยให้ event ไหลต่อ FullCalendar จะจับเป็น
+   * eventClick แล้วเปิดฟอร์มแก้ไขงานทับทันที กลายเป็นกดดูรายละเอียดไม่ได้เลยสักครั้ง
+   * ⚠️ ไม่แตะ React state โดยตั้งใจ — การ์ดใบอื่นทั้งเดือนไม่ต้อง re-render ตาม การกางจึงลื่นสนิท
+   * และไม่ไปรีเซ็ตอะไรที่ค้างอยู่ (เช่นฟอร์มที่เปิดค้าง/ตำแหน่ง scroll)
+   * ⚠️ ผูกครั้งเดียวตอน mount ([]) — ตัวดักอ่านจาก DOM/Set เสมอ ไม่ได้ปิดทับค่าจาก render รอบไหน
+   */
+  useEffect(() => {
+    /**
+     * 🐛 BUG ที่แก้ (กางแล้วการ์ดทับกัน / พับแล้วเหลือช่องว่างค้าง / ขยับแบบแข็งๆ):
+     *
+     * งานที่กินหลายวันในมุมมองเดือนถูก FullCalendar วางเป็นแท่ง absolute โดยคำนวณ "top" ของแต่ละชั้น
+     * (level) มาจากความสูงที่วัดได้ตอน render — พอเนื้อหาในการ์ดเปลี่ยนความสูงทีหลัง ค่า top ของแท่ง
+     * ชั้นถัดไปยังเป็นค่าเดิม ผลคือกางแล้วทับกัน และพับแล้วเหลือช่องว่างค้างไว้เท่าความสูงเดิม
+     *
+     * ✅ วิธีแก้ 2 ชั้นที่ต้องทำคู่กัน:
+     *   1) ให้ปฏิทินวัดใหม่แล้วจัดแถวใหม่ด้วย updateSize() ของตัวมันเอง → ตำแหน่ง "ปลายทาง" ถูกต้อง
+     *      ทันที แถวของวันยืด/หดจริง และไม่มีการทับกันเลยแม้แต่เฟรมเดียว
+     *   2) อนิเมตด้วยเทคนิค FLIP (First-Last-Invert-Play) → จำตำแหน่งเดิมไว้ก่อน พอ layout ใหม่เสร็จ
+     *      ก็ดึงทุกแท่งกลับไปที่เดิมด้วย transform แล้วค่อยปล่อยให้ไหลไปตำแหน่งใหม่
+     *
+     * ⚠️ ทำไมต้อง FLIP ไม่ใช่อนิเมตความสูงตรงๆ: ถ้าอนิเมตความสูง ระหว่างนั้นแท่งอื่นยังอยู่ตำแหน่งเดิม
+     * (top เป็นค่าคงที่ที่ FullCalendar ใส่ไว้) การ์ดที่กำลังขยายจะล้นไปทับ หรือไม่ก็ต้องสั่ง updateSize()
+     * ใหม่ทุกเฟรมซึ่งหน่วงทั้งเดือน — FLIP ได้ทั้งความถูกต้องของ layout และความลื่นพร้อมกัน เพราะ
+     * transform ไม่กระทบ layout เลย (เบราว์เซอร์อนิเมตบน compositor ไม่ต้องคำนวณ layout ซ้ำสักเฟรม)
+     *
+     * ⚠️ เทียบตำแหน่งด้วย "id ของงาน" ไม่ใช่ตัว element — updateSize() อาจสร้าง DOM ใหม่ ถ้าเก็บ
+     * reference ของ element ไว้ตรงๆ จะกลายเป็นอ้างถึงของที่หลุดจากหน้าจอไปแล้วแล้วอนิเมตไม่ขึ้น
+     */
+    const HARNESS_SELECTOR = ".fc-daygrid-event-harness, .fc-timegrid-event-harness";
+    // ⚠️ ต้องเท่ากับ --ec-anim ใน index.css เป๊ะๆ — การ์ดที่กำลังยืด/หด กับแท่งงานที่กำลังเลื่อนหลบ
+    // ต้องวิ่งด้วยจังหวะและ easing เดียวกัน ไม่งั้นจะเห็นเป็น 2 จังหวะซ้อนกันแล้วรู้สึกสะดุด
+    const FLIP_MS = 240;
+    // ⚠️ ต้องตรงกับ easing ของ .ec-card.ec-anim-height ใน index.css เป๊ะๆ — การ์ดที่กำลังยืด/หด
+    // กับแท่งงานที่กำลังเลื่อนหลบ ต้องวิ่งเป็นเส้นโค้งเดียวกัน ไม่งั้นเห็นเป็น 2 จังหวะแล้วรู้สึกสะดุด
+    const FLIP_EASE = "cubic-bezier(.4, 0, .2, 1)";
+
+    /**
+     * คีย์ประจำ "ชิ้นส่วนของแท่งงาน" หนึ่งชิ้น
+     *
+     * 🐛 BUG ที่แก้ (กดเปิดงานหนึ่ง แล้วงานที่ยาวข้ามสัปดาห์กระโดดแปลกๆ): งานที่กินหลายวันจนล้นไป
+     * สัปดาห์ถัดไปจะถูก FullCalendar ตัดเป็น "หลายชิ้น" คนละแถวกัน แต่ทุกชิ้นมี event id เดียวกันหมด
+     * — เดิมใช้ id เป็นคีย์ตรงๆ ตำแหน่งของชิ้นหลังจึงไปเขียนทับชิ้นแรก พอ invert ก็ดึงทั้งสองชิ้นไป
+     * ที่ตำแหน่งเดียวกัน (ของอีกสัปดาห์หนึ่ง) = กระโดดข้ามแถวแล้ววิ่งกลับ
+     * ✅ ผูกวันที่ของช่องที่ชิ้นนั้นอยู่เข้าไปด้วย ชิ้นแต่ละชิ้นจึงมีคีย์ของตัวเองไม่ชนกัน
+     */
+    const segKeyOf = (card) => {
+      const cell = card.closest("[data-date]");
+      return `card:${card.getAttribute("data-ec-card")}@${cell?.getAttribute("data-date") || ""}`;
+    };
+
+    /**
+     * จำตำแหน่งเดิมของ "แท่งงานทุกชิ้น" ตอนการ์ดยืด/หด
+     *
+     * 🐛 BUG ที่แก้ (แท่งงานบางใบกระโดดข้ามแถวแล้ววิ่งกลับ): เคยใส่ transform ให้ <tr> ของสัปดาห์ด้วย
+     * เพื่อให้เส้นตารางเลื่อนตามไปด้วย — แต่ transform ของแม่ส่งผลกับลูกที่อยู่ข้างในเสมอ พอชดเชยที่
+     * ลูกอีกชั้นในบางกรณีจึงกลายเป็นเลื่อนซ้ำสองเท่า (เห็นชัดมากกับแท่งที่ถูกตัดข้ามสัปดาห์ ซึ่งมีชิ้นส่วน
+     * อยู่คนละแถวกัน) ✅ อนิเมตเฉพาะ "แท่งงาน" ชั้นเดียวจบ ไม่มีแม่-ลูกซ้อนกันให้คำนวณพลาดได้อีก
+     * ⚠️ เส้นตาราง/ความสูงแถวจะปรับทันทีโดยไม่อนิเมต ซึ่งแทบไม่มีใครสังเกต (เป็นเส้นจางๆ พื้นหลัง)
+     * ต่างจากแท่งงานที่เป็นก้อนสีทึบมีตัวหนังสือ — ถ้าอันนั้นกระโดดคือเห็นชัดทันที
+     */
+    const snapshotTops = () => {
+      const map = new Map();
+      document.querySelectorAll("[data-ec-card]").forEach((card) => {
+        const h = card.closest(HARNESS_SELECTOR);
+        if (h) map.set(segKeyOf(card), h.getBoundingClientRect().top);
+      });
+      return map;
+    };
+
+    /**
+     * เปลี่ยนสถานะการ์ดแล้วจัดแถวใหม่พร้อมอนิเมชันลื่นๆ
+     *
+     * 🐛 BUG ที่แก้ (แท่งงานใบอื่นไม่ขยับตาม แล้วทับกันตลอดอนิเมชัน):
+     * ลำดับสำคัญมาก — updateSize() วัด "ความสูงจริงของการ์ด ณ วินาทีที่เรียก" ถ้าเรียกตอนที่การ์ด
+     * กำลังค่อยๆ ยืด (transition ยังวิ่งอยู่) มันจะวัดได้ความสูงเก่าแล้วจัดแถวเหมือนไม่มีอะไรเปลี่ยน
+     * → แท่งอื่นไม่ถูกดันลง → การ์ดที่ยืดเสร็จแล้วก็ทับใบถัดไปอยู่ดี
+     *
+     * ✅ ลำดับที่ถูกต้อง (FLIP เต็มรูปแบบ ทั้งตำแหน่งและความสูง):
+     *   1. จำตำแหน่งเดิมของทุกชิ้นไว้ (First)
+     *   2. สลับคลาสโดย "ปิดอนิเมชันชั่วคราว" → การ์ดกระโดดไปความสูงสุดท้ายทันที
+     *   3. updateSize() → ปฏิทินวัดความสูงสุดท้ายที่ถูกต้อง แล้วจองตำแหน่งปลายทางให้ทุกแท่ง (Last)
+     *   4. ดึงทุกอย่างกลับไปสภาพเดิมด้วย transform + บังคับการ์ดให้กลับไปความสูงเริ่มต้น (Invert)
+     *   5. เฟรมถัดไปเปิดอนิเมชันแล้วปล่อย → ทุกอย่างไหลไปที่ปลายทางพร้อมกัน (Play)
+     *
+     * ⚠️ ผลลัพธ์: พื้นที่ปลายทางถูกจองไว้ตั้งแต่เฟรมแรก การ์ดจึงค่อยๆ ขยายเข้าไปในที่ว่างของตัวเอง
+     * ไม่มีทางทับใบอื่นได้เลยแม้แต่เฟรมเดียว ขณะที่แท่งอื่นก็เลื่อนหลบไปพร้อมกันด้วยจังหวะเดียวกัน
+     */
+    const reflowWithAnimation = (mutate) => {
+      const before = snapshotTops();
+      const cards = [...document.querySelectorAll("[data-ec-card]")];
+      // จำสถานะเดิมด้วย "id ของงาน" ไม่ใช่ตัว element — element ชุดนี้อาจถูกสร้างใหม่หลัง updateSize()
+      const wasExpandedById = new Map(
+        cards.map((c) => [c.getAttribute("data-ec-card"), c.classList.contains("is-expanded")])
+      );
+      // 🐛 BUG ที่แก้ (กดเปิดใบเดียวแต่การ์ดอื่นอนิเมตตามหมด): เดิมใส่คลาส invert ให้ "ทุกใบ" ซึ่งบังคับ
+      // ใบที่กางอยู่แล้วให้ยุบกลับไป 0fr ชั่วขณะแล้วค่อยกางใหม่ = เห็นทั้งหน้าจอกระพริบขยับพร้อมกันหมด
+      // ✅ จำสถานะก่อนหน้าไว้ แล้ว invert เฉพาะใบที่ "สถานะเปลี่ยนจริง" เท่านั้น ใบที่ไม่ได้แตะจะอยู่นิ่ง
+      // (ยังเลื่อนตำแหน่งตามแถวได้ตามปกติผ่าน transform ซึ่งเป็นคนละเรื่องกับการยืด/หดตัวเอง)
+      // (2) ปิดอนิเมชันชั่วคราวแล้วสลับคลาส — ให้ความสูงเป็นค่าสุดท้ายทันที
+      cards.forEach((c) => c.classList.add("ec-anim-off"));
+      mutate();
+
+      // (3) ให้ปฏิทินวัดความสูงสุดท้ายแล้วจัดตำแหน่งปลายทาง
+      calendarRef.current?.getApi()?.updateSize();
+
+      // 🐛 BUG ที่แก้ (บางแท่งกระโดดข้ามแถวแล้ววิ่งกลับ): updateSize() ทำให้ FullCalendar สร้าง DOM
+      // ของงานใหม่ได้ — element ที่เก็บไว้ตั้งแต่ก่อนหน้านี้จะกลายเป็นของที่หลุดออกจากหน้าจอไปแล้ว
+      // (detached) พอเอาไปใส่ transform จึงไม่มีผลอะไร ส่วนตัวจริงบนจอก็ไม่เคยถูก invert เลย
+      // = เห็นเป็นแท่งนั้นโผล่ที่ตำแหน่งใหม่ทันทีทั้งที่ใบอื่นกำลังค่อยๆ เลื่อน
+      // ✅ ดึงรายการใหม่จาก DOM จริงหลัง updateSize() เสมอ แล้วบังคับคลาสให้ตรงกับค่าที่บันทึกไว้
+      // (eventContent อ่านจาก cardPrefs อยู่แล้ว ตัวที่สร้างใหม่จึงถูกต้องอยู่ก่อนแล้ว — ตรงนี้เป็น
+      // การการันตีซ้ำให้ครอบคลุมกรณีที่ FullCalendar เลือกใช้ DOM เดิมต่อ)
+      //
+      // 🐛 BUG ที่แก้ (งานวันเดียวกดแล้วแท่งอื่นกระโดด ไม่ยอมเลื่อน): updateSize() ไม่ได้จัด layout ใหม่
+      // เสร็จภายในบรรทัดนั้นเสมอไป — FullCalendar ทยอยทำต่อในคิวของเฟรมถัดไป ถ้าวัดตำแหน่งทันทีจะยัง
+      // ได้ค่าเก่าอยู่ ทำให้ระยะ invert คำนวณได้ ~0 แล้วข้ามไป (ไม่ใส่ transform) พอเฟรมถัดมา layout
+      // จริงขยับ แท่งนั้นจึงเด้งไปตำแหน่งใหม่ทันทีโดยไม่มีอนิเมชัน = กระโดดโดดๆ ใบเดียวกลางจอ
+      // ✅ รอให้ผ่านไป 1 เฟรมก่อนแล้วค่อยวัด/invert/เล่นอนิเมชัน — ตำแหน่งปลายทางนิ่งแน่นอนแล้ว
+      requestAnimationFrame(() => {
+      // 🐛 BUG ที่แก้ (งานข้ามสัปดาห์: กางแล้วงานใบล่างในแถวถัดไปทับกัน): FullCalendar ต้องวัด 2 รอบ
+      // สำหรับเคสนี้ — รอบแรกรู้แค่ว่า "ความสูงของแถวเปลี่ยน" แล้วดันทั้งแถวลง แต่ยังไม่ได้จัดลำดับ
+      // ชั้นของงานที่อยู่ "ใต้แท่งที่สูงขึ้น" ภายในช่องวันเดียวกันใหม่ ผลคือใบล่างขยับแค่ครึ่งเดียวของ
+      // ระยะที่ควรเป็น (ถูกดันตามแถว แต่ไม่ถูกดันตามแท่งที่สูงขึ้น) แล้วไปนั่งทับแท่งนั้นพอดี
+      // ✅ เรียกซ้ำอีกรอบหลังผ่านไป 1 เฟรม — รอบนี้ค่าความสูงใหม่ถูกบันทึกไว้หมดแล้ว การจัดชั้นจึงถูกต้อง
+      // 🐛 BUG ที่แก้ (งานข้ามสัปดาห์: กางแล้วงานใบล่างในแถวถัดไปทับกัน):
+      // งานที่กินหลายวัน FullCalendar จะวาง "ตัวจริง" ไว้แค่ชิ้นเดียวแบบ absolute แล้วใส่ "ตัวสำรอง"
+      // (คัดลอกเนื้อหาเดิม ซ่อนไว้ไม่ให้เห็น) ไว้ในช่องวันอื่นๆ ที่แท่งนั้นพาดผ่าน เพื่อ "จองความสูง"
+      // ให้งานใบล่างในช่องเดียวกันรู้ว่าต้องเริ่มต่อจากตรงไหน
+      // ⚠️ ตอนกดกาง เราสลับคลาสให้เฉพาะการ์ดที่กดเท่านั้น ตัวสำรองในช่องอื่นยังเป็นความสูงเดิม —
+      // ปฏิทินจึงจองที่ไว้เท่าความสูงตอนพับ แล้วงานใบล่างก็ไปนั่งทับแท่งที่สูงขึ้นพอดี
+      // ✅ ต้องบังคับคลาสให้ "ทุกชิ้นที่มี id เดียวกัน" (รวมตัวสำรอง) ให้ตรงกับค่าที่บันทึกไว้ "ก่อน"
+      // สั่งวัดใหม่เสมอ — ลำดับตรงนี้สำคัญมาก ถ้าวัดก่อนแล้วค่อยแก้คลาส การวัดจะใช้ค่าเก่าทั้งหมด
+      const liveCards = [...document.querySelectorAll("[data-ec-card]")];
+      liveCards.forEach((c) => {
+        c.classList.add("ec-anim-off");
+        c.classList.toggle("is-expanded", isCardExpanded(c.getAttribute("data-ec-card")));
+      });
+      calendarRef.current?.getApi()?.updateSize();
+
+      // (4) Invert — ดึงกลับไปสภาพก่อนกด
+      //
+      // ⚠️ ใส่ transform ที่ "แท่งงาน" ชั้นเดียวเท่านั้น ไม่แตะ <tr> ของสัปดาห์ — ดูเหตุผลที่ snapshotTops
+      // (transform ของแม่ส่งผลกับลูก ทำให้เลื่อนซ้ำสองเท่าในบางกรณี)
+      const moved = [];
+      const applyInvert = (el, delta) => {
+        if (Math.abs(delta) < 1) return;
+        el.style.transition = "none";
+        el.style.transform = `translateY(${delta}px)`;
+        moved.push(el);
+      };
+
+      liveCards.forEach((card) => {
+        const h = card.closest(HARNESS_SELECTOR);
+        const key = segKeyOf(card);
+        if (!h || !before.has(key)) return;
+        applyInvert(h, before.get(key) - h.getBoundingClientRect().top);
+      });
+
+      const changed = liveCards.filter(
+        (c) => wasExpandedById.get(c.getAttribute("data-ec-card")) !== c.classList.contains("is-expanded")
+      );
+      // ⚠️ ความสูงต้องอนิเมตเป็น "พิกเซลจริง" ไม่ใช่หน่วย fr — เบราว์เซอร์ไล่ค่า fr ไม่เป็นเส้นตรงกับ
+      // พิกเซล ทำให้ช่วงต้นกระโดดเยอะช่วงท้ายลากยาว เห็นเป็นกระตุก (ดู .ec-card-detail ใน index.css)
+      // ✅ วัด scrollHeight ตอนนี้ได้ค่าที่ถูกต้องแน่นอน เพราะ layout ปลายทางถูกจัดเสร็จแล้วในขั้นที่ 3
+      const heights = changed.map((card) => {
+        const detail = card.querySelector(".ec-card-detail");
+        if (!detail) return null;
+        const full = detail.scrollHeight;
+        const expanding = card.classList.contains("is-expanded");
+        detail.style.height = `${expanding ? 0 : full}px`; // Invert
+        return { detail, to: expanding ? full : 0 };
+      }).filter(Boolean);
+      changed.forEach((c) => c.classList.add("ec-anim-invert"));
+
+      // บังคับให้เบราว์เซอร์รับรู้สภาพ "ย้อนกลับ" ก่อน ไม่งั้นมันจะยุบ 2 สเต็ปเป็นสเต็ปเดียวแล้วไม่มีอนิเมชัน
+      void document.body.getBoundingClientRect();
+
+      // (5) Play
+      requestAnimationFrame(() => {
+        liveCards.forEach((c) => c.classList.remove("ec-anim-off"));
+        changed.forEach((c) => {
+          c.classList.remove("ec-anim-invert");
+          c.classList.add("ec-anim-height");
+        });
+        heights.forEach(({ detail, to }) => { detail.style.height = `${to}px`; });
+        moved.forEach((el) => {
+          el.style.transition = `transform ${FLIP_MS}ms ${FLIP_EASE}`;
+          el.style.transform = "";
+        });
+        // ล้าง inline style ทิ้งเมื่อจบ — ปล่อยค้างไว้จะไปชนกับการ render รอบถัดไปของ FullCalendar
+        // ⚠️ ความสูงต้องคืนเป็น 0/auto ตามคลาส ไม่ใช่ค้างค่าพิกเซลไว้ — เนื้อหาสูงเปลี่ยนได้เอง
+        // (ย่อจอแล้วข้อความขึ้นบรรทัดใหม่) ถ้าค้างพิกเซลไว้จะโดนตัดหรือเหลือที่ว่างทันที
+        setTimeout(() => {
+          moved.forEach((el) => { el.style.transition = ""; el.style.transform = ""; });
+          heights.forEach(({ detail }) => { detail.style.height = ""; });
+          changed.forEach((c) => c.classList.remove("ec-anim-height"));
+        }, FLIP_MS + 80);
+      });
+      });
+    };
+    // ให้ปุ่ม "กาง/ย่อทั้งหมด" (อยู่นอก useEffect นี้) เรียกตัวเดียวกันได้ โดยไม่ต้องก๊อปตรรกะไปไว้ 2 ที่
+    ecReflowRef.current = reflowWithAnimation;
+
+    const setExpanded = (card, next) => {
+      const id = card.getAttribute("data-ec-card");
+      reflowWithAnimation(() => {
+        card.classList.toggle("is-expanded", next);
+        const btn = card.querySelector('[data-ec-toggle="1"]');
+        if (btn) {
+          btn.setAttribute("aria-expanded", String(next));
+          btn.setAttribute("title", next ? "ย่อรายละเอียดงานนี้" : "ดูรายละเอียดงานนี้");
+        }
+        rememberCardState(id, next);
+        saveCardPrefs();
+      });
+    };
+
+    const onToggleClick = (e) => {
+      const btn = e.target.closest?.('[data-ec-toggle="1"]');
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const card = btn.closest("[data-ec-card]");
+      if (card) setExpanded(card, !card.classList.contains("is-expanded"));
+    };
+
+    // ✅ กดคีย์บอร์ดได้ด้วย (Enter/Space) — ปุ่มนี้เป็น div ที่ใส่ role="button" ไว้ จึงไม่ได้
+    // พฤติกรรมคีย์บอร์ดมาให้เองเหมือน <button> จริง ต้องเติมเอง
+    const onToggleKey = (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      const btn = e.target.closest?.('[data-ec-toggle="1"]');
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const card = btn.closest("[data-ec-card]");
+      if (card) setExpanded(card, !card.classList.contains("is-expanded"));
+    };
+
+    document.addEventListener("click", onToggleClick, true);
+    document.addEventListener("keydown", onToggleKey, true);
+    return () => {
+      document.removeEventListener("click", onToggleClick, true);
+      document.removeEventListener("keydown", onToggleKey, true);
+    };
+  }, []);
+
+  /**
+   * 📱 เลื่อนตารางมาที่ "วันนี้" ให้อัตโนมัติ เมื่อตารางกว้างเกินจอจนต้องปัดดู
+   *
+   * 🐛 ปัญหาที่แก้: พอตารางเดือนบนมือถือมีความกว้างของตัวเอง (ดู --ec-m-col) จอจะเห็นได้ทีละ ~3 วัน
+   * และเริ่มจากวันอาทิตย์เสมอ — เปิดแอปวันศุกร์มาจึงเจอช่องว่างเปล่าๆ ต้องปัดหาเองว่างานวันนี้อยู่ไหน
+   * ทั้งที่งานของวันนี้คือสิ่งแรกที่ทุกคนอยากเห็น
+   * ✅ เลื่อนให้คอลัมน์ "วันนี้" มาอยู่กลางจอให้เลย — เปิดมาเห็นงานวันนี้ทันทีโดยไม่ต้องทำอะไร
+   *
+   * ⚠️ ทำเฉพาะตอนที่ตารางกว้างเกินจอจริงๆ เท่านั้น — จอคอม/มุมมองรายการ/ย่อจนพอดีจอ ไม่มีอะไรให้เลื่อน
+   * การสั่ง scroll จึงไม่มีผลอะไรและไม่ควรไปยุ่ง
+   * ⚠️ ใช้ scrollLeft ของกล่องเลื่อนโดยตรง ไม่ใช่ scrollIntoView — scrollIntoView จะเลื่อน "ทั้งหน้าเว็บ"
+   * ในแนวตั้งตามไปด้วย ผู้ใช้จะโดนกระชากออกจากตำแหน่งที่กำลังดูอยู่
+   */
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const scroller = swipeAreaRef.current?.querySelector(".fc-view-harness");
+      if (!scroller) return;
+      if (scroller.scrollWidth - scroller.clientWidth <= 4) return;
+      const todayCell = scroller.querySelector(".fc-day-today");
+      if (!todayCell) return;
+      const sr = scroller.getBoundingClientRect();
+      const tr = todayCell.getBoundingClientRect();
+      // จัดให้คอลัมน์วันนี้อยู่กึ่งกลางจอ (ถ้าเลื่อนไปไม่ถึงก็ชิดสุดเท่าที่ไปได้เอง)
+      const target = scroller.scrollLeft + (tr.left - sr.left) - (sr.width - tr.width) / 2;
+      scroller.scrollTo({ left: Math.max(0, target), behavior: "smooth" });
+    }, 350);
+    return () => clearTimeout(t);
+    // ⚠️ ผูกกับ mobileColW ด้วย — ย่อ/ขยายแล้วตำแหน่งเดิมจะเพี้ยนไปคนละที่ ต้องจัดกึ่งกลางใหม่ทุกครั้ง
+  }, [events, mobileColW, viewingDept]);
+
+  /**
+   * 🔀 ลากจัดลำดับงานในวันเดียวกัน — เลือกเองได้ว่างานไหนอยู่บน/ล่าง
+   *
+   * ⚠️ ทำไมไม่ใช้ระบบลากของ FullCalendar: การลากการ์ดของมันมีความหมายว่า "ย้ายงานไปวันอื่น" อยู่แล้ว
+   * และมันไม่มีแนวคิดเรื่องลำดับภายในวันเลย (เรียงตาม eventOrder อย่างเดียว) — ถ้าเอามาปนกัน ผู้ใช้จะ
+   * แยกไม่ออกว่าลากแล้วจะได้ย้ายวันหรือสลับลำดับ ✅ แยกเป็น "ปุ่มจับ" (⠿) ของตัวเองไปเลย ชัดเจนทั้งคู่
+   *
+   * ⚠️ ระหว่างลากใช้ transform ขยับการ์ดให้ดูตาม ไม่ยุ่งกับ DOM จริง — พอปล่อยค่อยบันทึกทีเดียวแล้วให้
+   * ปฏิทินเรียงใหม่จากข้อมูล (ถ้าสลับ DOM ตอนลาก FullCalendar จะเขียนทับกลับตอน render รอบถัดไป)
+   */
+  useEffect(() => {
+    let drag = null;
+    // 🐛 BUG ที่แก้ (จับปุ่มลากแล้วเด้งฟอร์มแก้ไขงานขึ้นมา): เบราว์เซอร์ยิง click ต่อท้าย mousedown+
+    // mouseup บน element เดิมเสมอ แม้เราจะ stopPropagation ที่ mousedown ไปแล้วก็ตาม — FullCalendar
+    // ดัก click ของตัวการ์ดไว้เปิดหน้าแก้ไข ผลคือลากเสร็จปุ๊บฟอร์มเด้งขึ้นมาทันทีทุกครั้ง
+    // ✅ กลืน click ครั้งถัดไปทิ้งหลังแตะปุ่มจับลาก (ทั้งกรณีลากจริงและกดเฉยๆ — กดที่ปุ่มจับไม่ควร
+    // เปิดฟอร์มอยู่แล้ว) ⚠️ ต้องดักใน capture phase ให้ถึงก่อน listener ของ FullCalendar ที่อยู่ลึกกว่า
+    // ⚠️ ใช้ "หมดอายุเองตามเวลา" ไม่ใช่ธงบูลีนที่รอให้ click มาล้าง — ถ้าปล่อยเมาส์นอก element เดิม
+    // (ซึ่งเกิดตลอดเวลาเวลาลากไกลๆ) เบราว์เซอร์จะไม่ยิง click เลย ธงจะค้าง true แล้วไปกลืนคลิกจริง
+    // ครั้งถัดไปของผู้ใช้แทน — กลายเป็นว่าคลิกการ์ดแล้วฟอร์มไม่เปิด ซึ่งแย่กว่าปัญหาเดิมอีก
+    let suppressClicksUntil = 0;
+    const onClickCapture = (e) => {
+      if (Date.now() > suppressClicksUntil) return;
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    /**
+     * แท่งงานที่ "แย่งชั้นเดียวกัน" กับแท่งที่กำลังลาก = ตัวที่สลับบน/ล่างกันแล้วเห็นผลจริง
+     *
+     * ⚠️ ไม่ใช่ "ทุกใบในช่องวันเดียวกัน" — งานที่กินหลายวันเป็นแท่งพาดข้ามหลายช่อง ถ้าดูแค่ช่องเดียว
+     * จะเจอไม่ครบ และไม่ใช่ "ทุกใบในสัปดาห์" เพราะแท่งที่อยู่คนละช่วงวันไม่ได้แย่งชั้นกันเลย สลับไป
+     * ก็ไม่มีอะไรเปลี่ยน (ผู้ใช้จะรู้สึกว่าลากแล้วไม่เกิดอะไรขึ้น)
+     * ✅ เกณฑ์ที่ตรงกับความจริงคือ "อยู่แถวสัปดาห์เดียวกัน และช่วงวันซ้อนทับกัน" — ซึ่งวัดจากกรอบ
+     * แนวนอนบนจอได้ตรงๆ (แท่งที่คาบวันเดียวกันย่อมซ้อนกันในแนวนอน)
+     */
+    const peersOf = (harness) => {
+      const row = harness.closest("tr");
+      if (!row) return [harness];
+      const base = harness.getBoundingClientRect();
+      return [...row.querySelectorAll("[data-ec-grip]")]
+        .map((g) => g.closest(".fc-daygrid-event-harness"))
+        .filter(Boolean)
+        .filter((el) => {
+          const r = el.getBoundingClientRect();
+          return Math.min(base.right, r.right) - Math.max(base.left, r.left) > 4;
+        })
+        .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
+    };
+
+    const pointOf = (e) => (e.touches?.[0] ? e.touches[0] : e);
+
+    const onDown = (e) => {
+      const grip = e.target.closest?.('[data-ec-grip="1"]');
+      if (!grip) return;
+      const harness = grip.closest(".fc-daygrid-event-harness");
+      if (!harness) return;
+      const items = peersOf(harness);
+      if (items.length < 2) return; // ไม่มีใครแย่งชั้นด้วย ก็ไม่มีอะไรให้สลับ
+
+      e.preventDefault();
+      e.stopPropagation();
+      drag = {
+        harness,
+        startY: pointOf(e).clientY,
+        items,
+        // จำความสูงจริงของแต่ละใบไว้ ใช้คำนวณว่าลากผ่านใบไหนไปแล้วบ้าง
+        rects: items.map((el) => el.getBoundingClientRect()),
+        from: items.indexOf(harness),
+        to: items.indexOf(harness),
+        moved: false,
+      };
+      document.body.style.userSelect = "none";
+      harness.classList.add("ec-reorder-dragging");
+    };
+
+    const onMove = (e) => {
+      if (!drag) return;
+      const dy = pointOf(e).clientY - drag.startY;
+      if (!drag.moved && Math.abs(dy) < 3) return;
+      drag.moved = true;
+      if (e.cancelable) e.preventDefault();
+
+      // ตำแหน่งกึ่งกลางของใบที่กำลังลาก แล้วหาว่าควรไปแทรกที่ช่องไหน
+      const r = drag.rects[drag.from];
+      const centre = r.top + r.height / 2 + dy;
+      let to = 0;
+      drag.rects.forEach((rr, i) => {
+        if (centre > rr.top + rr.height / 2) to = i;
+      });
+      drag.to = to;
+
+      // ✅ ขยับใบอื่นให้เห็นว่าจะไปแทรกตรงไหน (preview) — ใช้ transform ล้วน ไม่แตะ DOM จริง
+      drag.items.forEach((el, i) => {
+        if (i === drag.from) {
+          el.style.transform = `translateY(${dy}px)`;
+          el.style.transition = "none";
+          return;
+        }
+        let shift = 0;
+        if (drag.from < drag.to && i > drag.from && i <= drag.to) shift = -drag.rects[drag.from].height;
+        if (drag.from > drag.to && i >= drag.to && i < drag.from) shift = drag.rects[drag.from].height;
+        el.style.transition = "transform .18s cubic-bezier(.4, 0, .2, 1)";
+        el.style.transform = shift ? `translateY(${shift}px)` : "";
+      });
+    };
+
+    const clearDragStyles = (d) => {
+      d.items.forEach((el) => { el.style.transform = ""; el.style.transition = ""; });
+      d.harness.classList.remove("ec-reorder-dragging");
+    };
+
+    const onUp = async () => {
+      if (!drag) return;
+      const d = drag;
+      drag = null;
+      document.body.style.userSelect = "";
+      // กลืนคลิกที่เบราว์เซอร์ยิงต่อท้ายการปล่อยเมาส์ (ถ้ามี) ไม่ให้ไปเปิดฟอร์มแก้ไขงาน
+      suppressClicksUntil = Date.now() + 300;
+
+      if (!d.moved || d.to === d.from) { clearDragStyles(d); return; }
+
+      // ลำดับใหม่ของทั้งวัน
+      const ids = d.items.map((el) => el.querySelector("[data-ec-grip]")?.dataset.eventId).filter(Boolean);
+      const next = [...ids];
+      next.splice(d.to, 0, next.splice(d.from, 1)[0]);
+      // ⚠️ เว้นช่วงทีละ 10 ไม่ใช่ 1 — เผื่อที่ให้แทรกใบใหม่ระหว่างกลางทีหลังได้โดยไม่ต้องเขียนใหม่ทั้งวัน
+      const items = next.map((id, i) => ({ id, displayOrder: (i + 1) * 10 }));
+
+      // ✅ อัปเดตบนจอทันทีแบบ optimistic แล้วค่อยบันทึก — การลากต้องเห็นผลทันที ไม่ใช่รอ network
+      setEvents((prev) => prev.map((ev) => {
+        const hit = items.find((it) => String(it.id) === String(ev.id || ev._id));
+        return hit ? { ...ev, displayOrder: hit.displayOrder } : ev;
+      }));
+      clearDragStyles(d);
+
+      try {
+        await EventService.ReorderEvents(items);
+      } catch (err) {
+        // ⚠️ ล้มแล้วต้องดึงของจริงกลับมา ไม่ใช่ปล่อยให้จอค้างลำดับที่ไม่ได้บันทึกจริง
+        Swal.fire("❌ จัดลำดับไม่สำเร็จ", err?.response?.data?.message || "กรุณาลองใหม่อีกครั้ง", "error");
+        fetchEventsFromDB(true);
+      }
+    };
+
+    document.addEventListener("mousedown", onDown, true);
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    document.addEventListener("click", onClickCapture, true);
+    document.addEventListener("touchstart", onDown, { capture: true, passive: false });
+    document.addEventListener("touchmove", onMove, { passive: false });
+    document.addEventListener("touchend", onUp);
+    return () => {
+      document.removeEventListener("mousedown", onDown, true);
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.removeEventListener("click", onClickCapture, true);
+      document.removeEventListener("touchstart", onDown, true);
+      document.removeEventListener("touchmove", onMove);
+      document.removeEventListener("touchend", onUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * กาง/ย่อ "ทุกใบ" ในหน้าจอปัจจุบัน — ปุ่มเดียวในแถบเครื่องมือ
+   * ⚠️ ไล่จาก DOM จริงที่เห็นอยู่ ไม่ใช่จาก filteredCalendarEvents — สิ่งที่ผู้ใช้เห็นคือของที่ปฏิทิน
+   * render จริงในเดือน/สัปดาห์ที่เปิดอยู่เท่านั้น การไปกางงานของเดือนอื่นที่ยังไม่ได้ render ไว้ล่วงหน้า
+   * ไม่มีความหมายอะไรและทำให้ปุ่มนี้ "ทำงานแล้วแต่ไม่เห็นอะไรเปลี่ยน"
+   */
+  const toggleAllCards = () => {
+    const cards = [...document.querySelectorAll("[data-ec-card]")]
+      .filter((c) => c.querySelector('[data-ec-toggle="1"]'));
+    if (cards.length === 0) return;
+    // ถ้ายังมีใบที่พับอยู่แม้แต่ใบเดียว = กดแล้ว "กางทั้งหมด" (คนกดคาดหวังให้เห็นครบก่อนเสมอ)
+    const next = cards.some((c) => !c.classList.contains("is-expanded"));
+    // ⚠️ ใช้ตัวช่วยชุดเดียวกับปุ่มในการ์ด (ecReflowRef) — ถูกผูกไว้ตอน mount ใน useEffect ด้านบน
+    // เพื่อไม่ต้องก๊อปตรรกะ FLIP มาไว้ 2 ที่แล้วต้องคอยแก้ให้ตรงกันตลอด
+    ecReflowRef.current(() => {
+      cards.forEach((card) => {
+        card.classList.toggle("is-expanded", next);
+        const btn = card.querySelector('[data-ec-toggle="1"]');
+        if (btn) {
+          btn.setAttribute("aria-expanded", String(next));
+          btn.setAttribute("title", next ? "ย่อรายละเอียดงานนี้" : "ดูรายละเอียดงานนี้");
+        }
+      });
+      // ✅ กดกาง/ย่อ "ทั้งหมด" = ตั้งค่าเริ่มต้นใหม่ทั้งชุด แล้วล้างรายการยกเว้นทิ้ง — งานใบใหม่ที่ยังไม่เคย
+      // เห็นก็จะเป็นไปตามค่านี้ด้วย (ไม่ใช่แค่ใบที่อยู่บนจอตอนกด) และรายการยกเว้นไม่บวมข้ามเวลา
+      cardPrefs.def = next;
+      cardPrefs.ex.clear();
+      saveCardPrefs();
+      setAllCardsExpanded(next);
+    });
+  };
+
   return (
-    <div className="modern-calendar-container">
+    <div
+      className={`modern-calendar-container${mobileZoom > 0 ? " ec-zoomed" : ""}`}
+      style={{ "--ec-m-col": `${mobileColW}px` }}
+    >
       {/* ✅ แถบเดียวกระชับ: ค้นหา + ปุ่มตัวกรอง (มี badge บอกจำนวนที่เลือกไว้) + Export
           แบบไอคอนล้วน — เดิมมีทั้งแถวปุ่ม Export ข้อความยาว + แถวค้นหา + dropdown 2 ตัวโชว์
           ตลอดเวลา กินพื้นที่แนวตั้งเยอะมากบนจอมือถือ ตอนนี้ซ่อนตัวกรองทั้งหมดไว้หลังปุ่มเดียว
@@ -1683,6 +2316,20 @@ function EventCalendar() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+
+        {/* ✅ กาง/ย่อรายละเอียดของการ์ดงานทั้งหมดในหน้าจอนี้ทีเดียว — ค่าเริ่มต้นคือ "ย่อ" เพื่อให้
+            ปฏิทินอ่านง่าย (ดูเหตุผลเต็มที่ expandedCardIds) แล้วกดปุ่มนี้ตอนต้องการดูรายละเอียดครบทุกใบ
+            ⚠️ ไม่ทำเป็นการตั้งค่าค้างถาวร — เป็นการสลับมุมมองชั่วคราวของการดูรอบนี้เท่านั้น */}
+        <button
+          className={`filter-toggle-btn ${allCardsExpanded ? "filter-toggle-btn--open" : ""}`}
+          onClick={toggleAllCards}
+          title={allCardsExpanded ? "ย่อรายละเอียดงานทั้งหมด" : "กางรายละเอียดงานทั้งหมด"}
+          aria-label={allCardsExpanded ? "ย่อรายละเอียดงานทั้งหมด" : "กางรายละเอียดงานทั้งหมด"}
+        >
+          <span style={{ fontSize: "0.95em", lineHeight: 1, display: "inline-block", transition: "transform .2s ease", transform: allCardsExpanded ? "rotate(180deg)" : "none" }}>
+            ⌄
+          </span>
+        </button>
 
         <button
           className={`filter-toggle-btn ${showFilterPanel ? "filter-toggle-btn--open" : ""} ${activeFilterCount > 0 ? "filter-toggle-btn--active" : ""}`}
@@ -1997,11 +2644,19 @@ function EventCalendar() {
           // ได้ตลอด — ใช้ position:sticky ที่ FullCalendar ทำมาให้ในตัวอยู่แล้ว (ผ่าน
           // .fc-scrollgrid-section-sticky) ทำงานได้แม้ contentHeight="auto" (ไม่มี scroll
           // container ภายในของตัวเอง) เพราะ sticky อิงกับ scroll ของหน้าเว็บทั้งหน้าได้เหมือนกัน
+          /**
+           * ✅ ลำดับงานในช่องวันเดียวกัน — ผู้ใช้ลากสลับบน/ล่างเองได้ (ดู displayOrder ใน models/Events.js)
+           * ⚠️ sortPriority ต้องมาก่อนเสมอ: วันหยุด (0) ต้องอยู่เหนืองาน (1) ตลอด ไม่ว่าใครจะจัดลำดับ
+           * อะไรไว้ก็ตาม — เป็นข้อมูลบริบทของวันนั้น ไม่ใช่งานที่เอามาสลับกันได้
+           * ⚠️ ต้องมีเกณฑ์สำรองต่อท้าย (start/title) — งานที่ยังไม่เคยถูกจัดลำดับมี displayOrder เท่ากัน
+           * หมด (0) ถ้าไม่มีเกณฑ์สำรอง ลำดับจะสลับไปมาเองทุกครั้งที่ข้อมูลมาจาก server คนละรอบ
+           */
+          eventOrder="sortPriority,displayOrder,start,title"
           stickyHeaderDates={true}
           showNonCurrentDates={false} // ✅ ไม่แสดงวันของเดือนก่อนและหลัง
           firstDay={0} // ✅ กำหนดให้วันอาทิตย์เป็นวันแรกของสัปดาห์
           eventContent={(arg) => {
-            const { title, extendedProps, backgroundColor, textColor } = arg.event;
+            const { title, extendedProps, textColor } = arg.event;
             const {
               system = "",
               time = "",
@@ -2023,19 +2678,34 @@ function EventCalendar() {
             // ⚠️ ป้องกัน stored XSS — ทุกฟิลด์ตรงนี้ (โครงการ/ระบบ/ทีม/เวลา/ชื่องาน) เป็นข้อความที่
             // ผู้ใช้พิมพ์เองได้ทั้งหมด แล้วถูกใช้เป็น eventContent แบบ raw HTML ของ FullCalendar
             // (render ให้ "ทุกคน" ที่เปิดปฏิทินเห็น ไม่ต้องคลิกอะไรเลย) ต้อง escape ก่อนเสมอ
-            const siteDisplay = site ? `- โครงการ : ${escapeHtml(site)}` : "";
+            // ✅ แถวรายละเอียด = [ขีดนำ] [หัวข้อ] [ : ] [ค่า] — ส่วนที่เป็น "แค่การจัดรูปแบบ"
+            // (ขีดนำกับช่องว่างรอบ :) ถูกห่อด้วย .ec-card-deco เพื่อให้ CSS ซ่อนได้ตอนคอลัมน์แคบ
+            // ⚠️ วัดจริงที่จอ 412px: ตัวคั่นเหล่านี้กินความกว้าง ~7px ต่อแถว บนคอลัมน์ 47px
+            // คือ 15% — พอที่จะดันข้อความให้ตกบรรทัดเพิ่มอีก 1 บรรทัด โดยไม่ได้ให้ข้อมูลเพิ่มขึ้นเลย
+            // ⚠️ บนจอคอมและมุมมอง "รายการ" ยังแสดงตัวคั่นครบเหมือนเดิมทุกประการ
+            // ⚠️ <wbr> หลังเครื่องหมาย : คือ "จุดที่ขึ้นบรรทัดใหม่ได้ถ้าจำเป็น" — ไม่ใช่การบังคับ
+            // บนคอลัมน์แคบ เบราว์เซอร์จะเลือกตัดตรงนี้ก่อนเสมอ — ได้ "หัวข้อ:" / "ค่า" อ่านง่าย
+            // แทนที่จะหั่นกลางคำเป็น "โครงการ:Am" / "azon" — แต่แถวที่สั้นพออยู่แล้วก็ยังคง 1 บรรทัดเหมือนเดิม
+            // โครงสร้าง: [ขีดนำ] [หัวข้อ :] [ช่องว่าง] [ค่า]
+            // ✅ แยก .ec-card-k (หัวข้อ) กับ .ec-card-v (ค่า) เพื่อให้ CSS ทำน้ำหนักต่างกันได้
+            // ปัญหาที่แก้: เดิมทั้งแถวเป็นตัวหนังสือน้ำหนัก/สีเดียวกันหมด การ์ดหนึ่งใบจึงเป็นก้อนข้อความ
+            // ทึบๆ ตาไม่มีจุดเกาะ ต้องอ่านไล่ทีละตัวถึงจะรู้ว่าบรรทัดไหนคืออะไร — ช้าและล้า
+            const detailRow = (label, value) =>
+              `<span class="ec-card-deco">- </span><span class="ec-card-k">${label}<span class="ec-card-deco"> </span>:</span><span class="ec-card-deco"> </span><wbr><span class="ec-card-v">${value}</span>`;
+
+            const siteDisplay = site ? detailRow("โครงการ", escapeHtml(site)) : "";
             // ✅ โชว์ "1/3" (ครั้งที่/จำนวนครั้งทั้งหมดของสัญญา) แทน "1" เฉยๆ — เห็นสัดส่วนความคืบหน้า
             // ทันทีจากหน้าปฏิทินโดยไม่ต้องเปิดไปดูหน้าภาพรวมสัญญา งานที่ไม่ใช่งานสัญญา (ไม่มี visitCount)
             // ยังโชว์แค่เลขครั้งเฉยๆ เหมือนเดิม (ดู formatRoundLabel)
-            const timeDisplay = time ? `- ครั้งที่ : ${escapeHtml(formatRoundLabel(time, visitCount))}` : "";
+            const timeDisplay = time ? detailRow("ครั้งที่", escapeHtml(formatRoundLabel(time, visitCount))) : "";
             // ✅ รวมช่างหลัก (team) + ลูกทีมเพิ่มเติม (teamMembers) เป็นรายชื่อเดียว ให้เห็นครบ
             // ทุกคนที่ช่วยทำงานนี้ในบรรทัดเดียวกัน แทนที่จะเห็นแค่ช่างหลักคนเดียวเหมือนเดิม
             const allTeamNames = [team, ...teamMembers.map((m) => m?.name)]
               .filter(Boolean)
               .filter((name, idx, arr) => arr.indexOf(name) === idx);
-            const teamDisplay = allTeamNames.length ? `- ทีม : ${allTeamNames.map(escapeHtml).join(", ")}` : "";
+            const teamDisplay = allTeamNames.length ? detailRow("ทีม", allTeamNames.map(escapeHtml).join(", ")) : "";
 
-            const systemDisplay = system ? `- ระบบ : ${escapeHtml(system)}` : "";
+            const systemDisplay = system ? detailRow("ระบบ", escapeHtml(system)) : "";
 
             // ✅ ผู้ติดต่อหน้างานบนการ์ดในปฏิทิน — เห็นได้โดยไม่ต้องเปิดงานขึ้นมาก่อน
             // ⚠️ เบอร์เป็นลิงก์ tel: จริง กดโทรออกได้เลยจากปฏิทิน (สำคัญกับช่างที่เปิดจากมือถือ) —
@@ -2043,51 +2713,49 @@ function EventCalendar() {
             // ⚠️ escape ทุกค่าเหมือนฟิลด์อื่นในบล็อกนี้ — เป็นข้อความที่ผู้ใช้พิมพ์เองแล้วถูก render
             // เป็น raw HTML ให้ทุกคนที่เปิดปฏิทินเห็น (ดูคอมเมนต์ XSS ด้านบน)
             const telDial = String(contactTel).replace(/[^\d+]/g, "");
-            const contactDisplay = (contactName || contactTel)
-              ? `- ผู้ติดต่อ : ${contactName ? escapeHtml(contactName) : ""}${
-                  contactTel
-                    ? ` <a href="tel:${escapeHtml(telDial)}" onclick="event.stopPropagation()" style="color:inherit;text-decoration:underline;">📞 ${escapeHtml(contactTel)}</a>`
-                    : ""
-                }`
+            // ⚠️ ชื่อกับเบอร์แยกคนละบรรทัดโดยตั้งใจ — ต่อท้ายกันแล้วบรรทัดยาวเกินความกว้างแท่งงาน
+            // เบอร์จะถูกดันไปขึ้นบรรทัดใหม่เองแบบครึ่งๆ กลางๆ (ตัวเลขแยกจากชื่อโดยไม่มีป้ายกำกับ)
+            // อ่านแล้วงงว่าเลขนั้นคืออะไร — แยกเป็นบรรทัดของตัวเองพร้อมไอคอนโทรจึงชัดเจนกว่า
+            const contactDisplay = contactName ? detailRow("ผู้ติดต่อ", escapeHtml(contactName)) : "";
+            const contactTelDisplay = contactTel
+              ? `<a href="tel:${escapeHtml(telDial)}" onclick="event.stopPropagation()" style="color:inherit;text-decoration:underline;"><span class="ec-card-deco">📞 </span><span class="ec-card-v">${escapeHtml(contactTel)}</span></a>`
               : "";
 
             const timeRangeDisplay =
               startTime && endTime
-                ? `เวลา : ${escapeHtml(startTime)} - ${escapeHtml(endTime)}`
+                ? detailRow("เวลา", `${escapeHtml(startTime)} - ${escapeHtml(endTime)}`)
                 : startTime
-                ? `- เริ่มเวลา : ${escapeHtml(startTime)}`
+                ? detailRow("เริ่มเวลา", escapeHtml(startTime))
                 : endTime
-                ? `- สิ้นสุดเวลา : ${escapeHtml(endTime)}`
+                ? detailRow("สิ้นสุดเวลา", escapeHtml(endTime))
                 : "";
-
-            const isSmallScreen = window.innerWidth < 576;
-            const fontSize = isSmallScreen ? "0.7em" : "1em";
 
             // ✅ ไอคอนสถานะ — คำนวณใหม่ทุกครั้งที่ event นี้ re-render (เช่นหลังบันทึกแก้ไข)
             // ต่างจาก eventDidMount ที่จะไม่ถูกเรียกซ้ำถ้า element ของ event ยังไม่ถูก unmount
-            const isSmallBadgeScreen = window.innerWidth < 768;
-            const badgeIconPx = isSmallBadgeScreen ? 6 : 12;
-            const badgeBoxSize = isSmallBadgeScreen ? "5px" : "19px";
-            const badgePadding = isSmallBadgeScreen
-              ? "8px 0px 2px 0px"
-              : "10px 20px 3px 3px";
+            // ⚠️ padding ของการ์ดย้ายไปอยู่ใน .ec-card (index.css) แล้ว — เดิมต้องเผื่อที่ว่างมุมขวา
+            // ให้ไอคอนที่ลอย absolute อยู่ ตอนนี้ไอคอนอยู่ในแถวหัวการ์ดตามปกติ ไม่ต้องเผื่ออะไรอีก
 
             const icon = getStatusIcon(status);
             const iconColor = textColor || "#000000";
-            const bgColor = backgroundColor || "#ffffff";
             const statusTitle = STATUS_DESCRIPTIONS[status] || "สถานะไม่ระบุ";
 
+            // 🐛 BUG ที่แก้ (การ์ดดูมั่ว ไอคอนลอยกระจาย): เดิมไอคอนสถานะ/กลุ่มงานเป็น position:absolute
+            // เกาะมุมการ์ด แต่ ".fc-daygrid-event { align-items:center }" ทำให้กล่องเนื้อหาหดเท่าความ
+            // กว้างข้อความ ไม่เต็มแท่งงาน — "มุมการ์ด" ที่ไอคอนไปเกาะจึงเป็นมุมของกล่องข้อความแคบๆ
+            // ที่ลอยอยู่กลางแท่ง ไม่ใช่มุมแท่งจริง ผลคือไอคอนไปโผล่กลางแท่งห่างจากข้อความแบบไร้ระเบียบ
+            // ✅ ย้ายมาเป็น "แถวหัวการ์ด" แบบ flex ปกติ: [ไอคอนกลุ่ม] ชื่องาน [ไอคอนสถานะ] [ปุ่มพับ/กาง]
+            // เรียงชิดซ้าย-ขวาอย่างเป็นระเบียบทุกใบ ไม่ว่าแท่งจะกว้างแค่ไหน
             const badgeHtml = icon
-              ? `<div title="${statusTitle}" style="position:absolute; top:0px; right:5px; width:${badgeBoxSize}; height:${badgeBoxSize}; display:flex; align-items:center; justify-content:center; background:${bgColor}; z-index:10; cursor:pointer;">${faIconToSvg(
+              ? `<span class="ec-card-icon" title="${statusTitle}">${faIconToSvg(
                   icon,
-                  { size: badgeIconPx, color: iconColor },
-                )}</div>`
+                  { color: iconColor },
+                )}</span>`
               : "";
 
             // ✅ สัญลักษณ์บอกว่างานนี้เป็นส่วนหนึ่งของ "งานหลายวัน" (ผูกกับ jobGroupId เดียวกัน)
             // กันผู้ใช้สับสนว่าทำไมมี event หน้าตาเหมือนกันโผล่คนละวันในปฏิทิน
             const groupBadgeHtml = jobGroupId
-              ? `<div title="งานนี้เป็นส่วนหนึ่งของงานหลายวัน (กลุ่มเดียวกัน)" style="position:absolute; top:0px; left:3px; font-size:${badgeIconPx}px; line-height:1; z-index:10;">🔗</div>`
+              ? `<span class="ec-card-icon" title="งานนี้เป็นส่วนหนึ่งของงานหลายวัน (กลุ่มเดียวกัน)">🔗</span>`
               : "";
 
             // ✅ ป้าย "รออนุมัติ/ไม่อนุมัติ" — เป็นบรรทัดแรกสุดของการ์ด ไม่ใช่ไอคอนมุมเล็กๆ อีกอันเพราะ
@@ -2104,24 +2772,62 @@ function EventCalendar() {
               ? `<div class="ec-timed-resize-handle" data-ec-resize="1" data-event-id="${escapeHtml(String(arg.event.id))}" title="ลากเพื่อขยายข้ามวัน"></div>`
               : "";
 
+            // ── การ์ดพับ/กางได้ ────────────────────────────────────────────────
+            // ส่วนหัว = ข้อมูลที่ "ระบุได้ว่างานนี้คืองานอะไร ที่ไหน" เห็นตลอดไม่ว่าพับหรือกาง
+            // ส่วนรายละเอียด = ระบบ · ครั้งที่ · ทีม · ผู้ติดต่อ · เวลา — กางดูเมื่อต้องการ
+            // ⚠️ วันหยุดไม่ต้องมีปุ่มพับ/กาง (ไม่มีรายละเอียดอะไรให้กาง) — เช็คที่ hasDetail
+            const eventIdStr = String(arg.event.id);
+            const detailRows = [systemDisplay, timeDisplay, teamDisplay, contactDisplay, contactTelDisplay, timeRangeDisplay]
+              .filter(Boolean);
+            const hasDetail = detailRows.length > 0;
+            const isExpanded = isCardExpanded(eventIdStr);
+
+            // ⚠️ ปุ่มนี้ต้องไม่ใช่ <button> ที่ซ้อนอยู่ใน element ซึ่ง FullCalendar ผูก drag ไว้ —
+            // ใช้ div + ตัวดักคลิกที่ document (capture) แทน ดู useEffect "ปุ่มพับ/กางการ์ด"
+            // ✅ ปุ่มจับลากจัดลำดับ — ลากขึ้น/ลงเพื่อเลือกว่างานไหนอยู่บน/ล่างในวันนั้น
+            // ⚠️ ต้องเป็น "ปุ่มจับ" แยกต่างหาก ไม่ใช่ลากที่ตัวการ์ด — การลากตัวการ์ดคือการย้ายงานไปวันอื่น
+            // (ของ FullCalendar เอง) ซึ่งต้องใช้ได้เหมือนเดิม ถ้าเอามาปนกันผู้ใช้จะแยกไม่ออกว่ากำลังทำอะไร
+            // ✅ จัดลำดับได้ทั้งงานวันเดียวและงานที่กินหลายวัน (รวมงานหลายวันแบบไม่ต่อเนื่อง ซึ่งแต่ละ
+            // ช่วงเป็นแท่งของตัวเอง) — ดูวิธีหา "คู่แข่งที่แย่งชั้นเดียวกัน" ที่ peersOf ด้านล่าง
+            // ⚠️ วันหยุดจัดลำดับไม่ได้ — เป็นข้อมูลบริบทของวัน ต้องอยู่บนสุดเสมอ (ดู eventOrder)
+            const canReorder = !arg.event.extendedProps?.isHoliday;
+            const reorderGripHtml = canReorder
+              ? `<span class="ec-card-grip" data-ec-grip="1" data-event-id="${escapeHtml(eventIdStr)}"
+                       title="ลากขึ้น/ลงเพื่อจัดลำดับงานในวันนี้">⠿</span>`
+              : "";
+
+            const toggleHtml = hasDetail
+              ? `<div class="ec-card-toggle" data-ec-toggle="1" data-event-id="${escapeHtml(eventIdStr)}"
+                      role="button" tabindex="0" aria-expanded="${isExpanded}"
+                      title="${isExpanded ? "ย่อรายละเอียดงานนี้" : "ดูรายละเอียดงานนี้"}">
+                   <span class="ec-card-toggle-icon">▾</span>
+                 </div>`
+              : "";
+
+            // ── โครงสร้างการ์ด ────────────────────────────────────────────────
+            //   แถวหัว : [🔗 กลุ่มงาน] ชื่องาน ......... [ไอคอนสถานะ] [ปุ่มพับ/กาง]
+            //   แถวสอง : โครงการ  (ข้อมูลที่ระบุ "งานไหน ที่ไหน" — เห็นตลอดแม้พับอยู่)
+            //   ส่วนพับ : ระบบ · ครั้งที่ · ทีม · ผู้ติดต่อ · เวลา
+            // ⚠️ ทุกบรรทัดชิดซ้ายเสมอ ไม่ว่าแท่งงานจะกว้างแค่ไหน — งานที่กินหลายวันจะกว้างเต็มสัปดาห์
+            // ถ้าปล่อยให้ข้อความลอยกลางแท่ง (พฤติกรรมเดิม) จะอ่านไล่ลงมาเป็นคอลัมน์ไม่ได้เลย
             return {
               html: `
-                <div style="position: relative; display: flex; align-items: center; padding: ${badgePadding}; width: 100%;">
-                  <div style="font-size: ${fontSize}; line-height: 2; padding: 0px; flex: 1; min-width: 0;">
-                    ${approvalPillHtml}
-                    <div>[ ${escapeHtml(title)} ]  </div>
-
-                    <div> ${systemDisplay} </div>
-                    <div> ${siteDisplay}</div>
-                     <div>${timeDisplay} </div>
-
-
-                <div>${teamDisplay}</div>
-                  ${contactDisplay ? `<div>${contactDisplay}</div>` : ""}
-                  ${timeRangeDisplay ? `<div>${timeRangeDisplay}</div>` : ""}
-                </div>
-                  ${badgeHtml}
-                  ${groupBadgeHtml}
+                <div class="ec-card${isExpanded ? " is-expanded" : ""}" data-ec-card="${escapeHtml(eventIdStr)}">
+                  <div class="ec-card-head">
+                    ${reorderGripHtml}
+                    ${groupBadgeHtml}
+                    <div class="ec-card-title" title="${escapeHtml(title)}"><span class="ec-card-deco">[ </span>${escapeHtml(title)}<span class="ec-card-deco"> ]</span></div>
+                    ${badgeHtml}
+                    ${toggleHtml}
+                  </div>
+                  ${approvalPillHtml}
+                  ${siteDisplay ? `<div class="ec-card-site">${siteDisplay}</div>` : ""}
+                  ${hasDetail ? `
+                  <div class="ec-card-detail">
+                    <div class="ec-card-detail-inner">
+                      ${detailRows.map((r) => `<div class="ec-card-row">${r}</div>`).join("")}
+                    </div>
+                  </div>` : ""}
                   ${resizeHandleHtml}
                 </div>
     `,
@@ -2133,7 +2839,8 @@ function EventCalendar() {
           headerToolbar={{
             left: "",
             center: "prev title next",
-            right: "today",
+            // ⚠️ ปุ่มย่อ/ขยายโผล่เฉพาะจอมือถือ (ซ่อนด้วย CSS บนจอคอม — ดู .fc-zoomIn-button)
+            right: "zoomOut,zoomIn today",
           }}
           footerToolbar={{
             right: "dayGridMonth,timeGridWeek,listWeek",
@@ -2151,6 +2858,17 @@ function EventCalendar() {
             today: {
               text: "วันนี้",
               click: () => calendarRef.current.getApi().today(),
+            },
+            // ✅ ปุ่มย่อ/ขยายความกว้างคอลัมน์ — วางไว้แถวเดียวกับ "วันนี้" ตรงกลางจอ กดง่ายด้วยนิ้วโป้ง
+            // (เดิมอยู่บนสุดปนกับปุ่มค้นหา/ตัวกรอง/ส่งออก ซึ่งเป็นกลุ่มเครื่องมือคนละเรื่องกันและอยู่ไกล)
+            // ⚠️ ซ่อนบนจอคอมด้วย CSS — คอลัมน์กว้างพออยู่แล้ว ไม่มีอะไรต้องย่อ/ขยาย
+            zoomOut: {
+              text: "−",
+              click: () => changeMobileCol(-1),
+            },
+            zoomIn: {
+              text: "+",
+              click: () => changeMobileCol(1),
             },
           }}
           datesSet={handleDatesSet} // ✅ อัปเดตสีวันเสาร์-อาทิตย์ + sync เดือนกับแผงงานล่วงหน้า

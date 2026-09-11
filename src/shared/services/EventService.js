@@ -120,6 +120,22 @@ const EventService = {
     }
   },
 
+  /**
+   * จัดลำดับงานในวันเดียวกันใหม่ทั้งวันในคำขอเดียว
+   * @param {Array<{id: string, displayOrder: number}>} items
+   * ⚠️ ต้องเป็นคำขอเดียวเสมอ ไม่ใช่ยิง UpdateEvent ทีละใบ — ถ้าสำเร็จบ้างล้มบ้าง ลำดับจะค้างเพี้ยน
+   * แบบครึ่งๆ (บางใบเลขใหม่ บางใบเลขเก่า) ซึ่งผู้ใช้กู้คืนเองไม่ได้เลย
+   */
+  async ReorderEvents(items) {
+    try {
+      const response = await API.put(`/events/reorder`, { items });
+      return response.data;
+    } catch (error) {
+      console.error("Error reordering events:", error);
+      throw error;
+    }
+  },
+
   async UpdateEvent(id, updatedEvent) {
     try {
       const response = await API.put(`/events/${id}`, updatedEvent); // เพิ่มข้อมูลสินค้า

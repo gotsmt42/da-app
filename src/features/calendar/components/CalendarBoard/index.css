@@ -790,7 +790,7 @@
 }
 
 .fc-daygrid-event {
-  font-size: 12px;
+  /* font-size: 12px; */
   display: flex;
   flex-direction: column;
   align-items: center; /* จัดข้อความไทยให้ดูสมดุล */
@@ -954,4 +954,491 @@
   /* .fc-scrollgrid {
       height: 100vh;
     } */
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   การ์ดงานในปฏิทิน — โครงสร้าง/การจัดวาง + พับ-กางได้
+   (ดู eventContent และ expandedCardIds ใน index.js)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* 🐛 BUG ที่แก้ (ข้อความลอยอยู่กลางแท่งงาน ไอคอนกระจายไม่เป็นระเบียบ):
+   ".fc-daygrid-event { align-items:center }" ด้านบนทำให้กล่องเนื้อหาของ FullCalendar (.fc-event-main)
+   หดเหลือเท่าความกว้างข้อความแล้วลอยอยู่กลางแท่ง — งานที่กินหลายวันซึ่งแท่งกว้างเต็มสัปดาห์จึงมีข้อความ
+   กระจุกอยู่ตรงกลาง อ่านไล่ลงมาเป็นคอลัมน์ไม่ได้ และไอคอนที่เกาะ "มุมการ์ด" ก็ไปเกาะมุมของกล่องแคบๆ นั้น
+   ✅ บังคับให้กล่องเนื้อหากว้างเต็มแท่งเสมอ แล้วจัดชิดซ้ายให้ทุกใบเรียงตรงกันเป็นระเบียบ */
+.fc-daygrid-event .fc-event-main,
+.fc-timegrid-event .fc-event-main,
+.fc-list-event .fc-event-main {
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+}
+
+/* ╔══ ⚙️  จุดเดียวที่คุม "ขนาดตัวหนังสือ + ไอคอน" ของการ์ดงานในปฏิทิน ══╗
+
+   ทำไมต้องรวมไว้จุดเดียว:
+   เดิมขนาดตัวหนังสือถูกกำหนดกระจายอยู่ 3 ที่ที่ไม่รู้จักกัน —
+     1. inline style จาก eventContent ใน index.js  (font-size: 0.7em / 1em)
+     2. ขนาดไอคอนที่ส่งเป็น px จาก JS             (badgeIconPx = 6 / 12)
+     3. กฎ font-size ใน media query ของไฟล์นี้อีกหลายจุด ซึ่งต้องใส่ !important เพื่อสู้กับข้อ 1
+   ผลคือ "ลดขนาดตัวหนังสือ" หนึ่งครั้งต้องไล่แก้ 2 ไฟล์หลายจุด และถ้าลืมจุดใดจุดหนึ่งจะไม่มีอะไร
+   เปลี่ยนเลย (เพราะ inline style ชนะ CSS เสมอถ้าไม่มี !important) — หาสาเหตุไม่เจอว่าทำไมแก้แล้วไม่ขยับ
+
+   ✅ ตอนนี้ตัวเลขทั้งหมดอยู่ในบล็อกนี้บล็อกเดียว กฎอื่นทั้งไฟล์อ่านค่าผ่าน var() ไม่มีตัวเลขซ้ำที่อื่น
+   ✅ index.js ไม่มี font-size ของการ์ดเหลืออยู่แล้วแม้แต่ตัวเดียว จึงไม่ต้องใช้ !important อีกต่อไป
+
+   ⚠️ ค่าบนจอคอมเป็น inherit โดยตั้งใจ = "ใช้ขนาดเดิมของ FullCalendar" ไม่ไปยุ่งกับหน้าจอคอม
+   ⚠️ --ec-fs-title แยกจาก --ec-fs เพราะชื่องานตัวหนา กินความกว้างมากกว่าตัวธรรมดาที่ขนาดเท่ากัน */
+.modern-calendar-container {
+  --ec-fs: inherit;        /* ตัวหนังสือในการ์ด (โครงการ/ระบบ/ครั้งที่/ทีม/ผู้ติดต่อ/เวลา) */
+  --ec-fs-title: inherit;  /* ชื่องาน (ตัวหนา) */
+  --ec-fs-list: 12.5px;    /* มุมมอง "รายการ" — กว้างเต็มแถว ใช้ขนาดเดียวทุกจอ */
+  --ec-icon: 12px;         /* ไอคอนสถานะ + ไอคอน 🔗 งานหลายวัน */
+  --ec-pad-y: 3px;         /* ระยะขอบบน-ล่างในการ์ด */
+  --ec-pad-x: 5px;         /* ระยะขอบซ้าย-ขวาในการ์ด (ยิ่งน้อย ข้อความยิ่งได้ความกว้างคืน) */
+  --ec-ctl: 12px;          /* ปุ่มจับลาก + ปุ่มพับ/กาง (ซ่อนอยู่ในตารางเดือนบนจอแคบ) */
+  --ec-lh: 1.45;           /* ระยะห่างระหว่างบรรทัด */
+}
+
+/* จอแคบ (แท็บเล็ต + มือถือ) — ตัวชี้วัดคือ "คอลัมน์แคบแค่ไหน" ไม่ใช่ "เป็นมือถือไหม"
+   ปฏิทินเดือนหารความกว้างจอด้วย 7 เสมอ ที่ 1100px จึงเหลือคอลัมน์ละ ~150px */
+@media (max-width: 1100px) {
+  .modern-calendar-container {
+    --ec-fs: 8.5px;
+    --ec-fs-title: 8.5px;
+    --ec-icon: 7px;
+    --ec-pad-x: 4px;
+  }
+}
+/* จอ 769-1100px มีที่มากกว่าโทรศัพท์จริงๆ — ใหญ่ขึ้นได้อีกนิดเพื่ออ่านสบาย */
+@media (min-width: 769px) and (max-width: 1100px) {
+  .modern-calendar-container {
+    --ec-fs: 10px;
+    --ec-fs-title: 9.5px;
+    --ec-icon: 9px;
+  }
+}
+/* โหมด "พอดีจอ" บนมือถือ (ยังไม่กดปุ่ม + ขยาย) — คอลัมน์เหลือ ~50px ต้องบีบทุกอย่างให้แน่นที่สุด
+   ⚠️ 7.5px คือขีดจำกัดล่างจริงๆ ของภาษาไทย เล็กกว่านี้สระบน/ล่างเริ่มเกยกันจนอ่านผิดตัว
+   ⚠️ ไม่ตัดข้อมูลบรรทัดไหนทิ้งเลย — ครบเท่าจอคอมทุกบรรทัด แค่เล็กลงและชิดขึ้น */
+@media (max-width: 768px) {
+  .modern-calendar-container:not(.ec-zoomed) {
+    --ec-fs: 7.5px;
+    --ec-fs-title: 7.5px;
+    --ec-icon: 6px;
+    --ec-pad-y: 1px;
+    --ec-pad-x: 2px;
+    --ec-lh: 1.3;
+  }
+}
+
+.ec-card {
+  /* ⚠️ ค่านี้ต้องตรงกับ FLIP_MS ใน index.js — เปลี่ยนที่ไหนต้องเปลี่ยนทั้งคู่ */
+  --ec-anim: 240ms;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: var(--ec-pad-y) var(--ec-pad-x);
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+  font-size: var(--ec-fs);
+  line-height: var(--ec-lh);
+}
+
+/* แถวหัวการ์ด: [🔗] ชื่องาน ......... [ไอคอนสถานะ] [ปุ่มพับ/กาง]
+   ⚠️ min-width:0 ที่ทั้งแถวและตัวชื่อ — ขาดตัวใดตัวหนึ่ง flex item จะไม่ยอมหดต่ำกว่าความกว้าง
+   เนื้อหาตัวเอง แล้ว ellipsis จะไม่ทำงาน ชื่อยาวๆ จะดันไอคอน/ปุ่มทะลุออกนอกแท่งแทน */
+.ec-card-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.ec-card-title {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--ec-fs-title);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ec-card-icon {
+  /* ไอคอนโตตาม font-size ของตัวเอง — svg ถูกสร้างเป็น 1em จาก faIconToSvg ใน index.js */
+  font-size: var(--ec-icon);
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+  opacity: .9;
+}
+
+/* บรรทัดโครงการ + บรรทัดรายละเอียด — ตัดบรรทัดเดียวตอนพับ ขึ้นบรรทัดใหม่ได้ตอนกาง */
+.ec-card-site,
+.ec-card-row {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: .95;
+}
+.ec-card.is-expanded .ec-card-title,
+.ec-card.is-expanded .ec-card-site,
+.ec-card.is-expanded .ec-card-row {
+  white-space: normal;
+  overflow: visible;
+}
+
+/* ── ส่วนพับ/กาง ───────────────────────────────────────────────────────────
+   ⚠️ ใช้ grid-template-rows: 0fr → 1fr ในการยุบ/กาง ไม่ใช่ max-height:
+   max-height ต้องเดาความสูงสูงสุดไว้ล่วงหน้า ซึ่งเดาผิดได้เสมอ (ชื่อทีมยาว/ลูกทีมหลายคน/ข้อความ
+   ขึ้นบรรทัดใหม่บนจอแคบ) — เดาน้อยไปข้อความโดนตัดหาย เดามากไปความสูงจะไม่ตรงกับของจริง
+   ⚠️ ตัวลูกต้องมี min-height:0 + overflow:hidden ไม่งั้น grid item จะไม่ยอมหดต่ำกว่าความสูงเนื้อหา
+   ของตัวเอง (พฤติกรรมมาตรฐานของ grid) แล้วจะไม่ยุบลงเลยสักพิกเซล
+
+   🐛 BUG ที่แก้ (กางแล้วการ์ดทับกัน): ตั้งใจ "ไม่" อนิเมตความสูงของส่วนนี้ — ปฏิทินต้องวัดความสูงใหม่
+   แล้วจัดแถวใหม่ (updateSize) ซึ่งทำได้ครั้งเดียวหลังความสูงนิ่งแล้วเท่านั้น ถ้าอนิเมตความสูง ระหว่าง
+   ที่กำลังขยายการ์ดจะล้นไปทับใบอื่นอยู่ดี หรือต้องสั่งวัดใหม่ทุกเฟรมซึ่งหน่วงทั้งเดือน
+   ✅ ความลื่นมาจากการ fade + เลื่อนเนื้อหาลงเล็กน้อยแทน ซึ่งไม่กระทบความสูงเลยแม้แต่พิกเซลเดียว
+   จึงได้ทั้งความรู้สึกนุ่มนวลและแถวที่จัดตำแหน่งถูกต้องพร้อมกัน */
+/* ── ส่วนพับ/กาง ───────────────────────────────────────────────────────────
+   🐛 BUG ที่แก้ (กางแล้วยังกระตุก/กระโดดนิดหน่อย): เคยใช้ grid-template-rows 0fr→1fr ซึ่งเบราว์เซอร์
+   ไม่ได้ไล่ค่าเป็น "พิกเซลต่อเฟรม" แบบตรงไปตรงมา — ช่วงต้นขยับเยอะ ช่วงท้ายลากยาว เห็นเป็นกระตุก
+   ✅ อนิเมต "ความสูงเป็นพิกเซลจริง" แทน โดยวัดความสูงปลายทางจาก scrollHeight ตอนที่ layout นิ่งแล้ว
+   (ดู reflowWithAnimation ใน index.js) — ได้เส้นโค้งที่ตรงกับ easing เป๊ะๆ ทุกเฟรม
+   ⚠️ สภาพ "นิ่ง" ใช้ height: 0 / auto ไม่ใช่ค่าพิกเซลค้างไว้ — ความสูงของเนื้อหาเปลี่ยนได้เอง
+   (ข้อความขึ้นบรรทัดใหม่ตอนย่อจอ/แก้ข้อมูล) ถ้าค้างพิกเซลไว้จะโดนตัดหรือเหลือที่ว่างทันที
+   ⚠️ ตัว transition ถูกเปิดเฉพาะตอนอนิเมชันผ่านคลาส ec-anim-height — ไม่เปิดค้างไว้ เพราะทุกครั้งที่
+   FullCalendar re-render (ทุก 30 วิ) ความสูงอาจถูกเซ็ตใหม่ ถ้ามี transition ค้างจะเห็นการ์ดขยับเองเฉยๆ */
+.ec-card-detail {
+  overflow: hidden;
+  height: 0;
+  opacity: 0;
+}
+.ec-card-detail-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  transform: translateY(-6px);
+}
+.ec-card.is-expanded .ec-card-detail {
+  height: auto;
+  opacity: 1;
+}
+.ec-card.is-expanded .ec-card-detail-inner {
+  transform: translateY(0);
+}
+/* เปิด transition เฉพาะช่วงที่กำลังอนิเมชันจริง (JS ใส่/ถอดคลาสนี้ให้)
+   ⚠️ easing ต้องตรงกับ FLIP_EASE ใน index.js เป๊ะๆ — การ์ดที่กำลังยืด กับแท่งงานที่กำลังเลื่อนหลบ
+   ต้องวิ่งเป็นจังหวะเดียวกัน ไม่งั้นจะเห็นเป็น 2 จังหวะซ้อนกันแล้วรู้สึกสะดุด */
+.ec-card.ec-anim-height .ec-card-detail {
+  transition:
+    height var(--ec-anim, 240ms) cubic-bezier(.4, 0, .2, 1),
+    opacity 200ms ease;
+}
+.ec-card.ec-anim-height .ec-card-detail-inner {
+  transition: transform var(--ec-anim, 240ms) cubic-bezier(.4, 0, .2, 1);
+}
+
+/* ปุ่มลูกศรพับ/กาง — อยู่ท้ายแถวหัวการ์ด (ไม่ลอยทับอะไร)
+   ⚠️ พื้นที่แตะต้อง ~20px ขึ้นไปถึงจะกดโดนด้วยนิ้วบนมือถือ (ตัวลูกศรเองเล็กกว่านั้นมาก) */
+.ec-card-toggle {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 5px;
+  opacity: .7;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: opacity .15s ease, background-color .15s ease;
+}
+.ec-card-toggle:hover,
+.ec-card-toggle:focus-visible {
+  opacity: 1;
+  background: rgba(255, 255, 255, .25);
+  outline: none;
+}
+.ec-card-toggle-icon {
+  display: block;
+  font-size: var(--ec-ctl);
+  line-height: 1;
+  transition: transform .22s cubic-bezier(.4, 0, .2, 1);
+}
+.ec-card.is-expanded .ec-card-toggle-icon {
+  transform: rotate(180deg);
+}
+
+/* ⚠️ มุมมอง "รายการ" (listWeek) วางการ์ดในเซลล์ตารางที่กว้างเต็มแถวอยู่แล้ว — ไม่ต้องตัดข้อความ */
+.fc-list-event .ec-card-site,
+.fc-list-event .ec-card-row {
+  white-space: normal;
+}
+
+/* ── คลาสช่วยของอนิเมชัน FLIP (ดู reflowWithAnimation ใน index.js) ────────────────────────────
+   ec-anim-off    : ปิด transition ชั่วคราว ใช้ตอน "กระโดดไปสภาพสุดท้าย" เพื่อให้ปฏิทินวัดความสูงที่
+                    ถูกต้อง — ถ้าไม่ปิด ปฏิทินจะวัดได้ความสูงกลางทางแล้วจัดแถวผิด
+   ec-anim-invert : บังคับ opacity/ตำแหน่งเนื้อหาให้กลับไป "สภาพก่อนกด" ชั่วขณะ เพื่อให้มีระยะให้อนิเมต
+                    จริงในเฟรมถัดไป (ส่วน "ความสูง" JS จัดการเองด้วยค่าพิกเซล — ดู .ec-card-detail)
+   ⚠️ ต้อง !important เพราะต้องชนะกฎ .ec-card.is-expanded ที่ระบุค่าปลายทางไว้แล้ว */
+.ec-card.ec-anim-off .ec-card-detail,
+.ec-card.ec-anim-off .ec-card-detail-inner {
+  transition: none !important;
+}
+/* กำลังกาง → ย้อนกลับไปสภาพ "ยังไม่กาง" */
+.ec-card.ec-anim-invert.is-expanded .ec-card-detail {
+  opacity: 0 !important;
+}
+.ec-card.ec-anim-invert.is-expanded .ec-card-detail-inner {
+  transform: translateY(-6px) !important;
+}
+/* กำลังพับ → ย้อนกลับไปสภาพ "ยังกางอยู่" */
+.ec-card.ec-anim-invert:not(.is-expanded) .ec-card-detail {
+  opacity: 1 !important;
+}
+.ec-card.ec-anim-invert:not(.is-expanded) .ec-card-detail-inner {
+  transform: translateY(0) !important;
+}
+
+/* ── ปุ่มจับลากจัดลำดับงานในวันเดียวกัน (ดู useEffect "ลากจัดลำดับ" ใน index.js) ────────────
+   ⚠️ ต้องเป็นปุ่มจับแยกจากตัวการ์ด — การลากตัวการ์ดคือ "ย้ายงานไปวันอื่น" ของ FullCalendar เอง
+   ซึ่งต้องใช้ได้เหมือนเดิม ถ้าเอามาปนกันผู้ใช้จะแยกไม่ออกว่ากำลังจะย้ายวันหรือสลับลำดับ
+   ⚠️ touch-action: none จำเป็นสำหรับการลากด้วยนิ้ว — ถ้าไม่ใส่ เบราว์เซอร์จะตีความว่ากำลังเลื่อนจอ
+   แล้วยึด gesture ไปเลย ลากจัดลำดับบนมือถือจะไม่มีวันทำงาน */
+.ec-card-grip {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 18px;
+  margin-left: -2px;
+  font-size: var(--ec-ctl);
+  line-height: 1;
+  cursor: grab;
+  opacity: .45;
+  border-radius: 4px;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  transition: opacity .15s ease, background-color .15s ease;
+}
+.ec-card-grip:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, .25);
+}
+.ec-card-grip:active {
+  cursor: grabbing;
+}
+
+/* ใบที่กำลังถูกลาก — ยกขึ้นมาชั้นบนสุดให้เห็นว่ากำลังจับอยู่ใบไหน */
+.fc .ec-reorder-dragging {
+  z-index: 70 !important;
+  opacity: .92;
+}
+.fc .ec-reorder-dragging .fc-event {
+  box-shadow: 0 8px 22px rgba(15, 23, 42, .35);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   📱 มุมมองเดือนบนจอมือถือ — คงรายละเอียดครบ แต่ทำให้อ่านออกจริง
+
+   🐛 ปัญหาที่แก้: คอลัมน์ของปฏิทินเดือนบนจอ ~390px เหลือกว้างแค่ ~50px แต่แถวหัวการ์ดมี
+   ปุ่มจับลาก + ไอคอนสถานะ + ปุ่มพับ/กาง แย่งที่กับชื่องานอยู่ในบรรทัดเดียวกัน — เหลือที่ให้ชื่อ
+   ไม่ถึง 20px ชื่อ "[ PM ]" จึงถูกหั่นเป็น 3 บรรทัด และทุกบรรทัดที่เหลือก็ขึ้นบรรทัดใหม่ทีละตัวอักษร
+   กลายเป็นแถบสูงผอมที่อ่านไม่ออกและกดอะไรไม่โดน
+
+   ✅ แก้ที่ต้นเหตุ = "คืนความกว้างให้ข้อความ" ไม่ใช่ตัดรายละเอียดทิ้ง:
+     • ซ่อนเฉพาะปุ่มจับลาก — ลากจัดลำดับในคอลัมน์กว้าง 50px ทำไม่ได้จริงอยู่แล้ว และยังลากได้
+       ตามปกติในมุมมอง "รายการ" ที่กว้างเต็มแถว
+     • ย้ายปุ่มพับ/กางกับไอคอนสถานะไปลอยมุมขวาบน (absolute) — ไม่แย่งความกว้างของบรรทัดชื่ออีก
+     • ลด padding/ช่องไฟ แล้วให้ทุกบรรทัดขึ้นบรรทัดใหม่ได้ตามปกติ
+   ⚠️ รายละเอียดทุกบรรทัด (ระบบ · ครั้งที่ · ทีม · ผู้ติดต่อ · เวลา) ยังอยู่ครบเหมือนจอคอม
+   ══════════════════════════════════════════════════════════════════════════ */
+/* ⚠️ ใช้ 1100px ไม่ใช่ 768px โดยตั้งใจ — ตัวชี้วัดจริงคือ "คอลัมน์แคบแค่ไหน" ไม่ใช่ "เป็นมือถือไหม"
+   ปฏิทินเดือนหารจอด้วย 7 เสมอ ที่ 1100px จึงยังเหลือคอลัมน์ละ ~150px ส่วนที่ 800px เหลือ ~110px
+   ซึ่งพอหักปุ่มจับลาก + ไอคอนสถานะ + ปุ่มพับ/กางในแถวหัวการ์ดออก จะเหลือที่ให้ชื่องานไม่ถึง 40px
+   แล้วโดนหั่นเป็น "[" / "Servic" / "e ]" เหมือนบนมือถือเป๊ะๆ — ปัญหาเดียวกัน ต้องแก้ด้วยกฎเดียวกัน
+   ✅ กฎเฉพาะโทรศัพท์จริงๆ (ปุ่มย่อ/ขยาย, แถบปุ่มบนหัวปฏิทิน) ยังอยู่ใน @media 768px ของตัวเองด้านล่าง */
+@media (max-width: 1100px) {
+  .fc-daygrid .fc-event {
+    padding: 0;
+    min-height: 18px;
+  }
+  .fc-daygrid .ec-card {
+    gap: 0;
+    /* กันเนื้อหาล้นออกนอกกรอบการ์ด (ซึ่งจะไปทับการ์ดใบข้างๆ) */
+    overflow: hidden;
+  }
+
+  /* ✅ ซ่อนทุกอย่างที่เป็น "แค่การตกแต่ง" บนคอลัมน์แคบ — วงเล็บ [ ] ครอบชื่องาน,
+     ขีดนำหน้าแต่ละแถว, ช่องว่างรอบเครื่องหมาย : และไอคอนโทรศัพท์หน้าเบอร์ (ดู detailRow ใน index.js)
+     ⚠️ ไม่มีข้อมูลตัวไหนหายไป — หัวข้อกับค่ายังครบทุกตัว แค่ตัดตัวคั่นที่ไม่จำเป็นออก
+     ⚠️ จอคอมและมุมมอง "รายการ" ยังเห็นตัวคั่นครบเหมือนเดิม — กฎนี้อยู่ใต้ .fc-daygrid เท่านั้น
+     🐛 BUG ที่แก้: วัดจริงที่จอ 412px ได้ว่าชื่องานเหลือความกว้างแค่ 25.6px แต่ "[ Service ]"
+     ต้องใช้ 38px จึงถูกหั่นเป็น 3 บรรทัด — วงเล็บ + ช่องว่างกินไปเกือบ 1 ใน 3 ของความกว้างที่มี
+     โดยไม่ได้ให้ข้อมูลอะไรเลย ตัดออกแล้วชื่องานอยู่บรรทัดเดียวได้ */
+  .fc-daygrid .ec-card-deco {
+    display: none;
+  }
+
+  /* ✅ ตารางเดือนบนมือถือ = "กางอยู่เสมอ" เหมือนก่อนมีปุ่มพับ/กาง — คอลัมน์กว้าง ~40-50px ไม่มีที่พอ
+     ให้ทั้งปุ่มและชื่องานอยู่บรรทัดเดียวกันจริงๆ (ลองเว้นที่ให้ปุ่มแล้วชื่อเหลือความกว้าง 0px ข้อความ
+     เลยถูกหั่นทีละตัวอักษรจนการ์ดสูง 300px) — ตัดปุ่มออกจากตารางเดือน ข้อความจึงได้ความกว้างคืนทั้งหมด
+     ⚠️ ไม่ได้ตัดข้อมูลทิ้งแม้แต่บรรทัดเดียว — รายละเอียดทุกบรรทัดแสดงครบตลอดเวลา
+     ⚠️ ฟีเจอร์พับ/กางและลากจัดลำดับยังใช้ได้ครบในมุมมอง "รายการ" (กว้างเต็มแถว) และบนจอคอม */
+  .fc-daygrid .ec-card-grip,
+  .fc-daygrid .ec-card-toggle {
+    display: none !important;
+  }
+  .fc-daygrid .ec-card-detail {
+    height: auto !important;
+    opacity: 1 !important;
+    overflow: visible !important;
+  }
+  .fc-daygrid .ec-card-detail-inner {
+    transform: none !important;
+    overflow: visible !important;
+  }
+
+  /* ไอคอนสถานะลอยมุมขวาบน ไม่แย่งความกว้างของบรรทัดชื่องาน */
+  .fc-daygrid .ec-card-head {
+    position: relative;
+    gap: 2px;
+  }
+  .fc-daygrid .ec-card-icon {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+
+  /* ✅ ทุกบรรทัดขึ้นบรรทัดใหม่ได้ตามปกติ — ข้อความไทยไม่มีช่องว่างระหว่างคำอยู่แล้ว การตัดบรรทัด
+     จึงเป็นเรื่องปกติและอ่านได้ ต่างจากตอนที่ความกว้างเหลือ ~0px ซึ่งหั่นทีละตัวอักษรจนอ่านไม่ออก */
+  .fc-daygrid .ec-card-title,
+  .fc-daygrid .ec-card-site,
+  .fc-daygrid .ec-card-row {
+    /* ⚠️ 9.5px คือขั้นต่ำที่ยังอ่านภาษาไทยออกสบายบนมือถือ (วรรณยุกต์/สระบนล่างยังไม่ติดกัน) —
+       เล็กกว่านี้เริ่มต้องเพ่ง ซึ่งแย่กว่าการปัดเลื่อนดูอีก */
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    /* 🐛 BUG ที่แก้ (ข้อความโดนตัดหายท้ายบรรทัด เช่น "Damrongsa" / "064112095"): กฎรวมของ .fc-event
+       ตั้ง word-break/overflow-wrap เป็น normal ไว้ — คำภาษาอังกฤษและเบอร์โทรเป็น "คำเดียวยาวๆ" ที่
+       เบราว์เซอร์ห้ามตัดกลางคำ พอกว้างไม่พอมันจึงล้นออกนอกการ์ดแล้วถูกตัดหายไปเลย (ข้อมูลไม่ครบ)
+       ✅ break-word = ตัดกลางคำ "เฉพาะคำที่ยาวเกินบรรทัดจริงๆ" เท่านั้น
+       ⚠️ ห้ามใช้ anywhere แม้จะดูคล้ายกัน — anywhere มีผลกับการคำนวณความกว้างขั้นต่ำของกล่องด้วย
+       เบราว์เซอร์จึงยุบกล่องให้แคบที่สุดแล้วหั่นคำสั้นๆ ที่พอดีอยู่แล้วโดยไม่จำเป็น ("[ Service ]"
+       กลายเป็น "[" / "Servic" / "e ]" 3 บรรทัด) ส่วน break-word ไม่แตะความกว้างขั้นต่ำ คำสั้นจึง
+       อยู่ครบบรรทัดเดียวตามปกติ */
+    overflow-wrap: break-word !important;
+    word-break: normal !important;
+  }
+  .fc-daygrid .ec-card-title {
+    font-weight: 700;
+    /* เว้นที่ให้ไอคอนสถานะที่ลอย absolute อยู่มุมขวาบน "พอดีตัวไอคอน" ไม่เผื่อเกิน
+       🐛 BUG ที่แก้: เดิมตรึงไว้ 12px ทั้งที่ไอคอนบนมือถือเหลือ 6px — กินความกว้างของชื่องานไปฟรีๆ
+       6px ซึ่งคิดเป็น ~23% ของที่ทั้งหมดที่ชื่องานมี (25.6px) */
+    padding-right: calc(var(--ec-icon) + 2px);
+  }
+
+  /* ✅ มุมมอง "รายการ" — กว้างเต็มแถว มีที่พอจริง จึงคงทุกอย่างไว้ครบและทำให้แตะง่ายขึ้น */
+  .fc-list-event .ec-card {
+    padding: 6px 8px;
+    line-height: 1.65;
+  }
+  .fc-list-event .ec-card-title,
+  .fc-list-event .ec-card-site,
+  .fc-list-event .ec-card-row {
+    font-size: var(--ec-fs-list);
+    white-space: normal;
+  }
+  .fc-list-event .ec-card-grip,
+  .fc-list-event .ec-card-toggle {
+    --ec-ctl: 14px;
+    width: 26px;
+    height: 26px;
+    opacity: .8;
+  }
+}
+
+/* ปุ่มย่อ/ขยายปฏิทิน (อยู่แถวเดียวกับ "วันนี้") — มีความหมายเฉพาะบนจอมือถือที่คอลัมน์แคบจนต้องปัดดู
+   ⚠️ จอคอมคอลัมน์กว้างพออยู่แล้ว ปุ่มจะกลายเป็นของรกที่ไม่มีใครใช้ จึงซ่อนไปเลย */
+.fc .fc-zoomOut-button,
+.fc .fc-zoomIn-button {
+  display: none !important;
+}
+@media (max-width: 768px) {
+  /* ✅ ให้ตารางเดือนมี "ความกว้างขั้นต่ำ" ของตัวเอง แล้วปัดเลื่อนดูแนวนอนได้
+     ⚠️ เฉพาะจอโทรศัพท์เท่านั้น — แท็บเล็ต/จอคอมแคบยังกว้างพอให้ 7 คอลัมน์อ่านได้โดยไม่ต้องปัด
+     การบังคับให้เลื่อนแนวนอนที่นั่นจะกลายเป็นความรำคาญที่ไม่ได้แก้อะไร
+     ⚠️ ต้องใส่ -webkit-overflow-scrolling ให้ปัดลื่นบน iOS และ overscroll-behavior-x กันการปัด
+     แนวนอนไปลากทั้งหน้าเว็บ/เด้งกลับหน้าก่อนหน้า */
+  .modern-calendar-container .fc-view-harness {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+  /* ⚠️ ระดับซูม 0 = --ec-m-col เป็น 0px → min-width เป็น 0 → ตารางพอดีจอเป๊ะ ไม่ต้องปัดแนวนอนเลย
+     (ดู MOBILE_ZOOM_STEPS ใน index.js) กด + ค่อยขยายทีละระดับเมื่ออยากอ่านรายละเอียดชัดๆ */
+  .modern-calendar-container .fc-daygrid > table,
+  .modern-calendar-container .fc-scrollgrid {
+    min-width: calc(var(--ec-m-col, 0px) * 7);
+  }
+
+  /* ✅ โหมด "พอดีจอ" — ทวงความกว้างที่เสียไปเปล่าๆ คืนให้ข้อความ
+     🐛 BUG ที่แก้ (วัดจริงที่จอ 412px): ช่องวันกว้าง 50.6px แต่การ์ดได้แค่ 43.6px — หายไป 7px
+     กับ padding ของกรอบวันและระยะขอบของแท่งงาน ซึ่งบนคอลัมน์ 50px คือ 14% ของพื้นที่ทั้งหมด
+     ที่หายไปโดยไม่ได้ให้อะไรกลับมาเลย — ทุก px ที่ทวงคืนได้ = ข้อความตัดบรรทัดน้อยลงตรงๆ
+     ⚠️ ขนาดตัวหนังสือไม่ได้อยู่ตรงนี้แล้ว — ไปอยู่ในบล็อก "จุดเดียวที่คุมขนาด" ด้านบนไฟล์ */
+  .modern-calendar-container:not(.ec-zoomed) .fc-daygrid-day-frame {
+    padding: 0;
+  }
+  .modern-calendar-container:not(.ec-zoomed) .fc-daygrid-day-events {
+    margin: 0;
+  }
+  .modern-calendar-container:not(.ec-zoomed) .fc-daygrid-event-harness {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+  .modern-calendar-container:not(.ec-zoomed) .fc-daygrid-event {
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  /* ✅ แถวล่างของหัวปฏิทิน (− + วันนี้) ต้องกว้างเต็มจอและไม่ล้นออกนอกขอบ
+     🐛 BUG ที่แก้: .fc-header-toolbar บนมือถือเป็น flex column + align-items:flex-start — chunk
+     ขวาจึงหดตามเนื้อหา แล้วปุ่ม "วันนี้" ที่ยืดเต็มที่ดันความกว้างรวมเกินจอ ผลคือปุ่ม − โดนตัดที่ขอบซ้าย
+     และ "วันนี้" ล้นออกไปนอกขอบขวา กดไม่โดนทั้งคู่ */
+  .fc .fc-header-toolbar > .fc-toolbar-chunk:last-child {
+    width: 100%;
+    display: flex;
+    gap: 6px;
+    box-sizing: border-box;
+  }
+  .fc .fc-header-toolbar > .fc-toolbar-chunk:last-child .fc-today-button {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .fc .fc-zoomOut-button,
+  .fc .fc-zoomIn-button {
+    flex: 0 0 auto;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    /* ✅ ปุ่มสี่เหลี่ยมจัตุรัสขนาดนิ้วแตะได้สบาย ตัวอักษร −/+ ใหญ่ชัด อ่านออกทันทีว่าคืออะไร
+       ⚠️ ต้องกำหนดความสูงเอง — ปุ่มของ FullCalendar เอาความสูงมาจาก padding ล้วน พอเราตัด padding
+       ทิ้งเพื่อให้ได้ปุ่มจัตุรัส ความสูงจะเหลือ ~19px ซึ่งเล็กเกินกว่าจะแตะโดนด้วยนิ้วจริง */
+    min-width: 38px;
+    height: 34px;
+    padding: 0 !important;
+    font-size: 17px !important;
+    font-weight: 800 !important;
+    line-height: 1 !important;
+  }
 }
