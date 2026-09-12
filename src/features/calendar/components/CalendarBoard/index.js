@@ -1982,11 +1982,31 @@ function EventCalendar() {
       }
       const handle = e.target.closest?.('[data-ec-resize="1"]');
       if (!handle) return;
-      e.preventDefault();
-      e.stopPropagation();
-      drag = { eventId: handle.dataset.eventId, moved: false, handle };
+      /* 🐛 BUG ที่แก้ (ผู้ใช้แจ้ง: "การเลื่อนขยายวัน ปุ่มสัมผัสไวไป เฟลได้ง่าย"):
+         เดิม "แตะปุ๊บจับติดปั๊บ" — ไม่มีเกณฑ์เลยว่าผู้ใช้ตั้งใจจะลากขยายจริงหรือแค่นิ้วผ่าน และยัง
+         preventDefault ตั้งแต่ touchstart ซึ่งตัดการเลื่อนจอของเบราว์เซอร์ทิ้งทันที
+         ผลคือถ้านิ้วบังเอิญเริ่มเลื่อนจอตรงขอบขวาการ์ดพอดี จอจะไม่เลื่อน แต่กลายเป็นลากขยายวันแทน
+         แล้วพอปล่อยนิ้วก็บันทึกวันที่ใหม่ให้เลยทั้งที่ผู้ใช้แค่จะเลื่อนดูปฏิทิน
+         ✅ ต้อง "ลากออกข้างจริงจัง" ก่อนถึงจะเริ่มขยาย (ดู RESIZE_SLOP ใน onMove) — ก่อนถึงเกณฑ์
+         ยังไม่ติดคลาส ไม่สั่น ไม่กั้นการเลื่อนจอ ถ้าขยับเป็นแนวตั้ง = ตั้งใจเลื่อนดู ยกเลิกให้เลย
+         ⚠️ ห้าม preventDefault ตรงนี้ — จะตัดการเลื่อนจอทิ้งตั้งแต่ยังไม่รู้เจตนา (คู่กับ
+         touch-action: pan-y ที่แท่งจับ ซึ่งยอมให้เบราว์เซอร์เลื่อนแนวตั้งเองได้) */
+      e.stopPropagation(); // กัน FullCalendar เห็น แล้วไปเริ่มลากทั้งการ์ดแทน
+      drag = {
+        eventId: handle.dataset.eventId,
+        handle,
+        startX: getPoint(e).clientX,
+        startY: getPoint(e).clientY,
+        armed: false, // ยังไม่ถือว่าเริ่มลากจริงจนกว่าจะพ้นเกณฑ์
+        moved: false,
+      };
+    };
+
+    /** เริ่มลากจริง — เรียกตอนพ้นเกณฑ์แล้วเท่านั้น (ดู onMove) */
+    const armResize = () => {
+      drag.armed = true;
       document.body.style.userSelect = "none";
-      handle.classList.add("is-resizing");
+      drag.handle?.classList.add("is-resizing");
       // สั่นตอบรับสั้นๆ ให้รู้ว่าจับแท่งติดแล้ว (ชุดเดียวกับตอนกดค้างเพื่อสลับลำดับ)
       try {
         navigator.vibrate?.(10);
@@ -2009,11 +2029,26 @@ function EventCalendar() {
       clearStuckDragLookSoon();
     };
 
+    /* ระยะที่ต้องลากออกข้างก่อนถึงจะถือว่า "ตั้งใจขยายวัน" จริง
+       10px = พ้นการสั่นของนิ้วตอนแตะ แต่ยังสั้นพอที่การลากตั้งใจจะรู้สึกว่าตอบสนองทันที */
+    const RESIZE_SLOP = 10;
+
     const onMove = (e) => {
       if ((e.touches && e.touches.length > 1) || touchCountRef.current > 1) return abortResize();
       if (!drag) return;
-      drag.moved = true;
       const { clientX, clientY } = getPoint(e);
+
+      // ── ยังไม่เริ่มลากจริง: ตัดสินเจตนาจากทิศและระยะที่ขยับ ──
+      if (!drag.armed) {
+        const dx = clientX - drag.startX;
+        const dy = clientY - drag.startY;
+        if (Math.abs(dx) < RESIZE_SLOP && Math.abs(dy) < RESIZE_SLOP) return; // ยังไม่พอ รอดูก่อน
+        // ขยับเป็นแนวตั้งมากกว่าแนวนอน = ตั้งใจเลื่อนดูปฏิทิน ไม่ใช่จะขยายวัน — ปล่อยให้จอเลื่อนไป
+        if (Math.abs(dy) > Math.abs(dx)) return abortResize();
+        armResize();
+      }
+
+      drag.moved = true;
       // ⚠️ จำจุดล่าสุดไว้ด้วย — ตอนปล่อยนิ้ว บาง event ไม่มี changedTouches ให้อ่านพิกัด ถ้าไม่มีตัวสำรอง
       // การลากจะจบแบบ "ไม่เกิดอะไรขึ้นเลย" โดยไม่มีอะไรบอกผู้ใช้ว่าทำไม
       drag.lastX = clientX;
@@ -2024,13 +2059,14 @@ function EventCalendar() {
 
     const onUp = async (e) => {
       if (!drag) return;
-      const { eventId, moved, lastX, lastY } = drag;
+      const { eventId, moved, armed, lastX, lastY } = drag;
       clearHandleLook(drag);
       drag = null;
       document.body.style.userSelect = "";
       clearHighlight();
       clearStuckDragLookSoon();
-      if (!moved) return; // แค่กดเฉยๆ ไม่ได้ลาก ไม่ต้องทำอะไร (กันชนกับการคลิกเปิดฟอร์มแก้ไข)
+      // ⚠️ ต้อง armed ด้วย — แตะโดนแท่งจับแล้วปล่อย (หรือขยับไม่ถึงเกณฑ์) ต้องไม่เปลี่ยนวันของงาน
+      if (!armed || !moved) return;
 
       const p = getPoint(e);
       const clientX = Number.isFinite(p?.clientX) ? p.clientX : lastX;
@@ -2649,13 +2685,14 @@ function EventCalendar() {
       // (ดูเหตุผลเต็มที่ yieldToCalendar) ⚠️ ต้องเช็กก่อน preventDefault ด้านล่าง ไม่งั้นเราจะไปกั้น
       // การลากของ FullCalendar ต่อทั้งที่ยกให้มันไปแล้ว
       if (drag.originCell) {
-        // ⚠️ ใช้ "กรอบของช่องวันเดิม" ไม่ใช่ "วันที่ใต้นิ้วต่างจากเดิมไหม" — การลากลงไปวางใต้กองการ์ด
-        // (ซึ่งคือการสลับไปอยู่ท้ายสุด ใช้งานบ่อยที่สุด) มักเลยขอบล่างของกองไปนิดหน่อยจนไปอยู่เหนือ
-        // ช่องวันของสัปดาห์ถัดไป ถ้าเทียบด้วยวันที่จะถูกตีความว่า "ย้ายวัน" แล้วการสลับลำดับจะไม่บันทึก
+        /* ⚠️ ดูเฉพาะ "แนวนอน" เท่านั้น ไม่สนแนวตั้งเลย — นี่คือหัวใจของการแยกสองท่าออกจากกัน
+           การสลับลำดับเป็นการลากขึ้น-ลงโดยธรรมชาติ และท่าที่ใช้บ่อยที่สุดคือลากลงไปวางท้ายกอง
+           ซึ่งมักเลยขอบล่างของช่องวันไปนิดหน่อย ถ้านับแนวตั้งด้วยจะกลายเป็น "ย้ายวัน" แล้วงานกระโดด
+           ไปสัปดาห์ถัดไปทั้งที่ผู้ใช้แค่จะจัดลำดับ (เจอจริงตอนทดสอบ: งานเลื่อนไป +7 วันเอง)
+           ส่วนการย้ายไปวันอื่นย่อมมีการขยับออกข้างเสมอ เพราะแต่ละวันคือคนละคอลัมน์ */
         const r = drag.originCell.getBoundingClientRect();
-        const p2 = pointOf(e);
-        const out = p2.clientX < r.left - 8 || p2.clientX > r.right + 8 || p2.clientY < r.top - 8 || p2.clientY > r.bottom + 8;
-        if (out) return yieldToCalendar();
+        const x = pointOf(e).clientX;
+        if (x < r.left - 8 || x > r.right + 8) return yieldToCalendar();
       }
       const dy = pointOf(e).clientY - drag.startY;
       if (!drag.moved && Math.abs(dy) < 3) return;
@@ -3778,7 +3815,10 @@ function EventCalendar() {
   width: 11px;
   cursor: ew-resize;
   z-index: 6;
-  touch-action: none;
+  /* ⚠️ pan-y ไม่ใช่ none — ยอมให้เบราว์เซอร์เลื่อนจอแนวตั้งผ่านแท่งจับนี้ได้ตามปกติ ส่วนการลาก
+     แนวนอน (= ขยาย/ย่อวัน) ถึงจะส่งมาให้เรา · เดิมใช้ none ทำให้นิ้วที่บังเอิญเริ่มเลื่อนจอตรงขอบขวา
+     การ์ดพอดี เลื่อนจอไม่ได้เลยและกลายเป็นลากขยายวันแทน (ผู้ใช้แจ้งว่า "ไวไป เฟลง่าย") */
+  touch-action: pan-y;
   display: flex;
   align-items: center;
   justify-content: flex-end;
