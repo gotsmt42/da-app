@@ -700,6 +700,9 @@ function EventCalendar() {
     };
 
     const onTouchStart = (e) => {
+      // ⚠️ ดักที่ document จึงต้องคัดเองว่าสัมผัสนั้นอยู่ในปฏิทินจริงไหม (ดูเหตุผลที่จุดผูก listener)
+      if (!calendarEl.contains(e.target)) { tracking = false; return; }
+      gestureClaimedRef.current = false; // เริ่มท่าใหม่ ยังไม่มีใครจอง
       // นิ้วเดียวเท่านั้น — 2 นิ้วขึ้นไปคือกำลังหุบ/กางเพื่อซูม ต้องไม่ตีความเป็นการปัดเปลี่ยนเดือน
       if (e.touches.length !== 1) { tracking = false; return; }
       if (scrollableXAt(e.target)) { tracking = false; return; }
@@ -713,6 +716,11 @@ function EventCalendar() {
     const onTouchEnd = (e) => {
       if (!tracking) return;
       tracking = false;
+      /* 🐛 BUG ที่แก้ (ผู้ใช้แจ้ง: "ขยายวันยังไว ไม่ได้ตั้งใจไปโดนก็เลื่อน"):
+         การปัดเปลี่ยนเดือนกับการลากขยายวันเป็น "การลากแนวนอน" เหมือนกันทั้งคู่ นิ้วเดียวจึงสั่งงาน
+         ทั้งสองอย่างพร้อมกันได้ — ปัดเปลี่ยนเดือนโดยบังเอิญเริ่มนิ้วตรงแท่งจับ จะได้ทั้งขยายวันของงาน
+         "และ" เปลี่ยนเดือนไปพร้อมกัน ✅ ใครเริ่มลากจริงก่อนเป็นคนจองท่านั้นไป อีกฝ่ายต้องไม่ทำงานซ้ำ */
+      if (gestureClaimedRef.current) return;
       const touch = e.changedTouches?.[0];
       if (!touch) return;
       const dx = touch.clientX - startX;
@@ -729,16 +737,23 @@ function EventCalendar() {
       }
     };
 
-    const opts = { passive: true };
-    calendarEl.addEventListener("touchstart", onTouchStart, opts);
-    calendarEl.addEventListener("touchmove", onTouchMove, opts);
-    calendarEl.addEventListener("touchend", onTouchEnd, opts);
-    calendarEl.addEventListener("touchcancel", onTouchEnd, opts);
+    /* 🐛 BUG ที่แก้ (ปัดเปลี่ยนเดือนไม่ทำงานถ้านิ้วเริ่มตรงแท่งจับขยายวัน):
+       เดิมผูกไว้ที่ตัวปฏิทิน ซึ่งอยู่ "ลึกกว่า" document — แต่ตัวลากขยายวันดัก touchstart ที่ document
+       ใน capture phase แล้ว stopPropagation() เพื่อกัน FullCalendar (ดู onDown ของมัน) สัมผัสนั้นจึง
+       ไม่มีวันไหลลงมาถึงตรงนี้เลย ตัวปัดเลยไม่รู้ด้วยซ้ำว่ามีนิ้วแตะ = ปัดตรงขอบขวาการ์ดแล้วเดือนไม่เปลี่ยน
+       ✅ ย้ายมาดักที่ document ใน capture phase เหมือนกัน — useEffect นี้อยู่เหนือกว่าในไฟล์ จึงถูก
+       ผูกก่อนและได้รับ event ก่อนเสมอ (คัดเองว่าอยู่ในปฏิทินไหมที่ onTouchStart)
+       ⚠️ passive:true ตามเดิม — ไม่แตะการเลื่อน/ซูมของเบราว์เซอร์เลยสักนิด */
+    const opts = { capture: true, passive: true };
+    document.addEventListener("touchstart", onTouchStart, opts);
+    document.addEventListener("touchmove", onTouchMove, opts);
+    document.addEventListener("touchend", onTouchEnd, opts);
+    document.addEventListener("touchcancel", onTouchEnd, opts);
     return () => {
-      calendarEl.removeEventListener("touchstart", onTouchStart);
-      calendarEl.removeEventListener("touchmove", onTouchMove);
-      calendarEl.removeEventListener("touchend", onTouchEnd);
-      calendarEl.removeEventListener("touchcancel", onTouchEnd);
+      document.removeEventListener("touchstart", onTouchStart, true);
+      document.removeEventListener("touchmove", onTouchMove, true);
+      document.removeEventListener("touchend", onTouchEnd, true);
+      document.removeEventListener("touchcancel", onTouchEnd, true);
     };
   }, []);
 
@@ -774,6 +789,9 @@ function EventCalendar() {
       ยังเหลือช่องให้การ์ดตอบสนองอยู่ (เช่น ตัวนับเวลากดค้างที่ตั้งไว้ก่อนนิ้วที่สองจะมาถึง) ผู้ใช้จึงยัง
       เห็นการ์ดขยับ/สั่นระหว่างจะซูม · เช็กจำนวนนิ้ว ณ วินาทีที่จะลงมือ = ปิดทุกช่องพร้อมกัน */
   const touchCountRef = useRef(0);
+  /** ท่าสัมผัสครั้งนี้ถูก "จอง" ไว้โดยตัวลากแล้ว — ตัวปัดเปลี่ยนเดือนต้องไม่ทำงานซ้ำจากนิ้วเดียวกัน
+      (ดูเหตุผลเต็มที่ onTouchEnd ของตัวปัด และที่ armResize) */
+  const gestureClaimedRef = useRef(false);
   useEffect(() => {
     const COOLDOWN = 500;
     const MOVE_SLOP = 12;
@@ -1997,6 +2015,7 @@ function EventCalendar() {
         handle,
         startX: getPoint(e).clientX,
         startY: getPoint(e).clientY,
+        startTime: Date.now(),
         armed: false, // ยังไม่ถือว่าเริ่มลากจริงจนกว่าจะพ้นเกณฑ์
         moved: false,
       };
@@ -2005,6 +2024,8 @@ function EventCalendar() {
     /** เริ่มลากจริง — เรียกตอนพ้นเกณฑ์แล้วเท่านั้น (ดู onMove) */
     const armResize = () => {
       drag.armed = true;
+      // จองท่านี้ไว้ ไม่ให้ตัวปัดเปลี่ยนเดือนทำงานซ้ำจากนิ้วเดียวกัน (ดู onTouchEnd ของตัวปัด)
+      gestureClaimedRef.current = true;
       document.body.style.userSelect = "none";
       drag.handle?.classList.add("is-resizing");
       // สั่นตอบรับสั้นๆ ให้รู้ว่าจับแท่งติดแล้ว (ชุดเดียวกับตอนกดค้างเพื่อสลับลำดับ)
@@ -2032,19 +2053,32 @@ function EventCalendar() {
     /* ระยะที่ต้องลากออกข้างก่อนถึงจะถือว่า "ตั้งใจขยายวัน" จริง
        10px = พ้นการสั่นของนิ้วตอนแตะ แต่ยังสั้นพอที่การลากตั้งใจจะรู้สึกว่าตอบสนองทันที */
     const RESIZE_SLOP = 10;
+    /** ความเร็วสูงสุดของนิ้ว "ตอนออกตัว" ที่ยังนับว่าเป็นการลากขยาย (พิกเซลต่อมิลลิวินาที)
+        เร็วกว่านี้ = ปัดปราด (เปลี่ยนเดือน) ไม่ใช่การลากขยาย
+        ⚠️ ใช้ความเร็วไม่ใช่ "ต้องนิ่งก่อนกี่ ms" — เคยลองแบบนิ่งก่อนแล้วพบว่าไปตัดการลากที่ตั้งใจ
+        แต่ออกตัวเร็วทิ้งไปด้วย (วัดจริงแล้วเฟลทั้งชุด) ส่วนความเร็วแยกสองท่านี้ออกจากกันชัดเจน:
+        ปัดปราดวัดได้ราว 0.4–0.9 px/ms ส่วนลากตั้งใจอยู่ราว 0.1 px/ms */
+    const RESIZE_MAX_START_SPEED = 0.35;
 
     const onMove = (e) => {
       if ((e.touches && e.touches.length > 1) || touchCountRef.current > 1) return abortResize();
       if (!drag) return;
       const { clientX, clientY } = getPoint(e);
 
-      // ── ยังไม่เริ่มลากจริง: ตัดสินเจตนาจากทิศและระยะที่ขยับ ──
+      // ── ยังไม่เริ่มลากจริง: ตัดสินเจตนาจากจังหวะ ทิศ และระยะที่ขยับ ──
       if (!drag.armed) {
         const dx = clientX - drag.startX;
         const dy = clientY - drag.startY;
         if (Math.abs(dx) < RESIZE_SLOP && Math.abs(dy) < RESIZE_SLOP) return; // ยังไม่พอ รอดูก่อน
         // ขยับเป็นแนวตั้งมากกว่าแนวนอน = ตั้งใจเลื่อนดูปฏิทิน ไม่ใช่จะขยายวัน — ปล่อยให้จอเลื่อนไป
         if (Math.abs(dy) > Math.abs(dx)) return abortResize();
+        /* ⚠️ "ปัดปราดเปลี่ยนเดือน" ไม่ใช่การลากขยาย — ตัดสินที่ "ความเร็วตอนนิ้วออกตัว" ครั้งแรก
+           สองท่านี้เป็นการลากแนวนอนเหมือนกันทั้งคู่ ต่างกันที่ความเร็ว: การปัดคือนิ้วลงแล้วสะบัดออกไปเลย
+           ส่วนการลากแท่งจับ (กว้างแค่ 12px) ผู้ใช้ต้องเล็งก่อน แล้วค่อยๆ ลากไปหาวันที่ต้องการ
+           ⚠️ ต้อง "ตัดทิ้ง" ไม่ใช่ "รอดูต่อ" — เคยทำเป็นรอดูต่อแล้วพบว่าการปัดยาวๆ จะแอบติดตอนท้าย
+           อยู่ดี · จุดนี้คือครั้งแรกเสมอ เพราะครั้งก่อนหน้าถูก return ทิ้งที่เกณฑ์ระยะด้านบนไปแล้ว */
+        const elapsed = Math.max(1, Date.now() - drag.startTime);
+        if (Math.hypot(dx, dy) / elapsed > RESIZE_MAX_START_SPEED) return abortResize();
         armResize();
       }
 
@@ -2092,10 +2126,20 @@ function EventCalendar() {
       if (targetDateStr === startDateStr && !spansMultipleDays) return;
 
       try {
+        const newEnd = moment(targetDateStr).add(1, "day").format("YYYY-MM-DD"); // exclusive ตามแบบแผนทั้งแอป
+        /* ✅ ขยับบนจอให้เห็นผลทันที ไม่รอ server (แบบเดียวกับการลากจัดลำดับ)
+           ⚠️ เดิมรอ UpdateEvent แล้วค่อย fetch ใหม่ทั้งชุด — บนมือถือ/เน็ตช้า ช่วงรอนั้นแท่งงานยัง
+           กว้างเท่าเดิมอยู่หลายวินาที ผู้ใช้จึงรู้สึกว่า "ลากแล้วไม่อัพเดต ต้องรีเฟรชเอง"
+           ถ้าบันทึกล้มเหลว ตัว catch ด้านล่างจะดึงของจริงกลับมาทับให้ จอไม่ค้างข้อมูลผิด */
+        setEvents((prev) => prev.map((ev) =>
+          String(ev.id || ev._id) === String(eventId)
+            ? { ...ev, allDay: true, start: startDateStr, end: newEnd }
+            : ev
+        ));
         await EventService.UpdateEvent(eventId, {
           allDay: true,
           start: startDateStr,
-          end: moment(targetDateStr).add(1, "day").format("YYYY-MM-DD"), // exclusive ตามแบบแผนทั้งแอป
+          end: newEnd,
         });
         await fetchEventsFromDB();
         Swal.fire({
@@ -2106,6 +2150,8 @@ function EventCalendar() {
           showConfirmButton: false, timer: 2200,
         });
       } catch (err) {
+        // ⚠️ บันทึกไม่สำเร็จ ต้องดึงของจริงกลับมาทับ ไม่ปล่อยให้จอค้างค่าที่เราขยับไว้ล่วงหน้า
+        fetchEventsFromDB(true);
         Swal.fire("เกิดข้อผิดพลาด", err?.response?.data?.message || "ขยายวันที่ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง", "error");
       }
     };
