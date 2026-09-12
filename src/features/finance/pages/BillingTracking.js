@@ -59,7 +59,15 @@ export default function BillingTracking() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [tab, setTab] = useState("attention");
+  /* ✅ เปิดแท็บที่ลิงก์เจาะจงมาให้เลย — แจ้งเตือน "บิลเลยกำหนดชำระ" ส่งลิงก์ ?status=overdue มา
+     🐛 ก่อนหน้านี้กดแจ้งเตือนแล้วมาโผล่แท็บ "ต้องตาม" ทุกครั้ง ผู้ใช้ต้องกดหาแท็บเองทั้งที่ระบบ
+     บอกมาแล้วว่าเรื่องอะไร
+     ⚠️ ใช้ชื่อ status ไม่ใช่ tab — หน้ารวมการเงินใช้ tab เลือกว่าจะเปิดแท็บ "วางบิล" หรือ
+     "ใบเสนอราคา" อยู่แล้ว ถ้าใช้ชื่อซ้ำกันจะแย่งกันเอง (ดู LegacyTabRedirect ใน router) */
+  const [tab, setTab] = useState(() => {
+    const wanted = new URLSearchParams(window.location.search).get("status");
+    return TABS.some((t) => t.key === wanted) ? wanted : "attention";
+  });
   const [page, setPage] = useState(1);
   const [target, setTarget] = useState(null);   // งานที่กำลังเปิดกล่องจัดการ
 

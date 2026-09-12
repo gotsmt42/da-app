@@ -220,6 +220,34 @@ const rememberCardState = (id, expanded) => {
   else cardPrefs.ex.add(key);
 };
 
+/**
+ * ล้าง "สถานะกดค้าง" ที่ FullCalendar ทิ้งค้างไว้หลังลากเสร็จ
+ *
+ * 🐛 อาการที่ผู้ใช้แจ้ง: ลากย้ายวันหรือสลับลำดับเสร็จแล้ว การ์ดยังดูเหมือนถูกกดค้างอยู่
+ * ⚠️ ตรวจจริงแล้วพบว่าไม่ใช่ของเรา — คลาส/inline style ของตัวลากจัดลำดับถูกล้างครบทุกครั้ง
+ * สิ่งที่ค้างคือของ FullCalendar เอง 2 อย่าง และค้างยาวเกิน 3.5 วินาทีโดยไม่หายไปเอง:
+ *   • .fc-event-selected — สถานะ "ถูกเลือก" ที่มันติดให้ตอนกดค้างบนทัชสกรีน ปกติจะหายเมื่อแตะที่ว่าง
+ *     แต่พอการลากถูกเราเข้าไปคุม/คืนค่า มันเลยไม่มีจังหวะนั้น
+ *   • .fc-event-mirror — "เงา" ที่มันสร้างไว้ตามนิ้วระหว่างลาก ซึ่งเป็นสำเนาลอย ไม่ใช่การ์ดจริง
+ * ✅ ล้างทิ้งตอนที่การลากจบแล้วเท่านั้น จึงปลอดภัย — ถ้า FullCalendar วาดใหม่ มันสร้างจาก state
+ * ของตัวเองอยู่แล้ว (เงาเป็นของชั่วคราวระหว่างลาก ไม่มีที่ยืนใน state หลังลากจบ)
+ */
+const clearStuckDragLook = () => {
+  document.querySelectorAll(".fc-event-selected").forEach((el) => el.classList.remove("fc-event-selected"));
+  document.querySelectorAll(".fc-event-dragging").forEach((el) => el.classList.remove("fc-event-dragging"));
+  document.querySelectorAll(".fc-event-mirror").forEach((el) => {
+    // เงาถูกห่อไว้ใน harness ของตัวเอง — เก็บทั้งกล่องไม่ให้เหลือช่องว่างค้าง
+    (el.closest(".fc-daygrid-event-harness") || el).remove();
+  });
+};
+
+/** เรียกซ้ำอีกครั้งหลัง FullCalendar วาดรอบถัดไป เผื่อมันติดคลาสกลับมาระหว่างนั้น */
+const clearStuckDragLookSoon = () => {
+  clearStuckDragLook();
+  setTimeout(clearStuckDragLook, 80);
+  setTimeout(clearStuckDragLook, 450);
+};
+
 function EventCalendar() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -328,6 +356,24 @@ function EventCalendar() {
     isServiceObserver || isJobParticipant(extendedProps) || canViewEventAsTeamMember(extendedProps);
 
   const [events, setEvents] = useState([]);
+  /* 🐛 จอกระตุกตอนเปิดหน้า (วัดได้ CLS 0.186 — เกินเกณฑ์ "ดี" ที่ 0.1 สองเท่า):
+     ปฏิทินถูกวาดทันทีตั้งแต่ยังไม่มีข้อมูล ทุกแถวจึงเตี้ยเท่ากันหมด พอข้อมูลมาถึง (ราว 1.2 วินาที)
+     แถวที่มีงานก็ยืดขึ้นพรวดเดียว ดันแถวล่างทั้งหมดเลื่อนลง — ถ้าผู้ใช้กำลังจะแตะอะไรอยู่พอดี
+     จะกดพลาดไปโดนของที่เลื่อนมาแทน
+     ✅ กันด้วยการไม่โชว์ตารางเปล่าเลย: จองความสูงไว้ก่อนแล้วค่อยเผยตารางตอนข้อมูลพร้อม
+     ผู้ใช้จึงเห็นปฏิทินที่ "สูงเท่าของจริง" ตั้งแต่เฟรมแรกที่มองเห็น ไม่มีการกระตุกให้เห็นอีก */
+  const [firstEventsLoaded, setFirstEventsLoaded] = useState(false);
+  /** ความสูงจริงของปฏิทินจากการเปิดครั้งก่อน — ใช้จองที่ระหว่างโหลด จะได้ไม่ดันของที่อยู่ใต้ปฏิทิน
+      (แผงคำอธิบาย/ท้ายหน้า) ให้เลื่อนตอนตารางโผล่ · ครั้งแรกสุดยังไม่มีค่าให้ใช้ ก็ใช้ 62vh ไปก่อน */
+  const CAL_H_KEY = "eventCalendar.lastHeight";
+  const [bootMinHeight] = useState(() => {
+    try {
+      const n = Number(localStorage.getItem(CAL_H_KEY));
+      if (Number.isFinite(n) && n > 200 && n < 4000) return `${n}px`;
+    } catch { /* อ่านไม่ได้ก็ใช้ค่าเริ่มต้น */ }
+    // ค่าเริ่มต้นสำหรับการเปิดครั้งแรกสุดในเครื่องนั้น — วัดจริงบนมือถือได้ราว 80% ของความสูงจอ
+    return "80vh";
+  });
 
   const [defaultTextColor, setDefaultTextColor] = useState("#FFFFFF"); // สีข้อความเริ่มต้น
   // ⚠️ เดิมใช้สีแดง #dc2626 (สีแบรนด์หลัก) เป็นค่าเริ่มต้น แต่สีแดงตอนนี้ถูกใช้สื่อความหมายอื่นไปแล้ว
@@ -373,7 +419,13 @@ function EventCalendar() {
    * ✅ อยากอ่านรายละเอียดชัดๆ ค่อยกด + ทีละระดับ (แล้วค่อยปัดดู) — เลือกเองได้ตามสถานการณ์
    * ⚠️ เก็บเป็น "ระดับ" ไม่ใช่ตัวเลข px — ระดับ 0 ต้องหมายถึงพอดีจอเสมอไม่ว่าจอกว้างเท่าไหร่
    */
-  const MOBILE_ZOOM_STEPS = [0, 95, 120, 150, 185, 220];
+  /* 🐛 BUG ที่แก้ (วัดจริงที่จอ 768px: กด + แล้วคอลัมน์ยัง 107px เท่าเดิม):
+     เดิมเก็บเป็น "ความกว้างคอลัมน์เป็น px ตายตัว" [0, 95, 120, ...] ซึ่งแปลว่าระดับที่เล็กกว่าคอลัมน์
+     ธรรมชาติของจอนั้นจะไม่มีผลอะไรเลย — บนแท็บเล็ต 768px คอลัมน์กว้าง 107px อยู่แล้ว การกด +
+     ครั้งแรก (95px) จึงเหมือนปุ่มเสีย ต้องกดสองทีถึงจะเริ่มขยาย
+     ✅ เก็บเป็น "สัดส่วนของความกว้างจอ" แทน — ทุกระดับกว้างกว่าจอเสมอไม่ว่าจอไหน กดแล้วขยายจริง
+     ทุกครั้ง และได้สัดส่วนเท่ากันทั้งมือถือเล็กและแท็บเล็ต (ดู --ec-m-zoom ใน index.css) */
+  const MOBILE_ZOOM_STEPS = [0, 1.35, 1.7, 2.15, 2.7, 3.3];
   const [mobileZoom, setMobileZoom] = useState(() => {
     try {
       const raw = localStorage.getItem(MOBILE_COL_KEY + (userData?.userId || "anonymous"));
@@ -439,7 +491,17 @@ function EventCalendar() {
   // ⚠️ deps มี viewingDept — สลับเมนู "ตารางงานช่าง" ↔ "ตารางงานเซล" เปลี่ยนแค่ query param
   // โดยไม่ remount หน้า ถ้าไม่ใส่ deps ปฏิทินจะค้างข้อมูลของแผนกเดิมจนกว่าจะรีเฟรช
   useEffect(() => {
-    fetchEventsFromDB();
+    // ✅ รอผลโหลดครั้งแรกก่อนค่อยเปิดตารางให้เห็น (ดู firstEventsLoaded) — กันจอกระตุกตอนเปิดหน้า
+    fetchEventsFromDB().finally(() => {
+      setFirstEventsLoaded(true);
+      // จำความสูงจริงไว้ให้การเปิดครั้งหน้าจองที่ได้พอดี (ดู bootMinHeight)
+      requestAnimationFrame(() => {
+        const h = document.querySelector(".calendar-wrapper .fc-view-harness")?.getBoundingClientRect().height;
+        if (h > 200) {
+          try { localStorage.setItem(CAL_H_KEY, String(Math.round(h))); } catch { /* โควตาเต็ม — ข้าม */ }
+        }
+      });
+    });
     fetchDrafts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewingDept]);
@@ -687,16 +749,42 @@ function EventCalendar() {
      ⚠️ ราก: FullCalendar ตัดสินว่า "แตะ" จากนิ้วที่อยู่นิ่ง แล้วยิง dateClick/eventClick เอง
      ไม่ได้รอ click ของเบราว์เซอร์ (ซึ่งจะไม่ยิงหลัง pinch/scroll อยู่แล้ว) จึงกันด้วย preventDefault
      ที่ระดับเบราว์เซอร์ไม่ได้ ต้องมาตัดสินเองว่าการสัมผัสครั้งนั้น "เป็นการแตะจริงหรือเปล่า"
-     ✅ นับว่าเป็นการแตะจริงก็ต่อเมื่อ: นิ้วเดียว · ขยับไม่เกิน 12px · ไม่เกิน 700ms · หน้าจอไม่ได้เลื่อน
+     ✅ นับว่าเป็นการแตะจริงก็ต่อเมื่อ: นิ้วเดียว · ขยับไม่เกิน 12px · ไม่เกิน 300ms · หน้าจอไม่ได้เลื่อน
      ถ้าไม่เข้าเกณฑ์ → ปิดการเปิดฟอร์มไว้ 500ms (เผื่อ event ที่ค้างในคิวยิงตามมาทีหลัง)
-     ⚠️ "กดค้างแล้วเปลี่ยนใจปล่อยเฉยๆ" ไม่พึ่งเกณฑ์ 700ms นี้แล้ว — ตอนที่การลากจัดลำดับจับติดจริง
-     มันจะสั่งปิดการเปิดฟอร์มเองทันที (ดู beginDrag) เพราะเวลากดค้างถูกลดเหลือ 240ms ซึ่งสั้นกว่า
-     700ms มาก การพึ่งลำดับเวลาสองค่านี้จึงใช้ไม่ได้อีกต่อไป */
+     ⚠️ "นิ้วเดียว" ในที่นี้เข้มกว่าที่เห็น — isPinching() เช็ก touchCountRef ด้วย จึงเปิดงานไม่ได้เลย
+     ตลอดเวลาที่ยังมีนิ้วมากกว่าหนึ่งแตะจออยู่ ไม่ว่าจะจับเวลาได้เท่าไหร่ */
   const suppressUntilRef = useRef(0);
+  /* ── ธงร่วมของ "การลากจัดลำดับ" ── ต้องอยู่ระดับคอมโพเนนต์เพราะมีคนอ่าน 3 ที่ซึ่งอยู่คนละ useEffect
+     • clickSuppressRef — เวลาที่ต้องกลืนคลิกถัดไปทิ้ง (ตั้งตอนลากเสร็จ) ทั้งตัวกลืนคลิกของการลากเอง
+       และตัวจัดการปุ่มพับ/กาง ⚠️ ปุ่มพับลงทะเบียน listener แบบ capture ไว้ "ก่อน" ตัวกลืนคลิก
+       (useEffect ของมันอยู่เหนือกว่าในไฟล์) มันจึงทำงานก่อนเสมอและ stopPropagation ไม่ทัน —
+       ต้องให้มันเช็กธงนี้เองด้วย ไม่งั้นกดค้างที่ปุ่มพับแล้วลาก พอปล่อยนิ้วการ์ดจะพับตามไปด้วย
+     • reorderGuardRef — กันไม่ให้ FullCalendar บันทึกการย้ายวันทับการลากจัดลำดับของเรา (ดู eventDrop) */
+  const clickSuppressRef = useRef(0);
+  const reorderGuardRef = useRef(0);
+  /* ── ธง "กำลังใช้สองนิ้ว" ──
+     🐛 อาการที่ผู้ใช้แจ้ง: หุบ/กางสองนิ้วเพื่อซูม แล้วงานถูกเลื่อน/ย้ายโดยไม่ตั้งใจ
+     ⚠️ ตัวกรองการแตะ (suppressUntilRef) กันได้แค่ "การเปิดฟอร์ม" เท่านั้น ส่วนการลากเป็นคนละเรื่อง
+     และจะเช็กด้วย suppressUntilRef แทนไม่ได้ เพราะค่านั้นถูกตั้งจากหลายสาเหตุ (ปัด/กดค้างเกิน
+     300ms/จอเลื่อน) ซึ่งเกิดระหว่างการลากจริงเป็นปกติอยู่แล้ว — ถ้าเอามาใช้จะบล็อกการลากที่ตั้งใจทิ้งหมด
+     ✅ จึงต้องมีธงแยกที่ตั้งจาก "มีนิ้วมากกว่าหนึ่ง" ล้วนๆ */
+  const pinchGuardRef = useRef(0);
+  /** จำนวนนิ้วที่แตะจออยู่ "ตอนนี้" — อัปเดตจากตัวสังเกตการณ์สัมผัสด้านล่าง
+      ⚠️ ต้องเป็นเงื่อนไขตรงๆ ไม่ใช่พึ่งลำดับเหตุการณ์ — การกันแบบ "พอนิ้วที่สองลงมาแล้วค่อยยกเลิก"
+      ยังเหลือช่องให้การ์ดตอบสนองอยู่ (เช่น ตัวนับเวลากดค้างที่ตั้งไว้ก่อนนิ้วที่สองจะมาถึง) ผู้ใช้จึงยัง
+      เห็นการ์ดขยับ/สั่นระหว่างจะซูม · เช็กจำนวนนิ้ว ณ วินาทีที่จะลงมือ = ปิดทุกช่องพร้อมกัน */
+  const touchCountRef = useRef(0);
   useEffect(() => {
     const COOLDOWN = 500;
     const MOVE_SLOP = 12;
-    const MAX_TAP_MS = 700;
+    /* 🐛 700ms → 300ms (ผู้ใช้แจ้ง: "แค่ค้าง 1 นิ้วพอ ไม่ให้กดอะไรได้")
+       เดิมนับว่าเป็น "การแตะ" ได้ยาวถึง 700ms — วางนิ้วแช่ไว้ครึ่งวินาทีแล้วยกขึ้น ฟอร์มก็ยังเด้ง
+       ทั้งที่ผู้ใช้แค่พักนิ้วอยู่บนจอ (ซึ่งเกิดตลอดเวลาเวลาถือมือถือมือเดียว หรือวางนิ้วก่อนจะซูม)
+       ✅ ใช้เกณฑ์เดียวกับเวลากดค้างเพื่อลาก (LONG_PRESS_MS = 300ms) — เหลือเส้นแบ่งเดียวทั้งระบบ:
+       สั้นกว่า 300ms = "แตะ" (เปิดงาน/พับการ์ด) · ตั้งแต่ 300ms ขึ้นไป = "ค้าง" (ลากจัดลำดับ หรือ
+       ไม่ทำอะไรเลยถ้าวันนั้นมีงานใบเดียว) ไม่มีช่วงกำกวมที่ค้างแล้วยังนับเป็นแตะอีกต่อไป
+       ⚠️ ถ้าจะแก้ค่านี้ ต้องแก้ LONG_PRESS_MS ให้ตรงกันเสมอ */
+    const MAX_TAP_MS = 300;
     let st = null; // { x, y, t, scrollY, multi }
 
     const scrollPos = () => {
@@ -707,10 +795,12 @@ function EventCalendar() {
 
     const onStart = (e) => {
       if (!e.touches) return;
+      touchCountRef.current = e.touches.length;
       if (e.touches.length > 1) {
         // นิ้วที่ 2 ลง = กำลังซูม — ปิดไว้จนกว่าจะยกครบแล้วพ้น cooldown
         if (st) st.multi = true;
         suppressUntilRef.current = Infinity;
+        pinchGuardRef.current = Infinity;
         return;
       }
       const t = e.touches[0];
@@ -718,6 +808,7 @@ function EventCalendar() {
     };
 
     const onMove = (e) => {
+      if (e.touches) touchCountRef.current = e.touches.length;
       if (!st || !e.touches || e.touches.length !== 1) return;
       const t = e.touches[0];
       if (Math.abs(t.clientX - st.x) > MOVE_SLOP || Math.abs(t.clientY - st.y) > MOVE_SLOP) {
@@ -726,7 +817,11 @@ function EventCalendar() {
     };
 
     const onEnd = (e) => {
+      if (e.touches) touchCountRef.current = e.touches.length;
       if (e.touches && e.touches.length > 0) return; // ยังมีนิ้วเหลือ ยังไม่จบท่า
+      // ⚠️ ต้องเผื่อเวลาหลังยกนิ้วครบด้วย — ตอนหุบสองนิ้วแล้วยก นิ้วสองข้างไม่ได้หลุดพร้อมกันเป๊ะ
+      // เบราว์เซอร์จึงยังยิง event ตามหลังมาอีกพักหนึ่ง และ eventDrop ของ FullCalendar ก็มาทีหลัง
+      if (pinchGuardRef.current === Infinity) pinchGuardRef.current = Date.now() + 700;
       if (suppressUntilRef.current === Infinity) {
         suppressUntilRef.current = Date.now() + COOLDOWN;
         st = null;
@@ -752,8 +847,13 @@ function EventCalendar() {
       document.removeEventListener("touchcancel", onEnd, true);
     };
   }, []);
-  /** true = สัมผัสครั้งล่าสุดไม่ใช่ "การแตะที่ตั้งใจ" (ซูม/ปัด/กดค้าง) → อย่าเพิ่งเปิดฟอร์ม */
-  const isPinching = useCallback(() => Date.now() < suppressUntilRef.current, []);
+  /** true = สัมผัสครั้งล่าสุดไม่ใช่ "การแตะที่ตั้งใจ" (ซูม/ปัด/กดค้าง) → อย่าเพิ่งเปิดฟอร์ม
+      ⚠️ เช็ก "มีนิ้วมากกว่าหนึ่งอยู่ตอนนี้" ด้วย ไม่ใช่แค่ค่าเวลาที่ตั้งไว้ — ระหว่างที่สองนิ้วยังแตะจอ
+      อยู่ ต้องเปิดงานไม่ได้เลยไม่ว่ากรณีใด ให้ซูมได้อย่างเดียวตามที่ผู้ใช้ต้องการ */
+  const isPinching = useCallback(
+    () => touchCountRef.current > 1 || Date.now() < suppressUntilRef.current,
+    [],
+  );
 
   // ⚠️ generateWorkPermitPDF (+ Functions/GenPDF.js) ถูกลบทิ้งแล้ว — ใบแจ้งเข้าปฏิบัติงานย้ายไปออก
   // ผ่านกล่อง WorkNoticeDialog แบบเดียวกับใบส่งมอบงาน (ดู workNoticeJob ด้านล่าง) ซึ่งแก้ไขทุกช่องได้
@@ -1513,9 +1613,14 @@ function EventCalendar() {
   // เราแค่เรียก API ย้ายสถานะจริงแล้ว fetch ใหม่ทับ ไม่ต้องยุ่งกับตำแหน่ง event บนปฏิทินเอง)
   const handleEventDragStop = (info) => {
     draftsPanelRef.current?.classList.remove("unscheduled-panel--drop-target");
+    // ลากย้ายวันเสร็จแล้วการ์ดต้องกลับมาเป็นปกติ ไม่ค้างสถานะกดค้างไว้ (ดูหัวฟังก์ชัน)
+    clearStuckDragLookSoon();
 
     const panelEl = draftsPanelRef.current;
     if (!panelEl || info.event.extendedProps?.isHoliday) return;
+    // ⚠️ ท่าซูมสองนิ้ว/ลากจัดลำดับ ต้องไม่กลายเป็นการ "ย้ายงานกลับไปเป็นแผนงานล่วงหน้า" โดยไม่ตั้งใจ
+    // (เหตุผลเดียวกับที่ eventDrop ต้องเช็ก — ที่นี่เป็นอีกทางที่ข้อมูลถูกเปลี่ยนจากการลากของ FullCalendar)
+    if (Date.now() < pinchGuardRef.current || Date.now() < reorderGuardRef.current) return;
 
     const rect = panelEl.getBoundingClientRect();
     const { clientX, clientY } = info.jsEvent;
@@ -1827,8 +1932,26 @@ function EventCalendar() {
   useEffect(() => {
     let drag = null; // { eventId, moved }
 
-    const findDayCell = (x, y) =>
-      document.elementFromPoint(x, y)?.closest?.(".fc-daygrid-day[data-date]") || null;
+    /**
+     * ช่องวันที่อยู่ "ใต้นิ้ว" จริงๆ
+     *
+     * 🐛 BUG ที่แก้ (ผู้ใช้แจ้ง: "เลื่อนกลับทีละวันไม่ได้"): เดิมใช้ elementFromPoint ตัวเดียว ซึ่งคืน
+     * element บนสุด ณ จุดนั้น — ระหว่างลากย่อ นิ้วจะอยู่เหนือ "แท่งงานหลายวัน" ของตัวเองตลอดทาง
+     * และ closest(".fc-daygrid-day") ของแท่งนั้นคือ "ช่องวันที่งานเริ่ม" เสมอ (แท่งงานหลายวันถูกวาง
+     * ไว้ในช่องวันแรกแล้วยืดพาดข้ามช่องอื่นด้วย position:absolute) ปลายทางจึงถูกอ่านเป็นวันเริ่มทุกครั้ง
+     * = ย่อกลับไม่ได้เลยสักวัน ส่วนการ "ขยาย" ไปทางขวาใช้ได้ เพราะนิ้วพ้นแท่งไปอยู่บนช่องว่างจริง
+     * ✅ ใช้ elementsFromPoint (ทั้งกอง) แล้วมองข้ามทุกอย่างที่อยู่ในแท่งงาน — ได้ช่องวันที่อยู่ใต้จริง
+     */
+    const findDayCell = (x, y) => {
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+      const stack = document.elementsFromPoint?.(x, y) || [];
+      for (const el of stack) {
+        if (el.closest?.(".fc-daygrid-event-harness")) continue; // มองทะลุแท่งงานที่กำลังลากอยู่
+        const cell = el.closest?.(".fc-daygrid-day[data-date]");
+        if (cell) return cell;
+      }
+      return null;
+    };
 
     const clearHighlight = () => {
       document.querySelectorAll(".ec-day-drop-target").forEach((el) => el.classList.remove("ec-day-drop-target"));
@@ -1847,6 +1970,7 @@ function EventCalendar() {
     const onDown = (e) => {
       // ⚠️ กดที่ปุ่มพับ/กางการ์ด ต้องไม่เริ่มลากงาน — หยุดตั้งแต่ capture phase เหมือน data-ec-resize
       // (ดูเหตุผลเต็มที่คอมเมนต์ด้านบน) ไม่งั้นแค่แตะปุ่มก็กลายเป็นลากงานย้ายวันทันทีบนทัชสกรีน
+      if ((e.touches && e.touches.length > 1) || touchCountRef.current > 1) return abortResize();
       if (e.target.closest?.('[data-ec-toggle="1"]')) {
         e.stopPropagation();
         return;
@@ -1860,27 +1984,57 @@ function EventCalendar() {
       if (!handle) return;
       e.preventDefault();
       e.stopPropagation();
-      drag = { eventId: handle.dataset.eventId, moved: false };
+      drag = { eventId: handle.dataset.eventId, moved: false, handle };
       document.body.style.userSelect = "none";
+      handle.classList.add("is-resizing");
+      // สั่นตอบรับสั้นๆ ให้รู้ว่าจับแท่งติดแล้ว (ชุดเดียวกับตอนกดค้างเพื่อสลับลำดับ)
+      try {
+        navigator.vibrate?.(10);
+      } catch {
+        /* บางเบราว์เซอร์ไม่รองรับ — ไม่ใช่เรื่องสำคัญ */
+      }
+    };
+
+    /** คืนหน้าตาแท่งจับหลังจบการลาก ไม่ว่าจะจบแบบไหน */
+    const clearHandleLook = (d) => d?.handle?.classList.remove("is-resizing");
+
+    /** นิ้วที่สองแตะลงมาระหว่างลากขยายวัน = กำลังจะซูม ไม่ใช่จะขยายงาน — ทิ้งทั้งดุ้นโดยไม่บันทึก
+        (เหตุผลเดียวกับ abortDrag ของการลากจัดลำดับ) */
+    const abortResize = () => {
+      if (!drag) return;
+      clearHandleLook(drag);
+      drag = null;
+      document.body.style.userSelect = "";
+      clearHighlight();
+      clearStuckDragLookSoon();
     };
 
     const onMove = (e) => {
+      if ((e.touches && e.touches.length > 1) || touchCountRef.current > 1) return abortResize();
       if (!drag) return;
       drag.moved = true;
       const { clientX, clientY } = getPoint(e);
+      // ⚠️ จำจุดล่าสุดไว้ด้วย — ตอนปล่อยนิ้ว บาง event ไม่มี changedTouches ให้อ่านพิกัด ถ้าไม่มีตัวสำรอง
+      // การลากจะจบแบบ "ไม่เกิดอะไรขึ้นเลย" โดยไม่มีอะไรบอกผู้ใช้ว่าทำไม
+      drag.lastX = clientX;
+      drag.lastY = clientY;
       clearHighlight();
       findDayCell(clientX, clientY)?.classList.add("ec-day-drop-target");
     };
 
     const onUp = async (e) => {
       if (!drag) return;
-      const { eventId, moved } = drag;
+      const { eventId, moved, lastX, lastY } = drag;
+      clearHandleLook(drag);
       drag = null;
       document.body.style.userSelect = "";
       clearHighlight();
+      clearStuckDragLookSoon();
       if (!moved) return; // แค่กดเฉยๆ ไม่ได้ลาก ไม่ต้องทำอะไร (กันชนกับการคลิกเปิดฟอร์มแก้ไข)
 
-      const { clientX, clientY } = getPoint(e);
+      const p = getPoint(e);
+      const clientX = Number.isFinite(p?.clientX) ? p.clientX : lastX;
+      const clientY = Number.isFinite(p?.clientY) ? p.clientY : lastY;
       const cell = findDayCell(clientX, clientY);
       const targetDateStr = cell?.getAttribute("data-date");
       if (!targetDateStr) return;
@@ -1895,7 +2049,11 @@ function EventCalendar() {
         });
         return;
       }
-      if (targetDateStr === startDateStr) return; // ลากกลับที่เดิม ไม่มีอะไรเปลี่ยน
+      // ✅ ลากกลับมาที่วันเริ่ม = "ย่อกลับเหลือวันเดียว" ซึ่งต้องทำได้ ไม่งั้นขยายไปแล้วย่อกลับไม่ได้เลย
+      // ⚠️ ยกเว้นงานที่ยังเป็นนัดตรงเวลา (allDay:false) และกินวันเดียวอยู่แล้ว — กรณีนั้นลากกลับที่เดิม
+      // ไม่ได้เปลี่ยนอะไร และไม่ควรไปแปลงมันเป็นงานทั้งวันโดยที่ผู้ใช้ไม่ได้ตั้งใจ
+      const spansMultipleDays = moment(ev.end).diff(moment(startDateStr), "days") > 1;
+      if (targetDateStr === startDateStr && !spansMultipleDays) return;
 
       try {
         await EventService.UpdateEvent(eventId, {
@@ -1906,7 +2064,9 @@ function EventCalendar() {
         await fetchEventsFromDB();
         Swal.fire({
           toast: true, position: "top", icon: "success",
-          title: `ขยายเป็น ${moment(startDateStr).locale("th").format("D MMM")} – ${moment(targetDateStr).locale("th").format("D MMM YYYY")}`,
+          title: targetDateStr === startDateStr
+            ? `ย่อเหลือวันเดียว: ${moment(startDateStr).locale("th").format("D MMM YYYY")}`
+            : `ขยายเป็น ${moment(startDateStr).locale("th").format("D MMM")} – ${moment(targetDateStr).locale("th").format("D MMM YYYY")}`,
           showConfirmButton: false, timer: 2200,
         });
       } catch (err) {
@@ -2153,6 +2313,11 @@ function EventCalendar() {
     };
 
     const onToggleClick = (e) => {
+      // ⚠️ เพิ่งลากจัดลำดับเสร็จ = คลิกนี้เป็นของแถมจากการปล่อยนิ้ว ไม่ใช่เจตนาจะพับการ์ด
+      // (ดูเหตุผลที่ต้องเช็กเองตรงนี้ที่ clickSuppressRef)
+      // ⚠️ และระหว่าง/หลังซูมสองนิ้ว การ์ดต้องนิ่งสนิท ไม่พับไม่กางเอง (ดู pinchGuardRef)
+      if (Date.now() < clickSuppressRef.current) return;
+      if (touchCountRef.current > 1 || Date.now() < pinchGuardRef.current) return;
       const btn = e.target.closest?.('[data-ec-toggle="1"]');
       if (!btn) return;
       e.preventDefault();
@@ -2231,9 +2396,8 @@ function EventCalendar() {
     // ⚠️ ใช้ "หมดอายุเองตามเวลา" ไม่ใช่ธงบูลีนที่รอให้ click มาล้าง — ถ้าปล่อยเมาส์นอก element เดิม
     // (ซึ่งเกิดตลอดเวลาเวลาลากไกลๆ) เบราว์เซอร์จะไม่ยิง click เลย ธงจะค้าง true แล้วไปกลืนคลิกจริง
     // ครั้งถัดไปของผู้ใช้แทน — กลายเป็นว่าคลิกการ์ดแล้วฟอร์มไม่เปิด ซึ่งแย่กว่าปัญหาเดิมอีก
-    let suppressClicksUntil = 0;
     const onClickCapture = (e) => {
-      if (Date.now() > suppressClicksUntil) return;
+      if (Date.now() > clickSuppressRef.current) return;
       e.preventDefault();
       e.stopPropagation();
     };
@@ -2270,14 +2434,28 @@ function EventCalendar() {
        ตั้งใจจะลากหรือแค่ปัดดู · รอให้ครบเวลากดค้างก่อนแล้วค่อยเริ่มลาก (ตอนนั้น onMove จะ
        preventDefault ให้เอง) ถ้านิ้วขยับเกินระยะเผื่อก่อนครบเวลา = ตั้งใจปัด ไม่ใช่ลาก → ยกเลิก
 
-       🐛 ที่แก้ (ผู้ใช้แจ้ง: "กดค้าง...นานเกินไป และทำได้ยาก"):
-       • 420ms → 240ms — ใกล้เคียงจังหวะกดค้างของ iOS/Android ที่มือคุ้นอยู่แล้ว
-       • ระยะเผื่อนิ้วสั่น 10px → 16px — นิ้วมนุษย์ขยับเล็กน้อยเสมอระหว่างกดค้าง ค่าเดิมแคบไปจน
-         การกดค้างถูกตีความเป็น "ตั้งใจปัด" แล้วยกเลิกทิ้งบ่อยๆ = อาการ "จับไม่ค่อยติด"
+       🐛 ที่แก้ (ผู้ใช้แจ้ง 2 รอบ — รอบแรก "นานเกินไป ทำได้ยาก" รอบสอง "ไวเกินไป พลาดง่าย"):
+       • 420ms → 240ms → 300ms — 420ms นานจนรู้สึกจับไม่ติด ส่วน 240ms ไวจนเผลอเข้าโหมดลาก
+         ระหว่างจะแตะหรือปัดดูเฉยๆ · 300ms คือจังหวะกดค้างมาตรฐานของรายการที่ลากจัดลำดับได้
+       • ระยะเผื่อนิ้วสั่น 8px — เคยลองขยายเป็น 16px เพื่อแก้อาการ "จับไม่ค่อยติด" แต่วัดแล้วพบว่า
+         ค่ากว้างๆ ทำให้การปัดเลื่อนช้า (~3px ต่อเฟรม) วิ่งไม่พ้นเกณฑ์ก่อนตัวนับ 300ms จะครบ กลายเป็น
+         แข่งกันว่าใครถึงก่อน ผลจึงไม่คงที่ — บางครั้งเลื่อนดูเฉยๆ แล้วเข้าโหมดลาก · 8px ตัดสินได้ตั้งแต่
+         ~150ms ซึ่งพ้นจากการแข่งเวลาชัดเจน และยังกว้างพอสำหรับนิ้วสั่นตอนกดค้างจริง (ปกติ 1–3px)
+         ⚠️ ต้นเหตุจริงของ "จับไม่ค่อยติด" ไม่ใช่ค่านี้ แต่เป็นพื้นที่ตายบนการ์ด ซึ่งแก้ที่ onDown ไปแล้ว
+         (จาก 82% เป็นใช้ได้เต็ม 100% ของพื้นที่การ์ด) — อย่าขยายค่านี้เพื่อแก้อาการนั้นอีก
+       • ยกเลิกทันทีถ้าหน้าจอเลื่อนจริงระหว่างนับเวลา (ดู scrollPos ใน onMove) — กันเคสที่ปัดช้าๆ
+         แล้วดันเข้าโหมดลากทั้งที่ตั้งใจจะเลื่อนดูปฏิทิน ซึ่งเป็นความผิดพลาดที่เจอง่ายสุด
        • เพิ่มการสั่นตอบรับ + ไฟวิ่งรอบการ์ด ตอนจับติด (ดู beginDrag) — เดิมไม่มีสัญญาณอะไรบอกเลย
-         ว่าครบเวลาแล้ว ผู้ใช้จึงต้องเดาเอง แล้วมักปล่อยก่อนเวลา */
-    const LONG_PRESS_MS = 240;
-    const LONG_PRESS_SLOP = 16;
+         ว่าครบเวลาแล้ว ผู้ใช้จึงต้องเดาเอง แล้วมักปล่อยก่อนเวลา
+       ⚠️ ค่านี้ต้องต่ำกว่า eventLongPressDelay ของ FullCalendar อย่างมีช่องว่างพอสมควร — ดูเหตุผล
+       ที่บล็อกตั้งค่าปฏิทินด้านล่าง */
+    const LONG_PRESS_MS = 300;
+    const LONG_PRESS_SLOP = 8;
+    /** ตำแหน่งการเลื่อนหน้าจอรวม ใช้ดูว่า "ปฏิทินเลื่อนจริงไหม" ระหว่างกำลังนับเวลากดค้าง */
+    const scrollPos = () => {
+      const sc = document.querySelector(".fc-scroller");
+      return (window.scrollY || 0) + (sc ? sc.scrollTop : 0);
+    };
     let pending = null; // { timer, x, y, harness }
 
     const cancelPending = () => {
@@ -2287,6 +2465,9 @@ function EventCalendar() {
     };
 
     const beginDrag = (harness, clientY) => {
+      // ⚠️ ด่านสุดท้ายก่อนลงมือ — ถ้ามีนิ้วมากกว่าหนึ่งแตะอยู่ ณ วินาทีนี้ แปลว่ากำลังซูม ไม่ใช่จะลาก
+      // เช็กตรงนี้เพราะตัวนับเวลาถูกตั้งไว้ตั้งแต่ตอนนิ้วเดียว สถานการณ์อาจเปลี่ยนไปแล้วระหว่างรอ
+      if (touchCountRef.current > 1) return false;
       const items = peersOf(harness);
       if (items.length < 2) return false; // ไม่มีใครแย่งชั้นด้วย ก็ไม่มีอะไรให้สลับ
       drag = {
@@ -2307,27 +2488,57 @@ function EventCalendar() {
       } catch {
         /* บางเบราว์เซอร์โยน error ถ้าเรียกโดยไม่มี user gesture ที่มันยอมรับ — ไม่ใช่เรื่องสำคัญ */
       }
-      // ⚠️ ปิดการเปิดฟอร์มไว้ตั้งแต่วินาทีที่จับติด — พอกดค้างสั้นลงเหลือ 240ms การ "กดค้างแล้ว
+      // ⚠️ ปิดการเปิดฟอร์มไว้ตั้งแต่วินาทีที่จับติด — พอกดค้างสั้นลงเหลือ 300ms การ "กดค้างแล้ว
       // เปลี่ยนใจปล่อยเฉยๆ" จะสั้นกว่าเกณฑ์การแตะ (MAX_TAP_MS) ได้ง่ายมาก ถ้าไม่ปิดไว้ตรงนี้
       // ฟอร์มแก้ไขงานจะเด้งขึ้นมาทุกครั้งที่ผู้ใช้ยกเลิกการลาก (ค่านี้ถูกแปลงเป็น cooldown ปกติ
       // ตอนยกนิ้ว — ดูตัวกรองการแตะที่ต้นไฟล์)
       suppressUntilRef.current = Infinity;
+      // ⚠️ ต้องตั้งตั้งแต่ "เริ่มลาก" ไม่ใช่รอตอนปล่อยนิ้ว — ลำดับการทำงานระหว่าง onUp ของเรากับ
+      // eventDrop ของ FullCalendar ตอน touchend ไม่ได้การันตีว่าใครก่อน (ดู eventDrop)
+      // ⚠️ ใช้เวลาหมดอายุยาวๆ ไม่ใช่ Infinity — onUp จะย่นให้เหลือ 600ms ทุกครั้งที่ปล่อยนิ้วอยู่แล้ว
+      // ค่านี้เป็นแค่ตาข่ายกันเหนียวเผื่อ onUp ไม่ได้ทำงาน · ถ้าใช้ Infinity แล้วพลาดขึ้นมาจริง
+      // การลากย้ายวันของ FullCalendar จะถูกบล็อกถาวรจนกว่าจะรีเฟรชหน้า ซึ่งแย่กว่าเดิมมาก
+      reorderGuardRef.current = Date.now() + 60000;
       return true;
     };
 
     const onDown = (e) => {
+      // ⚠️ มีนิ้วมากกว่าหนึ่ง = กำลังจะซูม ไม่ใช่จะลาก — ทิ้งทั้งตัวนับเวลาและการลากที่เริ่มไปแล้ว
+      // ต้องเช็กก่อนทุกอย่าง รวมถึงก่อนกรณีปุ่มจับลากด้วย
+      // (เช็ก touchCountRef ด้วยเผื่อ touchstart ของนิ้วอื่นถูกกลืนไประหว่างทางจนตัวเลขใน e ไม่ครบ)
+      if ((e.touches && e.touches.length > 1) || touchCountRef.current > 1) {
+        // 🐛 ที่แก้ (ผู้ใช้แจ้ง: "อีกนิ้วกดจอค้างไว้ แล้วอีกนิ้วยังกดการ์ดค้างเพื่อย้ายได้อยู่"):
+        // ตัวที่ย้ายงานในเคสนี้คือ FullCalendar เอง ซึ่งนับนิ้วแรกที่มันเจอเป็นหลักและไม่สนว่าจอมีกี่นิ้ว
+        // การยกเลิกฝั่งเราอย่างเดียวจึงไม่พอ ต้องไม่ให้ touchstart ของนิ้วที่สองไปถึงมันตั้งแต่แรก
+        // ⚠️ หยุดที่ capture phase ของ document = ตัวจัดการของ FullCalendar (ผูกไว้ที่ document
+        // เหมือนกันแต่เป็น bubble) จะไม่ได้รับ event นี้เลย มันจึงไม่เริ่มจับเวลาลากย้ายวัน
+        e.stopPropagation();
+        return abortDrag();
+      }
       const grip = e.target.closest?.('[data-ec-grip="1"]');
       if (!grip) {
         // ไม่ได้จับที่ปุ่มจับ — ถ้าเป็นการสัมผัสนิ้วเดียวบนการ์ด ให้เริ่มนับเวลากดค้าง
         if (e.type !== "touchstart" || (e.touches && e.touches.length !== 1)) return cancelPending();
         const card = e.target.closest?.("[data-ec-card]");
         if (!card) return;
-        // เว้นปุ่ม/ลิงก์ "ที่อยู่ข้างในการ์ด" ไว้ (ปุ่มพับ/กาง, ลิงก์โทรออก) — มีการกดของตัวเองอยู่แล้ว
-        // 🐛 BUG ที่แก้: เดิมเขียน closest("a") เฉยๆ ซึ่ง "ตรงเสมอ" เพราะ FullCalendar ห่อทั้งการ์ด
-        // ไว้ใน <a class="fc-event"> อยู่แล้ว ฟังก์ชันจึง return ทุกครั้ง กดค้างจึงไม่เคยทำงานเลย
-        // ✅ ต้องเช็คว่าลิงก์นั้นอยู่ "ข้างใน" การ์ดจริงๆ (card.contains) ไม่ใช่ตัวห่อที่อยู่ข้างนอก
-        const innerLink = e.target.closest?.("a[href]");
-        if (e.target.closest?.(".ec-card-toggle") || (innerLink && card.contains(innerLink))) return;
+        // ⚠️ แท่งจับลากขยาย/ย่อวันที่ขอบขวามีตัวจัดการของตัวเอง (ดู useEffect ลากขยายวัน) — ต้องไม่
+        // เริ่มนับเวลากดค้างทับ ไม่งั้นครบ 300ms แล้วการสลับลำดับจะเข้ามาแย่งการลากขยายไปกลางคัน
+        // (นี่เป็นการยกเว้นเดียวที่เหลืออยู่ และยกเว้นได้โดยไม่เกิดพื้นที่ตาย เพราะแท่งจับมีหน้าที่ลาก
+        //  อย่างเดียวอยู่แล้ว ไม่ใช่พื้นที่ที่ผู้ใช้จะกดค้างเพื่อสลับลำดับ)
+        if (e.target.closest?.('[data-ec-resize="1"]')) return;
+        /* 🐛 BUG ที่แก้ (ผู้ใช้แจ้ง: "กดแช่เพื่อเลื่อนลำดับ บางทีกดได้ บางทีไม่ได้"):
+           เดิมตรงนี้ return ทิ้งทันทีถ้านิ้วแตะโดนปุ่มพับ/กาง หรือลิงก์ที่อยู่ในการ์ด ซึ่งฟังดูสมเหตุสมผล
+           แต่พอวัดพื้นที่จริงบนมือถือแล้วพบว่ามันกิน "พื้นที่ตาย" ไปถึง 18% ของการ์ด และไม่ได้กระจาย
+           แบบสุ่ม — มันเกาะเป็นแถบที่นิ้วมักลงพอดี:
+             • เป้ากดปุ่มพับถูกขยายไว้ ~46×27px เกาะมุมขวาบน (ดู .ec-card-toggle::after ใน index.css)
+               บนคอลัมน์กว้างแค่ ~60px มันจึงคลุมแถบบนของการ์ดเกือบเต็มแถว
+             • แถว "เบอร์ติดต่อ" ทั้งแถวถูกห่อด้วย <a href="tel:"> จึงเป็นลิงก์ทั้งแถว
+           กดโดนแถบพวกนี้ = ไม่เริ่มจับเวลาเลย ผู้ใช้จึงเจอว่าบางทีติดบางทีไม่ติดโดยไม่รู้สาเหตุ
+
+           ✅ ให้กดค้างได้ทุกที่บนการ์ด ไม่ต้องยกเว้นอะไรเลย — สองอย่างนี้ไม่ได้ชนกันจริง เพราะ
+           ปุ่มพับ/ลิงก์ทำงานตอน "แตะสั้น" ส่วนการลากทำงานตอน "กดค้าง ≥300ms" และคลิกที่เบราว์เซอร์
+           ยิงตามมาหลังลากถูกกลืนด้วย suppressClicksUntil อยู่แล้ว (ดู onUp) แตะสั้นจึงยังพับการ์ด
+           และกดเบอร์โทรออกได้เหมือนเดิมทุกประการ */
         const h = card.closest(".fc-daygrid-event-harness");
         if (!h || peersOf(h).length < 2) return; // วันนั้นมีงานใบเดียว ไม่มีอะไรให้สลับ
         const p = pointOf(e);
@@ -2335,6 +2546,7 @@ function EventCalendar() {
         pending = {
           x: p.clientX,
           y: p.clientY,
+          scrollY: scrollPos(),
           harness: h,
           timer: setTimeout(() => {
             const target = pending?.harness;
@@ -2372,13 +2584,22 @@ function EventCalendar() {
     };
 
     const onMove = (e) => {
+      // ⚠️ กันไว้อีกชั้นเผื่อ touchstart ของนิ้วที่สองถูกกลืนไประหว่างทาง — พอเห็นสองนิ้วขยับพร้อมกัน
+      // เมื่อไหร่ก็ถือว่ากำลังซูม ทิ้งการลากทันที · และตัดไม่ให้ FullCalendar เห็นการขยับนี้ด้วย
+      // ไม่งั้นถ้ามันเริ่มลากไปก่อนหน้านี้แล้ว การ์ดจะยังวิ่งตามนิ้วอยู่ ทั้งที่ผู้ใช้แค่จะซูม
+      if ((e.touches && e.touches.length > 1) || touchCountRef.current > 1) {
+        e.stopPropagation();
+        return abortDrag();
+      }
       // ยังไม่เริ่มลาก แต่กำลังนับเวลากดค้างอยู่ — ขยับเกินเกณฑ์ = ตั้งใจปัด ไม่ใช่ลาก
       if (pending) {
         const p = pointOf(e);
         if (
           (e.touches && e.touches.length > 1) ||
           Math.abs(p.clientX - pending.x) > LONG_PRESS_SLOP ||
-          Math.abs(p.clientY - pending.y) > LONG_PRESS_SLOP
+          Math.abs(p.clientY - pending.y) > LONG_PRESS_SLOP ||
+          // ปัดช้าๆ จนหน้าจอเลื่อนจริงแต่นิ้วยังไม่พ้นระยะเผื่อ = ตั้งใจเลื่อนดู ไม่ใช่จะลาก
+          Math.abs(scrollPos() - pending.scrollY) > 2
         ) {
           cancelPending();
         }
@@ -2423,14 +2644,37 @@ function EventCalendar() {
       d.harness.classList.remove("ec-reorder-dragging");
     };
 
+    /** 🐛 ยกเลิกการลากทิ้งทั้งหมด "โดยไม่บันทึกอะไรเลย" — ใช้ตอนมีนิ้วที่สองแตะลงมา
+        อาการที่ผู้ใช้แจ้ง: หุบ/กางสองนิ้วเพื่อซูมแล้วงานถูกเลื่อนโดยไม่ตั้งใจ
+        ⚠️ ราก: เดิมพอนิ้วที่สองลงมา โค้ดเรียกแค่ cancelPending() ซึ่งล้างเฉพาะ "ตัวนับเวลากดค้าง"
+        ที่ยังไม่เริ่มลาก — ถ้านิ้วแรกกดค้างครบ 300ms ไปแล้ว การลากเริ่มไปเรียบร้อยและไม่มีอะไรมา
+        หยุดมัน พอกางนิ้วซูม onMove ก็อ่าน touches[0] แล้วเลื่อนการ์ดตามไปเรื่อยๆ ปล่อยนิ้วเมื่อไหร่
+        ก็บันทึกลำดับใหม่ทันที ทั้งที่ผู้ใช้แค่จะซูมดู */
+    const abortDrag = () => {
+      cancelPending();
+      if (!drag) return;
+      const d = drag;
+      drag = null;
+      document.body.style.userSelect = "";
+      clearDragStyles(d);
+      clickSuppressRef.current = Date.now() + 400;
+      reorderGuardRef.current = Date.now() + 800;
+      suppressUntilRef.current = Infinity; // ตัวกรองการแตะจะย่นเป็น cooldown เองตอนยกนิ้วครบ
+      clearStuckDragLookSoon();
+    };
+
     const onUp = async () => {
       cancelPending(); // ยกนิ้วก่อนครบเวลากดค้าง = แตะปกติ ปล่อยให้ทำงานตามเดิม
       if (!drag) return;
       const d = drag;
       drag = null;
       document.body.style.userSelect = "";
-      // กลืนคลิกที่เบราว์เซอร์ยิงต่อท้ายการปล่อยเมาส์ (ถ้ามี) ไม่ให้ไปเปิดฟอร์มแก้ไขงาน
-      suppressClicksUntil = Date.now() + 300;
+      // กลืนคลิกที่เบราว์เซอร์ยิงต่อท้ายการปล่อยเมาส์ (ถ้ามี) ไม่ให้ไปเปิดฟอร์มแก้ไขงาน/พับการ์ด
+      clickSuppressRef.current = Date.now() + 400;
+      // กัน FullCalendar บันทึกการย้ายวันจากการลากครั้งเดียวกันนี้ (ดู eventDrop)
+      reorderGuardRef.current = Date.now() + 600;
+      // คืนหน้าตาการ์ดให้เป็นปกติ — FullCalendar ทิ้งสถานะ "ถูกเลือก" กับเงาลากค้างไว้ (ดูหัวฟังก์ชัน)
+      clearStuckDragLookSoon();
 
       if (!d.moved || d.to === d.from) { clearDragStyles(d); return; }
 
@@ -2457,12 +2701,23 @@ function EventCalendar() {
       }
     };
 
+    /* ⚠️ ตอนนี้กดค้างบนลิงก์เบอร์โทรในการ์ดได้แล้ว (ดู onDown) — เบราว์เซอร์จะเด้งเมนูของระบบ
+       "โทรออก / คัดลอกลิงก์" ขึ้นมาทับตอนกดค้างบนลิงก์ ซึ่งกินการลากไปทั้งดุ้น จึงต้องปิดเมนูนี้
+       ระหว่างที่กำลังนับเวลาหรือกำลังลากอยู่ (คู่กับ -webkit-touch-callout: none ใน index.css
+       ซึ่งจัดการฝั่ง iOS ที่ไม่ได้ยิง contextmenu ให้) */
+    const onContextMenu = (e) => {
+      if (pending || drag) e.preventDefault();
+    };
+
     document.addEventListener("mousedown", onDown, true);
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
     document.addEventListener("click", onClickCapture, true);
+    document.addEventListener("contextmenu", onContextMenu);
     document.addEventListener("touchstart", onDown, { capture: true, passive: false });
-    document.addEventListener("touchmove", onMove, { passive: false });
+    // ⚠️ capture — ต้องถึงก่อน FullCalendar เพื่อ "ตัด" การขยับนิ้วตอนมีหลายนิ้วไม่ให้ไปถึงมัน
+    // (ดู onMove) การซูมของเบราว์เซอร์ไม่ได้พึ่ง listener พวกนี้ จึงยังหุบ/กางนิ้วซูมได้ตามปกติ
+    document.addEventListener("touchmove", onMove, { capture: true, passive: false });
     document.addEventListener("touchend", onUp);
     document.addEventListener("touchcancel", onUp);
     return () => {
@@ -2470,8 +2725,9 @@ function EventCalendar() {
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mouseup", onUp);
       document.removeEventListener("click", onClickCapture, true);
+      document.removeEventListener("contextmenu", onContextMenu);
       document.removeEventListener("touchstart", onDown, true);
-      document.removeEventListener("touchmove", onMove);
+      document.removeEventListener("touchmove", onMove, true);
       document.removeEventListener("touchend", onUp);
       document.removeEventListener("touchcancel", onUp);
       cancelPending();
@@ -2514,7 +2770,7 @@ function EventCalendar() {
   return (
     <div
       className={`modern-calendar-container${mobileZoom > 0 ? " ec-zoomed" : ""}`}
-      style={{ "--ec-m-col": `${mobileColW}px` }}
+      style={{ "--ec-m-zoom": mobileColW }}
     >
       {/* ✅ แถบเดียวกระชับ: ค้นหา + ปุ่มตัวกรอง (มี badge บอกจำนวนที่เลือกไว้) + Export
           แบบไอคอนล้วน — เดิมมีทั้งแถวปุ่ม Export ข้อความยาว + แถวค้นหา + dropdown 2 ตัวโชว์
@@ -2772,8 +3028,13 @@ function EventCalendar() {
             ทั้งฝ่ายช่างและฝ่ายขาย สีคือสิ่งที่บอกทันทีว่ากำลังดูปฏิทินของสายงานไหน */}
         <div
           id="content-id"
-          className={"calendar-wrapper" + (isSalesView ? " ec-sales" : "")}
+          className={
+            "calendar-wrapper" +
+            (isSalesView ? " ec-sales" : "") +
+            (firstEventsLoaded ? "" : " ec-booting")
+          }
           ref={swipeAreaRef}
+          style={firstEventsLoaded ? undefined : { minHeight: bootMinHeight }}
         >
         <FullCalendar
           ref={calendarRef}
@@ -2808,12 +3069,16 @@ function EventCalendar() {
              แยกตั้งทีละตัวแทนที่จะใช้ longPressDelay ตัวรวม เพราะสองงานนี้มีข้อจำกัดไม่เท่ากัน:
 
              • selectLongPressDelay (ลากเลือกช่วงวันบนช่องว่าง) — ไม่ชนกับใคร กดสั้นได้เต็มที่ 200ms
-             • eventLongPressDelay (ย้าย/ขยายตัวงาน) — ต้องทิ้งช่วงให้มากกว่าเวลากดค้างเพื่อ
-               "สลับลำดับในวันเดียวกัน" ของเรา (LONG_PRESS_MS = 240ms) พอสมควร ไม่งั้นสองระบบจะ
-               จับงานใบเดียวกันพร้อมกัน · 400ms ยังเร็วกว่าเดิม 2.5 เท่า และพ้นกันชัดเจน
+             • eventLongPressDelay (ย้าย/ขยายตัวงาน) — ต้องทิ้งช่วงห่างจากเวลากดค้างเพื่อ "สลับลำดับ
+               ในวันเดียวกัน" ของเรา (LONG_PRESS_MS = 300ms) ให้มากพอ · 500ms เร็วกว่าเดิมเท่าตัว
+               และเว้นช่องว่าง 200ms ซึ่งพ้นกันชัดเจน
+             ⚠️ ห้ามลด 500ms ลงมาใกล้ 300ms เด็ดขาด — วัดจริงแล้วพบว่า FullCalendar สร้าง "เงาลาก"
+             ทันทีที่ครบเวลาโดยไม่ต้องรอให้นิ้วขยับเลย ถ้าสองค่าใกล้กันจนผู้ใช้ลังเลแป๊บเดียวก็คร่อมทั้งคู่
+             จะกลายเป็นจับงานใบเดียวกันพร้อมกันสองระบบ แล้วปล่อยนิ้วทีเดียวได้ทั้งสลับลำดับและ
+             ย้ายวันงานจริงในฐานข้อมูล ซึ่งผู้ใช้ไม่ได้สั่ง
              ⚠️ ทั้งคู่ยกเลิกเองทันทีที่นิ้วขยับก่อนครบเวลา การปัดเลื่อนดูปฏิทินจึงไม่กลายเป็นการลากงาน */
           selectLongPressDelay={200}
-          eventLongPressDelay={400}
+          eventLongPressDelay={500}
           droppable={true}
           dateClick={(arg) => {
             if (isPinching()) return; // กำลังหุบ/กางนิ้วซูมอยู่ ไม่ใช่การแตะเลือกวัน
@@ -2840,6 +3105,18 @@ function EventCalendar() {
             }
           }}
           eventDrop={(arg) => {
+            // 🐛 ที่แก้: การกดค้างครั้งเดียวอาจปลุกทั้ง "สลับลำดับในวันเดียวกัน" ของเรา (300ms) และ
+            // ตัวลากของ FullCalendar (500ms) ถ้าผู้ใช้ลังเลก่อนขยับนิ้ว — วัดจริงแล้วพบว่า FullCalendar
+            // สร้างเงาลากทันทีที่ครบเวลาโดยไม่รอให้นิ้วขยับ และไม่ยกเลิกตัวนับเมื่อนิ้วขยับด้วย
+            // ผลคือปล่อยนิ้วทีเดียวได้ทั้งสลับลำดับ "และ" ย้ายวันงานจริงลงฐานข้อมูล ซึ่งผู้ใช้ไม่ได้สั่ง
+            // ✅ ถ้าการลากครั้งนี้เป็นของตัวสลับลำดับ ให้คืนตำแหน่งเดิมแล้วจบ — ตัวสลับลำดับบันทึกผล
+            // ของมันเองอยู่แล้ว (ดู reorderGuardRef)
+            // ⚠️ และถ้าท่านั้นมีสองนิ้ว = กำลังซูม ไม่ใช่ตั้งใจลากย้ายวัน (ดู pinchGuardRef)
+            if (Date.now() < reorderGuardRef.current || Date.now() < pinchGuardRef.current) {
+              arg.revert();
+              clearStuckDragLookSoon(); // คืนค่าแล้วต้องไม่เหลือเงา/สถานะถูกเลือกค้างไว้
+              return;
+            }
             if (arg.event.extendedProps?.isHoliday) {
               Swal.fire("❌ ข้อมูลวันหยุดไม่สามารถแก้ไขได้");
               arg.revert();
@@ -2853,6 +3130,12 @@ function EventCalendar() {
             }
           }}
           eventResize={(arg) => {
+            // เหตุผลเดียวกับ eventDrop ด้านบน (ทั้งการลากจัดลำดับและการซูมสองนิ้ว)
+            if (Date.now() < reorderGuardRef.current || Date.now() < pinchGuardRef.current) {
+              arg.revert();
+              clearStuckDragLookSoon(); // คืนค่าแล้วต้องไม่เหลือเงา/สถานะถูกเลือกค้างไว้
+              return;
+            }
             if (arg.event.extendedProps?.isHoliday) {
               Swal.fire("❌ ข้อมูลวันหยุดไม่สามารถแก้ไขได้");
               arg.revert();
@@ -3031,11 +3314,18 @@ function EventCalendar() {
               ? `<div style="display:inline-block; font-size:0.72em; font-weight:700; padding:0 5px; border-radius:4px; margin-bottom:2px; background:${approvalState === "pending" ? "rgba(245,158,11,.9)" : "rgba(239,68,68,.9)"}; color:#fff;">${approvalState === "pending" ? "⏳ รออนุมัติ" : "❌ ไม่อนุมัติ"}</div>`
               : "";
 
-            // ✅ แท่งจับลากขยายของเราเอง — เฉพาะงานที่มีเวลา (allDay:false) เพราะงาน allDay ลากขยาย
-            // ด้วย eventResize ของ FullCalendar ได้อยู่แล้วตามปกติ (ดูเหตุผลเต็มที่ useEffect ด้านบน
-            // ที่ผูก mousedown/touchstart ไว้ที่ document ทั้งก้อน — data-ec-resize เป็นตัวเชื่อม)
-            const resizeHandleHtml = !arg.event.allDay && canEditEvent(extendedProps)
-              ? `<div class="ec-timed-resize-handle" data-ec-resize="1" data-event-id="${escapeHtml(String(arg.event.id))}" title="ลากเพื่อขยายข้ามวัน"></div>`
+            /* ✅ แท่งจับลากขยาย/ย่อวันของเราเอง — ให้ "งานทุกประเภท" ไม่ใช่เฉพาะงานที่ระบุเวลาอีกต่อไป
+               🐛 เดิมจำกัดไว้ที่ !allDay เพราะเชื่อว่างาน allDay ใช้ตัวลากขยายของ FullCalendar ได้อยู่แล้ว
+               แต่บนทัชสกรีน ตัวของมันจะโผล่ก็ต่อเมื่องานถูก "เลือก" ด้วยการกดค้างก่อน ซึ่งตอนนี้ใช้ไม่ได้
+               แล้ว 2 ทาง: กดค้างบนวันที่มีงานซ้อนถูกตัวสลับลำดับของเรารับไปก่อน (300ms) และสถานะ
+               "ถูกเลือก" ที่ค้างหลังลากถูกเราล้างทิ้ง (ดู clearStuckDragLook) — งาน allDay จึงไม่เหลือ
+               ทางขยายวันบนมือถือเลย
+               ✅ ใช้แท่งจับตัวเดียวกันกับทุกงาน ได้ท่าใช้งานที่แยกกันชัดเจนและไม่ชนกันเอง:
+                  แตะ = เปิดงาน · กดค้าง = สลับลำดับ · ลากแท่งจับขอบขวา = ขยาย/ย่อวัน
+               (ตัวจัดการอยู่ที่ useEffect ซึ่งผูก mousedown/touchstart ไว้ที่ document — data-ec-resize
+               เป็นตัวเชื่อม · วันหยุดแก้ไม่ได้อยู่แล้วจึงไม่ต้องมีแท่งจับ) */
+            const resizeHandleHtml = canEditEvent(extendedProps) && !extendedProps?.isHoliday
+              ? `<div class="ec-timed-resize-handle" data-ec-resize="1" data-event-id="${escapeHtml(String(arg.event.id))}" title="ลากเพื่อขยาย/ย่อวันของงาน"></div>`
               : "";
 
             // ── การ์ดพับ/กางได้ ────────────────────────────────────────────────
@@ -3413,29 +3703,60 @@ function EventCalendar() {
    document) — มุมมองเดือนของ FullCalendar ไม่มี handle ให้งานที่มีเวลาโดยธรรมชาติของมันเอง
    (ดูเหตุผลเต็มที่ตรง useEffect) จึงต้องวาดเองตรงนี้แทน วางที่ขอบขวาของการ์ด กว้างพอกดง่ายบนมือถือ
    แต่ไม่บังเนื้อหา */
+/* ⚠️ เป้ากด (กล่องใส) กับสิ่งที่ตามองเห็น (ขีดเล็กๆ) แยกกันโดยตั้งใจ — กล่องต้องกว้างพอให้นิ้วจับติด
+   แต่สิ่งที่เห็นต้องเล็กและเบา ไม่งั้นมันกลายเป็นแถบทึบบังเนื้อหาการ์ด (เคยทำพลาดมาแล้วรอบหนึ่ง
+   ผู้ใช้แจ้งว่า "ปุ่มมันใหญ่ไปบังหมด")
+   ⚠️ ห้ามสูงเต็มใบ — ต้องเว้นแถวไอคอน/ปุ่มพับที่มุมขวาบนไว้ ไม่งั้นสองอย่างทับกันจนแตะไม่โดนทั้งคู่ */
 .ec-timed-resize-handle {
   position: absolute;
-  top: 0;
   right: 0;
-  bottom: 0;
-  width: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 46%;
+  min-height: 14px;
+  max-height: 24px;
+  width: 11px;
   cursor: ew-resize;
   z-index: 6;
   touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 }
 .ec-timed-resize-handle::after {
   content: "";
-  position: absolute;
-  top: 50%;
-  right: 3px;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 55%;
+  width: 2px;
+  height: 100%;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.55);
+  margin-right: 3px;
+  background: rgba(255, 255, 255, .72);
+  /* ขอบจางๆ ให้ขีดนี้เห็นได้บนการ์ดสีอ่อนด้วย โดยไม่ต้องใช้สีทึบ */
+  box-shadow: 0 0 0 .5px rgba(15, 23, 42, .18);
+  transition: width .12s ease, background .12s ease;
 }
 .ec-timed-resize-handle:hover::after {
-  background: rgba(255, 255, 255, 0.95);
+  background: #fff;
+  width: 3px;
+}
+/* ระหว่างลากอยู่ — ยืนยันว่าจับแท่งนี้ติดแล้วจริง (คู่กับไฮไลต์ช่องวันปลายทางด้านล่าง) */
+.ec-timed-resize-handle.is-resizing::after {
+  background: #fff;
+  width: 3.5px;
+  box-shadow: 0 0 0 1.5px rgba(15, 23, 42, .34);
+}
+
+/* จอแคบ: ย้ายมาชิดล่างเพื่อหนีแถวไอคอนมุมขวาบนให้ขาด
+   ⚠️ ห้ามขยายเป้ากดเกินนี้ — บนการ์ดกว้าง ~52px ทุก 1px ที่เพิ่มคือพื้นที่ที่ "แตะแล้วไม่เปิดงาน"
+   ผู้ใช้แจ้งสองรอบว่าแท่งนี้ใหญ่เกินและบังการ์ด (12px ≈ 23% ของการ์ดแคบสุด ซึ่งเป็นเพดานที่รับได้) */
+@media (max-width: 1100px) {
+  .fc-daygrid .ec-timed-resize-handle {
+    top: auto;
+    bottom: 2px;
+    transform: none;
+    width: 12px;
+    height: 44%;
+    max-height: 20px;
+  }
 }
 /* ✅ ไฮไลต์ช่องวันที่ปลายทางระหว่างลาก — feedback ว่าปล่อยแล้วจะไปจบที่วันไหน */
 .fc-daygrid-day.ec-day-drop-target {

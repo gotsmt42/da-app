@@ -723,6 +723,29 @@
   opacity: 0.4;
 }
 
+/* ── ระหว่างโหลดข้อมูลครั้งแรก ─────────────────────────────────────────────────────────────
+   ⚠️ ยังต้อง mount ปฏิทินไว้ตามปกติ (ไม่ใช่ไม่ render) — โค้ดหลายส่วนผูกกับ DOM ของ FullCalendar
+   ตั้งแต่ตอน mount ถ้าเลื่อนการ mount ออกไปจะพังเป็นทอดๆ · ใช้วิธี "จองที่ไว้แล้วยังไม่เผยให้เห็น"
+   แทน: ตารางยังคำนวณ/วัดตัวเองได้เหมือนเดิม แต่ผู้ใช้ไม่เห็นตอนมันยังว่างและกำลังจะยืด
+   (visibility ไม่ใช่ display — display:none จะทำให้ FullCalendar วัดความสูงได้ 0 แล้วจัดแถวผิด) */
+.calendar-wrapper.ec-booting {
+  min-height: 62vh;
+  position: relative;
+}
+.calendar-wrapper.ec-booting .fc-view-harness {
+  visibility: hidden;
+}
+.calendar-wrapper.ec-booting::after {
+  content: "กำลังโหลดแผนงาน…";
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  transform: translateX(-50%);
+  font-size: 13px;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
 .fc .fc-today-button {
   background-color: rgba(220, 38, 38, 0.08);
   border-color: rgba(220, 38, 38, 0.2);
@@ -1095,6 +1118,11 @@
   text-align: left;
   font-size: var(--ec-fs);
   line-height: var(--ec-lh);
+  /* ⚠️ กดค้างที่การ์ด = ลากจัดลำดับ (ดู LONG_PRESS_MS ใน index.js) แต่ในการ์ดมีลิงก์เบอร์โทร
+     (<a href="tel:">) อยู่ทั้งแถว — พอกดค้างบนลิงก์ iOS/Android จะเด้งเมนูของระบบ "โทรออก /
+     คัดลอกลิงก์" ขึ้นมาทับ แล้วการลากก็จบลงตรงนั้นทันที · ปิดเมนูนี้ทั้งการ์ด (ฝั่งที่ยิง contextmenu
+     มี onContextMenu ใน index.js กันอีกชั้น) — แตะสั้นเพื่อโทรออกยังทำได้ตามปกติ */
+  -webkit-touch-callout: none;
 }
 
 /* แถวหัวการ์ด: [🔗] ชื่องาน ......... [ไอคอนสถานะ] [ปุ่มพับ/กาง]
@@ -1741,6 +1769,19 @@
   }
 }
 
+/* 🐛 BUG ที่แก้ (ผู้ใช้แจ้ง: กดค้างแล้วมีปุ่ม ⋮⋮ โผล่มาบนการ์ด):
+   ตอนลาก FullCalendar จะ "โคลนการ์ดทั้งใบ" ไปเป็นเงาลอยที่แปะไว้นอกตารางปฏิทิน (วัดได้ว่าอยู่ใต้
+   pageWrapper ไม่ใช่ใต้ .fc-daygrid) กฎซ่อนด้านบนที่ขึ้นต้นด้วย .fc-daygrid จึงไม่ครอบถึงเงานั้น
+   ปุ่มจับลากจัดลำดับกับแท่งจับขยายวันเลยโผล่ขึ้นมาเฉพาะตอนกดค้าง ทั้งที่บนมือถือไม่ได้ใช้ทั้งคู่
+   ✅ ซ่อนในเงาลากเสมอทุกขนาดจอ — เงาเป็นแค่ภาพแทนระหว่างลาก ปุ่มในนั้นกดอะไรไม่ได้อยู่แล้ว
+   จึงมีแต่ทำให้รก และบนจอแคบยังไปบังชื่องานด้วย */
+.fc-event-dragging .ec-card-grip,
+.fc-event-mirror .ec-card-grip,
+.fc-event-dragging .ec-timed-resize-handle,
+.fc-event-mirror .ec-timed-resize-handle {
+  display: none !important;
+}
+
 /* ปุ่มย่อ/ขยายปฏิทิน (อยู่แถวเดียวกับ "วันนี้") — มีความหมายเฉพาะบนจอมือถือที่คอลัมน์แคบจนต้องปัดดู
    ⚠️ จอคอมคอลัมน์กว้างพออยู่แล้ว ปุ่มจะกลายเป็นของรกที่ไม่มีใครใช้ จึงซ่อนไปเลย */
 .fc .fc-zoomOut-button,
@@ -1758,11 +1799,13 @@
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-x: contain;
   }
-  /* ⚠️ ระดับซูม 0 = --ec-m-col เป็น 0px → min-width เป็น 0 → ตารางพอดีจอเป๊ะ ไม่ต้องปัดแนวนอนเลย
-     (ดู MOBILE_ZOOM_STEPS ใน index.js) กด + ค่อยขยายทีละระดับเมื่ออยากอ่านรายละเอียดชัดๆ */
+  /* ⚠️ ระดับซูม 0 = --ec-m-zoom เป็น 0 → min-width เป็น 0 → ตารางพอดีจอเป๊ะ ไม่ต้องปัดแนวนอนเลย
+     (ดู MOBILE_ZOOM_STEPS ใน index.js) กด + ค่อยขยายทีละระดับเมื่ออยากอ่านรายละเอียดชัดๆ
+     ⚠️ คิดจาก 100vw ไม่ใช่ px ตายตัว — ค่าตายตัวที่เล็กกว่าคอลัมน์ธรรมชาติของจอนั้นจะไม่มีผลเลย
+     (เคยเป็นบั๊กจริงบนแท็บเล็ต 768px: กด + ครั้งแรกแล้วไม่มีอะไรขยับ) */
   .modern-calendar-container .fc-daygrid > table,
   .modern-calendar-container .fc-scrollgrid {
-    min-width: calc(var(--ec-m-col, 0px) * 7);
+    min-width: calc(var(--ec-m-zoom, 0) * 100vw);
   }
 
   /* ✅ โหมด "พอดีจอ" — ทวงความกว้างที่เสียไปเปล่าๆ คืนให้ข้อความ
@@ -1801,6 +1844,10 @@
   .fc .fc-header-toolbar > .fc-toolbar-chunk:last-child .fc-today-button {
     flex: 1 1 auto;
     min-width: 0;
+    /* ⚠️ วัดจริงแล้วได้สูงแค่ 30px ซึ่งต่ำกว่าเป้าแตะที่นิ้วกดได้สบาย (≥32px) — ปุ่มนี้ความสูงมาจาก
+       padding ล้วนเหมือนปุ่มอื่นของ FullCalendar จึงต้องกำหนดเอง ให้เท่ากับปุ่ม −/+ ที่อยู่แถวเดียวกัน
+       ซึ่งทำให้ทั้งแถวสูงเสมอกันพอดีด้วย */
+    min-height: 34px;
   }
   .fc .fc-zoomOut-button,
   .fc .fc-zoomIn-button {

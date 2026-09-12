@@ -1,5 +1,24 @@
 import { lazy, Suspense } from "react";
-import { Navigate, createBrowserRouter } from "react-router-dom";
+import { Navigate, createBrowserRouter, useLocation } from "react-router-dom";
+
+/**
+ * พา URL เดิมไปหน้ารวม "พร้อมพาต่อไปให้ถึงจุดที่เจาะจงมา"
+ *
+ * 🐛 BUG ที่แก้ (แจ้งเตือนกดแล้วไปไม่ถึงรายการที่แจ้ง): เดิมใช้ <Navigate to="/finance?tab=billing">
+ * ซึ่งเขียนปลายทางตายตัว — query ที่ติดมากับลิงก์เดิมถูกทิ้งทั้งหมด ทั้งที่หน้าปลายทางรองรับอยู่แล้ว
+ *   • /quotations?jobId=xxx  (แจ้งเตือน "ใบเสนอราคาค้างนาน" ของงานใบนั้น) → jobId หายไป
+ *     กลายเป็นเปิดรายการรวมเฉยๆ ผู้ใช้ต้องไปไล่หางานเองทั้งที่ระบบรู้อยู่แล้วว่างานไหน
+ *   • /billing?status=overdue (แจ้งเตือน "บิลเลยกำหนดชำระ") → ตัวกรองหายไป
+ * ✅ คงพารามิเตอร์เดิมไว้ทุกตัว แล้วเติม/ทับเฉพาะ tab ของหน้ารวม
+ * ⚠️ ต้องทับ tab เสมอ — ชื่อพารามิเตอร์ชนกันพอดี (หน้ารวมใช้ tab เลือกแท็บ) ถ้าปล่อยค่าเดิมไว้
+ * จะเปิดผิดแท็บ พารามิเตอร์ย่อยของแต่ละแท็บจึงต้องใช้ชื่ออื่น (เช่น status, jobId)
+ */
+const LegacyTabRedirect = ({ to, tab }) => {
+  const { search } = useLocation();
+  const params = new URLSearchParams(search);
+  params.set("tab", tab);
+  return <Navigate to={`${to}?${params.toString()}`} replace />;
+};
 
 // Layouts และ Pages (Lazy Loaded)
 const FullLayout = lazy(() => import("@/layouts/FullLayout.js"));
@@ -131,7 +150,7 @@ const ThemeRoutes = [
         // ✅ URL เดิม — ยังเข้าได้เหมือนเดิม แต่พาไปหน้ารวมพร้อมเปิดแท็บที่ตรงกันให้เลย
         // (ลิงก์เก่า/บุ๊กมาร์ก/ลิงก์ในแอปที่ยังชี้มาที่นี่จึงไม่พังสักอัน)
         path: "customer",
-        element: <Navigate to="/customers?tab=registry" replace />,
+        element: <LegacyTabRedirect to="/customers" tab="registry" />,
       },
       {
         path: "worktype",
@@ -148,31 +167,31 @@ const ThemeRoutes = [
         // ✅ URL เดิม — ยังเข้าได้เหมือนเดิม แต่พาไปหน้ารวมพร้อมเปิดแท็บที่ตรงกันให้เลย
         // (ลิงก์เก่า/บุ๊กมาร์ก/ลิงก์ในแอปที่ยังชี้มาที่นี่จึงไม่พังสักอัน)
         path: "team-workload",
-        element: <Navigate to="/staff?tab=workload" replace />,
+        element: <LegacyTabRedirect to="/staff" tab="workload" />,
       },
       {
         // ✅ URL เดิม — ยังเข้าได้เหมือนเดิม แต่พาไปหน้ารวมพร้อมเปิดแท็บที่ตรงกันให้เลย
         // (ลิงก์เก่า/บุ๊กมาร์ก/ลิงก์ในแอปที่ยังชี้มาที่นี่จึงไม่พังสักอัน)
         path: "billing",
-        element: <Navigate to="/finance?tab=billing" replace />,
+        element: <LegacyTabRedirect to="/finance" tab="billing" />,
       },
       {
         // ✅ URL เดิม — ยังเข้าได้เหมือนเดิม แต่พาไปหน้ารวมพร้อมเปิดแท็บที่ตรงกันให้เลย
         // (ลิงก์เก่า/บุ๊กมาร์ก/ลิงก์ในแอปที่ยังชี้มาที่นี่จึงไม่พังสักอัน)
         path: "customer-overview",
-        element: <Navigate to="/customers?tab=overview" replace />,
+        element: <LegacyTabRedirect to="/customers" tab="overview" />,
       },
       {
         // ✅ URL เดิม — ยังเข้าได้เหมือนเดิม แต่พาไปหน้ารวมพร้อมเปิดแท็บที่ตรงกันให้เลย
         // (ลิงก์เก่า/บุ๊กมาร์ก/ลิงก์ในแอปที่ยังชี้มาที่นี่จึงไม่พังสักอัน)
         path: "quotations",
-        element: <Navigate to="/finance?tab=quotations" replace />,
+        element: <LegacyTabRedirect to="/finance" tab="quotations" />,
       },
       {
         // ✅ URL เดิม — ยังเข้าได้เหมือนเดิม แต่พาไปหน้ารวมพร้อมเปิดแท็บที่ตรงกันให้เลย
         // (ลิงก์เก่า/บุ๊กมาร์ก/ลิงก์ในแอปที่ยังชี้มาที่นี่จึงไม่พังสักอัน)
         path: "issued-documents",
-        element: <Navigate to="/documents?tab=issued" replace />,
+        element: <LegacyTabRedirect to="/documents" tab="issued" />,
       },
       {
         // ✅ ไม่ห่อด้วย AdminRoute เพราะ manager ต้องเข้าได้ด้วย เหมือน team-workload/quotations ด้านบน —
@@ -189,7 +208,7 @@ const ThemeRoutes = [
         // ✅ URL เดิม — ยังเข้าได้เหมือนเดิม แต่พาไปหน้ารวมพร้อมเปิดแท็บที่ตรงกันให้เลย
         // (ลิงก์เก่า/บุ๊กมาร์ก/ลิงก์ในแอปที่ยังชี้มาที่นี่จึงไม่พังสักอัน)
         path: "employee",
-        element: <Navigate to="/staff?tab=registry" replace />,
+        element: <LegacyTabRedirect to="/staff" tab="registry" />,
       },
       {
         path: "product",
@@ -228,7 +247,7 @@ const ThemeRoutes = [
         // ✅ URL เดิม — ยังเข้าได้เหมือนเดิม แต่พาไปหน้ารวมพร้อมเปิดแท็บที่ตรงกันให้เลย
         // (ลิงก์เก่า/บุ๊กมาร์ก/ลิงก์ในแอปที่ยังชี้มาที่นี่จึงไม่พังสักอัน)
         path: "files",
-        element: <Navigate to="/documents?tab=files" replace />,
+        element: <LegacyTabRedirect to="/documents" tab="files" />,
       },
       {
         path: "event",
