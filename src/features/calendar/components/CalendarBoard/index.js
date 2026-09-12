@@ -2081,6 +2081,11 @@ function EventCalendar() {
     document.addEventListener("touchstart", onDown, { capture: true, passive: false });
     document.addEventListener("touchmove", onMove, { passive: true });
     document.addEventListener("touchend", onUp);
+    /* ⚠️ เดิมไม่ได้ดัก touchcancel เลย — การสัมผัสที่ถูกยกเลิกกลางคัน (เบราว์เซอร์รับช่วงไปทำ
+       pinch-zoom / ดึงแถบแจ้งเตือน / มีสายเข้า) จะไม่มีใครมาเคลียร์ drag ให้ ค่าค้างอยู่จนกว่า
+       จะมีการแตะครั้งถัดไป — ไฮไลต์ช่องวันปลายทางก็ค้างบนจอไปด้วย
+       ✅ ยกเลิก = ทิ้งโดยไม่บันทึก (เหตุผลเดียวกับตัวสลับลำดับด้านล่าง) */
+    document.addEventListener("touchcancel", abortResize);
     return () => {
       document.removeEventListener("mousedown", onDown, true);
       document.removeEventListener("mousemove", onMove);
@@ -2088,6 +2093,7 @@ function EventCalendar() {
       document.removeEventListener("touchstart", onDown, true);
       document.removeEventListener("touchmove", onMove);
       document.removeEventListener("touchend", onUp);
+      document.removeEventListener("touchcancel", abortResize);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [events]);
@@ -2719,7 +2725,15 @@ function EventCalendar() {
     // (ดู onMove) การซูมของเบราว์เซอร์ไม่ได้พึ่ง listener พวกนี้ จึงยังหุบ/กางนิ้วซูมได้ตามปกติ
     document.addEventListener("touchmove", onMove, { capture: true, passive: false });
     document.addEventListener("touchend", onUp);
-    document.addEventListener("touchcancel", onUp);
+    /* 🐛 BUG ที่แก้ (ผู้ใช้แจ้ง: "สองนิ้วยังหลุดเหมือนเดิม" โดยเฉพาะในแอปที่ติดตั้งลงเครื่อง):
+       เดิมผูก touchcancel ไว้กับ onUp ตัวเดียวกับการยกนิ้วปกติ — ซึ่ง onUp คือตัวที่ "บันทึกลำดับใหม่
+       ลงฐานข้อมูล" การสัมผัสที่ถูกยกเลิกกลางคันจึงกลายเป็นการยืนยันการย้าย แทนที่จะทิ้งไป
+       ⚠️ touchcancel เกิดบ่อยกว่าที่คิดมากบนมือถือจริง และเป็นจังหวะที่ผู้ใช้ "ไม่ได้ตั้งใจจะย้าย"
+       ทั้งนั้น: เบราว์เซอร์รับช่วงนิ้วไปทำ pinch-zoom · ดึงแถบแจ้งเตือนลงมา · ปัดขอบจอย้อนกลับ ·
+       มีสายเข้า · ฝ่ามือแตะโดนขอบจอ — ในแอปที่ติดตั้งลงเครื่อง (standalone) เบราว์เซอร์ยิ่งชิงตัดสิน
+       ว่าเป็นท่าซูมเร็วกว่าตอนเปิดในแท็บปกติ อาการจึงโผล่ชัดเฉพาะในแอปที่ติดตั้ง
+       ✅ ยกเลิก = ทิ้งทั้งดุ้น ไม่บันทึกอะไรเลย (abortDrag) */
+    document.addEventListener("touchcancel", abortDrag);
     return () => {
       document.removeEventListener("mousedown", onDown, true);
       document.removeEventListener("mousemove", onMove);
@@ -2729,7 +2743,7 @@ function EventCalendar() {
       document.removeEventListener("touchstart", onDown, true);
       document.removeEventListener("touchmove", onMove, true);
       document.removeEventListener("touchend", onUp);
-      document.removeEventListener("touchcancel", onUp);
+      document.removeEventListener("touchcancel", abortDrag);
       cancelPending();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
