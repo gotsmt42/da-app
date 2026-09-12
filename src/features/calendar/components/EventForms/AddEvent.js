@@ -4,6 +4,11 @@ import { showTeamOverlapWarning } from "@/shared/utils/teamOverlapWarning";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { can } from "@/shared/utils/roles";
+import {
+  colorPickerHtml,
+  mountColorPicker,
+  rememberEventColors,
+} from "./eventColorPicker";
 
 // ✅ ป้องกัน stored XSS — ค่าที่ผู้ใช้พิมพ์เอง (ชื่อบริษัท/โครงการ/ประเภทงาน/ระบบ/ทีม ฯลฯ) ต้อง escape
 // ก่อนต่อเป็น HTML string เสมอ ไม่งั้นถ้ามีใครตั้งชื่อเป็น เช่น "><img src=x onerror="..."> จะยิง
@@ -326,14 +331,9 @@ function injectAddStyles() {
       display: flex; align-items: center; justify-content: center;
     }
 
-    /* ── Color row ── */
-    .ae-color-row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin-bottom: 0; }
-    .ae-color-item { display: flex; align-items: center; gap: 8px; }
-    .ae-color-item label { font-size: 12px; font-weight: 600; color: #374151; }
-    .ae-color-item input[type=color] {
-      width: 44px; height: 36px; border: 1.5px solid #e2e8f0;
-      border-radius: 8px; cursor: pointer; padding: 2px; background: #fff;
-    }
+    /* ── สีการ์ดงาน ──
+       หน้าตาทั้งหมดอยู่ใน eventColorPicker.js (คลาส .ecp-*) ซึ่งฉีด <style> ของตัวเองตอน mount
+       เพื่อให้ฟอร์มเพิ่มงานกับแก้ไขงานใช้ตัวเดียวกันโดยไม่ต้องก๊อป CSS ไว้สองที่ */
 
     /* ── Action bar ── */
     #ae-action-bar {
@@ -676,17 +676,16 @@ export const getAddEvent = async ({
         </div>
       </div>
 
-      <!-- colors -->
-      <div class="ae-color-row">
-        <div class="ae-color-item">
-          <label>🎨 สีพื้นหลัง</label>
-          <input id="backgroundColorPicker" type="color" value="${sourceEvent?.backgroundColor || defaultBackgroundColor}">
-        </div>
-        <div class="ae-color-item">
-          <label>✏️ สีข้อความ</label>
-          <input id="textColorPicker" type="color" value="${sourceEvent?.textColor || defaultTextColor}">
-        </div>
-      </div>
+      <!-- ── สีการ์ดงานบนปฏิทิน ──
+           ⚠️ id ของ input ทั้งสอง (backgroundColorPicker / textColorPicker) ยังเป็นตัวเดิม
+           โค้ดตอนกดบันทึกด้านล่างอ่านค่าจาก id เหล่านี้โดยตรง ห้ามเปลี่ยนชื่อ -->
+      <p class="ae-section-label">สีการ์ดงานบนปฏิทิน</p>
+      ${colorPickerHtml({
+        bgId: "backgroundColorPicker",
+        textId: "textColorPicker",
+        bg: sourceEvent?.backgroundColor || defaultBackgroundColor,
+        text: sourceEvent?.textColor || defaultTextColor,
+      })}
     </div>
 
     <!-- โหมด "งานตามสัญญา" -->
@@ -772,6 +771,7 @@ export const getAddEvent = async ({
     willClose: (popup) => {
       // ⚠️ คืนทรัพยากรของปฏิทิน พ.ศ. ที่ mount ไว้ด้วย ไม่งั้น React root จะค้างทุกครั้งที่เปิดกล่อง
       popup.__thaiDpCleanup?.();
+      popup.__colorPickerCleanup?.();
       popup.querySelectorAll(".tomselected").forEach((el) => el.tomselect?.destroy());
     },
 
@@ -779,6 +779,8 @@ export const getAddEvent = async ({
       // ✅ เปลี่ยนช่อง <input type="date"> ทุกช่องในกล่องนี้เป็นปฏิทิน พ.ศ. เดือนไทย
       // (ช่องเดิมถูกซ่อนไว้เป็นตัวเก็บค่า โค้ดที่อ่าน .value ตอนกดบันทึกจึงทำงานเหมือนเดิม)
       Swal.getPopup().__thaiDpCleanup = mountThaiDatePickers(Swal.getPopup());
+      // ✅ ตัวเลือกสีแบบจานสี + สไลเดอร์ (แทนวงล้อสีของระบบที่ลากยากบนมือถือ) — ดู eventColorPicker.js
+      Swal.getPopup().__colorPickerCleanup = mountColorPicker(Swal.getPopup());
       /* TomSelect */
       // ⚠️ BUG ที่แก้: maxOptions เดิม default แค่ 7 — บริษัท/โครงการ/ประเภทงาน/ระบบ/ทีม ที่มีมากกว่า 7
       // รายการ (เกิดขึ้นได้ง่ายมากในระบบจริงที่ใช้งานมาสักพัก) จะโดนตัดไม่แสดงในรายการให้เลือกเลย ทำให้
@@ -1320,6 +1322,9 @@ export const getAddEvent = async ({
           // ปฏิทินโดยไม่มีทางลบออก จนกว่าจะรีเฟรชหน้า — fetchEventsFromDB() หลังบันทึกสำเร็จ
           // ก็ดึงข้อมูลจริงมาแสดงอยู่แล้ว จึงตัด optimistic add ที่ไม่จำเป็นและเสี่ยงนี้ออก
           await saveEventToDB(newEvent);
+          // ✅ จำคู่สีที่ใช้จริงไว้ให้เลือกซ้ำได้ในแถว "ใช้ล่าสุด" — จำตอนบันทึกสำเร็จเท่านั้น
+          // ไม่ใช่ตอนลากสไลเดอร์ ไม่งั้นรายการจะเต็มไปด้วยสีระหว่างทางที่ไม่ได้ใช้จริง
+          rememberEventColors(payload.backgroundColor, payload.textColor);
           setDefaultTextColor(payload.textColor);
           setDefaultBackgroundColor(payload.backgroundColor);
           setDefaultFontSize(payload.fontSize);

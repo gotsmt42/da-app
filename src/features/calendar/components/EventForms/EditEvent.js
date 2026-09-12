@@ -12,6 +12,11 @@ import { formatThai } from "@/shared/utils/thaiDate";
 import { can } from "@/shared/utils/roles";
 // ✅ พิกัดหน้างาน — ใช้ตัวช่วยชุดเดียวกับหน้าอื่น (ดูหัวไฟล์ SiteMapLink.js)
 import { mapSearchUrl, googleMapsPinSvg } from "@/shared/ui/SiteMapLink";
+import {
+  colorPickerHtml,
+  mountColorPicker,
+  rememberEventColors,
+} from "./eventColorPicker";
 
 // ✅ ป้องกัน stored XSS — ค่าที่ผู้ใช้พิมพ์เอง (ชื่อบริษัท/โครงการ/ประเภทงาน/ระบบ/ทีม ฯลฯ) ต้อง escape
 // ก่อนต่อเป็น HTML string เสมอ ไม่งั้นถ้ามีใครตั้งชื่อเป็น เช่น "><img src=x onerror="..."> จะยิง
@@ -455,17 +460,9 @@ function injectStyles() {
       display: flex; align-items: center; justify-content: center;
     }
 
-    /* ── Color inline row ── */
-    .ee-color-inline {
-      display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
-      padding: 8px 0;
-    }
-    .ee-color-item { display: flex; align-items: center; gap: 6px; }
-    .ee-color-item span { font-size: 11px; font-weight: 600; color: #374151; }
-    .ee-color-item input[type=color] {
-      width: 40px; height: 32px; border: 1.5px solid #e2e8f0;
-      border-radius: 7px; cursor: pointer; padding: 2px; background: #fff;
-    }
+    /* ── สีการ์ดงาน ──
+       หน้าตาทั้งหมดอยู่ใน eventColorPicker.js (คลาส .ecp-*) ซึ่งฉีด <style> ของตัวเองตอน mount
+       เพื่อให้ฟอร์มเพิ่มงานกับแก้ไขงานใช้ตัวเดียวกันโดยไม่ต้องก๊อป CSS ไว้สองที่ */
 
     /* ── Action bar ── */
     #ee-action-bar {
@@ -1102,16 +1099,10 @@ export const getEditEvent = async ({
       : "ไม่ทราบผู้เพิ่ม");
 
   // ✅ สีบนปฏิทิน — ช่างที่มีชื่อในงานปรับเองได้แล้ว (ดู canEditColor) เดิมเป็นของ admin/manager เท่านั้น
-  const inputBg = Object.assign(document.createElement("input"), {
-    type: "color",
-    value: ev.backgroundColor || "#3b82f6",
-    disabled: !canEditColor,
-  });
-  const inputText = Object.assign(document.createElement("input"), {
-    type: "color",
-    value: ev.textColor || "#ffffff",
-    disabled: !canEditColor,
-  });
+  // ⚠️ เดิมสร้าง <input type="color"> สองตัวตรงนี้แล้ว appendChild ลงกล่องเปล่าใน didOpen
+  // ตอนนี้ input สองตัวถูกสร้างมาพร้อม HTML ของวิดเจ็ตเลือกสีแล้ว (ดู eventColorPicker.js)
+  // จึงอ่านค่าจาก id ตอนกดบันทึกแทน — ตัวช่วยสองตัวนี้ใช้แทน inputBg/inputText เดิมทุกจุด
+  const colorValue = (id, fallback) => document.getElementById(id)?.value || fallback;
 
   // ✅ admin/manager เลือกได้ครบทุกสถานะเสมอ; ช่างเลือกได้แค่ 2 สถานะแรกถ้ายังไม่ถูกเลื่อนสถานะ
   // แต่ถ้าสถานะถูกเลื่อนไปไกลกว่านั้นแล้ว (canEditStatus=false) ให้เหลือแค่ตัวเลือกเดียวคือสถานะปัจจุบัน
@@ -1575,16 +1566,13 @@ export const getEditEvent = async ({
          "เอกสาร" อ่านแล้วไม่รู้ว่าสองช่องนี้เป็นของอะไร/มีผลกับอะไร (จริงๆ คือสีของการ์ดงานบนปฏิทิน)
          และเป็นหมวดเดียวในฟอร์มที่ไม่มีหัวข้อ ทำให้จังหวะการอ่านสะดุด -->
     <p class="ee-section-label">การแสดงผลบนปฏิทิน</p>
-    <div class="ee-color-inline">
-      <div class="ee-color-item">
-        <span>🎨 สีพื้นหลัง</span>
-        <div id="ee-bg-picker"></div>
-      </div>
-      <div class="ee-color-item">
-        <span>✏️ สีข้อความ</span>
-        <div id="ee-txt-picker"></div>
-      </div>
-    </div>
+    ${colorPickerHtml({
+      bgId: "ee-bgColorPicker",
+      textId: "ee-textColorPicker",
+      bg: ev.backgroundColor || "#3b82f6",
+      text: ev.textColor || "#ffffff",
+      disabled: !canEditColor,
+    })}
 
     <hr class="ee-divider">
 
@@ -1816,6 +1804,7 @@ export const getEditEvent = async ({
     willClose: (popup) => {
       // ⚠️ คืนทรัพยากรของปฏิทิน พ.ศ. ที่ mount ไว้ด้วย ไม่งั้น React root จะค้างทุกครั้งที่เปิดกล่อง
       popup.__thaiDpCleanup?.();
+      popup.__colorPickerCleanup?.();
       popup.querySelectorAll(".tomselected").forEach((el) => el.tomselect?.destroy());
     },
 
@@ -1906,27 +1895,8 @@ export const getEditEvent = async ({
       // ✅ เปลี่ยนช่อง <input type="date"> ทุกช่องในกล่องนี้เป็นปฏิทิน พ.ศ. เดือนไทย
       // (ช่องเดิมถูกซ่อนไว้เป็นตัวเก็บค่า โค้ดที่อ่าน .value ตอนกดบันทึกจึงทำงานเหมือนเดิม)
       Swal.getPopup().__thaiDpCleanup = mountThaiDatePickers(Swal.getPopup());
-      /* color pickers */
-      Object.assign(inputBg.style, {
-        width: "40px",
-        height: "32px",
-        border: "1.5px solid #e2e8f0",
-        borderRadius: "7px",
-        cursor: isAdminOrManagerUser ? "pointer" : "not-allowed",
-        padding: "2px",
-        opacity: isAdminOrManagerUser ? "1" : "0.6",
-      });
-      Object.assign(inputText.style, {
-        width: "40px",
-        height: "32px",
-        border: "1.5px solid #e2e8f0",
-        borderRadius: "7px",
-        cursor: isAdminOrManagerUser ? "pointer" : "not-allowed",
-        padding: "2px",
-        opacity: isAdminOrManagerUser ? "1" : "0.6",
-      });
-      document.getElementById("ee-bg-picker").appendChild(inputBg);
-      document.getElementById("ee-txt-picker").appendChild(inputText);
+      // ✅ ตัวเลือกสีแบบจานสี + สไลเดอร์ (แทนวงล้อสีของระบบที่ลากยากบนมือถือ) — ดู eventColorPicker.js
+      Swal.getPopup().__colorPickerCleanup = mountColorPicker(Swal.getPopup());
 
       /* description */
       const descEl = document.getElementById("editDescription");
@@ -2248,8 +2218,8 @@ export const getEditEvent = async ({
         team: getVal("editTeam"),
         resPerson: teamToId.get(getVal("editTeam")) || "",
         teamMembers: getTeamMembers(),
-        textColor: inputText.value,
-        backgroundColor: inputBg.value,
+        textColor: colorValue("ee-textColorPicker", ev.textColor || "#ffffff"),
+        backgroundColor: colorValue("ee-bgColorPicker", ev.backgroundColor || "#3b82f6"),
         fontSize: eventFontSize,
         status: getVal("editStatus"),
         manualStatus: true,
@@ -2457,6 +2427,8 @@ export const getEditEvent = async ({
               // ⚠️ ตัดให้เหลือเฉพาะฟิลด์ที่อนุญาตก่อนส่ง ถ้าเป็นงานที่ปิดแล้วและผู้ใช้เป็นช่าง
               // (ดูเหตุผลเต็มที่ trimForClosedJob) — งานปกติส่งครบทุกฟิลด์เหมือนเดิมทุกประการ
               await EventService.UpdateEvent(eventId, trimForClosedJob(payload));
+              // ✅ จำคู่สีที่ใช้จริงไว้ให้เลือกซ้ำได้ในแถว "ใช้ล่าสุด" (ดู eventColorPicker.js)
+              rememberEventColors(payload.backgroundColor, payload.textColor);
               const contractFields = buildContractFields();
               if (contractFields) {
                 await EventService.UpdateContractFields(eventContractGroupId, contractFields);

@@ -680,37 +680,80 @@ function EventCalendar() {
     };
   }, []);
 
-  /* ── กันเปิดฟอร์มโดยไม่ตั้งใจตอนหุบ/กางนิ้วซูม ────────────────────────────────────────────
-     🐛 อาการ: ซูมด้วย 2 นิ้วบนมือถือแล้วมีฟอร์ม "เพิ่มแผนงาน" หรือ "แก้ไขงาน" เด้งขึ้นมาเอง
-     ⚠️ สาเหตุ: FullCalendar ตัดสินว่าเป็น "การแตะ" จากนิ้วที่อยู่นิ่ง — ตอนซูมมักมีนิ้วหนึ่งอยู่กับที่
-     แล้วอีกนิ้วเลื่อน มันจึงเห็นนิ้วแรกเป็นการแตะค้างที่เดิมและยิง dateClick/eventClick ออกมา
-     (ไม่ใช่ click ของเบราว์เซอร์ ซึ่งปกติจะไม่ยิงหลัง pinch อยู่แล้ว — จึงกันที่ปุ่ม preventDefault ไม่ได้)
-     ✅ จำไว้ว่ามีนิ้วที่ 2 แตะลงเมื่อไหร่ แล้วปิดการเปิดฟอร์มไว้จนถึง 500ms หลังยกนิ้วครบ
-     (เผื่อ event ที่ค้างอยู่ในคิวยิงตามมาทีหลัง) · แตะนิ้วเดียวตามปกติไม่ได้รับผลกระทบเลย */
-  const pinchUntilRef = useRef(0);
+  /* ── กันเปิดฟอร์มจากการแตะที่ไม่ได้ตั้งใจ ─────────────────────────────────────────────────
+     🐛 อาการที่ผู้ใช้แจ้ง 2 อย่าง ซึ่งมีรากเดียวกัน:
+       1) ซูมด้วย 2 นิ้วแล้วฟอร์ม "เพิ่มแผนงาน"/"แก้ไขงาน" เด้งขึ้นมาเอง
+       2) แตะโดนนิดเดียว (เช่นระหว่างปัดเลื่อนดู) ฟอร์มเพิ่มแผนงานก็เด้งแล้ว
+     ⚠️ ราก: FullCalendar ตัดสินว่า "แตะ" จากนิ้วที่อยู่นิ่ง แล้วยิง dateClick/eventClick เอง
+     ไม่ได้รอ click ของเบราว์เซอร์ (ซึ่งจะไม่ยิงหลัง pinch/scroll อยู่แล้ว) จึงกันด้วย preventDefault
+     ที่ระดับเบราว์เซอร์ไม่ได้ ต้องมาตัดสินเองว่าการสัมผัสครั้งนั้น "เป็นการแตะจริงหรือเปล่า"
+     ✅ นับว่าเป็นการแตะจริงก็ต่อเมื่อ: นิ้วเดียว · ขยับไม่เกิน 12px · ไม่เกิน 700ms · หน้าจอไม่ได้เลื่อน
+     ถ้าไม่เข้าเกณฑ์ → ปิดการเปิดฟอร์มไว้ 500ms (เผื่อ event ที่ค้างในคิวยิงตามมาทีหลัง)
+     ⚠️ "กดค้างแล้วเปลี่ยนใจปล่อยเฉยๆ" ไม่พึ่งเกณฑ์ 700ms นี้แล้ว — ตอนที่การลากจัดลำดับจับติดจริง
+     มันจะสั่งปิดการเปิดฟอร์มเองทันที (ดู beginDrag) เพราะเวลากดค้างถูกลดเหลือ 240ms ซึ่งสั้นกว่า
+     700ms มาก การพึ่งลำดับเวลาสองค่านี้จึงใช้ไม่ได้อีกต่อไป */
+  const suppressUntilRef = useRef(0);
   useEffect(() => {
-    const PINCH_COOLDOWN = 500;
+    const COOLDOWN = 500;
+    const MOVE_SLOP = 12;
+    const MAX_TAP_MS = 700;
+    let st = null; // { x, y, t, scrollY, multi }
+
+    const scrollPos = () => {
+      const sc = document.querySelector(".fc-scroller");
+      return (window.scrollY || 0) + (sc ? sc.scrollTop : 0);
+    };
+    const block = () => { suppressUntilRef.current = Date.now() + COOLDOWN; };
+
     const onStart = (e) => {
-      if (e.touches && e.touches.length >= 2) pinchUntilRef.current = Infinity;
+      if (!e.touches) return;
+      if (e.touches.length > 1) {
+        // นิ้วที่ 2 ลง = กำลังซูม — ปิดไว้จนกว่าจะยกครบแล้วพ้น cooldown
+        if (st) st.multi = true;
+        suppressUntilRef.current = Infinity;
+        return;
+      }
+      const t = e.touches[0];
+      st = { x: t.clientX, y: t.clientY, t: Date.now(), scrollY: scrollPos(), multi: false };
     };
+
+    const onMove = (e) => {
+      if (!st || !e.touches || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      if (Math.abs(t.clientX - st.x) > MOVE_SLOP || Math.abs(t.clientY - st.y) > MOVE_SLOP) {
+        st.moved = true;
+      }
+    };
+
     const onEnd = (e) => {
-      // ยังมีนิ้วเหลืออยู่ = ยังอยู่ในท่าซูม ยังไม่เริ่มนับถอยหลัง
-      if (e.touches && e.touches.length > 0) return;
-      if (pinchUntilRef.current === Infinity) pinchUntilRef.current = Date.now() + PINCH_COOLDOWN;
+      if (e.touches && e.touches.length > 0) return; // ยังมีนิ้วเหลือ ยังไม่จบท่า
+      if (suppressUntilRef.current === Infinity) {
+        suppressUntilRef.current = Date.now() + COOLDOWN;
+        st = null;
+        return;
+      }
+      if (!st) return;
+      const tooLong = Date.now() - st.t > MAX_TAP_MS;
+      const scrolled = Math.abs(scrollPos() - st.scrollY) > 2;
+      if (st.multi || st.moved || tooLong || scrolled) block();
+      st = null;
     };
-    // capture + passive — แค่สังเกตการณ์ ไม่ไปขวางการซูมของเบราว์เซอร์
+
+    // capture + passive — แค่สังเกตการณ์ ไม่ขวางการซูม/เลื่อนของเบราว์เซอร์
     const opts = { capture: true, passive: true };
     document.addEventListener("touchstart", onStart, opts);
+    document.addEventListener("touchmove", onMove, opts);
     document.addEventListener("touchend", onEnd, opts);
     document.addEventListener("touchcancel", onEnd, opts);
     return () => {
       document.removeEventListener("touchstart", onStart, true);
+      document.removeEventListener("touchmove", onMove, true);
       document.removeEventListener("touchend", onEnd, true);
       document.removeEventListener("touchcancel", onEnd, true);
     };
   }, []);
-  /** true = กำลังซูมอยู่ หรือเพิ่งซูมเสร็จไม่ถึงครึ่งวินาที → อย่าเพิ่งเปิดฟอร์มอะไรทั้งนั้น */
-  const isPinching = useCallback(() => Date.now() < pinchUntilRef.current, []);
+  /** true = สัมผัสครั้งล่าสุดไม่ใช่ "การแตะที่ตั้งใจ" (ซูม/ปัด/กดค้าง) → อย่าเพิ่งเปิดฟอร์ม */
+  const isPinching = useCallback(() => Date.now() < suppressUntilRef.current, []);
 
   // ⚠️ generateWorkPermitPDF (+ Functions/GenPDF.js) ถูกลบทิ้งแล้ว — ใบแจ้งเข้าปฏิบัติงานย้ายไปออก
   // ผ่านกล่อง WorkNoticeDialog แบบเดียวกับใบส่งมอบงาน (ดู workNoticeJob ด้านล่าง) ซึ่งแก้ไขทุกช่องได้
@@ -2220,9 +2263,88 @@ function EventCalendar() {
 
     const pointOf = (e) => (e.touches?.[0] ? e.touches[0] : e);
 
+    /* ── กดค้างแล้วลาก (สำหรับสัมผัส) ──────────────────────────────────────────────────────
+       จอคอมใช้ปุ่มจับ (⠿) ซึ่งเล็งด้วยเมาส์ได้แม่น แต่บนมือถือปุ่มขนาดเท่านิ้วกินที่มากเกินไปบน
+       คอลัมน์ ~61px จึงใช้ "กดค้างที่การ์ดทั้งใบ" แทน — เป้ากดใหญ่เท่าการ์ด เล็งไม่พลาด
+       ⚠️ ห้าม preventDefault ตอน touchstart — จะบล็อกการเลื่อนหน้าจอทันทีตั้งแต่ยังไม่รู้ว่าผู้ใช้
+       ตั้งใจจะลากหรือแค่ปัดดู · รอให้ครบเวลากดค้างก่อนแล้วค่อยเริ่มลาก (ตอนนั้น onMove จะ
+       preventDefault ให้เอง) ถ้านิ้วขยับเกินระยะเผื่อก่อนครบเวลา = ตั้งใจปัด ไม่ใช่ลาก → ยกเลิก
+
+       🐛 ที่แก้ (ผู้ใช้แจ้ง: "กดค้าง...นานเกินไป และทำได้ยาก"):
+       • 420ms → 240ms — ใกล้เคียงจังหวะกดค้างของ iOS/Android ที่มือคุ้นอยู่แล้ว
+       • ระยะเผื่อนิ้วสั่น 10px → 16px — นิ้วมนุษย์ขยับเล็กน้อยเสมอระหว่างกดค้าง ค่าเดิมแคบไปจน
+         การกดค้างถูกตีความเป็น "ตั้งใจปัด" แล้วยกเลิกทิ้งบ่อยๆ = อาการ "จับไม่ค่อยติด"
+       • เพิ่มการสั่นตอบรับ + ไฟวิ่งรอบการ์ด ตอนจับติด (ดู beginDrag) — เดิมไม่มีสัญญาณอะไรบอกเลย
+         ว่าครบเวลาแล้ว ผู้ใช้จึงต้องเดาเอง แล้วมักปล่อยก่อนเวลา */
+    const LONG_PRESS_MS = 240;
+    const LONG_PRESS_SLOP = 16;
+    let pending = null; // { timer, x, y, harness }
+
+    const cancelPending = () => {
+      if (!pending) return;
+      clearTimeout(pending.timer);
+      pending = null;
+    };
+
+    const beginDrag = (harness, clientY) => {
+      const items = peersOf(harness);
+      if (items.length < 2) return false; // ไม่มีใครแย่งชั้นด้วย ก็ไม่มีอะไรให้สลับ
+      drag = {
+        harness,
+        startY: clientY,
+        items,
+        rects: items.map((el) => el.getBoundingClientRect()),
+        from: items.indexOf(harness),
+        to: items.indexOf(harness),
+        moved: false,
+      };
+      document.body.style.userSelect = "none";
+      harness.classList.add("ec-reorder-dragging");
+      // ✅ สัญญาณตอบรับว่า "จับติดแล้ว" — เดิมไม่มีอะไรบอกเลยว่าครบเวลากดค้างหรือยัง ผู้ใช้จึงเดาไม่ถูก
+      // และมักปล่อยนิ้วก่อนเวลา จนรู้สึกว่า "ทำได้ยาก" (เบราว์เซอร์ที่ไม่รองรับก็แค่ข้ามไป)
+      try {
+        navigator.vibrate?.(12);
+      } catch {
+        /* บางเบราว์เซอร์โยน error ถ้าเรียกโดยไม่มี user gesture ที่มันยอมรับ — ไม่ใช่เรื่องสำคัญ */
+      }
+      // ⚠️ ปิดการเปิดฟอร์มไว้ตั้งแต่วินาทีที่จับติด — พอกดค้างสั้นลงเหลือ 240ms การ "กดค้างแล้ว
+      // เปลี่ยนใจปล่อยเฉยๆ" จะสั้นกว่าเกณฑ์การแตะ (MAX_TAP_MS) ได้ง่ายมาก ถ้าไม่ปิดไว้ตรงนี้
+      // ฟอร์มแก้ไขงานจะเด้งขึ้นมาทุกครั้งที่ผู้ใช้ยกเลิกการลาก (ค่านี้ถูกแปลงเป็น cooldown ปกติ
+      // ตอนยกนิ้ว — ดูตัวกรองการแตะที่ต้นไฟล์)
+      suppressUntilRef.current = Infinity;
+      return true;
+    };
+
     const onDown = (e) => {
       const grip = e.target.closest?.('[data-ec-grip="1"]');
-      if (!grip) return;
+      if (!grip) {
+        // ไม่ได้จับที่ปุ่มจับ — ถ้าเป็นการสัมผัสนิ้วเดียวบนการ์ด ให้เริ่มนับเวลากดค้าง
+        if (e.type !== "touchstart" || (e.touches && e.touches.length !== 1)) return cancelPending();
+        const card = e.target.closest?.("[data-ec-card]");
+        if (!card) return;
+        // เว้นปุ่ม/ลิงก์ "ที่อยู่ข้างในการ์ด" ไว้ (ปุ่มพับ/กาง, ลิงก์โทรออก) — มีการกดของตัวเองอยู่แล้ว
+        // 🐛 BUG ที่แก้: เดิมเขียน closest("a") เฉยๆ ซึ่ง "ตรงเสมอ" เพราะ FullCalendar ห่อทั้งการ์ด
+        // ไว้ใน <a class="fc-event"> อยู่แล้ว ฟังก์ชันจึง return ทุกครั้ง กดค้างจึงไม่เคยทำงานเลย
+        // ✅ ต้องเช็คว่าลิงก์นั้นอยู่ "ข้างใน" การ์ดจริงๆ (card.contains) ไม่ใช่ตัวห่อที่อยู่ข้างนอก
+        const innerLink = e.target.closest?.("a[href]");
+        if (e.target.closest?.(".ec-card-toggle") || (innerLink && card.contains(innerLink))) return;
+        const h = card.closest(".fc-daygrid-event-harness");
+        if (!h || peersOf(h).length < 2) return; // วันนั้นมีงานใบเดียว ไม่มีอะไรให้สลับ
+        const p = pointOf(e);
+        cancelPending();
+        pending = {
+          x: p.clientX,
+          y: p.clientY,
+          harness: h,
+          timer: setTimeout(() => {
+            const target = pending?.harness;
+            const y = pending?.y;
+            pending = null;
+            if (target) beginDrag(target, y);
+          }, LONG_PRESS_MS),
+        };
+        return;
+      }
       const harness = grip.closest(".fc-daygrid-event-harness");
       if (!harness) return;
       const items = peersOf(harness);
@@ -2250,6 +2372,17 @@ function EventCalendar() {
     };
 
     const onMove = (e) => {
+      // ยังไม่เริ่มลาก แต่กำลังนับเวลากดค้างอยู่ — ขยับเกินเกณฑ์ = ตั้งใจปัด ไม่ใช่ลาก
+      if (pending) {
+        const p = pointOf(e);
+        if (
+          (e.touches && e.touches.length > 1) ||
+          Math.abs(p.clientX - pending.x) > LONG_PRESS_SLOP ||
+          Math.abs(p.clientY - pending.y) > LONG_PRESS_SLOP
+        ) {
+          cancelPending();
+        }
+      }
       if (!drag) return;
       const dy = pointOf(e).clientY - drag.startY;
       if (!drag.moved && Math.abs(dy) < 3) return;
@@ -2291,6 +2424,7 @@ function EventCalendar() {
     };
 
     const onUp = async () => {
+      cancelPending(); // ยกนิ้วก่อนครบเวลากดค้าง = แตะปกติ ปล่อยให้ทำงานตามเดิม
       if (!drag) return;
       const d = drag;
       drag = null;
@@ -2330,6 +2464,7 @@ function EventCalendar() {
     document.addEventListener("touchstart", onDown, { capture: true, passive: false });
     document.addEventListener("touchmove", onMove, { passive: false });
     document.addEventListener("touchend", onUp);
+    document.addEventListener("touchcancel", onUp);
     return () => {
       document.removeEventListener("mousedown", onDown, true);
       document.removeEventListener("mousemove", onMove);
@@ -2338,6 +2473,8 @@ function EventCalendar() {
       document.removeEventListener("touchstart", onDown, true);
       document.removeEventListener("touchmove", onMove);
       document.removeEventListener("touchend", onUp);
+      document.removeEventListener("touchcancel", onUp);
+      cancelPending();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -2664,6 +2801,19 @@ function EventCalendar() {
 
           editable={true} // ✅ เปิดให้ทุกคน drag/resize ได้
           selectable={true} // ✅ เปิดให้ทุกคนเลือกวันได้
+          /* 🐛 ที่แก้ (ผู้ใช้แจ้ง: "แตะนิ้วแช่เพื่อเลื่อนงานหรือขยายมันนานเกินไป และทำได้ยาก"):
+             บนอุปกรณ์สัมผัส FullCalendar บังคับให้ "กดค้าง" ก่อนถึงจะย้าย/ขยายงานได้ เพื่อแยกออก
+             จากการปัดเลื่อนหน้าจอ — แต่ค่าปริยายคือ 1000ms (1 วินาทีเต็ม) และไฟล์นี้ไม่เคยตั้งค่านี้
+             มาก่อน จึงใช้ค่าปริยายมาตลอด นิ้วต้องนิ่งสนิทนานมากจนรู้สึกเหมือนจับงานไม่ติด
+             แยกตั้งทีละตัวแทนที่จะใช้ longPressDelay ตัวรวม เพราะสองงานนี้มีข้อจำกัดไม่เท่ากัน:
+
+             • selectLongPressDelay (ลากเลือกช่วงวันบนช่องว่าง) — ไม่ชนกับใคร กดสั้นได้เต็มที่ 200ms
+             • eventLongPressDelay (ย้าย/ขยายตัวงาน) — ต้องทิ้งช่วงให้มากกว่าเวลากดค้างเพื่อ
+               "สลับลำดับในวันเดียวกัน" ของเรา (LONG_PRESS_MS = 240ms) พอสมควร ไม่งั้นสองระบบจะ
+               จับงานใบเดียวกันพร้อมกัน · 400ms ยังเร็วกว่าเดิม 2.5 เท่า และพ้นกันชัดเจน
+             ⚠️ ทั้งคู่ยกเลิกเองทันทีที่นิ้วขยับก่อนครบเวลา การปัดเลื่อนดูปฏิทินจึงไม่กลายเป็นการลากงาน */
+          selectLongPressDelay={200}
+          eventLongPressDelay={400}
           droppable={true}
           dateClick={(arg) => {
             if (isPinching()) return; // กำลังหุบ/กางนิ้วซูมอยู่ ไม่ใช่การแตะเลือกวัน
