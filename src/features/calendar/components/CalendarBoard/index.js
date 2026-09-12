@@ -2470,7 +2470,37 @@ function EventCalendar() {
       pending = null;
     };
 
-    const beginDrag = (harness, clientY) => {
+    /** ช่องวันที่อยู่ใต้นิ้วจริงๆ — มองทะลุแท่งงาน (เหตุผลเดียวกับ findDayCell ของตัวลากขยายวัน) */
+    const dayCellAt = (x, y) => {
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+      for (const el of document.elementsFromPoint?.(x, y) || []) {
+        if (el.closest?.(".fc-daygrid-event-harness")) continue;
+        const cell = el.closest?.(".fc-daygrid-day[data-date]");
+        if (cell) return cell;
+      }
+      return null;
+    };
+
+    /* 🐛 BUG ที่แก้ (ผู้ใช้แจ้ง: "กดค้างแล้วเลื่อนงานไปวางวันอื่น เลื่อนได้แต่ไม่ยอมอัพเดต"):
+       การกดค้างครั้งเดียวปลุกทั้งตัวสลับลำดับของเรา (300ms) และตัวลากย้ายวันของ FullCalendar (500ms)
+       ตาข่ายกันเหนียวที่ eventDrop เลยคืนค่าการย้ายวันทิ้งทุกครั้ง เพราะมันเห็นว่า "นี่คือการลากของ
+       ตัวสลับลำดับ" — ผลคือบนวันที่มีงานซ้อนกัน ย้ายงานไปวันอื่นไม่ได้เลย (ลากเห็นภาพแต่ไม่บันทึก)
+       ส่วนวันที่มีงานใบเดียวย้ายได้ปกติเพราะตัวสลับลำดับไม่ทำงานตั้งแต่แรก
+
+       ✅ ให้สองระบบ "ยกให้กัน" ตามทิศที่ลากจริง แทนที่จะให้ตัวใดตัวหนึ่งชนะตายตัว:
+          ลากขึ้น-ลงในวันเดิม = สลับลำดับ · ลากออกไปวันอื่นเมื่อไหร่ = ยกให้ FullCalendar ย้ายวัน
+       ซึ่งตรงกับสิ่งที่ผู้ใช้ตั้งใจอยู่แล้วโดยไม่ต้องเรียนรู้ท่าใหม่ */
+    const yieldToCalendar = () => {
+      if (!drag) return;
+      const d = drag;
+      drag = null;
+      document.body.style.userSelect = "";
+      clearDragStyles(d);
+      reorderGuardRef.current = 0; // ปลดตาข่าย — การย้ายวันครั้งนี้เป็นของจริง ต้องบันทึกได้
+      clickSuppressRef.current = Date.now() + 400; // ลากอยู่ ไม่ใช่การแตะ อย่าเปิดฟอร์ม/พับการ์ด
+    };
+
+    const beginDrag = (harness, clientY, originCell) => {
       // ⚠️ ด่านสุดท้ายก่อนลงมือ — ถ้ามีนิ้วมากกว่าหนึ่งแตะอยู่ ณ วินาทีนี้ แปลว่ากำลังซูม ไม่ใช่จะลาก
       // เช็กตรงนี้เพราะตัวนับเวลาถูกตั้งไว้ตั้งแต่ตอนนิ้วเดียว สถานการณ์อาจเปลี่ยนไปแล้วระหว่างรอ
       if (touchCountRef.current > 1) return false;
@@ -2484,6 +2514,7 @@ function EventCalendar() {
         from: items.indexOf(harness),
         to: items.indexOf(harness),
         moved: false,
+        originCell, // ลากออกนอกกรอบช่องวันนี้เมื่อไหร่ = ยกให้ FullCalendar ย้ายวัน (ดู yieldToCalendar)
       };
       document.body.style.userSelect = "none";
       harness.classList.add("ec-reorder-dragging");
@@ -2554,11 +2585,14 @@ function EventCalendar() {
           y: p.clientY,
           scrollY: scrollPos(),
           harness: h,
+          // ช่องวันที่นิ้วกดลงไปตอนแรก — ใช้ตัดสินว่าตั้งใจ "สลับลำดับในวันเดิม" หรือ "ย้ายไปวันอื่น"
+          originCell: dayCellAt(p.clientX, p.clientY),
           timer: setTimeout(() => {
             const target = pending?.harness;
             const y = pending?.y;
+            const from = pending?.originCell;
             pending = null;
-            if (target) beginDrag(target, y);
+            if (target) beginDrag(target, y, from);
           }, LONG_PRESS_MS),
         };
         return;
@@ -2611,6 +2645,18 @@ function EventCalendar() {
         }
       }
       if (!drag) return;
+      // ลากออกพ้นช่องวันที่เริ่มไว้ = ตั้งใจย้ายไปวันอื่น ไม่ใช่สลับลำดับ — ยกให้ FullCalendar ทำต่อ
+      // (ดูเหตุผลเต็มที่ yieldToCalendar) ⚠️ ต้องเช็กก่อน preventDefault ด้านล่าง ไม่งั้นเราจะไปกั้น
+      // การลากของ FullCalendar ต่อทั้งที่ยกให้มันไปแล้ว
+      if (drag.originCell) {
+        // ⚠️ ใช้ "กรอบของช่องวันเดิม" ไม่ใช่ "วันที่ใต้นิ้วต่างจากเดิมไหม" — การลากลงไปวางใต้กองการ์ด
+        // (ซึ่งคือการสลับไปอยู่ท้ายสุด ใช้งานบ่อยที่สุด) มักเลยขอบล่างของกองไปนิดหน่อยจนไปอยู่เหนือ
+        // ช่องวันของสัปดาห์ถัดไป ถ้าเทียบด้วยวันที่จะถูกตีความว่า "ย้ายวัน" แล้วการสลับลำดับจะไม่บันทึก
+        const r = drag.originCell.getBoundingClientRect();
+        const p2 = pointOf(e);
+        const out = p2.clientX < r.left - 8 || p2.clientX > r.right + 8 || p2.clientY < r.top - 8 || p2.clientY > r.bottom + 8;
+        if (out) return yieldToCalendar();
+      }
       const dy = pointOf(e).clientY - drag.startY;
       if (!drag.moved && Math.abs(dy) < 3) return;
       drag.moved = true;
