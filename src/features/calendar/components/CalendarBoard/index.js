@@ -680,6 +680,38 @@ function EventCalendar() {
     };
   }, []);
 
+  /* ── กันเปิดฟอร์มโดยไม่ตั้งใจตอนหุบ/กางนิ้วซูม ────────────────────────────────────────────
+     🐛 อาการ: ซูมด้วย 2 นิ้วบนมือถือแล้วมีฟอร์ม "เพิ่มแผนงาน" หรือ "แก้ไขงาน" เด้งขึ้นมาเอง
+     ⚠️ สาเหตุ: FullCalendar ตัดสินว่าเป็น "การแตะ" จากนิ้วที่อยู่นิ่ง — ตอนซูมมักมีนิ้วหนึ่งอยู่กับที่
+     แล้วอีกนิ้วเลื่อน มันจึงเห็นนิ้วแรกเป็นการแตะค้างที่เดิมและยิง dateClick/eventClick ออกมา
+     (ไม่ใช่ click ของเบราว์เซอร์ ซึ่งปกติจะไม่ยิงหลัง pinch อยู่แล้ว — จึงกันที่ปุ่ม preventDefault ไม่ได้)
+     ✅ จำไว้ว่ามีนิ้วที่ 2 แตะลงเมื่อไหร่ แล้วปิดการเปิดฟอร์มไว้จนถึง 500ms หลังยกนิ้วครบ
+     (เผื่อ event ที่ค้างอยู่ในคิวยิงตามมาทีหลัง) · แตะนิ้วเดียวตามปกติไม่ได้รับผลกระทบเลย */
+  const pinchUntilRef = useRef(0);
+  useEffect(() => {
+    const PINCH_COOLDOWN = 500;
+    const onStart = (e) => {
+      if (e.touches && e.touches.length >= 2) pinchUntilRef.current = Infinity;
+    };
+    const onEnd = (e) => {
+      // ยังมีนิ้วเหลืออยู่ = ยังอยู่ในท่าซูม ยังไม่เริ่มนับถอยหลัง
+      if (e.touches && e.touches.length > 0) return;
+      if (pinchUntilRef.current === Infinity) pinchUntilRef.current = Date.now() + PINCH_COOLDOWN;
+    };
+    // capture + passive — แค่สังเกตการณ์ ไม่ไปขวางการซูมของเบราว์เซอร์
+    const opts = { capture: true, passive: true };
+    document.addEventListener("touchstart", onStart, opts);
+    document.addEventListener("touchend", onEnd, opts);
+    document.addEventListener("touchcancel", onEnd, opts);
+    return () => {
+      document.removeEventListener("touchstart", onStart, true);
+      document.removeEventListener("touchend", onEnd, true);
+      document.removeEventListener("touchcancel", onEnd, true);
+    };
+  }, []);
+  /** true = กำลังซูมอยู่ หรือเพิ่งซูมเสร็จไม่ถึงครึ่งวินาที → อย่าเพิ่งเปิดฟอร์มอะไรทั้งนั้น */
+  const isPinching = useCallback(() => Date.now() < pinchUntilRef.current, []);
+
   // ⚠️ generateWorkPermitPDF (+ Functions/GenPDF.js) ถูกลบทิ้งแล้ว — ใบแจ้งเข้าปฏิบัติงานย้ายไปออก
   // ผ่านกล่อง WorkNoticeDialog แบบเดียวกับใบส่งมอบงาน (ดู workNoticeJob ด้านล่าง) ซึ่งแก้ไขทุกช่องได้
   // ก่อนออกจริง ต่างจากของเดิมที่ยิง PDF ออกทันทีจาก toast ที่หายเองใน 5 วินาที
@@ -2633,11 +2665,15 @@ function EventCalendar() {
           editable={true} // ✅ เปิดให้ทุกคน drag/resize ได้
           selectable={true} // ✅ เปิดให้ทุกคนเลือกวันได้
           droppable={true}
-          dateClick={handleAddEvent}
+          dateClick={(arg) => {
+            if (isPinching()) return; // กำลังหุบ/กางนิ้วซูมอยู่ ไม่ใช่การแตะเลือกวัน
+            handleAddEvent(arg);
+          }}
           eventReceive={handleEventReceive}
           eventDragStart={handleEventDragStart}
           eventDragStop={handleEventDragStop}
           eventClick={(arg) => {
+            if (isPinching()) return; // กำลังหุบ/กางนิ้วซูมอยู่ ไม่ใช่การแตะเปิดงาน
             if (arg.event.extendedProps?.isHoliday) {
               Swal.fire("❌ ข้อมูลวันหยุดไม่สามารถแก้ไขได้");
               return;
