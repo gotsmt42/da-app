@@ -96,6 +96,14 @@ export const CAPABILITIES = {
    * แต่เพื่อไม่ให้ผู้ใช้กรอกไปทั้งหน้าแล้วเพิ่งมารู้ตอนกดบันทึกว่าทำไม่ได้
    */
   viewServiceCalendar: [ROLES.ADMIN, ROLES.MANAGER, ROLES.SALE],
+
+  // ── เบิกเงินล่วงหน้า (Advance) / เคลียร์ค่าใช้จ่าย (Claim) ───────────────
+  /** ออกใบ Advance / ใบเคลมของตัวเองได้ */
+  requestExpense: [ROLES.ADMIN, ROLES.MANAGER, ROLES.TECHNICIAN],
+  /** อนุมัติ / ตีกลับ / บันทึกจ่ายเงิน / ปิดส่วนต่าง */
+  approveExpense: [ROLES.ADMIN, ROLES.MANAGER],
+  /** เห็นใบของทุกคน + เบิกแทนคนอื่นได้ + ดูรายงานทั้งบริษัท */
+  viewAllExpenses: [ROLES.ADMIN, ROLES.MANAGER],
 };
 
 export const ALL_CAPABILITIES = Object.keys(CAPABILITIES);

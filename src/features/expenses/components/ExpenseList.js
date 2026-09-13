@@ -1,0 +1,306 @@
+/**
+ * ExpenseList — รายการใบเบิก Advance / ใบเคลม / กล่องงานรอดำเนินการของหัวหน้า
+ *
+ * ✅ จอคอม = ตาราง (อ่านเทียบกันหลายใบ) · จอมือถือ = การ์ด (แตะง่าย) — ไม่ใช่ตารางยืดบนมือถือ
+ * ✅ ตัวกรองสถานะเป็นชิปพร้อมตัวเลข — เห็นทันทีว่าค้างกี่ใบในแต่ละขั้นโดยไม่ต้องกดดูทีละอัน
+ * ⚠️ ขอบเขตข้อมูล (ช่างเห็นเฉพาะของตัวเอง) บังคับที่ server — หน้านี้แสดงเท่าที่ได้รับมา
+ */
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import {
+  Box, Stack, Typography, Chip, TextField, InputAdornment, MenuItem, Button, Table, TableHead, TableRow,
+  TableCell, TableBody, useMediaQuery, Skeleton, Alert,
+} from "@mui/material";
+import { alpha } from "@mui/material/styles";
+import { Search, Add, WarningAmber, ChevronRight, Inbox } from "@mui/icons-material";
+
+import { thaiDate } from "@/shared/utils/thaiDate";
+import usePermissions from "@/shared/hooks/usePermissions";
+import ExpenseService, { errorText } from "../services/ExpenseService";
+import KindBadge from "./KindBadge";
+import {
+  KIND_META, statusMeta, STATUS_FILTERS, baht, differenceMeta, isOverdueClear, jobText, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
+} from "../expenseMeta";
+
+const PERIODS = [
+  { value: "all", label: "ทุกช่วงเวลา" },
+  { value: "month", label: "เดือนนี้" },
+  { value: "3m", label: "3 เดือนล่าสุด" },
+  { value: "year", label: "ปีนี้" },
+];
+
+const periodRange = (p) => {
+  const now = new Date();
+  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  if (p === "month") return { from: iso(new Date(now.getFullYear(), now.getMonth(), 1)), to: iso(now) };
+  if (p === "3m") return { from: iso(new Date(now.getFullYear(), now.getMonth() - 2, 1)), to: iso(now) };
+  if (p === "year") return { from: iso(new Date(now.getFullYear(), 0, 1)), to: iso(now) };
+  return {};
+};
+
+/** กลุ่มในกล่องงานของหัวหน้า — เรียงตามความเร่งด่วนของ "สิ่งที่ต้องทำ" */
+const INBOX_GROUPS = [
+  { key: "approve", title: "รออนุมัติ", hint: "ใบเบิกและใบเคลมที่ส่งมาให้พิจารณา", match: (e) => e.status === "pending" },
+  { key: "pay", title: "รอจ่ายเงิน Advance", hint: "อนุมัติแล้ว ยังไม่ได้บันทึกการจ่าย", match: (e) => e.kind === "advance" && e.status === "approved" },
+  { key: "settle", title: "รอปิดส่วนต่าง", hint: "ใบเคลมอนุมัติแล้ว รอรับคืน/จ่ายเพิ่ม", match: (e) => e.kind === "claim" && e.status === "approved" },
+  { key: "overdue", title: "Advance เลยกำหนดเคลียร์", hint: "จ่ายเงินไปแล้วแต่ยังไม่ส่งใบเคลม", match: (e) => isOverdueClear(e) },
+];
+
+const StatusChip = ({ e }) => {
+  const st = statusMeta(e.status, e.kind);
+  return (
+    <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
+      <Chip size="small" label={st.label} sx={{ height: 22, fontSize: "0.72rem", fontWeight: 800, bgcolor: alpha(st.color, 0.12), color: st.color }} />
+      {isOverdueClear(e) && (
+        <Chip size="small" icon={<WarningAmber sx={{ fontSize: "14px !important" }} />} label="เลยกำหนด"
+          sx={{ height: 22, fontSize: "0.7rem", fontWeight: 800, bgcolor: alpha("#dc2626", 0.1), color: "#dc2626" }} />
+      )}
+    </Stack>
+  );
+};
+
+const AmountCell = ({ e }) => {
+  if (e.kind !== "claim") return <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", color: TEXT_MAIN }}>{baht(e.total)}</Typography>;
+  const d = differenceMeta(e.difference);
+  return (
+    <Box>
+      <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", color: TEXT_MAIN }}>{baht(e.total)}</Typography>
+      <Typography variant="caption" sx={{ color: d.color, fontWeight: 700, whiteSpace: "nowrap" }}>
+        {d.amount ? `${d.short} ${baht(d.amount)}` : "พอดี"}
+      </Typography>
+    </Box>
+  );
+};
+
+const MobileCard = ({ e, onOpen }) => (
+  <Box onClick={() => onOpen(e._id)} role="button" sx={{
+    p: 1.5, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 2.5, cursor: "pointer",
+    // ✅ แถบซ้ายเป็นสีประจำชนิดใบ (ไม่ใช่สีสถานะ) — ผู้ใช้ขอให้แยก Advance/Claim ได้ชัดเจนตั้งแต่มองรายการ
+    borderLeft: `5px solid ${(KIND_META[e.kind] || KIND_META.advance).color}`, "&:active": { bgcolor: "#f8fafc" },
+  }}>
+    <Stack direction="row" spacing={1.25} alignItems="flex-start">
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Stack direction="row" alignItems="baseline" spacing={1}>
+          <KindBadge kind={e.kind} />
+          <Typography sx={{ fontWeight: 800, fontSize: "0.84rem", color: (KIND_META[e.kind] || KIND_META.advance).dark, flex: 1 }} noWrap>{e.docNo}</Typography>
+          <AmountCell e={e} />
+        </Stack>
+        <Typography sx={{ fontWeight: 700, fontSize: "0.92rem", color: TEXT_MAIN, lineHeight: 1.35 }}>{e.subject}</Typography>
+        <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }} noWrap>
+          {thaiDate(e.docDate)} · {e.requester?.name}{e.kind === "claim" && e.advance?.docNo ? ` · อ้าง ${e.advance.docNo}` : ""}{e.job?.title ? ` · ${jobText(e.job)}` : ""}
+        </Typography>
+        <Box sx={{ mt: 0.75 }}><StatusChip e={e} /></Box>
+      </Box>
+    </Stack>
+  </Box>
+);
+
+const DesktopTable = ({ rows, onOpen }) => (
+  <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 2.5, overflowX: "auto" }}>
+    <Table size="small" sx={{ minWidth: 820, "& th": { fontWeight: 800, color: TEXT_SUB, fontSize: "0.76rem", bgcolor: "#f8fafc", whiteSpace: "nowrap" } }}>
+      <TableHead>
+        <TableRow>
+          <TableCell>เลขที่ / วันที่</TableCell>
+          <TableCell>ผู้เบิก</TableCell>
+          <TableCell>เรื่อง · งาน</TableCell>
+          <TableCell align="right">ยอด</TableCell>
+          <TableCell>สถานะ</TableCell>
+          <TableCell width={36} />
+        </TableRow>
+      </TableHead>
+      <TableBody>
+        {rows.map((e) => (
+          <TableRow key={e._id} hover onClick={() => onOpen(e._id)} sx={{ cursor: "pointer", "& td": { py: 1.1, borderColor: BORDER_MAIN } }}>
+            <TableCell sx={{ whiteSpace: "nowrap", boxShadow: `inset 5px 0 0 ${(KIND_META[e.kind] || KIND_META.advance).color}`, pl: 2.25 }}>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Box>
+                  <Stack direction="row" spacing={0.75} alignItems="center">
+                    <KindBadge kind={e.kind} />
+                    <Typography sx={{ fontWeight: 800, fontSize: "0.85rem", color: (KIND_META[e.kind] || KIND_META.advance).dark }}>{e.docNo}</Typography>
+                  </Stack>
+                  <Typography variant="caption" sx={{ color: TEXT_SUB }}>{thaiDate(e.docDate)}</Typography>
+                </Box>
+              </Stack>
+            </TableCell>
+            <TableCell sx={{ whiteSpace: "nowrap" }}>
+              <Typography sx={{ fontWeight: 700, fontSize: "0.85rem" }}>{e.requester?.name}</Typography>
+              <Typography variant="caption" sx={{ color: TEXT_SUB }}>{e.requester?.position}</Typography>
+            </TableCell>
+            <TableCell sx={{ maxWidth: 380 }}>
+              <Typography sx={{ fontWeight: 600, fontSize: "0.86rem" }} noWrap>{e.subject}</Typography>
+              <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }} noWrap>
+                {[e.kind === "claim" && e.advance?.docNo ? `อ้าง ${e.advance.docNo}` : "", jobText(e.job), `${e.items?.length || 0} รายการ`].filter(Boolean).join(" · ")}
+              </Typography>
+            </TableCell>
+            <TableCell align="right"><AmountCell e={e} /></TableCell>
+            <TableCell><StatusChip e={e} /></TableCell>
+            <TableCell><ChevronRight sx={{ color: "#cbd5e1" }} /></TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  </Box>
+);
+
+export default function ExpenseList({ mode, onOpen, onCreate, reloadKey }) {
+  const isDesktop = useMediaQuery("(min-width:900px)");
+  const { can } = usePermissions();
+  const viewAll = can("viewAllExpenses");
+  const [searchParams] = useSearchParams();
+  const kind = mode === "inbox" ? null : mode;
+  const meta = kind ? KIND_META[kind] : null;
+
+  const initialStatus = searchParams.get("status");
+  const [status, setStatus] = useState(kind && (STATUS_FILTERS[kind].includes(initialStatus) || initialStatus === "overdue") ? initialStatus : "all");
+  const [period, setPeriod] = useState("all");
+  const [person, setPerson] = useState("all");
+  const [q, setQ] = useState("");
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true); setError("");
+    const params = mode === "inbox" ? { status: "pending,approved,paid" } : { kind, ...periodRange(period) };
+    ExpenseService.list(params)
+      .then((r) => { if (alive) setRows(r); })
+      .catch((err) => { if (alive) setError(errorText(err, "โหลดรายการไม่สำเร็จ")); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [mode, kind, period, reloadKey]);
+
+  const people = useMemo(() => {
+    const map = new Map();
+    rows.forEach((e) => { if (e.requester?.userId) map.set(e.requester.userId, e.requester.name); });
+    return [...map.entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1]), "th"));
+  }, [rows]);
+
+  const base = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return rows.filter((e) => {
+      if (person !== "all" && e.requester?.userId !== person) return false;
+      if (!needle) return true;
+      return [e.docNo, e.subject, e.requester?.name, e.job?.title, e.job?.site, e.job?.company, e.advance?.docNo, e.to,
+        ...(e.items || []).map((it) => it.description)]
+        .some((v) => String(v || "").toLowerCase().includes(needle));
+    });
+  }, [rows, q, person]);
+
+  const counts = useMemo(() => {
+    const c = { all: base.length, overdue: 0 };
+    base.forEach((e) => { c[e.status] = (c[e.status] || 0) + 1; if (isOverdueClear(e)) c.overdue += 1; });
+    return c;
+  }, [base]);
+
+  const visible = useMemo(() => {
+    if (mode === "inbox" || status === "all") return base;
+    if (status === "overdue") return base.filter(isOverdueClear);
+    return base.filter((e) => e.status === status);
+  }, [base, status, mode]);
+
+  const filterBar = (
+    <Stack direction={{ xs: "column", md: "row" }} spacing={1} sx={{ mb: 1.5 }} alignItems={{ md: "center" }}>
+      <TextField
+        size="small" placeholder="ค้นหาเลขที่ / เรื่อง / ผู้เบิก / งาน" value={q} onChange={(ev) => setQ(ev.target.value)}
+        sx={{ flex: 1, bgcolor: "#fff", "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+        InputProps={{ startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 19, color: TEXT_SUB }} /></InputAdornment> }}
+      />
+      <Stack direction="row" spacing={1}>
+        {mode !== "inbox" && (
+          <TextField select size="small" value={period} onChange={(ev) => setPeriod(ev.target.value)} sx={{ minWidth: 140, flex: { xs: 1, md: "none" }, bgcolor: "#fff", "& .MuiOutlinedInput-root": { borderRadius: 2 } }}>
+            {PERIODS.map((p) => <MenuItem key={p.value} value={p.value}>{p.label}</MenuItem>)}
+          </TextField>
+        )}
+        {viewAll && people.length > 1 && (
+          <TextField select size="small" value={person} onChange={(ev) => setPerson(ev.target.value)} sx={{ minWidth: 150, flex: { xs: 1, md: "none" }, bgcolor: "#fff", "& .MuiOutlinedInput-root": { borderRadius: 2 } }}>
+            <MenuItem value="all">ทุกคน</MenuItem>
+            {people.map(([id, name]) => <MenuItem key={id} value={id}>{name}</MenuItem>)}
+          </TextField>
+        )}
+      </Stack>
+    </Stack>
+  );
+
+  const statusChips = kind && (
+    <Stack direction="row" spacing={0.75} sx={{ mb: 1.5, overflowX: "auto", pb: 0.5, "&::-webkit-scrollbar": { display: "none" } }}>
+      {["all", ...(kind === "advance" ? ["overdue"] : []), ...STATUS_FILTERS[kind]].map((s) => {
+        const st = s === "all" ? { label: "ทั้งหมด", color: meta.color } : s === "overdue" ? { label: "เลยกำหนดเคลียร์", color: "#dc2626" } : statusMeta(s, kind);
+        const n = counts[s] || 0;
+        if (s !== "all" && s !== status && n === 0) return null;
+        const active = status === s;
+        return (
+          <Chip
+            key={s} clickable onClick={() => setStatus(s)}
+            label={<span>{st.label} <b style={{ marginLeft: 2 }}>{n}</b></span>}
+            sx={{
+              flexShrink: 0, height: 30, fontWeight: 700, fontSize: "0.78rem", borderRadius: 2,
+              bgcolor: active ? st.color : "#fff", color: active ? "#fff" : TEXT_MAIN,
+              border: `1px solid ${active ? st.color : BORDER_MAIN}`,
+              "&:hover": { bgcolor: active ? st.color : alpha(st.color, 0.08) },
+            }}
+          />
+        );
+      })}
+    </Stack>
+  );
+
+  const renderRows = (list) => (isDesktop
+    ? <DesktopTable rows={list} onOpen={onOpen} />
+    : <Stack spacing={1}>{list.map((e) => <MobileCard key={e._id} e={e} onOpen={onOpen} />)}</Stack>);
+
+  const empty = (text, action) => (
+    <Stack alignItems="center" spacing={1.25} sx={{ py: 6, px: 2, bgcolor: "#fff", border: `1px dashed ${BORDER_MAIN}`, borderRadius: 2.5, textAlign: "center" }}>
+      <Inbox sx={{ fontSize: 44, color: "#cbd5e1" }} />
+      <Typography sx={{ fontWeight: 700, color: TEXT_SUB }}>{text}</Typography>
+      {action}
+    </Stack>
+  );
+
+  return (
+    <Box sx={{ pt: 2 }}>
+      {filterBar}
+      {statusChips}
+      {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
+      {loading ? (
+        <Stack spacing={1}>{[0, 1, 2, 3].map((i) => <Skeleton key={i} variant="rounded" height={isDesktop ? 52 : 96} />)}</Stack>
+      ) : mode === "inbox" ? (
+        (() => {
+          const groups = INBOX_GROUPS.map((g) => ({ ...g, rows: base.filter(g.match) })).filter((g) => g.rows.length);
+          if (!groups.length) return empty("ไม่มีรายการที่รอดำเนินการ 🎉");
+          return (
+            <Stack spacing={2.5}>
+              {groups.map((g) => (
+                <Box key={g.key}>
+                  <Stack direction="row" alignItems="baseline" spacing={1} sx={{ mb: 1 }}>
+                    <Typography sx={{ fontWeight: 800, fontSize: "0.98rem" }}>{g.title}</Typography>
+                    <Chip size="small" label={g.rows.length} sx={{ height: 20, fontWeight: 800 }} />
+                    <Typography variant="caption" sx={{ color: TEXT_SUB, display: { xs: "none", sm: "inline" } }}>{g.hint}</Typography>
+                  </Stack>
+                  {renderRows(g.rows)}
+                </Box>
+              ))}
+            </Stack>
+          );
+        })()
+      ) : visible.length ? (
+        <>
+          {renderRows(visible)}
+          <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", mt: 1, textAlign: "right" }}>
+            {visible.length} ใบ · รวม {baht(visible.filter((e) => e.status !== "cancelled").reduce((s, e) => s + (Number(e.total) || 0), 0))} (ไม่รวมใบที่ยกเลิก)
+          </Typography>
+        </>
+      ) : (
+        empty(
+          rows.length ? "ไม่พบรายการตามตัวกรอง" : kind === "claim" ? "ยังไม่มีใบเคลม" : "ยังไม่มีใบเบิก Advance",
+          !rows.length && onCreate && (can("requestExpense") || viewAll) && (
+            <Button variant="contained" startIcon={<Add />} onClick={() => onCreate(kind)}
+              sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: meta.color, "&:hover": { bgcolor: meta.dark } }}>
+              ออก{meta.label}
+            </Button>
+          )
+        )
+      )}
+    </Box>
+  );
+}

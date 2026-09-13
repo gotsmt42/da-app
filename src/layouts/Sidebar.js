@@ -23,6 +23,9 @@ import {
   FaClipboardCheck,
   FaCog,
   FaSignOutAlt,  FaWrench,
+  FaMoneyCheckAlt,
+  FaReceipt,
+  FaChartBar,
 } from "react-icons/fa";
 
 // ✅ Sidebar เป็น presentational ล้วนๆ ไม่จัดการ เปิด/ปิด บนมือถือเองอีกต่อไป
@@ -41,6 +44,8 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
   const canSell = can(userData, "createSalesPlan");
   const isSaleUser = isRole(userData, ROLES.SALE);
   const canViewFinance = can(userData, "viewFinance");
+  // ✅ เบิกค่าใช้จ่าย — ช่างเบิกของตัวเอง หัวหน้าเบิกแทน/อนุมัติ/ดูรายงานทั้งบริษัท
+  const canExpense = can(userData, "requestExpense") || can(userData, "viewAllExpenses");
   // ✅ คิวจ่ายงาน — เห็นเฉพาะคนที่มอบหมายงานได้จริง (ไม่งั้นกดเข้าไปก็เด้งออก)
   const canAssign = can(userData, "assignDispatch");
   // ✅ หมวด "งาน" (ตารางงาน/การดำเนินงาน) เป็นของสายบริการ — เซลกดเข้าไปเห็นแต่งานที่ไม่เกี่ยวกับ
@@ -188,6 +193,14 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
   // "ADMIN MANAGEMENT" ท้ายเมนูที่เป็นภาษาอังกฤษปนอยู่หมวดเดียวในแอปที่เป็นไทยทั้งหมด
   // ✅ แต่ละรายการยุบ "ภาพรวม + ทะเบียน" ของเอนทิตีเดียวกันไว้ในหน้าเดียว (ดู CustomerHub/StaffHub)
   // เดิมลูกค้าอยู่ 2 ที่คนละหมวด พนักงานก็อยู่ 2 ที่คนละหมวด ต้องจำว่าเรื่องเดียวกันอยู่ตรงไหนบ้าง
+  // ✅ หมวด "เบิกค่าใช้จ่าย" — 3 เมนูตามที่ผู้ใช้ขอ: ใบ Advance · ใบเคลม · รายงานย้อนหลัง
+  // ⚠️ ทั้งสามเป็นหน้าเดียวกัน (ExpensesHub) ต่างกันแค่ ?tab= — isActiveHref เทียบ query ตรงตัว จึงไฮไลต์ถูกเมนู
+  const expenseMenu = [
+    { title: "ใบเบิก Advance", href: "/expenses?tab=advances", icon: <FaMoneyCheckAlt /> },
+    { title: "ใบเคลม (Claim)", href: "/expenses?tab=claims", icon: <FaReceipt /> },
+    { title: "รายงานการเบิก", href: "/expenses?tab=report", icon: <FaChartBar /> },
+  ];
+
   const masterDataMenu = [
     { title: "ลูกค้า", href: "/customers", icon: <FaBuilding /> },
     { title: "พนักงาน / ทีมช่าง", href: "/staff", icon: <FaUserFriends /> },
@@ -380,6 +393,13 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
             <>
               <div className="admin-divider-label">การเงิน</div>
               {financeMenu.map((item, idx) => renderLink(item, `fin-${idx}`))}
+            </>
+          )}
+
+          {canExpense && (
+            <>
+              <div className="admin-divider-label">เบิกค่าใช้จ่าย</div>
+              {expenseMenu.map((item, idx) => renderLink(item, `exp-${idx}`))}
             </>
           )}
 

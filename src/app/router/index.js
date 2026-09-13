@@ -54,6 +54,8 @@ const MyJobs = lazy(() => import("@/features/technician/pages/MyJobs.js"));
 const JobRequests = lazy(() => import("@/features/dispatch/pages/JobRequests.js"));
 // ✅ คิวจ่ายงานของแอดมิน — ใบมอบหมายงานข้ามแผนก
 const JobRequestQueue = lazy(() => import("@/features/dispatch/pages/JobRequestQueue.js"));
+// ✅ เบิกค่าใช้จ่าย — ใบเบิก Advance / ใบเคลม / รอดำเนินการ / รายงานย้อนหลัง (หน้าเช็คสิทธิ์เอง)
+const ExpensesHub = lazy(() => import("@/features/expenses/pages/ExpensesHub.js"));
 
 // ✅ หน้ารวม 4 หน้า — ยุบหน้าที่เป็นข้อมูลประเภทเดียวกันให้เหลือหน้าเดียวต่อเรื่อง แล้วแยกด้วยแท็บ
 // (ดูเหตุผลของแต่ละการรวมในหัวไฟล์ของแต่ละตัว) URL เดิมทั้งหมดยัง redirect เข้ามาที่นี่ได้ ลิงก์เก่าไม่พัง
@@ -317,6 +319,17 @@ const ThemeRoutes = [
           </Suspense>
         ),
         title: "Dispatch",
+      },
+      {
+        // ⚠️ :id? — แจ้งเตือนทุกตัวของระบบเบิกส่งลิงก์มาเป็น /expenses/<id> เพื่อเปิดใบนั้นทันที
+        // ⚠️ ไม่ห่อด้วย AdminRoute — ช่างต้องเข้าได้ ตัวหน้าเช็คสิทธิ์ requestExpense/viewAllExpenses เอง
+        path: "expenses/:id?",
+        element: (
+          <Suspense fallback={<div>Loading...</div>}>
+            <ExpensesHub />
+          </Suspense>
+        ),
+        title: "Expenses",
       },
 
     ],
