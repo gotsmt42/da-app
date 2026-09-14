@@ -280,7 +280,7 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
   );
 };
 
-export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, notice = null, onClose, onChanged, onEdit, onCreateClaim, onOpenOther }) {
+export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, notice = null, onLoaded, onClose, onChanged, onEdit, onCreateClaim, onOpenOther }) {
   const isMobile = useMediaQuery("(max-width:600px)");
   const isDesktop = useMediaQuery("(min-width:900px)");
   const { userData } = useAuth();
@@ -303,12 +303,17 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
     if (!expenseId) return;
     setLoading(true); setLoadError("");
     try {
-      setExpense(await ExpenseService.get(expenseId));
+      const doc = await ExpenseService.get(expenseId);
+      setExpense(doc);
+      // ✅ บอกหน้าแม่ว่าใบนี้เป็นชนิดไหน — หน้า /expenses/<id> (มาจากลิงก์แจ้งเตือน) จะได้รู้ว่าต้องโชว์
+      // พื้นหลังเป็นหน้าใบ Advance หรือใบเคลม และตอนปิดกล่องควรพากลับไปหน้าไหน
+      onLoaded?.(doc);
     } catch (err) {
       setLoadError(errorText(err, "เปิดใบนี้ไม่สำเร็จ"));
     } finally {
       setLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- onLoaded เป็น callback ของหน้าแม่ ไม่ควรทำให้ผูกใหม่ทุกครั้ง
   }, [expenseId]);
 
   useEffect(() => {

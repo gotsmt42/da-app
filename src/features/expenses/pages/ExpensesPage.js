@@ -1,0 +1,303 @@
+/**
+ * ExpensesPage — โครงหน้าของระบบเบิก ใช้ร่วมกัน 4 หน้าที่ "แยก URL จริง" ไม่ใช่แท็บรวมหน้าเดียว
+ *
+ *   /expenses/advances    ใบเบิก Advance   (เขียวอมฟ้า)
+ *   /expenses/claims      ใบเคลม            (ม่วง)
+ *   /expenses/approvals   รอดำเนินการ       (ส้ม — เฉพาะผู้มีสิทธิ์อนุมัติ)
+ *   /expenses/report      รายงานย้อนหลัง    (น้ำเงินเข้ม)
+ *   /expenses/<id>        เปิดใบนั้นทันที — ลิงก์จากแจ้งเตือนทุกตัวชี้มาที่นี่
+ *
+ * 🐛 ที่แก้ (ผู้ใช้แจ้ง: "ใบ advance และ claim ควรแยกหน้ากัน ... ดูแล้วรวมๆ งง และดูรก"):
+ * เดิมทั้ง 4 มุมมองอยู่ใน URL เดียว (/expenses?tab=) หน้าจอหนึ่งหน้าจึงต้องแบกทุกอย่างพร้อมกัน —
+ * หัวข้อรวม + ปุ่มออกใบ 2 ปุ่ม + การ์ดสรุป 5 ใบ (ของทั้งสองชนิดปนกัน) + แถบแท็บ + แถบตัวกรอง +
+ * ชิปสถานะ + รายการ = บนมือถือกว่าจะเห็นรายการแรกต้องเลื่อนเกือบสองจอ และ "เลขของใบไหน" ก็แยกไม่ออก
+ *
+ * ✅ ตอนนี้แต่ละหน้ามีของเฉพาะของตัวเอง: สีประจำชนิดใบ · ปุ่มหลักปุ่มเดียว · ตัวเลขสรุปเฉพาะที่
+ * เกี่ยวกับหน้านั้น (แถบเดียว ไม่ใช่การ์ด 5 ใบ) · ชิปสถานะของชนิดนั้น · รายการ
+ * ⚠️ การสลับไปอีกหน้าใช้เมนู (แถบล่างมือถือ/เมนูข้าง) เป็นหลัก — ในหน้ามีแค่ลิงก์ข้อความเล็กๆ ไว้
+ * เผื่อคนที่เข้ามาจากแจ้งเตือน ไม่เอาแถบแท็บกลับมาอีกเพราะนั่นคือสิ่งที่ทำให้หน้ารกตั้งแต่แรก
+ */
+import { useCallback, useEffect, useState } from "react";
+import { Link as RouterLink, Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Box, Stack, Typography, Button, Chip } from "@mui/material";
+import { alpha } from "@mui/material/styles";
+import { Add, Payments, ReceiptLong, FactCheck, Insights, ChevronRight, WarningAmber } from "@mui/icons-material";
+
+import usePermissions from "@/shared/hooks/usePermissions";
+import { refreshAppBadges } from "@/shared/hooks/useAppBadges";
+import ExpenseService from "../services/ExpenseService";
+import ExpenseList from "../components/ExpenseList";
+import ExpenseFormDialog from "../components/ExpenseFormDialog";
+import ExpenseDetailDialog from "../components/ExpenseDetailDialog";
+import ExpenseReport from "./ExpenseReport";
+import { KIND_META, baht, TEXT_SUB, BORDER_MAIN } from "../expenseMeta";
+
+const INBOX_COLOR = "#d97706";
+const REPORT_COLOR = "#1d4ed8";
+
+/** ป้ายประจำหน้า — สี/ไอคอน/ชื่อ/คำอธิบาย/ปุ่มหลัก ของแต่ละหน้า */
+export const VIEW_META = {
+  advance: {
+    path: "/expenses/advances",
+    title: "ใบเบิก Advance",
+    icon: Payments,
+    color: KIND_META.advance.color,
+    dark: KIND_META.advance.dark,
+    soft: KIND_META.advance.soft,
+    sub: "ขอเบิกเงินล่วงหน้าไปใช้ในงาน · อนุมัติแล้วรับเงิน แล้วเคลียร์ด้วยใบเคลม",
+    action: "ออกใบ Advance",
+  },
+  claim: {
+    path: "/expenses/claims",
+    title: "ใบเคลม (Claim)",
+    icon: ReceiptLong,
+    color: KIND_META.claim.color,
+    dark: KIND_META.claim.dark,
+    soft: KIND_META.claim.soft,
+    sub: "สรุปค่าใช้จ่ายจริงพร้อมใบเสร็จ เพื่อเคลียร์เงิน Advance ที่รับไปแล้ว",
+    action: "ออกใบเคลม",
+  },
+  inbox: {
+    path: "/expenses/approvals",
+    title: "รอดำเนินการ",
+    icon: FactCheck,
+    color: INBOX_COLOR,
+    dark: "#b45309",
+    soft: "#fffbeb",
+    sub: "คิวของหัวหน้า — อนุมัติ · จ่ายเงิน · ปิดส่วนต่าง",
+    action: "",
+  },
+  report: {
+    path: "/expenses/report",
+    title: "รายงานการเบิก",
+    icon: Insights,
+    color: REPORT_COLOR,
+    dark: "#1e3a8a",
+    soft: "#eff6ff",
+    sub: "ย้อนหลังตามช่วงเวลา · ใครค้างเท่าไร · งานไหนใช้งบเท่าไร",
+    action: "",
+  },
+};
+
+/** ตัวเลขสรุปแบบ "แถบเดียว" — เล็กกว่าการ์ด กดแล้วกรองในหน้าเดิม ไม่กระโดดไปหน้าอื่น */
+const StatPill = ({ label, value, color, active, alert, onClick }) => (
+  <Box
+    role={onClick ? "button" : undefined}
+    onClick={onClick}
+    sx={{
+      flex: "0 0 auto", minWidth: 118, px: 1.5, py: 1, borderRadius: 2.5, cursor: onClick ? "pointer" : "default",
+      bgcolor: active ? alpha(color, 0.1) : "#fff",
+      border: `1px solid ${active ? color : alert ? alpha("#dc2626", 0.4) : BORDER_MAIN}`,
+      transition: "border-color .15s",
+      "&:hover": onClick ? { borderColor: color } : undefined,
+    }}
+  >
+    <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 700, display: "block", lineHeight: 1.3 }} noWrap>
+      {alert && <WarningAmber sx={{ fontSize: 13, color: "#dc2626", mr: 0.4, verticalAlign: "-2px" }} />}
+      {label}
+    </Typography>
+    <Typography sx={{ fontWeight: 900, fontSize: "1.15rem", color: alert ? "#dc2626" : color, lineHeight: 1.25 }} noWrap>
+      {value}
+    </Typography>
+  </Box>
+);
+
+/** ลิงก์ข้อความเล็กๆ ไปอีกหน้าในระบบเดียวกัน (แทนแถบแท็บเดิม) */
+const CrossLink = ({ to, label, color }) => (
+  <Chip
+    component={RouterLink} to={to} clickable size="small"
+    label={<span>{label} <ChevronRight sx={{ fontSize: 13, verticalAlign: "-2px" }} /></span>}
+    sx={{ height: 26, fontWeight: 700, fontSize: "0.76rem", bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, color, "& .MuiChip-label": { px: 1 } }}
+  />
+);
+
+export default function ExpensesPage({ view: viewProp }) {
+  const { can } = usePermissions();
+  const { id: routeId } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+
+  const canRequest = can("requestExpense");
+  const canApprove = can("approveExpense");
+  const viewAll = can("viewAllExpenses");
+
+  const [summary, setSummary] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [detailId, setDetailId] = useState(routeId || "");
+  // ⚠️ เข้ามาจากลิงก์แจ้งเตือน (/expenses/<id>) ยังไม่รู้ว่าเป็นใบชนิดไหนจนกว่ากล่องรายละเอียดจะโหลดเสร็จ
+  // — พอรู้แล้วค่อยสลับพื้นหลัง/ปลายทางตอนปิดให้ตรงชนิด ไม่ต้องยิง API ซ้ำอีกรอบเพื่อถามแค่ชนิดใบ
+  const [detailKind, setDetailKind] = useState(null);
+  const [form, setForm] = useState({ open: false, kind: "advance", expense: null, advance: null });
+  const [notice, setNotice] = useState(null);
+  const [status, setStatus] = useState(searchParams.get("status") || "all");
+
+  const view = routeId ? (detailKind || viewProp || "advance") : (viewProp || "advance");
+  const meta = VIEW_META[view] || VIEW_META.advance;
+  const Icon = meta.icon;
+  const isList = view === "advance" || view === "claim" || view === "inbox";
+
+  useEffect(() => { if (routeId) setDetailId(routeId); }, [routeId]);
+  useEffect(() => { setStatus(searchParams.get("status") || "all"); }, [searchParams]);
+
+  useEffect(() => {
+    let alive = true;
+    ExpenseService.summary().then((s) => alive && setSummary(s)).catch(() => {});
+    return () => { alive = false; };
+  }, [reloadKey]);
+
+  const refresh = useCallback(() => {
+    setReloadKey((k) => k + 1);
+    refreshAppBadges(); // ป้ายตัวเลขบนเมนูต้องขยับทันทีหลังอนุมัติ/ส่งใบ ไม่ใช่รอรอบ poll ถัดไป
+  }, []);
+
+  const openDetail = useCallback((id) => {
+    setDetailId(id);
+    navigate({ pathname: `/expenses/${id}`, search: location.search }, { replace: Boolean(routeId) });
+  }, [navigate, location.search, routeId]);
+
+  const closeDetail = () => {
+    setDetailId("");
+    setNotice(null);
+    if (routeId) navigate({ pathname: (VIEW_META[detailKind] || meta).path, search: location.search }, { replace: true });
+  };
+
+  const openCreate = (kind, advance = null) => setForm({ open: true, kind, expense: null, advance });
+
+  const onSaved = (expense, { created, warn }) => {
+    setForm((f) => ({ ...f, open: false }));
+    refresh();
+    setNotice({ severity: warn ? "warning" : "success", text: warn || (created ? `ส่ง${KIND_META[expense.kind].label} ${expense.docNo} แล้ว — รออนุมัติ` : "บันทึกการแก้ไขแล้ว") });
+    if (expense?._id) openDetail(expense._id);
+  };
+
+  if (!canRequest && !viewAll) return <Navigate to="/dashboard" replace />;
+  if (view === "inbox" && !canApprove) return <Navigate to="/expenses/advances" replace />;
+
+  const pick = (s) => setStatus((cur) => (cur === s ? "all" : s));
+
+  // ── ตัวเลขสรุปเฉพาะของหน้านี้ ──────────────────────────────────────────
+  const stats = [];
+  if (view === "advance") {
+    stats.push({ key: "pending", label: "รออนุมัติ", value: summary?.pending ?? "–", color: "#d97706", onClick: () => pick("pending") });
+    stats.push({ key: "approved", label: "รอจ่ายเงิน", value: summary?.toPay ?? "–", color: "#2563eb", onClick: () => pick("approved") });
+    stats.push({
+      key: summary?.overdueClear ? "overdue" : "paid", label: "รอเคลียร์", value: summary?.awaitingClaim ?? "–",
+      color: "#0369a1", onClick: () => pick(summary?.overdueClear ? "overdue" : "paid"),
+    });
+    if (summary?.overdueClear > 0) {
+      stats.push({ key: "overdue", label: "เลยกำหนดเคลียร์", value: summary.overdueClear, color: "#dc2626", alert: true, onClick: () => pick("overdue") });
+    }
+    stats.push({ key: "__money", label: "ยอดเงินค้างเคลียร์", value: summary ? baht(summary.outstandingAmount) : "–", color: meta.color });
+  } else if (view === "claim") {
+    stats.push({ key: "pending", label: "รออนุมัติ", value: summary?.pending ?? "–", color: "#d97706", onClick: () => pick("pending") });
+    stats.push({ key: "approved", label: "รอปิดส่วนต่าง", value: summary?.toSettle ?? "–", color: meta.color, onClick: () => pick("approved") });
+    stats.push({ key: "__await", label: "Advance ที่ยังไม่เคลียร์", value: summary?.awaitingClaim ?? "–", color: KIND_META.advance.color });
+  } else if (view === "inbox") {
+    stats.push({ key: "__p", label: "รออนุมัติ", value: summary?.pending ?? "–", color: "#d97706" });
+    stats.push({ key: "__t", label: "รอจ่ายเงิน", value: summary?.toPay ?? "–", color: "#2563eb" });
+    stats.push({ key: "__s", label: "รอปิดส่วนต่าง", value: summary?.toSettle ?? "–", color: KIND_META.claim.color });
+    if (summary?.overdueClear > 0) stats.push({ key: "__o", label: "เลยกำหนดเคลียร์", value: summary.overdueClear, color: "#dc2626", alert: true });
+  }
+
+  // ── ลิงก์ไปหน้าอื่นในระบบเดียวกัน ─────────────────────────────────────
+  const crossLinks = [];
+  if (view !== "advance") crossLinks.push({ to: "/expenses/advances", label: "ใบ Advance", color: KIND_META.advance.dark });
+  if (view !== "claim") crossLinks.push({ to: "/expenses/claims", label: "ใบเคลม", color: KIND_META.claim.dark });
+  if (canApprove && view !== "inbox") crossLinks.push({ to: "/expenses/approvals", label: "รอดำเนินการ", color: INBOX_COLOR });
+  if (view !== "report") crossLinks.push({ to: "/expenses/report", label: "รายงาน", color: REPORT_COLOR });
+
+  return (
+    <Box sx={{ p: { xs: 1.25, sm: 2.5 }, maxWidth: 1500, mx: "auto" }}>
+      {/* ── หัวหน้าเพจ: สีประจำหน้า + ปุ่มหลักปุ่มเดียว ─────────────────── */}
+      <Box sx={{
+        borderRadius: 3, border: `1px solid ${alpha(meta.color, 0.3)}`, borderTop: `4px solid ${meta.color}`,
+        bgcolor: meta.soft, px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.75 }, mb: 1.5,
+      }}>
+        <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "stretch", sm: "center" }} spacing={{ xs: 1.25, sm: 2 }}>
+          <Stack direction="row" alignItems="center" spacing={1.5} sx={{ flex: 1, minWidth: 0 }}>
+            <Box sx={{
+              width: 40, height: 40, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+              bgcolor: meta.color, color: "#fff",
+            }}>
+              <Icon />
+            </Box>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.12rem", sm: "1.3rem" }, color: meta.dark, lineHeight: 1.25 }}>
+                {meta.title}
+              </Typography>
+              <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", lineHeight: 1.35 }}>
+                {meta.sub}
+              </Typography>
+            </Box>
+          </Stack>
+          {meta.action && (canRequest || viewAll) && (
+            <Button
+              variant="contained" startIcon={view === "claim" ? <ReceiptLong /> : <Add />}
+              onClick={() => openCreate(view === "claim" ? "claim" : "advance")}
+              sx={{
+                flexShrink: 0, textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", whiteSpace: "nowrap",
+                bgcolor: meta.color, "&:hover": { bgcolor: meta.dark, boxShadow: "none" },
+              }}
+            >
+              {meta.action}
+            </Button>
+          )}
+        </Stack>
+      </Box>
+
+      {/* ── แถบตัวเลขของหน้านี้ (เลื่อนแนวนอนบนจอแคบ) ─────────────────── */}
+      {stats.length > 0 && (
+        <Stack
+          direction="row" spacing={1}
+          sx={{ mb: 1.25, overflowX: "auto", pb: 0.5, "&::-webkit-scrollbar": { display: "none" }, scrollbarWidth: "none" }}
+        >
+          {/* ⚠️ ต้องดึง key ออกจากอ็อบเจกต์ก่อน spread — ส่ง key ไปกับ {...s} React เตือนทุกครั้งที่ render */}
+          {stats.map(({ key, ...pill }) => (
+            <StatPill key={`${key}-${pill.label}`} {...pill} active={Boolean(pill.onClick) && status === key} />
+          ))}
+        </Stack>
+      )}
+
+      {/* ── ทางไปหน้าอื่นของระบบเบิก ────────────────────────────────── */}
+      <Stack direction="row" spacing={0.75} sx={{ mb: 0.5, overflowX: "auto", pb: 0.5, "&::-webkit-scrollbar": { display: "none" }, scrollbarWidth: "none" }}>
+        {crossLinks.map((l) => <CrossLink key={l.to} {...l} />)}
+      </Stack>
+
+      {isList ? (
+        <ExpenseList
+          mode={view === "inbox" ? "inbox" : view}
+          status={status}
+          onStatusChange={setStatus}
+          onOpen={openDetail}
+          onCreate={(k) => openCreate(k)}
+          reloadKey={reloadKey}
+        />
+      ) : (
+        <ExpenseReport onOpen={openDetail} reloadKey={reloadKey} />
+      )}
+
+      <ExpenseDetailDialog
+        open={Boolean(detailId)}
+        expenseId={detailId}
+        reloadKey={reloadKey}
+        notice={notice}
+        onLoaded={(e) => setDetailKind(e?.kind || null)}
+        onClose={closeDetail}
+        onChanged={refresh}
+        onOpenOther={(id) => { setNotice(null); openDetail(id); }}
+        onEdit={(expense) => setForm({ open: true, kind: expense.kind, expense, advance: null })}
+        onCreateClaim={(advance) => openCreate("claim", advance)}
+      />
+
+      <ExpenseFormDialog
+        open={form.open}
+        kind={form.kind}
+        expense={form.expense}
+        advance={form.advance}
+        onClose={() => setForm((f) => ({ ...f, open: false }))}
+        onSaved={onSaved}
+      />
+    </Box>
+  );
+}

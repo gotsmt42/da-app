@@ -241,3 +241,21 @@
 .schedule-toggle-caret--open {
   transform: rotate(180deg);
 }
+/* ── ป้ายตัวเลขท้ายเมนูบนแถบบน (จอกว้าง) ───────────────────────────────────
+   ✅ ตัวเลขเดียวกับป้ายบนเมนูข้าง/เมนูหลักหน้าแรก (shared/hooks/useAppBadges.js)
+   ⚠️ ขนาดเล็กกว่าป้ายในเมนูข้าง — แถบบนเตี้ยกว่าและมีเมนูเรียงติดกันหลายอัน ป้ายใหญ่จะดันเมนูจนล้น */
+.header-nav-count {
+  display: inline-block;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  margin-left: 2px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 17px;
+  text-align: center;
+  vertical-align: middle;
+}

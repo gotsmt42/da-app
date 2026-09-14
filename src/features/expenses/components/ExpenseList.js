@@ -9,10 +9,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Box, Stack, Typography, Chip, TextField, InputAdornment, MenuItem, Button, Table, TableHead, TableRow,
-  TableCell, TableBody, useMediaQuery, Skeleton, Alert,
+  TableCell, TableBody, useMediaQuery, Skeleton, Alert, IconButton, Menu,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Search, Add, WarningAmber, ChevronRight, Inbox } from "@mui/icons-material";
+import { Search, Add, WarningAmber, ChevronRight, Inbox, FilterList, Close } from "@mui/icons-material";
 
 import { thaiDate } from "@/shared/utils/thaiDate";
 import usePermissions from "@/shared/hooks/usePermissions";
@@ -142,7 +142,7 @@ const DesktopTable = ({ rows, onOpen }) => (
   </Box>
 );
 
-export default function ExpenseList({ mode, onOpen, onCreate, reloadKey }) {
+export default function ExpenseList({ mode, status: statusProp, onStatusChange, onOpen, onCreate, reloadKey }) {
   const isDesktop = useMediaQuery("(min-width:900px)");
   const { can } = usePermissions();
   const viewAll = can("viewAllExpenses");
@@ -150,11 +150,19 @@ export default function ExpenseList({ mode, onOpen, onCreate, reloadKey }) {
   const kind = mode === "inbox" ? null : mode;
   const meta = kind ? KIND_META[kind] : null;
 
-  const initialStatus = searchParams.get("status");
-  const [status, setStatus] = useState(kind && (STATUS_FILTERS[kind].includes(initialStatus) || initialStatus === "overdue") ? initialStatus : "all");
+  const initialStatus = statusProp || searchParams.get("status");
+  const [status, setStatusState] = useState(kind && (STATUS_FILTERS[kind].includes(initialStatus) || initialStatus === "overdue") ? initialStatus : "all");
+  // ⚠️ ตัวกรองสถานะเป็นของ "หน้า" ไม่ใช่ของรายการ — แถบตัวเลขด้านบนกับชิปในรายการต้องชี้ค่าเดียวกัน
+  // ไม่งั้นกดตัวเลขด้านบนแล้วชิปยังค้างที่ "ทั้งหมด" ผู้ใช้จะอ่านไม่ออกว่ากำลังดูอะไรอยู่
+  const setStatus = (v) => { setStatusState(v); onStatusChange?.(v); };
+  useEffect(() => {
+    if (statusProp !== undefined && statusProp !== status) setStatusState(statusProp || "all");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ตามค่าจากหน้าแม่เท่านั้น
+  }, [statusProp]);
   const [period, setPeriod] = useState("all");
   const [person, setPerson] = useState("all");
   const [q, setQ] = useState("");
+  const [filterAnchor, setFilterAnchor] = useState(null);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -199,26 +207,64 @@ export default function ExpenseList({ mode, onOpen, onCreate, reloadKey }) {
     return base.filter((e) => e.status === status);
   }, [base, status, mode]);
 
+  /**
+   * ⚠️ จอแคบ: ช่องค้นหา + ช่องเลือกช่วงเวลา + ช่องเลือกคน เรียงกัน 3 แถวกินจอไปครึ่งหนึ่งก่อนเห็นรายการแรก
+   * — ย้ายสองช่องหลังไปไว้หลังปุ่ม "ตัวกรอง" (ป้ายบอกจำนวนตัวกรองที่เปิดอยู่) เหลือช่องค้นหาแถวเดียว
+   */
+  const activeFilters = (period !== "all" ? 1 : 0) + (person !== "all" ? 1 : 0);
+  const selects = (
+    <>
+      {mode !== "inbox" && (
+        <TextField select size="small" label="ช่วงเวลา" value={period} onChange={(ev) => setPeriod(ev.target.value)}
+          sx={{ minWidth: 150, bgcolor: "#fff", "& .MuiOutlinedInput-root": { borderRadius: 2 } }}>
+          {PERIODS.map((x) => <MenuItem key={x.value} value={x.value}>{x.label}</MenuItem>)}
+        </TextField>
+      )}
+      {viewAll && people.length > 1 && (
+        <TextField select size="small" label="ผู้เบิก" value={person} onChange={(ev) => setPerson(ev.target.value)}
+          sx={{ minWidth: 160, bgcolor: "#fff", "& .MuiOutlinedInput-root": { borderRadius: 2 } }}>
+          <MenuItem value="all">ทุกคน</MenuItem>
+          {people.map(([id, name]) => <MenuItem key={id} value={id}>{name}</MenuItem>)}
+        </TextField>
+      )}
+    </>
+  );
+  const hasSelects = mode !== "inbox" || (viewAll && people.length > 1);
+
   const filterBar = (
-    <Stack direction={{ xs: "column", md: "row" }} spacing={1} sx={{ mb: 1.5 }} alignItems={{ md: "center" }}>
+    <Stack direction="row" spacing={1} sx={{ mb: 1.25 }} alignItems="center">
       <TextField
         size="small" placeholder="ค้นหาเลขที่ / เรื่อง / ผู้เบิก / งาน" value={q} onChange={(ev) => setQ(ev.target.value)}
-        sx={{ flex: 1, bgcolor: "#fff", "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-        InputProps={{ startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 19, color: TEXT_SUB }} /></InputAdornment> }}
+        sx={{ flex: 1, minWidth: 0, bgcolor: "#fff", "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+        InputProps={{
+          startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 19, color: TEXT_SUB }} /></InputAdornment>,
+          endAdornment: q ? (
+            <InputAdornment position="end">
+              <IconButton size="small" aria-label="ล้างคำค้นหา" onClick={() => setQ("")}><Close sx={{ fontSize: 17 }} /></IconButton>
+            </InputAdornment>
+          ) : null,
+        }}
       />
-      <Stack direction="row" spacing={1}>
-        {mode !== "inbox" && (
-          <TextField select size="small" value={period} onChange={(ev) => setPeriod(ev.target.value)} sx={{ minWidth: 140, flex: { xs: 1, md: "none" }, bgcolor: "#fff", "& .MuiOutlinedInput-root": { borderRadius: 2 } }}>
-            {PERIODS.map((p) => <MenuItem key={p.value} value={p.value}>{p.label}</MenuItem>)}
-          </TextField>
-        )}
-        {viewAll && people.length > 1 && (
-          <TextField select size="small" value={person} onChange={(ev) => setPerson(ev.target.value)} sx={{ minWidth: 150, flex: { xs: 1, md: "none" }, bgcolor: "#fff", "& .MuiOutlinedInput-root": { borderRadius: 2 } }}>
-            <MenuItem value="all">ทุกคน</MenuItem>
-            {people.map(([id, name]) => <MenuItem key={id} value={id}>{name}</MenuItem>)}
-          </TextField>
-        )}
-      </Stack>
+      {hasSelects && (isDesktop ? (
+        <Stack direction="row" spacing={1}>{selects}</Stack>
+      ) : (
+        <>
+          <Button
+            variant="outlined" size="medium" onClick={(ev) => setFilterAnchor(ev.currentTarget)}
+            startIcon={<FilterList sx={{ fontSize: 18 }} />}
+            sx={{ flexShrink: 0, textTransform: "none", fontWeight: 700, borderRadius: 2, bgcolor: "#fff", borderColor: BORDER_MAIN, color: TEXT_MAIN, px: 1.5 }}
+          >
+            ตัวกรอง{activeFilters ? " (" + activeFilters + ")" : ""}
+          </Button>
+          <Menu
+            anchorEl={filterAnchor} open={Boolean(filterAnchor)} onClose={() => setFilterAnchor(null)}
+            anchorOrigin={{ vertical: "bottom", horizontal: "right" }} transformOrigin={{ vertical: "top", horizontal: "right" }}
+            slotProps={{ paper: { sx: { p: 1.5, borderRadius: 2.5, minWidth: 230 } } }}
+          >
+            <Stack spacing={1.5}>{selects}</Stack>
+          </Menu>
+        </>
+      ))}
     </Stack>
   );
 

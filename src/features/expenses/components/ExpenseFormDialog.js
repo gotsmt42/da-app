@@ -362,8 +362,8 @@ export default function ExpenseFormDialog({ open, kind: kindProp, expense, advan
                 isOptionEqualToValue={(o, v) => o._id === v._id}
                 getOptionLabel={(o) => (o ? `${o.docNo} · ${o.subject}` : "")}
                 noOptionsText="ไม่มีใบ Advance ที่รอเคลียร์"
-                renderOption={(props, o) => (
-                  <li {...props} key={o._id}>
+                renderOption={({ key, ...liProps }, o) => (
+                  <li {...liProps} key={o._id}>
                     <Box sx={{ minWidth: 0, flex: 1 }}>
                       <Stack direction="row" spacing={1} alignItems="center">
                         <Typography sx={{ fontWeight: 800, fontSize: "0.86rem" }}>{o.docNo}</Typography>
@@ -426,8 +426,8 @@ export default function ExpenseFormDialog({ open, kind: kindProp, expense, advan
                 isOptionEqualToValue={(o, v) => o.userId === v.userId}
                 getOptionLabel={(o) => o?.fullName || o?.name || ""}
                 disableClearable
-                renderOption={(props, o) => (
-                  <li {...props} key={o.userId}>
+                renderOption={({ key, ...liProps }, o) => (
+                  <li {...liProps} key={o.userId}>
                     <Avatar src={o.imageUrl?.startsWith("http") ? o.imageUrl : undefined} sx={{ width: 26, height: 26, mr: 1, fontSize: 13 }}>
                       {(o.name || "?").charAt(0)}
                     </Avatar>
@@ -465,8 +465,8 @@ export default function ExpenseFormDialog({ open, kind: kindProp, expense, advan
                 isOptionEqualToValue={(o, v) => o._id === v._id}
                 getOptionLabel={(o) => (o ? jobText(o) || o.title || "" : "")}
                 noOptionsText="ไม่พบงาน"
-                renderOption={(props, o) => (
-                  <li {...props} key={o._id}>
+                renderOption={({ key, ...liProps }, o) => (
+                  <li {...liProps} key={o._id}>
                     <Box sx={{ minWidth: 0 }}>
                       <Typography sx={{ fontSize: "0.86rem", fontWeight: 700 }} noWrap>{o.title}{o.system ? ` · ${o.system}` : ""}</Typography>
                       <Typography variant="caption" sx={{ color: TEXT_SUB }} noWrap component="div">

@@ -13,7 +13,7 @@
  * ⚠️ ใครเห็นเมนูไหน = เงื่อนไขเดียวกับเมนูข้าง (layouts/Sidebar.js) ทุกรายการ — แก้ที่ Sidebar.js เมื่อไร
  * ต้องแก้ buildHomeMenu ที่นี่ด้วย ไม่งั้นผู้ใช้จะเจอทางลัดไปหน้าที่ไม่มีในเมนูของตัวเอง (หรือกดแล้วเด้งออก)
  */
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   FaCalendarAlt, FaWrench, FaFileContract, FaClipboardList, FaClipboardCheck,
   FaPaperPlane, FaFileAlt, FaFileInvoiceDollar, FaMoneyCheckAlt, FaReceipt, FaChartBar, FaInbox,
@@ -21,7 +21,7 @@ import {
 } from "react-icons/fa";
 
 import { can, isRole, ROLES, DEPARTMENT } from "@/shared/utils/roles";
-import useExpenseSummary from "@/features/expenses/hooks/useExpenseSummary";
+import useAppBadges, { BADGE_LABEL } from "@/shared/hooks/useAppBadges";
 import "./HomeMenu.css";
 
 /**
@@ -61,33 +61,33 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
   const work = [];
   if (canPlanWork) {
     if (isAdminOrManager) {
-      work.push({ key: "event-service", title: "ตารางงานช่าง", sub: "ปฏิทินงานบริการ", href: "/event", icon: FaCalendarAlt });
+      work.push({ key: "event-service", title: "ตารางงานช่าง", sub: "ปฏิทินงานบริการ", href: "/event", icon: FaCalendarAlt, badgeKey: "pendingApproval" });
       // ⚠️ "ตารางงานเซล" (/event?dept=sales) ตั้งใจไม่ใส่ในเมนูหลักหน้านี้ — ผู้ใช้สั่งให้เอาออกไปก่อน
       // (ยังเข้าได้ตามปกติจากเมนูข้าง "แผนงาน" และ dropdown บนแถบบน ไม่ได้ปิดฟีเจอร์)
     } else if (can(userData, "viewServiceCalendar")) {
-      work.push({ key: "event-mine", title: "แผนงานของฉัน", sub: "นัดหมายของฉัน", href: "/event", icon: FaCalendarAlt, tone: TONE.sales });
+      work.push({ key: "event-mine", title: "แผนงานของฉัน", sub: "นัดหมายของฉัน", href: "/event", icon: FaCalendarAlt, tone: TONE.sales, badgeKey: "pendingApproval" });
       work.push({ key: "event-service", title: "ตารางงานช่าง", sub: "ดูอย่างเดียว", href: `/event?dept=${DEPARTMENT.SERVICE}`, icon: FaWrench });
     } else {
-      work.push({ key: "event", title: canViewOperation ? "ตารางงาน" : "แผนงานของฉัน", sub: "ปฏิทินงาน", href: "/event", icon: FaCalendarAlt });
+      work.push({ key: "event", title: canViewOperation ? "ตารางงาน" : "แผนงานของฉัน", sub: "ปฏิทินงาน", href: "/event", icon: FaCalendarAlt, badgeKey: "pendingApproval" });
     }
   }
-  if (canViewOperation) work.push({ key: "operation", title: "การดำเนินงาน", sub: "เช็คอิน · ปิดงาน", href: "/operation", icon: FaWrench });
-  if (isTechnician && !hideMyJobs) work.push({ key: "my-jobs", title: "งานของฉัน", sub: "งานที่ได้รับมอบหมาย", href: "/technician/jobs", icon: FaClipboardList });
-  if (isAdminOrManager || isTechnician) work.push({ key: "contracts", title: "ภาพรวมงาน", sub: "สัญญา · รอบงาน", href: "/contracts", icon: FaFileContract });
-  if (canAssign) work.push({ key: "dispatch", title: "คำขอลงงาน", sub: "คิวรอมอบหมาย", href: "/dispatch", icon: FaClipboardCheck });
-  if (isSaleUser && !hideSalesJobs) work.push({ key: "sales", title: "แจ้งงานให้ช่าง", sub: "ส่งงานเข้าคิวช่าง", href: "/sales", icon: FaPaperPlane, tone: TONE.sales });
+  if (canViewOperation) work.push({ key: "operation", title: "การดำเนินงาน", sub: "เช็คอิน · ปิดงาน", href: "/operation", icon: FaWrench, badgeKey: "closeRequests" });
+  if (isTechnician && !hideMyJobs) work.push({ key: "my-jobs", title: "งานของฉัน", sub: "งานที่ได้รับมอบหมาย", href: "/technician/jobs", icon: FaClipboardList, badgeKey: "myJobs" });
+  if (isAdminOrManager || isTechnician) work.push({ key: "contracts", title: "ภาพรวมงาน", sub: "สัญญา · รอบงาน", href: "/contracts", icon: FaFileContract, badgeKey: "contracts" });
+  if (canAssign) work.push({ key: "dispatch", title: "คำขอลงงาน", sub: "คิวรอมอบหมาย", href: "/dispatch", icon: FaClipboardCheck, badgeKey: "dispatchQueue" });
+  if (isSaleUser && !hideSalesJobs) work.push({ key: "sales", title: "แจ้งงานให้ช่าง", sub: "ส่งงานเข้าคิวช่าง", href: "/sales", icon: FaPaperPlane, tone: TONE.sales, badgeKey: "dispatchMine" });
 
   // ── เบิกค่าใช้จ่าย ────────────────────────────────────────────────────────
   // ✅ วางต่อจากหมวดงานทันที — ผู้ใช้เลือกใบ Advance/ใบเคลมเป็นเมนูหลักบนแถบล่างมือถือ = ใช้บ่อยรองจากงาน
   const expense = [];
   if (canExpense) {
-    expense.push({ key: "advance", title: "ใบเบิก Advance", short: "ใบ Advance", sub: "เบิกเงินล่วงหน้า", href: "/expenses?tab=advances", icon: FaMoneyCheckAlt });
-    expense.push({ key: "claim", title: "ใบเคลม", sub: "เคลียร์ค่าใช้จ่าย", href: "/expenses?tab=claims", icon: FaReceipt, tone: TONE.claim, badgeKey: "awaitingClaim" });
+    expense.push({ key: "advance", title: "ใบเบิก Advance", short: "ใบ Advance", sub: "เบิกเงินล่วงหน้า", href: "/expenses/advances", icon: FaMoneyCheckAlt, badgeKey: "advance" });
+    expense.push({ key: "claim", title: "ใบเคลม", sub: "เคลียร์ค่าใช้จ่าย", href: "/expenses/claims", icon: FaReceipt, tone: TONE.claim, badgeKey: "claim" });
     // ✅ หัวหน้ามีคิวงานที่ต้องทำ (อนุมัติ/จ่าย/ปิดส่วนต่าง) เพิ่มอีกเมนู
     if (canApproveExpense) {
-      expense.push({ key: "expense-inbox", title: "รออนุมัติการเบิก", short: "รออนุมัติ", sub: "อนุมัติ · จ่ายเงิน", href: "/expenses?tab=approvals", icon: FaInbox, badgeKey: "expenseInbox" });
+      expense.push({ key: "expense-inbox", title: "รออนุมัติการเบิก", short: "รออนุมัติ", sub: "อนุมัติ · จ่ายเงิน", href: "/expenses/approvals", icon: FaInbox, badgeKey: "expenseInbox" });
     }
-    expense.push({ key: "expense-report", title: "รายงานการเบิก", short: "รายงาน", sub: "ยอดค้าง · ย้อนหลัง", href: "/expenses?tab=report", icon: FaChartBar });
+    expense.push({ key: "expense-report", title: "รายงานการเบิก", short: "รายงาน", sub: "ยอดค้าง · ย้อนหลัง", href: "/expenses/report", icon: FaChartBar });
   }
 
   // ── เอกสารและการเงิน ─────────────────────────────────────────────────────
@@ -128,12 +128,6 @@ export const splitColumns = (cats) => {
   return cols;
 };
 
-const BADGE_LABEL = {
-  quotations: "ใบเสนอราคาที่ต้องติดตาม",
-  awaitingClaim: "ใบ Advance ที่รอเคลียร์",
-  expenseInbox: "ใบเบิกที่รอดำเนินการ",
-};
-
 const badgeText = (n) => (n > 99 ? "99+" : String(n));
 
 /**
@@ -142,18 +136,15 @@ const badgeText = (n) => (n > 99 ? "99+" : String(n));
  * @param {object} [props.badges]   ตัวเลขที่หน้าแม่คำนวณไว้แล้ว เช่น { quotations: 3 }
  */
 export default function HomeMenu({ userData, badges = {}, hideMyJobs = false, hideSalesJobs = false }) {
-  const location = useLocation();
   const cats = buildHomeMenu(userData, { hideMyJobs, hideSalesJobs });
-  const hasExpense = cats.some((c) => c.key === "expense");
-  const summary = useExpenseSummary(hasExpense, userData?.userId, location.pathname);
+  // ⚠️ ทุกเมนูอ่านตัวเลขจาก store เดียวกัน (useAppBadges) — ห้ามคำนวณเองที่นี่ ไม่งั้นเลขบนเมนูหลัก
+  // กับแถบล่าง/แถบบนจะไม่ตรงกันเวลาเงื่อนไขเปลี่ยน
+  const { badges: shared } = useAppBadges(userData);
 
   if (!cats.length) return null;
 
-  const counts = {
-    awaitingClaim: Number(summary?.awaitingClaim) || 0,
-    expenseInbox: (Number(summary?.pending) || 0) + (Number(summary?.toPay) || 0) + (Number(summary?.toSettle) || 0),
-    ...badges,
-  };
+  // badges ที่หน้าแม่ส่งมา (ถ้ามี) ทับของ store ได้ — หน้านั้นมีข้อมูลสดกว่าเพราะโหลดเองอยู่แล้ว
+  const counts = { ...shared, ...badges };
 
   // มือถือ: หมวดที่มี ≤2 เมนูวางคู่กันครึ่งจอ — ถ้าเหลือใบเดียวไม่มีคู่ ให้เต็มแถวแทน (ไม่ทิ้งครึ่งจอว่าง)
   const narrow = cats.filter((c) => c.items.length <= 2);

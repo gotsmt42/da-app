@@ -1,7 +1,6 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import AuthService from "../shared/services/authService";
-import EventService from "../shared/services/EventService";
 import { useAuth } from "../features/auth/AuthContext";
 import useEventNotifications from "../shared/hooks/useEventNotifications";
 import NotificationBell from "../features/notifications/components/NotificationBell";
@@ -20,7 +19,7 @@ import {
 import { swalLogout, hasValidAvatar } from "../shared/utils/user";
 import Swal from "sweetalert2";
 import Badge from "@mui/material/Badge";
-import { countOverdueContracts } from "../shared/utils/contractOverdue";
+import useAppBadges from "@/shared/hooks/useAppBadges";
 // ✅ ไอคอน 3 เมนูกลางตรงกับที่ Dashboard.js/Sidebar.js ใช้จริงสำหรับหน้าเดียวกันเป๊ะๆ
 // (FaWrench="การดำเนินงาน", FaFileContract="ภาพรวมสัญญา", FaFileInvoiceDollar="ติดตามใบเสนอราคา")
 import {
@@ -87,6 +86,17 @@ const ScheduleDropdownMenu = ({ options, isSecondaryActive }) => {
   );
 };
 
+/**
+ * ป้ายตัวเลขเล็กๆ ท้ายเมนูบนแถบบน (จอกว้าง)
+ * ⚠️ ต้องอยู่ module scope — ประกาศซ้อนในตัว Header จะได้ component ชนิดใหม่ทุกครั้งที่ข้อมูลแจ้งเตือน
+ * เข้ามา (ทุก 30 วิ) React ถอดของเดิมทิ้งแล้วสร้างใหม่ทั้งแถบโดยไม่จำเป็น
+ */
+const HeaderCount = ({ n }) => {
+  const count = Number(n) || 0;
+  if (!count) return null;
+  return <span className="header-nav-count">{count > 99 ? "99+" : count}</span>;
+};
+
 const Header = ({ toggleMobileSidebar }) => {
   const location = useLocation();
   const [user, setUser] = useState({});
@@ -97,17 +107,12 @@ const Header = ({ toggleMobileSidebar }) => {
   const [scheduleMenuOpenDesktop, setScheduleMenuOpenDesktop] = useState(false);
   const [scheduleMenuOpenMobile, setScheduleMenuOpenMobile] = useState(false);
 
-  // ✅ ดึง events เองที่นี่ (แยกจากหน้า Operation) เพื่อให้กระดิ่งแจ้งเตือนเห็นได้ทุกหน้า
-  // ไม่ใช่แค่ตอนเปิดหน้า Operation ค้างไว้เท่านั้น — poll ทุก 30s เหมือนหน้าอื่นๆ ในระบบ
-  const [events, setEvents] = useState([]);
-  // ✅ แผนงานล่วงหน้า (unscheduled) ของสัญญา — ต้องรวมด้วยตอนเช็ค "เกินกำหนดวางแผนรอบถัดไป" กัน
-  // สัญญาที่จองรอบถัดไปไว้ล่วงหน้าแล้วถูกนับเป็น "เกินกำหนด" ผิดๆ (เทียบ pattern เดียวกับ
-  // ContractOverview.js fetchData) — ดึงให้ทุกสิทธิ์ที่เข้าหน้า "ภาพรวมงาน" ได้ (admin/manager/technician)
-  // เพราะป้ายนี้โชว์ให้ทุกคนเห็นจำนวนของตัวเองแล้ว ไม่ใช่แค่แอดมิน/manager อีกต่อไป — backend กรองข้อมูล
-  // ตาม role ให้อยู่แล้ว (GET /events/drafts) ช่างจึงได้เห็นแค่จำนวนของตัวเองเท่านั้นเหมือนหน้า "ภาพรวมงาน"
-  const [contractDrafts, setContractDrafts] = useState([]);
-
+  // ✅ events/แผนงานล่วงหน้า มาจาก store กลาง (shared/hooks/useAppBadges.js) ซึ่ง poll ให้ทุก 30 วิ
+  // 🐛 ที่แก้: เดิม Header ดึง /event-op เองอีกชุดหนึ่ง (~150 kB ทุก 30 วิ) พอเมนูอื่นเริ่มมีป้ายตัวเลข
+  // ที่ต้องใช้ข้อมูลชุดเดียวกัน จะกลายเป็นดึงซ้ำหลายรอบต่อหนึ่งนาที — ตอนนี้ทั้งแอปดึงก้อนเดียวแล้วแจกกัน
+  // ⚠️ ตัวเลขบนป้ายทุกจุด (เมนูข้าง/เมนูหลักหน้าแรก/แถบล่างมือถือ/ตรงนี้) จึงมาจากชุดข้อมูลเดียวกันเสมอ
   const { userData, logout } = useAuth();
+  const { events, badges } = useAppBadges(userData);
   const isAdminOrManager = can(userData, "viewAllJobs");
   // ✅ หน้า "ภาพรวมงาน" เปิดให้ช่างเข้าดูงานของตัวเองได้แล้ว (ดู ContractOverview.js canView) —
   // ปุ่มทางลัดในนี้ต้องเปิดให้ตรงกันด้วย ไม่ใช่แค่แอดมิน/manager เหมือนเดิม
@@ -145,37 +150,12 @@ const Header = ({ toggleMobileSidebar }) => {
       }
     };
 
-    const fetchEventsForNotifications = async () => {
-      try {
-        const res = await EventService.getEventOp();
-        setEvents(res?.userEvents || []);
-      } catch {
-        // เงียบไว้ — ไม่ใช่หน้าจอหลักของ endpoint นี้ ไม่ต้องกวนผู้ใช้ด้วย error
-      }
-    };
-
     getUserData();
-    fetchEventsForNotifications();
-
-    const interval = setInterval(fetchEventsForNotifications, 30000);
-    return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    if (!canViewContracts) return;
-    EventService.GetDraftEvents()
-      .then((res) => setContractDrafts(res?.drafts || []))
-      .catch(() => {}); // เงียบไว้เหมือนกัน — แค่ป้ายสรุปจำนวน ไม่ใช่ข้อมูลหลักของหน้านี้
-  }, [canViewContracts]);
-
-  // ✅ จำนวนสัญญาที่ถึง/เลยเดือนที่ต้องเข้ารอบถัดไปแล้วแต่ยังไม่ได้วางแผน — ใช้ตรรกะเดียวกับ
-  // ป้ายแจ้งเตือนในตาราง ContractOverview.js เป๊ะๆ (ดู shared/utils/contractOverdue.js) — events/contractDrafts
-  // ถูกกรองตาม role มาจาก backend แล้ว (admin/manager เห็นทั้งหมด ช่างเห็นแค่ของตัวเอง) จึงคำนวณตรงๆ
-  // ได้เลยไม่ต้องแยกเงื่อนไข role ที่นี่อีก
-  const overdueContractCount = useMemo(
-    () => (canViewContracts ? countOverdueContracts([...events, ...contractDrafts]) : 0),
-    [canViewContracts, events, contractDrafts]
-  );
+  // ✅ จำนวนสัญญาที่ถึง/เลยเดือนที่ต้องเข้ารอบถัดไปแล้วแต่ยังไม่ได้วางแผน — คำนวณด้วยตรรกะเดียวกับ
+  // ป้ายในตาราง ContractOverview.js (shared/utils/contractOverdue.js) ผ่าน store กลาง
+  const overdueContractCount = canViewContracts ? badges.contracts : 0;
 
   const toggle = () => setDropdownOpen((prevState) => !prevState);
 
@@ -213,6 +193,7 @@ const Header = ({ toggleMobileSidebar }) => {
               className={`nav-link d-flex align-items-center gap-2 ${location.pathname.startsWith("/operation") ? "active" : ""}`}
             >
               <FaWrench size={13} /> การดำเนินงาน
+              <HeaderCount n={badges.closeRequests} />
             </Link>
           </NavItem>
           )}
@@ -223,6 +204,7 @@ const Header = ({ toggleMobileSidebar }) => {
                 className={`nav-link d-flex align-items-center gap-2 ${location.pathname.startsWith("/contracts") ? "active" : ""}`}
               >
                 <FaFileContract size={13} /> ภาพรวมงาน
+                <HeaderCount n={overdueContractCount} />
               </Link>
             </NavItem>
           )}
@@ -233,6 +215,7 @@ const Header = ({ toggleMobileSidebar }) => {
               className={`nav-link d-flex align-items-center gap-2 ${location.pathname.startsWith("/quotations") ? "active" : ""}`}
             >
               <FaFileInvoiceDollar size={13} /> ติดตามใบเสนอราคา
+              <HeaderCount n={badges.quotations} />
             </Link>
           </NavItem>
           )}
@@ -251,6 +234,7 @@ const Header = ({ toggleMobileSidebar }) => {
               >
                 <FaCalendarAlt size={13} />
                 <span>{scheduleLabel}</span>
+                <HeaderCount n={badges.pendingApproval} />
                 <FaChevronDown
                   size={9}
                   className={`schedule-toggle-caret ${scheduleMenuOpenDesktop ? "schedule-toggle-caret--open" : ""}`}

@@ -7,6 +7,8 @@ import Swal from "sweetalert2";
 import { swalLogout, hasValidAvatar } from "../shared/utils/user";
 import { useAuth } from "../features/auth/AuthContext";
 import { can, isRole, roleLabel, ROLES, DEPARTMENT } from "@/shared/utils/roles";
+// ✅ ป้ายตัวเลข "ของค้างที่ต้องทำ" บนเมนู — ตัวเลขชุดเดียวกับเมนูหลักหน้าแรกและแถบล่างมือถือ
+import useAppBadges, { BADGE_LABEL } from "@/shared/hooks/useAppBadges";
 // ✅ ใช้ไอคอนชุดเดียวกับที่ Dashboard.js ใช้จริง (react-icons/fa) แทน bootstrap-icons เดิม — เดิม
 // สองที่นี้ใช้คนละชุดไอคอนกันคนละความหมาย (เช่น "แผนงานทั้งหมด" หน้า Dashboard กับ "แผนงาน" ใน
 // sidebar เป็นหน้าเดียวกันแต่ไอคอนคนละแบบ) ทำให้ผู้ใช้จำไม่ได้ว่าไอคอนไหนคือเมนูไหนบ้าง
@@ -23,6 +25,7 @@ import {
   FaClipboardCheck,
   FaCog,
   FaSignOutAlt,  FaWrench,
+  FaInbox,
   FaMoneyCheckAlt,
   FaReceipt,
   FaChartBar,
@@ -57,6 +60,8 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
   const canPlanWork = canViewOperation || canSell || isTechnician || isAdminOrManager;
   // มีอะไรอยู่ในหมวด "งาน" บ้างไหม — ใช้ตัดสินว่าจะโชว์หัวข้อหมวดหรือไม่
   const hasWorkMenu = canPlanWork || canAssign;
+
+  const { badges } = useAppBadges(userData);
 
   const [, setUser] = useState({});
 
@@ -117,7 +122,7 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
         href: "/event",
         icon: <FaCalendarAlt />,
         items: [
-          { title: "ตารางงานช่าง", href: "/event" },
+          { title: "ตารางงานช่าง", href: "/event", badgeKey: "pendingApproval" },
           { title: "ตารางงานเซล", href: "/event?dept=sales" },
         ],
       }]
@@ -131,23 +136,23 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
           href: "/event",
           icon: <FaCalendarAlt />,
           items: [
-            { title: "แผนงานของฉัน", href: "/event" },
+            { title: "แผนงานของฉัน", href: "/event", badgeKey: "pendingApproval" },
             { title: "ตารางงานช่าง (ดูอย่างเดียว)", href: `/event?dept=${DEPARTMENT.SERVICE}` },
           ],
         }]
-      : [{ title: canViewOperation ? "ตารางงาน" : "แผนงานของฉัน", href: "/event", icon: <FaCalendarAlt /> }];
+      : [{ title: canViewOperation ? "ตารางงาน" : "แผนงานของฉัน", href: "/event", icon: <FaCalendarAlt />, badgeKey: "pendingApproval" }];
 
   // ✅ "การดำเนินงาน" แยกออกมาเป็นเมนูระดับบนสุดตามที่ผู้ใช้สั่ง — เดิมซ่อนอยู่ในเมนูย่อยของ
   // "แผนงาน" ทั้งที่เป็นหน้าที่ใช้บ่อยที่สุดของฝ่ายช่าง (ไล่จัดการงานทีละใบ) และเป็นคนละเรื่องกับ
   // ปฏิทิน (ปฏิทิน = วางแผนว่าจะไปวันไหน · การดำเนินงาน = ตามงานที่ลงตารางแล้ว)
   const operationMenu = [
-    { title: "การดำเนินงาน", href: "/operation", icon: <FaWrench /> },
+    { title: "การดำเนินงาน", href: "/operation", icon: <FaWrench />, badgeKey: "closeRequests" },
   ];
   // ✅ เมนู "แผนงานรออนุมัติ" ถูกตัดออกตามที่ผู้ใช้ขอ — ย้ายไปเป็นแท็บ "รออนุมัติ" ในหน้า "การดำเนินงาน"
   // แทน (ดู PendingApprovalsPanel.js) เพราะเป็นงานเดียวกันกับการไล่จัดการงานในหน้านั้น ไม่ต้องสลับหน้า
   // ไปมา และมี badge บอกจำนวนงานค้างบนแท็บให้เห็นตั้งแต่เข้าหน้ามาแล้ว
   const workMenuManager = [
-    { title: "ภาพรวมงาน", href: "/contracts", icon: <FaFileContract /> },
+    { title: "ภาพรวมงาน", href: "/contracts", icon: <FaFileContract />, badgeKey: "contracts" },
   ];
   // ✅ หมวด "งานขาย" — เหลือรายการเดียวคือฟอร์มแจ้งงานข้ามแผนก
   // ⚠️ แผนงานของเซล **ไม่ได้อยู่ในหมวดนี้** แต่อยู่ในหมวด "งาน" ร่วมกับช่าง เพราะเป็นระบบเดียวกันจริงๆ
@@ -158,20 +163,20 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
     // (ไอคอนกราฟเส้น) ซึ่งสื่อถึง "ยอด/สถิติ" ไม่ใช่ "ส่งคำของานให้ช่าง" ทั้งที่เมนูนี้ไม่มีกราฟอะไรเลย
     // เปลี่ยนเป็นไอคอนกระดาษเครื่องบิน (ส่ง/แจ้งออกไป) ให้ตรงกับคำว่า "แจ้ง" จริงๆ และแยกจาก
     // FaClipboardCheck ของฝั่งแอดมิน ("คำขอลงงาน") ชัดเจน — คนละบทบาทกัน ไม่ควรใช้ไอคอนหน้าตาคล้ายกัน
-    { title: "แจ้งงานให้ช่าง", href: "/sales", icon: <FaPaperPlane /> },
+    { title: "แจ้งงานให้ช่าง", href: "/sales", icon: <FaPaperPlane />, badgeKey: "dispatchMine" },
   ];
   // ⚠️ อยู่หมวด "งาน" ไม่ใช่ "งานขาย" — เป็นคิวของฝ่ายบริการ ไม่ใช่ของฝ่ายขาย
   // 🧹 เดิมชื่อ "ใบมอบหมายงาน" ซึ่งเป็นคำที่มองจากฝั่งคนจ่ายงาน ทั้งที่ของในคิวคือ "คำขอ"
   // ที่ยังไม่ได้ตัดสินใจ — ยังไม่เป็นใบมอบหมายจนกว่าจะอนุมัติ
   const dispatchMenu = [
-    { title: "คำขอลงงาน", href: "/dispatch", icon: <FaClipboardCheck /> },
+    { title: "คำขอลงงาน", href: "/dispatch", icon: <FaClipboardCheck />, badgeKey: "dispatchQueue" },
   ];
   // ✅ เดิมประกาศไว้แต่ไม่เคย render เลย — ช่างจึงไม่มีทางกดเข้า "งานของฉัน" จาก sidebar ได้เลย
   // ✅ "ภาพรวมงาน" เดิมเฉพาะแอดมิน/manager (ดู workMenuManager ด้านบน) ตอนนี้ช่างเข้าดูได้ด้วย
   // (เห็นแค่งานของตัวเอง แก้ไขไม่ได้ — ดู ContractOverview.js) เลยเพิ่มเป็นทางลัดให้ตรงนี้ด้วย
   const workMenuTechnician = [
-    { title: "งานของฉัน", href: "/technician/jobs", icon: <FaClipboardList /> },
-    { title: "ภาพรวมงาน", href: "/contracts", icon: <FaFileContract /> },
+    { title: "งานของฉัน", href: "/technician/jobs", icon: <FaClipboardList />, badgeKey: "myJobs" },
+    { title: "ภาพรวมงาน", href: "/contracts", icon: <FaFileContract />, badgeKey: "contracts" },
   ];
 
   // ✅ หมวด "เอกสาร" — ยุบ "เอกสารทั้งหมด" (ไฟล์แนบงาน) + "ทะเบียนเอกสาร" (ใบที่ระบบออก) เหลือหน้าเดียว
@@ -186,7 +191,7 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
   // 🐛 ที่แก้ไปด้วย: เดิม "ติดตามใบเสนอราคา" ถูกโชว์ให้ช่างเห็น แต่ตัวหน้า redirect ช่างออกทันทีที่กด
   // = เมนูที่กดแล้วเด้งทิ้งทุกครั้ง ตอนนี้อยู่ใต้เงื่อนไข isAdminOrManager ตรงกับสิทธิ์จริงของหน้าแล้ว
   const financeMenu = [
-    { title: "ใบเสนอราคา / การเงิน", href: "/finance", icon: <FaFileInvoiceDollar /> },
+    { title: "ใบเสนอราคา / การเงิน", href: "/finance", icon: <FaFileInvoiceDollar />, badgeKey: "quotations" },
   ];
 
   // ✅ หมวด "ข้อมูลหลัก" — แทนหมวด "ทีมงาน" เดิมที่มีลูกค้าปนอยู่ (ผิดความหมาย) และแทน
@@ -196,9 +201,13 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
   // ✅ หมวด "เบิกค่าใช้จ่าย" — 3 เมนูตามที่ผู้ใช้ขอ: ใบ Advance · ใบเคลม · รายงานย้อนหลัง
   // ⚠️ ทั้งสามเป็นหน้าเดียวกัน (ExpensesHub) ต่างกันแค่ ?tab= — isActiveHref เทียบ query ตรงตัว จึงไฮไลต์ถูกเมนู
   const expenseMenu = [
-    { title: "ใบเบิก Advance", href: "/expenses?tab=advances", icon: <FaMoneyCheckAlt /> },
-    { title: "ใบเคลม (Claim)", href: "/expenses?tab=claims", icon: <FaReceipt /> },
-    { title: "รายงานการเบิก", href: "/expenses?tab=report", icon: <FaChartBar /> },
+    { title: "ใบเบิก Advance", href: "/expenses/advances", icon: <FaMoneyCheckAlt />, badgeKey: "advance" },
+    { title: "ใบเคลม (Claim)", href: "/expenses/claims", icon: <FaReceipt />, badgeKey: "claim" },
+    // ✅ คิวของหัวหน้า (อนุมัติ/จ่ายเงิน/ปิดส่วนต่าง) — เดิมมีแต่ในเมนูหลักหน้าแรก เมนูข้างเข้าไม่ถึง
+    ...(can(userData, "approveExpense")
+      ? [{ title: "รออนุมัติการเบิก", href: "/expenses/approvals", icon: <FaInbox />, badgeKey: "expenseInbox" }]
+      : []),
+    { title: "รายงานการเบิก", href: "/expenses/report", icon: <FaChartBar /> },
   ];
 
   const masterDataMenu = [
@@ -253,23 +262,43 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
 
   const initials = (userData?.fname?.charAt(0) || userData?.username?.charAt(0) || "U").toUpperCase();
 
+  /**
+   * ป้ายตัวเลขท้ายเมนู
+   * ⚠️ ตอนย่อแถบเหลือแต่ไอคอน ป้ายต้องหดเป็นจุดเล็กมุมไอคอน (ดู .nav-badge ใน Sidebar.css)
+   * ไม่งั้นตัวเลขจะล้นออกนอก rail แคบๆ
+   */
+  const renderBadge = (item) => {
+    const n = item.badgeKey ? Number(badges[item.badgeKey]) || 0 : 0;
+    if (!n) return null;
+    return <span className="nav-badge" aria-hidden="true">{n > 99 ? "99+" : n}</span>;
+  };
+
+  const badgeAria = (item) => {
+    const n = item.badgeKey ? Number(badges[item.badgeKey]) || 0 : 0;
+    return n ? `${item.title} (${BADGE_LABEL[item.badgeKey] || "รอดำเนินการ"} ${n})` : item.title;
+  };
+
   const renderLink = (item, key) => (
     <NavItem key={key}>
       <Link
         to={item.href}
         title={item.title}
+        aria-label={badgeAria(item)}
         className={`nav-link ${isActiveHref(item.href) ? "active" : ""}`}
         onClick={handleItemClick}
       >
         <span className="nav-icon">{item.icon}</span>
         <span className="nav-text">{item.title}</span>
+        {renderBadge(item)}
       </Link>
     </NavItem>
   );
 
   // ✅ เมนูแม่ที่มีลูก (ตอนนี้มีแค่ "แผนงาน") — ตอนย่อแถบไม่มีที่พอให้กาง submenu ใน rail แคบๆ
   // ได้เลย กดแล้วพาไปหน้า default (href ของแม่) ตรงๆ แทน ต้องขยายแถบก่อนถึงจะเข้าเมนูลูกอื่นได้
-  const renderParentWithItems = (navi, index) => (
+  const renderParentWithItems = (navi, index) => {
+    const childTotal = (navi.items || []).reduce((sum, it) => sum + (it.badgeKey ? Number(badges[it.badgeKey]) || 0 : 0), 0);
+    return (
     <NavItem key={index}>
       {isCollapsed ? (
         <Link
@@ -280,6 +309,7 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
         >
           <span className="nav-icon">{navi.icon}</span>
           <span className="nav-text">{navi.title}</span>
+          {childTotal > 0 && <span className="nav-badge" aria-hidden="true">{childTotal > 99 ? "99+" : childTotal}</span>}
         </Link>
       ) : (
         <>
@@ -289,6 +319,9 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
           >
             <span className="nav-icon">{navi.icon}</span>
             <span className="nav-text">{navi.title}</span>
+            {childTotal > 0 && !isMenuOpen(navi, index) && (
+              <span className="nav-badge" aria-hidden="true">{childTotal > 99 ? "99+" : childTotal}</span>
+            )}
             <i className={`bi bi-chevron-right arrow-icon ${isMenuOpen(navi, index) ? "rotate" : ""}`}></i>
           </button>
           <Collapse isOpen={isMenuOpen(navi, index)}>
@@ -302,6 +335,7 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
                 >
                   <i className="bi bi-circle submenu-dot"></i>
                   <span className="nav-text">{item.title}</span>
+                  {renderBadge(item)}
                 </Link>
               ))}
             </div>
@@ -309,7 +343,8 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
         </>
       )}
     </NavItem>
-  );
+    );
+  };
 
   return (
     <div className={`sidebar-container ${isCollapsed ? "collapsed" : ""}`}>
