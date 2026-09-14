@@ -15,6 +15,21 @@ const adv = (over = {}) => ({
   ...over,
 });
 
+/** ใบสำรองจ่าย (kind=claim + claimType=reimburse) — ไม่มี Advance ให้ผูก จึงมาคนละก้อนกับ adv() */
+const rmb = (over = {}) => ({
+  _id: Math.random().toString(16).slice(2),
+  kind: "claim",
+  claimType: "reimburse",
+  status: "approved",
+  total: 250,
+  difference: 250,
+  docDate: "2026-09-12T12:00:00.000Z",
+  requester: { userId: "u1", name: "เอ" },
+  eventId: "",
+  items: [{ category: "fuel", amount: 250 }],
+  ...over,
+});
+
 describe("bahtText", () => {
   it.each([
     [0, "ศูนย์บาทถ้วน"],
@@ -86,5 +101,41 @@ describe("buildExpenseReport", () => {
   it("ไม่มีเศษทศนิยมลอยตัว", () => {
     const r = buildExpenseReport([adv({ total: 0.1 }), adv({ total: 0.2 })], { now });
     expect(r.totals.advanced).toBe(0.3);
+  });
+
+  it("ใบสำรองจ่าย: แยกยอดของตัวเอง ไม่ปนกับจ่ายล่วงหน้า/ใช้จริง", () => {
+    const r = buildExpenseReport([adv({ status: "paid", total: 1000, requester: { userId: "u1", name: "เอ" } })], {
+      now,
+      reimbursements: [
+        rmb({ status: "pending", total: 100 }),
+        rmb({ status: "approved", total: 200 }),
+        rmb({ status: "settled", total: 300 }),
+        rmb({ status: "cancelled", total: 9999 }),
+      ],
+    });
+    // ⚠️ advanced/actual ต้องไม่ขยับเลย — สองตัวนี้มีไว้เทียบเงินที่จ่ายล่วงหน้ากับที่ใช้จริงเท่านั้น
+    expect(r.totals).toMatchObject({
+      advanced: 1000, actual: 0,
+      reimburseCount: 3, reimbursePending: 100, reimburse: 500, reimburseDue: 200, reimbursePaid: 300,
+    });
+  });
+
+  it("ใบสำรองจ่าย: โผล่ในกลุ่มตามคน/งาน/เดือน แม้คนนั้นไม่เคยเบิก Advance เลย", () => {
+    const r = buildExpenseReport([adv({ requester: { userId: "u1", name: "เอ" }, total: 400 })], {
+      now,
+      reimbursements: [
+        rmb({ status: "settled", total: 250, requester: { userId: "u9", name: "ซี" }, eventId: "e9", job: { title: "ซ่อมด่วน", site: "ตึก Z" } }),
+      ],
+    });
+    const c = r.byPerson.find((p) => p.label === "ซี");
+    expect(c).toMatchObject({ advanced: 0, reimburse: 250, reimburseCount: 1 });
+    expect(r.byJob.map((j) => j.label)).toContain("ซ่อมด่วน · ตึก Z");
+    expect(r.byMonth.find((m) => m.key === "2026-09")).toMatchObject({ reimburse: 250 });
+    expect(r.byCategory.find((x) => x.key === "fuel")).toMatchObject({ reimburse: 250 });
+  });
+
+  it("ใบสำรองจ่าย: ส่วนต่างอ่านว่า 'จ่ายคืน' ไม่ใช่ 'จ่ายเพิ่ม'", () => {
+    expect(differenceMeta(500, "reimburse").short).toBe("จ่ายคืน");
+    expect(differenceMeta(500, "claim").short).toBe("จ่ายเพิ่ม");
   });
 });

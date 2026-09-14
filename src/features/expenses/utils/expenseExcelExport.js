@@ -48,8 +48,15 @@ const GROUP_COLS = [
   { key: "extraDue", header: "รอจ่ายเพิ่ม", width: 12 },
   { key: "refunded", header: "รับคืนแล้ว", width: 12 },
   { key: "extraPaid", header: "จ่ายเพิ่มแล้ว", width: 12 },
+  // ── ใบสำรองจ่าย (ไม่มี Advance) ────────────────────────────────────
+  { key: "reimburseCount", header: "ใบสำรองจ่าย", width: 12 },
+  { key: "reimburse", header: "สำรองจ่าย (อนุมัติ)", width: 17 },
+  { key: "reimburseDue", header: "รอจ่ายคืน", width: 13 },
+  { key: "reimbursePaid", header: "จ่ายคืนแล้ว", width: 13 },
 ];
-const GROUP_MONEY = GROUP_COLS.map((c) => c.key).filter((k) => k !== "count");
+/** ⚠️ ช่องที่เป็น "จำนวนใบ" ต้องไม่ถูกจัดรูปแบบเป็นเงิน ไม่งั้นจะอ่านเป็น 3.00 ใบ */
+const GROUP_COUNTS = ["count", "reimburseCount"];
+const GROUP_MONEY = GROUP_COLS.map((c) => c.key).filter((k) => !GROUP_COUNTS.includes(k));
 
 export async function exportExpenseReport(report, { periodLabel = "", fileName = "รายงานการเบิก" } = {}) {
   const wb = new ExcelJS.Workbook();
@@ -76,10 +83,15 @@ export async function exportExpenseReport(report, { periodLabel = "", fileName =
     ["รอจ่ายเงินเพิ่ม", t.extraDue],
     ["รับเงินคืนแล้ว", t.refunded],
     ["จ่ายเงินเพิ่มแล้ว", t.extraPaid],
+    ["จำนวนใบสำรองจ่าย", t.reimburseCount],
+    ["สำรองจ่าย (อนุมัติแล้ว)", t.reimburse],
+    ["รอจ่ายคืนค่าสำรองจ่าย", t.reimburseDue],
+    ["จ่ายคืนค่าสำรองจ่ายแล้ว", t.reimbursePaid],
   ].forEach(([label, value], i) => {
     const row = ws.addRow([label, value]);
     row.getCell(1).font = { bold: true };
-    if (![0, 7].includes(i)) row.getCell(2).numFmt = MONEY;
+    // ⚠️ แถวที่เป็นจำนวนใบ (0 = จำนวนใบ Advance · 7 = ใบเลยกำหนด · 12 = จำนวนใบสำรองจ่าย) ไม่ใช่เงิน
+    if (![0, 7, 12].includes(i)) row.getCell(2).numFmt = MONEY;
     row.eachCell((c) => { c.border = { bottom: BORDER }; });
   });
 
@@ -114,6 +126,29 @@ export async function exportExpenseReport(report, { periodLabel = "", fileName =
     claimStatus: a.claim ? `${statusMeta(a.claim.status, "claim").label}${a.claim.difference ? ` (${differenceMeta(a.claim.difference).short})` : ""}` : "",
   })), ["total", "actual", "diff"]);
 
+  // ── ใบสำรองจ่าย ──────────────────────────────────────────────────────
+  // ✅ แยกชีตของตัวเอง — ใบพวกนี้ไม่มีคอลัมน์ "ยอดเบิก/กำหนดเคลียร์/ใบเคลม" ให้กรอก ยัดรวมชีตเดียวกับ
+  // ใบ Advance จะได้ตารางที่มีช่องว่างครึ่งตารางและอ่านยอดรวมผิดได้ง่าย
+  addTable(wb.addWorksheet("ใบสำรองจ่าย"), [
+    { key: "docNo", header: "เลขที่", width: 17 },
+    { key: "date", header: "วันที่", width: 13 },
+    { key: "person", header: "ผู้เบิก", width: 14 },
+    { key: "subject", header: "เรื่อง", width: 36 },
+    { key: "job", header: "งาน", width: 30 },
+    { key: "total", header: "ยอดจ่ายคืน", width: 14 },
+    { key: "status", header: "สถานะ", width: 18 },
+    { key: "paidAt", header: "วันที่จ่ายคืน", width: 14 },
+  ], (report.reimburseRows || []).map((r) => ({
+    docNo: r.docNo,
+    date: thaiDate(r.docDate),
+    person: r.requester?.name,
+    subject: r.subject,
+    job: jobText(r.job),
+    total: r.total,
+    status: statusMeta(r.status, "reimburse").label,
+    paidAt: r.payment?.at ? thaiDate(r.payment.at) : "",
+  })), ["total"]);
+
   const groupSheet = (name, firstHeader, rows) => addTable(
     wb.addWorksheet(name),
     [{ key: "label", header: firstHeader, width: 34 }, ...GROUP_COLS],
@@ -128,7 +163,8 @@ export async function exportExpenseReport(report, { periodLabel = "", fileName =
     { key: "label", header: "หมวดค่าใช้จ่าย", width: 24 },
     { key: "planned", header: "ตั้งเบิก (Advance ที่จ่ายแล้ว)", width: 22 },
     { key: "actual", header: "ใช้จริง (ใบเคลมที่อนุมัติ)", width: 22 },
-  ], report.byCategory.map((c) => ({ ...c, label: categoryMeta(c.key).label })), ["planned", "actual"]);
+    { key: "reimburse", header: "สำรองจ่าย (อนุมัติ)", width: 20 },
+  ], report.byCategory.map((c) => ({ ...c, label: categoryMeta(c.key).label })), ["planned", "actual", "reimburse"]);
 
   const buf = await wb.xlsx.writeBuffer();
   saveAs(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `${fileName}.xlsx`);

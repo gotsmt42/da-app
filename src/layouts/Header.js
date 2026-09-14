@@ -18,7 +18,6 @@ import {
 } from "reactstrap";
 import { swalLogout, hasValidAvatar } from "../shared/utils/user";
 import Swal from "sweetalert2";
-import Badge from "@mui/material/Badge";
 import useAppBadges from "@/shared/hooks/useAppBadges";
 // ✅ ไอคอน 3 เมนูกลางตรงกับที่ Dashboard.js/Sidebar.js ใช้จริงสำหรับหน้าเดียวกันเป๊ะๆ
 // (FaWrench="การดำเนินงาน", FaFileContract="ภาพรวมสัญญา", FaFileInvoiceDollar="ติดตามใบเสนอราคา")
@@ -27,6 +26,7 @@ import {
   FaChevronDown, FaCheck, FaBriefcase,
 } from "react-icons/fa";
 import { can, isRole, ROLES, DEPARTMENT } from "@/shared/utils/roles";
+import { pageTitleFor } from "./pageTitle";
 
 /**
  * ✅ ตัวเลือกของ dropdown "ตารางงาน" — ต่างกันตาม role เพราะ query ?dept= มีความหมายไม่เหมือนกัน
@@ -133,6 +133,19 @@ const Header = ({ toggleMobileSidebar }) => {
   // ✅ ป้ายบนปุ่มสลับตามตัวเลือกปัจจุบันเหมือน <select> จริง — อยู่หน้าอื่นที่ไม่ใช่ปฏิทินเลยก็ยัง
   // ต้องมีค่าเริ่มต้นให้แสดง จึงเผื่อตัวเลือกหลัก (primary) ไว้เป็นค่าตั้งต้นเสมอ
   const scheduleLabel = isSecondaryScheduleActive ? scheduleOptions.secondary.label : scheduleOptions.primary.label;
+
+  /**
+   * กลางแถบบนของ "จอมือถือ" มีได้ทีละอย่างเดียว (กว้างราว 180px):
+   *   1. ทางลัดตารางงานของเซล — เซลไม่มีทางลัดอื่นบนแถบบนเลย จึงมาก่อน
+   *   2. ชื่อหน้าที่เปิดอยู่ — role อื่นได้อันนี้ (ดูเหตุผลเต็มที่ layouts/pageTitle.js)
+   * ⚠️ แถบบนของจอคอมไม่เกี่ยวกับตรงนี้เลย ทั้งสองอย่างเป็น d-lg-none (ผู้ใช้ขอให้จอคอมคงเดิม)
+   */
+  const hasScheduleShortcut = !canViewContracts && canViewService;
+  // ✅ "/event" ใช้ชื่อเดียวกับปุ่มเลือกตารางงาน (ต่างกันตาม role + ?dept=) ตารางชื่อหน้าตายตัวตอบไม่ได้
+  const pageTitle = isOnEventPage
+    ? { label: scheduleLabel, Icon: FaCalendarAlt }
+    : pageTitleFor(location.pathname);
+  const PageTitleIcon = pageTitle?.Icon || null;
 
   const { notifications, unread, markRead, markAllRead } = useEventNotifications(
     events,
@@ -246,21 +259,15 @@ const Header = ({ toggleMobileSidebar }) => {
           )}
         </Nav>
 
-        {/* ✅ จอมือถือ: Nav ด้านบนถูกซ่อนไว้ (d-none d-lg-flex) เหลือพื้นที่ว่างกลางแถบ — ใส่ทางลัดหลัก
-            ของแต่ละสายงานแทนที่จะปล่อยว่างเปล่า มีได้ทีละอันเท่านั้น (พื้นที่กลางแถบแคบเกินจะใส่ 2 อัน)
-            ✅ สายบริการ (แอดมิน/manager/ช่าง) → "ภาพรวมงาน" พร้อมป้ายจำนวนสัญญาที่เกินกำหนดวางแผนรอบถัดไป
-            ✅ เซล (ไม่มี canViewContracts) → "ตารางงานช่าง" แทน ไม่งั้นจะไม่มีทางลัดอะไรเลยบนจอมือถือ */}
-        {canViewContracts ? (
-          <Link to="/contracts" className="header-shortcut-pill d-flex d-lg-none align-items-center gap-1 mx-auto">
-            <Badge
-              badgeContent={overdueContractCount} color="error" max={9} overlap="circular"
-              sx={{ "& .MuiBadge-badge": { fontSize: "8px", minWidth: 14, height: 14, padding: "0 3px" } }}
-            >
-              <FaFileContract size={12} />
-            </Badge>
-            <span>ภาพรวมงาน</span>
-          </Link>
-        ) : canViewService ? (
+        {/* ── กลางแถบบน เฉพาะจอมือถือ (Nav ด้านบนเป็น d-none d-lg-flex จึงว่างทั้งแถบ) ──────────
+            🧹 เดิมตรงนี้เป็นชิป "ภาพรวมงาน" — ตัดออกตามที่ผู้ใช้สั่ง เพราะซ้ำกับช่อง "ภาพรวมงาน" บน
+               แถบเมนูล่าง (ปลายทางเดียวกัน ป้ายตัวเลขเดียวกัน ห่างกันแค่ครึ่งจอ)
+            ✅ แล้วใส่ "ชื่อหน้าที่เปิดอยู่" แทนที่ช่องว่างนั้น (ผู้ใช้: "แถบ header ในมือถือควรใส่อะไร
+               ให้ไม่โล่ง") — เป็นป้ายบอกตำแหน่ง ไม่ใช่ปุ่ม จึงไม่เพิ่มทางเข้าซ้ำให้รกเหมือนเดิม
+               และอุดช่องโหว่จริง: แถบล่างไฮไลต์ได้แค่ 5 ปลายทาง หน้าอื่นเปิดแล้วไม่มีอะไรบอกว่าอยู่ไหน
+            ⚠️ เซลได้ทางลัด "ตารางงาน" เหมือนเดิม (มาก่อนชื่อหน้า) — เซลไม่มีทางลัดอื่นบนแถบบนเลย
+            ⚠️ แถบบนของจอคอมไม่ถูกแตะเลย ทั้งสองอย่างเป็น d-lg-none (ผู้ใช้ขอให้จอคอมคงเดิม) */}
+        {hasScheduleShortcut ? (
           <Dropdown
             isOpen={scheduleMenuOpenMobile} toggle={() => setScheduleMenuOpenMobile((o) => !o)}
             className="d-flex d-lg-none mx-auto"
@@ -279,6 +286,11 @@ const Header = ({ toggleMobileSidebar }) => {
             </DropdownToggle>
             <ScheduleDropdownMenu options={scheduleOptions} isSecondaryActive={isSecondaryScheduleActive} />
           </Dropdown>
+        ) : pageTitle ? (
+          <div className="header-page-title d-flex d-lg-none align-items-center gap-2 mx-auto" aria-current="page">
+            <PageTitleIcon size={12} className="header-page-title__icon" />
+            <span>{pageTitle.label}</span>
+          </div>
         ) : null}
 
         {/* ฝั่งขวา: แจ้งเตือน + รูปโปรไฟล์ผู้ใช้งาน + ปุ่มแฮมเบอร์เกอร์ */}

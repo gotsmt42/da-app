@@ -16,6 +16,7 @@ import { alpha } from "@mui/material/styles";
 import {
   Close, Print, Edit, CheckCircle, Undo, Block, Payments, ReceiptLong, AttachFile, OpenInNew,
   DeleteOutline, Link as LinkIcon, History, TaskAlt, WarningAmber, Image as ImageIcon, Description, ExpandMore,
+  AccountBalanceWallet,
 } from "@mui/icons-material";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
@@ -29,7 +30,7 @@ import AdvancePanel from "./AdvancePanel";
 import KindBadge from "./KindBadge";
 import { compareItems, COMPARE_KIND_LABEL } from "../utils/expenseCompare";
 import {
-  KIND_META, statusMeta, categoryMeta, baht, fmtMoney, qtyText, differenceMeta, paymentLabel, PAYMENT_METHODS,
+  KIND_META, slipKind, statusMeta, categoryMeta, baht, fmtMoney, qtyText, differenceMeta, paymentLabel, PAYMENT_METHODS,
   fileKindLabel, jobText, isOverdueClear, money, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
 } from "../expenseMeta";
 
@@ -205,21 +206,36 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
   }, [action, expense?._id, expense?.dueClearAt]);
   if (!action) return null;
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e?.target ? e.target.value : e }));
-  const diff = differenceMeta(expense?.difference);
+  const slip = slipKind(expense);
+  const reimburse = slip === "reimburse";
+  const diff = differenceMeta(expense?.difference, slip);
   const cfg = {
     approve: {
       title: "อนุมัติ", color: "#059669", button: "ยืนยันอนุมัติ",
-      body: expense?.kind === "claim"
-        ? (money(expense?.difference) === 0 ? "ใช้จริงพอดีกับยอด Advance — อนุมัติแล้วใบ Advance จะเคลียร์ทันที" : `อนุมัติแล้วรอ${diff.short} ${baht(diff.amount)} ก่อนปิดใบ`)
-        : `อนุมัติยอด ${baht(expense?.total)} — ขั้นต่อไปคือบันทึกการจ่ายเงิน`,
+      body: reimburse
+        ? `อนุมัติแล้วบริษัทต้องจ่ายคืนให้ ${expense?.requester?.name || "ผู้เบิก"} ${baht(expense?.total)}`
+        : expense?.kind === "claim"
+          ? (money(expense?.difference) === 0 ? "ใช้จริงพอดีกับยอด Advance — อนุมัติแล้วใบ Advance จะเคลียร์ทันที" : `อนุมัติแล้วรอ${diff.short} ${baht(diff.amount)} ก่อนปิดใบ`)
+          : `อนุมัติยอด ${baht(expense?.total)} — ขั้นต่อไปคือบันทึกการจ่ายเงิน`,
     },
     reject: { title: "ตีกลับให้แก้ไข", color: "#dc2626", button: "ตีกลับ", body: "ผู้เบิกจะได้รับแจ้งพร้อมเหตุผล และแก้ไขส่งใหม่ในใบเดิมได้" },
-    cancel: { title: "ยกเลิกใบนี้", color: "#64748b", button: "ยืนยันยกเลิก", body: expense?.kind === "claim" ? "ใบ Advance ที่อ้างถึงจะกลับไปรอเคลียร์ และออกใบเคลมใหม่ได้" : "ยกเลิกแล้วย้อนกลับไม่ได้ (เลขที่เอกสารจะไม่ถูกนำกลับมาใช้)" },
-    pay: { title: "บันทึกการจ่ายเงิน Advance", color: KIND_META.advance.color, button: "บันทึกจ่ายเงิน", body: `จ่ายให้ ${expense?.requester?.name || "-"} จำนวน ${baht(expense?.total)}` },
-    settle: {
-      title: money(expense?.difference) > 0 ? "บันทึกจ่ายเงินเพิ่ม" : "บันทึกรับเงินคืน", color: KIND_META.claim.color, button: "ปิดส่วนต่าง",
-      body: `${diff.label} ${baht(diff.amount)} — บันทึกแล้วใบ Advance จะเคลียร์เรียบร้อย`,
+    cancel: {
+      title: "ยกเลิกใบนี้", color: "#64748b", button: "ยืนยันยกเลิก",
+      // ⚠️ ใบสำรองจ่ายไม่มี Advance ให้คืนสถานะ — ข้อความของใบเคลมใช้กับมันไม่ได้
+      body: expense?.kind === "claim" && !reimburse
+        ? "ใบ Advance ที่อ้างถึงจะกลับไปรอเคลียร์ และออกใบเคลมใหม่ได้"
+        : "ยกเลิกแล้วย้อนกลับไม่ได้ (เลขที่เอกสารจะไม่ถูกนำกลับมาใช้)",
     },
+    pay: { title: "บันทึกการจ่ายเงิน Advance", color: KIND_META.advance.color, button: "บันทึกจ่ายเงิน", body: `จ่ายให้ ${expense?.requester?.name || "-"} จำนวน ${baht(expense?.total)}` },
+    settle: reimburse
+      ? {
+        title: "บันทึกจ่ายคืนค่าสำรองจ่าย", color: KIND_META.reimburse.color, button: "บันทึกจ่ายคืน",
+        body: `จ่ายคืนให้ ${expense?.requester?.name || "ผู้เบิก"} ${baht(expense?.total)} — บันทึกแล้วใบนี้จะเสร็จสิ้น`,
+      }
+      : {
+        title: money(expense?.difference) > 0 ? "บันทึกจ่ายเงินเพิ่ม" : "บันทึกรับเงินคืน", color: KIND_META.claim.color, button: "ปิดส่วนต่าง",
+        body: `${diff.label} ${baht(diff.amount)} — บันทึกแล้วใบ Advance จะเคลียร์เรียบร้อย`,
+      },
   }[action];
   const needReason = action === "reject";
   const payLike = action === "pay" || action === "settle";
@@ -341,8 +357,14 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
   const me = String(userData?.userId || "");
   const e = expense;
   const kind = e?.kind || "advance";
-  const meta = KIND_META[kind];
-  const st = statusMeta(e?.status, kind);
+  /**
+   * ⚠️ "ชนิดที่ใช้แสดงผล" ไม่เท่ากับ kind — ใบสำรองจ่ายมี kind = "claim" แต่ไม่มี Advance ให้เทียบเลย
+   * ทุกส่วนที่เกี่ยวกับการเทียบยอด/ใบอ้างอิง ต้องเช็ค isClearClaim ไม่ใช่ isClaimKind
+   */
+  const slip = slipKind(e);
+  const isReimburse = slip === "reimburse";
+  const meta = KIND_META[slip];
+  const st = statusMeta(e?.status, slip);
   const isOwner = e && (e.requester?.userId === me || e.createdBy?.userId === me);
   const canApprove = can("approveExpense");
   const viewAll = can("viewAllExpenses");
@@ -411,7 +433,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
   // ── ขั้นต่อไป ────────────────────────────────────────────────────────
   const nextStep = useMemo(() => {
     if (!e) return null;
-    const diff = differenceMeta(e.difference);
+    const diff = differenceMeta(e.difference, slip);
     if (e.status === "pending") return { severity: "warning", text: canApprove && !selfBlocked ? "รอคุณพิจารณาอนุมัติ" : "รอหัวหน้าพิจารณาอนุมัติ" };
     if (e.status === "rejected") return { severity: "error", text: `ถูกตีกลับโดย ${e.rejectedBy?.name || "-"}: ${e.rejectReason || "-"}` };
     if (e.status === "cancelled") return { severity: "info", text: `ยกเลิกโดย ${e.cancelledBy?.name || "-"} ${e.cancelledAt ? `เมื่อ ${thaiDate(e.cancelledAt)}` : ""}${e.cancelReason ? ` · ${e.cancelReason}` : ""}` };
@@ -424,12 +446,15 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
       }
       if (e.status === "clearing") return { severity: "info", text: `ส่งใบเคลม ${e.claimDocNo || ""} แล้ว — รอตรวจ/ปิดส่วนต่าง` };
       if (e.status === "cleared") return { severity: "success", text: `เคลียร์เรียบร้อยด้วยใบเคลม ${e.claimDocNo || ""}` };
+    } else if (isReimburse) {
+      if (e.status === "approved") return { severity: "info", text: `อนุมัติแล้ว — รอบริษัทจ่ายคืน ${baht(e.total)}` };
+      if (e.status === "settled") return { severity: "success", text: `จ่ายคืนเรียบร้อย ${baht(e.total)}` };
     } else {
       if (e.status === "approved") return { severity: "info", text: `อนุมัติแล้ว — รอ${diff.short} ${baht(diff.amount)}` };
       if (e.status === "settled") return { severity: "success", text: diff.amount ? `ปิดส่วนต่างเรียบร้อย (${diff.short} ${baht(diff.amount)})` : "เคลียร์เรียบร้อย ไม่มีส่วนต่าง" };
     }
     return null;
-  }, [e, kind, overdue, canApprove, selfBlocked]);
+  }, [e, kind, slip, isReimburse, overdue, canApprove, selfBlocked]);
 
   const steps = useMemo(() => {
     if (!e) return [];
@@ -442,19 +467,20 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
       ];
     }
     return [
-      { label: "ส่งเคลม", done: true, date: e.submittedAt || e.createdAt },
+      { label: isReimburse ? "ส่งขอเบิกคืน" : "ส่งเคลม", done: true, date: e.submittedAt || e.createdAt },
       { label: "อนุมัติ", done: ["approved", "settled"].includes(e.status), date: e.approvedAt, danger: e.status === "rejected" },
-      { label: "ปิดส่วนต่าง", done: e.status === "settled", date: e.status === "settled" ? e.payment?.at : null },
+      { label: isReimburse ? "จ่ายคืน" : "ปิดส่วนต่าง", done: e.status === "settled", date: e.status === "settled" ? e.payment?.at : null },
     ];
-  }, [e, kind, overdue]);
+  }, [e, kind, isReimburse, overdue]);
 
   const isClaimKind = kind === "claim";
+  const isClearClaim = isClaimKind && !isReimburse;
   // ✅ ผู้ใช้ขอให้ใบเคลมมีรายละเอียดของ Advance "ข้างๆ" — จอกว้างวางเป็นคอลัมน์ขวา ติดอยู่กับที่ขณะเลื่อน
-  const sidePanel = isClaimKind && e?.advanceDoc;
+  const sidePanel = isClearClaim && e?.advanceDoc;
 
   return (
     <>
-      <Dialog open={open} onClose={() => !busy && onClose?.()} fullWidth maxWidth={isClaimKind ? "lg" : "md"} fullScreen={isMobile}
+      <Dialog open={open} onClose={() => !busy && onClose?.()} fullWidth maxWidth={isClearClaim ? "lg" : "md"} fullScreen={isMobile}
         PaperProps={{ sx: { borderRadius: isMobile ? 0 : 3 } }}>
         <DialogTitle sx={{ p: 0 }}>
           {/* ✅ หัวกล่องเป็นสีประจำชนิดใบ — Advance เขียวอมฟ้า / Claim ม่วง พร้อมป้าย ADVANCE/CLAIM */}
@@ -466,11 +492,11 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
               width: 38, height: 38, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
               bgcolor: meta.color, color: "#fff",
             }}>
-              {isClaimKind ? <ReceiptLong sx={{ fontSize: 21 }} /> : <Payments sx={{ fontSize: 21 }} />}
+              {isReimburse ? <AccountBalanceWallet sx={{ fontSize: 21 }} /> : isClaimKind ? <ReceiptLong sx={{ fontSize: 21 }} /> : <Payments sx={{ fontSize: 21 }} />}
             </Box>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Stack direction="row" alignItems="center" spacing={0.75} sx={{ minWidth: 0 }}>
-                <KindBadge kind={kind} />
+                <KindBadge kind={slip} />
                 <Typography sx={{ fontWeight: 900, fontSize: "1.02rem", lineHeight: 1.3, color: meta.dark }} noWrap>
                   {e?.docNo || meta.label}
                 </Typography>
@@ -512,7 +538,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                     </Typography>
                   </Box>
                   <Box sx={{ textAlign: { sm: "right" } }}>
-                    <Typography variant="caption" sx={{ color: TEXT_SUB }}>{kind === "claim" ? "ใช้จ่ายจริง" : "ยอดขอเบิก"}</Typography>
+                    <Typography variant="caption" sx={{ color: TEXT_SUB }}>{isReimburse ? "ยอดขอเบิกคืน" : kind === "claim" ? "ใช้จ่ายจริง" : "ยอดขอเบิก"}</Typography>
                     <Typography sx={{ fontWeight: 900, fontSize: "1.45rem", color: meta.color, lineHeight: 1.1 }}>{baht(e.total)}</Typography>
                   </Box>
                 </Stack>
@@ -520,7 +546,9 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                 {e.status !== "cancelled" && <Steps steps={steps} color={meta.color} />}
               </Card>
 
-              {isClaimKind && (
+              {/* ✅ ใบสำรองจ่ายไม่มีใบ Advance ให้เทียบ — ข้ามการ์ดเทียบยอดไปใช้ตารางรายการธรรมดาแทน
+                  (การ์ดเทียบที่มีช่อง "ยอดเบิก Advance" เป็น 0 ตลอดคือข้อมูลที่ทำให้เข้าใจผิด ไม่ใช่ข้อมูลที่ขาด) */}
+              {isClearClaim && (
                 <Card title={isDesktop ? "เทียบรายการ: ตั้งเบิก (Advance) กับ ใช้จริง (Claim)" : "เทียบกับใบ Advance"} icon={<LinkIcon sx={{ fontSize: 18, color: meta.color }} />}
                   action={e.advanceId && (
                     <Button size="small" onClick={() => onOpenOther?.(e.advanceId)} endIcon={<OpenInNew sx={{ fontSize: 15 }} />}
@@ -529,7 +557,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                     </Button>
                   )}>
                   {(() => {
-                    const d = differenceMeta(e.difference);
+                    const d = differenceMeta(e.difference, slip);
                     return (
                       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)" }, gap: 1, mb: 1.5 }}>
                         <Box sx={{ p: 1, borderRadius: 2, bgcolor: KIND_META.advance.soft, border: `1px solid ${alpha(KIND_META.advance.color, 0.3)}` }}>
@@ -575,6 +603,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                   <InfoCell label="ตำแหน่ง">{e.requester?.position}</InfoCell>
                   {e.createdBy?.userId && e.createdBy.userId !== e.requester?.userId && <InfoCell label="ออกใบแทนโดย">{e.createdBy.name}</InfoCell>}
                   <InfoCell label="งานที่ผูก" span>{e.eventId || e.job?.title ? `${jobText(e.job)}${e.job?.start ? ` · ${thaiDate(e.job.start)}` : ""}` : "ไม่ผูกงาน"}</InfoCell>
+                  {isReimburse && <InfoCell label="ที่มาของเงิน">ผู้เบิกสำรองจ่ายเอง (ไม่มีใบ Advance)</InfoCell>}
                   {kind === "advance" && e.dueClearAt && <InfoCell label="กำหนดเคลียร์"><Box component="span" sx={{ color: overdue ? "#dc2626" : "inherit" }}>{thaiDate(e.dueClearAt)}</Box></InfoCell>}
                   {kind === "advance" && e.claimId && (
                     <InfoCell label="ใบเคลม">
@@ -583,7 +612,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                   )}
                   {e.approvedAt && !["pending", "rejected"].includes(e.status) && <InfoCell label="ผู้อนุมัติ">{e.approvedBy?.name} · {thaiDate(e.approvedAt)}</InfoCell>}
                   {e.payment?.at && ((kind === "advance" && ["paid", "clearing", "cleared"].includes(e.status)) || (kind === "claim" && e.status === "settled" && money(e.difference) !== 0)) && (
-                    <InfoCell label={kind === "advance" ? "การจ่ายเงิน" : "ปิดส่วนต่าง"} span>
+                    <InfoCell label={kind === "advance" ? "การจ่ายเงิน" : isReimburse ? "การจ่ายคืน" : "ปิดส่วนต่าง"} span>
                       {thaiDate(e.payment.at)} · {paymentLabel(e.payment.method)}{e.payment.ref ? ` · ${e.payment.ref}` : ""}{e.payment.by?.name ? ` · โดย ${e.payment.by.name}` : ""}{e.payment.note ? ` · ${e.payment.note}` : ""}
                     </InfoCell>
                   )}
@@ -591,7 +620,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                 </Box>
               </Card>
 
-              {!isClaimKind && (
+              {!isClearClaim && (
                 <Card title={`รายการ (${e.items?.length || 0})`} action={<Typography sx={{ fontWeight: 800, color: meta.color }}>{baht(e.total)}</Typography>}>
                   {!e.items?.length && <Typography variant="body2" sx={{ color: TEXT_SUB }}>ไม่มีรายการค่าใช้จ่าย{e.note ? " — ดูหมายเหตุ" : ""}</Typography>}
                   <Stack divider={<Divider flexItem />} spacing={1}>
@@ -715,7 +744,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
             {canApprove && kind === "claim" && e.status === "approved" && (
               <Button variant="contained" onClick={() => setAction("settle")} startIcon={<TaskAlt sx={{ fontSize: 18 }} />}
                 sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: meta.color, "&:hover": { bgcolor: meta.dark, boxShadow: "none" } }}>
-                {money(e.difference) > 0 ? "บันทึกจ่ายเพิ่ม" : "บันทึกรับเงินคืน"}
+                {isReimburse ? "บันทึกจ่ายคืน" : money(e.difference) > 0 ? "บันทึกจ่ายเพิ่ม" : "บันทึกรับเงินคืน"}
               </Button>
             )}
             {kind === "advance" && e.status === "paid" && (isOwner || viewAll) && (

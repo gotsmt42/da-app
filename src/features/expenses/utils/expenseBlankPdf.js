@@ -19,6 +19,14 @@
  *   6. ลายเซ็น 4 ช่อง รวม "ผู้บันทึกเข้าระบบ" พร้อมเลขที่ใบเคลมที่ได้ — ปิดวงจรว่ากระดาษแผ่นนี้ถูกบันทึกแล้ว
  *      ใบไหน (กันยื่นกระดาษแผ่นเดิมซ้ำเพื่อเบิกสองรอบ)
  *
+ * ── ฟอร์มมี 3 แบบ ────────────────────────────────────────────────────────────────────────────
+ *   "advance"   ใบเคลมที่ผูกใบ Advance — พิมพ์เลขที่/ยอด/รายการตั้งเบิกให้ + รหัสฟอร์ม FC- จาก server
+ *   "empty"     ใบเคลมเปล่าทั้งใบ — ไม่ผูกใบไหน รหัส FB- สุ่มในเครื่อง
+ *   "reimburse" ใบเบิกค่าใช้จ่าย (สำรองจ่ายเอง) — ไม่มี Advance ให้อ้างเลย จึงตัดกรอบอ้างอิง คอลัมน์
+ *               "ตั้งเบิก" และแถว "หัก เงินเบิกล่วงหน้า/ส่วนต่าง" ออกทั้งหมด เหลือยอดรวมบรรทัดเดียว
+ * ⚠️ ความสูงของส่วนท้ายตาราง (AFTER_H) ต่างกันตามแบบ — ต้องส่งเข้า planRows ให้ตรง ไม่งั้นแถวสุดท้าย
+ * จะทับช่องลายเซ็น หรือเหลือที่ว่างเปล่าครึ่งหน้า
+ *
  * ⚠️ ห้ามตัดรายการที่ตั้งเบิกทิ้งเพื่อให้จบหน้าเดียว (หลักเดียวกับ expensePdf.js) — ถ้าเยอะเกินจะบีบแถวก่อน
  * แล้วค่อยต่อหน้า 2 พร้อมหัวตารางซ้ำ ลายเซ็นอยู่หน้าสุดท้ายเสมอ
  */
@@ -46,6 +54,8 @@ const TOTAL_ROW_H = 7.2;
 const RULES_H = 18.5;
 /** ความสูงทุกอย่างหลังตาราง (แถวรวม 3 แถว + ตัวอักษร + เอกสารแนบ + ข้อปฏิบัติ) — ต้องตรงกับ drawAfterTable */
 const AFTER_H = TOTAL_ROW_H * 3 + 6.8 + 6.8 + 3.2 + RULES_H + 2.5;
+/** แบบสำรองจ่าย: มีแถวยอดรวมแถวเดียว (ไม่มีหัก Advance / ส่วนต่าง) */
+const AFTER_H_SIMPLE = AFTER_H - TOTAL_ROW_H * 2;
 
 const SLATE = [15, 23, 42];
 const GRAY = [100, 116, 139];
@@ -56,6 +66,26 @@ const AMBER = { fill: [255, 251, 235], line: [245, 158, 11], text: [146, 64, 14]
 
 const CLAIM = KIND_META.claim.pdf;
 const ADV = KIND_META.advance.pdf;
+const RMB = KIND_META.reimburse.pdf;
+
+/**
+ * หน้าตาประจำแบบฟอร์ม — ทุกจุดที่ "ต่างกันตามแบบ" รวมไว้ที่เดียว ไม่กระจายเป็น if ทั่วไฟล์
+ * ⚠️ showPlanned = false ตัดคอลัมน์ "ตั้งเบิก" ออกจากตารางด้วย (ดู buildColumns)
+ */
+const FORM_STYLE = {
+  claim: {
+    tint: CLAIM, badge: "CLAIM", title: "ใบเคลียร์ค่าใช้จ่าย (Claim)", noLabel: "เลขที่ใบเคลม",
+    amountHead: "ใช้จริง", descHead: "รายการค่าใช้จ่าย", totalLabel: "รวมค่าใช้จ่ายจริง",
+    wordsLabel: "จำนวนเงินใช้จริง (ตัวอักษร)", signRole: "ผู้เบิก / ผู้เคลียร์", signDocLine: "เลขที่ใบเคลม ......................",
+    showPlanned: true, afterH: AFTER_H,
+  },
+  reimburse: {
+    tint: RMB, badge: "สำรองจ่าย", title: "ใบเบิกค่าใช้จ่าย (สำรองจ่ายเอง)", noLabel: "เลขที่เอกสาร",
+    amountHead: "จำนวนเงิน", descHead: "รายการที่สำรองจ่าย", totalLabel: "รวมขอเบิกคืน",
+    wordsLabel: "จำนวนเงินที่ขอเบิกคืน (ตัวอักษร)", signRole: "ผู้เบิก / ผู้สำรองจ่าย", signDocLine: "เลขที่เอกสาร ......................",
+    showPlanned: false, afterH: AFTER_H_SIMPLE,
+  },
+};
 
 /** อักษรที่ใช้ในรหัสฟอร์ม — ตัด 0/O/1/I ที่อ่านสับสนเวลาคนเขียน/อ่านจากกระดาษ (ชุดเดียวกับฝั่ง server) */
 const CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -110,36 +140,36 @@ const makePen = (doc, hasBold) => {
 
 // ══ ส่วนหัว ══════════════════════════════════════════════════════════════════
 
-const drawCompanyHeader = (doc, pen) => {
+const drawCompanyHeader = (doc, pen, style) => {
   pen.color(SLATE);
   pen.bold(true); pen.size(15);
   doc.text(ISSUER.nameTh, W_PAGE / 2, 12.5, { align: "center" });
   pen.bold(false); pen.size(10);
   doc.text(`${ISSUER.address}  ${ISSUER.taxId}`, W_PAGE / 2, 17, { align: "center" });
-  doc.setDrawColor(...CLAIM.main);
+  doc.setDrawColor(...style.tint.main);
   doc.setLineWidth(0.8);
   doc.line(L, 19.5, R, 19.5);
 };
 
-const drawBadge = (doc, pen, baseline) => {
+const drawBadge = (doc, pen, baseline, style) => {
   pen.bold(true); pen.size(11);
-  const bw = doc.getTextWidth("CLAIM") + 6;
+  const bw = doc.getTextWidth(style.badge) + 6;
   const bh = 6;
-  doc.setFillColor(...CLAIM.main);
+  doc.setFillColor(...style.tint.main);
   doc.roundedRect(R - bw, baseline - bh + 1.4, bw, bh, bh / 2, bh / 2, "F");
   doc.setTextColor(255, 255, 255);
-  doc.text("CLAIM", R - bw / 2, baseline - bh / 2 + 2.7, { align: "center" });
+  doc.text(style.badge, R - bw / 2, baseline - bh / 2 + 2.7, { align: "center" });
 };
 
 /** หัวเอกสารหน้าแรก + ข้อมูลผู้เบิก + กรอบอ้างอิง Advance — คืนค่า y ของขอบบนตาราง */
 const drawFirstPageTop = (doc, pen, ctx) => {
-  const { pre, bound, code } = ctx;
-  drawCompanyHeader(doc, pen);
+  const { pre, bound, code, style } = ctx;
+  drawCompanyHeader(doc, pen, style);
 
   let y = 28.5;
-  pen.bold(true); pen.size(20); pen.color(CLAIM.main);
-  doc.text("ใบเคลียร์ค่าใช้จ่าย (Claim)", W_PAGE / 2, y, { align: "center" });
-  drawBadge(doc, pen, y);
+  pen.bold(true); pen.size(20); pen.color(style.tint.main);
+  doc.text(style.title, W_PAGE / 2, y, { align: "center" });
+  drawBadge(doc, pen, y, style);
   y += 5.4;
   pen.bold(false); pen.size(12.5); pen.color(GRAY);
   doc.text("แบบฟอร์มกรอกด้วยลายมือ", W_PAGE / 2, y, { align: "center" });
@@ -148,8 +178,8 @@ const drawFirstPageTop = (doc, pen, ctx) => {
   y += 7;
   pen.size(13.5); pen.color(SLATE);
   pen.bold(true);
-  doc.text("เลขที่ใบเคลม", L, y);
-  const noX = L + doc.getTextWidth("เลขที่ใบเคลม") + 2;
+  doc.text(style.noLabel, L, y);
+  const noX = L + doc.getTextWidth(style.noLabel) + 2;
   pen.dotted(noX, y + 1.2, noX + 40);
   pen.bold(false); pen.size(10.5); pen.color(GRAY);
   doc.text("(เว้นว่าง — ระบบออกเลขเมื่อบันทึก)", noX + 42, y);
@@ -201,6 +231,24 @@ const drawFirstPageTop = (doc, pen, ctx) => {
   field("เรื่อง", pre.subject, L, R, y);
   y += 7.2;
   field("งาน / โครงการ", pre.job, L, R, y);
+
+  // ── แบบสำรองจ่าย: ไม่มี Advance ให้อ้าง ────────────────────────────────────
+  // ⚠️ ไม่ใช้กรอบเปล่าที่มีช่อง "ยอดเบิก" ว่างไว้ — ช่องว่างบนกระดาษการเงินคือช่องให้เติมทีหลัง
+  if (!style.showPlanned) {
+    y += 3.4;
+    const noteH = 8.6;
+    doc.setFillColor(...style.tint.fill);
+    doc.setDrawColor(...style.tint.main);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(L, y, W, noteH, 1.5, 1.5, "FD");
+    doc.setFillColor(...style.tint.main);
+    doc.rect(L, y + 0.4, 1.4, noteH - 0.8, "F");
+    pen.bold(true); pen.size(12.5); pen.color(style.tint.main);
+    doc.text("ผู้เบิกสำรองจ่ายเอง — ไม่มีใบเบิกเงินล่วงหน้า (Advance)", L + 4, y + noteH / 2 + 1.5);
+    pen.bold(false); pen.size(10.5); pen.color(GRAY);
+    doc.text("ถ้าเคยรับเงิน Advance ไว้แล้ว ให้ใช้ฟอร์มใบเคลมแทน", R - 3, y + noteH / 2 + 1.5, { align: "right" });
+    return y + noteH + 3;
+  }
 
   // ── กรอบอ้างอิงใบ Advance ─────────────────────────────────────────────────
   y += 3.4;
@@ -259,14 +307,15 @@ const drawFirstPageTop = (doc, pen, ctx) => {
 
 /** หัวหน้าที่ 2 เป็นต้นไป (ตารางต่อ) — ย่อ แต่ยังมีรหัสฟอร์มให้รู้ว่าหน้านี้เป็นของฟอร์มแผ่นไหน */
 const drawContinuationTop = (doc, pen, ctx) => {
-  drawCompanyHeader(doc, pen);
+  const { style } = ctx;
+  drawCompanyHeader(doc, pen, style);
   const y = 27.5;
-  pen.bold(true); pen.size(16); pen.color(CLAIM.main);
-  doc.text("ใบเคลียร์ค่าใช้จ่าย (Claim) — รายการต่อ", L, y);
-  drawBadge(doc, pen, y);
+  pen.bold(true); pen.size(16); pen.color(style.tint.main);
+  doc.text(`${style.title} — รายการต่อ`, L, y);
+  drawBadge(doc, pen, y, style);
   pen.bold(true); pen.size(12); pen.color(SLATE);
   const codeText = `รหัสฟอร์ม ${ctx.code}`;
-  const badgeW = (() => { pen.size(11); return doc.getTextWidth("CLAIM") + 6; })();
+  const badgeW = (() => { pen.size(11); return doc.getTextWidth(style.badge) + 6; })();
   pen.size(12);
   doc.text(codeText, R - badgeW - 4, y, { align: "right" });
   return y + 5;
@@ -274,14 +323,15 @@ const drawContinuationTop = (doc, pen, ctx) => {
 
 // ══ ตาราง ════════════════════════════════════════════════════════════════════
 
-const buildColumns = () => {
+const buildColumns = (style) => {
   const cols = [
     { key: "no", w: 9, h1: "ลำดับ" },
     { key: "date", w: 17, h1: "วันที่", h2: "ใบเสร็จ" },
-    { key: "desc", w: 0, h1: "รายการค่าใช้จ่าย" },
+    { key: "desc", w: 0, h1: style.descHead },
     { key: "receipt", w: 21, h1: "เลขที่", h2: "ใบเสร็จ" },
     { key: "qty", w: 23, h1: "จำนวน /", h2: "หน่วย" },
-    { key: "planned", w: 21, h1: "ตั้งเบิก", h2: "(บาท)" },
+    // คอลัมน์ "ตั้งเบิก" มีเฉพาะฟอร์มที่ผูกใบ Advance — แบบสำรองจ่ายไม่มียอดต้นทางให้เทียบ
+    ...(style.showPlanned ? [{ key: "planned", w: 21, h1: "ตั้งเบิก", h2: "(บาท)" }] : []),
     { key: "baht", w: 20 },
     { key: "satang", w: 9 },
   ];
@@ -293,15 +343,17 @@ const buildColumns = () => {
   return { cols, col: (k) => map[k] };
 };
 
-const drawTableHead = (doc, pen, T, y) => {
+const drawTableHead = (doc, pen, T, y, style) => {
   const { cols, col } = T;
-  doc.setFillColor(...CLAIM.head);
+  doc.setFillColor(...style.tint.head);
   doc.setDrawColor(...LINE);
   doc.setLineWidth(0.25);
   doc.rect(L, y, W, HEAD_H, "FD");
   // คอลัมน์ตั้งเบิกเป็นสีของ Advance — ตัวเลขในช่องนี้มาจากใบต้นทาง ไม่ใช่ช่องให้เขียน
-  doc.setFillColor(...ADV.head);
-  doc.rect(col("planned").x, y, col("planned").w, HEAD_H, "F");
+  if (col("planned")) {
+    doc.setFillColor(...ADV.head);
+    doc.rect(col("planned").x, y, col("planned").w, HEAD_H, "F");
+  }
 
   pen.bold(true); pen.size(11.5); pen.color(SLATE);
   const mid = y + HEAD_H / 2;
@@ -318,7 +370,7 @@ const drawTableHead = (doc, pen, T, y) => {
   // "ใช้จริง" คร่อมช่อง บาท + สต.
   const bx = col("baht").x;
   const bw = col("baht").w + col("satang").w;
-  doc.text("ใช้จริง", bx + bw / 2, y + 4, { align: "center" });
+  doc.text(style.amountHead, bx + bw / 2, y + 4, { align: "center" });
   doc.setDrawColor(...LINE);
   doc.line(bx, y + HEAD_H / 2 + 0.3, R, y + HEAD_H / 2 + 0.3);
   pen.size(11);
@@ -335,8 +387,10 @@ const drawTableHead = (doc, pen, T, y) => {
 /** @param item รายการที่ตั้งเบิกจากใบ Advance (หรือ null = แถวว่างให้เขียน) */
 const drawRow = (doc, pen, T, y, rowH, no, item) => {
   const { col } = T;
-  doc.setFillColor(...ADV.fill);
-  doc.rect(col("planned").x, y, col("planned").w, rowH, "F");
+  if (col("planned")) {
+    doc.setFillColor(...ADV.fill);
+    doc.rect(col("planned").x, y, col("planned").w, rowH, "F");
+  }
   const base = y + rowH / 2 + 1.5;
   pen.bold(false); pen.size(12); pen.color(GRAY);
   doc.text(String(no), col("no").x + col("no").w / 2, base, { align: "center" });
@@ -346,8 +400,10 @@ const drawRow = (doc, pen, T, y, rowH, no, item) => {
     doc.text(pen.fit(desc, col("desc").w - 3), col("desc").x + 1.5, base);
     pen.size(11.5);
     doc.text(pen.fit(qtyText(item), col("qty").w - 2), col("qty").x + col("qty").w / 2, base, { align: "center" });
-    pen.size(12.5); pen.color(ADV.main);
-    doc.text(fmtMoney(item.amount), col("planned").x + col("planned").w - 1.5, base, { align: "right" });
+    if (col("planned")) {
+      pen.size(12.5); pen.color(ADV.main);
+      doc.text(fmtMoney(item.amount), col("planned").x + col("planned").w - 1.5, base, { align: "right" });
+    }
   }
   doc.setDrawColor(...FAINT);
   doc.setLineWidth(0.15);
@@ -384,18 +440,21 @@ const closeTable = (doc, T, top, bodyEnd, yEnd = bodyEnd) => {
 
 const drawAfterTable = (doc, pen, T, tableTop, y, ctx) => {
   const { col } = T;
-  const { bound, pre } = ctx;
-  const pX = col("planned").x;
+  const { bound, pre, style } = ctx;
+  // ไม่มีคอลัมน์ "ตั้งเบิก" → ป้ายยอดรวมชิดขอบซ้ายของช่องจำนวนเงินแทน
+  const pX = col("planned") ? col("planned").x : col("baht").x;
   const bX = col("baht").x;
   const sX = col("satang").x;
   const bodyEnd = y;
 
   const totalRow = (label, { planned, amount, na = false, strong = false, left = null }) => {
     const h = TOTAL_ROW_H;
-    doc.setFillColor(...(strong ? CLAIM.head : CLAIM.fill));
+    doc.setFillColor(...(strong ? style.tint.head : style.tint.fill));
     doc.rect(L, y, W, h, "F");
-    doc.setFillColor(...(na ? NA_FILL : ADV.head));
-    doc.rect(pX, y, col("planned").w, h, "F");
+    if (col("planned")) {
+      doc.setFillColor(...(na ? NA_FILL : ADV.head));
+      doc.rect(pX, y, col("planned").w, h, "F");
+    }
     doc.setDrawColor(...LINE);
     doc.setLineWidth(0.25);
     doc.line(L, y + h, R, y + h);
@@ -407,7 +466,9 @@ const drawAfterTable = (doc, pen, T, tableTop, y, ctx) => {
     if (left) left(base);
     pen.bold(true); pen.size(strong ? 13.5 : 13); pen.color(SLATE);
     doc.text(label, pX - 2, base, { align: "right" });
-    if (na) {
+    if (!col("planned")) {
+      // ไม่มีช่องตั้งเบิกให้วาด
+    } else if (na) {
       pen.bold(false); pen.size(11); pen.color(GRAY);
       doc.text("—", pX + col("planned").w / 2, base, { align: "center" });
     } else if (planned !== undefined && planned !== null) {
@@ -423,27 +484,45 @@ const drawAfterTable = (doc, pen, T, tableTop, y, ctx) => {
     y += h;
   };
 
-  totalRow("รวมค่าใช้จ่ายจริง", { planned: bound ? pre.plannedTotal : null });
-  totalRow("หัก เงินเบิกล่วงหน้า (Advance)", { na: true, amount: bound ? pre.advance.total : null });
-  totalRow("ส่วนต่าง", {
-    na: true,
-    strong: true,
-    left: (base) => {
-      pen.bold(false); pen.size(12.5); pen.color(SLATE);
-      let x = L + 3;
-      [["คืนเงินบริษัท", 6], ["บริษัทจ่ายเพิ่ม", 6], ["พอดี ไม่มีส่วนต่าง", 0]].forEach(([t, gap]) => {
-        x = pen.checkbox(x, base);
-        doc.text(t, x, base);
-        x += doc.getTextWidth(t) + gap;
-      });
-    },
-  });
+  if (style.showPlanned) {
+    totalRow(style.totalLabel, { planned: bound ? pre.plannedTotal : null });
+    totalRow("หัก เงินเบิกล่วงหน้า (Advance)", { na: true, amount: bound ? pre.advance.total : null });
+    totalRow("ส่วนต่าง", {
+      na: true,
+      strong: true,
+      left: (base) => {
+        pen.bold(false); pen.size(12.5); pen.color(SLATE);
+        let x = L + 3;
+        [["คืนเงินบริษัท", 6], ["บริษัทจ่ายเพิ่ม", 6], ["พอดี ไม่มีส่วนต่าง", 0]].forEach(([t, gap]) => {
+          x = pen.checkbox(x, base);
+          doc.text(t, x, base);
+          x += doc.getTextWidth(t) + gap;
+        });
+      },
+    });
+  } else {
+    // แบบสำรองจ่าย: ยอดรวมแถวเดียว + ช่องติ๊กวิธีรับเงินคืน (ข้อมูลที่ฝ่ายบัญชีต้องใช้จ่ายคืนจริง)
+    totalRow(style.totalLabel, {
+      strong: true,
+      left: (base) => {
+        pen.bold(false); pen.size(12.5); pen.color(SLATE);
+        let x = L + 3;
+        doc.text("รับเงินคืนโดย", x, base);
+        x += doc.getTextWidth("รับเงินคืนโดย") + 2.5;
+        [["โอนเข้าบัญชี", 6], ["เงินสด", 0]].forEach(([t, gap]) => {
+          x = pen.checkbox(x, base);
+          doc.text(t, x, base);
+          x += doc.getTextWidth(t) + gap;
+        });
+      },
+    });
+  }
   closeTable(doc, T, tableTop, bodyEnd, y);
 
   // ── ยอดเป็นตัวอักษร ────────────────────────────────────────────────────────
   y += 6.8;
   pen.size(13); pen.bold(true); pen.color(SLATE);
-  const wl = "จำนวนเงินใช้จริง (ตัวอักษร)";
+  const wl = style.wordsLabel;
   doc.text(wl, L, y);
   const wx = L + doc.getTextWidth(wl) + 2;
   pen.dotted(wx, y + 1.2, R);
@@ -491,7 +570,9 @@ const drawAfterTable = (doc, pen, T, tableTop, y, ctx) => {
     "ขีดเส้นปิดบรรทัดที่ไม่ได้ใช้ ก่อนยื่นเอกสาร",
     "ยอดเงินต้องตรงกับใบเสร็จ และเขียนตัวอักษรกำกับยอดรวม",
     "แนบใบเสร็จตัวจริง เขียนเลขลำดับรายการไว้ที่มุมใบเสร็จ",
-    due ? `บันทึกเข้าระบบพร้อมรูปใบเสร็จภายใน ${due}` : "บันทึกเข้าระบบพร้อมรูปใบเสร็จภายในกำหนดเคลียร์",
+    due ? `บันทึกเข้าระบบพร้อมรูปใบเสร็จภายใน ${due}`
+      : style.showPlanned ? "บันทึกเข้าระบบพร้อมรูปใบเสร็จภายในกำหนดเคลียร์"
+        : "บันทึกเข้าระบบพร้อมรูปใบเสร็จโดยเร็วที่สุดหลังจ่ายเงิน",
   ];
   pen.bold(false); pen.size(10.8); pen.color([51, 65, 85]);
   const colW = (W - 6) / 2;
@@ -512,7 +593,7 @@ const drawSignatures = (doc, pen, ctx) => {
   doc.line(L, SIG_TOP, R, SIG_TOP);
   const colW = W / 4;
   const boxes = [
-    { role: "ผู้เบิก / ผู้เคลียร์", name: ctx.pre.requester },
+    { role: ctx.style.signRole, name: ctx.pre.requester },
     { role: "ผู้ตรวจสอบ" },
     { role: "ผู้อนุมัติ" },
     { role: "ผู้บันทึกเข้าระบบ", docLine: true },
@@ -534,7 +615,7 @@ const drawSignatures = (doc, pen, ctx) => {
     doc.text("วันที่ ......../......../..........", cx, y, { align: "center" });
     if (b.docLine) {
       y += 5;
-      doc.text("เลขที่ใบเคลม ......................", cx, y, { align: "center" });
+      doc.text(ctx.style.signDocLine, cx, y, { align: "center" });
     }
   });
 };
@@ -543,7 +624,7 @@ const drawFooter = (doc, pen, ctx, pageNo, pageCount) => {
   pen.bold(false); pen.size(10); pen.color(GRAY);
   const tie = ctx.bound
     ? `ลงทะเบียนในประวัติใบ ${ctx.pre.advance.docNo}`
-    : "ฟอร์มเปล่า ไม่ผูกใบ Advance";
+    : ctx.style.showPlanned ? "ฟอร์มเปล่า ไม่ผูกใบ Advance" : "ฟอร์มสำรองจ่าย ไม่มีใบ Advance";
   doc.text(`รหัสฟอร์ม ${ctx.code} · ${tie} · ออกโดย ${ctx.issuedBy || "-"} ${thaiDateTime(ctx.issuedAt)}`, L, FOOT_Y);
   doc.text(`หน้า ${pageNo}/${pageCount}`, R, FOOT_Y, { align: "right" });
 };
@@ -554,11 +635,11 @@ const drawFooter = (doc, pen, ctx, pageNo, pageCount) => {
  * วางแผนแถว: แถวที่พิมพ์รายการตั้งเบิกก่อน ตามด้วยแถวว่างเติมจนเต็มพื้นที่
  * @returns {Array<{rows: number, rowH: number, last: boolean}>} จำนวนแถวต่อหน้า
  */
-export const planRows = (itemCount, firstBodyTop, nextBodyTop) => {
+export const planRows = (itemCount, firstBodyTop, nextBodyTop, afterH = AFTER_H) => {
   const room = (top, bottom, h) => Math.floor((bottom - top) / h + 1e-6);
   const minBlank = itemCount ? 2 : 0;
   for (const rowH of [ROW_H, ROW_H_TIGHT]) {
-    const cap = room(firstBodyTop, SIG_TOP - AFTER_H, rowH);
+    const cap = room(firstBodyTop, SIG_TOP - afterH, rowH);
     if (itemCount + minBlank <= cap) return [{ rows: cap, rowH, last: true }];
   }
   // ล้นหน้าเดียว — ต่อหน้าถัดไป (ลายเซ็น/ยอดรวมอยู่หน้าสุดท้าย)
@@ -568,12 +649,12 @@ export const planRows = (itemCount, firstBodyTop, nextBodyTop) => {
   let top = firstBodyTop;
   for (let guard = 0; guard < 10; guard += 1) {
     // หน้าสุดท้าย: รายการที่เหลือพอกับแถวสูงปกติไหม — พอก็ใช้แถวปกติ (ช่องเขียนมือกว้างกว่า)
-    const capRoomy = room(top, SIG_TOP - AFTER_H, ROW_H);
+    const capRoomy = room(top, SIG_TOP - afterH, ROW_H);
     if (left <= capRoomy) {
       pages.push({ rows: capRoomy, rowH: ROW_H, last: true });
       return pages;
     }
-    const capLast = room(top, SIG_TOP - AFTER_H, rowH);
+    const capLast = room(top, SIG_TOP - afterH, rowH);
     if (left <= capLast) {
       pages.push({ rows: capLast, rowH, last: true });
       return pages;
@@ -589,7 +670,8 @@ export const planRows = (itemCount, firstBodyTop, nextBodyTop) => {
 
 /**
  * @param {object} opts
- * @param {"empty"|"advance"} opts.variant  empty = เปล่าทั้งใบ · advance = พิมพ์ข้อมูลใบ Advance ให้
+ * @param {"empty"|"advance"|"reimburse"} opts.variant  empty = ใบเคลมเปล่าทั้งใบ · advance = ใบเคลม
+ *   พร้อมข้อมูลใบ Advance · reimburse = ใบเบิกค่าใช้จ่าย (สำรองจ่ายเอง) ที่ไม่มี Advance เลย
  * @param {object} [opts.advance]   ใบ Advance (รูปแบบเดียวกับ API) — จำเป็นเมื่อ variant = "advance"
  * @param {{code: string, issuedAt: string|Date, issuedBy: string}} opts.form  รหัสฟอร์ม
  * @param {"blob"|"open"|"download"} [opts.mode]
@@ -601,6 +683,7 @@ export async function generateBlankClaimPdf({ variant = "empty", advance = null,
     loadBoldFont(),
   ]);
   const hasBold = Boolean(bold);
+  const style = FORM_STYLE[variant === "reimburse" ? "reimburse" : "claim"];
   const bound = variant === "advance" && Boolean(advance);
   const items = bound ? (advance.items || []) : [];
   const pre = bound
@@ -620,22 +703,22 @@ export async function generateBlankClaimPdf({ variant = "empty", advance = null,
       },
     }
     : { to: "", requester: "", position: "", subject: "", job: "", plannedTotal: 0, advance: null };
-  const ctx = { pre, bound, code: form.code, issuedAt: form.issuedAt, issuedBy: form.issuedBy };
+  const ctx = { pre, bound, style, code: form.code, issuedAt: form.issuedAt, issuedBy: form.issuedBy };
 
   const doc = newDoc(jsPDF, fontModule.default, bold);
   const pen = makePen(doc, hasBold);
-  const T = buildColumns();
+  const T = buildColumns(style);
 
   const tableTop1 = drawFirstPageTop(doc, pen, ctx);
   // หัวหน้าต่อ: วัดตำแหน่งจากค่าคงที่ของ drawContinuationTop (27.5 + 5)
-  const plan = planRows(items.length, tableTop1 + HEAD_H, 32.5 + HEAD_H);
+  const plan = planRows(items.length, tableTop1 + HEAD_H, 32.5 + HEAD_H, style.afterH);
 
   let itemIdx = 0;
   let no = 1;
   plan.forEach((pg, p) => {
     if (p > 0) doc.addPage();
     const top = p === 0 ? tableTop1 : drawContinuationTop(doc, pen, ctx);
-    let y = drawTableHead(doc, pen, T, top);
+    let y = drawTableHead(doc, pen, T, top, style);
     for (let r = 0; r < pg.rows; r += 1) {
       y = drawRow(doc, pen, T, y, pg.rowH, no, items[itemIdx] || null);
       itemIdx += 1;
@@ -656,14 +739,17 @@ export async function generateBlankClaimPdf({ variant = "empty", advance = null,
     drawFooter(doc, pen, ctx, i, pageCount);
   }
 
+  const formName = style.showPlanned ? "ฟอร์มใบเคลม" : "ฟอร์มใบเบิกค่าใช้จ่าย (สำรองจ่าย)";
   doc.setProperties({
-    title: `ฟอร์มใบเคลม ${form.code}`,
-    subject: bound ? `อ้างอิง ${advance.docNo}` : "ฟอร์มใบเคลมเปล่า",
+    title: `${formName} ${form.code}`,
+    subject: bound ? `อ้างอิง ${advance.docNo}` : `${formName}เปล่า`,
     creator: ISSUER.nameEn,
     keywords: form.code,
   });
-  const name = bound ? `ฟอร์มเคลม ${advance.docNo} ${form.code}` : `ฟอร์มเคลมเปล่า ${form.code}`;
+  const name = bound
+    ? `ฟอร์มเคลม ${advance.docNo} ${form.code}`
+    : `${style.showPlanned ? "ฟอร์มเคลมเปล่า" : "ฟอร์มสำรองจ่ายเปล่า"} ${form.code}`;
   return outputDocument(doc, name, mode);
 }
 
-export const __test = { planRows, splitMoney, SIG_TOP, AFTER_H, ROW_H, ROW_H_TIGHT };
+export const __test = { planRows, splitMoney, SIG_TOP, AFTER_H, AFTER_H_SIMPLE, ROW_H, ROW_H_TIGHT };

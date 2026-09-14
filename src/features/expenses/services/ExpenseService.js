@@ -52,9 +52,14 @@ const ExpenseService = {
     return res.data;
   },
 
+  /**
+   * ข้อมูลรายงาน
+   * ⚠️ คืนทั้งก้อน { advances, reimbursements } ไม่ใช่อาร์เรย์เดียว — ใบสำรองจ่ายไม่มี Advance ให้ผูก
+   * จึงมาคนละก้อน (ดู route /report) ถ้าคืนแค่ advances ยอดสำรองจ่ายจะหายจากรายงานทั้งหมดเงียบๆ
+   */
   async report(params = {}) {
     const res = await API.get("/expenses/report", { params });
-    return res.data.advances || [];
+    return { advances: res.data.advances || [], reimbursements: res.data.reimbursements || [] };
   },
 
   async people() {
@@ -87,6 +92,17 @@ const ExpenseService = {
   async createClaim(fields, files = []) {
     const { body, config, rejected } = await buildBody(fields, files);
     const res = await API.post("/expenses/claims", body, config);
+    return { expense: res.data.expense, rejected };
+  },
+
+  /**
+   * ใบเบิกค่าใช้จ่ายแบบสำรองจ่ายเอง (ไม่มี Advance) — ผู้ใช้: "บางทีช่างออกค่าใช้จ่ายไปก่อนไม่ advance"
+   * ⚠️ คนละ endpoint กับ /claims เพราะเงื่อนไขต่างกันคนละเรื่อง: ใบนี้ไม่ต้องมี advanceId แต่ต้องมี
+   * รายการและยอด > 0 เสมอ และเลือกผู้เบิก/ผูกงานได้เหมือนใบ Advance
+   */
+  async createReimbursement(fields, files = []) {
+    const { body, config, rejected } = await buildBody(fields, files);
+    const res = await API.post("/expenses/reimbursements", body, config);
     return { expense: res.data.expense, rejected };
   },
 

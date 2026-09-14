@@ -19,7 +19,8 @@ import usePermissions from "@/shared/hooks/usePermissions";
 import ExpenseService, { errorText } from "../services/ExpenseService";
 import KindBadge from "./KindBadge";
 import {
-  KIND_META, statusMeta, STATUS_FILTERS, baht, differenceMeta, isOverdueClear, jobText, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
+  KIND_META, statusMeta, STATUS_FILTERS, CLAIM_TYPE_FILTERS, baht, differenceMeta, isOverdueClear, jobText,
+  slipKind, slipMeta, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
 } from "../expenseMeta";
 
 const PERIODS = [
@@ -42,12 +43,24 @@ const periodRange = (p) => {
 const INBOX_GROUPS = [
   { key: "approve", title: "รออนุมัติ", hint: "ใบเบิกและใบเคลมที่ส่งมาให้พิจารณา", match: (e) => e.status === "pending" },
   { key: "pay", title: "รอจ่ายเงิน Advance", hint: "อนุมัติแล้ว ยังไม่ได้บันทึกการจ่าย", match: (e) => e.kind === "advance" && e.status === "approved" },
-  { key: "settle", title: "รอปิดส่วนต่าง", hint: "ใบเคลมอนุมัติแล้ว รอรับคืน/จ่ายเพิ่ม", match: (e) => e.kind === "claim" && e.status === "approved" },
+  { key: "settle", title: "รอปิดส่วนต่าง", hint: "ใบเคลมอนุมัติแล้ว รอรับคืน/จ่ายเพิ่ม", match: (e) => e.kind === "claim" && e.status === "approved" && slipKind(e) !== "reimburse" },
+  // ⚠️ คนละงานกับข้างบน — ใบสำรองจ่ายคือพนักงานควักเงินตัวเองรออยู่ ไม่ใช่การปิดส่วนต่างของเงินที่จ่ายไปแล้ว
+  { key: "reimburse", title: "รอจ่ายคืนค่าสำรองจ่าย", hint: "อนุมัติแล้ว รอโอนคืนให้ผู้เบิก", match: (e) => slipKind(e) === "reimburse" && e.status === "approved" },
   { key: "overdue", title: "Advance เลยกำหนดเคลียร์", hint: "จ่ายเงินไปแล้วแต่ยังไม่ส่งใบเคลม", match: (e) => isOverdueClear(e) },
 ];
 
+/**
+ * ข้อความอ้างอิงใต้เลขที่ใบ — ใบเคลมบอกว่าเคลียร์ใบไหน · ใบสำรองจ่ายบอกว่า "ไม่มี Advance"
+ * ⚠️ ใบสำรองจ่ายต้องบอกให้ชัดว่าไม่มีใบอ้างอิง ไม่ใช่ปล่อยว่าง — ว่างไว้จะดูเหมือนข้อมูลหาย
+ */
+const refLabel = (e) => {
+  if (slipKind(e) === "reimburse") return "สำรองจ่ายเอง · ไม่มี Advance";
+  if (e.kind === "claim" && e.advance?.docNo) return `อ้าง ${e.advance.docNo}`;
+  return "";
+};
+
 const StatusChip = ({ e }) => {
-  const st = statusMeta(e.status, e.kind);
+  const st = statusMeta(e.status, slipKind(e));
   return (
     <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
       <Chip size="small" label={st.label} sx={{ height: 22, fontSize: "0.72rem", fontWeight: 800, bgcolor: alpha(st.color, 0.12), color: st.color }} />
@@ -61,7 +74,7 @@ const StatusChip = ({ e }) => {
 
 const AmountCell = ({ e }) => {
   if (e.kind !== "claim") return <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", color: TEXT_MAIN }}>{baht(e.total)}</Typography>;
-  const d = differenceMeta(e.difference);
+  const d = differenceMeta(e.difference, slipKind(e));
   return (
     <Box>
       <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", color: TEXT_MAIN }}>{baht(e.total)}</Typography>
@@ -76,18 +89,18 @@ const MobileCard = ({ e, onOpen }) => (
   <Box onClick={() => onOpen(e._id)} role="button" sx={{
     p: 1.5, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 2.5, cursor: "pointer",
     // ✅ แถบซ้ายเป็นสีประจำชนิดใบ (ไม่ใช่สีสถานะ) — ผู้ใช้ขอให้แยก Advance/Claim ได้ชัดเจนตั้งแต่มองรายการ
-    borderLeft: `5px solid ${(KIND_META[e.kind] || KIND_META.advance).color}`, "&:active": { bgcolor: "#f8fafc" },
+    borderLeft: `5px solid ${slipMeta(e).color}`, "&:active": { bgcolor: "#f8fafc" },
   }}>
     <Stack direction="row" spacing={1.25} alignItems="flex-start">
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Stack direction="row" alignItems="baseline" spacing={1}>
-          <KindBadge kind={e.kind} />
-          <Typography sx={{ fontWeight: 800, fontSize: "0.84rem", color: (KIND_META[e.kind] || KIND_META.advance).dark, flex: 1 }} noWrap>{e.docNo}</Typography>
+          <KindBadge kind={slipKind(e)} />
+          <Typography sx={{ fontWeight: 800, fontSize: "0.84rem", color: slipMeta(e).dark, flex: 1 }} noWrap>{e.docNo}</Typography>
           <AmountCell e={e} />
         </Stack>
         <Typography sx={{ fontWeight: 700, fontSize: "0.92rem", color: TEXT_MAIN, lineHeight: 1.35 }}>{e.subject}</Typography>
         <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }} noWrap>
-          {thaiDate(e.docDate)} · {e.requester?.name}{e.kind === "claim" && e.advance?.docNo ? ` · อ้าง ${e.advance.docNo}` : ""}{e.job?.title ? ` · ${jobText(e.job)}` : ""}
+          {thaiDate(e.docDate)} · {e.requester?.name}{refLabel(e) ? ` · ${refLabel(e)}` : ""}{e.job?.title ? ` · ${jobText(e.job)}` : ""}
         </Typography>
         <Box sx={{ mt: 0.75 }}><StatusChip e={e} /></Box>
       </Box>
@@ -111,12 +124,12 @@ const DesktopTable = ({ rows, onOpen }) => (
       <TableBody>
         {rows.map((e) => (
           <TableRow key={e._id} hover onClick={() => onOpen(e._id)} sx={{ cursor: "pointer", "& td": { py: 1.1, borderColor: BORDER_MAIN } }}>
-            <TableCell sx={{ whiteSpace: "nowrap", boxShadow: `inset 5px 0 0 ${(KIND_META[e.kind] || KIND_META.advance).color}`, pl: 2.25 }}>
+            <TableCell sx={{ whiteSpace: "nowrap", boxShadow: `inset 5px 0 0 ${slipMeta(e).color}`, pl: 2.25 }}>
               <Stack direction="row" spacing={1} alignItems="center">
                 <Box>
                   <Stack direction="row" spacing={0.75} alignItems="center">
-                    <KindBadge kind={e.kind} />
-                    <Typography sx={{ fontWeight: 800, fontSize: "0.85rem", color: (KIND_META[e.kind] || KIND_META.advance).dark }}>{e.docNo}</Typography>
+                    <KindBadge kind={slipKind(e)} />
+                    <Typography sx={{ fontWeight: 800, fontSize: "0.85rem", color: slipMeta(e).dark }}>{e.docNo}</Typography>
                   </Stack>
                   <Typography variant="caption" sx={{ color: TEXT_SUB }}>{thaiDate(e.docDate)}</Typography>
                 </Box>
@@ -129,7 +142,7 @@ const DesktopTable = ({ rows, onOpen }) => (
             <TableCell sx={{ maxWidth: 380 }}>
               <Typography sx={{ fontWeight: 600, fontSize: "0.86rem" }} noWrap>{e.subject}</Typography>
               <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }} noWrap>
-                {[e.kind === "claim" && e.advance?.docNo ? `อ้าง ${e.advance.docNo}` : "", jobText(e.job), `${e.items?.length || 0} รายการ`].filter(Boolean).join(" · ")}
+                {[refLabel(e), jobText(e.job), `${e.items?.length || 0} รายการ`].filter(Boolean).join(" · ")}
               </Typography>
             </TableCell>
             <TableCell align="right"><AmountCell e={e} /></TableCell>
@@ -142,7 +155,7 @@ const DesktopTable = ({ rows, onOpen }) => (
   </Box>
 );
 
-export default function ExpenseList({ mode, status: statusProp, onStatusChange, onOpen, onCreate, reloadKey }) {
+export default function ExpenseList({ mode, status: statusProp, claimType = "all", onClaimTypeChange, onStatusChange, onOpen, onCreate, reloadKey }) {
   const isDesktop = useMediaQuery("(min-width:900px)");
   const { can } = usePermissions();
   const viewAll = can("viewAllExpenses");
@@ -170,13 +183,17 @@ export default function ExpenseList({ mode, status: statusProp, onStatusChange, 
   useEffect(() => {
     let alive = true;
     setLoading(true); setError("");
-    const params = mode === "inbox" ? { status: "pending,approved,paid" } : { kind, ...periodRange(period) };
+    // ⚠️ กรองชนิดย่อยที่ server (ไม่ใช่กรองในหน้า) — รายการถูกจำกัดจำนวนแถวไว้ ถ้ากรองทีหลังจะได้
+    // ใบสำรองจ่ายไม่ครบเมื่อมีใบเคลมเยอะกว่าเพดาน
+    const params = mode === "inbox"
+      ? { status: "pending,approved,paid" }
+      : { kind, ...(kind === "claim" && claimType !== "all" ? { claimType } : {}), ...periodRange(period) };
     ExpenseService.list(params)
       .then((r) => { if (alive) setRows(r); })
       .catch((err) => { if (alive) setError(errorText(err, "โหลดรายการไม่สำเร็จ")); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [mode, kind, period, reloadKey]);
+  }, [mode, kind, claimType, period, reloadKey]);
 
   const people = useMemo(() => {
     const map = new Map();
@@ -268,10 +285,36 @@ export default function ExpenseList({ mode, status: statusProp, onStatusChange, 
     </Stack>
   );
 
+  /**
+   * ⚠️ แถวนี้อยู่ "เหนือ" ชิปสถานะเสมอ — มันเปลี่ยนว่ากำลังดูเอกสารชนิดไหน ซึ่งเป็นคำถามที่ต้องตอบก่อน
+   * คำถามว่าใบอยู่ขั้นไหน (ถ้าสลับลำดับกัน คนอ่านจะนึกว่าชิปสถานะเป็นของชนิดที่เลือกอยู่แถวบน)
+   */
+  const claimTypeChips = kind === "claim" && onClaimTypeChange && (
+    <Stack direction="row" spacing={0.75} sx={{ mb: 1.25, overflowX: "auto", pb: 0.25, "&::-webkit-scrollbar": { display: "none" } }}>
+      {CLAIM_TYPE_FILTERS.map((t) => {
+        const active = claimType === t.value;
+        const c = t.kind ? KIND_META[t.kind].color : TEXT_MAIN;
+        return (
+          <Chip
+            key={t.value} clickable onClick={() => onClaimTypeChange(t.value)} label={t.label}
+            sx={{
+              flexShrink: 0, height: 32, fontWeight: 800, fontSize: "0.8rem", borderRadius: 2,
+              bgcolor: active ? alpha(c, 0.12) : "#fff", color: active ? c : TEXT_SUB,
+              border: `1px solid ${active ? c : BORDER_MAIN}`,
+              "&:hover": { bgcolor: alpha(c, 0.08) },
+            }}
+          />
+        );
+      })}
+    </Stack>
+  );
+
   const statusChips = kind && (
     <Stack direction="row" spacing={0.75} sx={{ mb: 1.5, overflowX: "auto", pb: 0.5, "&::-webkit-scrollbar": { display: "none" } }}>
       {["all", ...(kind === "advance" ? ["overdue"] : []), ...STATUS_FILTERS[kind]].map((s) => {
-        const st = s === "all" ? { label: "ทั้งหมด", color: meta.color } : s === "overdue" ? { label: "เลยกำหนดเคลียร์", color: "#dc2626" } : statusMeta(s, kind);
+        // ⚠️ "ทุกสถานะ" ไม่ใช่ "ทั้งหมด" — หน้าใบเคลมมีแถวชิดชนิดเอกสารอยู่เหนือขึ้นไปซึ่งมีคำว่า
+        // "ทั้งหมด" อยู่แล้ว ถ้าสองแถวขึ้นคำเดียวกันจะแยกไม่ออกว่าอันไหนกรองอะไร
+        const st = s === "all" ? { label: "ทุกสถานะ", color: meta.color } : s === "overdue" ? { label: "เลยกำหนดเคลียร์", color: "#dc2626" } : statusMeta(s, kind);
         const n = counts[s] || 0;
         if (s !== "all" && s !== status && n === 0) return null;
         const active = status === s;
@@ -306,6 +349,7 @@ export default function ExpenseList({ mode, status: statusProp, onStatusChange, 
   return (
     <Box sx={{ pt: 2 }}>
       {filterBar}
+      {claimTypeChips}
       {statusChips}
       {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
       {loading ? (
@@ -338,12 +382,20 @@ export default function ExpenseList({ mode, status: statusProp, onStatusChange, 
         </>
       ) : (
         empty(
-          rows.length ? "ไม่พบรายการตามตัวกรอง" : kind === "claim" ? "ยังไม่มีใบเคลม" : "ยังไม่มีใบเบิก Advance",
+          rows.length ? "ไม่พบรายการตามตัวกรอง"
+            : kind === "claim" ? (claimType === "reimburse" ? "ยังไม่มีใบสำรองจ่าย" : "ยังไม่มีใบเคลม")
+              : "ยังไม่มีใบเบิก Advance",
           !rows.length && onCreate && (can("requestExpense") || viewAll) && (
-            <Button variant="contained" startIcon={<Add />} onClick={() => onCreate(kind)}
-              sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: meta.color, "&:hover": { bgcolor: meta.dark } }}>
-              ออก{meta.label}
-            </Button>
+            (() => {
+              // ปุ่มในสถานะว่างต้องตรงกับชนิดที่กำลังกรองอยู่ ไม่ใช่เปิดฟอร์มอีกชนิดให้เสมอ
+              const emptyKind = kind === "claim" && claimType === "reimburse" ? "reimburse" : kind;
+              return (
+                <Button variant="contained" startIcon={<Add />} onClick={() => onCreate(emptyKind)}
+                  sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: KIND_META[emptyKind].color, "&:hover": { bgcolor: KIND_META[emptyKind].dark } }}>
+                  ออก{KIND_META[emptyKind].label}
+                </Button>
+              );
+            })()
           )
         )
       )}

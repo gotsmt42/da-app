@@ -8,6 +8,12 @@
  * ✅ ใบเคลม: เลือกใบ Advance แล้วระบบคัดลอกรายการที่ตั้งเบิกมาให้แก้เป็น "ยอดใช้จริง" ทันที พร้อมโชว์
  * ส่วนต่าง (คืนเงิน/จ่ายเพิ่ม) แบบสดๆ ระหว่างกรอก — ผู้เบิกรู้ก่อนกดส่งว่าต้องคืนเท่าไร
  *
+ * ✅ ใบสำรองจ่าย (claimType = "reimburse"): ผู้เบิกออกเงินเองไปก่อน ไม่มี Advance ให้อ้าง — ฟอร์มจึง
+ * ตัดช่องเลือกใบ Advance/แผงเทียบยอดออกทั้งหมด แล้วใช้ช่องชุดเดียวกับใบ Advance แทน (เลือกผู้เบิกแทนได้ ·
+ * ผูกงานได้) เพราะมันคือ "ใบตั้งต้น" เหมือนกัน ต่างกันแค่เงินออกไปแล้วจากกระเป๋าใคร
+ * ⚠️ สามโหมดนี้ต่างกันที่ "มี Advance ให้อ้างหรือไม่" ไม่ใช่ที่ kind — เช็ค isClearClaim/isReimburseForm
+ * เสมอ อย่าเช็ค isClaim ตรงๆ เพราะใบสำรองจ่ายก็มี kind = "claim" เหมือนกัน
+ *
  * ⚠️ ยอดบนหน้าจอเป็นแค่ตัวช่วยอ่าน — server คำนวณใหม่ทั้งหมดเสมอ (ดู sanitizeItems ใน routes/expenses.js)
  */
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -20,7 +26,7 @@ import {
 import { alpha } from "@mui/material/styles";
 import {
   Close, Add, DeleteOutline, AttachFile, Send, Save, Link as LinkIcon, ReceiptLong, Payments, ExpandMore,
-  Print, EditNote,
+  Print, EditNote, AccountBalanceWallet,
 } from "@mui/icons-material";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
@@ -34,7 +40,7 @@ import KindBadge from "./KindBadge";
 import ExpensePrintDialog from "./ExpensePrintDialog";
 import {
   KIND_META, EXPENSE_CATEGORIES, categoryMeta, FILE_KINDS, baht, fmtMoney, itemAmount, itemsTotal,
-  differenceMeta, money, jobText, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
+  differenceMeta, money, jobText, slipKind, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
 } from "../expenseMeta";
 
 const MAX_ITEMS = 40;
@@ -90,16 +96,22 @@ const Section = ({ accent, icon, title, hint, children, action }) => (
   </Box>
 );
 
-export default function ExpenseFormDialog({ open, kind: kindProp, expense, advance: advanceProp, onClose, onSaved }) {
+export default function ExpenseFormDialog({ open, kind: kindProp, claimType: claimTypeProp, expense, advance: advanceProp, onClose, onSaved }) {
   const isMobile = useMediaQuery("(max-width:600px)");
   const isDesktop = useMediaQuery("(min-width:900px)");
   const { userData } = useAuth();
   const { can } = usePermissions();
   const editing = Boolean(expense?._id);
   const kind = expense?.kind || kindProp || "advance";
-  const meta = KIND_META[kind];
   const isClaim = kind === "claim";
-  const canPickPerson = can("viewAllExpenses") && !isClaim;
+  // ⚠️ ตอนแก้ไขใบเดิมต้องอ่านชนิดย่อยจากตัวใบเสมอ (ค่าที่ส่งมาทาง prop เป็นของ "ใบใหม่" เท่านั้น)
+  const claimType = editing ? (expense.claimType || "clear") : (claimTypeProp || "clear");
+  /** ใบสำรองจ่าย = ไม่มี Advance ให้อ้าง · ใบเคลมปกติ = ต้องอ้าง Advance เสมอ */
+  const isReimburseForm = isClaim && claimType === "reimburse";
+  const isClearClaim = isClaim && !isReimburseForm;
+  const slip = slipKind({ kind, claimType });
+  const meta = KIND_META[slip];
+  const canPickPerson = can("viewAllExpenses") && !isClearClaim;
   const accent = meta.color;
 
   const [docDate, setDocDate] = useState(moment().format("YYYY-MM-DD"));
@@ -152,7 +164,7 @@ export default function ExpenseFormDialog({ open, kind: kindProp, expense, advan
       setItems((expense.items || []).map(fromDoc));
       setDueClearAt(dayOf(expense.dueClearAt));
       setNote(expense.note || "");
-      setAdvance(isClaim ? { _id: expense.advanceId, ...expense.advance, ...(expense.advanceDoc || {}) } : null);
+      setAdvance(isClearClaim ? { _id: expense.advanceId, ...expense.advance, ...(expense.advanceDoc || {}) } : null);
     } else {
       setDocDate(moment().format("YYYY-MM-DD"));
       setTo("");
@@ -160,7 +172,8 @@ export default function ExpenseFormDialog({ open, kind: kindProp, expense, advan
       setPosition("");
       setSubject("");
       setJob(null);
-      setItems(isClaim ? [] : [blankItem("allowance")]);
+      // ใบเคลมที่อ้าง Advance เริ่มด้วยรายการว่าง (รอคัดลอกจากใบ Advance) ที่เหลือเริ่มด้วยแถวเปล่า
+      setItems(isClearClaim ? [] : [blankItem(isReimburseForm ? "fuel" : "allowance")]);
       setDueClearAt("");
       setNote("");
       setAdvance(null);
@@ -182,7 +195,7 @@ export default function ExpenseFormDialog({ open, kind: kindProp, expense, advan
 
   // ── ใบเคลม: รายการใบ Advance ที่เคลียร์ได้ ───────────────────────────
   useEffect(() => {
-    if (!open || !isClaim || editing) return;
+    if (!open || !isClearClaim || editing) return;
     let alive = true;
     ExpenseService.list({ kind: "advance", status: "paid" })
       .then((rows) => {
@@ -194,11 +207,11 @@ export default function ExpenseFormDialog({ open, kind: kindProp, expense, advan
       .catch((err) => alive && setError(errorText(err, "โหลดรายการใบ Advance ไม่สำเร็จ")));
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- โหลดครั้งเดียวต่อการเปิดกล่อง
-  }, [open, isClaim, editing, advanceProp?._id]);
+  }, [open, isClearClaim, editing, advanceProp?._id]);
 
   // ── ค้นหางานที่จะผูก (หน่วงให้พิมพ์จบก่อนค่อยยิง) ─────────────────────
   useEffect(() => {
-    if (!open || isClaim) return undefined;
+    if (!open || isClearClaim) return undefined;
     setJobLoading(true);
     const t = setTimeout(() => {
       ExpenseService.jobs(jobQuery)
@@ -207,12 +220,12 @@ export default function ExpenseFormDialog({ open, kind: kindProp, expense, advan
         .finally(() => setJobLoading(false));
     }, 300);
     return () => clearTimeout(t);
-  }, [open, isClaim, jobQuery]);
+  }, [open, isClearClaim, jobQuery]);
 
 
   const total = useMemo(() => itemsTotal(items), [items]);
   const diff = money(total - (advance?.total || 0));
-  const diffInfo = differenceMeta(diff);
+  const diffInfo = differenceMeta(diff, slip);
 
   const setItem = (key, patch) => setItems((rows) => rows.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   const removeItem = (key) => setItems((rows) => rows.filter((r) => r.key !== key));
@@ -230,11 +243,12 @@ export default function ExpenseFormDialog({ open, kind: kindProp, expense, advan
 
   const validItems = items.filter((it) => String(it.description).trim());
   const problems = [];
-  if (isClaim && !advance?._id) problems.push("เลือกใบ Advance ที่ต้องการเคลียร์");
+  if (isClearClaim && !advance?._id) problems.push("เลือกใบ Advance ที่ต้องการเคลียร์");
   if (!String(subject).trim()) problems.push("ระบุเรื่อง");
-  if (!isClaim && !validItems.length) problems.push("เพิ่มรายการอย่างน้อย 1 รายการ");
-  if (!isClaim && total <= 0) problems.push("ยอดขอเบิกต้องมากกว่า 0");
-  if (isClaim && !validItems.length && !String(note).trim()) problems.push("เพิ่มรายการที่ใช้จริง หรือระบุหมายเหตุหากไม่ได้ใช้เงินเลย");
+  // ⚠️ ใบสำรองจ่ายยอด 0 ไม่มีความหมาย (ไม่มีอะไรให้จ่ายคืน) — บังคับรายการเหมือนใบ Advance
+  if (!isClearClaim && !validItems.length) problems.push("เพิ่มรายการอย่างน้อย 1 รายการ");
+  if (!isClearClaim && total <= 0) problems.push("ยอดที่ขอเบิกต้องมากกว่า 0");
+  if (isClearClaim && !validItems.length && !String(note).trim()) problems.push("เพิ่มรายการที่ใช้จริง หรือระบุหมายเหตุหากไม่ได้ใช้เงินเลย");
   if (items.some((it) => String(it.description).trim() && Number(it.qty) <= 0)) problems.push("จำนวนต้องมากกว่า 0");
 
   const addFiles = (list) => {
@@ -253,9 +267,10 @@ export default function ExpenseFormDialog({ open, kind: kindProp, expense, advan
         ...it, qty: Number(it.qty) || 0, unitPrice: Number(it.unitPrice) || 0,
       })),
     };
-    if (!isClaim) {
+    if (!isClearClaim) {
       fields.eventId = job?._id || "";
-      fields.dueClearAt = dueClearAt || "";
+      // กำหนดเคลียร์เป็นเรื่องของเงินที่จ่ายล่วงหน้าเท่านั้น ใบสำรองจ่ายไม่มีขั้นนี้
+      if (!isClaim) fields.dueClearAt = dueClearAt || "";
       if (canPickPerson && requester?.userId) fields.requesterId = requester.userId;
     } else if (!editing) {
       fields.advanceId = advance._id;
@@ -264,9 +279,11 @@ export default function ExpenseFormDialog({ open, kind: kindProp, expense, advan
       const payload = files.map((f) => ({ file: f.file, kind: f.kind }));
       const result = editing
         ? await ExpenseService.update(expense._id, fields, payload)
-        : isClaim
-          ? await ExpenseService.createClaim(fields, payload)
-          : await ExpenseService.createAdvance(fields, payload);
+        : isReimburseForm
+          ? await ExpenseService.createReimbursement(fields, payload)
+          : isClaim
+            ? await ExpenseService.createClaim(fields, payload)
+            : await ExpenseService.createAdvance(fields, payload);
       const warn = result.rejected?.length
         ? `บันทึกแล้ว แต่มีไฟล์ที่แนบไม่ได้: ${result.rejected.map((r) => `${r.name} (${r.message})`).join(", ")}`
         : "";
@@ -280,7 +297,7 @@ export default function ExpenseFormDialog({ open, kind: kindProp, expense, advan
 
   const resubmit = editing && expense.status === "rejected";
   // ✅ แผงรายละเอียดใบ Advance "ข้างๆ" ใบเคลม (ผู้ใช้ขอ) — จอกว้างวางคู่ขวามือ ติดอยู่กับที่ขณะเลื่อนฟอร์ม
-  const showAdvancePanel = isClaim && Boolean(advance?._id) && Boolean(advance?.items);
+  const showAdvancePanel = isClearClaim && Boolean(advance?._id) && Boolean(advance?.items);
   const usedIndexes = new Set(items.map((it) => it.advanceItemIndex).filter((i) => Number.isInteger(i)));
   const restoreAdvanceItem = (idx) => {
     const src = advance?.items?.[idx];
@@ -297,17 +314,23 @@ export default function ExpenseFormDialog({ open, kind: kindProp, expense, advan
    * ⚠️ แบบผูกใบ Advance ใช้ใบ "ตามที่อยู่ในระบบ" ไม่ใช่ค่าที่กำลังแก้ในฟอร์ม — กระดาษต้องอ้างข้อมูลที่ตรวจสอบ
    * ย้อนกลับได้ ไม่ใช่ตัวเลขที่ผู้ใช้เพิ่งพิมพ์และยังไม่ได้บันทึก
    */
-  const canPrintBlank = isClaim && !editing;
+  /**
+    * ✅ พิมพ์ฟอร์มเปล่าไปกรอกด้วยลายมือได้ทั้งใบเคลมและใบสำรองจ่าย (ผู้ใช้ขอ) — เฉพาะตอนออกใบใหม่
+    * ⚠️ ต่างกันตรงตัวเลือก: ใบเคลมมี 2 แบบให้เลือก (ผูกใบ Advance / เปล่าทั้งใบ) จึงต้องมีเมนู ส่วนใบ
+    * สำรองจ่ายมีแบบเดียว (ไม่มี Advance ให้ผูกอยู่แล้ว) กดปุ่มแล้วเปิดเลย ไม่ต้องให้เลือกจากเมนูที่มีข้อเดียว
+    */
+   const canPrintBlank = (isClearClaim || isReimburseForm) && !editing;
   const openBlank = (variant) => {
     setBlankMenuEl(null);
     setBlankPrint({ variant, advance: variant === "advance" ? advance : null, printedBy: userData?.fname || "" });
   };
+  const onPrintBlankClick = (e) => (isReimburseForm ? openBlank("reimburse") : setBlankMenuEl(e.currentTarget));
 
   return (
     <Dialog
       open={open}
       onClose={(_, reason) => { if (saving || reason === "backdropClick") return; onClose?.(); }}
-      fullWidth maxWidth={isClaim ? "lg" : "md"} fullScreen={isMobile}
+      fullWidth maxWidth={isClearClaim ? "lg" : "md"} fullScreen={isMobile}
       PaperProps={{ sx: { borderRadius: isMobile ? 0 : 3 } }}
     >
       <DialogTitle sx={{ p: 0 }}>
@@ -320,17 +343,19 @@ export default function ExpenseFormDialog({ open, kind: kindProp, expense, advan
             width: 38, height: 38, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
             bgcolor: accent, color: "#fff",
           }}>
-            {isClaim ? <ReceiptLong sx={{ fontSize: 21 }} /> : <Payments sx={{ fontSize: 21 }} />}
+            {isReimburseForm ? <AccountBalanceWallet sx={{ fontSize: 21 }} /> : isClaim ? <ReceiptLong sx={{ fontSize: 21 }} /> : <Payments sx={{ fontSize: 21 }} />}
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Stack direction="row" alignItems="center" spacing={0.75} sx={{ minWidth: 0 }}>
-              <KindBadge kind={kind} />
+              <KindBadge kind={slip} />
               <Typography sx={{ fontWeight: 800, fontSize: "1.02rem", lineHeight: 1.3, color: meta.dark }} noWrap>
                 {editing ? `แก้ไข ${expense.docNo || ""}` : `ออก${meta.label}ใหม่`}
               </Typography>
             </Stack>
             <Typography variant="caption" sx={{ color: TEXT_SUB }} noWrap component="div">
-              {isClaim ? "สรุปค่าใช้จ่ายจริงพร้อมหลักฐาน เพื่อเคลียร์เงินเบิกล่วงหน้า" : "ขอเบิกเงินล่วงหน้าเพื่อใช้ในงาน · หัวหน้าจะได้รับแจ้งทันที"}
+              {isReimburseForm
+                ? "ค่าใช้จ่ายที่สำรองจ่ายไปก่อนแล้ว · แนบใบเสร็จให้ครบเพื่อขอเงินคืน"
+                : isClaim ? "สรุปค่าใช้จ่ายจริงพร้อมหลักฐาน เพื่อเคลียร์เงินเบิกล่วงหน้า" : "ขอเบิกเงินล่วงหน้าเพื่อใช้ในงาน · หัวหน้าจะได้รับแจ้งทันที"}
             </Typography>
           </Box>
           <IconButton onClick={onClose} disabled={saving}><Close /></IconButton>
@@ -349,8 +374,22 @@ export default function ExpenseFormDialog({ open, kind: kindProp, expense, advan
           </Alert>
         )}
 
+        {/* ── ใบสำรองจ่าย: บอกให้ชัดว่าใบนี้ไม่มี Advance ─────────────── */}
+        {isReimburseForm && (
+          <Alert
+            severity="info" icon={<AccountBalanceWallet fontSize="inherit" />}
+            sx={{
+              mb: 1.75, borderRadius: 2, bgcolor: meta.soft, color: meta.dark,
+              border: "1px solid " + alpha(accent, 0.3), "& .MuiAlert-icon": { color: accent },
+            }}
+          >
+            <b>สำรองจ่ายเอง</b> — ใบนี้ไม่ผูกกับใบเบิก Advance ใดๆ อนุมัติแล้วบริษัทจะ<b>จ่ายคืนเต็มยอด</b>ให้ผู้เบิก
+            {" "}(ถ้าเคยเบิก Advance ไปแล้วสำหรับงานนี้ ให้ออก<b>ใบเคลม</b>เพื่อเคลียร์ใบนั้นแทน)
+          </Alert>
+        )}
+
         {/* ── ใบเคลม: เลือกใบ Advance ───────────────────────────────── */}
-        {isClaim && (
+        {isClearClaim && (
           <Section accent={accent} icon={<LinkIcon sx={{ fontSize: 18, color: accent }} />} title="อ้างอิงใบเบิก Advance" hint="เลือกได้เฉพาะใบที่จ่ายเงินแล้วและยังไม่ได้เคลียร์">
             {editing ? (
               <Typography sx={{ fontWeight: 700 }}>{advance?.docNo} · {advance?.subject} · {baht(advance?.total)}</Typography>
@@ -443,17 +482,18 @@ export default function ExpenseFormDialog({ open, kind: kindProp, expense, advan
                 )}
               />
             ) : (
-              <TextField size="small" label="ชื่อผู้เบิกเงิน" value={isClaim ? (advance?.requester?.name || requester?.name || "") : (requester?.name || "")}
-                InputProps={{ readOnly: true }} helperText={isClaim ? "ผู้เบิกของใบเคลม = ผู้รับเงิน Advance" : undefined} />
+              <TextField size="small" label="ชื่อผู้เบิกเงิน" value={isClearClaim ? (advance?.requester?.name || requester?.name || "") : (requester?.name || "")}
+                InputProps={{ readOnly: true }}
+                helperText={isClearClaim ? "ผู้เบิกของใบเคลม = ผู้รับเงิน Advance" : isReimburseForm ? "ผู้เบิก = คนที่สำรองจ่ายและจะได้รับเงินคืน" : undefined} />
             )}
             <TextField size="small" label="ตำแหน่ง" value={position} onChange={(e) => setPosition(e.target.value)} />
             <TextField
               size="small" label="เรื่อง *" value={subject} onChange={(e) => setSubject(e.target.value)}
-              placeholder={isClaim ? "เคลียร์ค่าใช้จ่าย ..." : "เช่น เบิกเบี้ยเลี้ยง น.ศ. ฝึกงาน / ค่าเดินทางงาน PM"}
+              placeholder={isReimburseForm ? "เช่น ค่าน้ำมัน/ทางด่วน งาน PM ที่สำรองจ่ายไปก่อน" : isClaim ? "เคลียร์ค่าใช้จ่าย ..." : "เช่น เบิกเบี้ยเลี้ยง น.ศ. ฝึกงาน / ค่าเดินทางงาน PM"}
               error={touched && !String(subject).trim()}
               sx={{ gridColumn: { sm: "1 / -1" } }} inputProps={{ maxLength: 300 }}
             />
-            {!isClaim && (
+            {!isClearClaim && (
               <Autocomplete
                 sx={{ gridColumn: { sm: "1 / -1" } }}
                 options={job && !jobOptions.some((j) => j._id === job._id) ? [job, ...jobOptions] : jobOptions}
@@ -487,11 +527,11 @@ export default function ExpenseFormDialog({ open, kind: kindProp, expense, advan
 
         {/* ── รายการ ───────────────────────────────────────────────── */}
         <Section
-          title={isClaim ? "รายการค่าใช้จ่ายจริง" : "รายการที่ขอเบิก"}
-          hint={isClaim ? "แก้ยอดให้ตรงใบเสร็จ · เพิ่ม/ลบรายการได้" : "จำนวน × ราคาต่อหน่วย ระบบคำนวณยอดให้"}
+          title={isReimburseForm ? "รายการที่สำรองจ่ายไปแล้ว" : isClaim ? "รายการค่าใช้จ่ายจริง" : "รายการที่ขอเบิก"}
+          hint={isReimburseForm ? "กรอกตามใบเสร็จที่มีจริง · แนบไฟล์ใบเสร็จด้านล่างให้ครบ" : isClaim ? "แก้ยอดให้ตรงใบเสร็จ · เพิ่ม/ลบรายการได้" : "จำนวน × ราคาต่อหน่วย ระบบคำนวณยอดให้"}
           action={<Typography sx={{ fontWeight: 800, color: accent, whiteSpace: "nowrap" }}>{baht(total)}</Typography>}
         >
-          {touched && !isClaim && !validItems.length && <Alert severity="error" sx={{ mb: 1 }}>เพิ่มรายการอย่างน้อย 1 รายการ</Alert>}
+          {touched && !isClearClaim && !validItems.length && <Alert severity="error" sx={{ mb: 1 }}>เพิ่มรายการอย่างน้อย 1 รายการ</Alert>}
           <Stack spacing={1.25}>
             {items.map((row, idx) => {
               const cat = categoryMeta(row.category);
@@ -559,7 +599,7 @@ export default function ExpenseFormDialog({ open, kind: kindProp, expense, advan
                     </Box>
                     <Tooltip title="ลบรายการ">
                       <span>
-                        <IconButton size="small" aria-label="ลบรายการ" onClick={() => removeItem(row.key)} disabled={!isClaim && items.length === 1}>
+                        <IconButton size="small" aria-label="ลบรายการ" onClick={() => removeItem(row.key)} disabled={!isClearClaim && items.length === 1}>
                           <DeleteOutline fontSize="small" />
                         </IconButton>
                       </span>
@@ -582,7 +622,15 @@ export default function ExpenseFormDialog({ open, kind: kindProp, expense, advan
 
           {/* ── สรุปยอด ─────────────────────────────────────────────── */}
           <Box sx={{ mt: 1.75, p: 1.5, borderRadius: 2, bgcolor: alpha(accent, 0.06), border: `1px dashed ${alpha(accent, 0.35)}` }}>
-            {isClaim ? (
+            {isReimburseForm ? (
+              <Stack direction="row" alignItems="baseline" justifyContent="space-between">
+                <Box>
+                  <Typography sx={{ fontWeight: 700, color: TEXT_SUB }}>รวมขอเบิกคืน</Typography>
+                  <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }}>บริษัทจ่ายคืนให้ผู้เบิกเต็มจำนวนหลังอนุมัติ</Typography>
+                </Box>
+                <Typography sx={{ fontWeight: 900, fontSize: "1.3rem", color: accent }}>{baht(total)}</Typography>
+              </Stack>
+            ) : isClaim ? (
               <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)" }, gap: 1 }}>
                 <Box>
                   <Typography variant="caption" sx={{ color: TEXT_SUB }}>ยอดเบิก Advance</Typography>
@@ -612,7 +660,7 @@ export default function ExpenseFormDialog({ open, kind: kindProp, expense, advan
         <Section accent={accent} title="หมายเหตุและหลักฐาน" hint={isClaim ? "แนบรูปใบเสร็จ/บิลให้ครบ ผู้อนุมัติจะตรวจจากไฟล์เหล่านี้" : "แนบใบเสนอราคา/รูปประกอบได้ (ไม่บังคับ)"}>
           <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: isClaim ? "1fr" : "1fr 220px" } }}>
             <TextField size="small" label="หมายเหตุ" value={note} onChange={(e) => setNote(e.target.value)} multiline minRows={2} inputProps={{ maxLength: 1000 }}
-              placeholder={isClaim ? "เช่น ไม่ได้ใช้เงินเพราะงานเลื่อน / ใบเสร็จบางใบสูญหาย" : ""} />
+              placeholder={isReimburseForm ? "เช่น จ่ายสดหน้างาน ใบเสร็จอยู่ในรูปที่แนบ" : isClaim ? "เช่น ไม่ได้ใช้เงินเพราะงานเลื่อน / ใบเสร็จบางใบสูญหาย" : ""} />
             {!isClaim && (
               <ThaiDatePicker label="กำหนดเคลียร์ (ไม่บังคับ)" value={dueClearAt} onChange={(v) => setDueClearAt(v || "")}
                 helperText="ว่างไว้ = 7 วันหลังรับเงิน" />
@@ -657,9 +705,9 @@ export default function ExpenseFormDialog({ open, kind: kindProp, expense, advan
         {canPrintBlank && (
           <Tooltip describeChild title="พิมพ์ฟอร์มกระดาษไปกรอกด้วยลายมือ แล้วค่อยนำมาบันทึกเข้าระบบ">
             <Button
-              onClick={(e) => setBlankMenuEl(e.currentTarget)} disabled={saving}
+              onClick={onPrintBlankClick} disabled={saving}
               startIcon={<Print sx={{ fontSize: 18 }} />}
-              aria-haspopup="menu" aria-expanded={Boolean(blankMenuEl)}
+              aria-haspopup={isReimburseForm ? undefined : "menu"} aria-expanded={isReimburseForm ? undefined : Boolean(blankMenuEl)}
               sx={{ textTransform: "none", fontWeight: 700, color: accent, whiteSpace: "nowrap", flexShrink: 0 }}
             >
               <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>พิมพ์</Box>ฟอร์มเปล่า
@@ -683,7 +731,7 @@ export default function ExpenseFormDialog({ open, kind: kindProp, expense, advan
         </Button>
       </DialogActions>
 
-      {canPrintBlank && (
+      {canPrintBlank && !isReimburseForm && (
         <Menu
           anchorEl={blankMenuEl} open={Boolean(blankMenuEl)} onClose={() => setBlankMenuEl(null)}
           anchorOrigin={{ vertical: "top", horizontal: "left" }} transformOrigin={{ vertical: "bottom", horizontal: "left" }}

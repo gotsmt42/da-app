@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { localFormCode, planRows, __test } from "./expenseBlankPdf";
 
-const { splitMoney, SIG_TOP, AFTER_H, ROW_H, ROW_H_TIGHT } = __test;
+const { splitMoney, SIG_TOP, AFTER_H, AFTER_H_SIMPLE, ROW_H, ROW_H_TIGHT } = __test;
 
 // ตำแหน่งขอบบนของแถวแรกที่ใช้จริงในฟอร์ม (หน้าแรก / หน้าต่อ) — ค่าประมาณจาก drawFirstPageTop
 const FIRST_TOP = 114.3;
@@ -51,6 +51,15 @@ describe("planRows — ห้ามตัดรายการที่ตั้
     expect(plan).toHaveLength(1);
     expect(plan[0].rowH).toBe(ROW_H_TIGHT);
     expect(plan[0].rows).toBeGreaterThanOrEqual(normalCap + 2);
+  });
+
+  it("ฟอร์มสำรองจ่าย: ท้ายตารางสั้นกว่า (ยอดรวมแถวเดียว) จึงได้แถวเขียนมากกว่า และยังไม่ทับลายเซ็น", () => {
+    const claim = planRows(0, FIRST_TOP, NEXT_TOP);
+    const rmb = planRows(0, FIRST_TOP, NEXT_TOP, AFTER_H_SIMPLE);
+    expect(AFTER_H_SIMPLE).toBeLessThan(AFTER_H);
+    expect(rmb).toHaveLength(1);
+    expect(rmb[0].rows).toBeGreaterThan(claim[0].rows);
+    expect(FIRST_TOP + rmb[0].rows * rmb[0].rowH).toBeLessThanOrEqual(SIG_TOP - AFTER_H_SIMPLE + 1e-6);
   });
 
   it("รายการเยอะ = ต่อหน้า 2 ครบทุกรายการ และยอดรวม/ลายเซ็นอยู่หน้าสุดท้ายหน้าเดียว", () => {

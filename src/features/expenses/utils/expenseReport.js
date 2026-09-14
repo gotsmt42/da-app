@@ -14,6 +14,12 @@
  *   refundDue   ใบเคลมอนุมัติแล้ว ผู้เบิกต้องคืนเงิน แต่ยังไม่ได้ปิดส่วนต่าง
  *   extraDue    ใบเคลมอนุมัติแล้ว บริษัทต้องจ่ายเพิ่ม แต่ยังไม่ได้ปิดส่วนต่าง
  *   refunded / extraPaid  ส่วนต่างที่ปิดเรียบร้อยแล้ว
+ *
+ * ── ใบสำรองจ่าย (ผู้เบิกออกเงินเองไปก่อน ไม่มี Advance) ────────────────────
+ *   reimburseCount / reimbursePending / reimburse (อนุมัติแล้ว) / reimburseDue (รอจ่ายคืน) / reimbursePaid
+ * ⚠️ ยอดกลุ่มนี้ "ไม่รวม" เข้ากับ advanced/actual โดยเด็ดขาด — สองตัวนั้นมีไว้เทียบกันว่าเงินที่จ่าย
+ * ล่วงหน้าออกไปถูกใช้จริงเท่าไร ถ้าเอาเงินที่บริษัทยังไม่ได้จ่าย (สำรองจ่าย) ไปบวกใน actual อัตราส่วน
+ * การเคลียร์จะเพี้ยนทันทีและดูเหมือนใช้เกินยอดที่เบิกไปทุกเดือน
  */
 import { money } from "../expenseMeta";
 
@@ -23,6 +29,7 @@ const CLAIM_DONE = ["approved", "settled"];
 const emptyTotals = () => ({
   count: 0, requested: 0, pending: 0, toPay: 0, advanced: 0, actual: 0,
   outstanding: 0, refundDue: 0, extraDue: 0, refunded: 0, extraPaid: 0, overdue: 0,
+  reimburseCount: 0, reimbursePending: 0, reimburse: 0, reimburseDue: 0, reimbursePaid: 0,
 });
 
 const addRow = (t, a, now) => {
@@ -52,21 +59,42 @@ const addRow = (t, a, now) => {
   }
 };
 
-/** ⚠️ ปัดเฉพาะยอดเงิน — key/label ของกลุ่มเป็นสตริง และ count/overdue เป็นจำนวนใบ */
-const MONEY_FIELDS = Object.keys(emptyTotals()).filter((k) => k !== "count" && k !== "overdue");
+/**
+ * ใบสำรองจ่ายหนึ่งใบ
+ * ⚠️ ใบที่ถูกตีกลับยังถือว่า "รออยู่" (ผู้เบิกยังไม่ได้เงินคืน) แต่ไม่นับเป็นค่าใช้จ่ายที่อนุมัติแล้ว
+ */
+const addReimburse = (t, r) => {
+  const total = Number(r.total) || 0;
+  t.reimburseCount += 1;
+  if (["pending", "rejected"].includes(r.status)) t.reimbursePending += total;
+  if (["approved", "settled"].includes(r.status)) t.reimburse += total;
+  if (r.status === "approved") t.reimburseDue += total;
+  if (r.status === "settled") t.reimbursePaid += total;
+};
+
+/** ⚠️ ปัดเฉพาะยอดเงิน — key/label ของกลุ่มเป็นสตริง ส่วน count/overdue/*Count เป็นจำนวนใบ */
+const NON_MONEY = ["count", "overdue", "reimburseCount"];
+const MONEY_FIELDS = Object.keys(emptyTotals()).filter((k) => !NON_MONEY.includes(k));
 const round = (t) => {
   const out = { ...t };
   MONEY_FIELDS.forEach((k) => { out[k] = money(t[k]); });
   return out;
 };
 
-const groupBy = (rows, keyOf, labelOf, now) => {
+/**
+ * รวมสองก้อน (ใบ Advance + ใบสำรองจ่าย) ลงกลุ่มเดียวกัน
+ * ⚠️ keyOf/labelOf ต้องใช้ได้กับทั้งสองก้อน — ทั้งคู่มี requester / eventId / job / docDate เหมือนกัน
+ * (คนที่สำรองจ่ายก็ต้องโผล่ในตาราง "สรุปตามผู้เบิก" แม้ไม่เคยเบิก Advance เลยสักใบ)
+ */
+const groupBy = (rows, reimburseRows, keyOf, labelOf, now) => {
   const map = new Map();
-  rows.forEach((a) => {
-    const key = keyOf(a);
-    if (!map.has(key)) map.set(key, { key, label: labelOf(a), ...emptyTotals() });
-    addRow(map.get(key), a, now);
-  });
+  const bucket = (row) => {
+    const key = keyOf(row);
+    if (!map.has(key)) map.set(key, { key, label: labelOf(row), ...emptyTotals() });
+    return map.get(key);
+  };
+  rows.forEach((a) => addRow(bucket(a), a, now));
+  (reimburseRows || []).forEach((r) => addReimburse(bucket(r), r));
   return [...map.values()].map(round);
 };
 
@@ -74,33 +102,37 @@ const groupBy = (rows, keyOf, labelOf, now) => {
 export const monthKey = (d) => String(d || "").slice(0, 7);
 
 /**
- * @param {Array} advances  แถวจาก /report (ใบ Advance + claim)
+ * @param {Array} advances  แถวจาก /report (ใบ Advance + claim ที่ผูกอยู่)
  * @param {object} [opts]
+ * @param {Array}  [opts.reimbursements] ใบสำรองจ่ายในช่วงเวลาเดียวกัน (ไม่มี Advance ให้เทียบ)
  * @param {Date}   [opts.now]
  */
-export function buildExpenseReport(advances, { now = new Date() } = {}) {
+export function buildExpenseReport(advances, { reimbursements = [], now = new Date() } = {}) {
   const rows = (advances || []).filter((a) => a && a.status !== "cancelled");
+  const reimburseRows = (reimbursements || []).filter((r) => r && r.status !== "cancelled");
   const totals = emptyTotals();
   rows.forEach((a) => addRow(totals, a, now));
+  reimburseRows.forEach((r) => addReimburse(totals, r));
 
-  const byPerson = groupBy(rows, (a) => a.requester?.userId || a.requester?.name || "-", (a) => a.requester?.name || "-", now)
-    .sort((x, y) => y.advanced - x.advanced || y.requested - x.requested);
+  const byPerson = groupBy(rows, reimburseRows, (a) => a.requester?.userId || a.requester?.name || "-", (a) => a.requester?.name || "-", now)
+    .sort((x, y) => y.advanced - x.advanced || y.reimburse - x.reimburse || y.requested - x.requested);
 
   const byJob = groupBy(
     rows,
+    reimburseRows,
     (a) => a.eventId || "__none__",
     (a) => (a.eventId ? [a.job?.title, a.job?.site || a.job?.company].filter(Boolean).join(" · ") || "งานไม่มีชื่อ" : "ไม่ผูกงาน"),
     now
-  ).sort((x, y) => (x.key === "__none__") - (y.key === "__none__") || y.advanced - x.advanced);
+  ).sort((x, y) => (x.key === "__none__") - (y.key === "__none__") || y.advanced - x.advanced || y.reimburse - x.reimburse);
 
-  const byMonth = groupBy(rows, (a) => monthKey(a.docDate), (a) => monthKey(a.docDate), now)
+  const byMonth = groupBy(rows, reimburseRows, (a) => monthKey(a.docDate), (a) => monthKey(a.docDate), now)
     .sort((x, y) => (x.key < y.key ? -1 : 1));
 
   // ── หมวดค่าใช้จ่าย: ตั้งเบิก (รายการใน Advance ที่จ่ายแล้ว) เทียบ ใช้จริง (รายการในใบเคลมที่อนุมัติ) ──
   const catMap = new Map();
   const cat = (c) => {
     const k = c || "other";
-    if (!catMap.has(k)) catMap.set(k, { key: k, planned: 0, actual: 0 });
+    if (!catMap.has(k)) catMap.set(k, { key: k, planned: 0, actual: 0, reimburse: 0 });
     return catMap.get(k);
   };
   rows.forEach((a) => {
@@ -111,9 +143,14 @@ export function buildExpenseReport(advances, { now = new Date() } = {}) {
       (claim.items || []).forEach((it) => { cat(it.category).actual += Number(it.amount) || 0; });
     }
   });
+  // ✅ ค่าใช้จ่ายที่สำรองจ่ายเองก็ต้องรู้ว่าหมดไปกับหมวดไหน — แยกคอลัมน์ไว้ ไม่บวกรวมกับ actual
+  reimburseRows.forEach((r) => {
+    if (!CLAIM_DONE.includes(r.status)) return;
+    (r.items || []).forEach((it) => { cat(it.category).reimburse += Number(it.amount) || 0; });
+  });
   const byCategory = [...catMap.values()]
-    .map((c) => ({ ...c, planned: money(c.planned), actual: money(c.actual) }))
-    .sort((x, y) => y.actual - x.actual || y.planned - x.planned);
+    .map((c) => ({ ...c, planned: money(c.planned), actual: money(c.actual), reimburse: money(c.reimburse) }))
+    .sort((x, y) => (y.actual + y.reimburse) - (x.actual + x.reimburse) || y.planned - x.planned);
 
-  return { totals: round(totals), byPerson, byJob, byMonth, byCategory, rows };
+  return { totals: round(totals), byPerson, byJob, byMonth, byCategory, rows, reimburseRows };
 }

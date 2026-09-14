@@ -15,7 +15,7 @@ import boldFontUrl from "@/assets/fonts/THSarabunNew Bold.ttf?url";
 import { ISSUER, drawLetterhead, outputDocument, spaceThaiLatin } from "@/features/documents/utils/deliveryNotePdf";
 import { thaiDateFull, thaiDate, thaiDateTime } from "@/shared/utils/thaiDate";
 import {
-  KIND_META, statusMeta, fmtMoney, bahtText, qtyText, differenceMeta, paymentLabel, fileKindLabel, jobText, money,
+  KIND_META, slipKind, statusMeta, fmtMoney, bahtText, qtyText, differenceMeta, paymentLabel, fileKindLabel, jobText, money,
 } from "../expenseMeta";
 import { compareItems } from "./expenseCompare";
 
@@ -109,7 +109,9 @@ const LINE = [148, 163, 184];
  * @returns {number} y ล่างสุดของเนื้อหา
  */
 const renderBody = (doc, e, { s, compact, filler }, hasBold) => {
-  const kind = KIND_META[e.kind] || KIND_META.advance;
+  // ⚠️ ใช้ "ชนิดที่ใช้แสดงผล" — ใบสำรองจ่ายเป็น kind = "claim" แต่ต้องได้หัวเรื่อง/สี/ป้ายของตัวเอง
+  const slip = slipKind(e);
+  const kind = KIND_META[slip] || KIND_META.advance;
   const bold = (on) => doc.setFont("THSarabun", on && hasBold ? "bold" : "normal");
   const size = (pt) => doc.setFontSize(Math.max(pt * s, 8));
   const color = (rgb) => doc.setTextColor(...rgb);
@@ -198,9 +200,16 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold) => {
   }
 
   const isClaim = e.kind === "claim";
+  /**
+   * ใบสำรองจ่ายไม่มี Advance — บนกระดาษจึงไม่มีกรอบอ้างอิง ไม่มีคอลัมน์ "ตั้งเบิก" และไม่มีบรรทัด
+   * "หัก เงินเบิกล่วงหน้า" (พิมพ์เลข 0 ในช่องพวกนั้นออกไปคือเอกสารที่ชวนให้เข้าใจผิด)
+   * ⚠️ แต่ยังใช้ "ผังตารางแบบใบเคลม" อยู่ เพราะต้องมีช่องเลขที่ใบเสร็จเหมือนกัน
+   */
+  const isReimburse = slip === "reimburse";
+  const isClearClaim = isClaim && !isReimburse;
   const advDoc = e.advanceDoc || null;
   const advTint = KIND_META.advance.pdf;
-  if (isClaim) {
+  if (isClearClaim) {
     // ✅ ผู้ใช้ขอให้ใบเคลมมีรายละเอียดของ Advance "ข้างๆ" เพื่อตรวจสอบง่าย — บนกระดาษทำเป็นกรอบสีของ
     // Advance (เขียวอมฟ้า) ก่อนตาราง และในตารางมีคอลัมน์ "ตั้งเบิก" คู่กับ "ใช้จริง" ทุกบรรทัด
     const adv = { ...(e.advance || {}), ...(advDoc || {}) };
@@ -235,7 +244,7 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold) => {
   // ── ตารางรายการ ─────────────────────────────────────────────────────
   y += 1.5 * s;
   const compare = isClaim ? compareItems(e.items || [], advDoc?.items || []) : null;
-  const hasPlanned = Boolean(isClaim && advDoc?.items?.length);
+  const hasPlanned = Boolean(isClearClaim && advDoc?.items?.length);
   const cols = isClaim
     ? [
       { key: "no", w: 10 }, { key: "desc", w: 0 }, { key: "receipt", w: 22 },
@@ -248,9 +257,11 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold) => {
   let cx = L;
   cols.forEach((c) => { c.x = cx; cx += c.w; });
   const col = (k) => cols.find((c) => c.key === k);
-  const headers = isClaim
-    ? { no: "ลำดับ", desc: "รายการค่าใช้จ่ายจริง", receipt: "เลขที่ใบเสร็จ", planned: "ตั้งเบิก (Advance)", qty: "จำนวน / หน่วย", amount: "ใช้จริง (บาท)" }
-    : { no: "ลำดับ", desc: "รายการ", qty: "จำนวน / หน่วย", amount: "จำนวนเงิน (บาท)" };
+  const headers = isReimburse
+    ? { no: "ลำดับ", desc: "รายการที่สำรองจ่าย", receipt: "เลขที่ใบเสร็จ", qty: "จำนวน / หน่วย", amount: "จำนวนเงิน (บาท)" }
+    : isClaim
+      ? { no: "ลำดับ", desc: "รายการค่าใช้จ่ายจริง", receipt: "เลขที่ใบเสร็จ", planned: "ตั้งเบิก (Advance)", qty: "จำนวน / หน่วย", amount: "ใช้จริง (บาท)" }
+      : { no: "ลำดับ", desc: "รายการ", qty: "จำนวน / หน่วย", amount: "จำนวนเงิน (บาท)" };
 
   const headH = 8 * s;
   doc.setFillColor(...tint.head);
@@ -383,10 +394,11 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold) => {
   };
 
   const tableStart = tableTop - headH;
-  if (!isClaim) {
-    sumRow(`( ${bahtText(e.total)} )`, "รวมเบิกทั้งหมด", e.total, { strong: true, fill: tint.fill });
+  if (!isClearClaim) {
+    // ใบสำรองจ่ายสรุปบรรทัดเดียว = ยอดที่บริษัทต้องจ่ายคืนทั้งก้อน
+    sumRow(`( ${bahtText(e.total)} )`, isReimburse ? "รวมขอเบิกคืน" : "รวมเบิกทั้งหมด", e.total, { strong: true, fill: tint.fill });
   } else {
-    const d = differenceMeta(e.difference);
+    const d = differenceMeta(e.difference, slip);
     const advTotal = e.advance?.total || advDoc?.total || 0;
     sumRow(`( ${bahtText(e.total)} )`, "รวม", e.total, { plannedAmount: hasPlanned ? compare.plannedTotal : null, fill: tint.fill });
     sumRow("", "หัก เงินเบิกล่วงหน้า", advTotal, { labelFrom: hasPlanned ? "planned" : "receipt" });
@@ -419,7 +431,15 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold) => {
     ].filter(Boolean).join(" · "));
   }
   if (e.kind === "advance" && e.claimDocNo) infoLine("เคลียร์ด้วยใบเคลม:", e.claimDocNo);
-  if (e.kind === "claim" && e.status === "settled" && pay.at && money(e.difference) !== 0) {
+  if (isReimburse && e.status === "settled" && pay.at) {
+    infoLine("จ่ายคืนให้ผู้เบิก:", [
+      thaiDate(pay.at),
+      paymentLabel(pay.method),
+      pay.ref ? `เลขที่ ${pay.ref}` : "",
+      pay.by?.name ? `โดย ${pay.by.name}` : "",
+    ].filter(Boolean).join("  ·  "));
+  }
+  if (isClearClaim && e.status === "settled" && pay.at && money(e.difference) !== 0) {
     infoLine(money(e.difference) > 0 ? "จ่ายเงินเพิ่ม:" : "รับเงินคืน:", [
       thaiDateFull(pay.at), paymentLabel(pay.method), pay.ref ? `อ้างอิง ${pay.ref}` : "",
     ].filter(Boolean).join(" · "));
@@ -476,7 +496,7 @@ const renderFooter = (doc, e) => {
   doc.setTextColor(...GRAY);
   const by = e.createdBy?.userId && e.createdBy.userId !== e.requester?.userId ? ` · ออกใบแทนโดย ${e.createdBy.name}` : "";
   doc.text(`พิมพ์จากระบบเมื่อ ${thaiDateTime(new Date())}${by}`, L, H_PAGE - 6);
-  doc.text(`สถานะ: ${statusMeta(e.status, e.kind).label}`, R, H_PAGE - 6, { align: "right" });
+  doc.text(`สถานะ: ${statusMeta(e.status, slipKind(e)).label}`, R, H_PAGE - 6, { align: "right" });
 };
 
 const renderCancelledMark = (doc, hasBold) => {
@@ -523,7 +543,7 @@ export async function generateExpensePdf({ expense, mode = "blob" }) {
   if (expense.status === "cancelled") renderCancelledMark(doc, hasBold);
 
   doc.setProperties({
-    title: `${KIND_META[expense.kind]?.docTitle || "ใบเบิก"} ${expense.docNo || ""}`,
+    title: `${KIND_META[slipKind(expense)]?.docTitle || "ใบเบิก"} ${expense.docNo || ""}`,
     subject: expense.subject || "",
     creator: ISSUER.nameEn,
   });

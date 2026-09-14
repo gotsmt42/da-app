@@ -21,7 +21,9 @@ import { useCallback, useEffect, useState } from "react";
 import { Link as RouterLink, Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Box, Stack, Typography, Button, Chip } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Add, Payments, ReceiptLong, FactCheck, Insights, ChevronRight, WarningAmber } from "@mui/icons-material";
+import {
+  Add, Payments, ReceiptLong, FactCheck, Insights, ChevronRight, WarningAmber, AccountBalanceWallet,
+} from "@mui/icons-material";
 
 import usePermissions from "@/shared/hooks/usePermissions";
 import { refreshAppBadges } from "@/shared/hooks/useAppBadges";
@@ -30,7 +32,7 @@ import ExpenseList from "../components/ExpenseList";
 import ExpenseFormDialog from "../components/ExpenseFormDialog";
 import ExpenseDetailDialog from "../components/ExpenseDetailDialog";
 import ExpenseReport from "./ExpenseReport";
-import { KIND_META, baht, TEXT_SUB, BORDER_MAIN } from "../expenseMeta";
+import { KIND_META, slipMeta, baht, TEXT_SUB, BORDER_MAIN } from "../expenseMeta";
 
 const INBOX_COLOR = "#d97706";
 const REPORT_COLOR = "#1d4ed8";
@@ -54,8 +56,15 @@ export const VIEW_META = {
     color: KIND_META.claim.color,
     dark: KIND_META.claim.dark,
     soft: KIND_META.claim.soft,
-    sub: "สรุปค่าใช้จ่ายจริงพร้อมใบเสร็จ เพื่อเคลียร์เงิน Advance ที่รับไปแล้ว",
+    sub: "เคลียร์เงิน Advance ที่รับไปแล้ว · หรือเบิกคืนค่าที่สำรองจ่ายเอง",
     action: "ออกใบเคลม",
+    /**
+     * ✅ ปุ่มที่สองของหน้าใบเคลม — ใบสำรองจ่าย (ผู้ใช้: "บางทีช่างออกค่าใช้จ่ายไปก่อนไม่ advance")
+     * ⚠️ ไม่แยกเป็นหน้า/เมนูใหม่โดยตั้งใจ — ผู้ใช้เคยแจ้งว่าเมนูซ้ำหลายจุดแล้วดูรก ใบสองแบบนี้เป็น
+     * "ขอเงินคืนตามที่ใช้จริง" เหมือนกัน ต่างแค่เคยรับเงินล่วงหน้าไปหรือยัง จึงอยู่หน้าเดียวกันแล้วแยก
+     * ด้วยแถบตัวกรอง + สี + ป้ายชนิดใบ
+     */
+    action2: { label: "สำรองจ่ายเอง", kind: "reimburse", icon: AccountBalanceWallet },
   },
   inbox: {
     path: "/expenses/approvals",
@@ -128,17 +137,23 @@ export default function ExpensesPage({ view: viewProp }) {
   // ⚠️ เข้ามาจากลิงก์แจ้งเตือน (/expenses/<id>) ยังไม่รู้ว่าเป็นใบชนิดไหนจนกว่ากล่องรายละเอียดจะโหลดเสร็จ
   // — พอรู้แล้วค่อยสลับพื้นหลัง/ปลายทางตอนปิดให้ตรงชนิด ไม่ต้องยิง API ซ้ำอีกรอบเพื่อถามแค่ชนิดใบ
   const [detailKind, setDetailKind] = useState(null);
-  const [form, setForm] = useState({ open: false, kind: "advance", expense: null, advance: null });
+  const [form, setForm] = useState({ open: false, kind: "advance", claimType: "clear", expense: null, advance: null });
   const [notice, setNotice] = useState(null);
   const [status, setStatus] = useState(searchParams.get("status") || "all");
+  // ตัวกรองชนิดย่อยของหน้าใบเคลม: all | clear | reimburse (ลิงก์จากเมนู/แจ้งเตือนส่งมาทาง ?type= ได้)
+  const [claimType, setClaimType] = useState(searchParams.get("type") || "all");
 
   const view = routeId ? (detailKind || viewProp || "advance") : (viewProp || "advance");
   const meta = VIEW_META[view] || VIEW_META.advance;
   const Icon = meta.icon;
+  // ⚠️ ต้องดึงออกมาเป็นตัวแปรขึ้นต้นด้วยตัวใหญ่ก่อนใช้เป็นแท็ก — <meta.action2.icon /> อ่านยากและ
+  // พังทันทีถ้าหน้านั้นไม่มีปุ่มที่สอง
+  const Action2Icon = meta.action2?.icon || Add;
   const isList = view === "advance" || view === "claim" || view === "inbox";
 
   useEffect(() => { if (routeId) setDetailId(routeId); }, [routeId]);
   useEffect(() => { setStatus(searchParams.get("status") || "all"); }, [searchParams]);
+  useEffect(() => { setClaimType(searchParams.get("type") || "all"); }, [searchParams]);
 
   useEffect(() => {
     let alive = true;
@@ -162,12 +177,23 @@ export default function ExpensesPage({ view: viewProp }) {
     if (routeId) navigate({ pathname: (VIEW_META[detailKind] || meta).path, search: location.search }, { replace: true });
   };
 
-  const openCreate = (kind, advance = null) => setForm({ open: true, kind, expense: null, advance });
+  /**
+   * @param {"advance"|"claim"|"reimburse"} slip ชนิดที่ผู้ใช้กด (reimburse = ใบเคลมชนิดสำรองจ่าย)
+   * ⚠️ "reimburse" ไม่ใช่ kind จริงในฐานข้อมูล ต้องแปลงเป็น kind=claim + claimType=reimburse ตรงนี้
+   * จุดเดียว ไม่ปล่อยให้คำว่า reimburse หลุดไปถึง API
+   */
+  const openCreate = (slip, advance = null) => setForm({
+    open: true,
+    kind: slip === "reimburse" ? "claim" : slip,
+    claimType: slip === "reimburse" ? "reimburse" : "clear",
+    expense: null,
+    advance,
+  });
 
   const onSaved = (expense, { created, warn }) => {
     setForm((f) => ({ ...f, open: false }));
     refresh();
-    setNotice({ severity: warn ? "warning" : "success", text: warn || (created ? `ส่ง${KIND_META[expense.kind].label} ${expense.docNo} แล้ว — รออนุมัติ` : "บันทึกการแก้ไขแล้ว") });
+    setNotice({ severity: warn ? "warning" : "success", text: warn || (created ? `ส่ง${slipMeta(expense).label} ${expense.docNo} แล้ว — รออนุมัติ` : "บันทึกการแก้ไขแล้ว") });
     if (expense?._id) openDetail(expense._id);
   };
 
@@ -191,7 +217,12 @@ export default function ExpensesPage({ view: viewProp }) {
     stats.push({ key: "__money", label: "ยอดเงินค้างเคลียร์", value: summary ? baht(summary.outstandingAmount) : "–", color: meta.color });
   } else if (view === "claim") {
     stats.push({ key: "pending", label: "รออนุมัติ", value: summary?.pending ?? "–", color: "#d97706", onClick: () => pick("pending") });
-    stats.push({ key: "approved", label: "รอปิดส่วนต่าง", value: summary?.toSettle ?? "–", color: meta.color, onClick: () => pick("approved") });
+    // ⚠️ ป้ายต้องตรงกับชนิดที่กำลังกรองอยู่ — ใบสำรองจ่ายไม่มี "ส่วนต่าง" ให้ปิด มีแต่เงินที่ต้องจ่ายคืน
+    // (ตัวเลขเป็นยอดรวมของทั้งสองชนิดจาก /summary — เป็นคิวเดียวกันของฝ่ายบัญชี)
+    stats.push({
+      key: "approved", label: claimType === "reimburse" ? "รอจ่ายคืน" : "รอปิดส่วนต่าง",
+      value: summary?.toSettle ?? "–", color: meta.color, onClick: () => pick("approved"),
+    });
     stats.push({ key: "__await", label: "Advance ที่ยังไม่เคลียร์", value: summary?.awaitingClaim ?? "–", color: KIND_META.advance.color });
   } else if (view === "inbox") {
     stats.push({ key: "__p", label: "รออนุมัติ", value: summary?.pending ?? "–", color: "#d97706" });
@@ -232,16 +263,33 @@ export default function ExpensesPage({ view: viewProp }) {
             </Box>
           </Stack>
           {meta.action && (canRequest || viewAll) && (
-            <Button
-              variant="contained" startIcon={view === "claim" ? <ReceiptLong /> : <Add />}
-              onClick={() => openCreate(view === "claim" ? "claim" : "advance")}
-              sx={{
-                flexShrink: 0, textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", whiteSpace: "nowrap",
-                bgcolor: meta.color, "&:hover": { bgcolor: meta.dark, boxShadow: "none" },
-              }}
-            >
-              {meta.action}
-            </Button>
+            <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
+              <Button
+                variant="contained" startIcon={view === "claim" ? <ReceiptLong /> : <Add />}
+                onClick={() => openCreate(view === "claim" ? "claim" : "advance")}
+                sx={{
+                  flex: { xs: 1, sm: "none" }, textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", whiteSpace: "nowrap",
+                  bgcolor: meta.color, "&:hover": { bgcolor: meta.dark, boxShadow: "none" },
+                }}
+              >
+                {meta.action}
+              </Button>
+              {/* ปุ่มที่สองเป็นแบบเส้นขอบ + สีของใบสำรองจ่าย — เห็นว่าเป็นคนละเอกสารตั้งแต่ยังไม่กด */}
+              {meta.action2 && (
+                <Button
+                  variant="outlined" startIcon={<Action2Icon />}
+                  onClick={() => openCreate(meta.action2.kind)}
+                  sx={{
+                    flex: { xs: 1, sm: "none" }, textTransform: "none", fontWeight: 800, borderRadius: 2, whiteSpace: "nowrap",
+                    color: KIND_META[meta.action2.kind].dark, borderColor: KIND_META[meta.action2.kind].color,
+                    bgcolor: "#fff",
+                    "&:hover": { borderColor: KIND_META[meta.action2.kind].dark, bgcolor: KIND_META[meta.action2.kind].soft },
+                  }}
+                >
+                  {meta.action2.label}
+                </Button>
+              )}
+            </Stack>
           )}
         </Stack>
       </Box>
@@ -268,6 +316,8 @@ export default function ExpensesPage({ view: viewProp }) {
         <ExpenseList
           mode={view === "inbox" ? "inbox" : view}
           status={status}
+          claimType={claimType}
+          onClaimTypeChange={setClaimType}
           onStatusChange={setStatus}
           onOpen={openDetail}
           onCreate={(k) => openCreate(k)}
@@ -293,6 +343,7 @@ export default function ExpensesPage({ view: viewProp }) {
       <ExpenseFormDialog
         open={form.open}
         kind={form.kind}
+        claimType={form.claimType}
         expense={form.expense}
         advance={form.advance}
         onClose={() => setForm((f) => ({ ...f, open: false }))}

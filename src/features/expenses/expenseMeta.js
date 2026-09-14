@@ -16,6 +16,14 @@ export const EXPENSE_ACCENT = "#0d9488";
 export const EXPENSE_ACCENT_DARK = "#0f766e";
 export const CLAIM_ACCENT = "#7c3aed";
 export const CLAIM_ACCENT_DARK = "#6d28d9";
+/**
+ * ใบสำรองจ่าย (พนักงานออกเงินเองไปก่อน ไม่มี Advance) — ส้ม
+ * ✅ ต้องแยกจากใบเคลมปกติให้เห็นตั้งแต่มองรายการ เพราะ "เงินยังไม่ออกจากบริษัท" กับ "เงินออกไปแล้ว
+ * รอเคลียร์" คนละเรื่องกันโดยสิ้นเชิงสำหรับคนอนุมัติและฝ่ายบัญชี
+ * ⚠️ ส้มอยู่คนละฝั่งวงล้อสีกับทั้งเขียวอมฟ้าและม่วง — สามใบวางเรียงกันแล้วยังแยกออกทุกใบ
+ */
+export const REIMBURSE_ACCENT = "#ea580c";
+export const REIMBURSE_ACCENT_DARK = "#c2410c";
 
 export const TEXT_MAIN = "#0f172a";
 export const TEXT_SUB = "#64748b";
@@ -44,7 +52,33 @@ export const KIND_META = {
     badge: "CLAIM",
     pdf: { main: [109, 40, 217], head: [237, 233, 254], fill: [245, 243, 255] },
   },
+  /**
+   * ⚠️ ไม่ใช่ kind ในฐานข้อมูล — เป็นชนิดย่อยของ claim (claimType = "reimburse")
+   * อ่านผ่าน slipKind()/slipMeta() เสมอ อย่าอ้าง e.kind ตรงๆ ไม่งั้นใบสำรองจ่ายจะแสดงเป็นใบเคลมปกติ
+   */
+  reimburse: {
+    label: "ใบเบิกค่าใช้จ่าย (สำรองจ่าย)",
+    short: "สำรองจ่าย",
+    docTitle: "ใบเบิกค่าใช้จ่าย (สำรองจ่ายเอง)",
+    color: REIMBURSE_ACCENT,
+    dark: REIMBURSE_ACCENT_DARK,
+    soft: "#fff7ed",
+    badge: "สำรองจ่าย",
+    pdf: { main: [194, 65, 12], head: [255, 237, 213], fill: [255, 247, 237] },
+  },
 };
+
+/**
+ * ชนิดใบที่ใช้ "แสดงผล" — รวมชนิดย่อยของใบเคลมเข้ามาเป็นชนิดเต็มตัว
+ * @returns {"advance"|"claim"|"reimburse"}
+ */
+export const slipKind = (e) =>
+  (e?.kind === "claim" && e?.claimType === "reimburse" ? "reimburse" : e?.kind || "advance");
+
+export const slipMeta = (e) => KIND_META[slipKind(e)] || KIND_META.advance;
+
+/** ใบที่ผู้เบิกสำรองจ่ายเอง — บริษัทต้องจ่ายคืนเต็มยอด ไม่มี Advance ให้เทียบ */
+export const isReimburse = (e) => slipKind(e) === "reimburse";
 
 /**
  * สถานะ — ป้ายบางตัวต่างกันตามชนิดใบ (approved ของ Advance = รอจ่ายเงิน · ของ Claim = รอชำระส่วนต่าง)
@@ -61,10 +95,14 @@ const STATUS_BASE = {
   cancelled: { label: "ยกเลิก", color: "#94a3b8" },
 };
 
+/** @param {"advance"|"claim"|"reimburse"} kind — ใช้ slipKind(e) เสมอ ไม่ใช่ e.kind ดิบ */
 export const statusMeta = (status, kind) => {
   const base = STATUS_BASE[status] || { label: status || "-", color: "#94a3b8" };
   if (status === "approved") {
-    return { ...base, label: kind === "claim" ? "อนุมัติ · รอชำระส่วนต่าง" : "อนุมัติ · รอจ่ายเงิน" };
+    const label = kind === "reimburse" ? "อนุมัติ · รอจ่ายคืน"
+      : kind === "claim" ? "อนุมัติ · รอชำระส่วนต่าง"
+        : "อนุมัติ · รอจ่ายเงิน";
+    return { ...base, label };
   }
   return base;
 };
@@ -73,7 +111,16 @@ export const statusMeta = (status, kind) => {
 export const STATUS_FILTERS = {
   advance: ["pending", "rejected", "approved", "paid", "clearing", "cleared", "cancelled"],
   claim: ["pending", "rejected", "approved", "settled", "cancelled"],
+  // ใบสำรองจ่ายเดินทางเดียวกับใบเคลม (ไม่มีขั้นจ่ายเงินล่วงหน้า/รอเคลียร์)
+  reimburse: ["pending", "rejected", "approved", "settled", "cancelled"],
 };
+
+/** ตัวกรองชนิดย่อยของใบเคลม — ค่าต้องตรงกับที่ server รับ (?claimType=) */
+export const CLAIM_TYPE_FILTERS = [
+  { value: "all", label: "ทั้งหมด" },
+  { value: "clear", label: "เคลียร์ Advance", kind: "claim" },
+  { value: "reimburse", label: "สำรองจ่ายเอง", kind: "reimburse" },
+];
 
 /** ⚠️ ต้องตรงกับ CATEGORIES ใน models/Expense.js */
 export const EXPENSE_CATEGORIES = [
@@ -178,9 +225,17 @@ export const bahtText = (amount) => {
   return `${prefix}${integer > 0 ? `${readInteger(integer)}บาท` : ""}${readInteger(satang)}สตางค์`;
 };
 
-/** คำอธิบายส่วนต่างของใบเคลม */
-export const differenceMeta = (diff) => {
+/**
+ * คำอธิบายส่วนต่างของใบเคลม
+ * @param {number} diff ใช้จริง − ยอด Advance
+ * @param {"advance"|"claim"|"reimburse"} [kind] ใบสำรองจ่ายไม่มี Advance — ส่วนต่างทั้งก้อนคือเงินที่
+ * บริษัทต้องจ่ายคืน ไม่ใช่ "จ่ายเพิ่มจากที่เบิกไว้" (คำว่า "จ่ายเพิ่ม" จะทำให้เข้าใจผิดว่าเคยจ่ายไปแล้ว)
+ */
+export const differenceMeta = (diff, kind) => {
   const d = money(diff);
+  if (kind === "reimburse") {
+    return { label: "บริษัทจ่ายคืนให้ผู้เบิก", short: "จ่ายคืน", color: REIMBURSE_ACCENT_DARK, amount: d };
+  }
   if (d > 0) return { label: "บริษัทจ่ายเพิ่มให้ผู้เบิก", short: "จ่ายเพิ่ม", color: "#1d4ed8", amount: d };
   if (d < 0) return { label: "ผู้เบิกคืนเงินให้บริษัท", short: "คืนเงิน", color: "#d97706", amount: -d };
   return { label: "ใช้จริงพอดีกับยอด Advance", short: "พอดี", color: "#059669", amount: 0 };

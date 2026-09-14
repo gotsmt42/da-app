@@ -33,13 +33,13 @@ import { generateExpensePdf } from "../utils/expensePdf";
 import { generateBlankClaimPdf, localFormCode } from "../utils/expenseBlankPdf";
 import ExpenseService, { errorText } from "../services/ExpenseService";
 import KindBadge from "./KindBadge";
-import { KIND_META, statusMeta, TEXT_SUB, BORDER_MAIN } from "../expenseMeta";
+import { KIND_META, slipKind, statusMeta, TEXT_SUB, BORDER_MAIN } from "../expenseMeta";
 
 const IN_APP_NOTICE = "เบราว์เซอร์ในแอป (เช่น LINE) สั่งพิมพ์ไม่ได้ — กดเมนู ⋮ เลือก \"เปิดในเบราว์เซอร์\" แล้วกดพิมพ์อีกครั้ง หรือใช้ปุ่มแชร์/ดาวน์โหลดแทน";
 
 /**
  * @param {object}  [expense]  ใบจาก API — โหมดพิมพ์เอกสารจริง
- * @param {object}  [blank]    { variant: "empty"|"advance", advance?, printedBy } — โหมดฟอร์มใบเคลมเปล่า
+ * @param {object}  [blank]    { variant: "empty"|"advance"|"reimburse", advance?, printedBy } — โหมดฟอร์มเปล่า
  */
 export default function ExpensePrintDialog({ open, expense, blank, onClose }) {
   const isMobile = useMediaQuery("(max-width:600px)");
@@ -54,7 +54,10 @@ export default function ExpensePrintDialog({ open, expense, blank, onClose }) {
   const printFrameRef = useRef(null);
   const printerRef = useRef(null);
 
-  const kind = blank ? "claim" : expense?.kind;
+  // ⚠️ slipKind ไม่ใช่ expense.kind — ใบสำรองจ่ายต้องได้สี/ป้ายของตัวเอง ไม่ใช่ป้าย CLAIM สีม่วง
+  const kind = blank ? (blank.variant === "reimburse" ? "reimburse" : "claim") : slipKind(expense);
+  /** ชื่อเรียกฟอร์มเปล่าตามชนิดเอกสาร — ใช้ทั้งหัวกล่อง ชื่อไฟล์ และหัวข้อตอนสั่งพิมพ์ */
+  const blankName = blank?.variant === "reimburse" ? "ฟอร์มใบเบิกค่าใช้จ่าย (สำรองจ่าย)" : "ฟอร์มใบเคลม";
   const meta = KIND_META[kind] || KIND_META.advance;
   // ⚠️ ใช้คีย์ข้อความแทน object — ฟอร์มแม่ re-render ทุกครั้งที่พิมพ์ ถ้าผูกกับ object ตรงๆ จะสร้าง PDF
   // (และขอรหัสฟอร์มใหม่จาก server) ซ้ำทุกตัวอักษรที่พิมพ์
@@ -171,7 +174,7 @@ export default function ExpensePrintDialog({ open, expense, blank, onClose }) {
       setNotice(IN_APP_NOTICE);
       return;
     }
-    const title = blank ? `ฟอร์มใบเคลม ${formInfo?.code || ""}` : `${meta.label} ${expense.docNo} · ${expense.subject}`;
+    const title = blank ? `${blankName} ${formInfo?.code || ""}` : `${meta.label} ${expense.docNo} · ${expense.subject}`;
     const file = new File([pdf.blob], pdf.fileName, { type: "application/pdf" });
     let files = canShareFile(file) ? [file] : null;
     // ✅ บางเครื่องแชร์ไฟล์ PDF ไม่ได้แต่แชร์รูปได้ (เช่น ส่งเข้า LINE จาก Android บางรุ่น) —
@@ -197,12 +200,12 @@ export default function ExpensePrintDialog({ open, expense, blank, onClose }) {
   const printReady = imageMode ? Boolean(pages) || rasterFailed : Boolean(pdf);
   const preparing = Boolean(pdf) && imageMode && !pages && !rasterFailed;
 
-  const headTitle = blank ? "ฟอร์มใบเคลมเปล่า · กรอกด้วยลายมือ" : expense.docNo;
+  const headTitle = blank ? `${blankName}เปล่า · กรอกด้วยลายมือ` : expense.docNo;
   const headSub = blank
     ? (formInfo
-      ? `รหัสฟอร์ม ${formInfo.code}${blank.variant === "advance" ? ` · บันทึกในประวัติใบ ${blank.advance.docNo} แล้ว` : " · ไม่ผูกใบ Advance"}`
+      ? `รหัสฟอร์ม ${formInfo.code}${blank.variant === "advance" ? ` · บันทึกในประวัติใบ ${blank.advance.docNo} แล้ว` : blank.variant === "reimburse" ? " · ใบสำรองจ่ายไม่มี Advance" : " · ไม่ผูกใบ Advance"}`
       : blank.variant === "advance" ? "กำลังออกรหัสฟอร์ม..." : "A4")
-    : `A4 หน้าเดียว · สถานะ ${statusMeta(expense.status, expense.kind).label}`;
+    : `A4 หน้าเดียว · สถานะ ${statusMeta(expense.status, kind).label}`;
 
   return (
     <Dialog

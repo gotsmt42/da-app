@@ -15,7 +15,7 @@
  */
 import { Link } from "react-router-dom";
 import {
-  FaCalendarAlt, FaWrench, FaFileContract, FaClipboardList, FaClipboardCheck,
+  FaCalendarAlt, FaWrench, FaClipboardList, FaClipboardCheck,
   FaPaperPlane, FaFileAlt, FaFileInvoiceDollar, FaMoneyCheckAlt, FaReceipt, FaChartBar, FaInbox,
   FaBuilding, FaUserFriends, FaChevronRight, FaWallet, FaFolderOpen, FaDatabase,
 } from "react-icons/fa";
@@ -25,15 +25,20 @@ import useAppBadges, { BADGE_LABEL } from "@/shared/hooks/useAppBadges";
 import "./HomeMenu.css";
 
 /**
- * สีประจำหมวด/เมนู — ความหมายเดียวกับที่ใช้ทั้งแอป (แดง = งานบริการ · ม่วง = ฝ่ายขาย/ใบเคลม ·
- * เขียวอมฟ้า = ใบ Advance · ส้ม = เอกสาร/การเงิน · น้ำเงิน = ข้อมูลหลัก)
+ * สีประจำหมวด/เมนู — ความหมายเดียวกับที่ใช้ทั้งแอป (แดง = งานบริการ · ม่วง = ฝ่ายขาย ·
+ * เขียวอมฟ้า = เบิกค่าใช้จ่าย · ส้ม = เอกสาร/การเงิน · น้ำเงิน = ข้อมูลหลัก)
  * ⚠️ คำอธิบาย (sub) ต้องสั้นไม่เกิน ~16 ตัวอักษร — ยาวกว่านี้โดนตัดเป็น "..." บนจอแท็บเล็ต
+ * ⚠️ เคยลองเปลี่ยนเป็นเทาทั้งหมดเพื่อ "ลดสีให้ดูสงบ" แล้ว — ผู้ใช้ดูของจริงแล้วบอกว่าไม่สวย
+ * ให้คงชุดสีนี้ไว้ อย่าเปลี่ยนเป็นโทนเทาอีก
+ * ⚠️ กฎของหน้านี้: **ทุกปุ่มในหมวดเดียวกันใช้สีเดียวกัน** ปุ่มไหนใส่ tone ของตัวเองจะโดดออกจากแถว
+ * (เคยทาสีม่วงของ "ชนิดเอกสารใบเคลม" ที่ปุ่มใบเคลมปุ่มเดียว — ผู้ใช้ให้แก้กลับ) สีประจำชนิดเอกสาร
+ * ใช้ในหน้าของมันเอง (features/expenses/expenseMeta.js) ไม่ใช่ในเมนูหน้าแรก
+ * ยกเว้นเดียวที่เหลืออยู่คือเมนูของสายงานขายในหมวด "งาน" ซึ่งเป็นคนละสายงานกันจริงๆ
  */
 const TONE = {
   work: "#dc2626",
   sales: "#7c3aed",
   expense: "#0d9488",
-  claim: "#7c3aed",
   docs: "#d97706",
   master: "#2563eb",
 };
@@ -73,7 +78,9 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
   }
   if (canViewOperation) work.push({ key: "operation", title: "การดำเนินงาน", sub: "เช็คอิน · ปิดงาน", href: "/operation", icon: FaWrench, badgeKey: "closeRequests" });
   if (isTechnician && !hideMyJobs) work.push({ key: "my-jobs", title: "งานของฉัน", sub: "งานที่ได้รับมอบหมาย", href: "/technician/jobs", icon: FaClipboardList, badgeKey: "myJobs" });
-  if (isAdminOrManager || isTechnician) work.push({ key: "contracts", title: "ภาพรวมงาน", sub: "สัญญา · รอบงาน", href: "/contracts", icon: FaFileContract, badgeKey: "contracts" });
+  // 🧹 "ภาพรวมงาน" ถูกตัดออกจากเมนูหลักตามที่ผู้ใช้สั่ง — เดิมปลายทางนี้โผล่พร้อมกัน 3 ที่ในจอเดียว
+  // (ชิปบนแถบบน + ปุ่มตรงนี้ + ช่องบนแถบเมนูล่าง) พร้อมป้ายตัวเลขเดียวกันทั้งสามจุด
+  // ⚠️ ยังเข้าได้ตามปกติจากแถบเมนูล่าง (มือถือ) และเมนูข้าง (ทุกจอ) — ไม่ได้ตัดทางเข้าทิ้ง
   if (canAssign) work.push({ key: "dispatch", title: "คำขอลงงาน", sub: "คิวรอมอบหมาย", href: "/dispatch", icon: FaClipboardCheck, badgeKey: "dispatchQueue" });
   if (isSaleUser && !hideSalesJobs) work.push({ key: "sales", title: "แจ้งงานให้ช่าง", sub: "ส่งงานเข้าคิวช่าง", href: "/sales", icon: FaPaperPlane, tone: TONE.sales, badgeKey: "dispatchMine" });
 
@@ -82,7 +89,10 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
   const expense = [];
   if (canExpense) {
     expense.push({ key: "advance", title: "ใบเบิก Advance", short: "ใบ Advance", sub: "เบิกเงินล่วงหน้า", href: "/expenses/advances", icon: FaMoneyCheckAlt, badgeKey: "advance" });
-    expense.push({ key: "claim", title: "ใบเคลม", sub: "เคลียร์ค่าใช้จ่าย", href: "/expenses/claims", icon: FaReceipt, tone: TONE.claim, badgeKey: "claim" });
+    // ⚠️ ไม่ใส่ tone เอง — ใช้สีของหมวด "เบิกค่าใช้จ่าย" เหมือนปุ่มอื่นในแถวเดียวกัน
+    // (เคยทาสีม่วงของ "ชนิดเอกสาร" ไว้ที่ปุ่มนี้ปุ่มเดียว ผู้ใช้ดูของจริงแล้วบอกว่าโดดออกมาจากเพื่อนในแถว —
+    // สีประจำชนิดใบยังอยู่ครบในหน้าใบเคลมเอง ตรงนี้เป็นแค่ปุ่มทางเข้า)
+    expense.push({ key: "claim", title: "ใบเคลม", sub: "เคลียร์ค่าใช้จ่าย", href: "/expenses/claims", icon: FaReceipt, badgeKey: "claim" });
     // ✅ หัวหน้ามีคิวงานที่ต้องทำ (อนุมัติ/จ่าย/ปิดส่วนต่าง) เพิ่มอีกเมนู
     if (canApproveExpense) {
       expense.push({ key: "expense-inbox", title: "รออนุมัติการเบิก", short: "รออนุมัติ", sub: "อนุมัติ · จ่ายเงิน", href: "/expenses/approvals", icon: FaInbox, badgeKey: "expenseInbox" });

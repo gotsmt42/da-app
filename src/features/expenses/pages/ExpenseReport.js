@@ -23,6 +23,7 @@ import { buildExpenseReport } from "../utils/expenseReport";
 import {
   KIND_META, statusMeta, categoryMeta, baht, differenceMeta, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
 } from "../expenseMeta";
+import KindBadge from "../components/KindBadge";
 
 const PRESETS = [
   { value: "month", label: "เดือนนี้", range: () => [moment().startOf("month"), moment()] },
@@ -65,20 +66,26 @@ const Panel = ({ title, hint, children, action }) => (
 
 const ADV = KIND_META.advance.color;
 const ACT = KIND_META.claim.color;
+/** ใบสำรองจ่าย — เงินที่พนักงานออกไปก่อน ยังไม่ผ่านระบบเบิกล่วงหน้าเลย */
+const RMB = KIND_META.reimburse.color;
 
 /** กราฟแท่งรายเดือน: จ่ายล่วงหน้า vs ใช้จริง (CSS ล้วน ไม่ต้องพึ่งไลบรารีกราฟ) */
 const MonthBars = ({ rows }) => {
-  const max = Math.max(1, ...rows.map((r) => Math.max(r.advanced, r.actual, r.requested)));
+  const max = Math.max(1, ...rows.map((r) => Math.max(r.advanced, r.actual, r.requested, r.reimburse)));
   if (!rows.length) return <Typography variant="body2" sx={{ color: TEXT_SUB }}>ไม่มีข้อมูล</Typography>;
   return (
     <Box sx={{ overflowX: "auto" }}>
       <Stack direction="row" spacing={1.25} alignItems="flex-end" sx={{ height: 190, minWidth: rows.length * 52, pt: 1 }}>
         {rows.map((r) => (
-          <Tooltip key={r.key} arrow title={`${monthLabel(r.key)} · ขอเบิก ${baht(r.requested)} · จ่ายแล้ว ${baht(r.advanced)} · ใช้จริง ${baht(r.actual)} · ค้าง ${baht(r.outstanding)}`}>
+          <Tooltip key={r.key} arrow title={`${monthLabel(r.key)} · ขอเบิก ${baht(r.requested)} · จ่ายแล้ว ${baht(r.advanced)} · ใช้จริง ${baht(r.actual)} · ค้าง ${baht(r.outstanding)}${r.reimburse ? ` · สำรองจ่าย ${baht(r.reimburse)}` : ""}`}>
             <Stack alignItems="center" sx={{ flex: 1, minWidth: 40, height: "100%" }} justifyContent="flex-end">
               <Stack direction="row" spacing={0.4} alignItems="flex-end" sx={{ height: "calc(100% - 22px)", width: "100%", justifyContent: "center" }}>
                 <Box sx={{ width: "38%", maxWidth: 18, height: `${(r.advanced / max) * 100}%`, minHeight: r.advanced ? 3 : 0, bgcolor: ADV, borderRadius: "4px 4px 0 0" }} />
                 <Box sx={{ width: "38%", maxWidth: 18, height: `${(r.actual / max) * 100}%`, minHeight: r.actual ? 3 : 0, bgcolor: ACT, borderRadius: "4px 4px 0 0" }} />
+                {/* แท่งที่สามโผล่เฉพาะเดือนที่มีใบสำรองจ่ายจริง — ไม่งั้นกราฟจะมีช่องว่างเปล่าทุกเดือน */}
+                {r.reimburse > 0 && (
+                  <Box sx={{ width: "38%", maxWidth: 18, height: `${(r.reimburse / max) * 100}%`, minHeight: 3, bgcolor: RMB, borderRadius: "4px 4px 0 0" }} />
+                )}
               </Stack>
               <Typography sx={{ fontSize: "0.68rem", color: TEXT_SUB, mt: 0.5, whiteSpace: "nowrap" }}>{monthLabel(r.key)}</Typography>
             </Stack>
@@ -86,7 +93,7 @@ const MonthBars = ({ rows }) => {
         ))}
       </Stack>
       <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
-        {[["จ่ายล่วงหน้าแล้ว", ADV], ["ใช้จริง (อนุมัติ)", ACT]].map(([l, c]) => (
+        {[["จ่ายล่วงหน้าแล้ว", ADV], ["ใช้จริง (อนุมัติ)", ACT], ["สำรองจ่าย", RMB]].map(([l, c]) => (
           <Stack key={l} direction="row" spacing={0.75} alignItems="center">
             <Box sx={{ width: 10, height: 10, borderRadius: 0.5, bgcolor: c }} />
             <Typography variant="caption" sx={{ color: TEXT_SUB }}>{l}</Typography>
@@ -98,7 +105,7 @@ const MonthBars = ({ rows }) => {
 };
 
 const CategoryBars = ({ rows }) => {
-  const max = Math.max(1, ...rows.map((r) => Math.max(r.planned, r.actual)));
+  const max = Math.max(1, ...rows.map((r) => Math.max(r.planned, r.actual, r.reimburse || 0)));
   if (!rows.length) return <Typography variant="body2" sx={{ color: TEXT_SUB }}>ไม่มีข้อมูล</Typography>;
   return (
     <Stack spacing={1.25}>
@@ -113,6 +120,7 @@ const CategoryBars = ({ rows }) => {
               </Typography>
               <Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB }}>
                 ตั้งเบิก {baht(r.planned)} · <b style={{ color: TEXT_MAIN }}>ใช้จริง {baht(r.actual)}</b>
+                {r.reimburse ? <> · <b style={{ color: RMB }}>สำรองจ่าย {baht(r.reimburse)}</b></> : null}
               </Typography>
             </Stack>
             <Box sx={{ position: "relative", height: 10, borderRadius: 5, bgcolor: "#f1f5f9", overflow: "hidden" }}>
@@ -136,6 +144,7 @@ const GroupTable = ({ rows, firstHeader, onPick }) => (
           <TableCell align="right">จ่ายล่วงหน้า</TableCell>
           <TableCell align="right">ใช้จริง</TableCell>
           <TableCell align="right">ค้างเคลียร์</TableCell>
+          <TableCell align="right">สำรองจ่าย</TableCell>
           <TableCell align="right">รอคืน / จ่ายเพิ่ม</TableCell>
         </TableRow>
       </TableHead>
@@ -148,6 +157,10 @@ const GroupTable = ({ rows, firstHeader, onPick }) => (
             <TableCell align="right">{baht(r.actual)}</TableCell>
             <TableCell align="right" sx={{ color: r.outstanding ? "#0369a1" : TEXT_SUB, fontWeight: r.outstanding ? 800 : 400 }}>
               {baht(r.outstanding)}{r.overdue ? <WarningAmber sx={{ fontSize: 14, color: "#dc2626", ml: 0.5, verticalAlign: "-2px" }} /> : null}
+            </TableCell>
+            <TableCell align="right" sx={{ color: r.reimburse ? RMB : TEXT_SUB, fontWeight: r.reimburse ? 800 : 400, whiteSpace: "nowrap" }}>
+              {r.reimburse ? baht(r.reimburse) : "—"}
+              {r.reimburseDue ? <span style={{ display: "block", fontSize: "0.72rem", fontWeight: 700 }}>รอจ่ายคืน {baht(r.reimburseDue)}</span> : null}
             </TableCell>
             <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
               {r.refundDue ? <span style={{ color: "#d97706", fontWeight: 700 }}>คืน {baht(r.refundDue)}</span> : null}
@@ -173,6 +186,8 @@ export default function ExpenseReport({ onOpen, reloadKey }) {
   const [people, setPeople] = useState([]);
   const [group, setGroup] = useState("person");
   const [rows, setRows] = useState([]);
+  // ⚠️ ใบสำรองจ่ายมาคนละก้อนกับใบ Advance (ไม่มีใบไหนให้ผูก) — เก็บแยกแล้วส่งเข้าตัวสรุปพร้อมกัน
+  const [reimburseRows, setReimburseRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [exporting, setExporting] = useState(false);
@@ -198,13 +213,18 @@ export default function ExpenseReport({ onOpen, reloadKey }) {
     if (to) params.to = to;
     if (person !== "all") params.userId = person;
     ExpenseService.report(params)
-      .then((r) => alive && setRows(r))
+      .then((r) => {
+        if (!alive) return;
+        setRows(r.advances);
+        setReimburseRows(r.reimbursements);
+      })
       .catch((err) => alive && setError(errorText(err, "โหลดรายงานไม่สำเร็จ")))
       .finally(() => alive && setLoading(false));
     return () => { alive = false; };
   }, [from, to, person, reloadKey]);
 
-  const report = useMemo(() => buildExpenseReport(rows), [rows]);
+  const report = useMemo(() => buildExpenseReport(rows, { reimbursements: reimburseRows }), [rows, reimburseRows]);
+  const hasData = rows.length > 0 || reimburseRows.length > 0;
   const t = report.totals;
   const periodLabel = from || to ? `${from ? thaiDate(from) : "เริ่มต้น"} – ${to ? thaiDate(to) : "ปัจจุบัน"}` : "ทั้งหมด";
   const usage = t.advanced ? Math.round((t.actual / Math.max(t.advanced - t.outstanding, 1)) * 100) : 0;
@@ -242,7 +262,7 @@ export default function ExpenseReport({ onOpen, reloadKey }) {
         )}
         <Box sx={{ flex: 1 }} />
         <Typography variant="caption" sx={{ color: TEXT_SUB }}>{periodLabel} · อิงวันที่ของใบ Advance</Typography>
-        <Button variant="outlined" startIcon={<FileDownload />} onClick={doExport} disabled={loading || exporting || !rows.length}
+        <Button variant="outlined" startIcon={<FileDownload />} onClick={doExport} disabled={loading || exporting || !hasData}
           sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, bgcolor: "#fff" }}>
           {exporting ? "กำลังส่งออก..." : "ส่งออก Excel"}
         </Button>
@@ -260,16 +280,22 @@ export default function ExpenseReport({ onOpen, reloadKey }) {
       ) : (
         <>
           {/* ── ตัวเลขหลัก ─────────────────────────────────────────── */}
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)", lg: "repeat(6, 1fr)" }, gap: 1, mb: 1.5 }}>
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)", lg: "repeat(7, 1fr)" }, gap: 1, mb: 1.5 }}>
             <Kpi label="ยอดขอเบิก" value={baht(t.requested)} sub={`${t.count} ใบ · รออนุมัติ ${baht(t.pending)}`} color={TEXT_MAIN} />
             <Kpi label="จ่ายล่วงหน้าแล้ว" value={baht(t.advanced)} sub={t.toPay ? `รอจ่ายอีก ${baht(t.toPay)}` : "ไม่มีรายการรอจ่าย"} color={ADV} />
             <Kpi label="ใช้จริง (อนุมัติ)" value={baht(t.actual)} sub={t.advanced - t.outstanding > 0 ? `${usage}% ของยอดที่เคลียร์แล้ว` : " "} color={ACT} />
             <Kpi label="ค้างเคลียร์" value={baht(t.outstanding)} sub={t.overdue ? `เลยกำหนด ${t.overdue} ใบ` : "ไม่มีใบเลยกำหนด"} color="#0369a1" highlight={t.overdue > 0} />
             <Kpi label="รอรับเงินคืน" value={baht(t.refundDue)} sub={`คืนแล้ว ${baht(t.refunded)}`} color="#d97706" />
             <Kpi label="รอจ่ายเพิ่ม" value={baht(t.extraDue)} sub={`จ่ายเพิ่มแล้ว ${baht(t.extraPaid)}`} color="#1d4ed8" />
+            {/* ✅ เงินที่พนักงานสำรองจ่ายเอง — ไม่ได้ผ่านยอด "จ่ายล่วงหน้า" เลย ถ้าไม่มีช่องนี้ยอดกลุ่มนี้จะหายไปทั้งก้อน */}
+            <Kpi
+              label="สำรองจ่าย (อนุมัติ)" value={baht(t.reimburse)}
+              sub={t.reimburseDue ? `รอจ่ายคืน ${baht(t.reimburseDue)}` : `${t.reimburseCount} ใบ · จ่ายคืนแล้ว ${baht(t.reimbursePaid)}`}
+              color={RMB} highlight={t.reimburseDue > 0}
+            />
           </Box>
 
-          {!rows.length ? (
+          {!hasData ? (
             <Stack alignItems="center" spacing={1} sx={{ py: 6, bgcolor: "#fff", border: `1px dashed ${BORDER_MAIN}`, borderRadius: 2.5 }}>
               <Insights sx={{ fontSize: 44, color: "#cbd5e1" }} />
               <Typography sx={{ fontWeight: 700, color: TEXT_SUB }}>ไม่มีใบเบิกในช่วงเวลานี้</Typography>
@@ -299,7 +325,51 @@ export default function ExpenseReport({ onOpen, reloadKey }) {
                 />
               </Panel>
 
-              <Panel title={`รายใบ (${report.rows.length})`} hint="กดที่แถวเพื่อเปิดใบ Advance">
+              {report.reimburseRows.length > 0 && (
+                <Panel
+                  title={`ใบสำรองจ่าย (${report.reimburseRows.length})`}
+                  hint="พนักงานออกเงินเองไปก่อน · ไม่มีใบ Advance ให้เทียบ"
+                >
+                  <Box sx={{ overflowX: "auto" }}>
+                    <Table size="small" sx={{ minWidth: 680, "& th": { fontWeight: 800, color: TEXT_SUB, fontSize: "0.74rem", whiteSpace: "nowrap", bgcolor: "#f8fafc" }, "& td": { fontSize: "0.82rem", borderColor: BORDER_MAIN } }}>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>เลขที่ / วันที่</TableCell>
+                          <TableCell>ผู้เบิก</TableCell>
+                          <TableCell>เรื่อง · งาน</TableCell>
+                          <TableCell align="right">ยอดจ่ายคืน</TableCell>
+                          <TableCell>สถานะ</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {report.reimburseRows.map((r) => {
+                          const st = statusMeta(r.status, "reimburse");
+                          return (
+                            <TableRow key={r._id} hover onClick={() => onOpen?.(r._id)} sx={{ cursor: "pointer" }}>
+                              <TableCell sx={{ whiteSpace: "nowrap" }}>
+                                <Stack direction="row" spacing={0.75} alignItems="center">
+                                  <KindBadge kind="reimburse" />
+                                  <b>{r.docNo}</b>
+                                </Stack>
+                                <span style={{ color: TEXT_SUB }}>{thaiDate(r.docDate)}</span>
+                              </TableCell>
+                              <TableCell sx={{ whiteSpace: "nowrap" }}>{r.requester?.name}</TableCell>
+                              <TableCell sx={{ maxWidth: 320 }}>
+                                <Typography noWrap sx={{ fontSize: "inherit", fontWeight: 600 }}>{r.subject}</Typography>
+                                <Typography noWrap variant="caption" sx={{ color: TEXT_SUB, display: "block" }}>{r.job?.title ? `${r.job.title}${r.job.site ? ` · ${r.job.site}` : ""}` : "ไม่ผูกงาน"}</Typography>
+                              </TableCell>
+                              <TableCell align="right" sx={{ fontWeight: 800, color: RMB }}>{baht(r.total)}</TableCell>
+                              <TableCell><Chip size="small" label={st.label} sx={{ height: 20, fontSize: "0.7rem", fontWeight: 800, bgcolor: alpha(st.color, 0.12), color: st.color }} /></TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </Box>
+                </Panel>
+              )}
+
+              <Panel title={`รายใบ Advance (${report.rows.length})`} hint="กดที่แถวเพื่อเปิดใบ Advance">
                 {isDesktop ? (
                   <Box sx={{ overflowX: "auto" }}>
                     <Table size="small" sx={{ minWidth: 900, "& th": { fontWeight: 800, color: TEXT_SUB, fontSize: "0.74rem", whiteSpace: "nowrap", bgcolor: "#f8fafc" }, "& td": { fontSize: "0.82rem", borderColor: BORDER_MAIN } }}>

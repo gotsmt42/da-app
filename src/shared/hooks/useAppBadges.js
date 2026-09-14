@@ -35,7 +35,7 @@ export const BADGE_LABEL = {
   contracts: "สัญญาที่ถึงกำหนดรอบถัดไป",
   myJobs: "งานที่ต้องทำ",
   quotations: "ใบเสนอราคาที่ต้องติดตาม",
-  dispatchQueue: "คำขอลงงานรอมอบหมาย",
+  dispatchQueue: "คำขอลงงานรอตัดสินใจ",
   dispatchMine: "ใบแจ้งงานที่ถูกตีกลับ",
   advance: "ใบ Advance ที่ถูกตีกลับ",
   claim: "ใบ Advance ที่รอเคลียร์",
@@ -137,7 +137,16 @@ const computeBadges = (userData, data) => {
       ? countDistinctJobs(events, (e) => ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(e.status) && !e.closeRequested)
       : 0,
     quotations,
-    dispatchQueue: scope.dispatchQueue ? Number(byStatus.requested) || 0 : 0,
+    /**
+     * คิว "คำขอลงงาน" = คำขอจากฝ่ายขาย (Dispatch ที่ยังไม่ลงแผนงาน) + แผนงานที่ช่างสร้างเองแล้วรออนุมัติ
+     * 🐛 ที่แก้ (ผู้ใช้แจ้ง "ทำไมจำนวนแจ้งเตือนไม่ขึ้น"): เดิมนับแค่ฝั่งฝ่ายขาย พอคิวมีแต่งานจากช่าง
+     * ป้ายจึงเป็น 0 ทั้งที่หน้านั้นขึ้น "รอตัดสินใจ 1" — ป้ายกับหน้าปลายทางต้องเป็นเลขเดียวกันเสมอ
+     * (หน้านั้นคิด waiting + approvalCount ดู JobRequestQueue.js)
+     * ⚠️ งานรออนุมัติถูกนับทั้งที่นี่และที่ป้ายของปฏิทินโดยตั้งใจ — เป็นงานชิ้นเดียวที่ทำได้จากทั้งสองหน้า
+     */
+    dispatchQueue: scope.dispatchQueue
+      ? (Number(byStatus.requested) || 0) + countPendingJobs(events, drafts, { userId, isAdminOrManager })
+      : 0,
     dispatchMine: scope.dispatchMine ? Number(byStatus.rejected) || 0 : 0,
     // ใบเบิก: ป้ายบน "ใบ Advance"/"ใบเคลม" = ใบของฉันที่ถูกตีกลับ (ต้องแก้แล้วส่งใหม่)
     // ส่วน "ใบเคลม" รวมใบ Advance ที่รับเงินแล้วยังไม่ได้เคลียร์ด้วย — เป็นงานค้างของผู้เบิกเหมือนกัน
