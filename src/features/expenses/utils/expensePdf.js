@@ -29,7 +29,7 @@ const SIG_TOP = H_PAGE - 11 - SIG_H;
 
 let boldCache = null;
 /** ฟอนต์ตัวหนา — ถ้าโหลดไม่ได้ (ออฟไลน์) ยังพิมพ์ได้ด้วยตัวปกติ ไม่ใช่พังทั้งใบ */
-const loadBoldFont = async () => {
+export const loadBoldFont = async () => {
   if (boldCache !== null) return boldCache;
   try {
     const buf = new Uint8Array(await (await fetch(boldFontUrl)).arrayBuffer());
@@ -48,7 +48,7 @@ const loadBoldFont = async () => {
  * (อักษรประกอบ) ไม่งั้นสระจะหลุดไปอยู่ต้นบรรทัดถัดไปแบบลอยๆ อ่านไม่ออก
  */
 const COMBINING = /[ัิ-ฺ็-๎]/;
-const wrapText = (doc, text, width) => {
+export const wrapText = (doc, text, width) => {
   const lines = [];
   String(text || "").split(/\r?\n/).forEach((para) => {
     let cur = "";
@@ -74,7 +74,7 @@ const wrapText = (doc, text, width) => {
   return lines.length ? lines : [""];
 };
 
-const newDoc = (jsPDF, font, bold) => {
+export const newDoc = (jsPDF, font, bold) => {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "A4" });
   doc.addFileToVFS("THSarabun.ttf", font);
   doc.addFont("THSarabun.ttf", "THSarabun", "normal");

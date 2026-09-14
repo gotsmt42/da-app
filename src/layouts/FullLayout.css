@@ -196,6 +196,30 @@
     padding-left: 16px !important;
     padding-right: 16px !important;
   }
+  /* หน้า Dashboard — เต็มจอ ไม่มีขอบซ้อน (ดูคอมเมนต์ใน FullLayout.js) */
+  .app-page-container.app-page-container--flush {
+    padding-top: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   แถบเมนูติดขอบล่างบนมือถือ (MobileBottomNav) — เว้นที่ท้ายหน้าให้เท่าความสูงแถบ
+   ⚠️ ไม่งั้นเนื้อหาส่วนท้ายสุดของทุกหน้า (ปุ่มบันทึก/รายการสุดท้าย/footer) จะอยู่ใต้แถบ กดไม่ได้
+   ✅ --app-bottom-nav-h ใช้ร่วมกับของที่ fixed ขอบล่างจอของหน้าอื่นด้วย (เช่น แถบยอดรวมหน้าภาพรวมงาน)
+      ให้ขยับขึ้นมาเหนือแถบ — นอกช่วงจอนี้ตัวแปรเป็น 0 ของพวกนั้นจึงอยู่ตำแหน่งเดิมทุกประการ
+   -------------------------------------------------------------------------- */
+:root {
+  --app-bottom-nav-h: 0px;
+}
+@media (max-width: 767.98px) {
+  :root {
+    --app-bottom-nav-h: calc(58px + env(safe-area-inset-bottom, 0px));
+  }
+  .pageWrapper {
+    padding-bottom: var(--app-bottom-nav-h);
+  }
 }
 
 /* ✅ ย้ายสไตล์ Footer ไปที่ Footer.css ของตัวเองแล้ว (เดิมกฎ .footer ตรงนี้ไม่เคยถูกใช้จริง

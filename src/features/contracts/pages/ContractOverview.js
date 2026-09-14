@@ -4178,7 +4178,8 @@ pagedRows.map((c, idx) => {
       <Paper
         elevation={0}
         sx={{
-          position: "fixed", left: 0, right: 0, bottom: 0,
+          // ⚠️ bottom = ความสูงแถบเมนูล่างมือถือ (MobileBottomNav) — วางเกาะเหนือแถบ ไม่ใช่ขอบจอ ไม่งั้นโดนแถบทับมิด
+          position: "fixed", left: 0, right: 0, bottom: "var(--app-bottom-nav-h, 0px)",
           // ต่ำกว่า Dialog (1300) และแถบเมนูมือถือ (10000) — ไม่บังของที่ต้องอยู่บนสุด
           zIndex: 1200,
           borderRadius: 0, borderTop: `1px solid ${BORDER_MAIN}`,

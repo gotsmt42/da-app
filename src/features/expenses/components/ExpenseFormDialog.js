@@ -15,10 +15,12 @@ import moment from "moment";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack, Typography, TextField,
   IconButton, Alert, useMediaQuery, Autocomplete, MenuItem, Chip, Tooltip, CircularProgress, Avatar, Collapse,
+  Menu, ListItemIcon, ListItemText,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
   Close, Add, DeleteOutline, AttachFile, Send, Save, Link as LinkIcon, ReceiptLong, Payments, ExpandMore,
+  Print, EditNote,
 } from "@mui/icons-material";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
@@ -29,6 +31,7 @@ import usePermissions from "@/shared/hooks/usePermissions";
 import ExpenseService, { errorText } from "../services/ExpenseService";
 import AdvancePanel from "./AdvancePanel";
 import KindBadge from "./KindBadge";
+import ExpensePrintDialog from "./ExpensePrintDialog";
 import {
   KIND_META, EXPENSE_CATEGORIES, categoryMeta, FILE_KINDS, baht, fmtMoney, itemAmount, itemsTotal,
   differenceMeta, money, jobText, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
@@ -120,6 +123,9 @@ export default function ExpenseFormDialog({ open, kind: kindProp, expense, advan
   const [error, setError] = useState("");
   const [touched, setTouched] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
+  // ฟอร์มใบเคลมเปล่าสำหรับพิมพ์ไปกรอกด้วยลายมือ (ดู utils/expenseBlankPdf.js)
+  const [blankMenuEl, setBlankMenuEl] = useState(null);
+  const [blankPrint, setBlankPrint] = useState(null);
   const fileInputRef = useRef(null);
 
   const pickAdvance = (a) => {
@@ -284,6 +290,18 @@ export default function ExpenseFormDialog({ open, kind: kindProp, expense, advan
   const advancePanel = showAdvancePanel && (
     <AdvancePanel advance={advance} usedIndexes={usedIndexes} onRestore={restoreAdvanceItem} />
   );
+
+  /**
+   * ✅ พิมพ์ฟอร์มเปล่าได้เฉพาะตอน "ออกใบเคลมใหม่" — ตอนแก้ไขใบเคลมเดิม ใบ Advance ของมันมีใบเคลมอยู่แล้ว
+   * (server จะปฏิเสธการออกรหัสฟอร์มอยู่ดี) และคนที่แก้ไขใบในระบบไม่มีเหตุต้องพิมพ์กระดาษเปล่า
+   * ⚠️ แบบผูกใบ Advance ใช้ใบ "ตามที่อยู่ในระบบ" ไม่ใช่ค่าที่กำลังแก้ในฟอร์ม — กระดาษต้องอ้างข้อมูลที่ตรวจสอบ
+   * ย้อนกลับได้ ไม่ใช่ตัวเลขที่ผู้ใช้เพิ่งพิมพ์และยังไม่ได้บันทึก
+   */
+  const canPrintBlank = isClaim && !editing;
+  const openBlank = (variant) => {
+    setBlankMenuEl(null);
+    setBlankPrint({ variant, advance: variant === "advance" ? advance : null, printedBy: userData?.fname || "" });
+  };
 
   return (
     <Dialog
@@ -636,6 +654,18 @@ export default function ExpenseFormDialog({ open, kind: kindProp, expense, advan
       </DialogContent>
 
       <DialogActions sx={{ px: { xs: 1.5, sm: 2.5 }, py: 1.25, borderTop: `1px solid ${BORDER_MAIN}`, gap: 1 }}>
+        {canPrintBlank && (
+          <Tooltip describeChild title="พิมพ์ฟอร์มกระดาษไปกรอกด้วยลายมือ แล้วค่อยนำมาบันทึกเข้าระบบ">
+            <Button
+              onClick={(e) => setBlankMenuEl(e.currentTarget)} disabled={saving}
+              startIcon={<Print sx={{ fontSize: 18 }} />}
+              aria-haspopup="menu" aria-expanded={Boolean(blankMenuEl)}
+              sx={{ textTransform: "none", fontWeight: 700, color: accent, whiteSpace: "nowrap", flexShrink: 0 }}
+            >
+              <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>พิมพ์</Box>ฟอร์มเปล่า
+            </Button>
+          </Tooltip>
+        )}
         {error ? (
           <Alert severity="error" sx={{ flex: 1, py: 0, "& .MuiAlert-message": { fontSize: "0.8rem" } }}>{error}</Alert>
         ) : (
@@ -652,6 +682,37 @@ export default function ExpenseFormDialog({ open, kind: kindProp, expense, advan
           {saving ? "กำลังบันทึก..." : resubmit ? "ส่งใหม่" : editing ? "บันทึก" : "ส่งขออนุมัติ"}
         </Button>
       </DialogActions>
+
+      {canPrintBlank && (
+        <Menu
+          anchorEl={blankMenuEl} open={Boolean(blankMenuEl)} onClose={() => setBlankMenuEl(null)}
+          anchorOrigin={{ vertical: "top", horizontal: "left" }} transformOrigin={{ vertical: "bottom", horizontal: "left" }}
+          PaperProps={{ sx: { borderRadius: 2.5, maxWidth: 380 } }}
+        >
+          {/* แบบผูกใบ Advance ขึ้นก่อน — ปลอดภัยกว่า (รหัสฟอร์มตรวจกับระบบได้ + ยอดต้นทางพิมพ์จากระบบ) */}
+          <MenuItem onClick={() => openBlank("advance")} disabled={!advance?._id} sx={{ alignItems: "flex-start", py: 1.25, whiteSpace: "normal" }}>
+            <ListItemIcon sx={{ mt: 0.25 }}><ReceiptLong sx={{ color: accent }} /></ListItemIcon>
+            <ListItemText
+              primary={advance?._id ? `ฟอร์มพร้อมข้อมูล ${advance.docNo}` : "ฟอร์มพร้อมข้อมูลใบ Advance"}
+              secondary={advance?._id
+                ? "พิมพ์เลขที่ ยอดเบิก และรายการตั้งเบิกให้ · รหัสฟอร์มถูกบันทึกในประวัติใบ Advance (แนะนำ)"
+                : "เลือกใบ Advance ด้านบนก่อน"}
+              primaryTypographyProps={{ fontWeight: 800, fontSize: "0.88rem" }}
+              secondaryTypographyProps={{ fontSize: "0.76rem" }}
+            />
+          </MenuItem>
+          <MenuItem onClick={() => openBlank("empty")} sx={{ alignItems: "flex-start", py: 1.25, whiteSpace: "normal" }}>
+            <ListItemIcon sx={{ mt: 0.25 }}><EditNote sx={{ color: TEXT_SUB }} /></ListItemIcon>
+            <ListItemText
+              primary="ฟอร์มเปล่าทั้งใบ"
+              secondary="ไม่มีข้อมูลใดๆ กรอกเองทั้งหมด · รหัสฟอร์มตรวจกับระบบไม่ได้"
+              primaryTypographyProps={{ fontWeight: 800, fontSize: "0.88rem" }}
+              secondaryTypographyProps={{ fontSize: "0.76rem" }}
+            />
+          </MenuItem>
+        </Menu>
+      )}
+      <ExpensePrintDialog open={Boolean(blankPrint)} blank={blankPrint} onClose={() => setBlankPrint(null)} />
     </Dialog>
   );
 }

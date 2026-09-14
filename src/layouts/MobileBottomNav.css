@@ -1,0 +1,124 @@
+/* MobileBottomNav — แถบเมนูติดขอบล่างจอบนมือถือ (ดูเหตุผลใน MobileBottomNav.js)
+ *
+ * ⚠️ z-index 1040: สูงกว่าเนื้อหาทั่วไป แต่ "ต่ำกว่า" ทุกอย่างที่ต้องคลุมจอ — modal ของ Bootstrap (1050),
+ *    SweetAlert2 (1060), Dialog/Menu ของ MUI (1300) และเมนูข้างมือถือ (10000) ถ้าสูงกว่านี้แถบจะลอยทับ
+ *    พื้นหลังมืดของกล่องยืนยัน แล้วกดเปลี่ยนหน้าได้ทั้งที่กล่องยังค้างอยู่
+ * ⚠️ แสดงเฉพาะ < 768px (โทรศัพท์) — แท็บเล็ต/จอคอมมีเมนูข้างถาวรอยู่แล้ว
+ */
+.mbn {
+  display: none;
+}
+
+@media (max-width: 767.98px) {
+  .mbn {
+    display: block;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1040;
+    background: rgba(255, 255, 255, 0.97);
+    border-top: 1px solid #e2e8f0;
+    box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.06);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    transition: transform 0.2s ease;
+    -webkit-backdrop-filter: saturate(180%) blur(8px);
+    backdrop-filter: saturate(180%) blur(8px);
+  }
+  .mbn--hidden {
+    transform: translateY(110%);
+    pointer-events: none;
+  }
+}
+
+.mbn-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  height: 58px;
+}
+.mbn-li {
+  min-width: 0;
+}
+
+.mbn-item {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 0 2px;
+  color: #64748b;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: color 0.15s ease;
+}
+.mbn-item:hover {
+  color: #334155;
+}
+.mbn-item:active .mbn-icon {
+  transform: scale(0.9);
+}
+.mbn-item:focus-visible {
+  outline: 2px solid #dc2626;
+  outline-offset: -4px;
+  border-radius: 10px;
+}
+
+/* ✅ ช่องที่อยู่ตอนนี้ — สีแบรนด์ + ขีดบนแบบแอป Facebook ดูปราดเดียวรู้ว่าอยู่หน้าไหน */
+.mbn-item.is-active {
+  color: #dc2626;
+}
+.mbn-item.is-active::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 22%;
+  right: 22%;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: #dc2626;
+}
+
+.mbn-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 19px;
+  line-height: 1;
+  transition: transform 0.12s ease;
+}
+.mbn-label {
+  max-width: 100%;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mbn-item.is-active .mbn-label {
+  font-weight: 800;
+}
+
+.mbn-badge {
+  position: absolute;
+  top: -6px;
+  left: 12px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 17px;
+  text-align: center;
+  box-shadow: 0 0 0 2px #ffffff;
+}

@@ -1,25 +1,16 @@
 import { Container } from "reactstrap";
 import {
   FaCalendarAlt,
-  FaUsers,
   FaBuilding,
-  FaFileAlt,
-  FaWrench,
   FaChevronRight,
 
   FaClock,
   FaCheckCircle,
   FaExclamationCircle,
-  FaArrowRight,
   FaClipboardList,
-  FaClipboardCheck,
-  FaPaperPlane,
-  FaCog,
   FaCogs,
   FaChevronLeft,
-  FaUserFriends,
   FaCheckDouble,
-  FaFileInvoiceDollar,
 } from "react-icons/fa";
 import { useEffect, useState, useMemo } from "react";
 import useMediaQuery from "@mui/material/useMediaQuery";
@@ -27,7 +18,6 @@ import { Link, useNavigate } from "react-router-dom";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import AuthService from "@/shared/services/authService";
-import CustomerService from "@/shared/services/CustomerService";
 import SalesDashboard from "@/features/sales/SalesDashboard";
 import EventService from "@/shared/services/EventService";
 import { useAuth } from "@/features/auth/AuthContext";
@@ -49,6 +39,7 @@ import { groupEventsByContract, nextVisitOverdueInfo } from "@/shared/utils/cont
 import { getFollowUpInfo } from "@/shared/utils/quotationTracking";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { can, isRole, roleLabel, ROLES } from "@/shared/utils/roles";
+import HomeMenu from "../components/HomeMenu";
 
 // 🎨 สีและไอคอนประจำสถานะงาน — ใช้ร่วมกันทั้ง Quick Stats และการ์ดงานวันนี้
 // ✅ เก็บเป็น "component" ไม่ใช่ element ที่ render ไว้แล้ว เพื่อให้เรียกใช้คนละขนาดได้ตามบริบท
@@ -111,9 +102,7 @@ const Dashboard = () => {
   const canViewContracts = can(role, "viewContracts");
   // ✅ เซล — สายงานคนละสายกับช่าง จึงต้องมีทางลัดของตัวเองแทนที่จะเห็นทางลัดของงานช่างที่กดไปก็ทำอะไรไม่ได้
   const isSale = isRole(role, ROLES.SALE);
-  const canAssignDispatch = can(role, "assignDispatch");
-  // ⚠️ เกณฑ์เดียวกับ Sidebar.js/Header.js — เมนู/การ์ดของสายบริการต้องซ่อนพร้อมกันทุกที่
-  const canViewOperation = can(role, "editOperation") || can(role, "receiveDispatch");
+  // ⚠️ ทางลัดตามสิทธิ์ (การดำเนินงาน/คำขอลงงาน ฯลฯ) ย้ายไปตัดสินใน HomeMenu.js ที่เดียวแล้ว
   const canViewQuotations = can(role, "viewQuotations");
 
   /**
@@ -137,8 +126,6 @@ const Dashboard = () => {
       : `/operation/${id}${group ? `?group=${group}` : ""}`;
 
   const [loading, setLoading] = useState(false);
-  const [files, setFiles] = useState([]);
-  const [customers, setCustomers] = useState([]);
   const [users, setUsers] = useState([]);
   const [events, setEvents] = useState([]);
   // ✅ งานวางแผนล่วงหน้า (ยังไม่ลงตาราง) — เดิมไม่มีทางเห็นได้เลยนอกจากเข้าไปเปิดหน้า "แผนงาน"
@@ -157,18 +144,16 @@ const Dashboard = () => {
         // ไม่งั้นช่างจะเห็นสถิติงานของทั้งบริษัท ไม่ใช่งานของตัวเอง
         // ✅ ตัด WorkOrderService ออก — คอลเลกชัน workorders ว่างเปล่าจริงในระบบ (ไม่เคยถูกใช้งาน)
         // ระบบงานจริงคือ CalendarEvent ผ่านหน้า Operation ทั้งหมด
-        const [resFiles, resUsers, resCustomers, resEvents, resDrafts] =
+        // 🧹 ตัดการโหลด "ไฟล์เอกสารทั้งหมด" และ "ลูกค้าทั้งหมด" ออก — ใช้แค่นับตัวเลขบนทางลัดชุดเดิม
+        // (quickActions) ซึ่งถูกแทนด้วยเมนูหลักแล้ว เปิดหน้าแรกทุกครั้งเคยต้องโหลดทั้งสองก้อนมาทิ้งเปล่าๆ
+        const [resUsers, resEvents, resDrafts] =
           await Promise.all([
-            EventService.GetServiceReportFiles().catch(() => ({ files: [] })),
             AuthService.getAllUserData().catch(() => ({ allUser: [] })),
-            CustomerService.getCustomers().catch(() => ({ userCustomers: [] })),
             EventService.getEventOp().catch(() => ({ userEvents: [] })),
             EventService.GetDraftEvents().catch(() => ({ drafts: [] })),
           ]);
 
-        setFiles(resFiles?.files || []);
         setUsers(resUsers?.allUser || []);
-        setCustomers(resCustomers?.userCustomers || []);
         setEvents(resEvents?.userEvents || []);
         setDrafts(resDrafts?.drafts || []);
       } catch (error) {
@@ -565,121 +550,9 @@ const Dashboard = () => {
     { key: "manager", label: "ผู้จัดการ", color: "#f59e0b" },
   ];
 
-  // 🚀 ทางลัดแบบไอคอน (คล้ายหน้าจอโฮมของแอปมือถือ) ปรับตามสิทธิ์ผู้ใช้
-  const quickActions = [
-    // ⚠️ ทางลัด 2 ตัวนี้เป็นของสายงานช่าง — เซลกดไปก็ไม่มีอะไรให้ทำ (เห็นแต่งานที่ตัวเองไม่เกี่ยว)
-    // จึงซ่อนจากเซล แล้วใส่ทางลัดของสายขายแทนด้านล่าง
-    ...(isSale
-      ? []
-      : [
-          {
-            title: "แผนงานทั้งหมด",
-            icon: <FaCalendarAlt size={20} />,
-            link: "/event",
-            color: "#dc2626",
-          },
-          {
-            title: "การดำเนินงาน",
-            icon: <FaWrench size={20} />,
-            link: "/operation",
-            color: "#b91c1c",
-          },
-        ]),
-    /**
-     * ทางลัดของสายขาย — **เฉพาะ role เซลเท่านั้น**
-     *
-     * 🐛 ที่แก้ (ผู้ใช้แจ้งว่าแสดงผิด): เดิมใช้ canSell (สิทธิ์ createSalesPlan = แอดมิน/ผู้จัดการ/เซล)
-     * ทำให้แอดมินเห็นทางลัดสองตัวนี้ด้วย เกิดปัญหา 2 อย่างพร้อมกัน
-     *   1) "แผนงานของฉัน" ชี้ไป /event เหมือนกับ "แผนงานทั้งหมด" ที่แอดมินเห็นอยู่แล้วเป๊ะๆ —
-     *      กลายเป็นปุ่ม 2 ปุ่มไปหน้าเดียวกันแต่ชื่อขัดกันเอง ("ทั้งหมด" กับ "ของฉัน")
-     *   2) "แจ้งงานให้ช่าง" ขัดกับเมนูด้านซ้าย ซึ่งกำหนดให้โผล่เฉพาะเซลไปแล้ว —
-     *      แอดมินจึงเห็นทางลัดที่ไม่มีอยู่ในเมนูของตัวเอง
-     * ✅ ใช้ isSale ให้ตรงกับ Sidebar.js (เงื่อนไข isSaleUser) — เกณฑ์เดียวกันทั้งสองที่
-     */
-    ...(isSale
-      ? [
-          {
-            title: "แผนงานของฉัน",
-            icon: <FaCalendarAlt size={20} />,
-            // 🧹 เดิมชี้ ?tab=pipeline ซึ่งเป็นแท็บของระบบ CRM ที่ถูกตัดออกไปแล้ว
-            link: "/event",
-            color: "#8b5cf6",
-          },
-          {
-            // ⚠️ ไอคอนต้องตรงกับเมนูด้านซ้าย (FaPaperPlane = "ส่ง/แจ้งออกไป") — เดิมใช้ FaWrench
-            // ซ้ำกับ "การดำเนินงาน" และ "ใบมอบหมายงาน" กลายเป็นประแจ 3 ตัวที่หมายถึงคนละเรื่อง
-            title: "แจ้งงานให้ช่าง",
-            icon: <FaPaperPlane size={20} />,
-            // 🧹 เดิมชี้ ?tab=calendar ซึ่งเป็นแท็บของระบบ CRM ที่ถูกตัดออกไปแล้ว
-            link: "/sales",
-            color: "#a855f7",
-          },
-        ]
-      : []),
-    ...(canAssignDispatch
-      ? [
-          {
-            // 🧹 ที่แก้: เดิมชื่อ "ใบมอบหมายงาน" ซึ่งเป็นชื่อเก่าที่เลิกใช้แล้ว — ทั้งเมนูด้านซ้ายและ
-            // หัวข้อของหน้าจริงเปลี่ยนเป็น "คำขอลงงาน" ไปแล้ว (ของในคิวคือ "คำขอ" ที่ยังไม่ได้
-            // ตัดสินใจ ยังไม่เป็นใบมอบหมายจนกว่าจะอนุมัติ) ปล่อยชื่อไม่ตรงกันไว้ทำให้ดูเหมือนคนละหน้า
-            // ⚠️ ไอคอนใช้ FaClipboardCheck ตรงกับเมนูด้านซ้าย ไม่ใช่ FaWrench ที่ซ้ำกับหน้าอื่น
-            title: "คำขอลงงาน",
-            icon: <FaClipboardCheck size={20} />,
-            link: "/dispatch",
-            color: "#f59e0b",
-          },
-        ]
-      : []),
-    // ⚠️ เอกสารทั้งหมด = ไฟล์แนบของงานช่าง (ใบเสนอราคา/รายงาน/ใบวางบิล) — เซลไม่ได้ใช้
-    ...(isSale
-      ? []
-      : [{
-          title: "เอกสารทั้งหมด",
-          icon: <FaFileAlt size={20} />,
-          link: "/files",
-          color: "#475569",
-          badge: files.length,
-        }]),
-    // ✅ "ติดตามใบเสนอราคา" ย้ายขึ้นไปเป็นแบนเนอร์ hero ใหญ่เหนือ "สรุปสถานะงาน" แทนแล้ว (ตามที่ขอ)
-    // ไม่ต้องมีซ้ำเป็นไอคอนเล็กๆ ที่นี่อีก (เทียบเหตุผลเดียวกับ "งานของฉัน" ด้านบน)
-    // ✅ "งานของฉัน" ของช่างถูกย้ายขึ้นไปเป็นแบนเนอร์ hero เด่นๆ ด้านบนแทนแล้ว (ดู SECTION 2)
-    // ไม่ต้องมีซ้ำเป็นไอคอนเล็กๆ ที่นี่อีก
-    // ✅ ใช้ isAdminOrManager แทน isAdmin เพราะหน้า "ภาพรวมทีมช่าง" ตั้งใจให้ manager เข้าถึงได้ด้วย
-    ...(isAdminOrManager
-      ? [
-          {
-            title: "ภาพรวมทีมช่าง",
-            icon: <FaUserFriends size={20} />,
-            link: "/team-workload",
-            color: "#0891b2",
-          },
-        ]
-      : []),
-    ...(isAdmin
-      ? [
-          {
-            title: "รายชื่อลูกค้าทั้งหมด",
-            icon: <FaBuilding size={20} />,
-            link: "/customer",
-            color: "#3b82f6",
-            badge: customers.length,
-          },
-          {
-            title: "พนักงาน",
-            icon: <FaUsers size={20} />,
-            link: "/employee",
-            color: "#f43f5e",
-            badge: users.length,
-          },
-          {
-            title: "ตั้งค่า",
-            icon: <FaCog size={20} />,
-            link: "/about",
-            color: "#64748b",
-          },
-        ]
-      : []),
-  ];
+  // 🚀 ทางลัดทั้งหมดของหน้านี้ย้ายไปอยู่ใน "เมนูหลัก" (components/HomeMenu.js) ด้านบนสุดแล้ว
+  // 🐛 ทางลัดชุดเดิม (quickActions) อยู่ท้ายหน้าต้องเลื่อนลงไปหา และลิงก์หลายตัวยังชี้ URL เก่าที่ต้อง
+  // redirect ต่ออีกทอด (/files, /customer, /employee) ทั้งยังไม่มีทางเข้าระบบเบิกค่าใช้จ่ายเลย
 
   // ─── เนื้อหาแถบข้าง "งานค้างของช่าง" + "งานวางแผนล่วงหน้า" (เฉพาะแอดมิน/manager) — สร้างไว้
   // ตัวแปรเดียวแล้ว render 2 จุด (มือถือ/เดสก์ท็อป) แยกกันจริงๆ คนละ DOM element กันคนละ CSS
@@ -1112,41 +985,32 @@ const Dashboard = () => {
             {/* ─── SECTION 1.4: "งานขาย" HERO (เฉพาะเซล) — คู่ขนานกับแบนเนอร์ "งานของฉัน" ของช่าง
           เซลเปิดแอปมาเพื่อดูท่อขายกับนัดหมายของตัวเอง ไม่ใช่ตารางงานช่าง จึงต้องเป็นสิ่งแรกที่เห็น ─── */}
             {isSale && (
-              <div
-                onClick={() => navigate("/sales")}
-                // ⚠️ ม่วง = สายขาย · ฟ้า = สายบริการ ใช้สีเดียวกับแถบแท็บและกระดานดีลทั้งหมด
-                style={{
-                  ...styles.myJobsBanner,
-                  background: "linear-gradient(135deg, #8b5cf6 0%, #5b21b6 100%)",
-                  boxShadow: "0 8px 18px -8px rgba(139, 92, 246, 0.4)",
-                }}
-                className="action-hero-btn"
+              <Link
+                to="/sales"
+                style={{ ...styles.myJobsBanner, borderLeftColor: "#7c3aed" }}
+                className="action-hero-btn focus-card"
               >
-                <div style={styles.myJobsIconCircle}>
-                  <FaClipboardList size={19} />
+                <div style={{ ...styles.myJobsIconCircle, color: "#7c3aed", backgroundColor: "rgba(124,58,237,0.1)" }}>
+                  <FaClipboardList size={18} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <h3 style={styles.heroBtnTitle}>งานขายของฉัน</h3>
                   <p style={styles.heroBtnSub}>กรอกฟอร์มแจ้งงาน · ติดตามว่าช่างทำถึงไหน</p>
                 </div>
-                <FaArrowRight
-                  size={13}
-                  className="arrow-bounce"
-                  style={{ opacity: 0.8, flexShrink: 0 }}
-                />
-              </div>
+                <FaChevronRight size={12} className="arrow-bounce" style={styles.focusCardChevron} />
+              </Link>
             )}
 
             {/* ─── SECTION 1.5: "งานของฉัน" HERO (เฉพาะช่าง) — ให้เด่นและละเอียดกว่าไอคอนเล็กๆ เดิม
           วางไว้บนสุด (ก่อนแบนเนอร์ปฏิทินทั่วไป) เพราะเป็นสิ่งที่ช่างต้องใช้งานทุกวันมากที่สุด ─── */}
             {isTechnician && (
-              <div
-                onClick={() => navigate("/technician/jobs")}
-                style={styles.myJobsBanner}
-                className="action-hero-btn"
+              <Link
+                to="/technician/jobs"
+                style={{ ...styles.myJobsBanner, borderLeftColor: "#0891b2" }}
+                className="action-hero-btn focus-card"
               >
-                <div style={styles.myJobsIconCircle}>
-                  <FaClipboardList size={19} />
+                <div style={{ ...styles.myJobsIconCircle, color: "#0891b2", backgroundColor: "rgba(8,145,178,0.1)" }}>
+                  <FaClipboardList size={18} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <h3 style={styles.heroBtnTitle}>งานของฉัน</h3>
@@ -1155,84 +1019,26 @@ const Dashboard = () => {
                   </p>
                 </div>
                 {!loading && myActiveJobsCount + myPendingApprovalCount > 0 && (
-                  <span style={styles.myJobsCountBadge}>
+                  <span style={{ ...styles.myJobsCountBadge, backgroundColor: "#0891b2" }}>
                     {myActiveJobsCount + myPendingApprovalCount}
                   </span>
                 )}
-                <FaArrowRight
-                  size={13}
-                  className="arrow-bounce"
-                  style={{ opacity: 0.8, flexShrink: 0 }}
-                />
-              </div>
+                <FaChevronRight size={12} className="arrow-bounce" style={styles.focusCardChevron} />
+              </Link>
             )}
 
-            {/* ─── SECTION 2: CTA BANNER PAIR — เดิมเป็นแบนเนอร์เต็มความกว้างแค่ปฏิทินอันเดียว ส่วนปุ่ม
-          "ดูการดำเนินงานทั้งหมด" ไปหลบเป็นชิปเล็กๆ อยู่ข้างหัวข้อ "งานวันนี้" คนละจุดคนละน้ำหนัก
-          แบ่งครึ่งเป็น 2 การ์ดเท่ากัน ให้ทั้งคู่เด่นเท่ากันและกดถึงจากจุดเดียวกันด้านบนสุด ─── */}
-            {/* ⚠️ การ์ดคู่นี้เป็นของสายงานช่าง (ปฏิทินงาน + หน้าการดำเนินงาน) — เซลกดไปก็เห็นแต่
-                งานที่ไม่เกี่ยวกับตัวเอง ใช้เกณฑ์เดียวกับ Sidebar.js/Header.js เพื่อให้ซ่อน/โผล่พร้อมกัน */}
-            {canViewOperation && (
-            <div style={styles.heroPairGrid}>
-              <div
-                onClick={() => navigate("/event")}
-                style={styles.heroPairCard}
-                className="action-hero-btn"
-              >
-                <div style={styles.heroIconCircle}>
-                  <FaCalendarAlt size={16} />
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <h3 style={styles.heroPairTitle}>แผนงานทั้งหมด</h3>
-                  <p style={styles.heroPairSub}>ปฏิทินนัดหมาย</p>
-                </div>
-              </div>
-              <div
-                onClick={() => navigate("/operation")}
-                // ✅ เดิมเป็นเฉดแดงเข้มใกล้เคียงกับการ์ด "แผนงานทั้งหมด" มากจนแยกไม่ออกในแวบแรก
-                // เปลี่ยนเป็นน้ำเงินไปเลย ให้ตัดกันชัดเจน (แดง = แผนงาน, น้ำเงิน = การดำเนินงาน)
-                style={{
-                  ...styles.heroPairCard,
-                  background:
-                    "linear-gradient(135deg, #2563eb 0%, #1e3a8a 100%)",
-                  boxShadow: "0 8px 18px -8px rgba(37, 99, 235, 0.35)",
-                }}
-                className="action-hero-btn"
-              >
-                <div style={styles.heroIconCircle}>
-                  <FaWrench size={15} />
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <h3 style={styles.heroPairTitle}>การดำเนินงาน</h3>
-                  <p style={styles.heroPairSub}>ดูทั้งหมด</p>
-                </div>
-              </div>
-            </div>
-            )}
-
-            {/* ─── SECTION 2.5: "ติดตามใบเสนอราคา" BIG BANNER
-          ⚠️ เฉพาะคนที่มีสิทธิ์จริง — ฝ่ายขายถูกตัดออกตามที่ผู้ใช้สั่ง (การติดตามใบเสนอราคาที่นี่
-          ผูกกับงานของช่าง ไม่ใช่ดีลที่เซลกำลังปิด) เดิมโชว์ทุก role แล้วเซลกดเข้าไปเจอหน้าว่าง ─── */}
-            {canViewQuotations && (
-            <div
-              onClick={() => navigate("/quotations")}
-              style={styles.quotationBanner}
-              className="action-hero-btn"
-            >
-              <div style={styles.myJobsIconCircle}>
-                <FaFileInvoiceDollar size={18} />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <h3 style={styles.heroBtnTitle}>ติดตามใบเสนอราคา</h3>
-                <p style={styles.heroBtnSub}>ดูสถานะ · อนุมัติ/ปฏิเสธ · ติดตามลูกค้า</p>
-              </div>
-              <FaArrowRight
-                size={13}
-                className="arrow-bounce"
-                style={{ opacity: 0.8, flexShrink: 0 }}
-              />
-            </div>
-            )}
+            {/* ─── SECTION 2: เมนูหลัก — แทนปุ่ม gradient ใหญ่ 2 ใบ (แผนงานทั้งหมด/การดำเนินงาน) และแบนเนอร์ส้ม
+          "ติดตามใบเสนอราคา" เดิม (ผู้ใช้ขอ: "เพิ่มเมนูหน้าจอหลักให้ดูง่าย สวยงาม ปรับปุ่มไม่ให้รก มืออาชีพ")
+          ปุ่มสีจัดเต็มแถวแย่งสายตากับตัวเลขสถานะงานที่อยู่ถัดลงมา และทางเข้าแต่ละหน้าหน้าตาไม่เหมือนกันเลย
+          ✅ ทุกหน้ารวมเป็นกริดเดียว หน้าตาเดียวกัน ตามสิทธิ์ของผู้ใช้ (เงื่อนไขเดียวกับเมนูข้าง)
+          ✅ ตัวเลขใบเสนอราคาที่ต้องติดตามยังเห็นอยู่ เป็นป้ายแดงบนช่อง "ใบเสนอราคา" แทนแบนเนอร์ ─── */}
+            <h5 style={styles.sectionTitle}>เมนูหลัก</h5>
+            <HomeMenu
+              userData={userData}
+              badges={{ quotations: canViewQuotations ? staleQuotations.length : 0 }}
+              hideMyJobs={isTechnician}
+              hideSalesJobs={isSale}
+            />
 
             {/* ─── SECTION 3: QUICK STATS — การ์ด 4 ใบแถวเดียว (ไอคอนบน ตัวเลข/label ล่าง จัดกึ่งกลาง)
           แต่ละใบมีไอคอนเฉพาะของสถานะนั้นจริงๆ (ไม่ใช่จุดสีลอยๆ แบบเดิม) — ยังลิงก์ไปกรองหน้า
@@ -1529,41 +1335,6 @@ const Dashboard = () => {
               </>
             )}
 
-            {/* ─── SECTION 7: QUICK ACTIONS (ทางลัดคล้ายหน้าโฮมแอปมือถือ) ─── */}
-            <h5 style={styles.sectionTitle}>ทางลัด</h5>
-            <div style={styles.quickActionsGrid}>
-              {quickActions.map((action, idx) => (
-                <Link
-                  key={idx}
-                  to={action.link}
-                  style={{ textDecoration: "none" }}
-                >
-                  <div
-                    style={styles.quickActionItem}
-                    className="metric-card-hover"
-                  >
-                    <div style={{ position: "relative" }}>
-                      <div
-                        style={{
-                          ...styles.quickActionIcon,
-                          backgroundColor: `${action.color}15`,
-                          color: action.color,
-                        }}
-                      >
-                        {action.icon}
-                      </div>
-                      {action.badge > 0 && (
-                        <span style={styles.quickActionBadge}>
-                          {action.badge > 99 ? "99+" : action.badge}
-                        </span>
-                      )}
-                    </div>
-                    <span style={styles.quickActionLabel}>{action.title}</span>
-                  </div>
-                </Link>
-              ))}
-            </div>
-
             {/* ─── SECTION 8: TEAM OVERVIEW (เฉพาะแอดมิน) ─── */}
             {isAdmin && (
               <>
@@ -1669,6 +1440,14 @@ const Dashboard = () => {
         .action-hero-btn:active {
           transform: scale(0.97);
           filter: brightness(0.95);
+        }
+        .focus-card:hover {
+          box-shadow: 0 6px 16px -8px rgba(15, 23, 42, 0.22) !important;
+          transform: translateY(-1px);
+        }
+        .focus-card:focus-visible {
+          outline: 2px solid #0891b2;
+          outline-offset: 2px;
         }
         .metric-card-hover {
           transition: all 0.15s ease;
@@ -1811,34 +1590,42 @@ const baseStyles = {
     fontSize: "14px",
     fontWeight: "800",
     margin: 0,
-    color: "#ffffff",
+    color: "#0f172a",
     letterSpacing: "-0.2px",
   },
   heroBtnSub: {
     fontSize: "10.5px",
-    color: "rgba(255, 255, 255, 0.75)",
+    color: "#64748b",
     margin: "2px 0 0 0",
     lineHeight: "1.3",
+  },
+  focusCardChevron: {
+    color: "#94a3b8",
+    flexShrink: 0,
   },
 
   /* 🔧 "งานของฉัน" hero (เฉพาะช่าง) — สีต่างจาก ctaBanner (cyan แทนแดง) เพื่อแยกให้เห็นชัดว่า
      เป็นคนละปุ่มกัน แต่ใช้โครงสไตล์เดียวกัน (icon circle/title/sub/arrow) ให้ดูเป็นชุดเดียวกัน */
+  /* ✅ การ์ดงานหลักของช่าง/เซล — พื้นขาว + แถบสีซ้าย แทน gradient เต็มใบ (ผู้ใช้ขอให้ปุ่ม "ไม่รก มืออาชีพ")
+     ยังเด่นกว่าช่องเมนูด้วยแถบสีและตัวเลขงาน แต่ไม่แย่งสายตาจนข้อมูลส่วนอื่นดูจม */
   myJobsBanner: {
     width: "100%",
-    background: "linear-gradient(135deg, #0891b2 0%, #164e63 100%)",
-    color: "#ffffff",
-    border: "none",
-    borderRadius: "16px",
-    padding: "14px",
+    background: "#ffffff",
+    color: "#0f172a",
+    border: "1px solid #e2e8f0",
+    borderLeft: "4px solid #0891b2",
+    borderRadius: "14px",
+    padding: "12px 14px",
     cursor: "pointer",
-    boxShadow: "0 8px 18px -8px rgba(8, 145, 178, 0.35)",
+    boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
     marginBottom: "12px",
     display: "flex",
     alignItems: "center",
     gap: "12px",
+    textDecoration: "none",
   },
   myJobsIconCircle: {
-    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    backgroundColor: "rgba(8, 145, 178, 0.1)",
     width: "36px",
     height: "36px",
     borderRadius: "10px",
@@ -1852,7 +1639,8 @@ const baseStyles = {
     height: "26px",
     padding: "0 8px",
     borderRadius: "13px",
-    backgroundColor: "rgba(255, 255, 255, 0.22)",
+    backgroundColor: "#0891b2",
+    color: "#ffffff",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -2009,18 +1797,21 @@ const baseStyles = {
     overflow: "hidden",
     textOverflow: "ellipsis",
   },
+  /* ✅ ปุ่มรอง (ดูทั้งหมด) — โทนกลางขาว/เทา แทนชิปพื้นแดง: สีแดงในหน้านี้สงวนไว้ให้ "สิ่งที่ต้องรีบจัดการ"
+     (งานเลยกำหนด/ป้ายแจ้งเตือน) ปุ่มนำทางธรรมดาที่เป็นสีแดงทำให้ตาแยกไม่ออกว่าอะไรด่วนจริง */
   viewAllBtn: {
-    fontSize: "11px",
-    fontWeight: "700",
-    color: "#dc2626",
+    fontSize: "11.5px",
+    fontWeight: "600",
+    color: "#334155",
     textDecoration: "none",
     display: "flex",
     alignItems: "center",
-    gap: "4px",
-    backgroundColor: "rgba(220, 38, 38, 0.08)",
-    border: "1px solid rgba(220, 38, 38, 0.18)",
-    borderRadius: "20px",
-    padding: "6px 12px",
+    justifyContent: "center",
+    gap: "6px",
+    backgroundColor: "#ffffff",
+    border: "1px solid #e2e8f0",
+    borderRadius: "10px",
+    padding: "8px 12px",
     flexShrink: 0,
   },
 
@@ -2134,56 +1925,6 @@ const baseStyles = {
     letterSpacing: "0.5px",
     marginBottom: "8px",
     paddingLeft: "2px",
-  },
-
-  /* 🚀 Quick Actions Grid — ทางลัดคล้ายหน้าโฮมแอปมือถือ พร้อม badge จำนวน */
-  quickActionsGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(4, 1fr)",
-    gap: "10px",
-    marginBottom: "10px",
-  },
-  quickActionItem: {
-    backgroundColor: "#ffffff",
-    borderRadius: "14px",
-    border: "1px solid #e2e8f0",
-    padding: "12px 4px",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "6px",
-    boxShadow: "0 2px 4px rgba(0,0,0,0.015)",
-  },
-  quickActionIcon: {
-    width: "44px",
-    height: "44px",
-    borderRadius: "12px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  quickActionBadge: {
-    position: "absolute",
-    top: "-5px",
-    right: "-5px",
-    backgroundColor: "#ef4444",
-    color: "#fff",
-    fontSize: "9px",
-    fontWeight: "700",
-    minWidth: "16px",
-    height: "16px",
-    borderRadius: "8px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "0 3px",
-    border: "2px solid #ffffff",
-  },
-  quickActionLabel: {
-    fontSize: "10.5px",
-    fontWeight: "600",
-    color: "#334155",
-    textAlign: "center",
   },
 
   /* 🏆 Top Projects — แถบแนวนอน สีเดียว (แดงแบรนด์) ความยาวแปรตามสัดส่วนงาน

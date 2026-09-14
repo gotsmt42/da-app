@@ -1,0 +1,265 @@
+/* HomeMenu — "เมนูหลัก" หน้า Dashboard จัดเป็นหมวดหมู่ (ดูเหตุผลการออกแบบใน HomeMenu.js)
+ *
+ * ── หน้าตาตามขนาดจอ ─────────────────────────────────────────────────────────────
+ *   • ≥600px : การ์ดหมวด 2 คอลัมน์ · ข้างในเป็นรายการ [ไอคอน] ชื่อ + คำอธิบาย [ป้าย] ›
+ *   • <600px : การ์ดหมวดเรียงลงมา · ข้างในเป็นไอคอนแบบหน้าโฮมแอป 4 ช่องต่อแถว
+ *              (หมวดที่มี ≤2 เมนูวางคู่กันครึ่งจอ ช่องไอคอนจึงกว้างเท่ากันทุกการ์ด)
+ * ⚠️ มือถือใช้ .hm-col { display: contents } + style order จาก JS — การ์ดถูกแบ่งลง 2 คอลัมน์ไว้สำหรับจอกว้าง
+ *    ถ้าไม่ "ถอด" คอลัมน์ออก มือถือจะเรียงหมวดตามคอลัมน์ (งาน → ข้อมูลหลัก → เบิก) แทนลำดับจริง
+ */
+
+.hm {
+  margin-bottom: 16px;
+}
+
+.hm-cols {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.hm-col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── การ์ดหมวด ──────────────────────────────────────────────────────────────── */
+.hm-cat {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.hm-cat-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-bottom: 1px solid #f1f5f9;
+  background: #fafbfc;
+  background: color-mix(in srgb, var(--hm-tone) 5%, #ffffff);
+}
+.hm-cat-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #ffffff;
+  background: var(--hm-tone);
+}
+.hm-cat-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.3;
+  color: #0f172a;
+  letter-spacing: 0.1px;
+}
+
+/* ── รายการในหมวด (จอกว้าง) ─────────────────────────────────────────────────── */
+.hm-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+}
+.hm-li {
+  min-width: 0;
+}
+.hm-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 14px;
+  color: #0f172a;
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+/* เส้นคั่นรายการเยื้องเริ่มหลังไอคอน — แบ่งแถวชัดแต่ไม่หั่นการ์ดเป็นช่องๆ ให้ดูรก */
+.hm-li + .hm-li .hm-item::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 60px;
+  right: 14px;
+  height: 1px;
+  background: #f1f5f9;
+}
+.hm-item:hover {
+  color: #0f172a;
+  background: #f8fafc;
+}
+.hm-item:active {
+  background: #f1f5f9;
+}
+.hm-item:focus-visible {
+  outline: 2px solid var(--hm-tone);
+  outline-offset: -2px;
+  border-radius: 10px;
+}
+
+.hm-icon {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  color: var(--hm-tone);
+  /* ⚠️ ค่าแรกเป็นทางสำรองของเบราว์เซอร์ที่ยังไม่รู้จัก color-mix (Android/iOS รุ่นเก่า) */
+  background: rgba(15, 23, 42, 0.05);
+  background: color-mix(in srgb, var(--hm-tone) 11%, #ffffff);
+}
+
+.hm-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.hm-title-full {
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hm-title-short {
+  display: none;
+}
+.hm-sub {
+  margin-top: 1px;
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hm-badge {
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: #ef4444;
+  color: #ffffff;
+  font-weight: 800;
+  line-height: 1;
+}
+.hm-badge--pill {
+  display: flex;
+  flex-shrink: 0;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 11px;
+}
+.hm-badge--dot {
+  display: none;
+}
+
+.hm-chevron {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: #cbd5e1;
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+.hm-item:hover .hm-chevron {
+  color: var(--hm-tone);
+  transform: translateX(2px);
+}
+
+/* ── มือถือ: ไอคอนแบบหน้าโฮมแอป ─────────────────────────────────────────────── */
+@media (max-width: 599px) {
+  .hm-cols {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .hm-col {
+    display: contents;
+  }
+  .hm-cat {
+    grid-column: 1 / -1;
+  }
+  .hm-cat--half {
+    grid-column: auto;
+  }
+  .hm-cat-head {
+    padding: 8px 12px;
+  }
+  .hm-list {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 2px;
+    padding: 10px 4px 8px;
+  }
+  .hm-list--half {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .hm-li + .hm-li .hm-item::before {
+    display: none;
+  }
+  .hm-item {
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 6px;
+    padding: 4px 2px 6px;
+    border-radius: 12px;
+    text-align: center;
+  }
+  .hm-item:hover {
+    background: transparent;
+  }
+  .hm-item:active {
+    background: #f1f5f9;
+  }
+  .hm-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    font-size: 19px;
+  }
+  .hm-text {
+    align-items: center;
+  }
+  .hm-title-full {
+    display: none;
+  }
+  .hm-title-short {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.25;
+    color: #334155;
+  }
+  .hm-sub,
+  .hm-chevron,
+  .hm-badge--pill {
+    display: none;
+  }
+  .hm-badge--dot {
+    display: flex;
+    position: absolute;
+    top: -5px;
+    right: -7px;
+    min-width: 19px;
+    height: 19px;
+    padding: 0 5px;
+    font-size: 10.5px;
+    box-shadow: 0 0 0 2px #ffffff;
+  }
+}

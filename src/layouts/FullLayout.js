@@ -5,6 +5,7 @@ import Header from "./Header";
 import { Container } from "reactstrap";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import Footer from "./Footer";
+import MobileBottomNav from "./MobileBottomNav";
 import { FaArrowLeft, FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { IconButton } from "@mui/material";
 import Swal from "sweetalert2";
@@ -219,7 +220,13 @@ const FullLayout = () => {
           {/* ปรับแก้: ถ้าเป็นหน้าปฏิทิน/หน้าแรก จะใช้ p-0 m-0 เพื่อดึงพื้นที่เต็มความกว้างขอบจอ
               ✅ app-page-container — hook สำหรับบีบระยะขอบบนจอมือถือ (ดู FullLayout.css) จอใหญ่ยังได้
               p-4 เท่าเดิมทุกประการ */}
-          <Container className={isCalendarPage ? "p-0 m-0" : "p-4 app-page-container"} fluid={true}>
+          {/* ✅ app-page-container--flush (หน้า Dashboard) — มือถือไม่มีขอบซ้าย-ขวาของชั้นนี้ ให้เนื้อหาเต็มจอ
+              (ผู้ใช้ขอ: "ด้านข้างที่ย่นทำให้เต็มด้วย ในจอมือถือ") หน้า Dashboard มีระยะขอบในตัวเองอยู่แล้ว
+              เดิมจึงเว้นขอบซ้อน 2 ชั้น เห็นเป็นแถบสีพื้นหลังว่างๆ สองข้างกว้างรวมเกือบ 60px */}
+          <Container
+            className={isCalendarPage ? "p-0 m-0" : `p-4 app-page-container${isDashboard ? " app-page-container--flush" : ""}`}
+            fluid={true}
+          >
             <Outlet />
             <SpeedInsights />
           </Container>
@@ -227,6 +234,9 @@ const FullLayout = () => {
           <Footer />
         </div>
       </div>
+
+      {/* แถบเมนูหลักติดขอบล่าง — แสดงเฉพาะจอโทรศัพท์ (CSS ใน MobileBottomNav.css) */}
+      <MobileBottomNav />
     </main>
   );
 };

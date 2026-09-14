@@ -132,6 +132,16 @@ const ExpenseService = {
     return { expense: res.data.expense, rejected };
   },
 
+  /**
+   * ออกรหัสฟอร์มใบเคลมเปล่า (พิมพ์ไปกรอกด้วยลายมือ) ที่ผูกกับใบ Advance
+   * ✅ server สุ่มรหัสและบันทึกลงประวัติใบ Advance ให้ — ฝ่ายบัญชีใช้เทียบกับรหัสบนกระดาษได้
+   * @returns {{code: string, issuedAt: string, issuedBy: string}}
+   */
+  async issueBlankClaimForm(advanceId) {
+    const res = await API.post(`/expenses/${advanceId}/blank-claim-form`);
+    return res.data;
+  },
+
   async removeFile(id, fileId) {
     const res = await API.delete(`/expenses/${id}/files/${fileId}`);
     return res.data.expense;
