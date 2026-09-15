@@ -789,11 +789,11 @@ export const getAddEvent = async ({
       // ใช้ค่าเริ่มต้นเดียวกับที่ TomSelect ให้มาเอง (50) แล้วยังส่งความยาวลิสต์จริงมาที่แต่ละช่องด้านล่าง
       // อีกชั้น (เทียบ pattern เดียวกับ contractTs/attachTs ที่ใช้ selectableContracts.length มาตั้งแต่แรก)
       // รับประกันว่าไม่มีทางถูกตัดรายการทิ้งไม่ว่าลิสต์จะยาวแค่ไหนก็ตาม
-      const mkTs = (id, placeholder = "", maxOptions = 50) => {
+      const mkTs = (id, placeholder = "") => {
         try {
           return new TomSelect(id, {
             create: true,
-            maxOptions,
+            maxOptions: 20, // ✅ แสดงสูงสุด 20 แถว (กันหน่วง) + ป้ายบอกว่ามีเพิ่ม — ดู MAX_OPTIONS_NOTE ใน shared/utils/tomSelectFixes.js
             placeholder,
             sortField: { field: "text", direction: "asc" },
             // ✅ ถ้าไม่ใส่ allowEmptyOption, TomSelect จะทิ้ง <option value="">
@@ -852,7 +852,7 @@ export const getAddEvent = async ({
         try {
           const ts = new TomSelect(el, {
             create: true, // ✅ พิมพ์ชื่อที่ไม่มีในลิสต์เพิ่มเองได้ (ตามที่ผู้ใช้ขอ)
-            maxOptions: employeeList.length || 50, // ⚠️ เดิม fix ไว้ 7 ตัดรายชื่อพนักงานที่มีเกิน 7 คนทิ้ง
+            maxOptions: 20, // ✅ แสดงสูงสุด 20 แถว (กันหน่วง) + ป้ายบอกว่ามีเพิ่ม — ดู MAX_OPTIONS_NOTE ใน shared/utils/tomSelectFixes.js
             placeholder: "เลือกหรือพิมพ์ชื่อลูกทีม",
             sortField: { field: "text", direction: "asc" },
             allowEmptyOption: true,
@@ -969,7 +969,7 @@ export const getAddEvent = async ({
       try {
         contractTs = new TomSelect("#ae-contractPick", {
           create: false,
-          maxOptions: selectableContracts.length || 5,
+          maxOptions: 20, // ✅ แสดงสูงสุด 20 แถว (กันหน่วง) + ป้ายบอกว่ามีเพิ่ม — ดู MAX_OPTIONS_NOTE ใน shared/utils/tomSelectFixes.js
           placeholder: "ค้นหาบริษัท/โครงการ/เลขที่สัญญา...",
           sortField: { field: "text", direction: "asc" },
           render: { option: renderContractOption, item: renderContractItem },

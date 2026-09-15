@@ -1441,7 +1441,7 @@ function EventCalendar() {
             // default จริงคือ 50 อยู่แล้ว) ทำให้ค้นหา/เลือกทีมหรือลูกทีม "หาไม่เจอ" เป็นบางที
             const ts = new TomSelect(el, {
               create: true,
-              maxOptions: employeeList.length || 50,
+              maxOptions: 20, // ✅ แสดงสูงสุด 20 แถว (กันหน่วง) + ป้ายบอกว่ามีเพิ่ม — ดู MAX_OPTIONS_NOTE ใน shared/utils/tomSelectFixes.js
               placeholder,
               sortField: { field: "text", direction: "asc" },
               allowEmptyOption: true,

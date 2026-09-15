@@ -1,11 +1,11 @@
 /* HomeMenu — "เมนูหลัก" หน้า Dashboard จัดเป็นหมวดหมู่ (ดูเหตุผลการออกแบบใน HomeMenu.js)
  *
  * ── หน้าตาตามขนาดจอ ─────────────────────────────────────────────────────────────
- *   • ≥600px : การ์ดหมวด 2 คอลัมน์ · ข้างในเป็นรายการ [ไอคอน] ชื่อ + คำอธิบาย [ป้าย] ›
- *   • <600px : การ์ดหมวดเรียงลงมา · ข้างในเป็นไอคอนแบบหน้าโฮมแอป 4 ช่องต่อแถว
- *              (หมวดที่มี ≤2 เมนูวางคู่กันครึ่งจอ ช่องไอคอนจึงกว้างเท่ากันทุกการ์ด)
- * ⚠️ มือถือใช้ .hm-col { display: contents } + style order จาก JS — การ์ดถูกแบ่งลง 2 คอลัมน์ไว้สำหรับจอกว้าง
- *    ถ้าไม่ "ถอด" คอลัมน์ออก มือถือจะเรียงหมวดตามคอลัมน์ (งาน → ข้อมูลหลัก → เบิก) แทนลำดับจริง
+ *   • ทุกขนาดจอ: การ์ดหมวดเรียงลงมาตามลำดับ · ข้างในเป็นไอคอนแบบหน้าโฮมแอป 4 ช่องต่อแถว
+ *              (หมวดที่มี ≤2 เมนูวางคู่กันครึ่งแถว ช่องไอคอนจึงกว้างเท่ากันทุกการ์ด)
+ *   • จอคอมต่างแค่ขนาดไอคอน/ตัวอักษร + คำอธิบายใต้ชื่อ (บล็อก min-width: 600px ท้ายไฟล์)
+ * ⚠️ ใช้ .hm-col { display: contents } + style order จาก JS — JSX ยังแบ่งการ์ดลง 2 คอลัมน์ (โครงเดิม)
+ *    ถ้าไม่ "ถอด" คอลัมน์ออก จะเรียงหมวดตามคอลัมน์ (งาน → เอกสาร → เบิก) แทนลำดับจริง
  */
 
 .hm {
@@ -182,84 +182,139 @@
   transform: translateX(2px);
 }
 
-/* ── มือถือ: ไอคอนแบบหน้าโฮมแอป ─────────────────────────────────────────────── */
-@media (max-width: 599px) {
+/* ── ไอคอนแบบหน้าโฮมแอป — "ทุกขนาดจอ" ─────────────────────────────────────────────
+   ✅ ผู้ใช้สั่ง: "แก้ไขหน้าจอคอมให้แสดงผลคล้ายๆ มือถือ การเรียงแถวแบบนี้ดูไม่สวยและดูยาก"
+   🐛 เดิมจอคอมเป็นการ์ด 2 คอลัมน์ข้างในเป็นรายการยาว — หมวดสั้น/ยาวไม่เท่ากันทำให้การ์ดสองฝั่งสูงไม่เท่ากัน
+   เว้าแหว่ง ต้องกวาดตาซ้าย-ขวาสลับไปมา ส่วนมือถือเป็นแถวไอคอนเรียงตามหมวดลงมา อ่านง่ายกว่า
+   ✅ ใช้โครงเดียวกันทุกจอ: การ์ดหมวดเรียงลงมาตามลำดับ · ไอคอน 4 ช่องต่อแถว · หมวดที่มี ≤2 เมนูวางคู่กันครึ่งแถว
+   (ขนาดไอคอน/ตัวอักษรบนจอคอมขยายขึ้นในบล็อก min-width ด้านล่าง) */
+.hm-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.hm-col {
+  display: contents;
+}
+.hm-cat {
+  grid-column: 1 / -1;
+}
+.hm-cat--half {
+  grid-column: auto;
+}
+.hm-cat-head {
+  padding: 8px 12px;
+}
+.hm-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 2px;
+  padding: 10px 4px 8px;
+}
+.hm-list--half {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.hm-li + .hm-li .hm-item::before {
+  display: none;
+}
+.hm-item {
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 4px 2px 6px;
+  border-radius: 12px;
+  text-align: center;
+}
+.hm-item:hover {
+  background: transparent;
+}
+.hm-item:active {
+  background: #f1f5f9;
+}
+.hm-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  font-size: 19px;
+}
+.hm-text {
+  align-items: center;
+}
+.hm-title-full {
+  display: none;
+}
+.hm-title-short {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #334155;
+}
+.hm-sub,
+.hm-chevron,
+.hm-badge--pill {
+  display: none;
+}
+.hm-badge--dot {
+  display: flex;
+  position: absolute;
+  top: -5px;
+  right: -7px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  font-size: 10.5px;
+  box-shadow: 0 0 0 2px #ffffff;
+}
+
+/* จอคอม/แท็บเล็ต — โครงเดียวกับมือถือ แค่ไอคอนและตัวอักษรใหญ่ขึ้น มีเอฟเฟกต์ตอนชี้เมาส์ */
+@media (min-width: 600px) {
   .hm-cols {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-  }
-  .hm-col {
-    display: contents;
-  }
-  .hm-cat {
-    grid-column: 1 / -1;
-  }
-  .hm-cat--half {
-    grid-column: auto;
+    gap: 12px;
   }
   .hm-cat-head {
-    padding: 8px 12px;
+    padding: 9px 14px;
   }
   .hm-list {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 2px;
-    padding: 10px 4px 8px;
-  }
-  .hm-list--half {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .hm-li + .hm-li .hm-item::before {
-    display: none;
+    gap: 6px;
+    padding: 12px 10px 10px;
   }
   .hm-item {
-    flex-direction: column;
-    justify-content: flex-start;
-    gap: 6px;
-    padding: 4px 2px 6px;
-    border-radius: 12px;
-    text-align: center;
+    gap: 8px;
+    padding: 10px 4px 10px;
+    transition: background-color 0.15s ease;
   }
   .hm-item:hover {
-    background: transparent;
+    background: #f8fafc;
   }
-  .hm-item:active {
-    background: #f1f5f9;
+  .hm-item:hover .hm-icon {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 14px -6px rgba(15, 23, 42, 0.25);
   }
   .hm-icon {
-    width: 46px;
-    height: 46px;
-    border-radius: 14px;
-    font-size: 19px;
-  }
-  .hm-text {
-    align-items: center;
-  }
-  .hm-title-full {
-    display: none;
+    width: 52px;
+    height: 52px;
+    border-radius: 15px;
+    font-size: 21px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
   }
   .hm-title-short {
-    display: block;
-    font-size: 11px;
-    font-weight: 600;
-    line-height: 1.25;
-    color: #334155;
+    font-size: 13px;
+    font-weight: 700;
+    color: #1e293b;
   }
-  .hm-sub,
-  .hm-chevron,
-  .hm-badge--pill {
-    display: none;
+  /* คำอธิบายสั้นใต้ชื่อ — จอคอมมีที่พอ ช่วยให้รู้ว่าเมนูนั้นไว้ทำอะไรโดยไม่ต้องกดเข้าไป */
+  .hm-sub {
+    display: block;
+    margin-top: 2px;
+    font-size: 11px;
+    max-width: 100%;
   }
   .hm-badge--dot {
-    display: flex;
-    position: absolute;
-    top: -5px;
-    right: -7px;
-    min-width: 19px;
-    height: 19px;
-    padding: 0 5px;
-    font-size: 10.5px;
-    box-shadow: 0 0 0 2px #ffffff;
+    top: -6px;
+    right: -8px;
+    min-width: 20px;
+    height: 20px;
+    font-size: 11px;
   }
 }

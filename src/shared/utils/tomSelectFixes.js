@@ -58,6 +58,42 @@ const getOpenInstance = () => {
 /** instance ตัวไหนก็ได้ที่มีอยู่ตอนนี้ — ใช้เข้าถึง prototype เพื่อแทนที่ positionDropdown */
 const getAnyInstance = () => document.querySelector(".tomselected")?.tomselect || null;
 
+/**
+ * MAX_OPTIONS_NOTE — ช่อง TomSelect ในฟอร์มงานแสดงสูงสุด 20 แถว (maxOptions: 20) + ป้าย "แสดง 20 จาก N"
+ * 🐛 BUG ที่แก้ (ผู้ใช้แจ้ง: ช่อง "หัวหน้าทีมเข้างาน" แสดงชื่อไม่ครบ): เดิมตั้ง maxOptions = จำนวนพนักงานพอดี
+ * แต่ในรายการยังมีตัวเลือกอื่นนับรวมด้วย — "— เลือกหรือพิมพ์ —" (allowEmptyOption) และชื่อทีมเดิมของงานที่
+ * ไม่อยู่ในรายชื่อพนักงาน (customOption) → พนักงาน 1–2 คนท้ายรายการถูกตัดทิ้งเงียบๆ โดยไม่มีอะไรบอก หาเท่าไรก็ไม่เจอ
+ * ✅ ผู้ใช้สั่งจำกัด 20 แถว ("ไม่งั้นหน่วงถ้ามีเยอะ") — ตัดได้ แต่ต้อง "บอก" เสมอว่ามีมากกว่าที่เห็น
+ * (updateMoreHint ด้านล่าง) ผู้ใช้จึงรู้ว่าต้องพิมพ์ค้นหา แทนที่จะเข้าใจว่าคนนั้นไม่มีในระบบ
+ * ⚠️ ช่องที่รายการจำกัดตายตัวและต้องเลือกได้ครบ (เช่น "ครั้งที่" ของสัญญาสูงสุด 24 ครั้ง) ยังตั้ง null ไว้
+ */
+const MORE_HINT_CLASS = "ts-more-hint";
+
+/**
+ * ป้ายท้ายรายการ "แสดง 20 จาก 57 รายการ — พิมพ์เพื่อค้นหา" เมื่อผลลัพธ์มีมากกว่า maxOptions
+ * ⚠️ วางเป็นลูกของ .ts-dropdown (ข้างนอก .ts-dropdown-content) — TomSelect ล้างเนื้อหาใน content ทิ้งทุกครั้ง
+ * ที่กรองใหม่ ถ้าใส่ไว้ข้างในป้ายจะหายไปทันทีที่พิมพ์ตัวแรก
+ */
+const updateMoreHint = (ts) => {
+  const dropdown = ts?.dropdown;
+  const content = ts?.dropdown_content;
+  if (!dropdown || !content) return;
+  const limit = ts.settings?.maxOptions;
+  const total = ts.currentResults?.items?.length || 0;
+  let hint = [...dropdown.children].find((el) => el.classList?.contains(MORE_HINT_CLASS));
+  if (typeof limit !== "number" || total <= limit) {
+    hint?.remove();
+    return;
+  }
+  if (!hint) {
+    hint = document.createElement("div");
+    hint.className = MORE_HINT_CLASS;
+  }
+  hint.textContent = ts.lastQuery
+    ? `แสดง ${limit} จาก ${total} รายการที่ตรงกัน — พิมพ์ให้เจาะจงขึ้น`
+    : `แสดง ${limit} จาก ${total} รายการ — พิมพ์ชื่อเพื่อค้นหารายการอื่น`;
+  if (hint.previousElementSibling !== content) content.after(hint);
+};
 const GAP = 4;          // ระยะห่างระหว่างช่องกับกล่องตัวเลือก
 const MAX_HEIGHT = 260; // ความสูงสูงสุดของรายการก่อนจะเลื่อนในตัวมันเอง
 
@@ -78,7 +114,14 @@ const positionFixed = function () {
   const space = flipUp ? above : below;
 
   const content = this.dropdown_content;
-  if (content) content.style.maxHeight = `${Math.max(120, Math.min(MAX_HEIGHT, space))}px`;
+  // ⚠️ หักความสูงของส่วนท้ายกล่อง (ป้าย "แสดง 20 จาก N" / แถบแตะเพื่อพิมพ์) ออกจากที่ว่างก่อน — ไม่งั้นรายการ
+  // ใช้ที่ว่างเต็มจนป้ายท้ายกล่องหลุดขอบล่างจอไป มองไม่เห็นว่ามีรายการมากกว่าที่แสดง
+  const footerH = [...dropdown.children]
+    .filter((el) => el !== content && getComputedStyle(el).display !== "none")
+    .reduce((sum, el) => sum + el.offsetHeight, 0);
+  // ⚠️ หักขอบกล่อง (border บน-ล่าง) + ระยะเว้นจากขอบจออีกเล็กน้อยด้วย ไม่งั้นกล่องเกินขอบจอไป 2–3px พอดี
+  const EDGE = 8;
+  if (content) content.style.maxHeight = `${Math.max(120, Math.min(MAX_HEIGHT, space - footerH - EDGE))}px`;
 
   dropdown.style.position = "fixed";
   dropdown.style.width = `${rect.width}px`;
@@ -98,6 +141,19 @@ const patchPositioning = () => {
   const proto = ts && Object.getPrototypeOf(ts);
   if (!proto || typeof proto.positionDropdown !== "function") return;
   proto.positionDropdown = positionFixed;
+  // ✅ ป้าย "แสดง 20 จาก N" ต้องอัปเดตทุกครั้งที่รายการถูกกรองใหม่ (พิมพ์ค้นหา) ไม่ใช่แค่ตอนเปิดกล่อง
+  const originalRefresh = proto.refreshOptions;
+  if (typeof originalRefresh === "function") {
+    proto.refreshOptions = function patchedRefreshOptions(...args) {
+      const out = originalRefresh.apply(this, args);
+      const hadHint = [...(this.dropdown?.children || [])].some((el) => el.classList?.contains(MORE_HINT_CLASS));
+      updateMoreHint(this);
+      const hasHint = [...(this.dropdown?.children || [])].some((el) => el.classList?.contains(MORE_HINT_CLASS));
+      // ป้ายโผล่/หายทำให้ความสูงกล่องเปลี่ยน — จัดตำแหน่งใหม่ให้ยังพอดีจอ
+      if (this.isOpen && hadHint !== hasHint) this.positionDropdown();
+      return out;
+    };
+  }
   patched = true;
 };
 
@@ -123,6 +179,23 @@ const injectDropdownStyles = () => {
       border-radius: 10px !important;
       box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18) !important;
       overflow: hidden;
+    }
+    /* ✅ รายการตัวเลือกเลื่อนขึ้นลงได้ + เห็นแถบเลื่อนชัด (ผู้ใช้แจ้ง: "แก้ไขทีมเข้างานให้แสดงทั้งหมด และมี scroll
+       เลื่อนขึ้นลง") — แถบเลื่อนแบบบางของ Windows/Mac ซ่อนตัวจนดูเหมือนรายการจบแค่ที่เห็น ไม่รู้ว่ายังมีชื่อต่อข้างล่าง
+       ⚠️ overscroll-behavior: contain — เลื่อนจนสุดรายการแล้วต้องไม่ไปเลื่อนฟอร์มข้างหลังต่อ (กล่องจะหลุดจากช่อง) */
+    .ts-dropdown .ts-dropdown-content {
+      overflow-y: auto !important;
+      overscroll-behavior: contain;
+      scrollbar-width: thin;
+      scrollbar-color: #94a3b8 #f1f5f9;
+    }
+    .ts-dropdown .ts-dropdown-content::-webkit-scrollbar { width: 8px; }
+    .ts-dropdown .ts-dropdown-content::-webkit-scrollbar-track { background: #f1f5f9; }
+    .ts-dropdown .ts-dropdown-content::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 8px; border: 2px solid #f1f5f9; }
+    .ts-dropdown .ts-dropdown-content::-webkit-scrollbar-thumb:hover { background: #64748b; }
+    .ts-dropdown .${MORE_HINT_CLASS} {
+      padding: 7px 12px; font-size: 11.5px; font-weight: 600; color: #64748b;
+      background: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center;
     }
     .ts-dropdown .option {
       padding: 8px 12px !important;

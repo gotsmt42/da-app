@@ -444,14 +444,14 @@ export const getAddDraftEvent = async ({
         // ✅ ช่อง <input type="month"> ของเบราว์เซอร์แสดง ค.ศ. เสมอ และบังคับเป็นไทยไม่ได้
         // — แทนด้วยตัวเลือกเดือนของแอปที่เป็น พ.ศ. (ค่าที่เก็บยังเป็น "YYYY-MM" ของ ค.ศ. เหมือนเดิม)
         Swal.getPopup().__thaiDpCleanup = mountThaiDatePickers(Swal.getPopup());
-        const mkTs = (id, placeholder = "", maxOptions = 50) => {
+        const mkTs = (id, placeholder = "") => {
           // ⚠️ เดิม fix ไว้ 7 ตัดรายชื่อ/ตัวเลือกที่มีเกิน 7 รายการทิ้งไปเงียบๆ (ห้องสมุด TomSelect
           // ค่า default จริงคือ 50 อยู่แล้ว) ทำให้ dropdown บริษัท/โครงการ/ประเภทงาน/ระบบงาน "หาไม่เจอ"
           // เป็นบางที เวลารายการมีมากกว่า 7 รายการ — ผู้เรียกควรส่ง length ของรายการจริงมาแทน
           try {
             return new TomSelect(id, {
               create: true,
-              maxOptions,
+              maxOptions: 20, // ✅ แสดงสูงสุด 20 แถว (กันหน่วง) + ป้ายบอกว่ามีเพิ่ม — ดู MAX_OPTIONS_NOTE ใน shared/utils/tomSelectFixes.js
               placeholder,
               sortField: { field: "text", direction: "asc" },
               allowEmptyOption: true,
@@ -512,7 +512,7 @@ export const getAddDraftEvent = async ({
         try {
           contractTs = new TomSelect("#ade-contractPick", {
             create: false,
-            maxOptions: selectableContracts.length || 5,
+            maxOptions: 20, // ✅ แสดงสูงสุด 20 แถว (กันหน่วง) + ป้ายบอกว่ามีเพิ่ม — ดู MAX_OPTIONS_NOTE ใน shared/utils/tomSelectFixes.js
             placeholder: "ค้นหาบริษัท/โครงการ/เลขที่สัญญา...",
             sortField: { field: "text", direction: "asc" },
             render: { option: renderContractOption, item: renderContractItem },

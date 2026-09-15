@@ -618,10 +618,21 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
                   const taken = kind === "advance" && o.advance && o.advance._id !== expense?._id;
                   return (
                     <li {...liProps} key={o._id}>
+                      {/* ✅ รายละเอียดงานครบแบบเดียวกับตอนเปิดจากหน้า Event (ผู้ใช้ขอ) — "PM Fire Alarm โครงการ ... ครั้งที่ ..."
+                          🐛 เดิมบรรทัดหลักมีแค่ "PM · Fire Alarm" ทุกงานหน้าตาเหมือนกันหมด ต้องอ่านบรรทัดเล็กถึงจะแยกออก
+                          และไม่มี "ครั้งที่" งาน PM ของโครงการเดียวกันหลายครั้งจึงแยกกันไม่ได้เลย
+                          ⚠️ ไม่ตัดคำ (noWrap) บรรทัดหลัก — ชื่อโครงการยาวต้องอ่านได้ครบ ไม่ใช่ถูกตัดเป็น "..." */}
                       <Box sx={{ minWidth: 0, flex: 1 }}>
-                        <Typography sx={{ fontSize: "0.86rem", fontWeight: 700 }} noWrap>{o.title}{o.system ? ` · ${o.system}` : ""}</Typography>
-                        <Typography variant="caption" sx={{ color: TEXT_SUB }} noWrap component="div">
-                          {[o.site || o.company, o.start ? thaiDate(o.start) : "", o.docNo].filter(Boolean).join(" · ")}
+                        <Typography sx={{ fontSize: "0.86rem", fontWeight: 700, lineHeight: 1.35 }}>{jobText(o) || o.title}</Typography>
+                        <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", lineHeight: 1.35 }} component="div">
+                          {[
+                            // ⚠️ แสดงแค่วันเริ่ม — end ของงานทั้งวันในปฏิทินเป็นแบบ "ไม่รวมวันสุดท้าย" (+1 วัน) ถ้าเอามาโชว์ตรงๆ จะเกินจริง 1 วัน
+                            o.start ? `วันที่ ${thaiDate(o.start)}` : "",
+                            o.company && o.site && o.company !== o.site ? `บริษัท ${o.company}` : "",
+                            o.teamNames?.length ? `ทีม ${o.teamNames.join(", ")}` : "",
+                            o.docNo ? `เลขที่ ${o.docNo}` : "",
+                            o.status || "",
+                          ].filter(Boolean).join(" · ")}
                         </Typography>
                       </Box>
                       {taken && (

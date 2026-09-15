@@ -1737,7 +1737,7 @@ export const getEditEvent = async ({
         try {
           attachTs = new TomSelect("#eeaContractPick", {
             create: false,
-            maxOptions: attachableContracts.length || 5,
+            maxOptions: 20, // ✅ แสดงสูงสุด 20 แถว (กันหน่วง) + ป้ายบอกว่ามีเพิ่ม — ดู MAX_OPTIONS_NOTE ใน shared/utils/tomSelectFixes.js
             placeholder: "ค้นหาบริษัท/โครงการ/เลขที่สัญญา...",
             sortField: { field: "text", direction: "asc" },
             render: { option: renderContractOption, item: renderContractItem },
@@ -1991,16 +1991,17 @@ export const getEditEvent = async ({
       // โครงการที่มีเกิน 50 รายการจะถูกตัดทิ้งเงียบๆ โดยไม่มีอะไรบอก ผู้ใช้เลื่อนหาเท่าไหร่ก็ไม่เจอ
       // แล้วสุดท้ายพิมพ์ชื่อใหม่เอง (create:true) กลายเป็นบริษัทซ้ำที่สะกดต่างกันอีกรายการในระบบ —
       // ผูกกับจำนวนตัวเลือกจริงของแต่ละช่อง (เทียบ pattern เดียวกับ AddEvent.js/AddDraftEvent.js)
-      mkTsCleared("#editCompany", "เลือกหรือพิมพ์ชื่อบริษัท", eventCompany, { maxOptions: companyValues.length || 50 });
-      mkTsCleared("#editSite",    "เลือกหรือพิมพ์ชื่อโครงการ", eventSite, { maxOptions: siteValues.length || 50 });
-      mkTsCleared("#editTitle",   "เลือกหรือพิมพ์ประเภทงาน", eventTitle, { maxOptions: titleValues.length || 50 });
-      mkTsCleared("#editSystem",  "เลือกหรือพิมพ์ระบบงาน", eventSystem, { maxOptions: systemValues.length || 50 });
+      mkTsCleared("#editCompany", "เลือกหรือพิมพ์ชื่อบริษัท", eventCompany, { maxOptions: 20 });
+      mkTsCleared("#editSite",    "เลือกหรือพิมพ์ชื่อโครงการ", eventSite, { maxOptions: 20 });
+      mkTsCleared("#editTitle",   "เลือกหรือพิมพ์ประเภทงาน", eventTitle, { maxOptions: 20 });
+      mkTsCleared("#editSystem",  "เลือกหรือพิมพ์ระบบงาน", eventSystem, { maxOptions: 20 });
       // ⚠️ งานสัญญาต้องเลือกจากรายการครั้งที่ของสัญญาเท่านั้น ห้ามพิมพ์เลขเองเด็ดขาด (create:false) —
       // พิมพ์ "13" ใส่สัญญา 8 ครั้งได้เมื่อไหร่ ครั้งนั้นจะไม่มีคอลัมน์รองรับในหน้า "ภาพรวมงาน" และไม่ถูก
       // นับใน countUsedRounds ด้วย กลายเป็นงานที่มีอยู่จริงแต่มองไม่เห็นจากที่ไหนเลย
-      if (canEditContractRound) mkTs("#editTime", "เลือกครั้งที่", { create: false, maxOptions: 24 });
-      else mkTsCleared("#editTime", "เลือกครั้งที่", eventTime, { maxOptions: 24 });
-      mkTsCleared("#editTeam",    "เลือกหรือพิมพ์ชื่อทีม", eventTeam, { maxOptions: teamValues.length || 50 });
+      // ⚠️ "ครั้งที่" ไม่จำกัด (null) — สัญญาเข้าได้ถึง 24 ครั้ง ถ้าตัดที่ 20 ครั้งที่ 21–24 จะเลือกไม่ได้เลย (รายการสั้นอยู่แล้ว ไม่หน่วง)
+      if (canEditContractRound) mkTs("#editTime", "เลือกครั้งที่", { create: false, maxOptions: null });
+      else mkTsCleared("#editTime", "เลือกครั้งที่", eventTime, { maxOptions: null });
+      mkTsCleared("#editTeam",    "เลือกหรือพิมพ์ชื่อทีม", eventTeam, { maxOptions: 20 });
 
       const getVal = (id) => document.getElementById(id)?.value?.trim() || "";
 
@@ -2015,7 +2016,7 @@ export const getEditEvent = async ({
             selectOnTab: false,
             placeholder: "เลือกหรือพิมพ์ชื่อลูกทีม",
             allowEmptyOption: true,
-            maxOptions: employeeList.length || 50, // ⚠️ ค่าเริ่มต้น 50 ตัดรายชื่อพนักงานที่เกินทิ้งเงียบๆ
+            maxOptions: 20, // ✅ แสดงสูงสุด 20 แถว (กันหน่วง) + ป้ายบอกว่ามีเพิ่ม — ดู MAX_OPTIONS_NOTE ใน shared/utils/tomSelectFixes.js
             // ⚠️ ไม่ต้องก็อป onItemAdd (บังคับเลือกได้ทีละคน) มาจาก mkTs ด้านบน — <select> ที่ไม่มี
             // attribute multiple ถูก TomSelect ตั้ง maxItems:1 / mode:"single" ให้เองอยู่แล้ว
             dropdownParent: "body", // ✅ กัน #ee-body (overflow-y:auto) ตัดขอบ — เทียบ pattern เดียวกับ mkTs ด้านบน
