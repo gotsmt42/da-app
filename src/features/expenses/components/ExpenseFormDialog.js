@@ -17,6 +17,7 @@
  * ⚠️ ยอดบนหน้าจอเป็นแค่ตัวช่วยอ่าน — server คำนวณใหม่ทั้งหมดเสมอ (ดู sanitizeItems ใน routes/expenses.js)
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import moment from "moment";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack, Typography, TextField,
@@ -26,7 +27,7 @@ import {
 import { alpha } from "@mui/material/styles";
 import {
   Close, Add, DeleteOutline, AttachFile, Send, Save, Link as LinkIcon, ReceiptLong, Payments, ExpandMore,
-  Print, EditNote, AccountBalanceWallet,
+  Print, EditNote, AccountBalanceWallet, Groups, PersonOutline,
 } from "@mui/icons-material";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
@@ -40,7 +41,7 @@ import KindBadge from "./KindBadge";
 import ExpensePrintDialog from "./ExpensePrintDialog";
 import {
   KIND_META, EXPENSE_CATEGORIES, categoryMeta, FILE_KINDS, baht, fmtMoney, itemAmount, itemsTotal,
-  differenceMeta, money, jobText, slipKind, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
+  differenceMeta, money, jobText, jobSubject, itemPersonName, personFullName, slipKind, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
 } from "../expenseMeta";
 
 const MAX_ITEMS = 40;
@@ -52,6 +53,7 @@ const blankItem = (category = "other") => {
   return {
     key: nextKey(), category, description: category === "other" ? "" : meta.label, detail: "",
     qty: 1, unit: meta.unit === "รายการ" ? "" : meta.unit, unitPrice: "", receiptNo: "", advanceItemIndex: null,
+    person: null,
   };
 };
 
@@ -65,6 +67,7 @@ const fromDoc = (it) => ({
   unitPrice: it.unitPrice ?? "",
   receiptNo: it.receiptNo || "",
   advanceItemIndex: Number.isInteger(it.advanceItemIndex) ? it.advanceItemIndex : null,
+  person: it.person?.name ? { userId: it.person.userId || "", name: it.person.name } : null,
 });
 
 const dayOf = (d) => (d ? moment(d).format("YYYY-MM-DD") : "");
@@ -96,9 +99,14 @@ const Section = ({ accent, icon, title, hint, children, action }) => (
   </Box>
 );
 
-export default function ExpenseFormDialog({ open, kind: kindProp, claimType: claimTypeProp, expense, advance: advanceProp, onClose, onSaved }) {
+/**
+ * @param {object} [presetJob]  งานที่เปิดฟอร์มมาจากหน้าตารางงาน (เมนู "เบิก Advance งานนี้") —
+ *   { _id, title, company, site, docNo, start } · ผูกงานให้และล็อกช่องไว้ ไม่ให้เผลอเปลี่ยนเป็นงานอื่น
+ */
+export default function ExpenseFormDialog({ open, kind: kindProp, claimType: claimTypeProp, expense, advance: advanceProp, presetJob, onClose, onSaved }) {
   const isMobile = useMediaQuery("(max-width:600px)");
   const isDesktop = useMediaQuery("(min-width:900px)");
+  const navigate = useNavigate();
   const { userData } = useAuth();
   const { can } = usePermissions();
   const editing = Boolean(expense?._id);
@@ -125,6 +133,9 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
   const [jobOptions, setJobOptions] = useState([]);
   const [jobQuery, setJobQuery] = useState("");
   const [jobLoading, setJobLoading] = useState(false);
+  /** ใบ Advance ที่มีอยู่แล้วของงานที่เลือก (1 งานออกได้ใบเดียว) — null = ไม่มี (หรือยังตรวจไม่เสร็จ) */
+  const [jobAdvance, setJobAdvance] = useState(null);
+  const [jobAdvanceChecking, setJobAdvanceChecking] = useState(false);
   const [items, setItems] = useState([blankItem("allowance")]);
   const [dueClearAt, setDueClearAt] = useState("");
   const [note, setNote] = useState("");
@@ -139,6 +150,9 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
   const [blankMenuEl, setBlankMenuEl] = useState(null);
   const [blankPrint, setBlankPrint] = useState(null);
   const fileInputRef = useRef(null);
+  // เรื่องที่ระบบเติมให้ล่าสุด — ผู้ใช้พิมพ์แก้เองแล้ว เปลี่ยนงานทีหลังต้องไม่เขียนทับของที่ผู้ใช้พิมพ์
+  const autoSubjectRef = useRef("");
+  const subjectPrefix = isReimburseForm ? "เบิกคืนค่าใช้จ่ายงาน" : "เบิกค่าใช้จ่ายงาน";
 
   const pickAdvance = (a) => {
     setAdvance(a);
@@ -157,7 +171,7 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
     if (editing) {
       setDocDate(dayOf(expense.docDate) || moment().format("YYYY-MM-DD"));
       setTo(expense.to || "");
-      setRequester({ userId: expense.requester?.userId, name: expense.requester?.name, position: expense.requester?.position });
+      setRequester({ userId: expense.requester?.userId, name: expense.requester?.name, fullName: expense.requester?.fullName, position: expense.requester?.position });
       setPosition(expense.requester?.position || "");
       setSubject(expense.subject || "");
       setJob(expense.eventId ? { _id: expense.eventId, ...expense.job } : null);
@@ -170,8 +184,11 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
       setTo("");
       setRequester({ userId: userData?.userId, name: userData?.fname, position: "" });
       setPosition("");
-      setSubject("");
-      setJob(null);
+      // ✅ เปิดมาจากหน้าตารางงาน — ผูกงานให้ทันที และตั้งเรื่องจากชื่องาน/โครงการ (แก้ได้)
+      // ✅ เรื่องแบบรายละเอียดครบ "เบิกค่าใช้จ่ายงาน PM Fire Alarm โครงการ ... ครั้งที่ ..." (ดู jobSubject)
+      autoSubjectRef.current = presetJob ? jobSubject(presetJob, subjectPrefix) : "";
+      setSubject(autoSubjectRef.current);
+      setJob(presetJob ? { ...presetJob } : null);
       // ใบเคลมที่อ้าง Advance เริ่มด้วยรายการว่าง (รอคัดลอกจากใบ Advance) ที่เหลือเริ่มด้วยแถวเปล่า
       setItems(isClearClaim ? [] : [blankItem(isReimburseForm ? "fuel" : "allowance")]);
       setDueClearAt("");
@@ -188,10 +205,30 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
         setPosition((cur) => cur || s.position || "");
       }
     }).catch(() => {});
-    if (canPickPerson) ExpenseService.people().then((p) => alive && setPeople(p)).catch(() => {});
+    // ✅ โหลดรายชื่อพนักงานให้ทุกคน — นอกจากแอดมินใช้เลือกผู้เบิกแล้ว หัวหน้างานยังใช้ระบุพนักงานในแต่ละรายการ
+    ExpenseService.people().then((p) => alive && setPeople(p)).catch(() => {});
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- รีเซ็ตเฉพาะตอนเปิดกล่อง/เปลี่ยนใบเท่านั้น
-  }, [open, expense?._id, kind]);
+  }, [open, expense?._id, kind, presetJob?._id]);
+
+  /**
+   * 🔒 งานที่เลือกมีใบ Advance แล้วหรือยัง (ผู้ใช้สั่ง: "งานไหนมีการออกใบ Advance แล้วจะไม่สามารถออกซ้ำได้")
+   * ✅ ตรวจทันทีที่เลือกงาน — บอกก่อนผู้ใช้จะกรอกรายการทั้งใบ ไม่ใช่ไปเจอตอนกดส่ง
+   * ⚠️ นี่เป็นแค่ด่านหน้า server ตรวจซ้ำตอนบันทึกเสมอ (รวมกรณีกดส่งพร้อมกันจากหลายเครื่อง)
+   * ⚠️ ไม่นับใบที่กำลังแก้อยู่ — แก้ใบ Advance เดิมของงานนั้นต้องบันทึกได้ตามปกติ
+   */
+  const checksJobAdvance = open && kind === "advance";
+  useEffect(() => {
+    setJobAdvance(null);
+    if (!checksJobAdvance || !job?._id) return undefined;
+    let alive = true;
+    setJobAdvanceChecking(true);
+    ExpenseService.jobAdvance(job._id)
+      .then((adv) => { if (alive) setJobAdvance(adv && adv._id !== expense?._id ? adv : null); })
+      .catch(() => { if (alive) setJobAdvance(null); })
+      .finally(() => { if (alive) setJobAdvanceChecking(false); });
+    return () => { alive = false; };
+  }, [checksJobAdvance, job?._id, expense?._id]);
 
   // ── ใบเคลม: รายการใบ Advance ที่เคลียร์ได้ ───────────────────────────
   useEffect(() => {
@@ -241,6 +278,57 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
     setItem(row.key, patch);
   };
 
+  /** รายชื่อคนในงาน (หัวหน้าทีม + ลูกทีม) จากงานที่ผูก — ใช้กับปุ่ม "เบี้ยเลี้ยงทีมงาน" */
+  const teamNames = useMemo(() => [...new Set((job?.teamNames || []).map((n) => String(n || "").trim()).filter(Boolean))], [job]);
+
+  /**
+   * ✅ เพิ่มเบี้ยเลี้ยงให้ทุกคนในงานคนละบรรทัด (ข้ามคนที่มีบรรทัดเบี้ยเลี้ยงอยู่แล้ว)
+   * • แถวเบี้ยเลี้ยงที่ยังไม่ระบุคน (เช่นแถวตั้งต้นที่กรอกอัตราไว้แล้ว) ถูกใช้เป็นบรรทัดของคนถัดไปก่อน
+   *   ไม่งั้นจะเหลือแถวเบี้ยเลี้ยงไม่มีชื่อค้างอยู่ 1 แถว ซึ่งดูเหมือนเบิกเกินไป 1 คน
+   * • จำนวนวัน/ราคาต่อวันคัดลอกจากบรรทัดเบี้ยเลี้ยงแรกที่มีอยู่ — ส่วนใหญ่ทั้งทีมได้อัตราเดียวกัน แก้ทีหลังได้
+   */
+  const addTeamAllowance = () => {
+    setItems((rows) => {
+      const next = [...rows];
+      const has = (name) => {
+        const full = people.find((u) => u.name === name)?.fullName;
+        return next.some((r) => r.category === "allowance" && [name, full].includes(itemPersonName(r)));
+      };
+      const template = next.find((r) => r.category === "allowance");
+      const toPerson = (name) => {
+        // ทีมในปฏิทินเก็บเป็นชื่อต้น — จับคู่กับทะเบียนแล้วใช้ชื่อ-นามสกุล (คนนอกระบบคงชื่อเดิม)
+        const p = people.find((u) => u.name === name || u.fullName === name);
+        return { userId: p?.userId || "", name: p?.fullName || name };
+      };
+      teamNames.filter((name) => !has(name)).forEach((name) => {
+        const blankIdx = next.findIndex((r) => r.category === "allowance" && !itemPersonName(r));
+        if (blankIdx >= 0) {
+          next[blankIdx] = { ...next[blankIdx], person: toPerson(name) };
+          return;
+        }
+        if (next.length >= MAX_ITEMS) return;
+        next.push({
+          ...blankItem("allowance"), person: toPerson(name),
+          qty: template?.qty ?? 1, unit: template?.unit ?? "วัน", unitPrice: template?.unitPrice ?? "",
+        });
+      });
+      return next;
+    });
+  };
+
+  const personTotals = useMemo(() => {
+    const map = new Map();
+    items.forEach((it) => {
+      const name = itemPersonName(it);
+      if (!name || !String(it.description).trim()) return;
+      const cur = map.get(name) || { name, amount: 0, lines: 0 };
+      cur.amount = money(cur.amount + itemAmount(it));
+      cur.lines += 1;
+      map.set(name, cur);
+    });
+    return [...map.values()];
+  }, [items]);
+
   const validItems = items.filter((it) => String(it.description).trim());
   const problems = [];
   if (isClearClaim && !advance?._id) problems.push("เลือกใบ Advance ที่ต้องการเคลียร์");
@@ -250,6 +338,13 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
   if (!isClearClaim && total <= 0) problems.push("ยอดที่ขอเบิกต้องมากกว่า 0");
   if (isClearClaim && !validItems.length && !String(note).trim()) problems.push("เพิ่มรายการที่ใช้จริง หรือระบุหมายเหตุหากไม่ได้ใช้เงินเลย");
   if (items.some((it) => String(it.description).trim() && Number(it.qty) <= 0)) problems.push("จำนวนต้องมากกว่า 0");
+  // ✅ งานที่ล็อกมาจากตารางงานเปลี่ยนไม่ได้ — บอกให้ไปดูใบเดิม ไม่ใช่บอกให้ "เลือกงานอื่น" ที่ทำไม่ได้
+  const jobLocked = Boolean(presetJob) && !editing;
+  if (kind === "advance" && jobAdvance) {
+    problems.push(jobLocked
+      ? `ตรวจสอบใบเดิม — งานนี้มีใบเบิก Advance แล้ว (${jobAdvance.docNo}) ออกซ้ำไม่ได้`
+      : `เลือกงานอื่นหรือไม่ผูกงาน — งานนี้มีใบเบิก Advance แล้ว (${jobAdvance.docNo})`);
+  }
 
   const addFiles = (list) => {
     const arr = Array.from(list || []).map((file) => ({ key: nextKey(), file, kind: isClaim ? "receipt" : "other" }));
@@ -482,7 +577,11 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
                 )}
               />
             ) : (
-              <TextField size="small" label="ชื่อผู้เบิกเงิน" value={isClearClaim ? (advance?.requester?.name || requester?.name || "") : (requester?.name || "")}
+              <TextField size="small" label="ชื่อผู้เบิกเงิน"
+                // ✅ ชื่อ-นามสกุล (ผู้ใช้ขอ) — ใบใหม่ยังไม่มี fullName จาก server จึงหาจากรายชื่อพนักงานที่โหลดมาแทน
+                value={isClearClaim
+                  ? personFullName(advance?.requester) || personFullName(requester)
+                  : personFullName(requester) || people.find((p) => p.userId === requester?.userId)?.fullName || requester?.name || ""}
                 InputProps={{ readOnly: true }}
                 helperText={isClearClaim ? "ผู้เบิกของใบเคลม = ผู้รับเงิน Advance" : isReimburseForm ? "ผู้เบิก = คนที่สำรองจ่ายและจะได้รับเงินคืน" : undefined} />
             )}
@@ -500,27 +599,65 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
                 value={job}
                 loading={jobLoading}
                 filterOptions={(x) => x}
-                onChange={(_, v) => setJob(v)}
+                onChange={(_, v) => {
+                  setJob(v);
+                  // ✅ เติมเรื่องจากงานให้ — เฉพาะตอนช่องเรื่องยังว่างหรือยังเป็นค่าที่ระบบเติมไว้ (ไม่ทับที่ผู้ใช้พิมพ์เอง)
+                  const next = v ? jobSubject(v, subjectPrefix) : "";
+                  setSubject((cur) => (!String(cur).trim() || cur === autoSubjectRef.current ? next : cur));
+                  autoSubjectRef.current = next;
+                }}
+                // ✅ เปิดมาจากเมนู "เบิก Advance งานนี้" ในตารางงาน — ล็อกงานไว้ กันเผลอเปลี่ยนเป็นงานอื่น
+                disabled={Boolean(presetJob) && !editing}
                 onInputChange={(_, v, reason) => { if (reason === "input") setJobQuery(v); if (reason === "clear") setJobQuery(""); }}
                 isOptionEqualToValue={(o, v) => o._id === v._id}
                 getOptionLabel={(o) => (o ? jobText(o) || o.title || "" : "")}
+                // 🔒 ใบ Advance: งานที่มีใบแล้วเลือกไม่ได้ (ยกเว้นงานของใบที่กำลังแก้อยู่เอง)
+                getOptionDisabled={(o) => kind === "advance" && Boolean(o.advance) && o.advance._id !== expense?._id}
                 noOptionsText="ไม่พบงาน"
-                renderOption={({ key, ...liProps }, o) => (
-                  <li {...liProps} key={o._id}>
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography sx={{ fontSize: "0.86rem", fontWeight: 700 }} noWrap>{o.title}{o.system ? ` · ${o.system}` : ""}</Typography>
-                      <Typography variant="caption" sx={{ color: TEXT_SUB }} noWrap component="div">
-                        {[o.site || o.company, o.start ? thaiDate(o.start) : "", o.docNo].filter(Boolean).join(" · ")}
-                      </Typography>
-                    </Box>
-                  </li>
-                )}
+                renderOption={({ key, ...liProps }, o) => {
+                  const taken = kind === "advance" && o.advance && o.advance._id !== expense?._id;
+                  return (
+                    <li {...liProps} key={o._id}>
+                      <Box sx={{ minWidth: 0, flex: 1 }}>
+                        <Typography sx={{ fontSize: "0.86rem", fontWeight: 700 }} noWrap>{o.title}{o.system ? ` · ${o.system}` : ""}</Typography>
+                        <Typography variant="caption" sx={{ color: TEXT_SUB }} noWrap component="div">
+                          {[o.site || o.company, o.start ? thaiDate(o.start) : "", o.docNo].filter(Boolean).join(" · ")}
+                        </Typography>
+                      </Box>
+                      {taken && (
+                        <Chip size="small" label={`มีใบแล้ว ${o.advance.docNo}`}
+                          sx={{ ml: 1, flexShrink: 0, height: 20, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha(KIND_META.advance.color, 0.12), color: KIND_META.advance.dark }} />
+                      )}
+                    </li>
+                  );
+                }}
                 renderInput={(params) => (
-                  <TextField {...params} size="small" label="ผูกกับงาน (ไม่บังคับ)" placeholder="ค้นหาชื่องาน / โครงการ / เลขที่"
-                    helperText="ผูกงานแล้วจะดูได้ว่างานนี้ใช้งบไปเท่าไรในหน้ารายงาน"
-                    InputProps={{ ...params.InputProps, endAdornment: (<>{jobLoading ? <CircularProgress size={16} /> : null}{params.InputProps.endAdornment}</>) }} />
+                  <TextField {...params} size="small"
+                    label={presetJob && !editing ? "งานที่เบิก" : "ผูกกับงาน (ไม่บังคับ)"} placeholder="ค้นหาชื่องาน / โครงการ / เลขที่"
+                    error={Boolean(jobAdvance)}
+                    helperText={presetJob && !editing
+                      ? "เปิดจากตารางงาน — ผูกกับงานนี้แล้ว"
+                      : kind === "advance" ? "1 งานออกใบ Advance ได้ใบเดียว · ผูกงานแล้วดูงบที่ใช้ได้ในหน้ารายงาน" : "ผูกงานแล้วจะดูได้ว่างานนี้ใช้งบไปเท่าไรในหน้ารายงาน"}
+                    InputProps={{ ...params.InputProps, endAdornment: (<>{jobLoading || jobAdvanceChecking ? <CircularProgress size={16} /> : null}{params.InputProps.endAdornment}</>) }} />
                 )}
               />
+            )}
+            {!isClearClaim && jobAdvance && (
+              <Alert
+                severity="warning"
+                sx={{ gridColumn: { sm: "1 / -1" }, borderRadius: 2, "& .MuiAlert-message": { fontSize: "0.82rem", width: "100%" } }}
+                action={jobAdvance.canOpen ? (
+                  <Button color="inherit" size="small" sx={{ textTransform: "none", fontWeight: 800, whiteSpace: "nowrap" }}
+                    onClick={() => { onClose?.(); navigate(`/expenses/${jobAdvance._id}`); }}>
+                    เปิดดูใบนี้
+                  </Button>
+                ) : undefined}
+              >
+                <b>งานนี้มีใบเบิก Advance แล้ว</b> — {jobAdvance.docNo} · {jobAdvance.statusLabel}
+                {jobAdvance.requesterName ? ` · ผู้เบิก ${jobAdvance.requesterName}` : ""}
+                <br />1 งานออกใบ Advance ได้ใบเดียว{presetJob && !editing ? "" : " — เลือกงานอื่น หรือไม่ผูกงาน"}
+                {jobAdvance.status === "rejected" ? " (ใบเดิมถูกตีกลับ ให้แก้ไขใบนั้นแล้วส่งใหม่)" : ""}
+              </Alert>
             )}
           </Box>
         </Section>
@@ -583,11 +720,50 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
                       <TextField size="small" label="เลขที่ใบเสร็จ" value={row.receiptNo} onChange={(e) => setItem(row.key, { receiptNo: e.target.value })} inputProps={{ maxLength: 60 }} />
                     )}
                   </Box>
-                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 1 }}>
+                  <Box sx={{
+                    mt: 1, display: "grid", gap: 1, alignItems: "center",
+                    gridTemplateColumns: { xs: "1fr auto auto", sm: "210px 1fr auto auto" },
+                  }}>
+                    {/* ✅ พนักงานของรายการนี้ (ไม่บังคับ) — หัวหน้างานเบิกแทนลูกทีมได้ในใบเดียว แยกบรรทัดละคน
+                        พิมพ์ชื่อคนนอกระบบได้ (น.ศ. ฝึกงาน/แรงงานรายวัน) · เลือกจากรายชื่อ = ผูกกับทะเบียนพนักงาน */}
+                    <Autocomplete
+                      freeSolo size="small" options={people}
+                      value={row.person?.name ? (people.find((p) => p.userId && p.userId === row.person.userId) || itemPersonName(row)) : null}
+                      getOptionLabel={(o) => (typeof o === "string" ? o : o?.fullName || o?.name || "")}
+                      isOptionEqualToValue={(o, v) => (typeof v === "string" ? o.fullName === v || o.name === v : o.userId === v.userId)}
+                      onChange={(_, v) => {
+                        if (!v) setItem(row.key, { person: null });
+                        else if (typeof v === "string") setItem(row.key, { person: { userId: "", name: v.trim().slice(0, 80) } });
+                        else setItem(row.key, { person: { userId: v.userId, name: v.fullName || v.name } });
+                      }}
+                      onInputChange={(_, v, reason) => {
+                        if (reason !== "input") return;
+                        const name = v.slice(0, 80);
+                        const match = people.find((p) => p.fullName === name.trim() || p.name === name.trim());
+                        setItem(row.key, { person: name.trim() ? { userId: match?.userId || "", name } : null });
+                      }}
+                      renderOption={({ key, ...liProps }, o) => (
+                        <li {...liProps} key={o.userId}>
+                          <Avatar src={o.imageUrl?.startsWith("http") ? o.imageUrl : undefined} sx={{ width: 22, height: 22, mr: 1, fontSize: 11 }}>
+                            {(o.name || "?").charAt(0)}
+                          </Avatar>
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography sx={{ fontSize: "0.84rem", fontWeight: 700 }} noWrap>{o.fullName || o.name}</Typography>
+                            {o.position && <Typography variant="caption" sx={{ color: TEXT_SUB }} noWrap component="div">{o.position}</Typography>}
+                          </Box>
+                        </li>
+                      )}
+                      sx={{ gridColumn: { xs: "1 / -1", sm: "auto" } }}
+                      renderInput={(params) => (
+                        <TextField {...params} variant="standard" placeholder="พนักงาน (ไม่บังคับ)"
+                          InputProps={{ ...params.InputProps, startAdornment: <PersonOutline sx={{ fontSize: 17, color: row.person?.name ? accent : TEXT_SUB, mr: 0.5 }} /> }}
+                          sx={{ "& input": { fontSize: "0.82rem" } }} />
+                      )}
+                    />
                     <TextField
                       size="small" variant="standard" placeholder="รายละเอียดเพิ่มเติม เช่น ช่วงวันที่ / ทะเบียนรถ (ไม่บังคับ)"
                       value={row.detail} onChange={(e) => setItem(row.key, { detail: e.target.value })}
-                      sx={{ flex: 1, "& input": { fontSize: "0.82rem" } }} inputProps={{ maxLength: 300 }}
+                      sx={{ minWidth: 0, "& input": { fontSize: "0.82rem" } }} inputProps={{ maxLength: 300 }}
                     />
                     <Box sx={{ textAlign: "right", minWidth: 96 }}>
                       <Typography sx={{ fontWeight: 800, fontSize: "0.95rem", color: TEXT_MAIN }}>{fmtMoney(amount)}</Typography>
@@ -604,7 +780,7 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
                         </IconButton>
                       </span>
                     </Tooltip>
-                  </Stack>
+                  </Box>
                 </Box>
               );
             })}
@@ -614,11 +790,35 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
               sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, borderColor: alpha(accent, 0.5), color: accent }}>
               เพิ่มรายการ
             </Button>
+            {teamNames.length > 0 && !isClearClaim && (
+              <Tooltip describeChild title={`เพิ่มรายการเบี้ยเลี้ยงให้ทุกคนในงานนี้ คนละบรรทัด: ${teamNames.join(", ")}`}>
+                <Chip size="small" icon={<Groups sx={{ fontSize: "16px !important" }} />} label={`เบี้ยเลี้ยงทีมงาน (${teamNames.length} คน)`}
+                  onClick={addTeamAllowance} disabled={items.length >= MAX_ITEMS}
+                  sx={{ fontWeight: 800, bgcolor: alpha(accent, 0.1), color: meta.dark, "& .MuiChip-icon": { color: meta.dark } }} />
+              </Tooltip>
+            )}
             {QUICK_ADD.map((c) => (
               <Chip key={c} size="small" variant="outlined" icon={<Add sx={{ fontSize: "15px !important" }} />} label={categoryMeta(c).label}
                 onClick={() => addItem(c)} disabled={items.length >= MAX_ITEMS} sx={{ fontWeight: 600 }} />
             ))}
           </Stack>
+
+          {/* ✅ สรุปยอดตามพนักงาน — โชว์เมื่อมีการระบุพนักงานในรายการ ให้หัวหน้างานเห็นว่าต้องแบ่งเงินให้ใครเท่าไร */}
+          {personTotals.length > 0 && (
+            <Box sx={{ mt: 1.25, p: 1.25, borderRadius: 2, border: `1px solid ${BORDER_MAIN}`, bgcolor: "#fff" }}>
+              <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.75 }}>
+                <Groups sx={{ fontSize: 17, color: TEXT_SUB }} />
+                <Typography sx={{ fontWeight: 800, fontSize: "0.82rem", color: TEXT_MAIN }}>แยกตามพนักงาน</Typography>
+              </Stack>
+              <Stack direction="row" flexWrap="wrap" useFlexGap spacing={0.75}>
+                {personTotals.map((p) => (
+                  <Chip key={p.name} size="small" variant="outlined"
+                    label={<><b>{p.name}</b>&nbsp;{baht(p.amount)}{p.lines > 1 ? ` · ${p.lines} รายการ` : ""}</>}
+                    sx={{ fontSize: "0.76rem" }} />
+                ))}
+              </Stack>
+            </Box>
+          )}
 
           {/* ── สรุปยอด ─────────────────────────────────────────────── */}
           <Box sx={{ mt: 1.75, p: 1.5, borderRadius: 2, bgcolor: alpha(accent, 0.06), border: `1px dashed ${alpha(accent, 0.35)}` }}>
@@ -723,7 +923,7 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
         )}
         <Button onClick={onClose} disabled={saving} sx={{ textTransform: "none", color: TEXT_SUB, display: { xs: error ? "none" : "inline-flex", sm: "inline-flex" } }}>ยกเลิก</Button>
         <Button
-          variant="contained" onClick={submit} disabled={saving}
+          variant="contained" onClick={submit} disabled={saving || (jobLocked && kind === "advance" && Boolean(jobAdvance))}
           startIcon={saving ? <CircularProgress size={16} color="inherit" /> : editing && !resubmit ? <Save sx={{ fontSize: 18 }} /> : <Send sx={{ fontSize: 17 }} />}
           sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, px: 2.5, boxShadow: "none", whiteSpace: "nowrap", bgcolor: accent, "&:hover": { bgcolor: meta.dark, boxShadow: "none" } }}
         >

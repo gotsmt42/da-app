@@ -15,7 +15,7 @@ import boldFontUrl from "@/assets/fonts/THSarabunNew Bold.ttf?url";
 import { ISSUER, drawLetterhead, outputDocument, spaceThaiLatin } from "@/features/documents/utils/deliveryNotePdf";
 import { thaiDateFull, thaiDate, thaiDateTime } from "@/shared/utils/thaiDate";
 import {
-  KIND_META, slipKind, statusMeta, fmtMoney, bahtText, qtyText, differenceMeta, paymentLabel, fileKindLabel, jobText, money,
+  KIND_META, slipKind, statusMeta, fmtMoney, bahtText, qtyText, differenceMeta, paymentLabel, fileKindLabel, jobText, money, itemPersonName, personFullName,
 } from "../expenseMeta";
 import { compareItems } from "./expenseCompare";
 
@@ -189,7 +189,7 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold) => {
   field("ถึง", e.to, L, R, y);
   y += rowH;
   const mid = L + W * 0.6;
-  field("ชื่อผู้เบิกเงิน", e.requester?.name, L, mid - 4, y);
+  field("ชื่อผู้เบิกเงิน", personFullName(e.requester), L, mid - 4, y);
   field("ตำแหน่ง", e.requester?.position, mid, R, y);
   y += rowH;
   const subjLines = field("เรื่อง", e.subject, L, R, y);
@@ -220,7 +220,7 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold) => {
       adv.docDate ? `ลงวันที่ ${thaiDate(adv.docDate)}` : "",
       `ยอดเบิก ${fmtMoney(adv.total)} บาท`,
       paidAt ? `รับเงิน ${thaiDate(paidAt)}${pay.method ? ` (${paymentLabel(pay.method)}${pay.ref ? ` ${pay.ref}` : ""})` : ""}` : "",
-      adv.approvedBy?.name ? `อนุมัติโดย ${adv.approvedBy.name}` : "",
+      adv.approvedBy?.name ? `อนุมัติโดย ${personFullName(adv.approvedBy)}` : "",
     ].filter(Boolean).join("  ·  ");
     size(12.5); bold(false);
     const subjWrap = wrapText(doc, spaceThaiLatin(`เรื่อง: ${adv.subject || "-"}`), W - 8);
@@ -285,14 +285,16 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold) => {
   const detailH = 4.5 * s;
   const minRowH = 7.4 * s;
   const rows = isClaim
-    ? compare.rows.map((r) => ({ ...(r.actual || r.planned || {}), description: r.description, detail: r.detail, receiptNo: r.receiptNo, cmp: r }))
+    ? compare.rows.map((r) => ({ ...(r.actual || r.planned || {}), description: r.description, person: r.person, detail: r.detail, receiptNo: r.receiptNo, cmp: r }))
     : (e.items || []);
   rows.forEach((it, idx) => {
     const cmp = it.cmp;
     const unused = cmp?.kind === "unused";
     const tag = cmp?.kind === "unused" ? " (ไม่ได้ใช้)" : cmp?.kind === "added" && hasPlanned ? " (รายการเพิ่ม)" : "";
     size(14); bold(false);
-    const descLines = wrapText(doc, spaceThaiLatin(`${it.description}${tag}`), col("desc").w - 3.5);
+    // ✅ ชื่อพนักงานต่อท้ายรายการ (หัวหน้างานเบิกแทนลูกทีม) — ผู้อนุมัติ/บัญชีเห็นบนกระดาษว่าบรรทัดนี้จ่ายให้ใคร
+    const person = itemPersonName(it);
+    const descLines = wrapText(doc, spaceThaiLatin(`${it.description}${person ? ` (${person})` : ""}${tag}`), col("desc").w - 3.5);
     size(12);
     const detailLines = it.detail ? wrapText(doc, spaceThaiLatin(it.detail), col("desc").w - 3.5) : [];
     const rh = Math.max(minRowH, 2.6 * s + descLines.length * lineH + detailLines.length * detailH);
@@ -462,9 +464,10 @@ const renderSignatures = (doc, e, hasBold) => {
   const colW = W / 3;
   const approved = e.approvedAt && !["pending", "rejected"].includes(e.status);
   const boxes = [
-    { role: "ผู้เบิกค่าใช้จ่าย", name: e.requester?.name, date: e.submittedAt || e.docDate },
+    // ✅ ชื่อ-นามสกุลในวงเล็บใต้ลายเซ็น (ผู้ใช้ขอ) — ใบเก่า/คนนอกระบบที่ไม่มีนามสกุลในทะเบียนได้ชื่อต้นตามเดิม
+    { role: "ผู้เบิกค่าใช้จ่าย", name: personFullName(e.requester), date: e.submittedAt || e.docDate },
     { role: "ผู้ตรวจสอบ", name: "", date: null },
-    { role: "ผู้อนุมัติ", name: approved ? e.approvedBy?.name : "", date: approved ? e.approvedAt : null },
+    { role: "ผู้อนุมัติ", name: approved ? personFullName(e.approvedBy) : "", date: approved ? e.approvedAt : null },
   ];
   doc.setTextColor(...SLATE);
   boxes.forEach((b, i) => {
@@ -494,7 +497,7 @@ const renderFooter = (doc, e) => {
   doc.setFont("THSarabun", "normal");
   doc.setFontSize(10);
   doc.setTextColor(...GRAY);
-  const by = e.createdBy?.userId && e.createdBy.userId !== e.requester?.userId ? ` · ออกใบแทนโดย ${e.createdBy.name}` : "";
+  const by = e.createdBy?.userId && e.createdBy.userId !== e.requester?.userId ? ` · ออกใบแทนโดย ${personFullName(e.createdBy)}` : "";
   doc.text(`พิมพ์จากระบบเมื่อ ${thaiDateTime(new Date())}${by}`, L, H_PAGE - 6);
   doc.text(`สถานะ: ${statusMeta(e.status, slipKind(e)).label}`, R, H_PAGE - 6, { align: "right" });
 };

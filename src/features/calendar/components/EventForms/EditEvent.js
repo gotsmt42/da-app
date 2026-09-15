@@ -2,6 +2,7 @@
 // พอย้ายไปใช้กล่อง WorkNoticeDialog แล้วจึงตัดออก — และไฟล์นี้เป็นที่เดียวในแอปที่ใช้ toastify-js
 // (ที่อื่นใช้ react-toastify ซึ่งเป็นคนละไลบรารีและนำเข้า CSS ของตัวเองที่ App.js อยู่แล้ว)
 import { resolveOperationGroup } from "@/shared/utils/overdueJobs";
+import ExpenseService from "@/features/expenses/services/ExpenseService";
 import { countUsedRounds, formatRoundLabel } from "@/shared/utils/contractRounds";
 import { escapeHtml } from "@/shared/utils/escapeHtml";
 import { getApprovalState } from "@/shared/utils/approvalStatus";
@@ -560,6 +561,10 @@ function injectStyles() {
     }
     .ee-more-item span { font-size: 15px; line-height: 1; }
     .ee-more-item:hover { background: #f1f5f9; }
+    .ee-more-item .ee-more-item-text { font-weight: 600; font-size: 13px; }
+    .ee-more-item:disabled { opacity: .6; cursor: not-allowed; background: transparent; }
+    /* งานที่มีใบเบิก Advance แล้ว — เปลี่ยนเป็นทางไปดูใบเดิมแทน (สีเขียวอมฟ้าของระบบใบ Advance) */
+    .ee-more-item--advance-exists .ee-more-item-text { color: #0f766e; }
     /* ปุ่มอันตราย — คั่นเส้นบางๆ แยกออกจากกลุ่มปกติ กันกดพลาด */
     .ee-more-item--danger {
       color: #dc2626; margin-top: 4px; padding-top: 12px;
@@ -767,6 +772,8 @@ export const getEditEvent = async ({
   // EventCalendar/index.js (ซึ่งเป็น React จริง) เป็นคนเปิดกล่องให้แทน
   onOpenWorkNotice,
   onOpenDeliveryNote,
+  // ✅ เบิก Advance ของงานนี้ — ฟอร์มใบเบิกเป็น React Dialog เหมือนกล่องเอกสารด้านบน (ดู advanceJob ใน CalendarBoard)
+  onRequestAdvance,
   handleDeleteEvent,
   handleUnscheduleEvent,
   onCopyEvent,
@@ -951,6 +958,18 @@ export const getEditEvent = async ({
   // ต้องเติมรายละเอียดที่หน้างานเพิ่มทีหลัง) ถ้าล็อกตายตอนปิดงานจะกลายเป็นต้องรบกวนแอดมินทุกครั้ง
   // ⚠️ ยังบล็อกงานที่รออนุมัติอยู่ (isPendingForTech) — ช่างแตะอะไรไม่ได้เลยจนกว่าจะอนุมัติ/ไม่อนุมัติ
   const canEditDocFields = !readOnly && (isAdminOrManagerUser || (isJobParticipantUser && !isPendingForTech));
+
+  /**
+   * ✅ "เบิก Advance งานนี้" (ผู้ใช้ขอ: "เพิ่มเมนูให้สามารถกดเบิก Advance ในงานหน้า Event ได้เลย")
+   * ใครกดได้: มีสิทธิ์ออกใบเบิก (แอดมิน/หัวหน้า/ช่าง) และเป็นหัวหน้า หรือเป็นคนที่อยู่ในงานนี้จริง
+   * ⚠️ ไม่ให้เบิกจากงานที่ยังรออนุมัติ (ช่าง) — งานอาจไม่ได้ไปจริง เงินล่วงหน้าออกไปก่อนแล้วตามคืนยาก
+   * ⚠️ 1 งานออกใบ Advance ได้ใบเดียว — เปิดฟอร์มแล้วระบบตรวจก่อนเสมอ และปุ่มนี้เปลี่ยนเป็น "มีใบแล้ว"
+   * เองเมื่อพบใบเดิม (ดู btnRequestAdvance ใน didOpen) · server ตรวจซ้ำตอนบันทึกอีกชั้น
+   */
+  const canRequestAdvance = Boolean(onRequestAdvance) && !readOnly
+    && can(userData, "requestExpense")
+    && (isAdminOrManagerUser || isJobParticipantUser)
+    && !isPendingForTech;
 
   // ✅ สีบนปฏิทิน — แก้ได้แม้งานปิดแล้วเช่นกัน เพราะเป็นแค่การแสดงผลบนปฏิทิน ไม่กระทบข้อมูลงาน
   // รายงาน หรือยอดเงินใดๆ เลย (ต่างจากวันที่/ทีม/สถานะ ที่แก้แล้วกระทบของจริง)
@@ -1169,7 +1188,7 @@ export const getEditEvent = async ({
 
   // มีอะไรให้ใส่ในเมนู "เพิ่มเติม" ไหม — ถ้าไม่มีเลย (เช่น เซลเปิดดูอย่างเดียว) ก็ไม่ต้องมีปุ่มเมนู
   const hasMoreActions = Boolean(
-    canViewOperation || !readOnly || (canEditDocFields && onOpenDeliveryNote)
+    canViewOperation || canRequestAdvance || !readOnly || (canEditDocFields && onOpenDeliveryNote)
       || canAttachToContract || canUnscheduleEvent || canDeleteEvent
   );
   const titleValues = (jobTypes?.items || []).map((t) => t.name);
@@ -1630,6 +1649,8 @@ export const getEditEvent = async ({
     ${hasMoreActions ? `
     <!-- เมนูเพิ่มเติม — ซ่อนไว้จนกว่าจะกด · เรียงจาก "ใช้บ่อย → อันตราย" ให้ปุ่มลบอยู่ท้ายสุดเสมอ -->
     <div id="ee-more-menu" hidden>
+      ${/* ✅ เบิก Advance อยู่บนสุดของเมนู (ผู้ใช้สั่ง "ทำให้อยู่บนสุด") — เป็นสิ่งที่คนเปิดเมนูนี้กดบ่อยที่สุด */""}
+      ${canRequestAdvance ? `<button class="ee-more-item" id="btnRequestAdvance"><span>💵</span> <b id="ee-adv-label" class="ee-more-item-text">เบิก Advance งานนี้</b></button>` : ""}
       ${canViewOperation ? `<button class="ee-more-item" id="btnViewSchedule"><span>📊</span> ดูการดำเนินงาน</button>` : ""}
       ${readOnly ? "" : `<button class="ee-more-item" id="btnGeneratePDF"><span>📄</span> ออกใบแจ้งเข้างาน</button>`}
       ${canEditDocFields && onOpenDeliveryNote ? `<button class="ee-more-item" id="btnDeliveryNote"><span>📦</span> ออกใบส่งมอบงาน</button>` : ""}
@@ -2689,6 +2710,47 @@ export const getEditEvent = async ({
           Swal.close();
           onOpenDeliveryNote?.(ev);
         });
+
+      /* ✅ เบิก Advance งานนี้ — ปิดหน้าแก้ไขก่อนแล้วเปิดฟอร์มใบเบิก (React Dialog) ที่ผูกงานนี้ไว้ให้
+         🔒 ตรวจทันทีที่เปิดหน้า ว่างานนี้มีใบ Advance แล้วหรือยัง (1 งานออกได้ใบเดียว):
+           • มีแล้ว + เปิดดูใบนั้นได้ → ปุ่มกลายเป็น "มีใบ Advance แล้ว · เลขที่" กดแล้วพาไปดูใบเดิม
+           • มีแล้ว แต่เป็นใบของคนอื่นที่ตัวเองไม่มีสิทธิ์ดู → บอกเลขที่/สถานะ แล้วกดไม่ได้
+         ⚠️ ถ้ากดก่อนตรวจเสร็จ (เน็ตช้า) ฟอร์มใบเบิกตรวจซ้ำเองอีกรอบและไม่ให้ส่ง ส่วน server เป็นด่านสุดท้าย
+         ⚠️ ส่ง eventId ของ "วันที่เปิดอยู่" ไป — งานหลายวันไม่ต้องเลือกวัน server นับทั้งกลุ่มเป็นงานเดียวเอง */
+      const advanceBtn = document.getElementById("btnRequestAdvance");
+      if (advanceBtn) {
+        let existingAdvance = null;
+        ExpenseService.jobAdvance(eventId)
+          .then((adv) => {
+            existingAdvance = adv;
+            if (!adv || !advanceBtn.isConnected) return;
+            const label = document.getElementById("ee-adv-label");
+            if (label) label.textContent = `มีใบ Advance แล้ว · ${adv.docNo} (${adv.statusLabel})`;
+            advanceBtn.classList.add("ee-more-item--advance-exists");
+            advanceBtn.title = adv.canOpen
+              ? "1 งานออกใบเบิก Advance ได้ใบเดียว — กดเพื่อเปิดดูใบเดิม"
+              : `1 งานออกใบเบิก Advance ได้ใบเดียว — ใบนี้เป็นของ ${adv.requesterName || "ผู้อื่น"}`;
+            if (!adv.canOpen) advanceBtn.disabled = true;
+          })
+          .catch(() => { /* ตรวจไม่สำเร็จ — ฟอร์มใบเบิกตรวจซ้ำให้อีกชั้นอยู่แล้ว */ });
+        advanceBtn.addEventListener("click", () => {
+          if (existingAdvance && !existingAdvance.canOpen) return;
+          Swal.close();
+          if (existingAdvance) {
+            navigate?.(`/expenses/${existingAdvance._id}`);
+            return;
+          }
+          // ✅ รายละเอียดงานครบ (ระบบ/ครั้งที่) — ฟอร์มใช้ตั้งเรื่อง "เบิกค่าใช้จ่ายงาน PM Fire Alarm โครงการ ... ครั้งที่ ..."
+          // ✅ teamNames = หัวหน้าทีม + ลูกทีม — ปุ่ม "เบี้ยเลี้ยงทีมงาน" ในฟอร์มสร้างรายการให้ทีละคน
+          onRequestAdvance?.({
+            _id: eventId, title: eventTitle || "", system: eventSystem, company: eventCompany, site: eventSite,
+            docNo: evendocNo, start: ev.start || null,
+            round: eventTime ? String(eventTime) : "", visitCount: Number(eventVisitCount) || 0,
+            teamNames: [...new Set([eventTeam, ...(eventTeamMembers || []).map((m) => m?.name)]
+              .map((n) => String(n || "").trim()).filter(Boolean))],
+          });
+        });
+      }
 
       /* ✅ ออกใบแจ้งเข้าปฏิบัติงาน — ทำแบบเดียวกับใบส่งมอบงานเป๊ะๆ: ปิดหน้าแก้ไขก่อนแล้วค่อยเปิดกล่อง
          ออกเอกสาร (React Dialog) ไม่ซ้อนกัน 2 ชั้น

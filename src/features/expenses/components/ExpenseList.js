@@ -207,7 +207,7 @@ export default function ExpenseList({ mode, status: statusProp, claimType = "all
       if (person !== "all" && e.requester?.userId !== person) return false;
       if (!needle) return true;
       return [e.docNo, e.subject, e.requester?.name, e.job?.title, e.job?.site, e.job?.company, e.advance?.docNo, e.to,
-        ...(e.items || []).map((it) => it.description)]
+        ...(e.items || []).map((it) => it.description), ...(e.items || []).map((it) => it.person?.name || "")]
         .some((v) => String(v || "").toLowerCase().includes(needle));
     });
   }, [rows, q, person]);

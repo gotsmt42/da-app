@@ -4,6 +4,8 @@ import React, {
   useRef,
   useMemo,
   useCallback,
+  lazy,
+  Suspense,
 } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -85,6 +87,10 @@ import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { isRole, ROLES, DEPARTMENT } from "@/shared/utils/roles";
 import { can } from "@/shared/utils/roles";
+
+// ⚠️ lazy — ฟอร์มใบเบิกใหญ่ (MUI Autocomplete/DatePicker/แนบไฟล์) และน้อยคนที่เปิดจากหน้าปฏิทิน ไม่ควรถ่วง
+// การโหลดหน้าปฏิทินซึ่งเป็นหน้าที่เปิดบ่อยที่สุดของแอป
+const ExpenseFormDialog = lazy(() => import("@/features/expenses/components/ExpenseFormDialog"));
 
 // ✅ คำอธิบายสถานะแบบยาว (ใช้เป็น tooltip ของไอคอนสถานะบน event)
 const STATUS_DESCRIPTIONS = {
@@ -1098,6 +1104,7 @@ function EventCalendar() {
       setLoading,
       onOpenWorkNotice: setWorkNoticeJob,
       onOpenDeliveryNote: setDeliveryNoteJob,
+      onRequestAdvance: setAdvanceJob,
       handleDeleteEvent,
       handleUnscheduleEvent: handleUnscheduleViaButton,
       onCopyEvent: handleCopyEvent,
@@ -1673,6 +1680,8 @@ function EventCalendar() {
   const [deliveryNoteJob, setDeliveryNoteJob] = useState(null);
   // ✅ งานที่กำลังจะออกใบแจ้งเข้าปฏิบัติงาน — กลไกเดียวกับ deliveryNoteJob ทุกประการ
   const [workNoticeJob, setWorkNoticeJob] = useState(null);
+  // ✅ งานที่กำลังจะเบิก Advance (เมนู "เบิก Advance งานนี้" ในหน้าแก้ไขงาน) — กลไกเดียวกับ deliveryNoteJob
+  const [advanceJob, setAdvanceJob] = useState(null);
   const handleExportExcel = async () => {
     if (exportingExcel || filteredCalendarEvents.length === 0) return;
     setExportingExcel(true);
@@ -4091,6 +4100,32 @@ function EventCalendar() {
           issuer={userData}
           canUseRunningNumber={isAdminOrManager}
         />
+      )}
+
+      {/* ✅ ฟอร์มเบิก Advance ของงาน — เปิดจากเมนู "⋯ เพิ่มเติม" ในหน้าแก้ไขงาน (ดู onRequestAdvance)
+          งานถูกผูกและล็อกไว้ในฟอร์ม · 1 งานออกใบ Advance ได้ใบเดียว (ฟอร์มตรวจก่อน server ตรวจซ้ำ) */}
+      {advanceJob && (
+        <Suspense fallback={null}>
+          <ExpenseFormDialog
+            open
+            kind="advance"
+            presetJob={advanceJob}
+            onClose={() => setAdvanceJob(null)}
+            onSaved={async (expense, { warn }) => {
+              setAdvanceJob(null);
+              const r = await Swal.fire({
+                icon: warn ? "warning" : "success",
+                title: `ส่งใบเบิก ${expense?.docNo || ""} แล้ว`,
+                text: warn || "รอหัวหน้าอนุมัติ — ดูสถานะได้ที่เมนู ใบ Advance",
+                showCancelButton: Boolean(expense?._id),
+                confirmButtonText: expense?._id ? "ดูใบเบิก" : "ตกลง",
+                cancelButtonText: "ปิด",
+                confirmButtonColor: "#0d9488",
+              });
+              if (r.isConfirmed && expense?._id) navigate(`/expenses/${expense._id}`);
+            }}
+          />
+        </Suspense>
       )}
 
       {loading && (

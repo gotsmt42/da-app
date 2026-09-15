@@ -74,7 +74,7 @@ export default function AdvancePanel({ advance, usedIndexes, onRestore, onOpen, 
               sx={{ opacity: used ? 1 : 0.75, p: 0.6, borderRadius: 1.5, bgcolor: used ? "rgba(255,255,255,0.7)" : "transparent", border: used ? "none" : `1px dashed ${alpha(M.color, 0.45)}` }}>
               <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: cat.color, mt: 0.8, flexShrink: 0 }} />
               <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, lineHeight: 1.3 }}>{it.description}</Typography>
+                <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, lineHeight: 1.3 }}>{it.description}{it.person?.name ? ` · ${it.person.name}` : ""}</Typography>
                 <Typography sx={{ fontSize: "0.7rem", color: TEXT_SUB }}>{qtyText(it)}{it.detail ? ` · ${it.detail}` : ""}</Typography>
                 {!used && (
                   <Stack direction="row" alignItems="center" spacing={0.5}>

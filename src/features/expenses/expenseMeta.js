@@ -12,6 +12,8 @@
  * วางคู่กันแล้วแยกด้วยตาไม่ออก — ม่วงอยู่คนละฝั่งของวงล้อสีกับเขียวอมฟ้า เห็นปราดเดียวก็รู้ว่าเป็นใบไหน
  * ⚠️ สีสถานะ (STATUS_BASE) ถูกเลือกให้ไม่ชนกับสองสีนี้ — ห้ามใช้เขียวอมฟ้า/ม่วงเป็นสีสถานะ
  */
+import { formatRoundLabel } from "@/shared/utils/contractRounds";
+
 export const EXPENSE_ACCENT = "#0d9488";
 export const EXPENSE_ACCENT_DARK = "#0f766e";
 export const CLAIM_ACCENT = "#7c3aed";
@@ -253,4 +255,38 @@ export const qtyText = (it) => {
 export const isOverdueClear = (e) =>
   e?.kind === "advance" && e?.status === "paid" && e?.dueClearAt && new Date(e.dueClearAt) < new Date();
 
-export const jobText = (job) => [job?.title, job?.site || job?.company].filter(Boolean).join(" · ");
+/** ชื่องานเต็ม "PM Fire Alarm" — ไม่ต่อชื่อระบบซ้ำถ้าชื่องานมีอยู่แล้ว */
+export const jobName = (job) => {
+  const title = String(job?.title || "").trim();
+  const system = String(job?.system || "").trim();
+  if (!system || title.toLowerCase().includes(system.toLowerCase())) return title;
+  return [title, system].filter(Boolean).join(" ");
+};
+
+/**
+ * งานแบบรายละเอียดครบ — "PM Fire Alarm โครงการ Ibis Phuket Patong ครั้งที่ 3/8"
+ * ✅ ผู้ใช้ขอ: "เรื่องและงานให้ใส่รายละเอียดให้ครบ เช่น PM Fire Alarm โครงการ ..... ครั้งที่ ......"
+ * เดิมเหลือแค่ "PM · Ibis Phuket Patong" — งาน PM ของโครงการเดียวกันมีหลายครั้ง อ่านแล้วไม่รู้ว่าเบิกของครั้งไหน
+ * ⚠️ ใบเก่าที่ snapshot งานไว้ก่อนมีฟิลด์ system/round จะได้รูปแบบสั้นลงเอง (ไม่มีส่วนที่ขาด) ไม่พัง
+ */
+export const jobText = (job) => {
+  const place = String(job?.site || job?.company || "").trim();
+  const round = formatRoundLabel(job?.round, job?.visitCount);
+  return [jobName(job), place ? `โครงการ ${place}` : "", round ? `ครั้งที่ ${round}` : ""].filter(Boolean).join(" ");
+};
+
+/** เรื่องตั้งต้นของใบเบิกจากงาน — "เบิกค่าใช้จ่ายงาน PM Fire Alarm โครงการ ... ครั้งที่ ..." */
+export const jobSubject = (job, prefix = "เบิกค่าใช้จ่ายงาน") => {
+  const text = jobText(job);
+  return text ? `${prefix} ${text}` : "";
+};
+
+/**
+ * ชื่อ-นามสกุลของคนในใบ (ผู้เบิก/ผู้อนุมัติ/พนักงานในรายการ) สำหรับเอกสารและหน้าจอที่ต้องระบุตัวคนชัด
+ * ✅ ผู้ใช้ขอ: "ถ้าระบุอัตโนมัติให้มีนามสกุลด้วย" — server เติม fullName จากทะเบียนพนักงานให้ทุกครั้งที่อ่านใบ
+ * (ดู withFullNames ใน routes/expenses.js) คนนอกระบบไม่มี fullName จึงถอยไปใช้ชื่อที่พิมพ์ไว้
+ */
+export const personFullName = (p) => String(p?.fullName || p?.name || "").trim();
+
+/** พนักงานที่รายการนี้เบิกให้ (หัวหน้างานเบิกแทนลูกทีม) — ว่าง = ของผู้เบิกเอง */
+export const itemPersonName = (it) => personFullName(it?.person);

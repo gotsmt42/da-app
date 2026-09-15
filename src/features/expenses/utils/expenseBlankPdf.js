@@ -32,7 +32,7 @@
  */
 import { ISSUER, outputDocument, spaceThaiLatin } from "@/features/documents/utils/deliveryNotePdf";
 import { thaiDate, thaiDateTime } from "@/shared/utils/thaiDate";
-import { KIND_META, fmtMoney, bahtText, qtyText, jobText, money } from "../expenseMeta";
+import { KIND_META, fmtMoney, bahtText, qtyText, jobText, money, itemPersonName, personFullName } from "../expenseMeta";
 import { newDoc, loadBoldFont, wrapText } from "./expensePdf";
 
 const W_PAGE = 210;
@@ -396,7 +396,8 @@ const drawRow = (doc, pen, T, y, rowH, no, item) => {
   doc.text(String(no), col("no").x + col("no").w / 2, base, { align: "center" });
   if (item) {
     pen.size(12.5); pen.color(SLATE);
-    const desc = [item.description, item.detail].filter(Boolean).join(" · ");
+    const person = itemPersonName(item);
+    const desc = [`${item.description}${person ? ` (${person})` : ""}`, item.detail].filter(Boolean).join(" · ");
     doc.text(pen.fit(desc, col("desc").w - 3), col("desc").x + 1.5, base);
     pen.size(11.5);
     doc.text(pen.fit(qtyText(item), col("qty").w - 2), col("qty").x + col("qty").w / 2, base, { align: "center" });
@@ -689,7 +690,7 @@ export async function generateBlankClaimPdf({ variant = "empty", advance = null,
   const pre = bound
     ? {
       to: advance.to || "",
-      requester: advance.requester?.name || "",
+      requester: personFullName(advance.requester),
       position: advance.requester?.position || "",
       subject: `เคลียร์ค่าใช้จ่าย ${advance.subject || ""}`.trim(),
       job: advance.job?.title ? `${jobText(advance.job)}${advance.job?.docNo ? ` (${advance.job.docNo})` : ""}` : "",

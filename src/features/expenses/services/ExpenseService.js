@@ -72,6 +72,15 @@ const ExpenseService = {
     return res.data.jobs || [];
   },
 
+  /**
+   * ใบเบิก Advance ที่ยังมีผลของงานนี้ (1 งานออกได้ใบเดียว) — null = ยังไม่มี ออกใบได้
+   * @returns {Promise<null | {_id, docNo, status, statusLabel, requesterName, canOpen}>}
+   */
+  async jobAdvance(eventId) {
+    const res = await API.get(`/expenses/job-advance/${eventId}`);
+    return res.data.advance || null;
+  },
+
   async suggest() {
     const res = await API.get("/expenses/suggest");
     return res.data;

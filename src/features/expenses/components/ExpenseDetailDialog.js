@@ -108,7 +108,7 @@ const CompareTable = ({ items, advanceItems, wide }) => {
             <Box key={r.key} sx={{ p: 1, border: `1px solid ${BORDER_MAIN}`, borderRadius: 2, opacity: faded ? 0.8 : 1 }}>
               <Stack direction="row" spacing={0.75} alignItems="baseline">
                 <Typography sx={{ fontSize: "0.76rem", color: TEXT_SUB, fontWeight: 700 }}>{i + 1}.</Typography>
-                <Typography sx={{ fontWeight: 700, fontSize: "0.86rem", flex: 1, minWidth: 0, textDecoration: faded ? "line-through" : "none" }}>{r.description}</Typography>
+                <Typography sx={{ fontWeight: 700, fontSize: "0.86rem", flex: 1, minWidth: 0, textDecoration: faded ? "line-through" : "none" }}>{r.description}{r.person?.name ? <Box component="span" sx={{ fontWeight: 600, color: TEXT_SUB }}> · {r.person.name}</Box> : null}</Typography>
                 {COMPARE_KIND_LABEL[r.kind] && <Chip size="small" label={COMPARE_KIND_LABEL[r.kind]} sx={{ height: 18, fontSize: "0.62rem", fontWeight: 800 }} />}
               </Stack>
               <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", ml: 2 }}>
@@ -161,7 +161,7 @@ const CompareTable = ({ items, advanceItems, wide }) => {
             <Typography sx={{ ...cell, color: TEXT_SUB, fontWeight: 700 }}>{i + 1}</Typography>
             <Box sx={{ ...cell, minWidth: 0, opacity: faded ? 0.75 : 1 }}>
               <Stack direction="row" spacing={0.75} alignItems="center">
-                <Typography sx={{ fontWeight: 700, fontSize: "0.86rem", textDecoration: faded ? "line-through" : "none" }}>{r.description}</Typography>
+                <Typography sx={{ fontWeight: 700, fontSize: "0.86rem", textDecoration: faded ? "line-through" : "none" }}>{r.description}{r.person?.name ? <Box component="span" sx={{ fontWeight: 600, color: TEXT_SUB }}> · {r.person.name}</Box> : null}</Typography>
                 {COMPARE_KIND_LABEL[r.kind] && <Chip size="small" label={COMPARE_KIND_LABEL[r.kind]} sx={{ height: 18, fontSize: "0.62rem", fontWeight: 800 }} />}
               </Stack>
               <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }}>
@@ -630,7 +630,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                         <Stack key={it._id || i} direction="row" spacing={1.25} alignItems="flex-start">
                           <Typography sx={{ width: 20, color: TEXT_SUB, fontWeight: 700, fontSize: "0.82rem", pt: 0.2 }}>{i + 1}</Typography>
                           <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Typography sx={{ fontWeight: 700, fontSize: "0.9rem" }}>{it.description}</Typography>
+                            <Typography sx={{ fontWeight: 700, fontSize: "0.9rem" }}>{it.description}{it.person?.name ? <Box component="span" sx={{ fontWeight: 600, color: TEXT_SUB }}> · {it.person.name}</Box> : null}</Typography>
                             <Stack direction="row" flexWrap="wrap" useFlexGap spacing={0.75} alignItems="center" sx={{ mt: 0.25 }}>
                               <Chip size="small" label={cat.label} sx={{ height: 18, fontSize: "0.66rem", fontWeight: 700, bgcolor: alpha(cat.color, 0.1), color: cat.color }} />
                               <Typography variant="caption" sx={{ color: TEXT_SUB }}>{qtyText(it)}</Typography>
