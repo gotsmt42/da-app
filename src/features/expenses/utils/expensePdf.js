@@ -576,26 +576,59 @@ const drawSignatureImage = (doc, seal, { centerX, lineY, maxW, maxH }) => {
   }
 };
 
+/** ย่อขนาดตัวอักษรจนข้อความกว้างไม่เกิน maxW (ไม่ต่ำกว่า minSize) — ช่องลงนาม 4 ช่องแคบลง ชื่อยาวต้องไม่ล้นช่องข้าง */
+const fitFontSize = (doc, text, maxW, size, minSize) => {
+  let s = size;
+  doc.setFontSize(s);
+  while (s > minSize && doc.getTextWidth(text) > maxW) {
+    s -= 0.5;
+    doc.setFontSize(s);
+  }
+  return s;
+};
+
+/**
+ * ช่องลงนาม 4 ช่อง ตามสายอนุมัติ 4 ขั้น
+ * ✅ ผู้ใช้สั่ง: "ต้องการเพิ่มการเซ็นลงชื่ออีก 1 คือ ช่องผู้อนุมัติเบิกจ่าย"
+ *   ผู้เบิกค่าใช้จ่าย → ผู้ตรวจสอบ → ผู้อนุมัติ → ผู้อนุมัติเบิกจ่าย
+ * ⚠️ ช่องที่ขั้นยังไม่ถึงเว้นว่างไว้ให้เซ็นมือ (ใบเก่าก่อนมีขั้นไหนก็เว้นช่องนั้นเหมือนเดิม)
+ */
 const renderSignatures = (doc, e, hasBold, signatures = null) => {
   const bold = (on) => doc.setFont("THSarabun", on && hasBold ? "bold" : "normal");
-  const colW = W / 3;
+  const colW = W / 4;
   const approved = e.approvedAt && !["pending", "reviewed", "rejected"].includes(e.status);
-  // ✅ ขั้นตรวจสอบ (แอดมิน) — ใบเก่าก่อนมีขั้นนี้จะไม่มีค่า ช่องก็เว้นไว้ให้เซ็นมือเหมือนเดิม
   const reviewed = e.reviewedAt && e.status !== "rejected";
+  /**
+   * ขั้นอนุมัติเบิกจ่าย = ตอนบันทึกจ่ายเงิน Advance / ปิดส่วนต่างใบเคลม (payment.by คือผู้กด)
+   * ⚠️ ใบเคลมที่ใช้พอดี (ส่วนต่าง 0) ปิดจบที่ขั้นอนุมัติ ไม่มีเงินให้เบิกจ่าย — เขียนบอกในช่องแทนการเว้นว่าง
+   * ไม่งั้นคนตรวจเอกสารจะเข้าใจว่าใบยังขาดลายเซ็น
+   */
+  const slip = slipKind(e);
+  const noDisbursement = slip === "claim" && e.status === "settled" && money(e.difference) === 0;
+  const disbursed = !noDisbursement && e.payment?.at && (
+    (e.kind === "advance" && ["paid", "clearing", "cleared"].includes(e.status)) || (e.kind === "claim" && e.status === "settled")
+  );
   const boxes = [
     // ✅ ชื่อ-นามสกุลในวงเล็บใต้ลายเซ็น (ผู้ใช้ขอ) — ใบเก่า/คนนอกระบบที่ไม่มีนามสกุลในทะเบียนได้ชื่อต้นตามเดิม
     { role: "ผู้เบิกค่าใช้จ่าย", name: personFullName(e.requester), date: e.submittedAt || e.docDate, seal: signatures?.requester },
     { role: "ผู้ตรวจสอบ", name: reviewed ? personFullName(e.reviewedBy) : "", date: reviewed ? e.reviewedAt : null, seal: reviewed ? signatures?.reviewer : null },
     { role: "ผู้อนุมัติ", name: approved ? personFullName(e.approvedBy) : "", date: approved ? e.approvedAt : null, seal: approved ? signatures?.approver : null },
+    {
+      role: "ผู้อนุมัติเบิกจ่าย",
+      name: disbursed ? personFullName(e.payment.by) : "",
+      date: disbursed ? e.payment.at : null,
+      seal: disbursed ? signatures?.disburser : null,
+      note: noDisbursement ? "ไม่มียอดเบิกจ่าย (ใช้พอดี)" : "",
+    },
   ];
   doc.setTextColor(...SLATE);
   boxes.forEach((b, i) => {
     const cxm = L + colW * i + colW / 2;
-    const half = colW / 2 - 7;
+    const half = colW / 2 - 3;
     let y = SIG_TOP + 11;
-    doc.setFontSize(13.5); bold(false);
+    doc.setFontSize(13); bold(false);
     doc.text("ลงชื่อ", cxm - half, y);
-    const sx = cxm - half + doc.getTextWidth("ลงชื่อ") + 1.5;
+    const sx = cxm - half + doc.getTextWidth("ลงชื่อ") + 1.2;
     doc.setDrawColor(...LINE);
     doc.setLineWidth(0.2);
     doc.setLineDashPattern([0.5, 0.8], 0);
@@ -606,18 +639,22 @@ const renderSignatures = (doc, e, hasBold, signatures = null) => {
       centerX: (sx + cxm + half) / 2, lineY: y + 0.6, maxW: (cxm + half - sx) * 0.92, maxH: 11,
     });
     y += 7;
-    doc.text(b.name ? `( ${b.name} )` : "( ................................................ )", cxm, y, { align: "center" });
+    const nameText = b.note ? `( ${b.note} )` : b.name ? `( ${b.name} )` : "( ...................................... )";
+    fitFontSize(doc, nameText, colW - 3, 13, 10);
+    doc.text(nameText, cxm, y, { align: "center" });
     y += 6.2;
-    bold(true); doc.setFontSize(14);
+    bold(true);
+    fitFontSize(doc, b.role, colW - 3, 13.5, 11);
     doc.text(b.role, cxm, y, { align: "center" });
     y += 6;
-    bold(false); doc.setFontSize(12.5);
-    doc.text(b.date ? `วันที่ ${thaiDate(b.date)}` : "วันที่ ........../........../..........", cxm, y, { align: "center" });
+    bold(false); doc.setFontSize(12);
+    doc.text(b.date ? `วันที่ ${thaiDate(b.date)}` : b.note ? "" : "วันที่ ......../......../..........", cxm, y, { align: "center" });
     if (signed) {
       y += 4.6;
-      doc.setFontSize(9.5);
       doc.setTextColor(...GRAY);
-      doc.text(`ลงนามอิเล็กทรอนิกส์ ${thaiDateTime(b.seal.signedAt)}`, cxm, y, { align: "center" });
+      const caption = `ลงนามอิเล็กทรอนิกส์ ${thaiDateTime(b.seal.signedAt)}`;
+      fitFontSize(doc, caption, colW - 2, 9.5, 7.5);
+      doc.text(caption, cxm, y, { align: "center" });
       doc.setTextColor(...SLATE);
     }
   });
@@ -650,7 +687,7 @@ const renderCancelledMark = (doc, hasBold) => {
  * @returns {Promise<{blob: Blob, url: string, fileName: string}>}
  */
 /**
- * @param {object} opts.signatures  ลายเซ็นที่ผนึกไว้ในใบ { requester, approver } จาก
+ * @param {object} opts.signatures  ลายเซ็นที่ผนึกไว้ในใบ { requester, reviewer, approver, disburser } จาก
  *   GET /api/expenses/:id/signatures — ไม่ส่งมาก็ออกใบได้ (เว้นช่องให้เซ็นมือ)
  */
 export async function generateExpensePdf({ expense, signatures = null, mode = "blob" }) {

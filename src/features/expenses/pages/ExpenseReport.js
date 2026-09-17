@@ -64,6 +64,58 @@ const Panel = ({ title, hint, children, action }) => (
   </Box>
 );
 
+/**
+ * ใบที่ค้างอยู่ในสายอนุมัติ 4 ขั้น — ✅ ผู้ใช้สั่งให้หน้ารายงานตรงกับลำดับการเบิกใหม่
+ * ⚠️ นับตามช่วงเวลา/ตัวกรองเดียวกับรายงานทั้งหน้า (ไม่ใช่คิวงานสดของทั้งบริษัท — คิวสดอยู่ที่ "รอดำเนินการ")
+ */
+const PIPELINE_STEPS = [
+  { key: "review", no: 2, title: "รอตรวจสอบ", who: "แอดมินช่าง / ผู้จัดการแผนกช่าง", color: "#d97706" },
+  { key: "approve", no: 3, title: "รออนุมัติ", who: "ผู้จัดการแผนกช่าง", color: "#b45309" },
+  { key: "disburse", no: 4, title: "รออนุมัติเบิกจ่าย", who: "ผู้จัดการแผนกช่าง / กรรมการผู้จัดการ", color: "#2563eb" },
+];
+
+const Pipeline = ({ pipeline }) => (
+  <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" }, gap: 1 }}>
+    {PIPELINE_STEPS.map((s) => {
+      const p = pipeline?.[s.key] || {};
+      const parts = [
+        p.advance ? `Advance ${p.advance}` : "",
+        p.claim ? `ใบเคลม ${p.claim}` : "",
+        p.reimburse ? `สำรองจ่าย ${p.reimburse}` : "",
+      ].filter(Boolean).join(" · ");
+      return (
+        <Box key={s.key} sx={{
+          p: 1.5, borderRadius: 2, border: `1px solid ${p.count ? alpha(s.color, 0.35) : BORDER_MAIN}`,
+          bgcolor: p.count ? alpha(s.color, 0.05) : "#fff", minWidth: 0,
+        }}>
+          <Stack direction="row" alignItems="center" spacing={0.75}>
+            <Chip size="small" label={`ขั้นที่ ${s.no}/4`} sx={{ height: 20, fontSize: "0.68rem", fontWeight: 800, bgcolor: alpha(s.color, 0.14), color: s.color }} />
+            <Typography sx={{ fontWeight: 800, fontSize: "0.9rem", color: TEXT_MAIN }} noWrap>{s.title}</Typography>
+          </Stack>
+          <Typography sx={{ fontWeight: 900, fontSize: "1.3rem", color: p.count ? s.color : TEXT_SUB, mt: 0.5, lineHeight: 1.2 }}>
+            {p.count || 0} ใบ
+          </Typography>
+          <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }} noWrap>
+            {parts || "ไม่มีใบค้าง"}
+          </Typography>
+          {s.key === "disburse" ? (
+            p.count ? (
+              <Typography variant="caption" sx={{ display: "block", fontWeight: 700, color: TEXT_MAIN }}>
+                จ่ายออก {baht(p.payOut)}{p.payIn ? ` · รับคืน ${baht(p.payIn)}` : ""}
+              </Typography>
+            ) : null
+          ) : p.count ? (
+            <Typography variant="caption" sx={{ display: "block", fontWeight: 700, color: TEXT_MAIN }}>ยอดในใบ {baht(p.amount)}</Typography>
+          ) : null}
+          <Typography variant="caption" sx={{ display: "block", color: TEXT_SUB, mt: 0.25, fontSize: "0.7rem" }} noWrap>
+            ผู้ดำเนินการ: {s.who}
+          </Typography>
+        </Box>
+      );
+    })}
+  </Box>
+);
+
 const ADV = KIND_META.advance.color;
 const ACT = KIND_META.claim.color;
 /** ใบสำรองจ่าย — เงินที่พนักงานออกไปก่อน ยังไม่ผ่านระบบเบิกล่วงหน้าเลย */
@@ -160,7 +212,7 @@ const GroupTable = ({ rows, firstHeader, onPick }) => (
             </TableCell>
             <TableCell align="right" sx={{ color: r.reimburse ? RMB : TEXT_SUB, fontWeight: r.reimburse ? 800 : 400, whiteSpace: "nowrap" }}>
               {r.reimburse ? baht(r.reimburse) : "—"}
-              {r.reimburseDue ? <span style={{ display: "block", fontSize: "0.72rem", fontWeight: 700 }}>รอจ่ายคืนพนักงาน {baht(r.reimburseDue)}</span> : null}
+              {r.reimburseDue ? <span style={{ display: "block", fontSize: "0.72rem", fontWeight: 700 }}>รออนุมัติเบิกจ่ายคืน {baht(r.reimburseDue)}</span> : null}
             </TableCell>
             <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
               {/* ⚠️ ต้องบอกทิศทางเงินเสมอ — "คืน ฿3,000" ลอยๆ อ่านไม่ออกว่าใครคืนให้ใคร */}
@@ -282,22 +334,22 @@ export default function ExpenseReport({ onOpen, reloadKey }) {
         <>
           {/* ── ตัวเลขหลัก ─────────────────────────────────────────── */}
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)", lg: "repeat(7, 1fr)" }, gap: 1, mb: 1.5 }}>
-            {/* ✅ อนุมัติ 2 ขั้น — บอกด้วยว่าในยอดที่ยังไม่ผ่านอนุมัติ ค้างอยู่ที่ขั้นรออนุมัติเท่าไร */}
+            {/* ✅ สายอนุมัติ 4 ขั้น — บอกด้วยว่าในยอดที่ยังไม่ผ่านอนุมัติ ค้างอยู่ที่ขั้นรออนุมัติเท่าไร */}
             <Kpi
               label="ยอดขอเบิก"
               value={baht(t.requested)}
-              sub={`${t.count} ใบ · ยังไม่ผ่านอนุมัติ ${baht(t.pending)}${t.reviewing ? ` (รออนุมัติขั้นสุดท้าย ${baht(t.reviewing)})` : ""}`}
+              sub={`${t.count} ใบ · ยังไม่ผ่านอนุมัติ ${baht(t.pending)}${t.reviewing ? ` (ในนั้นรออนุมัติ ${baht(t.reviewing)})` : ""}`}
               color={TEXT_MAIN}
             />
-            <Kpi label="จ่ายล่วงหน้าให้พนักงานแล้ว" value={baht(t.advanced)} sub={t.toPay ? `รอจ่ายให้พนักงานอีก ${baht(t.toPay)}` : "ไม่มีรายการรอจ่าย"} color={ADV} />
+            <Kpi label="จ่ายล่วงหน้าให้พนักงานแล้ว" value={baht(t.advanced)} sub={t.toPay ? `รออนุมัติเบิกจ่ายอีก ${baht(t.toPay)}` : "ไม่มีรายการรออนุมัติเบิกจ่าย"} color={ADV} />
             <Kpi label="ใช้จริง (อนุมัติ)" value={baht(t.actual)} sub={t.advanced - t.outstanding > 0 ? `${usage}% ของยอดที่เคลียร์แล้ว` : " "} color={ACT} />
             <Kpi label="เงินที่ยังอยู่กับพนักงาน" value={baht(t.outstanding)} sub={t.overdue ? `เลยกำหนดเคลียร์ ${t.overdue} ใบ` : "ยังไม่มีใบเลยกำหนด"} color="#0369a1" highlight={t.overdue > 0} />
-            <Kpi label="รอพนักงานคืนเงินบริษัท" value={baht(t.refundDue)} sub={`คืนบริษัทแล้ว ${baht(t.refunded)}`} color="#d97706" />
-            <Kpi label="รอบริษัทจ่ายเพิ่มให้พนักงาน" value={baht(t.extraDue)} sub={`จ่ายเพิ่มแล้ว ${baht(t.extraPaid)}`} color="#1d4ed8" />
+            <Kpi label="รอพนักงานคืนเงินบริษัท" value={baht(t.refundDue)} sub={`รอยืนยันรับคืน · คืนแล้ว ${baht(t.refunded)}`} color="#d97706" />
+            <Kpi label="รอบริษัทจ่ายเพิ่มให้พนักงาน" value={baht(t.extraDue)} sub={`รออนุมัติเบิกจ่าย · จ่ายแล้ว ${baht(t.extraPaid)}`} color="#1d4ed8" />
             {/* ✅ เงินที่พนักงานสำรองจ่ายเอง — ไม่ได้ผ่านยอด "จ่ายล่วงหน้า" เลย ถ้าไม่มีช่องนี้ยอดกลุ่มนี้จะหายไปทั้งก้อน */}
             <Kpi
               label="พนักงานสำรองจ่าย (อนุมัติ)" value={baht(t.reimburse)}
-              sub={t.reimburseDue ? `รอบริษัทจ่ายคืนพนักงาน ${baht(t.reimburseDue)}` : `${t.reimburseCount} ใบ · จ่ายคืนพนักงานแล้ว ${baht(t.reimbursePaid)}`}
+              sub={t.reimburseDue ? `รออนุมัติเบิกจ่ายคืน ${baht(t.reimburseDue)}` : `${t.reimburseCount} ใบ · จ่ายคืนพนักงานแล้ว ${baht(t.reimbursePaid)}`}
               color={RMB} highlight={t.reimburseDue > 0}
             />
           </Box>
@@ -309,6 +361,9 @@ export default function ExpenseReport({ onOpen, reloadKey }) {
             </Stack>
           ) : (
             <Stack spacing={1.5}>
+              <Panel title="สถานะตามขั้นอนุมัติ" hint="ส่งขอเบิก → ตรวจสอบ → อนุมัติ → อนุมัติเบิกจ่าย · ใบที่ยังค้างในช่วงเวลานี้">
+                <Pipeline pipeline={report.pipeline} />
+              </Panel>
               <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "3fr 2fr" }, gap: 1.5 }}>
                 <Panel title="รายเดือน" hint="จ่ายล่วงหน้า เทียบ ใช้จริง"><MonthBars rows={report.byMonth} /></Panel>
                 <Panel title="ตามหมวดค่าใช้จ่าย" hint="แถบจาง = ตั้งเบิก · แถบเข้ม = ใช้จริง"><CategoryBars rows={report.byCategory} /></Panel>

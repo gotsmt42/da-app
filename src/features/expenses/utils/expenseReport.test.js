@@ -99,6 +99,25 @@ describe("buildExpenseReport", () => {
     expect(r.byMonth.map((m) => m.key)).toEqual(["2026-08", "2026-09"]);
   });
 
+  it("สายอนุมัติ 4 ขั้น: นับใบค้างแต่ละขั้นครบทุกชนิดใบ พร้อมทิศทางเงินของขั้นอนุมัติเบิกจ่าย", () => {
+    const r = buildExpenseReport([
+      adv({ status: "pending", total: 300 }),
+      adv({ status: "reviewed", total: 400 }),
+      adv({ status: "approved", total: 500 }),
+      adv({ status: "clearing", total: 1000, claim: { status: "approved", total: 1200, difference: 200 } }),
+      adv({ status: "clearing", total: 1000, claim: { status: "approved", total: 700, difference: -300 } }),
+      adv({ status: "clearing", total: 1000, claim: { status: "reviewed", total: 900, difference: -100 } }),
+      adv({ status: "clearing", total: 1000, claim: { status: "cancelled", total: 1, difference: -999 } }),
+    ], {
+      now,
+      reimbursements: [rmb({ status: "pending", total: 150 }), rmb({ status: "approved", total: 250 })],
+    });
+    expect(r.pipeline.review).toMatchObject({ count: 2, advance: 1, reimburse: 1, amount: 450 });
+    expect(r.pipeline.approve).toMatchObject({ count: 2, advance: 1, claim: 1, amount: 1300 });
+    // ขั้น 4: จ่ายออก = Advance 500 + ส่วนต่างเพิ่ม 200 + คืนค่าสำรองจ่าย 250 · รับคืน = 300
+    expect(r.pipeline.disburse).toMatchObject({ count: 4, advance: 1, claim: 2, reimburse: 1, payOut: 950, payIn: 300 });
+  });
+
   it("ไม่มีเศษทศนิยมลอยตัว", () => {
     const r = buildExpenseReport([adv({ total: 0.1 }), adv({ total: 0.2 })], { now });
     expect(r.totals.advanced).toBe(0.3);

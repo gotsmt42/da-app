@@ -39,15 +39,19 @@ const periodRange = (p) => {
 };
 
 /** กลุ่มในกล่องงานของหัวหน้า — เรียงตามความเร่งด่วนของ "สิ่งที่ต้องทำ" */
+/**
+ * กลุ่มในกล่อง "รอดำเนินการ" — เรียงตามสายอนุมัติ 4 ขั้น
+ * ✅ cap = สิทธิ์ของขั้นนั้น → แต่ละคนเห็นเฉพาะกลุ่มที่ตัวเองลงมือได้จริง (ผู้ใช้กำหนดว่าใครทำขั้นไหน)
+ *   แอดมินช่าง: รอตรวจสอบ · ผู้จัดการแผนกช่าง: ครบทุกขั้น · กรรมการผู้จัดการ: รออนุมัติเบิกจ่าย
+ */
 const INBOX_GROUPS = [
-  // ✅ 2 ขั้น: รอตรวจสอบ (แอดมิน) → รออนุมัติขั้นสุดท้าย (ผู้จัดการ) — แยกกล่องให้เห็นว่าค้างที่ขั้นไหน
-  { key: "review", title: "รอตรวจสอบ", hint: "ขั้นที่ 1 — ตรวจความถูกต้องก่อนส่งให้ผู้จัดการอนุมัติ", match: (e) => e.status === "pending" },
-  { key: "approve", title: "รออนุมัติขั้นสุดท้าย", hint: "ขั้นที่ 2 — ตรวจสอบแล้ว รอผู้จัดการอนุมัติ", match: (e) => e.status === "reviewed" },
-  { key: "pay", title: "รอจ่ายเงิน Advance", hint: "อนุมัติแล้ว ยังไม่ได้บันทึกการจ่าย", match: (e) => e.kind === "advance" && e.status === "approved" },
-  { key: "settle", title: "รอปิดส่วนต่าง", hint: "ใบเคลมอนุมัติแล้ว รอรับคืน/จ่ายเพิ่ม", match: (e) => e.kind === "claim" && e.status === "approved" && slipKind(e) !== "reimburse" },
+  { key: "review", cap: "reviewExpense", title: "รอตรวจสอบ", hint: "ขั้นที่ 2 จาก 4 — ตรวจรายการและหลักฐาน แล้วส่งต่อให้ผู้จัดการแผนกช่างอนุมัติ", match: (e) => e.status === "pending" },
+  { key: "approve", cap: "approveExpense", title: "รออนุมัติ", hint: "ขั้นที่ 3 จาก 4 — ตรวจสอบแล้ว รอผู้จัดการแผนกช่างอนุมัติ", match: (e) => e.status === "reviewed" },
+  { key: "pay", cap: "disburseExpense", title: "รออนุมัติเบิกจ่าย · Advance", hint: "ขั้นที่ 4 จาก 4 — อนุมัติแล้ว รออนุมัติเบิกจ่ายและบันทึกการจ่ายเงิน", match: (e) => e.kind === "advance" && e.status === "approved" },
+  { key: "settle", cap: "disburseExpense", title: "รออนุมัติเบิกจ่าย · ส่วนต่างใบเคลม", hint: "ขั้นที่ 4 จาก 4 — จ่ายส่วนต่างเพิ่ม / ยืนยันรับเงินคืน", match: (e) => e.kind === "claim" && e.status === "approved" && slipKind(e) !== "reimburse" },
   // ⚠️ คนละงานกับข้างบน — ใบสำรองจ่ายคือพนักงานควักเงินตัวเองรออยู่ ไม่ใช่การปิดส่วนต่างของเงินที่จ่ายไปแล้ว
-  { key: "reimburse", title: "รอจ่ายคืนค่าสำรองจ่าย", hint: "อนุมัติแล้ว รอโอนคืนให้ผู้เบิก", match: (e) => slipKind(e) === "reimburse" && e.status === "approved" },
-  { key: "overdue", title: "Advance เลยกำหนดเคลียร์", hint: "จ่ายเงินไปแล้วแต่ยังไม่ส่งใบเคลม", match: (e) => isOverdueClear(e) },
+  { key: "reimburse", cap: "disburseExpense", title: "รออนุมัติเบิกจ่าย · คืนค่าสำรองจ่าย", hint: "ขั้นที่ 4 จาก 4 — อนุมัติแล้ว รอโอนคืนให้ผู้เบิก", match: (e) => slipKind(e) === "reimburse" && e.status === "approved" },
+  { key: "overdue", cap: "viewAllExpenses", title: "Advance เลยกำหนดเคลียร์", hint: "จ่ายเงินไปแล้วแต่ยังไม่ส่งใบเคลม", match: (e) => isOverdueClear(e) },
 ];
 
 /**
@@ -358,7 +362,10 @@ export default function ExpenseList({ mode, status: statusProp, claimType = "all
         <Stack spacing={1}>{[0, 1, 2, 3].map((i) => <Skeleton key={i} variant="rounded" height={isDesktop ? 52 : 96} />)}</Stack>
       ) : mode === "inbox" ? (
         (() => {
-          const groups = INBOX_GROUPS.map((g) => ({ ...g, rows: base.filter(g.match) })).filter((g) => g.rows.length);
+          const groups = INBOX_GROUPS
+            .filter((g) => can(g.cap))
+            .map((g) => ({ ...g, rows: base.filter(g.match) }))
+            .filter((g) => g.rows.length);
           if (!groups.length) return empty("ไม่มีรายการที่รอดำเนินการ 🎉");
           return (
             <Stack spacing={2.5}>

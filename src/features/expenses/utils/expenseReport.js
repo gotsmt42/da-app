@@ -7,13 +7,13 @@
  * นิยามตัวเลข (ต้องตรงกันทุกที่ที่แสดง):
  *   requested   ยอดขอเบิกทุกใบที่ยังไม่ยกเลิก
  *   pending     ยอดที่ยังไม่ผ่านอนุมัติ (รอตรวจสอบ / ตรวจสอบแล้วรออนุมัติ / ถูกตีกลับ)
- *   reviewing   ยอดที่ "ตรวจสอบแล้ว รออนุมัติขั้นสุดท้าย" (ส่วนย่อยของ pending — ดูได้ว่าค้างที่ขั้นไหน)
- *   toPay       อนุมัติแล้วแต่ยังไม่จ่าย
+ *   reviewing   ยอดที่ "ตรวจสอบแล้ว รออนุมัติ" (ขั้นที่ 3 — ส่วนย่อยของ pending ดูได้ว่าค้างที่ขั้นไหน)
+ *   toPay       อนุมัติแล้ว รออนุมัติเบิกจ่าย (ขั้นที่ 4 ของใบ Advance)
  *   advanced    จ่ายเงินล่วงหน้าออกไปแล้วจริง (paid / clearing / cleared)
  *   actual      ใช้จริงตามใบเคลมที่อนุมัติแล้ว (approved / settled)
  *   outstanding ยอด Advance ที่จ่ายแล้วแต่ใบเคลมยังไม่ผ่านอนุมัติ = เงินที่ยังอยู่กับพนักงานโดยไม่มีหลักฐาน
- *   refundDue   ใบเคลมอนุมัติแล้ว ผู้เบิกต้องคืนเงิน แต่ยังไม่ได้ปิดส่วนต่าง
- *   extraDue    ใบเคลมอนุมัติแล้ว บริษัทต้องจ่ายเพิ่ม แต่ยังไม่ได้ปิดส่วนต่าง
+ *   refundDue   ใบเคลมอนุมัติแล้ว ผู้เบิกต้องคืนเงิน รอยืนยันรับเงินคืน (ขั้นที่ 4)
+ *   extraDue    ใบเคลมอนุมัติแล้ว บริษัทต้องจ่ายเพิ่ม รออนุมัติเบิกจ่าย (ขั้นที่ 4)
  *   refunded / extraPaid  ส่วนต่างที่ปิดเรียบร้อยแล้ว
  *
  * ── ใบสำรองจ่าย (ผู้เบิกออกเงินเองไปก่อน ไม่มี Advance) ────────────────────
@@ -103,6 +103,46 @@ const groupBy = (rows, reimburseRows, keyOf, labelOf, now) => {
   return [...map.values()].map(round);
 };
 
+/**
+ * ใบที่ค้างอยู่ในสายอนุมัติ 4 ขั้น — ✅ ผู้ใช้สั่งให้รายงานตรงกับลำดับการเบิกใหม่
+ *   review   ขั้นที่ 2 รอตรวจสอบ   (แอดมินช่าง / ผู้จัดการแผนกช่าง)
+ *   approve  ขั้นที่ 3 รออนุมัติ    (ผู้จัดการแผนกช่าง)
+ *   disburse ขั้นที่ 4 รออนุมัติเบิกจ่าย (ผู้จัดการแผนกช่าง / กรรมการผู้จัดการ)
+ * นับครบทั้ง 3 ชนิดใบ (Advance + ใบเคลมที่ผูก + ใบสำรองจ่าย)
+ *   amount  = ยอดในใบ (Advance = ยอดขอเบิก · ใบเคลม = ใช้จริง · สำรองจ่าย = ยอดขอเบิกคืน)
+ *   payOut  = เงินที่จะออกจากบริษัทเมื่ออนุมัติเบิกจ่าย · payIn = เงินที่พนักงานต้องคืนบริษัท
+ * ⚠️ ใบเคลมที่ใช้พอดี (ส่วนต่าง 0) ไม่มีขั้นที่ 4 (ปิดจบที่ขั้นอนุมัติ) — ไม่มีทางค้างอยู่ใน disburse
+ */
+const STEP_OF_STATUS = { pending: "review", reviewed: "approve", approved: "disburse" };
+
+export const buildPipeline = (rows = [], reimburseRows = []) => {
+  const blank = () => ({ count: 0, advance: 0, claim: 0, reimburse: 0, amount: 0, payOut: 0, payIn: 0 });
+  const out = { review: blank(), approve: blank(), disburse: blank() };
+  const add = (kind, doc) => {
+    const step = STEP_OF_STATUS[doc?.status];
+    if (!step) return;
+    const b = out[step];
+    const total = Number(doc.total) || 0;
+    b.count += 1;
+    b[kind] += 1;
+    b.amount += total;
+    if (kind === "claim") {
+      const diff = Number(doc.difference) || 0;
+      if (diff > 0) b.payOut += diff;
+      if (diff < 0) b.payIn += -diff;
+    } else {
+      b.payOut += total;
+    }
+  };
+  rows.forEach((a) => {
+    add("advance", a);
+    if (a.claim && a.claim.status !== "cancelled") add("claim", a.claim);
+  });
+  reimburseRows.forEach((r) => add("reimburse", r));
+  Object.values(out).forEach((b) => { b.amount = money(b.amount); b.payOut = money(b.payOut); b.payIn = money(b.payIn); });
+  return out;
+};
+
 /** เดือนตามเวลาไทย "2026-09" (docDate เก็บเที่ยงวัน UTC จึงตัดสตริงได้ตรงๆ ไม่คลาดวัน) */
 export const monthKey = (d) => String(d || "").slice(0, 7);
 
@@ -157,5 +197,5 @@ export function buildExpenseReport(advances, { reimbursements = [], now = new Da
     .map((c) => ({ ...c, planned: money(c.planned), actual: money(c.actual), reimburse: money(c.reimburse) }))
     .sort((x, y) => (y.actual + y.reimburse) - (x.actual + x.reimburse) || y.planned - x.planned);
 
-  return { totals: round(totals), byPerson, byJob, byMonth, byCategory, rows, reimburseRows };
+  return { totals: round(totals), pipeline: buildPipeline(rows, reimburseRows), byPerson, byJob, byMonth, byCategory, rows, reimburseRows };
 }

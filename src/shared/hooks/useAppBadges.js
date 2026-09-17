@@ -155,12 +155,13 @@ const computeBadges = (userData, data) => {
     // ✅ ใช้ใบ Advance "ของฉัน" ที่ต้องเคลียร์เท่านั้น
     claim: (Number(ex.awaitingClaimMine ?? ex.awaitingClaim) || 0) + (Number(ex.claimRejectedMine) || 0),
     /**
-     * ✅ นับเฉพาะใบที่ผู้ใช้คนนี้กดทำรายการได้จริง (server กรองกฎใบตัวเอง/ผู้ตรวจสอบคนเดิมให้แล้ว)
-     * ⚠️ toPay/toSettle เป็นงานของผู้ที่จ่ายเงินได้ (approveExpense) — คนอื่นไม่ต้องเห็นเลขนี้
+     * ✅ นับเฉพาะใบที่ผู้ใช้คนนี้กดทำรายการได้จริง ตามขั้นของตัวเองในสายอนุมัติ 4 ขั้น
+     *   inboxPending (ตรวจสอบ) + inboxReviewing (อนุมัติ) + inboxDisburse (อนุมัติเบิกจ่าย)
+     * server กรองกฎสิทธิ์/ใบตัวเอง/ผู้ตรวจสอบคนเดิมให้แล้ว — คนที่ไม่มีสิทธิ์ขั้นนั้นได้ 0 เสมอ
      */
-    expenseInbox: (Number(ex.inboxPending ?? ex.pending) || 0)
-      + (Number(ex.inboxReviewing ?? ex.reviewing) || 0)
-      + (can(userData, "approveExpense") ? (Number(ex.toPay) || 0) + (Number(ex.toSettle) || 0) : 0),
+    expenseInbox: (Number(ex.inboxPending) || 0)
+      + (Number(ex.inboxReviewing) || 0)
+      + (Number(ex.inboxDisburse) || 0),
   };
 };
 

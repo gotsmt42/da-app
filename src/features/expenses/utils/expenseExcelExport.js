@@ -61,12 +61,21 @@ const GROUP_COLS = [
   // ── ใบสำรองจ่าย (ไม่มี Advance) ────────────────────────────────────
   { key: "reimburseCount", header: "จำนวนใบสำรองจ่าย", width: 16 },
   { key: "reimburse", header: "พนักงานสำรองจ่าย (อนุมัติ)", width: 22 },
-  { key: "reimburseDue", header: "รอบริษัทจ่ายคืนพนักงาน", width: 22 },
+  { key: "reimburseDue", header: "รออนุมัติเบิกจ่ายคืนพนักงาน", width: 24 },
   { key: "reimbursePaid", header: "จ่ายคืนพนักงานแล้ว", width: 18 },
 ];
 /** ⚠️ ช่องที่เป็น "จำนวนใบ" ต้องไม่ถูกจัดรูปแบบเป็นเงิน ไม่งั้นจะอ่านเป็น 3.00 ใบ */
 const GROUP_COUNTS = ["count", "reimburseCount"];
 const GROUP_MONEY = GROUP_COLS.map((c) => c.key).filter((k) => !GROUP_COUNTS.includes(k));
+
+/** ชื่อผู้ทำแต่ละขั้น — ขั้นที่ยังไม่ถึง/ถูกตีกลับเว้นว่าง (ใบที่ตีกลับถูกล้างผลตรวจสอบ/อนุมัติเดิมแล้ว) */
+const reviewerOf = (d) => (d?.reviewedAt && d.status !== "rejected" ? personFullName(d.reviewedBy) : "");
+const approverOf = (d) => (d?.approvedAt && !["pending", "reviewed", "rejected"].includes(d.status) ? personFullName(d.approvedBy) : "");
+/** ผู้อนุมัติเบิกจ่าย (ขั้นที่ 4) = คนที่บันทึกจ่ายเงิน Advance / ปิดส่วนต่างใบเคลม / จ่ายคืนใบสำรองจ่าย */
+const disburserOf = (d) => {
+  const done = d?.kind === "advance" ? ["paid", "clearing", "cleared"].includes(d.status) : d?.status === "settled";
+  return done && d.payment?.by ? personFullName(d.payment.by) : "";
+};
 
 export async function exportExpenseReport(report, { periodLabel = "", fileName = "รายงานการเบิก" } = {}) {
   const wb = new ExcelJS.Workbook();
@@ -83,23 +92,23 @@ export async function exportExpenseReport(report, { periodLabel = "", fileName =
   [
     ["จำนวนใบ Advance", t.count],
     ["ยอดขอเบิกทั้งหมด", t.requested],
-    // ✅ อนุมัติ 2 ขั้น: รอตรวจสอบ (แอดมิน) → ตรวจสอบแล้วรออนุมัติ (ผู้จัดการ)
+    // ✅ สายอนุมัติ 4 ขั้น: ส่งขอเบิก → ตรวจสอบ → อนุมัติ → อนุมัติเบิกจ่าย
     ["ยังไม่ผ่านอนุมัติ (รอตรวจสอบ/รออนุมัติ/ตีกลับ)", t.pending],
-    ["— ในนั้น: ตรวจสอบแล้ว รออนุมัติขั้นสุดท้าย", t.reviewing],
-    ["อนุมัติแล้ว รอจ่ายเงินให้พนักงาน", t.toPay],
+    ["— ในนั้น: ตรวจสอบแล้ว รออนุมัติ", t.reviewing],
+    ["อนุมัติแล้ว รออนุมัติเบิกจ่าย Advance", t.toPay],
     ["จ่ายล่วงหน้าให้พนักงานแล้ว", t.advanced],
     ["ใช้จริงตามใบเคลมที่อนุมัติ", t.actual],
     ["เงินที่ยังอยู่กับพนักงาน (ยังไม่เคลียร์)", t.outstanding],
     ["ใบที่เลยกำหนดเคลียร์", t.overdue],
-    ["รอพนักงานคืนเงินบริษัท", t.refundDue],
-    ["รอบริษัทจ่ายเพิ่มให้พนักงาน", t.extraDue],
+    ["รอพนักงานคืนเงินบริษัท (รอยืนยันรับเงินคืน)", t.refundDue],
+    ["รอบริษัทจ่ายเพิ่มให้พนักงาน (รออนุมัติเบิกจ่าย)", t.extraDue],
     ["พนักงานคืนเงินบริษัทแล้ว", t.refunded],
     ["บริษัทจ่ายเพิ่มให้พนักงานแล้ว", t.extraPaid],
     ["จำนวนใบสำรองจ่าย (พนักงานออกเงินเอง)", t.reimburseCount],
     ["ใบสำรองจ่ายที่ยังไม่ผ่านอนุมัติ", t.reimbursePending],
-    ["— ในนั้น: ตรวจสอบแล้ว รออนุมัติขั้นสุดท้าย", t.reimburseReviewing],
+    ["— ในนั้น: ตรวจสอบแล้ว รออนุมัติ", t.reimburseReviewing],
     ["พนักงานสำรองจ่าย (อนุมัติแล้ว)", t.reimburse],
-    ["รอบริษัทจ่ายคืนพนักงาน", t.reimburseDue],
+    ["รออนุมัติเบิกจ่ายคืนพนักงาน", t.reimburseDue],
     ["บริษัทจ่ายคืนพนักงานแล้ว", t.reimbursePaid],
   ].forEach(([label, value], i) => {
     const row = ws.addRow([label, value]);
@@ -108,6 +117,32 @@ export async function exportExpenseReport(report, { periodLabel = "", fileName =
     if (!/^จำนวนใบ|^ใบที่เลยกำหนด/.test(String(label))) row.getCell(2).numFmt = MONEY;
     row.eachCell((c) => { c.border = { bottom: BORDER }; });
   });
+
+  // ── ใบที่ค้างตามขั้นอนุมัติ (4 ขั้น) ─────────────────────────────────────
+  // ✅ ผู้ใช้สั่งให้รายงานตรงกับลำดับการเบิกใหม่ — เห็นทันทีว่างานค้างอยู่ที่ขั้นไหน รอใคร
+  ws.addRow([]);
+  ws.addRow(["ใบที่ค้างตามขั้นอนุมัติ", "จำนวนใบ", "ยอดเงิน", "Advance", "ใบเคลม", "สำรองจ่าย", "ผู้ดำเนินการ"]).eachCell((c) => {
+    c.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0F766E" } };
+  });
+  ws.getColumn(3).width = 16;
+  [4, 5, 6].forEach((n) => { ws.getColumn(n).width = 11; });
+  ws.getColumn(7).width = 36;
+  const pl = report.pipeline || {};
+  [
+    ["ขั้นที่ 2/4 รอตรวจสอบ", pl.review, "แอดมินช่าง / ผู้จัดการแผนกช่าง", (p) => p.amount],
+    ["ขั้นที่ 3/4 รออนุมัติ", pl.approve, "ผู้จัดการแผนกช่าง", (p) => p.amount],
+    ["ขั้นที่ 4/4 รออนุมัติเบิกจ่าย (เงินจ่ายออก)", pl.disburse, "ผู้จัดการแผนกช่าง / กรรมการผู้จัดการ", (p) => p.payOut],
+  ].forEach(([label, p = {}, who, amountOf]) => {
+    const row = ws.addRow([label, p.count || 0, amountOf(p) || 0, p.advance || 0, p.claim || 0, p.reimburse || 0, who]);
+    row.getCell(1).font = { bold: true };
+    row.getCell(3).numFmt = MONEY;
+    row.eachCell((c) => { c.border = { bottom: BORDER }; });
+  });
+  if (pl.disburse?.payIn) {
+    const row = ws.addRow(["— ในขั้นที่ 4: รอยืนยันรับเงินคืนจากพนักงาน", "", pl.disburse.payIn]);
+    row.getCell(3).numFmt = MONEY;
+  }
 
   // ── รายใบ ────────────────────────────────────────────────────────────
   addTable(wb.addWorksheet("รายใบ"), [
@@ -118,10 +153,11 @@ export async function exportExpenseReport(report, { periodLabel = "", fileName =
     { key: "job", header: "งาน", width: 30 },
     { key: "total", header: "ยอดขอเบิก", width: 13 },
     { key: "status", header: "สถานะ", width: 22 },
-    // ✅ อนุมัติ 2 ขั้น — ต้องเห็นว่าใครตรวจสอบและใครอนุมัติ (ตรงกับช่องลงนามในใบ PDF)
+    // ✅ สายอนุมัติ 4 ขั้น — ต้องเห็นว่าใครทำแต่ละขั้น (ตรงกับช่องลงนาม 4 ช่องในใบ PDF)
     { key: "reviewer", header: "ผู้ตรวจสอบ", width: 20 },
     { key: "approver", header: "ผู้อนุมัติ", width: 20 },
-    { key: "paidAt", header: "วันที่จ่าย", width: 13 },
+    { key: "disburser", header: "ผู้อนุมัติเบิกจ่าย", width: 20 },
+    { key: "paidAt", header: "วันที่จ่ายเงิน", width: 13 },
     { key: "payTo", header: "บัญชีที่บริษัทโอนเงินล่วงหน้าให้", width: 34 },
     { key: "dueClearAt", header: "กำหนดเคลียร์", width: 13 },
     { key: "claimNo", header: "เลขที่ใบเคลม", width: 17 },
@@ -129,7 +165,10 @@ export async function exportExpenseReport(report, { periodLabel = "", fileName =
     { key: "diff", header: "ส่วนต่าง (+ บริษัทจ่ายเพิ่ม / − พนักงานคืนบริษัท)", width: 26 },
     { key: "diffLabel", header: "ใครต้องจ่ายใคร", width: 24 },
     { key: "claimPayTo", header: "บัญชีที่บริษัทโอนส่วนต่างให้", width: 34 },
-    { key: "claimStatus", header: "สถานะใบเคลม", width: 24 },
+    { key: "claimStatus", header: "สถานะใบเคลม", width: 30 },
+    { key: "claimReviewer", header: "ผู้ตรวจสอบใบเคลม", width: 20 },
+    { key: "claimApprover", header: "ผู้อนุมัติใบเคลม", width: 20 },
+    { key: "claimDisburser", header: "ผู้อนุมัติเบิกจ่าย/รับคืนส่วนต่าง", width: 26 },
   ], report.rows.map((a) => {
     const claim = a.claim || null;
     const diff = claim ? money(claim.difference) : null;
@@ -142,7 +181,8 @@ export async function exportExpenseReport(report, { periodLabel = "", fileName =
       total: a.total,
       status: statusMeta(a.status, "advance").label,
       reviewer: a.reviewedAt ? personFullName(a.reviewedBy) : "",
-      approver: a.approvedAt && !["pending", "reviewed", "rejected"].includes(a.status) ? personFullName(a.approvedBy) : "",
+      approver: approverOf(a),
+      disburser: disburserOf(a),
       paidAt: a.payment?.at ? thaiDate(a.payment.at) : "",
       payTo: payToText(a.payTo),
       dueClearAt: a.dueClearAt ? thaiDate(a.dueClearAt) : "",
@@ -153,6 +193,9 @@ export async function exportExpenseReport(report, { periodLabel = "", fileName =
       // ⚠️ ส่วนต่างติดลบ = ผู้เบิกคืนเงินบริษัท ไม่มีการโอนเข้าบัญชีผู้เบิก จึงต้องเว้นช่องนี้ไว้
       claimPayTo: claim && diff > 0 ? payToText(claim.payTo) : "",
       claimStatus: claim ? `${statusMeta(claim.status, "claim").label}${diff ? ` (${differenceMeta(diff, "claim").short})` : ""}` : "",
+      claimReviewer: claim ? reviewerOf(claim) : "",
+      claimApprover: claim ? approverOf(claim) : "",
+      claimDisburser: claim ? (claim.status === "settled" && !diff ? "ไม่มีส่วนต่าง" : disburserOf(claim)) : "",
     };
   }), ["total", "actual", "diff"]);
 
@@ -169,6 +212,7 @@ export async function exportExpenseReport(report, { periodLabel = "", fileName =
     { key: "status", header: "สถานะ", width: 22 },
     { key: "reviewer", header: "ผู้ตรวจสอบ", width: 20 },
     { key: "approver", header: "ผู้อนุมัติ", width: 20 },
+    { key: "disburser", header: "ผู้อนุมัติเบิกจ่าย", width: 20 },
     { key: "payTo", header: "บัญชีที่บริษัทโอนคืนให้พนักงาน", width: 34 },
     { key: "paidAt", header: "วันที่จ่ายคืนพนักงาน", width: 16 },
   ], (report.reimburseRows || []).map((r) => ({
@@ -179,8 +223,9 @@ export async function exportExpenseReport(report, { periodLabel = "", fileName =
     job: jobText(r.job),
     total: r.total,
     status: statusMeta(r.status, "reimburse").label,
-    reviewer: r.reviewedAt ? personFullName(r.reviewedBy) : "",
-    approver: r.approvedAt && !["pending", "reviewed", "rejected"].includes(r.status) ? personFullName(r.approvedBy) : "",
+    reviewer: reviewerOf(r),
+    approver: approverOf(r),
+    disburser: disburserOf(r),
     // ใบสำรองจ่าย = บริษัทจ่ายคืนให้ผู้เบิกเสมอ จึงมีบัญชีรับเงินได้ทุกใบ
     payTo: payToText(r.payTo),
     paidAt: r.payment?.at ? thaiDate(r.payment.at) : "",

@@ -73,7 +73,7 @@ export const VIEW_META = {
     color: INBOX_COLOR,
     dark: "#b45309",
     soft: "#fffbeb",
-    sub: "คิวของหัวหน้า — อนุมัติ · จ่ายเงิน · ปิดส่วนต่าง",
+    sub: "คิวงานตามขั้น — ตรวจสอบ · อนุมัติ · อนุมัติเบิกจ่าย",
     action: "",
   },
   report: {
@@ -130,8 +130,9 @@ export default function ExpensesPage({ view: viewProp }) {
   const canRequest = can("requestExpense");
   const canReview = can("reviewExpense");
   const canApprove = can("approveExpense");
-  /** เข้ากล่อง "รอดำเนินการ" ได้ทั้งผู้ตรวจสอบและผู้อนุมัติ — ทั้งคู่มีคิวงานของตัวเองอยู่ในนั้น */
-  const canHandle = canReview || canApprove;
+  const canDisburse = can("disburseExpense");
+  /** เข้ากล่อง "รอดำเนินการ" ได้ทุกคนที่มีขั้นของตัวเอง (ตรวจสอบ / อนุมัติ / อนุมัติเบิกจ่าย) */
+  const canHandle = canReview || canApprove || canDisburse;
   const viewAll = can("viewAllExpenses");
 
   const [summary, setSummary] = useState(null);
@@ -220,7 +221,7 @@ export default function ExpensesPage({ view: viewProp }) {
   if (view === "advance") {
     stats.push({ key: "pending", label: "รอตรวจสอบ", value: summary?.pending ?? "–", color: "#d97706", onClick: () => pick("pending") });
     stats.push({ key: "reviewed", label: "รออนุมัติ", value: summary?.reviewing ?? "–", color: "#b45309", onClick: () => pick("reviewed") });
-    stats.push({ key: "approved", label: "รอจ่ายเงิน", value: summary?.toPay ?? "–", color: "#2563eb", onClick: () => pick("approved") });
+    stats.push({ key: "approved", label: "รออนุมัติเบิกจ่าย", value: summary?.toPay ?? "–", color: "#2563eb", onClick: () => pick("approved") });
     stats.push({
       key: summary?.overdueClear ? "overdue" : "paid", label: "รอเคลียร์", value: summary?.awaitingClaim ?? "–",
       color: "#0369a1", onClick: () => pick(summary?.overdueClear ? "overdue" : "paid"),
@@ -235,15 +236,18 @@ export default function ExpensesPage({ view: viewProp }) {
     // ⚠️ ป้ายต้องตรงกับชนิดที่กำลังกรองอยู่ — ใบสำรองจ่ายไม่มี "ส่วนต่าง" ให้ปิด มีแต่เงินที่ต้องจ่ายคืน
     // (ตัวเลขเป็นยอดรวมของทั้งสองชนิดจาก /summary — เป็นคิวเดียวกันของฝ่ายบัญชี)
     stats.push({
-      key: "approved", label: claimType === "reimburse" ? "รอจ่ายคืน" : "รอปิดส่วนต่าง",
+      key: "approved", label: "รออนุมัติเบิกจ่าย",
       value: summary?.toSettle ?? "–", color: meta.color, onClick: () => pick("approved"),
     });
     stats.push({ key: "__await", label: "Advance ที่ยังไม่เคลียร์", value: summary?.awaitingClaim ?? "–", color: KIND_META.advance.color });
   } else if (view === "inbox") {
-    stats.push({ key: "__p", label: "รอตรวจสอบ", value: summary?.pending ?? "–", color: "#d97706" });
-    stats.push({ key: "__r", label: "รออนุมัติ", value: summary?.reviewing ?? "–", color: "#b45309" });
-    stats.push({ key: "__t", label: "รอจ่ายเงิน", value: summary?.toPay ?? "–", color: "#2563eb" });
-    stats.push({ key: "__s", label: "รอปิดส่วนต่าง", value: summary?.toSettle ?? "–", color: KIND_META.claim.color });
+    // ✅ ตัวเลขตามขั้นของสายอนุมัติ 4 ขั้น — การ์ดของขั้นที่ตัวเองไม่ได้รับผิดชอบไม่ต้องโชว์ให้รก
+    if (canReview) stats.push({ key: "__p", label: "รอตรวจสอบ", value: summary?.pending ?? "–", color: "#d97706" });
+    if (canApprove) stats.push({ key: "__r", label: "รออนุมัติ", value: summary?.reviewing ?? "–", color: "#b45309" });
+    if (canDisburse) {
+      stats.push({ key: "__t", label: "รออนุมัติเบิกจ่าย · Advance", value: summary?.toPay ?? "–", color: "#2563eb" });
+      stats.push({ key: "__s", label: "รออนุมัติเบิกจ่าย · ใบเคลม", value: summary?.toSettle ?? "–", color: KIND_META.claim.color });
+    }
     if (summary?.overdueClear > 0) stats.push({ key: "__o", label: "เลยกำหนดเคลียร์", value: summary.overdueClear, color: "#dc2626", alert: true });
   }
 
@@ -353,7 +357,10 @@ export default function ExpensesPage({ view: viewProp }) {
            * ✅ เปิดจากลิงก์แจ้งเตือน (ไม่มีหน้าต้นทาง) และใบนี้ "รอให้ฉันลงมือ" → พื้นหลัง/ปิดแล้วไปกล่องรอดำเนินการ
            * เพราะแจ้งเตือนแบบนี้คืองานในคิวของหัวหน้า ไม่ใช่การเปิดดูรายการตามชนิดใบ
            */
-          const needsMyAction = canHandle && ["pending", "reviewed", "approved"].includes(e?.status);
+          // ✅ "รอฉันลงมือ" ตามขั้นของตัวเองเท่านั้น (กรรมการเปิดใบรอตรวจสอบ = แค่เปิดดู ไม่ใช่งานในคิว)
+          const needsMyAction = (e?.status === "pending" && canReview)
+            || (e?.status === "reviewed" && canApprove)
+            || (e?.status === "approved" && canDisburse);
           setDetailKind(needsMyAction ? "inbox" : e?.kind || null);
         }}
         onClose={closeDetail}

@@ -114,19 +114,20 @@ export const CAPABILITIES = {
   /** ออกใบ Advance / ใบเคลมของตัวเองได้ */
   requestExpense: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER, ROLES.TECHNICIAN, ROLES.TECH_LEAD],
   /**
-   * ── การอนุมัติใบเบิกเป็น 2 ขั้น ──
-   * ขั้นที่ 1 "ตรวจสอบ" (reviewExpense) → ปกติคือแอดมิน · ลงลายเซ็นช่อง "ผู้ตรวจสอบ"
-   * ขั้นที่ 2 "อนุมัติ" (approveExpense) → ปกติคือผู้จัดการ · ลงลายเซ็นช่อง "ผู้อนุมัติ"
-   * ⚠️ มีทั้งสองสิทธิ์ทั้งคู่เพื่อแทนกันได้ แต่ "คนเดียวกันกดสองขั้นในใบเดียวไม่ได้" (server บังคับ)
+   * ── ลำดับการเบิกค่าใช้จ่าย 4 ขั้น (เหตุผลเต็มที่ da-app-server/src/config/roles.js) ──
+   *   ขั้น 1 ส่งขอเบิก → ขั้น 2 ตรวจสอบ (แอดมินช่าง/ผู้จัดการฯ) → ขั้น 3 อนุมัติ (ผู้จัดการฯ)
+   *   → ขั้น 4 อนุมัติเบิกจ่าย (ผู้จัดการฯ/กรรมการผู้จัดการ)
    */
-  reviewExpense: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER],
-  /** อนุมัติขั้นสุดท้าย / ตีกลับ / บันทึกจ่ายเงิน / ปิดส่วนต่าง */
-  approveExpense: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER],
+  reviewExpense: [ROLES.ADMIN, ROLES.MANAGER],
+  /** ขั้น 3 — อนุมัติ (ใบที่ตรวจสอบแล้วเท่านั้น) */
+  approveExpense: [ROLES.MANAGER],
+  /** ขั้น 4 — อนุมัติเบิกจ่าย: จ่ายเงิน Advance / ปิดส่วนต่างใบเคลม / จ่ายคืนใบสำรองจ่าย */
+  disburseExpense: [ROLES.DIRECTOR, ROLES.MANAGER],
   /**
    * กดครบทั้งสองขั้นในใบเดียวเองได้ (ตรวจสอบเอง → อนุมัติเอง) — ผู้จัดการเท่านั้น
    * ⚠️ เหตุผลและข้อแลกเปลี่ยนอยู่ที่ da-app-server/src/config/roles.js
    */
-  approveOwnReview: [ROLES.DIRECTOR, ROLES.MANAGER],
+  approveOwnReview: [ROLES.MANAGER],
   /**
    * ตรวจสอบ/อนุมัติใบของตัวเองได้ (แอดมิน + ผู้จัดการ ตามที่ผู้ใช้สั่ง)
    * ⚠️ แยกจาก manageAll โดยตั้งใจ — "ตั้งค่าระบบได้" ไม่ได้แปลว่า "เซ็นอนุมัติเงินให้ตัวเองได้"

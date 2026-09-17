@@ -262,8 +262,28 @@ const CompareTable = ({ items, advanceItems, wide }) => {
 
 const today = () => moment().format("YYYY-MM-DD");
 
+/** การกระทำที่ลงลายเซ็นอิเล็กทรอนิกส์ได้ และช่องลงนามของแต่ละการกระทำใน PDF */
+const SIGN_ACTIONS = ["review", "reviewApprove", "approve", "pay", "settle"];
+const SIGN_BOX_LABEL = {
+  review: "ผู้ตรวจสอบ",
+  reviewApprove: "ผู้ตรวจสอบ + ผู้อนุมัติ",
+  approve: "ผู้อนุมัติ",
+  pay: "ผู้อนุมัติเบิกจ่าย",
+  settle: "ผู้อนุมัติเบิกจ่าย",
+};
+
 /**
- * กล่องยืนยันการดำเนินการ (อนุมัติ / ตีกลับ / ยกเลิก / จ่ายเงิน / ปิดส่วนต่าง)
+ * ใครรับผิดชอบขั้นไหน — ใช้ในข้อความ "รอใคร" (ตรงกับ CAPABILITIES ใน shared/utils/roles.js)
+ * ⚠️ ถ้าเปลี่ยนสิทธิ์ของขั้นไหน ต้องแก้ข้อความที่นี่ด้วย
+ */
+const STEP_OWNER = {
+  review: "แอดมินช่าง/ผู้จัดการแผนกช่าง",
+  approve: "ผู้จัดการแผนกช่าง",
+  disburse: "ผู้จัดการแผนกช่าง/กรรมการผู้จัดการ",
+};
+
+/**
+ * กล่องยืนยันการดำเนินการ (ตรวจสอบ / อนุมัติ / อนุมัติเบิกจ่าย / ตีกลับ / ยกเลิก)
  * ⚠️ อยู่ module scope — ประกาศในตัว component หลักจะทำให้ช่องกรอกหลุดโฟกัสทุกตัวอักษร
  */
 const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
@@ -272,7 +292,7 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
   const [mySignature, setMySignature] = useState(null);
   const fileRef = useRef(null);
   useEffect(() => {
-    if (!["approve", "review", "reviewApprove"].includes(action)) return;
+    if (!SIGN_ACTIONS.includes(action)) return;
     SignatureService.me().then(setMySignature).catch(() => {});
   }, [action]);
   useEffect(() => {
@@ -289,33 +309,42 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
   const slip = slipKind(expense);
   const reimburse = slip === "reimburse";
   const diff = differenceMeta(expense?.difference, slip);
+  const zeroDiff = expense?.kind === "claim" && !reimburse && money(expense?.difference) === 0;
+  /** หลังขั้นอนุมัติ เงินจะไหลไปทางไหน — ใช้บอกผู้อนุมัติว่าขั้นถัดไป (อนุมัติเบิกจ่าย) คืออะไร */
+  const disburseWhat = expense?.kind === "advance"
+    ? `จ่ายเงิน Advance ${baht(expense?.total)}`
+    : reimburse ? `จ่ายคืนค่าสำรองจ่าย ${baht(expense?.total)}` : `${diff.short} ${baht(diff.amount)}`;
   const cfg = {
     /**
-     * ✅ ขั้นที่ 1 — ตรวจสอบ (ผู้ใช้สั่ง: แอดมินเป็นผู้ตรวจสอบ แล้วผู้จัดการอนุมัติอีกที)
+     * ✅ ขั้นที่ 2 จาก 4 — ตรวจสอบ (แอดมินช่าง / ผู้จัดการแผนกช่าง)
      * ⚠️ "ตรวจสอบ" ไม่ใช่ "อนุมัติ" — ต้องพูดให้ชัดว่ายังต้องรออีกขั้น ไม่งั้นคนกดเข้าใจว่าจบแล้ว
      */
     review: {
-      title: "ตรวจสอบใบเบิก", color: "#b45309", button: "ยืนยันผลตรวจสอบ",
-      body: `ตรวจสอบความถูกต้องของ ${baht(expense?.total)} แล้วส่งต่อให้ผู้จัดการอนุมัติขั้นสุดท้าย`,
+      title: "ตรวจสอบใบเบิก · ขั้นที่ 2 จาก 4", color: "#b45309", button: "ยืนยันผลตรวจสอบ",
+      body: `ยืนยันว่ารายการและหลักฐานของยอด ${baht(expense?.total)} ถูกต้อง — ระบบจะส่งต่อให้${STEP_OWNER.approve}พิจารณาอนุมัติ`,
     },
     /**
-     * ✅ ผู้ใช้สั่ง: "สิทธิ์ผู้จัดการให้กดตรวจสอบ และอนุมัติเองได้ด้วย" — ปุ่มเดียวจบทั้งสองขั้น
-     * ⚠️ ระบบยังบันทึกแยกเป็น 2 ขั้นเหมือนเดิม (ชื่อ/เวลา/ลายเซ็นลงทั้งช่องผู้ตรวจสอบและผู้อนุมัติ)
-     * ไม่ใช่การข้ามขั้น — ตรวจย้อนหลังได้ว่าใบไหนคนเดียวกันทำทั้งสองขั้น
+     * ✅ ผู้จัดการกดตรวจสอบและอนุมัติเองได้ในปุ่มเดียว (ผู้ใช้สั่งไว้ก่อนหน้า)
+     * ⚠️ ระบบยังบันทึกแยกเป็น 2 ขั้น (ชื่อ/เวลา/ลายเซ็นลงทั้งช่องผู้ตรวจสอบและผู้อนุมัติ) ไม่ใช่การข้ามขั้น
      */
     reviewApprove: {
-      title: "ตรวจสอบและอนุมัติ", color: "#059669", button: "ยืนยันทั้งสองขั้น",
-      body: `คุณจะลงนามทั้งช่อง "ผู้ตรวจสอบ" และ "ผู้อนุมัติ" ของใบนี้ (${baht(expense?.total)}) ด้วยตัวเอง`,
+      title: "ตรวจสอบและอนุมัติ · ขั้นที่ 2–3 จาก 4", color: "#059669", button: "ยืนยันทั้งสองขั้น",
+      body: zeroDiff
+        ? `คุณจะลงนามทั้งช่อง "ผู้ตรวจสอบ" และ "ผู้อนุมัติ" — ใช้จริงพอดีกับยอด Advance ใบจะปิดจบทันที`
+        : `คุณจะลงนามทั้งช่อง "ผู้ตรวจสอบ" และ "ผู้อนุมัติ" ของใบนี้ด้วยตัวเอง — จากนั้นส่งต่อให้${STEP_OWNER.disburse}อนุมัติเบิกจ่าย (${disburseWhat})`,
     },
     approve: {
-      title: "อนุมัติขั้นสุดท้าย", color: "#059669", button: "ยืนยันอนุมัติ",
-      body: reimburse
-        ? `อนุมัติแล้วบริษัทต้องจ่ายคืนให้ ${personFullName(expense?.requester) || "ผู้เบิก"} ${baht(expense?.total)}`
-        : expense?.kind === "claim"
-          ? (money(expense?.difference) === 0 ? "ใช้จริงพอดีกับยอด Advance — อนุมัติแล้วใบ Advance จะเคลียร์ทันที" : `อนุมัติแล้วรอ${diff.short} ${baht(diff.amount)} ก่อนปิดใบ`)
-          : `อนุมัติยอด ${baht(expense?.total)} — ขั้นต่อไปคือบันทึกการจ่ายเงิน`,
+      title: "อนุมัติใบเบิก · ขั้นที่ 3 จาก 4", color: "#059669", button: "ยืนยันอนุมัติ",
+      body: zeroDiff
+        ? "ใช้จริงพอดีกับยอด Advance ไม่มีเงินต้องเบิกจ่าย — อนุมัติแล้วใบ Advance จะเคลียร์ทันที"
+        : `อนุมัติแล้วระบบจะส่งต่อให้${STEP_OWNER.disburse}อนุมัติเบิกจ่าย (${disburseWhat})`,
     },
-    reject: { title: "ตีกลับให้แก้ไข", color: "#dc2626", button: "ตีกลับ", body: "ผู้เบิกจะได้รับแจ้งพร้อมเหตุผล และแก้ไขส่งใหม่ในใบเดิมได้" },
+    reject: {
+      title: "ตีกลับให้แก้ไข", color: "#dc2626", button: "ตีกลับ",
+      body: expense?.status === "pending"
+        ? "ผู้เบิกจะได้รับแจ้งพร้อมเหตุผล และแก้ไขส่งใหม่ในใบเดิมได้"
+        : "ผู้เบิกและผู้ที่ตรวจสอบ/อนุมัติไปแล้วจะได้รับแจ้งพร้อมเหตุผล — ผลตรวจสอบ อนุมัติ และลายเซ็นเดิมจะถูกล้าง เมื่อแก้ไขแล้วใบจะเริ่มที่ขั้นตรวจสอบใหม่",
+    },
     cancel: {
       title: "ยกเลิกใบนี้", color: "#64748b", button: "ยืนยันยกเลิก",
       // ⚠️ ใบสำรองจ่ายไม่มี Advance ให้คืนสถานะ — ข้อความของใบเคลมใช้กับมันไม่ได้
@@ -323,21 +352,28 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
         ? "ใบ Advance ที่อ้างถึงจะกลับไปรอเคลียร์ และออกใบเคลมใหม่ได้"
         : "ยกเลิกแล้วย้อนกลับไม่ได้ (เลขที่เอกสารจะไม่ถูกนำกลับมาใช้)",
     },
-    // ⚠️ ข้อความใต้หัวข้อบอกแค่ "ผลที่จะเกิด" — ตัวยอดและทิศทางเงินอยู่ในการ์ด MoneyCallout ด้านล่าง
+    /**
+     * ✅ ขั้นที่ 4 จาก 4 — อนุมัติเบิกจ่าย (ผู้จัดการแผนกช่าง / กรรมการผู้จัดการ) · ลงนามช่อง "ผู้อนุมัติเบิกจ่าย"
+     * ⚠️ ข้อความใต้หัวข้อบอกแค่ "ผลที่จะเกิด" — ตัวยอดและทิศทางเงินอยู่ในการ์ด MoneyCallout ด้านล่าง
+     */
     pay: {
-      title: "บันทึกการจ่ายเงิน Advance", color: KIND_META.advance.color, button: "บันทึกจ่ายเงิน",
-      body: "บันทึกแล้วใบนี้จะเปลี่ยนเป็น “จ่ายให้พนักงานแล้ว · รอเคลียร์”",
+      title: "อนุมัติเบิกจ่าย · จ่ายเงิน Advance", color: KIND_META.advance.color, button: "อนุมัติเบิกจ่าย",
+      body: "ขั้นที่ 4 จาก 4 — ลงนามผู้อนุมัติเบิกจ่ายและบันทึกการจ่ายเงิน ใบจะเปลี่ยนเป็น “จ่ายให้พนักงานแล้ว · รอเคลียร์”",
     },
     settle: reimburse
       ? {
-        title: "บันทึกจ่ายคืนพนักงาน", color: KIND_META.reimburse.color, button: "บันทึกจ่ายคืน",
-        body: "บันทึกแล้วใบนี้จะเสร็จสิ้น",
+        title: "อนุมัติเบิกจ่าย · จ่ายคืนค่าสำรองจ่าย", color: KIND_META.reimburse.color, button: "อนุมัติเบิกจ่าย",
+        body: "ขั้นที่ 4 จาก 4 — ลงนามผู้อนุมัติเบิกจ่ายและบันทึกการจ่ายคืน ใบนี้จะเสร็จสิ้น",
       }
-      : {
-        title: money(expense?.difference) > 0 ? "บันทึกจ่ายเงินเพิ่มให้พนักงาน" : "บันทึกรับเงินคืนจากพนักงาน",
-        color: KIND_META.claim.color, button: "บันทึกและปิดส่วนต่าง",
-        body: "บันทึกแล้วใบ Advance ที่อ้างถึงจะเคลียร์เรียบร้อย",
-      },
+      : money(expense?.difference) > 0
+        ? {
+          title: "อนุมัติเบิกจ่าย · จ่ายส่วนต่างเพิ่ม", color: KIND_META.claim.color, button: "อนุมัติเบิกจ่าย",
+          body: "ขั้นที่ 4 จาก 4 — ลงนามผู้อนุมัติเบิกจ่ายและบันทึกการจ่ายเงิน ใบ Advance ที่อ้างถึงจะเคลียร์เรียบร้อย",
+        }
+        : {
+          title: "ยืนยันรับเงินคืนจากพนักงาน", color: "#c2410c", button: "ยืนยันรับเงินคืน",
+          body: "ขั้นที่ 4 จาก 4 — ลงนามช่องผู้อนุมัติเบิกจ่ายเพื่อยืนยันว่าได้รับเงินคืนครบแล้ว ใบ Advance ที่อ้างถึงจะเคลียร์เรียบร้อย",
+        },
   }[action];
   const needReason = action === "reject";
   const payLike = action === "pay" || action === "settle";
@@ -411,11 +447,11 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
               placeholder={needReason ? "เช่น ใบเสร็จค่าน้ำมันไม่ชัด กรุณาแนบใหม่" : ""}
             />
           )}
-          {(["approve", "review", "reviewApprove"].includes(action) || payLike) && (
+          {SIGN_ACTIONS.includes(action) && (
             <TextField size="small" label="หมายเหตุ (ไม่บังคับ)" value={form.note || ""} onChange={set("note")} inputProps={{ maxLength: 500 }} />
           )}
-          {/* ✅ ลงลายเซ็นอิเล็กทรอนิกส์ในช่อง "ผู้ตรวจสอบ"/"ผู้อนุมัติ" ของใบ PDF หรือไม่ */}
-          {["approve", "review", "reviewApprove"].includes(action) && mySignature && (
+          {/* ✅ ลงลายเซ็นอิเล็กทรอนิกส์ในช่องของขั้นนี้ของใบ PDF หรือไม่ (ผู้ตรวจสอบ/ผู้อนุมัติ/ผู้อนุมัติเบิกจ่าย) */}
+          {SIGN_ACTIONS.includes(action) && mySignature && (
             <Box sx={{ p: 1.25, border: `1px solid ${BORDER_MAIN}`, borderRadius: 2 }}>
               <FormControlLabel
                 sx={{ mr: 0 }}
@@ -428,7 +464,7 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
                   <Stack direction="row" alignItems="center" spacing={0.75}>
                     <HistoryEdu sx={{ fontSize: 17, color: cfg.color }} />
                     <Typography sx={{ fontSize: "0.85rem", fontWeight: 700 }}>
-                      ลงลายเซ็นอิเล็กทรอนิกส์ของฉัน (ช่อง{action === "review" ? "ผู้ตรวจสอบ" : action === "reviewApprove" ? "ผู้ตรวจสอบ + ผู้อนุมัติ" : "ผู้อนุมัติ"})
+                      ลงลายเซ็นอิเล็กทรอนิกส์ของฉัน (ช่อง{SIGN_BOX_LABEL[action]})
                     </Typography>
                   </Stack>
                 )}
@@ -524,20 +560,34 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
   const meta = KIND_META[slip];
   const st = statusMeta(e?.status, slip);
   const isOwner = e && (e.requester?.userId === me || e.createdBy?.userId === me);
+  /**
+   * ✅ สายอนุมัติ 4 ขั้น: ส่งขอเบิก → ตรวจสอบ (reviewExpense) → อนุมัติ (approveExpense)
+   *   → อนุมัติเบิกจ่าย (disburseExpense) — server บังคับซ้ำทุกด่าน หน้าจอแค่ซ่อน/ปิดปุ่ม
+   */
   const canReview = can("reviewExpense");
   const canApprove = can("approveExpense");
+  const canDisburse = can("disburseExpense");
   /** ผู้ตรวจสอบใบนี้จะมาอนุมัติเองได้เฉพาะผู้จัดการ (approveOwnReview) — server บังคับซ้ำ */
   const reviewedByMe = e && String(e.reviewedBy?.userId || "") === String(me || "");
   const canApproveOwnReview = can("approveOwnReview");
-  /** กดจบทั้งสองขั้นเองได้ไหม (ผู้จัดการ) — ใช้ตัดสินทั้งปุ่มรวมและปุ่มอนุมัติหลังตรวจเอง */
+  /** กดจบทั้งขั้นตรวจสอบและอนุมัติเองได้ไหม (ผู้จัดการ) — ใช้ตัดสินทั้งปุ่มรวมและปุ่มอนุมัติหลังตรวจเอง */
   const canChainBothSteps = canReview && canApprove && canApproveOwnReview;
-  const canActOnDoc = canReview || canApprove;
+  /** ผู้ดำเนินการใบเบิกขั้นใดขั้นหนึ่ง */
+  const canActOnDoc = canReview || canApprove || canDisburse;
+  /** ทำขั้นที่ใบนี้กำลังรออยู่ได้ไหม (ใช้กับปุ่มตีกลับ — ตีกลับได้เฉพาะขั้นของตัวเอง) */
+  const canActOnCurrentStep = e && (
+    (e.status === "pending" && canReview) || (e.status === "reviewed" && canApprove) || (e.status === "approved" && canDisburse)
+  );
   const viewAll = can("viewAllExpenses");
   // ⚠️ ใช้ approveOwnExpense ไม่ใช่ manageAll — ผู้จัดการตั้งค่าระบบได้ทุกอย่างแต่ยังอนุมัติใบตัวเองไม่ได้
   const selfBlocked = e && e.requester?.userId === me && !can("approveOwnExpense");
   const editable = e && ["pending", "rejected"].includes(e.status);
   const canEdit = editable && (isOwner || viewAll);
-  const canCancel = e && ((isOwner && editable) || (canApprove && ["pending", "reviewed", "rejected", "approved"].includes(e.status)));
+  // ⚠️ กติกาเดียวกับ server (POST /:id/cancel): ยกเลิกได้ตามขั้นที่ตัวเองรับผิดชอบ
+  const canCancel = e && ((isOwner && editable)
+    || (editable && canActOnDoc)
+    || (e.status === "reviewed" && (canReview || canApprove))
+    || (e.status === "approved" && (canApprove || canDisburse)));
   const canAddFiles = e && e.status !== "cancelled" && (isOwner || canActOnDoc);
   const canRemoveFile = e && (canActOnDoc ? e.status !== "cancelled" : canEdit);
   const overdue = isOverdueClear(e);
@@ -572,9 +622,20 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
       if (action === "approve") updated = await ExpenseService.approve(e._id, form.note, form.useSignature !== false);
       if (action === "reject") updated = await ExpenseService.reject(e._id, form.reason);
       if (action === "cancel") updated = await ExpenseService.cancel(e._id, form.reason);
-      if (action === "pay") updated = (await ExpenseService.pay(e._id, { paidAt: form.paidAt, method: form.method, ref: form.ref, note: form.note, dueClearAt: form.dueClearAt }, files)).expense;
-      if (action === "settle") updated = (await ExpenseService.settle(e._id, { paidAt: form.paidAt, method: form.method, ref: form.ref, note: form.note }, files)).expense;
-      const msg = { approve: "อนุมัติเรียบร้อย", reject: "ตีกลับให้แก้ไขแล้ว", cancel: "ยกเลิกแล้ว", pay: "บันทึกการจ่ายเงินแล้ว", settle: "ปิดส่วนต่างเรียบร้อย" }[action];
+      const useSignature = form.useSignature !== false;
+      if (action === "pay") updated = (await ExpenseService.pay(e._id, { paidAt: form.paidAt, method: form.method, ref: form.ref, note: form.note, dueClearAt: form.dueClearAt, useSignature }, files)).expense;
+      if (action === "settle") updated = (await ExpenseService.settle(e._id, { paidAt: form.paidAt, method: form.method, ref: form.ref, note: form.note, useSignature }, files)).expense;
+      // ✅ บอกให้ชัดว่าใบไปอยู่ขั้นไหนต่อ — คนกดต้องรู้ว่างานของตัวเองจบแล้วและใครรับช่วงต่อ
+      const closedNow = updated?.status === "settled";
+      const msg = {
+        review: `ตรวจสอบแล้ว — ส่งต่อให้${STEP_OWNER.approve}อนุมัติ`,
+        reviewApprove: closedNow ? "ตรวจสอบและอนุมัติแล้ว — ใบเคลียร์เรียบร้อย" : `ตรวจสอบและอนุมัติแล้ว — ส่งต่อให้${STEP_OWNER.disburse}อนุมัติเบิกจ่าย`,
+        approve: closedNow ? "อนุมัติแล้ว — ใบเคลียร์เรียบร้อย (ไม่มีส่วนต่าง)" : `อนุมัติแล้ว — ส่งต่อให้${STEP_OWNER.disburse}อนุมัติเบิกจ่าย`,
+        reject: "ตีกลับให้แก้ไขแล้ว",
+        cancel: "ยกเลิกแล้ว",
+        pay: "อนุมัติเบิกจ่ายและบันทึกการจ่ายเงินแล้ว",
+        settle: money(e.difference) < 0 && !isReimburse ? "ยืนยันรับเงินคืนแล้ว — เคลียร์เรียบร้อย" : "อนุมัติเบิกจ่ายแล้ว — ปิดรายการเรียบร้อย",
+      }[action];
       applyResult(updated, msg);
     } catch (err) {
       setActionError(errorText(err));
@@ -613,56 +674,79 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
   const nextStep = useMemo(() => {
     if (!e) return null;
     const diff = differenceMeta(e.difference, slip);
-    // ✅ 2 ขั้น: รอตรวจสอบ (แอดมิน) → รออนุมัติ (ผู้จัดการ)
+    // ✅ 4 ขั้น: ส่งขอเบิก → ตรวจสอบ → อนุมัติ → อนุมัติเบิกจ่าย (บอกเสมอว่ารอใคร)
     if (e.status === "pending") {
-      return { severity: "warning", text: canReview && !selfBlocked ? "รอคุณตรวจสอบ (ขั้นที่ 1 จาก 2)" : "รอผู้ตรวจสอบพิจารณา (ขั้นที่ 1 จาก 2)" };
+      return {
+        severity: "warning",
+        text: canReview && !selfBlocked
+          ? "ขั้นที่ 2 จาก 4 · รอคุณตรวจสอบ"
+          : `ขั้นที่ 2 จาก 4 · รอตรวจสอบโดย${STEP_OWNER.review}`,
+      };
     }
     if (e.status === "reviewed") {
       const who = e.reviewedBy?.name ? `ตรวจสอบโดย ${personFullName(e.reviewedBy)}` : "ตรวจสอบแล้ว";
       return {
         severity: "warning",
         text: canApprove && !selfBlocked && (!reviewedByMe || canApproveOwnReview)
-          ? `${who} — รอคุณอนุมัติขั้นสุดท้าย`
-          : `${who} — รอผู้จัดการอนุมัติขั้นสุดท้าย`,
+          ? `ขั้นที่ 3 จาก 4 · ${who} — รอคุณอนุมัติ`
+          : `ขั้นที่ 3 จาก 4 · ${who} — รอ${STEP_OWNER.approve}อนุมัติ`,
+      };
+    }
+    if (e.status === "approved") {
+      const who = e.approvedBy?.name ? `อนุมัติโดย ${personFullName(e.approvedBy)}` : "อนุมัติแล้ว";
+      const what = kind === "advance"
+        ? `จ่ายเงิน Advance ${baht(e.total)}`
+        : isReimburse ? `จ่ายคืน ${baht(e.total)}` : `${differenceMeta(e.difference, slip).short} ${baht(differenceMeta(e.difference, slip).amount)}`;
+      return {
+        severity: "info",
+        text: canDisburse && !selfBlocked
+          ? `ขั้นที่ 4 จาก 4 · ${who} — รอคุณอนุมัติเบิกจ่าย (${what})`
+          : `ขั้นที่ 4 จาก 4 · ${who} — รอ${STEP_OWNER.disburse}อนุมัติเบิกจ่าย (${what})`,
       };
     }
     if (e.status === "rejected") return { severity: "error", text: `ถูกตีกลับโดย ${personFullName(e.rejectedBy) || "-"}: ${e.rejectReason || "-"}` };
     if (e.status === "cancelled") return { severity: "info", text: `ยกเลิกโดย ${personFullName(e.cancelledBy) || "-"} ${e.cancelledAt ? `เมื่อ ${thaiDate(e.cancelledAt)}` : ""}${e.cancelReason ? ` · ${e.cancelReason}` : ""}` };
     if (kind === "advance") {
-      if (e.status === "approved") return { severity: "info", text: `อนุมัติแล้ว — รอบันทึกการจ่ายเงิน ${baht(e.total)}` };
       if (e.status === "paid") {
         return overdue
           ? { severity: "error", text: `เลยกำหนดเคลียร์ (${thaiDate(e.dueClearAt)}) — กรุณาส่งใบเคลม` }
           : { severity: "info", text: `รับเงินแล้ว — ส่งใบเคลมพร้อมใบเสร็จ${e.dueClearAt ? ` ภายใน ${thaiDateFull(e.dueClearAt)}` : ""}` };
       }
-      if (e.status === "clearing") return { severity: "info", text: `ส่งใบเคลม ${e.claimDocNo || ""} แล้ว — รอตรวจ/ปิดส่วนต่าง` };
+      if (e.status === "clearing") return { severity: "info", text: `ส่งใบเคลม ${e.claimDocNo || ""} แล้ว — รอใบเคลมผ่านครบ 4 ขั้น` };
       if (e.status === "cleared") return { severity: "success", text: `เคลียร์เรียบร้อยด้วยใบเคลม ${e.claimDocNo || ""}` };
     } else if (isReimburse) {
-      if (e.status === "approved") return { severity: "info", text: `อนุมัติแล้ว — รอบริษัทจ่ายคืน ${baht(e.total)}` };
       if (e.status === "settled") return { severity: "success", text: `จ่ายคืนเรียบร้อย ${baht(e.total)}` };
     } else {
-      if (e.status === "approved") return { severity: "info", text: `อนุมัติแล้ว — รอ${diff.short} ${baht(diff.amount)}` };
       if (e.status === "settled") return { severity: "success", text: diff.amount ? `ปิดส่วนต่างเรียบร้อย (${diff.short} ${baht(diff.amount)})` : "เคลียร์เรียบร้อย ไม่มีส่วนต่าง" };
     }
     return null;
-  }, [e, kind, slip, isReimburse, overdue, canReview, canApprove, selfBlocked, reviewedByMe, canApproveOwnReview]);
+  }, [e, kind, slip, isReimburse, overdue, canReview, canApprove, canDisburse, selfBlocked, reviewedByMe, canApproveOwnReview]);
 
   const steps = useMemo(() => {
     if (!e) return [];
+    // ✅ 4 ขั้นหลักเหมือนกันทุกชนิดใบ: ส่งขอเบิก → ตรวจสอบ → อนุมัติ → อนุมัติเบิกจ่าย
+    const rejected = e.status === "rejected";
+    const head = [
+      { label: kind === "advance" ? "ส่งขอเบิก" : isReimburse ? "ส่งขอเบิกคืน" : "ส่งเคลม", done: true, date: e.submittedAt || e.createdAt },
+      { label: "ตรวจสอบ", done: Boolean(e.reviewedAt) && !rejected, date: e.reviewedAt, danger: rejected },
+      { label: "อนุมัติ", done: Boolean(e.approvedAt) && !["pending", "reviewed", "rejected"].includes(e.status), date: e.approvedAt, danger: rejected },
+    ];
     if (kind === "advance") {
       return [
-        { label: "ส่งขอเบิก", done: true, date: e.submittedAt || e.createdAt },
-        { label: "ตรวจสอบ", done: Boolean(e.reviewedAt) && e.status !== "rejected", date: e.reviewedAt, danger: e.status === "rejected" },
-        { label: "อนุมัติ", done: Boolean(e.approvedAt) && !["pending", "reviewed", "rejected"].includes(e.status), date: e.approvedAt, danger: e.status === "rejected" },
-        { label: "จ่ายเงิน", done: ["paid", "clearing", "cleared"].includes(e.status), date: e.payment?.at },
+        ...head,
+        { label: "อนุมัติเบิกจ่าย", done: ["paid", "clearing", "cleared"].includes(e.status), date: e.payment?.at },
+        // ขั้นติดตามหลังเงินออก (ไม่ใช่ขั้นอนุมัติ) — ผู้เบิกต้องส่งใบเคลม
         { label: "เคลียร์", done: e.status === "cleared", danger: overdue },
       ];
     }
+    const d = money(e.difference);
     return [
-      { label: isReimburse ? "ส่งขอเบิกคืน" : "ส่งเคลม", done: true, date: e.submittedAt || e.createdAt },
-      { label: "ตรวจสอบ", done: Boolean(e.reviewedAt) && e.status !== "rejected", date: e.reviewedAt, danger: e.status === "rejected" },
-      { label: "อนุมัติ", done: ["approved", "settled"].includes(e.status), date: e.approvedAt, danger: e.status === "rejected" },
-      { label: isReimburse ? "จ่ายคืน" : "ปิดส่วนต่าง", done: e.status === "settled", date: e.status === "settled" ? e.payment?.at : null },
+      ...head,
+      {
+        label: !isReimburse && d === 0 ? "ปิดใบ (ไม่มีส่วนต่าง)" : !isReimburse && d < 0 ? "ยืนยันรับเงินคืน" : "อนุมัติเบิกจ่าย",
+        done: e.status === "settled",
+        date: e.status === "settled" ? e.payment?.at : null,
+      },
     ];
   }, [e, kind, isReimburse, overdue]);
 
@@ -806,9 +890,15 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                   {e.reviewedAt && e.status !== "rejected" && <InfoCell label="ผู้ตรวจสอบ">{personFullName(e.reviewedBy)} · {thaiDate(e.reviewedAt)}</InfoCell>}
                   {e.approvedAt && !["pending", "reviewed", "rejected"].includes(e.status) && <InfoCell label="ผู้อนุมัติ">{personFullName(e.approvedBy)} · {thaiDate(e.approvedAt)}</InfoCell>}
                   {e.payment?.at && ((kind === "advance" && ["paid", "clearing", "cleared"].includes(e.status)) || (kind === "claim" && e.status === "settled" && money(e.difference) !== 0)) && (
-                    <InfoCell label={kind === "advance" ? "การจ่ายเงิน" : isReimburse ? "การจ่ายคืน" : "ปิดส่วนต่าง"} span>
-                      {thaiDate(e.payment.at)} · {paymentLabel(e.payment.method)}{e.payment.ref ? ` · ${e.payment.ref}` : ""}{e.payment.by?.name ? ` · โดย ${e.payment.by.name}` : ""}{e.payment.note ? ` · ${e.payment.note}` : ""}
-                    </InfoCell>
+                    <>
+                      {/* ✅ ขั้นที่ 4 — ผู้อนุมัติเบิกจ่าย (ช่องลงนามที่ผู้ใช้ขอเพิ่ม) */}
+                      <InfoCell label={mustReturn ? "ผู้อนุมัติเบิกจ่าย (ยืนยันรับเงินคืน)" : "ผู้อนุมัติเบิกจ่าย"}>
+                        {personFullName(e.payment.by) || "-"}
+                      </InfoCell>
+                      <InfoCell label={kind === "advance" ? "การจ่ายเงิน" : isReimburse ? "การจ่ายคืน" : mustReturn ? "การรับเงินคืน" : "การจ่ายส่วนต่าง"}>
+                        {thaiDate(e.payment.at)} · {paymentLabel(e.payment.method)}{e.payment.ref ? ` · ${e.payment.ref}` : ""}{e.payment.note ? ` · ${e.payment.note}` : ""}
+                      </InfoCell>
+                    </>
                   )}
                   {/* ✅ บัญชีรับเงินของผู้เบิก — โชว์เฉพาะใบที่บริษัทต้องโอนเงินให้ผู้เบิก
                       ⚠️ ใบที่ผู้เบิกต้องคืนเงินบริษัท ไม่โชว์บัญชี (คนละทิศทางเงิน) แต่โชว์ยอดที่ต้องคืนแทน */}
@@ -828,7 +918,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                             {baht(Math.abs(money(e.difference)))}
                           </Typography>
                           <Typography variant="caption" sx={{ color: TEXT_SUB }}>
-                            {e.status === "settled" ? "รับคืนเรียบร้อยแล้ว" : "ผู้เบิกนำส่งคืนที่ฝ่ายบัญชี แล้วบันทึกปิดส่วนต่างในระบบ"}
+                            {e.status === "settled" ? "รับคืนเรียบร้อยแล้ว" : "ผู้เบิกนำส่งคืนบริษัท แล้วผู้อนุมัติเบิกจ่ายกด “ยืนยันรับเงินคืน” ในระบบ"}
                           </Typography>
                         </Box>
                       </Stack>
@@ -953,8 +1043,8 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                 {e.status === "rejected" ? "แก้ไข / ส่งใหม่" : "แก้ไข"}
               </Button>
             )}
-            {/* ✅ ตีกลับได้ทั้งขั้นตรวจสอบและขั้นอนุมัติ */}
-            {canActOnDoc && ["pending", "reviewed"].includes(e.status) && (
+            {/* ✅ ตีกลับได้เฉพาะขั้นที่ตัวเองรับผิดชอบ (ตรวจสอบ / อนุมัติ / อนุมัติเบิกจ่าย) — server บังคับซ้ำ */}
+            {canActOnCurrentStep && (
               <Button onClick={() => setAction("reject")} disabled={selfBlocked} startIcon={<Undo sx={{ fontSize: 17 }} />} sx={{ textTransform: "none", fontWeight: 700, color: "#dc2626" }}>
                 ตีกลับ
               </Button>
@@ -970,7 +1060,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                 </span>
               </Tooltip>
             )}
-            {/* ขั้นที่ 1 — ตรวจสอบ (แอดมิน · ผู้จัดการกดแยกขั้นก็ได้) */}
+            {/* ขั้นที่ 2 — ตรวจสอบ (แอดมินช่าง · ผู้จัดการกดแยกขั้นก็ได้) */}
             {canReview && e.status === "pending" && (
               <Tooltip title={selfBlocked ? "ตรวจสอบใบของตัวเองไม่ได้ — ให้หัวหน้าท่านอื่นเป็นผู้ตรวจสอบ" : ""} describeChild>
                 <span>
@@ -983,7 +1073,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                 </span>
               </Tooltip>
             )}
-            {/* ขั้นที่ 2 — อนุมัติขั้นสุดท้าย (ผู้จัดการ) */}
+            {/* ขั้นที่ 3 — อนุมัติ (ผู้จัดการแผนกช่าง) */}
             {canApprove && e.status === "reviewed" && (
               <Tooltip
                 title={selfBlocked
@@ -994,22 +1084,22 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                 <span>
                   <Button variant="contained" disabled={selfBlocked || (reviewedByMe && !canApproveOwnReview)} onClick={() => setAction("approve")} startIcon={<CheckCircle sx={{ fontSize: 18 }} />}
                     sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: "#059669", "&:hover": { bgcolor: "#047857", boxShadow: "none" } }}>
-                    อนุมัติขั้นสุดท้าย
+                    อนุมัติ
                   </Button>
                 </span>
               </Tooltip>
             )}
-            {canApprove && kind === "advance" && e.status === "approved" && (
-              <Button variant="contained" onClick={() => setAction("pay")} startIcon={<Payments sx={{ fontSize: 18 }} />}
-                sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: meta.color, "&:hover": { bgcolor: meta.dark, boxShadow: "none" } }}>
-                บันทึกจ่ายเงิน
-              </Button>
-            )}
-            {canApprove && kind === "claim" && e.status === "approved" && (
-              <Button variant="contained" onClick={() => setAction("settle")} startIcon={<TaskAlt sx={{ fontSize: 18 }} />}
-                sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: meta.color, "&:hover": { bgcolor: meta.dark, boxShadow: "none" } }}>
-                {isReimburse ? "บันทึกจ่ายคืน" : money(e.difference) > 0 ? "บันทึกจ่ายเพิ่ม" : "บันทึกรับเงินคืน"}
-              </Button>
+            {/* ขั้นที่ 4 — อนุมัติเบิกจ่าย (ผู้จัดการแผนกช่าง / กรรมการผู้จัดการ) */}
+            {canDisburse && e.status === "approved" && (
+              <Tooltip title={selfBlocked ? "อนุมัติเบิกจ่ายใบของตัวเองไม่ได้" : ""} describeChild>
+                <span>
+                  <Button variant="contained" disabled={selfBlocked} onClick={() => setAction(kind === "advance" ? "pay" : "settle")}
+                    startIcon={kind === "advance" ? <Payments sx={{ fontSize: 18 }} /> : <TaskAlt sx={{ fontSize: 18 }} />}
+                    sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: mustReturn ? "#c2410c" : meta.color, "&:hover": { bgcolor: mustReturn ? "#9a3412" : meta.dark, boxShadow: "none" } }}>
+                    {mustReturn ? "ยืนยันรับเงินคืน" : "อนุมัติเบิกจ่าย"}
+                  </Button>
+                </span>
+              </Tooltip>
             )}
             {kind === "advance" && e.status === "paid" && (isOwner || viewAll) && (
               <Button variant="contained" onClick={() => onCreateClaim?.(e)} startIcon={<ReceiptLong sx={{ fontSize: 18 }} />}

@@ -57,8 +57,8 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
   const isSaleUser = isRole(userData, ROLES.SALE);
   const canViewFinance = can(userData, "viewFinance");
   const canExpense = can(userData, "requestExpense") || can(userData, "viewAllExpenses");
-  // ผู้ตรวจสอบ (ขั้นที่ 1) และผู้อนุมัติ (ขั้นที่ 2) เห็นคิวเดียวกัน
-  const canApproveExpense = can(userData, "reviewExpense") || can(userData, "approveExpense");
+  // ✅ ทุกคนที่มีขั้นของตัวเองในสายอนุมัติ 4 ขั้น (ตรวจสอบ / อนุมัติ / อนุมัติเบิกจ่าย) เห็นคิวงาน
+  const canApproveExpense = can(userData, "reviewExpense") || can(userData, "approveExpense") || can(userData, "disburseExpense");
   const canAssign = can(userData, "assignDispatch");
   const canViewOperation = can(userData, "editOperation") || can(userData, "receiveDispatch");
   const canPlanWork = canViewOperation || canSell || isTechnician || isAdminOrManager;
@@ -94,9 +94,9 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
     // (เคยทาสีม่วงของ "ชนิดเอกสาร" ไว้ที่ปุ่มนี้ปุ่มเดียว ผู้ใช้ดูของจริงแล้วบอกว่าโดดออกมาจากเพื่อนในแถว —
     // สีประจำชนิดใบยังอยู่ครบในหน้าใบเคลมเอง ตรงนี้เป็นแค่ปุ่มทางเข้า)
     expense.push({ key: "claim", title: "ใบเคลม", sub: "เคลียร์ค่าใช้จ่าย", href: "/expenses/claims", icon: FaReceipt, badgeKey: "claim" });
-    // ✅ หัวหน้ามีคิวงานที่ต้องทำ (อนุมัติ/จ่าย/ปิดส่วนต่าง) เพิ่มอีกเมนู
+    // ✅ คิวงานของผู้ดำเนินการแต่ละขั้น (ตรวจสอบ/อนุมัติ/อนุมัติเบิกจ่าย) เพิ่มอีกเมนู
     if (canApproveExpense) {
-      expense.push({ key: "expense-inbox", title: "รอตรวจสอบ / อนุมัติ", short: "รอดำเนินการ", sub: "ตรวจสอบ · อนุมัติ · จ่ายเงิน", href: "/expenses/approvals", icon: FaInbox, badgeKey: "expenseInbox" });
+      expense.push({ key: "expense-inbox", title: "รอดำเนินการ", short: "รอดำเนินการ", sub: "ตรวจสอบ · อนุมัติ · เบิกจ่าย", href: "/expenses/approvals", icon: FaInbox, badgeKey: "expenseInbox" });
     }
     expense.push({ key: "expense-report", title: "รายงานการเบิก", short: "รายงาน", sub: "ยอดค้าง · ย้อนหลัง", href: "/expenses/report", icon: FaChartBar });
   }

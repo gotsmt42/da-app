@@ -89,6 +89,20 @@ describe("สิทธิ์เดิมต้องไม่เปลี่ย�
     expect(can(ROLES.TECHNICIAN, "approveOwnExpense")).toBe(false);
   });
 
+  // ✅ สายอนุมัติใบเบิก 4 ขั้น (ผู้ใช้กำหนด)
+  it("ตรวจสอบ = แอดมิน/ผู้จัดการ · อนุมัติ = ผู้จัดการ · อนุมัติเบิกจ่าย = ผู้จัดการ/กรรมการ", () => {
+    expect(can(ROLES.ADMIN, "reviewExpense")).toBe(true);
+    expect(can(ROLES.MANAGER, "reviewExpense")).toBe(true);
+    expect(can(ROLES.DIRECTOR, "reviewExpense")).toBe(false);
+    expect(can(ROLES.MANAGER, "approveExpense")).toBe(true);
+    expect(can(ROLES.ADMIN, "approveExpense")).toBe(false);
+    expect(can(ROLES.DIRECTOR, "approveExpense")).toBe(false);
+    expect(can(ROLES.DIRECTOR, "disburseExpense")).toBe(true);
+    expect(can(ROLES.MANAGER, "disburseExpense")).toBe(true);
+    expect(can(ROLES.ADMIN, "disburseExpense")).toBe(false);
+    expect(can(ROLES.TECHNICIAN, "disburseExpense")).toBe(false);
+  });
+
   // ✅ ลำดับชั้น: ผู้จัดการ (3) > แอดมิน (2) > ช่าง/เซล/ผู้ใช้ (1)
   it("แอดมินตั้งใครเป็นผู้จัดการไม่ได้ และแตะบัญชีผู้จัดการไม่ได้", () => {
     expect(canAssignRole(ROLES.ADMIN, ROLES.MANAGER)).toBe(false);
@@ -110,8 +124,15 @@ describe("สิทธิ์เดิมต้องไม่เปลี่ย�
   // ✅ ผู้ใช้ขอเพิ่ม "กรรมการผู้จัดการ" — สูงสุดของบริษัท
   it("กรรมการผู้จัดการมีทุกสิทธิ์ที่ผู้จัดการมี และอยู่เหนือทุกระดับ", () => {
     const caps = Object.keys(CAPABILITIES);
+    /**
+     * ⚠️ ข้อยกเว้นที่ตั้งใจ (ผู้ใช้กำหนดสายอนุมัติใบเบิก 4 ขั้น): กรรมการผู้จัดการอยู่ขั้น "อนุมัติเบิกจ่าย"
+     * ไม่อยู่ขั้นตรวจสอบ ("ให้แค่แอดมิน และผู้จัดการเท่านั้น") และขั้นอนุมัติ ("ผู้จัดการที่อนุมัติ")
+     * นอกจากสองขั้นนี้ ต้องมีทุกสิทธิ์ที่ผู้จัดการมี
+     */
+    const EXPENSE_STEP_EXCEPTIONS = ["reviewExpense", "approveExpense", "approveOwnReview"];
     const missing = caps.filter((c) => can(ROLES.MANAGER, c) && !can(ROLES.DIRECTOR, c));
-    expect(missing).toEqual([]);
+    expect(missing.sort()).toEqual([...EXPENSE_STEP_EXCEPTIONS].sort());
+    expect(can(ROLES.DIRECTOR, "disburseExpense")).toBe(true);
     expect(roleLevel(ROLES.DIRECTOR)).toBeGreaterThan(roleLevel(ROLES.MANAGER));
     expect(ROLE_LABEL[ROLES.DIRECTOR]).toBe("กรรมการผู้จัดการ");
     // ⚠️ ผู้จัดการตั้ง/แตะบัญชีกรรมการผู้จัดการไม่ได้ (คนละระดับ)
