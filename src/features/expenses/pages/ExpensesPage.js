@@ -32,6 +32,8 @@ import ExpenseService from "../services/ExpenseService";
 import ExpenseList from "../components/ExpenseList";
 import ExpenseFormDialog from "../components/ExpenseFormDialog";
 import ExpenseDetailDialog from "../components/ExpenseDetailDialog";
+import MyExpenseTasks from "../components/MyExpenseTasks";
+import { useAuth } from "@/features/auth/AuthContext";
 import ExpenseReport from "./ExpenseReport";
 import { KIND_META, slipMeta, baht, TEXT_SUB, BORDER_MAIN } from "../expenseMeta";
 
@@ -123,6 +125,7 @@ const CrossLink = ({ to, label, color }) => (
 
 export default function ExpensesPage({ view: viewProp }) {
   const { can } = usePermissions();
+  const { userData } = useAuth();
   const { id: routeId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -336,6 +339,19 @@ export default function ExpensesPage({ view: viewProp }) {
       <Stack direction="row" spacing={0.75} sx={{ mb: 0.5, overflowX: "auto", pb: 0.5, "&::-webkit-scrollbar": { display: "none" }, scrollbarWidth: "none" }}>
         {crossLinks.map((l) => <CrossLink key={l.to} {...l} />)}
       </Stack>
+
+      {/* ✅ สิ่งที่ป้ายตัวเลขบนเมนู "ใบเคลม"/"ใบ Advance" นับไว้ — ต้องเห็นและกดทำต่อได้ทันทีที่เข้ามา
+          (ผู้ใช้แจ้งว่าป้ายขึ้นแต่เข้ามาแล้วไม่เจออะไร) */}
+      {(view === "claim" || view === "advance") && canRequest && (
+        <MyExpenseTasks
+          view={view}
+          userId={userData?.userId}
+          reloadKey={reloadKey}
+          onOpen={openDetail}
+          onCreateClaim={(advance) => openCreate("claim", advance)}
+          onEdit={(expense) => setForm({ open: true, kind: expense.kind, claimType: expense.claimType || "clear", expense, advance: null })}
+        />
+      )}
 
       {isList ? (
         <ExpenseList
