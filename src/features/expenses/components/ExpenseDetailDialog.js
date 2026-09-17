@@ -476,7 +476,8 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
   const canChainBothSteps = canReview && canApprove && canApproveOwnReview;
   const canActOnDoc = canReview || canApprove;
   const viewAll = can("viewAllExpenses");
-  const selfBlocked = e && e.requester?.userId === me && !can("manageAll");
+  // ⚠️ ใช้ approveOwnExpense ไม่ใช่ manageAll — ผู้จัดการตั้งค่าระบบได้ทุกอย่างแต่ยังอนุมัติใบตัวเองไม่ได้
+  const selfBlocked = e && e.requester?.userId === me && !can("approveOwnExpense");
   const editable = e && ["pending", "rejected"].includes(e.status);
   const canEdit = editable && (isOwner || viewAll);
   const canCancel = e && ((isOwner && editable) || (canApprove && ["pending", "reviewed", "rejected", "approved"].includes(e.status)));

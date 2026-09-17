@@ -29,7 +29,7 @@ describe("normalizeRole", () => {
 describe("can", () => {
   it("ตอบตามตารางสิทธิ์", () => {
     expect(can(ROLES.ADMIN, "manageAll")).toBe(true);
-    expect(can(ROLES.MANAGER, "manageAll")).toBe(false);
+    expect(can(ROLES.MANAGER, "manageAll")).toBe(true);
     expect(can({ role: "Manager" }, "approveJobs")).toBe(true);
   });
 
@@ -82,9 +82,14 @@ describe("สิทธิ์เดิมต้องไม่เปลี่ย�
     expect(can(ROLES.TECHNICIAN, "editContracts")).toBe(false);
   });
 
-  it("ผู้จัดการยังทำงานระดับ admin ไม่ได้ (manageAll เดิมเป็นของ admin คนเดียว)", () => {
-    expect(can(ROLES.MANAGER, "manageAll")).toBe(false);
+  // ✅ ผู้ใช้สั่งให้ผู้จัดการมีสิทธิ์สูงสุด: ตั้งค่าระบบได้ทุกอย่าง + ตรวจสอบ/อนุมัติใบของตัวเองได้
+  it("ผู้จัดการมีสิทธิ์สูงสุดเท่าแอดมิน", () => {
+    expect(can(ROLES.MANAGER, "manageAll")).toBe(true);
     expect(can(ROLES.MANAGER, "editAnyJob")).toBe(true);
+    expect(can(ROLES.MANAGER, "approveOwnExpense")).toBe(true);
+    expect(can(ROLES.MANAGER, "approveOwnReview")).toBe(true);
+    // ⚠️ ช่างยังต้องให้หัวหน้าพิจารณาเสมอ
+    expect(can(ROLES.TECHNICIAN, "approveOwnExpense")).toBe(false);
   });
 
   it("editOperation คงชุดเดิมที่มี user แต่ไม่มีช่าง", () => {

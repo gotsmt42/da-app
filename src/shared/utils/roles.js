@@ -64,7 +64,11 @@ const ROLE_DEPARTMENT = {
  * งานนี้คือรวมศูนย์การเช็คสิทธิ์ ไม่ใช่เปลี่ยนสิทธิ์ใคร (SALE เป็นของใหม่ล้วน)
  */
 export const CAPABILITIES = {
-  manageAll: [ROLES.ADMIN],
+  /**
+   * จัดการระบบทั้งหมด — ✅ ผู้ใช้สั่งให้ "ผู้จัดการ" มีสิทธิ์สูงสุดเท่าแอดมิน ตั้งค่าได้ทุกอย่าง
+   * (เหตุผล/ข้อจำกัดเต็มอยู่ที่ da-app-server/src/config/roles.js)
+   */
+  manageAll: [ROLES.ADMIN, ROLES.MANAGER],
   approveJobs: [ROLES.ADMIN, ROLES.MANAGER],
   viewAllJobs: [ROLES.ADMIN, ROLES.MANAGER],
   editAnyJob: [ROLES.ADMIN, ROLES.MANAGER],
@@ -114,6 +118,11 @@ export const CAPABILITIES = {
    * ⚠️ เหตุผลและข้อแลกเปลี่ยนอยู่ที่ da-app-server/src/config/roles.js
    */
   approveOwnReview: [ROLES.MANAGER],
+  /**
+   * ตรวจสอบ/อนุมัติใบของตัวเองได้ (แอดมิน + ผู้จัดการ ตามที่ผู้ใช้สั่ง)
+   * ⚠️ แยกจาก manageAll โดยตั้งใจ — "ตั้งค่าระบบได้" ไม่ได้แปลว่า "เซ็นอนุมัติเงินให้ตัวเองได้"
+   */
+  approveOwnExpense: [ROLES.ADMIN, ROLES.MANAGER],
   /** เห็นใบของทุกคน + เบิกแทนคนอื่นได้ + ดูรายงานทั้งบริษัท */
   viewAllExpenses: [ROLES.ADMIN, ROLES.MANAGER],
 };
