@@ -877,7 +877,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                   /* ✅ แยกเป็นกลุ่มตาม "ขั้นตอนที่แนบ" (ผู้ใช้ขอ) — ไฟล์ในใบเดียวมาจากคนละช่วงของกระบวนการ
                      เช่น ใบเสร็จตอนออกใบ กับสลิปโอนตอนจ่ายเงิน ถ้ากองรวมกันจะแยกไม่ออกว่าอันไหนของขั้นไหน */
                   <Stack spacing={1.5}>
-                    {groupFilesByStage(e.attachments).map((group) => (
+                    {groupFilesByStage(e.attachments, slip).map((group) => (
                       <Box key={group.value || "other"}>
                         <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.75 }}>
                           <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: group.color }} />

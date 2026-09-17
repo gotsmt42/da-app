@@ -16,6 +16,7 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
+import { roleLabel } from "@/shared/utils/roles";
 
 // ---- Design tokens (shared across the app) --------------------------------
 const COLOR = {
@@ -162,6 +163,18 @@ const EditProductModal = ({
               sx={fieldSx}
             />
           </Grid>
+          <Grid item xs={12} sm={6}>
+            {/* ✅ ตำแหน่งย้ายมาอยู่ฝั่ง "แก้ไขได้" — เป็นข้อมูลที่พิมพ์ใต้ชื่อในเอกสารจริง ต้องแก้เองได้ */}
+            <TextField
+              label="ตำแหน่ง"
+              placeholder="เช่น ช่างเทคนิคอาวุโส / ผู้ช่วยผู้จัดการ"
+              fullWidth
+              size="small"
+              defaultValue={editedData?.rank}
+              onChange={(e) => setEditedData({ ...editedData, rank: e.target.value })}
+              sx={fieldSx}
+            />
+          </Grid>
           <Grid item xs={12}>
             <TextField
               label="คำอธิบายตัวตน"
@@ -217,22 +230,13 @@ const EditProductModal = ({
             />
           </Grid>
           <Grid item xs={12} sm={6}>
+            {/* ⚠️ สิทธิ์เปลี่ยนได้จากหน้าทะเบียนพนักงานเท่านั้น (ต้องยืนยันรหัสผ่าน) — ที่นี่แสดงอย่างเดียว */}
             <TextField
-              label="ตำแหน่ง"
+              label="สิทธิ์การใช้งาน"
               fullWidth
               size="small"
               disabled
-              defaultValue={editedData?.rank}
-              sx={fieldSx}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              label="สถานะ"
-              fullWidth
-              size="small"
-              disabled
-              defaultValue={editedData?.role}
+              value={roleLabel(editedData) || "-"}
               sx={fieldSx}
             />
           </Grid>

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import Swal from "sweetalert2";
 
-import Facebook from "@mui/icons-material/Facebook";
-import { Instagram, Twitter } from "@mui/icons-material";
 import ManageAccountsRoundedIcon from "@mui/icons-material/ManageAccountsRounded";
+import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
+import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import EmailOutlinedIcon from "@mui/icons-material/EmailOutlined";
 import PhoneOutlinedIcon from "@mui/icons-material/PhoneOutlined";
 import BadgeOutlinedIcon from "@mui/icons-material/BadgeOutlined";
@@ -35,7 +35,8 @@ const FONT_UI = `"Noto Sans Thai", "IBM Plex Sans", sans-serif`;
 const FONT_MONO = `"IBM Plex Mono", ui-monospace, monospace`;
 
 const Account = () => {
-  const { updateUserData, userData } = useAuth();
+  const { updateUserData, userData, refreshUserData } = useAuth();
+  const [copied, setCopied] = useState("");
 
   const [modalOpenEdit, setModalOpenEdit] = useState(false);
   const [editedData, setEditedData] = useState({});
@@ -71,8 +72,14 @@ const Account = () => {
       const updatedUser = await AuthService.UpdateUser(userId, formData);
       setUser(updatedUser);
 
-      if (userData && updatedUser._id === userData._id) {
-        updateUserData(updatedUser);
+      /**
+       * ✅ อัปเดตทันทีทุกจุด (ผู้ใช้สั่ง) — ข้อมูลผู้ใช้ถูกใช้วาดชื่อ/รูป/สิทธิ์ทั้งบนหัวเว็บและเมนู
+       * ⚠️ เทียบด้วย userId ของ payload (ไม่ใช่ _id ซึ่ง payload ไม่มี) — ของเดิมเทียบผิดฟิลด์
+       * ทำให้หัวเว็บไม่อัปเดตจนกว่าจะรีเฟรชหน้า
+       */
+      if (String(updatedUser?._id || "") === String(userData?.userId || "")) {
+        updateUserData({ ...userData, ...updatedUser, userId: String(updatedUser._id) });
+        await refreshUserData();
       }
 
       setModalOpenEdit(false);
@@ -92,14 +99,19 @@ const Account = () => {
     { icon: EmailOutlinedIcon, label: "อีเมล", value: user?.email || "-" },
     { icon: PhoneOutlinedIcon, label: "เบอร์โทร", value: user?.tel || "-" },
     { icon: BadgeOutlinedIcon, label: "สิทธิ์การใช้งาน", value: roleLabel(user) || "-" },
-    { icon: WorkOutlineIcon, label: "ตำแหน่ง", value: user?.rank || "-" },
+    { icon: WorkOutlineIcon, label: "ตำแหน่ง", value: user?.rank || "ยังไม่ระบุ" },
   ];
 
-  const socialLinks = [
-    { icon: Facebook, href: "#!" },
-    { icon: Twitter, href: "#!" },
-    { icon: Instagram, href: "#!" },
-  ];
+  /** คัดลอกอีเมล/เบอร์ — แทนไอคอนโซเชียลปลอมที่ลิงก์ไปไหนไม่ได้ */
+  const copy = async (key, value) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(key);
+      setTimeout(() => setCopied(""), 1500);
+    } catch {
+      setCopied("");
+    }
+  };
 
   return (
     <Box
@@ -121,10 +133,10 @@ const Account = () => {
             bgcolor: COLOR.surface,
           }}
         >
-          {/* Cover */}
+          {/* Cover — ⚠️ สูงพอให้ชื่อที่ยกขึ้นมาทับ (mt: -52px) ไม่ไปคร่อมขอบล่างของแถบสี */}
           <Box
             sx={{
-              height: 128,
+              height: 150,
               background: `linear-gradient(135deg, ${COLOR.accentDeep} 0%, ${COLOR.accent} 55%, ${COLOR.gold} 130%)`,
               position: "relative",
             }}
@@ -139,6 +151,7 @@ const Account = () => {
                 alignItems: { xs: "center", sm: "flex-end" },
                 gap: 2.5,
                 mt: "-52px",
+                position: "relative",
               }}
             >
               <Box sx={{ position: "relative" }}>
@@ -289,35 +302,40 @@ const Account = () => {
 
             <Divider sx={{ my: 3, borderColor: COLOR.line }} />
 
-            {/* Social */}
+            {/* ✅ ช่องทางติดต่อของจริง — กดคัดลอกไปวางได้เลย (เดิมเป็นไอคอนโซเชียลที่ลิงก์ไปไหนไม่ได้) */}
             <Typography
-              sx={{
-                fontFamily: FONT_DISPLAY,
-                fontWeight: 700,
-                fontSize: 15,
-                color: COLOR.ink,
-                mb: 1.5,
-              }}
+              sx={{ fontFamily: FONT_DISPLAY, fontWeight: 700, fontSize: 15, color: COLOR.ink, mb: 1.5 }}
             >
               ช่องทางติดต่อ
             </Typography>
-            <Stack direction="row" spacing={1.25}>
-              {socialLinks.map(({ icon: Icon, href }, idx) => (
-                <IconButton
-                  key={idx}
-                  component="a"
-                  href={href}
-                  sx={{
-                    width: 38,
-                    height: 38,
-                    bgcolor: COLOR.bg,
-                    border: `1px solid ${COLOR.line}`,
-                    color: COLOR.sub,
-                    "&:hover": { bgcolor: COLOR.accentSoft, color: COLOR.accentDeep },
-                  }}
+            <Stack direction="row" spacing={1.25} flexWrap="wrap" useFlexGap>
+              {[
+                { key: "email", label: user?.email, href: user?.email ? `mailto:${user.email}` : "", icon: EmailOutlinedIcon },
+                { key: "tel", label: user?.tel, href: user?.tel ? `tel:${String(user.tel).replace(/[^0-9+]/g, "")}` : "", icon: PhoneOutlinedIcon },
+              ].filter((c) => c.label).map(({ key, label, href, icon: Icon }) => (
+                <Stack
+                  key={key}
+                  direction="row"
+                  alignItems="center"
+                  spacing={0.75}
+                  sx={{ pl: 1.25, pr: 0.5, py: 0.5, borderRadius: 999, bgcolor: COLOR.bg, border: `1px solid ${COLOR.line}` }}
                 >
-                  <Icon sx={{ fontSize: 19 }} />
-                </IconButton>
+                  <Icon sx={{ fontSize: 17, color: COLOR.accentDeep }} />
+                  <Typography
+                    component="a"
+                    href={href}
+                    sx={{ fontFamily: FONT_MONO, fontSize: 13, color: COLOR.ink, textDecoration: "none" }}
+                  >
+                    {label}
+                  </Typography>
+                  <Tooltip title={copied === key ? "คัดลอกแล้ว" : "คัดลอก"} describeChild>
+                    <IconButton size="small" onClick={() => copy(key, label)}>
+                      {copied === key
+                        ? <CheckRoundedIcon sx={{ fontSize: 16, color: COLOR.accent }} />
+                        : <ContentCopyRoundedIcon sx={{ fontSize: 15, color: COLOR.sub }} />}
+                    </IconButton>
+                  </Tooltip>
+                </Stack>
               ))}
             </Stack>
           </Box>

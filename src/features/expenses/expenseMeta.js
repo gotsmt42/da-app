@@ -169,11 +169,30 @@ export const FILE_STAGES = [
   { value: "", label: "ไฟล์แนบอื่นๆ", color: "#94a3b8" },
 ];
 
-export const fileStageMeta = (v) => FILE_STAGES.find((s) => s.value === (v || "")) || FILE_STAGES[FILE_STAGES.length - 1];
+/**
+ * ป้ายขั้นตอน "เจาะจงชนิดใบ" — ✅ ผู้ใช้ขอให้ระบุให้ชัดว่าเป็นตอนออกใบ Advance หรือใบเคลม
+ * ⚠️ ต้องส่ง slipKind(e) มาเสมอ ไม่ใช่ e.kind ดิบ (ใบสำรองจ่ายมี kind = "claim")
+ */
+const STAGE_LABEL_BY_KIND = {
+  created: { advance: "แนบตอนออกใบ Advance", claim: "แนบตอนออกใบเคลม", reimburse: "แนบตอนออกใบสำรองจ่าย" },
+  resubmitted: {
+    advance: "แนบตอนแก้ไขใบ Advance และส่งใหม่",
+    claim: "แนบตอนแก้ไขใบเคลมและส่งใหม่",
+    reimburse: "แนบตอนแก้ไขใบสำรองจ่ายและส่งใหม่",
+  },
+  pay: { advance: "แนบตอนจ่ายเงิน Advance ให้พนักงาน" },
+  settle: { claim: "แนบตอนเคลียร์ส่วนต่างกับพนักงาน", reimburse: "แนบตอนจ่ายคืนพนักงาน" },
+};
+
+export const fileStageMeta = (v, kind) => {
+  const base = FILE_STAGES.find((s) => s.value === (v || "")) || FILE_STAGES[FILE_STAGES.length - 1];
+  const label = STAGE_LABEL_BY_KIND[base.value]?.[kind];
+  return label ? { ...base, label } : base;
+};
 
 /** จัดไฟล์เป็นกลุ่มตามขั้นตอน เรียงตามลำดับที่เกิดขึ้นจริงในกระบวนการ */
-export const groupFilesByStage = (files = []) => FILE_STAGES
-  .map((stage) => ({ ...stage, files: files.filter((f) => (f.stage || "") === stage.value) }))
+export const groupFilesByStage = (files = [], kind) => FILE_STAGES
+  .map((stage) => ({ ...fileStageMeta(stage.value, kind), files: files.filter((f) => (f.stage || "") === stage.value) }))
   .filter((g) => g.files.length);
 
 export const PAYMENT_METHODS = [

@@ -32,6 +32,15 @@ export const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
 /** เล็กกว่านี้ไม่ต้องบีบอัด — เสียเวลา decode/encode มากกว่าที่ประหยัดได้ */
 const SKIP_COMPRESS_BELOW = 400 * 1024;
 
+/**
+ * เพดาน "หลังบีบอัด" ของรูปหนึ่งใบ
+ * ✅ ผู้ใช้สั่ง: "การแนบไฟล์บังคับลดขนาดไฟล์ด้วย ไม่ให้ใหญ่เกินไป และมาตรฐาน"
+ * รูปใบเสร็จ/หน้างานที่ 1920px คุณภาพ 0.75 ปกติได้ 300–800 KB อยู่แล้ว — ที่เกิน 1.5 MB คือรูป
+ * รายละเอียดสูงผิดปกติ (สแกน 300dpi / ภาพหน้าจอความละเอียดสูง) ซึ่งลดคุณภาพลงอีกนิดก็ยังอ่านออก
+ * ⚠️ ไล่ลดทีละขั้นแทนการตัดครั้งเดียว — รูปที่ตัวหนังสือเยอะถ้ากดคุณภาพต่ำทันทีจะอ่านไม่ออก
+ */
+const TARGET_IMAGE_BYTES = 1.5 * 1024 * 1024;
+
 // ── ชนิดไฟล์ที่อนุญาต (allowlist — ปลอดภัยกว่าการไล่แบนทีละชนิด) ──────────────
 export const ALLOWED_IMAGE_TYPES = [
   "image/jpeg",
@@ -174,8 +183,19 @@ export const compressImage = async (file, { maxEdge = 1920, quality = 0.75 } = {
     bitmap.close?.();
 
     const mime = supportsWebp() ? "image/webp" : "image/jpeg";
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, mime, quality));
+    let blob = await new Promise((resolve) => canvas.toBlob(resolve, mime, quality));
     if (!blob) return file;
+
+    // ✅ ยังใหญ่เกินเพดาน → ไล่ลดคุณภาพลงทีละขั้นจนผ่าน (อย่างมาก 3 รอบ ไม่ให้เครื่องช้า)
+    const encodeAt = (level) => new Promise((resolve) => canvas.toBlob(resolve, mime, level));
+    let q = quality;
+    for (let i = 0; i < 3 && blob.size > TARGET_IMAGE_BYTES; i += 1) {
+      q = Math.max(0.45, q - 0.15);
+      // eslint-disable-next-line no-await-in-loop -- ต้องรู้ขนาดรอบนี้ก่อนถึงจะตัดสินใจลดรอบถัดไป
+      const next = await encodeAt(q);
+      if (!next || next.size >= blob.size) break;
+      blob = next;
+    }
 
     // บีบแล้วไม่เล็กลง (เช่นรูปที่บีบมาดีอยู่แล้ว) — ใช้ต้นฉบับดีกว่า
     if (blob.size >= file.size) return file;

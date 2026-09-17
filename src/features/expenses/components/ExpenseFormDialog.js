@@ -31,7 +31,7 @@ import {
 } from "@mui/icons-material";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
-import { ACCEPT_ALL, formatBytes } from "@/shared/utils/fileUpload";
+import { ACCEPT_ALL, formatBytes, MAX_UPLOAD_MB } from "@/shared/utils/fileUpload";
 import { thaiDate } from "@/shared/utils/thaiDate";
 import { useAuth } from "@/features/auth/AuthContext";
 import usePermissions from "@/shared/hooks/usePermissions";
@@ -1012,6 +1012,10 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
               </Typography>
               <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }}>
                 {isClaim ? "รูปใบเสร็จ บิล สลิปโอน — ผู้อนุมัติจะตรวจจากไฟล์เหล่านี้" : "ใบเสนอราคา รูปหน้างาน หรือเอกสารประกอบ (ไม่บังคับ)"}
+              </Typography>
+              {/* ✅ บอกกฎขนาดไฟล์ตั้งแต่ก่อนเลือก — ผู้ใช้จะได้ไม่เสียเวลาอัปรูปใหญ่แล้วโดนปฏิเสธทีหลัง */}
+              <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", mt: 0.25 }}>
+                ระบบย่อรูปให้อัตโนมัติก่อนอัปโหลด · รองรับ JPG PNG HEIC PDF Word Excel · ไฟล์ละไม่เกิน {MAX_UPLOAD_MB} MB
               </Typography>
             </Box>
             <Stack spacing={0.75} sx={{ mt: 1 }}>

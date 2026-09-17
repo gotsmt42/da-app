@@ -311,7 +311,13 @@ const EmployeeFormModal = ({ open, mode, data, onChange, onClose, onSubmit, isSm
 };
 
 // ─── PasswordConfirmModal ────────────────────────────────────────────────
-const PasswordConfirmModal = ({ open, value, onChange, onClose, onConfirm, isSmallScreen }) => {
+const PasswordConfirmModal = ({
+  open, value, onChange, onClose, onConfirm, isSmallScreen,
+  title = "ยืนยันรหัสผ่าน Admin",
+  description = "เพื่อความปลอดภัยก่อนเพิ่มผู้ใช้ใหม่",
+  confirmLabel = "ยืนยัน",
+  busy = false,
+}) => {
   const modalStyle = {
     position: "absolute",
     top: "50%",
@@ -334,8 +340,8 @@ const PasswordConfirmModal = ({ open, value, onChange, onClose, onConfirm, isSma
             <VpnKeyIcon fontSize="small" />
           </Avatar>
           <Box>
-            <Typography fontWeight={800} fontSize="1.05rem">ยืนยันรหัสผ่าน Admin</Typography>
-            <Typography variant="caption" color="text.secondary">เพื่อความปลอดภัยก่อนเพิ่มผู้ใช้ใหม่</Typography>
+            <Typography fontWeight={800} fontSize="1.05rem">{title}</Typography>
+            <Typography variant="caption" color="text.secondary">{description}</Typography>
           </Box>
         </Stack>
         <Divider sx={{ mb: 2.5 }} />
@@ -349,8 +355,8 @@ const PasswordConfirmModal = ({ open, value, onChange, onClose, onConfirm, isSma
           <Button variant="outlined" color="inherit" fullWidth onClick={onClose} sx={{ borderRadius: 2 }}>
             ยกเลิก
           </Button>
-          <Button variant="contained" color="warning" fullWidth onClick={onConfirm} sx={{ borderRadius: 2, fontWeight: 700 }}>
-            ยืนยัน
+          <Button variant="contained" color="warning" fullWidth disabled={busy} onClick={onConfirm} sx={{ borderRadius: 2, fontWeight: 700 }}>
+            {confirmLabel}
           </Button>
         </Stack>
       </Box>
@@ -509,6 +515,9 @@ const Employee = () => {
   const [editedData, setEditedData] = useState({});
   const [newUserData, setNewUserData] = useState(EMPTY_FORM);
   const [passwordConfirm, setPasswordConfirm] = useState("");
+  /** คำขอเปลี่ยนสิทธิ์ที่รอการยืนยันด้วยรหัสผ่าน (null = กล่องรหัสผ่านนี้ใช้กับการเพิ่มผู้ใช้) */
+  const [pendingRoleChange, setPendingRoleChange] = useState(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const [alert, setAlert] = useState({ open: false, message: "", severity: "info" });
 
@@ -692,19 +701,37 @@ const Employee = () => {
     setModalOpenEdit(true);
   };
 
+  /**
+   * ✅ ผู้ใช้สั่ง: "เปลี่ยนสิทธิ์ต้องกรอกรหัสผ่านของ user ที่เปลี่ยนเพื่อยืนยัน"
+   * — การให้/ถอดอำนาจในระบบต้องยืนยันตัวตนซ้ำ กันเครื่องที่เปิดทิ้งไว้ถูกใช้ยกระดับสิทธิ์
+   * ⚠️ กล่องนี้เป็นแค่ UX — server ตรวจรหัสผ่านซ้ำเสมอ (ยิง API ตรงโดยไม่ผ่านหน้าจอก็ไม่รอด)
+   */
   const handleEditUser = async () => {
     if (!validateEditForm()) return;
     if (!editedData._id) {
       Swal.fire({ title: "เกิดข้อผิดพลาด!", text: "ไม่พบข้อมูลผู้ใช้ที่ต้องการแก้ไข", icon: "error" });
       return;
     }
+    // ⚠️ ส่ง role ไปเฉพาะตอนที่ "เปลี่ยนจริง" — การส่งสิทธิ์เดิมติดไปทุกครั้งทำให้คำขอธรรมดา
+    // (แก้ชื่อ/เบอร์) กลายเป็น "คำขอเปลี่ยนสิทธิ์" ในสายตา server โดยไม่จำเป็น
+    const payload = { ...editedData };
+    const roleChanged = Boolean(selectedUser) && String(payload.role || "") !== String(selectedUser.role || "");
+    if (!roleChanged) delete payload.role;
 
+    if (roleChanged) {
+      setPendingRoleChange(payload);
+      setPasswordConfirm("");
+      setModalOpenEdit(false);
+      setModalOpenPasswordConfirm(true);
+      return;
+    }
+    await submitUserUpdate(payload);
+  };
+
+  /** ยิงคำขอแก้ไขจริง — confirmPassword จะมีเฉพาะตอนเปลี่ยนสิทธิ์ */
+  const submitUserUpdate = async (payload, confirmPassword) => {
     try {
-      // ⚠️ ส่ง role ไปเฉพาะตอนที่ "เปลี่ยนจริง" — การส่งสิทธิ์เดิมติดไปทุกครั้งทำให้คำขอธรรมดา
-      // (แก้ชื่อ/เบอร์) กลายเป็น "คำขอเปลี่ยนสิทธิ์" ในสายตา server โดยไม่จำเป็น
-      const payload = { ...editedData };
-      if (selectedUser && String(payload.role || "") === String(selectedUser.role || "")) delete payload.role;
-      const response = await API.put(`/auth/user/${editedData._id}`, payload);
+      const response = await API.put(`/auth/user/${payload._id}`, confirmPassword ? { ...payload, confirmPassword } : payload);
       if (response.status === 200) {
         const { user, token } = response.data;
 
@@ -715,6 +742,9 @@ const Employee = () => {
         }
 
         setModalOpenEdit(false);
+        setModalOpenPasswordConfirm(false);
+        setPendingRoleChange(null);
+        setPasswordConfirm("");
         setSelectedUser(null);
         setEditedData({});
         await fetchUsers();
@@ -729,8 +759,28 @@ const Employee = () => {
         title: "เกิดข้อผิดพลาด!",
         text: error?.response?.data?.message || "ไม่สามารถอัปเดตข้อมูลผู้ใช้ได้",
         icon: "error",
+        // ⚠️ กล่องรหัสผ่านเป็น Modal ซ้อนอยู่ — ถ้าไม่ดัน z-index ข้อความ error จะโผล่ใต้กล่อง
+        willOpen: () => { const c = document.querySelector(".swal2-container"); if (c) c.style.zIndex = 1500; },
       });
     }
+  };
+
+  /** กดยืนยันในกล่องรหัสผ่าน — ตัดสินจากงานที่ค้างอยู่ว่าเป็น "เพิ่มผู้ใช้" หรือ "เปลี่ยนสิทธิ์" */
+  const handlePasswordConfirm = async () => {
+    if (!passwordConfirm.trim()) {
+      setAlert({ open: true, message: "กรุณากรอกรหัสผ่านของคุณ", severity: "error" });
+      return;
+    }
+    if (pendingRoleChange) {
+      setConfirmBusy(true);
+      try {
+        await submitUserUpdate(pendingRoleChange, passwordConfirm.trim());
+      } finally {
+        setConfirmBusy(false);
+      }
+      return;
+    }
+    await handleAddUser();
   };
 
   const handleDeleteRow = async (userId) => {
@@ -980,9 +1030,15 @@ const Employee = () => {
         open={modalOpenPasswordConfirm}
         value={passwordConfirm}
         onChange={(e) => setPasswordConfirm(e.target.value)}
-        onClose={() => setModalOpenPasswordConfirm(false)}
-        onConfirm={handleAddUser}
+        onClose={() => { setModalOpenPasswordConfirm(false); setPendingRoleChange(null); setPasswordConfirm(""); }}
+        onConfirm={handlePasswordConfirm}
         isSmallScreen={isSmallScreen}
+        busy={confirmBusy}
+        title={pendingRoleChange ? "ยืนยันการเปลี่ยนสิทธิ์" : "ยืนยันรหัสผ่าน Admin"}
+        description={pendingRoleChange
+          ? `กำลังเปลี่ยนสิทธิ์ของ ${[pendingRoleChange.fname, pendingRoleChange.lname].filter(Boolean).join(" ")} เป็น "${ROLE_LABEL[pendingRoleChange.role] || pendingRoleChange.role}" — กรอกรหัสผ่านของคุณเพื่อยืนยัน`
+          : "เพื่อความปลอดภัยก่อนเพิ่มผู้ใช้ใหม่"}
+        confirmLabel={pendingRoleChange ? "ยืนยันเปลี่ยนสิทธิ์" : "ยืนยัน"}
       />
 
       <Snackbar
