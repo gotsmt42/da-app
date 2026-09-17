@@ -12,7 +12,7 @@ import { OpenInNew, AddCircleOutline, AttachFile } from "@mui/icons-material";
 import { thaiDate } from "@/shared/utils/thaiDate";
 import KindBadge from "./KindBadge";
 import {
-  KIND_META, statusMeta, baht, fmtMoney, qtyText, paymentLabel, jobText, categoryMeta, TEXT_SUB, TEXT_MAIN,
+  KIND_META, statusMeta, baht, fmtMoney, qtyText, paymentLabel, jobText, categoryMeta, TEXT_SUB, TEXT_MAIN, personFullName,
 } from "../expenseMeta";
 
 const M = KIND_META.advance;
@@ -56,12 +56,12 @@ export default function AdvancePanel({ advance, usedIndexes, onRestore, onOpen, 
       <Typography sx={{ fontWeight: 800, fontSize: "0.88rem", lineHeight: 1.35, mb: 0.75 }}>{advance.subject}</Typography>
 
       <Row label="วันที่">{thaiDate(advance.docDate)}</Row>
-      <Row label="ผู้เบิก">{advance.requester?.name}{advance.requester?.position ? ` · ${advance.requester.position}` : ""}</Row>
+      <Row label="ผู้เบิก">{personFullName(advance.requester)}{advance.requester?.position ? ` · ${advance.requester.position}` : ""}</Row>
       {advance.to && <Row label="ถึง">{advance.to}</Row>}
       <Row label="งาน">{advance.job?.title ? jobText(advance.job) : "ไม่ผูกงาน"}</Row>
       {pay.at && <Row label="รับเงิน">{thaiDate(pay.at)} · {paymentLabel(pay.method)}{pay.ref ? ` · ${pay.ref}` : ""}</Row>}
       {advance.dueClearAt && <Row label="กำหนดเคลียร์">{thaiDate(advance.dueClearAt)}</Row>}
-      {advance.approvedBy?.name && <Row label="อนุมัติโดย">{advance.approvedBy.name}</Row>}
+      {advance.approvedBy?.name && <Row label="อนุมัติโดย">{personFullName(advance.approvedBy)}</Row>}
 
       <Divider sx={{ my: 1, borderColor: alpha(M.color, 0.25) }} />
       <Typography sx={{ fontSize: "0.76rem", fontWeight: 800, color: M.dark, mb: 0.5 }}>รายการที่ตั้งเบิก ({advance.items?.length || 0})</Typography>

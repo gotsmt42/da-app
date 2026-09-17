@@ -21,7 +21,7 @@ import usePermissions from "@/shared/hooks/usePermissions";
 import ExpenseService, { errorText } from "../services/ExpenseService";
 import { buildExpenseReport } from "../utils/expenseReport";
 import {
-  KIND_META, statusMeta, categoryMeta, baht, differenceMeta, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
+  KIND_META, statusMeta, categoryMeta, baht, differenceMeta, TEXT_SUB, TEXT_MAIN, BORDER_MAIN, personFullName,
 } from "../expenseMeta";
 import KindBadge from "../components/KindBadge";
 
@@ -353,7 +353,7 @@ export default function ExpenseReport({ onOpen, reloadKey }) {
                                 </Stack>
                                 <span style={{ color: TEXT_SUB }}>{thaiDate(r.docDate)}</span>
                               </TableCell>
-                              <TableCell sx={{ whiteSpace: "nowrap" }}>{r.requester?.name}</TableCell>
+                              <TableCell sx={{ whiteSpace: "nowrap" }}>{personFullName(r.requester)}</TableCell>
                               <TableCell sx={{ maxWidth: 320 }}>
                                 <Typography noWrap sx={{ fontSize: "inherit", fontWeight: 600 }}>{r.subject}</Typography>
                                 <Typography noWrap variant="caption" sx={{ color: TEXT_SUB, display: "block" }}>{r.job?.title ? `${r.job.title}${r.job.site ? ` · ${r.job.site}` : ""}` : "ไม่ผูกงาน"}</Typography>

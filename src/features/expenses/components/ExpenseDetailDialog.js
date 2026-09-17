@@ -32,8 +32,7 @@ import AdvancePanel from "./AdvancePanel";
 import KindBadge from "./KindBadge";
 import { compareItems, COMPARE_KIND_LABEL } from "../utils/expenseCompare";
 import {
-  KIND_META, slipKind, statusMeta, categoryMeta, baht, fmtMoney, qtyText, differenceMeta, paymentLabel, PAYMENT_METHODS,
-  fileKindLabel, jobText, isOverdueClear, money, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
+  KIND_META, slipKind, statusMeta, categoryMeta, baht, fmtMoney, qtyText, differenceMeta, paymentLabel, PAYMENT_METHODS, fileKindLabel, jobText, isOverdueClear, money, TEXT_SUB, TEXT_MAIN, BORDER_MAIN, personFullName,
 } from "../expenseMeta";
 import { bankMeta, formatAccountNo } from "../bankMeta";
 import BankLogo from "./BankLogo";
@@ -282,7 +281,7 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
     approve: {
       title: "อนุมัติขั้นสุดท้าย", color: "#059669", button: "ยืนยันอนุมัติ",
       body: reimburse
-        ? `อนุมัติแล้วบริษัทต้องจ่ายคืนให้ ${expense?.requester?.name || "ผู้เบิก"} ${baht(expense?.total)}`
+        ? `อนุมัติแล้วบริษัทต้องจ่ายคืนให้ ${personFullName(expense?.requester) || "ผู้เบิก"} ${baht(expense?.total)}`
         : expense?.kind === "claim"
           ? (money(expense?.difference) === 0 ? "ใช้จริงพอดีกับยอด Advance — อนุมัติแล้วใบ Advance จะเคลียร์ทันที" : `อนุมัติแล้วรอ${diff.short} ${baht(diff.amount)} ก่อนปิดใบ`)
           : `อนุมัติยอด ${baht(expense?.total)} — ขั้นต่อไปคือบันทึกการจ่ายเงิน`,
@@ -295,11 +294,11 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
         ? "ใบ Advance ที่อ้างถึงจะกลับไปรอเคลียร์ และออกใบเคลมใหม่ได้"
         : "ยกเลิกแล้วย้อนกลับไม่ได้ (เลขที่เอกสารจะไม่ถูกนำกลับมาใช้)",
     },
-    pay: { title: "บันทึกการจ่ายเงิน Advance", color: KIND_META.advance.color, button: "บันทึกจ่ายเงิน", body: `จ่ายให้ ${expense?.requester?.name || "-"} จำนวน ${baht(expense?.total)}` },
+    pay: { title: "บันทึกการจ่ายเงิน Advance", color: KIND_META.advance.color, button: "บันทึกจ่ายเงิน", body: `จ่ายให้ ${personFullName(expense?.requester) || "-"} จำนวน ${baht(expense?.total)}` },
     settle: reimburse
       ? {
         title: "บันทึกจ่ายคืนค่าสำรองจ่าย", color: KIND_META.reimburse.color, button: "บันทึกจ่ายคืน",
-        body: `จ่ายคืนให้ ${expense?.requester?.name || "ผู้เบิก"} ${baht(expense?.total)} — บันทึกแล้วใบนี้จะเสร็จสิ้น`,
+        body: `จ่ายคืนให้ ${personFullName(expense?.requester) || "ผู้เบิก"} ${baht(expense?.total)} — บันทึกแล้วใบนี้จะเสร็จสิ้น`,
       }
       : {
         title: money(expense?.difference) > 0 ? "บันทึกจ่ายเงินเพิ่ม" : "บันทึกรับเงินคืน", color: KIND_META.claim.color, button: "ปิดส่วนต่าง",
@@ -555,7 +554,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
       return { severity: "warning", text: canReview && !selfBlocked ? "รอคุณตรวจสอบ (ขั้นที่ 1 จาก 2)" : "รอผู้ตรวจสอบพิจารณา (ขั้นที่ 1 จาก 2)" };
     }
     if (e.status === "reviewed") {
-      const who = e.reviewedBy?.name ? `ตรวจสอบโดย ${e.reviewedBy.name}` : "ตรวจสอบแล้ว";
+      const who = e.reviewedBy?.name ? `ตรวจสอบโดย ${personFullName(e.reviewedBy)}` : "ตรวจสอบแล้ว";
       return {
         severity: "warning",
         text: canApprove && !selfBlocked && (!reviewedByMe || canApproveOwnReview)
@@ -563,8 +562,8 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
           : `${who} — รอผู้จัดการอนุมัติขั้นสุดท้าย`,
       };
     }
-    if (e.status === "rejected") return { severity: "error", text: `ถูกตีกลับโดย ${e.rejectedBy?.name || "-"}: ${e.rejectReason || "-"}` };
-    if (e.status === "cancelled") return { severity: "info", text: `ยกเลิกโดย ${e.cancelledBy?.name || "-"} ${e.cancelledAt ? `เมื่อ ${thaiDate(e.cancelledAt)}` : ""}${e.cancelReason ? ` · ${e.cancelReason}` : ""}` };
+    if (e.status === "rejected") return { severity: "error", text: `ถูกตีกลับโดย ${personFullName(e.rejectedBy) || "-"}: ${e.rejectReason || "-"}` };
+    if (e.status === "cancelled") return { severity: "info", text: `ยกเลิกโดย ${personFullName(e.cancelledBy) || "-"} ${e.cancelledAt ? `เมื่อ ${thaiDate(e.cancelledAt)}` : ""}${e.cancelReason ? ` · ${e.cancelReason}` : ""}` };
     if (kind === "advance") {
       if (e.status === "approved") return { severity: "info", text: `อนุมัติแล้ว — รอบันทึกการจ่ายเงิน ${baht(e.total)}` };
       if (e.status === "paid") {
@@ -664,7 +663,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography sx={{ fontWeight: 800, fontSize: "1.05rem", lineHeight: 1.35 }}>{e.subject}</Typography>
                     <Typography variant="caption" sx={{ color: TEXT_SUB }}>
-                      {thaiDateFull(e.docDate)} · {e.requester?.name}{e.requester?.position ? ` (${e.requester.position})` : ""}
+                      {thaiDateFull(e.docDate)} · {personFullName(e.requester)}{e.requester?.position ? ` (${e.requester.position})` : ""}
                     </Typography>
                   </Box>
                   <Box sx={{ textAlign: { sm: "right" } }}>
@@ -729,7 +728,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                   <InfoCell label="เลขที่">{e.docNo}</InfoCell>
                   <InfoCell label="วันที่">{thaiDate(e.docDate)}</InfoCell>
                   <InfoCell label="ถึง">{e.to}</InfoCell>
-                  <InfoCell label="ผู้เบิกเงิน">{e.requester?.name}</InfoCell>
+                  <InfoCell label="ผู้เบิกเงิน">{personFullName(e.requester)}</InfoCell>
                   <InfoCell label="ตำแหน่ง">{e.requester?.position}</InfoCell>
                   {e.createdBy?.userId && e.createdBy.userId !== e.requester?.userId && <InfoCell label="ออกใบแทนโดย">{e.createdBy.name}</InfoCell>}
                   <InfoCell label="งานที่ผูก" span>{e.eventId || e.job?.title ? `${jobText(e.job)}${e.job?.start ? ` · ${thaiDate(e.job.start)}` : ""}` : "ไม่ผูกงาน"}</InfoCell>
@@ -740,8 +739,8 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                       <Button size="small" onClick={() => onOpenOther?.(e.claimId)} sx={{ p: 0, minWidth: 0, textTransform: "none", fontWeight: 700 }}>{e.claimDocNo}</Button>
                     </InfoCell>
                   )}
-                  {e.reviewedAt && e.status !== "rejected" && <InfoCell label="ผู้ตรวจสอบ">{e.reviewedBy?.name} · {thaiDate(e.reviewedAt)}</InfoCell>}
-                  {e.approvedAt && !["pending", "reviewed", "rejected"].includes(e.status) && <InfoCell label="ผู้อนุมัติ">{e.approvedBy?.name} · {thaiDate(e.approvedAt)}</InfoCell>}
+                  {e.reviewedAt && e.status !== "rejected" && <InfoCell label="ผู้ตรวจสอบ">{personFullName(e.reviewedBy)} · {thaiDate(e.reviewedAt)}</InfoCell>}
+                  {e.approvedAt && !["pending", "reviewed", "rejected"].includes(e.status) && <InfoCell label="ผู้อนุมัติ">{personFullName(e.approvedBy)} · {thaiDate(e.approvedAt)}</InfoCell>}
                   {e.payment?.at && ((kind === "advance" && ["paid", "clearing", "cleared"].includes(e.status)) || (kind === "claim" && e.status === "settled" && money(e.difference) !== 0)) && (
                     <InfoCell label={kind === "advance" ? "การจ่ายเงิน" : isReimburse ? "การจ่ายคืน" : "ปิดส่วนต่าง"} span>
                       {thaiDate(e.payment.at)} · {paymentLabel(e.payment.method)}{e.payment.ref ? ` · ${e.payment.ref}` : ""}{e.payment.by?.name ? ` · โดย ${e.payment.by.name}` : ""}{e.payment.note ? ` · ${e.payment.note}` : ""}

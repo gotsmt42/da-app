@@ -19,8 +19,7 @@ import usePermissions from "@/shared/hooks/usePermissions";
 import ExpenseService, { errorText } from "../services/ExpenseService";
 import KindBadge from "./KindBadge";
 import {
-  KIND_META, statusMeta, STATUS_FILTERS, CLAIM_TYPE_FILTERS, baht, differenceMeta, isOverdueClear, jobText,
-  slipKind, slipMeta, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
+  KIND_META, statusMeta, STATUS_FILTERS, CLAIM_TYPE_FILTERS, baht, differenceMeta, isOverdueClear, jobText, slipKind, slipMeta, TEXT_SUB, TEXT_MAIN, BORDER_MAIN, personFullName,
 } from "../expenseMeta";
 
 const PERIODS = [
@@ -102,7 +101,7 @@ const MobileCard = ({ e, onOpen }) => (
         </Stack>
         <Typography sx={{ fontWeight: 700, fontSize: "0.92rem", color: TEXT_MAIN, lineHeight: 1.35 }}>{e.subject}</Typography>
         <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }} noWrap>
-          {thaiDate(e.docDate)} · {e.requester?.name}{refLabel(e) ? ` · ${refLabel(e)}` : ""}{e.job?.title ? ` · ${jobText(e.job)}` : ""}
+          {thaiDate(e.docDate)} · {personFullName(e.requester)}{refLabel(e) ? ` · ${refLabel(e)}` : ""}{e.job?.title ? ` · ${jobText(e.job)}` : ""}
         </Typography>
         <Box sx={{ mt: 0.75 }}><StatusChip e={e} /></Box>
       </Box>
@@ -138,7 +137,7 @@ const DesktopTable = ({ rows, onOpen }) => (
               </Stack>
             </TableCell>
             <TableCell sx={{ whiteSpace: "nowrap" }}>
-              <Typography sx={{ fontWeight: 700, fontSize: "0.85rem" }}>{e.requester?.name}</Typography>
+              <Typography sx={{ fontWeight: 700, fontSize: "0.85rem" }}>{personFullName(e.requester)}</Typography>
               <Typography variant="caption" sx={{ color: TEXT_SUB }}>{e.requester?.position}</Typography>
             </TableCell>
             <TableCell sx={{ maxWidth: 380 }}>
@@ -208,7 +207,7 @@ export default function ExpenseList({ mode, status: statusProp, claimType = "all
     return rows.filter((e) => {
       if (person !== "all" && e.requester?.userId !== person) return false;
       if (!needle) return true;
-      return [e.docNo, e.subject, e.requester?.name, e.job?.title, e.job?.site, e.job?.company, e.advance?.docNo, e.to,
+      return [e.docNo, e.subject, e.requester?.name, e.requester?.fullName, e.job?.title, e.job?.site, e.job?.company, e.advance?.docNo, e.to,
         ...(e.items || []).map((it) => it.description), ...(e.items || []).map((it) => it.person?.name || "")]
         .some((v) => String(v || "").toLowerCase().includes(needle));
     });
