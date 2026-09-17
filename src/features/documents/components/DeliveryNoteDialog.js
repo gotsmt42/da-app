@@ -14,6 +14,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Box, Stack, Typography,
   TextField, Button, IconButton, Divider, Alert, Chip, useMediaQuery, CircularProgress, Autocomplete,
+  Switch, FormControlLabel,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
@@ -31,6 +32,9 @@ import {
 import DocumentPreviewDialog from "./DocumentPreviewDialog";
 import IssuedDocumentService from "@/shared/services/IssuedDocumentService";
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
+import SignatureService from "@/shared/services/SignatureService";
+import StaffDirectoryService from "@/shared/services/StaffDirectoryService";
+import { useAuth } from "@/features/auth/AuthContext";
 
 const ACCENT = "#dc2626";
 const SURFACE_SUBTLE = "#f8fafc";
@@ -177,8 +181,43 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
   }, [preview?.url]);
 
 
+
+  /**
+   * ✅ ผู้ลงนามเลือกจากทะเบียนพนักงานได้เลย (ผู้ใช้ขอ: "ให้เลือกชื่อ พร้อมเบอร์ ในระบบได้เลย")
+   * — เลือกแล้วเติมตำแหน่ง/เบอร์ให้อัตโนมัติ · ยังพิมพ์ชื่อเองได้ (freeSolo) สำหรับคนนอกทะเบียน
+   */
+  const [staffOptions, setStaffOptions] = useState([]);
+  useEffect(() => {
+    if (!open) return;
+    StaffDirectoryService.list().then(setStaffOptions);
+  }, [open]);
+  const filterStaff = (options, state) => {
+    const q = String(state.inputValue || "").trim().toLowerCase();
+    if (!q) return options.slice(0, 30);
+    return options.filter((o) => [o.name, o.position, o.tel, o.role].join(" ").toLowerCase().includes(q)).slice(0, 30);
+  };
+  const pickSigner = (v) => {
+    if (!v || typeof v === "string") return;
+    setForm((f) => ({ ...f, signerName: v.name, signerPosition: v.position || f.signerPosition }));
+  };
+
+  // ── ลายเซ็นอิเล็กทรอนิกส์ของผู้ออกเอกสาร ─────────────────────────────────
+  const { userData } = useAuth();
+  const [mySignature, setMySignature] = useState(null);
+  const [useMySignature, setUseMySignature] = useState(true);
+  useEffect(() => {
+    if (!open) return;
+    SignatureService.me().then(setMySignature);
+  }, [open]);
+  const myFullName = [userData?.fname, userData?.lname].filter(Boolean).join(" ").trim();
+  const sameName = (a, b) => String(a || "").replace(/\s+/g, " ").trim() === String(b || "").replace(/\s+/g, " ").trim();
+  const signerIsMe = Boolean(myFullName) && sameName(form?.signerName, myFullName);
+  /** ⚠️ ไม่เก็บรูปลายเซ็นไว้ใน form state — ทะเบียนเอกสารเก็บ formSnapshot ทั้งก้อน ถ้าใส่รูปไปด้วย
+   * ฐานข้อมูลจะบวมขึ้นหลักร้อย KB ต่อใบโดยไม่จำเป็น (ใส่ตอนสร้างไฟล์เท่านั้น) */
+  const signatureImage = mySignature && useMySignature && signerIsMe ? mySignature.image : "";
+
   const buildPdf = (docNumber) =>
-    generateDeliveryNotePdf({ jsPDF, thSarabunFont, form: { ...form, docNumber }, mode: "blob" });
+    generateDeliveryNotePdf({ jsPDF, thSarabunFont, form: { ...form, docNumber, signatureImage }, mode: "blob" });
 
   /** ขั้นที่ 1 — สร้างไฟล์ตัวอย่างด้วย "เลขที่ที่จะได้" โดยยังไม่กินเลขจริง */
   const handlePreview = async () => {
@@ -513,10 +552,30 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
         <Box sx={{ p: 2, bgcolor: "#fff", borderRadius: 2.5, border: `1px solid ${BORDER_MAIN}` }}>
           <SectionLabel>ผู้ลงนามฝ่ายบริษัท</SectionLabel>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.75}>
-            <TextField
-              size="small" fullWidth label="ชื่อ-นามสกุล" value={form.signerName}
-              onChange={setField("signerName")} required
-              placeholder="เช่น นายสันติสุข ศรีมันตะ"
+            <Autocomplete
+              freeSolo fullWidth size="small"
+              options={staffOptions}
+              value={null}
+              inputValue={form.signerName || ""}
+              onInputChange={(_, v, reason) => { if (reason === "input" || reason === "clear") set("signerName")(v); }}
+              onChange={(_, v) => pickSigner(v)}
+              getOptionLabel={(o) => (typeof o === "string" ? o : o?.name || "")}
+              isOptionEqualToValue={(o, v) => o.userId === v?.userId}
+              filterOptions={filterStaff}
+              renderOption={({ key, ...liProps }, o) => (
+                <li {...liProps} key={o.userId}>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography sx={{ fontSize: "0.86rem", fontWeight: 700 }} noWrap>{o.name}</Typography>
+                    <Typography variant="caption" sx={{ color: "text.disabled" }}>
+                      {[o.position, o.tel].filter(Boolean).join(" · ") || o.role}
+                    </Typography>
+                  </Box>
+                </li>
+              )}
+              renderInput={(params) => (
+                <TextField {...params} label="ชื่อ-นามสกุล" required
+                  placeholder="เลือกจากพนักงานในระบบ หรือพิมพ์เอง" />
+              )}
             />
             {/* ✅ ตำแหน่ง — เลือกจากตำแหน่งที่ใช้ลงนามเอกสารจริงในบริษัท หรือพิมพ์เองก็ได้ */}
             <Autocomplete
@@ -526,6 +585,29 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
               renderInput={(params) => <TextField {...params} label="ตำแหน่ง" />}
             />
           </Stack>
+          {/* ✅ ลายเซ็นอิเล็กทรอนิกส์ของผู้ออกเอกสาร (ตั้งที่ ตั้งค่า › ลายเซ็นอิเล็กทรอนิกส์)
+              ⚠️ ใช้ได้เฉพาะเมื่อ "ชื่อผู้ลงนาม" เป็นชื่อของคนที่กำลังออกเอกสารเอง — เปลี่ยนเป็นชื่อคนอื่น
+              แล้วยังแปะลายเซ็นตัวเอง = ลงนามในนามคนอื่น ซึ่งเป็นการปลอมลายมือชื่อ */}
+          <Box sx={{ mt: 1.25 }}>
+            {mySignature ? (
+              <FormControlLabel
+                control={(
+                  <Switch size="small" checked={useMySignature && signerIsMe} disabled={!signerIsMe}
+                    onChange={(e) => setUseMySignature(e.target.checked)} />
+                )}
+                label={(
+                  <Typography sx={{ fontSize: "0.82rem" }}>
+                    ลงลายเซ็นอิเล็กทรอนิกส์ของฉัน
+                    {!signerIsMe && <Box component="span" sx={{ color: "text.disabled" }}> — ใช้ได้เมื่อชื่อผู้ลงนามเป็นชื่อของคุณ</Box>}
+                  </Typography>
+                )}
+              />
+            ) : (
+              <Typography variant="caption" sx={{ color: "text.disabled", display: "block" }}>
+                ยังไม่ได้ตั้งลายเซ็นอิเล็กทรอนิกส์ — เอกสารจะเว้นช่องไว้ให้เซ็นด้วยมือ (ตั้งได้ที่ ตั้งค่า › ลายเซ็นอิเล็กทรอนิกส์)
+              </Typography>
+            )}
+          </Box>
           <Typography variant="caption" sx={{ display: "block", mt: 1.25, color: "text.disabled" }}>
             ออกในนาม {ISSUER.nameTh} · แนบตราประทับบริษัทให้อัตโนมัติ
           </Typography>

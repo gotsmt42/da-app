@@ -142,6 +142,30 @@ export const ATTENTION_PRESETS = [
  * เพราะคนที่เซ็นส่งมอบจริงไม่ได้เป็นผู้จัดการเสมอไป — งานเล็กหรืองานที่ส่งมอบหน้างานเลย มักเป็น
  * หัวหน้าช่างหรือผู้รับผิดชอบโครงการเป็นคนเซ็น
  */
+/**
+ * วางลายเซ็นอิเล็กทรอนิกส์บนเส้นลงชื่อของเอกสาร (ใช้ร่วมกันทั้งใบส่งมอบงานและใบแจ้งเข้างาน)
+ *
+ * ✅ ผู้ใช้ขอ: ตั้งลายเซ็นไว้ที่ user แล้วนำมาใช้กับเอกสาร PDF ทั้งหมด — ที่นี่คือลายเซ็น "ของผู้ออก
+ * เอกสารเอง" ที่ดึงมาจาก /api/signatures/me ตอนกดออกใบ (ดู SignatureService.js)
+ * ⚠️ ฐานรูปอยู่เหนือเส้นเล็กน้อยและสูงไม่เกินช่องว่างเหนือเส้น — ไม่งั้นทับคำว่า "ขอแสดงความนับถือ"
+ * ⚠️ รูปเสียต้องไม่ทำให้ออกเอกสารไม่ได้ (เอกสารต้องออกได้เสมอ แค่กลับไปเป็นช่องเซ็นมือ)
+ * @returns {boolean} วางสำเร็จหรือไม่
+ */
+export const drawSignatureOnLine = (doc, image, { centerX, lineY, maxW, maxH }) => {
+  if (!image) return false;
+  try {
+    const props = doc.getImageProperties(image);
+    const ratio = props.height / props.width || 0.35;
+    let w = maxW;
+    let h = w * ratio;
+    if (h > maxH) { h = maxH; w = h / ratio; }
+    doc.addImage(image, "PNG", centerX - w / 2, lineY - h - 0.8, w, h);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const SIGNER_POSITION_PRESETS = [
   "ผู้จัดการแผนกช่าง",
   "ผู้รับผิดชอบโครงการ",
@@ -380,8 +404,58 @@ export const buildDeliveryNoteBody = (f) => {
  * ✅ เปิดเอกสาร jsPDF พร้อมฟอนต์ไทย — แยกออกมาเพราะเอกสารทุกชนิดต้องทำ 4 บรรทัดนี้เหมือนกันเป๊ะ และถ้า
  * ลืมโหลดฟอนต์ TH Sarabun ภาษาไทยทั้งใบจะกลายเป็นสี่เหลี่ยมทันที (พลาดง่ายมากตอนเพิ่มเอกสารชนิดใหม่)
  */
+/**
+ * ── ขนาดไฟล์ PDF ─────────────────────────────────────────────────────────────
+ * 🐛 ผู้ใช้แจ้ง: "ขนาดไฟล์มันใหญ่มาก แปลกๆ" — ใบส่งมอบงานใบเดียวเคยหนักเกือบ 5 MB
+ * สาเหตุ: โลโก้หัวกระดาษ (166 KB) กับตราประทับ (226 KB) เป็น PNG ขนาดเต็มความละเอียดต้นฉบับ
+ * ถูกฝังลงไฟล์แบบไม่ย่อและไม่บีบอัด ทั้งที่พิมพ์ออกมาจริงกว้างแค่ 28 มม. และ 24 มม.
+ * ✅ ย่อรูปให้พอดีความละเอียดงานพิมพ์ (≈300 dpi) หนึ่งครั้งแล้วแคชไว้ + เปิด compress ของ jsPDF
+ * ⚠️ ต้องคง "ความโปร่งใส" ไว้ (โลโก้/ตราประทับวางทับข้อความ) จึงย่อเป็น PNG ไม่ใช่ JPEG
+ */
+const PRINT_ASSET_PX = { [ISSUER.logo]: 420, [ISSUER.stamp]: 360 };
+const printAssetCache = new Map();
+
+const downscalePng = (url, maxPx) => new Promise((resolve, reject) => {
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.onload = () => {
+    // รูปที่เล็กกว่าเป้าอยู่แล้วไม่ต้องแตะ — ย่อแล้วขยายกลับมีแต่ทำให้เบลอ
+    if (img.naturalWidth <= maxPx) { resolve(url); return; }
+    const scale = maxPx / img.naturalWidth;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(img.naturalWidth * scale);
+    canvas.height = Math.round(img.naturalHeight * scale);
+    const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    resolve(canvas.toDataURL("image/png"));
+  };
+  img.onerror = () => reject(new Error(`โหลดรูปไม่สำเร็จ: ${url}`));
+  img.src = url;
+});
+
+/**
+ * เตรียมรูปประจำเอกสาร (โลโก้/ตราประทับ) แบบย่อแล้ว — เรียกก่อนเริ่มวาดทุกครั้ง
+ * ⚠️ ล้มเหลวต้องไม่ทำให้ออกเอกสารไม่ได้ — ตกกลับไปใช้ไฟล์ต้นฉบับเหมือนเดิม (แค่ไฟล์ใหญ่ขึ้น)
+ */
+export const preparePrintAssets = async () => {
+  await Promise.all(Object.entries(PRINT_ASSET_PX).map(async ([url, maxPx]) => {
+    if (printAssetCache.has(url)) return;
+    try {
+      printAssetCache.set(url, await downscalePng(url, maxPx));
+    } catch {
+      printAssetCache.set(url, url);
+    }
+  }));
+};
+
+/** รูปที่ย่อแล้ว (ถ้าเตรียมไว้) — ใช้แทน URL ต้นฉบับตอน addImage */
+export const printAsset = (url) => printAssetCache.get(url) || url;
+
 export const createDocument = (jsPDF, thSarabunFont) => {
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "A4" });
+  // ⚠️ compress: true บีบทั้งฟอนต์ที่ฝังและเนื้อหา — ฟอนต์ TH Sarabun ตัวเดียวหนัก ~470 KB
+  // ถ้าไม่บีบ ไฟล์จะใหญ่กว่าที่ควรเป็นหลายเท่าโดยที่หน้าตาเอกสารเหมือนกันทุกประการ
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "A4", compress: true });
   doc.addFileToVFS("THSarabun.ttf", thSarabunFont);
   doc.addFont("THSarabun.ttf", "THSarabun", "normal");
   doc.setFont("THSarabun");
@@ -398,10 +472,12 @@ export const drawLetterhead = (doc) => {
   // ✅ โลโก้ชิดขอบบน 8 มม. (ขอบพิมพ์ไม่ติดของเครื่องพิมพ์ทั่วไปอยู่ราว 4–6 มม.) กว้าง 28 มม. ≈ ขนาดตัวโลโก้เท่าเดิม
   let y = 8;
   try {
-    const props = doc.getImageProperties(ISSUER.logo);
+    const logo = printAsset(ISSUER.logo);
+    const props = doc.getImageProperties(logo);
     const w = 28;
     const h = (props.height / props.width) * w;
-    doc.addImage(ISSUER.logo, "PNG", centerX - w / 2, y, w, h);
+    // alias = ฝังรูปเดียวกันซ้ำในไฟล์เดียวไม่ได้ทำให้ไฟล์ใหญ่ขึ้นอีกรอบ
+    doc.addImage(logo, "PNG", centerX - w / 2, y, w, h, "letterhead-logo", "MEDIUM");
     y += h + 2.2;
   } catch {
     // ⚠️ ไม่มีโลโก้ก็ยังต้องออกเอกสารได้ — เว้นที่ไว้เท่าความสูงโลโก้จริงเพื่อไม่ให้เลย์เอาต์ที่เหลือขยับ
@@ -465,6 +541,9 @@ export const outputDocument = (doc, rawName, mode = "open") => {
  */
 export const generateDeliveryNotePdf = async ({ jsPDF, thSarabunFont, form, mode = "open" }) => {
   moment.locale("th");
+
+  // ✅ ย่อโลโก้/ตราประทับให้พอดีความละเอียดงานพิมพ์ก่อนฝังลงไฟล์ (ดูหัวข้อ "ขนาดไฟล์ PDF")
+  await preparePrintAssets();
 
   const doc = createDocument(jsPDF, thSarabunFont);
 
@@ -626,18 +705,23 @@ export const generateDeliveryNotePdf = async ({ jsPDF, thSarabunFont, form, mode
 
   // ✅ ตราประทับ — มุมซ้ายของช่องเซ็น จบก่อนถึงเส้นประที่ +26 จึงไม่มีทางทับทั้งลายเซ็นและชื่อ
   try {
-    const sp = doc.getImageProperties(ISSUER.stamp);
+    const stamp = printAsset(ISSUER.stamp);
+    const sp = doc.getImageProperties(stamp);
     const sw = 24;
     const sh = (sp.height / sp.width) * sw;
     // ⚠️ ยึด "ขอบล่าง" ของตราไว้ที่ +24.5 แล้วคำนวณขอบบนย้อนขึ้นไป — ความสูงของตราขึ้นกับสัดส่วน
     // ของไฟล์รูปซึ่งเปลี่ยนได้ถ้าวันหนึ่งมีการเปลี่ยนไฟล์ตรา ถ้ายึดขอบบนแบบเดิมแล้วรูปสูงขึ้น
     // ตราจะไหลลงไปทับเส้นเซ็นอีก (ซึ่งคือบั๊กเดิมเป๊ะๆ)
-    doc.addImage(ISSUER.stamp, "PNG", rightCenter - boxW / 2 + 2, boxY + boxH * 0.45 - sh, sw, sh);
+    doc.addImage(stamp, "PNG", rightCenter - boxW / 2 + 2, boxY + boxH * 0.45 - sh, sw, sh, "company-stamp", "MEDIUM");
   } catch {
     // ไม่มีไฟล์ตราประทับก็ออกเอกสารได้ตามปกติ (เว้นที่ว่างไว้ให้ประทับตรามือแทน)
   }
 
   doc.setFontSize(13);
+  // ✅ ลายเซ็นอิเล็กทรอนิกส์ของผู้ออกเอกสาร (ถ้าตั้งไว้และเลือกใช้) — วางบนเส้นก่อนพิมพ์เส้น
+  drawSignatureOnLine(doc, form.signatureImage, {
+    centerX: rightCenter, lineY: boxY + boxH * 0.47, maxW: boxW * 0.62, maxH: boxH * 0.26,
+  });
   doc.text("............................................", rightCenter, boxY + boxH * 0.48, { align: "center" });
   doc.text(`( ${spaceThaiLatin(form.signerName) || "____________________________"} )`, rightCenter, boxY + boxH * 0.61, { align: "center" });
   doc.text(spaceThaiLatin(form.signerPosition), rightCenter, boxY + boxH * 0.74, { align: "center" });

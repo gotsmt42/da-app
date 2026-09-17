@@ -111,6 +111,20 @@ const ExpenseService = {
     return res.data;
   },
 
+  /**
+   * ลายเซ็นอิเล็กทรอนิกส์ที่ผนึกไว้ในใบนี้ (ผู้เบิก/ผู้อนุมัติ) — ใช้ตอนสร้าง PDF
+   * 🔒 server คืนเฉพาะลายเซ็นของคนที่ลงนามในใบนี้จริง และเฉพาะผู้ที่มีสิทธิ์เห็นใบเท่านั้น
+   * ⚠️ ล้มเหลวต้องไม่ทำให้พิมพ์เอกสารไม่ได้ — คืน {} แล้วออกใบแบบเว้นช่องเซ็นมือ
+   */
+  async signatures(id) {
+    try {
+      const res = await API.get(`/expenses/${id}/signatures`);
+      return res.data.signatures || {};
+    } catch {
+      return {};
+    }
+  },
+
   async get(id) {
     const res = await API.get(`/expenses/${id}`);
     return res.data.expense;
@@ -146,8 +160,9 @@ const ExpenseService = {
     return { expense: res.data.expense, rejected };
   },
 
-  async approve(id, note = "") {
-    const res = await API.post(`/expenses/${id}/approve`, { note });
+  /** @param {boolean} useSignature  ลงลายเซ็นอิเล็กทรอนิกส์ของผู้อนุมัติในใบนี้ไหม (ผู้อนุมัติติ๊กเลือกเอง) */
+  async approve(id, note = "", useSignature = true) {
+    const res = await API.post(`/expenses/${id}/approve`, { note, useSignature });
     return res.data.expense;
   },
 

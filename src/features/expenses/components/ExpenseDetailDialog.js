@@ -11,12 +11,13 @@ import moment from "moment";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack, Typography, IconButton, Chip,
   Alert, CircularProgress, useMediaQuery, TextField, MenuItem, Tooltip, Divider, Skeleton, Collapse,
+  Checkbox, FormControlLabel,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
   Close, Print, Edit, CheckCircle, Undo, Block, Payments, ReceiptLong, AttachFile, OpenInNew,
   DeleteOutline, Link as LinkIcon, History, TaskAlt, WarningAmber, Image as ImageIcon, Description, ExpandMore,
-  AccountBalanceWallet, ContentCopy, Check,
+  AccountBalanceWallet, ContentCopy, Check, HistoryEdu,
 } from "@mui/icons-material";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
@@ -25,6 +26,7 @@ import { thaiDate, thaiDateFull, thaiDateTime } from "@/shared/utils/thaiDate";
 import { useAuth } from "@/features/auth/AuthContext";
 import usePermissions from "@/shared/hooks/usePermissions";
 import ExpenseService, { errorText } from "../services/ExpenseService";
+import SignatureService from "@/shared/services/SignatureService";
 import ExpensePrintDialog from "./ExpensePrintDialog";
 import AdvancePanel from "./AdvancePanel";
 import KindBadge from "./KindBadge";
@@ -238,10 +240,17 @@ const today = () => moment().format("YYYY-MM-DD");
  */
 const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
   const [form, setForm] = useState({});
+  /** ลายเซ็นของผู้อนุมัติเอง — ✅ ติ๊กเลือกได้ว่าจะลงลายเซ็นในใบที่กำลังอนุมัติไหม (ผู้ใช้ขอ) */
+  const [mySignature, setMySignature] = useState(null);
   const fileRef = useRef(null);
+  useEffect(() => {
+    if (action !== "approve") return;
+    SignatureService.me().then(setMySignature).catch(() => {});
+  }, [action]);
   useEffect(() => {
     if (!action) return;
     setForm({
+      useSignature: true,
       reason: "", note: "", paidAt: today(), method: "transfer", ref: "",
       dueClearAt: action === "pay" ? (expense?.dueClearAt ? moment(expense.dueClearAt).format("YYYY-MM-DD") : moment().add(7, "days").format("YYYY-MM-DD")) : "",
       files: [],
@@ -330,6 +339,27 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
           )}
           {(action === "approve" || payLike) && (
             <TextField size="small" label="หมายเหตุ (ไม่บังคับ)" value={form.note || ""} onChange={set("note")} inputProps={{ maxLength: 500 }} />
+          )}
+          {/* ✅ อนุมัติแล้วจะลงลายเซ็นอิเล็กทรอนิกส์ในช่อง "ผู้อนุมัติ" ของใบ PDF หรือไม่ */}
+          {action === "approve" && mySignature && (
+            <Box sx={{ p: 1.25, border: `1px solid ${BORDER_MAIN}`, borderRadius: 2 }}>
+              <FormControlLabel
+                sx={{ mr: 0 }}
+                control={(
+                  <Checkbox size="small" checked={form.useSignature !== false}
+                    onChange={(e) => setForm((f) => ({ ...f, useSignature: e.target.checked }))}
+                    sx={{ "&.Mui-checked": { color: cfg.color } }} />
+                )}
+                label={(
+                  <Stack direction="row" alignItems="center" spacing={0.75}>
+                    <HistoryEdu sx={{ fontSize: 17, color: cfg.color }} />
+                    <Typography sx={{ fontSize: "0.85rem", fontWeight: 700 }}>ลงลายเซ็นอิเล็กทรอนิกส์ของฉัน</Typography>
+                  </Stack>
+                )}
+              />
+              <Box component="img" src={mySignature.image} alt=""
+                sx={{ display: "block", ml: 3.75, height: 32, maxWidth: 150, objectFit: "contain", opacity: form.useSignature !== false ? 1 : 0.28 }} />
+            </Box>
           )}
         </Stack>
       </DialogContent>
@@ -442,7 +472,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
     try {
       let updated;
       const files = (form.files || []).map((file) => ({ file, kind: "transfer_slip" }));
-      if (action === "approve") updated = await ExpenseService.approve(e._id, form.note);
+      if (action === "approve") updated = await ExpenseService.approve(e._id, form.note, form.useSignature !== false);
       if (action === "reject") updated = await ExpenseService.reject(e._id, form.reason);
       if (action === "cancel") updated = await ExpenseService.cancel(e._id, form.reason);
       if (action === "pay") updated = (await ExpenseService.pay(e._id, { paidAt: form.paidAt, method: form.method, ref: form.ref, note: form.note, dueClearAt: form.dueClearAt }, files)).expense;

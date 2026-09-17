@@ -26,7 +26,8 @@ import {
   ISSUER, PAGE, CONTENT_W, letterIndentFor,
   spaceThaiLatin, thaiFullDate, resolveJobFields, referencePresetsFor,
   ATTENTION_PRESETS, SIGNER_POSITION_PRESETS,
-  wrapParagraph, createDocument, drawLetterhead, outputDocument,
+  wrapParagraph, createDocument, drawLetterhead, outputDocument, drawSignatureOnLine,
+  preparePrintAssets, printAsset,
 } from "./deliveryNotePdf";
 
 export { ATTENTION_PRESETS, SIGNER_POSITION_PRESETS, thaiFullDate, ISSUER };
@@ -224,6 +225,9 @@ export const buildWorkNoticeCooperation = () => spaceThaiLatin(
 export const generateWorkNoticePdf = async ({ jsPDF, thSarabunFont, form, mode = "open" }) => {
   moment.locale("th");
 
+  // ✅ ย่อโลโก้/ตราประทับให้พอดีความละเอียดงานพิมพ์ก่อนฝังลงไฟล์ (ดูหัวข้อ "ขนาดไฟล์ PDF")
+  await preparePrintAssets();
+
   const doc = createDocument(jsPDF, thSarabunFont);
   const headerY = drawLetterhead(doc);
 
@@ -414,16 +418,21 @@ export const generateWorkNoticePdf = async ({ jsPDF, thSarabunFont, form, mode =
   doc.setFontSize(13.5);
   doc.text("ขอแสดงความนับถือ", rightCenter, boxY + boxH * 0.15, { align: "center" });
   try {
-    const sp = doc.getImageProperties(ISSUER.stamp);
+    const stamp = printAsset(ISSUER.stamp);
+    const sp = doc.getImageProperties(stamp);
     const sw = 24;
     const sh = (sp.height / sp.width) * sw;
     // ⚠️ ยึด "ขอบล่าง" ของตราไว้ที่ +24.5 แล้วคำนวณขอบบนย้อนขึ้น — ถ้ายึดขอบบนแล้ววันหนึ่งเปลี่ยนไฟล์ตรา
     // เป็นรูปที่สูงกว่าเดิม ตราจะไหลลงไปทับเส้นเซ็น (บั๊กเดิมของใบส่งมอบงานเป๊ะๆ)
-    doc.addImage(ISSUER.stamp, "PNG", rightCenter - boxW / 2 + 2, boxY + boxH * 0.45 - sh, sw, sh);
+    doc.addImage(stamp, "PNG", rightCenter - boxW / 2 + 2, boxY + boxH * 0.45 - sh, sw, sh, "company-stamp", "MEDIUM");
   } catch {
     // ไม่มีไฟล์ตราประทับก็ออกเอกสารได้ตามปกติ (เว้นที่ว่างไว้ให้ประทับตรามือแทน)
   }
   doc.setFontSize(13);
+  // ✅ ลายเซ็นอิเล็กทรอนิกส์ของผู้ออกเอกสาร (ดู drawSignatureOnLine ใน deliveryNotePdf.js)
+  drawSignatureOnLine(doc, form.signatureImage, {
+    centerX: rightCenter, lineY: boxY + boxH * 0.47, maxW: boxW * 0.62, maxH: boxH * 0.26,
+  });
   doc.text("............................................", rightCenter, boxY + boxH * 0.48, { align: "center" });
   doc.text(`( ${spaceThaiLatin(form.signerName) || "____________________________"} )`, rightCenter, boxY + boxH * 0.61, { align: "center" });
   doc.text(spaceThaiLatin(form.signerPosition), rightCenter, boxY + boxH * 0.74, { align: "center" });

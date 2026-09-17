@@ -22,12 +22,12 @@ import moment from "moment";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack, Typography, TextField,
   IconButton, Alert, useMediaQuery, Autocomplete, MenuItem, Chip, Tooltip, CircularProgress, Avatar, Collapse,
-  Menu, ListItemIcon, ListItemText,
+  Menu, ListItemIcon, ListItemText, Checkbox, FormControlLabel,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
   Close, Add, DeleteOutline, AttachFile, Send, Save, Link as LinkIcon, ReceiptLong, Payments, ExpandMore,
-  Print, EditNote, AccountBalanceWallet, Groups, PersonOutline, AccountBalance,
+  Print, EditNote, AccountBalanceWallet, Groups, PersonOutline, AccountBalance, HistoryEdu,
 } from "@mui/icons-material";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
@@ -36,6 +36,7 @@ import { thaiDate } from "@/shared/utils/thaiDate";
 import { useAuth } from "@/features/auth/AuthContext";
 import usePermissions from "@/shared/hooks/usePermissions";
 import ExpenseService, { errorText } from "../services/ExpenseService";
+import SignatureService from "@/shared/services/SignatureService";
 import AdvancePanel from "./AdvancePanel";
 import KindBadge from "./KindBadge";
 import ExpensePrintDialog from "./ExpensePrintDialog";
@@ -152,6 +153,12 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
    * ⚠️ แยก undefined ออกจาก "" ให้ชัด: "" คือผู้ใช้ตั้งใจเลือก "ไม่ระบุบัญชี (รับเงินสด)"
    */
   const [payToAccountId, setPayToAccountId] = useState(undefined);
+  /**
+   * ✅ ผู้ใช้ขอ: "ใบ advance และ claim ให้มีให้ติ๊กด้วยว่าจะใช้ลายเซ็นอิเล็กทรอนิกไหม"
+   * ⚠️ ติ๊กได้เฉพาะตอนที่ผู้เบิกคือคนที่กำลังกรอกใบเอง — ลายเซ็นของคนอื่นเอามาแปะไม่ได้ (server บังคับซ้ำ)
+   */
+  const [mySignature, setMySignature] = useState(null);
+  const [useSignature, setUseSignature] = useState(true);
   // ฟอร์มใบเคลมเปล่าสำหรับพิมพ์ไปกรอกด้วยลายมือ (ดู utils/expenseBlankPdf.js)
   const [blankMenuEl, setBlankMenuEl] = useState(null);
   const [blankPrint, setBlankPrint] = useState(null);
@@ -214,6 +221,10 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
         setPosition((cur) => cur || s.position || "");
       }
     }).catch(() => {});
+    // ✅ ลายเซ็นอิเล็กทรอนิกส์ของตัวเอง — ใช้ตัดสินว่าจะโชว์ช่องติ๊กไหม (ไม่มีลายเซ็น = ไม่ต้องโชว์)
+    SignatureService.me().then((sig) => alive && setMySignature(sig)).catch(() => {});
+    // ✅ แก้ใบเดิม: ติ๊กไว้ตามสถานะจริงของใบ (เคยลงนามไว้หรือยัง) · ใบใหม่: ติ๊กไว้ให้เลย
+    setUseSignature(editing ? Boolean(expense.signatures?.requester?.hash) : true);
     // ✅ โหลดรายชื่อพนักงานให้ทุกคน — นอกจากแอดมินใช้เลือกผู้เบิกแล้ว หัวหน้างานยังใช้ระบุพนักงานในแต่ละรายการ
     ExpenseService.people().then((p) => alive && setPeople(p)).catch(() => {});
     return () => { alive = false; };
@@ -349,6 +360,9 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
   // 🔒 ทะเบียนบัญชีของคนอื่นเปิดดูได้เฉพาะแอดมิน/ผู้จัดการ — คนอื่นเห็นแค่บัญชีที่ใบเก็บไว้แล้ว
   const canManageBank = Boolean(payToUserId) && (payToUserId === userData?.userId || can("viewAllExpenses"));
 
+  /** ผู้เบิกของใบนี้คือคนที่กำลังกรอกเองไหม — เงื่อนไขเดียวที่ลงลายเซ็นอิเล็กทรอนิกส์ได้ */
+  const canSignSelf = Boolean(payToUserId) && payToUserId === userData?.userId;
+
   const validItems = items.filter((it) => String(it.description).trim());
   const problems = [];
   if (isClearClaim && !advance?._id) problems.push("เลือกใบ Advance ที่ต้องการเคลียร์");
@@ -390,6 +404,8 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
     } else if (!editing) {
       fields.advanceId = advance._id;
     }
+    // ✅ ลงลายเซ็นอิเล็กทรอนิกส์ในใบนี้หรือไม่ (ส่งเมื่อผู้เบิกคือตัวเองเท่านั้น — คนอื่นส่งไปก็ไม่มีผล)
+    if (canSignSelf) fields.useSignature = useSignature;
     // ✅ บัญชีรับเงิน (ทุกชนิดใบ) — ส่งเฉพาะตอนที่มีการเลือก/เปลี่ยนจริง
     // ⚠️ ตอนแก้ใบเดิมไม่ส่งถ้าไม่ได้เปลี่ยน: ถ้าบัญชีนั้นถูกลบออกจากทะเบียนไปแล้ว การส่งซ้ำจะทำให้
     // บันทึกไม่ผ่านทั้งใบ ทั้งที่ผู้ใช้แค่มาแก้ยอด — สำเนาบัญชีในใบเดิมยังอยู่ครบอยู่แล้ว
@@ -926,6 +942,38 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
           )}
         </Section>
 
+        {/* ── ลายเซ็นอิเล็กทรอนิกส์ ───────────────────────────────────
+            ✅ ติ๊กเลือกได้ว่าจะลงลายเซ็นในใบนี้ไหม (ผู้ใช้ขอ) — บางใบต้องการเซ็นสดด้วยมือต่อหน้าผู้อนุมัติ
+            ⚠️ โชว์เฉพาะตอนผู้เบิกเป็นตัวเอง — ออกใบแทนคนอื่นต้องเว้นช่องให้เจ้าตัวเซ็นเสมอ */}
+        {canSignSelf && (
+          <Section accent={accent} icon={<HistoryEdu sx={{ fontSize: 18, color: accent }} />} title="ลายเซ็นอิเล็กทรอนิกส์"
+            hint="ลายเซ็นที่ตั้งไว้ในหน้าตั้งค่า จะถูกพิมพ์ลงช่องผู้เบิกของใบ PDF">
+            {mySignature ? (
+              <>
+                <FormControlLabel
+                  sx={{ mr: 0 }}
+                  control={(
+                    <Checkbox size="small" checked={useSignature} onChange={(e) => setUseSignature(e.target.checked)}
+                      sx={{ "&.Mui-checked": { color: accent } }} />
+                  )}
+                  label={<Typography sx={{ fontSize: "0.85rem", fontWeight: 700 }}>ลงลายเซ็นอิเล็กทรอนิกส์ของฉันในใบนี้</Typography>}
+                />
+                <Stack direction="row" alignItems="center" spacing={1.25} sx={{ pl: 3.75 }}>
+                  <Box component="img" src={mySignature.image} alt=""
+                    sx={{ height: 34, maxWidth: 150, objectFit: "contain", opacity: useSignature ? 1 : 0.28, transition: "opacity .15s" }} />
+                  <Typography variant="caption" sx={{ color: TEXT_SUB }}>
+                    {useSignature ? "ลายเซ็นจะขึ้นในช่อง “ผู้เบิกค่าใช้จ่าย” ของใบ PDF" : "ไม่ติ๊ก = เว้นช่องไว้เซ็นด้วยมือ"}
+                  </Typography>
+                </Stack>
+              </>
+            ) : (
+              <Typography variant="caption" sx={{ color: TEXT_SUB }}>
+                ยังไม่ได้ตั้งลายเซ็นอิเล็กทรอนิกส์ — ใบนี้จะเว้นช่องไว้ให้เซ็นด้วยมือ (ตั้งได้ที่ ตั้งค่า › ลายเซ็นอิเล็กทรอนิกส์)
+              </Typography>
+            )}
+          </Section>
+        )}
+
         {/* ── เพิ่มเติม ───────────────────────────────────────────── */}
         <Section accent={accent} title="หมายเหตุและหลักฐาน" hint={isClaim ? "แนบรูปใบเสร็จ/บิลให้ครบ ผู้อนุมัติจะตรวจจากไฟล์เหล่านี้" : "แนบใบเสนอราคา/รูปประกอบได้ (ไม่บังคับ)"}>
           <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: isClaim ? "1fr" : "1fr 220px" } }}>
@@ -936,28 +984,53 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
                 helperText="ว่างไว้ = 7 วันหลังรับเงิน" />
             )}
           </Box>
-          <input ref={fileInputRef} type="file" hidden multiple accept={ACCEPT_ALL}
-            onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} />
-          <Stack spacing={0.75} sx={{ mt: 1.5 }}>
-            {files.map((f) => (
-              <Stack key={f.key} direction="row" alignItems="center" spacing={1} sx={{ p: 0.75, pl: 1.25, border: `1px solid ${BORDER_MAIN}`, borderRadius: 2, bgcolor: "#fff" }}>
-                <AttachFile sx={{ fontSize: 17, color: TEXT_SUB }} />
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography sx={{ fontSize: "0.82rem", fontWeight: 600 }} noWrap>{f.file.name}</Typography>
-                  <Typography variant="caption" sx={{ color: TEXT_SUB }}>{formatBytes(f.file.size)}</Typography>
-                </Box>
-                <TextField select size="small" value={f.kind} onChange={(e) => setFiles((cur) => cur.map((x) => (x.key === f.key ? { ...x, kind: e.target.value } : x)))}
-                  sx={{ width: 130, "& .MuiInputBase-input": { py: 0.6, fontSize: "0.8rem" } }}>
-                  {FILE_KINDS.map((k) => <MenuItem key={k.value} value={k.value}>{k.label}</MenuItem>)}
-                </TextField>
-                <IconButton size="small" onClick={() => setFiles((cur) => cur.filter((x) => x.key !== f.key))}><Close fontSize="small" /></IconButton>
-              </Stack>
-            ))}
-          </Stack>
-          <Button size="small" startIcon={<AttachFile />} onClick={() => fileInputRef.current?.click()}
-            sx={{ mt: 1, textTransform: "none", fontWeight: 700, color: accent }}>
-            {isClaim ? "แนบใบเสร็จ / รูปถ่าย" : "แนบไฟล์"}
-          </Button>
+          {/* ── ไฟล์แนบ ────────────────────────────────────────────────
+              🐛 ผู้ใช้แจ้ง: "ระยะตรงแนบไฟล์ จุดวางอาจจะสับสนว่าคืออะไร" — เดิมปุ่มแนบไฟล์เป็นปุ่มลอยๆ
+              อยู่ใต้ช่องหมายเหตุ ไม่มีหัวข้อกำกับ และมีบล็อกลายเซ็นมาคั่นกลาง เลยไม่รู้ว่าปุ่มนั้นของอะไร
+              ✅ รวมเป็นกล่องเดียวมีหัวข้อ "ไฟล์แนบ" + บอกชนิดไฟล์ที่ควรแนบ + กดที่กล่องเพื่อเลือกไฟล์ได้เลย */}
+          <Box sx={{ mt: 1.75 }}>
+            <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.75 }}>
+              <AttachFile sx={{ fontSize: 16, color: TEXT_SUB }} />
+              <Typography sx={{ fontSize: "0.82rem", fontWeight: 800, color: TEXT_MAIN }}>ไฟล์แนบ</Typography>
+              {files.length > 0 && (
+                <Chip size="small" label={`${files.length} ไฟล์`} sx={{ height: 18, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha(accent, 0.12), color: accent }} />
+              )}
+            </Stack>
+            <input ref={fileInputRef} type="file" hidden multiple accept={ACCEPT_ALL}
+              onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} />
+            <Box
+              onClick={() => fileInputRef.current?.click()}
+              sx={{
+                p: 1.5, border: `1px dashed ${alpha(accent, 0.45)}`, borderRadius: 2, bgcolor: alpha(accent, 0.03),
+                textAlign: "center", cursor: "pointer", transition: "background-color .15s",
+                "&:hover": { bgcolor: alpha(accent, 0.07) },
+              }}
+            >
+              <AttachFile sx={{ fontSize: 20, color: accent }} />
+              <Typography sx={{ fontSize: "0.85rem", fontWeight: 700, color: accent }}>
+                {isClaim ? "แนบใบเสร็จ / รูปถ่าย" : "แนบไฟล์ประกอบ"}
+              </Typography>
+              <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }}>
+                {isClaim ? "รูปใบเสร็จ บิล สลิปโอน — ผู้อนุมัติจะตรวจจากไฟล์เหล่านี้" : "ใบเสนอราคา รูปหน้างาน หรือเอกสารประกอบ (ไม่บังคับ)"}
+              </Typography>
+            </Box>
+            <Stack spacing={0.75} sx={{ mt: 1 }}>
+              {files.map((f) => (
+                <Stack key={f.key} direction="row" alignItems="center" spacing={1} sx={{ p: 0.75, pl: 1.25, border: `1px solid ${BORDER_MAIN}`, borderRadius: 2, bgcolor: "#fff" }}>
+                  <AttachFile sx={{ fontSize: 17, color: TEXT_SUB }} />
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography sx={{ fontSize: "0.82rem", fontWeight: 600 }} noWrap>{f.file.name}</Typography>
+                    <Typography variant="caption" sx={{ color: TEXT_SUB }}>{formatBytes(f.file.size)}</Typography>
+                  </Box>
+                  <TextField select size="small" value={f.kind} onChange={(e) => setFiles((cur) => cur.map((x) => (x.key === f.key ? { ...x, kind: e.target.value } : x)))}
+                    sx={{ width: 130, "& .MuiInputBase-input": { py: 0.6, fontSize: "0.8rem" } }}>
+                    {FILE_KINDS.map((k) => <MenuItem key={k.value} value={k.value}>{k.label}</MenuItem>)}
+                  </TextField>
+                  <IconButton size="small" onClick={(e) => { e.stopPropagation(); setFiles((cur) => cur.filter((x) => x.key !== f.key)); }}><Close fontSize="small" /></IconButton>
+                </Stack>
+              ))}
+            </Stack>
+          </Box>
           {editing && (expense.attachments?.length > 0) && (
             <Typography variant="caption" sx={{ display: "block", color: TEXT_SUB }}>
               มีไฟล์แนบเดิม {expense.attachments.length} ไฟล์ (จัดการได้ในหน้ารายละเอียด)

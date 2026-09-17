@@ -12,7 +12,7 @@
  * ⚠️ jsPDF + ฟอนต์ไทย (600+ kB) โหลดแบบ dynamic import เฉพาะตอนกดพิมพ์ ไม่ถ่วงการเปิดหน้ารายการ
  */
 import boldFontUrl from "@/assets/fonts/THSarabunNew Bold.ttf?url";
-import { ISSUER, drawLetterhead, outputDocument, spaceThaiLatin } from "@/features/documents/utils/deliveryNotePdf";
+import { ISSUER, drawLetterhead, outputDocument, spaceThaiLatin, preparePrintAssets } from "@/features/documents/utils/deliveryNotePdf";
 import { thaiDateFull, thaiDate, thaiDateTime } from "@/shared/utils/thaiDate";
 import {
   KIND_META, slipKind, statusMeta, fmtMoney, bahtText, qtyText, differenceMeta, paymentLabel, fileKindLabel, jobText, money, itemPersonName, personFullName,
@@ -76,7 +76,9 @@ export const wrapText = (doc, text, width) => {
 };
 
 export const newDoc = (jsPDF, font, bold) => {
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "A4" });
+  // ⚠️ compress: true — บีบฟอนต์ที่ฝัง (TH Sarabun ปกติ+ตัวหนา ~800 KB) และเนื้อหาในไฟล์
+  // ดูเหตุผลเต็มที่ deliveryNotePdf.js (หัวข้อ "ขนาดไฟล์ PDF")
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "A4", compress: true });
   doc.addFileToVFS("THSarabun.ttf", font);
   doc.addFont("THSarabun.ttf", "THSarabun", "normal");
   if (bold) {
@@ -518,15 +520,39 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold) => {
   return y;
 };
 
-const renderSignatures = (doc, e, hasBold) => {
+/**
+ * วางลายเซ็นอิเล็กทรอนิกส์ลงบนเส้นลงชื่อ
+ * ✅ ผู้ใช้ขอ: ตั้งลายเซ็นไว้ที่ user แล้วใช้กับเอกสาร PDF — ลายเซ็นที่วางที่นี่คือ "ลายเซ็นที่ถูกผนึก
+ * ไว้ในใบตอนคนนั้นกดออกใบ/กดอนุมัติเอง" (ดู da-app-server/src/routes/signatures.js)
+ * ⚠️ วางให้ฐานของรูปอยู่เหนือเส้นเล็กน้อย และสูงไม่เกินช่องว่างเหนือเส้น — ไม่งั้นลายเซ็นจะทับ
+ * หัวข้อ/ยอดเงินด้านบน ซึ่งทำให้เอกสารการเงินอ่านยากและดูเหมือนตัดแปะ
+ * ⚠️ ห่อ try/catch: รูปเสีย/ชนิดไม่รองรับต้องไม่ทำให้ "พิมพ์เอกสารไม่ได้" — ปล่อยเป็นเส้นเซ็นมือแทน
+ */
+const drawSignatureImage = (doc, seal, { centerX, lineY, maxW, maxH }) => {
+  if (!seal?.image) return false;
+  try {
+    const props = doc.getImageProperties(seal.image);
+    const ratio = props.height / props.width || 0.35;
+    let w = maxW;
+    let h = w * ratio;
+    if (h > maxH) { h = maxH; w = h / ratio; }
+    doc.addImage(seal.image, "PNG", centerX - w / 2, lineY - h - 0.6, w, h, undefined, "MEDIUM");
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const renderSignatures = (doc, e, hasBold, signatures = null) => {
   const bold = (on) => doc.setFont("THSarabun", on && hasBold ? "bold" : "normal");
   const colW = W / 3;
   const approved = e.approvedAt && !["pending", "rejected"].includes(e.status);
   const boxes = [
     // ✅ ชื่อ-นามสกุลในวงเล็บใต้ลายเซ็น (ผู้ใช้ขอ) — ใบเก่า/คนนอกระบบที่ไม่มีนามสกุลในทะเบียนได้ชื่อต้นตามเดิม
-    { role: "ผู้เบิกค่าใช้จ่าย", name: personFullName(e.requester), date: e.submittedAt || e.docDate },
-    { role: "ผู้ตรวจสอบ", name: "", date: null },
-    { role: "ผู้อนุมัติ", name: approved ? personFullName(e.approvedBy) : "", date: approved ? e.approvedAt : null },
+    { role: "ผู้เบิกค่าใช้จ่าย", name: personFullName(e.requester), date: e.submittedAt || e.docDate, seal: signatures?.requester },
+    // ⚠️ "ผู้ตรวจสอบ" ไม่มีขั้นตอนนี้ในระบบ (ไม่มีใครกดตรวจสอบ) — ต้องเว้นให้เซ็นมือเสมอ
+    { role: "ผู้ตรวจสอบ", name: "", date: null, seal: null },
+    { role: "ผู้อนุมัติ", name: approved ? personFullName(e.approvedBy) : "", date: approved ? e.approvedAt : null, seal: approved ? signatures?.approver : null },
   ];
   doc.setTextColor(...SLATE);
   boxes.forEach((b, i) => {
@@ -541,6 +567,10 @@ const renderSignatures = (doc, e, hasBold) => {
     doc.setLineDashPattern([0.5, 0.8], 0);
     doc.line(sx, y + 0.8, cxm + half, y + 0.8);
     doc.setLineDashPattern([], 0);
+    // ✅ ลายเซ็นวางบนเส้น แล้วมีบรรทัดกำกับเล็กๆ ว่าลงนามอิเล็กทรอนิกส์เมื่อไร (ตรวจย้อนหลังได้)
+    const signed = drawSignatureImage(doc, b.seal, {
+      centerX: (sx + cxm + half) / 2, lineY: y + 0.6, maxW: (cxm + half - sx) * 0.92, maxH: 11,
+    });
     y += 7;
     doc.text(b.name ? `( ${b.name} )` : "( ................................................ )", cxm, y, { align: "center" });
     y += 6.2;
@@ -549,6 +579,13 @@ const renderSignatures = (doc, e, hasBold) => {
     y += 6;
     bold(false); doc.setFontSize(12.5);
     doc.text(b.date ? `วันที่ ${thaiDate(b.date)}` : "วันที่ ........../........../..........", cxm, y, { align: "center" });
+    if (signed) {
+      y += 4.6;
+      doc.setFontSize(9.5);
+      doc.setTextColor(...GRAY);
+      doc.text(`ลงนามอิเล็กทรอนิกส์ ${thaiDateTime(b.seal.signedAt)}`, cxm, y, { align: "center" });
+      doc.setTextColor(...SLATE);
+    }
   });
 };
 
@@ -578,7 +615,11 @@ const renderCancelledMark = (doc, hasBold) => {
  * @param {"blob"|"open"|"download"} [opts.mode]
  * @returns {Promise<{blob: Blob, url: string, fileName: string}>}
  */
-export async function generateExpensePdf({ expense, mode = "blob" }) {
+/**
+ * @param {object} opts.signatures  ลายเซ็นที่ผนึกไว้ในใบ { requester, approver } จาก
+ *   GET /api/expenses/:id/signatures — ไม่ส่งมาก็ออกใบได้ (เว้นช่องให้เซ็นมือ)
+ */
+export async function generateExpensePdf({ expense, signatures = null, mode = "blob" }) {
   const [{ jsPDF }, fontModule, bold] = await Promise.all([
     import("jspdf"),
     import("@/assets/fonts/THSarabunNew_base64"),
@@ -586,6 +627,9 @@ export async function generateExpensePdf({ expense, mode = "blob" }) {
   ]);
   const font = fontModule.default;
   const hasBold = Boolean(bold);
+
+  // ✅ ย่อโลโก้หัวกระดาษก่อนฝังลงไฟล์ — ดูหัวข้อ "ขนาดไฟล์ PDF" ใน deliveryNotePdf.js
+  await preparePrintAssets();
 
   // วัดบนกระดาษทด แล้วเลือกขั้นย่อแรกที่พอดีหน้าเดียว
   let step = FIT_STEPS[FIT_STEPS.length - 1];
@@ -600,7 +644,7 @@ export async function generateExpensePdf({ expense, mode = "blob" }) {
   doc.setDrawColor(226, 232, 240);
   doc.setLineWidth(0.3);
   doc.line(L, SIG_TOP, R, SIG_TOP);
-  renderSignatures(doc, expense, hasBold);
+  renderSignatures(doc, expense, hasBold, signatures);
   renderFooter(doc, expense);
   if (expense.status === "cancelled") renderCancelledMark(doc, hasBold);
 

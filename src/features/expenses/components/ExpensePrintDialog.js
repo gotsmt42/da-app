@@ -82,7 +82,9 @@ export default function ExpensePrintDialog({ open, expense, blank, onClose }) {
           setFormInfo(form);
           out = await generateBlankClaimPdf({ variant: blank.variant, advance: blank.advance, form, mode: "blob" });
         } else {
-          out = await generateExpensePdf({ expense, mode: "blob" });
+          // ✅ ลายเซ็นอิเล็กทรอนิกส์ที่ผนึกไว้ในใบ (ผู้เบิก/ผู้อนุมัติ) — โหลดก่อนแล้วฝังลงไฟล์
+          const signatures = expense?._id ? await ExpenseService.signatures(expense._id) : null;
+          out = await generateExpensePdf({ expense, signatures, mode: "blob" });
         }
       } catch (err) {
         console.error("สร้าง PDF ไม่สำเร็จ:", err);

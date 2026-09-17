@@ -12,12 +12,15 @@ import {
   FaInfoCircle,
   FaSignOutAlt,
   FaTags,
+  FaFileSignature,
 } from "react-icons/fa";
 import Swal from "sweetalert2";
 import { useAuth } from "@/features/auth/AuthContext";
 import PushService from "@/shared/services/PushService";
 import { swalLogout } from "@/shared/utils/user";
 import { can } from "@/shared/utils/roles";
+import SignatureSettingsDialog from "../components/SignatureSettingsDialog";
+import SignatureService from "@/shared/services/SignatureService";
 
 const version = import.meta.env.REACT_APP_VERSION;
 
@@ -28,11 +31,15 @@ const Settings = () => {
 
   const [pushSubscribed, setPushSubscribed] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
+  // ลายเซ็นอิเล็กทรอนิกส์ของผู้ใช้เอง (ใช้กับเอกสาร PDF ทุกใบที่ตัวเองออก/อนุมัติ)
+  const [signOpen, setSignOpen] = useState(false);
+  const [hasSignature, setHasSignature] = useState(null);
 
   useEffect(() => {
     if (PushService.isSupported()) {
       PushService.isSubscribed().then(setPushSubscribed);
     }
+    SignatureService.me().then((sig) => setHasSignature(Boolean(sig)));
   }, []);
 
   // ✅ ใช้ PushService ตัวเดียวกับปุ่มกระดิ่งบน Header เป๊ะๆ — สลับที่ไหนก็ sync สถานะเดียวกัน
@@ -97,6 +104,26 @@ const Settings = () => {
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={styles.profileName}>{userData?.fname ? `${userData.fname} ${userData?.lname || ""}` : (userData?.username || "ผู้ใช้งาน")}</p>
           <span style={styles.roleBadge}>{userData?.role || "User"}</span>
+        </div>
+        <FaChevronRight style={styles.chevron} />
+      </div>
+
+      {/* ─── ลายเซ็นอิเล็กทรอนิกส์ ───
+          ✅ อยู่ใต้ "บัญชีของฉัน" เพราะเป็นของผู้ใช้คนนั้นคนเดียว (ตั้งแทนกันไม่ได้) และทุกสิทธิ์ต้องใช้ได้
+          — ช่างออกใบเบิก/ใบแจ้งเข้างานเองก็ต้องมีลายเซ็นตัวเองเหมือนกัน */}
+      <div style={styles.card} className="settings-row-hover" onClick={() => setSignOpen(true)}>
+        <div style={{ ...styles.iconCircle, backgroundColor: hasSignature ? "rgba(5,150,105,0.12)" : "rgba(148,163,184,0.15)" }}>
+          <FaFileSignature size={16} color={hasSignature ? "#059669" : "#94a3b8"} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={styles.rowTitle}>ลายเซ็นอิเล็กทรอนิกส์</p>
+          <p style={styles.rowDesc}>
+            {hasSignature === null
+              ? "กำลังตรวจสอบ..."
+              : hasSignature
+                ? "ตั้งไว้แล้ว — ใช้กับใบเบิก/ใบเคลม/ใบส่งมอบงานที่คุณออกหรืออนุมัติ"
+                : "ยังไม่ได้ตั้ง — เอกสารจะเว้นช่องให้เซ็นด้วยมือ"}
+          </p>
         </div>
         <FaChevronRight style={styles.chevron} />
       </div>
@@ -174,6 +201,11 @@ const Settings = () => {
           opacity: 0.9;
         }
       `}</style>
+      <SignatureSettingsDialog
+        open={signOpen}
+        onClose={() => setSignOpen(false)}
+        onSaved={(sig) => setHasSignature(Boolean(sig))}
+      />
     </Container>
   );
 };
