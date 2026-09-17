@@ -107,6 +107,20 @@ describe("สิทธิ์เดิมต้องไม่เปลี่ย�
     expect(canAssignRole(ROLES.MANAGER, "tecnicain")).toBe(false);
   });
 
+  // ✅ ผู้ใช้ขอเพิ่ม "กรรมการผู้จัดการ" — สูงสุดของบริษัท
+  it("กรรมการผู้จัดการมีทุกสิทธิ์ที่ผู้จัดการมี และอยู่เหนือทุกระดับ", () => {
+    const caps = Object.keys(CAPABILITIES);
+    const missing = caps.filter((c) => can(ROLES.MANAGER, c) && !can(ROLES.DIRECTOR, c));
+    expect(missing).toEqual([]);
+    expect(roleLevel(ROLES.DIRECTOR)).toBeGreaterThan(roleLevel(ROLES.MANAGER));
+    expect(ROLE_LABEL[ROLES.DIRECTOR]).toBe("กรรมการผู้จัดการ");
+    // ⚠️ ผู้จัดการตั้ง/แตะบัญชีกรรมการผู้จัดการไม่ได้ (คนละระดับ)
+    expect(canAssignRole(ROLES.MANAGER, ROLES.DIRECTOR)).toBe(false);
+    expect(canManageUserOfRole(ROLES.MANAGER, ROLES.DIRECTOR)).toBe(false);
+    expect(canAssignRole(ROLES.DIRECTOR, ROLES.DIRECTOR)).toBe(true);
+    expect(canManageUserOfRole(ROLES.DIRECTOR, ROLES.MANAGER)).toBe(true);
+  });
+
   // ✅ ผู้ใช้ขอเพิ่ม "หัวหน้าช่างเทคนิค" — ตอนนี้ต้องมีสิทธิ์เท่าช่างเทคนิคทุกข้อ
   it("หัวหน้าช่างเทคนิคมีสิทธิ์เท่าช่างเทคนิคทุกข้อ", () => {
     const caps = Object.keys(CAPABILITIES);

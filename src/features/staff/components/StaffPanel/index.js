@@ -127,6 +127,8 @@ const copyToClipboard = (text, cb) => {
  * โดยไม่มีอะไรบอกสาเหตุ ที่นี่จึงต้องโชว์ให้แอดมินเห็นชัดเพื่อกดแก้ให้ถูก
  */
 const ROLE_META = {
+  // ✅ กรรมการผู้จัดการ — ระดับสูงสุด ใช้สีเข้มสุดในชุดให้เห็นลำดับชั้นจากสีได้เลย
+  [ROLES.DIRECTOR]: { label: ROLE_LABEL[ROLES.DIRECTOR], color: "#7c2d12", icon: <ShieldIcon sx={{ fontSize: 14 }} /> },
   [ROLES.ADMIN]: { label: ROLE_LABEL[ROLES.ADMIN], color: "#ef4444", icon: <ShieldIcon sx={{ fontSize: 14 }} /> },
   [ROLES.MANAGER]: { label: ROLE_LABEL[ROLES.MANAGER], color: "#0891b2", icon: <ShieldIcon sx={{ fontSize: 14 }} /> },
   [ROLES.TECH_LEAD]: { label: ROLE_LABEL[ROLES.TECH_LEAD], color: "#0ea5e9", icon: <EngineeringIcon sx={{ fontSize: 14 }} /> },

@@ -16,6 +16,8 @@
  */
 
 export const ROLES = {
+  /** กรรมการผู้จัดการ — ✅ ผู้ใช้ขอเพิ่ม: ระดับสูงสุดของบริษัท มีทุกสิทธิ์ในระบบ */
+  DIRECTOR: "director",
   ADMIN: "admin",
   MANAGER: "manager",
   TECHNICIAN: "technician",
@@ -29,6 +31,7 @@ export const ALL_ROLES = Object.values(ROLES);
 
 /** ชื่อภาษาไทยสำหรับแสดงผล — ทั้งแอปเป็นภาษาไทย ห้ามโชว์ค่าดิบอย่าง "technician" ให้ผู้ใช้เห็น */
 export const ROLE_LABEL = {
+  [ROLES.DIRECTOR]: "กรรมการผู้จัดการ",
   [ROLES.ADMIN]: "แอดมินช่าง",
   [ROLES.MANAGER]: "ผู้จัดการแผนกช่าง",
   [ROLES.TECH_LEAD]: "หัวหน้าช่างเทคนิค",
@@ -39,6 +42,7 @@ export const ROLE_LABEL = {
 
 /** สีประจำสายงาน — ใช้ให้ตรงกันทั้งแอป เพื่อให้มองปราดเดียวรู้ว่ากำลังอยู่สายงานไหน */
 export const ROLE_COLOR = {
+  [ROLES.DIRECTOR]: "#7c2d12",
   [ROLES.ADMIN]: "#0f172a",
   [ROLES.MANAGER]: "#0f766e",
   [ROLES.TECHNICIAN]: "#0891b2", // ฟ้า = สายบริการ (สีเดิมของแอป)
@@ -73,26 +77,26 @@ export const CAPABILITIES = {
    * จัดการระบบทั้งหมด — ✅ ผู้ใช้สั่งให้ "ผู้จัดการ" มีสิทธิ์สูงสุดเท่าแอดมิน ตั้งค่าได้ทุกอย่าง
    * (เหตุผล/ข้อจำกัดเต็มอยู่ที่ da-app-server/src/config/roles.js)
    */
-  manageAll: [ROLES.ADMIN, ROLES.MANAGER],
-  approveJobs: [ROLES.ADMIN, ROLES.MANAGER],
-  viewAllJobs: [ROLES.ADMIN, ROLES.MANAGER],
-  editAnyJob: [ROLES.ADMIN, ROLES.MANAGER],
+  manageAll: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER],
+  approveJobs: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER],
+  viewAllJobs: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER],
+  editAnyJob: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER],
   // ⚠️ มี user แต่ไม่มี technician — พฤติกรรมเดิมของ OperationBoard.js ที่คงไว้เป๊ะ
-  editOperation: [ROLES.ADMIN, ROLES.MANAGER, ROLES.USER],
+  editOperation: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER, ROLES.USER],
   // ⚠️ ฝ่ายขายถูกตัดออกตามที่ผู้ใช้สั่ง — การติดตามใบเสนอราคาในระบบนี้ผูกกับ "งานของช่าง"
   // (ใบเสนอราคาของงานที่ลงตารางแล้ว) ไม่ใช่ดีลที่เซลกำลังปิด เซลเปิดเข้าไปก็ไม่มีของตัวเอง
-  viewQuotations: [ROLES.ADMIN, ROLES.MANAGER, ROLES.TECHNICIAN, ROLES.TECH_LEAD],
-  editDocuments: [ROLES.ADMIN, ROLES.MANAGER],
+  viewQuotations: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER, ROLES.TECHNICIAN, ROLES.TECH_LEAD],
+  editDocuments: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER],
   // ⚠️ ฝ่ายขายถูกตัดออก — หน้าการเงินคือการวางบิล/รับเงินของงานช่าง ไม่ใช่ยอดขายของเซล
-  viewFinance: [ROLES.ADMIN, ROLES.MANAGER, ROLES.TECHNICIAN, ROLES.TECH_LEAD, ROLES.USER],
-  editFinance: [ROLES.ADMIN, ROLES.MANAGER],
-  viewContracts: [ROLES.ADMIN, ROLES.MANAGER, ROLES.TECHNICIAN, ROLES.TECH_LEAD],
-  editContracts: [ROLES.ADMIN, ROLES.MANAGER],
-  manageMasterData: [ROLES.ADMIN, ROLES.MANAGER],
-  createSalesPlan: [ROLES.ADMIN, ROLES.MANAGER, ROLES.SALE],
-  viewAllSales: [ROLES.ADMIN, ROLES.MANAGER],
-  requestDispatch: [ROLES.ADMIN, ROLES.MANAGER, ROLES.SALE],
-  assignDispatch: [ROLES.ADMIN, ROLES.MANAGER],
+  viewFinance: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER, ROLES.TECHNICIAN, ROLES.TECH_LEAD, ROLES.USER],
+  editFinance: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER],
+  viewContracts: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER, ROLES.TECHNICIAN, ROLES.TECH_LEAD],
+  editContracts: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER],
+  manageMasterData: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER],
+  createSalesPlan: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER, ROLES.SALE],
+  viewAllSales: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER],
+  requestDispatch: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER, ROLES.SALE],
+  assignDispatch: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER],
   receiveDispatch: [ROLES.TECHNICIAN, ROLES.TECH_LEAD],
 
   /**
@@ -104,32 +108,32 @@ export const CAPABILITIES = {
    * ⚠️ ฝั่งหน้าจอยังต้องล็อกฟอร์มให้ครบด้วย (ดู readOnly ที่ EditEvent.js) — ไม่ใช่เพื่อความปลอดภัย
    * แต่เพื่อไม่ให้ผู้ใช้กรอกไปทั้งหน้าแล้วเพิ่งมารู้ตอนกดบันทึกว่าทำไม่ได้
    */
-  viewServiceCalendar: [ROLES.ADMIN, ROLES.MANAGER, ROLES.SALE],
+  viewServiceCalendar: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER, ROLES.SALE],
 
   // ── เบิกเงินล่วงหน้า (Advance) / เคลียร์ค่าใช้จ่าย (Claim) ───────────────
   /** ออกใบ Advance / ใบเคลมของตัวเองได้ */
-  requestExpense: [ROLES.ADMIN, ROLES.MANAGER, ROLES.TECHNICIAN, ROLES.TECH_LEAD],
+  requestExpense: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER, ROLES.TECHNICIAN, ROLES.TECH_LEAD],
   /**
    * ── การอนุมัติใบเบิกเป็น 2 ขั้น ──
    * ขั้นที่ 1 "ตรวจสอบ" (reviewExpense) → ปกติคือแอดมิน · ลงลายเซ็นช่อง "ผู้ตรวจสอบ"
    * ขั้นที่ 2 "อนุมัติ" (approveExpense) → ปกติคือผู้จัดการ · ลงลายเซ็นช่อง "ผู้อนุมัติ"
    * ⚠️ มีทั้งสองสิทธิ์ทั้งคู่เพื่อแทนกันได้ แต่ "คนเดียวกันกดสองขั้นในใบเดียวไม่ได้" (server บังคับ)
    */
-  reviewExpense: [ROLES.ADMIN, ROLES.MANAGER],
+  reviewExpense: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER],
   /** อนุมัติขั้นสุดท้าย / ตีกลับ / บันทึกจ่ายเงิน / ปิดส่วนต่าง */
-  approveExpense: [ROLES.ADMIN, ROLES.MANAGER],
+  approveExpense: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER],
   /**
    * กดครบทั้งสองขั้นในใบเดียวเองได้ (ตรวจสอบเอง → อนุมัติเอง) — ผู้จัดการเท่านั้น
    * ⚠️ เหตุผลและข้อแลกเปลี่ยนอยู่ที่ da-app-server/src/config/roles.js
    */
-  approveOwnReview: [ROLES.MANAGER],
+  approveOwnReview: [ROLES.DIRECTOR, ROLES.MANAGER],
   /**
    * ตรวจสอบ/อนุมัติใบของตัวเองได้ (แอดมิน + ผู้จัดการ ตามที่ผู้ใช้สั่ง)
    * ⚠️ แยกจาก manageAll โดยตั้งใจ — "ตั้งค่าระบบได้" ไม่ได้แปลว่า "เซ็นอนุมัติเงินให้ตัวเองได้"
    */
-  approveOwnExpense: [ROLES.ADMIN, ROLES.MANAGER],
+  approveOwnExpense: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER],
   /** เห็นใบของทุกคน + เบิกแทนคนอื่นได้ + ดูรายงานทั้งบริษัท */
-  viewAllExpenses: [ROLES.ADMIN, ROLES.MANAGER],
+  viewAllExpenses: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER],
 };
 
 export const ALL_CAPABILITIES = Object.keys(CAPABILITIES);
@@ -145,7 +149,7 @@ export const normalizeRole = (who) => {
 
 /**
  * ── ลำดับชั้นของสิทธิ์ (ใครแก้สิทธิ์ใครได้) ────────────────────────────────────
- * ผู้จัดการ (3) > แอดมิน (2) > ช่าง/เซล/ผู้ใช้ (1)
+ * กรรมการผู้จัดการ (4) > ผู้จัดการแผนกช่าง (3) > แอดมินช่าง (2) > ช่าง/เซล/ผู้ใช้ (1)
  * ✅ ผู้ใช้สั่ง: ผู้จัดการสูงสุด · แอดมินตั้งใครเป็นผู้จัดการไม่ได้ และแตะบัญชีผู้จัดการไม่ได้
  * ⚠️ คู่แฝดฝั่ง server ที่ da-app-server/src/config/roles.js — ต้องตรงกันเป๊ะ (ที่นี่ไว้ซ่อน/ปิดปุ่ม
  * ส่วนขอบเขตจริงบังคับที่ server)
@@ -158,6 +162,7 @@ export const normalizeRole = (who) => {
 export const TECHNICIAN_ROLES = [ROLES.TECHNICIAN, ROLES.TECH_LEAD];
 
 export const ROLE_LEVEL = {
+  [ROLES.DIRECTOR]: 4,
   [ROLES.MANAGER]: 3,
   [ROLES.ADMIN]: 2,
   [ROLES.TECHNICIAN]: 1,
@@ -199,6 +204,6 @@ export const isRole = (who, ...roles) =>
   roles.map((r) => String(r).toLowerCase()).includes(normalizeRole(who));
 
 /** ทางลัดที่ใช้บ่อยที่สุดในโค้ดเดิม — มีไว้ให้การย้ายโค้ดเก่าอ่านง่ายขึ้น */
-export const isAdminOrManager = (who) => isRole(who, ROLES.ADMIN, ROLES.MANAGER);
+export const isAdminOrManager = (who) => isRole(who, ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER);
 
 export const roleLabel = (who) => ROLE_LABEL[normalizeRole(who)] || who?.role || "ผู้ใช้";
