@@ -16,7 +16,7 @@ import { alpha } from "@mui/material/styles";
 import {
   Close, Print, Edit, CheckCircle, Undo, Block, Payments, ReceiptLong, AttachFile, OpenInNew,
   DeleteOutline, Link as LinkIcon, History, TaskAlt, WarningAmber, Image as ImageIcon, Description, ExpandMore,
-  AccountBalanceWallet,
+  AccountBalanceWallet, ContentCopy, Check,
 } from "@mui/icons-material";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
@@ -33,6 +33,49 @@ import {
   KIND_META, slipKind, statusMeta, categoryMeta, baht, fmtMoney, qtyText, differenceMeta, paymentLabel, PAYMENT_METHODS,
   fileKindLabel, jobText, isOverdueClear, money, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
 } from "../expenseMeta";
+import { bankMeta, formatAccountNo } from "../bankMeta";
+import BankLogo from "./BankLogo";
+
+/**
+ * บัญชีรับเงินของผู้เบิกที่ระบุไว้ในใบ
+ * ✅ มีปุ่มคัดลอกเลขบัญชี — คนโอนเงินจะได้ไม่ต้องพิมพ์ตามจากหน้าจอ (พิมพ์ผิดหลักเดียว = โอนผิดบัญชี)
+ * ⚠️ แสดงจากสำเนาในใบ (payTo) เสมอ ไม่ใช่จากทะเบียนปัจจุบัน — ใบที่จ่ายไปแล้วต้องตรงกับที่โอนจริง
+ */
+const PayToBox = ({ payTo, dense = false }) => {
+  const [copied, setCopied] = useState(false);
+  if (!payTo?.accountNo) return null;
+  const bank = bankMeta(payTo.bankCode);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(payTo.accountNo);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false); // เบราว์เซอร์บางตัวไม่ให้คัดลอกถ้าไม่ใช่ https — ผู้ใช้ยังอ่านเลขจากหน้าจอได้อยู่
+    }
+  };
+  return (
+    // พื้น/ขอบใช้สีธนาคารแบบอ่อน — ให้ตรงกับกล่องบัญชีในใบ PDF และมองแวบเดียวก็รู้ว่าธนาคารไหน
+    <Stack direction="row" spacing={1.25} alignItems="center"
+      sx={{ p: dense ? 1 : 1.25, border: `1px solid ${alpha(bank.color, 0.35)}`, borderRadius: 2, bgcolor: alpha(bank.color, 0.06) }}>
+      <BankLogo code={payTo.bankCode} size={dense ? 32 : 38} />
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography sx={{ fontSize: dense ? "0.95rem" : "1.05rem", fontWeight: 800, color: TEXT_MAIN, letterSpacing: 0.4 }}>
+          {formatAccountNo(payTo.accountNo)}
+        </Typography>
+        <Typography variant="caption" sx={{ color: bank.color, fontWeight: 800, display: "block", lineHeight: 1.3 }}>
+          {bank.name}
+        </Typography>
+        <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }}>ชื่อบัญชี {payTo.accountName}</Typography>
+      </Box>
+      <Tooltip title={copied ? "คัดลอกแล้ว" : "คัดลอกเลขบัญชี"} describeChild>
+        <IconButton size="small" onClick={copy}>
+          {copied ? <Check sx={{ fontSize: 17, color: "#059669" }} /> : <ContentCopy sx={{ fontSize: 16, color: TEXT_SUB }} />}
+        </IconButton>
+      </Tooltip>
+    </Stack>
+  );
+};
 
 const InfoCell = ({ label, children, span }) => (
   <Box sx={{ minWidth: 0, gridColumn: span ? "1 / -1" : "auto" }}>
@@ -249,6 +292,15 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
         <Stack spacing={1.5}>
           {payLike && (
             <>
+              {/* ✅ คนกดจ่ายเงินเห็นบัญชีปลายทางตรงนี้เลย ไม่ต้องปิดกล่องไปหาในหน้ารายละเอียด */}
+              {payLike && expense?.payTo?.accountNo && (
+                <Box>
+                  <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 700, display: "block", mb: 0.5 }}>
+                    {action === "pay" ? "โอนเงิน Advance เข้าบัญชีของผู้เบิก" : "โอนเข้าบัญชีของผู้เบิก"}
+                  </Typography>
+                  <PayToBox payTo={expense.payTo} dense />
+                </Box>
+              )}
               <ThaiDatePicker label={action === "pay" ? "วันที่จ่ายเงิน" : "วันที่"} value={form.paidAt} onChange={(v) => setForm((f) => ({ ...f, paidAt: v || today() }))} />
               <TextField select size="small" label="วิธีการ" value={form.method || "transfer"} onChange={set("method")}>
                 {PAYMENT_METHODS.map((m) => <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>)}
@@ -616,6 +668,12 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                       {thaiDate(e.payment.at)} · {paymentLabel(e.payment.method)}{e.payment.ref ? ` · ${e.payment.ref}` : ""}{e.payment.by?.name ? ` · โดย ${e.payment.by.name}` : ""}{e.payment.note ? ` · ${e.payment.note}` : ""}
                     </InfoCell>
                   )}
+                  {/* ✅ บัญชีรับเงินของผู้เบิก — ฝ่ายบัญชีใช้โอนเงิน Advance / จ่ายเพิ่ม / จ่ายคืน ได้จากใบนี้เลย */}
+                  <InfoCell label="บัญชีรับเงินของผู้เบิก" span>
+                    {e.payTo?.accountNo
+                      ? <Box sx={{ mt: 0.5 }}><PayToBox payTo={e.payTo} /></Box>
+                      : <Typography sx={{ fontSize: "0.88rem", color: TEXT_SUB }}>ไม่ระบุ (รับเป็นเงินสด)</Typography>}
+                  </InfoCell>
                   {e.note && <InfoCell label="หมายเหตุ" span>{e.note}</InfoCell>}
                 </Box>
               </Card>

@@ -17,6 +17,7 @@ import { thaiDateFull, thaiDate, thaiDateTime } from "@/shared/utils/thaiDate";
 import {
   KIND_META, slipKind, statusMeta, fmtMoney, bahtText, qtyText, differenceMeta, paymentLabel, fileKindLabel, jobText, money, itemPersonName, personFullName,
 } from "../expenseMeta";
+import { bankMeta, formatAccountNo } from "../bankMeta";
 import { compareItems } from "./expenseCompare";
 
 const W_PAGE = 210;
@@ -424,6 +425,64 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold) => {
     y += (Math.min(lines.length, 3) - 1) * 5 * s;
     color(SLATE);
   };
+
+  /**
+   * ✅ บัญชีรับเงินของผู้เบิก — ใบที่พิมพ์ออกไปให้ฝ่ายบัญชีต้องมีเลขบัญชีปลายทางอยู่ในเอกสารเอง
+   * ไม่ใช่ต้องกลับมาเปิดในแอปหาอีกที (ใบ Advance = บัญชีที่บริษัทโอนเงินล่วงหน้าให้)
+   * ✅ ผู้ใช้ขอให้ "เด่นและเข้าใจง่าย": วางเป็นกล่องมีสัญลักษณ์สีประจำธนาคาร + เลขบัญชีตัวใหญ่
+   * แทนบรรทัดข้อความยาวๆ ที่กลืนไปกับหมายเหตุอื่น — คนโอนเงินต้องหาเจอในแวบเดียว
+   */
+  if (e.payTo?.accountNo) {
+    const bank = bankMeta(e.payTo.bankCode);
+    // พื้น/เส้นขอบผสมจากสีธนาคารกับขาว — กล่องจึงเป็น "สีของธนาคารนั้น" แบบอ่อนๆ เห็นแล้วรู้ทันทีว่าธนาคารไหน
+    const mix = (ratio) => bank.rgb.map((c) => Math.round(c * ratio + 255 * (1 - ratio)));
+    const boxH = 21 * s;
+    y += 4 * s;
+    doc.setFillColor(...mix(0.07));
+    doc.setDrawColor(...mix(0.45));
+    doc.setLineWidth(0.5);
+    doc.roundedRect(L, y, W, boxH, 2.2, 2.2, "FD");
+
+    // ป้ายสัญลักษณ์ธนาคาร (ตัวย่อบนสีประจำธนาคาร — ชุดเดียวกับที่เห็นบนหน้าจอ)
+    const badge = 13 * s;
+    const bx = L + 4 * s;
+    const by = y + (boxH - badge) / 2;
+    doc.setFillColor(...bank.rgb);
+    doc.roundedRect(bx, by, badge, badge, 3, 3, "F");
+    const markSize = bank.mark.length > 3 ? 10 : bank.mark.length > 2 ? 12 : bank.mark.length > 1 ? 14 : 17;
+    bold(true);
+    size(markSize);
+    color(bank.darkText ? [31, 41, 55] : [255, 255, 255]);
+    doc.text(bank.mark, bx + badge / 2, by + badge / 2 + markSize * 0.17 * s, { align: "center" });
+
+    const tx = bx + badge + 4.5 * s;
+    // บรรทัดบน: ป้ายกำกับ + ชื่อธนาคารเป็นสีของธนาคาร
+    size(11.5); bold(true); color(GRAY);
+    const label = spaceThaiLatin(e.kind === "advance" ? "โอนเงินเข้าบัญชีผู้เบิก" : "โอนเงินคืนเข้าบัญชีผู้เบิก");
+    doc.text(label, tx, y + 6.4 * s);
+    // ⚠️ ธนาคารสีอ่อน (กรุงศรี/ออมสิน) ใช้สีแบรนด์เป็นสีตัวอักษรตรงๆ แล้วอ่านไม่ออกบนพื้นขาว — หรี่ลงก่อน
+    const nameRgb = bank.darkText ? bank.rgb.map((c) => Math.round(c * 0.55)) : bank.rgb;
+    size(12.5); color(nameRgb);
+    doc.text(spaceThaiLatin(e.payTo.bankName || bank.name), tx + doc.getTextWidth(label) + 3, y + 6.4 * s);
+
+    // บรรทัดกลาง: เลขบัญชีตัวใหญ่ เว้นช่องไฟให้อ่านทีละกลุ่มไม่สลับตัวเลข (ตัวที่คนโอนเงินต้องอ่าน)
+    size(17); bold(true); color(SLATE);
+    doc.setCharSpace(0.3);
+    doc.text(formatAccountNo(e.payTo.accountNo), tx, y + 13.6 * s);
+    doc.setCharSpace(0);
+
+    // บรรทัดล่าง: ชื่อบัญชี — ฝ่ายบัญชีใช้ตรวจว่าปลายทางตรงกับผู้เบิกก่อนกดโอน
+    if (e.payTo.accountName) {
+      size(11.5); bold(false); color(GRAY);
+      doc.text(spaceThaiLatin("ชื่อบัญชี"), tx, y + 19 * s);
+      const nx = tx + doc.getTextWidth(spaceThaiLatin("ชื่อบัญชี")) + 2;
+      bold(true); color(SLATE);
+      doc.text(wrapText(doc, spaceThaiLatin(e.payTo.accountName), R - nx - 4 * s)[0] || "", nx, y + 19 * s);
+    }
+    bold(false);
+    color(SLATE);
+    y += boxH;
+  }
 
   const pay = e.payment || {};
   if (e.kind === "advance" && pay.at && ["paid", "clearing", "cleared"].includes(e.status)) {

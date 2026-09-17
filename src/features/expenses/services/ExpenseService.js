@@ -81,6 +81,31 @@ const ExpenseService = {
     return res.data.advance || null;
   },
 
+  /**
+   * บัญชีรับเงินของพนักงานคนหนึ่ง (ทะเบียนบัญชี — ใช้เลือกใส่ใบเคลม)
+   * ⚠️ ดูได้เฉพาะบัญชีตัวเอง หรือแอดมิน/ผู้จัดการดูของคนอื่นได้ (server บังคับ) — เลขบัญชีเป็นข้อมูลส่วนตัว
+   * @returns {Promise<{accounts: Array, banks: Array}>}
+   */
+  async bankAccounts(userId) {
+    const res = await API.get("/expenses/bank-accounts", { params: userId ? { userId } : {} });
+    return { accounts: res.data.accounts || [], banks: res.data.banks || [] };
+  },
+
+  /** @param {{userId, bankCode, accountNo, accountName, isDefault}} fields */
+  async addBankAccount(fields) {
+    const res = await API.post("/expenses/bank-accounts", fields);
+    return res.data.account;
+  },
+
+  async updateBankAccount(accountId, fields) {
+    const res = await API.put(`/expenses/bank-accounts/${accountId}`, fields);
+    return res.data.account;
+  },
+
+  async deleteBankAccount(accountId) {
+    await API.delete(`/expenses/bank-accounts/${accountId}`);
+  },
+
   async suggest() {
     const res = await API.get("/expenses/suggest");
     return res.data;

@@ -27,7 +27,7 @@ import {
 import { alpha } from "@mui/material/styles";
 import {
   Close, Add, DeleteOutline, AttachFile, Send, Save, Link as LinkIcon, ReceiptLong, Payments, ExpandMore,
-  Print, EditNote, AccountBalanceWallet, Groups, PersonOutline,
+  Print, EditNote, AccountBalanceWallet, Groups, PersonOutline, AccountBalance,
 } from "@mui/icons-material";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
@@ -39,6 +39,7 @@ import ExpenseService, { errorText } from "../services/ExpenseService";
 import AdvancePanel from "./AdvancePanel";
 import KindBadge from "./KindBadge";
 import ExpensePrintDialog from "./ExpensePrintDialog";
+import BankAccountPicker from "./BankAccountPicker";
 import {
   KIND_META, EXPENSE_CATEGORIES, categoryMeta, FILE_KINDS, baht, fmtMoney, itemAmount, itemsTotal,
   differenceMeta, money, jobText, jobSubject, itemPersonName, personFullName, slipKind, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
@@ -146,6 +147,11 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
   const [error, setError] = useState("");
   const [touched, setTouched] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
+  /**
+   * บัญชีรับเงินของผู้เบิก (ทุกชนิดใบ) — undefined = ยังไม่ได้เลือก ให้ตัวเลือกเลือกบัญชีหลักให้เอง
+   * ⚠️ แยก undefined ออกจาก "" ให้ชัด: "" คือผู้ใช้ตั้งใจเลือก "ไม่ระบุบัญชี (รับเงินสด)"
+   */
+  const [payToAccountId, setPayToAccountId] = useState(undefined);
   // ฟอร์มใบเคลมเปล่าสำหรับพิมพ์ไปกรอกด้วยลายมือ (ดู utils/expenseBlankPdf.js)
   const [blankMenuEl, setBlankMenuEl] = useState(null);
   const [blankPrint, setBlankPrint] = useState(null);
@@ -179,6 +185,8 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
       setDueClearAt(dayOf(expense.dueClearAt));
       setNote(expense.note || "");
       setAdvance(isClearClaim ? { _id: expense.advanceId, ...expense.advance, ...(expense.advanceDoc || {}) } : null);
+      // ⚠️ ใบเดิม: ใช้บัญชีที่บันทึกไว้ ไม่ให้ตัวเลือกไปหยิบ "บัญชีหลัก" มาเปลี่ยนปลายทางเงินเองเงียบๆ
+      setPayToAccountId(expense.payTo?.accountId || "");
     } else {
       setDocDate(moment().format("YYYY-MM-DD"));
       setTo("");
@@ -194,6 +202,7 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
       setDueClearAt("");
       setNote("");
       setAdvance(null);
+      setPayToAccountId(undefined);
     }
     let alive = true;
     ExpenseService.suggest().then((s) => {
@@ -329,6 +338,17 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
     return [...map.values()];
   }, [items]);
 
+  // ── บัญชีรับเงิน: เจ้าของบัญชี = ผู้เบิกของใบเสมอ (ใบเคลมปกติผูกกับผู้เบิกของใบ Advance) ──
+  const payToUserId = isClearClaim ? advance?.requester?.userId || "" : requester?.userId || "";
+  // ⚠️ เอาชื่อ-นามสกุลจากทะเบียนพนักงานก่อน — ใบใหม่มีแค่ชื่อต้นจาก userData (ไม่มีนามสกุล)
+  // ถ้าใช้ค่านั้นเติมชื่อบัญชีให้ จะได้บัญชีชื่อ "ช่างเอ" เฉยๆ ซึ่งไม่ตรงกับหน้าสมุดบัญชีจริง
+  const payToOwnerName =
+    people.find((pp) => pp.userId === payToUserId)?.fullName ||
+    (isClearClaim ? personFullName(advance?.requester) : personFullName(requester)) ||
+    (isClearClaim ? advance?.requester?.name : requester?.name) || "";
+  // 🔒 ทะเบียนบัญชีของคนอื่นเปิดดูได้เฉพาะแอดมิน/ผู้จัดการ — คนอื่นเห็นแค่บัญชีที่ใบเก็บไว้แล้ว
+  const canManageBank = Boolean(payToUserId) && (payToUserId === userData?.userId || can("viewAllExpenses"));
+
   const validItems = items.filter((it) => String(it.description).trim());
   const problems = [];
   if (isClearClaim && !advance?._id) problems.push("เลือกใบ Advance ที่ต้องการเคลียร์");
@@ -369,6 +389,12 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
       if (canPickPerson && requester?.userId) fields.requesterId = requester.userId;
     } else if (!editing) {
       fields.advanceId = advance._id;
+    }
+    // ✅ บัญชีรับเงิน (ทุกชนิดใบ) — ส่งเฉพาะตอนที่มีการเลือก/เปลี่ยนจริง
+    // ⚠️ ตอนแก้ใบเดิมไม่ส่งถ้าไม่ได้เปลี่ยน: ถ้าบัญชีนั้นถูกลบออกจากทะเบียนไปแล้ว การส่งซ้ำจะทำให้
+    // บันทึกไม่ผ่านทั้งใบ ทั้งที่ผู้ใช้แค่มาแก้ยอด — สำเนาบัญชีในใบเดิมยังอยู่ครบอยู่แล้ว
+    if (payToAccountId !== undefined && payToAccountId !== (expense?.payTo?.accountId || (editing ? "" : undefined))) {
+      fields.payToAccountId = payToAccountId;
     }
     try {
       const payload = files.map((f) => ({ file: f.file, kind: f.kind }));
@@ -556,6 +582,8 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
                   if (!v) return;
                   setRequester(v);
                   setPosition(v.position || "");
+                  // ⚠️ เปลี่ยนผู้เบิก = บัญชีของคนเดิมใช้ไม่ได้แล้ว ล้างแล้วให้เลือกบัญชีหลักของคนใหม่ให้
+                  setPayToAccountId(undefined);
                 }}
                 isOptionEqualToValue={(o, v) => o.userId === v.userId}
                 getOptionLabel={(o) => o?.fullName || o?.name || ""}
@@ -579,9 +607,10 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
             ) : (
               <TextField size="small" label="ชื่อผู้เบิกเงิน"
                 // ✅ ชื่อ-นามสกุล (ผู้ใช้ขอ) — ใบใหม่ยังไม่มี fullName จาก server จึงหาจากรายชื่อพนักงานที่โหลดมาแทน
+                // ⚠️ ทะเบียนพนักงานมาก่อน — requester ของใบใหม่มีแค่ชื่อต้นจาก userData (ไม่มีนามสกุล)
                 value={isClearClaim
-                  ? personFullName(advance?.requester) || personFullName(requester)
-                  : personFullName(requester) || people.find((p) => p.userId === requester?.userId)?.fullName || requester?.name || ""}
+                  ? people.find((p) => p.userId === advance?.requester?.userId)?.fullName || personFullName(advance?.requester) || personFullName(requester)
+                  : payToOwnerName}
                 InputProps={{ readOnly: true }}
                 helperText={isClearClaim ? "ผู้เบิกของใบเคลม = ผู้รับเงิน Advance" : isReimburseForm ? "ผู้เบิก = คนที่สำรองจ่ายและจะได้รับเงินคืน" : undefined} />
             )}
@@ -865,6 +894,36 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
               </Stack>
             )}
           </Box>
+        </Section>
+
+        {/* ── บัญชีรับเงินของผู้เบิก ─────────────────────────────────── */}
+        {/* ✅ ทุกชนิดใบ — ใบ Advance ก็โอนเงินให้ผู้เบิกเหมือนกัน (ผู้ใช้ขอ "ทำในใบ advance ด้วย") */}
+        <Section
+          accent={accent}
+          icon={<AccountBalance sx={{ fontSize: 18, color: accent }} />}
+          title="บัญชีรับเงินของผู้เบิก"
+          hint={!isClaim
+            ? "บัญชีที่บริษัทจะโอนเงินล่วงหน้าให้ · เพิ่มบัญชีใหม่ได้เลยไม่ต้องออกจากหน้านี้"
+            : isReimburseForm
+              ? "บริษัทจะโอนเงินคืนเต็มยอดเข้าบัญชีนี้ · เพิ่มบัญชีใหม่ได้เลยไม่ต้องออกจากหน้านี้"
+              : "ใช้ตอนที่บริษัทต้องจ่ายเพิ่ม (ใช้จริงมากกว่ายอด Advance) · เพิ่มบัญชีใหม่ได้เลยไม่ต้องออกจากหน้านี้"}
+        >
+          {payToUserId ? (
+            <BankAccountPicker
+              userId={payToUserId}
+              ownerName={payToOwnerName}
+              value={payToAccountId}
+              onChange={(id) => setPayToAccountId(id)}
+              accent={accent}
+              canManage={canManageBank}
+              autoSelectDefault={!editing}
+              snapshot={expense?.payTo || null}
+            />
+          ) : (
+            <Typography variant="caption" sx={{ color: TEXT_SUB }}>
+              เลือกใบ Advance ก่อน แล้วจะเลือกบัญชีของผู้เบิกได้
+            </Typography>
+          )}
         </Section>
 
         {/* ── เพิ่มเติม ───────────────────────────────────────────── */}
