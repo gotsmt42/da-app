@@ -57,7 +57,8 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
   const isSaleUser = isRole(userData, ROLES.SALE);
   const canViewFinance = can(userData, "viewFinance");
   const canExpense = can(userData, "requestExpense") || can(userData, "viewAllExpenses");
-  const canApproveExpense = can(userData, "approveExpense");
+  // ผู้ตรวจสอบ (ขั้นที่ 1) และผู้อนุมัติ (ขั้นที่ 2) เห็นคิวเดียวกัน
+  const canApproveExpense = can(userData, "reviewExpense") || can(userData, "approveExpense");
   const canAssign = can(userData, "assignDispatch");
   const canViewOperation = can(userData, "editOperation") || can(userData, "receiveDispatch");
   const canPlanWork = canViewOperation || canSell || isTechnician || isAdminOrManager;
@@ -95,7 +96,7 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
     expense.push({ key: "claim", title: "ใบเคลม", sub: "เคลียร์ค่าใช้จ่าย", href: "/expenses/claims", icon: FaReceipt, badgeKey: "claim" });
     // ✅ หัวหน้ามีคิวงานที่ต้องทำ (อนุมัติ/จ่าย/ปิดส่วนต่าง) เพิ่มอีกเมนู
     if (canApproveExpense) {
-      expense.push({ key: "expense-inbox", title: "รออนุมัติการเบิก", short: "รออนุมัติ", sub: "อนุมัติ · จ่ายเงิน", href: "/expenses/approvals", icon: FaInbox, badgeKey: "expenseInbox" });
+      expense.push({ key: "expense-inbox", title: "รอตรวจสอบ / อนุมัติ", short: "รอดำเนินการ", sub: "ตรวจสอบ · อนุมัติ · จ่ายเงิน", href: "/expenses/approvals", icon: FaInbox, badgeKey: "expenseInbox" });
     }
     expense.push({ key: "expense-report", title: "รายงานการเบิก", short: "รายงาน", sub: "ยอดค้าง · ย้อนหลัง", href: "/expenses/report", icon: FaChartBar });
   }

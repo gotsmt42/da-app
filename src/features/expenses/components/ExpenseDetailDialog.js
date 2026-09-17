@@ -17,7 +17,7 @@ import { alpha } from "@mui/material/styles";
 import {
   Close, Print, Edit, CheckCircle, Undo, Block, Payments, ReceiptLong, AttachFile, OpenInNew,
   DeleteOutline, Link as LinkIcon, History, TaskAlt, WarningAmber, Image as ImageIcon, Description, ExpandMore,
-  AccountBalanceWallet, ContentCopy, Check, HistoryEdu,
+  AccountBalanceWallet, ContentCopy, Check, HistoryEdu, FactCheck, DoneAll,
 } from "@mui/icons-material";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
@@ -244,7 +244,7 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
   const [mySignature, setMySignature] = useState(null);
   const fileRef = useRef(null);
   useEffect(() => {
-    if (action !== "approve") return;
+    if (!["approve", "review", "reviewApprove"].includes(action)) return;
     SignatureService.me().then(setMySignature).catch(() => {});
   }, [action]);
   useEffect(() => {
@@ -262,8 +262,25 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
   const reimburse = slip === "reimburse";
   const diff = differenceMeta(expense?.difference, slip);
   const cfg = {
+    /**
+     * ✅ ขั้นที่ 1 — ตรวจสอบ (ผู้ใช้สั่ง: แอดมินเป็นผู้ตรวจสอบ แล้วผู้จัดการอนุมัติอีกที)
+     * ⚠️ "ตรวจสอบ" ไม่ใช่ "อนุมัติ" — ต้องพูดให้ชัดว่ายังต้องรออีกขั้น ไม่งั้นคนกดเข้าใจว่าจบแล้ว
+     */
+    review: {
+      title: "ตรวจสอบใบเบิก", color: "#b45309", button: "ยืนยันผลตรวจสอบ",
+      body: `ตรวจสอบความถูกต้องของ ${baht(expense?.total)} แล้วส่งต่อให้ผู้จัดการอนุมัติขั้นสุดท้าย`,
+    },
+    /**
+     * ✅ ผู้ใช้สั่ง: "สิทธิ์ผู้จัดการให้กดตรวจสอบ และอนุมัติเองได้ด้วย" — ปุ่มเดียวจบทั้งสองขั้น
+     * ⚠️ ระบบยังบันทึกแยกเป็น 2 ขั้นเหมือนเดิม (ชื่อ/เวลา/ลายเซ็นลงทั้งช่องผู้ตรวจสอบและผู้อนุมัติ)
+     * ไม่ใช่การข้ามขั้น — ตรวจย้อนหลังได้ว่าใบไหนคนเดียวกันทำทั้งสองขั้น
+     */
+    reviewApprove: {
+      title: "ตรวจสอบและอนุมัติ", color: "#059669", button: "ยืนยันทั้งสองขั้น",
+      body: `คุณจะลงนามทั้งช่อง "ผู้ตรวจสอบ" และ "ผู้อนุมัติ" ของใบนี้ (${baht(expense?.total)}) ด้วยตัวเอง`,
+    },
     approve: {
-      title: "อนุมัติ", color: "#059669", button: "ยืนยันอนุมัติ",
+      title: "อนุมัติขั้นสุดท้าย", color: "#059669", button: "ยืนยันอนุมัติ",
       body: reimburse
         ? `อนุมัติแล้วบริษัทต้องจ่ายคืนให้ ${expense?.requester?.name || "ผู้เบิก"} ${baht(expense?.total)}`
         : expense?.kind === "claim"
@@ -337,11 +354,11 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
               placeholder={needReason ? "เช่น ใบเสร็จค่าน้ำมันไม่ชัด กรุณาแนบใหม่" : ""}
             />
           )}
-          {(action === "approve" || payLike) && (
+          {(["approve", "review", "reviewApprove"].includes(action) || payLike) && (
             <TextField size="small" label="หมายเหตุ (ไม่บังคับ)" value={form.note || ""} onChange={set("note")} inputProps={{ maxLength: 500 }} />
           )}
-          {/* ✅ อนุมัติแล้วจะลงลายเซ็นอิเล็กทรอนิกส์ในช่อง "ผู้อนุมัติ" ของใบ PDF หรือไม่ */}
-          {action === "approve" && mySignature && (
+          {/* ✅ ลงลายเซ็นอิเล็กทรอนิกส์ในช่อง "ผู้ตรวจสอบ"/"ผู้อนุมัติ" ของใบ PDF หรือไม่ */}
+          {["approve", "review", "reviewApprove"].includes(action) && mySignature && (
             <Box sx={{ p: 1.25, border: `1px solid ${BORDER_MAIN}`, borderRadius: 2 }}>
               <FormControlLabel
                 sx={{ mr: 0 }}
@@ -353,7 +370,9 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
                 label={(
                   <Stack direction="row" alignItems="center" spacing={0.75}>
                     <HistoryEdu sx={{ fontSize: 17, color: cfg.color }} />
-                    <Typography sx={{ fontSize: "0.85rem", fontWeight: 700 }}>ลงลายเซ็นอิเล็กทรอนิกส์ของฉัน</Typography>
+                    <Typography sx={{ fontSize: "0.85rem", fontWeight: 700 }}>
+                      ลงลายเซ็นอิเล็กทรอนิกส์ของฉัน (ช่อง{action === "review" ? "ผู้ตรวจสอบ" : action === "reviewApprove" ? "ผู้ตรวจสอบ + ผู้อนุมัติ" : "ผู้อนุมัติ"})
+                    </Typography>
                   </Stack>
                 )}
               />
@@ -448,14 +467,21 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
   const meta = KIND_META[slip];
   const st = statusMeta(e?.status, slip);
   const isOwner = e && (e.requester?.userId === me || e.createdBy?.userId === me);
+  const canReview = can("reviewExpense");
   const canApprove = can("approveExpense");
+  /** ผู้ตรวจสอบใบนี้จะมาอนุมัติเองได้เฉพาะผู้จัดการ (approveOwnReview) — server บังคับซ้ำ */
+  const reviewedByMe = e && String(e.reviewedBy?.userId || "") === String(me || "");
+  const canApproveOwnReview = can("approveOwnReview");
+  /** กดจบทั้งสองขั้นเองได้ไหม (ผู้จัดการ) — ใช้ตัดสินทั้งปุ่มรวมและปุ่มอนุมัติหลังตรวจเอง */
+  const canChainBothSteps = canReview && canApprove && canApproveOwnReview;
+  const canActOnDoc = canReview || canApprove;
   const viewAll = can("viewAllExpenses");
   const selfBlocked = e && e.requester?.userId === me && !can("manageAll");
   const editable = e && ["pending", "rejected"].includes(e.status);
   const canEdit = editable && (isOwner || viewAll);
-  const canCancel = e && ((isOwner && editable) || (canApprove && ["pending", "rejected", "approved"].includes(e.status)));
-  const canAddFiles = e && e.status !== "cancelled" && (isOwner || canApprove);
-  const canRemoveFile = e && (canApprove ? e.status !== "cancelled" : canEdit);
+  const canCancel = e && ((isOwner && editable) || (canApprove && ["pending", "reviewed", "rejected", "approved"].includes(e.status)));
+  const canAddFiles = e && e.status !== "cancelled" && (isOwner || canActOnDoc);
+  const canRemoveFile = e && (canActOnDoc ? e.status !== "cancelled" : canEdit);
   const overdue = isOverdueClear(e);
 
   const applyResult = (updated, message) => {
@@ -472,6 +498,13 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
     try {
       let updated;
       const files = (form.files || []).map((file) => ({ file, kind: "transfer_slip" }));
+      if (action === "review") updated = await ExpenseService.review(e._id, form.note, form.useSignature !== false);
+      if (action === "reviewApprove") {
+        // ⚠️ ยิงสองครั้งตามลำดับจริง — ระบบจะได้บันทึกครบทั้งสองขั้น (ไม่ใช่ endpoint ลัดที่ข้ามขั้น)
+        // ถ้าขั้นแรกผ่านแต่ขั้นสองพลาด ใบจะค้างที่ "ตรวจสอบแล้ว" ซึ่งกดอนุมัติซ้ำต่อได้ตามปกติ
+        await ExpenseService.review(e._id, form.note, form.useSignature !== false);
+        updated = await ExpenseService.approve(e._id, form.note, form.useSignature !== false);
+      }
       if (action === "approve") updated = await ExpenseService.approve(e._id, form.note, form.useSignature !== false);
       if (action === "reject") updated = await ExpenseService.reject(e._id, form.reason);
       if (action === "cancel") updated = await ExpenseService.cancel(e._id, form.reason);
@@ -516,7 +549,19 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
   const nextStep = useMemo(() => {
     if (!e) return null;
     const diff = differenceMeta(e.difference, slip);
-    if (e.status === "pending") return { severity: "warning", text: canApprove && !selfBlocked ? "รอคุณพิจารณาอนุมัติ" : "รอหัวหน้าพิจารณาอนุมัติ" };
+    // ✅ 2 ขั้น: รอตรวจสอบ (แอดมิน) → รออนุมัติ (ผู้จัดการ)
+    if (e.status === "pending") {
+      return { severity: "warning", text: canReview && !selfBlocked ? "รอคุณตรวจสอบ (ขั้นที่ 1 จาก 2)" : "รอผู้ตรวจสอบพิจารณา (ขั้นที่ 1 จาก 2)" };
+    }
+    if (e.status === "reviewed") {
+      const who = e.reviewedBy?.name ? `ตรวจสอบโดย ${e.reviewedBy.name}` : "ตรวจสอบแล้ว";
+      return {
+        severity: "warning",
+        text: canApprove && !selfBlocked && (!reviewedByMe || canApproveOwnReview)
+          ? `${who} — รอคุณอนุมัติขั้นสุดท้าย`
+          : `${who} — รอผู้จัดการอนุมัติขั้นสุดท้าย`,
+      };
+    }
     if (e.status === "rejected") return { severity: "error", text: `ถูกตีกลับโดย ${e.rejectedBy?.name || "-"}: ${e.rejectReason || "-"}` };
     if (e.status === "cancelled") return { severity: "info", text: `ยกเลิกโดย ${e.cancelledBy?.name || "-"} ${e.cancelledAt ? `เมื่อ ${thaiDate(e.cancelledAt)}` : ""}${e.cancelReason ? ` · ${e.cancelReason}` : ""}` };
     if (kind === "advance") {
@@ -536,20 +581,22 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
       if (e.status === "settled") return { severity: "success", text: diff.amount ? `ปิดส่วนต่างเรียบร้อย (${diff.short} ${baht(diff.amount)})` : "เคลียร์เรียบร้อย ไม่มีส่วนต่าง" };
     }
     return null;
-  }, [e, kind, slip, isReimburse, overdue, canApprove, selfBlocked]);
+  }, [e, kind, slip, isReimburse, overdue, canReview, canApprove, selfBlocked, reviewedByMe, canApproveOwnReview]);
 
   const steps = useMemo(() => {
     if (!e) return [];
     if (kind === "advance") {
       return [
         { label: "ส่งขอเบิก", done: true, date: e.submittedAt || e.createdAt },
-        { label: "อนุมัติ", done: Boolean(e.approvedAt) && !["pending", "rejected"].includes(e.status), date: e.approvedAt, danger: e.status === "rejected" },
+        { label: "ตรวจสอบ", done: Boolean(e.reviewedAt) && e.status !== "rejected", date: e.reviewedAt, danger: e.status === "rejected" },
+        { label: "อนุมัติ", done: Boolean(e.approvedAt) && !["pending", "reviewed", "rejected"].includes(e.status), date: e.approvedAt, danger: e.status === "rejected" },
         { label: "จ่ายเงิน", done: ["paid", "clearing", "cleared"].includes(e.status), date: e.payment?.at },
         { label: "เคลียร์", done: e.status === "cleared", danger: overdue },
       ];
     }
     return [
       { label: isReimburse ? "ส่งขอเบิกคืน" : "ส่งเคลม", done: true, date: e.submittedAt || e.createdAt },
+      { label: "ตรวจสอบ", done: Boolean(e.reviewedAt) && e.status !== "rejected", date: e.reviewedAt, danger: e.status === "rejected" },
       { label: "อนุมัติ", done: ["approved", "settled"].includes(e.status), date: e.approvedAt, danger: e.status === "rejected" },
       { label: isReimburse ? "จ่ายคืน" : "ปิดส่วนต่าง", done: e.status === "settled", date: e.status === "settled" ? e.payment?.at : null },
     ];
@@ -692,7 +739,8 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                       <Button size="small" onClick={() => onOpenOther?.(e.claimId)} sx={{ p: 0, minWidth: 0, textTransform: "none", fontWeight: 700 }}>{e.claimDocNo}</Button>
                     </InfoCell>
                   )}
-                  {e.approvedAt && !["pending", "rejected"].includes(e.status) && <InfoCell label="ผู้อนุมัติ">{e.approvedBy?.name} · {thaiDate(e.approvedAt)}</InfoCell>}
+                  {e.reviewedAt && e.status !== "rejected" && <InfoCell label="ผู้ตรวจสอบ">{e.reviewedBy?.name} · {thaiDate(e.reviewedAt)}</InfoCell>}
+                  {e.approvedAt && !["pending", "reviewed", "rejected"].includes(e.status) && <InfoCell label="ผู้อนุมัติ">{e.approvedBy?.name} · {thaiDate(e.approvedAt)}</InfoCell>}
                   {e.payment?.at && ((kind === "advance" && ["paid", "clearing", "cleared"].includes(e.status)) || (kind === "claim" && e.status === "settled" && money(e.difference) !== 0)) && (
                     <InfoCell label={kind === "advance" ? "การจ่ายเงิน" : isReimburse ? "การจ่ายคืน" : "ปิดส่วนต่าง"} span>
                       {thaiDate(e.payment.at)} · {paymentLabel(e.payment.method)}{e.payment.ref ? ` · ${e.payment.ref}` : ""}{e.payment.by?.name ? ` · โดย ${e.payment.by.name}` : ""}{e.payment.note ? ` · ${e.payment.note}` : ""}
@@ -808,20 +856,51 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                 {e.status === "rejected" ? "แก้ไข / ส่งใหม่" : "แก้ไข"}
               </Button>
             )}
-            {canApprove && e.status === "pending" && (
-              <>
-                <Button onClick={() => setAction("reject")} disabled={selfBlocked} startIcon={<Undo sx={{ fontSize: 17 }} />} sx={{ textTransform: "none", fontWeight: 700, color: "#dc2626" }}>
-                  ตีกลับ
-                </Button>
-                <Tooltip title={selfBlocked ? "อนุมัติใบของตัวเองไม่ได้ — ให้หัวหน้าท่านอื่นเป็นผู้อนุมัติ" : ""}>
-                  <span>
-                    <Button variant="contained" disabled={selfBlocked} onClick={() => setAction("approve")} startIcon={<CheckCircle sx={{ fontSize: 18 }} />}
-                      sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: "#059669", "&:hover": { bgcolor: "#047857", boxShadow: "none" } }}>
-                      อนุมัติ
-                    </Button>
-                  </span>
-                </Tooltip>
-              </>
+            {/* ✅ ตีกลับได้ทั้งขั้นตรวจสอบและขั้นอนุมัติ */}
+            {canActOnDoc && ["pending", "reviewed"].includes(e.status) && (
+              <Button onClick={() => setAction("reject")} disabled={selfBlocked} startIcon={<Undo sx={{ fontSize: 17 }} />} sx={{ textTransform: "none", fontWeight: 700, color: "#dc2626" }}>
+                ตีกลับ
+              </Button>
+            )}
+            {/* ✅ ผู้จัดการ: จบทั้งสองขั้นด้วยปุ่มเดียว (ผู้ใช้สั่ง) — ยังบันทึกแยกเป็น 2 ขั้นเหมือนเดิม */}
+            {canChainBothSteps && e.status === "pending" && (
+              <Tooltip title={selfBlocked ? "ใบของตัวเองต้องให้หัวหน้าท่านอื่นพิจารณา" : ""} describeChild>
+                <span>
+                  <Button variant="contained" disabled={selfBlocked} onClick={() => setAction("reviewApprove")} startIcon={<DoneAll sx={{ fontSize: 18 }} />}
+                    sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: "#059669", "&:hover": { bgcolor: "#047857", boxShadow: "none" } }}>
+                    ตรวจสอบและอนุมัติ
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
+            {/* ขั้นที่ 1 — ตรวจสอบ (แอดมิน · ผู้จัดการกดแยกขั้นก็ได้) */}
+            {canReview && e.status === "pending" && (
+              <Tooltip title={selfBlocked ? "ตรวจสอบใบของตัวเองไม่ได้ — ให้หัวหน้าท่านอื่นเป็นผู้ตรวจสอบ" : ""} describeChild>
+                <span>
+                  <Button variant={canChainBothSteps ? "outlined" : "contained"} disabled={selfBlocked} onClick={() => setAction("review")} startIcon={<FactCheck sx={{ fontSize: 18 }} />}
+                    sx={canChainBothSteps
+                      ? { textTransform: "none", fontWeight: 800, borderRadius: 2, color: "#b45309", borderColor: "#fcd34d" }
+                      : { textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: "#b45309", "&:hover": { bgcolor: "#92400e", boxShadow: "none" } }}>
+                    {canChainBothSteps ? "ตรวจสอบอย่างเดียว" : "ตรวจสอบ"}
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
+            {/* ขั้นที่ 2 — อนุมัติขั้นสุดท้าย (ผู้จัดการ) */}
+            {canApprove && e.status === "reviewed" && (
+              <Tooltip
+                title={selfBlocked
+                  ? "อนุมัติใบของตัวเองไม่ได้ — ให้หัวหน้าท่านอื่นเป็นผู้อนุมัติ"
+                  : reviewedByMe && !canApproveOwnReview ? "คุณเป็นผู้ตรวจสอบใบนี้แล้ว — ผู้อนุมัติต้องเป็นคนละคน" : ""}
+                describeChild
+              >
+                <span>
+                  <Button variant="contained" disabled={selfBlocked || (reviewedByMe && !canApproveOwnReview)} onClick={() => setAction("approve")} startIcon={<CheckCircle sx={{ fontSize: 18 }} />}
+                    sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: "#059669", "&:hover": { bgcolor: "#047857", boxShadow: "none" } }}>
+                    อนุมัติขั้นสุดท้าย
+                  </Button>
+                </span>
+              </Tooltip>
             )}
             {canApprove && kind === "advance" && e.status === "approved" && (
               <Button variant="contained" onClick={() => setAction("pay")} startIcon={<Payments sx={{ fontSize: 18 }} />}

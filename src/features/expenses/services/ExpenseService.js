@@ -160,7 +160,17 @@ const ExpenseService = {
     return { expense: res.data.expense, rejected };
   },
 
-  /** @param {boolean} useSignature  ลงลายเซ็นอิเล็กทรอนิกส์ของผู้อนุมัติในใบนี้ไหม (ผู้อนุมัติติ๊กเลือกเอง) */
+  /**
+   * ขั้นที่ 1 — ตรวจสอบใบ (ปกติคือแอดมิน) → ใบเปลี่ยนเป็น "ตรวจสอบแล้ว รออนุมัติ"
+   * @param {boolean} useSignature  ลงลายเซ็นอิเล็กทรอนิกส์ในช่อง "ผู้ตรวจสอบ" ไหม
+   */
+  async review(id, note = "", useSignature = true) {
+    const res = await API.post(`/expenses/${id}/review`, { note, useSignature });
+    return res.data.expense;
+  },
+
+  /** ขั้นที่ 2 — อนุมัติขั้นสุดท้าย (ปกติคือผู้จัดการ · ต้องไม่ใช่คนที่ตรวจสอบใบนั้น)
+   * @param {boolean} useSignature  ลงลายเซ็นอิเล็กทรอนิกส์ของผู้อนุมัติในใบนี้ไหม */
   async approve(id, note = "", useSignature = true) {
     const res = await API.post(`/expenses/${id}/approve`, { note, useSignature });
     return res.data.expense;

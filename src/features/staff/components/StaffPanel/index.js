@@ -55,6 +55,7 @@ import MilitaryTechIcon from "@mui/icons-material/MilitaryTech";
 import VpnKeyIcon from "@mui/icons-material/VpnKey";
 
 import { useAuth } from "@/features/auth/AuthContext";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { ALL_ROLES, ROLE_LABEL, ROLES, isRole } from "@/shared/utils/roles";
 
 // ─── Styled (ให้ตรงกับ Customer/index.js) ───────────────────────────────
@@ -118,10 +119,31 @@ const copyToClipboard = (text, cb) => {
   cb?.();
 };
 
+/**
+ * ป้ายสิทธิ์ในตาราง
+ * ⚠️ ต้องครอบคลุมทุก role ใน shared/utils/roles.js — role ที่ไม่มีในนี้จะตกไปที่ badge "สิทธิ์ไม่ถูกต้อง"
+ * ✅ ทำไมต้องมี badge เตือน: ข้อมูลเก่ามีบัญชีที่ role สะกดผิด (เช่น "tecnicain") ซึ่ง "ไม่ตรงกับ role
+ * ไหนเลยในตารางสิทธิ์" → บัญชีนั้นจะถูกปฏิเสธเงียบๆ ทุกหน้า ผู้ใช้เห็นแค่เมนูหาย/กดอะไรไม่ได้
+ * โดยไม่มีอะไรบอกสาเหตุ ที่นี่จึงต้องโชว์ให้แอดมินเห็นชัดเพื่อกดแก้ให้ถูก
+ */
 const ROLE_META = {
-  admin: { label: "Admin", color: "#ef4444", icon: <ShieldIcon sx={{ fontSize: 14 }} /> },
-  technician: { label: "Technician", color: "#3b82f6", icon: <EngineeringIcon sx={{ fontSize: 14 }} /> },
-  editor: { label: "Editor", color: "#8b5cf6", icon: <PersonIcon sx={{ fontSize: 14 }} /> },
+  [ROLES.ADMIN]: { label: ROLE_LABEL[ROLES.ADMIN], color: "#ef4444", icon: <ShieldIcon sx={{ fontSize: 14 }} /> },
+  [ROLES.MANAGER]: { label: ROLE_LABEL[ROLES.MANAGER], color: "#0891b2", icon: <ShieldIcon sx={{ fontSize: 14 }} /> },
+  [ROLES.TECHNICIAN]: { label: ROLE_LABEL[ROLES.TECHNICIAN], color: "#3b82f6", icon: <EngineeringIcon sx={{ fontSize: 14 }} /> },
+  [ROLES.SALE]: { label: ROLE_LABEL[ROLES.SALE], color: "#8b5cf6", icon: <PersonIcon sx={{ fontSize: 14 }} /> },
+  [ROLES.USER]: { label: ROLE_LABEL[ROLES.USER], color: "#64748b", icon: <PersonIcon sx={{ fontSize: 14 }} /> },
+};
+
+/** @returns ป้ายของ role นั้น หรือป้ายเตือนสีส้มถ้าเป็นค่าที่ระบบไม่รู้จัก */
+const roleMetaOf = (role) => {
+  const key = String(role || "").trim().toLowerCase();
+  if (ROLE_META[key]) return ROLE_META[key];
+  return {
+    label: key ? `สิทธิ์ไม่ถูกต้อง (${role})` : "ยังไม่กำหนดสิทธิ์",
+    color: "#f59e0b",
+    icon: <WarningAmberIcon sx={{ fontSize: 14 }} />,
+    invalid: true,
+  };
 };
 
 const EMPTY_FORM = { fname: "", lname: "", tel: "", email: "", username: "", password: "", role: "", rank: "" };
@@ -339,7 +361,7 @@ const EmployeeRow = ({ row, isSmallScreen, onEdit, onDelete, onCopy }) => {
   const fullName = `${row.fname || ""} ${row.lname || ""}`.trim();
   const initial = (row.fname || "?").charAt(0).toUpperCase();
   const color = colorFromName(fullName || row.fname || "");
-  const roleMeta = ROLE_META[row.role] || { label: row.role || "ไม่ระบุ", color: "#94a3b8", icon: <PersonIcon sx={{ fontSize: 14 }} /> };
+  const roleMeta = roleMetaOf(row.role);
 
   return (
     <>
@@ -665,7 +687,11 @@ const Employee = () => {
     }
 
     try {
-      const response = await API.put(`/auth/user/${editedData._id}`, editedData);
+      // ⚠️ ส่ง role ไปเฉพาะตอนที่ "เปลี่ยนจริง" — การส่งสิทธิ์เดิมติดไปทุกครั้งทำให้คำขอธรรมดา
+      // (แก้ชื่อ/เบอร์) กลายเป็น "คำขอเปลี่ยนสิทธิ์" ในสายตา server โดยไม่จำเป็น
+      const payload = { ...editedData };
+      if (selectedUser && String(payload.role || "") === String(selectedUser.role || "")) delete payload.role;
+      const response = await API.put(`/auth/user/${editedData._id}`, payload);
       if (response.status === 200) {
         const { user, token } = response.data;
 
@@ -684,7 +710,13 @@ const Employee = () => {
       }
     } catch (error) {
       console.error("Error updating user:", error);
-      Swal.fire({ title: "เกิดข้อผิดพลาด!", text: "ไม่สามารถอัปเดตข้อมูลผู้ใช้ได้", icon: "error" });
+      // ⚠️ ต้องโชว์เหตุผลจาก server เสมอ — กฎเรื่องสิทธิ์ (เช่น "เปลี่ยนสิทธิ์ของตัวเองไม่ได้")
+      // ถ้ากลืนเป็นข้อความกลางๆ ผู้ใช้จะไม่รู้เลยว่าติดอะไรและต้องทำอย่างไรต่อ
+      Swal.fire({
+        title: "เกิดข้อผิดพลาด!",
+        text: error?.response?.data?.message || "ไม่สามารถอัปเดตข้อมูลผู้ใช้ได้",
+        icon: "error",
+      });
     }
   };
 

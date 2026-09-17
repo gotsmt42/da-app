@@ -152,7 +152,8 @@ const computeBadges = (userData, data) => {
     // ส่วน "ใบเคลม" รวมใบ Advance ที่รับเงินแล้วยังไม่ได้เคลียร์ด้วย — เป็นงานค้างของผู้เบิกเหมือนกัน
     advance: Number(ex.advanceRejectedMine) || 0,
     claim: (Number(ex.awaitingClaim) || 0) + (Number(ex.claimRejectedMine) || 0),
-    expenseInbox: (Number(ex.pending) || 0) + (Number(ex.toPay) || 0) + (Number(ex.toSettle) || 0),
+    // ✅ นับทั้งขั้นตรวจสอบ (pending) และขั้นอนุมัติ (reviewing) — ทั้งคู่คือ "งานที่ค้างอยู่ที่หัวหน้า"
+    expenseInbox: (Number(ex.pending) || 0) + (Number(ex.reviewing) || 0) + (Number(ex.toPay) || 0) + (Number(ex.toSettle) || 0),
   };
 };
 

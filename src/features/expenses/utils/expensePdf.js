@@ -546,12 +546,13 @@ const drawSignatureImage = (doc, seal, { centerX, lineY, maxW, maxH }) => {
 const renderSignatures = (doc, e, hasBold, signatures = null) => {
   const bold = (on) => doc.setFont("THSarabun", on && hasBold ? "bold" : "normal");
   const colW = W / 3;
-  const approved = e.approvedAt && !["pending", "rejected"].includes(e.status);
+  const approved = e.approvedAt && !["pending", "reviewed", "rejected"].includes(e.status);
+  // ✅ ขั้นตรวจสอบ (แอดมิน) — ใบเก่าก่อนมีขั้นนี้จะไม่มีค่า ช่องก็เว้นไว้ให้เซ็นมือเหมือนเดิม
+  const reviewed = e.reviewedAt && e.status !== "rejected";
   const boxes = [
     // ✅ ชื่อ-นามสกุลในวงเล็บใต้ลายเซ็น (ผู้ใช้ขอ) — ใบเก่า/คนนอกระบบที่ไม่มีนามสกุลในทะเบียนได้ชื่อต้นตามเดิม
     { role: "ผู้เบิกค่าใช้จ่าย", name: personFullName(e.requester), date: e.submittedAt || e.docDate, seal: signatures?.requester },
-    // ⚠️ "ผู้ตรวจสอบ" ไม่มีขั้นตอนนี้ในระบบ (ไม่มีใครกดตรวจสอบ) — ต้องเว้นให้เซ็นมือเสมอ
-    { role: "ผู้ตรวจสอบ", name: "", date: null, seal: null },
+    { role: "ผู้ตรวจสอบ", name: reviewed ? personFullName(e.reviewedBy) : "", date: reviewed ? e.reviewedAt : null, seal: reviewed ? signatures?.reviewer : null },
     { role: "ผู้อนุมัติ", name: approved ? personFullName(e.approvedBy) : "", date: approved ? e.approvedAt : null, seal: approved ? signatures?.approver : null },
   ];
   doc.setTextColor(...SLATE);

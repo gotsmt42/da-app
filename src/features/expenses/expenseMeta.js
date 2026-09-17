@@ -87,7 +87,9 @@ export const isReimburse = (e) => slipKind(e) === "reimburse";
  * ⚠️ ป้ายต้องบอก "ขั้นต่อไปคืออะไร" ไม่ใช่แค่ "ตอนนี้เป็นอะไร" — คนเปิดดูต้องรู้ทันทีว่าใครต้องทำอะไรต่อ
  */
 const STATUS_BASE = {
-  pending: { label: "รออนุมัติ", color: "#d97706" },
+  // ✅ 2 ขั้น: รอตรวจสอบ (แอดมิน) → ตรวจสอบแล้ว รออนุมัติ (ผู้จัดการ) → อนุมัติแล้ว
+  pending: { label: "รอตรวจสอบ", color: "#d97706" },
+  reviewed: { label: "ตรวจสอบแล้ว · รออนุมัติ", color: "#7c2d12" },
   rejected: { label: "ตีกลับให้แก้", color: "#dc2626" },
   approved: { label: "อนุมัติแล้ว", color: "#2563eb" },
   paid: { label: "จ่ายแล้ว · รอเคลียร์", color: "#0369a1" },
@@ -111,10 +113,10 @@ export const statusMeta = (status, kind) => {
 
 /** ตัวเลือกกรองสถานะของแต่ละชนิดใบ (เรียงตามลำดับขั้นจริง) */
 export const STATUS_FILTERS = {
-  advance: ["pending", "rejected", "approved", "paid", "clearing", "cleared", "cancelled"],
-  claim: ["pending", "rejected", "approved", "settled", "cancelled"],
+  advance: ["pending", "reviewed", "rejected", "approved", "paid", "clearing", "cleared", "cancelled"],
+  claim: ["pending", "reviewed", "rejected", "approved", "settled", "cancelled"],
   // ใบสำรองจ่ายเดินทางเดียวกับใบเคลม (ไม่มีขั้นจ่ายเงินล่วงหน้า/รอเคลียร์)
-  reimburse: ["pending", "rejected", "approved", "settled", "cancelled"],
+  reimburse: ["pending", "reviewed", "rejected", "approved", "settled", "cancelled"],
 };
 
 /** ตัวกรองชนิดย่อยของใบเคลม — ค่าต้องตรงกับที่ server รับ (?claimType=) */

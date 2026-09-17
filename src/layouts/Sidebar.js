@@ -204,8 +204,9 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
     { title: "ใบเบิก Advance", href: "/expenses/advances", icon: <FaMoneyCheckAlt />, badgeKey: "advance" },
     { title: "ใบเคลม (Claim)", href: "/expenses/claims", icon: <FaReceipt />, badgeKey: "claim" },
     // ✅ คิวของหัวหน้า (อนุมัติ/จ่ายเงิน/ปิดส่วนต่าง) — เดิมมีแต่ในเมนูหลักหน้าแรก เมนูข้างเข้าไม่ถึง
-    ...(can(userData, "approveExpense")
-      ? [{ title: "รออนุมัติการเบิก", href: "/expenses/approvals", icon: <FaInbox />, badgeKey: "expenseInbox" }]
+    // ⚠️ ต้องเปิดให้ทั้งผู้ตรวจสอบ (ขั้นที่ 1) และผู้อนุมัติ (ขั้นที่ 2) — ทั้งคู่มีคิวของตัวเองอยู่ในหน้านี้
+    ...(can(userData, "reviewExpense") || can(userData, "approveExpense")
+      ? [{ title: "รอตรวจสอบ / อนุมัติ", href: "/expenses/approvals", icon: <FaInbox />, badgeKey: "expenseInbox" }]
       : []),
     { title: "รายงานการเบิก", href: "/expenses/report", icon: <FaChartBar /> },
   ];

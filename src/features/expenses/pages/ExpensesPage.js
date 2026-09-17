@@ -128,7 +128,10 @@ export default function ExpensesPage({ view: viewProp }) {
   const [searchParams] = useSearchParams();
 
   const canRequest = can("requestExpense");
+  const canReview = can("reviewExpense");
   const canApprove = can("approveExpense");
+  /** เข้ากล่อง "รอดำเนินการ" ได้ทั้งผู้ตรวจสอบและผู้อนุมัติ — ทั้งคู่มีคิวงานของตัวเองอยู่ในนั้น */
+  const canHandle = canReview || canApprove;
   const viewAll = can("viewAllExpenses");
 
   const [summary, setSummary] = useState(null);
@@ -198,14 +201,15 @@ export default function ExpensesPage({ view: viewProp }) {
   };
 
   if (!canRequest && !viewAll) return <Navigate to="/dashboard" replace />;
-  if (view === "inbox" && !canApprove) return <Navigate to="/expenses/advances" replace />;
+  if (view === "inbox" && !canHandle) return <Navigate to="/expenses/advances" replace />;
 
   const pick = (s) => setStatus((cur) => (cur === s ? "all" : s));
 
   // ── ตัวเลขสรุปเฉพาะของหน้านี้ ──────────────────────────────────────────
   const stats = [];
   if (view === "advance") {
-    stats.push({ key: "pending", label: "รออนุมัติ", value: summary?.pending ?? "–", color: "#d97706", onClick: () => pick("pending") });
+    stats.push({ key: "pending", label: "รอตรวจสอบ", value: summary?.pending ?? "–", color: "#d97706", onClick: () => pick("pending") });
+    stats.push({ key: "reviewed", label: "รออนุมัติ", value: summary?.reviewing ?? "–", color: "#b45309", onClick: () => pick("reviewed") });
     stats.push({ key: "approved", label: "รอจ่ายเงิน", value: summary?.toPay ?? "–", color: "#2563eb", onClick: () => pick("approved") });
     stats.push({
       key: summary?.overdueClear ? "overdue" : "paid", label: "รอเคลียร์", value: summary?.awaitingClaim ?? "–",
@@ -216,7 +220,8 @@ export default function ExpensesPage({ view: viewProp }) {
     }
     stats.push({ key: "__money", label: "ยอดเงินค้างเคลียร์", value: summary ? baht(summary.outstandingAmount) : "–", color: meta.color });
   } else if (view === "claim") {
-    stats.push({ key: "pending", label: "รออนุมัติ", value: summary?.pending ?? "–", color: "#d97706", onClick: () => pick("pending") });
+    stats.push({ key: "pending", label: "รอตรวจสอบ", value: summary?.pending ?? "–", color: "#d97706", onClick: () => pick("pending") });
+    stats.push({ key: "reviewed", label: "รออนุมัติ", value: summary?.reviewing ?? "–", color: "#b45309", onClick: () => pick("reviewed") });
     // ⚠️ ป้ายต้องตรงกับชนิดที่กำลังกรองอยู่ — ใบสำรองจ่ายไม่มี "ส่วนต่าง" ให้ปิด มีแต่เงินที่ต้องจ่ายคืน
     // (ตัวเลขเป็นยอดรวมของทั้งสองชนิดจาก /summary — เป็นคิวเดียวกันของฝ่ายบัญชี)
     stats.push({
@@ -225,7 +230,8 @@ export default function ExpensesPage({ view: viewProp }) {
     });
     stats.push({ key: "__await", label: "Advance ที่ยังไม่เคลียร์", value: summary?.awaitingClaim ?? "–", color: KIND_META.advance.color });
   } else if (view === "inbox") {
-    stats.push({ key: "__p", label: "รออนุมัติ", value: summary?.pending ?? "–", color: "#d97706" });
+    stats.push({ key: "__p", label: "รอตรวจสอบ", value: summary?.pending ?? "–", color: "#d97706" });
+    stats.push({ key: "__r", label: "รออนุมัติ", value: summary?.reviewing ?? "–", color: "#b45309" });
     stats.push({ key: "__t", label: "รอจ่ายเงิน", value: summary?.toPay ?? "–", color: "#2563eb" });
     stats.push({ key: "__s", label: "รอปิดส่วนต่าง", value: summary?.toSettle ?? "–", color: KIND_META.claim.color });
     if (summary?.overdueClear > 0) stats.push({ key: "__o", label: "เลยกำหนดเคลียร์", value: summary.overdueClear, color: "#dc2626", alert: true });
@@ -235,7 +241,7 @@ export default function ExpensesPage({ view: viewProp }) {
   const crossLinks = [];
   if (view !== "advance") crossLinks.push({ to: "/expenses/advances", label: "ใบ Advance", color: KIND_META.advance.dark });
   if (view !== "claim") crossLinks.push({ to: "/expenses/claims", label: "ใบเคลม", color: KIND_META.claim.dark });
-  if (canApprove && view !== "inbox") crossLinks.push({ to: "/expenses/approvals", label: "รอดำเนินการ", color: INBOX_COLOR });
+  if (canHandle && view !== "inbox") crossLinks.push({ to: "/expenses/approvals", label: "รอดำเนินการ", color: INBOX_COLOR });
   if (view !== "report") crossLinks.push({ to: "/expenses/report", label: "รายงาน", color: REPORT_COLOR });
 
   return (
