@@ -186,8 +186,9 @@ export default function ExpenseList({ mode, status: statusProp, claimType = "all
     setLoading(true); setError("");
     // ⚠️ กรองชนิดย่อยที่ server (ไม่ใช่กรองในหน้า) — รายการถูกจำกัดจำนวนแถวไว้ ถ้ากรองทีหลังจะได้
     // ใบสำรองจ่ายไม่ครบเมื่อมีใบเคลมเยอะกว่าเพดาน
+    // 🐛 เดิมไม่มี "reviewed" → ใบที่ตรวจสอบแล้วรออนุมัติขั้นสุดท้ายไม่เคยโผล่ในกล่องนี้ ทั้งที่ป้ายนับไปแล้ว
     const params = mode === "inbox"
-      ? { status: "pending,approved,paid" }
+      ? { status: "pending,reviewed,approved,paid" }
       : { kind, ...(kind === "claim" && claimType !== "all" ? { claimType } : {}), ...periodRange(period) };
     ExpenseService.list(params)
       .then((r) => { if (alive) setRows(r); })

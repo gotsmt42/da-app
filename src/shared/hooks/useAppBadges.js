@@ -151,9 +151,16 @@ const computeBadges = (userData, data) => {
     // ใบเบิก: ป้ายบน "ใบ Advance"/"ใบเคลม" = ใบของฉันที่ถูกตีกลับ (ต้องแก้แล้วส่งใหม่)
     // ส่วน "ใบเคลม" รวมใบ Advance ที่รับเงินแล้วยังไม่ได้เคลียร์ด้วย — เป็นงานค้างของผู้เบิกเหมือนกัน
     advance: Number(ex.advanceRejectedMine) || 0,
-    claim: (Number(ex.awaitingClaim) || 0) + (Number(ex.claimRejectedMine) || 0),
-    // ✅ นับทั้งขั้นตรวจสอบ (pending) และขั้นอนุมัติ (reviewing) — ทั้งคู่คือ "งานที่ค้างอยู่ที่หัวหน้า"
-    expenseInbox: (Number(ex.pending) || 0) + (Number(ex.reviewing) || 0) + (Number(ex.toPay) || 0) + (Number(ex.toSettle) || 0),
+    // 🐛 เดิมใช้ awaitingClaim (ของทุกคนที่มองเห็น) → หัวหน้าเห็นเลขค้างบน "ใบเคลม" ตลอดทั้งที่ไม่ใช่งานตัวเอง
+    // ✅ ใช้ใบ Advance "ของฉัน" ที่ต้องเคลียร์เท่านั้น
+    claim: (Number(ex.awaitingClaimMine ?? ex.awaitingClaim) || 0) + (Number(ex.claimRejectedMine) || 0),
+    /**
+     * ✅ นับเฉพาะใบที่ผู้ใช้คนนี้กดทำรายการได้จริง (server กรองกฎใบตัวเอง/ผู้ตรวจสอบคนเดิมให้แล้ว)
+     * ⚠️ toPay/toSettle เป็นงานของผู้ที่จ่ายเงินได้ (approveExpense) — คนอื่นไม่ต้องเห็นเลขนี้
+     */
+    expenseInbox: (Number(ex.inboxPending ?? ex.pending) || 0)
+      + (Number(ex.inboxReviewing ?? ex.reviewing) || 0)
+      + (can(userData, "approveExpense") ? (Number(ex.toPay) || 0) + (Number(ex.toSettle) || 0) : 0),
   };
 };
 

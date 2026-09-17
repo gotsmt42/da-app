@@ -146,7 +146,13 @@ export default function ExpensesPage({ view: viewProp }) {
   // ตัวกรองชนิดย่อยของหน้าใบเคลม: all | clear | reimburse (ลิงก์จากเมนู/แจ้งเตือนส่งมาทาง ?type= ได้)
   const [claimType, setClaimType] = useState(searchParams.get("type") || "all");
 
-  const view = routeId ? (detailKind || viewProp || "advance") : (viewProp || "advance");
+  /**
+   * หน้าที่เปิดใบนี้มา — ✅ ผู้ใช้ขอ "กดเข้าไปอยากให้ตรงหน้าที่มันแจ้งเตือนเลย"
+   * 🐛 เดิมเปิดใบจากกล่อง "รอดำเนินการ" แล้วพื้นหลังสลับเป็นหน้าตามชนิดใบ ปิดแล้วไปโผล่หน้าใบเคลม/Advance
+   * ✅ จำหน้าต้นทางไว้ใน location.state (ไม่ใส่ใน URL — ลิงก์แจ้งเตือน /expenses/<id> ต้องสั้นเหมือนเดิม)
+   */
+  const fromView = location.state?.fromView;
+  const view = routeId ? (fromView || detailKind || viewProp || "advance") : (viewProp || "advance");
   const meta = VIEW_META[view] || VIEW_META.advance;
   const Icon = meta.icon;
   // ⚠️ ต้องดึงออกมาเป็นตัวแปรขึ้นต้นด้วยตัวใหญ่ก่อนใช้เป็นแท็ก — <meta.action2.icon /> อ่านยากและ
@@ -171,13 +177,17 @@ export default function ExpensesPage({ view: viewProp }) {
 
   const openDetail = useCallback((id) => {
     setDetailId(id);
-    navigate({ pathname: `/expenses/${id}`, search: location.search }, { replace: Boolean(routeId) });
-  }, [navigate, location.search, routeId]);
+    // ✅ จำว่าเปิดมาจากหน้าไหน (กล่องรอดำเนินการ / ใบ Advance / ใบเคลม) ปิดแล้วต้องกลับมาหน้าเดิม
+    navigate(
+      { pathname: `/expenses/${id}`, search: location.search },
+      { replace: Boolean(routeId), state: { fromView: fromView || (routeId ? detailKind : viewProp) || "advance" } },
+    );
+  }, [navigate, location.search, routeId, fromView, detailKind, viewProp]);
 
   const closeDetail = () => {
     setDetailId("");
     setNotice(null);
-    if (routeId) navigate({ pathname: (VIEW_META[detailKind] || meta).path, search: location.search }, { replace: true });
+    if (routeId) navigate({ pathname: (VIEW_META[fromView] || VIEW_META[detailKind] || meta).path, search: location.search }, { replace: true });
   };
 
   /**
@@ -338,7 +348,14 @@ export default function ExpensesPage({ view: viewProp }) {
         expenseId={detailId}
         reloadKey={reloadKey}
         notice={notice}
-        onLoaded={(e) => setDetailKind(e?.kind || null)}
+        onLoaded={(e) => {
+          /**
+           * ✅ เปิดจากลิงก์แจ้งเตือน (ไม่มีหน้าต้นทาง) และใบนี้ "รอให้ฉันลงมือ" → พื้นหลัง/ปิดแล้วไปกล่องรอดำเนินการ
+           * เพราะแจ้งเตือนแบบนี้คืองานในคิวของหัวหน้า ไม่ใช่การเปิดดูรายการตามชนิดใบ
+           */
+          const needsMyAction = canHandle && ["pending", "reviewed", "approved"].includes(e?.status);
+          setDetailKind(needsMyAction ? "inbox" : e?.kind || null);
+        }}
         onClose={closeDetail}
         onChanged={refresh}
         onOpenOther={(id) => { setNotice(null); openDetail(id); }}
