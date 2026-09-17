@@ -15,6 +15,7 @@ import EditModal from "../components/EditStaffModal";
 
 import AuthService from "@/shared/services/authService";
 import { useAuth } from "@/features/auth/AuthContext";
+import { roleLabel } from "@/shared/utils/roles";
 
 // ---- Design tokens (shared with the files page) --------------------------
 const COLOR = {
@@ -90,7 +91,7 @@ const Account = () => {
   const infoItems = [
     { icon: EmailOutlinedIcon, label: "อีเมล", value: user?.email || "-" },
     { icon: PhoneOutlinedIcon, label: "เบอร์โทร", value: user?.tel || "-" },
-    { icon: BadgeOutlinedIcon, label: "สถานะ", value: user?.role || "-" },
+    { icon: BadgeOutlinedIcon, label: "สิทธิ์การใช้งาน", value: roleLabel(user) || "-" },
     { icon: WorkOutlineIcon, label: "ตำแหน่ง", value: user?.rank || "-" },
   ];
 
@@ -194,7 +195,7 @@ const Account = () => {
                 >
                   {user?.role && (
                     <Chip
-                      label={user.role}
+                      label={roleLabel(user)}
                       size="small"
                       sx={{
                         fontFamily: FONT_UI,

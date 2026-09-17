@@ -1,7 +1,8 @@
-import { createContext, useContext, useState, useEffect, useRef } from "react";
+import { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { jwtDecode } from "jwt-decode"; // ✅ ถูกต้อง
 import PushService from "@/shared/services/PushService";
+import AuthService from "@/shared/services/authService";
 
 const AuthContext = createContext();
 
@@ -94,6 +95,51 @@ const updateUserData = (newData) => {
   setUserData({ ...newData }); // ✅ clone object เพื่อบังคับ re-render
 };
 
+  /**
+   * ดึงข้อมูลผู้ใช้ของตัวเองจาก server มาทับของที่แคชไว้
+   * ✅ ทำให้ "แก้สิทธิ์แล้วมีผลทันที" โดยไม่ต้องออกจากระบบ (ผู้ใช้สั่ง) — เมนู/ป้ายสิทธิ์วาดใหม่ตาม role ล่าสุด
+   * ⚠️ ล้มเหลวต้องเงียบ: เน็ตหลุดชั่วคราวไม่ควรทำให้ผู้ใช้หลุดจากระบบ
+   */
+  const refreshUserData = useCallback(async () => {
+    if (!localStorage.getItem("token")) return null;
+    try {
+      const res = await AuthService.getUserData();
+      const fresh = res?.user;
+      if (!fresh?._id) return null;
+      const merged = {
+        ...JSON.parse(localStorage.getItem("payload") || "{}"),
+        userId: String(fresh._id),
+        fname: fresh.fname,
+        lname: fresh.lname,
+        email: fresh.email,
+        tel: fresh.tel,
+        role: fresh.role,
+        imageUrl: fresh.imageUrl,
+      };
+      localStorage.setItem("payload", JSON.stringify(merged));
+      setUserData((cur) => (JSON.stringify(cur) === JSON.stringify(merged) ? cur : merged));
+      return merged;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  /**
+   * ✅ จังหวะที่รีเฟรช: เปิดแอป · กลับมาที่แท็บ · ทุก 60 วินาที
+   * ⚠️ ห้ามถี่กว่านี้ — เป็นการยิง API ของผู้ใช้ทุกคนตลอดเวลาโดยที่ข้อมูลแทบไม่เปลี่ยน
+   */
+  useEffect(() => {
+    if (!isLoggedIn) return undefined;
+    refreshUserData();
+    const onFocus = () => refreshUserData();
+    window.addEventListener("focus", onFocus);
+    const timer = setInterval(refreshUserData, 60_000);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      clearInterval(timer);
+    };
+  }, [isLoggedIn, refreshUserData]);
+
 
   // ✅ ฟังก์ชัน Login
   // const login = (newToken, payload) => {
@@ -161,7 +207,7 @@ const updateUserData = (newData) => {
 
   return (
     <AuthContext.Provider
-      value={{ isLoggedIn, userData, login, logout, updateUserData }}
+      value={{ isLoggedIn, userData, login, logout, updateUserData, refreshUserData }}
     >
       {children}
     </AuthContext.Provider>

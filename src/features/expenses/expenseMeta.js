@@ -152,6 +152,30 @@ export const FILE_KINDS = [
 ];
 export const fileKindLabel = (v) => FILE_KINDS.find((k) => k.value === v)?.label || "อื่นๆ";
 
+/**
+ * "แนบมาจากขั้นตอนไหน" — ✅ ผู้ใช้ขอให้แยกให้ชัด เพราะไฟล์ในใบเดียวมาจากคนละช่วงของกระบวนการ
+ * (ใบเสร็จตอนออกใบ · สลิปตอนจ่ายเงิน · หลักฐานตอนปิดส่วนต่าง) การกองรวมกันทำให้ตรวจย้อนหลังยาก
+ * ⚠️ ค่าต้องตรงกับ FILE_STAGES ใน da-app-server/src/models/Expense.js
+ * ⚠️ ไฟล์เก่าที่แนบก่อนมีฟิลด์นี้ stage = "" → ตกลงกลุ่ม "ไฟล์แนบอื่นๆ"
+ */
+export const FILE_STAGES = [
+  { value: "created", label: "แนบตอนออกใบ", color: "#0f766e" },
+  { value: "resubmitted", label: "แนบตอนแก้ไขและส่งใหม่", color: "#b45309" },
+  { value: "review", label: "แนบตอนตรวจสอบ", color: "#b45309" },
+  { value: "approve", label: "แนบตอนอนุมัติ", color: "#059669" },
+  { value: "pay", label: "แนบตอนจ่ายเงินให้พนักงาน", color: "#1d4ed8" },
+  { value: "settle", label: "แนบตอนเคลียร์ส่วนต่าง", color: "#7c3aed" },
+  { value: "added", label: "แนบเพิ่มภายหลัง", color: "#64748b" },
+  { value: "", label: "ไฟล์แนบอื่นๆ", color: "#94a3b8" },
+];
+
+export const fileStageMeta = (v) => FILE_STAGES.find((s) => s.value === (v || "")) || FILE_STAGES[FILE_STAGES.length - 1];
+
+/** จัดไฟล์เป็นกลุ่มตามขั้นตอน เรียงตามลำดับที่เกิดขึ้นจริงในกระบวนการ */
+export const groupFilesByStage = (files = []) => FILE_STAGES
+  .map((stage) => ({ ...stage, files: files.filter((f) => (f.stage || "") === stage.value) }))
+  .filter((g) => g.files.length);
+
 export const PAYMENT_METHODS = [
   { value: "transfer", label: "โอนเงิน" },
   { value: "cash", label: "เงินสด" },

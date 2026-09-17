@@ -32,7 +32,7 @@ import AdvancePanel from "./AdvancePanel";
 import KindBadge from "./KindBadge";
 import { compareItems, COMPARE_KIND_LABEL } from "../utils/expenseCompare";
 import {
-  KIND_META, slipKind, statusMeta, categoryMeta, baht, fmtMoney, qtyText, differenceMeta, paymentLabel, PAYMENT_METHODS, fileKindLabel, jobText, isOverdueClear, money, TEXT_SUB, TEXT_MAIN, BORDER_MAIN, personFullName,
+  KIND_META, slipKind, statusMeta, categoryMeta, baht, fmtMoney, qtyText, differenceMeta, paymentLabel, PAYMENT_METHODS, fileKindLabel, jobText, isOverdueClear, money, TEXT_SUB, TEXT_MAIN, BORDER_MAIN, personFullName, groupFilesByStage,
 } from "../expenseMeta";
 import { bankMeta, formatAccountNo } from "../bankMeta";
 import BankLogo from "./BankLogo";
@@ -77,6 +77,35 @@ const PayToBox = ({ payTo, dense = false }) => {
     </Stack>
   );
 };
+
+/**
+ * การ์ดยอดเงินหัวกล่องทำรายการ (จ่ายเงิน / จ่ายคืน / รับเงินคืน)
+ *
+ * ✅ ผู้ใช้ขอให้ "ชัดเจน อ่านง่าย สวยงาม" — เดิมเป็นข้อความบรรทัดเดียวสีเทาจางๆ ปนกับคำอธิบาย
+ * ทำให้คนกดต้องอ่านทั้งประโยคถึงจะรู้ว่าเงินไปทางไหนและเท่าไร
+ * ⚠️ ต้องบอก "ทิศทางเงิน" เสมอ (บริษัท→พนักงาน หรือ พนักงาน→บริษัท) เพราะสองอย่างนี้ปุ่มหน้าตาเหมือนกัน
+ * แต่ผลลัพธ์ตรงกันข้าม — เป็นจุดที่ผู้ใช้เคยสับสนจริง
+ */
+const MoneyCallout = ({ tone, direction, amount, who, note, icon }) => (
+  <Box sx={{ p: 1.5, borderRadius: 2.5, border: `1px solid ${alpha(tone, 0.35)}`, bgcolor: alpha(tone, 0.07) }}>
+    <Stack direction="row" spacing={1.25} alignItems="center">
+      <Box sx={{
+        width: 38, height: 38, borderRadius: "50%", flexShrink: 0, display: "flex",
+        alignItems: "center", justifyContent: "center", bgcolor: alpha(tone, 0.16), color: tone,
+      }}>
+        {icon}
+      </Box>
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Typography sx={{ fontSize: "0.82rem", fontWeight: 800, color: tone, lineHeight: 1.3 }}>{direction}</Typography>
+        <Typography sx={{ fontSize: "1.45rem", fontWeight: 900, color: TEXT_MAIN, lineHeight: 1.25 }}>{amount}</Typography>
+        {who && <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", lineHeight: 1.35 }}>{who}</Typography>}
+      </Box>
+    </Stack>
+    {note && (
+      <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", mt: 1, lineHeight: 1.45 }}>{note}</Typography>
+    )}
+  </Box>
+);
 
 const InfoCell = ({ label, children, span }) => (
   <Box sx={{ minWidth: 0, gridColumn: span ? "1 / -1" : "auto" }}>
@@ -294,15 +323,20 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
         ? "ใบ Advance ที่อ้างถึงจะกลับไปรอเคลียร์ และออกใบเคลมใหม่ได้"
         : "ยกเลิกแล้วย้อนกลับไม่ได้ (เลขที่เอกสารจะไม่ถูกนำกลับมาใช้)",
     },
-    pay: { title: "บันทึกการจ่ายเงิน Advance", color: KIND_META.advance.color, button: "บันทึกจ่ายเงิน", body: `จ่ายให้ ${personFullName(expense?.requester) || "-"} จำนวน ${baht(expense?.total)}` },
+    // ⚠️ ข้อความใต้หัวข้อบอกแค่ "ผลที่จะเกิด" — ตัวยอดและทิศทางเงินอยู่ในการ์ด MoneyCallout ด้านล่าง
+    pay: {
+      title: "บันทึกการจ่ายเงิน Advance", color: KIND_META.advance.color, button: "บันทึกจ่ายเงิน",
+      body: "บันทึกแล้วใบนี้จะเปลี่ยนเป็น “จ่ายให้พนักงานแล้ว · รอเคลียร์”",
+    },
     settle: reimburse
       ? {
-        title: "บันทึกจ่ายคืนค่าสำรองจ่าย", color: KIND_META.reimburse.color, button: "บันทึกจ่ายคืน",
-        body: `จ่ายคืนให้ ${personFullName(expense?.requester) || "ผู้เบิก"} ${baht(expense?.total)} — บันทึกแล้วใบนี้จะเสร็จสิ้น`,
+        title: "บันทึกจ่ายคืนพนักงาน", color: KIND_META.reimburse.color, button: "บันทึกจ่ายคืน",
+        body: "บันทึกแล้วใบนี้จะเสร็จสิ้น",
       }
       : {
-        title: money(expense?.difference) > 0 ? "บันทึกจ่ายเงินเพิ่ม" : "บันทึกรับเงินคืน", color: KIND_META.claim.color, button: "ปิดส่วนต่าง",
-        body: `${diff.label} ${baht(diff.amount)} — บันทึกแล้วใบ Advance จะเคลียร์เรียบร้อย`,
+        title: money(expense?.difference) > 0 ? "บันทึกจ่ายเงินเพิ่มให้พนักงาน" : "บันทึกรับเงินคืนจากพนักงาน",
+        color: KIND_META.claim.color, button: "บันทึกและปิดส่วนต่าง",
+        body: "บันทึกแล้วใบ Advance ที่อ้างถึงจะเคลียร์เรียบร้อย",
       },
   }[action];
   const needReason = action === "reject";
@@ -319,6 +353,20 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
         <Stack spacing={1.5}>
           {payLike && (
             <>
+              {/* ✅ ยอดและทิศทางเงินเป็นสิ่งแรกที่เห็น — กันกดผิดใบ/ผิดทิศทาง */}
+              <MoneyCallout
+                tone={returningToCompany ? "#c2410c" : cfg.color}
+                icon={returningToCompany ? <Undo /> : <Payments />}
+                direction={returningToCompany
+                  ? "พนักงานคืนเงินให้บริษัท"
+                  : action === "pay" ? "บริษัทจ่ายเงินล่วงหน้าให้พนักงาน"
+                    : reimburse ? "บริษัทจ่ายคืนพนักงาน" : "บริษัทจ่ายเพิ่มให้พนักงาน"}
+                amount={baht(action === "pay" || reimburse ? expense?.total : diff.amount)}
+                who={`${personFullName(expense?.requester) || "ผู้เบิก"}${expense?.docNo ? ` · ${expense.docNo}` : ""}`}
+                note={returningToCompany
+                  ? "รับเงินสด/เงินโอนจากพนักงานให้เรียบร้อยก่อน แล้วค่อยบันทึกที่นี่"
+                  : undefined}
+              />
               {/* ✅ คนกดจ่ายเงินเห็นบัญชีปลายทางตรงนี้เลย ไม่ต้องปิดกล่องไปหาในหน้ารายละเอียด */}
               {/* ⚠️ กล่องบัญชีขึ้นเฉพาะตอนบริษัทเป็นฝ่ายโอนให้ผู้เบิก — ตอน "รับเงินคืน" ไม่ต้องมี */}
               {payLike && expense?.payTo?.accountNo && !returningToCompany && (
@@ -329,11 +377,18 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
                   <PayToBox payTo={expense.payTo} dense />
                 </Box>
               )}
-              <ThaiDatePicker label={action === "pay" ? "วันที่จ่ายเงิน" : "วันที่"} value={form.paidAt} onChange={(v) => setForm((f) => ({ ...f, paidAt: v || today() }))} />
-              <TextField select size="small" label="วิธีการ" value={form.method || "transfer"} onChange={set("method")}>
+              {/* ป้ายช่องเปลี่ยนตามทิศทางเงิน — "วันที่รับเงินคืน" กับ "วันที่จ่ายเงิน" คนละความหมาย */}
+              <ThaiDatePicker
+                label={returningToCompany ? "วันที่รับเงินคืน" : action === "pay" ? "วันที่จ่ายเงิน" : "วันที่จ่ายเงิน"}
+                value={form.paidAt}
+                onChange={(v) => setForm((f) => ({ ...f, paidAt: v || today() }))}
+              />
+              <TextField select size="small" label={returningToCompany ? "รับคืนเป็น" : "จ่ายเป็น"} value={form.method || "transfer"} onChange={set("method")}>
                 {PAYMENT_METHODS.map((m) => <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>)}
               </TextField>
-              <TextField size="small" label="เลขอ้างอิง (ไม่บังคับ)" placeholder="เช่น ธนาคาร / เลขที่รายการ" value={form.ref || ""} onChange={set("ref")} />
+              <TextField size="small" label="เลขอ้างอิง (ไม่บังคับ)"
+                placeholder={returningToCompany ? "เช่น เลขที่ใบเสร็จรับเงิน / เลขที่รายการโอนเข้า" : "เช่น ธนาคาร / เลขที่รายการ"}
+                value={form.ref || ""} onChange={set("ref")} />
               {action === "pay" && (
                 <ThaiDatePicker label="กำหนดเคลียร์" value={form.dueClearAt} onChange={(v) => setForm((f) => ({ ...f, dueClearAt: v || "" }))}
                   helperText="ระบบจะเตือนผู้เบิกทุกวันเมื่อเลยกำหนดแล้วยังไม่ส่งใบเคลม" />
@@ -341,7 +396,7 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
               <input ref={fileRef} type="file" hidden accept={ACCEPT_ALL} multiple onChange={(e) => { const fl = Array.from(e.target.files || []); setForm((f) => ({ ...f, files: [...(f.files || []), ...fl].slice(0, 5) })); e.target.value = ""; }} />
               <Box>
                 <Button size="small" startIcon={<AttachFile />} onClick={() => fileRef.current?.click()} sx={{ textTransform: "none", fontWeight: 700 }}>
-                  แนบสลิป / หลักฐาน
+                  {returningToCompany ? "แนบหลักฐานการรับเงินคืน" : "แนบสลิป / หลักฐานการโอน"}
                 </Button>
                 {(form.files || []).map((f, i) => (
                   <Chip key={`${f.name}-${i}`} size="small" label={f.name} onDelete={() => setForm((x) => ({ ...x, files: x.files.filter((_, j) => j !== i) }))} sx={{ m: 0.25, maxWidth: "100%" }} />
@@ -819,29 +874,44 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                 {!e.attachments?.length ? (
                   <Typography variant="body2" sx={{ color: TEXT_SUB }}>{kind === "claim" ? "ยังไม่มีใบเสร็จแนบ" : "ไม่มีไฟล์แนบ"}</Typography>
                 ) : (
-                  <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1 }}>
-                    {e.attachments.map((f) => {
-                      const isImg = String(f.fileType || "").startsWith("image/");
-                      return (
-                        <Stack key={f._id} direction="row" spacing={1} alignItems="center" sx={{ p: 0.75, border: `1px solid ${BORDER_MAIN}`, borderRadius: 2, minWidth: 0 }}>
-                          <Box component="a" href={f.fileUrl} target="_blank" rel="noreferrer" sx={{
-                            width: 44, height: 44, borderRadius: 1.5, flexShrink: 0, overflow: "hidden", bgcolor: "#f1f5f9",
-                            display: "flex", alignItems: "center", justifyContent: "center", color: TEXT_SUB,
-                          }}>
-                            {isImg ? <Box component="img" src={f.fileUrl} alt="" loading="lazy" sx={{ width: "100%", height: "100%", objectFit: "cover" }} onError={(ev) => { ev.currentTarget.style.display = "none"; }} />
-                              : String(f.fileType).includes("pdf") ? <Description /> : <ImageIcon />}
-                          </Box>
-                          <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Typography component="a" href={f.fileUrl} target="_blank" rel="noreferrer" sx={{ fontSize: "0.82rem", fontWeight: 700, color: TEXT_MAIN, textDecoration: "none", display: "block" }} noWrap>{f.fileName}</Typography>
-                            <Typography variant="caption" sx={{ color: TEXT_SUB }} noWrap component="div">{fileKindLabel(f.kind)} · {f.uploadedBy} · {thaiDate(f.uploadedAt)}</Typography>
-                          </Box>
-                          {canRemoveFile && (
-                            <Tooltip title="ลบไฟล์"><IconButton size="small" disabled={busy} onClick={() => removeFile(f)}><DeleteOutline fontSize="small" /></IconButton></Tooltip>
-                          )}
+                  /* ✅ แยกเป็นกลุ่มตาม "ขั้นตอนที่แนบ" (ผู้ใช้ขอ) — ไฟล์ในใบเดียวมาจากคนละช่วงของกระบวนการ
+                     เช่น ใบเสร็จตอนออกใบ กับสลิปโอนตอนจ่ายเงิน ถ้ากองรวมกันจะแยกไม่ออกว่าอันไหนของขั้นไหน */
+                  <Stack spacing={1.5}>
+                    {groupFilesByStage(e.attachments).map((group) => (
+                      <Box key={group.value || "other"}>
+                        <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.75 }}>
+                          <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: group.color }} />
+                          <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: group.color }}>{group.label}</Typography>
+                          <Chip size="small" label={`${group.files.length} ไฟล์`}
+                            sx={{ height: 18, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha(group.color, 0.12), color: group.color }} />
                         </Stack>
-                      );
-                    })}
-                  </Box>
+                        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 1 }}>
+                          {group.files.map((f) => {
+                            const isImg = String(f.fileType || "").startsWith("image/");
+                            return (
+                              <Stack key={f._id} direction="row" spacing={1} alignItems="center"
+                                sx={{ p: 0.75, border: `1px solid ${BORDER_MAIN}`, borderLeft: `3px solid ${alpha(group.color, 0.55)}`, borderRadius: 2, minWidth: 0 }}>
+                                <Box component="a" href={f.fileUrl} target="_blank" rel="noreferrer" sx={{
+                                  width: 44, height: 44, borderRadius: 1.5, flexShrink: 0, overflow: "hidden", bgcolor: "#f1f5f9",
+                                  display: "flex", alignItems: "center", justifyContent: "center", color: TEXT_SUB,
+                                }}>
+                                  {isImg ? <Box component="img" src={f.fileUrl} alt="" loading="lazy" sx={{ width: "100%", height: "100%", objectFit: "cover" }} onError={(ev) => { ev.currentTarget.style.display = "none"; }} />
+                                    : String(f.fileType).includes("pdf") ? <Description /> : <ImageIcon />}
+                                </Box>
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                  <Typography component="a" href={f.fileUrl} target="_blank" rel="noreferrer" sx={{ fontSize: "0.82rem", fontWeight: 700, color: TEXT_MAIN, textDecoration: "none", display: "block" }} noWrap>{f.fileName}</Typography>
+                                  <Typography variant="caption" sx={{ color: TEXT_SUB }} noWrap component="div">{fileKindLabel(f.kind)} · {f.uploadedBy} · {thaiDate(f.uploadedAt)}</Typography>
+                                </Box>
+                                {canRemoveFile && (
+                                  <Tooltip title="ลบไฟล์"><IconButton size="small" disabled={busy} onClick={() => removeFile(f)}><DeleteOutline fontSize="small" /></IconButton></Tooltip>
+                                )}
+                              </Stack>
+                            );
+                          })}
+                        </Box>
+                      </Box>
+                    ))}
+                  </Stack>
                 )}
               </Card>
 

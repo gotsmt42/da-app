@@ -16,7 +16,7 @@ import Swal from "sweetalert2";
 import { useAuth } from "@/features/auth/AuthContext";
 import PushService from "@/shared/services/PushService";
 import { swalLogout } from "@/shared/utils/user";
-import { can } from "@/shared/utils/roles";
+import { can, roleLabel } from "@/shared/utils/roles";
 import SignatureSettingsDialog from "../components/SignatureSettingsDialog";
 import SignatureService from "@/shared/services/SignatureService";
 
@@ -99,7 +99,7 @@ const Settings = () => {
         )}
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={styles.profileName}>{userData?.fname ? `${userData.fname} ${userData?.lname || ""}` : (userData?.username || "ผู้ใช้งาน")}</p>
-          <span style={styles.roleBadge}>{userData?.role || "User"}</span>
+          <span style={styles.roleBadge}>{roleLabel(userData)}</span>
         </div>
         <FaChevronRight style={styles.chevron} />
       </div>

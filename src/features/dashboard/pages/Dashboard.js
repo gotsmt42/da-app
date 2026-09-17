@@ -38,7 +38,7 @@ import { groupEventsByContract, nextVisitOverdueInfo } from "@/shared/utils/cont
 // ✅ ตรรกะติดตามใบเสนอราคาตัวกลาง — ใช้ร่วมกับหน้า /quotations และฝั่ง server เพื่อให้เกณฑ์/ตัวเลขตรงกัน
 import { getFollowUpInfo } from "@/shared/utils/quotationTracking";
 import { formatThai } from "@/shared/utils/thaiDate";
-import { can, isRole, roleLabel, ROLES } from "@/shared/utils/roles";
+import { can, isRole, roleLabel, ROLES, TECHNICIAN_ROLES } from "@/shared/utils/roles";
 import HomeMenu from "../components/HomeMenu";
 
 // 🎨 สีและไอคอนประจำสถานะงาน — ใช้ร่วมกันทั้ง Quick Stats และการ์ดงานวันนี้
@@ -96,7 +96,7 @@ const Dashboard = () => {
   const role = userData?.role?.toLowerCase();
   const isAdmin = can(role, "manageAll");
   const isAdminOrManager = can(role, "viewAllJobs");
-  const isTechnician = isRole(role, ROLES.TECHNICIAN);
+  const isTechnician = isRole(role, ...TECHNICIAN_ROLES);
   // ✅ หน้า "ภาพรวมงาน" เปิดให้ช่างเข้าดูสัญญาของตัวเองได้แล้ว (ดู ContractOverview.js canView /
   // Header.js canViewContracts) — วิดเจ็ต "สัญญาที่เลยกำหนด/คงค้าง" ด้านล่างต้องเปิดให้ตรงกันด้วย
   const canViewContracts = can(role, "viewContracts");
@@ -297,7 +297,7 @@ const Dashboard = () => {
   const overdueByTechnician = useMemo(() => {
     if (!isAdminOrManager) return [];
     const technicians = users.filter(
-      (u) => (u.role || "").toLowerCase() === "technician",
+      (u) => isRole(u, ...TECHNICIAN_ROLES),
     );
     const userById = new Map(users.map((u) => [u._id, u]));
     const userByFname = new Map(users.map((u) => [u.fname, u]));
@@ -319,7 +319,7 @@ const Dashboard = () => {
     );
     bySignature.forEach(({ sessions, days }) => {
       const tech = resolveAssignedTechnician(sessions, userById, userByFname);
-      if (!tech || (tech.role || "").toLowerCase() !== "technician") return;
+      if (!tech || !isRole(tech, ...TECHNICIAN_ROLES)) return;
       const entry = counts.get(tech._id);
       if (!entry) return;
       entry.count += 1;

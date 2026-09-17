@@ -20,7 +20,7 @@ import {
   FaBuilding, FaUserFriends, FaChevronRight, FaWallet, FaFolderOpen, FaDatabase,
 } from "react-icons/fa";
 
-import { can, isRole, ROLES, DEPARTMENT } from "@/shared/utils/roles";
+import { can, isRole, ROLES, DEPARTMENT, TECHNICIAN_ROLES } from "@/shared/utils/roles";
 import useAppBadges, { BADGE_LABEL } from "@/shared/hooks/useAppBadges";
 import "./HomeMenu.css";
 
@@ -51,7 +51,7 @@ const TONE = {
  * @returns {Array<{key, title, icon, tone, items: Array<{key, title, short?, sub, href, icon, tone?, badgeKey?}>}>}
  */
 export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = false } = {}) => {
-  const isTechnician = isRole(userData, ROLES.TECHNICIAN);
+  const isTechnician = isRole(userData, ...TECHNICIAN_ROLES);
   const isAdminOrManager = can(userData, "manageMasterData");
   const canSell = can(userData, "createSalesPlan");
   const isSaleUser = isRole(userData, ROLES.SALE);

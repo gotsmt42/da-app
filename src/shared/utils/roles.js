@@ -19,6 +19,8 @@ export const ROLES = {
   ADMIN: "admin",
   MANAGER: "manager",
   TECHNICIAN: "technician",
+  /** หัวหน้าช่างเทคนิค — ✅ ผู้ใช้ขอเพิ่ม: ตอนนี้ให้สิทธิ์เท่าช่างเทคนิคทุกอย่างก่อน */
+  TECH_LEAD: "techlead",
   SALE: "sale",
   USER: "user",
 };
@@ -27,9 +29,10 @@ export const ALL_ROLES = Object.values(ROLES);
 
 /** ชื่อภาษาไทยสำหรับแสดงผล — ทั้งแอปเป็นภาษาไทย ห้ามโชว์ค่าดิบอย่าง "technician" ให้ผู้ใช้เห็น */
 export const ROLE_LABEL = {
-  [ROLES.ADMIN]: "แอดมิน",
-  [ROLES.MANAGER]: "ผู้จัดการ",
-  [ROLES.TECHNICIAN]: "ช่าง",
+  [ROLES.ADMIN]: "แอดมินช่าง",
+  [ROLES.MANAGER]: "ผู้จัดการแผนกช่าง",
+  [ROLES.TECH_LEAD]: "หัวหน้าช่างเทคนิค",
+  [ROLES.TECHNICIAN]: "ช่างเทคนิค",
   [ROLES.SALE]: "เซล",
   [ROLES.USER]: "ผู้ใช้ทั่วไป",
 };
@@ -39,6 +42,7 @@ export const ROLE_COLOR = {
   [ROLES.ADMIN]: "#0f172a",
   [ROLES.MANAGER]: "#0f766e",
   [ROLES.TECHNICIAN]: "#0891b2", // ฟ้า = สายบริการ (สีเดิมของแอป)
+  [ROLES.TECH_LEAD]: "#0ea5e9",  // ฟ้าอ่อนกว่าช่างหนึ่งระดับ — เป็นสายเดียวกันแต่แยกออกจากกันได้
   [ROLES.SALE]: "#8b5cf6",       // ม่วง = สายขาย
   [ROLES.USER]: "#64748b",
 };
@@ -55,6 +59,7 @@ export const DEPARTMENT_LABEL = {
 
 const ROLE_DEPARTMENT = {
   [ROLES.TECHNICIAN]: DEPARTMENT.SERVICE,
+  [ROLES.TECH_LEAD]: DEPARTMENT.SERVICE,
   [ROLES.SALE]: DEPARTMENT.SALES,
 };
 
@@ -76,19 +81,19 @@ export const CAPABILITIES = {
   editOperation: [ROLES.ADMIN, ROLES.MANAGER, ROLES.USER],
   // ⚠️ ฝ่ายขายถูกตัดออกตามที่ผู้ใช้สั่ง — การติดตามใบเสนอราคาในระบบนี้ผูกกับ "งานของช่าง"
   // (ใบเสนอราคาของงานที่ลงตารางแล้ว) ไม่ใช่ดีลที่เซลกำลังปิด เซลเปิดเข้าไปก็ไม่มีของตัวเอง
-  viewQuotations: [ROLES.ADMIN, ROLES.MANAGER, ROLES.TECHNICIAN],
+  viewQuotations: [ROLES.ADMIN, ROLES.MANAGER, ROLES.TECHNICIAN, ROLES.TECH_LEAD],
   editDocuments: [ROLES.ADMIN, ROLES.MANAGER],
   // ⚠️ ฝ่ายขายถูกตัดออก — หน้าการเงินคือการวางบิล/รับเงินของงานช่าง ไม่ใช่ยอดขายของเซล
-  viewFinance: [ROLES.ADMIN, ROLES.MANAGER, ROLES.TECHNICIAN, ROLES.USER],
+  viewFinance: [ROLES.ADMIN, ROLES.MANAGER, ROLES.TECHNICIAN, ROLES.TECH_LEAD, ROLES.USER],
   editFinance: [ROLES.ADMIN, ROLES.MANAGER],
-  viewContracts: [ROLES.ADMIN, ROLES.MANAGER, ROLES.TECHNICIAN],
+  viewContracts: [ROLES.ADMIN, ROLES.MANAGER, ROLES.TECHNICIAN, ROLES.TECH_LEAD],
   editContracts: [ROLES.ADMIN, ROLES.MANAGER],
   manageMasterData: [ROLES.ADMIN, ROLES.MANAGER],
   createSalesPlan: [ROLES.ADMIN, ROLES.MANAGER, ROLES.SALE],
   viewAllSales: [ROLES.ADMIN, ROLES.MANAGER],
   requestDispatch: [ROLES.ADMIN, ROLES.MANAGER, ROLES.SALE],
   assignDispatch: [ROLES.ADMIN, ROLES.MANAGER],
-  receiveDispatch: [ROLES.TECHNICIAN],
+  receiveDispatch: [ROLES.TECHNICIAN, ROLES.TECH_LEAD],
 
   /**
    * เปิดดู "ตารางงานช่าง" ได้ทั้งแผนก แม้ตัวเองไม่ได้อยู่ในงานเลย — อ่านอย่างเดียวเท่านั้น
@@ -103,7 +108,7 @@ export const CAPABILITIES = {
 
   // ── เบิกเงินล่วงหน้า (Advance) / เคลียร์ค่าใช้จ่าย (Claim) ───────────────
   /** ออกใบ Advance / ใบเคลมของตัวเองได้ */
-  requestExpense: [ROLES.ADMIN, ROLES.MANAGER, ROLES.TECHNICIAN],
+  requestExpense: [ROLES.ADMIN, ROLES.MANAGER, ROLES.TECHNICIAN, ROLES.TECH_LEAD],
   /**
    * ── การอนุมัติใบเบิกเป็น 2 ขั้น ──
    * ขั้นที่ 1 "ตรวจสอบ" (reviewExpense) → ปกติคือแอดมิน · ลงลายเซ็นช่อง "ผู้ตรวจสอบ"
@@ -145,10 +150,18 @@ export const normalizeRole = (who) => {
  * ⚠️ คู่แฝดฝั่ง server ที่ da-app-server/src/config/roles.js — ต้องตรงกันเป๊ะ (ที่นี่ไว้ซ่อน/ปิดปุ่ม
  * ส่วนขอบเขตจริงบังคับที่ server)
  */
+/**
+ * ช่างหน้างานทั้งหมด (ช่างเทคนิค + หัวหน้าช่างเทคนิค)
+ * ✅ ใช้ทุกที่ที่ถามว่า "คนนี้เป็นช่างไหม" — เพิ่ม role ช่างแบบใหม่ในอนาคตก็แก้ที่นี่ที่เดียว
+ * ⚠️ อย่าเทียบ role === "technician" ตรงๆ อีก ไม่งั้นหัวหน้าช่างจะหลุดจากรายชื่อ/เมนูของช่างเงียบๆ
+ */
+export const TECHNICIAN_ROLES = [ROLES.TECHNICIAN, ROLES.TECH_LEAD];
+
 export const ROLE_LEVEL = {
   [ROLES.MANAGER]: 3,
   [ROLES.ADMIN]: 2,
   [ROLES.TECHNICIAN]: 1,
+  [ROLES.TECH_LEAD]: 1,
   [ROLES.SALE]: 1,
   [ROLES.USER]: 1,
 };

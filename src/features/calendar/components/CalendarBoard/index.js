@@ -85,7 +85,7 @@ import { getAddDraftEvent } from "../EventForms/AddDraftEvent";
 import UnscheduledPanel from "../UnscheduledPanel";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 import { formatThai } from "@/shared/utils/thaiDate";
-import { isRole, ROLES, DEPARTMENT } from "@/shared/utils/roles";
+import { isRole, ROLES, DEPARTMENT, TECHNICIAN_ROLES } from "@/shared/utils/roles";
 import { can } from "@/shared/utils/roles";
 
 // ⚠️ lazy — ฟอร์มใบเบิกใหญ่ (MUI Autocomplete/DatePicker/แนบไฟล์) และน้อยคนที่เปิดจากหน้าปฏิทิน ไม่ควรถ่วง
@@ -1789,7 +1789,7 @@ function EventCalendar() {
 
   // ✅ ช่างเทคนิคทั้งหมด — ใช้สร้าง dropdown ค้นหางานของช่างแต่ละคน (resPerson เก็บเป็น _id)
   const technicianOptions = useMemo(
-    () => employeeList.filter((u) => isRole(u, ROLES.TECHNICIAN)),
+    () => employeeList.filter((u) => isRole(u, ...TECHNICIAN_ROLES)),
     [employeeList],
   );
 

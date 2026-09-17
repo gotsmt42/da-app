@@ -6,7 +6,7 @@
  * สองฝั่งให้ด้วย) ตรงนี้ดูเรื่องที่ script ตัวนั้นดูไม่ได้ เช่น การ normalize ค่าที่มาจากฐานข้อมูลจริง
  */
 import { describe, it, expect, vi } from "vitest";
-import { can, isRole, isAdminOrManager, normalizeRole, departmentOf, roleLabel, ROLES, DEPARTMENT, ALL_ROLES, CAPABILITIES, canAssignRole, canManageUserOfRole, roleLevel } from "./roles";
+import { can, isRole, isAdminOrManager, normalizeRole, departmentOf, roleLabel, ROLES, DEPARTMENT, ALL_ROLES, CAPABILITIES, canAssignRole, canManageUserOfRole, roleLevel, ROLE_LABEL, TECHNICIAN_ROLES } from "./roles";
 
 describe("normalizeRole", () => {
   // ⚠️ role ถูกกรอกด้วยมือผ่านหน้าจัดการผู้ใช้ และเคยมีทั้งตัวใหญ่/ช่องว่างติดมา
@@ -105,6 +105,22 @@ describe("สิทธิ์เดิมต้องไม่เปลี่ย�
     // ⚠️ role ที่ระบบไม่รู้จัก = ระดับ 0 ทำอะไรไม่ได้ และตั้งให้ใครก็ไม่ได้
     expect(roleLevel("tecnicain")).toBe(0);
     expect(canAssignRole(ROLES.MANAGER, "tecnicain")).toBe(false);
+  });
+
+  // ✅ ผู้ใช้ขอเพิ่ม "หัวหน้าช่างเทคนิค" — ตอนนี้ต้องมีสิทธิ์เท่าช่างเทคนิคทุกข้อ
+  it("หัวหน้าช่างเทคนิคมีสิทธิ์เท่าช่างเทคนิคทุกข้อ", () => {
+    const caps = Object.keys(CAPABILITIES);
+    const diff = caps.filter((c) => can(ROLES.TECHNICIAN, c) !== can(ROLES.TECH_LEAD, c));
+    expect(diff).toEqual([]);
+    expect(ROLE_LABEL[ROLES.TECH_LEAD]).toBe("หัวหน้าช่างเทคนิค");
+    expect(TECHNICIAN_ROLES).toContain(ROLES.TECH_LEAD);
+  });
+
+  // ⚠️ ชื่อสิทธิ์บนหน้าจอต้องตรงกับที่ผู้ใช้สั่ง (แผนกช่าง)
+  it("ชื่อสิทธิ์ภาษาไทยตรงตามที่ตั้งไว้", () => {
+    expect(ROLE_LABEL[ROLES.MANAGER]).toBe("ผู้จัดการแผนกช่าง");
+    expect(ROLE_LABEL[ROLES.ADMIN]).toBe("แอดมินช่าง");
+    expect(ROLE_LABEL[ROLES.TECHNICIAN]).toBe("ช่างเทคนิค");
   });
 
   it("editOperation คงชุดเดิมที่มี user แต่ไม่มีช่าง", () => {

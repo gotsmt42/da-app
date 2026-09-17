@@ -84,7 +84,7 @@ import InfoLine from "@/shared/ui/InfoLine";
 import { useSiteMapUrl, GoogleMapsPin } from "@/shared/ui/SiteMapLink";
 import { JOB_DOC_TYPES } from "@/shared/utils/jobDocTypes";
 import { formatThai } from "@/shared/utils/thaiDate";
-import { ROLES } from "@/shared/utils/roles";
+import { ROLES, TECHNICIAN_ROLES, isRole } from "@/shared/utils/roles";
 import { can } from "@/shared/utils/roles";
 
 // ✅ ใช้ตัดสินใจลำดับปุ่มแชร์ในเมนู "⋮" ต่อไฟล์ (ดูเหตุผลใน fileActions.js)
@@ -983,7 +983,7 @@ export const CommentThread = ({ comments = [], onSend, myRole }) => {
     setSending(false);
   };
 
-  const isMine = (c) => (myRole === ROLES.TECHNICIAN ? c.role === ROLES.TECHNICIAN : c.role !== ROLES.TECHNICIAN);
+  const isMine = (c) => (isRole(myRole, ...TECHNICIAN_ROLES) ? isRole(c.role, ...TECHNICIAN_ROLES) : !isRole(c.role, ...TECHNICIAN_ROLES));
 
   return (
     <Box>
@@ -1001,7 +1001,7 @@ export const CommentThread = ({ comments = [], onSend, myRole }) => {
                 }}>
                   <Stack direction="row" gap={0.75} alignItems="center" sx={{ mb: 0.25 }}>
                     <Typography variant="caption" fontWeight={700} color={mine ? "#3b82f6" : "text.secondary"}>
-                      {c.userName || (c.role === ROLES.TECHNICIAN ? "ช่าง" : "แอดมิน")}
+                      {c.userName || (isRole(c.role, ...TECHNICIAN_ROLES) ? "ช่าง" : "แอดมิน")}
                     </Typography>
                     <Typography variant="caption" color="text.disabled">
                       · {moment(c.timestamp).locale("th").format("DD MMM HH:mm")}
@@ -2244,7 +2244,7 @@ const JobGroupBlock = ({ sessions, currentUserRole, ...cardProps }) => {
 
   const renderCard = (event) => {
     const hideDocuments = isGrouped && event._id !== anchorId;
-    return currentUserRole === "technician" ? (
+    return isRole(currentUserRole, ...TECHNICIAN_ROLES) ? (
       <TechnicianJobCard key={event._id} event={event} {...cardProps} isTechnicianView={true} hideDocuments={hideDocuments} noOuterCard={isGrouped} />
     ) : (
       <EventRowCard key={event._id} event={event} {...cardProps} currentUserRole={currentUserRole} hideDocuments={hideDocuments} noOuterCard={isGrouped} />

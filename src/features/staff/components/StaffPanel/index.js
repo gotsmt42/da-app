@@ -56,7 +56,7 @@ import VpnKeyIcon from "@mui/icons-material/VpnKey";
 
 import { useAuth } from "@/features/auth/AuthContext";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
-import { ALL_ROLES, ROLE_LABEL, ROLES, isRole, canAssignRole, canManageUserOfRole } from "@/shared/utils/roles";
+import { ALL_ROLES, ROLE_LABEL, ROLES, isRole, canAssignRole, canManageUserOfRole, TECHNICIAN_ROLES } from "@/shared/utils/roles";
 
 // ─── Styled (ให้ตรงกับ Customer/index.js) ───────────────────────────────
 const GlassCard = styled(Box)(({ theme }) => ({
@@ -129,6 +129,7 @@ const copyToClipboard = (text, cb) => {
 const ROLE_META = {
   [ROLES.ADMIN]: { label: ROLE_LABEL[ROLES.ADMIN], color: "#ef4444", icon: <ShieldIcon sx={{ fontSize: 14 }} /> },
   [ROLES.MANAGER]: { label: ROLE_LABEL[ROLES.MANAGER], color: "#0891b2", icon: <ShieldIcon sx={{ fontSize: 14 }} /> },
+  [ROLES.TECH_LEAD]: { label: ROLE_LABEL[ROLES.TECH_LEAD], color: "#0ea5e9", icon: <EngineeringIcon sx={{ fontSize: 14 }} /> },
   [ROLES.TECHNICIAN]: { label: ROLE_LABEL[ROLES.TECHNICIAN], color: "#3b82f6", icon: <EngineeringIcon sx={{ fontSize: 14 }} /> },
   [ROLES.SALE]: { label: ROLE_LABEL[ROLES.SALE], color: "#8b5cf6", icon: <PersonIcon sx={{ fontSize: 14 }} /> },
   [ROLES.USER]: { label: ROLE_LABEL[ROLES.USER], color: "#64748b", icon: <PersonIcon sx={{ fontSize: 14 }} /> },
@@ -801,7 +802,7 @@ const Employee = () => {
   const stats = useMemo(() => {
     const total = users.length;
     const admin = users.filter((u) => isRole(u, ROLES.ADMIN, ROLES.MANAGER)).length;
-    const staff = users.filter((u) => isRole(u, ROLES.TECHNICIAN, ROLES.SALE)).length;
+    const staff = users.filter((u) => isRole(u, ...TECHNICIAN_ROLES, ROLES.SALE)).length;
     return { total, admin, staff };
   }, [users]);
 

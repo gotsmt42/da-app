@@ -56,7 +56,7 @@ import { WARNING_DAYS_AFTER_SENT, getFollowUpInfo, resolveQuotationGroup } from 
 import { formatEventDateRange } from "@/shared/utils/formatDateRange";
 import { formatRoundLabel } from "@/shared/utils/contractRounds";
 import { formatThai } from "@/shared/utils/thaiDate";
-import { can, isRole, ROLES } from "@/shared/utils/roles";
+import { can, isRole, TECHNICIAN_ROLES } from "@/shared/utils/roles";
 
 const STATUS_META = {
   waiting_file: { label: "รอช่างแนบไฟล์",   color: "#6b7280", icon: <AttachFile sx={{ fontSize: 14 }} /> },
@@ -569,7 +569,7 @@ const QuotationDetailDialog = ({ job, currentUserRole, onClose, onAction, onAmou
   // มอบหมายแก้ไข event ตัวเองได้เสมอ ดู PUT /:id) และ /quotations ก็ scope ให้ช่างเห็นแค่งานตัวเอง
   // อยู่แล้วด้วย (getEventOp) เลยไม่ต้องกันเพิ่มฝั่งนี้ — ยกเว้นมูลค่าใบเสนอราคา (AmountEditor) ที่ยังเป็น
   // สิทธิ์ admin/manager เท่านั้นเหมือนเดิม (ไม่ได้ถูกขอให้เปลี่ยน)
-  const canEditStatus = isAdminOrManager || currentUserRole === "technician";
+  const canEditStatus = isAdminOrManager || isRole(currentUserRole, ...TECHNICIAN_ROLES);
 
   if (!job) return null;
   const anchor = job.sessions[0];
@@ -913,7 +913,7 @@ export default function QuotationTracking() {
   // ✅ หาว่างานนี้เป็นของช่างคนไหน (ใช้ util กลางเดียวกับ TeamWorkload.js) — เฉพาะ admin/manager
   // ที่โหลดรายชื่อผู้ใช้ไว้แล้ว (technician ไม่ได้โหลด users จึงได้ techId ว่างเปล่าเสมอ ซึ่งไม่มีผล
   // เพราะ selectedTechId ก็เป็น null ตลอดสำหรับ role นี้อยู่แล้ว — ดูตัวกรองด้านล่าง)
-  const technicians = useMemo(() => users.filter((u) => isRole(u, ROLES.TECHNICIAN)), [users]);
+  const technicians = useMemo(() => users.filter((u) => isRole(u, ...TECHNICIAN_ROLES)), [users]);
 
   const jobsWithTech = useMemo(() => {
     const userById = new Map(users.map((u) => [u._id?.toString(), u]));
