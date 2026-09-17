@@ -434,7 +434,16 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold) => {
    * ✅ ผู้ใช้ขอให้ "เด่นและเข้าใจง่าย": วางเป็นกล่องมีสัญลักษณ์สีประจำธนาคาร + เลขบัญชีตัวใหญ่
    * แทนบรรทัดข้อความยาวๆ ที่กลืนไปกับหมายเหตุอื่น — คนโอนเงินต้องหาเจอในแวบเดียว
    */
-  if (e.payTo?.accountNo) {
+  /**
+   * ⚠️ แสดงบัญชีเฉพาะตอน "เงินไหลออกจากบริษัทไปหาผู้เบิก" เท่านั้น
+   * 🐛 ผู้ใช้แจ้ง: ใบที่ผู้เบิกต้อง "คืนเงินบริษัท" ก็ยังโชว์กล่องบัญชีของผู้เบิกอยู่ ทำให้ฝ่ายบัญชี
+   * สับสนว่าจะต้องโอนเข้าบัญชีนั้นอีกหรือเปล่า ทั้งที่ทิศทางเงินตรงกันข้าม
+   */
+  const moneyToRequester = e.kind === "advance" || isReimburse || money(e.difference) > 0;
+  const mustReturn = e.kind === "claim" && !isReimburse && money(e.difference) < 0;
+  const pay = e.payment || {};
+
+  if (e.payTo?.accountNo && moneyToRequester) {
     const bank = bankMeta(e.payTo.bankCode);
     // พื้น/เส้นขอบผสมจากสีธนาคารกับขาว — กล่องจึงเป็น "สีของธนาคารนั้น" แบบอ่อนๆ เห็นแล้วรู้ทันทีว่าธนาคารไหน
     const mix = (ratio) => bank.rgb.map((c) => Math.round(c * ratio + 255 * (1 - ratio)));
@@ -486,7 +495,31 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold) => {
     y += boxH;
   }
 
-  const pay = e.payment || {};
+  /**
+   * ✅ ใบที่ต้องคืนเงินบริษัท — ทำให้ "ยอดที่ต้องคืน" เด่นชัดแทนกล่องบัญชี (ผู้ใช้ขอ)
+   * ⚠️ ต้องบอกให้ชัดว่าเป็นเงินที่ผู้เบิก "นำส่งคืน" ไม่ใช่ยอดที่บริษัทจะโอนให้
+   */
+  if (mustReturn) {
+    const amount = Math.abs(money(e.difference));
+    const boxH = 15 * s;
+    y += 4 * s;
+    doc.setFillColor(255, 247, 237);
+    doc.setDrawColor(251, 146, 60);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(L, y, W, boxH, 2.2, 2.2, "FD");
+    size(12.5); bold(true); color([154, 52, 18]);
+    doc.text(spaceThaiLatin("ผู้เบิกต้องคืนเงินให้บริษัท"), L + 4 * s, y + 6 * s);
+    size(17);
+    doc.text(`${fmtMoney(amount)} บาท`, L + 4 * s, y + 12.4 * s);
+    size(11.5); bold(false); color(GRAY);
+    const note = e.status === "settled" && pay?.at
+      ? spaceThaiLatin(`รับคืนแล้วเมื่อ ${thaiDate(pay.at)}${pay.ref ? ` · อ้างอิง ${pay.ref}` : ""}`)
+      : spaceThaiLatin("นำส่งคืนที่ฝ่ายบัญชี แล้วให้ผู้รับเงินบันทึกปิดส่วนต่างในระบบ");
+    doc.text(note, R - 4 * s, y + 12.4 * s, { align: "right" });
+    color(SLATE);
+    y += boxH;
+  }
+
   if (e.kind === "advance" && pay.at && ["paid", "clearing", "cleared"].includes(e.status)) {
     infoLine("การจ่ายเงิน:", [
       thaiDateFull(pay.at), paymentLabel(pay.method), pay.ref ? `อ้างอิง ${pay.ref}` : "",

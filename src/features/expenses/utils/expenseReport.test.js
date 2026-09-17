@@ -54,8 +54,9 @@ describe("qtyText / differenceMeta", () => {
     expect(qtyText({ qty: 4, unitPrice: 250, unit: "วัน" })).toBe("250 × 4 วัน");
     expect(qtyText({ qty: 1, unitPrice: 480.5, unit: "" })).toBe("480.50");
   });
-  it("ทิศทางส่วนต่าง", () => {
-    expect(differenceMeta(120).short).toBe("จ่ายเพิ่ม");
+  it("ทิศทางส่วนต่าง — คำต้องบอกว่าใครจ่ายให้ใคร", () => {
+    expect(differenceMeta(120).short).toBe("จ่ายเพิ่มให้พนักงาน");
+    expect(differenceMeta(-80).short).toBe("คืนเงินบริษัท");
     expect(differenceMeta(-80).amount).toBe(80);
     expect(differenceMeta(0).short).toBe("พอดี");
   });
@@ -134,8 +135,8 @@ describe("buildExpenseReport", () => {
     expect(r.byCategory.find((x) => x.key === "fuel")).toMatchObject({ reimburse: 250 });
   });
 
-  it("ใบสำรองจ่าย: ส่วนต่างอ่านว่า 'จ่ายคืน' ไม่ใช่ 'จ่ายเพิ่ม'", () => {
-    expect(differenceMeta(500, "reimburse").short).toBe("จ่ายคืน");
-    expect(differenceMeta(500, "claim").short).toBe("จ่ายเพิ่ม");
+  it("ใบสำรองจ่าย: อ่านว่า 'จ่ายคืนพนักงาน' ไม่ใช่ 'จ่ายเพิ่มให้พนักงาน'", () => {
+    expect(differenceMeta(500, "reimburse").short).toBe("จ่ายคืนพนักงาน");
+    expect(differenceMeta(500, "claim").short).toBe("จ่ายเพิ่มให้พนักงาน");
   });
 });

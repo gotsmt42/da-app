@@ -307,6 +307,8 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
   }[action];
   const needReason = action === "reject";
   const payLike = action === "pay" || action === "settle";
+  /** ใบเคลมที่ผู้เบิกต้องคืนเงินบริษัท — ทิศทางเงินตรงข้ามกับการโอนเข้าบัญชีผู้เบิก */
+  const returningToCompany = expense?.kind === "claim" && !reimburse && money(expense?.difference) < 0;
 
   return (
     <Dialog open onClose={() => !busy && onCancel()} fullWidth maxWidth="xs">
@@ -318,7 +320,8 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
           {payLike && (
             <>
               {/* ✅ คนกดจ่ายเงินเห็นบัญชีปลายทางตรงนี้เลย ไม่ต้องปิดกล่องไปหาในหน้ารายละเอียด */}
-              {payLike && expense?.payTo?.accountNo && (
+              {/* ⚠️ กล่องบัญชีขึ้นเฉพาะตอนบริษัทเป็นฝ่ายโอนให้ผู้เบิก — ตอน "รับเงินคืน" ไม่ต้องมี */}
+              {payLike && expense?.payTo?.accountNo && !returningToCompany && (
                 <Box>
                   <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 700, display: "block", mb: 0.5 }}>
                     {action === "pay" ? "โอนเงิน Advance เข้าบัญชีของผู้เบิก" : "โอนเข้าบัญชีของผู้เบิก"}
@@ -483,6 +486,12 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
   const canAddFiles = e && e.status !== "cancelled" && (isOwner || canActOnDoc);
   const canRemoveFile = e && (canActOnDoc ? e.status !== "cancelled" : canEdit);
   const overdue = isOverdueClear(e);
+  /**
+   * ทิศทางของเงินในใบนี้ — ใช้ตัดสินว่าจะโชว์ "บัญชีรับเงิน" หรือ "ยอดที่ต้องคืนบริษัท"
+   * ⚠️ ใบเคลมที่ใช้จริงน้อยกว่ายอด Advance = ผู้เบิกต้องคืนเงิน ไม่ใช่รอรับโอน (ผู้ใช้แจ้งว่าสับสน)
+   */
+  const moneyToRequester = e && (kind === "advance" || isReimburse || money(e.difference) > 0);
+  const mustReturn = e && kind === "claim" && !isReimburse && money(e.difference) < 0;
 
   const applyResult = (updated, message) => {
     setAction("");
@@ -746,12 +755,30 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                       {thaiDate(e.payment.at)} · {paymentLabel(e.payment.method)}{e.payment.ref ? ` · ${e.payment.ref}` : ""}{e.payment.by?.name ? ` · โดย ${e.payment.by.name}` : ""}{e.payment.note ? ` · ${e.payment.note}` : ""}
                     </InfoCell>
                   )}
-                  {/* ✅ บัญชีรับเงินของผู้เบิก — ฝ่ายบัญชีใช้โอนเงิน Advance / จ่ายเพิ่ม / จ่ายคืน ได้จากใบนี้เลย */}
-                  <InfoCell label="บัญชีรับเงินของผู้เบิก" span>
-                    {e.payTo?.accountNo
-                      ? <Box sx={{ mt: 0.5 }}><PayToBox payTo={e.payTo} /></Box>
-                      : <Typography sx={{ fontSize: "0.88rem", color: TEXT_SUB }}>ไม่ระบุ (รับเป็นเงินสด)</Typography>}
-                  </InfoCell>
+                  {/* ✅ บัญชีรับเงินของผู้เบิก — โชว์เฉพาะใบที่บริษัทต้องโอนเงินให้ผู้เบิก
+                      ⚠️ ใบที่ผู้เบิกต้องคืนเงินบริษัท ไม่โชว์บัญชี (คนละทิศทางเงิน) แต่โชว์ยอดที่ต้องคืนแทน */}
+                  {moneyToRequester && (
+                    <InfoCell label="บัญชีรับเงินของผู้เบิก" span>
+                      {e.payTo?.accountNo
+                        ? <Box sx={{ mt: 0.5 }}><PayToBox payTo={e.payTo} /></Box>
+                        : <Typography sx={{ fontSize: "0.88rem", color: TEXT_SUB }}>ไม่ระบุ (รับเป็นเงินสด)</Typography>}
+                    </InfoCell>
+                  )}
+                  {mustReturn && (
+                    <InfoCell label="ยอดที่ผู้เบิกต้องคืนบริษัท" span>
+                      <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.5, p: 1.25, borderRadius: 2, border: "1px solid #fdba74", bgcolor: "#fff7ed" }}>
+                        <Undo sx={{ fontSize: 20, color: "#c2410c" }} />
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography sx={{ fontSize: "1.05rem", fontWeight: 900, color: "#9a3412", lineHeight: 1.2 }}>
+                            {baht(Math.abs(money(e.difference)))}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: TEXT_SUB }}>
+                            {e.status === "settled" ? "รับคืนเรียบร้อยแล้ว" : "ผู้เบิกนำส่งคืนที่ฝ่ายบัญชี แล้วบันทึกปิดส่วนต่างในระบบ"}
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    </InfoCell>
+                  )}
                   {e.note && <InfoCell label="หมายเหตุ" span>{e.note}</InfoCell>}
                 </Box>
               </Card>

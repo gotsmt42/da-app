@@ -56,7 +56,7 @@ import VpnKeyIcon from "@mui/icons-material/VpnKey";
 
 import { useAuth } from "@/features/auth/AuthContext";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
-import { ALL_ROLES, ROLE_LABEL, ROLES, isRole } from "@/shared/utils/roles";
+import { ALL_ROLES, ROLE_LABEL, ROLES, isRole, canAssignRole, canManageUserOfRole } from "@/shared/utils/roles";
 
 // ─── Styled (ให้ตรงกับ Customer/index.js) ───────────────────────────────
 const GlassCard = styled(Box)(({ theme }) => ({
@@ -169,7 +169,7 @@ const getComparator = (order, orderBy) =>
   order === "desc" ? (a, b) => comparator(a, b, orderBy) : (a, b) => -comparator(a, b, orderBy);
 
 // ─── EmployeeFormModal (ใช้ร่วมกันทั้งเพิ่ม/แก้ไข) ──────────────────────
-const EmployeeFormModal = ({ open, mode, data, onChange, onClose, onSubmit, isSmallScreen }) => {
+const EmployeeFormModal = ({ open, mode, data, onChange, onClose, onSubmit, isSmallScreen, me }) => {
   const modalStyle = {
     position: "absolute",
     top: "50%",
@@ -275,7 +275,9 @@ const EmployeeFormModal = ({ open, mode, data, onChange, onClose, onSubmit, isSm
                 value={data.role || ""} onChange={onChange}
                 sx={{ borderRadius: 2 }}
               >
-                {ALL_ROLES.map((r) => (
+                {/* 🔒 ตั้งสิทธิ์ที่สูงกว่าระดับตัวเองไม่ได้ — แอดมินจึงไม่เห็นตัวเลือก "ผู้จัดการ"
+                    (server บังคับซ้ำอีกชั้น ดู da-app-server/src/routes/auth.js) */}
+                {ALL_ROLES.filter((r) => canAssignRole(me, r)).map((r) => (
                   <MenuItem key={r} value={r}>{ROLE_LABEL[r]}</MenuItem>
                 ))}
               </Select>
@@ -356,12 +358,18 @@ const PasswordConfirmModal = ({ open, value, onChange, onClose, onConfirm, isSma
 };
 
 // ─── EmployeeRow: แถวหลัก + แถวขยายรายละเอียด ───────────────────────────
-const EmployeeRow = ({ row, isSmallScreen, onEdit, onDelete, onCopy }) => {
+const EmployeeRow = ({ row, isSmallScreen, onEdit, onDelete, onCopy, me }) => {
   const [open, setOpen] = useState(false);
   const fullName = `${row.fname || ""} ${row.lname || ""}`.trim();
   const initial = (row.fname || "?").charAt(0).toUpperCase();
   const color = colorFromName(fullName || row.fname || "");
   const roleMeta = roleMetaOf(row.role);
+  /**
+   * 🔒 แก้/ลบบัญชีที่ "ระดับสูงกว่าตัวเอง" ไม่ได้ — แอดมินแตะบัญชีผู้จัดการไม่ได้ (ผู้ใช้สั่ง)
+   * ⚠️ ปิดปุ่มพร้อมบอกเหตุผล ดีกว่าให้กดแล้วค่อยเด้ง error จาก server ทีหลัง
+   */
+  const manageable = canManageUserOfRole(me, row.role);
+  const blockedHint = `ต้องให้ผู้จัดการเป็นคนจัดการบัญชีระดับ${roleMeta.label}`;
 
   return (
     <>
@@ -432,11 +440,15 @@ const EmployeeRow = ({ row, isSmallScreen, onEdit, onDelete, onCopy }) => {
 
         <TableCell align="right">
           <Stack direction="row" gap={0.25} justifyContent="flex-end">
-            <Tooltip title="แก้ไข">
-              <IconButton size="small" onClick={() => onEdit(row)}><EditIcon sx={{ fontSize: 17 }} /></IconButton>
+            <Tooltip title={manageable ? "แก้ไข" : blockedHint} describeChild>
+              <span>
+                <IconButton size="small" disabled={!manageable} onClick={() => onEdit(row)}><EditIcon sx={{ fontSize: 17 }} /></IconButton>
+              </span>
             </Tooltip>
-            <Tooltip title="ลบ">
-              <IconButton size="small" color="error" onClick={() => onDelete(row._id)}><DeleteIcon sx={{ fontSize: 17 }} /></IconButton>
+            <Tooltip title={manageable ? "ลบ" : blockedHint} describeChild>
+              <span>
+                <IconButton size="small" color="error" disabled={!manageable} onClick={() => onDelete(row._id)}><DeleteIcon sx={{ fontSize: 17 }} /></IconButton>
+              </span>
             </Tooltip>
           </Stack>
         </TableCell>
@@ -914,6 +926,7 @@ const Employee = () => {
                         isSmallScreen={isSmallScreen}
                         onEdit={openEditModal}
                         onDelete={handleDeleteRow}
+                        me={userData}
                         onCopy={handleCopy}
                       />
                     ))}
@@ -946,6 +959,7 @@ const Employee = () => {
         onClose={() => setModalOpenInsert(false)}
         onSubmit={handleOpenPasswordConfirmModal}
         isSmallScreen={isSmallScreen}
+        me={userData}
       />
 
       {/* Edit modal */}
@@ -957,6 +971,7 @@ const Employee = () => {
         onClose={() => setModalOpenEdit(false)}
         onSubmit={handleEditUser}
         isSmallScreen={isSmallScreen}
+        me={userData}
       />
 
       {/* Admin password confirm modal */}

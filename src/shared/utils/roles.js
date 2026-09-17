@@ -139,6 +139,32 @@ export const normalizeRole = (who) => {
 };
 
 /**
+ * ── ลำดับชั้นของสิทธิ์ (ใครแก้สิทธิ์ใครได้) ────────────────────────────────────
+ * ผู้จัดการ (3) > แอดมิน (2) > ช่าง/เซล/ผู้ใช้ (1)
+ * ✅ ผู้ใช้สั่ง: ผู้จัดการสูงสุด · แอดมินตั้งใครเป็นผู้จัดการไม่ได้ และแตะบัญชีผู้จัดการไม่ได้
+ * ⚠️ คู่แฝดฝั่ง server ที่ da-app-server/src/config/roles.js — ต้องตรงกันเป๊ะ (ที่นี่ไว้ซ่อน/ปิดปุ่ม
+ * ส่วนขอบเขตจริงบังคับที่ server)
+ */
+export const ROLE_LEVEL = {
+  [ROLES.MANAGER]: 3,
+  [ROLES.ADMIN]: 2,
+  [ROLES.TECHNICIAN]: 1,
+  [ROLES.SALE]: 1,
+  [ROLES.USER]: 1,
+};
+
+/** ระดับของผู้ใช้/role (role ที่ระบบไม่รู้จัก = 0) */
+export const roleLevel = (who) => ROLE_LEVEL[normalizeRole(who)] || 0;
+
+/** ตั้ง role นี้ให้คนอื่นได้ไหม — ต้องมีสิทธิ์จัดการผู้ใช้ก่อน และห้ามตั้งสิทธิ์ที่สูงกว่าระดับตัวเอง */
+export const canAssignRole = (actor, role) =>
+  can(actor, "manageAll") && roleLevel(role) > 0 && roleLevel(role) <= roleLevel(actor);
+
+/** แตะบัญชีที่มี role นี้ได้ไหม (แก้สิทธิ์/ลบ) — ต้องมีสิทธิ์จัดการผู้ใช้ และห้ามแตะคนที่ระดับสูงกว่าตัวเอง */
+export const canManageUserOfRole = (actor, targetRole) =>
+  can(actor, "manageAll") && roleLevel(actor) >= roleLevel(targetRole);
+
+/**
  * ✅ ตัวเดียวที่โค้ดที่อื่นควรเรียก
  * @param {object|string} who         userData / สตริง role
  * @param {string} capability         ชื่อจาก CAPABILITIES

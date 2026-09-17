@@ -6,7 +6,8 @@
  *
  * นิยามตัวเลข (ต้องตรงกันทุกที่ที่แสดง):
  *   requested   ยอดขอเบิกทุกใบที่ยังไม่ยกเลิก
- *   pending     ยอดรออนุมัติ / ถูกตีกลับ
+ *   pending     ยอดที่ยังไม่ผ่านอนุมัติ (รอตรวจสอบ / ตรวจสอบแล้วรออนุมัติ / ถูกตีกลับ)
+ *   reviewing   ยอดที่ "ตรวจสอบแล้ว รออนุมัติขั้นสุดท้าย" (ส่วนย่อยของ pending — ดูได้ว่าค้างที่ขั้นไหน)
  *   toPay       อนุมัติแล้วแต่ยังไม่จ่าย
  *   advanced    จ่ายเงินล่วงหน้าออกไปแล้วจริง (paid / clearing / cleared)
  *   actual      ใช้จริงตามใบเคลมที่อนุมัติแล้ว (approved / settled)
@@ -27,9 +28,9 @@ const PAID = ["paid", "clearing", "cleared"];
 const CLAIM_DONE = ["approved", "settled"];
 
 const emptyTotals = () => ({
-  count: 0, requested: 0, pending: 0, toPay: 0, advanced: 0, actual: 0,
+  count: 0, requested: 0, pending: 0, reviewing: 0, toPay: 0, advanced: 0, actual: 0,
   outstanding: 0, refundDue: 0, extraDue: 0, refunded: 0, extraPaid: 0, overdue: 0,
-  reimburseCount: 0, reimbursePending: 0, reimburse: 0, reimburseDue: 0, reimbursePaid: 0,
+  reimburseCount: 0, reimbursePending: 0, reimburseReviewing: 0, reimburse: 0, reimburseDue: 0, reimbursePaid: 0,
 });
 
 const addRow = (t, a, now) => {
@@ -37,7 +38,10 @@ const addRow = (t, a, now) => {
   const total = Number(a.total) || 0;
   t.count += 1;
   t.requested += total;
-  if (["pending", "rejected"].includes(a.status)) t.pending += total;
+  // ⚠️ "reviewed" = ตรวจสอบแล้วแต่ยังไม่อนุมัติ → ยังเป็นเงินที่ยังไม่ผ่านอนุมัติ ต้องนับรวมใน pending
+  // ไม่งั้นใบที่ค้างอยู่ขั้นที่ 2 จะหายไปจากรายงานทั้งที่ยังไม่จบ
+  if (["pending", "reviewed", "rejected"].includes(a.status)) t.pending += total;
+  if (a.status === "reviewed") t.reviewing += total;
   if (a.status === "approved") t.toPay += total;
   if (PAID.includes(a.status)) {
     t.advanced += total;
@@ -66,7 +70,8 @@ const addRow = (t, a, now) => {
 const addReimburse = (t, r) => {
   const total = Number(r.total) || 0;
   t.reimburseCount += 1;
-  if (["pending", "rejected"].includes(r.status)) t.reimbursePending += total;
+  if (["pending", "reviewed", "rejected"].includes(r.status)) t.reimbursePending += total;
+  if (r.status === "reviewed") t.reimburseReviewing += total;
   if (["approved", "settled"].includes(r.status)) t.reimburse += total;
   if (r.status === "approved") t.reimburseDue += total;
   if (r.status === "settled") t.reimbursePaid += total;

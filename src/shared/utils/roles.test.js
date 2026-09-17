@@ -6,10 +6,7 @@
  * สองฝั่งให้ด้วย) ตรงนี้ดูเรื่องที่ script ตัวนั้นดูไม่ได้ เช่น การ normalize ค่าที่มาจากฐานข้อมูลจริง
  */
 import { describe, it, expect, vi } from "vitest";
-import {
-  can, isRole, isAdminOrManager, normalizeRole, departmentOf, roleLabel,
-  ROLES, DEPARTMENT, ALL_ROLES, CAPABILITIES,
-} from "./roles";
+import { can, isRole, isAdminOrManager, normalizeRole, departmentOf, roleLabel, ROLES, DEPARTMENT, ALL_ROLES, CAPABILITIES, canAssignRole, canManageUserOfRole, roleLevel } from "./roles";
 
 describe("normalizeRole", () => {
   // ⚠️ role ถูกกรอกด้วยมือผ่านหน้าจัดการผู้ใช้ และเคยมีทั้งตัวใหญ่/ช่องว่างติดมา
@@ -90,6 +87,24 @@ describe("สิทธิ์เดิมต้องไม่เปลี่ย�
     expect(can(ROLES.MANAGER, "approveOwnReview")).toBe(true);
     // ⚠️ ช่างยังต้องให้หัวหน้าพิจารณาเสมอ
     expect(can(ROLES.TECHNICIAN, "approveOwnExpense")).toBe(false);
+  });
+
+  // ✅ ลำดับชั้น: ผู้จัดการ (3) > แอดมิน (2) > ช่าง/เซล/ผู้ใช้ (1)
+  it("แอดมินตั้งใครเป็นผู้จัดการไม่ได้ และแตะบัญชีผู้จัดการไม่ได้", () => {
+    expect(canAssignRole(ROLES.ADMIN, ROLES.MANAGER)).toBe(false);
+    expect(canAssignRole(ROLES.ADMIN, ROLES.ADMIN)).toBe(true);
+    expect(canAssignRole(ROLES.ADMIN, ROLES.TECHNICIAN)).toBe(true);
+    expect(canManageUserOfRole(ROLES.ADMIN, ROLES.MANAGER)).toBe(false);
+    expect(canManageUserOfRole(ROLES.ADMIN, ROLES.ADMIN)).toBe(true);
+  });
+
+  it("ผู้จัดการตั้ง/แตะได้ทุกระดับ · ช่างตั้งสิทธิ์ใครไม่ได้เลย", () => {
+    expect(canAssignRole(ROLES.MANAGER, ROLES.MANAGER)).toBe(true);
+    expect(canManageUserOfRole(ROLES.MANAGER, ROLES.ADMIN)).toBe(true);
+    expect(canAssignRole(ROLES.TECHNICIAN, ROLES.TECHNICIAN)).toBe(false);
+    // ⚠️ role ที่ระบบไม่รู้จัก = ระดับ 0 ทำอะไรไม่ได้ และตั้งให้ใครก็ไม่ได้
+    expect(roleLevel("tecnicain")).toBe(0);
+    expect(canAssignRole(ROLES.MANAGER, "tecnicain")).toBe(false);
   });
 
   it("editOperation คงชุดเดิมที่มี user แต่ไม่มีช่าง", () => {

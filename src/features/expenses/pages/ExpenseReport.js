@@ -93,7 +93,7 @@ const MonthBars = ({ rows }) => {
         ))}
       </Stack>
       <Stack direction="row" spacing={2} sx={{ mt: 1 }}>
-        {[["จ่ายล่วงหน้าแล้ว", ADV], ["ใช้จริง (อนุมัติ)", ACT], ["สำรองจ่าย", RMB]].map(([l, c]) => (
+        {[["จ่ายล่วงหน้าให้พนักงาน", ADV], ["ใช้จริง (อนุมัติ)", ACT], ["พนักงานสำรองจ่าย", RMB]].map(([l, c]) => (
           <Stack key={l} direction="row" spacing={0.75} alignItems="center">
             <Box sx={{ width: 10, height: 10, borderRadius: 0.5, bgcolor: c }} />
             <Typography variant="caption" sx={{ color: TEXT_SUB }}>{l}</Typography>
@@ -141,11 +141,11 @@ const GroupTable = ({ rows, firstHeader, onPick }) => (
         <TableRow>
           <TableCell>{firstHeader}</TableCell>
           <TableCell align="right">ใบ</TableCell>
-          <TableCell align="right">จ่ายล่วงหน้า</TableCell>
+          <TableCell align="right">จ่ายล่วงหน้าให้พนักงาน</TableCell>
           <TableCell align="right">ใช้จริง</TableCell>
-          <TableCell align="right">ค้างเคลียร์</TableCell>
-          <TableCell align="right">สำรองจ่าย</TableCell>
-          <TableCell align="right">รอคืน / จ่ายเพิ่ม</TableCell>
+          <TableCell align="right">ยังไม่เคลียร์ (อยู่กับพนักงาน)</TableCell>
+          <TableCell align="right">พนักงานสำรองจ่าย</TableCell>
+          <TableCell align="right">ส่วนต่างที่ยังไม่จบ</TableCell>
         </TableRow>
       </TableHead>
       <TableBody>
@@ -160,12 +160,13 @@ const GroupTable = ({ rows, firstHeader, onPick }) => (
             </TableCell>
             <TableCell align="right" sx={{ color: r.reimburse ? RMB : TEXT_SUB, fontWeight: r.reimburse ? 800 : 400, whiteSpace: "nowrap" }}>
               {r.reimburse ? baht(r.reimburse) : "—"}
-              {r.reimburseDue ? <span style={{ display: "block", fontSize: "0.72rem", fontWeight: 700 }}>รอจ่ายคืน {baht(r.reimburseDue)}</span> : null}
+              {r.reimburseDue ? <span style={{ display: "block", fontSize: "0.72rem", fontWeight: 700 }}>รอจ่ายคืนพนักงาน {baht(r.reimburseDue)}</span> : null}
             </TableCell>
             <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
-              {r.refundDue ? <span style={{ color: "#d97706", fontWeight: 700 }}>คืน {baht(r.refundDue)}</span> : null}
-              {r.refundDue && r.extraDue ? " · " : null}
-              {r.extraDue ? <span style={{ color: "#2563eb", fontWeight: 700 }}>เพิ่ม {baht(r.extraDue)}</span> : null}
+              {/* ⚠️ ต้องบอกทิศทางเงินเสมอ — "คืน ฿3,000" ลอยๆ อ่านไม่ออกว่าใครคืนให้ใคร */}
+              {r.refundDue ? <span style={{ color: "#d97706", fontWeight: 700 }}>พนักงานคืนบริษัท {baht(r.refundDue)}</span> : null}
+              {r.refundDue && r.extraDue ? <br /> : null}
+              {r.extraDue ? <span style={{ color: "#2563eb", fontWeight: 700 }}>บริษัทจ่ายเพิ่ม {baht(r.extraDue)}</span> : null}
               {!r.refundDue && !r.extraDue ? <span style={{ color: TEXT_SUB }}>—</span> : null}
             </TableCell>
           </TableRow>
@@ -281,16 +282,22 @@ export default function ExpenseReport({ onOpen, reloadKey }) {
         <>
           {/* ── ตัวเลขหลัก ─────────────────────────────────────────── */}
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)", lg: "repeat(7, 1fr)" }, gap: 1, mb: 1.5 }}>
-            <Kpi label="ยอดขอเบิก" value={baht(t.requested)} sub={`${t.count} ใบ · รออนุมัติ ${baht(t.pending)}`} color={TEXT_MAIN} />
-            <Kpi label="จ่ายล่วงหน้าแล้ว" value={baht(t.advanced)} sub={t.toPay ? `รอจ่ายอีก ${baht(t.toPay)}` : "ไม่มีรายการรอจ่าย"} color={ADV} />
+            {/* ✅ อนุมัติ 2 ขั้น — บอกด้วยว่าในยอดที่ยังไม่ผ่านอนุมัติ ค้างอยู่ที่ขั้นรออนุมัติเท่าไร */}
+            <Kpi
+              label="ยอดขอเบิก"
+              value={baht(t.requested)}
+              sub={`${t.count} ใบ · ยังไม่ผ่านอนุมัติ ${baht(t.pending)}${t.reviewing ? ` (รออนุมัติขั้นสุดท้าย ${baht(t.reviewing)})` : ""}`}
+              color={TEXT_MAIN}
+            />
+            <Kpi label="จ่ายล่วงหน้าให้พนักงานแล้ว" value={baht(t.advanced)} sub={t.toPay ? `รอจ่ายให้พนักงานอีก ${baht(t.toPay)}` : "ไม่มีรายการรอจ่าย"} color={ADV} />
             <Kpi label="ใช้จริง (อนุมัติ)" value={baht(t.actual)} sub={t.advanced - t.outstanding > 0 ? `${usage}% ของยอดที่เคลียร์แล้ว` : " "} color={ACT} />
-            <Kpi label="ค้างเคลียร์" value={baht(t.outstanding)} sub={t.overdue ? `เลยกำหนด ${t.overdue} ใบ` : "ไม่มีใบเลยกำหนด"} color="#0369a1" highlight={t.overdue > 0} />
-            <Kpi label="รอรับเงินคืน" value={baht(t.refundDue)} sub={`คืนแล้ว ${baht(t.refunded)}`} color="#d97706" />
-            <Kpi label="รอจ่ายเพิ่ม" value={baht(t.extraDue)} sub={`จ่ายเพิ่มแล้ว ${baht(t.extraPaid)}`} color="#1d4ed8" />
+            <Kpi label="เงินที่ยังอยู่กับพนักงาน" value={baht(t.outstanding)} sub={t.overdue ? `เลยกำหนดเคลียร์ ${t.overdue} ใบ` : "ยังไม่มีใบเลยกำหนด"} color="#0369a1" highlight={t.overdue > 0} />
+            <Kpi label="รอพนักงานคืนเงินบริษัท" value={baht(t.refundDue)} sub={`คืนบริษัทแล้ว ${baht(t.refunded)}`} color="#d97706" />
+            <Kpi label="รอบริษัทจ่ายเพิ่มให้พนักงาน" value={baht(t.extraDue)} sub={`จ่ายเพิ่มแล้ว ${baht(t.extraPaid)}`} color="#1d4ed8" />
             {/* ✅ เงินที่พนักงานสำรองจ่ายเอง — ไม่ได้ผ่านยอด "จ่ายล่วงหน้า" เลย ถ้าไม่มีช่องนี้ยอดกลุ่มนี้จะหายไปทั้งก้อน */}
             <Kpi
-              label="สำรองจ่าย (อนุมัติ)" value={baht(t.reimburse)}
-              sub={t.reimburseDue ? `รอจ่ายคืน ${baht(t.reimburseDue)}` : `${t.reimburseCount} ใบ · จ่ายคืนแล้ว ${baht(t.reimbursePaid)}`}
+              label="พนักงานสำรองจ่าย (อนุมัติ)" value={baht(t.reimburse)}
+              sub={t.reimburseDue ? `รอบริษัทจ่ายคืนพนักงาน ${baht(t.reimburseDue)}` : `${t.reimburseCount} ใบ · จ่ายคืนพนักงานแล้ว ${baht(t.reimbursePaid)}`}
               color={RMB} highlight={t.reimburseDue > 0}
             />
           </Box>

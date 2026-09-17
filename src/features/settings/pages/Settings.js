@@ -6,8 +6,6 @@ import {
   FaBell,
   FaBuilding,
   FaUsers,
-  FaBoxOpen,
-  FaWarehouse,
   FaChevronRight,
   FaInfoCircle,
   FaSignOutAlt,
@@ -76,13 +74,11 @@ const Settings = () => {
 
   const initials = (userData?.fname?.charAt(0) || userData?.username?.charAt(0) || "U").toUpperCase();
 
-  // ✅ /product กับ /product/stock มีหน้าเว็บจริงอยู่แล้ว (ดู src/app/router/index.js) แต่ไม่เคย
-  // มีลิงก์เข้าถึงจาก Sidebar/เมนูไหนเลยมาก่อน — ใส่เป็นทางลัดไว้ที่นี่ให้แอดมินกดถึงได้จริง
+  // ⚠️ ไม่ใส่ "สินค้า" (/product) และ "สต็อกสินค้า" (/product/stock) ในเมนูนี้ — ผู้ใช้แจ้งว่าเป็นของเก่า
+  // ที่ไม่ได้ใช้งานแล้ว (หน้ายังอยู่ในระบบและเข้าผ่าน URL ตรงได้ แต่ไม่ต้องมีทางเข้าจากหน้าตั้งค่า)
   const adminLinks = [
     { title: "ลูกค้า", desc: "จัดการฐานข้อมูลลูกค้า", link: "/customer", icon: <FaBuilding size={18} />, color: "#3b82f6" },
     { title: "พนักงาน", desc: "จัดการสิทธิ์และข้อมูลพนักงาน", link: "/employee", icon: <FaUsers size={18} />, color: "#f43f5e" },
-    { title: "สินค้า", desc: "จัดการรายการสินค้าในระบบ", link: "/product", icon: <FaBoxOpen size={18} />, color: "#dc2626" },
-    { title: "สต็อกสินค้า", desc: "ตรวจสอบจำนวนคงเหลือในคลัง", link: "/product/stock", icon: <FaWarehouse size={18} />, color: "#b91c1c" },
     { title: "ประเภทงาน / ระบบ", desc: "จัดการตัวเลือกใน dropdown ตอนเพิ่ม/แก้ไขแผนงาน", link: "/worktype", icon: <FaTags size={18} />, color: "#8b5cf6" },
   ];
 

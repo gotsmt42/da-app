@@ -92,7 +92,7 @@ const STATUS_BASE = {
   reviewed: { label: "ตรวจสอบแล้ว · รออนุมัติ", color: "#7c2d12" },
   rejected: { label: "ตีกลับให้แก้", color: "#dc2626" },
   approved: { label: "อนุมัติแล้ว", color: "#2563eb" },
-  paid: { label: "จ่ายแล้ว · รอเคลียร์", color: "#0369a1" },
+  paid: { label: "จ่ายให้พนักงานแล้ว · รอเคลียร์", color: "#0369a1" },
   clearing: { label: "ส่งเคลมแล้ว · รอตรวจ", color: "#be185d" },
   cleared: { label: "เคลียร์แล้ว", color: "#16a34a" },
   settled: { label: "เสร็จสิ้น", color: "#16a34a" },
@@ -103,9 +103,10 @@ const STATUS_BASE = {
 export const statusMeta = (status, kind) => {
   const base = STATUS_BASE[status] || { label: status || "-", color: "#94a3b8" };
   if (status === "approved") {
-    const label = kind === "reimburse" ? "อนุมัติ · รอจ่ายคืน"
-      : kind === "claim" ? "อนุมัติ · รอชำระส่วนต่าง"
-        : "อนุมัติ · รอจ่ายเงิน";
+    // ⚠️ บอกให้ชัดว่าเงินไปทางไหน — "รอชำระส่วนต่าง" เดิมไม่บอกว่าใครจ่ายใคร
+    const label = kind === "reimburse" ? "อนุมัติ · รอจ่ายคืนพนักงาน"
+      : kind === "claim" ? "อนุมัติ · รอเคลียร์ส่วนต่าง"
+        : "อนุมัติ · รอจ่ายเงินให้พนักงาน";
     return { ...base, label };
   }
   return base;
@@ -238,10 +239,10 @@ export const bahtText = (amount) => {
 export const differenceMeta = (diff, kind) => {
   const d = money(diff);
   if (kind === "reimburse") {
-    return { label: "บริษัทจ่ายคืนให้ผู้เบิก", short: "จ่ายคืน", color: REIMBURSE_ACCENT_DARK, amount: d };
+    return { label: "บริษัทจ่ายคืนพนักงาน", short: "จ่ายคืนพนักงาน", color: REIMBURSE_ACCENT_DARK, amount: d };
   }
-  if (d > 0) return { label: "บริษัทจ่ายเพิ่มให้ผู้เบิก", short: "จ่ายเพิ่ม", color: "#1d4ed8", amount: d };
-  if (d < 0) return { label: "ผู้เบิกคืนเงินให้บริษัท", short: "คืนเงิน", color: "#d97706", amount: -d };
+  if (d > 0) return { label: "บริษัทจ่ายเพิ่มให้พนักงาน", short: "จ่ายเพิ่มให้พนักงาน", color: "#1d4ed8", amount: d };
+  if (d < 0) return { label: "พนักงานคืนเงินให้บริษัท", short: "คืนเงินบริษัท", color: "#d97706", amount: -d };
   return { label: "ใช้จริงพอดีกับยอด Advance", short: "พอดี", color: "#059669", amount: 0 };
 };
 
