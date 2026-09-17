@@ -12,6 +12,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import useRealtime from "@/shared/realtime/useRealtime";
 import ViewToggle, { initialViewMode } from "@/shared/ui/ViewToggle";
 import { useNavigate } from "react-router-dom";
 import moment from "moment";
@@ -77,6 +78,9 @@ export default function PendingApprovalsPanel({ onCountChange, active = true }) 
   // หน้ามา ไม่งั้นจะขึ้น 0 จนกว่าจะกดเข้ามาดูเอง ซึ่งทำให้ badge ไร้ประโยชน์ (จุดประสงค์คือบอกว่ามีงาน
   // ค้างโดยไม่ต้องกดเข้าไปดู)
   useEffect(() => { fetchData(); }, []);
+
+  // ✅ เรียลไทม์: มีคำขอใหม่/อนุมัติไปแล้วจากเครื่องอื่น → ตัวเลขและรายการอัปเดตทันที
+  useRealtime("events", () => { fetchData(true); });
 
   // ⚠️ จำมุมมองที่เลือกไว้ข้ามการเปิดหน้า (แบบแผนเดียวกับคิวคำขอจากฝ่ายขาย)
   useEffect(() => {

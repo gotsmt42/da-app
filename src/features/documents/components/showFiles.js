@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import useRealtime from "@/shared/realtime/useRealtime";
 import FileService from "@/shared/services/FileService";
 import AuthService from "@/shared/services/authService";
 import Swal from "sweetalert2";
@@ -111,21 +112,27 @@ const ShowFiles = () => {
     fetchData();
   }, []);
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await FileService.getUserFiles();
       setFiles(res.userFiles || []);
-      setSelectedRows([]);
-      setSearch("");
-      setDateSearch("");
-      setPage(1);
+      // ⚠️ อัปเดตแบบเงียบ (เรียลไทม์) ต้องไม่ล้างสิ่งที่ผู้ใช้เลือก/ค้นหาค้างไว้
+      if (!silent) {
+        setSelectedRows([]);
+        setSearch("");
+        setDateSearch("");
+        setPage(1);
+      }
     } catch (error) {
       console.error("Error fetching files:", error);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
+
+  // ✅ เรียลไทม์: อัปโหลด/ลบไฟล์จากเครื่องอื่น → รายการไฟล์อัปเดตทันที
+  useRealtime("files", () => { fetchData(true); });
 
   // ---- Derived filtering (single pass, replaces the old 3 useEffects) ---
   const filtered = useMemo(() => {

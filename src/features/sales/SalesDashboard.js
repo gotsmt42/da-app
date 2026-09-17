@@ -14,6 +14,7 @@
  * ⚠️ โทนม่วง/ชมพูทั้งหน้า แยกจากแดงของสายบริการ — ชุดเดียวกับหัวปฏิทิน แถบแท็บ และเมนู
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import useRealtime from "@/shared/realtime/useRealtime";
 import { useNavigate } from "react-router-dom";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
@@ -93,8 +94,8 @@ export default function SalesDashboard() {
   // (ตัวข้อมูลจริงถูกกันไว้ที่ server อยู่แล้ว นี่แค่ไม่ยิง request ทิ้งเปล่าๆ ฝั่งจอ)
   const canViewService = can(userData, "viewServiceCalendar");
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     const [ev, dp, sv] = await Promise.all([
       EventService.getEventOp().catch(() => ({ userEvents: [] })),
       DispatchService.list().catch(() => []),
@@ -105,10 +106,13 @@ export default function SalesDashboard() {
     setEvents(ev?.userEvents || []);
     setDispatches(Array.isArray(dp) ? dp : []);
     setServiceEvents(sv?.userEvents || []);
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, [canViewService]);
 
   useEffect(() => { load(); }, [load]);
+
+  // ✅ เรียลไทม์: นัดหมาย/งาน/ใบมอบหมายเปลี่ยน → แดชบอร์ดขายอัปเดตทันที
+  useRealtime("events", () => { load(true); });
 
   /**
    * ตารางงานช่าง — "ดูอย่างเดียว" ตามสิทธิ์ viewServiceCalendar (ดู roles.js / CalendarBoard.js)

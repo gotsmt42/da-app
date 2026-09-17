@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import useRealtime from "@/shared/realtime/useRealtime";
 import { useNavigate } from "react-router-dom";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
@@ -88,6 +89,9 @@ export default function TeamWorkload() {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  // ✅ เรียลไทม์: งาน/ทีมเปลี่ยน → ภาระงานอัปเดตทันที
+  useRealtime(["events", "users"], () => { fetchData(true); });
   useEffect(() => {
     const interval = setInterval(() => fetchData(true), 30000);
     return () => clearInterval(interval);

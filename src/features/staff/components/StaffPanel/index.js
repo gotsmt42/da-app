@@ -20,6 +20,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from "react";
+import useRealtime from "@/shared/realtime/useRealtime";
 import AuthService from "@/shared/services/authService";
 import API from "@/shared/api/axiosInstance";
 import Swal from "sweetalert2";
@@ -533,18 +534,21 @@ const Employee = () => {
     fetchUsers();
   }, []);
 
-  const fetchUsers = async () => {
-    setLoading(true);
+  const fetchUsers = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const getAllUser = await AuthService.getAllUserData();
       setUsers(getAllUser.allUser || []);
     } catch (error) {
       console.error("Error fetching user data:", error);
-      setAlert({ open: true, message: "โหลดข้อมูลผู้ใช้ไม่สำเร็จ", severity: "error" });
+      if (!silent) setAlert({ open: true, message: "โหลดข้อมูลผู้ใช้ไม่สำเร็จ", severity: "error" });
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
+
+  // ✅ เรียลไทม์: เพิ่ม/แก้สิทธิ์/ลบพนักงานจากเครื่องอื่น → ทะเบียนอัปเดตทันที
+  useRealtime("users", () => { fetchUsers(true); });
 
   const handleChange = (e) => {
     const { name, value } = e.target;

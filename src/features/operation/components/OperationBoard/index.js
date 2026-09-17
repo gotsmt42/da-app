@@ -12,6 +12,7 @@
  */
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import useRealtime from "@/shared/realtime/useRealtime";
 import EventService from "@/shared/services/EventService";
 import AuthService from "@/shared/services/authService";
 import JobTypeService from "@/shared/services/JobTypeService";
@@ -2534,6 +2535,11 @@ const Operation = () => {
     }, 15000);
     return () => clearInterval(interval);
   }, [currentUserRole]);
+
+  // ✅ เรียลไทม์: งานเปลี่ยน (อนุมัติปิดงาน/แก้สถานะ/มอบหมาย) → บอร์ดอัปเดตทันที ไม่ต้องรอรอบ 15 วินาทีข้างบน
+  useRealtime("events", () => { fetchEventsFromDB(true); });
+  useRealtime("users", () => { fetchEmployee(); });
+  useRealtime("lookups", () => { fetchLookupOptions(); });
 
   const fetchEventsFromDB = async (silent = false) => {
     if (!silent) setLoading(true);

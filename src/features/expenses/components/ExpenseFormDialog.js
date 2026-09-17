@@ -22,7 +22,7 @@ import moment from "moment";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack, Typography, TextField,
   IconButton, Alert, useMediaQuery, Autocomplete, MenuItem, Chip, Tooltip, CircularProgress, Avatar, Collapse,
-  Menu, ListItemIcon, ListItemText, Checkbox, FormControlLabel,
+  Menu, ListItemIcon, ListItemText, Checkbox, FormControlLabel, createFilterOptions,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
@@ -47,6 +47,8 @@ import {
 } from "../expenseMeta";
 
 const MAX_ITEMS = 40;
+/** ค้นหาช่อง "ถึง" ได้ทั้งชื่อและตำแหน่ง */
+const toFilter = createFilterOptions({ stringify: (o) => `${o.label} ${o.position || ""}` });
 let keySeq = 0;
 const nextKey = () => `k${Date.now()}_${(keySeq += 1)}`;
 
@@ -360,6 +362,34 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
   // 🔒 ทะเบียนบัญชีของคนอื่นเปิดดูได้เฉพาะแอดมิน/ผู้จัดการ — คนอื่นเห็นแค่บัญชีที่ใบเก็บไว้แล้ว
   const canManageBank = Boolean(payToUserId) && (payToUserId === userData?.userId || can("viewAllExpenses"));
 
+  /**
+   * ตัวเลือกช่อง "ถึง (ผู้มีอำนาจอนุมัติ)"
+   * ✅ ผู้ใช้ขอ: "ตรงช่องถึงให้เลือกชื่อจากระบบได้เลย และแสดงตำแหน่งให้รู้ด้วย"
+   *   1. ผู้มีอำนาจอนุมัติในระบบ (กรรมการผู้จัดการ → ผู้จัดการแผนกช่าง → แอดมินช่าง) ขึ้นก่อน
+   *   2. พนักงานคนอื่นในระบบ
+   *   3. ชื่อที่เคยพิมพ์ใช้ในใบก่อนๆ แต่ไม่มีในระบบ (เช่น "K.ธนสิทธิ์") — ใบเก่ายังเลือกซ้ำได้
+   * ⚠️ ยังพิมพ์ชื่อเองได้ (freeSolo) — บางใบส่งถึงคนนอกระบบ ช่องนี้เก็บเป็นข้อความเหมือนเดิม
+   */
+  const toChoices = useMemo(() => {
+    const authority = (role) => ({ director: 0, manager: 1, admin: 2 }[String(role || "").toLowerCase()] ?? 3);
+    const staff = [...people]
+      .sort((a, b) => authority(a.role) - authority(b.role) || String(a.fullName || "").localeCompare(String(b.fullName || ""), "th"))
+      .map((p) => ({
+        label: p.fullName || p.name || "",
+        position: p.position || "",
+        imageUrl: p.imageUrl || "",
+        group: authority(p.role) < 3 ? "ผู้มีอำนาจอนุมัติ" : "พนักงานในระบบ",
+      }))
+      .filter((o) => o.label);
+    const inSystem = new Set(staff.map((o) => o.label));
+    const history = (toOptions || [])
+      .filter((name) => name && !inSystem.has(name))
+      .map((name) => ({ label: name, position: "", imageUrl: "", group: "ชื่อที่เคยใช้" }));
+    return [...staff, ...history];
+  }, [people, toOptions]);
+  /** คนที่เลือกอยู่ในช่อง "ถึง" (ถ้าเป็นคนในระบบ) — ใช้แสดงตำแหน่งใต้ช่อง */
+  const toPerson = toChoices.find((o) => o.label === String(to || "").trim() && o.position);
+
   /** ผู้เบิกของใบนี้คือคนที่กำลังกรอกเองไหม — เงื่อนไขเดียวที่ลงลายเซ็นอิเล็กทรอนิกส์ได้ */
   const canSignSelf = Boolean(payToUserId) && payToUserId === userData?.userId;
 
@@ -586,9 +616,35 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
           <Box sx={{ display: "grid", gap: 1.5, alignItems: "start", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
             <ThaiDatePicker label="วันที่" value={docDate} onChange={(v) => setDocDate(v || moment().format("YYYY-MM-DD"))} />
             <Autocomplete
-              freeSolo options={toOptions} value={to} inputValue={to}
+              freeSolo
+              options={toChoices}
+              groupBy={(o) => o.group}
+              value={to}
+              inputValue={to}
               onInputChange={(_, v) => setTo(v)}
-              renderInput={(params) => <TextField {...params} size="small" label="ถึง (ผู้มีอำนาจอนุมัติ)" placeholder="เช่น K.ธนสิทธิ์" />}
+              onChange={(_, v) => setTo(typeof v === "string" ? v : v?.label || "")}
+              getOptionLabel={(o) => (typeof o === "string" ? o : o?.label || "")}
+              isOptionEqualToValue={(o, v) => o.label === (typeof v === "string" ? v : v?.label)}
+              // ✅ ค้นด้วยตำแหน่งได้ด้วย — พิมพ์ "กรรมการ" ก็เจอกรรมการผู้จัดการ ไม่ต้องจำชื่อ
+              filterOptions={toFilter}
+              renderOption={({ key, ...liProps }, o) => (
+                <li {...liProps} key={`${o.group}-${o.label}`}>
+                  <Avatar src={o.imageUrl?.startsWith("http") ? o.imageUrl : undefined}
+                    sx={{ width: 28, height: 28, mr: 1.25, fontSize: 13, bgcolor: o.position ? alpha(accent, 0.18) : "#e2e8f0", color: o.position ? accent : TEXT_SUB }}>
+                    {(o.label || "?").charAt(0)}
+                  </Avatar>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography sx={{ fontSize: "0.88rem", fontWeight: 700 }} noWrap>{o.label}</Typography>
+                    <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }} noWrap>
+                      {o.position || "ไม่มีในระบบ · ชื่อที่เคยใช้ในใบก่อนหน้า"}
+                    </Typography>
+                  </Box>
+                </li>
+              )}
+              renderInput={(params) => (
+                <TextField {...params} size="small" label="ถึง (ผู้มีอำนาจอนุมัติ)" placeholder="เลือกจากรายชื่อ หรือพิมพ์ชื่อ"
+                  helperText={toPerson ? `ตำแหน่ง: ${toPerson.position}` : String(to || "").trim() ? "ชื่อนอกระบบ (พิมพ์เอง)" : "เลือกผู้มีอำนาจอนุมัติจากรายชื่อในระบบได้"} />
+              )}
             />
             {canPickPerson ? (
               <Autocomplete
@@ -630,7 +686,8 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
                 InputProps={{ readOnly: true }}
                 helperText={isClearClaim ? "ผู้เบิกของใบเคลม = ผู้รับเงิน Advance" : isReimburseForm ? "ผู้เบิก = คนที่สำรองจ่ายและจะได้รับเงินคืน" : undefined} />
             )}
-            <TextField size="small" label="ตำแหน่ง" value={position} onChange={(e) => setPosition(e.target.value)} />
+            {/* ⚠️ ตำแหน่งของ "ผู้เบิก" ไม่ใช่ของคนในช่อง "ถึง" — ป้ายต้องบอกให้ชัด เพราะวางติดกัน */}
+            <TextField size="small" label="ตำแหน่งผู้เบิก" value={position} onChange={(e) => setPosition(e.target.value)} />
             <TextField
               size="small" label="เรื่อง *" value={subject} onChange={(e) => setSubject(e.target.value)}
               placeholder={isReimburseForm ? "เช่น ค่าน้ำมัน/ทางด่วน งาน PM ที่สำรองจ่ายไปก่อน" : isClaim ? "เคลียร์ค่าใช้จ่าย ..." : "เช่น เบิกเบี้ยเลี้ยง น.ศ. ฝึกงาน / ค่าเดินทางงาน PM"}

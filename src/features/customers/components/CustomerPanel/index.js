@@ -20,6 +20,7 @@
  */
 
 import React, { useMemo, useState, useEffect } from "react";
+import useRealtime from "@/shared/realtime/useRealtime";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import CustomerService from "@/shared/services/CustomerService";
 import EventService from "@/shared/services/EventService";
@@ -492,18 +493,21 @@ const Customer = () => {
       .catch((error) => console.error("Error fetching events for customer history:", error));
   }, []);
 
-  const fetchCustomers = async () => {
-    setLoading(true);
+  const fetchCustomers = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await CustomerService.getCustomers();
       setCustomers(res.userCustomers || []);
     } catch (error) {
       console.error("Error fetching customer data:", error);
-      setAlert({ open: true, message: "โหลดข้อมูลลูกค้าไม่สำเร็จ", severity: "error" });
+      if (!silent) setAlert({ open: true, message: "โหลดข้อมูลลูกค้าไม่สำเร็จ", severity: "error" });
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
+
+  // ✅ เรียลไทม์: เพิ่ม/แก้/ลบลูกค้าจากเครื่องอื่น → ทะเบียนอัปเดตทันที
+  useRealtime("customers", () => { fetchCustomers(true); });
 
   const handleChange = (e) => {
     const { name, value } = e.target;

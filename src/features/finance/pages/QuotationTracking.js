@@ -25,6 +25,7 @@
  */
 
 import { useEffect, useState, useCallback, useMemo, useRef, memo } from "react";
+import useRealtime from "@/shared/realtime/useRealtime";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
@@ -851,6 +852,9 @@ export default function QuotationTracking() {
   }, []);
 
   useEffect(() => { if (canAccess) fetchJobs(); }, [fetchJobs, canAccess]);
+
+  // ✅ เรียลไทม์: สถานะใบเสนอราคา/งานเปลี่ยน → รายการติดตามอัปเดตทันที
+  useRealtime("events", () => { fetchJobs(true); }, { enabled: Boolean(canAccess) });
 
   useEffect(() => {
     if (!canAccess) return;

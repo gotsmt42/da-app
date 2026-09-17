@@ -7,6 +7,7 @@
  * ⚠️ เป็นแค่ตัวช่วยแสดงป้าย ดึงไม่สำเร็จ = คืน null เงียบๆ (ไม่มีป้าย) ห้ามทำให้เมนูใช้งานไม่ได้
  */
 import { useEffect, useState } from "react";
+import useRealtime from "@/shared/realtime/useRealtime";
 import ExpenseService from "../services/ExpenseService";
 
 const TTL_MS = 60_000;
@@ -37,6 +38,12 @@ const load = (userId) => {
  */
 export default function useExpenseSummary(enabled, userId, refreshKey) {
   const [data, setData] = useState(() => (enabled && cache.userId === (userId || "") ? cache.data : null));
+
+  // ✅ เรียลไทม์: ใบเบิกเปลี่ยนที่ไหนก็ตาม → ทิ้งแคชแล้วดึงตัวเลขใหม่ทันที (ไม่รอแคชหมดอายุ 60 วินาที)
+  useRealtime("expenses", () => {
+    if (cache.userId === (userId || "")) cache.at = 0;
+    load(userId || "").then((d) => setData(d));
+  }, { enabled: Boolean(enabled) });
 
   useEffect(() => {
     if (!enabled) { setData(null); return undefined; }

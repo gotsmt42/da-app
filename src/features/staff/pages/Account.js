@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import useRealtime from "@/shared/realtime/useRealtime";
 import Swal from "sweetalert2";
 
 import ManageAccountsRoundedIcon from "@mui/icons-material/ManageAccountsRounded";
@@ -42,6 +43,9 @@ const Account = () => {
   const [editedData, setEditedData] = useState({});
   const [user, setUser] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
+
+  // ✅ เรียลไทม์: ข้อมูลบัญชีถูกแก้จากเครื่องอื่น (เช่น หัวหน้าเปลี่ยนสิทธิ์/ตำแหน่ง) → หน้านี้อัปเดตทันที
+  useRealtime("users", () => { getUserData(); });
 
   useEffect(() => {
     getUserData();

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import useRealtime from "@/shared/realtime/useRealtime";
 import { Link, useLocation } from "react-router-dom";
 import AuthService from "../shared/services/authService";
 import { useAuth } from "../features/auth/AuthContext";
@@ -153,6 +154,10 @@ const Header = ({ toggleMobileSidebar }) => {
     isSale ? "sale" : isAdminOrManager ? "admin" : "technician"
   );
 
+  // ✅ รูป/ชื่อบนหัวเว็บ อัปเดตทันทีเมื่อข้อมูลผู้ใช้เปลี่ยน (เรียลไทม์)
+  const [userLiveKey, setUserLiveKey] = useState(0);
+  useRealtime("users", () => setUserLiveKey((k) => k + 1));
+
   useEffect(() => {
     const getUserData = async () => {
       try {
@@ -164,7 +169,7 @@ const Header = ({ toggleMobileSidebar }) => {
     };
 
     getUserData();
-  }, []);
+  }, [userLiveKey]);
 
   // ✅ จำนวนสัญญาที่ถึง/เลยเดือนที่ต้องเข้ารอบถัดไปแล้วแต่ยังไม่ได้วางแผน — คำนวณด้วยตรรกะเดียวกับ
   // ป้ายในตาราง ContractOverview.js (shared/utils/contractOverdue.js) ผ่าน store กลาง

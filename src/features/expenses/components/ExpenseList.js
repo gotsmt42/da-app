@@ -5,7 +5,7 @@
  * ✅ ตัวกรองสถานะเป็นชิปพร้อมตัวเลข — เห็นทันทีว่าค้างกี่ใบในแต่ละขั้นโดยไม่ต้องกดดูทีละอัน
  * ⚠️ ขอบเขตข้อมูล (ช่างเห็นเฉพาะของตัวเอง) บังคับที่ server — หน้านี้แสดงเท่าที่ได้รับมา
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Box, Stack, Typography, Chip, TextField, InputAdornment, MenuItem, Button, Table, TableHead, TableRow,
@@ -185,15 +185,20 @@ export default function ExpenseList({ mode, status: statusProp, claimType = "all
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const lastQueryRef = useRef("");
   useEffect(() => {
     let alive = true;
-    setLoading(true); setError("");
     // ⚠️ กรองชนิดย่อยที่ server (ไม่ใช่กรองในหน้า) — รายการถูกจำกัดจำนวนแถวไว้ ถ้ากรองทีหลังจะได้
     // ใบสำรองจ่ายไม่ครบเมื่อมีใบเคลมเยอะกว่าเพดาน
     // 🐛 เดิมไม่มี "reviewed" → ใบที่ตรวจสอบแล้วรออนุมัติขั้นสุดท้ายไม่เคยโผล่ในกล่องนี้ ทั้งที่ป้ายนับไปแล้ว
     const params = mode === "inbox"
       ? { status: "pending,reviewed,approved,paid" }
       : { kind, ...(kind === "claim" && claimType !== "all" ? { claimType } : {}), ...periodRange(period) };
+    // ✅ โหลดซ้ำด้วยตัวกรองเดิม (ข้อมูลเปลี่ยนจากที่อื่น/เรียลไทม์) → ไม่ขึ้นโครงโหลดทับรายการที่ดูอยู่
+    const queryKey = JSON.stringify([mode, params]);
+    if (queryKey !== lastQueryRef.current) setLoading(true);
+    lastQueryRef.current = queryKey;
+    setError("");
     ExpenseService.list(params)
       .then((r) => { if (alive) setRows(r); })
       .catch((err) => { if (alive) setError(errorText(err, "โหลดรายการไม่สำเร็จ")); })

@@ -10,7 +10,8 @@
  * buildDaysPastDueMap) ห้ามคำนวณเกณฑ์ซ้ำเองในไฟล์นี้เด็ดขาด ไม่งั้นตัวเลขจะไม่ตรงกับหน้าต้นทาง
  * ซึ่งเป็นอาการที่ผู้ใช้จับได้ทันทีและทำให้เลิกเชื่อตัวเลขทั้งระบบ
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import useRealtime from "@/shared/realtime/useRealtime";
 import { Navigate, useNavigate } from "react-router-dom";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
@@ -83,9 +84,13 @@ export default function CustomerOverview() {
   const [selected, setSelected] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
 
+  // ✅ โหลดครั้งแรกเท่านั้นที่ขึ้นโครงโหลด — รอบต่อไป (เรียลไทม์/หลังแก้ไข) อัปเดตเงียบๆ ไม่ล้างหน้าที่ดูอยู่
+  const loadedOnceRef = useRef(false);
+  useRealtime(["events", "documents", "customers"], () => setReloadKey((k) => k + 1));
+
   useEffect(() => {
     let alive = true;
-    setLoading(true);
+    if (!loadedOnceRef.current) setLoading(true);
     (async () => {
       try {
         // ⚠️ ทะเบียนเอกสารดึงได้สูงสุด 200 ใบต่อครั้งตามที่ API จำกัดไว้ — ใช้แค่ "นับ + โชว์ล่าสุด"
@@ -98,6 +103,7 @@ export default function CustomerOverview() {
         if (!alive) return;
         setEvents(resEvents?.userEvents || []);
         setDocs(resDocs?.items || resDocs?.docs || []);
+        loadedOnceRef.current = true;
       } finally {
         if (alive) setLoading(false);
       }

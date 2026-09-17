@@ -13,6 +13,7 @@ import {
   FaCheckDouble,
 } from "react-icons/fa";
 import { useEffect, useState, useMemo } from "react";
+import useRealtime from "@/shared/realtime/useRealtime";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { Link, useNavigate } from "react-router-dom";
 import moment from "moment";
@@ -136,9 +137,13 @@ const Dashboard = () => {
     () => new Set(),
   );
 
+  // ✅ เรียลไทม์: งาน/ทีมเปลี่ยน → สถิติบนแดชบอร์ดอัปเดตเงียบๆ (ไม่ขึ้นโครงโหลดทับ)
+  const [liveKey, setLiveKey] = useState(0);
+  useRealtime(["events", "users"], () => setLiveKey((k) => k + 1));
+
   useEffect(() => {
     const fetchAllDashboardData = async () => {
-      setLoading(true);
+      if (liveKey === 0) setLoading(true);
       try {
         // ✅ ใช้ getEventOp() (scoped ตาม role) แทน getEvents() (คืนทุก event ของทุกคนเสมอ)
         // ไม่งั้นช่างจะเห็นสถิติงานของทั้งบริษัท ไม่ใช่งานของตัวเอง
@@ -167,8 +172,8 @@ const Dashboard = () => {
     // 🧹 คอมเมนต์เดิมตรงนี้บอกว่า "ผูกกับ canSell เพราะเซลต้องรอ role พร้อมก่อนถึงจะได้ข้อมูลการขาย"
     // — เป็นของตกค้างจากสมัยที่ยังมีระบบ CRM ซึ่งถูกตัดออกไปแล้ว ตอนนี้ไม่มีการดึงข้อมูลแยกตาม role
     // เลยสักจุด (getEventOp/GetDraftEvents ถูกกรองตามผู้ใช้ที่ฝั่ง server อยู่แล้ว) โหลดรอบเดียว
-    // ตอน mount จึงถูกต้อง และ deps ว่างคือสิ่งที่ตั้งใจจริง
-  }, []);
+    // ตอน mount จึงถูกต้อง — ✅ รอบต่อๆ ไปมาจากสัญญาณเรียลไทม์ (liveKey) เท่านั้น
+  }, [liveKey]);
 
   // ✅ นับแบบจัดกลุ่มก่อน (countDistinctJobs) ไม่ใช่นับทุกแถว event ดิบ — งานที่เข้าหลายวันไม่ติดกัน
   // (jobGroupId เดียวกัน) ต้องนับเป็น 1 งานเสมอ ไม่งั้นการ์ดสรุปสถานะจะขึ้นตัวเลขสูงเกินจริง

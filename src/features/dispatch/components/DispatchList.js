@@ -12,6 +12,7 @@
  * (บทเรียนเดียวกับ BillingDialog ที่เคยเกือบถูกก๊อปเป็น 2 ชุด)
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import useRealtime from "@/shared/realtime/useRealtime";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import {
@@ -374,19 +375,22 @@ export default function DispatchList({ mode = "board", myId = "" }) {
     try { localStorage.setItem("dispatchList.viewMode", viewMode); } catch { /* storage ปิดอยู่ */ }
   }, [viewMode]);
 
-  const load = useCallback(async () => {
-    setLoading(true); setError("");
+  const load = useCallback(async (silent = false) => {
+    if (!silent) { setLoading(true); setError(""); }
     try {
       const params = statusFilter === "all" ? { include: "all" } : {};
       setRows(await DispatchService.list(params));
     } catch (err) {
-      setError(err?.response?.data?.message || "โหลดใบมอบหมายไม่สำเร็จ");
+      if (!silent) setError(err?.response?.data?.message || "โหลดใบมอบหมายไม่สำเร็จ");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [statusFilter]);
 
   useEffect(() => { load(); }, [load]);
+
+  // ✅ เรียลไทม์: ใบมอบหมายถูกส่ง/รับ/อัปเดตความคืบหน้าจากเครื่องอื่น → รายการอัปเดตทันที
+  useRealtime("dispatch", () => { load(true); });
 
   // ⚠️ deps มี routeId — กดแจ้งเตือนใบอื่นตอนที่เปิดหน้านี้ค้างอยู่ จะเปลี่ยนแค่ param
   // โดยไม่ remount ถ้าไม่ฟังตรงนี้ กล่องจะไม่เปลี่ยนไปใบใหม่

@@ -23,6 +23,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import useRealtime from "@/shared/realtime/useRealtime";
 import { Navigate, Link, useSearchParams } from "react-router-dom";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
@@ -1288,6 +1289,10 @@ export default function ContractOverview() {
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ✅ เรียลไทม์: งานในสัญญาเปลี่ยน → ตารางอัปเดตทันที · ลูกค้า/พนักงาน/ประเภทงานเปลี่ยน → ตัวเลือกอัปเดต
+  useRealtime("events", () => { fetchData(true); });
+  useRealtime(["customers", "users", "lookups"], () => { fetchLookups(); });
 
   // ✅ จัดกลุ่มด้วย contractGroupId — งานเก่าที่ยังไม่มี (สร้างก่อนมีฟีเจอร์สัญญา) fallback เป็น
   // สัญญา 1 ครั้งของตัวเอง (key เฉพาะ _id) เทียบ pattern เดียวกับ getGroupKey ใน overdueJobs.js

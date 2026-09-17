@@ -3,6 +3,8 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { jwtDecode } from "jwt-decode"; // ✅ ถูกต้อง
 import PushService from "@/shared/services/PushService";
 import AuthService from "@/shared/services/authService";
+import { startRealtime, stopRealtime } from "@/shared/realtime/realtimeClient";
+import useRealtime from "@/shared/realtime/useRealtime";
 
 const AuthContext = createContext();
 
@@ -128,6 +130,16 @@ const updateUserData = (newData) => {
    * ✅ จังหวะที่รีเฟรช: เปิดแอป · กลับมาที่แท็บ · ทุก 60 วินาที
    * ⚠️ ห้ามถี่กว่านี้ — เป็นการยิง API ของผู้ใช้ทุกคนตลอดเวลาโดยที่ข้อมูลแทบไม่เปลี่ยน
    */
+  /** ✅ ช่องสัญญาณเรียลไทม์ — เปิดตลอดเวลาที่ล็อกอินอยู่ ใช้ร่วมกันทุกหน้า (ดู shared/realtime) */
+  useEffect(() => {
+    if (!isLoggedIn) return undefined;
+    startRealtime();
+    return () => stopRealtime();
+  }, [isLoggedIn]);
+
+  // ✅ ข้อมูลผู้ใช้เปลี่ยน (เช่น ถูกเปลี่ยนสิทธิ์) → เมนู/สิทธิ์บนหน้าจออัปเดตทันที ไม่ต้องรอรอบ 60 วินาที
+  useRealtime("users", () => { refreshUserData(); }, { enabled: Boolean(isLoggedIn) });
+
   useEffect(() => {
     if (!isLoggedIn) return undefined;
     refreshUserData();

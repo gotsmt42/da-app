@@ -6,7 +6,7 @@
  * ⚠️ ช่างเห็นเฉพาะของตัวเอง (server กรอง) — หัวหน้าเห็นทั้งบริษัทและกรองรายคนได้
  * ⚠️ ไม่มีเพดานงบ (ตามที่ผู้ใช้เลือก "ติดตามยอดและรายงาน") — หน้านี้รายงานอย่างเดียว ไม่บล็อกการเบิก
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import moment from "moment";
 import {
   Box, Stack, Typography, TextField, MenuItem, Button, Alert, Skeleton, Table, TableHead, TableRow, TableCell,
@@ -258,13 +258,18 @@ export default function ExpenseReport({ onOpen, reloadKey }) {
     if (viewAll) ExpenseService.people().then(setPeople).catch(() => {});
   }, [viewAll]);
 
+  const lastParamsRef = useRef("");
   useEffect(() => {
     let alive = true;
-    setLoading(true); setError("");
     const params = {};
     if (from) params.from = from;
     if (to) params.to = to;
     if (person !== "all") params.userId = person;
+    // ✅ ตัวกรองเดิม (ข้อมูลเปลี่ยนแบบเรียลไทม์) → อัปเดตตัวเลขเงียบๆ ไม่ล้างรายงานเป็นโครงโหลด
+    const paramsKey = JSON.stringify(params);
+    if (paramsKey !== lastParamsRef.current) setLoading(true);
+    lastParamsRef.current = paramsKey;
+    setError("");
     ExpenseService.report(params)
       .then((r) => {
         if (!alive) return;

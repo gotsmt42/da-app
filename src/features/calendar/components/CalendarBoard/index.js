@@ -7,6 +7,7 @@ import React, {
   lazy,
   Suspense,
 } from "react";
+import useRealtime from "@/shared/realtime/useRealtime";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import FullCalendar from "@fullcalendar/react";
@@ -583,8 +584,14 @@ function EventCalendar() {
     return () => clearTimeout(t);
   }, [showDraftsPanel]);
 
-  // ✅ Realtime: รีเฟรชข้อมูลเงียบๆ ทุก 30 วินาที เพื่อให้เห็นการเปลี่ยนแปลง
-  // จากคนอื่น (เพิ่ม/แก้ไข/ลบ event) โดยไม่ต้องกดรีเฟรชหน้าเอง
+  // ✅ เรียลไทม์: งาน/แผนงาน/ใบมอบหมายเปลี่ยนจากที่ไหนก็ตาม → ปฏิทินอัปเดตเองทันที (โหลดเงียบ)
+  useRealtime("events", () => {
+    fetchEventsFromDB(true);
+    fetchDrafts(true);
+  });
+  useRealtime("lookups", () => { fetchLookupOptions(); });
+
+  // ✅ สำรอง: รีเฟรชเงียบๆ ทุก 30 วินาที เผื่อช่องสัญญาณเรียลไทม์หลุด
   useEffect(() => {
     const interval = setInterval(() => {
       fetchEventsFromDB(true);

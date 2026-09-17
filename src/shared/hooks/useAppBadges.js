@@ -24,6 +24,7 @@ import { countDistinctJobs, getOverdueGroupKey } from "@/shared/utils/overdueJob
 import { countPendingJobs } from "@/shared/utils/approvalStatus";
 import { countOverdueContracts } from "@/shared/utils/contractOverdue";
 import { getFollowUpInfo } from "@/shared/utils/quotationTracking";
+import { subscribeRealtime } from "@/shared/realtime/realtimeClient";
 
 /**
  * คำอธิบายของแต่ละป้าย — ใช้เป็น aria-label ให้ผู้ใช้ screen reader รู้ว่าเลขนั้นคือเรื่องอะไร
@@ -67,15 +68,26 @@ let timer = null;
 
 const emit = () => subscribers.forEach((fn) => fn(store.data));
 
-const fetchAll = async (userData) => {
+const ALL_PARTS = ["events", "drafts", "expense", "dispatch"];
+/** ส่วนที่ต้องดึงซ้ำตอนมีสัญญาณเรียลไทม์ — ไม่ดึงงานทั้งก้อน (~150 kB) เพียงเพราะมีคนอนุมัติใบเบิก */
+const PARTS_BY_TOPIC = { events: ["events", "drafts"], dispatch: ["dispatch"], expenses: ["expense"] };
+let queuedParts = null;
+
+/** @param {string[]} [parts] ดึงเฉพาะส่วนนี้ (ไม่ระบุ = ทั้งหมด) */
+const fetchAll = async (userData, parts = ALL_PARTS) => {
   const scope = scopeOf(userData);
-  if (store.loading) return;
+  // ⚠️ กำลังดึงอยู่ — จดส่วนที่ขอไว้แล้วดึงต่อหลังรอบนี้จบ (ไม่งั้นสัญญาณที่มาระหว่างนั้นหายเงียบ)
+  if (store.loading) {
+    queuedParts = new Set([...(queuedParts || []), ...parts]);
+    return;
+  }
   store.loading = true;
+  const want = new Set(parts);
   const [events, drafts, expense, dispatch] = await Promise.all([
-    scope.jobs ? EventService.getEventOp().then((r) => r?.userEvents || []).catch(() => null) : null,
-    scope.contracts ? EventService.GetDraftEvents().then((r) => r?.drafts || []).catch(() => null) : null,
-    scope.expense ? ExpenseService.summary().catch(() => null) : null,
-    (scope.dispatchQueue || scope.dispatchMine) ? DispatchService.summary().catch(() => null) : null,
+    scope.jobs && want.has("events") ? EventService.getEventOp().then((r) => r?.userEvents || []).catch(() => null) : null,
+    scope.contracts && want.has("drafts") ? EventService.GetDraftEvents().then((r) => r?.drafts || []).catch(() => null) : null,
+    scope.expense && want.has("expense") ? ExpenseService.summary().catch(() => null) : null,
+    (scope.dispatchQueue || scope.dispatchMine) && want.has("dispatch") ? DispatchService.summary().catch(() => null) : null,
   ]);
   store.loading = false;
   // ⚠️ ค่าที่ดึงไม่สำเร็จ (null) ต้องคงของเดิมไว้ ไม่ใช่ล้างเป็นว่าง — เน็ตสะดุดทีเดียวป้ายหายทั้งแอป
@@ -85,8 +97,44 @@ const fetchAll = async (userData) => {
     expense: expense ?? store.data.expense,
     dispatch: dispatch ?? store.data.dispatch,
   };
-  store.at = Date.now();
+  if (want.size === ALL_PARTS.length) store.at = Date.now();
   emit();
+  if (queuedParts) {
+    const next = [...queuedParts];
+    queuedParts = null;
+    fetchAll(userData, next);
+  }
+};
+
+/**
+ * ✅ เรียลไทม์: ฟังสัญญาณครั้งเดียวทั้งแอป (ไม่ใช่ทุกเมนูที่ใช้ hook นี้ฟังเอง) แล้วดึงเฉพาะส่วนที่เปลี่ยน
+ * ป้ายตัวเลขบนเมนูทุกจุดจึงขยับทันทีที่มีคนส่ง/อนุมัติ/แก้งาน โดยไม่ต้องรอรอบ 30 วินาที
+ */
+let realtimeOff = null;
+let realtimeTimer = null;
+let realtimeParts = new Set();
+const flushRealtime = () => {
+  if (document.visibilityState === "hidden") return; // แท็บซ่อนอยู่ — เก็บไว้ดึงตอนกลับมา
+  const parts = [...realtimeParts];
+  realtimeParts = new Set();
+  if (parts.length && lastUser && subscribers.size) fetchAll(lastUser, parts);
+};
+const onBadgeVisibility = () => { if (document.visibilityState === "visible" && realtimeParts.size) flushRealtime(); };
+const listenRealtime = () => {
+  if (realtimeOff) return;
+  const off = subscribeRealtime(Object.keys(PARTS_BY_TOPIC), (evt) => {
+    (evt.type === "resync" ? ALL_PARTS : PARTS_BY_TOPIC[evt.topic] || []).forEach((p) => realtimeParts.add(p));
+    clearTimeout(realtimeTimer);
+    realtimeTimer = setTimeout(flushRealtime, 500);
+  });
+  document.addEventListener("visibilitychange", onBadgeVisibility);
+  realtimeOff = () => {
+    off();
+    document.removeEventListener("visibilitychange", onBadgeVisibility);
+    clearTimeout(realtimeTimer);
+    realtimeParts = new Set();
+    realtimeOff = null;
+  };
 };
 
 const start = (userData) => {
@@ -99,6 +147,7 @@ const start = (userData) => {
   }
   if (Date.now() - store.at > POLL_MS) fetchAll(userData);
   if (!timer) timer = setInterval(() => fetchAll(userData), POLL_MS);
+  listenRealtime();
 };
 
 /** เรียกหลังทำรายการที่เปลี่ยนตัวเลข (อนุมัติ/ส่งใบ ฯลฯ) ให้ป้ายอัปเดตทันทีโดยไม่ต้องรอรอบถัดไป */
@@ -181,6 +230,7 @@ export default function useAppBadges(userData) {
     return () => {
       subscribers.delete(onChange);
       if (subscribers.size === 0 && timer) { clearInterval(timer); timer = null; }
+      if (subscribers.size === 0) realtimeOff?.();
     };
   }, [userData]);
 

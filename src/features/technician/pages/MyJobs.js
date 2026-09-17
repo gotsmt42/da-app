@@ -12,6 +12,7 @@
  */
 
 import { useEffect, useMemo, useState, useCallback, cloneElement } from "react";
+import useRealtime from "@/shared/realtime/useRealtime";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import EventService from "@/shared/services/EventService";
@@ -314,6 +315,9 @@ export default function MyJobs() {
   }, []);
 
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
+
+  // ✅ เรียลไทม์: แอดมินอนุมัติ/ตีกลับปิดงาน หรือมอบหมายงานใหม่ → เห็นทันที
+  useRealtime("events", () => { fetchJobs(true); });
 
   // ✅ รีเฟรชอัตโนมัติทุก 15 วินาที เพื่อให้เห็นผลอนุมัติ/ไม่อนุมัติปิดงานจากแอดมินแบบ realtime
   useEffect(() => {

@@ -18,6 +18,7 @@
  * เผื่อคนที่เข้ามาจากแจ้งเตือน ไม่เอาแถบแท็บกลับมาอีกเพราะนั่นคือสิ่งที่ทำให้หน้ารกตั้งแต่แรก
  */
 import { useCallback, useEffect, useState } from "react";
+import useRealtime from "@/shared/realtime/useRealtime";
 import { Link as RouterLink, Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Box, Stack, Typography, Button, Chip } from "@mui/material";
 import { alpha } from "@mui/material/styles";
@@ -175,6 +176,10 @@ export default function ExpensesPage({ view: viewProp }) {
     setReloadKey((k) => k + 1);
     refreshAppBadges(); // ป้ายตัวเลขบนเมนูต้องขยับทันทีหลังอนุมัติ/ส่งใบ ไม่ใช่รอรอบ poll ถัดไป
   }, []);
+
+  // ✅ เรียลไทม์: ใครก็ตามส่ง/ตรวจสอบ/อนุมัติ/เบิกจ่ายใบไหน → รายการ ตัวเลขสรุป และใบที่เปิดอยู่อัปเดตเองทันที
+  // (รายการ/ใบที่เปิดอยู่โหลดแบบเงียบ — ไม่กระพริบเป็นโครงโหลด)
+  useRealtime("expenses", () => setReloadKey((k) => k + 1));
 
   const openDetail = useCallback((id) => {
     setDetailId(id);

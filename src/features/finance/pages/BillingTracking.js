@@ -11,6 +11,7 @@
  * งานรายครั้ง ไม่ใช่รายสัญญา
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import useRealtime from "@/shared/realtime/useRealtime";
 import { Navigate } from "react-router-dom";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
@@ -71,16 +72,19 @@ export default function BillingTracking() {
   const [page, setPage] = useState(1);
   const [target, setTarget] = useState(null);   // งานที่กำลังเปิดกล่องจัดการ
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await EventService.getEventOp().catch(() => ({ userEvents: [] }));
       setEvents(res?.userEvents || []);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
   useEffect(() => { load(); }, [load]);
+
+  // ✅ เรียลไทม์: บันทึกวางบิล/รับเงินจากเครื่องอื่น → สถานะการเก็บเงินอัปเดตทันที
+  useRealtime("events", () => { load(true); });
 
   // ── ประกอบแถว ─────────────────────────────────────────────────────────
   const rows = useMemo(() => events.map((e) => ({

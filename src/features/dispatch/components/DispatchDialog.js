@@ -12,6 +12,7 @@
  */
 import { useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
+import useRealtime from "@/shared/realtime/useRealtime";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import {
@@ -115,15 +116,22 @@ export default function DispatchDialog({ dispatchId, onClose, onSaved }) {
 
   const fileRef = useRef(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (silent = false) => {
     if (!dispatchId) return;
-    setLoading(true); setError("");
+    if (!silent) { setLoading(true); setError(""); }
     try { setD(await DispatchService.get(dispatchId)); }
-    catch (err) { setError(err?.response?.data?.message || "โหลดใบมอบหมายไม่สำเร็จ"); }
-    finally { setLoading(false); }
+    catch (err) { if (!silent) setError(err?.response?.data?.message || "โหลดใบมอบหมายไม่สำเร็จ"); }
+    finally { if (!silent) setLoading(false); }
   }, [dispatchId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // ✅ เรียลไทม์: ใบที่เปิดดูอยู่ถูกอัปเดตจากเครื่องอื่น (ช่างติ๊กเช็กลิสต์/เปลี่ยนสถานะ) → เห็นทันที
+  // ⚠️ ข้ามตอนกำลังทำรายการอยู่ (busy) — กันข้อมูลเก่าจากรอบดึงมาทับผลของปุ่มที่เพิ่งกด
+  useRealtime("dispatch", (evt) => {
+    if (busy) return;
+    if (evt.type === "resync" || !evt.id || String(evt.id) === String(dispatchId)) load(true);
+  }, { enabled: Boolean(dispatchId) });
 
   const apply = (updated) => { setD(updated); onSaved?.(updated); };
   const run = async (fn) => {

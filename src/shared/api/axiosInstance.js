@@ -1,5 +1,6 @@
 // 📁 shared/api/axiosInstance.js
 import axios from "axios";
+import { CLIENT_ID } from "@/shared/realtime/realtimeClient";
 
 // ⚠️ Vite ไม่มี process ในเบราว์เซอร์ ต้องอ่านผ่าน import.meta.env — ชื่อตัวแปรยังเป็น REACT_APP_
 // เหมือนเดิม เพราะตั้ง envPrefix: "REACT_APP_" ไว้ที่ vite.config.js (.env และตัวแปรบน Vercel
@@ -33,6 +34,8 @@ API.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // ✅ รหัสแท็บ — server แนบกลับมากับสัญญาณเรียลไทม์ ให้รู้ว่าการเปลี่ยนแปลงไหนแท็บนี้เป็นคนกดเอง
+    config.headers["X-Client-Id"] = CLIENT_ID;
     return config;
   },
   (error) => Promise.reject(error)

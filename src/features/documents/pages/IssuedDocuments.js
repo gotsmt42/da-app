@@ -11,6 +11,7 @@
  * แอดมินทุกใบ) — server บังคับกฎเดียวกันอีกชั้นเสมอ ไม่เชื่อการซ่อนปุ่มฝั่งจอ (routes/issuedDocument.js)
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import useRealtime from "@/shared/realtime/useRealtime";
 import {
   Box, Stack, Typography, TextField, InputAdornment, IconButton, Tooltip, Button,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Skeleton,
@@ -101,9 +102,8 @@ const IssuedDocuments = () => {
     return () => clearTimeout(t);
   }, [search]);
 
-  const fetchRows = useCallback(async () => {
-    setLoading(true);
-    setError("");
+  const fetchRows = useCallback(async (silent = false) => {
+    if (!silent) { setLoading(true); setError(""); }
     try {
       const res = await IssuedDocumentService.list({
         page, limit: PAGE_SIZE,
@@ -127,6 +127,9 @@ const IssuedDocuments = () => {
   }, [page, PAGE_SIZE, appliedSearch, docType, status, from, to]);
 
   useEffect(() => { fetchRows(); }, [fetchRows]);
+
+  // ✅ เรียลไทม์: ออกเอกสาร/ยกเลิกเอกสารจากเครื่องอื่น → ทะเบียนอัปเดตทันที
+  useRealtime("documents", () => { fetchRows(true); });
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   // 🐛 กันหน้าค้างเกินจำนวนหน้าจริง (เช่น กรองจนเหลือน้อยลงหลังอยู่หน้า 5) — ตารางจะว่างเปล่าโดยไม่มี
