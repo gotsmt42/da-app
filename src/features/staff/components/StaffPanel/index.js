@@ -71,7 +71,8 @@ const GlassCard = styled(Box)(({ theme }) => ({
   boxShadow: `0 4px 24px ${alpha(theme.palette.common.black, 0.06)}`,
 }));
 
-const StatCard = styled(GlassCard)(({ barColor }) => ({
+// ⚠️ shouldForwardProp: กัน barColor หลุดไปเป็น attribute บน <div> จริง (React เตือน "does not recognize the barColor prop")
+const StatCard = styled(GlassCard, { shouldForwardProp: (prop) => prop !== "barColor" })(({ barColor }) => ({
   position: "relative",
   overflow: "hidden",
   padding: 20,

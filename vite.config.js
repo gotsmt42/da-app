@@ -44,6 +44,17 @@ export default defineConfig({
     open: false,
 
     /**
+     * 🐛 ที่แก้ (หน้าขาว + "Invalid hook call / more than one copy of React"):
+     * โฟลเดอร์ชั่วคราวที่โผล่ขึ้นในโปรเจกต์ (เช่น .pwtmp ของชุดทดสอบ, test-results, ไฟล์ภาพ)
+     * ทำให้ watcher ของ Vite เห็นไฟล์เปลี่ยนนับพันไฟล์ → สั่ง re-optimize dependency กลางคัน
+     * → แท็บที่เปิดค้างไว้ถือ React คนละชุดกับโมดูลที่เพิ่งโหลด แล้วหน้าขาวทั้งหน้า
+     * ✅ ตัดโฟลเดอร์เหล่านี้ออกจาก watcher ไปเลย — ไม่เกี่ยวกับซอร์สจริงสักไฟล์
+     */
+    watch: {
+      ignored: ["**/.pwtmp/**", "**/test-results/**", "**/playwright-report/**", "**/shot-*.png"],
+    },
+
+    /**
      * ✅ proxy /api → backend (ใช้เฉพาะตอน dev เท่านั้น ไม่กระทบ build/production)
      *
      * มีไว้เพื่อ "เปิดทดสอบจากมือถือ" โดยเฉพาะ — เดิมหน้าเว็บยิง API ไปที่

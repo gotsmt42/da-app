@@ -295,7 +295,8 @@ export default function RolePermissions() {
                       {(u.fname || u.username || "?").charAt(0)}
                     </Avatar>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography sx={{ fontWeight: 700, fontSize: "0.9rem" }} noWrap>
+                      {/* ⚠️ component="span": Chip เป็น <div> ถ้าอยู่ใน <p> จะเป็น HTML ที่ซ้อนผิด */}
+                      <Typography component="div" sx={{ fontWeight: 700, fontSize: "0.9rem" }} noWrap>
                         {[u.fname, u.lname].filter(Boolean).join(" ") || u.username}
                         {isSelf && <Chip size="small" label="คุณ" sx={{ ml: 0.75, height: 18, fontSize: "0.65rem", fontWeight: 800 }} />}
                       </Typography>

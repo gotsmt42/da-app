@@ -4,6 +4,12 @@ node_modules
 build
 dist
 
+# โฟลเดอร์ชั่วคราวตอนทดสอบด้วยเบราว์เซอร์ (Vite ก็ไม่เฝ้าดู — ดู server.watch.ignored ใน vite.config.js)
+.pwtmp
+test-results
+playwright-report
+shot-*.png
+
 # แคช/ล็อกของเครื่องมือ
 *.local
 npm-debug.log*

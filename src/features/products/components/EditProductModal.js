@@ -13,6 +13,24 @@ import {
   MDBModalFooter,
 } from "mdb-react-ui-kit";
 
+/** ประเภทสินค้ามาตรฐาน — ใช้เช็คว่าค่าเดิมของสินค้ายังอยู่ในรายการนี้ไหม */
+const TYPE_OPTIONS = [
+  "Smoke ADD",
+  "Smoke Conven",
+  "Heat ADD",
+  "Heat Conven",
+  "Base",
+  "Sounder Base",
+  "Module",
+  "Manual Station",
+  "Speaker & Strobe",
+  "Horn & Strobe",
+  "Other",
+];
+
+/** หน่วยนับสินค้า */
+const UNIT_OPTIONS = ["EA", "Lot", "Other"];
+
 const EditProductModal = ({
   show,
   handleClose,
@@ -52,12 +70,15 @@ const EditProductModal = ({
                   setEditedData({ ...editedData, type: e.target.value })
                 }
               >
-                <option selected disabled>
+                {/* ⚠️ ห้ามใช้ selected บน <option> ใน React — ค่าที่เลือกอยู่ที่ value ของ <select> แล้ว */}
+                <option value="" disabled>
                   Select type product
                 </option>
-                <option selected disabled>
-                  {editedData.type}
-                </option>
+                {/* ✅ ของเก่าที่ประเภทไม่มีในรายการนี้แล้ว ต้องยังเห็นค่าเดิม ไม่ใช่ช่องว่าง
+                    (ไม่งั้นแค่เปิดมาแก้ชื่อ ประเภทจะหายไปเงียบๆ ตอนกดบันทึก) */}
+                {editedData.type && !TYPE_OPTIONS.includes(editedData.type) && (
+                  <option value={editedData.type}>{editedData.type}</option>
+                )}
                 <option value="Smoke ADD">Smoke ADD</option>
                 <option value="Smoke Conven">Smoke Conven</option>
                 <option value="Heat ADD">Heat ADD</option>
@@ -67,7 +88,7 @@ const EditProductModal = ({
                 <option value="Module">Module</option>
                 <option value="Manual Station">Manual Station</option>
                 <option value="Speaker & Strobe">Speaker & Strobe</option>
-                <option value="Horn & Strobe">Horn & Strobe</option>\
+                <option value="Horn & Strobe">Horn & Strobe</option>
                 <option value="Other">Other</option>
               </select>
               <label>Name:</label>
@@ -97,12 +118,15 @@ const EditProductModal = ({
                 }
                 required
               >
-                <option selected disabled>
+                <option value="" disabled>
                   Select Counting unit
                 </option>
-                <option value="EA">EA</option>
-                <option value="Lot">Lot</option>
-                <option value="Other">Other</option>
+                {editedData.countingUnit && !UNIT_OPTIONS.includes(editedData.countingUnit) && (
+                  <option value={editedData.countingUnit}>{editedData.countingUnit}</option>
+                )}
+                {UNIT_OPTIONS.map((u) => (
+                  <option key={u} value={u}>{u}</option>
+                ))}
               </select>
 
               <label>Description:</label>
