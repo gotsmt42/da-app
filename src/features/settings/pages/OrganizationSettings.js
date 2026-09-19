@@ -14,7 +14,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
 import {
-  Box, Stack, Typography, TextField, Button, Alert, Snackbar, CircularProgress, Divider, Chip,
+  Box, Stack, Typography, TextField, Button, Alert, Snackbar, CircularProgress, Divider, Chip, Tooltip
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { Business, Image as ImageIcon, Save, RestartAlt, UploadFile, Description } from "@mui/icons-material";
@@ -32,7 +32,7 @@ const BORDER = "#e2e8f0";
 const IMAGE_SLOTS = [
   {
     slot: "app", field: "logoUrl", title: "โลโก้แอป",
-    desc: "แสดงบนหัวเว็บและหน้าเข้าสู่ระบบ · แนะนำ PNG พื้นหลังโปร่งใส",
+    desc: "แสดงบนหัวเว็บและหน้าเข้าสู่ระบบ · ค่าเริ่มต้นคือโลโก้ PlanNgan ของแอป — เลือกชุดอื่นหรืออัปโหลดโลโก้บริษัททับได้",
     dark: true,
   },
   {
@@ -67,7 +67,7 @@ const Section = ({ icon: Icon, title, hint, children }) => (
 );
 
 /** ช่องอัปโหลดรูปหนึ่งช่อง พร้อมตัวอย่างรูปที่ใช้อยู่จริง */
-const ImageSlot = ({ meta, value, busy, onPick, onReset }) => {
+const ImageSlot = ({ meta, value, busy, presets = [], onPick, onReset, onUsePreset }) => {
   const inputRef = useRef(null);
   const isDefault = !value || value === ORG_FALLBACK[meta.field];
   return (
@@ -90,6 +90,33 @@ const ImageSlot = ({ meta, value, busy, onPick, onReset }) => {
         </Stack>
         <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }}>{meta.desc}</Typography>
       </Box>
+      {/* ✅ ผู้ใช้สั่ง: "วางชุดเดิมไว้ด้วย หรือให้เลือกได้" — กดรูปที่ติดมากับแอปได้เลย ไม่ต้องไปหาไฟล์มาอัป */}
+      {presets.length > 0 && (
+        <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexWrap: "wrap", rowGap: 0.75, flexShrink: 0 }}>
+          {presets.map((b) => {
+            const active = value === b.url;
+            return (
+              <Tooltip key={b.key} title={active ? `ใช้ ${b.label} อยู่` : `ใช้ ${b.label}`} describeChild>
+                <Box
+                  component="button" type="button" disabled={busy || active}
+                  onClick={() => onUsePreset(b.key)}
+                  sx={{
+                    width: 84, height: 46, p: 0.5, borderRadius: 1.5, cursor: active ? "default" : "pointer",
+                    border: `1.5px solid ${active ? ACCENT : BORDER}`,
+                    bgcolor: meta.dark ? "#0f172a" : "#fff",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    opacity: busy ? 0.5 : 1,
+                    "&:hover": { borderColor: ACCENT },
+                  }}
+                >
+                  <Box component="img" src={b.url} alt={b.label}
+                    sx={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+                </Box>
+              </Tooltip>
+            );
+          })}
+        </Stack>
+      )}
       <Stack direction="row" spacing={0.75} sx={{ flexShrink: 0 }}>
         <input
           ref={inputRef} type="file" hidden accept="image/png,image/jpeg,image/webp"
@@ -115,6 +142,8 @@ const ImageSlot = ({ meta, value, busy, onPick, onReset }) => {
 export default function OrganizationSettings() {
   const { can } = usePermissions();
   const live = useOrgSettings();
+  // รายการรูปที่ติดมากับแอป — server ส่งมาพร้อม GET /settings (อ่านหลัง live เปลี่ยนทุกครั้งเพื่อให้ได้ค่าล่าสุด)
+  const builtin = OrgSettingService.builtinImages();
   const [form, setForm] = useState(live);
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -156,6 +185,19 @@ export default function OrganizationSettings() {
     }
   };
 
+  /** เลือกรูปที่ติดมากับแอป (PlanNgan / ชุดเดิม) — เร็วกว่าไปหาไฟล์มาอัปโหลดใหม่ */
+  const applyPresetImage = async (slot, key) => {
+    setBusy(true); setError("");
+    try {
+      await OrgSettingService.applyBuiltinImage(slot, key);
+      setToast("เปลี่ยนรูปแล้ว");
+    } catch (err) {
+      setError(err?.response?.data?.message || "ทำรายการไม่สำเร็จ");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const resetImage = async (slot) => {
     setBusy(true); setError("");
     try {
@@ -190,8 +232,10 @@ export default function OrganizationSettings() {
           {IMAGE_SLOTS.map((meta) => (
             <ImageSlot
               key={meta.slot} meta={meta} value={live[meta.field]} busy={busy}
+              presets={builtin[meta.slot] || []}
               onPick={(file) => pickImage(meta.slot, file)}
               onReset={() => resetImage(meta.slot)}
+              onUsePreset={(key) => applyPresetImage(meta.slot, key)}
             />
           ))}
         </Stack>

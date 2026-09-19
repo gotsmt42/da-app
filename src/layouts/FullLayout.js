@@ -12,6 +12,7 @@ import Swal from "sweetalert2";
 import PushService from "../shared/services/PushService";
 
 import "./FullLayout.css";
+import AppRebrandNotice from "@/shared/components/AppRebrandNotice";
 
 const FullLayout = () => {
   const sidebarRef = useRef(null);
@@ -227,6 +228,8 @@ const FullLayout = () => {
             className={isCalendarPage ? "p-0 m-0" : `p-4 app-page-container${isDashboard ? " app-page-container--flush" : ""}`}
             fluid={true}
           >
+            {/* ✅ แจ้งครั้งเดียวสำหรับคนที่ติดตั้งแอปไว้ก่อนเปลี่ยนชื่อ/ไอคอน (ดูเหตุผลใน AppRebrandNotice) */}
+            <AppRebrandNotice />
             <Outlet />
             <SpeedInsights />
           </Container>

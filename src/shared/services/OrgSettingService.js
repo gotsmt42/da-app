@@ -25,8 +25,13 @@ export const ORG_FALLBACK = {
   tel: "",
   email: "",
   website: "",
-  /** โลโก้บนหัวเว็บ (พื้นเข้ม) · หน้าเข้าสู่ระบบใช้ตัวเดียวกัน */
-  logoUrl: "/logo-dark-2.png",
+  /**
+   * โลโก้บนหัวเว็บ · หน้าเข้าสู่ระบบ
+   * ✅ ค่าเริ่มต้น = โลโก้ของ "แอป" (PlanNgan) ไม่ใช่โลโก้บริษัทใดบริษัทหนึ่ง — องค์กรที่เพิ่งติดตั้ง
+   * จะได้แบรนด์ของแอปไปก่อน แล้วค่อยอัปโหลดโลโก้ตัวเอง หรือกดเลือกชุดที่ติดมากับแอปทับได้
+   * ⚠️ ชุดเดิมของ DO ALL ยังอยู่ครบทุกไฟล์ — เลือกกลับมาใช้ได้ 1 คลิกจากหน้า "ตั้งค่าองค์กร"
+   */
+  logoUrl: "/app-wordmark-light.png",
   /** โลโก้หัวกระดาษ — ไฟล์ที่ตัดขอบว่างแล้ว (ดูเหตุผลใน deliveryNotePdf.js) */
   letterheadUrl: "/logo-letterhead.png",
   stampUrl: "/stamp.png",
@@ -35,6 +40,37 @@ export const ORG_FALLBACK = {
   rankLabels: {},
 };
 
+/**
+ * ชุดโลโก้ของแอป (PlanNgan) — มีหลายแบบเพราะพื้นหลังแต่ละที่ไม่เหมือนกัน
+ * ⚠️ ไฟล์ PNG มีสีตัวอักษรตายตัว จึงต้องเลือกให้ตรงพื้น ไม่งั้นตัวหนังสือจมหายไปกับพื้น
+ */
+export const APP_LOGO = {
+  wordmarkLight: "/app-wordmark-light.png",    // แนวนอน ตัวหนังสือขาว — หัวเว็บพื้นเข้ม
+  wordmarkDark: "/app-wordmark-dark.png",      // แนวนอน ตัวหนังสือเข้ม — การ์ดพื้นขาว
+  stackedLight: "/app-logo-stacked-light.png", // เรียงแนวตั้ง ตัวหนังสือขาว — แผงใหญ่พื้นเข้ม
+  stackedDark: "/app-logo-stacked-dark.png",
+  icon: "/app-icon.svg",
+};
+const APP_LOGO_FILES = Object.values(APP_LOGO);
+
+/**
+ * โลโก้ที่ควรใช้ในบริบทนั้นๆ
+ * • องค์กรตั้งโลโก้ของตัวเองไว้ (อัปโหลดเอง หรือเลือกชุด DO ALL) → ใช้ของเขาทุกที่เหมือนเดิม
+ * • ยังใช้ค่าเริ่มต้นของแอปอยู่ → หยิบไฟล์ PlanNgan ที่เข้ากับพื้นตรงนั้นให้อัตโนมัติ
+ * @param {{on?: "dark"|"light", layout?: "wordmark"|"stacked"}} opts
+ * @param {object} [settings] ค่าที่หน้าจอ subscribe อยู่ (useOrgSettings) — ส่งมาด้วยเพื่อให้
+ *   เปลี่ยนโลโก้แล้วหน้าจอวาดใหม่ทันที (ถ้าอ่านจากแคชเฉยๆ React จะไม่รู้ว่ามีอะไรเปลี่ยน)
+ */
+export const appLogoFor = ({ on = "dark", layout = "wordmark" } = {}, settings) => {
+  const current = settings?.logoUrl || cache?.logoUrl || ORG_FALLBACK.logoUrl;
+  if (current && !APP_LOGO_FILES.includes(current)) return current;
+  if (layout === "stacked") return on === "light" ? APP_LOGO.stackedDark : APP_LOGO.stackedLight;
+  return on === "light" ? APP_LOGO.wordmarkDark : APP_LOGO.wordmarkLight;
+};
+
+/** ตอนนี้ยังใช้โลโก้ของแอปอยู่ไหม (= องค์กรยังไม่ได้ตั้งของตัวเอง) */
+export const isAppDefaultLogo = () => APP_LOGO_FILES.includes(cache?.logoUrl || ORG_FALLBACK.logoUrl);
+
 /** เติมค่าเริ่มต้นให้ช่องที่ยังไม่ได้ตั้ง — หน้าจอจะได้ไม่ต้องเช็ค null เอง */
 const withFallback = (s) => ({
   ...ORG_FALLBACK,
@@ -42,6 +78,7 @@ const withFallback = (s) => ({
 });
 
 let cache;
+let builtin = {};   // รูปที่ติดมากับแอปให้เลือก (server ส่งมาพร้อม GET /settings)
 let inflight;
 const listeners = new Set();
 
@@ -61,6 +98,7 @@ const OrgSettingService = {
       inflight = API.get("/settings")
         .then((res) => {
           cache = withFallback(res.data?.settings);
+          builtin = res.data?.builtinImages || {};
           // ✅ ชื่อตำแหน่งที่ผู้ดูแลตั้งเอง มีผลกับทุกที่ที่แสดงชื่อสิทธิ์ทันที (rankLabel ใน roles.js)
           setRankLabels(cache.rankLabels || {});
           emit();
@@ -73,6 +111,16 @@ const OrgSettingService = {
         .finally(() => { inflight = null; });
     }
     return inflight;
+  },
+
+  /** รูปที่ติดมากับแอปให้เลือก — { app: [...], letterhead: [...], stamp: [...] } */
+  builtinImages() {
+    return builtin;
+  },
+
+  /** เลือกใช้รูปที่ติดมากับแอปแทนการอัปโหลด — ✅ ผู้ใช้ขอให้ "เลือกได้" ไม่ใช่มีชุดเดียวตายตัว */
+  async applyBuiltinImage(slot, key) {
+    return OrgSettingService.update({ [`preset_${slot}`]: key });
   },
 
   /** @param {object} fields ช่องที่แก้ (ส่งเฉพาะที่เปลี่ยน) */

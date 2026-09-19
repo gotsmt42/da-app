@@ -27,6 +27,8 @@ import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import { useAuth } from "../AuthContext";
 // ✅ โลโก้บนหน้าเข้าสู่ระบบมาจากตั้งค่าองค์กร (GET /settings เปิดอ่านได้โดยไม่ต้องล็อกอิน)
 import useOrgSettings from "@/shared/hooks/useOrgSettings";
+// ✅ แผงซ้ายพื้นเข้ม การ์ดฟอร์มพื้นขาว — โลโก้แอปต้องใช้คนละไฟล์กัน
+import { appLogoFor } from "@/shared/services/OrgSettingService";
 
 // ✅ เดิมใช้ม่วง-น้ำเงิน (#667eea → #764ba2) ไม่ตรงกับธีมสีแดงที่ใช้จริงทั้งแอปข้างใน
 // (sidebar/หัวข้อ/ปุ่มเน้นสีต่างๆ ล้วนอิงจากสีแดงโลโก้เดียวกัน — ดู --accent-color ใน Sidebar.css)
@@ -187,9 +189,9 @@ const Login = () => {
           <Box sx={{ position: "relative", zIndex: 1 }}>
             <Box
               component="img"
-              src={org.logoUrl}
-              alt="DA App"
-              sx={{ height: 320, mb: -10, filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.15))" }}
+              src={appLogoFor({ on: "dark", layout: "stacked" }, org)}
+              alt="PlanNgan"
+              sx={{ height: 220, maxWidth: "100%", objectFit: "contain", mb: 1.5, filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.15))" }}
             />
             <Typography variant="h4" sx={{ fontWeight: 700, mb: 1.5, lineHeight: 1.3 }}>
               ระบบบริหารจัดการช่าง
@@ -240,9 +242,9 @@ const Login = () => {
         >
           <Box
             component="img"
-            src={org.logoUrl}
-            alt="DA App"
-            sx={{ height: "auto", mb: -10, display: { xs: "block", md: "none" } }}
+            src={appLogoFor({ on: "light" }, org)}
+            alt="PlanNgan"
+            sx={{ height: 52, maxWidth: "100%", objectFit: "contain", objectPosition: "left center", mb: 2.5, display: { xs: "block", md: "none" } }}
           />
 
           <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>

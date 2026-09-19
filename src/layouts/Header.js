@@ -21,6 +21,8 @@ import { swalLogout, hasValidAvatar } from "../shared/utils/user";
 import Swal from "sweetalert2";
 import useAppBadges from "@/shared/hooks/useAppBadges";
 import useOrgSettings from "@/shared/hooks/useOrgSettings";
+// ✅ โลโก้แอปต้องเลือกไฟล์ให้ตรงกับพื้น — หัวเว็บเป็นแถบเข้ม จึงใช้ตัวหนังสือสีขาว
+import { appLogoFor } from "@/shared/services/OrgSettingService";
 // ✅ ไอคอน 3 เมนูกลางตรงกับที่ Dashboard.js/Sidebar.js ใช้จริงสำหรับหน้าเดียวกันเป๊ะๆ
 // (FaWrench="การดำเนินงาน", FaFileContract="ภาพรวมสัญญา", FaFileInvoiceDollar="ติดตามใบเสนอราคา")
 import {
@@ -197,7 +199,7 @@ const Header = ({ toggleMobileSidebar }) => {
         <NavbarBrand tag={Link} to="/dashboard" className="m-0">
           <div className="gradiant-bg">
             {/* ✅ โลโก้ตั้งค่าเองได้จากหน้าตั้งค่าองค์กร (ว่าง = ใช้ไฟล์ที่ติดมากับแอป) */}
-            <img src={org.logoUrl} alt="Logo" className="logo" />
+            <img src={appLogoFor({ on: "dark" }, org)} alt="Logo" className="logo" />
           </div>
         </NavbarBrand>
 
