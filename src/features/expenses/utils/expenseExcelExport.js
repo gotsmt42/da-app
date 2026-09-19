@@ -71,7 +71,7 @@ const GROUP_MONEY = GROUP_COLS.map((c) => c.key).filter((k) => !GROUP_COUNTS.inc
 /** ชื่อผู้ทำแต่ละขั้น — ขั้นที่ยังไม่ถึง/ถูกตีกลับเว้นว่าง (ใบที่ตีกลับถูกล้างผลตรวจสอบ/อนุมัติเดิมแล้ว) */
 const reviewerOf = (d) => (d?.reviewedAt && d.status !== "rejected" ? personFullName(d.reviewedBy) : "");
 const approverOf = (d) => (d?.approvedAt && !["pending", "reviewed", "rejected"].includes(d.status) ? personFullName(d.approvedBy) : "");
-/** ผู้อนุมัติเบิกจ่าย (ขั้นที่ 4) = คนที่บันทึกจ่ายเงิน Advance / ปิดส่วนต่างใบเคลม / จ่ายคืนใบสำรองจ่าย */
+/** ผู้อนุมัติเบิกจ่าย (ส่วนที่ 3) = คนที่บันทึกจ่ายเงิน Advance / ปิดส่วนต่างใบเคลม / จ่ายคืนใบสำรองจ่าย */
 const disburserOf = (d) => {
   const done = d?.kind === "advance" ? ["paid", "clearing", "cleared"].includes(d.status) : d?.status === "settled";
   return done && d.payment?.by ? personFullName(d.payment.by) : "";
@@ -92,7 +92,7 @@ export async function exportExpenseReport(report, { periodLabel = "", fileName =
   [
     ["จำนวนใบ Advance", t.count],
     ["ยอดขอเบิกทั้งหมด", t.requested],
-    // ✅ สายอนุมัติ 4 ขั้น: ส่งขอเบิก → ตรวจสอบ → อนุมัติ → อนุมัติเบิกจ่าย
+    // ✅ สายอนุมัติ 3 ส่วน: ส่งขอเบิก → ตรวจสอบ/อนุมัติ (แอดมินตรวจ → ผู้จัดการอนุมัติ) → อนุมัติเบิกจ่าย
     ["ยังไม่ผ่านอนุมัติ (รอตรวจสอบ/รออนุมัติ/ตีกลับ)", t.pending],
     ["— ในนั้น: ตรวจสอบแล้ว รออนุมัติ", t.reviewing],
     ["อนุมัติแล้ว รออนุมัติเบิกจ่าย Advance", t.toPay],
@@ -118,7 +118,7 @@ export async function exportExpenseReport(report, { periodLabel = "", fileName =
     row.eachCell((c) => { c.border = { bottom: BORDER }; });
   });
 
-  // ── ใบที่ค้างตามขั้นอนุมัติ (4 ขั้น) ─────────────────────────────────────
+  // ── ใบที่ค้างตามขั้นอนุมัติ (3 ส่วน) ─────────────────────────────────────
   // ✅ ผู้ใช้สั่งให้รายงานตรงกับลำดับการเบิกใหม่ — เห็นทันทีว่างานค้างอยู่ที่ขั้นไหน รอใคร
   ws.addRow([]);
   ws.addRow(["ใบที่ค้างตามขั้นอนุมัติ", "จำนวนใบ", "ยอดเงิน", "Advance", "ใบเคลม", "สำรองจ่าย", "ผู้ดำเนินการ"]).eachCell((c) => {
@@ -130,9 +130,9 @@ export async function exportExpenseReport(report, { periodLabel = "", fileName =
   ws.getColumn(7).width = 36;
   const pl = report.pipeline || {};
   [
-    ["ขั้นที่ 2/4 รอตรวจสอบ", pl.review, "แอดมินช่าง / ผู้จัดการแผนกช่าง", (p) => p.amount],
-    ["ขั้นที่ 3/4 รออนุมัติ", pl.approve, "ผู้จัดการแผนกช่าง", (p) => p.amount],
-    ["ขั้นที่ 4/4 รออนุมัติเบิกจ่าย (เงินจ่ายออก)", pl.disburse, "ผู้จัดการแผนกช่าง / กรรมการผู้จัดการ", (p) => p.payOut],
+    ["ขั้นที่ 2/3 · รอตรวจสอบ", pl.review, "แอดมินช่าง / ผู้จัดการแผนกช่าง", (p) => p.amount],
+    ["ขั้นที่ 2/3 · ตรวจสอบแล้ว รออนุมัติ", pl.approve, "ผู้จัดการแผนกช่าง", (p) => p.amount],
+    ["ขั้นที่ 3/3 · รออนุมัติเบิกจ่าย (เงินจ่ายออก)", pl.disburse, "ผู้จัดการแผนกช่าง / กรรมการผู้จัดการ", (p) => p.payOut],
   ].forEach(([label, p = {}, who, amountOf]) => {
     const row = ws.addRow([label, p.count || 0, amountOf(p) || 0, p.advance || 0, p.claim || 0, p.reimburse || 0, who]);
     row.getCell(1).font = { bold: true };
@@ -140,7 +140,7 @@ export async function exportExpenseReport(report, { periodLabel = "", fileName =
     row.eachCell((c) => { c.border = { bottom: BORDER }; });
   });
   if (pl.disburse?.payIn) {
-    const row = ws.addRow(["— ในขั้นที่ 4: รอยืนยันรับเงินคืนจากพนักงาน", "", pl.disburse.payIn]);
+    const row = ws.addRow(["— ในขั้นที่ 3: รอยืนยันรับเงินคืนจากพนักงาน", "", pl.disburse.payIn]);
     row.getCell(3).numFmt = MONEY;
   }
 
@@ -153,7 +153,7 @@ export async function exportExpenseReport(report, { periodLabel = "", fileName =
     { key: "job", header: "งาน", width: 30 },
     { key: "total", header: "ยอดขอเบิก", width: 13 },
     { key: "status", header: "สถานะ", width: 22 },
-    // ✅ สายอนุมัติ 4 ขั้น — ต้องเห็นว่าใครทำแต่ละขั้น (ตรงกับช่องลงนาม 4 ช่องในใบ PDF)
+    // ✅ เก็บชื่อ "ผู้ตรวจสอบ" กับ "ผู้อนุมัติ" แยกคอลัมน์ไว้ (เอกสารรวมเป็นช่องเดียว แต่รายงานต้องตรวจย้อนได้ว่าใครทำมือไหน)
     { key: "reviewer", header: "ผู้ตรวจสอบ", width: 20 },
     { key: "approver", header: "ผู้อนุมัติ", width: 20 },
     { key: "disburser", header: "ผู้อนุมัติเบิกจ่าย", width: 20 },

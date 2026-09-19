@@ -161,7 +161,7 @@ const ExpenseService = {
   },
 
   /**
-   * ขั้นที่ 2 จาก 4 — ตรวจสอบใบ (แอดมินช่าง/ผู้จัดการแผนกช่าง) → "ตรวจสอบแล้ว รออนุมัติ"
+   * ส่วนที่ 2 (มือแรก) — ตรวจสอบใบ (แอดมินช่าง/ผู้จัดการแผนกช่าง) → "ตรวจสอบแล้ว รออนุมัติ"
    * @param {boolean} useSignature  ลงลายเซ็นอิเล็กทรอนิกส์ในช่อง "ผู้ตรวจสอบ" ไหม
    */
   async review(id, note = "", useSignature = true) {
@@ -169,7 +169,7 @@ const ExpenseService = {
     return res.data.expense;
   },
 
-  /** ขั้นที่ 3 จาก 4 — อนุมัติ (ผู้จัดการแผนกช่าง) → "อนุมัติแล้ว รออนุมัติเบิกจ่าย"
+  /** ส่วนที่ 2 (มือสอง) — อนุมัติ (ผู้จัดการแผนกช่าง) → "อนุมัติแล้ว รออนุมัติเบิกจ่าย"
    * @param {boolean} useSignature  ลงลายเซ็นอิเล็กทรอนิกส์ของผู้อนุมัติในใบนี้ไหม */
   async approve(id, note = "", useSignature = true) {
     const res = await API.post(`/expenses/${id}/approve`, { note, useSignature });
@@ -182,7 +182,7 @@ const ExpenseService = {
   },
 
   /**
-   * ขั้นที่ 4 จาก 4 — อนุมัติเบิกจ่ายใบ Advance (ผู้จัดการแผนกช่าง/กรรมการผู้จัดการ)
+   * ส่วนที่ 3 — อนุมัติเบิกจ่ายใบ Advance (ผู้จัดการแผนกช่าง/กรรมการผู้จัดการ)
    * fields = { paidAt, method, ref, note, dueClearAt, useSignature } — useSignature = ลงนามช่อง "ผู้อนุมัติเบิกจ่าย"
    */
   async pay(id, fields, files = []) {
@@ -191,7 +191,7 @@ const ExpenseService = {
     return { expense: res.data.expense, rejected };
   },
 
-  /** ขั้นที่ 4 จาก 4 — อนุมัติเบิกจ่ายใบเคลม/ใบสำรองจ่าย · fields = { paidAt, method, ref, note, useSignature } */
+  /** ส่วนที่ 3 — อนุมัติเบิกจ่ายใบเคลม/ใบสำรองจ่าย · fields = { paidAt, method, ref, note, useSignature } */
   async settle(id, fields, files = []) {
     const { body, config, rejected } = await buildBody(fields, files);
     const res = await API.post(`/expenses/${id}/settle`, body, config);

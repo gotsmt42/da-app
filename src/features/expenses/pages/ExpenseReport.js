@@ -65,19 +65,31 @@ const Panel = ({ title, hint, children, action }) => (
 );
 
 /**
- * ใบที่ค้างอยู่ในสายอนุมัติ 4 ขั้น — ✅ ผู้ใช้สั่งให้หน้ารายงานตรงกับลำดับการเบิกใหม่
+ * ใบที่ค้างอยู่ในสายอนุมัติ 3 ส่วน — ✅ ผู้ใช้สั่งให้หน้ารายงานตรงกับลำดับการเบิกใหม่
  * ⚠️ นับตามช่วงเวลา/ตัวกรองเดียวกับรายงานทั้งหน้า (ไม่ใช่คิวงานสดของทั้งบริษัท — คิวสดอยู่ที่ "รอดำเนินการ")
  */
 const PIPELINE_STEPS = [
-  { key: "review", no: 2, title: "รอตรวจสอบ", who: "แอดมินช่าง / ผู้จัดการแผนกช่าง", color: "#d97706" },
-  { key: "approve", no: 3, title: "รออนุมัติ", who: "ผู้จัดการแผนกช่าง", color: "#b45309" },
-  { key: "disburse", no: 4, title: "รออนุมัติเบิกจ่าย", who: "ผู้จัดการแผนกช่าง / กรรมการผู้จัดการ", color: "#2563eb" },
+  // ✅ ส่วนที่ 2 รวม "ตรวจสอบ" กับ "อนุมัติ" ไว้ด้วยกัน (ผู้ใช้สั่งให้เหลือ 3 ส่วน) — ยังแยกตัวเลขให้เห็นว่าค้างที่มือไหน
+  { key: "review", no: 2, title: "รอตรวจสอบ/อนุมัติ", who: "แอดมินช่าง ตรวจสอบ → ผู้จัดการแผนกช่าง อนุมัติ", color: "#b45309" },
+  { key: "disburse", no: 3, title: "รออนุมัติเบิกจ่าย", who: "ผู้จัดการแผนกช่าง / กรรมการผู้จัดการ", color: "#2563eb" },
 ];
 
+/** รวมตัวเลขของสองมือในส่วนที่ 2 เข้าด้วยกัน */
+const pipelineOf = (pipeline, key) => {
+  if (key !== "review") return pipeline?.disburse || {};
+  const r = pipeline?.review || {};
+  const a = pipeline?.approve || {};
+  const sum = (f) => (Number(r[f]) || 0) + (Number(a[f]) || 0);
+  return {
+    count: sum("count"), advance: sum("advance"), claim: sum("claim"), reimburse: sum("reimburse"), amount: sum("amount"),
+    waitReview: Number(r.count) || 0, waitApprove: Number(a.count) || 0,
+  };
+};
+
 const Pipeline = ({ pipeline }) => (
-  <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" }, gap: 1 }}>
+  <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" }, gap: 1 }}>
     {PIPELINE_STEPS.map((s) => {
-      const p = pipeline?.[s.key] || {};
+      const p = pipelineOf(pipeline, s.key);
       const parts = [
         p.advance ? `Advance ${p.advance}` : "",
         p.claim ? `ใบเคลม ${p.claim}` : "",
@@ -89,7 +101,7 @@ const Pipeline = ({ pipeline }) => (
           bgcolor: p.count ? alpha(s.color, 0.05) : "#fff", minWidth: 0,
         }}>
           <Stack direction="row" alignItems="center" spacing={0.75}>
-            <Chip size="small" label={`ขั้นที่ ${s.no}/4`} sx={{ height: 20, fontSize: "0.68rem", fontWeight: 800, bgcolor: alpha(s.color, 0.14), color: s.color }} />
+            <Chip size="small" label={`ขั้นที่ ${s.no}/3`} sx={{ height: 20, fontSize: "0.68rem", fontWeight: 800, bgcolor: alpha(s.color, 0.14), color: s.color }} />
             <Typography sx={{ fontWeight: 800, fontSize: "0.9rem", color: TEXT_MAIN }} noWrap>{s.title}</Typography>
           </Stack>
           <Typography sx={{ fontWeight: 900, fontSize: "1.3rem", color: p.count ? s.color : TEXT_SUB, mt: 0.5, lineHeight: 1.2 }}>
@@ -105,7 +117,9 @@ const Pipeline = ({ pipeline }) => (
               </Typography>
             ) : null
           ) : p.count ? (
-            <Typography variant="caption" sx={{ display: "block", fontWeight: 700, color: TEXT_MAIN }}>ยอดในใบ {baht(p.amount)}</Typography>
+            <Typography variant="caption" sx={{ display: "block", fontWeight: 700, color: TEXT_MAIN }}>
+              ยอดในใบ {baht(p.amount)} · รอตรวจสอบ {p.waitReview} · รออนุมัติ {p.waitApprove}
+            </Typography>
           ) : null}
           <Typography variant="caption" sx={{ display: "block", color: TEXT_SUB, mt: 0.25, fontSize: "0.7rem" }} noWrap>
             ผู้ดำเนินการ: {s.who}
@@ -339,7 +353,7 @@ export default function ExpenseReport({ onOpen, reloadKey }) {
         <>
           {/* ── ตัวเลขหลัก ─────────────────────────────────────────── */}
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)", lg: "repeat(7, 1fr)" }, gap: 1, mb: 1.5 }}>
-            {/* ✅ สายอนุมัติ 4 ขั้น — บอกด้วยว่าในยอดที่ยังไม่ผ่านอนุมัติ ค้างอยู่ที่ขั้นรออนุมัติเท่าไร */}
+            {/* ✅ สายอนุมัติ 3 ส่วน — บอกด้วยว่าในยอดที่ยังไม่ผ่านอนุมัติ ค้างอยู่ที่ขั้นรออนุมัติเท่าไร */}
             <Kpi
               label="ยอดขอเบิก"
               value={baht(t.requested)}
@@ -366,7 +380,7 @@ export default function ExpenseReport({ onOpen, reloadKey }) {
             </Stack>
           ) : (
             <Stack spacing={1.5}>
-              <Panel title="สถานะตามขั้นอนุมัติ" hint="ส่งขอเบิก → ตรวจสอบ → อนุมัติ → อนุมัติเบิกจ่าย · ใบที่ยังค้างในช่วงเวลานี้">
+              <Panel title="สถานะตามขั้นอนุมัติ" hint="ส่งขอเบิก → ตรวจสอบ/อนุมัติ → อนุมัติเบิกจ่าย · ใบที่ยังค้างในช่วงเวลานี้">
                 <Pipeline pipeline={report.pipeline} />
               </Panel>
               <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "3fr 2fr" }, gap: 1.5 }}>

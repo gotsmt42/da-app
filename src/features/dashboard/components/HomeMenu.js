@@ -57,7 +57,7 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
   const isSaleUser = isRole(userData, ROLES.SALE);
   const canViewFinance = can(userData, "viewFinance");
   const canExpense = can(userData, "requestExpense") || can(userData, "viewAllExpenses");
-  // ✅ ทุกคนที่มีขั้นของตัวเองในสายอนุมัติ 4 ขั้น (ตรวจสอบ / อนุมัติ / อนุมัติเบิกจ่าย) เห็นคิวงาน
+  // ✅ ทุกคนที่มีขั้นของตัวเองในสายอนุมัติ 3 ส่วน (ตรวจสอบ / อนุมัติ / อนุมัติเบิกจ่าย) เห็นคิวงาน
   const canApproveExpense = can(userData, "reviewExpense") || can(userData, "approveExpense") || can(userData, "disburseExpense");
   const canAssign = can(userData, "assignDispatch");
   const canViewOperation = can(userData, "editOperation") || can(userData, "receiveDispatch");

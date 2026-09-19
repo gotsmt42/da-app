@@ -145,12 +145,17 @@ const Steps = ({ steps, color }) => (
             bgcolor: done ? c : "#fff", color: done ? "#fff" : c, border: `2px solid ${c}`,
             boxShadow: current ? `0 0 0 4px ${alpha(color, 0.15)}` : "none",
           }}>
-            {done ? <TaskAlt sx={{ fontSize: 15 }} /> : i + 1}
+            {/* ⚠️ "เคลียร์" เป็นงานติดตามหลังเงินออก ไม่ใช่ขั้นอนุมัติ — ไม่ให้เลขขั้น ไม่งั้นจะนับเป็น 4 ส่วน */}
+            {done ? <TaskAlt sx={{ fontSize: 15 }} /> : s.followUp ? "•" : i + 1}
           </Box>
           <Typography sx={{ fontSize: { xs: "0.68rem", sm: "0.76rem" }, fontWeight: current || done ? 800 : 600, color: done || current ? TEXT_MAIN : TEXT_SUB, mt: 0.5, lineHeight: 1.2 }}>
             {s.label}
           </Typography>
           <Typography sx={{ fontSize: "0.66rem", color: TEXT_SUB, lineHeight: 1.2 }}>{s.date ? thaiDate(s.date) : " "}</Typography>
+          {/* ✅ ส่วนที่รวมสองมือ (ตรวจสอบ/อนุมัติ) บอกว่าตอนนี้อยู่มือไหน */}
+          {s.sub && (
+            <Typography sx={{ fontSize: "0.63rem", fontWeight: 700, color: alpha(color, 0.95), lineHeight: 1.2 }}>{s.sub}</Typography>
+          )}
         </Box>
       );
     })}
@@ -264,10 +269,14 @@ const today = () => moment().format("YYYY-MM-DD");
 
 /** การกระทำที่ลงลายเซ็นอิเล็กทรอนิกส์ได้ และช่องลงนามของแต่ละการกระทำใน PDF */
 const SIGN_ACTIONS = ["review", "reviewApprove", "approve", "pay", "settle"];
+/**
+ * ⚠️ เอกสารมีช่องลงนาม 3 ช่อง — "ตรวจสอบ" กับ "อนุมัติ" ใช้ช่องรวมช่องเดียวกัน (ผู้ใช้สั่ง)
+ * ช่องรวมพิมพ์ชื่อ/ลายเซ็นของผู้อนุมัติ แล้วกำกับบรรทัดเล็กว่าใครเป็นผู้ตรวจสอบ (ดู expensePdf.js)
+ */
 const SIGN_BOX_LABEL = {
-  review: "ผู้ตรวจสอบ",
-  reviewApprove: "ผู้ตรวจสอบ + ผู้อนุมัติ",
-  approve: "ผู้อนุมัติ",
+  review: "ผู้ตรวจสอบ/อนุมัติ",
+  reviewApprove: "ผู้ตรวจสอบ/อนุมัติ",
+  approve: "ผู้ตรวจสอบ/อนุมัติ",
   pay: "ผู้อนุมัติเบิกจ่าย",
   settle: "ผู้อนุมัติเบิกจ่าย",
 };
@@ -316,11 +325,11 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
     : reimburse ? `จ่ายคืนค่าสำรองจ่าย ${baht(expense?.total)}` : `${diff.short} ${baht(diff.amount)}`;
   const cfg = {
     /**
-     * ✅ ขั้นที่ 2 จาก 4 — ตรวจสอบ (แอดมินช่าง / ผู้จัดการแผนกช่าง)
+     * ✅ ส่วนที่ 2 (มือแรก) — ตรวจสอบ โดยแอดมินช่าง แล้วส่งต่อให้ผู้จัดการแผนกช่างอนุมัติ
      * ⚠️ "ตรวจสอบ" ไม่ใช่ "อนุมัติ" — ต้องพูดให้ชัดว่ายังต้องรออีกขั้น ไม่งั้นคนกดเข้าใจว่าจบแล้ว
      */
     review: {
-      title: "ตรวจสอบใบเบิก · ขั้นที่ 2 จาก 4", color: "#b45309", button: "ยืนยันผลตรวจสอบ",
+      title: "ตรวจสอบใบเบิก · ขั้นที่ 2 จาก 3", color: "#b45309", button: "ยืนยันผลตรวจสอบ",
       body: `ยืนยันว่ารายการและหลักฐานของยอด ${baht(expense?.total)} ถูกต้อง — ระบบจะส่งต่อให้${STEP_OWNER.approve}พิจารณาอนุมัติ`,
     },
     /**
@@ -328,13 +337,13 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
      * ⚠️ ระบบยังบันทึกแยกเป็น 2 ขั้น (ชื่อ/เวลา/ลายเซ็นลงทั้งช่องผู้ตรวจสอบและผู้อนุมัติ) ไม่ใช่การข้ามขั้น
      */
     reviewApprove: {
-      title: "ตรวจสอบและอนุมัติ · ขั้นที่ 2–3 จาก 4", color: "#059669", button: "ยืนยันทั้งสองขั้น",
+      title: "ตรวจสอบและอนุมัติ · ขั้นที่ 2 จาก 3", color: "#059669", button: "ยืนยันทั้งสองมือ",
       body: zeroDiff
         ? `คุณจะลงนามทั้งช่อง "ผู้ตรวจสอบ" และ "ผู้อนุมัติ" — ใช้จริงพอดีกับยอด Advance ใบจะปิดจบทันที`
         : `คุณจะลงนามทั้งช่อง "ผู้ตรวจสอบ" และ "ผู้อนุมัติ" ของใบนี้ด้วยตัวเอง — จากนั้นส่งต่อให้${STEP_OWNER.disburse}อนุมัติเบิกจ่าย (${disburseWhat})`,
     },
     approve: {
-      title: "อนุมัติใบเบิก · ขั้นที่ 3 จาก 4", color: "#059669", button: "ยืนยันอนุมัติ",
+      title: "อนุมัติใบเบิก · ขั้นที่ 2 จาก 3", color: "#059669", button: "ยืนยันอนุมัติ",
       body: zeroDiff
         ? "ใช้จริงพอดีกับยอด Advance ไม่มีเงินต้องเบิกจ่าย — อนุมัติแล้วใบ Advance จะเคลียร์ทันที"
         : `อนุมัติแล้วระบบจะส่งต่อให้${STEP_OWNER.disburse}อนุมัติเบิกจ่าย (${disburseWhat})`,
@@ -353,26 +362,26 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
         : "ยกเลิกแล้วย้อนกลับไม่ได้ (เลขที่เอกสารจะไม่ถูกนำกลับมาใช้)",
     },
     /**
-     * ✅ ขั้นที่ 4 จาก 4 — อนุมัติเบิกจ่าย (ผู้จัดการแผนกช่าง / กรรมการผู้จัดการ) · ลงนามช่อง "ผู้อนุมัติเบิกจ่าย"
+     * ✅ ส่วนที่ 3 — อนุมัติเบิกจ่าย (ผู้จัดการแผนกช่าง / กรรมการผู้จัดการ) · ลงนามช่อง "ผู้อนุมัติเบิกจ่าย"
      * ⚠️ ข้อความใต้หัวข้อบอกแค่ "ผลที่จะเกิด" — ตัวยอดและทิศทางเงินอยู่ในการ์ด MoneyCallout ด้านล่าง
      */
     pay: {
       title: "อนุมัติเบิกจ่าย · จ่ายเงิน Advance", color: KIND_META.advance.color, button: "อนุมัติเบิกจ่าย",
-      body: "ขั้นที่ 4 จาก 4 — ลงนามผู้อนุมัติเบิกจ่ายและบันทึกการจ่ายเงิน ใบจะเปลี่ยนเป็น “จ่ายให้พนักงานแล้ว · รอเคลียร์”",
+      body: "ขั้นที่ 3 จาก 3 — ลงนามผู้อนุมัติเบิกจ่ายและบันทึกการจ่ายเงิน ใบจะเปลี่ยนเป็น “จ่ายให้พนักงานแล้ว · รอเคลียร์”",
     },
     settle: reimburse
       ? {
         title: "อนุมัติเบิกจ่าย · จ่ายคืนค่าสำรองจ่าย", color: KIND_META.reimburse.color, button: "อนุมัติเบิกจ่าย",
-        body: "ขั้นที่ 4 จาก 4 — ลงนามผู้อนุมัติเบิกจ่ายและบันทึกการจ่ายคืน ใบนี้จะเสร็จสิ้น",
+        body: "ขั้นที่ 3 จาก 3 — ลงนามผู้อนุมัติเบิกจ่ายและบันทึกการจ่ายคืน ใบนี้จะเสร็จสิ้น",
       }
       : money(expense?.difference) > 0
         ? {
           title: "อนุมัติเบิกจ่าย · จ่ายส่วนต่างเพิ่ม", color: KIND_META.claim.color, button: "อนุมัติเบิกจ่าย",
-          body: "ขั้นที่ 4 จาก 4 — ลงนามผู้อนุมัติเบิกจ่ายและบันทึกการจ่ายเงิน ใบ Advance ที่อ้างถึงจะเคลียร์เรียบร้อย",
+          body: "ขั้นที่ 3 จาก 3 — ลงนามผู้อนุมัติเบิกจ่ายและบันทึกการจ่ายเงิน ใบ Advance ที่อ้างถึงจะเคลียร์เรียบร้อย",
         }
         : {
           title: "ยืนยันรับเงินคืนจากพนักงาน", color: "#c2410c", button: "ยืนยันรับเงินคืน",
-          body: "ขั้นที่ 4 จาก 4 — ลงนามช่องผู้อนุมัติเบิกจ่ายเพื่อยืนยันว่าได้รับเงินคืนครบแล้ว ใบ Advance ที่อ้างถึงจะเคลียร์เรียบร้อย",
+          body: "ขั้นที่ 3 จาก 3 — ลงนามช่องผู้อนุมัติเบิกจ่ายเพื่อยืนยันว่าได้รับเงินคืนครบแล้ว ใบ Advance ที่อ้างถึงจะเคลียร์เรียบร้อย",
         },
   }[action];
   const needReason = action === "reject";
@@ -561,7 +570,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
   const st = statusMeta(e?.status, slip);
   const isOwner = e && (e.requester?.userId === me || e.createdBy?.userId === me);
   /**
-   * ✅ สายอนุมัติ 4 ขั้น: ส่งขอเบิก → ตรวจสอบ (reviewExpense) → อนุมัติ (approveExpense)
+   * ✅ สายอนุมัติ 3 ส่วน: ส่งขอเบิก → ตรวจสอบ (reviewExpense) + อนุมัติ (approveExpense) = ส่วนที่ 2
    *   → อนุมัติเบิกจ่าย (disburseExpense) — server บังคับซ้ำทุกด่าน หน้าจอแค่ซ่อน/ปิดปุ่ม
    */
   const canReview = can("reviewExpense");
@@ -674,13 +683,16 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
   const nextStep = useMemo(() => {
     if (!e) return null;
     const diff = differenceMeta(e.difference, slip);
-    // ✅ 4 ขั้น: ส่งขอเบิก → ตรวจสอบ → อนุมัติ → อนุมัติเบิกจ่าย (บอกเสมอว่ารอใคร)
+    /**
+     * ✅ 3 ส่วน: ส่งขอเบิก → ตรวจสอบ/อนุมัติ → อนุมัติเบิกจ่าย
+     * ⚠️ ส่วนที่ 2 ยังเป็นสองมือ (แอดมินตรวจสอบ → ผู้จัดการอนุมัติ) ข้อความจึงต้องบอกให้ชัดว่าอยู่มือไหนแล้ว
+     */
     if (e.status === "pending") {
       return {
         severity: "warning",
         text: canReview && !selfBlocked
-          ? "ขั้นที่ 2 จาก 4 · รอคุณตรวจสอบ"
-          : `ขั้นที่ 2 จาก 4 · รอตรวจสอบโดย${STEP_OWNER.review}`,
+          ? "ขั้นที่ 2 จาก 3 · รอคุณตรวจสอบ แล้วส่งต่อให้ผู้จัดการแผนกช่างอนุมัติ"
+          : `ขั้นที่ 2 จาก 3 · รอตรวจสอบโดย${STEP_OWNER.review}`,
       };
     }
     if (e.status === "reviewed") {
@@ -688,8 +700,8 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
       return {
         severity: "warning",
         text: canApprove && !selfBlocked && (!reviewedByMe || canApproveOwnReview)
-          ? `ขั้นที่ 3 จาก 4 · ${who} — รอคุณอนุมัติ`
-          : `ขั้นที่ 3 จาก 4 · ${who} — รอ${STEP_OWNER.approve}อนุมัติ`,
+          ? `ขั้นที่ 2 จาก 3 · ${who} — รอคุณอนุมัติ`
+          : `ขั้นที่ 2 จาก 3 · ${who} — รอ${STEP_OWNER.approve}อนุมัติ`,
       };
     }
     if (e.status === "approved") {
@@ -700,8 +712,8 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
       return {
         severity: "info",
         text: canDisburse && !selfBlocked
-          ? `ขั้นที่ 4 จาก 4 · ${who} — รอคุณอนุมัติเบิกจ่าย (${what})`
-          : `ขั้นที่ 4 จาก 4 · ${who} — รอ${STEP_OWNER.disburse}อนุมัติเบิกจ่าย (${what})`,
+          ? `ขั้นที่ 3 จาก 3 · ${who} — รอคุณอนุมัติเบิกจ่าย (${what})`
+          : `ขั้นที่ 3 จาก 3 · ${who} — รอ${STEP_OWNER.disburse}อนุมัติเบิกจ่าย (${what})`,
       };
     }
     if (e.status === "rejected") return { severity: "error", text: `ถูกตีกลับโดย ${personFullName(e.rejectedBy) || "-"}: ${e.rejectReason || "-"}` };
@@ -712,7 +724,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
           ? { severity: "error", text: `เลยกำหนดเคลียร์ (${thaiDate(e.dueClearAt)}) — กรุณาส่งใบเคลม` }
           : { severity: "info", text: `รับเงินแล้ว — ส่งใบเคลมพร้อมใบเสร็จ${e.dueClearAt ? ` ภายใน ${thaiDateFull(e.dueClearAt)}` : ""}` };
       }
-      if (e.status === "clearing") return { severity: "info", text: `ส่งใบเคลม ${e.claimDocNo || ""} แล้ว — รอใบเคลมผ่านครบ 4 ขั้น` };
+      if (e.status === "clearing") return { severity: "info", text: `ส่งใบเคลม ${e.claimDocNo || ""} แล้ว — รอใบเคลมผ่านครบทุกขั้น` };
       if (e.status === "cleared") return { severity: "success", text: `เคลียร์เรียบร้อยด้วยใบเคลม ${e.claimDocNo || ""}` };
     } else if (isReimburse) {
       if (e.status === "settled") return { severity: "success", text: `จ่ายคืนเรียบร้อย ${baht(e.total)}` };
@@ -724,19 +736,30 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
 
   const steps = useMemo(() => {
     if (!e) return [];
-    // ✅ 4 ขั้นหลักเหมือนกันทุกชนิดใบ: ส่งขอเบิก → ตรวจสอบ → อนุมัติ → อนุมัติเบิกจ่าย
+    /**
+     * ✅ 3 ส่วนตามที่ผู้ใช้สั่ง: ส่งขอเบิก → ตรวจสอบ/อนุมัติ → อนุมัติเบิกจ่าย
+     * ⚠️ ส่วนที่ 2 รวมสองมือไว้ในจุดเดียว — ยังไม่ครบจนกว่าผู้จัดการจะอนุมัติ ระหว่างนั้นบอกใต้จุดว่า
+     * "ตรวจสอบแล้ว · รออนุมัติ" ไม่งั้นคนดูจะเข้าใจว่าจบส่วนนี้แล้วตั้งแต่แอดมินกดตรวจสอบ
+     */
     const rejected = e.status === "rejected";
+    const approvedDone = Boolean(e.approvedAt) && !["pending", "reviewed", "rejected"].includes(e.status);
+    const reviewedOnly = Boolean(e.reviewedAt) && !approvedDone && !rejected;
     const head = [
       { label: kind === "advance" ? "ส่งขอเบิก" : isReimburse ? "ส่งขอเบิกคืน" : "ส่งเคลม", done: true, date: e.submittedAt || e.createdAt },
-      { label: "ตรวจสอบ", done: Boolean(e.reviewedAt) && !rejected, date: e.reviewedAt, danger: rejected },
-      { label: "อนุมัติ", done: Boolean(e.approvedAt) && !["pending", "reviewed", "rejected"].includes(e.status), date: e.approvedAt, danger: rejected },
+      {
+        label: "ตรวจสอบ/อนุมัติ",
+        done: approvedDone,
+        date: approvedDone ? e.approvedAt : (reviewedOnly ? e.reviewedAt : null),
+        sub: reviewedOnly ? "ตรวจสอบแล้ว · รออนุมัติ" : "",
+        danger: rejected,
+      },
     ];
     if (kind === "advance") {
       return [
         ...head,
         { label: "อนุมัติเบิกจ่าย", done: ["paid", "clearing", "cleared"].includes(e.status), date: e.payment?.at },
         // ขั้นติดตามหลังเงินออก (ไม่ใช่ขั้นอนุมัติ) — ผู้เบิกต้องส่งใบเคลม
-        { label: "เคลียร์", done: e.status === "cleared", danger: overdue },
+        { label: "เคลียร์", done: e.status === "cleared", danger: overdue, followUp: true },
       ];
     }
     const d = money(e.difference);
@@ -891,7 +914,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                   {e.approvedAt && !["pending", "reviewed", "rejected"].includes(e.status) && <InfoCell label="ผู้อนุมัติ">{personFullName(e.approvedBy)} · {thaiDate(e.approvedAt)}</InfoCell>}
                   {e.payment?.at && ((kind === "advance" && ["paid", "clearing", "cleared"].includes(e.status)) || (kind === "claim" && e.status === "settled" && money(e.difference) !== 0)) && (
                     <>
-                      {/* ✅ ขั้นที่ 4 — ผู้อนุมัติเบิกจ่าย (ช่องลงนามที่ผู้ใช้ขอเพิ่ม) */}
+                      {/* ✅ ส่วนที่ 3 — ผู้อนุมัติเบิกจ่าย */}
                       <InfoCell label={mustReturn ? "ผู้อนุมัติเบิกจ่าย (ยืนยันรับเงินคืน)" : "ผู้อนุมัติเบิกจ่าย"}>
                         {personFullName(e.payment.by) || "-"}
                       </InfoCell>
@@ -1060,7 +1083,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                 </span>
               </Tooltip>
             )}
-            {/* ขั้นที่ 2 — ตรวจสอบ (แอดมินช่าง · ผู้จัดการกดแยกขั้นก็ได้) */}
+            {/* ส่วนที่ 2 มือแรก — ตรวจสอบ (แอดมินช่าง · ผู้จัดการกดแยกมือก็ได้) */}
             {canReview && e.status === "pending" && (
               <Tooltip title={selfBlocked ? "ตรวจสอบใบของตัวเองไม่ได้ — ให้หัวหน้าท่านอื่นเป็นผู้ตรวจสอบ" : ""} describeChild>
                 <span>
@@ -1073,7 +1096,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                 </span>
               </Tooltip>
             )}
-            {/* ขั้นที่ 3 — อนุมัติ (ผู้จัดการแผนกช่าง) */}
+            {/* ส่วนที่ 2 มือสอง — อนุมัติ (ผู้จัดการแผนกช่าง) */}
             {canApprove && e.status === "reviewed" && (
               <Tooltip
                 title={selfBlocked
@@ -1089,7 +1112,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                 </span>
               </Tooltip>
             )}
-            {/* ขั้นที่ 4 — อนุมัติเบิกจ่าย (ผู้จัดการแผนกช่าง / กรรมการผู้จัดการ) */}
+            {/* ส่วนที่ 3 — อนุมัติเบิกจ่าย (ผู้จัดการแผนกช่าง / กรรมการผู้จัดการ) */}
             {canDisburse && e.status === "approved" && (
               <Tooltip title={selfBlocked ? "อนุมัติเบิกจ่ายใบของตัวเองไม่ได้" : ""} describeChild>
                 <span>

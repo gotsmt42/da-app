@@ -40,17 +40,17 @@ const periodRange = (p) => {
 
 /** กลุ่มในกล่องงานของหัวหน้า — เรียงตามความเร่งด่วนของ "สิ่งที่ต้องทำ" */
 /**
- * กลุ่มในกล่อง "รอดำเนินการ" — เรียงตามสายอนุมัติ 4 ขั้น
+ * กลุ่มในกล่อง "รอดำเนินการ" — เรียงตามสายอนุมัติ 3 ส่วน (ส่วนที่ 2 แยกเป็นสองมือ: ตรวจสอบ → อนุมัติ)
  * ✅ cap = สิทธิ์ของขั้นนั้น → แต่ละคนเห็นเฉพาะกลุ่มที่ตัวเองลงมือได้จริง (ผู้ใช้กำหนดว่าใครทำขั้นไหน)
  *   แอดมินช่าง: รอตรวจสอบ · ผู้จัดการแผนกช่าง: ครบทุกขั้น · กรรมการผู้จัดการ: รออนุมัติเบิกจ่าย
  */
 const INBOX_GROUPS = [
-  { key: "review", cap: "reviewExpense", title: "รอตรวจสอบ", hint: "ขั้นที่ 2 จาก 4 — ตรวจรายการและหลักฐาน แล้วส่งต่อให้ผู้จัดการแผนกช่างอนุมัติ", match: (e) => e.status === "pending" },
-  { key: "approve", cap: "approveExpense", title: "รออนุมัติ", hint: "ขั้นที่ 3 จาก 4 — ตรวจสอบแล้ว รอผู้จัดการแผนกช่างอนุมัติ", match: (e) => e.status === "reviewed" },
-  { key: "pay", cap: "disburseExpense", title: "รออนุมัติเบิกจ่าย · Advance", hint: "ขั้นที่ 4 จาก 4 — อนุมัติแล้ว รออนุมัติเบิกจ่ายและบันทึกการจ่ายเงิน", match: (e) => e.kind === "advance" && e.status === "approved" },
-  { key: "settle", cap: "disburseExpense", title: "รออนุมัติเบิกจ่าย · ส่วนต่างใบเคลม", hint: "ขั้นที่ 4 จาก 4 — จ่ายส่วนต่างเพิ่ม / ยืนยันรับเงินคืน", match: (e) => e.kind === "claim" && e.status === "approved" && slipKind(e) !== "reimburse" },
+  { key: "review", cap: "reviewExpense", title: "รอตรวจสอบ", hint: "ขั้นที่ 2 จาก 3 — ตรวจรายการและหลักฐาน แล้วส่งต่อให้ผู้จัดการแผนกช่างอนุมัติ", match: (e) => e.status === "pending" },
+  { key: "approve", cap: "approveExpense", title: "รออนุมัติ", hint: "ขั้นที่ 2 จาก 3 — แอดมินตรวจสอบแล้ว รอผู้จัดการแผนกช่างอนุมัติ", match: (e) => e.status === "reviewed" },
+  { key: "pay", cap: "disburseExpense", title: "รออนุมัติเบิกจ่าย · Advance", hint: "ขั้นที่ 3 จาก 3 — อนุมัติแล้ว รออนุมัติเบิกจ่ายและบันทึกการจ่ายเงิน", match: (e) => e.kind === "advance" && e.status === "approved" },
+  { key: "settle", cap: "disburseExpense", title: "รออนุมัติเบิกจ่าย · ส่วนต่างใบเคลม", hint: "ขั้นที่ 3 จาก 3 — จ่ายส่วนต่างเพิ่ม / ยืนยันรับเงินคืน", match: (e) => e.kind === "claim" && e.status === "approved" && slipKind(e) !== "reimburse" },
   // ⚠️ คนละงานกับข้างบน — ใบสำรองจ่ายคือพนักงานควักเงินตัวเองรออยู่ ไม่ใช่การปิดส่วนต่างของเงินที่จ่ายไปแล้ว
-  { key: "reimburse", cap: "disburseExpense", title: "รออนุมัติเบิกจ่าย · คืนค่าสำรองจ่าย", hint: "ขั้นที่ 4 จาก 4 — อนุมัติแล้ว รอโอนคืนให้ผู้เบิก", match: (e) => slipKind(e) === "reimburse" && e.status === "approved" },
+  { key: "reimburse", cap: "disburseExpense", title: "รออนุมัติเบิกจ่าย · คืนค่าสำรองจ่าย", hint: "ขั้นที่ 3 จาก 3 — อนุมัติแล้ว รอโอนคืนให้ผู้เบิก", match: (e) => slipKind(e) === "reimburse" && e.status === "approved" },
   { key: "overdue", cap: "viewAllExpenses", title: "Advance เลยกำหนดเคลียร์", hint: "จ่ายเงินไปแล้วแต่ยังไม่ส่งใบเคลม", match: (e) => isOverdueClear(e) },
 ];
 

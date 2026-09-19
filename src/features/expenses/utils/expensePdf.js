@@ -25,7 +25,12 @@ const H_PAGE = 297;
 const L = 16;
 const R = W_PAGE - 16;
 const W = R - L;
-const SIG_H = 34;
+/**
+ * ความสูงของแถบลงนาม
+ * ⚠️ ช่องรวม "ผู้ตรวจสอบ/อนุมัติ" มีบรรทัดกำกับเพิ่มมาอีกบรรทัด — ถ้าไม่เผื่อความสูง บรรทัดล่างสุด
+ * (ลงนามอิเล็กทรอนิกส์ ...) จะไปทับข้อความท้ายกระดาษที่ H_PAGE - 6
+ */
+const SIG_H = 40;
 const SIG_TOP = H_PAGE - 11 - SIG_H;
 
 let boldCache = null;
@@ -576,7 +581,7 @@ const drawSignatureImage = (doc, seal, { centerX, lineY, maxW, maxH }) => {
   }
 };
 
-/** ย่อขนาดตัวอักษรจนข้อความกว้างไม่เกิน maxW (ไม่ต่ำกว่า minSize) — ช่องลงนาม 4 ช่องแคบลง ชื่อยาวต้องไม่ล้นช่องข้าง */
+/** ย่อขนาดตัวอักษรจนข้อความกว้างไม่เกิน maxW (ไม่ต่ำกว่า minSize) — ชื่อ/ตำแหน่งยาวต้องไม่ล้นไปช่องข้าง */
 const fitFontSize = (doc, text, maxW, size, minSize) => {
   let s = size;
   doc.setFontSize(s);
@@ -588,16 +593,23 @@ const fitFontSize = (doc, text, maxW, size, minSize) => {
 };
 
 /**
- * ช่องลงนาม 4 ช่อง ตามสายอนุมัติ 4 ขั้น
- * ✅ ผู้ใช้สั่ง: "ต้องการเพิ่มการเซ็นลงชื่ออีก 1 คือ ช่องผู้อนุมัติเบิกจ่าย"
- *   ผู้เบิกค่าใช้จ่าย → ผู้ตรวจสอบ → ผู้อนุมัติ → ผู้อนุมัติเบิกจ่าย
+ * ช่องลงนาม 3 ช่อง
+ * ✅ ผู้ใช้สั่ง: "แก้ไขใหม่ให้เหลือแค่ 3 ส่วน ให้ควบรวม ผู้ตรวจสอบ/อนุมัติ"
+ *   ผู้เบิกค่าใช้จ่าย → ผู้ตรวจสอบ/อนุมัติ → ผู้อนุมัติเบิกจ่าย
+ *
+ * ⚠️ ในระบบ "ตรวจสอบ" กับ "อนุมัติ" ยังเป็นคนละมือ คนละสถานะ คนละลายเซ็นเหมือนเดิม (แอดมินตรวจ → ผู้จัดการอนุมัติ)
+ * — ที่ควบรวมคือ "ช่องลงนามบนกระดาษ" เท่านั้น ช่องนี้จึงพิมพ์ชื่อ/ลายเซ็นของ **ผู้อนุมัติ** (ขั้นที่ 3)
+ * แล้วกำกับบรรทัดเล็กว่าใครเป็นผู้ตรวจสอบ (ขั้นที่ 2) ถ้าเป็นคนละคน — ตรวจย้อนหลังได้ครบเหมือนเดิม
  * ⚠️ ช่องที่ขั้นยังไม่ถึงเว้นว่างไว้ให้เซ็นมือ (ใบเก่าก่อนมีขั้นไหนก็เว้นช่องนั้นเหมือนเดิม)
  */
 const renderSignatures = (doc, e, hasBold, signatures = null) => {
   const bold = (on) => doc.setFont("THSarabun", on && hasBold ? "bold" : "normal");
-  const colW = W / 4;
+  const colW = W / 3;
   const approved = e.approvedAt && !["pending", "reviewed", "rejected"].includes(e.status);
   const reviewed = e.reviewedAt && e.status !== "rejected";
+  const reviewerName = reviewed ? personFullName(e.reviewedBy) : "";
+  const sameReviewerApprover = reviewed && approved
+    && String(e.reviewedBy?.userId || "") === String(e.approvedBy?.userId || "");
   /**
    * ขั้นอนุมัติเบิกจ่าย = ตอนบันทึกจ่ายเงิน Advance / ปิดส่วนต่างใบเคลม (payment.by คือผู้กด)
    * ⚠️ ใบเคลมที่ใช้พอดี (ส่วนต่าง 0) ปิดจบที่ขั้นอนุมัติ ไม่มีเงินให้เบิกจ่าย — เขียนบอกในช่องแทนการเว้นว่าง
@@ -611,8 +623,21 @@ const renderSignatures = (doc, e, hasBold, signatures = null) => {
   const boxes = [
     // ✅ ชื่อ-นามสกุลในวงเล็บใต้ลายเซ็น (ผู้ใช้ขอ) — ใบเก่า/คนนอกระบบที่ไม่มีนามสกุลในทะเบียนได้ชื่อต้นตามเดิม
     { role: "ผู้เบิกค่าใช้จ่าย", name: personFullName(e.requester), date: e.submittedAt || e.docDate, seal: signatures?.requester },
-    { role: "ผู้ตรวจสอบ", name: reviewed ? personFullName(e.reviewedBy) : "", date: reviewed ? e.reviewedAt : null, seal: reviewed ? signatures?.reviewer : null },
-    { role: "ผู้อนุมัติ", name: approved ? personFullName(e.approvedBy) : "", date: approved ? e.approvedAt : null, seal: approved ? signatures?.approver : null },
+    /**
+     * ช่องรวม: ลงนามโดย "ผู้อนุมัติ" — ถ้ายังไม่ถึงขั้นอนุมัติแต่ตรวจสอบแล้ว ให้พิมพ์ของผู้ตรวจสอบไปก่อน
+     * ⚠️ ชื่อกับลายเซ็นต้องเป็นคนเดียวกันเสมอ ห้ามเอาลายเซ็นผู้ตรวจสอบไปวางใต้ชื่อผู้อนุมัติ
+     */
+    {
+      role: "ผู้ตรวจสอบ / อนุมัติ",
+      name: approved ? personFullName(e.approvedBy) : reviewerName,
+      date: approved ? e.approvedAt : (reviewed ? e.reviewedAt : null),
+      seal: approved ? signatures?.approver : (reviewed ? signatures?.reviewer : null),
+      extra: approved
+        ? (sameReviewerApprover
+          ? "ตรวจสอบและอนุมัติโดยผู้ลงนามนี้"
+          : reviewerName ? `ตรวจสอบโดย ${reviewerName} · ${thaiDate(e.reviewedAt)}` : "")
+        : (reviewed ? "ตรวจสอบแล้ว · รออนุมัติ" : ""),
+    },
     {
       role: "ผู้อนุมัติเบิกจ่าย",
       name: disbursed ? personFullName(e.payment.by) : "",
@@ -646,7 +671,15 @@ const renderSignatures = (doc, e, hasBold, signatures = null) => {
     bold(true);
     fitFontSize(doc, b.role, colW - 3, 13.5, 11);
     doc.text(b.role, cxm, y, { align: "center" });
-    y += 6;
+    // ✅ บรรทัดกำกับของช่องรวม — บอกว่าใครตรวจสอบ (ขั้นที่ 2) เมื่อผู้อนุมัติเป็นคนละคน
+    if (b.extra) {
+      y += 4.4;
+      doc.setTextColor(...GRAY);
+      fitFontSize(doc, b.extra, colW - 2, 10, 8);
+      doc.text(b.extra, cxm, y, { align: "center" });
+      doc.setTextColor(...SLATE);
+    }
+    y += 5.8;
     bold(false); doc.setFontSize(12);
     doc.text(b.date ? `วันที่ ${thaiDate(b.date)}` : b.note ? "" : "วันที่ ......../......../..........", cxm, y, { align: "center" });
     if (signed) {

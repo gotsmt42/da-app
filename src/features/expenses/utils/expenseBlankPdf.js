@@ -594,9 +594,10 @@ const drawSignatures = (doc, pen, ctx) => {
   doc.line(L, SIG_TOP, R, SIG_TOP);
   const colW = W / 4;
   const boxes = [
+    // ✅ ช่องลงนามตรงกับใบที่ออกจากระบบ (ผู้ใช้สั่งให้ควบรวมผู้ตรวจสอบ/อนุมัติเป็นช่องเดียว)
     { role: ctx.style.signRole, name: ctx.pre.requester },
-    { role: "ผู้ตรวจสอบ" },
-    { role: "ผู้อนุมัติ" },
+    { role: "ผู้ตรวจสอบ / อนุมัติ" },
+    { role: "ผู้อนุมัติเบิกจ่าย" },
     { role: "ผู้บันทึกเข้าระบบ", docLine: true },
   ];
   boxes.forEach((b, i) => {

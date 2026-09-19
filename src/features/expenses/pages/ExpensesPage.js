@@ -249,7 +249,7 @@ export default function ExpensesPage({ view: viewProp }) {
     });
     stats.push({ key: "__await", label: "Advance ที่ยังไม่เคลียร์", value: summary?.awaitingClaim ?? "–", color: KIND_META.advance.color });
   } else if (view === "inbox") {
-    // ✅ ตัวเลขตามขั้นของสายอนุมัติ 4 ขั้น — การ์ดของขั้นที่ตัวเองไม่ได้รับผิดชอบไม่ต้องโชว์ให้รก
+    // ✅ ตัวเลขตามขั้นของสายอนุมัติ 3 ส่วน — การ์ดของขั้นที่ตัวเองไม่ได้รับผิดชอบไม่ต้องโชว์ให้รก
     if (canReview) stats.push({ key: "__p", label: "รอตรวจสอบ", value: summary?.pending ?? "–", color: "#d97706" });
     if (canApprove) stats.push({ key: "__r", label: "รออนุมัติ", value: summary?.reviewing ?? "–", color: "#b45309" });
     if (canDisburse) {
