@@ -191,7 +191,9 @@ const Login = () => {
               component="img"
               src={appLogoFor({ on: "dark", layout: "stacked" }, org)}
               alt="NexPlan"
-              sx={{ height: 220, maxWidth: "100%", objectFit: "contain", mb: 1.5, filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.15))" }}
+              /* ⚠️ 88 ไม่ใช่ 220 เหมือนตอนที่โลโก้ยังเป็นกรอบเรียงแนวตั้ง — ตอนนี้เป็นตัวอักษรบรรทัดเดียว
+                 ตั้ง 220 แล้วคำจะกว้างจนชนขอบแผงและใหญ่กลบหัวข้อที่อยู่ใต้มัน */
+              sx={{ height: 88, maxWidth: "100%", objectFit: "contain", mb: 1.5, filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.15))" }}
             />
             <Typography variant="h4" sx={{ fontWeight: 700, mb: 1.5, lineHeight: 1.3 }}>
               ระบบบริหารจัดการช่าง
@@ -244,7 +246,7 @@ const Login = () => {
             component="img"
             src={appLogoFor({ on: "light" }, org)}
             alt="NexPlan"
-            sx={{ height: 52, maxWidth: "100%", objectFit: "contain", objectPosition: "left center", mb: 2.5, display: { xs: "block", md: "none" } }}
+            sx={{ height: 40, maxWidth: "100%", objectFit: "contain", objectPosition: "left center", mb: 2.5, display: { xs: "block", md: "none" } }}
           />
 
           <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>

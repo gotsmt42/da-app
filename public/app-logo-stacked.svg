@@ -1,29 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 176" width="320" height="176" role="img" aria-label="NexPlan เน็กซ์แพลน">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 288 70" width="288" height="70" role="img" aria-label="NexPlan เน็กซ์แพลน">
   <!--
-    โลโก้แอปแบบเรียงแนวตั้ง — ใช้ตรงที่มีพื้นที่สูงและวางกลางจอ (หน้าเข้าสู่ระบบ)
-    ⚠️ สัดส่วนเกือบจัตุรัส ตั้งใจให้ใส่ในช่องที่กำหนดความสูงไว้แล้วไม่ล้นออกด้านข้าง
-       (แบบแนวนอนจะกว้างเกินไปถ้าเอาไปตั้งความสูงเท่ากัน)
+    โลโก้ NexPlan แบบตัวอักษรล้วน — ใช้ในแอป (แถบบน · หน้าเข้าสู่ระบบ)
+    "Nex" ใช้ currentColor จึงอ่านออกทั้งพื้นเข้มและพื้นสว่าง · "Plan" ไล่เฉดสีแบรนด์ แดง -> ม่วง
+    ⚠️ ไม่มีกรอบพื้นหลัง (ผู้ใช้สั่งตัดออก) — ไอคอนแบบมีกรอบอยู่ที่ app-icon.svg สำหรับหน้าจอโฮม
     ⚠️ เป็นเครื่องหมายของ "แอป" เท่านั้น ไม่ใช่โลโก้บริษัท (โลโก้บริษัทตั้งจากหน้า "ตั้งค่าองค์กร")
-    ⚠️ ไฟล์นี้สร้างจากสคริปต์ make-brand.js — แก้เครื่องหมายที่สคริปต์แล้วรันใหม่ อย่าแก้มือทีละไฟล์
+    ⚠️ ไฟล์นี้สร้างจากสคริปต์ make-brand.js — แก้ที่สคริปต์แล้วรันใหม่ อย่าแก้มือทีละไฟล์
   -->
   <defs>
-    <linearGradient id="nxGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#f05252"/>
-      <stop offset=".5" stop-color="#dc2626"/>
-      <stop offset="1" stop-color="#991b1b"/>
-    </linearGradient>
-    <linearGradient id="nxBeam" x1="0" y1="1" x2="1" y2="0">
-      <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
-      <stop offset=".5" stop-color="#ffffff" stop-opacity=".55"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    <linearGradient id="nxWord" gradientUnits="userSpaceOnUse"
+      x1="135" y1="61" x2="283" y2="14.5">
+      <stop offset="0" stop-color="#fb7185"/>
+      <stop offset=".45" stop-color="#ef4444"/>
+      <stop offset="1" stop-color="#a855f7"/>
     </linearGradient>
   </defs>
-  <g transform="translate(112 8) scale(1.5)">
-    <rect width="64" height="64" rx="15" fill="url(#nxGrad)"/>
-    <path d="M6 46 L28 10" stroke="url(#nxBeam)" stroke-width="9" stroke-linecap="round"/>
-  <g transform="skewX(-7) translate(4 0)"><path d="M15 49 V15 H23.5 L40.5 39 V15 H49 V49 H40.5 L23.5 25 V49 Z" fill="#ffffff"/></g>
-  </g>
-  <text x="160" y="156" text-anchor="middle" fill="currentColor"
-        font-family="'IBM Plex Sans Thai','IBM Plex Sans',system-ui,sans-serif"
-        font-size="40" font-weight="700" letter-spacing="-0.8">NexPlan</text>
+  <text x="5" y="61" font-family="'Space Grotesk','IBM Plex Sans',system-ui,sans-serif"
+        font-size="75" font-weight="700" letter-spacing="-1.7857142857142858">
+    <tspan fill="currentColor">Nex</tspan><tspan fill="url(#nxWord)">Plan</tspan>
+  </text>
 </svg>

@@ -1,23 +1,33 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="NexPlan เน็กซ์แพลน">
   <!--
-    ไอคอนแอป NexPlan (เน็กซ์แพลน) — ระบบวางแผนงานยุคใหม่
-    แนวคิด: ตัว N ทึบเอียงไปข้างหน้า (Nex = next) + ลำแสงทแยงพาด ให้ดูเป็นเทคยุคใหม่
-    ⚠️ เป็นเครื่องหมายของ "แอป" เท่านั้น ไม่ใช่โลโก้บริษัท (โลโก้บริษัทตั้งจากหน้า "ตั้งค่าองค์กร")
-    ⚠️ ไฟล์นี้สร้างจากสคริปต์ make-brand.js — แก้เครื่องหมายที่สคริปต์แล้วรันใหม่ อย่าแก้มือทีละไฟล์
+    ไอคอนแอป NexPlan — ใช้บนหน้าจอโฮม/แท็บเบราว์เซอร์ (ที่ที่ต้องเป็นสี่เหลี่ยมจัตุรัสมีพื้น)
+    แนวคิด: ตัว N ทึบเอียงไปข้างหน้า (Nex = next) ผ่าด้วยรอยทแยง + ลำแสงพาด = เทคยุคใหม่
+    ⚠️ ในแอปไม่ได้ใช้ไฟล์นี้ — แถบบน/หน้าเข้าสู่ระบบใช้แบบตัวอักษรล้วน (app-wordmark-*.png)
+    ⚠️ เป็นเครื่องหมายของ "แอป" เท่านั้น ไม่ใช่โลโก้บริษัท
+    ⚠️ ไฟล์นี้สร้างจากสคริปต์ make-brand.js — แก้ที่สคริปต์แล้วรันใหม่ อย่าแก้มือทีละไฟล์
   -->
   <defs>
-    <linearGradient id="nxGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#f05252"/>
-      <stop offset=".5" stop-color="#dc2626"/>
-      <stop offset="1" stop-color="#991b1b"/>
+    <linearGradient id="nxTile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fb5a7d"/>
+      <stop offset=".45" stop-color="#dc2626"/>
+      <stop offset="1" stop-color="#6d28d9"/>
     </linearGradient>
     <linearGradient id="nxBeam" x1="0" y1="1" x2="1" y2="0">
       <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
-      <stop offset=".5" stop-color="#ffffff" stop-opacity=".55"/>
+      <stop offset=".5" stop-color="#ffffff" stop-opacity=".5"/>
       <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
     </linearGradient>
+    <clipPath id="nxCutHi" clipPathUnits="userSpaceOnUse">
+      <polygon points="8,2 58,2 58,24 8,41"/>
+    </clipPath>
+    <clipPath id="nxCutLo" clipPathUnits="userSpaceOnUse">
+      <polygon points="8,44.5 58,27.5 58,62 8,62"/>
+    </clipPath>
   </defs>
-  <rect width="64" height="64" rx="15" fill="url(#nxGrad)"/>
+  <rect width="64" height="64" rx="15" fill="url(#nxTile)"/>
   <path d="M6 46 L28 10" stroke="url(#nxBeam)" stroke-width="9" stroke-linecap="round"/>
-  <g transform="skewX(-7) translate(4 0)"><path d="M15 49 V15 H23.5 L40.5 39 V15 H49 V49 H40.5 L23.5 25 V49 Z" fill="#ffffff"/></g>
+  <g transform="skewX(-7) translate(4 0)">
+    <path d="M15 49 V15 H23.5 L40.5 39 V15 H49 V49 H40.5 L23.5 25 V49 Z" fill="#ffffff" clip-path="url(#nxCutHi)"/>
+    <path d="M15 49 V15 H23.5 L40.5 39 V15 H49 V49 H40.5 L23.5 25 V49 Z" fill="#ffffff" opacity=".92" clip-path="url(#nxCutLo)"/>
+  </g>
 </svg>
