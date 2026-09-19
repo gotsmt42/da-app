@@ -1,9 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="NexPlan เน็กซ์แพลน">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Flowix โฟลวิกซ์">
   <!--
-    ไอคอนแอป NexPlan — ใช้บนหน้าจอโฮม/แท็บเบราว์เซอร์ (ที่ที่ต้องเป็นสี่เหลี่ยมจัตุรัสมีพื้น)
-    แนวคิด: ตัว N เอียงไปข้างหน้าผ่าด้วยรอยทแยง (Nex = next) + ลูกศรพุ่งขึ้น = ไปต่อ สู่อนาคต
-    ⚠️ รอยผ่าใช้ <clipPath> ของ SVG ไม่ใช่ clip-path แบบ CSS — CSS polygon() ไม่มีผลเวลาเปิด
-       ไฟล์ .svg ตรงๆ หรือแปลงด้วยเครื่องมืออื่น จะได้ตัว N เต็มใบไม่มีรอยผ่า
+    ไอคอนแอป Flowix — ใช้บนหน้าจอโฮม/แท็บเบราว์เซอร์ (ที่ที่ต้องเป็นสี่เหลี่ยมจัตุรัสมีพื้น)
+    แนวคิด: ตัว F เอียงไปข้างหน้า + สายธารสองเส้นไหลออกไปทางขวา
+    = Flow (งานไหลลื่น ไม่สะดุด) + ix (ลงท้ายแบบซอฟต์แวร์ยุคใหม่) -> งานและข้อมูลไหลเชื่อมโยงกัน
+    ⚠️ ตัวอักษรต้องเป็นชิ้นเดียวไม่ขาดตอน — เคยผ่าด้วยรอยทแยงแล้วเอาออก เพราะอ่านเป็น
+       "ตัดขาด/สะดุด" ซึ่งค้านกับความหมายของชื่อแบรนด์
     ⚠️ ในแอปไม่ได้ใช้ไฟล์นี้ — แถบบน/หน้าเข้าสู่ระบบใช้แบบตัวอักษรล้วน (app-wordmark-*.png)
     ⚠️ เป็นเครื่องหมายของ "แอป" เท่านั้น ไม่ใช่โลโก้บริษัท
     ⚠️ ไฟล์นี้สร้างจากสคริปต์ make-brand.js — แก้ที่สคริปต์แล้วรันใหม่ อย่าแก้มือทีละไฟล์
@@ -19,21 +20,14 @@
       <stop offset=".5" stop-color="#ffffff" stop-opacity=".5"/>
       <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
     </linearGradient>
-    <clipPath id="nxCutHi" clipPathUnits="userSpaceOnUse">
-      <polygon points="8,2 58,2 58,24 8,41"/>
-    </clipPath>
-    <clipPath id="nxCutLo" clipPathUnits="userSpaceOnUse">
-      <polygon points="8,44.5 58,27.5 58,62 8,62"/>
-    </clipPath>
   </defs>
   <rect width="64" height="64" rx="15" fill="url(#nxTile)"/>
   <path d="M6 46 L28 10" stroke="url(#nxBeam)" stroke-width="9" stroke-linecap="round"/>
-  <g transform="translate(-4 6) scale(0.84) skewX(-7) translate(4 0)">
-    <path d="M15 49 V15 H23.5 L40.5 39 V15 H49 V49 H40.5 L23.5 25 V49 Z" fill="#ffffff" clip-path="url(#nxCutHi)"/>
-    <path d="M15 49 V15 H23.5 L40.5 39 V15 H49 V49 H40.5 L23.5 25 V49 Z" fill="#ffffff" opacity=".92" clip-path="url(#nxCutLo)"/>
+  <g transform="translate(-3 2) scale(0.9) skewX(-7) translate(4 0)">
+    <path d="M15 15 H44 V23 H23.5 V28 H39 V36 H23.5 V49 H15 Z" fill="#ffffff"/>
   </g>
-  <path d="M40 45 L57 24" fill="none" stroke="#ffffff" stroke-width="5"
+  <path d="M33 42 C43 42 41 28 51 26" fill="none" stroke="#ffffff" stroke-width="4.6"
         stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M47 22.5 L58 22 L57.5 33" fill="none" stroke="#ffffff" stroke-width="5"
-        stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M33 51 C46 51 45 34 56 32" fill="none" stroke="#ffffff" stroke-width="4.6"
+        stroke-linecap="round" stroke-linejoin="round" opacity=".45"/>
 </svg>

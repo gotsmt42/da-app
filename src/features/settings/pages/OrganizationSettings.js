@@ -32,7 +32,7 @@ const BORDER = "#e2e8f0";
 const IMAGE_SLOTS = [
   {
     slot: "app", field: "logoUrl", title: "โลโก้แอป",
-    desc: "แสดงบนหัวเว็บและหน้าเข้าสู่ระบบ · ค่าเริ่มต้นคือโลโก้ NexPlan ของแอป — เลือกชุดอื่นหรืออัปโหลดโลโก้บริษัททับได้",
+    desc: "แสดงบนหัวเว็บและหน้าเข้าสู่ระบบ · ค่าเริ่มต้นคือโลโก้ Flowix ของแอป — เลือกชุดอื่นหรืออัปโหลดโลโก้บริษัททับได้",
     dark: true,
   },
   {
@@ -185,7 +185,7 @@ export default function OrganizationSettings() {
     }
   };
 
-  /** เลือกรูปที่ติดมากับแอป (NexPlan / ชุดเดิม) — เร็วกว่าไปหาไฟล์มาอัปโหลดใหม่ */
+  /** เลือกรูปที่ติดมากับแอป (Flowix / ชุดเดิม) — เร็วกว่าไปหาไฟล์มาอัปโหลดใหม่ */
   const applyPresetImage = async (slot, key) => {
     setBusy(true); setError("");
     try {
