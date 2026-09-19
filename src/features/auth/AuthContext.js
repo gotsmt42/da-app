@@ -5,6 +5,7 @@ import PushService from "@/shared/services/PushService";
 import AuthService from "@/shared/services/authService";
 import { startRealtime, stopRealtime } from "@/shared/realtime/realtimeClient";
 import useRealtime from "@/shared/realtime/useRealtime";
+import PermissionService from "@/shared/services/PermissionService";
 
 const AuthContext = createContext();
 
@@ -130,6 +131,25 @@ const updateUserData = (newData) => {
    * ✅ จังหวะที่รีเฟรช: เปิดแอป · กลับมาที่แท็บ · ทุก 60 วินาที
    * ⚠️ ห้ามถี่กว่านี้ — เป็นการยิง API ของผู้ใช้ทุกคนตลอดเวลาโดยที่ข้อมูลแทบไม่เปลี่ยน
    */
+  /**
+   * ✅ ตารางสิทธิ์ที่ผู้ดูแลปรับเอง (ใครเห็นเมนูอะไร) — โหลดตอนล็อกอิน แล้วนับเวอร์ชันไว้
+   * ⚠️ ต้องนับเวอร์ชันใน state และส่งผ่าน context — ตารางสิทธิ์เก็บในตัวแปรระดับโมดูล (roles.js)
+   * ซึ่งเปลี่ยนค่าแล้ว React ไม่รู้ ต้องมีอะไรสักอย่างสั่งให้เมนูวาดใหม่
+   */
+  const [permVersion, setPermVersion] = useState(0);
+  const reloadPermissions = useCallback(async () => {
+    await PermissionService.loadEffective();
+    setPermVersion((v) => v + 1);
+  }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    reloadPermissions();
+  }, [isLoggedIn, reloadPermissions]);
+
+  // ✅ ผู้ดูแลปรับสิทธิ์จากเครื่องไหนก็ตาม → เมนูของทุกคนที่เปิดอยู่เปลี่ยนตามทันที
+  useRealtime("settings", () => { reloadPermissions(); }, { enabled: Boolean(isLoggedIn) });
+
   /** ✅ ช่องสัญญาณเรียลไทม์ — เปิดตลอดเวลาที่ล็อกอินอยู่ ใช้ร่วมกันทุกหน้า (ดู shared/realtime) */
   useEffect(() => {
     if (!isLoggedIn) return undefined;
@@ -219,7 +239,7 @@ const updateUserData = (newData) => {
 
   return (
     <AuthContext.Provider
-      value={{ isLoggedIn, userData, login, logout, updateUserData, refreshUserData }}
+      value={{ isLoggedIn, userData, login, logout, updateUserData, refreshUserData, permVersion }}
     >
       {children}
     </AuthContext.Provider>

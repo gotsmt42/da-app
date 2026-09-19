@@ -21,7 +21,7 @@ import {
 } from "@/shared/utils/roles";
 
 export default function usePermissions() {
-  const { userData } = useAuth();
+  const { userData, permVersion } = useAuth();
   const role = normalizeRole(userData);
 
   // ⚠️ ผูกกับ role (สตริง) ไม่ใช่ userData ทั้งก้อน — userData ถูกสร้างใหม่ทุกครั้งที่โปรไฟล์ถูกรีเฟรช
@@ -35,6 +35,12 @@ export default function usePermissions() {
       isRole: (...roles) => isRoleOf(role, ...roles),
       isAdminOrManager: isAdminOrManagerOf(role),
     }),
-    [role]
+    /**
+     * ⚠️ permVersion จำเป็นจริง แม้ eslint จะบอกว่า "ไม่ได้ใช้ในนี้" — ตารางสิทธิ์ที่ผู้ดูแลปรับเองถูกเก็บใน
+     * ตัวแปรระดับโมดูลของ shared/utils/roles.js ซึ่ง React มองไม่เห็นว่าเปลี่ยน ถ้าไม่ผูกเวอร์ชันไว้
+     * เมนูจะยังเป็นของเดิมจนกว่าจะรีเฟรชหน้า
+     */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [role, permVersion]
   );
 }

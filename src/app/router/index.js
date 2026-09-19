@@ -50,6 +50,8 @@ const StockProduct = lazy(() => import("@/features/products/pages/StockProduct")
 const WorkTypeSystem = lazy(() => import("@/features/settings/pages/WorkTypeSystem.js"));
 // ✅ ตั้งค่าองค์กร (โลโก้/ข้อมูลบริษัทบนเอกสาร/ค่าตั้งต้น) — ผู้ใช้ขอให้แก้เองได้
 const OrganizationSettings = lazy(() => import("@/features/settings/pages/OrganizationSettings.js"));
+// ✅ ตั้งค่าสิทธิ์ (ใครเห็นเมนูอะไร/จัดการอะไรได้) — ผู้ใช้ขอให้ปรับเองได้
+const RolePermissions = lazy(() => import("@/features/settings/pages/RolePermissions.js"));
 const ContractOverview = lazy(() => import("@/features/contracts/pages/ContractOverview.js"));
 const FileUpload = lazy(() => import("@/features/documents/pages/FileUploadPage"));
 const EventCalendar = lazy(() => import("@/features/calendar/pages/EventCalendar.js"));
@@ -179,6 +181,17 @@ const ThemeRoutes = [
           </AdminRoute>
         ),
         title: "Organization Settings",
+      },
+      {
+        path: "settings/permissions",
+        element: (
+          <AdminRoute>
+            <Suspense fallback={<div>Loading...</div>}>
+              <RolePermissions />
+            </Suspense>
+          </AdminRoute>
+        ),
+        title: "Role Permissions",
       },
       {
         path: "worktype",

@@ -12,6 +12,7 @@ import {
   FaTags,
   FaFileSignature,
   FaImage,
+  FaUserShield,
 } from "react-icons/fa";
 import Swal from "sweetalert2";
 import { useAuth } from "@/features/auth/AuthContext";
@@ -83,6 +84,8 @@ const Settings = () => {
     { title: "ประเภทงาน / ระบบ", desc: "จัดการตัวเลือกใน dropdown ตอนเพิ่ม/แก้ไขแผนงาน", link: "/worktype", icon: <FaTags size={18} />, color: "#8b5cf6" },
     // ✅ ผู้ใช้ขอให้ "ปรับเปลี่ยนได้เอง เช่น Logo แอพ" — โลโก้/ข้อมูลบริษัทบนเอกสาร/ค่าตั้งต้นของระบบเบิก
     { title: "องค์กรและเอกสาร", desc: "โลโก้ · ข้อมูลบริษัทบนหัวกระดาษ · ค่าตั้งต้นของระบบเบิก", link: "/settings/organization", icon: <FaImage size={18} />, color: "#0f766e" },
+    // ✅ ผู้ใช้ขอ: "ตั้งค่ากำหนดสิทธิ์ได้ว่าใครมองเห็นเมนูอะไร และจัดการอะไรได้บ้าง"
+    { title: "สิทธิ์การใช้งาน", desc: "กำหนดว่าแต่ละสิทธิ์เห็นเมนูอะไร และจัดการอะไรได้", link: "/settings/permissions", icon: <FaUserShield size={18} />, color: "#7c3aed" },
   ];
 
   return (

@@ -188,8 +188,21 @@ export const canManageUserOfRole = (actor, targetRole) =>
  * @param {object|string} who         userData / สตริง role
  * @param {string} capability         ชื่อจาก CAPABILITIES
  */
+/**
+ * ตารางสิทธิ์ "ที่ใช้จริง" ซึ่งผู้ดูแลปรับเองได้จากหน้าตั้งค่าสิทธิ์ (ถ้าไม่มี = ใช้ค่าเริ่มต้นในไฟล์นี้)
+ * ✅ ผู้ใช้สั่ง: "ตั้งค่ากำหนดสิทธิ์ได้ว่าใครมองเห็นเมนูอะไร และจัดการอะไรได้บ้าง"
+ * ⚠️ นี่คือของฝั่งหน้าจอไว้ "ซ่อนเมนู" เท่านั้น — ตัวจริงบังคับที่ server ทุก endpoint เหมือนเดิม
+ * ⚠️ โหลดมาจาก GET /settings/permissions/effective ตอนล็อกอิน (ดู AuthContext)
+ */
+let EFFECTIVE = null;
+
+/** @param {Record<string, string[]>|null} table  { capability: [role, ...] } */
+export const setEffectiveCapabilities = (table) => {
+  EFFECTIVE = table && typeof table === "object" ? table : null;
+};
+
 export const can = (who, capability) => {
-  const allowed = CAPABILITIES[capability];
+  const allowed = EFFECTIVE?.[capability] || CAPABILITIES[capability];
   if (!allowed) {
     // พิมพ์ชื่อสิทธิ์ผิด = ปฏิเสธไว้ก่อน แต่ต้องส่งเสียงดังพอให้เห็นตอน dev
     // ไม่งั้นจะกลายเป็นบั๊กเงียบแบบเดียวกับที่ไฟล์นี้ตั้งใจกำจัด
