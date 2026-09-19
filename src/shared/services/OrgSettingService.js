@@ -27,7 +27,7 @@ export const ORG_FALLBACK = {
   website: "",
   /**
    * โลโก้บนหัวเว็บ · หน้าเข้าสู่ระบบ
-   * ✅ ค่าเริ่มต้น = โลโก้ของ "แอป" (PlanNgan) ไม่ใช่โลโก้บริษัทใดบริษัทหนึ่ง — องค์กรที่เพิ่งติดตั้ง
+   * ✅ ค่าเริ่มต้น = โลโก้ของ "แอป" (NexPlan) ไม่ใช่โลโก้บริษัทใดบริษัทหนึ่ง — องค์กรที่เพิ่งติดตั้ง
    * จะได้แบรนด์ของแอปไปก่อน แล้วค่อยอัปโหลดโลโก้ตัวเอง หรือกดเลือกชุดที่ติดมากับแอปทับได้
    * ⚠️ ชุดเดิมของ DO ALL ยังอยู่ครบทุกไฟล์ — เลือกกลับมาใช้ได้ 1 คลิกจากหน้า "ตั้งค่าองค์กร"
    */
@@ -41,7 +41,7 @@ export const ORG_FALLBACK = {
 };
 
 /**
- * ชุดโลโก้ของแอป (PlanNgan) — มีหลายแบบเพราะพื้นหลังแต่ละที่ไม่เหมือนกัน
+ * ชุดโลโก้ของแอป (NexPlan) — มีหลายแบบเพราะพื้นหลังแต่ละที่ไม่เหมือนกัน
  * ⚠️ ไฟล์ PNG มีสีตัวอักษรตายตัว จึงต้องเลือกให้ตรงพื้น ไม่งั้นตัวหนังสือจมหายไปกับพื้น
  */
 export const APP_LOGO = {
@@ -56,14 +56,20 @@ const APP_LOGO_FILES = Object.values(APP_LOGO);
 /**
  * โลโก้ที่ควรใช้ในบริบทนั้นๆ
  * • องค์กรตั้งโลโก้ของตัวเองไว้ (อัปโหลดเอง หรือเลือกชุด DO ALL) → ใช้ของเขาทุกที่เหมือนเดิม
- * • ยังใช้ค่าเริ่มต้นของแอปอยู่ → หยิบไฟล์ PlanNgan ที่เข้ากับพื้นตรงนั้นให้อัตโนมัติ
- * @param {{on?: "dark"|"light", layout?: "wordmark"|"stacked"}} opts
+ * • ยังใช้ค่าเริ่มต้นของแอปอยู่ → หยิบไฟล์ NexPlan ที่เข้ากับพื้นตรงนั้นให้อัตโนมัติ
+ * @param {{on?: "dark"|"light", layout?: "wordmark"|"stacked"|"icon"}} opts
  * @param {object} [settings] ค่าที่หน้าจอ subscribe อยู่ (useOrgSettings) — ส่งมาด้วยเพื่อให้
  *   เปลี่ยนโลโก้แล้วหน้าจอวาดใหม่ทันที (ถ้าอ่านจากแคชเฉยๆ React จะไม่รู้ว่ามีอะไรเปลี่ยน)
  */
 export const appLogoFor = ({ on = "dark", layout = "wordmark" } = {}, settings) => {
   const current = settings?.logoUrl || cache?.logoUrl || ORG_FALLBACK.logoUrl;
   if (current && !APP_LOGO_FILES.includes(current)) return current;
+  /**
+   * ที่แคบมากจริงๆ — เอาเฉพาะเครื่องหมาย ไม่เอาชื่อ
+   * ⚠️ แถบบนไม่ได้ใช้ทางนี้แล้ว: ผู้ใช้ยืนยันว่าต้องเห็นชื่อแอปเสมอ ("ให้มีตัวอักษรด้วย")
+   * เหลือไว้สำหรับที่ที่เป็นช่องสี่เหลี่ยมจัตุรัสจริงๆ เท่านั้น
+   */
+  if (layout === "icon") return APP_LOGO.icon;
   if (layout === "stacked") return on === "light" ? APP_LOGO.stackedDark : APP_LOGO.stackedLight;
   return on === "light" ? APP_LOGO.wordmarkDark : APP_LOGO.wordmarkLight;
 };

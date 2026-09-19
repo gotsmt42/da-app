@@ -1,17 +1,27 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 64" width="300" height="64" role="img" aria-label="PlanNgan แผนงาน — ระบบแผนงานและงานบริการหน้างาน">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 222 64" width="222" height="64" role="img" aria-label="NexPlan เน็กซ์แพลน">
   <!--
-    โลโก้แบบมีชื่อกำกับ (lockup) ของแอป PlanNgan — ใช้บนหน้าเข้าสู่ระบบ/สไลด์/เอกสารแนะนำระบบ
+    โลโก้แบบมีชื่อกำกับ (lockup) — ใช้บนหัวเว็บทุกขนาดจอ/หน้าเข้าสู่ระบบ/เอกสารแนะนำระบบ
+    ⚠️ มีแค่เครื่องหมาย + ชื่อแอป ไม่มีบรรทัดคำโปรยใต้ชื่อ (ผู้ใช้สั่งให้ตัดออก — บนจอมือถือ
+       บรรทัดนั้นเล็กจนอ่านไม่ออกอยู่ดี และทำให้โลโก้กว้างจนเบียดปุ่มอื่นบนแถบบน)
     ⚠️ เป็นเครื่องหมายของ "แอป" เท่านั้น ไม่ใช่โลโก้บริษัท (โลโก้บริษัทตั้งจากหน้า "ตั้งค่าองค์กร")
-    ⚠️ ตัวหนังสือใช้ currentColor — วางบนพื้นสว่างหรือพื้นเข้มก็อ่านออก แค่ตั้ง color ที่ element แม่
-    ⚠️ ฟอนต์เดียวกับที่แอปโหลดอยู่แล้ว (IBM Plex Sans Thai) เครื่องที่ไม่มีจะตกไปฟอนต์ระบบโดยยังอ่านได้
+    ⚠️ ตัวหนังสือใช้ currentColor — พื้นสว่างหรือพื้นเข้มก็อ่านออก แค่ตั้ง color ที่ element แม่
+    ⚠️ ไฟล์นี้สร้างจากสคริปต์ make-brand.js — แก้เครื่องหมายที่สคริปต์แล้วรันใหม่ อย่าแก้มือทีละไฟล์
   -->
-  <rect width="64" height="64" rx="15" fill="#dc2626"/>
-  <g fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M20 50 V14 H32 A8 8 0 0 1 32 30 H20"/>
-    <path d="M31 43 L37 49 L54 29"/>
-  </g>
-  <text x="80" y="34" font-family="'IBM Plex Sans Thai','IBM Plex Sans',system-ui,sans-serif"
-        font-size="27" font-weight="700" letter-spacing="-0.5" fill="currentColor">PlanNgan</text>
-  <text x="81" y="52" font-family="'IBM Plex Sans Thai',system-ui,sans-serif"
-        font-size="13" font-weight="500" fill="currentColor" opacity="0.6">แผนงาน · ระบบงานบริการหน้างาน</text>
+  <defs>
+    <linearGradient id="nxGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f05252"/>
+      <stop offset=".5" stop-color="#dc2626"/>
+      <stop offset="1" stop-color="#991b1b"/>
+    </linearGradient>
+    <linearGradient id="nxBeam" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset=".5" stop-color="#ffffff" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#nxGrad)"/>
+  <path d="M6 46 L28 10" stroke="url(#nxBeam)" stroke-width="9" stroke-linecap="round"/>
+  <g transform="skewX(-7) translate(4 0)"><path d="M15 49 V15 H23.5 L40.5 39 V15 H49 V49 H40.5 L23.5 25 V49 Z" fill="#ffffff"/></g>
+  <text x="78" y="43" font-family="'IBM Plex Sans Thai','IBM Plex Sans',system-ui,sans-serif"
+        font-size="31" font-weight="700" letter-spacing="-0.6" fill="currentColor">NexPlan</text>
 </svg>

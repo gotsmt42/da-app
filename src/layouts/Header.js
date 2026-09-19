@@ -30,7 +30,6 @@ import {
   FaChevronDown, FaCheck, FaBriefcase,
 } from "react-icons/fa";
 import { can, isRole, ROLES, DEPARTMENT, rankLabel } from "@/shared/utils/roles";
-import { pageTitleFor } from "./pageTitle";
 
 /**
  * ✅ ตัวเลือกของ dropdown "ตารางงาน" — ต่างกันตาม role เพราะ query ?dept= มีความหมายไม่เหมือนกัน
@@ -140,17 +139,14 @@ const Header = ({ toggleMobileSidebar }) => {
   const scheduleLabel = isSecondaryScheduleActive ? scheduleOptions.secondary.label : scheduleOptions.primary.label;
 
   /**
-   * กลางแถบบนของ "จอมือถือ" มีได้ทีละอย่างเดียว (กว้างราว 180px):
-   *   1. ทางลัดตารางงานของเซล — เซลไม่มีทางลัดอื่นบนแถบบนเลย จึงมาก่อน
-   *   2. ชื่อหน้าที่เปิดอยู่ — role อื่นได้อันนี้ (ดูเหตุผลเต็มที่ layouts/pageTitle.js)
-   * ⚠️ แถบบนของจอคอมไม่เกี่ยวกับตรงนี้เลย ทั้งสองอย่างเป็น d-lg-none (ผู้ใช้ขอให้จอคอมคงเดิม)
+   * กลางแถบบนของ "จอมือถือ" เหลือได้แค่ทางลัดตารางงานของเซลเท่านั้น
+   *
+   * 🐛 ที่แก้ (ผู้ใช้แจ้ง "โดนทับแล้ว"): เดิมมีชิป "ชื่อหน้าที่เปิดอยู่" อยู่ตรงกลางด้วย
+   * พอโลโก้แอปเปลี่ยนเป็นแบบมีชื่อกำกับ (กว้างขึ้นมาก) พื้นที่ตรงกลางไม่พอ ชิปเลยไปทับกับโลโก้
+   * ✅ ตัดชิปชื่อหน้าออก — ชื่อหน้าอยู่บนหัวของแต่ละหน้าและบนแท็บเบราว์เซอร์อยู่แล้ว ไม่ได้หายไปไหน
+   * ⚠️ ทางลัดของเซลยังอยู่ เพราะเป็น "ปุ่มที่กดไปไหนได้" ไม่ใช่ป้ายบอกชื่อเฉยๆ
    */
   const hasScheduleShortcut = !canViewContracts && canViewService;
-  // ✅ "/event" ใช้ชื่อเดียวกับปุ่มเลือกตารางงาน (ต่างกันตาม role + ?dept=) ตารางชื่อหน้าตายตัวตอบไม่ได้
-  const pageTitle = isOnEventPage
-    ? { label: scheduleLabel, Icon: FaCalendarAlt }
-    : pageTitleFor(location.pathname);
-  const PageTitleIcon = pageTitle?.Icon || null;
 
   const { notifications, unread, markRead, markAllRead } = useEventNotifications(
     events,
@@ -199,6 +195,9 @@ const Header = ({ toggleMobileSidebar }) => {
         <NavbarBrand tag={Link} to="/dashboard" className="m-0">
           <div className="gradiant-bg">
             {/* ✅ โลโก้ตั้งค่าเองได้จากหน้าตั้งค่าองค์กร (ว่าง = ใช้ไฟล์ที่ติดมากับแอป) */}
+            {/* ⚠️ ใช้ชุดเต็ม (เครื่องหมาย + ชื่อแอป + บรรทัดไทย) ทุกขนาดจอ — ผู้ใช้ยืนยันว่าเอาแบบนี้
+                เคยลองย่อเหลือเฉพาะเครื่องหมายบนมือถือแล้วจำไม่ได้ว่าแอปอะไร
+                ที่ให้พอดีจอมือถือคุมด้วย CSS (.logo ใน Header.css) ไม่ใช่สลับไฟล์ */}
             <img src={appLogoFor({ on: "dark" }, org)} alt="Logo" className="logo" />
           </div>
         </NavbarBrand>
@@ -285,6 +284,10 @@ const Header = ({ toggleMobileSidebar }) => {
             <DropdownToggle
               tag="button" type="button"
               className="header-shortcut-pill d-flex align-items-center gap-1"
+              /* ⚠️ จอมือถือซ่อนตัวหนังสือในพิลล์เพื่อเปิดที่ให้ชื่อแอป — ต้องมี title/aria กำกับไว้
+                 ไม่งั้นเหลือไอคอนปฏิทินเปล่าๆ ที่เดาไม่ออกว่ากดแล้วไปไหน */
+              title={scheduleLabel}
+              aria-label={scheduleLabel}
               style={{ fontFamily: "inherit", cursor: "pointer" }}
             >
               <FaCalendarAlt size={12} />
@@ -296,11 +299,6 @@ const Header = ({ toggleMobileSidebar }) => {
             </DropdownToggle>
             <ScheduleDropdownMenu options={scheduleOptions} isSecondaryActive={isSecondaryScheduleActive} />
           </Dropdown>
-        ) : pageTitle ? (
-          <div className="header-page-title d-flex d-lg-none align-items-center gap-2 mx-auto" aria-current="page">
-            <PageTitleIcon size={12} className="header-page-title__icon" />
-            <span>{pageTitle.label}</span>
-          </div>
         ) : null}
 
         {/* ฝั่งขวา: แจ้งเตือน + รูปโปรไฟล์ผู้ใช้งาน + ปุ่มแฮมเบอร์เกอร์ */}

@@ -1,20 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 232" width="320" height="232" role="img" aria-label="PlanNgan แผนงาน">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 176" width="320" height="176" role="img" aria-label="NexPlan เน็กซ์แพลน">
   <!--
     โลโก้แอปแบบเรียงแนวตั้ง — ใช้ตรงที่มีพื้นที่สูงและวางกลางจอ (หน้าเข้าสู่ระบบ)
     ⚠️ สัดส่วนเกือบจัตุรัส ตั้งใจให้ใส่ในช่องที่กำหนดความสูงไว้แล้วไม่ล้นออกด้านข้าง
-       (แบบแนวนอน app-wordmark.svg จะกว้างเกินไปถ้าเอาไปตั้งความสูงเท่ากัน)
-    ⚠️ ตัวหนังสือใช้ currentColor — พื้นเข้มตั้ง color ขาว พื้นสว่างตั้ง color เข้ม
+       (แบบแนวนอนจะกว้างเกินไปถ้าเอาไปตั้งความสูงเท่ากัน)
+    ⚠️ เป็นเครื่องหมายของ "แอป" เท่านั้น ไม่ใช่โลโก้บริษัท (โลโก้บริษัทตั้งจากหน้า "ตั้งค่าองค์กร")
+    ⚠️ ไฟล์นี้สร้างจากสคริปต์ make-brand.js — แก้เครื่องหมายที่สคริปต์แล้วรันใหม่ อย่าแก้มือทีละไฟล์
   -->
-  <rect x="112" y="8" width="96" height="96" rx="22" fill="#dc2626"/>
-  <g transform="translate(112 8) scale(1.5)" fill="none" stroke="#ffffff"
-     stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M20 50 V14 H32 A8 8 0 0 1 32 30 H20"/>
-    <path d="M31 43 L37 49 L54 29"/>
+  <defs>
+    <linearGradient id="nxGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f05252"/>
+      <stop offset=".5" stop-color="#dc2626"/>
+      <stop offset="1" stop-color="#991b1b"/>
+    </linearGradient>
+    <linearGradient id="nxBeam" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
+      <stop offset=".5" stop-color="#ffffff" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(112 8) scale(1.5)">
+    <rect width="64" height="64" rx="15" fill="url(#nxGrad)"/>
+    <path d="M6 46 L28 10" stroke="url(#nxBeam)" stroke-width="9" stroke-linecap="round"/>
+  <g transform="skewX(-7) translate(4 0)"><path d="M15 49 V15 H23.5 L40.5 39 V15 H49 V49 H40.5 L23.5 25 V49 Z" fill="#ffffff"/></g>
   </g>
-  <text x="160" y="160" text-anchor="middle" fill="currentColor"
+  <text x="160" y="156" text-anchor="middle" fill="currentColor"
         font-family="'IBM Plex Sans Thai','IBM Plex Sans',system-ui,sans-serif"
-        font-size="40" font-weight="700" letter-spacing="-0.8">PlanNgan</text>
-  <text x="160" y="190" text-anchor="middle" fill="currentColor" opacity="0.62"
-        font-family="'IBM Plex Sans Thai',system-ui,sans-serif"
-        font-size="16" font-weight="500">แผนงาน · ระบบงานบริการหน้างาน</text>
+        font-size="40" font-weight="700" letter-spacing="-0.8">NexPlan</text>
 </svg>
