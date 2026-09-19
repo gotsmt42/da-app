@@ -8,13 +8,20 @@
  * ⚠️ ดึงไม่สำเร็จต้องไม่ทำให้แอปพัง: คืนค่าเริ่มต้น (โลโก้/ชื่อบริษัทที่ติดมากับแอป) เสมอ
  */
 import API from "@/shared/api/axiosInstance";
+import { setRankLabels } from "@/shared/utils/roles";
 
-/** ค่าที่ติดมากับแอป — ใช้เมื่อยังไม่ได้ตั้งค่าเอง หรือดึงค่าจากเซิร์ฟเวอร์ไม่ได้ */
+/**
+ * ค่าที่ติดมากับแอป — ใช้เมื่อยังไม่ได้ตั้งค่าเอง หรือดึงค่าจากเซิร์ฟเวอร์ไม่ได้
+ * ✅ รองรับการนำไปใช้กับองค์กรอื่น: ตั้ง REACT_APP_ORG_* ตอน build ก็ได้ชื่อบริษัทนั้นทันที
+ * ⚠️ ค่าจริงมาจาก /settings เสมอ — ชุดนี้ใช้แค่ตอนที่ยังติดต่อเซิร์ฟเวอร์ไม่ได้
+ */
+const orgEnv = (key, fallback = "") => String(import.meta.env[key] || "").trim() || fallback;
+
 export const ORG_FALLBACK = {
-  nameTh: "บริษัท ดู ออล อาคิเทค แอนด์ เอ็นจิเนียริ่ง จำกัด",
-  nameEn: "DO ALL ARCHITECT AND ENGINEERING CO.,LTD.",
-  address: "สำนักงานใหญ่ : 68/155 หมู่ 3 ถนนชัยพฤกษ์ ตำบลคลองพระอุดม อำเภอปากเกร็ด จังหวัดนนทบุรี 11120",
-  taxId: "เลขประจำตัวผู้เสียภาษี 0125563014222",
+  nameTh: orgEnv("REACT_APP_ORG_NAME_TH", "องค์กรของคุณ"),
+  nameEn: orgEnv("REACT_APP_ORG_NAME_EN", "YOUR ORGANIZATION"),
+  address: orgEnv("REACT_APP_ORG_ADDRESS", ""),
+  taxId: orgEnv("REACT_APP_ORG_TAX_ID", ""),
   tel: "",
   email: "",
   website: "",
@@ -24,6 +31,8 @@ export const ORG_FALLBACK = {
   letterheadUrl: "/logo-letterhead.png",
   stampUrl: "/stamp.png",
   advanceClearDays: 7,
+  /** ชื่อ Rank (ตำแหน่งในองค์กร) ที่ตั้งเอง { rank: "ชื่อ" } — ว่าง = ใช้ชื่อเริ่มต้นของระบบ */
+  rankLabels: {},
 };
 
 /** เติมค่าเริ่มต้นให้ช่องที่ยังไม่ได้ตั้ง — หน้าจอจะได้ไม่ต้องเช็ค null เอง */
@@ -52,6 +61,8 @@ const OrgSettingService = {
       inflight = API.get("/settings")
         .then((res) => {
           cache = withFallback(res.data?.settings);
+          // ✅ ชื่อตำแหน่งที่ผู้ดูแลตั้งเอง มีผลกับทุกที่ที่แสดงชื่อสิทธิ์ทันที (rankLabel ใน roles.js)
+          setRankLabels(cache.rankLabels || {});
           emit();
           return cache;
         })
@@ -68,6 +79,7 @@ const OrgSettingService = {
   async update(fields) {
     const res = await API.put("/settings", fields);
     cache = withFallback(res.data?.settings);
+    setRankLabels(cache.rankLabels || {});
     emit();
     return cache;
   },

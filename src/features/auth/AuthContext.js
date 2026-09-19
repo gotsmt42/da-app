@@ -116,7 +116,11 @@ const updateUserData = (newData) => {
         lname: fresh.lname,
         email: fresh.email,
         tel: fresh.tel,
-        role: fresh.role,
+        role: fresh.role,                       // Rank — ตำแหน่งในองค์กร (คีย์เดิมในฐานข้อมูล)
+        // ✅ Role — ตำแหน่งในระบบ (Super Admin/Admin/Member) ต้องติดมาด้วย ไม่งั้นเมนูตั้งค่าระบบหาย
+        systemRole: fresh.systemRole || "",
+        // ✅ ตำแหน่งเฉพาะบุคคล — พิมพ์ใต้ชื่อในเอกสารที่ออกจากเครื่องนี้ (ข้อมูลเก่าอยู่ที่ rank)
+        jobTitle: fresh.jobTitle || fresh.rank || "",
         imageUrl: fresh.imageUrl,
       };
       localStorage.setItem("payload", JSON.stringify(merged));

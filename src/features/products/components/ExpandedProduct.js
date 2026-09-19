@@ -2,6 +2,7 @@ import React from "react";
 import moment from "moment";
 import API from "@/shared/api/axiosInstance";
 import { formatThai } from "@/shared/utils/thaiDate";
+import { titleOf } from "@/shared/utils/roles";
 
 
 const formatCurrency = (amount) => {
@@ -46,8 +47,8 @@ const ExpandedProduct = ({ data }) => (
           </p>
           <p className="card-text">
             <small className="text-body-secondary">
-              อัพโหลดโดย: {data.user.username},({data.user.fname}{" "}
-              {data.user.lname}) ( {data.user.role}, {data.user.rank} )
+              อัพโหลดโดย: {data.user.username} ({data.user.fname}{" "}
+              {data.user.lname}) — {titleOf(data.user)}
             </small>
           </p>
           <p className="card-text">

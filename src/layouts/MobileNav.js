@@ -5,7 +5,7 @@ import "./MobileNav.css";
 import Swal from "sweetalert2";
 import { swalLogout, hasValidAvatar } from "../shared/utils/user";
 import { useAuth } from "../features/auth/AuthContext";
-import { roleLabel } from "@/shared/utils/roles";
+import { rankLabel } from "@/shared/utils/roles";
 import { buildNavGroups, isActiveHref, isGroupActive } from "./navConfig";
 import { FaCog, FaSignOutAlt } from "react-icons/fa";
 
@@ -123,7 +123,7 @@ const MobileNav = ({ handleMenuClick }) => {
               {userData?.fname} {userData?.lname}
             </h6>
             {/* ⚠️ ห้ามโชว์ค่าดิบ ("sale"/"technician") ให้ผู้ใช้เห็น — ทั้งแอปเป็นภาษาไทย */}
-            <span className="user-role-badge">{roleLabel(userData)}</span>
+            <span className="user-role-badge">{rankLabel(userData)}</span>
           </div>
         </div>
       </div>

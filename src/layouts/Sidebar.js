@@ -6,7 +6,7 @@ import "./Sidebar.css";
 import Swal from "sweetalert2";
 import { swalLogout, hasValidAvatar } from "../shared/utils/user";
 import { useAuth } from "../features/auth/AuthContext";
-import { can, isRole, roleLabel, ROLES, DEPARTMENT } from "@/shared/utils/roles";
+import { can, isRole, rankLabel, ROLES, DEPARTMENT } from "@/shared/utils/roles";
 // ✅ ป้ายตัวเลข "ของค้างที่ต้องทำ" บนเมนู — ตัวเลขชุดเดียวกับเมนูหลักหน้าแรกและแถบล่างมือถือ
 import useAppBadges, { BADGE_LABEL } from "@/shared/hooks/useAppBadges";
 // ✅ ใช้ไอคอนชุดเดียวกับที่ Dashboard.js ใช้จริง (react-icons/fa) แทน bootstrap-icons เดิม — เดิม
@@ -370,7 +370,7 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
               {userData?.fname} {userData?.lname}
             </h6>
             {/* ⚠️ ห้ามโชว์ค่าดิบ ("sale"/"technician") ให้ผู้ใช้เห็น — ทั้งแอปเป็นภาษาไทย */}
-            <span className="user-role-badge">{roleLabel(userData)}</span>
+            <span className="user-role-badge">{rankLabel(userData)}</span>
           </div>
         </div>
       </div>

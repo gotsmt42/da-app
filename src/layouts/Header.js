@@ -27,7 +27,7 @@ import {
   FaBars, FaUserCircle, FaSignOutAlt, FaWrench, FaFileContract, FaFileInvoiceDollar, FaCalendarAlt,
   FaChevronDown, FaCheck, FaBriefcase,
 } from "react-icons/fa";
-import { can, isRole, ROLES, DEPARTMENT, roleLabel } from "@/shared/utils/roles";
+import { can, isRole, ROLES, DEPARTMENT, rankLabel } from "@/shared/utils/roles";
 import { pageTitleFor } from "./pageTitle";
 
 /**
@@ -333,7 +333,7 @@ const Header = ({ toggleMobileSidebar }) => {
                   <div className="dropdown-user-text">
                     <span className="user-display-name">{user?.username || userData?.name}</span>
                     {/* ⚠️ ห้ามโชว์ค่าดิบอย่าง "admin" — ผู้ใช้เห็นชื่อสิทธิ์ภาษาไทยเท่านั้น (roles.js) */}
-                    <span className="dropdown-user-role">{roleLabel(userData)}</span>
+                    <span className="dropdown-user-role">{rankLabel(userData)}</span>
                   </div>
                 </div>
                 <DropdownItem divider />

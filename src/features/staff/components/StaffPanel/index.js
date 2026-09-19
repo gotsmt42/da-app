@@ -57,7 +57,10 @@ import VpnKeyIcon from "@mui/icons-material/VpnKey";
 
 import { useAuth } from "@/features/auth/AuthContext";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
-import { ALL_ROLES, ROLE_LABEL, ROLES, isRole, canAssignRole, canManageUserOfRole, TECHNICIAN_ROLES } from "@/shared/utils/roles";
+import {
+  ALL_ROLES, ROLES, isRole, canAssignRole, canManageUserOfRole, TECHNICIAN_ROLES, rankLabel,
+  systemRoleOf, SYSTEM_ROLES, SYSTEM_ROLE_LABEL, titleOf,
+} from "@/shared/utils/roles";
 
 // ─── Styled (ให้ตรงกับ Customer/index.js) ───────────────────────────────
 const GlassCard = styled(Box)(({ theme }) => ({
@@ -129,35 +132,38 @@ const copyToClipboard = (text, cb) => {
  */
 const ROLE_META = {
   // ✅ กรรมการผู้จัดการ — ระดับสูงสุด ใช้สีเข้มสุดในชุดให้เห็นลำดับชั้นจากสีได้เลย
-  [ROLES.DIRECTOR]: { label: ROLE_LABEL[ROLES.DIRECTOR], color: "#7c2d12", icon: <ShieldIcon sx={{ fontSize: 14 }} /> },
-  [ROLES.ADMIN]: { label: ROLE_LABEL[ROLES.ADMIN], color: "#ef4444", icon: <ShieldIcon sx={{ fontSize: 14 }} /> },
-  [ROLES.MANAGER]: { label: ROLE_LABEL[ROLES.MANAGER], color: "#0891b2", icon: <ShieldIcon sx={{ fontSize: 14 }} /> },
-  [ROLES.TECH_LEAD]: { label: ROLE_LABEL[ROLES.TECH_LEAD], color: "#0ea5e9", icon: <EngineeringIcon sx={{ fontSize: 14 }} /> },
-  [ROLES.TECHNICIAN]: { label: ROLE_LABEL[ROLES.TECHNICIAN], color: "#3b82f6", icon: <EngineeringIcon sx={{ fontSize: 14 }} /> },
-  [ROLES.SALE]: { label: ROLE_LABEL[ROLES.SALE], color: "#8b5cf6", icon: <PersonIcon sx={{ fontSize: 14 }} /> },
-  [ROLES.USER]: { label: ROLE_LABEL[ROLES.USER], color: "#64748b", icon: <PersonIcon sx={{ fontSize: 14 }} /> },
+  [ROLES.DIRECTOR]: { color: "#7c2d12", icon: <ShieldIcon sx={{ fontSize: 14 }} /> },
+  [ROLES.ADMIN]: { color: "#ef4444", icon: <ShieldIcon sx={{ fontSize: 14 }} /> },
+  [ROLES.MANAGER]: { color: "#0891b2", icon: <ShieldIcon sx={{ fontSize: 14 }} /> },
+  [ROLES.TECH_LEAD]: { color: "#0ea5e9", icon: <EngineeringIcon sx={{ fontSize: 14 }} /> },
+  [ROLES.TECHNICIAN]: { color: "#3b82f6", icon: <EngineeringIcon sx={{ fontSize: 14 }} /> },
+  [ROLES.SALE]: { color: "#8b5cf6", icon: <PersonIcon sx={{ fontSize: 14 }} /> },
+  [ROLES.USER]: { color: "#64748b", icon: <PersonIcon sx={{ fontSize: 14 }} /> },
 };
 
-/** @returns ป้ายของ role นั้น หรือป้ายเตือนสีส้มถ้าเป็นค่าที่ระบบไม่รู้จัก */
+/**
+ * @returns ป้าย Rank ของคนนั้น หรือป้ายเตือนสีส้มถ้าเป็นค่าที่ระบบไม่รู้จัก
+ * ⚠️ ชื่ออ่านสดด้วย rankLabel() ทุกครั้ง — องค์กรที่เปลี่ยนชื่อ Rank จะเห็นผลทันทีทั้งตาราง
+ */
 const roleMetaOf = (role) => {
   const key = String(role || "").trim().toLowerCase();
-  if (ROLE_META[key]) return ROLE_META[key];
+  if (ROLE_META[key]) return { ...ROLE_META[key], label: rankLabel(key) };
   return {
-    label: key ? `สิทธิ์ไม่ถูกต้อง (${role})` : "ยังไม่กำหนดสิทธิ์",
+    label: key ? `Rank ไม่ถูกต้อง (${role})` : "ยังไม่กำหนด Rank",
     color: "#f59e0b",
     icon: <WarningAmberIcon sx={{ fontSize: 14 }} />,
     invalid: true,
   };
 };
 
-const EMPTY_FORM = { fname: "", lname: "", tel: "", email: "", username: "", password: "", role: "", rank: "" };
+const EMPTY_FORM = { fname: "", lname: "", tel: "", email: "", username: "", password: "", role: "", jobTitle: "" };
 
 const HEAD_CELLS = [
   { id: "expand",  label: "",             sortable: false, width: 44 },
   { id: "fname",   label: "ชื่อ-นามสกุล", sortable: true },
   { id: "email",   label: "อีเมล",         sortable: true },
   { id: "tel",     label: "เบอร์โทร",      sortable: true },
-  { id: "role",    label: "สิทธิ์",         sortable: true },
+  { id: "role",    label: "Rank / Role",  sortable: true },
   { id: "actions", label: "จัดการ",        sortable: false, width: 96, align: "right" },
 ];
 
@@ -273,16 +279,16 @@ const EmployeeFormModal = ({ open, mode, data, onChange, onClose, onSubmit, isSm
           )}
           <Grid item xs={12} sm={6}>
             <FormControl fullWidth size="small">
-              <InputLabel id="role-label">สิทธิ์ของผู้ใช้</InputLabel>
+              <InputLabel id="role-label">Rank · ตำแหน่งในองค์กร</InputLabel>
               <Select
-                labelId="role-label" name="role" label="สิทธิ์ของผู้ใช้"
+                labelId="role-label" name="role" label="Rank · ตำแหน่งในองค์กร"
                 value={data.role || ""} onChange={onChange}
                 sx={{ borderRadius: 2 }}
               >
                 {/* 🔒 ตั้งสิทธิ์ที่สูงกว่าระดับตัวเองไม่ได้ — แอดมินจึงไม่เห็นตัวเลือก "ผู้จัดการ"
                     (server บังคับซ้ำอีกชั้น ดู da-app-server/src/routes/auth.js) */}
                 {ALL_ROLES.filter((r) => canAssignRole(me, r)).map((r) => (
-                  <MenuItem key={r} value={r}>{ROLE_LABEL[r]}</MenuItem>
+                  <MenuItem key={r} value={r}>{rankLabel(r)}</MenuItem>
                 ))}
               </Select>
             </FormControl>
@@ -290,8 +296,9 @@ const EmployeeFormModal = ({ open, mode, data, onChange, onClose, onSubmit, isSm
           {mode === "add" && (
             <Grid item xs={12} sm={6}>
               <TextField
-                label="ยศ / ตำแหน่ง" name="rank" fullWidth size="small"
-                value={data.rank || ""} onChange={onChange}
+                label="ตำแหน่งเฉพาะบุคคล (พิมพ์ในเอกสาร)" name="jobTitle" fullWidth size="small"
+                helperText="เว้นว่าง = ใช้ชื่อ Rank"
+                value={data.jobTitle || ""} onChange={onChange}
                 InputProps={{ startAdornment: (<InputAdornment position="start"><MilitaryTechIcon fontSize="small" sx={{ color: "text.disabled" }} /></InputAdornment>) }}
                 sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
               />
@@ -441,10 +448,20 @@ const EmployeeRow = ({ row, isSmallScreen, onEdit, onDelete, onCopy, me }) => {
 
         {!isSmallScreen && (
           <TableCell>
-            <Chip
-              size="small" icon={roleMeta.icon} label={roleMeta.label}
-              sx={{ height: 22, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha(roleMeta.color, 0.1), color: roleMeta.color, "& .MuiChip-icon": { color: roleMeta.color } }}
-            />
+            <Stack spacing={0.4} alignItems="flex-start">
+              <Chip
+                size="small" icon={roleMeta.icon} label={roleMeta.label}
+                sx={{ height: 22, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha(roleMeta.color, 0.1), color: roleMeta.color, "& .MuiChip-icon": { color: roleMeta.color } }}
+              />
+              {/* ✅ Role = ตำแหน่งในระบบ — คนละเรื่องกับ Rank (ตำแหน่งในองค์กร) ตั้งที่หน้าตั้งค่าสิทธิ์
+                  ⚠️ โชว์เฉพาะคนที่ดูแลระบบได้ ไม่งั้นรายชื่อจะเต็มไปด้วยป้าย "Member" ที่ไม่ได้บอกอะไร */}
+              {systemRoleOf(row) !== SYSTEM_ROLES.MEMBER && (
+                <Chip
+                  size="small" label={`Role: ${SYSTEM_ROLE_LABEL[systemRoleOf(row)]}`}
+                  sx={{ height: 19, fontSize: "0.63rem", fontWeight: 800, bgcolor: alpha("#0f766e", 0.1), color: "#0f766e" }}
+                />
+              )}
+            </Stack>
           </TableCell>
         )}
 
@@ -476,7 +493,7 @@ const EmployeeRow = ({ row, isSmallScreen, onEdit, onDelete, onCopy, me }) => {
                       <Typography variant="body2">{row.tel || "—"}</Typography>
                     </Grid>
                     <Grid item xs={12} sm={4}>
-                      <SectionLabel>สิทธิ์</SectionLabel>
+                      <SectionLabel>Rank · ตำแหน่งในองค์กร</SectionLabel>
                       <Chip
                         size="small" icon={roleMeta.icon} label={roleMeta.label}
                         sx={{ height: 22, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha(roleMeta.color, 0.1), color: roleMeta.color }}
@@ -485,8 +502,8 @@ const EmployeeRow = ({ row, isSmallScreen, onEdit, onDelete, onCopy, me }) => {
                   </>
                 )}
                 <Grid item xs={12} sm={4}>
-                  <SectionLabel>ยศ / ตำแหน่ง</SectionLabel>
-                  <Typography variant="body2">{row.rank || "—"}</Typography>
+                  <SectionLabel>ตำแหน่งเฉพาะบุคคล (ในเอกสาร)</SectionLabel>
+                  <Typography variant="body2">{titleOf(row) || "—"}</Typography>
                 </Grid>
                 <Grid item xs={12} sm={4}>
                   <SectionLabel>ชื่อผู้ใช้ (Username)</SectionLabel>
@@ -661,7 +678,7 @@ const Employee = () => {
         username: newUserData.username.trim(),
         password: newUserData.password.trim(),
         role: newUserData.role.trim(),
-        rank: (newUserData.rank || "").trim(),
+        jobTitle: (newUserData.jobTitle || "").trim(),
       };
 
       const response = await API.post("/auth/signup", requestData);
@@ -1040,11 +1057,11 @@ const Employee = () => {
         onConfirm={handlePasswordConfirm}
         isSmallScreen={isSmallScreen}
         busy={confirmBusy}
-        title={pendingRoleChange ? "ยืนยันการเปลี่ยนสิทธิ์" : "ยืนยันรหัสผ่าน Admin"}
+        title={pendingRoleChange ? "ยืนยันการเปลี่ยน Rank" : "ยืนยันรหัสผ่าน"}
         description={pendingRoleChange
-          ? `กำลังเปลี่ยนสิทธิ์ของ ${[pendingRoleChange.fname, pendingRoleChange.lname].filter(Boolean).join(" ")} เป็น "${ROLE_LABEL[pendingRoleChange.role] || pendingRoleChange.role}" — กรอกรหัสผ่านของคุณเพื่อยืนยัน`
+          ? `กำลังเปลี่ยน Rank (ตำแหน่งในองค์กร) ของ ${[pendingRoleChange.fname, pendingRoleChange.lname].filter(Boolean).join(" ")} เป็น "${rankLabel(pendingRoleChange.role)}" — กรอกรหัสผ่านของคุณเพื่อยืนยัน`
           : "เพื่อความปลอดภัยก่อนเพิ่มผู้ใช้ใหม่"}
-        confirmLabel={pendingRoleChange ? "ยืนยันเปลี่ยนสิทธิ์" : "ยืนยัน"}
+        confirmLabel={pendingRoleChange ? "ยืนยันเปลี่ยน Rank" : "ยืนยัน"}
       />
 
       <Snackbar

@@ -13,16 +13,27 @@
  * role ใหม่ที่ไม่ได้ถูกเติมเข้าลิสต์ไหนจะถูกปฏิเสธเงียบๆ ไม่มี error ให้เห็น มีแค่เมนูหายหรือหน้าเด้งกลับ
  * — เป็นบั๊กที่ไล่หายากมากเพราะไม่รู้ว่ามีลิสต์ซ่อนอยู่กี่ที่
  * ✅ กฎใหม่: ห้ามถามว่า "เป็น role อะไร" ให้ถามว่า "ทำสิ่งนี้ได้ไหม" (capability)
+ *
+ * ── คำศัพท์สองคำที่ต้องแยกจากกันให้ขาด (✅ ผู้ใช้สั่ง: "Role คือตำแหน่งในระบบ Rank คือในองค์กร") ──
+ *
+ *   Role  = ตำแหน่ง "ในระบบ"  → Super Admin / Admin / Member (user.systemRole) เปลี่ยนชื่อไม่ได้
+ *   Rank  = ตำแหน่ง "ในองค์กร" → กรรมการผู้จัดการ / แอดมินช่าง / ช่างเทคนิค ... (user.role — คีย์เดิม) เปลี่ยนชื่อได้
+ *   ตำแหน่งเฉพาะบุคคล = user.jobTitle — ข้อความที่พิมพ์ใต้ชื่อในเอกสาร เว้นว่างแล้วใช้ชื่อ Rank (ดู titleOf)
  */
 
+/**
+ * Rank — ตำแหน่งในองค์กร
+ * ⚠️ ลำดับในก้อนนี้คือ "มากไปน้อยตามสิทธิ์การใช้งาน" (✅ ผู้ใช้สั่ง) — ALL_ROLES ใช้ลำดับนี้
+ * จึงมีผลกับลำดับคอลัมน์ในตารางสิทธิ์ ตัวเลือกตอนเพิ่ม/แก้ผู้ใช้ และรายงานทุกใบ — เพิ่มตำแหน่งใหม่ต้องใส่ให้ถูกที่
+ */
 export const ROLES = {
   /** กรรมการผู้จัดการ — ✅ ผู้ใช้ขอเพิ่ม: ระดับสูงสุดของบริษัท มีทุกสิทธิ์ในระบบ */
   DIRECTOR: "director",
-  ADMIN: "admin",
   MANAGER: "manager",
-  TECHNICIAN: "technician",
+  ADMIN: "admin",
   /** หัวหน้าช่างเทคนิค — ✅ ผู้ใช้ขอเพิ่ม: ตอนนี้ให้สิทธิ์เท่าช่างเทคนิคทุกอย่างก่อน */
   TECH_LEAD: "techlead",
+  TECHNICIAN: "technician",
   SALE: "sale",
   USER: "user",
 };
@@ -30,7 +41,7 @@ export const ROLES = {
 export const ALL_ROLES = Object.values(ROLES);
 
 /** ชื่อภาษาไทยสำหรับแสดงผล — ทั้งแอปเป็นภาษาไทย ห้ามโชว์ค่าดิบอย่าง "technician" ให้ผู้ใช้เห็น */
-export const ROLE_LABEL = {
+export const RANK_LABEL = {
   [ROLES.DIRECTOR]: "กรรมการผู้จัดการ",
   [ROLES.ADMIN]: "แอดมินช่าง",
   [ROLES.MANAGER]: "ผู้จัดการแผนกช่าง",
@@ -74,10 +85,9 @@ const ROLE_DEPARTMENT = {
  */
 export const CAPABILITIES = {
   /**
-   * จัดการระบบทั้งหมด — ✅ ผู้ใช้สั่งให้ "ผู้จัดการ" มีสิทธิ์สูงสุดเท่าแอดมิน ตั้งค่าได้ทุกอย่าง
-   * (เหตุผล/ข้อจำกัดเต็มอยู่ที่ da-app-server/src/config/roles.js)
+   * ⚠️ manageAll / manageSystem ไม่ได้อยู่ในตารางนี้แล้ว — เป็น "สิทธิ์ในระบบ" (SYSTEM_CAPABILITIES ด้านล่าง)
+   * ✅ ผู้ใช้สั่งให้แยก "สิทธิ์ในระบบ" ออกจาก "ตำแหน่งในองค์กร" — ตารางนี้เหลือเฉพาะสิ่งที่ตำแหน่งทำได้
    */
-  manageAll: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER],
   approveJobs: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER],
   viewAllJobs: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER],
   editAnyJob: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER],
@@ -136,6 +146,47 @@ export const CAPABILITIES = {
   /** เห็นใบของทุกคน + เบิกแทนคนอื่นได้ + ดูรายงานทั้งบริษัท */
   viewAllExpenses: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER],
 };
+
+/**
+ * ── สิทธิ์ในระบบ (คู่แฝดของ da-app-server/src/config/roles.js) ────────────────
+ * ✅ ผู้ใช้สั่ง: "ทำสิทธิ์ในระบบ และสิทธิ์ในองค์กรแยกกัน เช่นในระบบ Admin / Super Admin"
+ * ⚠️ ชื่อสามชั้นนี้เป็นภาษาอังกฤษและเปลี่ยนไม่ได้ (ผู้ใช้สั่ง — เป็นศัพท์ของระบบ กันสับสนกับตำแหน่ง
+ * "แอดมินช่าง" ในองค์กร) ส่วนตำแหน่งในองค์กรเปลี่ยนชื่อเองได้จากหน้าตั้งค่า
+ */
+export const SYSTEM_ROLES = { SUPER: "superadmin", ADMIN: "admin", MEMBER: "member" };
+export const ALL_SYSTEM_ROLES = Object.values(SYSTEM_ROLES);
+export const SYSTEM_ROLE_LABEL = {
+  [SYSTEM_ROLES.SUPER]: "Super Admin",
+  [SYSTEM_ROLES.ADMIN]: "Admin",
+  [SYSTEM_ROLES.MEMBER]: "Member",
+};
+export const SYSTEM_ROLE_DESC = {
+  [SYSTEM_ROLES.SUPER]: "ตั้งค่าองค์กร · ตารางสิทธิ์ · ตั้งผู้ดูแลระบบ · จัดการผู้ใช้ทั้งหมด",
+  [SYSTEM_ROLES.ADMIN]: "จัดการผู้ใช้และข้อมูลหลัก (ลูกค้า/ประเภทงาน) — แตะตั้งค่าระบบและตารางสิทธิ์ไม่ได้",
+  [SYSTEM_ROLES.MEMBER]: "ใช้งานตามตำแหน่งในองค์กรเท่านั้น",
+};
+const SYSTEM_CAPABILITIES = {
+  manageAll: [SYSTEM_ROLES.SUPER, SYSTEM_ROLES.ADMIN],
+  manageSystem: [SYSTEM_ROLES.SUPER],
+};
+/** ผู้ใช้ที่ยังไม่เคยตั้งชั้นในระบบ → เดาจากตำแหน่งในองค์กร (ตรงกับฝั่ง server) */
+export const DEFAULT_SYSTEM_ROLE = {
+  [ROLES.DIRECTOR]: SYSTEM_ROLES.SUPER,
+  [ROLES.MANAGER]: SYSTEM_ROLES.SUPER,
+  [ROLES.ADMIN]: SYSTEM_ROLES.ADMIN,
+  [ROLES.TECH_LEAD]: SYSTEM_ROLES.MEMBER,
+  [ROLES.TECHNICIAN]: SYSTEM_ROLES.MEMBER,
+  [ROLES.SALE]: SYSTEM_ROLES.MEMBER,
+  [ROLES.USER]: SYSTEM_ROLES.MEMBER,
+};
+
+export const systemRoleOf = (who) => {
+  const explicit = typeof who === "object" && who ? String(who.systemRole || "").trim().toLowerCase() : "";
+  if (ALL_SYSTEM_ROLES.includes(explicit)) return explicit;
+  return DEFAULT_SYSTEM_ROLE[normalizeRole(who)] || SYSTEM_ROLES.MEMBER;
+};
+
+export const systemRoleLabel = (who) => SYSTEM_ROLE_LABEL[systemRoleOf(who)] || "";
 
 export const ALL_CAPABILITIES = Object.keys(CAPABILITIES);
 
@@ -197,11 +248,30 @@ export const canManageUserOfRole = (actor, targetRole) =>
 let EFFECTIVE = null;
 
 /** @param {Record<string, string[]>|null} table  { capability: [role, ...] } */
+/**
+ * ชื่อตำแหน่งในองค์กรที่ผู้ดูแลตั้งเอง — ✅ ผู้ใช้ขอให้เปลี่ยนชื่อได้ (คีย์ของตำแหน่งคงเดิมเสมอ)
+ * โหลดมาพร้อมตั้งค่าองค์กร (ดู OrgSettingService) แล้วทับชื่อเริ่มต้นในไฟล์นี้
+ */
+let RANK_LABEL_OVERRIDES = {};
+export const setRankLabels = (map) => {
+  const clean = {};
+  Object.entries(map || {}).forEach(([role, label]) => {
+    const r = String(role || "").toLowerCase();
+    const text = String(label || "").trim();
+    if (text) clean[r] = text;
+  });
+  RANK_LABEL_OVERRIDES = clean;
+};
+
 export const setEffectiveCapabilities = (table) => {
   EFFECTIVE = table && typeof table === "object" ? table : null;
 };
 
 export const can = (who, capability) => {
+  // ✅ สิทธิ์ระดับระบบตัดสินด้วย "ชั้นในระบบ" ของผู้ใช้ ไม่เกี่ยวกับตำแหน่งในองค์กร
+  if (Object.prototype.hasOwnProperty.call(SYSTEM_CAPABILITIES, capability)) {
+    return SYSTEM_CAPABILITIES[capability].includes(systemRoleOf(who));
+  }
   const allowed = EFFECTIVE?.[capability] || CAPABILITIES[capability];
   if (!allowed) {
     // พิมพ์ชื่อสิทธิ์ผิด = ปฏิเสธไว้ก่อน แต่ต้องส่งเสียงดังพอให้เห็นตอน dev
@@ -220,4 +290,23 @@ export const isRole = (who, ...roles) =>
 /** ทางลัดที่ใช้บ่อยที่สุดในโค้ดเดิม — มีไว้ให้การย้ายโค้ดเก่าอ่านง่ายขึ้น */
 export const isAdminOrManager = (who) => isRole(who, ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER);
 
-export const roleLabel = (who) => ROLE_LABEL[normalizeRole(who)] || who?.role || "ผู้ใช้";
+/** ชื่อตำแหน่งที่แสดงจริง — ชื่อที่ผู้ดูแลตั้งเองมาก่อนชื่อเริ่มต้นของระบบ */
+export const rankLabel = (who) => {
+  const r = normalizeRole(who);
+  return RANK_LABEL_OVERRIDES[r] || RANK_LABEL[r] || who?.role || "ผู้ใช้";
+};
+
+/**
+ * นามแฝงของ Rank — คีย์ในฐานข้อมูลยังชื่อ role เหมือนเดิม แต่โค้ดใหม่ให้อ่านว่า Rank
+ * เพื่อให้ตรงกับคำที่ผู้ใช้เห็นบนหน้าจอ
+ */
+export const RANKS = ROLES;
+export const ALL_RANKS = ALL_ROLES;
+export const rankOf = (who) => normalizeRole(who);
+
+/**
+ * ตำแหน่งที่ใช้พิมพ์ใต้ชื่อคน — ตำแหน่งเฉพาะบุคคล > ค่าเก่า (rank) > ชื่อ Rank
+ * ⚠️ ต้องตรงกับ titleOf() ฝั่ง server — เอกสารที่สร้างสองทางต้องได้ตำแหน่งเหมือนกัน
+ */
+export const titleOf = (user) =>
+  String(user?.jobTitle || user?.rank || "").trim() || rankLabel(user?.role || user) || "";

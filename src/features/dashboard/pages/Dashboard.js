@@ -39,7 +39,7 @@ import { groupEventsByContract, nextVisitOverdueInfo } from "@/shared/utils/cont
 // ✅ ตรรกะติดตามใบเสนอราคาตัวกลาง — ใช้ร่วมกับหน้า /quotations และฝั่ง server เพื่อให้เกณฑ์/ตัวเลขตรงกัน
 import { getFollowUpInfo } from "@/shared/utils/quotationTracking";
 import { formatThai } from "@/shared/utils/thaiDate";
-import { can, isRole, roleLabel, ROLES, TECHNICIAN_ROLES } from "@/shared/utils/roles";
+import { can, isRole, rankLabel, ROLES, TECHNICIAN_ROLES } from "@/shared/utils/roles";
 import HomeMenu from "../components/HomeMenu";
 
 // 🎨 สีและไอคอนประจำสถานะงาน — ใช้ร่วมกันทั้ง Quick Stats และการ์ดงานวันนี้
@@ -983,7 +983,7 @@ const Dashboard = () => {
                   backgroundColor: accent.soft,
                 }}
               >
-                {roleLabel(role)}
+                {rankLabel(role)}
               </span>
             </div>
 

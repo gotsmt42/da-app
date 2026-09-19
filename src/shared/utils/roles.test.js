@@ -6,7 +6,7 @@
  * สองฝั่งให้ด้วย) ตรงนี้ดูเรื่องที่ script ตัวนั้นดูไม่ได้ เช่น การ normalize ค่าที่มาจากฐานข้อมูลจริง
  */
 import { describe, it, expect, vi } from "vitest";
-import { can, isRole, isAdminOrManager, normalizeRole, departmentOf, roleLabel, ROLES, DEPARTMENT, ALL_ROLES, CAPABILITIES, canAssignRole, canManageUserOfRole, roleLevel, ROLE_LABEL, TECHNICIAN_ROLES } from "./roles";
+import { can, isRole, isAdminOrManager, normalizeRole, departmentOf, rankLabel, ROLES, DEPARTMENT, ALL_ROLES, CAPABILITIES, canAssignRole, canManageUserOfRole, roleLevel, RANK_LABEL, TECHNICIAN_ROLES, RANKS, ALL_RANKS, systemRoleOf, setRankLabels, titleOf } from "./roles";
 
 describe("normalizeRole", () => {
   // ⚠️ role ถูกกรอกด้วยมือผ่านหน้าจัดการผู้ใช้ และเคยมีทั้งตัวใหญ่/ช่องว่างติดมา
@@ -134,7 +134,7 @@ describe("สิทธิ์เดิมต้องไม่เปลี่ย�
     expect(missing.sort()).toEqual([...EXPENSE_STEP_EXCEPTIONS].sort());
     expect(can(ROLES.DIRECTOR, "disburseExpense")).toBe(true);
     expect(roleLevel(ROLES.DIRECTOR)).toBeGreaterThan(roleLevel(ROLES.MANAGER));
-    expect(ROLE_LABEL[ROLES.DIRECTOR]).toBe("กรรมการผู้จัดการ");
+    expect(RANK_LABEL[ROLES.DIRECTOR]).toBe("กรรมการผู้จัดการ");
     // ⚠️ ผู้จัดการตั้ง/แตะบัญชีกรรมการผู้จัดการไม่ได้ (คนละระดับ)
     expect(canAssignRole(ROLES.MANAGER, ROLES.DIRECTOR)).toBe(false);
     expect(canManageUserOfRole(ROLES.MANAGER, ROLES.DIRECTOR)).toBe(false);
@@ -147,15 +147,15 @@ describe("สิทธิ์เดิมต้องไม่เปลี่ย�
     const caps = Object.keys(CAPABILITIES);
     const diff = caps.filter((c) => can(ROLES.TECHNICIAN, c) !== can(ROLES.TECH_LEAD, c));
     expect(diff).toEqual([]);
-    expect(ROLE_LABEL[ROLES.TECH_LEAD]).toBe("หัวหน้าช่างเทคนิค");
+    expect(RANK_LABEL[ROLES.TECH_LEAD]).toBe("หัวหน้าช่างเทคนิค");
     expect(TECHNICIAN_ROLES).toContain(ROLES.TECH_LEAD);
   });
 
   // ⚠️ ชื่อสิทธิ์บนหน้าจอต้องตรงกับที่ผู้ใช้สั่ง (แผนกช่าง)
   it("ชื่อสิทธิ์ภาษาไทยตรงตามที่ตั้งไว้", () => {
-    expect(ROLE_LABEL[ROLES.MANAGER]).toBe("ผู้จัดการแผนกช่าง");
-    expect(ROLE_LABEL[ROLES.ADMIN]).toBe("แอดมินช่าง");
-    expect(ROLE_LABEL[ROLES.TECHNICIAN]).toBe("ช่างเทคนิค");
+    expect(RANK_LABEL[ROLES.MANAGER]).toBe("ผู้จัดการแผนกช่าง");
+    expect(RANK_LABEL[ROLES.ADMIN]).toBe("แอดมินช่าง");
+    expect(RANK_LABEL[ROLES.TECHNICIAN]).toBe("ช่างเทคนิค");
   });
 
   it("editOperation คงชุดเดิมที่มี user แต่ไม่มีช่าง", () => {
@@ -178,10 +178,10 @@ describe("ตัวช่วยอื่น", () => {
     expect(departmentOf(ROLES.ADMIN)).toBe(null);
   });
 
-  it("roleLabel เป็นภาษาไทยทุกตัว ไม่มีค่าดิบหลุดไปถึงหน้าจอ", () => {
+  it("rankLabel เป็นภาษาไทยทุกตัว ไม่มีค่าดิบหลุดไปถึงหน้าจอ", () => {
     ALL_ROLES.forEach((r) => {
-      expect(roleLabel(r)).toBeTruthy();
-      expect(roleLabel(r)).not.toBe(r);
+      expect(rankLabel(r)).toBeTruthy();
+      expect(rankLabel(r)).not.toBe(r);
     });
   });
 });
@@ -197,5 +197,46 @@ describe("ความถูกต้องของตารางเอง", (
     Object.entries(CAPABILITIES).forEach(([capability, roles]) => {
       roles.forEach((r) => expect(ALL_ROLES, `${capability} → ${r}`).toContain(r));
     });
+  });
+});
+
+/**
+ * Role (ตำแหน่งในระบบ) กับ Rank (ตำแหน่งในองค์กร) — ✅ ผู้ใช้สั่งให้แยกจากกันขาด
+ * ⚠️ การสลับสองคำนี้คือบั๊กด้านสิทธิ์ที่เงียบที่สุด — ทดสอบไว้ให้ชัด
+ */
+describe("Role กับ Rank แยกกัน", () => {
+  it("Rank เรียงจากสิทธิ์มากไปน้อย (คอลัมน์ในตารางสิทธิ์ก็เรียงตามนี้)", () => {
+    expect(ALL_ROLES).toEqual(["director", "manager", "admin", "techlead", "technician", "sale", "user"]);
+  });
+
+  it("RANKS เป็นชื่อเรียกใหม่ของ ROLES (คีย์เดิมทั้งหมด ไม่มีการย้ายข้อมูล)", () => {
+    expect(RANKS).toBe(ROLES);
+    expect(ALL_RANKS).toBe(ALL_ROLES);
+  });
+
+  it("Role เดาจาก Rank ได้เมื่อยังไม่เคยตั้ง (ผู้ใช้เก่าไม่ต้องย้ายข้อมูล)", () => {
+    expect(systemRoleOf({ role: "manager" })).toBe("superadmin");
+    expect(systemRoleOf({ role: "admin" })).toBe("admin");
+    expect(systemRoleOf({ role: "technician" })).toBe("member");
+  });
+
+  it("ตั้ง Role เองแล้วชนะค่าที่เดา — ช่างเป็น Super Admin ได้ แต่ Rank ยังเป็นช่าง", () => {
+    const techBoss = { role: "technician", systemRole: "superadmin" };
+    expect(can(techBoss, "manageSystem")).toBe(true);
+    expect(can(techBoss, "approveExpense")).toBe(false);
+    expect(rankLabel(techBoss)).toBe("ช่างเทคนิค");
+  });
+
+  it("เปลี่ยนชื่อ Rank แล้วทุกหน้าจอเห็นชื่อใหม่ (องค์กรอื่นตั้งชื่อเองได้)", () => {
+    setRankLabels({ admin: "ธุรกาช่าง" });
+    expect(rankLabel("admin")).toBe("ธุรกาช่าง");
+    setRankLabels({});
+    expect(rankLabel("admin")).toBe("แอดมินช่าง");
+  });
+
+  it("titleOf: ตำแหน่งเฉพาะบุคคล > ค่าเก่า (rank) > ชื่อ Rank", () => {
+    expect(titleOf({ role: "technician", jobTitle: "ช่างแอร์อาวุโส" })).toBe("ช่างแอร์อาวุโส");
+    expect(titleOf({ role: "technician", rank: "ช่างเก่า" })).toBe("ช่างเก่า");
+    expect(titleOf({ role: "technician" })).toBe("ช่างเทคนิค");
   });
 });

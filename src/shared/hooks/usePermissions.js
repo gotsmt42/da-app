@@ -17,7 +17,7 @@ import {
   departmentOf,
   isRole as isRoleOf,
   isAdminOrManager as isAdminOrManagerOf,
-  roleLabel,
+  rankLabel,
 } from "@/shared/utils/roles";
 
 export default function usePermissions() {
@@ -29,7 +29,7 @@ export default function usePermissions() {
   return useMemo(
     () => ({
       role,
-      label: roleLabel(role),
+      label: rankLabel(role),
       department: departmentOf(role),
       can: (capability) => canWithRole(role, capability),
       isRole: (...roles) => isRoleOf(role, ...roles),

@@ -16,7 +16,7 @@ import {
 import CloseIcon from "@mui/icons-material/Close";
 import PhotoCameraOutlinedIcon from "@mui/icons-material/PhotoCameraOutlined";
 import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
-import { roleLabel } from "@/shared/utils/roles";
+import { rankLabel, systemRoleLabel } from "@/shared/utils/roles";
 
 // ---- Design tokens (shared across the app) --------------------------------
 const COLOR = {
@@ -164,14 +164,15 @@ const EditProductModal = ({
             />
           </Grid>
           <Grid item xs={12} sm={6}>
-            {/* ✅ ตำแหน่งย้ายมาอยู่ฝั่ง "แก้ไขได้" — เป็นข้อมูลที่พิมพ์ใต้ชื่อในเอกสารจริง ต้องแก้เองได้ */}
+            {/* ✅ ตำแหน่งเฉพาะบุคคล — ข้อความที่พิมพ์ใต้ชื่อในเอกสารจริง จึงแก้เองได้ (คนละส่วนกับ Rank) */}
             <TextField
-              label="ตำแหน่ง"
+              label="ตำแหน่งเฉพาะบุคคล (พิมพ์ในเอกสาร)"
               placeholder="เช่น ช่างเทคนิคอาวุโส / ผู้ช่วยผู้จัดการ"
+              helperText="เว้นว่าง = ใช้ชื่อ Rank ของตำแหน่ง"
               fullWidth
               size="small"
-              defaultValue={editedData?.rank}
-              onChange={(e) => setEditedData({ ...editedData, rank: e.target.value })}
+              defaultValue={editedData?.jobTitle ?? editedData?.rank ?? ""}
+              onChange={(e) => setEditedData({ ...editedData, jobTitle: e.target.value })}
               sx={fieldSx}
             />
           </Grid>
@@ -230,13 +231,26 @@ const EditProductModal = ({
             />
           </Grid>
           <Grid item xs={12} sm={6}>
-            {/* ⚠️ สิทธิ์เปลี่ยนได้จากหน้าทะเบียนพนักงานเท่านั้น (ต้องยืนยันรหัสผ่าน) — ที่นี่แสดงอย่างเดียว */}
+            {/* ⚠️ Rank เปลี่ยนได้จากหน้าทะเบียนพนักงานเท่านั้น (ต้องยืนยันรหัสผ่าน) — ที่นี่แสดงอย่างเดียว */}
             <TextField
-              label="สิทธิ์การใช้งาน"
+              label="Rank · ตำแหน่งในองค์กร"
+              helperText="ตัวกำหนดว่าทำงานอะไรได้บ้าง"
               fullWidth
               size="small"
               disabled
-              value={roleLabel(editedData) || "-"}
+              value={rankLabel(editedData) || "-"}
+              sx={fieldSx}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            {/* ⚠️ Role (ตำแหน่งในระบบ) — ตั้งได้ที่หน้าตั้งค่าสิทธิ์ โดย Super Admin เท่านั้น */}
+            <TextField
+              label="Role · ตำแหน่งในระบบ"
+              helperText="ระดับการดูแลระบบ — ตั้งได้ที่หน้าตั้งค่าสิทธิ์"
+              fullWidth
+              size="small"
+              disabled
+              value={systemRoleLabel(editedData) || "-"}
               sx={fieldSx}
             />
           </Grid>

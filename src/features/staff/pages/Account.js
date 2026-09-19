@@ -16,7 +16,7 @@ import EditModal from "../components/EditStaffModal";
 
 import AuthService from "@/shared/services/authService";
 import { useAuth } from "@/features/auth/AuthContext";
-import { roleLabel } from "@/shared/utils/roles";
+import { rankLabel, systemRoleLabel, titleOf } from "@/shared/utils/roles";
 
 // ---- Design tokens (shared with the files page) --------------------------
 const COLOR = {
@@ -102,8 +102,10 @@ const Account = () => {
   const infoItems = [
     { icon: EmailOutlinedIcon, label: "อีเมล", value: user?.email || "-" },
     { icon: PhoneOutlinedIcon, label: "เบอร์โทร", value: user?.tel || "-" },
-    { icon: BadgeOutlinedIcon, label: "สิทธิ์การใช้งาน", value: roleLabel(user) || "-" },
-    { icon: WorkOutlineIcon, label: "ตำแหน่ง", value: user?.rank || "ยังไม่ระบุ" },
+    // Rank = ตำแหน่งในองค์กร (ทำงานอะไรได้) · Role = ตำแหน่งในระบบ (ดูแลระบบได้แค่ไหน)
+    { icon: BadgeOutlinedIcon, label: "Rank · ตำแหน่งในองค์กร", value: rankLabel(user) || "-" },
+    { icon: BadgeOutlinedIcon, label: "Role · ตำแหน่งในระบบ", value: systemRoleLabel(user) || "-" },
+    { icon: WorkOutlineIcon, label: "ตำแหน่งเฉพาะบุคคล (ในเอกสาร)", value: titleOf(user) || "ยังไม่ระบุ" },
   ];
 
   /** คัดลอกอีเมล/เบอร์ — แทนไอคอนโซเชียลปลอมที่ลิงก์ไปไหนไม่ได้ */
@@ -212,7 +214,7 @@ const Account = () => {
                 >
                   {user?.role && (
                     <Chip
-                      label={roleLabel(user)}
+                      label={rankLabel(user)}
                       size="small"
                       sx={{
                         fontFamily: FONT_UI,
@@ -223,9 +225,9 @@ const Account = () => {
                       }}
                     />
                   )}
-                  {user?.rank && (
+                  {titleOf(user) && titleOf(user) !== rankLabel(user) && (
                     <Chip
-                      label={user.rank}
+                      label={titleOf(user)}
                       size="small"
                       variant="outlined"
                       sx={{
