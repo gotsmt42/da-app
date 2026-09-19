@@ -43,7 +43,7 @@ import ExpensePrintDialog from "./ExpensePrintDialog";
 import BankAccountPicker from "./BankAccountPicker";
 import {
   KIND_META, EXPENSE_CATEGORIES, categoryMeta, FILE_KINDS, baht, fmtMoney, itemAmount, itemsTotal,
-  differenceMeta, money, jobText, jobSubject, itemPersonName, personFullName, slipKind, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
+  differenceMeta, money, jobText, jobSubject, jobRangeText, jobPartText, itemPersonName, personFullName, slipKind, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
 } from "../expenseMeta";
 
 const MAX_ITEMS = 40;
@@ -712,7 +712,8 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
                 disabled={Boolean(presetJob) && !editing}
                 onInputChange={(_, v, reason) => { if (reason === "input") setJobQuery(v); if (reason === "clear") setJobQuery(""); }}
                 isOptionEqualToValue={(o, v) => o._id === v._id}
-                getOptionLabel={(o) => (o ? jobText(o) || o.title || "" : "")}
+                // ✅ ค่าที่เลือกแล้วต้องเห็นช่วงวันที่ด้วย — งานที่เข้าหลายช่วง ชื่องานอย่างเดียวแยกไม่ออกว่าเป็นการเข้างานรอบไหน
+                getOptionLabel={(o) => (o ? [jobText(o) || o.title || "", jobRangeText(o)].filter(Boolean).join(" · ") : "")}
                 // 🔒 ใบ Advance: งานที่มีใบแล้วเลือกไม่ได้ (ยกเว้นงานของใบที่กำลังแก้อยู่เอง)
                 getOptionDisabled={(o) => kind === "advance" && Boolean(o.advance) && o.advance._id !== expense?._id}
                 noOptionsText="ไม่พบงาน"
@@ -725,20 +726,27 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
                           และไม่มี "ครั้งที่" งาน PM ของโครงการเดียวกันหลายครั้งจึงแยกกันไม่ได้เลย
                           ⚠️ ไม่ตัดคำ (noWrap) บรรทัดหลัก — ชื่อโครงการยาวต้องอ่านได้ครบ ไม่ใช่ถูกตัดเป็น "..." */}
                       <Box sx={{ minWidth: 0, flex: 1 }}>
-                        <Typography sx={{ fontSize: "0.86rem", fontWeight: 700, lineHeight: 1.35 }}>{jobText(o) || o.title}</Typography>
-                        <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", lineHeight: 1.35 }} component="div">
+                        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexWrap: "wrap", rowGap: 0.25 }}>
+                          <Typography sx={{ fontSize: "0.86rem", fontWeight: 700, lineHeight: 1.35 }}>{jobText(o) || o.title}</Typography>
+                          {/* ✅ งานเดียวกันที่เข้าหลายช่วง จะขึ้นชื่อซ้ำกันหลายบรรทัด — ป้ายนี้คือสิ่งที่แยกแต่ละแถวออกจากกัน */}
+                          {jobPartText(o) && (
+                            <Chip size="small" label={jobPartText(o)}
+                              sx={{ height: 18, fontSize: "0.65rem", fontWeight: 800, bgcolor: alpha("#0f766e", 0.12), color: "#0f766e" }} />
+                          )}
+                        </Stack>
+                        <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", lineHeight: 1.4 }} component="div">
                           {[
-                            // ⚠️ แสดงแค่วันเริ่ม — end ของงานทั้งวันในปฏิทินเป็นแบบ "ไม่รวมวันสุดท้าย" (+1 วัน) ถ้าเอามาโชว์ตรงๆ จะเกินจริง 1 วัน
-                            o.start ? `วันที่ ${thaiDate(o.start)}` : "",
+                            // ✅ ช่วงวันที่เต็ม (เริ่ม–สิ้นสุด · กี่วัน) — แยกช่วงที่เข้าคนละรอบของงานเดียวกันออกจากกันได้
+                            jobRangeText(o),
                             o.company && o.site && o.company !== o.site ? `บริษัท ${o.company}` : "",
-                            o.teamNames?.length ? `ทีม ${o.teamNames.join(", ")}` : "",
+                            o.teamNames?.length ? `ผู้เข้างานช่วงนี้ ${o.teamNames.join(", ")}` : "",
                             o.docNo ? `เลขที่ ${o.docNo}` : "",
                             o.status || "",
                           ].filter(Boolean).join(" · ")}
                         </Typography>
                       </Box>
                       {taken && (
-                        <Chip size="small" label={`มีใบแล้ว ${o.advance.docNo}`}
+                        <Chip size="small" label={`ช่วงนี้มีใบแล้ว ${o.advance.docNo}`}
                           sx={{ ml: 1, flexShrink: 0, height: 20, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha(KIND_META.advance.color, 0.12), color: KIND_META.advance.dark }} />
                       )}
                     </li>
@@ -750,7 +758,9 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
                     error={Boolean(jobAdvance)}
                     helperText={presetJob && !editing
                       ? "เปิดจากตารางงาน — ผูกกับงานนี้แล้ว"
-                      : kind === "advance" ? "1 งานออกใบ Advance ได้ใบเดียว · ผูกงานแล้วดูงบที่ใช้ได้ในหน้ารายงาน" : "ผูกงานแล้วจะดูได้ว่างานนี้ใช้งบไปเท่าไรในหน้ารายงาน"}
+                      : kind === "advance"
+                        ? "1 ช่วงงานออกได้ 1 ใบ — งานที่เข้าหลายช่วง เบิกแยกได้ทุกช่วง · ผูกงานแล้วดูงบที่ใช้ได้ในหน้ารายงาน"
+                        : "ผูกงานแล้วจะดูได้ว่างานนี้ใช้งบไปเท่าไรในหน้ารายงาน"}
                     InputProps={{ ...params.InputProps, endAdornment: (<>{jobLoading || jobAdvanceChecking ? <CircularProgress size={16} /> : null}{params.InputProps.endAdornment}</>) }} />
                 )}
               />

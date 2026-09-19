@@ -409,6 +409,90 @@ function injectStyles() {
       box-shadow: 0 0 0 3px rgba(37,99,235,.10);
     }
     .ee-range-sep { flex-shrink: 0; color: #cbd5e1; font-weight: 700; font-size: 13px; }
+    /* ── ทีมของแต่ละช่วง (ผู้ใช้สั่ง: บางช่วงคนเข้าไม่ตรงกัน) ───────────────────────────
+       ⚠️ ต้องดูออกทันทีว่าช่วงนี้ "ใช้ทีมเดียวกับงานหลัก" หรือ "ตั้งทีมของตัวเอง" — ไม่งั้นจะเดาไม่ออก
+       ว่าช่องที่ว่างอยู่แปลว่าไม่มีคน หรือแปลว่าตามงานหลัก จึงใช้ช่องติ๊กบอกให้ชัดแทนการเดาจากค่าว่าง */
+    /* ปุ่มเบิกของช่วงนั้นๆ — ผู้ใช้สั่ง "ให้กดเบิกตามช่วงตรงนี้ได้ด้วย"
+       ⚠️ ต้องอ่านออกว่าเบิกของ "ช่วงนี้" ไม่ใช่ทั้งงาน ข้อความบนปุ่มจึงพูดคำว่าช่วงเสมอ */
+    /* เมนูของช่วงนั้นๆ — ผู้ใช้สั่ง "เอาเมนูมาไว้ตรงนี้ด้วย"
+       ⚠️ ทุกคำสั่งในเมนูนี้ทำกับ "ช่วงวันที่นี้" เท่านั้น ไม่ใช่ทั้งงาน จึงต้องเขียนคำว่าช่วงกำกับไว้ */
+    /* รายการช่วงวันที่ในเมนูล่าง — ปุ่มละช่วง กดแล้วเบิกของช่วงนั้นทันที */
+    .ee-range-picker { padding: 4px 6px 6px 30px; display: flex; flex-direction: column; gap: 4px; }
+    .ee-range-picker button {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%;
+      border: 1px solid #e2e8f0; background: #fff; border-radius: 8px; padding: 7px 10px;
+      font-size: 12.5px; font-weight: 600; color: #334155; cursor: pointer; text-align: left;
+    }
+    .ee-range-picker button:hover:not(:disabled) { background: #f8fafc; }
+    .ee-range-picker button:disabled { opacity: .6; cursor: not-allowed; }
+    .ee-range-picker .ee-range-picker-state { font-size: 11.5px; font-weight: 700; color: #1d4ed8; flex-shrink: 0; }
+    .ee-range-actions { position: relative; flex-shrink: 0; }
+    .ee-range-more {
+      border: 1px solid #e2e8f0; background: #fff; color: #475569; border-radius: 8px;
+      padding: 3px 9px; font-size: 13px; font-weight: 800; cursor: pointer; line-height: 1.4;
+    }
+    .ee-range-more:hover { background: #f8fafc; }
+    .ee-range-menu {
+      position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; min-width: 208px;
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 5px;
+      box-shadow: 0 12px 28px rgba(15, 23, 42, .16);
+    }
+    .ee-range-menu button {
+      display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+      border: 0; background: transparent; border-radius: 7px; padding: 8px 9px;
+      font-size: 12.5px; font-weight: 600; color: #334155; cursor: pointer;
+    }
+    .ee-range-menu button:hover:not(:disabled) { background: #f1f5f9; }
+    .ee-range-menu button:disabled { opacity: .55; cursor: not-allowed; }
+    .ee-range-menu .ee-range-menu--danger { color: #dc2626; }
+    .ee-range-menu hr { border: 0; border-top: 1px solid #f1f5f9; margin: 4px 2px; }
+    .ee-range-advance {
+      flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px;
+      border: 1px solid #bbf7d0; background: #f0fdf4; color: #15803d;
+      border-radius: 8px; padding: 4px 9px; font-size: 12px; font-weight: 700; cursor: pointer;
+    }
+    .ee-range-advance:hover:not(:disabled) { background: #dcfce7; }
+    .ee-range-advance:disabled { opacity: .65; cursor: not-allowed; }
+    /* ช่วงที่มีใบแล้ว — โทนน้ำเงินเพื่อบอกว่า "ไปดูใบเดิม" ไม่ใช่ "สร้างใหม่" */
+    .ee-range-advance--exists { border-color: #bfdbfe; background: #eff6ff; color: #1d4ed8; }
+    .ee-range-team { margin-top: 8px; border-top: 1px dashed #e2e8f0; padding-top: 8px; }
+    /* ✅ สรุป "ใครเข้างานช่วงนี้" ให้เห็นทันทีโดยไม่ต้องกางฟอร์ม (ผู้ใช้สั่ง: แสดงให้สมบูรณ์) */
+    /* ✅ ผู้ใช้สั่ง: "ถ้ามันยาวเกินให้ทำให้พับเปิดปิดได้ ไม่ให้กินพื้นที่ส่วนอื่นเกินไป"
+       งานที่เข้าหลายช่วง (4-5 ช่วงขึ้นไป) ดันช่องเวลา/สถานะ/ปุ่มบันทึกตกไปไกลมาก ต้องพับเก็บได้ */
+    .ee-range-listhead {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;
+      background: #f8fafc; border: 1px solid #eef2f7; border-radius: 10px; padding: 7px 10px;
+    }
+    .ee-range-toggle {
+      display: inline-flex; align-items: center; gap: 7px; border: 0; background: transparent;
+      padding: 0; font-size: 13px; font-weight: 800; color: #0f172a; cursor: pointer;
+    }
+    .ee-range-toggle:hover { color: #2563eb; }
+    /* ลูกศรหมุนแทนการสลับตัวอักษร — เปลี่ยนสถานะแล้วรู้สึกต่อเนื่อง ไม่กระตุก */
+    .ee-range-caret { display: inline-block; transition: transform .18s ease; font-size: 11px; color: #64748b; }
+    .ee-range-toggle[aria-expanded="false"] .ee-range-caret { transform: rotate(-90deg); }
+    .ee-range-count {
+      display: inline-flex; align-items: center; background: #e0e7ff; color: #3730a3;
+      border-radius: 999px; padding: 1px 8px; font-size: 11.5px; font-weight: 800;
+    }
+    .ee-range-listsum { font-size: 12px; color: #64748b; font-weight: 600; margin-left: auto; text-align: right; }
+    /* เปิดอยู่แต่ยาวมาก → ให้เลื่อนในกรอบของตัวเอง ไม่ดันส่วนอื่นของฟอร์มหาย */
+    #ee-multiDateList.ee-range-list--scroll { max-height: 330px; overflow-y: auto; padding-right: 4px; }
+    .ee-range-people { display: block; font-size: 12px; color: #475569; margin-top: 6px; line-height: 1.5; }
+    .ee-range-people b { color: #0f172a; font-weight: 700; }
+    .ee-range-people em { font-style: normal; color: #94a3b8; }
+    .ee-range-hint { display: block; font-size: 11.5px; color: #94a3b8; margin-top: 4px; }
+    .ee-range-same { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: #475569; font-weight: 600; cursor: pointer; }
+    .ee-range-same input { width: 15px; height: 15px; accent-color: #2563eb; cursor: pointer; }
+    .ee-range-team-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+    /* 🐛 ที่แก้: เดิมใช้คลาสเดียวกับป้าย "เริ่ม/ถึง" ซึ่งถูกบีบความกว้างไว้ให้พอดีคำสั้นๆ
+       พอเอามาใส่ข้อความยาว ("หัวหน้างานช่วงนี้") ตัวอักษรเลยตกบรรทัดทีละตัว อ่านไม่ออกเลย
+       ✅ ป้ายในกล่องนี้ต้องเป็นบรรทัดเต็มความกว้างของคอลัมน์ ไม่จำกัดความกว้าง ไม่ตัดคำ */
+    .ee-range-team-cap {
+      display: block; width: 100%; min-width: 0; white-space: nowrap;
+      font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 5px;
+    }
+    @media (max-width: 640px) { .ee-range-team-fields { grid-template-columns: 1fr; } }
     /* จอแคบ: วางช่องเริ่ม/ถึงซ้อนกันเป็นบรรทัดละช่อง — สองช่องเรียงข้างกันที่ความกว้างนี้เหลือช่องละ
        ~130px ซึ่งปฏิทินของเบราว์เซอร์แสดงวันที่ไม่ครบ · ป้าย "เริ่ม/ถึง" ทำหน้าที่แทนลูกศรได้อยู่แล้ว
        ลูกศรแนวนอนกลางคอลัมน์แนวตั้งจะกลายเป็นสัญลักษณ์ที่ไม่ได้ชี้อะไร จึงซ่อนไป */
@@ -1564,6 +1648,14 @@ export const getEditEvent = async ({
     </div>
 
     <div id="ee-multiDateSection" style="${hasSiblings ? "" : "display:none;"}">
+      <div class="ee-range-listhead">
+        <button type="button" class="ee-range-toggle" id="ee-rangeToggle" aria-expanded="true" title="ย่อ/ขยายรายการช่วงวันที่">
+          <span class="ee-range-caret" id="ee-rangeToggleIcon">▾</span>
+          <span id="ee-rangeToggleText">ช่วงวันที่</span>
+          <span class="ee-range-count" id="ee-rangeCount"></span>
+        </button>
+        <span class="ee-range-listsum" id="ee-rangeSummary"></span>
+      </div>
       <div id="ee-multiDateList"></div>
       ${isViewOnly ? "" : `<button type="button" class="ee-btn ee-btn-ghost" id="ee-addDateBtn" style="margin-bottom:12px;">➕ เพิ่มช่วงวันที่</button>`}
     </div>
@@ -1650,7 +1742,11 @@ export const getEditEvent = async ({
     <!-- เมนูเพิ่มเติม — ซ่อนไว้จนกว่าจะกด · เรียงจาก "ใช้บ่อย → อันตราย" ให้ปุ่มลบอยู่ท้ายสุดเสมอ -->
     <div id="ee-more-menu" hidden>
       ${/* ✅ เบิก Advance อยู่บนสุดของเมนู (ผู้ใช้สั่ง "ทำให้อยู่บนสุด") — เป็นสิ่งที่คนเปิดเมนูนี้กดบ่อยที่สุด */""}
-      ${canRequestAdvance ? `<button class="ee-more-item" id="btnRequestAdvance"><span>💵</span> <b id="ee-adv-label" class="ee-more-item-text">เบิก Advance งานนี้</b></button>` : ""}
+      ${canRequestAdvance ? `<button class="ee-more-item" id="btnRequestAdvance"><span>💵</span> <b id="ee-adv-label" class="ee-more-item-text">${hasSiblings ? "เบิก Advance ช่วงที่เปิดอยู่" : "เบิก Advance งานนี้"}</b></button>` : ""}
+      ${/* ✅ ผู้ใช้สั่ง: "เอาเมนูมาไว้ตรงนี้ด้วย ผู้ใช้ใช้ยาก" — งานที่เข้าหลายช่วง เลือกช่วงที่จะเบิกได้จากเมนูนี้เลย
+            ไม่ต้องเลื่อนไปหาการ์ดของช่วงนั้นในรายการวันที่ */""}
+      ${canRequestAdvance && hasSiblings ? `<button class="ee-more-item" id="btnAdvanceByRange"><span>🗓</span> <span class="ee-more-item-text">เบิก Advance ตามช่วงวันที่…</span></button>
+      <div id="ee-advance-range-list" class="ee-range-picker" hidden></div>` : ""}
       ${canViewOperation ? `<button class="ee-more-item" id="btnViewSchedule"><span>📊</span> ดูการดำเนินงาน</button>` : ""}
       ${readOnly ? "" : `<button class="ee-more-item" id="btnGeneratePDF"><span>📄</span> ออกใบแจ้งเข้างาน</button>`}
       ${canEditDocFields && onOpenDeliveryNote ? `<button class="ee-more-item" id="btnDeliveryNote"><span>📦</span> ออกใบส่งมอบงาน</button>` : ""}
@@ -2061,9 +2157,27 @@ export const getEditEvent = async ({
       const multiSection  = document.getElementById("ee-multiDateSection");
       const multiDateList = document.getElementById("ee-multiDateList");
 
+      /** TomSelect ของช่องเลือกคนในแถวช่วง (ทั้งหัวหน้างานและลูกทีม — ลูกทีมเป็น select multiple) */
+      const mkRangePersonTs = (el, placeholder) => {
+        if (!el) return null;
+        try {
+          const ts = new TomSelect(el, {
+            create: true,
+            maxOptions: 20,
+            placeholder,
+            sortField: { field: "text", direction: "asc" },
+            allowEmptyOption: true,
+            dropdownParent: "body",
+            plugins: el.multiple ? ["remove_button"] : [],
+          });
+          ts.clear(true);   // ⚠️ กัน option แรกถูกเลือกอัตโนมัติตาม HTML spec (เทียบ mkTsCleared)
+          return ts;
+        } catch { return null; }
+      };
+
       // แถวละ 1 ช่วงวันที่ (เริ่ม–สิ้นสุด) ติด data-event-id ถ้าผูกกับ event ที่มีอยู่จริงแล้ว
       // (แถวใหม่ที่เพิ่งกด "เพิ่มช่วงวันที่" ยังไม่มี data-event-id จนกว่าจะกดบันทึก)
-      const addDateRow = (startValue = "", endValue = "", eventIdAttr = "") => {
+      const addDateRow = (startValue = "", endValue = "", eventIdAttr = "", preset = {}) => {
         const row = document.createElement("div");
         row.className = "ee-multi-date-row";
         if (eventIdAttr) row.dataset.eventId = eventIdAttr;
@@ -2071,7 +2185,20 @@ export const getEditEvent = async ({
           <div class="ee-range-head">
             <span class="ee-range-no"></span>
             <span class="ee-range-preview" title="วันที่ของช่วงนี้ (วัน เดือน ปี)"></span>
-            ${isViewOnly ? "" : `<button type="button" class="ee-btn ee-btn-ghost ee-multi-date-remove" title="ลบทั้งช่วงนี้ออกจากงาน">✕</button>`}
+            ${eventIdAttr ? `
+            <div class="ee-range-actions">
+              <button type="button" class="ee-range-more" title="ตัวเลือกของช่วงวันที่นี้" aria-expanded="false">⋯ เพิ่มเติม</button>
+              <div class="ee-range-menu" hidden>
+                ${canRequestAdvance ? `<button type="button" class="ee-range-advance"><span>💵</span> <span class="ee-range-advance-text">เบิก Advance ช่วงนี้</span></button>` : ""}
+                ${canViewOperation ? `<button type="button" class="ee-range-operation"><span>📊</span> ดูการดำเนินงานช่วงนี้</button>` : ""}
+                ${readOnly ? "" : `<button type="button" class="ee-range-worknotice"><span>📄</span> ออกใบแจ้งเข้างานช่วงนี้</button>`}
+                ${canEditDocFields && onOpenDeliveryNote ? `<button type="button" class="ee-range-delivery"><span>📦</span> ออกใบส่งมอบงานช่วงนี้</button>` : ""}
+                ${isViewOnly ? "" : `<hr><button type="button" class="ee-range-menu--danger ee-range-delete"><span>🗑</span> ลบช่วงวันที่นี้</button>`}
+              </div>
+            </div>` : ""}
+            ${/* ✅ แถวที่บันทึกแล้วมีคำสั่งลบอยู่ในเมนู "⋯ เพิ่มเติม" แล้ว จึงไม่ต้องมีปุ่ม ✕ ซ้ำให้รก
+                  เหลือ ✕ ไว้เฉพาะแถวที่เพิ่งกดเพิ่มแต่ยังไม่บันทึก (แถวพวกนี้ยังไม่มีเมนู) */""}
+            ${isViewOnly || eventIdAttr ? "" : `<button type="button" class="ee-btn ee-btn-ghost ee-multi-date-remove" title="เอาช่วงนี้ออก">✕</button>`}
           </div>
           <div class="ee-range-body">
             <div class="ee-range-field">
@@ -2082,6 +2209,26 @@ export const getEditEvent = async ({
             <div class="ee-range-field">
               <span class="ee-range-cap">ถึง</span>
               <input type="date" class="ee-range-end" value="${endValue || startValue}" ${isViewOnly ? "disabled" : ""}>
+            </div>
+          </div>
+          <!-- ✅ ผู้ใช้สั่ง: "กำหนดหัวหน้างาน และลูกทีมของแต่ละช่วงงานแยกกันได้ บางทีคนเข้าไม่ตรงกัน"
+               ⚠️ "ผู้รับผิดชอบหลัก" ของงานยังเป็นคนเดิมทั้งงาน — ตรงนี้คือ "คนที่เข้าหน้างานช่วงนี้" เท่านั้น -->
+          <div class="ee-range-team">
+            <label class="ee-range-same">
+              <input type="checkbox" class="ee-range-sameTeam" ${isViewOnly ? "disabled" : ""} checked>
+              ใช้ทีมเดียวกับงานหลัก
+            </label>
+            <span class="ee-range-people"></span>
+            <div class="ee-range-team-fields" style="display:none;">
+              <div>
+                <span class="ee-range-team-cap">👷 หัวหน้างานช่วงนี้</span>
+                <select class="ee-range-lead" ${isViewOnly ? "disabled" : ""}><option value="">— เลือก —</option>${teamOpts}</select>
+              </div>
+              <div>
+                <span class="ee-range-team-cap">👥 ลูกทีมช่วงนี้</span>
+                <select class="ee-range-members" multiple ${isViewOnly ? "disabled" : ""}>${teamOpts}</select>
+                <span class="ee-range-hint">เลือกได้หลายคน · พิมพ์ชื่อที่ยังไม่มีในระบบเพื่อเพิ่มเองได้</span>
+              </div>
             </div>
           </div>
         `;
@@ -2112,7 +2259,7 @@ export const getEditEvent = async ({
             : `${ms.format("D MMM")} – ${formatThai(me, "D MMM YYYY")} · ${days} วัน`;
         };
         refreshPreview();
-        row.querySelector(".ee-multi-date-remove")?.addEventListener("click", () => {
+        const removeThisRange = () => {
           // ต้องเหลืออย่างน้อย 1 แถวเสมอ กันผู้ใช้ลบจนหมด
           if (multiDateList.children.length <= 1) return;
           const rowEventId = row.dataset.eventId;
@@ -2155,12 +2302,163 @@ export const getEditEvent = async ({
               confirmBar.remove();
             }
           });
-        });
+        };
+        row.querySelector(".ee-multi-date-remove")?.addEventListener("click", removeThisRange);
         // ✅ อัปเดตป้ายวันที่ + จัดเรียงแถวใหม่ทุกครั้งที่มีการเปลี่ยนวันที่ในแถวนี้
         row.querySelectorAll("input[type=date]").forEach((input) => {
           input.addEventListener("change", () => { refreshPreview(); sortDateRows(); });
         });
         multiDateList.appendChild(row);
+
+        /* ── ทีมของช่วงนี้ ─────────────────────────────────────────────────────────
+           ⚠️ ต้อง appendChild ก่อนค่อยสร้าง TomSelect เสมอ (อ่าน getComputedStyle ตอน construct)
+           ⚠️ เก็บ instance ไว้บน element เพื่อให้ตอนกดบันทึกอ่านค่าที่เลือกได้แน่นอน ไม่ต้องพึ่ง
+           selectedOptions ของ <select> ที่ TomSelect ซ่อนไว้ */
+        const sameEl = row.querySelector(".ee-range-sameTeam");
+        const fieldsEl = row.querySelector(".ee-range-team-fields");
+        const leadTs = mkRangePersonTs(row.querySelector(".ee-range-lead"), "เลือกหัวหน้างานของช่วงนี้");
+        const membersTs = mkRangePersonTs(row.querySelector(".ee-range-members"), "เลือกลูกทีมของช่วงนี้");
+        row._leadTs = leadTs;
+        row._membersTs = membersTs;
+
+        /**
+         * ✅ ผู้ใช้สั่ง: "ให้กดเบิกตามช่วงตรงนี้ได้ด้วย"
+         * เบิกของ "ช่วงนี้" โดยตรง ไม่ต้องปิดฟอร์มไปเปิดเมนูอื่นแล้วมาเดาว่าใบนี้ของรอบไหน
+         * ⚠️ แถวที่เพิ่งเพิ่มแต่ยังไม่กดบันทึก ยังไม่มี event จริงในระบบ จึงไม่มีปุ่มให้กด (ต้องบันทึกก่อน)
+         * ⚠️ 1 ช่วง = 1 ใบ — ถ้าช่วงนี้มีใบแล้ว ปุ่มเปลี่ยนเป็น "ดูใบเดิม" (server ตรวจซ้ำตอนบันทึกอีกชั้น)
+         */
+        /* เปิด/ปิดเมนูของช่วงนี้ — ปิดเมนูของช่วงอื่นก่อนเสมอ กันเปิดค้างพร้อมกันหลายอัน */
+        const moreBtn = row.querySelector(".ee-range-more");
+        const menuEl = row.querySelector(".ee-range-menu");
+        if (moreBtn && menuEl) {
+          const closeMenu = () => { menuEl.hidden = true; moreBtn.setAttribute("aria-expanded", "false"); };
+          closeMenu();
+          moreBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const willOpen = menuEl.hidden;
+            document.querySelectorAll(".ee-range-menu").forEach((m) => { m.hidden = true; });
+            document.querySelectorAll(".ee-range-more").forEach((b) => b.setAttribute("aria-expanded", "false"));
+            menuEl.hidden = !willOpen;
+            moreBtn.setAttribute("aria-expanded", String(willOpen));
+          });
+          menuEl.addEventListener("click", () => closeMenu());
+          /**
+           * 🐛 ที่แก้: เมนูที่เปิดค้างของช่วงก่อนหน้า "บัง" ปุ่มเพิ่มเติมของช่วงถัดไป กดยังไงก็ไม่โดน
+           * (คลิกไปโดนตัวเมนูแทน) — ต้องปิดตั้งแต่จังหวะ mousedown ก่อนที่ click จะเกิด และต้องดักแบบ
+           * capture เพื่อให้ทำงานก่อน handler ของปุ่ม
+           * ⚠️ ผูกที่ .swal2-container ซึ่งถูกลบทิ้งพร้อม popup — ไม่เหลือ listener ค้างไว้บน document
+           */
+          document.querySelector(".swal2-container")?.addEventListener("mousedown", (e) => {
+            document.querySelectorAll(".ee-range-actions").forEach((box) => {
+              if (box.contains(e.target)) return;
+              const m = box.querySelector(".ee-range-menu");
+              if (m) m.hidden = true;
+              box.querySelector(".ee-range-more")?.setAttribute("aria-expanded", "false");
+            });
+          }, true);
+        }
+
+        // งาน (event object) ของช่วงนี้ — ช่วงที่กำลังเปิดแก้ไขคือ ev ส่วนช่วงอื่นหยิบจากรายการพี่น้อง
+        const rowEvent = eventIdAttr === eventId ? ev : (siblingEvents.find((x) => String(x.id) === String(eventIdAttr)) || ev);
+
+        row.querySelector(".ee-range-operation")?.addEventListener("click", () => {
+          const jobGroup = resolveOperationGroup({ status: eventStatus });
+          Swal.close();
+          navigate(`/operation/${eventIdAttr}${jobGroup ? `?group=${jobGroup}` : ""}`);
+        });
+        row.querySelector(".ee-range-worknotice")?.addEventListener("click", () => {
+          Swal.close();
+          onOpenWorkNotice?.(rowEvent);
+        });
+        row.querySelector(".ee-range-delivery")?.addEventListener("click", () => {
+          Swal.close();
+          onOpenDeliveryNote?.(rowEvent);
+        });
+        // ใช้กลไกลบเดิม (มีแถบยืนยันในฟอร์มอยู่แล้ว) — ไม่ทำซ้ำสองทาง
+        row.querySelector(".ee-range-delete")?.addEventListener("click", removeThisRange);
+
+        const advBtn = row.querySelector(".ee-range-advance");
+        if (advBtn && eventIdAttr) {
+          let rowAdvance = null;
+          ExpenseService.jobAdvance(eventIdAttr)
+            .then((adv) => {
+              rowAdvance = adv;
+              if (!adv || !advBtn.isConnected) return;
+              advBtn.classList.add("ee-range-advance--exists");
+              const txt = advBtn.querySelector(".ee-range-advance-text");
+              if (txt) txt.textContent = `มีใบแล้ว · ${adv.docNo}`;
+              advBtn.title = adv.canOpen
+                ? "ช่วงนี้มีใบเบิกแล้ว — กดเพื่อเปิดดูใบเดิม (ช่วงอื่นยังเบิกแยกได้)"
+                : `ช่วงนี้มีใบเบิกแล้ว (ของ ${adv.requesterName || "ผู้อื่น"}) — ช่วงอื่นยังเบิกแยกได้`;
+              if (!adv.canOpen) advBtn.disabled = true;
+            })
+            .catch(() => { /* ตรวจไม่สำเร็จ — ฟอร์มใบเบิกตรวจซ้ำให้อีกชั้นอยู่แล้ว */ });
+
+          advBtn.addEventListener("click", () => {
+            if (rowAdvance && !rowAdvance.canOpen) return;
+            Swal.close();
+            if (rowAdvance) { navigate?.(`/expenses/${rowAdvance._id}`); return; }
+            // คนที่เข้างาน "ช่วงนี้" (ถ้าช่วงนี้ตั้งทีมเอง) ไม่ใช่ทีมของงานหลัก — ปุ่มเบี้ยเลี้ยงทีมงานในฟอร์มจะได้ตรงคน
+            const rowLead = String(row._leadTs?.getValue() || "").trim();
+            const rowMembers = [row._membersTs?.getValue() || []].flat().map((v) => String(v).trim()).filter(Boolean);
+            const useOwn = row.querySelector(".ee-range-sameTeam")?.checked === false;
+            const startVal = row.querySelector(".ee-range-start")?.value || "";
+            const endVal = row.querySelector(".ee-range-end")?.value || startVal;
+            onRequestAdvance?.({
+              _id: eventIdAttr,
+              title: eventTitle || "", system: eventSystem, company: eventCompany, site: eventSite,
+              docNo: evendocNo,
+              start: startVal ? moment(startVal).toISOString() : (ev.start || null),
+              // ⚠️ end ของงานทั้งวันเป็นแบบ "ไม่รวมวันสุดท้าย" — ฝั่งแสดงผลถอย 1 วันเองแล้ว (jobRangeText)
+              end: endVal ? moment(endVal).add(1, "days").toISOString() : null,
+              round: eventTime ? String(eventTime) : "", visitCount: Number(eventVisitCount) || 0,
+              teamNames: [...new Set((useOwn ? [rowLead, ...rowMembers] : [eventTeam, ...(eventTeamMembers || []).map((m) => m?.name)])
+                .map((n) => String(n || "").trim()).filter(Boolean))],
+            });
+          });
+        }
+
+        /** สรุปผู้เข้างานของช่วงนี้ — ใช้ทีมของช่วงถ้าตั้งเอง ไม่งั้นสะท้อนทีมของงานหลักที่กรอกอยู่ */
+        const peopleEl = row.querySelector(".ee-range-people");
+        const refreshPeople = () => {
+          const own = sameEl.checked === false;
+          const lead = own
+            ? String(row._leadTs?.getValue() || "").trim()
+            : String(document.getElementById("editTeam")?.value || eventTeam || "").trim();
+          const members = own
+            ? [row._membersTs?.getValue() || []].flat().map((v) => String(v).trim()).filter(Boolean)
+            : [...document.querySelectorAll(".ee-team-member-select")].map((el) => el.value).filter(Boolean);
+          const tag = own ? "ทีมเฉพาะช่วงนี้" : "ตามงานหลัก";
+          peopleEl.innerHTML = lead || members.length
+            ? `👷 ผู้เข้างานช่วงนี้ (${tag}): <b>${lead || "-"}</b>`
+              + (members.length ? ` · 👥 ลูกทีม ${members.length} คน: <b>${members.join(", ")}</b>` : " · <em>ไม่มีลูกทีม</em>")
+            : `👷 ผู้เข้างานช่วงนี้ (${tag}): <em>ยังไม่ได้ระบุ</em>`;
+        };
+
+        const syncTeamFields = () => {
+          fieldsEl.style.display = sameEl.checked ? "none" : "";
+          refreshPeople();
+        };
+        sameEl.addEventListener("change", syncTeamFields);
+        // เปลี่ยนคนในช่วงนี้ หรือเปลี่ยนทีมของงานหลัก → บรรทัดสรุปต้องตามทันที
+        row.querySelector(".ee-range-lead")?.addEventListener("change", refreshPeople);
+        row.querySelector(".ee-range-members")?.addEventListener("change", refreshPeople);
+        document.getElementById("editTeam")?.addEventListener("change", refreshPeople);
+        document.getElementById("ee-teamMembersList")?.addEventListener("change", refreshPeople);
+
+        // ค่าเดิมของช่วงนี้ (ถ้าต่างจากทีมของงานหลัก = ช่วงนี้ตั้งทีมเองไว้อยู่แล้ว)
+        const presetLead = String(preset.team || "").trim();
+        const presetMembers = (preset.teamMembers || []).map((m) => String(m?.name || m || "").trim()).filter(Boolean);
+        const jobMembers = eventTeamMembers.map((m) => String(m?.name || "").trim()).filter(Boolean);
+        const sameAsJob = (!presetLead || presetLead === eventTeam)
+          && presetMembers.join("|") === jobMembers.join("|");
+        if (!sameAsJob) {
+          sameEl.checked = false;
+          if (presetLead) leadTs?.setValue(presetLead, true);
+          if (presetMembers.length) membersTs?.setValue(presetMembers, true);
+        }
+        syncTeamFields();
+        refreshPeople();
       };
 
       // 🐛 BUG ที่แก้ (รายการช่วงวันที่เรียงมั่ว): เดิมวาดแถวตามลำดับที่ข้อมูลมาเป๊ะๆ — งานปัจจุบันขึ้นก่อน
@@ -2186,17 +2484,75 @@ export const getEditEvent = async ({
       };
 
       // ✅ ค้างวันที่/ช่วงวันที่เดิมไว้เสมอ: งานปัจจุบัน + วันอื่นๆ ของงานเดียวกัน (ถ้ามี) แล้วเรียงตามวันที่
-      addDateRow(eventStart.format("YYYY-MM-DD"), formattedEnd, eventId);
+      addDateRow(eventStart.format("YYYY-MM-DD"), formattedEnd, eventId,
+        { team: eventTeam, teamMembers: eventTeamMembers });
       siblingEvents.forEach((s) => {
         const sStart = moment(s.start).format("YYYY-MM-DD");
         const sEnd = s.allDay
           ? moment(s.end).subtract(1, "days").format("YYYY-MM-DD")
           : moment(s.end).format("YYYY-MM-DD");
-        addDateRow(sStart, sEnd, s.id);
+        // ⚠️ ข้อมูลของช่วงพี่น้องอยู่ได้ทั้งบน object ตรงๆ และใน extendedProps (แล้วแต่ทางที่โหลดมา)
+        addDateRow(sStart, sEnd, s.id, {
+          team: s.team ?? s.extendedProps?.team ?? "",
+          teamMembers: s.teamMembers ?? s.extendedProps?.teamMembers ?? [],
+        });
       });
       sortDateRows();
 
-      document.getElementById("ee-addDateBtn")?.addEventListener("click", () => { addDateRow(); sortDateRows(); });
+      /**
+       * พับ/กางรายการช่วงวันที่ — งานที่เข้าหลายช่วงทำให้ฟอร์มยาวจนหาปุ่มบันทึกไม่เจอ
+       * ✅ เกิน 3 ช่วง = พับไว้ก่อนตั้งแต่เปิดฟอร์ม (ยังกางดู/แก้ได้ทุกเมื่อ) · กางแล้วยาวมากก็ยังเลื่อนในกรอบตัวเอง
+       * ⚠️ ตอนพับต้องยังบอกให้ครบว่ามีกี่ช่วง ช่วงแรกถึงช่วงสุดท้ายคือวันไหน ไม่งั้นพับแล้วข้อมูลหายไปจากสายตา
+       */
+      const rangeToggle = document.getElementById("ee-rangeToggle");
+      const rangeToggleIcon = document.getElementById("ee-rangeToggleIcon");
+      const rangeToggleText = document.getElementById("ee-rangeToggleText");
+      const rangeSummary = document.getElementById("ee-rangeSummary");
+
+      const refreshRangeSummary = () => {
+        const rows = [...multiDateList.querySelectorAll(".ee-multi-date-row")];
+        const dates = rows.map((r) => r.querySelector(".ee-range-start")?.value).filter(Boolean).sort();
+        const withOwnTeam = rows.filter((r) => r.querySelector(".ee-range-sameTeam")?.checked === false).length;
+        if (rangeToggleText) rangeToggleText.textContent = "ช่วงวันที่";
+        const countEl = document.getElementById("ee-rangeCount");
+        if (countEl) countEl.textContent = `${rows.length} ช่วง`;
+        if (!rangeSummary) return;
+        const span = dates.length
+          ? `${formatThai(moment(dates[0]).locale("th"), "D MMM YYYY")}${dates.length > 1 ? ` – ${formatThai(moment(dates[dates.length - 1]).locale("th"), "D MMM YYYY")}` : ""}`
+          : "ยังไม่ได้เลือกวันที่";
+        rangeSummary.textContent = `${span}${withOwnTeam ? ` · ${withOwnTeam} ช่วงตั้งทีมเอง` : ""}`;
+      };
+
+      /**
+       * ✅ ผู้ใช้สั่ง: "ขั้นแรกให้เปิดไว้จนกว่าผู้ใช้มากดปิดเอง และบันทึกค่าไว้"
+       * ค่าเริ่มต้น = กางไว้เสมอ · ผู้ใช้กดพับเมื่อไร จำไว้ให้ครั้งต่อไป (เก็บในเครื่องผู้ใช้เอง)
+       * ⚠️ อ่าน/เขียน localStorage ต้องห่อ try เสมอ — โหมดส่วนตัวของบางเบราว์เซอร์โยน error ทันที
+       */
+      const RANGE_COLLAPSE_KEY = "eventForm.rangeList.collapsed";
+      const readCollapsed = () => { try { return localStorage.getItem(RANGE_COLLAPSE_KEY) === "1"; } catch { return false; } };
+      const saveCollapsed = (v) => { try { localStorage.setItem(RANGE_COLLAPSE_KEY, v ? "1" : "0"); } catch { /* ไม่ให้พังเพราะจำค่าไม่ได้ */ } };
+
+      const setRangeCollapsed = (collapsed, { persist = false } = {}) => {
+        multiDateList.hidden = collapsed;
+        multiDateList.classList.toggle("ee-range-list--scroll", !collapsed && multiDateList.children.length > 3);
+        rangeToggle?.setAttribute("aria-expanded", String(!collapsed));
+        if (rangeToggleIcon) rangeToggleIcon.textContent = "▾";   // หมุนด้วย CSS แทนการสลับตัวอักษร
+        const addBtn = document.getElementById("ee-addDateBtn");
+        if (addBtn) addBtn.style.display = collapsed ? "none" : "";
+        if (persist) saveCollapsed(collapsed);
+        refreshRangeSummary();
+      };
+
+      rangeToggle?.addEventListener("click", () => setRangeCollapsed(!multiDateList.hidden, { persist: true }));
+      // เปลี่ยนวันที่/ทีม แล้วสรุปด้านบนต้องตามทันที
+      multiDateList.addEventListener("change", refreshRangeSummary);
+      setRangeCollapsed(readCollapsed());
+
+      document.getElementById("ee-addDateBtn")?.addEventListener("click", () => {
+        addDateRow();
+        sortDateRows();
+        setRangeCollapsed(false);   // เพิ่งเพิ่มช่วงใหม่ ต้องเห็นแถวที่เพิ่งเพิ่มเสมอ
+      });
 
       multiToggle?.addEventListener("change", () => {
         const isMulti = multiToggle.checked;
@@ -2495,7 +2851,18 @@ export const getEditEvent = async ({
               Swal.showValidationMessage("แต่ละช่วงวันที่ วันสิ้นสุดต้องไม่ก่อนวันเริ่ม");
               return;
             }
-            ranges.push({ start: s, end: e, eventIdAttr: row.dataset.eventId || "" });
+            // ✅ ทีมของช่วงนี้ — ติ๊ก "ใช้ทีมเดียวกับงานหลัก" ไว้ = ไม่ override (ใช้ค่าจาก shared)
+            const sameTeam = row.querySelector(".ee-range-sameTeam")?.checked !== false;
+            const leadVal = String(row._leadTs?.getValue() || "").trim();
+            const memberVals = [row._membersTs?.getValue() || []].flat().map((v) => String(v).trim()).filter(Boolean);
+            const teamOverride = sameTeam ? null : {
+              // หัวหน้างานช่วงนี้ไม่ได้เลือก = ใช้ของงานหลัก (เผื่อผู้ใช้ตั้งใจเปลี่ยนแค่ลูกทีม)
+              ...(leadVal ? { team: leadVal, resPerson: teamToId.get(leadVal) || "" } : {}),
+              teamMembers: memberVals
+                .filter((name, idx, arr) => arr.indexOf(name) === idx)
+                .map((name) => ({ userId: teamToId.get(name) || "", name })),
+            };
+            ranges.push({ start: s, end: e, eventIdAttr: row.dataset.eventId || "", teamOverride });
           }
           if (ranges.length === 0) {
             Swal.showValidationMessage("กรุณาเลือกอย่างน้อย 1 ช่วงวันที่");
@@ -2547,6 +2914,8 @@ export const getEditEvent = async ({
                 start: r.start,
                 end: moment(r.end).add(1, "days").format("YYYY-MM-DD"),
                 date: r.start,
+                // ✅ ทีมเฉพาะของช่วงนี้ทับค่าทีมของงานหลัก (ผู้รับผิดชอบหลักไม่ถูกแตะ)
+                ...(r.teamOverride || {}),
               };
               // ✅ บันทึกประวัติเฉพาะแถวที่ตรงกับ record ที่กำลังเปิดแก้ไขอยู่จริง (eventId) — แถวอื่นๆ
               // ในกลุ่มไม่มี snapshot ค่าเดิมของตัวเองให้เทียบ (eventTeam/eventStatus/ฯลฯ ด้านบนเป็นของ
@@ -2718,6 +3087,46 @@ export const getEditEvent = async ({
            • มีแล้ว แต่เป็นใบของคนอื่นที่ตัวเองไม่มีสิทธิ์ดู → บอกเลขที่/สถานะ แล้วกดไม่ได้
          ⚠️ ถ้ากดก่อนตรวจเสร็จ (เน็ตช้า) ฟอร์มใบเบิกตรวจซ้ำเองอีกรอบและไม่ให้ส่ง ส่วน server เป็นด่านสุดท้าย
          ⚠️ ส่ง eventId ของ "วันที่เปิดอยู่" ไป — งานหลายวันไม่ต้องเลือกวัน server นับทั้งกลุ่มเป็นงานเดียวเอง */
+      /**
+       * เมนู "เบิก Advance ตามช่วงวันที่…" — สร้างรายการจากการ์ดช่วงที่มีอยู่จริงในฟอร์ม
+       * ✅ กดแล้วสั่งงานปุ่มของการ์ดช่วงนั้นโดยตรง (ไม่เขียนตรรกะซ้ำ) — สถานะ "มีใบแล้ว/กดไม่ได้"
+       * จึงตรงกันเสมอ ไม่มีทางเพี้ยนคนละทางกับการ์ด
+       */
+      const byRangeBtn = document.getElementById("btnAdvanceByRange");
+      const rangeListEl = document.getElementById("ee-advance-range-list");
+      if (byRangeBtn && rangeListEl) {
+        byRangeBtn.addEventListener("click", () => {
+          const willOpen = rangeListEl.hidden;
+          rangeListEl.innerHTML = "";
+          if (willOpen) {
+            [...document.querySelectorAll("#ee-multiDateList .ee-multi-date-row")].forEach((row, i) => {
+              const cardBtn = row.querySelector(".ee-range-advance");
+              if (!cardBtn) return;   // แถวที่ยังไม่ได้บันทึก = ยังเบิกไม่ได้
+              const dates = row.querySelector(".ee-range-preview")?.textContent || "";
+              const taken = cardBtn.classList.contains("ee-range-advance--exists");
+              const item = document.createElement("button");
+              item.type = "button";
+              item.disabled = cardBtn.disabled;
+              item.innerHTML = `<span>ช่วงวันที่ ${i + 1} · ${dates}</span>`
+                + `<span class="ee-range-picker-state">${taken ? (cardBtn.querySelector(".ee-range-advance-text")?.textContent || "มีใบแล้ว") : "เบิกช่วงนี้"}</span>`;
+              item.addEventListener("click", () => cardBtn.click());
+              rangeListEl.appendChild(item);
+            });
+          }
+          rangeListEl.hidden = !willOpen;
+        });
+      }
+
+      // Esc ปิดเมนูของช่วงก่อน (ถ้าเปิดอยู่) — ไม่ให้เผลอปิดทั้งฟอร์มทั้งที่ตั้งใจแค่ปิดเมนู
+      document.querySelector(".swal2-container")?.addEventListener("keydown", (e) => {
+        if (e.key !== "Escape") return;
+        const open = [...document.querySelectorAll(".ee-range-menu")].filter((m) => !m.hidden);
+        if (!open.length) return;
+        e.stopPropagation();
+        open.forEach((m) => { m.hidden = true; });
+        document.querySelectorAll(".ee-range-more").forEach((b) => b.setAttribute("aria-expanded", "false"));
+      }, true);
+
       const advanceBtn = document.getElementById("btnRequestAdvance");
       if (advanceBtn) {
         let existingAdvance = null;
@@ -2726,11 +3135,11 @@ export const getEditEvent = async ({
             existingAdvance = adv;
             if (!adv || !advanceBtn.isConnected) return;
             const label = document.getElementById("ee-adv-label");
-            if (label) label.textContent = `มีใบ Advance แล้ว · ${adv.docNo} (${adv.statusLabel})`;
+            if (label) label.textContent = `ช่วงนี้มีใบ Advance แล้ว · ${adv.docNo} (${adv.statusLabel})`;
             advanceBtn.classList.add("ee-more-item--advance-exists");
             advanceBtn.title = adv.canOpen
-              ? "1 งานออกใบเบิก Advance ได้ใบเดียว — กดเพื่อเปิดดูใบเดิม"
-              : `1 งานออกใบเบิก Advance ได้ใบเดียว — ใบนี้เป็นของ ${adv.requesterName || "ผู้อื่น"}`;
+              ? "ช่วงนี้มีใบเบิกแล้ว — กดเพื่อเปิดดูใบเดิม (ช่วงอื่นของงานเดียวกันยังเบิกแยกได้)"
+              : `ช่วงนี้มีใบเบิกแล้ว (ของ ${adv.requesterName || "ผู้อื่น"}) — ช่วงอื่นของงานเดียวกันยังเบิกแยกได้`;
             if (!adv.canOpen) advanceBtn.disabled = true;
           })
           .catch(() => { /* ตรวจไม่สำเร็จ — ฟอร์มใบเบิกตรวจซ้ำให้อีกชั้นอยู่แล้ว */ });

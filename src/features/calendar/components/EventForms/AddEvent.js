@@ -303,6 +303,14 @@ function injectAddStyles() {
       box-shadow: 0 0 0 3px rgba(37,99,235,.12);
     }
     .ae-multi-date-row .ae-range-sep { flex-shrink: 0; color: #94a3b8; font-weight: 700; }
+    /* ✅ ทีมของแต่ละช่วง (ผู้ใช้สั่ง: บางช่วงคนเข้าไม่ตรงกัน) — ซ่อนไว้จนกว่าจะเอาออกจากงานหลัก */
+    .ae-multi-date-row { flex-wrap: wrap; }
+    .ae-range-team { flex: 1 1 100%; border-top: 1px dashed #e2e8f0; margin-top: 6px; padding-top: 6px; }
+    .ae-range-same { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: #475569; font-weight: 600; cursor: pointer; }
+    .ae-range-same input { width: 15px; height: 15px; accent-color: #2563eb; cursor: pointer; }
+    .ae-range-team-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+    .ae-range-team-fields > div > span { display: block; width: 100%; min-width: 0; white-space: nowrap; font-size: 12px; color: #64748b; font-weight: 700; margin-bottom: 5px; }
+    @media (max-width: 640px) { .ae-range-team-fields { grid-template-columns: 1fr; } }
     .ae-multi-date-remove {
       flex-shrink: 0; width: 34px; height: 34px; padding: 0 !important;
       display: flex; align-items: center; justify-content: center;
@@ -894,6 +902,24 @@ export const getAddEvent = async ({
       // แผนงานล่วงหน้าจะไม่มีฟิลด์นี้เลย ก็แค่ไม่เติมแถวใดๆ เหมือนสร้างงานใหม่ปกติ)
       (sourceEvent?.teamMembers || []).forEach((name) => { if (name) addTeamMemberRow(name); });
 
+      /** TomSelect ของช่องเลือกคนในแถวช่วงวันที่ (ลูกทีมเป็น select multiple) */
+      const mkRangePersonTs = (el, placeholder) => {
+        if (!el) return null;
+        try {
+          const ts = new TomSelect(el, {
+            create: true,
+            maxOptions: 20,
+            placeholder,
+            sortField: { field: "text", direction: "asc" },
+            allowEmptyOption: true,
+            dropdownParent: "body",
+            plugins: el.multiple ? ["remove_button"] : [],
+          });
+          ts.clear(true);
+          return ts;
+        } catch { return null; }
+      };
+
       /* ── งานเข้าหลายวันไม่ติดกัน (multi-date) ── */
       // ✅ แต่ละแถว = "ช่วงวันที่" หนึ่งช่วง (เริ่ม–สิ้นสุด) เช่น 6-7 และ 9-10
       // เพิ่มได้หลายช่วง แต่ละช่วงถือเป็นงานเดียวกันทั้งหมด (ผูกด้วย jobGroupId เดียวกัน)
@@ -910,12 +936,41 @@ export const getAddEvent = async ({
           <span class="ae-range-sep">–</span>
           <input type="date" class="ae-range-end" value="${endValue || startValue}">
           <button type="button" class="ae-btn ae-btn-ghost ae-multi-date-remove" title="ลบช่วงนี้ออก">✕</button>
+          <!-- ✅ ผู้ใช้สั่ง: "กำหนดหัวหน้างาน และลูกทีมของแต่ละช่วงงานแยกกันได้"
+               ⚠️ ผู้รับผิดชอบหลักของงานยังเป็นคนเดิมทั้งงาน — ตรงนี้คือ "คนที่เข้าหน้างานช่วงนี้" เท่านั้น -->
+          <div class="ae-range-team">
+            <label class="ae-range-same">
+              <input type="checkbox" class="ae-range-sameTeam" checked>
+              ใช้ทีมเดียวกับงานหลัก
+            </label>
+            <div class="ae-range-team-fields" style="display:none;">
+              <div>
+                <span>👷 หัวหน้างานช่วงนี้</span>
+                <select class="ae-range-lead"><option value="">— เลือก —</option>${teamOpts}</select>
+              </div>
+              <div>
+                <span>👥 ลูกทีมช่วงนี้</span>
+                <select class="ae-range-members" multiple>${teamOpts}</select>
+              </div>
+            </div>
+          </div>
         `;
         row.querySelector(".ae-multi-date-remove").addEventListener("click", () => {
           // ต้องเหลืออย่างน้อย 1 แถวเสมอ กันผู้ใช้ลบจนหมด
-          if (multiDateList.children.length > 1) row.remove();
+          if (multiDateList.children.length > 1) {
+            row._leadTs?.destroy();
+            row._membersTs?.destroy();
+            row.remove();
+          }
         });
         multiDateList.appendChild(row);
+
+        // ⚠️ สร้าง TomSelect หลัง appendChild เสมอ (อ่าน getComputedStyle ตอน construct)
+        const sameEl = row.querySelector(".ae-range-sameTeam");
+        const fieldsEl = row.querySelector(".ae-range-team-fields");
+        row._leadTs = mkRangePersonTs(row.querySelector(".ae-range-lead"), "เลือกหัวหน้างานของช่วงนี้");
+        row._membersTs = mkRangePersonTs(row.querySelector(".ae-range-members"), "เลือกลูกทีมของช่วงนี้");
+        sameEl.addEventListener("change", () => { fieldsEl.style.display = sameEl.checked ? "none" : ""; });
       };
       addDateRow(arg.dateStr, arg.dateStr); // แถวแรก prefill ด้วยวันที่ที่คลิกบนปฏิทินมา
 
@@ -1215,7 +1270,20 @@ export const getAddEvent = async ({
               Swal.showValidationMessage("แต่ละช่วงวันที่ วันสิ้นสุดต้องไม่ก่อนวันเริ่ม");
               return;
             }
-            dateRanges.push({ start: s, end: e });
+            // ✅ ทีมเฉพาะของช่วงนี้ (ติ๊ก "ใช้ทีมเดียวกับงานหลัก" ไว้ = ไม่ส่งอะไร ใช้ค่าของงาน)
+            const sameTeam = row.querySelector(".ae-range-sameTeam")?.checked !== false;
+            const leadVal = String(row._leadTs?.getValue() || "").trim();
+            const memberVals = [row._membersTs?.getValue() || []].flat().map((v) => String(v).trim()).filter(Boolean);
+            dateRanges.push({
+              start: s,
+              end: e,
+              ...(sameTeam ? {} : {
+                ...(leadVal ? { team: leadVal, resPerson: teamToId.get(leadVal) || "" } : {}),
+                teamMembers: memberVals
+                  .filter((name, idx, arr) => arr.indexOf(name) === idx)
+                  .map((name) => ({ userId: teamToId.get(name) || "", name })),
+              }),
+            });
           }
           if (dateRanges.length === 0) {
             Swal.showValidationMessage("กรุณาเลือกอย่างน้อย 1 ช่วงวันที่");
@@ -1281,6 +1349,9 @@ export const getAddEvent = async ({
                   start: r.start,
                   end:   moment(r.end).add(1, "days").format("YYYY-MM-DD"),
                   date:  r.start,
+                  // ทีมเฉพาะช่วง — ไม่มี = backend ใช้ทีมของงานหลักให้เอง
+                  ...(r.team ? { team: r.team, resPerson: r.resPerson || "" } : {}),
+                  ...(r.teamMembers ? { teamMembers: r.teamMembers } : {}),
                 })),
               }
             : {

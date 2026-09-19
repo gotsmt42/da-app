@@ -32,7 +32,7 @@ import AdvancePanel from "./AdvancePanel";
 import KindBadge from "./KindBadge";
 import { compareItems, COMPARE_KIND_LABEL } from "../utils/expenseCompare";
 import {
-  KIND_META, slipKind, statusMeta, categoryMeta, baht, fmtMoney, qtyText, differenceMeta, paymentLabel, PAYMENT_METHODS, fileKindLabel, jobText, isOverdueClear, money, TEXT_SUB, TEXT_MAIN, BORDER_MAIN, personFullName, groupFilesByStage,
+  KIND_META, slipKind, statusMeta, categoryMeta, baht, fmtMoney, qtyText, differenceMeta, paymentLabel, PAYMENT_METHODS, fileKindLabel, jobText, jobRangeText, jobPartText, isOverdueClear, money, TEXT_SUB, TEXT_MAIN, BORDER_MAIN, personFullName, groupFilesByStage,
 } from "../expenseMeta";
 import { bankMeta, formatAccountNo } from "../bankMeta";
 import BankLogo from "./BankLogo";
@@ -902,7 +902,12 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                   <InfoCell label="ผู้เบิกเงิน">{personFullName(e.requester)}</InfoCell>
                   <InfoCell label="ตำแหน่ง">{e.requester?.position}</InfoCell>
                   {e.createdBy?.userId && e.createdBy.userId !== e.requester?.userId && <InfoCell label="ออกใบแทนโดย">{e.createdBy.name}</InfoCell>}
-                  <InfoCell label="งานที่ผูก" span>{e.eventId || e.job?.title ? `${jobText(e.job)}${e.job?.start ? ` · ${thaiDate(e.job.start)}` : ""}` : "ไม่ผูกงาน"}</InfoCell>
+                  {/* ✅ งานที่เข้าหลายช่วง: บอกช่วงวันที่เต็ม + เป็นช่วงที่เท่าไร — ใบของคนละช่วงจะได้ไม่สับสนกัน */}
+                  <InfoCell label="งานที่ผูก" span>
+                    {e.eventId || e.job?.title
+                      ? [jobText(e.job), jobPartText(e.job), jobRangeText(e.job) || (e.job?.start ? thaiDate(e.job.start) : "")].filter(Boolean).join(" · ")
+                      : "ไม่ผูกงาน"}
+                  </InfoCell>
                   {isReimburse && <InfoCell label="ที่มาของเงิน">ผู้เบิกสำรองจ่ายเอง (ไม่มีใบ Advance)</InfoCell>}
                   {kind === "advance" && e.dueClearAt && <InfoCell label="กำหนดเคลียร์"><Box component="span" sx={{ color: overdue ? "#dc2626" : "inherit" }}>{thaiDate(e.dueClearAt)}</Box></InfoCell>}
                   {kind === "advance" && e.claimId && (

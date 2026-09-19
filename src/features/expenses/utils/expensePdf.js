@@ -18,7 +18,7 @@ import boldFontUrl from "@/assets/fonts/THSarabunNew Bold.ttf?url";
 import { ISSUER, drawLetterhead, outputDocument, spaceThaiLatin, preparePrintAssets } from "@/features/documents/utils/deliveryNotePdf";
 import { thaiDateFull, thaiDate, thaiDateTime } from "@/shared/utils/thaiDate";
 import {
-  KIND_META, slipKind, statusMeta, fmtMoney, bahtText, qtyText, differenceMeta, paymentLabel, fileKindLabel, jobText, money, itemPersonName, personFullName,
+  KIND_META, slipKind, statusMeta, fmtMoney, bahtText, qtyText, differenceMeta, paymentLabel, fileKindLabel, jobText, jobRangeText, jobPartText, money, itemPersonName, personFullName,
 } from "../expenseMeta";
 import { bankMeta, formatAccountNo } from "../bankMeta";
 import { compareItems } from "./expenseCompare";
@@ -215,7 +215,10 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold, attachNote = "") =>
   const subjLines = field("เรื่อง", e.subject, L, R, y);
   y += rowH * subjLines;
   if (e.eventId || e.job?.title) {
-    field("งาน / โครงการ", `${jobText(e.job)}${e.job?.docNo ? ` (${e.job.docNo})` : ""}`, L, R, y);
+    // ✅ งานที่เข้าหลายช่วง: ใบที่พิมพ์ออกไปต้องระบุชัดว่าเป็นค่าใช้จ่ายของการเข้างานช่วงไหน
+    field("งาน / โครงการ",
+      [jobText(e.job), jobPartText(e.job), jobRangeText(e.job)].filter(Boolean).join(" · ")
+      + (e.job?.docNo ? ` (${e.job.docNo})` : ""), L, R, y);
     y += rowH;
   }
 

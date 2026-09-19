@@ -13,6 +13,7 @@
  * ⚠️ สีสถานะ (STATUS_BASE) ถูกเลือกให้ไม่ชนกับสองสีนี้ — ห้ามใช้เขียวอมฟ้า/ม่วงเป็นสีสถานะ
  */
 import { formatRoundLabel } from "@/shared/utils/contractRounds";
+import { thaiDate } from "@/shared/utils/thaiDate";
 
 export const EXPENSE_ACCENT = "#0d9488";
 export const EXPENSE_ACCENT_DARK = "#0f766e";
@@ -320,10 +321,48 @@ export const jobText = (job) => {
   return [jobName(job), place ? `โครงการ ${place}` : "", round ? `ครั้งที่ ${round}` : ""].filter(Boolean).join(" ");
 };
 
+/**
+ * ช่วงวันที่ของงาน — "15 ก.ย. 2569 · 1 วัน" หรือ "7 – 12 ก.ย. 2569 · 6 วัน"
+ *
+ * ✅ งานหนึ่งงานเข้าได้หลายช่วง (ผู้ใช้สั่งให้แยกเบิกเป็นช่วงได้) — ต้องเห็นช่วงวันที่เต็มๆ
+ * ถึงจะแยกออกได้ว่าแถวไหนคือการเข้ารอบไหน
+ * ⚠️ end ของงานทั้งวันในปฏิทินเป็นแบบ "ไม่รวมวันสุดท้าย" (+1 วัน) — ต้องถอยก่อนเสมอ
+ * ไม่งั้นงาน 1 วันจะกลายเป็น 2 วันทุกใบ
+ */
+/**
+ * ช่วงวันที่แบบสั้น (ไม่มีจำนวนวัน) — ใช้ต่อท้าย "เรื่อง" ของใบเบิกให้รู้ทันทีว่าเป็นค่าใช้จ่ายของการเข้างานวันไหน
+ * ✅ ผู้ใช้สั่ง: "ให้ใส่ช่วงวันที่ให้ชัดเจน" — เดิมเรื่องมีแค่ "ครั้งที่ 3" ซึ่งเป็นครั้งของสัญญา
+ * ไม่ได้บอกว่าเป็นการเข้างานช่วงไหนของครั้งนั้น
+ */
+export const jobRangeDates = (job) => String(jobRangeText(job) || "").split(" · ")[0];
+
+export const jobRangeText = (job) => {
+  if (!job?.start) return "";
+  const start = new Date(job.start);
+  const rawEnd = job.end ? new Date(job.end) : null;
+  /**
+   * BUG ที่แก้: end ของงานทั้งวันเป็นแบบ "ไม่รวมวันสุดท้าย" — งานวันเดียว (15 ก.ย.) เก็บ end เป็น 16 ก.ย.
+   * ถ้าถอยแค่เสี้ยววินาทีจะยังค้างวันที่ 16 อยู่ (เพราะเวลาที่เก็บไม่ใช่เที่ยงคืน) กลายเป็น "2 วัน"
+   * ทั้งที่เข้างานวันเดียว — ต้องนับเป็น "จำนวนวันเต็ม" แล้วถอยหนึ่งวันเต็มแทน
+   * (ตรงกับปฏิทินที่ใช้ moment(end).subtract(1,"days") ตอนแสดงผล)
+   */
+  const days = rawEnd && rawEnd > start ? Math.max(1, Math.round((rawEnd - start) / 86400000)) : 1;
+  if (days <= 1) return `${thaiDate(start)} · 1 วัน`;
+  const end = new Date(start.getTime() + (days - 1) * 86400000);
+  return `${thaiDate(start)} – ${thaiDate(end)} · ${days} วัน`;
+};
+
+/** ป้าย "ช่วงที่ n/N" — ว่างเมื่องานนั้นเข้าช่วงเดียว */
+export const jobPartText = (job) =>
+  (Number(job?.partCount) > 1 && Number(job?.part) > 0 ? `ช่วงวันที่ ${job.part}/${job.partCount}` : "");
+
 /** เรื่องตั้งต้นของใบเบิกจากงาน — "เบิกค่าใช้จ่ายงาน PM Fire Alarm โครงการ ... ครั้งที่ ..." */
 export const jobSubject = (job, prefix = "เบิกค่าใช้จ่ายงาน") => {
   const text = jobText(job);
-  return text ? `${prefix} ${text}` : "";
+  if (!text) return "";
+  // ✅ ต่อท้ายด้วยช่วงวันที่ที่เข้างานจริง — งานเดียวกันที่เข้าหลายช่วง จะได้เรื่องที่แยกออกจากกันอ่านแล้วรู้เรื่อง
+  const dates = jobRangeDates(job);
+  return dates ? `${prefix} ${text} (${dates})` : `${prefix} ${text}`;
 };
 
 /**
