@@ -9,9 +9,9 @@
   <defs>
     <linearGradient id="nxWord" gradientUnits="userSpaceOnUse"
       x1="193" y1="64" x2="389" y2="17.5">
-      <stop offset="0" stop-color="#fb7185"/>
-      <stop offset=".45" stop-color="#ef4444"/>
-      <stop offset="1" stop-color="#a855f7"/>
+      <stop offset="0" stop-color="#fb4b5c"/>
+      <stop offset=".55" stop-color="#dc2626"/>
+      <stop offset="1" stop-color="#a21caf"/>
     </linearGradient>
   </defs>
   <text x="5" y="64" font-family="'Michroma','Space Grotesk',system-ui,sans-serif"

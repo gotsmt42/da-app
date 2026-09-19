@@ -10,9 +10,9 @@
   -->
   <defs>
     <linearGradient id="nxTile" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#fb5a7d"/>
-      <stop offset=".45" stop-color="#dc2626"/>
-      <stop offset="1" stop-color="#6d28d9"/>
+      <stop offset="0" stop-color="#e8324a"/>
+      <stop offset=".55" stop-color="#b91c1c"/>
+      <stop offset="1" stop-color="#831843"/>
     </linearGradient>
     <linearGradient id="nxBeam" x1="0" y1="1" x2="1" y2="0">
       <stop offset="0" stop-color="#ffffff" stop-opacity="0"/>
