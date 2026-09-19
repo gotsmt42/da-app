@@ -5,7 +5,10 @@
  * ตำแหน่ง / เรื่อง / ตาราง (ลำดับ · รายการ · จำนวน/หน่วย · จำนวนเงิน) / รวมเบิกทั้งหมด / ลายเซ็น 3 ช่อง
  * (ผู้เบิกค่าใช้จ่าย · ผู้ตรวจสอบ · ผู้อนุมัติ) — คนที่เซ็นเอกสารกระดาษมาตลอดต้องเห็นแล้วคุ้นทันที
  *
- * ✅ หน้าเดียวเสมอ (ตามที่ผู้ใช้ขอ): วาดลงกระดาษทดก่อนเพื่อวัดความสูงจริง แล้วค่อยๆ ย่อ (ตัวอักษร/ความสูงแถว/
+ * ✅ ใบเคลมที่เคลียร์ Advance พิมพ์ออกมา 2 หน้า (ผู้ใช้ขอ): หน้า 1 = ใบเคลมเหมือนเดิมทุกอย่าง ·
+ * หน้า 2 = ใบ Advance ที่อ้างถึง เพื่อปริ้นคู่กันได้ในครั้งเดียว — ชนิดใบอื่นยังหน้าเดียวเหมือนเดิม
+ *
+ * ✅ แต่ละใบจบใน "หนึ่งแผ่นเสมอ": วาดลงกระดาษทดก่อนเพื่อวัดความสูงจริง แล้วค่อยๆ ย่อ (ตัวอักษร/ความสูงแถว/
  * แถวว่างเติมตาราง/หัวกระดาษแบบย่อ) จนเนื้อหาจบก่อนถึงช่องลายเซ็น ช่องลายเซ็นถูกตรึงไว้ท้ายกระดาษเสมอ
  * ⚠️ ห้ามใช้วิธีตัดรายการทิ้ง — เอกสารการเงินที่พิมพ์ออกมาไม่ครบรายการคือเอกสารที่ผิด
  *
@@ -116,7 +119,7 @@ const LINE = [148, 163, 184];
  * วาดเนื้อหาทั้งหมด (ยกเว้นลายเซ็น/ท้ายกระดาษ)
  * @returns {number} y ล่างสุดของเนื้อหา
  */
-const renderBody = (doc, e, { s, compact, filler }, hasBold) => {
+const renderBody = (doc, e, { s, compact, filler }, hasBold, attachNote = "") => {
   // ⚠️ ใช้ "ชนิดที่ใช้แสดงผล" — ใบสำรองจ่ายเป็น kind = "claim" แต่ต้องได้หัวเรื่อง/สี/ป้ายของตัวเอง
   const slip = slipKind(e);
   const kind = KIND_META[slip] || KIND_META.advance;
@@ -177,6 +180,15 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold) => {
   const dateW = doc.getTextWidth(dateText);
   doc.text(dateText, R, y, { align: "right" });
   bold(true); doc.text("วันที่", R - dateW - 2, y, { align: "right" });
+
+  // ✅ หน้าที่แนบมาคู่กัน (ใบ Advance ท้ายใบเคลม) — บอกให้ชัดว่าแผ่นนี้เป็นเอกสารแนบของใบไหน
+  // ⚠️ ต้องส่งค่าเดียวกันทั้งตอนวัดความสูงบนกระดาษทดและตอนวาดจริง ไม่งั้นการย่อให้พอดีหน้าจะคลาด
+  if (attachNote) {
+    y += 5.4 * s;
+    bold(false); size(11); color(GRAY);
+    doc.text(attachNote, L, y);
+    color(SLATE);
+  }
 
   // ── ช่องข้อมูล (ป้าย : ค่า บนเส้นประ แบบฟอร์มกระดาษ) ─────────────────
   const rowH = 7.4 * s;
@@ -693,12 +705,14 @@ const renderSignatures = (doc, e, hasBold, signatures = null) => {
   });
 };
 
-const renderFooter = (doc, e) => {
+const renderFooter = (doc, e, { page = 1, pages = 1 } = {}) => {
   doc.setFont("THSarabun", "normal");
   doc.setFontSize(10);
   doc.setTextColor(...GRAY);
   const by = e.createdBy?.userId && e.createdBy.userId !== e.requester?.userId ? ` · ออกใบแทนโดย ${personFullName(e.createdBy)}` : "";
   doc.text(`พิมพ์จากระบบเมื่อ ${thaiDateTime(new Date())}${by}`, L, H_PAGE - 6);
+  // ✅ พิมพ์คู่กันหลายแผ่น ต้องรู้ว่าแผ่นไหนของชุดไหน — กันเอกสารหลุดกันตอนวางบนโต๊ะ
+  if (pages > 1) doc.text(`หน้า ${page}/${pages}`, W_PAGE / 2, H_PAGE - 6, { align: "center" });
   doc.text(`สถานะ: ${statusMeta(e.status, slipKind(e)).label}`, R, H_PAGE - 6, { align: "right" });
 };
 
@@ -735,22 +749,41 @@ export async function generateExpensePdf({ expense, signatures = null, mode = "b
   // ✅ ย่อโลโก้หัวกระดาษก่อนฝังลงไฟล์ — ดูหัวข้อ "ขนาดไฟล์ PDF" ใน deliveryNotePdf.js
   await preparePrintAssets();
 
-  // วัดบนกระดาษทด แล้วเลือกขั้นย่อแรกที่พอดีหน้าเดียว
-  let step = FIT_STEPS[FIT_STEPS.length - 1];
-  for (const candidate of FIT_STEPS) {
-    const scratch = newDoc(jsPDF, font, bold);
-    const bottom = renderBody(scratch, expense, candidate, hasBold);
-    if (bottom <= SIG_TOP - 2) { step = candidate; break; }
-  }
+  /** เลือกขั้นย่อที่ทำให้ใบนี้จบพอดีหนึ่งแผ่น (วัดบนกระดาษทดก่อน) แล้ววาดลงแผ่นปัจจุบัน */
+  const renderSheet = (doc, sheet, sheetSignatures, { attachNote = "", page = 1, pages = 1 } = {}) => {
+    let step = FIT_STEPS[FIT_STEPS.length - 1];
+    for (const candidate of FIT_STEPS) {
+      const scratch = newDoc(jsPDF, font, bold);
+      const bottom = renderBody(scratch, sheet, candidate, hasBold, attachNote);
+      if (bottom <= SIG_TOP - 2) { step = candidate; break; }
+    }
+    renderBody(doc, sheet, step, hasBold, attachNote);
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.3);
+    doc.line(L, SIG_TOP, R, SIG_TOP);
+    renderSignatures(doc, sheet, hasBold, sheetSignatures);
+    renderFooter(doc, sheet, { page, pages });
+    if (sheet.status === "cancelled") renderCancelledMark(doc, hasBold);
+  };
+
+  /**
+   * ✅ ผู้ใช้สั่ง: ใบเคลมให้แนบใบ Advance ที่อ้างถึงเป็นหน้าที่ 2 เพื่อปริ้นคู่กัน
+   * ⚠️ หน้าแรกยังเหมือนเดิมทุกอย่าง (รวมตารางเทียบตั้งเบิก↔ใช้จริงในใบเคลม) — แค่เพิ่มแผ่นที่สองต่อท้าย
+   * ⚠️ ใบสำรองจ่ายไม่มี Advance ให้แนบ และใบ Advance ที่พิมพ์เดี่ยวๆ ก็ยังหน้าเดียวเหมือนเดิม
+   */
+  const attached = expense.kind === "claim" && slipKind(expense) === "claim" ? expense.advanceDoc : null;
+  const pages = attached ? 2 : 1;
 
   const doc = newDoc(jsPDF, font, bold);
-  renderBody(doc, expense, step, hasBold);
-  doc.setDrawColor(226, 232, 240);
-  doc.setLineWidth(0.3);
-  doc.line(L, SIG_TOP, R, SIG_TOP);
-  renderSignatures(doc, expense, hasBold, signatures);
-  renderFooter(doc, expense);
-  if (expense.status === "cancelled") renderCancelledMark(doc, hasBold);
+  renderSheet(doc, expense, signatures, { page: 1, pages });
+  if (attached) {
+    doc.addPage();
+    renderSheet(doc, attached, signatures?.advance, {
+      attachNote: `เอกสารแนบของใบเคลม ${expense.docNo || ""} — ใบเบิกเงินล่วงหน้าที่นำมาเคลียร์`,
+      page: 2,
+      pages,
+    });
+  }
 
   doc.setProperties({
     title: `${KIND_META[slipKind(expense)]?.docTitle || "ใบเบิก"} ${expense.docNo || ""}`,

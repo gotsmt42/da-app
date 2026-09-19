@@ -82,9 +82,21 @@ export default function ExpensePrintDialog({ open, expense, blank, onClose }) {
           setFormInfo(form);
           out = await generateBlankClaimPdf({ variant: blank.variant, advance: blank.advance, form, mode: "blob" });
         } else {
-          // ✅ ลายเซ็นอิเล็กทรอนิกส์ที่ผนึกไว้ในใบ (ผู้เบิก/ผู้อนุมัติ) — โหลดก่อนแล้วฝังลงไฟล์
-          const signatures = expense?._id ? await ExpenseService.signatures(expense._id) : null;
-          out = await generateExpensePdf({ expense, signatures, mode: "blob" });
+          /**
+           * ✅ ลายเซ็นอิเล็กทรอนิกส์ที่ผนึกไว้ในใบ — โหลดก่อนแล้วฝังลงไฟล์
+           * ✅ ใบเคลมพิมพ์คู่กับใบ Advance ที่อ้างถึง (หน้า 2) จึงต้องโหลดลายเซ็นของใบนั้นมาด้วย
+           * ⚠️ โหลดไม่ได้ก็ยังพิมพ์ได้ — หน้า 2 จะเว้นช่องลงนามไว้ให้เซ็นมือ (signatures() คืน {} เมื่อพลาด)
+           */
+          const advanceId = expense?.kind === "claim" ? expense?.advanceDoc?._id : null;
+          const [signatures, advanceSignatures] = await Promise.all([
+            expense?._id ? ExpenseService.signatures(expense._id) : null,
+            advanceId ? ExpenseService.signatures(advanceId) : null,
+          ]);
+          out = await generateExpensePdf({
+            expense,
+            signatures: signatures ? { ...signatures, advance: advanceSignatures || {} } : null,
+            mode: "blob",
+          });
         }
       } catch (err) {
         console.error("สร้าง PDF ไม่สำเร็จ:", err);
