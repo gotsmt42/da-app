@@ -1,7 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="NexPlan เน็กซ์แพลน">
   <!--
     ไอคอนแอป NexPlan — ใช้บนหน้าจอโฮม/แท็บเบราว์เซอร์ (ที่ที่ต้องเป็นสี่เหลี่ยมจัตุรัสมีพื้น)
-    แนวคิด: ตัว N ทึบเอียงไปข้างหน้า (Nex = next) ผ่าด้วยรอยทแยง + ลำแสงพาด = เทคยุคใหม่
+    แนวคิด: ตัว N เอียงไปข้างหน้าผ่าด้วยรอยทแยง (Nex = next) + ลูกศรพุ่งขึ้น = ไปต่อ สู่อนาคต
+    ⚠️ รอยผ่าใช้ <clipPath> ของ SVG ไม่ใช่ clip-path แบบ CSS — CSS polygon() ไม่มีผลเวลาเปิด
+       ไฟล์ .svg ตรงๆ หรือแปลงด้วยเครื่องมืออื่น จะได้ตัว N เต็มใบไม่มีรอยผ่า
     ⚠️ ในแอปไม่ได้ใช้ไฟล์นี้ — แถบบน/หน้าเข้าสู่ระบบใช้แบบตัวอักษรล้วน (app-wordmark-*.png)
     ⚠️ เป็นเครื่องหมายของ "แอป" เท่านั้น ไม่ใช่โลโก้บริษัท
     ⚠️ ไฟล์นี้สร้างจากสคริปต์ make-brand.js — แก้ที่สคริปต์แล้วรันใหม่ อย่าแก้มือทีละไฟล์
@@ -26,8 +28,12 @@
   </defs>
   <rect width="64" height="64" rx="15" fill="url(#nxTile)"/>
   <path d="M6 46 L28 10" stroke="url(#nxBeam)" stroke-width="9" stroke-linecap="round"/>
-  <g transform="skewX(-7) translate(4 0)">
+  <g transform="translate(-4 6) scale(0.84) skewX(-7) translate(4 0)">
     <path d="M15 49 V15 H23.5 L40.5 39 V15 H49 V49 H40.5 L23.5 25 V49 Z" fill="#ffffff" clip-path="url(#nxCutHi)"/>
     <path d="M15 49 V15 H23.5 L40.5 39 V15 H49 V49 H40.5 L23.5 25 V49 Z" fill="#ffffff" opacity=".92" clip-path="url(#nxCutLo)"/>
   </g>
+  <path d="M40 45 L57 24" fill="none" stroke="#ffffff" stroke-width="5"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M47 22.5 L58 22 L57.5 33" fill="none" stroke="#ffffff" stroke-width="5"
+        stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
