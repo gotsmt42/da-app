@@ -25,6 +25,8 @@ import EventAvailableOutlinedIcon from "@mui/icons-material/EventAvailableOutlin
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 
 import { useAuth } from "../AuthContext";
+// ✅ โลโก้บนหน้าเข้าสู่ระบบมาจากตั้งค่าองค์กร (GET /settings เปิดอ่านได้โดยไม่ต้องล็อกอิน)
+import useOrgSettings from "@/shared/hooks/useOrgSettings";
 
 // ✅ เดิมใช้ม่วง-น้ำเงิน (#667eea → #764ba2) ไม่ตรงกับธีมสีแดงที่ใช้จริงทั้งแอปข้างใน
 // (sidebar/หัวข้อ/ปุ่มเน้นสีต่างๆ ล้วนอิงจากสีแดงโลโก้เดียวกัน — ดู --accent-color ใน Sidebar.css)
@@ -46,6 +48,7 @@ const FEATURES = [
 ];
 
 const Login = () => {
+  const org = useOrgSettings();
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -184,7 +187,7 @@ const Login = () => {
           <Box sx={{ position: "relative", zIndex: 1 }}>
             <Box
               component="img"
-              src="/logo-dark-2.png"
+              src={org.logoUrl}
               alt="DA App"
               sx={{ height: 320, mb: -10, filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.15))" }}
             />
@@ -237,7 +240,7 @@ const Login = () => {
         >
           <Box
             component="img"
-            src="/logo-light-2.png"
+            src={org.logoUrl}
             alt="DA App"
             sx={{ height: "auto", mb: -10, display: { xs: "block", md: "none" } }}
           />

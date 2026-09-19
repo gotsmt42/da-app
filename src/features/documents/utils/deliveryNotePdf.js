@@ -23,6 +23,13 @@ import { thaiDateFull } from "@/shared/utils/thaiDate";
 
 // ── ข้อมูลบริษัทผู้ออกเอกสาร ────────────────────────────────────────────────
 // ✅ รวมไว้ที่เดียว — เดิม GenPDF.js ฝังข้อความพวกนี้กระจายอยู่กลางฟังก์ชัน ย้ายที่อยู่/เบอร์ทีต้องไล่หา
+import OrgSettingService from "@/shared/services/OrgSettingService";
+
+/**
+ * ข้อมูลบริษัทบนหัวกระดาษ
+ * ⚠️ ค่าที่เห็นตรงนี้คือ "ค่าเริ่มต้น" เท่านั้น — ของจริงถูกทับด้วยตั้งค่าองค์กร (applyOrgSettings)
+ * ทุกครั้งที่ออกเอกสาร ผู้ใช้แก้ชื่อ/ที่อยู่/โลโก้ได้เองจากหน้าตั้งค่า
+ */
 export const ISSUER = {
   nameTh: "บริษัท ดู ออล อาคิเทค แอนด์ เอ็นจิเนียริ่ง จำกัด",
   nameEn: "DO ALL ARCHITECT AND ENGINEERING CO.,LTD.",
@@ -412,7 +419,12 @@ export const buildDeliveryNoteBody = (f) => {
  * ✅ ย่อรูปให้พอดีความละเอียดงานพิมพ์ (≈300 dpi) หนึ่งครั้งแล้วแคชไว้ + เปิด compress ของ jsPDF
  * ⚠️ ต้องคง "ความโปร่งใส" ไว้ (โลโก้/ตราประทับวางทับข้อความ) จึงย่อเป็น PNG ไม่ใช่ JPEG
  */
-const PRINT_ASSET_PX = { [ISSUER.logo]: 420, [ISSUER.stamp]: 360 };
+/**
+ * ความละเอียดสูงสุดของรูปประจำเอกสาร (px) — คำนวณจากค่าปัจจุบันทุกครั้ง
+ * ⚠️ ห้ามคำนวณครั้งเดียวตอนโหลดโมดูล — โลโก้เปลี่ยนได้จากหน้าตั้งค่าองค์กร ถ้าล็อกพาธไว้ตั้งแต่ต้น
+ * รูปใหม่จะไม่เคยถูกย่อ/แคช และหัวกระดาษจะยังเป็นโลโก้เก่าจนกว่าจะรีโหลดหน้า
+ */
+const printAssetSizes = () => ({ [ISSUER.logo]: 420, [ISSUER.stamp]: 360 });
 const printAssetCache = new Map();
 
 const downscalePng = (url, maxPx) => new Promise((resolve, reject) => {
@@ -438,8 +450,29 @@ const downscalePng = (url, maxPx) => new Promise((resolve, reject) => {
  * เตรียมรูปประจำเอกสาร (โลโก้/ตราประทับ) แบบย่อแล้ว — เรียกก่อนเริ่มวาดทุกครั้ง
  * ⚠️ ล้มเหลวต้องไม่ทำให้ออกเอกสารไม่ได้ — ตกกลับไปใช้ไฟล์ต้นฉบับเหมือนเดิม (แค่ไฟล์ใหญ่ขึ้น)
  */
+/**
+ * ดึงค่าตั้งค่าองค์กรมาทับ ISSUER — ✅ ผู้ใช้ขอให้เปลี่ยนโลโก้/ข้อมูลบริษัทเองได้จากหน้าตั้งค่า
+ * ⚠️ ต้อง "เขียนทับในอ็อบเจกต์เดิม" ไม่ใช่สร้างก้อนใหม่ — เอกสารทุกชนิด import ISSUER ตัวนี้ไปแล้ว
+ * ⚠️ ค่าที่ยังไม่ได้ตั้ง (ว่าง) ตกกลับไปใช้ของที่ติดมากับแอป (ดู ORG_FALLBACK)
+ */
+export const applyOrgSettings = (s) => {
+  if (!s) return;
+  ISSUER.nameTh = s.nameTh || ISSUER.nameTh;
+  ISSUER.nameEn = s.nameEn || ISSUER.nameEn;
+  ISSUER.address = s.address || ISSUER.address;
+  ISSUER.taxId = s.taxId || ISSUER.taxId;
+  ISSUER.logo = s.letterheadUrl || ISSUER.logo;
+  ISSUER.stamp = s.stampUrl || ISSUER.stamp;
+};
+
 export const preparePrintAssets = async () => {
-  await Promise.all(Object.entries(PRINT_ASSET_PX).map(async ([url, maxPx]) => {
+  // ✅ จุดเดียวที่เอกสารทุกชนิดเรียกก่อนวาดเสมอ — เอาค่าองค์กรล่าสุดมาใช้ตรงนี้ที่เดียว
+  try {
+    applyOrgSettings(await OrgSettingService.load());
+  } catch {
+    /* ใช้ค่าที่ติดมากับแอปต่อไป — ออกเอกสารไม่ได้เพราะโหลดตั้งค่าไม่ได้ถือว่าแย่กว่า */
+  }
+  await Promise.all(Object.entries(printAssetSizes()).map(async ([url, maxPx]) => {
     if (printAssetCache.has(url)) return;
     try {
       printAssetCache.set(url, await downscalePng(url, maxPx));

@@ -48,6 +48,8 @@ const Account = lazy(() => import("@/features/staff/pages/Account.js"));
 const Product = lazy(() => import("@/features/products/pages/Product"));
 const StockProduct = lazy(() => import("@/features/products/pages/StockProduct"));
 const WorkTypeSystem = lazy(() => import("@/features/settings/pages/WorkTypeSystem.js"));
+// ✅ ตั้งค่าองค์กร (โลโก้/ข้อมูลบริษัทบนเอกสาร/ค่าตั้งต้น) — ผู้ใช้ขอให้แก้เองได้
+const OrganizationSettings = lazy(() => import("@/features/settings/pages/OrganizationSettings.js"));
 const ContractOverview = lazy(() => import("@/features/contracts/pages/ContractOverview.js"));
 const FileUpload = lazy(() => import("@/features/documents/pages/FileUploadPage"));
 const EventCalendar = lazy(() => import("@/features/calendar/pages/EventCalendar.js"));
@@ -166,6 +168,17 @@ const ThemeRoutes = [
         // (ลิงก์เก่า/บุ๊กมาร์ก/ลิงก์ในแอปที่ยังชี้มาที่นี่จึงไม่พังสักอัน)
         path: "customer",
         element: <LegacyTabRedirect to="/customers" tab="registry" />,
+      },
+      {
+        path: "settings/organization",
+        element: (
+          <AdminRoute>
+            <Suspense fallback={<div>Loading...</div>}>
+              <OrganizationSettings />
+            </Suspense>
+          </AdminRoute>
+        ),
+        title: "Organization Settings",
       },
       {
         path: "worktype",

@@ -20,6 +20,7 @@ import {
 import { swalLogout, hasValidAvatar } from "../shared/utils/user";
 import Swal from "sweetalert2";
 import useAppBadges from "@/shared/hooks/useAppBadges";
+import useOrgSettings from "@/shared/hooks/useOrgSettings";
 // ✅ ไอคอน 3 เมนูกลางตรงกับที่ Dashboard.js/Sidebar.js ใช้จริงสำหรับหน้าเดียวกันเป๊ะๆ
 // (FaWrench="การดำเนินงาน", FaFileContract="ภาพรวมสัญญา", FaFileInvoiceDollar="ติดตามใบเสนอราคา")
 import {
@@ -114,6 +115,7 @@ const Header = ({ toggleMobileSidebar }) => {
   // ⚠️ ตัวเลขบนป้ายทุกจุด (เมนูข้าง/เมนูหลักหน้าแรก/แถบล่างมือถือ/ตรงนี้) จึงมาจากชุดข้อมูลเดียวกันเสมอ
   const { userData, logout } = useAuth();
   const { events, badges } = useAppBadges(userData);
+  const org = useOrgSettings();
   const isAdminOrManager = can(userData, "viewAllJobs");
   // ✅ หน้า "ภาพรวมงาน" เปิดให้ช่างเข้าดูงานของตัวเองได้แล้ว (ดู ContractOverview.js canView) —
   // ปุ่มทางลัดในนี้ต้องเปิดให้ตรงกันด้วย ไม่ใช่แค่แอดมิน/manager เหมือนเดิม
@@ -194,7 +196,8 @@ const Header = ({ toggleMobileSidebar }) => {
         {/* ฝั่งซ้าย: โลโก้แบรนด์ */}
         <NavbarBrand tag={Link} to="/dashboard" className="m-0">
           <div className="gradiant-bg">
-            <img src="logo-dark-2.png" alt="Logo" className="logo" />
+            {/* ✅ โลโก้ตั้งค่าเองได้จากหน้าตั้งค่าองค์กร (ว่าง = ใช้ไฟล์ที่ติดมากับแอป) */}
+            <img src={org.logoUrl} alt="Logo" className="logo" />
           </div>
         </NavbarBrand>
 

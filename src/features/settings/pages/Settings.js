@@ -11,6 +11,7 @@ import {
   FaSignOutAlt,
   FaTags,
   FaFileSignature,
+  FaImage,
 } from "react-icons/fa";
 import Swal from "sweetalert2";
 import { useAuth } from "@/features/auth/AuthContext";
@@ -80,6 +81,8 @@ const Settings = () => {
     { title: "ลูกค้า", desc: "จัดการฐานข้อมูลลูกค้า", link: "/customer", icon: <FaBuilding size={18} />, color: "#3b82f6" },
     { title: "พนักงาน", desc: "จัดการสิทธิ์และข้อมูลพนักงาน", link: "/employee", icon: <FaUsers size={18} />, color: "#f43f5e" },
     { title: "ประเภทงาน / ระบบ", desc: "จัดการตัวเลือกใน dropdown ตอนเพิ่ม/แก้ไขแผนงาน", link: "/worktype", icon: <FaTags size={18} />, color: "#8b5cf6" },
+    // ✅ ผู้ใช้ขอให้ "ปรับเปลี่ยนได้เอง เช่น Logo แอพ" — โลโก้/ข้อมูลบริษัทบนเอกสาร/ค่าตั้งต้นของระบบเบิก
+    { title: "องค์กรและเอกสาร", desc: "โลโก้ · ข้อมูลบริษัทบนหัวกระดาษ · ค่าตั้งต้นของระบบเบิก", link: "/settings/organization", icon: <FaImage size={18} />, color: "#0f766e" },
   ];
 
   return (
