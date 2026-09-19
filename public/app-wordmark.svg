@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 64" width="300" height="64" role="img" aria-label="PlanNgan แผนงาน — ระบบแผนงานและงานบริการหน้างาน">
+  <!--
+    โลโก้แบบมีชื่อกำกับ (lockup) ของแอป PlanNgan — ใช้บนหน้าเข้าสู่ระบบ/สไลด์/เอกสารแนะนำระบบ
+    ⚠️ เป็นเครื่องหมายของ "แอป" เท่านั้น ไม่ใช่โลโก้บริษัท (โลโก้บริษัทตั้งจากหน้า "ตั้งค่าองค์กร")
+    ⚠️ ตัวหนังสือใช้ currentColor — วางบนพื้นสว่างหรือพื้นเข้มก็อ่านออก แค่ตั้ง color ที่ element แม่
+    ⚠️ ฟอนต์เดียวกับที่แอปโหลดอยู่แล้ว (IBM Plex Sans Thai) เครื่องที่ไม่มีจะตกไปฟอนต์ระบบโดยยังอ่านได้
+  -->
+  <rect width="64" height="64" rx="15" fill="#dc2626"/>
+  <g fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M20 50 V14 H32 A8 8 0 0 1 32 30 H20"/>
+    <path d="M31 43 L37 49 L54 29"/>
+  </g>
+  <text x="80" y="34" font-family="'IBM Plex Sans Thai','IBM Plex Sans',system-ui,sans-serif"
+        font-size="27" font-weight="700" letter-spacing="-0.5" fill="currentColor">PlanNgan</text>
+  <text x="81" y="52" font-family="'IBM Plex Sans Thai',system-ui,sans-serif"
+        font-size="13" font-weight="500" fill="currentColor" opacity="0.6">แผนงาน · ระบบงานบริการหน้างาน</text>
+</svg>
