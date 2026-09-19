@@ -174,7 +174,8 @@ const ThemeRoutes = [
       {
         path: "settings/organization",
         element: (
-          <AdminRoute>
+          // ตั้งค่าองค์กร = งานระดับระบบ — Role: Super Admin เท่านั้น (ตรงกับ requireCap ที่ server)
+          <AdminRoute cap="manageSystem" fallback="/about">
             <Suspense fallback={<div>Loading...</div>}>
               <OrganizationSettings />
             </Suspense>
@@ -185,7 +186,7 @@ const ThemeRoutes = [
       {
         path: "settings/permissions",
         element: (
-          <AdminRoute>
+          <AdminRoute cap="manageSystem" fallback="/about">
             <Suspense fallback={<div>Loading...</div>}>
               <RolePermissions />
             </Suspense>
@@ -196,7 +197,8 @@ const ThemeRoutes = [
       {
         path: "worktype",
         element: (
-          <AdminRoute>
+          // ประเภทงาน/ระบบ = ข้อมูลหลัก — คุมด้วยช่อง manageMasterData ในตารางสิทธิ์
+          <AdminRoute cap="manageMasterData">
             <Suspense fallback={<div>Loading...</div>}>
               <WorkTypeSystem />
             </Suspense>
@@ -254,7 +256,7 @@ const ThemeRoutes = [
       {
         path: "product",
         element: (
-          <AdminRoute>
+          <AdminRoute cap="manageMasterData">
             <Suspense fallback={<div>Loading Product...</div>}>
               <Product />
             </Suspense>
@@ -265,7 +267,7 @@ const ThemeRoutes = [
       {
         path: "product/stock",
         element: (
-          <AdminRoute>
+          <AdminRoute cap="manageMasterData">
             <Suspense fallback={<div>Loading Stock Product...</div>}>
               <StockProduct />
             </Suspense>

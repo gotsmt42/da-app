@@ -115,7 +115,7 @@ export const buildNavGroups = (userData) => {
   }
 
   // ── หมวด "เอกสาร" — ทุก role ยกเว้นเซล (เอกสารงานช่างล้วนๆ เซลไม่เกี่ยว)
-  if (!isSaleUser) {
+  if (can(userData, "viewDocuments")) {
     groups.push({ key: "documents", type: "link", title: "เอกสาร", href: "/documents", icon: FaFileAlt });
   }
 

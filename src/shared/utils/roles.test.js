@@ -240,3 +240,44 @@ describe("Role กับ Rank แยกกัน", () => {
     expect(titleOf({ role: "technician" })).toBe("ช่างเทคนิค");
   });
 });
+
+/**
+ * รูปแบบข้อมูลผู้ใช้ในฐานข้อมูล — ✅ ผู้ใช้สั่ง: "ทำรายการให้ตรง และตามชื่อจริงๆด้วย"
+ *   rank = ตำแหน่งในองค์กร · role = ตำแหน่งในระบบ · jobTitle = ตำแหน่งเฉพาะบุคคล
+ * ⚠️ ต้องอ่านข้อมูล "รูปแบบเก่า" (role = ตำแหน่งในองค์กร) ได้เหมือนเดิมทุกกรณี ไม่งั้นคนที่ยัง
+ * ไม่ถูกย้าย หรือสำเนาที่ฝังอยู่ในเอกสารอื่น จะกลายเป็นคนไม่มีสิทธิ์อะไรเลยแบบเงียบๆ
+ */
+describe("อ่านตำแหน่งได้ทั้งรูปแบบใหม่และเก่า", () => {
+  it("รูปแบบใหม่: rank = ตำแหน่งในองค์กร · role = ตำแหน่งในระบบ", () => {
+    const boss = { rank: "technician", role: "superadmin" };
+    expect(normalizeRole(boss)).toBe("technician");
+    expect(systemRoleOf(boss)).toBe("superadmin");
+    expect(can(boss, "manageSystem")).toBe(true);
+    expect(can(boss, "approveExpense")).toBe(false);
+  });
+
+  it("รูปแบบเก่า: role = ตำแหน่งในองค์กร · systemRole = ตำแหน่งในระบบ", () => {
+    const legacy = { role: "manager", systemRole: "superadmin" };
+    expect(normalizeRole(legacy)).toBe("manager");
+    expect(systemRoleOf(legacy)).toBe("superadmin");
+    expect(can(legacy, "approveExpense")).toBe(true);
+  });
+
+  it("สำเนาที่ฝังในเอกสารอื่น (มีแค่ role) ยังอ่านออก", () => {
+    expect(normalizeRole({ role: "sale" })).toBe("sale");
+    expect(can({ role: "admin" }, "reviewExpense")).toBe(true);
+  });
+
+  it('คำว่า "admin" เป็นได้ทั้ง Rank และ Role — ต้องไม่สลับกัน', () => {
+    const orgAdmin = { rank: "admin", role: "admin" };
+    expect(normalizeRole(orgAdmin)).toBe("admin");
+    expect(systemRoleOf(orgAdmin)).toBe("admin");
+    expect(can(orgAdmin, "reviewExpense")).toBe(true);   // สิทธิ์จาก Rank
+    expect(can(orgAdmin, "manageSystem")).toBe(false);   // Role แค่ Admin ตั้งค่าระบบไม่ได้
+  });
+
+  it("titleOf: ข้อมูลเก่าที่เคยพิมพ์ตำแหน่งไว้ในช่อง rank ยังไม่หายไปจากเอกสาร", () => {
+    expect(titleOf({ role: "technician", rank: "ช่างอาวุโส" })).toBe("ช่างอาวุโส");
+    expect(titleOf({ rank: "technician", role: "member" })).toBe("ช่างเทคนิค");
+  });
+});

@@ -18,14 +18,15 @@ import { Navigate } from "react-router-dom";
 import { FolderOpen, Description } from "@mui/icons-material";
 import TabbedPage from "@/shared/ui/TabbedPage";
 import { useAuth } from "@/features/auth/AuthContext";
-import { isRole, ROLES } from "@/shared/utils/roles";
+import { can } from "@/shared/utils/roles";
 
 const Files = lazy(() => import("./Files"));
 const IssuedDocuments = lazy(() => import("./IssuedDocuments"));
 
 const DocumentsHub = () => {
   const { userData } = useAuth();
-  if (isRole(userData, ROLES.SALE)) return <Navigate to="/dashboard" replace />;
+  // ✅ ถามตารางสิทธิ์ (เดิมฮาร์ดโค้ดว่า "เซลเข้าไม่ได้" — ติ๊กในตารางแล้วไม่มีผล)
+  if (!can(userData, "viewDocuments")) return <Navigate to="/dashboard" replace />;
 
   return (
   <TabbedPage

@@ -116,7 +116,8 @@ const updateUserData = (newData) => {
         lname: fresh.lname,
         email: fresh.email,
         tel: fresh.tel,
-        role: fresh.role,                       // Rank — ตำแหน่งในองค์กร (คีย์เดิมในฐานข้อมูล)
+        rank: fresh.rank || fresh.role,         // Rank — ตำแหน่งในองค์กร (ชื่อฟิลด์จริงในฐานข้อมูล)
+        role: fresh.role,                       // ⚠️ payload ส่ง role = Rank เหมือนเดิม เพื่อหน้าเก่าที่เปิดค้างไม่พัง
         // ✅ Role — ตำแหน่งในระบบ (Super Admin/Admin/Member) ต้องติดมาด้วย ไม่งั้นเมนูตั้งค่าระบบหาย
         systemRole: fresh.systemRole || "",
         // ✅ ตำแหน่งเฉพาะบุคคล — พิมพ์ใต้ชื่อในเอกสารที่ออกจากเครื่องนี้ (ข้อมูลเก่าอยู่ที่ rank)

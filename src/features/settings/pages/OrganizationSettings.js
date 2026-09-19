@@ -124,7 +124,7 @@ export default function OrganizationSettings() {
   // ค่าจากเซิร์ฟเวอร์เปลี่ยน (โหลดเสร็จ/คนอื่นแก้) — ดึงมาแสดง เว้นแต่กำลังพิมพ์ค้างอยู่
   useEffect(() => { if (!dirty) setForm(live); }, [live, dirty]);
 
-  if (!can("manageAll")) return <Navigate to="/about" replace />;
+  if (!can("manageSystem")) return <Navigate to="/about" replace />;
 
   const set = (key) => (e) => { setDirty(true); setForm((f) => ({ ...f, [key]: e.target.value })); };
 

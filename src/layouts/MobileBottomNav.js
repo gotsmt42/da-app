@@ -87,7 +87,7 @@ export const buildBottomNav = (userData) => {
   const fillers = [];
   if (isSaleUser) fillers.push({ key: "sales", label: "แจ้งงาน", href: "/sales", icon: FaPaperPlane, badgeKey: "dispatchMine", match: (loc) => loc.pathname.startsWith("/sales") });
   if (canViewOperation) fillers.push({ key: "operation", label: "ดำเนินงาน", href: "/operation", icon: FaWrench, badgeKey: "closeRequests", match: (loc) => loc.pathname.startsWith("/operation") });
-  if (!isSaleUser) fillers.push({ key: "documents", label: "เอกสาร", href: "/documents", icon: FaFileAlt, match: (loc) => loc.pathname.startsWith("/documents") });
+  if (can(userData, "viewDocuments")) fillers.push({ key: "documents", label: "เอกสาร", href: "/documents", icon: FaFileAlt, match: (loc) => loc.pathname.startsWith("/documents") });
   if (can(userData, "viewFinance")) fillers.push({ key: "finance", label: "ใบเสนอราคา", href: "/finance", icon: FaFileInvoiceDollar, badgeKey: "quotations", match: (loc) => loc.pathname.startsWith("/finance") });
   fillers.forEach((f) => { if (items.length < MAX_ITEMS) items.push(f); });
 

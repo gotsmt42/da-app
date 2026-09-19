@@ -1,24 +1,25 @@
 /**
- * หน้า "การดำเนินงาน" — ของสายงานช่างล้วนๆ
+ * หน้า "การดำเนินงาน"
  *
- * ⚠️ ฝ่ายขายเข้าไม่ได้ (เด้งกลับไปหน้าปฏิทินของตัวเอง) — หน้านี้ทั้งหน้าสร้างมารอบงานของช่าง:
- * เอกสาร 4 ชนิด · เช็คอินหน้างาน · คำขอปิดงาน · ทีมที่เข้างาน ซึ่งไม่มีอะไรเกี่ยวกับนัดของเซลเลย
- * และ server กรองด้วย department อยู่แล้ว เซลกดเข้ามาก็เห็นแต่หน้าเปล่า
+ * 🐛 ที่แก้: เดิมเขียนตรงๆว่า "ถ้าเป็นเซลให้เด้งออก" — ติ๊ก "อัปเดตการดำเนินงาน"
+ * ให้เซลในตารางสิทธิ์แล้วก็ยังเข้าหน้านี้ไม่ได้ (ตั้งค่าไปก็ไม่มีผลจริง)
+ * ✅ เปลี่ยนมาถามสิทธิ์แทน — เกณฑ์เดียวกับการโชว์เมนู (HomeMenu/navConfig) จึงไม่มีเมนูที่กดแล้วเด้ง
  *
- * ⚠️ นี่คือ "กันไม่ให้หลงเข้ามา" ไม่ใช่ด่านความปลอดภัย — ข้อมูลจริงถูกกรองที่ server ทุกเส้นทาง
+ * ⚠️ นี่คือ "กันหลงเข้า" ไม่ใช่ด่านความปลอดภัย — ข้อมูลจริงถูกกรองที่ server ทุกเส้นทาง
  * (ดู departmentScope ใน routes/calendarEvent/shared.js)
  */
 import { Navigate } from "react-router-dom";
 
 import { useAuth } from "@/features/auth/AuthContext";
-import { ROLES } from "@/shared/utils/roles";
+import { can } from "@/shared/utils/roles";
 import Operation from "../components/OperationBoard/index";
 
 const Operate = () => {
   const { userData } = useAuth();
-  const isSale = (userData?.role || "").toLowerCase() === ROLES.SALE;
+  // อัปเดตงานคนอื่นได้ หรือเป็นช่างที่รับงานเอง — ตรงกับเงื่อนไขโชว์เมนูเป๊ะ
+  const canOpen = can(userData, "editOperation") || can(userData, "receiveDispatch");
 
-  if (isSale) return <Navigate to="/event" replace />;
+  if (!canOpen) return <Navigate to="/dashboard" replace />;
 
   return <Operation />;
 };

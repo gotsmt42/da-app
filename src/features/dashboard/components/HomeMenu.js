@@ -103,7 +103,7 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
 
   // ── เอกสารและการเงิน ─────────────────────────────────────────────────────
   const docs = [];
-  if (!isSaleUser) docs.push({ key: "documents", title: "เอกสาร", sub: "ไฟล์ · เอกสารออก", href: "/documents", icon: FaFileAlt });
+  if (can(userData, "viewDocuments")) docs.push({ key: "documents", title: "เอกสาร", sub: "ไฟล์ · เอกสารออก", href: "/documents", icon: FaFileAlt });
   if (canViewFinance) {
     docs.push({ key: "finance", title: "ใบเสนอราคา / การเงิน", short: "ใบเสนอราคา", sub: "ติดตาม · วางบิล", href: "/finance", icon: FaFileInvoiceDollar, badgeKey: "quotations" });
   }
