@@ -9,12 +9,12 @@
     ⚠️ เป็นเครื่องหมายของ "แอป" เท่านั้น ไม่ใช่โลโก้บริษัท
     ⚠️ ไฟล์นี้สร้างจากสคริปต์ make-brand.js — แก้ที่สคริปต์แล้วรันใหม่ อย่าแก้มือทีละไฟล์
   -->
-  <rect width="64" height="64" rx="15" fill="#b91c1c"/>
+  <rect width="64" height="64" rx="15" fill="#000000"/>
   <g transform="translate(-3 2) scale(0.9) skewX(-7) translate(4 0)">
     <path d="M15 15 H44 V23 H23.5 V28 H39 V36 H23.5 V49 H15 Z" fill="#ffffff"/>
   </g>
   <path d="M33 42 C43 42 41 28 51 26" fill="none" stroke="#ffffff" stroke-width="4.6"
         stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M33 51 C46 51 45 34 56 32" fill="none" stroke="#ffffff" stroke-width="4.6"
-        stroke-linecap="round" stroke-linejoin="round" opacity=".45"/>
+  <path d="M33 51 C46 51 45 34 56 32" fill="none" stroke="#ef4444" stroke-width="4.6"
+        stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
