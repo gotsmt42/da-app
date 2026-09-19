@@ -247,7 +247,8 @@ export default function ExpensesPage({ view: viewProp }) {
       key: "approved", label: "รออนุมัติเบิกจ่าย",
       value: summary?.toSettle ?? "–", color: meta.color, onClick: () => pick("approved"),
     });
-    stats.push({ key: "__await", label: "Advance ที่ยังไม่เคลียร์", value: summary?.awaitingClaim ?? "–", color: KIND_META.advance.color });
+    // ⚠️ ของตัวเองแสดงอยู่ในกล่อง "ใบเบิกของคุณที่ค้างอยู่" ด้านล่างแล้ว — ตัวเลขนี้จึงมีไว้ให้หัวหน้าดูภาพรวมทั้งทีมเท่านั้น
+    if (viewAll) stats.push({ key: "__await", label: "Advance ที่ยังไม่เคลียร์ (ทั้งทีม)", value: summary?.awaitingClaim ?? "–", color: KIND_META.advance.color });
   } else if (view === "inbox") {
     // ✅ ตัวเลขตามขั้นของสายอนุมัติ 3 ส่วน — การ์ดของขั้นที่ตัวเองไม่ได้รับผิดชอบไม่ต้องโชว์ให้รก
     if (canReview) stats.push({ key: "__p", label: "รอตรวจสอบ", value: summary?.pending ?? "–", color: "#d97706" });
@@ -341,7 +342,7 @@ export default function ExpensesPage({ view: viewProp }) {
       </Stack>
 
       {/* ✅ สิ่งที่ป้ายตัวเลขบนเมนู "ใบเคลม"/"ใบ Advance" นับไว้ — ต้องเห็นและกดทำต่อได้ทันทีที่เข้ามา
-          (ผู้ใช้แจ้งว่าป้ายขึ้นแต่เข้ามาแล้วไม่เจออะไร) */}
+          (ผู้ใช้แจ้งว่าป้ายขึ้นแต่เข้ามาแล้วไม่เจออะไร) · ชื่อกล่องเรียกตามสิ่งที่มันเป็น: ใบเบิก ไม่ใช่ "งาน" */}
       {(view === "claim" || view === "advance") && canRequest && (
         <MyExpenseTasks
           view={view}

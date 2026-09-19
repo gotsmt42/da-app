@@ -1,5 +1,5 @@
 /**
- * MyExpenseTasks — "งานของคุณที่ต้องทำ" บนหัวหน้าใบเคลม / ใบ Advance
+ * MyExpenseTasks — "ใบเบิกของคุณที่ค้างอยู่" บนหัวหน้าใบเคลม / ใบ Advance
  *
  * 🐛 ผู้ใช้แจ้ง: "เจอปัญหาการแจ้งใบเคลมมาเองแปลกๆ โดยที่ไม่มีข้อมูล"
  * สาเหตุ: ป้ายตัวเลขบนเมนู "ใบเคลม" นับ (1) ใบ Advance ของฉันที่รับเงินแล้วยังไม่ได้ส่งใบเคลม และ (2) ใบเคลม
@@ -7,6 +7,8 @@
  * กดตามป้ายเข้ามาแล้วไม่เจออะไรให้ทำ
  *
  * ✅ แสดงทุกใบที่ป้ายนับไว้ตรงนี้ พร้อมปุ่มทำต่อได้ทันที (ออกใบเคลม / แก้ไขและส่งใหม่)
+ * ⚠️ ผู้ใช้แจ้งว่า "มันไม่ใช่งาน คือการเบิก" และให้ลดการแสดงซ้ำ — หัวกล่องไม่อธิบายซ้ำกับป้ายในแถว
+ * ป้ายในแถวบอกแค่สถานะ ส่วนยอดเงิน/กำหนดเคลียร์อยู่บรรทัดเดียวด้านล่าง
  * ⚠️ เงื่อนไขต้องตรงกับ /api/expenses/summary เป๊ะ ไม่งั้นเลขบนป้ายกับจำนวนในกล่องนี้จะไม่เท่ากันอีก:
  *   • awaitingClaimMine   = ใบ Advance ที่ "ฉันเป็นผู้เบิก" สถานะ paid
  *   • claimRejectedMine   = ใบเคลม (รวมสำรองจ่าย) ที่ฉันเป็นผู้เบิกหรือคนออกใบ สถานะ rejected
@@ -78,11 +80,9 @@ export default function MyExpenseTasks({ view, userId, reloadKey, onOpen, onCrea
     }}>
       <Stack direction="row" alignItems="center" spacing={1} sx={{ px: { xs: 1.5, sm: 2 }, py: 1.1, bgcolor: alpha("#dc2626", 0.05), borderBottom: `1px solid ${alpha("#dc2626", 0.15)}` }}>
         <AssignmentLate sx={{ fontSize: 20, color: "#dc2626" }} />
-        <Typography sx={{ fontWeight: 900, fontSize: "0.95rem", color: TEXT_MAIN }}>งานของคุณที่ต้องทำ</Typography>
+        {/* ✅ ผู้ใช้แจ้ง: "มันไม่ใช่งาน คือการเบิก" — เรียกตามสิ่งที่มันเป็น และไม่อธิบายซ้ำกับป้ายในแต่ละแถว */}
+        <Typography sx={{ fontWeight: 900, fontSize: "0.95rem", color: TEXT_MAIN }}>ใบเบิกของคุณที่ค้างอยู่</Typography>
         <Chip size="small" label={tasks.length} sx={{ height: 20, fontWeight: 900, bgcolor: "#dc2626", color: "#fff" }} />
-        <Typography variant="caption" sx={{ color: TEXT_SUB, display: { xs: "none", sm: "inline" } }}>
-          {view === "claim" ? "ใบ Advance ที่รับเงินแล้วต้องเคลียร์ · ใบเคลมที่ถูกตีกลับให้แก้ไข" : "ใบ Advance ที่ถูกตีกลับให้แก้ไข"}
-        </Typography>
       </Stack>
 
       <Stack divider={<Box sx={{ borderTop: `1px solid ${BORDER_MAIN}` }} />}>
@@ -103,20 +103,24 @@ export default function MyExpenseTasks({ view, userId, reloadKey, onOpen, onCrea
                 onKeyDown={(ev) => { if (ev.key === "Enter") onOpen?.(e._id); }}
                 sx={{ flex: 1, minWidth: 0, cursor: "pointer", "&:hover .mt-doc": { textDecoration: "underline" } }}
               >
+                {/* ⚠️ เลขที่ใบ + เรื่อง อยู่บรรทัดเดียวกัน — เดิมแยกสองบรรทัดทำให้กล่องสูงโดยไม่ได้ข้อมูลเพิ่ม */}
                 <Stack direction="row" alignItems="center" spacing={0.75} flexWrap="wrap" useFlexGap>
                   <Typography className="mt-doc" sx={{ fontWeight: 800, fontSize: "0.9rem", color: kindMeta.dark }}>{e.docNo}</Typography>
-                  {type === "clear" ? (
-                    <Chip size="small" label={late ? `เลยกำหนดเคลียร์ ${daysLate(e.dueClearAt)} วัน` : "รับเงินแล้ว · รอส่งใบเคลม"}
-                      sx={{ height: 20, fontSize: "0.7rem", fontWeight: 800, bgcolor: alpha(late ? "#dc2626" : "#0369a1", 0.1), color: late ? "#dc2626" : "#0369a1" }} />
-                  ) : (
-                    <Chip size="small" label="ถูกตีกลับ · ต้องแก้ไข"
-                      sx={{ height: 20, fontSize: "0.7rem", fontWeight: 800, bgcolor: alpha("#dc2626", 0.1), color: "#dc2626" }} />
-                  )}
+                  <Typography sx={{ fontSize: "0.85rem", color: TEXT_MAIN, minWidth: 0 }} noWrap>{e.subject || "-"}</Typography>
+                  {/* ป้ายบอก "สถานะ" อย่างเดียว ส่วนรายละเอียดเงิน/กำหนดอยู่บรรทัดล่าง ไม่พูดซ้ำกัน */}
+                  <Chip
+                    size="small"
+                    label={type === "clear" ? (late ? `เลยกำหนด ${daysLate(e.dueClearAt)} วัน` : "รอส่งใบเคลม") : "ถูกตีกลับ"}
+                    sx={{
+                      height: 20, fontSize: "0.7rem", fontWeight: 800,
+                      bgcolor: alpha(late || type === "fix" ? "#dc2626" : "#0369a1", 0.1),
+                      color: late || type === "fix" ? "#dc2626" : "#0369a1",
+                    }}
+                  />
                 </Stack>
-                <Typography sx={{ fontSize: "0.85rem", color: TEXT_MAIN }} noWrap>{e.subject || "-"}</Typography>
                 <Typography variant="caption" sx={{ color: late ? "#dc2626" : TEXT_SUB, display: "block" }}>
                   {type === "clear"
-                    ? `รับเงิน ${baht(e.total)}${e.payment?.at ? ` เมื่อ ${thaiDate(e.payment.at)}` : ""}${e.dueClearAt ? ` · เคลียร์ภายใน ${thaiDate(e.dueClearAt)}` : ""}`
+                    ? [`รับเงิน ${baht(e.total)}`, e.payment?.at ? thaiDate(e.payment.at) : "", e.dueClearAt ? `เคลียร์ภายใน ${thaiDate(e.dueClearAt)}` : ""].filter(Boolean).join(" · ")
                     : `เหตุผล: ${e.rejectReason || "-"}`}
                 </Typography>
               </Box>
