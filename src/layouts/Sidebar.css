@@ -100,6 +100,10 @@
   flex: 1;
   overflow-y: auto;
   padding: 10px 14px 20px 14px;
+  /* ⚠️ กันการเลื่อนในเมนูไป "ต่อ" ให้หน้าเบื้องหลังเลื่อนตามตอนเลื่อนจนสุดขอบ
+     (overscroll chaining) — ถ้าไม่กัน หน้าหลังจะขยับตามนิ้วทั้งที่ตั้งใจเลื่อนแค่ในเมนู */
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ซ่อน Scrollbar */
@@ -230,7 +234,8 @@
    เปลี่ยนเป็น overlay โปร่งแสงบนสีเดิม ให้กลืนเป็นเนื้อเดียวกัน มีแค่เส้นคั่นบางๆ บอกขอบเขต */
 .sidebar-fixed-bottom {
   flex-shrink: 0;
-  padding: 10px 16px 16px 16px;
+  /* ⚠️ เผื่อระยะให้แถบ gesture ของมือถือด้วย ไม่งั้นปุ่มล่างสุดจะโดนแถบนั้นทับครึ่งตัว */
+  padding: 10px 16px calc(16px + env(safe-area-inset-bottom, 0px)) 16px;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
   background-color: rgba(0, 0, 0, 0.12);
 }

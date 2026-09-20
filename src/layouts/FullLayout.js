@@ -26,7 +26,6 @@ const FullLayout = () => {
   );
   const [isScrollingUp, setIsScrollingUp] = useState(false);
   const [lastScrollTop, setLastScrollTop] = useState(0);
-  const [touchStartY, setTouchStartY] = useState(null);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -87,10 +86,23 @@ const FullLayout = () => {
     setIsScrollingUp(currentScrollTop < lastScrollTop && currentScrollTop > 0);
     setLastScrollTop(currentScrollTop <= 0 ? 0 : currentScrollTop);
 
-    if (currentScrollTop > 0 && isMobile) {
-      setIsSidebarOpen(false); // เลือนหน้าจอแล้วให้หุบซ่อน
-    }
-  }, [lastScrollTop, isMobile]);
+    // 🐛 เดิมมี setIsSidebarOpen(false) ตรงนี้ — เลื่อนหน้าทีเดียวลิ้นชักปิดทันที
+    // ผู้ใช้จึงเลื่อนลงไปกดเมนูท้ายลิ้นชัก (เช่น "ตั้งค่า") ไม่ได้เลย
+    // ✅ ลิ้นชักปิดได้ทางเดียวคือแตะนอกกรอบหรือกดเมนู — ระหว่างเปิดอยู่จะล็อกไม่ให้หน้าหลังเลื่อน
+    //    (ดู useEffect ล็อกการเลื่อนด้านล่าง) เนื้อหาในลิ้นชักเลื่อนเองได้ที่ .sidebar-content
+  }, [lastScrollTop]);
+
+  /**
+   * ล็อกไม่ให้หน้าเบื้องหลังเลื่อนตอนลิ้นชักเปิดอยู่
+   * ⚠️ จำเป็นคู่กับการเลิกปิดตอนเลื่อน — ไม่งั้นนิ้วที่ลากในลิ้นชักจะไปพาหน้าหลังเลื่อนตามด้วย
+   * ⚠️ ต้องคืนค่าเดิมตอนปิด/ตอน unmount เสมอ ไม่งั้นหน้าอื่นเลื่อนไม่ได้ทั้งแอป
+   */
+  useEffect(() => {
+    if (!(isMobile && isSidebarOpen)) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [isMobile, isSidebarOpen]);
 
   useEffect(() => {
     window.addEventListener("scroll", handleScroll);
@@ -146,20 +158,13 @@ const FullLayout = () => {
   // ปกติไว้ (ไม่ใช้ p-0 m-0 เหมือนปฏิทิน เพราะหน้านี้ยังอยากมีระยะขอบให้ดูไม่ติดขอบจอเกินไป)
   const isWideTablePage = location.pathname === "/contracts";
 
-  const handleTouchStart = (e) => {
-    setTouchStartY(e.touches[0].clientY);
-  };
-
-  const handleTouchEnd = (e) => {
-    const touchEndY = e.changedTouches[0].clientY;
-    const distance = touchStartY - touchEndY;
-    if (distance > 50 && isMobile) {
-      setIsSidebarOpen(false);
-    }
-  };
+  /* 🐛 เดิมมี handleTouchStart/handleTouchEnd ที่ <main> — ปัดนิ้วขึ้นเกิน 50px แล้วปิดลิ้นชัก
+     แต่ <main> ครอบลิ้นชักไว้ด้วย "การเลื่อนดูเมนูในลิ้นชัก" จึงเป็นการปัดขึ้นแบบเดียวกันเป๊ะ
+     ผู้ใช้เลยเลื่อนดูเมนูไม่ได้ พอปล่อยนิ้วลิ้นชักก็ปิดทิ้ง
+     ✅ ตัดทิ้งทั้งชุด — ปิดลิ้นชักได้ด้วยการแตะนอกกรอบหรือกดเมนู ซึ่งมีอยู่แล้วและชัดเจนกว่า */
 
   return (
-    <main onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+    <main>
       {/* ส่งฟังก์ชันเปิดปิดสไลด์บาร์ผ่าน props ชื่อ toggleMobileSidebar */}
       <div className={`header ${headerClass}`}>
         <Header toggleMobileSidebar={toggleSidebar} />
