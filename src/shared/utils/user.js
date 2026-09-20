@@ -12,13 +12,15 @@ export const swalLogout = () => {
 
     try {
       Swal.fire({
-        title: "Are you sure?",
-        text: "You will be logged out",
+        // ⚠️ ข้อความทั้งกล่องต้องเป็นไทย — ทั้งแอปใช้ไทยหมด เหลืออังกฤษเฉพาะตรงนี้จะดูหลุด
+        title: "ออกจากระบบ?",
+        text: "ต้องการออกจากระบบตอนนี้ใช่ไหม",
         icon: "warning",
         showCancelButton: true,
-        confirmButtonText: "Logout",
-        cancelButtonText: "Cancel",
-        confirmButtonColor:"#d33"
+        confirmButtonText: "ออกจากระบบ",
+        cancelButtonText: "ยกเลิก",
+        confirmButtonColor: "#ef4444",
+        reverseButtons: true,
       }).then((result) => {
         if (result.isConfirmed) {
     

@@ -3,8 +3,7 @@ import { Nav, NavItem, Collapse } from "reactstrap";
 import { Link, useLocation } from "react-router-dom";
 import AuthService from "../shared/services/authService";
 import "./Sidebar.css";
-import Swal from "sweetalert2";
-import { swalLogout, hasValidAvatar } from "../shared/utils/user";
+import { hasValidAvatar } from "../shared/utils/user";
 import { useAuth } from "../features/auth/AuthContext";
 import { can, isRole, rankLabel, ROLES, DEPARTMENT } from "@/shared/utils/roles";
 // ✅ ป้ายตัวเลข "ของค้างที่ต้องทำ" บนเมนู — ตัวเลขชุดเดียวกับเมนูหลักหน้าแรกและแถบล่างมือถือ
@@ -24,7 +23,7 @@ import {
   FaPaperPlane,
   FaClipboardCheck,
   FaCog,
-  FaSignOutAlt,  FaWrench,
+  FaWrench,
   FaInbox,
   FaMoneyCheckAlt,
   FaReceipt,
@@ -39,7 +38,7 @@ import {
 const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
   const [collapsedMenu, setCollapsedMenu] = useState({});
   const location = useLocation();
-  const { userData, logout } = useAuth();
+  const { userData } = useAuth();
 
   const isTechnician = isRole(userData, ROLES.TECHNICIAN);
   const isAdminOrManager = can(userData, "manageMasterData");
@@ -244,15 +243,6 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
     setCollapsedMenu({
       ...collapsedMenu,
       [index]: !collapsedMenu[index],
-    });
-  };
-
-  const handleLogout = async () => {
-    await swalLogout().then((result) => {
-      if (result.isConfirmed) {
-        logout();
-        Swal.fire("Logout Success!", "", "success");
-      }
     });
   };
 
@@ -472,13 +462,8 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
             </Link>
           </NavItem>
 
-          {/* ปุ่มออกจากระบบ — ไอคอนตัวเดียวกับที่ Header.js ใช้ตรงเมนู Logout ในดรอปดาวน์โปรไฟล์ */}
-          <NavItem className="mt-2">
-            <Link className="nav-link logout-link" title="Logout" onClick={handleLogout}>
-              <span className="nav-icon"><FaSignOutAlt /></span>
-              <span className="nav-text">LOGOUT</span>
-            </Link>
-          </NavItem>
+          {/* ⚠️ เดิมมีปุ่ม LOGOUT ต่อท้ายตรงนี้ — ย้ายไปไว้ที่ท้ายหน้าตั้งค่าที่เดียว
+              ตามที่ผู้ใช้สั่งว่าให้เหลือจุดออกจากระบบแค่จุดเดียว (เข้าได้จากเมนู "ตั้งค่า" ด้านบนนี้) */}
         </Nav>
       </div>
     </div>

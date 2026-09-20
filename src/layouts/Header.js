@@ -17,8 +17,7 @@ import {
   DropdownItem,
   Button,
 } from "reactstrap";
-import { swalLogout, hasValidAvatar } from "../shared/utils/user";
-import Swal from "sweetalert2";
+import { hasValidAvatar } from "../shared/utils/user";
 import useAppBadges from "@/shared/hooks/useAppBadges";
 import useOrgSettings from "@/shared/hooks/useOrgSettings";
 // ✅ โลโก้แอปต้องเลือกไฟล์ให้ตรงกับพื้น — หัวเว็บเป็นแถบเข้ม จึงใช้ตัวหนังสือสีขาว
@@ -26,7 +25,7 @@ import { appLogoFor } from "@/shared/services/OrgSettingService";
 // ✅ ไอคอน 3 เมนูกลางตรงกับที่ Dashboard.js/Sidebar.js ใช้จริงสำหรับหน้าเดียวกันเป๊ะๆ
 // (FaWrench="การดำเนินงาน", FaFileContract="ภาพรวมสัญญา", FaFileInvoiceDollar="ติดตามใบเสนอราคา")
 import {
-  FaBars, FaUserCircle, FaSignOutAlt, FaWrench, FaFileContract, FaFileInvoiceDollar, FaCalendarAlt,
+  FaBars, FaUserCircle, FaWrench, FaFileContract, FaFileInvoiceDollar, FaCalendarAlt,
   FaChevronDown, FaCheck, FaBriefcase,
 } from "react-icons/fa";
 import { can, isRole, ROLES, DEPARTMENT, rankLabel } from "@/shared/utils/roles";
@@ -114,7 +113,7 @@ const Header = ({ toggleMobileSidebar }) => {
   // 🐛 ที่แก้: เดิม Header ดึง /event-op เองอีกชุดหนึ่ง (~150 kB ทุก 30 วิ) พอเมนูอื่นเริ่มมีป้ายตัวเลข
   // ที่ต้องใช้ข้อมูลชุดเดียวกัน จะกลายเป็นดึงซ้ำหลายรอบต่อหนึ่งนาที — ตอนนี้ทั้งแอปดึงก้อนเดียวแล้วแจกกัน
   // ⚠️ ตัวเลขบนป้ายทุกจุด (เมนูข้าง/เมนูหลักหน้าแรก/แถบล่างมือถือ/ตรงนี้) จึงมาจากชุดข้อมูลเดียวกันเสมอ
-  const { userData, logout } = useAuth();
+  const { userData } = useAuth();
   const { events, badges } = useAppBadges(userData);
   const org = useOrgSettings();
   const isAdminOrManager = can(userData, "viewAllJobs");
@@ -176,14 +175,6 @@ const Header = ({ toggleMobileSidebar }) => {
   const overdueContractCount = canViewContracts ? badges.contracts : 0;
 
   const toggle = () => setDropdownOpen((prevState) => !prevState);
-
-  const handleLogout = async () => {
-    const result = await swalLogout();
-    if (result.isConfirmed) {
-      logout();
-      Swal.fire("Logout Success!", "", "success");
-    }
-  };
 
   const initials = (userData?.fname?.charAt(0) || userData?.username?.charAt(0) || "U").toUpperCase();
 
@@ -301,13 +292,18 @@ const Header = ({ toggleMobileSidebar }) => {
           </Dropdown>
         ) : null}
 
-        {/* ฝั่งขวา: แจ้งเตือน + รูปโปรไฟล์ผู้ใช้งาน + ปุ่มแฮมเบอร์เกอร์ */}
-        {/* ✅ ปุ่มเปิด/ปิด push notification ย้ายไปอยู่ที่หน้า Settings แล้ว (เดิมมีทั้งที่นี่และ
-            ที่ Settings ทำให้สับสนว่าอันไหนคือจุดควบคุมจริง) */}
+        {/* ฝั่งขวา: แจ้งเตือน + รูปโปรไฟล์ผู้ใช้งาน + ปุ่มแฮมเบอร์เกอร์
+            ✅ ปุ่มเปิด/ปิด push notification ย้ายไปอยู่ที่หน้า Settings แล้ว (เดิมมีทั้งที่นี่และ
+               ที่ Settings ทำให้สับสนว่าอันไหนคือจุดควบคุมจริง)
+            ✅ จอมือถือเหลือแค่ "กระดิ่ง + ปุ่มเมนู" สองปุ่ม (ผู้ใช้สั่งตัดรูปโปรไฟล์ออก)
+            ⚠️ ไม่ได้เสียทางเข้าอะไรเลย — ลิ้นชักเมนูมีการ์ดโปรไฟล์ที่กดไป /account ได้
+               และมีปุ่ม LOGOUT อยู่ล่างสุด (ดู Sidebar.js) ห่างกันแค่แตะเดียว
+            ⚠️ จงใจไม่เติมปุ่มใหม่แทนที่ เช่นไอคอนค้นหา — แอปยังไม่มี "ค้นหารวม" มีแต่ช่องค้นหา
+               แยกในแต่ละหน้า ปุ่มที่กดแล้วไม่รู้จะไปไหนรกกว่าช่องว่าง ที่ว่างคืนให้ป้ายทางลัดแทน */}
         <div className="d-flex align-items-center gap-2">
           <NotificationBell notifications={notifications} unread={unread} onItemClick={markRead} onMarkAllRead={markAllRead} dark jobBasePath={canViewOperation ? "/operation" : "/event"} />
 
-          <div className="profile-img">
+          <div className="profile-img d-none d-lg-block">
             <Dropdown isOpen={dropdownOpen} toggle={toggle}>
               <DropdownToggle color="transparent" style={{ padding: 0, border: 'none' }}>
                 {hasValidAvatar(userData?.imageUrl) ? (
@@ -337,15 +333,13 @@ const Header = ({ toggleMobileSidebar }) => {
                   </div>
                 </div>
                 <DropdownItem divider />
+                {/* ⚠️ เดิมมีเมนู "Logout" ต่อท้ายตรงนี้ — ย้ายไปไว้ที่ท้ายหน้าตั้งค่าที่เดียว
+                    ตามที่ผู้ใช้สั่งว่าให้เหลือจุดออกจากระบบแค่จุดเดียว */}
                 <Link to={"/account"} style={{ textDecoration: "none" }}>
                   <DropdownItem className="dropdown-item-icon">
-                    <FaUserCircle size={14} /> My Account
+                    <FaUserCircle size={14} /> บัญชีของฉัน
                   </DropdownItem>
                 </Link>
-                <DropdownItem divider />
-                <DropdownItem onClick={handleLogout} className="dropdown-item-icon" style={{ color: '#ef4444' }}>
-                  <FaSignOutAlt size={14} /> Logout
-                </DropdownItem>
               </DropdownMenu>
             </Dropdown>
           </div>
