@@ -332,13 +332,18 @@
   padding: 0 6px;
   margin-left: 8px;
   border-radius: 999px;
-  background: #dc2626;
+  background: var(--badge-act);
   color: #fff;
   font-size: 11px;
   font-weight: 800;
   line-height: 20px;
   text-align: center;
   box-shadow: 0 1px 3px rgba(220, 38, 38, 0.4);
+}
+
+.sidebar-container .nav-badge--soon {
+  background: var(--badge-soon);
+  box-shadow: 0 1px 3px rgba(217, 119, 6, 0.4);
 }
 
 /* แถบย่อเหลือไอคอน: ไม่มีที่ให้ป้ายยาวๆ — หดเป็นจุดเล็กเกาะมุมบนขวาของไอคอนแทน */

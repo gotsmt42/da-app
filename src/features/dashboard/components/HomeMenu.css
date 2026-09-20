@@ -150,14 +150,19 @@
   text-overflow: ellipsis;
 }
 
+/* ⚠️ สีป้ายมาจากตัวแปรกลาง (index.css) — ทั้งสามพื้นผิวต้องใช้ค่าเดียวกัน
+   เดิมหน้าแรก/แถบล่างใช้ #ef4444 ส่วนเมนูข้างใช้ #dc2626 ทั้งที่เป็นป้ายชุดเดียวกัน */
 .hm-badge {
   align-items: center;
   justify-content: center;
   border-radius: 10px;
-  background: #ef4444;
+  background: var(--badge-act);
   color: #ffffff;
   font-weight: 800;
   line-height: 1;
+}
+.hm-badge--soon {
+  background: var(--badge-soon);
 }
 .hm-badge--pill {
   display: flex;

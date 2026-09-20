@@ -18,7 +18,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthContext";
 import { can, isRole, ROLES, DEPARTMENT } from "@/shared/utils/roles";
-import useAppBadges, { BADGE_LABEL } from "@/shared/hooks/useAppBadges";
+import useAppBadges, { BADGE_LABEL, badgeTone } from "@/shared/hooks/useAppBadges";
 // ⚠️ ชื่อ/พาธ/ไอคอน/คีย์ป้ายตัวเลข มาจากทะเบียนกลาง — อย่าพิมพ์ทับที่นี่
 // ช่องบนแถบนี้กว้างราว 70px จึงใช้ชื่อที่สั้นที่สุดของปลายทาง (barTitle)
 import { dest, barTitle } from "./navConfig";
@@ -132,7 +132,7 @@ export default function MobileBottomNav() {
               >
                 <span className="mbn-icon" aria-hidden="true">
                   <Icon />
-                  {count > 0 && <span className="mbn-badge">{count > 99 ? "99+" : count}</span>}
+                  {count > 0 && <span className={`mbn-badge mbn-badge--${badgeTone(it.badgeKey)}`}>{count > 99 ? "99+" : count}</span>}
                 </span>
                 <span className="mbn-label">{it.label}</span>
               </Link>

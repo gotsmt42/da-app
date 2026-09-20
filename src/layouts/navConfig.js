@@ -63,7 +63,9 @@ export const DEST = {
   staff: { title: "พนักงาน / ทีมช่าง", short: "พนักงาน", sub: "ภาระงาน · ทะเบียน", href: "/staff", icon: FaUserFriends },
 
   settings: { title: "ตั้งค่า", href: "/about", icon: FaCog },
-  worktype: { title: "ประเภทงาน / ระบบ", sub: "ตัวเลือกประเภทงานและระบบงาน ที่ใช้ตอนเพิ่ม/แก้ไขแผนงาน", href: "/worktype", icon: FaTags },
+  // ⚠️ เดิมชื่อ "ประเภทงาน / ระบบ" — คำว่า "ระบบ" ตรงนี้หมายถึงระบบงาน (ไฟฟ้า/ประปา) แต่ไปอยู่
+  //    ในหน้าเดียวกับหมวด "ตั้งค่าระบบ" ที่แปลว่า system settings คนละเรื่องกันแต่ใช้คำเดียวกัน
+  worktype: { title: "ประเภทงานและระบบงาน", sub: "ตัวเลือกที่ใช้ตอนเพิ่ม/แก้ไขแผนงาน", href: "/worktype", icon: FaTags },
   orgSettings: { title: "ตั้งค่าองค์กร", sub: "โลโก้ · ข้อมูลบริษัทบนเอกสาร · ช่องทางติดต่อบนหัวเว็บ · ค่าตั้งต้นของระบบเบิก", href: "/settings/organization", icon: FaImage },
   permissions: { title: "ตั้งค่าสิทธิ์", sub: "สิทธิ์ในระบบ (ผู้ดูแลระบบ) · สิทธิ์ตามตำแหน่งในองค์กร", href: "/settings/permissions", icon: FaUserShield },
 };

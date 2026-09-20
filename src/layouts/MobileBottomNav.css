@@ -114,7 +114,7 @@
   height: 17px;
   padding: 0 4px;
   border-radius: 9px;
-  background: #ef4444;
+  background: var(--badge-act);
   color: #ffffff;
   font-size: 10px;
   font-weight: 800;

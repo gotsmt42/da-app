@@ -19,7 +19,7 @@ import {
 } from "react-icons/fa";
 
 import { can, isRole, ROLES, TECHNICIAN_ROLES } from "@/shared/utils/roles";
-import useAppBadges, { BADGE_LABEL } from "@/shared/hooks/useAppBadges";
+import useAppBadges, { BADGE_LABEL, badgeTone } from "@/shared/hooks/useAppBadges";
 // ⚠️ ชื่อ/พาธ/ไอคอน/คีย์ป้ายตัวเลข มาจากทะเบียนกลาง — อย่าพิมพ์ทับที่นี่ ไม่งั้นชื่อจะหลุดจาก
 // แถบล่างมือถือและเมนูข้างที่ชี้ปลายทางเดียวกัน (เคยหลุดมาแล้ว: "แผนงาน" / "แผนงานของฉัน" / "ตารางงาน")
 import { dest } from "@/layouts/navConfig";
@@ -197,14 +197,14 @@ export default function HomeMenu({ userData, badges = {}, hideMyJobs = false, hi
                           >
                             <span className="hm-icon" aria-hidden="true">
                               <Icon />
-                              {count > 0 && <span className="hm-badge hm-badge--dot">{badgeText(count)}</span>}
+                              {count > 0 && <span className={`hm-badge hm-badge--dot hm-badge--${badgeTone(it.badgeKey)}`}>{badgeText(count)}</span>}
                             </span>
                             <span className="hm-text">
                               <span className="hm-title-full">{it.title}</span>
                               <span className="hm-title-short">{it.short || it.title}</span>
                               <span className="hm-sub">{it.sub}</span>
                             </span>
-                            {count > 0 && <span className="hm-badge hm-badge--pill" aria-hidden="true">{badgeText(count)}</span>}
+                            {count > 0 && <span className={`hm-badge hm-badge--pill hm-badge--${badgeTone(it.badgeKey)}`} aria-hidden="true">{badgeText(count)}</span>}
                             <FaChevronRight className="hm-chevron" aria-hidden="true" />
                           </Link>
                         </li>

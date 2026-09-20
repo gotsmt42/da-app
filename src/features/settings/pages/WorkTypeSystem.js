@@ -15,7 +15,8 @@ const WorkTypeSystem = () => {
   return (
     <Container fluid style={styles.container}>
       <div style={styles.pageHeader}>
-        <h2 style={styles.pageTitle}>ประเภทงาน / ระบบ</h2>
+        {/* ⚠️ ชื่อต้องตรงกับชื่อเมนูในทะเบียนกลาง (layouts/navConfig.js -> DEST.worktype) */}
+        <h2 style={styles.pageTitle}>ประเภทงานและระบบงาน</h2>
         <p style={styles.pageSub}>จัดการตัวเลือกที่ใช้ตอนเพิ่ม/แก้ไขแผนงาน</p>
       </div>
 

@@ -10,7 +10,7 @@ import { can, isRole, rankLabel, ROLES, DEPARTMENT } from "@/shared/utils/roles"
 // และแถบล่างมือถือที่ชี้ปลายทางเดียวกัน
 import { dest } from "./navConfig";
 // ✅ ป้ายตัวเลข "ของค้างที่ต้องทำ" บนเมนู — ตัวเลขชุดเดียวกับเมนูหลักหน้าแรกและแถบล่างมือถือ
-import useAppBadges, { BADGE_LABEL } from "@/shared/hooks/useAppBadges";
+import useAppBadges, { BADGE_LABEL, badgeTone } from "@/shared/hooks/useAppBadges";
 // ✅ ใช้ไอคอนชุดเดียวกับที่ Dashboard.js ใช้จริง (react-icons/fa) แทน bootstrap-icons เดิม — เดิม
 // สองที่นี้ใช้คนละชุดไอคอนกันคนละความหมาย (เช่น "แผนงานทั้งหมด" หน้า Dashboard กับ "แผนงาน" ใน
 // sidebar เป็นหน้าเดียวกันแต่ไอคอนคนละแบบ) ทำให้ผู้ใช้จำไม่ได้ว่าไอคอนไหนคือเมนูไหนบ้าง
@@ -251,7 +251,7 @@ const side = (key, extra) => {
   const renderBadge = (item) => {
     const n = item.badgeKey ? Number(badges[item.badgeKey]) || 0 : 0;
     if (!n) return null;
-    return <span className="nav-badge" aria-hidden="true">{n > 99 ? "99+" : n}</span>;
+    return <span className={`nav-badge nav-badge--${badgeTone(item.badgeKey)}`} aria-hidden="true">{n > 99 ? "99+" : n}</span>;
   };
 
   const badgeAria = (item) => {
