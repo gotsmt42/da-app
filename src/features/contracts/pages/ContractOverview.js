@@ -1246,7 +1246,9 @@ export default function ContractOverview() {
       // ⚠️ แอดมิน/manager ไม่ได้รับผลอะไร — ฝั่ง server เห็นทุกงานอยู่แล้วไม่ว่าจะส่ง scope มาหรือไม่
       const scopeOpts = { scope: "responsible" };
       const [res, draftsRes] = await Promise.all([
-        EventService.getEventOp(scopeOpts).catch(() => ({ userEvents: [] })),
+        // ⚠️ detail = ขอ activityLog มาด้วย — contractEditHistory() อ่านประวัติการแก้สัญญา
+        //    จาก visits[].activityLog ถ้าไม่ขอ ประวัติจะว่างเปล่าโดยไม่มีอะไรฟ้อง
+        EventService.getEventOp({ ...scopeOpts, detail: true }).catch(() => ({ userEvents: [] })),
         EventService.GetDraftEvents(scopeOpts).catch(() => ({ drafts: [] })),
       ]);
       setEvents([...(res?.userEvents || []), ...(draftsRes?.drafts || [])]);

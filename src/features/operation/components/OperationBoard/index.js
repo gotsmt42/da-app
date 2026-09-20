@@ -2564,7 +2564,9 @@ const Operation = () => {
   const fetchEventsFromDB = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const res = await EventService.getEventOp();
+      // ⚠️ detail = ขอ activityLog มาด้วย — หน้านี้ทั้งแสดง (ActivityLogMini) และบันทึกต่อท้าย
+      //    ถ้าไม่ขอ แล้วมีการบันทึกกิจกรรมใหม่ ประวัติเดิมทั้งชุดจะถูกเขียนทับหาย
+      const res = await EventService.getEventOp({ detail: true });
       setEvents(res.userEvents || []);
       setLastRefreshed(new Date());
     } catch (err) { console.error(err); }

@@ -840,7 +840,9 @@ export default function QuotationTracking() {
   const fetchJobs = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const res = await EventService.getEventOp();
+      // ⚠️ detail = ขอ activityLog มาด้วย — หน้านี้บันทึกกิจกรรมต่อท้ายตอนอัปเดตใบเสนอราคา
+      //    (ดู UpdateEvent ด้านล่าง) ถ้าไม่ขอ ประวัติเดิมจะถูกเขียนทับหาย
+      const res = await EventService.getEventOp({ detail: true });
       setEvents(res?.userEvents || []);
       setLastRefreshed(new Date());
     } catch (err) {

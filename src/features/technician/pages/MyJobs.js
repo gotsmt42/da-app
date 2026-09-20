@@ -303,7 +303,9 @@ export default function MyJobs() {
   const fetchJobs = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const res = await EventService.getEventOp();
+      // ⚠️ detail = ขอ activityLog มาด้วย — การ์ดงานของช่าง (TechnicianJobPanel) แสดงประวัติ
+      //    และหน้านี้บันทึกต่อท้ายด้วย ถ้าไม่ขอ ประวัติเดิมจะถูกเขียนทับหาย
+      const res = await EventService.getEventOp({ detail: true });
       setEvents(res?.userEvents || []);
       setLastRefreshed(new Date());
     } catch (err) {
