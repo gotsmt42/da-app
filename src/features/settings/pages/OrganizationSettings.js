@@ -67,6 +67,15 @@ const CONTACT_FIELDS = [
   { key: "contactFacebook", label: "ลิงก์ Facebook", max: 300 },
 ];
 
+/**
+ * ข้อความนี้เพี้ยนจนอ่านไม่ออกแล้วหรือยัง
+ * 🐛 เคยเกิดจริง: ชื่อบริษัทภาษาไทยกลายเป็น "?????? ?? ??? ..." อยู่ในฐานข้อมูลเป็นระยะเวลาหนึ่ง
+ *    โดยไม่มีใครรู้ เพราะช่องนี้ไปโผล่แค่บนหัวกระดาษ PDF ที่ส่งให้ลูกค้า
+ * ⚠️ ตรวจจาก "ลายเซ็นของความเสียหาย" (เครื่องหมายคำถามติดกันตั้งแต่ 3 ตัว) ไม่ใช่ตรวจว่ามี
+ *    อักษรไทยไหม — บางองค์กรตั้งชื่อเป็นอักษรโรมันโดยตั้งใจ
+ */
+const looksCorrupted = (v) => /\?{3,}/.test(String(v || ""));
+
 const Section = ({ icon: Icon, title, hint, children }) => (
   <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER}`, borderRadius: 2.5, p: { xs: 1.5, sm: 2.25 }, mb: 1.75 }}>
     <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: hint ? 0.25 : 1.5 }}>
@@ -274,8 +283,14 @@ export default function OrganizationSettings() {
               key={f.key} size="small" label={f.label} value={form[f.key] || ""} onChange={set(f.key)}
               multiline={Boolean(f.rows)} minRows={f.rows} inputProps={{ maxLength: f.max }}
               sx={{ gridColumn: f.full ? { sm: "1 / -1" } : undefined }}
-              error={f.key === "nameTh" && !String(form.nameTh || "").trim()}
-              helperText={f.key === "nameTh" && !String(form.nameTh || "").trim() ? "ต้องมีชื่อบริษัท — ใช้พิมพ์บนเอกสารทุกใบ" : undefined}
+              error={(f.key === "nameTh" && !String(form.nameTh || "").trim()) || looksCorrupted(form[f.key])}
+              helperText={
+                f.key === "nameTh" && !String(form.nameTh || "").trim()
+                  ? "ต้องมีชื่อบริษัท — ใช้พิมพ์บนเอกสารทุกใบ"
+                  : looksCorrupted(form[f.key])
+                    ? "ข้อความนี้เพี้ยนเป็นเครื่องหมายคำถาม — กรุณาพิมพ์ใหม่ (ค่านี้ถูกพิมพ์บนหัวกระดาษเอกสารทุกใบ)"
+                    : undefined
+              }
             />
           ))}
         </Box>
