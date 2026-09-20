@@ -17,7 +17,7 @@ import {
   Box, Stack, Typography, TextField, Button, Alert, Snackbar, CircularProgress, Divider, Chip, Tooltip
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Business, Image as ImageIcon, Save, RestartAlt, UploadFile, Description } from "@mui/icons-material";
+import { Business, Image as ImageIcon, Save, RestartAlt, UploadFile, Description, SupportAgent } from "@mui/icons-material";
 
 import usePermissions from "@/shared/hooks/usePermissions";
 import useOrgSettings from "@/shared/hooks/useOrgSettings";
@@ -53,6 +53,16 @@ const FIELDS = [
   { key: "tel", label: "โทรศัพท์", max: 60 },
   { key: "email", label: "อีเมล", max: 120 },
   { key: "website", label: "เว็บไซต์", max: 160 },
+];
+
+/**
+ * ช่องทางติดต่อที่ไปโผล่เป็นเมนู "ติดต่อ" บนหัวเว็บ
+ * ⚠️ มีแค่ LINE กับ Facebook — เบอร์โทร/อีเมล/เว็บไซต์ ใช้ช่องใน "ข้อมูลบริษัทบนเอกสาร" ร่วมกัน
+ *    ถ้าแยกเก็บสองที่ จะมีวันที่เบอร์บนหัวเว็บกับเบอร์บนเอกสารไม่ตรงกันโดยไม่มีใครรู้
+ */
+const CONTACT_FIELDS = [
+  { key: "contactLine", label: "ลิงก์ LINE (เช่น https://lin.ee/xxxx)", max: 300 },
+  { key: "contactFacebook", label: "ลิงก์ Facebook", max: 300 },
 ];
 
 const Section = ({ icon: Icon, title, hint, children }) => (
@@ -162,6 +172,7 @@ export default function OrganizationSettings() {
     try {
       await OrgSettingService.update({
         ...Object.fromEntries(FIELDS.map((f) => [f.key, form[f.key] || ""])),
+        ...Object.fromEntries(CONTACT_FIELDS.map((f) => [f.key, String(form[f.key] || "").trim()])),
         advanceClearDays: Number(form.advanceClearDays) || ORG_FALLBACK.advanceClearDays,
       });
       setDirty(false);
@@ -266,6 +277,30 @@ export default function OrganizationSettings() {
             />
           ))}
         </Box>
+      </Section>
+
+      {/* ✅ ผู้ใช้สั่ง: "อยากให้มีไอคอนช่องทางการติดต่อบนหัวเว็บ และกำหนดลิงก์ในตั้งค่าของ Super Admin" */}
+      <Section
+        icon={SupportAgent} title="ช่องทางติดต่อบนหัวเว็บ"
+        hint="ขึ้นเป็นเมนู “ติดต่อ” บนแถบบนให้ผู้ใช้ทุกคนกดได้ · ช่องไหนเว้นว่างจะไม่แสดงช่องทางนั้น · ไม่กรอกเลยก็ไม่มีปุ่มขึ้น"
+      >
+        <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
+          {CONTACT_FIELDS.map((f) => {
+            const v = String(form[f.key] || "").trim();
+            const bad = Boolean(v) && !/^https?:\/\//i.test(v);
+            return (
+              <TextField
+                key={f.key} size="small" label={f.label} value={form[f.key] || ""} onChange={set(f.key)}
+                inputProps={{ maxLength: f.max }} error={bad}
+                helperText={bad ? "ต้องขึ้นต้นด้วย http:// หรือ https://" : undefined}
+              />
+            );
+          })}
+        </Box>
+        <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", mt: 1.5 }}>
+          เบอร์โทร · อีเมล · เว็บไซต์ ใช้ค่าจากหัวข้อ “ข้อมูลบริษัทบนเอกสาร” ด้านบนร่วมกัน
+          แก้ที่เดียวแล้วเปลี่ยนทั้งบนหัวเว็บและบนเอกสาร
+        </Typography>
       </Section>
 
       <Section icon={RestartAlt} title="ค่าตั้งต้นของระบบเบิก">

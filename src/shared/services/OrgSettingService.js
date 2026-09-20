@@ -35,6 +35,12 @@ export const ORG_FALLBACK = {
   /** โลโก้หัวกระดาษ — ไฟล์ที่ตัดขอบว่างแล้ว (ดูเหตุผลใน deliveryNotePdf.js) */
   letterheadUrl: "/logo-letterhead.png",
   stampUrl: "/stamp.png",
+  /**
+   * ช่องทางติดต่อแบบแชต/โซเชียล — ตั้งที่หน้า "องค์กรและเอกสาร" (Super Admin)
+   * ⚠️ เบอร์โทร/อีเมล/เว็บไซต์ ใช้ tel/email/website ด้านบนร่วมกัน ไม่ได้แยกเก็บอีกชุด
+   */
+  contactLine: "",
+  contactFacebook: "",
   advanceClearDays: 7,
   /** ชื่อ Rank (ตำแหน่งในองค์กร) ที่ตั้งเอง { rank: "ชื่อ" } — ว่าง = ใช้ชื่อเริ่มต้นของระบบ */
   rankLabels: {},
@@ -72,6 +78,42 @@ export const appLogoFor = ({ on = "dark", layout = "wordmark" } = {}, settings) 
   if (layout === "icon") return APP_LOGO.icon;
   if (layout === "stacked") return on === "light" ? APP_LOGO.stackedDark : APP_LOGO.stackedLight;
   return on === "light" ? APP_LOGO.wordmarkDark : APP_LOGO.wordmarkLight;
+};
+
+/**
+ * ช่องทางติดต่อที่ "ตั้งค่าไว้จริง" — ใช้วาดเมนูติดต่อบนหัวเว็บ (ดู layouts/HeaderContactMenu.js)
+ * ช่องไหนว่างจะไม่อยู่ในรายการ ผู้ดูแลจึงเลือกได้ว่าจะเปิดช่องทางไหนบ้างแค่ด้วยการกรอก/ลบ
+ * ⚠️ กรองสคีมซ้ำอีกชั้นถึงแม้ฝั่งเซิร์ฟเวอร์กันไว้แล้ว — ค่าเหล่านี้กลายเป็น href ที่ทุกคนกด
+ *    และอาจมีข้อมูลเก่าที่บันทึกไว้ก่อนมีการตรวจค้างอยู่ในฐานข้อมูล
+ * ⚠️ เบอร์โทรต้องถอดอักขระที่โทรไม่ได้ออกก่อนทำ tel: (ของจริงมักพิมพ์เป็น "02-123-4567 ต่อ 101")
+ *    แต่ข้อความที่แสดงยังเป็นตัวที่ผู้ดูแลพิมพ์ไว้เหมือนเดิม
+ */
+const httpOnly = (url) => {
+  const v = String(url || "").trim();
+  if (!v) return "";
+  try {
+    return ["http:", "https:"].includes(new URL(v).protocol) ? v : "";
+  } catch {
+    return "";
+  }
+};
+
+export const contactChannels = (settings) => {
+  const s = settings || cache || ORG_FALLBACK;
+  const tel = String(s.tel || "").trim();
+  const dial = tel.replace(/[^\d+]/g, "");
+  const email = String(s.email || "").trim();
+  const line = httpOnly(s.contactLine);
+  const facebook = httpOnly(s.contactFacebook);
+  const website = httpOnly(s.website);
+
+  return [
+    tel && dial && { key: "phone", label: `โทร ${tel}`, href: `tel:${dial}` },
+    line && { key: "line", label: "แชตทาง LINE", href: line, external: true },
+    facebook && { key: "facebook", label: "Facebook", href: facebook, external: true },
+    email && email.includes("@") && { key: "email", label: email, href: `mailto:${email}` },
+    website && { key: "website", label: "เว็บไซต์", href: website, external: true },
+  ].filter(Boolean);
 };
 
 /** ตอนนี้ยังใช้โลโก้ของแอปอยู่ไหม (= องค์กรยังไม่ได้ตั้งของตัวเอง) */

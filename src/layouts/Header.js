@@ -19,6 +19,7 @@ import {
 } from "reactstrap";
 import { hasValidAvatar } from "../shared/utils/user";
 import useAppBadges from "@/shared/hooks/useAppBadges";
+import HeaderContactMenu from "./HeaderContactMenu";
 import useOrgSettings from "@/shared/hooks/useOrgSettings";
 // ✅ โลโก้แอปต้องเลือกไฟล์ให้ตรงกับพื้น — หัวเว็บเป็นแถบเข้ม จึงใช้ตัวหนังสือสีขาว
 import { appLogoFor } from "@/shared/services/OrgSettingService";
@@ -301,6 +302,9 @@ const Header = ({ toggleMobileSidebar }) => {
             ⚠️ จงใจไม่เติมปุ่มใหม่แทนที่ เช่นไอคอนค้นหา — แอปยังไม่มี "ค้นหารวม" มีแต่ช่องค้นหา
                แยกในแต่ละหน้า ปุ่มที่กดแล้วไม่รู้จะไปไหนรกกว่าช่องว่าง ที่ว่างคืนให้ป้ายทางลัดแทน */}
         <div className="d-flex align-items-center gap-2">
+          {/* ✅ ช่องทางติดต่อที่ Super Admin ตั้งไว้ — ไม่ได้ตั้งไว้เลยจะไม่ขึ้นปุ่มนี้ */}
+          <HeaderContactMenu />
+
           <NotificationBell notifications={notifications} unread={unread} onItemClick={markRead} onMarkAllRead={markAllRead} dark jobBasePath={canViewOperation ? "/operation" : "/event"} />
 
           <div className="profile-img d-none d-lg-block">

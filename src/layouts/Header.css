@@ -92,6 +92,42 @@
   box-shadow: none !important;
 }
 
+/* ปุ่ม "ติดต่อ" บนแถบบน — ทรงเดียวกับปุ่มกระดิ่งที่อยู่ข้างกัน จะได้ดูเป็นชุดเดียวกัน */
+.header-contact-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #e2e8f0;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.header-contact-btn:hover,
+.header-contact-btn:focus {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.24);
+  color: #ffffff;
+  outline: none;
+}
+
+/* หัวข้อกลุ่มในดรอปดาวน์ — บอกว่ารายการข้างล่างคืออะไร ไม่ใช่ตัวเลือกที่กดได้ */
+.dropdown-section-label {
+  padding: 6px 10px 4px 10px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
 /* ตกแต่งกล่อง Dropdown ข้อมูลผู้ใช้เพิ่มเติมให้ดูทันสมัย */
 .modern-dropdown-menu {
   border: 1px solid #eef1f5 !important;
