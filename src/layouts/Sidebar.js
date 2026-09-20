@@ -150,6 +150,8 @@ const side = (key, extra) => {
   // "แผนงาน" ทั้งที่เป็นหน้าที่ใช้บ่อยที่สุดของฝ่ายช่าง (ไล่จัดการงานทีละใบ) และเป็นคนละเรื่องกับ
   // ปฏิทิน (ปฏิทิน = วางแผนว่าจะไปวันไหน · การดำเนินงาน = ตามงานที่ลงตารางแล้ว)
   const operationMenu = [side("operation")];
+  // ✅ รายงานงาน — คู่กับ "รายงานการเบิก" ของหมวดเบิกค่าใช้จ่าย
+  const jobReportMenu = [side("jobReport")];
   // ✅ เมนู "แผนงานรออนุมัติ" ถูกตัดออกตามที่ผู้ใช้ขอ — ย้ายไปเป็นแท็บ "รออนุมัติ" ในหน้า "การดำเนินงาน"
   // แทน (ดู PendingApprovalsPanel.js) เพราะเป็นงานเดียวกันกับการไล่จัดการงานในหน้านั้น ไม่ต้องสลับหน้า
   // ไปมา และมี badge บอกจำนวนงานค้างบนแท็บให้เห็นตั้งแต่เข้าหน้ามาแล้ว
@@ -376,6 +378,8 @@ const side = (key, extra) => {
           {isAdminOrManager && workMenuManager.map((item, idx) => renderLink(item, `work-mgr-${idx}`))}
           {isTechnician && workMenuTechnician.map((item, idx) => renderLink(item, `work-tech-${idx}`))}
           {canAssign && dispatchMenu.map((item, idx) => renderLink(item, `work-dispatch-${idx}`))}
+          {/* ✅ รายงานงานอยู่ท้ายหมวด "งาน" ตำแหน่งเดียวกับ "รายงานการเบิก" ท้ายหมวดเบิกค่าใช้จ่าย */}
+          {canViewOperation && jobReportMenu.map((item, idx) => renderLink(item, `work-report-${idx}`))}
 
           {/* หมวด "งานขาย"
               ✅ ที่แก้ (ผู้ใช้ขอ: "เบื้องต้นแถบนี้ให้เฉพาะเซล ที่เข้าได้") — เดิมเงื่อนไข canSell

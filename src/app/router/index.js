@@ -41,6 +41,9 @@ const AdminRoute = lazy(() => import("./AdminRoute.js"));
 const Dashboard = lazy(() => import("@/features/dashboard/pages/Dashboard.js"));
 const NoConnection = lazy(() => import("../NoConnection.js"));
 const About = lazy(() => import("@/features/settings/pages/Settings.js"));
+// ⚠️ ต้องเป็น /jobs/report ไม่ใช่ /operation/report — เส้นทาง "operation/:id?" จะกลืน
+//    คำว่า report ไปเป็น id แล้วเปิดหน้าการดำเนินงานที่กรองหางานชื่อ report แทน
+const JobReport = lazy(() => import("@/features/operation/pages/JobReport.js"));
 // ⚠️ ลบหน้า demo ของ template MaterialPro ออกแล้ว (Alerts/Badges/Buttons/Cards/Grid/Forms/
 // Breadcrumbs) — เป็นหน้าตัวอย่างที่ติดมากับ template ตั้งแต่ตอนสร้างโปรเจกต์ ไม่เกี่ยวกับธุรกิจ
 // ไม่มีลิงก์จากเมนูไหนเลย และไม่มีใคร import ต่อ
@@ -307,6 +310,15 @@ const ThemeRoutes = [
   // ทุกครั้งที่สลับไปมาระหว่างสองเส้นทางนี้ (เช่น กดแจ้งเตือนแล้วเด้งไปงานเฉพาะ) หน้าเลย
   // กระพริบ/โหลดใหม่ทั้งหน้า ให้ความรู้สึกเหมือนรีเฟรช — รวมเป็น route เดียวกันคง state
   // ของ component ไว้ได้ระหว่างเปลี่ยนแค่ :id param
+  path: "jobs/report",
+  element: (
+    <Suspense fallback={<div>Loading...</div>}>
+      <JobReport />
+    </Suspense>
+  ),
+  title: "Job Report",
+},
+{
   path: "operation/:id?",
   element: (
       <Suspense fallback={<div>Loading Operation...</div>}>

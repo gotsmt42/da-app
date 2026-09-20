@@ -44,6 +44,7 @@ export const DEST = {
   eventSales: { title: "ตารางงานเซล", href: "/event?dept=sales", icon: FaBriefcase },
 
   operation: { title: "การดำเนินงาน", bar: "ดำเนินงาน", sub: "เช็คอิน · ปิดงาน", href: "/operation", icon: FaWrench, badgeKey: "closeRequests" },
+  jobReport: { title: "รายงานงาน", short: "รายงาน", sub: "สรุปสถานะ · รายเดือน · ตามลูกค้า/ทีม", href: "/jobs/report", icon: FaChartBar },
   myJobs: { title: "งานของฉัน", sub: "งานที่ได้รับมอบหมาย", href: "/technician/jobs", icon: FaClipboardList, badgeKey: "myJobs" },
   contracts: { title: "ภาพรวมงาน", href: "/contracts", icon: FaFileContract, badgeKey: "contracts" },
   dispatch: { title: "คำขอลงงาน", sub: "คิวรอมอบหมาย", href: "/dispatch", icon: FaClipboardCheck, badgeKey: "dispatchQueue" },
