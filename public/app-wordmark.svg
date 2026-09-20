@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 162 39" width="162" height="39" role="img" aria-label="Flowix โฟลวิกซ์">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 124 41" width="124" height="41" role="img" aria-label="Flowix โฟลอิกซ์">
   <!--
     โลโก้ Flowix แบบตัวอักษรล้วน — ใช้ในแอป (แถบบน · หน้าเข้าสู่ระบบ)
     "Flow" ใช้ currentColor จึงอ่านออกทั้งพื้นเข้มและพื้นสว่าง · "ix" ไล่เฉดสีแบรนด์ แดง -> พลัม
@@ -8,14 +8,14 @@
   -->
   <defs>
     <linearGradient id="nxWord" gradientUnits="userSpaceOnUse"
-      x1="120" y1="35" x2="159" y2="8.96">
+      x1="90" y1="36" x2="120" y2="9.96">
       <stop offset="0" stop-color="#fb4b5c"/>
       <stop offset=".55" stop-color="#dc2626"/>
       <stop offset="1" stop-color="#a21caf"/>
     </linearGradient>
   </defs>
-  <text x="3" y="35" font-family="'Michroma','Space Grotesk',system-ui,sans-serif"
-        font-size="42" font-weight="400" letter-spacing="-1.9090909090909092">
+  <text x="3" y="36" font-family="'Righteous',system-ui,sans-serif"
+        font-size="42" font-weight="400" letter-spacing="-0.7636363636363637">
     <tspan fill="currentColor">Flow</tspan><tspan fill="url(#nxWord)">ix</tspan>
   </text>
 </svg>

@@ -63,7 +63,7 @@ export default function AppRebrandNotice() {
         }
       >
         <Typography sx={{ fontWeight: 800, fontSize: "0.9rem" }}>
-          แอปเปลี่ยนชื่อเป็น “Flowix (โฟลวิกซ์)” พร้อมไอคอนใหม่แล้ว
+          แอปเปลี่ยนชื่อเป็น “Flowix (โฟลอิกซ์)” พร้อมไอคอนใหม่แล้ว
         </Typography>
         <Typography variant="caption" sx={{ display: "block", color: "text.secondary" }}>
           ถ้าไอคอนบนหน้าจอโฮมยังเป็นอันเดิม ไม่ได้แปลว่าแอปไม่อัปเดต — ข้างในเป็นเวอร์ชันล่าสุดเสมอ
