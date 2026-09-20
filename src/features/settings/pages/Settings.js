@@ -20,13 +20,12 @@ import PushService from "@/shared/services/PushService";
 import { swalLogout } from "@/shared/utils/user";
 import { can, rankLabel } from "@/shared/utils/roles";
 import useOrgSettings from "@/shared/hooks/useOrgSettings";
+import { APP_NAME, APP_VERSION } from "@/shared/appInfo";
 import { ORG_FALLBACK } from "@/shared/services/OrgSettingService";
 import SignatureSettingsDialog from "../components/SignatureSettingsDialog";
 import SignatureService from "@/shared/services/SignatureService";
 
-const version = import.meta.env.REACT_APP_VERSION;
-/** ชื่อแอป — คนละเรื่องกับชื่อองค์กรที่ตั้งเองได้ ต้องตรงกับ <title> และ manifest.json */
-const APP_NAME = "Flowix";
+
 
 const Settings = () => {
   const { userData, logout } = useAuth();
@@ -221,7 +220,7 @@ const Settings = () => {
           <FaInfoCircle size={16} color="#64748b" />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={styles.rowTitle}>{APP_NAME} · เวอร์ชัน {version || "-"}</p>
+          <p style={styles.rowTitle}>{APP_NAME} · เวอร์ชัน {APP_VERSION || "-"}</p>
           <p style={styles.rowDesc}>ใช้งานในนาม {org?.nameTh || ORG_FALLBACK.nameTh}</p>
         </div>
       </div>
