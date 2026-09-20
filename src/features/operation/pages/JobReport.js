@@ -137,7 +137,9 @@ export default function JobReport() {
   useEffect(() => {
     let alive = true;
     // ⚠️ endpoint นี้คืน { userEvents: [...] } ไม่ใช่อาร์เรย์ตรงๆ (เหมือนที่ OperationBoard ทำ)
-    EventService.getEventOp()
+    // ⚠️ slim = ขอเฉพาะฟิลด์ที่ใช้สรุป — รายงานไม่ได้แสดงไฟล์แนบ/คอมเมนต์/ประวัติกิจกรรม
+    //    ที่ 1000 งาน แบบเต็มราว 3.6 MB ต่อการเปิดหนึ่งครั้ง แบบนี้เหลือราว 1 ใน 10
+    EventService.getEventOp({ slim: true })
       .then((res) => { if (alive) setEvents(res?.userEvents || []); })
       .catch(() => { if (alive) { setEvents([]); setError("ดึงข้อมูลงานไม่สำเร็จ — ลองใหม่อีกครั้ง"); } });
     return () => { alive = false; };

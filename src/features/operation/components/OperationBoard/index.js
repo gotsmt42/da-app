@@ -37,7 +37,7 @@ import {
   Box, Grid, Paper, Typography, TextField, IconButton, Chip, Avatar,
   Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
   Button, Stack, Tooltip, Badge, Fade, Collapse, LinearProgress,
-  Tabs, Tab, Divider, useMediaQuery, useTheme, InputAdornment,
+  Divider, useMediaQuery, useTheme, InputAdornment,
   Menu, MenuItem, ListItemIcon, ListItemText, Card, CardContent,
   Skeleton, Alert, Snackbar, Popover,
   List, ListItem, Pagination,
@@ -133,15 +133,6 @@ export const StatCard = styled(GlassCard)(({ color }) => ({
   },
 }));
 
-const StyledTab = styled(Tab)(({ theme }) => ({
-  fontWeight: 600,
-  fontSize: "0.85rem",
-  textTransform: "none",
-  minHeight: 48,
-  borderRadius: "8px 8px 0 0",
-  "&.Mui-selected": { color: theme.palette.primary.main },
-}));
-
 // ⚠️ ลบ FilterChip ออกแล้ว — เดิมใช้กับแผงตัวกรองที่กางชิปทุกตัวเลือกออกมา 23 ชิป ตอนนี้แผงนั้น
 // เปลี่ยนเป็น dropdown 4 ช่องแล้ว (ดู FilterPanel) จึงไม่มีใครใช้อีก
 
@@ -163,32 +154,56 @@ const StatusGroupCard = ({ active, onClick, icon, color, label, count, sub }) =>
       bgcolor: active ? alpha(color, 0.08) : "background.paper",
       "&:hover": { borderColor: active ? color : alpha(color, 0.5) },
       display: "flex",
-      p: { xs: 1.25, sm: 1.5 },
-      minHeight: { xs: 62, sm: 92 },
+      p: { xs: 1, sm: 1.5 },
+      minHeight: { xs: 54, sm: 92 },
       flexDirection: { xs: "row", sm: "column" },
       alignItems: "center",
       justifyContent: { xs: "flex-start", sm: "center" },
       textAlign: { xs: "left", sm: "center" },
-      gap: { xs: 1.25, sm: 0 },
+      gap: { xs: 1, sm: 0 },
     }}>
     {React.cloneElement(icon, {
       sx: {
-        fontSize: { xs: 22, sm: 24 },
+        fontSize: { xs: 20, sm: 24 },
         color: active ? color : "text.secondary",
         mb: { xs: 0, sm: 0.5 },
         flexShrink: 0,
       },
     })}
-    <Box sx={{ minWidth: 0 }}>
-      <Typography fontWeight={800} fontSize="0.8rem" lineHeight={1.25}
-        color={active ? color : "text.primary"}>
+    {/* 🐛 จอแคบเคยสูงเกือบ 110px ต่อใบ (2 ใบเรียงกัน = 230px) เพราะชื่อยาวอย่าง
+        "กำลังดำเนินการ/ยืนยันแล้ว" ห่อสองบรรทัด แล้วบรรทัดจำนวนงานห่ออีกบรรทัด
+        ✅ จอแคบ: เลขขึ้นก่อนตัวใหญ่ (สิ่งที่คนมองการ์ดนี้ต้องการจริงๆ) ชื่ออยู่ใต้บรรทัดเดียว
+        ตัดด้วย ellipsis — ชื่อเต็มยังอ่านได้จาก title ของกล่อง */}
+    <Box sx={{ minWidth: 0, width: "100%" }} title={`${label} ${count} งาน${sub ? ` · ${sub}` : ""}`}>
+      <Typography
+        sx={{
+          fontWeight: 800, lineHeight: 1.15,
+          fontSize: { xs: "1.05rem", sm: "0.8rem" },
+          color: active ? color : "text.primary",
+          display: { xs: "block", sm: "none" },
+        }}
+      >
+        {count} <Box component="span" sx={{ fontSize: "0.72rem", fontWeight: 600, color: "text.secondary" }}>งาน</Box>
+      </Typography>
+      <Typography
+        sx={{
+          fontWeight: 800, lineHeight: 1.25,
+          fontSize: { xs: "0.72rem", sm: "0.8rem" },
+          color: active ? color : "text.primary",
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: { xs: "nowrap", sm: "normal" },
+        }}
+      >
         {label}
       </Typography>
-      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25 }}>
-        <Box component="span" sx={{ fontWeight: 800, fontSize: "0.9rem", color: active ? color : "text.primary" }}>
+      <Typography
+        variant="caption" color="text.secondary"
+        sx={{ display: { xs: sub ? "block" : "none", sm: "block" }, mt: 0.15, fontSize: { xs: "0.62rem", sm: "0.75rem" } }}
+      >
+        <Box component="span" sx={{ display: { xs: "none", sm: "inline" }, fontWeight: 800, fontSize: "0.9rem", color: active ? color : "text.primary" }}>
           {count}
         </Box>
-        {" งาน"}{sub ? ` · ${sub}` : ""}
+        <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>{" งาน"}</Box>
+        {sub ? <Box component="span" sx={{ display: { xs: "inline", sm: "inline" } }}>{sub}</Box> : null}
       </Typography>
     </Box>
   </Box>
@@ -1895,8 +1910,8 @@ const FilterPanel = ({
   ].filter(Boolean);
 
   return (
-    <GlassCard sx={{ mb: 3 }}>
-      <CardContent sx={{ p: 2.5 }}>
+    <GlassCard sx={{ mb: { xs: 2, sm: 3 } }}>
+      <CardContent sx={{ p: { xs: 1.5, sm: 2.5 }, "&:last-child": { pb: { xs: 1.5, sm: 2.5 } } }}>
         <Stack direction="row" alignItems="center" gap={2} flexWrap="wrap">
           <TextField
             placeholder="ค้นหา บริษัท, ไซต์, เลขเอกสาร..."
@@ -3101,12 +3116,24 @@ const Operation = () => {
   );
 
   return (
-    <Box sx={{ px: { xs: 1, sm: 2, md: 3 }, py: 3, maxWidth: 1400, mx: "auto" }}>
+    <Box sx={{ px: { xs: 1, sm: 2, md: 3 }, py: { xs: 1.5, sm: 3 }, maxWidth: 1400, mx: "auto" }}>
 
-      {/* Header */}
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }} flexWrap="wrap" gap={1}>
-        <Box>
-          <Typography variant="h5" fontWeight={800} letterSpacing={-0.5}>การดำเนินงาน</Typography>
+      {/* Header
+          🐛 เดิมบนมือถือ ชื่อหน้ากับแถวปุ่มตกคนละบรรทัด (flexWrap ทำให้ปุ่ม 5 ตัวห่อลงมาเป็นแถบของ
+          ตัวเอง) กินความสูงเกือบ 150px ก่อนถึงเนื้อหา
+          ✅ บังคับบรรทัดเดียวบนจอแคบ + ย่อปุ่มกลมเหลือ 34px ให้พอดีจอ 393px */}
+      <Stack
+        direction="row" alignItems="center" justifyContent="space-between"
+        sx={{ mb: { xs: 2, sm: 3 } }}
+        flexWrap={{ xs: "nowrap", sm: "wrap" }} gap={{ xs: 0.75, sm: 1 }}
+      >
+        <Box sx={{ minWidth: 0 }}>
+          <Typography
+            fontWeight={800} letterSpacing={-0.5} noWrap
+            sx={{ fontSize: { xs: "1.15rem", sm: "1.5rem" }, lineHeight: 1.3 }}
+          >
+            การดำเนินงาน
+          </Typography>
           {/* 🐛 BUG ที่แก้ (ตัวเลขใต้หัวข้อไม่ตรงกับสิ่งที่เห็นบนจอ): เดิมโชว์ sortedEvents.length เสมอ
               ซึ่งเป็นจำนวนงานของแท็บ "รายการงาน" — พอสลับไปแท็บ "รออนุมัติ" ที่มี 0 งาน หัวข้อยังขึ้น
               "1 รายการ" ค้างอยู่ (จำนวนของอีกแท็บ) อ่านแล้วขัดกันเองทันที
@@ -3120,10 +3147,10 @@ const Operation = () => {
         </Box>
         {/* ✅ ปุ่มวงกลม ขนาด 40px ให้แตะง่ายขึ้นบนมือถือ (เดิม size="small" เล็กไปสำหรับนิ้วมือ)
             เข้าธีมเดียวกับปุ่มวงกลมที่ใช้ทั่วแอป (bell button ใน Dashboard/Header) */}
-        <Stack direction="row" gap={1}>
+        <Stack direction="row" gap={{ xs: 0.5, sm: 1 }} flexShrink={0}>
           <Tooltip title="รีเฟรช">
             <IconButton onClick={() => fetchEventsFromDB()}
-              sx={{ border: "1px solid", borderColor: "divider", borderRadius: "50%", width: 40, height: 40 }}>
+              sx={{ border: "1px solid", borderColor: "divider", borderRadius: "50%", width: { xs: 34, sm: 40 }, height: { xs: 34, sm: 40 } }}>
               <Refresh fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -3134,7 +3161,7 @@ const Operation = () => {
           <ToggleButtonGroup
             size="small" exclusive value={viewMode}
             onChange={(_, v) => v && setViewMode(v)}
-            sx={{ "& .MuiToggleButton-root": { px: 1.25, py: 0.75, borderRadius: 2 } }}
+            sx={{ "& .MuiToggleButton-root": { px: { xs: 0.85, sm: 1.25 }, py: { xs: 0.4, sm: 0.75 }, borderRadius: 2 } }}
           >
             <ToggleButton value="card" title="มุมมองการ์ด"><ViewList sx={{ fontSize: 18 }} /></ToggleButton>
             <ToggleButton value="table" title="มุมมองตาราง"><TableChart sx={{ fontSize: 18 }} /></ToggleButton>
@@ -3144,7 +3171,8 @@ const Operation = () => {
               <span>
                 <IconButton onClick={handleExportExcel} disabled={exporting || jobGroups.length === 0}
                   sx={{
-                    border: "1px solid", borderRadius: "50%", width: 40, height: 40,
+                    border: "1px solid", borderRadius: "50%",
+                    width: { xs: 34, sm: 40 }, height: { xs: 34, sm: 40 },
                     borderColor: alpha("#047857", 0.25), color: "#047857",
                     "&:hover": { bgcolor: alpha("#047857", 0.08), borderColor: "#047857" },
                   }}>
@@ -3273,23 +3301,10 @@ const Operation = () => {
         </Stack>
       )}
 
-      {/* Tabs */}
-      <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
-        <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)}
-          sx={{ "& .MuiTabs-indicator": { height: 3, borderRadius: "3px 3px 0 0" } }}>
-          {/* ✅ ตัดแท็บ "Dashboard" ออกตามที่ผู้ใช้ขอ — สถิติภาพรวมทั้งหมดที่เคยอยู่ในนั้น (จำนวนงานแยก
-              สถานะ/แถบความคืบหน้า/สรุปรายช่าง) ซ้ำกับหน้า Dashboard หลักของแอปและการ์ดกลุ่มงานด้านล่าง
-              ที่เห็นอยู่แล้วทุกแท็บ — หน้านี้ควรโฟกัสที่ "การดำเนินงานรายงาน" อย่างเดียว
-              ✅ ตัดแท็บ "Timeline" ออกตามที่ผู้ใช้ขอเช่นกัน — เป็นการเอางานชุดเดิมมาเรียงตามเดือนเฉยๆ
-              ซึ่งดูได้จากหน้าปฏิทินอยู่แล้ว และไม่มีอะไรให้จัดการงานได้จริงในนั้น (การ์ดในแท็บ
-              "รายการงาน" คือที่เดียวที่แนบเอกสาร/เช็คอิน/คอมเมนต์ได้) */}
-          <StyledTab icon={<TableChart fontSize="small" />} iconPosition="start" label="รายการงาน" />
-          {/* 🧹 แท็บ "รออนุมัติ" ถูกย้ายออกไปเป็นเมนู "คำขอลงงาน" แล้วตามที่ผู้ใช้สั่ง —
-              หน้านี้คือการไล่จัดการงานที่ *ผ่านการอนุมัติแล้ว* ส่วนคำขอที่ยังไม่ได้ตัดสินใจเป็นคนละ
-              ขั้นของงาน และมาจาก 2 แผนก (ฝ่ายขาย/ฝ่ายช่าง) ซึ่งควรอยู่รวมกันที่เดียว
-              ดู features/dispatch/pages/JobRequestQueue.js */}
-        </Tabs>
-      </Box>
+      {/* 🧹 แถบแท็บถูกลบออก — เหลือแท็บเดียว ("รายการงาน") มานานแล้วหลังย้าย Dashboard / Timeline /
+          รออนุมัติ ออกไปหน้าอื่นหมด แท็บเดียวไม่ได้บอกอะไรกับผู้ใช้เลยแต่กินความสูงราว 90px
+          ทุกครั้งที่เปิดหน้า — ชื่อหน้าด้านบนบอกอยู่แล้วว่านี่คือหน้าอะไร
+          ⚠️ state activeTab ยังอยู่ (มีโค้ดอื่นตั้งค่าและอ่านค่าอยู่) เผื่อวันหน้ามีแท็บที่สองจริงๆ */}
 
       {/* ✅ แอดมิน/manager: กลุ่มงาน 4 ตัวเลือก (รอคุณอนุมัติ / กำลังดำเนินการ / ค้างงาน / เสร็จสิ้น)
           ฝั่งช่าง: เหลือแค่ "ค้างงาน" กับ "เสร็จสิ้น" (งานที่กำลังทำ/รออนุมัติ ย้ายไปหน้า "งานของฉัน" หมดแล้ว)
@@ -3300,7 +3315,7 @@ const Operation = () => {
         <Box sx={{
           display: "grid",
           gridTemplateColumns: isAdminOrManager ? { xs: "1fr 1fr", sm: "repeat(4, 1fr)" } : "1fr 1fr",
-          gap: 1.25, mb: 3,
+          gap: 1, mb: { xs: 2, sm: 3 },
         }}>
           {isAdminOrManager && (
             <>
