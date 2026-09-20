@@ -17,7 +17,7 @@ import {
   Box, Stack, Typography, TextField, Button, Alert, Snackbar, CircularProgress, Divider, Chip, Tooltip
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Business, Image as ImageIcon, Save, RestartAlt, UploadFile, Description, SupportAgent } from "@mui/icons-material";
+import { Business, Image as ImageIcon, Save, RestartAlt, UploadFile, Description, SupportAgent, History } from "@mui/icons-material";
 
 import usePermissions from "@/shared/hooks/usePermissions";
 import useOrgSettings from "@/shared/hooks/useOrgSettings";
@@ -75,6 +75,35 @@ const CONTACT_FIELDS = [
  *    อักษรไทยไหม — บางองค์กรตั้งชื่อเป็นอักษรโรมันโดยตั้งใจ
  */
 const looksCorrupted = (v) => /\?{3,}/.test(String(v || ""));
+
+/**
+ * ชื่อช่องที่อ่านรู้เรื่อง สำหรับใช้ในประวัติการแก้ไข
+ * ⚠️ ประกอบจากรายการช่องที่หน้านี้มีอยู่แล้ว ไม่พิมพ์ชื่อซ้ำ — เพิ่มช่องใหม่แล้วประวัติจะรู้จักเอง
+ */
+const FIELD_LABEL = {
+  advanceClearDays: "กำหนดเคลียร์ Advance (วัน)",
+  logoUrl: "โลโก้บนหัวเว็บ",
+  letterheadUrl: "โลโก้หัวกระดาษ",
+  stampUrl: "ตราประทับบริษัท",
+  rankLabels: "ชื่อตำแหน่งในองค์กร",
+  capabilityOverrides: "ตารางสิทธิ์",
+};
+
+/** ค่าที่ว่างให้แสดงเป็นขีด ไม่ใช่ช่องว่างเปล่าที่อ่านไม่ออกว่าคืออะไร */
+const shownValue = (v) => (String(v ?? "").trim() ? String(v) : "—");
+
+/** จำนวนรายการประวัติที่เซิร์ฟเวอร์เก็บไว้ — ต้องตรงกับ OrgSetting.HISTORY_MAX ฝั่งเซิร์ฟเวอร์ */
+const HISTORY_MAX = 50;
+
+/**
+ * ชื่อช่องสำหรับแสดงในประวัติ — หยิบจากรายการช่องที่หน้านี้มีอยู่แล้วก่อน
+ * ⚠️ ป้ายของ FIELDS บางอันมีคำอธิบายยาวต่อท้าย ตัดที่วงเล็บ/ดอกจันออกให้อ่านง่ายในบรรทัดเดียว
+ */
+const fieldLabelOf = (key) => {
+  const hit = [...FIELDS, ...CONTACT_FIELDS].find((f) => f.key === key);
+  if (!hit) return key;
+  return hit.label.replace(/\s*\(.*$/, "").replace(/\s*\*$/, "").trim();
+};
 
 const Section = ({ icon: Icon, title, hint, children }) => (
   <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER}`, borderRadius: 2.5, p: { xs: 1.5, sm: 2.25 }, mb: 1.75 }}>
@@ -170,9 +199,23 @@ export default function OrganizationSettings() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
+  // null = ยังโหลดไม่เสร็จ · [] = โหลดแล้วแต่ยังไม่มีประวัติ
+  const [history, setHistory] = useState(null);
 
   // ค่าจากเซิร์ฟเวอร์เปลี่ยน (โหลดเสร็จ/คนอื่นแก้) — ดึงมาแสดง เว้นแต่กำลังพิมพ์ค้างอยู่
   useEffect(() => { if (!dirty) setForm(live); }, [live, dirty]);
+
+  /**
+   * โหลดประวัติใหม่ทุกครั้งที่ค่าตั้งค่าเปลี่ยน (รวมถึงหลังกดบันทึกเอง)
+   * ⚠️ ดึงไม่สำเร็จต้องไม่ทำให้หน้าพัง — ประวัติเป็นของเสริม ไม่ใช่ของที่ต้องมีถึงจะตั้งค่าได้
+   */
+  useEffect(() => {
+    let alive = true;
+    OrgSettingService.history()
+      .then((h) => { if (alive) setHistory(h); })
+      .catch(() => { if (alive) setHistory([]); });
+    return () => { alive = false; };
+  }, [live.updatedAt]);
 
   if (!can("manageSystem")) return <Navigate to="/about" replace />;
 
@@ -328,6 +371,34 @@ export default function OrganizationSettings() {
           helperText="นับจากวันที่อนุมัติเบิกจ่าย — ใช้เมื่อผู้อนุมัติเบิกจ่ายไม่ได้ระบุวันเอง และใช้เตือนเมื่อเลยกำหนด"
           sx={{ maxWidth: 320 }}
         />
+      </Section>
+
+      {/* ✅ ย้อนดูได้ว่าใครเปลี่ยนอะไรเมื่อไหร่ — เดิมเก็บแค่ "ใครแก้ล่าสุด" พอค่าเสียจึงสืบไม่ได้
+          ⚠️ อยู่ท้ายสุดของหน้าโดยตั้งใจ เป็นของไว้ "ย้อนดู" ไม่ใช่ของที่ต้องเห็นตอนมาตั้งค่า */}
+      <Section icon={History} title="ประวัติการแก้ไข" hint={`เก็บ ${HISTORY_MAX} รายการล่าสุด · ล่าสุดอยู่บนสุด`}>
+        {history === null && <Typography variant="caption" sx={{ color: TEXT_SUB }}>กำลังโหลด…</Typography>}
+        {history?.length === 0 && (
+          <Typography variant="caption" sx={{ color: TEXT_SUB }}>ยังไม่มีการแก้ไขนับตั้งแต่เริ่มเก็บประวัติ</Typography>
+        )}
+        <Stack divider={<Divider flexItem />} spacing={1.25}>
+          {(history || []).map((h, i) => (
+            <Box key={`${h.at}-${i}`} sx={{ pt: i ? 1.25 : 0 }}>
+              <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 700 }}>
+                {thaiDateTime(h.at)}{h.by ? ` · ${h.by}` : ""}
+              </Typography>
+              <Box component="ul" sx={{ pl: 2.25, m: 0, mt: 0.5 }}>
+                {h.changes.map((c, j) => (
+                  <Box component="li" key={j} sx={{ fontSize: "0.82rem", lineHeight: 1.7 }}>
+                    <b>{FIELD_LABEL[c.field] || fieldLabelOf(c.field)}</b>{" "}
+                    <Box component="span" sx={{ color: TEXT_SUB, textDecoration: "line-through" }}>{shownValue(c.from)}</Box>
+                    {" → "}
+                    <Box component="span" sx={{ fontWeight: 700 }}>{shownValue(c.to)}</Box>
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+          ))}
+        </Stack>
       </Section>
 
       <Stack direction="row" spacing={1} justifyContent="flex-end">

@@ -161,6 +161,16 @@ const OrgSettingService = {
     return inflight;
   },
 
+  /**
+   * ประวัติการแก้ค่าตั้งค่า (ล่าสุดอยู่หน้าสุด)
+   * 🔒 เส้นทางนี้ตรวจสิทธิ์ manageSystem ฝั่งเซิร์ฟเวอร์ — มีชื่อคนแก้อยู่ในนั้น
+   *    จึงไม่ได้รวมมากับ /settings ที่เปิดให้อ่านได้โดยไม่ต้องล็อกอิน
+   */
+  async history() {
+    const res = await API.get("/settings/history");
+    return res.data?.history || [];
+  },
+
   /** รูปที่ติดมากับแอปให้เลือก — { app: [...], letterhead: [...], stamp: [...] } */
   builtinImages() {
     return builtin;
