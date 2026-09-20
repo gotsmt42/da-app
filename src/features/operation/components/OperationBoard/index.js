@@ -1229,7 +1229,8 @@ const EventRowCard = ({
         <Grid item xs={12}>
           <Button size="small" onClick={() => setShowDocsOverride(true)}
             sx={{ textTransform: "none", fontSize: "0.75rem", color: "text.secondary" }}>
-            📄 เอกสารหลักอยู่ที่การ์ดวันล่าสุด — กดเพื่อแนบ/แก้ไฟล์แยกเฉพาะวันนี้
+            <Description sx={{ fontSize: 13, mr: 0.5, verticalAlign: "-2px" }} />
+            เอกสารหลักอยู่ที่การ์ดวันล่าสุด — กดเพื่อแนบ/แก้ไฟล์แยกเฉพาะวันนี้
           </Button>
         </Grid>
       )}
@@ -1413,7 +1414,8 @@ const EventRowCard = ({
                     }}
                   >
                     <Typography variant="caption" color="text.secondary" fontWeight={600} noWrap>
-                      📅 {formatEventDateRange(event)}
+                      <CalendarMonth sx={{ fontSize: 13, mr: 0.5, verticalAlign: "-2px" }} />
+                      {formatEventDateRange(event)}
                     </Typography>
                     {canEdit && <Edit sx={{ fontSize: 12, color: "text.disabled" }} />}
                   </Box>
@@ -1521,7 +1523,7 @@ const EventRowCard = ({
                   alignItems: "start",
                 }}
               >
-                {event.system && <InfoLine icon="💻" label="ระบบ">{event.system}</InfoLine>}
+                {event.system && <InfoLine label="ระบบ">{event.system}</InfoLine>}
                 {/* ชื่อโครงการเป็นตัวที่ใช้ระบุงานมากที่สุด ให้กินเต็มความกว้างเสมอ ไม่ต้องตัดคำ
                     ✅ ชื่อโครงการ = ลิงก์แผนที่ในตัว (ผู้ใช้ขอ: "ให้กดผ่านชื่อโครงการเลย และไม่ต้องมีแก้ไข
                     แบบนี้ดูรก") — เดิมมีกล่อง "ค้นหาตำแหน่งใน Maps" เต็มความกว้าง + ปุ่มดินสอแยกอีกปุ่ม
@@ -1531,7 +1533,7 @@ const EventRowCard = ({
                     ⚠️ การแก้พิกัดยังทำได้ที่ฟอร์มแก้ไขงานและหน้าภาพรวมสัญญาเหมือนเดิม — ตัดออกเฉพาะ
                     หน้านี้ซึ่งเป็นหน้า "ดูงาน/นำทาง" ไม่ใช่หน้าตั้งค่าข้อมูลโครงการ */}
                 <Box sx={{ gridColumn: { md: "1 / -1" } }}>
-                  <InfoLine icon="🏢" label="โครงการ">
+                  <InfoLine label="โครงการ">
                     <Box
                       component="a"
                       href={mapHref}
@@ -1570,7 +1572,7 @@ const EventRowCard = ({
                     ⚠️ ซ่อนทั้งบรรทัดถ้ายังไม่มีข้อมูล ไม่โชว์เป็นช่องว่าง — การ์ดนี้เรียงกันหลายสิบใบ
                     ในหน้าเดียว บรรทัดว่างทุกใบจะกินพื้นที่มากกว่าข้อมูลจริงที่มีอยู่ */}
                 {(event.contactName || event.contactTel) && (
-                  <InfoLine icon="🙍" label="ผู้ติดต่อ">
+                  <InfoLine label="ผู้ติดต่อ">
                     <Stack direction="row" gap={0.75} alignItems="center" flexWrap="wrap">
                       {event.contactName && <span>{event.contactName}</span>}
                       {event.contactTel && <TelLink tel={event.contactTel} />}
@@ -1578,9 +1580,9 @@ const EventRowCard = ({
                   </InfoLine>
                 )}
                 {/* ✅ ย้ายมาไว้ถัดจากโครงการตามที่ขอ (เดิมอยู่คู่กับระบบด้านบนสุด) */}
-                {event.time && <InfoLine icon="🔢" label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount)}</InfoLine>}
+                {event.time && <InfoLine label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount)}</InfoLine>}
                 {(event.startTime || event.endTime) && (
-                  <InfoLine icon="🕐" label="เวลา">{event.startTime || "-"} — {event.endTime || "-"}</InfoLine>
+                  <InfoLine label="เวลา">{event.startTime || "-"} — {event.endTime || "-"}</InfoLine>
                 )}
                 {/* ✅ ถ้ายังไม่มีเลขเอกสาร ซ่อนช่อง "ใส่เลขที่เอกสาร" ไว้ตอนพับการ์ด — เดิมโชว์ทุกการ์ด
                     ในลิสต์ตลอดเวลาแม้ยังไม่มีข้อมูล ดูรกเวลามีงานหลายรายการ ให้กดขยายก่อนค่อยใส่ */}
@@ -1599,7 +1601,8 @@ const EventRowCard = ({
                       sx={{ alignItems: "flex-start", cursor: canEdit ? "pointer" : "default" }}
                       onClick={e => { e.stopPropagation(); canEdit && setEditingDoc(true); }}>
                       <Typography variant="caption" color={event.docNo ? "text.secondary" : "text.disabled"} sx={{ flexShrink: 0, whiteSpace: "nowrap", "&:hover": canEdit ? { color: "primary.main", textDecoration: "underline" } : {} }}>
-                        📄 เอกสาร :
+                        <Description sx={{ fontSize: 13, mr: 0.4, verticalAlign: "-2px" }} />
+                        เอกสาร :
                       </Typography>
                       <Typography variant="caption" color={event.docNo ? "text.secondary" : "text.disabled"} sx={{ minWidth: 0, "&:hover": canEdit ? { color: "primary.main", textDecoration: "underline" } : {} }}>
                         {event.docNo || "ใส่เลขที่เอกสาร"}
@@ -1617,7 +1620,7 @@ const EventRowCard = ({
                   return teamNames.length > 0 && (
                     // รายชื่อทีม+ลูกทีมยาวได้เรื่อยๆ ให้กินเต็มความกว้างเช่นกัน
                     <Box sx={{ gridColumn: { md: "1 / -1" } }}>
-                      <InfoLine icon="👷" label="ทีม">{teamNames.join(", ")}</InfoLine>
+                      <InfoLine label="ทีม">{teamNames.join(", ")}</InfoLine>
                     </Box>
                   );
                 })()}
@@ -1845,17 +1848,17 @@ const EventRowCard = ({
               </Typography>
               {(event.company || event.site || event.system || event.time) && (
                 <Stack direction="row" gap={2} flexWrap="wrap" sx={{ mt: 0.5 }}>
-                  <InfoLine icon="🏢" label="โครงการ">{companySite(event.company, event.site)}</InfoLine>
+                  <InfoLine label="โครงการ">{companySite(event.company, event.site)}</InfoLine>
                   {(event.contactName || event.contactTel) && (
-                    <InfoLine icon="🙍" label="ผู้ติดต่อ">
+                    <InfoLine label="ผู้ติดต่อ">
                       <Stack direction="row" gap={0.75} alignItems="center" flexWrap="wrap">
                         {event.contactName && <span>{event.contactName}</span>}
                         {event.contactTel && <TelLink tel={event.contactTel} />}
                       </Stack>
                     </InfoLine>
                   )}
-                  {event.system && <InfoLine icon="💻" label="ระบบ">{event.system}</InfoLine>}
-                  {event.time && <InfoLine icon="🔢" label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount)}</InfoLine>}
+                  {event.system && <InfoLine label="ระบบ">{event.system}</InfoLine>}
+                  {event.time && <InfoLine label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount)}</InfoLine>}
                 </Stack>
               )}
             </Box>
@@ -1896,7 +1899,7 @@ const FilterPanel = ({
       <CardContent sx={{ p: 2.5 }}>
         <Stack direction="row" alignItems="center" gap={2} flexWrap="wrap">
           <TextField
-            placeholder="🔍 ค้นหา บริษัท, ไซต์, เลขเอกสาร..."
+            placeholder="ค้นหา บริษัท, ไซต์, เลขเอกสาร..."
             size="small" value={search}
             onChange={e => onSearch(e.target.value)}
             InputProps={{
@@ -2294,7 +2297,8 @@ const JobGroupBlock = ({ sessions, currentUserRole, ...cardProps }) => {
           <Chip label={`เข้างาน ${totalWorkDays} วัน`} size="small"
             sx={{ height: 20, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha("#dc2626", 0.15), color: "#dc2626" }} />
           <Typography variant="caption" color="text.secondary">
-            📅 {rangeStart} – {rangeEnd}
+            <CalendarMonth sx={{ fontSize: 13, mr: 0.5, verticalAlign: "-2px" }} />
+            {rangeStart} – {rangeEnd}
           </Typography>
           <IconButton size="small" sx={{ ml: "auto" }} onClick={(e) => { e.stopPropagation(); setExpanded(p => !p); }}>
             {expanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
@@ -2320,7 +2324,8 @@ const JobGroupBlock = ({ sessions, currentUserRole, ...cardProps }) => {
           })}
         </Stack>
         <Typography variant="caption" color="text.disabled" sx={{ display: "block", mt: 0.5 }}>
-          📄 เอกสารประจำงาน/ขอปิดงาน ใช้ร่วมกันที่การ์ดวันที่ {moment(head.start).locale("th").format("DD MMM")} (วันล่าสุด)
+          <Description sx={{ fontSize: 13, mr: 0.5, verticalAlign: "-2px" }} />
+          เอกสารประจำงาน/ขอปิดงาน ใช้ร่วมกันที่การ์ดวันที่ {moment(head.start).locale("th").format("DD MMM")} (วันล่าสุด)
         </Typography>
       </Box>
 

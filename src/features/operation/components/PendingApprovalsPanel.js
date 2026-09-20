@@ -497,16 +497,16 @@ export default function PendingApprovalsPanel({ onCountChange, active = true }) 
                     {/* ✅ ใช้บรรทัด "ไอคอน + ป้ายกำกับ + ค่า" ชุดเดียวกับการ์ดงานในแท็บ "รายการงาน"
                         (ไอคอน/ป้ายกำกับ/ลำดับเดียวกันเป๊ะ) ตามที่ผู้ใช้ขอให้แสดงข้อมูลสอดคล้องกัน */}
                     <Stack spacing={0.3} sx={{ mt: 0.6 }}>
-                      {head.system && <InfoLine icon="💻" label="ระบบ">{head.system}</InfoLine>}
-                      <InfoLine icon="🏢" label="โครงการ">{companySite || "ไม่ระบุบริษัท/ไซต์"}</InfoLine>
+                      {head.system && <InfoLine label="ระบบ">{head.system}</InfoLine>}
+                      <InfoLine label="โครงการ">{companySite || "ไม่ระบุบริษัท/ไซต์"}</InfoLine>
                       {head.time && (
-                        <InfoLine icon="🔢" label="ครั้งที่">{formatRoundLabel(head.time, head.visitCount)}</InfoLine>
+                        <InfoLine label="ครั้งที่">{formatRoundLabel(head.time, head.visitCount)}</InfoLine>
                       )}
-                      <InfoLine icon="📅" label="วันที่">{dateLabel}</InfoLine>
+                      <InfoLine label="วันที่">{dateLabel}</InfoLine>
                       {teamNames.length > 0 && (
-                        <InfoLine icon="👷" label="ทีม">{teamNames.join(", ")}</InfoLine>
+                        <InfoLine label="ทีม">{teamNames.join(", ")}</InfoLine>
                       )}
-                      <InfoLine icon="📨" label="ผู้ส่ง">
+                      <InfoLine label="ผู้ส่ง">
                         {head.approvalRequestedBy || "ผู้ใช้"}
                         {head.approvalRequestedAt ? ` · ${moment(head.approvalRequestedAt).locale("th").fromNow()}` : ""}
                       </InfoLine>
@@ -659,16 +659,16 @@ export default function PendingApprovalsPanel({ onCountChange, active = true }) 
 
                         {/* ✅ ชุดบรรทัดข้อมูลเดียวกับการ์ดรออนุมัติด้านบนและการ์ดงานในแท็บ "รายการงาน" */}
                         <Stack spacing={0.3} sx={{ mt: 0.6 }}>
-                          {head.system && <InfoLine icon="💻" label="ระบบ">{head.system}</InfoLine>}
-                          <InfoLine icon="🏢" label="โครงการ">{rCompanySite || "ไม่ระบุบริษัท/ไซต์"}</InfoLine>
+                          {head.system && <InfoLine label="ระบบ">{head.system}</InfoLine>}
+                          <InfoLine label="โครงการ">{rCompanySite || "ไม่ระบุบริษัท/ไซต์"}</InfoLine>
                           {head.time && (
-                            <InfoLine icon="🔢" label="ครั้งที่">{formatRoundLabel(head.time, head.visitCount)}</InfoLine>
+                            <InfoLine label="ครั้งที่">{formatRoundLabel(head.time, head.visitCount)}</InfoLine>
                           )}
-                          <InfoLine icon="📅" label="วันที่">{rDateLabel}</InfoLine>
+                          <InfoLine label="วันที่">{rDateLabel}</InfoLine>
                           {rTeamNames.length > 0 && (
-                            <InfoLine icon="👷" label="ทีม">{rTeamNames.join(", ")}</InfoLine>
+                            <InfoLine label="ทีม">{rTeamNames.join(", ")}</InfoLine>
                           )}
-                          <InfoLine icon="👤" label="ผู้รับผิดชอบ">
+                          <InfoLine label="ผู้รับผิดชอบ">
                             {head.responsiblePerson || "— ยังไม่มอบหมาย —"}
                           </InfoLine>
                         </Stack>

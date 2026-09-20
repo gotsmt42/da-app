@@ -1027,19 +1027,19 @@ const TechnicianJobCard = ({
                 </Typography>
               )}
               <Stack spacing={0.35} sx={{ mt: 0.6 }}>
-                {event.system && <InfoLine icon="💻" label="ระบบ">{event.system}</InfoLine>}
+                {event.system && <InfoLine label="ระบบ">{event.system}</InfoLine>}
                 {/* ✅ เดิม `{company || "—"} · {site || "—"}` โชว์ "— · ไซต์" เป็นขีดลอยๆ เวลาช่องใดช่องหนึ่งว่าง */}
-                <InfoLine icon="🏢" label="โครงการ">
+                <InfoLine label="โครงการ">
                   {event.company && event.site
                     ? `${event.company} · ${event.site}`
                     : (event.company || event.site || "ไม่ระบุบริษัท/ไซต์")}
                 </InfoLine>
                 {/* ✅ ย้ายมาไว้ถัดจากโครงการตามที่ขอ (เดิมอยู่คู่กับระบบด้านบนสุด) */}
-                {event.time && <InfoLine icon="🔢" label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount)}</InfoLine>}
+                {event.time && <InfoLine label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount)}</InfoLine>}
                 {(event.startTime || event.endTime) && (
-                  <InfoLine icon="🕐" label="เวลา">{event.startTime || "-"} — {event.endTime || "-"}</InfoLine>
+                  <InfoLine label="เวลา">{event.startTime || "-"} — {event.endTime || "-"}</InfoLine>
                 )}
-                {event.docNo && <InfoLine icon="📄" label="เอกสาร">{event.docNo}</InfoLine>}
+                {event.docNo && <InfoLine label="เอกสาร">{event.docNo}</InfoLine>}
                 {/* ✅ ทีม อยู่ล่างสุดของรายการ — เพิ่มชื่อลูกทีมเพิ่มเติม (teamMembers) ต่อท้ายชื่อทีม/
                     หัวหน้าทีมด้วย (เดิมมีแค่ event.team ตัวเดียว ไม่เห็นลูกทีมที่เพิ่มมาเลย) กันชื่อซ้ำ
                     ด้วย filter dedupe (เทียบ pattern เดียวกับ teamDisplay ใน EventCalendar/index.js) */}
@@ -1048,7 +1048,7 @@ const TechnicianJobCard = ({
                     .filter(Boolean)
                     .filter((name, idx, arr) => arr.indexOf(name) === idx);
                   return teamNames.length > 0 && (
-                    <InfoLine icon="👷" label="ทีม">{teamNames.join(", ")}</InfoLine>
+                    <InfoLine label="ทีม">{teamNames.join(", ")}</InfoLine>
                   );
                 })()}
               </Stack>
@@ -1227,11 +1227,11 @@ const TechnicianJobCard = ({
               </Typography>
               {(event.company || event.site || event.system || event.time) && (
                 <Stack direction="row" gap={2} flexWrap="wrap" sx={{ mt: 0.5 }}>
-                  <InfoLine icon="🏢" label="โครงการ">
+                  <InfoLine label="โครงการ">
                     {event.company && event.site ? `${event.company} · ${event.site}` : (event.company || event.site || "ไม่ระบุบริษัท/ไซต์")}
                   </InfoLine>
-                  {event.system && <InfoLine icon="💻" label="ระบบ">{event.system}</InfoLine>}
-                  {event.time && <InfoLine icon="🔢" label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount)}</InfoLine>}
+                  {event.system && <InfoLine label="ระบบ">{event.system}</InfoLine>}
+                  {event.time && <InfoLine label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount)}</InfoLine>}
                 </Stack>
               )}
             </Box>
@@ -1256,11 +1256,11 @@ const TechnicianJobCard = ({
               </Typography>
               {(event.company || event.site || event.system || event.time) && (
                 <Stack direction="row" gap={2} flexWrap="wrap" sx={{ mt: 0.5 }}>
-                  <InfoLine icon="🏢" label="โครงการ">
+                  <InfoLine label="โครงการ">
                     {event.company && event.site ? `${event.company} · ${event.site}` : (event.company || event.site || "ไม่ระบุบริษัท/ไซต์")}
                   </InfoLine>
-                  {event.system && <InfoLine icon="💻" label="ระบบ">{event.system}</InfoLine>}
-                  {event.time && <InfoLine icon="🔢" label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount)}</InfoLine>}
+                  {event.system && <InfoLine label="ระบบ">{event.system}</InfoLine>}
+                  {event.time && <InfoLine label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount)}</InfoLine>}
                 </Stack>
               )}
             </Box>
