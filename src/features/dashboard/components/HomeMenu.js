@@ -15,13 +15,14 @@
  */
 import { Link } from "react-router-dom";
 import {
-  FaCalendarAlt, FaWrench, FaClipboardList, FaClipboardCheck,
-  FaPaperPlane, FaFileAlt, FaFileInvoiceDollar, FaMoneyCheckAlt, FaReceipt, FaChartBar, FaInbox,
-  FaBuilding, FaUserFriends, FaChevronRight, FaWallet, FaFolderOpen, FaDatabase,
+  FaCalendarAlt, FaChevronRight, FaWallet, FaFolderOpen, FaDatabase,
 } from "react-icons/fa";
 
-import { can, isRole, ROLES, DEPARTMENT, TECHNICIAN_ROLES } from "@/shared/utils/roles";
+import { can, isRole, ROLES, TECHNICIAN_ROLES } from "@/shared/utils/roles";
 import useAppBadges, { BADGE_LABEL } from "@/shared/hooks/useAppBadges";
+// ⚠️ ชื่อ/พาธ/ไอคอน/คีย์ป้ายตัวเลข มาจากทะเบียนกลาง — อย่าพิมพ์ทับที่นี่ ไม่งั้นชื่อจะหลุดจาก
+// แถบล่างมือถือและเมนูข้างที่ชี้ปลายทางเดียวกัน (เคยหลุดมาแล้ว: "แผนงาน" / "แผนงานของฉัน" / "ตารางงาน")
+import { dest } from "@/layouts/navConfig";
 import "./HomeMenu.css";
 
 /**
@@ -67,52 +68,52 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
   const work = [];
   if (canPlanWork) {
     if (isAdminOrManager) {
-      work.push({ key: "event-service", title: "ตารางงานช่าง", sub: "ปฏิทินงานบริการ", href: "/event", icon: FaCalendarAlt, badgeKey: "pendingApproval" });
+      work.push(dest("eventService"));
       // ⚠️ "ตารางงานเซล" (/event?dept=sales) ตั้งใจไม่ใส่ในเมนูหลักหน้านี้ — ผู้ใช้สั่งให้เอาออกไปก่อน
       // (ยังเข้าได้ตามปกติจากเมนูข้าง "แผนงาน" และ dropdown บนแถบบน ไม่ได้ปิดฟีเจอร์)
     } else if (can(userData, "viewServiceCalendar")) {
-      work.push({ key: "event-mine", title: "แผนงานของฉัน", sub: "นัดหมายของฉัน", href: "/event", icon: FaCalendarAlt, tone: TONE.sales, badgeKey: "pendingApproval" });
-      work.push({ key: "event-service", title: "ตารางงานช่าง", sub: "ดูอย่างเดียว", href: `/event?dept=${DEPARTMENT.SERVICE}`, icon: FaWrench });
+      work.push(dest("eventMine", { tone: TONE.sales }));
+      work.push(dest("eventServiceReadOnly"));
     } else {
-      work.push({ key: "event", title: canViewOperation ? "ตารางงาน" : "แผนงานของฉัน", sub: "ปฏิทินงาน", href: "/event", icon: FaCalendarAlt, badgeKey: "pendingApproval" });
+      work.push(dest(canViewOperation ? "eventOwn" : "eventMine"));
     }
   }
-  if (canViewOperation) work.push({ key: "operation", title: "การดำเนินงาน", sub: "เช็คอิน · ปิดงาน", href: "/operation", icon: FaWrench, badgeKey: "closeRequests" });
-  if (isTechnician && !hideMyJobs) work.push({ key: "my-jobs", title: "งานของฉัน", sub: "งานที่ได้รับมอบหมาย", href: "/technician/jobs", icon: FaClipboardList, badgeKey: "myJobs" });
+  if (canViewOperation) work.push(dest("operation"));
+  if (isTechnician && !hideMyJobs) work.push(dest("myJobs"));
   // 🧹 "ภาพรวมงาน" ถูกตัดออกจากเมนูหลักตามที่ผู้ใช้สั่ง — เดิมปลายทางนี้โผล่พร้อมกัน 3 ที่ในจอเดียว
   // (ชิปบนแถบบน + ปุ่มตรงนี้ + ช่องบนแถบเมนูล่าง) พร้อมป้ายตัวเลขเดียวกันทั้งสามจุด
   // ⚠️ ยังเข้าได้ตามปกติจากแถบเมนูล่าง (มือถือ) และเมนูข้าง (ทุกจอ) — ไม่ได้ตัดทางเข้าทิ้ง
-  if (canAssign) work.push({ key: "dispatch", title: "คำขอลงงาน", sub: "คิวรอมอบหมาย", href: "/dispatch", icon: FaClipboardCheck, badgeKey: "dispatchQueue" });
-  if (isSaleUser && !hideSalesJobs) work.push({ key: "sales", title: "แจ้งงานให้ช่าง", sub: "ส่งงานเข้าคิวช่าง", href: "/sales", icon: FaPaperPlane, tone: TONE.sales, badgeKey: "dispatchMine" });
+  if (canAssign) work.push(dest("dispatch"));
+  if (isSaleUser && !hideSalesJobs) work.push(dest("sales", { tone: TONE.sales }));
 
   // ── เบิกค่าใช้จ่าย ────────────────────────────────────────────────────────
   // ✅ วางต่อจากหมวดงานทันที — ผู้ใช้เลือกใบ Advance/ใบเคลมเป็นเมนูหลักบนแถบล่างมือถือ = ใช้บ่อยรองจากงาน
   const expense = [];
   if (canExpense) {
-    expense.push({ key: "advance", title: "ใบเบิก Advance", short: "ใบ Advance", sub: "เบิกเงินล่วงหน้า", href: "/expenses/advances", icon: FaMoneyCheckAlt, badgeKey: "advance" });
+    expense.push(dest("advance"));
     // ⚠️ ไม่ใส่ tone เอง — ใช้สีของหมวด "เบิกค่าใช้จ่าย" เหมือนปุ่มอื่นในแถวเดียวกัน
     // (เคยทาสีม่วงของ "ชนิดเอกสาร" ไว้ที่ปุ่มนี้ปุ่มเดียว ผู้ใช้ดูของจริงแล้วบอกว่าโดดออกมาจากเพื่อนในแถว —
     // สีประจำชนิดใบยังอยู่ครบในหน้าใบเคลมเอง ตรงนี้เป็นแค่ปุ่มทางเข้า)
-    expense.push({ key: "claim", title: "ใบเคลม", sub: "เคลียร์ค่าใช้จ่าย", href: "/expenses/claims", icon: FaReceipt, badgeKey: "claim" });
+    expense.push(dest("claim"));
     // ✅ คิวงานของผู้ดำเนินการแต่ละขั้น (ตรวจสอบ/อนุมัติ/อนุมัติเบิกจ่าย) เพิ่มอีกเมนู
     if (canApproveExpense) {
-      expense.push({ key: "expense-inbox", title: "รอดำเนินการ", short: "รอดำเนินการ", sub: "ตรวจสอบ · อนุมัติ · เบิกจ่าย", href: "/expenses/approvals", icon: FaInbox, badgeKey: "expenseInbox" });
+      expense.push(dest("expenseInbox"));
     }
-    expense.push({ key: "expense-report", title: "รายงานการเบิก", short: "รายงาน", sub: "ยอดค้าง · ย้อนหลัง", href: "/expenses/report", icon: FaChartBar });
+    expense.push(dest("expenseReport"));
   }
 
   // ── เอกสารและการเงิน ─────────────────────────────────────────────────────
   const docs = [];
-  if (can(userData, "viewDocuments")) docs.push({ key: "documents", title: "เอกสาร", sub: "ไฟล์ · เอกสารออก", href: "/documents", icon: FaFileAlt });
+  if (can(userData, "viewDocuments")) docs.push(dest("documents"));
   if (canViewFinance) {
-    docs.push({ key: "finance", title: "ใบเสนอราคา / การเงิน", short: "ใบเสนอราคา", sub: "ติดตาม · วางบิล", href: "/finance", icon: FaFileInvoiceDollar, badgeKey: "quotations" });
+    docs.push(dest("finance"));
   }
 
   // ── ข้อมูลหลัก ────────────────────────────────────────────────────────────
   const master = [];
   if (isAdminOrManager) {
-    master.push({ key: "customers", title: "ลูกค้า", sub: "ทะเบียนลูกค้า", href: "/customers", icon: FaBuilding });
-    master.push({ key: "staff", title: "พนักงาน / ทีมช่าง", short: "พนักงาน", sub: "ภาระงาน · ทะเบียน", href: "/staff", icon: FaUserFriends });
+    master.push(dest("customers"));
+    master.push(dest("staff"));
   }
 
   return [

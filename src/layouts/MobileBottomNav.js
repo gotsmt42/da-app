@@ -16,19 +16,27 @@
  */
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import {
-  FaHome, FaCalendarAlt, FaMoneyCheckAlt, FaReceipt, FaFileContract, FaWrench, FaPaperPlane,
-  FaFileAlt, FaFileInvoiceDollar,
-} from "react-icons/fa";
-
 import { useAuth } from "@/features/auth/AuthContext";
 import { can, isRole, ROLES, DEPARTMENT } from "@/shared/utils/roles";
 import useAppBadges, { BADGE_LABEL } from "@/shared/hooks/useAppBadges";
+// ⚠️ ชื่อ/พาธ/ไอคอน/คีย์ป้ายตัวเลข มาจากทะเบียนกลาง — อย่าพิมพ์ทับที่นี่
+// ช่องบนแถบนี้กว้างราว 70px จึงใช้ชื่อที่สั้นที่สุดของปลายทาง (barTitle)
+import { dest, barTitle } from "./navConfig";
 import "./MobileBottomNav.css";
 
 const MAX_ITEMS = 5;
 // หน้าอื่นของระบบเบิกที่ไม่ใช่ "ใบ Advance" — ใช้ตัดสินว่าช่องไหนบนแถบล่างควรติดสว่าง
 const EXPENSE_OTHER_PATHS = ["/expenses/claims", "/expenses/approvals", "/expenses/report"];
+
+/**
+ * ช่องหนึ่งช่องบนแถบล่าง — เอาปลายทางจากทะเบียนกลางมาใส่ชื่อสั้นและเงื่อนไข "กำลังอยู่หน้านี้"
+ * ⚠️ match ต้องอยู่ที่นี่ ไม่ย้ายไปทะเบียนกลาง — เป็นเรื่องของแถบนี้ล้วนๆ (เช่น /expenses/<id>
+ *    ที่เปิดจากลิงก์แจ้งเตือน ต้องนับเป็นช่อง Advance ไม่งั้นไม่มีช่องไหนติดสว่างเลย)
+ */
+const bar = (key, match) => {
+  const d = dest(key);
+  return { ...d, label: barTitle(d), match };
+};
 
 /**
  * @returns {Array<{key, label, href, icon, match: (loc) => boolean, badgeKey?}>}
@@ -42,53 +50,41 @@ export const buildBottomNav = (userData) => {
   const canPlanWork = canViewOperation || can(userData, "createSalesPlan") || isTechnician || isAdminOrManager;
 
   const deptOf = (loc) => new URLSearchParams(loc.search).get("dept");
-  const items = [
-    { key: "home", label: "หน้าหลัก", href: "/dashboard", icon: FaHome, match: (loc) => loc.pathname === "/dashboard" },
-  ];
+  const items = [bar("home", (loc) => loc.pathname === "/dashboard")];
 
   // ── ปฏิทิน ──────────────────────────────────────────────────────────────
   if (isSaleUser && can(userData, "viewServiceCalendar")) {
     // เซล: ปฏิทินของตัวเอง + ตารางงานช่าง (ดูอย่างเดียว) คนละช่อง — /event เฉยๆ ของเซลคือนัดหมายของเซล
-    items.push({ key: "event-mine", label: "แผนงาน", href: "/event", icon: FaCalendarAlt, badgeKey: "pendingApproval", match: (loc) => loc.pathname === "/event" && deptOf(loc) !== DEPARTMENT.SERVICE });
-    items.push({ key: "event-service", label: "ตารางงานช่าง", href: `/event?dept=${DEPARTMENT.SERVICE}`, icon: FaWrench, match: (loc) => loc.pathname === "/event" && deptOf(loc) === DEPARTMENT.SERVICE });
+    items.push(bar("eventMine", (loc) => loc.pathname === "/event" && deptOf(loc) !== DEPARTMENT.SERVICE));
+    items.push(bar("eventServiceReadOnly", (loc) => loc.pathname === "/event" && deptOf(loc) === DEPARTMENT.SERVICE));
   } else if (canPlanWork) {
-    items.push({
-      key: "event",
-      // แอดมิน/หัวหน้ามีทั้งตารางงานช่างและเซล — ช่องนี้คือของช่าง (/event ไม่มี dept) ส่วนช่าง/พนักงานคือปฏิทินตัวเอง
-      label: isAdminOrManager ? "ตารางงานช่าง" : "ตารางงาน",
-      href: "/event",
-      icon: FaCalendarAlt,
-      badgeKey: "pendingApproval",
-      match: (loc) => loc.pathname === "/event" && deptOf(loc) !== "sales",
-    });
+    // แอดมิน/หัวหน้ามีทั้งตารางงานช่างและเซล — ช่องนี้คือของช่าง (/event ไม่มี dept) ส่วนช่าง/พนักงานคือปฏิทินตัวเอง
+    items.push(bar(
+      isAdminOrManager ? "eventService" : "eventOwn",
+      (loc) => loc.pathname === "/event" && deptOf(loc) !== "sales",
+    ));
   }
 
   // ── เบิกค่าใช้จ่าย ──────────────────────────────────────────────────────
   if (canExpense) {
     // ⚠️ /expenses ที่ไม่มี ?tab= (เช่นเปิดใบจากลิงก์แจ้งเตือน /expenses/<id>) เปิดแท็บ Advance เป็นค่าเริ่มต้น
     // จึงนับเป็นช่อง Advance — ไม่งั้นอยู่ในระบบเบิกแล้วแถบล่างไม่มีช่องไหนติดสว่างเลย
-    items.push({
-      key: "advance", label: "ใบ Advance", href: "/expenses/advances", icon: FaMoneyCheckAlt, badgeKey: "advance",
-      // ⚠️ /expenses/<id> (เปิดใบจากลิงก์แจ้งเตือน) นับเป็นช่องนี้ด้วย — ไม่งั้นอยู่ในระบบเบิกแล้วไม่มีช่องไหนสว่างเลย
-      match: (loc) => loc.pathname.startsWith("/expenses") && !EXPENSE_OTHER_PATHS.includes(loc.pathname),
-    });
-    items.push({
-      key: "claim", label: "ใบเคลม", href: "/expenses/claims", icon: FaReceipt, badgeKey: "claim",
-      match: (loc) => loc.pathname === "/expenses/claims",
-    });
+    // ⚠️ /expenses/<id> (เปิดใบจากลิงก์แจ้งเตือน) นับเป็นช่องนี้ด้วย — ไม่งั้นอยู่ในระบบเบิกแล้วไม่มีช่องไหนสว่างเลย
+    items.push(bar("advance", (loc) => loc.pathname.startsWith("/expenses") && !EXPENSE_OTHER_PATHS.includes(loc.pathname)));
+    items.push(bar("claim", (loc) => loc.pathname === "/expenses/claims"));
   }
 
   // ── ภาพรวมงาน ───────────────────────────────────────────────────────────
   if (isAdminOrManager || isTechnician) {
-    items.push({ key: "contracts", label: "ภาพรวมงาน", href: "/contracts", icon: FaFileContract, badgeKey: "contracts", match: (loc) => loc.pathname === "/contracts" });
+    items.push(bar("contracts", (loc) => loc.pathname === "/contracts"));
   }
 
   // ── เติมช่องว่างด้วยเมนูหลักของสายงาน (role ที่ไม่มีสิทธิ์ครบ 4 เมนูข้างบน) ────────────
   const fillers = [];
-  if (isSaleUser) fillers.push({ key: "sales", label: "แจ้งงาน", href: "/sales", icon: FaPaperPlane, badgeKey: "dispatchMine", match: (loc) => loc.pathname.startsWith("/sales") });
-  if (canViewOperation) fillers.push({ key: "operation", label: "ดำเนินงาน", href: "/operation", icon: FaWrench, badgeKey: "closeRequests", match: (loc) => loc.pathname.startsWith("/operation") });
-  if (can(userData, "viewDocuments")) fillers.push({ key: "documents", label: "เอกสาร", href: "/documents", icon: FaFileAlt, match: (loc) => loc.pathname.startsWith("/documents") });
-  if (can(userData, "viewFinance")) fillers.push({ key: "finance", label: "ใบเสนอราคา", href: "/finance", icon: FaFileInvoiceDollar, badgeKey: "quotations", match: (loc) => loc.pathname.startsWith("/finance") });
+  if (isSaleUser) fillers.push(bar("sales", (loc) => loc.pathname.startsWith("/sales")));
+  if (canViewOperation) fillers.push(bar("operation", (loc) => loc.pathname.startsWith("/operation")));
+  if (can(userData, "viewDocuments")) fillers.push(bar("documents", (loc) => loc.pathname.startsWith("/documents")));
+  if (can(userData, "viewFinance")) fillers.push(bar("finance", (loc) => loc.pathname.startsWith("/finance")));
   fillers.forEach((f) => { if (items.length < MAX_ITEMS) items.push(f); });
 
   return items.slice(0, MAX_ITEMS);

@@ -6,6 +6,9 @@ import "./Sidebar.css";
 import { hasValidAvatar } from "../shared/utils/user";
 import { useAuth } from "../features/auth/AuthContext";
 import { can, isRole, rankLabel, ROLES, DEPARTMENT } from "@/shared/utils/roles";
+// ⚠️ ชื่อ/พาธ/ไอคอน/คีย์ป้ายตัวเลข มาจากทะเบียนกลาง — อย่าพิมพ์ทับ ไม่งั้นหลุดจากการ์ดหน้าแรก
+// และแถบล่างมือถือที่ชี้ปลายทางเดียวกัน
+import { dest } from "./navConfig";
 // ✅ ป้ายตัวเลข "ของค้างที่ต้องทำ" บนเมนู — ตัวเลขชุดเดียวกับเมนูหลักหน้าแรกและแถบล่างมือถือ
 import useAppBadges, { BADGE_LABEL } from "@/shared/hooks/useAppBadges";
 // ✅ ใช้ไอคอนชุดเดียวกับที่ Dashboard.js ใช้จริง (react-icons/fa) แทน bootstrap-icons เดิม — เดิม
@@ -14,20 +17,10 @@ import useAppBadges, { BADGE_LABEL } from "@/shared/hooks/useAppBadges";
 import {
   FaTachometerAlt,
   FaCalendarAlt,
-  FaFileContract,
-  FaClipboardList,
-  FaFileAlt,
-  FaFileInvoiceDollar,
-  FaUserFriends,
-  FaBuilding,
-  FaPaperPlane,
-  FaClipboardCheck,
   FaCog,
-  FaWrench,
-  FaInbox,
-  FaMoneyCheckAlt,
+  // ⚠️ ไอคอนที่เหลือมาจากทะเบียนกลาง (navConfig) แล้ว — เหลือเฉพาะที่เมนูข้างใช้เองจริงๆ
+  // FaReceipt ยังต้องนำเข้าเพราะรายการ "ใบเคลม (Claim)" จงใจใช้คำต่างจากทะเบียน
   FaReceipt,
-  FaChartBar,
 } from "react-icons/fa";
 
 // ✅ Sidebar เป็น presentational ล้วนๆ ไม่จัดการ เปิด/ปิด บนมือถือเองอีกต่อไป
@@ -115,6 +108,18 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
    * ⚠️ role อื่นเห็นปฏิทินของตัวเองอันเดียว และ server ปฏิเสธการข้ามแผนกอยู่แล้ว
    * (departmentScope) เมนูนี้จึงไม่ใช่ด่านกัน
    */
+/**
+ * รายการเมนูข้างหนึ่งรายการ — เอาปลายทางจากทะเบียนกลาง (navConfig) มาแปลงไอคอนเป็น element
+ * เพราะเมนูข้าง render ไอคอนเป็น {item.icon} ตรงๆ ส่วนทะเบียนเก็บไว้เป็นคอมโพเนนต์
+ * ⚠️ ใช้ได้เฉพาะรายการที่ "ชื่อในเมนูข้างตรงกับชื่อในทะเบียนอยู่แล้ว" — รายการที่จงใจใช้คำต่าง
+ *    (เช่น "ใบเคลม (Claim)" ที่เติมคำอังกฤษกำกับไว้ให้หาเจอง่ายในรายการแนวตั้ง) ยังเขียนไว้ตรงนี้
+ */
+const side = (key, extra) => {
+  const d = dest(key, extra);
+  const Icon = d.icon;
+  return { ...d, icon: <Icon /> };
+};
+
   const workMenu = isAdminOrManager
     ? [{
         title: "แผนงาน",
@@ -144,15 +149,11 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
   // ✅ "การดำเนินงาน" แยกออกมาเป็นเมนูระดับบนสุดตามที่ผู้ใช้สั่ง — เดิมซ่อนอยู่ในเมนูย่อยของ
   // "แผนงาน" ทั้งที่เป็นหน้าที่ใช้บ่อยที่สุดของฝ่ายช่าง (ไล่จัดการงานทีละใบ) และเป็นคนละเรื่องกับ
   // ปฏิทิน (ปฏิทิน = วางแผนว่าจะไปวันไหน · การดำเนินงาน = ตามงานที่ลงตารางแล้ว)
-  const operationMenu = [
-    { title: "การดำเนินงาน", href: "/operation", icon: <FaWrench />, badgeKey: "closeRequests" },
-  ];
+  const operationMenu = [side("operation")];
   // ✅ เมนู "แผนงานรออนุมัติ" ถูกตัดออกตามที่ผู้ใช้ขอ — ย้ายไปเป็นแท็บ "รออนุมัติ" ในหน้า "การดำเนินงาน"
   // แทน (ดู PendingApprovalsPanel.js) เพราะเป็นงานเดียวกันกับการไล่จัดการงานในหน้านั้น ไม่ต้องสลับหน้า
   // ไปมา และมี badge บอกจำนวนงานค้างบนแท็บให้เห็นตั้งแต่เข้าหน้ามาแล้ว
-  const workMenuManager = [
-    { title: "ภาพรวมงาน", href: "/contracts", icon: <FaFileContract />, badgeKey: "contracts" },
-  ];
+  const workMenuManager = [side("contracts")];
   // ✅ หมวด "งานขาย" — เหลือรายการเดียวคือฟอร์มแจ้งงานข้ามแผนก
   // ⚠️ แผนงานของเซล **ไม่ได้อยู่ในหมวดนี้** แต่อยู่ในหมวด "งาน" ร่วมกับช่าง เพราะเป็นระบบเดียวกันจริงๆ
   // (ฟอร์มเดียวกัน ปฏิทินเดียวกัน) — สิ่งที่แยกคือ *ข้อมูลที่มองเห็น* ซึ่งกรองด้วย department ที่ server
@@ -162,36 +163,27 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
     // (ไอคอนกราฟเส้น) ซึ่งสื่อถึง "ยอด/สถิติ" ไม่ใช่ "ส่งคำของานให้ช่าง" ทั้งที่เมนูนี้ไม่มีกราฟอะไรเลย
     // เปลี่ยนเป็นไอคอนกระดาษเครื่องบิน (ส่ง/แจ้งออกไป) ให้ตรงกับคำว่า "แจ้ง" จริงๆ และแยกจาก
     // FaClipboardCheck ของฝั่งแอดมิน ("คำขอลงงาน") ชัดเจน — คนละบทบาทกัน ไม่ควรใช้ไอคอนหน้าตาคล้ายกัน
-    { title: "แจ้งงานให้ช่าง", href: "/sales", icon: <FaPaperPlane />, badgeKey: "dispatchMine" },
+    side("sales"),
   ];
   // ⚠️ อยู่หมวด "งาน" ไม่ใช่ "งานขาย" — เป็นคิวของฝ่ายบริการ ไม่ใช่ของฝ่ายขาย
   // 🧹 เดิมชื่อ "ใบมอบหมายงาน" ซึ่งเป็นคำที่มองจากฝั่งคนจ่ายงาน ทั้งที่ของในคิวคือ "คำขอ"
   // ที่ยังไม่ได้ตัดสินใจ — ยังไม่เป็นใบมอบหมายจนกว่าจะอนุมัติ
-  const dispatchMenu = [
-    { title: "คำขอลงงาน", href: "/dispatch", icon: <FaClipboardCheck />, badgeKey: "dispatchQueue" },
-  ];
+  const dispatchMenu = [side("dispatch")];
   // ✅ เดิมประกาศไว้แต่ไม่เคย render เลย — ช่างจึงไม่มีทางกดเข้า "งานของฉัน" จาก sidebar ได้เลย
   // ✅ "ภาพรวมงาน" เดิมเฉพาะแอดมิน/manager (ดู workMenuManager ด้านบน) ตอนนี้ช่างเข้าดูได้ด้วย
   // (เห็นแค่งานของตัวเอง แก้ไขไม่ได้ — ดู ContractOverview.js) เลยเพิ่มเป็นทางลัดให้ตรงนี้ด้วย
-  const workMenuTechnician = [
-    { title: "งานของฉัน", href: "/technician/jobs", icon: <FaClipboardList />, badgeKey: "myJobs" },
-    { title: "ภาพรวมงาน", href: "/contracts", icon: <FaFileContract />, badgeKey: "contracts" },
-  ];
+  const workMenuTechnician = [side("myJobs"), side("contracts")];
 
   // ✅ หมวด "เอกสาร" — ยุบ "เอกสารทั้งหมด" (ไฟล์แนบงาน) + "ทะเบียนเอกสาร" (ใบที่ระบบออก) เหลือหน้าเดียว
   // แยกด้วยแท็บ เพราะคนที่มาหาเอกสารไม่ได้แยกในหัวว่าไฟล์นั้นมาจากไหน รู้แค่ว่า "หาเอกสารของงานนี้"
   // (ดู DocumentsHub.js) — เห็นได้ทุก role เหมือนเดิมทั้งคู่
-  const documentsMenu = [
-    { title: "เอกสาร", href: "/documents", icon: <FaFileAlt /> },
-  ];
+  const documentsMenu = [side("documents")];
 
   // ✅ หมวดการเงิน — ยุบ "ติดตามใบเสนอราคา" + "วางบิล/รับเงิน" เหลือหน้าเดียว เพราะเป็นคนละช่วงของ
   // สายงานเดียวกัน (เสนอราคา → ทำงาน → วางบิล → รับเงิน) คนที่ตามเรื่องเงินของงานหนึ่งต้องดูทั้ง 2 ฝั่ง
   // 🐛 ที่แก้ไปด้วย: เดิม "ติดตามใบเสนอราคา" ถูกโชว์ให้ช่างเห็น แต่ตัวหน้า redirect ช่างออกทันทีที่กด
   // = เมนูที่กดแล้วเด้งทิ้งทุกครั้ง ตอนนี้อยู่ใต้เงื่อนไข isAdminOrManager ตรงกับสิทธิ์จริงของหน้าแล้ว
-  const financeMenu = [
-    { title: "ใบเสนอราคา / การเงิน", href: "/finance", icon: <FaFileInvoiceDollar />, badgeKey: "quotations" },
-  ];
+  const financeMenu = [side("finance")];
 
   // ✅ หมวด "ข้อมูลหลัก" — แทนหมวด "ทีมงาน" เดิมที่มีลูกค้าปนอยู่ (ผิดความหมาย) และแทน
   // "ADMIN MANAGEMENT" ท้ายเมนูที่เป็นภาษาอังกฤษปนอยู่หมวดเดียวในแอปที่เป็นไทยทั้งหมด
@@ -200,20 +192,18 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
   // ✅ หมวด "เบิกค่าใช้จ่าย" — 3 เมนูตามที่ผู้ใช้ขอ: ใบ Advance · ใบเคลม · รายงานย้อนหลัง
   // ⚠️ ทั้งสามเป็นหน้าเดียวกัน (ExpensesHub) ต่างกันแค่ ?tab= — isActiveHref เทียบ query ตรงตัว จึงไฮไลต์ถูกเมนู
   const expenseMenu = [
-    { title: "ใบเบิก Advance", href: "/expenses/advances", icon: <FaMoneyCheckAlt />, badgeKey: "advance" },
-    { title: "ใบเคลม (Claim)", href: "/expenses/claims", icon: <FaReceipt />, badgeKey: "claim" },
+    side("advance"),
+    // ⚠️ จงใจใช้คำต่างจากทะเบียนกลาง — เติม (Claim) กำกับไว้ให้กวาดตาหาเจอง่ายในรายการแนวตั้ง
+    { ...dest("claim"), title: "ใบเคลม (Claim)", icon: <FaReceipt /> },
     // ✅ คิวของหัวหน้า (อนุมัติ/จ่ายเงิน/ปิดส่วนต่าง) — เดิมมีแต่ในเมนูหลักหน้าแรก เมนูข้างเข้าไม่ถึง
     // ⚠️ เปิดให้ทุกคนที่มีขั้นของตัวเอง (ตรวจสอบ / อนุมัติ / อนุมัติเบิกจ่าย) — แต่ละคนมีคิวของตัวเองในหน้านี้
     ...(can(userData, "reviewExpense") || can(userData, "approveExpense") || can(userData, "disburseExpense")
-      ? [{ title: "รอดำเนินการ", href: "/expenses/approvals", icon: <FaInbox />, badgeKey: "expenseInbox" }]
+      ? [side("expenseInbox")]
       : []),
-    { title: "รายงานการเบิก", href: "/expenses/report", icon: <FaChartBar /> },
+    side("expenseReport"),
   ];
 
-  const masterDataMenu = [
-    { title: "ลูกค้า", href: "/customers", icon: <FaBuilding /> },
-    { title: "พนักงาน / ทีมช่าง", href: "/staff", icon: <FaUserFriends /> },
-  ];
+  const masterDataMenu = [side("customers"), side("staff")];
 
   // ✅ เดิม submenu จะปิดเสมอตอนโหลดหน้าใหม่ ต่อให้กำลังอยู่ในหน้าลูกของมันอยู่ก็ตาม
   // (เช่น เข้า /operation ตรงๆ จาก Dashboard) ทำให้มองไม่ออกเลยว่าอยู่หมวดไหน — ใช้ route

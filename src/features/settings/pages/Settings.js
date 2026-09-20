@@ -21,6 +21,7 @@ import { swalLogout } from "@/shared/utils/user";
 import { can, rankLabel } from "@/shared/utils/roles";
 import useOrgSettings from "@/shared/hooks/useOrgSettings";
 import { APP_NAME, APP_VERSION } from "@/shared/appInfo";
+import { dest, DEST } from "@/layouts/navConfig";
 import { ORG_FALLBACK } from "@/shared/services/OrgSettingService";
 import SignatureSettingsDialog from "../components/SignatureSettingsDialog";
 import SignatureService from "@/shared/services/SignatureService";
@@ -98,19 +99,21 @@ const Settings = () => {
    */
 
   /** ทะเบียนข้อมูลที่ทั้งระบบหยิบไปใช้ — ใช้คำว่า "ข้อมูลหลัก" ให้ตรงกับหมวดเดียวกันในเมนูข้าง */
+  // 🐛 เดิมสองแถวแรกชี้ไป /customer และ /employee ซึ่งเป็นแค่ตัว redirect ของเก่า
+  //    กดทีต้องเด้งสองต่อกว่าจะถึงหน้าจริง — ทะเบียนกลางชี้พาธจริง (/customers, /staff) ให้แล้ว
   const masterDataLinks = [
-    { title: "ลูกค้า", desc: "ทะเบียนลูกค้าและผู้ติดต่อ · ใช้เลือกตอนเปิดงานและออกเอกสาร", link: "/customer", icon: <FaBuilding size={18} />, color: "#3b82f6" },
-    // ⚠️ เดิมเขียนว่า "จัดการสิทธิ์และข้อมูลพนักงาน" ซึ่งชนกับหัวข้อ "ตั้งค่าสิทธิ์" ด้านล่าง
+    { ...dest("customers"), desc: "ทะเบียนลูกค้าและผู้ติดต่อ · ใช้เลือกตอนเปิดงานและออกเอกสาร", icon: <FaBuilding size={18} />, color: "#3b82f6" },
+    // ⚠️ คำอธิบายเดิมเขียนว่า "จัดการสิทธิ์และข้อมูลพนักงาน" ซึ่งชนกับหัวข้อ "ตั้งค่าสิทธิ์" ด้านล่าง
     // จนดูเหมือนตั้งสิทธิ์ได้สองที่ — ที่นี่คือสิทธิ์ของคนรายคน ส่วนตารางสิทธิ์อยู่อีกหน้า
-    { title: "พนักงาน", desc: "ทะเบียนพนักงาน · บัญชีผู้ใช้ · ตำแหน่งในองค์กรของแต่ละคน", link: "/employee", icon: <FaUsers size={18} />, color: "#f43f5e" },
-    { title: "ประเภทงาน / ระบบ", desc: "ตัวเลือกประเภทงานและระบบงาน ที่ใช้ตอนเพิ่ม/แก้ไขแผนงาน", link: "/worktype", icon: <FaTags size={18} />, color: "#8b5cf6" },
+    { ...dest("staff"), title: "พนักงาน", desc: "ทะเบียนพนักงาน · บัญชีผู้ใช้ · ตำแหน่งในองค์กรของแต่ละคน", icon: <FaUsers size={18} />, color: "#f43f5e" },
+    { ...dest("worktype"), desc: DEST.worktype.sub, icon: <FaTags size={18} />, color: "#8b5cf6" },
   ];
 
   /** ค่าระดับระบบ — คนละชั้นสิทธิ์กับด้านบน (ผู้ดูแลระบบสูงสุดเท่านั้น) จึงต้องแยกหัวข้อ */
   const systemLinks = [
-    { title: "ตั้งค่าองค์กร", desc: "โลโก้ · ข้อมูลบริษัทบนเอกสาร · ช่องทางติดต่อบนหัวเว็บ · ค่าตั้งต้นของระบบเบิก", link: "/settings/organization", icon: <FaImage size={18} />, color: "#0f766e" },
+    { ...dest("orgSettings"), desc: DEST.orgSettings.sub, icon: <FaImage size={18} />, color: "#0f766e" },
     // ✅ ผู้ใช้ขอให้แยก "สิทธิ์ในระบบ" (ผู้ดูแลระบบ/สูงสุด) กับ "สิทธิ์ในองค์กร" (ตำแหน่งงาน เปลี่ยนชื่อได้)
-    { title: "ตั้งค่าสิทธิ์", desc: "สิทธิ์ในระบบ (ผู้ดูแลระบบ) · สิทธิ์ตามตำแหน่งในองค์กร", link: "/settings/permissions", icon: <FaUserShield size={18} />, color: "#7c3aed" },
+    { ...dest("permissions"), desc: DEST.permissions.sub, icon: <FaUserShield size={18} />, color: "#7c3aed" },
   ];
 
   /**
@@ -119,7 +122,7 @@ const Settings = () => {
    *    คอมโพเนนต์ตรงนี้ React จะมองว่าเป็นชนิดใหม่ทุกครั้งที่ re-render แล้วถอด/ใส่ DOM ใหม่ทั้งแถว
    */
   const renderLink = (item) => (
-    <div key={item.link} style={styles.card} className="settings-row-hover" onClick={() => navigate(item.link)}>
+    <div key={item.href} style={styles.card} className="settings-row-hover" onClick={() => navigate(item.href)}>
       <div style={{ ...styles.iconCircle, backgroundColor: `${item.color}18`, color: item.color }}>{item.icon}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={styles.rowTitle}>{item.title}</p>
