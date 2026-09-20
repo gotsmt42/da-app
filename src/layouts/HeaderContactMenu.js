@@ -49,7 +49,7 @@ export default function HeaderContactMenu() {
     const only = channels[0];
     const Icon = ICON[only.key] || FaHeadset;
     return (
-      <a {...linkProps(only)} className="header-contact-btn" title={only.label} aria-label={only.label}>
+      <a {...linkProps(only)} className="header-icon-btn" title={only.label} aria-label={only.label}>
         <Icon size={15} />
       </a>
     );
@@ -58,7 +58,7 @@ export default function HeaderContactMenu() {
   return (
     <Dropdown isOpen={open} toggle={() => setOpen((o) => !o)}>
       <DropdownToggle
-        tag="button" type="button" className="header-contact-btn"
+        tag="button" type="button" className="header-icon-btn"
         title="ช่องทางติดต่อ" aria-label="ช่องทางติดต่อ"
       >
         <FaHeadset size={15} />

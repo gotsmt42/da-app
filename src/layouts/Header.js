@@ -20,6 +20,7 @@ import {
 import { hasValidAvatar } from "../shared/utils/user";
 import useAppBadges from "@/shared/hooks/useAppBadges";
 import HeaderContactMenu from "./HeaderContactMenu";
+import HeaderSearch from "./HeaderSearch";
 import useOrgSettings from "@/shared/hooks/useOrgSettings";
 // ✅ โลโก้แอปต้องเลือกไฟล์ให้ตรงกับพื้น — หัวเว็บเป็นแถบเข้ม จึงใช้ตัวหนังสือสีขาว
 import { appLogoFor } from "@/shared/services/OrgSettingService";
@@ -302,6 +303,9 @@ const Header = ({ toggleMobileSidebar }) => {
             ⚠️ จงใจไม่เติมปุ่มใหม่แทนที่ เช่นไอคอนค้นหา — แอปยังไม่มี "ค้นหารวม" มีแต่ช่องค้นหา
                แยกในแต่ละหน้า ปุ่มที่กดแล้วไม่รู้จะไปไหนรกกว่าช่องว่าง ที่ว่างคืนให้ป้ายทางลัดแทน */}
         <div className="d-flex align-items-center gap-2">
+          {/* ✅ ค้นหารวม — ช่องเดียวค้นข้ามงาน/ลูกค้า แทนที่จะต้องเดาว่าของที่หาอยู่หน้าไหน */}
+          <HeaderSearch />
+
           {/* ✅ ช่องทางติดต่อที่ Super Admin ตั้งไว้ — ไม่ได้ตั้งไว้เลยจะไม่ขึ้นปุ่มนี้ */}
           <HeaderContactMenu />
 
