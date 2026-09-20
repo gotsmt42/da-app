@@ -19,13 +19,18 @@ import { useAuth } from "@/features/auth/AuthContext";
 import PushService from "@/shared/services/PushService";
 import { swalLogout } from "@/shared/utils/user";
 import { can, rankLabel } from "@/shared/utils/roles";
+import useOrgSettings from "@/shared/hooks/useOrgSettings";
+import { ORG_FALLBACK } from "@/shared/services/OrgSettingService";
 import SignatureSettingsDialog from "../components/SignatureSettingsDialog";
 import SignatureService from "@/shared/services/SignatureService";
 
 const version = import.meta.env.REACT_APP_VERSION;
+/** ชื่อแอป — คนละเรื่องกับชื่อองค์กรที่ตั้งเองได้ ต้องตรงกับ <title> และ manifest.json */
+const APP_NAME = "Flowix";
 
 const Settings = () => {
   const { userData, logout } = useAuth();
+  const org = useOrgSettings();
   const navigate = useNavigate();
   const isAdmin = can(userData, "manageAll");
   // ✅ เมนูระดับ "ตั้งค่าระบบ" (โลโก้องค์กร/ตารางสิทธิ์) เห็นเฉพาะผู้ดูแลระบบสูงสุด — แยกจากการจัดการผู้ใช้
@@ -85,17 +90,45 @@ const Settings = () => {
 
   // ⚠️ ไม่ใส่ "สินค้า" (/product) และ "สต็อกสินค้า" (/product/stock) ในเมนูนี้ — ผู้ใช้แจ้งว่าเป็นของเก่า
   // ที่ไม่ได้ใช้งานแล้ว (หน้ายังอยู่ในระบบและเข้าผ่าน URL ตรงได้ แต่ไม่ต้องมีทางเข้าจากหน้าตั้งค่า)
-  const adminLinks = [
-    { title: "ลูกค้า", desc: "จัดการฐานข้อมูลลูกค้า", link: "/customer", icon: <FaBuilding size={18} />, color: "#3b82f6" },
-    { title: "พนักงาน", desc: "จัดการสิทธิ์และข้อมูลพนักงาน", link: "/employee", icon: <FaUsers size={18} />, color: "#f43f5e" },
-    { title: "ประเภทงาน / ระบบ", desc: "จัดการตัวเลือกใน dropdown ตอนเพิ่ม/แก้ไขแผนงาน", link: "/worktype", icon: <FaTags size={18} />, color: "#8b5cf6" },
-    // ✅ ผู้ใช้ขอให้ "ปรับเปลี่ยนได้เอง เช่น Logo แอพ" — โลโก้/ข้อมูลบริษัทบนเอกสาร/ค่าตั้งต้นของระบบเบิก
-    ...(isSuperAdmin ? [
-      { title: "องค์กรและเอกสาร", desc: "โลโก้ · ข้อมูลบริษัทบนหัวกระดาษ · ค่าตั้งต้นของระบบเบิก", link: "/settings/organization", icon: <FaImage size={18} />, color: "#0f766e" },
-      // ✅ ผู้ใช้ขอให้แยก "สิทธิ์ในระบบ" (ผู้ดูแลระบบ/สูงสุด) กับ "สิทธิ์ในองค์กร" (ตำแหน่งงาน เปลี่ยนชื่อได้)
-      { title: "สิทธิ์การใช้งาน", desc: "สิทธิ์ในระบบ (ผู้ดูแลระบบ) · สิทธิ์ในองค์กร (ตำแหน่งงาน)", link: "/settings/permissions", icon: <FaUserShield size={18} />, color: "#7c3aed" },
-    ] : []),
+  /**
+   * ⚠️ ชื่อเมนูต้องตรงกับ "ชื่อหัวข้อของหน้าปลายทาง" เป๊ะๆ — กดเมนูชื่อหนึ่งแล้วเปิดไปเจออีกชื่อหนึ่ง
+   * ทำให้ผู้ใช้ไม่แน่ใจว่ามาถูกที่ไหม (เดิม "องค์กรและเอกสาร" ไปหน้าชื่อ "ตั้งค่าองค์กร" และ
+   * "สิทธิ์การใช้งาน" ไปหน้าชื่อ "ตั้งค่าสิทธิ์")
+   * ⚠️ คำอธิบายใช้รูปแบบเดียวกันทุกแถว: "ในนั้นมีอะไร · ไปมีผลตรงไหน"
+   * และเลี่ยงศัพท์อังกฤษ (เดิมมีคำว่า dropdown ปนอยู่คำเดียวในทั้งหน้าที่เป็นไทยหมด)
+   */
+
+  /** ทะเบียนข้อมูลที่ทั้งระบบหยิบไปใช้ — ใช้คำว่า "ข้อมูลหลัก" ให้ตรงกับหมวดเดียวกันในเมนูข้าง */
+  const masterDataLinks = [
+    { title: "ลูกค้า", desc: "ทะเบียนลูกค้าและผู้ติดต่อ · ใช้เลือกตอนเปิดงานและออกเอกสาร", link: "/customer", icon: <FaBuilding size={18} />, color: "#3b82f6" },
+    // ⚠️ เดิมเขียนว่า "จัดการสิทธิ์และข้อมูลพนักงาน" ซึ่งชนกับหัวข้อ "ตั้งค่าสิทธิ์" ด้านล่าง
+    // จนดูเหมือนตั้งสิทธิ์ได้สองที่ — ที่นี่คือสิทธิ์ของคนรายคน ส่วนตารางสิทธิ์อยู่อีกหน้า
+    { title: "พนักงาน", desc: "ทะเบียนพนักงาน · บัญชีผู้ใช้ · ตำแหน่งในองค์กรของแต่ละคน", link: "/employee", icon: <FaUsers size={18} />, color: "#f43f5e" },
+    { title: "ประเภทงาน / ระบบ", desc: "ตัวเลือกประเภทงานและระบบงาน ที่ใช้ตอนเพิ่ม/แก้ไขแผนงาน", link: "/worktype", icon: <FaTags size={18} />, color: "#8b5cf6" },
   ];
+
+  /** ค่าระดับระบบ — คนละชั้นสิทธิ์กับด้านบน (ผู้ดูแลระบบสูงสุดเท่านั้น) จึงต้องแยกหัวข้อ */
+  const systemLinks = [
+    { title: "ตั้งค่าองค์กร", desc: "โลโก้ · ข้อมูลบริษัทบนเอกสาร · ช่องทางติดต่อบนหัวเว็บ · ค่าตั้งต้นของระบบเบิก", link: "/settings/organization", icon: <FaImage size={18} />, color: "#0f766e" },
+    // ✅ ผู้ใช้ขอให้แยก "สิทธิ์ในระบบ" (ผู้ดูแลระบบ/สูงสุด) กับ "สิทธิ์ในองค์กร" (ตำแหน่งงาน เปลี่ยนชื่อได้)
+    { title: "ตั้งค่าสิทธิ์", desc: "สิทธิ์ในระบบ (ผู้ดูแลระบบ) · สิทธิ์ตามตำแหน่งในองค์กร", link: "/settings/permissions", icon: <FaUserShield size={18} />, color: "#7c3aed" },
+  ];
+
+  /**
+   * แถวเมนูหนึ่งแถว
+   * ⚠️ เป็นฟังก์ชันคืน JSX ไม่ใช่คอมโพเนนต์ที่ประกาศในตัวคอมโพเนนต์แม่ — ถ้าประกาศเป็น
+   *    คอมโพเนนต์ตรงนี้ React จะมองว่าเป็นชนิดใหม่ทุกครั้งที่ re-render แล้วถอด/ใส่ DOM ใหม่ทั้งแถว
+   */
+  const renderLink = (item) => (
+    <div key={item.link} style={styles.card} className="settings-row-hover" onClick={() => navigate(item.link)}>
+      <div style={{ ...styles.iconCircle, backgroundColor: `${item.color}18`, color: item.color }}>{item.icon}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={styles.rowTitle}>{item.title}</p>
+        <p style={styles.rowDesc}>{item.desc}</p>
+      </div>
+      <FaChevronRight style={styles.chevron} />
+    </div>
+  );
 
   return (
     <Container fluid style={styles.container}>
@@ -157,39 +190,39 @@ const Settings = () => {
         />
       </div>
 
-      {/* ─── การจัดการระบบ (เฉพาะแอดมิน) ─── */}
+      {/* ─── ข้อมูลหลัก (ผู้ดูแลระบบขึ้นไป) ───
+          ⚠️ เดิมทะเบียนลูกค้า/พนักงาน/ประเภทงาน ถูกยัดไว้ใต้หัวข้อ "การจัดการระบบ" รวมกับค่าระดับ
+          ระบบ ทั้งที่เป็นคนละเรื่องและคนละชั้นสิทธิ์ (อันบนแค่ผู้ดูแลระบบ อันล่างต้องผู้ดูแลระบบสูงสุด)
+          แถวที่กดไม่ได้จึงเคยหายไปเงียบๆ กลางหมวดโดยไม่มีอะไรบอกว่าทำไม */}
       {isAdmin && (
         <>
-          <h5 style={styles.sectionTitle}>การจัดการระบบ</h5>
-          {adminLinks.map((item, idx) => (
-            <div
-              key={idx}
-              style={styles.card}
-              className="settings-row-hover"
-              onClick={() => navigate(item.link)}
-            >
-              <div style={{ ...styles.iconCircle, backgroundColor: `${item.color}18`, color: item.color }}>
-                {item.icon}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={styles.rowTitle}>{item.title}</p>
-                <p style={styles.rowDesc}>{item.desc}</p>
-              </div>
-              <FaChevronRight style={styles.chevron} />
-            </div>
-          ))}
+          <h5 style={styles.sectionTitle}>ข้อมูลหลัก</h5>
+          {masterDataLinks.map(renderLink)}
         </>
       )}
 
-      {/* ─── เกี่ยวกับแอป ─── */}
+      {/* ─── ตั้งค่าระบบ (ผู้ดูแลระบบสูงสุดเท่านั้น) ─── */}
+      {isSuperAdmin && (
+        <>
+          <h5 style={styles.sectionTitle}>ตั้งค่าระบบ</h5>
+          {systemLinks.map(renderLink)}
+        </>
+      )}
+
+      {/* ─── เกี่ยวกับแอป ───
+          🐛 เดิมช่องนี้พิมพ์ชื่อบริษัท "Do All Architect and Engineering" ไว้ตายตัวใต้หัวข้อ
+          "เกี่ยวกับแอป" ซึ่งผิดสองชั้น: ชื่อที่ขึ้นเป็นชื่อ "องค์กร" ไม่ใช่ชื่อ "แอป"
+          และองค์กรอื่นที่เอาระบบไปใช้ก็จะเห็นชื่อบริษัทนี้ค้างอยู่
+          ✅ แสดงชื่อแอปจริงกับเวอร์ชัน แล้วบอกว่ากำลังใช้งานในนามองค์กรไหน โดยดึงชื่อองค์กร
+             จากค่าที่ตั้งไว้ ไม่ฝังในโค้ด */}
       <h5 style={styles.sectionTitle}>เกี่ยวกับแอป</h5>
       <div style={styles.card}>
         <div style={{ ...styles.iconCircle, backgroundColor: "rgba(100,116,139,0.12)" }}>
           <FaInfoCircle size={16} color="#64748b" />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={styles.rowTitle}>Do All Architect and Engineering</p>
-          <p style={styles.rowDesc}>เวอร์ชัน {version || "-"}</p>
+          <p style={styles.rowTitle}>{APP_NAME} · เวอร์ชัน {version || "-"}</p>
+          <p style={styles.rowDesc}>ใช้งานในนาม {org?.nameTh || ORG_FALLBACK.nameTh}</p>
         </div>
       </div>
 
