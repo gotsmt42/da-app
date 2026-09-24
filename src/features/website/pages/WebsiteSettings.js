@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import {
   Box, Button, Chip, CircularProgress, FormControlLabel, IconButton, Link, MenuItem, Skeleton, Stack, Switch,
   TextField, Tooltip, Typography,
 } from "@mui/material";
-import { Add, ArrowDownward, ArrowUpward, Close, Save, Star, StarBorder, Visibility, VisibilityOff } from "@mui/icons-material";
+import {
+  Add, AddPhotoAlternate, ArrowDownward, ArrowUpward, Close, HideImage, Save, Star, StarBorder, Visibility, VisibilityOff,
+} from "@mui/icons-material";
 
 import { StringListEditor, cleanList } from "../components/ListEditors";
 import { ConfirmDialog, FieldLabel, UI, WebPageHeader, cardSx, useFeedback } from "../components/WebsiteUi";
@@ -152,6 +154,8 @@ function BrandManager({ onOk, onFail }) {
   const [category, setCategory] = useState("Fire Alarm");
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(null);
+  const [logoFor, setLogoFor] = useState(null);
+  const fileRef = useRef(null);
 
   useEffect(() => { WebsiteService.list("brands").then(setBrands).catch((err) => { setBrands([]); onFail(errorText(err, "โหลดยี่ห้อไม่สำเร็จ")); }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -161,6 +165,26 @@ function BrandManager({ onOk, onFail }) {
       const saved = await WebsiteService.update("brands", b._id, body);
       setBrands((list) => list.map((x) => (x._id === saved._id ? saved : x)));
     } catch (err) { onFail(errorText(err)); } finally { setBusy(false); }
+  };
+
+  /**
+   * โลโก้ — อัปแล้วบันทึกทันที (เหมือนปุ่มอื่นในกล่องนี้)
+   * ⚠️ ไม่อัป = เว็บใช้โลโก้ตั้งต้นที่ฝังในโค้ด (Notifier Edwards Hochiki Asenware GST) หรือแสดงเป็นชื่อ
+   *    โลโก้เก่าที่ถูกแทน/เอาออก server ลบไฟล์ใน Cloudinary ให้เอง
+   */
+  const uploadLogo = async (file) => {
+    const b = logoFor;
+    setLogoFor(null);
+    if (!b || !file) return;
+    if (!["image/png", "image/webp", "image/jpeg"].includes(file.type)) return onFail("โลโก้ต้องเป็น PNG / WebP / JPG (แนะนำ PNG พื้นโปร่งใส)");
+    if (file.size > 5 * 1024 * 1024) return onFail("ไฟล์โลโก้ใหญ่เกิน 5 MB");
+    setBusy(true);
+    try {
+      const r = await WebsiteService.upload(file);
+      const saved = await WebsiteService.update("brands", b._id, { logo: { url: r.url, publicId: r.publicId, width: r.width, height: r.height, alt: b.name } });
+      setBrands((list) => list.map((x) => (x._id === saved._id ? saved : x)));
+      onOk(`อัปโลโก้ ${b.name} แล้ว`);
+    } catch (err) { onFail(errorText(err, "อัปโลโก้ไม่สำเร็จ")); } finally { setBusy(false); }
   };
 
   const add = async () => {
@@ -204,7 +228,8 @@ function BrandManager({ onOk, onFail }) {
     <Box sx={cardSx}>
       <Typography sx={{ fontWeight: 800 }}>ยี่ห้อที่แสดงบนเว็บ</Typography>
       <Typography sx={{ color: UI.sub, fontSize: "0.82rem", mb: 1.5 }}>
-        ⭐ = แบรนด์หลัก (ขึ้นก่อน) · เว็บแสดงข้อความกำกับว่า “มิได้เป็นตัวแทนจำหน่ายอย่างเป็นทางการ” เสมอ · บันทึกทันทีที่กด
+        ⭐ = แบรนด์หลัก (ขึ้นก่อน) · กดกรอบรูปเพื่ออัปโลโก้ (PNG พื้นโปร่งใสดีที่สุด) — ไม่อัป เว็บใช้โลโก้ตั้งต้นหรือแสดงเป็นชื่อ ·
+        เว็บแสดงข้อความกำกับว่า “มิได้เป็นตัวแทนจำหน่ายอย่างเป็นทางการ” เสมอ · บันทึกทันทีที่กด
       </Typography>
       {!brands ? <Skeleton variant="rounded" height={160} /> : (
         <Stack spacing={0.75}>
@@ -215,7 +240,21 @@ function BrandManager({ onOk, onFail }) {
                   {b.featured ? <Star sx={{ fontSize: 19, color: "#f59e0b" }} /> : <StarBorder sx={{ fontSize: 19 }} />}
                 </IconButton>
               </Tooltip>
+              <Tooltip title={b.logo?.url ? "เปลี่ยนโลโก้" : "อัปโลโก้"}>
+                <Box component="button" type="button" disabled={busy} aria-label={`${b.logo?.url ? "เปลี่ยน" : "อัป"}โลโก้ ${b.name}`}
+                  onClick={() => { setLogoFor(b); fileRef.current?.click(); }}
+                  sx={{ width: 64, height: 32, flexShrink: 0, display: "grid", placeItems: "center", p: 0.25, cursor: "pointer", bgcolor: "#fff", border: `1px dashed ${b.logo?.url ? "transparent" : UI.border}`, borderRadius: 1, color: UI.sub, "&:hover": { borderColor: UI.accent } }}>
+                  {b.logo?.url
+                    ? <Box component="img" src={b.logo.url} alt="" sx={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+                    : <AddPhotoAlternate sx={{ fontSize: 18 }} />}
+                </Box>
+              </Tooltip>
               <Typography sx={{ fontWeight: 700, flex: 1, minWidth: 0 }} noWrap>{b.name}</Typography>
+              {b.logo?.url && (
+                <Tooltip title="เอาโลโก้ที่อัปออก (กลับไปใช้โลโก้ตั้งต้น/ชื่อ)">
+                  <IconButton size="small" disabled={busy} onClick={() => patch(b, { logo: null })} aria-label={`เอาโลโก้ ${b.name} ออก`}><HideImage sx={{ fontSize: 17 }} /></IconButton>
+                </Tooltip>
+              )}
               <Chip size="small" label={b.category} sx={{ fontWeight: 600 }} />
               <Tooltip title={b.status === "published" ? "ซ่อนจากเว็บ" : "แสดงบนเว็บ"}>
                 <IconButton size="small" disabled={busy} onClick={() => patch(b, { status: b.status === "published" ? "draft" : "published" })} aria-label="ซ่อน/แสดง">
@@ -236,6 +275,8 @@ function BrandManager({ onOk, onFail }) {
           </Stack>
         </Stack>
       )}
+      <input ref={fileRef} type="file" hidden accept="image/png,image/webp,image/jpeg"
+        onChange={(e) => { uploadLogo(e.target.files?.[0]); e.target.value = ""; }} />
       <ConfirmDialog open={Boolean(deleting)} busy={busy} onCancel={() => setDeleting(null)} onConfirm={remove}
         title={`ลบยี่ห้อ ${deleting?.name || ""}?`} detail="ยี่ห้อจะหายจากเว็บไซต์ (สินค้าของยี่ห้อนี้ยังอยู่) — ถ้าแค่อยากซ่อน กดปุ่มรูปตาแทน" />
     </Box>
