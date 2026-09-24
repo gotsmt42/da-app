@@ -50,7 +50,7 @@ const App = () => {
   useEffect(() => {
     const currentRoute = findCurrentRoute(ThemeRoutes, location.pathname);
     const title = currentRoute ? currentRoute.title || "Dashboard" : "Dashboard";
-    document.title = `${title} · Flowix`;
+    document.title = `${title} · WiRix`;
   }, [location.pathname]);
 
   return (

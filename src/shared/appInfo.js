@@ -10,7 +10,7 @@
  */
 
 /** ชื่อแอปที่แสดงให้ผู้ใช้เห็น */
-export const APP_NAME = "Flowix";
+export const APP_NAME = "WiRix";
 
 /** เลขเวอร์ชันจาก package.json (ดูปลั๊กอิน app-version ใน vite.config.js) */
 export { default as APP_VERSION } from "virtual:app-version";

@@ -15,7 +15,7 @@ import { useEffect, useState } from "react";
 import { Alert, Box, Button, Collapse, Stack, Typography } from "@mui/material";
 import { InstallMobile } from "@mui/icons-material";
 
-const ACK_KEY = "app.rebrand.flowix.ack";   // ⚠️ เปลี่ยนคีย์ทุกครั้งที่เปลี่ยนชื่อ/ไอคอน ไม่งั้นคนที่เคยกดรับทราบรอบก่อนจะไม่เห็นรอบใหม่
+const ACK_KEY = "app.rebrand.wirix.ack";   // ⚠️ เปลี่ยนคีย์ทุกครั้งที่เปลี่ยนชื่อ/ไอคอน ไม่งั้นคนที่เคยกดรับทราบรอบก่อนจะไม่เห็นรอบใหม่
 
 /** เปิดจากแอปที่ติดตั้งไว้ (ไม่ใช่แท็บเบราว์เซอร์) หรือเปล่า */
 const isInstalledApp = () => {
@@ -63,7 +63,7 @@ export default function AppRebrandNotice() {
         }
       >
         <Typography sx={{ fontWeight: 800, fontSize: "0.9rem" }}>
-          แอปเปลี่ยนชื่อเป็น “Flowix (โฟลอิกซ์)” พร้อมไอคอนใหม่แล้ว
+          แอปเปลี่ยนชื่อเป็น “WiRix (ไวริกซ์)” พร้อมไอคอนใหม่แล้ว
         </Typography>
         <Typography variant="caption" sx={{ display: "block", color: "text.secondary" }}>
           ถ้าไอคอนบนหน้าจอโฮมยังเป็นอันเดิม ไม่ได้แปลว่าแอปไม่อัปเดต — ข้างในเป็นเวอร์ชันล่าสุดเสมอ

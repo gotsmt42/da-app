@@ -1,14 +1,14 @@
 {
-  "short_name": "Flowix",
-  "name": "Flowix · งานไหลลื่น เชื่อมโยงกัน",
-  "description": "ระบบที่ทำให้งานและข้อมูลไหลลื่นเชื่อมโยงกัน — จัดตารางช่าง ติดตามการดำเนินงาน เอกสาร วางบิล และเบิกค่าใช้จ่าย",
+  "short_name": "WiRix",
+  "name": "WiRix · เชื่อมทุกงานเข้าด้วยกัน",
+  "description": "ระบบที่เชื่อมงาน ทีม และข้อมูลเข้าด้วยกัน — จัดตารางช่าง ติดตามการดำเนินงาน เอกสาร วางบิล และเบิกค่าใช้จ่าย",
   "lang": "th",
   "icons": [
     { "src": "favicon.ico", "sizes": "48x48 32x32 16x16", "type": "image/x-icon" },
-    { "src": "app-icon.svg?v=13", "type": "image/svg+xml", "sizes": "any", "purpose": "any" },
-    { "src": "app-icon-192.png?v=13", "type": "image/png", "sizes": "192x192", "purpose": "any" },
-    { "src": "app-icon-512.png?v=13", "type": "image/png", "sizes": "512x512", "purpose": "any" },
-    { "src": "app-icon-maskable-512.png?v=13", "type": "image/png", "sizes": "512x512", "purpose": "maskable" }
+    { "src": "app-icon.svg?v=14", "type": "image/svg+xml", "sizes": "any", "purpose": "any" },
+    { "src": "app-icon-192.png?v=14", "type": "image/png", "sizes": "192x192", "purpose": "any" },
+    { "src": "app-icon-512.png?v=14", "type": "image/png", "sizes": "512x512", "purpose": "any" },
+    { "src": "app-icon-maskable-512.png?v=14", "type": "image/png", "sizes": "512x512", "purpose": "maskable" }
   ],
   "start_url": ".",
   "display": "standalone",

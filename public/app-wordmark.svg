@@ -1,21 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 124 41" width="124" height="41" role="img" aria-label="Flowix โฟลอิกซ์">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 136 42" width="136" height="42" role="img" aria-label="WiRix ไวริกซ์">
   <!--
-    โลโก้ Flowix แบบตัวอักษรล้วน — ใช้ในแอป (แถบบน · หน้าเข้าสู่ระบบ)
-    "Flow" ใช้ currentColor จึงอ่านออกทั้งพื้นเข้มและพื้นสว่าง · "ix" ไล่เฉดสีแบรนด์ แดง -> พลัม
+    โลโก้ WiRix แบบตัวอักษรล้วน — ใช้ในแอป (แถบบน · หน้าเข้าสู่ระบบ)
+    "WiR" ใช้ currentColor จึงอ่านออกทั้งพื้นเข้มและพื้นสว่าง · "ix" ไล่เฉดสีแบรนด์ แดง -> พลัม
     ⚠️ ไม่มีกรอบพื้นหลัง (ผู้ใช้สั่งตัดออก) — ไอคอนแบบมีกรอบอยู่ที่ app-icon.svg สำหรับหน้าจอโฮม
     ⚠️ เป็นเครื่องหมายของ "แอป" เท่านั้น ไม่ใช่โลโก้บริษัท (โลโก้บริษัทตั้งจากหน้า "ตั้งค่าองค์กร")
     ⚠️ ไฟล์นี้สร้างจากสคริปต์ make-brand.js — แก้ที่สคริปต์แล้วรันใหม่ อย่าแก้มือทีละไฟล์
   -->
   <defs>
     <linearGradient id="nxWord" gradientUnits="userSpaceOnUse"
-      x1="90" y1="36" x2="120" y2="9.96">
+      x1="90" y1="36" x2="132" y2="9.96">
       <stop offset="0" stop-color="#fb4b5c"/>
       <stop offset=".55" stop-color="#dc2626"/>
       <stop offset="1" stop-color="#a21caf"/>
     </linearGradient>
   </defs>
-  <text x="3" y="36" font-family="'Righteous',system-ui,sans-serif"
-        font-size="42" font-weight="400" letter-spacing="-0.7636363636363637">
-    <tspan fill="currentColor">Flow</tspan><tspan fill="url(#nxWord)">ix</tspan>
+  <text x="3" y="36" font-family="'Sniglet',system-ui,sans-serif"
+        font-size="42" font-weight="800" letter-spacing="0">
+    <tspan fill="currentColor">WiR</tspan><tspan fill="url(#nxWord)">ix</tspan>
   </text>
 </svg>
