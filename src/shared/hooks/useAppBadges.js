@@ -19,6 +19,7 @@ import { useEffect, useState } from "react";
 import EventService from "@/shared/services/EventService";
 import ExpenseService from "@/features/expenses/services/ExpenseService";
 import DispatchService from "@/features/dispatch/services/DispatchService";
+import WebsiteService from "@/features/website/services/WebsiteService";
 import { can, isRole, ROLES } from "@/shared/utils/roles";
 import { countDistinctJobs, getOverdueGroupKey } from "@/shared/utils/overdueJobs";
 import { countPendingJobs } from "@/shared/utils/approvalStatus";
@@ -41,6 +42,7 @@ export const BADGE_LABEL = {
   advance: "ใบ Advance ที่ถูกตีกลับ",
   claim: "ใบ Advance ที่รอเคลียร์",
   expenseInbox: "ใบเบิกที่รอดำเนินการ",
+  webLeads: "คำขอใหม่จากเว็บไซต์",
 };
 
 /**
@@ -68,7 +70,7 @@ const POLL_MS = 30_000;
 const EMPTY = {
   pendingApproval: 0, closeRequests: 0, contracts: 0, myJobs: 0,
   quotations: 0, dispatchQueue: 0, dispatchMine: 0,
-  advance: 0, claim: 0, expenseInbox: 0,
+  advance: 0, claim: 0, expenseInbox: 0, webLeads: 0,
 };
 
 /** สิ่งที่ผู้ใช้คนนี้มีสิทธิ์เห็น = สิ่งที่ต้องดึง (ไม่ยิง endpoint ที่จะโดน 403 อยู่แล้ว) */
@@ -79,18 +81,20 @@ const scopeOf = (userData) => ({
   expense: can(userData, "requestExpense") || can(userData, "viewAllExpenses"),
   dispatchQueue: can(userData, "assignDispatch"),
   dispatchMine: can(userData, "requestDispatch") && isRole(userData, ROLES.SALE),
+  // ✅ คำขอจากเว็บไซต์ที่ยังไม่มีใครรับเรื่อง (สถานะ "ใหม่") — ลูกค้ารอสายอยู่ ต้องเห็นทันที
+  webLeads: can(userData, "viewLeads"),
 });
 
 let lastUser = null;
-let store = { userId: "", data: { events: [], drafts: [], expense: null, dispatch: null }, at: 0, loading: false };
+let store = { userId: "", data: { events: [], drafts: [], expense: null, dispatch: null, leads: null }, at: 0, loading: false };
 const subscribers = new Set();
 let timer = null;
 
 const emit = () => subscribers.forEach((fn) => fn(store.data));
 
-const ALL_PARTS = ["events", "drafts", "expense", "dispatch"];
+const ALL_PARTS = ["events", "drafts", "expense", "dispatch", "leads"];
 /** ส่วนที่ต้องดึงซ้ำตอนมีสัญญาณเรียลไทม์ — ไม่ดึงงานทั้งก้อน (~150 kB) เพียงเพราะมีคนอนุมัติใบเบิก */
-const PARTS_BY_TOPIC = { events: ["events", "drafts"], dispatch: ["dispatch"], expenses: ["expense"] };
+const PARTS_BY_TOPIC = { events: ["events", "drafts"], dispatch: ["dispatch"], expenses: ["expense"], leads: ["leads"] };
 let queuedParts = null;
 
 /** @param {string[]} [parts] ดึงเฉพาะส่วนนี้ (ไม่ระบุ = ทั้งหมด) */
@@ -103,11 +107,12 @@ const fetchAll = async (userData, parts = ALL_PARTS) => {
   }
   store.loading = true;
   const want = new Set(parts);
-  const [events, drafts, expense, dispatch] = await Promise.all([
+  const [events, drafts, expense, dispatch, leads] = await Promise.all([
     scope.jobs && want.has("events") ? EventService.getEventOp().then((r) => r?.userEvents || []).catch(() => null) : null,
     scope.contracts && want.has("drafts") ? EventService.GetDraftEvents().then((r) => r?.drafts || []).catch(() => null) : null,
     scope.expense && want.has("expense") ? ExpenseService.summary().catch(() => null) : null,
     (scope.dispatchQueue || scope.dispatchMine) && want.has("dispatch") ? DispatchService.summary().catch(() => null) : null,
+    scope.webLeads && want.has("leads") ? WebsiteService.leadSummary().catch(() => null) : null,
   ]);
   store.loading = false;
   // ⚠️ ค่าที่ดึงไม่สำเร็จ (null) ต้องคงของเดิมไว้ ไม่ใช่ล้างเป็นว่าง — เน็ตสะดุดทีเดียวป้ายหายทั้งแอป
@@ -116,6 +121,7 @@ const fetchAll = async (userData, parts = ALL_PARTS) => {
     drafts: drafts ?? store.data.drafts,
     expense: expense ?? store.data.expense,
     dispatch: dispatch ?? store.data.dispatch,
+    leads: leads ?? store.data.leads,
   };
   if (want.size === ALL_PARTS.length) store.at = Date.now();
   emit();
@@ -162,7 +168,7 @@ const start = (userData) => {
   const uid = String(userData?.userId || "");
   // เปลี่ยนบัญชี = ทิ้งของเก่าทั้งหมด ห้ามให้ป้ายของคนก่อนหน้าค้างอยู่
   if (store.userId !== uid) {
-    store = { userId: uid, data: { events: [], drafts: [], expense: null, dispatch: null }, at: 0, loading: false };
+    store = { userId: uid, data: { events: [], drafts: [], expense: null, dispatch: null, leads: null }, at: 0, loading: false };
     emit();
   }
   if (Date.now() - store.at > POLL_MS) fetchAll(userData);
@@ -231,6 +237,7 @@ const computeBadges = (userData, data) => {
     expenseInbox: (Number(ex.inboxPending) || 0)
       + (Number(ex.inboxReviewing) || 0)
       + (Number(ex.inboxDisburse) || 0),
+    webLeads: scope.webLeads ? Number(data.leads?.new) || 0 : 0,
   };
 };
 

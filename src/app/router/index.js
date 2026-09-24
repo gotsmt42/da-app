@@ -55,6 +55,12 @@ const WorkTypeSystem = lazy(() => import("@/features/settings/pages/WorkTypeSyst
 const OrganizationSettings = lazy(() => import("@/features/settings/pages/OrganizationSettings.js"));
 // ✅ ตั้งค่าสิทธิ์ (ใครเห็นเมนูอะไร/จัดการอะไรได้) — ผู้ใช้ขอให้ปรับเองได้
 const RolePermissions = lazy(() => import("@/features/settings/pages/RolePermissions.js"));
+// ✅ ระบบหลังบ้านของเว็บไซต์บริษัท (da-web)
+const WebsiteLeads = lazy(() => import("@/features/website/pages/WebsiteLeads.js"));
+const WebsiteProducts = lazy(() => import("@/features/website/pages/WebsiteProducts.js"));
+const WebsiteProjects = lazy(() => import("@/features/website/pages/WebsiteProjects.js"));
+const WebsiteArticles = lazy(() => import("@/features/website/pages/WebsiteArticles.js"));
+const WebsiteSettings = lazy(() => import("@/features/website/pages/WebsiteSettings.js"));
 const ContractOverview = lazy(() => import("@/features/contracts/pages/ContractOverview.js"));
 const FileUpload = lazy(() => import("@/features/documents/pages/FileUploadPage"));
 const EventCalendar = lazy(() => import("@/features/calendar/pages/EventCalendar.js"));
@@ -255,6 +261,66 @@ const ThemeRoutes = [
         // (ลิงก์เก่า/บุ๊กมาร์ก/ลิงก์ในแอปที่ยังชี้มาที่นี่จึงไม่พังสักอัน)
         path: "employee",
         element: <LegacyTabRedirect to="/staff" tab="registry" />,
+      },
+      {
+        // ⚠️ ด่านหน้าจอเท่านั้น — server ตรวจสิทธิ์ viewLeads ซ้ำทุกคำขอ (routes/web.js)
+        path: "website/leads",
+        element: (
+          <AdminRoute cap="viewLeads">
+            <Suspense fallback={<div>กำลังโหลด…</div>}>
+              <WebsiteLeads />
+            </Suspense>
+          </AdminRoute>
+        ),
+        title: "คำขอจากเว็บไซต์",
+      },
+      {
+        // ⚠️ ด่านหน้าจอเท่านั้น — server ตรวจสิทธิ์ manageWebsite ซ้ำทุกคำขอ (routes/web.js)
+        path: "website/products",
+        element: (
+          <AdminRoute cap="manageWebsite">
+            <Suspense fallback={<div>กำลังโหลด…</div>}>
+              <WebsiteProducts />
+            </Suspense>
+          </AdminRoute>
+        ),
+        title: "สินค้าบนเว็บ",
+      },
+      {
+        // ⚠️ ด่านหน้าจอเท่านั้น — server ตรวจสิทธิ์ manageWebsite ซ้ำทุกคำขอ (routes/web.js)
+        path: "website/projects",
+        element: (
+          <AdminRoute cap="manageWebsite">
+            <Suspense fallback={<div>กำลังโหลด…</div>}>
+              <WebsiteProjects />
+            </Suspense>
+          </AdminRoute>
+        ),
+        title: "ผลงานบนเว็บ",
+      },
+      {
+        // ⚠️ ด่านหน้าจอเท่านั้น — server ตรวจสิทธิ์ manageWebsite ซ้ำทุกคำขอ (routes/web.js)
+        path: "website/articles",
+        element: (
+          <AdminRoute cap="manageWebsite">
+            <Suspense fallback={<div>กำลังโหลด…</div>}>
+              <WebsiteArticles />
+            </Suspense>
+          </AdminRoute>
+        ),
+        title: "บทความ",
+      },
+      {
+        // ⚠️ ด่านหน้าจอเท่านั้น — server ตรวจสิทธิ์ manageWebsite ซ้ำทุกคำขอ (routes/web.js)
+        path: "website/settings",
+        element: (
+          <AdminRoute cap="manageWebsite">
+            <Suspense fallback={<div>กำลังโหลด…</div>}>
+              <WebsiteSettings />
+            </Suspense>
+          </AdminRoute>
+        ),
+        title: "การแสดงผลเว็บไซต์",
       },
       {
         path: "product",

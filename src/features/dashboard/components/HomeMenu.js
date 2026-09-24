@@ -15,7 +15,7 @@
  */
 import { Link } from "react-router-dom";
 import {
-  FaCalendarAlt, FaChevronRight, FaWallet, FaFolderOpen, FaDatabase,
+  FaCalendarAlt, FaChevronRight, FaWallet, FaFolderOpen, FaDatabase, FaGlobeAsia,
 } from "react-icons/fa";
 
 import { can, isRole, ROLES, TECHNICIAN_ROLES } from "@/shared/utils/roles";
@@ -42,6 +42,7 @@ const TONE = {
   expense: "#0d9488",
   docs: "#d97706",
   master: "#2563eb",
+  website: "#0f172a",
 };
 
 /**
@@ -119,11 +120,19 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
     master.push(dest("staff"));
   }
 
+  // ── เว็บไซต์บริษัท ───────────────────────────────────────────────────────
+  const website = [];
+  if (can(userData, "viewLeads")) website.push(dest("webLeads"));
+  if (can(userData, "manageWebsite")) {
+    website.push(dest("webProducts"), dest("webProjects"), dest("webArticles"), dest("webSettings"));
+  }
+
   return [
     { key: "work", title: "งาน", icon: FaCalendarAlt, tone: TONE.work, items: work },
     { key: "expense", title: "เบิกค่าใช้จ่าย", icon: FaWallet, tone: TONE.expense, items: expense },
     { key: "docs", title: "เอกสารและการเงิน", icon: FaFolderOpen, tone: TONE.docs, items: docs },
     { key: "master", title: "ข้อมูลหลัก", icon: FaDatabase, tone: TONE.master, items: master },
+    { key: "website", title: "เว็บไซต์บริษัท", icon: FaGlobeAsia, tone: TONE.website, items: website },
   ].filter((cat) => cat.items.length);
 };
 

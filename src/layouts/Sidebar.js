@@ -207,6 +207,15 @@ const side = (key, extra) => {
 
   const masterDataMenu = [side("customers"), side("staff")];
 
+  // ✅ หมวด "เว็บไซต์บริษัท" — ผู้ใช้สั่ง "ทำระบบหลังบ้านให้สมบูรณ์" (สินค้า รูปภาพ การแสดงผล)
+  // ⚠️ แยกสองสิทธิ์: คำขอจากลูกค้า (viewLeads — รวมฝ่ายขาย) กับการแก้เนื้อหาเว็บ (manageWebsite)
+  const websiteMenu = [
+    ...(can(userData, "viewLeads") ? [side("webLeads")] : []),
+    ...(can(userData, "manageWebsite")
+      ? [side("webProducts"), side("webProjects"), side("webArticles"), side("webSettings")]
+      : []),
+  ];
+
   // ✅ เดิม submenu จะปิดเสมอตอนโหลดหน้าใหม่ ต่อให้กำลังอยู่ในหน้าลูกของมันอยู่ก็ตาม
   // (เช่น เข้า /operation ตรงๆ จาก Dashboard) ทำให้มองไม่ออกเลยว่าอยู่หมวดไหน — ใช้ route
   // เป็นค่าเริ่มต้นแทน จนกว่าผู้ใช้จะกดเปิด/ปิดเองจึงค่อยยึดตามที่กดล่าสุด
@@ -425,6 +434,13 @@ const side = (key, extra) => {
 
           {/* ✅ หมวด "ข้อมูลหลัก" — ทะเบียนกลางของระบบ (ลูกค้า/พนักงาน) ที่ทุกหน้าอื่นอ้างอิงถึง
               เฉพาะแอดมิน/manager (แท็บ "ทะเบียน" ข้างในจำกัดเฉพาะ admin อีกชั้น ตรงกับสิทธิ์เดิม) */}
+          {websiteMenu.length > 0 && (
+            <>
+              <div className="admin-divider-label">เว็บไซต์บริษัท</div>
+              {websiteMenu.map((item, idx) => renderLink(item, `web-${idx}`))}
+            </>
+          )}
+
           {isAdminOrManager && (
             <>
               <div className="admin-divider-label">ข้อมูลหลัก</div>

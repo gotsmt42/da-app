@@ -147,6 +147,10 @@ export const CAPABILITIES = {
   approveOwnExpense: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER],
   /** เห็นใบของทุกคน + เบิกแทนคนอื่นได้ + ดูรายงานทั้งบริษัท */
   viewAllExpenses: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER],
+  /** แก้เนื้อหาเว็บไซต์บริษัท — เหตุผลอยู่ที่ da-app-server/src/config/roles.js */
+  manageWebsite: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER],
+  /** จัดการคำขอจากเว็บไซต์ (ข้อมูลส่วนบุคคลของลูกค้า) — รวมฝ่ายขายที่เป็นคนโทรกลับ */
+  viewLeads: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER, ROLES.SALE],
 };
 
 /**

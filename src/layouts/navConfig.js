@@ -18,7 +18,7 @@ import {
   FaHome, FaTachometerAlt, FaCalendarAlt, FaWrench, FaBriefcase, FaClipboardList,
   FaClipboardCheck, FaPaperPlane, FaMoneyCheckAlt, FaReceipt, FaInbox, FaChartBar,
   FaFileAlt, FaFileInvoiceDollar, FaFileContract, FaBuilding, FaUserFriends,
-  FaCog, FaTags, FaImage, FaUserShield,
+  FaCog, FaTags, FaImage, FaUserShield, FaBoxOpen, FaImages, FaNewspaper, FaSlidersH, FaEnvelopeOpenText,
 } from "react-icons/fa";
 import { DEPARTMENT } from "@/shared/utils/roles";
 
@@ -68,6 +68,12 @@ export const DEST = {
   //    ในหน้าเดียวกับหมวด "ตั้งค่าระบบ" ที่แปลว่า system settings คนละเรื่องกันแต่ใช้คำเดียวกัน
   worktype: { title: "ประเภทงานและระบบงาน", sub: "ตัวเลือกที่ใช้ตอนเพิ่ม/แก้ไขแผนงาน", href: "/worktype", icon: FaTags },
   orgSettings: { title: "ตั้งค่าองค์กร", sub: "โลโก้ · ข้อมูลบริษัทบนเอกสาร · ช่องทางติดต่อบนหัวเว็บ · ค่าตั้งต้นของระบบเบิก", href: "/settings/organization", icon: FaImage },
+  // ── เว็บไซต์บริษัท (da-web) — แก้เนื้อหาบนเว็บสาธารณะ + รับคำขอจากลูกค้า ──
+  webLeads: { title: "คำขอจากเว็บไซต์", short: "คำขอจากเว็บ", sub: "ติดต่อ · ขอใบเสนอราคา", href: "/website/leads", icon: FaEnvelopeOpenText, badgeKey: "webLeads" },
+  webProducts: { title: "สินค้าบนเว็บ", sub: "รูป · สเปก · Datasheet", href: "/website/products", icon: FaBoxOpen },
+  webProjects: { title: "ผลงานบนเว็บ", sub: "โครงการที่ส่งมอบ", href: "/website/projects", icon: FaImages },
+  webArticles: { title: "บทความ", sub: "ความรู้ · SEO", href: "/website/articles", icon: FaNewspaper },
+  webSettings: { title: "การแสดงผลเว็บไซต์", short: "การแสดงผล", sub: "ตัวเลข · ยี่ห้อ · เวลาทำการ", href: "/website/settings", icon: FaSlidersH },
   permissions: { title: "ตั้งค่าสิทธิ์", sub: "สิทธิ์ในระบบ (ผู้ดูแลระบบ) · สิทธิ์ตามตำแหน่งในองค์กร", href: "/settings/permissions", icon: FaUserShield },
 };
 
