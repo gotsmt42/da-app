@@ -38,7 +38,8 @@ export default function WebsiteProducts() {
     try {
       const [p, b] = await Promise.all([WebsiteService.list("products"), WebsiteService.list("brands")]);
       setItems(p);
-      setBrands(b.map((x) => x.name));
+      // ยี่ห้อเดียวอยู่ได้หลายหมวด (Hikvision: CCTV + Access Control) — ตัวเลือกต้องไม่ซ้ำ
+      setBrands([...new Set(b.map((x) => x.name))]);
     } catch (err) {
       setItems([]);
       fb.fail(errorText(err, "โหลดรายการสินค้าไม่สำเร็จ"));
