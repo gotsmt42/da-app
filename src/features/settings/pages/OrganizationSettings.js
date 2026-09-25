@@ -62,9 +62,12 @@ const FIELDS = [
  * ⚠️ มีแค่ LINE กับ Facebook — เบอร์โทร/อีเมล/เว็บไซต์ ใช้ช่องใน "ข้อมูลบริษัทบนเอกสาร" ร่วมกัน
  *    ถ้าแยกเก็บสองที่ จะมีวันที่เบอร์บนหัวเว็บกับเบอร์บนเอกสารไม่ตรงกันโดยไม่มีใครรู้
  */
+/** เบอร์โทร: ตัวเลข ขีด เว้นวรรค วงเล็บ + ได้ และต้องมีตัวเลขอย่างน้อย 4 ตัว (สายด่วนเลขสั้น) */
+const isPhone = (v) => /^[\d\s\-+()]+$/.test(v) && v.replace(/\D/g, "").length >= 4;
+
 const CONTACT_FIELDS = [
   // ✅ สายด่วนงานฉุกเฉิน — เว็บบริษัทแสดงก่อนเบอร์ปกติ (เบอร์ปกติใช้ช่อง "โทรศัพท์" ด้านบน)
-  { key: "contactHotline", label: "สายด่วน / Hotline (เช่น 08x-xxx-xxxx)", max: 60 },
+  { key: "contactHotline", label: "สายด่วน / Hotline (เช่น 08x-xxx-xxxx)", max: 60, phone: true },
   { key: "contactLine", label: "ลิงก์ LINE (เช่น https://lin.ee/xxxx)", max: 300 },
   { key: "contactFacebook", label: "ลิงก์ Facebook", max: 300 },
 ];
@@ -349,12 +352,14 @@ export default function OrganizationSettings() {
         <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
           {CONTACT_FIELDS.map((f) => {
             const v = String(form[f.key] || "").trim();
-            const bad = Boolean(v) && !/^https?:\/\//i.test(v);
+            // 🐛 เดิมตรวจทุกช่องว่าเป็นลิงก์ — ช่องสายด่วน (เบอร์โทร) จึงขึ้นว่า "ต้องขึ้นต้นด้วย http://" ผิดๆ
+            const bad = Boolean(v) && (f.phone ? !isPhone(v) : !/^https?:\/\//i.test(v));
             return (
               <TextField
                 key={f.key} size="small" label={f.label} value={form[f.key] || ""} onChange={set(f.key)}
                 inputProps={{ maxLength: f.max }} error={bad}
-                helperText={bad ? "ต้องขึ้นต้นด้วย http:// หรือ https://" : undefined}
+                helperText={bad ? (f.phone ? "ใส่เป็นเบอร์โทร เช่น 082-069-0919 หรือเลขสั้น 4 หลัก" : "ต้องขึ้นต้นด้วย http:// หรือ https://") : undefined}
+                type={f.phone ? "tel" : "text"}
               />
             );
           })}
