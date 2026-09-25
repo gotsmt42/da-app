@@ -148,9 +148,13 @@ export const CAPABILITIES = {
   /** เห็นใบของทุกคน + เบิกแทนคนอื่นได้ + ดูรายงานทั้งบริษัท */
   viewAllExpenses: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER],
   /** แก้เนื้อหาเว็บไซต์บริษัท — เหตุผลอยู่ที่ da-app-server/src/config/roles.js */
-  manageWebsite: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER],
+  // ✅ ผู้ใช้สั่ง (25 ก.ย. 2569): "การตั้งค่า และการแสดงเมนู ให้ทำได้แค่ Super Admin ก่อน"
+  //    ไม่ให้ตำแหน่งใดในองค์กรโดยค่าเริ่มต้น — Super Admin ผ่านทุกสิทธิ์อยู่แล้ว (ดู can())
+  //    ถ้าวันหลังจะให้ตำแหน่งไหน ติ๊กเพิ่มได้จากหน้าตั้งค่าสิทธิ์ ไม่ต้องแก้โค้ด
+  manageWebsite: [],
   /** จัดการคำขอจากเว็บไซต์ (ข้อมูลส่วนบุคคลของลูกค้า) — รวมฝ่ายขายที่เป็นคนโทรกลับ */
-  viewLeads: [ROLES.ADMIN, ROLES.DIRECTOR, ROLES.MANAGER, ROLES.SALE],
+  // ✅ ผู้ใช้สั่ง: "เซลไม่ต้อง ให้แก้และดูอะไรได้ในตั้งค่า" — เหลือ Super Admin เท่านั้นเหมือน manageWebsite
+  viewLeads: [],
 };
 
 /**
@@ -245,12 +249,23 @@ export const ROLE_LEVEL = {
 export const roleLevel = (who) => ROLE_LEVEL[normalizeRole(who)] || 0;
 
 /** ตั้ง role นี้ให้คนอื่นได้ไหม — ต้องมีสิทธิ์จัดการผู้ใช้ก่อน และห้ามตั้งสิทธิ์ที่สูงกว่าระดับตัวเอง */
+/** ✅ Super Admin ทำได้ทุกอย่าง (ตรงกับฝั่ง server) */
+export const isSuperAdmin = (who) => systemRoleOf(who) === SYSTEM_ROLES.SUPER;
+
+/**
+ * สายอนุมัติค่าใช้จ่าย — ⚠️ ยกเว้นจาก "Super Admin ทำได้ทุกอย่าง" โดยตั้งใจ
+ * ผู้ใช้กำหนดคนแต่ละขั้นไว้ชัดตามตำแหน่งในองค์กร (เช่น กรรมการผู้จัดการไม่อยู่ขั้นตรวจสอบ/อนุมัติ)
+ * และเป็นกลไกควบคุมภายในเรื่องเงิน — ถ้า Super Admin ข้ามได้ทุกขั้น ใบเบิกจะไม่มีคนสอบทานเลย
+ */
+export const EXPENSE_WORKFLOW_CAPS = ["reviewExpense", "approveExpense", "disburseExpense", "approveOwnReview", "approveOwnExpense"];
+
+
 export const canAssignRole = (actor, role) =>
-  can(actor, "manageAll") && roleLevel(role) > 0 && roleLevel(role) <= roleLevel(actor);
+  roleLevel(role) > 0 && (isSuperAdmin(actor) || (can(actor, "manageAll") && roleLevel(role) <= roleLevel(actor)));
 
 /** แตะบัญชีที่มี role นี้ได้ไหม (แก้สิทธิ์/ลบ) — ต้องมีสิทธิ์จัดการผู้ใช้ และห้ามแตะคนที่ระดับสูงกว่าตัวเอง */
 export const canManageUserOfRole = (actor, targetRole) =>
-  can(actor, "manageAll") && roleLevel(actor) >= roleLevel(targetRole);
+  isSuperAdmin(actor) || (can(actor, "manageAll") && roleLevel(actor) >= roleLevel(targetRole));
 
 /**
  * ✅ ตัวเดียวที่โค้ดที่อื่นควรเรียก
@@ -291,6 +306,8 @@ export const can = (who, capability) => {
     return SYSTEM_CAPABILITIES[capability].includes(systemRoleOf(who));
   }
   const allowed = EFFECTIVE?.[capability] || CAPABILITIES[capability];
+  // ✅ Super Admin ผ่านทุกสิทธิ์ที่มีอยู่จริง ยกเว้นสายอนุมัติค่าใช้จ่าย (ตรงกับฝั่ง server)
+  if (allowed && isSuperAdmin(who) && !EXPENSE_WORKFLOW_CAPS.includes(capability)) return true;
   if (!allowed) {
     // พิมพ์ชื่อสิทธิ์ผิด = ปฏิเสธไว้ก่อน แต่ต้องส่งเสียงดังพอให้เห็นตอน dev
     // ไม่งั้นจะกลายเป็นบั๊กเงียบแบบเดียวกับที่ไฟล์นี้ตั้งใจกำจัด
