@@ -9,8 +9,11 @@ import {
 } from "@mui/icons-material";
 
 import ImageManager from "../components/ImageManager";
+import {
+  AreasPreview, BrandsPreview, HomeOutlinePreview, HoursPreview, PreviewFrame, ServiceCardPreview, StatsPreview, WhereShown,
+} from "../components/SettingsPreview";
 import { StringListEditor, cleanList } from "../components/ListEditors";
-import { ConfirmDialog, FieldLabel, UI, WebPageHeader, cardSx, useFeedback } from "../components/WebsiteUi";
+import { ConfirmDialog, UI, WebPageHeader, cardSx, useFeedback } from "../components/WebsiteUi";
 import WebsiteService, { errorText } from "../services/WebsiteService";
 import { SERVICES } from "../utils/webContent";
 
@@ -22,10 +25,21 @@ import { SERVICES } from "../utils/webContent";
  * ⚠️ ตัวเลขบนหน้าแรกต้องพิสูจน์ได้ — ลูกค้า B2B ตรวจจริงตอนคัดผู้รับเหมา
  */
 
+/** คู่มือด้านบนของหน้า — [id ของกล่อง, ชื่อ, ไปโผล่ที่ไหน] ⚠️ เพิ่มกล่องใหม่ต้องเพิ่มที่นี่ด้วย */
+const GUIDE = [
+  ["ws-contact", "ช่องทางติดต่อ", "แถบเมนู · ปุ่มลอย · หน้าติดต่อเรา · ท้ายเว็บ (แก้ที่ตั้งค่าองค์กร)"],
+  ["ws-sections", "ส่วนที่แสดงบนเว็บ", "เปิด/ปิดส่วนของหน้าแรก และเมนูบทความ"],
+  ["ws-stats", "ตัวเลขของบริษัท", "แถบตัวเลขบนหน้าแรก"],
+  ["ws-hours", "เวลาทำการ งานฉุกเฉิน ประกาศ", "หน้าติดต่อเรา · ท้ายเว็บ · แถบบนสุด"],
+  ["ws-areas", "พื้นที่ให้บริการ", "หน้าเกี่ยวกับเรา · ข้อมูลสำหรับ Google"],
+  ["ws-service-images", "รูปของแต่ละบริการ", "การ์ดบริการหน้าแรก · หน้าบริการ"],
+  ["ws-brands", "ยี่ห้อที่แสดงบนเว็บ", "ส่วนแบรนด์หน้าแรก · กล่องแบรนด์ในหน้าบริการ (บันทึกทันที)"],
+];
+
 const SECTION_TOGGLES = [
   ["showStats", "ตัวเลขของบริษัท", "แถบตัวเลขใต้ส่วนหัวของหน้าแรก"],
   ["showProjects", "ผลงานบนหน้าแรก", "ซ่อนเองอัตโนมัติถ้ายังไม่มีผลงานที่เผยแพร่"],
-  ["showBrands", "ยี่ห้อที่ติดตั้ง", "รายชื่อยี่ห้อท้ายหน้าแรก"],
+  ["showBrands", "แบรนด์อุปกรณ์", "ส่วนโลโก้แบรนด์ท้ายหน้าแรก (จัดการยี่ห้อที่กล่อง 7)"],
   ["showArticles", "เมนูบทความ", "ปิดได้ช่วงที่ยังไม่มีบทความ — เมนูและ sitemap จะไม่มีบทความ"],
 ];
 
@@ -66,22 +80,48 @@ export default function WebsiteSettings() {
 
   return (
     <Box sx={{ maxWidth: 1000, mx: "auto", px: { xs: 1.5, sm: 2, md: 3 }, py: { xs: 2, sm: 3 } }}>
-      <WebPageHeader title="การแสดงผลเว็บไซต์" subtitle="ส่วนที่แสดงบนหน้าแรก ตัวเลขของบริษัท เวลาทำการ พื้นที่ให้บริการ และยี่ห้อ" sitePath="" />
+      <WebPageHeader title="การแสดงผลเว็บไซต์" subtitle="ตั้งค่าส่วนต่างๆ ของเว็บไซต์บริษัท พร้อมตัวอย่างก่อนบันทึก" sitePath="" />
       {fb.node}
 
       {!s ? <Skeleton variant="rounded" height={420} /> : (
         <Stack spacing={2}>
-          <Box sx={cardSx}>
-            <Typography sx={{ fontWeight: 800, mb: 0.5 }}>ช่องทางติดต่อบนเว็บไซต์</Typography>
+          {/* ── คู่มือหน้านี้ — ผู้ใช้สั่ง "อธิบายหน้าการตั้งค่าทั้งหมดว่าทำอะไร เปลี่ยนแปลงหน้าไหน" ── */}
+          <Box sx={{ ...cardSx, bgcolor: "#f8fafc" }}>
+            <Typography sx={{ fontWeight: 800, mb: 0.5 }}>หน้านี้ตั้งค่าอะไรได้บ้าง</Typography>
+            <Typography sx={{ color: UI.sub, fontSize: "0.84rem", mb: 1.5 }}>
+              ทุกกล่องมีป้าย <b>“แสดงที่”</b> บอกว่าค่านั้นไปโผล่หน้าไหนของเว็บ และมี <b>ตัวอย่าง</b> ให้ดูหน้าตาก่อนบันทึก ·
+              กล่อง 1–6 ต้องกด <b>“บันทึก”</b> ที่แถบล่างสุดถึงจะขึ้นเว็บ (ขึ้นภายในไม่กี่วินาที) · กล่อง 7 (ยี่ห้อ) บันทึกทันทีที่กด
+            </Typography>
+            <Box component="ol" sx={{ m: 0, pl: 2.5, display: "grid", gap: 0.5, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, fontSize: "0.84rem" }}>
+              {GUIDE.map(([id, title, where]) => (
+                <li key={id}>
+                  <Link href={`#${id}`} underline="hover" sx={{ fontWeight: 700 }}>{title}</Link>
+                  <Typography component="span" sx={{ color: UI.sub, fontSize: "0.8rem" }}> — {where}</Typography>
+                </li>
+              ))}
+            </Box>
+          </Box>
+
+          <Box sx={cardSx} id="ws-contact">
+            <Typography sx={{ fontWeight: 800, mb: 0.5 }}>1. ช่องทางติดต่อบนเว็บไซต์</Typography>
+            <WhereShown items={[
+              { label: "ปุ่มโทรบนแถบเมนู", path: "" }, { label: "ปุ่มลอยมุมขวาล่าง", path: "" },
+              { label: "หน้าติดต่อเรา", path: "/contact" }, { label: "ท้ายเว็บทุกหน้า", path: "" },
+            ]} />
             <Typography sx={{ color: UI.sub, fontSize: "0.88rem" }}>
               เบอร์โทร อีเมล LINE และ Facebook ใช้ชุดเดียวกับที่ตั้งไว้ใน{" "}
               <Link component={RouterLink} to="/settings/organization" sx={{ fontWeight: 700 }}>ตั้งค่าองค์กร</Link>
-              {" "}— แก้ที่นั่นที่เดียว เว็บไซต์เปลี่ยนตามอัตโนมัติ ช่องทางที่เว้นว่างจะไม่แสดงบนเว็บ
+              {" "}— แก้ที่นั่นที่เดียว เว็บไซต์เปลี่ยนตามอัตโนมัติ · ช่องทางที่เว้นว่างจะไม่แสดงบนเว็บ ·
+              ช่องที่กรอกผิดรูปแบบ (เช่น ใส่ลิงก์เว็บในช่องอีเมล) เว็บจะไม่ใช้ และแสดงค่าตั้งต้นของบริษัทแทน
             </Typography>
           </Box>
 
-          <Box sx={cardSx}>
-            <Typography sx={{ fontWeight: 800, mb: 1.5 }}>ส่วนที่แสดงบนเว็บ</Typography>
+          <Box sx={cardSx} id="ws-sections">
+            <Typography sx={{ fontWeight: 800, mb: 0.5 }}>2. ส่วนที่แสดงบนเว็บ</Typography>
+            <WhereShown items={[{ label: "หน้าแรก", path: "/" }, { label: "เมนูบทความ · ท้ายเว็บ · sitemap", path: "/articles" }]} />
+            <Typography sx={{ color: UI.sub, fontSize: "0.84rem", mb: 1.5 }}>
+              เปิด/ปิดส่วนต่างๆ ของหน้าแรกได้โดยไม่ต้องลบข้อมูล — ปิดแล้วเปิดกลับมา ข้อมูลยังอยู่ครบ
+            </Typography>
             <Stack spacing={0.5}>
               {SECTION_TOGGLES.map(([k, label, hint]) => (
                 <FormControlLabel key={k} control={<Switch checked={Boolean(s[k])} onChange={(e) => set(k)(e.target.checked)} />}
@@ -89,12 +129,15 @@ export default function WebsiteSettings() {
                   sx={{ alignItems: "flex-start", "& .MuiSwitch-root": { mt: -0.5 } }} />
               ))}
             </Stack>
+            <HomeOutlinePreview s={s} />
           </Box>
 
-          <Box sx={cardSx}>
-            <Typography sx={{ fontWeight: 800 }}>ตัวเลขของบริษัท</Typography>
+          <Box sx={cardSx} id="ws-stats">
+            <Typography sx={{ fontWeight: 800, mb: 0.5 }}>3. ตัวเลขของบริษัท</Typography>
+            <WhereShown items={[{ label: "หน้าแรก · แถบใต้ส่วนหัว", path: "/" }]} />
             <Typography sx={{ color: UI.sub, fontSize: "0.82rem", mb: 1.5 }}>
-              ⚠️ ใส่เฉพาะตัวเลขที่ยืนยันได้จริง — ลบแถวที่ยังไม่มีข้อมูลยืนยันออกดีกว่าใส่เลขประมาณ
+              ตัวเลข + ตัวต่อท้าย (เช่น “+” หรือ “/7”) + ป้ายตัวหนา + คำอธิบายเล็กใต้ป้าย · ได้สูงสุด 6 ช่อง (แนะนำ 4) ·
+              ⚠️ ใส่เฉพาะตัวเลขที่ยืนยันได้จริง — ลูกค้าองค์กรมักขอหลักฐาน ลบแถวที่ยังไม่มีข้อมูลยืนยันออกดีกว่าใส่เลขประมาณ
             </Typography>
             <Stack spacing={1.25}>
               {s.stats.map((st, i) => (
@@ -112,32 +155,54 @@ export default function WebsiteSettings() {
                   sx={{ textTransform: "none", fontWeight: 700, color: UI.accent }}>เพิ่มตัวเลข</Button></Box>
               )}
             </Stack>
+            <StatsPreview stats={s.stats} show={s.showStats} />
           </Box>
 
-          <Box sx={cardSx}>
-            <Typography sx={{ fontWeight: 800, mb: 1.5 }}>เวลาทำการและข้อความสำคัญ</Typography>
+          <Box sx={cardSx} id="ws-hours">
+            <Typography sx={{ fontWeight: 800, mb: 0.5 }}>4. เวลาทำการ งานฉุกเฉิน และประกาศ</Typography>
+            <WhereShown items={[
+              { label: "หน้าติดต่อเรา", path: "/contact" }, { label: "ท้ายเว็บทุกหน้า", path: "" }, { label: "ประกาศ: แถบบนสุดทุกหน้า", path: "" },
+            ]} />
+            <Typography sx={{ color: UI.sub, fontSize: "0.82rem", mb: 1.5 }}>
+              เวลาทำการ 3 บรรทัดแสดงในหน้าติดต่อเรา (ท้ายเว็บแสดงวันธรรมดาและวันหยุด) · ข้อความงานฉุกเฉินเป็นกล่องสีแดงอ่อนในหน้าติดต่อเรา ·
+              ประกาศใช้แจ้งเรื่องชั่วคราว เช่น วันหยุดยาว — ลบข้อความออก แถบจะหายไปหลังบันทึก
+            </Typography>
             <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr 1fr" } }}>
               <TextField size="small" label="วันธรรมดา" value={s.businessHoursWeekdays} onChange={(e) => set("businessHoursWeekdays")(e.target.value.slice(0, 80))} />
               <TextField size="small" label="วันเสาร์" value={s.businessHoursSaturday} onChange={(e) => set("businessHoursSaturday")(e.target.value.slice(0, 80))} />
-              <TextField size="small" label="วันหยุด" value={s.businessHoursClosed} onChange={(e) => set("businessHoursClosed")(e.target.value.slice(0, 80))} />
+              <TextField size="small" label="วันหยุด (เว็บเติมคำว่า “ปิด” ข้างหน้าให้)" value={s.businessHoursClosed} onChange={(e) => set("businessHoursClosed")(e.target.value.slice(0, 80))} />
             </Box>
             <TextField size="small" fullWidth label="ข้อความงานฉุกเฉิน (หน้าติดต่อเรา)" value={s.emergencyNote} onChange={(e) => set("emergencyNote")(e.target.value.slice(0, 200))} sx={{ mt: 2 }} />
             <TextField size="small" fullWidth label="ประกาศบนแถบบนสุดของเว็บ (ว่าง = ไม่แสดง)" value={s.announcement} onChange={(e) => set("announcement")(e.target.value.slice(0, 200))}
               placeholder="เช่น หยุดทำการ 12–16 เม.ย. งานฉุกเฉินติดต่อได้ตามปกติ" sx={{ mt: 2 }} />
+            <HoursPreview s={s} />
           </Box>
 
-          <Box sx={cardSx}>
-            <FieldLabel hint="แสดงบนหน้าเกี่ยวกับเรา และใช้ในข้อมูลสำหรับผลค้นหาแบบท้องถิ่นของ Google">พื้นที่ให้บริการ</FieldLabel>
-            <StringListEditor value={s.serviceAreas} onChange={set("serviceAreas")} placeholder="เช่น นนทบุรี" addText="เพิ่มพื้นที่" max={30} maxLength={60} itemLabel="พื้นที่ให้บริการ" />
-          </Box>
-
-          <Box sx={cardSx}>
-            <Typography sx={{ fontWeight: 800 }}>รูปของแต่ละบริการ</Typography>
+          <Box sx={cardSx} id="ws-areas">
+            <Typography sx={{ fontWeight: 800, mb: 0.5 }}>5. พื้นที่ให้บริการ</Typography>
+            <WhereShown items={[{ label: "หน้าเกี่ยวกับเรา", path: "/about" }, { label: "ข้อมูลสำหรับ Google (ค้นหาแบบใกล้ฉัน)" }]} />
             <Typography sx={{ color: UI.sub, fontSize: "0.82rem", mb: 1.5 }}>
-              แสดงบนการ์ดบริการหน้าแรกและหน้าบริการ · ยังไม่อัป = เว็บใช้ภาพประกอบที่ติดมากับเว็บ ·
-              แนะนำภาพถ่ายงานจริงแนวนอน (สัดส่วนประมาณ 16:10) · กด "บันทึก" ด้านล่างหลังอัป
+              รายชื่อจังหวัด/เขตที่รับงาน แสดงเป็นกล่องในหน้าเกี่ยวกับเรา และส่งให้ Google รู้ว่าบริษัทให้บริการพื้นที่ใด (ช่วยผลค้นหาแบบท้องถิ่น) · เรียงลำดับได้ด้วยลูกศร
             </Typography>
-            <Box sx={{ display: "grid", gap: 2.5, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
+            <StringListEditor value={s.serviceAreas} onChange={set("serviceAreas")} placeholder="เช่น นนทบุรี" addText="เพิ่มพื้นที่" max={30} maxLength={60} itemLabel="พื้นที่ให้บริการ" />
+            <AreasPreview areas={s.serviceAreas} />
+          </Box>
+
+          <Box sx={cardSx} id="ws-service-images">
+            <Typography sx={{ fontWeight: 800, mb: 0.5 }}>6. รูปของแต่ละบริการ</Typography>
+            <WhereShown items={[
+              { label: "หน้าแรก · การ์ดบริการ", path: "/" }, { label: "หน้ารวมบริการ", path: "/services" }, { label: "หน้าบริการแต่ละระบบ (ส่วนหัว)", path: "/services/fire-alarm" },
+            ]} />
+            <Typography sx={{ color: UI.sub, fontSize: "0.82rem", mb: 1.5 }}>
+              ยังไม่อัป = เว็บใช้ภาพประกอบที่ติดมากับเว็บ · แนะนำภาพถ่ายงานจริงแนวนอน (สัดส่วนประมาณ 16:10) กว้าง 1200px ขึ้นไป ·
+              เอารูปออกด้วยปุ่มถังขยะ แล้วเว็บจะกลับไปใช้ภาพประกอบ · กด “บันทึก” ด้านล่างหลังอัป
+            </Typography>
+            <PreviewFrame title="ตัวอย่างการ์ดบริการบนหน้าแรก (ตามรูปที่เลือกตอนนี้)">
+              <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "repeat(2, minmax(0,1fr))", md: "repeat(3, minmax(0,1fr))" } }}>
+                {SERVICES.map((sv) => <ServiceCardPreview key={sv.value} slug={sv.value} label={sv.label} image={serviceImg(sv.value)} />)}
+              </Box>
+            </PreviewFrame>
+            <Box sx={{ mt: 2.5, display: "grid", gap: 2.5, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
               {SERVICES.map((sv) => {
                 const img = serviceImg(sv.value);
                 return (
@@ -149,7 +214,7 @@ export default function WebsiteSettings() {
             </Box>
           </Box>
 
-          <BrandManager onOk={fb.ok} onFail={fb.fail} />
+          <Box id="ws-brands"><BrandManager onOk={fb.ok} onFail={fb.fail} /></Box>
         </Stack>
       )}
 
@@ -250,7 +315,8 @@ function BrandManager({ onOk, onFail }) {
 
   return (
     <Box sx={cardSx}>
-      <Typography sx={{ fontWeight: 800 }}>ยี่ห้อที่แสดงบนเว็บ</Typography>
+      <Typography sx={{ fontWeight: 800, mb: 0.5 }}>7. ยี่ห้อที่แสดงบนเว็บ</Typography>
+      <WhereShown items={[{ label: "หน้าแรก · ส่วนแบรนด์", path: "/" }, { label: "หน้าบริการ · ตัวอย่างแบรนด์ที่เลือกใช้", path: "/services/fire-alarm" }, { label: "ตัวเลือกยี่ห้อในหน้าสินค้า (หลังบ้าน)" }]} />
       <Typography sx={{ color: UI.sub, fontSize: "0.82rem", mb: 1.5 }}>
         ⭐ = แบรนด์หลัก (แสดงใหญ่ ขึ้นก่อน) · กดกรอบรูปเพื่ออัปโลโก้ — ใช้ไฟล์ PNG พื้นโปร่งใสจริง ระบบตัดขอบว่างให้อัตโนมัติ · ยี่ห้อที่ไม่ได้อัป เว็บใช้โลโก้ที่ติดมากับเว็บหรือแสดงเป็นชื่อ · บันทึกทันทีที่กด
       </Typography>
@@ -309,6 +375,7 @@ function BrandManager({ onOk, onFail }) {
       )}
       <input ref={fileRef} type="file" hidden accept="image/png,image/webp,image/jpeg"
         onChange={(e) => { uploadLogo(e.target.files?.[0]); e.target.value = ""; }} />
+      {brands && <BrandsPreview brands={brands} />}
       <ConfirmDialog open={Boolean(deleting)} busy={busy} onCancel={() => setDeleting(null)} onConfirm={remove}
         title={`ลบยี่ห้อ ${deleting?.name || ""}?`} detail="ยี่ห้อจะหายจากเว็บไซต์ (สินค้าของยี่ห้อนี้ยังอยู่) — ถ้าแค่อยากซ่อน กดปุ่มรูปตาแทน" />
     </Box>
