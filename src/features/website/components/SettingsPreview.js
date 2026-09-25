@@ -1,5 +1,7 @@
 import { Box, Chip, Link, Stack, Typography } from "@mui/material";
-import { CheckCircleOutline, LocationOnOutlined, OpenInNew, PlaceOutlined, VisibilityOffOutlined } from "@mui/icons-material";
+import {
+  CheckCircleOutline, EmailOutlined, LocationOnOutlined, OpenInNew, PhoneInTalkOutlined, PhoneOutlined, PlaceOutlined, VisibilityOffOutlined,
+} from "@mui/icons-material";
 
 import { WEBSITE_URL } from "../services/WebsiteService";
 import { UI } from "./WebsiteUi";
@@ -233,6 +235,63 @@ export function BrandsPreview({ brands }) {
             ยี่ห้อที่ไม่ได้อัปโลโก้ ใช้โลโก้ที่ติดมากับเว็บ · ยี่ห้อที่ไม่มีทั้งสองอย่างแสดงเป็นชื่อ · ⭐ แบรนด์หลักแสดงเป็นกล่องใหญ่แถวบน
           </Typography>
         </Stack>
+      )}
+    </PreviewFrame>
+  );
+}
+
+/* ── ช่องทางติดต่อของเว็บ — ท้ายเว็บ · หน้าติดต่อเรา · ปุ่มลอย ─────────────────── */
+const LINE_D = "M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.282.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314";
+const FB_D = "M9.101 23.691v-7.98H6.627v-3.667h2.474v-1.58c0-4.085 1.848-5.978 5.858-5.978.401 0 .955.042 1.468.103a8.68 8.68 0 0 1 1.141.195v3.325a8.623 8.623 0 0 0-.653-.036 26.805 26.805 0 0 0-.733-.009c-.707 0-1.259.096-1.675.309a1.686 1.686 0 0 0-.679.622c-.258.42-.374.995-.374 1.752v1.297h3.919l-.386 2.103-.287 1.564h-3.246v8.245C19.396 23.238 24 18.179 24 12.044c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.628 3.874 10.35 9.101 11.647Z";
+const BrandSvg = ({ d, color }) => (
+  <Box component="svg" viewBox="0 0 24 24" sx={{ width: 18, height: 18, flexShrink: 0 }}><path d={d} fill={color} /></Box>
+);
+
+/** ช่องทางที่จะแสดงบนเว็บ ตามลำดับจริงบนเว็บ (ช่องว่าง = ไม่แสดง) */
+export const webChannels = (s) => [
+  s.contactHotline && { key: "hotline", label: "สายด่วน (Hotline)", value: s.contactHotline, icon: <PhoneInTalkOutlined sx={{ fontSize: 18, color: RED }} /> },
+  s.contactTel && { key: "tel", label: "โทรศัพท์", value: s.contactTel, icon: <PhoneOutlined sx={{ fontSize: 18, color: "#64748b" }} /> },
+  s.contactEmail && { key: "email", label: "อีเมล", value: s.contactEmail, icon: <EmailOutlined sx={{ fontSize: 18, color: "#64748b" }} /> },
+  s.contactLine && { key: "line", label: "LINE", value: "แชทผ่าน LINE", icon: <BrandSvg d={LINE_D} color="#06C755" /> },
+  s.contactFacebook && { key: "facebook", label: "Facebook", value: "Facebook Page", icon: <BrandSvg d={FB_D} color="#0866FF" /> },
+].filter(Boolean);
+
+export function ContactPreview({ s }) {
+  const list = webChannels(s);
+  return (
+    <PreviewFrame title="ตัวอย่างช่องทางติดต่อบนเว็บ (ท้ายเว็บ · หน้าติดต่อเรา · ปุ่มลอยมุมขวาล่าง)">
+      {list.length === 0 ? (
+        <Typography sx={{ color: UI.sub, fontSize: "0.85rem" }}>ยังไม่มีช่องทางติดต่อ — ท้ายเว็บและหน้าติดต่อเราจะไม่มีเบอร์/ลิงก์ และไม่มีปุ่มลอย</Typography>
+      ) : (
+        <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
+          <Box sx={{ bgcolor: NAVY, borderRadius: 1.5, p: 1.5 }}>
+            <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: "#94a3b8", mb: 1 }}>ท้ายเว็บ (ทุกหน้า)</Typography>
+            <Stack spacing={1}>
+              {list.map((c) => (
+                <Stack key={c.key} direction="row" spacing={1} alignItems="center">
+                  {c.icon}
+                  <Typography sx={{ fontSize: "0.82rem", color: "#cbd5e1" }}>
+                    {c.key === "hotline" ? <>สายด่วน <b style={{ color: "#fff" }}>{c.value}</b></> : c.value}
+                  </Typography>
+                </Stack>
+              ))}
+            </Stack>
+          </Box>
+          <Box sx={{ border: `1px solid ${UI.border}`, borderRadius: 1.5, p: 1.5 }}>
+            <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: UI.sub, mb: 1 }}>หน้าติดต่อเรา</Typography>
+            <Stack spacing={1.25}>
+              {list.map((c) => (
+                <Stack key={c.key} direction="row" spacing={1.25} alignItems="flex-start">
+                  <Box sx={{ mt: 0.25 }}>{c.icon}</Box>
+                  <Box>
+                    <Typography sx={{ fontSize: "0.7rem", color: UI.sub }}>{c.label}</Typography>
+                    <Typography sx={{ fontSize: "0.85rem", fontWeight: 700, color: NAVY, wordBreak: "break-all" }}>{c.value}</Typography>
+                  </Box>
+                </Stack>
+              ))}
+            </Stack>
+          </Box>
+        </Box>
       )}
     </PreviewFrame>
   );

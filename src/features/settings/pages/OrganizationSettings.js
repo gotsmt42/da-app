@@ -66,8 +66,6 @@ const FIELDS = [
 const isPhone = (v) => /^[\d\s\-+()]+$/.test(v) && v.replace(/\D/g, "").length >= 4;
 
 const CONTACT_FIELDS = [
-  // ✅ สายด่วนงานฉุกเฉิน — เว็บบริษัทแสดงก่อนเบอร์ปกติ (เบอร์ปกติใช้ช่อง "โทรศัพท์" ด้านบน)
-  { key: "contactHotline", label: "สายด่วน / Hotline (เช่น 08x-xxx-xxxx)", max: 60, phone: true },
   { key: "contactLine", label: "ลิงก์ LINE (เช่น https://lin.ee/xxxx)", max: 300 },
   { key: "contactFacebook", label: "ลิงก์ Facebook", max: 300 },
 ];
@@ -289,7 +287,7 @@ export default function OrganizationSettings() {
         <Box>
           <Typography sx={{ fontWeight: 900, fontSize: "1.3rem", color: "#0f172a", lineHeight: 1.25 }}>ตั้งค่าองค์กร</Typography>
           <Typography variant="caption" sx={{ color: TEXT_SUB }}>
-            โลโก้ · ข้อมูลบริษัทบนเอกสาร · ช่องทางติดต่อบนหัวเว็บ · ค่าตั้งต้นของระบบเบิก
+            โลโก้ · ข้อมูลบริษัทบนเอกสาร · ช่องทางติดต่อในแอป · ค่าตั้งต้นของระบบเบิก · (ช่องทางติดต่อของเว็บไซต์บริษัทตั้งแยกที่เมนู เว็บไซต์บริษัท → ตั้งค่า)
             {live.updatedAt ? ` · แก้ล่าสุด ${thaiDateTime(live.updatedAt)}${live.updatedBy ? ` โดย ${live.updatedBy}` : ""}` : ""}
           </Typography>
         </Box>
@@ -346,8 +344,8 @@ export default function OrganizationSettings() {
 
       {/* ✅ ผู้ใช้สั่ง: "อยากให้มีไอคอนช่องทางการติดต่อบนหัวเว็บ และกำหนดลิงก์ในตั้งค่าของ Super Admin" */}
       <Section
-        icon={SupportAgent} title="ช่องทางติดต่อบนหัวเว็บ"
-        hint="ขึ้นเป็นเมนู “ติดต่อ” บนแถบบนให้ผู้ใช้ทุกคนกดได้ · ช่องไหนเว้นว่างจะไม่แสดงช่องทางนั้น · ไม่กรอกเลยก็ไม่มีปุ่มขึ้น"
+        icon={SupportAgent} title="ช่องทางติดต่อในแอป (เมนู “ติดต่อ” บนแถบบนของแอป)"
+        hint="ใช้เฉพาะในแอปหลังบ้านนี้ — ไม่เกี่ยวกับเว็บไซต์บริษัท (เว็บตั้งแยกที่ เว็บไซต์บริษัท → ตั้งค่า) · ช่องไหนเว้นว่างจะไม่แสดง"
       >
         <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
           {CONTACT_FIELDS.map((f) => {
@@ -365,8 +363,8 @@ export default function OrganizationSettings() {
           })}
         </Box>
         <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", mt: 1.5 }}>
-          เบอร์โทร · อีเมล · เว็บไซต์ ใช้ค่าจากหัวข้อ “ข้อมูลบริษัทบนเอกสาร” ด้านบนร่วมกัน
-          แก้ที่เดียวแล้วเปลี่ยนทั้งบนหัวเว็บและบนเอกสาร
+          เบอร์โทร · อีเมล · เว็บไซต์ ในเมนูติดต่อของแอป ใช้ค่าจากหัวข้อ “ข้อมูลบริษัทบนเอกสาร” ด้านบนร่วมกัน ·
+          ช่องทางติดต่อบนเว็บไซต์บริษัท (สายด่วน · โทร · อีเมล · LINE · Facebook) ตั้งแยกที่เมนู เว็บไซต์บริษัท → ตั้งค่า
         </Typography>
       </Section>
 

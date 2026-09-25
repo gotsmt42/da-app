@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { Link as RouterLink } from "react-router-dom";
 import {
   Box, Button, CircularProgress, FormControlLabel, IconButton, Link, MenuItem, Skeleton, Stack, Switch,
   TextField, Tooltip, Typography,
@@ -10,7 +9,7 @@ import {
 
 import ImageManager from "../components/ImageManager";
 import {
-  AreasPreview, BrandsPreview, HomeOutlinePreview, HoursPreview, PreviewFrame, ServiceCardPreview, StatsPreview, WhereShown,
+  AreasPreview, BrandsPreview, ContactPreview, HomeOutlinePreview, HoursPreview, PreviewFrame, ServiceCardPreview, StatsPreview, WhereShown,
 } from "../components/SettingsPreview";
 import { StringListEditor, cleanList } from "../components/ListEditors";
 import { ConfirmDialog, UI, WebPageHeader, cardSx, useFeedback } from "../components/WebsiteUi";
@@ -25,9 +24,28 @@ import { SERVICES } from "../utils/webContent";
  * ⚠️ ตัวเลขบนหน้าแรกต้องพิสูจน์ได้ — ลูกค้า B2B ตรวจจริงตอนคัดผู้รับเหมา
  */
 
+/**
+ * ช่องทางติดต่อของเว็บ — ✅ ผู้ใช้สั่งให้แยกจากตั้งค่าองค์กรของแอป (25 ก.ย. 2569)
+ * ⚠️ กติกาตรวจต้องตรงกับ contactError() ใน da-app-server/src/routes/web.js
+ */
+const isPhoneNo = (v) => /^[\d\s\-+()]+$/.test(v) && v.replace(/\D/g, "").length >= 4;
+const isHttp = (v) => /^https?:\/\/\S+$/i.test(v);
+const WEB_CONTACT_FIELDS = [
+  { key: "contactHotline", label: "สายด่วน / Hotline", placeholder: "เช่น 082-069-0919", type: "tel", max: 60,
+    hint: "แสดงบนสุด ไอคอนสีแดง — สำหรับงานฉุกเฉิน", check: (v) => (isPhoneNo(v) ? "" : "ใส่เป็นเบอร์โทร (ตัวเลขอย่างน้อย 4 หลัก)") },
+  { key: "contactTel", label: "โทรศัพท์", placeholder: "เช่น 097-085-7411", type: "tel", max: 60,
+    hint: "เบอร์ติดต่อทั่วไป · ใช้กับปุ่มโทรบนแถบเมนูด้วย", check: (v) => (isPhoneNo(v) ? "" : "ใส่เป็นเบอร์โทร (ตัวเลขอย่างน้อย 4 หลัก)") },
+  { key: "contactEmail", label: "อีเมล", placeholder: "เช่น info@company.com", type: "email", max: 120,
+    hint: "กดแล้วเปิดโปรแกรมอีเมล", check: (v) => (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? "" : "อีเมลไม่ถูกต้อง") },
+  { key: "contactLine", label: "ลิงก์ LINE", placeholder: "https://lin.ee/xxxx", type: "url", max: 300,
+    hint: "ลิงก์เพิ่มเพื่อน/กลุ่ม LINE", check: (v) => (isHttp(v) ? "" : "ต้องขึ้นต้นด้วย http:// หรือ https://") },
+  { key: "contactFacebook", label: "ลิงก์ Facebook", placeholder: "https://facebook.com/...", type: "url", max: 300,
+    hint: "ลิงก์เพจ Facebook ของบริษัท", check: (v) => (isHttp(v) ? "" : "ต้องขึ้นต้นด้วย http:// หรือ https://") },
+];
+
 /** คู่มือด้านบนของหน้า — [id ของกล่อง, ชื่อ, ไปโผล่ที่ไหน] ⚠️ เพิ่มกล่องใหม่ต้องเพิ่มที่นี่ด้วย */
 const GUIDE = [
-  ["ws-contact", "ช่องทางติดต่อ", "แถบเมนู · ปุ่มลอย · หน้าติดต่อเรา · ท้ายเว็บ (แก้ที่ตั้งค่าองค์กร)"],
+  ["ws-contact", "ช่องทางติดต่อ (สายด่วน · โทร · อีเมล · LINE · Facebook)", "ท้ายเว็บ · หน้าติดต่อเรา · ปุ่มลอย · ปุ่มโทรบนเมนู"],
   ["ws-sections", "ส่วนที่แสดงบนเว็บ", "เปิด/ปิดส่วนของหน้าแรก และเมนูบทความ"],
   ["ws-stats", "ตัวเลขของบริษัท", "แถบตัวเลขบนหน้าแรก"],
   ["ws-hours", "เวลาทำการ งานฉุกเฉิน ประกาศ", "หน้าติดต่อเรา · ท้ายเว็บ · แถบบนสุด"],
@@ -54,6 +72,8 @@ export default function WebsiteSettings() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const set = (k) => (v) => { setS((x) => ({ ...x, [k]: v })); setDirty(true); };
+  // ห้ามกดบันทึกถ้าช่องทางติดต่อยังผิดรูปแบบ (server ปฏิเสธซ้ำอีกชั้น)
+  const contactInvalid = Boolean(s) && WEB_CONTACT_FIELDS.some((f) => { const v = String(s[f.key] || "").trim(); return v && f.check(v); });
   /** รูปของบริการ — เก็บเป็นรายการ {slug, image} · ไม่มีรูป = เอารายการนั้นออก (เว็บกลับไปใช้ภาพประกอบ) */
   const serviceImg = (slug) => (s.serviceImages || []).find((x) => x.slug === slug)?.image;
   const setServiceImg = (slug, image) =>
@@ -105,15 +125,25 @@ export default function WebsiteSettings() {
           <Box sx={cardSx} id="ws-contact">
             <Typography sx={{ fontWeight: 800, mb: 0.5 }}>1. ช่องทางติดต่อบนเว็บไซต์</Typography>
             <WhereShown items={[
-              { label: "ปุ่มโทรบนแถบเมนู", path: "" }, { label: "ปุ่มลอยมุมขวาล่าง", path: "" },
-              { label: "หน้าติดต่อเรา", path: "/contact" }, { label: "ท้ายเว็บทุกหน้า", path: "" },
+              { label: "ท้ายเว็บทุกหน้า", path: "" }, { label: "หน้าติดต่อเรา", path: "/contact" },
+              { label: "ปุ่มลอยมุมขวาล่าง", path: "" }, { label: "ปุ่มโทรบนแถบเมนู (ใช้โทรศัพท์)", path: "" },
             ]} />
-            <Typography sx={{ color: UI.sub, fontSize: "0.88rem" }}>
-              สายด่วน (Hotline) เบอร์โทร อีเมล LINE และ Facebook ใช้ชุดเดียวกับที่ตั้งไว้ใน{" "}
-              <Link component={RouterLink} to="/settings/organization" sx={{ fontWeight: 700 }}>ตั้งค่าองค์กร</Link>
-              {" "}— แก้ที่นั่นที่เดียว เว็บไซต์เปลี่ยนตามอัตโนมัติ · ช่องทางที่เว้นว่างจะไม่แสดงบนเว็บ ·
-              ช่องที่กรอกผิดรูปแบบ (เช่น ใส่ลิงก์เว็บในช่องอีเมล) เว็บจะไม่ใช้ และแสดงค่าตั้งต้นของบริษัทแทน
+            <Typography sx={{ color: UI.sub, fontSize: "0.84rem", mb: 1.5 }}>
+              ตั้งแยกเฉพาะเว็บไซต์บริษัท — <b>ไม่เกี่ยวกับตั้งค่าองค์กรของแอป</b> (เบอร์บนเอกสาร PDF และเมนูติดต่อในแอปยังแก้ที่ตั้งค่าองค์กร) ·
+              ช่องไหนเว้นว่าง เว็บจะไม่แสดงช่องทางนั้น · เรียงบนเว็บตามลำดับนี้: สายด่วน → โทรศัพท์ → อีเมล → LINE → Facebook
             </Typography>
+            <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
+              {WEB_CONTACT_FIELDS.map((f) => {
+                const v = String(s[f.key] || "").trim();
+                const err = v ? f.check(v) : "";
+                return (
+                  <TextField key={f.key} size="small" label={f.label} value={s[f.key] || ""} placeholder={f.placeholder}
+                    type={f.type} onChange={(e) => set(f.key)(e.target.value.slice(0, f.max))}
+                    error={Boolean(err)} helperText={err || f.hint} />
+                );
+              })}
+            </Box>
+            <ContactPreview s={s} />
           </Box>
 
           <Box sx={cardSx} id="ws-sections">
@@ -225,7 +255,7 @@ export default function WebsiteSettings() {
         <Box sx={{ position: "sticky", bottom: 0, zIndex: 5, mt: 2, mx: { xs: -1.5, sm: -2, md: -3 }, bgcolor: "rgba(255,255,255,0.97)", borderTop: `1px solid ${UI.border}`, py: 1.25, px: { xs: 1.5, sm: 2, md: 3 }, pb: "calc(10px + env(safe-area-inset-bottom, 0px))" }}>
           <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="flex-end">
             {dirty && <Typography sx={{ color: "#b45309", fontSize: "0.85rem", fontWeight: 600 }}>มีการแก้ไขที่ยังไม่บันทึก</Typography>}
-            <Button variant="contained" startIcon={saving ? <CircularProgress size={14} color="inherit" /> : <Save />} disabled={!dirty || saving} onClick={save}
+            <Button variant="contained" startIcon={saving ? <CircularProgress size={14} color="inherit" /> : <Save />} disabled={!dirty || saving || contactInvalid} onClick={save}
               sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, bgcolor: UI.accent, "&:hover": { bgcolor: "#b91c1c" } }}>
               บันทึกการแสดงผล
             </Button>
