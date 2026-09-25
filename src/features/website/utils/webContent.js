@@ -15,6 +15,7 @@ export const PRODUCT_CATEGORIES = [
 /** slug ของบริการบนเว็บ — ใช้กับ "ระบบ" ของผลงาน และ "บริการที่เกี่ยวข้อง" ของบทความ */
 export const SERVICES = [
   { value: "fire-alarm", label: "ระบบแจ้งเหตุเพลิงไหม้ (Fire Alarm)" },
+  { value: "fire-protection", label: "ระบบป้องกันอัคคีภัย (Fire Protection)" },
   { value: "fire-pump", label: "ระบบเครื่องสูบน้ำดับเพลิง (Fire Pump)" },
   { value: "cctv", label: "กล้องวงจรปิด (CCTV)" },
   { value: "access-control", label: "ระบบควบคุมการเข้าออก" },

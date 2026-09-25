@@ -8,9 +8,11 @@ import {
   Add, AddPhotoAlternate, ArrowDownward, ArrowUpward, Close, HideImage, Save, Star, StarBorder, Visibility, VisibilityOff,
 } from "@mui/icons-material";
 
+import ImageManager from "../components/ImageManager";
 import { StringListEditor, cleanList } from "../components/ListEditors";
 import { ConfirmDialog, FieldLabel, UI, WebPageHeader, cardSx, useFeedback } from "../components/WebsiteUi";
 import WebsiteService, { errorText } from "../services/WebsiteService";
+import { SERVICES } from "../utils/webContent";
 
 /**
  * หลังบ้าน: การแสดงผลของเว็บไซต์ + ยี่ห้อ
@@ -38,6 +40,10 @@ export default function WebsiteSettings() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const set = (k) => (v) => { setS((x) => ({ ...x, [k]: v })); setDirty(true); };
+  /** รูปของบริการ — เก็บเป็นรายการ {slug, image} · ไม่มีรูป = เอารายการนั้นออก (เว็บกลับไปใช้ภาพประกอบ) */
+  const serviceImg = (slug) => (s.serviceImages || []).find((x) => x.slug === slug)?.image;
+  const setServiceImg = (slug, image) =>
+    set("serviceImages")([...(s.serviceImages || []).filter((x) => x.slug !== slug), ...(image ? [{ slug, image }] : [])]);
   const setStat = (i, k, v) => set("stats")(s.stats.map((st, j) => (j === i ? { ...st, [k]: v } : st)));
 
   const save = async () => {
@@ -123,6 +129,23 @@ export default function WebsiteSettings() {
           <Box sx={cardSx}>
             <FieldLabel hint="แสดงบนหน้าเกี่ยวกับเรา และใช้ในข้อมูลสำหรับผลค้นหาแบบท้องถิ่นของ Google">พื้นที่ให้บริการ</FieldLabel>
             <StringListEditor value={s.serviceAreas} onChange={set("serviceAreas")} placeholder="เช่น นนทบุรี" addText="เพิ่มพื้นที่" max={30} maxLength={60} itemLabel="พื้นที่ให้บริการ" />
+          </Box>
+
+          <Box sx={cardSx}>
+            <Typography sx={{ fontWeight: 800 }}>รูปของแต่ละบริการ</Typography>
+            <Typography sx={{ color: UI.sub, fontSize: "0.82rem", mb: 1.5 }}>
+              แสดงบนการ์ดบริการหน้าแรกและหน้าบริการ · ยังไม่อัป = เว็บใช้ภาพประกอบที่ติดมากับเว็บ ·
+              แนะนำภาพถ่ายงานจริงแนวนอน (สัดส่วนประมาณ 16:10) · กด "บันทึก" ด้านล่างหลังอัป
+            </Typography>
+            <Box sx={{ display: "grid", gap: 2.5, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
+              {SERVICES.map((sv) => {
+                const img = serviceImg(sv.value);
+                return (
+                  <ImageManager key={sv.value} single label={sv.label} value={img ? [img] : []}
+                    onChange={(list) => setServiceImg(sv.value, list[0] || null)} onError={fb.fail} />
+                );
+              })}
+            </Box>
           </Box>
 
           <BrandManager onOk={fb.ok} onFail={fb.fail} />
