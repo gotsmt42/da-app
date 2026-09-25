@@ -63,6 +63,8 @@ const FIELDS = [
  *    ถ้าแยกเก็บสองที่ จะมีวันที่เบอร์บนหัวเว็บกับเบอร์บนเอกสารไม่ตรงกันโดยไม่มีใครรู้
  */
 const CONTACT_FIELDS = [
+  // ✅ สายด่วนงานฉุกเฉิน — เว็บบริษัทแสดงก่อนเบอร์ปกติ (เบอร์ปกติใช้ช่อง "โทรศัพท์" ด้านบน)
+  { key: "contactHotline", label: "สายด่วน / Hotline (เช่น 08x-xxx-xxxx)", max: 60 },
   { key: "contactLine", label: "ลิงก์ LINE (เช่น https://lin.ee/xxxx)", max: 300 },
   { key: "contactFacebook", label: "ลิงก์ Facebook", max: 300 },
 ];

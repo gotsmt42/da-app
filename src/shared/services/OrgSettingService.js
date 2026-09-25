@@ -41,6 +41,7 @@ export const ORG_FALLBACK = {
    */
   contactLine: "",
   contactFacebook: "",
+  contactHotline: "",
   advanceClearDays: 7,
   /** ชื่อ Rank (ตำแหน่งในองค์กร) ที่ตั้งเอง { rank: "ชื่อ" } — ว่าง = ใช้ชื่อเริ่มต้นของระบบ */
   rankLabels: {},
@@ -102,12 +103,15 @@ export const contactChannels = (settings) => {
   const s = settings || cache || ORG_FALLBACK;
   const tel = String(s.tel || "").trim();
   const dial = tel.replace(/[^\d+]/g, "");
+  const hotline = String(s.contactHotline || "").trim();
+  const hotlineDial = hotline.replace(/[^\d+]/g, "");
   const email = String(s.email || "").trim();
   const line = httpOnly(s.contactLine);
   const facebook = httpOnly(s.contactFacebook);
   const website = httpOnly(s.website);
 
   return [
+    hotline && hotlineDial && { key: "hotline", label: `สายด่วน ${hotline}`, href: `tel:${hotlineDial}` },
     tel && dial && { key: "phone", label: `โทร ${tel}`, href: `tel:${dial}` },
     line && { key: "line", label: "แชตทาง LINE", href: line, external: true },
     facebook && { key: "facebook", label: "Facebook", href: facebook, external: true },

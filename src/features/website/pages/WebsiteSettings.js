@@ -109,7 +109,7 @@ export default function WebsiteSettings() {
               { label: "หน้าติดต่อเรา", path: "/contact" }, { label: "ท้ายเว็บทุกหน้า", path: "" },
             ]} />
             <Typography sx={{ color: UI.sub, fontSize: "0.88rem" }}>
-              เบอร์โทร อีเมล LINE และ Facebook ใช้ชุดเดียวกับที่ตั้งไว้ใน{" "}
+              สายด่วน (Hotline) เบอร์โทร อีเมล LINE และ Facebook ใช้ชุดเดียวกับที่ตั้งไว้ใน{" "}
               <Link component={RouterLink} to="/settings/organization" sx={{ fontWeight: 700 }}>ตั้งค่าองค์กร</Link>
               {" "}— แก้ที่นั่นที่เดียว เว็บไซต์เปลี่ยนตามอัตโนมัติ · ช่องทางที่เว้นว่างจะไม่แสดงบนเว็บ ·
               ช่องที่กรอกผิดรูปแบบ (เช่น ใส่ลิงก์เว็บในช่องอีเมล) เว็บจะไม่ใช้ และแสดงค่าตั้งต้นของบริษัทแทน
