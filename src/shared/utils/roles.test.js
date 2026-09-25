@@ -205,6 +205,9 @@ describe("ความถูกต้องของตารางเอง", (
     expect(can(superTech, "manageWebsite")).toBe(true);
     expect(can(superTech, "viewLeads")).toBe(true);
     expect(can(plainAdmin, "manageWebsite")).toBe(false);
+    // ✅ Admin ในระบบจัดการคำขอจากลูกค้าได้ (ผู้ใช้สั่ง) — ไม่ว่าตำแหน่งในองค์กรไหน
+    expect(can(plainAdmin, "viewLeads")).toBe(true);
+    expect(can({ rank: "director", role: "admin" }, "viewLeads")).toBe(true);
     expect(can(sale, "viewLeads")).toBe(false);
   });
 

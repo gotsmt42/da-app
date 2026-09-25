@@ -109,7 +109,7 @@ export default function WebsiteLeads() {
       )}
 
       {openId && (
-        <LeadDetail id={openId} canDelete={can("manageWebsite")} onClose={close}
+        <LeadDetail id={openId} canDelete={can("viewLeads")} onClose={close}
           onChanged={(msg) => { fb.ok(msg); load(); refreshAppBadges(); }}
           onDeleted={() => { close(); fb.ok("ลบคำขอแล้ว"); load(); refreshAppBadges(); }}
           onError={fb.fail} />

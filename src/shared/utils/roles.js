@@ -253,6 +253,14 @@ export const roleLevel = (who) => ROLE_LEVEL[normalizeRole(who)] || 0;
 export const isSuperAdmin = (who) => systemRoleOf(who) === SYSTEM_ROLES.SUPER;
 
 /**
+ * ✅ สิทธิ์ที่ให้ตาม "สิทธิ์ในระบบ" เพิ่มจากตารางตำแหน่ง — ผู้ใช้สั่ง (25 ก.ย. 2569):
+ *    "หน้าคำขอจากเว็บไซต์ ให้สิทธิ์แอดมินสามารถจัดการได้ด้วย"
+ *    Admin ในระบบ (ไม่ว่าตำแหน่งในองค์กรไหน) เห็น/อัปเดต/ลบคำขอจากลูกค้าได้ — Super Admin ผ่านอยู่แล้ว
+ * ⚠️ การตั้งค่าเว็บไซต์ (manageWebsite) ยังเป็น Super Admin เท่านั้น
+ */
+const SYSTEM_GRANTS = { viewLeads: [SYSTEM_ROLES.ADMIN] };
+
+/**
  * สายอนุมัติค่าใช้จ่าย — ⚠️ ยกเว้นจาก "Super Admin ทำได้ทุกอย่าง" โดยตั้งใจ
  * ผู้ใช้กำหนดคนแต่ละขั้นไว้ชัดตามตำแหน่งในองค์กร (เช่น กรรมการผู้จัดการไม่อยู่ขั้นตรวจสอบ/อนุมัติ)
  * และเป็นกลไกควบคุมภายในเรื่องเงิน — ถ้า Super Admin ข้ามได้ทุกขั้น ใบเบิกจะไม่มีคนสอบทานเลย
@@ -308,6 +316,7 @@ export const can = (who, capability) => {
   const allowed = EFFECTIVE?.[capability] || CAPABILITIES[capability];
   // ✅ Super Admin ผ่านทุกสิทธิ์ที่มีอยู่จริง ยกเว้นสายอนุมัติค่าใช้จ่าย (ตรงกับฝั่ง server)
   if (allowed && isSuperAdmin(who) && !EXPENSE_WORKFLOW_CAPS.includes(capability)) return true;
+  if (allowed && SYSTEM_GRANTS[capability]?.includes(systemRoleOf(who))) return true;
   if (!allowed) {
     // พิมพ์ชื่อสิทธิ์ผิด = ปฏิเสธไว้ก่อน แต่ต้องส่งเสียงดังพอให้เห็นตอน dev
     // ไม่งั้นจะกลายเป็นบั๊กเงียบแบบเดียวกับที่ไฟล์นี้ตั้งใจกำจัด
