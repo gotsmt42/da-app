@@ -7,7 +7,6 @@ export const PRODUCT_CATEGORIES = [
   { value: "fire-alarm", label: "Fire Alarm" },
   { value: "cctv", label: "CCTV" },
   { value: "access-control", label: "Access Control" },
-  { value: "network", label: "Network" },
   { value: "security", label: "Security" },
   { value: "accessories", label: "อุปกรณ์เสริม" },
 ];
@@ -19,10 +18,12 @@ export const SERVICES = [
   { value: "fire-pump", label: "ระบบเครื่องสูบน้ำดับเพลิง (Fire Pump)" },
   { value: "cctv", label: "กล้องวงจรปิด (CCTV)" },
   { value: "access-control", label: "ระบบควบคุมการเข้าออก" },
-  { value: "network", label: "ระบบเครือข่าย" },
   { value: "maintenance", label: "บำรุงรักษาระบบ (PM/CM)" },
 ];
-export const serviceLabel = (v) => SERVICES.find((s) => s.value === v)?.label || v || "-";
+/** ⚠️ ระบบ Network ถูกตัดออกจากเว็บชั่วคราว (บริษัทสั่ง 25 ก.ย. 2569) — เอาออกจากตัวเลือกแล้ว
+ *    แต่ข้อมูลเก่าที่เคยเลือกไว้ยังต้องแสดงชื่อไทยได้ ไม่ใช่ขึ้น "network" ดิบๆ */
+const RETIRED = { network: "ระบบเครือข่าย" };
+export const serviceLabel = (v) => SERVICES.find((s) => s.value === v)?.label || RETIRED[v] || v || "-";
 
 export const LEAD_STATUS = [
   { value: "new", label: "ใหม่", color: "#dc2626" },
