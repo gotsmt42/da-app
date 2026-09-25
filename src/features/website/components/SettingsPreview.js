@@ -131,7 +131,8 @@ export function HoursPreview({ s }) {
           <Box sx={{ bgcolor: NAVY, borderRadius: 1.5, p: 1.5 }}>
             <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: "#94a3b8", mb: 0.75 }}>ท้ายเว็บ (ทุกหน้า)</Typography>
             <Typography sx={{ fontSize: "0.82rem", color: "#e2e8f0" }}>{s.businessHoursWeekdays}</Typography>
-            <Typography sx={{ fontSize: "0.82rem", color: "#94a3b8" }}>{s.businessHoursClosed}</Typography>
+            {s.businessHoursSaturday && <Typography sx={{ fontSize: "0.82rem", color: "#e2e8f0" }}>{s.businessHoursSaturday}</Typography>}
+            {s.businessHoursClosed && <Typography sx={{ fontSize: "0.82rem", color: "#94a3b8" }}>ปิด{s.businessHoursClosed}</Typography>}
           </Box>
         </Box>
       </Stack>
