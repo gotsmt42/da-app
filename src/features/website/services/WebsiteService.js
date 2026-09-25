@@ -37,10 +37,11 @@ const WebsiteService = {
    * อัปโหลดรูป/PDF หนึ่งไฟล์ → { url, publicId, width, height, name, bytes }
    * ⚠️ ยังไม่ผูกกับรายการใด — ต้องกดบันทึกรายการด้วย รูปถึงจะขึ้นเว็บ
    */
-  async upload(file, onProgress) {
+  /** @param {{kind?: "logo"}} [opts] kind "logo" = ให้ server ตัดขอบว่างรอบโลโก้ออกให้ */
+  async upload(file, onProgress, opts = {}) {
     const fd = new FormData();
     fd.append("file", file);
-    const { data } = await API.post("/web/admin/upload", fd, {
+    const { data } = await API.post(`/web/admin/upload${opts.kind ? `?kind=${opts.kind}` : ""}`, fd, {
       headers: { "Content-Type": "multipart/form-data" },
       onUploadProgress: (e) => onProgress?.(e.total ? Math.round((e.loaded / e.total) * 100) : 0),
     });

@@ -17,7 +17,7 @@ import { UI } from "./WebsiteUi";
 const MAX_BYTES = 10 * 1024 * 1024;
 const ACCEPT = "image/jpeg,image/png,image/webp";
 
-export default function ImageManager({ value = [], onChange, max = 12, single = false, label = "รูปภาพ", onError }) {
+export default function ImageManager({ value = [], onChange, max = 12, single = false, label = "รูปภาพ", onError, hint }) {
   const inputRef = useRef(null);
   const [uploading, setUploading] = useState(0);
   const [progress, setProgress] = useState(0);
@@ -70,12 +70,14 @@ export default function ImageManager({ value = [], onChange, max = 12, single = 
         {!single && <Typography sx={{ color: UI.sub, fontSize: "0.78rem" }}>{images.length}/{max} รูป · รูปแรกคือรูปปก</Typography>}
       </Stack>
 
-      <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "repeat(2, minmax(0,1fr))", sm: "repeat(3, minmax(0,1fr))", md: "repeat(4, minmax(0,1fr))" } }}>
+      {/* 🐛 โหมดรูปเดียว (รูปของบริการ) เดิมใช้ตาราง 2–4 คอลัมน์ รูปเลยเล็กจิ๋วบนมือถือ — ตอนนี้เต็มความกว้าง
+          สัดส่วน 16:10 และครอปแบบเดียวกับการ์ดบนเว็บ ผู้ใช้เห็นตรงกับที่จะขึ้นเว็บจริง */}
+      <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: single ? "minmax(0,1fr)" : { xs: "repeat(2, minmax(0,1fr))", sm: "repeat(3, minmax(0,1fr))", md: "repeat(4, minmax(0,1fr))" } }}>
         {images.map((img, i) => (
           <Box key={img.publicId || img.url} sx={{ border: `1px solid ${i === 0 ? UI.accent : UI.border}`, borderRadius: 2, overflow: "hidden", bgcolor: "#fff" }}>
-            <Box sx={{ position: "relative", aspectRatio: "4 / 3", bgcolor: UI.soft }}>
+            <Box sx={{ position: "relative", aspectRatio: single ? "16 / 10" : "4 / 3", bgcolor: UI.soft }}>
               <Box component="img" src={img.url} alt={img.alt || ""} loading="lazy"
-                sx={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
+                sx={{ width: "100%", height: "100%", objectFit: single ? "cover" : "contain", display: "block" }} />
               {i === 0 && !single && (
                 <Box sx={{ position: "absolute", top: 6, left: 6, bgcolor: UI.accent, color: "#fff", fontSize: "0.68rem", fontWeight: 800, px: 0.75, py: 0.2, borderRadius: 1 }}>
                   รูปปก
@@ -105,7 +107,7 @@ export default function ImageManager({ value = [], onChange, max = 12, single = 
         {room > 0 && (
           <Button
             onClick={() => inputRef.current?.click()} disabled={uploading > 0} variant="outlined" color="inherit"
-            sx={{ aspectRatio: "4 / 3", minHeight: 110, borderStyle: "dashed", borderColor: UI.border, borderRadius: 2, flexDirection: "column", gap: 0.75, textTransform: "none", color: UI.sub }}
+            sx={{ aspectRatio: single ? "auto" : "4 / 3", minHeight: single ? 120 : 110, borderStyle: "dashed", borderColor: UI.border, borderRadius: 2, flexDirection: "column", gap: 0.75, textTransform: "none", color: UI.sub }}
           >
             <AddPhotoAlternate />
             <Typography sx={{ fontSize: "0.8rem", fontWeight: 700 }}>{uploading ? `กำลังอัป… เหลือ ${uploading}` : single ? "เลือกรูป" : "เพิ่มรูป"}</Typography>
@@ -118,7 +120,7 @@ export default function ImageManager({ value = [], onChange, max = 12, single = 
       <input ref={inputRef} type="file" hidden multiple={!single} accept={ACCEPT}
         onChange={(e) => { pick(e.target.files); e.target.value = ""; }} />
       <Typography sx={{ color: UI.sub, fontSize: "0.75rem", mt: 1 }}>
-        รูปจะขึ้นเว็บหลังกด "บันทึก" รายการนี้ · รูปพื้นขาวหรือพื้นโปร่งใสดูดีที่สุดบนการ์ดสินค้า
+        {hint || 'รูปจะขึ้นเว็บหลังกด "บันทึก" รายการนี้ · รูปพื้นขาวหรือพื้นโปร่งใสดูดีที่สุดบนการ์ดสินค้า'}
       </Typography>
     </Box>
   );

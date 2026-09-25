@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import {
-  Box, Button, Chip, CircularProgress, FormControlLabel, IconButton, Link, MenuItem, Skeleton, Stack, Switch,
+  Box, Button, CircularProgress, FormControlLabel, IconButton, Link, MenuItem, Skeleton, Stack, Switch,
   TextField, Tooltip, Typography,
 } from "@mui/material";
 import {
@@ -142,7 +142,8 @@ export default function WebsiteSettings() {
                 const img = serviceImg(sv.value);
                 return (
                   <ImageManager key={sv.value} single label={sv.label} value={img ? [img] : []}
-                    onChange={(list) => setServiceImg(sv.value, list[0] || null)} onError={fb.fail} />
+                    onChange={(list) => setServiceImg(sv.value, list[0] || null)} onError={fb.fail}
+                    hint="ภาพแนวนอนจะถูกครอปแบบเดียวกับที่เห็นนี้ · กด บันทึก ด้านล่างเพื่อขึ้นเว็บ" />
                 );
               })}
             </Box>
@@ -203,7 +204,7 @@ function BrandManager({ onOk, onFail }) {
     if (file.size > 5 * 1024 * 1024) return onFail("ไฟล์โลโก้ใหญ่เกิน 5 MB");
     setBusy(true);
     try {
-      const r = await WebsiteService.upload(file);
+      const r = await WebsiteService.upload(file, undefined, { kind: "logo" });
       const saved = await WebsiteService.update("brands", b._id, { logo: { url: r.url, publicId: r.publicId, width: r.width, height: r.height, alt: b.name } });
       setBrands((list) => list.map((x) => (x._id === saved._id ? saved : x)));
       onOk(`อัปโลโก้ ${b.name} แล้ว`);
@@ -251,47 +252,56 @@ function BrandManager({ onOk, onFail }) {
     <Box sx={cardSx}>
       <Typography sx={{ fontWeight: 800 }}>ยี่ห้อที่แสดงบนเว็บ</Typography>
       <Typography sx={{ color: UI.sub, fontSize: "0.82rem", mb: 1.5 }}>
-        ⭐ = แบรนด์หลัก (ขึ้นก่อน) · กดกรอบรูปเพื่ออัปโลโก้ (PNG พื้นโปร่งใสดีที่สุด) — ไม่อัป เว็บใช้โลโก้ตั้งต้นหรือแสดงเป็นชื่อ · บันทึกทันทีที่กด
+        ⭐ = แบรนด์หลัก (แสดงใหญ่ ขึ้นก่อน) · กดกรอบรูปเพื่ออัปโลโก้ — ใช้ไฟล์ PNG พื้นโปร่งใสจริง ระบบตัดขอบว่างให้อัตโนมัติ · ยี่ห้อที่ไม่ได้อัป เว็บใช้โลโก้ที่ติดมากับเว็บหรือแสดงเป็นชื่อ · บันทึกทันทีที่กด
       </Typography>
       {!brands ? <Skeleton variant="rounded" height={160} /> : (
         <Stack spacing={0.75}>
+          {/* 🐛 เดิมทุกอย่างอยู่แถวเดียว บนมือถือปุ่มล้นขอบขวา และชื่อยี่ห้อถูกบีบจนหายไป (ผู้ใช้ส่งภาพหน้าจอมา)
+              ✅ มือถือ: บรรทัดบน = ดาว · โลโก้ · ชื่อ+หมวด / บรรทัดล่าง = ปุ่มจัดการชิดขวา
+                 จอกว้าง: อยู่บรรทัดเดียวกันเหมือนเดิม */}
           {brands.map((b, i) => (
-            <Stack key={b._id} direction="row" alignItems="center" spacing={1} sx={{ px: 1, py: 0.5, border: `1px solid ${UI.border}`, borderRadius: 2, opacity: b.status === "published" ? 1 : 0.55 }}>
-              <Tooltip title={b.featured ? "เลิกเป็นแบรนด์หลัก" : "ตั้งเป็นแบรนด์หลัก"}>
-                <IconButton size="small" disabled={busy} onClick={() => patch(b, { featured: !b.featured })} aria-label="สลับแบรนด์หลัก">
-                  {b.featured ? <Star sx={{ fontSize: 19, color: "#f59e0b" }} /> : <StarBorder sx={{ fontSize: 19 }} />}
-                </IconButton>
-              </Tooltip>
-              <Tooltip title={b.logo?.url ? "เปลี่ยนโลโก้" : "อัปโลโก้"}>
-                <Box component="button" type="button" disabled={busy} aria-label={`${b.logo?.url ? "เปลี่ยน" : "อัป"}โลโก้ ${b.name}`}
-                  onClick={() => { setLogoFor(b); fileRef.current?.click(); }}
-                  sx={{ width: 64, height: 32, flexShrink: 0, display: "grid", placeItems: "center", p: 0.25, cursor: "pointer", bgcolor: "#fff", border: `1px dashed ${b.logo?.url ? "transparent" : UI.border}`, borderRadius: 1, color: UI.sub, "&:hover": { borderColor: UI.accent } }}>
-                  {b.logo?.url
-                    ? <Box component="img" src={b.logo.url} alt="" sx={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
-                    : <AddPhotoAlternate sx={{ fontSize: 18 }} />}
-                </Box>
-              </Tooltip>
-              <Typography sx={{ fontWeight: 700, flex: 1, minWidth: 0 }} noWrap>{b.name}</Typography>
-              {b.logo?.url && (
-                <Tooltip title="เอาโลโก้ที่อัปออก (กลับไปใช้โลโก้ตั้งต้น/ชื่อ)">
-                  <IconButton size="small" disabled={busy} onClick={() => patch(b, { logo: null })} aria-label={`เอาโลโก้ ${b.name} ออก`}><HideImage sx={{ fontSize: 17 }} /></IconButton>
+            <Box key={b._id} sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", columnGap: 1, rowGap: 0.5, px: 1, py: 0.75, border: `1px solid ${UI.border}`, borderRadius: 2, opacity: b.status === "published" ? 1 : 0.55 }}>
+              <Stack direction="row" alignItems="center" spacing={1} sx={{ flex: "1 1 240px", minWidth: 0 }}>
+                <Tooltip title={b.featured ? "เลิกเป็นแบรนด์หลัก" : "ตั้งเป็นแบรนด์หลัก"}>
+                  <IconButton size="small" disabled={busy} onClick={() => patch(b, { featured: !b.featured })} aria-label={`สลับแบรนด์หลัก ${b.name}`}>
+                    {b.featured ? <Star sx={{ fontSize: 20, color: "#f59e0b" }} /> : <StarBorder sx={{ fontSize: 20 }} />}
+                  </IconButton>
                 </Tooltip>
-              )}
-              <Chip size="small" label={b.category} sx={{ fontWeight: 600 }} />
-              <Tooltip title={b.status === "published" ? "ซ่อนจากเว็บ" : "แสดงบนเว็บ"}>
-                <IconButton size="small" disabled={busy} onClick={() => patch(b, { status: b.status === "published" ? "draft" : "published" })} aria-label="ซ่อน/แสดง">
-                  {b.status === "published" ? <Visibility sx={{ fontSize: 18 }} /> : <VisibilityOff sx={{ fontSize: 18 }} />}
-                </IconButton>
-              </Tooltip>
-              <IconButton size="small" disabled={busy || i === 0} onClick={() => move(i, -1)} aria-label="เลื่อนขึ้น"><ArrowUpward sx={{ fontSize: 16 }} /></IconButton>
-              <IconButton size="small" disabled={busy || i === brands.length - 1} onClick={() => move(i, 1)} aria-label="เลื่อนลง"><ArrowDownward sx={{ fontSize: 16 }} /></IconButton>
-              <IconButton size="small" disabled={busy} onClick={() => setDeleting(b)} aria-label={`ลบ ${b.name}`}><Close sx={{ fontSize: 17 }} /></IconButton>
-            </Stack>
+                <Tooltip title={b.logo?.url ? "เปลี่ยนโลโก้" : "อัปโลโก้"}>
+                  <Box component="button" type="button" disabled={busy} aria-label={`${b.logo?.url ? "เปลี่ยน" : "อัป"}โลโก้ ${b.name}`}
+                    onClick={() => { setLogoFor(b); fileRef.current?.click(); }}
+                    sx={{ width: 84, height: 40, flexShrink: 0, display: "grid", placeItems: "center", p: 0.5, cursor: "pointer", bgcolor: "#fff", border: `1px ${b.logo?.url ? "solid" : "dashed"} ${UI.border}`, borderRadius: 1.5, color: UI.sub, "&:hover": { borderColor: UI.accent } }}>
+                    {b.logo?.url
+                      ? <Box component="img" src={b.logo.url} alt="" sx={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+                      : <AddPhotoAlternate sx={{ fontSize: 20 }} />}
+                  </Box>
+                </Tooltip>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ fontWeight: 700, lineHeight: 1.3 }} noWrap>{b.name}</Typography>
+                  <Typography sx={{ color: UI.sub, fontSize: "0.78rem" }} noWrap>{b.category}{b.status !== "published" && " · ซ่อนอยู่"}</Typography>
+                </Box>
+              </Stack>
+              <Stack direction="row" alignItems="center" sx={{ ml: "auto" }}>
+                {b.logo?.url && (
+                  <Tooltip title="เอาโลโก้ที่อัปออก (กลับไปใช้โลโก้ตั้งต้น/ชื่อ)">
+                    <IconButton size="small" disabled={busy} onClick={() => patch(b, { logo: null })} aria-label={`เอาโลโก้ ${b.name} ออก`}><HideImage sx={{ fontSize: 18 }} /></IconButton>
+                  </Tooltip>
+                )}
+                <Tooltip title={b.status === "published" ? "ซ่อนจากเว็บ" : "แสดงบนเว็บ"}>
+                  <IconButton size="small" disabled={busy} onClick={() => patch(b, { status: b.status === "published" ? "draft" : "published" })} aria-label={`ซ่อน/แสดง ${b.name}`}>
+                    {b.status === "published" ? <Visibility sx={{ fontSize: 18 }} /> : <VisibilityOff sx={{ fontSize: 18 }} />}
+                  </IconButton>
+                </Tooltip>
+                <IconButton size="small" disabled={busy || i === 0} onClick={() => move(i, -1)} aria-label={`เลื่อน ${b.name} ขึ้น`}><ArrowUpward sx={{ fontSize: 17 }} /></IconButton>
+                <IconButton size="small" disabled={busy || i === brands.length - 1} onClick={() => move(i, 1)} aria-label={`เลื่อน ${b.name} ลง`}><ArrowDownward sx={{ fontSize: 17 }} /></IconButton>
+                <IconButton size="small" disabled={busy} onClick={() => setDeleting(b)} aria-label={`ลบ ${b.name}`}><Close sx={{ fontSize: 18 }} /></IconButton>
+              </Stack>
+            </Box>
           ))}
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ pt: 1 }}>
             <TextField size="small" label="ชื่อยี่ห้อ" value={name} onChange={(e) => setName(e.target.value.slice(0, 80))} onKeyDown={(e) => e.key === "Enter" && add()} sx={{ flex: 1 }} />
             <TextField select size="small" label="หมวด" value={category} onChange={(e) => setCategory(e.target.value)} sx={{ minWidth: 160 }}>
-              {["Fire Alarm", "CCTV", "Access Control", "Network", "Security", "อื่น ๆ"].map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
+              {["Fire Alarm", "Fire Protection", "Fire Pump", "CCTV", "Access Control", "อื่น ๆ"].map((c) => <MenuItem key={c} value={c}>{c}</MenuItem>)}
             </TextField>
             <Button variant="outlined" startIcon={<Add />} disabled={busy || !name.trim()} onClick={add} sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2 }}>เพิ่มยี่ห้อ</Button>
           </Stack>
