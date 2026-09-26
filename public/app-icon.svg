@@ -1,13 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="WiRix ไวริกซ์">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="TidTam ติดตาม">
   <!--
-    ไอคอนแอป WiRix — ใช้บนหน้าจอโฮม/แท็บเบราว์เซอร์ (ที่ที่ต้องเป็นสี่เหลี่ยมจัตุรัสมีพื้น)
-    แนวคิด: ตัว W โค้งพลิ้วแบบริบบิ้นสองเส้น (ขาว + แดงเข้ม) เกี่ยวกันที่ยอดกลาง
-    = Wire (เชื่อมงาน ทีม และข้อมูลเข้าด้วยกัน) + ix (ลงท้ายแบบซอฟต์แวร์ยุคใหม่)
-    ⚠️ ในแอปไม่ได้ใช้ไฟล์นี้ — แถบบน/หน้าเข้าสู่ระบบใช้แบบตัวอักษรล้วน (app-wordmark-*.png)
-    ⚠️ เป็นเครื่องหมายของ "แอป" เท่านั้น ไม่ใช่โลโก้บริษัท
-    ⚠️ ไฟล์นี้สร้างจากสคริปต์ make-brand.js — แก้ที่สคริปต์แล้วรันใหม่ อย่าแก้มือทีละไฟล์
+    ไอคอนแอป
+    ⚠️ ไฟล์นี้ถูกสร้างจากสคริปต์ scripts/make-brand.js — ห้ามแก้ด้วยมือ (รันใหม่แล้วทับทันที)
+    ⚠️ เป็นเครื่องหมายของ "แอป" เท่านั้น ไม่ใช่โลโก้บริษัท (โลโก้บริษัทตั้งจากหน้า "ตั้งค่าองค์กร")
   -->
-  <rect width="64" height="64" rx="15" fill="#f87171"/>
-  <path d="M32 28 C35 31 35.5 45 40.5 45 C45.5 45 48 33 51 19" fill="none" stroke="#7f1d1d" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M13 19 C16 33 18.5 45 23.5 45 C28.5 45 29 31 32 28 C34 26 35.5 25 37 25" fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <defs>
+    <linearGradient id="tt" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ef4444"/><stop offset="1" stop-color="#991b1b"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#tt)"/>
+  <g transform="translate(0 0) scale(1.0000)">
+  <path d="M32 12 A20 20 0 1 0 49 22" fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="32" cy="12" r="4.6" fill="#ffffff"/>
+  <path d="M23 32.5 L29.5 39 L42 25" fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></g>
 </svg>

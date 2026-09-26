@@ -190,7 +190,7 @@ const Login = () => {
             <Box
               component="img"
               src={appLogoFor({ on: "dark", layout: "stacked" }, org)}
-              alt="WiRix"
+              alt="TidTam"
               /* ⚠️ 88 ไม่ใช่ 220 เหมือนตอนที่โลโก้ยังเป็นกรอบเรียงแนวตั้ง — ตอนนี้เป็นตัวอักษรบรรทัดเดียว
                  ตั้ง 220 แล้วคำจะกว้างจนชนขอบแผงและใหญ่กลบหัวข้อที่อยู่ใต้มัน */
               sx={{ height: 88, maxWidth: "100%", objectFit: "contain", mb: 1.5, filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.15))" }}
@@ -245,7 +245,7 @@ const Login = () => {
           <Box
             component="img"
             src={appLogoFor({ on: "light" }, org)}
-            alt="WiRix"
+            alt="TidTam"
             sx={{ height: 40, maxWidth: "100%", objectFit: "contain", objectPosition: "left center", mb: 2.5, display: { xs: "block", md: "none" } }}
           />
 

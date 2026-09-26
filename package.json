@@ -1,6 +1,6 @@
 {
   "name": "da-app",
-  "version": "1.8.0",
+  "version": "2.0",
   "private": true,
   "dependencies": {
     "@date-io/moment": "^3.2.0",
@@ -58,7 +58,8 @@
     "preview": "vite preview",
     "lint": "eslint src --ext .js,.jsx --max-warnings 0",
     "test": "vitest run",
-    "dev:mobile": "vite --mode mobile --host"
+    "dev:mobile": "vite --mode mobile --host",
+    "brand": "node scripts/make-brand.js"
   },
   "eslintConfig": {
     "extends": [
@@ -86,6 +87,7 @@
     "eslint": "^8.57.1",
     "eslint-config-react-app": "^7.0.1",
     "jsdom": "^29.1.1",
+    "playwright-core": "^1.63.0",
     "vite": "^6.4.3",
     "vitest": "^3.2.7"
   }
