@@ -9,7 +9,7 @@
  * ⚠️ ทุกครั้งที่รันแล้วรูปเปลี่ยนจริง ต้องเลื่อนเลข ?v= ใน index.html และ public/manifest.json ด้วย
  *    ไม่งั้นเบราว์เซอร์/มือถือหยิบไอคอนเดิมจากแคชมาใช้ แล้วผู้ใช้จะเห็นของเก่าไปอีกเป็นสัปดาห์
  * ⚠️ ต้องมี playwright-core (devDependency) เพราะใช้ Chromium เรนเดอร์ SVG เป็น PNG ให้คมจริง
- *    — ไม่ได้แปลงด้วยไลบรารีแปลงภาพ เพราะต้องได้ฟอนต์ IBM Plex Sans Thai ตัวเดียวกับที่แอปใช้
+ *    — ไม่ได้แปลงด้วยไลบรารีแปลงภาพ เพราะต้องได้ฟอนต์ตัวเดียวกับที่ออกแบบไว้
  */
 const fs = require("fs");
 const path = require("path");
@@ -21,24 +21,26 @@ const PUBLIC = path.join(__dirname, "..", "public");
 const NAME = { head: "Tid", tail: "Tam", th: "ติดตาม" };
 
 /**
- * สีแบรนด์ — ชุดเดียวกับที่ใช้ทั้งแอป (แดง #dc2626 เป็นสีหลักของระบบมาตั้งแต่ต้น)
- * ไล่เฉดจบที่พลัมเพื่อให้ท้ายชื่อมีน้ำหนัก ไม่แบนเหมือนตัวอักษรสีเดียว
+ * สองโทน: กรมท่า + แดง
+ * • กรม #0f172a = สีเดียวกับแถบเมนูข้างของแอป (--bg-primary) · แดง #dc2626 = สีเน้นของทั้งระบบ
+ * ⚠️ ห้ามใช้ไล่เฉด — แบรนด์นี้เป็นสีทึบล้วนทั้งชุด (พิมพ์ลงกระดาษ/ปั๊มสกรีนแล้วไม่เพี้ยน
+ *    และตัวอักษรบนพื้นเข้มอ่านออกเท่ากันทุกจุด)
  */
 const C = {
-  iconFrom: "#ef4444",
-  iconTo: "#991b1b",
-  wordFrom: "#fb4b5c",
-  wordMid: "#dc2626",
-  wordTo: "#a21caf",
-  onLight: "#0f172a",
-  onDark: "#ffffff",
+  navy: "#0f172a",
+  red: "#dc2626",
+  white: "#ffffff",
   subOnLight: "#64748b",
-  subOnDark: "rgba(255,255,255,.72)",
+  subOnDark: "rgba(255,255,255,.7)",
 };
 
-/** ฟอนต์เดียวกับตัวแอป (ดู index.html) — โลโก้จึงเป็นเนื้อเดียวกับหน้าจอ ไม่ใช่ของแปลกปลอม */
-const FONT = "'IBM Plex Sans Thai', system-ui, sans-serif";
-const FONT_URL = "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@600;700&display=swap";
+/**
+ * ฟอนต์ชื่อแบรนด์ = Poppins 800 (เรขาคณิต หนา อ่านง่ายแม้ย่อเล็ก) · คำไทยใช้ฟอนต์เดียวกับตัวแอป
+ * ⚠️ ใช้ตอน "ผลิตรูป" เท่านั้น ไม่ได้โหลดในแอปจริง — ของที่แอปใช้คือ PNG ที่ผลิตจากที่นี่
+ */
+const FONT_LATIN = "'Poppins', system-ui, sans-serif";
+const FONT_THAI = "'IBM Plex Sans Thai', system-ui, sans-serif";
+const FONT_URL = "https://fonts.googleapis.com/css2?family=Poppins:wght@800&family=IBM+Plex+Sans+Thai:wght@600&display=swap";
 
 const NOTE = (what) => `
   <!--
@@ -48,74 +50,79 @@ const NOTE = (what) => `
   -->`;
 
 // ══ เครื่องหมายประจำแอป ═════════════════════════════════════════════════════
-/**
- * วงแหวนติดตามเปิด 270° + หัวจุดที่ปลาย + เครื่องหมายถูกตรงกลาง
- * = "ติดตามงานจนจบ" (วงแหวน = กำลังติดตาม · หัวจุด = ตำแหน่งปัจจุบัน · ถูก = ปิดงานได้)
- * ⚠️ วาดบนกริด 64×64 เสมอ — ที่อื่นแค่ย่อ/ขยายด้วย transform ไม่วาดใหม่
- */
-const MARK = (stroke) => `
-  <path d="M32 12 A20 20 0 1 0 49 22" fill="none" stroke="${stroke}" stroke-width="6" stroke-linecap="round"/>
-  <circle cx="32" cy="12" r="4.6" fill="${stroke}"/>
-  <path d="M23 32.5 L29.5 39 L42 25" fill="none" stroke="${stroke}" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>`;
+/** ขนาดของเฟือง (กริด 64×64) — รวมปลายฟันแล้วกว้าง ~61.5px เหลือขอบกันชนราว 1px ทุกด้าน */
+const GEAR = { r: 24, stroke: 5.5, teeth: 12, toothLen: 5.2, redFrom: -90, redTo: 30 };
 
 /**
- * ไอคอนสี่เหลี่ยมจัตุรัส (หน้าจอโฮม · แท็บเบราว์เซอร์)
+ * เฟืองสองสี ครอบวงกลมทึบที่มีเครื่องหมายถูก
+ * = "ติดตามงานจนจบ" — เฟือง = งานช่างที่เดินอยู่ · ช่วงแดง = รอบที่กำลังทำ · ถูก = ปิดงานได้
+ *
+ * ⚠️ วงแหวนต้อง "ต่อเนื่อง" ไม่เว้นช่อง — เฟืองที่วงขาดอ่านเป็นเฟืองหัก (ลองมาแล้ว)
+ *    สีที่สองบอกช่วงได้ด้วยส่วนโค้งแดง + ฟันแดงในช่วงเดียวกันอยู่แล้ว
+ * ⚠️ ฟันต้องเยื้องครึ่งช่วง เพื่อให้ "รอยต่อสี" ตกระหว่างฟันพอดี ไม่ใช่ผ่ากลางฟัน
+ * ⚠️ เครื่องหมายถูกต้องเป็นสีที่ตัดกับวงกลมทึบ ไม่ใช่สีแดง — แดงบนกรมที่ 16px จมหายทั้งอัน
+ * @param {"onLight"|"onDark"|"mono"} way สำหรับพื้นสว่าง / พื้นเข้ม / พื้นสีแบรนด์ (ขาวล้วน)
+ */
+const MARK = (way) => {
+  const base = way === "onLight" ? C.navy : C.white;
+  // แบบขาวล้วน: ทั้งเฟืองเป็นขาวหมด (บนพื้นสีแบรนด์ สีแดงจะจมหายไปกับพื้น)
+  const accent = way === "mono" ? C.white : C.red;
+  const discFill = way === "onLight" ? C.navy : C.white;
+  const checkColor = way === "onLight" ? C.white : C.navy;
+  const { r, stroke, teeth, toothLen, redFrom, redTo } = GEAR;
+  const inset = r + stroke / 2 - 1.2;                       // ฟันฝังเข้าไปในเนื้อวงเล็กน้อย กันเห็นรอยต่อ
+  const width = ((2 * Math.PI * r) / teeth) * 0.46;         // ความกว้างฟัน = 46% ของระยะห่างฟัน
+  const toothSvg = Array.from({ length: teeth }, (_, k) => {
+    const deg = redFrom + (360 / teeth) * (k + 0.5);
+    const fill = deg > redFrom && deg < redTo ? accent : base;
+    return `<rect x="${(32 + inset).toFixed(2)}" y="${(32 - width / 2).toFixed(2)}" width="${toothLen}" height="${width.toFixed(2)}" rx="1.6" fill="${fill}" transform="rotate(${deg.toFixed(1)} 32 32)"/>`;
+  }).join("\n  ");
+  return `
+  ${toothSvg}
+  <circle cx="32" cy="32" r="${r}" fill="none" stroke="${base}" stroke-width="${stroke}"/>
+  <path d="M32 8 A${r} ${r} 0 0 1 52.78 44" fill="none" stroke="${accent}" stroke-width="${stroke}"/>
+  <circle cx="32" cy="32" r="14" fill="${discFill}"/>
+  <path d="M25.5 32 L30 36.5 L38.8 27" fill="none" stroke="${checkColor}" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/>`;
+};
+
+/**
+ * ไอคอนสี่เหลี่ยมจัตุรัส (หน้าจอโฮม · แท็บเบราว์เซอร์) — พื้นกรมเข้าชุดกับแถบบน/แถบข้างของแอป
  * @param {number} [rx] ความโค้งมุม — 0 สำหรับ apple-touch/maskable เพราะระบบปฏิบัติการตัดมุมให้เอง
  *   (ถ้าโค้งมาเองด้วยจะโดนตัดซ้ำสองชั้น เห็นเป็นขอบขาวบางๆ รอบไอคอน)
  * @param {number} [pad] ระยะขอบของเครื่องหมาย — maskable ต้องหดเข้ามาให้อยู่ในวงปลอดภัย 80%
  */
-const iconSvg = ({ rx = 15, pad = 0, note = "ไอคอนแอป" } = {}) => {
+const iconSvg = ({ rx = 15, pad = 5, note = "ไอคอนแอป" } = {}) => {
   const s = (64 - pad * 2) / 64;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="${NAME.head}${NAME.tail} ${NAME.th}">${NOTE(note)}
-  <defs>
-    <linearGradient id="tt" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="${C.iconFrom}"/><stop offset="1" stop-color="${C.iconTo}"/>
-    </linearGradient>
-  </defs>
-  <rect width="64" height="64" rx="${rx}" fill="url(#tt)"/>
-  <g transform="translate(${pad} ${pad}) scale(${s.toFixed(4)})">${MARK("#ffffff")}</g>
+  <rect width="64" height="64" rx="${rx}" fill="${C.navy}"/>
+  <g transform="translate(${pad} ${pad}) scale(${s.toFixed(4)})">${MARK("onDark")}</g>
 </svg>`;
 };
 
 /**
  * โลโก้ตัวอักษรล้วน (แถบบน · การ์ดฟอร์ม)
- * "Tid" ใช้ currentColor จึงอ่านออกทั้งพื้นเข้มและพื้นสว่าง · "Tam" ไล่เฉดสีแบรนด์
+ * "Tid" ใช้ currentColor จึงอ่านออกทั้งพื้นเข้มและพื้นสว่าง · "Tam" เป็นสีแดงแบรนด์เสมอ
  * ⚠️ ไม่มีกรอบพื้นหลังและไม่มีเครื่องหมายนำหน้า (ผู้ใช้สั่งไว้ตั้งแต่แบรนด์ก่อนหน้า) —
  *    แบบที่มีเครื่องหมายอยู่ที่ app-logo-stacked.svg สำหรับพื้นที่ใหญ่
  */
-const wordmarkSvg = () => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 42" width="150" height="42" role="img" aria-label="${NAME.head}${NAME.tail} ${NAME.th}">${NOTE("โลโก้ตัวอักษรล้วน — ใช้บนแถบบนและการ์ดฟอร์ม")}
-  <defs>
-    <linearGradient id="ttWord" gradientUnits="userSpaceOnUse" x1="74" y1="36" x2="146" y2="8">
-      <stop offset="0" stop-color="${C.wordFrom}"/><stop offset=".55" stop-color="${C.wordMid}"/><stop offset="1" stop-color="${C.wordTo}"/>
-    </linearGradient>
-  </defs>
-  <text x="2" y="33" font-family="${FONT}" font-size="38" font-weight="700" letter-spacing="-.5">
-    <tspan fill="currentColor">${NAME.head}</tspan><tspan fill="url(#ttWord)">${NAME.tail}</tspan>
+const wordmarkSvg = () => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 148 42" width="148" height="42" role="img" aria-label="${NAME.head}${NAME.tail} ${NAME.th}">${NOTE("โลโก้ตัวอักษรล้วน — ใช้บนแถบบนและการ์ดฟอร์ม")}
+  <text x="2" y="33" font-family="${FONT_LATIN}" font-size="38" font-weight="800" letter-spacing="-1">
+    <tspan fill="currentColor">${NAME.head}</tspan><tspan fill="${C.red}">${NAME.tail}</tspan>
   </text>
 </svg>`;
 
 /**
  * โลโก้เต็มชุด: เครื่องหมาย + ชื่อ + คำไทยกำกับ — ใช้ที่แผงใหญ่ (หน้าเข้าสู่ระบบ)
- * ⚠️ ต้องเป็น "แนวนอน" ไม่ใช่เรียงแนวตั้งจริงๆ ถึงจะชื่อ stacked — หน้าเข้าสู่ระบบกำหนดความสูงไว้
- *    88px ถ้าเรียงแนวตั้ง ตัวอักษรจะเหลือเล็กจนอ่านไม่ออก (ดูคอมเมนต์ใน Login.js)
+ * ⚠️ ต้องเป็น "แนวนอน" ถึงจะชื่อ stacked — หน้าเข้าสู่ระบบกำหนดความสูงไว้ 88px ถ้าเรียงแนวตั้ง
+ *    ตัวอักษรจะเหลือเล็กจนอ่านไม่ออก (ดูคอมเมนต์ใน Login.js)
+ * @param {"onLight"|"mono"} way
  */
-const stackedSvg = ({ sub, mono = false } = {}) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 296 76" width="296" height="76" role="img" aria-label="${NAME.head}${NAME.tail} ${NAME.th}">${NOTE(`โลโก้เต็มชุด (เครื่องหมาย + ชื่อ + คำไทย) — ใช้ที่แผงใหญ่${mono ? " · แบบขาวล้วนสำหรับพื้นสีแบรนด์" : ""}`)}
-  <defs>
-    <linearGradient id="ttIcon2" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="${C.iconFrom}"/><stop offset="1" stop-color="${C.iconTo}"/>
-    </linearGradient>
-    <linearGradient id="ttWord2" gradientUnits="userSpaceOnUse" x1="204" y1="46" x2="290" y2="12">
-      <stop offset="0" stop-color="${C.wordFrom}"/><stop offset=".55" stop-color="${C.wordMid}"/><stop offset="1" stop-color="${C.wordTo}"/>
-    </linearGradient>
-  </defs>
-  <g transform="translate(0 6)">
-    ${mono ? "" : `<rect width="64" height="64" rx="15" fill="url(#ttIcon2)"/>`}
-    ${MARK(mono ? "currentColor" : "#ffffff")}
-  </g>
-  <text x="78" y="43" font-family="${FONT}" font-size="40" font-weight="700" letter-spacing="-.5">
-    <tspan fill="currentColor">${NAME.head}</tspan><tspan fill="${mono ? "currentColor" : "url(#ttWord2)"}">${NAME.tail}</tspan>
+const stackedSvg = (way) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 292 76" width="292" height="76" role="img" aria-label="${NAME.head}${NAME.tail} ${NAME.th}">${NOTE(`โลโก้เต็มชุด (เครื่องหมาย + ชื่อ + คำไทย)${way === "mono" ? " · แบบขาวล้วนสำหรับพื้นสีแบรนด์" : ""}`)}
+  <g transform="translate(0 6)">${MARK(way)}</g>
+  <text x="78" y="43" font-family="${FONT_LATIN}" font-size="40" font-weight="800" letter-spacing="-1">
+    <tspan fill="currentColor">${NAME.head}</tspan><tspan fill="${way === "mono" ? "currentColor" : C.red}">${NAME.tail}</tspan>
   </text>
-  <text x="80" y="63" font-family="${FONT}" font-size="15" font-weight="600" letter-spacing="3.4" fill="${sub}">${NAME.th}</text>
+  <text x="80" y="63" font-family="${FONT_THAI}" font-size="14" font-weight="600" letter-spacing="4.6" fill="${way === "mono" ? C.subOnDark : C.subOnLight}">${NAME.th}</text>
 </svg>`;
 
 // ══ แปลง SVG เป็น PNG ด้วย Chromium ══════════════════════════════════════════
@@ -178,7 +185,7 @@ const buildIco = (pngs) => {
     process.exit(1);
   }
   const browser = await chromium.launch({ executablePath: exe });
-  const shot = async (svg, { w, h, color = C.onDark, scale = 1 }) => {
+  const shot = async (svg, { w, h, color = C.white, scale = 1 }) => {
     const page = await browser.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: scale });
     await page.setContent(pageFor(svg, { w, h, color }), { waitUntil: "networkidle" });
     // ⚠️ รอฟอนต์พร้อมจริง — ถ่ายก่อนฟอนต์มาถึงจะได้ตัวอักษรฟอนต์สำรองของเครื่อง (คนละหน้าตากันทุกเครื่อง)
@@ -196,7 +203,7 @@ const buildIco = (pngs) => {
   const icon = iconSvg();
   write("app-icon.svg", icon);
   write("app-wordmark.svg", wordmarkSvg());
-  write("app-logo-stacked.svg", stackedSvg({ sub: C.subOnLight }));
+  write("app-logo-stacked.svg", stackedSvg("onLight"));
 
   console.log("\n── ไอคอนแอป (PNG) ──");
   const iconAt = (px, svg) => shot(svg, { w: px, h: px });
@@ -205,19 +212,19 @@ const buildIco = (pngs) => {
   // apple-touch: ไม่ต้องโค้งมุมเอง (iOS ตัดให้) และต้องทึบทั้งใบ ไม่มีพื้นโปร่ง
   write("app-icon-apple-180.png", await iconAt(180, iconSvg({ rx: 0, note: "ไอคอนสำหรับ iOS (หน้าจอโฮม)" })));
   // maskable: เครื่องหมายต้องอยู่ในวงปลอดภัย 80% กลางภาพ เผื่อระบบตัดเป็นวงกลม/หยดน้ำ
-  write("app-icon-maskable-512.png", await iconAt(512, iconSvg({ rx: 0, pad: 7, note: "ไอคอนแบบ maskable (Android ตัดรูปทรงเอง)" })));
+  write("app-icon-maskable-512.png", await iconAt(512, iconSvg({ rx: 0, pad: 10, note: "ไอคอนแบบ maskable (Android ตัดรูปทรงเอง)" })));
 
   console.log("\n── โลโก้ตัวอักษร (PNG) ──");
   const wm = wordmarkSvg();
-  write("app-wordmark-light.png", await shot(wm, { w: 150, h: 42, color: C.onDark, scale: 4 }));
-  write("app-wordmark-dark.png", await shot(wm, { w: 150, h: 42, color: C.onLight, scale: 4 }));
+  write("app-wordmark-light.png", await shot(wm, { w: 148, h: 42, color: C.white, scale: 4 }));
+  write("app-wordmark-dark.png", await shot(wm, { w: 148, h: 42, color: C.navy, scale: 4 }));
   /**
-   * ⚠️ แบบพื้นเข้ม (ใช้บนแผงสีแดงของหน้าเข้าสู่ระบบ) ต้องเป็น "ขาวล้วนไม่มีกรอบ" —
-   * ถ้าใช้ชุดสีเต็ม กรอบไอคอนสีแดงจะไปทับพื้นแดงจนจมหายไป และตัว "Tam" ที่ไล่เฉดแดง
-   * ก็อ่านยากบนพื้นเดียวกัน (เห็นของจริงมาแล้ว) — เป็นกติกามาตรฐานของโลโก้บนพื้นสีแบรนด์
+   * ⚠️ แบบพื้นเข้ม (ใช้บนแผงสีแดงของหน้าเข้าสู่ระบบ) ต้องเป็น "ขาวล้วน" —
+   * ถ้าใช้ชุดสองโทน ตัว "Tam" สีแดงกับช่วงแดงของวงแหวนจะไปจมกับพื้นแดงจนหายไปครึ่งโลโก้
+   * (เห็นของจริงมาแล้ว) — เป็นกติกามาตรฐานของโลโก้บนพื้นสีแบรนด์
    */
-  write("app-logo-stacked-light.png", await shot(stackedSvg({ sub: C.subOnDark, mono: true }), { w: 296, h: 76, color: C.onDark, scale: 4 }));
-  write("app-logo-stacked-dark.png", await shot(stackedSvg({ sub: C.subOnLight }), { w: 296, h: 76, color: C.onLight, scale: 4 }));
+  write("app-logo-stacked-light.png", await shot(stackedSvg("mono"), { w: 292, h: 76, color: C.white, scale: 4 }));
+  write("app-logo-stacked-dark.png", await shot(stackedSvg("onLight"), { w: 292, h: 76, color: C.navy, scale: 4 }));
 
   console.log("\n── favicon.ico (16/32/48 ในไฟล์เดียว) ──");
   const ico = [];

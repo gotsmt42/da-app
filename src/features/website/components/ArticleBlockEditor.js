@@ -2,18 +2,19 @@ import { Box, Button, IconButton, MenuItem, Stack, TextField, Tooltip, Typograph
 import { Add, ArrowDownward, ArrowUpward, DeleteOutline } from "@mui/icons-material";
 
 import { BLOCK_TYPES, emptyBlock } from "../utils/webContent";
+import ImageManager from "./ImageManager";
 import { StringListEditor } from "./ListEditors";
 import { UI } from "./WebsiteUi";
 
 /**
- * ตัวเขียนเนื้อหาบทความแบบบล็อก (ย่อหน้า · หัวข้อ · รายการ · ตาราง · หมายเหตุ)
+ * ตัวเขียนเนื้อหาบทความแบบบล็อก (ย่อหน้า · หัวข้อ · รายการ · ตาราง · หมายเหตุ · รูปภาพ)
  *
  * ⚠️ ตั้งใจไม่ใช้ตัวแก้แบบ Word/HTML — บทความเก็บเป็นบล็อก หน้าเว็บวาดเองทีละชนิด
  *    จึงไม่มีทางฝังสคริปต์ขึ้นเว็บสาธารณะได้ (ดู da-app-server/src/models/WebArticle.js)
  *    และหน้าตาทุกบทความสม่ำเสมอ ไม่มีใครเผลอใส่ตัวอักษรสีม่วงขนาด 30px กลางบทความ
  * ⚠️ ตารางต้องมีจำนวนช่องในแถวเท่าหัวตารางเสมอ — เพิ่ม/ลบคอลัมน์ที่หัวตาราง แถวปรับตามอัตโนมัติ
  */
-export default function ArticleBlockEditor({ value = [], onChange }) {
+export default function ArticleBlockEditor({ value = [], onChange, onError }) {
   const set = (i, block) => onChange(value.map((b, k) => (k === i ? block : b)));
   const move = (i, dir) => {
     const j = i + dir;
@@ -35,7 +36,11 @@ export default function ArticleBlockEditor({ value = [], onChange }) {
           <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 1.25, py: 0.5, bgcolor: UI.soft, borderBottom: `1px solid ${UI.border}`, borderRadius: "8px 8px 0 0" }}>
             <TextField
               select size="small" value={b.type} variant="standard"
-              onChange={(e) => set(i, { ...emptyBlock(e.target.value), text: b.text ?? "" })}
+              onChange={(e) => {
+                const next = emptyBlock(e.target.value);
+                // ⚠️ ย้ายข้อความเดิมตามไปเฉพาะชนิดที่มีช่องข้อความ — บล็อกรูปไม่มี text
+                set(i, "text" in next ? { ...next, text: b.text ?? "" } : next);
+              }}
               InputProps={{ disableUnderline: true, sx: { fontWeight: 700, fontSize: "0.82rem" } }}
             >
               {BLOCK_TYPES.map((t) => <MenuItem key={t.value} value={t.value}>{t.label}</MenuItem>)}
@@ -60,6 +65,20 @@ export default function ArticleBlockEditor({ value = [], onChange }) {
               <StringListEditor value={b.items || []} onChange={(items) => set(i, { ...b, items })} placeholder="ข้อความหนึ่งข้อ" addText="เพิ่มข้อ" maxLength={1000} itemLabel="รายการในบทความ" />
             )}
             {b.type === "table" && <TableBlock block={b} onChange={(nb) => set(i, nb)} />}
+            {b.type === "image" && (
+              <Stack spacing={1.25}>
+                {/* ⚠️ ใช้ตัวจัดการรูปตัวเดียวกับที่อื่นทั้งระบบ — อัปขึ้น Cloudinary แล้วเก็บ url+publicId
+                    ไม่ใช่ช่องให้วางลิงก์เอง (ลิงก์ภายนอกหายเมื่อไรก็ได้ และเป็นช่องให้ยัดของแปลกปลอม) */}
+                <ImageManager
+                  single value={b.image ? [b.image] : []}
+                  onChange={(arr) => set(i, { ...b, image: arr[0] || null })}
+                  onError={onError} label="รูปในบทความ"
+                  hint="อัปแล้วอย่าลืมกดบันทึกบทความ รูปถึงจะขึ้นเว็บ"
+                />
+                <TextField value={b.caption || ""} onChange={(e) => set(i, { ...b, caption: e.target.value })}
+                  fullWidth size="small" inputProps={{ maxLength: 300 }} placeholder="คำบรรยายใต้รูป (ไม่บังคับ)" />
+              </Stack>
+            )}
           </Box>
         </Box>
       ))}

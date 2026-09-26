@@ -1186,12 +1186,11 @@ const InlineAddRow = ({
 export default function ContractOverview() {
   const isMobile = useMediaQuery("(max-width:600px)");
   const { userData } = useAuth();
-  const role = userData?.role?.toLowerCase();
-  const isAdminOrManager = can(role, "editContracts");
+  const isAdminOrManager = can(userData, "editContracts");
   // ✅ ช่างเข้าดูหน้านี้ได้ด้วย (เห็นแค่งานของตัวเอง — กรองมาจาก backend แล้ว) แต่แก้ไขไม่ได้
   // isAdminOrManager ยังคงคุมทุกจุดที่แก้ไขข้อมูลเหมือนเดิมทั้งหมด เทียบ pattern เดียวกับ
   // QuotationTracking.js (canAccess/isAdminOrManager แยกกัน)
-  const canView = can(role, "viewContracts");
+  const canView = can(userData, "viewContracts");
 
   const [searchParams] = useSearchParams();
   const [events, setEvents] = useState([]);

@@ -85,7 +85,7 @@ import InfoLine from "@/shared/ui/InfoLine";
 import { useSiteMapUrl, GoogleMapsPin } from "@/shared/ui/SiteMapLink";
 import { JOB_DOC_TYPES } from "@/shared/utils/jobDocTypes";
 import { formatThai } from "@/shared/utils/thaiDate";
-import { ROLES, TECHNICIAN_ROLES, isRole } from "@/shared/utils/roles";
+import { ROLES, TECHNICIAN_ROLES, isRole, normalizeRole } from "@/shared/utils/roles";
 import { can } from "@/shared/utils/roles";
 
 // ✅ ใช้ตัดสินใจลำดับปุ่มแชร์ในเมนู "⋮" ต่อไฟล์ (ดูเหตุผลใน fileActions.js)
@@ -816,12 +816,12 @@ const FileRow = React.memo(
 export const FileUploadSection = ({
   eventId, type, label, files, applicable,
   onUpload, onDelete, onPreview,
-  uploading, progress, uploading_size, currentUserRole,
+  uploading, progress, uploading_size, currentUser,
 }) => {
   const [dragging, setDragging] = useState(false);
   const inputRef = React.useRef();
   const overrideInputRef = React.useRef();
-  const canEdit  = can(currentUserRole, "editOperation");
+  const canEdit  = can(currentUser, "editOperation");
 
   // ✅ เมนู "⋮" ต่อไฟล์ — เดิมโชว์ปุ่มดาวน์โหลด/ลบเรียงเป็นไอคอนแยกทุกแถว ดูรกตาเวลามีหลายไฟล์
   // รวมเป็นเมนูเดียว เหลือแค่ปุ่มดูไฟล์ (บ่อยสุด) + ปุ่ม "⋮" แยกต่างหาก
@@ -1078,7 +1078,7 @@ const EventRowCard = ({
   event, employee, onStatusUpdate, onDocNoUpdate, onInputUpdate, onDateUpdate,
   onFileUpload, onDeleteFile, onPreview, onDelete, onApproveClose, onRejectClose,
   uploadingState, isUploadingState, uploadProgressState, uploadingFileSizeState,
-  currentUserRole,
+  currentUser,
   // ✅ งานที่เข้าหลายวัน (กลุ่มเดียวกัน) ใช้เอกสารร่วมกันชุดเดียว — JobGroupBlock จะโชว์
   // เอกสารรวมไว้ที่หัวกลุ่มแทน จึงซ่อนส่วนอัปโหลดเอกสารในการ์ดรายวันแต่ละใบไม่ให้ซ้ำกัน
   hideDocuments = false,
@@ -1121,8 +1121,8 @@ const EventRowCard = ({
   // การกางลงในหน้า (Collapse) — เดิมกางแล้วเนื้อหายาวๆ ดันการ์ดอื่นในคอลัมน์เดียวกันลงมา ต้อง
   // เลื่อนจอตาม ทั้งที่จอกว้างเปิดลอยทับได้เลยโดยไม่กระทบตำแหน่งการ์ดอื่น (มือถือยังกางลงแบบเดิม)
   const isDesktop = useMediaQuery("(min-width:900px)");
-  const canEdit = can(currentUserRole, "editOperation");
-  const isAdminOrManager = can(currentUserRole, "approveJobs");
+  const canEdit = can(currentUser, "editOperation");
+  const isAdminOrManager = can(currentUser, "approveJobs");
 
   // ── Send Comment (คุยกับช่าง เช่น ตอบคำขอใบเสนอราคา) ──────────────────
   const handleSendComment = async (message) => {
@@ -1130,7 +1130,7 @@ const EventRowCard = ({
     const newComment = {
       userId: payload?.userId || "",
       userName: payload?.name || payload?.username || "แอดมิน",
-      role: currentUserRole,
+      role: normalizeRole(currentUser),   // ช่องนี้เก็บ "ตำแหน่ง" เป็นสตริงตามเดิม (ถูกเทียบด้วย isRole ตอนแสดงผล)
       message,
       timestamp: new Date().toISOString(),
     };
@@ -1258,7 +1258,7 @@ const EventRowCard = ({
           uploading={isUploadingState.report && uploadingState.report === event._id}
           progress={uploadProgressState.report}
           uploading_size={uploadingFileSizeState.report}
-          currentUserRole={currentUserRole}
+          currentUser={currentUser}
         />
       </Grid>
       )}
@@ -1272,7 +1272,7 @@ const EventRowCard = ({
           uploading={isUploadingState.quotation && uploadingState.quotation === event._id}
           progress={uploadProgressState.quotation}
           uploading_size={uploadingFileSizeState.quotation}
-          currentUserRole={currentUserRole}
+          currentUser={currentUser}
         />
       </Grid>
       )}
@@ -1287,7 +1287,7 @@ const EventRowCard = ({
           uploading={isUploadingState.invoice && uploadingState.invoice === event._id}
           progress={uploadProgressState.invoice}
           uploading_size={uploadingFileSizeState.invoice}
-          currentUserRole={currentUserRole}
+          currentUser={currentUser}
         />
       </Grid>
       )}
@@ -1302,7 +1302,7 @@ const EventRowCard = ({
           uploading={isUploadingState.completion && uploadingState.completion === event._id}
           progress={uploadProgressState.completion}
           uploading_size={uploadingFileSizeState.completion}
-          currentUserRole={currentUserRole}
+          currentUser={currentUser}
         />
       </Grid>
       )}
@@ -1314,7 +1314,7 @@ const EventRowCard = ({
           sx={{ textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 0.5, mb: 1 }}>
           <Chat sx={{ fontSize: 14 }} /> คุยกับช่าง{(event.comments || []).length > 0 && ` (${event.comments.length})`}
         </Typography>
-        <CommentThread comments={event.comments} onSend={handleSendComment} myRole={currentUserRole} />
+        <CommentThread comments={event.comments} onSend={handleSendComment} myRole={currentUser} />
       </Grid>
 
       {event.activityLog?.length > 0 && (
@@ -2252,7 +2252,7 @@ const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob }) => (
 // โชว์ช่วงวันที่รวมทั้งหมด (เริ่ม–สิ้นสุด) ในหัวการ์ดเดียว + ยุบ/ขยายเพื่อซ่อนการ์ดรายวัน
 // ลดความรกเวลามีหลายวัน แต่ยังกดขยายดู/จัดการแต่ละวันแยกกันได้ตามเดิม
 // ═══════════════════════════════════════════════════════════════════════
-const JobGroupBlock = ({ sessions, currentUserRole, ...cardProps }) => {
+const JobGroupBlock = ({ sessions, currentUser, ...cardProps }) => {
   const [expanded, setExpanded] = useState(false);
   const isGrouped = sessions.length > 1;
 
@@ -2263,10 +2263,10 @@ const JobGroupBlock = ({ sessions, currentUserRole, ...cardProps }) => {
 
   const renderCard = (event) => {
     const hideDocuments = isGrouped && event._id !== anchorId;
-    return isRole(currentUserRole, ...TECHNICIAN_ROLES) ? (
+    return isRole(currentUser, ...TECHNICIAN_ROLES) ? (
       <TechnicianJobCard key={event._id} event={event} {...cardProps} isTechnicianView={true} hideDocuments={hideDocuments} noOuterCard={isGrouped} />
     ) : (
-      <EventRowCard key={event._id} event={event} {...cardProps} currentUserRole={currentUserRole} hideDocuments={hideDocuments} noOuterCard={isGrouped} />
+      <EventRowCard key={event._id} event={event} {...cardProps} currentUser={currentUser} hideDocuments={hideDocuments} noOuterCard={isGrouped} />
     );
   };
 
@@ -2484,7 +2484,7 @@ const Operation = () => {
   // ตั้ง activeTab=1 ให้ role อื่นจะกลายเป็นแท็บที่ไม่มีอยู่จริง = หน้าว่างเปล่าโดยไม่มีอะไรอธิบาย
   // ⚠️ deps มี searchParams (ไม่ใช่ mount-only) — กดแจ้งเตือนซ้ำตอนที่อยู่หน้านี้อยู่แล้ว จะเปลี่ยนแค่
   // query param โดยไม่ remount หน้า (เทียบเหตุผลเดียวกับ effect ของ ?highlight= ด้านบน)
-  // ⚠️ ตัว effect จริงอยู่ใต้จุดที่ประกาศ currentUserRole (ดูด้านล่าง) — เขียนไว้ตรงนั้นเพื่อไม่ให้
+  // ⚠️ ตัว effect จริงอยู่ใต้จุดที่ประกาศ currentUser (ดูด้านล่าง) — เขียนไว้ตรงนั้นเพื่อไม่ให้
   // อ้างถึงตัวแปรก่อนถูกประกาศ
 
   const [page,     setPage]     = useState(1);
@@ -2507,8 +2507,12 @@ const Operation = () => {
   const [confirmOpen,      setConfirmOpen]        = useState(false);
   const [pendingDelete,    setPendingDelete]      = useState(null);
   const [snackbar,         setSnackbar]           = useState({ open: false, msg: "", severity: "success" });
-  const [currentUserRole,  setCurrentUserRole]    = useState("");
-  const isAdminOrManager = can(currentUserRole, "approveJobs");
+  /**
+   * ⚠️ เก็บ "ตัวผู้ใช้ทั้งก้อน" ไม่ใช่สตริงตำแหน่ง — can()/isRole() ต้องเห็นทั้งตำแหน่งในองค์กร (rank)
+   * และชั้นในระบบ (role) ถ้าส่งแค่สตริง Super Admin ที่ตำแหน่งเป็นช่างจะแก้อะไรในบอร์ดนี้ไม่ได้เลย
+   */
+  const [currentUser,  setCurrentUser]    = useState(null);
+  const isAdminOrManager = can(currentUser, "approveJobs");
 
   // ✅ ?tab=approvals — เปิดหน้านี้มาที่แท็บ "รออนุมัติ" ได้ทันที
   // 🐛 ที่แก้ (กดแจ้งเตือน "ส่งงานใหม่รออนุมัติ" แล้วมาไม่ถูกที่): แจ้งเตือนชนิดนี้เดิมพามาที่
@@ -2535,7 +2539,7 @@ const Operation = () => {
 
   useEffect(() => {
     const payload = JSON.parse(localStorage.getItem("payload") || "{}");
-    if (payload?.role) setCurrentUserRole(payload.role);
+    if (payload?.role || payload?.rank) setCurrentUser(payload);
   }, []);
 
   useEffect(() => {
@@ -2549,12 +2553,12 @@ const Operation = () => {
   // เพื่อให้ผลอนุมัติ/ไม่อนุมัติคำขอปิดงาน render กลับไปหาช่างแบบ realtime
   // โดยไม่ต้องกดรีเฟรชเอง
   useEffect(() => {
-    if (!currentUserRole) return;
+    if (!currentUser) return;
     const interval = setInterval(() => {
       fetchEventsFromDB(true); // silent refresh
     }, 15000);
     return () => clearInterval(interval);
-  }, [currentUserRole]);
+  }, [currentUser]);
 
   // ✅ เรียลไทม์: งานเปลี่ยน (อนุมัติปิดงาน/แก้สถานะ/มอบหมาย) → บอร์ดอัปเดตทันที ไม่ต้องรอรอบ 15 วินาทีข้างบน
   useRealtime("events", () => { fetchEventsFromDB(true); });
@@ -2673,7 +2677,7 @@ const Operation = () => {
     // ย้ายไปจัดการทั้งหมดที่หน้า "งานของฉัน" (technician/jobs) แทน ไม่มี "pending"/"active" ให้เลือก
     // ในมุมมองของช่างอีกต่อไป — ต้องคำนวณกลุ่มนี้ "ก่อน" matchNotPending เพราะกลุ่ม "ค้างงาน" ต้อง
     // งดเว้นการตัด "กำลังรอยืนยัน" ออก (ดูเหตุผลด้านล่าง)
-    const isAdminOrManagerRole = can(currentUserRole, "approveJobs");
+    const isAdminOrManagerRole = can(currentUser, "approveJobs");
     // ✅ เดิม default ไปที่ "pending" (รอคุณอนุมัติ) เสมอสำหรับแอดมิน/manager แม้ไม่มีงานรออนุมัติเลย
     // ทำให้เปิดหน้ามาเจอ "ไม่พบรายการ" ว่างเปล่าโดยไม่มีอะไรผิดพลาดจริง — ถ้าไม่มีคำขอปิดงานรออยู่
     // ให้ default ไปโชว์ "กำลังดำเนินการ/ยืนยันแล้ว" แทน ซึ่งมักจะมีงานอยู่จริงให้เห็นทันที
@@ -2713,7 +2717,7 @@ const Operation = () => {
 
     return matchMonth && matchType && matchSystem && matchStatus && matchOP && matchTeam && matchSearch && matchNotPending && matchGroup;
   });
-}, [id, selectedEvent, events, dateSearch, filterType, filterSystem, filterStatus, filterOP, filterTeam, search, statusGroup, currentUserRole, daysPastDueMap, pendingCount]);
+}, [id, selectedEvent, events, dateSearch, filterType, filterSystem, filterStatus, filterOP, filterTeam, search, statusGroup, currentUser, daysPastDueMap, pendingCount]);
 
   // ✅ แท็บ "ค้างงาน" เดิมเรียงตามวันที่เริ่มงานเหมือนแท็บอื่นๆ ทำให้ป้าย "เลยกำหนด X วัน" โผล่มาแบบ
   // สลับมั่วไม่มีลำดับ (เช่น 10, 14, 13, 20 วัน สลับกันไปมา) ดูยากว่างานไหนควรรีบทำก่อน — เรียง
@@ -3439,7 +3443,7 @@ const Operation = () => {
                     )}
                     <JobGroupBlock
                       sessions={sessions}
-                      currentUserRole={currentUserRole}
+                      currentUser={currentUser}
                       employee={employee}
                       onStatusUpdate={handleStatusUpdate}
                       onDateUpdate={handleDateUpdate}

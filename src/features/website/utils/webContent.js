@@ -42,8 +42,10 @@ export const BLOCK_TYPES = [
   { value: "list", label: "รายการ" },
   { value: "table", label: "ตาราง" },
   { value: "note", label: "กล่องหมายเหตุ" },
+  { value: "image", label: "รูปภาพ" },
 ];
 export const emptyBlock = (type) => {
+  if (type === "image") return { type, image: null, caption: "" };
   if (type === "list") return { type, items: [""] };
   if (type === "table") return { type, head: ["หัวข้อ", "รายละเอียด"], rows: [["", ""]] };
   return { type, text: "" };

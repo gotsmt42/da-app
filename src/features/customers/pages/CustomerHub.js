@@ -23,9 +23,8 @@ const Customer = lazy(() => import("./Customer"));
 
 const CustomerHub = () => {
   const { userData } = useAuth();
-  const role = userData?.role?.toLowerCase();
-  const isAdmin = can(role, "manageAll");
-  const isAdminOrManager = can(role, "manageMasterData");
+  const isAdmin = can(userData, "manageAll");
+  const isAdminOrManager = can(userData, "manageMasterData");
 
   // ⚠️ กันช่างเปิดหน้านี้ตรงๆ ผ่าน URL — เทียบ pattern เดียวกับที่แต่ละหน้าเดิมทำอยู่แล้ว
   if (!isAdminOrManager) return <Navigate to="/dashboard" replace />;

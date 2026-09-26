@@ -1,15 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 42" width="150" height="42" role="img" aria-label="TidTam ติดตาม">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 148 42" width="148" height="42" role="img" aria-label="TidTam ติดตาม">
   <!--
     โลโก้ตัวอักษรล้วน — ใช้บนแถบบนและการ์ดฟอร์ม
     ⚠️ ไฟล์นี้ถูกสร้างจากสคริปต์ scripts/make-brand.js — ห้ามแก้ด้วยมือ (รันใหม่แล้วทับทันที)
     ⚠️ เป็นเครื่องหมายของ "แอป" เท่านั้น ไม่ใช่โลโก้บริษัท (โลโก้บริษัทตั้งจากหน้า "ตั้งค่าองค์กร")
   -->
-  <defs>
-    <linearGradient id="ttWord" gradientUnits="userSpaceOnUse" x1="74" y1="36" x2="146" y2="8">
-      <stop offset="0" stop-color="#fb4b5c"/><stop offset=".55" stop-color="#dc2626"/><stop offset="1" stop-color="#a21caf"/>
-    </linearGradient>
-  </defs>
-  <text x="2" y="33" font-family="'IBM Plex Sans Thai', system-ui, sans-serif" font-size="38" font-weight="700" letter-spacing="-.5">
-    <tspan fill="currentColor">Tid</tspan><tspan fill="url(#ttWord)">Tam</tspan>
+  <text x="2" y="33" font-family="'Poppins', system-ui, sans-serif" font-size="38" font-weight="800" letter-spacing="-1">
+    <tspan fill="currentColor">Tid</tspan><tspan fill="#dc2626">Tam</tspan>
   </text>
 </svg>

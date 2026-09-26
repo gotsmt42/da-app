@@ -70,8 +70,7 @@ function TrackRow({ color, icon, title, sub }) {
 
 export default function CustomerOverview() {
   const { userData, loading: authLoading } = useAuth();
-  const role = (userData?.role || "").toLowerCase();
-  const isAdminOrManager = can(role, "manageMasterData");
+  const isAdminOrManager = can(userData, "manageMasterData");
   const isMobile = useMediaQuery("(max-width:900px)");
   const navigate = useNavigate();
 

@@ -560,17 +560,17 @@ const StatusEditMenu = ({ meta, onSelect }) => {
 };
 
 // ─── Dialog รายละเอียด/ดำเนินการ — เด้งขึ้นมาแทนการกางในหน้า (เต็มจอบนมือถือ) ───────────
-const QuotationDetailDialog = ({ job, currentUserRole, onClose, onAction, onAmountSave, onAddFollowUp,
+const QuotationDetailDialog = ({ job, currentUser, onClose, onAction, onAmountSave, onAddFollowUp,
   onFileUpload, onDeleteFile, onPreview, uploadingState, isUploadingState, uploadProgressState }) => {
   const theme = useTheme();
   const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
   const navigate = useNavigate();
-  const isAdminOrManager = can(currentUserRole, "editFinance");
+  const isAdminOrManager = can(currentUser, "editFinance");
   // ✅ ช่างแก้ไขสถานะงานของตัวเองได้ด้วย (ไม่ใช่แค่ดู) — backend อนุญาตอยู่แล้ว (เจ้าของ/ผู้ได้รับ
   // มอบหมายแก้ไข event ตัวเองได้เสมอ ดู PUT /:id) และ /quotations ก็ scope ให้ช่างเห็นแค่งานตัวเอง
   // อยู่แล้วด้วย (getEventOp) เลยไม่ต้องกันเพิ่มฝั่งนี้ — ยกเว้นมูลค่าใบเสนอราคา (AmountEditor) ที่ยังเป็น
   // สิทธิ์ admin/manager เท่านั้นเหมือนเดิม (ไม่ได้ถูกขอให้เปลี่ยน)
-  const canEditStatus = isAdminOrManager || isRole(currentUserRole, ...TECHNICIAN_ROLES);
+  const canEditStatus = isAdminOrManager || isRole(currentUser, ...TECHNICIAN_ROLES);
 
   if (!job) return null;
   const anchor = job.sessions[0];
@@ -641,7 +641,7 @@ const QuotationDetailDialog = ({ job, currentUserRole, onClose, onAction, onAmou
               onPreview={onPreview}
               uploading={isUploadingState.quotation && uploadingState.quotation === anchor._id}
               progress={uploadProgressState.quotation}
-              currentUserRole={currentUserRole}
+              currentUser={currentUser}
             />
           </Grid>
 
@@ -704,7 +704,7 @@ const QuotationDetailDialog = ({ job, currentUserRole, onClose, onAction, onAmou
               <Chat sx={{ fontSize: 14 }} /> คุยกับช่าง{(anchor.comments || []).length > 0 && ` (${anchor.comments.length})`}
             </Typography>
             <CommentThread comments={anchor.comments}
-              onSend={(message) => onAction(job, "comment", { message })} myRole={currentUserRole} />
+              onSend={(message) => onAction(job, "comment", { message })} myRole={currentUser} />
           </Grid>
         </Grid>
       </DialogContent>
@@ -802,8 +802,8 @@ const TechnicianFilterButton = ({ technicians, selectedId, counts, totalCount, o
 export default function QuotationTracking() {
   const { userData } = useAuth();
   const role = userData?.role?.toLowerCase();
-  const isAdminOrManager = can(role, "editFinance");
-  const canAccess = can(role, "viewQuotations");
+  const isAdminOrManager = can(userData, "editFinance");
+  const canAccess = can(userData, "viewQuotations");
   // ✅ deep-link จาก Dashboard (กล่องแจ้งเตือน "ใบเสนอราคาที่ต้องติดตามด่วน") — เปิด Dialog
   // รายละเอียดงานนั้นให้อัตโนมัติผ่าน ?jobId=<eventId> แทนที่จะให้ผู้ใช้ไล่หาเองในรายการ
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1332,7 +1332,7 @@ export default function QuotationTracking() {
 
       <QuotationDetailDialog
         job={detailJob}
-        currentUserRole={role}
+        currentUser={userData}
         onClose={() => setDetailJob(null)}
         onAction={handleAction}
         onAmountSave={handleAmountSave}

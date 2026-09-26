@@ -4,7 +4,10 @@
 
 /* แถบ Header หลัก */
 .fix-header {
-  height: 70px; /* ล็อกความสูงไว้ที่ 70px กำลังพอดีสำหรับแดชบอร์ดระดับพรีเมียม */
+  /* 70px กำลังพอดีสำหรับแดชบอร์ดระดับพรีเมียม
+     ⚠️ ค่าจริงอยู่ที่ --app-header-h ใน FullLayout.css — แถบเมนูข้างบนจอคอมคิดความสูงตัวเอง
+     จากค่านี้ (100vh ลบแถบบน) ถ้าแก้ตรงนี้เป็นตัวเลขตายตัว แถบข้างจะสูงไม่พอดีจอทันที */
+  height: var(--app-header-h, 70px);
   background: linear-gradient(180deg, #182031 0%, #141b29 100%) !important;
   padding: 0 24px !important;
   display: flex;
@@ -218,7 +221,8 @@
    -------------------------------------------------------------------------- */
 @media (max-width: 992px) {
   .fix-header {
-    height: 64px; /* กระชับพื้นที่บนจอเล็ก */
+    /* กระชับพื้นที่บนจอเล็ก — ค่าจริงมาจาก --app-header-h ใน FullLayout.css เช่นกัน */
+    height: var(--app-header-h, 64px);
     padding: 0 16px !important;
   }
 

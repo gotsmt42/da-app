@@ -49,12 +49,11 @@ const TABS = [
 
 export default function BillingTracking() {
   const { userData, loading: authLoading } = useAuth();
-  const role = (userData?.role || "").toLowerCase();
   // ✅ ช่างเข้าดู/อัปเดตการเงินของงานตัวเองได้ด้วย (ตามที่ผู้ใช้ระบุ) — ไม่ว่าจะเป็นผู้รับผิดชอบ
   // หัวหน้าทีม หรือลูกทีม ⚠️ ไม่ต้องกรองข้อมูลเองในหน้านี้ เพราะ getEventOp() ฝั่ง server คืนเฉพาะ
   // งานที่ผู้ใช้คนนั้นมีชื่ออยู่ให้อยู่แล้ว (ดู GET /event-op) และทุก route ที่บันทึกข้อมูลการเงินก็เช็ค
   // สิทธิ์รายงานซ้ำอีกชั้น (requireEventFinanceAccess) — ฝั่งจอจึงไม่ต้องกันซ้ำและไม่ควรกันด้วย role
-  const canAccess = can(role, "viewFinance");
+  const canAccess = can(userData, "viewFinance");
   const isMobile = useMediaQuery("(max-width:900px)");
 
   const [events, setEvents] = useState([]);

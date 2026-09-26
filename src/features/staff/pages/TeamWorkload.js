@@ -63,8 +63,7 @@ const SORT_OPTIONS = [
 export default function TeamWorkload() {
   const { userData } = useAuth();
   const navigate = useNavigate();
-  const role = userData?.role?.toLowerCase();
-  const isAdminOrManager = can(role, "manageMasterData");
+  const isAdminOrManager = can(userData, "manageMasterData");
 
   const [events, setEvents] = useState([]);
   const [users, setUsers] = useState([]);

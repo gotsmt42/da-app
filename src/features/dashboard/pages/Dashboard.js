@@ -95,16 +95,16 @@ const Dashboard = () => {
   const isDesktopScreen = useMediaQuery("(min-width:900px)");
   const styles = useMemo(() => scaleStyleFonts(baseStyles, isDesktopScreen), [isDesktopScreen]);
   const role = userData?.role?.toLowerCase();
-  const isAdmin = can(role, "manageAll");
-  const isAdminOrManager = can(role, "viewAllJobs");
+  const isAdmin = can(userData, "manageAll");
+  const isAdminOrManager = can(userData, "viewAllJobs");
   const isTechnician = isRole(role, ...TECHNICIAN_ROLES);
   // ✅ หน้า "ภาพรวมงาน" เปิดให้ช่างเข้าดูสัญญาของตัวเองได้แล้ว (ดู ContractOverview.js canView /
   // Header.js canViewContracts) — วิดเจ็ต "สัญญาที่เลยกำหนด/คงค้าง" ด้านล่างต้องเปิดให้ตรงกันด้วย
-  const canViewContracts = can(role, "viewContracts");
+  const canViewContracts = can(userData, "viewContracts");
   // ✅ เซล — สายงานคนละสายกับช่าง จึงต้องมีทางลัดของตัวเองแทนที่จะเห็นทางลัดของงานช่างที่กดไปก็ทำอะไรไม่ได้
   const isSale = isRole(role, ROLES.SALE);
   // ⚠️ ทางลัดตามสิทธิ์ (การดำเนินงาน/คำขอลงงาน ฯลฯ) ย้ายไปตัดสินใน HomeMenu.js ที่เดียวแล้ว
-  const canViewQuotations = can(role, "viewQuotations");
+  const canViewQuotations = can(userData, "viewQuotations");
 
   /**
    * ชุดสีประจำสายงานของผู้ใช้คนนี้

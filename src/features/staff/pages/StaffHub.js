@@ -20,9 +20,9 @@ const Employee = lazy(() => import("./Employee"));
 
 const StaffHub = () => {
   const { userData } = useAuth();
-  const role = userData?.role?.toLowerCase();
-  const isAdmin = can(role, "manageAll");
-  const isAdminOrManager = can(role, "manageMasterData");
+  // ⚠️ ส่ง userData ทั้งก้อน ไม่ใช่สตริงตำแหน่ง — ไม่งั้น Super Admin ที่ตำแหน่งเป็นช่างจะโดนเด้งออก
+  const isAdmin = can(userData, "manageAll");
+  const isAdminOrManager = can(userData, "manageMasterData");
 
   if (!isAdminOrManager) return <Navigate to="/dashboard" replace />;
 

@@ -28,9 +28,11 @@ const cleanBody = (body) =>
     .map((b) => {
       if (b.type === "list") return { type: "list", items: cleanList(b.items) };
       if (b.type === "table") return { type: "table", head: b.head.map((h) => h.trim()), rows: b.rows.filter((r) => r.some((c) => c.trim())) };
+      // ⚠️ บล็อกรูปไม่มีช่อง text — ถ้าเผลอส่งผ่านสาขาข้างล่างจะกลายเป็น text ว่างแล้วโดนตัดทิ้งทั้งบล็อก
+      if (b.type === "image") return { type: "image", image: b.image || null, caption: String(b.caption || "").trim() };
       return { type: b.type, text: String(b.text || "").trim() };
     })
-    .filter((b) => (b.type === "list" ? b.items.length : b.type === "table" ? b.rows.length : b.text));
+    .filter((b) => (b.type === "list" ? b.items.length : b.type === "table" ? b.rows.length : b.type === "image" ? b.image?.url : b.text));
 
 export default function WebsiteArticles() {
   const fb = useFeedback();
@@ -165,7 +167,7 @@ function ArticleEditor({ initial, busy, onCancel, onSave, onError }) {
           </Box>
           <Box>
             <FieldLabel required>เนื้อหา</FieldLabel>
-            <ArticleBlockEditor value={f.body} onChange={set("body")} />
+            <ArticleBlockEditor value={f.body} onChange={set("body")} onError={onError} />
           </Box>
         </Stack>
       </DialogContent>

@@ -11,7 +11,7 @@ import { can, isRole, isAdminOrManager, normalizeRole, departmentOf, rankLabel, 
 describe("normalizeRole", () => {
   // ⚠️ role ถูกกรอกด้วยมือผ่านหน้าจัดการผู้ใช้ และเคยมีทั้งตัวใหญ่/ช่องว่างติดมา
   it("รับได้ทั้ง object และสตริง และตัดช่องว่าง/ตัวพิมพ์ใหญ่ทิ้ง", () => {
-    expect(normalizeRole({ role: "Admin" })).toBe("admin");
+    expect(normalizeRole({ role: "Admin" })).toBe("techadmin");   // ชื่อคีย์เดิมยังอ่านออก
     expect(normalizeRole(" TECHNICIAN ")).toBe("technician");
     expect(normalizeRole({ role: "  Sale " })).toBe("sale");
   });
@@ -237,7 +237,7 @@ describe("ความถูกต้องของตารางเอง", (
  */
 describe("Role กับ Rank แยกกัน", () => {
   it("Rank เรียงจากสิทธิ์มากไปน้อย (คอลัมน์ในตารางสิทธิ์ก็เรียงตามนี้)", () => {
-    expect(ALL_ROLES).toEqual(["director", "manager", "admin", "techlead", "technician", "sale", "user"]);
+    expect(ALL_ROLES).toEqual(["director", "manager", "techadmin", "techlead", "technician", "sale", "user"]);
   });
 
   it("RANKS เป็นชื่อเรียกใหม่ของ ROLES (คีย์เดิมทั้งหมด ไม่มีการย้ายข้อมูล)", () => {
@@ -249,6 +249,42 @@ describe("Role กับ Rank แยกกัน", () => {
     expect(systemRoleOf({ role: "manager" })).toBe("superadmin");
     expect(systemRoleOf({ role: "admin" })).toBe("admin");
     expect(systemRoleOf({ role: "technician" })).toBe("member");
+  });
+
+  it("ตั้ง Super Admin ไว้ที่ role แต่ยังไม่มี rank — ต้องยังเป็น Super Admin (ไม่ใช่ Member)", () => {
+    // 🐛 ผู้ใช้แจ้ง: "role เป็น superadmin แล้ว แต่เมนูไม่ขึ้น" — เดิมต้องมี rank ที่ถูกต้องด้วย
+    // ถึงจะยอมอ่าน role เป็นชั้นในระบบ บัญชีที่ยังไม่ได้ตั้งตำแหน่งในองค์กรจึงตกเป็น Member เงียบๆ
+    const noRank = { role: "superadmin" };
+    expect(systemRoleOf(noRank)).toBe("superadmin");
+    expect(can(noRank, "manageSystem")).toBe(true);
+    expect(can(noRank, "viewContracts")).toBe(true);   // Super Admin ผ่านทุกสิทธิ์อยู่แล้ว
+    // ⚠️ และห้ามเอาคำว่า superadmin ไปสวมเป็น "ตำแหน่งในองค์กร"
+    expect(normalizeRole(noRank)).toBe("");
+  });
+
+  it('คีย์ตำแหน่ง "แอดมินช่าง" ไม่ชนกับชั้นในระบบ Admin อีกแล้ว', () => {
+    expect(ROLES.ADMIN).toBe("techadmin");
+    expect(ALL_ROLES).not.toContain("admin");   // "admin" เหลือความหมายเดียว = ชั้นในระบบ
+  });
+
+  it('ข้อมูลเก่าที่ยังใช้คีย์ "admin" ต้องอ่านเป็นแอดมินช่างได้เหมือนเดิม', () => {
+    // ⚠️ สำเนาที่ฝังในเอกสารเก่า (ใบเบิก/ใบมอบหมาย/ประวัติ) ยังมีค่าเดิมอยู่ตลอดไป — ห้ามอ่านไม่ออก
+    for (const legacy of [{ role: "admin" }, { rank: "admin" }, { role: "admin", rank: "admin" }, "admin"]) {
+      expect(normalizeRole(legacy)).toBe(ROLES.ADMIN);
+      expect(can(legacy, "approveJobs")).toBe(true);
+    }
+    expect(systemRoleOf({ role: "admin" })).toBe("admin");
+  });
+
+  it("ตั้งชั้นในระบบจากหน้าตั้งค่าแล้วต้องมีผลทันที (ชนะค่าเดิมในช่อง role)", () => {
+    // 🐛 ผู้ใช้แจ้ง "ตั้ง Super Admin แล้วเมนูไม่ขึ้น" — คนที่สมัครเข้ามาจะมี role = "member" ติดตัวมา
+    // ถ้าค่านั้นชนะ การตั้งค่าจากหน้าตั้งค่าสิทธิ์จะไม่มีผลอะไรเลย
+    const promoted = { role: "member", rank: "technician", systemRole: "superadmin" };
+    expect(systemRoleOf(promoted)).toBe("superadmin");
+    expect(can(promoted, "manageSystem")).toBe(true);
+    // ⚠️ แต่ตำแหน่งในองค์กรยังเป็นช่างเทคนิคเหมือนเดิม — คนละเรื่องกัน
+    expect(normalizeRole(promoted)).toBe("technician");
+    expect(can(promoted, "approveExpense")).toBe(false);   // สายอนุมัติเงินไม่ให้ลัดขั้น
   });
 
   it("ตั้ง Role เองแล้วชนะค่าที่เดา — ช่างเป็น Super Admin ได้ แต่ Rank ยังเป็นช่าง", () => {
@@ -300,8 +336,9 @@ describe("อ่านตำแหน่งได้ทั้งรูปแบ�
   });
 
   it('คำว่า "admin" เป็นได้ทั้ง Rank และ Role — ต้องไม่สลับกัน', () => {
+    // ⚠️ ข้อมูลชุดนี้คือ "ของเดิม" ตอนที่คีย์ยังชนกัน — ต้องยังแปลได้ถูกทั้งสองทาง
     const orgAdmin = { rank: "admin", role: "admin" };
-    expect(normalizeRole(orgAdmin)).toBe("admin");
+    expect(normalizeRole(orgAdmin)).toBe("techadmin");
     expect(systemRoleOf(orgAdmin)).toBe("admin");
     expect(can(orgAdmin, "reviewExpense")).toBe(true);   // สิทธิ์จาก Rank
     expect(can(orgAdmin, "manageSystem")).toBe(false);   // Role แค่ Admin ตั้งค่าระบบไม่ได้
