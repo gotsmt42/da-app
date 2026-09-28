@@ -43,11 +43,23 @@ const ACCENT = META.color;
 const MAX_ITEMS = 40;
 let keySeq = 0;
 const nextKey = () => `c${Date.now()}_${(keySeq += 1)}`;
-const blankItem = () => ({ key: nextKey(), category: "labor", description: "", detail: "", qty: 1, unit: "งาน", unitPrice: "" });
+const blankItem = () => ({ key: nextKey(), category: "labor", description: "", detail: "", qty: 1, unit: "งาน", unitPrice: "", workDate: "" });
+/** แถวค่าแรงรายวัน — 1 แถว = 1 วันทำงาน (ผู้ใช้: "อยากได้ใส่วันที่ เพราะเขาเบิกเป็นวัน") */
+const dayItem = (workDate = "", unitPrice = "", auto = false) => ({
+  key: nextKey(), category: "labor", description: "ค่าแรง", detail: "", qty: 1, unit: "วัน", unitPrice, workDate, auto,
+});
 const fromDoc = (it) => ({
   key: nextKey(), category: it.category || "labor", description: it.description || "", detail: it.detail || "",
-  qty: it.qty ?? 1, unit: it.unit || "", unitPrice: it.unitPrice ?? "",
+  qty: it.qty ?? 1, unit: it.unit || "", unitPrice: it.unitPrice ?? "", workDate: it.workDate ? moment(it.workDate).format("YYYY-MM-DD") : "",
 });
+/** วันทำงานทุกวันของช่วงงาน — end ของงานทั้งวันเป็นแบบ "ไม่รวมวันสุดท้าย" (เหมือน jobRangeText) */
+const daysOfRange = (r) => {
+  if (!r?.start) return [];
+  const start = moment(r.start).startOf("day");
+  const rawEnd = r.end ? moment(r.end) : null;
+  const n = rawEnd && rawEnd.isAfter(start) ? Math.max(1, Math.round(rawEnd.diff(start, "hours") / 24)) : 1;
+  return Array.from({ length: Math.min(n, 62) }, (_, i) => start.clone().add(i, "days").format("YYYY-MM-DD"));
+};
 const dayOf = (d) => (d ? moment(d).format("YYYY-MM-DD") : "");
 const numberField = { inputMode: "decimal", onWheel: (e) => e.currentTarget.blur() };
 const byStart = (a, b) => new Date(a.start || 0) - new Date(b.start || 0);
@@ -116,7 +128,11 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   // เงิน
-  const [items, setItems] = useState([blankItem()]);
+  const [items, setItems] = useState([dayItem()]);
+  /** daily = ค่าแรงรายวัน (ใส่วันที่ทีละวัน) · lump = เหมางาน (ใส่เนื้องาน × จำนวน) */
+  const [rateMode, setRateMode] = useState("daily");
+  /** ค่าแรงต่อวัน — กรอกครั้งเดียวใช้กับทุกวัน (แก้รายวันทีหลังได้) */
+  const [dailyRate, setDailyRate] = useState("");
   const [vatRate, setVatRate] = useState(0);
   const [whtRate, setWhtRate] = useState(3);
   const [deposit, setDeposit] = useState("");
@@ -157,7 +173,9 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
       setCAddress(e.contractor?.address || ""); setCIsCompany(Boolean(e.contractor?.isCompany));
       setInstNo(e.installment?.no ? String(e.installment.no) : ""); setInstTotal(e.installment?.total ? String(e.installment.total) : "");
       setContractValue(e.contractValue ? String(e.contractValue) : "");
-      setItems((e.items || []).length ? e.items.map(fromDoc) : [blankItem()]);
+      setItems((e.items || []).length ? e.items.map(fromDoc) : [dayItem()]);
+      setRateMode((e.items || []).some((it) => it.workDate) || !(e.items || []).length ? "daily" : "lump");
+      setDailyRate("");
       setVatRate(Number(e.deductions?.vatRate) || 0);
       setWhtRate(Number(e.deductions?.whtRate) || 0);
       setDeposit(e.deductions?.deposit ? String(e.deductions.deposit) : "");
@@ -174,7 +192,9 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
       setSubject("");
       setCName(""); setCTaxId(""); setCPhone(""); setCAddress(""); setCIsCompany(false);
       setInstNo(""); setInstTotal(""); setContractValue("");
-      setItems([blankItem()]);
+      setItems([]);
+      setRateMode("daily");
+      setDailyRate("");
       setVatRate(0); setWhtRate(3); setDeposit("");
       setPayMode("transfer"); setBankCode(""); setAccountNo(""); setAccountName("");
       setNote("");
@@ -269,6 +289,42 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
   };
 
   const validItems = items.filter((it) => String(it.description).trim());
+  const dates = items.map((it) => it.workDate).filter(Boolean);
+  const dupDates = [...new Set(dates.filter((d, i) => dates.indexOf(d) !== i))];
+  const dayCount = rateMode === "daily" ? validItems.filter((it) => it.workDate).length : 0;
+
+  /** ใช้ค่าแรงต่อวันกับทุกวันในรายการ */
+  const applyDailyRate = (v) => {
+    setDailyRate(v);
+    setItems((rows) => rows.map((r) => ({ ...r, unitPrice: v, qty: 1, unit: "วัน" })));
+  };
+  /**
+   * ✅ ผู้ใช้สั่ง: "อยากให้ทำง่าย คำนวณกรอกวันที่เองอัตโนมัติ"
+   * เลือกช่วงงานแล้ว ระบบสร้างแถวให้ทุกวันของทุกช่วงเอง · เอาช่วงออก = วันของช่วงนั้นหายไปด้วย
+   * ⚠️ แถวที่ผู้ใช้เพิ่มเอง (auto = false) ไม่ถูกลบ · แถวเดิมของวันเดียวกันเก็บค่าแรง/งานที่แก้ไว้
+   * ⚠️ ไม่ทำตอนแก้ใบเดิม — รายการที่บันทึกไว้แล้วต้องไม่เปลี่ยนเองเงียบๆ
+   */
+  const jobsKey = jobs.map((j) => j._id).join(",");
+  useEffect(() => {
+    if (!open || editing || rateMode !== "daily") return;
+    const days = [...new Set(jobs.flatMap(daysOfRange))].sort();
+    setItems((rows) => {
+      const manual = rows.filter((r) => !r.auto && (r.workDate || Number(r.unitPrice) > 0));
+      const byDate = new Map(rows.filter((r) => r.workDate).map((r) => [r.workDate, r]));
+      const auto = days.filter((d) => !manual.some((m) => m.workDate === d))
+        .map((d) => (byDate.get(d)?.auto ? byDate.get(d) : dayItem(d, dailyRate, true)));
+      const next = [...manual, ...auto].sort((a, b) => String(a.workDate || "9").localeCompare(String(b.workDate || "9"))).slice(0, MAX_ITEMS);
+      return next.length ? next : [dayItem("", dailyRate)];
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- สร้างใหม่เฉพาะตอนช่วงงานที่เลือกเปลี่ยน
+  }, [open, editing, rateMode, jobsKey]);
+
+  /** เพิ่มวันถัดจากวันล่าสุดในรายการ */
+  const addNextDay = () => setItems((rows) => {
+    const last = rows.map((r) => r.workDate).filter(Boolean).sort().pop();
+    const rate = dailyRate || ([...rows].reverse().find((r) => Number(r.unitPrice) > 0)?.unitPrice ?? "");
+    return [...rows, dayItem(last ? moment(last).add(1, "day").format("YYYY-MM-DD") : "", rate)];
+  });
   const taxDigits = digitsOnly(cTaxId);
   const bankError = payMode === "transfer" && bankCode ? validateAccount(bankCode, digitsOnly(accountNo)) : "";
   const problems = [];
@@ -276,6 +332,8 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
   if (taxDigits && taxDigits.length !== 13) problems.push("เลขประจำตัวผู้เสียภาษีต้องมี 13 หลัก");
   if (!String(subject).trim()) problems.push("ระบุเรื่อง");
   if (!validItems.length) problems.push("เพิ่มรายการค่าจ้างอย่างน้อย 1 รายการ");
+  if (rateMode === "daily" && validItems.some((it) => !it.workDate)) problems.push("ระบุวันที่ทำงานให้ครบทุกแถว");
+  if (dupDates.length) problems.push(`วันที่ซ้ำกัน (${dupDates.map((d) => thaiDate(d)).join(", ")})`);
   if (gross <= 0) problems.push("ยอดค่าจ้างต้องมากกว่า 0");
   if (items.some((it) => String(it.description).trim() && Number(it.qty) <= 0)) problems.push("จำนวนต้องมากกว่า 0");
   if (calc.net < 0) problems.push("ยอดหักมัดจำมากกว่ายอดที่ต้องจ่าย");
@@ -302,7 +360,12 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
       payBankCode: payMode === "transfer" ? bankCode : "",
       payAccountNo: payMode === "transfer" ? digitsOnly(accountNo) : "",
       payAccountName: payMode === "transfer" ? String(accountName).trim() : "",
-      items: validItems.map(({ key, ...it }) => ({ ...it, qty: Number(it.qty) || 0, unitPrice: Number(it.unitPrice) || 0 })),
+      // ✅ รายวัน: เรียงตามวันที่ก่อนส่ง — เอกสารอ่านไล่วันได้เสมอ · เหมางาน: ไม่ส่งวันที่
+      items: [...validItems]
+        .sort((a, b) => (rateMode === "daily" ? String(a.workDate).localeCompare(String(b.workDate)) : 0))
+        .map(({ key, auto, ...it }) => ({
+          ...it, qty: Number(it.qty) || 0, unitPrice: Number(it.unitPrice) || 0, workDate: rateMode === "daily" ? it.workDate : "",
+        })),
     };
     if (canPickPerson && requester?.userId) fields.requesterId = requester.userId;
     if (canSignSelf) fields.useSignature = useSignature;
@@ -547,10 +610,54 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
 
         {/* ── รายการค่าจ้าง ────────────────────────────────────────── */}
         <Section icon={<Receipt sx={{ fontSize: 18, color: ACCENT }} />} title="รายการค่าจ้างงวดนี้"
-          hint="เนื้องานที่ส่งมอบในงวดนี้ · จำนวน × ราคาต่อหน่วย (ไม่รวม VAT)"
+          hint={rateMode === "daily" ? "ค่าแรงรายวัน — 1 แถว = 1 วันทำงาน (ไม่รวม VAT)" : "เนื้องานที่ส่งมอบในงวดนี้ · จำนวน × ราคาต่อหน่วย (ไม่รวม VAT)"}
           action={<Typography sx={{ fontWeight: 800, color: ACCENT, whiteSpace: "nowrap" }}>{baht(gross)}</Typography>}>
-          <Stack spacing={1.25}>
-            {items.map((row, idx) => (
+          <ToggleButtonGroup exclusive size="small" value={rateMode} onChange={(_, v) => v && setRateMode(v)}
+            sx={{ mb: 1.5, "& .MuiToggleButton-root": { textTransform: "none", fontWeight: 700, px: 2 }, "& .Mui-selected": { color: `${ACCENT} !important`, bgcolor: `${alpha(ACCENT, 0.1)} !important` } }}>
+            <ToggleButton value="daily">คิดรายวัน (ใส่วันที่)</ToggleButton>
+            <ToggleButton value="lump">เหมางาน</ToggleButton>
+          </ToggleButtonGroup>
+          {rateMode === "daily" && (
+            <Box sx={{ display: "grid", gap: 1.5, alignItems: "center", gridTemplateColumns: { xs: "1fr", sm: "220px 1fr" }, mb: 1.5 }}>
+              <TextField size="small" label="ค่าแรงต่อวัน (ใช้กับทุกวัน)" type="number" value={dailyRate}
+                onChange={(e) => applyDailyRate(e.target.value)} inputProps={{ min: 0, step: "any", ...numberField }}
+                InputProps={{ endAdornment: <InputAdornment position="end">บาท</InputAdornment> }} />
+              <Typography variant="caption" sx={{ color: TEXT_SUB }}>
+                {jobs.length
+                  ? "ระบบใส่วันที่ให้ครบทุกวันตามช่วงงานที่เลือกแล้ว — ลบวันที่ไม่ได้มา หรือแก้ค่าแรงเฉพาะวันได้"
+                  : "เลือกงาน/ช่วงวันที่ด้านบน ระบบจะใส่วันที่ทำงานให้อัตโนมัติ · หรือกด “เพิ่มวัน” เอง"}
+              </Typography>
+            </Box>
+          )}
+          {rateMode === "daily" && dupDates.length > 0 && (
+            <Alert severity="warning" sx={{ mb: 1, py: 0 }}>วันที่ซ้ำกัน: {dupDates.map((d) => thaiDate(d)).join(", ")}</Alert>
+          )}
+          <Stack spacing={rateMode === "daily" ? 0.75 : 1.25}>
+            {rateMode === "daily" && items.map((row) => (
+              <Box key={row.key} sx={{
+                display: "grid", gap: 1, alignItems: "center", p: 1, bgcolor: "#fff", borderRadius: 2,
+                border: `1px solid ${dupDates.includes(row.workDate) ? "#f59e0b" : BORDER_MAIN}`, borderLeft: `3px solid ${ACCENT}`,
+                gridTemplateColumns: { xs: "1fr 1fr auto", md: "190px 1fr 140px 96px auto" },
+              }}>
+                <Box sx={{ gridColumn: { xs: "1 / 3", md: "auto" } }}>
+                  <ThaiDatePicker label="วันที่ทำงาน *" value={row.workDate} onChange={(v) => setItem(row.key, { workDate: v || "", auto: false })}
+                    error={touched && !row.workDate} />
+                </Box>
+                <Box sx={{ display: { xs: "flex", md: "none" }, justifyContent: "flex-end" }}>
+                  <IconButton size="small" aria-label="ลบวันนี้" disabled={items.length === 1}
+                    onClick={() => setItems((rows) => rows.filter((r) => r.key !== row.key))}><DeleteOutline fontSize="small" /></IconButton>
+                </Box>
+                <TextField size="small" label="งานที่ทำ" value={row.description} onChange={(e) => setItem(row.key, { description: e.target.value })}
+                  inputProps={{ maxLength: 300 }} placeholder="ค่าแรง" error={touched && !String(row.description).trim()} />
+                <TextField size="small" label="ค่าแรง/วัน" type="number" value={row.unitPrice} onChange={(e) => setItem(row.key, { unitPrice: e.target.value, qty: 1, unit: "วัน", auto: false })}
+                  inputProps={{ min: 0, step: "any", ...numberField }}
+                  InputProps={{ endAdornment: <InputAdornment position="end">฿</InputAdornment> }} />
+                <Typography sx={{ display: { xs: "none", md: "block" }, fontWeight: 800, fontSize: "0.95rem", textAlign: "right" }}>{fmtMoney(itemAmount(row))}</Typography>
+                <IconButton size="small" aria-label="ลบวันนี้" disabled={items.length === 1} sx={{ display: { xs: "none", md: "inline-flex" } }}
+                  onClick={() => setItems((rows) => rows.filter((r) => r.key !== row.key))}><DeleteOutline fontSize="small" /></IconButton>
+              </Box>
+            ))}
+            {rateMode === "lump" && items.map((row, idx) => (
               <Box key={row.key} sx={{ border: `1px solid ${BORDER_MAIN}`, borderLeft: `3px solid ${ACCENT}`, borderRadius: 2, p: 1.25, bgcolor: "#fff" }}>
                 <Box sx={{ display: "grid", gap: 1, alignItems: "start", gridTemplateColumns: { xs: "1fr 1fr", md: "1fr 72px 90px 130px" } }}>
                   <TextField size="small" label={`#${idx + 1} รายการ / เนื้องาน *`} value={row.description}
@@ -580,11 +687,16 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
               </Box>
             ))}
           </Stack>
-          <Button size="small" variant="outlined" startIcon={<Add />} disabled={items.length >= MAX_ITEMS}
-            onClick={() => setItems((rows) => [...rows, blankItem()])}
-            sx={{ mt: 1.25, textTransform: "none", fontWeight: 700, borderRadius: 2, borderColor: alpha(ACCENT, 0.5), color: ACCENT }}>
-            เพิ่มรายการ
-          </Button>
+          <Stack direction="row" flexWrap="wrap" useFlexGap spacing={1} alignItems="center" sx={{ mt: 1.25 }}>
+            <Button size="small" variant="outlined" startIcon={<Add />} disabled={items.length >= MAX_ITEMS}
+              onClick={() => (rateMode === "daily" ? addNextDay() : setItems((rows) => [...rows, blankItem()]))}
+              sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, borderColor: alpha(ACCENT, 0.5), color: ACCENT }}>
+              {rateMode === "daily" ? "เพิ่มวัน" : "เพิ่มรายการ"}
+            </Button>
+            {rateMode === "daily" && dayCount > 0 && (
+              <Typography variant="caption" sx={{ color: TEXT_SUB, ml: "auto", fontWeight: 700 }}>รวม {dayCount} วัน · {baht(gross)}</Typography>
+            )}
+          </Stack>
         </Section>
 
         {/* ── ภาษีและรายการหัก ─────────────────────────────────────── */}

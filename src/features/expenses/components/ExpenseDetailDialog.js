@@ -33,7 +33,7 @@ import KindBadge from "./KindBadge";
 import { compareItems, COMPARE_KIND_LABEL } from "../utils/expenseCompare";
 import {
   KIND_META, slipKind, statusMeta, categoryMeta, baht, fmtMoney, qtyText, differenceMeta, paymentLabel, PAYMENT_METHODS, fileKindLabel, jobText, jobRangeText, jobPartText, isOverdueClear, money, TEXT_SUB, TEXT_MAIN, BORDER_MAIN, personFullName, groupFilesByStage,
-  installmentText, bahtText, jobRangesText,
+  installmentText, bahtText, jobRangesText, itemTitle,
 } from "../expenseMeta";
 import { bankMeta, formatAccountNo } from "../bankMeta";
 import BankLogo from "./BankLogo";
@@ -1058,7 +1058,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                         <Stack key={it._id || i} direction="row" spacing={1.25} alignItems="flex-start">
                           <Typography sx={{ width: 20, color: TEXT_SUB, fontWeight: 700, fontSize: "0.82rem", pt: 0.2 }}>{i + 1}</Typography>
                           <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Typography sx={{ fontWeight: 700, fontSize: "0.9rem" }}>{it.description}{it.person?.name ? <Box component="span" sx={{ fontWeight: 600, color: TEXT_SUB }}> · {it.person.name}</Box> : null}</Typography>
+                            <Typography sx={{ fontWeight: 700, fontSize: "0.9rem" }}>{itemTitle(it)}{it.person?.name ? <Box component="span" sx={{ fontWeight: 600, color: TEXT_SUB }}> · {it.person.name}</Box> : null}</Typography>
                             <Stack direction="row" flexWrap="wrap" useFlexGap spacing={0.75} alignItems="center" sx={{ mt: 0.25 }}>
                               <Chip size="small" label={cat.label} sx={{ height: 18, fontSize: "0.66rem", fontWeight: 700, bgcolor: alpha(cat.color, 0.1), color: cat.color }} />
                               <Typography variant="caption" sx={{ color: TEXT_SUB }}>{qtyText(it)}</Typography>

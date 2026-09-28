@@ -19,7 +19,7 @@ import { ISSUER, drawLetterhead, outputDocument, spaceThaiLatin, preparePrintAss
 import { thaiDateFull, thaiDate, thaiDateTime } from "@/shared/utils/thaiDate";
 import {
   KIND_META, slipKind, statusMeta, fmtMoney, bahtText, qtyText, differenceMeta, paymentLabel, fileKindLabel, jobText, jobRangeText, jobPartText, money, itemPersonName, personFullName,
-  installmentText, jobRangesText,
+  installmentText, jobRangesText, itemTitle,
 } from "../expenseMeta";
 import { bankMeta, formatAccountNo } from "../bankMeta";
 import { compareItems } from "./expenseCompare";
@@ -219,10 +219,10 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold, attachNote = "") =>
   y += rowH * subjLines;
   if (e.eventId || e.job?.title) {
     // ✅ งานที่เข้าหลายช่วง: ใบที่พิมพ์ออกไปต้องระบุชัดว่าเป็นค่าใช้จ่ายของการเข้างานช่วงไหน
-    field("งาน / โครงการ",
+    // 🐛 เดิม y += rowH ตายตัว — ชื่องานยาวตัดเป็น 2 บรรทัดแล้วบรรทัด "ผู้รับเหมา" ทับกัน (ผู้ใช้แจ้ง "ซ้อนกันมั่ว")
+    y += rowH * field("งาน / โครงการ",
       [jobText(e.job), jobPartText(e.job), jobRangesText(e) ? `${e.jobRanges.length} ช่วงวันที่` : jobRangeText(e.job)].filter(Boolean).join(" · ")
       + (e.job?.docNo ? ` (${e.job.docNo})` : ""), L, R, y);
-    y += rowH;
   }
   if (isCtr) {
     const c = e.contractor || {};
@@ -336,7 +336,7 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold, attachNote = "") =>
     size(14); bold(false);
     // ✅ ชื่อพนักงานต่อท้ายรายการ (หัวหน้างานเบิกแทนลูกทีม) — ผู้อนุมัติ/บัญชีเห็นบนกระดาษว่าบรรทัดนี้จ่ายให้ใคร
     const person = itemPersonName(it);
-    const descLines = wrapText(doc, spaceThaiLatin(`${it.description}${person ? ` (${person})` : ""}${tag}`), col("desc").w - 3.5);
+    const descLines = wrapText(doc, spaceThaiLatin(`${itemTitle(it)}${person ? ` (${person})` : ""}${tag}`), col("desc").w - 3.5);
     size(12);
     const detailLines = it.detail ? wrapText(doc, spaceThaiLatin(it.detail), col("desc").w - 3.5) : [];
     const rh = Math.max(minRowH, 2.6 * s + descLines.length * lineH + detailLines.length * detailH);

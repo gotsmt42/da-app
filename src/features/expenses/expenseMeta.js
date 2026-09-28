@@ -268,6 +268,13 @@ export const baht = (n) => {
   return `฿${v.toLocaleString("th-TH", { minimumFractionDigits: Number.isInteger(v) ? 0 : 2, maximumFractionDigits: 2 })}`;
 };
 
+/**
+ * ชื่อรายการสำหรับแสดงผล — บรรทัดที่มีวันที่ทำงาน (ค่าแรงรายวันของผู้รับเหมา) ขึ้นวันที่ก่อน
+ * "14 ก.ย. 2569 · ค่าแรง"
+ */
+export const itemTitle = (it) =>
+  (it?.workDate ? [thaiDate(it.workDate), String(it.description || "").trim()].filter(Boolean).join(" · ") : String(it?.description || ""));
+
 export const itemAmount = (it) => money((Number(it?.qty) || 0) * (Number(it?.unitPrice) || 0));
 export const itemsTotal = (items) => money((items || []).reduce((s, it) => s + itemAmount(it), 0));
 
