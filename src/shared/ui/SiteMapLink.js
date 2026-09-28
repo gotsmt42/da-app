@@ -63,6 +63,18 @@ export const mapSearchUrl = (site, company) =>
     String(site || "").trim() || String(company || "").trim()
   )}`;
 
+/**
+ * URL สำหรับฝังแผนที่ Google Maps ใน iframe (ไม่ต้องใช้ API key) — รูปแบบเดียวกับหน้าติดต่อเราของเว็บบริษัท
+ * @param {{lat?: number, lng?: number, q?: string}|null} loc ผลจาก CustomerService.resolveMapEmbed
+ * @param {string} fallbackQuery ใช้เมื่อยังไม่มีพิกัด (ชื่อโครงการ)
+ */
+export const mapEmbedSrc = (loc, fallbackQuery = "") => {
+  const q = loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng)
+    ? `${loc.lat},${loc.lng}`
+    : (loc?.q || String(fallbackQuery || "").trim());
+  return q ? `https://maps.google.com/maps?q=${encodeURIComponent(q)}&hl=th&z=16&output=embed` : "";
+};
+
 // ── แคชทะเบียนลูกค้าระดับโมดูล ────────────────────────────────────────────
 // ⚠️ ต้องมี inflight ด้วย ไม่ใช่แค่ cache — การ์ดหลายใบบนหน้าเดียวกัน mount พร้อมกัน ถ้าเช็คแค่
 // cache จะยิง request พร้อมกันหลายเส้นก่อนที่เส้นแรกจะกลับมา

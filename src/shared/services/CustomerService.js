@@ -17,6 +17,20 @@ const CustomerService = {
    * ⚠️ ส่ง mapUrl เป็นสตริงว่าง = ตั้งใจลบพิกัดทิ้ง (ฝั่ง server แยกจากกรณี "ลิงก์ผิด" แล้ว)
    * ⚠️ ด่านสิทธิ์อยู่ที่ server — แอดมิน/ผู้จัดการ หรือช่างที่มีงานอยู่ที่โครงการนั้นจริงเท่านั้น
    */
+  /**
+   * แปลงลิงก์ Google Maps ที่บันทึกไว้ (มักเป็นลิงก์ย่อ maps.app.goo.gl) เป็นตำแหน่งสำหรับฝังแผนที่
+   * คืน { lat, lng, q } หรือ null — ⚠️ ล้มเหลวคืน null เสมอ ไม่โยน error (แผนที่ใช้ค้นจากชื่อโครงการแทน)
+   */
+  async resolveMapEmbed(url) {
+    if (!url) return null;
+    try {
+      const { data } = await API.get(`/customer/map/embed`, { params: { url } });
+      return data?.location || null;
+    } catch {
+      return null;
+    }
+  },
+
   async setSiteMapUrl({ company, site, mapUrl }) {
     const { data } = await API.patch(`/customer/map`, { company, site, mapUrl });
     return data.customer;

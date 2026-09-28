@@ -12,7 +12,7 @@ import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { can } from "@/shared/utils/roles";
 // ✅ พิกัดหน้างาน — ใช้ตัวช่วยชุดเดียวกับหน้าอื่น (ดูหัวไฟล์ SiteMapLink.js)
-import { mapSearchUrl, googleMapsPinSvg } from "@/shared/ui/SiteMapLink";
+import { mapSearchUrl, googleMapsPinSvg, mapEmbedSrc } from "@/shared/ui/SiteMapLink";
 import {
   colorPickerHtml,
   mountColorPicker,
@@ -664,6 +664,40 @@ function injectStyles() {
     }
     .ee-tag--link:hover { background: rgba(255, 255, 255, .38); }
     .ee-tag-go { opacity: .8; font-weight: 700; margin-left: 2px; }
+
+    /* ✅ แผนที่หน้างานบนสุดของฟอร์ม (ผู้ใช้สั่ง 28 ก.ย. 2569: "แสดงเป็นแผนที่ google map เลย ไว้แถวบนสุด
+       ให้ชัดเจน และสวยงาม") — หน้าตาเดียวกับแผนที่ในหน้าติดต่อเราของเว็บบริษัท */
+    .ee-map-card {
+      border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; background: #fff;
+      margin-bottom: 14px; box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+    }
+    .ee-map-frame { position: relative; height: 230px; background: #f1f5f9; }
+    @media (max-width: 600px) { .ee-map-frame { height: 190px; } }
+    .ee-map-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+    .ee-map-wait {
+      position: absolute; inset: 0; display: grid; place-items: center;
+      font-size: 12.5px; color: #94a3b8; font-weight: 600;
+    }
+    .ee-map-bar {
+      display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+      border-top: 1px solid #f1f5f9;
+    }
+    .ee-map-info { flex: 1; min-width: 0; text-align: left; }
+    .ee-map-name { font-size: 13.5px; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 6px; }
+    .ee-map-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ee-map-note { font-size: 11px; color: #64748b; margin-top: 1px; }
+    .ee-map-note--warn { color: #b45309; }
+    .ee-map-go {
+      flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px; text-decoration: none;
+      padding: 8px 12px; border-radius: 9px; font-size: 12.5px; font-weight: 700;
+      color: #fff; background: #1a73e8;
+    }
+    .ee-map-go:hover { background: #1765cc; }
+    .ee-map-edit {
+      flex-shrink: 0; padding: 8px 10px; border-radius: 9px; font-size: 12px; font-weight: 600; cursor: pointer;
+      color: #475569; background: #fff; border: 1px solid #e2e8f0;
+    }
+    #ee-mapEditor { padding: 0 12px 12px; }
 
     /* ปุ่มหลัก — ปุ่มเดียวในแถบที่เป็นสีทึบ */
     #ee-action-bar .ee-btn-success {
@@ -1378,6 +1412,42 @@ export const getEditEvent = async ({
     </div>
     ` : ""}
 
+    <!-- ── แผนที่หน้างาน (บนสุดของฟอร์ม) ────────────────────────────────────
+         ✅ ผู้ใช้สั่ง (28 ก.ย. 2569): "ตำแหน่งหน้างานแสดงเป็นแผนที่ google map เลย ไว้แถวบนสุด"
+         • มีพิกัดที่บันทึกไว้ → server แปลงลิงก์ย่อเป็นตำแหน่ง (GET /customer/map/embed) แล้วฝังแผนที่
+         • ยังไม่มี → แสดงแผนที่ค้นหาจากชื่อโครงการ พร้อมบอกชัดว่าเป็นตำแหน่งโดยประมาณ
+         ⚠️ iframe ใส่ src ทีหลังใน didOpen (ต้องรอแปลงลิงก์ก่อน) — ช่วงนั้นแสดง "กำลังโหลดแผนที่" -->
+    ${eventSite || savedMapUrl ? `
+    <div class="ee-map-card">
+      <div class="ee-map-frame">
+        <div class="ee-map-wait" id="ee-mapWait">กำลังโหลดแผนที่…</div>
+        <iframe id="ee-mapFrame" title="แผนที่หน้างาน ${attrHtml(eventSite)}" loading="lazy"
+                referrerpolicy="no-referrer-when-downgrade" allowfullscreen style="display:none;"></iframe>
+      </div>
+      <div class="ee-map-bar">
+        <div class="ee-map-info">
+          <div class="ee-map-name">${googleMapsPinSvg(15)}<span>${attrHtml(eventSite) || "—"}</span></div>
+          <div class="ee-map-note${savedMapUrl ? "" : " ee-map-note--warn"}" id="ee-mapNote">
+            ${savedMapUrl ? "ตำแหน่งที่บันทึกไว้ของโครงการนี้" : "ตำแหน่งโดยประมาณจากชื่อโครงการ — ยังไม่ได้บันทึกพิกัด"}
+          </div>
+        </div>
+        ${isAdminOrManagerUser ? `<button type="button" class="ee-map-edit" id="ee-mapEdit">${savedMapUrl ? "✏️ แก้พิกัด" : "📍 บันทึกพิกัด"}</button>` : ""}
+        <a class="ee-map-go" id="ee-mapGo" href="${attrHtml(savedMapUrl || mapSearchHref)}" target="_blank" rel="noopener noreferrer">
+          ${savedMapUrl ? "นำทาง ↗" : "ค้นหา ↗"}
+        </a>
+      </div>
+      ${isAdminOrManagerUser ? `
+      <div id="ee-mapEditor" style="display:none;">
+        <input id="ee-mapInput" type="url" placeholder="วางลิงก์ที่แชร์จาก Google Maps" value="${escapeHtml(savedMapUrl)}">
+        <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap;">
+          <span id="ee-mapMsg" style="font-size:11px;color:#94a3b8;flex:1;min-width:180px;">เปิด Google Maps → ค้นหาหน้างาน → แชร์ → คัดลอกลิงก์ → วางที่นี่ · เว้นว่างเพื่อลบ</span>
+          <button type="button" id="ee-mapCancel" style="padding:5px 10px;border-radius:7px;font-size:12px;color:#64748b;background:#fff;border:1px solid #e2e8f0;cursor:pointer;">ยกเลิก</button>
+          <button type="button" id="ee-mapSave" style="padding:5px 12px;border-radius:7px;font-size:12px;font-weight:700;color:#fff;background:#0891b2;border:none;cursor:pointer;">บันทึก</button>
+        </div>
+      </div>` : ""}
+    </div>
+    ` : ""}
+
     <!-- ✅ ข้อมูลสัญญา — ย้ายมาไว้บนสุด (เดิมอยู่ล่างสุด ต้องเลื่อนจอไปดู) เพราะเป็นข้อมูลอ้างอิงหลักของ
          "ครั้งที่" นี้ที่มักต้องเช็คก่อนแก้อย่างอื่น ใส่กล่องพื้นหลังโทนม่วง-น้ำเงินแยกจากส่วนอื่นชัดเจน
          ให้เห็นตั้งแต่แวบแรกว่าเป็นข้อมูล "ทั้งสัญญา" ไม่ใช่แค่ครั้งนี้ครั้งเดียว -->
@@ -1540,40 +1610,7 @@ export const getEditEvent = async ({
       ` : ""}
     </div>
 
-    <!-- ── ตำแหน่งหน้างานบน Google Maps ─────────────────────────────────────
-         ✅ ที่เพิ่ม (ผู้ใช้ขอ: "ทุกหน้าที่มีงาน ให้ดู/แก้ google maps ได้ แยกตามสิทธิเดิม")
-         พิกัดผูกกับ "โครงการ" (ทะเบียนลูกค้า) ไม่ใช่กับงานใบเดียว — แก้ที่นี่ทีเดียว ทุกงานของ
-         โครงการนั้นได้พิกัดพร้อมกัน และครั้งหน้าที่ลงงานใหม่ก็มีให้เลย ไม่ต้องหาซ้ำ
-         ⚠️ สิทธิ์แก้ = ชุดเดียวกับข้อมูลโครงการอื่นๆ ในหมวดนี้ (แอดมิน/manager) ส่วนช่างกด
-         "ค้นหาตำแหน่ง" เพื่อไปดูเองได้ตามปกติ -->
-    ${/* 🧹 เดิมตรงนี้มีทั้งปุ่มเปิดแผนที่และปุ่มแก้ — ปุ่ม "เปิด" ถูกยกไปไว้บน header (ชิปโครงการ)
-         และแถบปุ่มด้านล่างแล้ว ซึ่งเห็นง่ายกว่ามาก เหลือไว้เฉพาะ "ปุ่มแก้" สำหรับแอดมิน/manager
-         ซึ่งเป็นงานที่ทำนานๆ ครั้ง จึงไม่ต้องเด่น */""}
-    ${isAdminOrManagerUser ? `
-    <div class="ee-field" style="margin-bottom:4px;">
-      ${/* หมุดแดงตัวเดียวกับปุ่ม/ชิปเปิดแผนที่ — หัวข้อนี้กับปุ่มพวกนั้นพูดถึงข้อมูลชุดเดียวกัน
-            ⚠️ ปุ่ม "บันทึกพิกัด/แก้ลิงก์" ด้านล่างยังใช้อีโมจิ เพราะเป็นการ "แก้ข้อมูล" ไม่ใช่เปิด
-            Google Maps และข้อความของมันถูกเขียนทับด้วย textContent ตอนบันทึก (SVG จะหาย) */""}
-      <label>${googleMapsPinSvg(14)} ตำแหน่งหน้างาน (Google Maps)</label>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <button type="button" id="ee-mapEdit"
-                style="padding:7px 12px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;
-                       color:#64748b;background:#fff;border:1px solid #e2e8f0;">
-          ${savedMapUrl ? "✏️ แก้ลิงก์แผนที่" : "📍 บันทึกพิกัดของโครงการนี้"}
-        </button>
-        <span style="font-size:11px;color:#94a3b8;">
-          ${savedMapUrl ? "มีพิกัดแล้ว — กดชิปชื่อโครงการด้านบนเพื่อนำทาง" : "ยังไม่มีพิกัด — ช่างต้องหาเอง"}
-        </span>
-      </div>
-      <div id="ee-mapEditor" style="display:none;margin-top:8px;">
-        <input id="ee-mapInput" type="url" placeholder="วางลิงก์ที่แชร์จาก Google Maps" value="${escapeHtml(savedMapUrl)}">
-        <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
-          <span id="ee-mapMsg" style="font-size:11px;color:#94a3b8;flex:1;">เปิดลิงก์ค้นหาด้านบน → กด แชร์ → คัดลอกลิงก์ → วางที่นี่ · เว้นว่างเพื่อลบ</span>
-          <button type="button" id="ee-mapCancel" style="padding:5px 10px;border-radius:7px;font-size:12px;color:#64748b;background:#fff;border:1px solid #e2e8f0;cursor:pointer;">ยกเลิก</button>
-          <button type="button" id="ee-mapSave" style="padding:5px 12px;border-radius:7px;font-size:12px;font-weight:700;color:#fff;background:#0891b2;border:none;cursor:pointer;">บันทึก</button>
-        </div>
-      </div>
-    </div>` : ""}
+    ${/* 🧹 ช่องแก้พิกัดเดิมตรงนี้ย้ายไปอยู่ในการ์ดแผนที่บนสุดของฟอร์มแล้ว (28 ก.ย. 2569) */""}
 
     <hr class="ee-divider">
 
@@ -1968,7 +2005,31 @@ export const getEditEvent = async ({
       const mapTargets = [
         document.getElementById("ee-mapChip"),
         document.getElementById("btnOpenMap"),
+        document.getElementById("ee-mapGo"),
       ].filter(Boolean);
+
+      // ── แผนที่บนสุดของฟอร์ม: แปลงลิงก์ที่บันทึกไว้เป็นตำแหน่ง แล้วใส่ src ให้ iframe ──
+      const mapFrame = document.getElementById("ee-mapFrame");
+      const mapWait = document.getElementById("ee-mapWait");
+      const mapNote = document.getElementById("ee-mapNote");
+      const showMap = async (url) => {
+        if (!mapFrame) return;
+        const loc = url ? await CustomerService.resolveMapEmbed(url) : null;
+        const src = mapEmbedSrc(loc, eventSite || eventCompany);
+        if (!src) { if (mapWait) mapWait.textContent = "ยังไม่มีข้อมูลตำแหน่ง"; return; }
+        mapFrame.src = src;
+        mapFrame.style.display = "block";
+        if (mapWait) mapWait.style.display = "none";
+        if (mapNote) {
+          const exact = Boolean(url && loc);
+          mapNote.textContent = exact
+            ? "ตำแหน่งที่บันทึกไว้ของโครงการนี้"
+            : url ? "แสดงจากชื่อโครงการ — ลิงก์ที่บันทึกไว้แปลงเป็นแผนที่ไม่ได้ (กดนำทางได้ตามปกติ)"
+              : "ตำแหน่งโดยประมาณจากชื่อโครงการ — ยังไม่ได้บันทึกพิกัด";
+          mapNote.className = `ee-map-note${exact ? "" : " ee-map-note--warn"}`;
+        }
+      };
+      showMap(savedMapUrl);
       if (mapEditBtn && mapEditor && mapInput) {
         mapEditBtn.addEventListener("click", () => {
           mapEditor.style.display = mapEditor.style.display === "none" ? "block" : "none";
@@ -1991,13 +2052,16 @@ export const getEditEvent = async ({
                 // อัปเดตเฉพาะ span ข้อความ — หมุด Google Maps เป็น SVG อยู่ข้างๆ ต้องไม่ถูกเขียนทับ
                 const t = el.querySelector("#ee-mapBtnText");
                 if (t) t.textContent = url ? "นำทาง (Google Maps)" : "ค้นหาใน Google Maps";
+              } else if (el.id === "ee-mapGo") {
+                el.textContent = url ? "นำทาง ↗" : "ค้นหา ↗";
               } else {
                 const go = el.querySelector(".ee-tag-go");
                 if (go) go.textContent = url ? "นำทาง ↗" : "ค้นหา ↗";
                 el.title = url ? "เปิดแผนที่นำทางไปหน้างาน" : "ยังไม่มีพิกัดบันทึกไว้ — กดเพื่อค้นหาใน Google Maps";
               }
             }
-            mapEditBtn.textContent = url ? "✏️ แก้ลิงก์แผนที่" : "📍 บันทึกพิกัดของโครงการนี้";
+            mapEditBtn.textContent = url ? "✏️ แก้พิกัด" : "📍 บันทึกพิกัด";
+            showMap(url);   // แผนที่ด้านบนเปลี่ยนตามทันที
             if (mapMsg) { mapMsg.textContent = url ? "บันทึกพิกัดแล้ว" : "ลบพิกัดแล้ว"; mapMsg.style.color = "#059669"; }
             setTimeout(() => { mapEditor.style.display = "none"; }, 900);
           } catch (err) {
