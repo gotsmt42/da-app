@@ -3064,10 +3064,13 @@ const Operation = () => {
         };
         await EventService.UpdateEvent(eventId, { activityLog: [...(target?.activityLog || []), newLog] });
       }
-    } catch {
+    } catch (err) {
+      // ✅ บอกเหตุผลจริงจาก server/ตัวตรวจไฟล์ (ไฟล์ใหญ่เกิน · ชนิดไม่รองรับ · งานปิดแล้ว) — เดิมขึ้นแค่ "อัปโหลดไม่สำเร็จ"
+      const d = err?.response?.data;
+      const why = (typeof d === "string" ? d : d?.message || d?.error) || err?.message || "";
       setSnackbar({
         open: true,
-        msg: successCount > 0 ? `อัปโหลดสำเร็จ ${successCount}/${files.length} ไฟล์ (มีไฟล์ที่ล้มเหลว)` : "อัปโหลดไม่สำเร็จ",
+        msg: (successCount > 0 ? `อัปโหลดสำเร็จ ${successCount}/${files.length} ไฟล์ (มีไฟล์ที่ล้มเหลว)` : "อัปโหลดไม่สำเร็จ") + (why ? ` — ${why}` : ""),
         severity: "error",
       });
     } finally {
