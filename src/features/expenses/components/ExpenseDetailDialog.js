@@ -33,7 +33,7 @@ import KindBadge from "./KindBadge";
 import { compareItems, COMPARE_KIND_LABEL } from "../utils/expenseCompare";
 import {
   KIND_META, slipKind, statusMeta, categoryMeta, baht, fmtMoney, qtyText, differenceMeta, paymentLabel, PAYMENT_METHODS, fileKindLabel, jobText, jobRangeText, jobPartText, isOverdueClear, money, TEXT_SUB, TEXT_MAIN, BORDER_MAIN, personFullName, groupFilesByStage,
-  installmentText, bahtText,
+  installmentText, bahtText, jobRangesText,
 } from "../expenseMeta";
 import { bankMeta, formatAccountNo } from "../bankMeta";
 import BankLogo from "./BankLogo";
@@ -887,6 +887,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                       <InfoCell label="เลขประจำตัวผู้เสียภาษี">{e.contractor?.taxId}</InfoCell>
                       <InfoCell label="เบอร์โทร">{e.contractor?.phone}</InfoCell>
                       <InfoCell label="งวดงาน">{installmentText(e.installment) || "ไม่ระบุงวด"}</InfoCell>
+                      {jobRangesText(e) && <InfoCell label={`ช่วงงานที่เบิกในงวดนี้ (${e.jobRanges.length} ช่วง)`} span>{jobRangesText(e)}</InfoCell>}
                       {e.contractor?.address && <InfoCell label="ที่อยู่" span>{e.contractor.address}</InfoCell>}
                     </Box>
                     <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: C.soft, border: `1px solid ${alpha(C.color, 0.25)}` }}>
@@ -996,7 +997,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                   {/* ✅ งานที่เข้าหลายช่วง: บอกช่วงวันที่เต็ม + เป็นช่วงที่เท่าไร — ใบของคนละช่วงจะได้ไม่สับสนกัน */}
                   <InfoCell label="งานที่ผูก" span>
                     {e.eventId || e.job?.title
-                      ? [jobText(e.job), jobPartText(e.job), jobRangeText(e.job) || (e.job?.start ? thaiDate(e.job.start) : "")].filter(Boolean).join(" · ")
+                      ? [jobText(e.job), jobPartText(e.job), jobRangesText(e) || jobRangeText(e.job) || (e.job?.start ? thaiDate(e.job.start) : "")].filter(Boolean).join(" · ")
                       : "ไม่ผูกงาน"}
                   </InfoCell>
                   {isReimburse && <InfoCell label="ที่มาของเงิน">ผู้เบิกสำรองจ่ายเอง (ไม่มีใบ Advance)</InfoCell>}

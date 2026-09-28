@@ -19,7 +19,7 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
-  Close, Add, DeleteOutline, AttachFile, Send, Save, Engineering, AccountBalance, Payments, HistoryEdu,
+  Close, Add, DeleteOutline, AttachFile, Send, Save, Engineering, AccountBalance, Payments, HistoryEdu, CheckBox, CheckBoxOutlineBlank,
   Business, Person, Receipt, Work,
 } from "@mui/icons-material";
 
@@ -34,7 +34,7 @@ import KindBadge from "./KindBadge";
 import BankLogo from "./BankLogo";
 import { BANKS, bankMeta, digitsOnly, validateAccount } from "../bankMeta";
 import {
-  KIND_META, FILE_KINDS, baht, fmtMoney, bahtText, itemAmount, itemsTotal, money, jobText, jobRangeText, jobPartText,
+  KIND_META, FILE_KINDS, baht, fmtMoney, bahtText, itemAmount, itemsTotal, money, jobText, jobRangeText, jobPartText, jobRangeDates,
   contractorCalc, installmentText, WHT_PRESETS, statusMeta, personFullName, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
 } from "../expenseMeta";
 
@@ -50,6 +50,9 @@ const fromDoc = (it) => ({
 });
 const dayOf = (d) => (d ? moment(d).format("YYYY-MM-DD") : "");
 const numberField = { inputMode: "decimal", onWheel: (e) => e.currentTarget.blur() };
+const byStart = (a, b) => new Date(a.start || 0) - new Date(b.start || 0);
+/** ป้ายสั้นของช่วงงานบนชิป — "ช่วง 10/11 · 14 – 19 ก.ย. 2569" */
+const rangeChip = (o) => [Number(o.part) > 0 ? `ช่วง ${o.part}${o.partCount ? `/${o.partCount}` : ""}` : "", jobRangeDates(o)].filter(Boolean).join(" · ") || o.title || "";
 
 /** ⚠️ module scope — ประกาศในตัวฟอร์มจะทำให้ช่องกรอกหลุดโฟกัสทุกตัวอักษร (ดูเหตุผลใน ExpenseFormDialog) */
 const Section = ({ icon, title, hint, children, action }) => (
@@ -90,7 +93,12 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
   const [requester, setRequester] = useState(null);
   const [position, setPosition] = useState("");
   const [subject, setSubject] = useState("");
-  const [job, setJob] = useState(null);
+  /**
+   * ✅ ผู้ใช้สั่ง: "งานงวดให้เบิกหลายช่วงได้" — งวดเดียวของผู้รับเหมาครอบคลุมได้หลายช่วงวันที่ของงานเดียวกัน
+   * ⚠️ ต้องเป็นงานเดียวกันเท่านั้น (groupKey เดียวกัน) — server ตรวจซ้ำ (resolveJobRanges)
+   */
+  const [jobs, setJobs] = useState([]);
+  const job = jobs[0] || null;
   const [jobOptions, setJobOptions] = useState([]);
   const [jobQuery, setJobQuery] = useState("");
   const [jobLoading, setJobLoading] = useState(false);
@@ -142,7 +150,9 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
       setPosition(e.requester?.position || "");
       setSubject(e.subject || "");
       autoSubjectRef.current = "";
-      setJob(e.eventId ? { _id: e.eventId, ...e.job } : null);
+      setJobs(e.jobRanges?.length
+        ? e.jobRanges.map((r) => ({ ...e.job, _id: r.eventId, start: r.start, end: r.end, part: r.part, groupKey: e.jobGroupKey || "" }))
+        : e.eventId ? [{ _id: e.eventId, ...e.job, groupKey: e.jobGroupKey || "" }] : []);
       setCName(e.contractor?.name || ""); setCTaxId(e.contractor?.taxId || ""); setCPhone(e.contractor?.phone || "");
       setCAddress(e.contractor?.address || ""); setCIsCompany(Boolean(e.contractor?.isCompany));
       setInstNo(e.installment?.no ? String(e.installment.no) : ""); setInstTotal(e.installment?.total ? String(e.installment.total) : "");
@@ -159,7 +169,7 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
       setTo("");
       setRequester({ userId: userData?.userId, name: userData?.fname, position: "" });
       setPosition("");
-      setJob(presetJob ? { ...presetJob } : null);
+      setJobs(presetJob ? [{ ...presetJob }] : []);
       autoSubjectRef.current = "";
       setSubject("");
       setCName(""); setCTaxId(""); setCPhone(""); setCAddress(""); setCIsCompany(false);
@@ -233,12 +243,14 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
   /** เรื่องอัตโนมัติ — "เบิกค่าจ้างผู้รับเหมา นายสมชาย งวดที่ 2/5 งาน ... (วันที่)" (แก้เองได้ ไม่ถูกเขียนทับ) */
   useEffect(() => {
     if (!open || editing) return;
+    const last = jobs[jobs.length - 1];
+    const span = job ? jobRangeDates({ start: job.start, end: last?.end || job.end }) : "";
     const parts = ["เบิกค่าจ้างผู้รับเหมา", String(cName).trim(), installmentText({ no: instNo, total: instTotal }),
-      job ? `งาน ${jobText(job)}` : ""].filter(Boolean);
+      job ? `งาน ${jobText(job)}${span ? ` (${span})` : ""}` : ""].filter(Boolean);
     const next = parts.length > 1 ? parts.join(" ") : "";
     setSubject((cur) => (!String(cur).trim() || cur === autoSubjectRef.current ? next : cur));
     autoSubjectRef.current = next;
-  }, [open, editing, cName, instNo, instTotal, job]);
+  }, [open, editing, cName, instNo, instTotal, job, jobs]);
 
   const gross = useMemo(() => itemsTotal(items), [items]);
   const calc = contractorCalc(gross, { vatRate, whtRate, deposit });
@@ -282,7 +294,7 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
     const fields = {
       docDate, to: String(to || "").trim(), subject: String(subject).trim(), note: String(note || "").trim(),
       position: String(position || "").trim(),
-      eventId: job?._id || "",
+      eventIds: jobs.map((j) => j._id),
       contractorName: String(cName).trim(), contractorTaxId: taxDigits, contractorPhone: String(cPhone).trim(),
       contractorAddress: String(cAddress).trim(), contractorIsCompany: cIsCompany,
       installmentNo: Number(instNo) || 0, installmentTotal: Number(instTotal) || 0, contractValue: money(contractValue),
@@ -397,17 +409,37 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
           hint="ผูกงานแล้วระบบรวมยอดทุกงวดของผู้รับเหมาคนนี้ให้ เห็นว่าเบิกไปแล้วเท่าไรและเหลือเท่าไรตามสัญญา">
           <Box sx={{ display: "grid", gap: 1.5, alignItems: "start", gridTemplateColumns: { xs: "1fr 1fr", sm: "1fr 1fr 1.4fr" } }}>
             <Autocomplete
+              multiple disableCloseOnSelect
               sx={{ gridColumn: "1 / -1" }}
-              options={job && !jobOptions.some((j) => j._id === job._id) ? [job, ...jobOptions] : jobOptions}
-              value={job} loading={jobLoading} filterOptions={(x) => x}
-              onChange={(_, v) => setJob(v)}
+              // ✅ เลือกช่วงแรกแล้ว เหลือให้เลือกเฉพาะช่วงอื่นของ "งานเดียวกัน" — ปนคนละงานไม่ได้
+              options={(() => {
+                const merged = [...jobs, ...jobOptions.filter((o) => !jobs.some((j) => j._id === o._id))];
+                if (!job) return jobOptions;
+                return merged.filter((o) => jobs.some((j) => j._id === o._id) || (job.groupKey && o.groupKey === job.groupKey)).sort(byStart);
+              })()}
+              value={jobs} loading={jobLoading} filterOptions={(x) => x}
+              onChange={(_, v) => {
+                const next = [...v].sort(byStart);
+                // เลือกช่วงแรกของงาน → ค้นด้วยเลขที่/ชื่องานนั้น ให้ช่วงอื่นของงานเดียวกันขึ้นมาครบให้ติ๊กต่อ
+                if (!jobs.length && next.length) setJobQuery(next[0].docNo || next[0].title || "");
+                if (!next.length) setJobQuery("");
+                setJobs(next);
+              }}
               disabled={Boolean(presetJob) && !editing}
-              onInputChange={(_, v, reason) => { if (reason === "input") setJobQuery(v); if (reason === "clear") setJobQuery(""); }}
+              onInputChange={(_, v, reason) => { if (reason === "input") setJobQuery(v); }}
               isOptionEqualToValue={(o, v) => o._id === v._id}
               getOptionLabel={(o) => (o ? [jobText(o) || o.title || "", jobRangeText(o)].filter(Boolean).join(" · ") : "")}
-              noOptionsText="ไม่พบงาน"
-              renderOption={({ key, ...liProps }, o) => (
+              renderTags={(value, getTagProps) => value.map((o, i) => {
+                const { key, ...tagProps } = getTagProps({ index: i });
+                return <Chip key={key} {...tagProps} size="small" label={rangeChip(o)} sx={{ fontWeight: 700, bgcolor: alpha(ACCENT, 0.1), color: META.dark }} />;
+              })}
+              noOptionsText={job ? "ไม่มีช่วงวันที่อื่นของงานนี้" : "ไม่พบงาน"}
+              renderOption={({ key, ...liProps }, o, { selected }) => (
                 <li {...liProps} key={o._id}>
+                  {job && (
+                    <Checkbox size="small" checked={selected} sx={{ mr: 0.5, p: 0.5, "&.Mui-checked": { color: ACCENT } }}
+                      icon={<CheckBoxOutlineBlank fontSize="small" />} checkedIcon={<CheckBox fontSize="small" />} />
+                  )}
                   <Box sx={{ minWidth: 0, flex: 1 }}>
                     <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexWrap: "wrap", rowGap: 0.25 }}>
                       <Typography sx={{ fontSize: "0.86rem", fontWeight: 700, lineHeight: 1.35 }}>{jobText(o) || o.title}</Typography>
@@ -420,7 +452,11 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
                 </li>
               )}
               renderInput={(params) => (
-                <TextField {...params} size="small" label="งาน / โครงการ (แนะนำให้ผูก)" placeholder="ค้นหาชื่องาน / โครงการ / เลขที่"
+                <TextField {...params} size="small" label="งาน / ช่วงวันที่ของงวดนี้ (แนะนำให้ผูก)"
+                  placeholder={job ? "เพิ่มช่วงวันที่ของงานนี้" : "ค้นหาชื่องาน / โครงการ / เลขที่"}
+                  helperText={job
+                    ? `${jobText(job)} · เลือก ${jobs.length} ช่วงวันที่${job.groupKey ? " — ติ๊กเพิ่มช่วงอื่นของงานเดียวกันได้ (ล้างทั้งหมดเพื่อเปลี่ยนงาน)" : " (งานนี้มีช่วงเดียว)"}`
+                    : "งวดเดียวเลือกได้หลายช่วงวันที่ของงานเดียวกัน"}
                   InputProps={{ ...params.InputProps, endAdornment: (<>{jobLoading ? <CircularProgress size={16} /> : null}{params.InputProps.endAdornment}</>) }} />
               )}
             />

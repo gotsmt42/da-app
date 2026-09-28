@@ -19,7 +19,7 @@ import { ISSUER, drawLetterhead, outputDocument, spaceThaiLatin, preparePrintAss
 import { thaiDateFull, thaiDate, thaiDateTime } from "@/shared/utils/thaiDate";
 import {
   KIND_META, slipKind, statusMeta, fmtMoney, bahtText, qtyText, differenceMeta, paymentLabel, fileKindLabel, jobText, jobRangeText, jobPartText, money, itemPersonName, personFullName,
-  installmentText,
+  installmentText, jobRangesText,
 } from "../expenseMeta";
 import { bankMeta, formatAccountNo } from "../bankMeta";
 import { compareItems } from "./expenseCompare";
@@ -220,7 +220,7 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold, attachNote = "") =>
   if (e.eventId || e.job?.title) {
     // ✅ งานที่เข้าหลายช่วง: ใบที่พิมพ์ออกไปต้องระบุชัดว่าเป็นค่าใช้จ่ายของการเข้างานช่วงไหน
     field("งาน / โครงการ",
-      [jobText(e.job), jobPartText(e.job), jobRangeText(e.job)].filter(Boolean).join(" · ")
+      [jobText(e.job), jobPartText(e.job), jobRangesText(e) ? `${e.jobRanges.length} ช่วงวันที่` : jobRangeText(e.job)].filter(Boolean).join(" · ")
       + (e.job?.docNo ? ` (${e.job.docNo})` : ""), L, R, y);
     y += rowH;
   }
@@ -234,6 +234,8 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold, attachNote = "") =>
       .filter(Boolean).join("  ·  ");
     field("งวดงาน", inst, L, R, y);
     y += rowH;
+    // ✅ งวดที่ครอบคลุมหลายช่วงวันที่ของงาน — ระบุทุกช่วงบนเอกสาร
+    if (jobRangesText(e)) y += rowH * field("ช่วงงาน", jobRangesText(e), L, R, y);
   }
 
   // ⚠️ ใบค่าจ้างผู้รับเหมาใช้ผังตารางแบบใบตั้งต้น (ไม่มีช่องใบเสร็จ/ตั้งเบิก) แล้วสรุปยอดหักของตัวเอง

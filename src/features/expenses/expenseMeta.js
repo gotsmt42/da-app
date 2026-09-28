@@ -407,6 +407,16 @@ export const jobRangeText = (job) => {
   return `${thaiDate(start)} – ${thaiDate(end)} · ${days} วัน`;
 };
 
+/**
+ * ช่วงงานทั้งหมดที่ใบค่าจ้างผู้รับเหมาครอบคลุม — "ช่วงที่ 10 · 14 – 19 ก.ย. 2569, ช่วงที่ 11 · 21 – 26 ก.ย. 2569"
+ * ✅ ผู้ใช้สั่ง: "งานงวดให้เบิกหลายช่วงได้" · ว่างเมื่อใบผูกช่วงเดียว (ใช้ jobPartText/jobRangeText ตามเดิม)
+ */
+export const jobRangesText = (e) => {
+  const list = e?.jobRanges || [];
+  if (list.length < 2) return "";
+  return list.map((r) => [Number(r.part) > 0 ? `ช่วงที่ ${r.part}` : "", jobRangeDates(r)].filter(Boolean).join(" · ")).join(", ");
+};
+
 /** ป้าย "ช่วงที่ n/N" — ว่างเมื่องานนั้นเข้าช่วงเดียว */
 export const jobPartText = (job) =>
   (Number(job?.partCount) > 1 && Number(job?.part) > 0 ? `ช่วงวันที่ ${job.part}/${job.partCount}` : "");
