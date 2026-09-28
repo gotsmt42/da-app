@@ -37,7 +37,7 @@ import ExpenseDetailDialog from "../components/ExpenseDetailDialog";
 import MyExpenseTasks from "../components/MyExpenseTasks";
 import { useAuth } from "@/features/auth/AuthContext";
 import ExpenseReport from "./ExpenseReport";
-import { KIND_META, slipMeta, baht, TEXT_SUB, BORDER_MAIN } from "../expenseMeta";
+import { KIND_META, slipMeta, baht, TEXT_SUB, TEXT_MAIN, BORDER_MAIN } from "../expenseMeta";
 
 const INBOX_COLOR = "#d97706";
 const REPORT_COLOR = "#1d4ed8";
@@ -114,8 +114,9 @@ const StatPill = ({ label, value, color, active, alert, onClick }) => (
     onClick={onClick}
     sx={{
       flex: "0 0 auto", minWidth: 118, px: 1.5, py: 1, borderRadius: 2.5, cursor: onClick ? "pointer" : "default",
-      bgcolor: active ? alpha(color, 0.1) : "#fff",
-      border: `1px solid ${active ? color : alert ? alpha("#dc2626", 0.4) : BORDER_MAIN}`,
+      bgcolor: "#fff",
+      border: `1px solid ${active ? "#334155" : alert ? alpha("#dc2626", 0.4) : BORDER_MAIN}`,
+      boxShadow: active ? "inset 0 0 0 1px #334155" : "none",
       transition: "border-color .15s",
       "&:hover": onClick ? { borderColor: color } : undefined,
     }}
@@ -124,7 +125,8 @@ const StatPill = ({ label, value, color, active, alert, onClick }) => (
       {alert && <WarningAmber sx={{ fontSize: 13, color: "#dc2626", mr: 0.4, verticalAlign: "-2px" }} />}
       {label}
     </Typography>
-    <Typography sx={{ fontWeight: 900, fontSize: "1.15rem", color: alert ? "#dc2626" : color, lineHeight: 1.25 }} noWrap>
+    {/* ✅ ตัวเลขทุกช่องสีเดียวกัน (ยกเว้นเตือน) — เดิมแต่ละช่องคนละสี อ่านแล้วตาลาย (ผู้ใช้แจ้ง) */}
+    <Typography sx={{ fontWeight: 900, fontSize: "1.15rem", color: alert ? "#dc2626" : TEXT_MAIN, lineHeight: 1.25 }} noWrap>
       {value}
     </Typography>
   </Box>
@@ -135,7 +137,7 @@ const CrossLink = ({ to, label, color }) => (
   <Chip
     component={RouterLink} to={to} clickable size="small"
     label={<span>{label} <ChevronRight sx={{ fontSize: 13, verticalAlign: "-2px" }} /></span>}
-    sx={{ height: 26, fontWeight: 700, fontSize: "0.76rem", bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, color, "& .MuiChip-label": { px: 1 } }}
+    sx={{ height: 26, fontWeight: 700, fontSize: "0.76rem", bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, color: TEXT_SUB, "& .MuiChip-label": { px: 1 } }}
   />
 );
 
@@ -296,8 +298,9 @@ export default function ExpensesPage({ view: viewProp }) {
     <Box sx={{ p: { xs: 1.25, sm: 2.5 }, maxWidth: 1500, mx: "auto" }}>
       {/* ── หัวหน้าเพจ: สีประจำหน้า + ปุ่มหลักปุ่มเดียว ─────────────────── */}
       <Box sx={{
-        borderRadius: 3, border: `1px solid ${alpha(meta.color, 0.3)}`, borderTop: `4px solid ${meta.color}`,
-        bgcolor: meta.soft, px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.75 }, mb: 1.5,
+        // ✅ หัวหน้าเพจพื้นขาว — สีประจำหน้าเหลือแค่ไอคอนกับปุ่มหลัก (เดิมพื้นสี + ขอบสี + แถบบนสี)
+        borderRadius: 3, border: `1px solid ${BORDER_MAIN}`,
+        bgcolor: "#fff", px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.75 }, mb: 1.5,
       }}>
         <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "stretch", sm: "center" }} spacing={{ xs: 1.25, sm: 2 }}>
           <Stack direction="row" alignItems="center" spacing={1.5} sx={{ flex: 1, minWidth: 0 }}>
@@ -308,7 +311,7 @@ export default function ExpensesPage({ view: viewProp }) {
               <Icon />
             </Box>
             <Box sx={{ minWidth: 0 }}>
-              <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.12rem", sm: "1.3rem" }, color: meta.dark, lineHeight: 1.25 }}>
+              <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.12rem", sm: "1.3rem" }, color: TEXT_MAIN, lineHeight: 1.25 }}>
                 {meta.title}
               </Typography>
               <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", lineHeight: 1.35 }}>
@@ -335,9 +338,10 @@ export default function ExpensesPage({ view: viewProp }) {
                   onClick={() => openCreate(meta.action2.kind)}
                   sx={{
                     flex: { xs: 1, sm: "none" }, textTransform: "none", fontWeight: 800, borderRadius: 2, whiteSpace: "nowrap",
-                    color: KIND_META[meta.action2.kind].dark, borderColor: KIND_META[meta.action2.kind].color,
-                    bgcolor: "#fff",
-                    "&:hover": { borderColor: KIND_META[meta.action2.kind].dark, bgcolor: KIND_META[meta.action2.kind].soft },
+                    // ปุ่มรองเป็นขอบเทา ตัวดำ — สีของใบสำรองจ่ายเหลือแค่ที่ไอคอน
+                    color: TEXT_MAIN, borderColor: BORDER_MAIN, bgcolor: "#fff",
+                    "& .MuiButton-startIcon": { color: KIND_META[meta.action2.kind].color },
+                    "&:hover": { borderColor: "#94a3b8", bgcolor: "#f8fafc" },
                   }}
                 >
                   {meta.action2.label}

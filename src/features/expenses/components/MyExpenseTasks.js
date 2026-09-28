@@ -21,7 +21,7 @@ import { ReceiptLong, Edit, AssignmentLate, ChevronRight } from "@mui/icons-mate
 
 import { thaiDate } from "@/shared/utils/thaiDate";
 import ExpenseService from "../services/ExpenseService";
-import { KIND_META, slipKind, baht, isOverdueClear, TEXT_SUB, TEXT_MAIN, BORDER_MAIN } from "../expenseMeta";
+import { KIND_META, baht, isOverdueClear, TEXT_SUB, TEXT_MAIN, BORDER_MAIN } from "../expenseMeta";
 
 const isMine = (e, me, { includeCreator }) =>
   String(e?.requester?.userId || "") === me || (includeCreator && String(e?.createdBy?.userId || "") === me);
@@ -80,10 +80,10 @@ export default function MyExpenseTasks({ view, userId, reloadKey, onOpen, onCrea
 
   return (
     <Box sx={{
-      mb: 1.5, borderRadius: 2.5, border: `1px solid ${alpha("#dc2626", 0.28)}`, bgcolor: "#fff",
-      boxShadow: `0 1px 0 ${alpha("#dc2626", 0.06)}`, overflow: "hidden",
+      mb: 1.5, borderRadius: 2.5, border: `1px solid ${BORDER_MAIN}`, bgcolor: "#fff", overflow: "hidden",
     }}>
-      <Stack direction="row" alignItems="center" spacing={1} sx={{ px: { xs: 1.5, sm: 2 }, py: 1.1, bgcolor: alpha("#dc2626", 0.05), borderBottom: `1px solid ${alpha("#dc2626", 0.15)}` }}>
+      {/* ✅ โทนเรียบ (ผู้ใช้แจ้ง "สีสันรกตา") — แดงเหลือแค่ไอคอนกับตัวเลขจำนวน */}
+      <Stack direction="row" alignItems="center" spacing={1} sx={{ px: { xs: 1.5, sm: 2 }, py: 1.1, borderBottom: `1px solid ${BORDER_MAIN}` }}>
         <AssignmentLate sx={{ fontSize: 20, color: "#dc2626" }} />
         {/* ✅ ผู้ใช้แจ้ง: "มันไม่ใช่งาน คือการเบิก" — เรียกตามสิ่งที่มันเป็น และไม่อธิบายซ้ำกับป้ายในแต่ละแถว */}
         <Typography sx={{ fontWeight: 900, fontSize: "0.95rem", color: TEXT_MAIN }}>ใบเบิกของคุณที่ค้างอยู่</Typography>
@@ -93,7 +93,6 @@ export default function MyExpenseTasks({ view, userId, reloadKey, onOpen, onCrea
       <Stack divider={<Box sx={{ borderTop: `1px solid ${BORDER_MAIN}` }} />}>
         {tasks.map(({ type, e }) => {
           const late = type === "clear" && isOverdueClear(e);
-          const kindMeta = KIND_META[slipKind(e)];
           return (
             <Stack
               key={`${type}-${e._id}`}
@@ -110,7 +109,7 @@ export default function MyExpenseTasks({ view, userId, reloadKey, onOpen, onCrea
               >
                 {/* ⚠️ เลขที่ใบ + เรื่อง อยู่บรรทัดเดียวกัน — เดิมแยกสองบรรทัดทำให้กล่องสูงโดยไม่ได้ข้อมูลเพิ่ม */}
                 <Stack direction="row" alignItems="center" spacing={0.75} flexWrap="wrap" useFlexGap>
-                  <Typography className="mt-doc" sx={{ fontWeight: 800, fontSize: "0.9rem", color: kindMeta.dark }}>{e.docNo}</Typography>
+                  <Typography className="mt-doc" sx={{ fontWeight: 800, fontSize: "0.9rem", color: TEXT_MAIN }}>{e.docNo}</Typography>
                   <Typography sx={{ fontSize: "0.85rem", color: TEXT_MAIN, minWidth: 0 }} noWrap>{e.subject || "-"}</Typography>
                   {/* ป้ายบอก "สถานะ" อย่างเดียว ส่วนรายละเอียดเงิน/กำหนดอยู่บรรทัดล่าง ไม่พูดซ้ำกัน */}
                   <Chip
@@ -131,9 +130,9 @@ export default function MyExpenseTasks({ view, userId, reloadKey, onOpen, onCrea
               </Box>
               {type === "clear" ? (
                 <Button
-                  variant="contained" startIcon={<ReceiptLong sx={{ fontSize: 18 }} />}
+                  variant="outlined" startIcon={<ReceiptLong sx={{ fontSize: 18 }} />}
                   onClick={() => onCreateClaim?.(e)}
-                  sx={{ flexShrink: 0, textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: tone.color, "&:hover": { bgcolor: tone.dark, boxShadow: "none" } }}
+                  sx={{ flexShrink: 0, textTransform: "none", fontWeight: 800, borderRadius: 2, color: tone.dark, borderColor: alpha(tone.color, 0.5), "&:hover": { borderColor: tone.color, bgcolor: alpha(tone.color, 0.04) } }}
                 >
                   ออกใบเคลม
                 </Button>

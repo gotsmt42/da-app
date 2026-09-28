@@ -19,7 +19,7 @@ import usePermissions from "@/shared/hooks/usePermissions";
 import ExpenseService, { errorText } from "../services/ExpenseService";
 import KindBadge from "./KindBadge";
 import {
-  KIND_META, statusMeta, STATUS_FILTERS, CLAIM_TYPE_FILTERS, baht, differenceMeta, isOverdueClear, jobText, slipKind, slipMeta, TEXT_SUB, TEXT_MAIN, BORDER_MAIN, personFullName, installmentText,
+  KIND_META, statusMeta, STATUS_FILTERS, CLAIM_TYPE_FILTERS, baht, differenceMeta, isOverdueClear, jobText, slipKind, TEXT_SUB, TEXT_MAIN, BORDER_MAIN, personFullName, installmentText, money,
 } from "../expenseMeta";
 
 const PERIODS = [
@@ -61,57 +61,72 @@ const INBOX_GROUPS = [
  * ⚠️ ใบสำรองจ่ายต้องบอกให้ชัดว่าไม่มีใบอ้างอิง ไม่ใช่ปล่อยว่าง — ว่างไว้จะดูเหมือนข้อมูลหาย
  */
 const refLabel = (e) => {
-  if (slipKind(e) === "reimburse") return "สำรองจ่ายเอง · ไม่มี Advance";
+  // ⚠️ ใบสำรองจ่ายมีป้ายชนิดใบบอกอยู่แล้ว — ไม่ต้องพูดซ้ำในบรรทัดรอง (ผู้ใช้แจ้งว่ารกตา)
+  if (slipKind(e) === "reimburse") return "";
   if (slipKind(e) === "contractor") return [e.contractor?.name, installmentText(e.installment)].filter(Boolean).join(" · ");
   if (e.kind === "claim" && e.advance?.docNo) return `อ้าง ${e.advance.docNo}`;
   return "";
 };
 
-const StatusChip = ({ e }) => {
+/**
+ * สถานะแบบ "จุดสี + ข้อความ" — ✅ ผู้ใช้แจ้ง "สีสันรกตาเกินไป ทำให้มองง่าย ใช้ง่าย"
+ * เดิมเป็นชิปพื้นสีทุกแถว บวกแถบซ้ายสี + ป้ายทึบ + เลขที่สี + ยอดส่วนต่างสี = 4–5 สีต่อการ์ดเดียว
+ * ตอนนี้แต่ละแถวเหลือสีแค่ 2 จุดเล็ก (ป้ายชนิดใบแบบอ่อน + จุดสถานะ) ที่เหลือเป็นขาว-ดำ-เทา
+ */
+const StatusText = ({ e }) => {
   const st = statusMeta(e.status, slipKind(e));
   return (
-    <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
-      <Chip size="small" label={st.label} sx={{ height: 22, fontSize: "0.72rem", fontWeight: 800, bgcolor: alpha(st.color, 0.12), color: st.color }} />
+    <Stack direction="row" spacing={0.6} alignItems="center" sx={{ minWidth: 0 }}>
+      <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: st.color, flexShrink: 0 }} />
+      <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: TEXT_MAIN }} noWrap>{st.label}</Typography>
       {isOverdueClear(e) && (
-        <Chip size="small" icon={<WarningAmber sx={{ fontSize: "14px !important" }} />} label="เลยกำหนด"
-          sx={{ height: 22, fontSize: "0.7rem", fontWeight: 800, bgcolor: alpha("#dc2626", 0.1), color: "#dc2626" }} />
+        <Typography sx={{ fontSize: "0.74rem", fontWeight: 800, color: "#dc2626", display: "inline-flex", alignItems: "center", gap: 0.25 }} noWrap>
+          <WarningAmber sx={{ fontSize: 14 }} />เลยกำหนด
+        </Typography>
       )}
     </Stack>
   );
 };
 
-const AmountCell = ({ e }) => {
-  if (e.kind !== "claim") return <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", color: TEXT_MAIN }}>{baht(e.total)}</Typography>;
-  const d = differenceMeta(e.difference, slipKind(e));
-  return (
-    <Box>
-      <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", color: TEXT_MAIN }}>{baht(e.total)}</Typography>
-      <Typography variant="caption" sx={{ color: d.color, fontWeight: 700, whiteSpace: "nowrap" }}>
-        {d.amount ? `${d.short} ${baht(d.amount)}` : slipKind(e) === "contractor" ? "ไม่มียอดจ่าย" : "พอดี"}
-      </Typography>
-    </Box>
-  );
+/** บรรทัดเล็กใต้ยอด — บอกเฉพาะเมื่อมีข้อมูลที่ยอดรวมไม่ได้บอก (ส่วนต่างใบเคลม / ยอดสุทธิผู้รับเหมา) */
+const amountNote = (e) => {
+  const kind = slipKind(e);
+  if (kind === "contractor") return money(e.difference) !== money(e.total) ? `สุทธิ ${baht(e.difference)}` : "";
+  if (kind !== "claim") return "";
+  const d = differenceMeta(e.difference, kind);
+  return d.amount ? `${d.short} ${baht(d.amount)}` : "";
 };
+
+const AmountCell = ({ e }) => (
+  <Box sx={{ textAlign: "right", flexShrink: 0 }}>
+    <Typography sx={{ fontWeight: 800, fontSize: "0.95rem", color: TEXT_MAIN, whiteSpace: "nowrap" }}>{baht(e.total)}</Typography>
+    {amountNote(e) && <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 600, whiteSpace: "nowrap" }}>{amountNote(e)}</Typography>}
+  </Box>
+);
 
 const MobileCard = ({ e, onOpen }) => (
   <Box onClick={() => onOpen(e._id)} role="button" sx={{
     p: 1.5, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 2.5, cursor: "pointer",
-    // ✅ แถบซ้ายเป็นสีประจำชนิดใบ (ไม่ใช่สีสถานะ) — ผู้ใช้ขอให้แยก Advance/Claim ได้ชัดเจนตั้งแต่มองรายการ
-    borderLeft: `5px solid ${slipMeta(e).color}`, "&:active": { bgcolor: "#f8fafc" },
+    "&:active": { bgcolor: "#f8fafc" },
   }}>
     <Stack direction="row" spacing={1.25} alignItems="flex-start">
       <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Stack direction="row" alignItems="baseline" spacing={1}>
-          <KindBadge kind={slipKind(e)} />
-          <Typography sx={{ fontWeight: 800, fontSize: "0.84rem", color: slipMeta(e).dark, flex: 1 }} noWrap>{e.docNo}</Typography>
-          <AmountCell e={e} />
-        </Stack>
-        <Typography sx={{ fontWeight: 700, fontSize: "0.92rem", color: TEXT_MAIN, lineHeight: 1.35 }}>{e.subject}</Typography>
-        <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }} noWrap>
-          {thaiDate(e.docDate)} · {personFullName(e.requester)}{refLabel(e) ? ` · ${refLabel(e)}` : ""}{e.job?.title ? ` · ${jobText(e.job)}` : ""}
+        {/* เรื่องคือสิ่งที่คนหา — ตัวหนาบรรทัดแรก (ยาวได้ 2 บรรทัด) */}
+        <Typography sx={{
+          fontWeight: 700, fontSize: "0.93rem", color: TEXT_MAIN, lineHeight: 1.4,
+          display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+        }}>
+          {e.subject}
         </Typography>
-        <Box sx={{ mt: 0.75 }}><StatusChip e={e} /></Box>
+        <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", mt: 0.25 }} noWrap>
+          {[e.docNo, thaiDate(e.docDate), personFullName(e.requester), refLabel(e)].filter(Boolean).join(" · ")}
+        </Typography>
       </Box>
+      <AmountCell e={e} />
+    </Stack>
+    <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+      <KindBadge kind={slipKind(e)} variant="soft" />
+      <StatusText e={e} />
     </Stack>
   </Box>
 );
@@ -132,16 +147,12 @@ const DesktopTable = ({ rows, onOpen }) => (
       <TableBody>
         {rows.map((e) => (
           <TableRow key={e._id} hover onClick={() => onOpen(e._id)} sx={{ cursor: "pointer", "& td": { py: 1.1, borderColor: BORDER_MAIN } }}>
-            <TableCell sx={{ whiteSpace: "nowrap", boxShadow: `inset 5px 0 0 ${slipMeta(e).color}`, pl: 2.25 }}>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Box>
-                  <Stack direction="row" spacing={0.75} alignItems="center">
-                    <KindBadge kind={slipKind(e)} />
-                    <Typography sx={{ fontWeight: 800, fontSize: "0.85rem", color: slipMeta(e).dark }}>{e.docNo}</Typography>
-                  </Stack>
-                  <Typography variant="caption" sx={{ color: TEXT_SUB }}>{thaiDate(e.docDate)}</Typography>
-                </Box>
+            <TableCell sx={{ whiteSpace: "nowrap" }}>
+              <Stack direction="row" spacing={0.75} alignItems="center">
+                <KindBadge kind={slipKind(e)} variant="soft" />
+                <Typography sx={{ fontWeight: 700, fontSize: "0.85rem", color: TEXT_MAIN }}>{e.docNo}</Typography>
               </Stack>
+              <Typography variant="caption" sx={{ color: TEXT_SUB }}>{thaiDate(e.docDate)}</Typography>
             </TableCell>
             <TableCell sx={{ whiteSpace: "nowrap" }}>
               <Typography sx={{ fontWeight: 700, fontSize: "0.85rem" }}>{personFullName(e.requester)}</Typography>
@@ -154,7 +165,7 @@ const DesktopTable = ({ rows, onOpen }) => (
               </Typography>
             </TableCell>
             <TableCell align="right"><AmountCell e={e} /></TableCell>
-            <TableCell><StatusChip e={e} /></TableCell>
+            <TableCell><StatusText e={e} /></TableCell>
             <TableCell><ChevronRight sx={{ color: "#cbd5e1" }} /></TableCell>
           </TableRow>
         ))}
@@ -310,15 +321,16 @@ export default function ExpenseList({ mode, status: statusProp, claimType = "all
     <Stack direction="row" spacing={0.75} sx={{ mb: 1.25, overflowX: "auto", pb: 0.25, "&::-webkit-scrollbar": { display: "none" } }}>
       {CLAIM_TYPE_FILTERS.map((t) => {
         const active = claimType === t.value;
-        const c = t.kind ? KIND_META[t.kind].color : TEXT_MAIN;
+        // ✅ ตัวเลือกที่เลือกอยู่ = พื้นเทาเข้ม ตัวขาว (สีเดียวทั้งแอป) — ไม่ใช้สีประจำชนิดใบ ลดสีที่แย่งสายตา
+        const c = "#334155";
         return (
           <Chip
             key={t.value} clickable onClick={() => onClaimTypeChange(t.value)} label={t.label}
             sx={{
               flexShrink: 0, height: 32, fontWeight: 800, fontSize: "0.8rem", borderRadius: 2,
-              bgcolor: active ? alpha(c, 0.12) : "#fff", color: active ? c : TEXT_SUB,
+              bgcolor: active ? c : "#fff", color: active ? "#fff" : TEXT_SUB,
               border: `1px solid ${active ? c : BORDER_MAIN}`,
-              "&:hover": { bgcolor: alpha(c, 0.08) },
+              "&:hover": { bgcolor: active ? c : alpha(c, 0.06) },
             }}
           />
         );
@@ -335,15 +347,21 @@ export default function ExpenseList({ mode, status: statusProp, claimType = "all
         const n = counts[s] || 0;
         if (s !== "all" && s !== status && n === 0) return null;
         const active = status === s;
+        const dark = "#334155";
         return (
           <Chip
             key={s} clickable onClick={() => setStatus(s)}
-            label={<span>{st.label} <b style={{ marginLeft: 2 }}>{n}</b></span>}
+            label={(
+              <Stack direction="row" spacing={0.6} alignItems="center" component="span">
+                {s !== "all" && <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: active ? "#fff" : st.color }} />}
+                <span>{st.label} <b style={{ marginLeft: 2 }}>{n}</b></span>
+              </Stack>
+            )}
             sx={{
               flexShrink: 0, height: 30, fontWeight: 700, fontSize: "0.78rem", borderRadius: 2,
-              bgcolor: active ? st.color : "#fff", color: active ? "#fff" : TEXT_MAIN,
-              border: `1px solid ${active ? st.color : BORDER_MAIN}`,
-              "&:hover": { bgcolor: active ? st.color : alpha(st.color, 0.08) },
+              bgcolor: active ? dark : "#fff", color: active ? "#fff" : TEXT_MAIN,
+              border: `1px solid ${active ? dark : BORDER_MAIN}`,
+              "&:hover": { bgcolor: active ? dark : alpha(dark, 0.06) },
             }}
           />
         );
