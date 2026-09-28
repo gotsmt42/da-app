@@ -6,13 +6,13 @@
  * พื้นทึบ + ไอคอนคนละรูป + คำภาษาอังกฤษตัวใหญ่ที่คนในบริษัทเรียกกันจริง
  */
 import { Box } from "@mui/material";
-import { Payments, ReceiptLong, AccountBalanceWallet } from "@mui/icons-material";
+import { Payments, ReceiptLong, AccountBalanceWallet, Engineering } from "@mui/icons-material";
 import { KIND_META } from "../expenseMeta";
 
 export default function KindBadge({ kind, size = "small", sx }) {
   const m = KIND_META[kind] || KIND_META.advance;
   const big = size === "medium";
-  const Icon = kind === "reimburse" ? AccountBalanceWallet : kind === "claim" ? ReceiptLong : Payments;
+  const Icon = kind === "contractor" ? Engineering : kind === "reimburse" ? AccountBalanceWallet : kind === "claim" ? ReceiptLong : Payments;
   return (
     <Box
       component="span"

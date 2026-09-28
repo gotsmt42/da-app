@@ -41,6 +41,7 @@ export const BADGE_LABEL = {
   dispatchMine: "ใบแจ้งงานที่ถูกตีกลับ",
   advance: "ใบ Advance ที่ถูกตีกลับ",
   claim: "ใบ Advance ที่รอเคลียร์",
+  contractorPay: "ใบค่าจ้างผู้รับเหมาที่ถูกตีกลับ",
   expenseInbox: "ใบเบิกที่รอดำเนินการ",
   webLeads: "คำขอใหม่จากเว็บไซต์",
 };
@@ -70,7 +71,7 @@ const POLL_MS = 30_000;
 const EMPTY = {
   pendingApproval: 0, closeRequests: 0, contracts: 0, myJobs: 0,
   quotations: 0, dispatchQueue: 0, dispatchMine: 0,
-  advance: 0, claim: 0, expenseInbox: 0, webLeads: 0,
+  advance: 0, claim: 0, contractorPay: 0, expenseInbox: 0, webLeads: 0,
 };
 
 /** สิ่งที่ผู้ใช้คนนี้มีสิทธิ์เห็น = สิ่งที่ต้องดึง (ไม่ยิง endpoint ที่จะโดน 403 อยู่แล้ว) */
@@ -229,6 +230,8 @@ const computeBadges = (userData, data) => {
     // 🐛 เดิมใช้ awaitingClaim (ของทุกคนที่มองเห็น) → หัวหน้าเห็นเลขค้างบน "ใบเคลม" ตลอดทั้งที่ไม่ใช่งานตัวเอง
     // ✅ ใช้ใบ Advance "ของฉัน" ที่ต้องเคลียร์เท่านั้น
     claim: (Number(ex.awaitingClaimMine ?? ex.awaitingClaim) || 0) + (Number(ex.claimRejectedMine) || 0),
+    // ใบค่าจ้างผู้รับเหมาของฉันที่ถูกตีกลับ (server ไม่นับรวมใน claimRejectedMine แล้ว)
+    contractorPay: Number(ex.contractor?.rejectedMine) || 0,
     /**
      * ✅ นับเฉพาะใบที่ผู้ใช้คนนี้กดทำรายการได้จริง ตามขั้นของตัวเองในสายอนุมัติ 4 ขั้น
      *   inboxPending (ตรวจสอบ) + inboxReviewing (อนุมัติ) + inboxDisburse (อนุมัติเบิกจ่าย)

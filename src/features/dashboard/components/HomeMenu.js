@@ -99,6 +99,7 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
     // (เคยทาสีม่วงของ "ชนิดเอกสาร" ไว้ที่ปุ่มนี้ปุ่มเดียว ผู้ใช้ดูของจริงแล้วบอกว่าโดดออกมาจากเพื่อนในแถว —
     // สีประจำชนิดใบยังอยู่ครบในหน้าใบเคลมเอง ตรงนี้เป็นแค่ปุ่มทางเข้า)
     expense.push(dest("claim"));
+    expense.push(dest("contractorPay"));
     // ✅ คิวงานของผู้ดำเนินการแต่ละขั้น (ตรวจสอบ/อนุมัติ/อนุมัติเบิกจ่าย) เพิ่มอีกเมนู
     if (canApproveExpense) {
       expense.push(dest("expenseInbox"));

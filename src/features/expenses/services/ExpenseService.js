@@ -59,7 +59,7 @@ const ExpenseService = {
    */
   async report(params = {}) {
     const res = await API.get("/expenses/report", { params });
-    return { advances: res.data.advances || [], reimbursements: res.data.reimbursements || [] };
+    return { advances: res.data.advances || [], reimbursements: res.data.reimbursements || [], contractors: res.data.contractors || [] };
   },
 
   async people() {
@@ -152,6 +152,29 @@ const ExpenseService = {
     const { body, config, rejected } = await buildBody(fields, files);
     const res = await API.post("/expenses/reimbursements", body, config);
     return { expense: res.data.expense, rejected };
+  },
+
+  /**
+   * ใบเบิกค่าจ้างผู้รับเหมา (ไม่มี Advance — เบิกค่าแรงตรง) · พนักงานกรอกแทนผู้รับเหมา
+   * ⚠️ ยอด VAT / หัก ณ ที่จ่าย / สุทธิ คำนวณที่ server — ฟอร์มส่งแค่อัตราและยอดมัดจำ
+   */
+  async createContractorPayment(fields, files = []) {
+    const { body, config, rejected } = await buildBody(fields, files);
+    const res = await API.post("/expenses/contractor-payments", body, config);
+    return { expense: res.data.expense, rejected };
+  },
+
+  /** ผู้รับเหมาที่เคยออกใบ (ชื่อ/เลขภาษี/ที่อยู่/บัญชีล่าสุด) — ใช้เติมฟอร์มอัตโนมัติ */
+  async contractors() {
+    const res = await API.get("/expenses/contractors");
+    return res.data.contractors || [];
+  },
+
+  /** งวดที่เบิกไปแล้วของผู้รับเหมาคนนี้ในงานนี้ */
+  async contractorHistory(eventId, name, excludeId) {
+    if (!eventId || !String(name || "").trim()) return [];
+    const res = await API.get("/expenses/contractor-history", { params: { eventId, name, ...(excludeId ? { excludeId } : {}) } });
+    return res.data.history || [];
   },
 
   async update(id, fields, files = []) {

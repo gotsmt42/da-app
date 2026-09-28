@@ -49,10 +49,15 @@ export default function MyExpenseTasks({ view, userId, reloadKey, onOpen, onCrea
       ? [
         ExpenseService.list({ kind: "advance", status: "paid" })
           .then((rows) => rows.filter((e) => isMine(e, me, { includeCreator: false })).map((e) => ({ type: "clear", e }))),
-        ExpenseService.list({ kind: "claim", status: "rejected" })
+        ExpenseService.list({ kind: "claim", claimType: "staff", status: "rejected" })
           .then((rows) => rows.filter((e) => isMine(e, me, { includeCreator: true })).map((e) => ({ type: "fix", e }))),
       ]
-      : [
+      : view === "contractor"
+        ? [
+          ExpenseService.list({ kind: "claim", claimType: "contractor", status: "rejected" })
+            .then((rows) => rows.filter((e) => isMine(e, me, { includeCreator: true })).map((e) => ({ type: "fix", e }))),
+        ]
+        : [
         ExpenseService.list({ kind: "advance", status: "rejected" })
           .then((rows) => rows.filter((e) => isMine(e, me, { includeCreator: true })).map((e) => ({ type: "fix", e }))),
       ];
@@ -71,7 +76,7 @@ export default function MyExpenseTasks({ view, userId, reloadKey, onOpen, onCrea
 
   if (!tasks.length) return null;
 
-  const tone = view === "claim" ? KIND_META.claim : KIND_META.advance;
+  const tone = view === "claim" ? KIND_META.claim : view === "contractor" ? KIND_META.contractor : KIND_META.advance;
 
   return (
     <Box sx={{

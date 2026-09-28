@@ -26,7 +26,7 @@ import "./MobileBottomNav.css";
 
 const MAX_ITEMS = 5;
 // หน้าอื่นของระบบเบิกที่ไม่ใช่ "ใบ Advance" — ใช้ตัดสินว่าช่องไหนบนแถบล่างควรติดสว่าง
-const EXPENSE_OTHER_PATHS = ["/expenses/claims", "/expenses/approvals", "/expenses/report"];
+const EXPENSE_OTHER_PATHS = ["/expenses/claims", "/expenses/contractors", "/expenses/approvals", "/expenses/report"];
 
 /**
  * ช่องหนึ่งช่องบนแถบล่าง — เอาปลายทางจากทะเบียนกลางมาใส่ชื่อสั้นและเงื่อนไข "กำลังอยู่หน้านี้"

@@ -27,6 +27,12 @@ export const CLAIM_ACCENT_DARK = "#6d28d9";
  */
 export const REIMBURSE_ACCENT = "#ea580c";
 export const REIMBURSE_ACCENT_DARK = "#c2410c";
+/**
+ * ใบเบิกค่าจ้างผู้รับเหมา — น้ำเงินเข้ม (ผู้ใช้สั่ง 28 ก.ย. 2569 "เพิ่มระบบเบิกเงินผู้รับเหมา")
+ * ⚠️ เงินออกไปหา "คนนอก" ไม่ใช่พนักงาน — ต้องแยกจากสามใบของพนักงานได้ตั้งแต่มองรายการ
+ */
+export const CONTRACTOR_ACCENT = "#1e40af";
+export const CONTRACTOR_ACCENT_DARK = "#1e3a8a";
 
 export const TEXT_MAIN = "#0f172a";
 export const TEXT_SUB = "#64748b";
@@ -69,6 +75,17 @@ export const KIND_META = {
     badge: "สำรองจ่าย",
     pdf: { main: [194, 65, 12], head: [255, 237, 213], fill: [255, 247, 237] },
   },
+  /** ⚠️ ไม่ใช่ kind ในฐานข้อมูล — ชนิดย่อยของ claim (claimType = "contractor") อ่านผ่าน slipKind() เสมอ */
+  contractor: {
+    label: "ใบเบิกค่าจ้างผู้รับเหมา",
+    short: "ผู้รับเหมา",
+    docTitle: "ใบเบิกค่าจ้างผู้รับเหมา",
+    color: CONTRACTOR_ACCENT,
+    dark: CONTRACTOR_ACCENT_DARK,
+    soft: "#eef2ff",
+    badge: "ผู้รับเหมา",
+    pdf: { main: [30, 58, 138], head: [219, 234, 254], fill: [239, 246, 255] },
+  },
 };
 
 /**
@@ -76,12 +93,43 @@ export const KIND_META = {
  * @returns {"advance"|"claim"|"reimburse"}
  */
 export const slipKind = (e) =>
-  (e?.kind === "claim" && e?.claimType === "reimburse" ? "reimburse" : e?.kind || "advance");
+  (e?.kind === "claim" && ["reimburse", "contractor"].includes(e?.claimType) ? e.claimType : e?.kind || "advance");
 
 export const slipMeta = (e) => KIND_META[slipKind(e)] || KIND_META.advance;
 
 /** ใบที่ผู้เบิกสำรองจ่ายเอง — บริษัทต้องจ่ายคืนเต็มยอด ไม่มี Advance ให้เทียบ */
 export const isReimburse = (e) => slipKind(e) === "reimburse";
+
+/** ใบเบิกค่าจ้างผู้รับเหมา — difference = ยอดจ่ายสุทธิให้ผู้รับเหมา */
+export const isContractor = (e) => slipKind(e) === "contractor";
+
+/** ⚠️ ต้องตรงกับ contractorMoney ใน da-app-server/src/routes/expenses.js ทุกสูตร */
+export const VAT_RATES = [0, 7];
+export const WHT_PRESETS = [
+  { value: 0, label: "ไม่หัก" },
+  { value: 1, label: "1% (ค่าขนส่ง)" },
+  { value: 2, label: "2% (ค่าโฆษณา)" },
+  { value: 3, label: "3% (ค่าจ้างทำของ / ค่าบริการ)" },
+  { value: 5, label: "5% (ค่าเช่า)" },
+];
+
+/**
+ * ยอดของใบค่าจ้าง — ค่าจ้าง + VAT − หัก ณ ที่จ่าย (คิดจากยอดก่อน VAT) − หักมัดจำ/เบิกล่วงหน้า = จ่ายสุทธิ
+ * ใช้ทั้งพรีวิวในฟอร์ม และแสดงผล/พิมพ์ของใบเก่า (ค่าจริงในใบมาจาก server)
+ */
+export const contractorCalc = (gross, { vatRate = 0, whtRate = 0, deposit = 0 } = {}) => {
+  const g = money(gross);
+  const vr = VAT_RATES.includes(Number(vatRate)) ? Number(vatRate) : 0;
+  const wr = Math.min(Math.max(Number(whtRate) || 0, 0), 15);
+  const vat = money(g * vr / 100);
+  const wht = money(g * wr / 100);
+  const dep = money(Math.max(Number(deposit) || 0, 0));
+  return { gross: g, vatRate: vr, vat, whtRate: wr, wht, deposit: dep, net: money(g + vat - wht - dep) };
+};
+
+/** "งวดที่ 2/5" — ว่างเมื่อไม่ระบุงวด */
+export const installmentText = (inst) =>
+  (Number(inst?.no) > 0 ? `งวดที่ ${inst.no}${Number(inst?.total) > 0 ? `/${inst.total}` : ""}` : "");
 
 /**
  * สถานะ — ป้ายบางตัวต่างกันตามชนิดใบ (approved ของ Advance = รอจ่ายเงิน · ของ Claim = รอชำระส่วนต่าง)
@@ -118,10 +166,12 @@ export const STATUS_FILTERS = {
   claim: ["pending", "reviewed", "rejected", "approved", "settled", "cancelled"],
   // ใบสำรองจ่ายเดินทางเดียวกับใบเคลม (ไม่มีขั้นจ่ายเงินล่วงหน้า/รอเคลียร์)
   reimburse: ["pending", "reviewed", "rejected", "approved", "settled", "cancelled"],
+  contractor: ["pending", "reviewed", "rejected", "approved", "settled", "cancelled"],
 };
 
 /** ตัวกรองชนิดย่อยของใบเคลม — ค่าต้องตรงกับที่ server รับ (?claimType=) */
 export const CLAIM_TYPE_FILTERS = [
+  // ⚠️ "ทั้งหมด" ของหน้าใบเคลม = ใบของพนักงาน (server: claimType=staff) — ใบค่าจ้างผู้รับเหมามีหน้าของตัวเอง
   { value: "all", label: "ทั้งหมด" },
   { value: "clear", label: "เคลียร์ Advance", kind: "claim" },
   { value: "reimburse", label: "สำรองจ่ายเอง", kind: "reimburse" },
@@ -137,6 +187,7 @@ export const EXPENSE_CATEGORIES = [
   { value: "material", label: "วัสดุ / อุปกรณ์", unit: "ชิ้น", color: "#16a34a" },
   { value: "tool", label: "เครื่องมือ", unit: "ชิ้น", color: "#475569" },
   { value: "shipping", label: "ค่าขนส่ง", unit: "ครั้ง", color: "#0891b2" },
+  { value: "labor", label: "ค่าแรง / ค่าจ้างเหมา", unit: "งาน", color: "#1e40af" },
   { value: "other", label: "อื่นๆ", unit: "รายการ", color: "#64748b" },
 ];
 
@@ -174,14 +225,15 @@ export const FILE_STAGES = [
  * ⚠️ ต้องส่ง slipKind(e) มาเสมอ ไม่ใช่ e.kind ดิบ (ใบสำรองจ่ายมี kind = "claim")
  */
 const STAGE_LABEL_BY_KIND = {
-  created: { advance: "แนบตอนออกใบ Advance", claim: "แนบตอนออกใบเคลม", reimburse: "แนบตอนออกใบสำรองจ่าย" },
+  created: { advance: "แนบตอนออกใบ Advance", claim: "แนบตอนออกใบเคลม", reimburse: "แนบตอนออกใบสำรองจ่าย", contractor: "แนบตอนออกใบค่าจ้าง (ใบแจ้งหนี้ / รูปผลงาน)" },
   resubmitted: {
     advance: "แนบตอนแก้ไขใบ Advance และส่งใหม่",
     claim: "แนบตอนแก้ไขใบเคลมและส่งใหม่",
     reimburse: "แนบตอนแก้ไขใบสำรองจ่ายและส่งใหม่",
+    contractor: "แนบตอนแก้ไขใบค่าจ้างและส่งใหม่",
   },
   pay: { advance: "แนบตอนจ่ายเงิน Advance ให้พนักงาน" },
-  settle: { claim: "แนบตอนเคลียร์ส่วนต่างกับพนักงาน", reimburse: "แนบตอนจ่ายคืนพนักงาน" },
+  settle: { claim: "แนบตอนเคลียร์ส่วนต่างกับพนักงาน", reimburse: "แนบตอนจ่ายคืนพนักงาน", contractor: "แนบตอนจ่ายเงินผู้รับเหมา" },
 };
 
 export const fileStageMeta = (v, kind) => {
@@ -283,6 +335,9 @@ export const differenceMeta = (diff, kind) => {
   const d = money(diff);
   if (kind === "reimburse") {
     return { label: "บริษัทจ่ายคืนพนักงาน", short: "จ่ายคืนพนักงาน", color: REIMBURSE_ACCENT_DARK, amount: d };
+  }
+  if (kind === "contractor") {
+    return { label: "จ่ายสุทธิให้ผู้รับเหมา", short: "จ่ายสุทธิ", color: CONTRACTOR_ACCENT_DARK, amount: d };
   }
   if (d > 0) return { label: "บริษัทจ่ายเพิ่มให้พนักงาน", short: "จ่ายเพิ่มให้พนักงาน", color: "#1d4ed8", amount: d };
   if (d < 0) return { label: "พนักงานคืนเงินให้บริษัท", short: "คืนเงินบริษัท", color: "#d97706", amount: -d };

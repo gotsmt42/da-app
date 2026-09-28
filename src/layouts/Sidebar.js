@@ -197,6 +197,7 @@ const side = (key, extra) => {
     side("advance"),
     // ⚠️ จงใจใช้คำต่างจากทะเบียนกลาง — เติม (Claim) กำกับไว้ให้กวาดตาหาเจอง่ายในรายการแนวตั้ง
     { ...dest("claim"), title: "ใบเคลม (Claim)", icon: <FaReceipt /> },
+    side("contractorPay"),
     // ✅ คิวของหัวหน้า (อนุมัติ/จ่ายเงิน/ปิดส่วนต่าง) — เดิมมีแต่ในเมนูหลักหน้าแรก เมนูข้างเข้าไม่ถึง
     // ⚠️ เปิดให้ทุกคนที่มีขั้นของตัวเอง (ตรวจสอบ / อนุมัติ / อนุมัติเบิกจ่าย) — แต่ละคนมีคิวของตัวเองในหน้านี้
     ...(can(userData, "reviewExpense") || can(userData, "approveExpense") || can(userData, "disburseExpense")

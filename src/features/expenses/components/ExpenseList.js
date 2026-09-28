@@ -19,7 +19,7 @@ import usePermissions from "@/shared/hooks/usePermissions";
 import ExpenseService, { errorText } from "../services/ExpenseService";
 import KindBadge from "./KindBadge";
 import {
-  KIND_META, statusMeta, STATUS_FILTERS, CLAIM_TYPE_FILTERS, baht, differenceMeta, isOverdueClear, jobText, slipKind, slipMeta, TEXT_SUB, TEXT_MAIN, BORDER_MAIN, personFullName,
+  KIND_META, statusMeta, STATUS_FILTERS, CLAIM_TYPE_FILTERS, baht, differenceMeta, isOverdueClear, jobText, slipKind, slipMeta, TEXT_SUB, TEXT_MAIN, BORDER_MAIN, personFullName, installmentText,
 } from "../expenseMeta";
 
 const PERIODS = [
@@ -48,9 +48,11 @@ const INBOX_GROUPS = [
   { key: "review", cap: "reviewExpense", title: "รอตรวจสอบ", hint: "ขั้นที่ 2 จาก 3 — ตรวจรายการและหลักฐาน แล้วส่งต่อให้ผู้จัดการแผนกช่างอนุมัติ", match: (e) => e.status === "pending" },
   { key: "approve", cap: "approveExpense", title: "รออนุมัติ", hint: "ขั้นที่ 2 จาก 3 — แอดมินตรวจสอบแล้ว รอผู้จัดการแผนกช่างอนุมัติ", match: (e) => e.status === "reviewed" },
   { key: "pay", cap: "disburseExpense", title: "รออนุมัติเบิกจ่าย · Advance", hint: "ขั้นที่ 3 จาก 3 — อนุมัติแล้ว รออนุมัติเบิกจ่ายและบันทึกการจ่ายเงิน", match: (e) => e.kind === "advance" && e.status === "approved" },
-  { key: "settle", cap: "disburseExpense", title: "รออนุมัติเบิกจ่าย · ส่วนต่างใบเคลม", hint: "ขั้นที่ 3 จาก 3 — จ่ายส่วนต่างเพิ่ม / ยืนยันรับเงินคืน", match: (e) => e.kind === "claim" && e.status === "approved" && slipKind(e) !== "reimburse" },
+  { key: "settle", cap: "disburseExpense", title: "รออนุมัติเบิกจ่าย · ส่วนต่างใบเคลม", hint: "ขั้นที่ 3 จาก 3 — จ่ายส่วนต่างเพิ่ม / ยืนยันรับเงินคืน", match: (e) => slipKind(e) === "claim" && e.status === "approved" },
   // ⚠️ คนละงานกับข้างบน — ใบสำรองจ่ายคือพนักงานควักเงินตัวเองรออยู่ ไม่ใช่การปิดส่วนต่างของเงินที่จ่ายไปแล้ว
   { key: "reimburse", cap: "disburseExpense", title: "รออนุมัติเบิกจ่าย · คืนค่าสำรองจ่าย", hint: "ขั้นที่ 3 จาก 3 — อนุมัติแล้ว รอโอนคืนให้ผู้เบิก", match: (e) => slipKind(e) === "reimburse" && e.status === "approved" },
+  // ✅ เงินออกไปหาคนนอก (ผู้รับเหมา) — แยกกลุ่มให้ผู้อนุมัติเบิกจ่ายเห็นชัดว่าเป็นค่าจ้าง ไม่ใช่เงินพนักงาน
+  { key: "contractor", cap: "disburseExpense", title: "รออนุมัติเบิกจ่าย · ค่าจ้างผู้รับเหมา", hint: "ขั้นที่ 3 จาก 3 — อนุมัติแล้ว รอโอนยอดสุทธิให้ผู้รับเหมา", match: (e) => slipKind(e) === "contractor" && e.status === "approved" },
   { key: "overdue", cap: "viewAllExpenses", title: "Advance เลยกำหนดเคลียร์", hint: "จ่ายเงินไปแล้วแต่ยังไม่ส่งใบเคลม", match: (e) => isOverdueClear(e) },
 ];
 
@@ -60,6 +62,7 @@ const INBOX_GROUPS = [
  */
 const refLabel = (e) => {
   if (slipKind(e) === "reimburse") return "สำรองจ่ายเอง · ไม่มี Advance";
+  if (slipKind(e) === "contractor") return [e.contractor?.name, installmentText(e.installment)].filter(Boolean).join(" · ");
   if (e.kind === "claim" && e.advance?.docNo) return `อ้าง ${e.advance.docNo}`;
   return "";
 };
@@ -84,7 +87,7 @@ const AmountCell = ({ e }) => {
     <Box>
       <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", color: TEXT_MAIN }}>{baht(e.total)}</Typography>
       <Typography variant="caption" sx={{ color: d.color, fontWeight: 700, whiteSpace: "nowrap" }}>
-        {d.amount ? `${d.short} ${baht(d.amount)}` : "พอดี"}
+        {d.amount ? `${d.short} ${baht(d.amount)}` : slipKind(e) === "contractor" ? "ไม่มียอดจ่าย" : "พอดี"}
       </Typography>
     </Box>
   );
@@ -191,9 +194,12 @@ export default function ExpenseList({ mode, status: statusProp, claimType = "all
     // ⚠️ กรองชนิดย่อยที่ server (ไม่ใช่กรองในหน้า) — รายการถูกจำกัดจำนวนแถวไว้ ถ้ากรองทีหลังจะได้
     // ใบสำรองจ่ายไม่ครบเมื่อมีใบเคลมเยอะกว่าเพดาน
     // 🐛 เดิมไม่มี "reviewed" → ใบที่ตรวจสอบแล้วรออนุมัติขั้นสุดท้ายไม่เคยโผล่ในกล่องนี้ ทั้งที่ป้ายนับไปแล้ว
+    // ⚠️ หน้าใบเคลม "ทั้งหมด" = ใบของพนักงาน (staff) — ใบค่าจ้างผู้รับเหมาอยู่หน้าของตัวเอง ไม่ปนเข้ามา
     const params = mode === "inbox"
       ? { status: "pending,reviewed,approved,paid" }
-      : { kind, ...(kind === "claim" && claimType !== "all" ? { claimType } : {}), ...periodRange(period) };
+      : kind === "contractor"
+        ? { kind: "claim", claimType: "contractor", ...periodRange(period) }
+        : { kind, ...(kind === "claim" ? { claimType: claimType !== "all" ? claimType : "staff" } : {}), ...periodRange(period) };
     // ✅ โหลดซ้ำด้วยตัวกรองเดิม (ข้อมูลเปลี่ยนจากที่อื่น/เรียลไทม์) → ไม่ขึ้นโครงโหลดทับรายการที่ดูอยู่
     const queryKey = JSON.stringify([mode, params]);
     if (queryKey !== lastQueryRef.current) setLoading(true);
@@ -217,7 +223,7 @@ export default function ExpenseList({ mode, status: statusProp, claimType = "all
     return rows.filter((e) => {
       if (person !== "all" && e.requester?.userId !== person) return false;
       if (!needle) return true;
-      return [e.docNo, e.subject, e.requester?.name, e.requester?.fullName, e.job?.title, e.job?.site, e.job?.company, e.advance?.docNo, e.to,
+      return [e.docNo, e.subject, e.requester?.name, e.requester?.fullName, e.job?.title, e.job?.site, e.job?.company, e.advance?.docNo, e.to, e.contractor?.name,
         ...(e.items || []).map((it) => it.description), ...(e.items || []).map((it) => it.person?.name || "")]
         .some((v) => String(v || "").toLowerCase().includes(needle));
     });
@@ -397,6 +403,7 @@ export default function ExpenseList({ mode, status: statusProp, claimType = "all
       ) : (
         empty(
           rows.length ? "ไม่พบรายการตามตัวกรอง"
+            : kind === "contractor" ? "ยังไม่มีใบเบิกค่าจ้างผู้รับเหมา"
             : kind === "claim" ? (claimType === "reimburse" ? "ยังไม่มีใบสำรองจ่าย" : "ยังไม่มีใบเคลม")
               : "ยังไม่มีใบเบิก Advance",
           !rows.length && onCreate && (can("requestExpense") || viewAll) && (

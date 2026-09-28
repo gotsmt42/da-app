@@ -21,7 +21,7 @@ import usePermissions from "@/shared/hooks/usePermissions";
 import ExpenseService, { errorText } from "../services/ExpenseService";
 import { buildExpenseReport } from "../utils/expenseReport";
 import {
-  KIND_META, statusMeta, categoryMeta, baht, differenceMeta, TEXT_SUB, TEXT_MAIN, BORDER_MAIN, personFullName,
+  KIND_META, statusMeta, categoryMeta, baht, differenceMeta, TEXT_SUB, TEXT_MAIN, BORDER_MAIN, personFullName, installmentText,
 } from "../expenseMeta";
 import KindBadge from "../components/KindBadge";
 
@@ -255,6 +255,8 @@ export default function ExpenseReport({ onOpen, reloadKey }) {
   const [rows, setRows] = useState([]);
   // ⚠️ ใบสำรองจ่ายมาคนละก้อนกับใบ Advance (ไม่มีใบไหนให้ผูก) — เก็บแยกแล้วส่งเข้าตัวสรุปพร้อมกัน
   const [reimburseRows, setReimburseRows] = useState([]);
+  // ใบค่าจ้างผู้รับเหมา — แสดงเป็นก้อนของตัวเอง (ไม่เข้าสูตรเงินของพนักงาน: ผู้รับเงินเป็นคนนอก)
+  const [ctrRows, setCtrRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [exporting, setExporting] = useState(false);
@@ -289,6 +291,7 @@ export default function ExpenseReport({ onOpen, reloadKey }) {
         if (!alive) return;
         setRows(r.advances);
         setReimburseRows(r.reimbursements);
+        setCtrRows(r.contractors);
       })
       .catch((err) => alive && setError(errorText(err, "โหลดรายงานไม่สำเร็จ")))
       .finally(() => alive && setLoading(false));
@@ -296,7 +299,7 @@ export default function ExpenseReport({ onOpen, reloadKey }) {
   }, [from, to, person, reloadKey]);
 
   const report = useMemo(() => buildExpenseReport(rows, { reimbursements: reimburseRows }), [rows, reimburseRows]);
-  const hasData = rows.length > 0 || reimburseRows.length > 0;
+  const hasData = rows.length > 0 || reimburseRows.length > 0 || ctrRows.length > 0;
   const t = report.totals;
   const periodLabel = from || to ? `${from ? thaiDate(from) : "เริ่มต้น"} – ${to ? thaiDate(to) : "ปัจจุบัน"}` : "ทั้งหมด";
   const usage = t.advanced ? Math.round((t.actual / Math.max(t.advanced - t.outstanding, 1)) * 100) : 0;
@@ -449,6 +452,68 @@ export default function ExpenseReport({ onOpen, reloadKey }) {
                   </Box>
                 </Panel>
               )}
+
+              {/* ✅ ใบค่าจ้างผู้รับเหมา — เงินที่จ่ายให้คนนอก · ยอดหัก ณ ที่จ่ายรวมใช้เตรียมยื่น ภ.ง.ด.3/53 ของเดือน */}
+              {ctrRows.length > 0 && (() => {
+                const live = ctrRows.filter((r) => r.status !== "cancelled");
+                const done = live.filter((r) => ["approved", "settled"].includes(r.status));
+                const sumOf = (list, f) => list.reduce((s, r) => s + (Number(f(r)) || 0), 0);
+                const CTR = KIND_META.contractor;
+                return (
+                  <Panel
+                    title={`ใบค่าจ้างผู้รับเหมา (${ctrRows.length})`}
+                    hint="ค่าจ้างเหมา/ค่าแรงที่จ่ายให้ผู้รับเหมา · ยอดหัก ณ ที่จ่ายใช้ประกอบการยื่นภาษี"
+                  >
+                    <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" }, gap: 1, mb: 1.5 }}>
+                      <Kpi label="ค่าจ้าง (อนุมัติแล้ว)" value={baht(sumOf(done, (r) => r.total))} sub={`${done.length} ใบ`} color={CTR.color} />
+                      <Kpi label="หัก ณ ที่จ่ายรวม" value={baht(sumOf(done, (r) => r.deductions?.wht))} sub="นำส่งสรรพากร · ออก 50 ทวิ" color="#b45309" />
+                      <Kpi label="จ่ายผู้รับเหมาแล้ว (สุทธิ)" value={baht(sumOf(done.filter((r) => r.status === "settled"), (r) => r.difference))} sub=" " color="#059669" />
+                      <Kpi label="รออนุมัติเบิกจ่าย (สุทธิ)" value={baht(sumOf(done.filter((r) => r.status === "approved"), (r) => r.difference))}
+                        sub={`ยังไม่ผ่านอนุมัติ ${baht(sumOf(live.filter((r) => ["pending", "reviewed", "rejected"].includes(r.status)), (r) => r.difference))}`}
+                        color={CTR.dark} highlight={done.some((r) => r.status === "approved")} />
+                    </Box>
+                    <Box sx={{ overflowX: "auto" }}>
+                      <Table size="small" sx={{ minWidth: 820, "& th": { fontWeight: 800, color: TEXT_SUB, fontSize: "0.74rem", whiteSpace: "nowrap", bgcolor: "#f8fafc" }, "& td": { fontSize: "0.82rem", borderColor: BORDER_MAIN } }}>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>เลขที่ / วันที่</TableCell>
+                            <TableCell>ผู้รับเหมา · งวด</TableCell>
+                            <TableCell>งาน</TableCell>
+                            <TableCell align="right">ค่าจ้าง</TableCell>
+                            <TableCell align="right">หัก ณ ที่จ่าย</TableCell>
+                            <TableCell align="right">จ่ายสุทธิ</TableCell>
+                            <TableCell>สถานะ</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {ctrRows.map((r) => {
+                            const st = statusMeta(r.status, "contractor");
+                            return (
+                              <TableRow key={r._id} hover onClick={() => onOpen?.(r._id)} sx={{ cursor: "pointer" }}>
+                                <TableCell sx={{ whiteSpace: "nowrap" }}>
+                                  <Stack direction="row" spacing={0.75} alignItems="center"><KindBadge kind="contractor" /><b>{r.docNo}</b></Stack>
+                                  <span style={{ color: TEXT_SUB }}>{thaiDate(r.docDate)}</span>
+                                </TableCell>
+                                <TableCell sx={{ maxWidth: 220 }}>
+                                  <Typography noWrap sx={{ fontSize: "inherit", fontWeight: 700 }}>{r.contractor?.name || "-"}</Typography>
+                                  <Typography noWrap variant="caption" sx={{ color: TEXT_SUB, display: "block" }}>{installmentText(r.installment) || "ไม่ระบุงวด"} · ผู้จัดทำ {personFullName(r.requester)}</Typography>
+                                </TableCell>
+                                <TableCell sx={{ maxWidth: 260 }}>
+                                  <Typography noWrap sx={{ fontSize: "inherit" }}>{r.job?.title ? `${r.job.title}${r.job.site ? ` · ${r.job.site}` : ""}` : "ไม่ผูกงาน"}</Typography>
+                                </TableCell>
+                                <TableCell align="right">{baht(r.total)}</TableCell>
+                                <TableCell align="right" sx={{ color: "#b45309" }}>{r.deductions?.wht ? baht(r.deductions.wht) : "—"}</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 800, color: CTR.dark }}>{baht(r.difference)}</TableCell>
+                                <TableCell><Chip size="small" label={st.label} sx={{ height: 20, fontSize: "0.7rem", fontWeight: 800, bgcolor: alpha(st.color, 0.12), color: st.color }} /></TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </Box>
+                  </Panel>
+                );
+              })()}
 
               <Panel title={`รายใบ Advance (${report.rows.length})`} hint="กดที่แถวเพื่อเปิดใบ Advance">
                 {isDesktop ? (

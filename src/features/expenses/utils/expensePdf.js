@@ -19,6 +19,7 @@ import { ISSUER, drawLetterhead, outputDocument, spaceThaiLatin, preparePrintAss
 import { thaiDateFull, thaiDate, thaiDateTime } from "@/shared/utils/thaiDate";
 import {
   KIND_META, slipKind, statusMeta, fmtMoney, bahtText, qtyText, differenceMeta, paymentLabel, fileKindLabel, jobText, jobRangeText, jobPartText, money, itemPersonName, personFullName,
+  installmentText,
 } from "../expenseMeta";
 import { bankMeta, formatAccountNo } from "../bankMeta";
 import { compareItems } from "./expenseCompare";
@@ -209,7 +210,9 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold, attachNote = "") =>
   field("ถึง", e.to, L, R, y);
   y += rowH;
   const mid = L + W * 0.6;
-  field("ชื่อผู้เบิกเงิน", personFullName(e.requester), L, mid - 4, y);
+  // ✅ ใบค่าจ้างผู้รับเหมา: ผู้เบิก = พนักงานที่จัดทำใบแทน — ผู้รับเงินจริงพิมพ์แยกในบรรทัด "ผู้รับเหมา" ด้านล่าง
+  const isCtr = slip === "contractor";
+  field(isCtr ? "ผู้จัดทำ (พนักงาน)" : "ชื่อผู้เบิกเงิน", personFullName(e.requester), L, mid - 4, y);
   field("ตำแหน่ง", e.requester?.position, mid, R, y);
   y += rowH;
   const subjLines = field("เรื่อง", e.subject, L, R, y);
@@ -221,8 +224,20 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold, attachNote = "") =>
       + (e.job?.docNo ? ` (${e.job.docNo})` : ""), L, R, y);
     y += rowH;
   }
+  if (isCtr) {
+    const c = e.contractor || {};
+    const who = [c.name || "-", c.isCompany ? "(นิติบุคคล)" : "(บุคคลธรรมดา)", c.taxId ? `เลขประจำตัวผู้เสียภาษี ${c.taxId}` : "", c.phone ? `โทร ${c.phone}` : ""]
+      .filter(Boolean).join("  ");
+    y += rowH * field("ผู้รับเหมา", who, L, R, y);
+    if (c.address) y += rowH * field("ที่อยู่", c.address, L, R, y);
+    const inst = [installmentText(e.installment) || "ไม่ระบุงวด", e.contractValue ? `มูลค่าตามสัญญา ${fmtMoney(e.contractValue)} บาท (ไม่รวม VAT)` : ""]
+      .filter(Boolean).join("  ·  ");
+    field("งวดงาน", inst, L, R, y);
+    y += rowH;
+  }
 
-  const isClaim = e.kind === "claim";
+  // ⚠️ ใบค่าจ้างผู้รับเหมาใช้ผังตารางแบบใบตั้งต้น (ไม่มีช่องใบเสร็จ/ตั้งเบิก) แล้วสรุปยอดหักของตัวเอง
+  const isClaim = e.kind === "claim" && !isCtr;
   /**
    * ใบสำรองจ่ายไม่มี Advance — บนกระดาษจึงไม่มีกรอบอ้างอิง ไม่มีคอลัมน์ "ตั้งเบิก" และไม่มีบรรทัด
    * "หัก เงินเบิกล่วงหน้า" (พิมพ์เลข 0 ในช่องพวกนั้นออกไปคือเอกสารที่ชวนให้เข้าใจผิด)
@@ -280,7 +295,9 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold, attachNote = "") =>
   let cx = L;
   cols.forEach((c) => { c.x = cx; cx += c.w; });
   const col = (k) => cols.find((c) => c.key === k);
-  const headers = isReimburse
+  const headers = isCtr
+    ? { no: "ลำดับ", desc: "รายการค่าจ้าง / เนื้องานที่ส่งมอบ", qty: "จำนวน / หน่วย", amount: "จำนวนเงิน (บาท)" }
+    : isReimburse
     ? { no: "ลำดับ", desc: "รายการที่สำรองจ่าย", receipt: "เลขที่ใบเสร็จ", qty: "จำนวน / หน่วย", amount: "จำนวนเงิน (บาท)" }
     : isClaim
       ? { no: "ลำดับ", desc: "รายการค่าใช้จ่ายจริง", receipt: "เลขที่ใบเสร็จ", planned: "ตั้งเบิก (Advance)", qty: "จำนวน / หน่วย", amount: "ใช้จริง (บาท)" }
@@ -419,7 +436,15 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold, attachNote = "") =>
   };
 
   const tableStart = tableTop - headH;
-  if (!isClearClaim) {
+  if (isCtr) {
+    // ✅ ค่าจ้าง → VAT → หัก ณ ที่จ่าย → หักมัดจำ → จ่ายสุทธิ (บรรทัดสุดท้ายคือยอดที่โอนจริง)
+    const d = e.deductions || {};
+    sumRow("", "ค่าจ้างงวดนี้", e.total, { fill: tint.fill });
+    if (d.vat) sumRow("", `บวก VAT ${d.vatRate}%`, d.vat);
+    if (d.wht) sumRow(`( ${e.contractor?.isCompany ? "ภ.ง.ด.53" : "ภ.ง.ด.3"} )`, `หัก ณ ที่จ่าย ${d.whtRate}%`, -d.wht);
+    if (d.deposit) sumRow("", "หักมัดจำ/เบิกล่วงหน้า", -d.deposit);
+    sumRow(`( ${bahtText(e.difference)} )`, "จ่ายสุทธิ", e.difference, { strong: true, fill: tint.head });
+  } else if (!isClearClaim) {
     // ใบสำรองจ่ายสรุปบรรทัดเดียว = ยอดที่บริษัทต้องจ่ายคืนทั้งก้อน
     sumRow(`( ${bahtText(e.total)} )`, isReimburse ? "รวมขอเบิกคืน" : "รวมเบิกทั้งหมด", e.total, { strong: true, fill: tint.fill });
   } else {
@@ -460,7 +485,7 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold, attachNote = "") =>
    * สับสนว่าจะต้องโอนเข้าบัญชีนั้นอีกหรือเปล่า ทั้งที่ทิศทางเงินตรงกันข้าม
    */
   const moneyToRequester = e.kind === "advance" || isReimburse || money(e.difference) > 0;
-  const mustReturn = e.kind === "claim" && !isReimburse && money(e.difference) < 0;
+  const mustReturn = e.kind === "claim" && !isReimburse && !isCtr && money(e.difference) < 0;
   const pay = e.payment || {};
 
   if (e.payTo?.accountNo && moneyToRequester) {
@@ -489,7 +514,7 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold, attachNote = "") =>
     const tx = bx + badge + 4.5 * s;
     // บรรทัดบน: ป้ายกำกับ + ชื่อธนาคารเป็นสีของธนาคาร
     size(11.5); bold(true); color(GRAY);
-    const label = spaceThaiLatin(e.kind === "advance" ? "โอนเงินเข้าบัญชีผู้เบิก" : "โอนเงินคืนเข้าบัญชีผู้เบิก");
+    const label = spaceThaiLatin(e.kind === "advance" ? "โอนเงินเข้าบัญชีผู้เบิก" : isCtr ? "โอนเงินเข้าบัญชีผู้รับเหมา" : "โอนเงินคืนเข้าบัญชีผู้เบิก");
     doc.text(label, tx, y + 6.4 * s);
     // ⚠️ ธนาคารสีอ่อน (กรุงศรี/ออมสิน) ใช้สีแบรนด์เป็นสีตัวอักษรตรงๆ แล้วอ่านไม่ออกบนพื้นขาว — หรี่ลงก่อน
     const nameRgb = bank.darkText ? bank.rgb.map((c) => Math.round(c * 0.55)) : bank.rgb;
@@ -555,6 +580,11 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold, attachNote = "") =>
       pay.by?.name ? `โดย ${pay.by.name}` : "",
     ].filter(Boolean).join("  ·  "));
   }
+  if (isCtr && e.status === "settled" && pay.at && money(e.difference) !== 0) {
+    infoLine("จ่ายค่าจ้าง:", [
+      thaiDateFull(pay.at), paymentLabel(pay.method), pay.ref ? `อ้างอิง ${pay.ref}` : "",
+    ].filter(Boolean).join(" · "));
+  }
   if (isClearClaim && e.status === "settled" && pay.at && money(e.difference) !== 0) {
     infoLine(money(e.difference) > 0 ? "จ่ายเงินเพิ่ม:" : "รับเงินคืน:", [
       thaiDateFull(pay.at), paymentLabel(pay.method), pay.ref ? `อ้างอิง ${pay.ref}` : "",
@@ -619,7 +649,6 @@ const fitFontSize = (doc, text, maxW, size, minSize) => {
  */
 const renderSignatures = (doc, e, hasBold, signatures = null) => {
   const bold = (on) => doc.setFont("THSarabun", on && hasBold ? "bold" : "normal");
-  const colW = W / 3;
   const approved = e.approvedAt && !["pending", "reviewed", "rejected"].includes(e.status);
   const reviewed = e.reviewedAt && e.status !== "rejected";
   const reviewerName = reviewed ? personFullName(e.reviewedBy) : "";
@@ -631,13 +660,13 @@ const renderSignatures = (doc, e, hasBold, signatures = null) => {
    * ไม่งั้นคนตรวจเอกสารจะเข้าใจว่าใบยังขาดลายเซ็น
    */
   const slip = slipKind(e);
-  const noDisbursement = slip === "claim" && e.status === "settled" && money(e.difference) === 0;
+  const noDisbursement = (slip === "claim" || slip === "contractor") && e.status === "settled" && money(e.difference) === 0;
   const disbursed = !noDisbursement && e.payment?.at && (
     (e.kind === "advance" && ["paid", "clearing", "cleared"].includes(e.status)) || (e.kind === "claim" && e.status === "settled")
   );
   const boxes = [
     // ✅ ชื่อ-นามสกุลในวงเล็บใต้ลายเซ็น (ผู้ใช้ขอ) — ใบเก่า/คนนอกระบบที่ไม่มีนามสกุลในทะเบียนได้ชื่อต้นตามเดิม
-    { role: "ผู้เบิกค่าใช้จ่าย", name: personFullName(e.requester), date: e.submittedAt || e.docDate, seal: signatures?.requester },
+    { role: slip === "contractor" ? "ผู้จัดทำ / ผู้เบิก" : "ผู้เบิกค่าใช้จ่าย", name: personFullName(e.requester), date: e.submittedAt || e.docDate, seal: signatures?.requester },
     /**
      * ช่องรวม: ลงนามโดย "ผู้อนุมัติ" — ถ้ายังไม่ถึงขั้นอนุมัติแต่ตรวจสอบแล้ว ให้พิมพ์ของผู้ตรวจสอบไปก่อน
      * ⚠️ ชื่อกับลายเซ็นต้องเป็นคนเดียวกันเสมอ ห้ามเอาลายเซ็นผู้ตรวจสอบไปวางใต้ชื่อผู้อนุมัติ
@@ -658,9 +687,12 @@ const renderSignatures = (doc, e, hasBold, signatures = null) => {
       name: disbursed ? personFullName(e.payment.by) : "",
       date: disbursed ? e.payment.at : null,
       seal: disbursed ? signatures?.disburser : null,
-      note: noDisbursement ? "ไม่มียอดเบิกจ่าย (ใช้พอดี)" : "",
+      note: noDisbursement ? (slip === "contractor" ? "ไม่มียอดจ่าย (หักมัดจำครบ)" : "ไม่มียอดเบิกจ่าย (ใช้พอดี)") : "",
     },
+    // ✅ ใบค่าจ้างผู้รับเหมา: ช่องที่ 4 "ผู้รับเงิน" — ผู้รับเหมาเซ็นรับเงินบนกระดาษ (หลักฐานการจ่ายเงินให้คนนอก)
+    ...(slip === "contractor" ? [{ role: "ผู้รับเงิน (ผู้รับเหมา)", name: e.contractor?.name || "", date: null, seal: null }] : []),
   ];
+  const colW = W / boxes.length;
   doc.setTextColor(...SLATE);
   boxes.forEach((b, i) => {
     const cxm = L + colW * i + colW / 2;

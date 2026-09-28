@@ -17,7 +17,7 @@ import { alpha } from "@mui/material/styles";
 import {
   Close, Print, Edit, CheckCircle, Undo, Block, Payments, ReceiptLong, AttachFile, OpenInNew,
   DeleteOutline, Link as LinkIcon, History, TaskAlt, WarningAmber, Image as ImageIcon, Description, ExpandMore,
-  AccountBalanceWallet, ContentCopy, Check, HistoryEdu, FactCheck, DoneAll,
+  AccountBalanceWallet, ContentCopy, Check, HistoryEdu, FactCheck, DoneAll, Engineering,
 } from "@mui/icons-material";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
@@ -33,6 +33,7 @@ import KindBadge from "./KindBadge";
 import { compareItems, COMPARE_KIND_LABEL } from "../utils/expenseCompare";
 import {
   KIND_META, slipKind, statusMeta, categoryMeta, baht, fmtMoney, qtyText, differenceMeta, paymentLabel, PAYMENT_METHODS, fileKindLabel, jobText, jobRangeText, jobPartText, isOverdueClear, money, TEXT_SUB, TEXT_MAIN, BORDER_MAIN, personFullName, groupFilesByStage,
+  installmentText, bahtText,
 } from "../expenseMeta";
 import { bankMeta, formatAccountNo } from "../bankMeta";
 import BankLogo from "./BankLogo";
@@ -317,12 +318,15 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e?.target ? e.target.value : e }));
   const slip = slipKind(expense);
   const reimburse = slip === "reimburse";
+  /** ใบค่าจ้างผู้รับเหมา — เงินออกไปหาผู้รับเหมา (ยอดสุทธิหลังหัก) ไม่มี Advance ให้เคลียร์ */
+  const ctr = slip === "contractor";
   const diff = differenceMeta(expense?.difference, slip);
   const zeroDiff = expense?.kind === "claim" && !reimburse && money(expense?.difference) === 0;
   /** หลังขั้นอนุมัติ เงินจะไหลไปทางไหน — ใช้บอกผู้อนุมัติว่าขั้นถัดไป (อนุมัติเบิกจ่าย) คืออะไร */
   const disburseWhat = expense?.kind === "advance"
     ? `จ่ายเงิน Advance ${baht(expense?.total)}`
-    : reimburse ? `จ่ายคืนค่าสำรองจ่าย ${baht(expense?.total)}` : `${diff.short} ${baht(diff.amount)}`;
+    : reimburse ? `จ่ายคืนค่าสำรองจ่าย ${baht(expense?.total)}`
+      : ctr ? `จ่ายค่าจ้างสุทธิ ${baht(expense?.difference)} ให้ ${expense?.contractor?.name || "ผู้รับเหมา"}` : `${diff.short} ${baht(diff.amount)}`;
   const cfg = {
     /**
      * ✅ ส่วนที่ 2 (มือแรก) — ตรวจสอบ โดยแอดมินช่าง แล้วส่งต่อให้ผู้จัดการแผนกช่างอนุมัติ
@@ -339,13 +343,13 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
     reviewApprove: {
       title: "ตรวจสอบและอนุมัติ · ขั้นที่ 2 จาก 3", color: "#059669", button: "ยืนยันทั้งสองมือ",
       body: zeroDiff
-        ? `คุณจะลงนามทั้งช่อง "ผู้ตรวจสอบ" และ "ผู้อนุมัติ" — ใช้จริงพอดีกับยอด Advance ใบจะปิดจบทันที`
+        ? `คุณจะลงนามทั้งช่อง "ผู้ตรวจสอบ" และ "ผู้อนุมัติ" — ${ctr ? "ยอดสุทธิเป็น 0 (หักมัดจำครบ)" : "ใช้จริงพอดีกับยอด Advance"} ใบจะปิดจบทันที`
         : `คุณจะลงนามทั้งช่อง "ผู้ตรวจสอบ" และ "ผู้อนุมัติ" ของใบนี้ด้วยตัวเอง — จากนั้นส่งต่อให้${STEP_OWNER.disburse}อนุมัติเบิกจ่าย (${disburseWhat})`,
     },
     approve: {
       title: "อนุมัติใบเบิก · ขั้นที่ 2 จาก 3", color: "#059669", button: "ยืนยันอนุมัติ",
       body: zeroDiff
-        ? "ใช้จริงพอดีกับยอด Advance ไม่มีเงินต้องเบิกจ่าย — อนุมัติแล้วใบ Advance จะเคลียร์ทันที"
+        ? (ctr ? "ยอดสุทธิเป็น 0 (หักมัดจำ/เบิกล่วงหน้าครบ) ไม่มีเงินต้องจ่าย — อนุมัติแล้วปิดใบทันที" : "ใช้จริงพอดีกับยอด Advance ไม่มีเงินต้องเบิกจ่าย — อนุมัติแล้วใบ Advance จะเคลียร์ทันที")
         : `อนุมัติแล้วระบบจะส่งต่อให้${STEP_OWNER.disburse}อนุมัติเบิกจ่าย (${disburseWhat})`,
     },
     reject: {
@@ -357,7 +361,7 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
     cancel: {
       title: "ยกเลิกใบนี้", color: "#64748b", button: "ยืนยันยกเลิก",
       // ⚠️ ใบสำรองจ่ายไม่มี Advance ให้คืนสถานะ — ข้อความของใบเคลมใช้กับมันไม่ได้
-      body: expense?.kind === "claim" && !reimburse
+      body: expense?.kind === "claim" && !reimburse && !ctr
         ? "ใบ Advance ที่อ้างถึงจะกลับไปรอเคลียร์ และออกใบเคลมใหม่ได้"
         : "ยกเลิกแล้วย้อนกลับไม่ได้ (เลขที่เอกสารจะไม่ถูกนำกลับมาใช้)",
     },
@@ -369,7 +373,12 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
       title: "อนุมัติเบิกจ่าย · จ่ายเงิน Advance", color: KIND_META.advance.color, button: "อนุมัติเบิกจ่าย",
       body: "ขั้นที่ 3 จาก 3 — ลงนามผู้อนุมัติเบิกจ่ายและบันทึกการจ่ายเงิน ใบจะเปลี่ยนเป็น “จ่ายให้พนักงานแล้ว · รอเคลียร์”",
     },
-    settle: reimburse
+    settle: ctr
+      ? {
+        title: "อนุมัติเบิกจ่าย · จ่ายค่าจ้างผู้รับเหมา", color: KIND_META.contractor.color, button: "อนุมัติเบิกจ่าย",
+        body: "ขั้นที่ 3 จาก 3 — ลงนามผู้อนุมัติเบิกจ่ายและบันทึกการจ่ายเงินให้ผู้รับเหมา (อย่าลืมออกหนังสือรับรองการหักภาษี ณ ที่จ่ายถ้ามีการหัก)",
+      }
+      : reimburse
       ? {
         title: "อนุมัติเบิกจ่าย · จ่ายคืนค่าสำรองจ่าย", color: KIND_META.reimburse.color, button: "อนุมัติเบิกจ่าย",
         body: "ขั้นที่ 3 จาก 3 — ลงนามผู้อนุมัติเบิกจ่ายและบันทึกการจ่ายคืน ใบนี้จะเสร็จสิ้น",
@@ -387,7 +396,7 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
   const needReason = action === "reject";
   const payLike = action === "pay" || action === "settle";
   /** ใบเคลมที่ผู้เบิกต้องคืนเงินบริษัท — ทิศทางเงินตรงข้ามกับการโอนเข้าบัญชีผู้เบิก */
-  const returningToCompany = expense?.kind === "claim" && !reimburse && money(expense?.difference) < 0;
+  const returningToCompany = expense?.kind === "claim" && !reimburse && !ctr && money(expense?.difference) < 0;
 
   return (
     <Dialog open onClose={() => !busy && onCancel()} fullWidth maxWidth="xs">
@@ -405,19 +414,23 @@ const ActionDialog = ({ action, expense, busy, error, onCancel, onSubmit }) => {
                 direction={returningToCompany
                   ? "พนักงานคืนเงินให้บริษัท"
                   : action === "pay" ? "บริษัทจ่ายเงินล่วงหน้าให้พนักงาน"
+                    : ctr ? "บริษัทจ่ายค่าจ้างสุทธิให้ผู้รับเหมา"
                     : reimburse ? "บริษัทจ่ายคืนพนักงาน" : "บริษัทจ่ายเพิ่มให้พนักงาน"}
                 amount={baht(action === "pay" || reimburse ? expense?.total : diff.amount)}
-                who={`${personFullName(expense?.requester) || "ผู้เบิก"}${expense?.docNo ? ` · ${expense.docNo}` : ""}`}
-                note={returningToCompany
-                  ? "รับเงินสด/เงินโอนจากพนักงานให้เรียบร้อยก่อน แล้วค่อยบันทึกที่นี่"
+                who={ctr
+                  ? `${expense?.contractor?.name || "ผู้รับเหมา"}${installmentText(expense?.installment) ? ` · ${installmentText(expense.installment)}` : ""}${expense?.docNo ? ` · ${expense.docNo}` : ""}`
+                  : `${personFullName(expense?.requester) || "ผู้เบิก"}${expense?.docNo ? ` · ${expense.docNo}` : ""}`}
+                note={ctr && expense?.deductions?.wht
+                  ? `หัก ณ ที่จ่าย ${expense.deductions.whtRate}% = ${baht(expense.deductions.wht)} ไว้แล้ว — นำส่งสรรพากรและออก 50 ทวิ ให้ผู้รับเหมา`
                   : undefined}
+                {...(returningToCompany ? { note: "รับเงินสด/เงินโอนจากพนักงานให้เรียบร้อยก่อน แล้วค่อยบันทึกที่นี่" } : {})}
               />
               {/* ✅ คนกดจ่ายเงินเห็นบัญชีปลายทางตรงนี้เลย ไม่ต้องปิดกล่องไปหาในหน้ารายละเอียด */}
               {/* ⚠️ กล่องบัญชีขึ้นเฉพาะตอนบริษัทเป็นฝ่ายโอนให้ผู้เบิก — ตอน "รับเงินคืน" ไม่ต้องมี */}
               {payLike && expense?.payTo?.accountNo && !returningToCompany && (
                 <Box>
                   <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 700, display: "block", mb: 0.5 }}>
-                    {action === "pay" ? "โอนเงิน Advance เข้าบัญชีของผู้เบิก" : "โอนเข้าบัญชีของผู้เบิก"}
+                    {action === "pay" ? "โอนเงิน Advance เข้าบัญชีของผู้เบิก" : ctr ? "โอนเข้าบัญชีของผู้รับเหมา" : "โอนเข้าบัญชีของผู้เบิก"}
                   </Typography>
                   <PayToBox payTo={expense.payTo} dense />
                 </Box>
@@ -566,6 +579,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
    */
   const slip = slipKind(e);
   const isReimburse = slip === "reimburse";
+  const isCtr = slip === "contractor";
   const meta = KIND_META[slip];
   const st = statusMeta(e?.status, slip);
   const isOwner = e && (e.requester?.userId === me || e.createdBy?.userId === me);
@@ -605,7 +619,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
    * ⚠️ ใบเคลมที่ใช้จริงน้อยกว่ายอด Advance = ผู้เบิกต้องคืนเงิน ไม่ใช่รอรับโอน (ผู้ใช้แจ้งว่าสับสน)
    */
   const moneyToRequester = e && (kind === "advance" || isReimburse || money(e.difference) > 0);
-  const mustReturn = e && kind === "claim" && !isReimburse && money(e.difference) < 0;
+  const mustReturn = e && kind === "claim" && !isReimburse && !isCtr && money(e.difference) < 0;
 
   const applyResult = (updated, message) => {
     setAction("");
@@ -643,7 +657,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
         reject: "ตีกลับให้แก้ไขแล้ว",
         cancel: "ยกเลิกแล้ว",
         pay: "อนุมัติเบิกจ่ายและบันทึกการจ่ายเงินแล้ว",
-        settle: money(e.difference) < 0 && !isReimburse ? "ยืนยันรับเงินคืนแล้ว — เคลียร์เรียบร้อย" : "อนุมัติเบิกจ่ายแล้ว — ปิดรายการเรียบร้อย",
+        settle: mustReturn ? "ยืนยันรับเงินคืนแล้ว — เคลียร์เรียบร้อย" : "อนุมัติเบิกจ่ายแล้ว — ปิดรายการเรียบร้อย",
       }[action];
       applyResult(updated, msg);
     } catch (err) {
@@ -654,7 +668,9 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
   };
 
   const uploadFiles = async (list) => {
-    const files = Array.from(list || []).map((file) => ({ file, kind: kind === "claim" ? "receipt" : file.type.startsWith("image/") ? "photo" : "other" }));
+    const files = Array.from(list || []).map((file) => ({
+      file, kind: isCtr ? (file.type.startsWith("image/") ? "photo" : "invoice") : kind === "claim" ? "receipt" : file.type.startsWith("image/") ? "photo" : "other",
+    }));
     if (!files.length) return;
     setBusy(true);
     try {
@@ -708,7 +724,8 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
       const who = e.approvedBy?.name ? `อนุมัติโดย ${personFullName(e.approvedBy)}` : "อนุมัติแล้ว";
       const what = kind === "advance"
         ? `จ่ายเงิน Advance ${baht(e.total)}`
-        : isReimburse ? `จ่ายคืน ${baht(e.total)}` : `${differenceMeta(e.difference, slip).short} ${baht(differenceMeta(e.difference, slip).amount)}`;
+        : isReimburse ? `จ่ายคืน ${baht(e.total)}`
+          : isCtr ? `จ่ายค่าจ้างสุทธิ ${baht(e.difference)}` : `${differenceMeta(e.difference, slip).short} ${baht(differenceMeta(e.difference, slip).amount)}`;
       return {
         severity: "info",
         text: canDisburse && !selfBlocked
@@ -728,11 +745,15 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
       if (e.status === "cleared") return { severity: "success", text: `เคลียร์เรียบร้อยด้วยใบเคลม ${e.claimDocNo || ""}` };
     } else if (isReimburse) {
       if (e.status === "settled") return { severity: "success", text: `จ่ายคืนเรียบร้อย ${baht(e.total)}` };
+    } else if (isCtr) {
+      if (e.status === "settled") {
+        return { severity: "success", text: money(e.difference) ? `จ่ายค่าจ้างผู้รับเหมาเรียบร้อย · สุทธิ ${baht(e.difference)}` : "ปิดใบแล้ว — หักมัดจำครบ ไม่มียอดต้องจ่าย" };
+      }
     } else {
       if (e.status === "settled") return { severity: "success", text: diff.amount ? `ปิดส่วนต่างเรียบร้อย (${diff.short} ${baht(diff.amount)})` : "เคลียร์เรียบร้อย ไม่มีส่วนต่าง" };
     }
     return null;
-  }, [e, kind, slip, isReimburse, overdue, canReview, canApprove, canDisburse, selfBlocked, reviewedByMe, canApproveOwnReview]);
+  }, [e, kind, slip, isReimburse, isCtr, overdue, canReview, canApprove, canDisburse, selfBlocked, reviewedByMe, canApproveOwnReview]);
 
   const steps = useMemo(() => {
     if (!e) return [];
@@ -745,7 +766,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
     const approvedDone = Boolean(e.approvedAt) && !["pending", "reviewed", "rejected"].includes(e.status);
     const reviewedOnly = Boolean(e.reviewedAt) && !approvedDone && !rejected;
     const head = [
-      { label: kind === "advance" ? "ส่งขอเบิก" : isReimburse ? "ส่งขอเบิกคืน" : "ส่งเคลม", done: true, date: e.submittedAt || e.createdAt },
+      { label: kind === "advance" || isCtr ? "ส่งขอเบิก" : isReimburse ? "ส่งขอเบิกคืน" : "ส่งเคลม", done: true, date: e.submittedAt || e.createdAt },
       {
         label: "ตรวจสอบ/อนุมัติ",
         done: approvedDone,
@@ -766,15 +787,16 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
     return [
       ...head,
       {
-        label: !isReimburse && d === 0 ? "ปิดใบ (ไม่มีส่วนต่าง)" : !isReimburse && d < 0 ? "ยืนยันรับเงินคืน" : "อนุมัติเบิกจ่าย",
+        label: isCtr ? (d === 0 ? "ปิดใบ (ไม่มียอดจ่าย)" : "อนุมัติเบิกจ่าย")
+          : !isReimburse && d === 0 ? "ปิดใบ (ไม่มีส่วนต่าง)" : !isReimburse && d < 0 ? "ยืนยันรับเงินคืน" : "อนุมัติเบิกจ่าย",
         done: e.status === "settled",
         date: e.status === "settled" ? e.payment?.at : null,
       },
     ];
-  }, [e, kind, isReimburse, overdue]);
+  }, [e, kind, isReimburse, isCtr, overdue]);
 
   const isClaimKind = kind === "claim";
-  const isClearClaim = isClaimKind && !isReimburse;
+  const isClearClaim = isClaimKind && !isReimburse && !isCtr;
   // ✅ ผู้ใช้ขอให้ใบเคลมมีรายละเอียดของ Advance "ข้างๆ" — จอกว้างวางเป็นคอลัมน์ขวา ติดอยู่กับที่ขณะเลื่อน
   const sidePanel = isClearClaim && e?.advanceDoc;
 
@@ -792,7 +814,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
               width: 38, height: 38, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
               bgcolor: meta.color, color: "#fff",
             }}>
-              {isReimburse ? <AccountBalanceWallet sx={{ fontSize: 21 }} /> : isClaimKind ? <ReceiptLong sx={{ fontSize: 21 }} /> : <Payments sx={{ fontSize: 21 }} />}
+              {isCtr ? <Engineering sx={{ fontSize: 21 }} /> : isReimburse ? <AccountBalanceWallet sx={{ fontSize: 21 }} /> : isClaimKind ? <ReceiptLong sx={{ fontSize: 21 }} /> : <Payments sx={{ fontSize: 21 }} />}
             </Box>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Stack direction="row" alignItems="center" spacing={0.75} sx={{ minWidth: 0 }}>
@@ -838,13 +860,82 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                     </Typography>
                   </Box>
                   <Box sx={{ textAlign: { sm: "right" } }}>
-                    <Typography variant="caption" sx={{ color: TEXT_SUB }}>{isReimburse ? "ยอดขอเบิกคืน" : kind === "claim" ? "ใช้จ่ายจริง" : "ยอดขอเบิก"}</Typography>
-                    <Typography sx={{ fontWeight: 900, fontSize: "1.45rem", color: meta.color, lineHeight: 1.1 }}>{baht(e.total)}</Typography>
+                    <Typography variant="caption" sx={{ color: TEXT_SUB }}>{isCtr ? "ยอดจ่ายสุทธิ" : isReimburse ? "ยอดขอเบิกคืน" : kind === "claim" ? "ใช้จ่ายจริง" : "ยอดขอเบิก"}</Typography>
+                    <Typography sx={{ fontWeight: 900, fontSize: "1.45rem", color: meta.color, lineHeight: 1.1 }}>{baht(isCtr ? e.difference : e.total)}</Typography>
+                    {isCtr && <Typography variant="caption" sx={{ color: TEXT_SUB }}>ค่าจ้าง {baht(e.total)}</Typography>}
                   </Box>
                 </Stack>
                 {nextStep && <Alert severity={nextStep.severity} sx={{ mt: 1.5, borderRadius: 2, py: 0.25, "& .MuiAlert-message": { fontSize: "0.84rem", fontWeight: 600 } }}>{nextStep.text}</Alert>}
                 {e.status !== "cancelled" && <Steps steps={steps} color={meta.color} />}
               </Card>
+
+              {/* ✅ ใบค่าจ้างผู้รับเหมา: ผู้รับเงิน · งวดงาน · ยอดหัก · ยอดสะสมตามสัญญา — ข้อมูลที่ผู้ตรวจ/ผู้จ่ายเงินต้องใช้ */}
+              {isCtr && (() => {
+                const d = e.deductions || {};
+                const hist = e.contractorHistory || [];
+                const prev = money(hist.reduce((s, h) => s + (Number(h.total) || 0), 0));
+                const cum = money(prev + (Number(e.total) || 0));
+                const cv = money(e.contractValue);
+                const left = money(cv - cum);
+                const C = KIND_META.contractor;
+                return (
+                  <Card title="ผู้รับเหมาและงวดงาน" icon={<Engineering sx={{ fontSize: 18, color: C.color }} />}>
+                    <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)" }, gap: 1.5, mb: 1.5 }}>
+                      <InfoCell label={e.contractor?.isCompany ? "ผู้รับเหมา (นิติบุคคล)" : "ผู้รับเหมา (บุคคลธรรมดา)"} span>
+                        <Typography sx={{ fontWeight: 800, fontSize: "1rem" }}>{e.contractor?.name || "-"}</Typography>
+                      </InfoCell>
+                      <InfoCell label="เลขประจำตัวผู้เสียภาษี">{e.contractor?.taxId}</InfoCell>
+                      <InfoCell label="เบอร์โทร">{e.contractor?.phone}</InfoCell>
+                      <InfoCell label="งวดงาน">{installmentText(e.installment) || "ไม่ระบุงวด"}</InfoCell>
+                      {e.contractor?.address && <InfoCell label="ที่อยู่" span>{e.contractor.address}</InfoCell>}
+                    </Box>
+                    <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: C.soft, border: `1px solid ${alpha(C.color, 0.25)}` }}>
+                      {[
+                        ["ค่าจ้างงวดนี้ (ก่อน VAT)", e.total, false],
+                        ...(d.vat ? [[`บวก VAT ${d.vatRate}%`, d.vat, false]] : []),
+                        ...(d.wht ? [[`หัก ณ ที่จ่าย ${d.whtRate}% (${e.contractor?.isCompany ? "ภ.ง.ด.53" : "ภ.ง.ด.3"})`, d.wht, true]] : []),
+                        ...(d.deposit ? [["หักเงินมัดจำ / เบิกล่วงหน้า", d.deposit, true]] : []),
+                      ].map(([label, v, minus]) => (
+                        <Stack key={label} direction="row" justifyContent="space-between" sx={{ py: 0.3 }}>
+                          <Typography sx={{ fontSize: "0.86rem", color: minus ? "#b45309" : TEXT_SUB, fontWeight: 600 }}>{label}</Typography>
+                          <Typography sx={{ fontSize: "0.9rem", fontWeight: 700, color: minus ? "#b45309" : TEXT_MAIN }}>{minus ? "− " : ""}{fmtMoney(v)}</Typography>
+                        </Stack>
+                      ))}
+                      <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ borderTop: `1px solid ${alpha(C.color, 0.3)}`, mt: 0.5, pt: 0.75 }}>
+                        <Typography sx={{ fontWeight: 900, color: C.dark }}>ยอดจ่ายสุทธิ</Typography>
+                        <Typography sx={{ fontWeight: 900, fontSize: "1.3rem", color: C.dark }}>{fmtMoney(e.difference)}</Typography>
+                      </Stack>
+                      <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", textAlign: "right" }}>( {bahtText(e.difference)} )</Typography>
+                    </Box>
+                    {(hist.length > 0 || cv > 0) && (
+                      <Box sx={{ mt: 1.5 }}>
+                        <Typography sx={{ fontSize: "0.82rem", fontWeight: 800, mb: 0.75 }}>ยอดเบิกสะสมของผู้รับเหมารายนี้ในงานนี้</Typography>
+                        {hist.map((h) => {
+                          const hs = statusMeta(h.status, "contractor");
+                          return (
+                            <Stack key={h._id} direction="row" spacing={1} alignItems="center" sx={{ py: 0.3 }}>
+                              <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, minWidth: 64 }}>{installmentText(h.installment) || "ไม่ระบุงวด"}</Typography>
+                              <Button size="small" onClick={() => onOpenOther?.(h._id)} sx={{ p: 0, minWidth: 0, textTransform: "none", fontWeight: 700, fontSize: "0.8rem" }}>{h.docNo}</Button>
+                              <Chip size="small" label={hs.label} sx={{ height: 18, fontSize: "0.64rem", fontWeight: 800, bgcolor: alpha(hs.color, 0.12), color: hs.color }} />
+                              <Box sx={{ flex: 1 }} />
+                              <Typography sx={{ fontSize: "0.82rem", fontWeight: 800 }}>{fmtMoney(h.total)}</Typography>
+                            </Stack>
+                          );
+                        })}
+                        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)" }, gap: 1, mt: 1 }}>
+                          <InfoCell label="รวมสะสม (รวมงวดนี้)">{baht(cum)}</InfoCell>
+                          {cv > 0 && <InfoCell label="มูลค่าตามสัญญา">{baht(cv)}</InfoCell>}
+                          {cv > 0 && (
+                            <InfoCell label="คงเหลือตามสัญญา">
+                              <Box component="span" sx={{ color: left < 0 ? "#dc2626" : "#059669", fontWeight: 800 }}>{left < 0 ? `เกินสัญญา ${baht(-left)}` : baht(left)}</Box>
+                            </InfoCell>
+                          )}
+                        </Box>
+                      </Box>
+                    )}
+                  </Card>
+                );
+              })()}
 
               {/* ✅ ใบสำรองจ่ายไม่มีใบ Advance ให้เทียบ — ข้ามการ์ดเทียบยอดไปใช้ตารางรายการธรรมดาแทน
                   (การ์ดเทียบที่มีช่อง "ยอดเบิก Advance" เป็น 0 ตลอดคือข้อมูลที่ทำให้เข้าใจผิด ไม่ใช่ข้อมูลที่ขาด) */}
@@ -899,7 +990,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                   <InfoCell label="เลขที่">{e.docNo}</InfoCell>
                   <InfoCell label="วันที่">{thaiDate(e.docDate)}</InfoCell>
                   <InfoCell label="ถึง">{e.to}</InfoCell>
-                  <InfoCell label="ผู้เบิกเงิน">{personFullName(e.requester)}</InfoCell>
+                  <InfoCell label={isCtr ? "พนักงานผู้เบิก (กรอกแทน)" : "ผู้เบิกเงิน"}>{personFullName(e.requester)}</InfoCell>
                   <InfoCell label="ตำแหน่ง">{e.requester?.position}</InfoCell>
                   {e.createdBy?.userId && e.createdBy.userId !== e.requester?.userId && <InfoCell label="ออกใบแทนโดย">{e.createdBy.name}</InfoCell>}
                   {/* ✅ งานที่เข้าหลายช่วง: บอกช่วงวันที่เต็ม + เป็นช่วงที่เท่าไร — ใบของคนละช่วงจะได้ไม่สับสนกัน */}
@@ -923,7 +1014,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                       <InfoCell label={mustReturn ? "ผู้อนุมัติเบิกจ่าย (ยืนยันรับเงินคืน)" : "ผู้อนุมัติเบิกจ่าย"}>
                         {personFullName(e.payment.by) || "-"}
                       </InfoCell>
-                      <InfoCell label={kind === "advance" ? "การจ่ายเงิน" : isReimburse ? "การจ่ายคืน" : mustReturn ? "การรับเงินคืน" : "การจ่ายส่วนต่าง"}>
+                      <InfoCell label={kind === "advance" ? "การจ่ายเงิน" : isCtr ? "การจ่ายค่าจ้าง" : isReimburse ? "การจ่ายคืน" : mustReturn ? "การรับเงินคืน" : "การจ่ายส่วนต่าง"}>
                         {thaiDate(e.payment.at)} · {paymentLabel(e.payment.method)}{e.payment.ref ? ` · ${e.payment.ref}` : ""}{e.payment.note ? ` · ${e.payment.note}` : ""}
                       </InfoCell>
                     </>
@@ -931,10 +1022,10 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                   {/* ✅ บัญชีรับเงินของผู้เบิก — โชว์เฉพาะใบที่บริษัทต้องโอนเงินให้ผู้เบิก
                       ⚠️ ใบที่ผู้เบิกต้องคืนเงินบริษัท ไม่โชว์บัญชี (คนละทิศทางเงิน) แต่โชว์ยอดที่ต้องคืนแทน */}
                   {moneyToRequester && (
-                    <InfoCell label="บัญชีรับเงินของผู้เบิก" span>
+                    <InfoCell label={isCtr ? "บัญชีรับเงินของผู้รับเหมา" : "บัญชีรับเงินของผู้เบิก"} span>
                       {e.payTo?.accountNo
                         ? <Box sx={{ mt: 0.5 }}><PayToBox payTo={e.payTo} /></Box>
-                        : <Typography sx={{ fontSize: "0.88rem", color: TEXT_SUB }}>ไม่ระบุ (รับเป็นเงินสด)</Typography>}
+                        : <Typography sx={{ fontSize: "0.88rem", color: TEXT_SUB }}>{isCtr ? "จ่ายเป็นเงินสด / เช็ค" : "ไม่ระบุ (รับเป็นเงินสด)"}</Typography>}
                     </InfoCell>
                   )}
                   {mustReturn && (
@@ -957,7 +1048,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
               </Card>
 
               {!isClearClaim && (
-                <Card title={`รายการ (${e.items?.length || 0})`} action={<Typography sx={{ fontWeight: 800, color: meta.color }}>{baht(e.total)}</Typography>}>
+                <Card title={`${isCtr ? "รายการค่าจ้าง" : "รายการ"} (${e.items?.length || 0})`} action={<Typography sx={{ fontWeight: 800, color: meta.color }}>{baht(e.total)}</Typography>}>
                   {!e.items?.length && <Typography variant="body2" sx={{ color: TEXT_SUB }}>ไม่มีรายการค่าใช้จ่าย{e.note ? " — ดูหมายเหตุ" : ""}</Typography>}
                   <Stack divider={<Divider flexItem />} spacing={1}>
                     {(e.items || []).map((it, i) => {

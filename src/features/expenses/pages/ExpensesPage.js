@@ -3,6 +3,7 @@
  *
  *   /expenses/advances    ใบเบิก Advance   (เขียวอมฟ้า)
  *   /expenses/claims      ใบเคลม            (ม่วง)
+ *   /expenses/contractors ใบเบิกค่าจ้างผู้รับเหมา (น้ำเงินเข้ม)
  *   /expenses/approvals   รอดำเนินการ       (ส้ม — เฉพาะผู้มีสิทธิ์อนุมัติ)
  *   /expenses/report      รายงานย้อนหลัง    (น้ำเงินเข้ม)
  *   /expenses/<id>        เปิดใบนั้นทันที — ลิงก์จากแจ้งเตือนทุกตัวชี้มาที่นี่
@@ -23,7 +24,7 @@ import { Link as RouterLink, Navigate, useLocation, useNavigate, useParams, useS
 import { Box, Stack, Typography, Button, Chip } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
-  Add, Payments, ReceiptLong, FactCheck, Insights, ChevronRight, WarningAmber, AccountBalanceWallet,
+  Add, Payments, ReceiptLong, FactCheck, Insights, ChevronRight, WarningAmber, AccountBalanceWallet, Engineering,
 } from "@mui/icons-material";
 
 import usePermissions from "@/shared/hooks/usePermissions";
@@ -31,6 +32,7 @@ import { refreshAppBadges } from "@/shared/hooks/useAppBadges";
 import ExpenseService from "../services/ExpenseService";
 import ExpenseList from "../components/ExpenseList";
 import ExpenseFormDialog from "../components/ExpenseFormDialog";
+import ContractorFormDialog from "../components/ContractorFormDialog";
 import ExpenseDetailDialog from "../components/ExpenseDetailDialog";
 import MyExpenseTasks from "../components/MyExpenseTasks";
 import { useAuth } from "@/features/auth/AuthContext";
@@ -68,6 +70,20 @@ export const VIEW_META = {
      * ด้วยแถบตัวกรอง + สี + ป้ายชนิดใบ
      */
     action2: { label: "สำรองจ่ายเอง", kind: "reimburse", icon: AccountBalanceWallet },
+  },
+  /**
+   * ✅ ใบเบิกค่าจ้างผู้รับเหมา (ผู้ใช้สั่ง 28 ก.ย. 2569) — หน้าของตัวเอง เพราะผู้รับเงินเป็นคนนอก
+   * มีงวดงาน/หัก ณ ที่จ่าย/มัดจำ ที่ใบของพนักงานไม่มี (ปนกับใบเคลมจะกรองยากและยอดรวมผิดความหมาย)
+   */
+  contractor: {
+    path: "/expenses/contractors",
+    title: "ใบเบิกค่าจ้างผู้รับเหมา",
+    icon: Engineering,
+    color: KIND_META.contractor.color,
+    dark: KIND_META.contractor.dark,
+    soft: KIND_META.contractor.soft,
+    sub: "เบิกค่าแรง/ค่าจ้างเหมาตามงวดงาน · หัก ณ ที่จ่ายและเงินมัดจำ · จ่ายตรงเข้าบัญชีผู้รับเหมา",
+    action: "ออกใบค่าจ้าง",
   },
   inbox: {
     path: "/expenses/approvals",
@@ -146,6 +162,8 @@ export default function ExpensesPage({ view: viewProp }) {
   // — พอรู้แล้วค่อยสลับพื้นหลัง/ปลายทางตอนปิดให้ตรงชนิด ไม่ต้องยิง API ซ้ำอีกรอบเพื่อถามแค่ชนิดใบ
   const [detailKind, setDetailKind] = useState(null);
   const [form, setForm] = useState({ open: false, kind: "advance", claimType: "clear", expense: null, advance: null });
+  /** ฟอร์มใบค่าจ้างผู้รับเหมาเป็นคนละตัวกับฟอร์มใบของพนักงาน (ดู ContractorFormDialog) */
+  const isContractorForm = form.kind === "claim" && form.claimType === "contractor";
   const [notice, setNotice] = useState(null);
   const [status, setStatus] = useState(searchParams.get("status") || "all");
   // ตัวกรองชนิดย่อยของหน้าใบเคลม: all | clear | reimburse (ลิงก์จากเมนู/แจ้งเตือนส่งมาทาง ?type= ได้)
@@ -163,7 +181,7 @@ export default function ExpensesPage({ view: viewProp }) {
   // ⚠️ ต้องดึงออกมาเป็นตัวแปรขึ้นต้นด้วยตัวใหญ่ก่อนใช้เป็นแท็ก — <meta.action2.icon /> อ่านยากและ
   // พังทันทีถ้าหน้านั้นไม่มีปุ่มที่สอง
   const Action2Icon = meta.action2?.icon || Add;
-  const isList = view === "advance" || view === "claim" || view === "inbox";
+  const isList = view === "advance" || view === "claim" || view === "contractor" || view === "inbox";
 
   useEffect(() => { if (routeId) setDetailId(routeId); }, [routeId]);
   useEffect(() => { setStatus(searchParams.get("status") || "all"); }, [searchParams]);
@@ -200,14 +218,14 @@ export default function ExpensesPage({ view: viewProp }) {
   };
 
   /**
-   * @param {"advance"|"claim"|"reimburse"} slip ชนิดที่ผู้ใช้กด (reimburse = ใบเคลมชนิดสำรองจ่าย)
+   * @param {"advance"|"claim"|"reimburse"|"contractor"} slip ชนิดที่ผู้ใช้กด (reimburse/contractor = ใบเคลมชนิดย่อย)
    * ⚠️ "reimburse" ไม่ใช่ kind จริงในฐานข้อมูล ต้องแปลงเป็น kind=claim + claimType=reimburse ตรงนี้
    * จุดเดียว ไม่ปล่อยให้คำว่า reimburse หลุดไปถึง API
    */
   const openCreate = (slip, advance = null) => setForm({
     open: true,
-    kind: slip === "reimburse" ? "claim" : slip,
-    claimType: slip === "reimburse" ? "reimburse" : "clear",
+    kind: slip === "reimburse" || slip === "contractor" ? "claim" : slip,
+    claimType: slip === "reimburse" || slip === "contractor" ? slip : "clear",
     expense: null,
     advance,
   });
@@ -249,6 +267,12 @@ export default function ExpensesPage({ view: viewProp }) {
     });
     // ⚠️ ของตัวเองแสดงอยู่ในกล่อง "ใบเบิกของคุณที่ค้างอยู่" ด้านล่างแล้ว — ตัวเลขนี้จึงมีไว้ให้หัวหน้าดูภาพรวมทั้งทีมเท่านั้น
     if (viewAll) stats.push({ key: "__await", label: "Advance ที่ยังไม่เคลียร์ (ทั้งทีม)", value: summary?.awaitingClaim ?? "–", color: KIND_META.advance.color });
+  } else if (view === "contractor") {
+    const c = summary?.contractor;
+    stats.push({ key: "pending", label: "รอตรวจสอบ", value: c?.pending ?? "–", color: "#d97706", onClick: () => pick("pending") });
+    stats.push({ key: "reviewed", label: "รออนุมัติ", value: c?.reviewing ?? "–", color: "#b45309", onClick: () => pick("reviewed") });
+    stats.push({ key: "approved", label: "รออนุมัติเบิกจ่าย", value: c?.toPay ?? "–", color: meta.color, onClick: () => pick("approved") });
+    stats.push({ key: "__ctrmoney", label: "ยอดรอจ่ายผู้รับเหมา (สุทธิ)", value: c ? baht(c.toPayAmount) : "–", color: meta.dark });
   } else if (view === "inbox") {
     // ✅ ตัวเลขตามขั้นของสายอนุมัติ 3 ส่วน — การ์ดของขั้นที่ตัวเองไม่ได้รับผิดชอบไม่ต้องโชว์ให้รก
     if (canReview) stats.push({ key: "__p", label: "รอตรวจสอบ", value: summary?.pending ?? "–", color: "#d97706" });
@@ -264,6 +288,7 @@ export default function ExpensesPage({ view: viewProp }) {
   const crossLinks = [];
   if (view !== "advance") crossLinks.push({ to: "/expenses/advances", label: "ใบ Advance", color: KIND_META.advance.dark });
   if (view !== "claim") crossLinks.push({ to: "/expenses/claims", label: "ใบเคลม", color: KIND_META.claim.dark });
+  if (view !== "contractor") crossLinks.push({ to: "/expenses/contractors", label: "ค่าจ้างผู้รับเหมา", color: KIND_META.contractor.dark });
   if (canHandle && view !== "inbox") crossLinks.push({ to: "/expenses/approvals", label: "รอดำเนินการ", color: INBOX_COLOR });
   if (view !== "report") crossLinks.push({ to: "/expenses/report", label: "รายงาน", color: REPORT_COLOR });
 
@@ -294,8 +319,8 @@ export default function ExpensesPage({ view: viewProp }) {
           {meta.action && (canRequest || viewAll) && (
             <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
               <Button
-                variant="contained" startIcon={view === "claim" ? <ReceiptLong /> : <Add />}
-                onClick={() => openCreate(view === "claim" ? "claim" : "advance")}
+                variant="contained" startIcon={view === "claim" ? <ReceiptLong /> : view === "contractor" ? <Engineering /> : <Add />}
+                onClick={() => openCreate(view === "claim" ? "claim" : view === "contractor" ? "contractor" : "advance")}
                 sx={{
                   flex: { xs: 1, sm: "none" }, textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", whiteSpace: "nowrap",
                   bgcolor: meta.color, "&:hover": { bgcolor: meta.dark, boxShadow: "none" },
@@ -343,7 +368,7 @@ export default function ExpensesPage({ view: viewProp }) {
 
       {/* ✅ สิ่งที่ป้ายตัวเลขบนเมนู "ใบเคลม"/"ใบ Advance" นับไว้ — ต้องเห็นและกดทำต่อได้ทันทีที่เข้ามา
           (ผู้ใช้แจ้งว่าป้ายขึ้นแต่เข้ามาแล้วไม่เจออะไร) · ชื่อกล่องเรียกตามสิ่งที่มันเป็น: ใบเบิก ไม่ใช่ "งาน" */}
-      {(view === "claim" || view === "advance") && canRequest && (
+      {(view === "claim" || view === "advance" || view === "contractor") && canRequest && (
         <MyExpenseTasks
           view={view}
           userId={userData?.userId}
@@ -383,17 +408,24 @@ export default function ExpensesPage({ view: viewProp }) {
           const needsMyAction = (e?.status === "pending" && canReview)
             || (e?.status === "reviewed" && canApprove)
             || (e?.status === "approved" && canDisburse);
-          setDetailKind(needsMyAction ? "inbox" : e?.kind || null);
+          setDetailKind(needsMyAction ? "inbox" : e?.claimType === "contractor" ? "contractor" : e?.kind || null);
         }}
         onClose={closeDetail}
         onChanged={refresh}
         onOpenOther={(id) => { setNotice(null); openDetail(id); }}
-        onEdit={(expense) => setForm({ open: true, kind: expense.kind, expense, advance: null })}
+        onEdit={(expense) => setForm({ open: true, kind: expense.kind, claimType: expense.claimType || "clear", expense, advance: null })}
         onCreateClaim={(advance) => openCreate("claim", advance)}
       />
 
+      <ContractorFormDialog
+        open={form.open && isContractorForm}
+        expense={form.expense}
+        onClose={() => setForm((f) => ({ ...f, open: false }))}
+        onSaved={onSaved}
+      />
+
       <ExpenseFormDialog
-        open={form.open}
+        open={form.open && !isContractorForm}
         kind={form.kind}
         claimType={form.claimType}
         expense={form.expense}
