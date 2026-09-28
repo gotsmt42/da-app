@@ -15,9 +15,9 @@
  *   • advanceRejectedMine = ใบ Advance ที่ฉันเป็นผู้เบิกหรือคนออกใบ สถานะ rejected
  */
 import { useEffect, useRef, useState } from "react";
-import { Box, Stack, Typography, Button, Chip } from "@mui/material";
+import { Box, Stack, Typography, Button, Chip, Collapse, ButtonBase } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { ReceiptLong, Edit, AssignmentLate, ChevronRight } from "@mui/icons-material";
+import { ReceiptLong, Edit, AssignmentLate, ChevronRight, ExpandMore } from "@mui/icons-material";
 
 import { thaiDate } from "@/shared/utils/thaiDate";
 import ExpenseService from "../services/ExpenseService";
@@ -25,6 +25,15 @@ import { KIND_META, baht, isOverdueClear, TEXT_SUB, TEXT_MAIN, BORDER_MAIN } fro
 
 const isMine = (e, me, { includeCreator }) =>
   String(e?.requester?.userId || "") === me || (includeCreator && String(e?.createdBy?.userId || "") === me);
+
+/**
+ * ✅ ผู้ใช้สั่ง: "ใบที่ค้างอยู่ให้กดย่อ/ขยายได้" — จำสถานะไว้ต่อเครื่อง (ต่อชนิดหน้า)
+ * ⚠️ localStorage อาจใช้ไม่ได้ (โหมดส่วนตัว) — ห่อ try/catch แล้วถอยไปเปิดไว้ตามปกติ
+ */
+const OPEN_KEY = (view) => `expense.myTasks.open.${view}`;
+const readOpen = (view) => {
+  try { return localStorage.getItem(OPEN_KEY(view)) !== "0"; } catch { return true; }
+};
 
 const daysLate = (due) => Math.max(1, Math.floor((Date.now() - new Date(due).getTime()) / 86_400_000));
 
@@ -36,6 +45,12 @@ const daysLate = (due) => Math.max(1, Math.floor((Date.now() - new Date(due).get
 export default function MyExpenseTasks({ view, userId, reloadKey, onOpen, onCreateClaim, onEdit }) {
   const me = String(userId || "");
   const [tasks, setTasks] = useState([]);
+  const [expanded, setExpanded] = useState(() => readOpen(view));
+  useEffect(() => { setExpanded(readOpen(view)); }, [view]);
+  const toggle = () => setExpanded((v) => {
+    try { localStorage.setItem(OPEN_KEY(view), v ? "0" : "1"); } catch { /* ใช้ค่าในหน้าอย่างเดียว */ }
+    return !v;
+  });
   const aliveRef = useRef(true);
 
   useEffect(() => {
@@ -83,13 +98,18 @@ export default function MyExpenseTasks({ view, userId, reloadKey, onOpen, onCrea
       mb: 1.5, borderRadius: 2.5, border: `1px solid ${BORDER_MAIN}`, bgcolor: "#fff", overflow: "hidden",
     }}>
       {/* ✅ โทนเรียบ (ผู้ใช้แจ้ง "สีสันรกตา") — แดงเหลือแค่ไอคอนกับตัวเลขจำนวน */}
-      <Stack direction="row" alignItems="center" spacing={1} sx={{ px: { xs: 1.5, sm: 2 }, py: 1.1, borderBottom: `1px solid ${BORDER_MAIN}` }}>
+      <Stack component={ButtonBase} onClick={toggle} aria-expanded={expanded} direction="row" alignItems="center" spacing={1}
+        sx={{ width: "100%", justifyContent: "flex-start", textAlign: "left", px: { xs: 1.5, sm: 2 }, py: 1.1, borderBottom: expanded ? `1px solid ${BORDER_MAIN}` : "none", "&:hover": { bgcolor: "#f8fafc" } }}>
         <AssignmentLate sx={{ fontSize: 20, color: "#dc2626" }} />
         {/* ✅ ผู้ใช้แจ้ง: "มันไม่ใช่งาน คือการเบิก" — เรียกตามสิ่งที่มันเป็น และไม่อธิบายซ้ำกับป้ายในแต่ละแถว */}
         <Typography sx={{ fontWeight: 900, fontSize: "0.95rem", color: TEXT_MAIN }}>ใบเบิกของคุณที่ค้างอยู่</Typography>
         <Chip size="small" label={tasks.length} sx={{ height: 20, fontWeight: 900, bgcolor: "#dc2626", color: "#fff" }} />
+        <Box sx={{ flex: 1 }} />
+        <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: TEXT_SUB }}>{expanded ? "ย่อ" : "ดูทั้งหมด"}</Typography>
+        <ExpandMore sx={{ fontSize: 20, color: TEXT_SUB, transform: expanded ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
       </Stack>
 
+      <Collapse in={expanded} unmountOnExit>
       <Stack divider={<Box sx={{ borderTop: `1px solid ${BORDER_MAIN}` }} />}>
         {tasks.map(({ type, e }) => {
           const late = type === "clear" && isOverdueClear(e);
@@ -149,6 +169,7 @@ export default function MyExpenseTasks({ view, userId, reloadKey, onOpen, onCrea
           );
         })}
       </Stack>
+      </Collapse>
     </Box>
   );
 }
