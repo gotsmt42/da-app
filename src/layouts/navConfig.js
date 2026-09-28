@@ -16,7 +16,7 @@
  */
 import {
   FaHome, FaTachometerAlt, FaCalendarAlt, FaWrench, FaBriefcase, FaClipboardList,
-  FaClipboardCheck, FaPaperPlane, FaMoneyCheckAlt, FaReceipt, FaHardHat, FaInbox, FaChartBar,
+  FaClipboardCheck, FaPaperPlane, FaMoneyCheckAlt, FaReceipt, FaHardHat, FaUserClock, FaInbox, FaChartBar,
   FaFileAlt, FaFileInvoiceDollar, FaFileContract, FaBuilding, FaUserFriends,
   FaCog, FaTags, FaImage, FaUserShield, FaBoxOpen, FaImages, FaNewspaper, FaSlidersH, FaEnvelopeOpenText,
 } from "react-icons/fa";
@@ -52,6 +52,7 @@ export const DEST = {
 
   advance: { title: "ใบเบิก Advance", short: "ใบ Advance", sub: "เบิกเงินล่วงหน้า", href: "/expenses/advances", icon: FaMoneyCheckAlt, badgeKey: "advance" },
   claim: { title: "ใบเคลม", sub: "เคลียร์ค่าใช้จ่าย", href: "/expenses/claims", icon: FaReceipt, badgeKey: "claim" },
+  ot: { title: "OT · ทำงานล่วงเวลา", short: "OT", sub: "ขออนุมัติ OT · จ่ายพร้อมเงินเดือน", href: "/ot", icon: FaUserClock, badgeKey: "ot" },
   contractorPay: { title: "ค่าจ้างผู้รับเหมา", sub: "เบิกค่าแรงตามงวดงาน", href: "/expenses/contractors", icon: FaHardHat, badgeKey: "contractorPay" },
   expenseInbox: { title: "รอดำเนินการ", sub: "ตรวจสอบ · อนุมัติ · เบิกจ่าย", href: "/expenses/approvals", icon: FaInbox, badgeKey: "expenseInbox" },
   expenseReport: { title: "รายงานการเบิก", short: "รายงาน", sub: "ยอดค้าง · ย้อนหลัง", href: "/expenses/report", icon: FaChartBar },

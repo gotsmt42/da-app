@@ -42,6 +42,10 @@ export const ORG_FALLBACK = {
   contactLine: "",
   contactFacebook: "",
   advanceClearDays: 7,
+  /** OT — ตัวคูณ (เท่าของค่าจ้างต่อชั่วโมง) · ชั่วโมงทำงานต่อวัน · วันหยุดประจำสัปดาห์ (0 = อาทิตย์) */
+  otMultipliers: { workdayOT: 1.5, holidayWork: 1, holidayOT: 3 },
+  otHoursPerDay: 8,
+  otRestDays: [0],
   /** ชื่อ Rank (ตำแหน่งในองค์กร) ที่ตั้งเอง { rank: "ชื่อ" } — ว่าง = ใช้ชื่อเริ่มต้นของระบบ */
   rankLabels: {},
 };

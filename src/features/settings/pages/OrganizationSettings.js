@@ -85,6 +85,11 @@ const looksCorrupted = (v) => /\?{3,}/.test(String(v || ""));
  */
 const FIELD_LABEL = {
   advanceClearDays: "กำหนดเคลียร์ Advance (วัน)",
+  "otMultipliers.workdayOT": "ตัวคูณ OT วันทำงาน",
+  "otMultipliers.holidayWork": "ตัวคูณทำงานวันหยุด",
+  "otMultipliers.holidayOT": "ตัวคูณ OT วันหยุด",
+  otHoursPerDay: "ชั่วโมงทำงานต่อวัน (OT)",
+  otRestDays: "วันหยุดประจำสัปดาห์ (OT)",
   logoUrl: "โลโก้บนหัวเว็บ",
   letterheadUrl: "โลโก้หัวกระดาษ",
   stampUrl: "ตราประทับบริษัท",
@@ -231,6 +236,9 @@ export default function OrganizationSettings() {
         ...Object.fromEntries(FIELDS.map((f) => [f.key, form[f.key] || ""])),
         ...Object.fromEntries(CONTACT_FIELDS.map((f) => [f.key, String(form[f.key] || "").trim()])),
         advanceClearDays: Number(form.advanceClearDays) || ORG_FALLBACK.advanceClearDays,
+        otMultipliers: { ...ORG_FALLBACK.otMultipliers, ...(form.otMultipliers || {}) },
+        otHoursPerDay: Number(form.otHoursPerDay) || ORG_FALLBACK.otHoursPerDay,
+        otRestDays: Array.isArray(form.otRestDays) ? form.otRestDays : ORG_FALLBACK.otRestDays,
       });
       setDirty(false);
       setToast("บันทึกการตั้งค่าแล้ว — เอกสารที่ออกหลังจากนี้จะใช้ข้อมูลใหม่ทันที");
@@ -376,6 +384,43 @@ export default function OrganizationSettings() {
           helperText="นับจากวันที่อนุมัติเบิกจ่าย — ใช้เมื่อผู้อนุมัติเบิกจ่ายไม่ได้ระบุวันเอง และใช้เตือนเมื่อเลยกำหนด"
           sx={{ maxWidth: 320 }}
         />
+      </Section>
+
+      {/* ✅ ระบบ OT (ผู้ใช้สั่ง "ให้ตั้งค่าตัว x ได้") — ค่าต่ำสุดตามกฎหมายแรงงาน server ตรวจซ้ำ */}
+      <Section icon={RestartAlt} title="ค่าตั้งต้นของระบบ OT"
+        hint="ตัวคูณ = กี่เท่าของค่าจ้างต่อชั่วโมง · ขั้นต่ำตามกฎหมาย: OT วันทำงาน 1.5 · ทำงานวันหยุด 1 · OT วันหยุด 3 · ใบที่บันทึกแล้วไม่เปลี่ยนตาม">
+        <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(4, 1fr)" } }}>
+          {[
+            ["workdayOT", "OT วันทำงาน (เท่า)", 1.5],
+            ["holidayWork", "ทำงานวันหยุด (เท่า)", 1],
+            ["holidayOT", "OT วันหยุด (เท่า)", 3],
+          ].map(([k, label, min]) => (
+            <TextField key={k} size="small" type="number" label={label}
+              value={form.otMultipliers?.[k] ?? ""}
+              onChange={(e) => { setDirty(true); setForm((f) => ({ ...f, otMultipliers: { ...ORG_FALLBACK.otMultipliers, ...(f.otMultipliers || {}), [k]: e.target.value } })); }}
+              inputProps={{ min, max: 10, step: 0.25 }}
+              error={Number(form.otMultipliers?.[k]) < min}
+              helperText={Number(form.otMultipliers?.[k]) < min ? `ต่ำสุด ${min}` : " "} />
+          ))}
+          <TextField size="small" type="number" label="ชั่วโมงทำงานต่อวัน" value={form.otHoursPerDay ?? ""} onChange={set("otHoursPerDay")}
+            inputProps={{ min: 1, max: 12 }} helperText="ใช้แปลงเงินเดือน → ค่าจ้างต่อชั่วโมง" />
+        </Box>
+        <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 700, display: "block", mt: 1 }}>วันหยุดประจำสัปดาห์ (ระบบเดาประเภทวันให้อัตโนมัติ)</Typography>
+        <Stack direction="row" flexWrap="wrap" useFlexGap spacing={0.75} sx={{ mt: 0.5 }}>
+          {["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."].map((d, i) => {
+            const on = (form.otRestDays || []).includes(i);
+            return (
+              <Chip key={d} label={d} clickable onClick={() => {
+                setDirty(true);
+                setForm((f) => {
+                  const cur = Array.isArray(f.otRestDays) ? f.otRestDays : [];
+                  return { ...f, otRestDays: on ? cur.filter((x) => x !== i) : [...cur, i].sort() };
+                });
+              }}
+                sx={{ fontWeight: 800, bgcolor: on ? "#334155" : "#fff", color: on ? "#fff" : TEXT_SUB, border: `1px solid ${on ? "#334155" : BORDER}` }} />
+            );
+          })}
+        </Stack>
       </Section>
 
       {/* ✅ ย้อนดูได้ว่าใครเปลี่ยนอะไรเมื่อไหร่ — เดิมเก็บแค่ "ใครแก้ล่าสุด" พอค่าเสียจึงสืบไม่ได้

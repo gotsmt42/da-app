@@ -204,6 +204,8 @@ const side = (key, extra) => {
       ? [side("expenseInbox")]
       : []),
     side("expenseReport"),
+    // ✅ ระบบ OT (ผู้ใช้สั่ง 28 ก.ย. 2569) — สิทธิ์ชุดเดียวกับระบบเบิก จึงอยู่หมวดเดียวกัน
+    side("ot"),
   ];
 
   const masterDataMenu = [side("customers"), side("staff")];
