@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Box, Stack, Typography, Chip, TextField, InputAdornment, MenuItem, Button, Table, TableHead, TableRow,
-  TableCell, TableBody, useMediaQuery, Skeleton, Alert, IconButton, Menu,
+  TableCell, TableBody, useMediaQuery, Skeleton, Alert, IconButton, Menu, Pagination,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { Search, Add, WarningAmber, ChevronRight, Inbox, FilterList, Close } from "@mui/icons-material";
@@ -253,6 +253,22 @@ export default function ExpenseList({ mode, status: statusProp, claimType = "all
   }, [base, status, mode]);
 
   /**
+   * ✅ แบ่งหน้า 10 ใบต่อหน้า (ผู้ใช้สั่ง) — รายการยาวเลื่อนหาไม่ไหว โดยเฉพาะบนมือถือ
+   * ⚠️ เปลี่ยนตัวกรอง/คำค้น/ชนิดใบ = กลับไปหน้า 1 เสมอ ไม่งั้นค้างอยู่หน้าที่ไม่มีข้อมูลแล้วดูเหมือนว่างเปล่า
+   */
+  const PAGE_SIZE = 10;
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [status, q, person, period, claimType, mode]);
+  const pageCount = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+  const curPage = Math.min(page, pageCount);
+  const pageRows = visible.slice((curPage - 1) * PAGE_SIZE, curPage * PAGE_SIZE);
+  const topRef = useRef(null);
+  const goPage = (n) => {
+    setPage(n);
+    topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  /**
    * ⚠️ จอแคบ: ช่องค้นหา + ช่องเลือกช่วงเวลา + ช่องเลือกคน เรียงกัน 3 แถวกินจอไปครึ่งหนึ่งก่อนเห็นรายการแรก
    * — ย้ายสองช่องหลังไปไว้หลังปุ่ม "ตัวกรอง" (ป้ายบอกจำนวนตัวกรองที่เปิดอยู่) เหลือช่องค้นหาแถวเดียว
    */
@@ -382,7 +398,7 @@ export default function ExpenseList({ mode, status: statusProp, claimType = "all
   );
 
   return (
-    <Box sx={{ pt: 2 }}>
+    <Box ref={topRef} sx={{ pt: 2, scrollMarginTop: 72 }}>
       {filterBar}
       {claimTypeChips}
       {statusChips}
@@ -413,9 +429,16 @@ export default function ExpenseList({ mode, status: statusProp, claimType = "all
         })()
       ) : visible.length ? (
         <>
-          {renderRows(visible)}
+          {renderRows(pageRows)}
+          {pageCount > 1 && (
+            <Stack alignItems="center" sx={{ mt: 1.5 }}>
+              <Pagination count={pageCount} page={curPage} onChange={(_, n) => goPage(n)} shape="rounded" size={isDesktop ? "medium" : "small"}
+                siblingCount={isDesktop ? 1 : 0}
+                sx={{ "& .Mui-selected": { bgcolor: "#334155 !important", color: "#fff" } }} />
+            </Stack>
+          )}
           <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", mt: 1, textAlign: "right" }}>
-            {visible.length} ใบ · รวม {baht(visible.filter((e) => e.status !== "cancelled").reduce((s, e) => s + (Number(e.total) || 0), 0))} (ไม่รวมใบที่ยกเลิก)
+            {pageCount > 1 ? `แสดง ${(curPage - 1) * PAGE_SIZE + 1}–${(curPage - 1) * PAGE_SIZE + pageRows.length} จาก ` : ""}{visible.length} ใบ · รวม {baht(visible.filter((e) => e.status !== "cancelled").reduce((s, e) => s + (Number(e.total) || 0), 0))} (ไม่รวมใบที่ยกเลิก)
           </Typography>
         </>
       ) : (
