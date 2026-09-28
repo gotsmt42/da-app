@@ -11,8 +11,9 @@ import { OpenInNew, AddCircleOutline, AttachFile } from "@mui/icons-material";
 
 import { thaiDate } from "@/shared/utils/thaiDate";
 import KindBadge from "./KindBadge";
+import StatusBadge from "./StatusBadge";
 import {
-  KIND_META, statusMeta, baht, fmtMoney, qtyText, paymentLabel, jobText, categoryMeta, TEXT_SUB, TEXT_MAIN, personFullName,
+  KIND_META, baht, fmtMoney, qtyText, paymentLabel, jobText, categoryMeta, TEXT_SUB, TEXT_MAIN, personFullName,
 } from "../expenseMeta";
 
 const M = KIND_META.advance;
@@ -32,7 +33,6 @@ const Row = ({ label, children }) => (
  */
 export default function AdvancePanel({ advance, usedIndexes, onRestore, onOpen, sx }) {
   if (!advance) return null;
-  const st = statusMeta(advance.status, "advance");
   const pay = advance.payment || {};
   const files = advance.attachments || [];
 
@@ -51,7 +51,7 @@ export default function AdvancePanel({ advance, usedIndexes, onRestore, onOpen, 
         )}
       </Stack>
       {advance.status && (
-        <Chip size="small" label={st.label} sx={{ height: 20, fontSize: "0.68rem", fontWeight: 800, bgcolor: alpha(st.color, 0.12), color: st.color, mb: 0.75 }} />
+        <StatusBadge status={advance.status} kind="advance" sx={{ mb: 0.75 }} />
       )}
       <Typography sx={{ fontWeight: 800, fontSize: "0.88rem", lineHeight: 1.35, mb: 0.75 }}>{advance.subject}</Typography>
 

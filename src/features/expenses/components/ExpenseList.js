@@ -18,6 +18,7 @@ import { thaiDate } from "@/shared/utils/thaiDate";
 import usePermissions from "@/shared/hooks/usePermissions";
 import ExpenseService, { errorText } from "../services/ExpenseService";
 import KindBadge from "./KindBadge";
+import StatusBadge from "./StatusBadge";
 import {
   KIND_META, statusMeta, STATUS_FILTERS, CLAIM_TYPE_FILTERS, baht, differenceMeta, isOverdueClear, jobText, slipKind, TEXT_SUB, TEXT_MAIN, BORDER_MAIN, personFullName, installmentText, money,
 } from "../expenseMeta";
@@ -28,6 +29,21 @@ const PERIODS = [
   { value: "3m", label: "3 เดือนล่าสุด" },
   { value: "year", label: "ปีนี้" },
 ];
+
+/**
+ * เลขที่ "ADV-00012/2569" → [2569, 12] ใช้เรียงใหม่ → เก่า
+ * ⚠️ เทียบเป็นตัวเลข ไม่ใช่ตัวอักษร — ไม่งั้น 00100 กับ 00099 และปีที่ต่างกันจะเรียงผิด
+ * ใบที่ไม่มีเลขที่ (ไม่ควรมี) ไปอยู่ท้ายสุด · เลขเท่ากันต่างชุด (CLM/RMB) ใช้เวลาสร้างตัดสิน
+ */
+const docKey = (e) => {
+  const m = String(e?.docNo || "").match(/(\d+)\/(\d{4})$/);
+  return m ? [Number(m[2]), Number(m[1])] : [0, 0];
+};
+const byDocNoDesc = (a, b) => {
+  const [ya, na] = docKey(a);
+  const [yb, nb] = docKey(b);
+  return (yb - ya) || (nb - na) || (new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+};
 
 const periodRange = (p) => {
   const now = new Date();
@@ -73,20 +89,19 @@ const refLabel = (e) => {
  * เดิมเป็นชิปพื้นสีทุกแถว บวกแถบซ้ายสี + ป้ายทึบ + เลขที่สี + ยอดส่วนต่างสี = 4–5 สีต่อการ์ดเดียว
  * ตอนนี้แต่ละแถวเหลือสีแค่ 2 จุดเล็ก (ป้ายชนิดใบแบบอ่อน + จุดสถานะ) ที่เหลือเป็นขาว-ดำ-เทา
  */
-const StatusText = ({ e }) => {
-  const st = statusMeta(e.status, slipKind(e));
-  return (
-    <Stack direction="row" spacing={0.6} alignItems="center" sx={{ minWidth: 0 }}>
-      <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: st.color, flexShrink: 0 }} />
-      <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: TEXT_MAIN }} noWrap>{st.label}</Typography>
-      {isOverdueClear(e) && (
-        <Typography sx={{ fontSize: "0.74rem", fontWeight: 800, color: "#dc2626", display: "inline-flex", alignItems: "center", gap: 0.25 }} noWrap>
-          <WarningAmber sx={{ fontSize: 14 }} />เลยกำหนด
-        </Typography>
-      )}
-    </Stack>
-  );
-};
+const StatusText = ({ e }) => (
+  <Stack direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 0, flexWrap: "wrap", rowGap: 0.5 }}>
+    <StatusBadge status={e.status} kind={slipKind(e)} />
+    {isOverdueClear(e) && (
+      <Box component="span" sx={{
+        display: "inline-flex", alignItems: "center", gap: 0.4, height: 22, px: 0.8, borderRadius: 1.5,
+        bgcolor: "#dc2626", color: "#fff", fontSize: "0.7rem", fontWeight: 800,
+      }}>
+        <WarningAmber sx={{ fontSize: 14 }} />เลยกำหนด
+      </Box>
+    )}
+  </Stack>
+);
 
 /** บรรทัดเล็กใต้ยอด — บอกเฉพาะเมื่อมีข้อมูลที่ยอดรวมไม่ได้บอก (ส่วนต่างใบเคลม / ยอดสุทธิผู้รับเหมา) */
 const amountNote = (e) => {
@@ -231,7 +246,8 @@ export default function ExpenseList({ mode, status: statusProp, claimType = "all
 
   const base = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return rows.filter((e) => {
+    // ✅ เรียงตามเลขที่เอกสาร ใหม่ → เก่า (ผู้ใช้สั่ง "ยังเรียงตามเลขนะ") — ปีก่อน แล้วเลขลำดับ
+    return [...rows].sort(byDocNoDesc).filter((e) => {
       if (person !== "all" && e.requester?.userId !== person) return false;
       if (!needle) return true;
       return [e.docNo, e.subject, e.requester?.name, e.requester?.fullName, e.job?.title, e.job?.site, e.job?.company, e.advance?.docNo, e.to, e.contractor?.name,

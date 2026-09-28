@@ -31,11 +31,12 @@ import usePermissions from "@/shared/hooks/usePermissions";
 import ExpenseService, { errorText } from "../services/ExpenseService";
 import SignatureService from "@/shared/services/SignatureService";
 import KindBadge from "./KindBadge";
+import StatusBadge from "./StatusBadge";
 import BankLogo from "./BankLogo";
 import { BANKS, bankMeta, digitsOnly, validateAccount } from "../bankMeta";
 import {
   KIND_META, FILE_KINDS, baht, fmtMoney, bahtText, itemAmount, itemsTotal, money, jobText, jobRangeText, jobPartText, jobRangeDates,
-  contractorCalc, installmentText, WHT_PRESETS, statusMeta, personFullName, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
+  contractorCalc, installmentText, WHT_PRESETS, personFullName, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
 } from "../expenseMeta";
 
 const META = KIND_META.contractor;
@@ -542,12 +543,11 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
                 <Stack spacing={0.5} sx={{ mb: 1 }}>
                   <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: META.dark }}>งวดที่เบิกไปแล้วในงานนี้ ({history.length})</Typography>
                   {history.map((h) => {
-                    const st = statusMeta(h.status, "contractor");
                     return (
                       <Stack key={h._id} direction="row" spacing={1} alignItems="center" sx={{ fontSize: "0.8rem" }}>
                         <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, minWidth: 64 }}>{installmentText(h.installment) || "ไม่ระบุงวด"}</Typography>
                         <Typography sx={{ fontSize: "0.8rem", color: TEXT_SUB, flex: 1, minWidth: 0 }} noWrap>{h.docNo} · {thaiDate(h.docDate)}</Typography>
-                        <Chip size="small" label={st.label} sx={{ height: 18, fontSize: "0.64rem", fontWeight: 800, bgcolor: alpha(st.color, 0.12), color: st.color, display: { xs: "none", sm: "inline-flex" } }} />
+                        <StatusBadge status={h.status} kind="contractor" sx={{ display: { xs: "none", sm: "inline-flex" } }} />
                         <Typography sx={{ fontSize: "0.82rem", fontWeight: 800, whiteSpace: "nowrap" }}>{fmtMoney(h.total)}</Typography>
                       </Stack>
                     );

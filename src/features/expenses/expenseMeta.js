@@ -132,31 +132,34 @@ export const installmentText = (inst) =>
   (Number(inst?.no) > 0 ? `งวดที่ ${inst.no}${Number(inst?.total) > 0 ? `/${inst.total}` : ""}` : "");
 
 /**
- * สถานะ — ป้ายบางตัวต่างกันตามชนิดใบ (approved ของ Advance = รอจ่ายเงิน · ของ Claim = รอชำระส่วนต่าง)
+ * สถานะ — คำ + สีของแต่ละสถานะ (ป้ายในหน้าจอใช้ components/StatusBadge.js)
+ *
+ * ✅ ผู้ใช้แจ้ง (28 ก.ย. 2569): "สถานะต่างๆ ของใบมันแยกยาก ดูยาก ทำให้แยกกันชัดเจนแบบมืออาชีพ"
+ *   • คำสั้น บอกว่า "รออะไรอยู่" — ตัดคำนำหน้าที่ซ้ำ เช่น "อนุมัติแล้ว · รออนุมัติเบิกจ่าย" → "รออนุมัติเบิกจ่าย"
+ *   • แต่ละสถานะคนละโทนสีชัดเจน (เดิม รอตรวจสอบ/ตรวจสอบแล้ว เป็นส้มกับน้ำตาล · เคลียร์แล้ว/เสร็จสิ้น เขียวเดียวกัน
+ *     แต่คนละความหมาย ฯลฯ) — color = ตัวอักษร/ไอคอน · bg = พื้น · border = ขอบ
+ *   ลำดับสีตามขั้น: รอ (อำพัน → ม่วง → น้ำเงิน) · เงินออกแล้ว (ฟ้า/ชมพู) · จบ (เขียว) · ปัญหา (แดง) · ยกเลิก (เทา)
  * ⚠️ ป้ายต้องบอก "ขั้นต่อไปคืออะไร" ไม่ใช่แค่ "ตอนนี้เป็นอะไร" — คนเปิดดูต้องรู้ทันทีว่าใครต้องทำอะไรต่อ
  */
 const STATUS_BASE = {
-  // ✅ 3 ส่วน: ส่งขอเบิก → ตรวจสอบ/อนุมัติ (รอตรวจสอบ → ตรวจสอบแล้ว รออนุมัติ) → รออนุมัติเบิกจ่าย
-  pending: { label: "รอตรวจสอบ", color: "#d97706" },
-  reviewed: { label: "ตรวจสอบแล้ว · รออนุมัติ", color: "#7c2d12" },
-  rejected: { label: "ตีกลับให้แก้", color: "#dc2626" },
-  approved: { label: "อนุมัติแล้ว", color: "#2563eb" },
-  paid: { label: "จ่ายให้พนักงานแล้ว · รอเคลียร์", color: "#0369a1" },
-  clearing: { label: "ส่งเคลมแล้ว · รอตรวจ", color: "#be185d" },
-  cleared: { label: "เคลียร์แล้ว", color: "#16a34a" },
-  settled: { label: "เสร็จสิ้น", color: "#16a34a" },
-  cancelled: { label: "ยกเลิก", color: "#94a3b8" },
+  pending: { label: "รอตรวจสอบ", color: "#b45309", bg: "#fffbeb", border: "#fcd34d" },
+  reviewed: { label: "รออนุมัติ", color: "#6d28d9", bg: "#f5f3ff", border: "#c4b5fd" },
+  approved: { label: "รออนุมัติเบิกจ่าย", color: "#1d4ed8", bg: "#eff6ff", border: "#93c5fd" },
+  paid: { label: "รับเงินแล้ว · รอเคลียร์", color: "#0e7490", bg: "#ecfeff", border: "#67e8f9" },
+  clearing: { label: "ส่งเคลมแล้ว · รอปิด", color: "#be185d", bg: "#fdf2f8", border: "#f9a8d4" },
+  cleared: { label: "เคลียร์แล้ว", color: "#15803d", bg: "#f0fdf4", border: "#86efac" },
+  settled: { label: "เสร็จสิ้น", color: "#15803d", bg: "#f0fdf4", border: "#86efac" },
+  rejected: { label: "ตีกลับให้แก้", color: "#b91c1c", bg: "#fef2f2", border: "#fca5a5" },
+  cancelled: { label: "ยกเลิก", color: "#64748b", bg: "#f8fafc", border: "#cbd5e1" },
 };
 
-/** @param {"advance"|"claim"|"reimburse"} kind — ใช้ slipKind(e) เสมอ ไม่ใช่ e.kind ดิบ */
+/** ใบที่จบแล้วบอกให้ชัดว่าเงินไปทางไหน — "เสร็จสิ้น" เฉยๆ ของใบสำรองจ่าย/ผู้รับเหมา ไม่บอกว่าจ่ายแล้ว */
+const SETTLED_LABEL = { reimburse: "จ่ายคืนแล้ว", contractor: "จ่ายแล้ว" };
+
+/** @param {"advance"|"claim"|"reimburse"|"contractor"} kind — ใช้ slipKind(e) เสมอ ไม่ใช่ e.kind ดิบ */
 export const statusMeta = (status, kind) => {
-  const base = STATUS_BASE[status] || { label: status || "-", color: "#94a3b8" };
-  if (status === "approved") {
-    // ✅ ส่วนที่ 3 — ทุกชนิดใบรอ "อนุมัติเบิกจ่าย" (ผู้จัดการแผนกช่าง/กรรมการผู้จัดการ)
-    // ทิศทางเงิน (จ่ายเพิ่ม/รับคืน) โชว์แยกอยู่ที่ช่องยอดเงินของแถวแล้ว ป้ายสถานะจึงบอกแค่ขั้น
-    // ⚠️ ป้ายเดียวกันทุกชนิดใบ — ป้ายยาวกว่านี้ถูกตัดในตารางกล่องรอดำเนินการ (ตรวจด้วยภาพหน้าจอจริง)
-    return { ...base, label: "อนุมัติแล้ว · รออนุมัติเบิกจ่าย" };
-  }
+  const base = STATUS_BASE[status] || { label: status || "-", color: "#64748b", bg: "#f8fafc", border: "#cbd5e1" };
+  if (status === "settled" && SETTLED_LABEL[kind]) return { ...base, label: SETTLED_LABEL[kind] };
   return base;
 };
 

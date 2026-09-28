@@ -24,6 +24,7 @@ import {
   KIND_META, statusMeta, categoryMeta, baht, differenceMeta, TEXT_SUB, TEXT_MAIN, BORDER_MAIN, personFullName, installmentText,
 } from "../expenseMeta";
 import KindBadge from "../components/KindBadge";
+import StatusBadge from "../components/StatusBadge";
 
 const PRESETS = [
   { value: "month", label: "เดือนนี้", range: () => [moment().startOf("month"), moment()] },
@@ -427,7 +428,7 @@ export default function ExpenseReport({ onOpen, reloadKey }) {
                       </TableHead>
                       <TableBody>
                         {report.reimburseRows.map((r) => {
-                          const st = statusMeta(r.status, "reimburse");
+                          const st = { ...statusMeta(r.status, "reimburse"), status: r.status, kind: "reimburse" };
                           return (
                             <TableRow key={r._id} hover onClick={() => onOpen?.(r._id)} sx={{ cursor: "pointer" }}>
                               <TableCell sx={{ whiteSpace: "nowrap" }}>
@@ -443,7 +444,7 @@ export default function ExpenseReport({ onOpen, reloadKey }) {
                                 <Typography noWrap variant="caption" sx={{ color: TEXT_SUB, display: "block" }}>{r.job?.title ? `${r.job.title}${r.job.site ? ` · ${r.job.site}` : ""}` : "ไม่ผูกงาน"}</Typography>
                               </TableCell>
                               <TableCell align="right" sx={{ fontWeight: 800, color: RMB }}>{baht(r.total)}</TableCell>
-                              <TableCell><Chip size="small" label={st.label} sx={{ height: 20, fontSize: "0.7rem", fontWeight: 800, bgcolor: alpha(st.color, 0.12), color: st.color }} /></TableCell>
+                              <TableCell><StatusBadge status={st.status} kind={st.kind} /></TableCell>
                             </TableRow>
                           );
                         })}
@@ -487,7 +488,7 @@ export default function ExpenseReport({ onOpen, reloadKey }) {
                         </TableHead>
                         <TableBody>
                           {ctrRows.map((r) => {
-                            const st = statusMeta(r.status, "contractor");
+                            const st = { ...statusMeta(r.status, "contractor"), status: r.status, kind: "contractor" };
                             return (
                               <TableRow key={r._id} hover onClick={() => onOpen?.(r._id)} sx={{ cursor: "pointer" }}>
                                 <TableCell sx={{ whiteSpace: "nowrap" }}>
@@ -504,7 +505,7 @@ export default function ExpenseReport({ onOpen, reloadKey }) {
                                 <TableCell align="right">{baht(r.total)}</TableCell>
                                 <TableCell align="right" sx={{ color: "#b45309" }}>{r.deductions?.wht ? baht(r.deductions.wht) : "—"}</TableCell>
                                 <TableCell align="right" sx={{ fontWeight: 800, color: CTR.dark }}>{baht(r.difference)}</TableCell>
-                                <TableCell><Chip size="small" label={st.label} sx={{ height: 20, fontSize: "0.7rem", fontWeight: 800, bgcolor: alpha(st.color, 0.12), color: st.color }} /></TableCell>
+                                <TableCell><StatusBadge status={st.status} kind={st.kind} /></TableCell>
                               </TableRow>
                             );
                           })}
@@ -532,7 +533,7 @@ export default function ExpenseReport({ onOpen, reloadKey }) {
                       </TableHead>
                       <TableBody>
                         {report.rows.map((a) => {
-                          const st = statusMeta(a.status, "advance");
+                          const st = { ...statusMeta(a.status, "advance"), status: a.status, kind: "advance" };
                           const d = a.claim ? differenceMeta(a.claim.difference) : null;
                           return (
                             <TableRow key={a._id} hover onClick={() => onOpen?.(a._id)} sx={{ cursor: "pointer" }}>
@@ -545,7 +546,7 @@ export default function ExpenseReport({ onOpen, reloadKey }) {
                               <TableCell align="right" sx={{ fontWeight: 700 }}>{baht(a.total)}</TableCell>
                               <TableCell align="right">{a.claim ? baht(a.claim.total) : "—"}</TableCell>
                               <TableCell align="right" sx={{ color: d?.color, fontWeight: 700, whiteSpace: "nowrap" }}>{d ? (d.amount ? `${d.short} ${baht(d.amount)}` : "พอดี") : "—"}</TableCell>
-                              <TableCell><Chip size="small" label={st.label} sx={{ height: 20, fontSize: "0.7rem", fontWeight: 800, bgcolor: alpha(st.color, 0.12), color: st.color }} /></TableCell>
+                              <TableCell><StatusBadge status={st.status} kind={st.kind} /></TableCell>
                             </TableRow>
                           );
                         })}
@@ -555,7 +556,7 @@ export default function ExpenseReport({ onOpen, reloadKey }) {
                 ) : (
                   <Stack spacing={1}>
                     {report.rows.map((a) => {
-                      const st = statusMeta(a.status, "advance");
+                      const st = { ...statusMeta(a.status, "advance"), status: a.status, kind: "advance" };
                       const d = a.claim ? differenceMeta(a.claim.difference) : null;
                       return (
                         <Box key={a._id} onClick={() => onOpen?.(a._id)} sx={{ p: 1.25, border: `1px solid ${BORDER_MAIN}`, borderLeft: `4px solid ${st.color}`, borderRadius: 2, cursor: "pointer" }}>

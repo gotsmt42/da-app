@@ -30,9 +30,10 @@ import SignatureService from "@/shared/services/SignatureService";
 import ExpensePrintDialog from "./ExpensePrintDialog";
 import AdvancePanel from "./AdvancePanel";
 import KindBadge from "./KindBadge";
+import StatusBadge from "./StatusBadge";
 import { compareItems, COMPARE_KIND_LABEL } from "../utils/expenseCompare";
 import {
-  KIND_META, slipKind, statusMeta, categoryMeta, baht, fmtMoney, qtyText, differenceMeta, paymentLabel, PAYMENT_METHODS, fileKindLabel, jobText, jobRangeText, jobPartText, isOverdueClear, money, TEXT_SUB, TEXT_MAIN, BORDER_MAIN, personFullName, groupFilesByStage,
+  KIND_META, slipKind, categoryMeta, baht, fmtMoney, qtyText, differenceMeta, paymentLabel, PAYMENT_METHODS, fileKindLabel, jobText, jobRangeText, jobPartText, isOverdueClear, money, TEXT_SUB, TEXT_MAIN, BORDER_MAIN, personFullName, groupFilesByStage,
   installmentText, bahtText, jobRangesText, itemTitle,
 } from "../expenseMeta";
 import { bankMeta, formatAccountNo } from "../bankMeta";
@@ -581,7 +582,6 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
   const isReimburse = slip === "reimburse";
   const isCtr = slip === "contractor";
   const meta = KIND_META[slip];
-  const st = statusMeta(e?.status, slip);
   const isOwner = e && (e.requester?.userId === me || e.createdBy?.userId === me);
   /**
    * ✅ สายอนุมัติ 3 ส่วน: ส่งขอเบิก → ตรวจสอบ (reviewExpense) + อนุมัติ (approveExpense) = ส่วนที่ 2
@@ -825,7 +825,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
               </Stack>
               {e && (
                 <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.4 }}>
-                  <Chip size="small" label={st.label} sx={{ height: 20, fontSize: "0.7rem", fontWeight: 800, bgcolor: alpha(st.color, 0.12), color: st.color }} />
+                  <StatusBadge status={e.status} kind={slip} />
                   {overdue && <Chip size="small" icon={<WarningAmber sx={{ fontSize: "14px !important" }} />} label="เลยกำหนดเคลียร์" sx={{ height: 20, fontSize: "0.7rem", fontWeight: 800, bgcolor: alpha("#dc2626", 0.1), color: "#dc2626" }} />}
                 </Stack>
               )}
@@ -912,12 +912,11 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                       <Box sx={{ mt: 1.5 }}>
                         <Typography sx={{ fontSize: "0.82rem", fontWeight: 800, mb: 0.75 }}>ยอดเบิกสะสมของผู้รับเหมารายนี้ในงานนี้</Typography>
                         {hist.map((h) => {
-                          const hs = statusMeta(h.status, "contractor");
                           return (
                             <Stack key={h._id} direction="row" spacing={1} alignItems="center" sx={{ py: 0.3 }}>
                               <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, minWidth: 64 }}>{installmentText(h.installment) || "ไม่ระบุงวด"}</Typography>
                               <Button size="small" onClick={() => onOpenOther?.(h._id)} sx={{ p: 0, minWidth: 0, textTransform: "none", fontWeight: 700, fontSize: "0.8rem" }}>{h.docNo}</Button>
-                              <Chip size="small" label={hs.label} sx={{ height: 18, fontSize: "0.64rem", fontWeight: 800, bgcolor: alpha(hs.color, 0.12), color: hs.color }} />
+                              <StatusBadge status={h.status} kind="contractor" />
                               <Box sx={{ flex: 1 }} />
                               <Typography sx={{ fontSize: "0.82rem", fontWeight: 800 }}>{fmtMoney(h.total)}</Typography>
                             </Stack>
