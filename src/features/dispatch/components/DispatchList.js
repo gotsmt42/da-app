@@ -16,20 +16,22 @@ import useRealtime from "@/shared/realtime/useRealtime";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import {
-  Box, Stack, Typography, IconButton, Tooltip, TextField, MenuItem,
-  CircularProgress, Alert, AvatarGroup, Avatar, useMediaQuery,
+  Box, Stack, Typography, IconButton, Tooltip, TextField,
+  CircularProgress, Alert, useMediaQuery,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
   Refresh, Search, Bolt, Schedule, Inbox, Description, Place,
-  CalendarMonth,
+  CalendarMonth, HourglassTop, EventAvailable, TaskAlt, Close,
 } from "@mui/icons-material";
+import { PersonChip, UnassignedChip } from "@/shared/ui/PersonChip";
 
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { DEPARTMENT, DEPARTMENT_LABEL, departmentOf } from "@/shared/utils/roles";
 import ViewToggle, { initialViewMode } from "@/shared/ui/ViewToggle";
+import SelectField from "@/shared/ui/SelectField";
 import DispatchService from "../services/DispatchService";
 import DispatchDialog from "./DispatchDialog";
 import {
@@ -73,150 +75,171 @@ const statusBadge = (d) => {
   return m ? { label: m.label, color: m.color } : { label: d.status, color: TEXT_SUB };
 };
 
+/** ป้ายสถานะแบบพื้นสีอ่อน + จุด — ชุดเดียวกับหน้าการดำเนินงาน */
+const StatusPill = ({ meta }) => (
+  <Box component="span" sx={{
+    display: "inline-flex", alignItems: "center", gap: 0.6, flexShrink: 0,
+    px: 1, py: 0.3, borderRadius: 99, bgcolor: alpha(meta.color, 0.1),
+    border: "1px solid", borderColor: alpha(meta.color, 0.25),
+  }}>
+    <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: meta.color }} />
+    <Typography component="span" sx={{ fontSize: "0.7rem", fontWeight: 800, color: meta.color, whiteSpace: "nowrap", lineHeight: 1.4 }}>
+      {meta.label}
+    </Typography>
+  </Box>
+);
+
+const UrgentPill = () => (
+  <Box component="span" sx={{
+    display: "inline-flex", alignItems: "center", gap: 0.25, flexShrink: 0,
+    px: 0.75, py: 0.2, borderRadius: 99, bgcolor: "#fef2f2", border: "1px solid #fecaca",
+  }}>
+    <Bolt sx={{ fontSize: 13, color: "#dc2626" }} />
+    <Typography component="span" sx={{ fontSize: "0.68rem", fontWeight: 800, color: "#dc2626", lineHeight: 1.4 }}>ด่วน</Typography>
+  </Box>
+);
+
+/** ผู้รับผิดชอบที่ควรโชว์ — ใบที่อนุมัติแล้วอ่านจากแผนงานจริงก่อน (ตรงกับภาพรวมงาน/การดำเนินงาน) */
+const responsibleOf = (d) => d.job?.responsiblePerson || d.assignees?.[0]?.name || "";
+
 /**
  * การ์ดใบแจ้งงาน
  *
- * ✅ ที่แก้ (ผู้ใช้แจ้งว่า "ดูรกตามาก"): เดิมการ์ดใบเดียวมี 8 องค์ประกอบและ 4 สีพร้อมกัน —
- * แถบสีซ้าย + ชิปแผนก + ชื่อผู้แจ้ง + ชื่องาน + บรรทัด "🏢 โครงการ" + "💻 ระบบ" (มีอิโมจิและ
- * ป้ายกำกับ) + รายละเอียด + ป้ายสถานะพื้นสี + avatar ลอย + แถบพื้นสีฟ้าท้ายการ์ด
- * ตาไม่รู้จะเกาะตรงไหนเพราะทุกอย่างเด่นเท่ากันหมด
- *
- * ✅ ลำดับสายตาใหม่ เหลือ 3 ชั้นชัดเจน:
- *   1. ชื่อโครงการ (ตัวหนา) — สิ่งที่คนใช้จำงานได้จริง
- *   2. ประเภทงาน · ระบบ (บรรทัดเดียว สีจาง) — เดิมแยก 2 บรรทัดพร้อมป้ายกำกับ+อิโมจิ
- *   3. ข้อมูลประกอบ (วันเข้างาน/ผู้รับงาน) สีจาง ท้ายการ์ด
- * สีเหลือทางเดียวคือ "สถานะ" (จุดเล็ก + ตัวอักษร) — ไม่ใช้พื้นสีทับอีก
- * ⚠️ แถบสีซ้ายยังอยู่ แต่บางลงเหลือ 3px — เป็นตัวช่วยกวาดสายตาทั้งลิสต์ที่ได้ผลจริงโดยไม่กินพื้นที่
+ * ✅ ปรับใหม่ (ผู้ใช้: "ดูล้าสมัยมาก"): ลำดับสายตา 4 ชั้น
+ *   1. แถบบน — เลขที่ใบ · ด่วน · สถานะ (ป้ายพื้นอ่อน)
+ *   2. ชื่อโครงการตัวหนา + ประเภทงาน · ระบบ
+ *   3. "คน" — ผู้แจ้ง และผู้รับผิดชอบ เป็นชิปอักษรย่อ (ชุดเดียวกับหน้าการดำเนินงาน)
+ *   4. แถบล่างพื้นเทาอ่อน — วันเข้างาน / กำหนดเสร็จ / แจ้งเมื่อ / ไอคอนเอกสาร
  */
 const DispatchCard = ({ d, onOpen, myId }) => {
   const meta = statusBadge(d);
   const overdue = d.dueAt && moment(d.dueAt).isBefore(moment(), "day")
     && d.status !== "cancelled" && d.job?.status !== "ดำเนินการเสร็จสิ้น";
-  // ประเภทงาน · ระบบ — รวมเป็นบรรทัดเดียว ไม่ต้องมีป้ายกำกับ (บริบทชัดอยู่แล้ว)
   const typeLine = [d.title, d.system].filter(Boolean).join(" · ");
+  const responsible = responsibleOf(d);
+  const team = (d.assignees || []).map((a) => a.name).filter((n) => n && n !== responsible);
+  const hasDocs = (d.attachments || []).some((x) => DOC_TYPE_META[x.docType]?.commercial);
+  const mine = (d.assignees || []).some((a) => String(a.userId) === myId);
 
   return (
     <Box
       onClick={() => onOpen(d)}
+      role="button" tabIndex={0}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(d); } }}
       sx={{
-        position: "relative", overflow: "hidden",
-        pl: 2, pr: 1.75, py: 1.6, borderRadius: 2.5, cursor: "pointer", bgcolor: "#fff",
-        border: "1px solid", borderColor: BORDER_MAIN,
-        transition: "border-color .15s, box-shadow .15s",
-        "&:hover": {
-          borderColor: alpha(meta.color, 0.5),
-          boxShadow: "0 4px 12px -6px rgba(15, 23, 42, .18)",
-        },
+        position: "relative", overflow: "hidden", cursor: "pointer", bgcolor: "#fff",
+        borderRadius: 3, border: "1px solid", borderColor: mine ? alpha(DISPATCH_ACCENT, 0.45) : BORDER_MAIN,
+        boxShadow: "0 1px 2px rgba(15, 23, 42, .05)",
+        transition: "border-color .15s, box-shadow .15s, transform .15s",
+        "&:hover": { borderColor: alpha(meta.color, 0.55), boxShadow: `0 8px 22px -12px ${alpha(meta.color, 0.55)}`, transform: "translateY(-1px)" },
+        "&:focus-visible": { outline: `2px solid ${meta.color}`, outlineOffset: 2 },
+        "@media (prefers-reduced-motion: reduce)": { transition: "none", "&:hover": { transform: "none" } },
       }}
     >
-      <Box sx={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, bgcolor: meta.color }} />
+      <Box sx={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 4, bgcolor: meta.color }} />
 
-      {/* ── บรรทัดบน: ชื่อโครงการ + สถานะ ───────────────────────────── */}
-      <Stack direction="row" alignItems="flex-start" spacing={1}>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 700, fontSize: "0.9rem", lineHeight: 1.4, color: "#0f172a" }} noWrap>
-            {companySite(d.customer?.company, d.customer?.site)}
+      <Box sx={{ pl: 2, pr: 1.75, pt: 1.4, pb: 1.25 }}>
+        {/* ── แถบบน: เลขที่ใบ · ด่วน · สถานะ ── */}
+        <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.75 }}>
+          <Typography sx={{ fontSize: "0.7rem", fontWeight: 700, color: TEXT_SUB, fontVariantNumeric: "tabular-nums", letterSpacing: ".02em" }} noWrap>
+            {d.dispatchNo || "ใบแจ้งงาน"}
           </Typography>
-          {typeLine && (
-            <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", mt: 0.15 }} noWrap>
-              {typeLine}
-            </Typography>
-          )}
-        </Box>
-        {/* สถานะ = จุด + ตัวอักษร ไม่มีพื้นสี — อ่านออกเท่าเดิมแต่เบากว่ามาก */}
-        <Stack direction="row" alignItems="center" spacing={0.6} flexShrink={0} sx={{ mt: 0.2 }}>
-          <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: meta.color, flexShrink: 0 }} />
-          <Typography sx={{ fontSize: "0.7rem", fontWeight: 700, color: meta.color, whiteSpace: "nowrap" }}>
-            {meta.label}
-          </Typography>
+          {d.priority === "urgent" && <UrgentPill />}
+          <Box sx={{ flex: 1 }} />
+          <StatusPill meta={meta} />
         </Stack>
-      </Stack>
 
-      {/* ── รายละเอียดย่อ — บรรทัดเดียวพอให้ตัดสินใจว่าจะเปิดอ่านไหม ──── */}
-      {(d.detail || d.note) && (
-        <Typography
-          variant="body2"
-          sx={{
-            color: TEXT_SUB, fontSize: "0.78rem", mt: 0.6, lineHeight: 1.5,
-            display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
-          }}
-        >
-          {d.detail || d.note}
+        {/* ── ชื่อโครงการ + ประเภทงาน ── */}
+        <Typography sx={{ fontWeight: 800, fontSize: "0.95rem", lineHeight: 1.35, color: "#0f172a" }} noWrap>
+          {companySite(d.customer?.company, d.customer?.site)}
         </Typography>
-      )}
-
-      {/* ── ท้ายการ์ด: ข้อมูลประกอบทั้งหมดรวมบรรทัดเดียว สีจาง ────────── */}
-      <Stack
-        direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap
-        sx={{ mt: 1, pt: 1, borderTop: "1px solid", borderColor: alpha(BORDER_MAIN, 0.9) }}
-      >
-        {d.priority === "urgent" && (
-          <Stack direction="row" alignItems="center" spacing={0.3}>
-            <Bolt sx={{ fontSize: 13, color: "#dc2626" }} />
-            <Typography variant="caption" sx={{ fontWeight: 800, color: "#dc2626" }}>ด่วน</Typography>
-          </Stack>
-        )}
-        {d.job?.start ? (
-          <Stack direction="row" alignItems="center" spacing={0.4} sx={{ minWidth: 0 }}>
-            <CalendarMonth sx={{ fontSize: 13, color: TEXT_SUB, flexShrink: 0 }} />
-            <Typography variant="caption" sx={{ color: "#334155", fontWeight: 600 }} noWrap>
-              {formatThai(moment(d.job.start), "D MMM")}
-              {d.job.responsiblePerson ? ` · ${d.job.responsiblePerson}` : ""}
-            </Typography>
-          </Stack>
-        ) : (
-          <Typography variant="caption" sx={{ color: TEXT_SUB, fontStyle: "italic" }}>
-            ยังไม่ได้ลงวันเข้างาน
+        {typeLine && (
+          <Typography sx={{ color: "#475569", fontSize: "0.78rem", fontWeight: 600, mt: 0.2 }} noWrap>
+            {typeLine}
           </Typography>
+        )}
+        {(d.detail || d.note) && (
+          <Typography sx={{
+            color: TEXT_SUB, fontSize: "0.76rem", mt: 0.6, lineHeight: 1.5,
+            display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+          }}>
+            {d.detail || d.note}
+          </Typography>
+        )}
+
+        {/* ── คน: ผู้แจ้ง → ผู้รับผิดชอบ ── */}
+        <Box sx={{ mt: 1.1, display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", columnGap: 1, rowGap: 0.6, alignItems: "center" }}>
+          <Typography sx={{ fontSize: "0.68rem", fontWeight: 700, color: TEXT_SUB }}>ผู้แจ้ง</Typography>
+          <Box sx={{ minWidth: 0, display: "flex" }}>
+            {d.requestedBy?.name
+              ? <PersonChip name={d.requestedBy.name} badge={requesterDept(d)} size={20} />
+              : <Typography sx={{ fontSize: "0.76rem", color: TEXT_SUB }}>-</Typography>}
+          </Box>
+          <Typography sx={{ fontSize: "0.68rem", fontWeight: 700, color: TEXT_SUB }}>ผู้รับผิดชอบ</Typography>
+          <Box sx={{ minWidth: 0, display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+            {responsible ? <PersonChip name={responsible} strong size={20} /> : <UnassignedChip />}
+            {team.length > 0 && (
+              <Tooltip title={team.join(", ")}>
+                <Typography component="span" sx={{ alignSelf: "center", fontSize: "0.7rem", fontWeight: 700, color: TEXT_SUB }}>
+                  +{team.length} ทีม
+                </Typography>
+              </Tooltip>
+            )}
+          </Box>
+        </Box>
+
+        {d.status === "rejected" && d.rejectedReason && (
+          <Typography sx={{ mt: 1, fontSize: "0.74rem", color: "#b91c1c", fontWeight: 600, bgcolor: "#fef2f2", borderRadius: 1.5, px: 1, py: 0.5 }}>
+            ต้องแก้ไข: {d.rejectedReason}
+          </Typography>
+        )}
+      </Box>
+
+      {/* ── แถบล่าง: วันเข้างาน · กำหนดเสร็จ · แจ้งเมื่อ ── */}
+      <Stack
+        direction="row" alignItems="center" spacing={1.25} flexWrap="wrap" useFlexGap
+        sx={{ pl: 2, pr: 1.75, py: 0.85, bgcolor: SURFACE_SUBTLE, borderTop: "1px solid", borderColor: BORDER_MAIN }}
+      >
+        {d.job?.start ? (
+          <Tooltip title="วันเข้างาน">
+            <Stack direction="row" alignItems="center" spacing={0.4}>
+              <CalendarMonth sx={{ fontSize: 14, color: "#2563eb" }} />
+              <Typography sx={{ fontSize: "0.72rem", color: "#1e3a8a", fontWeight: 700 }} noWrap>
+                {formatThai(moment(d.job.start), "D MMM YY")}
+              </Typography>
+            </Stack>
+          </Tooltip>
+        ) : (
+          <Stack direction="row" alignItems="center" spacing={0.4}>
+            <CalendarMonth sx={{ fontSize: 14, color: "#d97706" }} />
+            <Typography sx={{ fontSize: "0.72rem", color: "#b45309", fontWeight: 700 }} noWrap>ยังไม่ลงวัน</Typography>
+          </Stack>
         )}
         {d.dueAt && (
-          <Stack direction="row" alignItems="center" spacing={0.3}>
-            <Schedule sx={{ fontSize: 13, color: overdue ? "#dc2626" : TEXT_SUB }} />
-            <Typography variant="caption" sx={{ color: overdue ? "#dc2626" : TEXT_SUB, fontWeight: overdue ? 700 : 500 }}>
-              {formatThai(moment(d.dueAt), "D MMM")}
-            </Typography>
-          </Stack>
+          <Tooltip title={overdue ? "เลยกำหนดเสร็จแล้ว" : "กำหนดเสร็จ"}>
+            <Stack direction="row" alignItems="center" spacing={0.4}>
+              <Schedule sx={{ fontSize: 14, color: overdue ? "#dc2626" : TEXT_SUB }} />
+              <Typography sx={{ fontSize: "0.72rem", color: overdue ? "#dc2626" : "#475569", fontWeight: 700 }} noWrap>
+                {formatThai(moment(d.dueAt), "D MMM")}
+              </Typography>
+            </Stack>
+          </Tooltip>
         )}
         <Box sx={{ flex: 1 }} />
-        {/* ไอคอนบอกว่ามีเอกสาร/พิกัด — ไม่ต้องเป็นชิปมีพื้นสีอีกต่อไป */}
-        {(d.attachments || []).some((x) => DOC_TYPE_META[x.docType]?.commercial) && (
-          <Tooltip title="มีใบเสนอราคา / ใบ PO แนบมาด้วย">
-            <Description sx={{ fontSize: 14, color: TEXT_SUB }} />
-          </Tooltip>
+        {hasDocs && (
+          <Tooltip title="มีใบเสนอราคา / ใบ PO แนบมาด้วย"><Description sx={{ fontSize: 15, color: TEXT_SUB }} /></Tooltip>
         )}
         {d.customer?.mapUrl && (
-          <Tooltip title="มีลิงก์แผนที่นำทาง">
-            <Place sx={{ fontSize: 14, color: TEXT_SUB }} />
-          </Tooltip>
+          <Tooltip title="มีลิงก์แผนที่นำทาง"><Place sx={{ fontSize: 15, color: TEXT_SUB }} /></Tooltip>
         )}
-        {d.assignees?.length > 0 && (
-          <Tooltip title={d.assignees.map((a) => a.name).join(", ")}>
-            <AvatarGroup
-              max={3}
-              sx={{ "& .MuiAvatar-root": { width: 20, height: 20, fontSize: "0.58rem", fontWeight: 700, border: "1.5px solid #fff" } }}
-            >
-              {d.assignees.map((a) => (
-                <Avatar
-                  key={a.userId}
-                  sx={{
-                    bgcolor: alpha("#64748b", 0.16), color: "#475569",
-                    outline: String(a.userId) === myId ? `2px solid ${DISPATCH_ACCENT}` : "none",
-                  }}
-                >
-                  {(a.name || "?").charAt(0)}
-                </Avatar>
-              ))}
-            </AvatarGroup>
+        {d.requestedAt && (
+          <Tooltip title={`แจ้งเมื่อ ${formatThai(moment(d.requestedAt), "D MMM YY HH:mm")}`}>
+            <Typography sx={{ fontSize: "0.7rem", color: TEXT_SUB, fontWeight: 600 }} noWrap>
+              {moment(d.requestedAt).fromNow()}
+            </Typography>
           </Tooltip>
         )}
       </Stack>
-
-      {/* ใบที่ถูกตีกลับ — เหตุผลต้องอยู่บนการ์ด ไม่ต้องเปิดเข้าไปอ่าน */}
-      {d.status === "rejected" && d.rejectedReason && (
-        <Typography variant="caption" sx={{ display: "block", mt: 0.85, color: "#dc2626", fontWeight: 600 }}>
-          ต้องแก้ไข: {d.rejectedReason}
-        </Typography>
-      )}
     </Box>
   );
 };
@@ -240,11 +263,11 @@ const DispatchTable = ({ rows, onOpen }) => (
       <TableHead>
         {/* ✅ หัวตารางเป็นเทาเรียบ — เดิมพื้นส้มอ่อน + เส้นใต้ส้มหนา 2px ดึงสายตาไปจากข้อมูลจริง */}
         <TableRow sx={{ bgcolor: SURFACE_SUBTLE }}>
-          {["งาน", "ลูกค้า / หน้างาน", "จากแผนก", "ผู้ขอ", "สถานะ", "ผู้รับงาน", "แจ้งเมื่อ"].map((h) => (
+          {["งาน", "ลูกค้า / หน้างาน", "ผู้แจ้ง", "สถานะ", "ผู้รับผิดชอบ", "วันเข้างาน", "แจ้งเมื่อ"].map((h) => (
             <TableCell
               key={h}
               sx={{
-                fontWeight: 800, fontSize: "0.72rem", color: "#334155", textTransform: "uppercase",
+                fontWeight: 800, fontSize: "0.74rem", color: "#334155",
                 letterSpacing: ".04em", whiteSpace: "nowrap", py: 1.25,
                 borderBottom: "1px solid", borderBottomColor: BORDER_MAIN,
               }}
@@ -268,7 +291,10 @@ const DispatchTable = ({ rows, onOpen }) => (
                 "&:hover": { bgcolor: SURFACE_SUBTLE },
               }}
             >
-              <TableCell sx={{ maxWidth: 260, borderLeft: "3px solid", borderLeftColor: m.color }}>
+              <TableCell sx={{ maxWidth: 260, borderLeft: "4px solid", borderLeftColor: m.color }}>
+                {d.dispatchNo && (
+                  <Typography sx={{ fontSize: "0.68rem", fontWeight: 700, color: TEXT_SUB, fontVariantNumeric: "tabular-nums" }} noWrap>{d.dispatchNo}</Typography>
+                )}
                 <Stack direction="row" alignItems="center" spacing={0.5}>
                   {d.priority === "urgent" && <Bolt sx={{ fontSize: 14, color: "#dc2626", flexShrink: 0 }} />}
                   <Typography sx={{ fontWeight: 700, fontSize: "0.82rem", minWidth: 0, color: "#0f172a" }} noWrap>{d.title}</Typography>
@@ -300,35 +326,22 @@ const DispatchTable = ({ rows, onOpen }) => (
                   <Typography variant="caption" sx={{ color: TEXT_SUB }} noWrap>{d.customer.site}</Typography>
                 )}
               </TableCell>
-              {/* ✅ เดิมเป็นชิปม่วง + วงกลมอักษรย่อสีม่วง = สีม่วง 2 จุดต่อแถว ทั้งที่เป็นข้อมูลรอง
-                  เหลือตัวหนังสือเรียบๆ อ่านง่ายกว่าและไม่แข่งกับสีสถานะซึ่งเป็นข้อมูลที่ต้องอ่านจริง */}
-              <TableCell sx={{ whiteSpace: "nowrap", fontSize: "0.74rem", color: TEXT_SUB }}>
-                {requesterDept(d)}
+              <TableCell sx={{ maxWidth: 200 }}>
+                {d.requestedBy?.name ? <PersonChip name={d.requestedBy.name} size={20} /> : "-"}
+                <Typography sx={{ display: "block", fontSize: "0.68rem", color: TEXT_SUB, mt: 0.3, pl: 0.5 }} noWrap>{requesterDept(d)}</Typography>
               </TableCell>
-              <TableCell sx={{ whiteSpace: "nowrap", fontSize: "0.76rem", color: "#334155" }}>
-                {d.requestedBy?.name || "-"}
+              <TableCell><StatusPill meta={m} /></TableCell>
+              <TableCell sx={{ maxWidth: 200 }}>
+                {responsibleOf(d) ? <PersonChip name={responsibleOf(d)} strong size={20} /> : <UnassignedChip />}
               </TableCell>
-              <TableCell>
-                {/* จุด + ตัวอักษร ไม่มีพื้นสี — แบบเดียวกับการ์ด */}
-                <Stack direction="row" alignItems="center" spacing={0.6}>
-                  <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: m.color, flexShrink: 0 }} />
-                  <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: m.color, whiteSpace: "nowrap" }}>{m.label}</Typography>
-                </Stack>
-              </TableCell>
-              <TableCell sx={{ fontSize: "0.76rem", color: TEXT_SUB, maxWidth: 160 }}>
-                {/* ⚠️ ถ้าไม่มี assignees ให้ใช้ผู้รับผิดชอบจากแผนงานจริง — ตอนอนุมัติเลือกผู้รับผิดชอบได้
-                    โดยไม่ต้องระบุ assignee ผู้แจ้งจึงอาจเห็น "ยังไม่มอบหมาย" ทั้งที่ช่างกำลังทำอยู่ */}
-                <Typography
-                  variant="caption" noWrap sx={{ display: "block", fontWeight: 600 }}
-                  fontStyle={d.assignees?.length || d.job?.responsiblePerson ? "normal" : "italic"}
-                >
-                  {d.assignees?.length
-                    ? d.assignees.map((a) => a.name).join(", ")
-                    : d.job?.responsiblePerson || "— ยังไม่มอบหมาย"}
-                </Typography>
+              <TableCell sx={{ whiteSpace: "nowrap" }}>
+                {d.job?.start
+                  ? <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: "#1e3a8a" }}>{formatThai(moment(d.job.start), "D MMM YY")}</Typography>
+                  : <Typography sx={{ fontSize: "0.74rem", fontWeight: 700, color: "#b45309" }}>ยังไม่ลงวัน</Typography>}
               </TableCell>
               <TableCell sx={{ fontSize: "0.74rem", color: TEXT_SUB, fontWeight: 600, whiteSpace: "nowrap" }}>
                 {formatThai(moment(d.requestedAt), "D MMM")}
+                <Typography sx={{ display: "block", fontSize: "0.68rem", color: TEXT_SUB }}>{moment(d.requestedAt).fromNow()}</Typography>
               </TableCell>
             </TableRow>
           );
@@ -351,6 +364,12 @@ const QUEUE_STATUSES = ["requested", "assigned"];
 const COLUMN_EMPTY_TEXT = {
   requested: "เคลียร์หมดแล้ว — ไม่มีคำขอรอตัดสินใจ",
   assigned: "ยังไม่มีใบที่ลงแผนงาน",
+};
+
+/** หัวคอลัมน์ — ไอคอน + คำอธิบายสั้นว่าต้องทำอะไรกับใบในคอลัมน์นี้ */
+const COLUMN_META = {
+  requested: { icon: <HourglassTop />, hint: "ตรวจรายละเอียด แล้วเลือกวัน + ช่าง" },
+  assigned: { icon: <EventAvailable />, hint: "ลงตารางงานแล้ว รอช่างเข้างาน" },
 };
 
 export default function DispatchList({ mode = "board", myId = "" }) {
@@ -444,45 +463,57 @@ export default function DispatchList({ mode = "board", myId = "" }) {
           ด้านบนรวมเป็น 3 ชั้นก่อนถึงเนื้อหาจริง — ปล่อยให้ลอยบนพื้นหน้าเลย เหลือชั้นเดียว */}
       {/* ⚠️ จอมือถือ: ช่องค้นหากินเต็มแถวบนสุด แล้วตัวกรอง/สลับมุมมอง/รีเฟรช อยู่แถวเดียวกันด้านล่าง
           — เดิมทุกชิ้นแย่งพื้นที่แถวเดียวกันแล้วตกบรรทัดทีละชิ้น กลายเป็น 3 แถวเรียงเหลื่อมกัน */}
+      {/* ✅ แถบเครื่องมือแถวเดียว (กล่องขาวชุดเดียวกับหน้าภาพรวมงาน/การดำเนินงาน) — มือถือ: ค้นหาเต็มแถว */}
       <Box
         sx={{
-          mb: 2, display: "flex", gap: 1, alignItems: "center",
-          flexDirection: { xs: "column", sm: "row" },
+          mb: 2, p: 1, display: "flex", gap: 1, alignItems: "center", flexWrap: { xs: "wrap", sm: "nowrap" },
+          bgcolor: "#fff", border: "1px solid", borderColor: BORDER_MAIN, borderRadius: 3,
+          boxShadow: "0 1px 2px rgba(15, 23, 42, .04)",
         }}
       >
         <TextField
           size="small" placeholder="ค้นหางาน / ลูกค้า / เลขที่ใบ" value={search}
           onChange={(e) => setSearch(e.target.value)}
-          InputProps={{ startAdornment: <Search sx={{ fontSize: 18, color: TEXT_SUB, mr: 0.75 }} /> }}
+          InputProps={{
+            startAdornment: <Search sx={{ fontSize: 19, color: TEXT_SUB, mr: 0.75 }} />,
+            endAdornment: search ? (
+              <IconButton size="small" aria-label="ล้างคำค้น" onClick={() => setSearch("")} sx={{ p: 0.25 }}>
+                <Close sx={{ fontSize: 16 }} />
+              </IconButton>
+            ) : null,
+          }}
           sx={{
-            width: { xs: "100%", sm: "auto" },
-            minWidth: { sm: 220 }, flex: { sm: "1 1 220px" }, maxWidth: { sm: 360 },
-            "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: "#fff" },
+            flex: { xs: "1 1 100%", sm: "1 1 auto" }, maxWidth: { sm: 420 },
+            "& .MuiOutlinedInput-root": {
+              borderRadius: 2.5, bgcolor: SURFACE_SUBTLE, height: 40, fontSize: "0.86rem",
+              "& fieldset": { borderColor: "transparent" },
+              "&:hover fieldset": { borderColor: BORDER_MAIN },
+              "&.Mui-focused": { bgcolor: "#fff" },
+            },
           }}
         />
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ width: { xs: "100%", sm: "auto" }, flex: { sm: 1 } }}>
-        {/* 🧹 คิวคำขอไม่มีตัวกรองสถานะแล้ว — เหลือ 2 สถานะที่แสดงเป็น 2 คอลัมน์อยู่แล้วทั้งคู่
-            ตัวกรองที่ทุกตัวเลือกให้ผลเหมือนเดิมคือปุ่มที่กดแล้วไม่มีอะไรเกิดขึ้น */}
-          {mode !== "board" && (
-            <TextField
-              select size="small" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
-              sx={{ minWidth: 150, "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: "#fff" } }}
-            >
-              <MenuItem value="open">ที่ยังไม่เสร็จ</MenuItem>
-              <MenuItem value="all">ทั้งหมด</MenuItem>
-            </TextField>
-          )}
-          <Box sx={{ flex: 1 }} />
-          <ViewToggle value={viewMode} onChange={setViewMode} accent={DISPATCH_ACCENT} />
-          <Tooltip title="โหลดข้อมูลใหม่">
-            <IconButton
-              size="small" onClick={load}
-              sx={{ color: TEXT_SUB, "&:hover": { bgcolor: SURFACE_SUBTLE } }}
-            >
-              <Refresh sx={{ fontSize: 19 }} />
-            </IconButton>
-          </Tooltip>
-        </Stack>
+        {mode !== "board" && (
+          <SelectField
+            size="small" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+            sx={{ minWidth: 150 }}
+          >
+            <option value="open">ที่ยังไม่เสร็จ</option>
+            <option value="all">ทั้งหมด</option>
+          </SelectField>
+        )}
+        <Typography sx={{ display: { xs: "none", md: "block" }, fontSize: "0.78rem", fontWeight: 700, color: TEXT_SUB, whiteSpace: "nowrap", ml: 0.5 }}>
+          {filtered.length.toLocaleString()} ใบ
+        </Typography>
+        <Box sx={{ flex: 1 }} />
+        <ViewToggle value={viewMode} onChange={setViewMode} accent={DISPATCH_ACCENT} />
+        <Tooltip title="โหลดข้อมูลใหม่">
+          <IconButton
+            size="small" onClick={() => load()} aria-label="โหลดข้อมูลใหม่"
+            sx={{ color: TEXT_SUB, border: "1px solid", borderColor: BORDER_MAIN, borderRadius: 2, width: 36, height: 36, "&:hover": { bgcolor: SURFACE_SUBTLE } }}
+          >
+            <Refresh sx={{ fontSize: 19, ...(loading ? { animation: "dlSpin 1s linear infinite", "@keyframes dlSpin": { to: { transform: "rotate(360deg)" } } } : {}) }} />
+          </IconButton>
+        </Tooltip>
       </Box>
 
       {/* ✅ หน้าว่างแบบเรียบ — เดิมมีทั้งเส้นประ พื้นเทา และวงกลมสีส้ม สำหรับ "ไม่มีอะไรเลย" */}
@@ -506,28 +537,46 @@ export default function DispatchList({ mode = "board", myId = "" }) {
             // พื้นสีอีกใบ = สีเดียวกัน 3 ระดับซ้อนกันเหนือการ์ดที่มีแถบสีของตัวเองอยู่แล้ว
             // เหลือเป็นหัวข้อตัวหนังสือ + จำนวน วางบนพื้นหน้าเปล่าๆ ให้การ์ดเป็นพระเอกแทน
             return (
-              <Box key={status} sx={{ mb: isDesktop ? 0 : 2.5 }}>
-                {/* ⚠️ คอลัมน์ที่นับได้ 0 ให้หรี่หัวข้อลง — สายตาจะได้ไปเกาะคอลัมน์ที่มีงานจริงก่อน
-                    (ถ้าเข้มเท่ากันหมด กระดานจะดูเหมือนมีของสองกองทั้งที่กองหนึ่งว่าง) */}
-                <Stack direction="row" alignItems="center" spacing={0.75} sx={{ px: 0.25, mb: 1, opacity: list.length === 0 ? 0.55 : 1 }}>
-                  <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: m.color, flexShrink: 0 }} />
-                  <Typography sx={{ fontWeight: 700, fontSize: "0.8rem", color: "#0f172a" }}>{m.label}</Typography>
-                  <Typography sx={{ fontWeight: 700, fontSize: "0.78rem", color: TEXT_SUB }}>{list.length}</Typography>
+              <Box
+                key={status}
+                sx={{
+                  mb: isDesktop ? 0 : 2, p: 1.25, borderRadius: 3.5,
+                  bgcolor: alpha(m.color, 0.04), border: "1px solid", borderColor: alpha(m.color, 0.18),
+                }}
+              >
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 0.25, mb: 1.25 }}>
+                  <Box sx={{
+                    width: 32, height: 32, borderRadius: 2, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+                    bgcolor: alpha(m.color, 0.14), color: m.color, "& svg": { fontSize: 18 },
+                  }}>
+                    {COLUMN_META[status]?.icon}
+                  </Box>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography sx={{ fontWeight: 800, fontSize: "0.9rem", color: "#0f172a", lineHeight: 1.3 }}>{m.label}</Typography>
+                    <Typography sx={{ fontSize: "0.7rem", color: TEXT_SUB }} noWrap>{COLUMN_META[status]?.hint}</Typography>
+                  </Box>
+                  <Box sx={{
+                    minWidth: 30, height: 26, px: 1, borderRadius: 99, display: "flex", alignItems: "center", justifyContent: "center",
+                    bgcolor: list.length ? m.color : "#e2e8f0", color: list.length ? "#fff" : TEXT_SUB,
+                    fontWeight: 800, fontSize: "0.8rem", fontVariantNumeric: "tabular-nums",
+                  }}>
+                    {list.length}
+                  </Box>
                 </Stack>
                 <Stack spacing={1.25}>
                   {list.map((d) => <DispatchCard key={d._id} d={d} onOpen={(x) => setOpenId(x._id)} myId={myId} />)}
                   {list.length === 0 && (
-                    <Box
-                      sx={{
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        minHeight: 104, px: 2, borderRadius: 2.5, textAlign: "center",
-                        border: "1px dashed", borderColor: BORDER_MAIN, bgcolor: SURFACE_SUBTLE,
-                      }}
+                    <Stack
+                      alignItems="center" justifyContent="center" spacing={0.75}
+                      sx={{ minHeight: 120, px: 2, borderRadius: 3, textAlign: "center", border: "1px dashed", borderColor: alpha(m.color, 0.3), bgcolor: "#fff" }}
                     >
-                      <Typography variant="caption" sx={{ color: TEXT_SUB }}>
+                      {status === "requested"
+                        ? <TaskAlt sx={{ fontSize: 26, color: "#10b981" }} />
+                        : <Inbox sx={{ fontSize: 26, color: alpha(TEXT_SUB, 0.5) }} />}
+                      <Typography sx={{ fontSize: "0.78rem", fontWeight: 600, color: TEXT_SUB }}>
                         {COLUMN_EMPTY_TEXT[status] || "ไม่มีรายการ"}
                       </Typography>
-                    </Box>
+                    </Stack>
                   )}
                 </Stack>
               </Box>

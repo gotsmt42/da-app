@@ -7,6 +7,7 @@ import React, {
   lazy,
   Suspense,
 } from "react";
+import SelectField from "@/shared/ui/SelectField";
 import useRealtime from "@/shared/realtime/useRealtime";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -30,9 +31,10 @@ import {
   faHourglassHalf,
   faCheck,
   faCheckDouble,
-  faFilter,
   faXmark,
-  faLayerGroup,
+  faSliders,
+  faClipboardList,
+  faAnglesDown,
 } from "@fortawesome/free-solid-svg-icons"; // Import ไอคอนต่างๆ
 
 import CustomerService from "@/shared/services/CustomerService";
@@ -2900,6 +2902,15 @@ function EventCalendar() {
    * render จริงในเดือน/สัปดาห์ที่เปิดอยู่เท่านั้น การไปกางงานของเดือนอื่นที่ยังไม่ได้ render ไว้ล่วงหน้า
    * ไม่มีความหมายอะไรและทำให้ปุ่มนี้ "ทำงานแล้วแต่ไม่เห็นอะไรเปลี่ยน"
    */
+  // ✅ จอใหญ่ (≥992px) แสดงตัวกรองตลอด ไม่ต้องกดเปิด (ผู้ใช้ขอ) — มือถือยังพับเก็บไว้เหมือนเดิม
+  const [isWideToolbar, setIsWideToolbar] = useState(() => typeof window !== "undefined" && window.matchMedia("(min-width: 992px)").matches);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 992px)");
+    const on = () => setIsWideToolbar(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+
   const toggleAllCards = () => {
     const cards = [...document.querySelectorAll("[data-ec-card]")]
       .filter((c) => c.querySelector('[data-ec-toggle="1"]'));
@@ -2926,9 +2937,121 @@ function EventCalendar() {
     });
   };
 
+  // ✅ ช่องตัวกรองชุดเดียว ใช้ทั้งในแผงพับ (มือถือ) และในแถวเครื่องมือแถวเดียว (จอใหญ่ — ผู้ใช้ขอ "ให้มีแถวเดียวพอ")
+  const filterFields = (
+    <>
+          {/* 🐛 ที่แก้ (ผู้ใช้แจ้ง: "อัปเดตสถานะแล้วดูเพี้ยนๆ"): แผงนี้เดิมใช้ตัวเลือกของงานช่างเสมอ
+              ไม่ว่าจะเปิดปฏิทินไหน — ปฏิทินเซลจึงมี "ช่างทุกคน" / สถานะช่าง (กำลังรอยืนยัน ฯลฯ) /
+              ประเภทงานช่าง (จาก JobType) / ระบบ ซึ่งไม่มีสักอันที่ตรงกับนัดหมายของเซลเลย เลือกกรอง
+              แล้วไม่มีอะไรตรงเงื่อนไข ดูเหมือนตัวกรองพัง
+              ✅ แยกชุดตัวเลือกตาม isSalesView ให้ตรงกับคำศัพท์ของแผนกที่กำลังดูอยู่จริง */}
+          {isSalesView ? (
+            <>
+              {/* คนเดียวเห็นนัดตัวเองอยู่แล้วจากขอบเขตฝั่ง server — ตัวกรองนี้มีความหมายเฉพาะตอน
+                  แอดมิน/ผู้จัดการเปิดดูรวมของทุกเซล */}
+              {viewingSalesCalendar && (
+                <SelectField
+                  className="event-filter-msel" fullWidth
+                  value={selectedTechnician}
+                  onChange={(e) => setSelectedTechnician(e.target.value)}
+                >
+                  <option value="">เซลทุกคน</option>
+                  {salespersonOptions.map((sp) => (
+                    <option key={sp._id} value={sp._id}>
+                      {sp.fname ? `${sp.fname} ${sp.lname || ""}`.trim() : sp.username}
+                    </option>
+                  ))}
+                </SelectField>
+              )}
+
+              <SelectField
+                className="event-filter-msel" fullWidth
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+              >
+                <option value="">ทุกสถานะนัดหมาย</option>
+                {SALES_STATUSES.map((st) => (
+                  <option key={st.key} value={st.key}>{st.icon} {st.key}</option>
+                ))}
+              </SelectField>
+
+              <SelectField
+                className="event-filter-msel" fullWidth
+                value={selectedJobType}
+                onChange={(e) => setSelectedJobType(e.target.value)}
+              >
+                <option value="">ทุกประเภทนัดหมาย</option>
+                {SALES_APPOINTMENT_TYPES.map((t) => (
+                  <option key={t.key} value={t.key}>{t.icon} {t.key}</option>
+                ))}
+              </SelectField>
+            </>
+          ) : (
+            <>
+              <SelectField
+                className="event-filter-msel" fullWidth
+                value={selectedTechnician}
+                onChange={(e) => setSelectedTechnician(e.target.value)}
+              >
+                <option value="">ช่างทุกคน</option>
+                {technicianOptions.map((tech) => (
+                  <option key={tech._id} value={tech._id}>
+                    {tech.fname ? `${tech.fname} ${tech.lname || ""}`.trim() : tech.username}
+                  </option>
+                ))}
+              </SelectField>
+
+              {/* ✅ รวมสถานะงาน + สถานะอนุมัติไว้ในช่องเดียวกัน (เดิมแยกเป็น 2 dropdown คนละที่ ต้องเช็ค
+                  2 จุดถึงจะรู้ว่างานไหนต้องดูแล) — ใช้ prefix "status:"/"approval:" แยกประเภทค่าที่เลือก
+                  แล้วแปลงกลับเป็น selectedStatus/selectedApproval ตามเดิม (ดู handleCombinedStatusChange) */}
+              <SelectField
+                className="event-filter-msel" fullWidth
+                value={combinedStatusValue}
+                onChange={(e) => handleCombinedStatusChange(e.target.value)}
+              >
+                <option value="">ทุกสถานะ</option>
+                {statusLegend.map((s) => (
+                  <option key={s.label} value={`status:${s.label}`}>{s.label}</option>
+                ))}
+                <option value="approval:pending">⏳ รออนุมัติ</option>
+                <option value="approval:rejected">❌ ไม่อนุมัติ</option>
+              </SelectField>
+
+              <SelectField
+                className="event-filter-msel" fullWidth
+                value={selectedJobType}
+                onChange={(e) => setSelectedJobType(e.target.value)}
+              >
+                <option value="">ทุกประเภทงาน</option>
+                {jobTypeOptions.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </SelectField>
+
+              <SelectField
+                className="event-filter-msel" fullWidth
+                value={selectedSystem}
+                onChange={(e) => setSelectedSystem(e.target.value)}
+              >
+                <option value="">ทุกระบบ</option>
+                {systemOptions.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </SelectField>
+            </>
+          )}
+
+          {hasActiveFilters && (
+            <button className="event-filter-clear" onClick={clearFilters}>
+              <FontAwesomeIcon icon={faXmark} /> {isWideToolbar ? "ล้างตัวกรอง" : "ล้างตัวกรองทั้งหมด"}
+            </button>
+          )}
+    </>
+  );
+
   return (
     <div
-      className={`modern-calendar-container${mobileZoom > 0 ? " ec-zoomed" : ""}`}
+      className={`modern-calendar-container${mobileZoom > 0 ? " ec-zoomed" : ""}${isWideToolbar ? " ec-wide-toolbar" : ""}`}
       style={{ "--ec-m-zoom": mobileColW }}
     >
       {/* ✅ แถบเดียวกระชับ: ค้นหา + ปุ่มตัวกรอง (มี badge บอกจำนวนที่เลือกไว้) + Export
@@ -2946,6 +3069,8 @@ function EventCalendar() {
           />
         </div>
 
+        {isWideToolbar && <div className="event-filter-inline">{filterFields}</div>}
+
         {/* ✅ กาง/ย่อรายละเอียดของการ์ดงานทั้งหมดในหน้าจอนี้ทีเดียว — ค่าเริ่มต้นคือ "ย่อ" เพื่อให้
             ปฏิทินอ่านง่าย (ดูเหตุผลเต็มที่ expandedCardIds) แล้วกดปุ่มนี้ตอนต้องการดูรายละเอียดครบทุกใบ
             ⚠️ ไม่ทำเป็นการตั้งค่าค้างถาวร — เป็นการสลับมุมมองชั่วคราวของการดูรอบนี้เท่านั้น */}
@@ -2955,19 +3080,21 @@ function EventCalendar() {
           title={allCardsExpanded ? "ย่อรายละเอียดงานทั้งหมด" : "กางรายละเอียดงานทั้งหมด"}
           aria-label={allCardsExpanded ? "ย่อรายละเอียดงานทั้งหมด" : "กางรายละเอียดงานทั้งหมด"}
         >
-          <span style={{ fontSize: "0.95em", lineHeight: 1, display: "inline-block", transition: "transform .2s ease", transform: allCardsExpanded ? "rotate(180deg)" : "none" }}>
-            ⌄
-          </span>
+          <FontAwesomeIcon icon={faAnglesDown} style={{ transition: "transform .2s ease", transform: allCardsExpanded ? "rotate(180deg)" : "none" }} />
+          <span className="tb-label">{allCardsExpanded ? "ย่อทั้งหมด" : "กางทั้งหมด"}</span>
         </button>
 
+        {!isWideToolbar && (
         <button
           className={`filter-toggle-btn ${showFilterPanel ? "filter-toggle-btn--open" : ""} ${activeFilterCount > 0 ? "filter-toggle-btn--active" : ""}`}
           onClick={() => setShowFilterPanel((p) => !p)}
           title="ตัวกรอง"
+          aria-label="ตัวกรอง"
         >
-          <FontAwesomeIcon icon={faFilter} />
+          <FontAwesomeIcon icon={faSliders} />
           {activeFilterCount > 0 && <span className="filter-badge">{activeFilterCount}</span>}
         </button>
+        )}
 
         {/* ⚠️ นัดหมายของเซลไม่มีแนวคิด "วางแผนล่วงหน้าไม่ระบุวันที่" เลย (ดู fetchDrafts) —
             ปุ่มนี้จึงไม่มีความหมายในโลกฝ่ายขาย ซ่อนไปเลยแทนที่จะโชว์ปุ่มที่กดแล้วว่างเปล่าตลอด */}
@@ -2977,7 +3104,8 @@ function EventCalendar() {
             onClick={() => setShowDraftsPanel((p) => !p)}
             title="งานวางแผนล่วงหน้า (ยังไม่ลงตาราง)"
           >
-            <FontAwesomeIcon icon={faLayerGroup} />
+            <FontAwesomeIcon icon={faClipboardList} />
+            <span className="tb-label">แผนล่วงหน้า</span>
             {visibleDrafts.length > 0 && <span className="filter-badge">{visibleDrafts.length}</span>}
           </button>
         )}
@@ -2996,7 +3124,8 @@ function EventCalendar() {
             }}
             title="งานรออนุมัติ"
           >
-            ⏳
+            <FontAwesomeIcon icon={faHourglassHalf} />
+            <span className="tb-label">รออนุมัติ</span>
             <span className="filter-badge filter-badge--approval-pending">{pendingApprovalCount}</span>
           </button>
         )}
@@ -3016,6 +3145,7 @@ function EventCalendar() {
           }
         >
           <FontAwesomeIcon icon={faFileExcel} />
+          <span className="tb-label">Excel</span>
         </button>
       </div>
 
@@ -3040,114 +3170,10 @@ function EventCalendar() {
 
       {/* ✅ แผงตัวกรอง — พับซ่อนไว้ default กดปุ่มช่องแว่นขยาย/漏斗ด้านบนถึงเปิด แยกประเภทงาน/ระบบ
           เพิ่มจากเดิมที่มีแค่ช่าง/สถานะ ให้ค้นหางานตามหมวดได้ครบขึ้น */}
-      {showFilterPanel && (
+      {/* มือถือ: แผงตัวกรองพับได้ · จอใหญ่: ตัวกรองอยู่ในแถวเครื่องมือแถวเดียว (ดู filterFields) */}
+      {showFilterPanel && !isWideToolbar && (
         <div className="event-filter-panel mb-3">
-          {/* 🐛 ที่แก้ (ผู้ใช้แจ้ง: "อัปเดตสถานะแล้วดูเพี้ยนๆ"): แผงนี้เดิมใช้ตัวเลือกของงานช่างเสมอ
-              ไม่ว่าจะเปิดปฏิทินไหน — ปฏิทินเซลจึงมี "ช่างทุกคน" / สถานะช่าง (กำลังรอยืนยัน ฯลฯ) /
-              ประเภทงานช่าง (จาก JobType) / ระบบ ซึ่งไม่มีสักอันที่ตรงกับนัดหมายของเซลเลย เลือกกรอง
-              แล้วไม่มีอะไรตรงเงื่อนไข ดูเหมือนตัวกรองพัง
-              ✅ แยกชุดตัวเลือกตาม isSalesView ให้ตรงกับคำศัพท์ของแผนกที่กำลังดูอยู่จริง */}
-          {isSalesView ? (
-            <>
-              {/* คนเดียวเห็นนัดตัวเองอยู่แล้วจากขอบเขตฝั่ง server — ตัวกรองนี้มีความหมายเฉพาะตอน
-                  แอดมิน/ผู้จัดการเปิดดูรวมของทุกเซล */}
-              {viewingSalesCalendar && (
-                <select
-                  className="event-filter-select"
-                  value={selectedTechnician}
-                  onChange={(e) => setSelectedTechnician(e.target.value)}
-                >
-                  <option value="">เซลทุกคน</option>
-                  {salespersonOptions.map((sp) => (
-                    <option key={sp._id} value={sp._id}>
-                      {sp.fname ? `${sp.fname} ${sp.lname || ""}`.trim() : sp.username}
-                    </option>
-                  ))}
-                </select>
-              )}
-
-              <select
-                className="event-filter-select"
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
-              >
-                <option value="">ทุกสถานะนัดหมาย</option>
-                {SALES_STATUSES.map((st) => (
-                  <option key={st.key} value={st.key}>{st.icon} {st.key}</option>
-                ))}
-              </select>
-
-              <select
-                className="event-filter-select"
-                value={selectedJobType}
-                onChange={(e) => setSelectedJobType(e.target.value)}
-              >
-                <option value="">ทุกประเภทนัดหมาย</option>
-                {SALES_APPOINTMENT_TYPES.map((t) => (
-                  <option key={t.key} value={t.key}>{t.icon} {t.key}</option>
-                ))}
-              </select>
-            </>
-          ) : (
-            <>
-              <select
-                className="event-filter-select"
-                value={selectedTechnician}
-                onChange={(e) => setSelectedTechnician(e.target.value)}
-              >
-                <option value="">ช่างทุกคน</option>
-                {technicianOptions.map((tech) => (
-                  <option key={tech._id} value={tech._id}>
-                    {tech.fname ? `${tech.fname} ${tech.lname || ""}`.trim() : tech.username}
-                  </option>
-                ))}
-              </select>
-
-              {/* ✅ รวมสถานะงาน + สถานะอนุมัติไว้ในช่องเดียวกัน (เดิมแยกเป็น 2 dropdown คนละที่ ต้องเช็ค
-                  2 จุดถึงจะรู้ว่างานไหนต้องดูแล) — ใช้ prefix "status:"/"approval:" แยกประเภทค่าที่เลือก
-                  แล้วแปลงกลับเป็น selectedStatus/selectedApproval ตามเดิม (ดู handleCombinedStatusChange) */}
-              <select
-                className="event-filter-select"
-                value={combinedStatusValue}
-                onChange={(e) => handleCombinedStatusChange(e.target.value)}
-              >
-                <option value="">ทุกสถานะ</option>
-                {statusLegend.map((s) => (
-                  <option key={s.label} value={`status:${s.label}`}>{s.label}</option>
-                ))}
-                <option value="approval:pending">⏳ รออนุมัติ</option>
-                <option value="approval:rejected">❌ ไม่อนุมัติ</option>
-              </select>
-
-              <select
-                className="event-filter-select"
-                value={selectedJobType}
-                onChange={(e) => setSelectedJobType(e.target.value)}
-              >
-                <option value="">ทุกประเภทงาน</option>
-                {jobTypeOptions.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-
-              <select
-                className="event-filter-select"
-                value={selectedSystem}
-                onChange={(e) => setSelectedSystem(e.target.value)}
-              >
-                <option value="">ทุกระบบ</option>
-                {systemOptions.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </>
-          )}
-
-          {hasActiveFilters && (
-            <button className="event-filter-clear" onClick={clearFilters}>
-              <FontAwesomeIcon icon={faXmark} /> ล้างตัวกรองทั้งหมด
-            </button>
-          )}
+          {filterFields}
         </div>
       )}
 
@@ -3399,9 +3425,10 @@ function EventCalendar() {
             // อ่านแล้วงงว่าเลขนั้นคืออะไร — แยกเป็นบรรทัดของตัวเองพร้อมไอคอนโทรจึงชัดเจนกว่า
             // 🐛 ที่แก้ (ผู้ใช้: "ผู้ติดต่อสื่อความหมายไม่ออก icon ไม่สื่อ"): การ์ดในตารางเดือนแสดงแค่ไอคอนแทนคำกำกับ
             // และ 📇 (กล่องบัตร) ไม่มีใครอ่านออกว่าคือผู้ติดต่อ — เห็นเป็นชื่อคนลอยๆ สับสนกับชื่อทีม
-            // ✅ ไอคอนคน 👤 + ป้ายเล็ก "ติดต่อ" นำหน้าชื่อเสมอ (ป้ายใช้สีตัวหนังสือของงาน จึงอ่านได้ทุกสีการ์ด)
+            // ✅ ไอคอนคน 👤 นำหน้าชื่อ (ชื่อเต็ม "ผู้ติดต่อหน้างาน" อยู่ใน title ตอนชี้)
+            // 🧹 ตัดป้าย "ติดต่อ" ออก (ผู้ใช้: การ์ดในวันดูล้น — ป้ายกินที่จนชื่อถูกตัดขึ้นบรรทัดใหม่)
             const contactDisplay = contactName
-              ? detailRow("ผู้ติดต่อหน้างาน", `<span class="ec-card-tag">ติดต่อ</span>${escapeHtml(contactName)}`, "👤")
+              ? detailRow("ผู้ติดต่อหน้างาน", escapeHtml(contactName), "👤")
               : "";
             const contactTelDisplay = contactTel
               // 🐛 BUG ที่แก้ (บนมือถือเบอร์โทรไม่มีไอคอนนำเลย เห็นเป็นตัวเลขลอยๆ ไม่รู้ว่าเลขอะไร):

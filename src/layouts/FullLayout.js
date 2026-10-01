@@ -13,6 +13,7 @@ import PushService from "../shared/services/PushService";
 
 import "./FullLayout.css";
 import AppRebrandNotice from "@/shared/components/AppRebrandNotice";
+import InAppPushBanner from "@/shared/ui/InAppPushBanner";
 
 const FullLayout = () => {
   const sidebarRef = useRef(null);
@@ -165,6 +166,8 @@ const FullLayout = () => {
 
   return (
     <main>
+      {/* ✅ แจ้งเตือนแบบ LINE ตอนแอปเปิดอยู่ — แบนเนอร์บนสุด + เสียง (ตอนแอปปิด service worker แจ้งผ่านระบบมือถือแทน) */}
+      <InAppPushBanner />
       {/* ส่งฟังก์ชันเปิดปิดสไลด์บาร์ผ่าน props ชื่อ toggleMobileSidebar */}
       <div className={`header ${headerClass}`}>
         <Header toggleMobileSidebar={toggleSidebar} />

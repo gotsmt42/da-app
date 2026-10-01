@@ -19,6 +19,9 @@ import { personColor, personInitial } from "@/shared/utils/personAvatar";
  * @param onChange เปลี่ยนตัวกรอง
  * @param employees รายชื่อพนักงาน (ใช้รูปโปรไฟล์)
  * @param isOverdue (row) => boolean — แถวที่เลยกำหนดรอบ (นับแยกเป็นป้ายสีแดง)
+ * @param title / hint  หัวข้อแผง (ค่าเริ่มต้น = งานตามผู้รับผิดชอบ) — หน้ารายงานการเบิกใช้ "ใบเบิกตามผู้เบิก"
+ * @param amountOf (row) => number — ถ้าส่งมา ท้ายการ์ดโชว์ยอดเงินรวมของคนนั้นแทน "% ของทั้งหมด"
+ * @param formatAmount (number) => string
  */
 
 const ACCENT = "#dc2626";
@@ -31,7 +34,11 @@ const initialOf = personInitial;
 // จอใหญ่โชว์แถวแรกพอ (กันแผงยาวจนดันตารางลงไป) — ที่เหลือกด "ดูทุกคน"
 const COLLAPSED_COUNT = 8;
 
-export default function ResponsibleSummary({ rows, unit = "งาน", value = "all", onChange, employees = [], isOverdue, isMobile = false }) {
+export default function ResponsibleSummary({
+  rows, unit = "งาน", value = "all", onChange, employees = [], isOverdue, isMobile = false,
+  title = "งานตามผู้รับผิดชอบ", hint = "กดที่ชื่อเพื่อดูเฉพาะงานของคนนั้น · กดซ้ำเพื่อดูทั้งหมด",
+  amountOf, formatAmount = (n) => n.toLocaleString(),
+}) {
   const [expanded, setExpanded] = useState(false);
 
   const avatarOf = useMemo(() => {
@@ -46,15 +53,16 @@ export default function ResponsibleSummary({ rows, unit = "งาน", value = "
     rows.forEach((r) => {
       const over = isOverdue ? isOverdue(r) : false;
       if (!r.responsiblePerson) { un += 1; if (over) unOver += 1; return; }
-      const p = map.get(r.responsiblePerson) || { name: r.responsiblePerson, count: 0, overdue: 0 };
+      const p = map.get(r.responsiblePerson) || { name: r.responsiblePerson, count: 0, overdue: 0, amount: 0 };
       p.count += 1;
+      if (amountOf) p.amount += Number(amountOf(r)) || 0;
       if (over) p.overdue += 1;
       map.set(r.responsiblePerson, p);
     });
     // ✅ มากไปน้อย — คนที่ถืองานเยอะสุดอยู่หน้าสุด (คำถามที่คนเปิดแผงนี้อยากรู้ก่อน) ชื่อเรียงไทยเมื่อเท่ากัน
     const list = [...map.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "th"));
     return { people: list, unassigned: un, unassignedOverdue: unOver, total: rows.length, max: Math.max(1, ...list.map((p) => p.count), un) };
-  }, [rows, isOverdue]);
+  }, [rows, isOverdue, amountOf]);
 
   // ✅ คนที่ถูกเลือกต้องเห็นเสมอแม้อยู่ในส่วนที่พับไว้
   const hiddenSelected = !expanded && value !== "all" && value !== "unassigned"
@@ -65,7 +73,7 @@ export default function ResponsibleSummary({ rows, unit = "งาน", value = "
 
   if (total === 0) return null;
 
-  const card = ({ key, name, count, overdue, selected, onClick, avatar, color, muted }) => (
+  const card = ({ key, name, count, overdue, amount, selected, onClick, avatar, color, muted }) => (
     <ButtonBase
       key={key}
       onClick={onClick}
@@ -108,9 +116,15 @@ export default function ResponsibleSummary({ rows, unit = "งาน", value = "
         <Box sx={{ height: "100%", width: `${Math.max(6, (count / max) * 100)}%`, bgcolor: color, borderRadius: 3 }} />
       </Box>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ minHeight: 18 }}>
-        <Typography sx={{ fontSize: "0.7rem", color: TEXT_SUB }}>
-          {Math.round((count / total) * 100)}% ของทั้งหมด
-        </Typography>
+        {amountOf ? (
+          <Typography sx={{ fontSize: "0.76rem", fontWeight: 800, color: selected ? color : "#334155", fontVariantNumeric: "tabular-nums" }}>
+            {formatAmount(amount || 0)}
+          </Typography>
+        ) : (
+          <Typography sx={{ fontSize: "0.7rem", color: TEXT_SUB }}>
+            {Math.round((count / total) * 100)}% ของทั้งหมด
+          </Typography>
+        )}
         {overdue > 0 && (
           <Tooltip title={`เลยกำหนดรอบเข้างาน ${overdue} ${unit}`}>
             <Box component="span" sx={{ fontSize: "0.68rem", fontWeight: 700, color: ACCENT, bgcolor: alpha(ACCENT, 0.08), px: 0.75, py: 0.1, borderRadius: 1 }}>
@@ -128,14 +142,14 @@ export default function ResponsibleSummary({ rows, unit = "งาน", value = "
         <Groups sx={{ fontSize: 20, color: ACCENT }} />
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography sx={{ fontWeight: 800, fontSize: "0.95rem" }}>
-            งานตามผู้รับผิดชอบ
+            {title}
             <Box component="span" sx={{ ml: 0.75, color: TEXT_SUB, fontWeight: 600, fontSize: "0.8rem" }}>
               {people.length} คน · {total} {unit}
             </Box>
           </Typography>
           {!isMobile && (
             <Typography sx={{ fontSize: "0.74rem", color: TEXT_SUB }}>
-              กดที่ชื่อเพื่อดูเฉพาะงานของคนนั้น · กดซ้ำเพื่อดูทั้งหมด
+              {hint}
             </Typography>
           )}
         </Box>
@@ -156,13 +170,13 @@ export default function ResponsibleSummary({ rows, unit = "งาน", value = "
           selected: value === "unassigned", onClick: () => toggle("unassigned"), color: AMBER, muted: true,
         })}
         {visiblePeople.map((p) => card({
-          key: p.name, name: p.name, count: p.count, overdue: p.overdue,
+          key: p.name, name: p.name, count: p.count, overdue: p.overdue, amount: p.amount,
           selected: value === p.name, onClick: () => toggle(p.name),
           avatar: avatarOf.get(p.name), color: colorOf(p.name),
         }))}
         {hiddenSelected && (() => {
           const p = people.find((x) => x.name === value);
-          return card({ key: `sel-${p.name}`, name: p.name, count: p.count, overdue: p.overdue, selected: true, onClick: () => toggle(p.name), avatar: avatarOf.get(p.name), color: colorOf(p.name) });
+          return card({ key: `sel-${p.name}`, name: p.name, count: p.count, overdue: p.overdue, amount: p.amount, selected: true, onClick: () => toggle(p.name), avatar: avatarOf.get(p.name), color: colorOf(p.name) });
         })()}
       </Box>
 

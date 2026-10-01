@@ -102,3 +102,34 @@ export default function SelectField({ children, SelectProps = {}, InputLabelProp
   );
 }
 
+
+/**
+ * สไตล์ชุดเดียวกับ SelectField สำหรับ <TextField select> ที่ใช้ <MenuItem> เป็นลูกอยู่แล้ว (เช่นมีจุดสีหน้าตัวเลือก)
+ * — ใส่ sx={SELECT_FIELD_SX} และ SelectProps={{ MenuProps: SELECT_MENU_PROPS }} ก็ได้หน้าตาเดียวกันทั้งแอป
+ */
+export const SELECT_FIELD_SX = {
+  "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: "background.paper", fontSize: "0.86rem", fontWeight: 600, transition: "box-shadow .15s" },
+  "& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#cbd5e1" },
+  "& .MuiOutlinedInput-root.Mui-focused": { boxShadow: `0 0 0 3px ${alpha(ACCENT, 0.12)}` },
+  "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: ACCENT, borderWidth: 1.5 },
+  "& .MuiOutlinedInput-notchedOutline": { borderColor: "#e2e8f0" },
+  "& .MuiInputLabel-root": { fontSize: "0.86rem", color: "#64748b" },
+  "& .MuiInputLabel-root.Mui-focused": { color: ACCENT },
+  "& .MuiSelect-icon": { color: "#94a3b8" },
+};
+export const SELECT_MENU_PROPS = {
+  PaperProps: {
+    sx: {
+      mt: 0.5, borderRadius: 2.5, maxHeight: 360, minWidth: 180,
+      border: "1px solid #e2e8f0", boxShadow: "0 12px 32px rgba(15,23,42,.14)",
+      "& .MuiMenu-list": { py: 0.5 },
+      "& .MuiMenuItem-root": {
+        fontSize: "0.86rem", mx: 0.5, my: 0.15, borderRadius: 1.5, minHeight: 34, pr: 4, position: "relative",
+        "&:hover, &.Mui-focusVisible": { bgcolor: "#f1f5f9" },
+        "&.Mui-selected": { bgcolor: alpha(ACCENT, 0.07), color: ACCENT, fontWeight: 700 },
+        "&.Mui-selected:hover, &.Mui-selected.Mui-focusVisible": { bgcolor: alpha(ACCENT, 0.11) },
+        "&.Mui-selected::after": { content: '"✓"', position: "absolute", right: 12, fontWeight: 800 },
+      },
+    },
+  },
+};

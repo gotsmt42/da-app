@@ -8,16 +8,17 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import moment from "moment";
+import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack, Typography, IconButton, Chip,
   Alert, CircularProgress, useMediaQuery, TextField, MenuItem, Tooltip, Divider, Skeleton, Collapse,
-  Checkbox, FormControlLabel,
+  Checkbox, FormControlLabel, Avatar,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
   Close, Print, Edit, CheckCircle, Undo, Block, Payments, ReceiptLong, AttachFile, OpenInNew,
   DeleteOutline, Link as LinkIcon, History, TaskAlt, WarningAmber, Image as ImageIcon, Description, ExpandMore,
-  AccountBalanceWallet, ContentCopy, Check, HistoryEdu, FactCheck, DoneAll, Engineering,
+  AccountBalanceWallet, ContentCopy, Check, HistoryEdu, FactCheck, DoneAll, Engineering, CalendarMonth, Build,
 } from "@mui/icons-material";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
@@ -109,10 +110,70 @@ const MoneyCallout = ({ tone, direction, amount, who, note, icon }) => (
   </Box>
 );
 
+/**
+ * ช่องข้อมูล 1 ช่อง
+ * ✅ ผู้ใช้: "ตัวหนังสือดูกลมกลืนกันหมด อ่านยาก" — เดิมป้ายกับค่าหนา/สีใกล้กัน (600 · เทา vs 600 · ดำ)
+ *    ตอนนี้ป้ายเล็ก บาง สีจาง · ค่าใหญ่กว่า ตัวหนา สีเข้ม → สายตาแยกออกทันทีว่าอะไรคือหัวข้อ อะไรคือข้อมูล
+ */
 const InfoCell = ({ label, children, span }) => (
   <Box sx={{ minWidth: 0, gridColumn: span ? "1 / -1" : "auto" }}>
-    <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 600, display: "block", lineHeight: 1.4 }}>{label}</Typography>
-    <Box sx={{ fontSize: "0.9rem", fontWeight: 600, color: TEXT_MAIN, wordBreak: "break-word" }}>{children || "-"}</Box>
+    <Typography sx={{ fontSize: "0.72rem", color: "#94a3b8", fontWeight: 600, display: "block", lineHeight: 1.4, mb: 0.25, letterSpacing: ".01em" }}>{label}</Typography>
+    <Box sx={{ fontSize: "0.95rem", fontWeight: 700, color: "#0f172a", lineHeight: 1.45, wordBreak: "break-word" }}>{children || "-"}</Box>
+  </Box>
+);
+
+/** ผู้เบิก — แถวเด่น: วงกลมอักษรย่อสีประจำคน + ชื่อตัวหนา + ตำแหน่ง (ผู้ใช้ขอ "เน้นดูชื่อผู้เบิก") */
+const RequesterRow = ({ label, name, position, extra }) => (
+  <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, p: 1.25, borderRadius: 2, bgcolor: "#f8fafc", border: `1px solid ${BORDER_MAIN}` }}>
+    <Avatar sx={{ width: 40, height: 40, bgcolor: personColor(name), fontWeight: 800, fontSize: "1rem" }}>{personInitial(name)}</Avatar>
+    <Box sx={{ minWidth: 0, flex: 1 }}>
+      <Typography sx={{ fontSize: "0.72rem", color: "#94a3b8", fontWeight: 600, lineHeight: 1.3 }}>{label}</Typography>
+      <Typography sx={{ fontSize: "1rem", fontWeight: 800, color: "#0f172a", lineHeight: 1.35 }} noWrap>{name || "-"}</Typography>
+      {(position || extra) && (
+        <Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB, fontWeight: 500 }} noWrap>{[position, extra].filter(Boolean).join(" · ")}</Typography>
+      )}
+    </Box>
+  </Box>
+);
+
+/**
+ * แถวข้อมูล "ป้ายซ้าย · ค่าขวา" ในกล่องเส้นคั่น — ✅ ผู้ใช้: "ตัวหนังสือกลมกลืนกันหมด"
+ * เดิมเป็นกริดป้ายบน-ค่าล่างทุกช่อง หน้าตาเหมือนกันหมดจนแยกไม่ออก · แบบตาราง 2 ฝั่งอ่านไล่ลงได้ทันที
+ */
+const KV = ({ label, children, color }) => (
+  <Box sx={{ display: "flex", alignItems: "baseline", gap: 1.5, px: 1.5, py: 1.1, "& + &": { borderTop: `1px solid ${BORDER_MAIN}` } }}>
+    <Typography sx={{ fontSize: "0.82rem", color: TEXT_SUB, fontWeight: 500, flexShrink: 0, minWidth: 92 }}>{label}</Typography>
+    <Box sx={{ flex: 1, minWidth: 0, textAlign: "right", fontSize: "0.92rem", fontWeight: 700, color: color || "#0f172a", wordBreak: "break-word" }}>{children || "-"}</Box>
+  </Box>
+);
+
+/** หัวข้อย่อยในการ์ด — ไอคอนสี + ตัวหนาเล็ก แบ่งกลุ่มข้อมูลให้เห็นเป็นก้อนๆ */
+const SubTitle = ({ icon, children, color }) => (
+  <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.85 }}>
+    <Box sx={{ display: "inline-flex", color: color || TEXT_SUB, "& svg": { fontSize: 17 } }}>{icon}</Box>
+    <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: "#334155", letterSpacing: ".02em" }}>{children}</Typography>
+  </Stack>
+);
+
+/** สายอนุมัติ — เส้นเวลา: วงกลมเช็คเขียว + เส้นเชื่อม · ชื่อขั้น (จาง) · ชื่อคน (หนา) · วันที่ (ชิปเทา ชิดขวา) */
+const ApprovalRow = ({ label, name, date, detail, last }) => (
+  <Box sx={{ display: "flex", gap: 1.25 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
+      <Box sx={{ width: 24, height: 24, borderRadius: "50%", bgcolor: "#dcfce7", color: "#16a34a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Check sx={{ fontSize: 15 }} />
+      </Box>
+      {!last && <Box sx={{ flex: 1, width: 2, bgcolor: "#bbf7d0", my: 0.25, minHeight: 14 }} />}
+    </Box>
+    <Box sx={{ minWidth: 0, flex: 1, pb: last ? 0 : 1.25 }}>
+      <Stack direction="row" alignItems="center" spacing={1}>
+        <Typography sx={{ fontSize: "0.74rem", color: TEXT_SUB, fontWeight: 600, flex: 1, minWidth: 0 }} noWrap>{label}</Typography>
+        {date && (
+          <Box component="span" sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#475569", bgcolor: "#f1f5f9", px: 0.85, py: 0.2, borderRadius: 1, whiteSpace: "nowrap" }}>{date}</Box>
+        )}
+      </Stack>
+      <Typography sx={{ fontSize: "0.94rem", fontWeight: 800, color: "#0f172a", lineHeight: 1.35 }}>{name || "-"}</Typography>
+      {detail && <Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB, lineHeight: 1.4, mt: 0.15 }}>{detail}</Typography>}
+    </Box>
   </Box>
 );
 
@@ -128,6 +189,60 @@ const Card = ({ title, icon, children, action }) => (
     {children}
   </Box>
 );
+
+/**
+ * ✅ ป้ายสถานะท้ายกล่อง (ข้างปุ่มพิมพ์) — บอกตลอดว่าใบนี้ "ถึงขั้นไหนแล้ว" แม้เลื่อนดูรายละเอียดลงไปจนไม่เห็นเส้นขั้นตอนด้านบน
+ *    (ผู้ใช้ขอ: ใบ ADV/CLM ฯลฯ ให้มีสถานะที่ footer พร้อมอนิเมชั่น ดูง่าย มืออาชีพ)
+ * - แถบความคืบหน้าค่อยๆ เติมขึ้นตอนเปิด · ระหว่างดำเนินการมีแสงวิ่งผ่านเบาๆ และจุดกะพริบที่ขั้นปัจจุบัน
+ * - ครบแล้ว = เขียว ✓ · ตีกลับ = แดง · ยกเลิก = เทา (ไม่มีอนิเมชั่น — จบแล้ว ไม่ต้องดึงสายตา)
+ * ⚠️ เคารพการตั้งค่า "ลดการเคลื่อนไหว" ของเครื่อง (prefers-reduced-motion)
+ */
+const FooterProgress = ({ steps, status, color }) => {
+  const total = steps.length || 1;
+  const done = steps.filter((x) => x.done).length;
+  const current = steps.find((x) => !x.done);
+  const rejected = status === "rejected";
+  const cancelled = status === "cancelled";
+  const complete = !rejected && !cancelled && done >= total;
+  const tone = cancelled ? "#94a3b8" : rejected ? "#dc2626" : complete ? "#059669" : color;
+  const text = cancelled ? "ยกเลิกแล้ว"
+    : rejected ? "ถูกตีกลับ · รอแก้ไข"
+      : complete ? "เสร็จสมบูรณ์"
+        : `รอ: ${current?.sub || current?.label || ""}`;
+  const moving = !complete && !rejected && !cancelled;
+  // ✅ วางข้างปุ่ม "พิมพ์ / แชร์" — จุดตามจำนวนขั้น (ผ่านแล้ว = จุดทึบ · ขั้นที่รอ = จุดกะพริบ · ยังไม่ถึง = จุดเทา)
+  //    🧹 เลิกใช้แถบหลอด (ผู้ใช้: ไม่สวย) — จุดขั้นอ่านง่ายกว่าว่าเหลืออีกกี่ขั้น และไม่กินที่
+  const currentIndex = moving ? steps.findIndex((x) => !x.done) : -1;
+  return (
+    <Box title={text} sx={{ display: "inline-flex", alignItems: "center", gap: 1, minWidth: 0 }}>
+      {!cancelled && (
+        <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, flexShrink: 0 }}>
+          {steps.map((st, i) => {
+            const isCurrent = i === currentIndex;
+            const filled = st.done || (complete);
+            return (
+              <Box key={i} sx={{
+                // ✅ ขั้นที่กำลังรอ = วงโหลดหมุน (ผู้ใช้ขอ "วงๆโหลด แบบแอพมืออาชีพ") · ขั้นอื่นเป็นจุดนิ่ง
+                width: isCurrent ? 12 : 7, height: isCurrent ? 12 : 7, borderRadius: "50%", boxSizing: "border-box",
+                bgcolor: isCurrent ? "transparent" : rejected && st.danger ? tone : filled ? tone : "#e2e8f0",
+                border: isCurrent ? `2px solid ${alpha(tone, 0.2)}` : "none",
+                borderTopColor: isCurrent ? tone : undefined,
+                transition: "background-color .3s",
+                animation: isCurrent ? "efpSpin .8s linear infinite" : `efpIn .35s ease-out ${i * 0.08}s both`,
+                "@keyframes efpIn": { from: { transform: "scale(0)", opacity: 0 }, to: { transform: "scale(1)", opacity: 1 } },
+                "@keyframes efpSpin": { to: { transform: "rotate(360deg)" } },
+                "@media (prefers-reduced-motion: reduce)": { animation: "none" },
+              }} />
+            );
+          })}
+        </Box>
+      )}
+      <Typography noWrap sx={{ minWidth: 0, fontSize: "0.78rem", fontWeight: 700, color: complete || rejected || cancelled ? tone : "text.primary" }}>
+        {complete ? "✓ " : ""}{text}
+      </Typography>
+    </Box>
+  );
+};
 
 /** เส้นขั้นตอน — ขั้นที่ผ่านแล้วมีวันที่กำกับ */
 const Steps = ({ steps, color }) => (
@@ -985,52 +1100,108 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                 </Box>
               )}
 
-              <Card title="ข้อมูลเอกสาร">
-                <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)" }, gap: 1.5 }}>
-                  <InfoCell label="เลขที่">{e.docNo}</InfoCell>
-                  <InfoCell label="วันที่">{thaiDate(e.docDate)}</InfoCell>
-                  <InfoCell label="ถึง">{e.to}</InfoCell>
-                  <InfoCell label={isCtr ? "พนักงานผู้เบิก (กรอกแทน)" : "ผู้เบิกเงิน"}>{personFullName(e.requester)}</InfoCell>
-                  <InfoCell label="ตำแหน่ง">{e.requester?.position}</InfoCell>
-                  {e.createdBy?.userId && e.createdBy.userId !== e.requester?.userId && <InfoCell label="ออกใบแทนโดย">{e.createdBy.name}</InfoCell>}
+              <Card title="ข้อมูลเอกสาร" icon={<Description sx={{ fontSize: 18, color: meta.color }} />}>
+                {/* ✅ ผู้ใช้: "ตัวหนังสือกลมกลืนกันหมด อ่านยาก ไม่สวย" — แบ่งเป็นก้อนชัดๆ แทนกริดช่องหน้าตาเดียวกันทั้งหมด:
+                    ผู้เบิก (แถวเด่น) · ข้อมูลใบ (ตารางป้ายซ้าย-ค่าขวา) · งานที่ผูก · สายอนุมัติ (เส้นเวลา) · บัญชีรับเงิน */}
+                <Stack spacing={2}>
+                  <RequesterRow
+                    label={isCtr ? "พนักงานผู้เบิก (กรอกแทน)" : "ผู้เบิกเงิน"}
+                    name={personFullName(e.requester)}
+                    position={e.requester?.position}
+                    extra={e.createdBy?.userId && e.createdBy.userId !== e.requester?.userId ? `ออกใบแทนโดย ${e.createdBy.name}` : ""}
+                  />
+
+                  <Box sx={{ border: `1px solid ${BORDER_MAIN}`, borderRadius: 2, overflow: "hidden" }}>
+                    <KV label="เลขที่">{e.docNo}</KV>
+                    <KV label="วันที่">{thaiDate(e.docDate)}</KV>
+                    <KV label="ถึง">{e.to}</KV>
+                    {isReimburse && <KV label="ที่มาของเงิน">สำรองจ่ายเอง (ไม่มีใบ Advance)</KV>}
+                    {kind === "advance" && e.dueClearAt && <KV label="กำหนดเคลียร์" color={overdue ? "#dc2626" : undefined}>{thaiDate(e.dueClearAt)}{overdue ? " · เลยกำหนด" : ""}</KV>}
+                    {kind === "advance" && e.claimId && (
+                      <KV label="ใบเคลม">
+                        <Button size="small" endIcon={<OpenInNew sx={{ fontSize: "14px !important" }} />} onClick={() => onOpenOther?.(e.claimId)}
+                          sx={{ p: 0, minWidth: 0, textTransform: "none", fontWeight: 800, fontSize: "0.92rem" }}>
+                          {e.claimDocNo}
+                        </Button>
+                      </KV>
+                    )}
+                  </Box>
+
                   {/* ✅ งานที่เข้าหลายช่วง: บอกช่วงวันที่เต็ม + เป็นช่วงที่เท่าไร — ใบของคนละช่วงจะได้ไม่สับสนกัน */}
-                  <InfoCell label="งานที่ผูก" span>
-                    {e.eventId || e.job?.title
-                      ? [jobText(e.job), jobPartText(e.job), jobRangesText(e) || jobRangeText(e.job) || (e.job?.start ? thaiDate(e.job.start) : "")].filter(Boolean).join(" · ")
-                      : "ไม่ผูกงาน"}
-                  </InfoCell>
-                  {isReimburse && <InfoCell label="ที่มาของเงิน">ผู้เบิกสำรองจ่ายเอง (ไม่มีใบ Advance)</InfoCell>}
-                  {kind === "advance" && e.dueClearAt && <InfoCell label="กำหนดเคลียร์"><Box component="span" sx={{ color: overdue ? "#dc2626" : "inherit" }}>{thaiDate(e.dueClearAt)}</Box></InfoCell>}
-                  {kind === "advance" && e.claimId && (
-                    <InfoCell label="ใบเคลม">
-                      <Button size="small" onClick={() => onOpenOther?.(e.claimId)} sx={{ p: 0, minWidth: 0, textTransform: "none", fontWeight: 700 }}>{e.claimDocNo}</Button>
-                    </InfoCell>
-                  )}
-                  {e.reviewedAt && e.status !== "rejected" && <InfoCell label="ผู้ตรวจสอบ">{personFullName(e.reviewedBy)} · {thaiDate(e.reviewedAt)}</InfoCell>}
-                  {e.approvedAt && !["pending", "reviewed", "rejected"].includes(e.status) && <InfoCell label="ผู้อนุมัติ">{personFullName(e.approvedBy)} · {thaiDate(e.approvedAt)}</InfoCell>}
-                  {e.payment?.at && ((kind === "advance" && ["paid", "clearing", "cleared"].includes(e.status)) || (kind === "claim" && e.status === "settled" && money(e.difference) !== 0)) && (
-                    <>
-                      {/* ✅ ส่วนที่ 3 — ผู้อนุมัติเบิกจ่าย */}
-                      <InfoCell label={mustReturn ? "ผู้อนุมัติเบิกจ่าย (ยืนยันรับเงินคืน)" : "ผู้อนุมัติเบิกจ่าย"}>
-                        {personFullName(e.payment.by) || "-"}
-                      </InfoCell>
-                      <InfoCell label={kind === "advance" ? "การจ่ายเงิน" : isCtr ? "การจ่ายค่าจ้าง" : isReimburse ? "การจ่ายคืน" : mustReturn ? "การรับเงินคืน" : "การจ่ายส่วนต่าง"}>
-                        {thaiDate(e.payment.at)} · {paymentLabel(e.payment.method)}{e.payment.ref ? ` · ${e.payment.ref}` : ""}{e.payment.note ? ` · ${e.payment.note}` : ""}
-                      </InfoCell>
-                    </>
-                  )}
+                  {/* ✅ งานที่ผูก — การ์ดขาวขอบเทาชุดเดียวกับตารางข้อมูลด้านบน (ผู้ใช้: "ไม่เข้าธีม" — เดิมกล่องพื้นสี + อีโมจิ)
+                      ชื่องานตัวหนา · ครั้งที่/ช่วงวันที่เป็นป้ายเทา · วันที่มีไอคอนปฏิทินแบบเดียวกับทั้งแอป */}
+                  <Box>
+                    <SubTitle icon={<Build />} color={meta.color}>งานที่ผูก</SubTitle>
+                    {e.eventId || e.job?.title ? (() => {
+                      const jt = jobText(e.job) || "";
+                      const round = (jt.match(/ครั้งที่\s*\d+\s*\/\s*\d+/) || [])[0] || "";
+                      const title = round ? jt.replace(round, "").replace(/\s{2,}/g, " ").trim() : jt;
+                      const tags = [round, jobPartText(e.job)].filter(Boolean);
+                      const when = jobRangesText(e) || jobRangeText(e.job) || (e.job?.start ? thaiDate(e.job.start) : "");
+                      return (
+                        <Box sx={{ p: 1.25, px: 1.5, borderRadius: 2, border: `1px solid ${BORDER_MAIN}`, bgcolor: "#fff" }}>
+                          {/* 🧹 ตัดไอคอนประแจในการ์ดออก (ผู้ใช้ขอ) — หัวข้อด้านบนมีไอคอนอยู่แล้ว */}
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography sx={{ fontSize: "0.92rem", fontWeight: 800, color: "#0f172a", lineHeight: 1.45 }}>{title || "-"}</Typography>
+                            {(tags.length > 0 || when) && (
+                              <Stack direction="row" alignItems="center" useFlexGap flexWrap="wrap" spacing={0.75} sx={{ mt: 0.6 }}>
+                                {tags.map((t) => (
+                                  <Box key={t} component="span" sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#475569", bgcolor: "#f1f5f9", px: 0.85, py: 0.2, borderRadius: 1, whiteSpace: "nowrap" }}>{t}</Box>
+                                ))}
+                                {when && (
+                                  <Stack direction="row" alignItems="center" spacing={0.4} sx={{ color: TEXT_SUB }}>
+                                    <CalendarMonth sx={{ fontSize: 15 }} />
+                                    <Typography sx={{ fontSize: "0.78rem", fontWeight: 600 }}>{when}</Typography>
+                                  </Stack>
+                                )}
+                              </Stack>
+                            )}
+                          </Box>
+                        </Box>
+                      );
+                    })() : <Typography sx={{ fontSize: "0.86rem", color: TEXT_SUB, px: 1.25, py: 1, borderRadius: 2, bgcolor: "#f8fafc", border: `1px dashed ${BORDER_MAIN}` }}>ไม่ผูกงาน</Typography>}
+                  </Box>
+
+                  {(() => {
+                    const showReview = e.reviewedAt && e.status !== "rejected";
+                    const showApprove = e.approvedAt && !["pending", "reviewed", "rejected"].includes(e.status);
+                    const showPay = e.payment?.at && ((kind === "advance" && ["paid", "clearing", "cleared"].includes(e.status)) || (kind === "claim" && e.status === "settled" && money(e.difference) !== 0));
+                    const steps = [
+                      showReview && { key: "r", label: "ผู้ตรวจสอบ", name: personFullName(e.reviewedBy), date: thaiDate(e.reviewedAt) },
+                      showApprove && { key: "a", label: "ผู้อนุมัติ", name: personFullName(e.approvedBy), date: thaiDate(e.approvedAt) },
+                      showPay && {
+                        key: "p",
+                        label: mustReturn ? "ผู้อนุมัติเบิกจ่าย (ยืนยันรับเงินคืน)" : "ผู้อนุมัติเบิกจ่าย",
+                        name: personFullName(e.payment.by) || "-",
+                        date: thaiDate(e.payment.at),
+                        detail: `${kind === "advance" ? "การจ่ายเงิน" : isCtr ? "การจ่ายค่าจ้าง" : isReimburse ? "การจ่ายคืน" : mustReturn ? "การรับเงินคืน" : "การจ่ายส่วนต่าง"} · ${[paymentLabel(e.payment.method), e.payment.ref, e.payment.note].filter(Boolean).join(" · ")}`,
+                      },
+                    ].filter(Boolean);
+                    if (!steps.length) return null;
+                    return (
+                      <Box>
+                        <SubTitle icon={<FactCheck />} color={meta.color}>สายอนุมัติ</SubTitle>
+                        <Box sx={{ pl: 0.25 }}>
+                          {steps.map(({ key, ...st }, i) => <ApprovalRow key={key} {...st} last={i === steps.length - 1} />)}
+                        </Box>
+                      </Box>
+                    );
+                  })()}
+
                   {/* ✅ บัญชีรับเงินของผู้เบิก — โชว์เฉพาะใบที่บริษัทต้องโอนเงินให้ผู้เบิก
                       ⚠️ ใบที่ผู้เบิกต้องคืนเงินบริษัท ไม่โชว์บัญชี (คนละทิศทางเงิน) แต่โชว์ยอดที่ต้องคืนแทน */}
                   {moneyToRequester && (
-                    <InfoCell label={isCtr ? "บัญชีรับเงินของผู้รับเหมา" : "บัญชีรับเงินของผู้เบิก"} span>
+                    <Box>
+                      <SubTitle icon={<AccountBalanceWallet />} color={meta.color}>{isCtr ? "บัญชีรับเงินของผู้รับเหมา" : "บัญชีรับเงินของผู้เบิก"}</SubTitle>
                       {e.payTo?.accountNo
-                        ? <Box sx={{ mt: 0.5 }}><PayToBox payTo={e.payTo} /></Box>
-                        : <Typography sx={{ fontSize: "0.88rem", color: TEXT_SUB }}>{isCtr ? "จ่ายเป็นเงินสด / เช็ค" : "ไม่ระบุ (รับเป็นเงินสด)"}</Typography>}
-                    </InfoCell>
+                        ? <PayToBox payTo={e.payTo} />
+                        : <Typography sx={{ fontSize: "0.86rem", color: TEXT_SUB, px: 1.25, py: 1, borderRadius: 2, bgcolor: "#f8fafc", border: `1px dashed ${BORDER_MAIN}` }}>{isCtr ? "จ่ายเป็นเงินสด / เช็ค" : "ไม่ระบุบัญชี — รับเป็นเงินสด"}</Typography>}
+                    </Box>
                   )}
                   {mustReturn && (
-                    <InfoCell label="ยอดที่ผู้เบิกต้องคืนบริษัท" span>
-                      <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.5, p: 1.25, borderRadius: 2, border: "1px solid #fdba74", bgcolor: "#fff7ed" }}>
+                    <Box>
+                      <SubTitle icon={<Undo />} color="#c2410c">ยอดที่ผู้เบิกต้องคืนบริษัท</SubTitle>
+                      <Stack direction="row" alignItems="center" spacing={1} sx={{ p: 1.25, borderRadius: 2, border: "1px solid #fdba74", bgcolor: "#fff7ed" }}>
                         <Undo sx={{ fontSize: 20, color: "#c2410c" }} />
                         <Box sx={{ minWidth: 0 }}>
                           <Typography sx={{ fontSize: "1.05rem", fontWeight: 900, color: "#9a3412", lineHeight: 1.2 }}>
@@ -1041,10 +1212,15 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                           </Typography>
                         </Box>
                       </Stack>
-                    </InfoCell>
+                    </Box>
                   )}
-                  {e.note && <InfoCell label="หมายเหตุ" span>{e.note}</InfoCell>}
-                </Box>
+                  {e.note && (
+                    <Box>
+                      <SubTitle icon={<HistoryEdu />} color={meta.color}>หมายเหตุ</SubTitle>
+                      <Typography sx={{ fontSize: "0.88rem", color: "#334155", px: 1.25, py: 1, borderRadius: 2, bgcolor: "#f8fafc", whiteSpace: "pre-wrap" }}>{e.note}</Typography>
+                    </Box>
+                  )}
+                </Stack>
               </Card>
 
               {!isClearClaim && (
@@ -1148,36 +1324,47 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
         </DialogContent>
 
         {e && (
-          <DialogActions sx={{ px: { xs: 1, sm: 2.5 }, py: 1.25, borderTop: `1px solid ${BORDER_MAIN}`, gap: 0.75, flexWrap: "wrap", justifyContent: "flex-end" }}>
-            <Button onClick={() => setPrintOpen(true)} startIcon={<Print sx={{ fontSize: 18 }} />} sx={{ textTransform: "none", fontWeight: 700, mr: "auto" }}>
-              พิมพ์ / แชร์
-            </Button>
-            {canCancel && (
-              <Button onClick={() => setAction("cancel")} startIcon={<Block sx={{ fontSize: 17 }} />} sx={{ textTransform: "none", fontWeight: 700, color: TEXT_SUB }}>
-                ยกเลิก
+          <DialogActions sx={{
+            px: { xs: 1, sm: 2.5 }, py: 1.25, borderTop: `1px solid ${BORDER_MAIN}`, gap: { xs: 0.5, sm: 0.75 }, flexWrap: "wrap", justifyContent: "flex-end",
+            // ✅ จอมือถือ: ปุ่มกระชับขึ้น (ระยะ/ตัวอักษร/ไอคอน) ให้ปุ่มคำสั่งอยู่แถวเดียวกันได้
+            "& > :not(style) ~ :not(style)": { ml: 0 },
+            "& .MuiButton-root": { minWidth: 0, px: { xs: 1, sm: 2 }, py: 0.75, justifyContent: "center", fontSize: { xs: "0.8rem", sm: "0.875rem" }, whiteSpace: "nowrap" },
+            "& .MuiButton-startIcon": { mr: { xs: 0.4, sm: 1 } },
+            // ✅ แถว 2 เต็มความกว้าง (ผู้ใช้: ไม่อยากให้มีช่องว่าง) — ปุ่มไอคอนคงขนาด ปุ่มข้อความยืดเท่าๆ กัน
+            "& > .MuiButton-root, & > span": { flex: "1 1 auto", display: "flex" },
+            "& > span > .MuiButton-root": { width: "100%" },
+          }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, minWidth: 0, flexBasis: "100%" }}>
+              <Button onClick={() => setPrintOpen(true)} startIcon={<Print sx={{ fontSize: 18 }} />} sx={{ textTransform: "none", fontWeight: 700, flexShrink: 0 }}>
+                พิมพ์ / แชร์
               </Button>
+              <FooterProgress steps={steps} status={e.status} color={meta.color} />
+            </Box>
+            {canCancel && (
+              <Tooltip title="ยกเลิกใบนี้">
+                <IconButton onClick={() => setAction("cancel")} aria-label="ยกเลิกใบนี้" sx={{ color: TEXT_SUB, border: `1px solid ${BORDER_MAIN}`, width: 36, height: 36 }}>
+                  <Block sx={{ fontSize: 18 }} />
+                </IconButton>
+              </Tooltip>
             )}
             {canEdit && (
-              <Button onClick={() => onEdit?.(e)} startIcon={<Edit sx={{ fontSize: 17 }} />} sx={{ textTransform: "none", fontWeight: 700 }}>
-                {e.status === "rejected" ? "แก้ไข / ส่งใหม่" : "แก้ไข"}
-              </Button>
+              e.status === "rejected" ? (
+                <Button onClick={() => onEdit?.(e)} startIcon={<Edit sx={{ fontSize: 17 }} />} sx={{ textTransform: "none", fontWeight: 700 }}>
+                  แก้ไข / ส่งใหม่
+                </Button>
+              ) : (
+                <Tooltip title="แก้ไขใบนี้">
+                  <IconButton onClick={() => onEdit?.(e)} aria-label="แก้ไขใบนี้" color="primary" sx={{ border: `1px solid ${BORDER_MAIN}`, width: 36, height: 36 }}>
+                    <Edit sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </Tooltip>
+              )
             )}
             {/* ✅ ตีกลับได้เฉพาะขั้นที่ตัวเองรับผิดชอบ (ตรวจสอบ / อนุมัติ / อนุมัติเบิกจ่าย) — server บังคับซ้ำ */}
             {canActOnCurrentStep && (
-              <Button onClick={() => setAction("reject")} disabled={selfBlocked} startIcon={<Undo sx={{ fontSize: 17 }} />} sx={{ textTransform: "none", fontWeight: 700, color: "#dc2626" }}>
+              <Button onClick={() => setAction("reject")} disabled={selfBlocked} startIcon={<Undo sx={{ fontSize: 17 }} />} variant="outlined" sx={{ textTransform: "none", fontWeight: 700, color: "#dc2626", borderColor: "#fecaca", borderRadius: 2, "&:hover": { borderColor: "#dc2626", bgcolor: "#fef2f2" } }}>
                 ตีกลับ
               </Button>
-            )}
-            {/* ✅ ผู้จัดการ: จบทั้งสองขั้นด้วยปุ่มเดียว (ผู้ใช้สั่ง) — ยังบันทึกแยกเป็น 2 ขั้นเหมือนเดิม */}
-            {canChainBothSteps && e.status === "pending" && (
-              <Tooltip title={selfBlocked ? "ใบของตัวเองต้องให้หัวหน้าท่านอื่นพิจารณา" : ""} describeChild>
-                <span>
-                  <Button variant="contained" disabled={selfBlocked} onClick={() => setAction("reviewApprove")} startIcon={<DoneAll sx={{ fontSize: 18 }} />}
-                    sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: "#059669", "&:hover": { bgcolor: "#047857", boxShadow: "none" } }}>
-                    ตรวจสอบและอนุมัติ
-                  </Button>
-                </span>
-              </Tooltip>
             )}
             {/* ส่วนที่ 2 มือแรก — ตรวจสอบ (แอดมินช่าง · ผู้จัดการกดแยกมือก็ได้) */}
             {canReview && e.status === "pending" && (
@@ -1187,7 +1374,18 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                     sx={canChainBothSteps
                       ? { textTransform: "none", fontWeight: 800, borderRadius: 2, color: "#b45309", borderColor: "#fcd34d" }
                       : { textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: "#b45309", "&:hover": { bgcolor: "#92400e", boxShadow: "none" } }}>
-                    {canChainBothSteps ? "ตรวจสอบอย่างเดียว" : "ตรวจสอบ"}
+                    ตรวจสอบ
+                  </Button>
+                </span>
+              </Tooltip>
+            )}
+            {/* ✅ ผู้จัดการ: จบทั้งสองขั้นด้วยปุ่มเดียว (ผู้ใช้สั่ง) — ยังบันทึกแยกเป็น 2 ขั้นเหมือนเดิม */}
+            {canChainBothSteps && e.status === "pending" && (
+              <Tooltip title={selfBlocked ? "ใบของตัวเองต้องให้หัวหน้าท่านอื่นพิจารณา" : "ตรวจสอบและอนุมัติในขั้นตอนเดียว"} describeChild>
+                <span>
+                  <Button variant="contained" disabled={selfBlocked} onClick={() => setAction("reviewApprove")} startIcon={<DoneAll sx={{ fontSize: 18 }} />}
+                    sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: "#059669", "&:hover": { bgcolor: "#047857", boxShadow: "none" } }}>
+                    อนุมัติ
                   </Button>
                 </span>
               </Tooltip>

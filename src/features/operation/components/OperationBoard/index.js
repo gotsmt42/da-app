@@ -57,7 +57,7 @@ import {
   NoteAdd, History, Person, AccessTime, FiberManualRecord,
   TaskAlt, HourglassTop, Cancel,
   Send, Chat, Link as LinkIcon,
-  Print, Share, RequestQuote, ReceiptLong, AssignmentTurnedIn, EventAvailable,
+  Print, Share, RequestQuote, ReceiptLong, AssignmentTurnedIn, EventAvailable, Tune,
 } from "@mui/icons-material";
 
 // MUI Date Picker
@@ -91,7 +91,8 @@ import ViewTiles from "@/shared/ui/ViewTiles";
 import ResponsibleSummary from "@/shared/ui/ResponsibleSummary";
 import Drawer from "@mui/material/Drawer";
 import AppsIcon from "@mui/icons-material/Apps";
-import SelectField from "@/shared/ui/SelectField";
+import SelectField, { SELECT_FIELD_SX, SELECT_MENU_PROPS } from "@/shared/ui/SelectField";
+import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
 import { PeopleRow, PersonChip, AssignableResponsible, AssignResponsibleMenu, useAvatarMap, teamNamesOf } from "@/shared/ui/PersonChip";
 
 // ✅ ใช้ตัดสินใจลำดับปุ่มแชร์ในเมนู "⋮" ต่อไฟล์ (ดูเหตุผลใน fileActions.js)
@@ -1852,7 +1853,7 @@ const FilterPanel = ({
   search, onSearch, filterType, onFilterType, filterSystem, onFilterSystem,
   filterStatus, onFilterStatus, filterOP, onFilterOP, filterTeam, onFilterTeam,
   showAll, onToggleShowAll, selectedDate, onDateChange, onClearAll, activeCount,
-  typeOptions, systemOptions,
+  typeOptions, systemOptions, inSheet = false,
 }) => {
   const [open, setOpen] = useState(false);
   // ✅ จอคอม/จอใหญ่ แสดงช่องเลือกตัวกรองตลอด (ผู้ใช้ขอ) — พื้นที่พอ ไม่ต้องกดเปิดก่อน · มือถือยังพับเก็บได้เหมือนเดิม
@@ -1868,6 +1869,87 @@ const FilterPanel = ({
     filterTeam && { key: "team", label: "ทีม", value: filterTeam, clear: () => onFilterTeam("") },
     search && { key: "search", label: "ค้นหา", value: search, clear: () => onSearch("") },
   ].filter(Boolean);
+
+  // ✅ ช่องตัวกรองชุดเดียว — จอใหญ่วางในแถวเดียวกับช่องค้นหา (ผู้ใช้ขอ "ให้เหลือแถวเดียว") · มือถืออยู่ในแผงพับ
+  const filterSelects = (
+    <>
+            <TextField
+              select size="small" label="สถานะงาน" value={filterOP}
+              onChange={(e) => onFilterOP(e.target.value)}
+              sx={SELECT_FIELD_SX} SelectProps={{ MenuProps: SELECT_MENU_PROPS }}
+            >
+              <MenuItem value=""><em>ทั้งหมด</em></MenuItem>
+              {OP_LIST.map((op) => (
+                <MenuItem key={op} value={op}>
+                  <Stack direction="row" alignItems="center" gap={1}>
+                    <Box sx={{ width: 9, height: 9, borderRadius: "50%", bgcolor: OP_COLOR[op], flexShrink: 0 }} />
+                    {op}
+                  </Stack>
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              select size="small" label="ประเภทงาน" value={filterType}
+              onChange={(e) => onFilterType(e.target.value)}
+              sx={SELECT_FIELD_SX} SelectProps={{ MenuProps: SELECT_MENU_PROPS }}
+            >
+              <MenuItem value=""><em>ทั้งหมด</em></MenuItem>
+              {typeOptions.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
+            </TextField>
+
+            <TextField
+              select size="small" label="ระบบ" value={filterSystem}
+              onChange={(e) => onFilterSystem(e.target.value)}
+              sx={SELECT_FIELD_SX} SelectProps={{ MenuProps: SELECT_MENU_PROPS }}
+            >
+              <MenuItem value=""><em>ทั้งหมด</em></MenuItem>
+              {systemOptions.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
+            </TextField>
+    </>
+  );
+  // ✅ มือถือ: อยู่ในแผ่นล่าง (เปิดจากปุ่มบนหัวเพจ) — ช่องค้นหา · เดือน · ช่องเลือก เรียงแนวตั้งเต็มความกว้าง
+  if (inSheet) {
+    return (
+      <Stack gap={1.5}>
+        <TextField
+          placeholder="ค้นหา บริษัท, ไซต์, เลขเอกสาร..." size="small" value={search} fullWidth
+          onChange={(e) => onSearch(e.target.value)}
+          InputProps={{
+            startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 18, color: "text.disabled" }} /></InputAdornment>,
+            endAdornment: search ? (
+              <InputAdornment position="end"><IconButton size="small" onClick={() => onSearch("")}><Clear fontSize="small" /></IconButton></InputAdornment>
+            ) : null,
+            sx: { borderRadius: 2.5, bgcolor: "#f8fafc" },
+          }}
+        />
+        <Stack direction="row" gap={1} alignItems="center">
+          <Button size="small" variant={showAll ? "contained" : "outlined"} onClick={() => onToggleShowAll(true)}
+            sx={{ flex: 1, borderRadius: 2.5, textTransform: "none", fontWeight: 700, height: 40, boxShadow: "none" }}>
+            ทุกเดือน
+          </Button>
+          {showAll ? (
+            <Button size="small" variant="outlined"
+              onClick={() => { onToggleShowAll(false); onDateChange(moment().format("YYYY-MM")); }}
+              sx={{ flex: 1, borderRadius: 2.5, textTransform: "none", fontWeight: 700, height: 40, boxShadow: "none" }}>
+              เลือกเดือน
+            </Button>
+          ) : (
+            <Box sx={{ flex: 1 }}>
+              <ThaiDatePicker
+                views={["year", "month"]} openTo="month" label="เดือน"
+                valueFormat="YYYY-MM" inputFormat="MM/YYYY"
+                value={selectedDate || ""}
+                onChange={(v) => { if (v) onDateChange(v); }}
+                textFieldProps={{ sx: { "& .MuiOutlinedInput-root": { borderRadius: 2.5 } } }}
+              />
+            </Box>
+          )}
+        </Stack>
+        <Box sx={{ display: "grid", gridTemplateColumns: "1fr", gap: 1.5 }}>{filterSelects}</Box>
+      </Stack>
+    );
+  }
 
   return (
     <GlassCard sx={{ mb: { xs: 2, sm: 3 } }}>
@@ -1886,12 +1968,17 @@ const FilterPanel = ({
               ) : null,
               sx: { borderRadius: 2 },
             }}
-            sx={{ flex: 1, minWidth: 220 }}
+            sx={{ flex: 1, minWidth: isWide ? 180 : 220 }}
           />
+          {isWide && (
+            <Stack direction="row" gap={1} sx={{ flexShrink: 1, minWidth: 0, "& > .MuiTextField-root": { width: 150, flexShrink: 1, minWidth: 110 } }}>
+              {filterSelects}
+            </Stack>
+          )}
           <Stack direction="row" gap={1} alignItems="center">
             <Button size="small" variant={showAll ? "contained" : "outlined"}
               onClick={() => onToggleShowAll(true)}
-              sx={{ borderRadius: 2, textTransform: "none", fontSize: "0.78rem" }}>
+              sx={{ borderRadius: 2.5, textTransform: "none", fontSize: "0.82rem", fontWeight: 700, height: 40, px: 1.75, boxShadow: "none" }}>
               ทั้งหมด
             </Button>
             {/* ✅ ตัวเลือกเดือน — ใช้ ThaiDatePicker เหมือนกันทั้งแอป ปีจึงเป็น พ.ศ. ตรงกับที่อื่น
@@ -1911,7 +1998,7 @@ const FilterPanel = ({
             {showAll && (
               <Button size="small" variant="outlined"
                 onClick={() => { onToggleShowAll(false); onDateChange(moment().format("YYYY-MM")); }}
-                sx={{ borderRadius: 2, textTransform: "none", fontSize: "0.78rem" }}>
+                sx={{ borderRadius: 2.5, textTransform: "none", fontSize: "0.82rem", fontWeight: 700, height: 40, px: 1.75, boxShadow: "none" }}>
                 เลือกเดือน
               </Button>
             )}
@@ -1931,7 +2018,7 @@ const FilterPanel = ({
             </Tooltip>
           )}
         </Stack>
-        <Collapse in={open || isWide}>
+        <Collapse in={open && !isWide}>
           <Divider sx={{ my: 2 }} />
           {/* 🐛 ที่แก้: เดิมกางชิปทุกตัวเลือกออกมาทั้งหมด 4 กลุ่ม (23 ชิป) กินพื้นที่แนวตั้ง ~300px
               ดันรายการงานตกจอไปเลย และต้องกวาดตาหาทีละชิปว่าตัวไหนคือตัวที่ต้องการ
@@ -1942,52 +2029,11 @@ const FilterPanel = ({
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", lg: "repeat(4, 1fr)" },
+              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", lg: "repeat(3, 1fr)" },
               gap: 1.5,
             }}
           >
-            <TextField
-              select size="small" label="สถานะงาน" value={filterOP}
-              onChange={(e) => onFilterOP(e.target.value)}
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-            >
-              <MenuItem value=""><em>ทั้งหมด</em></MenuItem>
-              {OP_LIST.map((op) => (
-                <MenuItem key={op} value={op}>
-                  <Stack direction="row" alignItems="center" gap={1}>
-                    <Box sx={{ width: 9, height: 9, borderRadius: "50%", bgcolor: OP_COLOR[op], flexShrink: 0 }} />
-                    {op}
-                  </Stack>
-                </MenuItem>
-              ))}
-            </TextField>
-
-            <TextField
-              select size="small" label="ประเภทงาน" value={filterType}
-              onChange={(e) => onFilterType(e.target.value)}
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-            >
-              <MenuItem value=""><em>ทั้งหมด</em></MenuItem>
-              {typeOptions.map((t) => <MenuItem key={t} value={t}>{t}</MenuItem>)}
-            </TextField>
-
-            <TextField
-              select size="small" label="ระบบ" value={filterSystem}
-              onChange={(e) => onFilterSystem(e.target.value)}
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-            >
-              <MenuItem value=""><em>ทั้งหมด</em></MenuItem>
-              {systemOptions.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
-            </TextField>
-
-            <TextField
-              select size="small" label="การเงิน" value={filterStatus}
-              onChange={(e) => onFilterStatus(e.target.value)}
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-            >
-              <MenuItem value=""><em>ทั้งหมด</em></MenuItem>
-              {STATUS_BILLING.map((s) => <MenuItem key={s} value={s}>{s}</MenuItem>)}
-            </TextField>
+            {filterSelects}
           </Box>
         </Collapse>
 
@@ -2635,6 +2681,8 @@ const Operation = () => {
   // กลุ่มแล้ว (ดู handleRequestClose) ทำให้ตัวเลขนี้เพี้ยนสูงกว่าจำนวนงานจริง (เช่น 1 งานเข้า 3 วัน
   // ขึ้นเป็น "3 งาน") ใช้ countDistinctJobs จัดกลุ่มก่อนนับแทน ให้ตรงกับจำนวนงานจริงที่เห็นในพาแนล
   const [filterResponsible, setFilterResponsible] = useState("all");
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
+  const [headerMenuAnchor, setHeaderMenuAnchor] = useState(null);
   /**
    * ✅ ตัวเลขบนการ์ดสถานะนับตามตัวกรองที่ตั้งอยู่ (ผู้ใช้ขอ) — ค้นหา/เดือน/ประเภท/ระบบ/การเงิน/สถานะ/ทีม/ผู้รับผิดชอบ
    *    ยกเว้น "กลุ่มของการ์ดเอง" (ไม่งั้นทุกการ์ดจะเหลือเลขเดียวกับการ์ดที่เลือกอยู่) — ตัวเลขจึงบอกตรงๆ ว่า
@@ -3188,6 +3236,77 @@ const Operation = () => {
     isAdminOrManager ? "admin" : "technician"
   );
 
+  // ✅ แถบแบ่งหน้าใช้ทั้งมุมมองการ์ดและตาราง — เดิมมีแค่การ์ด ตารางเลยดูข้อมูลหน้าถัดไปไม่ได้ (ผู้ใช้แจ้ง)
+  // ✅ มือถือ: การ์ดสถานะ/ผู้รับผิดชอบ/ค้นหา/ตัวกรอง รวมในแผ่นล่างแผ่นเดียว (ผู้ใช้ขอ — เหมือนหน้าภาพรวมงาน)
+  // ✅ มือถือ: เลือกสถานะ/ตัวกรอง/เดือนแล้วปิดแผ่นทันที — ยกเว้นกด "เลือกเดือน" (ยังต้องเลือกเดือนในช่องที่โผล่มา)
+  useCloseOnPick(mobileSheetOpen, () => setMobileSheetOpen(false), {
+    statusGroup, filterResponsible, filterOP, filterType, filterSystem, filterTeam, month: showAll ? "ALL" : selectedDate,
+  }, (prev, next) => prev.month === "ALL" && next.month !== "ALL");
+
+  const statusTileGroups = [{
+    title: "",
+    items: [
+      { value: "all", label: "ทั้งหมด", count: allJobsCount, unit: "งาน", icon: <AppsIcon />, color: "#475569" },
+      ...(isAdminOrManager ? [
+        { value: "pending", label: "คำขอปิดงาน", count: pendingCount, unit: "งาน", icon: <HourglassTop />, color: "#d97706", alert: true },
+        { value: "active", label: "กำลังดำเนินการ / ยืนยันแล้ว", shortLabel: "กำลังดำเนินการ", count: inProgressCount, unit: "งาน", icon: <PendingActions />, color: "#7c3aed" },
+      ] : []),
+      { value: "overdue", label: "ค้างงาน", count: overdueCount, unit: "งาน", icon: <Warning />, color: "#dc2626", alert: true,
+        sub: severeOverdueCount > 0 ? `${severeOverdueCount} เกิน 2 สัปดาห์` : undefined },
+      { value: "closed", label: "เสร็จสิ้น", count: closedCount, unit: "งาน", icon: <CheckCircle />, color: "#059669" },
+    ],
+  }];
+  const statusItem = statusTileGroups[0].items.find((i) => i.value === effectiveGroup);
+  const mobileActiveCount = activeFilterCount + (filterResponsible !== "all" ? 1 : 0) + (effectiveGroup && effectiveGroup !== "all" ? 1 : 0);
+  const responsibleOptions = (() => {
+    const m = new Map();
+    let unassigned = 0;
+    responsibleRows.forEach((r) => {
+      if (!r.responsiblePerson) { unassigned += 1; return; }
+      m.set(r.responsiblePerson, (m.get(r.responsiblePerson) || 0) + 1);
+    });
+    return { list: [...m].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "th")), unassigned, total: responsibleRows.length };
+  })();
+  const clearAllOpFilters = () => {
+    setFilterType(""); setFilterSystem(""); setFilterStatus(""); setFilterOP(""); setFilterTeam(""); setSearch(""); setFilterResponsible("all");
+  };
+  const filterPanelProps = {
+    search, onSearch: setSearch,
+    filterType, onFilterType: setFilterType,
+    filterSystem, onFilterSystem: setFilterSystem,
+    filterStatus, onFilterStatus: setFilterStatus,
+    filterOP, onFilterOP: setFilterOP,
+    filterTeam, onFilterTeam: setFilterTeam,
+    typeOptions, systemOptions,
+    showAll, onToggleShowAll: (v) => { setShowAll(v); if (v) setSelectedDate(""); },
+    selectedDate, onDateChange: (d) => { setSelectedDate(d); setShowAll(false); },
+    onClearAll: clearAllOpFilters,
+    activeCount: activeFilterCount,
+  };
+
+  const paginationBar = (
+    <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" justifyContent="space-between"
+      gap={1.5} sx={{ mt: 2, mb: 1 }}>
+      <SelectField
+        label="ต่อหน้า" value={pageSize}
+        onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
+        sx={{ width: 120 }}>
+        {[5, 10, 20, 50, 100].map(n => <option key={n} value={n}>{n} รายการ</option>)}
+      </SelectField>
+      {/* ✅ เดิม size="small" บนมือถือทำให้ปุ่มเลขหน้าเล็กเกินไป กดยาก/กดพลาด — ใช้ "large"
+          แทนบนมือถือ (ตรงข้ามกับเดิม) ให้ปุ่มโตพอกดง่ายด้วยนิ้ว จอกว้างยังใช้ "medium" เท่าเดิม */}
+      <Pagination
+        count={totalPages} page={page}
+        onChange={(_, v) => setPage(v)}
+        color="primary" shape="rounded" size={isMobile ? "large" : "medium"}
+        showFirstButton showLastButton
+        sx={isMobile ? {
+          "& .MuiPaginationItem-root": { minWidth: 40, height: 40, fontSize: "1rem" },
+        } : undefined}
+      />
+    </Stack>
+  );
+
   return (
     <Box sx={{ px: { xs: 1, sm: 2, md: 3 }, py: { xs: 1.5, sm: 3 }, maxWidth: 1400, mx: "auto" }}>
 
@@ -3221,6 +3340,54 @@ const Operation = () => {
         {/* ✅ ปุ่มวงกลม ขนาด 40px ให้แตะง่ายขึ้นบนมือถือ (เดิม size="small" เล็กไปสำหรับนิ้วมือ)
             เข้าธีมเดียวกับปุ่มวงกลมที่ใช้ทั่วแอป (bell button ใน Dashboard/Header) */}
         <Stack direction="row" gap={{ xs: 0.5, sm: 1 }} flexShrink={0}>
+          {/* ✅ มือถือ: ปุ่มสถานะ/ค้นหา/ตัวกรอง — เปิดแผ่นล่าง */}
+          {/* ✅ มือถือ (ผู้ใช้: "ปุ่มไม่ชัดเจน มองยาก"): เดิมเป็นไอคอนกลม 5 ปุ่มคนละแบบเรียงกัน เดาไม่ออกว่าอันไหนคืออะไร
+              → เหลือ 2 ปุ่ม: "ตัวกรอง" มีป้ายข้อความ + เมนู ⋮ (รีเฟรช · มุมมองการ์ด/ตาราง · ส่งออก Excel) */}
+          {isMobile && activeTab !== 1 && (
+            <Badge badgeContent={mobileActiveCount} color="error" sx={{ "& .MuiBadge-badge": { fontSize: "0.6rem", height: 16, minWidth: 16 } }}>
+              <Button
+                aria-label="สถานะ ค้นหา และตัวกรอง" onClick={() => setMobileSheetOpen(true)}
+                startIcon={<Tune sx={{ fontSize: "18px !important" }} />}
+                sx={{
+                  height: 38, px: 1.5, borderRadius: 2.5, textTransform: "none", fontWeight: 800, fontSize: "0.85rem",
+                  border: "1px solid", borderColor: mobileActiveCount ? alpha("#dc2626", 0.4) : "divider",
+                  color: mobileActiveCount ? "#dc2626" : "text.primary", bgcolor: mobileActiveCount ? alpha("#dc2626", 0.06) : "background.paper",
+                }}
+              >
+                ตัวกรอง
+              </Button>
+            </Badge>
+          )}
+          {isMobile && (
+            <>
+              <IconButton
+                aria-label="เมนูเพิ่มเติม" onClick={(e) => setHeaderMenuAnchor(e.currentTarget)}
+                sx={{ width: 38, height: 38, borderRadius: 2.5, border: "1px solid", borderColor: "divider" }}
+              >
+                <MoreVert sx={{ fontSize: 20 }} />
+              </IconButton>
+              <Menu
+                anchorEl={headerMenuAnchor} open={Boolean(headerMenuAnchor)} onClose={() => setHeaderMenuAnchor(null)}
+                anchorOrigin={{ vertical: "bottom", horizontal: "right" }} transformOrigin={{ vertical: "top", horizontal: "right" }}
+                slotProps={{ paper: { sx: { borderRadius: 2.5, minWidth: 210, mt: 0.5 } } }}
+              >
+                <MenuItem onClick={() => { setHeaderMenuAnchor(null); fetchEventsFromDB(); }}>
+                  <ListItemIcon><Refresh fontSize="small" /></ListItemIcon><ListItemText>รีเฟรชข้อมูล</ListItemText>
+                </MenuItem>
+                <MenuItem onClick={() => { setHeaderMenuAnchor(null); setViewMode(viewMode === "card" ? "table" : "card"); }}>
+                  <ListItemIcon>{viewMode === "card" ? <TableChart fontSize="small" /> : <ViewList fontSize="small" />}</ListItemIcon>
+                  <ListItemText>{viewMode === "card" ? "ดูแบบตาราง" : "ดูแบบการ์ด"}</ListItemText>
+                </MenuItem>
+                {isAdminOrManager && (
+                  <MenuItem disabled={exporting || jobGroups.length === 0} onClick={() => { setHeaderMenuAnchor(null); handleExportExcel(); }}>
+                    <ListItemIcon><FontAwesomeIcon icon={faFileExcel} style={{ fontSize: 16, color: "#047857" }} /></ListItemIcon>
+                    <ListItemText>ส่งออก Excel</ListItemText>
+                  </MenuItem>
+                )}
+              </Menu>
+            </>
+          )}
+          {!isMobile && (<>
           <Tooltip title="รีเฟรช">
             <IconButton onClick={() => fetchEventsFromDB()}
               sx={{ border: "1px solid", borderColor: "divider", borderRadius: "50%", width: { xs: 34, sm: 40 }, height: { xs: 34, sm: 40 } }}>
@@ -3228,7 +3395,8 @@ const Operation = () => {
             </IconButton>
           </Tooltip>
           {/* Notification bell — ทุก role เห็น แต่เนื้อหาต่างกันตามฝั่ง (ดูคอมเมนต์ใน NotificationBell) */}
-          <NotificationBell notifications={notifications} unread={unread} onItemClick={markRead} onMarkAllRead={markAllRead} />
+          {/* 🧹 มือถือ: ตัดกระดิ่งออก (ผู้ใช้ขอ — แถบหัวแอปมีกระดิ่งแจ้งเตือนอยู่แล้ว ปุ่มบนหัวเพจแน่นเกิน) */}
+          {!isMobile && <NotificationBell notifications={notifications} unread={unread} onItemClick={markRead} onMarkAllRead={markAllRead} />}
           {/* ✅ สลับมุมมองการ์ด ↔ ตาราง — การ์ดอ่านรายละเอียดทีละงานได้ครบ (มีเอกสาร/คอมเมนต์/ปุ่มจัดการ
               ในตัว) ส่วนตารางไว้กวาดดูหลายงานพร้อมกัน/เทียบกัน เทียบ pattern เดียวกับหน้าติดตามใบเสนอราคา */}
           <ToggleButtonGroup
@@ -3254,6 +3422,7 @@ const Operation = () => {
               </span>
             </Tooltip>
           )}
+          </>)}
         </Stack>
       </Stack>
 
@@ -3386,29 +3555,17 @@ const Operation = () => {
       {/* ⚠️ เหลือแท็บเดียวแล้ว (รายการงาน) — เงื่อนไขนี้จึงเป็นจริงเสมอ คงไว้เผื่อเพิ่มแท็บในอนาคต */}
       {/* ✅ การ์ดตัวเลขชุดเดียวกับหน้าภาพรวมงาน (ViewTiles) — เดิมเป็นกล่องจัดกลาง ไอคอนเทา ตัวเลขเล็ก
           ผู้ใช้แจ้งว่าดูยาก ไม่รู้ว่ากดสลับได้ · ช่างเห็นแค่ ค้างงาน/เสร็จสิ้น (งานรออนุมัติเป็นของแอดมิน) */}
-      {activeTab !== 1 && (
+      {activeTab !== 1 && !isMobile && (
         <ViewTiles
           value={effectiveGroup}
           onChange={setStatusGroup}
           isMobile={isMobile}
-          groups={[{
-            title: "",
-            items: [
-              { value: "all", label: "ทั้งหมด", count: allJobsCount, unit: "งาน", icon: <AppsIcon />, color: "#475569" },
-              ...(isAdminOrManager ? [
-                { value: "pending", label: "คำขอปิดงาน", count: pendingCount, unit: "งาน", icon: <HourglassTop />, color: "#d97706", alert: true },
-                { value: "active", label: "กำลังดำเนินการ / ยืนยันแล้ว", shortLabel: "กำลังดำเนินการ", count: inProgressCount, unit: "งาน", icon: <PendingActions />, color: "#7c3aed" },
-              ] : []),
-              { value: "overdue", label: "ค้างงาน", count: overdueCount, unit: "งาน", icon: <Warning />, color: "#dc2626", alert: true,
-                sub: severeOverdueCount > 0 ? `${severeOverdueCount} เกิน 2 สัปดาห์` : undefined },
-              { value: "closed", label: "เสร็จสิ้น", count: closedCount, unit: "งาน", icon: <CheckCircle />, color: "#059669" },
-            ],
-          }]}
+          groups={statusTileGroups}
         />
       )}
 
       {/* ✅ ทางลัดงานตามผู้รับผิดชอบ — ชุดเดียวกับหน้าภาพรวมงาน (กดชื่อเพื่อดูเฉพาะงานของคนนั้น) */}
-      {isAdminOrManager && activeTab !== 1 && !id && (
+      {isAdminOrManager && activeTab !== 1 && !id && !isMobile && (
         <ResponsibleSummary
           rows={responsibleRows}
           unit="งาน"
@@ -3435,19 +3592,66 @@ const Operation = () => {
             />
           )}
 
-          <FilterPanel
-            search={search} onSearch={setSearch}
-            filterType={filterType} onFilterType={setFilterType}
-            filterSystem={filterSystem} onFilterSystem={setFilterSystem}
-            filterStatus={filterStatus} onFilterStatus={setFilterStatus}
-            filterOP={filterOP} onFilterOP={setFilterOP}
-            filterTeam={filterTeam} onFilterTeam={setFilterTeam}
-            typeOptions={typeOptions} systemOptions={systemOptions}
-            showAll={showAll} onToggleShowAll={v => { setShowAll(v); if (v) setSelectedDate(""); }}
-            selectedDate={selectedDate} onDateChange={d => { setSelectedDate(d); setShowAll(false); }}
-            onClearAll={() => { setFilterType(""); setFilterSystem(""); setFilterStatus(""); setFilterOP(""); setFilterTeam(""); setSearch(""); setFilterResponsible("all"); }}
-            activeCount={activeFilterCount}
-          />
+          {!isMobile && <FilterPanel {...filterPanelProps} />}
+          {isMobile && (
+            <>
+              {/* มือถือ: สิ่งที่กำลังดูอยู่เป็นชิปบรรทัดเดียว — แตะเพื่อเปิดแผ่นตัวกรอง */}
+              <Stack direction="row" gap={0.75} flexWrap="wrap" alignItems="center" sx={{ mb: 1.5 }}>
+                {statusItem && (
+                  <Chip
+                    size="small" onClick={() => setMobileSheetOpen(true)}
+                    icon={<Box component="span" sx={{ display: "inline-flex", color: `${statusItem.color} !important`, "& svg": { fontSize: 16 } }}>{statusItem.icon}</Box>}
+                    label={`${statusItem.shortLabel || statusItem.label} · ${statusItem.count}`}
+                    sx={{ fontWeight: 800, bgcolor: alpha(statusItem.color, 0.08), color: statusItem.color, border: `1px solid ${alpha(statusItem.color, 0.25)}` }}
+                  />
+                )}
+                <Chip size="small" onClick={() => setMobileSheetOpen(true)} label={showAll ? "ทุกเดือน" : (selectedDate ? moment(selectedDate, "YYYY-MM").add(543, "year").format("MM/YYYY") : "เดือนนี้")} sx={{ fontWeight: 700 }} />
+                {filterResponsible !== "all" && (
+                  <Chip size="small" label={`ผู้รับผิดชอบ: ${filterResponsible === "unassigned" ? "ยังไม่มอบหมาย" : filterResponsible}`} onDelete={() => setFilterResponsible("all")} sx={{ fontWeight: 700 }} />
+                )}
+                {search.trim() && <Chip size="small" label={`ค้นหา: ${search.trim()}`} onDelete={() => setSearch("")} sx={{ fontWeight: 700 }} />}
+                {filterOP && <Chip size="small" label={`สถานะ: ${filterOP}`} onDelete={() => setFilterOP("")} sx={{ fontWeight: 700 }} />}
+                {filterType && <Chip size="small" label={`ประเภท: ${filterType}`} onDelete={() => setFilterType("")} sx={{ fontWeight: 700 }} />}
+                {filterSystem && <Chip size="small" label={`ระบบ: ${filterSystem}`} onDelete={() => setFilterSystem("")} sx={{ fontWeight: 700 }} />}
+                {filterTeam && <Chip size="small" label={`ทีม: ${filterTeam}`} onDelete={() => setFilterTeam("")} sx={{ fontWeight: 700 }} />}
+              </Stack>
+              <Drawer
+                anchor="bottom" open={mobileSheetOpen} onClose={() => setMobileSheetOpen(false)}
+                PaperProps={{ sx: { borderTopLeftRadius: 18, borderTopRightRadius: 18, px: 2, pt: 1, pb: "calc(16px + env(safe-area-inset-bottom))", maxHeight: "88vh" } }}
+              >
+                <Box sx={{ width: 40, height: 4, borderRadius: 2, bgcolor: "#cbd5e1", mx: "auto", mb: 1.25, flexShrink: 0 }} />
+                <Stack direction="row" alignItems="center" sx={{ mb: 1.5, flexShrink: 0 }}>
+                  <Typography sx={{ flex: 1, fontWeight: 800, fontSize: "1rem" }}>สถานะและตัวกรอง</Typography>
+                  {mobileActiveCount > 0 && (
+                    <Button size="small" onClick={() => { clearAllOpFilters(); setStatusGroup("all"); }} sx={{ textTransform: "none", fontWeight: 700, color: "#dc2626" }}>
+                      ล้างทั้งหมด
+                    </Button>
+                  )}
+                  <IconButton size="small" aria-label="ปิด" onClick={() => setMobileSheetOpen(false)}><Close /></IconButton>
+                </Stack>
+                <Box sx={{ overflowY: "auto", mx: -2, px: 2, pb: 1 }}>
+                  <Typography sx={{ fontSize: "0.78rem", fontWeight: 800, color: "text.secondary", mb: 0.75 }}>สถานะ</Typography>
+                  <Box sx={{ "& > div": { mb: 1.75 } }}>
+                    <ViewTiles value={effectiveGroup} onChange={setStatusGroup} isMobile groups={statusTileGroups} />
+                  </Box>
+                  {isAdminOrManager && !id && responsibleOptions.total > 0 && (
+                    <SelectField fullWidth label="ผู้รับผิดชอบ" value={filterResponsible} onChange={(e) => { setFilterResponsible(e.target.value); setPage(1); }} sx={{ mb: 1.5, width: "100%" }}>
+                      <option value="all">ทุกคน ({responsibleOptions.total})</option>
+                      {responsibleOptions.unassigned > 0 && <option value="unassigned">ยังไม่มอบหมาย ({responsibleOptions.unassigned})</option>}
+                      {responsibleOptions.list.map(([name, n]) => <option key={name} value={name}>{name} ({n})</option>)}
+                    </SelectField>
+                  )}
+                  <FilterPanel {...filterPanelProps} inSheet />
+                </Box>
+                <Button
+                  fullWidth variant="contained" onClick={() => setMobileSheetOpen(false)}
+                  sx={{ mt: 1.5, flexShrink: 0, py: 1.1, textTransform: "none", fontWeight: 800, borderRadius: 2.5, boxShadow: "none", bgcolor: "#334155", "&:hover": { bgcolor: "#1e293b", boxShadow: "none" } }}
+                >
+                  ดูผลลัพธ์ {sortedEvents.length} รายการ
+                </Button>
+              </Drawer>
+            </>
+          )}
 
           {loading ? (
             [1, 2, 3].map(i => <Skeleton key={i} variant="rounded" height={96} sx={{ mb: 1.5, borderRadius: 2 }} />)
@@ -3460,6 +3664,7 @@ const Operation = () => {
           ) : viewMode === "table" ? (
             /* ✅ มุมมองตาราง — กดแถวแล้วสลับกลับไปมุมมองการ์ดพร้อมไฮไลต์งานนั้น (การ์ดคือที่เดียวที่
                จัดการงานได้จริง: แนบเอกสาร/เช็คอิน/คอมเมนต์) จึงไม่ทำ dialog ซ้อนอีกชั้นให้ซับซ้อน */
+            <>
             <OperationTable
               employee={employee}
               canAssign={can(currentUser, "editContracts")}
@@ -3469,6 +3674,8 @@ const Operation = () => {
               // ✅ กดแถว = เปิดแผงรายละเอียดทับบนตาราง (ไม่สลับทั้งหน้าไปมุมมองการ์ดเหมือนเดิม)
               onOpenJob={(job) => setDetailJobId(job.sessions[0]._id)}
             />
+            {paginationBar}
+            </>
           ) : (
             <>
               {/* ✅ กลับมาเป็นคอลัมน์เดียว — เดิมลองแบ่ง 2 คอลัมน์บนจอกว้าง แต่การ์ดงานกรุ๊ป (เข้า
@@ -3537,26 +3744,7 @@ const Operation = () => {
                 );
               })}
 
-              <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" justifyContent="space-between"
-                gap={1.5} sx={{ mt: 2, mb: 1 }}>
-                <SelectField
-                  label="ต่อหน้า" value={pageSize}
-                  onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
-                  sx={{ width: 120 }}>
-                  {[5, 10, 20, 50, 100].map(n => <option key={n} value={n}>{n} รายการ</option>)}
-                </SelectField>
-                {/* ✅ เดิม size="small" บนมือถือทำให้ปุ่มเลขหน้าเล็กเกินไป กดยาก/กดพลาด — ใช้ "large"
-                    แทนบนมือถือ (ตรงข้ามกับเดิม) ให้ปุ่มโตพอกดง่ายด้วยนิ้ว จอกว้างยังใช้ "medium" เท่าเดิม */}
-                <Pagination
-                  count={totalPages} page={page}
-                  onChange={(_, v) => setPage(v)}
-                  color="primary" shape="rounded" size={isMobile ? "large" : "medium"}
-                  showFirstButton showLastButton
-                  sx={isMobile ? {
-                    "& .MuiPaginationItem-root": { minWidth: 40, height: 40, fontSize: "1rem" },
-                  } : undefined}
-                />
-              </Stack>
+              {paginationBar}
             </>
           )}
         </>

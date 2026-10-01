@@ -9,13 +9,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import moment from "moment";
 import {
-  Box, Stack, Typography, TextField, MenuItem, Button, Alert, Skeleton, Table, TableHead, TableRow, TableCell,
+  Box, Stack, Typography, Button, Alert, Skeleton, Table, TableHead, TableRow, TableCell, Drawer, IconButton,
   TableBody, ToggleButtonGroup, ToggleButton, useMediaQuery, Tooltip, Chip,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { FileDownload, Insights, WarningAmber } from "@mui/icons-material";
+import { FileDownload, Insights, WarningAmber, Close } from "@mui/icons-material";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
+import SelectField from "@/shared/ui/SelectField";
+import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
+import ResponsibleSummary from "@/shared/ui/ResponsibleSummary";
 import { thaiDate, THAI_MONTHS_SHORT } from "@/shared/utils/thaiDate";
 import usePermissions from "@/shared/hooks/usePermissions";
 import ExpenseService, { errorText } from "../services/ExpenseService";
@@ -243,7 +246,7 @@ const GroupTable = ({ rows, firstHeader, onPick }) => (
   </Box>
 );
 
-export default function ExpenseReport({ onOpen, reloadKey }) {
+export default function ExpenseReport({ onOpen, reloadKey, mobileFiltersOpen = false, onMobileFiltersClose, onActiveFiltersChange }) {
   const isDesktop = useMediaQuery("(min-width:900px)");
   const { can } = usePermissions();
   const viewAll = can("viewAllExpenses");
@@ -253,11 +256,11 @@ export default function ExpenseReport({ onOpen, reloadKey }) {
   const [person, setPerson] = useState("all");
   const [people, setPeople] = useState([]);
   const [group, setGroup] = useState("person");
-  const [rows, setRows] = useState([]);
+  const [allRows, setRows] = useState([]);
   // ⚠️ ใบสำรองจ่ายมาคนละก้อนกับใบ Advance (ไม่มีใบไหนให้ผูก) — เก็บแยกแล้วส่งเข้าตัวสรุปพร้อมกัน
-  const [reimburseRows, setReimburseRows] = useState([]);
+  const [allReimburse, setReimburseRows] = useState([]);
   // ใบค่าจ้างผู้รับเหมา — แสดงเป็นก้อนของตัวเอง (ไม่เข้าสูตรเงินของพนักงาน: ผู้รับเงินเป็นคนนอก)
-  const [ctrRows, setCtrRows] = useState([]);
+  const [allCtr, setCtrRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [exporting, setExporting] = useState(false);
@@ -281,7 +284,6 @@ export default function ExpenseReport({ onOpen, reloadKey }) {
     const params = {};
     if (from) params.from = from;
     if (to) params.to = to;
-    if (person !== "all") params.userId = person;
     // ✅ ตัวกรองเดิม (ข้อมูลเปลี่ยนแบบเรียลไทม์) → อัปเดตตัวเลขเงียบๆ ไม่ล้างรายงานเป็นโครงโหลด
     const paramsKey = JSON.stringify(params);
     if (paramsKey !== lastParamsRef.current) setLoading(true);
@@ -297,7 +299,34 @@ export default function ExpenseReport({ onOpen, reloadKey }) {
       .catch((err) => alive && setError(errorText(err, "โหลดรายงานไม่สำเร็จ")))
       .finally(() => alive && setLoading(false));
     return () => { alive = false; };
-  }, [from, to, person, reloadKey]);
+  }, [from, to, reloadKey]);
+
+  // ✅ กรองผู้เบิกฝั่งหน้าจอ (เดิมส่ง userId ไปให้ server) — server กรองทุกก้อนด้วย requester.userId อย่างเดียว
+  // ผลจึงเหมือนเดิมทุกตัวเลข แต่แผง "ใบเบิกตามผู้เบิก" ยังเห็นตัวเลขของทุกคนครบแม้เลือกคนหนึ่งอยู่
+  // (ถ้ากรองที่ server พอกดคนหนึ่ง คนอื่นจะหายจากแผงหมด — แบบเดียวกับแผงผู้รับผิดชอบหน้าภาพรวมงาน)
+  const ofPerson = (r) => person === "all" || String(r.requester?.userId || "") === person;
+  const rows = useMemo(() => allRows.filter(ofPerson), [allRows, person]); // eslint-disable-line react-hooks/exhaustive-deps
+  const reimburseRows = useMemo(() => allReimburse.filter(ofPerson), [allReimburse, person]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ctrRows = useMemo(() => allCtr.filter(ofPerson), [allCtr, person]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // แถวสำหรับแผงผู้เบิก — ใบ Advance + สำรองจ่าย + ค่าจ้างผู้รับเหมา (ชุดเดียวกับที่ตัวกรองผู้เบิกเดิมครอบ)
+  const personRows = useMemo(() => [...allRows, ...allReimburse, ...allCtr].map((r) => ({
+    responsiblePerson: personFullName(r.requester),
+    userId: String(r.requester?.userId || ""),
+    total: Number(r.total) || 0,
+  })), [allRows, allReimburse, allCtr]);
+  const selectedName = person === "all" ? "all" : (personRows.find((r) => r.userId === person)?.responsiblePerson
+    || people.find((p) => p.userId === person)?.fullName || "all");
+  const pickPerson = (name) => {
+    if (name === "all") { setPerson("all"); return; }
+    setPerson(personRows.find((r) => r.responsiblePerson === name)?.userId || "all");
+  };
+  const personOptions = useMemo(() => {
+    const m = new Map();
+    personRows.forEach((r) => { if (!r.userId) return; const p = m.get(r.userId) || { id: r.userId, name: r.responsiblePerson, count: 0 }; p.count += 1; m.set(r.userId, p); });
+    return [...m.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "th"));
+  }, [personRows]);
+  const avatarPeople = useMemo(() => people.map((p) => ({ fname: p.fullName, imageUrl: p.imageUrl })), [people]);
 
   const report = useMemo(() => buildExpenseReport(rows, { reimbursements: reimburseRows }), [rows, reimburseRows]);
   const hasData = rows.length > 0 || reimburseRows.length > 0 || ctrRows.length > 0;
@@ -317,34 +346,104 @@ export default function ExpenseReport({ onOpen, reloadKey }) {
     }
   };
 
+  // จำนวนตัวกรองที่ต่างจากค่าเริ่มต้น (ปีนี้ · ทุกคน) — ป้ายบนปุ่มตัวกรองของหัวเพจ (มือถือ)
+  const activeFilterCount = (preset !== "year" ? 1 : 0) + (person !== "all" ? 1 : 0);
+  useEffect(() => { onActiveFiltersChange?.(activeFilterCount); }, [activeFilterCount]); // eslint-disable-line react-hooks/exhaustive-deps
+  // ✅ มือถือ: เลือกช่วงเวลา/ผู้เบิกแล้วปิดแผ่นทันที — ยกเว้น "กำหนดเอง" (ยังต้องเลือกวันที่ในแผ่น)
+  useCloseOnPick(mobileFiltersOpen, () => onMobileFiltersClose?.(), { preset, person }, (_, next) => next.preset === "custom");
+
+  // ✅ แถบตัวกรองแถวเดียว (กล่องขาวชุดเดียวกับหน้าภาพรวมงาน) — จอใหญ่วางบนหน้า · มือถืออยู่ในแผ่นล่าง
+  const filterBox = (
+    <Stack
+      direction={{ xs: "column", md: "row" }} spacing={1} alignItems={{ md: "center" }}
+      sx={isDesktop
+        ? { mb: 1.5, p: 1, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, boxShadow: "0 1px 2px rgba(15,23,42,.04)" }
+        : { "& > *": { width: "100%" } }}
+    >
+      <SelectField label="ช่วงเวลา" value={preset} onChange={(e) => applyPreset(e.target.value)} sx={{ minWidth: 170 }}>
+        {PRESETS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+      </SelectField>
+      {preset === "custom" && (
+        <Stack direction="row" spacing={1} sx={{ flex: { md: "none" } }}>
+          <Box sx={{ flex: 1, minWidth: 150 }}><ThaiDatePicker label="ตั้งแต่" value={from} onChange={(v) => setFrom(v || "")} /></Box>
+          <Box sx={{ flex: 1, minWidth: 150 }}><ThaiDatePicker label="ถึง" value={to} onChange={(v) => setTo(v || "")} /></Box>
+        </Stack>
+      )}
+      {/* ✅ มือถือ: ผู้เบิกเป็น select (แผงการ์ดใช้บนจอใหญ่เท่านั้น) */}
+      {viewAll && !isDesktop && personOptions.length > 1 && (
+        <SelectField label="ผู้เบิก" value={person} onChange={(e) => setPerson(e.target.value)}>
+          <option value="all">ทุกคน ({personRows.length})</option>
+          {personOptions.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.count})</option>)}
+        </SelectField>
+      )}
+      {viewAll && isDesktop && person !== "all" && (
+        <Chip
+          label={`ผู้เบิก: ${selectedName}`} onDelete={() => setPerson("all")} color="primary" variant="outlined"
+          sx={{ fontWeight: 700, maxWidth: 260, alignSelf: { xs: "flex-start", md: "center" } }}
+        />
+      )}
+      <Box sx={{ flex: 1, display: { xs: "none", md: "block" } }} />
+      <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 600 }}>{periodLabel} · อิงวันที่ของใบ Advance</Typography>
+      <Button variant="outlined" startIcon={<FileDownload />} onClick={doExport} disabled={loading || exporting || !hasData}
+        sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, bgcolor: "#fff" }}>
+        {exporting ? "กำลังส่งออก..." : "ส่งออก Excel"}
+      </Button>
+    </Stack>
+  );
+
   return (
     <Box sx={{ pt: 2 }}>
       {/* ── ตัวกรอง ─────────────────────────────────────────────────── */}
-      <Stack direction={{ xs: "column", md: "row" }} spacing={1} alignItems={{ md: "center" }} sx={{ mb: 1.5 }}>
-        <TextField select size="small" label="ช่วงเวลา" value={preset} onChange={(e) => applyPreset(e.target.value)} sx={{ minWidth: 160, bgcolor: "#fff" }}>
-          {PRESETS.map((p) => <MenuItem key={p.value} value={p.value}>{p.label}</MenuItem>)}
-        </TextField>
-        {preset === "custom" && (
-          <Stack direction="row" spacing={1} sx={{ flex: { md: "none" } }}>
-            <Box sx={{ flex: 1, minWidth: 150 }}><ThaiDatePicker label="ตั้งแต่" value={from} onChange={(v) => setFrom(v || "")} /></Box>
-            <Box sx={{ flex: 1, minWidth: 150 }}><ThaiDatePicker label="ถึง" value={to} onChange={(v) => setTo(v || "")} /></Box>
+      {isDesktop ? filterBox : (
+        <>
+          {/* ── มือถือ: บอกช่วงเวลา/ผู้เบิกที่กำลังดูเป็นบรรทัดเล็ก (แผงเต็มอยู่ในแผ่นล่าง เปิดจากปุ่มบนหัวเพจ) ── */}
+          <Stack direction="row" spacing={0.75} useFlexGap alignItems="center" sx={{ mb: 1.25, flexWrap: "wrap" }}>
+            <Chip size="small" label={PRESETS.find((p) => p.value === preset)?.label || periodLabel} sx={{ fontWeight: 700, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}` }} />
+            {person !== "all" && <Chip size="small" label={`ผู้เบิก: ${selectedName}`} onDelete={() => setPerson("all")} sx={{ fontWeight: 700 }} />}
+            <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 600 }}>{periodLabel}</Typography>
           </Stack>
-        )}
-        {viewAll && (
-          <TextField select size="small" label="ผู้เบิก" value={person} onChange={(e) => setPerson(e.target.value)} sx={{ minWidth: 170, bgcolor: "#fff" }}>
-            <MenuItem value="all">ทุกคน</MenuItem>
-            {people.map((p) => <MenuItem key={p.userId} value={p.userId}>{p.fullName}</MenuItem>)}
-          </TextField>
-        )}
-        <Box sx={{ flex: 1 }} />
-        <Typography variant="caption" sx={{ color: TEXT_SUB }}>{periodLabel} · อิงวันที่ของใบ Advance</Typography>
-        <Button variant="outlined" startIcon={<FileDownload />} onClick={doExport} disabled={loading || exporting || !hasData}
-          sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, bgcolor: "#fff" }}>
-          {exporting ? "กำลังส่งออก..." : "ส่งออก Excel"}
-        </Button>
-      </Stack>
+          <Drawer
+            anchor="bottom" open={mobileFiltersOpen} onClose={() => onMobileFiltersClose?.()}
+            PaperProps={{ sx: { borderTopLeftRadius: 18, borderTopRightRadius: 18, px: 2, pt: 1, pb: "calc(16px + env(safe-area-inset-bottom))", maxHeight: "85vh" } }}
+          >
+            <Box sx={{ width: 40, height: 4, borderRadius: 2, bgcolor: "#cbd5e1", mx: "auto", mb: 1.25 }} />
+            <Stack direction="row" alignItems="center" sx={{ mb: 1.5 }}>
+              <Typography sx={{ flex: 1, fontWeight: 800, fontSize: "1rem", color: TEXT_MAIN }}>ตัวกรองรายงาน</Typography>
+              {activeFilterCount > 0 && (
+                <Button size="small" onClick={() => { applyPreset("year"); setPerson("all"); }} sx={{ textTransform: "none", fontWeight: 700, color: "#dc2626" }}>
+                  ล้างทั้งหมด
+                </Button>
+              )}
+              <IconButton size="small" aria-label="ปิด" onClick={() => onMobileFiltersClose?.()}><Close /></IconButton>
+            </Stack>
+            {filterBox}
+            <Button
+              fullWidth variant="contained" onClick={() => onMobileFiltersClose?.()}
+              sx={{ mt: 2, py: 1.1, textTransform: "none", fontWeight: 800, borderRadius: 2.5, boxShadow: "none", bgcolor: "#334155", "&:hover": { bgcolor: "#1e293b", boxShadow: "none" } }}
+            >
+              ดูรายงาน
+            </Button>
+          </Drawer>
+        </>
+      )}
 
       {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
+
+      {/* ✅ เลือกดูผู้เบิกแบบการ์ด — ชุดเดียวกับแผงผู้รับผิดชอบหน้าภาพรวมงาน (กดชื่อ = ดูเฉพาะคนนั้น · กดซ้ำ = ทุกคน) */}
+      {viewAll && isDesktop && !loading && personRows.length > 0 && (
+        <ResponsibleSummary
+          rows={personRows}
+          unit="ใบ"
+          value={selectedName}
+          onChange={pickPerson}
+          employees={avatarPeople}
+          isMobile={!isDesktop}
+          title="ใบเบิกตามผู้เบิก"
+          hint="กดที่ชื่อเพื่อดูรายงานเฉพาะคนนั้น · กดซ้ำเพื่อดูทุกคน · ยอดเงิน = ยอดในใบรวม"
+          amountOf={(r) => r.total}
+          formatAmount={baht}
+        />
+      )}
 
       {loading ? (
         <Stack spacing={1.5}>

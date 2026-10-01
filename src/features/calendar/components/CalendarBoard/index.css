@@ -1881,3 +1881,84 @@
   opacity: 0.85;
   vertical-align: 1px;
 }
+
+/* ── จอใหญ่ (≥992px): ปุ่มแถบเครื่องมือมีป้ายกำกับ + ตัวกรองแสดงตลอดเป็นแถวเดียวเรียบร้อย (ผู้ใช้ขอ) ── */
+.tb-label { display: none; }
+.ec-wide-toolbar .tb-label {
+  display: inline;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ec-wide-toolbar .event-toolbar-row .filter-toggle-btn,
+.ec-wide-toolbar .event-toolbar-row .toolbar-icon-btn {
+  width: auto;
+  padding: 0 12px;
+  gap: 7px;
+}
+.ec-wide-toolbar .event-filter-panel {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  align-items: center;
+  padding: 10px;
+  background-color: #ffffff;
+  animation: none;
+}
+.ec-wide-toolbar .event-filter-clear {
+  grid-column: auto;
+  white-space: nowrap;
+}
+.ec-wide-toolbar .event-filter-select { height: 40px; }
+
+/* ── จอใหญ่: ตัวกรองอยู่ในแถวเครื่องมือแถวเดียวกับช่องค้นหาและปุ่ม ── */
+.ec-wide-toolbar .event-search-input { flex: 1 1 220px; }
+.event-filter-inline {
+  display: flex; align-items: center; gap: 8px; flex: 0 1 auto; min-width: 0;
+}
+.event-filter-inline .event-filter-select { width: 150px; height: 40px; flex: 0 1 150px; min-width: 110px; }
+.event-filter-inline .event-filter-clear { grid-column: auto; padding: 0 12px; height: 40px; white-space: nowrap; }
+
+/* ── ช่องเลือกตัวกรอง: หน้าตาเดียวกับช่องเลือกทั้งแอป (ผู้ใช้: แก้ select ให้สวยงาม) ──
+   ⚠️ ยังเป็น <select> เดิม (ตรรกะไม่เปลี่ยน) — แต่งเฉพาะรูปลักษณ์: ลูกศรของเราเอง ขอบ/มุม/สีชุดเดียวกับแอป */
+.event-filter-select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  height: 40px;
+  padding: 0 34px 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  background-color: #ffffff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.event-filter-select:hover { border-color: #cbd5e1; }
+.event-filter-select:focus {
+  outline: none;
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+/* ช่องที่เลือกค่าแล้ว (ไม่ใช่ "ทั้งหมด") — เน้นสีให้รู้ว่ากำลังกรองอยู่ */
+.event-filter-select:has(option:checked:not([value=""])) {
+  border-color: rgba(220, 38, 38, 0.45);
+  background-color: #fff7f7;
+  color: #b91c1c;
+}
+
+/* ระยะห่างระหว่างแถวเครื่องมือกับหัวเดือนด้านล่าง (ผู้ใช้: ชิดเกินไป) */
+.modern-calendar-container .event-toolbar-row { margin-bottom: 28px !important; }
+.ec-wide-toolbar .event-toolbar-row { gap: 10px; }
+
+/* ── ช่องเลือกแบบเมนูสวย (SelectField) ในแถบตัวกรองปฏิทิน ── */
+.event-filter-msel .MuiOutlinedInput-root { height: 40px; font-size: 13px; font-weight: 600; border-radius: 10px; }
+.event-filter-inline .event-filter-msel { width: 150px; flex: 0 1 150px; min-width: 110px; }
+
+/* ปุ่มล้างตัวกรองอยู่ซ้ายสุดของกลุ่มตัวกรอง (ผู้ใช้ขอ) */
+.event-filter-inline .event-filter-clear { order: -1; }

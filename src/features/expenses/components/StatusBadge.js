@@ -14,7 +14,7 @@ import {
 } from "@mui/icons-material";
 import { statusMeta } from "../expenseMeta";
 
-const ICON = {
+export const STATUS_ICON = {
   pending: HourglassTop,
   reviewed: FactCheck,
   approved: Payments,
@@ -33,7 +33,7 @@ const ICON = {
  */
 export default function StatusBadge({ status, kind, size = "small", sx }) {
   const st = statusMeta(status, kind);
-  const Icon = ICON[status] || HelpOutline;
+  const Icon = STATUS_ICON[status] || HelpOutline;
   const big = size === "medium";
   return (
     <Box

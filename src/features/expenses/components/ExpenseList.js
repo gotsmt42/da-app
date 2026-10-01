@@ -8,17 +8,23 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  Box, Stack, Typography, Chip, TextField, InputAdornment, MenuItem, Button, Table, TableHead, TableRow,
-  TableCell, TableBody, useMediaQuery, Skeleton, Alert, IconButton, Menu, Pagination,
+  Box, Stack, Typography, Chip, TextField, InputAdornment, Button, Table, TableHead, TableRow,
+  TableCell, TableBody, useMediaQuery, Skeleton, Alert, IconButton, Pagination, Avatar,
+  ToggleButtonGroup, ToggleButton, Drawer,
 } from "@mui/material";
-import { alpha } from "@mui/material/styles";
-import { Search, Add, WarningAmber, ChevronRight, Inbox, FilterList, Close } from "@mui/icons-material";
+import { Search, Add, WarningAmber, ChevronRight, Inbox, Close, Apps } from "@mui/icons-material";
 
 import { thaiDate } from "@/shared/utils/thaiDate";
 import usePermissions from "@/shared/hooks/usePermissions";
 import ExpenseService, { errorText } from "../services/ExpenseService";
 import KindBadge from "./KindBadge";
-import StatusBadge from "./StatusBadge";
+import StatusBadge, { STATUS_ICON } from "./StatusBadge";
+import SelectField from "@/shared/ui/SelectField";
+import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
+import ViewTiles from "@/shared/ui/ViewTiles";
+import ResponsibleSummary from "@/shared/ui/ResponsibleSummary";
+import { personColor, personInitial } from "@/shared/utils/personAvatar";
+import { hasValidAvatar } from "@/shared/utils/user";
 import {
   KIND_META, statusMeta, STATUS_FILTERS, CLAIM_TYPE_FILTERS, baht, differenceMeta, isOverdueClear, jobText, slipKind, TEXT_SUB, TEXT_MAIN, BORDER_MAIN, personFullName, installmentText, money,
 } from "../expenseMeta";
@@ -103,6 +109,27 @@ const StatusText = ({ e }) => (
   </Stack>
 );
 
+/**
+ * ผู้เบิก — ✅ ผู้ใช้: "เน้นดูชื่อผู้เบิก" — รูป/อักษรย่อสีประจำคน (ชุดเดียวกับหน้าภาพรวมงาน) + ชื่อตัวหนา + ตำแหน่ง
+ */
+const Requester = ({ e, avatars, size = 34 }) => {
+  const name = personFullName(e.requester) || "-";
+  return (
+    <Stack direction="row" spacing={1.1} alignItems="center" sx={{ minWidth: 0 }}>
+      <Avatar src={avatars?.get(String(e.requester?.userId || "")) || undefined}
+        sx={{ width: size, height: size, fontSize: size * 0.42, fontWeight: 800, bgcolor: personColor(name), flexShrink: 0 }}>
+        {personInitial(name)}
+      </Avatar>
+      <Box sx={{ minWidth: 0 }}>
+        <Typography noWrap sx={{ fontWeight: 800, fontSize: "0.88rem", color: TEXT_MAIN, lineHeight: 1.3 }}>{name}</Typography>
+        {e.requester?.position && (
+          <Typography noWrap sx={{ fontSize: "0.72rem", color: TEXT_SUB, lineHeight: 1.3 }}>{e.requester.position}</Typography>
+        )}
+      </Box>
+    </Stack>
+  );
+};
+
 /** บรรทัดเล็กใต้ยอด — บอกเฉพาะเมื่อมีข้อมูลที่ยอดรวมไม่ได้บอก (ส่วนต่างใบเคลม / ยอดสุทธิผู้รับเหมา) */
 const amountNote = (e) => {
   const kind = slipKind(e);
@@ -119,40 +146,39 @@ const AmountCell = ({ e }) => (
   </Box>
 );
 
-const MobileCard = ({ e, onOpen }) => (
+const MobileCard = ({ e, onOpen, avatars }) => (
   <Box onClick={() => onOpen(e._id)} role="button" sx={{
-    p: 1.5, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 2.5, cursor: "pointer",
-    "&:active": { bgcolor: "#f8fafc" },
+    p: 1.5, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, cursor: "pointer",
+    boxShadow: "0 1px 2px rgba(15,23,42,.04)", "&:active": { bgcolor: "#f8fafc" },
   }}>
-    <Stack direction="row" spacing={1.25} alignItems="flex-start">
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        {/* เรื่องคือสิ่งที่คนหา — ตัวหนาบรรทัดแรก (ยาวได้ 2 บรรทัด) */}
-        <Typography sx={{
-          fontWeight: 700, fontSize: "0.93rem", color: TEXT_MAIN, lineHeight: 1.4,
-          display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
-        }}>
-          {e.subject}
-        </Typography>
-        <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", mt: 0.25 }} noWrap>
-          {[e.docNo, thaiDate(e.docDate), personFullName(e.requester), refLabel(e)].filter(Boolean).join(" · ")}
-        </Typography>
-      </Box>
+    <Stack direction="row" spacing={1} alignItems="center">
+      <Box sx={{ flex: 1, minWidth: 0 }}><Requester e={e} avatars={avatars} size={32} /></Box>
       <AmountCell e={e} />
     </Stack>
-    <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+    <Typography sx={{
+      mt: 1, fontWeight: 600, fontSize: "0.88rem", color: TEXT_MAIN, lineHeight: 1.4,
+      display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+    }}>
+      {e.subject}
+    </Typography>
+    <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", mt: 0.25 }} noWrap>
+      {[e.docNo, thaiDate(e.docDate), refLabel(e)].filter(Boolean).join(" · ")}
+    </Typography>
+    <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1, pt: 1, borderTop: `1px solid ${BORDER_MAIN}` }}>
       <KindBadge kind={slipKind(e)} variant="soft" />
+      <Box sx={{ flex: 1 }} />
       <StatusText e={e} />
     </Stack>
   </Box>
 );
 
-const DesktopTable = ({ rows, onOpen }) => (
-  <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 2.5, overflowX: "auto" }}>
+const DesktopTable = ({ rows, onOpen, avatars }) => (
+  <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, overflowX: "auto", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
     <Table size="small" sx={{ minWidth: 820, "& th": { fontWeight: 800, color: TEXT_SUB, fontSize: "0.76rem", bgcolor: "#f8fafc", whiteSpace: "nowrap" } }}>
       <TableHead>
         <TableRow>
-          <TableCell>เลขที่ / วันที่</TableCell>
           <TableCell>ผู้เบิก</TableCell>
+          <TableCell>เลขที่ / วันที่</TableCell>
           <TableCell>เรื่อง · งาน</TableCell>
           <TableCell align="right">ยอด</TableCell>
           <TableCell>สถานะ</TableCell>
@@ -161,17 +187,14 @@ const DesktopTable = ({ rows, onOpen }) => (
       </TableHead>
       <TableBody>
         {rows.map((e) => (
-          <TableRow key={e._id} hover onClick={() => onOpen(e._id)} sx={{ cursor: "pointer", "& td": { py: 1.1, borderColor: BORDER_MAIN } }}>
+          <TableRow key={e._id} hover onClick={() => onOpen(e._id)} sx={{ cursor: "pointer", "& td": { py: 1.2, borderColor: BORDER_MAIN }, "&:last-child td": { borderBottom: 0 } }}>
+            <TableCell sx={{ maxWidth: 240 }}><Requester e={e} avatars={avatars} /></TableCell>
             <TableCell sx={{ whiteSpace: "nowrap" }}>
               <Stack direction="row" spacing={0.75} alignItems="center">
                 <KindBadge kind={slipKind(e)} variant="soft" />
                 <Typography sx={{ fontWeight: 700, fontSize: "0.85rem", color: TEXT_MAIN }}>{e.docNo}</Typography>
               </Stack>
               <Typography variant="caption" sx={{ color: TEXT_SUB }}>{thaiDate(e.docDate)}</Typography>
-            </TableCell>
-            <TableCell sx={{ whiteSpace: "nowrap" }}>
-              <Typography sx={{ fontWeight: 700, fontSize: "0.85rem" }}>{personFullName(e.requester)}</Typography>
-              <Typography variant="caption" sx={{ color: TEXT_SUB }}>{e.requester?.position}</Typography>
             </TableCell>
             <TableCell sx={{ maxWidth: 380 }}>
               <Typography sx={{ fontWeight: 600, fontSize: "0.86rem" }} noWrap>{e.subject}</Typography>
@@ -189,13 +212,16 @@ const DesktopTable = ({ rows, onOpen }) => (
   </Box>
 );
 
-export default function ExpenseList({ mode, status: statusProp, claimType = "all", onClaimTypeChange, onStatusChange, onOpen, onCreate, reloadKey }) {
+export default function ExpenseList({
+  mode, status: statusProp, claimType = "all", onClaimTypeChange, onStatusChange, onOpen, onCreate, reloadKey,
+  // ✅ มือถือ: ปุ่มเปิดตัวกรองอยู่บนหัวเพจ (ExpensesPage) — แผงค้นหา/ตัวกรองเปิดเป็นแผ่นล่าง (bottom sheet)
+  mobileFiltersOpen = false, onMobileFiltersClose, onActiveFiltersChange,
+}) {
   const isDesktop = useMediaQuery("(min-width:900px)");
   const { can } = usePermissions();
   const viewAll = can("viewAllExpenses");
   const [searchParams] = useSearchParams();
   const kind = mode === "inbox" ? null : mode;
-  const meta = kind ? KIND_META[kind] : null;
 
   const initialStatus = statusProp || searchParams.get("status");
   const [status, setStatusState] = useState(kind && (STATUS_FILTERS[kind].includes(initialStatus) || initialStatus === "overdue") ? initialStatus : "all");
@@ -208,8 +234,14 @@ export default function ExpenseList({ mode, status: statusProp, claimType = "all
   }, [statusProp]);
   const [period, setPeriod] = useState("all");
   const [person, setPerson] = useState("all");
+  const [avatars, setAvatars] = useState(() => new Map());
+  useEffect(() => {
+    if (!viewAll) return;
+    ExpenseService.people()
+      .then((list) => setAvatars(new Map(list.filter((u) => hasValidAvatar(u.imageUrl)).map((u) => [String(u.userId), u.imageUrl]))))
+      .catch(() => {});
+  }, [viewAll]);
   const [q, setQ] = useState("");
-  const [filterAnchor, setFilterAnchor] = useState(null);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -238,11 +270,6 @@ export default function ExpenseList({ mode, status: statusProp, claimType = "all
     return () => { alive = false; };
   }, [mode, kind, claimType, period, reloadKey]);
 
-  const people = useMemo(() => {
-    const map = new Map();
-    rows.forEach((e) => { if (e.requester?.userId) map.set(e.requester.userId, e.requester.name); });
-    return [...map.entries()].sort((a, b) => String(a[1]).localeCompare(String(b[1]), "th"));
-  }, [rows]);
 
   const base = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -255,6 +282,22 @@ export default function ExpenseList({ mode, status: statusProp, claimType = "all
         .some((v) => String(v || "").toLowerCase().includes(needle));
     });
   }, [rows, q, person]);
+
+  // ✅ แผง "ใบเบิกตามผู้เบิก" — นับจากคำค้นเดียวกัน แต่ไม่กรองผู้เบิก (เลือกคนหนึ่งแล้วยังเห็นของทุกคน)
+  const personRows = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return rows
+      .filter((e) => !needle || [e.docNo, e.subject, e.requester?.name, e.requester?.fullName, e.job?.title, e.job?.site, e.job?.company, e.advance?.docNo, e.contractor?.name]
+        .some((v) => String(v || "").toLowerCase().includes(needle)))
+      .map((e) => ({ responsiblePerson: personFullName(e.requester), userId: String(e.requester?.userId || ""), total: e.status === "cancelled" ? 0 : Number(e.total) || 0 }));
+  }, [rows, q]);
+  const selectedName = person === "all" ? "all" : (personRows.find((r) => r.userId === person)?.responsiblePerson || "all");
+  const pickPerson = (name) => setPerson(name === "all" ? "all" : (personRows.find((r) => r.responsiblePerson === name)?.userId || "all"));
+  const avatarPeople = useMemo(() => {
+    const seen = new Map();
+    rows.forEach((e) => { const id = String(e.requester?.userId || ""); if (avatars.get(id)) seen.set(personFullName(e.requester), avatars.get(id)); });
+    return [...seen].map(([fname, imageUrl]) => ({ fname, imageUrl }));
+  }, [rows, avatars]);
 
   const counts = useMemo(() => {
     const c = { all: base.length, overdue: 0 };
@@ -285,34 +328,41 @@ export default function ExpenseList({ mode, status: statusProp, claimType = "all
   };
 
   /**
-   * ⚠️ จอแคบ: ช่องค้นหา + ช่องเลือกช่วงเวลา + ช่องเลือกคน เรียงกัน 3 แถวกินจอไปครึ่งหนึ่งก่อนเห็นรายการแรก
-   * — ย้ายสองช่องหลังไปไว้หลังปุ่ม "ตัวกรอง" (ป้ายบอกจำนวนตัวกรองที่เปิดอยู่) เหลือช่องค้นหาแถวเดียว
+   * ✅ ผู้ใช้: "ปุ่มดูยาก สับสน รกตา" — เดิมมี 4 แถวก่อนถึงรายการ (ช่องค้นหา+select 2 ช่อง · ชิปชนิดใบ · ชิปสถานะ
+   *    · และแถบตัวเลขซ้ำกับชิปสถานะอีกชุดด้านบน) → เหลือ:
+   *    1. แถบตัวกรองกล่องขาวแถวเดียว (ค้นหา · ชนิดใบ · ช่วงเวลา)
+   *    2. แผงผู้เบิก (หัวหน้า) — กดชื่อดูเฉพาะคนนั้น แทน select ผู้เบิก
+   *    3. การ์ดสถานะ (ViewTiles) ชุดเดียวกับหน้าภาพรวมงาน — ตัวเลขตามตัวกรอง
    */
-  const activeFilters = (period !== "all" ? 1 : 0) + (person !== "all" ? 1 : 0);
-  const selects = (
-    <>
-      {mode !== "inbox" && (
-        <TextField select size="small" label="ช่วงเวลา" value={period} onChange={(ev) => setPeriod(ev.target.value)}
-          sx={{ minWidth: 150, bgcolor: "#fff", "& .MuiOutlinedInput-root": { borderRadius: 2 } }}>
-          {PERIODS.map((x) => <MenuItem key={x.value} value={x.value}>{x.label}</MenuItem>)}
-        </TextField>
-      )}
-      {viewAll && people.length > 1 && (
-        <TextField select size="small" label="ผู้เบิก" value={person} onChange={(ev) => setPerson(ev.target.value)}
-          sx={{ minWidth: 160, bgcolor: "#fff", "& .MuiOutlinedInput-root": { borderRadius: 2 } }}>
-          <MenuItem value="all">ทุกคน</MenuItem>
-          {people.map(([id, name]) => <MenuItem key={id} value={id}>{name}</MenuItem>)}
-        </TextField>
-      )}
-    </>
-  );
-  const hasSelects = mode !== "inbox" || (viewAll && people.length > 1);
+  const showPeople = mode !== "inbox" && viewAll && new Set(personRows.map((r) => r.userId)).size > 1;
+  // รายชื่อผู้เบิก + จำนวนใบ — ใช้กับ select บนมือถือ (จอแคบ แผงการ์ดต้องปัดดู ผู้ใช้แจ้งว่าดูยาก)
+  const personOptions = useMemo(() => {
+    const m = new Map();
+    personRows.forEach((r) => { if (!r.userId) return; const p = m.get(r.userId) || { id: r.userId, name: r.responsiblePerson, count: 0 }; p.count += 1; m.set(r.userId, p); });
+    return [...m.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "th"));
+  }, [personRows]);
+
+  // จำนวนตัวกรองที่เปิดอยู่ — ป้ายตัวเลขบนปุ่มตัวกรองของหัวเพจ (มือถือ)
+  const activeFilterCount = (q.trim() ? 1 : 0) + (person !== "all" ? 1 : 0) + (period !== "all" ? 1 : 0) + (kind === "claim" && claimType !== "all" ? 1 : 0)
+    + (kind && status !== "all" ? 1 : 0);
+  const statusLabel = status === "overdue" ? "เลยกำหนดเคลียร์" : kind && status !== "all" ? String(statusMeta(status, kind).label).split(" · ")[0] : "";
+  useEffect(() => { onActiveFiltersChange?.(activeFilterCount); }, [activeFilterCount]); // eslint-disable-line react-hooks/exhaustive-deps
+  // ✅ มือถือ: เลือกสถานะ/ผู้เบิก/ช่วงเวลา/ชนิดใบแล้วปิดแผ่นทันที (ช่องค้นหาไม่ปิด — ยังพิมพ์อยู่)
+  useCloseOnPick(mobileFiltersOpen, () => onMobileFiltersClose?.(), { status, person, period, claimType });
 
   const filterBar = (
-    <Stack direction="row" spacing={1} sx={{ mb: 1.25 }} alignItems="center">
+    <Stack
+      direction={{ xs: "column", md: "row" }} spacing={1} alignItems={{ md: "center" }}
+      sx={isDesktop
+        ? { mb: 1.5, p: 1, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, boxShadow: "0 1px 2px rgba(15,23,42,.04)" }
+        : { "& > *": { width: "100%" } }}
+    >
       <TextField
         size="small" placeholder="ค้นหาเลขที่ / เรื่อง / ผู้เบิก / งาน" value={q} onChange={(ev) => setQ(ev.target.value)}
-        sx={{ flex: 1, minWidth: 0, bgcolor: "#fff", "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
+        sx={{
+          flex: 1, minWidth: 0,
+          "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: "#f8fafc", height: 40, "& fieldset": { borderColor: "transparent" }, "&:hover fieldset": { borderColor: BORDER_MAIN }, "&.Mui-focused": { bgcolor: "#fff" } },
+        }}
         InputProps={{
           startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 19, color: TEXT_SUB }} /></InputAdornment>,
           endAdornment: q ? (
@@ -322,88 +372,74 @@ export default function ExpenseList({ mode, status: statusProp, claimType = "all
           ) : null,
         }}
       />
-      {hasSelects && (isDesktop ? (
-        <Stack direction="row" spacing={1}>{selects}</Stack>
-      ) : (
-        <>
-          <Button
-            variant="outlined" size="medium" onClick={(ev) => setFilterAnchor(ev.currentTarget)}
-            startIcon={<FilterList sx={{ fontSize: 18 }} />}
-            sx={{ flexShrink: 0, textTransform: "none", fontWeight: 700, borderRadius: 2, bgcolor: "#fff", borderColor: BORDER_MAIN, color: TEXT_MAIN, px: 1.5 }}
+      {/* ⚠️ มือถือ: ห่อบรรทัด — ปุ่มชนิดใบเคลมเต็มแถว แล้ว select ผู้เบิก/ช่วงเวลาแบ่งครึ่งแถวถัดไป (เดิมล้นจอ) */}
+      <Stack direction="row" spacing={1} useFlexGap alignItems="center" sx={{ minWidth: 0, flexWrap: { xs: "wrap", md: "nowrap" } }}>
+        {/* ชนิดใบเคลม — ปุ่มแบ่งส่วนในแถวเดียวกัน (เดิมเป็นชิปอีกแถวแยก) */}
+        {kind === "claim" && onClaimTypeChange && (
+          <ToggleButtonGroup
+            size="small" exclusive value={claimType} onChange={(_, v) => v && onClaimTypeChange(v)}
+            sx={{
+              flex: { xs: "1 1 100%", md: "0 0 auto" }, minWidth: { xs: 0, md: "auto" }, bgcolor: "#f1f5f9", p: 0.4, gap: 0.4, borderRadius: 2.5, height: 40,
+              "& .MuiToggleButton-root": {
+                flex: { xs: 1, md: "0 0 auto" }, border: "0 !important", m: "0 !important", borderRadius: "8px !important", textTransform: "none", fontWeight: 700, fontSize: "0.8rem",
+                color: TEXT_SUB, px: { xs: 0.75, md: 1.75 }, whiteSpace: "nowrap", minWidth: { xs: 0, md: "auto" },
+                "&:hover": { bgcolor: "rgba(255,255,255,.6)" },
+                "&.Mui-selected": { bgcolor: "#fff", color: TEXT_MAIN, boxShadow: "0 1px 3px rgba(15,23,42,.12)" },
+                "&.Mui-selected:hover": { bgcolor: "#fff" },
+              },
+            }}
           >
-            ตัวกรอง{activeFilters ? " (" + activeFilters + ")" : ""}
-          </Button>
-          <Menu
-            anchorEl={filterAnchor} open={Boolean(filterAnchor)} onClose={() => setFilterAnchor(null)}
-            anchorOrigin={{ vertical: "bottom", horizontal: "right" }} transformOrigin={{ vertical: "top", horizontal: "right" }}
-            slotProps={{ paper: { sx: { p: 1.5, borderRadius: 2.5, minWidth: 230 } } }}
-          >
-            <Stack spacing={1.5}>{selects}</Stack>
-          </Menu>
-        </>
-      ))}
+            {CLAIM_TYPE_FILTERS.map((t) => <ToggleButton key={t.value} value={t.value}>{t.label}</ToggleButton>)}
+          </ToggleButtonGroup>
+        )}
+        {/* ✅ มือถือ: ผู้เบิกเป็น select (แผงการ์ดใช้บนจอใหญ่เท่านั้น) */}
+        {showPeople && !isDesktop && (
+          <SelectField label="ผู้เบิก" value={person} onChange={(ev) => setPerson(ev.target.value)} sx={{ minWidth: 0, flex: "1 1 0" }}>
+            <option value="all">ทุกคน ({personRows.length})</option>
+            {personOptions.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.count})</option>)}
+          </SelectField>
+        )}
+        {mode !== "inbox" && (
+          <SelectField label="ช่วงเวลา" value={period} onChange={(ev) => setPeriod(ev.target.value)} sx={{ minWidth: { xs: 0, md: 150 }, flex: { xs: "1 1 0", md: "none" } }}>
+            {PERIODS.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}
+          </SelectField>
+        )}
+      </Stack>
     </Stack>
   );
 
-  /**
-   * ⚠️ แถวนี้อยู่ "เหนือ" ชิปสถานะเสมอ — มันเปลี่ยนว่ากำลังดูเอกสารชนิดไหน ซึ่งเป็นคำถามที่ต้องตอบก่อน
-   * คำถามว่าใบอยู่ขั้นไหน (ถ้าสลับลำดับกัน คนอ่านจะนึกว่าชิปสถานะเป็นของชนิดที่เลือกอยู่แถวบน)
-   */
-  const claimTypeChips = kind === "claim" && onClaimTypeChange && (
-    <Stack direction="row" spacing={0.75} sx={{ mb: 1.25, overflowX: "auto", pb: 0.25, "&::-webkit-scrollbar": { display: "none" } }}>
-      {CLAIM_TYPE_FILTERS.map((t) => {
-        const active = claimType === t.value;
-        // ✅ ตัวเลือกที่เลือกอยู่ = พื้นเทาเข้ม ตัวขาว (สีเดียวทั้งแอป) — ไม่ใช้สีประจำชนิดใบ ลดสีที่แย่งสายตา
-        const c = "#334155";
-        return (
-          <Chip
-            key={t.value} clickable onClick={() => onClaimTypeChange(t.value)} label={t.label}
-            sx={{
-              flexShrink: 0, height: 32, fontWeight: 800, fontSize: "0.8rem", borderRadius: 2,
-              bgcolor: active ? c : "#fff", color: active ? "#fff" : TEXT_SUB,
-              border: `1px solid ${active ? c : BORDER_MAIN}`,
-              "&:hover": { bgcolor: active ? c : alpha(c, 0.06) },
-            }}
-          />
-        );
-      })}
-    </Stack>
+  const peoplePanel = showPeople && isDesktop && (
+    <ResponsibleSummary
+      rows={personRows}
+      unit="ใบ"
+      value={selectedName}
+      onChange={pickPerson}
+      employees={avatarPeople}
+      isMobile={!isDesktop}
+      title="ใบเบิกตามผู้เบิก"
+      hint="กดที่ชื่อเพื่อดูเฉพาะใบของคนนั้น · กดซ้ำเพื่อดูทุกคน · ยอดเงิน = ยอดรวมในใบ (ไม่รวมใบที่ยกเลิก)"
+      amountOf={(r) => r.total}
+      formatAmount={baht}
+    />
   );
 
-  const statusChips = kind && (
-    <Stack direction="row" spacing={0.75} sx={{ mb: 1.5, overflowX: "auto", pb: 0.5, "&::-webkit-scrollbar": { display: "none" } }}>
-      {["all", ...(kind === "advance" ? ["overdue"] : []), ...STATUS_FILTERS[kind]].map((s) => {
-        // ⚠️ "ทุกสถานะ" ไม่ใช่ "ทั้งหมด" — หน้าใบเคลมมีแถวชิดชนิดเอกสารอยู่เหนือขึ้นไปซึ่งมีคำว่า
-        // "ทั้งหมด" อยู่แล้ว ถ้าสองแถวขึ้นคำเดียวกันจะแยกไม่ออกว่าอันไหนกรองอะไร
-        const st = s === "all" ? { label: "ทุกสถานะ", color: meta.color } : s === "overdue" ? { label: "เลยกำหนดเคลียร์", color: "#dc2626" } : statusMeta(s, kind);
-        const n = counts[s] || 0;
-        if (s !== "all" && s !== status && n === 0) return null;
-        const active = status === s;
-        const dark = "#334155";
-        return (
-          <Chip
-            key={s} clickable onClick={() => setStatus(s)}
-            label={(
-              <Stack direction="row" spacing={0.6} alignItems="center" component="span">
-                {s !== "all" && <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: active ? "#fff" : st.color }} />}
-                <span>{st.label} <b style={{ marginLeft: 2 }}>{n}</b></span>
-              </Stack>
-            )}
-            sx={{
-              flexShrink: 0, height: 30, fontWeight: 700, fontSize: "0.78rem", borderRadius: 2,
-              bgcolor: active ? dark : "#fff", color: active ? "#fff" : TEXT_MAIN,
-              border: `1px solid ${active ? dark : BORDER_MAIN}`,
-              "&:hover": { bgcolor: active ? dark : alpha(dark, 0.06) },
-            }}
-          />
-        );
-      })}
-    </Stack>
-  );
+  // สถานะ: ทั้งหมด + สถานะที่มีใบ (ตัวที่เลือกอยู่แสดงเสมอแม้เป็น 0)
+  const statusTiles = kind && (() => {
+    const keys = ["all", ...(kind === "advance" ? ["overdue"] : []), ...STATUS_FILTERS[kind]]
+      .filter((s) => s === "all" || s === status || (counts[s] || 0) > 0);
+    const items = keys.map((s) => {
+      if (s === "all") return { value: "all", label: "ทุกสถานะ", count: counts.all || 0, unit: "ใบ", icon: <Apps />, color: "#475569" };
+      if (s === "overdue") return { value: "overdue", label: "เลยกำหนดเคลียร์", shortLabel: "เลยกำหนด", count: counts.overdue || 0, unit: "ใบ", icon: <WarningAmber />, color: "#dc2626", alert: true };
+      const st = statusMeta(s, kind);
+      const Icon = STATUS_ICON[s] || Apps;
+      return { value: s, label: st.label, shortLabel: String(st.label).split(" · ")[0], count: counts[s] || 0, unit: "ใบ", icon: <Icon />, color: st.color, alert: s === "rejected" };
+    });
+    return <ViewTiles value={status} onChange={setStatus} isMobile={!isDesktop} groups={[{ title: "", items }]} />;
+  })();
 
   const renderRows = (list) => (isDesktop
-    ? <DesktopTable rows={list} onOpen={onOpen} />
-    : <Stack spacing={1}>{list.map((e) => <MobileCard key={e._id} e={e} onOpen={onOpen} />)}</Stack>);
+    ? <DesktopTable rows={list} onOpen={onOpen} avatars={avatars} />
+    : <Stack spacing={1}>{list.map((e) => <MobileCard key={e._id} e={e} onOpen={onOpen} avatars={avatars} />)}</Stack>);
 
   const empty = (text, action) => (
     <Stack alignItems="center" spacing={1.25} sx={{ py: 6, px: 2, bgcolor: "#fff", border: `1px dashed ${BORDER_MAIN}`, borderRadius: 2.5, textAlign: "center" }}>
@@ -415,9 +451,54 @@ export default function ExpenseList({ mode, status: statusProp, claimType = "all
 
   return (
     <Box ref={topRef} sx={{ pt: 2, scrollMarginTop: 72 }}>
-      {filterBar}
-      {claimTypeChips}
-      {statusChips}
+      {isDesktop ? filterBar : (
+        <>
+          {/* ── มือถือ: ตัวกรองที่เปิดอยู่เป็นชิปกดลบได้ (แผงเต็มอยู่ในแผ่นล่าง เปิดจากปุ่มบนหัวเพจ) ── */}
+          {activeFilterCount > 0 && (
+            <Stack direction="row" spacing={0.75} useFlexGap sx={{ mb: 1.25, flexWrap: "wrap" }}>
+              {statusLabel && <Chip size="small" label={`สถานะ: ${statusLabel}`} onDelete={() => setStatus("all")} sx={{ fontWeight: 700 }} />}
+              {q.trim() && <Chip size="small" label={`ค้นหา: ${q.trim()}`} onDelete={() => setQ("")} sx={{ fontWeight: 700, maxWidth: "100%" }} />}
+              {person !== "all" && <Chip size="small" label={`ผู้เบิก: ${selectedName === "all" ? "-" : selectedName}`} onDelete={() => setPerson("all")} sx={{ fontWeight: 700 }} />}
+              {period !== "all" && <Chip size="small" label={PERIODS.find((x) => x.value === period)?.label} onDelete={() => setPeriod("all")} sx={{ fontWeight: 700 }} />}
+              {kind === "claim" && claimType !== "all" && onClaimTypeChange && (
+                <Chip size="small" label={CLAIM_TYPE_FILTERS.find((x) => x.value === claimType)?.label} onDelete={() => onClaimTypeChange("all")} sx={{ fontWeight: 700 }} />
+              )}
+            </Stack>
+          )}
+          <Drawer
+            anchor="bottom" open={mobileFiltersOpen} onClose={() => onMobileFiltersClose?.()}
+            PaperProps={{ sx: { borderTopLeftRadius: 18, borderTopRightRadius: 18, px: 2, pt: 1, pb: "calc(16px + env(safe-area-inset-bottom))", maxHeight: "85vh" } }}
+          >
+            <Box sx={{ width: 40, height: 4, borderRadius: 2, bgcolor: "#cbd5e1", mx: "auto", mb: 1.25 }} />
+            <Stack direction="row" alignItems="center" sx={{ mb: 1.5 }}>
+              <Typography sx={{ flex: 1, fontWeight: 800, fontSize: "1rem", color: TEXT_MAIN }}>ค้นหาและตัวกรอง</Typography>
+              {activeFilterCount > 0 && (
+                <Button size="small" onClick={() => { setQ(""); setPerson("all"); setPeriod("all"); setStatus("all"); if (kind === "claim") onClaimTypeChange?.("all"); }}
+                  sx={{ textTransform: "none", fontWeight: 700, color: "#dc2626" }}>
+                  ล้างทั้งหมด
+                </Button>
+              )}
+              <IconButton size="small" aria-label="ปิด" onClick={() => onMobileFiltersClose?.()}><Close /></IconButton>
+            </Stack>
+            {filterBar}
+            {/* ✅ สถานะ — อยู่ในแผ่นเดียวกับตัวกรอง (ผู้ใช้ขอ) ไม่กินจอเหนือรายการ */}
+            {statusTiles && (
+              <Box sx={{ mt: 1.75, "& > div": { mb: 0 } }}>
+                <Typography sx={{ fontSize: "0.78rem", fontWeight: 800, color: TEXT_SUB, mb: 0.75 }}>สถานะ</Typography>
+                {statusTiles}
+              </Box>
+            )}
+            <Button
+              fullWidth variant="contained" onClick={() => onMobileFiltersClose?.()}
+              sx={{ mt: 2, py: 1.1, textTransform: "none", fontWeight: 800, borderRadius: 2.5, boxShadow: "none", bgcolor: "#334155", "&:hover": { bgcolor: "#1e293b", boxShadow: "none" } }}
+            >
+              ดูผลลัพธ์ {visible.length.toLocaleString()} ใบ
+            </Button>
+          </Drawer>
+        </>
+      )}
+      {peoplePanel}
+      {isDesktop && statusTiles}
       {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
       {loading ? (
         <Stack spacing={1}>{[0, 1, 2, 3].map((i) => <Skeleton key={i} variant="rounded" height={isDesktop ? 52 : 96} />)}</Stack>

@@ -28,7 +28,7 @@ import { appLogoFor } from "@/shared/services/OrgSettingService";
 // (FaWrench="การดำเนินงาน", FaFileContract="ภาพรวมสัญญา", FaFileInvoiceDollar="ติดตามใบเสนอราคา")
 import {
   FaBars, FaUserCircle, FaWrench, FaFileContract, FaFileInvoiceDollar, FaCalendarAlt,
-  FaChevronDown, FaCheck, FaBriefcase,
+  FaChevronDown, FaCheck, FaBriefcase, FaMoneyCheckAlt, FaReceipt,
 } from "react-icons/fa";
 import { can, isRole, ROLES, DEPARTMENT, rankLabel } from "@/shared/utils/roles";
 
@@ -119,6 +119,7 @@ const Header = ({ toggleMobileSidebar }) => {
   const { events, badges } = useAppBadges(userData);
   const org = useOrgSettings();
   const isAdminOrManager = can(userData, "viewAllJobs");
+  const canUseExpenses = can(userData, "requestExpense") || can(userData, "viewAllExpenses");
   // ✅ หน้า "ภาพรวมงาน" เปิดให้ช่างเข้าดูงานของตัวเองได้แล้ว (ดู ContractOverview.js canView) —
   // ปุ่มทางลัดในนี้ต้องเปิดให้ตรงกันด้วย ไม่ใช่แค่แอดมิน/manager เหมือนเดิม
   const canViewContracts = can(userData, "viewContracts");
@@ -199,6 +200,32 @@ const Header = ({ toggleMobileSidebar }) => {
             ออกไปก่อนหน้านี้ — ตอนนี้เพิ่มกลับมาเฉพาะ 3 เมนูที่ใช้บ่อยและไม่มีใน sidebar เห็นง่ายๆ ระหว่าง
             ทำงาน (การดำเนินงาน/ภาพรวมสัญญา/ติดตามใบเสนอราคา) แทน ให้กระชับ ไม่รกเหมือนของเดิมที่มี 4 เมนู */}
         <Nav className="navbar-nav mx-auto d-none d-lg-flex" navbar>
+          {/* ✅ ตารางงานอยู่ซ้ายสุด (ผู้ใช้ขอ) — หน้าที่เปิดบ่อยที่สุด */}
+          {/* ✅ ทางลัดตารางงาน — สลับดูได้จากปุ่มเดียว ไม่ต้องเปิด sidebar ก่อน (ของเดิมเป็นลิงก์
+              ตายตัวไปทางเดียว ผู้ใช้ขอให้ทำเป็นตัวเลือกแทน) ตัวเลือกต่างกันตาม role — ดู scheduleOptionsFor
+              ✅ แอดมิน/manager เห็นด้วย (canViewService ครอบคลุมทั้ง 2 role นี้อยู่แล้ว) เดิมมีแค่ลิงก์
+              เดียวตายตัวเป็นของเซล พอเป็นแอดมินแล้วไม่มีอะไรให้กดในนี้เลย — ตอนนี้ได้ตัวเลือกที่ถูกต้อง
+              ตรงกับที่ Sidebar.js ให้แอดมินอยู่แล้ว (ตารางงานช่าง/ตารางงานเซล) */}
+          {canViewService && (
+          <NavItem>
+            <Dropdown isOpen={scheduleMenuOpenDesktop} toggle={() => setScheduleMenuOpenDesktop((o) => !o)}>
+              <DropdownToggle
+                tag="button" type="button"
+                className={`nav-link d-flex align-items-center gap-2 ${isOnEventPage ? "active" : ""}`}
+                style={{ background: "transparent", border: "none", fontFamily: "inherit", cursor: "pointer" }}
+              >
+                <FaCalendarAlt size={13} />
+                <span>{scheduleLabel}</span>
+                <HeaderCount n={badges.pendingApproval} />
+                <FaChevronDown
+                  size={9}
+                  className={`schedule-toggle-caret ${scheduleMenuOpenDesktop ? "schedule-toggle-caret--open" : ""}`}
+                />
+              </DropdownToggle>
+              <ScheduleDropdownMenu options={scheduleOptions} isSecondaryActive={isSecondaryScheduleActive} />
+            </Dropdown>
+          </NavItem>
+          )}
           {/* ⚠️ "การดำเนินงาน" เป็นหน้าของสายงานช่าง — เซลกดเข้าไปเห็นแต่งานที่ไม่เกี่ยวกับตัวเอง
               (server กรองให้เหลือศูนย์รายการอยู่แล้ว) จึงซ่อนไปเลยแทนที่จะให้กดแล้วเจอหน้าว่าง */}
           {canViewOperation && (
@@ -234,30 +261,28 @@ const Header = ({ toggleMobileSidebar }) => {
             </Link>
           </NavItem>
           )}
-          {/* ✅ ทางลัดตารางงาน — สลับดูได้จากปุ่มเดียว ไม่ต้องเปิด sidebar ก่อน (ของเดิมเป็นลิงก์
-              ตายตัวไปทางเดียว ผู้ใช้ขอให้ทำเป็นตัวเลือกแทน) ตัวเลือกต่างกันตาม role — ดู scheduleOptionsFor
-              ✅ แอดมิน/manager เห็นด้วย (canViewService ครอบคลุมทั้ง 2 role นี้อยู่แล้ว) เดิมมีแค่ลิงก์
-              เดียวตายตัวเป็นของเซล พอเป็นแอดมินแล้วไม่มีอะไรให้กดในนี้เลย — ตอนนี้ได้ตัวเลือกที่ถูกต้อง
-              ตรงกับที่ Sidebar.js ให้แอดมินอยู่แล้ว (ตารางงานช่าง/ตารางงานเซล) */}
-          {canViewService && (
-          <NavItem>
-            <Dropdown isOpen={scheduleMenuOpenDesktop} toggle={() => setScheduleMenuOpenDesktop((o) => !o)}>
-              <DropdownToggle
-                tag="button" type="button"
-                className={`nav-link d-flex align-items-center gap-2 ${isOnEventPage ? "active" : ""}`}
-                style={{ background: "transparent", border: "none", fontFamily: "inherit", cursor: "pointer" }}
+          {/* ✅ ทางลัดใบเบิก — ใช้บ่อยทุกวัน (ผู้ใช้ขอให้มีบนแถบบน) · โชว์เฉพาะคนที่มีสิทธิ์เบิก/ดูใบเบิก */}
+          {canUseExpenses && (
+            <NavItem>
+              <Link
+                to="/expenses/advances"
+                className={`nav-link d-flex align-items-center gap-2 ${location.pathname.startsWith("/expenses/advances") ? "active" : ""}`}
               >
-                <FaCalendarAlt size={13} />
-                <span>{scheduleLabel}</span>
-                <HeaderCount n={badges.pendingApproval} />
-                <FaChevronDown
-                  size={9}
-                  className={`schedule-toggle-caret ${scheduleMenuOpenDesktop ? "schedule-toggle-caret--open" : ""}`}
-                />
-              </DropdownToggle>
-              <ScheduleDropdownMenu options={scheduleOptions} isSecondaryActive={isSecondaryScheduleActive} />
-            </Dropdown>
-          </NavItem>
+                <FaMoneyCheckAlt size={13} /> ใบ Advance
+                <HeaderCount n={badges.advance} />
+              </Link>
+            </NavItem>
+          )}
+          {canUseExpenses && (
+            <NavItem>
+              <Link
+                to="/expenses/claims"
+                className={`nav-link d-flex align-items-center gap-2 ${location.pathname.startsWith("/expenses/claims") ? "active" : ""}`}
+              >
+                <FaReceipt size={13} /> ใบเคลม
+                <HeaderCount n={badges.claim} />
+              </Link>
+            </NavItem>
           )}
         </Nav>
 

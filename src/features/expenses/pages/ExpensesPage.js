@@ -21,10 +21,10 @@
 import { useCallback, useEffect, useState } from "react";
 import useRealtime from "@/shared/realtime/useRealtime";
 import { Link as RouterLink, Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Box, Stack, Typography, Button, Chip } from "@mui/material";
+import { Box, Stack, Typography, Button, Chip, IconButton, Badge } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
-  Add, Payments, ReceiptLong, FactCheck, Insights, ChevronRight, WarningAmber, AccountBalanceWallet, Engineering,
+  Add, Payments, ReceiptLong, FactCheck, Insights, ChevronRight, WarningAmber, AccountBalanceWallet, Engineering, Tune,
 } from "@mui/icons-material";
 
 import usePermissions from "@/shared/hooks/usePermissions";
@@ -167,6 +167,9 @@ export default function ExpensesPage({ view: viewProp }) {
   /** ฟอร์มใบค่าจ้างผู้รับเหมาเป็นคนละตัวกับฟอร์มใบของพนักงาน (ดู ContractorFormDialog) */
   const isContractorForm = form.kind === "claim" && form.claimType === "contractor";
   const [notice, setNotice] = useState(null);
+  // มือถือ: แผงค้นหา/ตัวกรองของรายการ เปิดจากปุ่มมุมขวาบนของหัวเพจ
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [activeFilters, setActiveFilters] = useState(0);
   const [status, setStatus] = useState(searchParams.get("status") || "all");
   // ตัวกรองชนิดย่อยของหน้าใบเคลม: all | clear | reimburse (ลิงก์จากเมนู/แจ้งเตือนส่งมาทาง ?type= ได้)
   const [claimType, setClaimType] = useState(searchParams.get("type") || "all");
@@ -286,6 +289,9 @@ export default function ExpensesPage({ view: viewProp }) {
     if (summary?.overdueClear > 0) stats.push({ key: "__o", label: "เลยกำหนดเคลียร์", value: summary.overdueClear, color: "#dc2626", alert: true });
   }
 
+  // ตัวเลขเงินที่การ์ดสถานะในรายการไม่มี — ย้ายขึ้นหัวเพจ
+  const headerStats = stats.filter((s) => !s.onClick && !s.alert);
+
   // ── ลิงก์ไปหน้าอื่นในระบบเดียวกัน ─────────────────────────────────────
   const crossLinks = [];
   if (view !== "advance") crossLinks.push({ to: "/expenses/advances", label: "ใบ Advance", color: KIND_META.advance.dark });
@@ -303,9 +309,24 @@ export default function ExpensesPage({ view: viewProp }) {
         bgcolor: "#fff", px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.75 }, mb: 1.5,
       }}>
         <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "stretch", sm: "center" }} spacing={{ xs: 1.25, sm: 2 }}>
-          <Stack direction="row" alignItems="center" spacing={1.5} sx={{ flex: 1, minWidth: 0 }}>
+          <Stack direction="row" alignItems={{ xs: "center", sm: "center" }} spacing={{ xs: 1.25, sm: 1.5 }} sx={{ flex: 1, minWidth: 0, position: "relative", pr: { xs: 6, sm: 0 } }}>
+            {/* ✅ มือถือ: ปุ่มค้นหา/ตัวกรอง มุมขวาบน (ผู้ใช้ขอ — เดิมแผงค้นหากินจอครึ่งหนึ่งก่อนถึงรายการ) */}
+            {(
+              <IconButton
+                aria-label="ค้นหาและตัวกรอง" onClick={() => setMobileFiltersOpen(true)}
+                sx={{
+                  display: { xs: "inline-flex", md: "none" }, position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)",
+                  width: 42, height: 42, borderRadius: 2.5, border: `1px solid ${BORDER_MAIN}`, bgcolor: activeFilters ? alpha(meta.color, 0.08) : "#fff",
+                  color: activeFilters ? meta.color : TEXT_MAIN,
+                }}
+              >
+                <Badge badgeContent={activeFilters} color="error" sx={{ "& .MuiBadge-badge": { fontSize: "0.62rem", height: 16, minWidth: 16 } }}>
+                  <Tune sx={{ fontSize: 21 }} />
+                </Badge>
+              </IconButton>
+            )}
             <Box sx={{
-              width: 40, height: 40, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+              width: { xs: 36, sm: 40 }, height: { xs: 36, sm: 40 }, borderRadius: 2.5, ml: "0 !important", // ⚠️ ปุ่มตัวกรอง (absolute) เป็นลูกตัวแรกของ Stack — ไม่งั้นไอคอนโดนเว้นซ้าย "& svg": { fontSize: { xs: 20, sm: 24 } }, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
               bgcolor: meta.color, color: "#fff",
             }}>
               <Icon />
@@ -314,11 +335,36 @@ export default function ExpensesPage({ view: viewProp }) {
               <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.12rem", sm: "1.3rem" }, color: TEXT_MAIN, lineHeight: 1.25 }}>
                 {meta.title}
               </Typography>
-              <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", lineHeight: 1.35 }}>
+              {/* ✅ มือถือ: ซ่อนคำอธิบาย (ยาว ตัดเป็น 2–3 บรรทัด ดันเนื้อหาลง) — ชื่อหน้าบอกอยู่แล้ว */}
+              <Typography variant="caption" sx={{ color: TEXT_SUB, display: { xs: "none", sm: "block" }, lineHeight: 1.35 }}>
                 {meta.sub}
               </Typography>
+              {/* ── ทางไปหน้าอื่นของระบบเบิก — จอใหญ่: บรรทัดเล็กใต้คำอธิบาย ── */}
+              <Box sx={{ display: { xs: "none", sm: "block" } }}>
+              <Stack direction="row" spacing={0.75} sx={{ mt: 0.75, overflowX: "auto", "&::-webkit-scrollbar": { display: "none" }, scrollbarWidth: "none" }}>
+                {crossLinks.map((l) => <CrossLink key={l.to} {...l} />)}
+              </Stack>
+              </Box>
             </Box>
           </Stack>
+          {/* ── มือถือ: ลิงก์หน้าอื่นเต็มความกว้าง (ไม่เยื้องตามไอคอน) ── */}
+          <Box sx={{ display: { xs: "block", sm: "none" }, minWidth: 0 }}>
+            <Stack direction="row" spacing={0.75} sx={{ overflowX: "auto", "&::-webkit-scrollbar": { display: "none" }, scrollbarWidth: "none" }}>
+                {crossLinks.map((l) => <CrossLink key={l.to} {...l} />)}
+              </Stack>
+          </Box>
+          {/* ตัวเลขเงินของหน้านี้ — จอใหญ่: คอลัมน์ขวามีเส้นคั่น · มือถือ: แถบเทาอ่อนแถวเดียว (ป้ายซ้าย ตัวเลขขวา) */}
+          {isList && view !== "inbox" && headerStats.map((st) => (
+            <Box key={st.key} sx={{
+              flexShrink: 0, display: "flex", flexDirection: { xs: "row", sm: "column" }, alignItems: { xs: "center", sm: "flex-end" },
+              justifyContent: "space-between", gap: 1,
+              px: 1.5, py: { xs: 1, sm: 0 }, borderRadius: { xs: 2, sm: 0 }, bgcolor: { xs: "#f8fafc", sm: "transparent" },
+              border: { xs: `1px solid ${BORDER_MAIN}`, sm: 0 }, borderLeft: { sm: `1px solid ${BORDER_MAIN}` },
+            }}>
+              <Typography sx={{ fontSize: "0.74rem", fontWeight: 700, color: TEXT_SUB, whiteSpace: "nowrap" }}>{st.label}</Typography>
+              <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.05rem", sm: "1.1rem" }, color: TEXT_MAIN, lineHeight: 1.25, whiteSpace: "nowrap" }}>{st.value}</Typography>
+            </Box>
+          ))}
           {meta.action && (canRequest || viewAll) && (
             <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
               <Button
@@ -353,7 +399,9 @@ export default function ExpensesPage({ view: viewProp }) {
       </Box>
 
       {/* ── แถบตัวเลขของหน้านี้ (เลื่อนแนวนอนบนจอแคบ) ─────────────────── */}
-      {stats.length > 0 && (
+      {/* ⚠️ หน้ารายการ (Advance/เคลม/ผู้รับเหมา) มีการ์ดสถานะที่กดกรองได้อยู่ในรายการแล้ว — แสดงเฉพาะตัวเลขเงิน
+          ที่การ์ดสถานะไม่มี (เดิมโชว์ "รอตรวจสอบ/รออนุมัติ" ซ้ำสองชุด ผู้ใช้แจ้งว่าสับสน รกตา) */}
+      {!(isList && view !== "inbox") && stats.length > 0 && (
         <Stack
           direction="row" spacing={1}
           sx={{ mb: 1.25, overflowX: "auto", pb: 0.5, "&::-webkit-scrollbar": { display: "none" }, scrollbarWidth: "none" }}
@@ -365,10 +413,6 @@ export default function ExpensesPage({ view: viewProp }) {
         </Stack>
       )}
 
-      {/* ── ทางไปหน้าอื่นของระบบเบิก ────────────────────────────────── */}
-      <Stack direction="row" spacing={0.75} sx={{ mb: 0.5, overflowX: "auto", pb: 0.5, "&::-webkit-scrollbar": { display: "none" }, scrollbarWidth: "none" }}>
-        {crossLinks.map((l) => <CrossLink key={l.to} {...l} />)}
-      </Stack>
 
       {/* ✅ สิ่งที่ป้ายตัวเลขบนเมนู "ใบเคลม"/"ใบ Advance" นับไว้ — ต้องเห็นและกดทำต่อได้ทันทีที่เข้ามา
           (ผู้ใช้แจ้งว่าป้ายขึ้นแต่เข้ามาแล้วไม่เจออะไร) · ชื่อกล่องเรียกตามสิ่งที่มันเป็น: ใบเบิก ไม่ใช่ "งาน" */}
@@ -393,9 +437,17 @@ export default function ExpensesPage({ view: viewProp }) {
           onOpen={openDetail}
           onCreate={(k) => openCreate(k)}
           reloadKey={reloadKey}
+          mobileFiltersOpen={mobileFiltersOpen}
+          onMobileFiltersClose={() => setMobileFiltersOpen(false)}
+          onActiveFiltersChange={setActiveFilters}
         />
       ) : (
-        <ExpenseReport onOpen={openDetail} reloadKey={reloadKey} />
+        <ExpenseReport
+          onOpen={openDetail} reloadKey={reloadKey}
+          mobileFiltersOpen={mobileFiltersOpen}
+          onMobileFiltersClose={() => setMobileFiltersOpen(false)}
+          onActiveFiltersChange={setActiveFilters}
+        />
       )}
 
       <ExpenseDetailDialog

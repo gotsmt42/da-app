@@ -17,13 +17,14 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { Navigate, useSearchParams } from "react-router-dom";
 import {
-  Box, Stack, Typography, Tabs, Tab, Badge, Skeleton, Alert,
+  Box, Stack, Typography, Skeleton, Alert, useMediaQuery,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { Inbox, Storefront, HourglassTop, Bolt } from "@mui/icons-material";
 
 import usePermissions from "@/shared/hooks/usePermissions";
 import { useAuth } from "@/features/auth/AuthContext";
+import ViewTiles from "@/shared/ui/ViewTiles";
 import DispatchList from "../components/DispatchList";
 import DispatchService from "../services/DispatchService";
 import { DISPATCH_ACCENT, TEXT_SUB, BORDER_MAIN } from "../dispatchMeta";
@@ -36,14 +37,14 @@ const SOURCES = [
   {
     key: "sales",
     label: "จากฝ่ายขาย",
-    icon: <Storefront sx={{ fontSize: 18 }} />,
+    icon: <Storefront />,
     color: "#8b5cf6",
     hint: "เซลกรอกฟอร์มแจ้งเข้ามา — ตรวจแล้วจัดลงแผนงานให้",
   },
   {
     key: "approvals",
     label: "จากฝ่ายช่าง",
-    icon: <HourglassTop sx={{ fontSize: 18 }} />,
+    icon: <HourglassTop />,
     color: "#f59e0b",
     hint: "ช่างสร้างแผนงานเอง — ต้องอนุมัติก่อนถึงจะยืนยันจริง",
   },
@@ -56,6 +57,7 @@ export default function JobRequestQueue() {
   const [summary, setSummary] = useState(null);
   const [approvalCount, setApprovalCount] = useState(0);
   const [error, setError] = useState("");
+  const isMobile = useMediaQuery("(max-width:600px)");
 
   const requested = searchParams.get("tab");
   const activeKey = SOURCES.some((s) => s.key === requested) ? requested : "sales";
@@ -70,7 +72,7 @@ export default function JobRequestQueue() {
 
   // ⚠️ replace:true — สลับแท็บไม่ควรทิ้งประวัติไว้ทุกครั้ง ไม่งั้นกด back หลังสลับไปมา 5 รอบ
   // ต้องกดย้อน 5 ครั้งกว่าจะออกจากหน้านี้ได้ (แบบแผนเดียวกับ TabbedPage.js)
-  const changeTab = (_, key) => {
+  const changeTab = (key) => {
     const next = new URLSearchParams(searchParams);
     next.set("tab", key);
     setSearchParams(next, { replace: true });
@@ -102,8 +104,9 @@ export default function JobRequestQueue() {
         >
           <Box
             sx={{
-              width: 40, height: 40, borderRadius: 2, flexShrink: 0,
-              bgcolor: alpha(DISPATCH_ACCENT, 0.12), color: DISPATCH_ACCENT,
+              width: 44, height: 44, borderRadius: 2.5, flexShrink: 0,
+              background: `linear-gradient(135deg, ${alpha(DISPATCH_ACCENT, 0.18)}, ${alpha(DISPATCH_ACCENT, 0.06)})`,
+              color: DISPATCH_ACCENT, border: "1px solid", borderColor: alpha(DISPATCH_ACCENT, 0.22),
               display: "flex", alignItems: "center", justifyContent: "center",
             }}
           >
@@ -121,64 +124,41 @@ export default function JobRequestQueue() {
         {/* ตัวเลขค้าง — เป็นตัวหนังสือ ไม่ใช่ชิปพื้นสี งานด่วนใช้สีแดงพอให้เด่นโดยไม่ต้องมีพื้น */}
         <Stack direction="row" alignItems="center" spacing={1.75} sx={{ flexShrink: 0 }}>
           {urgent > 0 && (
-            <Stack direction="row" alignItems="center" spacing={0.4}>
-              <Bolt sx={{ fontSize: 16, color: "#dc2626" }} />
-              <Typography sx={{ fontWeight: 800, fontSize: "0.85rem", color: "#dc2626" }}>ด่วน {urgent}</Typography>
+            <Stack direction="row" alignItems="center" spacing={0.4} sx={{ px: 1.1, py: 0.45, borderRadius: 99, bgcolor: "#fef2f2", border: "1px solid #fecaca" }}>
+              <Bolt sx={{ fontSize: 15, color: "#dc2626" }} />
+              <Typography sx={{ fontWeight: 800, fontSize: "0.8rem", color: "#dc2626" }}>ด่วน {urgent}</Typography>
             </Stack>
           )}
-          <Typography sx={{ fontWeight: 700, fontSize: "0.85rem", color: TEXT_SUB }}>
-            รอตัดสินใจ <Box component="span" sx={{ color: "#0f172a", fontWeight: 800 }}>{waiting + approvalCount}</Box>
-          </Typography>
+          <Stack direction="row" alignItems="center" spacing={0.6} sx={{ px: 1.25, py: 0.45, borderRadius: 99, bgcolor: "#fff", border: "1px solid", borderColor: BORDER_MAIN }}>
+            <Typography sx={{ fontWeight: 700, fontSize: "0.8rem", color: TEXT_SUB }}>รอตัดสินใจ</Typography>
+            <Typography sx={{ fontWeight: 800, fontSize: "0.9rem", color: "#0f172a", fontVariantNumeric: "tabular-nums" }}>{waiting + approvalCount}</Typography>
+          </Stack>
         </Stack>
       </Stack>
 
-      {/* ── แท็บตาม "ที่มาของคำขอ" ─────────────────────────────────────────
-          ⚠️ แยกตามแผนกต้นทาง ไม่ใช่ตามสถานะ — คนจัดคิวคิดเป็น "ของใครส่งมา" เพราะสองสายนี้
-          ตัดสินใจคนละแบบ (ของเซลต้องเลือกวัน+ช่างให้ · ของช่างแค่กดอนุมัติ/ไม่อนุมัติ) */}
-      {/* ✅ แท็บกลับมาเป็นเส้นใต้เรียบ — เดิมครอบด้วยการ์ดขาวมีขอบ+เงา ซึ่งบวกกับแถบคำอธิบาย
-          ด้านล่างและแถบเครื่องมือ กลายเป็นกล่อง 3 ใบซ้อนกันก่อนถึงรายการจริง */}
-      <Box sx={{ mb: 2, borderBottom: "1px solid", borderColor: BORDER_MAIN }}>
-        <Tabs
-          value={activeKey} onChange={changeTab}
-          variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile
-          sx={{
-            minHeight: 46, px: 0.5,
-            "& .MuiTab-root": {
-              textTransform: "none", fontWeight: 700,
-              fontSize: { xs: "0.78rem", sm: "0.88rem" },
-              minHeight: 46, color: TEXT_SUB, gap: { xs: 0.5, sm: 1 },
-              minWidth: 0, px: { xs: 1.25, sm: 2.5 },
-            },
-            "& .Mui-selected": { color: `${active.color} !important` },
-            "& .MuiTabs-indicator": { backgroundColor: active.color, height: 3, borderRadius: 2 },
-          }}
-        >
-          {SOURCES.map((s) => {
+      {/* ── ที่มาของคำขอ: การ์ดตัวเลข (ViewTiles) ชุดเดียวกับหน้าภาพรวมงาน/การดำเนินงาน ──
+          ✅ ที่แก้ (ผู้ใช้: "ดูล้าสมัยมาก"): เดิมเป็นแท็บเส้นใต้ + badge เล็กๆ มองไม่ออกว่าแต่ละฝั่งค้างกี่ใบ
+          ⚠️ แยกตามแผนกต้นทาง ไม่ใช่ตามสถานะ — ของเซลต้องเลือกวัน+ช่างให้ · ของช่างแค่กดอนุมัติ */}
+      <ViewTiles
+        value={activeKey}
+        onChange={changeTab}
+        isMobile={isMobile}
+        groups={[{
+          title: "",
+          items: SOURCES.map((s) => {
             const count = s.key === "sales" ? waiting : approvalCount;
-            return (
-              <Tab
-                key={s.key} value={s.key} iconPosition="start" label={s.label}
-                icon={
-                  <Badge
-                    badgeContent={count} color="warning" invisible={count === 0}
-                    sx={{ "& .MuiBadge-badge": { fontSize: "0.6rem", height: 15, minWidth: 15 } }}
-                  >
-                    {s.icon}
-                  </Badge>
-                }
-              />
-            );
-          })}
-        </Tabs>
-      </Box>
+            return {
+              value: s.key, label: s.label, count, unit: "ใบ", icon: s.icon, color: s.color, alert: false,
+              sub: s.key === "sales" && urgent > 0 ? `ด่วน ${urgent}` : undefined,
+            };
+          }),
+        }]}
+      />
 
-      {/* คำอธิบายว่าแท็บนี้คืออะไร — สองสายนี้หน้าตาคล้ายกันแต่ทำคนละอย่าง ถ้าไม่บอกจะสับสน
-          ✅ ไอคอนย้ายเข้าวงกลมพื้นสีอ่อน เข้าชุดกับ pattern ไอคอน-ในวงกลมที่ใช้ทั้งแอปตอนนี้ */}
-      {/* ✅ คำอธิบายแท็บเหลือบรรทัดตัวหนังสือจางๆ — เดิมเป็นแถบพื้นสี+ขอบสี+วงกลมไอคอนสี
-          ซึ่งเป็นสีเดียวกับแท็บที่เพิ่งกดอยู่ข้างบน = ย้ำเรื่องเดิมด้วยสีเดิมสองรอบติดกัน */}
-      <Typography variant="caption" sx={{ display: "block", color: TEXT_SUB, mb: 2, px: 0.25 }}>
-        {active.hint}
-      </Typography>
+      <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1.5, mt: isMobile ? -0.75 : -1, px: 0.25 }}>
+        <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: active.color, flexShrink: 0 }} />
+        <Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB, fontWeight: 600 }}>{active.hint}</Typography>
+      </Stack>
 
       {/* ⚠️ ต้อง mount แผงรออนุมัติไว้ตลอด แล้วซ่อนด้วย display แทนการถอดออกจาก DOM —
           ตัวเลขบน badge มาจากแผงนั้นเอง ถ้า unmount ตอนอยู่แท็บอื่น badge จะเป็น 0 เสมอ

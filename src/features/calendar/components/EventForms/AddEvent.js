@@ -87,6 +87,36 @@ function injectAddStyles() {
     }
 
     /* ── Section label ── */
+    /* ── การ์ดหมวดของฟอร์ม — หน้าตาเดียวกับฟอร์มแก้ไขงาน (EditEvent.js .ee-card) ── */
+    .ae-card {
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+      margin: 0 0 12px; overflow: hidden; text-align: left;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+    }
+    .ae-card-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #f8fafc; border-bottom: 1px solid #eef2f7; }
+    .ae-card-ico {
+      width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: #fff; border: 1px solid #e2e8f0; font-size: 15px; line-height: 1;
+    }
+    .ae-card-titles { flex: 1; min-width: 0; }
+    .ae-card-titles h4 { margin: 0; font-size: 13.5px; font-weight: 800; color: #0f172a; line-height: 1.3; }
+    .ae-card-titles p { margin: 1px 0 0; font-size: 11.5px; color: #64748b; line-height: 1.35; }
+    .ae-card-badge { flex-shrink: 0; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
+    .ae-card-badge--muted { color: #64748b; background: #f1f5f9; border: 1px solid #e2e8f0; }
+    .ae-card-body { padding: 12px 14px 4px; }
+    .ae-card-body > .ae-field { margin-bottom: 10px; }
+    .ae-card .ae-grid { gap: 10px 12px; margin-bottom: 10px; }
+    .ae-grid-2 { grid-template-columns: 1fr 1fr; }
+    .ae-field label .ae-opt { font-weight: 500; color: #94a3b8; }
+    @media (max-width: 600px) {
+      .ae-card { border-radius: 12px; }
+      .ae-card-head { padding: 9px 12px; }
+      .ae-card-body { padding: 10px 12px 2px; }
+      .ae-card-titles p { display: none; }
+      .ae-card .ae-grid.ae-grid-2 { grid-template-columns: 1fr; }
+    }
+
     .ae-section-label {
       font-size: 11px; font-weight: 700; letter-spacing: .08em;
       text-transform: uppercase; color: #64748b; margin: 0 0 10px;
@@ -553,7 +583,12 @@ export const getAddEvent = async ({
     ${!isAdminOrManagerUser ? `<div class="ae-approval-note">⏳ งานนี้จะขึ้นแสดงทันที แต่ต้องรอแอดมิน/manager อนุมัติก่อน จึงจะถือว่ายืนยันสมบูรณ์</div>` : ""}
 
     <!-- ขั้นตอนที่ 1: เลือกประเภทงาน -->
-    <p class="ae-section-label">ขั้นตอนที่ 1 — ประเภทงาน</p>
+    <section class="ae-card">
+      <div class="ae-card-head">
+        <span class="ae-card-ico" aria-hidden="true">🗂️</span>
+        <div class="ae-card-titles"><h4>ประเภทงาน</h4><p>งานครั้งเดียว · งานโปรเจค · หรือครั้งถัดไปของสัญญา</p></div>
+      </div>
+      <div class="ae-card-body">
     <div class="ae-jobtype-toggle">
       <label class="ae-jobtype-option">
         <input type="radio" name="ae-jobType" id="ae-jobTypeGeneral" value="general" checked>
@@ -597,33 +632,26 @@ export const getAddEvent = async ({
                 : `สัญญาของคุณครบจำนวนครั้งหมดแล้ว — ติดต่อแอดมิน/manager`)
         }</p>`
       : ""}
+    </div>
+    </section>
 
     <!-- โหมด "งานทั่วไป" -->
     <div id="ae-generalSection">
-      <p class="ae-section-label">ข้อมูลโครงการ</p>
-      <div class="ae-grid ae-grid-4">
-        <div class="ae-field">
-          <label>🏢 ชื่อบริษัท</label>
-          <select id="eventCompany"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${companyOpts}</select>
-        </div>
+      <section class="ae-card">
+      <div class="ae-card-head">
+        <span class="ae-card-ico" aria-hidden="true">🏗️</span>
+        <div class="ae-card-titles"><h4>ข้อมูลงาน</h4><p>งานนี้ของลูกค้ารายไหน เป็นงานอะไร</p></div>
+      </div>
+      <div class="ae-card-body">
+      <div class="ae-grid ae-grid-2">
         <div class="ae-field">
           <label><span class="req">*</span> ชื่อโครงการ</label>
           <select id="eventSite"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${siteOpts}</select>
         </div>
         <div class="ae-field">
-          <label>🙍 ผู้ติดต่อหน้างาน</label>
-          <input id="contactName" type="text" placeholder="ชื่อคนที่ต้องติดต่อเมื่อไปถึง">
+          <label>ชื่อบริษัท</label>
+          <select id="eventCompany"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${companyOpts}</select>
         </div>
-        <div class="ae-field">
-          <label>📞 เบอร์โทร</label>
-          <input id="contactTel" type="tel" inputmode="tel" placeholder="เช่น 081-234-5678">
-        </div>
-      </div>
-
-      <!-- ✅ "ครั้งที่" มีความหมายเฉพาะงานตามสัญญาเท่านั้น (รอบที่ N ของสัญญา — โหมด "งานตามสัญญา" ใช้
-           ตาราง "เลือกครั้งที่" แยกต่างหากอยู่แล้ว ไม่ได้ใช้ช่องนี้เลย) งานทั่วไป/งานโปรเจค เป็นงานเดี่ยวๆ
-           ไม่มีแนวคิด "ครั้งที่" จึงตัดช่องนี้ออก เหลือ 2 ช่องพอดี -->
-      <div class="ae-grid ae-grid-3">
         <div class="ae-field">
           <label><span class="req">*</span> ประเภทงาน</label>
           <select id="eventTitle"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${titleOpts}</select>
@@ -632,24 +660,56 @@ export const getAddEvent = async ({
           <label><span class="req">*</span> ระบบงาน</label>
           <select id="eventSystem"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${systemOpts}</select>
         </div>
+      </div>
+      </div>
+    </section>
+
+      <section class="ae-card">
+      <div class="ae-card-head">
+        <span class="ae-card-ico" aria-hidden="true">📞</span>
+        <div class="ae-card-titles"><h4>ผู้ติดต่อหน้างาน</h4><p>คนที่ต้องโทรหาเมื่อไปถึงหน้างาน</p></div><span class="ae-card-badge ae-card-badge--muted">ไม่บังคับ</span>
+      </div>
+      <div class="ae-card-body">
+      <div class="ae-grid ae-grid-2">
         <div class="ae-field">
-          <label>👷 ทีม</label>
-          <select id="eventTeam"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${teamOpts}</select>
+          <label>ชื่อผู้ติดต่อ</label>
+          <input id="contactName" type="text" placeholder="ชื่อคนที่ต้องติดต่อเมื่อไปถึง">
+        </div>
+        <div class="ae-field">
+          <label>เบอร์โทร</label>
+          <input id="contactTel" type="tel" inputmode="tel" placeholder="เช่น 081-234-5678">
         </div>
       </div>
-
-      <!-- ✅ ลูกทีมเพิ่มเติม (คนที่ 2, 3, ...) — แสดงผลอย่างเดียวว่าใครช่วยทำงานนี้บ้าง
-           ไม่กระทบสิทธิ์แก้ไข/แจ้งเตือน/นับงานค้าง ซึ่งยังผูกกับ "ทีม" (ช่างหลัก) ด้านบนเหมือนเดิม -->
-      <div class="ae-field" style="margin-bottom:16px;">
-        <label>👥 ลูกทีมเพิ่มเติม (ถ้ามี)</label>
-        <div id="ae-teamMembersList"></div>
-        <button type="button" class="ae-btn ae-btn-ghost" id="ae-addTeamMemberBtn" style="margin-top:2px;">➕ เพิ่มลูกทีม</button>
       </div>
+    </section>
 
-      <hr class="ae-divider">
+      <section class="ae-card">
+      <div class="ae-card-head">
+        <span class="ae-card-ico" aria-hidden="true">👷</span>
+        <div class="ae-card-titles"><h4>ทีมเข้างาน</h4><p>หัวหน้าทีมและลูกทีมที่ไปหน้างาน</p></div>
+      </div>
+      <div class="ae-card-body">
+      <div class="ae-grid ae-grid-2">
+        <div class="ae-field">
+          <label>หัวหน้าทีม</label>
+          <select id="eventTeam"><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${teamOpts}</select>
+        </div>
+        <!-- ✅ ลูกทีม (คนที่ 2, 3, ...) — แสดงผลอย่างเดียว ไม่กระทบสิทธิ์แก้ไข/แจ้งเตือน -->
+        <div class="ae-field">
+          <label>ลูกทีม <span class="ae-opt">ถ้ามี</span></label>
+          <div id="ae-teamMembersList"></div>
+          <button type="button" class="ae-btn ae-btn-ghost" id="ae-addTeamMemberBtn" style="margin-top:2px;">➕ เพิ่มลูกทีม</button>
+        </div>
+      </div>
+      </div>
+    </section>
 
-      <p class="ae-section-label">วันที่ & เวลา</p>
-
+      <section class="ae-card">
+      <div class="ae-card-head">
+        <span class="ae-card-ico" aria-hidden="true">📅</span>
+        <div class="ae-card-titles"><h4>วันที่และเวลา</h4><p>วันเข้างาน และช่วงเวลาที่ทำงาน</p></div>
+      </div>
+      <div class="ae-card-body">
       <label class="ae-checkbox-row">
         <input type="checkbox" id="ae-multiDateToggle">
         🗓️ งานนี้ต้องเข้างานหลายวัน (ไม่ติดกันก็ได้) — ถือเป็นงานเดียวกัน
@@ -658,11 +718,11 @@ export const getAddEvent = async ({
       <div id="ae-singleDateSection">
         <div class="ae-grid ae-grid-datetime">
           <div class="ae-field">
-            <label>📅 วันที่เริ่ม</label>
+            <label>วันที่เริ่ม</label>
             <input id="start" type="date" value="${arg.dateStr}">
           </div>
           <div class="ae-field">
-            <label>📅 วันที่สิ้นสุด</label>
+            <label>วันที่สิ้นสุด</label>
             <input id="end" type="date" value="${arg.dateStr}">
           </div>
         </div>
@@ -675,11 +735,11 @@ export const getAddEvent = async ({
 
       <div class="ae-grid ae-grid-datetime">
         <div class="ae-field">
-          <label>🕐 เวลาเริ่ม</label>
+          <label>เวลาเริ่ม</label>
           <input id="startTime" type="text" placeholder="เช่น 08:30">
         </div>
         <div class="ae-field">
-          <label>🕔 เวลาสิ้นสุด</label>
+          <label>เวลาสิ้นสุด</label>
           <input id="endTime" type="text" placeholder="เช่น 17:00">
         </div>
       </div>
@@ -687,31 +747,62 @@ export const getAddEvent = async ({
       <!-- ── สีการ์ดงานบนปฏิทิน ──
            ⚠️ id ของ input ทั้งสอง (backgroundColorPicker / textColorPicker) ยังเป็นตัวเดิม
            โค้ดตอนกดบันทึกด้านล่างอ่านค่าจาก id เหล่านี้โดยตรง ห้ามเปลี่ยนชื่อ -->
-      <p class="ae-section-label">สีการ์ดงานบนปฏิทิน</p>
+      </div>
+    </section>
+
+      <section class="ae-card">
+      <div class="ae-card-head">
+        <span class="ae-card-ico" aria-hidden="true">🎨</span>
+        <div class="ae-card-titles"><h4>การแสดงผลบนปฏิทิน</h4><p>สีของการ์ดงานบนปฏิทิน</p></div>
+      </div>
+      <div class="ae-card-body">
       ${colorPickerHtml({
         bgId: "backgroundColorPicker",
         textId: "textColorPicker",
         bg: sourceEvent?.backgroundColor || defaultBackgroundColor,
         text: sourceEvent?.textColor || defaultTextColor,
       })}
+      </div>
+    </section>
     </div>
 
     <!-- โหมด "งานตามสัญญา" -->
     <div id="ae-contractPickSection" style="display:none;">
-      <p class="ae-section-label">ขั้นตอนที่ 2 — เลือกสัญญา</p>
-      <div class="ae-field" style="margin-bottom:16px;">
+      <section class="ae-card">
+      <div class="ae-card-head">
+        <span class="ae-card-ico" aria-hidden="true">📄</span>
+        <div class="ae-card-titles"><h4>เลือกสัญญา</h4><p>สัญญาที่ยังเพิ่มครั้งได้</p></div>
+      </div>
+      <div class="ae-card-body">
+      <div class="ae-field" style="margin-bottom:10px;">
         <label><span class="req">*</span> เลือกสัญญา</label>
         <select id="ae-contractPick"><option value="" selected disabled>— เลือกสัญญา —</option>${contractOpts}</select>
       </div>
 
       <div class="ae-contract-pick-info" id="ae-contractPickInfo"></div>
 
-      <p class="ae-section-label">ขั้นตอนที่ 3 — เลือกครั้งที่จะลงวันที่</p>
+      </div>
+    </section>
+
+      <section class="ae-card">
+      <div class="ae-card-head">
+        <span class="ae-card-ico" aria-hidden="true">🔄</span>
+        <div class="ae-card-titles"><h4>เลือกครั้งที่</h4><p>ครั้งที่จะลงวันที่เข้างาน</p></div>
+      </div>
+      <div class="ae-card-body">
       <div class="ae-round-grid" id="ae-roundGrid"></div>
       <p class="ae-round-picked-hint" id="ae-roundPickedHint"></p>
       <input type="hidden" id="ae-selectedRound" value="">
 
-      <p class="ae-section-label">ขั้นตอนที่ 4 — วันที่เข้างาน</p>
+      </div>
+    </section>
+
+      <section class="ae-card">
+      <div class="ae-card-head">
+        <span class="ae-card-ico" aria-hidden="true">📅</span>
+        <div class="ae-card-titles"><h4>วันที่และทีมเข้างาน</h4></div>
+      </div>
+      <div class="ae-card-body">
       <div class="ae-grid ae-grid-datetime">
         <div class="ae-field">
           <label><span class="req">*</span> วันที่เริ่ม</label>
@@ -723,10 +814,12 @@ export const getAddEvent = async ({
         </div>
       </div>
       <div class="ae-field" style="margin-bottom:16px;">
-        <label>👷 หัวหน้าทีมเข้างาน</label>
+        <label>หัวหน้าทีมเข้างาน</label>
         <select id="ae-cpTeam"><option value="">— เลือกหรือพิมพ์ —</option>${teamOpts}</select>
         <p style="font-size:11px;color:#94a3b8;margin:4px 0 0;">ถ้าไม่เลือก ระบบจะลงผู้รับผิดชอบของสัญญานี้เป็นหัวหน้าทีมเข้างานให้อัตโนมัติ</p>
       </div>
+      </div>
+    </section>
     </div>
 
     ${/* ── เอกสาร ────────────────────────────────────────────────────────────────────────
@@ -735,17 +828,23 @@ export const getAddEvent = async ({
           ⚠️ วางไว้นอกทั้ง #ae-generalSection และ #ae-contractPickSection เพื่อให้ใช้ได้ทั้งสองโหมด
           (ทั้งสองโหมดสร้าง event ด้วย field ชุดเดียวกัน backend รับ docNo/description ตั้งแต่ POST อยู่แล้ว)
           ทั้งคู่ไม่บังคับกรอก — เรื่องเอกสารมักตามมาทีหลัง จึงยังเว้นว่างแล้วมาเติมภายหลังได้ */""}
-    <hr class="ae-divider">
-    <p class="ae-section-label">เอกสาร <span style="font-size:10.5px;font-weight:500;color:#94a3b8;">(ไม่บังคับ)</span></p>
+    <section class="ae-card">
+      <div class="ae-card-head">
+        <span class="ae-card-ico" aria-hidden="true">📄</span>
+        <div class="ae-card-titles"><h4>เอกสาร</h4><p>เลขที่อ้างอิงและรายละเอียดงาน</p></div><span class="ae-card-badge ae-card-badge--muted">ไม่บังคับ</span>
+      </div>
+      <div class="ae-card-body">
     <div class="ae-field" style="margin-bottom:12px;">
-      <label>📄 เลขที่อ้างอิง (Doc No.)</label>
+      <label>เลขที่อ้างอิง (Doc No.)</label>
       <input id="docNo" type="text" placeholder="เช่น DOC-2026-001">
     </div>
     <div class="ae-field" style="margin-bottom:16px;">
-      <label>📋 รายละเอียดงาน (Description)</label>
+      <label>รายละเอียดงาน</label>
       <textarea id="description" rows="5" placeholder="กรอกรายละเอียดงาน..."></textarea>
       <div class="ae-char-count" id="ae-charCount">0 ตัวอักษร</div>
     </div>
+    </div>
+    </section>
 
     <!-- hidden fontSize -->
     <input id="fontSize" type="hidden" value="8">

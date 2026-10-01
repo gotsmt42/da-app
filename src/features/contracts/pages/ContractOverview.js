@@ -34,15 +34,16 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, ToggleButtonGroup, ToggleButton,
   Button, Autocomplete, Alert, Chip, Checkbox, Pagination, useMediaQuery, Badge,
   TableSortLabel, Menu, MenuItem, ListItemIcon, ListItemText, Collapse, CircularProgress, Portal, Divider, Avatar, Popover,
+ Drawer,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
   Search, FolderOpen, Add, Close,
   PlaylistAdd, MergeType, GroupWork, DeleteOutline, WarningAmber,
   AddLink, LinkOff, Build, Engineering, ExpandMore, ExpandLess,
-  CalendarMonth, PersonOutline, Category, Assignment, Description, HourglassEmpty, Apps, DeviceHub,
+  CalendarMonth, Category, Assignment, Description, HourglassEmpty, Apps, DeviceHub,
   SwapHoriz, TableChart, FilterList, ViewAgenda, TableRows, SwipeLeft, ChevronLeft, ChevronRight,
-  AddCircleOutline, Check, Autorenew, EventBusy, History, Apartment, Timelapse,
+  AddCircleOutline, Check, Autorenew, EventBusy, History, Apartment, Timelapse, Tune,
 } from "@mui/icons-material";
 import { useAuth } from "@/features/auth/AuthContext";
 import EventService from "@/shared/services/EventService";
@@ -68,6 +69,7 @@ import ColumnSettings from "@/features/contracts/components/ColumnSettings";
 import ResponsiblePicker from "@/features/contracts/components/ResponsiblePicker";
 import FormSection, { FieldGrid } from "@/shared/ui/FormSection";
 import SelectField from "@/shared/ui/SelectField";
+import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { hasValidAvatar } from "@/shared/utils/user";
 import useColumnLayout from "@/features/contracts/hooks/useColumnLayout";
@@ -1318,6 +1320,9 @@ export default function ContractOverview() {
   // ปิดไว้เป็นค่าเริ่มต้นเสมอ (ตัวเลขบนปุ่มบอกอยู่แล้วว่ามีตัวกรองทำงานอยู่กี่ตัว จึงไม่ต้องกางให้เห็น)
   // — จอใหญ่ไม่ได้รับผลกระทบเลย ยังเรียงอยู่แถวเดียวกับช่องค้นหาเหมือนเดิมทุกประการ
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // ✅ มือถือ: มุมมอง/ผู้รับผิดชอบ/ค้นหา/ตัวกรอง รวมอยู่ในแผ่นล่างแผ่นเดียว เปิดจากปุ่มมุมขวาบนของหัวเพจ
+  // (ผู้ใช้ขอ — เดิมการ์ดมุมมอง 7 ใบ + แผงผู้รับผิดชอบ + ช่องค้นหา กินจอเกือบ 2 หน้าก่อนถึงงานแรก)
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
   // ✅ งานส่วนใหญ่ในระบบยังเป็นงานเก่าที่ยังไม่ได้จัดกลุ่มเป็นสัญญา (สร้างก่อนมีฟีเจอร์นี้) เดิม fallback
   // ให้ทุกงานเก่าขึ้นเป็น "สัญญา" 1 แถวของตัวเอง ทำให้ตารางท่วมไปด้วยแถวที่ไม่มีข้อมูลสัญญาจริงเลย
   // (ขึ้น "-" เกือบทุกช่อง) ดูรก/ไม่มีประโยชน์ — ใช้แท็บสลับมุมมองแทน switch เดียว (เทียบ pattern
@@ -1978,15 +1983,6 @@ export default function ContractOverview() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewBase, search, viewFilter, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, dateFrom, dateTo]);
 
-  // ✅ จำนวนงานที่ยังไม่เคยมอบหมายผู้รับผิดชอบ — ตัวเลือกในตัวกรองผู้รับผิดชอบ ให้ไล่เก็บงานที่ตกหล่น
-  // ได้ในคลิกเดียว (เดิมต้องไล่ดูทีละแถวเอง) โผล่เฉพาะตอนมีจริง — นับแบบเดียวกับ 2 ตัวด้านบนเป๊ะๆ
-  // (อิงแท็บที่เปิดอยู่ + ตัวกรองอื่น ยกเว้นตัวกรองผู้รับผิดชอบเอง) ตัวเลขทั้งแถวเครื่องมือจึงพูดตรงกัน
-  const unassignedResponsibleCount = useMemo(
-    () => applyCommonFilters(viewBase, { ignoreYear: viewFilter === "expired", skip: "responsible" })
-      .filter((c) => !c.responsiblePerson).length,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [viewBase, search, viewFilter, yearFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo]
-  );
 
   // ✅ เรียงลำดับตารางได้ด้วยการคลิกหัวตารางแต่ละช่อง (เฉพาะคอลัมน์ข้อมูลตรงๆ ที่เทียบค่าเดียวได้ —
   // ไม่รวม "สถานะสัญญา"/"คืบหน้า"/"ครั้งที่ N" ซึ่งเป็นค่าที่คำนวณจากหลายฟิลด์ ไม่มีค่าเดี่ยวให้เรียง)
@@ -5118,38 +5114,7 @@ pagedRows.map((c, idx) => {
           </option>
         ))}
       </SelectField>
-      {/* ✅ ซ่อนสำหรับช่าง — ข้อมูลที่ช่างเห็นถูกกรองเหลือแค่งานของตัวเองมาจาก backend อยู่แล้วเสมอ
-          ตัวกรองนี้มีประโยชน์แค่ตอนแอดมิน/manager ที่เห็นงานของทุกคนต้องกรองหาเฉพาะบางคน */}
-      {isAdminOrManager && (
-        <SelectField
-          size="small" label="ผู้รับผิดชอบงาน" value={responsibleFilter}
-          onChange={(e) => setResponsibleFilter(e.target.value)}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <PersonOutline sx={{ fontSize: 18, color: responsibleFilter !== "all" ? ACCENT : "text.disabled" }} />
-              </InputAdornment>
-            ),
-          }}
-          sx={{
-            width: { xs: "100%", sm: 185 }, flexShrink: 0,
-            "& .MuiOutlinedInput-root": {
-              borderRadius: 2.5,
-              bgcolor: responsibleFilter !== "all" ? alpha(ACCENT, 0.06) : "background.paper",
-              "& fieldset": responsibleFilter !== "all" ? { borderColor: alpha(ACCENT, 0.45) } : {},
-              "&:hover fieldset": responsibleFilter !== "all" ? { borderColor: ACCENT } : {},
-            },
-            "& .MuiInputLabel-root": responsibleFilter !== "all" ? { color: ACCENT, fontWeight: 700 } : {},
-          }}
-        >
-          <option value="all">ทุกคน</option>
-          {/* ✅ ไล่เก็บสัญญาที่ยังไม่เคยมอบหมายผู้รับผิดชอบ — โผล่เฉพาะตอนมีจริง (กันตัวเลือกรก) */}
-          {unassignedResponsibleCount > 0 && (
-            <option value="unassigned">— ยังไม่มอบหมาย ({unassignedResponsibleCount}) —</option>
-          )}
-          {teamOptions.map((name) => <option key={name} value={name}>{name}</option>)}
-        </SelectField>
-      )}
+      {/* 🧹 ตัวกรอง "ผู้รับผิดชอบงาน" เอาออก (ผู้ใช้ขอ) — ใช้แผง "งานตามผู้รับผิดชอบ" ด้านบนแทน (ตัวกรองเดียวกัน) */}
       {/* ✅ กรองตามอายุสัญญา (1 ปี / 2 ปี / 3 ปี ...) — ตามที่ผู้ใช้ขอให้ "แยกค้นหางานต่อปี" เพราะสัญญา
           หลายปีมีเงื่อนไขการดูแล/วางบิลต่างจากสัญญาปีต่อปีชัดเจน แต่เดิมปนกันอยู่ในตารางเดียวโดยไม่มี
           ทางแยกดูเลย ⚠️ ตัวเลือกสร้างจากอายุที่มีอยู่จริงในแท็บนี้เท่านั้น (ดู durationOptions)
@@ -5287,7 +5252,47 @@ pagedRows.map((c, idx) => {
   );
 
   // ✅ กันคนนอก (role อื่น) เปิดหน้านี้ตรงๆ ผ่าน URL — เทียบ pattern เดียวกับ QuotationTracking.js
+  // ✅ มือถือ: เลือกมุมมอง/ตัวกรองแล้วปิดแผ่นทันที — ยกเว้นเพิ่งเลือก "กำหนดช่วงวันที่เอง" (ยังต้องกรอกวันที่)
+  useCloseOnPick(mobileSheetOpen, () => setMobileSheetOpen(false), {
+    viewFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, yearFilter,
+    range: yearFilter === YEAR_FILTER_CUSTOM && dateFrom && dateTo ? `${dateFrom}|${dateTo}` : "",
+  }, (_, next) => next.yearFilter === YEAR_FILTER_CUSTOM && !next.range);
+
   if (!loading && !canView) return <Navigate to="/dashboard" replace />;
+
+  // กลุ่มการ์ดมุมมอง — จอใหญ่วางบนหน้า · มือถืออยู่ในแผ่นล่าง
+  const viewTileGroups = [
+    {
+      title: "สัญญาบริการ",
+      items: [
+        { value: "contracts", label: "งานสัญญา / รายปี", shortLabel: "งานสัญญา", count: realContractCount, unit: "สัญญา", icon: <Description />, color: "#4f46e5" },
+        { value: "overdue", label: "เลยกำหนด / คงค้าง", shortLabel: "เลยกำหนด", count: overdueCount, unit: "สัญญา", icon: <WarningAmber />, color: "#dc2626", alert: true },
+        { value: "expired", label: "สัญญาหมดอายุ", shortLabel: "หมดอายุ", count: expiredCount, unit: "สัญญา", icon: <EventBusy />, color: "#ea580c", alert: true },
+      ],
+    },
+    {
+      title: "งานอื่นๆ",
+      items: [
+        { value: "general", label: "งานทั่วไป", count: confirmedGeneralCount, unit: "งาน", icon: <Build />, color: "#059669" },
+        { value: "project", label: "งานโปรเจค", count: confirmedProjectCount, unit: "งาน", icon: <Engineering />, color: "#2563eb" },
+        ...(isAdminOrManager ? [{ value: "ungrouped", label: "งานเก่าที่ยังไม่จัดกลุ่ม", shortLabel: "ยังไม่จัดกลุ่ม", count: hiddenJobCount, unit: "งาน", icon: <HourglassEmpty />, color: "#d97706" }] : []),
+        { value: "all", label: "ทั้งหมด", count: allFilteredCount, unit: "งาน", icon: <Apps />, color: "#475569" },
+      ],
+    },
+  ];
+
+  // มือถือ: จำนวนผู้รับผิดชอบสำหรับ select ในแผ่นล่าง (ชุดเดียวกับแผงการ์ดบนจอใหญ่)
+  const responsibleOptions = (() => {
+    const m = new Map();
+    let unassigned = 0;
+    responsibleRows.forEach((r) => {
+      if (!r.responsiblePerson) { unassigned += 1; return; }
+      m.set(r.responsiblePerson, (m.get(r.responsiblePerson) || 0) + 1);
+    });
+    return { list: [...m].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "th")), unassigned, total: responsibleRows.length };
+  })();
+  const viewItem = viewTileGroups.flatMap((g) => g.items).find((i) => i.value === viewFilter);
+  const mobileActiveCount = activeFilterLabels.length + (viewFilter !== "contracts" ? 1 : 0);
 
   return (
     // ✅ จอมือถือแทบไม่ต้องเว้นบนเลย — มีแถวปุ่มย้อนกลับของ layout คั่นให้อยู่แล้ว (ดู FullLayout.css
@@ -5297,7 +5302,7 @@ pagedRows.map((c, idx) => {
           ปุ่มรีเฟรช + ปุ่มส่งออกรวมกัน ทำให้ล้นขอบจอ/ปุ่มถูกตัด สลับเป็นซ้อนกันคนละแถวบนจอแคบแทน
           (ชื่อหน้า/จำนวนอยู่แถวบน ปุ่มต่างๆ อยู่แถวล่าง เต็มความกว้าง) */}
       <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "stretch", sm: "flex-start" }} justifyContent="space-between" gap={1.25} sx={{ mb: 2 }}>
-        <Stack direction="row" alignItems="center" gap={1.25}>
+        <Stack direction="row" alignItems="center" gap={1.25} sx={{ minWidth: 0 }}>
           {/* ✅ ไอคอนป้ายหัวข้อ — ให้หน้านี้มีจุดเด่นตั้งแต่แวบแรก เทียบ pattern การ์ดหัวข้อสีพื้นหลัง
               วงกลมที่ใช้ทั่วไปในแอป (Dashboard/Operation) แทนตัวหนังสือเปล่าๆ */}
           <Box sx={{
@@ -5312,12 +5317,26 @@ pagedRows.map((c, idx) => {
             {/* ✅ แท็บ "เลยกำหนด/คงค้าง" กรองเฉพาะ isRealContract เหมือนแท็บ "งานสัญญา" ทุกประการ (ดู
                 filtered) แถวทั้งหมดจึงเป็นสัญญา ไม่ใช่ "งาน" — เดิมเช็คแค่ viewFilter==="contracts"
                 ทำให้แท็บนี้ขึ้นหน่วยผิดเป็น "งาน" */}
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
               {loading
                 ? "กำลังโหลด..."
                 : `กำลังดู ${exportLabels.viewLabel} · ${filtered.length.toLocaleString()} ${viewFilter === "contracts" || viewFilter === "overdue" || viewFilter === "expired" ? "สัญญา" : "งาน"}${hasActiveFilters ? " (กรองอยู่)" : ""}`}
             </Typography>
           </Box>
+          {/* ✅ มือถือ: ปุ่มมุมมอง/ค้นหา/ตัวกรอง มุมขวาบน — เปิดแผ่นล่าง */}
+          {isMobile && (
+            <IconButton
+              aria-label="มุมมอง ค้นหา และตัวกรอง" onClick={() => setMobileSheetOpen(true)}
+              sx={{
+                ml: "auto", flexShrink: 0, width: 42, height: 42, borderRadius: 2.5, border: `1px solid ${BORDER_MAIN}`,
+                bgcolor: mobileActiveCount ? alpha(ACCENT, 0.08) : "background.paper", color: mobileActiveCount ? ACCENT : "text.primary",
+              }}
+            >
+              <Badge badgeContent={mobileActiveCount} color="error" sx={{ "& .MuiBadge-badge": { fontSize: "0.62rem", height: 16, minWidth: 16 } }}>
+                <Tune sx={{ fontSize: 21 }} />
+              </Badge>
+            </IconButton>
+          )}
         </Stack>
         <Stack direction="row" gap={1}>
           {isAdminOrManager && (
@@ -5373,35 +5392,17 @@ pagedRows.map((c, idx) => {
       {/* ── สลับมุมมอง: การ์ดตัวเลขแทนแท็บเทาเล็กๆ ที่ผู้ใช้ไม่รู้ว่ากดได้ (ดู ViewTiles.js) ──
           ✅ กลุ่ม "สัญญา" (งานสัญญา/เลยกำหนด/หมดอายุ — เลยกำหนดเป็นส่วนย่อยของงานสัญญา) แยกจาก "งานอื่นๆ"
           ✅ แท็บ "งานเก่าที่ยังไม่จัดกลุ่ม" ซ่อนจากช่าง — มีไว้ให้แอดมินไล่จัดหมวดหมู่เท่านั้น */}
-      {!loading && (
+      {!loading && !isMobile && (
         <ViewTiles
           value={viewFilter}
           onChange={selectView}
           isMobile={isMobile}
-          groups={[
-            {
-              title: "สัญญาบริการ",
-              items: [
-                { value: "contracts", label: "งานสัญญา / รายปี", shortLabel: "งานสัญญา", count: realContractCount, unit: "สัญญา", icon: <Description />, color: "#4f46e5" },
-                { value: "overdue", label: "เลยกำหนด / คงค้าง", shortLabel: "เลยกำหนด", count: overdueCount, unit: "สัญญา", icon: <WarningAmber />, color: "#dc2626", alert: true },
-                { value: "expired", label: "สัญญาหมดอายุ", shortLabel: "หมดอายุ", count: expiredCount, unit: "สัญญา", icon: <EventBusy />, color: "#ea580c", alert: true },
-              ],
-            },
-            {
-              title: "งานอื่นๆ",
-              items: [
-                { value: "general", label: "งานทั่วไป", count: confirmedGeneralCount, unit: "งาน", icon: <Build />, color: "#059669" },
-                { value: "project", label: "งานโปรเจค", count: confirmedProjectCount, unit: "งาน", icon: <Engineering />, color: "#2563eb" },
-                ...(isAdminOrManager ? [{ value: "ungrouped", label: "งานเก่าที่ยังไม่จัดกลุ่ม", shortLabel: "ยังไม่จัดกลุ่ม", count: hiddenJobCount, unit: "งาน", icon: <HourglassEmpty />, color: "#d97706" }] : []),
-                { value: "all", label: "ทั้งหมด", count: allFilteredCount, unit: "งาน", icon: <Apps />, color: "#475569" },
-              ],
-            },
-          ]}
+          groups={viewTileGroups}
         />
       )}
 
       {/* ✅ สรุปว่าผู้รับผิดชอบแต่ละคนถืองานกี่ชิ้น — กดเพื่อกรองตาราง (ตัวกรองเดียวกับ dropdown ผู้รับผิดชอบ) */}
-      {!loading && isAdminOrManager && (
+      {!loading && isAdminOrManager && !isMobile && (
         <ResponsibleSummary
           rows={responsibleRows}
           unit={viewFilter === "contracts" || viewFilter === "overdue" ? "สัญญา" : "งาน"}
@@ -5484,13 +5485,15 @@ pagedRows.map((c, idx) => {
           dropdown ทั้ง 4 ช่องพับซ่อนไว้ กดกางเมื่อต้องใช้ — เดิมกางเรียงเต็มความกว้างซ้อนกันลงมาหมด
           กินพื้นที่เกือบเต็มจอก่อนถึงข้อมูลจริงสักแถว
           ✅ จอใหญ่: เหมือนเดิมทุกประการ (ช่องค้นหา + ทุก dropdown เรียงแถวเดียวกัน ไม่มีปุ่มพับ) */}
+      {/* จอใหญ่: แถบค้นหา + ตัวกรองแถวเดียว (มือถือย้ายไปอยู่ในแผ่นล่าง) */}
+      {!isMobile && (
       <Box sx={{ mb: 2, ...(isMobile ? {} : { p: 1.5, border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, bgcolor: "background.paper", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }) }}>
         {/* 🐛 BUG ที่แก้ (ตัวกรองล้นออกนอกจอ): แถวนี้ไม่เคยตั้ง flexWrap ไว้ พอตัวกรองเพิ่มขึ้นเรื่อยๆ
             (แผนก/สถานะ/อายุสัญญา/ช่วงวันที่) ช่องท้ายๆ จะดันทะลุขอบขวาออกไปนอกจอจนกดไม่ได้เลย
             ✅ ให้ห่อลงบรรทัดใหม่แทนเมื่อพื้นที่ไม่พอ — ช่องค้นหายังกินพื้นที่ที่เหลือของบรรทัดแรกเหมือนเดิม
             แต่มีความกว้างขั้นต่ำกันไม่ให้ถูกบีบจนพิมพ์ไม่ได้ */}
         <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} sx={{ flexWrap: { sm: "wrap" } }}>
-          <Stack direction="row" gap={1} sx={{ flex: 1, minWidth: { sm: 260 } }}>
+          <Stack direction="row" gap={1} sx={{ flex: "1 1 240px", minWidth: { sm: 220 } }}>
             <TextField
               fullWidth size="small"
               placeholder={isMobile ? "ค้นหางาน..." : "ค้นหาบริษัท / โครงการ / เลขที่สัญญา / ผู้รับผิดชอบ..."}
@@ -5566,15 +5569,87 @@ pagedRows.map((c, idx) => {
             </Collapse>
           ) : (
             <Box sx={{
-              flexBasis: "100%", display: "grid", gap: 1.25,
-              gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))",
-              "& > .MuiFormControl-root, & > .MuiTextField-root": { minWidth: "0 !important", width: "100% !important", m: 0 },
+              // ✅ แถวเดียวกับช่องค้นหา (ผู้ใช้ขอ) — ช่องเลือกยืดเท่าๆ กัน · ถ้าจอแคบจริงๆ ถึงจะขึ้นบรรทัดใหม่ทั้งกลุ่ม
+              flex: "999 1 780px", display: "flex", gap: 1, minWidth: 0,
+              "& > .MuiFormControl-root, & > .MuiTextField-root": { flex: "1 1 120px", minWidth: "110px !important", width: "auto !important", m: 0 },
+              // จอคอมขนาดกลาง: ซ่อนไอคอนเล็กในช่อง ให้ข้อความในช่องไม่ถูกตัด (จอกว้างยังแสดงไอคอนตามเดิม)
+              "@media (max-width: 1700px)": { "& .MuiInputAdornment-positionStart": { display: "none" } },
+              "& .MuiSelect-select": { fontSize: "0.86rem" },
             }}>
               {renderFilterFields()}
             </Box>
           )}
         </Stack>
       </Box>
+      )}
+
+      {/* ── มือถือ: สิ่งที่กำลังดูอยู่เป็นชิปบรรทัดเดียว (มุมมอง + ตัวกรอง) · แผงเต็มอยู่ในแผ่นล่าง ── */}
+      {isMobile && !loading && (
+        <Stack direction="row" spacing={0.75} useFlexGap alignItems="center" sx={{ mb: 1.25, flexWrap: "wrap" }}>
+          {viewItem && (
+            <Chip
+              size="small" onClick={() => setMobileSheetOpen(true)}
+              icon={<Box component="span" sx={{ display: "inline-flex", color: `${viewItem.color} !important`, "& svg": { fontSize: 16 } }}>{viewItem.icon}</Box>}
+              label={`${viewItem.shortLabel || viewItem.label} · ${viewItem.count.toLocaleString()}`}
+              sx={{ fontWeight: 800, bgcolor: alpha(viewItem.color, 0.08), color: viewItem.color, border: `1px solid ${alpha(viewItem.color, 0.25)}` }}
+            />
+          )}
+          {activeFilterLabels.map((l) => (
+            <Chip key={l} size="small" label={l} onClick={() => setMobileSheetOpen(true)} sx={{ fontWeight: 700, maxWidth: "100%" }} />
+          ))}
+          {hasActiveFilters && (
+            <Chip size="small" label="ล้าง" onDelete={clearAllFilters} onClick={clearAllFilters} sx={{ fontWeight: 700, color: ACCENT, bgcolor: alpha(ACCENT, 0.06) }} />
+          )}
+        </Stack>
+      )}
+      {isMobile && (
+        <Drawer
+          anchor="bottom" open={mobileSheetOpen} onClose={() => setMobileSheetOpen(false)}
+          PaperProps={{ sx: { borderTopLeftRadius: 18, borderTopRightRadius: 18, px: 2, pt: 1, pb: "calc(16px + env(safe-area-inset-bottom))", maxHeight: "88vh" } }}
+        >
+          <Box sx={{ width: 40, height: 4, borderRadius: 2, bgcolor: "#cbd5e1", mx: "auto", mb: 1.25, flexShrink: 0 }} />
+          <Stack direction="row" alignItems="center" sx={{ mb: 1.5, flexShrink: 0 }}>
+            <Typography sx={{ flex: 1, fontWeight: 800, fontSize: "1rem" }}>มุมมองและตัวกรอง</Typography>
+            {(hasActiveFilters || viewFilter !== "contracts") && (
+              <Button size="small" onClick={() => { clearAllFilters(); selectView("contracts"); }} sx={{ textTransform: "none", fontWeight: 700, color: ACCENT }}>
+                ล้างทั้งหมด
+              </Button>
+            )}
+            <IconButton size="small" aria-label="ปิด" onClick={() => setMobileSheetOpen(false)}><Close /></IconButton>
+          </Stack>
+          <Box sx={{ overflowY: "auto", mx: -2, px: 2, pb: 1 }}>
+            <TextField
+              fullWidth size="small" placeholder="ค้นหาบริษัท / โครงการ / เลขที่สัญญา..." value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              sx={{ mb: 1.75, "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: SURFACE_SUBTLE, "& fieldset": { borderColor: "transparent" }, "&.Mui-focused": { bgcolor: "background.paper" } } }}
+              InputProps={{
+                startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 19, color: "text.disabled" }} /></InputAdornment>,
+                endAdornment: search ? (
+                  <InputAdornment position="end"><IconButton size="small" onClick={() => setSearch("")} edge="end"><Close sx={{ fontSize: 16 }} /></IconButton></InputAdornment>
+                ) : undefined,
+              }}
+            />
+            <Typography sx={{ fontSize: "0.78rem", fontWeight: 800, color: "text.secondary", mb: 0.75 }}>มุมมอง</Typography>
+            <Box sx={{ "& > div": { mb: 1.75 } }}>
+              <ViewTiles value={viewFilter} onChange={selectView} isMobile groups={viewTileGroups.map((g) => ({ ...g, title: "" }))} />
+            </Box>
+            {isAdminOrManager && responsibleOptions.total > 0 && (
+              <SelectField fullWidth label="ผู้รับผิดชอบ" value={responsibleFilter} onChange={(e) => setResponsibleFilter(e.target.value)} sx={{ mb: 1.5, width: "100%" }}>
+                <option value="all">ทุกคน ({responsibleOptions.total})</option>
+                {responsibleOptions.unassigned > 0 && <option value="unassigned">ยังไม่มอบหมาย ({responsibleOptions.unassigned})</option>}
+                {responsibleOptions.list.map(([name, n]) => <option key={name} value={name}>{name} ({n})</option>)}
+              </SelectField>
+            )}
+            <Stack gap={1.5}>{renderFilterFields()}</Stack>
+          </Box>
+          <Button
+            fullWidth variant="contained" onClick={() => setMobileSheetOpen(false)}
+            sx={{ mt: 1.5, flexShrink: 0, py: 1.1, textTransform: "none", fontWeight: 800, borderRadius: 2.5, boxShadow: "none", bgcolor: "#334155", "&:hover": { bgcolor: "#1e293b", boxShadow: "none" } }}
+          >
+            ดูผลลัพธ์ {filtered.length.toLocaleString()} รายการ
+          </Button>
+        </Drawer>
+      )}
 
       {/* ── สลับรูปแบบการแสดงผลบนจอมือถือ (การ์ด / ตาราง) ────────────────────────
           ✅ มุมมอง "การ์ด" อ่านทีละงานได้ครบทุกฟิลด์โดยไม่ต้องเลื่อนซ้ายขวา แต่เทียบข้ามงานยาก
@@ -5675,25 +5750,22 @@ pagedRows.map((c, idx) => {
         {/* ✅ บอกให้รู้ตั้งแต่แรกว่าตารางกว้างเกินจอและปัดดูต่อได้ — ไม่งั้นคนที่เพิ่งสลับมาโหมดตารางจะ
             เห็นแค่ 2-3 คอลัมน์แรกแล้วนึกว่าข้อมูลที่เหลือหายไป (ไม่มีคอลัมน์ตรึงแล้ว ทุกคอลัมน์เลื่อน
             ไปพร้อมกันหมด กด ‹ เพื่อกลับมาคอลัมน์เลขที่เอกสารได้ ดู mobileTableSx) */}
-        {useMobileTable && (
-          <>
-            <Stack
-              direction="row" alignItems="center" spacing={0.5}
-              sx={{ mb: 0.75, color: "text.disabled" }}
-            >
-              <SwipeLeft sx={{ fontSize: 15 }} />
-              <Typography variant="caption">
-                ปัดซ้าย-ขวา หรือกดปุ่ม ‹ › เพื่อดูคอลัมน์ที่เหลือ · แตะช่องเพื่อแก้ไข
-              </Typography>
-            </Stack>
-          </>
-        )}
         {/* ✅ แถบเครื่องมือของตาราง — จัดลำดับ/ซ่อนคอลัมน์ (ลากหัวตารางสลับที่ได้แบบ Excel ด้วย) */}
-        <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} sx={{ mb: 1 }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} flexWrap="wrap" sx={{ mb: 1 }}>
           <Typography variant="caption" sx={{ color: "text.disabled", display: "flex", alignItems: "center", gap: 0.5, minWidth: 0 }}>
+            {/* มือถือแสดงจำนวนรายการในแถวสลับการ์ด/ตารางด้านบนแล้ว — ไม่ต้องซ้ำ (เคยซ้อนทับกับป้ายคอลัมน์ที่ซ่อน) */}
+            {!isMobile && (
             <Box component="span" sx={{ fontWeight: 800, fontSize: "0.8rem", color: "text.primary", mr: 1, whiteSpace: "nowrap" }}>
               {filtered.length.toLocaleString()} รายการ{totalPages > 1 ? ` · หน้า ${safePage}/${totalPages}` : ""}
             </Box>
+            )}
+            {/* มือถือ: คำแนะนำปัดดูคอลัมน์อยู่แถวเดียวกับปุ่มคอลัมน์ (เดิมเป็นอีกบรรทัดแยก ดูซ้อนกันหลายชั้น) */}
+            {useMobileTable && (
+              <>
+                <SwipeLeft sx={{ fontSize: 15 }} />
+                ปัดดูเพิ่ม
+              </>
+            )}
             {!useMobileTable && (
               <>
                 <DragIndicator sx={{ fontSize: 15 }} />
@@ -5701,12 +5773,12 @@ pagedRows.map((c, idx) => {
               </>
             )}
           </Typography>
-          <Stack direction="row" alignItems="center" gap={1} sx={{ flexShrink: 0 }}>
+          <Stack direction="row" alignItems="center" gap={1} sx={{ flexShrink: 0, ml: "auto" }}>
             {/* ✅ บอกให้รู้เสมอว่ามีคอลัมน์ถูกซ่อนอยู่ — กันเข้าใจผิดว่าข้อมูลหาย */}
             {columnLayout.hidden.length > 0 && (
               <Chip
                 size="small" icon={<VisibilityOffOutlined sx={{ fontSize: 15 }} />}
-                label={`ซ่อนอยู่ ${columnLayout.hidden.length} คอลัมน์ · แสดงทั้งหมด`}
+                label={isMobile ? `ซ่อน ${columnLayout.hidden.length}` : `ซ่อนอยู่ ${columnLayout.hidden.length} คอลัมน์ · แสดงทั้งหมด`}
                 onClick={columnLayout.showAll}
                 sx={{ height: 26, fontSize: "0.72rem", fontWeight: 700, bgcolor: alpha("#f59e0b", 0.12), color: "#b45309", "& .MuiChip-icon": { color: "#b45309" }, "&:hover": { bgcolor: alpha("#f59e0b", 0.2) } }}
               />

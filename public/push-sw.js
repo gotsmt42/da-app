@@ -8,21 +8,34 @@ self.addEventListener("push", (event) => {
     data.body = event.data?.text() || "";
   }
 
+  // ✅ แอปเปิดอยู่บนจอ → ส่งให้หน้าแอปเด้งแบนเนอร์ในแอป + เสียงเตือน (แบบ LINE) แทนแจ้งเตือนระบบซ้ำซ้อน
+  //    แอปปิด/อยู่เบื้องหลัง → แจ้งเตือนระบบของมือถือ (เสียง/สั่นตามตั้งค่าเครื่อง)
+  // ⚠️ ข้ามแจ้งเตือนระบบได้เฉพาะตอนมีหน้าแอป "มองเห็นอยู่" เท่านั้น — Chrome บังคับ userVisibleOnly
+  //    ถ้าไม่มีหน้าไหนเปิดอยู่แล้วไม่ showNotification เบราว์เซอร์จะโชว์ข้อความกลางๆ ของมันเองแทน
   event.waitUntil(
-    self.registration.showNotification(data.title || "🔔 แจ้งเตือน", {
-      body: data.body || "",
-      icon: "/logo192.png",
-      badge: "/logo192.png",
-      // ✅ tag เดียวกัน = แจ้งเตือนเกี่ยวกับงานเดียวกัน ถูกรวม/แทนที่ของเก่าแทนที่จะกองสะสม
-      // renotify: true ทำให้ถึงจะแทนที่ของเก่า ก็ยังสั่น/เด้งแจ้งซ้ำให้รู้ว่ามีอัปเดตใหม่จริง (ไม่ใช่แค่เงียบๆ แทนที่)
-      tag: data.tag || undefined,
-      renotify: Boolean(data.tag) && Boolean(data.renotify),
-      vibrate: [120, 60, 120],
-      // ✅ ให้ค้างอยู่ในกล่องแจ้งเตือนจนกว่าจะมีคนกดดู ไม่ให้หายไปเองหลังเด้งขึ้นมาไม่กี่วินาที
-      requireInteraction: true,
-      dir: "auto",
-      lang: "th",
-      data: { url: data.url || "/" },
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      const visible = list.filter((c) => c.visibilityState === "visible" && new URL(c.url).origin === self.location.origin);
+      if (visible.length) {
+        visible.forEach((c) => c.postMessage({ type: "app-push", payload: { title: data.title, body: data.body, url: data.url || "/", tag: data.tag } }));
+        return undefined;
+      }
+      return self.registration.showNotification(data.title || "🔔 แจ้งเตือน", {
+        body: data.body || "",
+        icon: "/logo192.png",
+        badge: "/logo192.png",
+        // ✅ tag เดียวกัน = แจ้งเตือนเกี่ยวกับงานเดียวกัน ถูกรวม/แทนที่ของเก่าแทนที่จะกองสะสม
+        // renotify: true ทำให้ถึงจะแทนที่ของเก่า ก็ยังสั่น/เด้งแจ้งซ้ำให้รู้ว่ามีอัปเดตใหม่จริง (ไม่ใช่แค่เงียบๆ แทนที่)
+        tag: data.tag || undefined,
+        renotify: Boolean(data.tag) && Boolean(data.renotify),
+        // ✅ มีเสียงเสมอ (ใช้เสียงแจ้งเตือนของเครื่อง) — เว็บกำหนดไฟล์เสียงเองไม่ได้ เบราว์เซอร์มือถือไม่รองรับ
+        silent: false,
+        vibrate: [120, 60, 120],
+        // ✅ ให้ค้างอยู่ในกล่องแจ้งเตือนจนกว่าจะมีคนกดดู ไม่ให้หายไปเองหลังเด้งขึ้นมาไม่กี่วินาที
+        requireInteraction: true,
+        dir: "auto",
+        lang: "th",
+        data: { url: data.url || "/" },
+      });
     })
   );
 });
