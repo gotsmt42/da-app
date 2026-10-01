@@ -1,5 +1,5 @@
 import moment from "moment";
-import { countUsedRounds, DEFAULT_INTERVAL_MONTHS } from "./contractRounds";
+import { countUsedRounds, DEFAULT_INTERVAL_MONTHS, totalRoundsOf } from "./contractRounds";
 
 /**
  * contractOverdue.js — จัดกลุ่ม event ด้วย contractGroupId ให้เป็น "สัญญา" (1 แถว/สัญญา) และเช็คว่า
@@ -13,16 +13,49 @@ import { countUsedRounds, DEFAULT_INTERVAL_MONTHS } from "./contractRounds";
 // ⚠️ BUG ที่แก้: เดิม fallback ไปที่ _id ของตัวเองตรงๆ เสมอ ทำให้ "งานทั่วไป" ที่เข้าหลายวันไม่ติดกัน
 // (ผูกกันด้วย jobGroupId เดียวกันอยู่แล้ว — Operation จัดกลุ่มถูกอยู่แล้วโดยใช้ jobGroupId นี้) โผล่เป็น
 // หลายแถวแยกกันในตารางนี้ ทั้งที่จริงเป็นงานเดียวกัน — ต้อง fallback ไปที่ jobGroupId ก่อน ถ้ามี
+/** key ของ "งาน" 1 แถวในภาพรวมงาน — สัญญา > งานหลายวัน (jobGroupId) > งานเดี่ยว */
+const overviewKeyOf = (e) => e.contractGroupId || (e.jobGroupId ? `jgid:${e.jobGroupId}` : `nogid:${e._id || e.id}`);
+
+/**
+ * ลำดับครั้งในงานเดียวกัน — ครั้งที่ (time) ก่อน แล้ววันที่
+ * ⚠️ ต้องตรงกับ byRound ใน services/groupResponsible.js ฝั่ง server (ตัวตัดสินว่าใครคือ "หัวกลุ่ม")
+ *    เดิมเรียงด้วย time อย่างเดียว ครั้งที่ 1 ที่มีหลายวันจึงได้หัวกลุ่มตามลำดับที่ API ส่งมา ไม่แน่นอน
+ */
+const byRound = (a, b) =>
+  (Number(a.time) || 0) - (Number(b.time) || 0) ||
+  (new Date(a.start || a.date || 0) - new Date(b.start || b.date || 0));
+
+/** ผู้รับผิดชอบของงานทั้งกลุ่ม = ใบแรกตามลำดับครั้งที่มีการมอบหมาย (หัวกลุ่มก่อนเสมอ) */
+const groupOwnerOf = (sortedVisits) => sortedVisits.find((v) => v.responsiblePerson) || null;
+
+/**
+ * ✅ ผู้รับผิดชอบของงานนี้ "ตามที่หน้าภาพรวมงานแสดง" — ใช้ในหน้าแก้ไขงานให้ตรงกับภาพรวมงานเสมอ
+ * @param event งานที่เปิดอยู่ (FullCalendar event หรือ object ดิบ)
+ * @param allEvents งานทั้งหมดที่โหลดไว้ (ใช้หาวัน/ครั้งอื่นของงานเดียวกัน)
+ * @returns { name, id } หรือ { name: "", id: "" } ถ้ายังไม่มอบหมาย
+ */
+export const overviewResponsibleOf = (event, allEvents = []) => {
+  const self = { ...(event?.extendedProps || {}), ...event, _id: event?._id || event?.id };
+  const key = overviewKeyOf(self);
+  const visits = (allEvents || [])
+    .map((e) => ({ ...(e.extendedProps || {}), ...e, _id: e._id || e.id }))
+    .filter((e) => !e.isHoliday && overviewKeyOf(e) === key);
+  if (!visits.some((v) => String(v._id) === String(self._id))) visits.push(self);
+  const owner = groupOwnerOf(visits.sort(byRound));
+  return { name: owner?.responsiblePerson || "", id: owner?.responsiblePersonId || "" };
+};
+
 export const groupEventsByContract = (events) => {
   const map = new Map();
   events.forEach((e) => {
-    const key = e.contractGroupId || (e.jobGroupId ? `jgid:${e.jobGroupId}` : `nogid:${e._id}`);
+    const key = overviewKeyOf(e);
     if (!map.has(key)) map.set(key, []);
     map.get(key).push(e);
   });
   return [...map.entries()].map(([key, visits]) => {
-    const sorted = visits.slice().sort((a, b) => (Number(a.time) || 0) - (Number(b.time) || 0));
+    const sorted = visits.slice().sort(byRound);
     const head = sorted[0];
+    const owner = groupOwnerOf(sorted);
     const teamNames = [head.team, ...(head.teamMembers || []).map((m) => m?.name)]
       .filter(Boolean)
       .filter((name, idx, arr) => arr.indexOf(name) === idx);
@@ -90,7 +123,10 @@ export const groupEventsByContract = (events) => {
       // (ดู key ด้านบน) ทำให้ visitCount กลายเป็น 2, 3, ... ทั้งที่ไม่ใช่สัญญาเลย แล้วไปดันคอลัมน์
       // "ครั้งที่ 2" ให้โผล่ขึ้นมาทั้งตาราง (maxVisitCount คำนวณรวมทุกแถวในหน้าที่กรองอยู่) — visitCount
       // มีความหมายเฉพาะสัญญาจริงเท่านั้น แถวที่ไม่ใช่สัญญาไม่ควรมีค่านี้เลย
-      visitCount: head.contractGroupId ? (head.visitCount || sorted.length) : undefined,
+      // ✅ จำนวนครั้ง "ที่ใช้จริง" ตามกติกาเดียวทั้งระบบ (ดู totalRoundsOf) — ป้าย/ปุ่ม/แจ้งเตือนอ่านตัวนี้หมด
+      visitCount: head.contractGroupId ? (totalRoundsOf(head) || sorted.length) : undefined,
+      // ค่าที่บันทึกไว้ดิบๆ — ใช้แค่ตอนเปิดช่องแก้ไขจำนวนครั้ง
+      storedVisitCount: head.contractGroupId ? head.visitCount : undefined,
       intervalMonths: head.contractGroupId ? head.intervalMonths : undefined,
       jobValue: head.jobValue,
       commission: head.commission,   // ค่าคอมให้ลูกค้า — ระดับสัญญาเหมือน jobValue
@@ -111,8 +147,10 @@ export const groupEventsByContract = (events) => {
       // ⚠️ ไม่กระทบสิทธิ์การมองเห็นงานของช่าง — ฝั่ง backend มีตรรกะ fallback ของตัวเองแยกต่างหาก
       // (effectiveResponsibleOrClauses ใน routes/calendarEvent.js) ซึ่งยังคงไว้เหมือนเดิม เพื่อไม่ให้
       // งานเก่าที่ไม่เคยตั้งผู้รับผิดชอบหลุดหายไปจากรายการของคนที่ดูแลอยู่จริง
-      responsiblePerson: head.responsiblePerson || "",
-      responsiblePersonId: head.responsiblePersonId || "",
+      // ✅ ใบแรกที่มีการมอบหมาย (ปกติคือหัวกลุ่ม — server ทำให้ทุกใบในกลุ่มตรงกันอยู่แล้ว) กันกรณี
+      //    หัวกลุ่มว่างแต่ครั้งอื่นมอบหมายแล้ว ตารางจะได้ไม่ขึ้น "ยังไม่มอบหมาย" ผิดๆ
+      responsiblePerson: owner?.responsiblePerson || "",
+      responsiblePersonId: owner?.responsiblePersonId || "",
       // ✅ ค่าที่ตั้งไว้ตรงๆ เท่านั้น (ไม่ fallback ไปที่ team เหมือนสองฟิลด์ด้านบน) — ใช้เช็คสิทธิ์ใหม่ที่
       // ต้อง "มอบหมายผู้รับผิดชอบไว้ชัดเจนก่อน" เท่านั้นถึงจะได้ (เช่น แก้ไขทีมของแต่ละครั้งในตารางนี้ —
       // ดู beginRoundTeamEdit) ตรงกับที่ backend เช็คแบบเข้มงวดเหมือนกันทุกประการ (ไม่ fallback)
@@ -235,6 +273,13 @@ const REQUIRED_CONTRACT = [
   { key: "contractStart", label: "วันเริ่มสัญญา", missing: (c) => !c.contractStart },
   { key: "contractEnd", label: "วันสิ้นสุดสัญญา", missing: (c) => !c.contractEnd },
   { key: "visitCount", label: "จำนวนครั้ง/รอบเข้า", missing: (c) => !(Number(c.visitCount) > 0 || Number(c.intervalMonths) > 0) },
+  // ✅ จำนวนครั้งที่กรอกไว้ขัดกับรอบเข้า (เช่น ทุก 6 เดือน = ปีละ 2 แต่บันทึกไว้ 3 ครั้ง) — ระบบใช้ค่าจากรอบเข้า
+  //    (ดู totalRoundsOf) แต่ต้องบอกให้คนแก้ข้อมูลให้ตรง ไม่แก้ทับให้เองเพราะเดาไม่ได้ว่าอันไหนถูก
+  { key: "visitCountMismatch", label: "จำนวนครั้งไม่ตรงกับรอบเข้า", missing: (c) => {
+    const n = Number(c.intervalMonths);
+    const stored = Number(c.storedVisitCount);
+    return n >= 1 && 12 % n === 0 && stored > 0 && stored !== 12 / n;
+  } },
   { key: "jobValue", label: "มูลค่างาน", missing: (c) => !(Number(c.jobValue) > 0) },
   { key: "responsiblePerson", label: "ผู้รับผิดชอบงาน", missing: (c) => !c.responsiblePerson },
 ];

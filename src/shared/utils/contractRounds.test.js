@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { countUsedRounds, formatRoundLabel, visitsPerYear, INTERVAL_MONTHS_PRESETS } from "./contractRounds";
+import { countUsedRounds, formatRoundLabel, visitsPerYear, INTERVAL_MONTHS_PRESETS, totalRoundsOf } from "./contractRounds";
 
 /**
  * เทสต์ชุดนี้มาแทน App.test.js เดิมที่ติดมากับ Create React App (มันหาข้อความ "learn react link"
@@ -81,5 +81,20 @@ describe("INTERVAL_MONTHS_PRESETS", () => {
     expect(INTERVAL_MONTHS_PRESETS.find((p) => p.months === 1).label).toBe("ทุกเดือน (ปีละ 12 ครั้ง)");
     expect(INTERVAL_MONTHS_PRESETS.find((p) => p.months === 12).label).toBe("ทุกปี (ปีละ 1 ครั้ง)");
     expect(INTERVAL_MONTHS_PRESETS.find((p) => p.months === 3).label).toBe("ทุก 3 เดือน (ปีละ 4 ครั้ง)");
+  });
+});
+
+describe("totalRoundsOf — จำนวนครั้งทั้งหมดของสัญญา (ตัวตัดสินเดียวทั้งระบบ)", () => {
+  it("รอบเข้าหาร 12 ลงตัว ชนะ visitCount ที่ค้างค่าเก่า (บั๊ก 2/2 แต่ยังมีช่องครั้งที่ 3)", () => {
+    expect(totalRoundsOf({ intervalMonths: 6, visitCount: 3, contractStart: "2026-01-01", contractEnd: "2026-12-31" })).toBe(2);
+  });
+  it("นับเป็นรายปีเสมอ (ตรงกับฟอร์มเพิ่มสัญญา/การแก้รอบเข้า)", () => {
+    expect(totalRoundsOf({ intervalMonths: 6, visitCount: 4, contractStart: "2026-01-01", contractEnd: "2027-12-31" })).toBe(2);
+    expect(totalRoundsOf({ intervalMonths: 4 })).toBe(3);
+  });
+  it("รอบเข้าหารไม่ลงตัว/ไม่ระบุ → ใช้ visitCount ที่กรอกไว้", () => {
+    expect(totalRoundsOf({ intervalMonths: 5, visitCount: 3 })).toBe(3);
+    expect(totalRoundsOf({ visitCount: 7 })).toBe(7);
+    expect(totalRoundsOf({})).toBe(0);
   });
 });

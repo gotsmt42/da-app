@@ -6,7 +6,7 @@
  * สองฝั่งให้ด้วย) ตรงนี้ดูเรื่องที่ script ตัวนั้นดูไม่ได้ เช่น การ normalize ค่าที่มาจากฐานข้อมูลจริง
  */
 import { describe, it, expect, vi } from "vitest";
-import { can, isRole, isAdminOrManager, normalizeRole, departmentOf, rankLabel, ROLES, DEPARTMENT, ALL_ROLES, CAPABILITIES, canAssignRole, canManageUserOfRole, roleLevel, RANK_LABEL, TECHNICIAN_ROLES, RANKS, ALL_RANKS, systemRoleOf, setRankLabels, titleOf, EXPENSE_WORKFLOW_CAPS } from "./roles";
+import { can, isRole, isAdminOrManager, normalizeRole, departmentOf, rankLabel, ROLES, DEPARTMENT, ALL_ROLES, CAPABILITIES, canAssignRole, canManageUserOfRole, roleLevel, RANK_LABEL, TECHNICIAN_ROLES, RANKS, ALL_RANKS, systemRoleOf, setRankLabels, titleOf } from "./roles";
 
 describe("normalizeRole", () => {
   // ⚠️ role ถูกกรอกด้วยมือผ่านหน้าจัดการผู้ใช้ และเคยมีทั้งตัวใหญ่/ช่องว่างติดมา
@@ -211,12 +211,16 @@ describe("ความถูกต้องของตารางเอง", (
     expect(can(sale, "viewLeads")).toBe(false);
   });
 
-  it("Super Admin ทำได้ทุกอย่าง (ยกเว้นสายอนุมัติค่าใช้จ่าย) และตั้ง/แก้ได้ทุกตำแหน่ง", () => {
+  it("Super Admin = สิทธิ์ดูแลระบบ · สิทธิ์ทำงานตามตำแหน่ง (ช่างเทคนิคที่เป็น Super Admin แก้งานคนอื่นไม่ได้)", () => {
     const superTech = { rank: "technician", role: "superadmin" };
-    Object.keys(CAPABILITIES).forEach((c) => {
-      if (EXPENSE_WORKFLOW_CAPS.includes(c)) return;
-      expect(can(superTech, c), c).toBe(true);
-    });
+    // ดูแลระบบได้ครบ
+    ["manageSystem", "manageAll", "manageMasterData", "manageWebsite", "viewLeads"].forEach((c) => expect(can(superTech, c), c).toBe(true));
+    // 🐛 ผู้ใช้แจ้ง: "ทำไมช่างเทคนิคยังแก้ไขงานของคนอื่นได้" — งานของคนอื่นต้องเป็นของตำแหน่งที่มีสิทธิ์เท่านั้น
+    ["editAnyJob", "approveJobs", "viewAllJobs", "editContracts", "editDocuments", "editFinance", "assignDispatch"].forEach((c) => expect(can(superTech, c), c).toBe(false));
+    // ส่วนสิทธิ์ที่ช่างเทคนิคมีอยู่แล้วตามตำแหน่ง ยังได้ตามปกติ
+    ["viewContracts", "viewDocuments", "requestExpense", "receiveDispatch"].forEach((c) => expect(can(superTech, c), c).toBe(true));
+    // ผู้จัดการที่เป็น Super Admin ได้สิทธิ์ทำงานจากตำแหน่งตามปกติ
+    expect(can({ rank: "manager", role: "superadmin" }, "editAnyJob")).toBe(true);
     expect(can(superTech, "approveExpense")).toBe(false);
     expect(canAssignRole(superTech, ROLES.DIRECTOR)).toBe(true);
     expect(canManageUserOfRole(superTech, ROLES.DIRECTOR)).toBe(true);
@@ -257,7 +261,9 @@ describe("Role กับ Rank แยกกัน", () => {
     const noRank = { role: "superadmin" };
     expect(systemRoleOf(noRank)).toBe("superadmin");
     expect(can(noRank, "manageSystem")).toBe(true);
-    expect(can(noRank, "viewContracts")).toBe(true);   // Super Admin ผ่านทุกสิทธิ์อยู่แล้ว
+    expect(can(noRank, "manageAll")).toBe(true);
+    // สิทธิ์ทำงานมาจากตำแหน่งในองค์กร — ยังไม่ตั้งตำแหน่ง = ยังไม่มีสิทธิ์ทำงาน (ดูแลระบบได้อย่างเดียว)
+    expect(can(noRank, "viewContracts")).toBe(false);
     // ⚠️ และห้ามเอาคำว่า superadmin ไปสวมเป็น "ตำแหน่งในองค์กร"
     expect(normalizeRole(noRank)).toBe("");
   });

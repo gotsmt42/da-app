@@ -3,11 +3,12 @@
 // (ที่อื่นใช้ react-toastify ซึ่งเป็นคนละไลบรารีและนำเข้า CSS ของตัวเองที่ App.js อยู่แล้ว)
 import { resolveOperationGroup } from "@/shared/utils/overdueJobs";
 import ExpenseService from "@/features/expenses/services/ExpenseService";
-import { countUsedRounds, formatRoundLabel } from "@/shared/utils/contractRounds";
+import { countUsedRounds, formatRoundLabel, totalRoundsOf } from "@/shared/utils/contractRounds";
 import { escapeHtml } from "@/shared/utils/escapeHtml";
 import { getApprovalState } from "@/shared/utils/approvalStatus";
 import { getActivityLogMeta } from "@/shared/utils/activityLogMeta";
 import { classifyJob, getJobClassMeta } from "@/shared/utils/jobClassification";
+import { overviewResponsibleOf } from "@/shared/utils/contractOverdue";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { can } from "@/shared/utils/roles";
@@ -179,6 +180,45 @@ function injectStyles() {
       background: #eff6ff; border: 1px solid #bfdbfe;
       color: #1d4ed8; border-radius: 20px; padding: 3px 10px;
       font-size: 11px; font-weight: 600;
+    }
+
+    /* ── การ์ดหมวดของฟอร์ม — แบ่งเรื่องให้ชัด (เดิมเป็นตัวหนังสือเทาเล็กๆ คั่นด้วยเส้นบาง อ่านไม่ออกว่าช่องไหนเป็นของเรื่องไหน) ── */
+    .ee-card {
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+      margin: 0 0 12px; overflow: hidden; text-align: left;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+    }
+    .ee-card-head {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px; background: #f8fafc; border-bottom: 1px solid #eef2f7;
+    }
+    .ee-card-ico {
+      width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: #fff; border: 1px solid #e2e8f0; font-size: 15px; line-height: 1;
+    }
+    .ee-card-titles { flex: 1; min-width: 0; }
+    .ee-card-titles h4 { margin: 0; font-size: 13.5px; font-weight: 800; color: #0f172a; line-height: 1.3; }
+    .ee-card-titles p { margin: 1px 0 0; font-size: 11.5px; color: #64748b; line-height: 1.35; }
+    .ee-card-badge {
+      flex-shrink: 0; font-size: 11px; font-weight: 700; color: #15803d;
+      background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 999px; padding: 2px 9px; white-space: nowrap;
+    }
+    .ee-card-body { padding: 12px 14px 4px; }
+    .ee-card-body > .ee-field { margin-bottom: 10px; }
+    .ee-card .ee-grid { gap: 10px 12px; margin-bottom: 10px; }
+    /* ช่องจำนวนไม่แน่นอน (มูลค่างานโผล่เฉพาะงานที่ไม่ใช่สัญญา) — จัดเต็มแถวเองไม่เหลือช่องว่างกำพร้า */
+    .ee-grid-auto { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+    .ee-field label { font-size: 11.5px; font-weight: 700; color: #475569; }
+    .ee-field label .ee-opt { font-weight: 500; color: #94a3b8; }
+    .ee-hint { font-size: 10.5px; color: #94a3b8; }
+    @media (max-width: 600px) {
+      .ee-card { border-radius: 12px; }
+      .ee-card-head { padding: 9px 12px; }
+      .ee-card-body { padding: 10px 12px 2px; }
+      .ee-card-titles p { display: none; }
+      /* ช่องสั้น (ประเภทงาน/ระบบ/ครั้งที่/มูลค่า) วางคู่กัน 2 ช่องต่อแถว — ไม่ต้องเลื่อนยาวทีละช่อง */
+      .ee-card .ee-grid.ee-grid-auto { grid-template-columns: 1fr 1fr; }
     }
 
     /* ── Section label ── */
@@ -1022,8 +1062,20 @@ export const getEditEvent = async ({
    * ⚠️ แต่ต้องบอกให้รู้ด้วยว่าอันไหน "ตั้งไว้จริง" อันไหน "อนุมานจากทีม" — ไม่งั้นจะเข้าใจผิดว่างานนี้
    * มอบหมายเรียบร้อยแล้วทั้งที่ยังไม่มีใครถูกตั้งเป็นผู้รับผิดชอบ
    */
-  const headerResponsibleName = effectiveResponsibleName;
-  const headerResponsibleIsInferred = !eventResponsiblePerson && Boolean(eventTeam);
+  /**
+   * 🐛 ที่แก้ (งานสัญญา/โปรเจคขึ้นผู้รับผิดชอบไม่ตรงกับหน้าภาพรวมงาน): สองประเภทนี้มอบหมายผู้รับผิดชอบที่
+   * หน้า "ภาพรวมงาน" เป็นระดับ "ทั้งงาน" — แต่ป้ายนี้อ่านจากใบของตัวเอง ถ้าว่างก็เดาจากทีมที่เข้างาน
+   * ภาพรวมงานบอก "ยังไม่มอบหมาย" แต่หน้านี้บอกชื่อหัวหน้าทีม — ดูเหมือนระบบมั่ว
+   * ✅ สัญญา/โปรเจค: ใช้ค่าเดียวกับภาพรวมงานเป๊ะ (overviewResponsibleOf) ไม่เดาจากทีม
+   * ✅ งานทั่วไป: คงพฤติกรรมเดิม (เดาจากทีมพร้อมบอกว่าเป็นค่าที่อนุมาน)
+   */
+  // ✅ ทุกประเภทงานใช้ค่าเดียวกับหน้าภาพรวมงาน/การดำเนินงาน (ผู้ใช้ขอให้ข้อมูลตรงกันทุกหน้า) — ไม่เดาจากทีมแล้ว
+  //    งานทั่วไปที่ยังไม่มอบหมายเคยขึ้นชื่อหัวหน้าทีม "(ตามทีมที่เข้างาน)" ขณะที่หน้าอื่นขึ้น "ยังไม่มอบหมาย"
+  // ⚠️ สิทธิ์แก้ไขงาน (isEffectiveResponsiblePerson ด้านล่าง) ยังใช้เกณฑ์เดิมที่ตรงกับ server ไม่เปลี่ยน
+  const isOverviewManagedJob = true;
+  const overviewResponsible = overviewResponsibleOf(ev, events);
+  const headerResponsibleName = overviewResponsible.name;
+  const headerResponsibleIsInferred = false;
   const isEffectiveResponsiblePerson =
     (effectiveResponsibleId && effectiveResponsibleId === userData?.userId) ||
     (effectiveResponsibleName && effectiveResponsibleName === userData?.fname);
@@ -1131,7 +1183,7 @@ export const getEditEvent = async ({
         key: e.contractGroupId,
         company: e.company || "", site: e.site || "", system: e.system || "", title: e.title || "",
         contractNo: e.contractNo || "", quotationNo: e.quotationNo || "",
-        visitCount: e.visitCount || 0, jobValue: e.jobValue, team: e.team || "",
+        visitCount: totalRoundsOf(e), jobValue: e.jobValue, team: e.team || "",
         // ✅ ผู้ติดต่อระดับสัญญา — เก็บค่าแรกที่ "มีข้อมูลจริง" จากครั้งไหนก็ได้ในสัญญา (ดู forEach ล่าง)
         contactName: "", contactTel: "",
         visits: [],
@@ -1372,7 +1424,7 @@ export const getEditEvent = async ({
         ${eventTeam && eventTeam !== headerResponsibleName ? `<span class="ee-tag">👷 ${attrHtml(eventTeam)}</span>` : ""}
         ${headerResponsibleName
           ? `<span class="ee-tag"${headerResponsibleIsInferred ? ' title="งานนี้ยังไม่ได้ระบุผู้รับผิดชอบไว้ชัดเจน — แสดงตามทีมที่เข้างานแทน"' : ""}>🧑‍💼 ผู้รับผิดชอบ: ${attrHtml(headerResponsibleName)}${headerResponsibleIsInferred ? " (ตามทีมที่เข้างาน)" : ""}</span>`
-          : `<span class="ee-tag ee-tag--muted" title="ยังไม่มีใครรับผิดชอบงานนี้">🧑‍💼 ยังไม่ได้มอบหมายผู้รับผิดชอบ</span>`}
+          : `<span class="ee-tag ee-tag--muted" title="${isOverviewManagedJob ? "มอบหมายผู้รับผิดชอบได้ที่หน้าภาพรวมงาน" : "ยังไม่มีใครรับผิดชอบงานนี้"}">🧑‍💼 ยังไม่ได้มอบหมายผู้รับผิดชอบ</span>`}
         ${eventJobClassMeta ? `<span class="ee-tag">${eventJobClassMeta.emoji} ${attrHtml(eventJobClassMeta.label)}</span>` : ""}
       </div>
     </div>
@@ -1494,7 +1546,7 @@ export const getEditEvent = async ({
           <input id="editVisitCount" type="number" value="${eventVisitCount}" placeholder="เช่น 4" ${isAdminOrManagerUser ? "" : "disabled"}>
         </div>
         <div class="ee-field">
-          <label>💰 มูลค่างาน (บาท)</label>
+          <label>มูลค่างาน (บาท)</label>
           <div class="ee-money-input">
             <span class="ee-money-symbol">฿</span>
             <input id="editJobValue" type="number" value="${eventJobValue}" placeholder="เช่น 86000" ${isAdminOrManagerUser ? "" : "disabled"}>
@@ -1529,45 +1581,37 @@ export const getEditEvent = async ({
     </div>
 
     <!-- section: โครงการ -->
-    <p class="ee-section-label">ข้อมูลโครงการ</p>
+    <section class="ee-card">
+      <div class="ee-card-head">
+        <span class="ee-card-ico" aria-hidden="true">🏗️</span>
+        <div class="ee-card-titles"><h4>ข้อมูลงาน</h4><p>งานนี้ของลูกค้ารายไหน เป็นงานอะไร</p></div>
+      </div>
+      <div class="ee-card-body">
     <!-- ✅ ช่างทั่วไปแก้ไขข้อมูลส่วนนี้ไม่ได้ (เดิมแก้ได้ครบทุกช่อง) — คงไว้แค่ "วันที่/เวลา" และ
          "สถานะงาน" ตามที่ผู้ใช้ยืนยันไว้ ยกเว้น "หัวหน้าทีมเข้างาน"/"ลูกทีม" ที่ "ผู้รับผิดชอบ" ของงานนี้
          แก้ไขได้ด้วย (canEditTeamAssignment ด้านบน) ส่วนที่เหลือ (บริษัท/โครงการ/ประเภทงาน/ระบบ ฯลฯ)
          แก้ได้เฉพาะแอดมิน/manager เท่านั้นเสมอ -->
     ${!isAdminOrManagerUser ? `
-    <p style="font-size:11px;color:#64748b;margin:-6px 0 10px;">
+    <p style="font-size:11px;color:#64748b;margin:0 0 10px;">
       🔒 ดูได้อย่างเดียว — แก้ไขได้เฉพาะแอดมิน/manager เท่านั้น (ช่างแก้ไขได้เฉพาะ "วันที่/เวลา" และ "สถานะงาน" ด้านล่าง${canEditTeamAssignment ? ` และ "หัวหน้าทีมเข้างาน"/"ลูกทีม" ในฐานะผู้รับผิดชอบงานนี้` : ""})
     </p>
     ` : eventContractGroupId ? `
-    <p style="font-size:11px;color:#b91c1c;margin:-6px 0 10px;">
+    <p style="font-size:11px;color:#b91c1c;margin:0 0 10px;">
       🔒 งานนี้เป็นส่วนหนึ่งของสัญญา — ล็อกบริษัท/โครงการ/ประเภทงาน/ระบบ/ครั้งที่ไว้ไม่ให้แก้ตรงนี้
       กันข้อมูลไม่ตรงกับครั้งอื่นในสัญญาเดียวกัน
     </p>
     ` : ""}
-    <div class="ee-grid ee-grid-4">
+    <div class="ee-grid ee-grid-2">
       <div class="ee-field">
-        <label>🏢 ชื่อบริษัท</label>
+        <label>ชื่อบริษัท</label>
         <select id="editCompany" ${eventContractGroupId || !isAdminOrManagerUser ? "disabled" : ""}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventCompany, companyValues)}${custOpt("company")}</select>
       </div>
       <div class="ee-field">
         <label><span class="req">*</span> ชื่อโครงการ</label>
         <select id="editSite" ${eventContractGroupId || !isAdminOrManagerUser ? "disabled" : ""}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventSite, siteValues)}${custOpt("site")}</select>
       </div>
-      <!-- ✅ ผู้ติดต่อหน้างาน วางต่อจากชื่อโครงการทันที — อ่านเป็นชุดเดียวกันว่า "งานนี้อยู่ที่ไหน
-           แล้วไปถึงต้องโทรหาใคร" ⚠️ ใช้ด่านสิทธิ์ชุดเดียวกับเอกสาร (canEditDocFields) โดยตั้งใจ:
-           ช่างที่มีชื่อในงานแก้ได้เอง และแก้ได้แม้งานปิดแล้ว เพราะเบอร์ติดต่อเปลี่ยนได้เรื่อยๆ และเป็น
-           ข้อมูลติดต่อล้วนๆ ไม่กระทบข้อมูลงาน/ยอดเงิน/รายงาน (ฝั่ง server เปิดให้เหมือนกัน — ดู
-           CLOSED_JOB_TECH_FIELDS ใน routes/calendarEvent/core.js) -->
-      <div class="ee-field">
-        <label>🙍 ผู้ติดต่อหน้างาน</label>
-        <input id="editContactName" type="text" value="${attrHtml(evenContactName)}" placeholder="ชื่อคนที่ต้องติดต่อเมื่อไปถึง" ${canEditContact ? "" : "disabled"}>
-      </div>
-      <div class="ee-field">
-        <label>📞 เบอร์โทร</label>
-        <input id="editContactTel" type="tel" inputmode="tel" value="${attrHtml(evenContactTel)}" placeholder="เช่น 081-234-5678" ${canEditContact ? "" : "disabled"}>
-      </div>
     </div>
-    <div class="ee-grid ee-grid-3">
+    <div class="ee-grid ee-grid-auto">
       <div class="ee-field">
         <label><span class="req">*</span> ประเภทงาน</label>
         <select id="editTitle" ${eventContractGroupId || !isAdminOrManagerUser ? "disabled" : ""}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventTitle, titleValues)}${titleOpts}</select>
@@ -1579,7 +1623,7 @@ export const getEditEvent = async ({
       <!-- ✅ งานสัญญา: เลือกครั้งที่ได้จากรายการครั้งที่ยังว่างของสัญญานั้นจริงๆ (ดู contractRoundOpts)
            งานทั่วไป/โปรเจค: รายการเดิม 1-4 + พิมพ์เองได้ ไม่เปลี่ยนแปลง -->
       <div class="ee-field">
-        <label>🔢 ครั้งที่</label>
+        <label>ครั้งที่</label>
         ${canEditContractRound ? `
         <select id="editTime">${contractRoundOpts}</select>
         <span style="font-size:10.5px;color:#94a3b8;">
@@ -1599,61 +1643,99 @@ export const getEditEvent = async ({
            ✅ วางไว้ในกลุ่ม "ข้อมูลโครงการ" คู่กับครั้งที่ — เป็นข้อมูลของ "ตัวงาน" เหมือนกัน ไม่ใช่ข้อมูลคน -->
       ${!eventContractGroupId ? `
       <div class="ee-field">
-        <label>💰 มูลค่างาน (บาท)</label>
+        <label>มูลค่างาน (บาท)</label>
         <div class="ee-money-input">
           <span class="ee-money-symbol">฿</span>
           <input id="editJobValueSingle" type="number" min="0" step="1" value="${eventJobValue}"
                  placeholder="เช่น 86000" ${isAdminOrManagerUser ? "" : "disabled"}>
         </div>
-        <span style="font-size:10.5px;color:#94a3b8;">ไม่บังคับ — ใช้รวมยอดในหน้า "ภาพรวมงาน"</span>
+        <span class="ee-hint">ไม่บังคับ — ใช้รวมยอดในหน้า "ภาพรวมงาน"</span>
       </div>
       ` : ""}
     </div>
 
     ${/* 🧹 ช่องแก้พิกัดเดิมตรงนี้ย้ายไปอยู่ในการ์ดแผนที่บนสุดของฟอร์มแล้ว (28 ก.ย. 2569) */""}
 
-    <hr class="ee-divider">
+      </div>
+    </section>
+
+    <section class="ee-card">
+      <div class="ee-card-head">
+        <span class="ee-card-ico" aria-hidden="true">📞</span>
+        <div class="ee-card-titles"><h4>ผู้ติดต่อหน้างาน</h4><p>คนที่ต้องโทรหาเมื่อไปถึงหน้างาน</p></div>
+      </div>
+      <div class="ee-card-body">
+      <div class="ee-grid ee-grid-2">
+        <!-- ✅ ผู้ติดต่อหน้างาน วางต่อจากชื่อโครงการทันที — อ่านเป็นชุดเดียวกันว่า "งานนี้อยู่ที่ไหน
+             แล้วไปถึงต้องโทรหาใคร" ⚠️ ใช้ด่านสิทธิ์ชุดเดียวกับเอกสาร (canEditDocFields) โดยตั้งใจ:
+             ช่างที่มีชื่อในงานแก้ได้เอง และแก้ได้แม้งานปิดแล้ว เพราะเบอร์ติดต่อเปลี่ยนได้เรื่อยๆ และเป็น
+             ข้อมูลติดต่อล้วนๆ ไม่กระทบข้อมูลงาน/ยอดเงิน/รายงาน (ฝั่ง server เปิดให้เหมือนกัน — ดู
+             CLOSED_JOB_TECH_FIELDS ใน routes/calendarEvent/core.js) -->
+        <div class="ee-field">
+          <label>ชื่อผู้ติดต่อ</label>
+          <input id="editContactName" type="text" value="${attrHtml(evenContactName)}" placeholder="ชื่อคนที่ต้องติดต่อเมื่อไปถึง" ${canEditContact ? "" : "disabled"}>
+        </div>
+        <div class="ee-field">
+          <label>เบอร์โทร</label>
+          <input id="editContactTel" type="tel" inputmode="tel" value="${attrHtml(evenContactTel)}" placeholder="เช่น 081-234-5678" ${canEditContact ? "" : "disabled"}>
+        </div>
+      </div>
+      </div>
+    </section>
 
     <!-- ✅ แยก "ผู้เข้างาน" ออกมาเป็นหมวดของตัวเอง — เดิมหัวหน้าทีม/ลูกทีมถูกยัดรวมอยู่ในหมวด
          "ข้อมูลโครงการ" ซึ่งเป็นคนละเรื่องกัน (หมวดนั้นคือข้อมูลระบุตัวงาน: บริษัท/โครงการ/ระบบ/ครั้งที่)
          ทำให้หมวดเดียวยาวมากและอ่านแล้วหาไม่เจอว่าใครเข้างาน ซ้ำสิทธิ์แก้ไขของสองกลุ่มนี้ก็คนละชุดกัน
          (ข้อมูลงาน = แอดมิน/manager เท่านั้น, ผู้เข้างาน = ผู้รับผิดชอบแก้ได้ด้วย) แยกออกมาแล้วอธิบาย
          สิทธิ์ได้ตรงจุด ไม่ต้องเขียนรวมกันในประโยคเดียวให้สับสน -->
-    <p class="ee-section-label">ผู้เข้างาน ${!isAdminOrManagerUser && canEditTeamAssignment ? `<span style="font-size:10.5px;font-weight:600;color:#16a34a;">✏️ แก้ไขได้ (ผู้รับผิดชอบ)</span>` : ""}</p>
+    <section class="ee-card">
+      <div class="ee-card-head">
+        <span class="ee-card-ico" aria-hidden="true">👷</span>
+        <div class="ee-card-titles"><h4>ทีมเข้างาน</h4><p>หัวหน้าทีมและลูกทีมที่ไปหน้างาน</p></div>
+        ${!isAdminOrManagerUser && canEditTeamAssignment ? `<span class="ee-card-badge">✏️ แก้ไขได้ (ผู้รับผิดชอบ)</span>` : ""}
+      </div>
+      <div class="ee-card-body">
     <div class="ee-grid ee-grid-2">
       <div class="ee-field">
-        <label>👷 หัวหน้าทีมเข้างาน</label>
+        <label>หัวหน้าทีม</label>
         <select id="editTeam" ${canEditTeamAssignment ? "" : "disabled"}><option value="" disabled>— เลือกหรือพิมพ์ —</option>${customOption(eventTeam, teamValues)}${teamOpts}</select>
       </div>
       <!-- ✅ ลูกทีม (คนที่ 2, 3, ...) — แสดงผลอย่างเดียว ไม่กระทบสิทธิ์แก้ไข/แจ้งเตือน — แก้ไข/เพิ่ม/ลบ
            ได้เฉพาะแอดมิน/manager หรือ "ผู้รับผิดชอบ" ของงานนี้ (canEditTeamAssignment) เหมือนหัวหน้าทีม
            ⚠️ ลูกทีมที่มีชื่อในงานเปิดดูงานนี้ได้ แต่แก้ไม่ได้ (ดู isTeamMemberViewer ด้านบน) -->
       <div class="ee-field">
-        <label>👥 ลูกทีม (ถ้ามี)</label>
+        <label>ลูกทีม <span class="ee-opt">ถ้ามี</span></label>
         <div id="ee-teamMembersList"></div>
         ${canEditTeamAssignment ? `<button type="button" class="ee-btn ee-btn-ghost" id="ee-addTeamMemberBtn" style="margin-top:2px;">➕ เพิ่มลูกทีม</button>` : ""}
       </div>
     </div>
 
-    <hr class="ee-divider">
+      </div>
+    </section>
 
     <!-- section: วันที่ & เวลา — เหมือนหน้า Add เลย ค้างวันที่/ช่วงวันที่เดิมไว้ให้แก้ง่าย -->
-    <p class="ee-section-label">วันที่ & เวลา ${!isAdminOrManagerUser && !isViewOnly ? `<span style="font-size:10.5px;font-weight:600;color:#16a34a;">✏️ แก้ไขได้</span>` : ""}</p>
+    <section class="ee-card">
+      <div class="ee-card-head">
+        <span class="ee-card-ico" aria-hidden="true">📅</span>
+        <div class="ee-card-titles"><h4>วันที่และเวลา</h4><p>วันเข้างาน และช่วงเวลาที่ทำงาน</p></div>
+        ${!isAdminOrManagerUser && !isViewOnly ? `<span class="ee-card-badge">✏️ แก้ไขได้</span>` : ""}
+      </div>
+      <div class="ee-card-body">
     ${readOnly ? `
-    <p style="font-size:11px;color:#6d28d9;margin:-6px 0 10px;">
+    <p style="font-size:11px;color:#6d28d9;margin:0 0 10px;">
       👁️ คุณกำลังดู ตารางงานของช่าง — เปิดดูรายละเอียดได้ทั้งหมด แต่แก้ไขไม่ได้
       (ถ้าต้องการให้ช่างเข้างาน ให้เปิด <b>ใบแจ้งงาน</b>)
     </p>
     ` : isPendingForTech ? `
-    <p style="font-size:11px;color:#b45309;margin:-6px 0 10px;">
+    <p style="font-size:11px;color:#b45309;margin:0 0 10px;">
       🔒 งานนี้ยังรออนุมัติ — ดูได้อย่างเดียว แก้ไขไม่ได้จนกว่าแอดมิน/manager จะอนุมัติหรือไม่อนุมัติก่อน
     </p>
     ` : isClosedForTech ? `
-    <p style="font-size:11px;color:#059669;margin:-6px 0 10px;">
+    <p style="font-size:11px;color:#059669;margin:0 0 10px;">
       ✅ งานนี้ปิดแล้ว — เปิดดูย้อนหลังได้ทั้งหมด แต่แก้ไขไม่ได้ (ถ้าต้องแก้ ให้แจ้งแอดมิน/manager)
     </p>
     ` : isTeamMemberViewer ? `
-    <p style="font-size:11px;color:#0369a1;margin:-6px 0 10px;">
+    <p style="font-size:11px;color:#0369a1;margin:0 0 10px;">
       👥 คุณเป็น "ลูกทีม" ของงานนี้ — เปิดดูได้ทั้งหมด
       ${canEditDocFields
         ? `และแก้ได้เฉพาะ <b>สีบนปฏิทิน · เลขที่อ้างอิงเอกสาร · รายละเอียดงาน</b>
@@ -1674,11 +1756,11 @@ export const getEditEvent = async ({
     <div id="ee-singleDateSection" style="${hasSiblings ? "display:none;" : ""}">
       <div class="ee-grid ee-grid-datetime">
         <div class="ee-field">
-          <label>📅 วันที่เริ่ม</label>
+          <label>วันที่เริ่ม</label>
           <input id="editStart" type="date" value="${eventStart.format("YYYY-MM-DD")}" ${isViewOnly ? "disabled" : ""}>
         </div>
         <div class="ee-field">
-          <label>📅 วันที่สิ้นสุด</label>
+          <label>วันที่สิ้นสุด</label>
           <input id="editEnd" type="date" value="${formattedEnd}" ${isViewOnly ? "disabled" : ""}>
         </div>
       </div>
@@ -1699,21 +1781,27 @@ export const getEditEvent = async ({
 
     <div class="ee-grid ee-grid-datetime">
       <div class="ee-field">
-        <label>🕐 เวลาเริ่ม</label>
+        <label>เวลาเริ่ม</label>
         <input id="editStartTime" type="text" placeholder="เช่น 08:30" value="${attrHtml(eventStartTime)}" ${isViewOnly ? "disabled" : ""}>
       </div>
       <div class="ee-field">
-        <label>🕔 เวลาสิ้นสุด</label>
+        <label>เวลาสิ้นสุด</label>
         <input id="editEndTime" type="text" placeholder="เช่น 17:00" value="${attrHtml(eventEndTime)}" ${isViewOnly ? "disabled" : ""}>
       </div>
     </div>
 
-    <hr class="ee-divider">
+      </div>
+    </section>
 
     <!-- ✅ เพิ่มหัวข้อกำกับให้กลุ่มสี — เดิมเป็นบล็อกลอยไม่มีหัวข้อ อยู่คั่นระหว่าง "วันที่ & เวลา" กับ
          "เอกสาร" อ่านแล้วไม่รู้ว่าสองช่องนี้เป็นของอะไร/มีผลกับอะไร (จริงๆ คือสีของการ์ดงานบนปฏิทิน)
          และเป็นหมวดเดียวในฟอร์มที่ไม่มีหัวข้อ ทำให้จังหวะการอ่านสะดุด -->
-    <p class="ee-section-label">การแสดงผลบนปฏิทิน</p>
+    <section class="ee-card">
+      <div class="ee-card-head">
+        <span class="ee-card-ico" aria-hidden="true">🎨</span>
+        <div class="ee-card-titles"><h4>การแสดงผลบนปฏิทิน</h4><p>สีของการ์ดงานบนปฏิทิน</p></div>
+      </div>
+      <div class="ee-card-body">
     ${colorPickerHtml({
       bgId: "ee-bgColorPicker",
       textId: "ee-textColorPicker",
@@ -1722,22 +1810,32 @@ export const getEditEvent = async ({
       disabled: !canEditColor,
     })}
 
-    <hr class="ee-divider">
+      </div>
+    </section>
 
     <!-- section: เอกสาร — ✅ ช่างที่มีชื่อในงาน (หัวหน้าทีม/ลูกทีม) แก้ได้แล้ว และยังแก้ได้แม้งานปิดไปแล้ว
          (เรื่องเอกสารมักตามมาทีหลังงานปิดเสมอ — ดู canEditDocFields) -->
-    <p class="ee-section-label">เอกสาร ${!isAdminOrManagerUser && canEditDocFields ? `<span style="font-size:10.5px;font-weight:600;color:#16a34a;">✏️ แก้ไขได้</span>` : ""}</p>
+    <section class="ee-card">
+      <div class="ee-card-head">
+        <span class="ee-card-ico" aria-hidden="true">📄</span>
+        <div class="ee-card-titles"><h4>เอกสาร</h4><p>เลขที่อ้างอิงและรายละเอียดงาน</p></div>
+        ${!isAdminOrManagerUser && canEditDocFields ? `<span class="ee-card-badge">✏️ แก้ไขได้</span>` : ""}
+      </div>
+      <div class="ee-card-body">
     <!-- ⚠️ เดิมเป็นกริด 2 คอลัมน์คู่กับช่อง "ชื่อเรื่อง" ที่ถูกตัดออกไปแล้ว — เหลือช่องเดียวในกริด 2 ช่อง
          ทำให้ช่องกินแค่ครึ่งซ้ายและมีที่ว่างค้างครึ่งขวาทั้งแถว จึงเอาออกจากกริดให้เต็มความกว้างไปเลย -->
     <div class="ee-field">
-      <label>📄 เลขที่อ้างอิง (Doc No.)</label>
+      <label>เลขที่อ้างอิง (Doc No.)</label>
       <input id="editdocNo" type="text" value="${attrHtml(evendocNo)}" placeholder="เช่น DOC-2026-001" ${canEditDocFields ? "" : "disabled"}>
     </div>
     <div class="ee-field">
-      <label>📋 รายละเอียดงาน (Description)</label>
+      <label>รายละเอียดงาน</label>
       <textarea id="editDescription" rows="8" placeholder="กรอกรายละเอียดงาน..." ${canEditDocFields ? "" : "disabled"}></textarea>
       <div class="ee-char-count" id="charCount">0 ตัวอักษร</div>
     </div>
+
+      </div>
+    </section>
 
     ${eventActivityLog.length > 0 ? `
     <hr class="ee-divider">

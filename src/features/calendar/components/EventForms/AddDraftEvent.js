@@ -1,4 +1,4 @@
-import { countUsedRounds } from "@/shared/utils/contractRounds";
+import { countUsedRounds, totalRoundsOf } from "@/shared/utils/contractRounds";
 import { escapeHtml } from "@/shared/utils/escapeHtml";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
@@ -229,7 +229,7 @@ export const getAddDraftEvent = async ({
         quotationNo: e.quotationNo || "",
         contractStart: e.contractStart || "",
         contractEnd: e.contractEnd || "",
-        visitCount: e.visitCount || 0,
+        visitCount: totalRoundsOf(e),
         intervalMonths: e.intervalMonths,
         jobValue: e.jobValue,
         team: e.team || "",

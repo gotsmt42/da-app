@@ -388,7 +388,10 @@ const side = (key, extra) => {
           ))}
           {canViewOperation && operationMenu.map((item, idx) => renderLink(item, `work-op-${idx}`))}
           {isAdminOrManager && workMenuManager.map((item, idx) => renderLink(item, `work-mgr-${idx}`))}
-          {isTechnician && workMenuTechnician.map((item, idx) => renderLink(item, `work-tech-${idx}`))}
+          {/* 🐛 คนที่เป็นทั้งแอดมิน (ชั้นในระบบ) และช่าง (ตำแหน่ง) เคยเห็น "ภาพรวมงาน" ซ้ำ 2 อัน — ตัดตัวซ้ำออก */}
+          {isTechnician && workMenuTechnician
+            .filter((item) => !(isAdminOrManager && workMenuManager.some((m) => m.href === item.href)))
+            .map((item, idx) => renderLink(item, `work-tech-${idx}`))}
           {canAssign && dispatchMenu.map((item, idx) => renderLink(item, `work-dispatch-${idx}`))}
           {/* ✅ รายงานงานอยู่ท้ายหมวด "งาน" ตำแหน่งเดียวกับ "รายงานการเบิก" ท้ายหมวดเบิกค่าใช้จ่าย */}
           {canViewOperation && jobReportMenu.map((item, idx) => renderLink(item, `work-report-${idx}`))}

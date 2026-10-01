@@ -76,6 +76,7 @@ export async function exportContractsToExcel({
   statusLabel,
   missingFields,
   durationYears,
+  columnOrder,
 }) {
   const wb = new ExcelJS.Workbook();
   wb.creator = "DA-APP";
@@ -174,7 +175,29 @@ export async function exportContractsToExcel({
     // กวาดสายตาเทียบกันทุกแถวให้เลื่อนหนีไปทางขวา (ตรงกับตำแหน่งคอลัมน์เดียวกันบนหน้าจอ)
     { key: "remark", header: "หมายเหตุ", width: 36, group: "หมายเหตุ", wrap: true },
   ];
-  const cols = [...baseCols, ...visitCols, ...tailCols];
+  // ✅ เรียงคอลัมน์ตามที่ผู้ใช้จัดไว้บนจอ (ลากหัวตาราง/เมนู "คอลัมน์") — คอลัมน์ในไฟล์ที่ละเอียดกว่าบนจอ
+  //    (เช่น บริษัท/โครงการแยกช่อง) ติดไปกับคอลัมน์บนจอที่มันอยู่ด้วย ส่วนคอลัมน์ที่มีแต่ในไฟล์
+  //    (วางบิล/เอกสารแนบ/ลูกทีม) ติดไปกับคอลัมน์บนจอที่ใกล้เคียงที่สุด
+  // ⚠️ ส่งออกครบทุกคอลัมน์เสมอแม้ซ่อนไว้บนจอ — ไฟล์มีไว้เก็บ/ส่งต่อ ข้อมูลต้องไม่หายตามการซ่อนชั่วคราว
+  const SCREEN_KEY = {
+    departmentTag: "departmentTag", contractNo: "doc", quotationNo: "doc", docNo: "doc",
+    company: "customer", site: "customer", system: "work", title: "work",
+    contractStart: "period", contractEnd: "period", durationYears: "period", intervalMonths: "period", perYear: "period", visitCount: "period",
+    jobValue: "jobValue", commission: "commission", commissionPct: "commission",
+    contractStatus: "statusProgress", missingFields: "statusProgress", progress: "statusProgress",
+    billingStatus: "statusProgress", billingInvoiced: "statusProgress", billingPaid: "statusProgress", billingOutstanding: "statusProgress",
+    responsiblePerson: "responsiblePerson", contactName: "customer", contactTel: "customer",
+    teamMembers: "visits", remark: "remark",
+  };
+  const screenKeyOf = (key) => SCREEN_KEY[key] || (key.startsWith("visit_") ? "visits" : key.startsWith("doc_") ? "statusProgress" : null);
+  const rank = (key) => {
+    const i = Array.isArray(columnOrder) ? columnOrder.indexOf(screenKeyOf(key)) : -1;
+    return i < 0 ? Number.MAX_SAFE_INTEGER : i;
+  };
+  const cols = [...baseCols, ...visitCols, ...tailCols]
+    .map((c, i) => ({ c, i }))
+    .sort((a, b) => rank(a.c.key) - rank(b.c.key) || a.i - b.i)
+    .map((x) => x.c);
   ws.columns = cols.map((c) => ({ key: c.key, width: c.width }));
   const lastCol = cols.length;
 

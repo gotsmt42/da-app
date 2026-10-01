@@ -87,6 +87,12 @@ import { JOB_DOC_TYPES } from "@/shared/utils/jobDocTypes";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { ROLES, TECHNICIAN_ROLES, isRole, normalizeRole } from "@/shared/utils/roles";
 import { can } from "@/shared/utils/roles";
+import ViewTiles from "@/shared/ui/ViewTiles";
+import ResponsibleSummary from "@/shared/ui/ResponsibleSummary";
+import Drawer from "@mui/material/Drawer";
+import AppsIcon from "@mui/icons-material/Apps";
+import SelectField from "@/shared/ui/SelectField";
+import { PeopleRow, PersonChip, AssignableResponsible, AssignResponsibleMenu, useAvatarMap, teamNamesOf } from "@/shared/ui/PersonChip";
 
 // ✅ ใช้ตัดสินใจลำดับปุ่มแชร์ในเมนู "⋮" ต่อไฟล์ (ดูเหตุผลใน fileActions.js)
 const IS_MOBILE = isMobileDevice();
@@ -136,7 +142,7 @@ export const StatCard = styled(GlassCard)(({ color }) => ({
 // ⚠️ ลบ FilterChip ออกแล้ว — เดิมใช้กับแผงตัวกรองที่กางชิปทุกตัวเลือกออกมา 23 ชิป ตอนนี้แผงนั้น
 // เปลี่ยนเป็น dropdown 4 ช่องแล้ว (ดู FilterPanel) จึงไม่มีใครใช้อีก
 
-// ─── StatusGroupCard ────────────────────────────────────────────────────
+// ─── Upload / Badge ─────────────────────────────────────────────────
 // ✅ ปุ่มเลือกกลุ่มสถานะงาน (รอคุณอนุมัติ/กำลังดำเนินการ/ค้างงาน/เสร็จสิ้น) — เดิมใช้ ToggleButtonGroup
 // แบบชิปเล็กๆ เรียงแนวนอน พอจอแคบ (มือถือ) จะห่อบรรทัดมั่วๆ กดยาก เปลี่ยนเป็นการ์ดใหญ่จัดกริด
 // 2 คอลัมน์เสมอ (ฝั่งแอดมิน/manager ขยายเป็น 4 คอลัมน์ในแนวนอนตอนจอกว้างพอ) แตะง่าย เห็นตัวเลขชัด
@@ -145,70 +151,6 @@ export const StatCard = styled(GlassCard)(({ color }) => ({
 // ✅ จอเล็ก: เรียงแนวนอน (ไอคอน | ชื่อ+จำนวน) สูงแค่ ~62px — เห็นครบเหมือนเดิมแต่ประหยัดที่ราวครึ่งหนึ่ง
 // ✅ จอกว้าง: คงแบบเดิม (จัดกลาง 3 ชั้น) ซึ่งดูสมส่วนอยู่แล้วเมื่อวางเรียง 4 ใบในแถวเดียว
 // ✅ ตัวเลขจำนวนงานทำให้เด่นขึ้น (ตัวหนา+ใหญ่กว่าคำว่า "งาน") — เป็นข้อมูลที่คนมองการ์ดนี้ต้องการจริงๆ
-const StatusGroupCard = ({ active, onClick, icon, color, label, count, sub }) => (
-  <Box
-    onClick={onClick}
-    sx={{
-      cursor: "pointer", borderRadius: 3, transition: "all 0.15s ease", border: "2px solid",
-      borderColor: active ? color : "divider",
-      bgcolor: active ? alpha(color, 0.08) : "background.paper",
-      "&:hover": { borderColor: active ? color : alpha(color, 0.5) },
-      display: "flex",
-      p: { xs: 1, sm: 1.5 },
-      minHeight: { xs: 54, sm: 92 },
-      flexDirection: { xs: "row", sm: "column" },
-      alignItems: "center",
-      justifyContent: { xs: "flex-start", sm: "center" },
-      textAlign: { xs: "left", sm: "center" },
-      gap: { xs: 1, sm: 0 },
-    }}>
-    {React.cloneElement(icon, {
-      sx: {
-        fontSize: { xs: 20, sm: 24 },
-        color: active ? color : "text.secondary",
-        mb: { xs: 0, sm: 0.5 },
-        flexShrink: 0,
-      },
-    })}
-    {/* 🐛 จอแคบเคยสูงเกือบ 110px ต่อใบ (2 ใบเรียงกัน = 230px) เพราะชื่อยาวอย่าง
-        "กำลังดำเนินการ/ยืนยันแล้ว" ห่อสองบรรทัด แล้วบรรทัดจำนวนงานห่ออีกบรรทัด
-        ✅ จอแคบ: เลขขึ้นก่อนตัวใหญ่ (สิ่งที่คนมองการ์ดนี้ต้องการจริงๆ) ชื่ออยู่ใต้บรรทัดเดียว
-        ตัดด้วย ellipsis — ชื่อเต็มยังอ่านได้จาก title ของกล่อง */}
-    <Box sx={{ minWidth: 0, width: "100%" }} title={`${label} ${count} งาน${sub ? ` · ${sub}` : ""}`}>
-      <Typography
-        sx={{
-          fontWeight: 800, lineHeight: 1.15,
-          fontSize: { xs: "1.05rem", sm: "0.8rem" },
-          color: active ? color : "text.primary",
-          display: { xs: "block", sm: "none" },
-        }}
-      >
-        {count} <Box component="span" sx={{ fontSize: "0.72rem", fontWeight: 600, color: "text.secondary" }}>งาน</Box>
-      </Typography>
-      <Typography
-        sx={{
-          fontWeight: 800, lineHeight: 1.25,
-          fontSize: { xs: "0.72rem", sm: "0.8rem" },
-          color: active ? color : "text.primary",
-          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: { xs: "nowrap", sm: "normal" },
-        }}
-      >
-        {label}
-      </Typography>
-      <Typography
-        variant="caption" color="text.secondary"
-        sx={{ display: { xs: sub ? "block" : "none", sm: "block" }, mt: 0.15, fontSize: { xs: "0.62rem", sm: "0.75rem" } }}
-      >
-        <Box component="span" sx={{ display: { xs: "none", sm: "inline" }, fontWeight: 800, fontSize: "0.9rem", color: active ? color : "text.primary" }}>
-          {count}
-        </Box>
-        <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>{" งาน"}</Box>
-        {sub ? <Box component="span" sx={{ display: { xs: "inline", sm: "inline" } }}>{sub}</Box> : null}
-      </Typography>
-    </Box>
-  </Box>
-);
-
 const UploadZone = styled(Box)(({ theme, dragging }) => ({
   border: `2px dashed ${dragging ? theme.palette.primary.main : alpha(theme.palette.divider, 0.4)}`,
   borderRadius: 12,
@@ -1078,7 +1020,12 @@ const EventRowCard = ({
   event, employee, onStatusUpdate, onDocNoUpdate, onInputUpdate, onDateUpdate,
   onFileUpload, onDeleteFile, onPreview, onDelete, onApproveClose, onRejectClose,
   uploadingState, isUploadingState, uploadProgressState, uploadingFileSizeState,
-  currentUser,
+  currentUser, onAssignResponsible,
+  // ✅ เปิดกางรายละเอียดไว้ตั้งแต่แรก — ใช้ในแผงรายละเอียด (กดจากตาราง) ซึ่งเปิดมาเพื่อดูรายละเอียดอยู่แล้ว
+  defaultExpanded = false,
+  // ✅ แสดงรายละเอียด (เอกสาร/คุยกับช่าง/ประวัติ) กางลงในตัวการ์ด แทนการเปิดหน้าต่างซ้อน — ใช้ในแผงด้านข้าง
+  //    (ผู้ใช้: "เปิดมาแบบแผงนี้พอ ไม่ต้องเด้งหน้าไฟล์ซ้อนขึ้นมาอีก")
+  inlineDetails = false,
   // ✅ งานที่เข้าหลายวัน (กลุ่มเดียวกัน) ใช้เอกสารร่วมกันชุดเดียว — JobGroupBlock จะโชว์
   // เอกสารรวมไว้ที่หัวกลุ่มแทน จึงซ่อนส่วนอัปโหลดเอกสารในการ์ดรายวันแต่ละใบไม่ให้ซ้ำกัน
   hideDocuments = false,
@@ -1086,7 +1033,11 @@ const EventRowCard = ({
   // (ห่อจากข้างนอก) จึงไม่ต้องมี GlassCard/เงา/ระยะห่างซ้อนของตัวเองอีกชั้น
   noOuterCard = false,
 }) => {
-  const [expanded,   setExpanded]   = useState(false);
+  const avatarMap = useAvatarMap(employee);
+  // ✅ มอบหมาย/เปลี่ยนผู้รับผิดชอบจากการ์ดนี้ได้เลย (สิทธิ์เดียวกับหน้าภาพรวมงาน — editContracts)
+  const [assignAnchor, setAssignAnchor] = useState(null);
+  const canAssign = Boolean(onAssignResponsible) && can(currentUser, "editContracts");
+  const [expanded,   setExpanded]   = useState(defaultExpanded);
   const [editingDoc, setEditingDoc] = useState(false);
   const [docNo,      setDocNo]      = useState(event.docNo || "");
   const [anchorEl,   setAnchorEl]   = useState(null);
@@ -1522,6 +1473,19 @@ const EventRowCard = ({
                   {event.title}
                 </Typography>
               )}
+              {/* ✅ เน้น "ใครรับผิดชอบ · ใครเข้าทำงาน" ไว้บนสุดของรายละเอียด (ผู้ใช้ขอ) — ชิปรูป/อักษรย่อสีประจำตัว
+                  แทนชื่อคั่นจุลภาคบรรทัดท้ายการ์ดที่อ่านแล้วไม่รู้ว่าใครเป็นอะไร */}
+              <PeopleRow
+                responsible={event.responsiblePerson} team={teamNamesOf(event)} avatars={avatarMap}
+                onAssign={canAssign ? setAssignAnchor : undefined}
+              />
+              {canAssign && (
+                <AssignResponsibleMenu
+                  anchorEl={assignAnchor} onClose={() => setAssignAnchor(null)}
+                  employees={employee} value={event.responsiblePerson || ""}
+                  onPick={(name) => { setAssignAnchor(null); onAssignResponsible(event, name); }}
+                />
+              )}
               {/* ✅ จอกว้างจัดข้อมูลเป็น 2 คอลัมน์ จอแคบเรียงลงมาคอลัมน์เดียวเหมือนเดิม
                   🐛 ที่แก้: เดิมเรียงลงมาคอลัมน์เดียวทุกขนาดจอ — บนจอคอมการ์ดกว้างเต็มหน้า แต่เนื้อหา
                   เกาะอยู่ซ้ายมือแค่ ~30% ที่เหลือว่างเปล่า ทำให้การ์ดสูงเกินจำเป็น เห็นงานได้ทีละไม่กี่
@@ -1625,20 +1589,6 @@ const EventRowCard = ({
                     </Stack>
                   )
                 )}
-                {/* ✅ ทีม อยู่ล่างสุดของรายการ — เพิ่มชื่อลูกทีมเพิ่มเติม (teamMembers) ต่อท้ายชื่อทีม/
-                    หัวหน้าทีมด้วย (เดิมมีแค่ event.team ตัวเดียว ไม่เห็นลูกทีมที่เพิ่มมาเลย) กันชื่อซ้ำ
-                    ด้วย filter dedupe (เทียบ pattern เดียวกับ teamDisplay ใน EventCalendar/index.js) */}
-                {(() => {
-                  const teamNames = [event.team, ...(event.teamMembers || []).map(m => m?.name)]
-                    .filter(Boolean)
-                    .filter((name, idx, arr) => arr.indexOf(name) === idx);
-                  return teamNames.length > 0 && (
-                    // รายชื่อทีม+ลูกทีมยาวได้เรื่อยๆ ให้กินเต็มความกว้างเช่นกัน
-                    <Box sx={{ gridColumn: { md: "1 / -1" } }}>
-                      <InfoLine label="ทีม">{teamNames.join(", ")}</InfoLine>
-                    </Box>
-                  );
-                })()}
               </Box>
               {/* เวลาเข้า/ออก */}
               {(event.checkedInAt || event.checkedOutAt) && (
@@ -1850,6 +1800,13 @@ const EventRowCard = ({
             เลื่อนจอตามอีกต่อไป — จอเล็ก (มือถือ) เปิดแบบเต็มจอ (fullScreen) แทนกล่องลอย */}
       </CardContent>
 
+      {inlineDetails ? (
+        <Collapse in={expanded} unmountOnExit>
+          <Box sx={{ px: { xs: 1.5, sm: 2 }, pb: 2, pt: 1.5, borderTop: "1px solid", borderColor: "divider" }}>
+            {expandedContent}
+          </Box>
+        </Collapse>
+      ) : (
       <Dialog open={expanded} onClose={() => setExpanded(false)} fullWidth maxWidth="md" fullScreen={!isDesktop}>
           <DialogTitle sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}>
             <Box sx={{ minWidth: 0 }}>
@@ -1885,6 +1842,7 @@ const EventRowCard = ({
             {expandedContent}
           </DialogContent>
         </Dialog>
+      )}
     </Wrapper>
   );
 };
@@ -1897,6 +1855,8 @@ const FilterPanel = ({
   typeOptions, systemOptions,
 }) => {
   const [open, setOpen] = useState(false);
+  // ✅ จอคอม/จอใหญ่ แสดงช่องเลือกตัวกรองตลอด (ผู้ใช้ขอ) — พื้นที่พอ ไม่ต้องกดเปิดก่อน · มือถือยังพับเก็บได้เหมือนเดิม
+  const isWide = useMediaQuery("(min-width:900px)");
 
   // ✅ รายการตัวกรองที่เปิดอยู่ตอนนี้ — ใช้ทั้งโชว์เป็นชิปถอดได้ และเป็นแหล่งความจริงเดียว
   // ว่า "กำลังกรองอะไรอยู่บ้าง" (เดิมกระจายอยู่ตามชิปแต่ละกลุ่มซึ่งเห็นได้ต่อเมื่อกางแผงเท่านั้น)
@@ -1956,6 +1916,7 @@ const FilterPanel = ({
               </Button>
             )}
           </Stack>
+          {!isWide && (
           <Badge badgeContent={activeCount} color="error" invisible={activeCount === 0}>
             <Button size="small" variant="outlined" startIcon={<FilterList />}
               onClick={() => setOpen(p => !p)}
@@ -1963,13 +1924,14 @@ const FilterPanel = ({
               ตัวกรอง
             </Button>
           </Badge>
+          )}
           {activeCount > 0 && (
             <Tooltip title="ล้างตัวกรองทั้งหมด">
               <IconButton size="small" onClick={onClearAll} color="error"><Clear fontSize="small" /></IconButton>
             </Tooltip>
           )}
         </Stack>
-        <Collapse in={open}>
+        <Collapse in={open || isWide}>
           <Divider sx={{ my: 2 }} />
           {/* 🐛 ที่แก้: เดิมกางชิปทุกตัวเลือกออกมาทั้งหมด 4 กลุ่ม (23 ชิป) กินพื้นที่แนวตั้ง ~300px
               ดันรายการงานตกจอไปเลย และต้องกวาดตาหาทีละชิปว่าตัวไหนคือตัวที่ต้องการ
@@ -2141,7 +2103,10 @@ export const FilePreviewDialog = ({ previewUrl, previewFileName, onClose }) => {
 // ─── มุมมองตาราง — ทางเลือกของการ์ด สำหรับกวาดดูหลายงานพร้อมกัน/เทียบกัน ─────────────────
 // ✅ การ์ดมีข้อมูลครบและจัดการงานได้ในตัว (เอกสาร/คอมเมนต์/ปุ่ม) แต่พอมี 20-30 งานต้องเลื่อนยาวมาก
 // และเทียบข้ามงานไม่ได้เลย — ตารางตอบโจทย์คนละแบบ กดแถวเพื่อเปิดดูรายละเอียดแบบการ์ดได้เหมือนเดิม
-const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob }) => (
+const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob, employee, canAssign, onAssignResponsible }) => {
+  const avatarMap = useAvatarMap(employee);
+  const [assign, setAssign] = useState(null); // { anchor, job } | null
+  return (
   <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 3, overflowX: "auto" }}>
     <Table size="small" sx={{ minWidth: 1000, width: "100%" }}>
       <TableHead>
@@ -2150,7 +2115,7 @@ const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob }) => (
             ที่อื่นในระบบ และไม่ไปแย่งสายตากับสีสถานะในแต่ละแถวซึ่งเป็นข้อมูลจริงที่ต้องอ่าน */}
         <TableRow sx={{ "& th": { fontWeight: 800, fontSize: "0.72rem", bgcolor: "#f1f5f9", color: "#334155", whiteSpace: "nowrap", letterSpacing: 0.2 } }}>
           <TableCell>สถานะ</TableCell>
-          <TableCell>บริษัท / โครงการ</TableCell>
+          <TableCell>โครงการ / บริษัท</TableCell>
           {/* ✅ ผู้ติดต่อหน้างาน — วางถัดจากโครงการ อ่านเป็นชุดเดียวกันว่า "ไปที่ไหน แล้วโทรหาใคร" */}
           <TableCell>ผู้ติดต่อ</TableCell>
           <TableCell>ประเภทงาน · ระบบ</TableCell>
@@ -2158,7 +2123,8 @@ const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob }) => (
               เป็นตัวเลขที่จำเป็นกับงานสัญญา (รู้ว่าเข้าไปแล้วกี่ครั้งจากทั้งหมดกี่ครั้ง) */}
           <TableCell align="center">ครั้งที่</TableCell>
           <TableCell>วันที่เข้างาน</TableCell>
-          <TableCell>ทีมที่เข้างาน</TableCell>
+          <TableCell>ผู้รับผิดชอบ</TableCell>
+          <TableCell>ผู้เข้าทำงาน</TableCell>
           <TableCell align="center">ค้าง</TableCell>
           <TableCell align="center">เอกสาร</TableCell>
           <TableCell align="center" />
@@ -2173,7 +2139,7 @@ const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob }) => (
             .reduce((sum, k) => sum + (a[k]?.length || 0), 0);
           // ⚠️ ตัดชื่อซ้ำออก — หัวหน้าทีม (team) มักถูกใส่ไว้ใน teamMembers ด้วย ทำให้ขึ้นเป็น
           // "Santisuk, Santisuk" เหมือนมี 2 คนทั้งที่เป็นคนเดียว (เห็นชัดขึ้นหลังชื่อทุกที่ใช้ชื่อต้นเหมือนกันแล้ว)
-          const teamNames = [...new Set([a.team, ...(a.teamMembers || []).map((m) => m?.name)].filter(Boolean))];
+          const teamNames = teamNamesOf(a);
           return (
             <TableRow key={a._id} hover onClick={() => onOpenJob(job)}
               sx={{ cursor: "pointer", bgcolor: idx % 2 ? alpha("#0f172a", 0.02) : "transparent" }}>
@@ -2181,8 +2147,9 @@ const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob }) => (
                 <StatusBadge color={OP_COLOR[a.status] || "#6b7280"}>{a.status || "—"}</StatusBadge>
               </TableCell>
               <TableCell sx={{ maxWidth: 220 }}>
-                <Typography variant="caption" fontWeight={700} noWrap sx={{ display: "block" }}>{a.company || "-"}</Typography>
-                <Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block" }}>{a.site || "-"}</Typography>
+                {/* ✅ โครงการเป็นบรรทัดหลัก (มีค่าเสมอ) บริษัทเป็นบรรทัดรอง — เดิมบริษัทขึ้นก่อน งานที่ไม่ได้กรอกบริษัทจึงขึ้น "-" ตัวหนา */}
+                <Typography variant="caption" fontWeight={700} noWrap sx={{ display: "block", fontSize: "0.8rem" }}>{a.site || "-"}</Typography>
+                <Typography variant="caption" color={a.company ? "text.secondary" : "text.disabled"} noWrap sx={{ display: "block" }}>{a.company || "ไม่ระบุบริษัท"}</Typography>
               </TableCell>
               {/* ⚠️ หยุด event ไม่ให้ลอยขึ้นไปที่ onClick ของทั้งแถว (ซึ่งเปิดกล่องรายละเอียดงาน) —
                   TelLink หยุดให้อยู่แล้ว แต่พื้นที่ว่างรอบๆ ในเซลล์ยังคลิกทะลุได้ */}
@@ -2220,10 +2187,25 @@ const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob }) => (
                   </Typography>
                 )}
               </TableCell>
-              <TableCell sx={{ maxWidth: 160 }}>
-                <Typography variant="caption" noWrap sx={{ display: "block" }}>
-                  {teamNames.length > 0 ? teamNames.join(", ") : "-"}
-                </Typography>
+              <TableCell sx={{ maxWidth: 170 }} onClick={canAssign ? (e) => e.stopPropagation() : undefined}>
+                <AssignableResponsible
+                  responsible={a.responsiblePerson} avatars={avatarMap}
+                  onAssign={canAssign ? (anchor) => setAssign({ anchor, job: a }) : undefined}
+                />
+              </TableCell>
+              <TableCell sx={{ maxWidth: 240 }}>
+                {teamNames.length > 0 ? (
+                  <Stack direction="row" gap={0.5} flexWrap="wrap">
+                    {teamNames.slice(0, 3).map((n, i) => (
+                      <PersonChip key={n} name={n} avatar={avatarMap.get(n)} size={20} badge={i === 0 && teamNames.length > 1 ? "หัวหน้า" : undefined} />
+                    ))}
+                    {teamNames.length > 3 && (
+                      <Typography variant="caption" sx={{ alignSelf: "center", fontWeight: 700, color: "text.secondary" }} title={teamNames.slice(3).join(", ")}>
+                        +{teamNames.length - 3}
+                      </Typography>
+                    )}
+                  </Stack>
+                ) : <Typography variant="caption" color="text.disabled">ยังไม่ระบุ</Typography>}
               </TableCell>
               <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
                 {isOverdue ? (
@@ -2244,8 +2226,16 @@ const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob }) => (
         })}
       </TableBody>
     </Table>
+    {canAssign && (
+      <AssignResponsibleMenu
+        anchorEl={assign?.anchor || null} onClose={() => setAssign(null)}
+        employees={employee} value={assign?.job?.responsiblePerson || ""}
+        onPick={(name) => { const job = assign?.job; setAssign(null); if (job) onAssignResponsible(job, name); }}
+      />
+    )}
   </TableContainer>
-);
+  );
+};
 
 // ─── JobGroupBlock ──────────────────────────────────────────────────────
 // การ์ดรวมสำหรับงานที่เข้าหลายวันไม่ติดกัน (ผูกกันด้วย jobGroupId/signature เดียวกัน)
@@ -2253,7 +2243,7 @@ const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob }) => (
 // ลดความรกเวลามีหลายวัน แต่ยังกดขยายดู/จัดการแต่ละวันแยกกันได้ตามเดิม
 // ═══════════════════════════════════════════════════════════════════════
 const JobGroupBlock = ({ sessions, currentUser, ...cardProps }) => {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(Boolean(cardProps.defaultExpanded));
   const isGrouped = sessions.length > 1;
 
   // ✅ งานกลุ่มเดียวกันใช้เอกสาร (Service Report/ใบเสนอราคา/ใบวางบิล/ใบส่งมอบงาน) และ "ขอปิดงาน"
@@ -2565,6 +2555,23 @@ const Operation = () => {
   useRealtime("users", () => { fetchEmployee(); });
   useRealtime("lookups", () => { fetchLookupOptions(); });
 
+  /**
+   * ✅ มอบหมาย/เปลี่ยนผู้รับผิดชอบจากหน้านี้
+   * ⚠️ ใช้ /basic-info ตัวเดียวกับหน้าภาพรวมงาน — server ทำให้ทุกวัน/ทุกครั้งของงานเดียวกันได้ค่าเดียวกัน
+   *    (ดู services/groupResponsible.js) หน้าภาพรวมงาน/ปฏิทิน/ฟอร์มแก้ไขงาน จึงเห็นชื่อเดียวกันทันที
+   */
+  const handleAssignResponsible = async (event, name) => {
+    if ((event.responsiblePerson || "") === (name || "")) return;
+    const person = employee.find((e) => e.fname === name);
+    try {
+      await EventService.UpdateBasicInfo([event._id], { responsiblePerson: name || "", responsiblePersonId: person?._id ? String(person._id) : "" });
+      await fetchEventsFromDB(true);
+      setSnackbar({ open: true, msg: name ? `มอบหมาย ${name} เป็นผู้รับผิดชอบแล้ว` : "ยกเลิกการมอบหมายแล้ว", severity: "success" });
+    } catch (err) {
+      setSnackbar({ open: true, msg: err?.response?.data?.message || "มอบหมายผู้รับผิดชอบไม่สำเร็จ", severity: "error" });
+    }
+  };
+
   const fetchEventsFromDB = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
@@ -2627,9 +2634,35 @@ const Operation = () => {
   // ✅ เดิมนับทุกแถว event ดิบ — งานที่เข้าหลายวันไม่ติดกัน (jobGroupId เดียวกัน) ขอปิดพร้อมกันทั้ง
   // กลุ่มแล้ว (ดู handleRequestClose) ทำให้ตัวเลขนี้เพี้ยนสูงกว่าจำนวนงานจริง (เช่น 1 งานเข้า 3 วัน
   // ขึ้นเป็น "3 งาน") ใช้ countDistinctJobs จัดกลุ่มก่อนนับแทน ให้ตรงกับจำนวนงานจริงที่เห็นในพาแนล
+  const [filterResponsible, setFilterResponsible] = useState("all");
+  /**
+   * ✅ ตัวเลขบนการ์ดสถานะนับตามตัวกรองที่ตั้งอยู่ (ผู้ใช้ขอ) — ค้นหา/เดือน/ประเภท/ระบบ/การเงิน/สถานะ/ทีม/ผู้รับผิดชอบ
+   *    ยกเว้น "กลุ่มของการ์ดเอง" (ไม่งั้นทุกการ์ดจะเหลือเลขเดียวกับการ์ดที่เลือกอยู่) — ตัวเลขจึงบอกตรงๆ ว่า
+   *    "ถ้ากดการ์ดนี้จะเห็นกี่งาน" เหมือนการ์ดในหน้าภาพรวมงาน
+   */
+  const countBase = useMemo(() => {
+    const keyword = search.toLowerCase();
+    return events.filter((event) => {
+      if (dateSearch && moment(event.start).format("YYYY-MM") !== dateSearch) return false;
+      if (filterType && event.title !== filterType) return false;
+      if (filterSystem && event.system !== filterSystem) return false;
+      if (filterTeam && event.team !== filterTeam) return false;
+      if (filterStatus && ![event.status_two, event.status_three].includes(filterStatus)) return false;
+      if (filterOP && event.status !== filterOP) return false;
+      if (filterResponsible === "unassigned" && event.responsiblePerson) return false;
+      if (filterResponsible !== "all" && filterResponsible !== "unassigned" && event.responsiblePerson !== filterResponsible) return false;
+      if (keyword) {
+        const hit = [event.company, event.site, event.title, event.system, event.team, event.docNo, event.contactName, event.contactTel,
+          formatThai(moment(event.start), "DD/MM/YYYY HH:mm")].map((v) => (v || "").toLowerCase()).some((t) => t.includes(keyword));
+        if (!hit) return false;
+      }
+      return true;
+    });
+  }, [events, dateSearch, filterType, filterSystem, filterTeam, filterStatus, filterOP, filterResponsible, search]);
+
   const pendingCount = useMemo(
-    () => countDistinctJobs(events, e => e.closeRequested === true && e.status !== "ดำเนินการเสร็จสิ้น"),
-    [events]
+    () => countDistinctJobs(countBase, e => e.closeRequested === true && e.status !== "ดำเนินการเสร็จสิ้น"),
+    [countBase]
   );
 
   // ✅ ฝั่งช่างเหลือแค่ "ค้างงาน" กับ "เสร็จสิ้น" (รอผู้ดูแลอนุมัติ/กำลังดำเนินการ ย้ายไปจัดการที่
@@ -2645,15 +2678,9 @@ const Operation = () => {
   // จะติดสว่างผิดแท็บเหมือนเดิม — มี id แปลว่ากำลังดูงานเจาะจงตัวเดียวอยู่แล้ว ไม่ควรเดาแท็บกลุ่ม
   // ✅ ย้ายมาไว้ก่อน sortedEvents (เดิมอยู่ท้ายไฟล์ใกล้ render) เพราะตอนนี้ sortedEvents ต้องรู้ว่า
   // กำลังดูแท็บ "ค้างงาน" อยู่หรือเปล่า เพื่อเรียงงานตามความรุนแรง (วันที่ค้างมากสุดก่อน) แทน
-  const effectiveGroup =
-    statusGroup ||
-    (filterOP || id
-      ? ""
-      : isAdminOrManager
-        ? pendingCount > 0
-          ? "pending"
-          : "active"
-        : "overdue");
+  // ✅ เปิดหน้ามา = "ทั้งหมด" เสมอ (ผู้ใช้ขอ) — ลิงก์เจาะจงจากที่อื่น (?group= / ?status= / ?highlight= / งานเดียว)
+  //    ยังเปิดตรงกลุ่ม/งานนั้นเหมือนเดิม เพราะตั้ง statusGroup/filterOP/id มาให้ก่อนแล้ว
+  const effectiveGroup = statusGroup || (filterOP || id ? "" : "all");
 
   const filteredEvents = useMemo(() => {
   // ✅ เดิม return แค่ [selectedEvent] ตัวเดียว — งานที่เข้าหลายวันไม่ติดกัน (ผูกด้วย jobGroupId
@@ -2681,8 +2708,7 @@ const Operation = () => {
     // ✅ เดิม default ไปที่ "pending" (รอคุณอนุมัติ) เสมอสำหรับแอดมิน/manager แม้ไม่มีงานรออนุมัติเลย
     // ทำให้เปิดหน้ามาเจอ "ไม่พบรายการ" ว่างเปล่าโดยไม่มีอะไรผิดพลาดจริง — ถ้าไม่มีคำขอปิดงานรออยู่
     // ให้ default ไปโชว์ "กำลังดำเนินการ/ยืนยันแล้ว" แทน ซึ่งมักจะมีงานอยู่จริงให้เห็นทันที
-    const defaultGroup = pendingCount > 0 ? "pending" : "active";
-    const group = filterOP ? null : (statusGroup || (isAdminOrManagerRole ? defaultGroup : "overdue"));
+    const group = filterOP ? null : (statusGroup || "all");
 
     // ✅ เดิมตัดงานสถานะ "กำลังรอยืนยัน" ออกทั้งหมดเสมอ (ยกเว้นกรองเจาะจงเอง) แต่งานที่ค้างมานาน
     // จนเลยกำหนดโดยไม่เคยถูกยืนยันเลยตั้งแต่แรกคืองานที่กลุ่ม "ค้างงาน" ต้องจับให้ได้มากที่สุด —
@@ -2692,12 +2718,12 @@ const Operation = () => {
     // สถานะเลย (status ยังเป็น "กำลังรอยืนยัน" อยู่ แต่ closeRequested:true แล้ว) ถูกตัดออกจากรายการ
     // ทั้งที่ pendingCount/ClosureRequestsPanel นับรวมงานนี้ไว้แล้ว ทำให้เห็น badge "2 งาน" แต่เปิด
     // แท็บมาแล้วเจอ "ไม่พบรายการ" ว่างเปล่า ต้องงดเว้นตัดออกในกลุ่มนี้ด้วยเช่นกัน
-    const matchNotPending = (filterOP === "กำลังรอยืนยัน" || group === "overdue" || group === "pending")
+    const matchNotPending = (filterOP === "กำลังรอยืนยัน" || group === "overdue" || group === "pending" || group === "all")
       ? true
       : event.status !== "กำลังรอยืนยัน";
 
     let matchGroup;
-    if (!group) {
+    if (!group || group === "all") {
       matchGroup = true;
     } else if (group === "pending")      matchGroup = event.closeRequested === true && event.status !== "ดำเนินการเสร็จสิ้น";
     // ✅ ตัดงานที่ค้างเกินกำหนดออกจากกลุ่มนี้ ให้ไปอยู่แถบ "ค้างงาน" แถบเดียว (ดูเหตุผลเต็มที่ inProgressCount)
@@ -2717,15 +2743,25 @@ const Operation = () => {
 
     return matchMonth && matchType && matchSystem && matchStatus && matchOP && matchTeam && matchSearch && matchNotPending && matchGroup;
   });
-}, [id, selectedEvent, events, dateSearch, filterType, filterSystem, filterStatus, filterOP, filterTeam, search, statusGroup, currentUser, daysPastDueMap, pendingCount]);
+}, [id, selectedEvent, events, dateSearch, filterType, filterSystem, filterStatus, filterOP, filterTeam, search, statusGroup, currentUser, daysPastDueMap]);
 
   // ✅ แท็บ "ค้างงาน" เดิมเรียงตามวันที่เริ่มงานเหมือนแท็บอื่นๆ ทำให้ป้าย "เลยกำหนด X วัน" โผล่มาแบบ
   // สลับมั่วไม่มีลำดับ (เช่น 10, 14, 13, 20 วัน สลับกันไปมา) ดูยากว่างานไหนควรรีบทำก่อน — เรียง
   // ตามจำนวนวันที่ค้างมากสุดก่อนแทนเฉพาะแท็บนี้ ให้เห็นชัดว่างานไหนเร่งด่วนที่สุดอยู่บนสุดเสมอ
   // (แท็บอื่นยังเรียงตามวันที่เริ่มงานล่าสุดก่อนเหมือนเดิม)
+  /**
+   * ✅ ทางลัดดูงานตามผู้รับผิดชอบ (แผงเดียวกับหน้าภาพรวมงาน) — กรองหลังกลุ่ม/ค้นหา/ตัวกรองอื่นทั้งหมด
+   * ⚠️ ตัวเลขบนแผงนับจาก filteredEvents (ก่อนกรองผู้รับผิดชอบ) — เลือกคนหนึ่งอยู่ก็ยังเห็นตัวเลขของทุกคน
+   */
+  const responsibleFiltered = useMemo(() => (
+    filterResponsible === "all" ? filteredEvents
+      : filterResponsible === "unassigned" ? filteredEvents.filter((e) => !e.responsiblePerson)
+        : filteredEvents.filter((e) => e.responsiblePerson === filterResponsible)
+  ), [filteredEvents, filterResponsible]);
+
   const sortedEvents = useMemo(() => {
     if (effectiveGroup === "overdue") {
-      return filteredEvents.slice().sort((a, b) => {
+      return responsibleFiltered.slice().sort((a, b) => {
         const daysA = daysPastDueMap.get(a._id)?.days ?? 0;
         const daysB = daysPastDueMap.get(b._id)?.days ?? 0;
         return daysB - daysA;
@@ -2734,17 +2770,18 @@ const Operation = () => {
     // ✅ แท็บ "เสร็จสิ้น" ให้เอางานล่าสุดขึ้นก่อน (ใหม่ไปเก่า) — ต่างจากแท็บอื่นที่เรียงเก่าไปใหม่
     // เพราะงานที่ปิดแล้วอยากเห็นงานที่เพิ่งเสร็จล่าสุดก่อน ไม่ใช่งานเก่าที่ปิดไปนานแล้ว
     if (effectiveGroup === "closed") {
-      return filteredEvents.slice().sort((a, b) => new Date(b.start) - new Date(a.start));
+      return responsibleFiltered.slice().sort((a, b) => new Date(b.start) - new Date(a.start));
     }
     // ✅ เรียงจากวันเก่าสุด (ก่อนวันปัจจุบัน) ไล่ไปจนถึงอนาคต — งานที่ค้าง/ใกล้ถึงกำหนดอยู่บนสุด
     // เดิมเรียงจากวันลงงานล่าสุดก่อน (ใหม่ไปเก่า) ทำให้งานที่ลงวันในอนาคตไกลๆ แซงหน้างานที่ควรทำก่อน
-    return filteredEvents.slice().sort((a, b) => new Date(a.start) - new Date(b.start));
-  }, [filteredEvents, effectiveGroup, daysPastDueMap]);
+    return responsibleFiltered.slice().sort((a, b) => new Date(a.start) - new Date(b.start));
+  }, [responsibleFiltered, effectiveGroup, daysPastDueMap]);
   const activeFilterCount = [filterType, filterSystem, filterStatus, filterOP, search.trim(), filterTeam].filter(Boolean).length;
 
   // นับจำนวนงานแต่ละกลุ่มไว้โชว์บน toggle — อ้างอิงจาก events ทั้งหมด ไม่ผ่านตัวกรองอื่น
   // ✅ ใช้ countDistinctJobs จัดกลุ่มก่อนนับเหมือนกัน (เทียบเหตุผลเดียวกับ pendingCount ด้านบน)
-  const closedCount   = useMemo(() => countDistinctJobs(events, e => e.status === "ดำเนินการเสร็จสิ้น"), [events]);
+  const closedCount   = useMemo(() => countDistinctJobs(countBase, e => e.status === "ดำเนินการเสร็จสิ้น"), [countBase]);
+  const allJobsCount  = useMemo(() => countDistinctJobs(countBase, () => true), [countBase]);
   // 🐛 BUG ที่แก้ (งานค้างโผล่ซ้ำ 2 แถบ): เดิมนับงานสถานะ "ยืนยันแล้ว/กำลังดำเนินการ" ทั้งหมดเข้ากลุ่มนี้
   // โดยไม่สนว่าเลยกำหนดไปแล้วหรือยัง — งานที่ค้างเกิน 1 สัปดาห์จึงถูกนับ/แสดงทั้งใน "กำลังดำเนินการ"
   // และ "ค้างงาน" พร้อมกัน ตัวเลขบนการ์ดรวมกันแล้วเกินจำนวนงานจริง และไล่ดูทีละแถบก็เจองานเดิมซ้ำ
@@ -2754,15 +2791,15 @@ const Operation = () => {
   // ในกำหนดจริงๆ — แต่ละงานอยู่แถบเดียวเสมอ ผลรวมของทุกแถบ = จำนวนงานทั้งหมดพอดี
   const inProgressCount  = useMemo(
     () => countDistinctJobs(
-      events,
+      countBase,
       e => ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(e.status)
         && !e.closeRequested
         && !isFlaggedDays(daysPastDueMap.get(e._id)?.days),
     ),
-    [events, daysPastDueMap]
+    [countBase, daysPastDueMap]
   );
-  const overdueCount     = useMemo(() => countFlaggedJobs(events, daysPastDueMap, isFlaggedDays), [events, daysPastDueMap]);
-  const severeOverdueCount = useMemo(() => countFlaggedJobs(events, daysPastDueMap, isSevereDays), [events, daysPastDueMap]);
+  const overdueCount     = useMemo(() => countFlaggedJobs(countBase, daysPastDueMap, isFlaggedDays), [countBase, daysPastDueMap]);
+  const severeOverdueCount = useMemo(() => countFlaggedJobs(countBase, daysPastDueMap, isSevereDays), [countBase, daysPastDueMap]);
 
   // ✅ จัดกลุ่ม event ที่เป็น "งานเดียวกัน" เข้าด้วยกัน กันงานที่ต้องเข้าหลายวันแบบไม่ติดกัน
   // (เช่น PM ครั้งที่ 1 แบ่งเข้า 3 วันเว้นระยะ) ถูกนับ/แสดงเป็นคนละงานแยกกัน
@@ -2795,11 +2832,38 @@ const Operation = () => {
 
   // ✅ เพจจิ้งอิงตาม "งาน" (jobGroups) ไม่ใช่ raw event — กันงานเดียวกันถูกตัดกระจายไปคนละหน้า
   const totalPages = Math.max(1, Math.ceil(jobGroups.length / pageSize));
+  const responsibleRows = useMemo(() => {
+    const seen = new Set();
+    return filteredEvents.filter((e) => {
+      const sig = getJobSignature(e);
+      if (seen.has(sig)) return false;
+      seen.add(sig);
+      return true;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredEvents]);
+  const isRowOverdue = useCallback((r) => isFlaggedDays(daysPastDueMap.get(r._id)?.days), [daysPastDueMap]);
 
   // กันหน้าเกินขอบเขตเมื่อผลลัพธ์หลังกรองน้อยกว่าหน้าปัจจุบัน
   useEffect(() => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
+
+  /**
+   * ✅ แผงรายละเอียดงาน — กดแถวในตารางแล้วเปิดการ์ดงานตัวเต็ม (ทุกปุ่มทำงานเหมือนมุมมองการ์ด) ทับบนตารางเลย
+   * 🐛 เดิมกดแถวแล้ว "สลับทั้งหน้าไปมุมมองการ์ด" แล้วเลื่อนหาให้ — ผู้ใช้หลุดจากตาราง ต้องกดกลับเองทุกครั้ง (ไม่มืออาชีพ)
+   * ⚠️ เก็บแค่ id — หากลุ่มงานสดจากรายการทุก render: แก้สถานะ/อัปโหลดในแผงแล้วข้อมูลในแผงเปลี่ยนตามทันที
+   *    ถ้างานหลุดจากตัวกรองปัจจุบัน (เช่น ปิดงานแล้วย้ายไปกลุ่มเสร็จสิ้น) ยังเปิดค้างได้จากข้อมูลทั้งหมด
+   */
+  const [detailJobId, setDetailJobId] = useState(null);
+  const detailSessions = useMemo(() => {
+    if (!detailJobId) return null;
+    const inList = jobGroups.find((g) => g.some((x) => x._id === detailJobId));
+    if (inList) return inList;
+    const base = events.find((e) => e._id === detailJobId);
+    if (!base) return null;
+    return base.jobGroupId ? events.filter((e) => e.jobGroupId === base.jobGroupId) : [base];
+  }, [detailJobId, jobGroups, events]);
 
   const pagedGroups = useMemo(
     () => jobGroups.slice((page - 1) * pageSize, page * pageSize),
@@ -3095,7 +3159,7 @@ const Operation = () => {
     try {
       const { exportOperationToExcel, buildOperationFileName } = await import("@/features/operation/utils/operationExcelExport");
       const groupLabel = {
-        pending: "คำขอปิดงาน", active: "กำลังดำเนินการ", overdue: "ค้างงาน", closed: "เสร็จสิ้น",
+        all: "ทั้งหมด", pending: "คำขอปิดงาน", active: "กำลังดำเนินการ", overdue: "ค้างงาน", closed: "เสร็จสิ้น",
       }[effectiveGroup] || "ทั้งหมด";
       await exportOperationToExcel({
         // ⚠️ jobGroups เป็น array ของ "array of sessions" ตรงๆ (ดู useMemo ด้านบน) ไม่ใช่ object ที่มี
@@ -3320,34 +3384,40 @@ const Operation = () => {
           เดิมใช้ ToggleButtonGroup แบบชิปเล็กเรียงแนวนอน จอมือถือห่อบรรทัดมั่วๆ กดยาก เปลี่ยนเป็น
           การ์ดใหญ่จัดกริด 2 คอลัมน์เสมอบนจอแคบ (แอดมินขยายเป็น 4 คอลัมน์แนวนอนตอนจอกว้างพอ) */}
       {/* ⚠️ เหลือแท็บเดียวแล้ว (รายการงาน) — เงื่อนไขนี้จึงเป็นจริงเสมอ คงไว้เผื่อเพิ่มแท็บในอนาคต */}
+      {/* ✅ การ์ดตัวเลขชุดเดียวกับหน้าภาพรวมงาน (ViewTiles) — เดิมเป็นกล่องจัดกลาง ไอคอนเทา ตัวเลขเล็ก
+          ผู้ใช้แจ้งว่าดูยาก ไม่รู้ว่ากดสลับได้ · ช่างเห็นแค่ ค้างงาน/เสร็จสิ้น (งานรออนุมัติเป็นของแอดมิน) */}
       {activeTab !== 1 && (
-        <Box sx={{
-          display: "grid",
-          gridTemplateColumns: isAdminOrManager ? { xs: "1fr 1fr", sm: "repeat(4, 1fr)" } : "1fr 1fr",
-          gap: 1, mb: { xs: 2, sm: 3 },
-        }}>
-          {isAdminOrManager && (
-            <>
-              <StatusGroupCard
-                active={effectiveGroup === "pending"} onClick={() => setStatusGroup("pending")}
-                icon={<HourglassTop />} color="#f59e0b" label="คำขอปิดงาน" count={pendingCount}
-              />
-              <StatusGroupCard
-                active={effectiveGroup === "active"} onClick={() => setStatusGroup("active")}
-                icon={<PendingActions />} color="#8b5cf6" label="กำลังดำเนินการ/ยืนยันแล้ว" count={inProgressCount}
-              />
-            </>
-          )}
-          <StatusGroupCard
-            active={effectiveGroup === "overdue"} onClick={() => setStatusGroup("overdue")}
-            icon={<Warning />} color="#ef4444" label="ค้างงาน" count={overdueCount}
-            sub={severeOverdueCount > 0 ? `${severeOverdueCount} เกิน 2 สัปดาห์` : undefined}
-          />
-          <StatusGroupCard
-            active={effectiveGroup === "closed"} onClick={() => setStatusGroup("closed")}
-            icon={<CheckCircle />} color="#10b981" label="เสร็จสิ้น" count={closedCount}
-          />
-        </Box>
+        <ViewTiles
+          value={effectiveGroup}
+          onChange={setStatusGroup}
+          isMobile={isMobile}
+          groups={[{
+            title: "",
+            items: [
+              { value: "all", label: "ทั้งหมด", count: allJobsCount, unit: "งาน", icon: <AppsIcon />, color: "#475569" },
+              ...(isAdminOrManager ? [
+                { value: "pending", label: "คำขอปิดงาน", count: pendingCount, unit: "งาน", icon: <HourglassTop />, color: "#d97706", alert: true },
+                { value: "active", label: "กำลังดำเนินการ / ยืนยันแล้ว", shortLabel: "กำลังดำเนินการ", count: inProgressCount, unit: "งาน", icon: <PendingActions />, color: "#7c3aed" },
+              ] : []),
+              { value: "overdue", label: "ค้างงาน", count: overdueCount, unit: "งาน", icon: <Warning />, color: "#dc2626", alert: true,
+                sub: severeOverdueCount > 0 ? `${severeOverdueCount} เกิน 2 สัปดาห์` : undefined },
+              { value: "closed", label: "เสร็จสิ้น", count: closedCount, unit: "งาน", icon: <CheckCircle />, color: "#059669" },
+            ],
+          }]}
+        />
+      )}
+
+      {/* ✅ ทางลัดงานตามผู้รับผิดชอบ — ชุดเดียวกับหน้าภาพรวมงาน (กดชื่อเพื่อดูเฉพาะงานของคนนั้น) */}
+      {isAdminOrManager && activeTab !== 1 && !id && (
+        <ResponsibleSummary
+          rows={responsibleRows}
+          unit="งาน"
+          value={filterResponsible}
+          onChange={(v) => { setFilterResponsible(v); setPage(1); }}
+          employees={employee}
+          isOverdue={isRowOverdue}
+          isMobile={isMobile}
+        />
       )}
 
       {loading && <LinearProgress sx={{ borderRadius: 1, mb: 2 }} />}
@@ -3375,7 +3445,7 @@ const Operation = () => {
             typeOptions={typeOptions} systemOptions={systemOptions}
             showAll={showAll} onToggleShowAll={v => { setShowAll(v); if (v) setSelectedDate(""); }}
             selectedDate={selectedDate} onDateChange={d => { setSelectedDate(d); setShowAll(false); }}
-            onClearAll={() => { setFilterType(""); setFilterSystem(""); setFilterStatus(""); setFilterOP(""); setFilterTeam(""); setSearch(""); }}
+            onClearAll={() => { setFilterType(""); setFilterSystem(""); setFilterStatus(""); setFilterOP(""); setFilterTeam(""); setSearch(""); setFilterResponsible("all"); }}
             activeCount={activeFilterCount}
           />
 
@@ -3391,14 +3461,13 @@ const Operation = () => {
             /* ✅ มุมมองตาราง — กดแถวแล้วสลับกลับไปมุมมองการ์ดพร้อมไฮไลต์งานนั้น (การ์ดคือที่เดียวที่
                จัดการงานได้จริง: แนบเอกสาร/เช็คอิน/คอมเมนต์) จึงไม่ทำ dialog ซ้อนอีกชั้นให้ซับซ้อน */
             <OperationTable
+              employee={employee}
+              canAssign={can(currentUser, "editContracts")}
+              onAssignResponsible={handleAssignResponsible}
               jobGroups={pagedGroups.map((sessions) => ({ sessions }))}
               daysPastDueMap={daysPastDueMap}
-              onOpenJob={(job) => {
-                setViewMode("card");
-                // ⚠️ ต้องเป็นรูปแบบ "<id>|<nonce>" ตามที่ highlightId ใช้ (ดู highlightJobId ด้านบน) —
-                // nonce ทำให้กดงานเดิมซ้ำแล้วไฮไลต์กระพริบใหม่ได้ทุกครั้ง ไม่ใช่ค่าเดิมจนไม่มีอะไรเกิดขึ้น
-                setHighlightId(`${job.sessions[0]._id}|${Date.now()}`);
-              }}
+              // ✅ กดแถว = เปิดแผงรายละเอียดทับบนตาราง (ไม่สลับทั้งหน้าไปมุมมองการ์ดเหมือนเดิม)
+              onOpenJob={(job) => setDetailJobId(job.sessions[0]._id)}
             />
           ) : (
             <>
@@ -3447,6 +3516,7 @@ const Operation = () => {
                     <JobGroupBlock
                       sessions={sessions}
                       currentUser={currentUser}
+                      onAssignResponsible={handleAssignResponsible}
                       employee={employee}
                       onStatusUpdate={handleStatusUpdate}
                       onDateUpdate={handleDateUpdate}
@@ -3469,13 +3539,12 @@ const Operation = () => {
 
               <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" justifyContent="space-between"
                 gap={1.5} sx={{ mt: 2, mb: 1 }}>
-                <TextField
-                  select size="small" label="ต่อหน้า" value={pageSize}
+                <SelectField
+                  label="ต่อหน้า" value={pageSize}
                   onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
-                  sx={{ width: 110, "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-                  SelectProps={{ native: true }}>
+                  sx={{ width: 120 }}>
                   {[5, 10, 20, 50, 100].map(n => <option key={n} value={n}>{n} รายการ</option>)}
-                </TextField>
+                </SelectField>
                 {/* ✅ เดิม size="small" บนมือถือทำให้ปุ่มเลขหน้าเล็กเกินไป กดยาก/กดพลาด — ใช้ "large"
                     แทนบนมือถือ (ตรงข้ามกับเดิม) ให้ปุ่มโตพอกดง่ายด้วยนิ้ว จอกว้างยังใช้ "medium" เท่าเดิม */}
                 <Pagination
@@ -3501,6 +3570,75 @@ const Operation = () => {
           ข้อมูลรอบแรกให้เสมอ แต่หยุดรีเฟรชอัตโนมัติเมื่อไม่ได้เปิดอยู่ (ดู prop active) */}
 
 
+
+      {/* ── แผงรายละเอียดงาน (จากตาราง) — ขวามือบนจอใหญ่ · เต็มจอบนมือถือ ── */}
+      <Drawer
+        anchor={isMobile ? "bottom" : "right"}
+        open={Boolean(detailSessions)}
+        onClose={() => setDetailJobId(null)}
+        PaperProps={{ sx: {
+          width: isMobile ? "100%" : "min(640px, 92vw)",
+          height: isMobile ? "92dvh" : "100%",
+          borderTopLeftRadius: isMobile ? 16 : 0, borderTopRightRadius: isMobile ? 16 : 0,
+          bgcolor: "#f8fafc",
+        } }}
+      >
+        {detailSessions && (() => {
+          const head = detailSessions[0];
+          return (
+            <>
+              <Stack direction="row" alignItems="center" gap={1.25}
+                sx={{ px: 2, py: 1.5, bgcolor: "background.paper", borderBottom: "1px solid #e2e8f0", position: "sticky", top: 0, zIndex: 2 }}>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography noWrap sx={{ fontWeight: 800, fontSize: "1rem", lineHeight: 1.3 }}>
+                    {head.site || head.company || "รายละเอียดงาน"}
+                  </Typography>
+                  <Typography noWrap sx={{ fontSize: "0.76rem", color: "text.secondary" }}>
+                    {[head.title, head.system, head.company && head.site ? head.company : ""].filter(Boolean).join(" · ")}
+                  </Typography>
+                </Box>
+                <Button
+                  size="small" startIcon={<CalendarMonth sx={{ fontSize: 16 }} />}
+                  onClick={() => {
+                    const q = head.unscheduled
+                      ? `draft=${head._id}&month=${head.plannedMonth || ""}`
+                      : `event=${head._id}&date=${moment(head.start).format("YYYY-MM-DD")}`;
+                    navigate(`/event?${q}&t=${Date.now()}`);
+                  }}
+                  sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, flexShrink: 0 }}
+                >
+                  ดูในปฏิทิน
+                </Button>
+                <IconButton size="small" onClick={() => setDetailJobId(null)} aria-label="ปิด"><Close fontSize="small" /></IconButton>
+              </Stack>
+              <Box sx={{ p: { xs: 1.5, sm: 2 }, overflowY: "auto", flex: 1 }}>
+                <JobGroupBlock
+                  key={detailJobId}
+                  inlineDetails
+                  sessions={detailSessions}
+                  currentUser={currentUser}
+                  onAssignResponsible={handleAssignResponsible}
+                  employee={employee}
+                  onStatusUpdate={handleStatusUpdate}
+                  onDateUpdate={handleDateUpdate}
+                  onDocNoUpdate={handleDocNoUpdate}
+                  onInputUpdate={handleInputUpdate}
+                  onFileUpload={handleFileUpload}
+                  onDeleteFile={(eid, type, fileId) => { setPendingDelete({ id: eid, type, fileId }); setConfirmOpen(true); }}
+                  onPreview={handlePreviewFile}
+                  onDelete={(...args) => { setDetailJobId(null); return handleDeleteRow(...args); }}
+                  onApproveClose={handleApproveClose}
+                  onRejectClose={handleRejectClose}
+                  uploadingState={uploadingState}
+                  isUploadingState={isUploadingState}
+                  uploadProgressState={uploadProgressState}
+                  uploadingFileSizeState={uploadingFileSizeState}
+                />
+              </Box>
+            </>
+          );
+        })()}
+      </Drawer>
 
       {/* File Preview */}
       <FilePreviewDialog
