@@ -54,9 +54,13 @@ export const getFollowUpInfo = (event) => {
   const followUps = event.quotationFollowUps || [];
   const lastContactAt = getLastContactAt(event);
   const daysSinceLastContact = getDaysSinceLastContact(event);
-  const dueAt = lastContactAt.clone().add(WARNING_DAYS_AFTER_SENT, "days");
+  // ✅ นัดติดตามครั้งถัดไป (ตั้งไว้ตอนบันทึกการติดตาม/ในข้อมูลใบเสนอราคา) — ถ้ามีและอยู่หลังการติดต่อล่าสุด
+  //    ใช้วันนั้นแทนเกณฑ์ 7 วัน (เช่น ลูกค้าบอก "ขอเข้าที่ประชุมสิ้นเดือน") · ⚠️ ตรงกับ OverdueReminder ฝั่ง server
+  const next = event.quotationNextFollowUpAt ? moment(event.quotationNextFollowUpAt) : null;
+  const scheduled = Boolean(next && next.isValid() && next.isAfter(lastContactAt));
+  const dueAt = scheduled ? next.clone().startOf("day") : lastContactAt.clone().startOf("day").add(WARNING_DAYS_AFTER_SENT, "days");
   // จำนวนวันที่เหลือก่อนครบกำหนดติดตามรอบถัดไป (ติดลบ = เลยกำหนดมาแล้วกี่วัน)
-  const daysUntilDue = dueAt.startOf("day").diff(moment().startOf("day"), "days");
+  const daysUntilDue = dueAt.clone().startOf("day").diff(moment().startOf("day"), "days");
   return {
     followUpCount: followUps.length,
     lastFollowUp: followUps.length > 0 ? followUps[followUps.length - 1] : null,
@@ -66,8 +70,9 @@ export const getFollowUpInfo = (event) => {
     daysSinceSent: getDaysSinceSent(event),
     daysSinceLastContact,
     dueAt,
+    scheduled,
     daysUntilDue,
-    needsFollowUp: isQuotationNeedsFollowUp(daysSinceLastContact),
+    needsFollowUp: daysUntilDue < 0,
   };
 };
 
@@ -82,7 +87,7 @@ export const resolveQuotationGroup = (event) => {
   if (!hasFiles) return event.quotationApplicable === true ? "waiting_file" : "";
   if (!event.quotationStatus) return "not_sent";
   if (event.quotationStatus === "sent") {
-    return isQuotationNeedsFollowUp(getDaysSinceLastContact(event)) ? "follow_up" : "sent";
+    return getFollowUpInfo(event)?.needsFollowUp ? "follow_up" : "sent";
   }
   return event.quotationStatus; // "approved" | "rejected" | "revising"
 };

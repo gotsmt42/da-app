@@ -237,10 +237,18 @@ const EventService = {
     return res.data;
   },
 
-  async AddQuotationFollowUp(id, { note, file }) {
+  /** ข้อมูล/สถานะใบเสนอราคา — PUT /events/:id/quotation (บันทึกทุกวันของงานเดียวกันพร้อมกัน) */
+  async UpdateQuotation(id, body) {
+    const response = await API.put(`/events/${id}/quotation`, body);
+    return response.data;
+  },
+
+  async AddQuotationFollowUp(id, { note, file, channel = "", nextFollowUpAt = "" }) {
     try {
       const formData = new FormData();
       formData.append("note", note);
+      if (channel) formData.append("channel", channel);
+      if (nextFollowUpAt) formData.append("nextFollowUpAt", nextFollowUpAt);
       if (file) {
         const prepared = await prepareUploadFile(file);
         if (!prepared.ok) throw new Error(prepared.message);

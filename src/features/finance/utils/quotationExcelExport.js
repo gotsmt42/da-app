@@ -67,8 +67,13 @@ export async function exportQuotationsToExcel({ jobs, meta, getFollowUpInfo, for
   });
 
   const cols = [
-    { key: "status", header: "สถานะ", width: 18, group: "สถานะใบเสนอราคา", align: "center" },
-    { key: "amount", header: "มูลค่าใบเสนอราคา (฿)", width: 18, group: "สถานะใบเสนอราคา", align: "right", numFmt: MONEY_FMT },
+    { key: "status", header: "สถานะ", width: 18, group: "ใบเสนอราคา", align: "center" },
+    { key: "qNo", header: "เลขที่ใบเสนอราคา", width: 18, group: "ใบเสนอราคา" },
+    { key: "qDate", header: "วันที่ใบเสนอราคา", width: 14, group: "ใบเสนอราคา", align: "center" },
+    { key: "amount", header: "มูลค่า (฿)", width: 16, group: "ใบเสนอราคา", align: "right", numFmt: MONEY_FMT },
+    { key: "vat", header: "VAT", width: 10, group: "ใบเสนอราคา", align: "center" },
+    { key: "validUntil", header: "ยืนราคาถึง", width: 14, group: "ใบเสนอราคา", align: "center" },
+    { key: "contact", header: "ผู้ติดต่อลูกค้า", width: 26, group: "ใบเสนอราคา", wrap: true },
     { key: "company", header: "บริษัท", width: 24, group: "ข้อมูลงาน" },
     { key: "site", header: "โครงการ", width: 24, group: "ข้อมูลงาน" },
     { key: "title", header: "ประเภทงาน", width: 16, group: "ข้อมูลงาน" },
@@ -84,6 +89,8 @@ export async function exportQuotationsToExcel({ jobs, meta, getFollowUpInfo, for
     { key: "lastNote", header: "บันทึกติดตามล่าสุด", width: 34, group: "การติดตาม", wrap: true },
     { key: "decidedAt", header: "วันที่ลูกค้าตอบ", width: 14, group: "ผลลัพธ์", align: "center" },
     { key: "decidedBy", header: "ผู้บันทึกผล", width: 16, group: "ผลลัพธ์" },
+    { key: "poNo", header: "เลขที่ PO ลูกค้า", width: 16, group: "ผลลัพธ์" },
+    { key: "decisionNote", header: "เหตุผล / หมายเหตุ", width: 30, group: "ผลลัพธ์", wrap: true },
     { key: "team", header: "ทีมที่เข้างาน", width: 18, group: "ผู้เกี่ยวข้อง" },
     { key: "responsible", header: "ผู้รับผิดชอบงาน", width: 18, group: "ผู้เกี่ยวข้อง" },
     { key: "fileCount", header: "ไฟล์แนบ (ไฟล์)", width: 13, group: "เอกสาร", align: "center" },
@@ -151,6 +158,13 @@ export async function exportQuotationsToExcel({ jobs, meta, getFollowUpInfo, for
 
     const row = ws.addRow({
       status: STATUS_LABEL[job.groupKey] || job.groupKey,
+      qNo: a.quotationNo || "",
+      qDate: a.quotationDate ? new Date(a.quotationDate) : "",
+      vat: a.quotationAmount ? (a.quotationVatIncluded ? "รวม VAT" : "ก่อน VAT") : "",
+      validUntil: a.quotationValidUntil ? new Date(a.quotationValidUntil) : "",
+      contact: [a.quotationContact?.name || a.contactName, a.quotationContact?.phone || a.contactTel, a.quotationContact?.email].filter(Boolean).join(" · "),
+      poNo: a.quotationPoNo || "",
+      decisionNote: a.quotationDecisionNote || "",
       // ✅ ส่งเป็นตัวเลขจริง (ไม่ใช่ข้อความ) — รวมยอด/ทำ pivot ใน Excel ได้ทันที
       amount: a.quotationAmount != null && a.quotationAmount !== "" ? Number(a.quotationAmount) : "",
       company: a.company || "",
@@ -183,7 +197,7 @@ export async function exportQuotationsToExcel({ jobs, meta, getFollowUpInfo, for
       cell.alignment = { vertical: "middle", horizontal: colDef.align || "left", wrapText: Boolean(colDef.wrap) };
       if (zebra) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.zebra } };
       if (colDef.numFmt) cell.numFmt = colDef.numFmt;
-      if (["sentAt", "lastContact", "dueAt", "decidedAt"].includes(colDef.key)) cell.numFmt = "dd/mm/yyyy";
+      if (["sentAt", "lastContact", "dueAt", "decidedAt", "qDate", "validUntil"].includes(colDef.key)) cell.numFmt = "dd/mm/yyyy";
 
       // 🎨 ระบายสีตามความหมาย — จุดที่ CSV ทำไม่ได้
       if (colDef.key === "status") {

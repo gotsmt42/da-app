@@ -1,886 +1,690 @@
 /**
- * QuotationTracking.js — ติดตามใบเสนอราคา (admin/manager/ช่าง — ดูขอบเขตสิทธิ์ด้านล่าง)
+ * QuotationTracking.js — ติดตามใบเสนอราคา (แท็บแรกของหน้า "ใบเสนอราคา / การเงิน")
  *
- * เดิมช่างอัพโหลดใบเสนอราคาเข้า Operation ได้อยู่แล้ว (quotationFiles/quotationApplicable) แต่ไม่มี
- * ที่ไหนติดตามต่อว่า "ส่งลูกค้าหรือยัง / ลูกค้าตอบว่าอย่างไร / ต้องติดตามไหม" เลย — หน้านี้เพิ่ม
- * lifecycle ให้ครบ: รอช่างแนบไฟล์ → รอส่งลูกค้า → ส่งแล้วรอลูกค้าตอบ (ไม่ได้ติดต่อลูกค้าเกิน 7 วัน = ต้องติดตามด่วน)
- * → อนุมัติ/ปฏิเสธ/ขอแก้ไข (วนกลับไปส่งใหม่ได้)
+ * ✅ v4 — ผู้ใช้สั่ง (2 ต.ค. 2569): "ยังใช้งานยาก ข้อมูลไม่สมบูรณ์ ปรับปรุงหน้านี้ทั้งหมด ให้สมบูรณ์และมืออาชีพ"
+ *    + "การจัดวางต่างๆ ไม่สวย"
+ *   เดิม: หน้าแคบ 900px กลางจอ · การ์ดยาวเรียงบรรทัดไอคอนอีโมจิ · ตัวกรองเหลือ 3 กลุ่ม (รอ/อนุมัติ/ปฏิเสธ)
+ *         · ไม่มีเลขที่/วันที่ใบเสนอราคา · ไม่มียืนราคา · ไม่มีผู้ติดต่อลูกค้า · ปฏิเสธไม่ต้องบอกเหตุผล
+ *         · อนุมัติไม่มีเลข PO · บันทึกติดตามไม่มีช่องทาง/นัดครั้งถัดไป
+ *   ตอนนี้ (โครงเดียวกับหน้าใบเบิก/ใบขอซื้อ):
+ *     หัวเพจ + ตัวเลขเงินขวา → ตัวเลขสรุป (มูลค่ารอตอบ · ต้องตามด่วน · อนุมัติ · อัตราปิดการขาย · ข้อมูลไม่ครบ)
+ *     → แถบค้นหา/ตัวกรองกล่องขาว → การ์ดสถานะ (ViewTiles ครบทุกขั้น) → ตาราง (มือถือ = การ์ดกระชับ)
+ *     กล่องรายละเอียด: ขั้นตอน → "สิ่งที่ต้องทำต่อ" → ข้อมูลใบเสนอราคา (แก้ได้) → ไฟล์ → การติดตาม → คุยกับช่าง → ประวัติ
+ *   บันทึกผ่าน PUT /events/:id/quotation (server ตรวจค่า + บันทึกทุกวันของงานเดียวกันพร้อมกัน)
  *
- * ✅ v2: มือถือใช้ยาก — เดิมแท็บกรองสถานะเป็นแถว Chip เลื่อนแนวนอน (ล้นขอบจอ มองแล้วเหมือนตัด)
- * และแตะการ์ดแล้วกางลงในหน้า (Collapse) ต้องเลื่อนจอตามยาว แก้เป็น: แท็บกรองรวมเป็นปุ่มเดียว กดแล้ว
- * เด้งเมนูขึ้นมาเลือก (ไม่มีเลื่อนแนวนอนอีกต่อไป), แตะการ์ดแล้วเด้งเป็น Dialog เต็มจอแทนการกางในหน้า
- *
- * ✅ v3: เปิดให้ช่างเข้าดู "งานของตัวเอง" ได้ด้วย (เดิม admin/manager เท่านั้น) — ช่างดูสถานะ/ไฟล์
- * (read-only, เหมือนเดิม) และบันทึก "การติดตามลูกค้า" แบบเป็นครั้งๆ (ครั้งที่ 1,2,3... พร้อมแนบ
- * หลักฐานถ้ามี) ได้ แต่การเปลี่ยนสถานะ (ส่ง/อนุมัติ/ปฏิเสธ/แก้ไข) และมูลค่าใบเสนอราคายังเป็นสิทธิ์
- * admin/manager เท่านั้น (เทียบ pattern เดียวกับ flow ขอปิดงานที่ต้อง admin อนุมัติ) — เพิ่มตัวกรอง
- * "แยกตามช่าง" (admin/manager เท่านั้น) ให้เห็นว่าช่างแต่ละคนมีใบเสนอราคาค้างอยู่เท่าไหร่
- *
- * โครงสร้าง/pattern อ้างอิงจาก features/staff/pages/TeamWorkload.js (หน้า standalone แบบเดียวกัน) — เช็คสิทธิ์เอง
- * ในนี้ (ไม่ผ่าน AdminRoute), ใช้ EventService.getEventOp() ตัวเดียวกับ Operation/MyJobs/TeamWorkload
- * (backend scope ตาม role ให้แล้ว — ช่างเห็นแค่งานตัวเอง ไม่ต้อง endpoint ใหม่)
- *
- * ส่วน UI ไฟล์แนบ/คุยกับช่าง ใช้ GlassCard/StatCard/FileUploadSection/CommentThread ตัวเดียวกับหน้า
- * Operation จริง (export เพิ่มจากไฟล์นั้น) แทนการ copy โค้ดเมนู "⋮"/แชร์/พิมพ์ไฟล์มาซ้ำ
+ * ⚠️ ขอบเขตข้อมูล: GET /event-op คืนเฉพาะงานที่ผู้ใช้เกี่ยวข้อง (ช่างเห็นงานตัวเอง) — server เป็นด่านจริง
+ * ⚠️ มูลค่า / ย้อนสถานะ = editFinance เท่านั้น (server บังคับซ้ำ)
  */
-
-import { useEffect, useState, useCallback, useMemo, useRef, memo } from "react";
-import useRealtime from "@/shared/realtime/useRealtime";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import { alpha } from "@mui/material/styles";
 import {
-  Box, Stack, Typography, TextField, InputAdornment, IconButton, Chip, Avatar,
-  Tooltip, Skeleton, Snackbar, Alert, Button, Divider, Grid, CardContent,
-  Menu, MenuItem, ListItemIcon, ListItemText, Dialog, DialogContent,
-  useMediaQuery, useTheme, Pagination,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
-  ToggleButtonGroup, ToggleButton,
+  Box, Stack, Typography, TextField, InputAdornment, IconButton, Chip, Avatar, Tooltip, Skeleton, Snackbar, Alert,
+  Button, Dialog, DialogTitle, DialogContent, DialogActions, useMediaQuery, Pagination, Checkbox, FormControlLabel,
+  Table, TableBody, TableCell, TableHead, TableRow, Collapse,
 } from "@mui/material";
 import {
-  Search, Clear, Refresh, RequestQuote, Send, CheckCircle, Cancel,
-  Autorenew, HourglassTop, Warning, ExpandMore, ChevronRight, AttachFile,
-  Chat, OpenInNew, PriceCheck, Close, History, Person,
-  ViewList, TableChart, Description,
+  Search, Close, Refresh, RequestQuote, Send, CheckCircle, Cancel, Autorenew, HourglassTop, WarningAmber, ChevronRight,
+  AttachFile, Chat, OpenInNew, History, Apps, Description, Edit, Phone, Email, EventRepeat, Undo, Save, Insights, ExpandMore,
 } from "@mui/icons-material";
-// ✅ ไอคอนไฟล์ Excel — ใช้ตัวเดียวกับปุ่มส่งออก Excel ในหน้าปฏิทิน (EventCalendar) ให้ทั้งแอปสื่อความหมาย
-// เดียวกัน (MUI ไม่มีไอคอนไฟล์ Excel ในชุดมาตรฐาน จึงใช้ FontAwesome ที่โปรเจกต์ติดตั้งไว้แล้ว)
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFileExcel } from "@fortawesome/free-solid-svg-icons";
+
+import useRealtime from "@/shared/realtime/useRealtime";
 import { useAuth } from "@/features/auth/AuthContext";
 import EventService from "@/shared/services/EventService";
-import AuthService from "@/shared/services/authService";
-import { GlassCard, StatCard, FileUploadSection, CommentThread, FilePreviewDialog } from "@/features/operation/components/OperationBoard";
-import { getOverdueGroupKey, resolveAssignedTechnician } from "@/shared/utils/overdueJobs";
+import { FileUploadSection, CommentThread, FilePreviewDialog } from "@/features/operation/components/OperationBoard";
+import { getOverdueGroupKey } from "@/shared/utils/overdueJobs";
 import { WARNING_DAYS_AFTER_SENT, getFollowUpInfo, resolveQuotationGroup } from "@/shared/utils/quotationTracking";
 import { formatEventDateRange } from "@/shared/utils/formatDateRange";
 import { formatRoundLabel } from "@/shared/utils/contractRounds";
-import { formatThai } from "@/shared/utils/thaiDate";
-import { can, isRole, TECHNICIAN_ROLES } from "@/shared/utils/roles";
+import { formatThai, thaiDate } from "@/shared/utils/thaiDate";
+import { personColor, personInitial } from "@/shared/utils/personAvatar";
+import { can } from "@/shared/utils/roles";
+import ViewTiles from "@/shared/ui/ViewTiles";
+import SelectField from "@/shared/ui/SelectField";
+import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 
-const STATUS_META = {
-  waiting_file: { label: "รอช่างแนบไฟล์",   color: "#6b7280", icon: <AttachFile sx={{ fontSize: 14 }} /> },
-  not_sent:     { label: "รอส่งลูกค้า",      color: "#f59e0b", icon: <HourglassTop sx={{ fontSize: 14 }} /> },
-  sent:         { label: "รอลูกค้าตอบ",      color: "#3b82f6", icon: <Send sx={{ fontSize: 14 }} /> },
-  follow_up:    { label: "ต้องติดตามด่วน",   color: "#ef4444", icon: <Warning sx={{ fontSize: 14 }} /> },
-  revising:     { label: "ลูกค้าขอแก้ไข",    color: "#8b5cf6", icon: <Autorenew sx={{ fontSize: 14 }} /> },
-  approved:     { label: "อนุมัติแล้ว",       color: "#10b981", icon: <CheckCircle sx={{ fontSize: 14 }} /> },
-  rejected:     { label: "ปฏิเสธแล้ว",        color: "#94a3b8", icon: <Cancel sx={{ fontSize: 14 }} /> },
-};
+const TEXT_MAIN = "#0f172a";
+const TEXT_SUB = "#64748b";
+const BORDER = "#e2e8f0";
+const PAGE_SIZE = 15;
 
-// ✅ เมนูกรองสถานะ (ปุ่ม+popup) ตัดเหลือแค่ 3 กลุ่มที่ใช้จริง (รอลูกค้าตอบ/อนุมัติ/ปฏิเสธ) — ตัด
-// "ลูกค้าขอแก้ไข" ออกจากแท็บ/การ์ดสรุปแล้วตามที่ขอ (ไม่มีใครดูอยู่แล้ว) แต่ยังกดสั่งจากเมนู "เปลี่ยน
-// สถานะ" ต่องานได้เหมือนเดิม (STATUS_ACTIONS) แค่ไม่ต้องมีแท็บ/การ์ดสรุปแยกให้รกอีกต่อไป — งานที่เคย
-// ตั้งเป็น "ลูกค้าขอแก้ไข" ไว้แล้วจึงพับไปรวมกับ "รอลูกค้าตอบ" แทน (การ์ดยังโชว์ป้ายสถานะจริงของตัวเอง
-// อยู่ ไม่ได้หายไปไหน) — งานที่ยังไม่ถึงขั้นตอนคุยกับลูกค้า (รอช่างแนบไฟล์/รอส่งลูกค้า) และงานที่ส่งแล้ว
-// เกินกำหนดต้องติดตามด่วน ก็รวมอยู่ใน "รอลูกค้าตอบ" เหมือนเดิม
-const TAB_GROUP_MAP = {
-  waiting_file: "pending",
-  not_sent: "pending",
-  sent: "pending",
-  follow_up: "pending",
-  revising: "pending",
-  approved: "approved",
-  rejected: "rejected",
+/** สถานะย่อยของใบ — ลำดับ = ลำดับขั้นตอนจริง (ใช้ทั้งการ์ดสถานะและการเรียง) */
+const STATUS = {
+  follow_up: { label: "ต้องติดตามด่วน", short: "ตามด่วน", color: "#dc2626", icon: WarningAmber },
+  sent: { label: "รอลูกค้าตอบ", short: "รอตอบ", color: "#2563eb", icon: Send },
+  revising: { label: "ลูกค้าขอแก้ไข", short: "ขอแก้ไข", color: "#7c3aed", icon: Autorenew },
+  not_sent: { label: "รอส่งลูกค้า", short: "รอส่ง", color: "#d97706", icon: HourglassTop },
+  waiting_file: { label: "รอแนบไฟล์", short: "รอไฟล์", color: "#64748b", icon: AttachFile },
+  approved: { label: "อนุมัติแล้ว", short: "อนุมัติ", color: "#15803d", icon: CheckCircle },
+  rejected: { label: "ปฏิเสธ", short: "ปฏิเสธ", color: "#94a3b8", icon: Cancel },
 };
-const TAB_META = {
-  pending:  { label: "รอลูกค้าตอบ",   color: "#3b82f6", icon: <Send sx={{ fontSize: 14 }} /> },
-  approved: { label: "อนุมัติแล้ว",    color: "#10b981", icon: <CheckCircle sx={{ fontSize: 14 }} /> },
-  rejected: { label: "ปฏิเสธแล้ว",     color: "#94a3b8", icon: <Cancel sx={{ fontSize: 14 }} /> },
-};
-const TABS = ["pending", "approved", "rejected"];
-// ✅ เรียงลำดับความเร่งด่วนภายในแท็บ "รอลูกค้าตอบ" ที่รวมหลายสถานะย่อยไว้ด้วยกัน — ต้องติดตามด่วน
-// ขึ้นก่อนสุด ไล่ไปจนถึงรอช่างแนบไฟล์ (ยังทำอะไรกับลูกค้าไม่ได้จนกว่าจะมีไฟล์)
-const PENDING_PRIORITY = { follow_up: 0, sent: 1, revising: 2, not_sent: 3, waiting_file: 4 };
-
-// ✅ ใช้กับปุ่ม "เปลี่ยนสถานะ" ที่กดได้ตลอดเวลาไม่ว่างานจะอยู่สถานะไหนอยู่ก็ตาม (ไม่ต้องรอให้ปุ่ม
-// ตามลำดับขั้นตอนโผล่มาเอง) — เผื่อกรณีกดผิด/ต้องแก้ไขข้ามขั้นตอน เช่น จากอนุมัติแล้วสลับไปขอแก้ไขตรงๆ
-const STATUS_ACTIONS = [
-  { action: "send",    label: "ส่งใบเสนอราคาให้ลูกค้าแล้ว", icon: <Send sx={{ fontSize: 16 }} />,      color: "#3b82f6" },
-  { action: "approve", label: "ลูกค้าอนุมัติ",                icon: <CheckCircle sx={{ fontSize: 16 }} />, color: "#10b981" },
-  { action: "reject",  label: "ลูกค้าปฏิเสธ",                 icon: <Cancel sx={{ fontSize: 16 }} />,      color: "#94a3b8" },
+const STATUS_ORDER = ["follow_up", "sent", "revising", "not_sent", "waiting_file", "approved", "rejected"];
+const OPEN = ["follow_up", "sent", "revising", "not_sent", "waiting_file"];
+const CHANNELS = [
+  { value: "phone", label: "โทรศัพท์" },
+  { value: "line", label: "LINE" },
+  { value: "email", label: "อีเมล" },
+  { value: "visit", label: "เข้าพบ" },
+  { value: "other", label: "อื่นๆ" },
+];
+const channelLabel = (v) => CHANNELS.find((c) => c.value === v)?.label || "";
+const PERIODS = [
+  { value: "all", label: "ทุกช่วงเวลา" },
+  { value: "month", label: "เดือนนี้" },
+  { value: "3m", label: "3 เดือนล่าสุด" },
+  { value: "year", label: "ปีนี้" },
 ];
 
-// ─── ช่องกรอก "มูลค่าใบเสนอราคา" แบบกดแก้ตรงจุด (เทียบ pattern เดียวกับ docNo ในหน้า Operation) ───
-// 🐛 ปรับตามที่ผู้ใช้แจ้ง (ราคาที่แสดง/แก้ไข ต้องเป็นราคาของ "ใบเสนอราคา" ไม่ใช่ราคางาน):
-// ค่านี้เก็บที่ฟิลด์ quotationAmount ซึ่งเป็นฟิลด์อิสระจาก jobValue (ราคางานตามสัญญา) อยู่แล้วตั้งแต่แรก
-// — ฝั่งข้อมูลถูกต้องดี แต่ "หน้าจอเรียกมันว่า มูลค่างาน" ซึ่งเป็นคำเดียวกับที่หน้า "ภาพรวมงาน" ใช้เรียก
-// jobValue เป๊ะๆ ผู้ใช้จึงเข้าใจว่าตัวเลขนี้ดึงมาจากราคางานอัตโนมัติ ทั้งที่จริงต้องกรอกเองทุกใบ
-// ✅ เปลี่ยนชื่อให้ตรงความหมาย ("มูลค่าใบเสนอราคา") + เปลี่ยนจากลิงก์ตัวหนังสือเล็กๆ ซ่อนมุมขวา เป็นช่อง
-// กรอกที่เห็นชัดพร้อมป้ายกำกับ เพราะเป็นค่าที่ "ต้องกรอกเพิ่มเอง" ไม่มีทางมาเองได้ ถ้าไม่เด่นก็ไม่มีใครกรอก
-// แล้วยอดรวมในการ์ดสรุปจะต่ำกว่าความจริงโดยไม่มีใครรู้
-const AmountEditor = ({ value, onSave, compact = false }) => {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value ?? "");
+const baht = (n) => `฿${(Number(n) || 0).toLocaleString("th-TH", { maximumFractionDigits: 2 })}`;
+const ymd = (d) => (d ? moment(d).format("YYYY-MM-DD") : "");
+const siteText = (a) => [a.company, a.site].filter(Boolean).join(" · ") || "ไม่ระบุโครงการ";
+const jobText = (a) => [a.title, a.system].filter(Boolean).join(" · ");
+const ownerOf = (a) => a.responsiblePerson || a.team || "";
+/** วันที่อ้างอิงของใบ (ใช้กรองช่วงเวลา/เรียง) — วันที่ใบเสนอราคา > วันที่ส่ง > วันที่งาน */
+const refDateOf = (a) => a.quotationDate || a.quotationSentAt || a.start;
+const isExpired = (a) => a.quotationValidUntil && ["sent", "revising"].includes(a.quotationStatus) && moment(a.quotationValidUntil).isBefore(moment(), "day");
+const missingInfo = (a) => !a.quotationAmount || !a.quotationNo;
 
-  const save = () => {
-    setEditing(false);
-    const num = draft === "" ? null : Number(draft);
-    if (num !== value) onSave(num);
-  };
-
-  if (editing) {
-    return (
-      <Stack direction="row" gap={0.5} alignItems="center" onClick={(e) => e.stopPropagation()}>
-        <TextField size="small" type="number" autoFocus
-          value={draft} onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") { setDraft(value ?? ""); setEditing(false); } }}
-          placeholder="0"
-          InputProps={{ startAdornment: <Typography sx={{ mr: 0.5, color: "text.disabled" }}>฿</Typography> }}
-          inputProps={{ min: 0, style: { fontSize: "0.85rem" } }}
-          sx={{ width: 150 }} />
-        <Button size="small" variant="contained" onClick={save} sx={{ textTransform: "none", minWidth: "auto", px: 1.25 }}>บันทึก</Button>
-        <Button size="small" color="inherit" onClick={() => { setDraft(value ?? ""); setEditing(false); }}
-          sx={{ textTransform: "none", minWidth: "auto", px: 1 }}>ยกเลิก</Button>
-      </Stack>
-    );
-  }
-
-  // ✅ โหมดกระชับ (ใช้ในการ์ดรายการ) — แค่แสดงค่า ไม่ต้องมีกรอบ
-  if (compact) {
-    return (
-      <Stack direction="row" gap={0.5} alignItems="center"
-        sx={{ cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); setEditing(true); }}>
-        <PriceCheck sx={{ fontSize: 15, color: "text.disabled" }} />
-        <Typography variant="caption" color={value ? "text.primary" : "warning.main"} fontWeight={700}
-          sx={{ "&:hover": { color: "primary.main", textDecoration: "underline" } }}>
-          {value ? `฿${Number(value).toLocaleString()}` : "กรอกมูลค่าใบเสนอราคา"}
-        </Typography>
-      </Stack>
-    );
-  }
-
-  // ✅ โหมดเต็ม (กล่องรายละเอียด) — ยังไม่กรอก = กล่องสีส้มชวนให้กด ไม่ใช่ข้อความเทาจางที่มองข้ามได้
+/** ✅ ผู้ใช้สั่ง "แก้สีสันไม่ให้รกตา" — ป้ายสถานะพื้นเทาอ่อน + จุดสีเล็กๆ (สีอยู่ที่จุดเท่านั้น ยกเว้นต้องตามด่วน) */
+const StatusChip = ({ k, size = "small" }) => {
+  const m = STATUS[k] || STATUS.not_sent;
   return (
-    <Box
-      onClick={(e) => { e.stopPropagation(); setEditing(true); }}
-      sx={{
-        p: 1.25, borderRadius: 2, cursor: "pointer", width: "100%",
-        border: "1px solid",
-        borderColor: value ? "divider" : alpha("#f59e0b", 0.5),
-        bgcolor: value ? "transparent" : alpha("#f59e0b", 0.07),
-        transition: "border-color .15s, background-color .15s",
-        "&:hover": { borderColor: "primary.main" },
-      }}
-    >
-      <Stack direction="row" alignItems="center" gap={1}>
-        <PriceCheck sx={{ fontSize: 18, color: value ? "text.disabled" : "#b45309" }} />
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ display: "block", lineHeight: 1.2 }}>
-            มูลค่าใบเสนอราคา
-          </Typography>
-          <Typography fontWeight={800} fontSize="1rem" color={value ? "text.primary" : "#b45309"} sx={{ lineHeight: 1.3 }}>
-            {value ? `฿${Number(value).toLocaleString()}` : "ยังไม่ระบุ — กดเพื่อกรอก"}
-          </Typography>
-        </Box>
-        <Typography variant="caption" color="primary.main" fontWeight={700} sx={{ flexShrink: 0 }}>
-          {value ? "แก้ไข" : "กรอก"}
-        </Typography>
-      </Stack>
-      {/* ✅ บอกให้ชัดว่าเป็นคนละตัวกับราคางานตามสัญญา กันกรอกผิดช่อง/เข้าใจว่าระบบดึงมาให้เอง */}
-      <Typography variant="caption" color="text.disabled" sx={{ display: "block", mt: 0.4, fontSize: "0.68rem" }}>
-        ราคาที่เสนอลูกค้าในใบนี้ — แยกจาก "มูลค่างาน" ของสัญญาในหน้าภาพรวมงาน
-      </Typography>
+    <Box component="span" sx={{
+      display: "inline-flex", alignItems: "center", gap: 0.6, height: size === "small" ? 22 : 26, px: 1, borderRadius: 999,
+      bgcolor: "#f8fafc", color: k === "follow_up" ? m.color : "#334155", border: `1px solid ${BORDER}`,
+      fontSize: size === "small" ? "0.72rem" : "0.8rem", fontWeight: 700, whiteSpace: "nowrap",
+    }}>
+      <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: m.color, flexShrink: 0 }} />{m.label}
     </Box>
   );
 };
 
-// ─── บรรทัดข้อมูล "ไอคอน + ป้ายกำกับ : ค่า" — เทียบ pattern เดียวกับ InfoLine ในหน้า Operation
-// (EventRowCard) ให้การ์ดใบเสนอราคาแสดงรายละเอียดงานครบแบบเดียวกัน (ระบบ/โครงการ/ครั้งที่/ทีม) ───
-const InfoLine = ({ icon, label, children }) => (
-  <Stack direction="row" spacing={0.5} sx={{ alignItems: "flex-start" }}>
-    <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0, whiteSpace: "nowrap" }}>
-      {icon} {label} :
-    </Typography>
-    <Typography variant="caption" color="text.secondary" sx={{ minWidth: 0 }}>
-      {children}
-    </Typography>
+/** ป้ายกำหนดติดตาม — เลยกำหนด (แดง) / วันนี้ (ส้ม) / อีก N วัน (เทา) */
+const DueChip = ({ info }) => {
+  if (!info) return null;
+  const d = info.daysUntilDue;
+  const [label, color] = d < 0 ? [`เลยกำหนด ${-d} วัน`, "#dc2626"] : d === 0 ? ["ตามวันนี้", "#d97706"] : [`ตามอีก ${d} วัน`, TEXT_SUB];
+  return <Typography component="span" sx={{ fontSize: "0.72rem", fontWeight: 800, color, whiteSpace: "nowrap" }}>{label}</Typography>;
+};
+
+const Owner = ({ name, size = 30 }) => (
+  <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+    <Avatar sx={{ width: size, height: size, fontSize: size * 0.42, fontWeight: 800, bgcolor: name ? personColor(name) : "#cbd5e1", flexShrink: 0 }}>
+      {name ? personInitial(name) : "?"}
+    </Avatar>
+    <Typography noWrap sx={{ fontSize: "0.84rem", fontWeight: 700, color: name ? TEXT_MAIN : TEXT_SUB }}>{name || "ไม่ระบุ"}</Typography>
   </Stack>
 );
 
-// ─── การ์ดสรุปต่องาน (แตะแล้วเด้ง Dialog รายละเอียดขึ้นมา — ไม่กางลงในหน้าอีกต่อไป) ───────
-// ✅ perf: auto-refresh ทุก 30 วิ แทนที่ events ทั้งก้อนด้วย object ใหม่เสมอ (แม้ข้อมูลจริงไม่เปลี่ยน)
-// memo ไว้เทียบด้วยค่าจริง (updatedAt/groupKey) กันการ์ดที่ไม่มีอะไรเปลี่ยนต้อง re-render ทุก tick —
-// onOpen ต้องเป็น stable reference จากต้นทาง (เป็น setDetailJob ตรงๆ อยู่แล้ว จึง stable โดยธรรมชาติ)
-const QuotationCard = memo(({ job, onOpen, onPreview }) => {
-  const anchor = job.sessions[0];
-  const groupKey = job.groupKey;
-  // ✅ ไฟล์ใบเสนอราคาจริง — เดิมต้องเปิดการ์ด → เลื่อนหาส่วนไฟล์ → ค่อยกดดู (3 ขั้น) ทั้งที่เป็นสิ่งที่
-  // อยากดูบ่อยที่สุดในหน้านี้ ตอนนี้กดจากการ์ดได้เลยในขั้นเดียว
-  const quotationFiles = anchor.quotationFiles || [];
-  const meta = STATUS_META[groupKey] || STATUS_META.not_sent;
-  // ✅ ข้อมูลติดตามครบชุดจาก util กลาง (นับจาก "ติดต่อลูกค้าครั้งล่าสุด" ไม่ใช่วันที่ส่งอย่างเดียว)
-  const followUp = getFollowUpInfo(anchor);
+const Kpi = ({ label, value, sub, color = TEXT_MAIN, onClick, active, alert }) => (
+  <Box component={onClick ? "button" : "div"} type={onClick ? "button" : undefined} onClick={onClick} sx={{
+    textAlign: "left", font: "inherit", cursor: onClick ? "pointer" : "default", minWidth: 0,
+    p: { xs: 1.25, sm: 1.5 }, borderRadius: 2.5, bgcolor: "#fff",
+    border: `1px solid ${active ? "#334155" : BORDER}`, boxShadow: active ? "inset 0 -3px 0 #334155" : "0 1px 2px rgba(15,23,42,.04)",
+    transition: "border-color .15s", "&:hover": onClick ? { borderColor: "#94a3b8" } : {},
+  }}>
+    <Typography noWrap sx={{ fontSize: "0.74rem", color: TEXT_SUB, fontWeight: 700 }}>{label}</Typography>
+    <Typography noWrap sx={{ fontWeight: 900, fontSize: { xs: "1.1rem", sm: "1.3rem" }, color: alert ? color : TEXT_MAIN, lineHeight: 1.3 }}>{value}</Typography>
+    {sub && <Typography noWrap sx={{ fontSize: "0.7rem", color: TEXT_SUB }}>{sub}</Typography>}
+  </Box>
+);
 
-  return (
-    <GlassCard sx={{ mb: 1.5, border: "1px solid", borderColor: alpha(meta.color, 0.3), cursor: "pointer" }}
-      onClick={() => onOpen(job)}>
-      <Box sx={{ p: 2 }}>
-        <Stack direction="row" alignItems="flex-start" gap={1.5}>
-          <Avatar sx={{
-            width: 36, height: 36, flexShrink: 0,
-            bgcolor: alpha(meta.color, 0.15), color: meta.color,
-          }}>
-            <RequestQuote sx={{ fontSize: 18 }} />
-          </Avatar>
+const Section = ({ title, icon, action, children }) => (
+  <Box sx={{ border: `1px solid ${BORDER}`, borderRadius: 2.5, bgcolor: "#fff", overflow: "hidden" }}>
+    <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 1.75, py: 1.1, borderBottom: `1px solid ${BORDER}`, bgcolor: "#f8fafc" }}>
+      <Box sx={{ color: TEXT_SUB, display: "flex", "& svg": { fontSize: 18 } }}>{icon}</Box>
+      <Typography sx={{ flex: 1, fontWeight: 800, fontSize: "0.88rem", color: TEXT_MAIN }}>{title}</Typography>
+      {action}
+    </Stack>
+    <Box sx={{ p: 1.75 }}>{children}</Box>
+  </Box>
+);
 
-          <Box minWidth={0} flex={1}>
-            <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" sx={{ mb: 0.5 }}>
-              <Chip size="small" icon={meta.icon} label={meta.label} sx={{
-                height: 22, fontSize: "0.68rem", fontWeight: 700,
-                bgcolor: alpha(meta.color, 0.12), color: meta.color, "& .MuiChip-icon": { color: meta.color },
-              }} />
-              <Typography variant="caption" color="text.secondary" fontWeight={600} noWrap>
-                📅 {formatEventDateRange(anchor)}
-              </Typography>
-              {/* ✅ เดิมโชว์แค่ "N วัน" เฉยๆ เฉพาะตอนเลยกำหนด ซึ่งนับจากวันที่ส่งเสมอ — ใบที่ตามไปแล้ว
-                  5 ครั้งกับใบที่ปล่อยทิ้งไว้เฉยๆ จึงหน้าตาเหมือนกันเป๊ะ แยกไม่ออกว่าต้องจัดการแบบไหน
-                  ✅ ตอนนี้บอก "เงียบมากี่วันนับจากติดต่อครั้งล่าสุด" (ตรงกับเกณฑ์เตือนจริง) และใบที่ยัง
-                  ไม่ถึงกำหนดก็บอกว่าเหลืออีกกี่วัน ให้วางแผนล่วงหน้าได้ ไม่ใช่รอจนแดงแล้วค่อยรู้ */}
-              {followUp?.needsFollowUp && (
-                <Chip size="small" label={`เงียบ ${followUp.daysSinceLastContact} วัน`} sx={{
-                  height: 22, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha("#ef4444", 0.12), color: "#ef4444",
-                }} />
-              )}
-              {followUp && !followUp.needsFollowUp && (
-                <Chip size="small"
-                  label={followUp.daysUntilDue > 0 ? `ตามอีกใน ${followUp.daysUntilDue} วัน` : "ถึงกำหนดตามวันนี้"}
-                  sx={{
-                    height: 22, fontSize: "0.68rem", fontWeight: 600,
-                    bgcolor: alpha(followUp.daysUntilDue > 0 ? "#64748b" : "#f59e0b", 0.1),
-                    color: followUp.daysUntilDue > 0 ? "#64748b" : "#b45309",
-                  }} />
-              )}
-              {/* ✅ เห็นได้ทันทีจากการ์ดว่าเคยตามไปแล้วกี่ครั้ง ไม่ต้องเปิดเข้าไปดูข้างในก่อน */}
-              {followUp?.followUpCount > 0 && (
-                <Chip size="small" label={`☎️ ตามแล้ว ${followUp.followUpCount} ครั้ง`} sx={{
-                  height: 22, fontSize: "0.68rem", fontWeight: 600,
-                  bgcolor: alpha("#0ea5e9", 0.1), color: "#0369a1",
-                }} />
-              )}
-            </Stack>
+const KV = ({ label, children, color }) => (
+  <Box sx={{ minWidth: 0 }}>
+    <Typography sx={{ fontSize: "0.7rem", color: TEXT_SUB, fontWeight: 700 }}>{label}</Typography>
+    <Typography sx={{ fontSize: "0.88rem", fontWeight: 700, color: color || TEXT_MAIN, wordBreak: "break-word" }}>{children || "—"}</Typography>
+  </Box>
+);
 
-            {anchor.title && (
-              <Typography fontWeight={700} fontSize="0.92rem" noWrap>[{anchor.title}]</Typography>
-            )}
-
-            <Stack spacing={0.3} sx={{ mt: 0.4 }}>
-              {anchor.system && <InfoLine icon="💻" label="ระบบ">{anchor.system}</InfoLine>}
-              <InfoLine icon="🏢" label="โครงการ">
-                {anchor.company && anchor.site ? `${anchor.company} · ${anchor.site}` : (anchor.company || anchor.site || "ไม่ระบุโครงการ")}
-              </InfoLine>
-              {anchor.time && <InfoLine icon="🔢" label="ครั้งที่">{formatRoundLabel(anchor.time, anchor.visitCount)}</InfoLine>}
-              {anchor.team && <InfoLine icon="👷" label="ทีม">{anchor.team}</InfoLine>}
-              {anchor.docNo && <InfoLine icon="📄" label="เอกสาร">{anchor.docNo}</InfoLine>}
-            </Stack>
-
-            {/* ✅ เดิมโชว์แค่ตัวเลข "฿86,000" ลอยๆ ไม่มีป้ายกำกับ อ่านแล้วเดาไม่ออกว่าเป็นราคาอะไร
-                (ราคางาน? ราคาใบเสนอราคา?) และถ้ายังไม่กรอกก็ไม่แสดงอะไรเลย จนไม่มีใครรู้ว่าขาดอยู่ —
-                ตอนนี้ติดป้ายชัดเจน และใบที่ยังไม่กรอกขึ้นเตือนเป็นสีส้มให้เห็นตั้งแต่หน้ารายการ */}
-            <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" sx={{ mt: 0.75 }}>
-              <Typography variant="caption">
-                {anchor.quotationAmount ? (
-                  <>
-                    <Box component="span" sx={{ color: "text.secondary" }}>💰 มูลค่าใบเสนอราคา : </Box>
-                    <Box component="span" sx={{ fontWeight: 800 }}>฿{Number(anchor.quotationAmount).toLocaleString()}</Box>
-                  </>
-                ) : (
-                  <Box component="span" sx={{ color: "#b45309", fontWeight: 700 }}>
-                    💰 ยังไม่ระบุมูลค่าใบเสนอราคา
-                  </Box>
-                )}
-              </Typography>
-              <Box sx={{ flex: 1 }} />
-              {/* ✅ ลิงก์เปิด "ใบเสนอราคาจริง" ตรงจากการ์ด — หยุด event ไม่ให้ลอยไปเปิด Dialog รายละเอียด */}
-              {quotationFiles.length > 0 ? (
-                <Button
-                  size="small" variant="outlined" startIcon={<Description sx={{ fontSize: 15 }} />}
-                  onClick={(e) => { e.stopPropagation(); onPreview(quotationFiles[0].fileUrl, quotationFiles[0].fileName); }}
-                  sx={{ textTransform: "none", borderRadius: 2, fontSize: "0.7rem", py: 0.25 }}
-                >
-                  ดูใบเสนอราคา{quotationFiles.length > 1 ? ` (${quotationFiles.length})` : ""}
-                </Button>
-              ) : (
-                <Chip size="small" label="ยังไม่มีไฟล์" sx={{
-                  height: 20, fontSize: "0.65rem", bgcolor: alpha("#94a3b8", 0.12), color: "#64748b",
-                }} />
-              )}
-            </Stack>
-          </Box>
-
-          <ChevronRight sx={{ color: "text.disabled", flexShrink: 0, mt: 0.5 }} />
-        </Stack>
-      </Box>
-    </GlassCard>
-  );
-}, (prev, next) => {
-  const prevAnchor = prev.job.sessions[0];
-  const nextAnchor = next.job.sessions[0];
-  return (
-    prevAnchor._id === nextAnchor._id &&
-    prevAnchor.updatedAt === nextAnchor.updatedAt &&
-    prev.job.groupKey === next.job.groupKey &&
-    prev.onOpen === next.onOpen
-  );
-});
-
-// ─── มุมมองตาราง — ทางเลือกของการ์ด สำหรับดูหลายรายการพร้อมกัน/เปรียบเทียบ/หายอดรวม ────────
-// ✅ การ์ดอ่านง่ายทีละใบก็จริง แต่พอมี 30-40 ใบต้องเลื่อนยาวมากและเทียบข้ามใบไม่ได้เลย (เช่น อยากรู้ว่า
-// ใบไหนเงียบนานสุด/มูลค่าเท่าไหร่บ้าง) ตารางตอบโจทย์คนละแบบ — ให้สลับได้ตามงานที่กำลังทำอยู่
-const QuotationTable = ({ jobs, onOpen, onPreview }) => (
-  <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 3, overflowX: "auto" }}>
-    {/* ✅ minWidth กันตารางถูกบีบจนอ่านไม่ออกบนจอแคบ (ยังเลื่อนแนวนอนได้) แต่บนจอกว้างให้ยืดเต็มพื้นที่
-        ที่มี ไม่ใช่ค้างอยู่ที่ 1100px แล้วเหลือที่ว่างข้างๆ เปล่าๆ */}
-    <Table size="small" sx={{ minWidth: 1000, width: "100%" }}>
+// ─── ตาราง (จอใหญ่) ───────────────────────────────────────────────────────────
+const DesktopTable = ({ jobs, onOpen, onPreview }) => (
+  <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER}`, borderRadius: 3, overflowX: "auto", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
+    <Table size="small" sx={{ minWidth: 1080, "& th": { fontWeight: 800, color: TEXT_SUB, fontSize: "0.74rem", bgcolor: "#f8fafc", whiteSpace: "nowrap" } }}>
       <TableHead>
-        <TableRow sx={{ "& th": { fontWeight: 700, bgcolor: "#eff6ff", color: "#1e3a8a", whiteSpace: "nowrap" } }}>
+        <TableRow>
+          <TableCell>ลูกค้า / โครงการ</TableCell>
+          <TableCell>ใบเสนอราคา</TableCell>
+          <TableCell>ผู้รับผิดชอบ</TableCell>
+          <TableCell align="right">มูลค่า</TableCell>
+          <TableCell>ส่งลูกค้า / ยืนราคา</TableCell>
+          <TableCell>การติดตาม</TableCell>
           <TableCell>สถานะ</TableCell>
-          <TableCell>บริษัท / โครงการ</TableCell>
-          <TableCell>ประเภทงาน · ระบบ</TableCell>
-          <TableCell align="right">มูลค่าใบเสนอราคา (฿)</TableCell>
-          <TableCell align="center">ส่งลูกค้า</TableCell>
-          <TableCell align="center">ตามแล้ว</TableCell>
-          <TableCell align="center">เงียบมา</TableCell>
-          <TableCell align="center">ใบเสนอราคา</TableCell>
-          <TableCell align="center" />
+          <TableCell width={36} />
         </TableRow>
       </TableHead>
       <TableBody>
-        {jobs.map((job, idx) => {
-          const a = job.sessions[0];
-          const meta = STATUS_META[job.groupKey] || STATUS_META.not_sent;
-          const info = getFollowUpInfo(a);
+        {jobs.map((job) => {
+          const a = job.anchor;
+          const info = job.info;
           const files = a.quotationFiles || [];
           return (
-            <TableRow
-              key={a._id} hover
-              onClick={() => onOpen(job)}
-              sx={{ cursor: "pointer", bgcolor: idx % 2 ? alpha("#0f172a", 0.02) : "transparent" }}
-            >
+            <TableRow key={a._id} hover onClick={() => onOpen(job)} sx={{ cursor: "pointer", "& td": { py: 1.1, borderColor: BORDER } }}>
+              <TableCell sx={{ maxWidth: 300 }}>
+                <Typography noWrap sx={{ fontWeight: 800, fontSize: "0.86rem", color: TEXT_MAIN }}>{siteText(a)}</Typography>
+                <Typography noWrap sx={{ fontSize: "0.74rem", color: TEXT_SUB }}>{jobText(a) || "—"}{a.time ? ` · ครั้งที่ ${formatRoundLabel(a.time, a.visitCount)}` : ""}</Typography>
+              </TableCell>
               <TableCell sx={{ whiteSpace: "nowrap" }}>
-                <Chip size="small" icon={meta.icon} label={meta.label} sx={{
-                  height: 22, fontSize: "0.68rem", fontWeight: 700,
-                  bgcolor: alpha(meta.color, 0.12), color: meta.color, "& .MuiChip-icon": { color: meta.color },
-                }} />
+                <Stack direction="row" spacing={0.5} alignItems="center">
+                  <Typography sx={{ fontWeight: 700, fontSize: "0.84rem", color: a.quotationNo ? TEXT_MAIN : "#94a3b8" }}>{a.quotationNo || "ไม่มีเลขที่"}</Typography>
+                  {files.length > 0 && (
+                    <Tooltip title={`เปิดไฟล์ใบเสนอราคา${files.length > 1 ? ` (${files.length} ไฟล์)` : ""}`}>
+                      <IconButton size="small" onClick={(e) => { e.stopPropagation(); onPreview(files[files.length - 1].fileUrl, files[files.length - 1].fileName); }} sx={{ p: 0.25, color: "#475569" }}>
+                        <Description sx={{ fontSize: 17 }} />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                </Stack>
+                <Typography sx={{ fontSize: "0.72rem", color: TEXT_SUB }}>{a.quotationDate ? thaiDate(a.quotationDate) : `งาน ${formatEventDateRange(a)}`}</Typography>
               </TableCell>
-              <TableCell sx={{ maxWidth: 240 }}>
-                <Typography variant="caption" fontWeight={700} noWrap sx={{ display: "block" }}>
-                  {a.company || "-"}
-                </Typography>
-                <Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block" }}>
-                  {a.site || "-"}
-                </Typography>
-              </TableCell>
-              <TableCell sx={{ maxWidth: 180 }}>
-                <Typography variant="caption" noWrap sx={{ display: "block" }}>{a.title || "-"}</Typography>
-                <Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block" }}>{a.system || "-"}</Typography>
-              </TableCell>
+              <TableCell sx={{ maxWidth: 170 }}><Owner name={ownerOf(a)} size={28} /></TableCell>
               <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
                 {a.quotationAmount ? (
-                  <Typography variant="caption" fontWeight={800}>฿{Number(a.quotationAmount).toLocaleString()}</Typography>
-                ) : (
-                  <Typography variant="caption" sx={{ color: "#b45309", fontWeight: 700 }}>ยังไม่ระบุ</Typography>
-                )}
+                  <>
+                    <Typography sx={{ fontWeight: 800, fontSize: "0.9rem", color: TEXT_MAIN }}>{baht(a.quotationAmount)}</Typography>
+                    <Typography sx={{ fontSize: "0.68rem", color: TEXT_SUB }}>{a.quotationVatIncluded ? "รวม VAT" : "ก่อน VAT"}</Typography>
+                  </>
+                ) : <Typography sx={{ fontSize: "0.78rem", fontWeight: 600, color: "#94a3b8" }}>ยังไม่ระบุ</Typography>}
               </TableCell>
-              <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
-                <Typography variant="caption" color="text.secondary">
-                  {a.quotationSentAt ? formatThai(moment(a.quotationSentAt).locale("th"), "D MMM YY") : "-"}
-                </Typography>
-              </TableCell>
-              <TableCell align="center">
-                <Typography variant="caption" fontWeight={info?.followUpCount ? 700 : 400}
-                  color={info?.followUpCount ? "success.main" : "text.disabled"}>
-                  {info ? `${info.followUpCount} ครั้ง` : "-"}
-                </Typography>
-              </TableCell>
-              <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
-                {info ? (
-                  <Typography variant="caption" fontWeight={info.needsFollowUp ? 800 : 400}
-                    color={info.needsFollowUp ? "error.main" : "text.secondary"}>
-                    {info.daysSinceLastContact} วัน
+              <TableCell sx={{ whiteSpace: "nowrap" }}>
+                <Typography sx={{ fontSize: "0.8rem", color: a.quotationSentAt ? TEXT_MAIN : TEXT_SUB }}>{a.quotationSentAt ? thaiDate(a.quotationSentAt) : "ยังไม่ส่ง"}</Typography>
+                {a.quotationValidUntil && (
+                  <Typography sx={{ fontSize: "0.7rem", fontWeight: isExpired(a) ? 800 : 500, color: isExpired(a) ? "#dc2626" : TEXT_SUB }}>
+                    {isExpired(a) ? "หมดอายุ " : "ยืนราคาถึง "}{thaiDate(a.quotationValidUntil)}
                   </Typography>
-                ) : <Typography variant="caption" color="text.disabled">-</Typography>}
-              </TableCell>
-              <TableCell align="center">
-                {files.length > 0 ? (
-                  <Tooltip title={files[0].fileName || "เปิดใบเสนอราคา"}>
-                    <IconButton size="small" color="primary"
-                      onClick={(e) => { e.stopPropagation(); onPreview(files[0].fileUrl, files[0].fileName); }}>
-                      <Description sx={{ fontSize: 18 }} />
-                    </IconButton>
-                  </Tooltip>
-                ) : (
-                  <Typography variant="caption" color="text.disabled">ไม่มีไฟล์</Typography>
                 )}
               </TableCell>
-              <TableCell align="center">
-                <ChevronRight sx={{ color: "text.disabled", fontSize: 18 }} />
+              <TableCell sx={{ whiteSpace: "nowrap" }}>
+                {info ? (
+                  <>
+                    <DueChip info={info} />
+                    <Typography sx={{ fontSize: "0.7rem", color: TEXT_SUB }}>
+                      {info.followUpCount ? `ตามแล้ว ${info.followUpCount} ครั้ง` : "ยังไม่เคยตาม"} · เงียบ {info.daysSinceLastContact} วัน
+                    </Typography>
+                  </>
+                ) : a.quotationDecisionAt ? (
+                  <Typography sx={{ fontSize: "0.74rem", color: TEXT_SUB }}>ตอบกลับ {thaiDate(a.quotationDecisionAt)}{a.quotationPoNo ? ` · PO ${a.quotationPoNo}` : ""}</Typography>
+                ) : <Typography sx={{ fontSize: "0.74rem", color: "#cbd5e1" }}>—</Typography>}
               </TableCell>
+              <TableCell><StatusChip k={job.groupKey} /></TableCell>
+              <TableCell><ChevronRight sx={{ color: "#cbd5e1" }} /></TableCell>
             </TableRow>
           );
         })}
       </TableBody>
     </Table>
-  </TableContainer>
+  </Box>
 );
 
-// ─── ประวัติการติดตามลูกค้า — บันทึกได้ทั้งช่างและแอดมิน/manager (คนที่โทร/คุยกับลูกค้าจริงมักเป็น
-// ช่าง) ครั้งที่นับอัตโนมัติจากจำนวนรายการเดิม (server คำนวณจริง ฝั่งนี้แค่โชว์ผลลัพธ์ที่ได้กลับมา) ───
-const FollowUpSection = ({ job, onSubmit, onPreview }) => {
-  const anchor = job.sessions[0];
-  const followUps = anchor.quotationFollowUps || [];
-  const followUpInfo = getFollowUpInfo(anchor);
-  const [note, setNote] = useState("");
-  const [file, setFile] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
-  const inputRef = useRef();
-
-  const handleSubmit = async () => {
-    if (!note.trim() || submitting) return;
-    setSubmitting(true);
-    await onSubmit(job, note.trim(), file);
-    setNote("");
-    setFile(null);
-    setSubmitting(false);
-  };
-
+// ─── การ์ด (มือถือ) ───────────────────────────────────────────────────────────
+const MobileCard = ({ job, onOpen }) => {
+  const a = job.anchor;
+  const m = STATUS[job.groupKey] || STATUS.not_sent;
   return (
-    <Box>
-      <Typography variant="caption" fontWeight={700} color="text.secondary"
-        sx={{ textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 0.5, mb: 1 }}>
-        <History sx={{ fontSize: 14 }} /> ประวัติการติดตามลูกค้า{followUps.length > 0 && ` (${followUps.length})`}
-      </Typography>
-
-      {/* ✅ สรุปสถานะติดตามให้เห็นชัดในบรรทัดเดียว — ตามที่ผู้ใช้ขอ ("บันทึกผลแล้วให้แสดงให้ชัดเจน และ
-          นับไปอีก 7 วัน") เดิมต้องไล่อ่านรายการประวัติเองแล้วคำนวณในหัวว่าครบกำหนดหรือยัง */}
-      {followUpInfo && (
-        <Box sx={{
-          p: 1.25, mb: 1.5, borderRadius: 2,
-          bgcolor: alpha(followUpInfo.needsFollowUp ? "#ef4444" : "#10b981", 0.07),
-          border: "1px solid",
-          borderColor: alpha(followUpInfo.needsFollowUp ? "#ef4444" : "#10b981", 0.25),
-        }}>
-          <Typography variant="caption" fontWeight={700}
-            sx={{ display: "block", color: followUpInfo.needsFollowUp ? "#b91c1c" : "#047857" }}>
-            {followUpInfo.needsFollowUp
-              ? `⚠️ ถึงเวลาติดตาม — เงียบมา ${followUpInfo.daysSinceLastContact} วันแล้ว`
-              : followUpInfo.daysUntilDue > 0
-                ? `✅ ติดตามแล้ว — ครบกำหนดตามรอบถัดไปอีก ${followUpInfo.daysUntilDue} วัน`
-                : "⏰ ครบกำหนดติดตามรอบถัดไปวันนี้"}
-          </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25 }}>
-            {followUpInfo.lastContactIsFollowUp
-              ? `ติดตามล่าสุด ${formatThai(followUpInfo.lastContactAt.locale("th"), "D MMM YYYY")}`
-              : `ส่งใบเสนอราคา ${formatThai(followUpInfo.lastContactAt.locale("th"), "D MMM YYYY")}`}
-            {" · "}ครบกำหนด {formatThai(followUpInfo.dueAt.locale("th"), "D MMM YYYY")}
-            {followUpInfo.daysSinceSent !== followUpInfo.daysSinceLastContact &&
-              ` · ส่งไปแล้วรวม ${followUpInfo.daysSinceSent} วัน`}
-          </Typography>
+    <Box onClick={() => onOpen(job)} role="button" sx={{ p: 1.5, bgcolor: "#fff", border: `1px solid ${BORDER}`, borderLeft: `3px solid ${job.groupKey === "follow_up" ? m.color : "#cbd5e1"}`, borderRadius: 2.5, cursor: "pointer", "&:active": { bgcolor: "#f8fafc" } }}>
+      <Stack direction="row" spacing={1} alignItems="flex-start">
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography sx={{ fontWeight: 800, fontSize: "0.9rem", color: TEXT_MAIN, lineHeight: 1.35 }}>{siteText(a)}</Typography>
+          <Typography noWrap sx={{ fontSize: "0.76rem", color: TEXT_SUB }}>{jobText(a) || "—"}</Typography>
         </Box>
-      )}
-
-      {followUps.length > 0 && (
-        <Stack spacing={1} sx={{ mb: 1.5 }}>
-          {followUps.slice().reverse().map((f, i) => (
-            <Box key={f._id || i} sx={{ p: 1.25, borderRadius: 2, border: "1px solid", borderColor: "divider" }}>
-              <Stack direction="row" justifyContent="space-between" alignItems="center">
-                <Typography variant="caption" fontWeight={700} color="primary.main">ครั้งที่ {f.attemptNumber}</Typography>
-                <Typography variant="caption" color="text.secondary">{formatThai(moment(f.contactedAt).locale("th"), "DD MMM YYYY HH:mm")}</Typography>
-              </Stack>
-              {f.note && <Typography variant="body2" sx={{ mt: 0.5, whiteSpace: "pre-wrap" }}>{f.note}</Typography>}
-              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 0.5 }}>
-                <Typography variant="caption" color="text.secondary">โดย {f.userName}</Typography>
-                {f.evidenceFileUrl && (
-                  <Button size="small" startIcon={<AttachFile fontSize="small" />}
-                    onClick={() => onPreview(f.evidenceFileUrl, f.evidenceFileName)}
-                    sx={{ fontSize: "0.7rem", textTransform: "none", minWidth: "auto", p: 0.5 }}>
-                    ดูหลักฐาน
-                  </Button>
-                )}
-              </Stack>
-            </Box>
-          ))}
-        </Stack>
-      )}
-
-      <Stack spacing={1}>
-        <TextField multiline minRows={2} size="small" placeholder="บันทึกการติดตาม เช่น โทรหาลูกค้าแล้ว ลูกค้าบอกว่า..."
-          value={note} onChange={(e) => setNote(e.target.value)} />
-        <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
-          <input ref={inputRef} type="file" hidden onChange={(e) => setFile(e.target.files?.[0] || null)} />
-          <Button size="small" variant="outlined" color="inherit" startIcon={<AttachFile fontSize="small" />}
-            onClick={() => inputRef.current?.click()} sx={{ textTransform: "none", borderRadius: 2, fontSize: "0.72rem" }}>
-            {file ? file.name : "แนบหลักฐาน (ถ้ามี)"}
-          </Button>
-          {file && (
-            <IconButton size="small" onClick={() => setFile(null)}><Close fontSize="small" /></IconButton>
-          )}
-          <Box sx={{ flex: 1 }} />
-          <Button size="small" variant="contained" disabled={!note.trim() || submitting}
-            startIcon={<Send fontSize="small" />} onClick={handleSubmit}
-            sx={{ textTransform: "none", borderRadius: 2 }}>
-            บันทึกการติดตาม
-          </Button>
-        </Stack>
+        <Box sx={{ textAlign: "right", flexShrink: 0 }}>
+          <Typography sx={{ fontWeight: 900, fontSize: "0.92rem", color: a.quotationAmount ? TEXT_MAIN : "#94a3b8" }}>{a.quotationAmount ? baht(a.quotationAmount) : "ไม่ระบุมูลค่า"}</Typography>
+          <Typography sx={{ fontSize: "0.7rem", color: TEXT_SUB }}>{a.quotationNo || "ไม่มีเลขที่"}</Typography>
+        </Box>
+      </Stack>
+      <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1, pt: 1, borderTop: `1px solid ${BORDER}` }}>
+        <StatusChip k={job.groupKey} />
+        <Box sx={{ flex: 1, minWidth: 0 }}>{job.info ? <DueChip info={job.info} /> : null}</Box>
+        <Typography noWrap sx={{ fontSize: "0.74rem", color: TEXT_SUB, maxWidth: 120 }}>{ownerOf(a) || "ไม่ระบุ"}</Typography>
       </Stack>
     </Box>
   );
 };
 
-// ─── ป้ายสถานะ + ปุ่มเปลี่ยนสถานะ รวมเป็นปุ่มเดียว (admin/manager เท่านั้น) — เดิมแยกเป็นชิปสถานะ
-// (แสดงอย่างเดียว) กับปุ่ม "เปลี่ยนสถานะ" อีกอันแยกต่างหาก ทำให้ต้องมองสองจุด — ตอนนี้ตัวปุ่มเองแสดง
-// สถานะปัจจุบัน (สี/ไอคอน/ป้ายกำกับ) ไปด้วยในตัว กดแล้วเด้งเมนูเปลี่ยนได้เลย ไม่ต้องแยกกันสองอัน ───
-const StatusEditMenu = ({ meta, onSelect }) => {
-  const [anchorEl, setAnchorEl] = useState(null);
+// ─── กล่องยืนยันการตัดสินใจของลูกค้า (อนุมัติ = เลข PO · ปฏิเสธ = เหตุผลบังคับ · ส่ง = วันที่ส่ง) ─────
+const DecisionDialog = ({ mode, onClose, onConfirm, busy }) => {
+  const [date, setDate] = useState(moment().format("YYYY-MM-DD"));
+  const [po, setPo] = useState("");
+  const [note, setNote] = useState("");
+  useEffect(() => { if (mode) { setDate(moment().format("YYYY-MM-DD")); setPo(""); setNote(""); } }, [mode]);
+  if (!mode) return null;
+  const meta = {
+    send: { title: "บันทึกว่าส่งใบเสนอราคาให้ลูกค้าแล้ว", color: "#2563eb", btn: "บันทึกการส่ง", dateLabel: "วันที่ส่ง" },
+    resend: { title: "ส่งใบเสนอราคา (ฉบับแก้ไข) ให้ลูกค้าอีกครั้ง", color: "#7c3aed", btn: "บันทึกการส่งใหม่", dateLabel: "วันที่ส่ง" },
+    approve: { title: "ลูกค้าอนุมัติใบเสนอราคา", color: "#15803d", btn: "ยืนยันอนุมัติ", dateLabel: "วันที่ลูกค้าอนุมัติ" },
+    reject: { title: "ลูกค้าปฏิเสธใบเสนอราคา", color: "#b91c1c", btn: "ยืนยันปฏิเสธ", dateLabel: "วันที่ลูกค้าแจ้ง" },
+  }[mode];
+  const invalid = mode === "reject" && !note.trim();
   return (
-    <>
-      <Button variant="contained" disableElevation
-        startIcon={meta.icon} endIcon={<ExpandMore fontSize="small" />}
-        onClick={(e) => setAnchorEl(e.currentTarget)}
-        sx={{
-          textTransform: "none", borderRadius: 2.5, fontSize: "0.78rem", fontWeight: 700,
-          bgcolor: alpha(meta.color, 0.12), color: meta.color,
-          "&:hover": { bgcolor: alpha(meta.color, 0.2) },
-          "& .MuiButton-startIcon": { color: meta.color },
-        }}>
-        {meta.label}
-      </Button>
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}
-        PaperProps={{ sx: { borderRadius: 2, minWidth: 240 } }}>
-        {STATUS_ACTIONS.map((a) => (
-          <MenuItem key={a.action} onClick={() => { onSelect(a.action); setAnchorEl(null); }} sx={{ gap: 1, minHeight: 48 }}>
-            <ListItemIcon sx={{ color: a.color, minWidth: 28 }}>{a.icon}</ListItemIcon>
-            <ListItemText primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 600 }}>{a.label}</ListItemText>
-          </MenuItem>
-        ))}
-      </Menu>
-    </>
-  );
-};
-
-// ─── Dialog รายละเอียด/ดำเนินการ — เด้งขึ้นมาแทนการกางในหน้า (เต็มจอบนมือถือ) ───────────
-const QuotationDetailDialog = ({ job, currentUser, onClose, onAction, onAmountSave, onAddFollowUp,
-  onFileUpload, onDeleteFile, onPreview, uploadingState, isUploadingState, uploadProgressState }) => {
-  const theme = useTheme();
-  const fullScreen = useMediaQuery(theme.breakpoints.down("sm"));
-  const navigate = useNavigate();
-  const isAdminOrManager = can(currentUser, "editFinance");
-  // ✅ ช่างแก้ไขสถานะงานของตัวเองได้ด้วย (ไม่ใช่แค่ดู) — backend อนุญาตอยู่แล้ว (เจ้าของ/ผู้ได้รับ
-  // มอบหมายแก้ไข event ตัวเองได้เสมอ ดู PUT /:id) และ /quotations ก็ scope ให้ช่างเห็นแค่งานตัวเอง
-  // อยู่แล้วด้วย (getEventOp) เลยไม่ต้องกันเพิ่มฝั่งนี้ — ยกเว้นมูลค่าใบเสนอราคา (AmountEditor) ที่ยังเป็น
-  // สิทธิ์ admin/manager เท่านั้นเหมือนเดิม (ไม่ได้ถูกขอให้เปลี่ยน)
-  const canEditStatus = isAdminOrManager || isRole(currentUser, ...TECHNICIAN_ROLES);
-
-  if (!job) return null;
-  const anchor = job.sessions[0];
-  const groupKey = job.groupKey;
-  const meta = STATUS_META[groupKey] || STATUS_META.not_sent;
-
-  return (
-    <Dialog open={Boolean(job)} onClose={onClose} fullScreen={fullScreen} fullWidth maxWidth="sm"
-      PaperProps={{ sx: { borderRadius: fullScreen ? 0 : 4 } }}>
-      <Box sx={{ p: 2, borderBottom: "1px solid", borderColor: "divider" }}>
-        <Stack direction="row" alignItems="flex-start" gap={1}>
-          <Box minWidth={0} flex={1}>
-            <Typography fontWeight={800} fontSize="1rem" noWrap>
-              {anchor.company && anchor.site ? `${anchor.company} · ${anchor.site}` : (anchor.company || anchor.site || "ไม่ระบุโครงการ")}
-            </Typography>
-            {anchor.title && <Typography variant="body2" color="text.secondary" noWrap>{anchor.title}</Typography>}
-          </Box>
-          <IconButton onClick={onClose} size="small"><Close /></IconButton>
-        </Stack>
-        {/* ✅ เพิ่มระบบ/ครั้งที่/เลขเอกสาร ไว้ในหัว Dialog ด้วย (เดิมมีแค่โครงการ+ชื่องาน ไม่ครบเท่าการ์ด
-            สรุปในลิสต์) ใช้ InfoLine ตัวเดียวกับการ์ดสรุป ให้ดูเป็นชุดข้อมูลเดียวกันสม่ำเสมอทั้งหน้า */}
-        {(anchor.system || anchor.time || anchor.docNo) && (
-          <Stack direction="row" gap={2} flexWrap="wrap" sx={{ mt: 1 }}>
-            {anchor.system && <InfoLine icon="💻" label="ระบบ">{anchor.system}</InfoLine>}
-            {anchor.time && <InfoLine icon="🔢" label="ครั้งที่">{formatRoundLabel(anchor.time, anchor.visitCount)}</InfoLine>}
-            {anchor.docNo && <InfoLine icon="📄" label="เอกสาร">{anchor.docNo}</InfoLine>}
-          </Stack>
-        )}
-      </Box>
-
-      <DialogContent sx={{ p: 2 }}>
-        {/* ✅ ป้ายสถานะ + ปุ่มเปลี่ยนสถานะ รวมเป็นปุ่มเดียวแล้ว (ดู StatusEditMenu) ไม่ต้องแยกสองจุด */}
-        <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" sx={{ mb: 1.5 }}>
-          {canEditStatus ? (
-            <StatusEditMenu meta={meta} onSelect={(action) => onAction(job, action)} />
-          ) : (
-            <Chip size="small" icon={meta.icon} label={meta.label} sx={{
-              height: 26, fontSize: "0.75rem", fontWeight: 700,
-              bgcolor: alpha(meta.color, 0.12), color: meta.color, "& .MuiChip-icon": { color: meta.color },
-            }} />
+    <Dialog open onClose={busy ? undefined : onClose} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: 3 } }}>
+      <DialogTitle sx={{ fontWeight: 900, fontSize: "1rem", color: meta.color }}>{meta.title}</DialogTitle>
+      <DialogContent>
+        <Stack spacing={1.5} sx={{ pt: 0.5 }}>
+          <ThaiDatePicker label={meta.dateLabel} value={date} onChange={(v) => setDate(v || moment().format("YYYY-MM-DD"))} />
+          {mode === "approve" && <TextField size="small" label="เลขที่ PO / ใบสั่งซื้อของลูกค้า (ถ้ามี)" value={po} onChange={(e) => setPo(e.target.value)} inputProps={{ maxLength: 60 }} />}
+          {(mode === "approve" || mode === "reject") && (
+            <TextField size="small" multiline minRows={2} label={mode === "reject" ? "เหตุผลที่ลูกค้าปฏิเสธ *" : "หมายเหตุ (ถ้ามี)"} value={note}
+              onChange={(e) => setNote(e.target.value)} error={invalid && note !== ""} inputProps={{ maxLength: 500 }}
+              placeholder={mode === "reject" ? "เช่น ราคาสูงกว่าเจ้าอื่น / เลื่อนโครงการ / ใช้ผู้รับเหมาเดิม" : ""} />
           )}
         </Stack>
-
-        {/* ✅ ย้ายมูลค่าใบเสนอราคาออกจากมุมขวาของแถวสถานะ (เดิมเป็นตัวหนังสือจางๆ เบียดอยู่ท้ายแถว
-            มองข้ามได้ง่ายมาก) มาเป็นบล็อกของตัวเองใต้สถานะ — เป็นข้อมูลสำคัญที่ต้องกรอกเองทุกใบ
-            และเป็นตัวตั้งของยอดรวมในการ์ดสรุปด้านบนของหน้า จึงควรเห็นชัดตั้งแต่เปิดกล่องมา */}
-        <Box sx={{ mb: 1.5 }}>
-          {isAdminOrManager ? (
-            <AmountEditor value={anchor.quotationAmount} onSave={(v) => onAmountSave(job, v)} />
-          ) : (
-            <Box sx={{ p: 1.25, borderRadius: 2, border: "1px solid", borderColor: "divider" }}>
-              <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ display: "block", lineHeight: 1.2 }}>
-                มูลค่าใบเสนอราคา
-              </Typography>
-              <Typography fontWeight={800} fontSize="1rem" color={anchor.quotationAmount ? "text.primary" : "text.disabled"}>
-                {anchor.quotationAmount ? `฿${Number(anchor.quotationAmount).toLocaleString()}` : "ยังไม่ระบุ"}
-              </Typography>
-            </Box>
-          )}
-        </Box>
-
-        <Grid container spacing={2}>
-          <Grid item xs={12}>
-            <FileUploadSection
-              eventId={anchor._id} type="quotation" label="ใบเสนอราคา"
-              files={anchor.quotationFiles} applicable={anchor.quotationApplicable}
-              onUpload={onFileUpload} onDelete={onDeleteFile}
-              onPreview={onPreview}
-              uploading={isUploadingState.quotation && uploadingState.quotation === anchor._id}
-              progress={uploadProgressState.quotation}
-              currentUser={currentUser}
-            />
-          </Grid>
-
-          {/* ปุ่มดำเนินการตามสถานะปัจจุบัน — เปลี่ยนสถานะได้ทั้ง admin/manager และช่าง (เจ้าของงาน)
-              ส่วนมูลค่าใบเสนอราคายังเป็นสิทธิ์ admin/manager เท่านั้น (ดู AmountEditor ด้านบน) */}
-          {canEditStatus && (
-            <Grid item xs={12}>
-              <Stack direction="row" gap={1} flexWrap="wrap">
-                {groupKey === "not_sent" && (
-                  <Button size="small" variant="contained" startIcon={<Send fontSize="small" />}
-                    onClick={() => onAction(job, "send")} sx={{ textTransform: "none", borderRadius: 2 }}>
-                    ส่งใบเสนอราคาให้ลูกค้าแล้ว
-                  </Button>
-                )}
-                {/* ✅ "ลูกค้าขอแก้ไข" ตัดออกจากตัวเลือกแล้ว (ไม่มีใครใช้) — งานเก่าที่เคยถูกตั้งไว้เป็น
-                    สถานะนี้ (ก่อนตัดออก) ก็ใช้ปุ่มชุดเดียวกับ "รอลูกค้าตอบ" นี้ต่อได้เลย ไม่ต้องมี
-                    เส้นทางแยกอีกต่อไป */}
-                {(groupKey === "sent" || groupKey === "follow_up" || groupKey === "revising") && (
-                  <>
-                    <Button size="small" variant="contained" color="success" startIcon={<CheckCircle fontSize="small" />}
-                      onClick={() => onAction(job, "approve")} sx={{ textTransform: "none", borderRadius: 2 }}>
-                      ลูกค้าอนุมัติ
-                    </Button>
-                    <Button size="small" variant="outlined" color="error" startIcon={<Cancel fontSize="small" />}
-                      onClick={() => onAction(job, "reject")} sx={{ textTransform: "none", borderRadius: 2 }}>
-                      ลูกค้าปฏิเสธ
-                    </Button>
-                  </>
-                )}
-                {(groupKey === "approved" || groupKey === "rejected") && (anchor.quotationDecisionBy || anchor.quotationDecisionAt) && (
-                  <Typography variant="caption" color="text.secondary">
-                    {anchor.quotationDecisionBy ? `บันทึกโดย ${anchor.quotationDecisionBy}` : ""}
-                    {anchor.quotationDecisionAt ? ` · ${formatThai(moment(anchor.quotationDecisionAt).locale("th"), "DD MMM YYYY HH:mm")}` : ""}
-                  </Typography>
-                )}
-                {groupKey === "waiting_file" && (
-                  <Typography variant="caption" color="text.disabled">รอแนบไฟล์ใบเสนอราคาก่อน</Typography>
-                )}
-              </Stack>
-            </Grid>
-          )}
-
-          <Grid item xs={12}>
-            <Button size="small" fullWidth color="inherit" endIcon={<OpenInNew fontSize="small" />}
-              onClick={() => navigate(`/operation/${anchor._id}`)}
-              sx={{ textTransform: "none", fontSize: "0.75rem", justifyContent: "space-between", border: "1px dashed", borderColor: "divider", borderRadius: 2 }}>
-              เปิดดูในหน้าการดำเนินงาน
-            </Button>
-          </Grid>
-
-          <Grid item xs={12}>
-            <Divider sx={{ mb: 1.5 }} />
-            <FollowUpSection job={job} onSubmit={onAddFollowUp} onPreview={onPreview} />
-          </Grid>
-
-          <Grid item xs={12}>
-            <Divider sx={{ mb: 1.5 }} />
-            <Typography variant="caption" fontWeight={700} color="text.secondary"
-              sx={{ textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 0.5, mb: 1 }}>
-              <Chat sx={{ fontSize: 14 }} /> คุยกับช่าง{(anchor.comments || []).length > 0 && ` (${anchor.comments.length})`}
-            </Typography>
-            <CommentThread comments={anchor.comments}
-              onSend={(message) => onAction(job, "comment", { message })} myRole={currentUser} />
-          </Grid>
-        </Grid>
       </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onClose} disabled={busy} sx={{ textTransform: "none", color: TEXT_SUB }}>ยกเลิก</Button>
+        <Button variant="contained" disabled={busy || invalid} onClick={() => onConfirm({ date, po: po.trim(), note: note.trim() })}
+          sx={{ textTransform: "none", fontWeight: 800, boxShadow: "none", bgcolor: meta.color, "&:hover": { bgcolor: meta.color, filter: "brightness(.92)" } }}>
+          {busy ? "กำลังบันทึก..." : meta.btn}
+        </Button>
+      </DialogActions>
     </Dialog>
   );
 };
 
-// ─── ปุ่มเลือกแท็บสถานะ — กดแล้วเด้งเมนูขึ้นมาเลือก แทนแถว Chip เลื่อนแนวนอนเดิม (ล้นขอบจอ) ───
-const StatusFilterButton = ({ group, counts, onChange }) => {
-  const [anchorEl, setAnchorEl] = useState(null);
-  const meta = TAB_META[group];
-
+// ─── ข้อมูลใบเสนอราคา (ดู/แก้ไข) ─────────────────────────────────────────────
+const InfoSection = ({ a, isFinance, canEdit, onSave }) => {
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [f, setF] = useState({});
+  const start = () => {
+    setF({
+      quotationNo: a.quotationNo || "", quotationDate: ymd(a.quotationDate), quotationValidUntil: ymd(a.quotationValidUntil),
+      quotationAmount: a.quotationAmount ?? "", quotationVatIncluded: Boolean(a.quotationVatIncluded),
+      name: a.quotationContact?.name || a.contactName || "", phone: a.quotationContact?.phone || a.contactTel || "", email: a.quotationContact?.email || "",
+    });
+    setEditing(true);
+  };
+  const badRange = f.quotationDate && f.quotationValidUntil && f.quotationValidUntil < f.quotationDate;
+  const save = async () => {
+    setBusy(true);
+    const body = {
+      quotationNo: f.quotationNo, quotationDate: f.quotationDate || "", quotationValidUntil: f.quotationValidUntil || "",
+      quotationVatIncluded: f.quotationVatIncluded, quotationContact: { name: f.name, phone: f.phone, email: f.email },
+      ...(isFinance ? { quotationAmount: f.quotationAmount === "" ? null : Number(f.quotationAmount) } : {}),
+    };
+    const ok = await onSave(body);
+    setBusy(false);
+    if (ok) setEditing(false);
+  };
+  const contact = a.quotationContact || {};
   return (
-    <>
-      <Button
-        onClick={(e) => setAnchorEl(e.currentTarget)}
-        startIcon={meta.icon}
-        endIcon={<ExpandMore />}
-        sx={{
-          width: { xs: "100%", sm: "auto" }, justifyContent: "space-between",
-          textTransform: "none", fontWeight: 700, fontSize: "0.85rem",
-          borderRadius: 2.5, border: "1px solid", borderColor: alpha(meta.color, 0.4),
-          bgcolor: alpha(meta.color, 0.08), color: meta.color, px: 1.75, py: 1,
-          "&:hover": { bgcolor: alpha(meta.color, 0.15) },
-        }}
-      >
-        {meta.label} ({counts[group] || 0})
-      </Button>
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}
-        PaperProps={{ sx: { borderRadius: 2, minWidth: 220 } }}>
-        {TABS.map((key) => {
-          const m = TAB_META[key];
-          return (
-            <MenuItem key={key} selected={key === group}
-              onClick={() => { onChange(key); setAnchorEl(null); }}
-              sx={{ gap: 1, minHeight: 44 }}>
-              <ListItemIcon sx={{ color: m.color, minWidth: 28 }}>{m.icon}</ListItemIcon>
-              <ListItemText primaryTypographyProps={{ fontSize: "0.85rem" }}>{m.label}</ListItemText>
-              <Chip size="small" label={counts[key] || 0} sx={{
-                height: 20, minWidth: 20, fontWeight: 700, fontSize: "0.7rem",
-                bgcolor: alpha(m.color, 0.15), color: m.color,
-              }} />
-            </MenuItem>
-          );
-        })}
-      </Menu>
-    </>
+    <Section title="ข้อมูลใบเสนอราคา" icon={<RequestQuote />}
+      action={canEdit && !editing ? <Button size="small" startIcon={<Edit sx={{ fontSize: 16 }} />} onClick={start} sx={{ textTransform: "none", fontWeight: 700 }}>แก้ไข</Button> : null}>
+      {editing ? (
+        <Stack spacing={1.5}>
+          <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
+            <TextField size="small" label="เลขที่ใบเสนอราคา" value={f.quotationNo} onChange={(e) => setF((x) => ({ ...x, quotationNo: e.target.value }))} inputProps={{ maxLength: 60 }} placeholder="เช่น QT-2569-0123" />
+            <TextField size="small" label="มูลค่า (บาท)" type="number" value={f.quotationAmount} disabled={!isFinance}
+              helperText={isFinance ? "" : "แก้ได้เฉพาะฝ่ายบริหาร/การเงิน"}
+              onChange={(e) => setF((x) => ({ ...x, quotationAmount: e.target.value }))} inputProps={{ min: 0, step: "any" }} />
+            <ThaiDatePicker label="วันที่ใบเสนอราคา" value={f.quotationDate} onChange={(v) => setF((x) => ({ ...x, quotationDate: v || "" }))} />
+            <ThaiDatePicker label="ยืนราคาถึงวันที่" value={f.quotationValidUntil} onChange={(v) => setF((x) => ({ ...x, quotationValidUntil: v || "" }))}
+              helperText={badRange ? "ต้องไม่ก่อนวันที่ใบเสนอราคา" : ""} />
+          </Box>
+          <FormControlLabel sx={{ mt: -0.5 }} control={<Checkbox size="small" checked={f.quotationVatIncluded} disabled={!isFinance} onChange={(e) => setF((x) => ({ ...x, quotationVatIncluded: e.target.checked }))} />}
+            label={<Typography sx={{ fontSize: "0.85rem" }}>มูลค่านี้รวม VAT 7% แล้ว</Typography>} />
+          <Typography sx={{ fontSize: "0.78rem", fontWeight: 800, color: TEXT_SUB }}>ผู้ติดต่อฝั่งลูกค้า (คนที่รับใบเสนอราคา)</Typography>
+          <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr 1fr" } }}>
+            <TextField size="small" label="ชื่อ" value={f.name} onChange={(e) => setF((x) => ({ ...x, name: e.target.value }))} inputProps={{ maxLength: 120 }} />
+            <TextField size="small" label="โทรศัพท์" value={f.phone} onChange={(e) => setF((x) => ({ ...x, phone: e.target.value }))} inputProps={{ maxLength: 40, inputMode: "tel" }} />
+            <TextField size="small" label="อีเมล" value={f.email} onChange={(e) => setF((x) => ({ ...x, email: e.target.value }))} inputProps={{ maxLength: 120, inputMode: "email" }} />
+          </Box>
+          <Stack direction="row" spacing={1} justifyContent="flex-end">
+            <Button onClick={() => setEditing(false)} disabled={busy} sx={{ textTransform: "none", color: TEXT_SUB }}>ยกเลิก</Button>
+            <Button variant="contained" startIcon={<Save />} onClick={save} disabled={busy || badRange}
+              sx={{ textTransform: "none", fontWeight: 800, boxShadow: "none", bgcolor: TEXT_MAIN, "&:hover": { bgcolor: "#1e293b" } }}>
+              {busy ? "กำลังบันทึก..." : "บันทึก"}
+            </Button>
+          </Stack>
+        </Stack>
+      ) : (
+        <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)" } }}>
+          <KV label="เลขที่" color={a.quotationNo ? undefined : "#b45309"}>{a.quotationNo || "ยังไม่ระบุ"}</KV>
+          <KV label="วันที่ใบเสนอราคา">{a.quotationDate ? thaiDate(a.quotationDate) : ""}</KV>
+          <KV label="ยืนราคาถึง" color={isExpired(a) ? "#dc2626" : undefined}>{a.quotationValidUntil ? `${thaiDate(a.quotationValidUntil)}${isExpired(a) ? " (หมดอายุ)" : ""}` : ""}</KV>
+          <KV label="มูลค่า" color={a.quotationAmount ? undefined : "#b45309"}>
+            {a.quotationAmount ? `${baht(a.quotationAmount)} ${a.quotationVatIncluded ? "(รวม VAT)" : "(ก่อน VAT)"}` : "ยังไม่ระบุ"}
+          </KV>
+          <KV label="ผู้ติดต่อลูกค้า">{contact.name || a.contactName}</KV>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography sx={{ fontSize: "0.7rem", color: TEXT_SUB, fontWeight: 700 }}>ติดต่อ</Typography>
+            <Stack spacing={0.25}>
+              {(contact.phone || a.contactTel) ? (
+                <Typography component="a" href={`tel:${contact.phone || a.contactTel}`} onClick={(e) => e.stopPropagation()}
+                  sx={{ fontSize: "0.86rem", fontWeight: 700, color: "#2563eb", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 0.5 }}>
+                  <Phone sx={{ fontSize: 15 }} />{contact.phone || a.contactTel}
+                </Typography>
+              ) : null}
+              {contact.email ? (
+                <Typography component="a" href={`mailto:${contact.email}`} sx={{ fontSize: "0.82rem", fontWeight: 700, color: "#2563eb", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 0.5, wordBreak: "break-all" }}>
+                  <Email sx={{ fontSize: 15 }} />{contact.email}
+                </Typography>
+              ) : null}
+              {!contact.phone && !a.contactTel && !contact.email && <Typography sx={{ fontSize: "0.88rem", fontWeight: 700 }}>—</Typography>}
+            </Stack>
+          </Box>
+        </Box>
+      )}
+    </Section>
   );
 };
 
-// ─── ปุ่มเลือกช่าง (admin/manager เท่านั้น) — เห็นจำนวนใบเสนอราคาแยกรายคน กดแล้วเด้งเมนูขึ้นมาเลือก
-// เทียบ pattern เดียวกับ StatusFilterButton ด้านบน ───────────────────────────────────────
-const TechnicianFilterButton = ({ technicians, selectedId, counts, totalCount, onChange }) => {
-  const [anchorEl, setAnchorEl] = useState(null);
-  const selected = technicians.find((t) => t._id === selectedId);
-  const label = selected ? `${selected.fname || ""} ${selected.lname || ""}`.trim() || selected.username : "ทุกช่าง";
-  const count = selectedId ? (counts[selectedId] || 0) : totalCount;
-
+// ─── การติดตามลูกค้า ─────────────────────────────────────────────────────────
+const FollowUpSection = ({ a, onSubmit, onPreview, canFollow }) => {
+  const followUps = a.quotationFollowUps || [];
+  const info = getFollowUpInfo(a);
+  const [note, setNote] = useState("");
+  const [channel, setChannel] = useState("phone");
+  const [next, setNext] = useState("");
+  const [file, setFile] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const inputRef = useRef();
+  const submit = async () => {
+    if (!note.trim() || busy) return;
+    setBusy(true);
+    const ok = await onSubmit({ note: note.trim(), channel, nextFollowUpAt: next, file });
+    setBusy(false);
+    if (ok) { setNote(""); setFile(null); setNext(""); }
+  };
   return (
-    <>
-      <Button
-        onClick={(e) => setAnchorEl(e.currentTarget)}
-        startIcon={<Person sx={{ fontSize: 18 }} />}
-        endIcon={<ExpandMore />}
-        sx={{
-          width: { xs: "100%", sm: "auto" }, justifyContent: "space-between",
-          textTransform: "none", fontWeight: 700, fontSize: "0.85rem",
-          borderRadius: 2.5, border: "1px solid", borderColor: "divider",
-          color: "text.secondary", bgcolor: "background.paper", px: 1.75, py: 1,
-          "&:hover": { bgcolor: "action.hover" },
-        }}
-      >
-        {label} ({count})
-      </Button>
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}
-        PaperProps={{ sx: { borderRadius: 2, minWidth: 240, maxHeight: 360 } }}>
-        <MenuItem selected={!selectedId} onClick={() => { onChange(null); setAnchorEl(null); }} sx={{ gap: 1, minHeight: 40 }}>
-          <ListItemText primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 700 }}>ทุกช่าง</ListItemText>
-          <Chip size="small" label={totalCount} sx={{ height: 20, minWidth: 20, fontWeight: 700, fontSize: "0.7rem" }} />
-        </MenuItem>
-        <Divider />
-        {technicians.map((t) => (
-          <MenuItem key={t._id} selected={selectedId === t._id} onClick={() => { onChange(t._id); setAnchorEl(null); }} sx={{ gap: 1, minHeight: 40 }}>
-            <ListItemText primaryTypographyProps={{ fontSize: "0.85rem" }}>
-              {`${t.fname || ""} ${t.lname || ""}`.trim() || t.username}
-            </ListItemText>
-            <Chip size="small" label={counts[t._id] || 0} sx={{ height: 20, minWidth: 20, fontWeight: 700, fontSize: "0.7rem" }} />
-          </MenuItem>
-        ))}
-      </Menu>
-    </>
+    <Section title={`การติดตามลูกค้า${followUps.length ? ` (${followUps.length} ครั้ง)` : ""}`} icon={<EventRepeat />}>
+      {info && (
+        <Box sx={{ p: 1.25, mb: 1.5, borderRadius: 2, bgcolor: "#f8fafc", border: `1px solid ${BORDER}` }}>
+          <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: info.needsFollowUp ? "#b91c1c" : TEXT_MAIN }}>
+            {info.needsFollowUp ? `ถึงเวลาติดตาม — เลยกำหนดมา ${-info.daysUntilDue} วัน` : info.daysUntilDue === 0 ? "ครบกำหนดติดตามวันนี้" : `ติดตามครั้งถัดไปอีก ${info.daysUntilDue} วัน`}
+          </Typography>
+          <Typography sx={{ fontSize: "0.76rem", color: TEXT_SUB }}>
+            ติดต่อล่าสุด {thaiDate(info.lastContactAt)} ({info.lastContactIsFollowUp ? "ติดตาม" : "ส่งใบเสนอราคา"})
+            {" · "}กำหนดตาม {thaiDate(info.dueAt)}{info.scheduled ? " (นัดไว้)" : ` (ครบ ${WARNING_DAYS_AFTER_SENT} วัน)`}
+          </Typography>
+        </Box>
+      )}
+
+      {followUps.length > 0 && (
+        <Stack spacing={0} sx={{ mb: 1.5, position: "relative", pl: 2.25, "&::before": { content: '""', position: "absolute", left: 6, top: 6, bottom: 6, width: 2, bgcolor: BORDER } }}>
+          {followUps.slice().reverse().map((x, i) => (
+            <Box key={x._id || i} sx={{ position: "relative", pb: 1.25 }}>
+              <Box sx={{ position: "absolute", left: -20.5, top: 4, width: 11, height: 11, borderRadius: "50%", bgcolor: i === 0 ? "#2563eb" : "#cbd5e1", border: "2px solid #fff" }} />
+              <Stack direction="row" spacing={1} alignItems="baseline" sx={{ flexWrap: "wrap" }}>
+                <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: TEXT_MAIN }}>ครั้งที่ {x.attemptNumber}</Typography>
+                {x.channel && <Chip size="small" label={channelLabel(x.channel)} sx={{ height: 18, fontSize: "0.66rem", fontWeight: 700 }} />}
+                <Typography sx={{ fontSize: "0.72rem", color: TEXT_SUB }}>{formatThai(moment(x.contactedAt).locale("th"), "D MMM YY HH:mm")} · {x.userName}</Typography>
+              </Stack>
+              {x.note && <Typography sx={{ fontSize: "0.84rem", color: "#334155", whiteSpace: "pre-wrap", mt: 0.25 }}>{x.note}</Typography>}
+              {x.evidenceFileUrl && (
+                <Button size="small" startIcon={<AttachFile sx={{ fontSize: 15 }} />} onClick={() => onPreview(x.evidenceFileUrl, x.evidenceFileName)}
+                  sx={{ textTransform: "none", fontSize: "0.72rem", p: 0, minWidth: 0, mt: 0.25 }}>หลักฐาน</Button>
+              )}
+            </Box>
+          ))}
+        </Stack>
+      )}
+
+      {canFollow && ["sent", "revising"].includes(a.quotationStatus) ? (
+        <Stack spacing={1.25} sx={{ p: 1.25, borderRadius: 2, bgcolor: "#f8fafc", border: `1px dashed ${BORDER}` }}>
+          <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: TEXT_MAIN }}>บันทึกการติดตามครั้งที่ {followUps.length + 1}</Typography>
+          <Box sx={{ display: "grid", gap: 1.25, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
+            <SelectField label="ช่องทาง" value={channel} onChange={(e) => setChannel(e.target.value)}>
+              {CHANNELS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </SelectField>
+            <ThaiDatePicker label="นัดติดตามครั้งถัดไป (ถ้ามี)" value={next} onChange={(v) => setNext(v || "")} />
+          </Box>
+          <TextField multiline minRows={2} size="small" placeholder="ผลการติดตาม เช่น ลูกค้ารอเข้าที่ประชุมสิ้นเดือน / ขอส่วนลดเพิ่ม 5%"
+            value={note} onChange={(e) => setNote(e.target.value)} sx={{ bgcolor: "#fff" }} />
+          <Stack direction="row" spacing={1} alignItems="center">
+            <input ref={inputRef} type="file" hidden onChange={(e) => setFile(e.target.files?.[0] || null)} />
+            <Button size="small" variant="outlined" color="inherit" startIcon={<AttachFile sx={{ fontSize: 16 }} />} onClick={() => inputRef.current?.click()}
+              sx={{ textTransform: "none", borderRadius: 2, fontSize: "0.74rem", maxWidth: 220, borderColor: BORDER, bgcolor: "#fff" }}>
+              <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file ? file.name : "แนบหลักฐาน"}</Box>
+            </Button>
+            {file && <IconButton size="small" onClick={() => setFile(null)}><Close sx={{ fontSize: 16 }} /></IconButton>}
+            <Box sx={{ flex: 1 }} />
+            <Button variant="contained" disabled={!note.trim() || busy} startIcon={<Save sx={{ fontSize: 17 }} />} onClick={submit}
+              sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none" }}>
+              {busy ? "กำลังบันทึก..." : "บันทึก"}
+            </Button>
+          </Stack>
+        </Stack>
+      ) : !followUps.length ? (
+        <Typography sx={{ fontSize: "0.82rem", color: TEXT_SUB }}>
+          {a.quotationStatus ? "ไม่มีบันทึกการติดตาม" : "เริ่มบันทึกการติดตามได้หลังบันทึกว่าส่งใบเสนอราคาให้ลูกค้าแล้ว"}
+        </Typography>
+      ) : null}
+    </Section>
   );
 };
 
+// ─── กล่องรายละเอียด ─────────────────────────────────────────────────────────
+const STEPS = [["file", "แนบไฟล์"], ["send", "ส่งลูกค้า"], ["follow", "ติดตาม"], ["done", "ผลลัพธ์"]];
+const stepIndex = (k) => ({ waiting_file: 0, not_sent: 1, sent: 2, follow_up: 2, revising: 2, approved: 3, rejected: 3 }[k] ?? 0);
+
+const DetailDialog = ({
+  job, currentUser, onClose, onQuotation, onFollowUp, onComment, onFileUpload, onDeleteFile, onPreview, upload,
+}) => {
+  const fullScreen = useMediaQuery("(max-width:600px)");
+  const navigate = useNavigate();
+  const [decision, setDecision] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [showLog, setShowLog] = useState(false);
+  if (!job) return null;
+  const a = job.anchor;
+  const k = job.groupKey;
+  const m = STATUS[k] || STATUS.not_sent;
+  const isFinance = can(currentUser, "editFinance");
+  const step = stepIndex(k);
+  const log = (a.activityLog || []).filter((l) => String(l.action || "").startsWith("quotation")).slice().reverse();
+
+  const confirmDecision = async ({ date, po, note }) => {
+    setBusy(true);
+    const action = decision === "resend" ? "send" : decision;
+    const body = { action, ...(action === "send" ? { sentAt: date } : { decidedAt: date, poNo: po, decisionNote: note }) };
+    const ok = await onQuotation(job, body);
+    setBusy(false);
+    if (ok) setDecision(null);
+  };
+
+  const nextAction = (() => {
+    if (k === "waiting_file") return { text: "แนบไฟล์ใบเสนอราคาในส่วน \"ไฟล์ใบเสนอราคา\" ด้านล่างก่อน แล้วจึงบันทึกการส่งลูกค้า", buttons: [] };
+    if (k === "not_sent") return { text: "แนบไฟล์แล้ว — ส่งให้ลูกค้าแล้วกดบันทึก ระบบจะเริ่มนับวันติดตาม", buttons: [["send", "บันทึกว่าส่งลูกค้าแล้ว", "#2563eb", <Send key="i" />]] };
+    if (["sent", "follow_up", "revising"].includes(k)) {
+      return {
+        text: k === "follow_up" ? "ลูกค้าเงียบเกินกำหนด — ติดตามแล้วบันทึกผลในส่วน \"การติดตามลูกค้า\" หรือบันทึกผลการตัดสินใจ" : "รอลูกค้าตัดสินใจ — บันทึกผลเมื่อได้คำตอบ",
+        buttons: [
+          ["approve", "ลูกค้าอนุมัติ", "#15803d", <CheckCircle key="i" />],
+          ["reject", "ลูกค้าปฏิเสธ", "#b91c1c", <Cancel key="i" />],
+          ["resend", "ส่งฉบับแก้ไข", "#7c3aed", <Autorenew key="i" />],
+        ],
+      };
+    }
+    return null;
+  })();
+
+  return (
+    <Dialog open onClose={onClose} fullScreen={fullScreen} fullWidth maxWidth="md" PaperProps={{ sx: { borderRadius: fullScreen ? 0 : 3, bgcolor: "#f8fafc" } }}>
+      {/* หัว */}
+      <Box sx={{ px: { xs: 2, sm: 2.5 }, pt: 2, pb: 1.5, bgcolor: "#fff", borderBottom: `1px solid ${BORDER}` }}>
+        <Stack direction="row" spacing={1.5} alignItems="flex-start">
+          <Box sx={{ width: 40, height: 40, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#f1f5f9", color: "#334155" }}>
+            <RequestQuote />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: "wrap", rowGap: 0.5 }}>
+              <StatusChip k={k} size="medium" />
+              {a.quotationNo && <Typography sx={{ fontSize: "0.82rem", fontWeight: 800, color: TEXT_SUB }}>{a.quotationNo}</Typography>}
+            </Stack>
+            <Typography sx={{ fontWeight: 900, fontSize: "1.05rem", color: TEXT_MAIN, mt: 0.5, lineHeight: 1.35 }}>{siteText(a)}</Typography>
+            <Typography sx={{ fontSize: "0.8rem", color: TEXT_SUB }}>
+              {[jobText(a), a.time ? `ครั้งที่ ${formatRoundLabel(a.time, a.visitCount)}` : "", `งาน ${formatEventDateRange(a)}`, a.docNo ? `เอกสาร ${a.docNo}` : ""].filter(Boolean).join(" · ")}
+            </Typography>
+          </Box>
+          <Box sx={{ textAlign: "right", display: { xs: "none", sm: "block" } }}>
+            <Typography sx={{ fontSize: "0.72rem", color: TEXT_SUB, fontWeight: 700 }}>มูลค่า</Typography>
+            <Typography sx={{ fontWeight: 900, fontSize: "1.2rem", color: a.quotationAmount ? TEXT_MAIN : "#b45309" }}>{a.quotationAmount ? baht(a.quotationAmount) : "ยังไม่ระบุ"}</Typography>
+          </Box>
+          <IconButton onClick={onClose} size="small" aria-label="ปิด"><Close /></IconButton>
+        </Stack>
+        {/* ขั้นตอน */}
+        <Stack direction="row" spacing={0.5} sx={{ mt: 1.5 }}>
+          {STEPS.map(([key, label], i) => {
+            const done = i < step || (i === 3 && step === 3);
+            const cur = i === step && step < 3;
+            const color = i === 3 && step === 3 ? m.color : done ? "#15803d" : cur ? m.color : "#cbd5e1";
+            return (
+              <Box key={key} sx={{ flex: 1, minWidth: 0 }}>
+                <Box sx={{ height: 4, borderRadius: 2, bgcolor: done || cur ? color : "#e2e8f0" }} />
+                <Typography noWrap sx={{ fontSize: "0.7rem", fontWeight: cur || done ? 800 : 600, color: done || cur ? color : "#94a3b8", mt: 0.4 }}>
+                  {i === 3 && step === 3 ? m.label : label}
+                </Typography>
+              </Box>
+            );
+          })}
+        </Stack>
+      </Box>
+
+      <DialogContent sx={{ px: { xs: 1.5, sm: 2.5 }, py: 2 }}>
+        <Stack spacing={1.75}>
+          {/* สิ่งที่ต้องทำต่อ */}
+          {nextAction && (
+            <Box sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${BORDER}`, borderLeft: `4px solid ${m.color}` }}>
+              <Typography sx={{ fontSize: "0.86rem", fontWeight: 800, color: TEXT_MAIN }}>สิ่งที่ต้องทำต่อ</Typography>
+              <Typography sx={{ fontSize: "0.8rem", color: "#334155", mt: 0.25 }}>{nextAction.text}</Typography>
+              {nextAction.buttons.length > 0 && (
+                <Stack direction="row" spacing={1} sx={{ mt: 1.25, flexWrap: "wrap", rowGap: 1 }}>
+                  {nextAction.buttons.map(([key, label, color, icon], i) => (
+                    <Button key={key} size="small" variant={i === 0 ? "contained" : "outlined"} startIcon={icon} onClick={() => setDecision(key)}
+                      sx={{
+                        textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none",
+                        ...(i === 0 ? { bgcolor: color, "&:hover": { bgcolor: color, filter: "brightness(.92)", boxShadow: "none" } } : { color: "#334155", borderColor: BORDER, bgcolor: "#fff", "& .MuiButton-startIcon": { color } }),
+                      }}>{label}</Button>
+                  ))}
+                </Stack>
+              )}
+            </Box>
+          )}
+          {/* ผลการตัดสินใจ */}
+          {["approved", "rejected"].includes(k) && (
+            <Box sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${BORDER}`, borderLeft: `4px solid ${m.color}` }}>
+              <Stack direction="row" spacing={1} alignItems="flex-start">
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography sx={{ fontSize: "0.88rem", fontWeight: 900, color: TEXT_MAIN }}>
+                    {k === "approved" ? "ลูกค้าอนุมัติใบเสนอราคา" : "ลูกค้าปฏิเสธใบเสนอราคา"}
+                    {a.quotationPoNo ? ` · PO ${a.quotationPoNo}` : ""}
+                  </Typography>
+                  {a.quotationDecisionNote && <Typography sx={{ fontSize: "0.82rem", color: "#334155", mt: 0.25 }}>{k === "rejected" ? "เหตุผล: " : ""}{a.quotationDecisionNote}</Typography>}
+                  <Typography sx={{ fontSize: "0.74rem", color: TEXT_SUB, mt: 0.25 }}>
+                    {a.quotationDecisionAt ? thaiDate(a.quotationDecisionAt) : ""}{a.quotationDecisionBy ? ` · บันทึกโดย ${a.quotationDecisionBy}` : ""}
+                    {a.quotationSentAt ? ` · ส่งลูกค้า ${thaiDate(a.quotationSentAt)}` : ""}
+                  </Typography>
+                </Box>
+                {isFinance && (
+                  <Button size="small" startIcon={<Undo sx={{ fontSize: 16 }} />} onClick={async () => { setBusy(true); await onQuotation(job, { action: "reset" }); setBusy(false); }} disabled={busy}
+                    sx={{ textTransform: "none", fontWeight: 700, color: TEXT_SUB, flexShrink: 0 }}>ย้อนสถานะ</Button>
+                )}
+              </Stack>
+            </Box>
+          )}
+
+          <InfoSection a={a} isFinance={isFinance} canEdit onSave={(body) => onQuotation(job, body)} />
+
+          <Section title="ไฟล์ใบเสนอราคา" icon={<Description />}>
+            <FileUploadSection
+              eventId={a._id} type="quotation" label="ใบเสนอราคา"
+              files={a.quotationFiles} applicable={a.quotationApplicable}
+              onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
+              uploading={upload.busy && upload.eventId === a._id} progress={upload.progress} currentUser={currentUser}
+            />
+          </Section>
+
+          <FollowUpSection a={a} canFollow onPreview={onPreview} onSubmit={(payload) => onFollowUp(job, payload)} />
+
+          <Section title={`คุยกับช่าง${(a.comments || []).length ? ` (${a.comments.length})` : ""}`} icon={<Chat />}>
+            <CommentThread comments={a.comments} onSend={(message) => onComment(job, message)} myRole={currentUser} />
+          </Section>
+
+          <Section title="ประวัติใบเสนอราคา" icon={<History />}
+            action={log.length > 3 ? <Button size="small" endIcon={<ExpandMore sx={{ transform: showLog ? "rotate(180deg)" : "none" }} />} onClick={() => setShowLog((v) => !v)} sx={{ textTransform: "none", fontWeight: 700 }}>{showLog ? "ย่อ" : `ทั้งหมด ${log.length}`}</Button> : null}>
+            {log.length ? (
+              <Stack spacing={0.75}>
+                {log.slice(0, 3).map((l, i) => <LogRow key={i} l={l} />)}
+                <Collapse in={showLog} unmountOnExit><Stack spacing={0.75}>{log.slice(3).map((l, i) => <LogRow key={i} l={l} />)}</Stack></Collapse>
+              </Stack>
+            ) : <Typography sx={{ fontSize: "0.82rem", color: TEXT_SUB }}>ยังไม่มีประวัติ</Typography>}
+          </Section>
+
+          <Button fullWidth endIcon={<OpenInNew sx={{ fontSize: 17 }} />} onClick={() => navigate(`/operation/${a._id}`)}
+            sx={{ textTransform: "none", justifyContent: "space-between", border: `1px dashed ${BORDER}`, borderRadius: 2, color: TEXT_SUB, bgcolor: "#fff" }}>
+            เปิดงานนี้ในหน้าการดำเนินงาน
+          </Button>
+        </Stack>
+      </DialogContent>
+      <DecisionDialog mode={decision} busy={busy} onClose={() => setDecision(null)} onConfirm={confirmDecision} />
+    </Dialog>
+  );
+};
+
+const LogRow = ({ l }) => (
+  <Stack direction="row" spacing={1} alignItems="baseline">
+    <Typography sx={{ fontSize: "0.72rem", color: TEXT_SUB, whiteSpace: "nowrap", minWidth: 96 }}>{formatThai(moment(l.timestamp).locale("th"), "D MMM YY HH:mm")}</Typography>
+    <Typography sx={{ fontSize: "0.8rem", color: "#334155", minWidth: 0 }}>{l.detail}{l.userName ? <Box component="span" sx={{ color: TEXT_SUB }}> — {l.userName}</Box> : null}</Typography>
+  </Stack>
+);
+
+// ═════════════════════════════════════════════════════════════════════════════
 export default function QuotationTracking() {
   const { userData } = useAuth();
-  const role = userData?.role?.toLowerCase();
-  const isAdminOrManager = can(userData, "editFinance");
+  const isDesktop = useMediaQuery("(min-width:900px)");
   const canAccess = can(userData, "viewQuotations");
-  // ✅ deep-link จาก Dashboard (กล่องแจ้งเตือน "ใบเสนอราคาที่ต้องติดตามด่วน") — เปิด Dialog
-  // รายละเอียดงานนั้นให้อัตโนมัติผ่าน ?jobId=<eventId> แทนที่จะให้ผู้ใช้ไล่หาเองในรายการ
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [events, setEvents] = useState([]);
-  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState(null);
   const [search, setSearch] = useState("");
-  const [group, setGroup] = useState("pending");
-  const [selectedTechId, setSelectedTechId] = useState(null);
-  // ✅ perf: เดิมไม่แบ่งหน้าเลย render ทุกงานที่ผ่านตัวกรองพร้อมกันทั้งหมด ยิ่งงานสะสมเยอะยิ่งหน่วง
-  // (เทียบ pattern เดียวกับหน้า Operation ที่แบ่งหน้าอยู่แล้ว) — หน้าละ 10 งาน
+  const [status, setStatus] = useState("open");
+  const [owner, setOwner] = useState("all");
+  const [period, setPeriod] = useState("all");
   const [page, setPage] = useState(1);
-  // ✅ สลับมุมมองการ์ด/ตาราง — จำค่าไว้ข้ามการเปิดหน้า เพราะแต่ละคนถนัดคนละแบบและมักใช้แบบเดิมตลอด
-  const [viewMode, setViewMode] = useState(() => {
-    try { return localStorage.getItem("quotations.viewMode") === "table" ? "table" : "card"; }
-    catch { return "card"; }
-  });
-  useEffect(() => {
-    try { localStorage.setItem("quotations.viewMode", viewMode); } catch {}
-  }, [viewMode]);
   const [exporting, setExporting] = useState(false);
-  const QUOTATIONS_PAGE_SIZE = 10;
-  const [detailJob, setDetailJob] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
-  const [previewFileName, setPreviewFileName] = useState("");
+  const [detailId, setDetailId] = useState("");
+  const [preview, setPreview] = useState({ url: null, name: "" });
   const [snackbar, setSnackbar] = useState({ open: false, msg: "", severity: "success" });
+  const [upload, setUpload] = useState({ busy: false, eventId: null, progress: 0 });
+  const topRef = useRef(null);
 
-  const [uploadingState, setUploadingState] = useState({ quotation: null });
-  const [uploadProgressState, setUploadProgressState] = useState({ quotation: 0 });
-  const [isUploadingState, setIsUploadingState] = useState({ quotation: false });
+  const toast = (msg, severity = "success") => setSnackbar({ open: true, msg, severity });
+  const errMsg = (err, fallback) => err?.response?.data?.message || err?.response?.data?.err || err?.message || fallback;
 
   const fetchJobs = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      // ⚠️ detail = ขอ activityLog มาด้วย — หน้านี้บันทึกกิจกรรมต่อท้ายตอนอัปเดตใบเสนอราคา
-      //    (ดู UpdateEvent ด้านล่าง) ถ้าไม่ขอ ประวัติเดิมจะถูกเขียนทับหาย
+      // ⚠️ detail = ขอ activityLog มาด้วย (ประวัติใบเสนอราคาในกล่องรายละเอียด)
       const res = await EventService.getEventOp({ detail: true });
       setEvents(res?.userEvents || []);
       setLastRefreshed(new Date());
-    } catch (err) {
-      console.error(err);
-      if (!silent) setSnackbar({ open: true, msg: "โหลดรายการไม่สำเร็จ", severity: "error" });
+    } catch {
+      if (!silent) toast("โหลดรายการไม่สำเร็จ", "error");
     } finally {
       if (!silent) setLoading(false);
     }
   }, []);
-
   useEffect(() => { if (canAccess) fetchJobs(); }, [fetchJobs, canAccess]);
+  useRealtime("events", () => fetchJobs(true), { enabled: Boolean(canAccess) });
 
-  // ✅ เรียลไทม์: สถานะใบเสนอราคา/งานเปลี่ยน → รายการติดตามอัปเดตทันที
-  useRealtime("events", () => { fetchJobs(true); }, { enabled: Boolean(canAccess) });
-
-  useEffect(() => {
-    if (!canAccess) return;
-    const interval = setInterval(() => fetchJobs(true), 30000);
-    return () => clearInterval(interval);
-  }, [fetchJobs, canAccess]);
-
-  // ✅ ตัวกรอง "แยกตามช่าง" เป็นสิทธิ์ admin/manager เท่านั้น — ช่างไม่ต้องโหลดรายชื่อผู้ใช้ทั้งหมด
-  useEffect(() => {
-    if (!isAdminOrManager) return;
-    (async () => {
-      try {
-        const res = await AuthService.getAllUserData();
-        setUsers(res?.allUser || []);
-      } catch (err) {
-        console.error(err);
-      }
-    })();
-  }, [isAdminOrManager]);
-
-  // ✅ งานที่เข้าหลายวันไม่ติดกัน (jobGroupId เดียวกัน) รวมเป็น "1 งาน" — เอกสาร/สถานะใบเสนอราคา
-  // ยึดจากวันล่าสุดของกลุ่มเสมอ (sessions[0] หลังเรียง desc) เทียบ pattern เดียวกับ JobGroupBlock
-  // ในหน้า Operation ที่ยึดเอกสารไว้ที่วันล่าสุดเป็นจุดเดียวอยู่แล้ว
-  const quotationJobs = useMemo(() => {
+  // งานหลายวัน (jobGroupId เดียวกัน) = ใบเสนอราคาใบเดียว — ยึดวันล่าสุดของกลุ่มเป็นตัวแทน
+  const jobs = useMemo(() => {
     const map = new Map();
     events.forEach((ev) => {
       const key = getOverdueGroupKey(ev);
@@ -888,471 +692,276 @@ export default function QuotationTracking() {
       map.get(key).push(ev);
     });
     return [...map.values()]
-      .map((sessions) => sessions.slice().sort((a, b) => new Date(b.start) - new Date(a.start)))
-      .map((sessions) => ({ sessions, groupKey: resolveQuotationGroup(sessions[0]) }))
-      .filter((job) => job.groupKey !== "");
+      .map((sessions) => sessions.slice().sort((x, y) => new Date(y.start) - new Date(x.start)))
+      .map((sessions) => {
+        const anchor = sessions[0];
+        return { sessions, anchor, groupKey: resolveQuotationGroup(anchor), info: getFollowUpInfo(anchor) };
+      })
+      .filter((j) => j.groupKey !== "");
   }, [events]);
 
-  // ✅ Dialog รายละเอียดถือ job object ที่ snapshot ไว้ตอนเปิด — พอ events รีเฟรชใหม่ (เช่นทุก 30s
-  // หรือหลังกดบันทึก) ต้องหา job ตัวเดียวกันตัวล่าสุดมาแทน ไม่งั้น Dialog จะค้างข้อมูลเก่าไม่อัปเดต
-  useEffect(() => {
-    if (!detailJob) return;
-    const anchorId = detailJob.sessions[0]._id;
-    const updated = quotationJobs.find((j) => j.sessions.some((s) => s._id === anchorId));
-    if (updated) setDetailJob(updated);
-  }, [quotationJobs]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ✅ เปิด Dialog อัตโนมัติเมื่อมาจาก deep-link ?jobId= (Dashboard) — รอจน quotationJobs โหลดเสร็จ
-  // ก่อนค่อยหา แล้วลบ query param ทิ้งทันทีไม่ให้เปิดซ้ำเวลาผู้ใช้ปิด Dialog เองแล้ว events รีเฟรชใหม่
+  // deep-link ?jobId= (แจ้งเตือน/Dashboard) → เปิดใบนั้นเลย
   useEffect(() => {
     const jobId = searchParams.get("jobId");
-    if (!jobId || quotationJobs.length === 0) return;
-    const target = quotationJobs.find((j) => j.sessions.some((s) => s._id === jobId));
-    if (target) setDetailJob(target);
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.delete("jobId");
-      return next;
-    }, { replace: true });
-  }, [quotationJobs, searchParams, setSearchParams]);
+    if (!jobId || !jobs.length) return;
+    const target = jobs.find((j) => j.sessions.some((s) => s._id === jobId));
+    if (target) setDetailId(target.anchor._id);
+    setSearchParams((prev) => { const next = new URLSearchParams(prev); next.delete("jobId"); return next; }, { replace: true });
+  }, [jobs, searchParams, setSearchParams]);
+  const detailJob = useMemo(() => jobs.find((j) => j.sessions.some((s) => s._id === detailId)) || null, [jobs, detailId]);
 
-  // ✅ หาว่างานนี้เป็นของช่างคนไหน (ใช้ util กลางเดียวกับ TeamWorkload.js) — เฉพาะ admin/manager
-  // ที่โหลดรายชื่อผู้ใช้ไว้แล้ว (technician ไม่ได้โหลด users จึงได้ techId ว่างเปล่าเสมอ ซึ่งไม่มีผล
-  // เพราะ selectedTechId ก็เป็น null ตลอดสำหรับ role นี้อยู่แล้ว — ดูตัวกรองด้านล่าง)
-  const technicians = useMemo(() => users.filter((u) => isRole(u, ...TECHNICIAN_ROLES)), [users]);
+  // ── ตัวกรอง ──
+  const inPeriod = useCallback((a) => {
+    if (period === "all") return true;
+    const d = moment(refDateOf(a));
+    if (period === "month") return d.isSameOrAfter(moment().startOf("month"));
+    if (period === "3m") return d.isSameOrAfter(moment().subtract(2, "months").startOf("month"));
+    return d.isSameOrAfter(moment().startOf("year"));
+  }, [period]);
+  const matchQ = useCallback((a) => {
+    const q = search.trim().toLowerCase();
+    return !q || [a.company, a.site, a.title, a.system, a.docNo, a.quotationNo, a.quotationPoNo, ownerOf(a), a.quotationContact?.name]
+      .some((v) => String(v || "").toLowerCase().includes(q));
+  }, [search]);
+  const scoped = useMemo(() => jobs.filter((j) => matchQ(j.anchor) && inPeriod(j.anchor)), [jobs, matchQ, inPeriod]);
+  const owners = useMemo(() => {
+    const m = new Map();
+    scoped.forEach((j) => { const n = ownerOf(j.anchor) || "ไม่ระบุ"; m.set(n, (m.get(n) || 0) + 1); });
+    return [...m].sort((x, y) => y[1] - x[1]);
+  }, [scoped]);
+  const base = useMemo(() => scoped.filter((j) => owner === "all" || (ownerOf(j.anchor) || "ไม่ระบุ") === owner), [scoped, owner]);
 
-  const jobsWithTech = useMemo(() => {
-    const userById = new Map(users.map((u) => [u._id?.toString(), u]));
-    const userByFname = new Map(users.map((u) => [u.fname, u]));
-    return quotationJobs.map((job) => ({
-      ...job,
-      techId: resolveAssignedTechnician(job.sessions, userById, userByFname)?._id?.toString() || null,
-    }));
-  }, [quotationJobs, users]);
-
-  const technicianCounts = useMemo(() => {
-    const c = {};
-    jobsWithTech.forEach((job) => { if (job.techId) c[job.techId] = (c[job.techId] || 0) + 1; });
-    return c;
-  }, [jobsWithTech]);
-
-  const techFilteredJobs = useMemo(
-    () => (selectedTechId ? jobsWithTech.filter((j) => j.techId === selectedTechId) : jobsWithTech),
-    [jobsWithTech, selectedTechId],
-  );
-
-  // ✅ นับแบบละเอียด (7 สถานะย่อยจริง) ไว้ใช้กับการ์ดสถิติด้านบน — แยกจาก tabCounts ที่รวมกลุ่มแล้ว
   const counts = useMemo(() => {
-    const c = { waiting_file: 0, not_sent: 0, sent: 0, follow_up: 0, revising: 0, approved: 0, rejected: 0 };
-    techFilteredJobs.forEach((job) => { c[job.groupKey] = (c[job.groupKey] || 0) + 1; });
+    const c = { all: base.length, open: 0, incomplete: 0 };
+    base.forEach((j) => { c[j.groupKey] = (c[j.groupKey] || 0) + 1; if (OPEN.includes(j.groupKey)) c.open += 1; if (missingInfo(j.anchor)) c.incomplete += 1; });
     return c;
-  }, [techFilteredJobs]);
+  }, [base]);
+  const stats = useMemo(() => {
+    const sum = (list) => list.reduce((s, j) => s + (Number(j.anchor.quotationAmount) || 0), 0);
+    const pending = base.filter((j) => ["sent", "follow_up", "revising"].includes(j.groupKey));
+    const approved = base.filter((j) => j.groupKey === "approved");
+    const rejected = base.filter((j) => j.groupKey === "rejected");
+    const decided = approved.length + rejected.length;
+    return {
+      pendingValue: sum(pending), pendingCount: pending.length,
+      approvedValue: sum(approved), approvedCount: approved.length,
+      winRate: decided ? Math.round((approved.length / decided) * 100) : null, decided,
+      urgentValue: sum(base.filter((j) => j.groupKey === "follow_up")),
+    };
+  }, [base]);
 
-  // ✅ นับตามกลุ่มแท็บที่รวมแล้ว (4 กลุ่ม) ไว้ใช้กับปุ่มกรองสถานะ
-  const tabCounts = useMemo(() => {
-    const c = { pending: 0, approved: 0, rejected: 0 };
-    techFilteredJobs.forEach((job) => {
-      const t = TAB_GROUP_MAP[job.groupKey];
-      if (t) c[t] = (c[t] || 0) + 1;
-    });
-    return c;
-  }, [techFilteredJobs]);
+  const visible = useMemo(() => {
+    let list = base;
+    if (status === "open") list = base.filter((j) => OPEN.includes(j.groupKey));
+    else if (status === "incomplete") list = base.filter((j) => missingInfo(j.anchor));
+    else if (status !== "all") list = base.filter((j) => j.groupKey === status);
+    // เรียง: ขั้นที่ต้องจัดการก่อน → ครบกำหนดติดตามใกล้สุด → ใหม่สุด
+    return list.slice().sort((x, y) => (STATUS_ORDER.indexOf(x.groupKey) - STATUS_ORDER.indexOf(y.groupKey))
+      || ((x.info?.daysUntilDue ?? 999) - (y.info?.daysUntilDue ?? 999))
+      || (new Date(refDateOf(y.anchor)) - new Date(refDateOf(x.anchor))));
+  }, [base, status]);
+  useEffect(() => { setPage(1); }, [status, owner, period, search]);
+  const pageCount = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+  const cur = Math.min(page, pageCount);
+  const pageRows = visible.slice((cur - 1) * PAGE_SIZE, cur * PAGE_SIZE);
 
-  // ✅ ยอดรวมมูลค่าใบเสนอราคาที่ลูกค้าอนุมัติแล้ว — พร้อมนับใบที่ "ยังไม่กรอกมูลค่า" แยกไว้ด้วย
-  // ⚠️ มูลค่าใบเสนอราคาต้องกรอกเองทุกใบ (ไม่ได้ดึงจากราคางานตามสัญญาให้อัตโนมัติ) ใบที่ยังไม่กรอกจึงถูก
-  // นับเป็น 0 ในยอดรวม — เดิมไม่มีอะไรบอกเลย ยอดรวมจึงต่ำกว่าความจริงแบบเงียบๆ และไม่มีใครรู้ว่าขาดกี่ใบ
-  const approvedStats = useMemo(() => {
-    const approved = techFilteredJobs.filter((job) => job.groupKey === "approved");
-    let total = 0;
-    let missing = 0;
-    approved.forEach((job) => {
-      const amount = Number(job.sessions[0].quotationAmount) || 0;
-      if (amount > 0) total += amount;
-      else missing += 1;
-    });
-    return { total, missing };
-  }, [techFilteredJobs]);
-  const approvedValue = approvedStats.total;
-
-  const filteredJobs = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
-    const list = techFilteredJobs.filter((job) => {
-      if (TAB_GROUP_MAP[job.groupKey] !== group) return false;
-      if (!keyword) return true;
-      const anchor = job.sessions[0];
-      return [anchor.company, anchor.site, anchor.title, anchor.docNo]
-        .some((v) => (v || "").toLowerCase().includes(keyword));
-    });
-    // ✅ แท็บ "รอลูกค้าตอบ" รวมหลายสถานะย่อยไว้ด้วยกัน — เรียงงานด่วนที่สุดขึ้นก่อนเสมอ
-    if (group === "pending") {
-      return list.slice().sort((a, b) => (PENDING_PRIORITY[a.groupKey] ?? 9) - (PENDING_PRIORITY[b.groupKey] ?? 9));
+  // ── บันทึก ──
+  const onQuotation = useCallback(async (job, body) => {
+    try {
+      await EventService.UpdateQuotation(job.anchor._id, body);
+      await fetchJobs(true);
+      toast(body.action === "approve" ? "บันทึก: ลูกค้าอนุมัติแล้ว" : body.action === "reject" ? "บันทึก: ลูกค้าปฏิเสธ" : body.action === "send" ? "บันทึกการส่งแล้ว — เริ่มนับวันติดตาม" : body.action === "reset" ? "ย้อนสถานะแล้ว" : "บันทึกข้อมูลแล้ว");
+      return true;
+    } catch (err) {
+      toast(errMsg(err, "บันทึกไม่สำเร็จ"), "error");
+      return false;
     }
-    return list;
-  }, [techFilteredJobs, group, search]);
+  }, [fetchJobs]);
+  const onFollowUp = useCallback(async (job, payload) => {
+    try {
+      await EventService.AddQuotationFollowUp(job.anchor._id, payload);
+      await fetchJobs(true);
+      toast("บันทึกการติดตามแล้ว");
+      return true;
+    } catch (err) {
+      toast(errMsg(err, "บันทึกการติดตามไม่สำเร็จ"), "error");
+      return false;
+    }
+  }, [fetchJobs]);
+  const onComment = useCallback(async (job, message) => {
+    const p = JSON.parse(localStorage.getItem("payload") || "{}");
+    const name = p?.fname ? `${p.fname} ${p.lname || ""}`.trim() : (p?.username || "ผู้ใช้");
+    try {
+      await EventService.UpdateEvent(job.anchor._id, {
+        comments: [...(job.anchor.comments || []), { userId: p?.userId || "", userName: name, role: userData?.role?.toLowerCase(), message, timestamp: new Date().toISOString() }],
+      });
+      await fetchJobs(true);
+    } catch (err) {
+      toast(errMsg(err, "ส่งข้อความไม่สำเร็จ"), "error");
+    }
+  }, [fetchJobs, userData]);
+  const onFileUpload = useCallback(async (fileOrFiles, eventId, type) => {
+    const files = Array.from(fileOrFiles?.length !== undefined ? fileOrFiles : [fileOrFiles]);
+    if (!files.length) return;
+    setUpload({ busy: true, eventId, progress: 0 });
+    let ok = 0;
+    try {
+      for (const file of files) {
+        // eslint-disable-next-line no-await-in-loop -- อัปโหลดทีละไฟล์ให้แถบความคืบหน้าถูกต้อง
+        await EventService.Upload(eventId, file, type, {
+          onUploadProgress: (pe) => setUpload((u) => ({ ...u, progress: Math.min(99, Math.round((pe.loaded * 100) / pe.total)) })),
+        });
+        ok += 1;
+      }
+      toast(`อัปโหลด ${ok} ไฟล์เรียบร้อย`);
+    } catch (err) {
+      toast(ok ? `อัปโหลดสำเร็จ ${ok}/${files.length} ไฟล์` : errMsg(err, "อัปโหลดไม่สำเร็จ"), "error");
+    } finally {
+      await fetchJobs(true);
+      setUpload({ busy: false, eventId: null, progress: 0 });
+    }
+  }, [fetchJobs]);
+  const onDeleteFile = useCallback(async (eventId, type, fileId) => {
+    try { await EventService.DeleteFile(eventId, type, fileId); toast("ลบไฟล์เรียบร้อย"); await fetchJobs(true); } catch { toast("ลบไฟล์ไม่สำเร็จ", "error"); }
+  }, [fetchJobs]);
 
-  // ✅ กลับไปหน้า 1 เสมอเมื่อตัวกรองเปลี่ยน (สถานะ/ช่าง/คำค้นหา) ไม่งั้นอาจค้างอยู่หน้าที่ไม่มีข้อมูล
-  useEffect(() => { setPage(1); }, [group, selectedTechId, search]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredJobs.length / QUOTATIONS_PAGE_SIZE));
-  // ✅ กันหน้าค้างเกินจำนวนหน้าจริง (auto-refresh ทุก 30 วิ อาจทำให้รายการลดลงจนหน้าปัจจุบันไม่มีข้อมูล
-  // แล้วเห็นหน้าว่างเปล่าโดยไม่มีอะไรอธิบาย — เทียบ pattern เดียวกับ safePage ในหน้า "ภาพรวมงาน")
-  const safePage = Math.min(page, totalPages);
-  const pagedJobs = useMemo(
-    () => filteredJobs.slice((safePage - 1) * QUOTATIONS_PAGE_SIZE, safePage * QUOTATIONS_PAGE_SIZE),
-    [filteredJobs, safePage],
-  );
-
-  // ✅ ส่งออก Excel — ส่งออก "ทุกใบที่ผ่านตัวกรองอยู่" (filteredJobs) ไม่ใช่แค่หน้าที่เปิดอยู่
-  // โหลด exceljs แบบ dynamic ตอนกดจริงเท่านั้น (ไลบรารีก้อนใหญ่) ไม่ให้ถ่วงเวลาโหลดหน้าของทุกคน
-  const handleExportExcel = async () => {
-    if (exporting || filteredJobs.length === 0) return;
+  const doExport = async () => {
+    if (exporting || !visible.length) return;
     setExporting(true);
     try {
       const { exportQuotationsToExcel, buildQuotationFileName } = await import("../utils/quotationExcelExport");
-      const tabLabel = TAB_META[group]?.label || "ทั้งหมด";
-      const filters = [];
-      if (search.trim()) filters.push(`ค้นหา "${search.trim()}"`);
-      if (selectedTechId) {
-        const t = technicians.find((u) => u._id === selectedTechId);
-        if (t) filters.push(`ผู้รับผิดชอบ ${t.fname || t.username}`);
-      }
+      const tabLabel = status === "open" ? "กำลังดำเนินการ" : status === "all" ? "ทั้งหมด" : status === "incomplete" ? "ข้อมูลไม่ครบ" : STATUS[status]?.label || "ทั้งหมด";
+      const filters = [search.trim() && `ค้นหา "${search.trim()}"`, owner !== "all" && `ผู้รับผิดชอบ ${owner}`, period !== "all" && PERIODS.find((x) => x.value === period)?.label].filter(Boolean);
       await exportQuotationsToExcel({
-        jobs: filteredJobs,
+        jobs: visible,
         meta: {
-          fileName: buildQuotationFileName(tabLabel),
-          tabLabel: `หมวด: ${tabLabel}`,
-          filterSummary: filters.length > 0 ? `ตัวกรอง: ${filters.join(" · ")}` : "ไม่ได้กรองเพิ่มเติม",
+          fileName: buildQuotationFileName(tabLabel), tabLabel: `หมวด: ${tabLabel}`,
+          filterSummary: filters.length ? `ตัวกรอง: ${filters.join(" · ")}` : "ไม่ได้กรองเพิ่มเติม",
           exportedAt: formatThai(moment(), "DD/MM/YYYY HH:mm"),
         },
-        getFollowUpInfo,
-        formatEventDateRange,
+        getFollowUpInfo, formatEventDateRange,
       });
     } catch (err) {
-      setSnackbar({ open: true, msg: err?.message || "ส่งออกไม่สำเร็จ", severity: "error" });
+      toast(errMsg(err, "ส่งออกไม่สำเร็จ"), "error");
     } finally {
       setExporting(false);
     }
   };
 
-  const updateQuotationFields = useCallback(async (job, fields, logEntry) => {
-    try {
-      const ids = job.sessions.map((s) => s._id);
-      await Promise.all(ids.map((gid) => EventService.UpdateEvent(gid, fields)));
-      if (logEntry) {
-        const anchor = job.sessions[0];
-        await EventService.UpdateEvent(anchor._id, { activityLog: [...(anchor.activityLog || []), logEntry] });
-      }
-      await fetchJobs(true);
-      setSnackbar({ open: true, msg: "บันทึกเรียบร้อย", severity: "success" });
-    } catch (err) {
-      console.error(err);
-      // ✅ โชว์ข้อความจริงจาก backend (เช่น "งานนี้ปิดแล้ว ไม่สามารถแก้ไขได้") แทนข้อความรวมๆ เดิม
-      // ที่บอกแค่ "บันทึกไม่สำเร็จ" ทำให้ผู้ใช้เดาสาเหตุไม่ออกว่าติดขัดตรงไหน
-      const apiMsg = err?.response?.data?.message || err?.response?.data?.err;
-      setSnackbar({ open: true, msg: apiMsg || "บันทึกไม่สำเร็จ", severity: "error" });
-    }
-  }, [fetchJobs]);
-
-  const handleAction = useCallback(async (job, action, extra = {}) => {
-    const payload = JSON.parse(localStorage.getItem("payload") || "{}");
-    const actorName = payload?.fname ? `${payload.fname} ${payload.lname || ""}`.trim() : (payload?.username || "แอดมิน");
-    const now = new Date().toISOString();
-
-    if (action === "comment") {
-      const anchor = job.sessions[0];
-      const newComment = { userId: payload?.userId || "", userName: actorName, role, message: extra.message, timestamp: now };
-      await updateQuotationFields(job, { comments: [...(anchor.comments || []), newComment] });
-      return;
-    }
-
-    const ACTION_MAP = {
-      send:    { fields: { quotationStatus: "sent", quotationSentAt: now, quotationDecisionAt: null, quotationDecisionBy: null }, log: ["quotation_sent", "ส่งใบเสนอราคาให้ลูกค้า"] },
-      approve: { fields: { quotationStatus: "approved", quotationDecisionAt: now, quotationDecisionBy: actorName }, log: ["quotation_approved", "ลูกค้าอนุมัติใบเสนอราคา"] },
-      reject:  { fields: { quotationStatus: "rejected", quotationDecisionAt: now, quotationDecisionBy: actorName }, log: ["quotation_rejected", "ลูกค้าปฏิเสธใบเสนอราคา"] },
-    };
-    const def = ACTION_MAP[action];
-    if (!def) return;
-    const [logAction, logDetail] = def.log;
-    await updateQuotationFields(job, def.fields, { action: logAction, detail: logDetail, userName: actorName, timestamp: now });
-  }, [role, updateQuotationFields]);
-
-  const handleAmountSave = useCallback((job, amount) => {
-    updateQuotationFields(job, { quotationAmount: amount });
-  }, [updateQuotationFields]);
-
-  // ✅ ช่างและ admin/manager บันทึกได้ทั้งคู่ — ผ่าน route เฉพาะ (server คำนวณ attemptNumber เอง)
-  // ไม่ผ่าน updateQuotationFields (นั่นสำหรับฟิลด์ที่ propagate ทั้งกลุ่มวัน ส่วนนี้บันทึกที่ anchor เดียว)
-  const handleAddFollowUp = useCallback(async (job, note, file) => {
-    try {
-      const anchor = job.sessions[0];
-      await EventService.AddQuotationFollowUp(anchor._id, { note, file });
-      await fetchJobs(true);
-      setSnackbar({ open: true, msg: "บันทึกการติดตามเรียบร้อย", severity: "success" });
-    } catch (err) {
-      console.error(err);
-      const apiMsg = err?.response?.data?.message || err?.response?.data?.err;
-      setSnackbar({ open: true, msg: apiMsg || "บันทึกการติดตามไม่สำเร็จ", severity: "error" });
-    }
-  }, [fetchJobs]);
-
-  const handleFileUpload = useCallback(async (fileOrFiles, eventId, type) => {
-    const files = Array.from(fileOrFiles?.length !== undefined ? fileOrFiles : [fileOrFiles]);
-    if (files.length === 0) return;
-    setUploadingState((p) => ({ ...p, [type]: eventId }));
-    setIsUploadingState((p) => ({ ...p, [type]: true }));
-    let successCount = 0;
-    try {
-      for (let i = 0; i < files.length; i++) {
-        setUploadProgressState((p) => ({ ...p, [type]: 0 }));
-        await EventService.Upload(eventId, files[i], type, {
-          onUploadProgress: (pe) => {
-            const pct = Math.round((pe.loaded * 100) / pe.total);
-            setUploadProgressState((p) => ({ ...p, [type]: Math.min(pct, 99) }));
-          },
-        });
-        setUploadProgressState((p) => ({ ...p, [type]: 100 }));
-        successCount++;
-      }
-      setSnackbar({ open: true, msg: `อัปโหลด ${successCount} ไฟล์เรียบร้อย`, severity: "success" });
-    } catch {
-      setSnackbar({
-        open: true,
-        msg: successCount > 0 ? `อัปโหลดสำเร็จ ${successCount}/${files.length} ไฟล์ (มีไฟล์ที่ล้มเหลว)` : "อัปโหลดไม่สำเร็จ",
-        severity: "error",
-      });
-    } finally {
-      await fetchJobs(true);
-      setIsUploadingState((p) => ({ ...p, [type]: false }));
-      setTimeout(() => {
-        setUploadingState((p) => ({ ...p, [type]: null }));
-        setUploadProgressState((p) => ({ ...p, [type]: 0 }));
-      }, 800);
-    }
-  }, [fetchJobs]);
-
-  const handleDeleteFile = useCallback(async (eventId, type, fileId) => {
-    try {
-      await EventService.DeleteFile(eventId, type, fileId);
-      setSnackbar({ open: true, msg: "ลบไฟล์เรียบร้อย", severity: "success" });
-      await fetchJobs(true);
-    } catch {
-      setSnackbar({ open: true, msg: "ลบไฟล์ไม่สำเร็จ", severity: "error" });
-    }
-  }, [fetchJobs]);
-
-  // ✅ กันช่างเปิดหน้านี้ตรงๆ ผ่าน URL — เทียบ pattern เดียวกับ TeamWorkload.js (ไม่ผ่าน AdminRoute
-  // เพราะ manager/ช่างต้องเข้าได้ด้วย จึงเช็ค role เองในนี้แทน)
   if (!loading && !canAccess) return <Navigate to="/dashboard" replace />;
 
-  // ✅ การ์ดสถิติตัดให้ตรงกับ 3 แท็บที่เหลือเป๊ะๆ (ตัด "ลูกค้าขอแก้ไข" ออกแล้ว ไม่มีใครดูอยู่แล้ว) —
-  // ผลรวม 3 การ์ดนี้ = ทั้งหมดเสมอ (โชว์ "ทั้งหมด" เป็นบรรทัดเดียวกับหัวข้อแทน ไม่ต้องมีการ์ดแยก)
-  const statCards = [
-    { key: "pending", label: TAB_META.pending.label, value: tabCounts.pending,
-      color: "linear-gradient(135deg,#3b82f6,#1d4ed8)", icon: <Send />,
-      sub: counts.follow_up > 0 ? `ต้องติดตามด่วน ${counts.follow_up} งาน (เงียบเกิน ${WARNING_DAYS_AFTER_SENT} วัน)` : "ยังไม่มีงานต้องติดตามด่วน" },
-    { key: "approved", label: TAB_META.approved.label, value: tabCounts.approved,
-      color: "linear-gradient(135deg,#10b981,#059669)", icon: <CheckCircle />,
-      // ✅ บอกตรงๆ ว่ายอดรวมยังขาดกี่ใบ แทนที่จะโชว์เลขที่ต่ำกว่าความจริงเฉยๆ (ดู approvedStats)
-      sub: approvedStats.missing > 0
-        ? `มูลค่ารวม ฿${approvedValue.toLocaleString()} · ยังไม่ระบุมูลค่า ${approvedStats.missing} ใบ`
-        : `มูลค่ารวม ฿${approvedValue.toLocaleString()}` },
-    { key: "rejected", label: TAB_META.rejected.label, value: tabCounts.rejected,
-      color: "linear-gradient(135deg,#94a3b8,#64748b)", icon: <Cancel />,
-      sub: "ไม่ผ่านการอนุมัติ" },
+  const tiles = [
+    { value: "open", label: "กำลังดำเนินการ", shortLabel: "ดำเนินการ", count: counts.open, unit: "ใบ", icon: <Apps />, color: "#475569" },
+    ...STATUS_ORDER.filter((s) => s !== "revising" || counts.revising || status === s).map((s) => {
+      const m = STATUS[s];
+      const Icon = m.icon;
+      return { value: s, label: m.label, shortLabel: m.short, count: counts[s] || 0, unit: "ใบ", icon: <Icon />, color: s === "follow_up" ? m.color : "#475569", alert: s === "follow_up" };
+    }),
+    { value: "all", label: "ทั้งหมด", count: counts.all, unit: "ใบ", icon: <Insights />, color: "#475569" },
   ];
 
-  // ✅ เดิมล็อก maxWidth ไว้ที่ 900px ตายตัว — เหมาะกับตอนที่หน้านี้มีแต่มุมมองการ์ด (การ์ดกว้างเกินไป
-  // จะอ่านยาก) แต่ตอนนี้มีมุมมองตาราง 9 คอลัมน์แล้ว พื้นที่ 900px ทำให้ตารางต้องเลื่อนแนวนอนตลอดทั้งที่
-  // จอเหลือที่ว่างอีกครึ่งจอ — ให้ตารางใช้ความกว้างเต็มที่ ส่วนมุมมองการ์ดยังจำกัดไว้เท่าเดิม เพราะการ์ด
-  // ที่ยืดเต็มจอกว้างๆ จะอ่านยากกว่าเดิม (บรรทัดยาวเกินไป สายตาไล่ไม่ทัน)
   return (
-    <Box sx={{
-      px: { xs: 1.5, sm: 2 }, pt: 2, pb: 4, mx: "auto",
-      maxWidth: viewMode === "table" ? 1600 : 900,
-      transition: "max-width .2s ease",
-    }}>
-      <Stack direction="row" alignItems="flex-start" justifyContent="space-between" sx={{ mb: 2 }}>
-        <Box>
-          <Typography variant="h6" fontWeight={800}>ติดตามใบเสนอราคา</Typography>
-          <Typography variant="caption" color="text.secondary">
-            {`ทั้งหมด ${techFilteredJobs.length} งาน`}
-            {lastRefreshed ? ` · อัปเดตล่าสุด ${moment(lastRefreshed).locale("th").format("HH:mm:ss")}` : " · กำลังโหลด..."}
-          </Typography>
-        </Box>
-        <Tooltip title="รีเฟรช">
-          <IconButton onClick={() => fetchJobs()} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2 }}>
-            <Refresh sx={{ fontSize: 20 }} />
-          </IconButton>
-        </Tooltip>
-      </Stack>
+    <Box sx={{ p: { xs: 1.25, sm: 2.5 }, maxWidth: 1500, mx: "auto" }}>
+      {/* ── หัวเพจ ── */}
+      <Box sx={{ borderRadius: 3, border: `1px solid ${BORDER}`, bgcolor: "#fff", px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.5 }, mb: 1.5 }}>
+        <Stack direction="row" alignItems="center" spacing={1.5}>
+          <Box sx={{ width: 40, height: 40, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#334155", color: "#fff" }}>
+            <RequestQuote />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.1rem", sm: "1.25rem" }, color: TEXT_MAIN, lineHeight: 1.25 }}>ติดตามใบเสนอราคา</Typography>
+            <Typography noWrap sx={{ fontSize: "0.76rem", color: TEXT_SUB }}>
+              แนบไฟล์ → ส่งลูกค้า → ติดตาม (ทุก {WARNING_DAYS_AFTER_SENT} วัน หรือตามนัด) → อนุมัติ / ปฏิเสธ
+              {lastRefreshed ? ` · อัปเดต ${moment(lastRefreshed).format("HH:mm")}` : ""}
+            </Typography>
+          </Box>
+          <Tooltip title="รีเฟรช">
+            <IconButton onClick={() => fetchJobs()} sx={{ border: `1px solid ${BORDER}`, borderRadius: 2 }}><Refresh sx={{ fontSize: 20 }} /></IconButton>
+          </Tooltip>
+        </Stack>
+      </Box>
 
+      {/* ── ตัวเลขสรุป ── */}
       {loading ? (
-        <Grid container spacing={1.5} sx={{ mb: 3 }}>
-          {[1, 2, 3].map((i) => (
-            <Grid item xs={4} key={i}><Skeleton variant="rounded" height={104} sx={{ borderRadius: 4 }} /></Grid>
-          ))}
-        </Grid>
+        <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(5, 1fr)" }, mb: 1.5 }}>
+          {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} variant="rounded" height={78} sx={{ borderRadius: 2.5 }} />)}
+        </Box>
       ) : (
-        <Grid container spacing={1.5} sx={{ mb: 3 }}>
-          {statCards.map((c) => (
-            <Grid item xs={4} key={c.key}>
-              {/* ✅ กดการ์ดสถิติแล้วกรองไปแท็บนั้นเลย — ตัวเลขบนการ์ดกับในเมนูกรองเป็นชุดเดียวกันแล้ว
-                  (ตัด "ทั้งหมด"/"ต้องติดตาม" ที่ไม่มีแท็บของตัวเองออกไปแล้วด้านบน) ทำให้กดแล้วตรงพอดี */}
-              {/* ✅ เหลือ 3 การ์ด (ตัด "ลูกค้าขอแก้ไข" ออก) — ปรับเป็น 3 คอลัมน์เท่ากันเสมอ (ไม่เว้น
-                  ช่องว่างแบบ 2+1 เหมือนตอน 4 การ์ด) ย่อ padding/ไอคอนลงอีกนิดให้พอดีกับคอลัมน์แคบลง */}
-              <StatCard color={c.color} onClick={() => setGroup(c.key)}
-                sx={{ height: "100%", cursor: "pointer" }}>
-                <CardContent sx={{ p: 1.25, "&:last-child": { pb: 1.25 } }}>
-                  <Stack spacing={0.5}>
-                    <Box sx={{
-                      width: 26, height: 26, borderRadius: 1.5, background: c.color, color: "#fff",
-                      display: "flex", alignItems: "center", justifyContent: "center", "& svg": { fontSize: 15 },
-                    }}>
-                      {c.icon}
-                    </Box>
-                    <Typography variant="caption" color="text.secondary" fontWeight={700}
-                      noWrap sx={{ fontSize: "0.66rem", display: "block" }}>
-                      {c.label}
-                    </Typography>
-                    <Typography variant="h5" fontWeight={800} sx={{ lineHeight: 1 }}>{c.value}</Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: "block", fontSize: "0.62rem", lineHeight: 1.25 }}>{c.sub}</Typography>
-                  </Stack>
-                </CardContent>
-              </StatCard>
-            </Grid>
-          ))}
-        </Grid>
+        <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(5, 1fr)" }, mb: 1.5 }}>
+          <Kpi label="มูลค่ารอลูกค้าตอบ" value={baht(stats.pendingValue)} sub={`${stats.pendingCount} ใบ`} color="#2563eb" onClick={() => setStatus("open")} active={status === "open"} />
+          <Kpi label="ต้องติดตามด่วน" value={`${counts.follow_up || 0} ใบ`} sub={counts.follow_up ? `มูลค่า ${baht(stats.urgentValue)}` : "ไม่มีใบเลยกำหนด"} color="#dc2626" alert={counts.follow_up > 0} onClick={() => setStatus("follow_up")} active={status === "follow_up"} />
+          <Kpi label="อนุมัติแล้ว" value={baht(stats.approvedValue)} sub={`${stats.approvedCount} ใบ`} color="#15803d" onClick={() => setStatus("approved")} active={status === "approved"} />
+          <Kpi label="อัตราปิดการขาย" value={stats.winRate === null ? "—" : `${stats.winRate}%`} sub={stats.decided ? `อนุมัติ ${stats.approvedCount} จาก ${stats.decided} ใบที่ได้คำตอบ` : "ยังไม่มีใบที่ได้คำตอบ"} color="#0f172a" />
+          <Kpi label="ข้อมูลไม่ครบ" value={`${counts.incomplete} ใบ`} sub="ไม่มีเลขที่ หรือ ไม่มีมูลค่า" color="#b45309" alert={counts.incomplete > 0} onClick={() => setStatus("incomplete")} active={status === "incomplete"} />
+        </Box>
       )}
 
-      <TextField
-        fullWidth size="small" placeholder="ค้นหาโครงการ, ไซต์, เลขเอกสาร..."
-        value={search} onChange={(e) => setSearch(e.target.value)}
-        sx={{ mb: 1.5, "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: "background.paper" } }}
-        InputProps={{
-          startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 19, color: "text.disabled" }} /></InputAdornment>,
-          endAdornment: search ? (
-            <InputAdornment position="end">
-              <IconButton size="small" onClick={() => setSearch("")}><Clear sx={{ fontSize: 17 }} /></IconButton>
-            </InputAdornment>
-          ) : null,
-        }}
-      />
-
-      <Stack direction="row" gap={1} flexWrap="wrap" sx={{ mb: 2 }}>
-        <StatusFilterButton group={group} counts={tabCounts} onChange={setGroup} />
-        {isAdminOrManager && (
-          <TechnicianFilterButton
-            technicians={technicians}
-            selectedId={selectedTechId}
-            counts={technicianCounts}
-            totalCount={jobsWithTech.length}
-            onChange={setSelectedTechId}
-          />
-        )}
-        <Box sx={{ flex: 1 }} />
-
-        {/* ✅ สลับมุมมองการ์ด ↔ ตาราง — การ์ดอ่านง่ายทีละใบ ตารางเทียบหลายใบพร้อมกัน/หายอดรวมได้ */}
-        <ToggleButtonGroup
-          size="small" exclusive value={viewMode}
-          onChange={(_, v) => v && setViewMode(v)}
-          sx={{ "& .MuiToggleButton-root": { textTransform: "none", px: 1.25, py: 0.5, borderRadius: 2 } }}
-        >
-          <ToggleButton value="card" title="มุมมองการ์ด">
-            <ViewList sx={{ fontSize: 18 }} />
-          </ToggleButton>
-          <ToggleButton value="table" title="มุมมองตาราง">
-            <TableChart sx={{ fontSize: 18 }} />
-          </ToggleButton>
-        </ToggleButtonGroup>
-
-        {/* ✅ ส่งออก Excel — ส่งออก "ทุกใบที่ผ่านตัวกรองอยู่" ไม่ใช่แค่หน้าที่เปิดอยู่
-            ใช้ไอคอนไฟล์ Excel (FontAwesome) + โทนเขียว #047857 ให้ตรงกับปุ่มส่งออก Excel ในหน้าปฏิทิน
-            (.toolbar-icon-btn--excel) — เดิมเป็นไอคอนลูกศรดาวน์โหลดทั่วไป ดูไม่ออกว่าได้ไฟล์อะไร */}
-        <Tooltip title="ส่งออกเป็นไฟล์ Excel (.xlsx)">
-          <span>
-            <IconButton
-              onClick={handleExportExcel}
-              disabled={exporting || filteredJobs.length === 0}
-              sx={{
-                border: "1px solid", borderRadius: 2,
-                borderColor: alpha("#047857", 0.25), color: "#047857",
-                transition: "background-color .15s, border-color .15s",
-                "&:hover": { bgcolor: alpha("#047857", 0.08), borderColor: "#047857" },
-              }}
-            >
-              <FontAwesomeIcon icon={faFileExcel} style={{ fontSize: 17 }} />
-            </IconButton>
-          </span>
-        </Tooltip>
+      {/* ── ค้นหา + ตัวกรอง ── */}
+      <Stack ref={topRef} direction={{ xs: "column", md: "row" }} spacing={1} alignItems={{ md: "center" }}
+        sx={{ mb: 1.5, p: 1, bgcolor: "#fff", border: `1px solid ${BORDER}`, borderRadius: 3, boxShadow: "0 1px 2px rgba(15,23,42,.04)", scrollMarginTop: 72 }}>
+        <TextField size="small" placeholder="ค้นหาลูกค้า / โครงการ / เลขที่ใบเสนอราคา / PO / ผู้ติดต่อ" value={search} onChange={(e) => setSearch(e.target.value)}
+          sx={{ flex: 1, minWidth: 0, "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: "#f8fafc", height: 40, "& fieldset": { borderColor: "transparent" }, "&:hover fieldset": { borderColor: BORDER }, "&.Mui-focused": { bgcolor: "#fff" } } }}
+          InputProps={{
+            startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 19, color: TEXT_SUB }} /></InputAdornment>,
+            endAdornment: search ? <InputAdornment position="end"><IconButton size="small" onClick={() => setSearch("")}><Close sx={{ fontSize: 17 }} /></IconButton></InputAdornment> : null,
+          }} />
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+          <SelectField label="ผู้รับผิดชอบ" value={owner} onChange={(e) => setOwner(e.target.value)} sx={{ minWidth: { xs: 0, md: 190 }, flex: { xs: "1 1 0", md: "none" } }}>
+            <option value="all">ทุกคน ({scoped.length})</option>
+            {owners.map(([n, c]) => <option key={n} value={n}>{n} ({c})</option>)}
+          </SelectField>
+          <SelectField label="ช่วงเวลา" value={period} onChange={(e) => setPeriod(e.target.value)} sx={{ minWidth: { xs: 0, md: 150 }, flex: { xs: "1 1 0", md: "none" } }}>
+            {PERIODS.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}
+          </SelectField>
+          <Tooltip title="ส่งออกรายการที่กรองอยู่เป็น Excel">
+            <span>
+              <Button onClick={doExport} disabled={exporting || !visible.length} startIcon={<FontAwesomeIcon icon={faFileExcel} />}
+                sx={{ height: 40, flexShrink: 0, textTransform: "none", fontWeight: 700, borderRadius: 2.5, color: "#047857", border: `1px solid ${alpha("#047857", 0.3)}`, px: 1.5, "& .MuiButton-startIcon": { mr: { xs: 0, sm: 1 } } }}>
+                <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>{exporting ? "กำลังส่งออก..." : "Excel"}</Box>
+              </Button>
+            </span>
+          </Tooltip>
+        </Stack>
       </Stack>
 
+      <ViewTiles value={status} onChange={setStatus} isMobile={!isDesktop} groups={[{ title: "", items: tiles }]} />
+
+      {/* ── รายการ ── */}
       {loading ? (
-        <Stack spacing={1.5}>
-          {[1, 2, 3].map((i) => <Skeleton key={i} variant="rounded" height={96} sx={{ borderRadius: 4 }} />)}
+        <Stack spacing={1}>{[0, 1, 2, 3].map((i) => <Skeleton key={i} variant="rounded" height={isDesktop ? 54 : 100} sx={{ borderRadius: 2 }} />)}</Stack>
+      ) : !visible.length ? (
+        <Stack alignItems="center" spacing={1} sx={{ py: 6, px: 2, bgcolor: "#fff", border: `1px dashed ${BORDER}`, borderRadius: 2.5, textAlign: "center" }}>
+          <RequestQuote sx={{ fontSize: 44, color: "#cbd5e1" }} />
+          <Typography sx={{ fontWeight: 700, color: TEXT_SUB }}>{jobs.length ? "ไม่พบใบเสนอราคาตามตัวกรอง" : "ยังไม่มีใบเสนอราคาให้ติดตาม"}</Typography>
+          {!jobs.length && <Typography sx={{ fontSize: "0.8rem", color: "#94a3b8" }}>งานที่ระบุว่า "มีใบเสนอราคา" ในหน้าการดำเนินงาน จะขึ้นที่นี่</Typography>}
         </Stack>
-      ) : filteredJobs.length === 0 ? (
-        <Box sx={{ textAlign: "center", py: 6, px: 2, borderRadius: 4, border: "1px dashed", borderColor: "divider", color: "text.disabled" }}>
-          <RequestQuote sx={{ fontSize: 40, opacity: 0.3, mb: 1 }} />
-          <Typography variant="body2">
-            {search ? "ไม่พบรายการที่ตรงกับคำค้นหา" : `ยังไม่มีงานในหมวด "${TAB_META[group]?.label}"`}
-          </Typography>
-        </Box>
       ) : (
         <>
-          {viewMode === "table" ? (
-            <QuotationTable
-              jobs={pagedJobs}
-              onOpen={setDetailJob}
-              onPreview={(url, name) => { setPreviewUrl(url); setPreviewFileName(name); }}
-            />
-          ) : (
-            <Stack spacing={0}>
-              {pagedJobs.map((job) => (
-                <QuotationCard
-                  key={job.sessions[0].jobGroupId || job.sessions[0]._id}
-                  job={job}
-                  onOpen={setDetailJob}
-                  onPreview={(url, name) => { setPreviewUrl(url); setPreviewFileName(name); }}
-                />
-              ))}
-            </Stack>
-          )}
-          {totalPages > 1 && (
-            <Stack alignItems="center" sx={{ mt: 2 }}>
-              <Pagination
-                count={totalPages} page={safePage}
-                onChange={(_, v) => setPage(v)}
-                color="primary" shape="rounded" size="medium"
-                showFirstButton showLastButton
-              />
-            </Stack>
-          )}
+          {isDesktop
+            ? <DesktopTable jobs={pageRows} onOpen={(j) => setDetailId(j.anchor._id)} onPreview={(url, name) => setPreview({ url, name })} />
+            : <Stack spacing={1}>{pageRows.map((j) => <MobileCard key={j.anchor._id} job={j} onOpen={(x) => setDetailId(x.anchor._id)} />)}</Stack>}
+          <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" spacing={1} sx={{ mt: 1.5 }}>
+            <Typography sx={{ flex: 1, fontSize: "0.76rem", color: TEXT_SUB }}>
+              {pageCount > 1 ? `แสดง ${(cur - 1) * PAGE_SIZE + 1}–${(cur - 1) * PAGE_SIZE + pageRows.length} จาก ` : ""}{visible.length} ใบ · มูลค่ารวม {baht(visible.reduce((s, j) => s + (Number(j.anchor.quotationAmount) || 0), 0))}
+            </Typography>
+            {pageCount > 1 && (
+              <Pagination count={pageCount} page={cur} shape="rounded" size={isDesktop ? "medium" : "small"} siblingCount={isDesktop ? 1 : 0}
+                onChange={(_, n) => { setPage(n); topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
+                sx={{ "& .Mui-selected": { bgcolor: "#334155 !important", color: "#fff" } }} />
+            )}
+          </Stack>
         </>
       )}
 
-      <QuotationDetailDialog
-        job={detailJob}
-        currentUser={userData}
-        onClose={() => setDetailJob(null)}
-        onAction={handleAction}
-        onAmountSave={handleAmountSave}
-        onAddFollowUp={handleAddFollowUp}
-        onFileUpload={handleFileUpload}
-        onDeleteFile={handleDeleteFile}
-        onPreview={(url, name) => { setPreviewUrl(url); setPreviewFileName(name); }}
-        uploadingState={uploadingState}
-        isUploadingState={isUploadingState}
-        uploadProgressState={uploadProgressState}
-      />
-
-      <FilePreviewDialog
-        previewUrl={previewUrl}
-        previewFileName={previewFileName}
-        onClose={() => { setPreviewUrl(null); setPreviewFileName(""); }}
-      />
-
-      <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={() => setSnackbar((p) => ({ ...p, open: false }))}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
+      {detailJob && (
+        <DetailDialog
+          job={detailJob} currentUser={userData} onClose={() => setDetailId("")}
+          onQuotation={onQuotation} onFollowUp={onFollowUp} onComment={onComment}
+          onFileUpload={onFileUpload} onDeleteFile={onDeleteFile} onPreview={(url, name) => setPreview({ url, name })} upload={upload}
+        />
+      )}
+      <FilePreviewDialog previewUrl={preview.url} previewFileName={preview.name} onClose={() => setPreview({ url: null, name: "" })} />
+      <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={() => setSnackbar((p) => ({ ...p, open: false }))} anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
         <Alert severity={snackbar.severity} variant="filled" sx={{ borderRadius: 2 }}>{snackbar.msg}</Alert>
       </Snackbar>
     </Box>
