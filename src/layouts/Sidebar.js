@@ -206,6 +206,8 @@ const side = (key, extra) => {
     side("expenseReport"),
     // ✅ ระบบ OT (ผู้ใช้สั่ง 28 ก.ย. 2569) — สิทธิ์ชุดเดียวกับระบบเบิก จึงอยู่หมวดเดียวกัน
     side("ot"),
+    // ✅ ใบขอซื้อสินค้า PR (ผู้ใช้สั่ง 2 ต.ค. 2569) — สิทธิ์ชุดเดียวกับระบบเบิก
+    side("purchase"),
   ];
 
   const masterDataMenu = [side("customers"), side("staff")];

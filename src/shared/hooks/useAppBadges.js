@@ -19,6 +19,7 @@ import { useEffect, useState } from "react";
 import EventService from "@/shared/services/EventService";
 import ExpenseService from "@/features/expenses/services/ExpenseService";
 import OtService from "@/features/ot/services/OtService";
+import PurchaseService from "@/features/purchase/services/PurchaseService";
 import DispatchService from "@/features/dispatch/services/DispatchService";
 import WebsiteService from "@/features/website/services/WebsiteService";
 import { can, isRole, ROLES } from "@/shared/utils/roles";
@@ -44,6 +45,7 @@ export const BADGE_LABEL = {
   claim: "ใบ Advance ที่รอเคลียร์",
   contractorPay: "ใบค่าจ้างผู้รับเหมาที่ถูกตีกลับ",
   ot: "ใบ OT ที่ต้องดำเนินการ",
+  purchase: "ใบขอซื้อที่ต้องดำเนินการ",
   expenseInbox: "ใบเบิกที่รอดำเนินการ",
   webLeads: "คำขอใหม่จากเว็บไซต์",
 };
@@ -73,7 +75,7 @@ const POLL_MS = 30_000;
 const EMPTY = {
   pendingApproval: 0, closeRequests: 0, contracts: 0, myJobs: 0,
   quotations: 0, dispatchQueue: 0, dispatchMine: 0,
-  advance: 0, claim: 0, contractorPay: 0, ot: 0, expenseInbox: 0, webLeads: 0,
+  advance: 0, claim: 0, contractorPay: 0, ot: 0, purchase: 0, expenseInbox: 0, webLeads: 0,
 };
 
 /** สิ่งที่ผู้ใช้คนนี้มีสิทธิ์เห็น = สิ่งที่ต้องดึง (ไม่ยิง endpoint ที่จะโดน 403 อยู่แล้ว) */
@@ -89,15 +91,15 @@ const scopeOf = (userData) => ({
 });
 
 let lastUser = null;
-let store = { userId: "", data: { events: [], drafts: [], expense: null, dispatch: null, leads: null, ot: null }, at: 0, loading: false };
+let store = { userId: "", data: { events: [], drafts: [], expense: null, dispatch: null, leads: null, ot: null, purchase: null }, at: 0, loading: false };
 const subscribers = new Set();
 let timer = null;
 
 const emit = () => subscribers.forEach((fn) => fn(store.data));
 
-const ALL_PARTS = ["events", "drafts", "expense", "dispatch", "leads", "ot"];
+const ALL_PARTS = ["events", "drafts", "expense", "dispatch", "leads", "ot", "purchase"];
 /** ส่วนที่ต้องดึงซ้ำตอนมีสัญญาณเรียลไทม์ — ไม่ดึงงานทั้งก้อน (~150 kB) เพียงเพราะมีคนอนุมัติใบเบิก */
-const PARTS_BY_TOPIC = { events: ["events", "drafts"], dispatch: ["dispatch"], expenses: ["expense"], leads: ["leads"], ot: ["ot"] };
+const PARTS_BY_TOPIC = { events: ["events", "drafts"], dispatch: ["dispatch"], expenses: ["expense"], leads: ["leads"], ot: ["ot"], purchase: ["purchase"] };
 let queuedParts = null;
 
 /** @param {string[]} [parts] ดึงเฉพาะส่วนนี้ (ไม่ระบุ = ทั้งหมด) */
@@ -110,7 +112,7 @@ const fetchAll = async (userData, parts = ALL_PARTS) => {
   }
   store.loading = true;
   const want = new Set(parts);
-  const [events, drafts, expense, dispatch, leads, ot] = await Promise.all([
+  const [events, drafts, expense, dispatch, leads, ot, purchase] = await Promise.all([
     scope.jobs && want.has("events") ? EventService.getEventOp().then((r) => r?.userEvents || []).catch(() => null) : null,
     scope.contracts && want.has("drafts") ? EventService.GetDraftEvents().then((r) => r?.drafts || []).catch(() => null) : null,
     scope.expense && want.has("expense") ? ExpenseService.summary().catch(() => null) : null,
@@ -118,6 +120,7 @@ const fetchAll = async (userData, parts = ALL_PARTS) => {
     scope.webLeads && want.has("leads") ? WebsiteService.leadSummary().catch(() => null) : null,
     // ✅ OT ใช้สิทธิ์ชุดเดียวกับระบบเบิก
     scope.expense && want.has("ot") ? OtService.summary().catch(() => null) : null,
+    scope.expense && want.has("purchase") ? PurchaseService.summary().catch(() => null) : null,
   ]);
   store.loading = false;
   // ⚠️ ค่าที่ดึงไม่สำเร็จ (null) ต้องคงของเดิมไว้ ไม่ใช่ล้างเป็นว่าง — เน็ตสะดุดทีเดียวป้ายหายทั้งแอป
@@ -128,6 +131,7 @@ const fetchAll = async (userData, parts = ALL_PARTS) => {
     dispatch: dispatch ?? store.data.dispatch,
     leads: leads ?? store.data.leads,
     ot: ot ?? store.data.ot,
+    purchase: purchase ?? store.data.purchase,
   };
   if (want.size === ALL_PARTS.length) store.at = Date.now();
   emit();
@@ -174,7 +178,7 @@ const start = (userData) => {
   const uid = String(userData?.userId || "");
   // เปลี่ยนบัญชี = ทิ้งของเก่าทั้งหมด ห้ามให้ป้ายของคนก่อนหน้าค้างอยู่
   if (store.userId !== uid) {
-    store = { userId: uid, data: { events: [], drafts: [], expense: null, dispatch: null, leads: null, ot: null }, at: 0, loading: false };
+    store = { userId: uid, data: { events: [], drafts: [], expense: null, dispatch: null, leads: null, ot: null, purchase: null }, at: 0, loading: false };
     emit();
   }
   if (Date.now() - store.at > POLL_MS) fetchAll(userData);
@@ -248,6 +252,8 @@ const computeBadges = (userData, data) => {
     webLeads: scope.webLeads ? Number(data.leads?.new) || 0 : 0,
     // OT: ใบของฉันที่ถูกตีกลับ + ใบที่รอฉันตรวจสอบ/อนุมัติ
     ot: (Number(data.ot?.rejectedMine) || 0) + (Number(data.ot?.inbox) || 0),
+    // PR: ใบของฉันที่ถูกตีกลับ + ใบที่รอฉันตรวจสอบ/อนุมัติ/สั่งซื้อ
+    purchase: (Number(data.purchase?.rejectedMine) || 0) + (Number(data.purchase?.inbox) || 0),
   };
 };
 

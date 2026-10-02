@@ -106,6 +106,7 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
     }
     expense.push(dest("expenseReport"));
     expense.push(dest("ot"));
+    expense.push(dest("purchase"));
   }
 
   // ── เอกสารและการเงิน ─────────────────────────────────────────────────────
