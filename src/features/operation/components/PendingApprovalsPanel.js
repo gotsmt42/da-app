@@ -249,7 +249,7 @@ export default function PendingApprovalsPanel({ onCountChange, active = true }) 
               ⚠️ โชว์เฉพาะตอนมีงานจริง ไม่งั้นจะมีปุ่มสลับมุมมองลอยอยู่เหนือข้อความ
               "เคลียร์ครบแล้ว" ซึ่งไม่มีอะไรให้สลับดู */}
           {pendingGroups.length > 0 && (
-            <ViewToggle value={viewMode} onChange={setViewMode} accent="#f59e0b" />
+            <ViewToggle value={viewMode} onChange={setViewMode} />
           )}
           <Tooltip title="รีเฟรช">
             <IconButton
@@ -279,21 +279,22 @@ export default function PendingApprovalsPanel({ onCountChange, active = true }) 
         <Box sx={{
           display: "flex", alignItems: "center", gap: 1.75, mb: 2.5,
           p: { xs: 1.75, sm: 2 }, borderRadius: 3, border: "1px solid",
-          borderColor: hasPending ? alpha("#f59e0b", 0.35) : alpha("#10b981", 0.3),
-          bgcolor: hasPending ? alpha("#f59e0b", 0.05) : alpha("#10b981", 0.04),
+          // ✅ กล่องขาวขอบเทา (กฎ: สีไม่เยอะ) — มีงานรอ = ขอบซ้ายส้มบอกว่าต้องทำ · ไม่มี = เรียบๆ
+          borderColor: "#e2e8f0", bgcolor: "#fff", boxShadow: "0 1px 2px rgba(15,23,42,.04)",
+          borderLeft: hasPending ? "4px solid #d97706" : "1px solid #e2e8f0",
         }}>
           <Box sx={{
             width: 46, height: 46, borderRadius: 2.5, flexShrink: 0,
             display: "flex", alignItems: "center", justifyContent: "center",
-            bgcolor: hasPending ? alpha("#f59e0b", 0.15) : alpha("#10b981", 0.15),
-            color: hasPending ? "#b45309" : "#059669",
+            bgcolor: "#f8fafc", border: "1px solid #e2e8f0",
+            color: hasPending ? "#b45309" : "#64748b",
           }}>
             {hasPending ? <HourglassTop sx={{ fontSize: 24 }} /> : <CheckCircle sx={{ fontSize: 24 }} />}
           </Box>
 
           <Box sx={{ minWidth: 0, flex: 1 }}>
             <Stack direction="row" alignItems="baseline" gap={0.75}>
-              <Typography fontWeight={800} sx={{ fontSize: "1.6rem", lineHeight: 1.05, color: hasPending ? "#b45309" : "#059669" }}>
+              <Typography fontWeight={800} sx={{ fontSize: "1.6rem", lineHeight: 1.05, color: "#0f172a", fontVariantNumeric: "tabular-nums" }}>
                 {pendingGroups.length}
               </Typography>
               <Typography fontWeight={700} sx={{ fontSize: "0.9rem", color: "text.primary" }}>

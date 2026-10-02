@@ -19,15 +19,15 @@ import { Navigate, useSearchParams } from "react-router-dom";
 import {
   Box, Stack, Typography, Skeleton, Alert, useMediaQuery,
 } from "@mui/material";
-import { alpha } from "@mui/material/styles";
-import { Inbox, Storefront, HourglassTop, Bolt } from "@mui/icons-material";
+import { Inbox, Storefront, HourglassTop } from "@mui/icons-material";
+import { PageHeader } from "@/shared/ui/PageKit";
 
 import usePermissions from "@/shared/hooks/usePermissions";
 import { useAuth } from "@/features/auth/AuthContext";
 import ViewTiles from "@/shared/ui/ViewTiles";
 import DispatchList from "../components/DispatchList";
 import DispatchService from "../services/DispatchService";
-import { DISPATCH_ACCENT, TEXT_SUB, BORDER_MAIN } from "../dispatchMeta";
+import { TEXT_SUB, BORDER_MAIN } from "../dispatchMeta";
 
 // ⚠️ แผงนี้อยู่ใน feature "operation" เพราะเป็นเรื่องแผนงานของช่างโดยตรง — ไม่ย้ายไฟล์มาที่นี่
 // เพื่อไม่ให้ประวัติ git ของมันขาดตอน แค่เรียกใช้ข้ามฟีเจอร์ (โหลดแบบ lazy เพราะเป็นแผงใหญ่)
@@ -84,57 +84,25 @@ export default function JobRequestQueue() {
   const urgent = summary?.urgentOpen ?? 0;
 
   return (
-    <Box sx={{ p: { xs: 1.5, sm: 2 }, maxWidth: 1500, mx: "auto" }}>
+    <Box sx={{ p: { xs: 1.25, sm: 2.5 }, maxWidth: 1500, mx: "auto" }}>
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>{error}</Alert>}
 
-      {/* ── หัวหน้าเพจ ────────────────────────────────────────────────────
-          ✅ ที่แก้ (ผู้ใช้แจ้งว่า "ดูรกตามาก"): เดิมเป็นแถบไล่สีส้มเต็มความกว้างพร้อมวงกลมตกแต่ง —
-          เป็นก้อนสีที่หนักที่สุดบนหน้าทั้งที่เป็นแค่ป้ายชื่อหน้า และหน้านี้มีแถบซ้อนใต้มันอีก 3 ชั้น
-          (แท็บ → คำอธิบาย → เครื่องมือ) กว่าจะถึงข้อมูลจริง
-          ✅ เหลือหัวข้อ + ไอคอนสีจาง + ตัวเลขค้างเป็นตัวหนังสือ (ไม่ใช่ชิปพื้นสี) */}
-      <Stack
-        direction="row" alignItems="center" spacing={1.5}
-        sx={{ mb: 2.5 }} flexWrap="wrap" useFlexGap
-      >
-        {/* ⚠️ จอมือถือ: ไอคอน+หัวข้ออยู่แถวเดียวกันเสมอ (ห่อไว้ด้วยกัน) แล้วตัวเลขค้างตกลงแถวถัดไป
-            — ถ้าไม่ห่อ ไอคอนจะถูกดันไปลอยอยู่บรรทัดของตัวเองเมื่อหัวข้อกินเต็มแถว */}
-        <Stack
-          direction="row" alignItems="center" spacing={1.5}
-          sx={{ flex: 1, minWidth: 0, flexBasis: { xs: "100%", sm: "auto" } }}
-        >
-          <Box
-            sx={{
-              width: 44, height: 44, borderRadius: 2.5, flexShrink: 0,
-              background: `linear-gradient(135deg, ${alpha(DISPATCH_ACCENT, 0.18)}, ${alpha(DISPATCH_ACCENT, 0.06)})`,
-              color: DISPATCH_ACCENT, border: "1px solid", borderColor: alpha(DISPATCH_ACCENT, 0.22),
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}
-          >
-            <Inbox sx={{ fontSize: 21 }} />
-          </Box>
-          <Box sx={{ minWidth: 0 }}>
-            <Typography sx={{ fontWeight: 800, fontSize: { xs: "1.15rem", sm: "1.3rem" }, lineHeight: 1.25, color: "#0f172a" }}>
-              คำขอลงงาน
+      {/* ── หัวหน้าเพจ — กล่องขาวชุดเดียวกับทุกหน้า (shared/ui/PageKit) ตามกฎออกแบบ (ผู้ใช้สั่ง 2 ต.ค. 2569
+          "ธีมและ UI ยังไม่สวย ไม่สอดคล้อง") — เดิมไอคอนส้มไล่สี + ป้ายตัวเลขลอยแถวใหม่ */}
+      <PageHeader
+        icon={<Inbox />}
+        title="คำขอลงงาน"
+        subtitle="คำขอที่รอตัดสินใจก่อนเข้าตารางงานจริง — จากฝ่ายขาย และแผนงานที่ช่างสร้างเอง"
+        actions={(
+          <Stack alignItems="flex-end" sx={{ pl: 1.5, borderLeft: `1px solid ${BORDER_MAIN}` }}>
+            <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: TEXT_SUB, whiteSpace: "nowrap" }}>รอตัดสินใจ</Typography>
+            <Typography sx={{ fontWeight: 900, fontSize: "1.15rem", color: "#0f172a", lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>
+              {waiting + approvalCount}
+              {urgent > 0 && <Box component="span" sx={{ ml: 0.75, fontSize: "0.74rem", fontWeight: 800, color: "#dc2626" }}>ด่วน {urgent}</Box>}
             </Typography>
-            <Typography variant="caption" sx={{ color: TEXT_SUB }}>
-              ทุกอย่างที่รอให้คุณตัดสินใจก่อนเข้าตารางงานจริง
-            </Typography>
-          </Box>
-        </Stack>
-        {/* ตัวเลขค้าง — เป็นตัวหนังสือ ไม่ใช่ชิปพื้นสี งานด่วนใช้สีแดงพอให้เด่นโดยไม่ต้องมีพื้น */}
-        <Stack direction="row" alignItems="center" spacing={1.75} sx={{ flexShrink: 0 }}>
-          {urgent > 0 && (
-            <Stack direction="row" alignItems="center" spacing={0.4} sx={{ px: 1.1, py: 0.45, borderRadius: 99, bgcolor: "#fef2f2", border: "1px solid #fecaca" }}>
-              <Bolt sx={{ fontSize: 15, color: "#dc2626" }} />
-              <Typography sx={{ fontWeight: 800, fontSize: "0.8rem", color: "#dc2626" }}>ด่วน {urgent}</Typography>
-            </Stack>
-          )}
-          <Stack direction="row" alignItems="center" spacing={0.6} sx={{ px: 1.25, py: 0.45, borderRadius: 99, bgcolor: "#fff", border: "1px solid", borderColor: BORDER_MAIN }}>
-            <Typography sx={{ fontWeight: 700, fontSize: "0.8rem", color: TEXT_SUB }}>รอตัดสินใจ</Typography>
-            <Typography sx={{ fontWeight: 800, fontSize: "0.9rem", color: "#0f172a", fontVariantNumeric: "tabular-nums" }}>{waiting + approvalCount}</Typography>
           </Stack>
-        </Stack>
-      </Stack>
+        )}
+      />
 
       {/* ── ที่มาของคำขอ: การ์ดตัวเลข (ViewTiles) ชุดเดียวกับหน้าภาพรวมงาน/การดำเนินงาน ──
           ✅ ที่แก้ (ผู้ใช้: "ดูล้าสมัยมาก"): เดิมเป็นแท็บเส้นใต้ + badge เล็กๆ มองไม่ออกว่าแต่ละฝั่งค้างกี่ใบ
@@ -148,7 +116,8 @@ export default function JobRequestQueue() {
           items: SOURCES.map((s) => {
             const count = s.key === "sales" ? waiting : approvalCount;
             return {
-              value: s.key, label: s.label, count, unit: "ใบ", icon: s.icon, color: s.color, alert: false,
+              // ✅ สีเดียวทั้งแถว (เทาเข้ม) ตามกฎ "สีไม่เยอะ" — เดิมม่วง/ส้มคนละช่อง
+              value: s.key, label: s.label, count, unit: "ใบ", icon: s.icon, color: "#475569", alert: false,
               sub: s.key === "sales" && urgent > 0 ? `ด่วน ${urgent}` : undefined,
             };
           }),
@@ -156,7 +125,7 @@ export default function JobRequestQueue() {
       />
 
       <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1.5, mt: isMobile ? -0.75 : -1, px: 0.25 }}>
-        <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: active.color, flexShrink: 0 }} />
+        <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#94a3b8", flexShrink: 0 }} />
         <Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB, fontWeight: 600 }}>{active.hint}</Typography>
       </Stack>
 

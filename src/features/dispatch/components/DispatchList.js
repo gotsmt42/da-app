@@ -505,7 +505,7 @@ export default function DispatchList({ mode = "board", myId = "" }) {
           {filtered.length.toLocaleString()} ใบ
         </Typography>
         <Box sx={{ flex: 1 }} />
-        <ViewToggle value={viewMode} onChange={setViewMode} accent={DISPATCH_ACCENT} />
+        <ViewToggle value={viewMode} onChange={setViewMode} />
         <Tooltip title="โหลดข้อมูลใหม่">
           <IconButton
             size="small" onClick={() => load()} aria-label="โหลดข้อมูลใหม่"
@@ -518,8 +518,8 @@ export default function DispatchList({ mode = "board", myId = "" }) {
 
       {/* ✅ หน้าว่างแบบเรียบ — เดิมมีทั้งเส้นประ พื้นเทา และวงกลมสีส้ม สำหรับ "ไม่มีอะไรเลย" */}
       {filtered.length === 0 ? (
-        <Box sx={{ py: 8, textAlign: "center" }}>
-          <Inbox sx={{ fontSize: 36, color: alpha(TEXT_SUB, 0.5), mb: 1 }} />
+        <Box sx={{ py: 6, px: 2, textAlign: "center", bgcolor: "#fff", border: "1px dashed", borderColor: BORDER_MAIN, borderRadius: 3 }}>
+          <Inbox sx={{ fontSize: 40, color: "#cbd5e1", mb: 1 }} />
           <Typography sx={{ fontWeight: 700, color: "#334155" }}>
             {search ? "ไม่พบรายการที่ค้นหา" : empty.title}
           </Typography>
@@ -539,25 +539,21 @@ export default function DispatchList({ mode = "board", myId = "" }) {
             return (
               <Box
                 key={status}
+                // ✅ คอลัมน์พื้นขาวขอบเทา (เดิมพื้น/ขอบสีตามสถานะ) — สีสถานะเหลือแค่จุดหน้าหัวข้อ
                 sx={{
-                  mb: isDesktop ? 0 : 2, p: 1.25, borderRadius: 3.5,
-                  bgcolor: alpha(m.color, 0.04), border: "1px solid", borderColor: alpha(m.color, 0.18),
+                  mb: isDesktop ? 0 : 2, p: 1.25, borderRadius: 3,
+                  bgcolor: "#fff", border: "1px solid", borderColor: BORDER_MAIN, boxShadow: "0 1px 2px rgba(15,23,42,.04)",
                 }}
               >
                 <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 0.25, mb: 1.25 }}>
-                  <Box sx={{
-                    width: 32, height: 32, borderRadius: 2, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
-                    bgcolor: alpha(m.color, 0.14), color: m.color, "& svg": { fontSize: 18 },
-                  }}>
-                    {COLUMN_META[status]?.icon}
-                  </Box>
+                  <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: m.color, flexShrink: 0 }} />
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography sx={{ fontWeight: 800, fontSize: "0.9rem", color: "#0f172a", lineHeight: 1.3 }}>{m.label}</Typography>
                     <Typography sx={{ fontSize: "0.7rem", color: TEXT_SUB }} noWrap>{COLUMN_META[status]?.hint}</Typography>
                   </Box>
                   <Box sx={{
                     minWidth: 30, height: 26, px: 1, borderRadius: 99, display: "flex", alignItems: "center", justifyContent: "center",
-                    bgcolor: list.length ? m.color : "#e2e8f0", color: list.length ? "#fff" : TEXT_SUB,
+                    bgcolor: list.length ? "#334155" : "#f1f5f9", color: list.length ? "#fff" : TEXT_SUB,
                     fontWeight: 800, fontSize: "0.8rem", fontVariantNumeric: "tabular-nums",
                   }}>
                     {list.length}
@@ -568,10 +564,10 @@ export default function DispatchList({ mode = "board", myId = "" }) {
                   {list.length === 0 && (
                     <Stack
                       alignItems="center" justifyContent="center" spacing={0.75}
-                      sx={{ minHeight: 120, px: 2, borderRadius: 3, textAlign: "center", border: "1px dashed", borderColor: alpha(m.color, 0.3), bgcolor: "#fff" }}
+                      sx={{ minHeight: 110, px: 2, borderRadius: 2.5, textAlign: "center", border: "1px dashed", borderColor: BORDER_MAIN, bgcolor: SURFACE_SUBTLE }}
                     >
                       {status === "requested"
-                        ? <TaskAlt sx={{ fontSize: 26, color: "#10b981" }} />
+                        ? <TaskAlt sx={{ fontSize: 26, color: "#94a3b8" }} />
                         : <Inbox sx={{ fontSize: 26, color: alpha(TEXT_SUB, 0.5) }} />}
                       <Typography sx={{ fontSize: "0.78rem", fontWeight: 600, color: TEXT_SUB }}>
                         {COLUMN_EMPTY_TEXT[status] || "ไม่มีรายการ"}

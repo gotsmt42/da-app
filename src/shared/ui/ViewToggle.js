@@ -10,7 +10,9 @@
 import { ToggleButton, ToggleButtonGroup, Tooltip } from "@mui/material";
 import { ViewAgenda, TableRows } from "@mui/icons-material";
 
-export default function ViewToggle({ value, onChange, accent = "#0891b2" }) {
+// ✅ กฎออกแบบ (สีไม่เยอะ): ปุ่มที่เลือกอยู่เป็นเทาเข้มเหมือนกันทุกหน้า — ไม่รับสีประจำหน้าแล้ว (เดิมส้ม/ฟ้าคนละหน้า)
+export default function ViewToggle({ value, onChange, accent: _accent }) {
+  const accent = "#334155";
   return (
     <ToggleButtonGroup
       exclusive size="small" value={value}
