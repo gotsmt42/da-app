@@ -53,6 +53,7 @@ export const DEST = {
   advance: { title: "ใบเบิก Advance", short: "ใบ Advance", sub: "เบิกเงินล่วงหน้า", href: "/expenses/advances", icon: FaMoneyCheckAlt, badgeKey: "advance" },
   claim: { title: "ใบเคลม", sub: "เคลียร์ค่าใช้จ่าย", href: "/expenses/claims", icon: FaReceipt, badgeKey: "claim" },
   purchase: { title: "ใบขอซื้อสินค้า (PR)", short: "ขอซื้อ", sub: "ขอซื้อ · อนุมัติ · สั่งซื้อ · รับของ", href: "/purchase", icon: FaShoppingCart, badgeKey: "purchase" },
+  purchaseReport: { title: "รายงานการจัดซื้อ", short: "รายงาน", sub: "ยอดซื้อ · ร้านค้า · ค้างรับ", href: "/purchase/report", icon: FaChartBar },
   ot: { title: "OT · ทำงานล่วงเวลา", short: "OT", sub: "ขออนุมัติ OT · จ่ายพร้อมเงินเดือน", href: "/ot", icon: FaUserClock, badgeKey: "ot" },
   contractorPay: { title: "ค่าจ้างผู้รับเหมา", sub: "เบิกค่าแรงตามงวดงาน", href: "/expenses/contractors", icon: FaHardHat, badgeKey: "contractorPay" },
   expenseInbox: { title: "รอดำเนินการ", sub: "ตรวจสอบ · อนุมัติ · เบิกจ่าย", href: "/expenses/approvals", icon: FaInbox, badgeKey: "expenseInbox" },

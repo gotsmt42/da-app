@@ -204,11 +204,12 @@ const side = (key, extra) => {
       ? [side("expenseInbox")]
       : []),
     side("expenseReport"),
-    // ✅ ระบบ OT (ผู้ใช้สั่ง 28 ก.ย. 2569) — สิทธิ์ชุดเดียวกับระบบเบิก จึงอยู่หมวดเดียวกัน
-    side("ot"),
-    // ✅ ใบขอซื้อสินค้า PR (ผู้ใช้สั่ง 2 ต.ค. 2569) — สิทธิ์ชุดเดียวกับระบบเบิก
-    side("purchase"),
   ];
+  // ✅ แยกหมวดตามเรื่อง (ผู้ใช้สั่ง "แยกจุดวาง และหมวดหมู่ให้สอดคล้องแบบมืออาชีพ" 2 ต.ค. 2569)
+  // เดิม OT/ใบขอซื้อต่อท้ายหมวดเบิก — ตอนนี้: จัดซื้อ = ใบขอซื้อ PR · บุคคล = OT
+  // ⚠️ สิทธิ์ยังเป็นชุดเดียวกับระบบเบิก (canExpense) — เปลี่ยนแค่จุดวาง · ลำดับหมวดตรงกับหน้าแรก (HomeMenu)
+  const purchaseMenu = [side("purchase"), side("purchaseReport")];
+  const peopleMenu = [side("ot")];
 
   const masterDataMenu = [side("customers"), side("staff")];
 
@@ -412,47 +413,44 @@ const side = (key, extra) => {
             </>
           )}
 
-          {/* หมวด "เอกสาร" — ไฟล์แนบงาน / เอกสารที่ออกจากระบบ
-              ✅ ถามตารางสิทธิ์ (viewDocuments) — เดิมฮาร์ดโค้ดว่า "ทุกคนยกเว้นเซล"
-              ทำให้ติ๊กในหน้าตั้งค่าสิทธิ์แล้วเมนูนี้ไม่ขยับ · ด่านหน้าเพจ DocumentsHub ใช้สิทธิ์เดียวกัน */}
-          {can(userData, "viewDocuments") && (
-            <>
-              <div className="admin-divider-label">เอกสาร</div>
-              {documentsMenu.map((item, idx) => renderLink(item, `doc-${idx}`))}
-            </>
-          )}
-
-          {/* ✅ เห็นได้ทุก role แล้ว — ช่างต้องเข้าไปติดตามใบเสนอราคา/อัปเดตการวางบิลของงานตัวเองได้
-              (ตามที่ผู้ใช้ระบุ) ⚠️ ไม่ได้แปลว่าเห็นข้อมูลการเงินของทั้งบริษัท: ฝั่ง server คืนเฉพาะงานที่
-              ผู้ใช้คนนั้นมีชื่ออยู่ (GET /event-op) และเช็คสิทธิ์รายงานซ้ำทุกครั้งที่บันทึก
-              (requireEventFinanceAccess) — การซ่อนเมนูไม่เคยเป็นด่านความปลอดภัยอยู่แล้ว */}
-          {canViewFinance && (
-            <>
-              <div className="admin-divider-label">การเงิน</div>
-              {financeMenu.map((item, idx) => renderLink(item, `fin-${idx}`))}
-            </>
-          )}
-
           {canExpense && (
             <>
               <div className="admin-divider-label">เบิกค่าใช้จ่าย</div>
               {expenseMenu.map((item, idx) => renderLink(item, `exp-${idx}`))}
             </>
           )}
-
-          {/* ✅ หมวด "ข้อมูลหลัก" — ทะเบียนกลางของระบบ (ลูกค้า/พนักงาน) ที่ทุกหน้าอื่นอ้างอิงถึง
-              เฉพาะแอดมิน/manager (แท็บ "ทะเบียน" ข้างในจำกัดเฉพาะ admin อีกชั้น ตรงกับสิทธิ์เดิม) */}
-          {websiteMenu.length > 0 && (
+          {canExpense && (
             <>
-              <div className="admin-divider-label">เว็บไซต์บริษัท</div>
-              {websiteMenu.map((item, idx) => renderLink(item, `web-${idx}`))}
+              <div className="admin-divider-label">จัดซื้อ</div>
+              {purchaseMenu.map((item, idx) => renderLink(item, `pur-${idx}`))}
+              <div className="admin-divider-label">บุคคล</div>
+              {peopleMenu.map((item, idx) => renderLink(item, `ppl-${idx}`))}
             </>
           )}
 
+          {/* หมวด "เอกสารและการเงิน" — ชื่อเดียวกับหน้าแรก
+              ✅ เดิมแยก "เอกสาร" / "การเงิน" เป็นสองหัวข้อ หัวละเมนูเดียว — รวมเป็นหมวดเดียวให้ตรงกับ HomeMenu
+              ⚠️ เอกสาร = สิทธิ์ viewDocuments · ใบเสนอราคา = viewFinance (ฝั่ง server คืนเฉพาะงานที่มีชื่ออยู่) */}
+          {(can(userData, "viewDocuments") || canViewFinance) && (
+            <>
+              <div className="admin-divider-label">เอกสารและการเงิน</div>
+              {can(userData, "viewDocuments") && documentsMenu.map((item, idx) => renderLink(item, `doc-${idx}`))}
+              {canViewFinance && financeMenu.map((item, idx) => renderLink(item, `fin-${idx}`))}
+            </>
+          )}
+
+          {/* ✅ หมวด "ข้อมูลหลัก" — ทะเบียนกลางของระบบ (ลูกค้า/พนักงาน) ที่ทุกหน้าอื่นอ้างอิงถึง
+              เฉพาะแอดมิน/manager (แท็บ "ทะเบียน" ข้างในจำกัดเฉพาะ admin อีกชั้น ตรงกับสิทธิ์เดิม) */}
           {isAdminOrManager && (
             <>
               <div className="admin-divider-label">ข้อมูลหลัก</div>
               {masterDataMenu.map((item, idx) => renderLink(item, `md-${idx}`))}
+            </>
+          )}
+          {websiteMenu.length > 0 && (
+            <>
+              <div className="admin-divider-label">เว็บไซต์บริษัท</div>
+              {websiteMenu.map((item, idx) => renderLink(item, `web-${idx}`))}
             </>
           )}
         </Nav>

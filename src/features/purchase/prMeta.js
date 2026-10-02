@@ -31,6 +31,17 @@ export const PRIORITIES = [
 ];
 export const priorityMeta = (v) => PRIORITIES.find((p) => p.value === v) || PRIORITIES[0];
 
+/** ประเภทการซื้อ — ต้องตรงกับ PurchaseRequest.CATEGORIES ฝั่ง server */
+export const PR_CATEGORIES = [
+  { value: "material", label: "วัสดุ/อุปกรณ์ใช้ในงาน" },
+  { value: "tool", label: "เครื่องมือ" },
+  { value: "consumable", label: "วัสดุสิ้นเปลือง/สำนักงาน" },
+  { value: "asset", label: "ครุภัณฑ์/สินทรัพย์" },
+  { value: "service", label: "งานบริการ/จ้างเหมา" },
+  { value: "other", label: "อื่นๆ" },
+];
+export const categoryLabel = (v) => PR_CATEGORIES.find((c) => c.value === v)?.label || PR_CATEGORIES[0].label;
+
 export const FILE_KINDS = [
   { value: "quotation", label: "ใบเสนอราคาร้านค้า" },
   { value: "spec", label: "สเปก / แคตตาล็อก" },

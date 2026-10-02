@@ -26,7 +26,7 @@ import usePermissions from "@/shared/hooks/usePermissions";
 import PurchaseService, { errorText } from "../services/PurchaseService";
 import PrStatusBadge from "./PrStatusBadge";
 import {
-  PR_ACCENT, PR_DARK, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, priorityMeta, fileKindLabel, fmtMoney, fmtQty, baht, prJobText, receiveProgress, money,
+  PR_ACCENT, PR_DARK, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, priorityMeta, fileKindLabel, fmtMoney, fmtQty, baht, prJobText, receiveProgress, money, categoryLabel,
 } from "../prMeta";
 
 const Card = ({ title, icon, children, action }) => (
@@ -330,14 +330,16 @@ export default function PrDetailDialog({ open, id, reloadKey = 0, notice, onClos
 
               <Card title="ข้อมูลเอกสาร" icon={<Description sx={{ fontSize: 18, color: PR_ACCENT }} />}>
                 <Stack spacing={2}>
-                  <RequesterRow label="ผู้ขอซื้อ" name={r.requester?.name} position={r.requester?.position}
+                  <RequesterRow label="ผู้ขอซื้อ" name={r.requester?.name} position={[r.requester?.position, r.requester?.department, r.requester?.phone ? `โทร ${r.requester.phone}` : ""].filter(Boolean).join(" · ")}
                     extra={r.createdBy?.userId && r.createdBy.userId !== r.requester?.userId ? `ออกใบแทนโดย ${r.createdBy.name}` : ""} />
                   <Box sx={{ border: `1px solid ${BORDER_MAIN}`, borderRadius: 2, overflow: "hidden" }}>
                     <KV label="เลขที่">{r.docNo}</KV>
                     <KV label="วันที่ขอ">{thaiDate(r.docDate)}</KV>
                     <KV label="ต้องการใช้ภายใน" color={late ? "#dc2626" : undefined}>{r.neededBy ? `${thaiDate(r.neededBy)}${late ? " · เลยกำหนด" : ""}` : "ไม่ระบุ"}</KV>
                     <KV label="ความเร่งด่วน" color={r.priority !== "normal" ? pr.color : undefined}>{pr.label}</KV>
+                    <KV label="ประเภทการซื้อ">{categoryLabel(r.category)}</KV>
                     <KV label="สถานที่ส่งของ">{r.deliverTo}</KV>
+                    {(r.contactName || r.contactPhone) && <KV label="ผู้รับของ">{[r.contactName, r.contactPhone].filter(Boolean).join(" · ")}</KV>}
                     {r.suggestedSupplier && <KV label="ร้านค้าที่แนะนำ">{r.suggestedSupplier}</KV>}
                   </Box>
 
@@ -402,6 +404,7 @@ export default function PrDetailDialog({ open, id, reloadKey = 0, notice, onClos
                         <Typography sx={{ width: 20, color: TEXT_SUB, fontWeight: 700, fontSize: "0.82rem", pt: 0.2 }}>{i + 1}</Typography>
                         <Box sx={{ flex: 1, minWidth: 0 }}>
                           <Typography sx={{ fontWeight: 700, fontSize: "0.9rem" }}>{it.description}</Typography>
+                          {it.code && <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }}>รหัส {it.code}</Typography>}
                           {it.spec && <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }}>{it.spec}</Typography>}
                           <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }}>
                             {fmtQty(it.qty)} {it.unit} × {it.actualUnitPrice !== null && it.actualUnitPrice !== undefined ? `${fmtMoney(it.actualUnitPrice)} (ราคาจริง)` : fmtMoney(it.estUnitPrice)}

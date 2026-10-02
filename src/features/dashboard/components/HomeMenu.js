@@ -15,7 +15,7 @@
  */
 import { Link } from "react-router-dom";
 import {
-  FaCalendarAlt, FaChevronRight, FaWallet, FaFolderOpen, FaDatabase, FaGlobeAsia,
+  FaCalendarAlt, FaChevronRight, FaWallet, FaFolderOpen, FaDatabase, FaGlobeAsia, FaShoppingCart, FaUserClock,
 } from "react-icons/fa";
 
 import { can, isRole, ROLES, TECHNICIAN_ROLES } from "@/shared/utils/roles";
@@ -40,6 +40,8 @@ const TONE = {
   work: "#dc2626",
   sales: "#7c3aed",
   expense: "#0d9488",
+  purchase: "#4338ca",
+  people: "#0891b2",
   docs: "#d97706",
   master: "#2563eb",
   website: "#0f172a",
@@ -105,9 +107,14 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
       expense.push(dest("expenseInbox"));
     }
     expense.push(dest("expenseReport"));
-    expense.push(dest("ot"));
-    expense.push(dest("purchase"));
   }
+
+  // ── จัดซื้อ · บุคคล ───────────────────────────────────────────────────────
+  // ✅ ผู้ใช้สั่ง "แยกจุดวาง และหมวดหมู่ให้สอดคล้องแบบมืออาชีพ" (2 ต.ค. 2569) — เดิม OT กับใบขอซื้อ
+  // ไปต่อท้ายหมวดเบิกค่าใช้จ่าย ทั้งที่เป็นคนละเรื่อง (ขอซื้อของ ≠ เบิกเงิน · OT = เวลาทำงานของพนักงาน)
+  // ⚠️ สิทธิ์ยังเป็นชุดเดียวกับระบบเบิก (canExpense) — แยกแค่ "หมวด" ไม่ได้แยกสิทธิ์
+  const purchase = canExpense ? [dest("purchase"), dest("purchaseReport")] : [];
+  const people = canExpense ? [dest("ot")] : [];
 
   // ── เอกสารและการเงิน ─────────────────────────────────────────────────────
   const docs = [];
@@ -133,6 +140,8 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
   return [
     { key: "work", title: "งาน", icon: FaCalendarAlt, tone: TONE.work, items: work },
     { key: "expense", title: "เบิกค่าใช้จ่าย", icon: FaWallet, tone: TONE.expense, items: expense },
+    { key: "purchase", title: "จัดซื้อ", icon: FaShoppingCart, tone: TONE.purchase, items: purchase },
+    { key: "people", title: "บุคคล", icon: FaUserClock, tone: TONE.people, items: people },
     { key: "docs", title: "เอกสารและการเงิน", icon: FaFolderOpen, tone: TONE.docs, items: docs },
     { key: "master", title: "ข้อมูลหลัก", icon: FaDatabase, tone: TONE.master, items: master },
     { key: "website", title: "เว็บไซต์บริษัท", icon: FaGlobeAsia, tone: TONE.website, items: website },

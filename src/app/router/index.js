@@ -84,6 +84,7 @@ const JobRequestQueue = lazy(() => import("@/features/dispatch/pages/JobRequestQ
 const ExpensesPage = lazy(() => import("@/features/expenses/pages/ExpensesPage.js"));
 const OtPage = lazy(() => import("@/features/ot/pages/OtPage.js"));
 const PurchasePage = lazy(() => import("@/features/purchase/pages/PurchasePage.js"));
+const PurchaseReport = lazy(() => import("@/features/purchase/pages/PurchaseReport.js"));
 
 // ✅ หน้ารวม 4 หน้า — ยุบหน้าที่เป็นข้อมูลประเภทเดียวกันให้เหลือหน้าเดียวต่อเรื่อง แล้วแยกด้วยแท็บ
 // (ดูเหตุผลของแต่ละการรวมในหัวไฟล์ของแต่ละตัว) URL เดิมทั้งหมดยัง redirect เข้ามาที่นี่ได้ ลิงก์เก่าไม่พัง
@@ -442,6 +443,15 @@ const ThemeRoutes = [
         title: "Dispatch",
       },
       // ── ใบขอซื้อสินค้า PR (ผู้ใช้สั่ง 2 ต.ค. 2569) — path ตายตัวก่อน "purchase/:id"
+      {
+        path: "purchase/report",
+        element: (
+          <Suspense fallback={<div>Loading...</div>}>
+            <PurchaseReport />
+          </Suspense>
+        ),
+        title: "รายงานการจัดซื้อ",
+      },
       ...[
         ["purchase", "mine", "ใบขอซื้อสินค้า"],
         ["purchase/approvals", "inbox", "ใบขอซื้อรอดำเนินการ"],

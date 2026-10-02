@@ -266,6 +266,7 @@ export default function PurchasePage({ view = "mine" }) {
   const crossLinks = [
     ...(view !== "mine" ? [{ to: "/purchase", label: "ใบขอซื้อ" }] : []),
     ...(canHandle && view !== "inbox" ? [{ to: "/purchase/approvals", label: `รอดำเนินการ${summary?.inbox ? ` (${summary.inbox})` : ""}` }] : []),
+    { to: "/purchase/report", label: "รายงาน" },
     { to: "/expenses/advances", label: "ระบบเบิก" },
   ];
   const waitingAmount = rows.filter((r) => ["approved", "ordered", "partial"].includes(r.status)).reduce((s, r) => s + amountOf(r), 0);

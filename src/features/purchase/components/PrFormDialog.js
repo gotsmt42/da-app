@@ -23,12 +23,12 @@ import ExpenseService from "@/features/expenses/services/ExpenseService";
 import { jobText, jobRangeText } from "@/features/expenses/expenseMeta";
 import PurchaseService, { errorText } from "../services/PurchaseService";
 import {
-  PR_ACCENT, PR_DARK, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, PRIORITIES, FILE_KINDS, money, fmtMoney, baht,
+  PR_ACCENT, PR_DARK, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, PRIORITIES, PR_CATEGORIES, FILE_KINDS, money, fmtMoney, baht,
 } from "../prMeta";
 
 let seq = 0;
 const key = () => `p${Date.now()}_${(seq += 1)}`;
-const blank = () => ({ key: key(), description: "", spec: "", qty: 1, unit: "ชิ้น", estUnitPrice: "", note: "" });
+const blank = () => ({ key: key(), code: "", description: "", spec: "", qty: 1, unit: "ชิ้น", estUnitPrice: "", note: "" });
 const numberField = { inputMode: "decimal", onWheel: (e) => e.currentTarget.blur() };
 
 const Section = ({ title, hint, children, action }) => (
@@ -58,6 +58,9 @@ export default function PrFormDialog({ open, request, onClose, onSaved }) {
   const [priority, setPriority] = useState("normal");
   const [neededBy, setNeededBy] = useState("");
   const [deliverTo, setDeliverTo] = useState("");
+  const [category, setCategory] = useState("material");
+  const [contactName, setContactName] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
   const [job, setJob] = useState(null);
   const [purpose, setPurpose] = useState("");
   const [items, setItems] = useState([blank()]);
@@ -87,12 +90,14 @@ export default function PrFormDialog({ open, request, onClose, onSaved }) {
       setDocDate(r.docDate ? moment(r.docDate).format("YYYY-MM-DD") : moment().format("YYYY-MM-DD"));
       setSubject(r.subject || ""); setPriority(r.priority || "normal");
       setNeededBy(r.neededBy ? moment(r.neededBy).format("YYYY-MM-DD") : "");
+      setCategory(r.category || "material"); setContactName(r.contactName || ""); setContactPhone(r.contactPhone || "");
       setDeliverTo(r.deliverTo || ""); setPurpose(r.purpose || ""); setSupplier(r.suggestedSupplier || ""); setNote(r.note || "");
       setJob(r.eventId ? { _id: r.eventId, ...r.job } : null);
-      setItems((r.items || []).map((it) => ({ key: key(), _id: it._id, description: it.description, spec: it.spec || "", qty: it.qty, unit: it.unit || "", estUnitPrice: it.estUnitPrice || "", note: it.note || "" })));
+      setItems((r.items || []).map((it) => ({ key: key(), _id: it._id, code: it.code || "", description: it.description, spec: it.spec || "", qty: it.qty, unit: it.unit || "", estUnitPrice: it.estUnitPrice || "", note: it.note || "" })));
       setVatRate(r.vatRate || 0);
     } else {
       setDocDate(moment().format("YYYY-MM-DD")); setSubject(""); setPriority("normal"); setNeededBy(""); setDeliverTo("");
+      setCategory("material"); setContactName(""); setContactPhone("");
       setPurpose(""); setSupplier(""); setNote(""); setJob(null); setItems([blank()]); setVatRate(0);
     }
     return () => { alive = false; };
@@ -112,7 +117,7 @@ export default function PrFormDialog({ open, request, onClose, onSaved }) {
   const pickProduct = (k, v) => {
     if (!v || typeof v === "string") { setItem(k, { description: String(v || "").slice(0, 300) }); return; }
     setItems((rows) => rows.map((r) => (r.key !== k ? r : {
-      ...r, description: v.description, spec: r.spec || v.spec || "", unit: v.unit || r.unit, estUnitPrice: r.estUnitPrice || v.lastPrice || "",
+      ...r, code: r.code || v.code || "", description: v.description, spec: r.spec || v.spec || "", unit: v.unit || r.unit, estUnitPrice: r.estUnitPrice || v.lastPrice || "",
     })));
   };
 
@@ -133,6 +138,7 @@ export default function PrFormDialog({ open, request, onClose, onSaved }) {
     setSaving(true); setError("");
     const fields = {
       docDate, subject: subject.trim(), priority, neededBy: neededBy || "", deliverTo: deliverTo.trim(), eventId: job?._id || "",
+      category, contactName: contactName.trim(), contactPhone: contactPhone.trim(),
       purpose: purpose.trim(), suggestedSupplier: supplier.trim(), note: note.trim(), vatRate,
       ...(isMine && mySignature ? { useSignature } : {}),
       items: valid.map(({ key: k, ...it }) => ({ ...it, qty: Number(it.qty) || 0, estUnitPrice: Number(it.estUnitPrice) || 0 })),
@@ -189,6 +195,9 @@ export default function PrFormDialog({ open, request, onClose, onSaved }) {
                 ))}
               </ToggleButtonGroup>
             </Box>
+            <TextField select size="small" label="ประเภทการซื้อ" value={category} onChange={(e) => setCategory(e.target.value)} sx={{ gridColumn: { sm: "1 / -1" } }}>
+              {PR_CATEGORIES.map((c) => <MenuItem key={c.value} value={c.value}>{c.label}</MenuItem>)}
+            </TextField>
             <Autocomplete
               sx={{ gridColumn: { sm: "1 / -1" } }}
               options={job && !jobOptions.some((j) => j._id === job._id) ? [job, ...jobOptions] : jobOptions}
@@ -205,6 +214,8 @@ export default function PrFormDialog({ open, request, onClose, onSaved }) {
             <Autocomplete freeSolo options={suggest.deliverTo || []} value={deliverTo} inputValue={deliverTo}
               onInputChange={(_, v) => setDeliverTo(v)} onChange={(_, v) => setDeliverTo(v || "")} sx={{ gridColumn: { sm: "1 / -1" } }}
               renderInput={(params) => <TextField {...params} size="small" label="สถานที่ส่งของ" placeholder="เช่น หน้างาน Centara Grand Bangkok / สำนักงาน" />} />
+            <TextField size="small" label="ผู้รับของ ณ จุดส่ง" value={contactName} onChange={(e) => setContactName(e.target.value)} inputProps={{ maxLength: 120 }} placeholder="ว่าง = ผู้ขอซื้อ" />
+            <TextField size="small" label="เบอร์ติดต่อผู้รับของ" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} inputProps={{ maxLength: 40, inputMode: "tel" }} />
             <TextField size="small" label="วัตถุประสงค์ / เหตุผลการซื้อ" value={purpose} onChange={(e) => setPurpose(e.target.value)} multiline minRows={2}
               sx={{ gridColumn: { sm: "1 / -1" } }} inputProps={{ maxLength: 1000 }} placeholder="เช่น ใช้ติดตั้งตามสัญญางวดที่ 2 / ของเดิมชำรุดต้องเปลี่ยน" />
           </Box>
@@ -237,8 +248,10 @@ export default function PrFormDialog({ open, request, onClose, onSaved }) {
                     renderInput={(params) => <TextField {...params} size="small" label="หน่วย" />} />
                   <TextField size="small" label="ราคา/หน่วย (ประมาณ)" type="number" value={row.estUnitPrice} onChange={(e) => setItem(row.key, { estUnitPrice: e.target.value })}
                     inputProps={{ min: 0, step: "any", ...numberField }} sx={{ gridColumn: { xs: "1 / -1", md: "auto" } }} />
+                  <TextField size="small" label="รหัสสินค้า / Part No." value={row.code} onChange={(e) => setItem(row.key, { code: e.target.value })}
+                    sx={{ gridColumn: { xs: "1 / -1", md: "auto" } }} inputProps={{ maxLength: 60 }} placeholder="ไม่บังคับ" />
                   <TextField size="small" label="ยี่ห้อ / รุ่น / สเปก" value={row.spec} onChange={(e) => setItem(row.key, { spec: e.target.value })}
-                    sx={{ gridColumn: "1 / -1" }} inputProps={{ maxLength: 500 }} placeholder="เช่น Hochiki ALN-EN · 24VDC · มี มอก." />
+                    sx={{ gridColumn: { xs: "1 / -1", md: "2 / -1" } }} inputProps={{ maxLength: 500 }} placeholder="เช่น Hochiki ALN-EN · 24VDC · มี มอก." />
                 </Box>
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
                   <TextField size="small" variant="standard" placeholder="หมายเหตุรายการ (ไม่บังคับ)" value={row.note} onChange={(e) => setItem(row.key, { note: e.target.value })}

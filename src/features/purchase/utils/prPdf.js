@@ -17,7 +17,7 @@ import { ISSUER, drawLetterhead, outputDocument, spaceThaiLatin, preparePrintAss
 import { loadBoldFont, newDoc, wrapText } from "@/features/expenses/utils/expensePdf";
 import { bahtText } from "@/features/expenses/expenseMeta";
 import { thaiDate, thaiDateFull, thaiDateTime } from "@/shared/utils/thaiDate";
-import { prStatus, priorityMeta, fmtMoney, fmtQty, prJobText } from "../prMeta";
+import { prStatus, priorityMeta, fmtMoney, fmtQty, prJobText, categoryLabel, fileKindLabel } from "../prMeta";
 
 const W_PAGE = 210;
 const H_PAGE = 297;
@@ -89,10 +89,6 @@ export async function generatePrPdf({ request: r, signatures = null, mode = "ope
   };
   kvRight("เลขที่", r.docNo || "-", y - 4);
   kvRight("วันที่", thaiDate(r.docDate), y + 1.5);
-  if (r.priority && r.priority !== "normal") {
-    size(12.5); bold(true); color(INK);
-    doc.text(`[ ${pr.label} ]`, L, y - 1);
-  }
   y += 10;
 
   // ── 2. ข้อมูลการขอซื้อ (ตารางเส้นบาง ป้ายเล็ก · ค่าตัวปกติ) ──────────
@@ -118,13 +114,28 @@ export async function generatePrPdf({ request: r, signatures = null, mode = "ope
     y += h;
   };
   const boxTop = y;
-  infoRow([{ label: "ผู้ขอซื้อ", value: signatures?.requester?.name || r.requester?.name, w: 1.2 }, { label: "ตำแหน่ง", value: r.requester?.position }, { label: "ต้องการใช้ภายใน", value: r.neededBy ? thaiDateFull(r.neededBy) : "ไม่ระบุ" }]);
+  // ✅ ช่องมาตรฐานของแบบฟอร์ม PR ทั่วไป (ผู้ใช้สั่ง "ข้อมูลครบถ้วน และมืออาชีพ ที่ใช้ทั่วไป"):
+  //    ผู้ขอ/ตำแหน่ง-ฝ่าย/โทร · วันที่ต้องการ/ความเร่งด่วน/ประเภทการซื้อ · เรื่อง · งาน(ศูนย์ต้นทุน)/สถานที่ส่ง · ผู้รับของ/ร้านค้าแนะนำ
+  const req = r.requester || {};
+  infoRow([
+    { label: "ผู้ขอซื้อ", value: signatures?.requester?.name || req.name, w: 1.2 },
+    { label: "ตำแหน่ง / ฝ่าย", value: [req.position, req.department].filter(Boolean).join(" · ") || "-", w: 1.2 },
+    { label: "โทรศัพท์", value: req.phone || "-", w: 0.8 },
+  ]);
+  infoRow([
+    { label: "ต้องการใช้ภายใน", value: r.neededBy ? thaiDateFull(r.neededBy) : "ไม่ระบุ", w: 1.2 },
+    { label: "ความเร่งด่วน", value: pr.label, w: 0.8 },
+    { label: "ประเภทการซื้อ", value: categoryLabel(r.category), w: 1.2 },
+  ]);
   infoRow([{ label: "เรื่อง", value: r.subject }]);
   infoRow([
-    { label: "ใช้กับงาน / โครงการ", value: r.eventId ? `${prJobText(r.job)}${r.job?.docNo ? ` (${r.job.docNo})` : ""}` : "ไม่ผูกงาน", w: 2 },
-    { label: "สถานที่ส่งของ", value: r.deliverTo || "-", w: 1.2 },
+    { label: "ใช้กับงาน / โครงการ", value: r.eventId ? `${prJobText(r.job)}${r.job?.docNo ? ` (${r.job.docNo})` : ""}` : "ไม่ผูกงาน (ค่าใช้จ่ายทั่วไป)", w: 1.6 },
+    { label: "สถานที่ส่งของ", value: r.deliverTo || "-", w: 1.6 },
   ]);
-  if (r.suggestedSupplier) infoRow([{ label: "ร้านค้าที่แนะนำ", value: r.suggestedSupplier }]);
+  infoRow([
+    { label: "ผู้รับของ / โทร", value: [r.contactName || (r.contactPhone ? "" : req.name), r.contactPhone].filter(Boolean).join(" · ") || "-", w: 1.6 },
+    { label: "ร้านค้าที่แนะนำ", value: r.suggestedSupplier || "-", w: 1.6 },
+  ]);
   doc.setDrawColor(...RULE); doc.setLineWidth(0.25);
   doc.rect(L, boxTop, W, y - boxTop);
   y += 6;
@@ -157,7 +168,7 @@ export async function generatePrPdf({ request: r, signatures = null, mode = "ope
     size(13.5); bold(false);
     const descLines = wrapText(doc, T(it.description), col("desc").w - 4);
     size(11.5);
-    const subLines = [it.spec, it.note ? `หมายเหตุ: ${it.note}` : ""].filter(Boolean).flatMap((t) => wrapText(doc, T(t), col("desc").w - 4));
+    const subLines = [[it.code ? `รหัส ${it.code}` : "", it.spec].filter(Boolean).join(" · "), it.note ? `หมายเหตุ: ${it.note}` : ""].filter(Boolean).flatMap((t) => wrapText(doc, T(t), col("desc").w - 4));
     const rh = Math.max(8.5, 3.5 + descLines.length * 5.4 + subLines.length * 4.5);
     if (y + rh > BODY_LIMIT) { closeTable(); doc.addPage(); y = 16; tableTop = y; drawHead(); }
     const base = y + 5.6;
@@ -178,11 +189,11 @@ export async function generatePrPdf({ request: r, signatures = null, mode = "ope
   });
   closeTable();
 
-  // ── 4. ยอดรวม — แถวต่อท้ายตาราง (ป้ายชิดขวา · ตัวเลขในช่องจำนวนเงิน) ─────
+  // ── 4. ยอดรวม — แถวต่อท้ายตาราง (ช่องป้ายกว้างตั้งแต่คอลัมน์จำนวน กันข้อความล้น) ─────
   const sumRow = (label, value, strong) => {
     const h = 7.5;
     doc.setDrawColor(...LINE); doc.setLineWidth(0.25);
-    doc.rect(col("price").x, y, R - col("price").x, h);
+    doc.rect(col("qty").x, y, R - col("qty").x, h);
     doc.line(col("amount").x, y, col("amount").x, y + h);
     size(13); bold(strong); color(INK);
     doc.text(label, col("amount").x - 2, y + 5.2, { align: "right" });
@@ -196,7 +207,8 @@ export async function generatePrPdf({ request: r, signatures = null, mode = "ope
   sumRow("ยอดประมาณการรวม", r.estTotal, true);
   if (r.actualTotal) sumRow("ยอดสั่งซื้อจริง", r.actualTotal);
   bold(false); size(12.5); color(SUB);
-  doc.text(T(`( ${bahtText(r.estTotal)} )`), L + 2, sumTop + 5.2);
+  wrapText(doc, T(`( ${bahtText(r.estTotal)} )`), col("qty").x - L - 4).slice(0, 3)
+    .forEach((ln, i) => doc.text(ln, L + 2, sumTop + 5.2 + i * 5));
   y += 6;
 
   // ── 5. ข้อมูลเพิ่มเติม — หัวข้อตัวหนาเล็ก + ข้อความ (ไม่มีกล่อง/แถบสี) ─────
@@ -233,7 +245,15 @@ export async function generatePrPdf({ request: r, signatures = null, mode = "ope
   if (r.receipts?.length) {
     section("การรับของ", r.receipts.map((rc) => [thaiDate(rc.at), `${rc.lines.map((l) => `${l.description} (${fmtQty(l.qty)})`).join(", ")} · รับโดย ${rc.by?.name || "-"}${rc.note ? ` · ${rc.note}` : ""}`]));
   }
-  section("หมายเหตุ", [r.note && ["", r.note], r.status === "rejected" && r.rejectReason && ["เหตุผลที่ตีกลับ", r.rejectReason]]);
+  // เอกสารแนบ — นับตามชนิด (ผู้ตรวจสอบรู้ว่ามีใบเสนอราคาเทียบกี่ฉบับ โดยไม่ต้องเปิดระบบ)
+  const kinds = new Map();
+  (r.attachments || []).forEach((f) => kinds.set(f.kind, (kinds.get(f.kind) || 0) + 1));
+  section("เอกสารแนบ", [kinds.size && ["", [...kinds].map(([k, n]) => `${fileKindLabel(k)} ${n} ไฟล์`).join(" · ")]]);
+  section("หมายเหตุ", [
+    r.note && ["", r.note],
+    r.status === "rejected" && r.rejectReason && ["เหตุผลที่ตีกลับ", r.rejectReason],
+    r.status === "cancelled" && ["ยกเลิกใบ", `${r.cancelReason || "ไม่ระบุเหตุผล"}${r.cancelledBy?.name ? ` · โดย ${r.cancelledBy.name}` : ""}${r.cancelledAt ? ` · ${thaiDate(r.cancelledAt)}` : ""}`],
+  ]);
 
   // ── 6. ลงนาม 4 ช่อง (ไม่มีกรอบ — เส้นลงชื่อ · ชื่อ · บทบาท · วันที่) ─────
   if (y > SIG_TOP - 2) doc.addPage();
@@ -270,7 +290,7 @@ export async function generatePrPdf({ request: r, signatures = null, mode = "ope
     doc.setPage(p);
     bold(false); size(10); color(FAINT);
     doc.text(`พิมพ์จากระบบเมื่อ ${thaiDateTime(new Date())} · ${ISSUER.nameEn}`, L, H_PAGE - 5);
-    doc.text(`${r.docNo || ""} · สถานะ: ${st.label}${pages > 1 ? ` · หน้า ${p}/${pages}` : ""}`, R, H_PAGE - 5, { align: "right" });
+    doc.text(`${r.docNo || ""} · สถานะ: ${st.label}${` · หน้า ${p}/${pages}`}`, R, H_PAGE - 5, { align: "right" });
   }
   doc.setProperties({ title: `ใบขอซื้อสินค้า ${r.docNo || ""}`, subject: r.subject || "", creator: ISSUER.nameEn });
   return outputDocument(doc, r.docNo || "ใบขอซื้อ", mode);
