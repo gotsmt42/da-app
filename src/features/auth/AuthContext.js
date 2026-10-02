@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { jwtDecode } from "jwt-decode"; // ✅ ถูกต้อง
 import PushService from "@/shared/services/PushService";
 import { resetInbox } from "@/shared/hooks/useInbox";
+import SignatureService from "@/shared/services/SignatureService";
 import AuthService from "@/shared/services/authService";
 import { startRealtime, stopRealtime } from "@/shared/realtime/realtimeClient";
 import useRealtime from "@/shared/realtime/useRealtime";
@@ -212,6 +213,8 @@ const updateUserData = (newData) => {
   // };
 
   const login = (newToken, payload) => {
+    // ✅ ลายเซ็นในแคชเป็นของบัญชีก่อนหน้า — ล้างก่อนเสมอ (ดู SignatureService)
+    SignatureService.clearCache();
     localStorage.setItem("token", newToken);
     localStorage.setItem("payload", JSON.stringify(payload));
     setLoggedIn(true);
@@ -232,6 +235,7 @@ const updateUserData = (newData) => {
     // token ถูกลบไปแล้ว ระบบก็ลบ record ให้เองตอนส่ง push ครั้งถัดไปแล้วได้ 410 กลับมา
     PushService.unsubscribe().catch(() => {});
     resetInbox();
+    SignatureService.clearCache();
     localStorage.removeItem("token");
     localStorage.removeItem("payload");
     setLoggedIn(false);
