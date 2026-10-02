@@ -23,11 +23,11 @@ import { alpha } from "@mui/material/styles";
 import {
   Box, Stack, Typography, TextField, InputAdornment, IconButton, Chip, Avatar, Tooltip, Skeleton, Snackbar, Alert,
   Button, Dialog, DialogTitle, DialogContent, DialogActions, useMediaQuery, Pagination, Checkbox, FormControlLabel,
-  Table, TableBody, TableCell, TableHead, TableRow, Collapse,
+  Table, TableBody, TableCell, TableHead, TableRow, Collapse, Drawer, Badge,
 } from "@mui/material";
 import {
   Search, Close, Refresh, RequestQuote, Send, CheckCircle, Cancel, Autorenew, HourglassTop, WarningAmber, ChevronRight,
-  AttachFile, Chat, OpenInNew, History, Apps, Description, Edit, Phone, Email, EventRepeat, Undo, Save, Insights, ExpandMore,
+  AttachFile, Chat, OpenInNew, History, Apps, Description, Edit, Phone, Email, EventRepeat, Undo, Save, Insights, ExpandMore, Tune,
 } from "@mui/icons-material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFileExcel } from "@fortawesome/free-solid-svg-icons";
@@ -46,6 +46,7 @@ import { can } from "@/shared/utils/roles";
 import ViewTiles from "@/shared/ui/ViewTiles";
 import SelectField from "@/shared/ui/SelectField";
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
+import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
 
 const TEXT_MAIN = "#0f172a";
 const TEXT_SUB = "#64748b";
@@ -659,6 +660,7 @@ export default function QuotationTracking() {
   const [period, setPeriod] = useState("all");
   const [page, setPage] = useState(1);
   const [exporting, setExporting] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [detailId, setDetailId] = useState("");
   const [preview, setPreview] = useState({ url: null, name: "" });
   const [snackbar, setSnackbar] = useState({ open: false, msg: "", severity: "success" });
@@ -849,6 +851,10 @@ export default function QuotationTracking() {
     }
   };
 
+  // จำนวนตัวกรองที่ต่างจากค่าเริ่มต้น — ป้ายบนปุ่มตัวกรอง (มือถือ)
+  const activeFilters = (search.trim() ? 1 : 0) + (owner !== "all" ? 1 : 0) + (period !== "all" ? 1 : 0) + (status !== "open" ? 1 : 0);
+  useCloseOnPick(filtersOpen, () => setFiltersOpen(false), { status, owner, period });
+
   if (!loading && !canAccess) return <Navigate to="/dashboard" replace />;
 
   const tiles = [
@@ -862,45 +868,9 @@ export default function QuotationTracking() {
     { value: "all", label: "ทั้งหมด", count: counts.all, unit: "ใบ", icon: <Insights />, color: "#475569" },
   ];
 
-  return (
-    <Box sx={{ p: { xs: 1.25, sm: 2.5 }, maxWidth: 1500, mx: "auto" }}>
-      {/* ── หัวเพจ ── */}
-      <Box sx={{ borderRadius: 3, border: `1px solid ${BORDER}`, bgcolor: "#fff", px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.5 }, mb: 1.5 }}>
-        <Stack direction="row" alignItems="center" spacing={1.5}>
-          <Box sx={{ width: 40, height: 40, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#334155", color: "#fff" }}>
-            <RequestQuote />
-          </Box>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.1rem", sm: "1.25rem" }, color: TEXT_MAIN, lineHeight: 1.25 }}>ติดตามใบเสนอราคา</Typography>
-            <Typography noWrap sx={{ fontSize: "0.76rem", color: TEXT_SUB }}>
-              แนบไฟล์ → ส่งลูกค้า → ติดตาม (ทุก {WARNING_DAYS_AFTER_SENT} วัน หรือตามนัด) → อนุมัติ / ปฏิเสธ
-              {lastRefreshed ? ` · อัปเดต ${moment(lastRefreshed).format("HH:mm")}` : ""}
-            </Typography>
-          </Box>
-          <Tooltip title="รีเฟรช">
-            <IconButton onClick={() => fetchJobs()} sx={{ border: `1px solid ${BORDER}`, borderRadius: 2 }}><Refresh sx={{ fontSize: 20 }} /></IconButton>
-          </Tooltip>
-        </Stack>
-      </Box>
-
-      {/* ── ตัวเลขสรุป ── */}
-      {loading ? (
-        <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(5, 1fr)" }, mb: 1.5 }}>
-          {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} variant="rounded" height={78} sx={{ borderRadius: 2.5 }} />)}
-        </Box>
-      ) : (
-        <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(5, 1fr)" }, mb: 1.5 }}>
-          <Kpi label="มูลค่ารอลูกค้าตอบ" value={baht(stats.pendingValue)} sub={`${stats.pendingCount} ใบ`} color="#2563eb" onClick={() => setStatus("open")} active={status === "open"} />
-          <Kpi label="ต้องติดตามด่วน" value={`${counts.follow_up || 0} ใบ`} sub={counts.follow_up ? `มูลค่า ${baht(stats.urgentValue)}` : "ไม่มีใบเลยกำหนด"} color="#dc2626" alert={counts.follow_up > 0} onClick={() => setStatus("follow_up")} active={status === "follow_up"} />
-          <Kpi label="อนุมัติแล้ว" value={baht(stats.approvedValue)} sub={`${stats.approvedCount} ใบ`} color="#15803d" onClick={() => setStatus("approved")} active={status === "approved"} />
-          <Kpi label="อัตราปิดการขาย" value={stats.winRate === null ? "—" : `${stats.winRate}%`} sub={stats.decided ? `อนุมัติ ${stats.approvedCount} จาก ${stats.decided} ใบที่ได้คำตอบ` : "ยังไม่มีใบที่ได้คำตอบ"} color="#0f172a" />
-          <Box sx={{ gridColumn: { xs: "1 / -1", md: "auto" }, display: "grid" }}><Kpi label="ข้อมูลไม่ครบ" value={`${counts.incomplete} ใบ`} sub="ไม่มีเลขที่ หรือ ไม่มีมูลค่า" color="#b45309" alert={counts.incomplete > 0} onClick={() => setStatus("incomplete")} active={status === "incomplete"} /></Box>
-        </Box>
-      )}
-
-      {/* ── ค้นหา + ตัวกรอง ── */}
-      <Stack ref={topRef} direction={{ xs: "column", md: "row" }} spacing={1} alignItems={{ md: "center" }}
-        sx={{ mb: 1.5, p: 1, bgcolor: "#fff", border: `1px solid ${BORDER}`, borderRadius: 3, boxShadow: "0 1px 2px rgba(15,23,42,.04)", scrollMarginTop: 72 }}>
+  const filterBar = (
+      <Stack direction={{ xs: "column", md: "row" }} spacing={1} alignItems={{ md: "center" }}
+        sx={isDesktop ? { mb: 1.5, p: 1, bgcolor: "#fff", border: `1px solid ${BORDER}`, borderRadius: 3, boxShadow: "0 1px 2px rgba(15,23,42,.04)" } : {}}>
         <TextField size="small" placeholder="ค้นหาลูกค้า / โครงการ / เลขที่ใบเสนอราคา / PO / ผู้ติดต่อ" value={search} onChange={(e) => setSearch(e.target.value)}
           sx={{ flex: 1, minWidth: 0, "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: "#f8fafc", height: 40, "& fieldset": { borderColor: "transparent" }, "&:hover fieldset": { borderColor: BORDER }, "&.Mui-focused": { bgcolor: "#fff" } } }}
           InputProps={{
@@ -925,8 +895,95 @@ export default function QuotationTracking() {
           </Tooltip>
         </Stack>
       </Stack>
+  );
+  const tilesEl = <ViewTiles value={status} onChange={setStatus} isMobile={!isDesktop} groups={[{ title: "", items: tiles }]} />;
+  const statusLabel = status === "open" ? "กำลังดำเนินการ" : status === "all" ? "ทั้งหมด" : status === "incomplete" ? "ข้อมูลไม่ครบ" : STATUS[status]?.label || "";
 
-      <ViewTiles value={status} onChange={setStatus} isMobile={!isDesktop} groups={[{ title: "", items: tiles }]} />
+  return (
+    <Box sx={{ p: { xs: 1.25, sm: 2.5 }, maxWidth: 1500, mx: "auto" }}>
+      {/* ── หัวเพจ ── */}
+      <Box sx={{ borderRadius: 3, border: `1px solid ${BORDER}`, bgcolor: "#fff", px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.5 }, mb: 1.5 }}>
+        <Stack direction="row" alignItems="center" spacing={1.5}>
+          <Box sx={{ width: 40, height: 40, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#334155", color: "#fff" }}>
+            <RequestQuote />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.1rem", sm: "1.25rem" }, color: TEXT_MAIN, lineHeight: 1.25 }}>ติดตามใบเสนอราคา</Typography>
+            <Typography noWrap sx={{ fontSize: "0.76rem", color: TEXT_SUB }}>
+              แนบไฟล์ → ส่งลูกค้า → ติดตาม (ทุก {WARNING_DAYS_AFTER_SENT} วัน หรือตามนัด) → อนุมัติ / ปฏิเสธ
+              {lastRefreshed ? ` · อัปเดต ${moment(lastRefreshed).format("HH:mm")}` : ""}
+            </Typography>
+          </Box>
+          <Tooltip title="รีเฟรช">
+            <IconButton onClick={() => fetchJobs()} sx={{ border: `1px solid ${BORDER}`, borderRadius: 2, display: { xs: "none", md: "inline-flex" } }}><Refresh sx={{ fontSize: 20 }} /></IconButton>
+          </Tooltip>
+          {/* ✅ มือถือ: ค้นหา/ตัวกรอง/สถานะ ซ่อนในแผ่นล่าง (เหมือนหน้าใบเบิก/ใบขอซื้อ) — ผู้ใช้สั่ง 2 ต.ค. 2569 */}
+          {!isDesktop && (
+            <IconButton aria-label="ค้นหาและตัวกรอง" onClick={() => setFiltersOpen(true)}
+              sx={{ width: 42, height: 42, borderRadius: 2.5, border: `1px solid ${BORDER}`, bgcolor: activeFilters ? "#f1f5f9" : "#fff", color: TEXT_MAIN }}>
+              <Badge badgeContent={activeFilters} color="error" sx={{ "& .MuiBadge-badge": { fontSize: "0.62rem", height: 16, minWidth: 16 } }}><Tune sx={{ fontSize: 21 }} /></Badge>
+            </IconButton>
+          )}
+        </Stack>
+      </Box>
+
+      {/* ── ตัวเลขสรุป ── */}
+      {loading ? (
+        <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(5, 1fr)" }, mb: 1.5 }}>
+          {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} variant="rounded" height={78} sx={{ borderRadius: 2.5 }} />)}
+        </Box>
+      ) : (
+        <Box sx={{
+          display: "grid", gap: 1, mb: 1.5,
+          // มือถือ: แถวเดียวเลื่อนแนวนอน (ไม่กินจอครึ่งหน้าก่อนถึงรายการ)
+          gridTemplateColumns: { xs: "none", md: "repeat(5, 1fr)" }, gridAutoFlow: { xs: "column", md: "row" }, gridAutoColumns: { xs: "44%", md: "auto" },
+          overflowX: { xs: "auto", md: "visible" }, scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" },
+        }}>
+          <Kpi label="มูลค่ารอลูกค้าตอบ" value={baht(stats.pendingValue)} sub={`${stats.pendingCount} ใบ`} color="#2563eb" onClick={() => setStatus("open")} active={status === "open"} />
+          <Kpi label="ต้องติดตามด่วน" value={`${counts.follow_up || 0} ใบ`} sub={counts.follow_up ? `มูลค่า ${baht(stats.urgentValue)}` : "ไม่มีใบเลยกำหนด"} color="#dc2626" alert={counts.follow_up > 0} onClick={() => setStatus("follow_up")} active={status === "follow_up"} />
+          <Kpi label="อนุมัติแล้ว" value={baht(stats.approvedValue)} sub={`${stats.approvedCount} ใบ`} color="#15803d" onClick={() => setStatus("approved")} active={status === "approved"} />
+          <Kpi label="อัตราปิดการขาย" value={stats.winRate === null ? "—" : `${stats.winRate}%`} sub={stats.decided ? `อนุมัติ ${stats.approvedCount} จาก ${stats.decided} ใบที่ได้คำตอบ` : "ยังไม่มีใบที่ได้คำตอบ"} color="#0f172a" />
+          <Box sx={{ display: "grid" }}><Kpi label="ข้อมูลไม่ครบ" value={`${counts.incomplete} ใบ`} sub="ไม่มีเลขที่ หรือ ไม่มีมูลค่า" color="#b45309" alert={counts.incomplete > 0} onClick={() => setStatus("incomplete")} active={status === "incomplete"} /></Box>
+        </Box>
+      )}
+
+      {/* ── ค้นหา + ตัวกรอง ── จอใหญ่วางบนหน้า · มือถืออยู่ในแผ่นล่าง */}
+      <Box ref={topRef} sx={{ scrollMarginTop: 72 }} />
+      {isDesktop ? (
+        <>
+          {filterBar}
+          {tilesEl}
+        </>
+      ) : (
+        <>
+          {activeFilters > 0 && (
+            <Stack direction="row" spacing={0.75} useFlexGap sx={{ mb: 1.25, flexWrap: "wrap" }}>
+              {status !== "open" && <Chip size="small" label={`สถานะ: ${statusLabel}`} onDelete={() => setStatus("open")} sx={{ fontWeight: 700 }} />}
+              {search.trim() && <Chip size="small" label={`ค้นหา: ${search.trim()}`} onDelete={() => setSearch("")} sx={{ fontWeight: 700, maxWidth: "100%" }} />}
+              {owner !== "all" && <Chip size="small" label={`ผู้รับผิดชอบ: ${owner}`} onDelete={() => setOwner("all")} sx={{ fontWeight: 700 }} />}
+              {period !== "all" && <Chip size="small" label={PERIODS.find((x) => x.value === period)?.label} onDelete={() => setPeriod("all")} sx={{ fontWeight: 700 }} />}
+            </Stack>
+          )}
+          <Drawer anchor="bottom" open={filtersOpen} onClose={() => setFiltersOpen(false)}
+            PaperProps={{ sx: { borderTopLeftRadius: 18, borderTopRightRadius: 18, px: 2, pt: 1, pb: "calc(16px + env(safe-area-inset-bottom))", maxHeight: "88vh" } }}>
+            <Box sx={{ width: 40, height: 4, borderRadius: 2, bgcolor: "#cbd5e1", mx: "auto", mb: 1.25 }} />
+            <Stack direction="row" alignItems="center" sx={{ mb: 1.5 }}>
+              <Typography sx={{ flex: 1, fontWeight: 800, fontSize: "1rem", color: TEXT_MAIN }}>ค้นหาและตัวกรอง</Typography>
+              {activeFilters > 0 && (
+                <Button size="small" onClick={() => { setSearch(""); setOwner("all"); setPeriod("all"); setStatus("open"); }} sx={{ textTransform: "none", fontWeight: 700, color: "#dc2626" }}>ล้างทั้งหมด</Button>
+              )}
+              <IconButton size="small" aria-label="ปิด" onClick={() => setFiltersOpen(false)}><Close /></IconButton>
+            </Stack>
+            {filterBar}
+            <Typography sx={{ fontSize: "0.78rem", fontWeight: 800, color: TEXT_SUB, mt: 1.75, mb: 0.75 }}>สถานะ</Typography>
+            <Box sx={{ "& > div": { mb: 0 } }}>{tilesEl}</Box>
+            <Button fullWidth variant="contained" onClick={() => setFiltersOpen(false)}
+              sx={{ mt: 2, py: 1.1, textTransform: "none", fontWeight: 800, borderRadius: 2.5, boxShadow: "none", bgcolor: "#334155", "&:hover": { bgcolor: "#1e293b", boxShadow: "none" } }}>
+              ดูผลลัพธ์ {visible.length.toLocaleString()} ใบ
+            </Button>
+          </Drawer>
+        </>
+      )}
 
       {/* ── รายการ ── */}
       {loading ? (
