@@ -145,6 +145,12 @@
   background-color: rgba(4, 120, 87, 0.08);
 }
 
+/* ✅ โหมดคนตาบอด — ปฏิทิน + แผงแผนล่วงหน้าเป็นขาวดำ (ตัวหนังสือ/ป้ายยังอ่านได้ครบ)
+   ⚠️ ใส่ที่ .calendar-layout ไม่ใช่ทั้งหน้า — filter บนตัวแม่ทำให้ลูกที่ position: fixed (หัวเว็บ/เมนู) เพี้ยน */
+.calendar-layout--gray {
+  filter: grayscale(1) contrast(1.05);
+}
+
 .filter-toggle-btn--open {
   border-color: #dc2626;
   color: #dc2626;

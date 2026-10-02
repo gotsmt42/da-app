@@ -35,6 +35,8 @@ import {
   faSliders,
   faClipboardList,
   faAnglesDown,
+  faEye,
+  faEyeSlash,
 } from "@fortawesome/free-solid-svg-icons"; // Import ไอคอนต่างๆ
 
 import CustomerService from "@/shared/services/CustomerService";
@@ -456,6 +458,16 @@ function EventCalendar() {
     });
   };
 
+  // ✅ โหมดคนตาบอด (ผู้ใช้สั่ง 2 ต.ค. 2569): ปฏิทินเป็นขาวดำทั้งหน้า — สีพื้นการ์ดงานจัดจ้านหลายสี
+  //    ทำให้คนที่แยกสีไม่ออก/ตาล้าอ่านยาก โหมดนี้ให้อ่านจากตัวหนังสือและป้ายแทนสี
+  //    ⚠️ จำค่าไว้ในเครื่อง (localStorage) — เปิดครั้งเดียว กลับมาหน้านี้ยังเป็นขาวดำ
+  const [grayMode, setGrayMode] = useState(() => {
+    try { return localStorage.getItem("calendar.grayMode") === "1"; } catch { return false; }
+  });
+  const toggleGrayMode = () => setGrayMode((on) => {
+    try { localStorage.setItem("calendar.grayMode", on ? "0" : "1"); } catch { /* ไม่มีที่เก็บ */ }
+    return !on;
+  });
   const [allCardsExpanded, setAllCardsExpanded] = useState(() => {
     loadCardPrefs(userData?.userId);
     return cardPrefs.def;
@@ -3084,6 +3096,17 @@ function EventCalendar() {
           <span className="tb-label">{allCardsExpanded ? "ย่อทั้งหมด" : "กางทั้งหมด"}</span>
         </button>
 
+        <button
+          className={`filter-toggle-btn ${grayMode ? "filter-toggle-btn--open" : ""}`}
+          onClick={toggleGrayMode}
+          title={grayMode ? "ปิดโหมดคนตาบอด (กลับเป็นภาพสี)" : "โหมดคนตาบอด (แสดงปฏิทินเป็นขาวดำ)"}
+          aria-label={grayMode ? "ปิดโหมดคนตาบอด" : "เปิดโหมดคนตาบอด"}
+          aria-pressed={grayMode}
+        >
+          <FontAwesomeIcon icon={grayMode ? faEyeSlash : faEye} />
+          <span className="tb-label">โหมดคนตาบอด</span>
+        </button>
+
         {!isWideToolbar && (
         <button
           className={`filter-toggle-btn ${showFilterPanel ? "filter-toggle-btn--open" : ""} ${activeFilterCount > 0 ? "filter-toggle-btn--active" : ""}`}
@@ -3183,7 +3206,7 @@ function EventCalendar() {
           ✅ ปฏิทิน + คอลัมน์นี้เรียงข้างกันบนจอใหญ่ (≥992px) — กดปุ่มด้านบนเพื่อเปิด/ปิด ปฏิทินย่อ
           ความกว้างให้เองอัตโนมัติ (ดู .calendar-layout ใน index.css) จอเล็กกว่านั้นไม่มีที่พอวาง
           ข้างกัน กลับไปเรียงบนล่างเหมือนเดิม (เดิมแผงนี้ดันปฏิทินลงมาทุกครั้งที่เปิด) */}
-      <div className={`calendar-layout ${showDraftsPanel && !isSalesView ? "calendar-layout--with-drafts" : ""}`}>
+      <div className={`calendar-layout ${showDraftsPanel && !isSalesView ? "calendar-layout--with-drafts" : ""}${grayMode ? " calendar-layout--gray" : ""}`}>
         {/* ⚠️ กันซ้ำอีกชั้น (ปุ่มเปิดถูกซ่อนไปแล้วด้านบน) เผื่อ showDraftsPanel ยังค้างค่า true
             จากตอนอยู่ปฏิทินช่างก่อนสลับมา — คนละ query string บนหน้าเดียวกัน ไม่ได้ remount */}
         {showDraftsPanel && !isSalesView && (
