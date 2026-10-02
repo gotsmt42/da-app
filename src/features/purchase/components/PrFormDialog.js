@@ -10,10 +10,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import moment from "moment";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack, Typography, TextField, IconButton, Alert,
-  useMediaQuery, Autocomplete, MenuItem, Tooltip, CircularProgress, ToggleButton, ToggleButtonGroup,
+  useMediaQuery, Autocomplete, MenuItem, Tooltip, CircularProgress, ToggleButton, ToggleButtonGroup, Checkbox, FormControlLabel,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Close, Add, DeleteOutline, AttachFile, Send, Save, ShoppingCart } from "@mui/icons-material";
+import { Close, Add, DeleteOutline, AttachFile, Send, Save, ShoppingCart, HistoryEdu } from "@mui/icons-material";
+import SignatureService from "@/shared/services/SignatureService";
+import { useAuth } from "@/features/auth/AuthContext";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import { ACCEPT_ALL, formatBytes, MAX_UPLOAD_MB } from "@/shared/utils/fileUpload";
@@ -67,12 +69,19 @@ export default function PrFormDialog({ open, request, onClose, onSaved }) {
   const [error, setError] = useState("");
   const [touched, setTouched] = useState(false);
   const fileRef = useRef(null);
+  const { userData } = useAuth();
+  /** ✅ ลายเซ็นอิเล็กทรอนิกส์ช่อง "ผู้ขอซื้อ" — ติ๊กเลือกได้ (เหมือนใบเบิก) · แก้ใบคนอื่นไม่มีช่องนี้ */
+  const [mySignature, setMySignature] = useState(null);
+  const [useSignature, setUseSignature] = useState(true);
+  const isMine = !editing || request?.requester?.userId === userData?.userId;
 
   useEffect(() => {
     if (!open) return undefined;
     setError(""); setTouched(false); setFiles([]); setSaving(false);
     let alive = true;
     PurchaseService.suggest().then((s) => alive && setSuggest(s)).catch(() => {});
+    SignatureService.me().then((sig) => alive && setMySignature(sig)).catch(() => {});
+    setUseSignature(editing ? Boolean(request.signatures?.requester?.hash) : true);
     if (editing) {
       const r = request;
       setDocDate(r.docDate ? moment(r.docDate).format("YYYY-MM-DD") : moment().format("YYYY-MM-DD"));
@@ -125,6 +134,7 @@ export default function PrFormDialog({ open, request, onClose, onSaved }) {
     const fields = {
       docDate, subject: subject.trim(), priority, neededBy: neededBy || "", deliverTo: deliverTo.trim(), eventId: job?._id || "",
       purpose: purpose.trim(), suggestedSupplier: supplier.trim(), note: note.trim(), vatRate,
+      ...(isMine && mySignature ? { useSignature } : {}),
       items: valid.map(({ key: k, ...it }) => ({ ...it, qty: Number(it.qty) || 0, estUnitPrice: Number(it.estUnitPrice) || 0 })),
     };
     try {
@@ -284,6 +294,14 @@ export default function PrFormDialog({ open, request, onClose, onSaved }) {
                 <IconButton size="small" onClick={() => setFiles((cur) => cur.filter((x) => x.key !== f.key))}><Close fontSize="small" /></IconButton>
               </Stack>
             ))}
+            {isMine && mySignature && (
+              <Box sx={{ p: 1.25, border: `1px solid ${BORDER_MAIN}`, borderRadius: 2, bgcolor: "#fff" }}>
+                <FormControlLabel sx={{ mr: 0 }}
+                  control={<Checkbox size="small" checked={useSignature} onChange={(e) => setUseSignature(e.target.checked)} sx={{ "&.Mui-checked": { color: PR_ACCENT } }} />}
+                  label={<Stack direction="row" alignItems="center" spacing={0.75}><HistoryEdu sx={{ fontSize: 17, color: PR_ACCENT }} /><Typography sx={{ fontSize: "0.85rem", fontWeight: 700 }}>ลงลายเซ็นอิเล็กทรอนิกส์ของฉันในช่อง “ผู้ขอซื้อ”</Typography></Stack>} />
+                <Box component="img" src={mySignature.image} alt="" sx={{ display: "block", ml: 3.75, height: 32, maxWidth: 150, objectFit: "contain", opacity: useSignature ? 1 : 0.28 }} />
+              </Box>
+            )}
             {editing && request.attachments?.length > 0 && <Typography variant="caption" sx={{ color: TEXT_SUB }}>มีไฟล์แนบเดิม {request.attachments.length} ไฟล์ (จัดการได้ในหน้ารายละเอียด)</Typography>}
           </Stack>
         </Section>

@@ -7,12 +7,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import moment from "moment";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack, Typography, IconButton, Alert, Skeleton,
-  useMediaQuery, TextField, CircularProgress, Tooltip, Divider, LinearProgress, MenuItem, Chip,
+  useMediaQuery, TextField, CircularProgress, Tooltip, Divider, LinearProgress, MenuItem, Chip, Checkbox, FormControlLabel, Avatar,
 } from "@mui/material";
 import {
-  Close, Edit, Undo, Block, FactCheck, CheckCircle, DoneAll, History, ShoppingCart, LocalShipping, Inventory2, Print,
-  AttachFile, DeleteOutline, Description, Image as ImageIcon, TaskAlt,
+  Close, Edit, Undo, Block, FactCheck, CheckCircle, DoneAll, History, ShoppingCart, Inventory2, Print,
+  AttachFile, DeleteOutline, Description, Image as ImageIcon, TaskAlt, HistoryEdu, Check, CalendarMonth, Build, Storefront,
 } from "@mui/icons-material";
+import { alpha } from "@mui/material/styles";
+import { personColor, personInitial } from "@/shared/utils/personAvatar";
+import PdfPrintDialog from "@/shared/components/PdfPrintDialog";
+import SignatureService from "@/shared/services/SignatureService";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import { ACCEPT_ALL } from "@/shared/utils/fileUpload";
@@ -37,20 +41,102 @@ const Card = ({ title, icon, children, action }) => (
     {children}
   </Box>
 );
-const Info = ({ label, children, span }) => (
-  <Box sx={{ minWidth: 0, gridColumn: span ? "1 / -1" : "auto" }}>
-    <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 600, display: "block" }}>{label}</Typography>
-    <Box sx={{ fontSize: "0.9rem", fontWeight: 600, color: TEXT_MAIN, wordBreak: "break-word" }}>{children || "-"}</Box>
+
+/**
+ * ✅ ผู้ใช้สั่ง: ใบขอซื้อ "ให้อัปเดตให้เหมือนใบอื่นๆ" — ส่วนประกอบชุดเดียวกับหน้ารายละเอียดใบเบิก (ExpenseDetailDialog)
+ *   RequesterRow (ผู้ขอแถวเด่น) · KV (ป้ายซ้าย-ค่าขวา) · SubTitle (หัวข้อย่อย) · ApprovalRow (สายอนุมัติแบบเส้นเวลา)
+ *   · FooterProgress (จุดขั้นข้างปุ่มพิมพ์)
+ */
+const RequesterRow = ({ label, name, position, extra }) => (
+  <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, p: 1.25, borderRadius: 2, bgcolor: "#f8fafc", border: `1px solid ${BORDER_MAIN}` }}>
+    <Avatar sx={{ width: 40, height: 40, bgcolor: personColor(name), fontWeight: 800, fontSize: "1rem" }}>{personInitial(name)}</Avatar>
+    <Box sx={{ minWidth: 0, flex: 1 }}>
+      <Typography sx={{ fontSize: "0.72rem", color: "#94a3b8", fontWeight: 600, lineHeight: 1.3 }}>{label}</Typography>
+      <Typography sx={{ fontSize: "1rem", fontWeight: 800, color: "#0f172a", lineHeight: 1.35 }} noWrap>{name || "-"}</Typography>
+      {(position || extra) && <Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB, fontWeight: 500 }} noWrap>{[position, extra].filter(Boolean).join(" · ")}</Typography>}
+    </Box>
   </Box>
 );
+const KV = ({ label, children, color }) => (
+  <Box sx={{ display: "flex", alignItems: "baseline", gap: 1.5, px: 1.5, py: 1.1, "& + &": { borderTop: `1px solid ${BORDER_MAIN}` } }}>
+    <Typography sx={{ fontSize: "0.82rem", color: TEXT_SUB, fontWeight: 500, flexShrink: 0, minWidth: 92 }}>{label}</Typography>
+    <Box sx={{ flex: 1, minWidth: 0, textAlign: "right", fontSize: "0.92rem", fontWeight: 700, color: color || "#0f172a", wordBreak: "break-word" }}>{children || "-"}</Box>
+  </Box>
+);
+const SubTitle = ({ icon, children, color }) => (
+  <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.85 }}>
+    <Box sx={{ display: "inline-flex", color: color || TEXT_SUB, "& svg": { fontSize: 17 } }}>{icon}</Box>
+    <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: "#334155", letterSpacing: ".02em" }}>{children}</Typography>
+  </Stack>
+);
+const ApprovalRow = ({ label, name, date, detail, last }) => (
+  <Box sx={{ display: "flex", gap: 1.25 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
+      <Box sx={{ width: 24, height: 24, borderRadius: "50%", bgcolor: "#dcfce7", color: "#16a34a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <Check sx={{ fontSize: 15 }} />
+      </Box>
+      {!last && <Box sx={{ flex: 1, width: 2, bgcolor: "#bbf7d0", my: 0.25, minHeight: 14 }} />}
+    </Box>
+    <Box sx={{ minWidth: 0, flex: 1, pb: last ? 0 : 1.25 }}>
+      <Stack direction="row" alignItems="center" spacing={1}>
+        <Typography sx={{ fontSize: "0.74rem", color: TEXT_SUB, fontWeight: 600, flex: 1, minWidth: 0 }} noWrap>{label}</Typography>
+        {date && <Box component="span" sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#475569", bgcolor: "#f1f5f9", px: 0.85, py: 0.2, borderRadius: 1, whiteSpace: "nowrap" }}>{date}</Box>}
+      </Stack>
+      <Typography sx={{ fontSize: "0.94rem", fontWeight: 800, color: "#0f172a", lineHeight: 1.35 }}>{name || "-"}</Typography>
+      {detail && <Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB, lineHeight: 1.4, mt: 0.15 }}>{detail}</Typography>}
+    </Box>
+  </Box>
+);
+/** จุดขั้นข้างปุ่มพิมพ์ — ขั้นที่ผ่าน = จุดทึบ · ขั้นที่รอ = วงโหลดหมุน · ยังไม่ถึง = จุดเทา (เหมือนใบเบิก) */
+const FooterProgress = ({ steps, status, color }) => {
+  const total = steps.length || 1;
+  const done = steps.filter((x) => x.done).length;
+  const current = steps.find((x) => !x.done);
+  const rejected = status === "rejected";
+  const cancelled = status === "cancelled";
+  const complete = !rejected && !cancelled && done >= total;
+  const tone = cancelled ? "#94a3b8" : rejected ? "#dc2626" : complete ? "#059669" : color;
+  const text = cancelled ? "ยกเลิกแล้ว" : rejected ? "ถูกตีกลับ · รอแก้ไข" : complete ? "เสร็จสมบูรณ์" : `รอ: ${current?.wait || current?.label || ""}`;
+  const moving = !complete && !rejected && !cancelled;
+  const currentIndex = moving ? steps.findIndex((x) => !x.done) : -1;
+  return (
+    <Box title={text} sx={{ display: "inline-flex", alignItems: "center", gap: 1, minWidth: 0 }}>
+      {!cancelled && (
+        <Box sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, flexShrink: 0 }}>
+          {steps.map((st, i) => {
+            const isCurrent = i === currentIndex;
+            return (
+              <Box key={st.label} sx={{
+                width: isCurrent ? 12 : 7, height: isCurrent ? 12 : 7, borderRadius: "50%", boxSizing: "border-box",
+                bgcolor: isCurrent ? "transparent" : st.done || complete ? tone : "#e2e8f0",
+                border: isCurrent ? `2px solid ${alpha(tone, 0.2)}` : "none", borderTopColor: isCurrent ? tone : undefined,
+                animation: isCurrent ? "prfSpin .8s linear infinite" : `prfIn .35s ease-out ${i * 0.08}s both`,
+                "@keyframes prfIn": { from: { transform: "scale(0)", opacity: 0 }, to: { transform: "scale(1)", opacity: 1 } },
+                "@keyframes prfSpin": { to: { transform: "rotate(360deg)" } },
+                "@media (prefers-reduced-motion: reduce)": { animation: "none" },
+              }} />
+            );
+          })}
+        </Box>
+      )}
+      <Typography noWrap sx={{ minWidth: 0, fontSize: "0.78rem", fontWeight: 700, color: complete || rejected || cancelled ? tone : "text.primary" }}>
+        {complete ? "✓ " : ""}{text}
+      </Typography>
+    </Box>
+  );
+};
 
 /** เส้นขั้นตอน 4 ขั้น */
 const STEPS = [
   { label: "ขอซื้อ", done: () => true },
-  { label: "ตรวจสอบ/อนุมัติ", done: (r) => ["approved", "ordered", "partial", "received"].includes(r.status) },
-  { label: "สั่งซื้อ", done: (r) => ["ordered", "partial", "received"].includes(r.status) },
-  { label: "รับของ", done: (r) => r.status === "received" },
+  { label: "ตรวจสอบ/อนุมัติ", wait: (r) => (r.status === "reviewed" ? "อนุมัติ" : "ตรวจสอบ"), done: (r) => ["approved", "ordered", "partial", "received"].includes(r.status) },
+  { label: "สั่งซื้อ", wait: () => "ฝ่ายจัดซื้อสั่งซื้อ", done: (r) => ["ordered", "partial", "received"].includes(r.status) },
+  { label: "รับของ", wait: (r) => (r.status === "partial" ? "รับของส่วนที่เหลือ" : "รับของ"), done: (r) => r.status === "received" },
 ];
+
+/** ขั้นที่ลงลายเซ็นได้ และช่องลงนามบน PDF ของแต่ละขั้น */
+const SIGN_ACTIONS = ["review", "reviewApprove", "approve", "order"];
+const SIGN_BOX = { review: "ผู้ตรวจสอบ", reviewApprove: "ผู้ตรวจสอบและผู้อนุมัติ", approve: "ผู้อนุมัติ", order: "ฝ่ายจัดซื้อ" };
 
 const SIMPLE = {
   review: { title: "ตรวจสอบใบขอซื้อ", button: "ยืนยันผลตรวจสอบ", color: "#b45309", body: "ยืนยันว่ารายการและความจำเป็นถูกต้อง — ส่งต่อให้ผู้อนุมัติ" },
@@ -74,7 +160,10 @@ export default function PrDetailDialog({ open, id, reloadKey = 0, notice, onClos
   const [order, setOrder] = useState({});
   const [recv, setRecv] = useState({});
   const [actionFiles, setActionFiles] = useState([]);
-  const [printing, setPrinting] = useState(false);
+  const [printOpen, setPrintOpen] = useState(false);
+  /** ✅ ลายเซ็นอิเล็กทรอนิกส์ของผู้กด — ติ๊กเลือกได้ว่าจะลงนามในช่องของขั้นนี้ไหม (เหมือนใบเบิก) */
+  const [mySignature, setMySignature] = useState(null);
+  const [useSignature, setUseSignature] = useState(true);
   const fileRef = useRef(null);
   const actFileRef = useRef(null);
 
@@ -84,6 +173,7 @@ export default function PrDetailDialog({ open, id, reloadKey = 0, notice, onClos
     try { setR(await PurchaseService.get(id)); } catch (err) { setLoadError(errorText(err, "เปิดใบนี้ไม่สำเร็จ")); }
   }, [id]);
   useEffect(() => { if (open) { setR(null); setAction(""); setToast(notice || ""); load(); } }, [open, load]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (open) SignatureService.me().then(setMySignature).catch(() => setMySignature(null)); }, [open]);
   useEffect(() => { if (open && reloadKey) load(); }, [reloadKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const me = String(userData?.userId || "");
@@ -104,7 +194,7 @@ export default function PrDetailDialog({ open, id, reloadKey = 0, notice, onClos
   const canFiles = r && r.status !== "cancelled" && (isOwner || canBuy);
 
   const openAction = (a) => {
-    setAction(a); setText(""); setActionError(""); setActionFiles([]);
+    setAction(a); setText(""); setActionError(""); setActionFiles([]); setUseSignature(true);
     if (a === "order") {
       setOrder({
         supplier: r.order?.supplier || r.suggestedSupplier || "", supplierContact: r.order?.supplierContact || "", poNo: r.order?.poNo || "",
@@ -124,12 +214,12 @@ export default function PrDetailDialog({ open, id, reloadKey = 0, notice, onClos
     try {
       let out;
       const files = actionFiles.map((file) => ({ file, kind: action === "order" ? "po" : "delivery" }));
-      if (action === "review") out = await PurchaseService.review(r._id, text);
-      if (action === "reviewApprove") { await PurchaseService.review(r._id, text); out = await PurchaseService.approve(r._id, text); }
-      if (action === "approve") out = await PurchaseService.approve(r._id, text);
+      if (action === "review") out = await PurchaseService.review(r._id, text, useSignature);
+      if (action === "reviewApprove") { await PurchaseService.review(r._id, text, useSignature); out = await PurchaseService.approve(r._id, text, useSignature); }
+      if (action === "approve") out = await PurchaseService.approve(r._id, text, useSignature);
       if (action === "reject") out = await PurchaseService.reject(r._id, text);
       if (action === "cancel") out = await PurchaseService.cancel(r._id, text);
-      if (action === "order") out = (await PurchaseService.order(r._id, order, files)).request;
+      if (action === "order") out = (await PurchaseService.order(r._id, { ...order, useSignature }, files)).request;
       if (action === "receive") {
         const lines = Object.entries(recv.qty || {}).map(([itemId, qty]) => ({ itemId, qty: Number(qty) || 0 })).filter((l) => l.qty > 0);
         out = (await PurchaseService.receive(r._id, { lines, receivedAt: recv.receivedAt, note: text }, files)).request;
@@ -160,18 +250,6 @@ export default function PrDetailDialog({ open, id, reloadKey = 0, notice, onClos
     if (!window.confirm(`ลบไฟล์ "${f.fileName}" ?`)) return;
     setBusy(true);
     try { setR(await PurchaseService.removeFile(r._id, f._id)); } catch (err) { setLoadError(errorText(err)); } finally { setBusy(false); }
-  };
-  const print = async () => {
-    setPrinting(true);
-    try {
-      const { generatePrPdf } = await import("../utils/prPdf");
-      await generatePrPdf({ request: r, mode: isMobile ? "download" : "open" });
-    } catch (err) {
-      console.error(err);
-      setLoadError("สร้างเอกสารไม่สำเร็จ — ลองใหม่อีกครั้ง");
-    } finally {
-      setPrinting(false);
-    }
   };
 
   const nextText = !r ? "" : {
@@ -250,20 +328,63 @@ export default function PrDetailDialog({ open, id, reloadKey = 0, notice, onClos
                 {late && <Alert severity="warning" sx={{ mt: 1, borderRadius: 2, py: 0.25 }}>เลยวันที่ต้องการใช้ ({thaiDate(r.neededBy)}) แล้ว</Alert>}
               </Card>
 
-              <Card title="ข้อมูลการขอซื้อ">
-                <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)" }, gap: 1.5 }}>
-                  <Info label="เลขที่">{r.docNo}</Info>
-                  <Info label="วันที่ขอ">{thaiDate(r.docDate)}</Info>
-                  <Info label="ต้องการใช้ภายใน"><Box component="span" sx={{ color: late ? "#dc2626" : "inherit" }}>{r.neededBy ? thaiDate(r.neededBy) : "ไม่ระบุ"}</Box></Info>
-                  <Info label="ความเร่งด่วน"><Box component="span" sx={{ color: pr.color }}>{pr.label}</Box></Info>
-                  <Info label="สถานที่ส่งของ">{r.deliverTo}</Info>
-                  <Info label="ร้านค้าที่แนะนำ">{r.suggestedSupplier}</Info>
-                  <Info label="ใช้กับงาน / โครงการ" span>{r.eventId ? prJobText(r.job) : "ไม่ผูกงาน"}</Info>
-                  {r.purpose && <Info label="วัตถุประสงค์" span>{r.purpose}</Info>}
-                  {r.reviewedAt && <Info label="ผู้ตรวจสอบ">{r.reviewedBy?.name} · {thaiDate(r.reviewedAt)}</Info>}
-                  {r.approvedAt && <Info label="ผู้อนุมัติ">{r.approvedBy?.name} · {thaiDate(r.approvedAt)}</Info>}
-                  {r.note && <Info label="หมายเหตุ" span>{r.note}</Info>}
-                </Box>
+              <Card title="ข้อมูลเอกสาร" icon={<Description sx={{ fontSize: 18, color: PR_ACCENT }} />}>
+                <Stack spacing={2}>
+                  <RequesterRow label="ผู้ขอซื้อ" name={r.requester?.name} position={r.requester?.position}
+                    extra={r.createdBy?.userId && r.createdBy.userId !== r.requester?.userId ? `ออกใบแทนโดย ${r.createdBy.name}` : ""} />
+                  <Box sx={{ border: `1px solid ${BORDER_MAIN}`, borderRadius: 2, overflow: "hidden" }}>
+                    <KV label="เลขที่">{r.docNo}</KV>
+                    <KV label="วันที่ขอ">{thaiDate(r.docDate)}</KV>
+                    <KV label="ต้องการใช้ภายใน" color={late ? "#dc2626" : undefined}>{r.neededBy ? `${thaiDate(r.neededBy)}${late ? " · เลยกำหนด" : ""}` : "ไม่ระบุ"}</KV>
+                    <KV label="ความเร่งด่วน" color={r.priority !== "normal" ? pr.color : undefined}>{pr.label}</KV>
+                    <KV label="สถานที่ส่งของ">{r.deliverTo}</KV>
+                    {r.suggestedSupplier && <KV label="ร้านค้าที่แนะนำ">{r.suggestedSupplier}</KV>}
+                  </Box>
+
+                  <Box>
+                    <SubTitle icon={<Build />} color={PR_ACCENT}>ใช้กับงาน / โครงการ</SubTitle>
+                    {r.eventId ? (
+                      <Box sx={{ p: 1.25, px: 1.5, borderRadius: 2, border: `1px solid ${BORDER_MAIN}`, bgcolor: "#fff" }}>
+                        <Typography sx={{ fontSize: "0.92rem", fontWeight: 800, color: "#0f172a", lineHeight: 1.45 }}>{prJobText(r.job) || "-"}</Typography>
+                        {r.job?.docNo && (
+                          <Stack direction="row" alignItems="center" spacing={0.4} sx={{ mt: 0.5, color: TEXT_SUB }}>
+                            <CalendarMonth sx={{ fontSize: 15 }} />
+                            <Typography sx={{ fontSize: "0.78rem", fontWeight: 600 }}>เลขที่งาน {r.job.docNo}</Typography>
+                          </Stack>
+                        )}
+                      </Box>
+                    ) : <Typography sx={{ fontSize: "0.86rem", color: TEXT_SUB, px: 1.25, py: 1, borderRadius: 2, bgcolor: "#f8fafc", border: `1px dashed ${BORDER_MAIN}` }}>ไม่ผูกงาน</Typography>}
+                  </Box>
+
+                  {(() => {
+                    const steps = [
+                      r.reviewedAt && r.status !== "rejected" && { key: "r", label: "ผู้ตรวจสอบ", name: r.reviewedBy?.name, date: thaiDate(r.reviewedAt) },
+                      r.approvedAt && !["pending", "reviewed", "rejected"].includes(r.status) && { key: "a", label: "ผู้อนุมัติ", name: r.approvedBy?.name, date: thaiDate(r.approvedAt) },
+                      r.order?.orderedAt && { key: "o", label: "ฝ่ายจัดซื้อ (สั่งซื้อ)", name: r.order.by?.name, date: thaiDate(r.order.orderedAt), detail: [`ร้าน ${r.order.supplier}`, r.order.poNo ? `PO ${r.order.poNo}` : ""].filter(Boolean).join(" · ") },
+                      r.status === "received" && { key: "g", label: "รับของครบ · ปิดใบ", name: r.receipts?.[r.receipts.length - 1]?.by?.name, date: thaiDate(r.receivedAt) },
+                    ].filter(Boolean);
+                    if (!steps.length) return null;
+                    return (
+                      <Box>
+                        <SubTitle icon={<FactCheck />} color={PR_ACCENT}>สายอนุมัติ</SubTitle>
+                        <Box sx={{ pl: 0.25 }}>{steps.map(({ key, ...st }, i) => <ApprovalRow key={key} {...st} last={i === steps.length - 1} />)}</Box>
+                      </Box>
+                    );
+                  })()}
+
+                  {r.purpose && (
+                    <Box>
+                      <SubTitle icon={<HistoryEdu />} color={PR_ACCENT}>วัตถุประสงค์</SubTitle>
+                      <Typography sx={{ fontSize: "0.88rem", color: "#334155", px: 1.25, py: 1, borderRadius: 2, bgcolor: "#f8fafc", whiteSpace: "pre-wrap" }}>{r.purpose}</Typography>
+                    </Box>
+                  )}
+                  {r.note && (
+                    <Box>
+                      <SubTitle icon={<HistoryEdu />} color={PR_ACCENT}>หมายเหตุ</SubTitle>
+                      <Typography sx={{ fontSize: "0.88rem", color: "#334155", px: 1.25, py: 1, borderRadius: 2, bgcolor: "#f8fafc", whiteSpace: "pre-wrap" }}>{r.note}</Typography>
+                    </Box>
+                  )}
+                </Stack>
               </Card>
 
               <Card title={`รายการสินค้า (${r.items.length})`} action={["ordered", "partial", "received"].includes(r.status) && (
@@ -310,15 +431,15 @@ export default function PrDetailDialog({ open, id, reloadKey = 0, notice, onClos
               </Card>
 
               {r.order?.orderedAt && (
-                <Card title="การสั่งซื้อ" icon={<LocalShipping sx={{ fontSize: 18, color: PR_ACCENT }} />}>
-                  <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)" }, gap: 1.5 }}>
-                    <Info label="ร้านค้า / ผู้ขาย">{r.order.supplier}</Info>
-                    <Info label="ผู้ติดต่อ / โทร">{r.order.supplierContact}</Info>
-                    <Info label="เลขที่ PO">{r.order.poNo}</Info>
-                    <Info label="วันที่สั่ง">{thaiDate(r.order.orderedAt)}</Info>
-                    <Info label="กำหนดส่ง">{r.order.expectedAt ? thaiDate(r.order.expectedAt) : "-"}</Info>
-                    <Info label="ผู้สั่งซื้อ">{r.order.by?.name}</Info>
-                    {r.order.note && <Info label="หมายเหตุ" span>{r.order.note}</Info>}
+                <Card title="การสั่งซื้อ" icon={<Storefront sx={{ fontSize: 18, color: PR_ACCENT }} />}>
+                  <Box sx={{ border: `1px solid ${BORDER_MAIN}`, borderRadius: 2, overflow: "hidden" }}>
+                    <KV label="ร้านค้า / ผู้ขาย">{r.order.supplier}</KV>
+                    {r.order.supplierContact && <KV label="ผู้ติดต่อ / โทร">{r.order.supplierContact}</KV>}
+                    <KV label="เลขที่ PO">{r.order.poNo}</KV>
+                    <KV label="วันที่สั่ง">{thaiDate(r.order.orderedAt)}</KV>
+                    <KV label="กำหนดส่ง">{r.order.expectedAt ? thaiDate(r.order.expectedAt) : "-"}</KV>
+                    <KV label="ผู้สั่งซื้อ">{r.order.by?.name}</KV>
+                    {r.order.note && <KV label="หมายเหตุ">{r.order.note}</KV>}
                   </Box>
                 </Card>
               )}
@@ -375,39 +496,65 @@ export default function PrDetailDialog({ open, id, reloadKey = 0, notice, onClos
         </DialogContent>
 
         {r && (
-          <DialogActions sx={{ px: { xs: 1, sm: 2.5 }, py: 1.25, borderTop: `1px solid ${BORDER_MAIN}`, gap: 0.75, flexWrap: "wrap", justifyContent: "flex-end" }}>
-            <Button onClick={print} disabled={printing} startIcon={printing ? <CircularProgress size={15} /> : <Print />} sx={{ textTransform: "none", fontWeight: 700, mr: "auto" }}>พิมพ์ PDF</Button>
-            {canCancel && <Button onClick={() => openAction("cancel")} startIcon={<Block />} sx={{ textTransform: "none", fontWeight: 700, color: TEXT_SUB }}>ยกเลิก</Button>}
-            {canEdit && <Button onClick={() => onEdit?.(r)} startIcon={<Edit />} sx={{ textTransform: "none", fontWeight: 700 }}>{r.status === "rejected" ? "แก้ไข / ส่งใหม่" : "แก้ไข"}</Button>}
-            {canReject && <Button onClick={() => openAction("reject")} disabled={selfBlocked} startIcon={<Undo />} sx={{ textTransform: "none", fontWeight: 700, color: "#dc2626" }}>ตีกลับ</Button>}
-            {chain && r.status === "pending" && (
-              <Tooltip title={selfBlocked ? "ใบของตัวเองต้องให้หัวหน้าท่านอื่นพิจารณา" : ""} describeChild><span>
-                <Button variant="contained" disabled={selfBlocked} onClick={() => openAction("reviewApprove")} startIcon={<DoneAll />}
-                  sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: "#059669", "&:hover": { bgcolor: "#047857", boxShadow: "none" } }}>ตรวจสอบและอนุมัติ</Button>
-              </span></Tooltip>
+          <DialogActions sx={{
+            px: { xs: 1, sm: 2.5 }, py: 1.25, borderTop: `1px solid ${BORDER_MAIN}`, gap: { xs: 0.5, sm: 0.75 }, flexWrap: "wrap", justifyContent: "flex-end",
+            "& > :not(style) ~ :not(style)": { ml: 0 },
+            "& .MuiButton-root": { minWidth: 0, px: { xs: 1, sm: 2 }, py: 0.75, justifyContent: "center", fontSize: { xs: "0.8rem", sm: "0.875rem" }, whiteSpace: "nowrap" },
+            "& .MuiButton-startIcon": { mr: { xs: 0.4, sm: 1 } },
+            "& > .MuiButton-root, & > span": { flex: "1 1 auto", display: "flex" },
+            "& > span > .MuiButton-root": { width: "100%" },
+          }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, minWidth: 0, flexBasis: "100%" }}>
+              <Button onClick={() => setPrintOpen(true)} startIcon={<Print sx={{ fontSize: 18 }} />} sx={{ textTransform: "none", fontWeight: 700, flexShrink: 0 }}>พิมพ์ / แชร์</Button>
+              <FooterProgress steps={STEPS.map((st) => ({ label: st.label, wait: st.wait?.(r), done: st.done(r) }))} status={r.status} color={PR_ACCENT} />
+            </Box>
+            {canCancel && (
+              <Tooltip title="ยกเลิกใบนี้">
+                <IconButton onClick={() => openAction("cancel")} aria-label="ยกเลิกใบนี้" sx={{ color: TEXT_SUB, border: `1px solid ${BORDER_MAIN}`, width: 36, height: 36 }}><Block sx={{ fontSize: 18 }} /></IconButton>
+              </Tooltip>
+            )}
+            {canEdit && (r.status === "rejected" ? (
+              <Button onClick={() => onEdit?.(r)} startIcon={<Edit sx={{ fontSize: 17 }} />} sx={{ textTransform: "none", fontWeight: 700 }}>แก้ไข / ส่งใหม่</Button>
+            ) : (
+              <Tooltip title="แก้ไขใบนี้">
+                <IconButton onClick={() => onEdit?.(r)} aria-label="แก้ไขใบนี้" color="primary" sx={{ border: `1px solid ${BORDER_MAIN}`, width: 36, height: 36 }}><Edit sx={{ fontSize: 18 }} /></IconButton>
+              </Tooltip>
+            ))}
+            {canReject && (
+              <Button onClick={() => openAction("reject")} disabled={selfBlocked} startIcon={<Undo sx={{ fontSize: 17 }} />} variant="outlined"
+                sx={{ textTransform: "none", fontWeight: 700, color: "#dc2626", borderColor: "#fecaca", borderRadius: 2, "&:hover": { borderColor: "#dc2626", bgcolor: "#fef2f2" } }}>ตีกลับ</Button>
             )}
             {canReview && r.status === "pending" && (
-              <Tooltip title={selfBlocked ? "ตรวจสอบใบของตัวเองไม่ได้" : ""} describeChild><span>
-                <Button variant={chain ? "outlined" : "contained"} disabled={selfBlocked} onClick={() => openAction("review")} startIcon={<FactCheck />}
-                  sx={chain ? { textTransform: "none", fontWeight: 800, borderRadius: 2, color: "#b45309", borderColor: "#fcd34d" } : { textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: "#b45309" }}>
-                  {chain ? "ตรวจสอบอย่างเดียว" : "ตรวจสอบ"}
+              <Tooltip title={selfBlocked ? "ตรวจสอบใบของตัวเองไม่ได้ — ให้หัวหน้าท่านอื่นเป็นผู้ตรวจสอบ" : ""} describeChild><span>
+                <Button variant={chain ? "outlined" : "contained"} disabled={selfBlocked} onClick={() => openAction("review")} startIcon={<FactCheck sx={{ fontSize: 18 }} />}
+                  sx={chain ? { textTransform: "none", fontWeight: 800, borderRadius: 2, color: "#b45309", borderColor: "#fcd34d" }
+                    : { textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: "#b45309", "&:hover": { bgcolor: "#92400e", boxShadow: "none" } }}>
+                  ตรวจสอบ
                 </Button>
               </span></Tooltip>
             )}
+            {chain && r.status === "pending" && (
+              <Tooltip title={selfBlocked ? "ใบของตัวเองต้องให้หัวหน้าท่านอื่นพิจารณา" : "ตรวจสอบและอนุมัติในขั้นตอนเดียว"} describeChild><span>
+                <Button variant="contained" disabled={selfBlocked} onClick={() => openAction("reviewApprove")} startIcon={<DoneAll sx={{ fontSize: 18 }} />}
+                  sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: "#059669", "&:hover": { bgcolor: "#047857", boxShadow: "none" } }}>อนุมัติ</Button>
+              </span></Tooltip>
+            )}
             {canApprove && r.status === "reviewed" && (
-              <Tooltip title={selfBlocked ? "อนุมัติใบของตัวเองไม่ได้" : reviewedByMe && !can("approveOwnReview") ? "คุณเป็นผู้ตรวจสอบใบนี้แล้ว" : ""} describeChild><span>
-                <Button variant="contained" disabled={selfBlocked || (reviewedByMe && !can("approveOwnReview"))} onClick={() => openAction("approve")} startIcon={<CheckCircle />}
+              <Tooltip title={selfBlocked ? "อนุมัติใบของตัวเองไม่ได้" : reviewedByMe && !can("approveOwnReview") ? "คุณเป็นผู้ตรวจสอบใบนี้แล้ว — ผู้อนุมัติต้องเป็นคนละคน" : ""} describeChild><span>
+                <Button variant="contained" disabled={selfBlocked || (reviewedByMe && !can("approveOwnReview"))} onClick={() => openAction("approve")} startIcon={<CheckCircle sx={{ fontSize: 18 }} />}
                   sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: "#059669", "&:hover": { bgcolor: "#047857", boxShadow: "none" } }}>อนุมัติ</Button>
               </span></Tooltip>
             )}
             {canOrder && (
-              <Button variant={r.status === "approved" ? "contained" : "outlined"} onClick={() => openAction("order")} startIcon={<ShoppingCart />}
-                sx={r.status === "approved" ? { textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: PR_ACCENT, "&:hover": { bgcolor: PR_DARK, boxShadow: "none" } } : { textTransform: "none", fontWeight: 700, borderRadius: 2 }}>
+              <Button variant={r.status === "approved" ? "contained" : "outlined"} onClick={() => openAction("order")} startIcon={<ShoppingCart sx={{ fontSize: 18 }} />}
+                sx={r.status === "approved"
+                  ? { textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: PR_ACCENT, "&:hover": { bgcolor: PR_DARK, boxShadow: "none" } }
+                  : { textTransform: "none", fontWeight: 700, borderRadius: 2, color: PR_ACCENT, borderColor: alpha(PR_ACCENT, 0.4) }}>
                 {r.status === "approved" ? "บันทึกสั่งซื้อ" : "แก้ข้อมูลสั่งซื้อ"}
               </Button>
             )}
             {canReceive && (
-              <Button variant="contained" onClick={() => openAction("receive")} startIcon={<Inventory2 />}
+              <Button variant="contained" onClick={() => openAction("receive")} startIcon={<Inventory2 sx={{ fontSize: 18 }} />}
                 sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: "#0e7490", "&:hover": { bgcolor: "#155e75", boxShadow: "none" } }}>รับของ</Button>
             )}
           </DialogActions>
@@ -424,6 +571,14 @@ export default function PrDetailDialog({ open, id, reloadKey = 0, notice, onClos
               {actionError && <Alert severity="error" sx={{ mb: 1.5 }}>{actionError}</Alert>}
               <TextField size="small" fullWidth autoFocus multiline minRows={2} value={text} onChange={(ev) => setText(ev.target.value)}
                 label={action === "reject" ? "เหตุผลที่ตีกลับ *" : action === "cancel" ? "เหตุผล (ไม่บังคับ)" : "หมายเหตุ (ไม่บังคับ)"} inputProps={{ maxLength: 500 }} />
+              {mySignature && SIGN_ACTIONS.includes(action) && (
+                <Box sx={{ mt: 1.5, p: 1.25, border: `1px solid ${BORDER_MAIN}`, borderRadius: 2 }}>
+                  <FormControlLabel sx={{ mr: 0 }}
+                    control={<Checkbox size="small" checked={useSignature} onChange={(e) => setUseSignature(e.target.checked)} sx={{ "&.Mui-checked": { color: PR_ACCENT } }} />}
+                    label={<Stack direction="row" alignItems="center" spacing={0.75}><HistoryEdu sx={{ fontSize: 17, color: PR_ACCENT }} /><Typography sx={{ fontSize: "0.85rem", fontWeight: 700 }}>ลงลายเซ็นอิเล็กทรอนิกส์ของฉัน (ช่อง{SIGN_BOX[action]})</Typography></Stack>} />
+                  <Box component="img" src={mySignature.image} alt="" sx={{ display: "block", ml: 3.75, height: 32, maxWidth: 150, objectFit: "contain", opacity: useSignature ? 1 : 0.28 }} />
+                </Box>
+              )}
             </DialogContent>
             <DialogActions sx={{ px: 3, pb: 2 }}>
               <Button onClick={() => setAction("")} disabled={busy} sx={{ textTransform: "none", color: TEXT_SUB }}>ปิด</Button>
@@ -467,6 +622,14 @@ export default function PrDetailDialog({ open, id, reloadKey = 0, notice, onClos
                 ยอดสั่งซื้อ {baht(money(r.items.reduce((s, it) => s + it.qty * (Number(order.prices?.[it._id]) || 0), 0) * (1 + (order.vatRate || 0) / 100)))}
               </Typography>
               <TextField size="small" label="หมายเหตุ" value={order.note} onChange={(e) => setOrder((o) => ({ ...o, note: e.target.value }))} />
+            {mySignature && SIGN_ACTIONS.includes(action) && (
+                <Box sx={{ mt: 1.5, p: 1.25, border: `1px solid ${BORDER_MAIN}`, borderRadius: 2 }}>
+                  <FormControlLabel sx={{ mr: 0 }}
+                    control={<Checkbox size="small" checked={useSignature} onChange={(e) => setUseSignature(e.target.checked)} sx={{ "&.Mui-checked": { color: PR_ACCENT } }} />}
+                    label={<Stack direction="row" alignItems="center" spacing={0.75}><HistoryEdu sx={{ fontSize: 17, color: PR_ACCENT }} /><Typography sx={{ fontSize: "0.85rem", fontWeight: 700 }}>ลงลายเซ็นอิเล็กทรอนิกส์ของฉัน (ช่อง{SIGN_BOX[action]})</Typography></Stack>} />
+                  <Box component="img" src={mySignature.image} alt="" sx={{ display: "block", ml: 3.75, height: 32, maxWidth: 150, objectFit: "contain", opacity: useSignature ? 1 : 0.28 }} />
+                </Box>
+              )}
               <input ref={actFileRef} type="file" hidden multiple accept={ACCEPT_ALL} onChange={(e) => { setActionFiles((f) => [...f, ...Array.from(e.target.files || [])].slice(0, 10)); e.target.value = ""; }} />
               <Box>
                 <Button size="small" startIcon={<AttachFile />} onClick={() => actFileRef.current?.click()} sx={{ textTransform: "none", fontWeight: 700 }}>แนบใบสั่งซื้อ / ใบเสนอราคา</Button>
@@ -519,6 +682,20 @@ export default function PrDetailDialog({ open, id, reloadKey = 0, notice, onClos
             sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: "#0e7490" }}>บันทึกรับของ</Button>
         </DialogActions>
       </Dialog>
+      <PdfPrintDialog
+        open={printOpen && Boolean(r)}
+        onClose={() => setPrintOpen(false)}
+        jobKey={`${r?._id}:${r?.status}:${r?.updatedAt}`}
+        generate={async () => {
+          const [{ generatePrPdf }, signatures] = await Promise.all([import("../utils/prPdf"), PurchaseService.signatures(r._id)]);
+          return generatePrPdf({ request: r, signatures, mode: "blob" });
+        }}
+        title={r?.docNo || "ใบขอซื้อสินค้า"}
+        subtitle={r ? `ใบขอซื้อสินค้า · ${r.subject}` : ""}
+        badge={<Box component="span" sx={{ px: 0.9, height: 20, display: "inline-flex", alignItems: "center", borderRadius: 999, bgcolor: PR_ACCENT, color: "#fff", fontSize: "0.66rem", fontWeight: 900, letterSpacing: "0.06em" }}>PR</Box>}
+        color={PR_ACCENT} dark={PR_DARK}
+        shareText={r ? `ใบขอซื้อสินค้า ${r.docNo} · ${r.subject}` : ""}
+      />
     </>
   );
 }

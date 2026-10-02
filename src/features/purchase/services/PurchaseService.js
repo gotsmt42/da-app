@@ -42,8 +42,12 @@ const PurchaseService = {
   order: (id, fields, files) => send("post", `/purchase/${id}/order`, fields, files),
   receive: (id, fields, files) => send("post", `/purchase/${id}/receive`, fields, files),
   addFiles: (id, files) => send("post", `/purchase/${id}/files`, {}, files),
-  async review(id, note = "") { return (await API.post(`/purchase/${id}/review`, { note })).data.request; },
-  async approve(id, note = "") { return (await API.post(`/purchase/${id}/approve`, { note })).data.request; },
+  async review(id, note = "", useSignature = true) { return (await API.post(`/purchase/${id}/review`, { note, useSignature })).data.request; },
+  async approve(id, note = "", useSignature = true) { return (await API.post(`/purchase/${id}/approve`, { note, useSignature })).data.request; },
+  /** ลายเซ็นที่ผนึกในใบ — ล้มเหลวคืน {} (ยังพิมพ์ได้ เว้นช่องเซ็นมือ) */
+  async signatures(id) {
+    try { return (await API.get(`/purchase/${id}/signatures`)).data.signatures || {}; } catch { return {}; }
+  },
   async reject(id, reason) { return (await API.post(`/purchase/${id}/reject`, { reason })).data.request; },
   async cancel(id, reason = "") { return (await API.post(`/purchase/${id}/cancel`, { reason })).data.request; },
   async removeFile(id, fileId) { return (await API.delete(`/purchase/${id}/files/${fileId}`)).data.request; },
