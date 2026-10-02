@@ -166,16 +166,19 @@ const UploadZone = styled(Box)(({ theme, dragging }) => ({
   },
 }));
 
+// ✅ ป้ายสถานะ — พื้นเทาอ่อน ขอบบาง ตัวหนังสือเข้ม · สีสถานะอยู่ที่จุดเล็กหน้าข้อความ (กฎออกแบบ: สีไม่เยอะ)
 const StatusBadge = styled(Box)(({ color }) => ({
   display: "inline-flex",
   alignItems: "center",
-  gap: 4,
-  padding: "3px 10px",
+  gap: 6,
+  padding: "2px 10px",
   borderRadius: 20,
   fontSize: "0.75rem",
-  fontWeight: 600,
-  background: alpha(color || "#999", 0.12),
-  color: color || "#999",
+  fontWeight: 700,
+  background: "#f8fafc",
+  border: "1px solid #e2e8f0",
+  color: "#334155",
+  "& .MuiSvgIcon-root": { color: color || "#94a3b8", fontSize: 8 },
 }));
 
 // ── Pulse dot (แสดงว่า online / กำลังทำงาน) ──
@@ -1308,7 +1311,9 @@ const EventRowCard = ({
           <Stack direction="row" alignItems="flex-start" gap={1.5} flex={1} minWidth={0}>
             {/* ✅ ลดขนาดลงบนจอมือถือ (จอกว้างยังคง 40px เท่าเดิม) — การ์ดตอนนี้เนื้อหากระชับขึ้นแล้ว
                 วงกลมไอคอนใหญ่แบบเดิมเลยดูไม่สมส่วนเมื่อเทียบกับตัวหนังสือที่เหลือ */}
+            {/* ✅ มือถือ: ซ่อนวงกลมไอคอน — กินคอลัมน์ซ้ายทั้งการ์ด ทำให้ข้อความถูกบีบตัดบรรทัด (ผู้ใช้: "รก ดูข้อมูลยาก") */}
             <Avatar sx={{
+              display: { xs: "none", sm: "flex" },
               width: { xs: 32, sm: 40 }, height: { xs: 32, sm: 40 }, flexShrink: 0, fontSize: "0.8rem", fontWeight: 700,
               background: OP_COLOR[localStatus] ? alpha(OP_COLOR[localStatus], 0.15) : alpha(theme.palette.grey[500], 0.15),
               color: OP_COLOR[localStatus] || theme.palette.text.secondary,
@@ -1352,10 +1357,9 @@ const EventRowCard = ({
                   if (jobClass !== "project" && jobClass !== "contract") return null;
                   const meta = getJobClassMeta(jobClass);
                   return (
-                    <Chip size="small" label={`${meta.emoji} ${meta.label}`} sx={{
-                      height: 22, fontSize: "0.7rem", fontWeight: 700,
-                      bgcolor: alpha(meta.color, 0.15), color: meta.color,
-                    }} />
+                    <Chip size="small" label={meta.label}
+                      icon={<Circle sx={{ fontSize: "8px !important", color: `${meta.color} !important` }} />}
+                      sx={{ height: 22, fontSize: "0.7rem", fontWeight: 700, bgcolor: "#f8fafc", border: "1px solid #e2e8f0", color: "#334155" }} />
                   );
                 })()}
                 {isRejected(event) && (
@@ -3284,26 +3288,26 @@ const Operation = () => {
     activeCount: activeFilterCount,
   };
 
+  // ✅ แถบแบ่งหน้าแบบเดียวกับทั้งแอป (สไตล์ปุ่มมาจากธีม — app/theme.js) — ซ้าย: แสดงกี่รายการ + ต่อหน้า · ขวา: เลขหน้า
+  //    มือถือ: ซ่อนช่อง "ต่อหน้า" (ใช้ค่าเดิม) และตัดปุ่มหน้าแรก/สุดท้าย ให้เลขหน้าอยู่บรรทัดเดียวไม่ล้นจอ
+  const pageFrom = jobGroups.length ? (page - 1) * pageSize + 1 : 0;
+  const pageTo = Math.min(page * pageSize, jobGroups.length);
   const paginationBar = (
-    <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" justifyContent="space-between"
-      gap={1.5} sx={{ mt: 2, mb: 1 }}>
-      <SelectField
-        label="ต่อหน้า" value={pageSize}
-        onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
-        sx={{ width: 120 }}>
-        {[5, 10, 20, 50, 100].map(n => <option key={n} value={n}>{n} รายการ</option>)}
-      </SelectField>
-      {/* ✅ เดิม size="small" บนมือถือทำให้ปุ่มเลขหน้าเล็กเกินไป กดยาก/กดพลาด — ใช้ "large"
-          แทนบนมือถือ (ตรงข้ามกับเดิม) ให้ปุ่มโตพอกดง่ายด้วยนิ้ว จอกว้างยังใช้ "medium" เท่าเดิม */}
-      <Pagination
-        count={totalPages} page={page}
-        onChange={(_, v) => setPage(v)}
-        color="primary" shape="rounded" size={isMobile ? "large" : "medium"}
-        showFirstButton showLastButton
-        sx={isMobile ? {
-          "& .MuiPaginationItem-root": { minWidth: 40, height: 40, fontSize: "1rem" },
-        } : undefined}
-      />
+    <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" justifyContent="space-between" gap={1.25} sx={{ mt: 2, mb: 1 }}>
+      <Stack direction="row" alignItems="center" gap={1.5}>
+        <Typography sx={{ fontSize: "0.78rem", color: "#64748b", fontVariantNumeric: "tabular-nums" }}>
+          {totalPages > 1 ? `แสดง ${pageFrom}–${pageTo} จาก ${jobGroups.length} งาน` : `${jobGroups.length} งาน`}
+        </Typography>
+        {!isMobile && (
+          <SelectField label="ต่อหน้า" value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }} sx={{ width: 120 }}>
+            {[5, 10, 20, 50, 100].map(n => <option key={n} value={n}>{n} รายการ</option>)}
+          </SelectField>
+        )}
+      </Stack>
+      {totalPages > 1 && (
+        <Pagination count={totalPages} page={page} onChange={(_, v) => setPage(v)}
+          size="medium" siblingCount={isMobile ? 0 : 1} showFirstButton={!isMobile} showLastButton={!isMobile} />
+      )}
     </Stack>
   );
 
@@ -3350,8 +3354,8 @@ const Operation = () => {
                 startIcon={<Tune sx={{ fontSize: "18px !important" }} />}
                 sx={{
                   height: 38, px: 1.5, borderRadius: 2.5, textTransform: "none", fontWeight: 800, fontSize: "0.85rem",
-                  border: "1px solid", borderColor: mobileActiveCount ? alpha("#dc2626", 0.4) : "divider",
-                  color: mobileActiveCount ? "#dc2626" : "text.primary", bgcolor: mobileActiveCount ? alpha("#dc2626", 0.06) : "background.paper",
+                  border: "1px solid", borderColor: mobileActiveCount ? "#334155" : "divider",
+                  color: "#334155", bgcolor: mobileActiveCount ? "#f1f5f9" : "background.paper",
                 }}
               >
                 ตัวกรอง
@@ -3442,104 +3446,32 @@ const Operation = () => {
           ⚠️ ยังคง "กรองเหลืองานเดียว" ไว้เหมือนเดิม (ไม่ได้เอาออก) เพราะลิงก์ที่พามาที่ /operation/:id
           มาจากหลายที่ (แจ้งเตือน/แผงรออนุมัติ/ตาราง) ถ้าไม่กรอง งานที่ตั้งใจให้ดูอาจไม่อยู่ในหน้าปัจจุบัน
           เลย (โดนตัวกรองเดือน/สถานะที่ค้างอยู่คัดออก) กลายเป็นกดลิงก์แล้วไม่เจออะไรเลย */}
+      {/* ✅ แถบ "กำลังดูเฉพาะงานนี้" — โทนเรียบ (ขาว + ขอบซ้ายเทาเข้ม) ไม่ใช่กล่องฟ้าทั้งแถบ (กฎ: สีไม่เยอะ)
+          ⚠️ ยังกรองเหลืองานเดียวเหมือนเดิม — ลิงก์ /operation/:id มาจากหลายที่ ถ้าไม่กรองงานอาจไม่อยู่ในหน้านี้ */}
       {selectedEvent && (
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          alignItems={{ xs: "stretch", sm: "center" }}
-          gap={1.5}
-          sx={{
-            mb: 2.5, px: { xs: 1.5, sm: 2 }, py: 1.5, borderRadius: 2,
-            bgcolor: alpha("#0ea5e9", 0.07),
-            border: "1px solid", borderColor: alpha("#0ea5e9", 0.3),
-            // ✅ ขอบซ้ายหนา = ภาษาที่คนอ่าน UI เข้าใจตรงกันว่า "นี่คือสถานะที่เปิดค้างอยู่" ไม่ใช่คำเตือน
-            // เดิมทั้งแถบเป็นสีจางมาก (พื้น 6% + ตัวหนังสือ caption สีเทา) จนกลืนไปกับพื้นหลังหน้า
-            borderLeft: "4px solid #0284c7",
-            boxShadow: `0 1px 3px ${alpha("#0ea5e9", 0.14)}`,
-          }}
-        >
-          <Box
-            sx={{
-              width: 36, height: 36, borderRadius: 1.5, flexShrink: 0,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              bgcolor: alpha("#0ea5e9", 0.15), color: "#0284c7",
-            }}
-          >
-            <FilterList sx={{ fontSize: 20 }} />
-          </Box>
-
+        <Stack direction="row" alignItems="center" gap={1.25}
+          sx={{ mb: 2, px: 1.5, py: 1.1, borderRadius: 2.5, bgcolor: "#fff", border: "1px solid #e2e8f0", borderLeft: "4px solid #334155" }}>
           <Box flex={1} minWidth={0}>
-            <Typography
-              sx={{ fontSize: "0.7rem", fontWeight: 800, color: "#0284c7", letterSpacing: 0.4, lineHeight: 1.4 }}
-            >
-              กำลังดูเฉพาะงานนี้
-            </Typography>
-            <Typography
-              title={focusedJob.name}
-              sx={{
-                fontSize: "0.95rem", fontWeight: 700, color: "#0f172a", lineHeight: 1.35,
-                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-              }}
-            >
-              {focusedJob.name}
-            </Typography>
+            <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: "#64748b" }}>กำลังดูเฉพาะงานนี้</Typography>
+            <Typography title={focusedJob.name} noWrap sx={{ fontSize: "0.9rem", fontWeight: 800, color: "#0f172a" }}>{focusedJob.name}</Typography>
             {focusedJob.tags.length > 0 && (
-              <Stack direction="row" gap={0.5} flexWrap="wrap" sx={{ mt: 0.5 }}>
-                {focusedJob.tags.map(tag => (
-                  <Chip
-                    key={tag}
-                    label={tag}
-                    size="small"
-                    sx={{
-                      height: 20, fontSize: "0.68rem", fontWeight: 700,
-                      bgcolor: "#fff", color: "#0369a1",
-                      border: "1px solid", borderColor: alpha("#0ea5e9", 0.35),
-                      "& .MuiChip-label": { px: 0.85 },
-                    }}
-                  />
-                ))}
-              </Stack>
+              <Typography noWrap sx={{ fontSize: "0.74rem", color: "#64748b" }}>{focusedJob.tags.join(" · ")}</Typography>
             )}
           </Box>
-          {/* ✅ "ดูในปฏิทิน" พาไปดูงานนี้บนปฏิทินแบบเจาะจงวัน — งานที่ยังไม่ลงตารางไม่มีวันที่จริง
-              ส่งไปที่แผงงานล่วงหน้า (?draft=) แทน ซึ่งเป็นที่ที่การ์ดของมันอยู่จริง
-              ✅ ให้เป็นปุ่มทึบใบเดียวในแถบนี้ (การกระทำที่พาไปข้างหน้า) ส่วน "แสดงทั้งหมด" คือการ
-              "ล้างตัวกรอง" จึงใช้ไอคอนกากบาทกับน้ำหนักที่เบากว่า ไม่แข่งสายตากัน — เดิมเป็น outlined
-              คู่กับ text ที่ดูน้ำหนักพอๆ กันจนไม่รู้ว่าควรกดอันไหน */}
-          <Stack
-            direction="row" gap={0.75} flexShrink={0}
-            sx={{ width: { xs: "100%", sm: "auto" } }}
-          >
-            <Button
-              size="small" variant="contained" disableElevation
-              startIcon={<CalendarMonth sx={{ fontSize: 16 }} />}
-              onClick={() => {
-                const q = selectedEvent.unscheduled
-                  ? `draft=${selectedEvent._id}&month=${selectedEvent.plannedMonth || ""}`
-                  : `event=${selectedEvent._id}&date=${moment(selectedEvent.start).format("YYYY-MM-DD")}`;
-                navigate(`/event?${q}&t=${Date.now()}`);
-              }}
-              sx={{
-                flex: { xs: 1, sm: "initial" },
-                borderRadius: 2, textTransform: "none", fontWeight: 700, whiteSpace: "nowrap",
-                bgcolor: "#0284c7", "&:hover": { bgcolor: "#0369a1" },
-              }}
-            >
-              ดูในปฏิทิน
-            </Button>
-            <Button
-              size="small" variant="outlined"
-              startIcon={<Close sx={{ fontSize: 16 }} />}
-              onClick={() => navigate("/operation")}
-              sx={{
-                flex: { xs: 1, sm: "initial" },
-                borderRadius: 2, textTransform: "none", fontWeight: 600, whiteSpace: "nowrap",
-                color: "text.secondary", borderColor: alpha("#0ea5e9", 0.35), bgcolor: "#fff",
-                "&:hover": { borderColor: alpha("#0ea5e9", 0.6), bgcolor: alpha("#0ea5e9", 0.04) },
-              }}
-            >
-              แสดงทั้งหมด
-            </Button>
-          </Stack>
+          <Tooltip title="ดูงานนี้ในปฏิทิน">
+            <IconButton aria-label="ดูในปฏิทิน" onClick={() => {
+              const q = selectedEvent.unscheduled
+                ? `draft=${selectedEvent._id}&month=${selectedEvent.plannedMonth || ""}`
+                : `event=${selectedEvent._id}&date=${moment(selectedEvent.start).format("YYYY-MM-DD")}`;
+              navigate(`/event?${q}&t=${Date.now()}`);
+            }} sx={{ width: 38, height: 38, border: "1px solid #e2e8f0", borderRadius: 2, color: "#334155" }}>
+              <CalendarMonth sx={{ fontSize: 19 }} />
+            </IconButton>
+          </Tooltip>
+          <Button size="small" onClick={() => navigate("/operation")}
+            sx={{ flexShrink: 0, height: 38, px: 1.25, borderRadius: 2, fontWeight: 700, whiteSpace: "nowrap", color: "#fff", bgcolor: "#334155", "&:hover": { bgcolor: "#1e293b" } }}>
+            ดูทั้งหมด
+          </Button>
         </Stack>
       )}
 
@@ -3602,10 +3534,10 @@ const Operation = () => {
                     size="small" onClick={() => setMobileSheetOpen(true)}
                     icon={<Box component="span" sx={{ display: "inline-flex", color: `${statusItem.color} !important`, "& svg": { fontSize: 16 } }}>{statusItem.icon}</Box>}
                     label={`${statusItem.shortLabel || statusItem.label} · ${statusItem.count}`}
-                    sx={{ fontWeight: 800, bgcolor: alpha(statusItem.color, 0.08), color: statusItem.color, border: `1px solid ${alpha(statusItem.color, 0.25)}` }}
+                    sx={{ fontWeight: 800, bgcolor: "#fff", color: "#334155", border: "1px solid #e2e8f0" }}
                   />
                 )}
-                <Chip size="small" onClick={() => setMobileSheetOpen(true)} label={showAll ? "ทุกเดือน" : (selectedDate ? moment(selectedDate, "YYYY-MM").add(543, "year").format("MM/YYYY") : "เดือนนี้")} sx={{ fontWeight: 700 }} />
+                <Chip size="small" onClick={() => setMobileSheetOpen(true)} label={showAll ? "ทุกเดือน" : (selectedDate ? moment(selectedDate, "YYYY-MM").add(543, "year").format("MM/YYYY") : "เดือนนี้")} sx={{ fontWeight: 700, bgcolor: "#fff", border: "1px solid #e2e8f0", color: "#334155" }} />
                 {filterResponsible !== "all" && (
                   <Chip size="small" label={`ผู้รับผิดชอบ: ${filterResponsible === "unassigned" ? "ยังไม่มอบหมาย" : filterResponsible}`} onDelete={() => setFilterResponsible("all")} sx={{ fontWeight: 700 }} />
                 )}
@@ -3709,16 +3641,12 @@ const Operation = () => {
                       }),
                     }}>
                     {daysPastDue !== null && daysPastDue !== undefined && (
-                      <Chip
-                        size="small"
-                        icon={severeOverdue ? <Warning sx={{ fontSize: 14 }} /> : <HourglassTop sx={{ fontSize: 14 }} />}
-                        label={severeOverdue ? `ค้างงาน ${daysPastDue} วัน` : `แจ้งเตือน · เลยกำหนด ${daysPastDue} วัน`}
-                        sx={{
-                          mb: 0.75, fontWeight: 700, fontSize: "0.7rem", height: 24,
-                          bgcolor: severeOverdue ? alpha("#ef4444", 0.12) : alpha("#f59e0b", 0.12),
-                          color: severeOverdue ? "#ef4444" : "#f59e0b",
-                        }}
-                      />
+                      <Stack direction="row" alignItems="center" gap={0.6} sx={{ mb: 0.6, px: 0.5 }}>
+                        <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: severeOverdue ? "#dc2626" : "#d97706" }} />
+                        <Typography sx={{ fontSize: "0.76rem", fontWeight: 800, color: severeOverdue ? "#b91c1c" : "#92400e" }}>
+                          {severeOverdue ? `ค้างงาน ${daysPastDue} วัน` : `เลยกำหนด ${daysPastDue} วัน`}
+                        </Typography>
+                      </Stack>
                     )}
                     <JobGroupBlock
                       sessions={sessions}

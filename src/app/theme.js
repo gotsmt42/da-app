@@ -34,6 +34,44 @@ const theme = createTheme({
         body: { fontFamily: FONT_STACK },
       },
     },
+    // ✅ ตัวแบ่งหน้าทั้งแอปหน้าตาเดียวกัน (ผู้ใช้สั่ง 2 ต.ค. 2569 "ตัวแบ่งหน้าทั้งหมดไม่สวย ปรับให้เข้าธีม")
+    //    โทนเทา-น้ำเงินเข้มตามกฎออกแบบ (สีน้อย): ปุ่มเลขพื้นขาวขอบเทาอ่อน · หน้าปัจจุบันพื้นเข้มตัวขาว ·
+    //    ไม่มีวงกลมสีน้ำเงินของ MUI — ⚠️ ตั้งที่ธีมจุดเดียว ทุกหน้าที่ใช้ <Pagination>/<TablePagination> ได้ผลเหมือนกัน
+    MuiPagination: {
+      defaultProps: { shape: "rounded" },
+      styleOverrides: {
+        ul: { gap: 4, flexWrap: "nowrap" },
+      },
+    },
+    MuiPaginationItem: {
+      styleOverrides: {
+        root: {
+          minWidth: 34, height: 34, margin: 0, borderRadius: 8, fontWeight: 700, fontSize: "0.84rem",
+          color: "#334155", border: "1px solid #e2e8f0", backgroundColor: "#fff",
+          fontVariantNumeric: "tabular-nums",
+          "&:hover": { backgroundColor: "#f8fafc", borderColor: "#cbd5e1" },
+          "&.Mui-selected, &.Mui-selected:hover, &.Mui-selected.Mui-focusVisible": {
+            backgroundColor: "#334155", borderColor: "#334155", color: "#fff",
+          },
+          "&.Mui-disabled": { opacity: 0.35 },
+        },
+        ellipsis: { border: 0, backgroundColor: "transparent", minWidth: 20 },
+        sizeSmall: { minWidth: 30, height: 30, fontSize: "0.78rem" },
+        sizeLarge: { minWidth: 38, height: 38, fontSize: "0.9rem" },
+        icon: { fontSize: "1.15rem" },
+      },
+    },
+    MuiTablePagination: {
+      styleOverrides: {
+        root: { color: "#64748b", borderTop: "1px solid #e2e8f0" },
+        selectLabel: { fontSize: "0.78rem" },
+        displayedRows: { fontSize: "0.78rem", fontVariantNumeric: "tabular-nums" },
+        actions: {
+          "& .MuiIconButton-root": { border: "1px solid #e2e8f0", borderRadius: 8, width: 32, height: 32, marginLeft: 4, color: "#334155" },
+          "& .MuiIconButton-root.Mui-disabled": { opacity: 0.35 },
+        },
+      },
+    },
   },
 });
 

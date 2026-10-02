@@ -273,7 +273,7 @@ export default function BillingTracking() {
           </Box>
           {pageCount > 1 && (
             <Stack alignItems="center" sx={{ mt: 2 }}>
-              <Pagination count={pageCount} page={safePage} onChange={(_, p) => setPage(p)} size="small" color="primary" />
+              <Pagination count={pageCount} page={safePage} onChange={(_, p) => setPage(p)} size="small" />
             </Stack>
           )}
         </>

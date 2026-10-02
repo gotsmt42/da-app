@@ -519,7 +519,7 @@ const ServiceReportFiles = () => {
             <Pagination
               count={totalPages} page={page}
               onChange={(_, v) => setPage(v)}
-              color="primary" shape="rounded" size={isMobile ? "large" : "medium"}
+              shape="rounded" size="medium"
               showFirstButton showLastButton
               sx={isMobile ? { "& .MuiPaginationItem-root": { minWidth: 40, height: 40, fontSize: "1rem" } } : undefined}
             />

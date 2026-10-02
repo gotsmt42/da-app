@@ -6222,11 +6222,7 @@ pagedRows.map((c, idx) => {
           <Pagination
             count={totalPages} page={safePage}
             onChange={(_, v) => setPage(v)}
-            color="primary" shape="rounded" size={isMobile ? "large" : "small"}
-            sx={{
-              "& .Mui-selected": { bgcolor: `${ACCENT} !important`, color: "#fff" },
-              ...(isMobile ? { "& .MuiPaginationItem-root": { minWidth: 40, height: 40, fontSize: "1rem" } } : {}),
-            }}
+            shape="rounded" size="medium" siblingCount={isMobile ? 0 : 1}
           />
         </Stack>
       )}
