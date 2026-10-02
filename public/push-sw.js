@@ -1,5 +1,9 @@
 // Service worker เฉพาะสำหรับรับ Web Push notification (ไม่แตะ cache ของแอปหลัก)
 
+// ✅ เวอร์ชันใหม่ของไฟล์นี้ใช้งานทันที ไม่ต้องรอปิดแอปทุกแท็บก่อน (ไฟล์นี้ไม่มี cache ให้พัง)
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+
 self.addEventListener("push", (event) => {
   let data = { title: "แจ้งเตือน", body: "" };
   try {
@@ -12,31 +16,51 @@ self.addEventListener("push", (event) => {
   //    แอปปิด/อยู่เบื้องหลัง → แจ้งเตือนระบบของมือถือ (เสียง/สั่นตามตั้งค่าเครื่อง)
   // ⚠️ ข้ามแจ้งเตือนระบบได้เฉพาะตอนมีหน้าแอป "มองเห็นอยู่" เท่านั้น — Chrome บังคับ userVisibleOnly
   //    ถ้าไม่มีหน้าไหนเปิดอยู่แล้วไม่ showNotification เบราว์เซอร์จะโชว์ข้อความกลางๆ ของมันเองแทน
+  // ✅ ตัวเลขบนไอคอนแอป (แบบ LINE) — server แนบจำนวนที่ยังไม่อ่านมาใน payload.badge
+  //    รองรับ Android (Chrome) / iOS 16.4+ ที่ติดตั้งแอปลงหน้าจอโฮม · เครื่องที่ไม่รองรับข้ามไปเงียบๆ
+  const setBadge = () => {
+    try {
+      if (!("setAppBadge" in self.navigator)) return Promise.resolve();
+      const n = Number(data.badge);
+      return (n > 0 ? self.navigator.setAppBadge(n) : Number.isFinite(n) ? self.navigator.clearAppBadge() : self.navigator.setAppBadge()).catch(() => {});
+    } catch {
+      return Promise.resolve();
+    }
+  };
+
   event.waitUntil(
-    clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
-      const visible = list.filter((c) => c.visibilityState === "visible" && new URL(c.url).origin === self.location.origin);
-      if (visible.length) {
-        visible.forEach((c) => c.postMessage({ type: "app-push", payload: { title: data.title, body: data.body, url: data.url || "/", tag: data.tag } }));
-        return undefined;
-      }
-      return self.registration.showNotification(data.title || "🔔 แจ้งเตือน", {
-        body: data.body || "",
-        icon: "/logo192.png",
-        badge: "/logo192.png",
-        // ✅ tag เดียวกัน = แจ้งเตือนเกี่ยวกับงานเดียวกัน ถูกรวม/แทนที่ของเก่าแทนที่จะกองสะสม
-        // renotify: true ทำให้ถึงจะแทนที่ของเก่า ก็ยังสั่น/เด้งแจ้งซ้ำให้รู้ว่ามีอัปเดตใหม่จริง (ไม่ใช่แค่เงียบๆ แทนที่)
-        tag: data.tag || undefined,
-        renotify: Boolean(data.tag) && Boolean(data.renotify),
-        // ✅ มีเสียงเสมอ (ใช้เสียงแจ้งเตือนของเครื่อง) — เว็บกำหนดไฟล์เสียงเองไม่ได้ เบราว์เซอร์มือถือไม่รองรับ
-        silent: false,
-        vibrate: [120, 60, 120],
-        // ✅ ให้ค้างอยู่ในกล่องแจ้งเตือนจนกว่าจะมีคนกดดู ไม่ให้หายไปเองหลังเด้งขึ้นมาไม่กี่วินาที
-        requireInteraction: true,
-        dir: "auto",
-        lang: "th",
-        data: { url: data.url || "/" },
-      });
-    })
+    Promise.all([
+      setBadge(),
+      clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+        const visible = list.filter((c) => c.visibilityState === "visible" && new URL(c.url).origin === self.location.origin);
+        if (visible.length) {
+          visible.forEach((c) => c.postMessage({ type: "app-push", payload: { title: data.title, body: data.body, url: data.url || "/", tag: data.tag, nid: data.nid, kind: data.kind } }));
+          return undefined;
+        }
+        return self.registration.showNotification(data.title || "🔔 แจ้งเตือน", {
+          body: data.body || "",
+          // ✅ ไอคอนแอป (ใหญ่ ข้างข้อความ) + ไอคอนขาวล้วนสำหรับแถบสถานะ Android
+          //    🐛 เดิมใช้ /logo192.png (โลโก้เก่า) ทั้งสองช่อง — แถบสถานะ Android แสดงเป็นสี่เหลี่ยมขาวทึบ
+          //    เพราะระบบใช้แค่ความโปร่งใสของรูป badge ต้องเป็นรูปขาวบนพื้นโปร่งใสเท่านั้น
+          icon: "/app-icon-192.png?v=16",
+          badge: "/notification-badge.png",
+          // ✅ tag เดียวกัน = แจ้งเตือนเกี่ยวกับงานเดียวกัน ถูกรวม/แทนที่ของเก่าแทนที่จะกองสะสม
+          // renotify: true ทำให้ถึงจะแทนที่ของเก่า ก็ยังสั่น/เด้งแจ้งซ้ำให้รู้ว่ามีอัปเดตใหม่จริง (ไม่ใช่แค่เงียบๆ แทนที่)
+          tag: data.tag || undefined,
+          renotify: Boolean(data.tag) && Boolean(data.renotify),
+          // ✅ มีเสียงเสมอ (ใช้เสียงแจ้งเตือนของเครื่อง) — เว็บกำหนดไฟล์เสียงเองไม่ได้ เบราว์เซอร์มือถือไม่รองรับ
+          silent: false,
+          vibrate: [120, 60, 120],
+          // ✅ ให้ค้างอยู่ในกล่องแจ้งเตือนจนกว่าจะมีคนกดดู ไม่ให้หายไปเองหลังเด้งขึ้นมาไม่กี่วินาที
+          requireInteraction: true,
+          timestamp: Date.now(),
+          dir: "auto",
+          lang: "th",
+          data: { url: data.url || "/", nid: data.nid || "" },
+          actions: [{ action: "open", title: "เปิดดู" }],
+        });
+      }),
+    ])
   );
 });
 
@@ -70,18 +94,22 @@ self.addEventListener("pushsubscriptionchange", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const targetUrl = event.notification.data?.url || "/";
+  const { url = "/", nid = "" } = event.notification.data || {};
 
+  // ✅ แอปเปิดค้างอยู่ (แม้อยู่เบื้องหลัง) → ส่งให้แอปเปลี่ยนหน้าเองแบบ SPA (ไม่โหลดใหม่ทั้งแอป) + ทำเครื่องหมายอ่านแล้ว
+  //    แอปปิดอยู่ → เปิดหน้าใหม่พร้อม ?_n=<id> ให้แอปทำเครื่องหมายอ่านแล้วตอนเปิดขึ้นมา (service worker ไม่มี token เรียก API เองไม่ได้)
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
-        const clientUrl = new URL(client.url);
-        if (clientUrl.origin === self.location.origin && "focus" in client) {
-          client.navigate(targetUrl);
+        if (new URL(client.url).origin === self.location.origin && "focus" in client) {
+          client.postMessage({ type: "open-url", url, nid });
           return client.focus();
         }
       }
-      if (clients.openWindow) return clients.openWindow(targetUrl);
+      if (!clients.openWindow) return undefined;
+      const target = new URL(url, self.location.origin);
+      if (nid) target.searchParams.set("_n", nid);
+      return clients.openWindow(target.pathname + target.search + target.hash);
     })
   );
 });

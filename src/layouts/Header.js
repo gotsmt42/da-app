@@ -3,8 +3,9 @@ import useRealtime from "@/shared/realtime/useRealtime";
 import { Link, useLocation } from "react-router-dom";
 import AuthService from "../shared/services/authService";
 import { useAuth } from "../features/auth/AuthContext";
-import useEventNotifications from "../shared/hooks/useEventNotifications";
-import NotificationBell from "../features/notifications/components/NotificationBell";
+// ✅ กระดิ่งอ่านจากกล่องแจ้งเตือนที่ server (ทุกระบบ ทุกเครื่อง) — เดิมสร้างรายการเองจากการเทียบข้อมูลงาน
+//    ฝั่งหน้าจอ (useEventNotifications) จึงเห็นแค่เรื่องงาน และหายเมื่อเปลี่ยนเครื่อง
+import InboxBell from "../features/notifications/components/InboxBell";
 import './Header.css';
 import {
   Navbar,
@@ -30,7 +31,7 @@ import {
   FaBars, FaUserCircle, FaWrench, FaFileContract, FaFileInvoiceDollar, FaCalendarAlt,
   FaChevronDown, FaCheck, FaBriefcase, FaMoneyCheckAlt, FaReceipt,
 } from "react-icons/fa";
-import { can, isRole, ROLES, DEPARTMENT, rankLabel } from "@/shared/utils/roles";
+import { can, DEPARTMENT, rankLabel } from "@/shared/utils/roles";
 
 /**
  * ✅ ตัวเลือกของ dropdown "ตารางงาน" — ต่างกันตาม role เพราะ query ?dept= มีความหมายไม่เหมือนกัน
@@ -116,7 +117,7 @@ const Header = ({ toggleMobileSidebar }) => {
   // ที่ต้องใช้ข้อมูลชุดเดียวกัน จะกลายเป็นดึงซ้ำหลายรอบต่อหนึ่งนาที — ตอนนี้ทั้งแอปดึงก้อนเดียวแล้วแจกกัน
   // ⚠️ ตัวเลขบนป้ายทุกจุด (เมนูข้าง/เมนูหลักหน้าแรก/แถบล่างมือถือ/ตรงนี้) จึงมาจากชุดข้อมูลเดียวกันเสมอ
   const { userData } = useAuth();
-  const { events, badges } = useAppBadges(userData);
+  const { badges } = useAppBadges(userData);
   const org = useOrgSettings();
   const isAdminOrManager = can(userData, "viewAllJobs");
   const canUseExpenses = can(userData, "requestExpense") || can(userData, "viewAllExpenses");
@@ -125,7 +126,6 @@ const Header = ({ toggleMobileSidebar }) => {
   const canViewContracts = can(userData, "viewContracts");
   // ✅ ซ่อนเมนูที่ผู้ใช้กดไปแล้วไม่มีอะไรให้ทำ แทนที่จะโชว์ไว้แล้วเจอหน้าว่าง/โดนเด้งกลับ
   const canViewOperation = can(userData, "editOperation") || can(userData, "receiveDispatch");
-  const isSale = isRole(userData, ROLES.SALE);
   const canViewQuotations = can(userData, "viewQuotations");
   // ✅ ทางลัด "ตารางงานช่าง" (ดูอย่างเดียว) — เซลไม่เข้าเงื่อนไข canViewOperation/canViewContracts/
   // canViewQuotations เลยสักข้อ พื้นที่กลาง header จึงว่างเปล่าทั้งจอกว้างและจอมือถือมาตลอด
@@ -150,11 +150,6 @@ const Header = ({ toggleMobileSidebar }) => {
    */
   const hasScheduleShortcut = !canViewContracts && canViewService;
 
-  const { notifications, unread, markRead, markAllRead } = useEventNotifications(
-    events,
-    // ⚠️ เซลต้องเป็นสายของตัวเอง ไม่ใช่ตกไปเป็น "technician" (ดูเหตุผลใน hook)
-    isSale ? "sale" : isAdminOrManager ? "admin" : "technician"
-  );
 
   // ✅ รูป/ชื่อบนหัวเว็บ อัปเดตทันทีเมื่อข้อมูลผู้ใช้เปลี่ยน (เรียลไทม์)
   const [userLiveKey, setUserLiveKey] = useState(0);
@@ -334,7 +329,7 @@ const Header = ({ toggleMobileSidebar }) => {
           {/* ✅ ช่องทางติดต่อที่ Super Admin ตั้งไว้ — ไม่ได้ตั้งไว้เลยจะไม่ขึ้นปุ่มนี้ */}
           <HeaderContactMenu />
 
-          <NotificationBell notifications={notifications} unread={unread} onItemClick={markRead} onMarkAllRead={markAllRead} dark jobBasePath={canViewOperation ? "/operation" : "/event"} />
+          <InboxBell dark />
 
           <div className="profile-img d-none d-lg-block">
             <Dropdown isOpen={dropdownOpen} toggle={toggle}>

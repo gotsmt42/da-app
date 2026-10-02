@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { refreshInbox, markInboxRead } from "@/shared/hooks/useInbox";
 import { Box, ButtonBase, IconButton, Slide, Typography } from "@mui/material";
-import { Close, NotificationsActive } from "@mui/icons-material";
+import { Close } from "@mui/icons-material";
 
 /**
  * แบนเนอร์แจ้งเตือนในแอป (แบบ LINE) + เสียงเตือน — ใช้ตอน "แอปเปิดอยู่บนจอ"
@@ -50,6 +51,7 @@ const playChime = () => {
 
 export default function InAppPushBanner() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [msg, setMsg] = useState(null);
   const [open, setOpen] = useState(false);
   const timer = useRef(null);
@@ -72,7 +74,14 @@ export default function InAppPushBanner() {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return undefined;
     const onMessage = (e) => {
+      // ✅ กดแจ้งเตือนบนมือถือตอนแอปเปิดค้างอยู่เบื้องหลัง → service worker ส่งมาให้เปลี่ยนหน้าแบบ SPA + อ่านแล้ว
+      if (e.data?.type === "open-url") {
+        if (e.data.nid) markInboxRead(e.data.nid);
+        if (e.data.url) navigate(e.data.url);
+        return;
+      }
       if (e.data?.type !== "app-push") return;
+      refreshInbox();
       setMsg(e.data.payload || {});
       setOpen(true);
       playChime();
@@ -85,7 +94,19 @@ export default function InAppPushBanner() {
       navigator.serviceWorker.removeEventListener("message", onMessage);
       clearTimeout(timer.current);
     };
-  }, []);
+  }, [navigate]);
+
+  // ✅ เปิดแอปจากการกดแจ้งเตือนตอนแอปปิดอยู่ → URL มี ?_n=<id> → ทำเครื่องหมายอ่านแล้ว แล้วลบพารามิเตอร์ทิ้ง
+  //    (ไม่ลบ = เมนูที่เทียบ query แบบตรงตัวจะไม่ติดสว่าง และกดย้อนกลับแล้วนับซ้ำ)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const nid = params.get("_n");
+    if (!nid) return;
+    markInboxRead(nid);
+    params.delete("_n");
+    const q = params.toString();
+    navigate(`${location.pathname}${q ? `?${q}` : ""}${location.hash}`, { replace: true });
+  }, [location.search]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!msg) return null;
 
@@ -106,12 +127,10 @@ export default function InAppPushBanner() {
           }}
         >
           <ButtonBase
-            onClick={() => { hide(); if (msg.url) navigate(msg.url); }}
+            onClick={() => { hide(); if (msg.nid) markInboxRead(msg.nid); if (msg.url) navigate(msg.url); }}
             sx={{ flex: 1, minWidth: 0, display: "flex", alignItems: "flex-start", gap: 1.25, textAlign: "left", borderRadius: 2.5 }}
           >
-            <Box sx={{ width: 38, height: 38, borderRadius: 2.5, flexShrink: 0, bgcolor: "#dc2626", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <NotificationsActive sx={{ fontSize: 21 }} />
-            </Box>
+            <Box component="img" src="/app-icon-192.png?v=16" alt="" sx={{ width: 38, height: 38, borderRadius: 2.5, flexShrink: 0 }} />
             <Box sx={{ minWidth: 0, flex: 1 }}>
               <Typography sx={{ fontSize: "0.7rem", fontWeight: 700, color: "#64748b", lineHeight: 1.3 }}>TidTam · ตอนนี้</Typography>
               <Typography sx={{ fontSize: "0.9rem", fontWeight: 800, color: "#0f172a", lineHeight: 1.35 }} noWrap>{msg.title || "แจ้งเตือน"}</Typography>

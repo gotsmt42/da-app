@@ -117,6 +117,27 @@ const FullLayout = () => {
   // เบราว์เซอร์บล็อกไว้แล้ว (permission "denied") เพราะเด้งไปก็ไม่มีประโยชน์อะไร
   useEffect(() => {
     const promptEnablePush = async () => {
+      // ✅ iPhone/iPad เปิดจาก Safari ตรงๆ = รับแจ้งเตือนไม่ได้เลย (Apple ให้เฉพาะแอปที่ "เพิ่มไปยังหน้าจอโฮม", iOS 16.4+)
+      //    เดิมเงียบไปเฉยๆ (isSupported = false) ผู้ใช้ iPhone จึงไม่เคยได้รับแจ้งเตือนและไม่รู้ว่าต้องทำอะไร
+      //    → บอกวิธีติดตั้ง สัปดาห์ละครั้งจนกว่าจะติดตั้ง
+      if (PushService.isIos() && !PushService.isStandalone()) {
+        const KEY = "push.iosGuide.at";
+        let last = 0;
+        try { last = Number(localStorage.getItem(KEY)) || 0; } catch { /* ไม่มีที่เก็บ */ }
+        if (Date.now() - last < 7 * 24 * 60 * 60 * 1000) return;
+        try { localStorage.setItem(KEY, String(Date.now())); } catch { /* ไม่มีที่เก็บ */ }
+        Swal.fire({
+          title: "รับแจ้งเตือนบน iPhone 🔔",
+          html: `<div style="text-align:left;font-size:0.95rem;line-height:1.7">
+            iPhone รับแจ้งเตือนได้เมื่อเปิดแอปจาก<b>ไอคอนบนหน้าจอโฮม</b>เท่านั้น<br/>
+            1. กดปุ่ม <b>แชร์</b> <span style="font-size:1.1em">⬆️</span> ด้านล่างของ Safari<br/>
+            2. เลือก <b>"เพิ่มไปยังหน้าจอโฮม"</b><br/>
+            3. เปิดแอปจากไอคอนใหม่ แล้วกด <b>"เปิดการแจ้งเตือน"</b></div>`,
+          confirmButtonText: "เข้าใจแล้ว",
+          confirmButtonColor: "#dc2626",
+        });
+        return;
+      }
       if (!PushService.isSupported()) return;
       const permission = await PushService.getPermissionState();
       if (permission === "denied") return;

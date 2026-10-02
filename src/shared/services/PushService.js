@@ -101,6 +101,31 @@ const PushService = {
       // เงียบไว้ — เป็นงานเบื้องหลัง ไม่ควรมี error เด้งกวนผู้ใช้ตอนเปิดแอป
     }
   },
+
+  // ── กล่องแจ้งเตือน (server เก็บทุกข้อความที่เด้ง) ──
+  async inbox(params = {}) { return (await API.get("/push/inbox", { params })).data; },
+  async markRead(ids) { return (await API.post("/push/inbox/read", { ids })).data; },
+  async markAllRead() { return (await API.post("/push/inbox/read", { all: true })).data; },
+  async clearRead() { return (await API.delete("/push/inbox/read")).data; },
+  async status() { return (await API.get("/push/status")).data; },
+  async test() { return (await API.post("/push/test")).data; },
+
+  /** ตัวเลขบนไอคอนแอป (Android/iOS ที่ติดตั้งแอปแล้ว) — ไม่รองรับก็ข้ามเงียบๆ */
+  setAppBadge(n) {
+    try {
+      if (!("setAppBadge" in navigator)) return;
+      (n > 0 ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(() => {});
+    } catch { /* ไม่รองรับ */ }
+  },
+
+  /** iPhone/iPad — push ใช้ได้เฉพาะตอนเปิดจากไอคอนบนหน้าจอโฮม (iOS 16.4+) ไม่ใช่จาก Safari */
+  isIos() {
+    const ua = navigator.userAgent || "";
+    return /iphone|ipad|ipod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  },
+  isStandalone() {
+    return window.matchMedia?.("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  },
 };
 
 export default PushService;

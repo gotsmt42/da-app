@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useRef, useCallback } f
 import { useNavigate, useLocation } from "react-router-dom";
 import { jwtDecode } from "jwt-decode"; // ✅ ถูกต้อง
 import PushService from "@/shared/services/PushService";
+import { resetInbox } from "@/shared/hooks/useInbox";
 import AuthService from "@/shared/services/authService";
 import { startRealtime, stopRealtime } from "@/shared/realtime/realtimeClient";
 import useRealtime from "@/shared/realtime/useRealtime";
@@ -230,6 +231,7 @@ const updateUserData = (newData) => {
     // ขั้นแรกเสมอ (หยุดรับ push ทันที) ส่วนการแจ้ง server เป็นแค่เก็บกวาด ถ้ายิงไม่ทัน/ไม่ผ่านเพราะ
     // token ถูกลบไปแล้ว ระบบก็ลบ record ให้เองตอนส่ง push ครั้งถัดไปแล้วได้ 410 กลับมา
     PushService.unsubscribe().catch(() => {});
+    resetInbox();
     localStorage.removeItem("token");
     localStorage.removeItem("payload");
     setLoggedIn(false);

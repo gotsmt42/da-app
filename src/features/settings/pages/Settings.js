@@ -38,6 +38,14 @@ const Settings = () => {
 
   const [pushSubscribed, setPushSubscribed] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
+  const [pushPermission, setPushPermission] = useState("default");
+  const [pushDevices, setPushDevices] = useState(null);
+  const [testing, setTesting] = useState(false);
+  const iosNeedsInstall = PushService.isIos() && !PushService.isStandalone();
+  const loadPushStatus = () => {
+    PushService.getPermissionState().then(setPushPermission).catch(() => {});
+    PushService.status().then((st) => setPushDevices(st.devices)).catch(() => {});
+  };
   // ลายเซ็นอิเล็กทรอนิกส์ของผู้ใช้เอง (ใช้กับเอกสาร PDF ทุกใบที่ตัวเองออก/อนุมัติ)
   const [signOpen, setSignOpen] = useState(false);
   const [hasSignature, setHasSignature] = useState(null);
@@ -46,6 +54,7 @@ const Settings = () => {
     if (PushService.isSupported()) {
       PushService.isSubscribed().then(setPushSubscribed);
     }
+    loadPushStatus();
     SignatureService.me().then((sig) => setHasSignature(Boolean(sig)));
   }, []);
 
@@ -70,6 +79,24 @@ const Settings = () => {
       Swal.fire("ทำรายการไม่สำเร็จ", error.message || "กรุณาลองใหม่อีกครั้ง", "error");
     } finally {
       setPushLoading(false);
+      loadPushStatus();
+    }
+  };
+
+  /** ✅ ส่งแจ้งเตือนทดสอบหาตัวเอง — แนะนำให้ล็อกจอ/ย่อแอปก่อน จะเห็นแบบเดียวกับแจ้งเตือนจริง */
+  const handleTestPush = async () => {
+    setTesting(true);
+    try {
+      const r = await PushService.test();
+      Swal.fire({
+        title: "ส่งแจ้งเตือนทดสอบแล้ว",
+        html: `ส่งไป ${r.devices} อุปกรณ์ · ถ้าแอปเปิดอยู่จะเด้งเป็นแถบบนจอ<br/>ลองย่อแอป/ล็อกจอแล้วกดทดสอบอีกครั้งเพื่อดูแบบแจ้งเตือนของมือถือ`,
+        icon: "success", confirmButtonColor: "#dc2626",
+      });
+    } catch (error) {
+      Swal.fire("ส่งไม่สำเร็จ", error?.response?.data?.message || error.message || "กรุณาลองใหม่อีกครั้ง", "error");
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -190,6 +217,32 @@ const Settings = () => {
           onChange={handleTogglePush}
           sx={{ "& .MuiSwitch-switchBase.Mui-checked": { color: "#dc2626" }, "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { backgroundColor: "#dc2626" } }}
         />
+      </div>
+      {/* ✅ สถานะ + ทดสอบ — ผู้ใช้เช็คเองได้ว่าเครื่องนี้รับแจ้งเตือนได้จริงไหม ไม่ต้องรอให้มีงานเข้า */}
+      <div style={{ ...styles.card, flexDirection: "column", alignItems: "stretch", gap: 8, marginTop: -4 }}>
+        {iosNeedsInstall ? (
+          <p style={{ ...styles.rowDesc, color: "#b45309" }}>
+            📱 iPhone/iPad: ต้องเปิดแอปจากไอคอนบนหน้าจอโฮมก่อนจึงจะรับแจ้งเตือนได้ — กดปุ่มแชร์ ⬆️ ใน Safari → "เพิ่มไปยังหน้าจอโฮม" แล้วเปิดแอปจากไอคอนนั้น
+          </p>
+        ) : !PushService.isSupported() ? (
+          <p style={{ ...styles.rowDesc, color: "#b45309" }}>เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือน — ใช้ Chrome (Android/คอม) หรือ Safari ที่ติดตั้งแอปลงหน้าจอโฮม (iPhone)</p>
+        ) : pushPermission === "denied" ? (
+          <p style={{ ...styles.rowDesc, color: "#b91c1c" }}>
+            🚫 เบราว์เซอร์บล็อกการแจ้งเตือนของแอปนี้ไว้ — เปิดที่ตั้งค่าของเบราว์เซอร์ (ไอคอนแม่กุญแจหน้า URL → การแจ้งเตือน → อนุญาต) แล้วกลับมาเปิดสวิตช์อีกครั้ง
+          </p>
+        ) : (
+          <p style={styles.rowDesc}>
+            {pushSubscribed ? "✅ เครื่องนี้รับแจ้งเตือนอยู่" : "เครื่องนี้ยังไม่ได้เปิดรับแจ้งเตือน"}
+            {pushDevices !== null ? ` · บัญชีของคุณเปิดรับไว้ทั้งหมด ${pushDevices} อุปกรณ์` : ""}
+            <br />เด้งบนจอแบบ LINE: งานใหม่/มอบหมายงาน · ขอปิดงาน · ใบเบิก · OT · ใบขอซื้อ · คำขอจากเว็บ (เฉพาะที่เกี่ยวกับคุณ)
+          </p>
+        )}
+        {pushSubscribed && (
+          <button type="button" onClick={handleTestPush} disabled={testing}
+            style={{ alignSelf: "flex-start", border: "1px solid #e2e8f0", background: "#fff", borderRadius: 10, padding: "6px 14px", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer", color: "#0f172a" }}>
+            {testing ? "กำลังส่ง..." : "🔔 ส่งแจ้งเตือนทดสอบ"}
+          </button>
+        )}
       </div>
 
       {/* ─── ข้อมูลหลัก (ผู้ดูแลระบบขึ้นไป) ───
