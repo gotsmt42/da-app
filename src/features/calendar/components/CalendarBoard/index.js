@@ -35,6 +35,8 @@ import {
   faSliders,
   faClipboardList,
   faAnglesDown,
+  faEye,
+  faEyeSlash,
 } from "@fortawesome/free-solid-svg-icons"; // Import ไอคอนต่างๆ
 
 import CustomerService from "@/shared/services/CustomerService";
@@ -3144,6 +3146,19 @@ function EventCalendar() {
             ภาพหน้าจอ ค้นหา/คัดลอก/คำนวณต่อไม่ได้เลย ต่างจากไฟล์ Excel ที่เอาไปทำงานต่อได้จริง
             ⚠️ ไม่เกี่ยวกับ "ใบสั่งงาน (Work Permit) PDF" ในฟอร์มแก้ไขงาน ซึ่งเป็นคนละฟีเจอร์และยังอยู่
             ครบเหมือนเดิม (ดู generateWorkPermitPDF ที่ส่งเข้า getEditEvent) */}
+        {/* ✅ โหมดคนตาบอด (ผู้ใช้สั่ง: "ไว้ข้างซ้ายปุ่ม Excel") — ปุ่มแยกของตัวเอง ไม่ใช่ปุ่มตัวกรอง
+            เปิดอยู่ = พื้นดำ ไอคอนตาปิด ให้เห็นชัดว่ากำลังดูแบบขาวดำ */}
+        <button
+          className={`toolbar-icon-btn toolbar-icon-btn--gray${grayMode ? " toolbar-icon-btn--gray-on" : ""}`}
+          onClick={toggleGrayMode}
+          title={grayMode ? "ปิดโหมดคนตาบอด (กลับเป็นภาพสี)" : "โหมดคนตาบอด (แสดงปฏิทินเป็นขาวดำ)"}
+          aria-label={grayMode ? "ปิดโหมดคนตาบอด" : "เปิดโหมดคนตาบอด"}
+          aria-pressed={grayMode}
+        >
+          <FontAwesomeIcon icon={grayMode ? faEyeSlash : faEye} />
+          <span className="tb-label">โหมดคนตาบอด</span>
+        </button>
+
         <button
           className="toolbar-icon-btn toolbar-icon-btn--excel"
           onClick={handleExportExcel}
@@ -3621,9 +3636,7 @@ function EventCalendar() {
             left: "",
             center: "prev title next",
             // ⚠️ ปุ่มย่อ/ขยายโผล่เฉพาะจอมือถือ (ซ่อนด้วย CSS บนจอคอม — ดู .fc-zoomIn-button)
-            // ✅ "โหมดคนตาบอด" แยกจากกลุ่มตัวกรอง/เครื่องมือ (ผู้ใช้สั่ง) — อยู่ด้านขวาแถวชื่อเดือน ข้างปุ่ม "วันนี้"
-            //    มือถือแสดงเป็นไอคอนอย่างเดียวในแถว − + วันนี้ (ไม่เพิ่มแถวใหม่)
-            right: "grayMode zoomOut,zoomIn today",
+            right: "zoomOut,zoomIn today",
           }}
           footerToolbar={{
             right: "dayGridMonth,timeGridWeek,listWeek",
@@ -3641,12 +3654,6 @@ function EventCalendar() {
             today: {
               text: "วันนี้",
               click: () => calendarRef.current.getApi().today(),
-            },
-            // ✅ โหมดคนตาบอด — ไอคอนตา (ตาเปิด = ภาพสี · ตาปิด = ขาวดำ) วาดด้วย CSS (.fc-grayMode-button)
-            grayMode: {
-              text: grayMode ? "ปิดโหมดคนตาบอด" : "โหมดคนตาบอด",
-              hint: grayMode ? "กลับเป็นภาพสี" : "แสดงปฏิทินเป็นขาวดำ",
-              click: toggleGrayMode,
             },
             // ✅ ปุ่มย่อ/ขยายความกว้างคอลัมน์ — วางไว้แถวเดียวกับ "วันนี้" ตรงกลางจอ กดง่ายด้วยนิ้วโป้ง
             // (เดิมอยู่บนสุดปนกับปุ่มค้นหา/ตัวกรอง/ส่งออก ซึ่งเป็นกลุ่มเครื่องมือคนละเรื่องกันและอยู่ไกล)
