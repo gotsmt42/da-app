@@ -264,7 +264,7 @@ const DecisionDialog = ({ mode, onClose, onConfirm, busy }) => {
   if (!mode) return null;
   const meta = {
     send: { title: "บันทึกว่าส่งใบเสนอราคาให้ลูกค้าแล้ว", color: "#2563eb", btn: "บันทึกการส่ง", dateLabel: "วันที่ส่ง" },
-    resend: { title: "ส่งใบเสนอราคา (ฉบับแก้ไข) ให้ลูกค้าอีกครั้ง", color: "#7c3aed", btn: "บันทึกการส่งใหม่", dateLabel: "วันที่ส่ง" },
+    resend: { title: "ส่งใบเสนอราคา (ฉบับแก้ไข) ให้ลูกค้าอีกครั้ง", color: "#334155", btn: "บันทึกการส่งใหม่", dateLabel: "วันที่ส่ง" },
     approve: { title: "ลูกค้าอนุมัติใบเสนอราคา", color: "#15803d", btn: "ยืนยันอนุมัติ", dateLabel: "วันที่ลูกค้าอนุมัติ" },
     reject: { title: "ลูกค้าปฏิเสธใบเสนอราคา", color: "#b91c1c", btn: "ยืนยันปฏิเสธ", dateLabel: "วันที่ลูกค้าแจ้ง" },
   }[mode];
@@ -505,7 +505,7 @@ const DetailDialog = ({
         buttons: [
           ["approve", "ลูกค้าอนุมัติ", "#15803d", <CheckCircle key="i" />],
           ["reject", "ลูกค้าปฏิเสธ", "#b91c1c", <Cancel key="i" />],
-          ["resend", "ส่งฉบับแก้ไข", "#7c3aed", <Autorenew key="i" />],
+          ["resend", "ส่งฉบับแก้ไข", "#475569", <Autorenew key="i" />],
         ],
       };
     }
@@ -599,14 +599,15 @@ const DetailDialog = ({
 
           <InfoSection a={a} isFinance={isFinance} canEdit onSave={(body) => onQuotation(job, body)} />
 
-          <Section title="ไฟล์ใบเสนอราคา" icon={<Description />}>
+          {/* ⚠️ FileUploadSection มีหัว "ใบเสนอราคา" + จำนวนไฟล์ของตัวเองอยู่แล้ว — ห่อแค่กรอบ ไม่ซ้อนหัวซ้ำ */}
+          <Box sx={{ border: `1px solid ${BORDER}`, borderRadius: 2.5, bgcolor: "#fff", p: 1.75 }}>
             <FileUploadSection
               eventId={a._id} type="quotation" label="ใบเสนอราคา"
               files={a.quotationFiles} applicable={a.quotationApplicable}
               onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
               uploading={upload.busy && upload.eventId === a._id} progress={upload.progress} currentUser={currentUser}
             />
-          </Section>
+          </Box>
 
           <FollowUpSection a={a} canFollow onPreview={onPreview} onSubmit={(payload) => onFollowUp(job, payload)} />
 
@@ -852,7 +853,8 @@ export default function QuotationTracking() {
 
   const tiles = [
     { value: "open", label: "กำลังดำเนินการ", shortLabel: "ดำเนินการ", count: counts.open, unit: "ใบ", icon: <Apps />, color: "#475569" },
-    ...STATUS_ORDER.filter((s) => s !== "revising" || counts.revising || status === s).map((s) => {
+    // ✅ โชว์เฉพาะสถานะที่มีใบอยู่จริง (หรือกำลังเลือกอยู่) — การ์ดเลข 0 เรียงเต็มแถวทำให้รกตา
+    ...STATUS_ORDER.filter((s) => (counts[s] || 0) > 0 || status === s).map((s) => {
       const m = STATUS[s];
       const Icon = m.icon;
       return { value: s, label: m.label, shortLabel: m.short, count: counts[s] || 0, unit: "ใบ", icon: <Icon />, color: s === "follow_up" ? m.color : "#475569", alert: s === "follow_up" };
@@ -892,7 +894,7 @@ export default function QuotationTracking() {
           <Kpi label="ต้องติดตามด่วน" value={`${counts.follow_up || 0} ใบ`} sub={counts.follow_up ? `มูลค่า ${baht(stats.urgentValue)}` : "ไม่มีใบเลยกำหนด"} color="#dc2626" alert={counts.follow_up > 0} onClick={() => setStatus("follow_up")} active={status === "follow_up"} />
           <Kpi label="อนุมัติแล้ว" value={baht(stats.approvedValue)} sub={`${stats.approvedCount} ใบ`} color="#15803d" onClick={() => setStatus("approved")} active={status === "approved"} />
           <Kpi label="อัตราปิดการขาย" value={stats.winRate === null ? "—" : `${stats.winRate}%`} sub={stats.decided ? `อนุมัติ ${stats.approvedCount} จาก ${stats.decided} ใบที่ได้คำตอบ` : "ยังไม่มีใบที่ได้คำตอบ"} color="#0f172a" />
-          <Kpi label="ข้อมูลไม่ครบ" value={`${counts.incomplete} ใบ`} sub="ไม่มีเลขที่ หรือ ไม่มีมูลค่า" color="#b45309" alert={counts.incomplete > 0} onClick={() => setStatus("incomplete")} active={status === "incomplete"} />
+          <Box sx={{ gridColumn: { xs: "1 / -1", md: "auto" }, display: "grid" }}><Kpi label="ข้อมูลไม่ครบ" value={`${counts.incomplete} ใบ`} sub="ไม่มีเลขที่ หรือ ไม่มีมูลค่า" color="#b45309" alert={counts.incomplete > 0} onClick={() => setStatus("incomplete")} active={status === "incomplete"} /></Box>
         </Box>
       )}
 
