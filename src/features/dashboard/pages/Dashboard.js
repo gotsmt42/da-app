@@ -1,7 +1,5 @@
 import { Container } from "reactstrap";
 import {
-  FaCalendarAlt,
-  FaBuilding,
   FaChevronRight,
 
   FaClock,
@@ -9,13 +7,12 @@ import {
   FaExclamationCircle,
   FaClipboardList,
   FaCogs,
-  FaChevronLeft,
   FaCheckDouble,
 } from "react-icons/fa";
 import { useEffect, useState, useMemo } from "react";
 import useRealtime from "@/shared/realtime/useRealtime";
 import useMediaQuery from "@mui/material/useMediaQuery";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import AuthService from "@/shared/services/authService";
@@ -39,8 +36,13 @@ import { groupEventsByContract, nextVisitOverdueInfo } from "@/shared/utils/cont
 // ✅ ตรรกะติดตามใบเสนอราคาตัวกลาง — ใช้ร่วมกับหน้า /quotations และฝั่ง server เพื่อให้เกณฑ์/ตัวเลขตรงกัน
 import { getFollowUpInfo } from "@/shared/utils/quotationTracking";
 import { formatThai } from "@/shared/utils/thaiDate";
-import { can, isRole, rankLabel, ROLES, TECHNICIAN_ROLES } from "@/shared/utils/roles";
+import { can, isRole, rankLabel, ROLES, TECHNICIAN_ROLES, ALL_ROLES } from "@/shared/utils/roles";
 import HomeMenu from "../components/HomeMenu";
+import { Box, Stack, Typography, Skeleton, Avatar } from "@mui/material";
+import { ExpandMore } from "@mui/icons-material";
+import { personColor, personInitial } from "@/shared/utils/personAvatar";
+import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, DANGER, CARD_SHADOW } from "@/shared/ui/PageKit";
+import { Widget, Row, Dot, Empty, Loading, Pager, GroupTitle } from "../components/DashWidgets";
 
 // 🎨 สีและไอคอนประจำสถานะงาน — ใช้ร่วมกันทั้ง Quick Stats และการ์ดงานวันนี้
 // ✅ เก็บเป็น "component" ไม่ใช่ element ที่ render ไว้แล้ว เพื่อให้เรียกใช้คนละขนาดได้ตามบริบท
@@ -90,7 +92,6 @@ const scaleStyleFonts = (styleMap, enabled) => {
 
 const Dashboard = () => {
   const { userData } = useAuth();
-  const navigate = useNavigate();
   // ✅ 900px ขึ้นไปถือว่าเป็นจอคอม/แท็บเล็ตแนวนอน (ตรงกับ breakpoint ที่หน้าอื่นในแอปใช้อยู่แล้ว)
   const isDesktopScreen = useMediaQuery("(min-width:900px)");
   const styles = useMemo(() => scaleStyleFonts(baseStyles, isDesktopScreen), [isDesktopScreen]);
@@ -437,61 +438,20 @@ const Dashboard = () => {
   // ในนั้นจะไปโผล่ซ้ำที่แถบข้างฝั่งขวาของจอกว้างด้วย ทั้งที่ต้องการให้จอกว้างอยู่ฝั่งซ้ายเท่านั้น
   const overdueContractsBlock =
     canViewContracts && overdueContracts.length > 0 ? (
-      <>
-        <h5 style={styles.sectionTitle}>⏰ สัญญาที่เลยกำหนด / คงค้าง</h5>
-        <div style={styles.contractOverdueCard}>
-          <div style={{ padding: "6px 0" }}>
-            {overdueContracts.slice(0, 5).map((c) => (
-              <Link
-                // ✅ ลิงก์เจาะจง — เด้งตรงไปแท็บ "เลยกำหนด/คงค้าง" พร้อมค้นหาชื่อบริษัท/
-                // โครงการนั้นให้ทันที (ดู ?q= ใน ContractOverview.js) แทนที่จะเปิดมาเจอทั้ง
-                // ลิสต์แล้วต้องมานั่งหาเอง
-                key={c.key}
-                to={`/contracts?view=overdue&q=${encodeURIComponent(c.company || c.site || "")}`}
-                style={styles.sideJobRow}
-                className="metric-card-hover"
-              >
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={styles.sideJobName}>
-                    {[c.company, c.site].filter(Boolean).join(" · ") ||
-                      c.title ||
-                      "สัญญา"}
-                  </span>
-                  <span style={styles.sideJobDetail}>
-                    {[c.title, c.system].filter(Boolean).join(" · ")}
-                  </span>
-                </span>
-                {/* ✅ ป้ายบอกสถานะจริง (ถึงรอบแล้ว / เกิน N ด. / ใกล้ถึงรอบ) พร้อมสีตามระดับความเร่งด่วน
-                    — เดิมเขียน "เกิน N ด." ตายตัวทุกใบ ซึ่งจะกลายเป็น "เกิน 0 ด." สำหรับรอบที่เพิ่งถึง
-                    กำหนดเดือนนี้ และไม่มีทางแยกออกจากรอบที่ยังมาไม่ถึงได้เลย */}
-                <span
-                  style={{
-                    ...styles.contractOverdueBadge,
-                    ...(c.overdueInfo.state === "due_soon" ? styles.contractDueSoonBadge : null),
-                  }}
-                >
-                  {c.overdueInfo.shortLabel}
-                </span>
-              </Link>
-            ))}
-          </div>
-        </div>
-        {overdueContracts.length > 5 && (
-          <Link
-            to="/contracts?view=overdue"
-            style={{
-              ...styles.viewAllBtn,
-              color: "#b91c1c",
-              backgroundColor: "rgba(220, 38, 38, 0.08)",
-              border: "1px solid rgba(220, 38, 38, 0.25)",
-            }}
-            className="metric-card-hover"
-          >
-            ดูสัญญาที่เลยกำหนดทั้งหมด ({overdueContracts.length}){" "}
-            <FaChevronRight size={9} />
-          </Link>
-        )}
-      </>
+      <Widget title="สัญญาที่เลยกำหนด / ใกล้ถึงรอบ" count={overdueContracts.length} hint="รอบเข้างานถัดไปของสัญญา (จากหน้าภาพรวมงาน)"
+        to={overdueContracts.length > 5 ? "/contracts?view=overdue" : undefined}>
+        {overdueContracts.slice(0, 5).map((c) => {
+          const soon = c.overdueInfo.state === "due_soon";
+          return (
+            // ✅ เจาะจง: เปิดแท็บ "เลยกำหนด" พร้อมค้นชื่อบริษัท/โครงการนั้นให้เลย (ดู ?q= ใน ContractOverview.js)
+            <Row key={c.key} to={`/contracts?view=overdue&q=${encodeURIComponent(c.company || c.site || "")}`}
+              leading={<Dot color={soon ? "#d97706" : DANGER} />}
+              title={[c.company, c.site].filter(Boolean).join(" · ") || c.title || "สัญญา"}
+              sub={[c.title, c.system].filter(Boolean).join(" · ")}
+              trailing={c.overdueInfo.shortLabel} danger={!soon} />
+          );
+        })}
+      </Widget>
     ) : null;
 
   // 🏆 โครงการที่มีงานมากที่สุด (ทั้งหมด แบ่งหน้า) — จัดกลุ่มงานตาม บริษัท+โครงการ (company+site) เพราะ
@@ -543,17 +503,10 @@ const Dashboard = () => {
     projectPage * PROJECTS_PER_PAGE,
   );
 
-  // 👥 ภาพรวมทีมงานแยกตามสิทธิ์ (เฉพาะแอดมิน)
-  const roleCounts = users.reduce((acc, u) => {
-    const r = (u.role || "other").toLowerCase();
-    acc[r] = (acc[r] || 0) + 1;
-    return acc;
-  }, {});
-  const teamItems = [
-    { key: "technician", label: "ช่างเทคนิค", color: "#0891b2" },
-    { key: "admin", label: "ผู้ดูแลระบบ", color: "#dc2626" },
-    { key: "manager", label: "ผู้จัดการ", color: "#f59e0b" },
-  ];
+  // 👥 ภาพรวมทีมงานแยกตาม Rank (ตำแหน่งในองค์กร) — นับด้วย isRole ตัวเดียวกับทั้งแอป · แสดงเฉพาะ Rank ที่มีคน
+  const teamItems = ALL_ROLES
+    .map((r) => ({ key: r, label: rankLabel(r), count: users.filter((u) => isRole(u, r)).length }))
+    .filter((t) => t.count > 0);
 
   // 🚀 ทางลัดทั้งหมดของหน้านี้ย้ายไปอยู่ใน "เมนูหลัก" (components/HomeMenu.js) ด้านบนสุดแล้ว
   // 🐛 ทางลัดชุดเดิม (quickActions) อยู่ท้ายหน้าต้องเลื่อนลงไปหา และลิงก์หลายตัวยังชี้ URL เก่าที่ต้อง
@@ -566,380 +519,71 @@ const Dashboard = () => {
   // ทำให้กด dropdown ขยายแล้วทั้งหน้าสั่น/มีช่องว่างเกิดขึ้นเวลาแถบนี้สูงกว่าเนื้อหาหลักช่วงบน ───
   const sidebarContent = isAdminOrManager ? (
     <>
-      {/* ─── งานที่กำลังจะถึงในอีก 7 วัน — ย้ายมาไว้บนสุด เหนือ "งานค้างของช่าง" ให้เห็นงานที่
-      ใกล้ถึงกำหนดก่อนเป็นอันดับแรก (ไม่รวมงานวันนี้ เพราะการ์ด "งานวันนี้" ด้านบนแสดงอยู่แล้ว) ─── */}
-      <h5 style={styles.sectionTitle}>🔔 งานที่กำลังจะถึง (7 วัน)</h5>
-      <div style={styles.notiCard}>
-        {loading ? (
-          <div style={{ padding: "14px" }}>
-            {[1, 2].map((i) => (
-              <div
-                key={i}
-                style={{ ...styles.topProjectSkeletonRow }}
-                className="skeleton-pulse"
-              />
-            ))}
-          </div>
-        ) : upcomingJobs.length === 0 ? (
-          <div style={styles.notiEmpty}>
-            <FaCalendarAlt
-              size={20}
-              style={{ opacity: 0.25, marginBottom: "6px" }}
-            />
-            <p style={{ margin: 0, fontSize: "12px", color: "#94a3b8" }}>
-              ไม่มีงานที่จะถึงใน 7 วันนี้
-            </p>
-          </div>
-        ) : (
-          <div style={{ padding: "6px 0" }}>
-            {upcomingJobs.slice(0, 5).map((job) => {
-              const jobStart = moment(job.start || job.date).startOf("day");
-              const diffDays = jobStart.diff(today, "days");
-              const badgeLabel =
-                diffDays === 1 ? "พรุ่งนี้" : `อีก ${diffDays} วัน`;
-              const jobGroup = resolveOperationGroup(job);
-              return (
-                <Link
-                  key={job._id}
-                  to={`/operation/${job._id}${jobGroup ? `?group=${jobGroup}` : ""}`}
-                  style={styles.sideJobRow}
-                  className="metric-card-hover"
-                >
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={styles.sideJobName}>{job.title || "งาน"}</span>
-                    <span style={styles.sideJobDetail}>
-                      {[job.company, job.site].filter(Boolean).join(" · ")}
-                    </span>
-                  </span>
-                  <span
-                    style={{
-                      ...styles.sideJobBadge,
-                      ...(diffDays === 1
-                        ? { backgroundColor: "#fef3c7", color: "#b45309" }
-                        : {}),
-                    }}
-                  >
-                    {badgeLabel}
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </div>
-      {upcomingJobs.length > 5 && (
-        <Link
-          to="/operation"
-          style={styles.viewAllBtn}
-          className="metric-card-hover"
-        >
-          ดูงานที่กำลังจะถึงทั้งหมด ({upcomingJobs.length}){" "}
-          <FaChevronRight size={9} />
-        </Link>
-      )}
+      {/* งานที่กำลังจะถึงใน 7 วัน (ไม่รวมวันนี้ — มีกล่อง "งานวันนี้" แยกแล้ว) */}
+      <Widget title="งานที่กำลังจะถึง" count={upcomingJobs.length || undefined} hint="ภายใน 7 วันข้างหน้า" to={upcomingJobs.length > 5 ? "/operation" : undefined}>
+        {loading ? <Loading rows={2} /> : upcomingJobs.length === 0 ? <Empty text="ไม่มีงานที่จะถึงใน 7 วันนี้" /> : upcomingJobs.slice(0, 5).map((job) => {
+          const jobStart = moment(job.start || job.date).startOf("day");
+          const diffDays = jobStart.diff(today, "days");
+          const jobGroup = resolveOperationGroup(job);
+          return (
+            <Row key={job._id} to={`/operation/${job._id}${jobGroup ? `?group=${jobGroup}` : ""}`}
+              title={job.title || "งาน"} sub={[job.company, job.site].filter(Boolean).join(" · ") || "ไม่ระบุโครงการ"}
+              trailing={diffDays === 1 ? "พรุ่งนี้" : `อีก ${diffDays} วัน`} trailingSub={formatThai(jobStart, "D MMM")} />
+          );
+        })}
+      </Widget>
 
-      <h5 style={{ ...styles.sectionTitle, marginTop: "16px" }}>
-        งานค้างของช่าง
-      </h5>
-      <div style={styles.notiCard}>
-        {loading ? (
-          <div style={{ padding: "14px" }}>
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                style={{ ...styles.topProjectSkeletonRow }}
-                className="skeleton-pulse"
-              />
-            ))}
-          </div>
-        ) : overdueByTechnician.length === 0 ? (
-          <div style={styles.notiEmpty}>
-            <FaCheckDouble
-              size={22}
-              style={{ opacity: 0.25, marginBottom: "6px" }}
-            />
-            <p style={{ margin: 0, fontSize: "12px", color: "#94a3b8" }}>
-              ไม่มีงานค้างของช่างในตอนนี้ 🎉
-            </p>
-          </div>
-        ) : (
-          <div style={{ padding: "6px 0" }}>
-            {overdueByTechnician.map(({ tech, count, severeCount, jobs }) => {
-              const isExpanded = expandedOverdueTechIds.has(tech._id);
-              return (
-                <div key={tech._id}>
-                  <div
-                    onClick={() =>
-                      setExpandedOverdueTechIds((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(tech._id)) next.delete(tech._id);
-                        else next.add(tech._id);
-                        return next;
-                      })
-                    }
-                    style={styles.sideJobRow}
-                    className="metric-card-hover"
-                  >
-                    <span style={styles.sideJobAvatar}>
-                      {(tech.fname || tech.username || "?")
-                        .charAt(0)
-                        .toUpperCase()}
-                    </span>
-                    <span style={{ flex: 1, minWidth: 0 }}>
-                      <span style={styles.sideJobName}>
-                        {tech.fname || tech.username}
-                      </span>
-                      <span style={styles.sideJobDetail}>
-                        {count} งานค้าง
-                        {severeCount > 0
-                          ? ` · ${severeCount} เกิน 2 สัปดาห์`
-                          : ""}
-                      </span>
-                    </span>
-                    <span
-                      style={{
-                        ...styles.sideJobBadge,
-                        ...(severeCount > 0
-                          ? {
-                              backgroundColor: "#fee2e2",
-                              color: "#ef4444",
-                            }
-                          : {}),
-                      }}
-                    >
-                      {count}
-                    </span>
-                    <FaChevronRight
-                      size={10}
-                      style={{
-                        marginLeft: "2px",
-                        color: "#94a3b8",
-                        flexShrink: 0,
-                        transform: isExpanded ? "rotate(90deg)" : "none",
-                        transition: "transform 0.15s ease",
-                      }}
-                    />
-                  </div>
-                  {isExpanded && (
-                    <div
-                      style={styles.sideJobDropdown}
-                      className="side-job-dropdown-enter"
-                    >
-                      {jobs.map((job) => (
-                        <Link
-                          key={job.id}
-                          // ✅ เพิ่ม ?group=overdue — งานนี้เป็นงานค้างแน่ๆ (มาจากแถบ "งานค้าง
-                          // ของช่าง") แต่ id เพียงอย่างเดียวไม่บอกหน้า Operation ว่าควรไฮไลต์
-                          // แถบสถานะไหน ทำให้ขึ้นแถบผิด (เช่น "กำลังดำเนินการ") ทั้งที่งานที่
-                          // เห็นจริงคืองานค้าง — ระบุ group ให้ตรงไปเลย
-                          to={`/operation/${job.id}?group=overdue`}
-                          style={styles.sideJobItem}
-                          className="metric-card-hover"
-                        >
-                          <span style={{ flex: 1, minWidth: 0 }}>
-                            <span style={styles.sideJobItemTitle}>
-                              {job.title || "งาน"}
-                            </span>
-                            <span style={styles.sideJobItemSub}>
-                              {[job.company, job.site]
-                                .filter(Boolean)
-                                .join(" · ")}
-                            </span>
-                          </span>
-                          <span
-                            style={{
-                              ...styles.sideJobItemDays,
-                              ...(job.days >= 14 ? { color: "#ef4444" } : {}),
-                            }}
-                          >
-                            {job.days} วัน
-                          </span>
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-      <Link
-        to="/team-workload"
-        style={styles.viewAllBtn}
-        className="metric-card-hover"
-      >
-        ดูภาพรวมทีมช่างทั้งหมด <FaChevronRight size={9} />
-      </Link>
+      {/* งานค้างของช่างแยกรายคน — กดชื่อเพื่อดูรายการงานค้างของคนนั้น */}
+      <Widget title="งานค้างของช่าง" count={overdueByTechnician.reduce((n, t) => n + t.count, 0) || undefined} hint="เลยกำหนดเกิน 7 วัน · แยกรายคน" to="/staff?tab=workload" toLabel="ภาระงานทีม">
+        {loading ? <Loading rows={3} /> : overdueByTechnician.length === 0 ? <Empty text="ไม่มีงานค้างของช่างตอนนี้" /> : overdueByTechnician.map(({ tech, count, severeCount, jobs }) => {
+          const isExpanded = expandedOverdueTechIds.has(tech._id);
+          const name = [tech.fname, tech.lname].filter(Boolean).join(" ") || tech.username;
+          return (
+            <Box key={tech._id} sx={{ borderTop: `1px solid ${LINE}`, "&:first-of-type": { borderTop: 0 } }}>
+              <Row onClick={() => setExpandedOverdueTechIds((prev) => { const next = new Set(prev); if (next.has(tech._id)) next.delete(tech._id); else next.add(tech._id); return next; })}
+                chevron={false}
+                leading={<Avatar sx={{ width: 30, height: 30, fontSize: "0.8rem", fontWeight: 800, bgcolor: personColor(name) }}>{personInitial(name)}</Avatar>}
+                title={name} sub={`${count} งานค้าง${severeCount > 0 ? ` · ${severeCount} เกิน 2 สัปดาห์` : ""}`}
+                trailing={<Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>{count}<ExpandMore sx={{ fontSize: 18, color: FAINT, transition: "transform .15s", transform: isExpanded ? "rotate(180deg)" : "none" }} /></Box>}
+                danger={severeCount > 0} />
+              {isExpanded && (
+                <Box sx={{ bgcolor: SURFACE, borderTop: `1px solid ${LINE}`, pl: 4.5 }}>
+                  {jobs.map((job) => (
+                    // ✅ ?group=overdue — บอกหน้า Operation ให้ไฮไลต์แท็บ "ค้างงาน" ให้ตรงกับที่มา
+                    <Row key={job.id} dense to={`/operation/${job.id}?group=overdue`} title={job.title || "งาน"}
+                      sub={[job.company, job.site].filter(Boolean).join(" · ")} trailing={`${job.days} วัน`} danger={job.days >= 14} />
+                  ))}
+                </Box>
+              )}
+            </Box>
+          );
+        })}
+      </Widget>
 
-      {/* ─── ใบเสนอราคาที่ต้องติดตาม (ส่งลูกค้าไปแล้วเกิน 7 วัน ยังไม่มีผล) — โชว์เฉพาะตอนมีจริง
-      เป็นกล่องแจ้งเตือน (โทนส้ม/แดง) วางไว้เหนือ "งานวางแผนล่วงหน้า" ให้เห็นก่อน กดแต่ละแถวแล้วเด้ง
-      เข้าไปที่หน้า /quotations พร้อมเปิดรายละเอียดงานนั้นให้เลยทันที (ดู ?jobId= ใน QuotationTracking.js) ─── */}
+      {/* ใบเสนอราคาที่ต้องติดตาม — โชว์เฉพาะตอนมีจริง · กดแล้วเปิดใบนั้นในหน้าติดตามใบเสนอราคา */}
       {staleQuotations.length > 0 && (
-        <>
-          <h5 style={{ ...styles.sectionTitle, marginTop: "16px" }}>
-            ⚠️ ใบเสนอราคาที่ต้องติดตาม
-          </h5>
-          <div style={styles.quotationAlertCard}>
-            <div style={{ padding: "6px 0" }}>
-              {staleQuotations.slice(0, 5).map((q) => (
-                <Link
-                  key={q.id}
-                  to={`/quotations?jobId=${q.id}`}
-                  style={styles.sideJobRow}
-                  className="metric-card-hover"
-                >
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={styles.sideJobName}>{q.title || "งาน"}</span>
-                    <span style={styles.sideJobDetail}>
-                      {[q.company, q.site].filter(Boolean).join(" · ")}
-                    </span>
-                    {/* ✅ บอกด้วยว่าเคยตามไปแล้วกี่ครั้ง — เดิมเห็นแค่ "เกิน N วัน" แยกไม่ออกว่าใบนี้
-                        ปล่อยทิ้งไว้เฉยๆ หรือตามอยู่ตลอดแต่ลูกค้ายังไม่ตอบ ซึ่งต้องจัดการคนละแบบ */}
-                    {q.followUpCount > 0 && (
-                      <span style={styles.sideJobDetail}>
-                        ☎️ ตามแล้ว {q.followUpCount} ครั้ง
-                      </span>
-                    )}
-                  </span>
-                  {/* ✅ นับจาก "ติดต่อครั้งล่าสุด" ไม่ใช่วันที่ส่ง — ข้อความจึงต้องสื่อให้ตรงกัน */}
-                  <span style={styles.quotationAlertBadge}>
-                    เงียบ {q.days} วัน
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </div>
-          {staleQuotations.length > 5 && (
-            <Link
-              to="/quotations"
-              style={{
-                ...styles.viewAllBtn,
-                color: "#c2410c",
-                backgroundColor: "rgba(249, 115, 22, 0.1)",
-                border: "1px solid rgba(249, 115, 22, 0.25)",
-              }}
-              className="metric-card-hover"
-            >
-              ดูใบเสนอราคาที่ต้องติดตามทั้งหมด ({staleQuotations.length}){" "}
-              <FaChevronRight size={9} />
-            </Link>
-          )}
-        </>
+        <Widget title="ใบเสนอราคาที่ต้องติดตาม" count={staleQuotations.length} hint="ลูกค้าเงียบเกินกำหนดติดตาม" to="/finance?tab=quotations">
+          {staleQuotations.slice(0, 5).map((q) => (
+            <Row key={q.id} to={`/finance?tab=quotations&jobId=${q.id}`} leading={<Dot color={DANGER} />}
+              title={q.title || "งาน"}
+              sub={[[q.company, q.site].filter(Boolean).join(" · "), q.followUpCount ? `ตามแล้ว ${q.followUpCount} ครั้ง` : "ยังไม่เคยตาม"].filter(Boolean).join(" · ")}
+              trailing={`เงียบ ${q.days} วัน`} danger />
+          ))}
+        </Widget>
       )}
 
-      {/* ─── สัญญาที่เลยกำหนด/คงค้าง — สำเนาสำหรับจอมือถือเท่านั้น (ดู .dashboard-mobile-only ใน
-      <style> ด้านล่าง) ตามที่ผู้ใช้ขอให้อยู่เหนือ "งานวางแผนล่วงหน้า" พอดี — sidebarContent ก้อนนี้
-      render ซ้ำทั้งจอมือถือ/จอกว้าง (คนละคอลัมน์) ถ้าไม่ครอบด้วยคลาสนี้จะไปโผล่ซ้ำที่แถบข้างฝั่งขวา
-      ของจอกว้างด้วย ทั้งที่จอกว้างต้องการให้อยู่ฝั่งซ้ายที่เดียว (ดู SECTION 5.5 ในคอลัมน์หลัก) ─── */}
-      {overdueContractsBlock && (
-        <div className="dashboard-mobile-only">{overdueContractsBlock}</div>
-      )}
+      {/* สัญญาที่เลยกำหนด — มือถือแสดงตรงนี้ (จอกว้างอยู่คอลัมน์หลัก) */}
+      {overdueContractsBlock && <div className="dashboard-mobile-only">{overdueContractsBlock}</div>}
 
-      {/* ─── งานวางแผนล่วงหน้า (drafts) — เดิมไม่มีทางเห็นได้เลยนอกจากเข้าไปเปิดหน้า "แผนงาน"
-      เอง ย่อมาโชว์เป็นแถบข้างต่อจาก "งานค้างของช่าง" แทนพื้นที่ว่างที่เหลือด้านล่าง ─── */}
-      <h5 style={{ ...styles.sectionTitle, marginTop: "16px" }}>
-        📌 งานวางแผนล่วงหน้า
-      </h5>
-      <div style={styles.notiCard}>
-        {loading ? (
-          <div style={{ padding: "14px" }}>
-            {[1, 2].map((i) => (
-              <div
-                key={i}
-                style={{ ...styles.topProjectSkeletonRow }}
-                className="skeleton-pulse"
-              />
-            ))}
-          </div>
-        ) : draftsPreview.length === 0 ? (
-          <div style={styles.notiEmpty}>
-            <FaCalendarAlt
-              size={20}
-              style={{ opacity: 0.25, marginBottom: "6px" }}
-            />
-            <p style={{ margin: 0, fontSize: "12px", color: "#94a3b8" }}>
-              ยังไม่มีงานวางแผนล่วงหน้า
-            </p>
-          </div>
-        ) : (
-          <div style={{ padding: "6px 0" }}>
-            {draftsPreview.map((d) => (
-              <Link
-                key={d._id}
-                to="/event"
-                style={styles.sideJobRow}
-                className="metric-card-hover"
-              >
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={styles.sideJobName}>[{d.title}]</span>
-                  <span style={styles.sideJobDetail}>
-                    {d.system ? `💻ระบบ : ${d.system}` : ""}
-                  </span>
-                  <span style={styles.sideJobDetail}>
-                    🏢โครงการ : {[d.site].filter(Boolean).join(" · ")}
-                  </span>
-                </span>
-                <span style={styles.sideJobBadge}>
-                  {d.plannedMonth
-                    ? formatThai(moment(d.plannedMonth, "YYYY-MM"), "MMM YYYY")
-                    : "-"}
-                </span>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ✅ แบ่งหน้าแทนโชว์แค่ไม่กี่ใบตายตัว — เห็นได้ครบทุกใบจากตรงนี้เลย 5 แถวต่อหน้า */}
-      {draftsSorted.length > DRAFTS_PAGE_SIZE && (
-        <div style={styles.draftsPagination}>
-          <button
-            type="button"
-            style={{
-              ...styles.draftsPageNav,
-              ...(draftsSafePage <= 1 ? styles.draftsPageNavDisabled : {}),
-            }}
-            onClick={() => setDraftsPage((p) => Math.max(1, p - 1))}
-            disabled={draftsSafePage <= 1}
-            title="หน้าก่อนหน้า"
-          >
-            <FaChevronRight size={10} style={{ transform: "rotate(180deg)" }} />
-          </button>
-          <span style={styles.draftsPageLabel}>
-            หน้า {draftsSafePage} / {draftsTotalPages}
-          </span>
-          <button
-            type="button"
-            style={{
-              ...styles.draftsPageNav,
-              ...(draftsSafePage >= draftsTotalPages
-                ? styles.draftsPageNavDisabled
-                : {}),
-            }}
-            onClick={() =>
-              setDraftsPage((p) => Math.min(draftsTotalPages, p + 1))
-            }
-            disabled={draftsSafePage >= draftsTotalPages}
-            title="หน้าถัดไป"
-          >
-            <FaChevronRight size={10} />
-          </button>
-        </div>
-      )}
-
-      {/* ✅ ใช้ generalDrafts (ตัดฉบับร่างของสัญญาออกแล้ว) ให้ตัวเลขตรงกับรายการที่แสดงจริงด้านบน
-          และตรงกับจำนวนที่จะเห็นจริงเมื่อกดไปหน้า "แผนงาน" (ซึ่งกรองแบบเดียวกัน — ดู visibleDrafts) */}
-      {generalDrafts.length > 0 && (
-        <Link
-          to="/event"
-          style={styles.viewAllBtn}
-          className="metric-card-hover"
-        >
-          ดูงานวางแผนล่วงหน้าทั้งหมด ({generalDrafts.length}){" "}
-          <FaChevronRight size={9} />
-        </Link>
-      )}
+      {/* งานวางแผนล่วงหน้า (ยังไม่ลงตาราง · ไม่รวมฉบับร่างของสัญญา) */}
+      <Widget title="งานวางแผนล่วงหน้า" count={generalDrafts.length || undefined} hint="ยังไม่ลงวันที่ในตาราง" to={generalDrafts.length ? "/event" : undefined} toLabel="เปิดปฏิทิน"
+        footer={<Pager page={draftsSafePage} pages={draftsTotalPages} onChange={setDraftsPage} />}>
+        {loading ? <Loading rows={2} /> : draftsPreview.length === 0 ? <Empty text="ยังไม่มีงานวางแผนล่วงหน้า" /> : draftsPreview.map((d) => (
+          <Row key={d._id} to="/event" title={d.title || "งาน"}
+            sub={[d.system, d.site].filter(Boolean).join(" · ") || "ไม่ระบุโครงการ"}
+            trailing={d.plannedMonth ? formatThai(moment(d.plannedMonth, "YYYY-MM"), "MMM YYYY") : "ไม่ระบุเดือน"} />
+        ))}
+      </Widget>
     </>
   ) : null;
 
@@ -1037,7 +681,7 @@ const Dashboard = () => {
           ปุ่มสีจัดเต็มแถวแย่งสายตากับตัวเลขสถานะงานที่อยู่ถัดลงมา และทางเข้าแต่ละหน้าหน้าตาไม่เหมือนกันเลย
           ✅ ทุกหน้ารวมเป็นกริดเดียว หน้าตาเดียวกัน ตามสิทธิ์ของผู้ใช้ (เงื่อนไขเดียวกับเมนูข้าง)
           ✅ ตัวเลขใบเสนอราคาที่ต้องติดตามยังเห็นอยู่ เป็นป้ายแดงบนช่อง "ใบเสนอราคา" แทนแบนเนอร์ ─── */}
-            <h5 style={styles.sectionTitle}>เมนูหลัก</h5>
+            <GroupTitle>เมนูหลัก</GroupTitle>
             <HomeMenu
               userData={userData}
               badges={{ quotations: canViewQuotations ? staleQuotations.length : 0 }}
@@ -1050,145 +694,45 @@ const Dashboard = () => {
           Operation ตรงสถานะเหมือนเดิมผ่าน ?status=... ─── */}
             {/* ⚠️ เซลเรียกสิ่งเหล่านี้ว่า "นัดหมาย" ไม่ใช่ "งาน" — คำที่ใช้ต้องตรงกับฟอร์มที่เขากรอก
                 (AddSalesAppointment) ไม่งั้นตัวเลขชุดเดียวกันถูกเรียกคนละชื่อในสองหน้าจอ */}
-            <h5 style={styles.sectionTitle}>{isSale ? "สรุปนัดหมายของฉัน" : "สรุปสถานะงาน"}</h5>
-            <div style={styles.statsGrid}>
-              {statItems.map((item, i) => {
-                const meta = getStatusMeta(item.status);
-                const StatIcon = meta.Icon;
+            {/* ✅ สรุปสถานะงาน — ตัวเลขสีเข้ม · สีสถานะอยู่ที่จุดเล็กหน้าชื่อเท่านั้น (กฎ: สีไม่เยอะ) */}
+            <GroupTitle>{isSale ? "สรุปนัดหมายของฉัน" : "สรุปสถานะงาน"}</GroupTitle>
+            <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: "repeat(4, minmax(0, 1fr))", mb: 2 }}>
+              {statItems.map((item) => (
+                <Box key={item.status} component={Link}
+                  to={isSale ? "/event" : `/operation?status=${encodeURIComponent(item.status)}${item.group ? `&group=${item.group}` : ""}`}
+                  sx={{ p: { xs: 1.1, sm: 1.5 }, bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 2.5, boxShadow: CARD_SHADOW, textDecoration: "none", minWidth: 0, "&:hover": { borderColor: FAINT } }}>
+                  <Stack direction="row" spacing={0.6} alignItems="center" sx={{ minWidth: 0 }}>
+                    <Dot color={getStatusMeta(item.status).color} />
+                    <Typography noWrap sx={{ fontSize: "0.74rem", fontWeight: 700, color: MUTED }}>{item.label}</Typography>
+                  </Stack>
+                  {loading ? <Skeleton width={36} height={30} /> : (
+                    <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.15rem", sm: "1.35rem" }, color: INK, lineHeight: 1.3, fontVariantNumeric: "tabular-nums" }}>{item.count.toLocaleString()}</Typography>
+                  )}
+                </Box>
+              ))}
+            </Box>
+
+            {/* ✅ งานวันนี้ — เดิมเป็นการ์ดใหญ่ใบละครึ่งจอ + อีโมจิ ตอนนี้เป็นรายการในกล่องเดียว อ่านไล่ลงได้ทันที */}
+            <Widget title={`${isSale ? "นัดหมายวันนี้" : "งานวันนี้"} · ${formatThai(moment(), "D MMM")}`} count={todayJobs.length || undefined}
+              to={isSale ? "/event" : todayJobs.length ? "/operation" : undefined}>
+              {loading ? <Loading rows={2} /> : todayJobs.length === 0 ? (
+                <Empty text={isSale ? "วันนี้ยังไม่มีนัดหมาย" : "ไม่มีงานที่นัดหมายไว้วันนี้"} />
+              ) : todayJobs.map((job) => {
+                const assignedName = getAssignedName(job);
                 return (
-                  <Link
-                    key={i}
-                    to={
-                      isSale
-                        ? "/event"
-                        : `/operation?status=${encodeURIComponent(item.status)}${item.group ? `&group=${item.group}` : ""}`
-                    }
-                    style={styles.statTile}
-                    className="metric-card-hover"
-                  >
-                    <div
-                      style={{
-                        ...styles.statTileIcon,
-                        backgroundColor: meta.bg,
-                        color: meta.color,
-                      }}
-                    >
-                      <StatIcon size={11} />
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      {loading ? (
-                        <span
-                          style={styles.skeletonInline}
-                          className="skeleton-pulse"
-                        />
-                      ) : (
-                        <div style={styles.statTileNumber}>{item.count}</div>
-                      )}
-                      <div style={styles.statTileLabel}>{item.label}</div>
-                    </div>
-                  </Link>
+                  <Row key={job._id} to={jobLink(job._id, resolveOperationGroup(job))}
+                    leading={<Box sx={{ width: 52, textAlign: "center" }}>
+                      <Typography sx={{ fontSize: "0.78rem", fontWeight: 800, color: INK_2, lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>{job.startTime || "ทั้งวัน"}</Typography>
+                      {job.endTime && <Typography sx={{ fontSize: "0.68rem", color: FAINT, lineHeight: 1.2 }}>{job.endTime}</Typography>}
+                    </Box>}
+                    title={[job.title || job.company || "งาน", job.system].filter(Boolean).join(" · ")}
+                    sub={[job.site || job.company, assignedName ? `ทีม ${assignedName}` : "", job.docNo ? `#${job.docNo}` : ""].filter(Boolean).join(" · ")}
+                    trailing={<Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.6, fontWeight: 700, fontSize: "0.76rem", color: INK_2 }}>
+                      <Dot color={getStatusMeta(job.status).color} />{job.status}
+                    </Box>} />
                 );
               })}
-            </div>
-
-            {/* ─── SECTION 4: TODAY'S JOBS (ข้อมูลจริงจาก CalendarEvent ของวันนี้) ─── */}
-            {/* ✅ ปุ่ม "ดูการดำเนินงานทั้งหมด" ย้ายขึ้นไปเป็นการ์ดครึ่งหนึ่งของ SECTION 2 ด้านบนแล้ว
-          (เด่นกว่าเดิมมาก) ไม่ต้องมีชิปเล็กๆ ซ้ำอีกจุดที่นี่ */}
-            <h5 style={styles.sectionTitle}>
-              {isSale ? "นัดหมายวันนี้" : "งานวันนี้"} · {moment().locale("th").format("D MMM")}
-            </h5>
-            {loading ? (
-              <div style={styles.todayScrollRow}>
-                {[1, 2].map((i) => (
-                  <div
-                    key={i}
-                    style={{
-                      ...styles.todayJobCard,
-                      ...styles.skeletonPulseBg,
-                    }}
-                    className="skeleton-pulse"
-                  />
-                ))}
-              </div>
-            ) : todayJobs.length === 0 ? (
-              <div style={styles.notiCard}>
-                <div style={styles.notiEmpty}>
-                  <FaCalendarAlt
-                    size={22}
-                    style={{ opacity: 0.25, marginBottom: "6px" }}
-                  />
-                  <p style={{ margin: 0, fontSize: "12px", color: "#94a3b8" }}>
-                    {isSale ? "วันนี้ยังไม่มีนัดหมาย — กดที่ปฏิทินเพื่อเพิ่มนัดใหม่" : "ไม่มีงานที่นัดหมายไว้ในวันนี้"}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div style={styles.todayScrollRow}>
-                {todayJobs.map((job) => {
-                  const meta = getStatusMeta(job.status);
-                  const assignedName = getAssignedName(job);
-                  const jobGroup = resolveOperationGroup(job);
-                  return (
-                    <div
-                      key={job._id}
-                      style={styles.todayJobCard}
-                      className="metric-card-hover"
-                      onClick={() => navigate(jobLink(job._id, jobGroup))}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "flex-start",
-                        }}
-                      >
-                        <span style={styles.todayJobTime}>
-                          <FaClock size={10} style={{ marginRight: "4px" }} />
-                          {job.startTime && job.endTime
-                            ? `${job.startTime}-${job.endTime}`
-                            : "ทั้งวัน"}
-                        </span>
-                        <span
-                          style={{
-                            ...styles.todayJobStatusChip,
-                            backgroundColor: meta.bg,
-                            color: meta.color,
-                          }}
-                        >
-                          {job.status}
-                        </span>
-                      </div>
-                      {job.docNo && (
-                        <span style={styles.todayJobDocNo}>#{job.docNo}</span>
-                      )}
-
-                      <h4 style={styles.todayJobTitle}>
-                        [{job.title || job.company}]
-                      </h4>
-                    
-
-                      {job.system && (
-                        <p style={styles.todayJobDetail}>
-                      
-                          💻ระบบ : {job.system}
-                        </p>
-                      )}
-                      <p style={styles.todayJobSite}>
-                     
-                        🏢โครงการ : {job.site}
-                      </p>
-
-                      {assignedName && (
-                        <p style={styles.todayJobDetail}>
-                          
-                          👷ทีม : {assignedName}
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+            </Widget>
           </div>
 
           {/* ─── แถบข้าง: งานค้างของช่างแยกรายคน (เฉพาะแอดมิน/manager) — ✅ ย้ายมาไว้ตรงนี้ (แทรกระหว่าง
@@ -1219,146 +763,39 @@ const Dashboard = () => {
             {/* ─── SECTION 6: TOP PROJECTS (เฉพาะแอดมิน/manager — events scope ตาม role มีความหมาย
           เป็น "ภาพรวมทั้งบริษัท" จริงๆ แค่กับสองสิทธิ์นี้เท่านั้น) ─── */}
             {isAdminOrManager && (
-              <>
-                <h5 style={styles.sectionTitle}>โครงการที่มีงานมากที่สุด</h5>
-                <div style={styles.notiCard}>
-                  {loading ? (
-                    <div style={{ padding: "16px" }}>
-                      {[1, 2, 3, 4, 5].map((i) => (
-                        <div
-                          key={i}
-                          style={{ ...styles.topProjectSkeletonRow }}
-                          className="skeleton-pulse"
-                        />
-                      ))}
-                    </div>
-                  ) : topProjects.length === 0 ? (
-                    <div style={styles.notiEmpty}>
-                      <FaBuilding
-                        size={22}
-                        style={{ opacity: 0.25, marginBottom: "6px" }}
-                      />
-                      <p
-                        style={{
-                          margin: 0,
-                          fontSize: "12px",
-                          color: "#94a3b8",
-                        }}
-                      >
-                        ยังไม่มีข้อมูลงานของโครงการ
-                      </p>
-                    </div>
-                  ) : (
-                    <>
-                      <div style={styles.topProjectList}>
-                        {pagedProjects.map((p, i) => {
-                          const rank =
-                            (projectPage - 1) * PROJECTS_PER_PAGE + i + 1;
-                          return (
-                            <Link
-                              key={p.name}
-                              to={`/customer?company=${encodeURIComponent(p.company)}&site=${encodeURIComponent(p.site)}`}
-                              style={{ textDecoration: "none" }}
-                            >
-                              <div
-                                style={styles.topProjectRow}
-                                className="metric-card-hover"
-                              >
-                                <span
-                                  style={{
-                                    ...styles.topProjectRank,
-                                    ...(rank === 1
-                                      ? {
-                                          backgroundColor: "#dc2626",
-                                          color: "#fff",
-                                        }
-                                      : {}),
-                                  }}
-                                >
-                                  {rank}
-                                </span>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <p style={styles.topProjectName}>{p.name}</p>
-                                  <div style={styles.topProjectTrack}>
-                                    <div
-                                      style={{
-                                        ...styles.topProjectBar,
-                                        width: `${Math.max((p.count / maxProjectCount) * 100, 6)}%`,
-                                      }}
-                                    />
-                                  </div>
-                                </div>
-                                <span style={styles.topProjectCount}>
-                                  {p.count}
-                                </span>
-                              </div>
-                            </Link>
-                          );
-                        })}
-                      </div>
-                      {totalProjectPages > 1 && (
-                        <div style={styles.projectPagination}>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setProjectPage((p) => Math.max(1, p - 1))
-                            }
-                            disabled={projectPage === 1}
-                            style={{
-                              ...styles.projectPageBtn,
-                              opacity: projectPage === 1 ? 0.35 : 1,
-                            }}
-                            className="metric-card-hover"
-                          >
-                            <FaChevronLeft size={10} />
-                          </button>
-                          <span style={styles.projectPageLabel}>
-                            หน้า {projectPage} / {totalProjectPages}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setProjectPage((p) =>
-                                Math.min(totalProjectPages, p + 1),
-                              )
-                            }
-                            disabled={projectPage === totalProjectPages}
-                            style={{
-                              ...styles.projectPageBtn,
-                              opacity:
-                                projectPage === totalProjectPages ? 0.35 : 1,
-                            }}
-                            className="metric-card-hover"
-                          >
-                            <FaChevronRight size={10} />
-                          </button>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              </>
+              <Widget title="โครงการที่มีงานมากที่สุด" count={topProjects.length ? `${topProjects.length} โครงการ` : undefined} hint="นับจำนวนงานทั้งหมดในระบบ"
+                footer={<Pager page={projectPage} pages={totalProjectPages} onChange={setProjectPage} />}>
+                {loading ? <Loading rows={5} /> : topProjects.length === 0 ? <Empty text="ยังไม่มีข้อมูลงานของโครงการ" /> : pagedProjects.map((p, i) => {
+                  const rank = (projectPage - 1) * PROJECTS_PER_PAGE + i + 1;
+                  return (
+                    <Row key={`${p.company}|${p.site}`}
+                      to={`/customers?tab=registry&company=${encodeURIComponent(p.company)}&site=${encodeURIComponent(p.site)}`}
+                      leading={<Typography sx={{ width: 22, textAlign: "center", fontWeight: 800, fontSize: "0.82rem", color: rank <= 3 ? INK : FAINT, fontVariantNumeric: "tabular-nums" }}>{rank}</Typography>}
+                      title={p.name}
+                      sub={<Box component="span" sx={{ display: "block", height: 4, mt: 0.75, borderRadius: 2, bgcolor: SURFACE, overflow: "hidden" }}>
+                        <Box component="span" sx={{ display: "block", height: "100%", width: `${Math.max((p.count / maxProjectCount) * 100, 4)}%`, bgcolor: "#94a3b8", borderRadius: 2 }} />
+                      </Box>}
+                      trailing={`${p.count} งาน`} />
+                  );
+                })}
+              </Widget>
             )}
 
-            {/* ─── SECTION 8: TEAM OVERVIEW (เฉพาะแอดมิน) ─── */}
+            {/* ✅ ภาพรวมทีมงาน — 🐛 เดิมนับจาก role (ซึ่งตอนนี้คือ "ตำแหน่งในระบบ") จึงขึ้น "ผู้ดูแลระบบ 0" ผิดความจริง
+                ตอนนี้นับตาม Rank (ตำแหน่งในองค์กร) ด้วย isRole ตัวเดียวกับทั้งแอป และแสดงครบทุก Rank ที่มีคน */}
             {isAdmin && (
-              <>
-                <h5 style={styles.sectionTitle}>ภาพรวมทีมงาน</h5>
-                <div style={styles.notiCard}>
-                  <div style={styles.teamRow}>
-                    {teamItems.map((item) => (
-                      <div key={item.key} style={styles.teamChip}>
-                        <span
-                          style={{ ...styles.teamChipCount, color: item.color }}
-                        >
-                          {loading ? "…" : roleCounts[item.key] || 0}
-                        </span>
-                        <span style={styles.teamChipLabel}>{item.label}</span>
-                      </div>
+              <Widget title="ภาพรวมทีมงาน" count={loading ? undefined : `${users.length} คน`} to="/staff?tab=registry" toLabel="ทะเบียนพนักงาน">
+                {loading ? <Loading rows={1} /> : (
+                  <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(3, 1fr)", sm: `repeat(${Math.max(teamItems.length, 1)}, 1fr)` }, py: 1 }}>
+                    {teamItems.map((t, i) => (
+                      <Box key={t.key} sx={{ textAlign: "center", py: 1, borderLeft: { sm: i ? `1px solid ${LINE}` : 0 } }}>
+                        <Typography sx={{ fontWeight: 900, fontSize: "1.2rem", color: INK, fontVariantNumeric: "tabular-nums" }}>{t.count}</Typography>
+                        <Typography noWrap sx={{ fontSize: "0.72rem", color: MUTED, px: 0.5 }}>{t.label}</Typography>
+                      </Box>
                     ))}
-                  </div>
-                </div>
-              </>
+                  </Box>
+                )}
+              </Widget>
             )}
           </div>
         </div>
