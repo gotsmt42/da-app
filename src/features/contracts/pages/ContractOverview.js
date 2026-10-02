@@ -5493,7 +5493,7 @@ pagedRows.map((c, idx) => {
             ✅ ให้ห่อลงบรรทัดใหม่แทนเมื่อพื้นที่ไม่พอ — ช่องค้นหายังกินพื้นที่ที่เหลือของบรรทัดแรกเหมือนเดิม
             แต่มีความกว้างขั้นต่ำกันไม่ให้ถูกบีบจนพิมพ์ไม่ได้ */}
         <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} sx={{ flexWrap: { sm: "wrap" } }}>
-          <Stack direction="row" gap={1} sx={{ flex: "1 1 240px", minWidth: { sm: 220 } }}>
+          <Stack direction="row" gap={1} sx={{ flex: "1 1 280px", minWidth: { sm: 260 } }}>
             <TextField
               fullWidth size="small"
               placeholder={isMobile ? "ค้นหางาน..." : "ค้นหาบริษัท / โครงการ / เลขที่สัญญา / ผู้รับผิดชอบ..."}
@@ -5518,15 +5518,6 @@ pagedRows.map((c, idx) => {
                 ) : undefined,
               }}
             />
-            {/* ✅ ล้างตัวกรองทั้งหมดในคลิกเดียว — โผล่เฉพาะตอนมีตัวกรองอยู่ พร้อมบอกจำนวน */}
-            {!isMobile && hasActiveFilters && (
-              <Button
-                onClick={clearAllFilters} startIcon={<Close sx={{ fontSize: 16 }} />}
-                sx={{ flexShrink: 0, textTransform: "none", fontWeight: 700, borderRadius: 2.5, px: 1.75, color: ACCENT, bgcolor: alpha(ACCENT, 0.06), "&:hover": { bgcolor: alpha(ACCENT, 0.12) } }}
-              >
-                ล้างตัวกรอง ({activeFilterLabels.length})
-              </Button>
-            )}
             {/* ✅ ปุ่มพับ/กางตัวกรอง — เฉพาะจอมือถือ (จอใหญ่มีที่พอให้ทุกช่องอยู่แถวเดียวกันอยู่แล้ว) */}
             {isMobile && (
               <Badge
@@ -5549,6 +5540,18 @@ pagedRows.map((c, idx) => {
               </Badge>
             )}
           </Stack>
+          {/* ✅ ล้างตัวกรองทั้งหมดในคลิกเดียว — โผล่เฉพาะตอนมีตัวกรองอยู่ พร้อมบอกจำนวน
+              🐛 ที่แก้ (ผู้ใช้แจ้ง "พิมพ์แล้วช่องทับ มองไม่เห็นตัวพิมพ์"): เดิมปุ่มนี้อยู่ "ในกล่องเดียวกับช่องค้นหา"
+              ซึ่งตั้งความกว้างไว้แค่ ~240px — พอปุ่มโผล่ (มีตัวกรอง) ช่องค้นหาถูกบีบเหลือแค่ไอคอน + ปุ่ม × จนไม่เห็นข้อความ
+              ✅ แยกปุ่มออกมาเป็นช่องของตัวเองในแถว ช่องค้นหาคงความกว้างขั้นต่ำไว้เสมอ */}
+          {!isMobile && hasActiveFilters && (
+            <Button
+              onClick={clearAllFilters} startIcon={<Close sx={{ fontSize: 16 }} />}
+              sx={{ flexShrink: 0, alignSelf: "center", height: 40, textTransform: "none", fontWeight: 700, borderRadius: 2.5, px: 1.75, color: ACCENT, bgcolor: alpha(ACCENT, 0.06), "&:hover": { bgcolor: alpha(ACCENT, 0.12) } }}
+            >
+              ล้างตัวกรอง ({activeFilterLabels.length})
+            </Button>
+          )}
           {/* ✅ บนมือถือห่อ dropdown ทั้งชุดไว้ใน Collapse — จอใหญ่ render ตรงๆ ไม่ผ่าน Collapse เลย
               (Collapse ที่ in=true ตลอดยังแทรก div ครอบเพิ่มอยู่ดี ซึ่งจะไปทำลายการเรียงแถวของ Stack) */}
           {isMobile ? (
