@@ -13,14 +13,16 @@ import { useNavigate } from "react-router-dom";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import {
-  Box, Stack, Typography, TextField, InputAdornment, IconButton,
-  Chip, Skeleton, Avatar, Tooltip, ToggleButton, ToggleButtonGroup,
+  Box, Stack, Typography, IconButton, Skeleton, Avatar, Tooltip, useMediaQuery,
+  Table, TableHead, TableBody, TableRow, TableCell,
 } from "@mui/material";
-import { alpha } from "@mui/material/styles";
+import { Refresh, Groups, ChevronRight } from "@mui/icons-material";
+import SelectField from "@/shared/ui/SelectField";
+import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import {
-  Search, Clear, Refresh, Groups, PendingActions, Warning, CheckCircle,
-  HourglassTop, CalendarMonth, ArrowForwardIos, RequestQuote, Timer, EventAvailable,
-} from "@mui/icons-material";
+  PageHeader, Kpi, KpiRow, FilterBar, Panel, EmptyState, INK, MUTED, FAINT, LINE, SURFACE, DANGER, CARD_SHADOW,
+  TABLE_HEAD_SX, TABLE_ROW_SX, ICON_BTN_SX,
+} from "@/shared/ui/PageKit";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthContext";
 import EventService from "@/shared/services/EventService";
@@ -63,6 +65,7 @@ const SORT_OPTIONS = [
 export default function TeamWorkload() {
   const { userData } = useAuth();
   const navigate = useNavigate();
+  const isDesktop = useMediaQuery("(min-width:900px)");
   const isAdminOrManager = can(userData, "manageMasterData");
 
   const [events, setEvents] = useState([]);
@@ -257,181 +260,142 @@ export default function TeamWorkload() {
   // ✅ กันช่างเปิดหน้านี้ตรงๆ ผ่าน URL — AdminRoute เดิมไม่รองรับ manager จึงเช็ค role เองในนี้แทน
   if (!loading && !isAdminOrManager) return <Navigate to="/dashboard" replace />;
 
+  // ✅ v2 (ผู้ใช้สั่ง 2 ต.ค. 2569 "ปรับ UI ใหม่ทั้งหมด" + กฎ 6 ข้อ: สีน้อย · ตัวอักษรชัด · ช่องว่างพอดี ·
+  //    จัดแนวแม่น · component เหมือนหน้าอื่น · กดแล้วเดาได้) — ใช้ชิ้นส่วนจาก shared/ui/PageKit
+  //    เดิม: ไอคอนสีละอย่าง 6 ช่อง · ชิปสีจัด 5 สี · ปุ่มเรียงลำดับแบบแท็บ → ตอนนี้ตัวเลขสีเข้ม แดงเฉพาะค้างงาน
+  //    จอใหญ่เป็นตาราง (ตัวเลขชิดขวาเรียงคอลัมน์) · มือถือเป็นการ์ดตัวเลข 4 ช่องเท่ากัน
+  const avgText = (ms, n) => (n > 0 ? formatDuration(ms / n) : "—");
+  const pctText = (a, n) => (n > 0 ? `${Math.round((a / n) * 100)}%` : "—");
+  const openTech = (tech) => navigate(`/operation?team=${encodeURIComponent(tech.fname || "")}`);
+  const nameOf = (tech) => (tech.fname ? `${tech.fname} ${tech.lname || ""}`.trim() : tech.username);
+  const Num = ({ v, alert }) => (
+    <Typography component="span" sx={{ fontWeight: v ? 800 : 500, fontSize: "0.9rem", color: !v ? FAINT : alert ? DANGER : INK, fontVariantNumeric: "tabular-nums" }}>
+      {v || "—"}
+    </Typography>
+  );
+
   return (
-    <Box sx={{ px: { xs: 1.5, sm: 2 }, pt: 2, pb: 4, maxWidth: 1200, mx: "auto" }}>
-      <Stack direction="row" alignItems="flex-start" justifyContent="space-between" sx={{ mb: 2 }}>
-        <Box>
-          <Typography variant="h6" fontWeight={800}>ภาพรวมทีมช่าง</Typography>
-          <Typography variant="caption" color="text.secondary">
-            {lastRefreshed ? `อัปเดตล่าสุด ${moment(lastRefreshed).locale("th").format("HH:mm:ss")}` : "กำลังโหลด..."}
-          </Typography>
-        </Box>
-        <Tooltip title="รีเฟรช">
-          <IconButton onClick={() => fetchData()} sx={{ border: "1px solid", borderColor: "divider", borderRadius: "50%", width: 40, height: 40 }}>
-            <Refresh sx={{ fontSize: 20 }} />
-          </IconButton>
-        </Tooltip>
-      </Stack>
-
-      {/* สรุปภาพรวมทีมทั้งหมด */}
-      <Box sx={{
-        // ✅ 6 ช่องบนจอกว้าง · จอเล็กพับเป็น 3x2 — 6 ช่องเรียงเดียวบนมือถือจะแคบจนตัวเลขตกบรรทัด
-        display: "grid",
-        gridTemplateColumns: { xs: "repeat(3, 1fr)", sm: "repeat(6, 1fr)" },
-        gap: 1, mb: 2,
-        p: 1.5, borderRadius: 3, border: "1px solid", borderColor: "divider", bgcolor: "background.paper",
-      }}>
-        {[
-          { label: "ช่างทั้งหมด", value: statsByTech.length, color: "#0891b2", icon: <Groups sx={{ fontSize: 16 }} /> },
-          { label: "กำลังทำ", value: teamTotals.active, color: "#3b82f6", icon: <PendingActions sx={{ fontSize: 16 }} /> },
-          { label: "ค้างงาน", value: teamTotals.overdue, color: "#ef4444", icon: <Warning sx={{ fontSize: 16 }} /> },
-          { label: "เสร็จเดือนนี้", value: teamTotals.completedThisMonth, color: "#10b981", icon: <CheckCircle sx={{ fontSize: 16 }} /> },
-          // ✅ 2 ช่องใหม่ — คำนวณจากเวลาเช็คอิน/เช็คเอาต์ที่ระบบเก็บมาตลอดแต่ไม่เคยถูกใช้เลย
-          // ⚠️ ขึ้น "—" เมื่อยังไม่มีข้อมูลพอ ไม่ใช่ 0 — 0% กับ "ยังไม่มีข้อมูล" คนละความหมายกันคนละเรื่อง
-          {
-            label: "เวลาเฉลี่ย/ครั้ง",
-            value: teamTotals.durationCount > 0 ? formatDuration(teamTotals.durationMs / teamTotals.durationCount) : "—",
-            color: "#8b5cf6", icon: <Timer sx={{ fontSize: 16 }} />,
-            hint: teamTotals.durationCount > 0
-              ? `เฉลี่ยจากการเข้างาน ${teamTotals.durationCount.toLocaleString()} ครั้งที่มีทั้งเวลาเข้าและออก`
-              : "ยังไม่มีการเข้างานที่กดทั้งเข้าและออกครบ",
-          },
-          {
-            label: "เข้าตรงตามแผน",
-            value: teamTotals.checkedInCount > 0 ? `${Math.round((teamTotals.onTimeCount / teamTotals.checkedInCount) * 100)}%` : "—",
-            color: "#0891b2", icon: <EventAvailable sx={{ fontSize: 16 }} />,
-            hint: teamTotals.checkedInCount > 0
-              ? `เข้างานไม่เลยวันที่นัด ${teamTotals.onTimeCount.toLocaleString()} จาก ${teamTotals.checkedInCount.toLocaleString()} ครั้ง`
-              : "ยังไม่มีการเช็คอินที่เทียบกับวันนัดได้",
-          },
-        ].map((s, i) => (
-          // ✅ ช่องที่เป็นค่าเฉลี่ย/เปอร์เซ็นต์ต้องบอกได้ว่า "คิดจากกี่ครั้ง" — 100% จาก 2 ครั้งกับ
-          // 100% จาก 200 ครั้ง คนละความหมายกันสิ้นเชิง ตัวเลขลอยๆ ทำให้ตัดสินใจผิดได้ง่ายมาก
-          <Tooltip key={i} title={s.hint || ""} arrow disableHoverListener={!s.hint}>
-            <Box sx={{ textAlign: "center", cursor: s.hint ? "help" : "default" }}>
-              <Box sx={{ color: s.color, mb: 0.25 }}>{s.icon}</Box>
-              {loading ? <Skeleton width={28} sx={{ mx: "auto" }} /> : (
-                <Typography fontWeight={800} fontSize="1.1rem" sx={{ whiteSpace: "nowrap" }}>{s.value}</Typography>
-              )}
-              <Typography variant="caption" color="text.secondary" sx={{ fontSize: "0.65rem" }}>{s.label}</Typography>
-            </Box>
+    <Box sx={{ p: { xs: 1.25, sm: 2.5 }, maxWidth: 1400, mx: "auto" }}>
+      <PageHeader
+        icon={<Groups />}
+        title="ภาระงานทีมช่าง"
+        subtitle={`งานที่ช่างแต่ละคนถืออยู่ · ค้างเกิน ${WARNING_DAYS_AFTER_END} วันนับเป็นค้างงาน${lastRefreshed ? ` · อัปเดต ${moment(lastRefreshed).format("HH:mm")}` : ""}`}
+        actions={(
+          <Tooltip title="รีเฟรช">
+            <IconButton onClick={() => fetchData()} sx={ICON_BTN_SX} aria-label="รีเฟรช"><Refresh sx={{ fontSize: 20 }} /></IconButton>
           </Tooltip>
-        ))}
-      </Box>
-
-      <TextField
-        fullWidth size="small" placeholder="ค้นหาชื่อช่าง..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        sx={{ mb: 1.5, "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: "background.paper" } }}
-        InputProps={{
-          startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 19, color: "text.disabled" }} /></InputAdornment>,
-          endAdornment: search ? (
-            <InputAdornment position="end">
-              <IconButton size="small" onClick={() => setSearch("")}><Clear sx={{ fontSize: 17 }} /></IconButton>
-            </InputAdornment>
-          ) : null,
-        }}
+        )}
       />
 
-      <ToggleButtonGroup
-        value={sortBy} exclusive size="small"
-        onChange={(_, v) => { if (v) setSortBy(v); }}
-        sx={{ mb: 2, flexWrap: "wrap" }}
-      >
-        {SORT_OPTIONS.map((o) => (
-          <ToggleButton key={o.key} value={o.key} sx={{ textTransform: "none", fontWeight: 700, px: 1.5, fontSize: "0.75rem" }}>
-            {o.label}
-          </ToggleButton>
-        ))}
-      </ToggleButtonGroup>
-
       {loading ? (
-        <Stack spacing={1.5}>
-          {[1, 2, 3].map((i) => <Skeleton key={i} variant="rounded" height={92} sx={{ borderRadius: 3 }} />)}
-        </Stack>
-      ) : filtered.length === 0 ? (
-        <Box sx={{ textAlign: "center", py: 6, color: "text.disabled" }}>
-          <Groups sx={{ fontSize: 40, opacity: 0.3, mb: 1 }} />
-          <Typography variant="body2">{search ? "ไม่พบช่างที่ตรงกับคำค้นหา" : "ยังไม่มีช่างในระบบ"}</Typography>
+        <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(6, 1fr)" }, mb: 1.5 }}>
+          {[0, 1, 2, 3, 4, 5].map((i) => <Skeleton key={i} variant="rounded" height={76} sx={{ borderRadius: 2.5 }} />)}
         </Box>
       ) : (
-        <Stack spacing={1.5}>
-          {filtered.map(({ tech, active, pending, overdue, severeOverdue, completedThisMonth, maxOverdueDays, quotationPending, nextJob, durationMs, durationCount, onTimeCount, checkedInCount }) => (
-            <Box
-              key={tech._id}
-              onClick={() => navigate(`/operation?team=${encodeURIComponent(tech.fname || "")}`)}
-              sx={{
-                p: 1.75, borderRadius: 3, border: "1px solid", borderColor: "divider",
-                bgcolor: "background.paper", cursor: "pointer", transition: "all 0.15s ease",
-                "&:hover": { borderColor: "#0891b2", boxShadow: "0 2px 12px rgba(8,145,178,0.12)" },
-              }}
-            >
-              <Stack direction="row" alignItems="center" gap={1.25}>
-                <Avatar sx={{ bgcolor: alpha("#0891b2", 0.14), color: "#0891b2", fontWeight: 700 }}>
-                  {(tech.fname || tech.username || "?").charAt(0).toUpperCase()}
-                </Avatar>
-                <Box flex={1} minWidth={0}>
-                  <Typography fontWeight={700} fontSize="0.9rem" noWrap>
-                    {tech.fname ? `${tech.fname} ${tech.lname || ""}`.trim() : tech.username}
-                  </Typography>
-                  <Stack direction="row" gap={0.5} flexWrap="wrap" sx={{ mt: 0.4 }}>
-                    {active > 0 && (
-                      <Chip size="small" label={`${active} กำลังทำ`} sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha("#3b82f6", 0.12), color: "#3b82f6" }} />
-                    )}
-                    {pending > 0 && (
-                      <Chip size="small" icon={<HourglassTop sx={{ fontSize: 12 }} />} label={`${pending} รออนุมัติ`} sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha("#f59e0b", 0.12), color: "#f59e0b" }} />
-                    )}
-                    {overdue > 0 && (
-                      /* ✅ เพิ่ม "ค้างนานสุดกี่วัน" — บอกความรุนแรงตรงกว่าจำนวนงานเฉยๆ (ค้าง 1 งาน
-                         30 วัน เร่งด่วนกว่าค้าง 3 งาน 8 วัน แต่เดิมดูไม่ออกจากตัวเลขอย่างเดียว) */
-                      <Chip size="small" icon={<Warning sx={{ fontSize: 12 }} />}
-                        label={`${overdue} ค้างงาน${maxOverdueDays > 0 ? ` · นานสุด ${maxOverdueDays} วัน` : ""}${severeOverdue > 0 ? ` (${severeOverdue} เกิน 2 สัปดาห์)` : ""}`}
-                        sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha("#ef4444", 0.12), color: "#ef4444" }} />
-                    )}
-                    {/* ✅ ใบเสนอราคารอผลลูกค้า — ภาระงานติดตามที่ผู้รับผิดชอบต้องทำต่อ เดิมหน้านี้ไม่แสดงเลย */}
-                    {quotationPending > 0 && (
-                      <Chip size="small" icon={<RequestQuote sx={{ fontSize: 12 }} />} label={`${quotationPending} ใบเสนอราคารอผล`}
-                        sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha("#8b5cf6", 0.12), color: "#8b5cf6" }} />
-                    )}
-                    {completedThisMonth > 0 && (
-                      <Chip size="small" icon={<CheckCircle sx={{ fontSize: 12 }} />} label={`${completedThisMonth} เสร็จเดือนนี้`} sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha("#10b981", 0.12), color: "#10b981" }} />
-                    )}
-                    {active === 0 && pending === 0 && overdue === 0 && completedThisMonth === 0 && quotationPending === 0 && (
-                      <Typography variant="caption" color="text.disabled">ไม่มีงานในตอนนี้</Typography>
-                    )}
-                  </Stack>
-                  {/* ✅ สถิติจากเวลาเช็คอิน/เช็คเอาต์ — แยกบรรทัดจากชิปสถานะงานด้านบน เพราะเป็นคนละ
-                      เรื่องกัน (ด้านบน = ภาระงานตอนนี้ / ด้านล่าง = พฤติกรรมการทำงานที่ผ่านมา)
-                      ⚠️ ต้องมีอย่างน้อย 3 ครั้งถึงจะแสดง — เฉลี่ยจาก 1-2 ครั้งไม่ได้บอกอะไรเลย
-                      แต่คนอ่านมักเชื่อทันทีเพราะมันขึ้นเป็นตัวเลขเหมือนกัน */}
-                  {(durationCount >= 3 || checkedInCount >= 3) && (
-                    <Stack direction="row" gap={1.25} flexWrap="wrap" sx={{ mt: 0.5 }}>
-                      {durationCount >= 3 && (
-                        <Typography variant="caption" color="text.secondary" sx={{ display: "flex", alignItems: "center", gap: 0.4 }}>
-                          <Timer sx={{ fontSize: 12 }} />
-                          เฉลี่ย {formatDuration(durationMs / durationCount)}/ครั้ง
-                          <Box component="span" sx={{ color: "text.disabled" }}>({durationCount} ครั้ง)</Box>
-                        </Typography>
-                      )}
-                      {checkedInCount >= 3 && (
-                        <Typography variant="caption" color="text.secondary" sx={{ display: "flex", alignItems: "center", gap: 0.4 }}>
-                          <EventAvailable sx={{ fontSize: 12 }} />
-                          ตรงตามแผน {Math.round((onTimeCount / checkedInCount) * 100)}%
-                          <Box component="span" sx={{ color: "text.disabled" }}>({onTimeCount}/{checkedInCount})</Box>
-                        </Typography>
-                      )}
+        <KpiRow columns={6}>
+          <Kpi label="ช่างทั้งหมด" value={`${statsByTech.length} คน`} />
+          <Kpi label="กำลังทำ" value={`${teamTotals.active} งาน`} sub={teamTotals.pending ? `รออนุมัติปิดงาน ${teamTotals.pending}` : "ไม่มีงานรออนุมัติปิด"} />
+          <Kpi label="ค้างงาน" value={`${teamTotals.overdue} งาน`} sub={`เลยกำหนดเกิน ${WARNING_DAYS_AFTER_END} วัน`} alert={teamTotals.overdue > 0} />
+          <Kpi label="เสร็จเดือนนี้" value={`${teamTotals.completedThisMonth} งาน`} />
+          <Kpi label="เวลาเฉลี่ย / ครั้ง" value={avgText(teamTotals.durationMs, teamTotals.durationCount)}
+            sub={teamTotals.durationCount ? `จาก ${teamTotals.durationCount.toLocaleString()} ครั้งที่กดเข้า-ออกครบ` : "ยังไม่มีข้อมูลเข้า-ออก"} />
+          <Kpi label="เข้างานตรงตามแผน" value={pctText(teamTotals.onTimeCount, teamTotals.checkedInCount)}
+            sub={teamTotals.checkedInCount ? `${teamTotals.onTimeCount} จาก ${teamTotals.checkedInCount} ครั้ง` : "ยังไม่มีข้อมูลเช็คอิน"} />
+        </KpiRow>
+      )}
+
+      <FilterBar search={search} onSearch={setSearch} placeholder="ค้นหาชื่อช่าง">
+        <SelectField label="เรียงตาม" value={sortBy} onChange={(e) => setSortBy(e.target.value)} sx={{ minWidth: { xs: 0, sm: 180 }, flex: { xs: 1, sm: "none" } }}>
+          {SORT_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+        </SelectField>
+      </FilterBar>
+
+      {loading ? (
+        <Stack spacing={1}>{[1, 2, 3].map((i) => <Skeleton key={i} variant="rounded" height={isDesktop ? 54 : 120} sx={{ borderRadius: 2.5 }} />)}</Stack>
+      ) : filtered.length === 0 ? (
+        <EmptyState icon={<Groups />} title={search ? "ไม่พบช่างที่ตรงกับคำค้นหา" : "ยังไม่มีช่างในระบบ"} hint={search ? "" : "เพิ่มพนักงานตำแหน่งช่างได้ที่แท็บ \"ทะเบียนพนักงาน\""} />
+      ) : isDesktop ? (
+        <Panel sx={{ overflowX: "auto" }}>
+          <Table size="small" sx={{ minWidth: 980, ...TABLE_HEAD_SX }}>
+            <TableHead>
+              <TableRow>
+                <TableCell>ช่าง</TableCell>
+                <TableCell align="right">กำลังทำ</TableCell>
+                <TableCell align="right">รออนุมัติปิด</TableCell>
+                <TableCell align="right">ค้างงาน</TableCell>
+                <TableCell align="right">ใบเสนอราคารอผล</TableCell>
+                <TableCell align="right">เสร็จเดือนนี้</TableCell>
+                <TableCell align="right">เวลาเฉลี่ย/ครั้ง</TableCell>
+                <TableCell align="right">ตรงตามแผน</TableCell>
+                <TableCell>งานถัดไป</TableCell>
+                <TableCell width={32} />
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {filtered.map((s) => (
+                <TableRow key={s.tech._id} hover onClick={() => openTech(s.tech)} sx={{ cursor: "pointer", ...TABLE_ROW_SX }}>
+                  <TableCell sx={{ maxWidth: 240 }}>
+                    <Stack direction="row" spacing={1.1} alignItems="center" sx={{ minWidth: 0 }}>
+                      <Avatar sx={{ width: 32, height: 32, fontSize: "0.85rem", fontWeight: 800, bgcolor: personColor(nameOf(s.tech)) }}>{personInitial(nameOf(s.tech))}</Avatar>
+                      <Typography noWrap sx={{ fontWeight: 800, fontSize: "0.88rem", color: INK }}>{nameOf(s.tech)}</Typography>
                     </Stack>
-                  )}
-                  {nextJob && (
-                    <Typography variant="caption" color="text.secondary" sx={{ display: "flex", alignItems: "center", gap: 0.4, mt: 0.5 }}>
-                      <CalendarMonth sx={{ fontSize: 12 }} />
-                      งานถัดไป: {nextJob.title || "งาน"} · {[nextJob.company, nextJob.site].filter(Boolean).join(" · ")} · {moment(nextJob.start).locale("th").format("D MMM")}
-                    </Typography>
-                  )}
+                  </TableCell>
+                  <TableCell align="right"><Num v={s.active} /></TableCell>
+                  <TableCell align="right"><Num v={s.pending} /></TableCell>
+                  <TableCell align="right">
+                    <Num v={s.overdue} alert />
+                    {s.overdue > 0 && <Typography sx={{ fontSize: "0.7rem", color: MUTED }}>นานสุด {s.maxOverdueDays} วัน</Typography>}
+                  </TableCell>
+                  <TableCell align="right"><Num v={s.quotationPending} /></TableCell>
+                  <TableCell align="right"><Num v={s.completedThisMonth} /></TableCell>
+                  <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                    <Typography sx={{ fontSize: "0.84rem", color: s.durationCount >= 3 ? INK : FAINT }}>{s.durationCount >= 3 ? avgText(s.durationMs, s.durationCount) : "—"}</Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    <Typography sx={{ fontSize: "0.84rem", color: s.checkedInCount >= 3 ? INK : FAINT, fontVariantNumeric: "tabular-nums" }}>{s.checkedInCount >= 3 ? pctText(s.onTimeCount, s.checkedInCount) : "—"}</Typography>
+                  </TableCell>
+                  <TableCell sx={{ maxWidth: 240 }}>
+                    {s.nextJob ? (
+                      <>
+                        <Typography noWrap sx={{ fontSize: "0.82rem", fontWeight: 700, color: INK }}>{moment(s.nextJob.start).locale("th").format("D MMM")} · {s.nextJob.title || "งาน"}</Typography>
+                        <Typography noWrap sx={{ fontSize: "0.72rem", color: MUTED }}>{[s.nextJob.company, s.nextJob.site].filter(Boolean).join(" · ")}</Typography>
+                      </>
+                    ) : <Typography sx={{ fontSize: "0.8rem", color: FAINT }}>—</Typography>}
+                  </TableCell>
+                  <TableCell><ChevronRight sx={{ color: "#cbd5e1" }} /></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Panel>
+      ) : (
+        <Stack spacing={1}>
+          {filtered.map((s) => (
+            <Box key={s.tech._id} role="button" onClick={() => openTech(s.tech)}
+              sx={{ p: 1.5, bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, cursor: "pointer", boxShadow: CARD_SHADOW, "&:active": { bgcolor: SURFACE } }}>
+              <Stack direction="row" spacing={1.1} alignItems="center">
+                <Avatar sx={{ width: 34, height: 34, fontSize: "0.9rem", fontWeight: 800, bgcolor: personColor(nameOf(s.tech)) }}>{personInitial(nameOf(s.tech))}</Avatar>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography noWrap sx={{ fontWeight: 800, fontSize: "0.92rem", color: INK }}>{nameOf(s.tech)}</Typography>
+                  {s.overdue > 0
+                    ? <Typography noWrap sx={{ fontSize: "0.74rem", fontWeight: 700, color: DANGER }}>ค้าง {s.overdue} งาน · นานสุด {s.maxOverdueDays} วัน</Typography>
+                    : <Typography noWrap sx={{ fontSize: "0.74rem", color: MUTED }}>ไม่มีงานค้าง</Typography>}
                 </Box>
-                <ArrowForwardIos sx={{ fontSize: 13, color: "text.disabled", flexShrink: 0 }} />
+                <ChevronRight sx={{ color: "#cbd5e1" }} />
               </Stack>
+              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", mt: 1.25, pt: 1.25, borderTop: `1px solid ${LINE}` }}>
+                {[["กำลังทำ", s.active], ["ค้างงาน", s.overdue, true], ["รออนุมัติปิด", s.pending], ["เสร็จเดือนนี้", s.completedThisMonth]].map(([l, v, alert], i) => (
+                  <Box key={l} sx={{ textAlign: "center", borderLeft: i ? `1px solid ${LINE}` : 0 }}>
+                    <Num v={v} alert={alert} />
+                    <Typography noWrap sx={{ fontSize: "0.66rem", color: MUTED }}>{l}</Typography>
+                  </Box>
+                ))}
+              </Box>
+              {s.nextJob && (
+                <Typography noWrap sx={{ mt: 1, fontSize: "0.74rem", color: MUTED }}>
+                  งานถัดไป {moment(s.nextJob.start).locale("th").format("D MMM")} · {s.nextJob.title || "งาน"}{s.nextJob.site ? ` · ${s.nextJob.site}` : ""}
+                </Typography>
+              )}
             </Box>
           ))}
         </Stack>

@@ -918,6 +918,13 @@ export default function QuotationTracking() {
             <IconButton onClick={() => fetchJobs()} sx={{ border: `1px solid ${BORDER}`, borderRadius: 2, display: { xs: "none", md: "inline-flex" } }}><Refresh sx={{ fontSize: 20 }} /></IconButton>
           </Tooltip>
           {/* ✅ มือถือ: ค้นหา/ตัวกรอง/สถานะ ซ่อนในแผ่นล่าง (เหมือนหน้าใบเบิก/ใบขอซื้อ) — ผู้ใช้สั่ง 2 ต.ค. 2569 */}
+          {/* ✅ Excel ต้องกดได้เสมอ (แท็บเล็ต/มือถือด้วย) — ไม่ซ่อนไว้ในแผ่นตัวกรองอย่างเดียว */}
+          {!isDesktop && (
+            <IconButton aria-label="ส่งออก Excel" onClick={doExport} disabled={exporting || !visible.length}
+              sx={{ width: 42, height: 42, borderRadius: 2.5, border: `1px solid ${BORDER}`, color: "#047857" }}>
+              <FontAwesomeIcon icon={faFileExcel} style={{ fontSize: 17 }} />
+            </IconButton>
+          )}
           {!isDesktop && (
             <IconButton aria-label="ค้นหาและตัวกรอง" onClick={() => setFiltersOpen(true)}
               sx={{ width: 42, height: 42, borderRadius: 2.5, border: `1px solid ${BORDER}`, bgcolor: activeFilters ? "#f1f5f9" : "#fff", color: TEXT_MAIN }}>

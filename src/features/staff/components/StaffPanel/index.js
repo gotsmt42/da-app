@@ -1,531 +1,217 @@
-/* eslint-disable no-unused-vars */
 /**
- * Employee/index.js — v2
+ * StaffPanel — ทะเบียนพนักงาน (เพิ่ม / แก้ไข / ลบ บัญชีผู้ใช้ · Rank · ตำแหน่งในเอกสาร)
  *
- * เปลี่ยนจากเดิม:
- *   ❌ ตัดการใช้ DataTableComponent / DataTableColumns / Expanded (react-data-table-component) ทิ้งทั้งหมด
- *   ✅ สร้างตารางเองใหม่ทั้งหมดด้วย MUI Table ล้วนๆ ให้หน้าตาตรงกับ Customer/index.js:
- *        - หัวคอลัมน์กดเรียงลำดับได้ (TableSortLabel)
- *        - แถวขยายดูรายละเอียดเพิ่มเติมได้ (Collapse)
- *        - Pagination จริงของ MUI (TablePagination)
- *        - คอลัมน์แอคชัน (แก้ไข/ลบ) เป็นไอคอนอยู่ในแถวเลย
- *        - ชื่อ-นามสกุล มี avatar ตัวอักษรแรก สีตาม hash ชื่อ
- *        - สิทธิ์ผู้ใช้ (role) แสดงเป็น Chip สี
- *        - สถิติสรุป: ผู้ใช้ทั้งหมด / ผู้ดูแลระบบ / ทีมงาน
- *   🐞 แก้บั๊ก UI เดิม:
- *        - modal พื้นหลังเพี้ยน/ไม่กึ่งกลางแน่นอน → ใช้ position:absolute + translate มาจัดกึ่งกลาง แทน margin:auto
- *        - ฟอร์มเพิ่มผู้ใช้มี state "rank" แต่ไม่มีช่องกรอกจริง → เพิ่มช่องกรอกยศ/ตำแหน่งให้ครบ
- *        - reset ฟอร์มหลังเพิ่มผู้ใช้ไม่ครบทุก field (ขาด role, rank) → แก้ให้ reset ครบ
- *   ✅ คงฟีเจอร์เดิมทั้งหมด: ค้นหา, เพิ่ม/แก้ไขผู้ใช้, ยืนยันรหัสผ่าน Admin ก่อนเพิ่ม, ลบ, อัปเดต session ของผู้ใช้ที่ล็อกอินอยู่, Snackbar
+ * ✅ v3 (ผู้ใช้สั่ง 2 ต.ค. 2569 "ปรับ UI ใหม่ทั้งหมด ให้ดูสวยงามมืออาชีพ" + กฎ 6 ข้อ:
+ *    สีน้อย · ตัวอักษรชัด · ช่องว่างพอดี · จัดแนวแม่น · component เหมือนหน้าอื่น · กดแล้วเดาได้)
+ *   เดิม: การ์ดสถิติแถบไล่สี + ไอคอนสีจัด 3 ใบเรียงยาวเต็มจอมือถือ · ปุ่มเพิ่มสีเขียว · ป้ายสิทธิ์ 7 สี ·
+ *         ต้องกดลูกศรกางแถวถึงจะเห็นตำแหน่ง/ชื่อผู้ใช้
+ *   ตอนนี้ (ชิ้นส่วนจาก shared/ui/PageKit — หน้าตาเดียวกับหน้าใบเบิก/ใบขอซื้อ/ใบเสนอราคา):
+ *         หัวเพจ + ปุ่มหลักสีเข้ม → ตัวเลขสรุป → ค้นหา + กรอง Rank → ตาราง (ข้อมูลครบในแถวเดียว ไม่ต้องกาง)
+ *         มือถือ = การ์ดต่อคน (กดเบอร์โทรออกได้เลย) · ป้าย Rank พื้นเทา + จุดสี
+ *   ✅ คงพฤติกรรมเดิมครบ: ยืนยันรหัสผ่านก่อนเพิ่มผู้ใช้/เปลี่ยน Rank · ตั้ง/แก้บัญชีที่สูงกว่าตัวเองไม่ได้ ·
+ *      อัปเดต session ถ้าแก้บัญชีตัวเอง · เรียลไทม์
  */
-
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import useRealtime from "@/shared/realtime/useRealtime";
 import AuthService from "@/shared/services/authService";
 import API from "@/shared/api/axiosInstance";
 import Swal from "sweetalert2";
 
 import {
-  Modal, TextField, Button, Snackbar, Alert, Box, Stack, Typography, Avatar,
-  Chip, IconButton, Tooltip, Divider, Grid, Skeleton, InputAdornment,
-  useMediaQuery, Table, TableBody, TableCell, TableContainer, TableHead,
-  TableRow, TableSortLabel, TablePagination, Collapse, Select, MenuItem,
-  InputLabel, FormControl,
+  TextField, Button, Snackbar, Alert, Box, Stack, Typography, Avatar, IconButton, Tooltip, Skeleton,
+  useMediaQuery, Table, TableBody, TableCell, TableHead, TableRow, TableSortLabel, Pagination,
+  MenuItem, Dialog, DialogContent, DialogActions,
 } from "@mui/material";
-import { styled, alpha, useTheme } from "@mui/material/styles";
-
-import AccountCircleIcon from "@mui/icons-material/AccountCircle";
-import EmailIcon from "@mui/icons-material/Email";
-import LockIcon from "@mui/icons-material/Lock";
-import PhoneIcon from "@mui/icons-material/Phone";
-import PersonIcon from "@mui/icons-material/Person";
-import AddIcon from "@mui/icons-material/Add";
-import EditIcon from "@mui/icons-material/Edit";
-import DeleteIcon from "@mui/icons-material/Delete";
-import CloseIcon from "@mui/icons-material/Close";
-import SearchIcon from "@mui/icons-material/Search";
-import ClearIcon from "@mui/icons-material/Clear";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
-import GroupsIcon from "@mui/icons-material/Groups";
-import ShieldIcon from "@mui/icons-material/Shield";
-import EngineeringIcon from "@mui/icons-material/Engineering";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import ExpandLessIcon from "@mui/icons-material/ExpandLess";
-import FolderOpenIcon from "@mui/icons-material/FolderOpen";
-import MilitaryTechIcon from "@mui/icons-material/MilitaryTech";
-import VpnKeyIcon from "@mui/icons-material/VpnKey";
+import {
+  Add, Edit, DeleteOutline, Close, Badge as BadgeIcon, Phone, Email, ContentCopy, VpnKey, WarningAmber,
+} from "@mui/icons-material";
 
 import { useAuth } from "@/features/auth/AuthContext";
-import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import {
   ALL_ROLES, ROLES, isRole, canAssignRole, canManageUserOfRole, TECHNICIAN_ROLES, rankLabel,
   systemRoleOf, SYSTEM_ROLES, SYSTEM_ROLE_LABEL, titleOf,
 } from "@/shared/utils/roles";
+import { personColor, personInitial } from "@/shared/utils/personAvatar";
+import SelectField from "@/shared/ui/SelectField";
+import {
+  PageHeader, Kpi, KpiRow, FilterBar, Panel, EmptyState, DotLabel, INK, INK_2, MUTED, FAINT, LINE, SURFACE, DANGER,
+  CARD_SHADOW, TABLE_HEAD_SX, TABLE_ROW_SX, PRIMARY_BTN_SX,
+} from "@/shared/ui/PageKit";
 
-// ─── Styled (ให้ตรงกับ Customer/index.js) ───────────────────────────────
-const GlassCard = styled(Box)(({ theme }) => ({
-  background: alpha(theme.palette.background.paper, 0.9),
-  backdropFilter: "blur(10px)",
-  borderRadius: 16,
-  border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
-  boxShadow: `0 4px 24px ${alpha(theme.palette.common.black, 0.06)}`,
-}));
-
-// ⚠️ shouldForwardProp: กัน barColor หลุดไปเป็น attribute บน <div> จริง (React เตือน "does not recognize the barColor prop")
-const StatCard = styled(GlassCard, { shouldForwardProp: (prop) => prop !== "barColor" })(({ barColor }) => ({
-  position: "relative",
-  overflow: "hidden",
-  padding: 20,
-  "&::before": {
-    content: '""',
-    position: "absolute",
-    top: 0, left: 0, right: 0,
-    height: 4,
-    background: barColor || "linear-gradient(90deg, #667eea, #764ba2)",
-  },
-}));
-
-const SectionLabel = styled(Typography)(({ theme }) => ({
-  fontSize: "0.7rem",
-  fontWeight: 700,
-  letterSpacing: 0.6,
-  textTransform: "uppercase",
-  color: theme.palette.text.secondary,
-}));
-
-const HeadCell = styled(TableCell)(({ theme }) => ({
-  fontSize: "0.7rem",
-  fontWeight: 700,
-  letterSpacing: "0.04em",
-  textTransform: "uppercase",
-  color: theme.palette.text.secondary,
-  background: alpha(theme.palette.primary.main, 0.04),
-  borderBottom: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
-  whiteSpace: "nowrap",
-}));
-
-const BodyRow = styled(TableRow)(({ theme }) => ({
-  "&:hover": { background: alpha(theme.palette.primary.main, 0.03) },
-  "& > td": { borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}` },
-}));
-
-// ─── Constants / Helpers ────────────────────────────────────────────────
-const AVATAR_PALETTE = ["#667eea", "#8b5cf6", "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#ec4899"];
-
-const colorFromName = (name = "") => {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
-};
-
-const copyToClipboard = (text, cb) => {
-  if (!text) return;
-  navigator.clipboard.writeText(text);
-  cb?.();
+/** สีจุดของ Rank — ไล่ระดับเข้มตามลำดับชั้น (ใช้เป็นจุดเล็กๆ เท่านั้น) */
+const RANK_DOT = {
+  [ROLES.DIRECTOR]: "#0f172a",
+  [ROLES.MANAGER]: "#334155",
+  [ROLES.ADMIN]: "#475569",
+  [ROLES.TECH_LEAD]: "#2563eb",
+  [ROLES.TECHNICIAN]: "#60a5fa",
+  [ROLES.SALE]: "#8b5cf6",
+  [ROLES.USER]: "#cbd5e1",
 };
 
 /**
- * ป้ายสิทธิ์ในตาราง
- * ⚠️ ต้องครอบคลุมทุก role ใน shared/utils/roles.js — role ที่ไม่มีในนี้จะตกไปที่ badge "สิทธิ์ไม่ถูกต้อง"
- * ✅ ทำไมต้องมี badge เตือน: ข้อมูลเก่ามีบัญชีที่ role สะกดผิด (เช่น "tecnicain") ซึ่ง "ไม่ตรงกับ role
- * ไหนเลยในตารางสิทธิ์" → บัญชีนั้นจะถูกปฏิเสธเงียบๆ ทุกหน้า ผู้ใช้เห็นแค่เมนูหาย/กดอะไรไม่ได้
- * โดยไม่มีอะไรบอกสาเหตุ ที่นี่จึงต้องโชว์ให้แอดมินเห็นชัดเพื่อกดแก้ให้ถูก
+ * ป้าย Rank ของคนนั้น — ⚠️ ค่าที่ระบบไม่รู้จัก (ข้อมูลเก่าสะกดผิด) ต้องเตือนให้เห็น ไม่งั้นบัญชีนั้นจะถูก
+ * ปฏิเสธเงียบๆ ทุกหน้าโดยไม่มีใครรู้สาเหตุ · ชื่ออ่านสดด้วย rankLabel() (องค์กรเปลี่ยนชื่อ Rank ได้)
  */
-const ROLE_META = {
-  // ✅ กรรมการผู้จัดการ — ระดับสูงสุด ใช้สีเข้มสุดในชุดให้เห็นลำดับชั้นจากสีได้เลย
-  [ROLES.DIRECTOR]: { color: "#7c2d12", icon: <ShieldIcon sx={{ fontSize: 14 }} /> },
-  [ROLES.ADMIN]: { color: "#ef4444", icon: <ShieldIcon sx={{ fontSize: 14 }} /> },
-  [ROLES.MANAGER]: { color: "#0891b2", icon: <ShieldIcon sx={{ fontSize: 14 }} /> },
-  [ROLES.TECH_LEAD]: { color: "#0ea5e9", icon: <EngineeringIcon sx={{ fontSize: 14 }} /> },
-  [ROLES.TECHNICIAN]: { color: "#3b82f6", icon: <EngineeringIcon sx={{ fontSize: 14 }} /> },
-  [ROLES.SALE]: { color: "#8b5cf6", icon: <PersonIcon sx={{ fontSize: 14 }} /> },
-  [ROLES.USER]: { color: "#64748b", icon: <PersonIcon sx={{ fontSize: 14 }} /> },
-};
-
-/**
- * @returns ป้าย Rank ของคนนั้น หรือป้ายเตือนสีส้มถ้าเป็นค่าที่ระบบไม่รู้จัก
- * ⚠️ ชื่ออ่านสดด้วย rankLabel() ทุกครั้ง — องค์กรที่เปลี่ยนชื่อ Rank จะเห็นผลทันทีทั้งตาราง
- */
-const roleMetaOf = (role) => {
+const rankMetaOf = (role) => {
   const key = String(role || "").trim().toLowerCase();
-  if (ROLE_META[key]) return { ...ROLE_META[key], label: rankLabel(key) };
-  return {
-    label: key ? `Rank ไม่ถูกต้อง (${role})` : "ยังไม่กำหนด Rank",
-    color: "#f59e0b",
-    icon: <WarningAmberIcon sx={{ fontSize: 14 }} />,
-    invalid: true,
-  };
+  if (RANK_DOT[key]) return { label: rankLabel(key), color: RANK_DOT[key] };
+  return { label: key ? `Rank ไม่ถูกต้อง (${role})` : "ยังไม่กำหนด Rank", color: DANGER, invalid: true };
 };
 
 const EMPTY_FORM = { fname: "", lname: "", tel: "", email: "", username: "", password: "", role: "", jobTitle: "" };
+const fullNameOf = (u) => `${u.fname || ""} ${u.lname || ""}`.trim();
 
-const HEAD_CELLS = [
-  { id: "expand",  label: "",             sortable: false, width: 44 },
-  { id: "fname",   label: "ชื่อ-นามสกุล", sortable: true },
-  { id: "email",   label: "อีเมล",         sortable: true },
-  { id: "tel",     label: "เบอร์โทร",      sortable: true },
-  { id: "role",    label: "Rank / Role",  sortable: true },
-  { id: "actions", label: "จัดการ",        sortable: false, width: 96, align: "right" },
+const COLUMNS = [
+  { id: "fname", label: "พนักงาน", sortable: true },
+  { id: "jobTitle", label: "ตำแหน่ง (ในเอกสาร)", sortable: false },
+  { id: "role", label: "Rank", sortable: true },
+  { id: "tel", label: "เบอร์โทร", sortable: true },
+  { id: "email", label: "อีเมล", sortable: true },
+  { id: "actions", label: "", sortable: false, align: "right" },
 ];
 
 const comparator = (a, b, orderBy) => {
-  const av = (a[orderBy] || "").toString().toLowerCase();
-  const bv = (b[orderBy] || "").toString().toLowerCase();
-  if (bv < av) return -1;
-  if (bv > av) return 1;
-  return 0;
+  const av = (orderBy === "role" ? rankLabel(a.role) : a[orderBy] || "").toString().toLowerCase();
+  const bv = (orderBy === "role" ? rankLabel(b.role) : b[orderBy] || "").toString().toLowerCase();
+  return av.localeCompare(bv, "th");
 };
+const getComparator = (order, orderBy) => (order === "desc" ? (a, b) => -comparator(a, b, orderBy) : (a, b) => comparator(a, b, orderBy));
 
-const getComparator = (order, orderBy) =>
-  order === "desc" ? (a, b) => comparator(a, b, orderBy) : (a, b) => -comparator(a, b, orderBy);
+const FIELD_SX = { "& .MuiOutlinedInput-root": { borderRadius: 2 } };
+const Label = ({ children }) => <Typography sx={{ fontSize: "0.76rem", fontWeight: 800, color: MUTED, mb: 1 }}>{children}</Typography>;
 
-// ─── EmployeeFormModal (ใช้ร่วมกันทั้งเพิ่ม/แก้ไข) ──────────────────────
-const EmployeeFormModal = ({ open, mode, data, onChange, onClose, onSubmit, isSmallScreen, me }) => {
-  const modalStyle = {
-    position: "absolute",
-    top: "50%",
-    left: "50%",
-    transform: "translate(-50%, -50%)",
-    padding: isSmallScreen ? 2.5 : 3.5,
-    bgcolor: "background.paper",
-    width: isSmallScreen ? "92%" : "540px",
-    maxWidth: "540px",
-    borderRadius: 3,
-    overflowY: "auto",
-    maxHeight: "90vh",
-    boxShadow: "0 24px 64px rgba(0,0,0,0.24)",
-    outline: "none",
-  };
-
-  return (
-    <Modal open={open} onClose={onClose}>
-      <Box sx={modalStyle}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-          <Stack direction="row" alignItems="center" gap={1.25}>
-            <Avatar sx={{
-              bgcolor: alpha(mode === "add" ? "#10b981" : "#3b82f6", 0.15),
-              color: mode === "add" ? "#10b981" : "#3b82f6", width: 38, height: 38,
-            }}>
-              {mode === "add" ? <AddIcon fontSize="small" /> : <EditIcon fontSize="small" />}
-            </Avatar>
-            <Box>
-              <Typography fontWeight={800} fontSize="1.05rem">
-                {mode === "add" ? "เพิ่มผู้ใช้ใหม่" : "แก้ไขข้อมูลผู้ใช้"}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {mode === "add" ? "กรอกข้อมูลผู้ใช้และสิทธิ์การเข้าถึงให้ครบถ้วน" : `${data.fname || ""} ${data.lname || ""}`}
-              </Typography>
-            </Box>
-          </Stack>
-          <IconButton size="small" onClick={onClose}><CloseIcon fontSize="small" /></IconButton>
-        </Stack>
-
-        <Divider sx={{ mb: 2.5 }} />
-
-        <SectionLabel sx={{ display: "block", mb: 1 }}>ข้อมูลส่วนตัว</SectionLabel>
-        <Grid container spacing={1.5} sx={{ mb: 2.5 }}>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              label="ชื่อ" name="fname" fullWidth size="small" required
-              value={data.fname || ""} onChange={onChange}
-              InputProps={{ startAdornment: (<InputAdornment position="start"><PersonIcon fontSize="small" sx={{ color: "text.disabled" }} /></InputAdornment>) }}
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              label="นามสกุล" name="lname" fullWidth size="small" required
-              value={data.lname || ""} onChange={onChange}
-              InputProps={{ startAdornment: (<InputAdornment position="start"><PersonIcon fontSize="small" sx={{ color: "text.disabled" }} /></InputAdornment>) }}
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              label="เบอร์โทร" name="tel" fullWidth size="small" required
-              value={data.tel || ""} onChange={onChange} inputProps={{ maxLength: 10 }}
-              InputProps={{ startAdornment: (<InputAdornment position="start"><PhoneIcon fontSize="small" sx={{ color: "text.disabled" }} /></InputAdornment>) }}
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              label="อีเมล" name="email" fullWidth size="small" required
-              value={data.email || ""} onChange={onChange}
-              InputProps={{ startAdornment: (<InputAdornment position="start"><EmailIcon fontSize="small" sx={{ color: "text.disabled" }} /></InputAdornment>) }}
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-            />
-          </Grid>
-        </Grid>
-
-        <SectionLabel sx={{ display: "block", mb: 1 }}>บัญชีผู้ใช้ &amp; สิทธิ์</SectionLabel>
-        <Grid container spacing={1.5}>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              label="ชื่อผู้ใช้" name="username" fullWidth size="small" required
-              value={data.username || ""} onChange={onChange}
-              InputProps={{ startAdornment: (<InputAdornment position="start"><AccountCircleIcon fontSize="small" sx={{ color: "text.disabled" }} /></InputAdornment>) }}
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-            />
-          </Grid>
-          {mode === "add" && (
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="รหัสผ่าน" name="password" type="password" fullWidth size="small" required
-                value={data.password || ""} onChange={onChange}
-                InputProps={{ startAdornment: (<InputAdornment position="start"><LockIcon fontSize="small" sx={{ color: "text.disabled" }} /></InputAdornment>) }}
-                sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-              />
-            </Grid>
-          )}
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth size="small">
-              <InputLabel id="role-label">Rank · ตำแหน่งในองค์กร</InputLabel>
-              <Select
-                labelId="role-label" name="role" label="Rank · ตำแหน่งในองค์กร"
-                value={data.role || ""} onChange={onChange}
-                sx={{ borderRadius: 2 }}
-              >
-                {/* 🔒 ตั้งสิทธิ์ที่สูงกว่าระดับตัวเองไม่ได้ — แอดมินจึงไม่เห็นตัวเลือก "ผู้จัดการ"
-                    (server บังคับซ้ำอีกชั้น ดู da-app-server/src/routes/auth.js) */}
-                {ALL_ROLES.filter((r) => canAssignRole(me, r)).map((r) => (
-                  <MenuItem key={r} value={r}>{rankLabel(r)}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Grid>
-          {mode === "add" && (
-            <Grid item xs={12} sm={6}>
-              <TextField
-                label="ตำแหน่งเฉพาะบุคคล (พิมพ์ในเอกสาร)" name="jobTitle" fullWidth size="small"
-                helperText="เว้นว่าง = ใช้ชื่อ Rank"
-                value={data.jobTitle || ""} onChange={onChange}
-                InputProps={{ startAdornment: (<InputAdornment position="start"><MilitaryTechIcon fontSize="small" sx={{ color: "text.disabled" }} /></InputAdornment>) }}
-                sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-              />
-            </Grid>
-          )}
-        </Grid>
-
-        <Stack direction="row" gap={1.5} sx={{ mt: 3 }}>
-          <Button variant="outlined" color="inherit" fullWidth onClick={onClose} sx={{ borderRadius: 2 }}>
-            ยกเลิก
-          </Button>
-          <Button variant="contained" color={mode === "add" ? "success" : "primary"} fullWidth
-            onClick={onSubmit} sx={{ borderRadius: 2, fontWeight: 700 }}>
-            {mode === "add" ? "ถัดไป: ยืนยันรหัสผ่าน Admin" : "บันทึกการแก้ไข"}
-          </Button>
-        </Stack>
+// ─── ฟอร์มเพิ่ม/แก้ไข ──────────────────────────────────────────────────────
+const EmployeeFormDialog = ({ open, mode, data, onChange, onClose, onSubmit, fullScreen, me }) => (
+  <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm" fullScreen={fullScreen} PaperProps={{ sx: { borderRadius: fullScreen ? 0 : 3 } }}>
+    <Stack direction="row" alignItems="center" spacing={1.5} sx={{ px: 2.5, py: 1.75, borderBottom: `1px solid ${LINE}` }}>
+      <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: SURFACE, border: `1px solid ${LINE}`, display: "flex", alignItems: "center", justifyContent: "center", color: INK_2 }}>
+        {mode === "add" ? <Add sx={{ fontSize: 20 }} /> : <Edit sx={{ fontSize: 18 }} />}
       </Box>
-    </Modal>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography sx={{ fontWeight: 900, fontSize: "1.02rem", color: INK }}>{mode === "add" ? "เพิ่มผู้ใช้ใหม่" : "แก้ไขข้อมูลผู้ใช้"}</Typography>
+        <Typography noWrap sx={{ fontSize: "0.76rem", color: MUTED }}>{mode === "add" ? "กรอกข้อมูลให้ครบทุกช่องที่มี *" : fullNameOf(data) || data.username}</Typography>
+      </Box>
+      <IconButton size="small" aria-label="ปิด" onClick={onClose}><Close /></IconButton>
+    </Stack>
+    <DialogContent sx={{ px: 2.5, py: 2.25 }}>
+      <Label>ข้อมูลส่วนตัว</Label>
+      <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, mb: 2.5 }}>
+        <TextField label="ชื่อ *" name="fname" size="small" value={data.fname || ""} onChange={onChange} sx={FIELD_SX} />
+        <TextField label="นามสกุล *" name="lname" size="small" value={data.lname || ""} onChange={onChange} sx={FIELD_SX} />
+        <TextField label="เบอร์โทร *" name="tel" size="small" value={data.tel || ""} onChange={onChange} inputProps={{ maxLength: 10, inputMode: "tel" }} helperText="ตัวเลข 10 หลัก" sx={FIELD_SX} />
+        <TextField label="อีเมล *" name="email" size="small" value={data.email || ""} onChange={onChange} inputProps={{ inputMode: "email" }} sx={FIELD_SX} />
+      </Box>
+      <Label>บัญชีผู้ใช้และตำแหน่ง</Label>
+      <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
+        <TextField label="ชื่อผู้ใช้ (ใช้เข้าระบบ) *" name="username" size="small" value={data.username || ""} onChange={onChange} sx={FIELD_SX} />
+        {mode === "add" && (
+          <TextField label="รหัสผ่าน *" name="password" type="password" size="small" value={data.password || ""} onChange={onChange} helperText="อย่างน้อย 6 ตัวอักษร" sx={FIELD_SX} />
+        )}
+        {/* 🔒 ตั้ง Rank ที่สูงกว่าตัวเองไม่ได้ (server บังคับซ้ำ ดู da-app-server/src/routes/auth.js) */}
+        <TextField select label="Rank · ตำแหน่งในองค์กร *" name="role" size="small" value={data.role || ""} onChange={onChange} sx={FIELD_SX}>
+          {ALL_ROLES.filter((r) => canAssignRole(me, r)).map((r) => <MenuItem key={r} value={r}>{rankLabel(r)}</MenuItem>)}
+        </TextField>
+        {mode === "add" && (
+          <TextField label="ตำแหน่งที่พิมพ์ในเอกสาร" name="jobTitle" size="small" value={data.jobTitle || ""} onChange={onChange} helperText="เว้นว่าง = ใช้ชื่อ Rank" sx={FIELD_SX} />
+        )}
+      </Box>
+    </DialogContent>
+    <DialogActions sx={{ px: 2.5, py: 1.75, borderTop: `1px solid ${LINE}` }}>
+      <Button onClick={onClose} sx={{ textTransform: "none", fontWeight: 700, color: MUTED }}>ยกเลิก</Button>
+      <Button variant="contained" onClick={onSubmit} sx={PRIMARY_BTN_SX}>{mode === "add" ? "ถัดไป: ยืนยันรหัสผ่าน" : "บันทึกการแก้ไข"}</Button>
+    </DialogActions>
+  </Dialog>
+);
+
+// ─── ยืนยันรหัสผ่าน (เพิ่มผู้ใช้ / เปลี่ยน Rank) ───────────────────────────────
+const PasswordConfirmDialog = ({ open, value, onChange, onClose, onConfirm, title, description, confirmLabel = "ยืนยัน", busy = false }) => (
+  <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: 3 } }}>
+    <DialogContent sx={{ px: 2.5, pt: 2.5 }}>
+      <Stack direction="row" spacing={1.5} alignItems="flex-start" sx={{ mb: 2 }}>
+        <Box sx={{ width: 36, height: 36, borderRadius: 2, flexShrink: 0, bgcolor: SURFACE, border: `1px solid ${LINE}`, display: "flex", alignItems: "center", justifyContent: "center", color: INK_2 }}>
+          <VpnKey sx={{ fontSize: 18 }} />
+        </Box>
+        <Box>
+          <Typography sx={{ fontWeight: 900, fontSize: "1rem", color: INK }}>{title}</Typography>
+          <Typography sx={{ fontSize: "0.8rem", color: MUTED, mt: 0.25 }}>{description}</Typography>
+        </Box>
+      </Stack>
+      <TextField label="รหัสผ่านของคุณ" type="password" fullWidth size="small" autoFocus value={value} onChange={onChange}
+        onKeyDown={(e) => { if (e.key === "Enter" && !busy) onConfirm(); }} sx={FIELD_SX} />
+    </DialogContent>
+    <DialogActions sx={{ px: 2.5, pb: 2 }}>
+      <Button onClick={onClose} sx={{ textTransform: "none", fontWeight: 700, color: MUTED }}>ยกเลิก</Button>
+      <Button variant="contained" disabled={busy} onClick={onConfirm} sx={PRIMARY_BTN_SX}>{busy ? "กำลังตรวจสอบ..." : confirmLabel}</Button>
+    </DialogActions>
+  </Dialog>
+);
+
+/** ป้าย Rank + Role ในระบบ (แสดง Role เฉพาะคนที่ดูแลระบบได้ — Member ไม่ต้องแสดง) */
+const RankCell = ({ row }) => {
+  const meta = rankMetaOf(row.role);
+  const sys = systemRoleOf(row);
+  return (
+    <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexWrap: "wrap", rowGap: 0.5 }}>
+      {meta.invalid ? (
+        <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, fontSize: "0.72rem", fontWeight: 800, color: DANGER }}>
+          <WarningAmber sx={{ fontSize: 15 }} />{meta.label}
+        </Box>
+      ) : <DotLabel color={meta.color}>{meta.label}</DotLabel>}
+      {sys !== SYSTEM_ROLES.MEMBER && (
+        <Box component="span" sx={{ fontSize: "0.68rem", fontWeight: 800, color: MUTED, px: 0.75, height: 20, display: "inline-flex", alignItems: "center", border: `1px solid ${LINE}`, borderRadius: 1 }}>
+          {SYSTEM_ROLE_LABEL[sys]}
+        </Box>
+      )}
+    </Stack>
   );
 };
 
-// ─── PasswordConfirmModal ────────────────────────────────────────────────
-const PasswordConfirmModal = ({
-  open, value, onChange, onClose, onConfirm, isSmallScreen,
-  title = "ยืนยันรหัสผ่าน Admin",
-  description = "เพื่อความปลอดภัยก่อนเพิ่มผู้ใช้ใหม่",
-  confirmLabel = "ยืนยัน",
-  busy = false,
-}) => {
-  const modalStyle = {
-    position: "absolute",
-    top: "50%",
-    left: "50%",
-    transform: "translate(-50%, -50%)",
-    padding: isSmallScreen ? 2.5 : 3.5,
-    bgcolor: "background.paper",
-    width: isSmallScreen ? "92%" : "420px",
-    maxWidth: "420px",
-    borderRadius: 3,
-    boxShadow: "0 24px 64px rgba(0,0,0,0.24)",
-    outline: "none",
-  };
-
+const Person = ({ row, size = 34 }) => {
+  const name = fullNameOf(row) || row.username || "-";
   return (
-    <Modal open={open} onClose={onClose}>
-      <Box sx={modalStyle}>
-        <Stack direction="row" alignItems="center" gap={1.25} sx={{ mb: 2 }}>
-          <Avatar sx={{ bgcolor: alpha("#f59e0b", 0.15), color: "#d97706", width: 38, height: 38 }}>
-            <VpnKeyIcon fontSize="small" />
-          </Avatar>
-          <Box>
-            <Typography fontWeight={800} fontSize="1.05rem">{title}</Typography>
-            <Typography variant="caption" color="text.secondary">{description}</Typography>
-          </Box>
-        </Stack>
-        <Divider sx={{ mb: 2.5 }} />
-        <TextField
-          label="รหัสผ่านของคุณ" name="passwordConfirm" type="password" fullWidth size="small"
-          value={value} onChange={onChange}
-          InputProps={{ startAdornment: (<InputAdornment position="start"><LockIcon fontSize="small" sx={{ color: "text.disabled" }} /></InputAdornment>) }}
-          sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
-        />
-        <Stack direction="row" gap={1.5} sx={{ mt: 3 }}>
-          <Button variant="outlined" color="inherit" fullWidth onClick={onClose} sx={{ borderRadius: 2 }}>
-            ยกเลิก
-          </Button>
-          <Button variant="contained" color="warning" fullWidth disabled={busy} onClick={onConfirm} sx={{ borderRadius: 2, fontWeight: 700 }}>
-            {confirmLabel}
-          </Button>
-        </Stack>
+    <Stack direction="row" spacing={1.1} alignItems="center" sx={{ minWidth: 0 }}>
+      <Avatar sx={{ width: size, height: size, fontSize: size * 0.4, fontWeight: 800, bgcolor: personColor(name), flexShrink: 0 }}>{personInitial(name)}</Avatar>
+      <Box sx={{ minWidth: 0 }}>
+        <Typography noWrap sx={{ fontWeight: 800, fontSize: "0.88rem", color: INK, lineHeight: 1.3 }}>{name}</Typography>
+        <Typography noWrap sx={{ fontSize: "0.72rem", color: MUTED, lineHeight: 1.3 }}>@{row.username || "-"}</Typography>
       </Box>
-    </Modal>
+    </Stack>
   );
 };
 
-// ─── EmployeeRow: แถวหลัก + แถวขยายรายละเอียด ───────────────────────────
-const EmployeeRow = ({ row, isSmallScreen, onEdit, onDelete, onCopy, me }) => {
-  const [open, setOpen] = useState(false);
-  const fullName = `${row.fname || ""} ${row.lname || ""}`.trim();
-  const initial = (row.fname || "?").charAt(0).toUpperCase();
-  const color = colorFromName(fullName || row.fname || "");
-  const roleMeta = roleMetaOf(row.role);
-  /**
-   * 🔒 แก้/ลบบัญชีที่ "ระดับสูงกว่าตัวเอง" ไม่ได้ — แอดมินแตะบัญชีผู้จัดการไม่ได้ (ผู้ใช้สั่ง)
-   * ⚠️ ปิดปุ่มพร้อมบอกเหตุผล ดีกว่าให้กดแล้วค่อยเด้ง error จาก server ทีหลัง
-   */
+/** ปุ่มแก้/ลบ — 🔒 บัญชีระดับสูงกว่าตัวเองกดไม่ได้ พร้อมบอกเหตุผล (ดีกว่ากดแล้วโดน server ปฏิเสธ) */
+const RowActions = ({ row, me, onEdit, onDelete }) => {
   const manageable = canManageUserOfRole(me, row.role);
-  const blockedHint = `ต้องให้ผู้จัดการเป็นคนจัดการบัญชีระดับ${roleMeta.label}`;
-
+  const hint = `ต้องให้ผู้จัดการเป็นคนจัดการบัญชีระดับ${rankMetaOf(row.role).label}`;
   return (
-    <>
-      <BodyRow>
-        <TableCell sx={{ width: 44 }}>
-          <IconButton size="small" onClick={() => setOpen(p => !p)}>
-            {open ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
-          </IconButton>
-        </TableCell>
-
-        <TableCell sx={{ minWidth: 200 }}>
-          <Stack direction="row" alignItems="center" gap={1.25} sx={{ py: 0.5, minWidth: 0 }}>
-            <Avatar sx={{ width: 34, height: 34, fontSize: "0.85rem", fontWeight: 700, flexShrink: 0, bgcolor: alpha(color, 0.15), color }}>
-              {initial}
-            </Avatar>
-            <Box minWidth={0}>
-              <Typography fontWeight={700} fontSize="0.85rem" noWrap>{fullName || "—"}</Typography>
-              <Stack direction="row" alignItems="center" gap={0.4}>
-                <AccountCircleIcon sx={{ fontSize: 12, color: "text.disabled" }} />
-                <Typography variant="caption" color="text.secondary" noWrap>{row.username || "ไม่มีชื่อผู้ใช้"}</Typography>
-              </Stack>
-            </Box>
-          </Stack>
-        </TableCell>
-
-        <TableCell>
-          {row.email ? (
-            <Stack direction="row" alignItems="center" gap={0.5} sx={{ minWidth: 0 }}>
-              <EmailIcon sx={{ fontSize: 15, color: "text.disabled", flexShrink: 0 }} />
-              <Typography variant="body2" noWrap sx={{ fontSize: "0.8rem", maxWidth: 180 }}>{row.email}</Typography>
-              <Tooltip title="คัดลอกอีเมล">
-                <IconButton size="small" sx={{ p: 0.4 }} onClick={() => onCopy(row.email, "อีเมล")}>
-                  <ContentCopyIcon sx={{ fontSize: 13 }} />
-                </IconButton>
-              </Tooltip>
-            </Stack>
-          ) : (
-            <Chip label="ไม่มีอีเมล" size="small" variant="outlined" sx={{ fontSize: "0.68rem", height: 22, color: "text.disabled" }} />
-          )}
-        </TableCell>
-
-        {!isSmallScreen && (
-          <TableCell>
-            {row.tel ? (
-              <Stack direction="row" alignItems="center" gap={0.5}>
-                <PhoneIcon sx={{ fontSize: 15, color: "text.disabled" }} />
-                <Typography variant="body2" sx={{ fontSize: "0.8rem" }}>{row.tel}</Typography>
-                <Tooltip title="คัดลอกเบอร์โทร">
-                  <IconButton size="small" sx={{ p: 0.4 }} onClick={() => onCopy(row.tel, "เบอร์โทร")}>
-                    <ContentCopyIcon sx={{ fontSize: 13 }} />
-                  </IconButton>
-                </Tooltip>
-              </Stack>
-            ) : (
-              <Chip label="ไม่มีเบอร์" size="small" variant="outlined" sx={{ fontSize: "0.68rem", height: 22, color: "text.disabled" }} />
-            )}
-          </TableCell>
-        )}
-
-        {!isSmallScreen && (
-          <TableCell>
-            <Stack spacing={0.4} alignItems="flex-start">
-              <Chip
-                size="small" icon={roleMeta.icon} label={roleMeta.label}
-                sx={{ height: 22, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha(roleMeta.color, 0.1), color: roleMeta.color, "& .MuiChip-icon": { color: roleMeta.color } }}
-              />
-              {/* ✅ Role = ตำแหน่งในระบบ — คนละเรื่องกับ Rank (ตำแหน่งในองค์กร) ตั้งที่หน้าตั้งค่าสิทธิ์
-                  ⚠️ โชว์เฉพาะคนที่ดูแลระบบได้ ไม่งั้นรายชื่อจะเต็มไปด้วยป้าย "Member" ที่ไม่ได้บอกอะไร */}
-              {systemRoleOf(row) !== SYSTEM_ROLES.MEMBER && (
-                <Chip
-                  size="small" label={`Role: ${SYSTEM_ROLE_LABEL[systemRoleOf(row)]}`}
-                  sx={{ height: 19, fontSize: "0.63rem", fontWeight: 800, bgcolor: alpha("#0f766e", 0.1), color: "#0f766e" }}
-                />
-              )}
-            </Stack>
-          </TableCell>
-        )}
-
-        <TableCell align="right">
-          <Stack direction="row" gap={0.25} justifyContent="flex-end">
-            <Tooltip title={manageable ? "แก้ไข" : blockedHint} describeChild>
-              <span>
-                <IconButton size="small" disabled={!manageable} onClick={() => onEdit(row)}><EditIcon sx={{ fontSize: 17 }} /></IconButton>
-              </span>
-            </Tooltip>
-            <Tooltip title={manageable ? "ลบ" : blockedHint} describeChild>
-              <span>
-                <IconButton size="small" color="error" disabled={!manageable} onClick={() => onDelete(row._id)}><DeleteIcon sx={{ fontSize: 17 }} /></IconButton>
-              </span>
-            </Tooltip>
-          </Stack>
-        </TableCell>
-      </BodyRow>
-
-      <TableRow>
-        <TableCell colSpan={6} sx={{ p: 0, border: 0 }}>
-          <Collapse in={open} timeout="auto" unmountOnExit>
-            <Box sx={{ px: 3, py: 2, background: theme => alpha(theme.palette.primary.main, 0.02) }}>
-              <Grid container spacing={2}>
-                {isSmallScreen && (
-                  <>
-                    <Grid item xs={12} sm={4}>
-                      <SectionLabel>เบอร์โทร</SectionLabel>
-                      <Typography variant="body2">{row.tel || "—"}</Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={4}>
-                      <SectionLabel>Rank · ตำแหน่งในองค์กร</SectionLabel>
-                      <Chip
-                        size="small" icon={roleMeta.icon} label={roleMeta.label}
-                        sx={{ height: 22, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha(roleMeta.color, 0.1), color: roleMeta.color }}
-                      />
-                    </Grid>
-                  </>
-                )}
-                <Grid item xs={12} sm={4}>
-                  <SectionLabel>ตำแหน่งเฉพาะบุคคล (ในเอกสาร)</SectionLabel>
-                  <Typography variant="body2">{titleOf(row) || "—"}</Typography>
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <SectionLabel>ชื่อผู้ใช้ (Username)</SectionLabel>
-                  <Typography variant="body2">{row.username || "—"}</Typography>
-                </Grid>
-              </Grid>
-            </Box>
-          </Collapse>
-        </TableCell>
-      </TableRow>
-    </>
+    <Stack direction="row" spacing={0.25} justifyContent="flex-end">
+      <Tooltip title={manageable ? "แก้ไข" : hint} describeChild>
+        <span><IconButton size="small" aria-label="แก้ไข" disabled={!manageable} onClick={(e) => { e.stopPropagation(); onEdit(row); }} sx={{ color: INK_2 }}><Edit sx={{ fontSize: 18 }} /></IconButton></span>
+      </Tooltip>
+      <Tooltip title={manageable ? "ลบ" : hint} describeChild>
+        <span><IconButton size="small" aria-label="ลบ" disabled={!manageable} onClick={(e) => { e.stopPropagation(); onDelete(row._id); }} sx={{ color: MUTED, "&:hover": { color: DANGER } }}><DeleteOutline sx={{ fontSize: 19 }} /></IconButton></span>
+      </Tooltip>
+    </Stack>
   );
 };
 
-// ═══════════════════════════════════════════════════════════════════════
+const CopyBtn = ({ text, label, onCopy }) => (
+  <Tooltip title={`คัดลอก${label}`}>
+    <IconButton size="small" aria-label={`คัดลอก${label}`} onClick={(e) => { e.stopPropagation(); onCopy(text, label); }} sx={{ p: 0.4, color: FAINT, "&:hover": { color: INK_2 } }}>
+      <ContentCopy sx={{ fontSize: 14 }} />
+    </IconButton>
+  </Tooltip>
+);
+
 const Employee = () => {
-  const theme = useTheme();
   const isSmallScreen = useMediaQuery("(max-width:600px)");
+  // ✅ แท็บเล็ตใช้การ์ดเหมือนมือถือ — ตารางกว้าง 900px บนจอ 820px ต้องเลื่อนข้างถึงจะเห็นปุ่มแก้ไข/ลบ
+  const useCards = useMediaQuery("(max-width:899px)");
   const { userData, updateUserData } = useAuth();
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [rankFilter, setRankFilter] = useState("all");
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -546,7 +232,7 @@ const Employee = () => {
   const [order, setOrder] = useState("asc");
   const [orderBy, setOrderBy] = useState("fname");
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const rowsPerPage = 10;
 
   useEffect(() => {
     fetchUsers();
@@ -632,10 +318,8 @@ const Employee = () => {
 
   const validateAdminPassword = async () => {
     try {
-      const response = await API.post("/auth/validate-password", {
-        email: "gotsmtdd@gmail.com",
-        password: passwordConfirm,
-      });
+      // ✅ server ตรวจกับบัญชีของคนที่ล็อกอินอยู่ (req.userId) — เดิมส่งอีเมลตายตัวของแอดมินคนหนึ่งไปด้วยโดยไม่ได้ใช้
+      const response = await API.post("/auth/validate-password", { password: passwordConfirm });
       if (!response.data.valid) {
         Swal.fire({
           title: "รหัสผ่านไม่ถูกต้อง!",
@@ -834,7 +518,10 @@ const Employee = () => {
   };
 
   const handleCopy = (text, label) => {
-    copyToClipboard(text, () => setAlert({ open: true, message: `คัดลอก${label}แล้ว`, severity: "success" }));
+    if (!text) return;
+    navigator.clipboard?.writeText(text)
+      .then(() => setAlert({ open: true, message: `คัดลอก${label}แล้ว`, severity: "success" }))
+      .catch(() => setAlert({ open: true, message: "คัดลอกไม่สำเร็จ", severity: "error" }));
   };
 
   const handleSort = (field) => {
@@ -843,237 +530,193 @@ const Employee = () => {
     setOrderBy(field);
   };
 
-  const handleChangePage = (_, newPage) => setPage(newPage);
-  const handleChangeRowsPerPage = (e) => {
-    setRowsPerPage(parseInt(e.target.value, 10));
-    setPage(0);
-  };
 
   // ─── Derived data ──────────────────────────────────────────────────
   const filteredUsers = useMemo(() => {
-    const lowerSearch = searchTerm.toLowerCase();
-    return users.filter((user) =>
-      user.fname?.toLowerCase().includes(lowerSearch) ||
-      user.lname?.toLowerCase().includes(lowerSearch) ||
-      user.email?.toLowerCase().includes(lowerSearch) ||
-      user.tel?.toLowerCase().includes(lowerSearch) ||
-      user.username?.toLowerCase().includes(lowerSearch)
-    );
-  }, [users, searchTerm]);
+    const lowerSearch = searchTerm.trim().toLowerCase();
+    return users.filter((user) => {
+      if (rankFilter === "admin" && !isRole(user, ROLES.DIRECTOR, ROLES.ADMIN, ROLES.MANAGER)) return false;
+      if (rankFilter === "staff" && !isRole(user, ...TECHNICIAN_ROLES, ROLES.SALE)) return false;
+      if (rankFilter === "invalid" && !rankMetaOf(user.role).invalid) return false;
+      if (rankFilter.startsWith("r:") && String(user.role || "").toLowerCase() !== rankFilter.slice(2)) return false;
+      return !lowerSearch || [user.fname, user.lname, fullNameOf(user), user.email, user.tel, user.username, titleOf(user)]
+        .some((v) => String(v || "").toLowerCase().includes(lowerSearch));
+    });
+  }, [users, searchTerm, rankFilter]);
 
   const sortedUsers = useMemo(
     () => filteredUsers.slice().sort(getComparator(order, orderBy)),
     [filteredUsers, order, orderBy]
   );
 
-  const paginatedUsers = useMemo(
-    () => sortedUsers.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
-    [sortedUsers, page, rowsPerPage]
-  );
-
-  useEffect(() => { setPage(0); }, [searchTerm]);
+  useEffect(() => { setPage(0); }, [searchTerm, rankFilter]);
 
   const stats = useMemo(() => {
     const total = users.length;
-    const admin = users.filter((u) => isRole(u, ROLES.ADMIN, ROLES.MANAGER)).length;
+    const admin = users.filter((u) => isRole(u, ROLES.DIRECTOR, ROLES.ADMIN, ROLES.MANAGER)).length;
     const staff = users.filter((u) => isRole(u, ...TECHNICIAN_ROLES, ROLES.SALE)).length;
-    return { total, admin, staff };
+    const invalid = users.filter((u) => rankMetaOf(u.role).invalid).length;
+    return { total, admin, staff, invalid };
   }, [users]);
 
-  const statCards = [
-    { label: "ผู้ใช้ทั้งหมด", value: stats.total, bar: "linear-gradient(135deg,#667eea,#764ba2)", icon: <GroupsIcon />, sub: "บัญชีในระบบทั้งหมด" },
-    { label: "ผู้ดูแลระบบ", value: stats.admin, bar: "linear-gradient(135deg,#ef4444,#dc2626)", icon: <ShieldIcon />, sub: "แอดมิน / ผู้จัดการ" },
-    { label: "ทีมงาน", value: stats.staff, bar: "linear-gradient(135deg,#3b82f6,#8b5cf6)", icon: <EngineeringIcon />, sub: "ช่าง / เซล" },
-  ];
 
-  const visibleHeadCells = HEAD_CELLS.filter(c => !isSmallScreen || !["tel", "role"].includes(c.id));
+  const pageCount = Math.max(1, Math.ceil(sortedUsers.length / rowsPerPage));
+  const cur = Math.min(page, pageCount - 1);
+  const pageRows = sortedUsers.slice(cur * rowsPerPage, cur * rowsPerPage + rowsPerPage);
+  const openAdd = () => { setNewUserData(EMPTY_FORM); setModalOpenInsert(true); };
 
   return (
     <>
-      <Box sx={{ px: { xs: 1, sm: 2, md: 3 }, py: 3, maxWidth: 1400, mx: "auto" }}>
-
-        {/* Header */}
-        <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1} sx={{ mb: 3 }}>
-          <Box>
-            <Typography variant="h5" fontWeight={800} letterSpacing={-0.5}>จัดการผู้ใช้งานระบบ</Typography>
-            <Typography variant="body2" color="text.secondary">
-              {loading ? "กำลังโหลด..." : `${filteredUsers.length} รายการ${searchTerm ? ` · ค้นหา "${searchTerm}"` : ""}`}
-            </Typography>
-          </Box>
-          <Button
-            variant="contained" color="success" startIcon={<AddIcon />}
-            onClick={() => { setNewUserData(EMPTY_FORM); setModalOpenInsert(true); }}
-            sx={{ borderRadius: 2, fontWeight: 700, textTransform: "none" }}
-          >
-            เพิ่มผู้ใช้ใหม่
-          </Button>
-        </Stack>
-
-        {/* Stat cards */}
-        <Grid container spacing={2} sx={{ mb: 3 }}>
-          {statCards.map(s => (
-            <Grid item xs={12} sm={4} key={s.label}>
-              <StatCard barColor={s.bar}>
-                <Stack direction="row" alignItems="flex-start" justifyContent="space-between">
-                  <Box>
-                    <SectionLabel sx={{ mb: 0.5, display: "block" }}>{s.label}</SectionLabel>
-                    {loading ? (
-                      <Skeleton width={48} height={40} />
-                    ) : (
-                      <Typography variant="h4" fontWeight={800} sx={{ lineHeight: 1 }}>{s.value}</Typography>
-                    )}
-                    <Typography variant="caption" color="text.secondary">{s.sub}</Typography>
-                  </Box>
-                  <Box sx={{ p: 1, borderRadius: 2, background: s.bar, color: "#fff", display: "flex" }}>
-                    {s.icon}
-                  </Box>
-                </Stack>
-              </StatCard>
-            </Grid>
-          ))}
-        </Grid>
-
-        {/* Search */}
-        <GlassCard sx={{ p: 2, mb: 2.5 }}>
-          <TextField
-            placeholder="🔍 ค้นหาชื่อ, อีเมล, เบอร์โทร, ชื่อผู้ใช้..."
-            variant="outlined"
-            size="small"
-            fullWidth
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start"><SearchIcon sx={{ fontSize: 18, color: "text.disabled" }} /></InputAdornment>
-              ),
-              endAdornment: searchTerm ? (
-                <InputAdornment position="end">
-                  <IconButton size="small" onClick={() => setSearchTerm("")}><ClearIcon fontSize="small" /></IconButton>
-                </InputAdornment>
-              ) : null,
-              sx: { borderRadius: 2 },
-            }}
-          />
-        </GlassCard>
-
-        {/* Table */}
-        <GlassCard sx={{ overflow: "hidden" }}>
-          {loading ? (
-            <Stack spacing={1.5} sx={{ p: 2 }}>
-              {[1, 2, 3, 4].map(i => <Skeleton key={i} variant="rounded" height={52} sx={{ borderRadius: 2 }} />)}
-            </Stack>
-          ) : filteredUsers.length === 0 ? (
-            <Box sx={{ textAlign: "center", py: 8, color: "text.secondary" }}>
-              <FolderOpenIcon sx={{ fontSize: 48, opacity: 0.25, mb: 1 }} />
-              <Typography fontWeight={600}>
-                {searchTerm ? "ไม่พบผู้ใช้ที่ตรงกับการค้นหา" : "ยังไม่มีข้อมูลผู้ใช้"}
-              </Typography>
-              <Typography variant="body2" color="text.disabled">
-                {searchTerm ? "ลองเปลี่ยนคำค้นหาดูอีกครั้ง" : "กด “เพิ่มผู้ใช้ใหม่” เพื่อเริ่มต้น"}
-              </Typography>
-            </Box>
-          ) : (
-            <>
-              <TableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      {visibleHeadCells.map(cell => (
-                        <HeadCell key={cell.id} align={cell.align || "left"} sx={{ width: cell.width }}>
-                          {cell.sortable ? (
-                            <TableSortLabel
-                              active={orderBy === cell.id}
-                              direction={orderBy === cell.id ? order : "asc"}
-                              onClick={() => handleSort(cell.id)}
-                            >
-                              {cell.label}
-                            </TableSortLabel>
-                          ) : cell.label}
-                        </HeadCell>
-                      ))}
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {paginatedUsers.map((row) => (
-                      <EmployeeRow
-                        key={row._id}
-                        row={row}
-                        isSmallScreen={isSmallScreen}
-                        onEdit={openEditModal}
-                        onDelete={handleDeleteRow}
-                        me={userData}
-                        onCopy={handleCopy}
-                      />
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-              <TablePagination
-                component="div"
-                count={filteredUsers.length}
-                page={page}
-                onPageChange={handleChangePage}
-                rowsPerPage={rowsPerPage}
-                onRowsPerPageChange={handleChangeRowsPerPage}
-                rowsPerPageOptions={[5, 10, 25, 50]}
-                labelRowsPerPage="แถวต่อหน้า"
-                labelDisplayedRows={({ from, to, count }) => `${from}–${to} จาก ${count}`}
-                sx={{ borderTop: `1px solid ${alpha(theme.palette.divider, 0.5)}` }}
-              />
-            </>
+      <Box sx={{ p: { xs: 1.25, sm: 2.5 }, maxWidth: 1400, mx: "auto" }}>
+        <PageHeader
+          icon={<BadgeIcon />}
+          title="ทะเบียนพนักงาน"
+          subtitle="บัญชีผู้ใช้ · Rank (ตำแหน่งในองค์กร) · ตำแหน่งที่พิมพ์ในเอกสาร"
+          actions={(
+            <Button variant="contained" startIcon={<Add />} onClick={openAdd} sx={{ ...PRIMARY_BTN_SX, height: 40, px: { xs: 1.5, sm: 2 } }}>
+              <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>เพิ่มผู้ใช้</Box>
+              <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>เพิ่ม</Box>
+            </Button>
           )}
-        </GlassCard>
+        />
+
+        {loading ? (
+          <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" }, mb: 1.5 }}>
+            {[0, 1, 2, 3].map((i) => <Skeleton key={i} variant="rounded" height={76} sx={{ borderRadius: 2.5 }} />)}
+          </Box>
+        ) : (
+          <KpiRow columns={4}>
+            <Kpi label="ผู้ใช้ทั้งหมด" value={`${stats.total} คน`} onClick={() => setRankFilter("all")} active={rankFilter === "all"} />
+            <Kpi label="ผู้บริหาร / แอดมิน" value={`${stats.admin} คน`} sub="กรรมการ · ผู้จัดการ · แอดมิน" onClick={() => setRankFilter("admin")} active={rankFilter === "admin"} />
+            <Kpi label="ทีมช่าง / เซล" value={`${stats.staff} คน`} onClick={() => setRankFilter("staff")} active={rankFilter === "staff"} />
+            <Kpi label="Rank ไม่ถูกต้อง" value={`${stats.invalid} คน`} sub={stats.invalid ? "บัญชีจะใช้งานไม่ได้ — กดแก้ไข" : "ทุกบัญชีถูกต้อง"} alert={stats.invalid > 0}
+              onClick={stats.invalid ? () => setRankFilter("invalid") : undefined} active={rankFilter === "invalid"} />
+          </KpiRow>
+        )}
+
+        <FilterBar search={searchTerm} onSearch={setSearchTerm} placeholder="ค้นหาชื่อ / ชื่อผู้ใช้ / อีเมล / เบอร์โทร">
+          <SelectField label="Rank" value={rankFilter} onChange={(e) => setRankFilter(e.target.value)} sx={{ minWidth: { xs: 0, sm: 200 }, flex: { xs: 1, sm: "none" } }}>
+            <option value="all">ทุก Rank ({users.length})</option>
+            <option value="admin">ผู้บริหาร / แอดมิน</option>
+            <option value="staff">ทีมช่าง / เซล</option>
+            {ALL_ROLES.map((r) => <option key={r} value={`r:${r}`}>{rankLabel(r)}</option>)}
+            {stats.invalid > 0 && <option value="invalid">Rank ไม่ถูกต้อง ({stats.invalid})</option>}
+          </SelectField>
+        </FilterBar>
+
+        {loading ? (
+          <Stack spacing={1}>{[1, 2, 3, 4].map((i) => <Skeleton key={i} variant="rounded" height={useCards ? 120 : 56} sx={{ borderRadius: 2.5 }} />)}</Stack>
+        ) : filteredUsers.length === 0 ? (
+          <EmptyState icon={<BadgeIcon />}
+            title={searchTerm || rankFilter !== "all" ? "ไม่พบผู้ใช้ตามตัวกรอง" : "ยังไม่มีผู้ใช้"}
+            hint={searchTerm || rankFilter !== "all" ? "ลองเปลี่ยนคำค้นหาหรือ Rank" : "กด \"เพิ่มผู้ใช้\" เพื่อเริ่มต้น"}
+            action={!searchTerm && rankFilter === "all" ? <Button variant="contained" startIcon={<Add />} onClick={openAdd} sx={PRIMARY_BTN_SX}>เพิ่มผู้ใช้</Button> : null} />
+        ) : useCards ? (
+          <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
+            {pageRows.map((row) => (
+              <Box key={row._id} sx={{ p: 1.5, bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, boxShadow: CARD_SHADOW }}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Box sx={{ flex: 1, minWidth: 0 }}><Person row={row} /></Box>
+                  <RowActions row={row} me={userData} onEdit={openEditModal} onDelete={handleDeleteRow} />
+                </Stack>
+                <Box sx={{ mt: 1.25, pt: 1.25, borderTop: `1px solid ${LINE}`, display: "grid", gap: 0.75 }}>
+                  <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+                    <RankCell row={row} />
+                    {titleOf(row) && titleOf(row) !== rankMetaOf(row.role).label && (
+                      <Typography noWrap sx={{ fontSize: "0.76rem", color: MUTED, minWidth: 0 }}>{titleOf(row)}</Typography>
+                    )}
+                  </Stack>
+                  {row.tel && (
+                    <Typography component="a" href={`tel:${row.tel}`} sx={{ fontSize: "0.84rem", fontWeight: 700, color: INK_2, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 0.75 }}>
+                      <Phone sx={{ fontSize: 16, color: MUTED }} />{row.tel}
+                    </Typography>
+                  )}
+                  {row.email && (
+                    <Typography component="a" href={`mailto:${row.email}`} noWrap sx={{ fontSize: "0.8rem", color: INK_2, textDecoration: "none", display: "flex", alignItems: "center", gap: 0.75, minWidth: 0 }}>
+                      <Email sx={{ fontSize: 16, color: MUTED, flexShrink: 0 }} /><Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis" }}>{row.email}</Box>
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        ) : (
+          <Panel sx={{ overflowX: "auto" }}>
+            <Table size="small" sx={{ minWidth: 900, ...TABLE_HEAD_SX }}>
+              <TableHead>
+                <TableRow>
+                  {COLUMNS.map((c) => (
+                    <TableCell key={c.id} align={c.align || "left"} sx={c.id === "actions" ? { width: 96 } : undefined}>
+                      {c.sortable ? (
+                        <TableSortLabel active={orderBy === c.id} direction={orderBy === c.id ? order : "asc"} onClick={() => handleSort(c.id)}>{c.label}</TableSortLabel>
+                      ) : c.label}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {pageRows.map((row) => (
+                  <TableRow key={row._id} hover sx={TABLE_ROW_SX}>
+                    <TableCell sx={{ maxWidth: 260 }}><Person row={row} /></TableCell>
+                    <TableCell sx={{ maxWidth: 220 }}><Typography noWrap sx={{ fontSize: "0.84rem", color: titleOf(row) ? INK : FAINT }}>{titleOf(row) || "—"}</Typography></TableCell>
+                    <TableCell><RankCell row={row} /></TableCell>
+                    <TableCell sx={{ whiteSpace: "nowrap" }}>
+                      {row.tel ? (
+                        <Stack direction="row" spacing={0.5} alignItems="center">
+                          <Typography sx={{ fontSize: "0.84rem", color: INK, fontVariantNumeric: "tabular-nums" }}>{row.tel}</Typography>
+                          <CopyBtn text={row.tel} label="เบอร์โทร" onCopy={handleCopy} />
+                        </Stack>
+                      ) : <Typography sx={{ fontSize: "0.84rem", color: FAINT }}>—</Typography>}
+                    </TableCell>
+                    <TableCell sx={{ maxWidth: 260 }}>
+                      {row.email ? (
+                        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
+                          <Typography noWrap sx={{ fontSize: "0.84rem", color: INK, minWidth: 0 }}>{row.email}</Typography>
+                          <CopyBtn text={row.email} label="อีเมล" onCopy={handleCopy} />
+                        </Stack>
+                      ) : <Typography sx={{ fontSize: "0.84rem", color: FAINT }}>—</Typography>}
+                    </TableCell>
+                    <TableCell align="right"><RowActions row={row} me={userData} onEdit={openEditModal} onDelete={handleDeleteRow} /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Panel>
+        )}
+
+        {!loading && filteredUsers.length > 0 && (
+          <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" spacing={1} sx={{ mt: 1.5 }}>
+            <Typography sx={{ flex: 1, fontSize: "0.76rem", color: MUTED }}>
+              {pageCount > 1 ? `แสดง ${cur * rowsPerPage + 1}–${cur * rowsPerPage + pageRows.length} จาก ` : ""}{filteredUsers.length} คน
+            </Typography>
+            {pageCount > 1 && (
+              <Pagination count={pageCount} page={cur + 1} onChange={(_, n) => setPage(n - 1)} shape="rounded" size={isSmallScreen ? "small" : "medium"}
+                sx={{ "& .Mui-selected": { bgcolor: `${INK_2} !important`, color: "#fff" } }} />
+            )}
+          </Stack>
+        )}
       </Box>
 
-      {/* Add modal */}
-      <EmployeeFormModal
-        open={modalOpenInsert}
-        mode="add"
-        data={newUserData}
-        onChange={handleChange}
-        onClose={() => setModalOpenInsert(false)}
-        onSubmit={handleOpenPasswordConfirmModal}
-        isSmallScreen={isSmallScreen}
-        me={userData}
-      />
-
-      {/* Edit modal */}
-      <EmployeeFormModal
-        open={modalOpenEdit}
-        mode="edit"
-        data={editedData}
-        onChange={handleChangeEdit}
-        onClose={() => setModalOpenEdit(false)}
-        onSubmit={handleEditUser}
-        isSmallScreen={isSmallScreen}
-        me={userData}
-      />
-
-      {/* Admin password confirm modal */}
-      <PasswordConfirmModal
+      <EmployeeFormDialog open={modalOpenInsert} mode="add" data={newUserData} onChange={handleChange}
+        onClose={() => setModalOpenInsert(false)} onSubmit={handleOpenPasswordConfirmModal} fullScreen={isSmallScreen} me={userData} />
+      <EmployeeFormDialog open={modalOpenEdit} mode="edit" data={editedData} onChange={handleChangeEdit}
+        onClose={() => setModalOpenEdit(false)} onSubmit={handleEditUser} fullScreen={isSmallScreen} me={userData} />
+      <PasswordConfirmDialog
         open={modalOpenPasswordConfirm}
         value={passwordConfirm}
         onChange={(e) => setPasswordConfirm(e.target.value)}
         onClose={() => { setModalOpenPasswordConfirm(false); setPendingRoleChange(null); setPasswordConfirm(""); }}
         onConfirm={handlePasswordConfirm}
-        isSmallScreen={isSmallScreen}
         busy={confirmBusy}
         title={pendingRoleChange ? "ยืนยันการเปลี่ยน Rank" : "ยืนยันรหัสผ่าน"}
         description={pendingRoleChange
-          ? `กำลังเปลี่ยน Rank (ตำแหน่งในองค์กร) ของ ${[pendingRoleChange.fname, pendingRoleChange.lname].filter(Boolean).join(" ")} เป็น "${rankLabel(pendingRoleChange.role)}" — กรอกรหัสผ่านของคุณเพื่อยืนยัน`
-          : "เพื่อความปลอดภัยก่อนเพิ่มผู้ใช้ใหม่"}
-        confirmLabel={pendingRoleChange ? "ยืนยันเปลี่ยน Rank" : "ยืนยัน"}
+          ? `เปลี่ยน Rank ของ ${[pendingRoleChange.fname, pendingRoleChange.lname].filter(Boolean).join(" ")} เป็น "${rankLabel(pendingRoleChange.role)}" — กรอกรหัสผ่านของคุณเพื่อยืนยัน`
+          : "กรอกรหัสผ่านของคุณเพื่อยืนยันการเพิ่มผู้ใช้ใหม่"}
+        confirmLabel={pendingRoleChange ? "ยืนยันเปลี่ยน Rank" : "เพิ่มผู้ใช้"}
       />
 
-      <Snackbar
-        open={alert.open}
-        autoHideDuration={2500}
-        onClose={() => setAlert(p => ({ ...p, open: false }))}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        <Alert severity={alert.severity} onClose={() => setAlert(p => ({ ...p, open: false }))} sx={{ borderRadius: 2, fontWeight: 600 }}>
-          {alert.message}
-        </Alert>
+      <Snackbar open={alert.open} autoHideDuration={2500} onClose={() => setAlert((p) => ({ ...p, open: false }))} anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
+        <Alert severity={alert.severity} variant="filled" onClose={() => setAlert((p) => ({ ...p, open: false }))} sx={{ borderRadius: 2, fontWeight: 600 }}>{alert.message}</Alert>
       </Snackbar>
     </>
   );
