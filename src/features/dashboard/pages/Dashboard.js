@@ -107,15 +107,6 @@ const Dashboard = () => {
   // ⚠️ ทางลัดตามสิทธิ์ (การดำเนินงาน/คำขอลงงาน ฯลฯ) ย้ายไปตัดสินใน HomeMenu.js ที่เดียวแล้ว
   const canViewQuotations = can(userData, "viewQuotations");
 
-  /**
-   * ชุดสีประจำสายงานของผู้ใช้คนนี้
-   * ✅ ม่วง = ฝ่ายขาย · แดง = ฝ่ายบริการ (สีแบรนด์เดิมของแอป)
-   * ⚠️ ใช้ชุดเดียวกับหัวปฏิทิน แถบแท็บ และเมนู — ถ้าหน้าแรกยังแดงอยู่ที่เดียวจะขัดกับทุกหน้าที่
-   * เซลเปิดต่อจากนี้ และทำให้ "รู้ทันทีว่าอยู่สายไหน" ที่ตั้งใจไว้ไม่เกิดขึ้นจริง
-   */
-  const accent = isSale
-    ? { main: "#8b5cf6", deep: "#5b21b6", soft: "rgba(139,92,246,0.12)" }
-    : { main: "#dc2626", deep: "#7f1d1d", soft: "rgba(220,38,38,0.10)" };
 
   /**
    * ⚠️ ปลายทางของ "งานหนึ่งงาน" ต่างกันตามสายงาน — เซลไม่มีสิทธิ์เข้าหน้า "การดำเนินงาน"
@@ -607,29 +598,16 @@ const Dashboard = () => {
           (ซึ่งอยู่เหนือหน้านี้ตลอดเวลา แสดงพร้อมกันในจอเดียว) ตัดทั้งสองออก เหลือแค่ข้อความทักทาย
           + ชื่อ + badge สิทธิ์ ให้แถวนี้โล่งและกระชับที่สุด (แจ้งเตือนดูได้จากกระดิ่งบน Header
           หรือเลื่อนลงไปที่ส่วน "การแจ้งเตือนล่าสุด" ด้านล่างอยู่แล้ว ไม่จำเป็นต้องมีทางลัดซ้ำที่นี่) ─── */}
-            <div style={styles.topAppBar}>
-              <div>
-                <span style={styles.welcomeSub}>
-                  {getGreeting()} ·{" "}
-                  {formatThai(moment().locale("th"), "D MMMM YYYY")}
-                </span>
-                <h2 style={styles.welcomeTitle}>
-                  {userData?.fname || "ผู้ใช้งาน"}
-                </h2>
-              </div>
-              {/* ✅ ป้ายบทบาทรับสีประจำสายงาน — จุดเดียวที่บอกว่า "คุณเป็นใคร" บนหน้าแรก
-                  ควรเป็นตัวแรกที่สื่อสารสีของสายงานนั้น */}
-              <span
-                style={{
-                  ...styles.roleBadge,
-                  color: accent.main,
-                  borderColor: accent.main,
-                  backgroundColor: accent.soft,
-                }}
-              >
-                {rankLabel(role)}
-              </span>
-            </div>
+            {/* ✅ หัวหน้าแรกแบบกล่องขาวชุดเดียวกับหน้าอื่น (กฎ: component เหมือนกัน · สีไม่เยอะ) —
+                เดิมป้ายตำแหน่งสีแดงขอบแดงลอยมุมขวา แย่งสายตาจากเมนู · ตอนนี้ตำแหน่งเป็นข้อความรองสีเทา */}
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2, px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.5 }, bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, boxShadow: CARD_SHADOW }}>
+              <Avatar sx={{ width: 42, height: 42, fontWeight: 800, bgcolor: personColor(userData?.fname || "ผู้ใช้") }}>{personInitial(userData?.fname || "ผู้ใช้")}</Avatar>
+              <Box sx={{ minWidth: 0, flex: 1 }}>
+                <Typography noWrap sx={{ fontSize: "0.76rem", color: MUTED }}>{getGreeting()} · {formatThai(moment().locale("th"), "D MMMM YYYY")}</Typography>
+                <Typography noWrap sx={{ fontWeight: 900, fontSize: { xs: "1.1rem", sm: "1.25rem" }, color: INK, lineHeight: 1.3 }}>{userData?.fname || "ผู้ใช้งาน"}</Typography>
+              </Box>
+              <Typography noWrap sx={{ fontSize: "0.76rem", fontWeight: 700, color: INK_2, px: 1.25, py: 0.5, borderRadius: 999, bgcolor: SURFACE, border: `1px solid ${LINE}`, maxWidth: "45%" }}>{rankLabel(role)}</Typography>
+            </Box>
 
             {/* ─── SECTION 1.4: "งานขาย" HERO (เฉพาะเซล) — คู่ขนานกับแบนเนอร์ "งานของฉัน" ของช่าง
           เซลเปิดแอปมาเพื่อดูท่อขายกับนัดหมายของตัวเอง ไม่ใช่ตารางงานช่าง จึงต้องเป็นสิ่งแรกที่เห็น ─── */}

@@ -323,3 +323,47 @@
     font-size: 11px;
   }
 }
+
+
+/* ── v3 โทนมืออาชีพ (ผู้ใช้สั่ง 2 ต.ค. 2569 "ปรับปรุงให้มืออาชีพ" + กฎออกแบบ: สีไม่เยอะ) ───────────────
+   ⚠️ ผู้ใช้เคยปฏิเสธ "เทาทั้งหมด" — จึงยังคงสีประจำหมวดไว้ แต่ย้ายสีไปอยู่ที่ "ตัวไอคอน" อย่างเดียว:
+   • หัวหมวดพื้นขาว (ไม่ทาพื้นสีอ่อน) · ไอคอนหัวหมวดเล็กลง
+   • ช่องไอคอนเมนู = พื้นขาว ขอบเทาบาง + ไอคอนสีประจำหมวด (แทนกล่องพื้นสีพาสเทลทุกช่อง ซึ่งทำให้ทั้งจอเป็นสีๆ)
+   • ชื่อเมนูตัวเข้มอ่านง่าย · ระยะห่างสม่ำเสมอ */
+.hm-cat {
+  border-radius: 16px;
+}
+.hm-cat-head {
+  background: #ffffff;
+  border-bottom: 1px solid #f1f5f9;
+  padding: 10px 14px 8px;
+}
+.hm-cat-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+.hm-cat-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: #334155;
+}
+.hm-icon {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+.hm-item:active .hm-icon {
+  background: #f8fafc;
+}
+.hm-title-short {
+  color: #1e293b;
+  font-weight: 700;
+}
+@media (min-width: 600px) {
+  .hm-item:hover .hm-icon {
+    border-color: var(--hm-tone);
+    box-shadow: 0 6px 14px -8px rgba(15, 23, 42, 0.3);
+  }
+}
