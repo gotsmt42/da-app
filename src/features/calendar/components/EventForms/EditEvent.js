@@ -813,6 +813,82 @@ function injectStyles() {
        ไม่ขึ้น") — ดันให้สูงกว่าเสมอ เทียบ pattern เดียวกับ AddEvent.js/AddDraftEvent.js/
        EventCalendar/index.js/injectAttachStyles ด้านล่างในไฟล์นี้เอง */
     .ts-dropdown { z-index: 100000 !important; }
+
+    /* ══ ปรับหน้าตาใหม่ (ผู้ใช้สั่ง 3 ต.ค. 2569: "จัดวางให้ดูดีมืออาชีพ มองง่าย ไม่รก · มือถือขยายเต็มจอ")
+       ✅ หัวกล่องขาว + แถบสีสถานะบางๆ ด้านบน (เดิมพื้นทึบทั้งหัวตามสถานะ) · ป้ายเทาอ่อน · ปุ่มหลักน้ำเงิน
+       ⚠️ วางท้ายสุดของสไตล์ชีตโดยตั้งใจ — ชนะกฎเดิมด้านบนด้วยลำดับ ══ */
+    .swal-edit-event #ee-status-header {
+      background: #fff !important; border-top: 4px solid var(--ee-status, #64748b);
+      border-bottom: 1px solid #e2e8f0; padding: 12px 16px 12px 18px; align-items: flex-start; text-align: left;
+    }
+    .swal-edit-event #ee-status-icon {
+      width: 40px; height: 40px; border-radius: 11px; box-shadow: none; backdrop-filter: none;
+      background: var(--ee-status-soft, #f1f5f9); border: 1px solid var(--ee-status-line, #e2e8f0); font-size: 19px;
+    }
+    .swal-edit-event #ee-status-title { gap: 6px; }
+    .swal-edit-event #ee-status-title h3 {
+      color: #0f172a; text-shadow: none; font-size: 16px; font-weight: 800; line-height: 1.35;
+      white-space: normal; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    }
+    .swal-edit-event #ee-status-title h3 .marquee-track { animation: none !important; padding-right: 0 !important; display: inline !important; }
+    .swal-edit-event #ee-status-title .ee-tag {
+      background: #f8fafc; border: 1px solid #e2e8f0; color: #334155; font-size: 11.5px; padding: 2px 9px;
+    }
+    .swal-edit-event #ee-status-title .ee-tag--muted { background: #fff; border-style: dashed; color: #94a3b8; }
+    .swal-edit-event .ee-tag--link:hover { background: #eff6ff; border-color: #bfdbfe; }
+    .swal-edit-event .ee-tag--link .ee-tag-go { color: #2563eb; }
+    .swal-edit-event #ee-close-btn, .swal-edit-event #ee-copy-btn {
+      width: 34px; height: 34px; border-radius: 10px; background: #f1f5f9; border: 1px solid #e2e8f0; color: #475569;
+    }
+    .swal-edit-event #ee-close-btn:hover, .swal-edit-event #ee-copy-btn:hover { background: #e2e8f0; }
+    .swal-edit-event #ee-body { text-align: left; padding: 16px 20px 12px; }
+    .swal-edit-event #ee-status-bar { border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 1px 2px rgba(15,23,42,.04); padding: 8px 12px; gap: 10px; }
+
+    /* แผนที่: ปุ่มเรียงใต้ชื่อบนจอแคบ ไม่บีบข้อความ */
+    .ee-map-go { background: #2563eb; border-radius: 10px; }
+    .ee-map-go:hover { background: #1d4ed8; }
+    .ee-map-edit { border-radius: 10px; }
+
+    /* แถบปุ่ม — ขาว · ปุ่มหลักน้ำเงิน */
+    #ee-action-bar { background: #fff; padding: 12px 20px; }
+    #ee-action-bar .ee-btn { border-radius: 10px; padding: 10px 16px; font-size: 13.5px; }
+    #ee-action-bar .ee-btn-success { background: #2563eb; border-color: #2563eb; box-shadow: none; }
+    #ee-action-bar .ee-btn-success:hover { background: #1d4ed8; border-color: #1d4ed8; }
+    #ee-action-bar .ee-btn-map { background: #fff; border-color: #e2e8f0; color: #334155; }
+    #ee-action-bar .ee-btn-map:hover { background: #f8fafc; }
+    #ee-action-bar .ee-btn-ghost { border-color: #e2e8f0; background: #fff; color: #475569; }
+
+    /* ── มือถือ: เต็มจอ + แถบปุ่มแถวเดียว ── */
+    @media (max-width: 600px) {
+      .swal2-container:has(> .swal-edit-event) { padding: 0 !important; }
+      .swal-edit-event.swal2-popup {
+        width: 100vw !important; max-width: 100vw !important; margin: 0 !important;
+        height: 100dvh !important; max-height: 100dvh !important; border-radius: 0 !important; box-shadow: none !important;
+      }
+      .swal-edit-event #ee-status-header { padding: 10px 12px; gap: 10px; }
+      .swal-edit-event #ee-status-icon { width: 36px; height: 36px; font-size: 17px; }
+      .swal-edit-event #ee-status-title h3 { font-size: 15px; }
+      /* ป้ายบนหัวเลื่อนแนวนอนแถวเดียว — เดิมตัดลงหลายบรรทัด กินหัวกล่องสูงเกือบ 1 ใน 4 ของจอ */
+      .swal-edit-event #ee-status-title .ee-header-meta { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-right: -4px; padding-bottom: 2px; }
+      .swal-edit-event #ee-status-title .ee-header-meta::-webkit-scrollbar { display: none; }
+      .swal-edit-event #ee-body { padding: 12px 12px 14px; }
+      .ee-map-bar { flex-wrap: wrap; }
+      .ee-map-info { flex: 1 1 100%; }
+      .ee-map-go, .ee-map-edit { flex: 1 1 0; justify-content: center; text-align: center; }
+
+      #ee-action-bar { flex-direction: row; flex-wrap: nowrap; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); }
+      .ee-btn-group, .ee-btn-group-left, .ee-btn-group-right { width: auto; gap: 8px; }
+      .ee-btn-group-left { flex: 0 0 auto; }
+      .ee-btn-group-right { flex: 1 1 auto; }
+      #ee-action-bar .ee-btn-group-left .ee-btn { flex: 0 0 auto; width: 44px; height: 44px; padding: 0; }
+      #ee-action-bar .ee-btn-group-right .ee-btn { height: 44px; }
+      #ee-action-bar .ee-btn-group-right .ee-btn-ghost { flex: 1 1 0; }
+      #ee-action-bar .ee-btn-group-right .ee-btn-success { flex: 2 1 0; }
+      /* ไอคอนอย่างเดียวบนมือถือ (มีชื่อเต็มใน title) */
+      #ee-mapBtnText, #btnMoreActions .ee-btn-label { display: none; }
+      #btnMoreActions { font-size: 20px !important; letter-spacing: 1px; }
+      #ee-more-menu { left: 12px; right: 12px; max-width: none; }
+    }
   `;
   document.head.appendChild(style);
 }
@@ -904,10 +980,11 @@ function injectAttachStyles() {
 // (เดิมมีแค่ 2 สถานะแรก ทำให้งานที่สถานะไปไกลกว่านั้นแล้ว เช่น "กำลังดำเนินการ" หา config ไม่เจอ
 // แล้ว fallback ไปแสดงเป็น "กำลังรอยืนยัน" ผิดๆ ทั้ง header สีและตัวเลือกใน dropdown)
 const STATUS_CONFIG = {
-  กำลังรอยืนยัน: { bg: "linear-gradient(135deg,#475569,#64748b)", icon: "⏳" },
-  ยืนยันแล้ว: { bg: "linear-gradient(135deg,#1d4ed8,#2563eb)", icon: "✅" },
-  กำลังดำเนินการ: { bg: "linear-gradient(135deg,#6d28d9,#8b5cf6)", icon: "🔄" },
-  ดำเนินการเสร็จสิ้น: { bg: "linear-gradient(135deg,#065f46,#10b981)", icon: "🎉" },
+  // ✅ หัวกล่องเป็นพื้นขาวแล้ว — สีสถานะเหลือแค่แถบบนบางๆ + พื้นไอคอนอ่อน (color/soft/line) · bg คงไว้ให้ที่อื่นที่อ่านค่า
+  กำลังรอยืนยัน: { bg: "linear-gradient(135deg,#475569,#64748b)", color: "#64748b", soft: "#f1f5f9", line: "#e2e8f0", icon: "⏳" },
+  ยืนยันแล้ว: { bg: "linear-gradient(135deg,#1d4ed8,#2563eb)", color: "#2563eb", soft: "#eff6ff", line: "#bfdbfe", icon: "✅" },
+  กำลังดำเนินการ: { bg: "linear-gradient(135deg,#6d28d9,#8b5cf6)", color: "#7c3aed", soft: "#f5f3ff", line: "#ddd6fe", icon: "🔄" },
+  ดำเนินการเสร็จสิ้น: { bg: "linear-gradient(135deg,#065f46,#10b981)", color: "#16a34a", soft: "#f0fdf4", line: "#bbf7d0", icon: "🎉" },
 };
 
 // ✅ ช่างแก้สถานะเองได้แค่ 2 สถานะแรก (กำลังรอยืนยัน/ยืนยันแล้ว) — สอดคล้องกับหน้า Operation
@@ -1406,7 +1483,7 @@ export const getEditEvent = async ({
 <div id="ee-modal-inner">
 
   <!-- ── Header ── -->
-  <div id="ee-status-header" style="background:${cfg0.bg}">
+  <div id="ee-status-header" style="--ee-status:${cfg0.color};--ee-status-soft:${cfg0.soft};--ee-status-line:${cfg0.line}">
     <div id="ee-status-icon">${cfg0.icon}</div>
     <div id="ee-status-title">
       <h3><span >${attrHtml(eventTitle)} · ${attrHtml(eventSystem)} ${eventTime ? `· ครั้งที่ ${attrHtml(formatRoundLabel(eventTime, eventVisitCount))}` : ""}</span></h3>
@@ -1866,11 +1943,11 @@ export const getEditEvent = async ({
     <div class="ee-btn-group ee-btn-group-left">
       ${/* ⚠️ ไอคอนกับข้อความต้องแยก span — ตอนบันทึกพิกัดเสร็จเราอัปเดตเฉพาะข้อความ ถ้าเขียนรวมกัน
             แล้วสั่ง textContent ทับ SVG หมุดจะถูกลบหายไปทันทีที่กดบันทึกครั้งแรก */""}
-      <a class="ee-btn ee-btn-map" id="btnOpenMap"
+      <a class="ee-btn ee-btn-map" id="btnOpenMap" title="${savedMapUrl ? "นำทาง (Google Maps)" : "ค้นหาใน Google Maps"}"
          href="${attrHtml(savedMapUrl || mapSearchHref)}" target="_blank" rel="noopener noreferrer">
         ${googleMapsPinSvg(15)}<span id="ee-mapBtnText">${savedMapUrl ? "นำทาง (Google Maps)" : "ค้นหาใน Google Maps"}</span>
       </a>
-      ${hasMoreActions ? `<button class="ee-btn ee-btn-more" id="btnMoreActions" aria-expanded="false">⋯ เพิ่มเติม</button>` : ""}
+      ${hasMoreActions ? `<button class="ee-btn ee-btn-more" id="btnMoreActions" aria-expanded="false" title="เพิ่มเติม">⋯<span class="ee-btn-label"> เพิ่มเติม</span></button>` : ""}
     </div>
 
     ${hasMoreActions ? `
@@ -2196,7 +2273,9 @@ export const getEditEvent = async ({
       statusSel?.addEventListener("change", (e) => {
         const cfg =
           STATUS_CONFIG[e.target.value] || STATUS_CONFIG["กำลังรอยืนยัน"];
-        headerEl.style.background = cfg.bg;
+        headerEl.style.setProperty("--ee-status", cfg.color);
+        headerEl.style.setProperty("--ee-status-soft", cfg.soft);
+        headerEl.style.setProperty("--ee-status-line", cfg.line);
         iconEl.innerHTML = cfg.icon;
       });
 

@@ -22,7 +22,8 @@ const optionHtml = (value, current) =>
    STYLE INJECTION  (shared with EditEvent — skip if already injected)
 ───────────────────────────────────────────── */
 function injectAddStyles() {
-  if (document.getElementById("add-event-styles")) return;
+  // ⚠️ ลบของเก่าแล้วฉีดใหม่ทุกครั้ง (แบบเดียวกับ EditEvent) — ไม่งั้นแก้สไตล์แล้วหน้าที่เปิดค้างไม่เห็นผล
+  document.getElementById("add-event-styles")?.remove();
   const style = document.createElement("style");
   style.id = "add-event-styles";
   style.textContent = `
@@ -403,6 +404,72 @@ function injectAddStyles() {
       padding: 8px 12px !important; font-size: 14px !important; min-height: 40px;
     }
     .swal-add-event .ts-wrapper.focus .ts-control { border-color: #2563eb !important; }
+
+    /* ══ ปรับหน้าตาใหม่ (ผู้ใช้สั่ง 3 ต.ค. 2569: "จัดวางให้ดูดีมืออาชีพ มองง่าย ไม่รก · มือถือขยายเต็มจอ")
+       ✅ กฎออกแบบ: สีน้อย (น้ำเงิน = เลือก/ปุ่มหลัก) · หัวกล่องขาว · ระยะ/แนวเท่ากันทุกการ์ด
+       ⚠️ วางท้ายสุดของสไตล์ชีตโดยตั้งใจ — ชนะกฎเดิมด้านบนด้วยลำดับ ไม่ต้องไล่แก้ทีละจุด ══ */
+    .swal-add-event #ae-header {
+      background: #fff; border-bottom: 1px solid #e2e8f0; padding: 14px 64px 14px 20px; text-align: left;
+    }
+    .swal-add-event #ae-header-icon {
+      width: 40px; height: 40px; border-radius: 11px; flex-shrink: 0; font-size: 0;
+      background: #eff6ff; display: flex; align-items: center; justify-content: center;
+    }
+    .swal-add-event #ae-header-icon::before {
+      content: ""; width: 18px; height: 18px;
+      background:
+        linear-gradient(#2563eb, #2563eb) center / 18px 2.6px no-repeat,
+        linear-gradient(#2563eb, #2563eb) center / 2.6px 18px no-repeat;
+    }
+    .swal-add-event #ae-header-info h3 { color: #0f172a; font-size: 17px; font-weight: 800; }
+    .swal-add-event #ae-header-info small { color: #64748b; font-size: 12.5px; }
+    .swal-add-event .swal2-close {
+      top: 18px !important; right: 16px !important;
+      background: #f1f5f9 !important; color: #475569 !important; border-radius: 10px !important;
+      width: 34px !important; height: 34px !important; font-size: 22px !important;
+    }
+    .swal-add-event .swal2-close:hover { background: #e2e8f0 !important; }
+    .swal-add-event #ae-body { text-align: left; padding: 18px 22px; }
+    .swal-add-event .ae-date-badge { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+
+    /* ประเภทงาน — เลือกแล้วเป็นฟ้าอ่อนขอบน้ำเงิน (เดิมแดงทั้งการ์ด) */
+    .ae-jobtype-card { min-height: 58px; }
+    .ae-jobtype-option input:checked + .ae-jobtype-card {
+      border-color: #2563eb; background: #eff6ff; box-shadow: 0 0 0 3px rgba(37,99,235,.10);
+    }
+    .ae-jobtype-option input:checked + .ae-jobtype-card .ae-jobtype-title { color: #1d4ed8; }
+    .ae-contract-box, .ae-contract-pick-info { background: #f8fafc; border-color: #e2e8f0; }
+    .ae-contract-pick-info b { color: #1d4ed8; }
+    .ae-contract-option-badge, .ae-cpi-badge { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+    button.ae-round-chip--open:hover { border-color: #2563eb; }
+    .ae-round-chip--selected { border-color: #2563eb !important; background: #eff6ff !important; color: #1d4ed8 !important; box-shadow: 0 0 0 4px rgba(37,99,235,.15); }
+    .ae-round-chip--selected::after { background: #2563eb; }
+    .ae-field select:focus, .ae-field input:focus, .ae-field textarea:focus { border-color: #2563eb; }
+
+    /* แถบปุ่ม — ขาว · ปุ่มหลักน้ำเงิน */
+    #ae-action-bar { background: #fff; padding: 12px 20px; gap: 8px; }
+    .ae-btn { border-radius: 10px; padding: 11px 20px; font-size: 14px; }
+    .ae-btn:hover { opacity: 1; transform: none; }
+    .ae-btn-success { background: #2563eb; color: #fff; }
+    .ae-btn-success:hover { background: #1d4ed8; }
+    .ae-btn-ghost { background: #fff; color: #475569; border: 1px solid #e2e8f0; }
+    .ae-btn-ghost:hover { background: #f8fafc; }
+
+    /* ── มือถือ: เต็มจอ ไม่มีขอบเว้น ── */
+    @media (max-width: 600px) {
+      .swal2-container:has(> .swal-add-event) { padding: 0 !important; }
+      .swal-add-event.swal2-popup {
+        width: 100vw !important; max-width: 100vw !important; margin: 0 !important;
+        height: 100dvh !important; max-height: 100dvh !important; border-radius: 0 !important; box-shadow: none !important;
+      }
+      .swal-add-event #ae-header { padding: 12px 58px 12px 14px; gap: 12px; }
+      .swal-add-event .swal2-close { top: 15px !important; right: 12px !important; }
+      .swal-add-event #ae-body { padding: 12px 12px 16px; }
+      #ae-action-bar { padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); flex-wrap: nowrap; }
+      #ae-action-bar .ae-btn { justify-content: center; }
+      #ae-action-bar .ae-btn-ghost { flex: 1 1 0; }
+      #ae-action-bar .ae-btn-success { flex: 2 1 0; }
+    }
   `;
   document.head.appendChild(style);
 }
