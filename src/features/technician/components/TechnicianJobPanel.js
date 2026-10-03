@@ -967,9 +967,11 @@ const TechnicianJobCard = ({
   );
 
   const Wrapper = noOuterCard ? React.Fragment : JobCard;
+  // ✅ แถบสีสถานะด้านซ้ายของการ์ด — กวาดตาแยกสถานะได้ทันที (ผู้ใช้: "สีสันจืด")
+  const wrapperProps = noOuterCard ? {} : { sx: { borderLeft: `4px solid ${statusColor}` } };
 
   return (
-    <Wrapper>
+    <Wrapper {...wrapperProps}>
       <CardContent sx={{ p: { xs: 2, sm: 2.5 }, "&:last-child": { pb: { xs: 2, sm: 2.5 } } }}>
 
         {/* ── Header — กดที่ไหนก็ได้บนแถวนี้เพื่อกาง/พับการ์ด ไม่ต้องเล็งกดลูกศรเล็กๆ อีกต่อไป ── */}

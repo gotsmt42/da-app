@@ -27,7 +27,7 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { formatThai } from "@/shared/utils/thaiDate";
-import { PageHeader, ICON_BTN_SX } from "@/shared/ui/PageKit";
+import { useAuth } from "@/features/auth/AuthContext";
 import {
   Search, Clear, Refresh, WorkOutline, HourglassTop, TaskAlt, Warning,
   Download, Close, PictureAsPdf, FolderOpen, Image, Article, InsertDriveFile, AttachFile,
@@ -266,13 +266,13 @@ const JobGroupCard = ({ sessions, ...cardProps }) => {
 
 // ─── กลุ่มสถานะแท็บ ───
 const GROUPS = [
-  { key: "active", label: "งานที่ต้องทำ", short: "ต้องทำ", icon: <WorkOutline sx={{ fontSize: 15 }} />, color: "#3b82f6" },
+  { key: "active", label: "งานที่ต้องทำ", short: "ต้องทำ", icon: <WorkOutline sx={{ fontSize: 15 }} />, color: "#2563eb" },
   // ✅ เดิมไม่มีทางเห็นงานค้างแยกจากงานทั่วไปเลยในหน้านี้ (ต้องไปเปิดหน้า Operation ต่างหาก) —
   // เพิ่มแท็บนี้โดยตรง ใช้เกณฑ์เดียวกับหน้า Operation เป๊ะๆ (เลยกำหนด 1 สัปดาห์ขึ้นไป, งานหลายวัน
   // ไม่ติดกันนับเป็น 1 งาน คิดจากวันสุดท้าย) ผ่าน util กลาง
-  { key: "overdue", label: "ค้างงาน", icon: <Warning sx={{ fontSize: 15 }} />, color: "#ef4444" },
-  { key: "pending", label: "รอแอดมินอนุมัติ", short: "รออนุมัติ", icon: <HourglassTop sx={{ fontSize: 15 }} />, color: "#f59e0b" },
-  { key: "closed", label: "เสร็จสิ้น", icon: <TaskAlt sx={{ fontSize: 15 }} />, color: "#10b981" },
+  { key: "overdue", label: "ค้างงาน", icon: <Warning sx={{ fontSize: 15 }} />, color: "#dc2626" },
+  { key: "pending", label: "รอแอดมินอนุมัติ", short: "รออนุมัติ", icon: <HourglassTop sx={{ fontSize: 15 }} />, color: "#d97706" },
+  { key: "closed", label: "เสร็จสิ้น", icon: <TaskAlt sx={{ fontSize: 15 }} />, color: "#059669" },
 ];
 
 const matchesGroup = (event, group, daysPastDueMap) => {
@@ -356,6 +356,9 @@ export default function MyJobs() {
 
   // ✅ เปิดหน้ามาครั้งแรก ถ้าไม่มีงานที่ต้องทำแต่มีงานค้าง → พาไปหมวดค้างงานเลย (ไม่ต้องเจอหน้าว่างก่อน)
   const autoPickedRef = useRef(false);
+  const { userData } = useAuth();
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "สวัสดีตอนเช้า" : hour < 17 ? "สวัสดีตอนบ่าย" : "สวัสดีตอนเย็น";
   useEffect(() => {
     if (autoPickedRef.current || loading || !events.length) return;
     autoPickedRef.current = true;
@@ -478,28 +481,62 @@ export default function MyJobs() {
     <Box sx={{ px: { xs: 1.5, sm: 2 }, pt: 2, pb: 4, maxWidth: 720, mx: "auto" }}>
       {/* ✅ ผู้ใช้สั่ง (3 ต.ค. 2569): "UI มองง่ายขึ้น มืออาชีพ แสดงผลครบ" — หัวกล่องขาวชุดเดียวกับทุกหน้า
           · สถานะ 4 หมวดเห็นครบทุกช่องโดยไม่ต้องเลื่อน (เดิมเป็นชิปเลื่อนแนวนอน หมวดท้ายถูกตัดหาย) */}
-      <PageHeader
-        icon={<WorkOutline />}
-        title="งานของฉัน"
-        subtitle={lastRefreshed ? `อัปเดตล่าสุด ${moment(lastRefreshed).locale("th").format("HH:mm")} น.` : "กำลังโหลด..."}
-        actions={<Tooltip title="รีเฟรช"><IconButton onClick={() => fetchJobs()} sx={ICON_BTN_SX}><Refresh sx={{ fontSize: 20 }} /></IconButton></Tooltip>}
-      />
+      {/* ✅ หัวหน้าแบบทักทาย + สรุปวันนี้ (ผู้ใช้: "สีสันจืด ไม่ดึงดูดให้ทำงาน") — พื้นน้ำเงินไล่เฉดอ่อนๆ ตัวหนังสือขาว */}
+      <Box sx={{
+        position: "relative", overflow: "hidden", mb: 1.5, p: { xs: 2, sm: 2.5 }, borderRadius: 3.5, color: "#fff",
+        background: "linear-gradient(135deg, #1d4ed8 0%, #2563eb 55%, #3b82f6 100%)",
+        boxShadow: "0 8px 24px rgba(37,99,235,.25)",
+      }}>
+        <Box sx={{ position: "absolute", right: -30, top: -30, width: 140, height: 140, borderRadius: "50%", bgcolor: "rgba(255,255,255,.08)" }} />
+        <Box sx={{ position: "absolute", right: 40, bottom: -50, width: 110, height: 110, borderRadius: "50%", bgcolor: "rgba(255,255,255,.06)" }} />
+        <Stack direction="row" alignItems="flex-start" spacing={1.5} sx={{ position: "relative" }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography sx={{ fontSize: "0.8rem", opacity: 0.85, fontWeight: 600 }}>
+              {greeting}{userData?.fname ? ` คุณ${userData.fname}` : ""}
+            </Typography>
+            <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.25rem", sm: "1.4rem" }, lineHeight: 1.3 }}>งานของฉัน</Typography>
+            <Typography sx={{ fontSize: "0.82rem", opacity: 0.92, mt: 0.25 }}>
+              {groupCounts.overdue > 0
+                ? `มีงานค้าง ${groupCounts.overdue} งาน — ส่งงาน/ขอปิดงานให้เรียบร้อยนะ`
+                : groupCounts.active > 0
+                  ? `วันนี้มีงานต้องทำ ${groupCounts.active} งาน — ลุยกันเลย 💪`
+                  : "ไม่มีงานค้าง เยี่ยมมาก 🎉"}
+            </Typography>
+          </Box>
+          <Tooltip title="รีเฟรช">
+            <IconButton onClick={() => fetchJobs()} sx={{ color: "#fff", bgcolor: "rgba(255,255,255,.16)", border: "1px solid rgba(255,255,255,.25)", borderRadius: 2.5, "&:hover": { bgcolor: "rgba(255,255,255,.26)" } }}>
+              <Refresh sx={{ fontSize: 20 }} />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+        <Typography sx={{ position: "relative", fontSize: "0.7rem", opacity: 0.7, mt: 1 }}>
+          {lastRefreshed ? `อัปเดตล่าสุด ${moment(lastRefreshed).locale("th").format("HH:mm")} น. · อัปเดตอัตโนมัติ` : "กำลังโหลด..."}
+        </Typography>
+      </Box>
 
-      {/* ✅ แถวเดียว 4 ช่องแบบกระชับ (ผู้ใช้: "ใหญ่เทอะทะไป") — ตัวเลข + ชื่อสั้น */}
+      {/* ✅ แถวเดียว 4 ช่อง — สีประจำหมวด (ฟ้า/แดง/ส้ม/เขียว) ที่ไอคอนและตัวเลข · ช่องที่เลือกพื้นอ่อน+ขอบสีหมวด */}
       <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 0.75, mb: 1.25 }}>
         {GROUPS.map((g) => {
           const on = group === g.key;
           const n = groupCounts[g.key];
-          const hot = g.key === "overdue" && n > 0;
           return (
             <Box key={g.key} component="button" type="button" onClick={() => setGroup(g.key)} title={g.label}
               sx={{
-                font: "inherit", cursor: "pointer", py: 0.75, px: 0.5, borderRadius: 2, minWidth: 0, textAlign: "center",
-                bgcolor: on ? (hot ? "#fef2f2" : "#eff6ff") : "#fff",
-                border: `1px solid ${on ? (hot ? "#fca5a5" : "#93c5fd") : "#e2e8f0"}`,
+                position: "relative", font: "inherit", cursor: "pointer", pt: 1, pb: 0.85, px: 0.5, borderRadius: 2.5, minWidth: 0, textAlign: "center",
+                bgcolor: on ? alpha(g.color, 0.1) : "#fff",
+                border: `1.5px solid ${on ? g.color : "#e2e8f0"}`,
+                boxShadow: on ? `0 4px 14px ${alpha(g.color, 0.22)}` : "0 1px 2px rgba(15,23,42,.04)",
+                transition: "all .15s",
               }}>
-              <Typography sx={{ fontSize: "1.05rem", fontWeight: 900, lineHeight: 1.25, color: hot ? "#dc2626" : on ? "#1d4ed8" : "#0f172a" }}>{n}</Typography>
-              <Typography noWrap sx={{ fontSize: "0.68rem", fontWeight: 700, color: on ? (hot ? "#b91c1c" : "#1d4ed8") : "#64748b" }}>{g.short || g.label}</Typography>
+              <Box sx={{
+                width: 28, height: 28, mx: "auto", mb: 0.4, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+                bgcolor: on ? g.color : alpha(g.color, 0.12), color: on ? "#fff" : g.color, "& svg": { fontSize: 16 },
+              }}>{g.icon}</Box>
+              <Typography sx={{ fontSize: "1.05rem", fontWeight: 900, lineHeight: 1.2, color: n > 0 ? g.color : "#94a3b8" }}>{n}</Typography>
+              <Typography noWrap sx={{ fontSize: "0.68rem", fontWeight: 800, color: on ? g.color : "#64748b" }}>{g.short || g.label}</Typography>
+              {g.key === "overdue" && n > 0 && !on && (
+                <Box sx={{ position: "absolute", top: 6, right: 6, width: 8, height: 8, borderRadius: "50%", bgcolor: "#dc2626", boxShadow: "0 0 0 3px rgba(220,38,38,.18)" }} />
+              )}
             </Box>
           );
         })}
