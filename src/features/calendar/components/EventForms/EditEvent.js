@@ -15,6 +15,7 @@ import { can } from "@/shared/utils/roles";
 // ✅ พิกัดหน้างาน — ใช้ตัวช่วยชุดเดียวกับหน้าอื่น (ดูหัวไฟล์ SiteMapLink.js)
 import { mapSearchUrl, googleMapsPinSvg, mapEmbedSrc } from "@/shared/ui/SiteMapLink";
 import { faHourglassHalf, faCheck, faClockRotateLeft, faCheckDouble } from "@fortawesome/free-solid-svg-icons";
+import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import {
   colorPickerHtml,
   mountColorPicker,
@@ -875,6 +876,89 @@ function injectStyles() {
     .ee-hm-value { font-size: 13.5px; font-weight: 700; color: #0f172a; line-height: 1.35; overflow-wrap: anywhere; }
     .ee-hm-value small { font-weight: 500; color: #94a3b8; font-size: 11px; }
     .ee-hm-value--empty { color: #94a3b8; font-weight: 600; }
+    .ee-hm-value--edit { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    #ee-respSelect {
+      appearance: none; -webkit-appearance: none; min-width: 0; max-width: 100%; flex: 0 1 auto;
+      height: 30px; padding: 0 28px 0 10px; border-radius: 8px; border: 1px solid #cbd5e1; cursor: pointer;
+      font: inherit; font-size: 13px; font-weight: 700; color: #0f172a; text-overflow: ellipsis;
+      background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 8px center / 14px;
+    }
+    #ee-respSelect:hover { border-color: #2563eb; }
+    #ee-respSelect:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+    /* ── เมนูเลือก (enhanceSelect) ── */
+    .ee-pick-btn {
+      display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; cursor: pointer; text-align: left;
+      height: 34px; padding: 0 10px 0 5px; border-radius: 9px; border: 1px solid #cbd5e1; background: #fff;
+      font: inherit; font-size: 13px; font-weight: 700; color: #0f172a; transition: border-color .15s, box-shadow .15s;
+    }
+    .ee-pick-btn:hover:not(:disabled) { border-color: #2563eb; }
+    .ee-pick-btn:focus { outline: none; }
+    .ee-pick-btn:focus-visible, .ee-pick-btn[aria-expanded="true"] { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+    .ee-pick-btn:disabled { cursor: not-allowed; opacity: .7; }
+    .ee-pick-cur { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; overflow: hidden; }
+    .ee-pick-caret { flex-shrink: 0; color: #64748b; transition: transform .15s; }
+    .ee-pick-btn[aria-expanded="true"] .ee-pick-caret { transform: rotate(180deg); }
+    .ee-pick-btn--status { height: 36px; border-radius: 10px; background: var(--ee-status-soft, #fff); border-color: var(--ee-status-line, #cbd5e1); }
+    .ee-pick-btn--person { width: auto; max-width: 100%; }
+    .ee-pick-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ee-pick-text--muted { color: #94a3b8; font-weight: 600; }
+    .ee-pick-ico { width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; }
+    .ee-pick-ico svg { width: 14px; height: 14px; }
+    .ee-av { flex-shrink: 0; border-radius: 50%; object-fit: cover; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; line-height: 1; box-sizing: border-box; }
+    .ee-av--empty { background: #fff; color: #94a3b8; border: 1.5px dashed #cbd5e1; }
+    .ee-av-wrap { position: relative; flex-shrink: 0; display: inline-flex; }
+    .ee-av-wrap .ee-av--img { position: absolute; inset: 0; background: #fff; }
+    .ee-pick-layer { position: absolute; inset: 0; z-index: 60; }
+    .ee-pick-backdrop { position: absolute; inset: 0; }
+    .ee-pick-menu {
+      position: absolute; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden;
+      box-shadow: 0 16px 40px rgba(15,23,42,.18); display: flex; flex-direction: column; max-height: 380px; text-align: left;
+      animation: ee-pick-in .12s ease-out;
+    }
+    @keyframes ee-pick-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+    .ee-pick-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 4px; }
+    .ee-pick-head b { font-size: 12.5px; font-weight: 800; color: #64748b; }
+    .ee-pick-x { width: 32px; height: 32px; border-radius: 9px; border: 1px solid #e2e8f0; background: #f8fafc; color: #475569; cursor: pointer; }
+    .ee-pick-search { padding: 6px 12px 4px; }
+    .ee-pick-search input {
+      width: 100%; box-sizing: border-box; height: 38px; padding: 0 12px; border-radius: 10px; border: 1px solid #cbd5e1;
+      font: inherit; font-size: 14px; background: #fff;
+    }
+    .ee-pick-search input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+    .ee-pick-list { overflow-y: auto; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+    .ee-pick-item {
+      display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; cursor: pointer;
+      padding: 7px 10px; border: 0; border-radius: 10px; background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: #0f172a;
+    }
+    .ee-pick-item:hover { background: #f8fafc; }
+    .ee-pick-item.is-on { background: #eff6ff; font-weight: 800; }
+    .ee-pick-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; }
+    .ee-pick-tick { flex-shrink: 0; color: #2563eb; visibility: hidden; }
+    .ee-pick-item.is-on .ee-pick-tick { visibility: visible; }
+    .ee-pick-none { padding: 14px; text-align: center; font-size: 13px; color: #94a3b8; }
+    .ee-pick-clear {
+      border: 0; border-top: 1px solid #eef2f7; background: #fff; text-align: left; cursor: pointer;
+      padding: 12px 16px; font: inherit; font-size: 13.5px; font-weight: 700; color: #b45309;
+    }
+    .ee-pick-clear:hover { background: #fffbeb; }
+    .ee-pick-menu .ee-pick-item .ee-av, .ee-pick-menu .ee-pick-item .ee-av-wrap { width: 30px !important; height: 30px !important; font-size: 12.5px !important; }
+    .ee-pick-menu .ee-pick-item .ee-pick-ico { width: 30px; height: 30px; }
+    /* มือถือ: แผ่นเลื่อนจากล่าง */
+    .ee-pick-layer--sheet { position: fixed; z-index: 100001; }
+    .ee-pick-layer--sheet .ee-pick-backdrop { background: rgba(15,23,42,.35); }
+    .ee-pick-layer--sheet .ee-pick-menu {
+      left: 0; right: 0; bottom: 0; top: auto; width: auto; max-height: 75dvh; border-radius: 18px 18px 0 0;
+      padding-bottom: env(safe-area-inset-bottom); animation: ee-pick-up .18s ease-out;
+    }
+    @keyframes ee-pick-up { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
+    .ee-pick-layer--sheet .ee-pick-head { padding: 14px 14px 6px 18px; }
+    .ee-pick-layer--sheet .ee-pick-head b { font-size: 15px; color: #0f172a; }
+    .ee-pick-layer--sheet .ee-pick-list { padding: 6px 10px 10px; }
+    .ee-pick-layer--sheet .ee-pick-item { padding: 10px 12px; font-size: 15px; }
+    .ee-pick-layer--sheet .ee-pick-item .ee-av, .ee-pick-layer--sheet .ee-pick-item .ee-av-wrap { width: 34px !important; height: 34px !important; font-size: 14px !important; }
+    .ee-pick-layer--sheet .ee-pick-item .ee-pick-ico { width: 34px; height: 34px; }
+    #ee-respMsg { font-style: normal; font-size: 11px; font-weight: 700; white-space: nowrap; color: #94a3b8; }
+    #ee-respMsg.ok { color: #16a34a; } #ee-respMsg.err { color: #dc2626; white-space: normal; }
     .swal-edit-event #ee-status-title .ee-tag {
       background: #f8fafc; border: 1px solid #e2e8f0; color: #334155; font-size: 11.5px; padding: 2px 9px;
     }
@@ -898,7 +982,9 @@ function injectStyles() {
     }
     #ee-head-status > label { font-size: 12px; font-weight: 700; color: #64748b; white-space: nowrap; }
     .swal-edit-event #ee-status-select-wrap { position: relative; flex: 0 1 240px; min-width: 0; }
-    .swal-edit-event #ee-status-select-wrap::before { display: none; }
+    .swal-edit-event #ee-status-select-wrap::before, .swal-edit-event #ee-status-select-wrap::after { display: none !important; }
+    /* ไอคอนสถานะอยู่ในปุ่มเลือกแล้ว — ซ่อนกล่องไอคอนแยก (id คงไว้ให้โค้ดเปลี่ยนสถานะ) */
+    .swal-edit-event #ee-head-status #ee-status-icon { display: none !important; }
     .swal-edit-event #ee-status-select-wrap::before {
       content: ""; position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
       width: 9px; height: 9px; border-radius: 50%; background: var(--ee-status, #64748b); pointer-events: none;
@@ -946,8 +1032,16 @@ function injectStyles() {
       }
       .ee-hm-item { flex-direction: row; align-items: baseline; gap: 10px; border: 0; border-radius: 0; background: transparent; padding: 7px 12px; }
       .ee-hm-item + .ee-hm-item { border-top: 1px solid #eef2f7; }
-      .ee-hm-item { align-items: center; padding: 9px 12px; }
-      .ee-hm-label { flex: 0 0 138px; font-size: 12.5px; }
+      /* ✅ กระชับ (ผู้ใช้: "เล็กและกระชับกว่านี้ ยังกินพื้นที่เยอะ") */
+      .ee-hm-item { align-items: center; padding: 5px 10px; min-height: 34px; }
+      .ee-hm-label { flex: 0 0 122px; font-size: 12px; gap: 5px; }
+      .ee-hm-label i { font-size: 13px; width: 16px; }
+      .ee-hm-value { font-size: 13px; }
+      .swal-edit-event #ee-status-header { row-gap: 8px; }
+      .swal-edit-event #ee-head-status #ee-status-icon { width: 34px; height: 34px; border-radius: 9px; }
+      .swal-edit-event #ee-status-select-wrap select { height: 34px; font-size: 13px; border-radius: 9px; }
+      .swal-edit-event #ee-head-status { padding-top: 8px; }
+      #ee-head-toggle, .swal-edit-event #ee-close-btn, .swal-edit-event #ee-copy-btn { width: 32px; height: 32px; }
       .ee-hm-value { flex: 1; min-width: 0; font-size: 13.5px; }
       .swal-edit-event #ee-body { padding: 12px 12px 14px; }
       .ee-map-bar { flex-wrap: wrap; }
@@ -1061,6 +1155,110 @@ function injectAttachStyles() {
 const faSvg = (def, size = 17) => {
   const [w, h, , , path] = def.icon;
   return `<svg viewBox="0 0 ${w} ${h}" width="${size}" height="${size}" aria-hidden="true"><path fill="currentColor" d="${Array.isArray(path) ? path.join(" ") : path}"/></svg>`;
+};
+
+
+/**
+ * ✅ ตัวเลือกแบบเมนูสวยๆ แทน <select> ดั้งเดิม (ผู้ใช้สั่ง 3 ต.ค. 2569: "UI การเลือกดูเก่ามาก ปรับให้สวยงาม")
+ *    หน้าตาเดียวกับเมนู "มอบหมายผู้รับผิดชอบ" ในหน้าการดำเนินงาน (AssignResponsibleMenu)
+ *    — <select> ตัวจริงยังอยู่ (ซ่อนไว้) เป็นที่เก็บค่า · เลือกแล้วยิง "change" ให้โค้ดเดิมทำงานต่อได้ทันที
+ *    จอใหญ่ = เมนูลอยใต้ปุ่ม · มือถือ = แผ่นเลื่อนจากล่าง
+ * @param {HTMLSelectElement} sel
+ * @param {{ host: HTMLElement, title: string, renderItem: Function, btnClass?: string,
+ *           search?: boolean, clearLabel?: string }} cfg  clearLabel = ซ่อนตัวเลือกค่าว่างจากรายการ แล้วทำเป็นปุ่มล้างท้ายเมนู
+ */
+function enhanceSelect(sel, { host, title, renderItem, btnClass = "", search = false, clearLabel = "" }) {
+  if (!sel || sel.dataset.enhanced) return null;
+  sel.dataset.enhanced = "1";
+  const options = () => Array.from(sel.options).map((o) => ({ value: o.value, label: o.textContent }));
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = `ee-pick-btn ${btnClass}`;
+  btn.setAttribute("aria-haspopup", "listbox");
+  btn.setAttribute("aria-expanded", "false");
+  sel.after(btn);
+  sel.style.display = "none";
+  const caret = '<svg class="ee-pick-caret" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const tick = '<svg class="ee-pick-tick" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const paint = () => {
+    const cur = options().find((o) => o.value === sel.value) || options()[0];
+    btn.innerHTML = `<span class="ee-pick-cur">${cur ? renderItem(cur) : ""}</span>${caret}`;
+    btn.disabled = sel.disabled;
+    if (sel.title) btn.title = sel.title;
+  };
+  paint();
+  sel.addEventListener("change", paint);
+
+  let layer = null;
+  const close = () => { layer?.remove(); layer = null; btn.setAttribute("aria-expanded", "false"); };
+  const pick = (value) => {
+    close();
+    if (value !== sel.value) { sel.value = value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+  };
+  const open = () => {
+    if (sel.disabled) return;
+    close();
+    const mobile = window.matchMedia("(max-width: 600px)").matches;
+    const opts = options().filter((o) => !(clearLabel && o.value === ""));
+    layer = document.createElement("div");
+    layer.className = `ee-pick-layer${mobile ? " ee-pick-layer--sheet" : ""}`;
+    layer.innerHTML = `
+      <div class="ee-pick-backdrop"></div>
+      <div class="ee-pick-menu" role="listbox" aria-label="${escapeHtml(title)}">
+        <div class="ee-pick-head"><b>${escapeHtml(title)}</b>${mobile ? '<button type="button" class="ee-pick-x" aria-label="ปิด">✕</button>' : ""}</div>
+        ${search ? '<div class="ee-pick-search"><input type="search" placeholder="ค้นหาชื่อ" aria-label="ค้นหาชื่อ"></div>' : ""}
+        <div class="ee-pick-list">
+          ${opts.map((o, i) => `<button type="button" role="option" class="ee-pick-item${o.value === sel.value ? " is-on" : ""}" data-i="${i}" aria-selected="${o.value === sel.value}">
+            <span class="ee-pick-main">${renderItem(o)}</span>${tick}
+          </button>`).join("")}
+          <div class="ee-pick-none" hidden>ไม่พบชื่อที่ค้นหา</div>
+        </div>
+        ${clearLabel && sel.value ? `<button type="button" class="ee-pick-clear">${escapeHtml(clearLabel)}</button>` : ""}
+      </div>`;
+    host.appendChild(layer);
+    btn.setAttribute("aria-expanded", "true");
+    const menu = layer.querySelector(".ee-pick-menu");
+    if (!mobile) {
+      const r = btn.getBoundingClientRect();
+      const hr = host.getBoundingClientRect();
+      const w = Math.max(r.width, 260);
+      const left = Math.min(r.left - hr.left, hr.width - w - 8);
+      menu.style.left = `${Math.max(8, left)}px`;
+      menu.style.top = `${r.bottom - hr.top + 6}px`;
+      menu.style.width = `${w}px`;
+    }
+    layer.querySelector(".ee-pick-backdrop").addEventListener("click", close);
+    layer.querySelector(".ee-pick-x")?.addEventListener("click", close);
+    layer.querySelector(".ee-pick-clear")?.addEventListener("click", () => pick(""));
+    layer.querySelectorAll(".ee-pick-item").forEach((b) => b.addEventListener("click", () => pick(opts[Number(b.dataset.i)].value)));
+    const q = layer.querySelector(".ee-pick-search input");
+    q?.addEventListener("input", () => {
+      const t = q.value.trim().toLowerCase();
+      let shown = 0;
+      layer.querySelectorAll(".ee-pick-item").forEach((b) => {
+        const ok = !t || opts[Number(b.dataset.i)].label.toLowerCase().includes(t);
+        b.style.display = ok ? "" : "none";
+        if (ok) shown += 1;
+      });
+      layer.querySelector(".ee-pick-none").hidden = shown > 0;
+    });
+    if (q && !mobile) q.focus();
+    layer.querySelector(".ee-pick-item.is-on")?.scrollIntoView({ block: "nearest" });
+  };
+  btn.addEventListener("click", () => (layer ? close() : open()));
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && layer) { e.stopPropagation(); close(); } }, true);
+  return { close, paint };
+}
+
+/** รูปพนักงาน — แบบเดียวกับ PersonChip ในหน้าอื่น (รูปจริงก่อน ไม่มีค่อยใช้ตัวอักษรย่อบนสีประจำตัว) */
+const personAvatarHtml = (name, imageUrl, size = 26) => {
+  const box = `width:${size}px;height:${size}px;font-size:${Math.round(size * 0.42)}px`;
+  if (!name) return `<span class="ee-av ee-av--empty" style="${box}">?</span>`;
+  const letter = `<span class="ee-av" style="${box};background:${personColor(name)}">${escapeHtml(personInitial(name))}</span>`;
+  // ⚠️ รูปโหลดไม่ได้ (ลิงก์เสีย) → ซ่อนรูป ให้ตัวอักษรย่อที่วางซ้อนอยู่ด้านหลังโผล่ขึ้นมาแทน
+  return imageUrl
+    ? `<span class="ee-av-wrap" style="${box}">${letter}<img class="ee-av ee-av--img" src="${escapeHtml(imageUrl)}" alt="" style="${box}" onerror="this.remove()"></span>`
+    : letter;
 };
 
 const STATUS_CONFIG = {
@@ -1493,6 +1691,18 @@ export const getEditEvent = async ({
     .map((e) => optionHtml(e.fname, eventTeam === e.fname))
     .join("");
 
+  // ✅ มอบหมายผู้รับผิดชอบจากหัวกล่องนี้ได้เลย (ผู้ใช้สั่ง 3 ต.ค. 2569) — สิทธิ์ชุดเดียวกับหน้าการดำเนินงาน
+  //    (editContracts) และบันทึกผ่าน /events/basic-info ตัวเดียวกับหน้าภาพรวมงาน/การดำเนินงาน — server
+  //    ตั้งค่าให้ทุกวัน/ทุกครั้งของงานเดียวกัน (services/groupResponsible.js) ทุกหน้าจึงเห็นชื่อเดียวกัน
+  const canAssignResponsible = !readOnly && can(userData, "editContracts");
+  const responsibleOpts = canAssignResponsible
+    ? [
+        `<option value=""${overviewResponsibleOf(ev, events).name ? "" : " selected"}>— ยังไม่ได้มอบหมาย —</option>`,
+        ...[...employeeList].filter((e) => e.fname).sort((a, b) => a.fname.localeCompare(b.fname, "th"))
+          .map((e) => optionHtml(e.fname, overviewResponsibleOf(ev, events).name === e.fname)),
+      ].join("")
+    : "";
+
   // ✅ เดิมช่อง select ทุกช่อง (บริษัท/โครงการ/ประเภทงาน/ระบบ/ครั้งที่/ทีม) ใช้ placeholder option
   // (value="") ที่ทั้ง "selected" ทั้งใส่ค่าจริงเป็น "—" กันไว้ตอนไม่มีค่า — พอมี TomSelect
   // plugin "remove_button" (ดู mkTs ด้านล่าง) ทำให้ตัว placeholder นี้ถูกเรนเดอร์เป็น chip
@@ -1582,9 +1792,11 @@ export const getEditEvent = async ({
       ${/* ⚠️ ผู้รับผิดชอบอยู่บนสุด (ผู้ใช้สั่ง) — ไอคอนอยู่หน้าป้าย ชื่ออยู่ขวาไม่มีอีโมจิปน อ่านง่ายกว่า */""}
       <div class="ee-hm-item"${headerResponsibleIsInferred ? ' title="งานนี้ยังไม่ได้ระบุผู้รับผิดชอบไว้ชัดเจน — แสดงตามทีมที่เข้างานแทน"' : !headerResponsibleName ? ` title="${isOverviewManagedJob ? "มอบหมายผู้รับผิดชอบได้ที่หน้าภาพรวมงาน" : "ยังไม่มีใครรับผิดชอบงานนี้"}"` : ""}>
         <span class="ee-hm-label"><i aria-hidden="true">🧑‍💼</i>ผู้รับผิดชอบ</span>
-        <span class="ee-hm-value${headerResponsibleName ? "" : " ee-hm-value--empty"}">${headerResponsibleName
+        ${canAssignResponsible
+          ? `<span class="ee-hm-value ee-hm-value--edit"><select id="ee-respSelect" aria-label="ผู้รับผิดชอบงาน">${responsibleOpts}</select><em id="ee-respMsg" aria-live="polite"></em></span>`
+          : `<span class="ee-hm-value${headerResponsibleName ? "" : " ee-hm-value--empty"}">${headerResponsibleName
           ? `${attrHtml(headerResponsibleName)}${headerResponsibleIsInferred ? ' <small>(ตามทีมที่เข้างาน)</small>' : ""}`
-          : "ยังไม่ได้มอบหมาย"}</span>
+          : "ยังไม่ได้มอบหมาย"}</span>`}
       </div>
       <div class="ee-hm-item">
         <span class="ee-hm-label"><i aria-hidden="true">👷</i>หัวหน้าทีมเข้างาน</span>
@@ -2368,6 +2580,54 @@ export const getEditEvent = async ({
         const mini = document.getElementById("ee-head-mini");
         if (mini) mini.innerHTML = `${cfg.icon}<span id="ee-head-mini-text">${escapeHtml(e.target.value)}</span>`;
       });
+
+      /* ✅ เปลี่ยน <select> สถานะ/ผู้รับผิดชอบ เป็นเมนูสวยๆ (ซ่อน select จริงไว้เก็บค่า) */
+      {
+        const host = document.querySelector(".swal-edit-event") || document.body;
+        enhanceSelect(document.getElementById("editStatus"), {
+          host, title: "เลือกสถานะงาน", btnClass: "ee-pick-btn--status",
+          renderItem: (o) => {
+            const c = STATUS_CONFIG[o.value];
+            return `<span class="ee-pick-ico" style="color:${c?.color || "#64748b"};background:${c?.soft || "#f1f5f9"}">${c?.icon || ""}</span><span class="ee-pick-text">${escapeHtml(o.label)}</span>`;
+          },
+        });
+        const imgByName = new Map(employeeList.map((e) => [e.fname, e.imageUrl || ""]));
+        enhanceSelect(document.getElementById("ee-respSelect"), {
+          host, title: "มอบหมายผู้รับผิดชอบ", btnClass: "ee-pick-btn--person", search: true, clearLabel: "ยกเลิกการมอบหมาย",
+          renderItem: (o) => (o.value
+            ? `${personAvatarHtml(o.value, imgByName.get(o.value))}<span class="ee-pick-text">${escapeHtml(o.label)}</span>`
+            : `${personAvatarHtml("", "")}<span class="ee-pick-text ee-pick-text--muted">ยังไม่ได้มอบหมาย</span>`),
+        });
+      }
+
+      /* ✅ มอบหมายผู้รับผิดชอบจากหัวกล่อง — บันทึกทันทีที่เลือก (ไม่ต้องรอกดบันทึกทั้งฟอร์ม) */
+      {
+        const respSel = document.getElementById("ee-respSelect");
+        const respMsg = document.getElementById("ee-respMsg");
+        let prev = respSel?.value || "";
+        respSel?.addEventListener("change", async () => {
+          const name = respSel.value;
+          const person = employeeList.find((e) => e.fname === name);
+          respSel.disabled = true;
+          respSel.nextElementSibling?.setAttribute("disabled", "");
+          if (respMsg) { respMsg.textContent = "กำลังบันทึก..."; respMsg.className = ""; }
+          try {
+            await EventService.UpdateBasicInfo([eventId], { responsiblePerson: name, responsiblePersonId: person?._id ? String(person._id) : "" });
+            prev = name;
+            // อัปเดตการ์ดในปฏิทินทันที (ค่าที่เหลือของทั้งกลุ่มมาตามรอบเรียลไทม์)
+            try { ev.setExtendedProp?.("responsiblePerson", name); ev.setExtendedProp?.("responsiblePersonId", person?._id ? String(person._id) : ""); } catch { /* ไม่สำคัญ */ }
+            if (respMsg) { respMsg.textContent = "✓ บันทึกแล้ว"; respMsg.className = "ok"; }
+          } catch (err) {
+            respSel.value = prev;
+            respSel.dispatchEvent(new Event("change"));
+            if (respMsg) { respMsg.textContent = err?.response?.data?.message || "บันทึกไม่สำเร็จ"; respMsg.className = "err"; }
+          } finally {
+            respSel.disabled = false;
+            respSel.nextElementSibling?.removeAttribute("disabled");
+            setTimeout(() => { if (respMsg?.className === "ok") respMsg.textContent = ""; }, 2500);
+          }
+        });
+      }
 
       /* ✅ หัวกล่องพับได้ — ย่ออัตโนมัติเมื่อเลื่อนฟอร์มลง กางเมื่อกลับบนสุด หรือกดปุ่ม ▴/▾ เอง
          ⚠️ มีช่วงกันกระพริบ (ย่อที่ >48px กางที่ <4px) — หัวกล่องอยู่นอกกล่องเลื่อน ความสูงที่เปลี่ยนไม่ดัน scrollTop
