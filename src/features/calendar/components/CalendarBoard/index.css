@@ -749,16 +749,21 @@
 .calendar-wrapper.ec-booting .fc-view-harness {
   visibility: hidden;
 }
+/* ✅ วงแหวนหมุน + ข้อความ — ชุดเดียวกับ PageLoader (shared/ui/PageLoader.css) แทนข้อความเทาลอยๆ */
+.calendar-wrapper.ec-booting::before {
+  content: "";
+  position: absolute; left: 50%; top: 34%;
+  width: 40px; height: 40px; margin-left: -20px; border-radius: 50%; box-sizing: border-box;
+  border: 4px solid #e2e8f0; border-top-color: #2563eb; border-right-color: #2563eb;
+  animation: ec-boot-spin .8s cubic-bezier(.55,.15,.45,.85) infinite; z-index: 2;
+}
 .calendar-wrapper.ec-booting::after {
   content: "กำลังโหลดแผนงาน…";
-  position: absolute;
-  left: 50%;
-  top: 38%;
-  transform: translateX(-50%);
-  font-size: 13px;
-  font-weight: 700;
-  color: #94a3b8;
+  position: absolute; left: 50%; top: calc(34% + 54px);
+  transform: translateX(-50%); white-space: nowrap;
+  font-size: 13.5px; font-weight: 700; color: #64748b; z-index: 2;
 }
+@keyframes ec-boot-spin { to { transform: rotate(360deg); } }
 
 .fc .fc-today-button {
   background-color: rgba(220, 38, 38, 0.08);

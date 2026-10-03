@@ -1,34 +1,9 @@
-import { useState, useEffect } from "react";
+/**
+ * Loader — หน้าโหลดตอนเปิดแอป (Suspense ชั้นนอกสุดใน src/index.js)
+ * ✅ เดิมเป็น div ว่าง (โค้ดจำลองโหลด 3 วินาทีที่ถูกคอมเมนต์ทิ้ง) ผู้ใช้เห็นจอขาวเปล่า — ใช้ PageLoader กลางแทน
+ */
+import PageLoader from "@/shared/ui/PageLoader";
 
-const Loader = () => {
-  const [, setLoading] = useState(true); // เริ่มต้นโหลดเมื่อโหลดหน้าใหม่ (JSX ที่อ่านค่านี้ถูกคอมเมนต์ไว้)
-
-  // useEffect สำหรับจัดการการโหลดเมื่อโหลดหน้าใหม่
-  useEffect(() => {
-    // ฟังก์ชันสำหรับจำลองการโหลดข้อมูล
-    const simulateLoading = () => {
-      // จำลองการโหลดข้อมูลในระยะเวลา 3 วินาที (ใช้ setTimeout)
-      setTimeout(() => {
-        setLoading(false); // เมื่อโหลดเสร็จสมบูรณ์
-      }, 3000); // จำลองเวลาโหลด 3 วินาที
-    };
-
-    // เรียกใช้ฟังก์ชันจำลองการโหลดข้อมูล
-    simulateLoading();
-
-    // อย่าลืมกำหนด dependency array ว่าง [] เพื่อให้ useEffect ทำงานเพียงครั้งเดียวเมื่อโหลดหน้าใหม่
-  }, []); // ใช้ dependency array ว่าง [] เพื่อให้ useEffect ทำงานเพียงครั้งเดียวเมื่อโหลดหน้าใหม่
-
-  return (
-    <div>
-      {/* แสดง Loader เมื่อ loading เป็น true */}
-      {/* {loading && (
-        <div className="loading-overlay">
-          <ThreeDots type="ThreeDots" color="#007bff" height={50} width={50} />
-        </div>
-      )} */}
-    </div>
-  );
-};
+const Loader = () => <PageLoader variant="fullscreen" label="กำลังเปิดระบบ…" />;
 
 export default Loader;

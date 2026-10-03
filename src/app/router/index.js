@@ -1,4 +1,5 @@
 import { lazy, Suspense } from "react";
+import PageLoader from "@/shared/ui/PageLoader";
 import { Navigate, createBrowserRouter, useLocation } from "react-router-dom";
 
 /**
@@ -103,7 +104,7 @@ const ThemeRoutes = [
     element: (
       <CheckConnectionToast>
         <PrivateRoute>
-          <Suspense fallback={<div>Loading Layout...</div>}>
+          <Suspense fallback={<PageLoader />}>
             <FullLayout />
           </Suspense>
         </PrivateRoute>
@@ -114,7 +115,7 @@ const ThemeRoutes = [
       {
         path: "dashboard",
         element: (
-          <Suspense fallback={<div>Loading Dashboard...</div>}>
+          <Suspense fallback={<PageLoader />}>
             <Dashboard />
           </Suspense>
         ),
@@ -123,7 +124,7 @@ const ThemeRoutes = [
       {
         path: "about",
         element: (
-          <Suspense fallback={<div>Loading Settings...</div>}>
+          <Suspense fallback={<PageLoader />}>
             <About />
           </Suspense>
         ),
@@ -132,7 +133,7 @@ const ThemeRoutes = [
       {
         path: "account",
         element: (
-          <Suspense fallback={<div>Loading Account...</div>}>
+          <Suspense fallback={<PageLoader />}>
             <Account />
           </Suspense>
         ),
@@ -144,7 +145,7 @@ const ThemeRoutes = [
       {
         path: "customers",
         element: (
-          <Suspense fallback={<div>Loading...</div>}>
+          <Suspense fallback={<PageLoader />}>
             <CustomerHub />
           </Suspense>
         ),
@@ -153,7 +154,7 @@ const ThemeRoutes = [
       {
         path: "staff",
         element: (
-          <Suspense fallback={<div>Loading...</div>}>
+          <Suspense fallback={<PageLoader />}>
             <StaffHub />
           </Suspense>
         ),
@@ -162,7 +163,7 @@ const ThemeRoutes = [
       {
         path: "documents",
         element: (
-          <Suspense fallback={<div>Loading...</div>}>
+          <Suspense fallback={<PageLoader />}>
             <DocumentsHub />
           </Suspense>
         ),
@@ -171,7 +172,7 @@ const ThemeRoutes = [
       {
         path: "finance",
         element: (
-          <Suspense fallback={<div>Loading...</div>}>
+          <Suspense fallback={<PageLoader />}>
             <FinanceHub />
           </Suspense>
         ),
@@ -188,7 +189,7 @@ const ThemeRoutes = [
         element: (
           // ตั้งค่าองค์กร = งานระดับระบบ — Role: Super Admin เท่านั้น (ตรงกับ requireCap ที่ server)
           <AdminRoute cap="manageSystem" fallback="/about">
-            <Suspense fallback={<div>Loading...</div>}>
+            <Suspense fallback={<PageLoader />}>
               <OrganizationSettings />
             </Suspense>
           </AdminRoute>
@@ -199,7 +200,7 @@ const ThemeRoutes = [
         path: "settings/permissions",
         element: (
           <AdminRoute cap="manageSystem" fallback="/about">
-            <Suspense fallback={<div>Loading...</div>}>
+            <Suspense fallback={<PageLoader />}>
               <RolePermissions />
             </Suspense>
           </AdminRoute>
@@ -211,7 +212,7 @@ const ThemeRoutes = [
         element: (
           // ประเภทงาน/ระบบ = ข้อมูลหลัก — คุมด้วยช่อง manageMasterData ในตารางสิทธิ์
           <AdminRoute cap="manageMasterData">
-            <Suspense fallback={<div>Loading...</div>}>
+            <Suspense fallback={<PageLoader />}>
               <WorkTypeSystem />
             </Suspense>
           </AdminRoute>
@@ -253,7 +254,7 @@ const ThemeRoutes = [
         // ตัวคอมโพเนนต์เองเช็ค role แล้ว redirect กลับ /dashboard ถ้าไม่ใช่ admin/manager
         path: "contracts",
         element: (
-          <Suspense fallback={<div>Loading...</div>}>
+          <Suspense fallback={<PageLoader />}>
             <ContractOverview />
           </Suspense>
         ),
@@ -270,7 +271,7 @@ const ThemeRoutes = [
         path: "website/leads",
         element: (
           <AdminRoute cap="viewLeads">
-            <Suspense fallback={<div>กำลังโหลด…</div>}>
+            <Suspense fallback={<PageLoader />}>
               <WebsiteLeads />
             </Suspense>
           </AdminRoute>
@@ -282,7 +283,7 @@ const ThemeRoutes = [
         path: "website/products",
         element: (
           <AdminRoute cap="manageWebsite">
-            <Suspense fallback={<div>กำลังโหลด…</div>}>
+            <Suspense fallback={<PageLoader />}>
               <WebsiteProducts />
             </Suspense>
           </AdminRoute>
@@ -294,7 +295,7 @@ const ThemeRoutes = [
         path: "website/projects",
         element: (
           <AdminRoute cap="manageWebsite">
-            <Suspense fallback={<div>กำลังโหลด…</div>}>
+            <Suspense fallback={<PageLoader />}>
               <WebsiteProjects />
             </Suspense>
           </AdminRoute>
@@ -306,7 +307,7 @@ const ThemeRoutes = [
         path: "website/articles",
         element: (
           <AdminRoute cap="manageWebsite">
-            <Suspense fallback={<div>กำลังโหลด…</div>}>
+            <Suspense fallback={<PageLoader />}>
               <WebsiteArticles />
             </Suspense>
           </AdminRoute>
@@ -318,7 +319,7 @@ const ThemeRoutes = [
         path: "website/settings",
         element: (
           <AdminRoute cap="manageWebsite">
-            <Suspense fallback={<div>กำลังโหลด…</div>}>
+            <Suspense fallback={<PageLoader />}>
               <WebsiteSettings />
             </Suspense>
           </AdminRoute>
@@ -329,7 +330,7 @@ const ThemeRoutes = [
         path: "product",
         element: (
           <AdminRoute cap="manageMasterData">
-            <Suspense fallback={<div>Loading Product...</div>}>
+            <Suspense fallback={<PageLoader />}>
               <Product />
             </Suspense>
           </AdminRoute>
@@ -340,7 +341,7 @@ const ThemeRoutes = [
         path: "product/stock",
         element: (
           <AdminRoute cap="manageMasterData">
-            <Suspense fallback={<div>Loading Stock Product...</div>}>
+            <Suspense fallback={<PageLoader />}>
               <StockProduct />
             </Suspense>
           </AdminRoute>
@@ -351,7 +352,7 @@ const ThemeRoutes = [
         path: "fileupload",
         element: (
 
-            <Suspense fallback={<div>Loading File Upload...</div>}>
+            <Suspense fallback={<PageLoader />}>
               <FileUpload />
             </Suspense>
 
@@ -367,7 +368,7 @@ const ThemeRoutes = [
       {
         path: "event",
         element: (
-          <Suspense fallback={<div>Loading Event Calendar...</div>}>
+          <Suspense fallback={<PageLoader />}>
             <EventCalendar />
           </Suspense>
         ),
@@ -381,7 +382,7 @@ const ThemeRoutes = [
   // ของ component ไว้ได้ระหว่างเปลี่ยนแค่ :id param
   path: "jobs/report",
   element: (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<PageLoader />}>
       <JobReport />
     </Suspense>
   ),
@@ -390,7 +391,7 @@ const ThemeRoutes = [
 {
   path: "operation/:id?",
   element: (
-      <Suspense fallback={<div>Loading Operation...</div>}>
+      <Suspense fallback={<PageLoader />}>
         <Operate />
       </Suspense>
   ),
@@ -400,7 +401,7 @@ const ThemeRoutes = [
       {
         path: "register",
         element: (
-          <Suspense fallback={<div>Loading Register...</div>}>
+          <Suspense fallback={<PageLoader />}>
             <Register />
           </Suspense>
         ),
@@ -411,7 +412,7 @@ const ThemeRoutes = [
       {
         path: "technician/jobs",
         element: (
-          <Suspense fallback={<div>Loading Jobs...</div>}>
+          <Suspense fallback={<PageLoader />}>
             <MyJobs />
           </Suspense>
         ),
@@ -424,7 +425,7 @@ const ThemeRoutes = [
         // ⚠️ :id? เหมือน /dispatch — ผู้แจ้งกดแจ้งเตือน "ใบถูกตีกลับ/อนุมัติแล้ว" ต้องเปิดใบนั้นได้เลย
         path: "sales/:id?",
         element: (
-          <Suspense fallback={<div>Loading...</div>}>
+          <Suspense fallback={<PageLoader />}>
             <JobRequests />
           </Suspense>
         ),
@@ -436,7 +437,7 @@ const ThemeRoutes = [
         // "No routes matched location" = หน้าว่าง
         path: "dispatch/:id?",
         element: (
-          <Suspense fallback={<div>Loading...</div>}>
+          <Suspense fallback={<PageLoader />}>
             <JobRequestQueue />
           </Suspense>
         ),
@@ -446,7 +447,7 @@ const ThemeRoutes = [
       {
         path: "purchase/report",
         element: (
-          <Suspense fallback={<div>Loading...</div>}>
+          <Suspense fallback={<PageLoader />}>
             <PurchaseReport />
           </Suspense>
         ),
@@ -459,7 +460,7 @@ const ThemeRoutes = [
       ].map(([path, view, title]) => ({
         path,
         element: (
-          <Suspense fallback={<div>Loading...</div>}>
+          <Suspense fallback={<PageLoader />}>
             <PurchasePage view={view} />
           </Suspense>
         ),
@@ -478,7 +479,7 @@ const ThemeRoutes = [
       ].map(([path, view, title]) => ({
         path,
         element: (
-          <Suspense fallback={<div>Loading...</div>}>
+          <Suspense fallback={<PageLoader />}>
             <OtPage view={view} />
           </Suspense>
         ),
@@ -504,7 +505,7 @@ const ThemeRoutes = [
       ].map(([path, view, title]) => ({
         path,
         element: (
-          <Suspense fallback={<div>Loading...</div>}>
+          <Suspense fallback={<PageLoader />}>
             <ExpensesPage view={view} />
           </Suspense>
         ),
@@ -514,7 +515,7 @@ const ThemeRoutes = [
         // แจ้งเตือนทุกตัวของระบบเบิกส่งลิงก์มาเป็น /expenses/<id> — เปิดใบนั้นทันทีบนพื้นหลังของหน้าที่ตรงชนิดใบ
         path: "expenses/:id",
         element: (
-          <Suspense fallback={<div>Loading...</div>}>
+          <Suspense fallback={<PageLoader />}>
             <ExpensesPage view="advance" />
           </Suspense>
         ),
@@ -527,7 +528,7 @@ const ThemeRoutes = [
   {
     path: "/login",
     element: (
-      <Suspense fallback={<div>Loading Login...</div>}>
+      <Suspense fallback={<PageLoader />}>
         <PublicRoute>
           <Login />
         </PublicRoute>
@@ -540,7 +541,7 @@ const ThemeRoutes = [
   //   path: "/login",
   //   element: (
 
-  //     <Suspense fallback={<div>Loading Login...</div>}>
+  //     <Suspense fallback={<PageLoader />}>
   //       <Login />
   //     </Suspense>
   //   ),
@@ -550,7 +551,7 @@ const ThemeRoutes = [
   {
     path: "/noconnection",
     element: (
-      <Suspense fallback={<div>Loading No Connection...</div>}>
+      <Suspense fallback={<PageLoader />}>
         <NoConnection />
       </Suspense>
     ),

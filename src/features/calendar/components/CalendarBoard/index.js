@@ -48,7 +48,7 @@ import AuthService from "@/shared/services/authService";
 
 import moment from "moment";
 
-import { ThreeDots } from "react-loader-spinner";
+import PageLoader from "@/shared/ui/PageLoader";
 
 
 
@@ -4193,11 +4193,8 @@ function EventCalendar() {
         </Suspense>
       )}
 
-      {loading && (
-        <div className="loading-overlay">
-          <ThreeDots type="ThreeDots" color="#007bff" height={50} width={50} />
-        </div>
-      )}
+      {/* ✅ โหลดซ้ำ = แถบบางบนสุด (ข้อมูลเดิมยังเห็นอยู่) · โหลดครั้งแรกใช้วงแหวนกลางปฏิทิน (.ec-booting ใน index.css) */}
+      {loading && firstEventsLoaded && <PageLoader variant="bar" label="กำลังโหลดแผนงาน" />}
     </div>
   );
 }

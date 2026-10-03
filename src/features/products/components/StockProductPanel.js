@@ -14,7 +14,7 @@ import DataTableColumns from "./columns/stockColumns";
 import ExpandedStockProduct from "./ExpandedStockProduct";
 
 import moment from "moment"; // Import moment library for date formatting
-import { ThreeDots } from "react-loader-spinner";
+import PageLoader from "@/shared/ui/PageLoader";
 import { FaFileExcel, FaMinus, FaPlus, FaSave } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import { Search } from "@mui/icons-material";
@@ -459,9 +459,7 @@ const StockProduct = () => {
       />
 
       {loading && (
-        <div className="loading-overlay">
-          <ThreeDots type="ThreeDots" color="#007bff" height={50} width={50} />
-        </div>
+        <PageLoader variant="fullscreen" label="กำลังโหลดข้อมูล…" />
       )}
     </>
   );

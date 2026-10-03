@@ -4,7 +4,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUpload, faFileImport, faTimes } from "@fortawesome/free-solid-svg-icons";
 import FileService from "@/shared/services/FileService";
 import Swal from "sweetalert2";
-import { ThreeDots } from "react-loader-spinner";
+import PageLoader from "@/shared/ui/PageLoader";
 import { getFileIcon, getFileIconColor } from "@/shared/utils/CustomFile";
 import { escapeHtml } from "@/shared/utils/escapeHtml";
 
@@ -330,7 +330,7 @@ const FileUpload = () => {
             </div>
           </div>
           <div className="d-flex justify-content-center mt-3">
-            <ThreeDots color="#0d6efd" height={40} width={40} />
+            <PageLoader variant="inline" small label="กำลังอัปโหลด…" />
           </div>
         </>
       )}

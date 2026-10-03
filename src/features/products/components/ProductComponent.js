@@ -22,7 +22,7 @@ import EditModal from "./EditProductModal";
 import ExpandedProduct from "./ExpandedProduct";
 
 import moment from "moment"; // Import moment library for date formatting
-import { ThreeDots } from "react-loader-spinner";
+import PageLoader from "@/shared/ui/PageLoader";
 import { FaFileExcel } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
@@ -436,9 +436,7 @@ const ProductComponent = () => {
       />
 
       {loading && (
-        <div className="loading-overlay">
-          <ThreeDots type="ThreeDots" color="#007bff" height={50} width={50} />
-        </div>
+        <PageLoader variant="fullscreen" label="กำลังโหลดข้อมูล…" />
       )}
 
       <InsertModal

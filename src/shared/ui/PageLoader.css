@@ -1,0 +1,40 @@
+/* ── PageLoader — หน้ากำลังโหลดชุดเดียวทั้งแอป (ผู้ใช้สั่ง 3 ต.ค. 2569: "แก้ไขหน้าโหลด ให้สวยงาม ทันสมัย ทั้งหมด")
+   ✅ วงแหวนหมุน (น้ำเงินหลักของแอป) + ข้อความเทา · โผล่หลัง 150ms กันกระพริบตอนโหลดเร็ว ── */
+.pl-root {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  width: 100%; min-height: 50vh; padding: 32px 16px; box-sizing: border-box;
+  opacity: 0; animation: pl-fade .25s ease-out .15s forwards;
+}
+.pl-root--fullscreen { position: fixed; inset: 0; min-height: 100dvh; background: #f8fafc; z-index: 2000; }
+.pl-root--overlay { position: absolute; inset: 0; min-height: 0; background: rgba(248, 250, 252, .72); backdrop-filter: blur(1.5px); z-index: 20; }
+.pl-root--inline { min-height: 160px; }
+
+.pl-ring { position: relative; width: 44px; height: 44px; }
+.pl-ring::before, .pl-ring::after { content: ""; position: absolute; inset: 0; border-radius: 50%; }
+.pl-ring::before { border: 4px solid #e2e8f0; }
+.pl-ring::after {
+  border: 4px solid transparent; border-top-color: #2563eb; border-right-color: #2563eb;
+  animation: pl-spin .8s cubic-bezier(.55,.15,.45,.85) infinite;
+}
+.pl-root--sm .pl-ring { width: 28px; height: 28px; }
+.pl-root--sm .pl-ring::before, .pl-root--sm .pl-ring::after { border-width: 3px; }
+
+.pl-label { font-size: 13.5px; font-weight: 700; color: #64748b; letter-spacing: .01em; text-align: center; }
+.pl-sub { font-size: 12px; color: #94a3b8; margin-top: -8px; text-align: center; }
+.pl-brand { font-size: 22px; font-weight: 900; letter-spacing: -.01em; color: #0f172a; }
+.pl-brand b { color: #dc2626; }
+
+/* แถบบางๆ บนสุดของพื้นที่ — ใช้ตอนโหลดซ้ำทั้งที่มีข้อมูลเดิมแสดงอยู่แล้ว (ไม่บังเนื้อหา) */
+.pl-bar { position: absolute; left: 0; right: 0; top: 0; height: 3px; overflow: hidden; z-index: 20; background: rgba(37,99,235,.12); border-radius: 3px; }
+.pl-bar::after {
+  content: ""; position: absolute; top: 0; bottom: 0; width: 40%; border-radius: 3px;
+  background: linear-gradient(90deg, transparent, #2563eb, transparent); animation: pl-slide 1.1s ease-in-out infinite;
+}
+
+@keyframes pl-spin { to { transform: rotate(360deg); } }
+@keyframes pl-fade { to { opacity: 1; } }
+@keyframes pl-slide { from { left: -40%; } to { left: 100%; } }
+@media (prefers-reduced-motion: reduce) {
+  .pl-ring::after { animation-duration: 2s; }
+  .pl-bar::after { animation: none; left: 30%; }
+}

@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
+import PageLoader from "@/shared/ui/PageLoader";
 import { useNavigate, useLocation } from "react-router-dom";
 import { jwtDecode } from "jwt-decode"; // ✅ ถูกต้อง
 import PushService from "@/shared/services/PushService";
@@ -245,7 +246,7 @@ const updateUserData = (newData) => {
 
   // ✅ ป้องกัน UI Render ก่อนโหลดค่า Token
   if (isLoggedIn === null) {
-    return <div>Loading...</div>;
+    return <PageLoader variant="fullscreen" label="กำลังตรวจสอบการเข้าสู่ระบบ…" />;
   }
 
   return (
