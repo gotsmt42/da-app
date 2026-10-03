@@ -14,6 +14,7 @@ import { formatThai } from "@/shared/utils/thaiDate";
 import { can } from "@/shared/utils/roles";
 // ✅ พิกัดหน้างาน — ใช้ตัวช่วยชุดเดียวกับหน้าอื่น (ดูหัวไฟล์ SiteMapLink.js)
 import { mapSearchUrl, googleMapsPinSvg, mapEmbedSrc } from "@/shared/ui/SiteMapLink";
+import { faHourglassHalf, faCheck, faClockRotateLeft, faCheckDouble } from "@fortawesome/free-solid-svg-icons";
 import {
   colorPickerHtml,
   mountColorPicker,
@@ -837,8 +838,30 @@ function injectStyles() {
     .swal-edit-event #ee-head-status #ee-status-icon {
       display: flex; width: 38px; height: 38px; border-radius: 11px; flex-shrink: 0; font-size: 18px;
       background: var(--ee-status-soft, #f1f5f9); border: 1.5px solid var(--ee-status-line, #e2e8f0);
+      color: var(--ee-status, #64748b); align-items: center; justify-content: center;
     }
     .swal-edit-event #ee-head-status > label { display: none; }
+
+    /* ── หัวกล่องพับได้ (ผู้ใช้สั่ง: "ไม่ต้องล็อกเวลาเลื่อน บังพื้นที่เกินไป หรือให้พับเก็บได้")
+       เลื่อนฟอร์มลง = ย่อเหลือแถวชื่องาน + ป้ายสถานะเล็ก · เลื่อนกลับบนสุด/กดปุ่ม ▾ = กางเต็ม ── */
+    #ee-head-toggle {
+      width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0; cursor: pointer;
+      background: #f1f5f9; border: 1px solid #e2e8f0; color: #475569; font-size: 14px; line-height: 1;
+      display: flex; align-items: center; justify-content: center; transition: transform .2s;
+    }
+    #ee-head-toggle:focus { outline: none; }
+    .ee-head--compact #ee-head-toggle { transform: rotate(180deg); }
+    #ee-head-mini {
+      display: none; align-items: center; gap: 5px; flex-shrink: 0; max-width: 46%;
+      padding: 3px 10px 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 800;
+      color: var(--ee-status, #64748b); background: var(--ee-status-soft, #f1f5f9); border: 1px solid var(--ee-status-line, #e2e8f0);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    #ee-head-mini svg { flex-shrink: 0; }
+    .ee-head--compact #ee-head-meta, .ee-head--compact #ee-head-status { display: none !important; }
+    .ee-head--compact #ee-head-mini { display: inline-flex; }
+    .swal-edit-event .ee-head--compact#ee-status-header { padding-top: 8px; padding-bottom: 8px; }
+    .ee-head--compact #ee-status-title h3 { -webkit-line-clamp: 1; font-size: 14.5px; line-height: 1.6; }
     .swal-edit-event #ee-head-meta {
       flex: 1 1 100%; min-width: 0; display: grid; gap: 8px;
       grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -1034,12 +1057,19 @@ function injectAttachStyles() {
 // ✅ ครบทั้ง 4 สถานะ ให้ตรงกับ OP_LIST/OP_COLOR ของหน้า Operation เสมอ
 // (เดิมมีแค่ 2 สถานะแรก ทำให้งานที่สถานะไปไกลกว่านั้นแล้ว เช่น "กำลังดำเนินการ" หา config ไม่เจอ
 // แล้ว fallback ไปแสดงเป็น "กำลังรอยืนยัน" ผิดๆ ทั้ง header สีและตัวเลือกใน dropdown)
+/** ไอคอน Font Awesome → SVG string (ฟอร์มนี้เป็น HTML string ของ Swal ใช้คอมโพเนนต์ React ไม่ได้) */
+const faSvg = (def, size = 17) => {
+  const [w, h, , , path] = def.icon;
+  return `<svg viewBox="0 0 ${w} ${h}" width="${size}" height="${size}" aria-hidden="true"><path fill="currentColor" d="${Array.isArray(path) ? path.join(" ") : path}"/></svg>`;
+};
+
 const STATUS_CONFIG = {
-  // ✅ หัวกล่องเป็นพื้นขาวแล้ว — สีสถานะเหลือแค่แถบบนบางๆ + พื้นไอคอนอ่อน (color/soft/line) · bg คงไว้ให้ที่อื่นที่อ่านค่า
-  กำลังรอยืนยัน: { bg: "linear-gradient(135deg,#475569,#64748b)", color: "#64748b", soft: "#f1f5f9", line: "#e2e8f0", icon: "⏳" },
-  ยืนยันแล้ว: { bg: "linear-gradient(135deg,#1d4ed8,#2563eb)", color: "#2563eb", soft: "#eff6ff", line: "#bfdbfe", icon: "✅" },
-  กำลังดำเนินการ: { bg: "linear-gradient(135deg,#6d28d9,#8b5cf6)", color: "#7c3aed", soft: "#f5f3ff", line: "#ddd6fe", icon: "🔄" },
-  ดำเนินการเสร็จสิ้น: { bg: "linear-gradient(135deg,#065f46,#10b981)", color: "#16a34a", soft: "#f0fdf4", line: "#bbf7d0", icon: "🎉" },
+  // ✅ ไอคอน + สี ชุดเดียวกับการ์ดงาน/คำอธิบายสถานะในปฏิทิน (CalendarBoard getStatusIcon/statusLegend)
+  //    ผู้ใช้สั่ง 3 ต.ค. 2569 "สถานะ icon ให้เหมือนกับด้านนอก" · bg คงไว้ให้ที่อื่นที่อ่านค่า
+  กำลังรอยืนยัน: { bg: "linear-gradient(135deg,#475569,#64748b)", color: "#888888", soft: "#f4f4f5", line: "#e4e4e7", icon: faSvg(faHourglassHalf) },
+  ยืนยันแล้ว: { bg: "linear-gradient(135deg,#1d4ed8,#2563eb)", color: "#0c49ac", soft: "#eff6ff", line: "#bfdbfe", icon: faSvg(faCheck) },
+  กำลังดำเนินการ: { bg: "linear-gradient(135deg,#6d28d9,#8b5cf6)", color: "#a1b50b", soft: "#f7fbe5", line: "#e3ec9f", icon: faSvg(faClockRotateLeft) },
+  ดำเนินการเสร็จสิ้น: { bg: "linear-gradient(135deg,#065f46,#10b981)", color: "#18b007", soft: "#f0fdf4", line: "#bbf7d0", icon: faSvg(faCheckDouble) },
 };
 
 // ✅ ช่างแก้สถานะเองได้แค่ 2 สถานะแรก (กำลังรอยืนยัน/ยืนยันแล้ว) — สอดคล้องกับหน้า Operation
@@ -1542,6 +1572,8 @@ export const getEditEvent = async ({
     <div id="ee-status-title">
       <h3><span >${attrHtml(eventTitle)} · ${attrHtml(eventSystem)} ${eventTime ? `· ครั้งที่ ${attrHtml(formatRoundLabel(eventTime, eventVisitCount))}` : ""}</span></h3>
     </div>
+    <span id="ee-head-mini" title="สถานะงาน">${cfg0.icon}<span id="ee-head-mini-text">${attrHtml(eventStatus || "กำลังรอยืนยัน")}</span></span>
+    <button id="ee-head-toggle" type="button" title="พับ/กางหัวข้อ" aria-expanded="true"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 15l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     ${canCopyEvent ? `<button id="ee-copy-btn" title="คัดลอกงานนี้">📋</button>` : ""}
     <button id="ee-close-btn" title="ปิด">✕</button>
     ${/* ✅ ข้อมูลคนของงาน — มีป้ายกำกับชัดเจน (ผู้ใช้สั่ง 3 ต.ค. 2569: "อธิบายด้วยว่า หัวหน้าทีม ผู้รับผิดชอบ ให้ชัดเจน
@@ -2333,7 +2365,32 @@ export const getEditEvent = async ({
         headerEl.style.setProperty("--ee-status-soft", cfg.soft);
         headerEl.style.setProperty("--ee-status-line", cfg.line);
         iconEl.innerHTML = cfg.icon;
+        const mini = document.getElementById("ee-head-mini");
+        if (mini) mini.innerHTML = `${cfg.icon}<span id="ee-head-mini-text">${escapeHtml(e.target.value)}</span>`;
       });
+
+      /* ✅ หัวกล่องพับได้ — ย่ออัตโนมัติเมื่อเลื่อนฟอร์มลง กางเมื่อกลับบนสุด หรือกดปุ่ม ▴/▾ เอง
+         ⚠️ มีช่วงกันกระพริบ (ย่อที่ >48px กางที่ <4px) — หัวกล่องอยู่นอกกล่องเลื่อน ความสูงที่เปลี่ยนไม่ดัน scrollTop
+            แต่ถ้าใช้เกณฑ์เดียวกันสองทาง ค่าที่ก้ำกึ่งจะสลับไปมาตอนเลื่อนช้าๆ */
+      {
+        const bodyEl = document.getElementById("ee-body");
+        const toggleEl = document.getElementById("ee-head-toggle");
+        let pinned = null; // null = อัตโนมัติ · true/false = ผู้ใช้กดเลือกเอง (จนกว่าจะเลื่อนกลับบนสุด)
+        const setCompact = (on) => {
+          headerEl?.classList.toggle("ee-head--compact", on);
+          toggleEl?.setAttribute("aria-expanded", on ? "false" : "true");
+        };
+        bodyEl?.addEventListener("scroll", () => {
+          const y = bodyEl.scrollTop;
+          if (y < 4) { pinned = null; setCompact(false); return; }
+          if (pinned === null && y > 48) setCompact(true);
+        }, { passive: true });
+        toggleEl?.addEventListener("click", () => {
+          const next = !headerEl.classList.contains("ee-head--compact");
+          pinned = next;
+          setCompact(next);
+        });
+      }
 
       /* TomSelect */
       // ⚠️ เดิมมี plugins: ["remove_button"] ซึ่งเติมปุ่ม × ให้ "ทุก item ปัจจุบัน" ไม่ว่าจะเป็นค่า
