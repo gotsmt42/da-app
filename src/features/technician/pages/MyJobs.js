@@ -11,7 +11,7 @@
  *    Operation ฝั่งแอดมิน)
  */
 
-import { useEffect, useMemo, useState, useCallback, cloneElement } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef, cloneElement } from "react";
 import PdfBlobView from "@/shared/components/PdfBlobView";
 import useRealtime from "@/shared/realtime/useRealtime";
 import moment from "moment";
@@ -27,6 +27,7 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { formatThai } from "@/shared/utils/thaiDate";
+import { PageHeader, ICON_BTN_SX } from "@/shared/ui/PageKit";
 import {
   Search, Clear, Refresh, WorkOutline, HourglassTop, TaskAlt, Warning,
   Download, Close, PictureAsPdf, FolderOpen, Image, Article, InsertDriveFile, AttachFile,
@@ -205,24 +206,25 @@ const JobGroupCard = ({ sessions, ...cardProps }) => {
   // ✅ เปลี่ยนจากม่วง (#8b5cf6) เป็นสีธีมแอพ (แดง) ให้ตรงกับธีมสีของทั้งแอพ
   return (
     <Box sx={{
-      borderRadius: 4, border: "1px solid", borderColor: alpha("#dc2626", 0.3),
+      // ✅ โทนเรียบ (ขาว/เทา) ชุดเดียวกับทั้งแอป — เดิมขอบ/หัวแดงทั้งการ์ด ดูเหมือนแจ้งเตือน
+      borderRadius: 4, border: "1px solid #e2e8f0",
       bgcolor: "background.paper", overflow: "hidden",
-      boxShadow: "0 2px 16px rgba(0,0,0,0.06)",
+      boxShadow: "0 1px 2px rgba(15,23,42,.04)",
     }}>
       <Box
         onClick={() => setExpanded((p) => !p)}
         sx={{
-          p: 2, cursor: "pointer", background: alpha("#dc2626", 0.04),
-          borderBottom: expanded ? "1px solid" : "none", borderColor: alpha("#dc2626", 0.2),
+          p: 2, cursor: "pointer", background: "#f8fafc",
+          borderBottom: expanded ? "1px solid #e2e8f0" : "none",
         }}>
         <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
-          <CalendarMonth sx={{ fontSize: 18, color: "#dc2626" }} />
-          <Typography variant="body2" fontWeight={700} color="#dc2626">
+          <CalendarMonth sx={{ fontSize: 18, color: "#64748b" }} />
+          <Typography variant="body2" fontWeight={800} color="#0f172a">
             {head.company && head.site ? `${head.company} · ${head.site}` : (head.company || head.site)}
             {head.title && ` — ${head.title}`}{head.system && ` · ${head.system}`}
           </Typography>
           <Chip label={`เข้างาน ${totalWorkDays} วัน`} size="small"
-            sx={{ height: 20, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha("#dc2626", 0.15), color: "#dc2626" }} />
+            sx={{ height: 20, fontSize: "0.68rem", fontWeight: 800, bgcolor: "#eff6ff", color: "#1d4ed8" }} />
           <Typography variant="caption" color="text.secondary">📅 {rangeStart} – {rangeEnd}</Typography>
           <IconButton size="small" sx={{ ml: "auto" }} onClick={(e) => { e.stopPropagation(); setExpanded((p) => !p); }}>
             {expanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
@@ -239,9 +241,9 @@ const JobGroupCard = ({ sessions, ...cardProps }) => {
               <Chip key={s._id} label={chipLabel} size="small"
                 variant={s._id === anchorId ? "filled" : "outlined"}
                 sx={{
-                  height: 20, fontSize: "0.68rem", borderColor: alpha("#dc2626", 0.35),
-                  bgcolor: s._id === anchorId ? alpha("#dc2626", 0.2) : "transparent",
-                  color: "#dc2626", fontWeight: s._id === anchorId ? 700 : 400,
+                  height: 20, fontSize: "0.68rem", borderColor: "#e2e8f0",
+                  bgcolor: s._id === anchorId ? "#eff6ff" : "#fff",
+                  color: s._id === anchorId ? "#1d4ed8" : "#475569", fontWeight: s._id === anchorId ? 800 : 500,
                 }} />
             );
           })}
@@ -351,6 +353,14 @@ export default function MyJobs() {
     });
     return counts;
   }, [events, daysPastDueMap]);
+
+  // ✅ เปิดหน้ามาครั้งแรก ถ้าไม่มีงานที่ต้องทำแต่มีงานค้าง → พาไปหมวดค้างงานเลย (ไม่ต้องเจอหน้าว่างก่อน)
+  const autoPickedRef = useRef(false);
+  useEffect(() => {
+    if (autoPickedRef.current || loading || !events.length) return;
+    autoPickedRef.current = true;
+    if (groupCounts.active === 0 && groupCounts.overdue > 0) setGroup("overdue");
+  }, [loading, events.length, groupCounts]);
 
   const filteredJobs = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -466,27 +476,45 @@ export default function MyJobs() {
 
   return (
     <Box sx={{ px: { xs: 1.5, sm: 2 }, pt: 2, pb: 4, maxWidth: 720, mx: "auto" }}>
-      {/* ── หัวข้อ + รีเฟรช ── */}
-      <Stack direction="row" alignItems="flex-start" justifyContent="space-between" sx={{ mb: 2 }}>
-        <Box>
-          <Typography variant="h6" fontWeight={800}>งานของฉัน</Typography>
-          <Typography variant="caption" color="text.secondary">
-            {lastRefreshed ? `อัปเดตล่าสุด ${moment(lastRefreshed).locale("th").format("HH:mm:ss")}` : "กำลังโหลด..."}
-          </Typography>
-        </Box>
-        <Tooltip title="รีเฟรช">
-          <IconButton onClick={() => fetchJobs()} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2 }}>
-            <Refresh sx={{ fontSize: 20 }} />
-          </IconButton>
-        </Tooltip>
-      </Stack>
+      {/* ✅ ผู้ใช้สั่ง (3 ต.ค. 2569): "UI มองง่ายขึ้น มืออาชีพ แสดงผลครบ" — หัวกล่องขาวชุดเดียวกับทุกหน้า
+          · สถานะ 4 หมวดเห็นครบทุกช่องโดยไม่ต้องเลื่อน (เดิมเป็นชิปเลื่อนแนวนอน หมวดท้ายถูกตัดหาย) */}
+      <PageHeader
+        icon={<WorkOutline />}
+        title="งานของฉัน"
+        subtitle={lastRefreshed ? `อัปเดตล่าสุด ${moment(lastRefreshed).locale("th").format("HH:mm")} น.` : "กำลังโหลด..."}
+        actions={<Tooltip title="รีเฟรช"><IconButton onClick={() => fetchJobs()} sx={ICON_BTN_SX}><Refresh sx={{ fontSize: 20 }} /></IconButton></Tooltip>}
+      />
 
-      {/* ── ค้นหา ── */}
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(4, 1fr)" }, gap: 1, mb: 1.5 }}>
+        {GROUPS.map((g) => {
+          const on = group === g.key;
+          const n = groupCounts[g.key];
+          const hot = g.key === "overdue" && n > 0;
+          return (
+            <Box key={g.key} component="button" type="button" onClick={() => setGroup(g.key)}
+              sx={{
+                textAlign: "left", font: "inherit", cursor: "pointer", p: 1.25, borderRadius: 2.5, minWidth: 0,
+                bgcolor: on ? (hot ? "#fef2f2" : "#eff6ff") : "#fff",
+                border: `1px solid ${on ? (hot ? "#fecaca" : "#bfdbfe") : "#e2e8f0"}`,
+                boxShadow: on ? `inset 0 -3px 0 ${hot ? "#dc2626" : "#2563eb"}` : "0 1px 2px rgba(15,23,42,.04)",
+              }}>
+              <Stack direction="row" alignItems="center" spacing={0.75} sx={{ color: g.color, "& svg": { fontSize: 17 } }}>
+                {g.icon}
+                <Typography noWrap sx={{ fontSize: "0.78rem", fontWeight: 800, color: "#475569" }}>{g.label}</Typography>
+              </Stack>
+              <Typography sx={{ fontSize: "1.35rem", fontWeight: 900, lineHeight: 1.3, color: hot ? "#dc2626" : "#0f172a" }}>
+                {n}<Box component="span" sx={{ fontSize: "0.74rem", fontWeight: 700, color: "#94a3b8", ml: 0.5 }}>งาน</Box>
+              </Typography>
+            </Box>
+          );
+        })}
+      </Box>
+
       <TextField
-        fullWidth size="small" placeholder="ค้นหาโครงการ, ไซต์, ประเภทงาน, เลขเอกสาร..."
+        fullWidth size="small" placeholder="ค้นหาโครงการ / ไซต์ / ประเภทงาน / เลขเอกสาร"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        sx={{ mb: 1.5, "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: "background.paper" } }}
+        sx={{ mb: 2, "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: "#fff", height: 42 } }}
         InputProps={{
           startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 19, color: "text.disabled" }} /></InputAdornment>,
           endAdornment: search ? (
@@ -496,29 +524,6 @@ export default function MyJobs() {
           ) : null,
         }}
       />
-
-      {/* ── แท็บกลุ่มสถานะ — เลื่อนแนวนอนได้บนจอแคบ ── */}
-      <Stack direction="row" gap={1} sx={{ mb: 2, overflowX: "auto", pb: 0.5 }}>
-        {GROUPS.map((g) => {
-          const active = group === g.key;
-          return (
-            <Chip
-              key={g.key}
-              icon={g.icon}
-              label={`${g.label} (${groupCounts[g.key]})`}
-              onClick={() => setGroup(g.key)}
-              sx={{
-                fontWeight: 700, fontSize: "0.78rem", flexShrink: 0, height: 32,
-                bgcolor: active ? g.color : "transparent",
-                color: active ? "#fff" : "text.secondary",
-                border: "1px solid", borderColor: active ? g.color : "divider",
-                "& .MuiChip-icon": { color: active ? "#fff" : g.color },
-                "&:hover": { bgcolor: active ? g.color : "action.hover" },
-              }}
-            />
-          );
-        })}
-      </Stack>
 
       {/* ── รายการงาน ── */}
       {loading ? (
@@ -540,8 +545,8 @@ export default function MyJobs() {
           );
           return (
             <Box sx={{
-              textAlign: "center", py: 5, px: 2, borderRadius: 4,
-              border: "1px dashed", borderColor: "divider",
+              textAlign: "center", py: 5, px: 2, borderRadius: 3,
+              border: "1px dashed #e2e8f0", bgcolor: "#fff",
             }}>
               {activeGroup?.icon && (
                 <Box sx={{ opacity: 0.3, mb: 1, color: "text.disabled" }}>
@@ -595,22 +600,24 @@ export default function MyJobs() {
             // หน้า Operation) — เลย 1 สัปดาห์ = แจ้งเตือนสีเหลือง, เลย 2 สัปดาห์ = ค้างงานเต็มตัวสีแดง
             // ✅ เช็คซ้ำด้วย isFlaggedDays อีกชั้น (เทียบ pattern เดียวกับหน้า Operation) กันป้าย
             // "เลยกำหนด" ติดลบไร้ความหมายหลุดมาแสดง ถ้าวันที่คำนวณได้ดันไม่เข้าเกณฑ์ค้างจริง
-            const daysPastDueRaw = group === "overdue" ? daysPastDueMap.get(sessions[0]._id)?.days ?? null : null;
+            // ✅ แสดงทุกหมวด ไม่ใช่เฉพาะแท็บค้างงาน
+            const daysPastDueRaw = group === "closed" ? null : daysPastDueMap.get(sessions[0]._id)?.days ?? null;
             const daysPastDue = isFlaggedDays(daysPastDueRaw) ? daysPastDueRaw : null;
             const severeOverdue = isSevereDays(daysPastDue);
             return (
               <Box key={sessions[0].jobGroupId || sessions[0]._id}>
                 {daysPastDue !== null && (
-                  <Chip
-                    size="small"
-                    icon={severeOverdue ? <Warning sx={{ fontSize: 14 }} /> : <HourglassTop sx={{ fontSize: 14 }} />}
-                    label={severeOverdue ? `ค้างงาน ${daysPastDue} วัน` : `แจ้งเตือน · เลยกำหนด ${daysPastDue} วัน`}
+                  <Stack direction="row" alignItems="center" gap={0.75}
                     sx={{
-                      mb: 0.75, fontWeight: 700, fontSize: "0.7rem", height: 24,
-                      bgcolor: severeOverdue ? alpha("#ef4444", 0.12) : alpha("#f59e0b", 0.12),
-                      color: severeOverdue ? "#ef4444" : "#f59e0b",
-                    }}
-                  />
+                      mb: -1.5, pb: 2, pt: 0.75, px: 1.75, borderRadius: "16px 16px 0 0",
+                      bgcolor: severeOverdue ? "#fef2f2" : "#fffbeb", border: `1px solid ${severeOverdue ? "#fecaca" : "#fde68a"}`, borderBottom: 0,
+                    }}>
+                    <Warning sx={{ fontSize: 16, color: severeOverdue ? "#dc2626" : "#d97706" }} />
+                    <Typography sx={{ fontSize: "0.8rem", fontWeight: 900, color: severeOverdue ? "#b91c1c" : "#92400e" }}>
+                      {severeOverdue ? `ค้างงาน ${daysPastDue} วัน` : `เลยกำหนด ${daysPastDue} วัน`}
+                    </Typography>
+                    <Typography sx={{ fontSize: "0.74rem", color: severeOverdue ? "#b91c1c" : "#92400e", opacity: 0.8 }}>· ส่งงาน/ขอปิดงานด้วย</Typography>
+                  </Stack>
                 )}
                 <JobGroupCard
                   sessions={sessions}

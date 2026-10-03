@@ -19,7 +19,7 @@ import { formatEventDateRange } from "@/shared/utils/formatDateRange";
 import { isApproved } from "@/shared/utils/approvalStatus";
 import { formatRoundLabel } from "@/shared/utils/contractRounds";
 import {
-  Box, Card, CardContent, Typography, Stack, Chip, Avatar,
+  Box, Card, CardContent, Typography, Stack, Avatar,
   Button, IconButton, TextField, Collapse, Divider, LinearProgress,
   Tooltip, ToggleButton, ToggleButtonGroup, Menu, MenuItem, ListItemIcon, ListItemText,
   Dialog, DialogTitle, DialogContent, useMediaQuery,
@@ -32,7 +32,7 @@ import {
   PictureAsPdf, Image, Article, InsertDriveFile,
   AttachFile, Delete, Download, TaskAlt, HourglassTop, NoteAdd,
   RequestQuote, ReceiptLong, AssignmentTurnedIn, Close, Cancel,
-  Send, Chat, Link as LinkIcon, MoreVert, Print, Share,
+  Send, Chat, Link as LinkIcon, MoreVert, Print, Share, CalendarMonth, Lock,
 } from "@mui/icons-material";
 import LineIcon from "@/shared/ui/LineIcon";
 import { printFile, shareFile, shareToLine, isMobileDevice } from "@/shared/utils/fileActions";
@@ -970,7 +970,7 @@ const TechnicianJobCard = ({
 
   return (
     <Wrapper>
-      <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
+      <CardContent sx={{ p: { xs: 2, sm: 2.5 }, "&:last-child": { pb: { xs: 2, sm: 2.5 } } }}>
 
         {/* ── Header — กดที่ไหนก็ได้บนแถวนี้เพื่อกาง/พับการ์ด ไม่ต้องเล็งกดลูกศรเล็กๆ อีกต่อไป ── */}
         <Stack
@@ -981,7 +981,9 @@ const TechnicianJobCard = ({
           <Stack direction="row" alignItems="flex-start" gap={1.5} flex={1} minWidth={0}>
             {/* ✅ ลดขนาดลงบนจอมือถือ (จอกว้างยังคง 44px เท่าเดิม) — การ์ดตอนนี้เนื้อหากระชับขึ้นแล้ว
                 วงกลมไอคอนใหญ่แบบเดิมเลยดูไม่สมส่วนเมื่อเทียบกับตัวหนังสือที่เหลือ */}
+            {/* ✅ มือถือซ่อนวงกลมไอคอน — กินคอลัมน์ซ้ายทั้งการ์ด ข้อความถูกบีบ (ผู้ใช้: "มองง่ายขึ้น ไม่รก") */}
             <Avatar sx={{
+              display: { xs: "none", sm: "flex" },
               width: { xs: 32, sm: 44 }, height: { xs: 32, sm: 44 }, flexShrink: 0,
               background: alpha(statusColor, 0.14),
               color: statusColor,
@@ -997,20 +999,18 @@ const TechnicianJobCard = ({
                   (ย่อแล้ว) ไว้แถวบนสุดด้วยกัน ใช้พื้นที่กว้างๆ ข้างสถานะที่เคยเว้นว่างไว้ให้เกิดประโยชน์
                   ระบบ/ครั้งที่ วางคู่กัน 2 คอลัมน์ ส่วนทีมย้ายไปไว้ล่างสุดของรายการ */}
               <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" mb={0.4}>
-                <Chip
-                  size="small"
-                  label={event.status || "ไม่ระบุ"}
-                  sx={{
-                    height: 22, fontSize: "0.7rem", fontWeight: 700,
-                    bgcolor: alpha(statusColor, 0.12),
-                    color: statusColor,
-                    border: `1px solid ${alpha(statusColor, 0.3)}`,
-                  }}
-                />
+                {/* ✅ ป้ายสถานะแบบเรียบ — พื้นเทาอ่อน จุดสีตามสถานะ (ชุดเดียวกับหน้าการดำเนินงาน) */}
+                <Box component="span" sx={{
+                  display: "inline-flex", alignItems: "center", gap: 0.6, height: 24, px: 1, borderRadius: 999,
+                  bgcolor: "#f8fafc", border: "1px solid #e2e8f0", color: "#334155", fontSize: "0.74rem", fontWeight: 700, whiteSpace: "nowrap",
+                }}>
+                  <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: statusColor }} />
+                  {event.status || "ไม่ระบุ"}
+                </Box>
                 {/* ✅ ย่อช่วงวันที่ให้กระชับ (ดู formatEventDateRange) — ถ้าอยู่ปีเดียวกัน/เดือนเดียวกัน
                     ไม่ต้องพิมพ์เดือนปีซ้ำสองรอบ กันตัดขึ้นบรรทัดใหม่แบบขาดกลางวันที่บนจอแคบด้วย */}
-                <Typography variant="caption" color="text.secondary" fontWeight={600} noWrap>
-                  📅 {formatEventDateRange(event)}
+                <Typography variant="caption" color="text.secondary" fontWeight={700} noWrap sx={{ display: "inline-flex", alignItems: "center", gap: 0.4 }}>
+                  <CalendarMonth sx={{ fontSize: 14, color: "#94a3b8" }} />{formatEventDateRange(event)}
                 </Typography>
                 {event.jobGroupId && (
                   <Tooltip title="งานนี้เป็นส่วนหนึ่งของงานหลายวัน (กลุ่มเดียวกัน)">
@@ -1057,9 +1057,7 @@ const TechnicianJobCard = ({
           {/* ✅ ไม่มี onClick ของตัวเองแล้ว — แค่ไอคอนบอกว่ากดดูรายละเอียดได้ ตัวกดจริงคือทั้งแถว
               Header (คลิกบับเบิลขึ้นมาถึงเอง) — เดิมใช้ลูกศรชี้ลง/ขึ้นสื่อถึงการกางเนื้อหาลงในหน้า
               แต่ตอนนี้เปิดเป็น Dialog ทับขึ้นมาแทนแล้ว เปลี่ยนเป็นลูกศรชี้ขวาให้ตรงกับพฤติกรรมจริง */}
-          <IconButton sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2, p: { xs: 0.5, sm: 1 }, pointerEvents: "none" }}>
-            <ChevronRight sx={{ fontSize: { xs: 18, sm: 24 } }} />
-          </IconButton>
+          <ChevronRight sx={{ fontSize: 22, color: "#cbd5e1", flexShrink: 0, mt: 0.25 }} />
         </Stack>
 
         {/* ── เอกสารประจำงาน + ขอปิดงาน: ซ่อนถ้างานนี้ใช้เอกสารร่วมกับกลุ่ม (แสดงที่การ์ดตัวแทนแทน) ── */}
@@ -1075,8 +1073,9 @@ const TechnicianJobCard = ({
               "&:hover": { borderColor: canRequestClose ? "#10b981" : "#3b82f6" },
             }}>
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-              <Typography variant="body2" fontWeight={700} color="text.secondary">
-                📋 เอกสารประจำงาน{isLocked ? " 🔒" : ""}
+              <Typography variant="body2" fontWeight={800} sx={{ color: "#334155", display: "inline-flex", alignItems: "center", gap: 0.6 }}>
+                <Description sx={{ fontSize: 17, color: "#64748b" }} /> เอกสารประจำงาน
+                {isLocked && <Lock sx={{ fontSize: 14, color: "#94a3b8" }} />}
               </Typography>
               <Stack direction="row" alignItems="center" gap={0.5}>
                 <Typography variant="body2" fontWeight={800} color={canRequestClose ? "#10b981" : "text.secondary"}>
@@ -1091,7 +1090,7 @@ const TechnicianJobCard = ({
               variant="determinate"
               value={(completedDocCount / DOCUMENT_TYPES.length) * 100}
               sx={{
-                height: 10, borderRadius: 5,
+                height: 6, borderRadius: 5,
                 bgcolor: alpha("#6b7280", 0.12),
                 "& .MuiLinearProgress-bar": {
                   bgcolor: canRequestClose ? "#10b981" : "#3b82f6",
