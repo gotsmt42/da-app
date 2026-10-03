@@ -851,15 +851,8 @@ function injectStyles() {
     }
     #ee-head-toggle:focus { outline: none; }
     .ee-head--compact #ee-head-toggle { transform: rotate(180deg); }
-    #ee-head-mini {
-      display: none; align-items: center; gap: 5px; flex-shrink: 0; max-width: 46%;
-      padding: 3px 10px 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 800;
-      color: var(--ee-status, #64748b); background: var(--ee-status-soft, #f1f5f9); border: 1px solid var(--ee-status-line, #e2e8f0);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    #ee-head-mini svg { flex-shrink: 0; }
-    .ee-head--compact #ee-head-meta, .ee-head--compact #ee-head-status { display: none !important; }
-    .ee-head--compact #ee-head-mini { display: inline-flex; }
+    /* ✅ สถานะงานไม่พับ (ผู้ใช้สั่ง: "ตรงสถานะไม่ต้องพับเก็บ ให้แยกออกมา") — พับเฉพาะกล่องข้อมูลคนของงาน */
+    .ee-head--compact #ee-head-meta { display: none !important; }
     .swal-edit-event .ee-head--compact#ee-status-header { padding-top: 8px; padding-bottom: 8px; }
     .ee-head--compact #ee-status-title h3 { -webkit-line-clamp: 1; font-size: 14.5px; line-height: 1.6; }
     .swal-edit-event #ee-head-meta {
@@ -894,7 +887,7 @@ function injectStyles() {
     .swal-edit-event #ee-status-header { flex-wrap: wrap; row-gap: 10px; }
     #ee-head-status {
       flex: 1 1 100%; display: flex; align-items: center; gap: 10px; min-width: 0;
-      margin-left: 0; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+      margin-left: 0;
     }
     #ee-head-status > label { font-size: 12px; font-weight: 700; color: #64748b; white-space: nowrap; }
     .swal-edit-event #ee-status-select-wrap { position: relative; flex: 0 1 240px; min-width: 0; }
@@ -1572,10 +1565,20 @@ export const getEditEvent = async ({
     <div id="ee-status-title">
       <h3><span >${attrHtml(eventTitle)} · ${attrHtml(eventSystem)} ${eventTime ? `· ครั้งที่ ${attrHtml(formatRoundLabel(eventTime, eventVisitCount))}` : ""}</span></h3>
     </div>
-    <span id="ee-head-mini" title="สถานะงาน">${cfg0.icon}<span id="ee-head-mini-text">${attrHtml(eventStatus || "กำลังรอยืนยัน")}</span></span>
     <button id="ee-head-toggle" type="button" title="พับ/กางหัวข้อ" aria-expanded="true"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 15l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     ${canCopyEvent ? `<button id="ee-copy-btn" title="คัดลอกงานนี้">📋</button>` : ""}
     <button id="ee-close-btn" title="ปิด">✕</button>
+    ${/* ✅ สถานะงานอยู่บนหัวกล่อง (ผู้ใช้สั่ง 3 ต.ค. 2569: "การเลือกสถานะให้เอาไว้ header ของงาน") — แถวของตัวเอง
+         เต็มความกว้าง ไม่เบียดชื่องาน/ป้าย · สีของปุ่มตามสถานะ (ตัวแปร --ee-status ของหัวกล่อง) */""}
+    <div id="ee-head-status">
+      ${/* ✅ ไอคอนสถานะกลับมาอยู่หน้าปุ่มเลือก (ผู้ใช้: "อยากให้มี icon สถานะงานด้วย") — id เดิม โค้ดเปลี่ยนสถานะอัปเดตให้เอง */""}
+      <div id="ee-status-icon" aria-hidden="true">${cfg0.icon}</div>
+      <label for="editStatus">สถานะงาน</label>
+      <div id="ee-status-select-wrap">
+        <select id="editStatus" ${canEditStatus ? "" : "disabled title=\"สถานะนี้เปลี่ยนได้เฉพาะแอดมิน/manager\""}>${statusOptions}</select>
+      </div>
+      <span class="ee-head-owner" title="ผู้สร้างแผนงาน">สร้างโดย ${footerName}</span>
+    </div>
     ${/* ✅ ข้อมูลคนของงาน — มีป้ายกำกับชัดเจน (ผู้ใช้สั่ง 3 ต.ค. 2569: "อธิบายด้วยว่า หัวหน้าทีม ผู้รับผิดชอบ ให้ชัดเจน
          และสวยงาม") เดิมเป็นชิปลอยๆ ไม่บอกว่าชื่อไหนคือบทบาทอะไร · แถวเต็มความกว้าง แสดงครบทุกตัว */""}
     <div id="ee-head-meta">
@@ -1594,17 +1597,6 @@ export const getEditEvent = async ({
         <span class="ee-hm-label"><i aria-hidden="true">${eventJobClassMeta.emoji}</i>ประเภทงาน</span>
         <span class="ee-hm-value">${attrHtml(eventJobClassMeta.label)}</span>
       </div>` : ""}
-    </div>
-    ${/* ✅ สถานะงานอยู่บนหัวกล่อง (ผู้ใช้สั่ง 3 ต.ค. 2569: "การเลือกสถานะให้เอาไว้ header ของงาน") — แถวของตัวเอง
-         เต็มความกว้าง ไม่เบียดชื่องาน/ป้าย · สีของปุ่มตามสถานะ (ตัวแปร --ee-status ของหัวกล่อง) */""}
-    <div id="ee-head-status">
-      ${/* ✅ ไอคอนสถานะกลับมาอยู่หน้าปุ่มเลือก (ผู้ใช้: "อยากให้มี icon สถานะงานด้วย") — id เดิม โค้ดเปลี่ยนสถานะอัปเดตให้เอง */""}
-      <div id="ee-status-icon" aria-hidden="true">${cfg0.icon}</div>
-      <label for="editStatus">สถานะงาน</label>
-      <div id="ee-status-select-wrap">
-        <select id="editStatus" ${canEditStatus ? "" : "disabled title=\"สถานะนี้เปลี่ยนได้เฉพาะแอดมิน/manager\""}>${statusOptions}</select>
-      </div>
-      <span class="ee-head-owner" title="ผู้สร้างแผนงาน">สร้างโดย ${footerName}</span>
     </div>
   </div>
 
@@ -2365,8 +2357,6 @@ export const getEditEvent = async ({
         headerEl.style.setProperty("--ee-status-soft", cfg.soft);
         headerEl.style.setProperty("--ee-status-line", cfg.line);
         iconEl.innerHTML = cfg.icon;
-        const mini = document.getElementById("ee-head-mini");
-        if (mini) mini.innerHTML = `${cfg.icon}<span id="ee-head-mini-text">${escapeHtml(e.target.value)}</span>`;
       });
 
       /* ✅ หัวกล่องพับได้ — ย่ออัตโนมัติเมื่อเลื่อนฟอร์มลง กางเมื่อกลับบนสุด หรือกดปุ่ม ▴/▾ เอง
