@@ -844,6 +844,29 @@ function injectStyles() {
     .swal-edit-event #ee-body { text-align: left; padding: 16px 20px 12px; }
     .swal-edit-event #ee-status-bar { border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 1px 2px rgba(15,23,42,.04); padding: 8px 12px; gap: 10px; }
 
+    /* ── สถานะงานบนหัวกล่อง ── */
+    .swal-edit-event #ee-status-header { flex-wrap: wrap; row-gap: 10px; }
+    #ee-head-status {
+      flex: 1 1 100%; display: flex; align-items: center; gap: 10px; min-width: 0;
+      margin-left: 52px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+    }
+    #ee-head-status > label { font-size: 12px; font-weight: 700; color: #64748b; white-space: nowrap; }
+    .swal-edit-event #ee-status-select-wrap { position: relative; flex: 0 1 240px; min-width: 0; }
+    .swal-edit-event #ee-status-select-wrap::before {
+      content: ""; position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+      width: 9px; height: 9px; border-radius: 50%; background: var(--ee-status, #64748b); pointer-events: none;
+    }
+    .swal-edit-event #ee-status-select-wrap::after { color: var(--ee-status, #64748b); right: 13px; font-size: 13px; }
+    .swal-edit-event #ee-status-select-wrap select {
+      width: 100%; min-width: 0; height: 38px; padding: 0 34px 0 30px; border-radius: 999px;
+      background: var(--ee-status-soft, #f1f5f9); border: 1.5px solid var(--ee-status-line, #e2e8f0);
+      color: #0f172a; font-size: 13.5px; font-weight: 800; font-family: inherit; text-overflow: ellipsis;
+    }
+    .swal-edit-event #ee-status-select-wrap select:hover:not(:disabled) { border-color: var(--ee-status, #64748b); }
+    .swal-edit-event #ee-status-select-wrap select:focus { outline: none; border-color: var(--ee-status, #2563eb); box-shadow: 0 0 0 3px var(--ee-status-soft, rgba(37,99,235,.12)); }
+    .swal-edit-event #ee-status-select-wrap select:disabled { cursor: not-allowed; opacity: .75; }
+    .ee-head-owner { margin-left: auto; font-size: 11.5px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+
     /* แผนที่: ปุ่มเรียงใต้ชื่อบนจอแคบ ไม่บีบข้อความ */
     .ee-map-go { background: #2563eb; border-radius: 10px; }
     .ee-map-go:hover { background: #1d4ed8; }
@@ -868,6 +891,8 @@ function injectStyles() {
       .swal-edit-event #ee-status-header { padding: 10px 12px; gap: 10px; }
       .swal-edit-event #ee-status-icon { width: 36px; height: 36px; font-size: 17px; }
       .swal-edit-event #ee-status-title h3 { font-size: 15px; }
+      #ee-head-status { margin-left: 0; }
+      .swal-edit-event #ee-status-select-wrap { flex: 1 1 auto; }
       /* ป้ายบนหัวเลื่อนแนวนอนแถวเดียว — เดิมตัดลงหลายบรรทัด กินหัวกล่องสูงเกือบ 1 ใน 4 ของจอ */
       .swal-edit-event #ee-status-title .ee-header-meta { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-right: -4px; padding-bottom: 2px; }
       .swal-edit-event #ee-status-title .ee-header-meta::-webkit-scrollbar { display: none; }
@@ -1507,6 +1532,15 @@ export const getEditEvent = async ({
     </div>
     ${canCopyEvent ? `<button id="ee-copy-btn" title="คัดลอกงานนี้">📋</button>` : ""}
     <button id="ee-close-btn" title="ปิด">✕</button>
+    ${/* ✅ สถานะงานอยู่บนหัวกล่อง (ผู้ใช้สั่ง 3 ต.ค. 2569: "การเลือกสถานะให้เอาไว้ header ของงาน") — แถวของตัวเอง
+         เต็มความกว้าง ไม่เบียดชื่องาน/ป้าย · สีของปุ่มตามสถานะ (ตัวแปร --ee-status ของหัวกล่อง) */""}
+    <div id="ee-head-status">
+      <label for="editStatus">สถานะงาน</label>
+      <div id="ee-status-select-wrap">
+        <select id="editStatus" ${canEditStatus ? "" : "disabled title=\"สถานะนี้เปลี่ยนได้เฉพาะแอดมิน/manager\""}>${statusOptions}</select>
+      </div>
+      <span class="ee-head-owner" title="ผู้สร้างแผนงาน">สร้างโดย ${footerName}</span>
+    </div>
   </div>
 
   <!-- ── Body ── -->
@@ -1645,17 +1679,7 @@ export const getEditEvent = async ({
     ` : ""}
 
     <!-- Status bar -->
-    <div id="ee-status-bar">
-      <div id="ee-status-bar-left">
-        <div class="ee-owner-badge">👤 ${footerName}</div>
-      </div>
-      <div id="ee-status-bar-right">
-        <span class="ee-status-bar-label">🔖 สถานะ</span>
-        <div id="ee-status-select-wrap">
-          <select id="editStatus" ${canEditStatus ? "" : "disabled title=\"สถานะนี้เปลี่ยนได้เฉพาะแอดมิน/manager\""}>${statusOptions}</select>
-        </div>
-      </div>
-    </div>
+    ${/* ✅ ตัวเลือกสถานะย้ายขึ้นไปอยู่บนหัวกล่องแล้ว (ผู้ใช้สั่ง 3 ต.ค. 2569) — ดู #ee-head-status */""}
 
     <!-- section: โครงการ -->
     <section class="ee-card">
