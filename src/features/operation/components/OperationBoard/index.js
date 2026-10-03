@@ -1439,7 +1439,8 @@ const EventRowCard = ({
                   ไม่ว่าป้ายสถานะ/วันที่จะยาวแค่ไหน — เปลี่ยนไอคอนเอกสารแต่ละชนิดให้ไม่ซ้ำกัน (เทียบ
                   pattern เดียวกับ DOCUMENT_TYPES ใน TechnicianJobPanel.js) และคั่นกลุ่ม "เอกสาร" กับ
                   "กิจกรรม/ข้อความ/กลุ่มงาน" ด้วยเส้นแบ่งบางๆ ให้อ่านง่าย ไม่ปนกันรก */}
-              {(event.reportFiles?.length > 0 || event.quotationFiles?.length > 0 || event.invoiceFiles?.length > 0 || event.completionFiles?.length > 0 || event.activityLog?.length > 0 || event.comments?.length > 0 || event.jobGroupId) && (
+              {/* ⚠️ มือถือแสดงเฉพาะเอกสาร/ข้อความ — ไอคอนกิจกรรม/กลุ่มงานลอยเดี่ยวๆ เป็นบรรทัดว่างที่ไม่บอกอะไร */}
+              {(event.reportFiles?.length > 0 || event.quotationFiles?.length > 0 || event.invoiceFiles?.length > 0 || event.completionFiles?.length > 0 || event.comments?.length > 0 || (isDesktop && (event.activityLog?.length > 0 || event.jobGroupId))) && (
                 <Stack direction="row" alignItems="center" justifyContent="flex-end" gap={0.7}
                   divider={<Divider orientation="vertical" flexItem sx={{ height: 14, my: "auto" }} />}
                   sx={{ mb: 0.5 }}>
@@ -1451,9 +1452,9 @@ const EventRowCard = ({
                       {event.completionFiles?.length > 0 && <DocIndicator title={`ใบส่งมอบงาน: ${event.completionFiles.length} ไฟล์`} icon={AssignmentTurnedIn} color="#07941a" count={event.completionFiles.length} showCount={isDesktop} />}
                     </Stack>
                   )}
-                  {(event.activityLog?.length > 0 || event.comments?.length > 0 || event.jobGroupId) && (
+                  {(event.comments?.length > 0 || (isDesktop && (event.activityLog?.length > 0 || event.jobGroupId))) && (
                     <Stack direction="row" alignItems="center" gap={0.5}>
-                      {event.activityLog?.length > 0 && (
+                      {event.activityLog?.length > 0 && isDesktop && (
                         <DocIndicator title={`${event.activityLog.length} กิจกรรม`} icon={History}
                           color="text.disabled" count={event.activityLog.length} showCount={isDesktop} />
                       )}
@@ -1461,7 +1462,7 @@ const EventRowCard = ({
                         <DocIndicator title={`${event.comments.length} ข้อความ`} icon={Chat}
                           color="text.disabled" count={event.comments.length} showCount={isDesktop} />
                       )}
-                      {event.jobGroupId && (
+                      {event.jobGroupId && isDesktop && (
                         <Tooltip title="งานนี้เป็นส่วนหนึ่งของงานหลายวัน (กลุ่มเดียวกัน)">
                           <LinkIcon sx={{ fontSize: 16, color: "text.disabled" }} />
                         </Tooltip>
@@ -3529,15 +3530,35 @@ const Operation = () => {
           {isMobile && (
             <>
               {/* มือถือ: สิ่งที่กำลังดูอยู่เป็นชิปบรรทัดเดียว — แตะเพื่อเปิดแผ่นตัวกรอง */}
+              {/* ✅ แถบสถานะกดสลับได้ทันที (ผู้ใช้: "ยังดูงานที่ค้างยาก") — ค้างงานเป็นแดงเห็นชัดตั้งแต่เปิดหน้า
+                  ไม่ต้องเปิดแผ่นตัวกรองก่อน · เลื่อนแนวนอนได้ถ้ามีหลายสถานะ */}
+              {!id && (
+                <Box sx={{ display: "flex", gap: 0.75, overflowX: "auto", mx: -1.5, px: 1.5, pb: 0.5, mb: 1, scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
+                  {/* ⚠️ ค้างงานอยู่ถัดจาก "ทั้งหมด" เสมอ — เห็นได้โดยไม่ต้องเลื่อนแถบ */}
+                  {[...statusTileGroups[0].items].sort((x, y) => (x.value === "all" ? -2 : x.value === "overdue" ? -1 : 0) - (y.value === "all" ? -2 : y.value === "overdue" ? -1 : 0)).map((it) => {
+                    const on = effectiveGroup === it.value;
+                    const hot = it.alert && it.count > 0;
+                    return (
+                      <Box key={it.value} component="button" type="button" onClick={() => { setStatusGroup(it.value); setPage(1); }}
+                        sx={{
+                          flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 0.75, height: 36, px: 1.5, borderRadius: 999, cursor: "pointer",
+                          font: "inherit", fontSize: "0.84rem", fontWeight: 800, whiteSpace: "nowrap",
+                          border: `1px solid ${on ? (hot ? "#fecaca" : "#bfdbfe") : "#e2e8f0"}`,
+                          bgcolor: on ? (hot ? "#fef2f2" : "#eff6ff") : "#fff",
+                          color: on ? (hot ? "#b91c1c" : "#1d4ed8") : "#334155",
+                        }}>
+                        {it.shortLabel || it.label}
+                        <Box component="span" sx={{
+                          minWidth: 22, height: 22, px: 0.6, borderRadius: 999, display: "inline-flex", alignItems: "center", justifyContent: "center",
+                          fontSize: "0.74rem", fontWeight: 900,
+                          bgcolor: hot ? "#dc2626" : on ? "#2563eb" : "#f1f5f9", color: hot || on ? "#fff" : "#64748b",
+                        }}>{it.count}</Box>
+                      </Box>
+                    );
+                  })}
+                </Box>
+              )}
               <Stack direction="row" gap={0.75} flexWrap="wrap" alignItems="center" sx={{ mb: 1.5 }}>
-                {statusItem && (
-                  <Chip
-                    size="small" onClick={() => setMobileSheetOpen(true)}
-                    icon={<Box component="span" sx={{ display: "inline-flex", color: `${statusItem.color} !important`, "& svg": { fontSize: 16 } }}>{statusItem.icon}</Box>}
-                    label={`${statusItem.shortLabel || statusItem.label} · ${statusItem.count}`}
-                    sx={{ fontWeight: 800, bgcolor: "#fff", color: "#334155", border: "1px solid #e2e8f0" }}
-                  />
-                )}
                 <Chip size="small" onClick={() => setMobileSheetOpen(true)} label={showAll ? "ทุกเดือน" : (selectedDate ? moment(selectedDate, "YYYY-MM").add(543, "year").format("MM/YYYY") : "เดือนนี้")} sx={{ fontWeight: 700, bgcolor: "#fff", border: "1px solid #e2e8f0", color: "#334155" }} />
                 {filterResponsible !== "all" && (
                   <Chip size="small" label={`ผู้รับผิดชอบ: ${filterResponsible === "unassigned" ? "ยังไม่มอบหมาย" : filterResponsible}`} onDelete={() => setFilterResponsible("all")} sx={{ fontWeight: 700 }} />
@@ -3618,7 +3639,8 @@ const Operation = () => {
               {pagedGroups.map(sessions => {
                 // ✅ ในมุมมอง "ค้างงาน" ให้เห็นความรุนแรงต่างกันชัดๆ ก่อนเปิดการ์ด — เลย 1 สัปดาห์
                 // = แจ้งเตือนสีเหลือง (ให้ทันเห็นก่อน), เลย 2 สัปดาห์ = ค้างงานเต็มตัวสีแดง
-                const daysPastDueRaw = effectiveGroup === "overdue" ? (daysPastDueMap.get(sessions[0]._id)?.days ?? null) : null;
+                // ✅ แสดงทุกมุมมอง ไม่ใช่เฉพาะแท็บค้างงาน (ผู้ใช้: "ยังดูงานที่ค้างยาก")
+                const daysPastDueRaw = daysPastDueMap.get(sessions[0]._id)?.days ?? null;
                 const daysPastDue = isFlaggedDays(daysPastDueRaw) ? daysPastDueRaw : null;
                 const severeOverdue = isSevereDays(daysPastDue);
                 // ✅ งานที่ถูกส่งมาไฮไลต์จากปุ่ม "ตรวจสอบ" (ดู highlightId effect ด้านบน) — ใส่ id
@@ -3642,11 +3664,16 @@ const Operation = () => {
                       }),
                     }}>
                     {daysPastDue !== null && daysPastDue !== undefined && (
-                      <Stack direction="row" alignItems="center" gap={0.6} sx={{ mb: 0.6, px: 0.5 }}>
-                        <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: severeOverdue ? "#dc2626" : "#d97706" }} />
-                        <Typography sx={{ fontSize: "0.76rem", fontWeight: 800, color: severeOverdue ? "#b91c1c" : "#92400e" }}>
+                      <Stack direction="row" alignItems="center" gap={0.75}
+                        sx={{
+                          mb: -1.25, pb: 1.75, pt: 0.75, px: 1.5, borderRadius: "14px 14px 0 0",
+                          bgcolor: severeOverdue ? "#fef2f2" : "#fffbeb", border: `1px solid ${severeOverdue ? "#fecaca" : "#fde68a"}`, borderBottom: 0,
+                        }}>
+                        <Warning sx={{ fontSize: 16, color: severeOverdue ? "#dc2626" : "#d97706" }} />
+                        <Typography sx={{ fontSize: "0.8rem", fontWeight: 900, color: severeOverdue ? "#b91c1c" : "#92400e" }}>
                           {severeOverdue ? `ค้างงาน ${daysPastDue} วัน` : `เลยกำหนด ${daysPastDue} วัน`}
                         </Typography>
+                        <Typography sx={{ fontSize: "0.74rem", color: severeOverdue ? "#b91c1c" : "#92400e", opacity: 0.8 }}>· ยังไม่ปิดงาน</Typography>
                       </Stack>
                     )}
                     <JobGroupBlock
