@@ -288,7 +288,7 @@ const matchesGroup = (event, group, daysPastDueMap) => {
 export default function MyJobs() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [lastRefreshed, setLastRefreshed] = useState(null);
+  const [, setLastRefreshed] = useState(null);
   const [search, setSearch] = useState("");
   const [group, setGroup] = useState("active");
   const [snackbar, setSnackbar] = useState({ open: false, msg: "", severity: "success" });
@@ -483,20 +483,20 @@ export default function MyJobs() {
           · สถานะ 4 หมวดเห็นครบทุกช่องโดยไม่ต้องเลื่อน (เดิมเป็นชิปเลื่อนแนวนอน หมวดท้ายถูกตัดหาย) */}
       {/* ✅ หัวหน้าแบบทักทาย + สรุปวันนี้ (ผู้ใช้: "สีสันจืด ไม่ดึงดูดให้ทำงาน") — พื้นน้ำเงินไล่เฉดอ่อนๆ ตัวหนังสือขาว */}
       <Box sx={{
-        position: "relative", overflow: "hidden", mb: 1.5, p: { xs: 2, sm: 2.5 }, borderRadius: 3.5, color: "#fff",
+        position: "relative", overflow: "hidden", mb: 1.25, px: 1.75, py: 1.4, borderRadius: 3, color: "#fff",
         background: "linear-gradient(135deg, #1d4ed8 0%, #2563eb 55%, #3b82f6 100%)",
-        boxShadow: "0 8px 24px rgba(37,99,235,.25)",
+        boxShadow: "0 4px 14px rgba(37,99,235,.2)",
       }}>
         <Box sx={{ position: "absolute", right: -30, top: -30, width: 140, height: 140, borderRadius: "50%", bgcolor: "rgba(255,255,255,.08)" }} />
         <Box sx={{ position: "absolute", right: 40, bottom: -50, width: 110, height: 110, borderRadius: "50%", bgcolor: "rgba(255,255,255,.06)" }} />
-        <Stack direction="row" alignItems="flex-start" spacing={1.5} sx={{ position: "relative" }}>
+        <Stack direction="row" alignItems="center" spacing={1.25} sx={{ position: "relative" }}>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography sx={{ fontSize: "0.8rem", opacity: 0.85, fontWeight: 600 }}>
+            <Typography noWrap sx={{ fontSize: "0.72rem", opacity: 0.85, fontWeight: 600 }}>
               {greeting}{userData?.fname ? ` คุณ${userData.fname}` : ""}
             </Typography>
-            <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.25rem", sm: "1.4rem" }, lineHeight: 1.3 }}>งานของฉัน</Typography>
-            <Typography sx={{ fontSize: "0.82rem", opacity: 0.92, mt: 0.25 }}>
-              {groupCounts.overdue > 0
+            <Typography sx={{ fontWeight: 900, fontSize: "1.08rem", lineHeight: 1.3 }}>งานของฉัน</Typography>
+            <Typography noWrap sx={{ fontSize: "0.76rem", opacity: 0.92 }}>
+              {loading ? "กำลังโหลดงาน…" : groupCounts.overdue > 0
                 ? `มีงานค้าง ${groupCounts.overdue} งาน — ส่งงาน/ขอปิดงานให้เรียบร้อยนะ`
                 : groupCounts.active > 0
                   ? `วันนี้มีงานต้องทำ ${groupCounts.active} งาน — ลุยกันเลย 💪`
@@ -504,14 +504,11 @@ export default function MyJobs() {
             </Typography>
           </Box>
           <Tooltip title="รีเฟรช">
-            <IconButton onClick={() => fetchJobs()} sx={{ color: "#fff", bgcolor: "rgba(255,255,255,.16)", border: "1px solid rgba(255,255,255,.25)", borderRadius: 2.5, "&:hover": { bgcolor: "rgba(255,255,255,.26)" } }}>
-              <Refresh sx={{ fontSize: 20 }} />
+            <IconButton size="small" onClick={() => fetchJobs()} sx={{ width: 36, height: 36, color: "#fff", bgcolor: "rgba(255,255,255,.16)", border: "1px solid rgba(255,255,255,.25)", borderRadius: 2.5, "&:hover": { bgcolor: "rgba(255,255,255,.26)" } }}>
+              <Refresh sx={{ fontSize: 18 }} />
             </IconButton>
           </Tooltip>
         </Stack>
-        <Typography sx={{ position: "relative", fontSize: "0.7rem", opacity: 0.7, mt: 1 }}>
-          {lastRefreshed ? `อัปเดตล่าสุด ${moment(lastRefreshed).locale("th").format("HH:mm")} น. · อัปเดตอัตโนมัติ` : "กำลังโหลด..."}
-        </Typography>
       </Box>
 
       {/* ✅ แถวเดียว 4 ช่อง — สีประจำหมวด (ฟ้า/แดง/ส้ม/เขียว) ที่ไอคอนและตัวเลข · ช่องที่เลือกพื้นอ่อน+ขอบสีหมวด */}
@@ -522,20 +519,23 @@ export default function MyJobs() {
           return (
             <Box key={g.key} component="button" type="button" onClick={() => setGroup(g.key)} title={g.label}
               sx={{
-                position: "relative", font: "inherit", cursor: "pointer", pt: 1, pb: 0.85, px: 0.5, borderRadius: 2.5, minWidth: 0, textAlign: "center",
+                position: "relative", font: "inherit", cursor: "pointer", py: 0.6, px: 0.5, borderRadius: 2, minWidth: 0, textAlign: "center",
                 bgcolor: on ? alpha(g.color, 0.1) : "#fff",
                 border: `1.5px solid ${on ? g.color : "#e2e8f0"}`,
-                boxShadow: on ? `0 4px 14px ${alpha(g.color, 0.22)}` : "0 1px 2px rgba(15,23,42,.04)",
+                boxShadow: on ? `0 2px 8px ${alpha(g.color, 0.18)}` : "none",
                 transition: "all .15s",
               }}>
-              <Box sx={{
-                width: 28, height: 28, mx: "auto", mb: 0.4, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
-                bgcolor: on ? g.color : alpha(g.color, 0.12), color: on ? "#fff" : g.color, "& svg": { fontSize: 16 },
-              }}>{g.icon}</Box>
-              <Typography sx={{ fontSize: "1.05rem", fontWeight: 900, lineHeight: 1.2, color: n > 0 ? g.color : "#94a3b8" }}>{n}</Typography>
-              <Typography noWrap sx={{ fontSize: "0.68rem", fontWeight: 800, color: on ? g.color : "#64748b" }}>{g.short || g.label}</Typography>
+              {/* ไอคอน + ตัวเลขบรรทัดเดียว · ชื่อหมวดบรรทัดล่าง */}
+              <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.5}>
+                <Box sx={{
+                  width: 20, height: 20, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                  bgcolor: on ? g.color : alpha(g.color, 0.12), color: on ? "#fff" : g.color, "& svg": { fontSize: 12 },
+                }}>{g.icon}</Box>
+                <Typography sx={{ fontSize: "0.98rem", fontWeight: 900, lineHeight: 1.3, color: n > 0 ? g.color : "#94a3b8" }}>{n}</Typography>
+              </Stack>
+              <Typography noWrap sx={{ fontSize: "0.66rem", fontWeight: 800, color: on ? g.color : "#64748b", lineHeight: 1.3 }}>{g.short || g.label}</Typography>
               {g.key === "overdue" && n > 0 && !on && (
-                <Box sx={{ position: "absolute", top: 6, right: 6, width: 8, height: 8, borderRadius: "50%", bgcolor: "#dc2626", boxShadow: "0 0 0 3px rgba(220,38,38,.18)" }} />
+                <Box sx={{ position: "absolute", top: 4, right: 4, width: 7, height: 7, borderRadius: "50%", bgcolor: "#dc2626", boxShadow: "0 0 0 3px rgba(220,38,38,.18)" }} />
               )}
             </Box>
           );
