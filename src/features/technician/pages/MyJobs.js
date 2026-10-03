@@ -266,12 +266,12 @@ const JobGroupCard = ({ sessions, ...cardProps }) => {
 
 // ─── กลุ่มสถานะแท็บ ───
 const GROUPS = [
-  { key: "active", label: "งานที่ต้องทำ", icon: <WorkOutline sx={{ fontSize: 15 }} />, color: "#3b82f6" },
+  { key: "active", label: "งานที่ต้องทำ", short: "ต้องทำ", icon: <WorkOutline sx={{ fontSize: 15 }} />, color: "#3b82f6" },
   // ✅ เดิมไม่มีทางเห็นงานค้างแยกจากงานทั่วไปเลยในหน้านี้ (ต้องไปเปิดหน้า Operation ต่างหาก) —
   // เพิ่มแท็บนี้โดยตรง ใช้เกณฑ์เดียวกับหน้า Operation เป๊ะๆ (เลยกำหนด 1 สัปดาห์ขึ้นไป, งานหลายวัน
   // ไม่ติดกันนับเป็น 1 งาน คิดจากวันสุดท้าย) ผ่าน util กลาง
   { key: "overdue", label: "ค้างงาน", icon: <Warning sx={{ fontSize: 15 }} />, color: "#ef4444" },
-  { key: "pending", label: "รอแอดมินอนุมัติ", icon: <HourglassTop sx={{ fontSize: 15 }} />, color: "#f59e0b" },
+  { key: "pending", label: "รอแอดมินอนุมัติ", short: "รออนุมัติ", icon: <HourglassTop sx={{ fontSize: 15 }} />, color: "#f59e0b" },
   { key: "closed", label: "เสร็จสิ้น", icon: <TaskAlt sx={{ fontSize: 15 }} />, color: "#10b981" },
 ];
 
@@ -485,26 +485,21 @@ export default function MyJobs() {
         actions={<Tooltip title="รีเฟรช"><IconButton onClick={() => fetchJobs()} sx={ICON_BTN_SX}><Refresh sx={{ fontSize: 20 }} /></IconButton></Tooltip>}
       />
 
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(4, 1fr)" }, gap: 1, mb: 1.5 }}>
+      {/* ✅ แถวเดียว 4 ช่องแบบกระชับ (ผู้ใช้: "ใหญ่เทอะทะไป") — ตัวเลข + ชื่อสั้น */}
+      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 0.75, mb: 1.25 }}>
         {GROUPS.map((g) => {
           const on = group === g.key;
           const n = groupCounts[g.key];
           const hot = g.key === "overdue" && n > 0;
           return (
-            <Box key={g.key} component="button" type="button" onClick={() => setGroup(g.key)}
+            <Box key={g.key} component="button" type="button" onClick={() => setGroup(g.key)} title={g.label}
               sx={{
-                textAlign: "left", font: "inherit", cursor: "pointer", p: 1.25, borderRadius: 2.5, minWidth: 0,
+                font: "inherit", cursor: "pointer", py: 0.75, px: 0.5, borderRadius: 2, minWidth: 0, textAlign: "center",
                 bgcolor: on ? (hot ? "#fef2f2" : "#eff6ff") : "#fff",
-                border: `1px solid ${on ? (hot ? "#fecaca" : "#bfdbfe") : "#e2e8f0"}`,
-                boxShadow: on ? `inset 0 -3px 0 ${hot ? "#dc2626" : "#2563eb"}` : "0 1px 2px rgba(15,23,42,.04)",
+                border: `1px solid ${on ? (hot ? "#fca5a5" : "#93c5fd") : "#e2e8f0"}`,
               }}>
-              <Stack direction="row" alignItems="center" spacing={0.75} sx={{ color: g.color, "& svg": { fontSize: 17 } }}>
-                {g.icon}
-                <Typography noWrap sx={{ fontSize: "0.78rem", fontWeight: 800, color: "#475569" }}>{g.label}</Typography>
-              </Stack>
-              <Typography sx={{ fontSize: "1.35rem", fontWeight: 900, lineHeight: 1.3, color: hot ? "#dc2626" : "#0f172a" }}>
-                {n}<Box component="span" sx={{ fontSize: "0.74rem", fontWeight: 700, color: "#94a3b8", ml: 0.5 }}>งาน</Box>
-              </Typography>
+              <Typography sx={{ fontSize: "1.05rem", fontWeight: 900, lineHeight: 1.25, color: hot ? "#dc2626" : on ? "#1d4ed8" : "#0f172a" }}>{n}</Typography>
+              <Typography noWrap sx={{ fontSize: "0.68rem", fontWeight: 700, color: on ? (hot ? "#b91c1c" : "#1d4ed8") : "#64748b" }}>{g.short || g.label}</Typography>
             </Box>
           );
         })}
@@ -514,7 +509,7 @@ export default function MyJobs() {
         fullWidth size="small" placeholder="ค้นหาโครงการ / ไซต์ / ประเภทงาน / เลขเอกสาร"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        sx={{ mb: 2, "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: "#fff", height: 42 } }}
+        sx={{ mb: 1.5, "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: "#fff", height: 40, fontSize: "0.9rem" } }}
         InputProps={{
           startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 19, color: "text.disabled" }} /></InputAdornment>,
           endAdornment: search ? (

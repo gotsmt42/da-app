@@ -1063,17 +1063,17 @@ const TechnicianJobCard = ({
         {/* ── เอกสารประจำงาน + ขอปิดงาน: ซ่อนถ้างานนี้ใช้เอกสารร่วมกับกลุ่ม (แสดงที่การ์ดตัวแทนแทน) ── */}
         {!hideDocuments && (
         <>
-        <Box sx={{ mt: 2 }}>
+        <Box sx={{ mt: 1.5 }}>
           <Box
             onClick={() => setDocsExpanded(p => !p)}
             sx={{
-              cursor: "pointer", p: 1.5, borderRadius: 2, minHeight: 56,
+              cursor: "pointer", px: 1.5, py: 1.1, borderRadius: 2,
               border: "1px solid", borderColor: "divider",
               "&:active": { bgcolor: alpha("#6b7280", 0.06) },
               "&:hover": { borderColor: canRequestClose ? "#10b981" : "#3b82f6" },
             }}>
-            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-              <Typography variant="body2" fontWeight={800} sx={{ color: "#334155", display: "inline-flex", alignItems: "center", gap: 0.6 }}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.75 }}>
+              <Typography variant="body2" fontWeight={800} sx={{ fontSize: "0.84rem", color: "#334155", display: "inline-flex", alignItems: "center", gap: 0.6 }}>
                 <Description sx={{ fontSize: 17, color: "#64748b" }} /> เอกสารประจำงาน
                 {isLocked && <Lock sx={{ fontSize: 14, color: "#94a3b8" }} />}
               </Typography>
