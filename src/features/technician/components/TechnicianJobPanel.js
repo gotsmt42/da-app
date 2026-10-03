@@ -21,7 +21,7 @@ import { formatRoundLabel } from "@/shared/utils/contractRounds";
 import {
   Box, Card, CardContent, Typography, Stack, Avatar,
   Button, IconButton, TextField, Collapse, Divider, LinearProgress,
-  Tooltip, ToggleButton, ToggleButtonGroup, Menu, MenuItem, ListItemIcon, ListItemText,
+  Tooltip, Menu, MenuItem, ListItemIcon, ListItemText,
   Dialog, DialogTitle, DialogContent, useMediaQuery,
 } from "@mui/material";
 import { styled, alpha } from "@mui/material/styles";
@@ -33,7 +33,9 @@ import {
   AttachFile, Delete, Download, TaskAlt, HourglassTop, NoteAdd,
   RequestQuote, ReceiptLong, AssignmentTurnedIn, Close, Cancel,
   Send, Chat, Link as LinkIcon, MoreVert, Print, Share, CalendarMonth, Lock,
+  CheckCircleOutline, InfoOutlined, RemoveCircleOutline, CheckBox, CheckBoxOutlineBlank,
 } from "@mui/icons-material";
+import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LINE, SUCCESS } from "@/shared/ui/PageKit";
 import LineIcon from "@/shared/ui/LineIcon";
 import { printFile, shareFile, shareToLine, isMobileDevice } from "@/shared/utils/fileActions";
 import InfoLine from "@/shared/ui/InfoLine";
@@ -73,12 +75,12 @@ const TYPE_ICON = {
 // โดยไม่ต้องเดาหรือไปถามแอดมิน
 const DOCUMENT_TYPES = [
   {
-    type: "report", label: "Service Report", color: "#3b82f6", alwaysRequired: true,
+    type: "report", label: "Service Report", color: "#2563eb", alwaysRequired: true,
     icon: <Description sx={{ fontSize: 18 }} />,
     desc: "ใบรายงานผลการเข้าปฏิบัติงานครั้งนี้ — ทุกงานต้องแนบก่อนขอปิดงาน",
   },
   {
-    type: "quotation", label: "ใบเสนอราคา", color: "#f59e0b", alwaysRequired: false,
+    type: "quotation", label: "ใบเสนอราคา", color: "#d97706", alwaysRequired: false,
     icon: <RequestQuote sx={{ fontSize: 18 }} />,
     desc: "ใบเสนอราคาที่ต้องเสนอลูกค้าเพิ่มจากงานนี้ เช่น อะไหล่ที่ต้องเปลี่ยน หรืองานซ่อมเพิ่มเติมที่พบหน้างาน",
     question: "งานนี้ต้องเสนอราคางานเพิ่มเติมให้ลูกค้าไหม?",
@@ -88,7 +90,7 @@ const DOCUMENT_TYPES = [
     uploadHint: "แนบไฟล์ใบเสนอราคาที่ทำให้ลูกค้า — แอดมินจะนำไปติดตามผลกับลูกค้าต่อในหน้า “ติดตามใบเสนอราคา”",
   },
   {
-    type: "invoice", label: "ใบวางบิล", color: "#8b5cf6", alwaysRequired: false,
+    type: "invoice", label: "ใบวางบิล", color: "#0891b2", alwaysRequired: false,
     icon: <ReceiptLong sx={{ fontSize: 18 }} />,
     desc: "ใบวางบิล/ใบแจ้งหนี้ที่ต้องวางให้ลูกค้าสำหรับงานครั้งนี้",
     question: "งานนี้ต้องวางบิลลูกค้าไหม?",
@@ -98,7 +100,7 @@ const DOCUMENT_TYPES = [
     uploadHint: "แนบไฟล์ใบวางบิลที่ส่งให้ลูกค้า",
   },
   {
-    type: "completion", label: "ใบส่งมอบงาน", color: "#10b981", alwaysRequired: false,
+    type: "completion", label: "ใบส่งมอบงาน", color: "#059669", alwaysRequired: false,
     icon: <AssignmentTurnedIn sx={{ fontSize: 18 }} />,
     desc: "ใบส่งมอบงานที่ลูกค้าเซ็นรับงานเรียบร้อยแล้ว",
     question: "งานนี้มีใบส่งมอบงานที่ลูกค้าเซ็นรับไหม?",
@@ -228,21 +230,22 @@ const fileTypeIcon = (fileName) => {
 // (เปลี่ยนทุก poll อยู่แล้วแม้เนื้อหาเดิม) — onPreview/onOpenMenu ต้องเป็น stable reference จากต้นทาง
 const FileRow = React.memo(
   ({ file: f, onPreview, onOpenMenu }) => (
-    <Stack direction="row" alignItems="center" gap={0.5} sx={{
-      p: 1, borderRadius: 1.5, bgcolor: alpha("#6b7280", 0.06),
+    <Stack direction="row" alignItems="center" gap={1} sx={{
+      pl: 1.25, pr: 0.5, py: 0.5, borderRadius: 2, bgcolor: "#fff", border: `1px solid ${LINE}`,
     }}>
       {fileTypeIcon(f.fileName)}
-      <Typography variant="caption" color="text.secondary" noWrap flex={1} sx={{ fontSize: "0.8rem" }}
-        onClick={() => onPreview(f.fileUrl, f.fileName)} style={{ cursor: "pointer" }}>
+      <Typography noWrap flex={1} title={f.fileName}
+        sx={{ fontSize: "0.82rem", fontWeight: 600, color: INK_2, cursor: "pointer", minWidth: 0 }}
+        onClick={() => onPreview(f.fileUrl, f.fileName)}>
         {f.fileName}
       </Typography>
       <Tooltip title="ดูไฟล์">
-        <IconButton onClick={() => onPreview(f.fileUrl, f.fileName)} sx={{ p: 1 }}>
+        <IconButton onClick={() => onPreview(f.fileUrl, f.fileName)} sx={{ p: 0.9, color: MUTED }}>
           <Visibility sx={{ fontSize: 18 }} />
         </IconButton>
       </Tooltip>
-      <Tooltip title="เพิ่มเติม">
-        <IconButton onClick={e => onOpenMenu(e.currentTarget, f)} sx={{ p: 1 }}>
+      <Tooltip title="ดาวน์โหลด/พิมพ์/แชร์/ลบ">
+        <IconButton onClick={e => onOpenMenu(e.currentTarget, f)} sx={{ p: 0.9, color: MUTED }}>
           <MoreVert sx={{ fontSize: 18 }} />
         </IconButton>
       </Tooltip>
@@ -278,7 +281,7 @@ const DocumentFileList = ({ type, files, isUploading, uploadProgress, onFileUplo
   return (
     <Box>
       {fileList.length > 0 && (
-        <Stack spacing={0.5} sx={{ mb: 0.5, maxHeight: 260, overflowY: "auto", pr: 0.5 }}>
+        <Stack spacing={0.75} sx={{ mb: 1, maxHeight: 260, overflowY: "auto" }}>
           {fileList.map(f => (
             <FileRow key={f._id || f.fileUrl} file={f} onPreview={onPreview} onOpenMenu={handleOpenFileMenu} />
           ))}
@@ -336,13 +339,27 @@ const DocumentFileList = ({ type, files, isUploading, uploadProgress, onFileUplo
       ) : (
         <>
           <input ref={fileRef} type="file" hidden multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={handleFileChange} />
-          <Button
-            variant="outlined" fullWidth
-            startIcon={<CloudUpload sx={{ fontSize: 18 }} />}
-            onClick={() => fileRef.current?.click()}
-            sx={{ textTransform: "none", fontSize: "0.8rem", fontWeight: 600, borderRadius: 1.5, borderStyle: "dashed", py: 1 }}>
-            {fileList.length > 0 ? "+ เพิ่มไฟล์อีก" : "แนบไฟล์ (เลือกได้หลายไฟล์)"}
-          </Button>
+          {/* ✅ ปุ่มแนบไฟล์แบบกล่องเส้นประ — บอกชนิดไฟล์ที่รับได้ในตัว ไม่ต้องเดา */}
+          <Box component="button" type="button" onClick={() => fileRef.current?.click()}
+            sx={{
+              width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 1.25,
+              py: fileList.length > 0 ? 1 : 1.5, px: 1.5, borderRadius: 2, cursor: "pointer", font: "inherit",
+              border: `1.5px dashed ${ACCENT_LINE}`, bgcolor: fileList.length > 0 ? "#fff" : ACCENT_SOFT, color: ACCENT,
+              transition: "background-color .15s, border-color .15s",
+              "&:hover": { bgcolor: ACCENT_SOFT, borderColor: ACCENT },
+            }}>
+            <CloudUpload sx={{ fontSize: 22 }} />
+            <Box sx={{ textAlign: "left" }}>
+              <Typography sx={{ fontSize: "0.85rem", fontWeight: 800, lineHeight: 1.3 }}>
+                {fileList.length > 0 ? "เพิ่มไฟล์อีก" : "แนบไฟล์"}
+              </Typography>
+              {fileList.length === 0 && (
+                <Typography sx={{ fontSize: "0.7rem", color: MUTED, lineHeight: 1.3 }}>
+                  PDF, รูปภาพ, Word, Excel · เลือกได้หลายไฟล์
+                </Typography>
+              )}
+            </Box>
+          </Box>
         </>
       )}
     </Box>
@@ -371,167 +388,161 @@ const DocumentChecklistItem = ({
   // โหมดที่ 3: ไม่มีปุ่ม "มี/ไม่มี" ให้เลือก (เพราะไม่มีทางเลือก) แต่ก็ไม่มีเช็คบ็อกซ์ให้ติ๊กเหมือน report
   const requiredByJobType = !alwaysRequired && isDocRequired(event, type);
 
+  // ✅ สถานะของช่องนี้ 1 ป้ายทางขวา (แทนวงกลมเปล่า/การระบายสีทั้งการ์ด) — อ่านแล้วรู้ทันทีว่าต้องทำอะไรต่อ
+  const pending = alwaysRequired ? (!hasFiles ? "ต้องแนบไฟล์" : "รอยืนยัน")
+    : requiredByJobType || applicable === true ? "ต้องแนบไฟล์"
+    : "รอเลือก";
+  const pill = complete
+    ? { text: applicable === false && !alwaysRequired && !requiredByJobType ? "ไม่มี · ครบ" : "ครบแล้ว", fg: "#15803d", bg: "#f0fdf4", bd: "#bbf7d0", icon: <CheckCircle sx={{ fontSize: 14 }} /> }
+    : pending === "รอเลือก"
+      ? { text: pending, fg: MUTED, bg: SURFACE, bd: LINE }
+      : { text: pending, fg: "#b45309", bg: "#fffbeb", bd: "#fde68a" };
+  const required = alwaysRequired || requiredByJobType;
+  const fileList = (
+    <DocumentFileList
+      type={type} files={files}
+      isUploading={isUploading} uploadProgress={uploadProgress}
+      onFileUpload={onFileUpload} onDeleteFile={onDeleteFile} onPreview={onPreview}
+      isLocked={isLocked}
+    />
+  );
+  const hint = (text) => text ? (
+    <Typography sx={{ fontSize: "0.74rem", color: MUTED, lineHeight: 1.45, mb: 1 }}>{text}</Typography>
+  ) : null;
+
   return (
     <Box sx={{
-      borderRadius: 2, border: "1px solid",
-      borderColor: complete ? alpha(color, 0.35) : "divider",
-      background: complete ? alpha(color, 0.05) : "transparent",
-      transition: "all 0.15s ease",
-      overflow: "hidden",
+      borderRadius: 2.5, bgcolor: "#fff", overflow: "hidden",
+      border: `1px solid ${complete ? "#bbf7d0" : LINE}`,
+      boxShadow: "0 1px 2px rgba(15,23,42,.04)",
+      transition: "border-color .15s ease",
     }}>
-      {/* แถวหัวข้อ — แตะได้ทั้งแถวเพื่อติ๊ก (เฉพาะ Service Report) */}
-      <Stack direction="row" alignItems="center" gap={1.25}
-        onClick={alwaysRequired && !isLocked ? () => onToggleCheck(type, !checked) : undefined}
-        sx={{
-          p: 1.5,
-          cursor: alwaysRequired && !isLocked ? "pointer" : "default",
-          minHeight: 48,
-        }}>
+      {/* ── หัว: ไอคอนชนิดเอกสาร · ชื่อ + ป้ายบังคับ/ถ้ามี · ป้ายสถานะ ── */}
+      <Stack direction="row" alignItems="flex-start" gap={1.25} sx={{ px: 1.75, pt: 1.5, pb: 1 }}>
         <Box sx={{
-          width: 34, height: 34, borderRadius: "10px", flexShrink: 0,
+          width: 36, height: 36, borderRadius: "10px", flexShrink: 0,
           display: "flex", alignItems: "center", justifyContent: "center",
-          bgcolor: alpha(color, complete ? 0.18 : 0.1),
-          color,
+          bgcolor: alpha(color, 0.1), color,
         }}>
           {icon}
         </Box>
-        {/* ✅ ชื่อเอกสาร + คำอธิบายสั้นๆ ว่าเป็นเอกสารอะไรของงานนี้ — เดิมมีแต่ชื่อลอยๆ ช่างต้องเดาเอง
-            ว่า "ใบเสนอราคา" หมายถึงใบไหน ของอะไร ต้องทำอะไรกับมัน */}
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="body2" fontWeight={700}
-            color={complete ? color : "text.primary"}>
-            {label}
-          </Typography>
+          <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap">
+            <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", color: INK, lineHeight: 1.3 }}>{label}</Typography>
+            <Box component="span" sx={{
+              fontSize: "0.64rem", fontWeight: 800, px: 0.75, py: 0.1, borderRadius: 1,
+              color: required ? INK_2 : MUTED, bgcolor: required ? "#f1f5f9" : "transparent",
+              border: required ? "none" : `1px solid ${LINE}`,
+            }}>
+              {required ? "บังคับ" : "ถ้ามี"}
+            </Box>
+          </Stack>
+          {/* ✅ คำอธิบายเต็ม — ช่างรู้ว่าเอกสารนี้คืออะไร ของอะไร ใช้ทำอะไรต่อ (ผู้ใช้: "อธิบายรายละเอียดให้ครบ") */}
           {desc && (
-            <Typography variant="caption" color="text.secondary"
-              sx={{ display: "block", lineHeight: 1.35, mt: 0.15 }}>
-              {desc}
-            </Typography>
-          )}
-          {/* ✅ บอกให้ชัดว่าทำไมช่องนี้ถึงไม่มีตัวเลือก "ไม่มี" ให้กด — ไม่งั้นช่างจะงงว่าทำไมงานนี้
-              ต่างจากงานอื่น (เดียวกันนี้เป็นเหตุผลเดียวที่ปุ่มหายไป) */}
-          {requiredByJobType && (
-            <Typography variant="caption" fontWeight={700}
-              sx={{ display: "block", mt: 0.3, color: "#b45309", fontSize: "0.68rem" }}>
-              ⚠️ งาน PM ต้องมีเอกสารนี้ทุกครั้ง — แนบไฟล์ก่อนจึงจะขอปิดงานได้
-            </Typography>
+            <Typography sx={{ fontSize: "0.76rem", color: MUTED, lineHeight: 1.45, mt: 0.25 }}>{desc}</Typography>
           )}
         </Box>
-        {alwaysRequired ? (
-          <Box sx={{
-            width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            border: `2px solid ${checked ? color : alpha("#6b7280", 0.4)}`,
-            background: checked ? color : "transparent",
-            transition: "all 0.15s ease",
-          }}>
-            {checked && <CheckCircle sx={{ fontSize: 16, color: "#fff" }} />}
-          </Box>
-        ) : complete ? (
-          <CheckCircle sx={{ fontSize: 22, color, flexShrink: 0 }} />
-        ) : null}
+        <Box component="span" sx={{
+          display: "inline-flex", alignItems: "center", gap: 0.4, flexShrink: 0, mt: 0.25,
+          height: 24, px: 1, borderRadius: 999, fontSize: "0.7rem", fontWeight: 800, whiteSpace: "nowrap",
+          color: pill.fg, bgcolor: pill.bg, border: `1px solid ${pill.bd}`,
+        }}>
+          {pill.icon}{pill.text}
+        </Box>
       </Stack>
 
-      {/* เนื้อหาย่อย: คำเตือน / ปุ่มมี-ไม่มี / แนบไฟล์ */}
-      {alwaysRequired ? (
-        <Box sx={{ px: 1.5, pb: 1.5 }}>
-          {checked && !hasFiles && (
-            <Typography variant="caption" color="warning.main" sx={{ display: "block", mb: 0.75, fontWeight: 600 }}>
-              ⚠️ ต้องแนบไฟล์ก่อน จึงจะขอปิดงานได้
+      <Box sx={{ px: 1.75, pb: 1.75 }}>
+        {/* ✅ เหตุผลที่ช่องนี้ไม่มีตัวเลือก "ไม่มี" — บอกครั้งเดียวในกล่องเล็ก (เดิมเตือนซ้ำ 2 บรรทัดตัวส้มหนา) */}
+        {requiredByJobType && (
+          <Stack direction="row" gap={0.75} alignItems="flex-start" sx={{ mb: 1, px: 1.25, py: 0.85, borderRadius: 2, bgcolor: "#fffbeb", border: "1px solid #fef3c7" }}>
+            <InfoOutlined sx={{ fontSize: 16, color: "#d97706", mt: 0.15 }} />
+            <Typography sx={{ fontSize: "0.74rem", color: "#92400e", lineHeight: 1.45 }}>
+              งาน PM ต้องมีเอกสารนี้ทุกครั้ง — แนบไฟล์ก่อนจึงจะขอปิดงานได้
             </Typography>
-          )}
-          <DocumentFileList
-            type={type} files={files}
-            isUploading={isUploading} uploadProgress={uploadProgress}
-            onFileUpload={onFileUpload} onDeleteFile={onDeleteFile} onPreview={onPreview}
-            isLocked={isLocked}
-          />
-        </Box>
-      ) : requiredByJobType ? (
-        /* ✅ บังคับตามประเภทงาน (งาน PM: ใบวางบิล/ใบส่งมอบงาน) — ไม่มีคำถาม "มี/ไม่มี" ให้เลือกเลย
-           เพราะไม่มีทางเลือก ไปที่กล่องแนบไฟล์ตรงๆ พร้อมเตือนถ้ายังไม่แนบ (เทียบ pattern เดียวกับ
-           Service Report ด้านบน แค่ไม่ต้องติ๊กยืนยันเพิ่ม) */
-        <Box sx={{ px: 1.5, pb: 1.5 }}>
-          {!hasFiles && (
-            <Typography variant="caption" color="warning.main" sx={{ display: "block", mb: 0.75, fontWeight: 600 }}>
-              ⚠️ ยังไม่ได้แนบไฟล์ — ต้องแนบก่อนจึงจะขอปิดงานได้
+          </Stack>
+        )}
+
+        {alwaysRequired ? (
+          <>
+            {!hasFiles && hint("แนบไฟล์ Service Report ของงานนี้ แล้วกดยืนยันด้านล่าง — ต้องมีทั้งไฟล์และการยืนยันจึงจะขอปิดงานได้")}
+            {fileList}
+            {/* ✅ การยืนยันเป็นช่องติ๊กมีคำอธิบาย แทนวงกลมเปล่าทางขวาที่ไม่รู้ว่ากดได้ */}
+            <Stack direction="row" alignItems="center" gap={1} role="checkbox" aria-checked={checked}
+              onClick={!isLocked ? () => onToggleCheck(type, !checked) : undefined}
+              sx={{
+                mt: 1, px: 1.25, py: 0.9, borderRadius: 2, cursor: isLocked ? "default" : "pointer",
+                border: `1px solid ${checked ? ACCENT_LINE : LINE}`, bgcolor: checked ? ACCENT_SOFT : "#fff",
+                opacity: isLocked ? 0.7 : 1,
+              }}>
+              {checked ? <CheckBox sx={{ fontSize: 22, color: ACCENT }} /> : <CheckBoxOutlineBlank sx={{ fontSize: 22, color: FAINT }} />}
+              <Box sx={{ minWidth: 0 }}>
+                <Typography sx={{ fontSize: "0.82rem", fontWeight: 700, color: checked ? "#1d4ed8" : INK_2, lineHeight: 1.3 }}>
+                  ยืนยันว่า Service Report ครบถ้วนแล้ว
+                </Typography>
+                {checked && !hasFiles && (
+                  <Typography sx={{ fontSize: "0.7rem", color: "#b45309", fontWeight: 600 }}>ยังไม่มีไฟล์ — แนบไฟล์ก่อนจึงจะนับว่าครบ</Typography>
+                )}
+              </Box>
+            </Stack>
+          </>
+        ) : requiredByJobType ? (
+          <>
+            {!hasFiles && hint(uploadHint)}
+            {fileList}
+          </>
+        ) : applicable === null || applicable === undefined ? (
+          <>
+            {/* ✅ คำถามเจาะจงต่อชนิดเอกสาร + ปุ่มที่บอกผลลัพธ์ตรงๆ — ปุ่มขาวชัดเจน (เดิมสีเทาดูเหมือนกดไม่ได้) */}
+            <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: INK_2, mb: 0.75 }}>
+              {question || "งานนี้มีเอกสารนี้หรือไม่?"}
             </Typography>
-          )}
-          {uploadHint && !hasFiles && (
-            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.75, lineHeight: 1.4 }}>
-              {uploadHint}
+            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1 }}>
+              {[["yes", yesLabel || "มี", <CheckCircleOutline key="i" sx={{ fontSize: 18, color: SUCCESS }} />],
+                ["no", noLabel || "ไม่มี", <RemoveCircleOutline key="i" sx={{ fontSize: 18, color: FAINT }} />]].map(([v, text, ic]) => (
+                <Button key={v} disabled={isLocked} onClick={() => onSetApplicable(type, v === "yes")} startIcon={ic}
+                  sx={{
+                    textTransform: "none", fontWeight: 700, fontSize: "0.82rem", borderRadius: 2, py: 0.9,
+                    color: INK_2, bgcolor: "#fff", border: `1px solid ${LINE}`,
+                    "&:hover": { bgcolor: ACCENT_SOFT, borderColor: ACCENT_LINE },
+                  }}>
+                  {text}
+                </Button>
+              ))}
+            </Box>
+            {/* ✅ บอกล่วงหน้าว่าตอบแล้วจะเกิดอะไรต่อ — ลดความลังเลว่าจะกดผิดไหม */}
+            <Typography sx={{ fontSize: "0.7rem", color: FAINT, mt: 0.75 }}>
+              {yesLabel ? `เลือก “${yesLabel}” แล้วแนบไฟล์ · ` : ""}เลือกแล้วเปลี่ยนทีหลังได้ · ตอบครบทุกช่องจึงจะขอปิดงานได้
             </Typography>
-          )}
-          <DocumentFileList
-            type={type} files={files}
-            isUploading={isUploading} uploadProgress={uploadProgress}
-            onFileUpload={onFileUpload} onDeleteFile={onDeleteFile} onPreview={onPreview}
-            isLocked={isLocked}
-          />
-        </Box>
-      ) : applicable === null || applicable === undefined ? (
-        <Box sx={{ px: 1.5, pb: 1.5 }}>
-          {/* ✅ คำถามเจาะจงต่อชนิดเอกสาร + ปุ่มที่บอกผลลัพธ์ตรงๆ — เดิมทุกช่องใช้ข้อความเดียวกันหมด
-              ("งานนี้มีเอกสารนี้หรือไม่?" + "มี/ไม่มี") ซึ่งไม่ได้บอกว่ากำลังตอบเรื่องอะไรอยู่ */}
-          <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ display: "block", mb: 0.75 }}>
-            {question || "งานนี้มีเอกสารนี้หรือไม่?"}
-          </Typography>
-          <ToggleButtonGroup
-            fullWidth exclusive size="small"
-            value={null}
-            disabled={isLocked}
-            onChange={(_, val) => { if (val !== null) onSetApplicable(type, val === "yes"); }}
-            sx={{ height: 40 }}>
-            <ToggleButton value="yes" sx={{ textTransform: "none", fontWeight: 700, fontSize: "0.8rem", gap: 0.5 }}>
-              <CheckCircle sx={{ fontSize: 17 }} /> {yesLabel || "มี"}
-            </ToggleButton>
-            <ToggleButton value="no" sx={{ textTransform: "none", fontWeight: 700, fontSize: "0.8rem", gap: 0.5 }}>
-              <Close sx={{ fontSize: 17 }} /> {noLabel || "ไม่มี"}
-            </ToggleButton>
-          </ToggleButtonGroup>
-          {/* ✅ บอกล่วงหน้าว่าตอบแล้วจะเกิดอะไรต่อ — ลดความลังเลว่าจะกดผิดไหม */}
-          <Typography variant="caption" color="text.disabled" sx={{ display: "block", mt: 0.6, fontSize: "0.68rem" }}>
-            เลือกแล้วเปลี่ยนทีหลังได้ · ตอบครบทุกช่องจึงจะขอปิดงานได้
-          </Typography>
-        </Box>
-      ) : applicable === false ? (
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 1.5, pb: 1.5 }}>
-          {/* ✅ บอกด้วยคำเดียวกับที่ช่างเพิ่งกดเลือกไป (เช่น "ไม่ต้องเสนอราคาเพิ่ม") ไม่ใช่ประโยคกลางๆ
-              ที่อ่านแล้วนึกไม่ออกว่าเคยตอบอะไรไว้ */}
-          <Typography variant="caption" color="text.disabled">
-            {noneText || "ไม่มีเอกสารนี้สำหรับงานนี้"}
-          </Typography>
-          {!isLocked && (
-            <Button size="small" onClick={() => onSetApplicable(type, true)}
-              sx={{ textTransform: "none", fontSize: "0.75rem", minWidth: "auto" }}>
-              แก้เป็นต้องมี
-            </Button>
-          )}
-        </Stack>
-      ) : (
-        <Box sx={{ px: 1.5, pb: 1.5 }}>
-          {/* ✅ บอกว่าต้องแนบไฟล์อะไร และไฟล์นั้นถูกเอาไปใช้ต่อที่ไหน — เดิมมีแต่กล่องอัปโหลดเปล่าๆ
-              ช่างไม่รู้ว่าแนบแล้วเรื่องจบตรงนี้หรือมีคนเอาไปทำอะไรต่อ */}
-          {uploadHint && !hasFiles && (
-            <Typography variant="caption" color="text.secondary"
-              sx={{ display: "block", mb: 0.75, lineHeight: 1.4 }}>
-              {uploadHint}
+          </>
+        ) : applicable === false ? (
+          <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}
+            sx={{ px: 1.25, py: 0.75, borderRadius: 2, bgcolor: SURFACE }}>
+            {/* ✅ บอกด้วยคำเดียวกับที่ช่างเพิ่งกดเลือกไป (เช่น "ไม่ต้องเสนอราคาเพิ่ม") */}
+            <Typography sx={{ fontSize: "0.8rem", color: INK_2, display: "inline-flex", alignItems: "center", gap: 0.6 }}>
+              <RemoveCircleOutline sx={{ fontSize: 16, color: FAINT }} />
+              {noneText || "ไม่มีเอกสารนี้สำหรับงานนี้"}
             </Typography>
-          )}
-          <DocumentFileList
-            type={type} files={files}
-            isUploading={isUploading} uploadProgress={uploadProgress}
-            onFileUpload={onFileUpload} onDeleteFile={onDeleteFile} onPreview={onPreview}
-            isLocked={isLocked}
-          />
-          {!hasFiles && !isLocked && (
-            <Button size="small" onClick={() => onSetApplicable(type, false)}
-              sx={{ textTransform: "none", fontSize: "0.75rem", minWidth: "auto", p: 0, mt: 0.75, color: "text.disabled" }}>
-              {noLabel ? `แก้เป็น “${noLabel}”` : "เปลี่ยนเป็นไม่มี"}
-            </Button>
-          )}
-        </Box>
-      )}
+            {!isLocked && (
+              <Button size="small" onClick={() => onSetApplicable(type, true)}
+                sx={{ textTransform: "none", fontSize: "0.76rem", fontWeight: 700, minWidth: "auto", color: ACCENT, flexShrink: 0 }}>
+                เปลี่ยน
+              </Button>
+            )}
+          </Stack>
+        ) : (
+          <>
+            {/* ✅ บอกว่าต้องแนบไฟล์อะไร และไฟล์นั้นถูกเอาไปใช้ต่อที่ไหน */}
+            {!hasFiles && hint(uploadHint)}
+            {fileList}
+            {!hasFiles && !isLocked && (
+              <Button size="small" onClick={() => onSetApplicable(type, false)}
+                sx={{ textTransform: "none", fontSize: "0.74rem", fontWeight: 600, minWidth: "auto", px: 0.5, mt: 0.5, color: MUTED }}>
+                {noLabel ? `เปลี่ยนเป็น “${noLabel}”` : "เปลี่ยนเป็นไม่มี"}
+              </Button>
+            )}
+          </>
+        )}
+      </Box>
     </Box>
   );
 };
@@ -866,7 +877,7 @@ const TechnicianJobCard = ({
   // ✅ เช็คลิสต์เอกสารประจำงาน แยกออกมาเป็นตัวแปรเดียว ใช้ร่วมกันทั้งแบบกางลงในหน้า (Collapse บน
   // มือถือ) และแบบ Dialog ทับขึ้นมา (จอกว้าง) เหมือนกับ expandedContent ด้านล่าง
   const docsContent = (
-    <Stack spacing={1}>
+    <Stack spacing={1.25}>
       {DOCUMENT_TYPES.map(doc => (
         <DocumentChecklistItem
           key={doc.type}
@@ -1246,45 +1257,47 @@ const TechnicianJobCard = ({
         </Dialog>
 
       {!hideDocuments && (
-        <Dialog open={docsExpanded} onClose={() => setDocsExpanded(false)} fullWidth maxWidth="sm" fullScreen={!isDesktop}>
-          <DialogTitle sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}>
-            <Box sx={{ minWidth: 0 }}>
-              <Typography fontWeight={800} fontSize="1rem" noWrap>
-                {event.title || "ไม่ระบุประเภทงาน"}
+        <Dialog open={docsExpanded} onClose={() => setDocsExpanded(false)} fullWidth maxWidth="sm" fullScreen={!isDesktop}
+          PaperProps={{ sx: { borderRadius: { xs: 0, sm: 3 } } }}>
+          {/* ✅ หัวกระชับ: ชื่องาน · โครงการ/ระบบ/ครั้งที่ 1 บรรทัด · ความคืบหน้า + บอกว่าต้องครบกี่ช่องจึงขอปิดงานได้ */}
+          <Box sx={{ px: { xs: 2, sm: 2.5 }, pt: 2, pb: 1.75, borderBottom: `1px solid ${LINE}` }}>
+            <Stack direction="row" alignItems="flex-start" gap={1}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: MUTED, letterSpacing: 0.2 }}>เอกสารประจำงาน</Typography>
+                <Typography noWrap sx={{ fontWeight: 800, fontSize: "1.05rem", color: INK, lineHeight: 1.35 }}>
+                  {event.title || "ไม่ระบุประเภทงาน"}
+                </Typography>
+                {(() => {
+                  const place = [event.company && event.site ? `${event.company} · ${event.site}` : (event.company || event.site),
+                    event.system, event.time ? `ครั้งที่ ${formatRoundLabel(event.time, event.visitCount)}` : ""].filter(Boolean).join(" · ");
+                  return place ? <Typography sx={{ fontSize: "0.8rem", color: INK_2, mt: 0.25 }}>{place}</Typography> : null;
+                })()}
+              </Box>
+              <IconButton size="small" onClick={() => setDocsExpanded(false)} aria-label="ปิด" sx={{ color: MUTED, mr: -0.5 }}>
+                <Close fontSize="small" />
+              </IconButton>
+            </Stack>
+            <Stack direction="row" alignItems="center" gap={1.25} sx={{ mt: 1.5 }}>
+              <LinearProgress
+                variant="determinate"
+                value={(completedDocCount / DOCUMENT_TYPES.length) * 100}
+                sx={{
+                  flex: 1, height: 6, borderRadius: 5, bgcolor: "#f1f5f9",
+                  "& .MuiLinearProgress-bar": { bgcolor: completedDocCount === DOCUMENT_TYPES.length ? SUCCESS : ACCENT, borderRadius: 5 },
+                }}
+              />
+              <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: completedDocCount === DOCUMENT_TYPES.length ? "#15803d" : INK_2, whiteSpace: "nowrap" }}>
+                ครบ {completedDocCount}/{DOCUMENT_TYPES.length}
               </Typography>
-              <Typography variant="caption" color="text.secondary">
-                เอกสารประจำงาน ({completedDocCount}/{DOCUMENT_TYPES.length})
-              </Typography>
-              {(event.company || event.site || event.system || event.time) && (
-                <Stack direction="row" gap={2} flexWrap="wrap" sx={{ mt: 0.5 }}>
-                  <InfoLine label="โครงการ">
-                    {event.company && event.site ? `${event.company} · ${event.site}` : (event.company || event.site || "ไม่ระบุบริษัท/ไซต์")}
-                  </InfoLine>
-                  {event.system && <InfoLine label="ระบบ">{event.system}</InfoLine>}
-                  {event.time && <InfoLine label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount)}</InfoLine>}
-                </Stack>
-              )}
-            </Box>
-            <IconButton size="small" onClick={() => setDocsExpanded(false)}>
-              <Close fontSize="small" />
-            </IconButton>
-          </DialogTitle>
-          {/* ✅ เพิ่มหลอดสถานะความคืบหน้าเหมือนแถบด้านนอก (เดิมมีแค่ตัวเลข "0/4" ไม่มีหลอดจริง) */}
-          <Box sx={{ px: 3, pb: 1.5 }}>
-            <LinearProgress
-              variant="determinate"
-              value={(completedDocCount / DOCUMENT_TYPES.length) * 100}
-              sx={{
-                height: 10, borderRadius: 5,
-                bgcolor: alpha("#6b7280", 0.12),
-                "& .MuiLinearProgress-bar": {
-                  bgcolor: canRequestClose ? "#10b981" : "#3b82f6",
-                  borderRadius: 5,
-                },
-              }}
-            />
+            </Stack>
+            <Typography sx={{ fontSize: "0.72rem", color: MUTED, mt: 0.5 }}>
+              {completedDocCount === DOCUMENT_TYPES.length
+                ? "เอกสารครบแล้ว — กลับไปที่การ์ดงานเพื่อกด “ขอปิดงาน”"
+                : `เหลืออีก ${DOCUMENT_TYPES.length - completedDocCount} รายการ · ต้องครบทุกรายการจึงจะขอปิดงานได้`}
+              {isLocked ? " · งานปิดแล้ว ดูได้อย่างเดียว" : ""}
+            </Typography>
           </Box>
-          <DialogContent dividers>
+          <DialogContent sx={{ bgcolor: SURFACE, px: { xs: 1.5, sm: 2.5 }, py: 2 }}>
             {docsContent}
           </DialogContent>
         </Dialog>
