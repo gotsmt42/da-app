@@ -392,8 +392,12 @@ const DocumentChecklistItem = ({
   const pending = alwaysRequired ? (!hasFiles ? "ต้องแนบไฟล์" : "รอยืนยัน")
     : requiredByJobType || applicable === true ? "ต้องแนบไฟล์"
     : "รอเลือก";
-  const pill = complete
-    ? { text: applicable === false && !alwaysRequired && !requiredByJobType ? "ไม่มี · ครบ" : "ครบแล้ว", fg: "#15803d", bg: "#f0fdf4", bd: "#bbf7d0", icon: <CheckCircle sx={{ fontSize: 14 }} /> }
+  // ✅ ตอบ "ไม่มี" = ป้ายเทา "ไม่มีเอกสารนี้" ไม่ใช่ "ครบ" (ผู้ใช้: "ถ้าไม่มี ไม่ควรมีคำว่าครบ")
+  const notApplicable = complete && applicable === false && !alwaysRequired && !requiredByJobType;
+  const pill = notApplicable
+    ? { text: "ไม่มี", fg: MUTED, bg: SURFACE, bd: LINE }
+    : complete
+    ? { text: "แนบแล้ว", fg: "#15803d", bg: "#f0fdf4", bd: "#bbf7d0", icon: <CheckCircle sx={{ fontSize: 14 }} /> }
     : pending === "รอเลือก"
       ? { text: pending, fg: MUTED, bg: SURFACE, bd: LINE }
       : { text: pending, fg: "#b45309", bg: "#fffbeb", bd: "#fde68a" };
@@ -413,7 +417,7 @@ const DocumentChecklistItem = ({
   return (
     <Box sx={{
       borderRadius: 2.5, bgcolor: "#fff", overflow: "hidden",
-      border: `1px solid ${complete ? "#bbf7d0" : LINE}`,
+      border: `1px solid ${complete && !notApplicable ? "#bbf7d0" : LINE}`,
       boxShadow: "0 1px 2px rgba(15,23,42,.04)",
       transition: "border-color .15s ease",
     }}>
@@ -1287,14 +1291,15 @@ const TechnicianJobCard = ({
                 }}
               />
               <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: completedDocCount === DOCUMENT_TYPES.length ? "#15803d" : INK_2, whiteSpace: "nowrap" }}>
-                ครบ {completedDocCount}/{DOCUMENT_TYPES.length}
+                {completedDocCount}/{DOCUMENT_TYPES.length} รายการ
               </Typography>
             </Stack>
             <Typography sx={{ fontSize: "0.72rem", color: MUTED, mt: 0.5 }}>
-              {completedDocCount === DOCUMENT_TYPES.length
-                ? "เอกสารครบแล้ว — กลับไปที่การ์ดงานเพื่อกด “ขอปิดงาน”"
-                : `เหลืออีก ${DOCUMENT_TYPES.length - completedDocCount} รายการ · ต้องครบทุกรายการจึงจะขอปิดงานได้`}
-              {isLocked ? " · งานปิดแล้ว ดูได้อย่างเดียว" : ""}
+              {isLocked
+                ? "งานนี้ปิดแล้ว — ดูเอกสารได้อย่างเดียว"
+                : completedDocCount === DOCUMENT_TYPES.length
+                ? "ทำเอกสารทุกรายการเรียบร้อยแล้ว — กลับไปที่การ์ดงานเพื่อกด “ขอปิดงาน”"
+                : `เหลืออีก ${DOCUMENT_TYPES.length - completedDocCount} รายการ · ต้องแนบหรือตอบทุกรายการจึงจะขอปิดงานได้`}
             </Typography>
           </Box>
           <DialogContent sx={{ bgcolor: SURFACE, px: { xs: 1.5, sm: 2.5 }, py: 2 }}>
