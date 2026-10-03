@@ -12,6 +12,7 @@
  */
 
 import { useEffect, useMemo, useState, useCallback, cloneElement } from "react";
+import PdfBlobView from "@/shared/components/PdfBlobView";
 import useRealtime from "@/shared/realtime/useRealtime";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
@@ -104,7 +105,7 @@ const FilePreviewDialog = ({ previewUrl, previewFileName, onClose }) => {
   }, [type, previewUrl]);
 
   return (
-    <Dialog open={Boolean(previewUrl)} onClose={onClose} maxWidth="xl" fullWidth
+    <Dialog open={Boolean(previewUrl)} onClose={onClose} maxWidth="xl" fullWidth fullScreen={window.matchMedia?.("(max-width:600px)").matches}
       PaperProps={{ sx: { borderRadius: 3, overflow: "hidden" } }}>
       <DialogTitle sx={{ m: 0, p: 2, display: "flex", alignItems: "center", gap: 1.5 }}>
         {fileTypeIcon(previewFileName)}
@@ -140,7 +141,7 @@ const FilePreviewDialog = ({ previewUrl, previewFileName, onClose }) => {
               </Button>
             </Box>
           ) : pdfBlobUrl ? (
-            <iframe src={pdfBlobUrl} width="100%" height="780px" style={{ border: "none" }} title="PDF" />
+            <PdfBlobView url={pdfBlobUrl} />
           ) : null
         )}
         {(type === "word" || type === "excel") && (
