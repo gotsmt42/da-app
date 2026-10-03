@@ -800,24 +800,24 @@ export const FileUploadSection = ({
   const reportUnconfirmed = type === "report" && event && hasFiles && !event.documentSentReport;
   const pill = hasFiles
     ? (reportUnconfirmed
-        ? { text: "ช่างยังไม่ยืนยัน", fg: "#b45309", dot: "#f59e0b" }
-        : { text: `แนบแล้ว ${fileList.length} ไฟล์`, fg: "#15803d", icon: true })
+        ? { text: "ช่างยังไม่ยืนยัน", fg: "#b45309", bg: "#fffbeb", dot: "#f59e0b" }
+        : { text: `แนบแล้ว ${fileList.length} ไฟล์`, fg: "#15803d", bg: "#f0fdf4", icon: true })
     : applicable === false && !required
-      ? { text: "ไม่มี", fg: MUTED, dot: "#cbd5e1" }
+      ? { text: "ไม่มี", fg: MUTED, bg: "#f1f5f9", dot: FAINT }
       : required || applicable === true
-        ? { text: "ยังไม่แนบ", fg: "#b45309", dot: "#f59e0b" }
-        : { text: "รอช่างตอบ", fg: MUTED, dot: "#cbd5e1" };
+        ? { text: "ยังไม่แนบ", fg: "#b45309", bg: "#fffbeb", dot: "#f59e0b" }
+        : { text: "รอช่างตอบ", fg: MUTED, bg: "#f1f5f9", dot: FAINT };
 
   return (
     <Box sx={card ? {
-      borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}`,
+      borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${hasFiles && !reportUnconfirmed ? "#d1fae5" : LINE}`,
       boxShadow: "0 1px 2px rgba(15,23,42,.04)", px: 1.75, pt: 1.5, pb: 1.75,
     } : undefined}>
       <Stack direction="row" alignItems="flex-start" gap={1.25} sx={{ mb: 1.25 }}>
         <Box sx={{
           width: card ? 36 : 30, height: card ? 36 : 30, borderRadius: "10px", flexShrink: 0,
           display: "flex", alignItems: "center", justifyContent: "center",
-          bgcolor: "#f1f5f9", color: INK_2,
+          bgcolor: alpha(meta.color, 0.1), color: meta.color,
         }}>
           <TypeIcon sx={{ fontSize: card ? 19 : 17 }} />
         </Box>
@@ -840,10 +840,11 @@ export const FileUploadSection = ({
         </Box>
         <Box component="span" sx={{
           display: "inline-flex", alignItems: "center", gap: 0.4, flexShrink: 0, mt: 0.25,
-          height: 22, fontSize: "0.74rem", fontWeight: 700, whiteSpace: "nowrap", color: pill.fg,
+          height: 24, px: 1, borderRadius: 999, fontSize: "0.72rem", fontWeight: 700, whiteSpace: "nowrap",
+          color: pill.fg, bgcolor: pill.bg,
         }}>
           {!pill.icon && <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: pill.dot }} />}
-          {pill.icon && <CheckCircle sx={{ fontSize: 15 }} />}{pill.text}
+          {pill.icon && <CheckCircle sx={{ fontSize: 14 }} />}{pill.text}
         </Box>
       </Stack>
 
@@ -940,14 +941,14 @@ export const FileUploadSection = ({
           onClick={() => inputRef.current?.click()}
           sx={{
             display: "flex", alignItems: "center", gap: 1, minHeight: 44, px: 1.5, borderRadius: 2, cursor: "pointer",
-            border: `1px dashed ${dragging ? ACCENT : "#cbd5e1"}`,
-            bgcolor: dragging ? ACCENT_SOFT : "#fff", color: dragging ? ACCENT : INK_2,
+            border: `1px dashed ${dragging ? ACCENT : ACCENT_LINE}`,
+            bgcolor: dragging ? ACCENT_SOFT : "#fff", color: ACCENT,
             transition: "background-color .15s, border-color .15s, color .15s",
-            "&:hover": { bgcolor: ACCENT_SOFT, borderColor: ACCENT_LINE, color: ACCENT },
+            "&:hover": { bgcolor: ACCENT_SOFT, borderColor: ACCENT },
           }}>
           <input ref={inputRef} type="file" hidden multiple
             onChange={e => { if (e.target.files?.length) onUpload(e.target.files, eventId, type); }} />
-          <CloudUpload sx={{ fontSize: 19, opacity: 0.8 }} />
+          <CloudUpload sx={{ fontSize: 19 }} />
           <Typography component="span" sx={{ fontSize: "0.84rem", fontWeight: 700, color: "inherit" }}>
             {dragging ? "ปล่อยไฟล์ที่นี่" : hasFiles ? "เพิ่มไฟล์" : "แนบไฟล์"}
           </Typography>

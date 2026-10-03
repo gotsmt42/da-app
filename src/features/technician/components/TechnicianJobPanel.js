@@ -344,11 +344,11 @@ const DocumentFileList = ({ type, files, isUploading, uploadProgress, onFileUplo
             sx={{
               width: "100%", display: "flex", alignItems: "center", gap: 1, minHeight: 44,
               px: 1.5, borderRadius: 2, cursor: "pointer", font: "inherit", textAlign: "left",
-              border: "1px dashed #cbd5e1", bgcolor: "#fff", color: INK_2,
+              border: `1px dashed ${ACCENT_LINE}`, bgcolor: "#fff", color: ACCENT,
               transition: "background-color .15s, border-color .15s, color .15s",
-              "&:hover": { bgcolor: ACCENT_SOFT, borderColor: ACCENT_LINE, color: ACCENT },
+              "&:hover": { bgcolor: ACCENT_SOFT, borderColor: ACCENT },
             }}>
-            <CloudUpload sx={{ fontSize: 19, color: "inherit", opacity: 0.8 }} />
+            <CloudUpload sx={{ fontSize: 19, color: "inherit" }} />
             <Typography component="span" sx={{ fontSize: "0.84rem", fontWeight: 700, color: "inherit" }}>
               {fileList.length > 0 ? "เพิ่มไฟล์" : "แนบไฟล์"}
             </Typography>
@@ -391,12 +391,12 @@ const DocumentChecklistItem = ({
   // ✅ ตอบ "ไม่มี" = ป้ายเทา "ไม่มีเอกสารนี้" ไม่ใช่ "ครบ" (ผู้ใช้: "ถ้าไม่มี ไม่ควรมีคำว่าครบ")
   const notApplicable = complete && applicable === false && !alwaysRequired && !requiredByJobType;
   const pill = notApplicable
-    ? { text: "ไม่มี", fg: MUTED, dot: "#cbd5e1" }
+    ? { text: "ไม่มี", fg: MUTED, bg: "#f1f5f9", dot: FAINT }
     : complete
-    ? { text: "แนบแล้ว", fg: "#15803d", icon: <CheckCircle sx={{ fontSize: 15 }} /> }
+    ? { text: "แนบแล้ว", fg: "#15803d", bg: "#f0fdf4", icon: <CheckCircle sx={{ fontSize: 14 }} /> }
     : pending === "รอเลือก"
-      ? { text: pending, fg: MUTED, dot: "#cbd5e1" }
-      : { text: pending, fg: "#b45309", dot: "#f59e0b" };
+      ? { text: pending, fg: MUTED, bg: "#f1f5f9", dot: FAINT }
+      : { text: pending, fg: "#b45309", bg: "#fffbeb", dot: "#f59e0b" };
   const required = alwaysRequired || requiredByJobType;
   const fileList = (
     <DocumentFileList
@@ -413,7 +413,7 @@ const DocumentChecklistItem = ({
   return (
     <Box sx={{
       borderRadius: 2.5, bgcolor: "#fff", overflow: "hidden",
-      border: `1px solid ${LINE}`,
+      border: `1px solid ${complete && !notApplicable ? "#d1fae5" : LINE}`,
       boxShadow: "0 1px 2px rgba(15,23,42,.04)",
       transition: "border-color .15s ease",
     }}>
@@ -422,7 +422,7 @@ const DocumentChecklistItem = ({
         <Box sx={{
           width: 36, height: 36, borderRadius: "10px", flexShrink: 0,
           display: "flex", alignItems: "center", justifyContent: "center",
-          bgcolor: "#f1f5f9", color: INK_2,
+          bgcolor: alpha(color, 0.1), color,
         }}>
           {icon}
         </Box>
@@ -444,7 +444,8 @@ const DocumentChecklistItem = ({
         </Box>
         <Box component="span" sx={{
           display: "inline-flex", alignItems: "center", gap: 0.4, flexShrink: 0, mt: 0.25,
-          height: 22, fontSize: "0.74rem", fontWeight: 700, whiteSpace: "nowrap", color: pill.fg,
+          height: 24, px: 1, borderRadius: 999, fontSize: "0.72rem", fontWeight: 700, whiteSpace: "nowrap",
+          color: pill.fg, bgcolor: pill.bg,
         }}>
           {!pill.icon && <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: pill.dot }} />}
           {pill.icon}{pill.text}
@@ -471,7 +472,7 @@ const DocumentChecklistItem = ({
               onClick={!isLocked ? () => onToggleCheck(type, !checked) : undefined}
               sx={{
                 mt: 1, px: 1.25, py: 0.9, borderRadius: 2, cursor: isLocked ? "default" : "pointer",
-                border: `1px solid ${LINE}`, bgcolor: "#fff",
+                border: `1px solid ${checked ? ACCENT_LINE : LINE}`, bgcolor: checked ? ACCENT_SOFT : "#fff",
                 opacity: isLocked ? 0.7 : 1,
               }}>
               {checked ? <CheckBox sx={{ fontSize: 22, color: ACCENT }} /> : <CheckBoxOutlineBlank sx={{ fontSize: 22, color: FAINT }} />}
