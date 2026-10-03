@@ -835,14 +835,18 @@ function injectStyles() {
     /* ✅ ซ่อนไอคอนสถานะ (✅/⏳) — ผู้ใช้: "ลบไอคอนติ๊กถูกออกได้" สถานะเห็นจากแถบสีด้านบน + ปุ่มเลือกสถานะแล้ว
        ⚠️ ซ่อนด้วย CSS ไม่ลบ element — โค้ดเปลี่ยนสถานะยังอ้าง #ee-status-icon อยู่ */
     .swal-edit-event #ee-status-icon { display: none; }
-    .swal-edit-event #ee-head-meta { flex: 1 1 100%; margin-left: 0; gap: 6px; display: flex; flex-wrap: wrap; min-width: 0; }
-    .swal-edit-event #ee-head-meta:empty { display: none; }
-    .swal-edit-event #ee-head-meta .ee-tag {
-      display: inline-flex; align-items: center; gap: 4px; max-width: 100%; white-space: normal; line-height: 1.35;
-      background: #f8fafc; border: 1px solid #e2e8f0; color: #334155; font-size: 12px; font-weight: 600;
-      border-radius: 999px; padding: 3px 10px;
+    .swal-edit-event #ee-head-meta {
+      flex: 1 1 100%; min-width: 0; display: grid; gap: 8px;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     }
-    .swal-edit-event #ee-head-meta .ee-tag--muted { background: #fff; border-style: dashed; color: #94a3b8; }
+    .ee-hm-item {
+      min-width: 0; display: flex; flex-direction: column; gap: 2px;
+      padding: 7px 11px; border-radius: 10px; background: #f8fafc; border: 1px solid #eef2f7;
+    }
+    .ee-hm-label { font-size: 11px; font-weight: 700; color: #64748b; letter-spacing: .01em; }
+    .ee-hm-value { font-size: 13.5px; font-weight: 700; color: #0f172a; line-height: 1.35; overflow-wrap: anywhere; }
+    .ee-hm-value small { font-weight: 500; color: #94a3b8; font-size: 11px; }
+    .ee-hm-value--empty { color: #94a3b8; font-weight: 600; }
     .swal-edit-event #ee-status-title .ee-tag {
       background: #f8fafc; border: 1px solid #e2e8f0; color: #334155; font-size: 11.5px; padding: 2px 9px;
     }
@@ -854,7 +858,7 @@ function injectStyles() {
     }
     .swal-edit-event #ee-close-btn:hover, .swal-edit-event #ee-copy-btn:hover { background: #e2e8f0; }
     /* Swal โฟกัสปุ่มแรกให้เองตอนเปิด — ไม่ต้องโชว์กรอบดำถ้าไม่ได้ใช้คีย์บอร์ด */
-    .swal-edit-event #ee-close-btn:focus:not(:focus-visible), .swal-edit-event #ee-copy-btn:focus:not(:focus-visible) { outline: none; box-shadow: none; }
+    .swal-edit-event #ee-close-btn:focus, .swal-edit-event #ee-copy-btn:focus { outline: none; box-shadow: none; }
     .swal-edit-event #ee-body { text-align: left; padding: 16px 20px 12px; }
     .swal-edit-event #ee-status-bar { border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 1px 2px rgba(15,23,42,.04); padding: 8px 12px; gap: 10px; }
 
@@ -907,7 +911,14 @@ function injectStyles() {
       .swal-edit-event #ee-status-title h3 { font-size: 15px; }
       #ee-head-status { margin-left: 0; }
       .swal-edit-event #ee-status-select-wrap { flex: 1 1 auto; }
-      #ee-head-meta { margin-left: 0; }
+      /* มือถือ: กล่องเดียว แถวละบทบาท (ป้ายซ้าย · ชื่อขวา) — อ่านไล่ลงได้ทันที ไม่เหลือช่องว่างกำพร้า */
+      .swal-edit-event #ee-head-meta {
+        grid-template-columns: 1fr; gap: 0; border: 1px solid #eef2f7; border-radius: 10px; background: #f8fafc; overflow: hidden;
+      }
+      .ee-hm-item { flex-direction: row; align-items: baseline; gap: 10px; border: 0; border-radius: 0; background: transparent; padding: 7px 12px; }
+      .ee-hm-item + .ee-hm-item { border-top: 1px solid #eef2f7; }
+      .ee-hm-label { flex: 0 0 116px; font-size: 12px; }
+      .ee-hm-value { flex: 1; min-width: 0; font-size: 13.5px; }
       .swal-edit-event #ee-body { padding: 12px 12px 14px; }
       .ee-map-bar { flex-wrap: wrap; }
       .ee-map-info { flex: 1 1 100%; }
@@ -1527,16 +1538,23 @@ export const getEditEvent = async ({
     </div>
     ${canCopyEvent ? `<button id="ee-copy-btn" title="คัดลอกงานนี้">📋</button>` : ""}
     <button id="ee-close-btn" title="ปิด">✕</button>
-    <div class="ee-header-meta" id="ee-head-meta">
-      ${/* ✅ ป้ายทีม/ผู้รับผิดชอบ/ประเภทงาน เป็นแถวเต็มความกว้างของหัวกล่อง ตัดบรรทัดได้ — แสดงครบทุกตัว
-           (ผู้ใช้สั่ง 3 ต.ค. 2569 "อยากให้แสดงได้เต็มทั้งหมด") เดิมอยู่ใต้ชื่องานแคบๆ แล้วต้องเลื่อนแนวนอน */""}
-      ${/* ✅ เอาชิป 📍 โครงการ/แผนที่ออกจากหัวกล่อง (ผู้ใช้สั่ง 3 ต.ค. 2569: "มีในด้านล่างอยู่แล้ว")
-           — แผนที่ + ปุ่มนำทาง/ค้นหาอยู่การ์ดบนสุดของฟอร์ม และปุ่ม 📍 ในแถบล่าง */""}
-      ${eventTeam && eventTeam !== headerResponsibleName ? `<span class="ee-tag">👷 ${attrHtml(eventTeam)}</span>` : ""}
-      ${headerResponsibleName
-        ? `<span class="ee-tag"${headerResponsibleIsInferred ? ' title="งานนี้ยังไม่ได้ระบุผู้รับผิดชอบไว้ชัดเจน — แสดงตามทีมที่เข้างานแทน"' : ""}>🧑‍💼 ผู้รับผิดชอบ: ${attrHtml(headerResponsibleName)}${headerResponsibleIsInferred ? " (ตามทีมที่เข้างาน)" : ""}</span>`
-        : `<span class="ee-tag ee-tag--muted" title="${isOverviewManagedJob ? "มอบหมายผู้รับผิดชอบได้ที่หน้าภาพรวมงาน" : "ยังไม่มีใครรับผิดชอบงานนี้"}">🧑‍💼 ยังไม่ได้มอบหมายผู้รับผิดชอบ</span>`}
-      ${eventJobClassMeta ? `<span class="ee-tag">${eventJobClassMeta.emoji} ${attrHtml(eventJobClassMeta.label)}</span>` : ""}
+    ${/* ✅ ข้อมูลคนของงาน — มีป้ายกำกับชัดเจน (ผู้ใช้สั่ง 3 ต.ค. 2569: "อธิบายด้วยว่า หัวหน้าทีม ผู้รับผิดชอบ ให้ชัดเจน
+         และสวยงาม") เดิมเป็นชิปลอยๆ ไม่บอกว่าชื่อไหนคือบทบาทอะไร · แถวเต็มความกว้าง แสดงครบทุกตัว */""}
+    <div id="ee-head-meta">
+      <div class="ee-hm-item">
+        <span class="ee-hm-label">หัวหน้าทีมเข้างาน</span>
+        <span class="ee-hm-value${eventTeam ? "" : " ee-hm-value--empty"}">${eventTeam ? `👷 ${attrHtml(eventTeam)}` : "ยังไม่ระบุ"}</span>
+      </div>
+      <div class="ee-hm-item"${headerResponsibleIsInferred ? ' title="งานนี้ยังไม่ได้ระบุผู้รับผิดชอบไว้ชัดเจน — แสดงตามทีมที่เข้างานแทน"' : !headerResponsibleName ? ` title="${isOverviewManagedJob ? "มอบหมายผู้รับผิดชอบได้ที่หน้าภาพรวมงาน" : "ยังไม่มีใครรับผิดชอบงานนี้"}"` : ""}>
+        <span class="ee-hm-label">ผู้รับผิดชอบ</span>
+        <span class="ee-hm-value${headerResponsibleName ? "" : " ee-hm-value--empty"}">${headerResponsibleName
+          ? `🧑‍💼 ${attrHtml(headerResponsibleName)}${headerResponsibleIsInferred ? ' <small>(ตามทีมที่เข้างาน)</small>' : ""}`
+          : "ยังไม่ได้มอบหมาย"}</span>
+      </div>
+      ${eventJobClassMeta ? `<div class="ee-hm-item">
+        <span class="ee-hm-label">ประเภทงาน</span>
+        <span class="ee-hm-value">${eventJobClassMeta.emoji} ${attrHtml(eventJobClassMeta.label)}</span>
+      </div>` : ""}
     </div>
     ${/* ✅ สถานะงานอยู่บนหัวกล่อง (ผู้ใช้สั่ง 3 ต.ค. 2569: "การเลือกสถานะให้เอาไว้ header ของงาน") — แถวของตัวเอง
          เต็มความกว้าง ไม่เบียดชื่องาน/ป้าย · สีของปุ่มตามสถานะ (ตัวแปร --ee-status ของหัวกล่อง) */""}
