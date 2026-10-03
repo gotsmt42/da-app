@@ -1513,16 +1513,8 @@ export const getEditEvent = async ({
     <div id="ee-status-title">
       <h3><span >${attrHtml(eventTitle)} · ${attrHtml(eventSystem)} ${eventTime ? `· ครั้งที่ ${attrHtml(formatRoundLabel(eventTime, eventVisitCount))}` : ""}</span></h3>
       <div class="ee-header-meta">
-        ${/* ✅ ที่แก้ (ผู้ใช้ขอ: "หน้า event อยากให้แสดงให้เห็นง่ายกว่านี้ เช่น header หรือ footer"):
-             เดิมลิงก์แผนที่ถูกฝังอยู่กลางฟอร์ม ระหว่าง "ครั้งที่" กับ "ผู้เข้างาน" ต้องเลื่อนหาถึงจะเจอ
-             — ทั้งที่บน header มีชิป 📍 ชื่อโครงการอยู่แล้ว แค่กดไม่ได้เฉยๆ
-             ✅ ทำชิปเดิมให้กดได้เลย ไม่ต้องเพิ่มอะไรใหม่บน header (ไม่เพิ่มความรก)
-             มีพิกัดบันทึกไว้ = เปิดนำทางทันที · ยังไม่มี = พาไปค้นหาใน Maps ให้ */""}
-        <a class="ee-tag ee-tag--link" id="ee-mapChip"
-           href="${attrHtml(savedMapUrl || mapSearchHref)}" target="_blank" rel="noopener noreferrer"
-           title="${savedMapUrl ? "เปิดแผนที่นำทางไปหน้างาน" : "ยังไม่มีพิกัดบันทึกไว้ — กดเพื่อค้นหาใน Google Maps"}">
-          ${googleMapsPinSvg(13)} ${attrHtml(eventSite) || "—"} <span class="ee-tag-go">${savedMapUrl ? "นำทาง ↗" : "ค้นหา ↗"}</span>
-        </a>
+        ${/* ✅ เอาชิป 📍 โครงการ/แผนที่ออกจากหัวกล่อง (ผู้ใช้สั่ง 3 ต.ค. 2569: "มีในด้านล่างอยู่แล้ว")
+             — แผนที่ + ปุ่มนำทาง/ค้นหาอยู่การ์ดบนสุดของฟอร์ม และปุ่ม 📍 ในแถบล่าง */""}
         ${eventTeam && eventTeam !== headerResponsibleName ? `<span class="ee-tag">👷 ${attrHtml(eventTeam)}</span>` : ""}
         ${headerResponsibleName
           ? `<span class="ee-tag"${headerResponsibleIsInferred ? ' title="งานนี้ยังไม่ได้ระบุผู้รับผิดชอบไว้ชัดเจน — แสดงตามทีมที่เข้างานแทน"' : ""}>🧑‍💼 ผู้รับผิดชอบ: ${attrHtml(headerResponsibleName)}${headerResponsibleIsInferred ? " (ตามทีมที่เข้างาน)" : ""}</span>`
@@ -2199,10 +2191,9 @@ export const getEditEvent = async ({
       const mapEditor = document.getElementById("ee-mapEditor");
       const mapInput = document.getElementById("ee-mapInput");
       const mapMsg = document.getElementById("ee-mapMsg");
-      // ⚠️ ปุ่ม/ลิงก์เปิดแผนที่ตอนนี้มี 2 จุด (ชิปบน header + ปุ่มในแถบล่าง) — บันทึกแล้วต้อง
-      // อัปเดตทั้งคู่ ไม่งั้นจุดที่ไม่ได้อัปเดตจะยังพาไปหน้าค้นหาเดิมทั้งที่บันทึกพิกัดไปแล้ว
+      // ⚠️ ปุ่ม/ลิงก์เปิดแผนที่มีหลายจุด (ปุ่มในแถบล่าง + ปุ่มใต้แผนที่) — บันทึกแล้วต้องอัปเดตทุกจุด
+      // ไม่งั้นจุดที่ไม่ได้อัปเดตจะยังพาไปหน้าค้นหาเดิมทั้งที่บันทึกพิกัดไปแล้ว
       const mapTargets = [
-        document.getElementById("ee-mapChip"),
         document.getElementById("btnOpenMap"),
         document.getElementById("ee-mapGo"),
       ].filter(Boolean);
