@@ -27,7 +27,6 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { formatThai } from "@/shared/utils/thaiDate";
-import { useAuth } from "@/features/auth/AuthContext";
 import {
   Search, Clear, Refresh, WorkOutline, HourglassTop, TaskAlt, Warning,
   Download, Close, PictureAsPdf, FolderOpen, Image, Article, InsertDriveFile, AttachFile,
@@ -356,9 +355,6 @@ export default function MyJobs() {
 
   // ✅ เปิดหน้ามาครั้งแรก ถ้าไม่มีงานที่ต้องทำแต่มีงานค้าง → พาไปหมวดค้างงานเลย (ไม่ต้องเจอหน้าว่างก่อน)
   const autoPickedRef = useRef(false);
-  const { userData } = useAuth();
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? "สวัสดีตอนเช้า" : hour < 17 ? "สวัสดีตอนบ่าย" : "สวัสดีตอนเย็น";
   useEffect(() => {
     if (autoPickedRef.current || loading || !events.length) return;
     autoPickedRef.current = true;
@@ -478,38 +474,30 @@ export default function MyJobs() {
   }, [fetchJobs]);
 
   return (
-    <Box sx={{ px: { xs: 1.5, sm: 2 }, pt: 2, pb: 4, maxWidth: 720, mx: "auto" }}>
+    <Box sx={{ px: { xs: 0.5, sm: 1.5 }, pt: 1.5, pb: 4, maxWidth: 860, mx: "auto" }}>
       {/* ✅ ผู้ใช้สั่ง (3 ต.ค. 2569): "UI มองง่ายขึ้น มืออาชีพ แสดงผลครบ" — หัวกล่องขาวชุดเดียวกับทุกหน้า
           · สถานะ 4 หมวดเห็นครบทุกช่องโดยไม่ต้องเลื่อน (เดิมเป็นชิปเลื่อนแนวนอน หมวดท้ายถูกตัดหาย) */}
       {/* ✅ หัวหน้าแบบทักทาย + สรุปวันนี้ (ผู้ใช้: "สีสันจืด ไม่ดึงดูดให้ทำงาน") — พื้นน้ำเงินไล่เฉดอ่อนๆ ตัวหนังสือขาว */}
-      <Box sx={{
-        position: "relative", overflow: "hidden", mb: 1.25, px: 1.75, py: 1.4, borderRadius: 3, color: "#fff",
-        background: "linear-gradient(135deg, #1d4ed8 0%, #2563eb 55%, #3b82f6 100%)",
-        boxShadow: "0 4px 14px rgba(37,99,235,.2)",
-      }}>
-        <Box sx={{ position: "absolute", right: -30, top: -30, width: 140, height: 140, borderRadius: "50%", bgcolor: "rgba(255,255,255,.08)" }} />
-        <Box sx={{ position: "absolute", right: 40, bottom: -50, width: 110, height: 110, borderRadius: "50%", bgcolor: "rgba(255,255,255,.06)" }} />
-        <Stack direction="row" alignItems="center" spacing={1.25} sx={{ position: "relative" }}>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography noWrap sx={{ fontSize: "0.72rem", opacity: 0.85, fontWeight: 600 }}>
-              {greeting}{userData?.fname ? ` คุณ${userData.fname}` : ""}
-            </Typography>
-            <Typography sx={{ fontWeight: 900, fontSize: "1.08rem", lineHeight: 1.3 }}>งานของฉัน</Typography>
-            <Typography noWrap sx={{ fontSize: "0.76rem", opacity: 0.92 }}>
-              {loading ? "กำลังโหลดงาน…" : groupCounts.overdue > 0
-                ? `มีงานค้าง ${groupCounts.overdue} งาน — ส่งงาน/ขอปิดงานให้เรียบร้อยนะ`
-                : groupCounts.active > 0
-                  ? `วันนี้มีงานต้องทำ ${groupCounts.active} งาน — ลุยกันเลย 💪`
-                  : "ไม่มีงานค้าง เยี่ยมมาก 🎉"}
-            </Typography>
-          </Box>
-          <Tooltip title="รีเฟรช">
-            <IconButton size="small" onClick={() => fetchJobs()} sx={{ width: 36, height: 36, color: "#fff", bgcolor: "rgba(255,255,255,.16)", border: "1px solid rgba(255,255,255,.25)", borderRadius: 2.5, "&:hover": { bgcolor: "rgba(255,255,255,.26)" } }}>
-              <Refresh sx={{ fontSize: 18 }} />
-            </IconButton>
-          </Tooltip>
-        </Stack>
-      </Box>
+      {/* ✅ หัวหน้าโทนเรียบ (ผู้ใช้: "สีหัวข้อเด่นเกิน ดูรก") — ขาว ขอบเทา · สีเหลือแค่ไอคอนและข้อความสรุป */}
+      <Stack direction="row" alignItems="center" spacing={1.25}
+        sx={{ mb: 1.25, px: 1.5, py: 1.1, borderRadius: 3, bgcolor: "#fff", border: "1px solid #e2e8f0", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
+        <Box sx={{ width: 36, height: 36, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#eff6ff", color: "#2563eb" }}>
+          <WorkOutline sx={{ fontSize: 20 }} />
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography sx={{ fontWeight: 900, fontSize: "1.05rem", color: "#0f172a", lineHeight: 1.3 }}>งานของฉัน</Typography>
+          <Typography noWrap sx={{ fontSize: "0.76rem", fontWeight: 600, color: !loading && groupCounts.overdue > 0 ? "#b91c1c" : "#64748b" }}>
+            {loading ? "กำลังโหลดงาน…" : groupCounts.overdue > 0
+              ? `มีงานค้าง ${groupCounts.overdue} งาน — ส่งงาน/ขอปิดงานให้เรียบร้อย`
+              : groupCounts.active > 0 ? `วันนี้มีงานต้องทำ ${groupCounts.active} งาน` : "ไม่มีงานค้าง เยี่ยมมาก 🎉"}
+          </Typography>
+        </Box>
+        <Tooltip title="รีเฟรช">
+          <IconButton size="small" onClick={() => fetchJobs()} sx={{ width: 36, height: 36, border: "1px solid #e2e8f0", borderRadius: 2.5, color: "#334155" }}>
+            <Refresh sx={{ fontSize: 18 }} />
+          </IconButton>
+        </Tooltip>
+      </Stack>
 
       {/* ✅ แถวเดียว 4 ช่อง — สีประจำหมวด (ฟ้า/แดง/ส้ม/เขียว) ที่ไอคอนและตัวเลข · ช่องที่เลือกพื้นอ่อน+ขอบสีหมวด */}
       <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 0.75, mb: 1.25 }}>
