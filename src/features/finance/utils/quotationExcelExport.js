@@ -43,7 +43,7 @@ const STATUS_COLOR = {
 };
 const STATUS_LABEL = {
   waiting_file: "รอช่างแนบไฟล์",
-  not_sent: "รอส่งลูกค้า",
+  not_sent: "รอช่างส่งงาน",
   sent: "รอลูกค้าตอบ",
   follow_up: "ต้องติดตามด่วน",
   revising: "ลูกค้าขอแก้ไข",
@@ -81,7 +81,7 @@ export async function exportQuotationsToExcel({ jobs, meta, getFollowUpInfo, for
     { key: "round", header: "ครั้งที่", width: 10, group: "ข้อมูลงาน", align: "center" },
     { key: "docNo", header: "เลขที่เอกสาร", width: 16, group: "ข้อมูลงาน" },
     { key: "jobDate", header: "วันที่เข้างาน", width: 22, group: "ข้อมูลงาน" },
-    { key: "sentAt", header: "วันที่ส่งลูกค้า", width: 14, group: "การติดตาม", align: "center" },
+    { key: "sentAt", header: "วันที่เริ่มนับ", width: 14, group: "การติดตาม", align: "center" },
     { key: "followUpCount", header: "ติดตามแล้ว (ครั้ง)", width: 15, group: "การติดตาม", align: "center" },
     { key: "lastContact", header: "ติดต่อล่าสุด", width: 14, group: "การติดตาม", align: "center" },
     { key: "silentDays", header: "เงียบมา (วัน)", width: 13, group: "การติดตาม", align: "center" },

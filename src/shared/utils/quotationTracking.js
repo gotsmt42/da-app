@@ -78,7 +78,7 @@ export const getFollowUpInfo = (event) => {
 
 // ✅ สถานะของ "งาน" ในหน้าติดตามใบเสนอราคา — mutually exclusive ให้ตรงกับแท็บบนหน้า
 // waiting_file: quotationApplicable=true แต่ยังไม่มีไฟล์ (ช่างยังไม่ได้แนบ)
-// not_sent:     มีไฟล์แล้วแต่ยังไม่ได้กดส่งลูกค้า
+// not_sent:     มีไฟล์แล้วแต่ยังไม่เริ่มนับ = รอช่างส่งงาน (server เริ่มนับเองเมื่อส่งงาน — services/quotationAutoStart.js)
 // follow_up:    ติดต่อลูกค้าครั้งล่าสุดผ่านมาเกิน WARNING_DAYS_AFTER_SENT วัน ยังไม่มีผล
 // sent:         ส่ง/ติดตามไปแล้ว ยังไม่ถึงกำหนดติดตามรอบถัดไป
 // approved / rejected / revising: ตรงกับ quotationStatus

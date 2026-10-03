@@ -58,8 +58,9 @@ const STATUS = {
   follow_up: { label: "ต้องติดตามด่วน", short: "ตามด่วน", color: "#dc2626", icon: WarningAmber },
   sent: { label: "รอลูกค้าตอบ", short: "รอตอบ", color: "#2563eb", icon: Send },
   revising: { label: "ลูกค้าขอแก้ไข", short: "ขอแก้ไข", color: "#7c3aed", icon: Autorenew },
-  not_sent: { label: "รอส่งลูกค้า", short: "รอส่ง", color: "#d97706", icon: HourglassTop },
-  waiting_file: { label: "รอแนบไฟล์", short: "รอไฟล์", color: "#64748b", icon: AttachFile },
+  // ✅ ไม่มีขั้น "ส่งลูกค้า" แล้ว — มีไฟล์แต่ยังไม่เริ่มนับ = รอช่างส่งงาน (services/quotationAutoStart.js)
+  not_sent: { label: "รอช่างส่งงาน", short: "รอส่งงาน", color: "#d97706", icon: HourglassTop },
+  waiting_file: { label: "รอแนบใบเสนอราคา", short: "รอไฟล์", color: "#64748b", icon: AttachFile },
   approved: { label: "อนุมัติแล้ว", short: "อนุมัติ", color: "#15803d", icon: CheckCircle },
   rejected: { label: "ปฏิเสธ", short: "ปฏิเสธ", color: "#94a3b8", icon: Cancel },
 };
@@ -162,7 +163,7 @@ const DesktopTable = ({ jobs, onOpen, onPreview }) => (
           <TableCell>ใบเสนอราคา</TableCell>
           <TableCell>ผู้รับผิดชอบ</TableCell>
           <TableCell align="right">มูลค่า</TableCell>
-          <TableCell>ส่งลูกค้า / ยืนราคา</TableCell>
+          <TableCell>เริ่มนับ / ยืนราคา</TableCell>
           <TableCell>การติดตาม</TableCell>
           <TableCell>สถานะ</TableCell>
           <TableCell width={36} />
@@ -202,7 +203,7 @@ const DesktopTable = ({ jobs, onOpen, onPreview }) => (
                 ) : <Typography sx={{ fontSize: "0.78rem", fontWeight: 600, color: "#94a3b8" }}>ยังไม่ระบุ</Typography>}
               </TableCell>
               <TableCell sx={{ whiteSpace: "nowrap" }}>
-                <Typography sx={{ fontSize: "0.8rem", color: a.quotationSentAt ? TEXT_MAIN : TEXT_SUB }}>{a.quotationSentAt ? thaiDate(a.quotationSentAt) : "ยังไม่ส่ง"}</Typography>
+                <Typography sx={{ fontSize: "0.8rem", color: a.quotationSentAt ? TEXT_MAIN : TEXT_SUB }}>{a.quotationSentAt ? thaiDate(a.quotationSentAt) : "ยังไม่เริ่มนับ"}</Typography>
                 {a.quotationValidUntil && (
                   <Typography sx={{ fontSize: "0.7rem", fontWeight: isExpired(a) ? 800 : 500, color: isExpired(a) ? "#dc2626" : TEXT_SUB }}>
                     {isExpired(a) ? "หมดอายุ " : "ยืนราคาถึง "}{thaiDate(a.quotationValidUntil)}
@@ -264,8 +265,8 @@ const DecisionDialog = ({ mode, onClose, onConfirm, busy }) => {
   useEffect(() => { if (mode) { setDate(moment().format("YYYY-MM-DD")); setPo(""); setNote(""); } }, [mode]);
   if (!mode) return null;
   const meta = {
-    send: { title: "บันทึกว่าส่งใบเสนอราคาให้ลูกค้าแล้ว", color: "#2563eb", btn: "บันทึกการส่ง", dateLabel: "วันที่ส่ง" },
-    resend: { title: "ส่งใบเสนอราคา (ฉบับแก้ไข) ให้ลูกค้าอีกครั้ง", color: "#334155", btn: "บันทึกการส่งใหม่", dateLabel: "วันที่ส่ง" },
+    send: { title: "เริ่มนับติดตามใบเสนอราคา", color: "#2563eb", btn: "เริ่มนับ", dateLabel: "เริ่มนับจากวันที่" },
+    resend: { title: "ส่งใบเสนอราคาฉบับแก้ไขให้ลูกค้าแล้ว", color: "#2563eb", btn: "บันทึก · เริ่มนับใหม่", dateLabel: "วันที่ส่งฉบับแก้ไข" },
     approve: { title: "ลูกค้าอนุมัติใบเสนอราคา", color: "#15803d", btn: "ยืนยันอนุมัติ", dateLabel: "วันที่ลูกค้าอนุมัติ" },
     reject: { title: "ลูกค้าปฏิเสธใบเสนอราคา", color: "#b91c1c", btn: "ยืนยันปฏิเสธ", dateLabel: "วันที่ลูกค้าแจ้ง" },
   }[mode];
@@ -296,7 +297,7 @@ const DecisionDialog = ({ mode, onClose, onConfirm, busy }) => {
 };
 
 // ─── ข้อมูลใบเสนอราคา (ดู/แก้ไข) ─────────────────────────────────────────────
-const InfoSection = ({ a, isFinance, canEdit, onSave }) => {
+const InfoSection = ({ a, isFinance, canEdit, onSave, bare = false }) => {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [f, setF] = useState({});
@@ -321,9 +322,11 @@ const InfoSection = ({ a, isFinance, canEdit, onSave }) => {
     if (ok) setEditing(false);
   };
   const contact = a.quotationContact || {};
-  return (
-    <Section title="ข้อมูลใบเสนอราคา" icon={<RequestQuote />}
-      action={canEdit && !editing ? <Button size="small" startIcon={<Edit sx={{ fontSize: 16 }} />} onClick={start} sx={{ textTransform: "none", fontWeight: 700 }}>แก้ไข</Button> : null}>
+  const editBtn = canEdit && !editing ? <Button size="small" startIcon={<Edit sx={{ fontSize: 16 }} />} onClick={start} sx={{ textTransform: "none", fontWeight: 700 }}>แก้ไข</Button> : null;
+  // ✅ bare = ไม่มีกรอบ/หัวของตัวเอง (ใช้ซ้อนในแถบพับ "ข้อมูลใบเสนอราคา" ของกล่องรายละเอียด)
+  // ⚠️ ไม่ห่อด้วยคอมโพเนนต์ที่สร้างใหม่ทุก render — ช่องกรอกจะถูก remount แล้วหลุดโฟกัสทุกตัวอักษร
+  const body = (
+    <>
       {editing ? (
         <Stack spacing={1.5}>
           <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
@@ -379,17 +382,25 @@ const InfoSection = ({ a, isFinance, canEdit, onSave }) => {
           </Box>
         </Box>
       )}
-    </Section>
+    </>
+  );
+  return bare ? (
+    <Box sx={{ p: 1.75 }}>
+      {editBtn && <Box sx={{ display: "flex", justifyContent: "flex-end", mt: -0.75, mb: 0.5 }}>{editBtn}</Box>}
+      {body}
+    </Box>
+  ) : (
+    <Section title="ข้อมูลใบเสนอราคา" icon={<RequestQuote />} action={editBtn}>{body}</Section>
   );
 };
 
 // ─── การติดตามลูกค้า ─────────────────────────────────────────────────────────
-const FollowUpSection = ({ a, onSubmit, onPreview, canFollow }) => {
+const FollowUpSection = ({ a, onSubmit, onPreview, canFollow, formRef }) => {
   const followUps = a.quotationFollowUps || [];
-  const info = getFollowUpInfo(a);
   const [note, setNote] = useState("");
   const [channel, setChannel] = useState("phone");
   const [next, setNext] = useState("");
+  const [showNext, setShowNext] = useState(false);
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
   const inputRef = useRef();
@@ -398,24 +409,51 @@ const FollowUpSection = ({ a, onSubmit, onPreview, canFollow }) => {
     setBusy(true);
     const ok = await onSubmit({ note: note.trim(), channel, nextFollowUpAt: next, file });
     setBusy(false);
-    if (ok) { setNote(""); setFile(null); setNext(""); }
+    if (ok) { setNote(""); setFile(null); setNext(""); setShowNext(false); }
   };
+  const canWrite = canFollow && ["sent", "revising"].includes(a.quotationStatus);
   return (
-    <Section title={`การติดตามลูกค้า${followUps.length ? ` (${followUps.length} ครั้ง)` : ""}`} icon={<EventRepeat />}>
-      {info && (
-        <Box sx={{ p: 1.25, mb: 1.5, borderRadius: 2, bgcolor: "#f8fafc", border: `1px solid ${BORDER}` }}>
-          <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: info.needsFollowUp ? "#b91c1c" : TEXT_MAIN }}>
-            {info.needsFollowUp ? `ถึงเวลาติดตาม — เลยกำหนดมา ${-info.daysUntilDue} วัน` : info.daysUntilDue === 0 ? "ครบกำหนดติดตามวันนี้" : `ติดตามครั้งถัดไปอีก ${info.daysUntilDue} วัน`}
-          </Typography>
-          <Typography sx={{ fontSize: "0.76rem", color: TEXT_SUB }}>
-            ติดต่อล่าสุด {thaiDate(info.lastContactAt)} ({info.lastContactIsFollowUp ? "ติดตาม" : "ส่งใบเสนอราคา"})
-            {" · "}กำหนดตาม {thaiDate(info.dueAt)}{info.scheduled ? " (นัดไว้)" : ` (ครบ ${WARNING_DAYS_AFTER_SENT} วัน)`}
-          </Typography>
-        </Box>
+    <Section title={`การติดตามลูกค้า${followUps.length ? ` · ${followUps.length} ครั้ง` : ""}`} icon={<EventRepeat />}>
+      {/* ✅ ฟอร์มอยู่บนสุด (สิ่งที่ทำบ่อยที่สุด) · ช่องทางเป็นปุ่มกดเลือก ไม่ต้องเปิดเมนู · นัดวันถัดไปซ่อนไว้จนกว่าจะใช้ */}
+      {canWrite && (
+        <Stack ref={formRef} spacing={1} sx={{ mb: followUps.length ? 1.75 : 0 }}>
+          <Stack direction="row" spacing={0.75} sx={{ flexWrap: "wrap", rowGap: 0.75 }}>
+            {CHANNELS.map((c) => (
+              <Chip key={c.value} label={c.label} size="small" onClick={() => setChannel(c.value)}
+                sx={{
+                  height: 28, fontWeight: 700, borderRadius: 1.5,
+                  bgcolor: channel === c.value ? "#eff6ff" : "#fff", color: channel === c.value ? "#1d4ed8" : "#334155",
+                  border: `1px solid ${channel === c.value ? "#bfdbfe" : BORDER}`,
+                }} />
+            ))}
+          </Stack>
+          <TextField multiline minRows={2} size="small" placeholder="ผลการติดตาม เช่น ลูกค้ารอเข้าที่ประชุมสิ้นเดือน / ขอส่วนลดเพิ่ม 5%"
+            value={note} onChange={(e) => setNote(e.target.value)} sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: 2 } }} />
+          <Collapse in={showNext} unmountOnExit>
+            <ThaiDatePicker label="นัดติดตามครั้งถัดไป" value={next} onChange={(v) => setNext(v || "")} />
+          </Collapse>
+          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexWrap: "wrap", rowGap: 0.5 }}>
+            <input ref={inputRef} type="file" hidden onChange={(e) => setFile(e.target.files?.[0] || null)} />
+            <Button size="small" startIcon={<AttachFile sx={{ fontSize: 16 }} />} onClick={() => inputRef.current?.click()}
+              sx={{ textTransform: "none", fontWeight: 700, color: TEXT_SUB, maxWidth: 180 }}>
+              <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file ? file.name : "หลักฐาน"}</Box>
+            </Button>
+            {file && <IconButton size="small" onClick={() => setFile(null)}><Close sx={{ fontSize: 16 }} /></IconButton>}
+            {!showNext && (
+              <Button size="small" startIcon={<EventRepeat sx={{ fontSize: 16 }} />} onClick={() => setShowNext(true)}
+                sx={{ textTransform: "none", fontWeight: 700, color: TEXT_SUB }}>นัดวันตามต่อ</Button>
+            )}
+            <Box sx={{ flex: 1 }} />
+            <Button variant="contained" disabled={!note.trim() || busy} startIcon={<Save sx={{ fontSize: 17 }} />} onClick={submit}
+              sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", px: 2, width: { xs: "100%", sm: "auto" } }}>
+              {busy ? "กำลังบันทึก..." : "บันทึกการติดตาม"}
+            </Button>
+          </Stack>
+        </Stack>
       )}
 
-      {followUps.length > 0 && (
-        <Stack spacing={0} sx={{ mb: 1.5, position: "relative", pl: 2.25, "&::before": { content: '""', position: "absolute", left: 6, top: 6, bottom: 6, width: 2, bgcolor: BORDER } }}>
+      {followUps.length > 0 ? (
+        <Stack spacing={0} sx={{ position: "relative", pl: 2.25, pt: canWrite ? 1.5 : 0, borderTop: canWrite ? `1px solid ${BORDER}` : "none", "&::before": { content: '""', position: "absolute", left: 6, top: canWrite ? 20 : 6, bottom: 6, width: 2, bgcolor: BORDER } }}>
           {followUps.slice().reverse().map((x, i) => (
             <Box key={x._id || i} sx={{ position: "relative", pb: 1.25 }}>
               <Box sx={{ position: "absolute", left: -20.5, top: 4, width: 11, height: 11, borderRadius: "50%", bgcolor: i === 0 ? "#2563eb" : "#cbd5e1", border: "2px solid #fff" }} />
@@ -432,36 +470,9 @@ const FollowUpSection = ({ a, onSubmit, onPreview, canFollow }) => {
             </Box>
           ))}
         </Stack>
-      )}
-
-      {canFollow && ["sent", "revising"].includes(a.quotationStatus) ? (
-        <Stack spacing={1.25} sx={{ p: 1.25, borderRadius: 2, bgcolor: "#f8fafc", border: `1px dashed ${BORDER}` }}>
-          <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: TEXT_MAIN }}>บันทึกการติดตามครั้งที่ {followUps.length + 1}</Typography>
-          <Box sx={{ display: "grid", gap: 1.25, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
-            <SelectField label="ช่องทาง" value={channel} onChange={(e) => setChannel(e.target.value)}>
-              {CHANNELS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-            </SelectField>
-            <ThaiDatePicker label="นัดติดตามครั้งถัดไป (ถ้ามี)" value={next} onChange={(v) => setNext(v || "")} />
-          </Box>
-          <TextField multiline minRows={2} size="small" placeholder="ผลการติดตาม เช่น ลูกค้ารอเข้าที่ประชุมสิ้นเดือน / ขอส่วนลดเพิ่ม 5%"
-            value={note} onChange={(e) => setNote(e.target.value)} sx={{ bgcolor: "#fff" }} />
-          <Stack direction="row" spacing={1} alignItems="center">
-            <input ref={inputRef} type="file" hidden onChange={(e) => setFile(e.target.files?.[0] || null)} />
-            <Button size="small" variant="outlined" color="inherit" startIcon={<AttachFile sx={{ fontSize: 16 }} />} onClick={() => inputRef.current?.click()}
-              sx={{ textTransform: "none", borderRadius: 2, fontSize: "0.74rem", maxWidth: 220, borderColor: BORDER, bgcolor: "#fff" }}>
-              <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file ? file.name : "แนบหลักฐาน"}</Box>
-            </Button>
-            {file && <IconButton size="small" onClick={() => setFile(null)}><Close sx={{ fontSize: 16 }} /></IconButton>}
-            <Box sx={{ flex: 1 }} />
-            <Button variant="contained" disabled={!note.trim() || busy} startIcon={<Save sx={{ fontSize: 17 }} />} onClick={submit}
-              sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none" }}>
-              {busy ? "กำลังบันทึก..." : "บันทึก"}
-            </Button>
-          </Stack>
-        </Stack>
-      ) : !followUps.length ? (
+      ) : !canWrite ? (
         <Typography sx={{ fontSize: "0.82rem", color: TEXT_SUB }}>
-          {a.quotationStatus ? "ไม่มีบันทึกการติดตาม" : "เริ่มบันทึกการติดตามได้หลังบันทึกว่าส่งใบเสนอราคาให้ลูกค้าแล้ว"}
+          {a.quotationStatus ? "ไม่มีบันทึกการติดตาม" : "บันทึกการติดตามได้เมื่อระบบเริ่มนับ (แนบใบเสนอราคา + ส่งงานแล้ว)"}
         </Typography>
       ) : null}
     </Section>
@@ -469,7 +480,9 @@ const FollowUpSection = ({ a, onSubmit, onPreview, canFollow }) => {
 };
 
 // ─── กล่องรายละเอียด ─────────────────────────────────────────────────────────
-const STEPS = [["file", "แนบไฟล์"], ["send", "ส่งลูกค้า"], ["follow", "ติดตาม"], ["done", "ผลลัพธ์"]];
+// ✅ ผู้ใช้สั่ง (3 ต.ค. 2569): ตัดขั้น "ส่งลูกค้า" — ระบบเริ่มนับติดตามเองเมื่อแนบใบเสนอราคาและส่งงานแล้ว
+//    (server: services/quotationAutoStart.js) · จัดลำดับใหม่ตามสิ่งที่ทำบ่อย: สถานะ+ปุ่ม → ไฟล์ → ติดตาม → ข้อมูล
+const STEPS = [["file", "แนบใบเสนอราคา"], ["job", "ส่งงาน"], ["follow", "ติดตาม"], ["done", "ผลลัพธ์"]];
 const stepIndex = (k) => ({ waiting_file: 0, not_sent: 1, sent: 2, follow_up: 2, revising: 2, approved: 3, rejected: 3 }[k] ?? 0);
 
 const DetailDialog = ({
@@ -480,73 +493,84 @@ const DetailDialog = ({
   const [decision, setDecision] = useState(null);
   const [busy, setBusy] = useState(false);
   const [showLog, setShowLog] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
+  const followRef = useRef(null);
   if (!job) return null;
   const a = job.anchor;
   const k = job.groupKey;
   const m = STATUS[k] || STATUS.not_sent;
   const isFinance = can(currentUser, "editFinance");
   const step = stepIndex(k);
+  const info = getFollowUpInfo(a);
   const log = (a.activityLog || []).filter((l) => String(l.action || "").startsWith("quotation")).slice().reverse();
+  const open = ["sent", "follow_up", "revising"].includes(k);
 
   const confirmDecision = async ({ date, po, note }) => {
     setBusy(true);
-    const action = decision === "resend" ? "send" : decision;
+    const action = decision === "resend" || decision === "send" ? "send" : decision;
     const body = { action, ...(action === "send" ? { sentAt: date } : { decidedAt: date, poNo: po, decisionNote: note }) };
     const ok = await onQuotation(job, body);
     setBusy(false);
     if (ok) setDecision(null);
   };
+  const goFollow = () => {
+    const el = followRef.current;
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(() => el?.querySelector("textarea")?.focus(), 350);
+  };
 
-  const nextAction = (() => {
-    if (k === "waiting_file") return { text: "แนบไฟล์ใบเสนอราคาในส่วน \"ไฟล์ใบเสนอราคา\" ด้านล่างก่อน แล้วจึงบันทึกการส่งลูกค้า", buttons: [] };
-    if (k === "not_sent") return { text: "แนบไฟล์แล้ว — ส่งให้ลูกค้าแล้วกดบันทึก ระบบจะเริ่มนับวันติดตาม", buttons: [["send", "บันทึกว่าส่งลูกค้าแล้ว", "#2563eb", <Send key="i" />]] };
-    if (["sent", "follow_up", "revising"].includes(k)) {
+  // ── การ์ดสถานะ: บอกว่าตอนนี้อยู่ตรงไหน + ปุ่มที่ต้องกดต่อ (ปุ่มหลักปุ่มเดียว) ──
+  const banner = (() => {
+    if (k === "waiting_file") {
+      return { title: "รอแนบใบเสนอราคา", text: "แนบไฟล์ในส่วน \"ใบเสนอราคา\" ด้านล่าง — เมื่อแนบแล้วและงานส่งเสร็จ ระบบเริ่มนับวันติดตามให้เอง" };
+    }
+    if (k === "not_sent") {
       return {
-        text: k === "follow_up" ? "ลูกค้าเงียบเกินกำหนด — ติดตามแล้วบันทึกผลในส่วน \"การติดตามลูกค้า\" หรือบันทึกผลการตัดสินใจ" : "รอลูกค้าตัดสินใจ — บันทึกผลเมื่อได้คำตอบ",
-        buttons: [
-          ["approve", "ลูกค้าอนุมัติ", "#15803d", <CheckCircle key="i" />],
-          ["reject", "ลูกค้าปฏิเสธ", "#b91c1c", <Cancel key="i" />],
-          ["resend", "ส่งฉบับแก้ไข", "#475569", <Autorenew key="i" />],
-        ],
+        title: "แนบใบเสนอราคาแล้ว · รอช่างส่งงาน",
+        text: "ระบบจะเริ่มนับวันติดตามให้เองทันทีที่ช่างส่งงาน/ปิดงาน",
+        extra: isFinance ? [["send", "เริ่มนับตอนนี้", <EventRepeat key="i" />]] : [],
       };
+    }
+    if (open) {
+      const due = !info ? "" : info.needsFollowUp ? `เลยกำหนดติดตาม ${-info.daysUntilDue} วัน` : info.daysUntilDue === 0 ? "ครบกำหนดติดตามวันนี้" : `ติดตามครั้งถัดไปอีก ${info.daysUntilDue} วัน`;
+      const sub = !info ? "" : `เริ่มนับ ${thaiDate(a.quotationSentAt)} · ติดต่อล่าสุด ${thaiDate(info.lastContactAt)} · ครบกำหนด ${thaiDate(info.dueAt)}${info.scheduled ? " (นัดไว้)" : ""}`;
+      return { title: k === "revising" ? `ลูกค้าขอแก้ไข · ${due}` : due, text: sub, follow: true };
     }
     return null;
   })();
 
   return (
     <Dialog open onClose={onClose} fullScreen={fullScreen} fullWidth maxWidth="md" PaperProps={{ sx: { borderRadius: fullScreen ? 0 : 3, bgcolor: "#f8fafc" } }}>
-      {/* หัว */}
-      <Box sx={{ px: { xs: 2, sm: 2.5 }, pt: 2, pb: 1.5, bgcolor: "#fff", borderBottom: `1px solid ${BORDER}` }}>
-        <Stack direction="row" spacing={1.5} alignItems="flex-start">
-          <Box sx={{ width: 40, height: 40, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#f1f5f9", color: "#334155" }}>
-            <RequestQuote />
-          </Box>
+      {/* ── หัว: ชื่องาน 1 บรรทัด + มูลค่า · ขั้นตอนเป็นแถบบาง ── */}
+      <Box sx={{ px: { xs: 1.75, sm: 2.5 }, pt: 1.5, pb: 1.25, bgcolor: "#fff", borderBottom: `1px solid ${BORDER}` }}>
+        <Stack direction="row" spacing={1} alignItems="flex-start">
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: "wrap", rowGap: 0.5 }}>
-              <StatusChip k={k} size="medium" />
-              {a.quotationNo && <Typography sx={{ fontSize: "0.82rem", fontWeight: 800, color: TEXT_SUB }}>{a.quotationNo}</Typography>}
-            </Stack>
-            <Typography sx={{ fontWeight: 900, fontSize: "1.05rem", color: TEXT_MAIN, mt: 0.5, lineHeight: 1.35 }}>{siteText(a)}</Typography>
-            <Typography sx={{ fontSize: "0.8rem", color: TEXT_SUB }}>
-              {[jobText(a), a.time ? `ครั้งที่ ${formatRoundLabel(a.time, a.visitCount)}` : "", `งาน ${formatEventDateRange(a)}`, a.docNo ? `เอกสาร ${a.docNo}` : ""].filter(Boolean).join(" · ")}
+            <Typography sx={{ fontWeight: 900, fontSize: "1.02rem", color: TEXT_MAIN, lineHeight: 1.35, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+              {siteText(a)}
+            </Typography>
+            <Typography noWrap sx={{ fontSize: "0.76rem", color: TEXT_SUB }}>
+              {[jobText(a), a.time ? `ครั้งที่ ${formatRoundLabel(a.time, a.visitCount)}` : "", formatEventDateRange(a)].filter(Boolean).join(" · ")}
             </Typography>
           </Box>
-          <Box sx={{ textAlign: "right", display: { xs: "none", sm: "block" } }}>
-            <Typography sx={{ fontSize: "0.72rem", color: TEXT_SUB, fontWeight: 700 }}>มูลค่า</Typography>
-            <Typography sx={{ fontWeight: 900, fontSize: "1.2rem", color: a.quotationAmount ? TEXT_MAIN : "#b45309" }}>{a.quotationAmount ? baht(a.quotationAmount) : "ยังไม่ระบุ"}</Typography>
-          </Box>
-          <IconButton onClick={onClose} size="small" aria-label="ปิด"><Close /></IconButton>
+          <IconButton onClick={onClose} size="small" aria-label="ปิด" sx={{ mt: -0.25 }}><Close /></IconButton>
         </Stack>
-        {/* ขั้นตอน */}
-        <Stack direction="row" spacing={0.5} sx={{ mt: 1.5 }}>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+          <StatusChip k={k} />
+          {a.quotationNo && <Typography noWrap sx={{ fontSize: "0.76rem", fontWeight: 700, color: TEXT_SUB }}>{a.quotationNo}</Typography>}
+          <Box sx={{ flex: 1 }} />
+          <Typography noWrap sx={{ fontWeight: 900, fontSize: "1rem", color: a.quotationAmount ? TEXT_MAIN : "#b45309" }}>
+            {a.quotationAmount ? baht(a.quotationAmount) : "ไม่ระบุมูลค่า"}
+          </Typography>
+        </Stack>
+        <Stack direction="row" spacing={0.5} sx={{ mt: 1.25 }}>
           {STEPS.map(([key, label], i) => {
             const done = i < step || (i === 3 && step === 3);
             const cur = i === step && step < 3;
             const color = i === 3 && step === 3 ? m.color : done ? "#15803d" : cur ? m.color : "#cbd5e1";
             return (
               <Box key={key} sx={{ flex: 1, minWidth: 0 }}>
-                <Box sx={{ height: 4, borderRadius: 2, bgcolor: done || cur ? color : "#e2e8f0" }} />
-                <Typography noWrap sx={{ fontSize: "0.7rem", fontWeight: cur || done ? 800 : 600, color: done || cur ? color : "#94a3b8", mt: 0.4 }}>
+                <Box sx={{ height: 3, borderRadius: 2, bgcolor: done || cur ? color : "#e2e8f0" }} />
+                <Typography noWrap sx={{ fontSize: "0.68rem", fontWeight: cur || done ? 800 : 600, color: done || cur ? color : "#94a3b8", mt: 0.35 }}>
                   {i === 3 && step === 3 ? m.label : label}
                 </Typography>
               </Box>
@@ -555,39 +579,44 @@ const DetailDialog = ({
         </Stack>
       </Box>
 
-      <DialogContent sx={{ px: { xs: 1.5, sm: 2.5 }, py: 2 }}>
-        <Stack spacing={1.75}>
-          {/* สิ่งที่ต้องทำต่อ */}
-          {nextAction && (
+      <DialogContent sx={{ px: { xs: 1.5, sm: 2.5 }, py: 1.75 }}>
+        <Stack spacing={1.5}>
+          {/* ── การ์ดสถานะ + ปุ่ม ── */}
+          {banner && (
             <Box sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${BORDER}`, borderLeft: `4px solid ${m.color}` }}>
-              <Typography sx={{ fontSize: "0.86rem", fontWeight: 800, color: TEXT_MAIN }}>สิ่งที่ต้องทำต่อ</Typography>
-              <Typography sx={{ fontSize: "0.8rem", color: "#334155", mt: 0.25 }}>{nextAction.text}</Typography>
-              {nextAction.buttons.length > 0 && (
-                <Stack direction="row" spacing={1} sx={{ mt: 1.25, flexWrap: "wrap", rowGap: 1 }}>
-                  {nextAction.buttons.map(([key, label, color, icon], i) => (
-                    <Button key={key} size="small" variant={i === 0 ? "contained" : "outlined"} startIcon={icon} onClick={() => setDecision(key)}
-                      sx={{
-                        textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none",
-                        ...(i === 0 ? { bgcolor: color, "&:hover": { bgcolor: color, filter: "brightness(.92)", boxShadow: "none" } } : { color: "#334155", borderColor: BORDER, bgcolor: "#fff", "& .MuiButton-startIcon": { color } }),
-                      }}>{label}</Button>
+              <Typography sx={{ fontSize: "0.9rem", fontWeight: 900, color: k === "follow_up" ? "#b91c1c" : TEXT_MAIN }}>{banner.title}</Typography>
+              {banner.text && <Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB, mt: 0.25 }}>{banner.text}</Typography>}
+              {banner.follow && (
+                <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "1.3fr 1fr 1fr" }, gap: 1, mt: 1.25 }}>
+                  <Button variant="contained" startIcon={<EventRepeat />} onClick={goFollow}
+                    sx={{ gridColumn: { xs: "1 / -1", sm: "auto" }, textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none" }}>บันทึกการติดตาม</Button>
+                  <Button variant="outlined" startIcon={<CheckCircle sx={{ color: "#15803d" }} />} onClick={() => setDecision("approve")}
+                    sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, color: "#334155", borderColor: BORDER, bgcolor: "#fff" }}>อนุมัติ</Button>
+                  <Button variant="outlined" startIcon={<Cancel sx={{ color: "#b91c1c" }} />} onClick={() => setDecision("reject")}
+                    sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, color: "#334155", borderColor: BORDER, bgcolor: "#fff" }}>ปฏิเสธ</Button>
+                </Box>
+              )}
+              {banner.extra?.length > 0 && (
+                <Stack direction="row" spacing={1} sx={{ mt: 1.25 }}>
+                  {banner.extra.map(([key, label, icon]) => (
+                    <Button key={key} size="small" variant="outlined" startIcon={icon} onClick={() => setDecision(key)}
+                      sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, color: "#334155", borderColor: BORDER }}>{label}</Button>
                   ))}
                 </Stack>
               )}
             </Box>
           )}
-          {/* ผลการตัดสินใจ */}
+          {/* ── ผลการตัดสินใจ ── */}
           {["approved", "rejected"].includes(k) && (
             <Box sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${BORDER}`, borderLeft: `4px solid ${m.color}` }}>
               <Stack direction="row" spacing={1} alignItems="flex-start">
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography sx={{ fontSize: "0.88rem", fontWeight: 900, color: TEXT_MAIN }}>
-                    {k === "approved" ? "ลูกค้าอนุมัติใบเสนอราคา" : "ลูกค้าปฏิเสธใบเสนอราคา"}
-                    {a.quotationPoNo ? ` · PO ${a.quotationPoNo}` : ""}
+                  <Typography sx={{ fontSize: "0.9rem", fontWeight: 900, color: TEXT_MAIN }}>
+                    {k === "approved" ? "ลูกค้าอนุมัติใบเสนอราคา" : "ลูกค้าปฏิเสธใบเสนอราคา"}{a.quotationPoNo ? ` · PO ${a.quotationPoNo}` : ""}
                   </Typography>
                   {a.quotationDecisionNote && <Typography sx={{ fontSize: "0.82rem", color: "#334155", mt: 0.25 }}>{k === "rejected" ? "เหตุผล: " : ""}{a.quotationDecisionNote}</Typography>}
                   <Typography sx={{ fontSize: "0.74rem", color: TEXT_SUB, mt: 0.25 }}>
                     {a.quotationDecisionAt ? thaiDate(a.quotationDecisionAt) : ""}{a.quotationDecisionBy ? ` · บันทึกโดย ${a.quotationDecisionBy}` : ""}
-                    {a.quotationSentAt ? ` · ส่งลูกค้า ${thaiDate(a.quotationSentAt)}` : ""}
                   </Typography>
                 </Box>
                 {isFinance && (
@@ -598,33 +627,54 @@ const DetailDialog = ({
             </Box>
           )}
 
-          <InfoSection a={a} isFinance={isFinance} canEdit onSave={(body) => onQuotation(job, body)} />
-
-          {/* ⚠️ FileUploadSection มีหัว "ใบเสนอราคา" + จำนวนไฟล์ของตัวเองอยู่แล้ว — ห่อแค่กรอบ ไม่ซ้อนหัวซ้ำ */}
-          <Box sx={{ border: `1px solid ${BORDER}`, borderRadius: 2.5, bgcolor: "#fff", p: 1.75 }}>
+          {/* ── ไฟล์ใบเสนอราคา ── */}
+          <Box sx={{ border: `1px solid ${BORDER}`, borderRadius: 2.5, bgcolor: "#fff", p: 1.5 }}>
             <FileUploadSection
               eventId={a._id} type="quotation" label="ใบเสนอราคา"
               files={a.quotationFiles} applicable={a.quotationApplicable}
               onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
               uploading={upload.busy && upload.eventId === a._id} progress={upload.progress} currentUser={currentUser}
             />
+            {open && (
+              <Button size="small" startIcon={<Autorenew sx={{ fontSize: 16 }} />} onClick={() => setDecision("resend")}
+                sx={{ mt: 0.5, textTransform: "none", fontWeight: 700, color: TEXT_SUB }}>ส่งฉบับแก้ไขแล้ว (เริ่มนับใหม่)</Button>
+            )}
           </Box>
 
-          <FollowUpSection a={a} canFollow onPreview={onPreview} onSubmit={(payload) => onFollowUp(job, payload)} />
+          {(open || (a.quotationFollowUps || []).length > 0) && (
+            <FollowUpSection a={a} canFollow formRef={followRef} onPreview={onPreview} onSubmit={(payload) => onFollowUp(job, payload)} />
+          )}
 
-          <Section title={`คุยกับช่าง${(a.comments || []).length ? ` (${a.comments.length})` : ""}`} icon={<Chat />}>
+          {/* ── ข้อมูลใบเสนอราคา: สรุปบรรทัดเดียว กดเพื่อดู/แก้ ── */}
+          <Box sx={{ border: `1px solid ${BORDER}`, borderRadius: 2.5, bgcolor: "#fff", overflow: "hidden" }}>
+            <Button fullWidth onClick={() => setShowInfo((v) => !v)} endIcon={<ExpandMore sx={{ transform: showInfo ? "rotate(180deg)" : "none", transition: "transform .2s" }} />}
+              sx={{ textTransform: "none", justifyContent: "space-between", px: 1.75, py: 1.1, color: TEXT_MAIN, "& .MuiButton-endIcon": { ml: 1 } }}>
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+                <RequestQuote sx={{ fontSize: 18, color: TEXT_SUB }} />
+                <Typography sx={{ fontWeight: 800, fontSize: "0.88rem" }}>ข้อมูลใบเสนอราคา</Typography>
+                {missingInfo(a) && <Typography noWrap sx={{ fontSize: "0.74rem", fontWeight: 700, color: "#b45309" }}>· ยังไม่ครบ</Typography>}
+              </Stack>
+            </Button>
+            <Collapse in={showInfo} unmountOnExit>
+              <Box sx={{ borderTop: `1px solid ${BORDER}` }}>
+                <InfoSection a={a} isFinance={isFinance} canEdit onSave={(body) => onQuotation(job, body)} bare />
+              </Box>
+            </Collapse>
+          </Box>
+
+          <Section title={`คุยกับช่าง${(a.comments || []).length ? ` · ${a.comments.length}` : ""}`} icon={<Chat />}>
             <CommentThread comments={a.comments} onSend={(message) => onComment(job, message)} myRole={currentUser} />
           </Section>
 
-          <Section title="ประวัติใบเสนอราคา" icon={<History />}
-            action={log.length > 3 ? <Button size="small" endIcon={<ExpandMore sx={{ transform: showLog ? "rotate(180deg)" : "none" }} />} onClick={() => setShowLog((v) => !v)} sx={{ textTransform: "none", fontWeight: 700 }}>{showLog ? "ย่อ" : `ทั้งหมด ${log.length}`}</Button> : null}>
-            {log.length ? (
+          {log.length > 0 && (
+            <Section title="ประวัติ" icon={<History />}
+              action={log.length > 3 ? <Button size="small" endIcon={<ExpandMore sx={{ transform: showLog ? "rotate(180deg)" : "none" }} />} onClick={() => setShowLog((v) => !v)} sx={{ textTransform: "none", fontWeight: 700 }}>{showLog ? "ย่อ" : `ทั้งหมด ${log.length}`}</Button> : null}>
               <Stack spacing={0.75}>
                 {log.slice(0, 3).map((l, i) => <LogRow key={i} l={l} />)}
                 <Collapse in={showLog} unmountOnExit><Stack spacing={0.75}>{log.slice(3).map((l, i) => <LogRow key={i} l={l} />)}</Stack></Collapse>
               </Stack>
-            ) : <Typography sx={{ fontSize: "0.82rem", color: TEXT_SUB }}>ยังไม่มีประวัติ</Typography>}
-          </Section>
+            </Section>
+          )}
 
           <Button fullWidth endIcon={<OpenInNew sx={{ fontSize: 17 }} />} onClick={() => navigate(`/operation/${a._id}`)}
             sx={{ textTransform: "none", justifyContent: "space-between", border: `1px dashed ${BORDER}`, borderRadius: 2, color: TEXT_SUB, bgcolor: "#fff" }}>
@@ -773,7 +823,7 @@ export default function QuotationTracking() {
     try {
       await EventService.UpdateQuotation(job.anchor._id, body);
       await fetchJobs(true);
-      toast(body.action === "approve" ? "บันทึก: ลูกค้าอนุมัติแล้ว" : body.action === "reject" ? "บันทึก: ลูกค้าปฏิเสธ" : body.action === "send" ? "บันทึกการส่งแล้ว — เริ่มนับวันติดตาม" : body.action === "reset" ? "ย้อนสถานะแล้ว" : "บันทึกข้อมูลแล้ว");
+      toast(body.action === "approve" ? "บันทึก: ลูกค้าอนุมัติแล้ว" : body.action === "reject" ? "บันทึก: ลูกค้าปฏิเสธ" : body.action === "send" ? "เริ่มนับวันติดตามแล้ว" : body.action === "reset" ? "ย้อนสถานะแล้ว" : "บันทึกข้อมูลแล้ว");
       return true;
     } catch (err) {
       toast(errMsg(err, "บันทึกไม่สำเร็จ"), "error");
@@ -910,7 +960,7 @@ export default function QuotationTracking() {
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.1rem", sm: "1.25rem" }, color: TEXT_MAIN, lineHeight: 1.25 }}>ติดตามใบเสนอราคา</Typography>
             <Typography noWrap sx={{ fontSize: "0.76rem", color: TEXT_SUB }}>
-              แนบไฟล์ → ส่งลูกค้า → ติดตาม (ทุก {WARNING_DAYS_AFTER_SENT} วัน หรือตามนัด) → อนุมัติ / ปฏิเสธ
+              แนบใบเสนอราคา + ส่งงาน → เริ่มนับเอง → ติดตาม (ทุก {WARNING_DAYS_AFTER_SENT} วัน หรือตามนัด) → อนุมัติ / ปฏิเสธ
               {lastRefreshed ? ` · อัปเดต ${moment(lastRefreshed).format("HH:mm")}` : ""}
             </Typography>
           </Box>
