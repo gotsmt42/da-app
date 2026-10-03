@@ -819,7 +819,7 @@ function injectStyles() {
        ⚠️ วางท้ายสุดของสไตล์ชีตโดยตั้งใจ — ชนะกฎเดิมด้านบนด้วยลำดับ ══ */
     .swal-edit-event #ee-status-header {
       background: #fff !important; border-top: 4px solid var(--ee-status, #64748b);
-      border-bottom: 1px solid #e2e8f0; padding: 12px 16px 12px 18px; align-items: flex-start; text-align: left;
+      border-bottom: 1px solid #e2e8f0; padding: 12px 16px 12px 20px; align-items: center; text-align: left;
     }
     .swal-edit-event #ee-status-icon {
       width: 40px; height: 40px; border-radius: 11px; box-shadow: none; backdrop-filter: none;
@@ -831,6 +831,18 @@ function injectStyles() {
       white-space: normal; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
     }
     .swal-edit-event #ee-status-title h3 .marquee-track { animation: none !important; padding-right: 0 !important; display: inline !important; }
+    /* แถวป้าย — เต็มความกว้าง ตัดบรรทัดได้ ตรงแนวชื่องาน */
+    /* ✅ ซ่อนไอคอนสถานะ (✅/⏳) — ผู้ใช้: "ลบไอคอนติ๊กถูกออกได้" สถานะเห็นจากแถบสีด้านบน + ปุ่มเลือกสถานะแล้ว
+       ⚠️ ซ่อนด้วย CSS ไม่ลบ element — โค้ดเปลี่ยนสถานะยังอ้าง #ee-status-icon อยู่ */
+    .swal-edit-event #ee-status-icon { display: none; }
+    .swal-edit-event #ee-head-meta { flex: 1 1 100%; margin-left: 0; gap: 6px; display: flex; flex-wrap: wrap; min-width: 0; }
+    .swal-edit-event #ee-head-meta:empty { display: none; }
+    .swal-edit-event #ee-head-meta .ee-tag {
+      display: inline-flex; align-items: center; gap: 4px; max-width: 100%; white-space: normal; line-height: 1.35;
+      background: #f8fafc; border: 1px solid #e2e8f0; color: #334155; font-size: 12px; font-weight: 600;
+      border-radius: 999px; padding: 3px 10px;
+    }
+    .swal-edit-event #ee-head-meta .ee-tag--muted { background: #fff; border-style: dashed; color: #94a3b8; }
     .swal-edit-event #ee-status-title .ee-tag {
       background: #f8fafc; border: 1px solid #e2e8f0; color: #334155; font-size: 11.5px; padding: 2px 9px;
     }
@@ -841,6 +853,8 @@ function injectStyles() {
       width: 34px; height: 34px; border-radius: 10px; background: #f1f5f9; border: 1px solid #e2e8f0; color: #475569;
     }
     .swal-edit-event #ee-close-btn:hover, .swal-edit-event #ee-copy-btn:hover { background: #e2e8f0; }
+    /* Swal โฟกัสปุ่มแรกให้เองตอนเปิด — ไม่ต้องโชว์กรอบดำถ้าไม่ได้ใช้คีย์บอร์ด */
+    .swal-edit-event #ee-close-btn:focus:not(:focus-visible), .swal-edit-event #ee-copy-btn:focus:not(:focus-visible) { outline: none; box-shadow: none; }
     .swal-edit-event #ee-body { text-align: left; padding: 16px 20px 12px; }
     .swal-edit-event #ee-status-bar { border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 1px 2px rgba(15,23,42,.04); padding: 8px 12px; gap: 10px; }
 
@@ -848,7 +862,7 @@ function injectStyles() {
     .swal-edit-event #ee-status-header { flex-wrap: wrap; row-gap: 10px; }
     #ee-head-status {
       flex: 1 1 100%; display: flex; align-items: center; gap: 10px; min-width: 0;
-      margin-left: 52px; padding-top: 10px; border-top: 1px dashed #e2e8f0;
+      margin-left: 0; padding-top: 10px; border-top: 1px dashed #e2e8f0;
     }
     #ee-head-status > label { font-size: 12px; font-weight: 700; color: #64748b; white-space: nowrap; }
     .swal-edit-event #ee-status-select-wrap { position: relative; flex: 0 1 240px; min-width: 0; }
@@ -893,9 +907,7 @@ function injectStyles() {
       .swal-edit-event #ee-status-title h3 { font-size: 15px; }
       #ee-head-status { margin-left: 0; }
       .swal-edit-event #ee-status-select-wrap { flex: 1 1 auto; }
-      /* ป้ายบนหัวเลื่อนแนวนอนแถวเดียว — เดิมตัดลงหลายบรรทัด กินหัวกล่องสูงเกือบ 1 ใน 4 ของจอ */
-      .swal-edit-event #ee-status-title .ee-header-meta { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-right: -4px; padding-bottom: 2px; }
-      .swal-edit-event #ee-status-title .ee-header-meta::-webkit-scrollbar { display: none; }
+      #ee-head-meta { margin-left: 0; }
       .swal-edit-event #ee-body { padding: 12px 12px 14px; }
       .ee-map-bar { flex-wrap: wrap; }
       .ee-map-info { flex: 1 1 100%; }
@@ -1512,18 +1524,20 @@ export const getEditEvent = async ({
     <div id="ee-status-icon">${cfg0.icon}</div>
     <div id="ee-status-title">
       <h3><span >${attrHtml(eventTitle)} · ${attrHtml(eventSystem)} ${eventTime ? `· ครั้งที่ ${attrHtml(formatRoundLabel(eventTime, eventVisitCount))}` : ""}</span></h3>
-      <div class="ee-header-meta">
-        ${/* ✅ เอาชิป 📍 โครงการ/แผนที่ออกจากหัวกล่อง (ผู้ใช้สั่ง 3 ต.ค. 2569: "มีในด้านล่างอยู่แล้ว")
-             — แผนที่ + ปุ่มนำทาง/ค้นหาอยู่การ์ดบนสุดของฟอร์ม และปุ่ม 📍 ในแถบล่าง */""}
-        ${eventTeam && eventTeam !== headerResponsibleName ? `<span class="ee-tag">👷 ${attrHtml(eventTeam)}</span>` : ""}
-        ${headerResponsibleName
-          ? `<span class="ee-tag"${headerResponsibleIsInferred ? ' title="งานนี้ยังไม่ได้ระบุผู้รับผิดชอบไว้ชัดเจน — แสดงตามทีมที่เข้างานแทน"' : ""}>🧑‍💼 ผู้รับผิดชอบ: ${attrHtml(headerResponsibleName)}${headerResponsibleIsInferred ? " (ตามทีมที่เข้างาน)" : ""}</span>`
-          : `<span class="ee-tag ee-tag--muted" title="${isOverviewManagedJob ? "มอบหมายผู้รับผิดชอบได้ที่หน้าภาพรวมงาน" : "ยังไม่มีใครรับผิดชอบงานนี้"}">🧑‍💼 ยังไม่ได้มอบหมายผู้รับผิดชอบ</span>`}
-        ${eventJobClassMeta ? `<span class="ee-tag">${eventJobClassMeta.emoji} ${attrHtml(eventJobClassMeta.label)}</span>` : ""}
-      </div>
     </div>
     ${canCopyEvent ? `<button id="ee-copy-btn" title="คัดลอกงานนี้">📋</button>` : ""}
     <button id="ee-close-btn" title="ปิด">✕</button>
+    <div class="ee-header-meta" id="ee-head-meta">
+      ${/* ✅ ป้ายทีม/ผู้รับผิดชอบ/ประเภทงาน เป็นแถวเต็มความกว้างของหัวกล่อง ตัดบรรทัดได้ — แสดงครบทุกตัว
+           (ผู้ใช้สั่ง 3 ต.ค. 2569 "อยากให้แสดงได้เต็มทั้งหมด") เดิมอยู่ใต้ชื่องานแคบๆ แล้วต้องเลื่อนแนวนอน */""}
+      ${/* ✅ เอาชิป 📍 โครงการ/แผนที่ออกจากหัวกล่อง (ผู้ใช้สั่ง 3 ต.ค. 2569: "มีในด้านล่างอยู่แล้ว")
+           — แผนที่ + ปุ่มนำทาง/ค้นหาอยู่การ์ดบนสุดของฟอร์ม และปุ่ม 📍 ในแถบล่าง */""}
+      ${eventTeam && eventTeam !== headerResponsibleName ? `<span class="ee-tag">👷 ${attrHtml(eventTeam)}</span>` : ""}
+      ${headerResponsibleName
+        ? `<span class="ee-tag"${headerResponsibleIsInferred ? ' title="งานนี้ยังไม่ได้ระบุผู้รับผิดชอบไว้ชัดเจน — แสดงตามทีมที่เข้างานแทน"' : ""}>🧑‍💼 ผู้รับผิดชอบ: ${attrHtml(headerResponsibleName)}${headerResponsibleIsInferred ? " (ตามทีมที่เข้างาน)" : ""}</span>`
+        : `<span class="ee-tag ee-tag--muted" title="${isOverviewManagedJob ? "มอบหมายผู้รับผิดชอบได้ที่หน้าภาพรวมงาน" : "ยังไม่มีใครรับผิดชอบงานนี้"}">🧑‍💼 ยังไม่ได้มอบหมายผู้รับผิดชอบ</span>`}
+      ${eventJobClassMeta ? `<span class="ee-tag">${eventJobClassMeta.emoji} ${attrHtml(eventJobClassMeta.label)}</span>` : ""}
+    </div>
     ${/* ✅ สถานะงานอยู่บนหัวกล่อง (ผู้ใช้สั่ง 3 ต.ค. 2569: "การเลือกสถานะให้เอาไว้ header ของงาน") — แถวของตัวเอง
          เต็มความกว้าง ไม่เบียดชื่องาน/ป้าย · สีของปุ่มตามสถานะ (ตัวแปร --ee-status ของหัวกล่อง) */""}
     <div id="ee-head-status">
