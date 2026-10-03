@@ -485,7 +485,7 @@ const Customer = () => {
 
         {/* ✅ ตัวกรองโครงการเดียว (มาจากการ์ดใน Dashboard) — ต้องมีทางออกชัดเจนเสมอ */}
         {projectFilter && (
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5, px: 1.5, py: 1, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}`, borderLeft: `4px solid ${INK_2}` }}>
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5, px: 1.5, py: 1, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}`, borderLeft: "4px solid #2563eb" }}>
             <FilterAlt sx={{ fontSize: 18, color: MUTED }} />
             <Typography sx={{ flex: 1, fontSize: "0.84rem", fontWeight: 700, color: INK }}>
               แสดงเฉพาะ: {[projectFilter.company, projectFilter.site].filter(Boolean).join(" · ")}
@@ -591,7 +591,7 @@ const Customer = () => {
             </Typography>
             {pageCount > 1 && (
               <Pagination count={pageCount} page={cur + 1} onChange={(_, n) => setPage(n - 1)} shape="rounded" size={useCards ? "small" : "medium"} siblingCount={useCards ? 0 : 1}
-                sx={{ "& .Mui-selected": { bgcolor: `${INK_2} !important`, color: "#fff" } }} />
+                sx={{ "& .Mui-selected": { bgcolor: "#eff6ff !important", color: "#1d4ed8", borderColor: "#bfdbfe" } }} />
             )}
           </Stack>
         )}

@@ -691,7 +691,7 @@ const Employee = () => {
             </Typography>
             {pageCount > 1 && (
               <Pagination count={pageCount} page={cur + 1} onChange={(_, n) => setPage(n - 1)} shape="rounded" size={isSmallScreen ? "small" : "medium"}
-                sx={{ "& .Mui-selected": { bgcolor: `${INK_2} !important`, color: "#fff" } }} />
+                sx={{ "& .Mui-selected": { bgcolor: "#eff6ff !important", color: "#1d4ed8", borderColor: "#bfdbfe" } }} />
             )}
           </Stack>
         )}

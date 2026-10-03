@@ -553,7 +553,7 @@ export default function DispatchList({ mode = "board", myId = "" }) {
                   </Box>
                   <Box sx={{
                     minWidth: 30, height: 26, px: 1, borderRadius: 99, display: "flex", alignItems: "center", justifyContent: "center",
-                    bgcolor: list.length ? "#334155" : "#f1f5f9", color: list.length ? "#fff" : TEXT_SUB,
+                    bgcolor: list.length ? "#eff6ff" : "#f1f5f9", color: list.length ? "#1d4ed8" : TEXT_SUB,
                     fontWeight: 800, fontSize: "0.8rem", fontVariantNumeric: "tabular-nums",
                   }}>
                     {list.length}

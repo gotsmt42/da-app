@@ -3450,7 +3450,7 @@ const Operation = () => {
           ⚠️ ยังกรองเหลืองานเดียวเหมือนเดิม — ลิงก์ /operation/:id มาจากหลายที่ ถ้าไม่กรองงานอาจไม่อยู่ในหน้านี้ */}
       {selectedEvent && (
         <Stack direction="row" alignItems="center" gap={1.25}
-          sx={{ mb: 2, px: 1.5, py: 1.1, borderRadius: 2.5, bgcolor: "#fff", border: "1px solid #e2e8f0", borderLeft: "4px solid #334155" }}>
+          sx={{ mb: 2, px: 1.5, py: 1.1, borderRadius: 2.5, bgcolor: "#fff", border: "1px solid #e2e8f0", borderLeft: "4px solid #2563eb" }}>
           <Box flex={1} minWidth={0}>
             <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: "#64748b" }}>กำลังดูเฉพาะงานนี้</Typography>
             <Typography title={focusedJob.name} noWrap sx={{ fontSize: "0.9rem", fontWeight: 800, color: "#0f172a" }}>{focusedJob.name}</Typography>
@@ -3469,7 +3469,7 @@ const Operation = () => {
             </IconButton>
           </Tooltip>
           <Button size="small" onClick={() => navigate("/operation")}
-            sx={{ flexShrink: 0, height: 38, px: 1.25, borderRadius: 2, fontWeight: 700, whiteSpace: "nowrap", color: "#fff", bgcolor: "#334155", "&:hover": { bgcolor: "#1e293b" } }}>
+            sx={{ flexShrink: 0, height: 38, px: 1.25, borderRadius: 2, fontWeight: 700, whiteSpace: "nowrap", color: "#fff", bgcolor: "#2563eb", "&:hover": { bgcolor: "#1d4ed8" } }}>
             ดูทั้งหมด
           </Button>
         </Stack>

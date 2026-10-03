@@ -109,7 +109,7 @@ export default function InboxBell({ dark = false }) {
           {[["all", "ทั้งหมด"], ["unread", `ยังไม่อ่าน${unread ? ` (${unread > 99 ? "99+" : unread})` : ""}`]].map(([v, l]) => (
             <Box key={v} component="button" type="button" onClick={() => setTab(v)} sx={{
               border: 0, cursor: "pointer", px: 1.5, height: 28, borderRadius: 999, fontSize: "0.78rem", fontWeight: 700, fontFamily: "inherit",
-              bgcolor: tab === v ? TEXT_MAIN : "#f1f5f9", color: tab === v ? "#fff" : "#475569",
+              bgcolor: tab === v ? "#eff6ff" : "#f1f5f9", color: tab === v ? "#1d4ed8" : "#475569",
             }}>{l}</Box>
           ))}
         </Stack>

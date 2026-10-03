@@ -394,7 +394,7 @@ export default function CustomerOverview() {
           </Typography>
           {pageCount > 1 && (
             <Pagination count={pageCount} page={cur} onChange={(_, n) => setPage(n)} shape="rounded" size={isDesktop ? "medium" : "small"} siblingCount={isDesktop ? 1 : 0}
-              sx={{ "& .Mui-selected": { bgcolor: `${INK_2} !important`, color: "#fff" } }} />
+              sx={{ "& .Mui-selected": { bgcolor: "#eff6ff !important", color: "#1d4ed8", borderColor: "#bfdbfe" } }} />
           )}
         </Stack>
       )}

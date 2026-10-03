@@ -22,7 +22,7 @@ import {
   Search, Close, Refresh, FilterList, Description, EventAvailable, MoreVert,
   EditNote, OpenInNew, Inventory2, Visibility,
 } from "@mui/icons-material";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import "@/shared/utils/momentThaiLocale";
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import { thaiDateNumeric } from "@/shared/utils/thaiDate";
@@ -81,9 +81,12 @@ const IssuedDocuments = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [search, setSearch] = useState("");
+  // ✅ ?q= จากลิงก์ "เปิดในทะเบียนเอกสาร" ในกล่องออกเอกสาร — เปิดมาแล้วค้นเลขที่ใบนั้นให้เลย
+  const [searchParams] = useSearchParams();
+  const initialQ = searchParams.get("q") || "";
+  const [search, setSearch] = useState(initialQ);
   // ✅ คำค้นที่ "ยิงจริง" แยกจากคำที่กำลังพิมพ์ — ไม่งั้นทุกตัวอักษรที่พิมพ์ = 1 คำขอไปที่ server
-  const [appliedSearch, setAppliedSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState(initialQ);
   const [docType, setDocType] = useState("all");
   const [status, setStatus] = useState("all");
   const [from, setFrom] = useState("");

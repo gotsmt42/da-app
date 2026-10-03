@@ -51,7 +51,8 @@ const theme = createTheme({
           fontVariantNumeric: "tabular-nums",
           "&:hover": { backgroundColor: "#f8fafc", borderColor: "#cbd5e1" },
           "&.Mui-selected, &.Mui-selected:hover, &.Mui-selected.Mui-focusVisible": {
-            backgroundColor: "#334155", borderColor: "#334155", color: "#fff",
+            // ✅ หน้าที่เลือก = ฟ้าอ่อนตัวน้ำเงิน (ผู้ใช้ไม่เอาพื้นเข้มทึบ)
+            backgroundColor: "#eff6ff", borderColor: "#bfdbfe", color: "#1d4ed8",
           },
           "&.Mui-disabled": { opacity: 0.35 },
         },

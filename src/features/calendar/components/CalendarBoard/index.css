@@ -151,12 +151,12 @@
   filter: grayscale(1) contrast(1.05);
 }
 
-/* ปุ่ม "โหมดคนตาบอด" (ข้างซ้ายปุ่ม Excel) — เปิดอยู่ = พื้นดำตัวขาว */
+/* ปุ่ม "โหมดคนตาบอด" (ข้างซ้ายปุ่ม Excel) — เปิดอยู่ = พื้นฟ้าอ่อนตัวน้ำเงิน (ผู้ใช้ไม่เอาพื้นดำ) */
 .toolbar-icon-btn--gray-on,
 .toolbar-icon-btn--gray-on:hover {
-  background-color: #0f172a;
-  border-color: #0f172a;
-  color: #ffffff;
+  background-color: #eff6ff;
+  border-color: #93c5fd;
+  color: #1d4ed8;
 }
 
 .filter-toggle-btn--open {

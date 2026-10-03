@@ -18,13 +18,24 @@ export const LINE = "#e2e8f0";
 export const SURFACE = "#f8fafc";
 export const DANGER = "#dc2626";
 export const CARD_SHADOW = "0 1px 2px rgba(15,23,42,.04)";
+/**
+ * ✅ สีหลักของการกระทำ (ผู้ใช้สั่ง 3 ต.ค. 2569: "ปุ่ม/ธีมไม่อยากให้เป็นสีดำ ดูอึมครึม ใช้ตามสถานะได้แต่ไม่มากไป")
+ *    ปุ่มหลัก/รายการที่เลือก = น้ำเงิน · สำเร็จ = เขียว · อันตราย = แดง · ที่เหลือเป็นเทาอ่อน
+ */
+export const ACCENT = "#2563eb";
+export const ACCENT_DARK = "#1d4ed8";
+export const ACCENT_SOFT = "#eff6ff";
+export const ACCENT_LINE = "#bfdbfe";
+export const SUCCESS = "#16a34a";
+/** รายการที่ถูกเลือก (แบ่งหน้า/ตัวสลับ/ชิป) — พื้นฟ้าอ่อน ตัวน้ำเงิน ไม่ใช่พื้นทึบ */
+export const SELECTED_SX = { bgcolor: `${ACCENT_SOFT} !important`, color: `${ACCENT_DARK} !important`, borderColor: `${ACCENT_LINE} !important` };
 
-/** หัวเพจ: ไอคอนกล่องเข้ม · ชื่อ · คำอธิบาย · (ด้านขวา) ปุ่ม/ตัวเลข */
+/** หัวเพจ: ไอคอนกล่องฟ้าอ่อน · ชื่อ · คำอธิบาย · (ด้านขวา) ปุ่ม/ตัวเลข */
 export function PageHeader({ icon, title, subtitle, actions }) {
   return (
     <Box sx={{ borderRadius: 3, border: `1px solid ${LINE}`, bgcolor: "#fff", px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.5 }, mb: 1.5, boxShadow: CARD_SHADOW }}>
       <Stack direction="row" alignItems="center" spacing={1.5}>
-        <Box sx={{ width: 40, height: 40, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: INK_2, color: "#fff", "& svg": { fontSize: 22 } }}>
+        <Box sx={{ width: 40, height: 40, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: ACCENT_SOFT, color: ACCENT, "& svg": { fontSize: 22 } }}>
           {icon}
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -118,7 +129,9 @@ export function DotLabel({ color = FAINT, children, strong }) {
 export const TABLE_HEAD_SX = { "& th": { fontWeight: 800, color: MUTED, fontSize: "0.74rem", bgcolor: SURFACE, whiteSpace: "nowrap", borderColor: LINE } };
 export const TABLE_ROW_SX = { "& td": { py: 1.1, borderColor: LINE }, "&:last-child td": { borderBottom: 0 } };
 
-/** ปุ่มหลักของหน้า (เข้ม) */
-export const PRIMARY_BTN_SX = { textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: INK_2, color: "#fff", whiteSpace: "nowrap", "&:hover": { bgcolor: "#1e293b", boxShadow: "none" } };
+/** ปุ่มหลักของหน้า (น้ำเงิน) */
+export const PRIMARY_BTN_SX = { textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: ACCENT, color: "#fff", whiteSpace: "nowrap", "&:hover": { bgcolor: ACCENT_DARK, boxShadow: "none" } };
+/** ปุ่มยืนยันที่ "สำเร็จ/ออกจริง" (เขียว) */
+export const SUCCESS_BTN_SX = { ...PRIMARY_BTN_SX, bgcolor: SUCCESS, "&:hover": { bgcolor: "#15803d", boxShadow: "none" } };
 /** ปุ่มไอคอนกรอบ (รีเฟรช ฯลฯ) */
 export const ICON_BTN_SX = { width: 40, height: 40, border: `1px solid ${LINE}`, borderRadius: 2, color: INK_2, bgcolor: "#fff" };

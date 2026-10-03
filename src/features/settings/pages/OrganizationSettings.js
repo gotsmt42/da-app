@@ -417,7 +417,7 @@ export default function OrganizationSettings() {
                   return { ...f, otRestDays: on ? cur.filter((x) => x !== i) : [...cur, i].sort() };
                 });
               }}
-                sx={{ fontWeight: 800, bgcolor: on ? "#334155" : "#fff", color: on ? "#fff" : TEXT_SUB, border: `1px solid ${on ? "#334155" : BORDER}` }} />
+                sx={{ fontWeight: 800, bgcolor: on ? "#eff6ff" : "#fff", color: on ? "#1d4ed8" : TEXT_SUB, border: `1px solid ${on ? "#bfdbfe" : BORDER}` }} />
             );
           })}
         </Stack>

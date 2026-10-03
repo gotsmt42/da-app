@@ -13,15 +13,14 @@
  * ⚠️ เลขที่เอกสารถูก "กินจริง" ตอนกดออกเท่านั้น (DocNumberService.next) ไม่ใช่ตอนเปิดกล่อง —
  * เปิดดูแล้วปิดไปเฉยๆ ต้องไม่ทำให้เลขกระโดดหายไปหนึ่งใบ
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Box, Stack, Typography,
-  TextField, Button, IconButton, Alert, Chip, useMediaQuery, CircularProgress, Autocomplete,
-  Switch, FormControlLabel,
+  TextField, Button, IconButton, Alert, useMediaQuery, CircularProgress, Autocomplete,
+  Switch, FormControlLabel, Menu, MenuItem, ListItemIcon,
 } from "@mui/material";
-import { alpha } from "@mui/material/styles";
 import {
-  Close, Visibility, EventAvailable, Refresh, Search, Add, DeleteOutline, ContentPaste,
+  Visibility, EventAvailable, Refresh, Search, Add, DeleteOutline, ContentPaste, AutoFixHigh,
 } from "@mui/icons-material";
 import { jsPDF } from "jspdf";
 import thSarabunFont from "@/assets/fonts/THSarabunNew_base64";
@@ -42,35 +41,35 @@ import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import SignatureService from "@/shared/services/SignatureService";
 import StaffDirectoryService from "@/shared/services/StaffDirectoryService";
 import { useAuth } from "@/features/auth/AuthContext";
+import {
+  DocDialogHeader, DocSection, SubHeader, DraftBanner, IssuedSummary, SignerPreview, useDocDraft, useIssuedDoc,
+  SMALL_BTN_SX, OUTLINE_BTN_SX,
+} from "./docFormKit";
+import { INK_2, MUTED, FAINT, LINE, SURFACE, DANGER, PRIMARY_BTN_SX } from "@/shared/ui/PageKit";
 
 // ✅ สีประจำเอกสารชนิดนี้เป็น "ฟ้า" ไม่ใช่แดงเหมือนใบส่งมอบงาน — ตรงกับสีปุ่ม "📄 ออกใบแจ้งเข้างาน"
 // ในหน้าแก้ไขงาน (.ee-btn-info = #0ea5e9) ผู้ใช้จึงเชื่อมโยงได้ทันทีว่ากล่องนี้มาจากปุ่มไหน และแยกออก
 // จากกล่องใบส่งมอบงาน (แดง #dc2626 / ปุ่ม .ee-btn-delivery เขียวน้ำเงิน) ตั้งแต่แวบแรกที่เปิด
 const ACCENT = "#0284c7";
-const ACCENT_DARK = "#0369a1";
-const SURFACE_SUBTLE = "#f8fafc";
-const BORDER_MAIN = "#e2e8f0";
-const TEXT_SUB = "#64748b";
+const TEXT_SUB = MUTED;
 
-// ✅ ป้ายหัวข้อกลุ่มฟิลด์ — แบ่งฟอร์มยาวๆ เป็นก้อนที่กวาดตาหาได้ แทนกองช่องกรอกเรียงติดกันรวด
-const SectionLabel = ({ children }) => (
-  <Typography
-    variant="caption"
-    sx={{ fontWeight: 800, color: TEXT_SUB, letterSpacing: "0.04em", display: "block", mb: 1 }}
-  >
-    {children}
-  </Typography>
-);
-
-const Card = ({ children }) => (
-  <Box sx={{ p: 2, mb: 2, bgcolor: "#fff", borderRadius: 2.5, border: `1px solid ${BORDER_MAIN}` }}>
-    {children}
-  </Box>
-);
+/** จับคู่งานกับทะเบียนลูกค้า (โครงการ + บริษัท ก่อน แล้วค่อยอย่างใดอย่างหนึ่ง) */
+const findCustomer = (list, job) => {
+  const p = resolveJobFields(job);
+  const norm = (v) => String(v || "").trim().toLowerCase();
+  return list.find((c) => norm(c.cSite) === norm(p.site) && norm(c.cCompany) === norm(p.company))
+    || list.find((c) => norm(c.cSite) === norm(p.site))
+    || (p.company ? list.find((c) => norm(c.cCompany) === norm(p.company)) : null);
+};
 
 const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningNumber = false }) => {
   const isMobile = useMediaQuery("(max-width:600px)");
-  const [form, setForm] = useState(null);
+  const [form, setFormState] = useState(null);
+  // ✅ แยก "ผู้ใช้แก้เอง" (setForm → นับเป็นร่าง) ออกจาก "ระบบเติมให้" (setFormState) — ดู useDocDraft
+  const dirtyRef = useRef(false);
+  const setForm = (u) => { dirtyRef.current = true; setFormState(u); };
+  const [toolsAnchor, setToolsAnchor] = useState(null);
+  const [viewingExisting, setViewingExisting] = useState(false);
   const [previewNumber, setPreviewNumber] = useState("");
   const [loadingNumber, setLoadingNumber] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -86,7 +85,7 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
   useEffect(() => {
     if (!open || !job) return;
     const base = buildWorkNoticeDefaults(job, customer, issuer);
-    setForm({
+    setFormState({
       ...base,
       body: buildWorkNoticeBody(base),
       cooperationNote: buildWorkNoticeCooperation(),
@@ -105,44 +104,65 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
         .then((d) => {
           if (!alive) return;
           setPreviewNumber(d.docNumber);
-          setForm((f) => (f ? { ...f, docNumber: d.docNumber } : f));
+          setFormState((f) => (f ? { ...f, docNumber: d.docNumber } : f));
         })
         .catch(() => { if (alive) setPreviewNumber(""); })
         .finally(() => { if (alive) setLoadingNumber(false); });
     }
 
-    {
-      const p = resolveJobFields(job);
-      const norm = (v) => String(v || "").trim().toLowerCase();
-      CustomerService.getCustomers()
-        .then((res) => {
-          if (!alive) return;
-          // ⚠️ API /customer คืนค่าในคีย์ "userCustomers" (ดู routes/customer.js) — ตัวอื่นเป็น fallback
-          const list = res?.userCustomers || res?.customers || res?.data
-            || (Array.isArray(res) ? res : []);
-          setCustomerList(Array.isArray(list) ? list : []);
-          if (customer) return;
-          const found =
-            list.find((c) => norm(c.cSite) === norm(p.site) && norm(c.cCompany) === norm(p.company))
-            || list.find((c) => norm(c.cSite) === norm(p.site))
-            || (p.company ? list.find((c) => norm(c.cCompany) === norm(p.company)) : null);
-          if (found) {
-            setForm((f) => (f ? {
-              ...f,
-              customerAddress: f.customerAddress || found.address || "",
-              customerCompany: f.customerCompany || found.cCompany || "",
-              customerTaxId: f.customerTaxId || found.tax || "",
-            } : f));
-          }
-        })
-        // ⚠️ หาที่อยู่ไม่เจอต้องไม่บล็อกการออกเอกสาร — ที่อยู่ไม่ใช่ช่องบังคับ (พิมพ์เองได้ในกล่อง)
-        .catch(() => {});
-    }
+    CustomerService.getCustomers()
+      .then((res) => {
+        if (!alive) return;
+        // ⚠️ API /customer คืนค่าในคีย์ "userCustomers" (ดู routes/customer.js) — ตัวอื่นเป็น fallback
+        const list = res?.userCustomers || res?.customers || res?.data
+          || (Array.isArray(res) ? res : []);
+        setCustomerList(Array.isArray(list) ? list : []);
+        if (customer) return;
+        const found = findCustomer(list, job);
+        if (found) {
+          setFormState((f) => (f ? {
+            ...f,
+            customerAddress: f.customerAddress || found.address || "",
+            customerCompany: f.customerCompany || found.cCompany || "",
+            customerTaxId: f.customerTaxId || found.tax || "",
+          } : f));
+        }
+      })
+      // ⚠️ หาที่อยู่ไม่เจอต้องไม่บล็อกการออกเอกสาร — ที่อยู่ไม่ใช่ช่องบังคับ (พิมพ์เองได้ในกล่อง)
+      .catch(() => {});
 
     return () => { alive = false; };
   }, [open, job, customer, issuer, canUseRunningNumber]);
 
-  const set = (k) => (v) => setForm((f) => ({ ...f, [k]: v }));
+  // ✅ ร่างอัตโนมัติ + กันออกซ้ำ (ผู้ใช้สั่ง 3 ต.ค. 2569) — ⚠️ ต้องอยู่หลัง effect ตั้งค่าเริ่มต้นด้านบน
+  const eventId = String(job?.id || job?._id || "");
+  const draft = useDocDraft({
+    open, draftKey: eventId ? `notice:${eventId}` : "", form, setFormState, dirtyRef,
+    // เลขที่เดินหน้าออกให้ใหม่ทุกครั้ง — ไม่กู้คืนเลขเก่าจากร่าง
+    omit: canUseRunningNumber ? ["docNumber"] : [],
+  });
+  const existing = useIssuedDoc({ open, eventId, docType: "notice" });
+
+  /** ทิ้งร่าง แล้วเริ่มใหม่จากข้อมูลงาน */
+  const discardDraft = () => {
+    draft.clear();
+    const base = buildWorkNoticeDefaults(job, customer, issuer);
+    const found = customer ? null : findCustomer(customerList, job);
+    setFormState((f) => ({
+      ...base,
+      body: buildWorkNoticeBody(base),
+      cooperationNote: buildWorkNoticeCooperation(),
+      docNumber: canUseRunningNumber ? (previewNumber || f?.docNumber || "") : base.docNumber,
+      ...(found ? {
+        customerAddress: base.customerAddress || found.address || "",
+        customerCompany: base.customerCompany || found.cCompany || "",
+        customerTaxId: base.customerTaxId || found.tax || "",
+      } : {}),
+    }));
+  };
+
+  // ⚠️ ไม่เปลี่ยนจริง = ไม่นับเป็นการแก้ (Autocomplete ยิง onInputChange ซ้ำตอนเปิดกล่อง → ร่างปลอม)
+  const set = (k) => (v) => { if ((form?.[k] ?? "") === (v ?? "")) return; setForm((f) => ({ ...f, [k]: v })); };
   const setField = (k) => (e) => set(k)(e.target.value);
 
   // ✅ สร้างข้อความใหม่จากค่าที่แก้ล่าสุดได้ตลอด — เผื่อผู้ใช้แก้ชื่อโครงการ/งาน/อ้างถึง หลังเปิดกล่อง
@@ -267,6 +287,7 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
 
   /** ขั้นที่ 1 — สร้างไฟล์ตัวอย่างด้วย "เลขที่ที่จะได้" โดยยังไม่กินเลขจริง */
   const handlePreview = async () => {
+    if (existing.doc) return;
     if (missing.length > 0) {
       setError(`กรุณากรอก: ${missing.join(" · ")}`);
       return;
@@ -277,6 +298,7 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
       const { url, blob, fileName } = await buildPdf(form.docNumber);
       replacePreview({ url, blob, fileName });
       setIssued(false);
+      setViewingExisting(false);
       setPreviewOpen(true);
     } catch {
       setError("สร้างตัวอย่างเอกสารไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
@@ -292,6 +314,14 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
     try {
       // ⚠️ กินเลขจริงตรงนี้ที่เดียวเท่านั้น และต้องได้เลขมาก่อนถึงจะสร้างไฟล์ — เอกสารที่ไม่มีเลขอ้างอิง
       // คือเอกสารที่ตามกลับไม่ได้ (เฉพาะคนที่มีสิทธิ์ออกเลข ส่วนคนอื่นใช้เลขที่กรอกไว้ในช่องตามเดิม)
+      // ✅ ตรวจซ้ำอีกรอบก่อนออกจริง — อีกคน/อีกแท็บอาจออกใบของงานนี้ไปแล้วระหว่างที่กรอกอยู่
+      const dup = await IssuedDocumentService.activeForEvent(eventId, "notice").catch(() => null);
+      if (dup) {
+        existing.setDoc(dup);
+        setPreviewOpen(false);
+        setError(`งานนี้ออกใบแจ้งเข้างานไปแล้ว (เลขที่ ${dup.docNumber}) — ออกซ้ำไม่ได้`);
+        return;
+      }
       let finalNumber = form.docNumber;
       if (canUseRunningNumber) {
         // ⚠️ ส่ง id ของงานไปด้วย — backend ใช้ตรวจว่าผู้ขอเลขเกี่ยวข้องกับงานนี้จริง (ดู /doc-number/next)
@@ -305,6 +335,7 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
       // ✅ บันทึกลงทะเบียนเอกสารทันทีที่ออกจริง (ดูหน้า "ทะเบียนเอกสาร")
       // ⚠️ ห้าม await รวมใน try เดียวกับการสร้างไฟล์ — ถ้าบันทึกทะเบียนล้มเหลว (เน็ตหลุด/สิทธิ์ไม่พอ)
       // ต้องไม่ทำให้ผู้ใช้เห็นว่า "ออกเอกสารไม่สำเร็จ" ทั้งที่เลขถูกกินและไฟล์ออกเรียบร้อยแล้ว
+      draft.clear();
       IssuedDocumentService.create({
         docType: "notice",
         docNumber: finalNumber,
@@ -318,8 +349,12 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
         eventId: job?.id || job?._id || null,
         contractNo: resolveJobFields(job).contractNo || "",
         formSnapshot: { ...form, docNumber: finalNumber },
-      }).catch(() => {});
+      }).then((doc) => existing.setDoc(doc)).catch(() => {});
     } catch (err) {
+      if (err?.response?.status === 409 && err.response.data?.doc) {
+        existing.setDoc(err.response.data.doc);
+        setPreviewOpen(false);
+      }
       setError(err?.response?.data?.message || "ออกเอกสารไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
     } finally {
       setBusy(false);
@@ -330,16 +365,37 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
     replacePreview(null);
     setPreviewOpen(false);
     setIssued(false);
+    setViewingExisting(false);
     onClose?.();
+  };
+
+  /** เปิดดูใบที่ออกไปแล้ว — สร้างไฟล์จากข้อมูลที่บันทึกไว้ในทะเบียน (ส่ง/พิมพ์ใบเดิมซ้ำได้) */
+  const viewExisting = async () => {
+    const snap = existing.doc?.formSnapshot;
+    if (!snap || !Object.keys(snap).length) { setError("ใบเดิมไม่มีข้อมูลสำหรับสร้างไฟล์ — เปิดดูได้ที่ทะเบียนเอกสาร"); return; }
+    setBusy(true); setError("");
+    try {
+      const { url, blob, fileName } = await generateWorkNoticePdf({ jsPDF, thSarabunFont, form: snap, mode: "blob" });
+      replacePreview({ url, blob, fileName });
+      setIssued(true);
+      setViewingExisting(true);
+      setPreviewOpen(true);
+    } catch {
+      setError("สร้างไฟล์ใบเดิมไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+    } finally {
+      setBusy(false);
+    }
   };
 
   if (!form) return null;
 
+  const fieldSx = { bgcolor: "#fff" };
+  const locked = Boolean(existing.doc);
+
   return (
     <Dialog
       open={open}
-      // ✅ ปิดได้เฉพาะปุ่ม "✕" กับ "ยกเลิก" — กล่องนี้เป็นฟอร์มยาวที่กรอก/แก้ไปหลายช่องแล้ว เผลอแตะ
-      // พื้นหลังนอกกล่องทีเดียว (โดยเฉพาะบนมือถือที่นิ้วโดนขอบง่าย) แล้วข้อมูลหายหมดต้องเริ่มใหม่
+      // ✅ ปิดได้เฉพาะปุ่ม "✕" กับ "ยกเลิก" — เผลอแตะพื้นหลังแล้วหลุดจากฟอร์มยาว (ข้อความยังอยู่ในร่างอัตโนมัติ)
       onClose={(_, reason) => {
         if (busy) return;
         if (reason === "backdropClick" || reason === "escapeKeyDown") return;
@@ -349,411 +405,276 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
       PaperProps={{ sx: { borderRadius: isMobile ? 0 : 3 } }}
     >
       <DialogTitle sx={{ p: 0 }}>
-        <Stack
-          direction="row" alignItems="center" spacing={1.5}
-          sx={{ px: 2.5, py: 2, borderBottom: `1px solid ${BORDER_MAIN}` }}
-        >
-          <Box sx={{
-            width: 40, height: 40, borderRadius: 2.5, flexShrink: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            bgcolor: alpha(ACCENT, 0.1), color: ACCENT,
-          }}>
-            <EventAvailable sx={{ fontSize: 22 }} />
-          </Box>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography sx={{ fontWeight: 800, fontSize: "1.05rem", lineHeight: 1.3 }}>
-              ออกใบแจ้งเข้างาน
-            </Typography>
-            <Typography variant="caption" sx={{ color: TEXT_SUB }}>
-              {/* ✅ โชว์เลขที่จะได้ล่วงหน้า เพื่อให้รู้ก่อนกดว่าเอกสารใบนี้จะเป็นเลขอะไร */}
-              {!canUseRunningNumber
-                ? "ใช้เลขที่อ้างอิงของงานนี้ — แก้ไขได้ในช่องด้านล่าง"
-                : loadingNumber
-                  ? "กำลังตรวจเลขที่เอกสารถัดไป..."
-                  : previewNumber
-                    ? `เลขที่ถัดไป ${previewNumber} · ออกเลขจริงตอนกดออกเอกสาร`
-                    : "ระบบจะออกเลขที่เอกสารให้อัตโนมัติตอนกดออกเอกสาร"}
-            </Typography>
-          </Box>
-          <IconButton onClick={closeAll} disabled={busy}><Close /></IconButton>
-        </Stack>
+        <DocDialogHeader
+          icon={<EventAvailable />} accent={ACCENT} title="ออกใบแจ้งเข้างาน"
+          subtitle={locked
+            ? `ออกแล้ว · เลขที่ ${existing.doc.docNumber}`
+            : !canUseRunningNumber
+              ? "ใช้เลขที่อ้างอิงของงาน"
+              : loadingNumber ? "กำลังตรวจเลขที่..." : previewNumber ? `เลขที่ถัดไป ${previewNumber}` : "ออกเลขที่อัตโนมัติ"}
+          savedLabel={locked ? "" : draft.savedLabel}
+          onClose={closeAll} busy={busy}
+        />
       </DialogTitle>
 
-      <DialogContent sx={{ px: 2.5, py: 2.5, bgcolor: SURFACE_SUBTLE }}>
-        {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+      <DialogContent sx={{ px: { xs: 1.5, sm: 3 }, py: { xs: 1.75, sm: 2.5 }, bgcolor: SURFACE, overflowX: "hidden" }}>
+        {error && <Alert severity="error" onClose={() => setError("")} sx={{ mb: 1.75, borderRadius: 2 }}>{error}</Alert>}
+        {locked && <IssuedSummary doc={existing.doc} label="ใบแจ้งเข้างาน" onView={viewExisting} viewing={busy} onNavigate={closeAll} />}
+        {!locked && draft.restoredLabel && <DraftBanner when={draft.restoredLabel} onDiscard={discardDraft} />}
 
-        {/* ── ผู้รับ ─────────────────────────────────────────────────────── */}
-        <Card>
-          <SectionLabel>แจ้งถึง</SectionLabel>
-          <Stack spacing={1.75}>
-            {/* ✅ ค้นหาจากทะเบียนลูกค้า แล้ววางชื่อบริษัท/ที่อยู่/เลขผู้เสียภาษีให้ครบชุดในคลิกเดียว */}
-            <Autocomplete
-              size="small" fullWidth
-              options={customerList}
-              value={null} blurOnSelect clearOnBlur
-              getOptionLabel={(o) =>
-                [o?.cSite, o?.cCompany].filter(Boolean).join(" · ") || "(ไม่ระบุชื่อ)"}
-              filterOptions={(opts, { inputValue }) => {
-                const q = inputValue.trim().toLowerCase();
-                if (!q) return opts.slice(0, 30);
-                return opts
-                  .filter((o) => [o.cSite, o.cCompany, o.tax, o.address]
-                    .some((v) => String(v || "").toLowerCase().includes(q)))
-                  .slice(0, 30);
-              }}
-              onChange={(_, picked) => {
-                if (!picked) return;
-                setForm((f) => ({
-                  ...f,
-                  site: picked.cSite || f.site,
-                  customerCompany: picked.cCompany || "",
-                  customerAddress: picked.address || "",
-                  customerTaxId: picked.tax || "",
-                }));
-              }}
-              renderOption={(props, o) => (
-                <Box component="li" {...props} key={o._id} sx={{ display: "block !important", py: 1 }}>
-                  <Typography sx={{ fontSize: "0.85rem", fontWeight: 700 }}>{o.cSite}</Typography>
-                  <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }}>
-                    {o.cCompany || "— ไม่ระบุบริษัท —"}{o.tax ? ` · เลขภาษี ${o.tax}` : ""}
-                  </Typography>
+        {/* ✅ ออกแล้ว = แสดงสรุปใบเดิมอย่างเดียว ไม่โชว์ฟอร์ม (แก้/ออกซ้ำไม่ได้อยู่แล้ว) */}
+        {!locked && (<Box>
+          {/* ── 1 ผู้รับ ─────────────────────────────────────────────────── */}
+          <DocSection step={1} title="แจ้งถึง" hint="เลือกจากทะเบียนลูกค้าเพื่อเติมบริษัท/ที่อยู่ให้ครบ">
+            <Stack spacing={1.75}>
+              <Autocomplete
+                size="small" fullWidth
+                options={customerList}
+                value={null} blurOnSelect clearOnBlur
+                getOptionLabel={(o) => [o?.cSite, o?.cCompany].filter(Boolean).join(" · ") || "(ไม่ระบุชื่อ)"}
+                filterOptions={(opts, { inputValue }) => {
+                  const q = inputValue.trim().toLowerCase();
+                  if (!q) return opts.slice(0, 30);
+                  return opts.filter((o) => [o.cSite, o.cCompany, o.tax, o.address].some((v) => String(v || "").toLowerCase().includes(q))).slice(0, 30);
+                }}
+                onChange={(_, picked) => {
+                  if (!picked) return;
+                  setForm((f) => ({ ...f, site: picked.cSite || f.site, customerCompany: picked.cCompany || "", customerAddress: picked.address || "", customerTaxId: picked.tax || "" }));
+                }}
+                renderOption={(props, o) => (
+                  <Box component="li" {...props} key={o._id} sx={{ display: "block !important", py: 1 }}>
+                    <Typography sx={{ fontSize: "0.85rem", fontWeight: 700 }}>{o.cSite}</Typography>
+                    <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }}>
+                      {o.cCompany || "— ไม่ระบุบริษัท —"}{o.tax ? ` · เลขภาษี ${o.tax}` : ""}
+                    </Typography>
+                  </Box>
+                )}
+                renderInput={(params) => (
+                  <TextField {...params} placeholder="ค้นหาลูกค้า: ชื่อโครงการ / บริษัท / เลขผู้เสียภาษี" sx={fieldSx}
+                    InputProps={{ ...params.InputProps, startAdornment: <Search sx={{ fontSize: 18, color: FAINT, ml: 0.5, mr: 0.5 }} /> }} />
+                )}
+              />
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.75}>
+                <TextField size="small" fullWidth label="ชื่อโครงการ" value={form.site} onChange={setField("site")} required sx={fieldSx} />
+                <TextField size="small" fullWidth label="บริษัทลูกค้า" value={form.customerCompany} onChange={setField("customerCompany")} sx={fieldSx} />
+              </Stack>
+              <TextField size="small" fullWidth multiline minRows={2} label="ที่อยู่ลูกค้า (ไม่บังคับ)"
+                value={form.customerAddress} onChange={setField("customerAddress")} sx={fieldSx} />
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.75}>
+                <Autocomplete
+                  freeSolo fullWidth size="small" options={ATTENTION_PRESETS}
+                  inputValue={form.attention} onInputChange={(_, v) => set("attention")(v)}
+                  renderInput={(params) => <TextField {...params} label="เรียน" sx={fieldSx} />}
+                />
+                {/* ✅ อ้างถึง — ตัวเลือกจากเลขเอกสารที่ผูกกับงานนี้ (ใบเสนอราคา/สัญญา) */}
+                <Autocomplete
+                  freeSolo fullWidth size="small" options={referenceOptions}
+                  inputValue={form.reference} onInputChange={(_, v) => set("reference")(v)}
+                  renderInput={(params) => <TextField {...params} label="อ้างถึง" placeholder="เช่น สัญญาเลขที่ FAPTY01-2569" sx={fieldSx} />}
+                />
+              </Stack>
+            </Stack>
+          </DocSection>
+
+          {/* ── 2 งาน + กำหนดการรายวัน ──────────────────────────────────────
+              ✅ รูปแบบตรงกับเอกสารจริงของบริษัท: 1 บรรทัดต่อ 1 วัน (ระบบเติมทุกวันตามตารางเป็นจุดตั้งต้น) */}
+          <DocSection step={2} title="งานและกำหนดการ" hint={`ตารางในระบบ: ${form.jobDateText}`}>
+            <Stack direction="row" spacing={1.5} sx={{ minWidth: 0 }}>
+              <TextField size="small" fullWidth label="งานที่ดำเนินการ" placeholder="เช่น PM ระบบ Fire Alarm"
+                value={form.workLabel} onChange={setField("workLabel")} sx={fieldSx} />
+              <TextField size="small" label="ครั้งที่" placeholder="1/2" value={form.roundLabel || ""}
+                onChange={setField("roundLabel")} sx={{ ...fieldSx, width: { xs: 96, sm: 140 }, flexShrink: 0 }} />
+            </Stack>
+
+            <SubHeader action={(
+              <Stack direction="row" spacing={0.75}>
+                <Button size="small" onClick={(e) => setToolsAnchor(e.currentTarget)} startIcon={<AutoFixHigh sx={{ fontSize: 16 }} />} sx={OUTLINE_BTN_SX}>
+                  ตัวช่วย
+                </Button>
+                <Button size="small" onClick={addDay} startIcon={<Add sx={{ fontSize: 16 }} />} sx={OUTLINE_BTN_SX}>เพิ่มวัน</Button>
+              </Stack>
+            )} count={`${printedDays.length} วัน`}>
+              กำหนดการ
+            </SubHeader>
+            <Menu anchorEl={toolsAnchor} open={Boolean(toolsAnchor)} onClose={() => setToolsAnchor(null)}
+              anchorOrigin={{ vertical: "bottom", horizontal: "right" }} transformOrigin={{ vertical: "top", horizontal: "right" }}>
+              {[
+                [regenerateDays, <Refresh key="i" fontSize="small" />, "สร้างรายการใหม่ตามตารางในระบบ"],
+                [() => applyFirstToAll("time"), <ContentPaste key="i" fontSize="small" />, "ใช้เวลาของวันแรกกับทุกวัน"],
+                [() => applyFirstToAll("detail"), <ContentPaste key="i" fontSize="small" />, "ใช้รายละเอียดของวันแรกกับทุกวัน"],
+              ].map(([fn, icon, label]) => (
+                <MenuItem key={label} onClick={() => { fn(); setToolsAnchor(null); }} sx={{ fontSize: "0.86rem" }}>
+                  <ListItemIcon sx={{ color: INK_2 }}>{icon}</ListItemIcon>{label}
+                </MenuItem>
+              ))}
+            </Menu>
+
+            {/* ✅ รายการเดียวคั่นเส้น (ไม่ซ้อนกล่องในกล่อง) · วันที่/เวลาแถวเดียวกัน · ปุ่มลบอยู่ขวาของหัววัน */}
+            <Box sx={{ border: `1px solid ${LINE}`, borderRadius: 2, overflow: "hidden", bgcolor: "#fff" }}>
+              {(form.dayRows || []).map((r, i) => (
+                <Box key={i} sx={{ px: 1.5, pt: 1, pb: 1.5, borderTop: i ? `1px solid ${LINE}` : "none" }}>
+                  <Stack direction="row" alignItems="center" sx={{ mb: 1 }}>
+                    <Typography sx={{ flex: 1, fontSize: "0.8rem", fontWeight: 800, color: INK_2 }}>วันที่ {i + 1}</Typography>
+                    <IconButton size="small" onClick={() => removeDay(i)} aria-label={`ลบวันที่ ${i + 1}`} sx={{ color: FAINT, p: 0.5 }}>
+                      <DeleteOutline sx={{ fontSize: 18 }} />
+                    </IconButton>
+                  </Stack>
+                  <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0,1fr)", sm: "200px minmax(0,1fr)" }, gap: 1 }}>
+                    <ThaiDatePicker label="วันที่" value={r.date} onChange={(v) => updateDay(i, "date", v)} textFieldProps={{ sx: fieldSx }} />
+                    {/* ⚠️ disableClearable — ไม่จองที่ปุ่มล้างด้านขวา เวลา "09.30 - 17.30 น." จะไม่ถูกตัดเป็น "17...." */}
+                    <Autocomplete
+                      freeSolo disableClearable size="small" options={TIME_PRESETS}
+                      inputValue={r.time || ""} onInputChange={(_, v) => { if (v !== (r.time || "")) updateDay(i, "time", v); }}
+                      renderInput={(params) => <TextField {...params} label="เวลา" sx={fieldSx} />}
+                    />
+                  </Box>
+                  <TextField
+                    size="small" fullWidth multiline sx={{ mt: 1, ...fieldSx }}
+                    label="เข้าทำอะไร / บริเวณไหน"
+                    value={r.detail || ""} onChange={(e) => updateDay(i, "detail", e.target.value)}
+                    placeholder="เช่น เข้าทำการตรวจเช็คตู้ควบคุม และทดสอบบริเวณห้องพัก"
+                  />
+                </Box>
+              ))}
+              {(form.dayRows || []).length === 0 && (
+                <Box sx={{ py: 2.5, textAlign: "center" }}>
+                  <Typography sx={{ fontSize: "0.82rem", color: MUTED }}>ยังไม่มีกำหนดการ — กด "เพิ่มวัน" หรือ "ตัวช่วย"</Typography>
                 </Box>
               )}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="ค้นหาจากทะเบียนลูกค้า (ชื่อโครงการ / บริษัท / เลขผู้เสียภาษี)"
-                  placeholder="พิมพ์เพื่อค้นหา แล้วเลือกเพื่อวางข้อมูลให้ครบชุด"
-                  InputProps={{
-                    ...params.InputProps,
-                    startAdornment: <Search sx={{ fontSize: 18, color: "text.disabled", ml: 0.5, mr: 0.5 }} />,
-                  }}
-                />
-              )}
-            />
+            </Box>
+
+            <SubHeader>หมายเหตุ (ไม่บังคับ)</SubHeader>
             <TextField
-              size="small" fullWidth label="ชื่อโครงการ" value={form.site}
-              onChange={setField("site")} required
-            />
-            <TextField
-              size="small" fullWidth label="บริษัทลูกค้า" value={form.customerCompany}
-              onChange={setField("customerCompany")}
-            />
-            <TextField
-              size="small" fullWidth multiline minRows={2} label="ที่อยู่ลูกค้า"
-              value={form.customerAddress} onChange={setField("customerAddress")}
-              helperText={form.customerAddress ? undefined : "ไม่พบที่อยู่ในทะเบียนลูกค้า — กรอกเองได้ หรือเว้นว่างไว้ก็ออกเอกสารได้"}
-            />
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.75}>
-              <Autocomplete
-                freeSolo fullWidth size="small" options={ATTENTION_PRESETS}
-                inputValue={form.attention}
-                onInputChange={(_, v) => set("attention")(v)}
-                renderInput={(params) => <TextField {...params} label="เรียน" />}
-              />
-              {/* ✅ อ้างถึง — ตัวเลือกสร้างจากเลขเอกสารที่ผูกกับงานนี้อยู่แล้ว (ใบเสนอราคา/สัญญา)
-                  เลือกได้เลยไม่ต้องไปเปิดหน้าอื่นคัดลอกเลขมาวาง และไม่มีทางพิมพ์เลขผิด */}
-              <Autocomplete
-                freeSolo fullWidth size="small" options={referenceOptions}
-                inputValue={form.reference}
-                onInputChange={(_, v) => set("reference")(v)}
-                renderInput={(params) => (
-                  <TextField
-                    {...params} label="อ้างถึง"
-                    placeholder="เช่น สัญญาเลขที่ FAPTY01-2569"
-                    helperText={referenceOptions.length === 0 ? "งานนี้ยังไม่มีเลขเอกสารในระบบ — พิมพ์เองได้" : undefined}
-                  />
-                )}
-              />
-            </Stack>
-          </Stack>
-        </Card>
-
-        {/* ── กำหนดการเข้างาน ───────────────────────────────────────────── */}
-        <Card>
-          <SectionLabel>งานที่จะเข้าดำเนินการ</SectionLabel>
-          <Stack spacing={1.75}>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.75}>
-              <TextField
-                size="small" fullWidth label="งานที่ดำเนินการ (ประเภทงาน + ระบบ)"
-                value={form.workLabel} onChange={setField("workLabel")}
-                placeholder="เช่น PM ระบบ Fire Alarm"
-                helperText='ใช้ประกอบทั้งหัวข้อ "เรื่อง" และเนื้อความของเอกสาร'
-              />
-              <TextField
-                size="small" sx={{ width: { xs: "100%", sm: 150 }, flexShrink: 0 }}
-                label="ครั้งที่" value={form.roundLabel || ""}
-                onChange={setField("roundLabel")}
-                placeholder="เช่น 1/2"
-                helperText={form.roundLabel ? undefined : "งานนี้ไม่มีครั้งที่"}
-              />
-            </Stack>
-          </Stack>
-
-          {/* ── กำหนดการรายวัน ────────────────────────────────────────────
-              ✅ รูปแบบตรงกับเอกสารจริงของบริษัท: 1 บรรทัดต่อ 1 วัน
-                 "วันที่ 5 กุมภาพันธ์ 2569  เวลา 09.30 - 17.30 น.  เข้าทำการตรวจเช็คตู้ควบคุม ..."
-              ⚠️ ต้องแยกรายวัน ไม่ใช่เขียนช่วง "5–7 ก.พ." รวดเดียว เพราะแต่ละวันเข้าทำคนละอย่าง/คนละ
-              พื้นที่ และบางงานเว้นวัน — ระบบเติมให้ครบทุกวันตามที่ลงตารางไว้เป็นจุดตั้งต้น แล้วผู้ใช้
-              แก้ข้อความรายวันเอง (นัดหมายไม่เหมือนกันสักโครงการ) */}
-          <Stack direction="row" alignItems="center" sx={{ mt: 2, mb: 0.5 }}>
-            <SectionLabel>กำหนดการรายวัน</SectionLabel>
-            <Box sx={{ flex: 1 }} />
-            <Button
-              size="small" startIcon={<Add sx={{ fontSize: 16 }} />} onClick={addDay}
-              sx={{ textTransform: "none", fontWeight: 700, color: ACCENT, mb: 1 }}
-            >
-              เพิ่มวัน
-            </Button>
-          </Stack>
-
-          {/* แถบเครื่องมือกรอกเร็ว — เคสที่เจอบ่อยที่สุดคือ "เวลาเดิมทุกวัน / ทำเหมือนกันทุกวัน" */}
-          <Stack
-            direction="row" spacing={0.5} alignItems="center" useFlexGap
-            sx={{ flexWrap: "wrap", mb: 1.25, p: 1, borderRadius: 2, bgcolor: alpha(ACCENT, 0.06), border: `1px dashed ${alpha(ACCENT, 0.35)}` }}
-          >
-            <Typography variant="caption" sx={{ color: TEXT_SUB, mr: 0.5 }}>
-              ตารางลงไว้ <b style={{ color: ACCENT_DARK }}>{form.jobDateText}</b>
-            </Typography>
-            <Button size="small" onClick={regenerateDays} startIcon={<Refresh sx={{ fontSize: 15 }} />}
-              sx={{ textTransform: "none", fontWeight: 700, color: ACCENT_DARK, minWidth: 0 }}>
-              สร้างใหม่ตามตาราง
-            </Button>
-            <Button size="small" onClick={() => applyFirstToAll("time")} startIcon={<ContentPaste sx={{ fontSize: 15 }} />}
-              sx={{ textTransform: "none", fontWeight: 700, color: ACCENT_DARK, minWidth: 0 }}>
-              ใช้เวลาวันแรกทุกวัน
-            </Button>
-            <Button size="small" onClick={() => applyFirstToAll("detail")} startIcon={<ContentPaste sx={{ fontSize: 15 }} />}
-              sx={{ textTransform: "none", fontWeight: 700, color: ACCENT_DARK, minWidth: 0 }}>
-              ใช้รายละเอียดวันแรกทุกวัน
-            </Button>
-          </Stack>
-
-          <Stack spacing={1.25}>
-            {(form.dayRows || []).map((r, i) => (
-              <Box key={i} sx={{ p: 1.25, borderRadius: 2, border: `1px solid ${BORDER_MAIN}`, bgcolor: SURFACE_SUBTLE }}>
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
-                  <ThaiDatePicker
-                    label={`วันที่ ${i + 1}`}
-                    fullWidth={false}
-                    textFieldProps={{ sx: { width: { xs: "100%", sm: 185 }, flexShrink: 0, bgcolor: "#fff" } }}
-                    value={r.date} onChange={(v) => updateDay(i, "date", v)}
-                  />
-                  <Autocomplete
-                    freeSolo size="small" options={TIME_PRESETS}
-                    sx={{ width: { xs: "100%", sm: 175 }, flexShrink: 0, bgcolor: "#fff" }}
-                    inputValue={r.time || ""}
-                    onInputChange={(_, v) => updateDay(i, "time", v)}
-                    renderInput={(params) => <TextField {...params} label="เวลา" />}
-                  />
-                  <Box sx={{ flex: 1 }} />
-                  <IconButton size="small" onClick={() => removeDay(i)} sx={{ color: "text.disabled", alignSelf: { xs: "flex-end", sm: "center" } }}>
-                    <DeleteOutline sx={{ fontSize: 18 }} />
-                  </IconButton>
-                </Stack>
-                <TextField
-                  size="small" fullWidth multiline sx={{ mt: 1, bgcolor: "#fff" }}
-                  label="วันนี้เข้าทำอะไร / บริเวณไหน"
-                  value={r.detail || ""} onChange={(e) => updateDay(i, "detail", e.target.value)}
-                  placeholder="เช่น เข้าทำการตรวจเช็คตู้ควบคุม และทดสอบบริเวณพื้นที่ห้องพักที่สามารถเข้าได้"
-                />
-                {/* ✅ ตัวอย่างบรรทัดจริงที่จะถูกพิมพ์ — เห็นผลทันทีโดยไม่ต้องออกเอกสารมาดูก่อน */}
-                <Typography variant="caption" sx={{ display: "block", mt: 0.75, color: TEXT_SUB, fontStyle: "italic" }}>
-                  {dayRowText(r) || "— บรรทัดนี้ยังว่าง จะไม่ถูกพิมพ์ลงเอกสาร —"}
-                </Typography>
-              </Box>
-            ))}
-            {(form.dayRows || []).length === 0 && (
-              <Typography variant="caption" sx={{ color: "text.disabled" }}>
-                ยังไม่มีวันไหนเลย — กด "เพิ่มวัน" หรือ "สร้างใหม่ตามตาราง"
-              </Typography>
-            )}
-          </Stack>
-
-          {/* ✅ หมายเหตุเพิ่มเติม — เป็นข้อความของ "ทั้งใบ" ไม่ใช่ของวันใดวันหนึ่ง จึงต้องแยกให้ชัดทั้งใน
-              กล่องนี้และในเอกสาร (ในเอกสารจะมีป้าย "หมายเหตุ" คั่นไว้เป็นคอลัมน์ของตัวเอง) */}
-          <Box sx={{ mt: 2, p: 1.5, borderRadius: 2, border: `1px solid ${BORDER_MAIN}`, bgcolor: "#fff" }}>
-            <SectionLabel>หมายเหตุเพิ่มเติม (ไม่บังคับ)</SectionLabel>
-            <TextField
-              size="small" fullWidth multiline minRows={2}
+              size="small" fullWidth multiline minRows={2} sx={fieldSx}
               value={form.supportNote} onChange={setField("supportNote")}
               placeholder={SUPPORT_REQUEST_PRESETS[0]}
-              helperText='ขึ้นบรรทัดใหม่ได้ · ในเอกสารจะขึ้นเป็นย่อหน้า "หมายเหตุ" แยกจากรายการรายวัน'
             />
-          </Box>
-          <Typography variant="caption" sx={{ display: "block", mt: 1, color: "text.disabled" }}>
-            {printedDays.length > 0
-              ? `จะถูกพิมพ์ลงเอกสาร ${printedDays.length} วัน`
-              : "ยังไม่มีวันไหนถูกกรอก — เอกสารจะไม่มีกำหนดการเลย"}
-          </Typography>
-        </Card>
+          </DocSection>
 
-        {/* ── รายละเอียดเอกสาร ───────────────────────────────────────────── */}
-        <Card>
-          <SectionLabel>รายละเอียดเอกสาร</SectionLabel>
-          <Stack spacing={1.75}>
-            <Autocomplete
-              freeSolo fullWidth size="small" options={subjectOptions}
-              inputValue={form.subject}
-              onInputChange={(_, v) => set("subject")(v)}
-              renderInput={(params) => <TextField {...params} label="เรื่อง" required />}
-            />
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.75}>
-              <TextField
-                size="small" fullWidth label="เลขที่เอกสาร" value={form.docNumber}
-                onChange={setField("docNumber")}
-                disabled={canUseRunningNumber}
-                helperText={canUseRunningNumber
-                  ? "ระบบออกเลขเดินหน้าให้อัตโนมัติตอนกดออกเอกสาร"
-                  : 'ใช้ "เลขที่อ้างอิง (Doc No.)" ของงานนี้ — แก้ไขได้'}
-              />
-              <ThaiDatePicker
-                label="วันที่ออกเอกสาร"
-                value={form.issuedAt} onChange={set("issuedAt")}
-                helperText={`ในเอกสารจะขึ้นเป็น "${thaiFullDate(form.issuedAt)}"`}
-              />
-            </Stack>
-          </Stack>
-        </Card>
-
-        {/* ── เนื้อความ ──────────────────────────────────────────────────── */}
-        <Card>
-          <Stack direction="row" alignItems="center">
-            <SectionLabel>เนื้อความ</SectionLabel>
-            <Box sx={{ flex: 1 }} />
-            <Button
-              size="small" startIcon={<Refresh sx={{ fontSize: 15 }} />} onClick={regenerateBody}
-              sx={{ textTransform: "none", fontWeight: 700, color: TEXT_SUB, mb: 1 }}
-            >
-              สร้างข้อความใหม่จากข้อมูลด้านบน
-            </Button>
-          </Stack>
-          <Stack spacing={1.75}>
-            <TextField
-              size="small" fullWidth multiline minRows={3}
-              label="ย่อหน้าที่ 1 — ที่มาและกำหนดการ"
-              value={form.body} onChange={setField("body")}
-            />
-            <TextField
-              size="small" fullWidth multiline minRows={3}
-              label="ย่อหน้าที่ 2 — ขอความร่วมมือ"
-              value={form.cooperationNote} onChange={setField("cooperationNote")}
-              helperText='ปิดท้ายด้วย "จึงเรียนมาเพื่อโปรดทราบ..." ให้อัตโนมัติในเอกสาร'
-            />
-          </Stack>
-        </Card>
-
-        {/* ── ผู้ออกเอกสาร ───────────────────────────────────────────────── */}
-        <Card>
-          <SectionLabel>ผู้ออกเอกสาร (ผู้ประสานงาน)</SectionLabel>
-          <Stack spacing={1.75}>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.75}>
+          {/* ── 3 หัวเอกสาร ─────────────────────────────────────────────── */}
+          <DocSection step={3} title="หัวเอกสาร">
+            <Stack spacing={1.75}>
               <Autocomplete
-                freeSolo fullWidth size="small"
-                options={staffOptions}
-                value={null}
-                inputValue={form.signerName || ""}
-                onInputChange={(_, v, reason) => { if (reason === "input" || reason === "clear") set("signerName")(v); }}
-                onChange={(_, v) => pickSigner(v)}
-                getOptionLabel={(o) => (typeof o === "string" ? o : o?.name || "")}
-                isOptionEqualToValue={(o, v) => o.userId === v?.userId}
-                filterOptions={filterStaff}
-                renderOption={({ key, ...liProps }, o) => (
-                  <li {...liProps} key={o.userId}>
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography sx={{ fontSize: "0.86rem", fontWeight: 700 }} noWrap>{o.name}</Typography>
-                      <Typography variant="caption" sx={{ color: "text.disabled" }}>
-                        {[o.position, o.tel].filter(Boolean).join(" · ") || o.role}
-                      </Typography>
-                    </Box>
-                  </li>
-                )}
-                renderInput={(params) => (
-                  <TextField {...params} label="ชื่อ-นามสกุล" required
-                    placeholder="เลือกจากพนักงานในระบบ หรือพิมพ์เอง"
-                    helperText="เลือกชื่อแล้วระบบเติมตำแหน่งและเบอร์ติดต่อให้เอง" />
-                )}
+                freeSolo fullWidth size="small" options={subjectOptions}
+                inputValue={form.subject} onInputChange={(_, v) => set("subject")(v)}
+                renderInput={(params) => <TextField {...params} label="เรื่อง" required sx={fieldSx} />}
               />
-              <Autocomplete
-                freeSolo fullWidth size="small" options={SIGNER_POSITION_PRESETS}
-                inputValue={form.signerPosition}
-                onInputChange={(_, v) => set("signerPosition")(v)}
-                renderInput={(params) => <TextField {...params} label="ตำแหน่ง" />}
-              />
+              {/* ✅ grid: มือถือเรียงเต็มกว้าง · จอใหญ่ 2 คอลัมน์ — เดิม flex บีบช่องวันที่จนล้นขอบจอมือถือ */}
+              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0,1fr)", sm: "minmax(0,1fr) minmax(0,1fr)" }, gap: 1.5 }}>
+                <TextField
+                  size="small" fullWidth label="เลขที่เอกสาร" value={form.docNumber}
+                  onChange={setField("docNumber")} disabled={canUseRunningNumber} sx={fieldSx}
+                  helperText={canUseRunningNumber ? "ออกให้อัตโนมัติ" : "เลขที่อ้างอิงของงาน"}
+                />
+                <ThaiDatePicker label="วันที่ออก" value={form.issuedAt} onChange={set("issuedAt")}
+                  helperText={thaiFullDate(form.issuedAt)} textFieldProps={{ sx: fieldSx }} />
+              </Box>
             </Stack>
-            {/* ✅ เบอร์ติดต่อกลับ — จุดที่ลูกค้ามองหาเมื่อไม่สะดวกตามกำหนดการ ใบแจ้งเข้างานที่ไม่มีเบอร์
-                ให้ติดต่อกลับใช้ประโยชน์จริงไม่ได้ (ต่างจากใบส่งมอบงานที่แค่ต้องมีคนเซ็นกำกับ) */}
-            <TextField
-              size="small" fullWidth label="เบอร์ติดต่อกลับ" value={form.signerTel}
-              onChange={setField("signerTel")}
-              placeholder="เช่น 097-085-7411"
-              helperText={form.signerTel ? undefined : "แนะนำให้ใส่ — ลูกค้าใช้ติดต่อกลับเมื่อต้องเลื่อนนัด"}
-            />
-          {/* ✅ ลายเซ็นอิเล็กทรอนิกส์ของผู้ออกเอกสาร (ตั้งที่ ตั้งค่า › ลายเซ็นอิเล็กทรอนิกส์)
-              ⚠️ ใช้ได้เฉพาะเมื่อ "ชื่อผู้ลงนาม" เป็นชื่อของคนที่กำลังออกเอกสารเอง — เปลี่ยนเป็นชื่อคนอื่น
-              แล้วยังแปะลายเซ็นตัวเอง = ลงนามในนามคนอื่น ซึ่งเป็นการปลอมลายมือชื่อ */}
-          <Box sx={{ mt: 1.25 }}>
-            {mySignature ? (
-              <FormControlLabel
-                control={(
-                  <Switch size="small" checked={useMySignature && signerIsMe} disabled={!signerIsMe}
-                    onChange={(e) => setUseMySignature(e.target.checked)} />
-                )}
-                label={(
-                  <Typography sx={{ fontSize: "0.82rem" }}>
-                    ลงลายเซ็นอิเล็กทรอนิกส์ของฉัน
-                    {!signerIsMe && <Box component="span" sx={{ color: "text.disabled" }}> — ใช้ได้เมื่อชื่อผู้ลงนามเป็นชื่อของคุณ</Box>}
-                  </Typography>
-                )}
-              />
-            ) : (
-              <Typography variant="caption" sx={{ color: "text.disabled", display: "block" }}>
-                ยังไม่ได้ตั้งลายเซ็นอิเล็กทรอนิกส์ — เอกสารจะเว้นช่องไว้ให้เซ็นด้วยมือ (ตั้งได้ที่ ตั้งค่า › ลายเซ็นอิเล็กทรอนิกส์)
-              </Typography>
-            )}
-          </Box>
-            <Typography variant="caption" sx={{ display: "block", color: "text.disabled" }}>
-              ออกในนาม {ISSUER.nameTh} · แนบตราประทับบริษัทให้อัตโนมัติ
-            </Typography>
-          </Stack>
-        </Card>
+          </DocSection>
+
+          {/* ── 4 เนื้อความ ─────────────────────────────────────────────── */}
+          <DocSection step={4} title="เนื้อความ"
+            action={<Button size="small" onClick={regenerateBody} startIcon={<Refresh sx={{ fontSize: 16 }} />} sx={SMALL_BTN_SX}>สร้างใหม่</Button>}>
+            <Stack spacing={1.75}>
+              <TextField size="small" fullWidth multiline minRows={3} label="ย่อหน้า 1 · ที่มาและกำหนดการ"
+                value={form.body} onChange={setField("body")} sx={fieldSx} />
+              <TextField size="small" fullWidth multiline minRows={3} label="ย่อหน้า 2 · ขอความร่วมมือ"
+                value={form.cooperationNote} onChange={setField("cooperationNote")} sx={fieldSx}
+                helperText='ปิดท้ายด้วย "จึงเรียนมาเพื่อโปรดทราบ..." ให้อัตโนมัติ' />
+            </Stack>
+          </DocSection>
+
+          {/* ── 5 ผู้ออกเอกสาร ──────────────────────────────────────────── */}
+          <DocSection step={5} title="ผู้ออกเอกสาร (ผู้ประสานงาน)" hint={`ออกในนาม ${ISSUER.nameTh} · แนบตราประทับให้อัตโนมัติ`}>
+            <Stack spacing={1.75}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.75}>
+                <Autocomplete
+                  freeSolo fullWidth size="small"
+                  options={staffOptions}
+                  value={null}
+                  inputValue={form.signerName || ""}
+                  onInputChange={(_, v, reason) => { if (reason === "input" || reason === "clear") set("signerName")(v); }}
+                  onChange={(_, v) => pickSigner(v)}
+                  getOptionLabel={(o) => (typeof o === "string" ? o : o?.name || "")}
+                  isOptionEqualToValue={(o, v) => o.userId === v?.userId}
+                  filterOptions={filterStaff}
+                  renderOption={({ key, ...liProps }, o) => (
+                    <li {...liProps} key={o.userId}>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography sx={{ fontSize: "0.86rem", fontWeight: 700 }} noWrap>{o.name}</Typography>
+                        <Typography variant="caption" sx={{ color: FAINT }}>{[o.position, o.tel].filter(Boolean).join(" · ") || o.role}</Typography>
+                      </Box>
+                    </li>
+                  )}
+                  renderInput={(params) => <TextField {...params} label="ชื่อ-นามสกุล" required placeholder="เลือกจากพนักงาน หรือพิมพ์เอง" sx={fieldSx} />}
+                />
+                <Autocomplete
+                  freeSolo fullWidth size="small" options={SIGNER_POSITION_PRESETS}
+                  inputValue={form.signerPosition} onInputChange={(_, v) => set("signerPosition")(v)}
+                  renderInput={(params) => <TextField {...params} label="ตำแหน่ง" sx={fieldSx} />}
+                />
+              </Stack>
+              {/* ✅ เบอร์ติดต่อกลับ — ลูกค้าใช้โทรกลับเมื่อต้องเลื่อนนัด */}
+              <TextField size="small" fullWidth label="เบอร์ติดต่อกลับ" value={form.signerTel} onChange={setField("signerTel")}
+                placeholder="เช่น 097-085-7411" sx={fieldSx} />
+              {/* ⚠️ ลายเซ็นของฉันใช้ได้เฉพาะเมื่อชื่อผู้ลงนามเป็นชื่อตัวเอง — แปะลงชื่อคนอื่น = ปลอมลายมือชื่อ */}
+              {mySignature ? (
+                <FormControlLabel
+                  control={<Switch size="small" checked={useMySignature && signerIsMe} disabled={!signerIsMe} onChange={(e) => setUseMySignature(e.target.checked)} />}
+                  label={(
+                    <Typography sx={{ fontSize: "0.84rem", color: INK_2 }}>
+                      ลงลายเซ็นอิเล็กทรอนิกส์ของฉัน
+                      {!signerIsMe && <Box component="span" sx={{ color: FAINT }}> — ใช้ได้เมื่อผู้ลงนามเป็นคุณ</Box>}
+                    </Typography>
+                  )}
+                />
+              ) : (
+                <Typography sx={{ fontSize: "0.76rem", color: FAINT }}>
+                  ยังไม่ได้ตั้งลายเซ็นอิเล็กทรอนิกส์ — เอกสารจะเว้นช่องให้เซ็นมือ (ตั้งได้ที่ ตั้งค่า › ลายเซ็น)
+                </Typography>
+              )}
+              <SignerPreview name={form.signerName} position={form.signerPosition} tel={form.signerTel}
+                company={ISSUER.nameTh} signatureImage={signatureImage} />
+            </Stack>
+          </DocSection>
+        </Box>)}
       </DialogContent>
 
-      <DialogActions sx={{ px: 2.5, py: 2, borderTop: `1px solid ${BORDER_MAIN}`, gap: 1 }}>
-        {missing.length > 0 && (
-          <Chip
-            size="small" label={`ยังไม่ได้กรอก: ${missing.join(" · ")}`}
-            sx={{ mr: "auto", fontWeight: 700, bgcolor: alpha("#f59e0b", 0.15), color: "#b45309" }}
-          />
+      <DialogActions sx={{ px: { xs: 1.5, sm: 3 }, py: 1.5, borderTop: `1px solid ${LINE}`, gap: 1, flexWrap: "wrap" }}>
+        {!locked && missing.length > 0 && (
+          <Typography sx={{ flexBasis: { xs: "100%", sm: "auto" }, mr: { sm: "auto" }, fontSize: "0.78rem", fontWeight: 700, color: DANGER }}>
+            ยังไม่ได้กรอก: {missing.join(" · ")}
+          </Typography>
         )}
-        <Button onClick={closeAll} disabled={busy} sx={{ textTransform: "none" }}>ยกเลิก</Button>
-        {/* ✅ เหลือปุ่มเดียว: ไปดูตัวอย่างก่อนเสมอ — ปุ่มออกเอกสาร/ดาวน์โหลด/แชร์ ย้ายไปอยู่ในกล่อง
-            ตัวอย่างทั้งหมด (ดู DocumentPreviewDialog) เพื่อไม่ให้มีทางลัด "ออกเลยโดยไม่ได้ดู" หลงเหลือ
-            อยู่เลย — เอกสารใบนี้กินเลขที่เดินหน้าอย่างเดียว ออกผิดแล้วย้อนไม่ได้ */}
-        <Button
-          variant="contained" onClick={handlePreview} disabled={busy}
-          startIcon={busy ? <CircularProgress size={16} color="inherit" /> : <Visibility sx={{ fontSize: 18 }} />}
-          sx={{ textTransform: "none", fontWeight: 700, bgcolor: ACCENT, borderRadius: 2, boxShadow: "none", px: 2, "&:hover": { bgcolor: ACCENT_DARK, boxShadow: "none" } }}
-        >
-          {busy ? "กำลังสร้างตัวอย่าง..." : "ดูตัวอย่างเอกสาร"}
+        <Box sx={{ flex: { xs: 1, sm: "none" }, ml: { sm: missing.length > 0 && !locked ? 0 : "auto" } }} />
+        <Button onClick={closeAll} disabled={busy} sx={{ textTransform: "none", fontWeight: 700, color: MUTED }}>
+          {locked ? "ปิด" : "ยกเลิก"}
         </Button>
+        {/* ✅ ปุ่มหลักปุ่มเดียว — ไปดูตัวอย่างก่อนเสมอ (ออกเอกสารจริงอยู่ในกล่องตัวอย่าง) · ออกแล้ว = ดูใบเดิม */}
+        {!locked && <Button
+          variant="contained" onClick={handlePreview} disabled={busy || existing.loading}
+          startIcon={busy ? <CircularProgress size={16} color="inherit" /> : <Visibility sx={{ fontSize: 18 }} />}
+          sx={{ ...PRIMARY_BTN_SX, px: 2.25 }}
+        >
+          {busy ? "กำลังสร้างไฟล์..." : "ดูตัวอย่างเอกสาร"}
+        </Button>}
       </DialogActions>
 
       {/* ✅ กล่องตัวอย่าง — ซ้อนบนฟอร์ม กด "กลับไปแก้ไข" แล้วข้อมูลที่กรอกไว้ยังอยู่ครบทุกช่อง */}
       <DocumentPreviewDialog
         open={previewOpen}
         title="ใบแจ้งเข้างาน"
-        accent={ACCENT} accentDark={ACCENT_DARK}
+        accent={ACCENT}
         preview={preview}
         issued={issued}
-        docNumber={issued ? form.docNumber : (previewNumber || form.docNumber)}
-        busy={busy} error={error}
+        docNumber={viewingExisting ? existing.doc?.docNumber : issued ? form.docNumber : (previewNumber || form.docNumber)}
+        busy={busy} error={previewOpen ? error : ""}
         onBack={() => setPreviewOpen(false)}
         onConfirm={handleConfirm}
-        onClose={issued ? closeAll : () => setPreviewOpen(false)}
+        onClose={viewingExisting ? () => { setPreviewOpen(false); setViewingExisting(false); setIssued(false); } : issued ? closeAll : () => setPreviewOpen(false)}
         email={{
           docType: "ใบแจ้งเข้างาน",
-          refId: String(job?.id || job?._id || ""),
+          refId: eventId,
           defaultTo: MailService.customerEmailFor(customerList, { company: form.customerCompany, site: form.site }, customer),
           recipientName: form.attention,
           project: form.site,

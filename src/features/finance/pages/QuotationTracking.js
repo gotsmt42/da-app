@@ -346,7 +346,7 @@ const InfoSection = ({ a, isFinance, canEdit, onSave }) => {
           <Stack direction="row" spacing={1} justifyContent="flex-end">
             <Button onClick={() => setEditing(false)} disabled={busy} sx={{ textTransform: "none", color: TEXT_SUB }}>ยกเลิก</Button>
             <Button variant="contained" startIcon={<Save />} onClick={save} disabled={busy || badRange}
-              sx={{ textTransform: "none", fontWeight: 800, boxShadow: "none", bgcolor: TEXT_MAIN, "&:hover": { bgcolor: "#1e293b" } }}>
+              sx={{ textTransform: "none", fontWeight: 800, boxShadow: "none", bgcolor: "#2563eb", "&:hover": { bgcolor: "#1d4ed8" } }}>
               {busy ? "กำลังบันทึก..." : "บันทึก"}
             </Button>
           </Stack>
@@ -904,7 +904,7 @@ export default function QuotationTracking() {
       {/* ── หัวเพจ ── */}
       <Box sx={{ borderRadius: 3, border: `1px solid ${BORDER}`, bgcolor: "#fff", px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.5 }, mb: 1.5 }}>
         <Stack direction="row" alignItems="center" spacing={1.5}>
-          <Box sx={{ width: 40, height: 40, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#334155", color: "#fff" }}>
+          <Box sx={{ width: 40, height: 40, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#eff6ff", color: "#2563eb" }}>
             <RequestQuote />
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -985,7 +985,7 @@ export default function QuotationTracking() {
             <Typography sx={{ fontSize: "0.78rem", fontWeight: 800, color: TEXT_SUB, mt: 1.75, mb: 0.75 }}>สถานะ</Typography>
             <Box sx={{ "& > div": { mb: 0 } }}>{tilesEl}</Box>
             <Button fullWidth variant="contained" onClick={() => setFiltersOpen(false)}
-              sx={{ mt: 2, py: 1.1, textTransform: "none", fontWeight: 800, borderRadius: 2.5, boxShadow: "none", bgcolor: "#334155", "&:hover": { bgcolor: "#1e293b", boxShadow: "none" } }}>
+              sx={{ mt: 2, py: 1.1, textTransform: "none", fontWeight: 800, borderRadius: 2.5, boxShadow: "none", bgcolor: "#2563eb", "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } }}>
               ดูผลลัพธ์ {visible.length.toLocaleString()} ใบ
             </Button>
           </Drawer>
@@ -1013,7 +1013,7 @@ export default function QuotationTracking() {
             {pageCount > 1 && (
               <Pagination count={pageCount} page={cur} shape="rounded" size={isDesktop ? "medium" : "small"} siblingCount={isDesktop ? 1 : 0}
                 onChange={(_, n) => { setPage(n); topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
-                sx={{ "& .Mui-selected": { bgcolor: "#334155 !important", color: "#fff" } }} />
+                sx={{ "& .Mui-selected": { bgcolor: "#eff6ff !important", color: "#1d4ed8", borderColor: "#bfdbfe" } }} />
             )}
           </Stack>
         </>

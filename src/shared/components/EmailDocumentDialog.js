@@ -29,7 +29,7 @@ import {
 import MailService from "@/shared/services/MailService";
 import OrgSettingService from "@/shared/services/OrgSettingService";
 import { useAuth } from "@/features/auth/AuthContext";
-import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, DANGER, PRIMARY_BTN_SX } from "@/shared/ui/PageKit";
+import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, DANGER, PRIMARY_BTN_SX, ACCENT, ACCENT_SOFT, ACCENT_DARK, ACCENT_LINE } from "@/shared/ui/PageKit";
 
 const EMAIL_RE = /^[^\s@<>(),;:"]+@[^\s@<>(),;:"]+\.[^\s@<>(),;:"]{2,}$/;
 const isEmail = (v) => EMAIL_RE.test(String(v || "").trim());
@@ -280,7 +280,7 @@ export default function EmailDocumentDialog({
       PaperProps={{ sx: { borderRadius: isMobile ? 0 : 3 } }}>
       <DialogTitle sx={{ p: 0 }}>
         <Stack direction="row" alignItems="center" spacing={1.5} sx={{ px: { xs: 2, sm: 3 }, py: 1.75, borderBottom: `1px solid ${LINE}` }}>
-          <Box sx={{ width: 38, height: 38, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: INK_2, color: "#fff" }}>
+          <Box sx={{ width: 38, height: 38, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: ACCENT_SOFT, color: ACCENT }}>
             <MailOutline sx={{ fontSize: 21 }} />
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -350,8 +350,8 @@ export default function EmailDocumentDialog({
                   <Chip key={k} size="small" label={l} onClick={() => applyTemplate(k)}
                     sx={{
                       fontWeight: 700, height: 26, borderRadius: 1.5,
-                      bgcolor: template === k ? INK_2 : "#fff", color: template === k ? "#fff" : INK_2,
-                      border: `1px solid ${template === k ? INK_2 : LINE}`, "&:hover": { bgcolor: template === k ? "#1e293b" : SURFACE },
+                      bgcolor: template === k ? ACCENT_SOFT : "#fff", color: template === k ? ACCENT_DARK : INK_2,
+                      border: `1px solid ${template === k ? ACCENT_LINE : LINE}`, "&:hover": { bgcolor: template === k ? ACCENT_SOFT : SURFACE },
                     }} />
                 ))}
                 <Tooltip title="คืนข้อความตามแม่แบบ">
@@ -381,7 +381,7 @@ export default function EmailDocumentDialog({
             </FieldRow>
             <Box sx={{ pl: isMobile ? 0 : "88px" }}>
               <FormControlLabel
-                control={<Checkbox size="small" checked={copyMe} onChange={(e) => setCopyMe(e.target.checked)} disabled={!myEmail} sx={{ color: FAINT, "&.Mui-checked": { color: INK_2 } }} />}
+                control={<Checkbox size="small" checked={copyMe} onChange={(e) => setCopyMe(e.target.checked)} disabled={!myEmail} sx={{ color: FAINT, "&.Mui-checked": { color: ACCENT } }} />}
                 label={<Typography sx={{ fontSize: "0.84rem", color: INK_2 }}>ส่งสำเนาถึงฉัน{myEmail ? ` (${myEmail})` : " — บัญชีนี้ยังไม่มีอีเมล"}</Typography>}
               />
             </Box>

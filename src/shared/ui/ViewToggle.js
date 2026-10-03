@@ -12,7 +12,7 @@ import { ViewAgenda, TableRows } from "@mui/icons-material";
 
 // ✅ กฎออกแบบ (สีไม่เยอะ): ปุ่มที่เลือกอยู่เป็นเทาเข้มเหมือนกันทุกหน้า — ไม่รับสีประจำหน้าแล้ว (เดิมส้ม/ฟ้าคนละหน้า)
 export default function ViewToggle({ value, onChange, accent: _accent }) {
-  const accent = "#334155";
+  const accent = "#2563eb";
   return (
     <ToggleButtonGroup
       exclusive size="small" value={value}

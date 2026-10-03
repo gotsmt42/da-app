@@ -419,7 +419,7 @@ export default function ExpenseReport({ onOpen, reloadKey, mobileFiltersOpen = f
             {filterBox}
             <Button
               fullWidth variant="contained" onClick={() => onMobileFiltersClose?.()}
-              sx={{ mt: 2, py: 1.1, textTransform: "none", fontWeight: 800, borderRadius: 2.5, boxShadow: "none", bgcolor: "#334155", "&:hover": { bgcolor: "#1e293b", boxShadow: "none" } }}
+              sx={{ mt: 2, py: 1.1, textTransform: "none", fontWeight: 800, borderRadius: 2.5, boxShadow: "none", bgcolor: "#2563eb", "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } }}
             >
               ดูรายงาน
             </Button>

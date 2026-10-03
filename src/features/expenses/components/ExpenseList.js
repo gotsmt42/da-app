@@ -490,7 +490,7 @@ export default function ExpenseList({
             )}
             <Button
               fullWidth variant="contained" onClick={() => onMobileFiltersClose?.()}
-              sx={{ mt: 2, py: 1.1, textTransform: "none", fontWeight: 800, borderRadius: 2.5, boxShadow: "none", bgcolor: "#334155", "&:hover": { bgcolor: "#1e293b", boxShadow: "none" } }}
+              sx={{ mt: 2, py: 1.1, textTransform: "none", fontWeight: 800, borderRadius: 2.5, boxShadow: "none", bgcolor: "#2563eb", "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } }}
             >
               ดูผลลัพธ์ {visible.length.toLocaleString()} ใบ
             </Button>
@@ -531,7 +531,7 @@ export default function ExpenseList({
             <Stack alignItems="center" sx={{ mt: 1.5 }}>
               <Pagination count={pageCount} page={curPage} onChange={(_, n) => goPage(n)} shape="rounded" size={isDesktop ? "medium" : "small"}
                 siblingCount={isDesktop ? 1 : 0}
-                sx={{ "& .Mui-selected": { bgcolor: "#334155 !important", color: "#fff" } }} />
+                sx={{ "& .Mui-selected": { bgcolor: "#eff6ff !important", color: "#1d4ed8", borderColor: "#bfdbfe" } }} />
             </Stack>
           )}
           <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", mt: 1, textAlign: "right" }}>

@@ -5647,7 +5647,7 @@ pagedRows.map((c, idx) => {
           </Box>
           <Button
             fullWidth variant="contained" onClick={() => setMobileSheetOpen(false)}
-            sx={{ mt: 1.5, flexShrink: 0, py: 1.1, textTransform: "none", fontWeight: 800, borderRadius: 2.5, boxShadow: "none", bgcolor: "#334155", "&:hover": { bgcolor: "#1e293b", boxShadow: "none" } }}
+            sx={{ mt: 1.5, flexShrink: 0, py: 1.1, textTransform: "none", fontWeight: 800, borderRadius: 2.5, boxShadow: "none", bgcolor: "#2563eb", "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } }}
           >
             ดูผลลัพธ์ {filtered.length.toLocaleString()} รายการ
           </Button>

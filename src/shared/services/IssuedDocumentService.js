@@ -17,6 +17,16 @@ const IssuedDocumentService = {
     return res.data;
   },
 
+  /**
+   * ใบที่ยังใช้อยู่ (ไม่ถูกยกเลิก) ของงานนี้ — ใช้กัน "ออกซ้ำ" (ผู้ใช้สั่ง 3 ต.ค. 2569)
+   * @returns {Promise<object|null>}
+   */
+  async activeForEvent(eventId, docType) {
+    if (!eventId) return null;
+    const res = await API.get(`/issued-documents/by-event/${eventId}`, { params: { docType } });
+    return res.data?.doc || null;
+  },
+
   /** เปลี่ยนสถานะติดตาม / แก้บันทึกเพิ่มเติมของใบนั้น */
   async update(id, payload) {
     const res = await API.patch(`/issued-documents/${id}`, payload);
