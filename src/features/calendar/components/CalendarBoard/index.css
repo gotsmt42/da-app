@@ -1981,3 +1981,27 @@
 
 /* ปุ่มล้างตัวกรองอยู่ซ้ายสุดของกลุ่มตัวกรอง (ผู้ใช้ขอ) */
 .event-filter-inline .event-filter-clear { order: -1; }
+
+/* ── แถบเปลี่ยนเดือนลอย (ec-month-float) — โผล่เมื่อแถบหัวปฏิทินเลื่อนพ้นจอ ── */
+.ec-month-float {
+  position: fixed; left: 50%; bottom: 24px; z-index: 1100;
+  display: flex; align-items: center; gap: 2px; padding: 4px;
+  background: #ffffff; border: 1px solid #e2e8f0; border-radius: 999px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, .18);
+  transform: translate(-50%, 16px); opacity: 0; pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease;
+}
+.ec-month-float.is-on { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.ec-month-float button {
+  border: 0; background: transparent; cursor: pointer; font: inherit; color: #0f172a;
+  height: 40px; min-width: 40px; border-radius: 999px; font-size: 22px; line-height: 1; font-weight: 700;
+}
+.ec-month-float button:hover { background: #f1f5f9; }
+.ec-month-float .ec-month-float-title { font-size: 15px; font-weight: 800; padding: 0 10px; white-space: nowrap; }
+.ec-month-float .ec-month-float-today {
+  font-size: 13px; font-weight: 800; color: #1d4ed8; background: #eff6ff; padding: 0 12px; margin-left: 4px; white-space: nowrap;
+}
+@media (max-width: 767.98px) {
+  /* เหนือแถบเมนูล่างของมือถือ (สูง 58px + safe area) */
+  .ec-month-float { bottom: calc(70px + env(safe-area-inset-bottom, 0px)); }
+}

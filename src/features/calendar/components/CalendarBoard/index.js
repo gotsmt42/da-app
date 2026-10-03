@@ -495,6 +495,10 @@ function EventCalendar() {
   const [clipboardEvent, setClipboardEvent] = useState(null);
 
   const calendarRef = useRef(null);
+  // ✅ แถบเปลี่ยนเดือนลอย (ผู้ใช้สั่ง 3 ต.ค. 2569: "เดือนข้อมูลยาว ต้องเลื่อนขึ้นไปเปลี่ยนด้านบน") —
+  //    โผล่เมื่อแถบหัวปฏิทิน (‹ เดือน ›) เลื่อนพ้นจอ · กดชื่อเดือน = กลับขึ้นบนสุด
+  const [calTitle, setCalTitle] = useState("");
+  const [toolbarOffscreen, setToolbarOffscreen] = useState(false);
   // ตัวช่วย "เปลี่ยนสถานะการ์ดแล้วจัดแถวใหม่พร้อมอนิเมชัน" — ถูกเซ็ตค่าจริงใน useEffect ของปุ่มพับ/กาง
   // (ต้องอยู่ใน ref เพราะ toggleAllCards อยู่คนละ scope กับตัวช่วยที่ประกาศไว้ใน useEffect นั้น)
   const ecReflowRef = useRef((fn) => fn());
@@ -1770,12 +1774,26 @@ function EventCalendar() {
   // ให้ calendarRef เสร็จ (ref ยังเป็น null อยู่) ทำให้ .getApi() พังทันทีถ้าอ่านจาก ref ตรงๆ
   const handleDatesSet = useCallback((info) => {
     handleHighlightWeekends();
+    setCalTitle(info.view.title || "");
     const calendarMonth = moment(info.view.currentStart).format("YYYY-MM");
     setDraftMonth((prev) => (prev === calendarMonth ? prev : calendarMonth));
   }, [handleHighlightWeekends]);
 
   // ✅ ทิศทางกลับกัน: เลื่อนเดือนจากปุ่ม ‹ › ของแผงงานล่วงหน้าเอง ก็ต้องพาปฏิทินจริงตามไปเดือน
   // เดียวกันด้วย (handleDatesSet ด้านบนจะ sync draftMonth ให้ตรงกันเองอัตโนมัติหลังจากนี้)
+  useEffect(() => {
+    let io = null;
+    let tries = 0;
+    const attach = () => {
+      const el = document.querySelector("#content-id .fc-header-toolbar");
+      if (!el) { if (tries++ < 40) setTimeout(attach, 250); return; }
+      io = new IntersectionObserver(([en]) => setToolbarOffscreen(!en.isIntersecting && en.boundingClientRect.top < 0), { threshold: 0 });
+      io.observe(el);
+    };
+    attach();
+    return () => io?.disconnect();
+  }, []);
+
   const handleDraftMonthChange = useCallback((newMonth) => {
     setDraftMonth(newMonth);
     calendarRef.current?.getApi()?.gotoDate(moment(newMonth, "YYYY-MM").format("YYYY-MM-DD"));
@@ -4192,6 +4210,17 @@ function EventCalendar() {
           />
         </Suspense>
       )}
+
+      {/* ── แถบเปลี่ยนเดือนลอย — ล่างกลางจอ เหนือแถบเมนูมือถือ ── */}
+      <div className={`ec-month-float${toolbarOffscreen && calTitle ? " is-on" : ""}`} aria-hidden={!toolbarOffscreen}>
+        <button type="button" aria-label="เดือนก่อน" onClick={() => calendarRef.current?.getApi()?.prev()}>‹</button>
+        <button type="button" className="ec-month-float-title" title="กลับขึ้นบนสุด"
+          onClick={() => document.querySelector("#content-id")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
+          {calTitle}
+        </button>
+        <button type="button" aria-label="เดือนถัดไป" onClick={() => calendarRef.current?.getApi()?.next()}>›</button>
+        <button type="button" className="ec-month-float-today" onClick={() => calendarRef.current?.getApi()?.today()}>วันนี้</button>
+      </div>
 
       {/* ✅ โหลดซ้ำ = แถบบางบนสุด (ข้อมูลเดิมยังเห็นอยู่) · โหลดครั้งแรกใช้วงแหวนกลางปฏิทิน (.ec-booting ใน index.css) */}
       {loading && firstEventsLoaded && <PageLoader variant="bar" label="กำลังโหลดแผนงาน" />}
