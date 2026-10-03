@@ -2,7 +2,7 @@
  * MultiDayGroup — หัวการ์ด "งานหลายช่วงวัน" ชุดเดียวกันทั้งหน้าการดำเนินงานและงานของฉัน
  *
  * ✅ ผู้ใช้สั่ง (3 ต.ค. 2569): "ทำให้มองแล้วรู้ว่างานมีหลายช่วงวัน · สีแดงๆ ดูรก · รูปแบบต้องเหมือนกันกับหน้างานของฉัน"
- *    การ์ดซ้อนเป็นปึก (เงาแผ่นกระดาษด้านล่าง) + ป้ายแดง (สีธีมแอป) "งานหลายช่วงวัน · N ช่วง" + หัวพื้นเทาอ่อน
+ *    การ์ดซ้อนเป็นปึก (เงาแผ่นกระดาษด้านล่าง) + ป้ายน้ำเงิน "งานหลายช่วงวัน · N ช่วง" + หัวพื้นเทาอ่อน
  *    สีอื่นเหลือแค่แถบสถานะด้านซ้าย — ต่างจากการ์ดงานวันเดียวชัดเจน แต่ไม่ฉูดฉาด
  */
 import moment from "moment";
@@ -34,7 +34,7 @@ export default function MultiDayGroupHeader({ sessions, anchorId, title, expande
   return (
     <Box onClick={onToggle} sx={{ px: 2, py: 1.5, cursor: "pointer", bgcolor: "#f8fafc", borderRadius: "14px 14px 0 0", borderBottom: expanded ? "1px solid #e2e8f0" : "none" }}>
       <Stack direction="row" alignItems="center" gap={1}>
-        <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, height: 24, pl: 0.75, pr: 1, borderRadius: 999, bgcolor: "#dc2626", color: "#fff", fontSize: "0.72rem", fontWeight: 800, whiteSpace: "nowrap" }}>
+        <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, height: 24, pl: 0.75, pr: 1, borderRadius: 999, bgcolor: "#2563eb", color: "#fff", fontSize: "0.72rem", fontWeight: 800, whiteSpace: "nowrap" }}>
           <DateRange sx={{ fontSize: 15 }} /> งานหลายช่วงวัน · {sessions.length} ช่วง
         </Box>
         <Box sx={{ flex: 1 }} />
@@ -44,7 +44,7 @@ export default function MultiDayGroupHeader({ sessions, anchorId, title, expande
       </Stack>
       <Typography sx={{ mt: 0.5, fontWeight: 800, fontSize: "0.95rem", color: "#0f172a", lineHeight: 1.35 }}>{title}</Typography>
       <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" sx={{ mt: 0.5 }}>
-        <Box component="span" sx={{ display: "inline-flex", alignItems: "center", height: 22, px: 1, borderRadius: 999, bgcolor: "#fef2f2", color: "#b91c1c", fontSize: "0.72rem", fontWeight: 800 }}>
+        <Box component="span" sx={{ display: "inline-flex", alignItems: "center", height: 22, px: 1, borderRadius: 999, bgcolor: "#eff6ff", color: "#1d4ed8", fontSize: "0.72rem", fontWeight: 800 }}>
           เข้างาน {totalWorkDays} วัน
         </Box>
         <Typography sx={{ fontSize: "0.78rem", color: "#64748b", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 0.4 }}>
@@ -60,8 +60,8 @@ export default function MultiDayGroupHeader({ sessions, anchorId, title, expande
           return (
             <Box key={s._id} component="span" sx={{
               display: "inline-flex", alignItems: "center", height: 22, px: 1, borderRadius: 999, fontSize: "0.72rem",
-              fontWeight: on ? 800 : 600, bgcolor: on ? "#fef2f2" : "#fff", color: on ? "#b91c1c" : "#475569",
-              border: `1px solid ${on ? "#fecaca" : "#cbd5e1"}`,
+              fontWeight: on ? 800 : 600, bgcolor: on ? "#eff6ff" : "#fff", color: on ? "#1d4ed8" : "#475569",
+              border: `1px solid ${on ? "#bfdbfe" : "#cbd5e1"}`,
             }}>{label}</Box>
           );
         })}
