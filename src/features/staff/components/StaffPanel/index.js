@@ -11,6 +11,7 @@
  *   ✅ คงพฤติกรรมเดิมครบ: ยืนยันรหัสผ่านก่อนเพิ่มผู้ใช้/เปลี่ยน Rank · ตั้ง/แก้บัญชีที่สูงกว่าตัวเองไม่ได้ ·
  *      อัปเดต session ถ้าแก้บัญชีตัวเอง · เรียลไทม์
  */
+import { FilterArea } from "@/shared/ui/MobileFilterSheet";
 import { useEffect, useMemo, useState } from "react";
 import useRealtime from "@/shared/realtime/useRealtime";
 import AuthService from "@/shared/services/authService";
@@ -580,29 +581,37 @@ const Employee = () => {
           )}
         />
 
-        {loading ? (
-          <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" }, mb: 1.5 }}>
-            {[0, 1, 2, 3].map((i) => <Skeleton key={i} variant="rounded" height={76} sx={{ borderRadius: 2.5 }} />)}
-          </Box>
-        ) : (
-          <KpiRow columns={4}>
-            <Kpi label="ผู้ใช้ทั้งหมด" value={`${stats.total} คน`} onClick={() => setRankFilter("all")} active={rankFilter === "all"} />
-            <Kpi label="ผู้บริหาร / แอดมิน" value={`${stats.admin} คน`} sub="กรรมการ · ผู้จัดการ · แอดมิน" onClick={() => setRankFilter("admin")} active={rankFilter === "admin"} />
-            <Kpi label="ทีมช่าง / เซล" value={`${stats.staff} คน`} onClick={() => setRankFilter("staff")} active={rankFilter === "staff"} />
-            <Kpi label="Rank ไม่ถูกต้อง" value={`${stats.invalid} คน`} sub={stats.invalid ? "บัญชีจะใช้งานไม่ได้ — กดแก้ไข" : "ทุกบัญชีถูกต้อง"} alert={stats.invalid > 0}
-              onClick={stats.invalid ? () => setRankFilter("invalid") : undefined} active={rankFilter === "invalid"} />
-          </KpiRow>
-        )}
-
-        <FilterBar search={searchTerm} onSearch={setSearchTerm} placeholder="ค้นหาชื่อ / ชื่อผู้ใช้ / อีเมล / เบอร์โทร">
-          <SelectField label="Rank" value={rankFilter} onChange={(e) => setRankFilter(e.target.value)} sx={{ minWidth: { xs: 0, sm: 200 }, flex: { xs: 1, sm: "none" } }}>
-            <option value="all">ทุก Rank ({users.length})</option>
-            <option value="admin">ผู้บริหาร / แอดมิน</option>
-            <option value="staff">ทีมช่าง / เซล</option>
-            {ALL_ROLES.map((r) => <option key={r} value={`r:${r}`}>{rankLabel(r)}</option>)}
-            {stats.invalid > 0 && <option value="invalid">Rank ไม่ถูกต้อง ({stats.invalid})</option>}
-          </SelectField>
-        </FilterBar>
+        {/* ✅ มือถือ: ตัวเลขสรุป/ค้นหา/ตัวกรองอยู่ในแผ่นล่าง (FilterArea) — จอไม่รก (ผู้ใช้สั่ง 3 ต.ค. 2569) */}
+        <FilterArea count={(searchTerm.trim() ? 1 : 0) + (rankFilter !== "all" ? 1 : 0)} summary={`ผู้ใช้ ${stats.total} คน`}
+          onClear={() => { setSearchTerm(""); setRankFilter("all"); }}
+          chips={[
+            searchTerm.trim() && { key: "q", label: `ค้นหา: ${searchTerm.trim()}`, onDelete: () => setSearchTerm("") },
+            rankFilter !== "all" && { key: "r", label: rankFilter === "admin" ? "ผู้บริหาร / แอดมิน" : rankFilter === "staff" ? "ทีมช่าง / เซล" : rankFilter === "invalid" ? "Rank ไม่ถูกต้อง" : rankLabel(rankFilter.slice(2)), onDelete: () => setRankFilter("all") },
+          ]}>
+          {loading ? (
+            <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" }, mb: 1.5 }}>
+              {[0, 1, 2, 3].map((i) => <Skeleton key={i} variant="rounded" height={76} sx={{ borderRadius: 2.5 }} />)}
+            </Box>
+          ) : (
+            <KpiRow columns={4}>
+              <Kpi label="ผู้ใช้ทั้งหมด" value={`${stats.total} คน`} onClick={() => setRankFilter("all")} active={rankFilter === "all"} />
+              <Kpi label="ผู้บริหาร / แอดมิน" value={`${stats.admin} คน`} sub="กรรมการ · ผู้จัดการ · แอดมิน" onClick={() => setRankFilter("admin")} active={rankFilter === "admin"} />
+              <Kpi label="ทีมช่าง / เซล" value={`${stats.staff} คน`} onClick={() => setRankFilter("staff")} active={rankFilter === "staff"} />
+              <Kpi label="Rank ไม่ถูกต้อง" value={`${stats.invalid} คน`} sub={stats.invalid ? "บัญชีจะใช้งานไม่ได้ — กดแก้ไข" : "ทุกบัญชีถูกต้อง"} alert={stats.invalid > 0}
+                onClick={stats.invalid ? () => setRankFilter("invalid") : undefined} active={rankFilter === "invalid"} />
+            </KpiRow>
+          )}
+  
+          <FilterBar search={searchTerm} onSearch={setSearchTerm} placeholder="ค้นหาชื่อ / ชื่อผู้ใช้ / อีเมล / เบอร์โทร">
+            <SelectField label="Rank" value={rankFilter} onChange={(e) => setRankFilter(e.target.value)} sx={{ minWidth: { xs: 0, sm: 200 }, flex: { xs: 1, sm: "none" } }}>
+              <option value="all">ทุก Rank ({users.length})</option>
+              <option value="admin">ผู้บริหาร / แอดมิน</option>
+              <option value="staff">ทีมช่าง / เซล</option>
+              {ALL_ROLES.map((r) => <option key={r} value={`r:${r}`}>{rankLabel(r)}</option>)}
+              {stats.invalid > 0 && <option value="invalid">Rank ไม่ถูกต้อง ({stats.invalid})</option>}
+            </SelectField>
+          </FilterBar>
+        </FilterArea>
 
         {loading ? (
           <Stack spacing={1}>{[1, 2, 3, 4].map((i) => <Skeleton key={i} variant="rounded" height={useCards ? 120 : 56} sx={{ borderRadius: 2.5 }} />)}</Stack>

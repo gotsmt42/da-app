@@ -25,6 +25,7 @@ import {
 } from "@mui/icons-material";
 import LineIcon from "@/shared/ui/LineIcon";
 import SelectField from "@/shared/ui/SelectField";
+import { FilterArea } from "@/shared/ui/MobileFilterSheet";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { Kpi, KpiRow, FilterBar, Panel, EmptyState, INK, INK_2, MUTED, LINE, SURFACE, ICON_BTN_SX } from "@/shared/ui/PageKit";
 import { formatThai } from "@/shared/utils/thaiDate";
@@ -316,6 +317,16 @@ const ServiceReportFiles = () => {
 
   return (
     <Box>
+      {/* ✅ มือถือ: ตัวเลข/ค้นหา/ตัวกรองอยู่ในแผ่นล่าง (FilterArea) */}
+      <FilterArea count={(search.trim() ? 1 : 0) + (docTypeFilter !== "all" ? 1 : 0) + (teamFilter !== "all" ? 1 : 0)}
+        summary={`${filtered.length.toLocaleString()} ไฟล์${docTypeFilter !== "all" ? "" : " · ทุกชนิด"}`}
+        resultLabel={`ดูผลลัพธ์ ${filtered.length.toLocaleString()} ไฟล์`}
+        onClear={() => { setSearch(""); setDocTypeFilter("all"); setTeamFilter("all"); }}
+        chips={[
+          search.trim() && { key: "q", label: `ค้นหา: ${search.trim()}`, onDelete: () => setSearch("") },
+          docTypeFilter !== "all" && { key: "t", label: DOC_TYPES.find((d) => d.value === docTypeFilter)?.label, onDelete: () => setDocTypeFilter("all") },
+          teamFilter !== "all" && { key: "m", label: `ช่าง: ${teamFilter}`, onDelete: () => setTeamFilter("all") },
+        ]}>
       {/* ── ตัวเลขตามชนิดเอกสาร — กดเพื่อกรอง (แทนแถวปุ่มเลื่อนแนวนอนที่ซ่อนชนิดอื่นไว้) ── */}
       <KpiRow columns={5}>
         {DOC_TYPES.map((d) => (
@@ -335,6 +346,7 @@ const ServiceReportFiles = () => {
           <IconButton onClick={fetchData} sx={{ ...ICON_BTN_SX, flexShrink: 0, display: { xs: "none", sm: "inline-flex" } }}><Refresh sx={{ fontSize: 20 }} /></IconButton>
         </Tooltip>
       </FilterBar>
+      </FilterArea>
 
       {loading && <LinearProgress sx={{ mb: 1.5, borderRadius: 1 }} />}
 

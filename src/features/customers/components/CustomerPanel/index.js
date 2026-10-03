@@ -9,6 +9,7 @@
  *     + จำนวนงาน) · แท็บเล็ต/มือถือ = การ์ด · กดแถว = กล่องรายละเอียด (ข้อมูลครบ + ประวัติงานรายปี)
  *   ✅ คงฟีเจอร์เดิมครบ: กรองโครงการเดียวจาก Dashboard (?company=&site=) · เพิ่ม/แก้ไข/ลบ · กันชื่อซ้ำ (409) · CSV · เรียลไทม์
  */
+import { FilterArea } from "@/shared/ui/MobileFilterSheet";
 import { useMemo, useState, useEffect } from "react";
 import useRealtime from "@/shared/realtime/useRealtime";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -470,19 +471,6 @@ const Customer = () => {
           )}
         />
 
-        {loading ? (
-          <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" }, mb: 1.5 }}>
-            {[0, 1, 2, 3].map((i) => <Skeleton key={i} variant="rounded" height={76} sx={{ borderRadius: 2.5 }} />)}
-          </Box>
-        ) : (
-          <KpiRow columns={4}>
-            <Kpi label="โครงการทั้งหมด" value={`${stats.total} รายการ`} sub={`${stats.companies} บริษัท`} />
-            <Kpi label="มีงานในระบบ" value={`${stats.withJobs} รายการ`} sub={`งานรวม ${stats.jobs} รายการ`} />
-            <Kpi label="ไม่มีข้อมูลติดต่อ" value={`${stats.noContact} รายการ`} sub="ไม่มีทั้งเบอร์และอีเมล" />
-            <Kpi label="เพิ่มเดือนนี้" value={`${stats.thisMonth} รายการ`} sub={formatThai(moment(), "MMMM YYYY")} />
-          </KpiRow>
-        )}
-
         {/* ✅ ตัวกรองโครงการเดียว (มาจากการ์ดใน Dashboard) — ต้องมีทางออกชัดเจนเสมอ */}
         {projectFilter && (
           <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5, px: 1.5, py: 1, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}`, borderLeft: "4px solid #2563eb" }}>
@@ -493,15 +481,33 @@ const Customer = () => {
             <Button size="small" onClick={clearProjectFilter} sx={{ textTransform: "none", fontWeight: 700, color: INK_2 }}>ดูทั้งหมด</Button>
           </Stack>
         )}
-
-        <FilterBar search={searchTerm} onSearch={(v) => { if (projectFilter) clearProjectFilter(); setSearchTerm(v); }} placeholder="ค้นหาโครงการ / บริษัท / ผู้ติดต่อ / เบอร์ / อีเมล">
-          <SelectField label="เรียงตาม" value={sortBy} onChange={(e) => setSortBy(e.target.value)} sx={{ minWidth: { xs: 0, sm: 190 }, flex: { xs: 1, sm: "none" } }}>
-            <option value="site">ชื่อโครงการ ก-ฮ</option>
-            <option value="company">ชื่อบริษัท ก-ฮ</option>
-            <option value="jobs">งานมากที่สุด</option>
-            <option value="newest">เพิ่มล่าสุด</option>
-          </SelectField>
-        </FilterBar>
+        {/* ✅ มือถือ: ตัวเลขสรุป/ค้นหา/ตัวกรองอยู่ในแผ่นล่าง (FilterArea) — จอไม่รก (ผู้ใช้สั่ง 3 ต.ค. 2569) */}
+        <FilterArea count={searchTerm.trim() ? 1 : 0} summary={`โครงการ ${stats.total} รายการ · ${stats.companies} บริษัท`}
+          onClear={() => setSearchTerm("")}
+          chips={[searchTerm.trim() && { key: "q", label: `ค้นหา: ${searchTerm.trim()}`, onDelete: () => setSearchTerm("") }]}>
+          {loading ? (
+            <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" }, mb: 1.5 }}>
+              {[0, 1, 2, 3].map((i) => <Skeleton key={i} variant="rounded" height={76} sx={{ borderRadius: 2.5 }} />)}
+            </Box>
+          ) : (
+            <KpiRow columns={4}>
+              <Kpi label="โครงการทั้งหมด" value={`${stats.total} รายการ`} sub={`${stats.companies} บริษัท`} />
+              <Kpi label="มีงานในระบบ" value={`${stats.withJobs} รายการ`} sub={`งานรวม ${stats.jobs} รายการ`} />
+              <Kpi label="ไม่มีข้อมูลติดต่อ" value={`${stats.noContact} รายการ`} sub="ไม่มีทั้งเบอร์และอีเมล" />
+              <Kpi label="เพิ่มเดือนนี้" value={`${stats.thisMonth} รายการ`} sub={formatThai(moment(), "MMMM YYYY")} />
+            </KpiRow>
+          )}
+  
+          
+          <FilterBar search={searchTerm} onSearch={(v) => { if (projectFilter) clearProjectFilter(); setSearchTerm(v); }} placeholder="ค้นหาโครงการ / บริษัท / ผู้ติดต่อ / เบอร์ / อีเมล">
+            <SelectField label="เรียงตาม" value={sortBy} onChange={(e) => setSortBy(e.target.value)} sx={{ minWidth: { xs: 0, sm: 190 }, flex: { xs: 1, sm: "none" } }}>
+              <option value="site">ชื่อโครงการ ก-ฮ</option>
+              <option value="company">ชื่อบริษัท ก-ฮ</option>
+              <option value="jobs">งานมากที่สุด</option>
+              <option value="newest">เพิ่มล่าสุด</option>
+            </SelectField>
+          </FilterBar>
+        </FilterArea>
 
         {loading ? (
           <Stack spacing={1}>{[1, 2, 3, 4].map((i) => <Skeleton key={i} variant="rounded" height={useCards ? 110 : 56} sx={{ borderRadius: 2.5 }} />)}</Stack>

@@ -70,7 +70,7 @@ export function KpiRow({ children, columns = 4 }) {
   // แท็บเล็ต: ตารางไม่เลื่อน (4 ช่องต่อแถว หรือ 3 ช่องถ้ามีมากกว่า 4) — ต้องเห็นครบโดยไม่ต้องปัด
   const tablet = columns <= 4 ? columns : 3;
   return (
-    <Box sx={{
+    <Box className="pk-kpirow" sx={{
       display: "grid", gap: 1, mb: 1.5,
       gridTemplateColumns: { xs: "none", sm: `repeat(${tablet}, minmax(0, 1fr))`, md: `repeat(${columns}, minmax(0, 1fr))` },
       gridAutoFlow: { xs: "column", sm: "row" }, gridAutoColumns: { xs: "44%", sm: "auto" },
@@ -84,7 +84,7 @@ export function KpiRow({ children, columns = 4 }) {
 /** แถบค้นหา/ตัวกรอง กล่องขาว — ช่องค้นหาซ้าย ตัวกรองขวา */
 export function FilterBar({ search, onSearch, placeholder = "ค้นหา", children }) {
   return (
-    <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}
+    <Stack className="pk-filterbar" direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}
       sx={{ mb: 1.5, p: 1, bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, boxShadow: CARD_SHADOW }}>
       <TextField size="small" placeholder={placeholder} value={search} onChange={(e) => onSearch(e.target.value)}
         sx={{ flex: 1, minWidth: 0, "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: SURFACE, height: 40, "& fieldset": { borderColor: "transparent" }, "&:hover fieldset": { borderColor: LINE }, "&.Mui-focused": { bgcolor: "#fff" } } }}
@@ -92,7 +92,7 @@ export function FilterBar({ search, onSearch, placeholder = "ค้นหา", c
           startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 19, color: MUTED }} /></InputAdornment>,
           endAdornment: search ? <InputAdornment position="end"><IconButton size="small" aria-label="ล้างคำค้นหา" onClick={() => onSearch("")}><Close sx={{ fontSize: 17 }} /></IconButton></InputAdornment> : null,
         }} />
-      {children && <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>{children}</Stack>}
+      {children && <Stack className="pk-filterbar-extra" direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>{children}</Stack>}
     </Stack>
   );
 }

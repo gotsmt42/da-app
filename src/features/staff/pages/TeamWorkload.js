@@ -7,6 +7,7 @@
  * แยกเป็นการ์ดต่อคนชัดเจน + สรุปภาพรวมทีมทั้งหมดไว้ด้านบน
  */
 
+import { FilterArea } from "@/shared/ui/MobileFilterSheet";
 import { useEffect, useMemo, useState } from "react";
 import useRealtime from "@/shared/realtime/useRealtime";
 import { useNavigate } from "react-router-dom";
@@ -287,28 +288,33 @@ export default function TeamWorkload() {
         )}
       />
 
-      {loading ? (
-        <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(6, 1fr)" }, mb: 1.5 }}>
-          {[0, 1, 2, 3, 4, 5].map((i) => <Skeleton key={i} variant="rounded" height={76} sx={{ borderRadius: 2.5 }} />)}
-        </Box>
-      ) : (
-        <KpiRow columns={6}>
-          <Kpi label="ช่างทั้งหมด" value={`${statsByTech.length} คน`} />
-          <Kpi label="กำลังทำ" value={`${teamTotals.active} งาน`} sub={teamTotals.pending ? `รออนุมัติปิดงาน ${teamTotals.pending}` : "ไม่มีงานรออนุมัติปิด"} />
-          <Kpi label="ค้างงาน" value={`${teamTotals.overdue} งาน`} sub={`เลยกำหนดเกิน ${WARNING_DAYS_AFTER_END} วัน`} alert={teamTotals.overdue > 0} />
-          <Kpi label="เสร็จเดือนนี้" value={`${teamTotals.completedThisMonth} งาน`} />
-          <Kpi label="เวลาเฉลี่ย / ครั้ง" value={avgText(teamTotals.durationMs, teamTotals.durationCount)}
-            sub={teamTotals.durationCount ? `จาก ${teamTotals.durationCount.toLocaleString()} ครั้งที่กดเข้า-ออกครบ` : "ยังไม่มีข้อมูลเข้า-ออก"} />
-          <Kpi label="เข้างานตรงตามแผน" value={pctText(teamTotals.onTimeCount, teamTotals.checkedInCount)}
-            sub={teamTotals.checkedInCount ? `${teamTotals.onTimeCount} จาก ${teamTotals.checkedInCount} ครั้ง` : "ยังไม่มีข้อมูลเช็คอิน"} />
-        </KpiRow>
-      )}
-
-      <FilterBar search={search} onSearch={setSearch} placeholder="ค้นหาชื่อช่าง">
-        <SelectField label="เรียงตาม" value={sortBy} onChange={(e) => setSortBy(e.target.value)} sx={{ minWidth: { xs: 0, sm: 180 }, flex: { xs: 1, sm: "none" } }}>
-          {SORT_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
-        </SelectField>
-      </FilterBar>
+      {/* ✅ มือถือ: ตัวเลขสรุป/ค้นหา/ตัวกรองอยู่ในแผ่นล่าง (FilterArea) — จอไม่รก (ผู้ใช้สั่ง 3 ต.ค. 2569) */}
+      <FilterArea count={search.trim() ? 1 : 0} summary={`ช่าง ${statsByTech.length} คน · ค้างงาน ${teamTotals.overdue}`}
+        onClear={() => setSearch("")}
+        chips={[search.trim() && { key: "q", label: `ค้นหา: ${search.trim()}`, onDelete: () => setSearch("") }]}>
+        {loading ? (
+          <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(6, 1fr)" }, mb: 1.5 }}>
+            {[0, 1, 2, 3, 4, 5].map((i) => <Skeleton key={i} variant="rounded" height={76} sx={{ borderRadius: 2.5 }} />)}
+          </Box>
+        ) : (
+          <KpiRow columns={6}>
+            <Kpi label="ช่างทั้งหมด" value={`${statsByTech.length} คน`} />
+            <Kpi label="กำลังทำ" value={`${teamTotals.active} งาน`} sub={teamTotals.pending ? `รออนุมัติปิดงาน ${teamTotals.pending}` : "ไม่มีงานรออนุมัติปิด"} />
+            <Kpi label="ค้างงาน" value={`${teamTotals.overdue} งาน`} sub={`เลยกำหนดเกิน ${WARNING_DAYS_AFTER_END} วัน`} alert={teamTotals.overdue > 0} />
+            <Kpi label="เสร็จเดือนนี้" value={`${teamTotals.completedThisMonth} งาน`} />
+            <Kpi label="เวลาเฉลี่ย / ครั้ง" value={avgText(teamTotals.durationMs, teamTotals.durationCount)}
+              sub={teamTotals.durationCount ? `จาก ${teamTotals.durationCount.toLocaleString()} ครั้งที่กดเข้า-ออกครบ` : "ยังไม่มีข้อมูลเข้า-ออก"} />
+            <Kpi label="เข้างานตรงตามแผน" value={pctText(teamTotals.onTimeCount, teamTotals.checkedInCount)}
+              sub={teamTotals.checkedInCount ? `${teamTotals.onTimeCount} จาก ${teamTotals.checkedInCount} ครั้ง` : "ยังไม่มีข้อมูลเช็คอิน"} />
+          </KpiRow>
+        )}
+  
+        <FilterBar search={search} onSearch={setSearch} placeholder="ค้นหาชื่อช่าง">
+          <SelectField label="เรียงตาม" value={sortBy} onChange={(e) => setSortBy(e.target.value)} sx={{ minWidth: { xs: 0, sm: 180 }, flex: { xs: 1, sm: "none" } }}>
+            {SORT_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+          </SelectField>
+        </FilterBar>
+      </FilterArea>
 
       {loading ? (
         <Stack spacing={1}>{[1, 2, 3].map((i) => <Skeleton key={i} variant="rounded" height={isDesktop ? 54 : 120} sx={{ borderRadius: 2.5 }} />)}</Stack>

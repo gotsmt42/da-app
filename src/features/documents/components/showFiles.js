@@ -47,6 +47,7 @@ import CalendarTodayOutlinedIcon from "@mui/icons-material/CalendarTodayOutlined
 import InventoryOutlinedIcon from "@mui/icons-material/InventoryOutlined";
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import { PageHeader, PRIMARY_BTN_SX } from "@/shared/ui/PageKit";
+import { FilterArea } from "@/shared/ui/MobileFilterSheet";
 import { formatThai } from "@/shared/utils/thaiDate";
 
 // ---- Design tokens -------------------------------------------------------
@@ -371,7 +372,7 @@ const ShowFiles = () => {
         subtitle={activeTab === 0 ? "Service Report · ใบเสนอราคา · ใบวางบิล · ใบส่งมอบงาน ที่แนบไว้กับงาน" : "ไฟล์ทั่วไปที่อัปโหลดเก็บไว้ในระบบ"}
         actions={activeTab === 1 ? (
           <Button component={Link} to="/fileupload" variant="contained" startIcon={<Add />}
-            sx={{ ...PRIMARY_BTN_SX, height: 40, display: { xs: "none", sm: "inline-flex" } }}>อัปโหลดไฟล์</Button>
+            sx={{ ...PRIMARY_BTN_SX, height: 40 }}>อัปโหลด</Button>
         ) : null}
       />
       <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0.5, p: 0.5, mb: 1.5, bgcolor: "#fff", border: `1px solid ${COLOR.line}`, borderRadius: 3, maxWidth: { sm: 420 } }}>
@@ -389,6 +390,16 @@ const ShowFiles = () => {
         <ServiceReportFiles />
       ) : (
         <Box>
+          {/* ✅ มือถือ: ค้นหา/ตัวกรองอยู่ในแผ่นล่าง (FilterArea) */}
+          <FilterArea count={(search ? 1 : 0) + (userSearch ? 1 : 0) + (dateSearch ? 1 : 0) + (categorySearch ? 1 : 0)}
+            summary={`${sortedData.length.toLocaleString()} ไฟล์`} resultLabel={`ดูผลลัพธ์ ${sortedData.length.toLocaleString()} ไฟล์`}
+            onClear={clearFilters}
+            chips={[
+              search && { key: "q", label: `ค้นหา: ${search}`, onDelete: () => setSearch("") },
+              userSearch && { key: "u", label: "ผู้อัปโหลด", onDelete: () => setUserSearch("") },
+              dateSearch && { key: "d", label: "วันที่อัปเดต", onDelete: () => setDateSearch("") },
+              categorySearch && { key: "c", label: categorySearch, onDelete: () => setCategorySearch("") },
+            ]}>
           {/* Toolbar */}
           <Paper
             variant="outlined"
@@ -463,24 +474,6 @@ const ShowFiles = () => {
                     ล้างตัวกรอง
                   </Button>
                 )}
-                <Button
-                  component={Link}
-                  to="/fileupload"
-                  variant="contained"
-                  startIcon={<Add />}
-                  sx={{
-                    bgcolor: COLOR.accent,
-                    "&:hover": { bgcolor: COLOR.accentDeep },
-                    borderRadius: 2.5,
-                    textTransform: "none",
-                    fontFamily: FONT_UI,
-                    fontWeight: 600,
-                    boxShadow: "none",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  อัพโหลดไฟล์
-                </Button>
               </Grid>
             </Grid>
 
@@ -516,6 +509,7 @@ const ShowFiles = () => {
               </Stack>
             )}
           </Paper>
+          </FilterArea>
 
           {/* Bulk action bar */}
           <Fade in={selectedRows.length > 0}>

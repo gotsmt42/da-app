@@ -15,6 +15,7 @@
  * ⚠️ หน้านี้ไม่เก็บข้อมูลใหม่เลย — ใช้ "ตรรกะกลาง" ชุดเดียวกับหน้าอื่นเป๊ะๆ (groupEventsByContract /
  * contractStatusInfo / getFollowUpInfo / buildDaysPastDueMap) ห้ามคำนวณเกณฑ์ซ้ำเองในไฟล์นี้
  */
+import { FilterArea } from "@/shared/ui/MobileFilterSheet";
 import { useEffect, useMemo, useRef, useState } from "react";
 import useRealtime from "@/shared/realtime/useRealtime";
 import { Navigate, useNavigate } from "react-router-dom";
@@ -277,30 +278,38 @@ export default function CustomerOverview() {
         )}
       />
 
-      {loading ? (
-        <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(5, 1fr)" }, mb: 1.5 }}>
-          {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} variant="rounded" height={76} sx={{ borderRadius: 2.5 }} />)}
-        </Box>
-      ) : (
-        <KpiRow columns={5}>
-          <Kpi label="ลูกค้าทั้งหมด" value={`${totals.customers} ราย`} sub={`มีงานในระบบ ${totals.active} ราย`} onClick={() => setFilter("all")} active={filter === "all"} />
-          <Kpi label="มูลค่างานรวม" value={baht(totals.value)} sub="ตามมูลค่างาน/สัญญาที่บันทึก" />
-          <Kpi label="ต้องติดตาม" value={`${totals.attention} ราย`} sub={`งานค้าง ${totals.overdueJobs} · ใบเสนอราคา ${totals.quotations}`} alert={totals.attention > 0}
-            onClick={() => setFilter("attention")} active={filter === "attention"} />
-          <Kpi label="สัญญาหมดอายุ" value={`${totals.expired} ฉบับ`} sub={totals.expiring ? `ใกล้หมดอีก ${totals.expiring} ฉบับ` : "ไม่มีสัญญาใกล้หมด"} alert={totals.expired > 0}
-            onClick={() => setFilter("contract")} active={filter === "contract"} />
-          <Kpi label="ยังไม่มีงานในระบบ" value={`${totals.customers - totals.active} ราย`} sub="มีในทะเบียนแต่ยังไม่เคยลงงาน" onClick={() => setFilter("idle")} active={filter === "idle"} />
-        </KpiRow>
-      )}
-
-      <FilterBar search={search} onSearch={setSearch} placeholder="ค้นหาลูกค้า / โครงการ / ผู้ติดต่อ / เบอร์โทร">
-        <SelectField label="แสดง" value={filter} onChange={(e) => setFilter(e.target.value)} sx={{ minWidth: { xs: 0, sm: 170 }, flex: { xs: 1, sm: "none" } }}>
-          {FILTERS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
-        </SelectField>
-        <SelectField label="เรียงตาม" value={sortBy} onChange={(e) => setSortBy(e.target.value)} sx={{ minWidth: { xs: 0, sm: 170 }, flex: { xs: 1, sm: "none" } }}>
-          {SORT_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
-        </SelectField>
-      </FilterBar>
+      {/* ✅ มือถือ: ตัวเลขสรุป/ค้นหา/ตัวกรองอยู่ในแผ่นล่าง (FilterArea) — จอไม่รก (ผู้ใช้สั่ง 3 ต.ค. 2569) */}
+      <FilterArea count={(search.trim() ? 1 : 0) + (filter !== "all" ? 1 : 0)} summary={`ลูกค้า ${totals.customers} ราย · ต้องติดตาม ${totals.attention}`}
+        onClear={() => { setSearch(""); setFilter("all"); }}
+        chips={[
+          search.trim() && { key: "q", label: `ค้นหา: ${search.trim()}`, onDelete: () => setSearch("") },
+          filter !== "all" && { key: "f", label: FILTERS.find((x) => x.key === filter)?.label, onDelete: () => setFilter("all") },
+        ]}>
+        {loading ? (
+          <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(5, 1fr)" }, mb: 1.5 }}>
+            {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} variant="rounded" height={76} sx={{ borderRadius: 2.5 }} />)}
+          </Box>
+        ) : (
+          <KpiRow columns={5}>
+            <Kpi label="ลูกค้าทั้งหมด" value={`${totals.customers} ราย`} sub={`มีงานในระบบ ${totals.active} ราย`} onClick={() => setFilter("all")} active={filter === "all"} />
+            <Kpi label="มูลค่างานรวม" value={baht(totals.value)} sub="ตามมูลค่างาน/สัญญาที่บันทึก" />
+            <Kpi label="ต้องติดตาม" value={`${totals.attention} ราย`} sub={`งานค้าง ${totals.overdueJobs} · ใบเสนอราคา ${totals.quotations}`} alert={totals.attention > 0}
+              onClick={() => setFilter("attention")} active={filter === "attention"} />
+            <Kpi label="สัญญาหมดอายุ" value={`${totals.expired} ฉบับ`} sub={totals.expiring ? `ใกล้หมดอีก ${totals.expiring} ฉบับ` : "ไม่มีสัญญาใกล้หมด"} alert={totals.expired > 0}
+              onClick={() => setFilter("contract")} active={filter === "contract"} />
+            <Kpi label="ยังไม่มีงานในระบบ" value={`${totals.customers - totals.active} ราย`} sub="มีในทะเบียนแต่ยังไม่เคยลงงาน" onClick={() => setFilter("idle")} active={filter === "idle"} />
+          </KpiRow>
+        )}
+  
+        <FilterBar search={search} onSearch={setSearch} placeholder="ค้นหาลูกค้า / โครงการ / ผู้ติดต่อ / เบอร์โทร">
+          <SelectField label="แสดง" value={filter} onChange={(e) => setFilter(e.target.value)} sx={{ minWidth: { xs: 0, sm: 170 }, flex: { xs: 1, sm: "none" } }}>
+            {FILTERS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+          </SelectField>
+          <SelectField label="เรียงตาม" value={sortBy} onChange={(e) => setSortBy(e.target.value)} sx={{ minWidth: { xs: 0, sm: 170 }, flex: { xs: 1, sm: "none" } }}>
+            {SORT_OPTIONS.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+          </SelectField>
+        </FilterBar>
+      </FilterArea>
 
       {loading ? (
         <Stack spacing={1}>{[1, 2, 3, 4].map((i) => <Skeleton key={i} variant="rounded" height={isDesktop ? 56 : 110} sx={{ borderRadius: 2.5 }} />)}</Stack>

@@ -22,6 +22,7 @@ import {
   EditNote, OpenInNew, Inventory2, Visibility,
 } from "@mui/icons-material";
 import SelectField from "@/shared/ui/SelectField";
+import MobileFilterSheet, { FilterSheetButton, ActiveFilterChips, SheetOptions, SheetSearch, SheetLabel } from "@/shared/ui/MobileFilterSheet";
 import {
   PageHeader, Kpi, KpiRow, FilterBar, Panel, EmptyState, DotLabel,
   INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT_DARK, TABLE_HEAD_SX, TABLE_ROW_SX, ICON_BTN_SX,
@@ -94,6 +95,7 @@ const IssuedDocuments = () => {
   const [to, setTo] = useState("");
   const [page, setPage] = useState(1);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [menu, setMenu] = useState(null); // { anchor, row }
 
   // ✅ จอคอม 10 แถว / มือถือ 5 แถว ต่อหน้า — จอแคบแสดงเป็นการ์ดแนวตั้งซึ่งสูงกว่าแถวตารางหลายเท่า
@@ -267,9 +269,40 @@ const IssuedDocuments = () => {
         icon={<Description />}
         title="ทะเบียนเอกสาร"
         subtitle="ใบแจ้งเข้างาน / ใบส่งมอบงาน ที่ออกจากระบบ — ดู พิมพ์ ส่งอีเมล และติดตามสถานะ"
-        actions={<Tooltip title="โหลดใหม่"><IconButton onClick={() => fetchRows()} sx={ICON_BTN_SX}><Refresh sx={{ fontSize: 20 }} /></IconButton></Tooltip>}
+        actions={isMobile
+          ? <FilterSheetButton count={(appliedSearch ? 1 : 0) + (status !== "all" ? 1 : 0) + filterCount} onClick={() => setSheetOpen(true)} />
+          : <Tooltip title="โหลดใหม่"><IconButton onClick={() => fetchRows()} sx={ICON_BTN_SX}><Refresh sx={{ fontSize: 20 }} /></IconButton></Tooltip>}
       />
 
+      {/* ✅ มือถือ: ตัวเลขสรุป/ค้นหา/ตัวกรอง อยู่ในแผ่นล่าง (แบบหน้าใบเบิก) — เหลือแค่ชิปตัวกรองที่ใช้อยู่เหนือรายการ */}
+      {isMobile && (
+        <>
+          <ActiveFilterChips items={[
+            appliedSearch && { key: "q", label: `ค้นหา: ${appliedSearch}`, onDelete: () => setSearch("") },
+            status !== "all" && { key: "s", label: `สถานะ: ${STATUS_META[status]?.label}`, onDelete: () => { setStatus("all"); setPage(1); } },
+            docType !== "all" && { key: "t", label: DOC_TYPE_META[docType]?.label, onDelete: () => { setDocType("all"); setPage(1); } },
+            from && { key: "f", label: `ตั้งแต่ ${thaiDate(from)}`, onDelete: () => { setFrom(""); setPage(1); } },
+            to && { key: "to", label: `ถึง ${thaiDate(to)}`, onDelete: () => { setTo(""); setPage(1); } },
+          ].filter(Boolean)} />
+          <MobileFilterSheet open={sheetOpen} onClose={() => setSheetOpen(false)} onClear={clearFilters}
+            activeCount={activeFilters.length} resultLabel={`ดูผลลัพธ์ ${total.toLocaleString()} ฉบับ`}>
+            <SheetSearch value={search} onChange={setSearch} placeholder="ค้นหาเลขที่ / โครงการ / บริษัท / เรื่อง" />
+            <SheetLabel>สถานะ</SheetLabel>
+            <SheetOptions value={status} onChange={(v) => { setStatus(v); setPage(1); }}
+              options={[{ value: "all", label: "ทั้งหมด", count: totalAll }, ...STATUS_ORDER.map((st) => ({ value: st, label: STATUS_META[st].label, count: statusCounts[st] || 0 }))]} />
+            <SheetLabel>ชนิดเอกสาร</SheetLabel>
+            <SheetOptions value={docType} onChange={(v) => { setDocType(v); setPage(1); }}
+              options={[{ value: "all", label: "ทุกชนิด" }, ...Object.entries(DOC_TYPE_META).map(([k, v]) => ({ value: k, label: v.label }))]} />
+            <SheetLabel>ช่วงวันที่ออก</SheetLabel>
+            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1 }}>
+              <ThaiDatePicker label="ตั้งแต่" value={from} onChange={(v) => { setFrom(v); setPage(1); }} />
+              <ThaiDatePicker label="ถึง" value={to} onChange={(v) => { setTo(v); setPage(1); }} />
+            </Box>
+          </MobileFilterSheet>
+        </>
+      )}
+
+      {!isMobile && <>
       <KpiRow columns={5}>
         <Kpi label="ทั้งหมด" value={totalAll.toLocaleString()} sub="ฉบับ" active={status === "all"} onClick={() => { setStatus("all"); setPage(1); }} />
         {STATUS_ORDER.map((s) => (
@@ -296,7 +329,9 @@ const IssuedDocuments = () => {
         </Box>
       </Collapse>
 
-      {activeFilters.length > 0 && (
+      </>}
+
+      {!isMobile && activeFilters.length > 0 && (
         <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 1.25, flexWrap: "wrap", rowGap: 0.75 }} useFlexGap>
           <Typography sx={{ fontSize: "0.76rem", color: MUTED, fontWeight: 700 }}>กรองอยู่:</Typography>
           {activeFilters.map((f) => <Chip key={f} size="small" label={f} sx={{ height: 22, fontSize: "0.72rem", fontWeight: 600, bgcolor: "#fff", border: `1px solid ${LINE}` }} />)}
