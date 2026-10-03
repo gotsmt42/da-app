@@ -13,15 +13,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import useRealtime from "@/shared/realtime/useRealtime";
 import {
-  Box, Stack, Typography, TextField, InputAdornment, IconButton, Tooltip, Button,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Skeleton,
+  Box, Stack, Typography, IconButton, Tooltip, Button,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Skeleton,
   Chip, MenuItem, Menu, Pagination, useMediaQuery, Collapse, Divider, Alert,
 } from "@mui/material";
-import { alpha } from "@mui/material/styles";
 import {
-  Search, Close, Refresh, FilterList, Description, EventAvailable, MoreVert,
+  Refresh, Tune, Description, EventAvailable, MoreVert,
   EditNote, OpenInNew, Inventory2, Visibility,
 } from "@mui/icons-material";
+import SelectField from "@/shared/ui/SelectField";
+import {
+  PageHeader, Kpi, KpiRow, FilterBar, Panel, EmptyState, DotLabel,
+  INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT_DARK, TABLE_HEAD_SX, TABLE_ROW_SX, ICON_BTN_SX,
+} from "@/shared/ui/PageKit";
 import { Link, useSearchParams } from "react-router-dom";
 import "@/shared/utils/momentThaiLocale";
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
@@ -36,11 +40,8 @@ import { generateDeliveryNotePdf } from "../utils/deliveryNotePdf";
 import DocumentPreviewDialog from "../components/DocumentPreviewDialog";
 import { can } from "@/shared/utils/roles";
 
-const ACCENT = "#dc2626";
-const SURFACE_SUBTLE = "#f8fafc";
-const BORDER_MAIN = "#e2e8f0";
-const BORDER_SOFT = "#eef2f7";
-const TEXT_SUB = "#64748b";
+const ACCENT = "#2563eb";
+const OUTLINE_SX = { textTransform: "none", fontWeight: 700, borderRadius: 2, height: 40, px: 1.75, color: INK_2, border: `1px solid ${LINE}`, bgcolor: "#fff", whiteSpace: "nowrap" };
 
 // ✅ ชนิดเอกสารใช้สีเดียวกับกล่องออกเอกสารของมัน (ฟ้า = ใบแจ้งเข้างาน, แดง = ใบส่งมอบงาน)
 // ผู้ใช้จึงกวาดตาแยกออกทันทีว่าแถวไหนเป็นเอกสารชนิดไหน โดยไม่ต้องอ่านตัวหนังสือ
@@ -216,7 +217,7 @@ const IssuedDocuments = () => {
       showCancelButton: true,
       confirmButtonText: "บันทึก",
       cancelButtonText: "ยกเลิก",
-      confirmButtonColor: ACCENT,
+      confirmButtonColor: "#2563eb",
     });
     if (!isConfirmed) return;
     try {
@@ -229,382 +230,196 @@ const IssuedDocuments = () => {
 
   const StatusChip = ({ value }) => {
     const meta = STATUS_META[value] || STATUS_META.issued;
-    return (
-      <Tooltip title={meta.desc}>
-        <Chip
-          size="small" label={meta.label}
-          sx={{ height: 22, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha(meta.color, 0.12), color: meta.color }}
-        />
-      </Tooltip>
-    );
+    return <Tooltip title={meta.desc}><span><DotLabel color={meta.color}>{meta.label}</DotLabel></span></Tooltip>;
   };
 
-  const TypeChip = ({ value }) => {
+  /** ชนิดเอกสาร — ไอคอนสีเล็ก + ชื่อ (สีอยู่ที่ไอคอนเท่านั้น) */
+  const TypeLabel = ({ value }) => {
     const meta = DOC_TYPE_META[value];
     if (!meta) return <span>-</span>;
     return (
-      <Chip
-        size="small" icon={meta.icon} label={meta.label}
-        sx={{
-          height: 22, fontSize: "0.7rem", fontWeight: 700,
-          bgcolor: alpha(meta.color, 0.1), color: meta.color,
-          "& .MuiChip-icon": { color: meta.color, ml: 0.5 },
-        }}
-      />
+      <Stack direction="row" spacing={0.5} alignItems="center" sx={{ color: meta.color, minWidth: 0 }}>
+        {meta.icon}
+        <Typography noWrap sx={{ fontSize: "0.76rem", fontWeight: 700, color: INK_2 }}>{meta.label}</Typography>
+      </Stack>
     );
   };
 
+  const filterCount = (docType !== "all" ? 1 : 0) + (from ? 1 : 0) + (to ? 1 : 0);
+  const RowActions = ({ r }) => (
+    <Stack direction="row" spacing={0.25} sx={{ flexShrink: 0 }}>
+      <Tooltip title="ดูเอกสาร · พิมพ์ · ส่งอีเมล">
+        <IconButton size="small" onClick={(e) => { e.stopPropagation(); openPreview(r); }} sx={{ color: INK_2 }}><Visibility sx={{ fontSize: 19 }} /></IconButton>
+      </Tooltip>
+      {canEditRow(r) && (
+        <IconButton size="small" aria-label="จัดการ" onClick={(e) => { e.stopPropagation(); setMenu({ anchor: e.currentTarget, row: r }); }} sx={{ color: MUTED }}>
+          <MoreVert sx={{ fontSize: 19 }} />
+        </IconButton>
+      )}
+    </Stack>
+  );
+
   return (
-    <Box sx={{ maxWidth: 1500, mx: "auto" }}>
-      {/* ── หัวหน้า ─────────────────────────────────────────────────────── */}
-      <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ sm: "center" }} spacing={1.5} sx={{ mb: 2 }}>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 800, fontSize: "1.3rem", lineHeight: 1.3 }}>
-            ทะเบียนเอกสาร
-          </Typography>
-          <Typography variant="caption" sx={{ color: TEXT_SUB }}>
-            ใบแจ้งเข้างาน / ใบส่งมอบงาน ที่ออกเลขที่ไปแล้วทั้งหมด — ค้นหาและเรียกดูย้อนหลังได้
-          </Typography>
+    <Box sx={{ maxWidth: 1500, mx: "auto", p: { xs: 1.25, sm: 2 } }}>
+      {/* ✅ ผู้ใช้สั่ง (3 ต.ค. 2569): "หน้าเอกสารยังไม่เข้าธีม ดูข้อมูลยาก" — ใช้ชุด PageKit เดียวกับทุกหน้า
+          (หัวกล่องขาว · ตัวเลขสรุปกดกรองได้ · แถบค้นหา · รายการพื้นขาว สีน้อย) */}
+      <PageHeader
+        icon={<Description />}
+        title="ทะเบียนเอกสาร"
+        subtitle="ใบแจ้งเข้างาน / ใบส่งมอบงาน ที่ออกจากระบบ — ดู พิมพ์ ส่งอีเมล และติดตามสถานะ"
+        actions={<Tooltip title="โหลดใหม่"><IconButton onClick={() => fetchRows()} sx={ICON_BTN_SX}><Refresh sx={{ fontSize: 20 }} /></IconButton></Tooltip>}
+      />
+
+      <KpiRow columns={5}>
+        <Kpi label="ทั้งหมด" value={totalAll.toLocaleString()} sub="ฉบับ" active={status === "all"} onClick={() => { setStatus("all"); setPage(1); }} />
+        {STATUS_ORDER.map((s) => (
+          <Kpi key={s} label={STATUS_META[s].label} value={(statusCounts[s] || 0).toLocaleString()} sub="ฉบับ"
+            active={status === s} onClick={() => { setStatus(status === s ? "all" : s); setPage(1); }} />
+        ))}
+      </KpiRow>
+
+      <FilterBar search={search} onSearch={setSearch} placeholder="ค้นหาเลขที่ / โครงการ / บริษัท / เรื่อง / ผู้ออก">
+        <Button onClick={() => setFiltersOpen((v) => !v)} startIcon={<Tune sx={{ fontSize: 18 }} />}
+          sx={{ ...OUTLINE_SX, width: { xs: "100%", sm: "auto" }, ...(filterCount ? { color: ACCENT_DARK, borderColor: "#bfdbfe", bgcolor: "#eff6ff" } : {}) }}>
+          ตัวกรอง{filterCount ? ` · ${filterCount}` : ""}
+        </Button>
+      </FilterBar>
+
+      <Collapse in={filtersOpen}>
+        <Box sx={{ mb: 1.5, p: 1.5, bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, display: "grid", gap: 1.25, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr 1fr" } }}>
+          <SelectField label="ชนิดเอกสาร" value={docType} onChange={(e) => { setDocType(e.target.value); setPage(1); }}>
+            <option value="all">ทุกชนิด</option>
+            {Object.entries(DOC_TYPE_META).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          </SelectField>
+          <ThaiDatePicker label="ออกตั้งแต่วันที่" value={from} onChange={(v) => { setFrom(v); setPage(1); }} />
+          <ThaiDatePicker label="ถึงวันที่" value={to} onChange={(v) => { setTo(v); setPage(1); }} />
         </Box>
-        <Tooltip title="โหลดใหม่">
-          <IconButton onClick={fetchRows} sx={{ color: TEXT_SUB }}><Refresh /></IconButton>
-        </Tooltip>
-      </Stack>
+      </Collapse>
 
-      {/* ── แถบสรุปตามสถานะ — กดเพื่อกรองได้เลย ──────────────────────────── */}
-      <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: "wrap", rowGap: 1 }} useFlexGap>
-        <Chip
-          label={`ทั้งหมด ${totalAll.toLocaleString()}`}
-          onClick={() => { setStatus("all"); setPage(1); }}
-          sx={{
-            fontWeight: 800,
-            bgcolor: status === "all" ? alpha(ACCENT, 0.12) : SURFACE_SUBTLE,
-            color: status === "all" ? ACCENT : TEXT_SUB,
-            border: `1px solid ${status === "all" ? alpha(ACCENT, 0.4) : BORDER_MAIN}`,
-          }}
-        />
-        {STATUS_ORDER.map((s) => {
-          const meta = STATUS_META[s];
-          const on = status === s;
-          return (
-            <Chip
-              key={s} label={`${meta.label} ${(statusCounts[s] || 0).toLocaleString()}`}
-              onClick={() => { setStatus(on ? "all" : s); setPage(1); }}
-              sx={{
-                fontWeight: 700,
-                bgcolor: on ? alpha(meta.color, 0.15) : SURFACE_SUBTLE,
-                color: on ? meta.color : TEXT_SUB,
-                border: `1px solid ${on ? alpha(meta.color, 0.45) : BORDER_MAIN}`,
-              }}
-            />
-          );
-        })}
-      </Stack>
-
-      {/* ── ค้นหา + ตัวกรอง ──────────────────────────────────────────────── */}
-      <Paper variant="outlined" sx={{ p: 1.5, mb: 2, borderRadius: 3, borderColor: BORDER_MAIN }}>
-        <Stack direction={{ xs: "column", md: "row" }} spacing={1.25}>
-          <TextField
-            size="small" fullWidth value={search} onChange={(e) => setSearch(e.target.value)}
-            placeholder="ค้นหาเลขที่เอกสาร / โครงการ / บริษัท / เรื่อง / ผู้ออก"
-            InputProps={{
-              startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 19, color: "text.disabled" }} /></InputAdornment>,
-              endAdornment: search ? (
-                <InputAdornment position="end">
-                  <IconButton size="small" onClick={() => setSearch("")}><Close sx={{ fontSize: 16 }} /></IconButton>
-                </InputAdornment>
-              ) : null,
-            }}
-            sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2.5 } }}
-          />
-          <TextField
-            select size="small" value={docType}
-            onChange={(e) => { setDocType(e.target.value); setPage(1); }}
-            sx={{ width: { xs: "100%", md: 190 }, flexShrink: 0, "& .MuiOutlinedInput-root": { borderRadius: 2.5 } }}
-          >
-            <MenuItem value="all">ทุกชนิดเอกสาร</MenuItem>
-            {Object.entries(DOC_TYPE_META).map(([k, v]) => (
-              <MenuItem key={k} value={k}>{v.label}</MenuItem>
-            ))}
-          </TextField>
-          <Button
-            onClick={() => setFiltersOpen((v) => !v)}
-            startIcon={<FilterList sx={{ fontSize: 18 }} />}
-            sx={{
-              textTransform: "none", fontWeight: 700, flexShrink: 0, borderRadius: 2.5, px: 2,
-              color: filtersOpen || from || to ? ACCENT : TEXT_SUB,
-              bgcolor: filtersOpen || from || to ? alpha(ACCENT, 0.06) : "transparent",
-            }}
-          >
-            ช่วงวันที่
-          </Button>
+      {activeFilters.length > 0 && (
+        <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 1.25, flexWrap: "wrap", rowGap: 0.75 }} useFlexGap>
+          <Typography sx={{ fontSize: "0.76rem", color: MUTED, fontWeight: 700 }}>กรองอยู่:</Typography>
+          {activeFilters.map((f) => <Chip key={f} size="small" label={f} sx={{ height: 22, fontSize: "0.72rem", fontWeight: 600, bgcolor: "#fff", border: `1px solid ${LINE}` }} />)}
+          <Button size="small" onClick={clearFilters} sx={{ textTransform: "none", fontWeight: 700, color: ACCENT_DARK, minWidth: 0 }}>ล้างทั้งหมด</Button>
         </Stack>
+      )}
 
-        <Collapse in={filtersOpen || Boolean(from || to)}>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ mt: 1.25 }} alignItems={{ sm: "center" }}>
-            <ThaiDatePicker
-              label="ออกตั้งแต่วันที่" fullWidth={false}
-              value={from} onChange={(v) => { setFrom(v); setPage(1); }}
-              textFieldProps={{ sx: { width: { xs: "100%", sm: 210 } } }}
-            />
-            <ThaiDatePicker
-              label="ถึงวันที่" fullWidth={false}
-              value={to} onChange={(v) => { setTo(v); setPage(1); }}
-              textFieldProps={{ sx: { width: { xs: "100%", sm: 210 } } }}
-            />
-          </Stack>
-        </Collapse>
+      {error && <Alert severity="error" sx={{ mb: 1.5, borderRadius: 2 }}>{error}</Alert>}
 
-        {activeFilters.length > 0 && (
-          <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 1.25, flexWrap: "wrap", rowGap: 0.75 }} useFlexGap>
-            <Typography variant="caption" sx={{ color: TEXT_SUB, fontWeight: 700 }}>กรองอยู่:</Typography>
-            {activeFilters.map((f) => (
-              <Chip key={f} size="small" variant="outlined" label={f}
-                sx={{ height: 21, fontSize: "0.68rem", color: TEXT_SUB, borderColor: alpha("#0f172a", 0.18) }} />
-            ))}
-            <Button size="small" onClick={clearFilters} startIcon={<Close sx={{ fontSize: 14 }} />}
-              sx={{ textTransform: "none", fontWeight: 700, color: ACCENT, minWidth: 0 }}>
-              ล้างทั้งหมด
-            </Button>
-          </Stack>
-        )}
-      </Paper>
-
-      {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
-
-      {/* ── ตาราง ────────────────────────────────────────────────────────── */}
       {loading ? (
         <Skeleton variant="rounded" height={320} sx={{ borderRadius: 3 }} />
       ) : rows.length === 0 ? (
-        <Paper variant="outlined" sx={{ textAlign: "center", py: 6, borderRadius: 3, borderStyle: "dashed" }}>
-          <Box sx={{
-            width: 62, height: 62, borderRadius: "50%", mx: "auto", mb: 1.5,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            bgcolor: alpha(ACCENT, 0.06), color: alpha(ACCENT, 0.6),
-          }}>
-            <Inventory2 sx={{ fontSize: 29 }} />
-          </Box>
-          <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 460, mx: "auto", px: 2 }}>
-            {activeFilters.length > 0
-              ? `ไม่พบเอกสารที่ตรงกับเงื่อนไขที่กรองอยู่ (${activeFilters.join(" · ")})`
-              : "ยังไม่มีเอกสารในทะเบียน — เอกสารจะถูกบันทึกที่นี่อัตโนมัติเมื่อกดยืนยันออกเอกสารจากหน้างาน"}
-          </Typography>
-          {activeFilters.length > 0 && (
-            <Button size="small" variant="outlined" onClick={clearFilters} startIcon={<Close sx={{ fontSize: 16 }} />}
-              sx={{ mt: 1.5, textTransform: "none", fontWeight: 700, borderRadius: 2, borderColor: alpha(ACCENT, 0.5), color: ACCENT }}>
-              ล้างตัวกรองทั้งหมด
-            </Button>
-          )}
-        </Paper>
+        <EmptyState icon={<Inventory2 />}
+          title={activeFilters.length ? "ไม่พบเอกสารที่ตรงกับตัวกรอง" : "ยังไม่มีเอกสารในทะเบียน"}
+          hint={activeFilters.length ? activeFilters.join(" · ") : "เอกสารจะถูกบันทึกที่นี่อัตโนมัติเมื่อกดยืนยันออกเอกสารจากหน้างาน"}
+          action={activeFilters.length ? <Button size="small" onClick={clearFilters} sx={{ ...OUTLINE_SX, mt: 1 }}>ล้างตัวกรอง</Button> : null} />
       ) : isMobile ? (
-        /* ── มุมมองการ์ดสำหรับจอมือถือ ────────────────────────────────────
-           🐛 ที่แก้: ตารางนี้ตั้ง minWidth 900px ไว้ (8 คอลัมน์) บนจอ 375px จึงต้องปัดซ้าย-ขวาหลายจอ
-           กว่าจะอ่านครบ 1 แถว และพอปัดไปคอลัมน์ขวาสุดก็ลืมไปแล้วว่ากำลังอ่านใบไหนอยู่
-           ✅ จอแคบเปลี่ยนเป็นการ์ดแนวตั้ง — ข้อมูลชุดเดียวกันครบทุกตัว แค่เรียงตามลำดับที่ตาต้องการ
-           (เลขที่+ชนิด → โครงการ+เรื่อง → งาน → หมายเหตุ → สถานะ+วันที่+ผู้ออก+ปุ่ม) ไม่ต้องปัดจอเลย */
-        <Stack spacing={1.25}>
-          {rows.map((r) => {
-            const typeMeta = DOC_TYPE_META[r.docType];
-            return (
-              <Paper
-                key={r._id} variant="outlined"
-                sx={{
-                  p: 1.75, borderRadius: 3, borderColor: BORDER_MAIN,
-                  boxShadow: "0 1px 2px rgba(15,23,42,0.05)",
-                  // ✅ แถบสีชนิดเอกสารที่ขอบซ้าย — แยกใบแจ้งเข้างาน/ใบส่งมอบงานออกจากกันได้ตั้งแต่
-                  // กวาดตาผ่าน ไม่ต้องอ่านชิป (ชิปยังอยู่ครบสำหรับคนที่อยากอ่านให้แน่ใจ)
-                  borderLeft: `4px solid ${typeMeta?.color || ACCENT}`,
-                  opacity: r.status === "cancelled" ? 0.6 : 1,
-                }}
-              >
-                <Stack direction="row" alignItems="flex-start" spacing={1}>
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography sx={{ fontWeight: 800, fontSize: "0.9rem", color: ACCENT, fontVariantNumeric: "tabular-nums", lineHeight: 1.3 }}>
-                      {r.docNumber}
-                    </Typography>
-                    <Typography sx={{ fontWeight: 700, fontSize: "0.88rem", lineHeight: 1.35, mt: 0.25 }}>
-                      {r.site || "—"}
-                    </Typography>
-                  </Box>
-                  <TypeChip value={r.docType} />
-                </Stack>
-
-                {(r.subject || r.customerCompany) && (
-                  <Typography variant="caption" sx={{ display: "block", color: TEXT_SUB, mt: 0.5, lineHeight: 1.45 }}>
-                    {r.subject || r.customerCompany}
-                  </Typography>
-                )}
-                {(r.workLabel || r.roundLabel) && (
-                  <Typography variant="caption" sx={{ display: "block", color: TEXT_SUB, mt: 0.25 }}>
-                    {[r.workLabel, r.roundLabel && `ครั้งที่ ${r.roundLabel}`].filter(Boolean).join("  ·  ")}
-                  </Typography>
-                )}
-                {r.note && (
-                  <Typography variant="caption" sx={{ display: "block", mt: 0.5, color: "#b45309", fontStyle: "italic", lineHeight: 1.45 }}>
-                    📝 {r.note}
-                  </Typography>
-                )}
-
-                <Stack
-                  direction="row" alignItems="center" spacing={1}
-                  sx={{ mt: 1.25, pt: 1.25, borderTop: `1px solid ${BORDER_SOFT}` }}
-                >
-                  <StatusChip value={r.status} />
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography variant="caption" sx={{ display: "block", color: "text.disabled", fontSize: "0.68rem", lineHeight: 1.4 }}>
-                      {thaiDate(r.issuedAt)}{r.issuedByName ? ` · ${r.issuedByName}` : ""}
-                    </Typography>
-                  </Box>
-                  <IconButton size="small" onClick={() => openPreview(r)} sx={{ color: "text.disabled" }}>
-                    <Visibility sx={{ fontSize: 19 }} />
-                  </IconButton>
-                  {canEditRow(r) && (
-                    <IconButton size="small" onClick={(e) => setMenu({ anchor: e.currentTarget, row: r })} sx={{ color: "text.disabled" }}>
-                      <MoreVert sx={{ fontSize: 19 }} />
-                    </IconButton>
-                  )}
-                </Stack>
-              </Paper>
-            );
-          })}
-        </Stack>
+        /* ── มือถือ: รายการการ์ด — เลขที่+ชนิด · โครงการ · เรื่อง · สถานะ/วันที่/ปุ่ม ── */
+        <Panel>
+          {rows.map((r, i) => (
+            <Box key={r._id} onClick={() => openPreview(r)} role="button"
+              sx={{ px: 1.75, py: 1.5, borderTop: i ? `1px solid ${LINE}` : "none", cursor: "pointer", opacity: r.status === "cancelled" ? 0.55 : 1, "&:active": { bgcolor: SURFACE } }}>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Typography sx={{ fontWeight: 900, fontSize: "0.92rem", color: INK, fontVariantNumeric: "tabular-nums" }}>{r.docNumber}</Typography>
+                <Box sx={{ flex: 1 }} />
+                <TypeLabel value={r.docType} />
+              </Stack>
+              <Typography sx={{ fontWeight: 700, fontSize: "0.88rem", color: INK, mt: 0.5, lineHeight: 1.35 }}>{r.site || "—"}</Typography>
+              {(r.subject || r.customerCompany) && (
+                <Typography sx={{ fontSize: "0.78rem", color: MUTED, lineHeight: 1.45, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                  {r.subject || r.customerCompany}
+                </Typography>
+              )}
+              {r.note && <Typography sx={{ fontSize: "0.76rem", color: "#92400e", mt: 0.25 }}>หมายเหตุ: {r.note}</Typography>}
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+                <StatusChip value={r.status} />
+                <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.74rem", color: FAINT }}>
+                  {thaiDate(r.issuedAt)}{r.issuedByName ? ` · ${r.issuedByName}` : ""}
+                </Typography>
+                <RowActions r={r} />
+              </Stack>
+            </Box>
+          ))}
+        </Panel>
       ) : (
-        <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER_MAIN, overflowX: "auto" }}>
-          <Table size="small" sx={{
-            minWidth: 900,
-            "& th, & td": { border: "none", borderBottom: `1px solid ${BORDER_SOFT}` },
-            "& td": { py: 1 },
-          }}>
-            <TableHead>
-              <TableRow sx={{ "& th": { fontWeight: 700, fontSize: "0.75rem", bgcolor: SURFACE_SUBTLE, color: TEXT_SUB, borderBottom: `1px solid ${BORDER_MAIN}` } }}>
-                <TableCell sx={{ width: 130 }}>เลขที่เอกสาร</TableCell>
-                <TableCell sx={{ width: 145 }}>ชนิด</TableCell>
-                <TableCell sx={{ width: 95 }}>วันที่ออก</TableCell>
-                <TableCell>โครงการ / เรื่อง</TableCell>
-                <TableCell sx={{ width: 150 }}>งาน</TableCell>
-                <TableCell sx={{ width: 130 }}>ผู้ออก</TableCell>
-                <TableCell sx={{ width: 150 }}>สถานะ</TableCell>
-                <TableCell sx={{ width: 86 }} align="center" />
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {rows.map((r, idx) => (
-                <TableRow
-                  key={r._id}
-                  sx={{
-                    bgcolor: idx % 2 ? SURFACE_SUBTLE : "#fff",
-                    transition: "background-color .12s",
-                    "&:hover": { bgcolor: alpha(ACCENT, 0.04) },
-                    // ✅ ใบที่ยกเลิกแล้วจางลงทั้งแถว — ยังอยู่ในทะเบียน (เลขถูกใช้ไปแล้ว) แต่ไม่ควรเด่น
-                    // เท่าใบที่ยังใช้งานอยู่ เวลากวาดตาหาใบจริงจะได้ไม่สะดุด
-                    opacity: r.status === "cancelled" ? 0.55 : 1,
-                  }}
-                >
-                  <TableCell>
-                    <Typography sx={{ fontWeight: 800, fontSize: "0.82rem", color: ACCENT, fontVariantNumeric: "tabular-nums" }}>
-                      {r.docNumber}
-                    </Typography>
-                  </TableCell>
-                  <TableCell><TypeChip value={r.docType} /></TableCell>
-                  <TableCell>
-                    <Typography sx={{ fontSize: "0.8rem", fontVariantNumeric: "tabular-nums" }}>
-                      {thaiDate(r.issuedAt)}
-                    </Typography>
-                  </TableCell>
-                  <TableCell sx={{ maxWidth: 340 }}>
-                    <Typography sx={{ fontWeight: 700, fontSize: "0.83rem", lineHeight: 1.35 }}>
-                      {r.site || "—"}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", lineHeight: 1.35 }}>
-                      {r.subject || r.customerCompany || ""}
-                    </Typography>
-                    {r.note && (
-                      <Typography variant="caption" sx={{ display: "block", mt: 0.25, color: "#b45309", fontStyle: "italic" }}>
-                        📝 {r.note}
-                      </Typography>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Typography sx={{ fontSize: "0.78rem" }}>{r.workLabel || "—"}</Typography>
-                    {r.roundLabel && (
-                      <Typography variant="caption" sx={{ color: TEXT_SUB }}>ครั้งที่ {r.roundLabel}</Typography>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Typography sx={{ fontSize: "0.78rem" }}>{r.issuedByName || "—"}</Typography>
-                  </TableCell>
-                  <TableCell><StatusChip value={r.status} /></TableCell>
-                  <TableCell align="center">
-                    <Stack direction="row" spacing={0.25} justifyContent="center">
-                      {/* ✅ ดูตัวอย่างได้ทุก role — เป็นการอ่านอย่างเดียว ไม่ได้แก้อะไรในทะเบียน */}
-                      <Tooltip title="ดูตัวอย่างเอกสาร">
-                        <IconButton size="small" onClick={() => openPreview(r)} sx={{ color: "text.disabled" }}>
-                          <Visibility sx={{ fontSize: 18 }} />
-                        </IconButton>
-                      </Tooltip>
-                      {canEditRow(r) && (
-                        <IconButton size="small" onClick={(e) => setMenu({ anchor: e.currentTarget, row: r })} sx={{ color: "text.disabled" }}>
-                          <MoreVert sx={{ fontSize: 18 }} />
-                        </IconButton>
-                      )}
-                    </Stack>
-                  </TableCell>
+        <Panel>
+          <TableContainer sx={{ overflowX: "auto" }}>
+            <Table size="small" sx={{ minWidth: 880, tableLayout: "fixed" }}>
+              <TableHead sx={TABLE_HEAD_SX}>
+                <TableRow>
+                  <TableCell sx={{ width: 110 }}>เลขที่</TableCell>
+                  <TableCell sx={{ width: 130 }}>ชนิด</TableCell>
+                  <TableCell>โครงการ / เรื่อง</TableCell>
+                  <TableCell sx={{ width: 160 }}>งาน</TableCell>
+                  <TableCell sx={{ width: 120 }}>ออกเมื่อ / โดย</TableCell>
+                  <TableCell sx={{ width: 150 }}>สถานะ</TableCell>
+                  <TableCell sx={{ width: 84 }} />
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+              </TableHead>
+              <TableBody>
+                {rows.map((r) => (
+                  <TableRow key={r._id} hover onClick={() => openPreview(r)}
+                    sx={{ ...TABLE_ROW_SX, cursor: "pointer", opacity: r.status === "cancelled" ? 0.55 : 1 }}>
+                    <TableCell><Typography sx={{ fontWeight: 800, fontSize: "0.84rem", color: INK, fontVariantNumeric: "tabular-nums" }}>{r.docNumber}</Typography></TableCell>
+                    <TableCell><TypeLabel value={r.docType} /></TableCell>
+                    <TableCell sx={{ maxWidth: 360 }}>
+                      <Typography noWrap sx={{ fontWeight: 700, fontSize: "0.84rem", color: INK }}>{r.site || "—"}</Typography>
+                      <Typography noWrap sx={{ fontSize: "0.74rem", color: MUTED }}>{r.subject || r.customerCompany || ""}</Typography>
+                      {r.note && <Typography noWrap sx={{ fontSize: "0.72rem", color: "#92400e" }}>หมายเหตุ: {r.note}</Typography>}
+                    </TableCell>
+                    <TableCell>
+                      <Typography noWrap sx={{ fontSize: "0.8rem", color: INK_2 }}>{r.workLabel || "—"}</Typography>
+                      {r.roundLabel && <Typography sx={{ fontSize: "0.72rem", color: MUTED }}>ครั้งที่ {r.roundLabel}</Typography>}
+                    </TableCell>
+                    <TableCell>
+                      <Typography sx={{ fontSize: "0.8rem", color: INK_2, fontVariantNumeric: "tabular-nums" }}>{thaiDate(r.issuedAt)}</Typography>
+                      <Typography noWrap sx={{ fontSize: "0.72rem", color: MUTED }}>{r.issuedByName || "—"}</Typography>
+                    </TableCell>
+                    <TableCell><StatusChip value={r.status} /></TableCell>
+                    <TableCell align="right"><RowActions r={r} /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Panel>
       )}
 
-      {/* ── เมนูจัดการแต่ละแถว ───────────────────────────────────────────── */}
-      <Menu
-        anchorEl={menu?.anchor} open={Boolean(menu)} onClose={() => setMenu(null)}
-        PaperProps={{ sx: { borderRadius: 2.5, minWidth: 230 } }}
-      >
-        <Typography variant="caption" sx={{ px: 2, pt: 1, pb: 0.5, display: "block", fontWeight: 800, color: TEXT_SUB }}>
-          เปลี่ยนสถานะเป็น
-        </Typography>
+      {/* ── เมนูจัดการแต่ละแถว ── */}
+      <Menu anchorEl={menu?.anchor} open={Boolean(menu)} onClose={() => setMenu(null)} PaperProps={{ sx: { borderRadius: 2.5, minWidth: 230 } }}>
+        <Typography sx={{ px: 2, pt: 1, pb: 0.5, display: "block", fontSize: "0.74rem", fontWeight: 800, color: MUTED }}>เปลี่ยนสถานะเป็น</Typography>
         {STATUS_ORDER.map((s) => {
           const meta = STATUS_META[s];
           const current = menu?.row?.status === s;
           return (
-            <MenuItem
-              key={s} disabled={current} onClick={() => changeStatus(menu.row, s)}
-              sx={{ fontSize: "0.85rem", fontWeight: current ? 800 : 500 }}
-            >
-              <Box sx={{ width: 9, height: 9, borderRadius: "50%", bgcolor: meta.color, mr: 1.25, flexShrink: 0 }} />
+            <MenuItem key={s} disabled={current} onClick={() => changeStatus(menu.row, s)} sx={{ fontSize: "0.86rem", fontWeight: current ? 800 : 500 }}>
+              <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: meta.color, mr: 1.25, flexShrink: 0 }} />
               {meta.label}{current ? " (ปัจจุบัน)" : ""}
             </MenuItem>
           );
         })}
         <Divider sx={{ my: 0.5 }} />
-        <MenuItem onClick={() => editNote(menu.row)} sx={{ fontSize: "0.85rem" }}>
-          <EditNote sx={{ fontSize: 18, mr: 1.25, color: TEXT_SUB }} /> บันทึกเพิ่มเติม
+        <MenuItem onClick={() => editNote(menu.row)} sx={{ fontSize: "0.86rem" }}>
+          <EditNote sx={{ fontSize: 18, mr: 1.25, color: MUTED }} /> บันทึกเพิ่มเติม
         </MenuItem>
         {menu?.row?.eventId && (
-          <MenuItem
-            component={Link} to={`/operation/${menu.row.eventId}`} onClick={() => setMenu(null)}
-            sx={{ fontSize: "0.85rem" }}
-          >
-            <OpenInNew sx={{ fontSize: 17, mr: 1.25, color: TEXT_SUB }} /> เปิดงานต้นทาง
+          <MenuItem component={Link} to={`/operation/${menu.row.eventId}`} onClick={() => setMenu(null)} sx={{ fontSize: "0.86rem" }}>
+            <OpenInNew sx={{ fontSize: 17, mr: 1.25, color: MUTED }} /> เปิดงานต้นทาง
           </MenuItem>
         )}
       </Menu>
 
-      {/* ✅ กล่องดูตัวอย่างเอกสารย้อนหลัง — ใช้กล่องเดียวกับตอนออกเอกสาร (issued=true จึงแสดงปุ่ม
-          เปิดแท็บใหม่ / ดาวน์โหลด / แชร์ และไม่มีปุ่มยืนยันออกซ้ำ เพราะใบนี้ออกไปแล้ว) */}
+      {/* ✅ กล่องดูเอกสารย้อนหลัง — ตัวเดียวกับตอนออกเอกสาร (ดู/พิมพ์/แชร์/ส่งอีเมล) */}
       {previewRow && (
         <DocumentPreviewDialog
           open
           title={DOC_TYPE_META[previewRow.docType]?.label || "เอกสาร"}
           accent={DOC_TYPE_META[previewRow.docType]?.color || ACCENT}
-          accentDark={previewRow.docType === "notice" ? "#0369a1" : "#b91c1c"}
           preview={preview}
           issued
           docNumber={previewRow.docNumber}
           busy={previewBusy}
           onClose={() => { setPreviewRow(null); setPreview(null); }}
-          // ✅ ส่งเอกสารย้อนหลังทางอีเมลได้จากทะเบียน (ผู้ใช้สั่ง 3 ต.ค. 2569) — ผู้รับเติมเองหรือเลือกจากรายชื่อ
           email={{
             docType: DOC_TYPE_META[previewRow.docType]?.label || "เอกสาร",
             refId: String(previewRow.eventId || previewRow._id || ""),
@@ -617,17 +432,10 @@ const IssuedDocuments = () => {
         />
       )}
 
-      {/* ── แบ่งหน้า ─────────────────────────────────────────────────────── */}
       {totalPages > 1 && (
-        <Stack alignItems="center" sx={{ mt: 2.5 }}>
-          <Pagination
-            count={totalPages} page={Math.min(page, totalPages)} onChange={(_, p) => setPage(p)}
-            color="standard" shape="rounded"
-            sx={{ "& .Mui-selected": { bgcolor: `${alpha(ACCENT, 0.12)} !important`, color: ACCENT, fontWeight: 800 } }}
-          />
-          <Typography variant="caption" sx={{ mt: 0.75, color: TEXT_SUB }}>
-            ทั้งหมด {total.toLocaleString()} ฉบับ · หน้า {Math.min(page, totalPages)}/{totalPages}
-          </Typography>
+        <Stack alignItems="center" spacing={0.75} sx={{ mt: 2 }}>
+          <Pagination count={totalPages} page={Math.min(page, totalPages)} onChange={(_, p) => setPage(p)} shape="rounded" />
+          <Typography sx={{ fontSize: "0.76rem", color: MUTED }}>ทั้งหมด {total.toLocaleString()} ฉบับ · หน้า {Math.min(page, totalPages)}/{totalPages}</Typography>
         </Stack>
       )}
     </Box>

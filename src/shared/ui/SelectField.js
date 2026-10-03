@@ -16,7 +16,8 @@ import { alpha } from "@mui/material/styles";
  *    เมนูเปิดทันทีที่โผล่ · เลือกแล้ว onChange ทำงาน (จุดเรียกใช้บันทึกเอง) · ปิดเมนูโดยไม่ได้เลือก → onMenuClose
  *    ⚠️ ห้ามใช้ onBlur บันทึกในโหมดนี้ — เปิดเมนูแล้วช่องเสียโฟกัสทันที จะบันทึกค่าเดิมทิ้งก่อนได้เลือก
  */
-const ACCENT = "#dc2626";
+// ✅ น้ำเงินหลักของแอป (ผู้ใช้ไม่เอาสีเข้ม/แดงทั้งหน้า — ดู ACCENT ใน PageKit)
+const ACCENT = "#2563eb";
 
 const toItems = (children) => {
   const out = [];

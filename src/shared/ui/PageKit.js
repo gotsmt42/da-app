@@ -53,8 +53,9 @@ export function Kpi({ label, value, sub, alert, onClick, active }) {
   return (
     <Box component={onClick ? "button" : "div"} type={onClick ? "button" : undefined} onClick={onClick} sx={{
       textAlign: "left", font: "inherit", cursor: onClick ? "pointer" : "default", minWidth: 0, width: "100%",
-      p: { xs: 1.25, sm: 1.5 }, borderRadius: 2.5, bgcolor: "#fff",
-      border: `1px solid ${active ? INK_2 : LINE}`, boxShadow: active ? `inset 0 -3px 0 ${INK_2}` : CARD_SHADOW,
+      p: { xs: 1.25, sm: 1.5 }, borderRadius: 2.5,
+      // ✅ ช่องที่เลือกอยู่ = ขอบ/เส้นล่างน้ำเงิน (ผู้ใช้ไม่เอาพื้นเข้ม/ดำ)
+      border: `1px solid ${active ? ACCENT_LINE : LINE}`, bgcolor: active ? ACCENT_SOFT : "#fff", boxShadow: active ? `inset 0 -3px 0 ${ACCENT}` : CARD_SHADOW,
       transition: "border-color .15s", "&:hover": onClick ? { borderColor: FAINT } : {},
     }}>
       <Typography noWrap sx={{ fontSize: "0.74rem", color: MUTED, fontWeight: 700 }}>{label}</Typography>

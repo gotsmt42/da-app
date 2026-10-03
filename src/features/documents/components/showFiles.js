@@ -12,8 +12,6 @@ import API from "@/shared/api/axiosInstance";
 import {
   Box,
   Paper,
-  Tabs,
-  Tab,
   Grid,
   Checkbox,
   Chip,
@@ -48,21 +46,24 @@ import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
 import CalendarTodayOutlinedIcon from "@mui/icons-material/CalendarTodayOutlined";
 import InventoryOutlinedIcon from "@mui/icons-material/InventoryOutlined";
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
+import { PageHeader, PRIMARY_BTN_SX } from "@/shared/ui/PageKit";
 import { formatThai } from "@/shared/utils/thaiDate";
 
 // ---- Design tokens -------------------------------------------------------
+// ✅ ผู้ใช้สั่ง (3 ต.ค. 2569): "หน้าเอกสารยังไม่เข้าธีม" — เดิมใช้โทนเขียวหม่น/ครีมของตัวเอง ไม่เหมือนหน้าไหนในแอป
+//    เปลี่ยนเป็นชุดสีกลางของแอป (PageKit: เทา/ขาว + น้ำเงินเป็นสีเลือก)
 const COLOR = {
-  bg: "#F6F5F1",
+  bg: "#f8fafc",
   surface: "#FFFFFF",
-  ink: "#20242B",
-  sub: "#6C7278",
-  line: "#E7E4DC",
-  accent: "#3C6659", // deep teal — document/archive feel
-  accentSoft: "#E4ECE8",
-  accentDeep: "#2A4A40",
-  danger: "#B5453A",
-  dangerSoft: "#F5E6E3",
-  gold: "#B08B3F",
+  ink: "#0f172a",
+  sub: "#64748b",
+  line: "#e2e8f0",
+  accent: "#2563eb",
+  accentSoft: "#eff6ff",
+  accentDeep: "#1d4ed8",
+  danger: "#dc2626",
+  dangerSoft: "#fef2f2",
+  gold: "#94a3b8",
 };
 
 // ✅ ใช้ฟอนต์ชุดเดียวกับทั้งแอป (ตัวแปร --app-font ที่ตั้งไว้ใน src/index.css) — เดิมไฟล์นี้ประกาศ
@@ -362,39 +363,27 @@ const ShowFiles = () => {
   const allOnPageSelected = pagedData.length > 0 && pagedData.every((f) => isSelected(f._id));
 
   return (
-    <Box sx={{ fontFamily: FONT_UI, color: COLOR.ink }}>
-      {/* Section tabs */}
-      <Paper
-        variant="outlined"
-        sx={{ borderRadius: 3, mb: 2.5, overflow: "hidden", borderColor: COLOR.line }}
-      >
-        <Tabs
-          value={activeTab}
-          onChange={(_, v) => setActiveTab(v)}
-          variant="scrollable"
-          scrollButtons="auto"
-          TabIndicatorProps={{ style: { backgroundColor: COLOR.accent, height: 3 } }}
-          sx={{
-            px: 1,
-            "& .MuiTab-root": {
-              textTransform: "none",
-              fontWeight: 600,
-              minHeight: 54,
-              fontFamily: FONT_UI,
-              color: COLOR.sub,
-            },
-            "& .Mui-selected": { color: `${COLOR.accentDeep} !important` },
-          }}
-        >
-          {/* ✅ ย้าย "เอกสารประจำงาน" มาเป็นแท็บแรก (ใช้งานบ่อยกว่า "ไฟล์ทั่วไป") ตามที่ขอ */}
-          <Tab
-            icon={<Description sx={{ fontSize: 20 }} />}
-            iconPosition="start"
-            label="เอกสารประจำงาน"
-          />
-          <Tab icon={<FolderOpen sx={{ fontSize: 20 }} />} iconPosition="start" label="ไฟล์ทั่วไป" />
-        </Tabs>
-      </Paper>
+    <Box sx={{ fontFamily: FONT_UI, color: COLOR.ink, maxWidth: 1500, mx: "auto", p: { xs: 1.25, sm: 2 } }}>
+      {/* ── หัวหน้า + สลับ "เอกสารประจำงาน / ไฟล์ทั่วไป" แบบปุ่มคู่ (ชุดเดียวกับหน้าอื่นใน PageKit) ── */}
+      <PageHeader
+        icon={<FolderOpen />}
+        title="ไฟล์แนบของงาน"
+        subtitle={activeTab === 0 ? "Service Report · ใบเสนอราคา · ใบวางบิล · ใบส่งมอบงาน ที่แนบไว้กับงาน" : "ไฟล์ทั่วไปที่อัปโหลดเก็บไว้ในระบบ"}
+        actions={activeTab === 1 ? (
+          <Button component={Link} to="/fileupload" variant="contained" startIcon={<Add />}
+            sx={{ ...PRIMARY_BTN_SX, height: 40, display: { xs: "none", sm: "inline-flex" } }}>อัปโหลดไฟล์</Button>
+        ) : null}
+      />
+      <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0.5, p: 0.5, mb: 1.5, bgcolor: "#fff", border: `1px solid ${COLOR.line}`, borderRadius: 3, maxWidth: { sm: 420 } }}>
+        {[[0, "เอกสารประจำงาน", <Description key="i" sx={{ fontSize: 18 }} />], [1, "ไฟล์ทั่วไป", <FolderOpen key="i" sx={{ fontSize: 18 }} />]].map(([v, label, icon]) => (
+          <Button key={v} onClick={() => setActiveTab(v)} startIcon={icon}
+            sx={{
+              textTransform: "none", fontWeight: 800, borderRadius: 2.5, height: 38,
+              color: activeTab === v ? COLOR.accentDeep : COLOR.sub, bgcolor: activeTab === v ? COLOR.accentSoft : "transparent",
+              "&:hover": { bgcolor: activeTab === v ? COLOR.accentSoft : COLOR.bg },
+            }}>{label}</Button>
+        ))}
+      </Box>
 
       {activeTab === 0 ? (
         <ServiceReportFiles />
@@ -504,8 +493,9 @@ const ShowFiles = () => {
                   sx={{
                     fontFamily: FONT_UI,
                     fontWeight: 600,
-                    bgcolor: categorySearch === "" ? COLOR.accentDeep : COLOR.bg,
-                    color: categorySearch === "" ? "#fff" : COLOR.sub,
+                    bgcolor: categorySearch === "" ? COLOR.accentSoft : COLOR.bg,
+                    color: categorySearch === "" ? COLOR.accentDeep : COLOR.sub,
+                    border: categorySearch === "" ? "1px solid #bfdbfe" : "1px solid transparent",
                   }}
                 />
                 {uniqueCategory.slice(0, 10).map((cat) => (
@@ -793,7 +783,6 @@ const ShowFiles = () => {
                 shape="rounded"
                 sx={{
                   "& .MuiPaginationItem-root": { fontFamily: FONT_UI },
-                  "& .Mui-selected": { bgcolor: `${COLOR.accent} !important`, color: "#fff" },
                 }}
               />
             </Box>
