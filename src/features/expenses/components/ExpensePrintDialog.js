@@ -23,9 +23,10 @@ import {
   Alert, CircularProgress, useMediaQuery,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Close, Print, Share, Download, OpenInNew, PictureAsPdf, EditNote } from "@mui/icons-material";
+import { Close, Print, Share, Download, OpenInNew, PictureAsPdf, EditNote, MailOutline } from "@mui/icons-material";
 
 import { canShareFile } from "@/features/documents/components/DocumentPreviewDialog";
+import EmailDocumentDialog from "@/shared/components/EmailDocumentDialog";
 import {
   renderPdfToImages, revokePageImages, preparePagePrint, prefersImagePrint, isInAppBrowser,
 } from "@/shared/utils/pdfRaster";
@@ -59,6 +60,15 @@ export default function ExpensePrintDialog({ open, expense, blank, onClose }) {
   /** ชื่อเรียกฟอร์มเปล่าตามชนิดเอกสาร — ใช้ทั้งหัวกล่อง ชื่อไฟล์ และหัวข้อตอนสั่งพิมพ์ */
   const blankName = blank?.variant === "reimburse" ? "ฟอร์มใบเบิกค่าใช้จ่าย (สำรองจ่าย)" : "ฟอร์มใบเคลม";
   const meta = KIND_META[kind] || KIND_META.advance;
+  // ✅ ส่งทางอีเมล (ผู้ใช้สั่ง 3 ต.ค. 2569) — เฉพาะใบจริง ฟอร์มเปล่าไม่มีเหตุให้ส่ง
+  const [mailOpen, setMailOpen] = useState(false);
+  const email = expense ? {
+    docType: meta.docTitle || meta.label,
+    docNo: expense.docNo || "",
+    refId: String(expense._id || ""),
+    project: expense.subject || expense.job?.title || "",
+    audience: "internal",
+  } : null;
   // ⚠️ ใช้คีย์ข้อความแทน object — ฟอร์มแม่ re-render ทุกครั้งที่พิมพ์ ถ้าผูกกับ object ตรงๆ จะสร้าง PDF
   // (และขอรหัสฟอร์มใหม่จาก server) ซ้ำทุกตัวอักษรที่พิมพ์
   const jobKey = blank
@@ -293,6 +303,11 @@ export default function ExpensePrintDialog({ open, expense, blank, onClose }) {
         <Button onClick={handleShare} disabled={!pdf} startIcon={<Share sx={{ fontSize: 18 }} />} sx={{ textTransform: "none", fontWeight: 700 }}>
           แชร์
         </Button>
+        {email && (
+          <Button onClick={() => setMailOpen(true)} disabled={!pdf} startIcon={<MailOutline sx={{ fontSize: 18 }} />} sx={{ textTransform: "none", fontWeight: 700 }}>
+            อีเมล
+          </Button>
+        )}
         <Button
           variant="contained" onClick={handlePrint} disabled={!pdf || !printReady}
           startIcon={preparing ? <CircularProgress size={15} color="inherit" /> : <Print sx={{ fontSize: 18 }} />}
@@ -301,6 +316,7 @@ export default function ExpensePrintDialog({ open, expense, blank, onClose }) {
           {preparing ? "กำลังเตรียม..." : "พิมพ์"}
         </Button>
       </DialogActions>
+      {email && <EmailDocumentDialog {...email} open={mailOpen && Boolean(pdf)} onClose={() => setMailOpen(false)} attachment={pdf} />}
     </Dialog>
   );
 }

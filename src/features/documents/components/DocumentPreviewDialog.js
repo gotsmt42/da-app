@@ -21,8 +21,10 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
-  Close, ArrowBack, Download, Share, OpenInNew, CheckCircle, TaskAlt, ContentCopy,
+  Close, ArrowBack, Download, Share, OpenInNew, CheckCircle, TaskAlt, ContentCopy, MailOutline,
 } from "@mui/icons-material";
+
+import EmailDocumentDialog from "@/shared/components/EmailDocumentDialog";
 
 const BORDER_MAIN = "#e2e8f0";
 const TEXT_SUB = "#64748b";
@@ -48,9 +50,13 @@ const DocumentPreviewDialog = ({
   docNumber,        // เลขที่ที่กำลังแสดง (ตัวอย่าง หรือ เลขจริง)
   busy, error,
   onBack, onConfirm,
+  // ✅ ส่งทางอีเมล (ผู้ใช้สั่ง 3 ต.ค. 2569) — { docType, refId, defaultTo, recipientName, project, audience }
+  // ไม่ส่ง prop นี้ = ไม่มีปุ่มอีเมล · แสดงเฉพาะขั้น "ออกแล้ว" เหตุผลเดียวกับปุ่มดาวน์โหลด/แชร์ (ดูหัวไฟล์)
+  email,
 }) => {
   const isMobile = useMediaQuery("(max-width:600px)");
   const [shareState, setShareState] = useState(""); // "", "ok", "unsupported", "fail"
+  const [mailOpen, setMailOpen] = useState(false);
 
   // รีเซ็ตสถานะปุ่มแชร์ทุกครั้งที่ไฟล์เปลี่ยน (ออกเอกสารใหม่/กลับไปแก้แล้วดูตัวอย่างใหม่)
   useEffect(() => { setShareState(""); }, [preview?.url]);
@@ -198,6 +204,14 @@ const DocumentPreviewDialog = ({
             >
               ดาวน์โหลด
             </Button>
+            {email && (
+              <Button
+                onClick={() => setMailOpen(true)} disabled={!preview?.blob} startIcon={<MailOutline sx={{ fontSize: 18 }} />}
+                sx={{ textTransform: "none", fontWeight: 700 }}
+              >
+                ส่งอีเมล
+              </Button>
+            )}
             <Button
               variant="contained" onClick={handleShare} startIcon={<Share sx={{ fontSize: 18 }} />}
               sx={{
@@ -236,6 +250,14 @@ const DocumentPreviewDialog = ({
           </>
         )}
       </DialogActions>
+      {email && issued && (
+        <EmailDocumentDialog
+          open={mailOpen} onClose={() => setMailOpen(false)}
+          attachment={preview} docType={email.docType || title} docNo={docNumber}
+          refId={email.refId} defaultTo={email.defaultTo} recipientName={email.recipientName}
+          project={email.project} audience={email.audience} customerMatch={email.customerMatch}
+        />
+      )}
     </Dialog>
   );
 };

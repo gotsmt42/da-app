@@ -36,6 +36,7 @@ import {
 import moment from "moment";
 import { resolveJobFields, referencePresetsFor } from "../utils/deliveryNotePdf";
 import DocumentPreviewDialog from "./DocumentPreviewDialog";
+import MailService from "@/shared/services/MailService";
 import IssuedDocumentService from "@/shared/services/IssuedDocumentService";
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import SignatureService from "@/shared/services/SignatureService";
@@ -750,6 +751,14 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
         onBack={() => setPreviewOpen(false)}
         onConfirm={handleConfirm}
         onClose={issued ? closeAll : () => setPreviewOpen(false)}
+        email={{
+          docType: "ใบแจ้งเข้างาน",
+          refId: String(job?.id || job?._id || ""),
+          defaultTo: MailService.customerEmailFor(customerList, { company: form.customerCompany, site: form.site }, customer),
+          recipientName: form.attention,
+          project: form.site,
+          audience: "customer",
+        }}
       />
     </Dialog>
   );

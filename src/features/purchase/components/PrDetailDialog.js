@@ -698,6 +698,7 @@ export default function PrDetailDialog({ open, id, reloadKey = 0, notice, onClos
         badge={<Box component="span" sx={{ px: 0.9, height: 20, display: "inline-flex", alignItems: "center", borderRadius: 999, bgcolor: PR_ACCENT, color: "#fff", fontSize: "0.66rem", fontWeight: 900, letterSpacing: "0.06em" }}>PR</Box>}
         color={PR_ACCENT} dark={PR_DARK}
         shareText={r ? `ใบขอซื้อสินค้า ${r.docNo} · ${r.subject}` : ""}
+        email={r ? { docType: "ใบขอซื้อสินค้า", docNo: r.docNo, refId: String(r._id), project: r.subject, audience: "internal" } : undefined}
       />
     </>
   );

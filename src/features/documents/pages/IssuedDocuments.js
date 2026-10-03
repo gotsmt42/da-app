@@ -601,6 +601,16 @@ const IssuedDocuments = () => {
           docNumber={previewRow.docNumber}
           busy={previewBusy}
           onClose={() => { setPreviewRow(null); setPreview(null); }}
+          // ✅ ส่งเอกสารย้อนหลังทางอีเมลได้จากทะเบียน (ผู้ใช้สั่ง 3 ต.ค. 2569) — ผู้รับเติมเองหรือเลือกจากรายชื่อ
+          email={{
+            docType: DOC_TYPE_META[previewRow.docType]?.label || "เอกสาร",
+            refId: String(previewRow.eventId || previewRow._id || ""),
+            defaultTo: [],
+            customerMatch: { company: previewRow.customerCompany, site: previewRow.site },
+            recipientName: previewRow.formSnapshot?.attention || "",
+            project: previewRow.site || "",
+            audience: "customer",
+          }}
         />
       )}
 

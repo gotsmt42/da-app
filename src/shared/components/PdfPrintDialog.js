@@ -8,21 +8,24 @@
  *
  * @param {() => Promise<{blob: Blob, url: string, fileName: string, safeName: string}>} generate  สร้าง PDF (โหมด blob)
  * @param {string} jobKey   เปลี่ยนเมื่อเนื้อหาเปลี่ยน (สร้างใหม่) — อย่าผูกกับ object ที่สร้างใหม่ทุก render
+ * @param {object} [email]  ส่งทางอีเมล — props ของ EmailDocumentDialog (docType/docNo/refId/defaultTo/...) · ไม่ส่ง = ไม่มีปุ่ม
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, Box, Stack, Typography, IconButton, Alert, CircularProgress, useMediaQuery,
 } from "@mui/material";
-import { Close, Print, Share, Download, OpenInNew, PictureAsPdf } from "@mui/icons-material";
+import { Close, Print, Share, Download, OpenInNew, PictureAsPdf, MailOutline } from "@mui/icons-material";
 
 import { canShareFile } from "@/features/documents/components/DocumentPreviewDialog";
+import EmailDocumentDialog from "@/shared/components/EmailDocumentDialog";
 import { renderPdfToImages, revokePageImages, preparePagePrint, prefersImagePrint, isInAppBrowser } from "@/shared/utils/pdfRaster";
 
 const IN_APP_NOTICE = "เบราว์เซอร์ในแอป (เช่น LINE) สั่งพิมพ์ไม่ได้ — กดเมนู ⋮ เลือก \"เปิดในเบราว์เซอร์\" แล้วกดพิมพ์อีกครั้ง หรือใช้ปุ่มแชร์/ดาวน์โหลดแทน";
 const TEXT_SUB = "#64748b";
 const BORDER_MAIN = "#e2e8f0";
 
-export default function PdfPrintDialog({ open, onClose, generate, jobKey, title, subtitle, badge, color = "#334155", dark, shareText }) {
+export default function PdfPrintDialog({ open, onClose, generate, jobKey, title, subtitle, badge, color = "#334155", dark, shareText, email }) {
+  const [mailOpen, setMailOpen] = useState(false);
   const isMobile = useMediaQuery("(max-width:600px)");
   const imageMode = useMemo(() => prefersImagePrint(), []);
   const [pdf, setPdf] = useState(null);
@@ -166,12 +169,18 @@ export default function PdfPrintDialog({ open, onClose, generate, jobKey, title,
           sx={{ textTransform: "none", fontWeight: 700, color: TEXT_SUB, mr: "auto", display: { xs: "none", sm: "inline-flex" } }}>เปิดแท็บใหม่</Button>
         <Button onClick={handleDownload} disabled={!pdf} startIcon={<Download sx={{ fontSize: 18 }} />} sx={{ textTransform: "none", fontWeight: 700 }}>ดาวน์โหลด</Button>
         <Button onClick={handleShare} disabled={!pdf} startIcon={<Share sx={{ fontSize: 18 }} />} sx={{ textTransform: "none", fontWeight: 700 }}>แชร์</Button>
+        {email && (
+          <Button onClick={() => setMailOpen(true)} disabled={!pdf} startIcon={<MailOutline sx={{ fontSize: 18 }} />} sx={{ textTransform: "none", fontWeight: 700 }}>
+            อีเมล
+          </Button>
+        )}
         <Button variant="contained" onClick={handlePrint} disabled={!pdf || !printReady}
           startIcon={preparing ? <CircularProgress size={15} color="inherit" /> : <Print sx={{ fontSize: 18 }} />}
           sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", px: 2.25, bgcolor: color, "&:hover": { bgcolor: dark || color, boxShadow: "none" } }}>
           {preparing ? "กำลังเตรียม..." : "พิมพ์"}
         </Button>
       </DialogActions>
+      {email && <EmailDocumentDialog {...email} open={mailOpen && Boolean(pdf)} onClose={() => setMailOpen(false)} attachment={pdf} />}
     </Dialog>
   );
 }

@@ -30,6 +30,7 @@ import {
   ATTENTION_PRESETS, SIGNER_POSITION_PRESETS, subjectPresetsFor, referencePresetsFor,
 } from "../utils/deliveryNotePdf";
 import DocumentPreviewDialog from "./DocumentPreviewDialog";
+import MailService from "@/shared/services/MailService";
 import IssuedDocumentService from "@/shared/services/IssuedDocumentService";
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import SignatureService from "@/shared/services/SignatureService";
@@ -646,6 +647,14 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
         onBack={() => setPreviewOpen(false)}
         onConfirm={handleConfirm}
         onClose={issued ? closeAll : () => setPreviewOpen(false)}
+        email={{
+          docType: "ใบส่งมอบงาน",
+          refId: String(job?.id || job?._id || ""),
+          defaultTo: MailService.customerEmailFor(customerList, { company: form.customerCompany, site: form.site }, customer),
+          recipientName: form.attention,
+          project: form.site,
+          audience: "customer",
+        }}
       />
     </Dialog>
   );
