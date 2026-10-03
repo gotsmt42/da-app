@@ -10,11 +10,17 @@
  */
 import { Description, RequestQuote, ReceiptLong, AssignmentTurnedIn } from "@mui/icons-material";
 
+// ✅ (3 ต.ค. 2569) สีชุดเดียวกับหน้าแนบเอกสารของช่าง — ไม่ใช้แดง/ม่วง (ผู้ใช้: "สีแดงๆ ดูรก", "ไม่เอาสีม่วง")
+//    desc = คำอธิบายสั้นว่าเอกสารนี้คืออะไร ใช้ทำอะไรต่อ (แสดงในหน้าแอดมิน)
 export const JOB_DOC_TYPES = [
-  { key: "report", field: "reportFiles", label: "Service Report", color: "#3b82f6", Icon: Description },
-  { key: "quotation", field: "quotationFiles", label: "ใบเสนอราคา", color: "#ef4444", Icon: RequestQuote },
-  { key: "invoice", field: "invoiceFiles", label: "ใบวางบิล", color: "#f59e0b", Icon: ReceiptLong },
-  { key: "completion", field: "completionFiles", label: "ใบส่งมอบงาน", color: "#07941a", Icon: AssignmentTurnedIn },
+  { key: "report", field: "reportFiles", label: "Service Report", color: "#2563eb", Icon: Description,
+    desc: "ใบรายงานผลการเข้าปฏิบัติงานครั้งนี้ — ทุกงานต้องมีก่อนปิดงาน" },
+  { key: "quotation", field: "quotationFiles", label: "ใบเสนอราคา", color: "#d97706", Icon: RequestQuote,
+    desc: "เสนอราคางานเพิ่มเติม/อะไหล่ที่พบหน้างาน — ไฟล์ที่แนบจะไปอยู่ในหน้า “ติดตามใบเสนอราคา”" },
+  { key: "invoice", field: "invoiceFiles", label: "ใบวางบิล", color: "#0891b2", Icon: ReceiptLong,
+    desc: "ใบวางบิล/ใบแจ้งหนี้ที่วางให้ลูกค้าสำหรับงานครั้งนี้" },
+  { key: "completion", field: "completionFiles", label: "ใบส่งมอบงาน", color: "#059669", Icon: AssignmentTurnedIn,
+    desc: "ใบส่งมอบงานที่ลูกค้าเซ็นรับงานเรียบร้อยแล้ว" },
 ];
 
 /** map แบบ key → นิยาม สำหรับที่ที่รู้ key อยู่แล้ว (เช่นประวัติกิจกรรม) */

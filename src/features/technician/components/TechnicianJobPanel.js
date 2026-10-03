@@ -121,7 +121,7 @@ const isPMJob = (event) => (event?.title || "").trim().toUpperCase() === "PM";
 //   • Service Report — บังคับทุกงานเหมือนเดิม
 //   • ใบวางบิล / ใบส่งมอบงาน — บังคับเฉพาะงาน PM (งานอื่นยังเลือก "มี/ไม่มี" ได้ตามเดิม)
 //   • ใบเสนอราคา — ไม่บังคับทุกกรณี (มีงานเพิ่มเติมค่อยเสนอ)
-const isDocRequired = (event, type) => {
+export const isDocRequired = (event, type) => {
   if (type === "report") return true;
   if (type === "quotation") return false;
   return isPMJob(event); // invoice / completion
@@ -131,7 +131,7 @@ const isDocRequired = (event, type) => {
 //   • report: ต้องติ๊กยืนยัน "และ" มีไฟล์
 //   • เอกสารที่บังคับตามประเภทงาน (เช่น ใบวางบิลของงาน PM): ต้องมีไฟล์เท่านั้น ไม่มีทางเลือก "ไม่มี"
 //   • เอกสารที่ไม่บังคับ: ตอบ "ไม่มี" ก็เสร็จ / ตอบ "มี" ต้องแนบไฟล์อย่างน้อย 1 ไฟล์
-const isDocComplete = (event, type) => {
+export const isDocComplete = (event, type) => {
   const hasFiles = (event[`${type}Files`] || []).length > 0;
   // Service Report: บังคับต้องติ๊ก "และ" ต้องแนบไฟล์จริงอย่างน้อย 1 ไฟล์ ถึงจะถือว่าเสร็จ
   if (type === "report") return Boolean(event.documentSentReport) && hasFiles;
@@ -342,23 +342,19 @@ const DocumentFileList = ({ type, files, isUploading, uploadProgress, onFileUplo
           {/* ✅ ปุ่มแนบไฟล์แบบกล่องเส้นประ — บอกชนิดไฟล์ที่รับได้ในตัว ไม่ต้องเดา */}
           <Box component="button" type="button" onClick={() => fileRef.current?.click()}
             sx={{
-              width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 1.25,
-              py: fileList.length > 0 ? 1 : 1.5, px: 1.5, borderRadius: 2, cursor: "pointer", font: "inherit",
-              border: `1.5px dashed ${ACCENT_LINE}`, bgcolor: fileList.length > 0 ? "#fff" : ACCENT_SOFT, color: ACCENT,
-              transition: "background-color .15s, border-color .15s",
-              "&:hover": { bgcolor: ACCENT_SOFT, borderColor: ACCENT },
+              width: "100%", display: "flex", alignItems: "center", gap: 1, minHeight: 44,
+              px: 1.5, borderRadius: 2, cursor: "pointer", font: "inherit", textAlign: "left",
+              border: "1px dashed #cbd5e1", bgcolor: "#fff", color: INK_2,
+              transition: "background-color .15s, border-color .15s, color .15s",
+              "&:hover": { bgcolor: ACCENT_SOFT, borderColor: ACCENT_LINE, color: ACCENT },
             }}>
-            <CloudUpload sx={{ fontSize: 22 }} />
-            <Box sx={{ textAlign: "left" }}>
-              <Typography sx={{ fontSize: "0.85rem", fontWeight: 800, lineHeight: 1.3 }}>
-                {fileList.length > 0 ? "เพิ่มไฟล์อีก" : "แนบไฟล์"}
-              </Typography>
-              {fileList.length === 0 && (
-                <Typography sx={{ fontSize: "0.7rem", color: MUTED, lineHeight: 1.3 }}>
-                  PDF, รูปภาพ, Word, Excel · เลือกได้หลายไฟล์
-                </Typography>
-              )}
-            </Box>
+            <CloudUpload sx={{ fontSize: 19, color: "inherit", opacity: 0.8 }} />
+            <Typography component="span" sx={{ fontSize: "0.84rem", fontWeight: 700, color: "inherit" }}>
+              {fileList.length > 0 ? "เพิ่มไฟล์" : "แนบไฟล์"}
+            </Typography>
+            <Typography component="span" noWrap sx={{ fontSize: "0.7rem", color: FAINT, ml: "auto", minWidth: 0 }}>
+              PDF · รูป · Word · Excel
+            </Typography>
           </Box>
         </>
       )}
@@ -395,12 +391,12 @@ const DocumentChecklistItem = ({
   // ✅ ตอบ "ไม่มี" = ป้ายเทา "ไม่มีเอกสารนี้" ไม่ใช่ "ครบ" (ผู้ใช้: "ถ้าไม่มี ไม่ควรมีคำว่าครบ")
   const notApplicable = complete && applicable === false && !alwaysRequired && !requiredByJobType;
   const pill = notApplicable
-    ? { text: "ไม่มี", fg: MUTED, bg: SURFACE, bd: LINE }
+    ? { text: "ไม่มี", fg: MUTED, dot: "#cbd5e1" }
     : complete
-    ? { text: "แนบแล้ว", fg: "#15803d", bg: "#f0fdf4", bd: "#bbf7d0", icon: <CheckCircle sx={{ fontSize: 14 }} /> }
+    ? { text: "แนบแล้ว", fg: "#15803d", icon: <CheckCircle sx={{ fontSize: 15 }} /> }
     : pending === "รอเลือก"
-      ? { text: pending, fg: MUTED, bg: SURFACE, bd: LINE }
-      : { text: pending, fg: "#b45309", bg: "#fffbeb", bd: "#fde68a" };
+      ? { text: pending, fg: MUTED, dot: "#cbd5e1" }
+      : { text: pending, fg: "#b45309", dot: "#f59e0b" };
   const required = alwaysRequired || requiredByJobType;
   const fileList = (
     <DocumentFileList
@@ -417,7 +413,7 @@ const DocumentChecklistItem = ({
   return (
     <Box sx={{
       borderRadius: 2.5, bgcolor: "#fff", overflow: "hidden",
-      border: `1px solid ${complete && !notApplicable ? "#bbf7d0" : LINE}`,
+      border: `1px solid ${LINE}`,
       boxShadow: "0 1px 2px rgba(15,23,42,.04)",
       transition: "border-color .15s ease",
     }}>
@@ -426,7 +422,7 @@ const DocumentChecklistItem = ({
         <Box sx={{
           width: 36, height: 36, borderRadius: "10px", flexShrink: 0,
           display: "flex", alignItems: "center", justifyContent: "center",
-          bgcolor: alpha(color, 0.1), color,
+          bgcolor: "#f1f5f9", color: INK_2,
         }}>
           {icon}
         </Box>
@@ -448,9 +444,9 @@ const DocumentChecklistItem = ({
         </Box>
         <Box component="span" sx={{
           display: "inline-flex", alignItems: "center", gap: 0.4, flexShrink: 0, mt: 0.25,
-          height: 24, px: 1, borderRadius: 999, fontSize: "0.7rem", fontWeight: 800, whiteSpace: "nowrap",
-          color: pill.fg, bgcolor: pill.bg, border: `1px solid ${pill.bd}`,
+          height: 22, fontSize: "0.74rem", fontWeight: 700, whiteSpace: "nowrap", color: pill.fg,
         }}>
+          {!pill.icon && <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: pill.dot }} />}
           {pill.icon}{pill.text}
         </Box>
       </Stack>
@@ -458,9 +454,9 @@ const DocumentChecklistItem = ({
       <Box sx={{ px: 1.75, pb: 1.75 }}>
         {/* ✅ เหตุผลที่ช่องนี้ไม่มีตัวเลือก "ไม่มี" — บอกครั้งเดียวในกล่องเล็ก (เดิมเตือนซ้ำ 2 บรรทัดตัวส้มหนา) */}
         {requiredByJobType && (
-          <Stack direction="row" gap={0.75} alignItems="flex-start" sx={{ mb: 1, px: 1.25, py: 0.85, borderRadius: 2, bgcolor: "#fffbeb", border: "1px solid #fef3c7" }}>
-            <InfoOutlined sx={{ fontSize: 16, color: "#d97706", mt: 0.15 }} />
-            <Typography sx={{ fontSize: "0.74rem", color: "#92400e", lineHeight: 1.45 }}>
+          <Stack direction="row" gap={0.6} alignItems="flex-start" sx={{ mb: 1 }}>
+            <InfoOutlined sx={{ fontSize: 15, color: FAINT, mt: 0.2 }} />
+            <Typography sx={{ fontSize: "0.74rem", color: INK_2, lineHeight: 1.45 }}>
               งาน PM ต้องมีเอกสารนี้ทุกครั้ง — แนบไฟล์ก่อนจึงจะขอปิดงานได้
             </Typography>
           </Stack>
@@ -475,12 +471,12 @@ const DocumentChecklistItem = ({
               onClick={!isLocked ? () => onToggleCheck(type, !checked) : undefined}
               sx={{
                 mt: 1, px: 1.25, py: 0.9, borderRadius: 2, cursor: isLocked ? "default" : "pointer",
-                border: `1px solid ${checked ? ACCENT_LINE : LINE}`, bgcolor: checked ? ACCENT_SOFT : "#fff",
+                border: `1px solid ${LINE}`, bgcolor: "#fff",
                 opacity: isLocked ? 0.7 : 1,
               }}>
               {checked ? <CheckBox sx={{ fontSize: 22, color: ACCENT }} /> : <CheckBoxOutlineBlank sx={{ fontSize: 22, color: FAINT }} />}
               <Box sx={{ minWidth: 0 }}>
-                <Typography sx={{ fontSize: "0.82rem", fontWeight: 700, color: checked ? "#1d4ed8" : INK_2, lineHeight: 1.3 }}>
+                <Typography sx={{ fontSize: "0.82rem", fontWeight: 700, color: INK_2, lineHeight: 1.3 }}>
                   ยืนยันว่า Service Report ครบถ้วนแล้ว
                 </Typography>
                 {checked && !hasFiles && (

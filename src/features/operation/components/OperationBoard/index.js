@@ -60,6 +60,7 @@ import {
   TaskAlt, HourglassTop, Cancel,
   Send, Chat, Link as LinkIcon,
   Print, Share, RequestQuote, ReceiptLong, AssignmentTurnedIn, EventAvailable, Tune,
+  RemoveCircleOutline, NoteAlt,
 } from "@mui/icons-material";
 
 // MUI Date Picker
@@ -73,7 +74,8 @@ import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 // Styled
 import { styled, alpha } from "@mui/material/styles";
 
-import TechnicianJobCard from "@/features/technician/components/TechnicianJobPanel";
+import TechnicianJobCard, { isDocComplete, isDocRequired } from "@/features/technician/components/TechnicianJobPanel";
+import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LINE, SUCCESS } from "@/shared/ui/PageKit";
 import useEventNotifications from "@/shared/hooks/useEventNotifications";
 import NotificationBell from "@/features/notifications/components/NotificationBell";
 import LineIcon from "@/shared/ui/LineIcon";
@@ -154,20 +156,6 @@ export const StatCard = styled(GlassCard)(({ color }) => ({
 // ✅ จอเล็ก: เรียงแนวนอน (ไอคอน | ชื่อ+จำนวน) สูงแค่ ~62px — เห็นครบเหมือนเดิมแต่ประหยัดที่ราวครึ่งหนึ่ง
 // ✅ จอกว้าง: คงแบบเดิม (จัดกลาง 3 ชั้น) ซึ่งดูสมส่วนอยู่แล้วเมื่อวางเรียง 4 ใบในแถวเดียว
 // ✅ ตัวเลขจำนวนงานทำให้เด่นขึ้น (ตัวหนา+ใหญ่กว่าคำว่า "งาน") — เป็นข้อมูลที่คนมองการ์ดนี้ต้องการจริงๆ
-const UploadZone = styled(Box)(({ theme, dragging }) => ({
-  border: `2px dashed ${dragging ? theme.palette.primary.main : alpha(theme.palette.divider, 0.4)}`,
-  borderRadius: 12,
-  padding: theme.spacing(3),
-  textAlign: "center",
-  cursor: "pointer",
-  background: dragging ? alpha(theme.palette.primary.main, 0.04) : "transparent",
-  transition: "all 0.2s ease",
-  "&:hover": {
-    borderColor: theme.palette.primary.main,
-    background: alpha(theme.palette.primary.main, 0.02),
-  },
-}));
-
 // ✅ ป้ายสถานะ — พื้นเทาอ่อน ขอบบาง ตัวหนังสือเข้ม · สีสถานะอยู่ที่จุดเล็กหน้าข้อความ (กฎออกแบบ: สีไม่เยอะ)
 const StatusBadge = styled(Box)(({ color }) => ({
   display: "inline-flex",
@@ -723,7 +711,7 @@ const ActivityLogMini = ({ logs = [] }) => {
 // "ภาพรวมงาน" ต้องใช้ชุดเดียวกันด้วย (ถ้าก๊อปไว้คนละที่ วันหนึ่งจะเปลี่ยนสีไม่ครบแล้วผู้ใช้เห็นคนละสี
 // ระหว่าง 2 หน้าโดยไม่มีอะไรฟ้อง)
 const DOC_TYPE_META = Object.fromEntries(
-  JOB_DOC_TYPES.map((t) => [t.key, { icon: t.Icon, color: t.color }])
+  JOB_DOC_TYPES.map((t) => [t.key, { icon: t.Icon, color: t.color, desc: t.desc }])
 );
 
 // ✅ perf: แยกแถวไฟล์ออกมาเป็นคอมโพเนนต์ของตัวเอง + React.memo — เดิมแถวไฟล์ทั้งหมดอยู่ใน .map()
@@ -735,20 +723,24 @@ const DOC_TYPE_META = Object.fromEntries(
 // memo จะไม่มีผลอะไรเลยเพราะ props เปลี่ยนทุกครั้งอยู่ดี
 const FileRow = React.memo(
   ({ file: f, onPreview, onOpenMenu }) => (
-    <Stack direction="row" alignItems="center" gap={0.5} sx={{
-      p: 1.25, borderRadius: 2, border: "1px solid", borderColor: "divider",
-      background: t => alpha(t.palette.success.main, 0.04),
+    <Stack direction="row" alignItems="center" gap={1} sx={{
+      pl: 1.25, pr: 0.5, py: 0.5, borderRadius: 2, bgcolor: "#fff", border: `1px solid ${LINE}`,
     }}>
       {fileTypeIcon(f.fileName)}
       <Box flex={1} minWidth={0} onClick={() => onPreview(f.fileUrl, f.fileName)} sx={{ cursor: "pointer" }}>
-        <Typography variant="caption" fontWeight={600} noWrap sx={{ fontSize: "0.8rem", display: "block" }}>{f.fileName}</Typography>
+        <Typography noWrap title={f.fileName} sx={{ fontSize: "0.82rem", fontWeight: 600, color: INK_2 }}>{f.fileName}</Typography>
+        {(f.uploadedBy || f.uploadedAt) && (
+          <Typography noWrap sx={{ fontSize: "0.68rem", color: FAINT }}>
+            {[f.uploadedBy, f.uploadedAt ? moment(f.uploadedAt).locale("th").format("D MMM HH:mm") : ""].filter(Boolean).join(" · ")}
+          </Typography>
+        )}
       </Box>
       <Tooltip title="ดูไฟล์">
-        <IconButton onClick={() => onPreview(f.fileUrl, f.fileName)} sx={{ p: 1 }}><Visibility sx={{ fontSize: 20 }} /></IconButton>
+        <IconButton onClick={() => onPreview(f.fileUrl, f.fileName)} sx={{ p: 0.9, color: MUTED }}><Visibility sx={{ fontSize: 18 }} /></IconButton>
       </Tooltip>
-      <Tooltip title="เพิ่มเติม">
-        <IconButton onClick={e => onOpenMenu(e.currentTarget, f)} sx={{ p: 1 }}>
-          <MoreVert sx={{ fontSize: 20 }} />
+      <Tooltip title="ดาวน์โหลด/พิมพ์/แชร์/ลบ">
+        <IconButton onClick={e => onOpenMenu(e.currentTarget, f)} sx={{ p: 0.9, color: MUTED }}>
+          <MoreVert sx={{ fontSize: 18 }} />
         </IconButton>
       </Tooltip>
     </Stack>
@@ -761,10 +753,16 @@ const FileRow = React.memo(
     prev.onOpenMenu === next.onOpenMenu,
 );
 
+/**
+ * ✅ (3 ต.ค. 2569) ผู้ใช้: "หน้าของแอดมินด้วย ให้สอดคล้อง ดูง่าย รายละเอียดครบถ้วน มืออาชีพ"
+ *    card=true → การ์ดขาวแบบเดียวกับหน้าแนบเอกสารของช่าง: ไอคอน · ชื่อ + ป้ายบังคับ/ถ้ามี · คำอธิบาย · ป้ายสถานะ
+ *    event (ถ้าส่งมา) ใช้ตัดสินว่าบังคับไหม (งาน PM) และสถานะครบหรือยัง — ตรรกะเดียวกับฝั่งช่าง (isDocComplete)
+ */
 export const FileUploadSection = ({
   eventId, type, label, files, applicable,
   onUpload, onDelete, onPreview,
   uploading, progress, uploading_size, currentUser,
+  card = false, event = null,
 }) => {
   const [dragging, setDragging] = useState(false);
   const inputRef = React.useRef();
@@ -797,31 +795,62 @@ export const FileUploadSection = ({
   const meta = DOC_TYPE_META[type] || { icon: Description, color: "#6b7280" };
   const TypeIcon = meta.icon;
 
+  // ✅ ป้ายสถานะ 1 ป้าย — แอดมินเห็นทันทีว่าช่องนี้ช่างทำแล้ว/ยังขาด/ระบุว่าไม่มี
+  const required = event ? isDocRequired(event, type) : type === "report";
+  const reportUnconfirmed = type === "report" && event && hasFiles && !event.documentSentReport;
+  const pill = hasFiles
+    ? (reportUnconfirmed
+        ? { text: "ช่างยังไม่ยืนยัน", fg: "#b45309", dot: "#f59e0b" }
+        : { text: `แนบแล้ว ${fileList.length} ไฟล์`, fg: "#15803d", icon: true })
+    : applicable === false && !required
+      ? { text: "ไม่มี", fg: MUTED, dot: "#cbd5e1" }
+      : required || applicable === true
+        ? { text: "ยังไม่แนบ", fg: "#b45309", dot: "#f59e0b" }
+        : { text: "รอช่างตอบ", fg: MUTED, dot: "#cbd5e1" };
+
   return (
-    <Box>
-      <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1.25 }}>
+    <Box sx={card ? {
+      borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}`,
+      boxShadow: "0 1px 2px rgba(15,23,42,.04)", px: 1.75, pt: 1.5, pb: 1.75,
+    } : undefined}>
+      <Stack direction="row" alignItems="flex-start" gap={1.25} sx={{ mb: 1.25 }}>
         <Box sx={{
-          width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
+          width: card ? 36 : 30, height: card ? 36 : 30, borderRadius: "10px", flexShrink: 0,
           display: "flex", alignItems: "center", justifyContent: "center",
-          bgcolor: alpha(meta.color, 0.12), color: meta.color,
+          bgcolor: "#f1f5f9", color: INK_2,
         }}>
-          <TypeIcon sx={{ fontSize: 16 }} />
+          <TypeIcon sx={{ fontSize: card ? 19 : 17 }} />
         </Box>
-        <Typography variant="subtitle2" fontWeight={800} sx={{ flex: 1, minWidth: 0 }} noWrap>
-          {label}
-        </Typography>
-        {hasFiles && (
-          <Chip label={fileList.length} size="small" sx={{
-            height: 20, minWidth: 20, fontWeight: 700, fontSize: "0.7rem",
-            bgcolor: alpha(meta.color, 0.15), color: meta.color,
-          }} />
-        )}
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap">
+            <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", color: INK, lineHeight: 1.3 }}>{label}</Typography>
+            {card && (
+              <Box component="span" sx={{
+                fontSize: "0.64rem", fontWeight: 800, px: 0.75, py: 0.1, borderRadius: 1,
+                color: required ? INK_2 : MUTED, bgcolor: required ? "#f1f5f9" : "transparent",
+                border: required ? "none" : `1px solid ${LINE}`,
+              }}>
+                {required ? (type === "report" ? "บังคับ" : "บังคับงาน PM") : "ถ้ามี"}
+              </Box>
+            )}
+          </Stack>
+          {card && meta.desc && (
+            <Typography sx={{ fontSize: "0.76rem", color: MUTED, lineHeight: 1.45, mt: 0.25 }}>{meta.desc}</Typography>
+          )}
+        </Box>
+        <Box component="span" sx={{
+          display: "inline-flex", alignItems: "center", gap: 0.4, flexShrink: 0, mt: 0.25,
+          height: 22, fontSize: "0.74rem", fontWeight: 700, whiteSpace: "nowrap", color: pill.fg,
+        }}>
+          {!pill.icon && <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: pill.dot }} />}
+          {pill.icon && <CheckCircle sx={{ fontSize: 15 }} />}{pill.text}
+        </Box>
       </Stack>
 
       {/* ✅ ถ้ามีไฟล์เยอะ (เช่น 6+ ไฟล์) จำกัดความสูงแล้วเลื่อนดูแทน ไม่ให้รายการยาวจนดันเนื้อหา
           ส่วนอื่นไปไกล ทำให้หน้าดูไม่เป็นระบบเวลาไฟล์เยอะ */}
       {hasFiles && (
-        <Stack spacing={0.75} sx={{ mb: uploading || canEdit ? 1 : 0, maxHeight: 260, overflowY: "auto", pr: 0.5 }}>
+        <Stack spacing={0.75} sx={{ mb: uploading || canEdit ? 1 : 0, maxHeight: 260, overflowY: "auto" }}>
           {fileList.map(f => (
             <FileRow key={f._id || f.fileUrl} file={f} onPreview={onPreview} onOpenMenu={handleOpenFileMenu} />
           ))}
@@ -884,48 +913,54 @@ export const FileUploadSection = ({
           <Typography variant="caption" color="text.secondary">{progress}%</Typography>
         </Box>
       ) : notApplicable ? (
-        <Box sx={{
-          p: 1.5, borderRadius: 2, border: "1px dashed", borderColor: alpha("#6b7280", 0.4),
-          textAlign: "center", bgcolor: alpha("#6b7280", 0.05),
-        }}>
-          <Stack direction="row" alignItems="center" justifyContent="center" gap={0.5}>
-            <Close sx={{ fontSize: 16, color: "text.disabled" }} />
-            <Typography variant="caption" color="text.secondary" fontWeight={600}>
-              ไม่มีเอกสารนี้ (ช่างระบุไว้)
-            </Typography>
-          </Stack>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}
+          sx={{ px: 1.25, py: 0.75, borderRadius: 2, bgcolor: SURFACE }}>
+          <Typography sx={{ fontSize: "0.8rem", color: INK_2, display: "inline-flex", alignItems: "center", gap: 0.6 }}>
+            <RemoveCircleOutline sx={{ fontSize: 16, color: FAINT }} />
+            ช่างระบุว่างานนี้ไม่มี{label}
+          </Typography>
           {canEdit && (
             <>
               <input ref={overrideInputRef} type="file" hidden multiple
                 onChange={e => { if (e.target.files?.length) onUpload(e.target.files, eventId, type); }} />
               <Button size="small" onClick={() => overrideInputRef.current?.click()}
-                sx={{ textTransform: "none", fontSize: "0.72rem", mt: 0.5, minHeight: 32 }}>
-                มีไฟล์จริง? แนบที่นี่
+                sx={{ textTransform: "none", fontSize: "0.76rem", fontWeight: 700, color: ACCENT, flexShrink: 0, minWidth: "auto" }}>
+                แนบไฟล์แทน
               </Button>
             </>
           )}
-        </Box>
+        </Stack>
       ) : canEdit ? (
-        <UploadZone
-          dragging={dragging ? 1 : 0}
+        /* ✅ กล่องแนบไฟล์แบบเดียวกับฝั่งช่าง — กดหรือลากไฟล์มาวาง บอกชนิดไฟล์ที่รับในตัว */
+        <Box
+          role="button"
           onDragOver={e => { e.preventDefault(); setDragging(true); }}
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
           onClick={() => inputRef.current?.click()}
           sx={{
-            minHeight: hasFiles ? 48 : 76, display: "flex", flexDirection: "column",
-            alignItems: "center", justifyContent: "center", py: hasFiles ? 1 : undefined,
+            display: "flex", alignItems: "center", gap: 1, minHeight: 44, px: 1.5, borderRadius: 2, cursor: "pointer",
+            border: `1px dashed ${dragging ? ACCENT : "#cbd5e1"}`,
+            bgcolor: dragging ? ACCENT_SOFT : "#fff", color: dragging ? ACCENT : INK_2,
+            transition: "background-color .15s, border-color .15s, color .15s",
+            "&:hover": { bgcolor: ACCENT_SOFT, borderColor: ACCENT_LINE, color: ACCENT },
           }}>
           <input ref={inputRef} type="file" hidden multiple
             onChange={e => { if (e.target.files?.length) onUpload(e.target.files, eventId, type); }} />
-          {!hasFiles && <CloudUpload sx={{ color: "text.disabled", mb: 0.5, fontSize: 26 }} />}
-          <Typography variant="caption" color="text.secondary">
-            {hasFiles ? "+ เพิ่มไฟล์อีก" : "แตะเพื่อเลือกไฟล์ (เลือกได้หลายไฟล์) หรือลากมาวาง"}
+          <CloudUpload sx={{ fontSize: 19, opacity: 0.8 }} />
+          <Typography component="span" sx={{ fontSize: "0.84rem", fontWeight: 700, color: "inherit" }}>
+            {dragging ? "ปล่อยไฟล์ที่นี่" : hasFiles ? "เพิ่มไฟล์" : "แนบไฟล์"}
           </Typography>
-        </UploadZone>
+          <Typography component="span" noWrap sx={{ fontSize: "0.7rem", color: FAINT, ml: "auto", minWidth: 0, display: { xs: "none", sm: "inline" } }}>
+            กดเลือก หรือลากไฟล์มาวาง · PDF · รูป · Word · Excel
+          </Typography>
+          <Typography component="span" noWrap sx={{ fontSize: "0.7rem", color: FAINT, ml: "auto", minWidth: 0, display: { xs: "inline", sm: "none" } }}>
+            PDF · รูป · Word · Excel
+          </Typography>
+        </Box>
       ) : !hasFiles ? (
-        <Box sx={{ p: 1.5, borderRadius: 2, border: "1px dashed", borderColor: "divider", textAlign: "center" }}>
-          <Typography variant="caption" color="text.disabled">ไม่มีไฟล์</Typography>
+        <Box sx={{ px: 1.25, py: 1, borderRadius: 2, bgcolor: SURFACE }}>
+          <Typography sx={{ fontSize: "0.8rem", color: MUTED }}>ยังไม่มีไฟล์</Typography>
         </Box>
       ) : null}
     </Box>
@@ -1178,22 +1213,34 @@ const EventRowCard = ({
   // พอช่องไหนมีไฟล์เยอะ (เช่น Service Report 6 ไฟล์) จะสูงกว่าอีกฝั่งมาก ทำให้เห็นพื้นที่ว่างเปล่า
   // ข้างๆ เยอะผิดปกติ ดูไม่เป็นระบบ — เปลี่ยนเป็นคอลัมน์เดียวเรียงลงมาทั้งหมด (xs={12} เสมอ) แทน
   // ไม่มีปัญหาคอลัมน์สูงไม่เท่ากันให้กวนตาอีก (เทียบเหตุผลเดียวกับที่แก้การ์ดงานกรุ๊ปก่อนหน้านี้)
+  const docDone = JOB_DOC_TYPES.filter((t) => isDocComplete(event, t.key)).length;
+  const sectionLabel = (icon, text, extra) => (
+    <Stack direction="row" alignItems="center" gap={0.75} sx={{ mb: 1 }}>
+      {icon}
+      <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: INK_2, flex: 1 }}>{text}</Typography>
+      {extra}
+    </Stack>
+  );
   const expandedContent = (
-    <Grid container spacing={2}>
+    <Grid container spacing={1.25}>
       {event.workNote && (
-        <Grid item xs={12}>
-          <Typography variant="caption" fontWeight={700} color="text.secondary"
-            sx={{ textTransform: "uppercase", letterSpacing: 0.5, display: "block", mb: 0.5 }}>
-            สรุปงานที่ทำ (ช่าง)
-          </Typography>
-          <Box sx={{
-            p: 1.5, borderRadius: 2, border: "1px solid",
-            borderColor: alpha("#3b82f6", 0.25), background: alpha("#3b82f6", 0.04),
-          }}>
-            <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: "pre-line", lineHeight: 1.7 }}>
+        <Grid item xs={12} sx={{ mb: 0.75 }}>
+          {sectionLabel(<NoteAlt sx={{ fontSize: 17, color: MUTED }} />, "สรุปงานที่ทำ (จากช่าง)")}
+          <Box sx={{ px: 1.75, py: 1.25, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}` }}>
+            <Typography sx={{ fontSize: "0.84rem", color: INK_2, whiteSpace: "pre-line", lineHeight: 1.65 }}>
               {event.workNote}
             </Typography>
           </Box>
+        </Grid>
+      )}
+
+      {(!hideDocuments || showDocsOverride) && (
+        <Grid item xs={12} sx={{ mb: -0.25 }}>
+          {sectionLabel(<Description sx={{ fontSize: 17, color: MUTED }} />, "เอกสารประจำงาน", (
+            <Typography sx={{ fontSize: "0.76rem", fontWeight: 800, color: docDone === JOB_DOC_TYPES.length ? "#15803d" : MUTED }}>
+              {docDone}/{JOB_DOC_TYPES.length} รายการ{docDone === JOB_DOC_TYPES.length ? " · พร้อมปิดงาน" : ""}
+            </Typography>
+          ))}
         </Grid>
       )}
 
@@ -1209,6 +1256,7 @@ const EventRowCard = ({
       {(!hideDocuments || showDocsOverride) && (
         <Grid item xs={12}>
         <FileUploadSection
+          card event={event}
           eventId={event._id} type="report" label="Service Report"
           files={event.reportFiles}
           onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
@@ -1222,6 +1270,7 @@ const EventRowCard = ({
       {(!hideDocuments || showDocsOverride) && (
       <Grid item xs={12}>
         <FileUploadSection
+          card event={event}
           eventId={event._id} type="quotation" label="ใบเสนอราคา"
           files={event.quotationFiles}
           applicable={event.quotationApplicable}
@@ -1237,6 +1286,7 @@ const EventRowCard = ({
       {(!hideDocuments || showDocsOverride) && (
        <Grid item xs={12}>
         <FileUploadSection
+          card event={event}
           eventId={event._id} type="invoice" label="ใบวางบิล"
           files={event.invoiceFiles}
           applicable={event.invoiceApplicable}
@@ -1252,6 +1302,7 @@ const EventRowCard = ({
       {(!hideDocuments || showDocsOverride) && (
        <Grid item xs={12}>
         <FileUploadSection
+          card event={event}
           eventId={event._id} type="completion" label="ใบส่งมอบงาน"
           files={event.completionFiles}
           applicable={event.completionApplicable}
@@ -1265,19 +1316,18 @@ const EventRowCard = ({
       )}
 
       {/* คุยกับช่าง (เช่น ตอบคำขอใบเสนอราคา) */}
-      <Grid item xs={12}>
-        <Divider sx={{ mb: 1.5 }} />
-        <Typography variant="caption" fontWeight={700} color="text.secondary"
-          sx={{ textTransform: "uppercase", letterSpacing: 0.5, display: "flex", alignItems: "center", gap: 0.5, mb: 1 }}>
-          <Chat sx={{ fontSize: 14 }} /> คุยกับช่าง{(event.comments || []).length > 0 && ` (${event.comments.length})`}
-        </Typography>
-        <CommentThread comments={event.comments} onSend={handleSendComment} myRole={currentUser} />
+      <Grid item xs={12} sx={{ mt: 1 }}>
+        {sectionLabel(<Chat sx={{ fontSize: 17, color: MUTED }} />, `คุยกับช่าง${(event.comments || []).length > 0 ? ` (${event.comments.length})` : ""}`)}
+        <Box sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}` }}>
+          <CommentThread comments={event.comments} onSend={handleSendComment} myRole={currentUser} />
+        </Box>
       </Grid>
 
       {event.activityLog?.length > 0 && (
         <Grid item xs={12}>
-          <Divider sx={{ mb: 1.5 }} />
-          <ActivityLogMini logs={event.activityLog} />
+          <Box sx={{ px: 1.5, py: 0.75, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}` }}>
+            <ActivityLogMini logs={event.activityLog} />
+          </Box>
         </Grid>
       )}
     </Grid>
@@ -1815,38 +1865,49 @@ const EventRowCard = ({
           </Box>
         </Collapse>
       ) : (
-      <Dialog open={expanded} onClose={() => setExpanded(false)} fullWidth maxWidth="md" fullScreen={!isDesktop}>
-          <DialogTitle sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}>
-            <Box sx={{ minWidth: 0 }}>
-              {/* ✅ สลับตำแหน่ง: ประเภทงานขึ้นเป็นหัวข้อหลัก (ไม่ใส่ label "ประเภท" เพราะเป็นหัวข้อ
-                  อยู่แล้วเหมือนที่โครงการเคยอยู่ตำแหน่งนี้), โครงการย้ายลงไปอยู่แถวข้อมูลแทน */}
-              <Typography fontWeight={800} fontSize="1rem" noWrap>
-                {event.title || "ไม่ระบุประเภทงาน"}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                เอกสาร/คุยกับช่าง/ประวัติ
-              </Typography>
-              {(event.company || event.site || event.system || event.time) && (
-                <Stack direction="row" gap={2} flexWrap="wrap" sx={{ mt: 0.5 }}>
-                  <InfoLine label="โครงการ">{companySite(event.company, event.site)}</InfoLine>
+      <Dialog open={expanded} onClose={() => setExpanded(false)} fullWidth maxWidth="md" fullScreen={!isDesktop}
+        PaperProps={{ sx: { borderRadius: { xs: 0, sm: 3 } } }}>
+          {/* ✅ หัวกระชับแบบเดียวกับฝั่งช่าง: ประเภทงาน · โครงการ/ระบบ/ครั้งที่ บรรทัดเดียว · ผู้ติดต่อ · สถานะ+วันที่ */}
+          <Box sx={{ px: { xs: 2, sm: 2.5 }, pt: 2, pb: 1.5, borderBottom: `1px solid ${LINE}` }}>
+            <Stack direction="row" alignItems="flex-start" gap={1}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: MUTED, letterSpacing: 0.2 }}>
+                  รายละเอียดงาน
+                </Typography>
+                <Typography noWrap sx={{ fontWeight: 800, fontSize: "1.05rem", color: INK, lineHeight: 1.35 }}>
+                  {event.title || "ไม่ระบุประเภทงาน"}
+                </Typography>
+                {(() => {
+                  const place = [companySite(event.company, event.site), event.system,
+                    event.time ? `ครั้งที่ ${formatRoundLabel(event.time, event.visitCount)}` : ""].filter(Boolean).join(" · ");
+                  return place ? <Typography sx={{ fontSize: "0.82rem", color: INK_2, mt: 0.25 }}>{place}</Typography> : null;
+                })()}
+                <Stack direction="row" alignItems="center" gap={1.25} flexWrap="wrap" sx={{ mt: 0.75 }}>
+                  <Box component="span" sx={{
+                    display: "inline-flex", alignItems: "center", gap: 0.6, height: 24, px: 1, borderRadius: 999,
+                    bgcolor: SURFACE, border: `1px solid ${LINE}`, color: INK_2, fontSize: "0.72rem", fontWeight: 700, whiteSpace: "nowrap",
+                  }}>
+                    <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: OP_COLOR[event.status] || FAINT }} />
+                    {event.status || "ไม่ระบุสถานะ"}
+                  </Box>
+                  <Typography sx={{ fontSize: "0.76rem", color: MUTED, fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 0.4 }}>
+                    <CalendarMonth sx={{ fontSize: 14, color: FAINT }} />{formatEventDateRange(event)}
+                  </Typography>
                   {(event.contactName || event.contactTel) && (
-                    <InfoLine label="ผู้ติดต่อ">
-                      <Stack direction="row" gap={0.75} alignItems="center" flexWrap="wrap">
-                        {event.contactName && <span>{event.contactName}</span>}
-                        {event.contactTel && <TelLink tel={event.contactTel} />}
-                      </Stack>
-                    </InfoLine>
+                    <Stack direction="row" alignItems="center" gap={0.6} sx={{ fontSize: "0.78rem", color: INK_2 }}>
+                      <Person sx={{ fontSize: 15, color: FAINT }} />
+                      {event.contactName && <span>{event.contactName}</span>}
+                      {event.contactTel && <TelLink tel={event.contactTel} />}
+                    </Stack>
                   )}
-                  {event.system && <InfoLine label="ระบบ">{event.system}</InfoLine>}
-                  {event.time && <InfoLine label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount)}</InfoLine>}
                 </Stack>
-              )}
-            </Box>
-            <IconButton size="small" onClick={() => setExpanded(false)}>
-              <Close fontSize="small" />
-            </IconButton>
-          </DialogTitle>
-          <DialogContent dividers>
+              </Box>
+              <IconButton size="small" onClick={() => setExpanded(false)} aria-label="ปิด" sx={{ color: MUTED, mr: -0.5 }}>
+                <Close fontSize="small" />
+              </IconButton>
+            </Stack>
+          </Box>
+          <DialogContent sx={{ bgcolor: SURFACE, px: { xs: 1.5, sm: 2.5 }, py: 2 }}>
             {expandedContent}
           </DialogContent>
         </Dialog>

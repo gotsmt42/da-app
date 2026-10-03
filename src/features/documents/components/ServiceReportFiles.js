@@ -39,10 +39,10 @@ const IS_MOBILE = isMobileDevice();
 
 // ─── Doc-type color scheme (ตรงกับ FileUploadSection ในหน้า Operation) ─────
 const DOC_TYPE_COLOR = {
-  report: "#3b82f6",
-  quotation: "#ef4444",
-  invoice: "#f59e0b",
-  completion: "#07941a",
+  report: "#2563eb",
+  quotation: "#d97706",
+  invoice: "#0891b2",
+  completion: "#059669",
 };
 
 const DOC_TYPE_ICON = {
