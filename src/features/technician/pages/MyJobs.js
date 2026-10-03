@@ -11,6 +11,7 @@
  *    Operation ฝั่งแอดมิน)
  */
 
+import MultiDayGroupHeader, { multiDayCardSx } from "@/shared/ui/MultiDayGroup";
 import { useEffect, useMemo, useState, useCallback, useRef, cloneElement } from "react";
 import PdfBlobView from "@/shared/components/PdfBlobView";
 import useRealtime from "@/shared/realtime/useRealtime";
@@ -26,11 +27,9 @@ import {
   Tooltip, Button, Snackbar, Alert, LinearProgress, Collapse,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { formatThai } from "@/shared/utils/thaiDate";
 import {
   Search, Clear, Refresh, WorkOutline, HourglassTop, TaskAlt, Warning,
   Download, Close, PictureAsPdf, FolderOpen, Image, Article, InsertDriveFile, AttachFile,
-  CalendarMonth, ExpandMore, ExpandLess,
 } from "@mui/icons-material";
 
 // ─── file-type helpers (เหมือนกับที่ใช้ใน Operation/ServiceReportFiles) ───
@@ -184,73 +183,11 @@ const JobGroupCard = ({ sessions, ...cardProps }) => {
   if (!isGrouped) return renderCard(sessions[0]);
 
   const head = sessions[0];
-  const sortedByStart = sessions.slice().sort((a, b) => new Date(a.start) - new Date(b.start));
-  const latestEndSession = sessions.reduce((latest, s) =>
-    new Date(s.end || s.start) > new Date(latest.end || latest.start) ? s : latest
-  );
-  const rangeStart = moment(sortedByStart[0].start).locale("th").format("DD MMM");
-  const rangeEnd = formatThai(
-    moment(latestEndSession.end || latestEndSession.start)
-      .subtract(latestEndSession.allDay ? 1 : 0, "days"),
-    "DD MMM YYYY",
-  );
-
-  // ✅ นับ "จำนวนวันเข้างานจริง" รวมทุกวันในแต่ละช่วง ไม่ใช่แค่จำนวนช่วง/แถวที่ลงไว้
-  const dayEnd = (s) => moment(s.end || s.start).subtract(s.allDay ? 1 : 0, "days").startOf("day");
-  const totalWorkDays = sessions.reduce((sum, s) => {
-    const days = dayEnd(s).diff(moment(s.start).startOf("day"), "days") + 1;
-    return sum + Math.max(days, 1);
-  }, 0);
-
-  // ✅ เปลี่ยนจากม่วง (#8b5cf6) เป็นสีธีมแอพ (แดง) ให้ตรงกับธีมสีของทั้งแอพ
+  // ✅ หัวการ์ดงานหลายช่วงวัน — ตัวกลางชุดเดียวกับหน้าการดำเนินงาน (shared/ui/MultiDayGroup)
   return (
-    <Box sx={{
-      // ✅ โทนเรียบ (ขาว/เทา) ชุดเดียวกับทั้งแอป — เดิมขอบ/หัวแดงทั้งการ์ด ดูเหมือนแจ้งเตือน
-      borderRadius: 4, border: "1px solid #e2e8f0",
-      bgcolor: "background.paper", overflow: "hidden",
-      boxShadow: "0 1px 2px rgba(15,23,42,.04)",
-    }}>
-      <Box
-        onClick={() => setExpanded((p) => !p)}
-        sx={{
-          p: 2, cursor: "pointer", background: "#f8fafc",
-          borderBottom: expanded ? "1px solid #e2e8f0" : "none",
-        }}>
-        <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
-          <CalendarMonth sx={{ fontSize: 18, color: "#64748b" }} />
-          <Typography variant="body2" fontWeight={800} color="#0f172a">
-            {head.company && head.site ? `${head.company} · ${head.site}` : (head.company || head.site)}
-            {head.title && ` — ${head.title}`}{head.system && ` · ${head.system}`}
-          </Typography>
-          <Chip label={`เข้างาน ${totalWorkDays} วัน`} size="small"
-            sx={{ height: 20, fontSize: "0.68rem", fontWeight: 800, bgcolor: "#eff6ff", color: "#1d4ed8" }} />
-          <Typography variant="caption" color="text.secondary">📅 {rangeStart} – {rangeEnd}</Typography>
-          <IconButton size="small" sx={{ ml: "auto" }} onClick={(e) => { e.stopPropagation(); setExpanded((p) => !p); }}>
-            {expanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
-          </IconButton>
-        </Stack>
-        <Stack direction="row" gap={0.5} flexWrap="wrap" sx={{ mt: 0.75 }}>
-          {sortedByStart.map((s) => {
-            const sStart = moment(s.start);
-            const sEnd = dayEnd(s);
-            const chipLabel = sStart.isSame(sEnd, "day")
-              ? sStart.locale("th").format("DD MMM")
-              : `${sStart.locale("th").format("DD")}-${sEnd.locale("th").format("DD MMM")}`;
-            return (
-              <Chip key={s._id} label={chipLabel} size="small"
-                variant={s._id === anchorId ? "filled" : "outlined"}
-                sx={{
-                  height: 20, fontSize: "0.68rem", borderColor: "#e2e8f0",
-                  bgcolor: s._id === anchorId ? "#eff6ff" : "#fff",
-                  color: s._id === anchorId ? "#1d4ed8" : "#475569", fontWeight: s._id === anchorId ? 800 : 500,
-                }} />
-            );
-          })}
-        </Stack>
-        <Typography variant="caption" color="text.disabled" sx={{ display: "block", mt: 0.5 }}>
-          📄 เอกสารประจำงาน/ขอปิดงาน ใช้ร่วมกันที่วันที่ {moment(head.start).locale("th").format("DD MMM")} (วันล่าสุด)
-        </Typography>
-      </Box>
+    <Box sx={multiDayCardSx(STATUS_DOT[head.status] || "#94a3b8")}>
+      <MultiDayGroupHeader sessions={sessions} anchorId={anchorId} expanded={expanded} onToggle={() => setExpanded((p) => !p)}
+        title={`${head.company && head.site ? `${head.company} · ${head.site}` : (head.company || head.site || "")}${head.title ? ` — ${head.title}` : ""}${head.system ? ` · ${head.system}` : ""}`} />
       <Collapse in={expanded}>
         {sessions.map((event, i) => (
           <Box key={event._id}>
@@ -262,6 +199,9 @@ const JobGroupCard = ({ sessions, ...cardProps }) => {
     </Box>
   );
 };
+
+/** สีสถานะงาน (แถบซ้ายการ์ดกลุ่ม) — ชุดเดียวกับหน้าการดำเนินงาน */
+const STATUS_DOT = { กำลังรอยืนยัน: "#f59e0b", ยืนยันแล้ว: "#3b82f6", กำลังดำเนินการ: "#8b5cf6", ดำเนินการเสร็จสิ้น: "#10b981" };
 
 // ─── กลุ่มสถานะแท็บ ───
 const GROUPS = [

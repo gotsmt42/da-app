@@ -11,6 +11,7 @@
  *      เพื่อให้ผลอนุมัติ/ไม่อนุมัติ render กลับไปหาช่างแบบ realtime โดยไม่ต้องรีเฟรชเอง
  */
 
+import MultiDayGroupHeader, { multiDayCardSx } from "@/shared/ui/MultiDayGroup";
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import PdfBlobView from "@/shared/components/PdfBlobView";
 import useRealtime from "@/shared/realtime/useRealtime";
@@ -51,7 +52,7 @@ import {
   Search, FilterList, Clear, TableChart, ChevronRight, ViewList,
   Upload, Download, Delete, Visibility, Close, CheckCircle,
   PendingActions, Build, Assignment, Notifications, MoreVert,
-  CalendarMonth, Warning, TrendingUp, Description,
+  CalendarMonth, Warning, TrendingUp, Description, DateRange,
   CloudUpload, InsertDriveFile, Image, PictureAsPdf, Article,
   Refresh, ArrowUpward, ArrowDownward, Circle, ExpandMore,
   ExpandLess, FolderOpen, AttachFile, Login, Logout, Edit,
@@ -2337,54 +2338,11 @@ const JobGroupBlock = ({ sessions, currentUser, ...cardProps }) => {
 
   // ✅ รวมงานทั้งกลุ่ม (หัวข้อ + ทุกวัน) ไว้ใน GlassCard ใบเดียวกันเลย (ไม่ใช่การ์ดแยกคนละใบ)
   // แต่ละวันคั่นด้วย Divider แทน — เพื่อให้เห็นชัดว่าเป็น "งานเดียวกัน" จริงๆ ไม่ใช่แค่จัดกลุ่มแยกกันไว้
-  // ✅ เปลี่ยนจากม่วง (#8b5cf6) เป็นสีธีมแอพ (แดง) ให้ตรงกับธีมสีของทั้งแอพ
+  // ✅ หัวการ์ดงานหลายช่วงวัน — ตัวกลางชุดเดียวกับหน้างานของฉัน (shared/ui/MultiDayGroup)
   return (
-    <GlassCard sx={{ mb: 2, border: "1px solid", borderColor: alpha("#dc2626", 0.3) }}>
-      <Box
-        onClick={() => setExpanded(p => !p)}
-        sx={{
-          p: 2, cursor: "pointer", background: alpha("#dc2626", 0.04),
-          borderBottom: expanded ? "1px solid" : "none", borderColor: alpha("#dc2626", 0.2),
-        }}>
-        <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
-          <CalendarMonth sx={{ fontSize: 18, color: "#dc2626" }} />
-          <Typography variant="body2" fontWeight={700} color="#dc2626">
-            {companySite(head.company, head.site)} — {head.title}{head.system && ` · ${head.system}`}{head.time && ` ครั้งที่ ${formatRoundLabel(head.time, head.visitCount)}`}
-          </Typography>
-          <Chip label={`เข้างาน ${totalWorkDays} วัน`} size="small"
-            sx={{ height: 20, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha("#dc2626", 0.15), color: "#dc2626" }} />
-          <Typography variant="caption" color="text.secondary">
-            <CalendarMonth sx={{ fontSize: 13, mr: 0.5, verticalAlign: "-2px" }} />
-            {rangeStart} – {rangeEnd}
-          </Typography>
-          <IconButton size="small" sx={{ ml: "auto" }} onClick={(e) => { e.stopPropagation(); setExpanded(p => !p); }}>
-            {expanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
-          </IconButton>
-        </Stack>
-        <Stack direction="row" gap={0.5} flexWrap="wrap" sx={{ mt: 0.75 }}>
-          {sortedByStart.map(s => {
-            const sStart = moment(s.start);
-            const sEnd = dayEnd(s);
-            const chipLabel = sStart.isSame(sEnd, "day")
-              ? sStart.locale("th").format("DD MMM")
-              : `${sStart.locale("th").format("DD")}-${sEnd.locale("th").format("DD MMM")}`;
-            return (
-            <Chip key={s._id} label={chipLabel} size="small"
-              variant={s._id === anchorId ? "filled" : "outlined"}
-              sx={{
-                height: 20, fontSize: "0.68rem",
-                borderColor: alpha("#dc2626", 0.35),
-                bgcolor: s._id === anchorId ? alpha("#dc2626", 0.2) : "transparent",
-                color: "#dc2626", fontWeight: s._id === anchorId ? 700 : 400,
-              }} />
-            );
-          })}
-        </Stack>
-        <Typography variant="caption" color="text.disabled" sx={{ display: "block", mt: 0.5 }}>
-          <Description sx={{ fontSize: 13, mr: 0.5, verticalAlign: "-2px" }} />
-          เอกสารประจำงาน/ขอปิดงาน ใช้ร่วมกันที่การ์ดวันที่ {moment(head.start).locale("th").format("DD MMM")} (วันล่าสุด)
-        </Typography>
-      </Box>
+    <GlassCard sx={multiDayCardSx(OP_COLOR[head.status] || "#94a3b8")}>
+      <MultiDayGroupHeader sessions={sessions} anchorId={anchorId} expanded={expanded} onToggle={() => setExpanded((p) => !p)}
+        title={`${companySite(head.company, head.site)} — ${head.title || ""}${head.system ? ` · ${head.system}` : ""}${head.time ? ` ครั้งที่ ${formatRoundLabel(head.time, head.visitCount)}` : ""}`} />
 
       <Collapse in={expanded}>
         {sessions.map((event, i) => (
