@@ -29,6 +29,15 @@ const SessionService = {
   async revoke(sid) {
     return (await API.delete(`/auth/sessions/${encodeURIComponent(sid)}`)).data;
   },
+  /** ส่งรุ่นเครื่องจริง (Client Hints) ให้ server อัปเดตอุปกรณ์นี้ — เรียกครั้งเดียวต่อการเปิดแอป ไม่สนผล */
+  async reportDevice() {
+    try {
+      if (sessionStorage.getItem("tt-device-reported")) return;
+      sessionStorage.setItem("tt-device-reported", "1");
+    } catch { /* sessionStorage ใช้ไม่ได้ — ส่งทุกครั้งก็ได้ */ }
+    const device = await getDeviceHints();
+    return API.post("/auth/sessions/device", { device }).catch(() => {});
+  },
   async revokeOthers() {
     return (await API.post("/auth/sessions/revoke-others")).data;
   },

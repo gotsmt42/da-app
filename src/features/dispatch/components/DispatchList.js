@@ -17,9 +17,10 @@ import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import {
   Box, Stack, Typography, IconButton, Tooltip, TextField,
-  CircularProgress, Alert, useMediaQuery, Button,
+  Alert, useMediaQuery, Button,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
 } from "@mui/material";
+import PageLoader from "@/shared/ui/PageLoader";
 import { alpha } from "@mui/material/styles";
 import {
   Refresh, Search, Bolt, Schedule, Inbox, Description, Place,
@@ -471,7 +472,7 @@ export default function DispatchList({ mode = "board", myId = "" }) {
     .sort((a, b) => new Date(b.job.start) - new Date(a.job.start));
 
   if (loading && !rows.length) {
-    return <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}><CircularProgress /></Box>;
+    return <PageLoader variant="inline" label="กำลังโหลดรายการ…" />;
   }
 
   if (mode === "board") {

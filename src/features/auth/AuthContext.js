@@ -156,6 +156,12 @@ const updateUserData = (newData) => {
     reloadPermissions();
   }, [isLoggedIn, reloadPermissions]);
 
+  // ✅ ส่งรุ่นเครื่องจริงให้รายการ "อุปกรณ์ที่เข้าสู่ระบบ" (ครั้งเดียวต่อการเปิดแอป) — เครื่องที่ล็อกอินไว้ก่อน
+  //    มีระบบนี้จะได้ชื่อรุ่นถูกด้วย (เช่น Galaxy S25 Ultra แทน "Android 10")
+  useEffect(() => {
+    if (isLoggedIn) SessionService.reportDevice();
+  }, [isLoggedIn]);
+
   // ✅ ผู้ดูแลปรับสิทธิ์จากเครื่องไหนก็ตาม → เมนูของทุกคนที่เปิดอยู่เปลี่ยนตามทันที
   useRealtime("settings", () => { reloadPermissions(); }, { enabled: Boolean(isLoggedIn) });
 

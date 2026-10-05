@@ -15,6 +15,7 @@ import {
   Box, Stack, Typography, Avatar, IconButton, Tooltip, Button, CircularProgress, Dialog, DialogTitle,
   DialogContent, DialogActions, TextField, Snackbar, Alert,
 } from "@mui/material";
+import PageLoader from "@/shared/ui/PageLoader";
 import {
   PhotoCamera, Edit, EmailOutlined, PhoneOutlined, AlternateEmail, ContentCopy, Check, BadgeOutlined,
   WorkOutline, ApartmentOutlined, AdminPanelSettingsOutlined, CheckCircle, RemoveCircleOutline,
@@ -177,7 +178,7 @@ export default function Account() {
   };
 
   if (!user) {
-    return <Box sx={{ py: 10, display: "flex", justifyContent: "center" }}><CircularProgress size={30} /></Box>;
+    return <PageLoader label="กำลังโหลดบัญชี…" />;
   }
 
   const fullName = [user.fname, user.lname].filter(Boolean).join(" ") || user.username;

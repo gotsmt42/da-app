@@ -22,14 +22,26 @@ import {
 import { useAuth } from "@/features/auth/AuthContext";
 import SessionService from "@/shared/services/SessionService";
 import { formatThai } from "@/shared/utils/thaiDate";
+import { marketingName } from "@/shared/utils/deviceNames";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LINE, SUCCESS } from "@/shared/ui/PageKit";
 
 const RED = "#dc2626";
 
-/** ชื่ออุปกรณ์ที่อ่านแล้วเข้าใจ */
+/**
+ * ⚠️ Chrome บน Android ส่ง UA แบบลดข้อมูล "Android 10; K" ทุกเครื่อง (ผู้ใช้: "เข้าด้วย S25 Ultra แต่ขึ้น Android 10")
+ *    — ถ้าไม่มีรุ่นเครื่อง/เลขเวอร์ชันจาก Client Hints เลข 10 นั้นเชื่อไม่ได้ จึงไม่แสดง
+ */
+const osLabel = (s) => {
+  const ver = s.os === "Android" && s.osVersion === "10" && !s.deviceModel ? "" : s.osVersion;
+  return [s.os, ver].filter(Boolean).join(" ");
+};
+
+/** ชื่ออุปกรณ์ที่อ่านแล้วเข้าใจ — รุ่นที่รู้จักใช้ชื่อทางการค้า (SM-S938B → Samsung Galaxy S25 Ultra) */
 export const deviceTitle = (s) => {
+  const known = marketingName(s.deviceVendor, s.deviceModel);
+  if (known) return known;
   const model = [s.deviceVendor, s.deviceModel].filter(Boolean).join(" ").replace(/^Apple (iPhone|iPad)/, "$1");
-  const osName = [s.os, s.osVersion].filter(Boolean).join(" ");
+  const osName = osLabel(s);
   if (model) return model;
   if (s.deviceType === "desktop" && osName) return `คอมพิวเตอร์ ${osName}`;
   if (osName) return `${s.deviceType === "tablet" ? "แท็บเล็ต" : "มือถือ"} ${osName}`;
@@ -64,11 +76,12 @@ const Meta = ({ icon, children }) => (
 
 const DeviceRow = ({ s, onRevoke }) => {
   const browser = [s.browser, s.browserVersion?.split(".")[0]].filter(Boolean).join(" ");
-  const osName = [s.os, s.osVersion].filter(Boolean).join(" ");
+  const osName = osLabel(s);
   const title = deviceTitle(s);
+  const code = marketingName(s.deviceVendor, s.deviceModel) ? s.deviceModel : "";
   const place = placeOf(s.location);
   const active = isActive(s);
-  const sub = [browser, osName && title !== `คอมพิวเตอร์ ${osName}` ? osName : ""].filter(Boolean).join(" · ") || "ไม่ทราบเบราว์เซอร์";
+  const sub = [browser, osName && !title.endsWith(osName) ? osName : "", code].filter(Boolean).join(" · ") || "ไม่ทราบเบราว์เซอร์";
   const revokeBtn = onRevoke && (
     <Button size="small" variant="outlined" onClick={onRevoke}
       sx={{ flexShrink: 0, textTransform: "none", fontWeight: 700, borderRadius: 2, color: RED, borderColor: "#fecaca", "&:hover": { borderColor: RED, bgcolor: "#fef2f2" } }}>

@@ -18,6 +18,7 @@ import {
   IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button, MenuItem, Select, Avatar,
   Switch, ButtonBase, useMediaQuery,
 } from "@mui/material";
+import PageLoader from "@/shared/ui/PageLoader";
 import { alpha } from "@mui/material/styles";
 import { AdminPanelSettings, Lock, InfoOutlined, Edit, Badge as BadgeIcon, Save, CheckCircle, RemoveCircleOutline } from "@mui/icons-material";
 
@@ -251,7 +252,7 @@ export default function RolePermissions() {
     }
   };
 
-  if (loading) return <Box sx={{ p: 4, textAlign: "center" }}><CircularProgress size={28} /></Box>;
+  if (loading) return <PageLoader label="กำลังโหลดสิทธิ์…" />;
 
   /** สิ่งที่แต่ละ Role ทำได้ — ตรงกับ config/roles.js ฝั่ง server (manageAll / manageSystem / SYSTEM_GRANTS) */
   const ROLE_DETAIL = {
