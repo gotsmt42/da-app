@@ -16,6 +16,7 @@ import { Navigate } from "react-router-dom";
 import {
   Box, Stack, Typography, Checkbox, Alert, Snackbar, CircularProgress, Tooltip, Chip, Tabs, Tab,
   IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button, MenuItem, Select, Avatar,
+  Switch, ButtonBase, useMediaQuery,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { AdminPanelSettings, Lock, InfoOutlined, Edit, Badge as BadgeIcon, Save } from "@mui/icons-material";
@@ -28,7 +29,7 @@ import AuthService from "@/shared/services/authService";
 import useRealtime from "@/shared/realtime/useRealtime";
 import { systemRoleOf, SYSTEM_ROLE_LABEL, rankLabel, titleOf } from "@/shared/utils/roles";
 
-const ACCENT = "#7c3aed";
+const ACCENT = "#2563eb"; // ✅ น้ำเงินตามธีมแอป (ผู้ใช้: "ไม่เอาสีม่วง")
 const SYS_ACCENT = "#0f766e";
 const TEXT_SUB = "#64748b";
 const BORDER = "#e2e8f0";
@@ -165,6 +166,10 @@ export default function RolePermissions() {
   const [rename, setRename] = useState(null);     // { rank, label }
   const [tierChange, setTierChange] = useState(null); // { user, systemRole } — เปลี่ยน Role ของผู้ใช้รายคน
   const [confirmError, setConfirmError] = useState("");
+  // ✅ (5 ต.ค. 2569) ผู้ใช้: "หน้ามือถือมันเพี้ยน ไม่สมบูรณ์" — ตาราง 7 คอลัมน์บีบไม่ลงจอมือถือ
+  //    มือถือ: เลือก Rank ทีละตำแหน่ง แล้วเห็นรายการสิทธิ์พร้อมสวิตช์ (อ่านเต็มบรรทัด กดง่าย)
+  const isMobile = useMediaQuery("(max-width:900px)");
+  const [mobileRank, setMobileRank] = useState("");
 
   const load = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
@@ -347,6 +352,85 @@ export default function RolePermissions() {
             ติ๊กแล้วบันทึกทันที · ส่วนสิทธิ์ดูแลระบบอยู่ที่แท็บ Role
           </Alert>
 
+          {isMobile ? (() => {
+            const cur = ranks.find((r) => r.rank === mobileRank) || ranks.find((r) => !r.locked) || ranks[0];
+            if (!cur) return null;
+            return (
+              <>
+                {/* ── เลือก Rank ── */}
+                <Typography sx={{ fontSize: "0.78rem", fontWeight: 800, color: TEXT_SUB, mb: 0.75, px: 0.25 }}>เลือกตำแหน่งที่จะตั้งสิทธิ์</Typography>
+                <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0.75, mb: 1.5 }}>
+                  {ranks.map((r) => {
+                    const on = r.rank === cur.rank;
+                    const count = (data?.capabilities || []).filter((c) => r.locked || isOn(r.rank, c)).length;
+                    return (
+                      <ButtonBase key={r.rank} onClick={() => setMobileRank(r.rank)} sx={{
+                        justifyContent: "space-between", gap: 0.75, px: 1.25, py: 1, borderRadius: 2.5, fontFamily: "inherit", textAlign: "left",
+                        border: "1px solid", borderColor: on ? ACCENT : BORDER, bgcolor: on ? alpha(ACCENT, 0.06) : "#fff",
+                        boxShadow: on ? `inset 0 0 0 1px ${ACCENT}` : "none",
+                      }}>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography noWrap sx={{ fontSize: "0.84rem", fontWeight: 800, color: on ? ACCENT : "#0f172a" }}>{r.label}</Typography>
+                          <Typography sx={{ fontSize: "0.68rem", color: TEXT_SUB }}>{r.locked ? "สิทธิ์เต็ม" : `${count} สิทธิ์`}</Typography>
+                        </Box>
+                        {r.locked && <Lock sx={{ fontSize: 15, color: TEXT_SUB }} />}
+                      </ButtonBase>
+                    );
+                  })}
+                </Box>
+
+                {/* ── หัวของ Rank ที่เลือก ── */}
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1, px: 1.5, py: 1.1, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${BORDER}` }}>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography sx={{ fontSize: "0.7rem", fontWeight: 700, color: TEXT_SUB }}>กำลังตั้งสิทธิ์ของ</Typography>
+                    <Typography noWrap sx={{ fontWeight: 900, fontSize: "1rem", color: "#0f172a" }}>{cur.label}</Typography>
+                  </Box>
+                  <Button size="small" startIcon={<Edit sx={{ fontSize: 16 }} />} onClick={() => setRename({ rank: cur.rank, label: cur.label })}
+                    sx={{ textTransform: "none", fontWeight: 700, color: ACCENT, flexShrink: 0 }}>
+                    เปลี่ยนชื่อ
+                  </Button>
+                </Stack>
+                {cur.locked && (
+                  <Alert severity="info" icon={<Lock />} sx={{ mb: 1 }}>{cur.label}มีสิทธิ์เต็มเสมอ แก้ไม่ได้</Alert>
+                )}
+
+                {/* ── รายการสิทธิ์ ── */}
+                {GROUPS.map((group) => {
+                  const items = group.items.filter(([cap]) => (data?.capabilities || []).includes(cap));
+                  if (!items.length) return null;
+                  return (
+                    <Box key={group.title} sx={{ mb: 1.25, bgcolor: "#fff", border: `1px solid ${BORDER}`, borderRadius: 2.5, overflow: "hidden" }}>
+                      <Typography sx={{ px: 1.5, py: 0.9, fontWeight: 900, fontSize: "0.8rem", color: ACCENT, bgcolor: alpha(ACCENT, 0.05), borderBottom: `1px solid ${BORDER}` }}>
+                        {group.title}
+                      </Typography>
+                      {items.map(([cap, label, hint, scope], i) => {
+                        const busy = saving === `${cur.rank}:${cap}`;
+                        const checked = cur.locked ? true : isOn(cur.rank, cap);
+                        return (
+                          <Stack key={cap} direction="row" alignItems="flex-start" spacing={1}
+                            sx={{ px: 1.5, py: 1.1, borderTop: i ? `1px solid ${BORDER}` : 0 }}>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <Typography sx={{ fontSize: "0.86rem", fontWeight: 700, color: "#0f172a", lineHeight: 1.4 }}>{label}</Typography>
+                              <Chip size="small" label={scope === "ui" ? "เมนู/หน้า" : "บังคับจริง"}
+                                sx={{ mt: 0.4, height: 17, fontSize: "0.6rem", fontWeight: 800,
+                                  bgcolor: scope === "ui" ? alpha("#64748b", 0.12) : alpha("#0f766e", 0.12),
+                                  color: scope === "ui" ? "#475569" : "#0f766e" }} />
+                              {hint && <Typography sx={{ fontSize: "0.74rem", color: TEXT_SUB, mt: 0.4, lineHeight: 1.45 }}>{hint}</Typography>}
+                            </Box>
+                            <Switch
+                              checked={checked} disabled={cur.locked || busy}
+                              onChange={(e) => toggle(cur.rank, cap, e.target.checked)}
+                              sx={{ flexShrink: 0, mt: -0.5, "& .MuiSwitch-switchBase.Mui-checked": { color: ACCENT }, "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: ACCENT } }}
+                            />
+                          </Stack>
+                        );
+                      })}
+                    </Box>
+                  );
+                })}
+              </>
+            );
+          })() : (
           <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER}`, borderRadius: 2.5, overflow: "hidden" }}>
             <Box sx={{ overflowX: "auto" }}>
               <Box component="table" sx={{ borderCollapse: "collapse", width: "100%", minWidth: 780 }}>
@@ -389,8 +473,8 @@ export default function RolePermissions() {
                     ...group.items
                       .filter(([cap]) => (data?.capabilities || []).includes(cap))
                       .map(([cap, label, hint, scope]) => (
-                        <Box component="tr" key={cap} sx={{ "&:hover": { bgcolor: "#f8fafc" } }}>
-                          <Box component="td" sx={{ position: "sticky", left: 0, zIndex: 1, bgcolor: "inherit", p: 1.25, borderBottom: `1px solid ${BORDER}` }}>
+                        <Box component="tr" key={cap} sx={{ "&:hover > td": { bgcolor: "#f8fafc" } }}>
+                          <Box component="td" sx={{ position: "sticky", left: 0, zIndex: 1, bgcolor: "#fff", p: 1.25, borderBottom: `1px solid ${BORDER}`, boxShadow: `1px 0 0 ${BORDER}` }}>
                             <Stack direction="row" alignItems="flex-start" spacing={0.5}>
                               <Typography sx={{ fontSize: "0.86rem", fontWeight: 700 }}>{label}</Typography>
                               {/* ✅ บอกความจริงว่าสิทธิ์นี้บังคับลึกแค่ไหน — อย่าให้ผู้ดูแลเข้าใจว่ากันได้มากกว่าความจริง */}
@@ -436,6 +520,8 @@ export default function RolePermissions() {
             </Box>
           </Box>
 
+          )}
+
           <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", mt: 1.25 }}>
             ⚠️ การซ่อนเมนูเป็นเพียงการจัดหน้าจอ — ระบบยังตรวจสิทธิ์ซ้ำที่เซิร์ฟเวอร์ทุกครั้งที่บันทึกข้อมูลจริง ·
             คุณกำลังใช้ Rank: {ranks.find((r) => r.rank === myRole)?.label || rankLabel(myRole)} · Role: {SYSTEM_ROLE_LABEL[systemRoleOf(userData)]}
@@ -462,7 +548,7 @@ export default function RolePermissions() {
           <Button onClick={() => setRename(null)} sx={{ textTransform: "none", color: TEXT_SUB }}>ยกเลิก</Button>
           <Button
             variant="contained" onClick={saveRename} disabled={saving.startsWith("name:")}
-            sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: ACCENT, "&:hover": { bgcolor: "#6d28d9", boxShadow: "none" } }}
+            sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: ACCENT, "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } }}
           >
             บันทึกชื่อ
           </Button>
