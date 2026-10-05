@@ -1782,17 +1782,28 @@ function EventCalendar() {
 
   // ✅ ทิศทางกลับกัน: เลื่อนเดือนจากปุ่ม ‹ › ของแผงงานล่วงหน้าเอง ก็ต้องพาปฏิทินจริงตามไปเดือน
   // เดียวกันด้วย (handleDatesSet ด้านบนจะ sync draftMonth ให้ตรงกันเองอัตโนมัติหลังจากนี้)
+  // 🐛 ที่แก้ (5 ต.ค. 2569 ผู้ใช้: "ค้นหาชื่อที่ไม่มีในตาราง แถบนี้จะหายไป"): เดิมใช้ IntersectionObserver
+  //    เฝ้าแถบหัวปฏิทินตัวเดิม — กรองแล้วปฏิทินเตี้ยลง/วาดหัวใหม่ แถบลอยเลยหายกลางคันทั้งที่ยังเลือกช่างค้างอยู่
+  //    ✅ ตอนนี้วัดตำแหน่งแถบหัว "ตัวปัจจุบัน" ทุกครั้งที่เลื่อน/ย่อจอ/ข้อมูลเปลี่ยน
+  //    และถ้ากำลังกรองตามช่างอยู่ ให้แถบลอยแสดงค้างไว้เสมอ (จะได้เปลี่ยนคน/กลับเป็นช่างทุกคนได้)
   useEffect(() => {
-    let io = null;
-    let tries = 0;
-    const attach = () => {
-      const el = document.querySelector("#content-id .fc-header-toolbar");
-      if (!el) { if (tries++ < 40) setTimeout(attach, 250); return; }
-      io = new IntersectionObserver(([en]) => setToolbarOffscreen(!en.isIntersecting && en.boundingClientRect.top < 0), { threshold: 0 });
-      io.observe(el);
+    let raf = 0;
+    const check = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const el = document.querySelector("#content-id .fc-header-toolbar");
+        setToolbarOffscreen(Boolean(el) && el.getBoundingClientRect().bottom < 0);
+      });
     };
-    attach();
-    return () => io?.disconnect();
+    check();
+    window.addEventListener("scroll", check, { passive: true, capture: true });
+    window.addEventListener("resize", check);
+    const t = setInterval(check, 1500); // กันกรณีความสูงหน้าเปลี่ยนโดยไม่มีการเลื่อน
+    return () => {
+      cancelAnimationFrame(raf); clearInterval(t);
+      window.removeEventListener("scroll", check, { capture: true });
+      window.removeEventListener("resize", check);
+    };
   }, []);
 
   const handleDraftMonthChange = useCallback((newMonth) => {
@@ -4230,7 +4241,7 @@ function EventCalendar() {
       )}
 
       {/* ── แถบเปลี่ยนเดือนลอย — ล่างกลางจอ เหนือแถบเมนูมือถือ ── */}
-      <div className={`ec-month-float${toolbarOffscreen && calTitle ? " is-on" : ""}`} aria-hidden={!toolbarOffscreen}>
+      <div className={`ec-month-float${(toolbarOffscreen || selectedTechnician) && calTitle ? " is-on" : ""}`} aria-hidden={!(toolbarOffscreen || selectedTechnician)}>
         <button type="button" aria-label="เดือนก่อน" onClick={() => calendarRef.current?.getApi()?.prev()}>‹</button>
         <button type="button" className="ec-month-float-title" title="กลับขึ้นบนสุด"
           onClick={() => document.querySelector("#content-id")?.scrollIntoView({ behavior: "smooth", block: "start" })}>
