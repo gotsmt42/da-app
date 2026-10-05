@@ -63,45 +63,85 @@ const SignaturePad = forwardRef(function SignaturePad({ height = 190, onChange, 
     return { x: (e.clientX - rect.left) * scale, y: (e.clientY - rect.top) * scale, t: performance.now() };
   };
 
+  /** จุดกึ่งกลางเส้นล่าสุด + ความหนาเส้นล่าสุด — ใช้ต่อเส้นโค้งแบบไม่ขาดช่วง */
+  const lastMid = useRef(null);
+  const lastWidth = useRef(0);
+
+  const strokeStyle = (ctx, width) => {
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = width;
+  };
+
   const start = (e) => {
     if (disabled) return;
     e.currentTarget.setPointerCapture?.(e.pointerId);
     const canvas = canvasRef.current;
     history.current = [...history.current.slice(-9), canvas.toDataURL("image/png")];
     drawing.current = true;
-    last.current = pointOf(e);
+    const p = pointOf(e);
+    last.current = p;
+    lastMid.current = p;
+    lastWidth.current = canvas.width / 260;
     // จุดเดียว (แตะแล้วปล่อย) ต้องมีหมึกติดด้วย — คนเซ็นจุดท้ายชื่อบ่อย
     const ctx = ctxOf();
     ctx.beginPath();
-    ctx.arc(last.current.x, last.current.y, 1.6 * (canvas.width / 900), 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, lastWidth.current / 2, 0, Math.PI * 2);
     ctx.fillStyle = INK;
     ctx.fill();
   };
 
-  const move = (e) => {
-    if (!drawing.current) return;
+  /**
+   * 🐛 ที่แก้ (5 ต.ค. 2569 ผู้ใช้: "ลายเซ็นเป็นเส้นประ ไม่สวย"): เดิมแต่ละช่วงวาดแค่ "จุดก่อนหน้า → จุดกึ่งกลาง"
+   *    แล้วช่วงถัดไปเริ่มที่จุดใหม่ ส่วน "จุดกึ่งกลาง → จุดใหม่" จึงไม่ถูกวาดเลย = เส้นขาดเป็นช่วงๆ
+   * ✅ วาดโค้งต่อกันจาก "กึ่งกลางเดิม" ผ่านจุดก่อนหน้า (เป็นจุดควบคุม) ไป "กึ่งกลางใหม่" — เส้นต่อเนื่องและลื่น
+   *    + ความหนาเปลี่ยนแบบค่อยเป็นค่อยไป (เร็ว = บาง ช้า = หนา) เหมือนปากกาจริง
+   *    + ใช้จุดย่อยที่เบราว์เซอร์รวบไว้ (coalesced events) ไม่ให้เส้นเป็นเหลี่ยมตอนลากเร็ว
+   */
+  const drawTo = (p) => {
     const canvas = canvasRef.current;
     const ctx = ctxOf();
-    const p = pointOf(e);
     const prev = last.current;
     const dist = Math.hypot(p.x - prev.x, p.y - prev.y);
+    if (dist < 0.8) return;
     const speed = dist / Math.max(1, p.t - prev.t);
     const base = canvas.width / 260;
-    ctx.lineWidth = Math.max(base * 0.55, base * (1.25 - Math.min(speed * 0.35, 0.75)));
-    // เส้นโค้งผ่านจุดกลางระหว่างสองจุด = ลายเส้นลื่นไม่เป็นเหลี่ยม
+    const target = Math.max(base * 0.55, base * (1.3 - Math.min(speed * 0.3, 0.75)));
+    const width = lastWidth.current * 0.7 + target * 0.3;
     const mid = { x: (prev.x + p.x) / 2, y: (prev.y + p.y) / 2 };
+    strokeStyle(ctx, width);
     ctx.beginPath();
-    ctx.moveTo(prev.x, prev.y);
+    ctx.moveTo(lastMid.current.x, lastMid.current.y);
     ctx.quadraticCurveTo(prev.x, prev.y, mid.x, mid.y);
     ctx.stroke();
+    lastMid.current = mid;
+    lastWidth.current = width;
     last.current = p;
+  };
+
+  const move = (e) => {
+    if (!drawing.current) return;
+    const events = e.nativeEvent?.getCoalescedEvents?.() || [];
+    if (events.length > 1) events.forEach((ev) => drawTo(pointOf(ev)));
+    else drawTo(pointOf(e));
     if (!hasInk) setHasInk(true);
   };
 
   const end = () => {
     if (!drawing.current) return;
     drawing.current = false;
+    // ปิดท้ายเส้น: ต่อจากกึ่งกลางสุดท้ายไปถึงจุดที่ยกนิ้วจริง
+    if (last.current && lastMid.current) {
+      const ctx = ctxOf();
+      strokeStyle(ctx, lastWidth.current);
+      ctx.beginPath();
+      ctx.moveTo(lastMid.current.x, lastMid.current.y);
+      ctx.lineTo(last.current.x, last.current.y);
+      ctx.stroke();
+    }
     last.current = null;
+    lastMid.current = null;
     setHasInk(true);
     onChange?.(true);
   };
