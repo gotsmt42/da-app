@@ -10,8 +10,9 @@
  *    inline style (มาพร้อมตัว element เสมอ) ส่วน keyframes ฝังเป็น <style> ในตัว component เอง
  *    ⚠️ ห้ามย้ายขนาดภาพกลับไปไว้ในไฟล์ .css อีก
  *
- * @param {"page"|"fullscreen"|"overlay"|"inline"|"bar"} variant
+ * @param {"page"|"center"|"fullscreen"|"overlay"|"inline"|"bar"} variant
  *   page = กลางจอ (ค่าเริ่มต้น ใช้กับ Suspense ของแต่ละหน้า — ไม่บังเมนู/หัวเว็บ กดได้ตามปกติ)
+ *   center = กลางจอเหมือน page แต่ไม่จองความสูง (วางทับหน้าที่มีเนื้อหาอยู่แล้ว เช่น ปฏิทินที่กำลังโหลดครั้งแรก)
  *   fullscreen = ตอนเปิดแอป/ตรวจสิทธิ์ (พื้นทึบทั้งจอ) · overlay = ทับกล่องที่ position:relative
  *   inline = ในกล่องเล็ก · bar = แถบบางบนสุด (โหลดซ้ำ ไม่บังข้อมูล)
  */
@@ -26,6 +27,7 @@ const KEYFRAMES = `
 
 const ROOT = {
   page: { position: "fixed", inset: 0, zIndex: 5, pointerEvents: "none" },
+  center: { position: "fixed", inset: 0, zIndex: 5, pointerEvents: "none" },
   fullscreen: { position: "fixed", inset: 0, zIndex: 2000, background: "#f8fafc" },
   overlay: { position: "absolute", inset: 0, zIndex: 20, background: "rgba(248,250,252,.85)" },
   inline: { width: "100%", minHeight: 160, padding: "24px 16px" },
@@ -62,7 +64,7 @@ export default function PageLoader({ variant = "page", label = "กำลัง�
     );
   }
   const full = variant === "fullscreen";
-  const width = full ? 168 : small ? 84 : variant === "page" ? 140 : 112;
+  const width = full ? 168 : small ? 84 : variant === "page" || variant === "center" ? 140 : 112;
   const box = (
     <div
       role="status" aria-live="polite"
