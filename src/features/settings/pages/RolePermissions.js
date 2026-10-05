@@ -14,12 +14,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import {
-  Box, Stack, Typography, Checkbox, Alert, Snackbar, CircularProgress, Tooltip, Chip, Tabs, Tab,
+  Box, Stack, Typography, Checkbox, Alert, Snackbar, CircularProgress, Tooltip, Chip,
   IconButton, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button, MenuItem, Select, Avatar,
   Switch, ButtonBase, useMediaQuery,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { AdminPanelSettings, Lock, InfoOutlined, Edit, Badge as BadgeIcon, Save } from "@mui/icons-material";
+import { AdminPanelSettings, Lock, InfoOutlined, Edit, Badge as BadgeIcon, Save, CheckCircle, RemoveCircleOutline } from "@mui/icons-material";
 
 import usePermissions from "@/shared/hooks/usePermissions";
 import { useAuth } from "@/features/auth/AuthContext";
@@ -44,79 +44,79 @@ const BORDER = "#e2e8f0";
  */
 const GROUPS = [
   {
-    title: "งานและปฏิทิน",
+    title: "งานและตารางงาน",
     items: [
-      ["viewAllJobs", "เห็นงานของทุกคน ทั้งฝ่ายบริการและฝ่ายขาย",
-        "ไม่ติ๊ก = เห็นเฉพาะงานที่ตัวเองสร้างหรือถูกระบุเป็นผู้รับผิดชอบ — เช่น ช่างเทคนิคจะเห็นแค่งานของตัวเองในปฏิทิน แดชบอร์ด และรายการใบเสนอราคา", "server"],
-      ["viewServiceCalendar", "เปิดเมนู ปฏิทินงาน > ฝ่ายบริการ (คิวงานช่าง) ได้",
-        "เปิดดูคิวช่างได้อย่างเดียว — จะเพิ่ม/แก้/ย้ายงานของฝ่ายบริการต้องติ๊ก “แก้ไขงานของคนอื่น” เพิ่ม · ช่องนี้มีไว้ให้เซลเช็กคิวช่างก่อนนัดลูกค้า (ปฏิทินฝ่ายขายเปิดได้อยู่แล้วโดยไม่ต้องใช้สิทธิ์นี้)", "server"],
-      ["editAnyJob", "แก้ไข / ย้ายวัน / ลบงานของคนอื่นได้ทั้ง 2 ปฏิทิน",
-        "ไม่ติ๊ก = แก้ได้เฉพาะงานที่ตัวเองสร้างหรือเป็นผู้รับผิดชอบ งานคนอื่นกดแก้ไม่ได้", "server"],
-      ["editOperation", "เปิดเมนู “การดำเนินงาน” และอัปเดตสถานะ/ความคืบหน้า/รูปหน้างาน",
-        "ช่างที่ติ๊ก “ถูกมอบหมายงานได้” เข้าหน้านี้ได้อยู่แล้วแต่อัปเดตได้เฉพาะงานที่ตัวเองรับ · ติ๊กช่องนี้ = อัปเดตได้ทุกงานที่มองเห็น", "ui"],
-      ["approveJobs", "อนุมัติแผนงาน และอนุมัติคำขอปิดงานในปฏิทิน",
-        "ไม่ติ๊ก = สร้างงานและกดขอปิดงานได้ แต่งานจะค้างอยู่จนกว่าคนที่มีสิทธิ์นี้จะกดอนุมัติ", "server"],
+      ["viewAllJobs", "เห็นงานของทุกคน",
+        "ติ๊ก = เห็นงานทุกงานในตารางงาน หน้าการดำเนินงาน แดชบอร์ด รายงานงาน และติดตามใบเสนอราคา · ไม่ติ๊ก = เห็นเฉพาะงานที่ตัวเองสร้าง เป็นผู้รับผิดชอบ หรืออยู่ในทีมเข้างาน", "server"],
+      ["viewServiceCalendar", "เปิดดู “ตารางงานช่าง” ได้ (ดูอย่างเดียว)",
+        "สำหรับคนนอกฝ่ายบริการ เช่น เซล — เช็กว่าช่างว่างวันไหนก่อนนัดลูกค้า · เพิ่ม/แก้/ย้ายงานช่างไม่ได้ ถ้าต้องการให้ติ๊ก “แก้ไขงานของคนอื่น” เพิ่ม", "server"],
+      ["editAnyJob", "แก้ไข / ย้ายวัน / ลบ งานของคนอื่น",
+        "ไม่ติ๊ก = แก้ได้เฉพาะงานที่ตัวเองสร้างหรือเป็นผู้รับผิดชอบ", "server"],
+      ["editOperation", "เปิดเมนู “การดำเนินงาน” และอัปเดตงานได้ทุกงานที่มองเห็น",
+        "เปลี่ยนสถานะ มอบหมายผู้รับผิดชอบ แนบเอกสารแทนช่าง · ช่างที่ติ๊ก “รับงานที่ได้รับมอบหมาย” ใช้เมนู “งานของฉัน” แทน และอัปเดตได้เฉพาะงานของตัวเอง", "ui"],
+      ["approveJobs", "อนุมัติแผนงาน และอนุมัติ/ไม่อนุมัติการปิดงาน",
+        "แผนงานที่ช่าง/เซลสร้างเองจะรอที่ “คำขอลงงาน” จนกว่าคนที่มีสิทธิ์นี้อนุมัติ · คำขอปิดงานจากช่างก็ต้องให้คนที่มีสิทธิ์นี้อนุมัติ", "server"],
     ],
   },
   {
-    title: "ใบมอบหมายงานช่าง (Dispatch)",
+    title: "แจ้งงานและคำขอลงงาน",
     items: [
-      ["requestDispatch", "เปิดใบขอลงงานถึงฝ่ายบริการ (เมนู “คำขอลงงานของฉัน”)",
-        "เห็นเฉพาะคำขอที่ตัวเองเปิด — คำขอของคนอื่นไม่เห็น และมอบหมายช่างเองไม่ได้", "server"],
-      ["assignDispatch", "เปิดเมนู “คิวคำขอลงงาน” จัดคิว และเลือกช่างผู้รับงาน",
-        "เห็นคำขอของทุกคนในบริษัท ไม่ใช่แค่ของตัวเอง · รวมถึงแก้ไข ยกเลิก หรือปิดคำขอของคนอื่น", "server"],
-      ["receiveDispatch", "ถูกเลือกเป็นผู้รับงานได้ และอัปเดตเฉพาะงานที่ตัวเองรับ",
-        "สำหรับช่างหน้างาน — ไม่ติ๊ก = ชื่อไม่ขึ้นในรายชื่อให้เลือกตอนมอบหมายงาน", "server"],
+      ["requestDispatch", "แจ้งงานให้ช่าง (เมนู “แจ้งงานให้ช่าง”)",
+        "ส่งรายละเอียดงานพร้อมใบเสนอราคา/PO ให้ฝ่ายช่างจัดคิว · เห็นเฉพาะใบที่ตัวเองแจ้ง เลือกช่างหรือนัดวันเองไม่ได้", "server"],
+      ["assignDispatch", "จัดคิว “คำขอลงงาน” — ลงแผนงาน เลือกช่าง ตีกลับ",
+        "เห็นคำขอของทุกคน ทั้งที่เซลแจ้งเข้ามาและแผนงานที่ช่างสร้างเอง · แก้ไข/ยกเลิกใบของคนอื่นได้", "server"],
+      ["receiveDispatch", "รับงานที่ได้รับมอบหมาย (เมนู “งานของฉัน”)",
+        "สำหรับช่างหน้างาน — แนบเอกสารประจำงาน คุยกับแอดมิน ขอปิดงาน · ไม่ติ๊ก = ชื่อไม่ขึ้นในรายชื่อให้มอบหมายงาน", "server"],
     ],
   },
   {
-    title: "เอกสารและการเงิน",
+    title: "เอกสาร · ใบเสนอราคา · สัญญา",
     items: [
-      ["viewDocuments", "เปิดเมนู “เอกสาร” (ไฟล์แนบของงาน · ทะเบียนเอกสารที่ออกแล้ว)",
-        "ไม่ติ๊ก = เมนูเอกสารหายไปทั้งหมด และเปิด /documents เองก็ถูกพากลับไปหน้าแรก · ค่าเริ่มต้น: ทุก Rank ยกเว้นเซล", "ui"],
-      ["editDocuments", "ออกเลขที่เอกสาร และแก้เอกสารที่ออกไปแล้ว (ใบส่งมอบงาน · ใบแจ้งหนี้ · ใบเสร็จ)",
-        "ไม่ติ๊ก = เปิดดูและสั่งพิมพ์ได้อย่างเดียว ออกเลขที่ใหม่หรือแก้ของเดิมไม่ได้", "server"],
-      ["viewFinance", "เปิดเมนู “การเงิน” (ใบเสนอราคา · ติดตามวางบิล · ติดตามการชำระเงิน)",
-        "เปิดดูอย่างเดียว · ไม่ติ๊ก = เมนูการเงินหายไปทั้งหมด และพิมพ์ลิงก์ /finance เองก็ถูกปฏิเสธ", "ui"],
-      ["editFinance", "แก้สถานะใบเสนอราคา บันทึกวางบิล และบันทึกรับเงิน",
-        "ต้องติ๊ก “เปิดเมนูการเงิน” คู่กันเสมอ — ติ๊กแต่ช่องนี้อย่างเดียวจะเข้าหน้าไม่ได้", "server"],
-      ["viewContracts", "เปิดเมนู “สัญญาบริการ” ดูสัญญาและรอบเข้า PM ของลูกค้า",
-        "เปิดดูอย่างเดียว รวมถึงเห็นว่ารอบไหนถึงกำหนดเข้าบริการ", "ui"],
-      ["editContracts", "สร้าง / แก้ / ต่ออายุสัญญา และกำหนดรอบเข้าบริการ (PM)",
-        "ต้องติ๊ก “เปิดเมนูสัญญาบริการ” คู่กันเสมอ", "server"],
-      ["createSalesPlan", "เปิดเมนู “งานขาย” สร้างงานขายและนัดหมายลูกค้าในปฏิทินฝ่ายขาย",
-        "คนละปฏิทินกับคิวงานช่าง — ไม่ติ๊ก = เมนูงานขายหายไปทั้งหมด", "ui"],
+      ["viewDocuments", "เปิดเมนู “เอกสาร” (ไฟล์แนบของงาน · ทะเบียนเอกสารที่ออกจากระบบ)",
+        "ไม่ติ๊ก = เมนูเอกสารหาย และเปิดหน้าเอกสารตรงๆ ก็ถูกพากลับหน้าแรก · ค่าเริ่มต้น: ทุก Rank ยกเว้นเซล", "ui"],
+      ["editDocuments", "ออกเลขที่และแก้ไขเอกสารที่ออกจากระบบ (ใบแจ้งเข้างาน · ใบส่งมอบงาน)",
+        "เปลี่ยนสถานะ/ยกเลิกเอกสารในทะเบียนได้ · ไม่ติ๊ก = เปิดดู พิมพ์ และส่งอีเมลได้อย่างเดียว", "server"],
+      ["viewFinance", "เปิดเมนู “ใบเสนอราคา / การเงิน” (ติดตามใบเสนอราคา · วางบิล/รับเงิน)",
+        "เห็นตามขอบเขตงานของตัวเอง (ดู “เห็นงานของทุกคน”) · บันทึกการติดตามลูกค้าได้ · ไม่ติ๊ก = เมนูนี้หาย", "ui"],
+      ["editFinance", "แก้มูลค่า/VAT ใบเสนอราคา · เริ่มนับ/ย้อนสถานะ · บันทึกวางบิลและรับเงิน",
+        "ต้องติ๊ก “เปิดเมนูใบเสนอราคา / การเงิน” คู่กันเสมอ", "server"],
+      ["viewContracts", "เปิดเมนู “ภาพรวมงาน” (สัญญาบริการ · รอบเข้างาน · งานทั่วไป/โปรเจค)",
+        "ดูอย่างเดียว · เห็นว่าสัญญาไหนใกล้หมดอายุหรือเลยกำหนดเข้ารอบ", "ui"],
+      ["editContracts", "เพิ่ม / แก้ไข / ต่ออายุสัญญา และจัดรอบเข้างาน",
+        "ต้องติ๊ก “เปิดเมนูภาพรวมงาน” คู่กันเสมอ", "server"],
+      ["createSalesPlan", "ลงนัดหมายลูกค้าในตารางงานฝ่ายขาย (แผนงานของฉัน)",
+        "คนละตารางกับตารางงานช่าง · ไม่ติ๊ก = สร้างนัดหมายฝ่ายขายไม่ได้", "ui"],
     ],
   },
   {
-    title: "ระบบเบิกค่าใช้จ่าย (สายอนุมัติ 3 ส่วน)",
+    title: "เบิกค่าใช้จ่าย · OT · ใบขอซื้อ (สายอนุมัติ 3 ส่วน)",
     items: [
-      ["requestExpense", "ส่วนที่ 1 — ออกใบเบิกล่วงหน้า (Advance) และใบเคลมของตัวเอง",
-        "เห็นและแก้ได้เฉพาะใบของตัวเอง และเฉพาะตอนที่ยังไม่ถูกตรวจสอบ — ใบของคนอื่นไม่เห็น", "server"],
-      ["reviewExpense", "ส่วนที่ 2 (มือแรก) — ตรวจสอบใบเบิกของคนอื่นก่อนส่งให้อนุมัติ",
-        "ตรวจเสร็จ ระบบแจ้งเตือนคนที่มีสิทธิ์อนุมัติทันที — คนตรวจกับคนอนุมัติต้องเป็นคนละคน", "server"],
-      ["approveExpense", "ส่วนที่ 2 (มือสอง) — อนุมัติใบเบิกที่ผ่านการตรวจสอบแล้ว",
-        "อนุมัติแล้วเงินยังไม่ออก — การจ่ายจริงอยู่ที่ส่วนที่ 3", "server"],
-      ["disburseExpense", "ส่วนที่ 3 — อนุมัติเบิกจ่าย ยืนยันว่าจ่ายเงินให้ผู้ขอแล้วจริง",
-        "ขั้นสุดท้ายของสาย · กดแล้วระบบเริ่มนับกำหนดเคลียร์ Advance ตามจำนวนวันที่ตั้งไว้ใน ตั้งค่าองค์กร", "server"],
-      ["viewAllExpenses", "เห็นใบเบิกของทุกคน ออกใบเบิกแทนคนอื่น และเปิดรายงานสรุปค่าใช้จ่าย",
-        "ไม่ติ๊ก = เห็นเฉพาะใบเบิกของตัวเอง (เช่น ช่างเทคนิคเห็นแค่ใบที่ตัวเองเบิก)", "server"],
+      ["requestExpense", "ส่วนที่ 1 — ยื่นของตัวเอง: ใบเบิก Advance · ใบเคลม · ค่าจ้างผู้รับเหมา · OT · ใบขอซื้อ",
+        "เห็นเฉพาะใบของตัวเอง และแก้ได้จนกว่าจะถูกตรวจสอบ · ไม่ติ๊ก = เมนูเบิกค่าใช้จ่าย OT และจัดซื้อหาย", "server"],
+      ["reviewExpense", "ส่วนที่ 2 มือแรก — ตรวจสอบใบของคนอื่น แล้วส่งต่อให้ผู้อนุมัติ",
+        "ใช้กับใบเบิก OT และใบขอซื้อ · ตรวจแล้วระบบแจ้งผู้อนุมัติทันที · ตีกลับให้แก้ได้", "server"],
+      ["approveExpense", "ส่วนที่ 2 มือสอง — อนุมัติใบที่ผ่านการตรวจสอบแล้ว",
+        "คนตรวจกับคนอนุมัติต้องเป็นคนละคน (ยกเว้นตำแหน่งที่ระบบกำหนดให้ทำได้ทั้งสองขั้น) · อนุมัติแล้วเงินยังไม่ออก", "server"],
+      ["disburseExpense", "ส่วนที่ 3 — อนุมัติเบิกจ่าย (ยืนยันการจ่ายเงิน) · ปิดรอบจ่าย OT",
+        "ขั้นสุดท้าย · ใบ Advance เริ่มนับกำหนดเคลียร์ตามจำนวนวันใน “ตั้งค่าองค์กร”", "server"],
+      ["viewAllExpenses", "เห็นใบของทุกคน ยื่นแทนคนอื่น ดูรายงาน · สั่งซื้อและรับของในใบขอซื้อ · ค่าจ้าง OT",
+        "ไม่ติ๊ก = เห็นเฉพาะใบของตัวเอง", "server"],
     ],
   },
   {
     title: "ข้อมูลหลัก",
     items: [
-      ["manageMasterData", "เปิดเมนูข้อมูลหลัก: ทะเบียนลูกค้า · ทะเบียนพนักงาน/ทีมช่าง · ประเภทงาน/ระบบ · สินค้า/สต็อก · ลายเซ็น",
-        "ไม่ติ๊ก = เมนูเหล่านี้หาย และเปิด /customers /staff /worktype /product เองไม่ได้ · ไม่รวมการเพิ่ม/ลบผู้ใช้และตั้งค่าระบบ สองอย่างนั้นกำหนดด้วย Role ที่แท็บแรก", "server"],
+      ["manageMasterData", "จัดการข้อมูลหลัก: ลูกค้า · พนักงาน/ภาระงานทีมช่าง · ประเภทงานและระบบงาน",
+        "รวมถึงแก้ลิงก์แผนที่ของทุกโครงการ และดูว่าใครตั้งลายเซ็นแล้วบ้าง · การเพิ่ม/ลบผู้ใช้และตั้งค่าระบบกำหนดด้วย Role (แท็บแรก)", "server"],
     ],
   },
   {
     title: "เว็บไซต์บริษัท",
     items: [
-      ["manageWebsite", "แก้เนื้อหาเว็บไซต์บริษัท: สินค้า · ผลงาน · บทความ · ยี่ห้อ · การแสดงผลหน้าเว็บ",
-        "ทุกอย่างที่บันทึกขึ้นเว็บสาธารณะทันที — ให้เฉพาะคนที่รับผิดชอบภาพลักษณ์บริษัท", "server"],
-      ["viewLeads", "เห็นและจัดการคำขอจากเว็บไซต์ (ฟอร์มติดต่อ / ขอใบเสนอราคา)",
-        "มีชื่อ เบอร์โทร และอีเมลของลูกค้า — เป็นข้อมูลส่วนบุคคล เปิดเฉพาะคนที่ต้องติดต่อกลับ", "server"],
+      ["manageWebsite", "แก้เนื้อหาเว็บไซต์บริษัท (สินค้า · ผลงาน · บทความ · การแสดงผล)",
+        "บันทึกแล้วขึ้นเว็บสาธารณะทันที · ค่าเริ่มต้น: เฉพาะ Super Admin", "server"],
+      ["viewLeads", "ดูและจัดการคำขอจากเว็บไซต์ (ติดต่อ / ขอใบเสนอราคา)",
+        "มีชื่อ เบอร์โทร อีเมลของลูกค้า (ข้อมูลส่วนบุคคล) · ค่าเริ่มต้น: Super Admin และ Admin", "server"],
     ],
   },
 ];
@@ -170,6 +170,8 @@ export default function RolePermissions() {
   //    มือถือ: เลือก Rank ทีละตำแหน่ง แล้วเห็นรายการสิทธิ์พร้อมสวิตช์ (อ่านเต็มบรรทัด กดง่าย)
   const isMobile = useMediaQuery("(max-width:900px)");
   const [mobileRank, setMobileRank] = useState("");
+  const [userQuery, setUserQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
 
   const load = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
@@ -251,107 +253,185 @@ export default function RolePermissions() {
 
   if (loading) return <Box sx={{ p: 4, textAlign: "center" }}><CircularProgress size={28} /></Box>;
 
+  /** สิ่งที่แต่ละ Role ทำได้ — ตรงกับ config/roles.js ฝั่ง server (manageAll / manageSystem / SYSTEM_GRANTS) */
+  const ROLE_DETAIL = {
+    superadmin: {
+      tone: "#1d4ed8", bg: "#eff6ff",
+      can: ["ทุกเมนูและทุกสิทธิ์ในตาราง Rank โดยไม่ต้องติ๊ก", "ตั้งค่าองค์กร · ตั้งค่าสิทธิ์ · ตั้ง Role ให้ผู้อื่น", "เพิ่ม/แก้ไข/ลบผู้ใช้ทุกตำแหน่ง รวมถึงกรรมการผู้จัดการ", "จัดการเว็บไซต์บริษัทและคำขอจากลูกค้า"],
+      cannot: ["ข้ามสายอนุมัติค่าใช้จ่าย (ยังเป็นไปตาม Rank)", "เปลี่ยน Role ของตัวเอง"],
+    },
+    admin: {
+      tone: "#0f766e", bg: "#f0fdfa",
+      can: ["เพิ่ม/แก้ไขผู้ใช้ (เฉพาะตำแหน่งต่ำกว่าตัวเอง)", "จัดการข้อมูลหลัก: ลูกค้า · พนักงาน · ประเภทงาน", "ดูและจัดการคำขอจากเว็บไซต์"],
+      cannot: ["ตั้งค่าองค์กร · ตั้งค่าสิทธิ์ · ตั้ง Role"],
+    },
+    member: {
+      tone: "#475569", bg: "#f8fafc",
+      can: ["ใช้งานตามสิทธิ์ของ Rank (ตำแหน่งในองค์กร) เท่านั้น"],
+      cannot: ["จัดการผู้ใช้และตั้งค่าระบบ"],
+    },
+  };
+  const q = userQuery.trim().toLowerCase();
+  const shownUsers = users
+    .filter((u) => roleFilter === "all" || systemRoleOf(u) === roleFilter)
+    .filter((u) => !q || [u.fname, u.lname, u.username, u.email, rankLabel(u.role)].filter(Boolean).some((v) => String(v).toLowerCase().includes(q)))
+    .sort((x, y) => ["superadmin", "admin", "member"].indexOf(systemRoleOf(x)) - ["superadmin", "admin", "member"].indexOf(systemRoleOf(y))
+      || String(x.fname || x.username).localeCompare(String(y.fname || y.username), "th"));
+  const capCount = (r) => (data?.capabilities || []).filter((c) => r.locked || isOn(r.rank, c)).length;
+  const totalCaps = (data?.capabilities || []).length;
+
   return (
-    <Box sx={{ p: { xs: 1.25, sm: 2.5 }, maxWidth: 1200, mx: "auto" }}>
-      <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1.5 }}>
-        <Box sx={{ width: 40, height: 40, borderRadius: 2.5, bgcolor: ACCENT, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <Box sx={{ p: { xs: 1.25, sm: 2.5 }, maxWidth: 1240, mx: "auto" }}>
+      <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2 }}>
+        <Box sx={{ width: 44, height: 44, borderRadius: 2.5, bgcolor: "#eff6ff", color: ACCENT, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <AdminPanelSettings />
         </Box>
-        <Box>
-          <Typography sx={{ fontWeight: 900, fontSize: "1.3rem", color: "#0f172a", lineHeight: 1.25 }}>ตั้งค่าสิทธิ์</Typography>
-          <Typography variant="caption" sx={{ color: TEXT_SUB }}>
-            แยกกันชัดเจน — <b>Role</b> คือตำแหน่งในระบบ (ใครดูแลระบบ) · <b>Rank</b> คือตำแหน่งในองค์กร (ทำงานอะไรได้บ้าง)
+        <Box sx={{ minWidth: 0 }}>
+          <Typography sx={{ fontWeight: 900, fontSize: "1.35rem", color: "#0f172a", lineHeight: 1.25 }}>ตั้งค่าสิทธิ์</Typography>
+          <Typography sx={{ fontSize: "0.82rem", color: TEXT_SUB }}>
+            สิทธิ์มี 2 ชั้น · <b>Role</b> = ใครดูแลระบบได้แค่ไหน (ตั้งรายคน) · <b>Rank</b> = ตำแหน่งในบริษัททำงานอะไรได้บ้าง (ตั้งรายตำแหน่ง)
           </Typography>
         </Box>
       </Stack>
 
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 1.5, borderBottom: `1px solid ${BORDER}`, "& .MuiTab-root": { textTransform: "none", fontWeight: 800 } }}>
-        <Tab value="system" label="Role · ตำแหน่งในระบบ" icon={<BadgeIcon sx={{ fontSize: 18 }} />} iconPosition="start" />
-        <Tab value="org" label="Rank · ตำแหน่งในองค์กร" icon={<AdminPanelSettings sx={{ fontSize: 18 }} />} iconPosition="start" />
-      </Tabs>
+      {/* แท็บแบบปุ่มคู่ */}
+      <Box sx={{ display: { xs: "grid", sm: "inline-flex" }, gridTemplateColumns: "1fr 1fr", width: { xs: "100%", sm: "auto" }, p: 0.5, mb: 2, borderRadius: 3, bgcolor: "#f1f5f9", border: `1px solid ${BORDER}` }}>
+        {[["system", "Role · ตำแหน่งในระบบ", <BadgeIcon key="i" sx={{ fontSize: 18 }} />, users.length + " คน"], ["org", "Rank · ตำแหน่งในองค์กร", <AdminPanelSettings key="i" sx={{ fontSize: 18 }} />, ranks.length + " ตำแหน่ง"]].map(([v, label, icon, sub]) => {
+          const on = tab === v;
+          return (
+            <ButtonBase key={v} onClick={() => setTab(v)} sx={{
+              gap: 0.75, px: { xs: 1.25, sm: 2 }, py: 0.9, borderRadius: 2.5, fontFamily: "inherit",
+              bgcolor: on ? "#fff" : "transparent", color: on ? ACCENT : TEXT_SUB, boxShadow: on ? "0 1px 3px rgba(15,23,42,.12)" : "none",
+            }}>
+              {icon}
+              <Typography sx={{ fontWeight: 800, fontSize: "0.86rem", color: "inherit", whiteSpace: "nowrap" }}>
+                <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>{label}</Box>
+                <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>{label.split(" · ")[0]}</Box>
+              </Typography>
+              <Typography sx={{ display: { xs: "none", sm: "block" }, fontSize: "0.72rem", color: TEXT_SUB }}>{sub}</Typography>
+            </ButtonBase>
+          );
+        })}
+      </Box>
 
       {error && <Alert severity="error" sx={{ mb: 1.5 }} onClose={() => setError("")}>{error}</Alert>}
 
       {tab === "system" ? (
         <>
-          <Alert severity="info" icon={<InfoOutlined />} sx={{ mb: 1.5 }}>
-            <b>Role</b> = ตำแหน่งในระบบ (Super Admin / Admin / Member) — คนละเรื่องกับ <b>Rank</b> ที่เป็นตำแหน่งในบริษัท ·
-            ใช้ชื่ออังกฤษและเปลี่ยนชื่อไม่ได้ · ตั้งได้เฉพาะ Super Admin · ต้องยืนยันด้วยรหัสผ่าน ·
-            ต้องเหลือ Super Admin อย่างน้อย 1 คนเสมอ
-          </Alert>
-          {/* ✅ ผู้ใช้สั่ง (25 ก.ย. 2569): Super Admin ทำได้ทุกอย่าง — บอกไว้ตรงนี้ให้เห็นชัด */}
-          <Alert severity="success" sx={{ mb: 1.5 }}>
-            <b>Super Admin ทำได้ทุกอย่าง</b> — ทุกเมนูและทุกสิทธิ์ในตาราง Rank (ไม่ต้องติ๊ก) · ตั้ง/เปลี่ยนตำแหน่งในองค์กรได้ทุกระดับ
-            รวมถึงกรรมการผู้จัดการ และเปลี่ยนตำแหน่งในองค์กรของตัวเองได้ · จัดการเว็บไซต์บริษัทและคำขอจากลูกค้าได้ (ตอนนี้ Super Admin เท่านั้น) ·
-            ยกเว้น <b>สายอนุมัติค่าใช้จ่าย</b> (ตรวจสอบ · อนุมัติ · อนุมัติเบิกจ่าย) ที่ยังเป็นไปตามตำแหน่งในองค์กร เพื่อให้ใบเบิกมีคนสอบทานเสมอ ·
-            เปลี่ยน Role ของตัวเองไม่ได้ (กันล็อกตัวเองออกจากระบบ)
-          </Alert>
-
-          {/* ── 3 Role ของระบบ ── */}
-          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" }, gap: 1, mb: 2 }}>
-            {systemRoles.map((t) => (
-              <Box key={t.systemRole} sx={{ p: 1.5, borderRadius: 2.5, border: `1px solid ${alpha(SYS_ACCENT, 0.3)}`, bgcolor: alpha(SYS_ACCENT, 0.04) }}>
-                <Stack direction="row" alignItems="center" spacing={0.75}>
-                  <BadgeIcon sx={{ fontSize: 18, color: SYS_ACCENT }} />
-                  <Typography sx={{ fontWeight: 900, fontSize: "0.95rem" }}>{t.label}</Typography>
-                  <Chip size="small" label={users.filter((u) => systemRoleOf(u) === t.systemRole).length} sx={{ height: 19, fontWeight: 800 }} />
-                </Stack>
-                <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", mt: 0.5 }}>{t.desc}</Typography>
-              </Box>
-            ))}
+          {/* ── 3 Role: ทำอะไรได้ / ทำอะไรไม่ได้ ── */}
+          <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(3, minmax(0, 1fr))" }, gap: 1.25, mb: 2 }}>
+            {systemRoles.map((t) => {
+              const d = ROLE_DETAIL[t.systemRole] || ROLE_DETAIL.member;
+              const count = users.filter((u) => systemRoleOf(u) === t.systemRole).length;
+              const on = roleFilter === t.systemRole;
+              return (
+                <ButtonBase key={t.systemRole} onClick={() => setRoleFilter(on ? "all" : t.systemRole)} sx={{
+                  display: "flex", flexDirection: "column", alignItems: "stretch", justifyContent: "flex-start", textAlign: "left", p: 1.75, borderRadius: 3, fontFamily: "inherit", bgcolor: "#fff",
+                  border: `1px solid ${on ? d.tone : BORDER}`, boxShadow: on ? `0 0 0 1px ${d.tone}` : "0 1px 2px rgba(15,23,42,.04)",
+                }}>
+                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+                    <Box sx={{ width: 32, height: 32, borderRadius: 2, bgcolor: d.bg, color: d.tone, display: "flex", alignItems: "center", justifyContent: "center" }}><BadgeIcon sx={{ fontSize: 18 }} /></Box>
+                    <Typography sx={{ flex: 1, fontWeight: 900, fontSize: "1rem", color: "#0f172a" }}>{t.label}</Typography>
+                    <Typography sx={{ fontWeight: 900, fontSize: "1.1rem", color: d.tone }}>{count}<Box component="span" sx={{ fontSize: "0.72rem", color: TEXT_SUB, fontWeight: 700, ml: 0.4 }}>คน</Box></Typography>
+                  </Stack>
+                  <Stack spacing={0.4}>
+                    {d.can.map((x) => (
+                      <Stack key={x} direction="row" spacing={0.75} alignItems="flex-start">
+                        <CheckCircle sx={{ fontSize: 15, color: "#16a34a", mt: 0.2 }} />
+                        <Typography sx={{ fontSize: "0.78rem", color: "#334155", lineHeight: 1.45 }}>{x}</Typography>
+                      </Stack>
+                    ))}
+                    {d.cannot.map((x) => (
+                      <Stack key={x} direction="row" spacing={0.75} alignItems="flex-start">
+                        <RemoveCircleOutline sx={{ fontSize: 15, color: "#94a3b8", mt: 0.2 }} />
+                        <Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB, lineHeight: 1.45 }}>ไม่ได้: {x}</Typography>
+                      </Stack>
+                    ))}
+                  </Stack>
+                </ButtonBase>
+              );
+            })}
           </Box>
 
-          {/* ── ผู้ใช้แต่ละคนอยู่ Role ไหน ── */}
-          <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER}`, borderRadius: 2.5, overflow: "hidden" }}>
-            <Box sx={{ px: 2, py: 1.25, bgcolor: "#f8fafc", borderBottom: `1px solid ${BORDER}` }}>
-              <Typography sx={{ fontWeight: 900, fontSize: "0.92rem" }}>ผู้ใช้ในระบบ ({users.length}) — เลือก Role ให้แต่ละคน</Typography>
+          {/* ── ผู้ใช้แต่ละคน ── */}
+          <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER}`, borderRadius: 3, overflow: "hidden" }}>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }} sx={{ px: 2, py: 1.25, bgcolor: "#f8fafc", borderBottom: `1px solid ${BORDER}` }}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontWeight: 900, fontSize: "0.95rem", color: "#0f172a" }}>
+                  ผู้ใช้ในระบบ {roleFilter !== "all" ? `· ${SYSTEM_ROLE_LABEL[roleFilter]} ` : ""}({shownUsers.length}{shownUsers.length !== users.length ? `/${users.length}` : ""})
+                </Typography>
+                <Typography sx={{ fontSize: "0.74rem", color: TEXT_SUB }}>เลือก Role ให้แต่ละคน · ต้องยืนยันด้วยรหัสผ่านของคุณ · ต้องเหลือ Super Admin อย่างน้อย 1 คน</Typography>
+              </Box>
+              <TextField size="small" placeholder="ค้นหาชื่อ / ชื่อผู้ใช้ / ตำแหน่ง" value={userQuery} onChange={(e) => setUserQuery(e.target.value)}
+                sx={{ width: { xs: "100%", sm: 260 }, "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "#fff" } }} />
+            </Stack>
+            {/* หัวคอลัมน์ (จอใหญ่) */}
+            <Box sx={{ display: { xs: "none", md: "grid" }, gridTemplateColumns: "minmax(0, 1.4fr) minmax(0, 1fr) 210px", gap: 2, px: 2, py: 0.9, borderBottom: `1px solid ${BORDER}` }}>
+              {["ผู้ใช้", "ตำแหน่งในองค์กร (Rank)", "Role ในระบบ"].map((h) => (
+                <Typography key={h} sx={{ fontSize: "0.72rem", fontWeight: 800, color: TEXT_SUB }}>{h}</Typography>
+              ))}
             </Box>
-            <Stack divider={<Box sx={{ borderTop: `1px solid ${BORDER}` }} />}>
-              {users.map((u) => {
-                const tier = systemRoleOf(u);
-                const isSelf = String(u._id) === String(userData?.userId || "");
-                return (
-                  <Stack key={u._id} direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "stretch", sm: "center" }} spacing={1.25} sx={{ px: 2, py: 1.1 }}>
-                    <Avatar src={u.imageUrl?.startsWith("http") ? u.imageUrl : undefined} sx={{ width: 32, height: 32, fontSize: 14 }}>
+            {shownUsers.length === 0 && <Typography sx={{ p: 2, fontSize: "0.86rem", color: TEXT_SUB }}>ไม่พบผู้ใช้</Typography>}
+            {shownUsers.map((u) => {
+              const tier = systemRoleOf(u);
+              const d = ROLE_DETAIL[tier] || ROLE_DETAIL.member;
+              const isSelf = String(u._id) === String(userData?.userId || "");
+              const name = [u.fname, u.lname].filter(Boolean).join(" ") || u.username;
+              return (
+                <Box key={u._id} sx={{
+                  display: "grid", gridTemplateColumns: { xs: "minmax(0,1fr) auto", md: "minmax(0, 1.4fr) minmax(0, 1fr) 210px" }, gap: { xs: 1, md: 2 }, alignItems: "center",
+                  px: 2, py: 1.1, borderTop: `1px solid ${BORDER}`, "&:first-of-type": { borderTop: 0 }, "&:hover": { bgcolor: "#f8fafc" },
+                }}>
+                  <Stack direction="row" spacing={1.25} alignItems="center" sx={{ minWidth: 0 }}>
+                    <Avatar src={u.imageUrl?.startsWith("http") ? u.imageUrl : undefined} sx={{ width: 36, height: 36, fontSize: 15, fontWeight: 800 }}>
                       {(u.fname || u.username || "?").charAt(0)}
                     </Avatar>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      {/* ⚠️ component="span": Chip เป็น <div> ถ้าอยู่ใน <p> จะเป็น HTML ที่ซ้อนผิด */}
-                      <Typography component="div" sx={{ fontWeight: 700, fontSize: "0.9rem" }} noWrap>
-                        {[u.fname, u.lname].filter(Boolean).join(" ") || u.username}
-                        {isSelf && <Chip size="small" label="คุณ" sx={{ ml: 0.75, height: 18, fontSize: "0.65rem", fontWeight: 800 }} />}
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography noWrap component="div" sx={{ fontWeight: 800, fontSize: "0.9rem", color: "#0f172a" }}>
+                        {name}{isSelf && <Box component="span" sx={{ ml: 0.75, px: 0.75, py: 0.1, borderRadius: 99, fontSize: "0.64rem", fontWeight: 800, bgcolor: "#eff6ff", color: ACCENT }}>คุณ</Box>}
                       </Typography>
-                      <Typography variant="caption" sx={{ color: TEXT_SUB }}>
-                        Rank: {rankLabel(u.role)}{titleOf(u) && titleOf(u) !== rankLabel(u.role) ? ` · ${titleOf(u)}` : ""}
+                      <Typography noWrap sx={{ fontSize: "0.74rem", color: TEXT_SUB }}>
+                        @{u.username}<Box component="span" sx={{ display: { md: "none" } }}> · {rankLabel(u.role)}</Box>
                       </Typography>
                     </Box>
-                    <Tooltip title={isSelf ? "เปลี่ยน Role ของตัวเองไม่ได้" : ""} describeChild>
-                      <span>
-                        <Select
-                          size="small" value={tier} disabled={isSelf || saving === `tier:${u._id}`}
-                          onChange={(e) => { setConfirmError(""); setTierChange({ user: u, systemRole: e.target.value }); }}
-                          sx={{ minWidth: 190, fontWeight: 700, fontSize: "0.85rem" }}
-                        >
-                          {systemRoles.map((t) => (
-                            <MenuItem key={t.systemRole} value={t.systemRole} sx={{ fontSize: "0.85rem" }}>{t.label}</MenuItem>
-                          ))}
-                        </Select>
-                      </span>
-                    </Tooltip>
                   </Stack>
-                );
-              })}
-            </Stack>
+                  <Box sx={{ display: { xs: "none", md: "block" }, minWidth: 0 }}>
+                    <Typography noWrap sx={{ fontSize: "0.86rem", fontWeight: 700, color: "#334155" }}>{rankLabel(u.role)}</Typography>
+                    {titleOf(u) && titleOf(u) !== rankLabel(u.role) && <Typography noWrap sx={{ fontSize: "0.72rem", color: TEXT_SUB }}>ในเอกสาร: {titleOf(u)}</Typography>}
+                  </Box>
+                  <Tooltip title={isSelf ? "เปลี่ยน Role ของตัวเองไม่ได้ (กันล็อกตัวเองออกจากระบบ)" : ""} describeChild>
+                    <span>
+                      <Select
+                        size="small" value={tier} disabled={isSelf || saving === `tier:${u._id}`}
+                        onChange={(e) => { setConfirmError(""); setTierChange({ user: u, systemRole: e.target.value }); }}
+                        renderValue={(v) => (
+                          <Stack direction="row" spacing={0.75} alignItems="center">
+                            <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: (ROLE_DETAIL[v] || d).tone }} />
+                            <span>{SYSTEM_ROLE_LABEL[v]}</span>
+                          </Stack>
+                        )}
+                        sx={{ width: { xs: 136, md: "100%" }, fontWeight: 800, fontSize: "0.85rem", borderRadius: 2, bgcolor: "#fff" }}
+                      >
+                        {systemRoles.map((t) => (
+                          <MenuItem key={t.systemRole} value={t.systemRole} sx={{ fontSize: "0.85rem", fontWeight: 700 }}>{t.label}</MenuItem>
+                        ))}
+                      </Select>
+                    </span>
+                  </Tooltip>
+                </Box>
+              );
+            })}
           </Box>
         </>
       ) : (
         <>
-          <Alert severity="info" icon={<InfoOutlined />} sx={{ mb: 1.5 }}>
-            <b>Rank</b> คือตำแหน่งในองค์กร — เปลี่ยน “ชื่อ” ได้ (กดไอคอนดินสอที่หัวคอลัมน์) ·
-            {" "}{ranks.find((r) => r.locked)?.label || "กรรมการผู้จัดการ"} มีสิทธิ์เต็มเสมอ แก้ไม่ได้ ·
-            ติ๊กแล้วบันทึกทันที · ส่วนสิทธิ์ดูแลระบบอยู่ที่แท็บ Role
-          </Alert>
-
+          {/* คำอธิบายย่อ + สัญลักษณ์ */}
+          <Stack direction={{ xs: "column", md: "row" }} spacing={{ xs: 0.75, md: 2.5 }} sx={{ mb: 1.5, px: 1.75, py: 1.25, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${BORDER}` }}>
+            <Stack direction="row" spacing={0.75} alignItems="center"><InfoOutlined sx={{ fontSize: 17, color: ACCENT }} /><Typography sx={{ fontSize: "0.8rem", color: "#334155" }}>ติ๊กแล้วบันทึกทันที มีผลกับทุกคนในตำแหน่งนั้น</Typography></Stack>
+            <Stack direction="row" spacing={0.75} alignItems="center"><Box component="span" sx={{ px: 0.75, borderRadius: 1, fontSize: "0.62rem", fontWeight: 800, bgcolor: alpha("#0f766e", 0.12), color: "#0f766e" }}>บังคับจริง</Box><Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB }}>server ตรวจซ้ำทุกครั้ง</Typography></Stack>
+            <Stack direction="row" spacing={0.75} alignItems="center"><Box component="span" sx={{ px: 0.75, borderRadius: 1, fontSize: "0.62rem", fontWeight: 800, bgcolor: alpha("#64748b", 0.12), color: "#475569" }}>เมนู/หน้า</Box><Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB }}>คุมการเห็นเมนู · ข้อมูลยังกรองตามเจ้าของงาน</Typography></Stack>
+            <Stack direction="row" spacing={0.75} alignItems="center"><Lock sx={{ fontSize: 15, color: TEXT_SUB }} /><Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB }}>{ranks.find((r) => r.locked)?.label || "กรรมการผู้จัดการ"} สิทธิ์เต็มเสมอ</Typography></Stack>
+          </Stack>
           {isMobile ? (() => {
             const cur = ranks.find((r) => r.rank === mobileRank) || ranks.find((r) => !r.locked) || ranks[0];
             if (!cur) return null;
@@ -436,11 +516,10 @@ export default function RolePermissions() {
               <Box component="table" sx={{ borderCollapse: "collapse", width: "100%", minWidth: 780 }}>
                 <Box component="thead">
                   <Box component="tr">
-                    <Box component="th" sx={{ position: "sticky", left: 0, zIndex: 2, bgcolor: "#f8fafc", textAlign: "left", p: 1.25, borderBottom: `1px solid ${BORDER}`, minWidth: 260, fontSize: "0.85rem" }}>
-                      สิ่งที่ Rank นี้ทำได้ / เมนูที่เห็น
+                    <Box component="th" sx={{ position: "sticky", left: 0, zIndex: 2, bgcolor: "#f8fafc", textAlign: "left", p: 1.25, borderBottom: `1px solid ${BORDER}`, minWidth: 380, fontSize: "0.85rem" }}>
+                      สิทธิ์
                       <Typography variant="caption" sx={{ display: "block", color: TEXT_SUB, fontWeight: 500 }}>
-                        ☑ = ทำได้ · ☐ = ทำไม่ได้ (เมนูและหน้านั้นหายไปทันที)
-                        <br />ป้าย “บังคับจริง” = เซิร์ฟเวอร์ปฏิเสธซ้ำอีกชั้น · ป้าย “เมนู/หน้า” = คุมการเข้าถึงหน้านั้น ส่วนข้อมูลถูกกรองตามเจ้าของงานอยู่แล้ว
+                        ติ๊ก = ตำแหน่งนั้นทำได้ · ไม่ติ๊ก = เมนู/ปุ่มนั้นหายไป
                       </Typography>
                     </Box>
                     {ranks.map((r) => (
@@ -454,9 +533,11 @@ export default function RolePermissions() {
                               </IconButton>
                             </Tooltip>
                           </Stack>
-                          {r.locked && (
+                          {r.locked ? (
                             <Chip size="small" icon={<Lock sx={{ fontSize: "13px !important" }} />} label="สิทธิ์เต็ม"
                               sx={{ height: 18, fontSize: "0.63rem", fontWeight: 700, bgcolor: alpha(ACCENT, 0.1), color: ACCENT }} />
+                          ) : (
+                            <Typography sx={{ fontSize: "0.66rem", fontWeight: 700, color: TEXT_SUB }}>{capCount(r)}/{totalCaps} สิทธิ์</Typography>
                           )}
                         </Stack>
                       </Box>
