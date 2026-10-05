@@ -13,19 +13,19 @@
 
 import { useEffect, useMemo, useState } from "react";
 import useRealtime from "@/shared/realtime/useRealtime";
-import ViewToggle, { initialViewMode } from "@/shared/ui/ViewToggle";
+import { initialViewMode } from "@/shared/ui/ViewToggle";
 import { useNavigate } from "react-router-dom";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import {
-  Box, Stack, Typography, Chip, Button, IconButton, Tooltip, Skeleton, Collapse, Divider,
+  Box, Stack, Typography, Chip, Button, IconButton, Tooltip, Skeleton,
   Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, TextField, MenuItem,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
-  Refresh, HourglassTop, CheckCircle, Cancel, EventNote, CalendarMonth,
-  ExpandMore, ExpandLess, ArrowForwardIos, TaskAlt,
+  HourglassTop, Cancel, EventNote, CalendarMonth,
+  ArrowForwardIos, TaskAlt,
 } from "@mui/icons-material";
 import Swal from "sweetalert2";
 import EventService from "@/shared/services/EventService";
@@ -37,8 +37,9 @@ import { formatRoundLabel } from "@/shared/utils/contractRounds";
 import { classifyJob, getJobClassMeta } from "@/shared/utils/jobClassification";
 // ✅ ใช้บรรทัดข้อมูลตัวเดียวกับการ์ดงานในแท็บ "รายการงาน" — ข้อมูลชุดเดียวกัน (ระบบ/โครงการ/ครั้งที่/ทีม)
 // จะได้แสดงหน้าตาเหมือนกันเป๊ะทั้งสองแท็บตามที่ผู้ใช้ขอ ไม่ใช่ต่างคนต่างจัดรูปแบบเอง
-import InfoLine from "@/shared/ui/InfoLine";
 import { formatThai } from "@/shared/utils/thaiDate";
+import { PersonChip, UnassignedChip } from "@/shared/ui/PersonChip";
+import { QueueToolbar, SectionHead, AllClear, ActionCard, PeopleField, QueueRow, RowGroup, SoftPill, AMBER, BLUE } from "@/features/dispatch/components/QueueKit";
 
 export default function PendingApprovalsPanel({ onCountChange, active = true }) {
   const navigate = useNavigate();
@@ -48,7 +49,7 @@ export default function PendingApprovalsPanel({ onCountChange, active = true }) 
   const [loading, setLoading] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState(null);
   const [viewMode, setViewMode] = useState(() => initialViewMode("pendingApprovals.viewMode"));
-  const [showRejected, setShowRejected] = useState(false);
+  const [showRejected] = useState(false);
   const [busyKey, setBusyKey] = useState(null);
   const [rejectTarget, setRejectTarget] = useState(null); // sessions[] ของกลุ่มที่กำลังจะไม่อนุมัติ
   const [rejectReason, setRejectReason] = useState("");
@@ -56,6 +57,8 @@ export default function PendingApprovalsPanel({ onCountChange, active = true }) 
   // ✅ รายชื่อพนักงาน — ใช้เป็นตัวเลือกช่อง "ผู้รับผิดชอบ" ที่มอบหมายได้ตรงจากการ์ดนี้เลย
   const [employees, setEmployees] = useState([]);
   const [assigningKey, setAssigningKey] = useState(null);
+  const [search, setSearch] = useState("");
+  const [quick, setQuick] = useState("all");
 
   // ⚠️ ทั้งสอง endpoint ตอบ 404 เมื่อไม่มีข้อมูลเลย (axios throw) จึงต้อง .catch() ทุกตัว —
   // การอนุมัติจริงยังถูกกันซ้ำอีกชั้นที่ backend (403 ถ้าไม่ใช่ admin/manager)
@@ -153,8 +156,6 @@ export default function PendingApprovalsPanel({ onCountChange, active = true }) 
     if (!loading) onCountChange?.(pendingGroups.length);
   }, [pendingGroups.length, loading, onCountChange]);
 
-  const pendingDraftCount = pendingGroups.filter((s) => s[0].unscheduled).length;
-  const pendingScheduledCount = pendingGroups.length - pendingDraftCount;
 
   // ✅ DecideApproval ตัดสินทั้ง jobGroupId ให้ในครั้งเดียวฝั่ง backend อยู่แล้ว → ยิงแค่ id เดียว
   // (ตัวแรกของกลุ่ม) พอ ไม่ต้อง loop ทีละวัน ไม่งั้นตัวที่ 2 เป็นต้นไปจะโดน 400 "งานนี้ไม่ได้อยู่
@@ -235,143 +236,63 @@ export default function PendingApprovalsPanel({ onCountChange, active = true }) 
     }
   };
 
-  const hasPending = pendingGroups.length > 0;
+
+
+  // ── ค้นหา + ตัวกรองด่วน (ชุดเดียวกับแท็บ "จากฝ่ายขาย" — ดู dispatch/components/QueueKit.js) ──
+  const q = search.trim().toLowerCase();
+  const matchQ = (s) => !q || [s[0].title, s[0].system, s[0].company, s[0].site, s[0].responsiblePerson, s[0].approvalRequestedBy]
+    .filter(Boolean).some((v) => String(v).toLowerCase().includes(q));
+  const QUICK = {
+    all: () => true,
+    scheduled: (s) => !s[0].unscheduled,
+    unscheduled: (s) => Boolean(s[0].unscheduled),
+    unassigned: (s) => !s[0].responsiblePerson,
+  };
+  const searched = pendingGroups.filter(matchQ);
+  const shownGroups = searched.filter(QUICK[quick] || QUICK.all);
+  const dateLabelOf = (sessions) => {
+    const head = sessions[0];
+    return head.unscheduled
+      ? (head.plannedMonth ? `แผนเดือน ${formatThai(moment(head.plannedMonth, "YYYY-MM").locale("th"), "MMMM YYYY")}` : "ยังไม่ระบุเดือน")
+      : sessions.map((s) => formatEventDateRange(s)).join(", ");
+  };
+  const teamOf = (sessions) => [...new Set(sessions.flatMap((s) => [s.team, ...(s.teamMembers || []).map((m) => m?.name)]).filter(Boolean))];
 
   return (
     <Box>
-      {/* ✅ แถบหัวแผง — เหลือแค่เวลาอัปเดต + ปุ่มรีเฟรช (ชื่อหน้าอยู่บนแท็บแล้ว ไม่ต้องเขียนซ้ำ) */}
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
-        <Typography variant="caption" color="text.secondary">
-          {lastRefreshed ? `อัปเดตล่าสุด ${moment(lastRefreshed).locale("th").format("HH:mm:ss")}` : "กำลังโหลด..."}
-        </Typography>
-        <Stack direction="row" alignItems="center" spacing={1}>
-          {/* ✅ มุมมองตาราง — ชุดเดียวกับคิวคำขอจากฝ่ายขาย ให้สองแท็บทำงานเหมือนกัน
-              ⚠️ โชว์เฉพาะตอนมีงานจริง ไม่งั้นจะมีปุ่มสลับมุมมองลอยอยู่เหนือข้อความ
-              "เคลียร์ครบแล้ว" ซึ่งไม่มีอะไรให้สลับดู */}
-          {pendingGroups.length > 0 && (
-            <ViewToggle value={viewMode} onChange={setViewMode} />
-          )}
-          <Tooltip title="รีเฟรช">
-            <IconButton
-              onClick={() => fetchData()}
-              size="small"
-              sx={{ border: "1px solid", borderColor: "divider", borderRadius: "50%" }}
-            >
-              <Refresh sx={{ fontSize: 18 }} />
-            </IconButton>
-          </Tooltip>
-        </Stack>
-      </Stack>
+      <QueueToolbar
+        search={search} onSearch={setSearch} placeholder="ค้นหางาน / โครงการ / ผู้ส่ง"
+        filter={quick} onFilter={setQuick}
+        filters={[
+          { key: "all", label: "ทั้งหมด", count: searched.length },
+          { key: "scheduled", label: "ลงตารางแล้ว", count: searched.filter(QUICK.scheduled).length, color: BLUE },
+          { key: "unscheduled", label: "ยังไม่ลงตาราง", count: searched.filter(QUICK.unscheduled).length, color: "#0e7490" },
+          { key: "unassigned", label: "ยังไม่มีผู้รับผิดชอบ", count: searched.filter(QUICK.unassigned).length, color: AMBER },
+        ]}
+        view={viewMode} onView={setViewMode} onRefresh={() => fetchData()} loading={loading}
+        note={lastRefreshed ? `อัปเดต ${moment(lastRefreshed).format("HH:mm")}` : ""}
+      />
 
-      {/* ✅ สรุปภาพรวม — ออกแบบใหม่ทั้งหมด
-          ⚠️ ปัญหาของแบบเดิม (4 ช่องเท่ากันเรียงกัน): ตอนไม่มีงานรออนุมัติจะขึ้นเลข "0" ติดกัน 3 ช่องรวด
-          (รอคุณอนุมัติ / ยังไม่ลงตาราง / ลงตารางแล้ว) ซึ่งไม่ได้สื่ออะไรเลยนอกจากรกตา แถมช่อง
-          "ไม่อนุมัติ" สีแดงเด่นเท่ากันทั้งที่เป็นแค่ข้อมูลอ้างอิงย้อนหลัง (กดทำอะไรไม่ได้แล้ว) —
-          พอตัวเลขหลักเป็น 0 แต่มีเลขแดง 1 เด่นอยู่ข้างๆ และตรงกลางจอเขียนว่า "ไม่มีแผนงานรออนุมัติ"
-          ทั้งสามอย่างขัดกันเองจนอ่านไม่เข้าใจว่าตกลงมีงานหรือไม่มี
-          ✅ แบบใหม่: เหลือ "ตัวเลขหลัก" ตัวเดียวคือจำนวนงานที่ต้องอนุมัติ (สิ่งเดียวที่ต้องลงมือทำ)
-          ส่วนการแยกย่อย (ยังไม่ลงตาราง/ลงตารางแล้ว) เป็นข้อความเล็กใต้ตัวเลข และโชว์เฉพาะตอนมีงานจริง
-          เท่านั้น — ไม่มีงาน = ไม่มีเลข 0 ให้อ่านเลยสักตัว และการ์ดเปลี่ยนเป็นโทนเขียว "เคลียร์แล้ว"
-          ✅ "ไม่อนุมัติ" ลดเป็นข้อความอ้างอิงเล็กๆ ไม่ใช่การ์ดสีแดงระดับเดียวกับตัวเลขหลักอีกต่อไป */}
+      <SectionHead color={AMBER} title="รออนุมัติ" count={shownGroups.length} hint="ช่างสร้างแผนงานเอง — มอบหมายผู้รับผิดชอบ แล้วกดอนุมัติ" />
+
       {loading ? (
-        <Skeleton variant="rounded" height={92} sx={{ borderRadius: 3, mb: 2.5 }} />
-      ) : (
-        <Box sx={{
-          display: "flex", alignItems: "center", gap: 1.75, mb: 2.5,
-          p: { xs: 1.75, sm: 2 }, borderRadius: 3, border: "1px solid",
-          // ✅ กล่องขาวขอบเทา (กฎ: สีไม่เยอะ) — มีงานรอ = ขอบซ้ายส้มบอกว่าต้องทำ · ไม่มี = เรียบๆ
-          borderColor: "#e2e8f0", bgcolor: "#fff", boxShadow: "0 1px 2px rgba(15,23,42,.04)",
-          borderLeft: hasPending ? "4px solid #d97706" : "1px solid #e2e8f0",
-        }}>
-          <Box sx={{
-            width: 46, height: 46, borderRadius: 2.5, flexShrink: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            bgcolor: "#f8fafc", border: "1px solid #e2e8f0",
-            color: hasPending ? "#b45309" : "#64748b",
-          }}>
-            {hasPending ? <HourglassTop sx={{ fontSize: 24 }} /> : <CheckCircle sx={{ fontSize: 24 }} />}
-          </Box>
-
-          <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Stack direction="row" alignItems="baseline" gap={0.75}>
-              <Typography fontWeight={800} sx={{ fontSize: "1.6rem", lineHeight: 1.05, color: "#0f172a", fontVariantNumeric: "tabular-nums" }}>
-                {pendingGroups.length}
-              </Typography>
-              <Typography fontWeight={700} sx={{ fontSize: "0.9rem", color: "text.primary" }}>
-                งานรอคุณอนุมัติ
-              </Typography>
-            </Stack>
-
-            {/* ✅ แยกย่อยเฉพาะตอนมีงานจริง — และแสดงเฉพาะกลุ่มที่มีจำนวน > 0 ด้วย (ถ้ารออนุมัติ 3 งาน
-                เป็นงานที่ลงตารางแล้วทั้งหมด ก็ไม่ต้องขึ้น "ยังไม่ลงตาราง 0" ให้อ่านเปล่าๆ) */}
-            {hasPending ? (
-              <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap" sx={{ mt: 0.5 }}>
-                {pendingDraftCount > 0 && (
-                  <Chip
-                    size="small" icon={<EventNote sx={{ fontSize: 13 }} />}
-                    label={`ยังไม่ลงตาราง ${pendingDraftCount}`}
-                    sx={{ height: 22, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha("#0891b2", 0.12), color: "#0e7490", "& .MuiChip-icon": { color: "#0e7490" } }}
-                  />
-                )}
-                {pendingScheduledCount > 0 && (
-                  <Chip
-                    size="small" icon={<CalendarMonth sx={{ fontSize: 13 }} />}
-                    label={`ลงตารางแล้ว ${pendingScheduledCount}`}
-                    sx={{ height: 22, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha("#3b82f6", 0.12), color: "#1d4ed8", "& .MuiChip-icon": { color: "#1d4ed8" } }}
-                  />
-                )}
-              </Stack>
-            ) : (
-              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25 }}>
-                เคลียร์ครบแล้ว — งานที่ช่าง/เซลส่งเข้ามาใหม่จะมารอที่นี่
-              </Typography>
-            )}
-          </Box>
-
-          {/* ✅ ข้อมูลอ้างอิงย้อนหลัง — วางชิดขวา ตัวเล็ก โทนเทา ไม่แย่งความสนใจจากตัวเลขหลัก
-              (กดแล้วเลื่อน/กางรายการด้านล่างให้เลย ไม่ใช่ป้ายตายที่กดไม่ได้เหมือนเดิม) */}
-          {rejectedAll.length > 0 && (
-            <Box
-              onClick={() => setShowRejected(true)}
-              sx={{
-                flexShrink: 0, textAlign: "right", cursor: "pointer", px: 1, py: 0.5, borderRadius: 2,
-                "&:hover": { bgcolor: alpha("#ef4444", 0.06) },
-              }}
-            >
-              <Typography fontWeight={800} sx={{ fontSize: "1.1rem", lineHeight: 1.1, color: "#dc2626" }}>
-                {rejectedAll.length}
-              </Typography>
-              <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.68rem", whiteSpace: "nowrap" }}>
-                ไม่อนุมัติ
-              </Typography>
-            </Box>
-          )}
-        </Box>
-      )}
-
-      {/* ⚠️ ตัดกล่อง "ไม่มีแผนงานรออนุมัติ 🎉" กลางจอออก — ซ้ำกับการ์ดสรุปด้านบนที่บอกไปแล้วว่า
-          "0 งานรอคุณอนุมัติ · เคลียร์ครบแล้ว" การมีข้อความเดียวกัน 2 ที่พร้อมช่องว่างสูงๆ คั่นกลาง
-          ทำให้หน้าดูโล่งผิดปกติและอ่านซ้ำโดยไม่ได้ข้อมูลเพิ่ม */}
-      {loading ? (
-        <Stack spacing={1.5}>
-          {[1, 2, 3].map((i) => <Skeleton key={i} variant="rounded" height={110} sx={{ borderRadius: 3 }} />)}
+        <Stack spacing={1.25}>
+          {[1, 2].map((i) => <Skeleton key={i} variant="rounded" height={120} sx={{ borderRadius: 3 }} />)}
         </Stack>
-      ) : pendingGroups.length === 0 ? null : viewMode === "table" ? (
-        /* ✅ มุมมองตาราง — กวาดสายตาเทียบกันได้ทีละหลายงาน และกดอนุมัติ/ไม่อนุมัติได้ในแถวเลย
-           ⚠️ ปุ่มต้อง stopPropagation ทุกตัว — ทั้งแถวเป็นพื้นที่กดได้ (เปิดงาน) ถ้าไม่หยุด
-           การกด "อนุมัติ" จะเปิดหน้ารายละเอียดงานตามมาทันทีจนดูเหมือนกดไม่ติด
-           ⚠️ overflowX: auto ที่ตัวห่อ ไม่ใช่ที่หน้าเพจ — ไม่งั้นจอแคบจะเลื่อนทั้งหน้าไปข้างๆ */
+      ) : shownGroups.length === 0 ? (
+        <AllClear text={pendingGroups.length ? "ไม่มีรายการในตัวกรองนี้" : "เคลียร์หมดแล้ว — ไม่มีแผนงานรออนุมัติ"} />
+      ) : viewMode === "table" ? (
         <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2.5, overflowX: "auto" }}>
           <Table size="small" sx={{ minWidth: 760 }}>
             <TableHead>
-              <TableRow sx={{ bgcolor: "#fffbeb" }}>
+              <TableRow sx={{ bgcolor: "#f8fafc" }}>
                 {["งาน", "โครงการ / ไซต์", "ประเภท", "วันที่", "ทีมที่เข้างาน", ""].map((h, i) => (
                   <TableCell key={i} sx={{ fontWeight: 800, fontSize: "0.74rem", color: "text.secondary", whiteSpace: "nowrap" }}>{h}</TableCell>
                 ))}
               </TableRow>
             </TableHead>
             <TableBody>
-              {pendingGroups.map((sessions) => {
+              {shownGroups.map((sessions) => {
                 const head = sessions[0];
                 const key = getOverdueGroupKey(head);
                 const busy = busyKey === key;
@@ -440,276 +361,98 @@ export default function PendingApprovalsPanel({ onCountChange, active = true }) 
           </Table>
         </TableContainer>
       ) : (
-        <Stack spacing={1.5}>
-          {pendingGroups.map((sessions) => {
+        <Stack spacing={1.25} sx={{ mb: 3 }}>
+          {shownGroups.map((sessions) => {
             const head = sessions[0];
             const key = getOverdueGroupKey(head);
             const busy = busyKey === key;
-            const companySite = [head.company, head.site].filter(Boolean).join(" · ");
-            const jobClass = classifyJob(head);
-            const jobClassMeta = getJobClassMeta(jobClass);
-            // ✅ วันที่ที่วางแผนไว้ — ข้อมูลสำคัญที่สุดที่ขาดไปจากการ์ดเดิม: ผู้อนุมัติต้องรู้ว่า "งานนี้จะ
-            // เข้าเมื่อไหร่" ถึงจะตัดสินใจได้ (ชนงานอื่นไหม/ทันกำหนดไหม) เดิมไม่แสดงเลยสักที่
-            // ⚠️ งานที่ยังไม่ลงตาราง (draft) ไม่มีวันที่จริง มีแค่ "เดือนที่ตั้งใจ" (plannedMonth)
-            const dateLabel = head.unscheduled
-              ? (head.plannedMonth ? `แผนเดือน ${formatThai(moment(head.plannedMonth, "YYYY-MM").locale("th"), "MMMM YYYY")}` : "ยังไม่ระบุเดือน")
-              : sessions.map((s) => formatEventDateRange(s)).join(", ");
-            // ✅ ทีมที่เข้างานจากทุกวันของงานนี้ (แต่ละวันอาจคนละทีม) ตัดชื่อซ้ำออก
-            const teamNames = [...new Set(
-              sessions.flatMap((s) => [s.team, ...(s.teamMembers || []).map((m) => m?.name)]).filter(Boolean)
-            )];
-            const responsibleName = head.responsiblePerson || "";
             const isAssigning = assigningKey === key;
+            const jcMeta = getJobClassMeta(classifyJob(head));
+            const responsibleName = head.responsiblePerson || "";
+            const team = teamOf(sessions);
             return (
-              <Box key={key} sx={{
-                p: 1.75, borderRadius: 3, border: "1px solid", borderColor: alpha("#f59e0b", 0.3),
-                bgcolor: alpha("#f59e0b", 0.03),
-                transition: "border-color .15s, box-shadow .15s",
-                "&:hover": { borderColor: alpha("#f59e0b", 0.55), boxShadow: "0 2px 10px rgba(245,158,11,.10)" },
-              }}>
-                <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={1}>
-                  <Box minWidth={0} flex={1}>
-                    <Stack direction="row" gap={0.6} flexWrap="wrap" alignItems="center" sx={{ mb: 0.6 }}>
-                      <Chip size="small" label="⏳ รออนุมัติ" sx={{ height: 22, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha("#f59e0b", 0.15), color: "#92400e" }} />
-                      {head.unscheduled && (
-                        <Chip size="small" label="📌 ยังไม่ลงตาราง" sx={{ height: 22, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha("#0891b2", 0.15), color: "#0e7490" }} />
-                      )}
-                      {sessions.length > 1 && (
-                        <Chip size="small" label={`เข้างาน ${sessions.length} วัน`} sx={{ height: 22, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha("#64748b", 0.15), color: "#475569" }} />
-                      )}
-                      {head.system && (
-                        <Chip size="small" label={head.system} variant="outlined" sx={{ height: 22, fontSize: "0.7rem", fontWeight: 600, color: "text.secondary" }} />
-                      )}
-                      {/* ✅ ประเภทงาน (สัญญา/โปรเจค/ทั่วไป) — ใช้ตัดสินใจต่างกัน งานสัญญาผูกกับรอบที่
-                          ตกลงไว้กับลูกค้าแล้ว ปฏิเสธ/เลื่อนไม่ได้ง่ายเหมือนงานทั่วไป */}
-                      {jobClassMeta && (
-                        <Chip
-                          size="small" label={`${jobClassMeta.emoji} ${jobClassMeta.label}`}
-                          sx={{ height: 22, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha(jobClassMeta.color, 0.15), color: jobClassMeta.color }}
-                        />
-                      )}
-                    </Stack>
-                    {/* ✅ แยกชื่องานกับบริษัท/โครงการเป็นคนละบรรทัด — เดิมต่อกันด้วย " · " ในบรรทัดเดียว
-                        ที่ noWrap ทำให้บนมือถือถูกตัดหายตั้งแต่ชื่อบริษัท มองไม่เห็นว่าเป็นงานของที่ไหน */}
-                    <Typography fontWeight={800} fontSize="0.95rem" noWrap sx={{ letterSpacing: "-0.01em" }}>
-                      {head.title || "งาน"}
-                    </Typography>
-
-                    {/* ✅ ใช้บรรทัด "ไอคอน + ป้ายกำกับ + ค่า" ชุดเดียวกับการ์ดงานในแท็บ "รายการงาน"
-                        (ไอคอน/ป้ายกำกับ/ลำดับเดียวกันเป๊ะ) ตามที่ผู้ใช้ขอให้แสดงข้อมูลสอดคล้องกัน */}
-                    <Stack spacing={0.3} sx={{ mt: 0.6 }}>
-                      {head.system && <InfoLine label="ระบบ">{head.system}</InfoLine>}
-                      <InfoLine label="โครงการ">{companySite || "ไม่ระบุบริษัท/ไซต์"}</InfoLine>
-                      {head.time && (
-                        <InfoLine label="ครั้งที่">{formatRoundLabel(head.time, head.visitCount)}</InfoLine>
-                      )}
-                      <InfoLine label="วันที่">{dateLabel}</InfoLine>
-                      {teamNames.length > 0 && (
-                        <InfoLine label="ทีม">{teamNames.join(", ")}</InfoLine>
-                      )}
-                      <InfoLine label="ผู้ส่ง">
-                        {head.approvalRequestedBy || "ผู้ใช้"}
-                        {head.approvalRequestedAt ? ` · ${moment(head.approvalRequestedAt).locale("th").fromNow()}` : ""}
-                      </InfoLine>
-                    </Stack>
-                  </Box>
-                  {/* ✅ 2 ทางเข้าดูงาน: ปฏิทิน (เห็นบริบทว่าชนกับงานอื่นไหม) กับหน้ารายละเอียดงาน */}
-                  <Stack direction="row" gap={0.25} sx={{ flexShrink: 0 }}>
-                    <Tooltip title="ดูในปฏิทิน (เจาะจงงานนี้)">
-                      <IconButton size="small" onClick={() => goToCalendar(head)}>
-                        <CalendarMonth sx={{ fontSize: 15 }} />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="ดูรายละเอียดงาน">
-                      <IconButton size="small" onClick={() => goToDetail(head)}>
-                        <ArrowForwardIos sx={{ fontSize: 13 }} />
-                      </IconButton>
-                    </Tooltip>
+              <ActionCard
+                key={key}
+                date={head.unscheduled ? null : head.start} dateTone={head.unscheduled ? "amber" : "blue"}
+                top={<>
+                  <SoftPill color={AMBER} icon={<HourglassTop />}>รออนุมัติ</SoftPill>
+                  {jcMeta && <SoftPill color={jcMeta.color}>{jcMeta.label}</SoftPill>}
+                  {head.unscheduled && <SoftPill color="#0e7490" icon={<EventNote />}>ยังไม่ลงตาราง</SoftPill>}
+                  {sessions.length > 1 && <SoftPill color={BLUE}>เข้างาน {sessions.length} ช่วง</SoftPill>}
+                </>}
+                title={[head.company, head.site].filter(Boolean).join(" · ") || "ไม่ระบุโครงการ"}
+                sub={[head.title, head.system, head.time ? `ครั้งที่ ${formatRoundLabel(head.time, head.visitCount)}` : ""].filter(Boolean).join(" · ")}
+                detail={`📅 ${dateLabelOf(sessions)}${team.length ? `  ·  ทีม ${team.join(", ")}` : ""}`}
+                people={<>
+                  <PeopleField label="ผู้ส่ง">{head.approvalRequestedBy ? <PersonChip name={head.approvalRequestedBy} size={20} /> : "-"}</PeopleField>
+                  {head.approvalRequestedAt && <Typography sx={{ fontSize: "0.72rem", color: "text.secondary" }}>ส่ง {moment(head.approvalRequestedAt).locale("th").fromNow()}</Typography>}
+                  <Stack direction="row" spacing={0.25}>
+                    <Tooltip title="ดูในปฏิทิน"><IconButton size="small" onClick={(e) => { e.stopPropagation(); goToCalendar(head); }}><CalendarMonth sx={{ fontSize: 16 }} /></IconButton></Tooltip>
+                    <Tooltip title="ดูรายละเอียดงาน"><IconButton size="small" onClick={(e) => { e.stopPropagation(); goToDetail(head); }}><ArrowForwardIos sx={{ fontSize: 13 }} /></IconButton></Tooltip>
                   </Stack>
-                </Stack>
-
-                {/* ✅ มอบหมาย "ผู้รับผิดชอบงาน" ได้ตรงนี้ก่อนกดอนุมัติ — จุดที่ขาดอยู่เดิมและตกหล่นบ่อย:
-                    งานที่เซล/ช่างส่งเข้ามามักยังไม่มีผู้รับผิดชอบ เพราะคนส่งไม่มีสิทธิ์มอบหมายเอง
-                    (backend ตอบ 403) แอดมินจึงต้องอนุมัติไปก่อนแล้วค่อยไปตามหางานนั้นในหน้าอื่นทีหลัง
-                    ⚠️ เตือนให้เห็นชัดเมื่อยังไม่มอบหมาย — งานที่ไม่มีผู้รับผิดชอบจะไม่มีใครถูกแจ้งเตือน
-                    และหลุดจากตัวกรอง "งานของฉัน" ของทุกคน กลายเป็นงานลอยที่ไม่มีใครดูแลจริงๆ */}
-                <Box sx={{
-                  mt: 1.25, p: 1.25, borderRadius: 2,
-                  bgcolor: responsibleName ? alpha("#10b981", 0.06) : alpha("#ef4444", 0.05),
-                  border: "1px solid",
-                  borderColor: responsibleName ? alpha("#10b981", 0.25) : alpha("#ef4444", 0.25),
-                }}>
+                </>}
+                extra={
                   <TextField
-                    select fullWidth size="small"
-                    label="ผู้รับผิดชอบงาน"
-                    value={responsibleName}
+                    select fullWidth size="small" label="ผู้รับผิดชอบงาน" value={responsibleName}
                     disabled={isAssigning || busy || employees.length === 0}
                     onChange={(e) => handleAssignResponsible(sessions, e.target.value)}
-                    InputLabelProps={{ shrink: true }}
-                    SelectProps={{ displayEmpty: true }}
-                    helperText={
-                      isAssigning
-                        ? "กำลังบันทึก..."
-                        : responsibleName
-                        ? "มอบหมายแล้ว — เปลี่ยนได้ที่นี่"
-                        : "⚠️ ยังไม่มอบหมาย — ควรเลือกก่อนอนุมัติ ไม่งั้นจะไม่มีใครได้รับแจ้งเตือนงานนี้"
-                    }
-                    FormHelperTextProps={{
-                      sx: { fontSize: "0.68rem", m: 0, mt: 0.5, color: responsibleName ? "text.secondary" : "#b91c1c" },
-                    }}
-                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: "background.paper" } }}
+                    InputLabelProps={{ shrink: true }} SelectProps={{ displayEmpty: true }}
+                    helperText={isAssigning ? "กำลังบันทึก..." : responsibleName ? "" : "ควรเลือกก่อนอนุมัติ"}
+                    FormHelperTextProps={{ sx: { m: 0, mt: 0.25, fontSize: "0.68rem", color: AMBER } }}
+                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, bgcolor: responsibleName ? "#fff" : alpha(AMBER, 0.05) } }}
                   >
                     <MenuItem value=""><em>— ยังไม่มอบหมาย —</em></MenuItem>
-                    {employees.map((e) => (
-                      <MenuItem key={e._id} value={e.fname}>{e.fname}</MenuItem>
-                    ))}
+                    {employees.map((e) => <MenuItem key={e._id} value={e.fname}>{e.fname}</MenuItem>)}
                   </TextField>
-                </Box>
-
-                <Stack direction={{ xs: "column", sm: "row" }} gap={1} sx={{ mt: 1.25 }}>
-                  <Button
-                    color="success" variant="contained" size="small"
-                    startIcon={<TaskAlt sx={{ fontSize: 16 }} />}
-                    onClick={() => handleApprove(sessions)}
-                    disabled={busy || isAssigning}
-                    sx={{ flex: 1, borderRadius: 2, textTransform: "none", fontWeight: 700 }}
-                  >
-                    {busy ? "กำลังอนุมัติ..." : "อนุมัติ"}
-                  </Button>
-                  <Button
-                    color="error" variant="outlined" size="small"
-                    startIcon={<Cancel sx={{ fontSize: 16 }} />}
-                    onClick={() => { setRejectTarget(sessions); setRejectReason(""); }}
-                    disabled={busy || isAssigning}
-                    sx={{ flex: 1, borderRadius: 2, textTransform: "none", fontWeight: 700 }}
-                  >
-                    ไม่อนุมัติ
-                  </Button>
-                </Stack>
-              </Box>
+                }
+                actions={
+                  <Stack direction="row" spacing={1}>
+                    <Button
+                      variant="contained" startIcon={<TaskAlt sx={{ fontSize: 17 }} />}
+                      onClick={() => handleApprove(sessions)} disabled={busy || isAssigning}
+                      sx={{ flex: 1, textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: "#16a34a", "&:hover": { bgcolor: "#15803d", boxShadow: "none" } }}
+                    >
+                      {busy ? "กำลังอนุมัติ..." : "อนุมัติ"}
+                    </Button>
+                    <Button
+                      variant="outlined" color="error" startIcon={<Cancel sx={{ fontSize: 17 }} />}
+                      onClick={() => { setRejectTarget(sessions); setRejectReason(""); }} disabled={busy || isAssigning}
+                      sx={{ flex: 1, textTransform: "none", fontWeight: 700, borderRadius: 2 }}
+                    >
+                      ไม่อนุมัติ
+                    </Button>
+                  </Stack>
+                }
+              />
             );
           })}
         </Stack>
       )}
 
-      {/* ไม่อนุมัติล่าสุด — เก็บไว้เป็นข้อมูลอ้างอิงเท่านั้น (กด "ยกเลิก" ไปแล้วต้องรอเจ้าของงานแก้ไข
-          ส่งกลับเข้าคิวเอง ระบบจะพากลับมาที่ลิสต์ด้านบนอัตโนมัติ) จึงไม่มีปุ่มกดใดๆ ในนี้ */}
+      {/* ไม่อนุมัติล่าสุด — ข้อมูลอ้างอิง (ไม่มีปุ่มทำงาน) แถวกระชับแบบเดียวกับหมวด "ลงแผนงานแล้ว" ของฝั่งขาย */}
       {!loading && rejectedAll.length > 0 && (
-        <Box sx={{ mt: 3 }}>
-          <Divider sx={{ mb: 1 }} />
-          <Button
-            onClick={() => setShowRejected((p) => !p)}
-            endIcon={showRejected ? <ExpandLess /> : <ExpandMore />}
-            sx={{ textTransform: "none", fontWeight: 700, color: "text.secondary" }}
-          >
-            {/* ✅ บอกให้ชัดว่ากำลังแสดงกี่รายการจากทั้งหมดเท่าไหร่ เมื่อรายการถูกตัด — เดิมขึ้นแค่ตัวเลข
-                ที่ตัดแล้ว ทำให้เข้าใจว่ามีเท่านั้นจริงๆ */}
-            ไม่อนุมัติล่าสุด{" "}
-            {rejectedAll.length > rejectedGroups.length
-              ? `(แสดง ${rejectedGroups.length} จาก ${rejectedAll.length})`
-              : `(${rejectedAll.length})`}
-          </Button>
-          <Collapse in={showRejected}>
-            <Stack spacing={1} sx={{ mt: 1 }}>
-              {/* ✅ แสดงรายละเอียดให้ครบเท่าการ์ดรออนุมัติด้านบน (ตามที่ผู้ใช้ขอ) — เดิมมีแค่ชื่องาน
-                  ต่อกันยาวบรรทัดเดียวกับบริษัท/โครงการแบบ noWrap (ตัดหายบนมือถือ) + คนไม่อนุมัติ/เหตุผล
-                  ยัดรวมเป็นข้อความก้อนเดียว อ่านยากและไม่รู้ว่างานนี้คือวันไหน ครั้งที่เท่าไหร่ ใครเข้า
-                  ⚠️ "เหตุผลที่ไม่อนุมัติ" คือข้อมูลสำคัญที่สุดของการ์ดนี้ (เจ้าของงานต้องเอาไปแก้)
-                  จึงแยกออกมาเป็นกล่องของตัวเองให้เห็นชัด ไม่ใช่ต่อท้ายบรรทัดอื่นจนกลืนหาย */}
-              {rejectedGroups.map((sessions) => {
-                const head = sessions[0];
-                const rCompanySite = [head.company, head.site].filter(Boolean).join(" · ");
-                const rJobClassMeta = getJobClassMeta(classifyJob(head));
-                const rDateLabel = head.unscheduled
-                  ? (head.plannedMonth ? `แผนเดือน ${formatThai(moment(head.plannedMonth, "YYYY-MM").locale("th"), "MMMM YYYY")}` : "ยังไม่ระบุเดือน")
-                  : sessions.map((s) => formatEventDateRange(s)).join(", ");
-                const rTeamNames = [...new Set(
-                  sessions.flatMap((s) => [s.team, ...(s.teamMembers || []).map((m) => m?.name)]).filter(Boolean)
-                )];
-                return (
-                  <Box
-                    key={getOverdueGroupKey(head)}
-                    sx={{
-                      p: 1.5, borderRadius: 2, border: "1px solid", borderColor: alpha("#ef4444", 0.25),
-                      bgcolor: alpha("#ef4444", 0.03),
-                      "&:hover": { borderColor: alpha("#ef4444", 0.5) },
-                    }}
-                  >
-                    <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={1}>
-                      <Box minWidth={0} flex={1}>
-                        <Stack direction="row" gap={0.6} flexWrap="wrap" alignItems="center" sx={{ mb: 0.5 }}>
-                          <Chip size="small" label="❌ ไม่อนุมัติ" sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha("#ef4444", 0.15), color: "#991b1b" }} />
-                          {head.unscheduled && (
-                            <Chip size="small" label="📌 ยังไม่ลงตาราง" sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha("#0891b2", 0.15), color: "#0e7490" }} />
-                          )}
-                          {sessions.length > 1 && (
-                            <Chip size="small" label={`เข้างาน ${sessions.length} วัน`} sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha("#64748b", 0.15), color: "#475569" }} />
-                          )}
-                          {head.system && (
-                            <Chip size="small" label={head.system} variant="outlined" sx={{ height: 20, fontSize: "0.65rem", fontWeight: 600, color: "text.secondary" }} />
-                          )}
-                          {rJobClassMeta && (
-                            <Chip size="small" label={`${rJobClassMeta.emoji} ${rJobClassMeta.label}`}
-                              sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha(rJobClassMeta.color, 0.15), color: rJobClassMeta.color }} />
-                          )}
-                        </Stack>
-
-                        <Typography fontWeight={800} fontSize="0.9rem" noWrap sx={{ letterSpacing: "-0.01em" }}>
-                          {head.title || "งาน"}
-                        </Typography>
-
-                        {/* ✅ ชุดบรรทัดข้อมูลเดียวกับการ์ดรออนุมัติด้านบนและการ์ดงานในแท็บ "รายการงาน" */}
-                        <Stack spacing={0.3} sx={{ mt: 0.6 }}>
-                          {head.system && <InfoLine label="ระบบ">{head.system}</InfoLine>}
-                          <InfoLine label="โครงการ">{rCompanySite || "ไม่ระบุบริษัท/ไซต์"}</InfoLine>
-                          {head.time && (
-                            <InfoLine label="ครั้งที่">{formatRoundLabel(head.time, head.visitCount)}</InfoLine>
-                          )}
-                          <InfoLine label="วันที่">{rDateLabel}</InfoLine>
-                          {rTeamNames.length > 0 && (
-                            <InfoLine label="ทีม">{rTeamNames.join(", ")}</InfoLine>
-                          )}
-                          <InfoLine label="ผู้รับผิดชอบ">
-                            {head.responsiblePerson || "— ยังไม่มอบหมาย —"}
-                          </InfoLine>
-                        </Stack>
-                      </Box>
-                      <Stack direction="row" gap={0.25} sx={{ flexShrink: 0 }}>
-                        <Tooltip title="ดูในปฏิทิน (เจาะจงงานนี้)">
-                          <IconButton size="small" onClick={() => goToCalendar(head)}>
-                            <CalendarMonth sx={{ fontSize: 15 }} />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="ดูรายละเอียดงาน">
-                          <IconButton size="small" onClick={() => goToDetail(head)}>
-                            <ArrowForwardIos sx={{ fontSize: 13 }} />
-                          </IconButton>
-                        </Tooltip>
-                      </Stack>
-                    </Stack>
-
-                    {/* ✅ เหตุผลที่ไม่อนุมัติ — แยกเป็นกล่องของตัวเอง เพราะเป็นสิ่งที่เจ้าของงานต้องเอาไป
-                        แก้ไขจริง ไม่ควรกลืนไปกับบรรทัดข้อมูลอื่น */}
-                    <Box sx={{ mt: 1, pt: 1, borderTop: "1px dashed", borderColor: alpha("#ef4444", 0.25) }}>
-                      <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-                        {head.approvalDecidedBy || "แอดมิน"} ไม่อนุมัติ
-                        {head.approvalDecidedAt ? ` · ${moment(head.approvalDecidedAt).locale("th").fromNow()}` : ""}
-                      </Typography>
-                      {head.approvalRejectReason ? (
-                        <Typography variant="caption" sx={{ display: "block", mt: 0.25, color: "#991b1b", fontWeight: 600 }}>
-                          เหตุผล: {head.approvalRejectReason}
-                        </Typography>
-                      ) : (
-                        <Typography variant="caption" sx={{ display: "block", mt: 0.25, color: "text.disabled", fontStyle: "italic" }}>
-                          ไม่ได้ระบุเหตุผล
-                        </Typography>
-                      )}
-                    </Box>
-                  </Box>
-                );
-              })}
-            </Stack>
-          </Collapse>
+        <Box sx={{ mt: 1 }}>
+          <SectionHead color="#dc2626" title="ไม่อนุมัติล่าสุด" count={rejectedAll.length}
+            hint={rejectedAll.length > rejectedGroups.length ? `แสดง ${rejectedGroups.length} รายการล่าสุด` : "รอเจ้าของงานแก้ไขแล้วส่งใหม่"} />
+          <RowGroup title="งานที่ไม่อนุมัติ" count={rejectedGroups.length} color="#dc2626" defaultOpen={showRejected}>
+            {rejectedGroups.map((sessions) => {
+              const head = sessions[0];
+              return (
+                <QueueRow
+                  key={getOverdueGroupKey(head)} onOpen={() => goToDetail(head)} edge="#dc2626"
+                  date={head.unscheduled ? null : head.start} dateTone={head.unscheduled ? "amber" : "grey"}
+                  title={[head.company, head.site].filter(Boolean).join(" · ") || head.title || "งาน"}
+                  sub={`${[head.title, head.system].filter(Boolean).join(" · ")} — ${head.approvalRejectReason ? `เหตุผล: ${head.approvalRejectReason}` : "ไม่ได้ระบุเหตุผล"}`}
+                  right={<>
+                    {head.responsiblePerson ? <PersonChip name={head.responsiblePerson} strong size={20} /> : <UnassignedChip />}
+                    <Typography sx={{ fontSize: "0.72rem", color: "text.secondary", whiteSpace: "nowrap" }}>
+                      {head.approvalDecidedBy || "แอดมิน"}{head.approvalDecidedAt ? ` · ${moment(head.approvalDecidedAt).locale("th").fromNow()}` : ""}
+                    </Typography>
+                  </>}
+                />
+              );
+            })}
+          </RowGroup>
         </Box>
       )}
 

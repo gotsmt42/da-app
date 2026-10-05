@@ -17,7 +17,7 @@ import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import {
   Box, Stack, Typography, IconButton, Tooltip, TextField,
-  CircularProgress, Alert, useMediaQuery,
+  CircularProgress, Alert, useMediaQuery, Button,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
@@ -26,6 +26,8 @@ import {
   CalendarMonth, HourglassTop, EventAvailable, TaskAlt, Close,
 } from "@mui/icons-material";
 import { PersonChip, UnassignedChip } from "@/shared/ui/PersonChip";
+import { QueueToolbar, SectionHead, AllClear, ActionCard, PeopleField, QueueRow, RowGroup, SoftPill, AMBER, BLUE } from "./QueueKit";
+
 
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { formatThai } from "@/shared/utils/thaiDate";
@@ -39,6 +41,8 @@ import {
   DOC_TYPE_META,
   jobStatusColor,
 } from "../dispatchMeta";
+
+const FAINT_DOT = "#94a3b8";
 
 const EMPTY_TEXT = {
   board: { title: "ยังไม่มีคำขอมอบหมายงาน", sub: "เมื่อฝ่ายขายส่งงานเข้ามา จะมาโผล่ที่นี่" },
@@ -379,6 +383,7 @@ export default function DispatchList({ mode = "board", myId = "" }) {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("open");
+  const [quick, setQuick] = useState("all");
   // ✅ เปิดใบตาม /dispatch/<id> หรือ /sales/<id> ที่มาจากแจ้งเตือน
   // ⚠️ อ่านจาก useParams ไม่ใช่ prop — คอมโพเนนต์นี้ถูกใช้ทั้งสองหน้า และทั้งคู่มี :id? เหมือนกัน
   const { id: routeId } = useParams();
@@ -448,8 +453,120 @@ export default function DispatchList({ mode = "board", myId = "" }) {
     return QUEUE_STATUSES.map((st) => [st, map[st]]);
   }, [filtered, mode]);
 
+  // ── ตัวกรองด่วนของคิว (ผู้ใช้: "ข้อมูลดูยาก จัดการยาก") — นับจากรายการที่ผ่านคำค้นแล้ว ──
+  const today = moment().startOf("day");
+  const QUICK = {
+    all: () => true,
+    urgent: (d) => d.priority === "urgent",
+    unassigned: (d) => !responsibleOf(d),
+    soon: (d) => d.job?.start && moment(d.job.start).isBetween(today, today.clone().add(7, "days"), "day", "[]"),
+  };
+  const quickList = filtered.filter(QUICK[quick] || QUICK.all);
+  const waitingRows = quickList.filter((d) => d.status === "requested")
+    .sort((a, b) => (b.priority === "urgent") - (a.priority === "urgent") || new Date(a.requestedAt) - new Date(b.requestedAt));
+  const assignedRows = quickList.filter((d) => d.status === "assigned");
+  const upcoming = assignedRows.filter((d) => !d.job?.start || !moment(d.job.start).isBefore(today, "day"))
+    .sort((a, b) => new Date(a.job?.start || 0) - new Date(b.job?.start || 0));
+  const past = assignedRows.filter((d) => d.job?.start && moment(d.job.start).isBefore(today, "day"))
+    .sort((a, b) => new Date(b.job.start) - new Date(a.job.start));
+
   if (loading && !rows.length) {
     return <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}><CircularProgress /></Box>;
+  }
+
+  if (mode === "board") {
+    const open = (x) => setOpenId(x._id);
+    const assignedRow = (d) => {
+      const m = statusBadge(d);
+      const resp = responsibleOf(d);
+      return (
+        <QueueRow
+          key={d._id} onOpen={() => open(d)} edge={m.color}
+          date={d.job?.start} dateTone={d.job?.start ? "blue" : "amber"}
+          title={companySite(d.customer?.company, d.customer?.site)}
+          sub={[d.dispatchNo, [d.title, d.system].filter(Boolean).join(" · ")].filter(Boolean).join("  ·  ")}
+          right={<>
+            {resp ? <PersonChip name={resp} strong size={20} /> : <UnassignedChip />}
+            <SoftPill color={m.color}>{m.label}</SoftPill>
+          </>}
+        />
+      );
+    };
+    return (
+      <Box>
+        {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>{error}</Alert>}
+        <QueueToolbar
+          search={search} onSearch={setSearch} placeholder="ค้นหางาน / ลูกค้า / เลขที่ใบ"
+          filter={quick} onFilter={setQuick}
+          filters={[
+            { key: "all", label: "ทั้งหมด", count: filtered.length },
+            { key: "urgent", label: "ด่วน", count: filtered.filter(QUICK.urgent).length, color: "#dc2626" },
+            { key: "unassigned", label: "ยังไม่มีผู้รับผิดชอบ", count: filtered.filter(QUICK.unassigned).length, color: AMBER },
+            { key: "soon", label: "เข้างานใน 7 วัน", count: filtered.filter(QUICK.soon).length, color: BLUE },
+          ]}
+          view={viewMode} onView={setViewMode} onRefresh={() => load()} loading={loading}
+        />
+
+        {viewMode === "table" ? (
+          quickList.length ? <DispatchTable rows={quickList} onOpen={open} /> : <AllClear text={search ? "ไม่พบรายการที่ค้นหา" : "ไม่มีรายการในตัวกรองนี้"} />
+        ) : (
+          <>
+            <SectionHead color={AMBER} title="รอลงแผนงาน" count={waitingRows.length} hint="ตรวจรายละเอียด แล้วเลือกวันเข้างาน + ช่าง" />
+            {waitingRows.length === 0 ? (
+              <AllClear text="เคลียร์หมดแล้ว — ไม่มีคำขอรอลงแผนงาน" />
+            ) : (
+              <Stack spacing={1.25} sx={{ mb: 3 }}>
+                {waitingRows.map((d) => {
+                  const resp = responsibleOf(d);
+                  return (
+                    <ActionCard
+                      key={d._id} urgent={d.priority === "urgent"} onOpen={() => open(d)}
+                      date={d.job?.start} dateTone="amber"
+                      top={<>
+                        <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: TEXT_SUB, fontVariantNumeric: "tabular-nums" }}>{d.dispatchNo || "ใบแจ้งงาน"}</Typography>
+                        {d.priority === "urgent" && <UrgentPill />}
+                        {(d.attachments || []).some((x) => DOC_TYPE_META[x.docType]?.commercial) && <SoftPill color="#059669" icon={<Description />}>มี QT/PO</SoftPill>}
+                        {d.customer?.mapUrl && <SoftPill color={BLUE} icon={<Place />}>มีแผนที่</SoftPill>}
+                      </>}
+                      title={companySite(d.customer?.company, d.customer?.site)}
+                      sub={[d.title, d.system].filter(Boolean).join(" · ")}
+                      detail={d.detail || d.note}
+                      people={<>
+                        <PeopleField label="ผู้แจ้ง">{d.requestedBy?.name ? <PersonChip name={d.requestedBy.name} badge={requesterDept(d)} size={20} /> : "-"}</PeopleField>
+                        <PeopleField label="ผู้รับผิดชอบ">{resp ? <PersonChip name={resp} strong size={20} /> : <UnassignedChip />}</PeopleField>
+                        {d.requestedAt && <Typography sx={{ fontSize: "0.72rem", color: TEXT_SUB }}>แจ้ง {moment(d.requestedAt).fromNow()}</Typography>}
+                      </>}
+                      actions={
+                        <Button variant="contained" startIcon={<EventAvailable />} onClick={() => open(d)}
+                          sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: BLUE, py: 1, "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } }}>
+                          ตรวจและลงแผนงาน
+                        </Button>
+                      }
+                    />
+                  );
+                })}
+              </Stack>
+            )}
+
+            <SectionHead color={BLUE} title="ลงแผนงานแล้ว" count={assignedRows.length} hint="ลงตารางงานแล้ว — งานที่กำลังทำ/ปิดงานดูต่อที่หน้าการดำเนินงาน" />
+            {assignedRows.length === 0 ? (
+              <Typography sx={{ px: 0.5, fontSize: "0.82rem", color: TEXT_SUB }}>ยังไม่มีใบที่ลงแผนงาน</Typography>
+            ) : (
+              <>
+                {upcoming.length > 0 && <RowGroup title="กำลังจะเข้างาน" count={upcoming.length} color={BLUE}>{upcoming.map(assignedRow)}</RowGroup>}
+                {past.length > 0 && <RowGroup title="เข้างานไปแล้ว" count={past.length} color={FAINT_DOT} defaultOpen={upcoming.length === 0}>{past.map(assignedRow)}</RowGroup>}
+              </>
+            )}
+          </>
+        )}
+
+        <DispatchDialog
+          dispatchId={openId}
+          onClose={() => { setOpenId(null); if (routeId) navigate(basePath, { replace: true }); }}
+          onSaved={patch}
+        />
+      </Box>
+    );
   }
 
   const empty = EMPTY_TEXT[mode];

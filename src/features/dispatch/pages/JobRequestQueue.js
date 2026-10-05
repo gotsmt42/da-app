@@ -38,14 +38,14 @@ const SOURCES = [
     key: "sales",
     label: "จากฝ่ายขาย",
     icon: <Storefront />,
-    color: "#8b5cf6",
+    color: "#2563eb",
     hint: "เซลกรอกฟอร์มแจ้งเข้ามา — ตรวจแล้วจัดลงแผนงานให้",
   },
   {
     key: "approvals",
     label: "จากฝ่ายช่าง",
     icon: <HourglassTop />,
-    color: "#f59e0b",
+    color: "#d97706",
     hint: "ช่างสร้างแผนงานเอง — ต้องอนุมัติก่อนถึงจะยืนยันจริง",
   },
 ];
@@ -116,8 +116,8 @@ export default function JobRequestQueue() {
           items: SOURCES.map((s) => {
             const count = s.key === "sales" ? waiting : approvalCount;
             return {
-              // ✅ สีเดียวทั้งแถว (เทาเข้ม) ตามกฎ "สีไม่เยอะ" — เดิมม่วง/ส้มคนละช่อง
-              value: s.key, label: s.label, count, unit: "ใบ", icon: s.icon, color: "#475569", alert: false,
+              // ✅ (5 ต.ค. 2569) ผู้ใช้: "สีจืดเกินไป" — ไอคอน/ขอบตอนเลือกใช้สีประจำแหล่งที่มา (ขาย = น้ำเงิน · ช่าง = ส้ม)
+              value: s.key, label: s.label, count, unit: "ใบ", icon: s.icon, color: s.color, alert: false,
               sub: s.key === "sales" && urgent > 0 ? `ด่วน ${urgent}` : undefined,
             };
           }),
