@@ -1,366 +1,381 @@
-import { useEffect, useState } from "react";
+/**
+ * Settings — หน้า "การตั้งค่า"
+ *
+ * ✅ ผู้ใช้สั่ง (5 ต.ค. 2569): "แก้ไขหน้าตั้งค่าใหม่ ใช้ยาก ไม่สวย · มืออาชีพ ละเอียด สมบูรณ์"
+ *    + "อยากเห็นว่าบัญชีเข้าไว้ที่อุปกรณ์อะไรบ้าง ชื่ออะไร ที่ไหน อย่างละเอียด"
+ *   • จัดเป็นกลุ่มแบบรายการตั้งค่ามาตรฐาน: หัวกลุ่ม → กล่องขาว 1 กล่อง → แถวคั่นเส้นบาง (เดิมทุกแถวเป็นการ์ดลอยแยกกัน)
+ *   • เพิ่ม "อุปกรณ์ที่เข้าสู่ระบบ": ชนิดเครื่อง/รุ่น · เบราว์เซอร์ · ระบบปฏิบัติการ · ตำแหน่งโดยประมาณ + IP
+ *     · เวลาใช้งานล่าสุด · ออกจากระบบทีละเครื่อง หรือทุกเครื่องยกเว้นเครื่องนี้
+ *   • ธีมเดียวกับทั้งแอป (ขาว · เทา · น้ำเงิน) · ใช้สีแดงเฉพาะปุ่มออกจากระบบ
+ */
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Container } from "reactstrap";
-import { Switch } from "@mui/material";
+import moment from "moment";
+import "@/shared/utils/momentThaiLocale";
 import {
-  FaBell,
-  FaBuilding,
-  FaUsers,
-  FaChevronRight,
-  FaInfoCircle,
-  FaSignOutAlt,
-  FaTags,
-  FaFileSignature,
-  FaImage,
-  FaUserShield,
-} from "react-icons/fa";
-import Swal from "sweetalert2";
+  Box, Stack, Typography, Avatar, Switch, Button, IconButton, Tooltip, CircularProgress, Dialog, DialogTitle,
+  DialogContent, DialogActions, Snackbar, Alert, Skeleton,
+} from "@mui/material";
+import {
+  ChevronRight, DrawOutlined, NotificationsActiveOutlined, NotificationsOffOutlined, BusinessOutlined,
+  GroupOutlined, LocalOfferOutlined, ImageOutlined, AdminPanelSettingsOutlined, InfoOutlined, Logout,
+  LaptopMac, PhoneIphone, TabletMac, DevicesOther, PlaceOutlined, Refresh, CheckCircle, PersonOutline,
+  ShieldOutlined, InstallMobile,
+} from "@mui/icons-material";
 import { useAuth } from "@/features/auth/AuthContext";
 import PushService from "@/shared/services/PushService";
-import { swalLogout } from "@/shared/utils/user";
-import { can, rankLabel } from "@/shared/utils/roles";
+import SessionService from "@/shared/services/SessionService";
+import SignatureService from "@/shared/services/SignatureService";
+import { swalLogout, hasValidAvatar } from "@/shared/utils/user";
+import { can, rankLabel, systemRoleLabel } from "@/shared/utils/roles";
+import { personColor, personInitial } from "@/shared/utils/personAvatar";
+import { getOptimizedImageUrl } from "@/shared/utils/cloudinaryImage";
+import { formatThai } from "@/shared/utils/thaiDate";
 import useOrgSettings from "@/shared/hooks/useOrgSettings";
 import { APP_NAME, APP_VERSION } from "@/shared/appInfo";
 import { dest, DEST } from "@/layouts/navConfig";
 import { ORG_FALLBACK } from "@/shared/services/OrgSettingService";
 import SignatureSettingsDialog from "../components/SignatureSettingsDialog";
-import SignatureService from "@/shared/services/SignatureService";
+import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LINE } from "@/shared/ui/PageKit";
 
+const GREEN = "#16a34a";
+const RED = "#dc2626";
+const AMBER = "#b45309";
 
+/** หัวกลุ่ม + กล่องขาว */
+const Group = ({ title, hint, right, children }) => (
+  <Box sx={{ mb: 2.5 }}>
+    <Stack direction="row" alignItems="flex-end" spacing={1} sx={{ px: 0.5, mb: 0.75 }}>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography sx={{ fontSize: "0.78rem", fontWeight: 800, color: MUTED, letterSpacing: ".02em" }}>{title}</Typography>
+        {hint && <Typography sx={{ fontSize: "0.72rem", color: FAINT }}>{hint}</Typography>}
+      </Box>
+      {right}
+    </Stack>
+    <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflow: "hidden", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
+      {children}
+    </Box>
+  </Box>
+);
 
-const Settings = () => {
+/** แถวตั้งค่า 1 แถว — กดได้ (onClick) หรือมีตัวควบคุมทางขวา (right) */
+const Row = ({ icon, tone = ACCENT, title, desc, right, onClick, danger }) => (
+  <Stack
+    direction="row" alignItems="center" spacing={1.5} onClick={onClick}
+    role={onClick ? "button" : undefined} tabIndex={onClick ? 0 : undefined}
+    onKeyDown={onClick ? (e) => { if (e.key === "Enter") onClick(); } : undefined}
+    sx={{
+      px: 2, py: 1.4, borderTop: `1px solid ${LINE}`, "&:first-of-type": { borderTop: 0 },
+      cursor: onClick ? "pointer" : "default", "&:hover": onClick ? { bgcolor: SURFACE } : undefined,
+      "&:focus-visible": { outline: `2px solid ${ACCENT}`, outlineOffset: -2 },
+    }}
+  >
+    <Box sx={{ width: 38, height: 38, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: `${tone}14`, color: tone, "& svg": { fontSize: 20 } }}>
+      {icon}
+    </Box>
+    <Box sx={{ flex: 1, minWidth: 0 }}>
+      <Typography sx={{ fontSize: "0.92rem", fontWeight: 700, color: danger ? RED : INK }}>{title}</Typography>
+      {desc && <Typography component="div" sx={{ fontSize: "0.78rem", color: MUTED, mt: 0.15, lineHeight: 1.45 }}>{desc}</Typography>}
+    </Box>
+    {right !== undefined ? right : onClick ? <ChevronRight sx={{ color: FAINT }} /> : null}
+  </Stack>
+);
+
+/** ชื่ออุปกรณ์ที่อ่านแล้วเข้าใจ */
+const deviceTitle = (s) => {
+  const model = [s.deviceVendor, s.deviceModel].filter(Boolean).join(" ").replace(/^Apple (iPhone|iPad)/, "$1");
+  const osName = [s.os, s.osVersion].filter(Boolean).join(" ");
+  if (model) return model;
+  if (s.deviceType === "desktop" && osName) return `คอมพิวเตอร์ ${osName}`;
+  if (osName) return `${s.deviceType === "tablet" ? "แท็บเล็ต" : "มือถือ"} ${osName}`;
+  return "อุปกรณ์ไม่ทราบชนิด";
+};
+const deviceIcon = (t) => (t === "mobile" ? <PhoneIphone /> : t === "tablet" ? <TabletMac /> : t === "desktop" ? <LaptopMac /> : <DevicesOther />);
+const placeOf = (loc = {}) => [loc.city, loc.region && loc.region !== loc.city ? loc.region : "", loc.country].filter(Boolean).join(", ");
+
+export default function Settings() {
   const { userData, logout } = useAuth();
   const org = useOrgSettings();
   const navigate = useNavigate();
   const isAdmin = can(userData, "manageAll");
-  // ✅ เมนูระดับ "ตั้งค่าระบบ" (โลโก้องค์กร/ตารางสิทธิ์) เห็นเฉพาะผู้ดูแลระบบสูงสุด — แยกจากการจัดการผู้ใช้
   const isSuperAdmin = can(userData, "manageSystem");
 
+  // ── การแจ้งเตือน ──
   const [pushSubscribed, setPushSubscribed] = useState(false);
   const [pushLoading, setPushLoading] = useState(false);
   const [pushPermission, setPushPermission] = useState("default");
   const [pushDevices, setPushDevices] = useState(null);
+  const pushSupported = PushService.isSupported();
   const iosNeedsInstall = PushService.isIos() && !PushService.isStandalone();
-  const loadPushStatus = () => {
+  const loadPushStatus = useCallback(() => {
     PushService.getPermissionState().then(setPushPermission).catch(() => {});
     PushService.status().then((st) => setPushDevices(st.devices)).catch(() => {});
-  };
-  // ลายเซ็นอิเล็กทรอนิกส์ของผู้ใช้เอง (ใช้กับเอกสาร PDF ทุกใบที่ตัวเองออก/อนุมัติ)
+    if (PushService.isSupported()) PushService.isSubscribed().then(setPushSubscribed).catch(() => {});
+  }, []);
+
+  // ── ลายเซ็น ──
   const [signOpen, setSignOpen] = useState(false);
   const [hasSignature, setHasSignature] = useState(null);
 
-  useEffect(() => {
-    if (PushService.isSupported()) {
-      PushService.isSubscribed().then(setPushSubscribed);
-    }
-    loadPushStatus();
-    SignatureService.me().then((sig) => setHasSignature(Boolean(sig)));
+  // ── อุปกรณ์ที่เข้าสู่ระบบ ──
+  const [sessions, setSessions] = useState(null);
+  const [sessError, setSessError] = useState("");
+  const [confirm, setConfirm] = useState(null); // { type: "one"|"others", session? }
+  const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  const loadSessions = useCallback(async () => {
+    setSessError("");
+    try { setSessions(await SessionService.list()); }
+    catch (err) { setSessions([]); setSessError(err?.response?.data?.message || "โหลดรายการอุปกรณ์ไม่สำเร็จ"); }
   }, []);
 
-  // ✅ ใช้ PushService ตัวเดียวกับปุ่มกระดิ่งบน Header เป๊ะๆ — สลับที่ไหนก็ sync สถานะเดียวกัน
+  useEffect(() => {
+    loadPushStatus();
+    SignatureService.me().then((sig) => setHasSignature(Boolean(sig))).catch(() => setHasSignature(false));
+    loadSessions();
+  }, [loadPushStatus, loadSessions]);
+
   const handleTogglePush = async () => {
-    if (!PushService.isSupported()) {
-      Swal.fire("อุปกรณ์นี้ไม่รองรับ", "เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือนแบบ Push", "warning");
-      return;
-    }
+    if (!pushSupported) return;
     setPushLoading(true);
     try {
-      if (pushSubscribed) {
-        await PushService.unsubscribe();
-        setPushSubscribed(false);
-        Swal.fire({ title: "ปิดการแจ้งเตือนแล้ว", icon: "success", timer: 1200, showConfirmButton: false });
-      } else {
-        await PushService.subscribe();
-        setPushSubscribed(true);
-        Swal.fire({ title: "เปิดการแจ้งเตือนแล้ว 🔔", icon: "success", timer: 1200, showConfirmButton: false });
-      }
+      if (pushSubscribed) { await PushService.unsubscribe(); setPushSubscribed(false); setToast({ type: "success", text: "ปิดการแจ้งเตือนบนอุปกรณ์นี้แล้ว" }); }
+      else { await PushService.subscribe(); setPushSubscribed(true); setToast({ type: "success", text: "เปิดการแจ้งเตือนบนอุปกรณ์นี้แล้ว" }); }
     } catch (error) {
-      Swal.fire("ทำรายการไม่สำเร็จ", error.message || "กรุณาลองใหม่อีกครั้ง", "error");
+      setToast({ type: "error", text: error.message || "ทำรายการไม่สำเร็จ" });
     } finally {
       setPushLoading(false);
       loadPushStatus();
     }
   };
 
-  /**
-   * ✅ จุดออกจากระบบ "จุดเดียว" ของทั้งแอป (ผู้ใช้สั่ง "ให้เหลือแค่จุดเดียว")
-   * เดิมมี 3 ที่: ดรอปดาวน์รูปโปรไฟล์บนแถบบน · ท้ายเมนูข้าง · และที่นี่
-   * ⚠️ ถ้าจะเพิ่มทางออกที่อื่นอีก ให้ทบทวนก่อน — ปุ่มออกจากระบบหลายจุดคือสิ่งที่ผู้ใช้สั่งให้เลิก
-   */
+  /** ✅ จุดออกจากระบบจุดเดียวของทั้งแอป (ผู้ใช้สั่ง "ให้เหลือแค่จุดเดียว") */
   const handleLogout = async () => {
     const result = await swalLogout();
-    if (result.isConfirmed) {
-      logout();
-      Swal.fire("ออกจากระบบแล้ว", "", "success");
+    if (result.isConfirmed) logout();
+  };
+
+  const doRevoke = async () => {
+    setBusy(true);
+    try {
+      if (confirm.type === "others") {
+        const r = await SessionService.revokeOthers();
+        setToast({ type: "success", text: `ออกจากระบบอุปกรณ์อื่นแล้ว ${r.revoked || 0} เครื่อง` });
+      } else {
+        const r = await SessionService.revoke(confirm.session.sid);
+        if (r.self) { logout(); return; }
+        setToast({ type: "success", text: `ออกจากระบบ ${deviceTitle(confirm.session)} แล้ว` });
+      }
+      setConfirm(null);
+      loadSessions();
+    } catch (err) {
+      setToast({ type: "error", text: err?.response?.data?.message || "ทำรายการไม่สำเร็จ" });
+    } finally {
+      setBusy(false);
     }
   };
 
-  const initials = (userData?.fname?.charAt(0) || userData?.username?.charAt(0) || "U").toUpperCase();
+  const fullName = userData?.fname ? `${userData.fname} ${userData?.lname || ""}`.trim() : (userData?.username || "ผู้ใช้งาน");
+  const nameKey = userData?.fname || userData?.username;
+  const others = (sessions || []).filter((s) => !s.current);
 
-  // ⚠️ ไม่ใส่ "สินค้า" (/product) และ "สต็อกสินค้า" (/product/stock) ในเมนูนี้ — ผู้ใช้แจ้งว่าเป็นของเก่า
-  // ที่ไม่ได้ใช้งานแล้ว (หน้ายังอยู่ในระบบและเข้าผ่าน URL ตรงได้ แต่ไม่ต้องมีทางเข้าจากหน้าตั้งค่า)
-  /**
-   * ⚠️ ชื่อเมนูต้องตรงกับ "ชื่อหัวข้อของหน้าปลายทาง" เป๊ะๆ — กดเมนูชื่อหนึ่งแล้วเปิดไปเจออีกชื่อหนึ่ง
-   * ทำให้ผู้ใช้ไม่แน่ใจว่ามาถูกที่ไหม (เดิม "องค์กรและเอกสาร" ไปหน้าชื่อ "ตั้งค่าองค์กร" และ
-   * "สิทธิ์การใช้งาน" ไปหน้าชื่อ "ตั้งค่าสิทธิ์")
-   * ⚠️ คำอธิบายใช้รูปแบบเดียวกันทุกแถว: "ในนั้นมีอะไร · ไปมีผลตรงไหน"
-   * และเลี่ยงศัพท์อังกฤษ (เดิมมีคำว่า dropdown ปนอยู่คำเดียวในทั้งหน้าที่เป็นไทยหมด)
-   */
-
-  /** ทะเบียนข้อมูลที่ทั้งระบบหยิบไปใช้ — ใช้คำว่า "ข้อมูลหลัก" ให้ตรงกับหมวดเดียวกันในเมนูข้าง */
-  // 🐛 เดิมสองแถวแรกชี้ไป /customer และ /employee ซึ่งเป็นแค่ตัว redirect ของเก่า
-  //    กดทีต้องเด้งสองต่อกว่าจะถึงหน้าจริง — ทะเบียนกลางชี้พาธจริง (/customers, /staff) ให้แล้ว
-  const masterDataLinks = [
-    { ...dest("customers"), desc: "ทะเบียนลูกค้าและผู้ติดต่อ · ใช้เลือกตอนเปิดงานและออกเอกสาร", icon: <FaBuilding size={18} />, color: "#3b82f6" },
-    // ⚠️ คำอธิบายเดิมเขียนว่า "จัดการสิทธิ์และข้อมูลพนักงาน" ซึ่งชนกับหัวข้อ "ตั้งค่าสิทธิ์" ด้านล่าง
-    // จนดูเหมือนตั้งสิทธิ์ได้สองที่ — ที่นี่คือสิทธิ์ของคนรายคน ส่วนตารางสิทธิ์อยู่อีกหน้า
-    { ...dest("staff"), title: "พนักงาน", desc: "ทะเบียนพนักงาน · บัญชีผู้ใช้ · ตำแหน่งในองค์กรของแต่ละคน", icon: <FaUsers size={18} />, color: "#f43f5e" },
-    { ...dest("worktype"), desc: DEST.worktype.sub, icon: <FaTags size={18} />, color: "#8b5cf6" },
-  ];
-
-  /** ค่าระดับระบบ — คนละชั้นสิทธิ์กับด้านบน (ผู้ดูแลระบบสูงสุดเท่านั้น) จึงต้องแยกหัวข้อ */
-  const systemLinks = [
-    { ...dest("orgSettings"), desc: DEST.orgSettings.sub, icon: <FaImage size={18} />, color: "#0f766e" },
-    // ✅ ผู้ใช้ขอให้แยก "สิทธิ์ในระบบ" (ผู้ดูแลระบบ/สูงสุด) กับ "สิทธิ์ในองค์กร" (ตำแหน่งงาน เปลี่ยนชื่อได้)
-    { ...dest("permissions"), desc: DEST.permissions.sub, icon: <FaUserShield size={18} />, color: "#7c3aed" },
-  ];
-
-  /**
-   * แถวเมนูหนึ่งแถว
-   * ⚠️ เป็นฟังก์ชันคืน JSX ไม่ใช่คอมโพเนนต์ที่ประกาศในตัวคอมโพเนนต์แม่ — ถ้าประกาศเป็น
-   *    คอมโพเนนต์ตรงนี้ React จะมองว่าเป็นชนิดใหม่ทุกครั้งที่ re-render แล้วถอด/ใส่ DOM ใหม่ทั้งแถว
-   */
-  const renderLink = (item) => (
-    <div key={item.href} style={styles.card} className="settings-row-hover" onClick={() => navigate(item.href)}>
-      <div style={{ ...styles.iconCircle, backgroundColor: `${item.color}18`, color: item.color }}>{item.icon}</div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={styles.rowTitle}>{item.title}</p>
-        <p style={styles.rowDesc}>{item.desc}</p>
-      </div>
-      <FaChevronRight style={styles.chevron} />
-    </div>
-  );
+  const pushState = iosNeedsInstall
+    ? { tone: AMBER, text: "iPhone/iPad: เปิดแอปจากไอคอนบนหน้าจอโฮมก่อน — Safari กดปุ่มแชร์ → “เพิ่มไปยังหน้าจอโฮม” แล้วเปิดจากไอคอนนั้น" }
+    : !pushSupported
+      ? { tone: AMBER, text: "เบราว์เซอร์นี้ไม่รองรับ — ใช้ Chrome (Android/คอม) หรือ Safari ที่ติดตั้งแอปลงหน้าจอโฮม (iPhone)" }
+      : pushPermission === "denied"
+        ? { tone: RED, text: "เบราว์เซอร์บล็อกการแจ้งเตือนไว้ — กดไอคอนแม่กุญแจหน้า URL → การแจ้งเตือน → อนุญาต แล้วเปิดสวิตช์อีกครั้ง" }
+        : null;
 
   return (
-    <Container fluid style={styles.container}>
-      <div style={styles.pageHeader}>
-        <h2 style={styles.pageTitle}>การตั้งค่า</h2>
-        <p style={styles.pageSub}>จัดการบัญชี การแจ้งเตือน และระบบ</p>
-      </div>
+    <Box sx={{ p: { xs: 1.5, sm: 2.5 }, maxWidth: 860, mx: "auto" }}>
+      <Box sx={{ mb: 2.5, px: 0.5 }}>
+        <Typography sx={{ fontWeight: 900, fontSize: "1.4rem", color: INK }}>การตั้งค่า</Typography>
+        <Typography sx={{ fontSize: "0.84rem", color: MUTED }}>บัญชี · ความปลอดภัย · การแจ้งเตือน · ข้อมูลระบบ</Typography>
+      </Box>
 
-      {/* ─── โปรไฟล์ของฉัน ─── */}
-      <h5 style={styles.sectionTitle}>บัญชีของฉัน</h5>
-      <div style={styles.card} className="settings-row-hover" onClick={() => navigate("/account")}>
-        {userData?.imageUrl ? (
-          <img src={userData.imageUrl} alt="profile" style={styles.avatarImg} />
-        ) : (
-          <div style={styles.avatarFallback}>{initials}</div>
-        )}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={styles.profileName}>{userData?.fname ? `${userData.fname} ${userData?.lname || ""}` : (userData?.username || "ผู้ใช้งาน")}</p>
-          <span style={styles.roleBadge}>{rankLabel(userData)}</span>
-        </div>
-        <FaChevronRight style={styles.chevron} />
-      </div>
+      {/* ── โปรไฟล์ ── */}
+      <Box onClick={() => navigate("/account")} role="button" tabIndex={0}
+        sx={{ mb: 2.5, p: 2, display: "flex", alignItems: "center", gap: 2, cursor: "pointer", bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, boxShadow: "0 1px 2px rgba(15,23,42,.04)", "&:hover": { borderColor: ACCENT_LINE } }}>
+        <Avatar src={hasValidAvatar(userData?.imageUrl) ? getOptimizedImageUrl(userData.imageUrl, { width: 128 }) : undefined}
+          sx={{ width: 56, height: 56, fontSize: 22, fontWeight: 800, bgcolor: personColor(nameKey) }}>
+          {personInitial(nameKey)}
+        </Avatar>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography noWrap sx={{ fontWeight: 900, fontSize: "1.05rem", color: INK }}>{fullName}</Typography>
+          <Typography noWrap sx={{ fontSize: "0.8rem", color: MUTED }}>{userData?.email || `@${userData?.username || ""}`}</Typography>
+          <Stack direction="row" spacing={0.6} useFlexGap sx={{ mt: 0.6, flexWrap: "wrap", rowGap: 0.5 }}>
+            <Box component="span" sx={{ px: 0.9, py: 0.2, borderRadius: 99, fontSize: "0.7rem", fontWeight: 800, bgcolor: ACCENT_SOFT, color: "#1d4ed8" }}>{rankLabel(userData)}</Box>
+            <Box component="span" sx={{ px: 0.9, py: 0.2, borderRadius: 99, fontSize: "0.7rem", fontWeight: 700, bgcolor: SURFACE, color: INK_2, border: `1px solid ${LINE}` }}>{systemRoleLabel(userData)}</Box>
+          </Stack>
+        </Box>
+        <Typography sx={{ display: { xs: "none", sm: "block" }, fontSize: "0.8rem", fontWeight: 700, color: ACCENT }}>ดูบัญชีของฉัน</Typography>
+        <ChevronRight sx={{ color: FAINT }} />
+      </Box>
 
-      {/* ─── ลายเซ็นอิเล็กทรอนิกส์ ───
-          ✅ อยู่ใต้ "บัญชีของฉัน" เพราะเป็นของผู้ใช้คนนั้นคนเดียว (ตั้งแทนกันไม่ได้) และทุกสิทธิ์ต้องใช้ได้
-          — ช่างออกใบเบิก/ใบแจ้งเข้างานเองก็ต้องมีลายเซ็นตัวเองเหมือนกัน */}
-      <div style={styles.card} className="settings-row-hover" onClick={() => setSignOpen(true)}>
-        <div style={{ ...styles.iconCircle, backgroundColor: hasSignature ? "rgba(5,150,105,0.12)" : "rgba(148,163,184,0.15)" }}>
-          <FaFileSignature size={16} color={hasSignature ? "#059669" : "#94a3b8"} />
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={styles.rowTitle}>ลายเซ็นอิเล็กทรอนิกส์</p>
-          <p style={styles.rowDesc}>
-            {hasSignature === null
-              ? "กำลังตรวจสอบ..."
-              : hasSignature
-                ? "ตั้งไว้แล้ว — ใช้กับใบเบิก/ใบเคลม/ใบส่งมอบงานที่คุณออกหรืออนุมัติ"
-                : "ยังไม่ได้ตั้ง — เอกสารจะเว้นช่องให้เซ็นด้วยมือ"}
-          </p>
-        </div>
-        <FaChevronRight style={styles.chevron} />
-      </div>
-
-      {/* ─── การแจ้งเตือน ─── */}
-      <h5 style={styles.sectionTitle}>การแจ้งเตือน</h5>
-      <div style={styles.card}>
-        <div style={{ ...styles.iconCircle, backgroundColor: pushSubscribed ? "rgba(220,38,38,0.1)" : "rgba(148,163,184,0.15)" }}>
-          <FaBell size={16} color={pushSubscribed ? "#dc2626" : "#94a3b8"} />
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={styles.rowTitle}>การแจ้งเตือนบนอุปกรณ์นี้</p>
-          <p style={styles.rowDesc}>รับการแจ้งเตือนงานใหม่/อัปเดตสถานะแบบ Push</p>
-        </div>
-        <Switch
-          checked={pushSubscribed}
-          disabled={pushLoading}
-          onChange={handleTogglePush}
-          sx={{ "& .MuiSwitch-switchBase.Mui-checked": { color: "#dc2626" }, "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { backgroundColor: "#dc2626" } }}
+      {/* ── บัญชีและความปลอดภัย ── */}
+      <Group title="บัญชีและความปลอดภัย">
+        <Row icon={<PersonOutline />} title="บัญชีของฉัน" desc="รูปโปรไฟล์ · ชื่อ · เบอร์โทร · ตำแหน่งที่พิมพ์ในเอกสาร" onClick={() => navigate("/account")} />
+        <Row
+          icon={<DrawOutlined />} tone={hasSignature ? GREEN : MUTED} title="ลายเซ็นอิเล็กทรอนิกส์" onClick={() => setSignOpen(true)}
+          desc={hasSignature === null ? "กำลังตรวจสอบ..." : hasSignature
+            ? <Box component="span" sx={{ color: GREEN, fontWeight: 600 }}>ตั้งไว้แล้ว — ใช้กับใบเบิก/ใบเคลม/ใบส่งมอบงานที่คุณออกหรืออนุมัติ</Box>
+            : "ยังไม่ได้ตั้ง — เอกสารจะเว้นช่องให้เซ็นด้วยมือ"}
         />
-      </div>
-      {/* ✅ สถานะ + ทดสอบ — ผู้ใช้เช็คเองได้ว่าเครื่องนี้รับแจ้งเตือนได้จริงไหม ไม่ต้องรอให้มีงานเข้า */}
-      <div style={{ ...styles.card, flexDirection: "column", alignItems: "stretch", gap: 8, marginTop: -4 }}>
-        {iosNeedsInstall ? (
-          <p style={{ ...styles.rowDesc, color: "#b45309" }}>
-            📱 iPhone/iPad: ต้องเปิดแอปจากไอคอนบนหน้าจอโฮมก่อนจึงจะรับแจ้งเตือนได้ — กดปุ่มแชร์ ⬆️ ใน Safari → "เพิ่มไปยังหน้าจอโฮม" แล้วเปิดแอปจากไอคอนนั้น
-          </p>
-        ) : !PushService.isSupported() ? (
-          <p style={{ ...styles.rowDesc, color: "#b45309" }}>เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือน — ใช้ Chrome (Android/คอม) หรือ Safari ที่ติดตั้งแอปลงหน้าจอโฮม (iPhone)</p>
-        ) : pushPermission === "denied" ? (
-          <p style={{ ...styles.rowDesc, color: "#b91c1c" }}>
-            🚫 เบราว์เซอร์บล็อกการแจ้งเตือนของแอปนี้ไว้ — เปิดที่ตั้งค่าของเบราว์เซอร์ (ไอคอนแม่กุญแจหน้า URL → การแจ้งเตือน → อนุญาต) แล้วกลับมาเปิดสวิตช์อีกครั้ง
-          </p>
-        ) : (
-          <p style={styles.rowDesc}>
-            {pushSubscribed ? "✅ เครื่องนี้รับแจ้งเตือนอยู่" : "เครื่องนี้ยังไม่ได้เปิดรับแจ้งเตือน"}
-            {pushDevices !== null ? ` · บัญชีของคุณเปิดรับไว้ทั้งหมด ${pushDevices} อุปกรณ์` : ""}
-            <br />เด้งบนจอแบบ LINE: งานใหม่/มอบหมายงาน · ขอปิดงาน · ใบเบิก · OT · ใบขอซื้อ · คำขอจากเว็บ (เฉพาะที่เกี่ยวกับคุณ)
-          </p>
+      </Group>
+
+      {/* ── อุปกรณ์ที่เข้าสู่ระบบ ── */}
+      <Group
+        title={`อุปกรณ์ที่เข้าสู่ระบบ${sessions ? ` (${sessions.length})` : ""}`}
+        hint="เครื่องที่บัญชีนี้ยังเข้าสู่ระบบอยู่ · ตำแหน่งเป็นค่าประมาณจาก IP อินเทอร์เน็ต"
+        right={(
+          <Tooltip title="โหลดใหม่"><IconButton size="small" onClick={loadSessions}><Refresh sx={{ fontSize: 18 }} /></IconButton></Tooltip>
         )}
-      </div>
+      >
+        {sessions === null ? (
+          <Box sx={{ p: 2 }}><Skeleton height={56} /><Skeleton height={56} /></Box>
+        ) : sessError ? (
+          <Typography sx={{ p: 2, fontSize: "0.86rem", color: RED }}>{sessError}</Typography>
+        ) : sessions.length === 0 ? (
+          <Typography sx={{ p: 2, fontSize: "0.86rem", color: MUTED }}>ยังไม่มีข้อมูลอุปกรณ์ — จะเริ่มบันทึกตั้งแต่การใช้งานครั้งถัดไป</Typography>
+        ) : sessions.map((s) => {
+          const browser = [s.browser, s.browserVersion?.split(".")[0]].filter(Boolean).join(" ");
+          const osName = [s.os, s.osVersion].filter(Boolean).join(" ");
+          const place = placeOf(s.location);
+          const active = moment().diff(moment(s.lastSeenAt), "minutes") < 5;
+          return (
+            <Stack key={s.sid} direction="row" spacing={1.5} alignItems="flex-start"
+              sx={{ px: 2, py: 1.5, borderTop: `1px solid ${LINE}`, "&:first-of-type": { borderTop: 0 }, bgcolor: s.current ? alpha8(ACCENT) : "transparent" }}>
+              <Box sx={{ position: "relative", width: 42, height: 42, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: s.current ? ACCENT_SOFT : SURFACE, color: s.current ? ACCENT : INK_2, border: `1px solid ${s.current ? ACCENT_LINE : LINE}`, "& svg": { fontSize: 22 } }}>
+                {deviceIcon(s.deviceType)}
+                {active && <Box sx={{ position: "absolute", right: -2, bottom: -2, width: 11, height: 11, borderRadius: "50%", bgcolor: GREEN, border: "2px solid #fff" }} />}
+              </Box>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Stack direction="row" spacing={0.75} alignItems="center" useFlexGap flexWrap="wrap">
+                  <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", color: INK }}>{deviceTitle(s)}</Typography>
+                  {s.current && <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.4, px: 0.8, py: 0.1, borderRadius: 99, fontSize: "0.68rem", fontWeight: 800, bgcolor: "#dcfce7", color: "#15803d" }}><CheckCircle sx={{ fontSize: 13 }} />อุปกรณ์นี้</Box>}
+                  {s.standalone && <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.3, px: 0.8, py: 0.1, borderRadius: 99, fontSize: "0.68rem", fontWeight: 700, bgcolor: SURFACE, color: INK_2, border: `1px solid ${LINE}` }}><InstallMobile sx={{ fontSize: 12 }} />แอปบนหน้าจอโฮม</Box>}
+                </Stack>
+                <Typography sx={{ fontSize: "0.8rem", color: INK_2, mt: 0.2 }}>
+                  {[browser, osName && deviceTitle(s) !== `คอมพิวเตอร์ ${osName}` ? osName : ""].filter(Boolean).join(" · ") || "ไม่ทราบเบราว์เซอร์"}
+                </Typography>
+                <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.3, color: MUTED }}>
+                  <PlaceOutlined sx={{ fontSize: 14, flexShrink: 0 }} />
+                  <Typography sx={{ fontSize: "0.76rem", color: MUTED, overflowWrap: "anywhere" }}>
+                    {[place || "ไม่ทราบตำแหน่ง", s.ip ? `IP ${s.ip}` : "", s.location?.isp].filter(Boolean).join(" · ")}
+                  </Typography>
+                </Stack>
+                <Typography sx={{ fontSize: "0.74rem", color: FAINT, mt: 0.3 }}>
+                  {active ? <Box component="span" sx={{ color: GREEN, fontWeight: 700 }}>กำลังใช้งาน</Box> : `ใช้งานล่าสุด ${moment(s.lastSeenAt).locale("th").fromNow()}`}
+                  {s.createdAt ? ` · เข้าสู่ระบบ ${formatThai(moment(s.createdAt), "D MMM YY HH:mm")} น.` : ""}
+                </Typography>
+                {!s.current && (
+                  <Box sx={{ display: { xs: "block", sm: "none" }, mt: 1 }}>
+                    <Button size="small" variant="outlined" onClick={() => setConfirm({ type: "one", session: s })}
+                  sx={{ flexShrink: 0, textTransform: "none", fontWeight: 700, borderRadius: 2, color: RED, borderColor: "#fecaca", "&:hover": { borderColor: RED, bgcolor: "#fef2f2" } }}>
+                  ออกจากระบบ
+                </Button>
+                  </Box>
+                )}
+              </Box>
+              {!s.current && (
+                <Box sx={{ display: { xs: "none", sm: "block" } }}>
+                  <Button size="small" variant="outlined" onClick={() => setConfirm({ type: "one", session: s })}
+                  sx={{ flexShrink: 0, textTransform: "none", fontWeight: 700, borderRadius: 2, color: RED, borderColor: "#fecaca", "&:hover": { borderColor: RED, bgcolor: "#fef2f2" } }}>
+                  ออกจากระบบ
+                </Button>
+                </Box>
+              )}
+            </Stack>
+          );
+        })}
+        {others.length > 0 && (
+          <Stack direction="row" alignItems="center" sx={{ px: 2, py: 1, borderTop: `1px solid ${LINE}` }}>
+            <Button startIcon={<Logout sx={{ fontSize: 17 }} />} onClick={() => setConfirm({ type: "others" })}
+              sx={{ textTransform: "none", fontWeight: 800, color: RED, px: 1, "&:hover": { bgcolor: "#fef2f2" } }}>
+              ออกจากระบบเครื่องอื่นทั้งหมด ({others.length})
+            </Button>
+          </Stack>
+        )}
+        <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ px: 2, py: 1.1, bgcolor: SURFACE, borderTop: `1px solid ${LINE}` }}>
+          <ShieldOutlined sx={{ fontSize: 16, color: MUTED, mt: 0.2 }} />
+          <Typography sx={{ fontSize: "0.74rem", color: MUTED, lineHeight: 1.5 }}>
+            เห็นเครื่องที่ไม่รู้จัก ให้กด “ออกจากระบบ” ที่เครื่องนั้น แล้วแจ้งผู้ดูแลระบบให้เปลี่ยนรหัสผ่าน · เครื่องที่ถูกออกจากระบบจะต้องเข้าสู่ระบบใหม่
+          </Typography>
+        </Stack>
+      </Group>
 
-      {/* ─── ข้อมูลหลัก (ผู้ดูแลระบบขึ้นไป) ───
-          ⚠️ เดิมทะเบียนลูกค้า/พนักงาน/ประเภทงาน ถูกยัดไว้ใต้หัวข้อ "การจัดการระบบ" รวมกับค่าระดับ
-          ระบบ ทั้งที่เป็นคนละเรื่องและคนละชั้นสิทธิ์ (อันบนแค่ผู้ดูแลระบบ อันล่างต้องผู้ดูแลระบบสูงสุด)
-          แถวที่กดไม่ได้จึงเคยหายไปเงียบๆ กลางหมวดโดยไม่มีอะไรบอกว่าทำไม */}
+      {/* ── การแจ้งเตือน ── */}
+      <Group title="การแจ้งเตือน">
+        <Row
+          icon={pushSubscribed ? <NotificationsActiveOutlined /> : <NotificationsOffOutlined />} tone={pushSubscribed ? ACCENT : MUTED}
+          title="การแจ้งเตือนบนอุปกรณ์นี้"
+          desc={pushState
+            ? <Box component="span" sx={{ color: pushState.tone }}>{pushState.text}</Box>
+            : <>
+                {pushSubscribed ? <Box component="span" sx={{ color: GREEN, fontWeight: 600 }}>เปิดรับอยู่</Box> : "ปิดอยู่"}
+                {pushDevices !== null ? ` · บัญชีของคุณเปิดรับไว้ ${pushDevices} อุปกรณ์` : ""}
+                <br />เด้งบนจอเหมือน LINE: งานใหม่/มอบหมายงาน · ขอปิดงาน · ใบเบิก · OT · ใบขอซื้อ · คำขอจากเว็บ (เฉพาะที่เกี่ยวกับคุณ)
+              </>}
+          right={pushLoading ? <CircularProgress size={22} /> : (
+            <Switch checked={pushSubscribed} disabled={!pushSupported || iosNeedsInstall || pushPermission === "denied"} onChange={handleTogglePush}
+              sx={{ "& .MuiSwitch-switchBase.Mui-checked": { color: ACCENT }, "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: ACCENT } }} />
+          )}
+        />
+      </Group>
+
+      {/* ── ข้อมูลหลัก ── */}
       {isAdmin && (
-        <>
-          <h5 style={styles.sectionTitle}>ข้อมูลหลัก</h5>
-          {masterDataLinks.map(renderLink)}
-        </>
+        <Group title="ข้อมูลหลัก" hint="ทะเบียนที่ทั้งระบบหยิบไปใช้">
+          <Row icon={<BusinessOutlined />} title={dest("customers").title} desc="ทะเบียนลูกค้าและผู้ติดต่อ · ใช้เลือกตอนเปิดงานและออกเอกสาร" onClick={() => navigate(dest("customers").href)} />
+          <Row icon={<GroupOutlined />} title="พนักงาน" desc="ทะเบียนพนักงาน · บัญชีผู้ใช้ · ตำแหน่งในองค์กรของแต่ละคน" onClick={() => navigate(dest("staff").href)} />
+          <Row icon={<LocalOfferOutlined />} title={dest("worktype").title} desc={DEST.worktype.sub} onClick={() => navigate(dest("worktype").href)} />
+        </Group>
       )}
 
-      {/* ─── ตั้งค่าระบบ (ผู้ดูแลระบบสูงสุดเท่านั้น) ─── */}
+      {/* ── ตั้งค่าระบบ ── */}
       {isSuperAdmin && (
-        <>
-          <h5 style={styles.sectionTitle}>ตั้งค่าระบบ</h5>
-          {systemLinks.map(renderLink)}
-        </>
+        <Group title="ตั้งค่าระบบ" hint="เฉพาะ Super Admin">
+          <Row icon={<ImageOutlined />} title={dest("orgSettings").title} desc={DEST.orgSettings.sub} onClick={() => navigate(dest("orgSettings").href)} />
+          <Row icon={<AdminPanelSettingsOutlined />} title={dest("permissions").title} desc={DEST.permissions.sub} onClick={() => navigate(dest("permissions").href)} />
+        </Group>
       )}
 
-      {/* ─── เกี่ยวกับแอป ───
-          🐛 เดิมช่องนี้พิมพ์ชื่อบริษัท "Do All Architect and Engineering" ไว้ตายตัวใต้หัวข้อ
-          "เกี่ยวกับแอป" ซึ่งผิดสองชั้น: ชื่อที่ขึ้นเป็นชื่อ "องค์กร" ไม่ใช่ชื่อ "แอป"
-          และองค์กรอื่นที่เอาระบบไปใช้ก็จะเห็นชื่อบริษัทนี้ค้างอยู่
-          ✅ แสดงชื่อแอปจริงกับเวอร์ชัน แล้วบอกว่ากำลังใช้งานในนามองค์กรไหน โดยดึงชื่อองค์กร
-             จากค่าที่ตั้งไว้ ไม่ฝังในโค้ด */}
-      <h5 style={styles.sectionTitle}>เกี่ยวกับแอป</h5>
-      <div style={styles.card}>
-        <div style={{ ...styles.iconCircle, backgroundColor: "rgba(100,116,139,0.12)" }}>
-          <FaInfoCircle size={16} color="#64748b" />
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={styles.rowTitle}>{APP_NAME} · เวอร์ชัน {APP_VERSION || "-"}</p>
-          <p style={styles.rowDesc}>ใช้งานในนาม {org?.nameTh || ORG_FALLBACK.nameTh}</p>
-        </div>
-      </div>
+      {/* ── เกี่ยวกับแอป + ออกจากระบบ ── */}
+      <Group title="เกี่ยวกับ">
+        <Row icon={<InfoOutlined />} tone={MUTED} title={`${APP_NAME} · เวอร์ชัน ${APP_VERSION || "-"}`} desc={`ใช้งานในนาม ${org?.nameTh || ORG_FALLBACK.nameTh}`} right={null} />
+        <Row icon={<Logout />} tone={RED} title="ออกจากระบบ" desc="ออกจากระบบบนอุปกรณ์นี้" danger onClick={handleLogout} right={null} />
+      </Group>
 
-      {/* ─── ออกจากระบบ ─── */}
-      <div style={{ ...styles.card, ...styles.logoutRow }} className="settings-row-hover" onClick={handleLogout}>
-        <div style={{ ...styles.iconCircle, backgroundColor: "rgba(239,68,68,0.1)" }}>
-          <FaSignOutAlt size={16} color="#ef4444" />
-        </div>
-        <p style={{ ...styles.rowTitle, color: "#ef4444", margin: 0 }}>ออกจากระบบ</p>
-      </div>
+      {/* ยืนยันออกจากระบบอุปกรณ์อื่น */}
+      <Dialog open={Boolean(confirm)} onClose={() => !busy && setConfirm(null)} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: 3 } }}>
+        <DialogTitle sx={{ fontWeight: 800 }}>
+          {confirm?.type === "others" ? `ออกจากระบบเครื่องอื่น ${others.length} เครื่อง?` : "ออกจากระบบอุปกรณ์นี้?"}
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: "0.9rem", color: INK_2 }}>
+            {confirm?.type === "others"
+              ? "ทุกเครื่องยกเว้นเครื่องที่คุณใช้อยู่ตอนนี้จะต้องเข้าสู่ระบบใหม่"
+              : confirm?.session ? `${deviceTitle(confirm.session)} · ${[confirm.session.browser, placeOf(confirm.session.location)].filter(Boolean).join(" · ")} จะต้องเข้าสู่ระบบใหม่` : ""}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setConfirm(null)} disabled={busy} sx={{ textTransform: "none", fontWeight: 700, color: MUTED }}>ยกเลิก</Button>
+          <Button variant="contained" onClick={doRevoke} disabled={busy}
+            sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: RED, "&:hover": { bgcolor: "#b91c1c", boxShadow: "none" } }}>
+            {busy ? "กำลังดำเนินการ..." : "ออกจากระบบ"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
-      <style>{`
-        .settings-row-hover {
-          cursor: pointer;
-          transition: all 0.15s ease;
-          touch-action: manipulation;
-        }
-        .settings-row-hover:active {
-          transform: scale(0.99);
-          opacity: 0.9;
-        }
-      `}</style>
-      <SignatureSettingsDialog
-        open={signOpen}
-        onClose={() => setSignOpen(false)}
-        onSaved={(sig) => setHasSignature(Boolean(sig))}
-      />
-    </Container>
+      <SignatureSettingsDialog open={signOpen} onClose={() => setSignOpen(false)} onSaved={(sig) => setHasSignature(Boolean(sig))} />
+      <Snackbar open={Boolean(toast)} autoHideDuration={2600} onClose={() => setToast(null)} anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
+        {toast ? <Alert severity={toast.type} variant="filled" onClose={() => setToast(null)}>{toast.text}</Alert> : <span />}
+      </Snackbar>
+    </Box>
   );
-};
+}
 
-const styles = {
-  container: {
-    padding: "16px 14px 40px 14px",
-    backgroundColor: "#f8fafc",
-    width: "100%",
-    minHeight: "100vh",
-  },
-  pageHeader: { marginBottom: "18px" },
-  pageTitle: { fontSize: "20px", fontWeight: "800", color: "#0f172a", margin: 0 },
-  pageSub: { fontSize: "12px", color: "#94a3b8", margin: "2px 0 0 0" },
-  sectionTitle: {
-    fontSize: "11px",
-    fontWeight: "700",
-    color: "#64748b",
-    textTransform: "uppercase",
-    letterSpacing: "0.5px",
-    marginBottom: "8px",
-    marginTop: "18px",
-    paddingLeft: "2px",
-  },
-  card: {
-    backgroundColor: "#ffffff",
-    borderRadius: "14px",
-    border: "1px solid #e2e8f0",
-    padding: "14px",
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    boxShadow: "0 2px 4px rgba(0,0,0,0.015)",
-    marginBottom: "8px",
-  },
-  avatarImg: {
-    width: "44px",
-    height: "44px",
-    borderRadius: "50%",
-    objectFit: "cover",
-    flexShrink: 0,
-  },
-  avatarFallback: {
-    width: "44px",
-    height: "44px",
-    borderRadius: "50%",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "linear-gradient(135deg, #ef4444 0%, #7f1d1d 100%)",
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: "16px",
-    flexShrink: 0,
-  },
-  profileName: { fontSize: "14px", fontWeight: "700", color: "#0f172a", margin: 0 },
-  roleBadge: {
-    display: "inline-block",
-    marginTop: "3px",
-    padding: "2px 8px",
-    fontSize: "10px",
-    fontWeight: "700",
-    color: "#dc2626",
-    backgroundColor: "rgba(220,38,38,0.08)",
-    borderRadius: "8px",
-    textTransform: "uppercase",
-  },
-  iconCircle: {
-    width: "38px",
-    height: "38px",
-    borderRadius: "10px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  rowTitle: { fontSize: "13.5px", fontWeight: "700", color: "#0f172a", margin: 0 },
-  rowDesc: { fontSize: "11px", color: "#94a3b8", margin: "2px 0 0 0" },
-  chevron: { fontSize: "11px", color: "#94a3b8", flexShrink: 0 },
-  logoutRow: { justifyContent: "flex-start", marginTop: "6px" },
-};
-
-export default Settings;
+/** พื้นจางมากของแถวอุปกรณ์ปัจจุบัน */
+function alpha8(hex) { return `${hex}0d`; }

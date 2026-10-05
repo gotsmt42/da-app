@@ -3,6 +3,7 @@ import PageLoader from "@/shared/ui/PageLoader";
 import { useNavigate, useLocation } from "react-router-dom";
 import { jwtDecode } from "jwt-decode"; // ✅ ถูกต้อง
 import PushService from "@/shared/services/PushService";
+import SessionService from "@/shared/services/SessionService";
 import { resetInbox } from "@/shared/hooks/useInbox";
 import SignatureService from "@/shared/services/SignatureService";
 import AuthService from "@/shared/services/authService";
@@ -235,6 +236,8 @@ const updateUserData = (newData) => {
     // ขั้นแรกเสมอ (หยุดรับ push ทันที) ส่วนการแจ้ง server เป็นแค่เก็บกวาด ถ้ายิงไม่ทัน/ไม่ผ่านเพราะ
     // token ถูกลบไปแล้ว ระบบก็ลบ record ให้เองตอนส่ง push ครั้งถัดไปแล้วได้ 410 กลับมา
     PushService.unsubscribe().catch(() => {});
+    // ✅ ปิดอุปกรณ์นี้ในรายการ "อุปกรณ์ที่เข้าสู่ระบบ" — ต้องยิงก่อนลบ token (ใช้ token ระบุตัวอุปกรณ์)
+    SessionService.logout();
     resetInbox();
     SignatureService.clearCache();
     localStorage.removeItem("token");

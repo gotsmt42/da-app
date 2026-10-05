@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import API from "@/shared/api/axiosInstance";
+import { getDeviceHints } from "@/shared/services/SessionService";
 
 import {
   Box,
@@ -81,7 +82,8 @@ const Login = () => {
 
     setLoading(true);
     try {
-      const response = await API.post(`/auth/login`, { username, password });
+      const device = await getDeviceHints();
+      const response = await API.post(`/auth/login`, { username, password, device });
 
       if (response?.data?.token && response?.data?.payload) {
         const { token, payload } = response.data;
