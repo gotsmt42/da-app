@@ -4220,6 +4220,19 @@ function EventCalendar() {
         </button>
         <button type="button" aria-label="เดือนถัดไป" onClick={() => calendarRef.current?.getApi()?.next()}>›</button>
         <button type="button" className="ec-month-float-today" onClick={() => calendarRef.current?.getApi()?.today()}>วันนี้</button>
+        {/* ✅ (5 ต.ค. 2569) ผู้ใช้: "ให้มี select เลือกช่างที่เข้างานได้ด้วย" — ค่าเดียวกับตัวกรองบนหัวปฏิทิน
+            (selectedTechnician) เลื่อนลงมาดูเดือนยาวๆ ก็สลับดูทีละช่างได้โดยไม่ต้องเลื่อนกลับขึ้นไป */}
+        {(!isSalesView || viewingSalesCalendar) && (isSalesView ? salespersonOptions : technicianOptions).length > 0 && (
+          <label className={`ec-month-float-person${selectedTechnician ? " is-set" : ""}`}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-8 1.7-8 5v1h16v-1c0-3.3-4.7-5-8-5Z" /></svg>
+            <select value={selectedTechnician} onChange={(e) => setSelectedTechnician(e.target.value)} aria-label={isSalesView ? "เลือกเซล" : "เลือกช่าง"}>
+              <option value="">{isSalesView ? "เซลทุกคน" : "ช่างทุกคน"}</option>
+              {(isSalesView ? salespersonOptions : technicianOptions).map((p) => (
+                <option key={p._id} value={p._id}>{p.fname ? `${p.fname} ${p.lname || ""}`.trim() : p.username}</option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
 
       {/* ✅ โหลดซ้ำ = แถบบางบนสุด (ข้อมูลเดิมยังเห็นอยู่) · โหลดครั้งแรกใช้วงแหวนกลางปฏิทิน (.ec-booting ใน index.css) */}
