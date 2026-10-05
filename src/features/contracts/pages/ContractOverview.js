@@ -1001,22 +1001,6 @@ const FieldRow = ({ label, hideIfEmptyReadOnly, ...cellProps }) => {
   );
 };
 
-// ✅ 1 ช่องในแถบสรุปหัวการ์ดมือถือ (ประเภทงาน / ระบบ / มูลค่างาน) — ป้ายกำกับตัวเล็กด้านบน ค่าด้านล่าง
-// วางเรียงแนวนอน 3 ช่องจบในบรรทัดเดียว ต่างจาก FieldRow ที่เป็นป้าย-ค่าแนวนอนทีละแถว (ยาวเกินไปถ้าเอามา
-// ไว้ในหัวการ์ดที่ต้องกระชับ) ⚠️ ต้องอยู่ module scope เหมือน EditableCell/FieldRow ไม่งั้นทุก re-render
-// React จะมองเป็นคนละคอมโพเนนต์แล้ว remount ช่องที่กำลังพิมพ์อยู่จนโฟกัสหลุด
-const CardMetaCell = ({ label, align, children }) => (
-  <Box sx={{ minWidth: 0, textAlign: align || "left" }}>
-    <Typography
-      variant="caption"
-      sx={{ display: "block", color: "text.secondary", fontWeight: 700, fontSize: "0.62rem", lineHeight: 1.6, letterSpacing: "0.02em" }}
-    >
-      {label}
-    </Typography>
-    {children}
-  </Box>
-);
-
 // ✅ ค่าเริ่มต้นของ "ฟอร์มสร้างสัญญา" — ใช้ร่วมกันทั้งไดอะล็อก "เพิ่มสัญญาใหม่" และแถวร่างในตาราง
 // ✅ วันที่เข้างานครั้งที่ 1 — ไม่บังคับ (บางสัญญายังไม่รู้วันที่แน่นอนตอนสร้าง) กรอกมาจะลงตารางเป็น
 // ครั้งที่ 1 จริงทันที ไม่กรอกจะบันทึกเป็นฉบับร่าง (unscheduled) — ฉบับร่างของสัญญาจะไม่โผล่ใน
@@ -4512,147 +4496,132 @@ pagedRows.map((c, idx) => {
 
     const isExpanded = expandedCards.has(c.key);
 
-    return (
-      <Paper key={c.key} variant="outlined" sx={{ borderRadius: 3, p: 1.75, borderColor: BORDER_MAIN, boxShadow: "0 1px 2px rgba(15,23,42,0.05)" }}>
-        {/* หัวการ์ด — ส่วนที่โชว์เสมอ: บริษัท/โครงการ + หมวดหมู่งาน(สัญญา/ทั่วไป/โปรเจค) + สถานะสัญญา
-            แล้วต่อด้วยแถบสรุป ประเภทงาน/ระบบ/มูลค่างาน และแถวคืบหน้า — ครบพอให้ตัดสินใจได้ว่าใบไหน
-            คืองานที่กำลังหาโดยไม่ต้องกางสักใบ ที่เหลือกด "รายละเอียด" เพื่อกางดูเพิ่ม (เทียบ pattern
-            เดียวกับการ์ดงานในหน้า "การดำเนินงาน") กันการ์ดยาวเกินไปตอนมีหลายรายการในหน้าเดียว */}
-        <Stack direction="row" alignItems="flex-start" spacing={1} sx={{ mb: isExpanded ? 0.5 : 0 }}>
-          {showCheckboxes && isSelectableForMerge(c) && (
-            <Checkbox
-              size="small" checked={selectedIds.has(c.key)} onChange={() => toggleSelect(c)}
-              sx={{ p: 0.5, mt: -0.5, "&.Mui-checked": { color: ACCENT } }}
-            />
-          )}
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            {/* ✅ โครงการเป็นหัวการ์ด (ตัวหนา) บริษัทเป็นบรรทัดรอง — ตรงกับคอลัมน์ในตารางจอใหญ่ และงานส่วนใหญ่
-                ไม่ได้กรอกบริษัท เดิมหัวการ์ดเลยขึ้นเป็นขีด "—" เฉยๆ อ่านไม่ออกว่าเป็นงานไหน */}
-            <EditableCell
-              Wrapper={Box} editable={canEditBasicField(c, "site")} value={c.site} width="100%"
-              formatDisplay={(v) => <Typography sx={{ fontWeight: 800, fontSize: "0.98rem", lineHeight: 1.25, wordBreak: "break-word" }}>{v || <Dash />}</Typography>}
-              {...fp("site")}
-            />
-            <EditableCell
-              Wrapper={Box} editable={canEditBasicField(c, "company")} value={c.company} width="100%"
-              formatDisplay={(v) => <Typography sx={{ fontSize: "0.8rem", color: v ? "text.secondary" : "text.disabled", wordBreak: "break-word" }}>{v || "ไม่ระบุบริษัท"}</Typography>}
-              {...fp("company")}
-            />
-            {/* ✅ การ์ดมือถือ — ใช้ปุ่มเต็ม (ไม่ใช่ compact) เพราะบนมือถือคือจังหวะที่กำลังจะออกรถ
-                ต้องแตะง่ายที่สุด ต่างจากตารางบนจอคอมที่พื้นที่จำกัดกว่า */}
-            <Box sx={{ mt: 0.75 }}>
-              <SiteMapLink company={c.company} site={c.site} canEdit={isAdminOrManager} />
-            </Box>
-          </Box>
-          <Stack alignItems="flex-end" spacing={0.5} sx={{ flexShrink: 0 }}>
-            {/* ✅ ป้ายแผนกอยู่บนหัวการ์ดเลย ไม่ต้องกางดู — ตรงกับที่เดสก์ท็อปวางแผนกเป็นคอลัมน์แรกสุด
-                (แก้ค่าได้ที่แถว "แผนก" ในส่วนรายละเอียดที่กางออกมา) */}
-            <DepartmentPill value={c.departmentTag} />
-            <Chip label={jobTypeLabel} size="small" sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha(jobTypeColor, 0.12), color: jobTypeColor }} />
-            {/* 🐛 BUG ที่แก้: ชิปนี้เคยอ่านจาก contractStatusInfo ตรงๆ ผลคือ (1) แถวที่ข้อมูลยังไม่ครบ
-                ไม่มีชิปอะไรขึ้นเลย เงียบสนิทจนแยกไม่ออกจาก "ไม่มีสถานะ" และ (2) หมายเหตุที่คนพิมพ์ทับไว้
-                ไม่ถูกนำมาแสดง หัวการ์ดมือถือกับตารางเดสก์ท็อปจึงบอกสถานะคนละอย่างของแถวเดียวกัน
-                ✅ ใช้ statusDisplay ตัวเดียวกับทุกที่ — ทั้งแอปพูดตรงกันเสมอ */}
-            {(() => {
-              const sd = statusDisplay(c);
-              return sd.kind === "none" ? null : (
-                <Chip
-                  label={sd.label} size="small"
-                  sx={{
-                    height: 20, maxWidth: 160, fontSize: "0.65rem", fontWeight: 700,
-                    bgcolor: sd.bg, color: sd.color,
-                    "& .MuiChip-label": { overflow: "hidden", textOverflow: "ellipsis" },
-                  }}
-                />
-              );
-            })()}
-            {/* ✅ สถานะวางบิล/รับเงินอยู่บนหัวการ์ดเลย ไม่ต้องกางดู — เป็นสิ่งที่ต้องเห็นพร้อมสถานะสัญญา
-                ⚠️ ซ่อนชิป "ยังไม่วางบิล" ทิ้ง เพราะเป็นค่าเริ่มต้นของเกือบทุกแถวในช่วงแรกที่เริ่มใช้ระบบ
-                ถ้าโชว์ทุกใบจะกลายเป็นเสียงรบกวนที่กลบชิปที่มีความหมายจริงจนหมด */}
-            {(() => {
-              const bs = contractBillingSummary(c.visits);
-              if (!bs || bs.state === "not_invoiced") return null;
-              return (
-                <Chip
-                  label={bs.state === "overdue" && bs.overdueDays > 0 ? `เลยกำหนดชำระ ${bs.overdueDays} วัน` : bs.label}
-                  size="small"
-                  sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha(bs.color, 0.12), color: bs.color }}
-                />
-              );
-            })()}
-          </Stack>
-        </Stack>
+    // ✅ (5 ต.ค. 2569) ผู้ใช้: "ภาพรวมงานในมือถือ ดูข้อมูลยาก จัดวางไม่สวย ไม่มืออาชีพ"
+    //    เดิม: ป้าย 3 อันซ้อนแนวตั้งทางขวาเบียดชื่อโครงการ · ปุ่มแผนที่เต็มความกว้างทุกใบ · กล่องสรุป 3 ช่อง
+    //    ใหม่ (อ่านจากบนลงล่างทีเดียวจบ):
+    //      ชื่อโครงการ ............................ มูลค่างาน
+    //      บริษัท
+    //      ประเภทงาน · ระบบ
+    //      ● สถานะสัญญา · หมวดงาน · แผนก · (วางบิล)
+    //      ─────────────────────────────────────────
+    //      ความคืบหน้า [แถบ] 2/2 ครั้ง · ล่าสุด …        📍  รายละเอียด ˅
+    //    แถบสีซ้ายของการ์ด = สีสถานะสัญญา (กวาดตาหาใบที่หมดอายุ/ใกล้หมดได้ทันที)
+    const sd = statusDisplay(c);
+    const bs = contractBillingSummary(c.visits);
+    const edge = sd.kind === "none" ? BORDER_MAIN : sd.color;
+    const tag = (label, color, bg) => (
+      <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, height: 22, px: 0.9, borderRadius: 999, fontSize: "0.68rem", fontWeight: 800, whiteSpace: "nowrap", color, bgcolor: bg || alpha(color, 0.1) }}>
+        {label}
+      </Box>
+    );
+    const progressNums = String(progressLabel).match(/(\d+)\s*\/\s*(\d+)/);
+    const pct = progressNums && Number(progressNums[2]) > 0 ? Math.min(100, (Number(progressNums[1]) / Number(progressNums[2])) * 100) : null;
 
-        {/* ✅ แถบสรุปหัวการ์ด — "ประเภทงาน / ระบบ / มูลค่างาน" ต้องเห็นทันทีโดยไม่ต้องกด "รายละเอียด"
-            เดิม 3 ฟิลด์นี้อยู่ในส่วนที่พับไว้ทั้งหมด การ์ดที่ยังพับอยู่จึงบอกได้แค่ชื่อโครงการกับความคืบหน้า
-            มองไม่ออกเลยว่าเป็นงานอะไร ระบบไหน มูลค่าเท่าไหร่ ต้องกางทีละใบถึงจะรู้ (ดูภาพที่ผู้ใช้ส่งมา)
-            ⚠️ ใช้ EditableCell ตัวเดียวกับที่เคยอยู่ในส่วนพับ พร้อมเงื่อนไขสิทธิ์เดิมเป๊ะๆ จึงยังแตะแก้ไขได้
-            ตรงนี้เลย — และเป็นการ "ย้าย" ไม่ใช่ "เพิ่ม" (ลบ FieldRow เดิมในส่วนพับออกแล้ว) กันข้อมูล
-            เดียวกันโผล่ซ้ำ 2 ที่ในการ์ดใบเดียว ซึ่งจะทำให้การ์ดยาวขึ้นโดยไม่ได้ข้อมูลเพิ่ม */}
-        <Box
-          sx={{
-            mt: 1, px: 1, py: 0.75, borderRadius: 2, bgcolor: alpha("#0f172a", 0.025),
-            display: "grid",
-            // minmax(0,…) จำเป็นทั้ง 3 ช่อง — ไม่งั้นช่องที่ข้อความยาว (เช่นระบบ "Fire Alarm & CCTV")
-            // จะดันความกว้างขั้นต่ำของตัวเองจนกริดล้นออกนอกการ์ดแทนที่จะตัดด้วย ellipsis
-            // ⚠️ ช่องมูลค่ามีพื้นขั้นต่ำ 84px — ตอนแตะแก้ไขจะกลายเป็นช่องกรอกตัวเลข ถ้าปล่อยให้กว้าง
-            // ตามเนื้อหา (auto ล้วน) ช่องกรอกจะหดจนพิมพ์เลขหลักหมื่นแล้วมองไม่เห็นตัวที่พิมพ์
-            gridTemplateColumns: "minmax(0,1fr) minmax(0,1.1fr) minmax(84px,auto)",
-            columnGap: 1, alignItems: "start",
-          }}
-        >
-          <CardMetaCell label="ประเภทงาน">
-            <EditableCell
-              Wrapper={Box} width="100%" editable={canEditBasicField(c, "title")} editType="autocomplete" editOptions={titleOptions}
-              value={c.title} title={c.title}
-              formatDisplay={(v) => <Typography component="span" sx={{ fontSize: "0.82rem", fontWeight: 700, lineHeight: 1.35 }}>{v || <Dash />}</Typography>}
-              {...fp("title")}
-            />
-          </CardMetaCell>
-          <CardMetaCell label="ระบบ">
-            <EditableCell
-              Wrapper={Box} width="100%" editable={canEditBasicField(c, "system")} editType="autocomplete" editOptions={systemOptions}
-              value={c.system} title={c.system}
-              formatDisplay={(v) => <Typography component="span" sx={{ fontSize: "0.82rem", lineHeight: 1.35, color: v ? "text.primary" : undefined }}>{v || <Dash />}</Typography>}
-              {...fp("system")}
-            />
-          </CardMetaCell>
-          <CardMetaCell label="มูลค่างาน" align="right">
-            <EditableCell
-              Wrapper={Box} width="100%" editable={isAdminOrManager && canEditField(c, "jobValue")} editType="number" value={c.jobValue}
-              // ✅ ยังไม่กรอกมูลค่า = บอกตรงๆ ด้วยสีส้มเตือน ไม่ใช่ขีด "–" เงียบๆ ให้เข้าใจว่าเป็นงานไม่มี
-              // มูลค่า — ตรงกับคำเตือน "ยังไม่ได้กรอกมูลค่า N รายการ" ในกล่องสรุปยอดรวมด้านบนของหน้า
-              formatDisplay={(v) => (hasMoney(v)
-                ? <Typography component="span" sx={{ fontSize: "0.88rem", fontWeight: 800, letterSpacing: "-0.01em" }}>{formatBaht(v)}</Typography>
-                : <Typography component="span" sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#b45309" }}>ยังไม่ระบุ</Typography>)}
-              {...fp("jobValue")}
-            />
-          </CardMetaCell>
+    return (
+      <Paper key={c.key} variant="outlined" sx={{ position: "relative", overflow: "hidden", borderRadius: 3, borderColor: BORDER_MAIN, boxShadow: "0 1px 2px rgba(15,23,42,0.05)" }}>
+        <Box sx={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 4, bgcolor: edge }} />
+        <Box sx={{ pl: 2.25, pr: 1.75, pt: 1.5, pb: 1.25 }}>
+          <Stack direction="row" alignItems="flex-start" spacing={1}>
+            {showCheckboxes && isSelectableForMerge(c) && (
+              <Checkbox
+                size="small" checked={selectedIds.has(c.key)} onChange={() => toggleSelect(c)}
+                sx={{ p: 0.5, mt: -0.5, "&.Mui-checked": { color: ACCENT } }}
+              />
+            )}
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <EditableCell
+                Wrapper={Box} editable={canEditBasicField(c, "site")} value={c.site} width="100%"
+                formatDisplay={(v) => <Typography sx={{ fontWeight: 800, fontSize: "1rem", lineHeight: 1.3, color: "#0f172a", wordBreak: "break-word" }}>{v || <Dash />}</Typography>}
+                {...fp("site")}
+              />
+              <EditableCell
+                Wrapper={Box} editable={canEditBasicField(c, "company")} value={c.company} width="100%"
+                formatDisplay={(v) => <Typography sx={{ fontSize: "0.78rem", color: v ? "text.secondary" : "text.disabled", lineHeight: 1.4, wordBreak: "break-word" }}>{v || "ไม่ระบุบริษัท"}</Typography>}
+                {...fp("company")}
+              />
+            </Box>
+            {/* มูลค่างาน — ตัวเลขที่คนเปิดหน้านี้มาดู วางมุมขวาบนให้กวาดตาลงมาเทียบกันได้ */}
+            <Box sx={{ flexShrink: 0, textAlign: "right", minWidth: 84 }}>
+              <EditableCell
+                Wrapper={Box} width="100%" editable={isAdminOrManager && canEditField(c, "jobValue")} editType="number" value={c.jobValue}
+                formatDisplay={(v) => (hasMoney(v)
+                  ? <Typography component="span" sx={{ fontSize: "0.98rem", fontWeight: 900, color: "#0f172a", letterSpacing: "-0.01em", fontVariantNumeric: "tabular-nums" }}>{formatBaht(v)}</Typography>
+                  : <Typography component="span" sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#b45309" }}>ยังไม่ระบุมูลค่า</Typography>)}
+                {...fp("jobValue")}
+              />
+            </Box>
+          </Stack>
+
+          {/* ประเภทงาน · ระบบ — แตะแก้ได้เหมือนเดิม */}
+          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.6, minWidth: 0 }}>
+            <Box sx={{ minWidth: 0, maxWidth: "45%" }}>
+              <EditableCell
+                Wrapper={Box} width="100%" editable={canEditBasicField(c, "title")} editType="autocomplete" editOptions={titleOptions}
+                value={c.title} title={c.title}
+                formatDisplay={(v) => <Typography component="span" noWrap sx={{ display: "block", fontSize: "0.84rem", fontWeight: 800, color: "#334155" }}>{v || <Dash />}</Typography>}
+                {...fp("title")}
+              />
+            </Box>
+            <Typography sx={{ color: "#cbd5e1", flexShrink: 0 }}>·</Typography>
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+              <EditableCell
+                Wrapper={Box} width="100%" editable={canEditBasicField(c, "system")} editType="autocomplete" editOptions={systemOptions}
+                value={c.system} title={c.system}
+                formatDisplay={(v) => <Typography component="span" noWrap sx={{ display: "block", fontSize: "0.84rem", color: v ? "#475569" : undefined }}>{v || <Dash />}</Typography>}
+                {...fp("system")}
+              />
+            </Box>
+          </Stack>
+
+          {/* ป้ายสถานะเรียงแถวเดียว (ตัดบรรทัดได้) แทนการซ้อนแนวตั้งทางขวา */}
+          <Stack direction="row" spacing={0.6} useFlexGap sx={{ mt: 0.9, flexWrap: "wrap", rowGap: 0.6 }}>
+            {sd.kind !== "none" && (
+              <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, height: 22, px: 0.9, borderRadius: 999, fontSize: "0.68rem", fontWeight: 800, whiteSpace: "nowrap", color: sd.color, bgcolor: sd.bg, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis" }}>
+                <Box component="span" sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: sd.color, flexShrink: 0 }} />
+                {sd.label}
+              </Box>
+            )}
+            {tag(jobTypeLabel, jobTypeColor)}
+            <DepartmentPill value={c.departmentTag} />
+            {bs && bs.state !== "not_invoiced" && tag(bs.state === "overdue" && bs.overdueDays > 0 ? `เลยกำหนดชำระ ${bs.overdueDays} วัน` : bs.label, bs.color)}
+            {overdueInfo && (
+              <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.4, height: 22, px: 0.9, borderRadius: 999, fontSize: "0.68rem", fontWeight: 800, whiteSpace: "nowrap", color: overdueInfo.color, bgcolor: alpha(overdueInfo.color, 0.1) }}>
+                <WarningAmber sx={{ fontSize: 13 }} />{overdueInfo.shortLabel}
+              </Box>
+            )}
+          </Stack>
         </Box>
 
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.75 }}>
-          <Chip label={progressLabel} size="small" sx={{ height: 20, fontSize: "0.7rem", fontWeight: 700, bgcolor: alpha(progressColor, 0.12), color: progressColor }} />
-          {overdueInfo && (
-            <Tooltip title={`รอบล่าสุด ${thaiDateNumeric(overdueInfo.lastVisitDate)} — ครบกำหนดรอบถัดไป ${thaiDateNumeric(overdueInfo.dueDate)}`}>
-              {/* ป้ายบอกสถานะตรงๆ แทนคำว่า "เกินกำหนด" คำเดียว — บนมือถือไม่มี hover ให้ชี้ดูรายละเอียด */}
-              <Chip
-                icon={<WarningAmber sx={{ fontSize: 14 }} />} label={overdueInfo.shortLabel} size="small"
-                sx={{ height: 20, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha(overdueInfo.color, 0.12), color: overdueInfo.color, "& .MuiChip-icon": { color: overdueInfo.color } }}
-              />
-            </Tooltip>
-          )}
-          <Box sx={{ flex: 1 }} />
+        {/* แถบล่าง: ความคืบหน้า · ล่าสุด · แผนที่ · รายละเอียด */}
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ pl: 2.25, pr: 1, py: 0.75, bgcolor: "#f8fafc", borderTop: `1px solid ${BORDER_MAIN}` }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Stack direction="row" alignItems="center" spacing={0.75}>
+              <Typography sx={{ fontSize: "0.74rem", fontWeight: 800, color: progressColor, whiteSpace: "nowrap" }}>
+                {c.isRealContract ? `ครั้งที่ ${progressLabel}` : progressLabel}
+              </Typography>
+              {pct !== null && (
+                <Box sx={{ flex: 1, maxWidth: 90, height: 5, borderRadius: 9, bgcolor: alpha(progressColor, 0.15), overflow: "hidden" }}>
+                  <Box sx={{ width: `${pct}%`, height: "100%", bgcolor: progressColor, borderRadius: 9 }} />
+                </Box>
+              )}
+            </Stack>
+            <Typography noWrap sx={{ fontSize: "0.7rem", color: TEXT_SUB, mt: 0.1 }}>
+              {latestVisit ? `ล่าสุด ${formatEventDateRange(latestVisit)}${latestVisit.team ? ` · ${latestVisit.team}` : ""}` : "ยังไม่ลงตารางจริง"}
+            </Typography>
+          </Box>
+          <Box onClick={(e) => e.stopPropagation()} sx={{ flexShrink: 0 }}>
+            <SiteMapLink company={c.company} site={c.site} canEdit={isAdminOrManager} compact />
+          </Box>
           <Button
             size="small" onClick={() => toggleCardExpand(c.key)}
             endIcon={isExpanded ? <ExpandLess sx={{ fontSize: 16 }} /> : <ExpandMore sx={{ fontSize: 16 }} />}
-            // ✅ เป็นกลาง ไม่ใช่สีแดง — ปุ่มนี้โผล่ซ้ำทุกใบการ์ด ถ้าย้อมแดงด้วยจะกลายเป็นจุดแดงเรียงลงมา
-            // ทั้งหน้าจนไปกลบป้ายเตือนจริงๆ (เกินกำหนด/หมดอายุแล้ว) ที่อยู่ในการ์ดเดียวกัน
-            sx={{ textTransform: "none", fontSize: "0.72rem", fontWeight: 700, color: TEXT_SUB, minWidth: 0, px: 1, "&:hover": { color: ACCENT } }}
+            sx={{ flexShrink: 0, textTransform: "none", fontSize: "0.74rem", fontWeight: 800, color: "#2563eb", minWidth: 0, px: 1, borderRadius: 2, "&:hover": { bgcolor: "#eff6ff" } }}
           >
             {isExpanded ? "ย่อ" : "รายละเอียด"}
           </Button>
         </Stack>
 
+        <Box sx={{ px: 1.75, pb: isExpanded ? 1.5 : 0 }}>
         <Collapse in={isExpanded}>
         <Box sx={{ mt: 1 }}>
         {/* ⚠️ "ประเภทงาน"/"ระบบ" ไม่ได้อยู่ตรงนี้แล้ว — ย้ายขึ้นไปอยู่แถบสรุปหัวการ์ดที่เห็นตลอดโดยไม่ต้อง
@@ -4990,6 +4959,7 @@ pagedRows.map((c, idx) => {
         )}
         </Box>
         </Collapse>
+        </Box>
       </Paper>
     );
   };
