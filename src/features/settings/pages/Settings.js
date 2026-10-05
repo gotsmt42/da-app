@@ -40,7 +40,6 @@ const Settings = () => {
   const [pushLoading, setPushLoading] = useState(false);
   const [pushPermission, setPushPermission] = useState("default");
   const [pushDevices, setPushDevices] = useState(null);
-  const [testing, setTesting] = useState(false);
   const iosNeedsInstall = PushService.isIos() && !PushService.isStandalone();
   const loadPushStatus = () => {
     PushService.getPermissionState().then(setPushPermission).catch(() => {});
@@ -80,23 +79,6 @@ const Settings = () => {
     } finally {
       setPushLoading(false);
       loadPushStatus();
-    }
-  };
-
-  /** ✅ ส่งแจ้งเตือนทดสอบหาตัวเอง — แนะนำให้ล็อกจอ/ย่อแอปก่อน จะเห็นแบบเดียวกับแจ้งเตือนจริง */
-  const handleTestPush = async () => {
-    setTesting(true);
-    try {
-      const r = await PushService.test();
-      Swal.fire({
-        title: "ส่งแจ้งเตือนทดสอบแล้ว",
-        html: `ส่งไป ${r.devices} อุปกรณ์ · ถ้าแอปเปิดอยู่จะเด้งเป็นแถบบนจอ<br/>ลองย่อแอป/ล็อกจอแล้วกดทดสอบอีกครั้งเพื่อดูแบบแจ้งเตือนของมือถือ`,
-        icon: "success", confirmButtonColor: "#dc2626",
-      });
-    } catch (error) {
-      Swal.fire("ส่งไม่สำเร็จ", error?.response?.data?.message || error.message || "กรุณาลองใหม่อีกครั้ง", "error");
-    } finally {
-      setTesting(false);
     }
   };
 
@@ -236,12 +218,6 @@ const Settings = () => {
             {pushDevices !== null ? ` · บัญชีของคุณเปิดรับไว้ทั้งหมด ${pushDevices} อุปกรณ์` : ""}
             <br />เด้งบนจอแบบ LINE: งานใหม่/มอบหมายงาน · ขอปิดงาน · ใบเบิก · OT · ใบขอซื้อ · คำขอจากเว็บ (เฉพาะที่เกี่ยวกับคุณ)
           </p>
-        )}
-        {pushSubscribed && (
-          <button type="button" onClick={handleTestPush} disabled={testing}
-            style={{ alignSelf: "flex-start", border: "1px solid #e2e8f0", background: "#fff", borderRadius: 10, padding: "6px 14px", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer", color: "#0f172a" }}>
-            {testing ? "กำลังส่ง..." : "🔔 ส่งแจ้งเตือนทดสอบ"}
-          </button>
         )}
       </div>
 
