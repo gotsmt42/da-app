@@ -1828,10 +1828,23 @@ function EventCalendar() {
   }, []);
 
   // ✅ ช่างเทคนิคทั้งหมด — ใช้สร้าง dropdown ค้นหางานของช่างแต่ละคน (resPerson เก็บเป็น _id)
-  const technicianOptions = useMemo(
-    () => employeeList.filter((u) => isRole(u, ...TECHNICIAN_ROLES)),
-    [employeeList],
-  );
+  // ✅ (5 ต.ค. 2569) ผู้ใช้: "ค้นหาช่างให้อิงตามรายชื่อที่มีทั้งหมด ไม่ว่าหัวหน้าทีมหรือลูกทีม"
+  //    รวมทุกคนที่ถูกใส่เป็นหัวหน้าทีม/ลูกทีมในงานจริงด้วย (บางคนไม่ได้อยู่ Rank ช่าง เช่นแอดมินที่ไปช่วยหน้างาน)
+  const technicianOptions = useMemo(() => {
+    const inJobs = new Set();
+    events.forEach((ev) => {
+      const xp = ev.extendedProps || {};
+      [ev.resPerson, xp.resPerson].forEach((id) => id && inJobs.add(`id:${id}`));
+      [ev.team, xp.team].forEach((n) => n && inJobs.add(`name:${n}`));
+      [...(ev.teamMembers || []), ...(xp.teamMembers || [])].forEach((m) => {
+        if (m?.userId) inJobs.add(`id:${m.userId}`);
+        if (m?.name) inJobs.add(`name:${m.name}`);
+      });
+    });
+    return employeeList
+      .filter((u) => isRole(u, ...TECHNICIAN_ROLES) || inJobs.has(`id:${u._id}`) || (u.fname && inJobs.has(`name:${u.fname}`)))
+      .sort((a, b) => String(a.fname || a.username).localeCompare(String(b.fname || b.username), "th"));
+  }, [employeeList, events]);
 
   // ✅ รายชื่อเซล — ใช้แทน technicianOptions ตอนแอดมิน/ผู้จัดการเปิดเมนู "ตารางงานเซล" กรองดูของ
   // เซลแต่ละคน (เซลเองเห็นแค่นัดของตัวเองอยู่แล้วจากขอบเขตฝั่ง server ไม่ต้องมีตัวกรองนี้)
@@ -1903,6 +1916,7 @@ function EventCalendar() {
         event.company ?? "",
         event.system ?? "",
         event.team ?? "",
+        ...[...(event.teamMembers || []), ...(event.extendedProps?.teamMembers || [])].map((m) => m?.name || ""),
         event.time?.toString() ?? "",
         ownerName, // ✅ เพิ่มชื่อเจ้าของเข้าไปในเงื่อนไข search
       ].some((field) => field.toLowerCase().includes(keyword));
@@ -1912,11 +1926,14 @@ function EventCalendar() {
       // — ตัวกรองเดิมเทียบกับคำศัพท์ของช่างเสมอ นัดของเซลจึงไม่ตรงเงื่อนไขไหนเลยเวลาเลือกกรอง
       // ✅ แยกเทียบตามโลกที่กำลังดูอยู่ — matchesTechnician กลายเป็น "กรองตามเซล" โดยเทียบ userId
       // (นัดของเซลผูกกับ userId ของผู้สร้าง ไม่ใช่ resPerson/team ซึ่งเป็นแนวคิดของงานช่าง)
+      // ✅ ช่างที่เลือก = หัวหน้าทีม (resPerson/team) หรือ ลูกทีม (teamMembers) ของงานนั้น
+      const members = [...(event.teamMembers || []), ...(event.extendedProps?.teamMembers || [])];
       const matchesTechnician = isSalesView
         ? !selectedTechnician || String(event.userId || "") === String(selectedTechnician)
         : !selectedTechnician ||
           event.resPerson === selectedTechnician ||
-          (!event.resPerson && selectedTechnicianName && event.team === selectedTechnicianName);
+          (!event.resPerson && selectedTechnicianName && event.team === selectedTechnicianName) ||
+          members.some((m) => String(m?.userId || "") === String(selectedTechnician) || (selectedTechnicianName && m?.name === selectedTechnicianName));
 
       const matchesStatus = isSalesView
         ? !selectedStatus || toSalesStatus(event.status) === selectedStatus
