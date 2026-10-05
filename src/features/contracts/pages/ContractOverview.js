@@ -991,15 +991,46 @@ const EditableCell = ({
 // ✅ 1 แถวข้อมูล = ป้ายชื่อฟิลด์ + EditableCell (Wrapper={Box}) — ใช้ในการ์ดมือถือแทนคอลัมน์ตาราง
 // เดสก์ท็อป ให้ทุกฟิลด์อ่านง่าย/แก้ไขได้เหมือนกันทุกประการ แค่จัดวางแนวตั้งแทนแนวนอน (ไม่ต้องเลื่อนจอ
 // ซ้าย-ขวาหาข้อมูลเหมือนตารางเดิมบนจอแคบ)
+// ✅ (5 ต.ค. 2569) ผู้ใช้: "รายละเอียดดูยาก" — ตัวอักษรค่าเล็กลงให้เท่ากันทุกแถว · ป้ายสีเทาอ่อน
+//    เส้นคั่นเฉพาะระหว่างแถว (แถวสุดท้ายของกลุ่มไม่มีเส้น) ใช้คู่กับ DetailSection ด้านล่าง
 const FieldRow = ({ label, hideIfEmptyReadOnly, ...cellProps }) => {
   if (hideIfEmptyReadOnly && !cellProps.editable && !cellProps.value) return null;
   return (
-    <Stack direction="row" alignItems="center" spacing={1} sx={{ py: 0.6, minHeight: 34, borderBottom: "1px solid", borderColor: alpha("#0f172a", 0.06) }}>
-      <Typography variant="caption" sx={{ width: 96, flexShrink: 0, color: "text.secondary", fontWeight: 700, fontSize: "0.72rem" }}>{label}</Typography>
-      <EditableCell Wrapper={Box} width="100%" {...cellProps} />
+    <Stack
+      direction="row" alignItems="center" spacing={1}
+      sx={{ py: 0.5, minHeight: 36, borderBottom: "1px solid", borderColor: alpha("#0f172a", 0.06), "&:last-of-type": { borderBottom: 0 } }}
+    >
+      <Typography sx={{ width: 92, flexShrink: 0, color: TEXT_SUB, fontWeight: 600, fontSize: "0.74rem" }}>{label}</Typography>
+      <Box sx={{ flex: 1, minWidth: 0, fontSize: "0.82rem", color: "#0f172a", fontWeight: 600 }}>
+        <EditableCell Wrapper={Box} width="100%" {...cellProps} />
+      </Box>
     </Stack>
   );
 };
+
+// ✅ กลุ่มข้อมูลในการ์ดมือถือ: หัวข้อเล็ก (+ ปุ่มด้านขวาถ้ามี) แล้วตามด้วยพื้นเทาอ่อนห่อแถวข้อมูล
+//    แบ่งเป็นก้อนให้กวาดตาหาเรื่องที่ต้องการได้ทันที แทนรายการยาวเหยียดแถวเดียว
+const DetailSection = ({ title, action, children, sx }) => (
+  <Box sx={{ mt: 1.5, ...sx }}>
+    <Stack direction="row" alignItems="center" sx={{ mb: 0.5, px: 0.25, minHeight: 22 }}>
+      <Typography sx={{ flex: 1, fontSize: "0.7rem", fontWeight: 800, color: TEXT_SUB, letterSpacing: "0.02em" }}>{title}</Typography>
+      {action}
+    </Stack>
+    <Box sx={{ px: 1.25, borderRadius: 2, bgcolor: "#f8fafc", border: `1px solid ${alpha("#0f172a", 0.05)}` }}>
+      {children}
+    </Box>
+  </Box>
+);
+
+// ✅ ช่องข้อมูลแบบ "ป้ายอยู่บน ค่าอยู่ล่าง" — ใช้วางตาราง 2 คอลัมน์ (วันเริ่ม/สิ้นสุด/รอบเข้า/จำนวนครั้ง)
+const GridField = ({ label, ...cellProps }) => (
+  <Box sx={{ minWidth: 0, py: 0.75 }}>
+    <Typography sx={{ color: TEXT_SUB, fontWeight: 600, fontSize: "0.7rem", mb: 0.15 }}>{label}</Typography>
+    <Box sx={{ fontSize: "0.84rem", color: "#0f172a", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+      <EditableCell Wrapper={Box} width="100%" {...cellProps} />
+    </Box>
+  </Box>
+);
 
 // ✅ ค่าเริ่มต้นของ "ฟอร์มสร้างสัญญา" — ใช้ร่วมกันทั้งไดอะล็อก "เพิ่มสัญญาใหม่" และแถวร่างในตาราง
 // ✅ วันที่เข้างานครั้งที่ 1 — ไม่บังคับ (บางสัญญายังไม่รู้วันที่แน่นอนตอนสร้าง) กรอกมาจะลงตารางเป็น
@@ -4623,14 +4654,18 @@ pagedRows.map((c, idx) => {
 
         <Box sx={{ px: 1.75, pb: isExpanded ? 1.5 : 0 }}>
         <Collapse in={isExpanded}>
-        <Box sx={{ mt: 1 }}>
+        <Box sx={{ pt: 0.25 }}>
         {/* ⚠️ "ประเภทงาน"/"ระบบ" ไม่ได้อยู่ตรงนี้แล้ว — ย้ายขึ้นไปอยู่แถบสรุปหัวการ์ดที่เห็นตลอดโดยไม่ต้อง
             กางการ์ด (ดูคอมเมนต์ที่แถบสรุป) แก้ไขได้เหมือนเดิมทุกประการที่ตำแหน่งใหม่ */}
 
         {/* เอกสาร: เลขที่สัญญา/ใบเสนอราคา (สัญญาจริง) หรือเลขที่เอกสาร (งานทั่วไป/โปรเจค) */}
+        {/* ✅ (5 ต.ค. 2569) ผู้ใช้: "หน้าภาพรวม ตรงนี้ด้วย ดูยาก" — จัดเป็นกลุ่ม: ข้อมูลงาน · ระยะสัญญา ·
+            ครั้งที่เข้างาน · การวางบิล · ผู้ติดต่อ แทนรายการยาวแถวเดียว · เลขที่สัญญาไม่ใช้สีแดงแล้ว
+            (แดงสงวนไว้ให้เรื่องผิดปกติจริงเท่านั้น) */}
+        <DetailSection title="ข้อมูลงาน">
         {c.isRealContract ? (
           <>
-            <FieldRow label="เลขที่สัญญา" editable={isAdminOrManager} value={c.contractNo} formatDisplay={(v) => (v ? <span style={{ color: ACCENT, fontWeight: 600 }}>{v}</span> : <Dash />)} {...fp("contractNo")} />
+            <FieldRow label="เลขที่สัญญา" editable={isAdminOrManager} value={c.contractNo} formatDisplay={(v) => (v ? <span style={{ fontWeight: 700 }}>{v}</span> : <Dash />)} {...fp("contractNo")} />
             <FieldRow label="ใบเสนอราคา" editable={isAdminOrManager} value={c.quotationNo} {...fp("quotationNo")} />
           </>
         ) : (
@@ -4664,7 +4699,7 @@ pagedRows.map((c, idx) => {
                 <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap">
                   <Chip
                     label={sd.label} size="small"
-                    sx={{ height: 20, fontSize: "0.7rem", fontWeight: 700, bgcolor: sd.bg, color: sd.color }}
+                    sx={{ height: 20, fontSize: "0.68rem", fontWeight: 800, bgcolor: sd.bg, color: sd.color }}
                   />
                   {/* บนมือถือไม่มี hover ให้ชี้ดู tooltip — เขียนรายชื่อช่องที่ขาดออกมาตรงๆ เลย */}
                   {hint && (
@@ -4684,28 +4719,52 @@ pagedRows.map((c, idx) => {
           );
         })()}
 
+        </DetailSection>
+
+        {/* ระยะเวลา/จำนวนครั้ง/ค่าคอม — เฉพาะสัญญาจริงเท่านั้น (งานทั่วไป/โปรเจคไม่มีแนวคิดนี้)
+            วาง 2 คอลัมน์ ป้ายบน-ค่าล่าง อ่านทีเดียวเห็นครบทั้งช่วงสัญญา */}
+        {c.isRealContract && (
+          <DetailSection title="ระยะสัญญา">
+            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", columnGap: 1.5, borderBottom: "1px solid", borderColor: alpha("#0f172a", 0.06) }}>
+              <GridField label="เริ่มสัญญา" editable={isAdminOrManager} editType="date" value={c.contractStart} formatDisplay={(v) => (v ? thaiDateNumeric(v) : <Dash />)} {...fp("contractStart")} />
+              <GridField label="สิ้นสุดสัญญา" editable={isAdminOrManager} editType="date" value={c.contractEnd} formatDisplay={(v) => (v ? thaiDateNumeric(v) : <Dash />)} {...fp("contractEnd")} />
+              <GridField
+                label="รอบเข้า" editable={isAdminOrManager} editType="intervalMonths" value={c.intervalMonths}
+                formatDisplay={(v) => (v ? `ทุก ${v} เดือน` : <Dash />)}
+                title={c.intervalMonths && visitsPerYear(c.intervalMonths) ? `ปีละ ${visitsPerYear(c.intervalMonths)} ครั้ง` : undefined}
+                {...fp("intervalMonths")}
+              />
+              <GridField label="จำนวนครั้ง" editable={isAdminOrManager} editType="number" value={c.visitCount} formatDisplay={(v) => (v ? `${v} ครั้ง` : <Dash />)} {...fp("visitCount")} />
+            </Box>
+            <FieldRow
+              label="ค่าคอมลูกค้า" editable={isAdminOrManager && canEditField(c, "commission")} editType="number"
+              value={c.commission}
+              formatDisplay={(v) => (hasMoney(v)
+                ? <Box component="span">{formatBaht(v)}{commissionPct(c) ? <Box component="span" sx={{ fontSize: "0.72rem", color: TEXT_SUB, fontWeight: 500, ml: 0.5 }}>({commissionPct(c)})</Box> : null}</Box>
+                : <Dash />)}
+              {...fp("commission")}
+            />
+          </DetailSection>
+        )}
+
         {/* ครั้งที่เข้างาน — แสดง/แก้ไขทีมของแต่ละครั้งแยกกัน (canEditRoundTeam) — พับ/กางแยกอีกชั้นจาก
             การ์ดหลัก (expandedRounds) เพราะสัญญาที่มีหลายครั้ง (สูงสุด 12) ทำให้ยาวเกินไปถ้าโชว์ตลอด
             เริ่มพับไว้ โชว์แค่สรุปย่อ (จำนวนครั้ง + ครั้งล่าสุด) กดดูทั้งหมดทีหลังได้ตามต้องการ */}
-        <Box sx={{ py: 0.75 }}>
-          <Stack direction="row" alignItems="center" spacing={1}>
-            <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 700, fontSize: "0.72rem" }}>
-              {/* ✅ งานทั่วไป/โปรเจค/ยังไม่จัดกลุ่ม ไม่มีแนวคิด "หลายครั้ง" แบบสัญญาจริง (มีแค่คอลัมน์
-                  เดียวอยู่แล้ว) — เปลี่ยนหัวข้อเป็น "วันที่เข้างาน" ตามที่ผู้ใช้ขอ แทน "ครั้งที่เข้างาน (N ครั้ง)"
-                  ซึ่งไม่มีความหมายตอน N=1 เสมอ */}
-              {c.isRealContract ? `ครั้งที่เข้างาน (${rowMaxRound(c)} ครั้ง)` : "วันที่เข้างาน"}
-            </Typography>
-            <Box sx={{ flex: 1 }} />
+        <DetailSection
+          title={c.isRealContract ? `ครั้งที่เข้างาน · ${rowMaxRound(c)} ครั้ง` : "วันที่เข้างาน"}
+          action={(
             <Button
               size="small" onClick={() => toggleRoundsExpand(c.key)}
               endIcon={isRoundsExpanded ? <ExpandLess sx={{ fontSize: 14 }} /> : <ExpandMore sx={{ fontSize: 14 }} />}
-              sx={{ textTransform: "none", fontSize: "0.68rem", fontWeight: 700, color: ACCENT, minWidth: 0, px: 0.75, py: 0.25 }}
+              sx={{ textTransform: "none", fontSize: "0.7rem", fontWeight: 700, color: "#2563eb", minWidth: 0, px: 0.75, py: 0, "&:hover": { bgcolor: "#eff6ff" } }}
             >
               {isRoundsExpanded ? "ย่อ" : "ดูทั้งหมด"}
             </Button>
-          </Stack>
+          )}
+        >
+        <Box sx={{ py: 0.9 }}>
           {!isRoundsExpanded && (
-            <Typography variant="caption" sx={{ display: "block", fontSize: "0.72rem", color: "text.secondary", mt: 0.25 }}>
+            <Typography sx={{ display: "block", fontSize: "0.78rem", color: "#334155", fontWeight: 600 }}>
               {latestVisit
                 ? (c.isRealContract
                   ? `ล่าสุด: ครั้งที่ ${Number(latestVisit.time) || 1} · ${formatEventDateRange(latestVisit)}${latestVisit.team ? ` · 👷 ${latestVisit.team}` : ""}`
@@ -4714,13 +4773,13 @@ pagedRows.map((c, idx) => {
             </Typography>
           )}
           <Collapse in={isRoundsExpanded}>
-          <Stack spacing={0.75} sx={{ mt: 0.5 }}>
+          <Stack spacing={0.75}>
             {Array.from({ length: rowMaxRound(c) }, (_, i) => i + 1).map((n) => {
               const roundVisits = roundVisitsOf(c, n);
               const pendingDraft = roundVisits.length === 0 && c.visits.find((v) => v.unscheduled && (Number(v.time) || 1) === n);
               return (
-                <Stack key={n} direction="row" alignItems="flex-start" spacing={1} sx={{ p: 0.75, borderRadius: 1.5, bgcolor: alpha("#0f172a", 0.025) }}>
-                  <Chip label={n} size="small" sx={{ height: 20, minWidth: 20, fontSize: "0.68rem", fontWeight: 700, bgcolor: alpha(ACCENT, 0.1), color: ACCENT }} />
+                <Stack key={n} direction="row" alignItems="flex-start" spacing={1} sx={{ p: 0.75, borderRadius: 1.5, bgcolor: "#fff", border: `1px solid ${alpha("#0f172a", 0.06)}` }}>
+                  <Chip label={n} size="small" sx={{ height: 20, minWidth: 20, fontSize: "0.68rem", fontWeight: 800, bgcolor: "#eff6ff", color: "#2563eb" }} />
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     {roundVisits.length > 0 ? (
                       <>
@@ -4825,30 +4884,7 @@ pagedRows.map((c, idx) => {
           </Stack>
           </Collapse>
         </Box>
-
-        {/* ระยะเวลา/จำนวนครั้ง/มูลค่างาน — เฉพาะสัญญาจริงเท่านั้น (งานทั่วไป/โปรเจคไม่มีแนวคิดนี้) */}
-        {c.isRealContract && (
-          <>
-            <FieldRow label="เริ่มสัญญา" editable={isAdminOrManager} editType="date" value={c.contractStart} formatDisplay={(v) => (v ? thaiDateNumeric(v) : <Dash />)} {...fp("contractStart")} />
-            <FieldRow label="สิ้นสุดสัญญา" editable={isAdminOrManager} editType="date" value={c.contractEnd} formatDisplay={(v) => (v ? thaiDateNumeric(v) : <Dash />)} {...fp("contractEnd")} />
-            <FieldRow
-              label="รอบเข้า" editable={isAdminOrManager} editType="intervalMonths" value={c.intervalMonths}
-              formatDisplay={(v) => (v ? `ทุก ${v} เดือน${visitsPerYear(v) ? ` (ปีละ ${visitsPerYear(v)} ครั้ง)` : ""}` : <Dash />)}
-              {...fp("intervalMonths")}
-            />
-            {/* ✅ ค่าคอมอยู่ในรายละเอียดที่กางดู ไม่ได้อยู่แถบสรุปหัวการ์ด — แถบนั้นมี 3 ช่องพอดีจอแล้ว
-                (ประเภทงาน/ระบบ/มูลค่างาน) เพิ่มช่องที่ 4 จะแคบจนตัวเลขตกบรรทัดบนมือถือ */}
-            <FieldRow
-              label="ค่าคอมให้ลูกค้า" editable={isAdminOrManager && canEditField(c, "commission")} editType="number"
-              value={c.commission}
-              formatDisplay={(v) => (hasMoney(v)
-                ? <Box component="span">{formatBaht(v)}{commissionPct(c) ? <Box component="span" sx={{ fontSize: "0.72rem", color: TEXT_SUB, ml: 0.5 }}>({commissionPct(c)})</Box> : null}</Box>
-                : <Dash />)}
-              {...fp("commission")}
-            />
-            <FieldRow label="จำนวนครั้ง" editable={isAdminOrManager} editType="number" value={c.visitCount} {...fp("visitCount")} />
-          </>
-        )}
+        </DetailSection>
 
         {/* ⚠️ "มูลค่างาน" ย้ายขึ้นไปอยู่แถบสรุปหัวการ์ดแล้วเช่นกัน (แสดงทุกแท็บเหมือนเดิม ไม่ได้จำกัดแค่
             สัญญาจริง เพราะงานทั่วไป/โปรเจค/ยังไม่จัดกลุ่มก็มีมูลค่าของตัวเองได้ ตรงกับคอลัมน์ฝั่งเดสก์ท็อป) */}
@@ -4859,32 +4895,33 @@ pagedRows.map((c, idx) => {
           const bs = contractBillingSummary(c.visits);
           if (!bs || bs.invoicedCount === 0) return null;
           return (
-            <Box sx={{ mt: 1, p: 1.1, borderRadius: 2, bgcolor: alpha(bs.color, 0.06) }}>
-              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.4 }}>
-                <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: bs.color }}>
-                  วางบิลแล้ว {bs.invoicedCount}/{bs.totalCount} ครั้ง
-                </Typography>
-                <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: bs.color }}>
+            <DetailSection
+              title={`การวางบิล · ${bs.invoicedCount}/${bs.totalCount} ครั้ง`}
+              action={(
+                <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, fontSize: "0.68rem", fontWeight: 800, color: bs.color }}>
+                  <Box component="span" sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: bs.color }} />
                   {bs.state === "overdue" && bs.overdueDays > 0 ? `เลยกำหนด ${bs.overdueDays} วัน` : bs.label}
-                </Typography>
-              </Stack>
-              <Stack direction="row" justifyContent="space-between" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                </Box>
+              )}
+            >
+              <Stack direction="row" justifyContent="space-between" sx={{ py: 0.9, fontVariantNumeric: "tabular-nums" }}>
                 {[
                   { k: "ยอดวางบิล", v: bs.net },
                   { k: "รับแล้ว", v: bs.paid },
                   { k: "ค้างรับ", v: bs.outstanding },
                 ].map((it) => (
-                  <Box key={it.k} sx={{ textAlign: "center", flex: 1, minWidth: 0 }}>
-                    <Typography sx={{ fontSize: "0.62rem", color: TEXT_SUB }}>{it.k}</Typography>
-                    <Typography sx={{ fontSize: "0.78rem", fontWeight: 800 }} noWrap>{bahtFmt(it.v)}</Typography>
+                  <Box key={it.k} sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography sx={{ fontSize: "0.68rem", color: TEXT_SUB, fontWeight: 600 }}>{it.k}</Typography>
+                    <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: it.k === "ค้างรับ" && it.v > 0 ? "#b45309" : "#0f172a" }} noWrap>{bahtFmt(it.v)}</Typography>
                   </Box>
                 ))}
               </Stack>
-            </Box>
+            </DetailSection>
           );
         })()}
 
         {/* ผู้รับผิดชอบ — ฟิลด์อิสระจากทีมที่เข้างานทุกครั้งด้านบนโดยสมบูรณ์ */}
+        <DetailSection title="ผู้รับผิดชอบและผู้ติดต่อ">
         <FieldRow label="ผู้รับผิดชอบ" editable={isAdminOrManager && canEditField(c, "responsiblePerson")} editType="select" editOptions={teamOptions} value={c.responsiblePerson} formatDisplay={responsibleDisplay} {...fp("responsiblePerson")} />
         {/* ✅ ผู้ติดต่อหน้างาน — เบอร์กดโทรออกได้ทันที ซึ่งเป็นเหตุผลหลักที่ต้องมีบนมือถือ
             (ช่างเปิดจากรถ/หน้างานแล้วโทรได้เลย ไม่ต้องจดเบอร์แล้วไปพิมพ์ในแอปโทรศัพท์เอง) */}
@@ -4912,14 +4949,15 @@ pagedRows.map((c, idx) => {
           value={c.remark}
           placeholder="พิมพ์หมายเหตุ"
           formatDisplay={(v) => (v
-            ? <Typography variant="body2" sx={{ fontSize: "0.8rem", color: "text.secondary", whiteSpace: "pre-wrap" }}>{v}</Typography>
+            ? <Typography sx={{ fontSize: "0.8rem", fontWeight: 500, color: "#334155", whiteSpace: "pre-wrap" }}>{v}</Typography>
             : <Dash />)}
           {...fp("remark")}
         />
+        </DetailSection>
 
         {/* ปุ่มจัดการ — เฉพาะแอดมิน/manager เทียบ pattern เดียวกับคอลัมน์ actions ในตารางเดสก์ท็อป */}
         {isAdminOrManager && (
-          <Stack direction="row" justifyContent="flex-end" spacing={0.5} sx={{ mt: 1, pt: 1, borderTop: "1px solid", borderColor: alpha("#0f172a", 0.08) }}>
+          <Stack direction="row" justifyContent="flex-end" spacing={0.5} sx={{ mt: 1 }}>
             {!c.isRealContract && (
               <Tooltip title="จัดหมวดหมู่งาน (ทั่วไป/โปรเจค)">
                 <IconButton

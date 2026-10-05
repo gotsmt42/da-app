@@ -49,6 +49,7 @@ const JobReport = lazy(() => import("@/features/operation/pages/JobReport.js"));
 // Breadcrumbs) — เป็นหน้าตัวอย่างที่ติดมากับ template ตั้งแต่ตอนสร้างโปรเจกต์ ไม่เกี่ยวกับธุรกิจ
 // ไม่มีลิงก์จากเมนูไหนเลย และไม่มีใคร import ต่อ
 const Account = lazy(() => import("@/features/staff/pages/Account.js"));
+const LoginDevices = lazy(() => import("@/features/settings/pages/LoginDevices.js"));
 const Product = lazy(() => import("@/features/products/pages/Product"));
 const StockProduct = lazy(() => import("@/features/products/pages/StockProduct"));
 const WorkTypeSystem = lazy(() => import("@/features/settings/pages/WorkTypeSystem.js"));
@@ -138,6 +139,15 @@ const ThemeRoutes = [
           </Suspense>
         ),
         title: "Account",
+      },
+      {
+        path: "settings/devices",
+        element: (
+          <Suspense fallback={<PageLoader />}>
+            <LoginDevices />
+          </Suspense>
+        ),
+        title: "Login Devices",
       },
       // ── หน้ารวม (ยุบหน้าที่เป็นข้อมูลประเภทเดียวกันให้เหลือหน้าเดียวต่อเรื่อง) ──────────
       // ⚠️ ไม่ห่อด้วย AdminRoute — แต่ละ Hub เช็ค role เองและ "ไม่สร้างแท็บ" ที่ผู้ใช้ไม่มีสิทธิ์เห็น
