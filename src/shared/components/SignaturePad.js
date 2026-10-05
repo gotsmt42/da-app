@@ -126,6 +126,7 @@ const SignaturePad = forwardRef(function SignaturePad({ height = 190, onChange, 
       ctx.drawImage(img, 0, 0);
       const still = history.current.length > 0;
       setHasInk(still || true);
+      onChange?.(true); // ให้ตัวอย่างบนเอกสารอัปเดตตามหลังย้อนกลับ
     };
     img.src = prev;
   };
@@ -143,9 +144,10 @@ const SignaturePad = forwardRef(function SignaturePad({ height = 190, onChange, 
         ref={wrapRef}
         sx={{
           position: "relative", height, borderRadius: 2, overflow: "hidden",
-          border: "1px dashed #cbd5e1", bgcolor: "#fff",
-          // เส้นบรรทัดจางๆ ให้เซ็นตรงแนว เหมือนช่องเซ็นบนกระดาษ
-          backgroundImage: "linear-gradient(to bottom, transparent calc(72% - 1px), #e2e8f0 72%, transparent calc(72% + 1px))",
+          border: "1px solid #e2e8f0", bgcolor: "#fff", boxShadow: "inset 0 1px 3px rgba(15,23,42,.05)",
+          // เส้นบรรทัดให้เซ็นตรงแนว เหมือนช่องเซ็นบนกระดาษ
+          backgroundImage: "linear-gradient(to bottom, transparent calc(72% - 1px), #cbd5e1 72%, transparent calc(72% + 1px))",
+          backgroundSize: "calc(100% - 48px) 100%", backgroundPosition: "24px 0", backgroundRepeat: "no-repeat",
           opacity: disabled ? 0.6 : 1,
         }}
       >
@@ -158,6 +160,7 @@ const SignaturePad = forwardRef(function SignaturePad({ height = 190, onChange, 
           onPointerCancel={end}
           style={{ width: "100%", height: "100%", display: "block", touchAction: "none", cursor: disabled ? "default" : "crosshair" }}
         />
+        <Typography sx={{ position: "absolute", left: 24, top: "calc(72% - 26px)", fontSize: "1.3rem", color: "#94a3b8", pointerEvents: "none", fontWeight: 300 }}>×</Typography>
         {!hasInk && (
           <Typography
             sx={{
