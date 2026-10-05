@@ -2001,30 +2001,20 @@
 .ec-month-float .ec-month-float-today {
   font-size: 13px; font-weight: 800; color: #1d4ed8; background: #eff6ff; padding: 0 12px; margin-left: 4px; white-space: nowrap;
 }
-/* ตัวเลือกช่างในแถบลอย — แคปซูลเดียวกับปุ่มวันนี้ · เลือกแล้วเป็นสีน้ำเงิน */
+/* ตัวเลือกช่างในแถบลอย (FloatPersonPicker) — แคปซูลต่อท้ายปุ่มวันนี้ · เลือกแล้วเป็นสีน้ำเงินอ่อน */
 .ec-month-float .ec-month-float-person {
-  position: relative; display: flex; align-items: center; gap: 6px; height: 40px; margin: 0 0 0 4px; padding: 0 30px 0 12px;
-  border-left: 1px solid #e2e8f0; border-radius: 0 999px 999px 0; cursor: pointer; color: #334155;
-}
-.ec-month-float .ec-month-float-person svg { width: 17px; height: 17px; fill: currentColor; flex-shrink: 0; opacity: .75; }
-.ec-month-float .ec-month-float-person::after {
-  content: ""; position: absolute; right: 13px; top: 50%; width: 6px; height: 6px; margin-top: -5px;
-  border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); opacity: .6; pointer-events: none;
-}
-.ec-month-float .ec-month-float-person select {
-  appearance: none; -webkit-appearance: none; border: 0; background: transparent; font: inherit; font-size: 14px; font-weight: 700;
-  color: inherit; cursor: pointer; outline: none; max-width: 150px; text-overflow: ellipsis; padding: 0;
+  display: flex; align-items: center; gap: 6px; height: 40px; margin-left: 4px; padding: 0 10px 0 12px;
+  border-left: 1px solid #e2e8f0; border-radius: 0 999px 999px 0; color: #334155; font: inherit;
 }
 .ec-month-float .ec-month-float-person:hover { background: #f8fafc; }
 .ec-month-float .ec-month-float-person.is-set { color: #1d4ed8; background: #eff6ff; border-left-color: #bfdbfe; }
-.ec-month-float .ec-month-float-person:focus-within { box-shadow: inset 0 0 0 2px #93c5fd; }
+.ec-month-float .ec-month-float-person-label { font-size: 14px; font-weight: 700; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 767.98px) {
   /* เหนือแถบเมนูล่างของมือถือ (สูง 58px + safe area) */
   .ec-month-float { bottom: calc(70px + env(safe-area-inset-bottom, 0px)); max-width: calc(100vw - 16px); }
   .ec-month-float .ec-month-float-title { font-size: 14px; padding: 0 6px; }
   .ec-month-float button { min-width: 34px; }
   .ec-month-float .ec-month-float-today { padding: 0 9px; }
-  .ec-month-float .ec-month-float-person { padding: 0 24px 0 9px; }
-  .ec-month-float .ec-month-float-person::after { right: 10px; }
-  .ec-month-float .ec-month-float-person select { max-width: 74px; font-size: 13px; }
+  .ec-month-float .ec-month-float-person { padding: 0 8px 0 9px; gap: 4px; }
+  .ec-month-float .ec-month-float-person-label { max-width: 70px; font-size: 13px; }
 }
