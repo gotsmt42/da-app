@@ -46,30 +46,21 @@
       ส่วน %PUBLIC_URL% เป็นไวยากรณ์ของ CRA ที่ Vite ไม่รู้จัก — เปลี่ยนเป็น / ตรงๆ ทั้งหมด
       (ไฟล์ใน public/ ยังถูกเสิร์ฟที่ราก / เหมือนเดิม เช่น /favicon.ico, /manifest.json, /push-sw.js)
     -->
+    <style>@keyframes tt-spin { to { transform: rotate(360deg); } }</style>
     <title>TidTam · ติดตามทุกงานจนจบ</title>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <!-- ✅ splash ก่อน JS โหลดเสร็จ (เดิมจอขาวเปล่า) — หน้าตาเดียวกับ PageLoader แบบ fullscreen
-         (src/shared/ui/PageLoader.css) React แทนที่ทั้งก้อนเองตอน render ครั้งแรก -->
+         (src/shared/ui/PageLoader.js) React แทนที่ทั้งก้อนเองตอน render ครั้งแรก
+         ⚠️ ขนาด/ตำแหน่งใส่เป็น inline style ทั้งหมด — ห้ามพึ่ง CSS ที่โหลดทีหลัง (ไม่งั้นโลโก้ขึ้นขนาดเต็ม 592px ชิดมุมซ้าย) -->
     <div id="root">
-      <div id="boot-splash" role="status" aria-label="กำลังเปิดระบบ">
-        <img src="/app-wordmark-dark.png?v=16" alt="TidTam" width="190" />
-        <div class="bs-track"><span></span></div>
-        <div class="bs-tag">ติดตามทุกงานจนจบ</div>
-        <div class="bs-label">กำลังเปิดระบบ…</div>
+      <div role="status" aria-label="กำลังเปิดระบบ" style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#f8fafc;font-family:'IBM Plex Sans Thai',system-ui,sans-serif">
+        <img src="/app-wordmark-dark.png?v=16" alt="TidTam" width="168" style="display:block;width:168px;max-width:70vw;height:auto" />
+        <span style="display:block;width:30px;height:30px;box-sizing:border-box;border-radius:50%;border:3px solid #e2e8f0;border-top-color:#2563eb;animation:tt-spin .8s linear infinite"></span>
+        <div style="font-size:13.5px;font-weight:600;color:#64748b">กำลังเปิดระบบ…</div>
       </div>
     </div>
-    <style>
-      #boot-splash { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: #f8fafc; font-family: 'IBM Plex Sans Thai', system-ui, sans-serif; }
-      #boot-splash img { width: 190px; height: auto; animation: bs-breathe 1.6s ease-in-out infinite; }
-      #boot-splash .bs-track { position: relative; width: 137px; height: 3px; margin-top: -4px; border-radius: 3px; overflow: hidden; background: #e2e8f0; }
-      #boot-splash .bs-track span { position: absolute; top: 0; bottom: 0; width: 40%; border-radius: 3px; background: #2563eb; animation: bs-slide 1.1s ease-in-out infinite; }
-      #boot-splash .bs-tag { margin-top: -2px; font-size: 13px; font-weight: 600; color: #94a3b8; letter-spacing: .02em; }
-      #boot-splash .bs-label { font-size: 13.5px; font-weight: 700; color: #64748b; }
-      @keyframes bs-slide { from { left: -40%; } to { left: 100%; } }
-      @keyframes bs-breathe { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
-    </style>
     <script type="module" src="/src/index.js"></script>
   </body>
 </html>

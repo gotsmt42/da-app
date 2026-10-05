@@ -749,7 +749,7 @@
 .calendar-wrapper.ec-booting .fc-view-harness {
   visibility: hidden;
 }
-/* ✅ วงแหวนหมุน + ข้อความ — ชุดเดียวกับ PageLoader (shared/ui/PageLoader.css) แทนข้อความเทาลอยๆ */
+/* ✅ วงแหวนหมุน + ข้อความ — ชุดเดียวกับ PageLoader (shared/ui/PageLoader.js) แทนข้อความเทาลอยๆ */
 .calendar-wrapper.ec-booting::before {
   content: "";
   position: absolute; left: 50%; top: 34%;
