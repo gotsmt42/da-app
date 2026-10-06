@@ -17,7 +17,7 @@ import {
   ButtonBase,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { CalendarMonth, Insights, WarningAmber, Close, ExpandMore, Groups } from "@mui/icons-material";
+import { CalendarMonth, BarChart, DonutLarge, Work, FactCheck, Engineering, ReceiptLong, Insights, WarningAmber, Close, ExpandMore, Groups } from "@mui/icons-material";
 
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import SelectField from "@/shared/ui/SelectField";
@@ -86,16 +86,28 @@ const Kpi = ({ label, value, sub, color, highlight, followup = false, active }) 
   );
 };
 
-const Panel = ({ title, hint, children, action }) => (
-  <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 2.5, p: { xs: 1.5, sm: 2 }, minWidth: 0 }}>
-    <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
+/**
+ * แผงหนึ่งหัวข้อของรายงาน — ✅ ผู้ใช้: "หัวข้อการสรุปทำให้ชัดเจน เด่น สวยงาม แต่ไม่รกตา"
+ * หัวแผง = ไอคอนในกรอบสีอ่อนตามความหมายของหัวข้อ · ชื่อหัวข้อตัวใหญ่ขึ้น · คำอธิบายจาง · เส้นคั่นบางใต้หัวแผง
+ */
+const Panel = ({ title, hint, children, action, icon, color = "#475569" }) => (
+  <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 2.5, minWidth: 0, overflow: "hidden" }}>
+    <Stack direction="row" alignItems="center" spacing={1.25} sx={{ px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.4 }, borderBottom: `1px solid #f1f5f9` }}>
+      {icon && (
+        <Box sx={{
+          width: 34, height: 34, borderRadius: 2, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+          bgcolor: alpha(color, 0.1), color, "& svg": { fontSize: 19 },
+        }}>
+          {icon}
+        </Box>
+      )}
       <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography sx={{ fontWeight: 800, fontSize: "0.95rem" }}>{title}</Typography>
-        {hint && <Typography variant="caption" sx={{ color: TEXT_SUB }}>{hint}</Typography>}
+        <Typography sx={{ fontWeight: 800, fontSize: { xs: "0.98rem", sm: "1.05rem" }, color: TEXT_MAIN, lineHeight: 1.35 }}>{title}</Typography>
+        {hint && <Typography sx={{ fontSize: "0.76rem", color: TEXT_SUB, lineHeight: 1.45 }}>{hint}</Typography>}
       </Box>
       {action}
     </Stack>
-    {children}
+    <Box sx={{ p: { xs: 1.5, sm: 2 } }}>{children}</Box>
   </Box>
 );
 
@@ -208,8 +220,9 @@ const CategoryBars = ({ rows }) => {
         const cat = categoryMeta(r.key);
         return (
           <Box key={r.key}>
-            <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.4 }}>
-              <Typography sx={{ fontSize: "0.82rem", fontWeight: 700 }}>
+            {/* มือถือ: ชื่อหมวดบรรทัดบน ตัวเลขบรรทัดล่าง — ไม่ให้ชื่อหมวดถูกบีบจนตัดกลางคำ ("ค่าน้ำ / มัน") */}
+            <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={{ xs: 0.15, sm: 1 }} sx={{ mb: 0.4 }}>
+              <Typography sx={{ fontSize: "0.82rem", fontWeight: 700, whiteSpace: "nowrap" }}>
                 <Box component="span" sx={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", bgcolor: cat.color, mr: 0.75 }} />
                 {cat.label}
               </Typography>
@@ -544,9 +557,19 @@ const GroupTable = ({ rows, firstHeader, onPick }) => {
             <Box key={r.key} onClick={onPick ? () => onPick(r) : undefined} sx={{ py: 1, cursor: onPick ? "pointer" : "default" }}>
               <Stack direction="row" alignItems="baseline" spacing={1}>
                 {eventLinkOf(r) ? (
-                  <Typography component={RouterLink} to={eventLinkOf(r)} sx={{ flex: 1, minWidth: 0, fontSize: "0.86rem", fontWeight: 600, color: TEXT_MAIN, lineHeight: 1.4, textDecoration: "none", "&:active": { color: "#2563eb" } }}>
-                    {r.label} <CalendarMonth sx={{ fontSize: 14, color: "#94a3b8", verticalAlign: "-2px" }} />
-                  </Typography>
+                  <Box component={RouterLink} to={eventLinkOf(r)} sx={{ flex: 1, minWidth: 0, textDecoration: "none", "&:active": { opacity: 0.7 } }}>
+                    {(() => {
+                      const m = String(r.label).match(/^(.*?)\s+(ครั้งที่\s.*)$/);
+                      return (
+                        <>
+                          <Typography sx={{ fontSize: "0.86rem", fontWeight: 600, color: TEXT_MAIN, lineHeight: 1.4 }}>
+                            {m ? m[1] : r.label} <CalendarMonth sx={{ fontSize: 14, color: "#94a3b8", verticalAlign: "-2px" }} />
+                          </Typography>
+                          {m && <Typography sx={{ fontSize: "0.74rem", color: TEXT_SUB, lineHeight: 1.4 }}>{m[2]}</Typography>}
+                        </>
+                      );
+                    })()}
+                  </Box>
                 ) : (
                   <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.86rem", fontWeight: 600, color: TEXT_MAIN, lineHeight: 1.4 }}>{r.label}</Typography>
                 )}
@@ -922,25 +945,25 @@ export default function ExpenseReport({ onOpen, reloadKey, mobileFiltersOpen = f
             </Stack>
           ) : (
             <Stack spacing={1.5}>
-              <Panel title="สถานะตามขั้นอนุมัติ" hint="ส่งขอเบิก → ตรวจสอบ/อนุมัติ → อนุมัติเบิกจ่าย · ใบที่ยังค้างในช่วงเวลานี้">
+              <Panel icon={<FactCheck />} color="#d97706" title="สถานะตามขั้นอนุมัติ" hint="ส่งขอเบิก → ตรวจสอบ/อนุมัติ → อนุมัติเบิกจ่าย · ใบที่ยังค้างในช่วงเวลานี้">
                 <Pipeline pipeline={report.pipeline} />
               </Panel>
               <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "3fr 2fr" }, gap: 1.5 }}>
-                <Panel title="รายเดือน" hint={personView ? "จ่ายล่วงหน้า เทียบ ใช้จริง · ตามชื่อในรายการ (รวมที่คนอื่นเบิกให้)" : "จ่ายล่วงหน้า เทียบ ใช้จริง"}><MonthBars rows={viewByMonth} /></Panel>
-                <Panel title="ตามหมวดค่าใช้จ่าย" hint={personView ? "แถบจาง = ตั้งเบิก · แถบเข้ม = ใช้จริง · ตามชื่อในรายการ (รวมที่คนอื่นเบิกให้)" : "แถบจาง = ตั้งเบิก · แถบเข้ม = ใช้จริง"}><CategoryBars rows={viewByCategory} /></Panel>
+                <Panel icon={<BarChart />} color={ADV} title="รายเดือน" hint={personView ? "จ่ายล่วงหน้า เทียบ ใช้จริง · ตามชื่อในรายการ (รวมที่คนอื่นเบิกให้)" : "จ่ายล่วงหน้า เทียบ ใช้จริง"}><MonthBars rows={viewByMonth} /></Panel>
+                <Panel icon={<DonutLarge />} color="#ea580c" title="ตามหมวดค่าใช้จ่าย" hint={personView ? "แถบจาง = ตั้งเบิก · แถบเข้ม = ใช้จริง · ตามชื่อในรายการ (รวมที่คนอื่นเบิกให้)" : "แถบจาง = ตั้งเบิก · แถบเข้ม = ใช้จริง"}><CategoryBars rows={viewByCategory} /></Panel>
               </Box>
 
               {/* 🧹 เดิมสลับ "ผู้เบิก / งาน" — ส่วนผู้เบิกซ้ำกับแผงรายบุคคล (ตัวเลขเงินค้าง/ส่วนต่างย้ายไปเป็นป้ายในแถวรายบุคคลแล้ว)
                   เหลือมุมมองตามงานอย่างเดียว */}
-              <Panel title="สรุปตามงาน" hint="งานไหนใช้งบไปเท่าไร · เงินที่ยังไม่เคลียร์ของแต่ละงาน">
+              <Panel icon={<Work />} color="#2563eb" title="สรุปตามงาน" hint="งานไหนใช้งบไปเท่าไร · เงินที่ยังไม่เคลียร์ของแต่ละงาน">
                 <GroupTable rows={report.byJob} firstHeader="งาน" />
               </Panel>
 
               {ledger.length > 0 && (
                 <Panel
+                  icon={<Groups />} color={ACT}
                   title={`รายบุคคล (${ledger.length} คน)`}
                   hint="นับยอดตามชื่อในรายการ (เบิกให้ลูกทีม = ยอดของลูกทีม) · กดชื่อเพื่อดูทีละใบ"
-                  action={<Groups sx={{ color: "#7c3aed" }} />}
                 >
                   <Stack spacing={1}>
                     {ledgerPg.rows.map((p) => <LedgerRow key={p.key} p={p} holder={report.byPerson.find((b) => b.key === p.userId)} onOpen={onOpen} isDesktop={isDesktop} />)}
@@ -957,6 +980,7 @@ export default function ExpenseReport({ onOpen, reloadKey, mobileFiltersOpen = f
                 const CTR = KIND_META.contractor;
                 return (
                   <Panel
+                    icon={<Engineering />} color={KIND_META.contractor.color}
                     title={`ใบค่าจ้างผู้รับเหมา (${ctrRows.length})`}
                     hint="ค่าจ้างเหมา/ค่าแรงที่จ่ายให้ผู้รับเหมา · ยอดหัก ณ ที่จ่ายใช้ประกอบการยื่นภาษี"
                   >
@@ -1015,6 +1039,7 @@ export default function ExpenseReport({ onOpen, reloadKey, mobileFiltersOpen = f
               {/* ✅ รวมรายใบ Advance + ใบสำรองจ่าย เป็นแผงเดียว สลับด้วยปุ่ม (เดิมเป็น 2 แผงคนละที่ หน้าตาเดียวกัน) */}
               {docTab === "reimburse" && (
                 <Panel
+                  icon={<ReceiptLong />} color="#475569"
                   title="รายใบทั้งหมด"
                   hint="ใบสำรองจ่าย — พนักงานออกเงินเองไปก่อน ไม่มีใบ Advance ให้เทียบ · กดที่แถวเพื่อเปิดใบ"
                   action={<ToggleButtonGroup size="small" exclusive value={docTab} onChange={(_, v) => v && setDocTab(v)}
@@ -1064,7 +1089,7 @@ export default function ExpenseReport({ onOpen, reloadKey, mobileFiltersOpen = f
               )}
 
               {docTab === "advance" && (
-              <Panel title="รายใบทั้งหมด" hint="ใบ Advance คู่กับใบเคลมที่เคลียร์ใบนั้น (แถวเดียวกัน) — กดเลขที่เพื่อเปิดใบ"
+              <Panel icon={<ReceiptLong />} color="#475569" title="รายใบทั้งหมด" hint="ใบ Advance คู่กับใบเคลมที่เคลียร์ใบนั้น (แถวเดียวกัน) — กดเลขที่เพื่อเปิดใบ"
                 action={report.reimburseRows.length > 0 ? <ToggleButtonGroup size="small" exclusive value={docTab} onChange={(_, v) => v && setDocTab(v)}
                     sx={{ "& .MuiToggleButton-root": { textTransform: "none", fontWeight: 700, px: 1.25, py: 0.35 } }}>
                     <ToggleButton value="advance">Advance + ใบเคลม ({report.rows.length})</ToggleButton>
