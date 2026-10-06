@@ -167,7 +167,7 @@ export default function LoginDevices() {
   };
 
   return (
-    <Box sx={{ p: { xs: 1.5, sm: 2.5 }, maxWidth: 860, mx: "auto" }}>
+    <Box sx={{ px: { xs: 0, sm: 2.5 }, py: { xs: 1.5, sm: 2.5 }, maxWidth: 860, mx: "auto" }}>
       <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2.5, px: 0.5 }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography sx={{ fontWeight: 900, fontSize: "1.3rem", color: INK, lineHeight: 1.25 }}>อุปกรณ์ที่เข้าสู่ระบบ</Typography>

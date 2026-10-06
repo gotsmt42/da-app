@@ -198,7 +198,7 @@ export default function Account() {
   ) : null;
 
   return (
-    <Box sx={{ p: { xs: 1.5, sm: 2.5 }, maxWidth: 1080, mx: "auto" }}>
+    <Box sx={{ px: { xs: 0, sm: 2.5 }, py: { xs: 1.5, sm: 2.5 }, maxWidth: 1080, mx: "auto" }}>
       {/* ── การ์ดตัวตน ── */}
       <Box sx={{ mb: 2, bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflow: "hidden", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
         <Box sx={{ height: { xs: 84, sm: 104 }, background: `linear-gradient(120deg, ${ACCENT_SOFT} 0%, #e0e7ff 55%, #f1f5f9 100%)`, borderBottom: `1px solid ${LINE}` }} />

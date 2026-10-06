@@ -287,7 +287,7 @@ export default function OrganizationSettings() {
   };
 
   return (
-    <Box sx={{ p: { xs: 1.25, sm: 2.5 }, maxWidth: 980, mx: "auto" }}>
+    <Box sx={{ px: { xs: 0, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: 980, mx: "auto" }}>
       <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2 }}>
         <Box sx={{ width: 40, height: 40, borderRadius: 2.5, bgcolor: ACCENT, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Business />

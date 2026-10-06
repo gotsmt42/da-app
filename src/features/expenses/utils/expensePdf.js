@@ -21,8 +21,27 @@ import {
   KIND_META, slipKind, statusMeta, fmtMoney, bahtText, qtyText, differenceMeta, paymentLabel, fileKindLabel, jobText, jobRangeText, jobPartText, money, itemPersonName, personFullName,
   installmentText, jobRangesText, itemTitle,
 } from "../expenseMeta";
-import { bankMeta, formatAccountNo } from "../bankMeta";
+import { bankMeta, formatAccountNo, bankLogoUrl } from "../bankMeta";
 import { compareItems } from "./expenseCompare";
+
+/**
+ * โลโก้ธนาคารจริงสำหรับ PDF — jsPDF วาดรูปได้เฉพาะ data URL จึงต้องโหลดไว้ก่อนเริ่มวาด (วาดเป็น sync)
+ * ⚠️ โหลดไม่ได้ = ไม่ใส่ใน cache → ตอนวาดกลับไปใช้ป้ายสี + ตัวย่อแบบเดิม (ใบไม่พังเพราะรูปหาย)
+ */
+const BANK_LOGO_CACHE = {};
+const loadBankLogo = async (code) => {
+  const url = bankLogoUrl(code);
+  if (!url || BANK_LOGO_CACHE[code]) return;
+  try {
+    const blob = await (await fetch(url)).blob();
+    BANK_LOGO_CACHE[code] = await new Promise((ok, bad) => {
+      const fr = new FileReader();
+      fr.onload = () => ok(fr.result);
+      fr.onerror = bad;
+      fr.readAsDataURL(blob);
+    });
+  } catch { /* ใช้ป้ายตัวย่อแทน */ }
+};
 
 const W_PAGE = 210;
 const H_PAGE = 297;
@@ -505,13 +524,19 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold, attachNote = "") =>
     const badge = 13 * s;
     const bx = L + 4 * s;
     const by = y + (boxH - badge) / 2;
-    doc.setFillColor(...bank.rgb);
-    doc.roundedRect(bx, by, badge, badge, 3, 3, "F");
-    const markSize = bank.mark.length > 3 ? 10 : bank.mark.length > 2 ? 12 : bank.mark.length > 1 ? 14 : 17;
-    bold(true);
-    size(markSize);
-    color(bank.darkText ? [31, 41, 55] : [255, 255, 255]);
-    doc.text(bank.mark, bx + badge / 2, by + badge / 2 + markSize * 0.17 * s, { align: "center" });
+    const logo = BANK_LOGO_CACHE[e.payTo.bankCode];
+    if (logo) {
+      // ✅ โลโก้จริงของธนาคาร (วงกลม) — ชุดเดียวกับบนหน้าจอ
+      doc.addImage(logo, "PNG", bx, by, badge, badge, `bank-${e.payTo.bankCode}`, "MEDIUM");
+    } else {
+      doc.setFillColor(...bank.rgb);
+      doc.roundedRect(bx, by, badge, badge, 3, 3, "F");
+      const markSize = bank.mark.length > 3 ? 10 : bank.mark.length > 2 ? 12 : bank.mark.length > 1 ? 14 : 17;
+      bold(true);
+      size(markSize);
+      color(bank.darkText ? [31, 41, 55] : [255, 255, 255]);
+      doc.text(bank.mark, bx + badge / 2, by + badge / 2 + markSize * 0.17 * s, { align: "center" });
+    }
 
     const tx = bx + badge + 4.5 * s;
     // บรรทัดบน: ป้ายกำกับ + ชื่อธนาคารเป็นสีของธนาคาร
@@ -785,6 +810,8 @@ export async function generateExpensePdf({ expense, signatures = null, mode = "b
 
   // ✅ ย่อโลโก้หัวกระดาษก่อนฝังลงไฟล์ — ดูหัวข้อ "ขนาดไฟล์ PDF" ใน deliveryNotePdf.js
   await preparePrintAssets();
+  // โลโก้ธนาคารของใบนี้ (+ ใบ Advance ที่แนบมา) — โหลดก่อนวาด
+  await Promise.all([expense?.payTo?.bankCode, expense?.advanceDoc?.payTo?.bankCode].filter(Boolean).map(loadBankLogo));
 
   /** เลือกขั้นย่อที่ทำให้ใบนี้จบพอดีหนึ่งแผ่น (วัดบนกระดาษทดก่อน) แล้ววาดลงแผ่นปัจจุบัน */
   const renderSheet = (doc, sheet, sheetSignatures, { attachNote = "", page = 1, pages = 1 } = {}) => {

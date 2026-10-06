@@ -273,7 +273,7 @@ export default function PurchaseReport() {
   }[group];
 
   return (
-    <Box sx={{ p: { xs: 1.25, sm: 2.5 }, maxWidth: 1500, mx: "auto" }}>
+    <Box sx={{ px: { xs: 0, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: 1500, mx: "auto" }}>
       {/* ── หัวเพจ (โครงเดียวกับหน้าใบขอซื้อ) ── */}
       <Box sx={{ borderRadius: 3, border: `1px solid ${BORDER_MAIN}`, bgcolor: "#fff", px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.75 }, mb: 1.5 }}>
         <Stack direction="row" alignItems="center" spacing={{ xs: 1.25, sm: 1.5 }}>

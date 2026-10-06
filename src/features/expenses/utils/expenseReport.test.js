@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildExpenseReport } from "./expenseReport";
+import { buildExpenseReport, buildPersonLedger, personBreakdown, filterByCategory } from "./expenseReport";
 import { bahtText, qtyText, differenceMeta } from "../expenseMeta";
 
 const adv = (over = {}) => ({
@@ -95,7 +95,7 @@ describe("buildExpenseReport", () => {
       adv({ requester: { userId: "u2", name: "บี" }, total: 300, eventId: "e1", job: { title: "PM", site: "ตึก A" } }),
     ], { now });
     expect(r.byPerson.map((p) => [p.label, p.advanced])).toEqual([["บี", 1000], ["เอ", 100]]);
-    expect(r.byJob.map((j) => j.label)).toEqual(["PM · ตึก A", "ไม่ผูกงาน"]);
+    expect(r.byJob.map((j) => j.label)).toEqual(["PM โครงการ ตึก A", "ไม่ผูกงาน"]);
     expect(r.byMonth.map((m) => m.key)).toEqual(["2026-08", "2026-09"]);
   });
 
@@ -149,7 +149,7 @@ describe("buildExpenseReport", () => {
     });
     const c = r.byPerson.find((p) => p.label === "ซี");
     expect(c).toMatchObject({ advanced: 0, reimburse: 250, reimburseCount: 1 });
-    expect(r.byJob.map((j) => j.label)).toContain("ซ่อมด่วน · ตึก Z");
+    expect(r.byJob.map((j) => j.label)).toContain("ซ่อมด่วน โครงการ ตึก Z");
     expect(r.byMonth.find((m) => m.key === "2026-09")).toMatchObject({ reimburse: 250 });
     expect(r.byCategory.find((x) => x.key === "fuel")).toMatchObject({ reimburse: 250 });
   });
@@ -157,5 +157,122 @@ describe("buildExpenseReport", () => {
   it("ใบสำรองจ่าย: อ่านว่า 'จ่ายคืนพนักงาน' ไม่ใช่ 'จ่ายเพิ่มให้พนักงาน'", () => {
     expect(differenceMeta(500, "reimburse").short).toBe("จ่ายคืนพนักงาน");
     expect(differenceMeta(500, "claim").short).toBe("จ่ายเพิ่มให้พนักงาน");
+  });
+});
+
+describe("buildPersonLedger — รายบุคคลตามชื่อในรายการ", () => {
+  const A = { userId: "a", name: "นาย A" };
+  const B = { userId: "b", name: "นาย B" };
+  const advance = {
+    _id: "adv1", docNo: "ADV-1", docDate: "2026-09-10", status: "cleared", requester: A, total: 1500,
+    items: [
+      { category: "allowance", description: "เบี้ยเลี้ยง A", amount: 500 },
+      { category: "allowance", description: "เบี้ยเลี้ยง B", amount: 1000, person: B },
+    ],
+    claim: {
+      _id: "clm1", docNo: "CLM-1", docDate: "2026-09-12", status: "settled", requester: A, total: 1400,
+      items: [
+        { category: "allowance", amount: 500 },
+        { category: "allowance", amount: 900, person: B },
+      ],
+    },
+  };
+  const reimburse = {
+    _id: "rmb1", docNo: "RMB-1", docDate: "2026-09-15", status: "approved", requester: B, total: 300,
+    items: [{ category: "fuel", amount: 300 }],
+  };
+
+  it("นับเงินบรรทัดที่ใส่ชื่อ B เป็นของ B และบอกว่า A เบิกให้", () => {
+    const ledger = buildPersonLedger([advance], [reimburse]);
+    const b = ledger.find((p) => p.userId === "b");
+    expect(b.requested).toBe(1300);        // 1000 (A เบิกให้) + 300 (สำรองจ่ายเอง)
+    expect(b.byOthers).toBe(1000);
+    expect(b.self).toBe(300);
+    expect(b.requesters).toEqual([{ name: "นาย A", amount: 1000 }]);
+    expect(b.advanced).toBe(1000);
+    expect(b.actual).toBe(900);
+    expect(b.reimburse).toBe(300);
+    expect(b.approvedCost).toBe(1200);
+  });
+
+  it("บรรทัดที่ไม่ใส่ชื่อ = ของผู้เบิกเอง · ผู้เบิกเห็นยอดที่เบิกให้คนอื่นแยกไว้", () => {
+    const a = buildPersonLedger([advance], []).find((p) => p.userId === "a");
+    expect(a.requested).toBe(500);
+    expect(a.byOthers).toBe(0);
+    expect(a.actual).toBe(500);
+    expect(a.forOthers).toBe(1000);
+    expect(a.onSlips).toBe(1500);              // = ยอดใบ Advance ที่ A เป็นผู้เบิก
+    expect(a.beneficiaries).toEqual([{ name: "นาย B", amount: 1000 }]);
+  });
+
+  it("หมวด/รายเดือนของคนเดียว รวมยอดที่คนอื่นเบิกให้", () => {
+    const b = buildPersonLedger([advance], [reimburse]).find((p) => p.userId === "b");
+    const { byCategory, byMonth } = personBreakdown(b);
+    expect(byCategory.find((c) => c.key === "allowance")).toEqual({ key: "allowance", planned: 1000, actual: 900, reimburse: 0 });
+    expect(byCategory.find((c) => c.key === "fuel").reimburse).toBe(300);
+    const sep = byMonth.find((x) => x.key === "2026-09");
+    expect(sep.advanced).toBe(1000);
+    expect(sep.actual).toBe(900);       // ใบเคลมนับเข้าเดือนของใบ Advance
+    expect(sep.reimburse).toBe(300);
+  });
+
+  it("เคลมให้คนอื่น: A ตั้งเบิกในชื่อตัวเอง แต่ตอนเคลมแยกบรรทัดให้ B", () => {
+    const adv = {
+      _id: "adv9", docNo: "ADV-9", docDate: "2026-09-20", status: "cleared", requester: A, total: 1000,
+      items: [{ category: "allowance", amount: 1000 }],
+      claim: { _id: "clm9", docNo: "CLM-9", status: "settled", requester: A, total: 1000,
+        items: [{ category: "allowance", amount: 600 }, { category: "allowance", amount: 400, person: B }] },
+    };
+    const ledger = buildPersonLedger([adv], []);
+    const a = ledger.find((p) => p.userId === "a");
+    const b = ledger.find((p) => p.userId === "b");
+    expect(a.requested).toBe(1000);
+    expect(a.actual).toBe(600);
+    expect(a.claimedForOthers).toBe(400);
+    expect(b.requested).toBe(0);
+    expect(b.actual).toBe(400);
+    expect(b.claimedByOthers).toBe(400);
+    expect(b.lines[0].sharedWith).toEqual(["นาย A"]);
+    expect(a.lines.every((l) => l.sharedWith.includes("นาย B"))).toBe(true);
+  });
+
+  it("ไม่นับใบที่ยกเลิก และใบเคลมที่ยังไม่อนุมัติไม่นับเป็นใช้จริง", () => {
+    const ledger = buildPersonLedger([
+      { ...advance, status: "cancelled" },
+      { ...advance, _id: "adv2", status: "paid", claim: { ...advance.claim, status: "pending" } },
+    ], []);
+    const b = ledger.find((p) => p.userId === "b");
+    expect(b.requested).toBe(1000);
+    expect(b.actual).toBe(0);
+  });
+});
+
+describe("filterByCategory — ดูทีละหมวด", () => {
+  const A = { userId: "a", name: "เอ" };
+  const adv = {
+    _id: "x1", docNo: "ADV-X", docDate: "2026-09-01", status: "cleared", requester: A, total: 1500,
+    items: [{ category: "allowance", amount: 500 }, { category: "fuel", amount: 1000 }],
+    claim: { _id: "c1", docNo: "CLM-X", status: "settled", requester: A, total: 1300, difference: -200,
+      items: [{ category: "allowance", amount: 500 }, { category: "fuel", amount: 800 }] },
+  };
+  const rmb = { _id: "r1", docNo: "RMB-X", docDate: "2026-09-02", status: "approved", requester: A, total: 300, items: [{ category: "toll", amount: 300 }] };
+
+  it("ยอดใบ/ใบเคลม/ส่วนต่าง คิดใหม่จากรายการหมวดนั้น", () => {
+    const { advances, reimbursements } = filterByCategory([adv], [rmb], "fuel");
+    expect(advances).toHaveLength(1);
+    expect(advances[0].total).toBe(1000);
+    expect(advances[0].claim.total).toBe(800);
+    expect(advances[0].claim.difference).toBe(-200);
+    expect(reimbursements).toHaveLength(0);
+    const r = buildExpenseReport(advances, { reimbursements });
+    expect(r.totals.requested).toBe(1000);
+    expect(r.totals.actual).toBe(800);
+    expect(r.totals.refunded).toBe(200);
+  });
+
+  it("all = ไม่กรอง", () => {
+    const out = filterByCategory([adv], [rmb], "all");
+    expect(out.advances[0]).toBe(adv);
+    expect(out.reimbursements[0]).toBe(rmb);
   });
 });

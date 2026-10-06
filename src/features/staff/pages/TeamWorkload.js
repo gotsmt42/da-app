@@ -276,7 +276,7 @@ export default function TeamWorkload() {
   );
 
   return (
-    <Box sx={{ p: { xs: 1.25, sm: 2.5 }, maxWidth: 1400, mx: "auto" }}>
+    <Box sx={{ px: { xs: 0, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: 1400, mx: "auto" }}>
       <PageHeader
         icon={<Groups />}
         title="ภาระงานทีมช่าง"

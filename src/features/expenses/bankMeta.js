@@ -34,6 +34,12 @@ export const bankMeta = (code) =>
   BANKS.find((b) => b.code === code)
   || { code: code || "", name: code || "ไม่ระบุธนาคาร", short: code || "-", color: "#64748b", rgb: [100, 116, 139], mark: "?", darkText: false, digits: [] };
 
+/**
+ * โลโก้จริงของธนาคาร (public/banks/<CODE>.png จากแพ็กเกจ thai-banks-logo · ISC) — null = ไม่มีไฟล์ ใช้ป้ายตัวย่อ
+ * ⚠️ เพิ่มธนาคารใน BANKS ต้องวางไฟล์โลโก้ชื่อเดียวกับ code ด้วย
+ */
+export const bankLogoUrl = (code) => (BANKS.some((b) => b.code === code) ? `/banks/${code}.png` : null);
+
 export const digitsOnly = (v) => String(v || "").replace(/\D/g, "");
 
 /** @returns {string} ข้อความผิดพลาดภาษาไทย หรือ "" ถ้าถูกต้อง (ตรรกะเดียวกับ server) */

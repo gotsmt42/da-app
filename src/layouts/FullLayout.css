@@ -235,10 +235,12 @@
    ⚠️ จอใหญ่ไม่ได้รับผลอะไรเลย — ยังเป็น p-4 (24px) เท่าเดิมทุกด้าน
    -------------------------------------------------------------------------- */
 @media (max-width: 767.98px) {
+  /* ✅ ลดจาก 16px เหลือ 10px (ผู้ใช้: "ระยะย่นจากขอบจอมากไป") — หน้าต่างๆ ไม่เว้นขอบซ้าย-ขวาซ้อนเองแล้ว
+     บนมือถือ (root Box ของแต่ละหน้าเป็น px: { xs: 0 }) ขอบทั้งหมดจึงเหลือชั้นนี้ชั้นเดียว */
   .app-page-container {
     padding-top: 4px !important;
-    padding-left: 16px !important;
-    padding-right: 16px !important;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
   }
   /* หน้า Dashboard — เต็มจอ ไม่มีขอบซ้อน (ดูคอมเมนต์ใน FullLayout.js) */
   .app-page-container.app-page-container--flush {

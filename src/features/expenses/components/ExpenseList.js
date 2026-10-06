@@ -20,6 +20,7 @@ import ExpenseService, { errorText } from "../services/ExpenseService";
 import KindBadge from "./KindBadge";
 import StatusBadge, { STATUS_ICON } from "./StatusBadge";
 import SelectField from "@/shared/ui/SelectField";
+import PersonSelectField from "@/shared/ui/PersonSelectField";
 import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
 import ViewTiles from "@/shared/ui/ViewTiles";
 import ResponsibleSummary from "@/shared/ui/ResponsibleSummary";
@@ -393,11 +394,13 @@ export default function ExpenseList({
           </ToggleButtonGroup>
         )}
         {/* ✅ มือถือ: ผู้เบิกเป็น select (แผงการ์ดใช้บนจอใหญ่เท่านั้น) */}
-        {showPeople && !isDesktop && (
-          <SelectField label="ผู้เบิก" value={person} onChange={(ev) => setPerson(ev.target.value)} sx={{ minWidth: 0, flex: "1 1 0" }}>
-            <option value="all">ทุกคน ({personRows.length})</option>
-            {personOptions.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.count})</option>)}
-          </SelectField>
+        {showPeople && (
+          <PersonSelectField
+            label="ผู้เบิก" title="เลือกผู้เบิก" value={person} onChange={setPerson}
+            allLabel="ทุกคน" allCount={personRows.length} unit="ใบ"
+            options={personOptions.map((p) => ({ id: p.id, name: p.name, count: p.count, avatar: avatars.get(p.id) }))}
+            sx={{ minWidth: 0, flex: { xs: "1 1 0", md: "0 0 220px" } }}
+          />
         )}
         {mode !== "inbox" && (
           <SelectField label="ช่วงเวลา" value={period} onChange={(ev) => setPeriod(ev.target.value)} sx={{ minWidth: { xs: 0, md: 150 }, flex: { xs: "1 1 0", md: "none" } }}>

@@ -84,7 +84,7 @@ export default function JobRequestQueue() {
   const urgent = summary?.urgentOpen ?? 0;
 
   return (
-    <Box sx={{ p: { xs: 1.25, sm: 2.5 }, maxWidth: 1500, mx: "auto" }}>
+    <Box sx={{ px: { xs: 0, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: 1500, mx: "auto" }}>
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>{error}</Alert>}
 
       {/* ── หัวหน้าเพจ — กล่องขาวชุดเดียวกับทุกหน้า (shared/ui/PageKit) ตามกฎออกแบบ (ผู้ใช้สั่ง 2 ต.ค. 2569

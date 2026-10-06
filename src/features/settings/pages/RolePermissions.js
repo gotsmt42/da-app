@@ -282,7 +282,7 @@ export default function RolePermissions() {
   const totalCaps = (data?.capabilities || []).length;
 
   return (
-    <Box sx={{ p: { xs: 1.25, sm: 2.5 }, maxWidth: 1240, mx: "auto" }}>
+    <Box sx={{ px: { xs: 0, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: 1240, mx: "auto" }}>
       <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2 }}>
         <Box sx={{ width: 44, height: 44, borderRadius: 2.5, bgcolor: "#eff6ff", color: ACCENT, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <AdminPanelSettings />

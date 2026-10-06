@@ -34,17 +34,48 @@ const styleHeader = (row) => {
   row.height = 22;
 };
 
-const addTable = (ws, columns, rows, moneyKeys = []) => {
+/**
+ * ตารางมาตรฐานของไฟล์ — ✅ ผู้ใช้: "ทำข้อมูลใน excel ให้ดูง่าย ชัดเจน และสอดคล้อง"
+ *   • หัวตารางสีเดียวกันทุกชีต · ตรึงหัวตาราง · มีปุ่มกรอง (AutoFilter) ทุกคอลัมน์
+ *   • แถว "รวมทั้งหมด" ท้ายตาราง (ตัวหนา) — รวมเฉพาะช่องเงิน/จำนวน (sumKeys)
+ *   • แถวที่มี __subtotal = แถวรวมย่อย (พื้นเทา ตัวหนา) · ไม่ถูกนับซ้ำในแถวรวมทั้งหมด
+ * ⚠️ ใส่ "ค่า" ไม่ใช่สูตร SUM — ถ้าเป็นสูตร แถวรวมย่อยในช่วงเดียวกันจะถูกบวกซ้ำ และกรองข้อมูลแล้วยอดเพี้ยน
+ */
+const addTable = (ws, columns, rows, moneyKeys = [], { countKeys = [], totals = true } = {}) => {
   ws.columns = columns.map((c) => ({ key: c.key, width: c.width || 14 }));
   styleHeader(ws.addRow(columns.map((c) => c.header)));
-  rows.forEach((r, i) => {
+  let stripe = 0;
+  rows.forEach((r) => {
     const row = ws.addRow(columns.map((c) => r[c.key]));
-    row.eachCell((cell, col) => {
+    const sub = Boolean(r.__subtotal);
+    if (!sub) stripe += 1;
+    row.eachCell({ includeEmpty: true }, (cell, col) => {
       cell.border = { bottom: BORDER };
       if (moneyKeys.includes(columns[col - 1].key)) cell.numFmt = MONEY;
-      if (i % 2 === 1) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
+      if (sub) {
+        cell.font = { bold: true, color: { argb: "FF334155" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE2E8F0" } };
+      } else if (stripe % 2 === 0) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
     });
   });
+  const sumKeys = [...moneyKeys, ...countKeys];
+  if (totals && rows.length && sumKeys.length) {
+    const body = rows.filter((r) => !r.__subtotal);
+    const vals = columns.map((c, i) => {
+      if (i === 0) return "รวมทั้งหมด";
+      if (!sumKeys.includes(c.key)) return null;
+      const t = body.reduce((acc, r) => acc + (Number(r[c.key]) || 0), 0);
+      return moneyKeys.includes(c.key) ? money(t) : t;
+    });
+    const row = ws.addRow(vals);
+    row.eachCell({ includeEmpty: true }, (cell, col) => {
+      cell.font = { bold: true, color: { argb: HEAD.bg } };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFCCFBF1" } };
+      cell.border = { top: { style: "medium", color: { argb: HEAD.bg } }, bottom: BORDER };
+      if (moneyKeys.includes(columns[col - 1].key)) cell.numFmt = MONEY;
+    });
+  }
+  ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: columns.length } };
   ws.views = [{ state: "frozen", ySplit: 1 }];
 };
 
@@ -77,7 +108,7 @@ const disburserOf = (d) => {
   return done && d.payment?.by ? personFullName(d.payment.by) : "";
 };
 
-export async function exportExpenseReport(report, { periodLabel = "", fileName = "รายงานการเบิก" } = {}) {
+export async function exportExpenseReport(report, { periodLabel = "", fileName = "รายงานการเบิก", ledger = [] } = {}) {
   const wb = new ExcelJS.Workbook();
   wb.creator = "DA App";
   wb.created = new Date();
@@ -144,8 +175,82 @@ export async function exportExpenseReport(report, { periodLabel = "", fileName =
     row.getCell(3).numFmt = MONEY;
   }
 
+  // ── รายบุคคล (ตามชื่อในรายการ) ───────────────────────────────────────────
+  // ✅ ผู้ใช้ขอ: นาย A เบิกเบี้ยเลี้ยงใส่ชื่อนาย B → ต้องรู้ว่านาย B ถูกเบิกให้เท่าไร (ดู buildPersonLedger)
+  // ⚠️ คิดจาก "ชื่อเจ้าของแต่ละบรรทัด" ไม่ใช่ผู้เบิก — ยอดรวมจึงไม่จำเป็นต้องเท่าชีต "ตามผู้เบิก" ทีละคน
+  //    แต่ยอดรวมทุกคนของ "ขอเบิก" เท่ากับรายการทั้งหมดในใบ Advance + ใบสำรองจ่าย
+  if (ledger.length) {
+    addTable(wb.addWorksheet("รายบุคคล"), [
+      { key: "label", header: "ชื่อ (ตามรายการ)", width: 26 },
+      { key: "lineCount", header: "จำนวนรายการ", width: 12 },
+      { key: "requested", header: "ยอดของคนนี้ (ขอเบิก)", width: 17 },
+      { key: "self", header: "เบิกเอง", width: 13 },
+      { key: "byOthers", header: "คนอื่นเบิกให้", width: 14 },
+      { key: "requesters", header: "คนอื่นเบิกให้ (โดย)", width: 32 },
+      { key: "forOthers", header: "เบิกให้คนอื่น (ไม่นับเป็นของตัวเอง)", width: 22 },
+      { key: "beneficiaries", header: "เบิกให้ใคร", width: 32 },
+      { key: "onSlips", header: "ยอดในใบที่เป็นผู้เบิก", width: 18 },
+      { key: "claimedByOthers", header: "คนอื่นเคลมให้ (ใช้จริง)", width: 18 },
+      { key: "claimedForOthers", header: "เคลมให้คนอื่น (ใช้จริง)", width: 18 },
+      { key: "advanced", header: "จ่ายล่วงหน้าแล้ว (Advance)", width: 20 },
+      { key: "actual", header: "ใช้จริง (ใบเคลมอนุมัติ)", width: 20 },
+      { key: "reimburse", header: "สำรองจ่าย (อนุมัติ)", width: 18 },
+      { key: "approvedCost", header: "ค่าใช้จ่ายอนุมัติรวม", width: 18 },
+      { key: "categories", header: "แยกตามหมวด (ยอดขอเบิก)", width: 44 },
+    ], ledger.map((p) => ({
+      label: p.label,
+      lineCount: p.lines.length,
+      requested: p.requested, self: p.self, byOthers: p.byOthers, forOthers: p.forOthers, onSlips: p.onSlips, claimedByOthers: p.claimedByOthers, claimedForOthers: p.claimedForOthers,
+      beneficiaries: p.beneficiaries.map((r) => `${r.name} ${r.amount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`).join(", "),
+      requesters: p.requesters.map((r) => `${r.name} ${r.amount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`).join(", "),
+      advanced: p.advanced, actual: p.actual, reimburse: p.reimburse, approvedCost: p.approvedCost,
+      categories: p.categories.map((c) => `${categoryMeta(c.key).label} ${c.amount.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`).join(", "),
+    })), ["requested", "self", "byOthers", "forOthers", "onSlips", "claimedByOthers", "claimedForOthers", "advanced", "actual", "reimburse", "approvedCost"], { countKeys: ["lineCount"] });
+
+    const SOURCE_LABEL = { advance: "การเบิก · ใบ Advance", claim: "การเคลม · ใช้จริง", reimburse: "การเบิก · ใบสำรองจ่าย" };
+    const SOURCE_KIND = { advance: "advance", claim: "claim", reimburse: "reimburse" };
+    // ✅ แยกยอด "ขอเบิก" กับ "ใช้จริง" คนละคอลัมน์ (ตรงกับหน้าจอ) — เดิมคอลัมน์ยอดเดียวปนสองความหมาย รวมแล้วไม่มีความหมาย
+    //    แต่ละคน: การเบิกก่อน แล้วการเคลม · ปิดท้ายด้วยแถวรวมย่อยของคนนั้น
+    const lineRows = ledger.flatMap((p) => {
+      const lines = [...p.lines].sort((x, y) => (x.source === "claim") - (y.source === "claim"));
+      const out = lines.map((l) => ({
+        person: p.label,
+        date: thaiDate(l.date),
+        source: SOURCE_LABEL[l.source] || l.source,
+        docNo: l.docNo,
+        pairNo: l.source === "claim" ? l.parentNo : "",
+        requester: l.byOther ? l.requester : "เบิกเอง",
+        sharedWith: (l.sharedWith || []).join(", "),
+        category: categoryMeta(l.category).label,
+        description: l.description && l.description !== categoryMeta(l.category).label ? l.description : "",
+        requested: l.source === "claim" ? null : l.amount,
+        actual: l.source === "claim" ? l.amount : null,
+        status: statusMeta(l.status, SOURCE_KIND[l.source]).label,
+      }));
+      out.push({
+        __subtotal: true, person: `รวม ${p.label}`, source: `${lines.length} รายการ`,
+        requested: money(p.requested), actual: money(p.actual),
+      });
+      return out;
+    });
+    addTable(wb.addWorksheet("รายการรายบุคคล"), [
+      { key: "person", header: "ชื่อ (ตามรายการ)", width: 24 },
+      { key: "date", header: "วันที่", width: 13 },
+      { key: "source", header: "ประเภท", width: 20 },
+      { key: "docNo", header: "เลขที่ใบ", width: 17 },
+      { key: "pairNo", header: "เคลียร์ใบ Advance", width: 17 },
+      { key: "requester", header: "เบิก/เคลมโดย", width: 20 },
+      { key: "sharedWith", header: "ใบนี้มีรายการของ", width: 22 },
+      { key: "category", header: "หมวด", width: 18 },
+      { key: "description", header: "รายละเอียด", width: 30 },
+      { key: "requested", header: "ยอดขอเบิก", width: 13 },
+      { key: "actual", header: "ยอดใช้จริง (เคลม)", width: 15 },
+      { key: "status", header: "สถานะใบ", width: 22 },
+    ], lineRows, ["requested", "actual"]);
+  }
+
   // ── รายใบ ────────────────────────────────────────────────────────────
-  addTable(wb.addWorksheet("รายใบ"), [
+  addTable(wb.addWorksheet("รายใบ Advance+เคลม"), [
     { key: "docNo", header: "เลขที่ Advance", width: 17 },
     { key: "date", header: "วันที่", width: 13 },
     { key: "person", header: "ผู้เบิก", width: 20 },
@@ -235,9 +340,11 @@ export async function exportExpenseReport(report, { periodLabel = "", fileName =
     wb.addWorksheet(name),
     [{ key: "label", header: firstHeader, width: 34 }, ...GROUP_COLS],
     rows,
-    GROUP_MONEY
+    GROUP_MONEY,
+    { countKeys: GROUP_COUNTS }
   );
-  groupSheet("ตามผู้เบิก", "ผู้เบิก", report.byPerson);
+  // ⚠️ ชีตนี้ยึด "ผู้เบิก" (เงินอยู่กับใคร) — ต่างจากชีตรายบุคคลที่ยึดชื่อในรายการ
+  groupSheet("ตามผู้เบิก (เงินค้าง)", "ผู้เบิก", report.byPerson);
   groupSheet("ตามงาน", "งาน", report.byJob);
   groupSheet("รายเดือน", "เดือน", report.byMonth.map((m) => ({ ...m, label: m.key ? thaiDate(`${m.key}-15`).replace(/^\d+\s/, "") : "-" })));
 

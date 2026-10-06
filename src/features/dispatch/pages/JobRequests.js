@@ -39,7 +39,7 @@ export default function JobRequests() {
   if (!can("requestDispatch")) return <Navigate to="/dashboard" replace />;
 
   return (
-    <Box sx={{ p: { xs: 1.5, sm: 2.5 }, maxWidth: 1500, mx: "auto" }}>
+    <Box sx={{ px: { xs: 0, sm: 2.5 }, py: { xs: 1.5, sm: 2.5 }, maxWidth: 1500, mx: "auto" }}>
       {/* ── หัวหน้าเพจ ────────────────────────────────────────────────────
           ✅ ที่แก้ (ผู้ใช้แจ้งว่า "ดูรกตามาก"): เดิมเป็นแถบไล่สีม่วงเต็มความกว้าง สูง ~90px พร้อม
           วงกลมตกแต่ง 2 วง — เป็นก้อนสีที่หนักที่สุดบนหน้าทั้งที่เป็นแค่ "ป้ายชื่อหน้า" ไม่ใช่ข้อมูล

@@ -69,6 +69,7 @@ import ColumnSettings from "@/features/contracts/components/ColumnSettings";
 import ResponsiblePicker from "@/features/contracts/components/ResponsiblePicker";
 import FormSection, { FieldGrid } from "@/shared/ui/FormSection";
 import SelectField from "@/shared/ui/SelectField";
+import PersonSelectField from "@/shared/ui/PersonSelectField";
 import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { hasValidAvatar } from "@/shared/utils/user";
@@ -5645,11 +5646,16 @@ pagedRows.map((c, idx) => {
               <ViewTiles value={viewFilter} onChange={selectView} isMobile groups={viewTileGroups.map((g) => ({ ...g, title: "" }))} />
             </Box>
             {isAdminOrManager && responsibleOptions.total > 0 && (
-              <SelectField fullWidth label="ผู้รับผิดชอบ" value={responsibleFilter} onChange={(e) => setResponsibleFilter(e.target.value)} sx={{ mb: 1.5, width: "100%" }}>
-                <option value="all">ทุกคน ({responsibleOptions.total})</option>
-                {responsibleOptions.unassigned > 0 && <option value="unassigned">ยังไม่มอบหมาย ({responsibleOptions.unassigned})</option>}
-                {responsibleOptions.list.map(([name, n]) => <option key={name} value={name}>{name} ({n})</option>)}
-              </SelectField>
+              <Box sx={{ mb: 1.5, display: "flex", "& > *": { flex: 1 } }}>
+                <PersonSelectField
+                  label="ผู้รับผิดชอบ" title="เลือกผู้รับผิดชอบ" value={responsibleFilter} onChange={setResponsibleFilter}
+                  allLabel="ทุกคน" allCount={responsibleOptions.total}
+                  options={[
+                    ...(responsibleOptions.unassigned > 0 ? [{ id: "unassigned", name: "ยังไม่มอบหมาย", count: responsibleOptions.unassigned, unassigned: true }] : []),
+                    ...responsibleOptions.list.map(([name, n]) => ({ id: name, name, count: n, avatar: lookups.employees.find((e) => e.fname === name)?.imageUrl })),
+                  ]}
+                />
+              </Box>
             )}
             <Stack gap={1.5}>{renderFilterFields()}</Stack>
           </Box>

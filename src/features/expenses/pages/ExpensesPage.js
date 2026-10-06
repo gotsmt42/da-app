@@ -21,10 +21,10 @@
 import { useCallback, useEffect, useState } from "react";
 import useRealtime from "@/shared/realtime/useRealtime";
 import { Link as RouterLink, Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Box, Stack, Typography, Button, Chip, IconButton, Badge } from "@mui/material";
+import { Box, Stack, Typography, Button, IconButton, Badge, ButtonBase } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
-  Add, Payments, ReceiptLong, FactCheck, Insights, ChevronRight, WarningAmber, AccountBalanceWallet, Engineering, Tune,
+  Add, Payments, ReceiptLong, FactCheck, Insights, WarningAmber, AccountBalanceWallet, Engineering, Tune,
 } from "@mui/icons-material";
 
 import usePermissions from "@/shared/hooks/usePermissions";
@@ -132,14 +132,6 @@ const StatPill = ({ label, value, color, active, alert, onClick }) => (
   </Box>
 );
 
-/** ลิงก์ข้อความเล็กๆ ไปอีกหน้าในระบบเดียวกัน (แทนแถบแท็บเดิม) */
-const CrossLink = ({ to, label, color }) => (
-  <Chip
-    component={RouterLink} to={to} clickable size="small"
-    label={<span>{label} <ChevronRight sx={{ fontSize: 13, verticalAlign: "-2px" }} /></span>}
-    sx={{ height: 26, fontWeight: 700, fontSize: "0.76rem", bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, color: TEXT_SUB, "& .MuiChip-label": { px: 1 } }}
-  />
-);
 
 export default function ExpensesPage({ view: viewProp }) {
   const { can } = usePermissions();
@@ -293,15 +285,18 @@ export default function ExpensesPage({ view: viewProp }) {
   const headerStats = stats.filter((s) => !s.onClick && !s.alert);
 
   // ── ลิงก์ไปหน้าอื่นในระบบเดียวกัน ─────────────────────────────────────
-  const crossLinks = [];
-  if (view !== "advance") crossLinks.push({ to: "/expenses/advances", label: "ใบ Advance", color: KIND_META.advance.dark });
-  if (view !== "claim") crossLinks.push({ to: "/expenses/claims", label: "ใบเคลม", color: KIND_META.claim.dark });
-  if (view !== "contractor") crossLinks.push({ to: "/expenses/contractors", label: "ค่าจ้างผู้รับเหมา", color: KIND_META.contractor.dark });
-  if (canHandle && view !== "inbox") crossLinks.push({ to: "/expenses/approvals", label: "รอดำเนินการ", color: INBOX_COLOR });
-  if (view !== "report") crossLinks.push({ to: "/expenses/report", label: "รายงาน", color: REPORT_COLOR });
+  // ✅ แถบเมนูของระบบเบิกแบบคงที่ (ผู้ใช้: "ยังดูแปลกๆ ไม่ลงตัว") — เดิมเป็นชิปลิงก์ "ไปหน้าอื่น" ที่รายการเปลี่ยนไปทุกหน้า
+  //    และไม่มีหน้าปัจจุบัน → ตอนนี้ครบทุกหน้า ลำดับเดิมเสมอ หน้าที่อยู่ไฮไลต์สีของหน้านั้น
+  const navItems = [
+    { key: "advance", to: "/expenses/advances", label: "ใบ Advance", color: KIND_META.advance.color },
+    { key: "claim", to: "/expenses/claims", label: "ใบเคลม", color: KIND_META.claim.color },
+    { key: "contractor", to: "/expenses/contractors", label: "ผู้รับเหมา", color: KIND_META.contractor.color },
+    ...(canHandle ? [{ key: "inbox", to: "/expenses/approvals", label: "รอดำเนินการ", color: INBOX_COLOR }] : []),
+    { key: "report", to: "/expenses/report", label: "รายงาน", color: REPORT_COLOR },
+  ];
 
   return (
-    <Box sx={{ p: { xs: 1.25, sm: 2.5 }, maxWidth: 1500, mx: "auto" }}>
+    <Box sx={{ px: { xs: 0, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: 1500, mx: "auto" }}>
       {/* ── หัวหน้าเพจ: สีประจำหน้า + ปุ่มหลักปุ่มเดียว ─────────────────── */}
       <Box sx={{
         // ✅ หัวหน้าเพจพื้นขาว — สีประจำหน้าเหลือแค่ไอคอนกับปุ่มหลัก (เดิมพื้นสี + ขอบสี + แถบบนสี)
@@ -326,33 +321,21 @@ export default function ExpensesPage({ view: viewProp }) {
               </IconButton>
             )}
             <Box sx={{
-              width: { xs: 36, sm: 40 }, height: { xs: 36, sm: 40 }, borderRadius: 2.5, ml: "0 !important", // ⚠️ ปุ่มตัวกรอง (absolute) เป็นลูกตัวแรกของ Stack — ไม่งั้นไอคอนโดนเว้นซ้าย "& svg": { fontSize: { xs: 20, sm: 24 } }, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+              width: { xs: 34, sm: 38 }, height: { xs: 34, sm: 38 }, borderRadius: 2.25, ml: "0 !important", // ⚠️ ปุ่มตัวกรอง (absolute) เป็นลูกตัวแรกของ Stack — ไม่งั้นไอคอนโดนเว้นซ้าย "& svg": { fontSize: { xs: 20, sm: 24 } }, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
               bgcolor: meta.color, color: "#fff",
             }}>
               <Icon />
             </Box>
             <Box sx={{ minWidth: 0 }}>
-              <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.12rem", sm: "1.3rem" }, color: TEXT_MAIN, lineHeight: 1.25 }}>
+              <Typography sx={{ fontWeight: 800, fontSize: { xs: "1.08rem", sm: "1.2rem" }, color: TEXT_MAIN, lineHeight: 1.3 }}>
                 {meta.title}
               </Typography>
               {/* ✅ มือถือ: ซ่อนคำอธิบาย (ยาว ตัดเป็น 2–3 บรรทัด ดันเนื้อหาลง) — ชื่อหน้าบอกอยู่แล้ว */}
               <Typography variant="caption" sx={{ color: TEXT_SUB, display: { xs: "none", sm: "block" }, lineHeight: 1.35 }}>
                 {meta.sub}
               </Typography>
-              {/* ── ทางไปหน้าอื่นของระบบเบิก — จอใหญ่: บรรทัดเล็กใต้คำอธิบาย ── */}
-              <Box sx={{ display: { xs: "none", sm: "block" } }}>
-              <Stack direction="row" spacing={0.75} sx={{ mt: 0.75, overflowX: "auto", "&::-webkit-scrollbar": { display: "none" }, scrollbarWidth: "none" }}>
-                {crossLinks.map((l) => <CrossLink key={l.to} {...l} />)}
-              </Stack>
-              </Box>
             </Box>
           </Stack>
-          {/* ── มือถือ: ลิงก์หน้าอื่นเต็มความกว้าง (ไม่เยื้องตามไอคอน) ── */}
-          <Box sx={{ display: { xs: "block", sm: "none" }, minWidth: 0 }}>
-            <Stack direction="row" spacing={0.75} sx={{ overflowX: "auto", "&::-webkit-scrollbar": { display: "none" }, scrollbarWidth: "none" }}>
-                {crossLinks.map((l) => <CrossLink key={l.to} {...l} />)}
-              </Stack>
-          </Box>
           {/* ตัวเลขเงินของหน้านี้ — จอใหญ่: คอลัมน์ขวามีเส้นคั่น · มือถือ: แถบเทาอ่อนแถวเดียว (ป้ายซ้าย ตัวเลขขวา) */}
           {isList && view !== "inbox" && headerStats.map((st) => (
             <Box key={st.key} sx={{
@@ -396,6 +379,31 @@ export default function ExpensesPage({ view: viewProp }) {
             </Stack>
           )}
         </Stack>
+        {/* ── แถบเมนูระบบเบิก (ติดขอบล่างของหัวเพจ) — หน้าปัจจุบัน: ตัวสีของหน้า + เส้นใต้ · มือถือเลื่อนซ้าย-ขวาได้ ── */}
+        <Box
+          component="nav" aria-label="เมนูระบบเบิก"
+          sx={{
+            display: "flex", gap: { xs: 0.25, sm: 0.5 }, mt: { xs: 1.25, sm: 1.5 }, mb: { xs: -1.25, sm: -1.75 }, mx: { xs: -1.5, sm: -2 }, px: { xs: 1, sm: 1.5 },
+            borderTop: `1px solid ${BORDER_MAIN}`, overflowX: "auto", "&::-webkit-scrollbar": { display: "none" }, scrollbarWidth: "none",
+          }}
+        >
+          {navItems.map((n) => {
+            const on = n.key === view;
+            return (
+              <ButtonBase
+                key={n.key} component={RouterLink} to={n.to} aria-current={on ? "page" : undefined}
+                sx={{
+                  flexShrink: 0, px: { xs: 1.25, sm: 1.5 }, py: 1.1, fontFamily: "inherit", whiteSpace: "nowrap",
+                  fontSize: "0.84rem", fontWeight: on ? 800 : 600, color: on ? n.color : TEXT_SUB,
+                  borderBottom: `2px solid ${on ? n.color : "transparent"}`, mb: "-1px",
+                  "&:hover": { color: on ? n.color : TEXT_MAIN },
+                }}
+              >
+                {n.label}
+              </ButtonBase>
+            );
+          })}
+        </Box>
       </Box>
 
       {/* ── แถบตัวเลขของหน้านี้ (เลื่อนแนวนอนบนจอแคบ) ─────────────────── */}

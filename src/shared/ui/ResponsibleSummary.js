@@ -22,6 +22,7 @@ import { personColor, personInitial } from "@/shared/utils/personAvatar";
  * @param title / hint  หัวข้อแผง (ค่าเริ่มต้น = งานตามผู้รับผิดชอบ) — หน้ารายงานการเบิกใช้ "ใบเบิกตามผู้เบิก"
  * @param amountOf (row) => number — ถ้าส่งมา ท้ายการ์ดโชว์ยอดเงินรวมของคนนั้นแทน "% ของทั้งหมด"
  * @param formatAmount (number) => string
+ * @param noteOf   (name) => string — บรรทัดเล็กใต้ยอดเงิน (เช่น "คนอื่นเบิกให้ +฿3,000") ไม่ส่ง = ไม่แสดง
  */
 
 const ACCENT = "#dc2626";
@@ -37,7 +38,7 @@ const COLLAPSED_COUNT = 8;
 export default function ResponsibleSummary({
   rows, unit = "งาน", value = "all", onChange, employees = [], isOverdue, isMobile = false,
   title = "งานตามผู้รับผิดชอบ", hint = "กดที่ชื่อเพื่อดูเฉพาะงานของคนนั้น · กดซ้ำเพื่อดูทั้งหมด",
-  amountOf, formatAmount = (n) => n.toLocaleString(),
+  amountOf, formatAmount = (n) => n.toLocaleString(), noteOf,
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -124,6 +125,9 @@ export default function ResponsibleSummary({
           <Typography sx={{ fontSize: "0.7rem", color: TEXT_SUB }}>
             {Math.round((count / total) * 100)}% ของทั้งหมด
           </Typography>
+        )}
+        {noteOf && !muted && noteOf(name) && (
+          <Typography component="span" noWrap sx={{ fontSize: "0.68rem", fontWeight: 700, color: "#6d28d9", minWidth: 0, ml: 0.75 }}>{noteOf(name)}</Typography>
         )}
         {overdue > 0 && (
           <Tooltip title={`เลยกำหนดรอบเข้างาน ${overdue} ${unit}`}>

@@ -96,6 +96,7 @@ import ResponsibleSummary from "@/shared/ui/ResponsibleSummary";
 import Drawer from "@mui/material/Drawer";
 import AppsIcon from "@mui/icons-material/Apps";
 import SelectField, { SELECT_FIELD_SX, SELECT_MENU_PROPS } from "@/shared/ui/SelectField";
+import PersonSelectField from "@/shared/ui/PersonSelectField";
 import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
 import { PeopleRow, PersonChip, AssignableResponsible, AssignResponsibleMenu, useAvatarMap, teamNamesOf } from "@/shared/ui/PersonChip";
 
@@ -3334,7 +3335,7 @@ const Operation = () => {
   );
 
   return (
-    <Box sx={{ px: { xs: 1, sm: 2, md: 3 }, py: { xs: 1.5, sm: 3 }, maxWidth: 1400, mx: "auto" }}>
+    <Box sx={{ px: { xs: 0, sm: 2, md: 3 }, py: { xs: 1.5, sm: 3 }, maxWidth: 1400, mx: "auto" }}>
 
       {/* Header
           🐛 เดิมบนมือถือ ชื่อหน้ากับแถวปุ่มตกคนละบรรทัด (flexWrap ทำให้ปุ่ม 5 ตัวห่อลงมาเป็นแถบของ
@@ -3609,11 +3610,16 @@ const Operation = () => {
                     <ViewTiles value={effectiveGroup} onChange={setStatusGroup} isMobile groups={statusTileGroups} />
                   </Box>
                   {isAdminOrManager && !id && responsibleOptions.total > 0 && (
-                    <SelectField fullWidth label="ผู้รับผิดชอบ" value={filterResponsible} onChange={(e) => { setFilterResponsible(e.target.value); setPage(1); }} sx={{ mb: 1.5, width: "100%" }}>
-                      <option value="all">ทุกคน ({responsibleOptions.total})</option>
-                      {responsibleOptions.unassigned > 0 && <option value="unassigned">ยังไม่มอบหมาย ({responsibleOptions.unassigned})</option>}
-                      {responsibleOptions.list.map(([name, n]) => <option key={name} value={name}>{name} ({n})</option>)}
-                    </SelectField>
+                    <Box sx={{ mb: 1.5, display: "flex", "& > *": { flex: 1 } }}>
+                      <PersonSelectField
+                        label="ผู้รับผิดชอบ" title="เลือกผู้รับผิดชอบ" value={filterResponsible} onChange={(v) => { setFilterResponsible(v); setPage(1); }}
+                        allLabel="ทุกคน" allCount={responsibleOptions.total} unit="งาน"
+                        options={[
+                          ...(responsibleOptions.unassigned > 0 ? [{ id: "unassigned", name: "ยังไม่มอบหมาย", count: responsibleOptions.unassigned, unassigned: true }] : []),
+                          ...responsibleOptions.list.map(([name, n]) => ({ id: name, name, count: n, avatar: (employee || []).find((e) => e.fname === name)?.imageUrl })),
+                        ]}
+                      />
+                    </Box>
                   )}
                   <FilterPanel {...filterPanelProps} inSheet />
                 </Box>

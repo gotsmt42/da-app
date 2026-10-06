@@ -154,7 +154,7 @@ export default function Settings() {
         : null;
 
   return (
-    <Box sx={{ p: { xs: 1.5, sm: 2.5 }, maxWidth: 860, mx: "auto" }}>
+    <Box sx={{ px: { xs: 0, sm: 2.5 }, py: { xs: 1.5, sm: 2.5 }, maxWidth: 860, mx: "auto" }}>
       <Box sx={{ mb: 2.5, px: 0.5 }}>
         <Typography sx={{ fontWeight: 900, fontSize: "1.4rem", color: INK }}>การตั้งค่า</Typography>
         <Typography sx={{ fontSize: "0.84rem", color: MUTED }}>บัญชี · ความปลอดภัย · การแจ้งเตือน · ข้อมูลระบบ</Typography>
