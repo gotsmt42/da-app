@@ -92,7 +92,7 @@ const Kpi = ({ label, value, sub, color, highlight, followup = false, active }) 
  */
 const Panel = ({ title, hint, children, action, icon, color = "#475569" }) => (
   <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 2.5, minWidth: 0, overflow: "hidden" }}>
-    <Stack direction="row" alignItems="center" spacing={1.25} sx={{ px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.4 }, borderBottom: `1px solid #f1f5f9` }}>
+    <Stack direction="row" alignItems="center" useFlexGap flexWrap={{ xs: "wrap", sm: "nowrap" }} sx={{ columnGap: 1.25, rowGap: 1, px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.4 }, borderBottom: `1px solid #f1f5f9` }}>
       {icon && (
         <Box sx={{
           width: 34, height: 34, borderRadius: 2, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
@@ -101,11 +101,12 @@ const Panel = ({ title, hint, children, action, icon, color = "#475569" }) => (
           {icon}
         </Box>
       )}
-      <Box sx={{ flex: 1, minWidth: 0 }}>
+      <Box sx={{ flex: "1 1 200px", minWidth: 0 }}>
         <Typography sx={{ fontWeight: 800, fontSize: { xs: "0.98rem", sm: "1.05rem" }, color: TEXT_MAIN, lineHeight: 1.35 }}>{title}</Typography>
         {hint && <Typography sx={{ fontSize: "0.76rem", color: TEXT_SUB, lineHeight: 1.45 }}>{hint}</Typography>}
       </Box>
-      {action}
+      {/* ⚠️ มือถือ: ปุ่มด้านขวาลงบรรทัดใหม่เต็มความกว้าง — ไม่งั้นชื่อหัวข้อถูกบีบจนตัดทีละคำ */}
+      {action && <Box sx={{ flexShrink: 0, width: { xs: "100%", sm: "auto" }, "& .MuiToggleButtonGroup-root": { width: { xs: "100%", sm: "auto" } }, "& .MuiToggleButton-root": { flex: { xs: 1, sm: "none" } } }}>{action}</Box>}
     </Stack>
     <Box sx={{ p: { xs: 1.5, sm: 2 } }}>{children}</Box>
   </Box>
@@ -444,30 +445,54 @@ const LedgerRow = ({ p, holder, onOpen, isDesktop }) => {
   ].filter(Boolean) : [];
   const cells = [
     // ✅ สีชุดเดียวกับกล่องสรุปด้านบนของหน้า (ขอเบิก = เข้ม · จ่ายล่วงหน้า = เขียว · ใช้จริง = ม่วง · สำรองจ่าย = ส้ม)
-    { label: "ยอดของคนนี้ (ขอเบิก)", value: p.requested, color: TEXT_MAIN },
-    { label: "จ่ายล่วงหน้าแล้ว", value: p.advanced, color: ADV },
-    { label: "ใช้จริง (เคลมอนุมัติ)", value: p.actual, color: ACT },
-    { label: "สำรองจ่าย (อนุมัติ)", value: p.reimburse, color: RMB },
-    { label: "ค่าใช้จ่ายอนุมัติรวม", value: p.approvedCost, color: TEXT_MAIN },
+    // ป้ายสั้น — อยู่เป็นคอลัมน์แคบในแถวเดียวกับชื่อ (ความหมายเต็มอยู่ใน title ตอนชี้)
+    { label: "ขอเบิก", full: "ยอดของคนนี้ (ขอเบิก)", value: p.requested, color: TEXT_MAIN },
+    { label: "จ่ายล่วงหน้า", full: "จ่ายล่วงหน้าแล้ว", value: p.advanced, color: ADV },
+    { label: "ใช้จริง", full: "ใช้จริง (ใบเคลมที่อนุมัติ)", value: p.actual, color: ACT },
+    { label: "สำรองจ่าย", full: "สำรองจ่าย (อนุมัติ)", value: p.reimburse, color: RMB },
+    { label: "รวมอนุมัติ", full: "ค่าใช้จ่ายที่อนุมัติรวม (ใช้จริง + สำรองจ่าย)", value: p.approvedCost, color: TEXT_MAIN },
   ];
   return (
     <Box sx={{ border: `1px solid ${BORDER_MAIN}`, borderRadius: 2.5, overflow: "hidden", bgcolor: "#fff" }}>
       <Box
         role="button" tabIndex={0} onClick={() => setOpen((v) => !v)}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen((v) => !v); } }}
-        sx={{ p: 1.5, cursor: "pointer", "&:hover": { bgcolor: "#f8fafc" } }}
+        sx={{ px: 1.5, py: { xs: 1.25, md: 1 }, cursor: "pointer", "&:hover": { bgcolor: "#f8fafc" } }}
       >
         <Stack direction="row" alignItems={{ xs: "flex-start", sm: "center" }} spacing={1.25}>
-          <Avatar sx={{ width: 40, height: 40, bgcolor: personColor(p.label), fontWeight: 800, fontSize: "1rem" }}>{personInitial(p.label)}</Avatar>
-          <Box sx={{ minWidth: 0, flex: 1 }}>
-            {/* ✅ ผู้ใช้: "ตรงนี้ไม่สวย" — ชื่อ + จำนวนรายการบรรทัดเดียว · สรุปเบิกข้ามคนเป็นบรรทัดเดียวคั่นด้วยเส้นบาง (ไม่มีกล่องเทาซ้อน)
-                ป้ายเงินค้างย้ายไปชิดขวาข้างลูกศร (มือถือห่อลงล่าง) */}
-            <Stack direction="row" alignItems="baseline" spacing={0.75} sx={{ minWidth: 0 }}>
-              <Typography sx={{ fontWeight: 800, fontSize: "1rem", color: TEXT_MAIN, lineHeight: 1.3 }} noWrap>{p.label}</Typography>
+          <Avatar sx={{ width: 34, height: 34, bgcolor: personColor(p.label), fontWeight: 800, fontSize: "0.9rem" }}>{personInitial(p.label)}</Avatar>
+          <Box sx={{ minWidth: 0, flex: isDesktop ? "1.6 1 0" : 1 }}>
+            {/* ✅ ผู้ใช้: "ตรงนี้ให้มีแค่ชื่อกับสถานะที่ยังค้างก็พอ ข้อมูลอื่นๆ เอาไปไว้ข้างใน"
+                → แถวที่ปิดอยู่ = ชื่อ · จำนวนรายการ · ป้ายเงินค้าง · สรุปเบิก/เคลมข้ามคนย้ายไปอยู่ในส่วนที่กางออก */}
+            <Stack direction="row" alignItems="center" useFlexGap flexWrap="wrap" sx={{ minWidth: 0, columnGap: 0.75, rowGap: 0.4 }}>
+              <Typography sx={{ fontWeight: 800, fontSize: "0.95rem", color: TEXT_MAIN, lineHeight: 1.3 }} noWrap>{p.label}</Typography>
               <Typography sx={{ fontSize: "0.74rem", color: TEXT_SUB, whiteSpace: "nowrap" }}>{p.lines.length} รายการ</Typography>
+              {alerts.map((al) => <AlertTag key={al.text} {...al} />)}
             </Stack>
+          </Box>
+          {isDesktop && (
+            // ✅ ผู้ใช้: "ย่อให้กระชับลงอีกหน่อย" — 5 ตัวเลขเป็นคอลัมน์ในแถวเดียวกับชื่อ (เดิมกล่อง 5 ใบอีกแถว)
+            <Box sx={{ flex: "3 1 0", minWidth: 0, display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", columnGap: 1.5 }}>
+              {cells.map((c) => (
+                <Box key={c.label} title={c.full} sx={{ minWidth: 0, textAlign: "right" }}>
+                  <Typography sx={{ fontSize: "0.68rem", color: TEXT_SUB, fontWeight: 600 }} noWrap>{c.label}</Typography>
+                  <Typography sx={{ fontSize: "0.95rem", fontWeight: 800, color: c.value ? c.color : "#cbd5e1", lineHeight: 1.3, ...NUM }}>{baht(c.value)}</Typography>
+                </Box>
+              ))}
+            </Box>
+          )}
+          <ExpandMore sx={{ color: TEXT_SUB, transition: "transform .2s", transform: open ? "rotate(180deg)" : "none" }} />
+        </Stack>
+      </Box>
+
+      <Collapse in={open} unmountOnExit>
+        <Box sx={{ px: 1.5, pb: 1.5, pt: 0.5, borderTop: `1px solid ${BORDER_MAIN}`, bgcolor: "#fcfdfe" }}>
+          {/* ✅ ผู้ใช้: "ข้อมูลยังดูยาก รก สับสน" — เดิมเป็นตารางเบิก + ตารางเคลมแยกกัน ซ้ำวันที่/เลขที่/สถานะทุกบรรทัด
+              และต้องจับคู่เองว่าบรรทัดเบิกไหนเคลียร์ด้วยบรรทัดเคลมไหน
+              → การ์ดละ 1 ใบ: หัวการ์ด = เลขที่ใบ (Advance → ใบเคลม) · วันที่ · ใครเบิก · สถานะ
+                 เนื้อการ์ด = ทีละหมวด  ขอเบิก | ใช้จริง | ส่วนต่าง  วางคู่กันในแถวเดียว */}
             <Stack
-              direction="row" useFlexGap flexWrap="wrap" alignItems="center" sx={{ mt: 0.35, columnGap: 1.25, rowGap: 0.25 }}
+              direction="row" useFlexGap flexWrap="wrap" alignItems="center" sx={{ mt: 1, columnGap: 1.25, rowGap: 0.25 }}
               divider={<Box sx={{ width: "1px", height: 12, bgcolor: BORDER_MAIN }} />}
             >
               {[
@@ -477,53 +502,23 @@ const LedgerRow = ({ p, holder, onOpen, isDesktop }) => {
                 ["คนอื่นเคลมให้", p.claimedByOthers],
                 ["เคลมให้คนอื่น", p.claimedForOthers],
               ].filter(([, v]) => v > 0).map(([label, v]) => (
-                <Typography key={label} component="span" sx={{ fontSize: "0.76rem", color: TEXT_SUB, whiteSpace: "nowrap" }}>
+                <Typography key={label} component="span" sx={{ fontSize: "0.78rem", color: TEXT_SUB, whiteSpace: "nowrap" }}>
                   {label} <Box component="span" sx={{ color: TEXT_MAIN, fontWeight: 700, ...NUM }}>{baht(v)}</Box>
                 </Typography>
               ))}
             </Stack>
-            {alerts.length > 0 && (
-              <Stack direction="row" useFlexGap flexWrap="wrap" spacing={0.5} sx={{ mt: 0.75, display: { xs: "flex", sm: "none" } }}>
-                {alerts.map((al) => <AlertTag key={al.text} {...al} />)}
-              </Stack>
-            )}
-          </Box>
-          {alerts.length > 0 && (
-            <Stack direction="row" spacing={0.5} sx={{ display: { xs: "none", sm: "flex" }, flexShrink: 0 }}>
-              {alerts.map((al) => <AlertTag key={al.text} {...al} />)}
-            </Stack>
+        {!isDesktop && (
+            // ✅ มือถือ: กล่องเดียว ป้ายซ้าย-ตัวเลขขวา (เดิม 5 กล่องซ้อนกัน 3 แถว กินจอ ผู้ใช้แจ้งว่ารก)
+            <Box sx={{ mt: 1, px: 1.25, py: 0.5, borderRadius: 2, bgcolor: "#f8fafc", border: `1px solid ${BORDER_MAIN}` }}>
+              {cells.map((c, ci) => (
+                <Stack key={c.label} direction="row" alignItems="baseline" justifyContent="space-between" spacing={1}
+                  sx={{ py: 0.6, borderTop: ci ? `1px dashed ${BORDER_MAIN}` : 0 }}>
+                  <Typography sx={{ fontSize: "0.8rem", color: TEXT_SUB }}>{c.label}</Typography>
+                  <Typography sx={{ fontSize: ci === 0 || ci === cells.length - 1 ? "0.98rem" : "0.9rem", fontWeight: 800, color: c.value ? c.color : "#cbd5e1", ...NUM }}>{baht(c.value)}</Typography>
+                </Stack>
+              ))}
+            </Box>
           )}
-          <ExpandMore sx={{ color: TEXT_SUB, transition: "transform .2s", transform: open ? "rotate(180deg)" : "none" }} />
-        </Stack>
-        {isDesktop ? (
-          <Box sx={{ mt: 1.25, display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 0.75 }}>
-            {cells.map((c) => (
-              <Box key={c.label} sx={{ px: 1.25, py: 1, borderRadius: 2, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, minWidth: 0 }}>
-                <Typography sx={{ fontSize: "0.7rem", color: TEXT_SUB, fontWeight: 700 }} noWrap>{c.label}</Typography>
-                <Typography sx={{ fontSize: "1.05rem", fontWeight: 800, color: c.value ? c.color : "#cbd5e1", lineHeight: 1.3, ...NUM }}>{baht(c.value)}</Typography>
-              </Box>
-            ))}
-          </Box>
-        ) : (
-          // ✅ มือถือ: กล่องเดียว ป้ายซ้าย-ตัวเลขขวา (เดิม 5 กล่องซ้อนกัน 3 แถว กินจอ ผู้ใช้แจ้งว่ารก)
-          <Box sx={{ mt: 1, px: 1.25, py: 0.5, borderRadius: 2, bgcolor: "#f8fafc", border: `1px solid ${BORDER_MAIN}` }}>
-            {cells.map((c, ci) => (
-              <Stack key={c.label} direction="row" alignItems="baseline" justifyContent="space-between" spacing={1}
-                sx={{ py: 0.6, borderTop: ci ? `1px dashed ${BORDER_MAIN}` : 0 }}>
-                <Typography sx={{ fontSize: "0.8rem", color: TEXT_SUB }}>{c.label}</Typography>
-                <Typography sx={{ fontSize: ci === 0 || ci === cells.length - 1 ? "0.98rem" : "0.9rem", fontWeight: 800, color: c.value ? c.color : "#cbd5e1", ...NUM }}>{baht(c.value)}</Typography>
-              </Stack>
-            ))}
-          </Box>
-        )}
-      </Box>
-
-      <Collapse in={open} unmountOnExit>
-        <Box sx={{ px: 1.5, pb: 1.5, pt: 0.5, borderTop: `1px solid ${BORDER_MAIN}`, bgcolor: "#fcfdfe" }}>
-          {/* ✅ ผู้ใช้: "ข้อมูลยังดูยาก รก สับสน" — เดิมเป็นตารางเบิก + ตารางเคลมแยกกัน ซ้ำวันที่/เลขที่/สถานะทุกบรรทัด
-              และต้องจับคู่เองว่าบรรทัดเบิกไหนเคลียร์ด้วยบรรทัดเคลมไหน
-              → การ์ดละ 1 ใบ: หัวการ์ด = เลขที่ใบ (Advance → ใบเคลม) · วันที่ · ใครเบิก · สถานะ
-                 เนื้อการ์ด = ทีละหมวด  ขอเบิก | ใช้จริง | ส่วนต่าง  วางคู่กันในแถวเดียว */}
           {(p.requesters.length > 0 || p.beneficiaries.length > 0) && (
             <Typography sx={{ mt: 1, fontSize: "0.78rem", color: TEXT_SUB, lineHeight: 1.6 }}>
               {p.requesters.length > 0 && <>คนอื่นเบิกให้ — {p.requesters.map((r) => `${r.name} ${baht(r.amount)}`).join(", ")}</>}
