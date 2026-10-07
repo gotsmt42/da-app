@@ -3723,10 +3723,10 @@ function EventCalendar() {
             list: "รายการ",
           }}
           views={{
-            listWeek: { dayMaxEventRows: window.innerWidth >= 576 ? 7 : 7 },
-            dayGridMonth: { dayMaxEventRows: window.innerWidth >= 576 ? 7 : 7 },
-            timeGridWeek: { dayMaxEventRows: window.innerWidth >= 576 ? 7 : 7 },
-            timeGridDay: { dayMaxEventRows: window.innerWidth >= 576 ? 7 : 7 },
+            listWeek: { dayMaxEventRows: window.innerWidth >= 576 ? 10 : 7 },
+            dayGridMonth: { dayMaxEventRows: window.innerWidth >= 576 ? 10 : 7 },
+            timeGridWeek: { dayMaxEventRows: window.innerWidth >= 576 ? 10 : 7 },
+            timeGridDay: { dayMaxEventRows: window.innerWidth >= 576 ? 10 : 7 },
           }}
           eventClassNames={(arg) => {
             const classes = !canEditEvent(arg.event.extendedProps) ? ["fc-event-locked"] : [];
