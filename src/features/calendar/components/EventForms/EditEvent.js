@@ -1389,6 +1389,58 @@ export const getEditEvent = async ({
   const eventApprovalDecidedBy   = ev.extendedProps?.approvalDecidedBy || "";
   const eventApprovalDecidedAt   = ev.extendedProps?.approvalDecidedAt || "";
   const eventApprovalRejectReason = ev.extendedProps?.approvalRejectReason || "";
+
+  /**
+   * ✅ (8 ต.ค. 2569 ผู้ใช้: "หน้าของช่างให้มีสถานะบอกแบบนี้ด้วย ให้สวยงาม และสอดคล้อง")
+   * แถบขั้นตอนแบบเดียวกับหน้ารายละเอียดนัดฝ่ายขาย: รอยืนยัน → ยืนยันแล้ว → กำลังดำเนินการ → เสร็จสิ้น
+   * วันที่ใต้แต่ละขั้นมาจากข้อมูลจริงที่มี (สร้างงาน · อนุมัติ · เช็คอิน · อนุมัติปิดงาน/เช็คเอาท์) ไม่มีก็เว้นว่าง
+   * ไม่อนุมัติ = แถบสีแดงทั้งเส้น · ขอปิดงานรออนุมัติ = ป้ายส้มใต้ขั้นสุดท้าย
+   */
+  const stepperHtml = (() => {
+    const xp = ev.extendedProps || {};
+    const STEPS = [
+      { key: "กำลังรอยืนยัน", label: "รอยืนยัน", color: "#64748b", at: xp.createdAt },
+      { key: "ยืนยันแล้ว", label: "ยืนยันแล้ว", color: "#2563eb", at: eventApprovalState === "approved" ? (eventApprovalDecidedAt || "") : "" },
+      { key: "กำลังดำเนินการ", label: "กำลังดำเนินการ", color: "#a16207", at: xp.checkedInAt },
+      { key: "ดำเนินการเสร็จสิ้น", label: "เสร็จสิ้น", color: "#16a34a", at: xp.closeApprovedAt || xp.checkedOutAt },
+    ];
+    const idx = Math.max(0, STEPS.findIndex((st) => st.key === eventStatus));
+    const rejected = eventApprovalState === "rejected";
+    const pending = eventApprovalState === "pending";
+    const closeReq = Boolean(xp.closeRequested) && eventStatus !== "ดำเนินการเสร็จสิ้น";
+    const tick = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="#fff" d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>';
+    const cells = STEPS.map((st, i) => {
+      const done = !rejected && i <= idx;
+      const cur = !rejected && i === idx;
+      const c = rejected ? "#dc2626" : done ? st.color : "#e2e8f0";
+      const date = done && st.at && moment(st.at).isValid() ? formatThai(moment(st.at), "D MMM YY") : "";
+      const sub = i === STEPS.length - 1 && closeReq ? '<span class="ee-step-flag">ขอปิดงานแล้ว · รออนุมัติ</span>'
+        : i === 0 && pending ? '<span class="ee-step-flag">รออนุมัติงาน</span>'
+          : i === 0 && rejected ? '<span class="ee-step-flag ee-step-flag--red">ไม่อนุมัติ</span>' : (date || "&nbsp;");
+      return `
+        <div class="ee-step${done ? " is-done" : ""}${cur ? " is-cur" : ""}">
+          ${i > 0 ? `<span class="ee-step-line" style="background:${!rejected && i <= idx ? c : "#e2e8f0"}"></span>` : ""}
+          <span class="ee-step-dot" style="${done || rejected ? `background:${c};border-color:${c};` : ""}${cur ? `box-shadow:0 0 0 4px ${c}2e;` : ""}">${done ? tick : `<b>${i + 1}</b>`}</span>
+          <span class="ee-step-label">${st.label}</span>
+          <span class="ee-step-date">${sub}</span>
+        </div>`;
+    }).join("");
+    return `
+    <style>
+      .ee-stepper { display:flex; align-items:flex-start; margin: 0 0 12px; padding: 12px 8px 10px; background:#fff; border:1px solid #e2e8f0; border-radius:12px; }
+      .ee-step { flex:1; position:relative; display:flex; flex-direction:column; align-items:center; text-align:center; min-width:0; }
+      .ee-step-line { position:absolute; top:11px; right:50%; width:100%; height:2px; z-index:0; }
+      .ee-step-dot { position:relative; z-index:1; width:24px; height:24px; border-radius:50%; border:2px solid #e2e8f0; background:#fff; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
+      .ee-step-dot b { font-size:11px; color:#94a3b8; font-weight:800; }
+      .ee-step-label { margin-top:5px; font-size:12px; font-weight:800; color:#94a3b8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+      .ee-step.is-done .ee-step-label { color:#0f172a; }
+      .ee-step-date { font-size:11px; color:#64748b; min-height:16px; }
+      .ee-step-flag { display:inline-block; margin-top:2px; padding:0 6px; border-radius:999px; font-size:10.5px; font-weight:800; color:#b45309; background:#fffbeb; border:1px solid #fde68a; white-space:nowrap; }
+      .ee-step-flag--red { color:#b91c1c; background:#fef2f2; border-color:#fecaca; }
+      @media (max-width: 480px) { .ee-step-label { font-size:11px; } }
+    </style>
+    <div class="ee-stepper" role="list" aria-label="ขั้นตอนงาน">${cells}</div>`;
+  })();
   const siblingEvents = (events || [])
     .filter((e) => !e.extendedProps?.isHoliday && e.id !== eventId)
     .filter((e) => eventJobGroupId && e.jobGroupId === eventJobGroupId)
@@ -1887,6 +1939,8 @@ export const getEditEvent = async ({
       </div>` : ""}
     </div>
     ` : ""}
+
+    ${stepperHtml}
 
     <!-- ✅ ข้อมูลสัญญา — ย้ายมาไว้บนสุด (เดิมอยู่ล่างสุด ต้องเลื่อนจอไปดู) เพราะเป็นข้อมูลอ้างอิงหลักของ
          "ครั้งที่" นี้ที่มักต้องเช็คก่อนแก้อย่างอื่น ใส่กล่องพื้นหลังโทนม่วง-น้ำเงินแยกจากส่วนอื่นชัดเจน
