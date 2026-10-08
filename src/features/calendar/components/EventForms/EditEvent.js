@@ -1001,15 +1001,16 @@ function injectStyles() {
     .ee-head-owner { margin-left: auto; font-size: 11.5px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 
     /* แผนที่: ปุ่มเรียงใต้ชื่อบนจอแคบ ไม่บีบข้อความ */
-    .ee-map-go { background: #2563eb; border-radius: 10px; }
-    .ee-map-go:hover { background: #1d4ed8; }
+    /* ✅ (8 ต.ค. 2569 "ปุ่มต่างๆ ของช่างให้เป็นธีมสีแดง") */
+    .ee-map-go { background: #dc2626; border-radius: 10px; }
+    .ee-map-go:hover { background: #b91c1c; }
     .ee-map-edit { border-radius: 10px; }
 
     /* แถบปุ่ม — ขาว · ปุ่มหลักน้ำเงิน */
     #ee-action-bar { background: #fff; padding: 12px 20px; }
     #ee-action-bar .ee-btn { border-radius: 10px; padding: 10px 16px; font-size: 13.5px; }
-    #ee-action-bar .ee-btn-success { background: #2563eb; border-color: #2563eb; box-shadow: none; }
-    #ee-action-bar .ee-btn-success:hover { background: #1d4ed8; border-color: #1d4ed8; }
+    #ee-action-bar .ee-btn-success { background: #dc2626; border-color: #dc2626; box-shadow: none; }
+    #ee-action-bar .ee-btn-success:hover { background: #b91c1c; border-color: #b91c1c; }
     #ee-action-bar .ee-btn-map { background: #fff; border-color: #e2e8f0; color: #334155; }
     #ee-action-bar .ee-btn-map:hover { background: #f8fafc; }
     #ee-action-bar .ee-btn-ghost { border-color: #e2e8f0; background: #fff; color: #475569; }
@@ -1867,8 +1868,8 @@ export const getEditEvent = async ({
       .ee-sum-head { display:flex; align-items:center; justify-content:space-between; margin: 4px 2px 8px; }
       .ee-sum-head h4 { margin:0; font-size:14px; font-weight:800; color:#0f172a; }
       /* ✅ (8 ต.ค. 2569 "จุดที่ให้กดแก้ไขให้มองง่าย") ปุ่มแคปซูลขอบน้ำเงินชัดเจน ไม่ใช่ลิงก์ตัวหนังสือเล็กๆ */
-      .ee-sum-edit { display:inline-flex; align-items:center; gap:6px; border:1.5px solid #bfdbfe; background:#eff6ff; color:#1d4ed8; font-weight:800; font-size:13px; cursor:pointer; padding:6px 14px; border-radius:999px; font-family:inherit; transition:background .15s, border-color .15s; }
-      .ee-sum-edit:hover { background:#dbeafe; border-color:#93c5fd; }
+      .ee-sum-edit { display:inline-flex; align-items:center; gap:6px; border:1.5px solid #fecaca; background:#fef2f2; color:#b91c1c; font-weight:800; font-size:13px; cursor:pointer; padding:6px 14px; border-radius:999px; font-family:inherit; transition:background .15s, border-color .15s; }
+      .ee-sum-edit:hover { background:#fee2e2; border-color:#fca5a5; }
       .ee-sum { background:#fff; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; margin-bottom:12px; }
       .ee-sum-owner { display:flex; align-items:center; gap:10px; padding:10px 14px; background:#f8fafc; border-bottom:1px solid #e2e8f0; }
       .ee-sum-owner small { display:block; font-size:11px; font-weight:700; color:#64748b; }
@@ -1885,16 +1886,30 @@ export const getEditEvent = async ({
       .ee-sum-tel { color:#2563eb; font-weight:800; text-decoration:none; margin-left:6px; }
       .ee-sum-people { display:flex; flex-wrap:wrap; gap:6px; }
       .ee-sum-person { display:inline-flex; align-items:center; gap:5px; padding:2px 8px 2px 3px; border-radius:999px; background:#f1f5f9; font-size:12.5px; }
-      .ee-sum-person em { font-style:normal; font-size:10.5px; font-weight:800; color:#2563eb; margin-left:2px; }
-      #ee-editGroup > summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:8px; margin: 4px 0 12px; padding:11px 14px; border:1.5px solid #bfdbfe; border-radius:12px; background:#eff6ff; font-size:14px; font-weight:800; color:#1d4ed8; }
-      #ee-editGroup > summary:hover { background:#dbeafe; }
-      #ee-editGroup > summary .ee-eg-hint { margin-left:auto; font-size:12px; font-weight:700; color:#2563eb; }
+      .ee-sum-person em { font-style:normal; font-size:10.5px; font-weight:800; color:#dc2626; margin-left:2px; }
+      #ee-editGroup > summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:8px; margin: 4px 0 12px; padding:11px 14px; border:1.5px solid #fecaca; border-radius:12px; background:#fef2f2; font-size:14px; font-weight:800; color:#b91c1c; }
+      #ee-editGroup > summary:hover { background:#fee2e2; }
+      #ee-editGroup > summary .ee-eg-hint { margin-left:auto; font-size:12px; font-weight:700; color:#dc2626; }
       #ee-editGroup > summary::-webkit-details-marker { display:none; }
-      #ee-editGroup > summary .ee-eg-caret { color:#2563eb; transition:transform .15s; }
+      #ee-editGroup > summary .ee-eg-caret { color:#dc2626; transition:transform .15s; }
       #ee-editGroup[open] > summary .ee-eg-caret { transform:rotate(90deg); }
       #ee-editGroup > summary small { font-size:12px; font-weight:600; color:#64748b; }
       @media (max-width: 480px) { .ee-sum-k { width:78px; } }
       @media (max-width: 600px) { #ee-editGroup > summary small, #ee-editGroup > summary .ee-eg-hint { display:none; } }
+      /* ✅ (8 ต.ค. 2569 "บริเวณนี้ยังดูไม่ค่อยสวย ดูยาก") ตอนกาง = แผงแก้ไขแผงเดียว: แถบหัว + หัวข้อย่อยบางๆ คั่นด้วยเส้น
+         (ไม่ใช่การ์ด 4 ใบหัวใหญ่ซ้อนกัน) · แถบหัวใช้โทนกลาง ตัดสีแดงเหลือแค่ไอคอน/ลูกศร */
+      #ee-editGroup > summary { background:#fff; border-color:#e2e8f0; color:#0f172a; }
+      #ee-editGroup > summary:hover { background:#f8fafc; }
+      #ee-editGroup > summary small { color:#64748b; }
+      #ee-editGroup[open] { border:1px solid #e2e8f0; border-radius:14px; background:#fff; margin:0 0 12px; overflow:hidden; box-shadow:0 1px 2px rgba(15,23,42,.04); }
+      #ee-editGroup[open] > summary { margin:0; border:0; border-radius:0; border-bottom:1px solid #eef2f7; background:#f8fafc; }
+      #ee-editGroup .ee-card { border:0; border-radius:0; box-shadow:none; margin:0; border-top:1px solid #eef2f7; }
+      #ee-editGroup .ee-card:first-of-type { border-top:0; }
+      #ee-editGroup .ee-card-head { background:transparent; border-bottom:0; padding:12px 14px 2px; gap:8px; }
+      #ee-editGroup .ee-card-ico { width:24px; height:24px; border-radius:7px; font-size:13px; }
+      #ee-editGroup .ee-card-titles h4 { font-size:12.5px; color:#475569; letter-spacing:.01em; }
+      #ee-editGroup .ee-card-titles p { display:none; }
+      #ee-editGroup .ee-card-body { padding:8px 14px 6px; }
     </style>
     <div class="ee-sum-head">
       <h4>ข้อมูลงาน</h4>

@@ -123,7 +123,7 @@ export function usePaged(list, resetKey) {
   };
   return { items, page: cur, pageCount, total: list.length, go, topRef };
 }
-export function ListPager({ page, pageCount, total, go }) {
+export function ListPager({ page, pageCount, total, go, accent = ACCENT }) {
   if (total <= PAGE_SIZE) return null;
   const from = (page - 1) * PAGE_SIZE + 1;
   const to = Math.min(total, page * PAGE_SIZE);
@@ -133,13 +133,14 @@ export function ListPager({ page, pageCount, total, go }) {
       <Typography sx={{ fontSize: "0.8rem", color: MUTED }}>
         แสดง <b style={{ color: INK }}>{from}–{to}</b> จาก <b style={{ color: INK }}>{total}</b> รายการ
       </Typography>
-      <Pagination count={pageCount} page={page} onChange={(_, p) => go(p)} shape="rounded" size="small" color="primary" siblingCount={1} />
+      <Pagination count={pageCount} page={page} onChange={(_, p) => go(p)} shape="rounded" size="small" siblingCount={1}
+        sx={{ "& .MuiPaginationItem-root.Mui-selected": { bgcolor: alpha(accent, 0.1), color: accent, fontWeight: 800, border: `1px solid ${alpha(accent, 0.35)}` }, "& .MuiPaginationItem-root.Mui-selected:hover": { bgcolor: alpha(accent, 0.16) } }} />
     </Stack>
   );
 }
 
 /** ปุ่มสลับมุมมอง รายการ/ปฏิทิน แบบกะทัดรัด (วางในแถวค้นหา) */
-export function SalesViewToggle({ view, onView }) {
+export function SalesViewToggle({ view, onView, accent = ACCENT }) {
   return (
     <Stack direction="row" sx={{ p: "3px", borderRadius: "10px", bgcolor: "#eef2f7", flexShrink: 0 }}>
       {[
@@ -149,7 +150,7 @@ export function SalesViewToggle({ view, onView }) {
         <ButtonBase key={o.k} onClick={() => onView(o.k)} title={o.label} aria-label={o.label} aria-pressed={view === o.k}
           sx={{
             gap: 0.6, height: 32, px: { xs: 1, sm: 1.5 }, borderRadius: "8px", fontSize: "0.8rem", fontWeight: 800,
-            color: view === o.k ? ACCENT : MUTED, bgcolor: view === o.k ? "#fff" : "transparent",
+            color: view === o.k ? accent : MUTED, bgcolor: view === o.k ? "#fff" : "transparent",
             boxShadow: view === o.k ? "0 1px 2px rgba(15,23,42,.12)" : "none",
           }}>
           {o.icon}

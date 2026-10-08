@@ -3237,7 +3237,7 @@ function EventCalendar() {
         <div className="tb-view">
           {isSalesView
             ? <SalesViewToggle view={salesView} onView={setSalesView} />
-            : <SalesViewToggle view={techView} onView={setTechView} />}
+            : <SalesViewToggle view={techView} onView={setTechView} accent="#dc2626" />}
         </div>
         {/* จอใหญ่: แถว 1 = มุมมอง ......... ปุ่มคำสั่ง · แถว 2 = ค้นหา + ตัวกรอง (ดู .ec-wide-toolbar ใน index.css) */}
         <div className="tb-spacer" />

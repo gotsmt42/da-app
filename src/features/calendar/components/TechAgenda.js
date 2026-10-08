@@ -16,7 +16,7 @@ import { Box, Stack, Typography, Button, ButtonBase } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { Add, FileDownloadOutlined, ChevronRight, EngineeringOutlined, Groups2Outlined } from "@mui/icons-material";
 import { formatThai } from "@/shared/utils/thaiDate";
-import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, PRIMARY_BTN_SX } from "@/shared/ui/PageKit";
+import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, PRIMARY_BTN_SX } from "@/shared/ui/PageKit";
 import { Kpi, usePaged, ListPager } from "./SalesAgenda";
 
 const AMBER = "#d97706";
@@ -111,14 +111,14 @@ export function TechTopBar({ events, onAdd, onTab, onExport, exportDisabled, tit
           </Button>
         )}
         {canAdd && (
-          <Button variant="contained" startIcon={<Add />} onClick={onAdd} sx={{ ...PRIMARY_BTN_SX, px: { xs: 1.25, sm: 2 }, py: { xs: 0.5, sm: 0.75 }, fontSize: { xs: "0.82rem", sm: "0.875rem" } }}>
+          <Button variant="contained" startIcon={<Add />} onClick={onAdd} sx={{ ...PRIMARY_BTN_SX, bgcolor: RED, "&:hover": { bgcolor: "#b91c1c", boxShadow: "none" }, px: { xs: 1.25, sm: 2 }, py: { xs: 0.5, sm: 0.75 }, fontSize: { xs: "0.82rem", sm: "0.875rem" } }}>
             <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>เพิ่มงาน</Box>
             <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>เพิ่ม</Box>
           </Button>
         )}
       </Stack>
       <Stack direction="row" spacing={{ xs: 0.75, sm: 1 }}>
-        <Kpi label="งานวันนี้" value={s.today} color={ACCENT} onClick={() => onTab("upcoming")} />
+        <Kpi label="งานวันนี้" value={s.today} color={INK} onClick={() => onTab("upcoming")} />
         <Kpi label="ค้างปิดงาน" value={s.overdue} color={RED} onClick={() => onTab("follow")} />
         <Kpi label="รออนุมัติ" value={s.waiting} color={AMBER} onClick={() => onTab("follow")} />
         <Box sx={{ flex: 1, minWidth: 0, display: { xs: "none", sm: "flex" } }}>
@@ -181,7 +181,7 @@ function DayGroup({ day, rows, onOpen }) {
   return (
     <Box sx={{ mb: 1.5 }}>
       <Stack direction="row" alignItems="baseline" spacing={0.75} sx={{ px: 0.5, mb: 0.6 }}>
-        {rel && <Typography sx={{ fontSize: "0.82rem", fontWeight: 900, color: rel === "วันนี้" ? ACCENT : INK }}>{rel}</Typography>}
+        {rel && <Typography sx={{ fontSize: "0.82rem", fontWeight: 900, color: rel === "วันนี้" ? RED : INK }}>{rel}</Typography>}
         <Typography sx={{ fontSize: "0.8rem", fontWeight: rel ? 600 : 800, color: rel ? MUTED : INK }}>{formatThai(d, "dddd D MMM YY")}</Typography>
         <Typography sx={{ fontSize: "0.72rem", color: FAINT }}>· {rows.length} งาน</Typography>
       </Stack>
@@ -259,7 +259,7 @@ export default function TechAgenda({ events, onOpen, onAdd, canAdd = true, tab, 
             {cur.k === "follow" ? "ทุกงานปิดงานและได้รับอนุมัติเรียบร้อย" : canAdd ? "กด “เพิ่มงาน” เพื่อลงงานใหม่" : ""}
           </Typography>
           {cur.k === "upcoming" && canAdd && (
-            <Button startIcon={<Add />} onClick={onAdd} sx={{ mt: 1.5, textTransform: "none", fontWeight: 800 }}>เพิ่มงาน</Button>
+            <Button startIcon={<Add />} onClick={onAdd} sx={{ mt: 1.5, textTransform: "none", fontWeight: 800, color: RED }}>เพิ่มงาน</Button>
           )}
         </Box>
       ) : cur.k === "follow" ? (
@@ -270,7 +270,7 @@ export default function TechAgenda({ events, onOpen, onAdd, canAdd = true, tab, 
         groupByDay(list, dayOf).map(([day, rs]) => <DayGroup key={day} day={day} rows={rs} onOpen={onOpen} />)
       )}
 
-      <ListPager {...pg} />
+      <ListPager {...pg} accent={RED} />
     </Box>
   );
 }
