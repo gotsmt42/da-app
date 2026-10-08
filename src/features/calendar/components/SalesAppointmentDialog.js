@@ -234,8 +234,8 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
   })();
 
   const checklist = primary ? [
-    { ok: !needPhoto, text: `รูปหน้างาน (${photos.length} รูป)` },
-    ...(primary.next === "ปิดงานแล้ว" ? [{ ok: !needResult, text: "สรุปผลการเข้าพบ" }] : []),
+    { key: "photo", ok: !needPhoto, text: needPhoto ? "ยังไม่ได้แนบรูปหน้างาน" : `แนบรูปหน้างานแล้ว ${photos.length} รูป` },
+    ...(primary.next === "ปิดงานแล้ว" ? [{ key: "result", ok: !needResult, text: needResult ? "ยังไม่ได้สรุปผลการเข้าพบ" : "สรุปผลการเข้าพบแล้ว" }] : []),
   ] : [];
 
   return (
@@ -471,15 +471,23 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
       {/* ── ปุ่มล่าง ── */}
       {ev && canAct && (
         <Box sx={{ px: 2.5, py: 1.5, borderTop: `1px solid ${LINE}`, bgcolor: "#fff", flexShrink: 0 }}>
+          {/* ✅ (8 ต.ค. 2569 "ตรงนี้ดูสับสน คืออะไรให้ชัดเจน") บอกเป็นประโยคว่าก่อนกดปุ่มต้องทำอะไร และแต่ละข้อทำแล้วหรือยัง */}
           {primary && checklist.some((c) => !c.ok) && (
-            <Stack direction="row" spacing={1.5} useFlexGap flexWrap="wrap" sx={{ mb: 1 }}>
+            <Stack direction="row" alignItems="center" spacing={0.75} useFlexGap flexWrap="wrap"
+              sx={{ mb: 1.25, px: 1.25, py: 0.9, borderRadius: 2, bgcolor: "#fffbeb", border: "1px solid #fde68a" }}>
+              <Typography sx={{ fontSize: "0.78rem", fontWeight: 800, color: "#92400e", mr: 0.25 }}>
+                ก่อนกด “{primary.label}” ต้องทำให้ครบ:
+              </Typography>
               {checklist.map((c) => (
-                <Stack key={c.text} direction="row" spacing={0.5} alignItems="center">
-                  <Box sx={{ width: 16, height: 16, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", bgcolor: c.ok ? GREEN : "#fff", border: `1.5px solid ${c.ok ? GREEN : "#cbd5e1"}` }}>
-                    {c.ok && <CheckCircle sx={{ fontSize: 14, color: "#fff" }} />}
-                  </Box>
-                  <Typography sx={{ fontSize: "0.74rem", fontWeight: 700, color: c.ok ? INK_2 : "#b45309" }}>{c.text}</Typography>
-                </Stack>
+                <Box key={c.key} component="span"
+                  sx={{
+                    display: "inline-flex", alignItems: "center", gap: 0.5, height: 24, px: 1, borderRadius: 99,
+                    fontSize: "0.74rem", fontWeight: 800, whiteSpace: "nowrap",
+                    bgcolor: c.ok ? "#dcfce7" : "#fff", color: c.ok ? "#15803d" : "#b45309",
+                    border: `1px solid ${c.ok ? "#bbf7d0" : "#fcd34d"}`,
+                  }}>
+                  {c.ok ? "✓" : "✕"} {c.text}
+                </Box>
               ))}
             </Stack>
           )}
