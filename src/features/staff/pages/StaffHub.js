@@ -25,10 +25,12 @@ const StaffHub = () => {
   const isAdmin = can(userData, "manageAll");
   const isAdminOrManager = can(userData, "manageMasterData");
 
-  if (!isAdminOrManager) return <Navigate to="/dashboard" replace />;
+  // ✅ (8 ต.ค. 2569) Role ผู้ดูแลระบบ (manageAll) เข้าทะเบียนพนักงาน/บัญชีผู้ใช้ได้เสมอ ไม่ขึ้นกับตำแหน่ง ·
+  //    แท็บภาระงานทีมช่างเป็นสิทธิ์ทำงาน (ข้อมูลหลักของ Rank)
+  if (!isAdminOrManager && !isAdmin) return <Navigate to="/dashboard" replace />;
 
   const tabs = [
-    {
+    isAdminOrManager && {
       key: "workload",
       label: "ภาระงานทีมช่าง",
       icon: <InsertChart sx={{ fontSize: 18 }} />,

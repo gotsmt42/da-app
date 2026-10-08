@@ -36,11 +36,25 @@ export const reloadForFreshBuild = () => {
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * ✅ (8 ต.ค. 2569 ผู้ใช้: "บางทีหน้าก็โหลดไม่มาเลย ค้าง 'กำลังโหลด…' ต้องรีเฟรช")
+ * โหลดไฟล์ที่ "ค้าง" (ไม่สำเร็จและไม่ล้ม — เน็ตมือถือหลุดกลางทาง / เครือข่ายในออฟฟิศ) เดิมรอตลอดไป
+ * ตอนนี้ถือว่าล้มเมื่อเกิน 20 วินาที → เข้าขั้นตอนเดียวกับโหลดไม่สำเร็จ (รีโหลดให้เอง 1 ครั้ง / ปุ่ม "โหลดใหม่")
+ */
+// โหมด dev (เปิดผ่าน LAN จากมือถือ) โหลดไฟล์ทีละหลายร้อยตัวแบบไม่บีบอัด — เผื่อเวลามากกว่า
+const IMPORT_TIMEOUT_MS = import.meta.env.DEV ? 60_000 : 20_000;
+const TIMEOUT_MSG = "ChunkLoadError: Loading chunk timeout";
+const withTimeout = (promise) => new Promise((resolve, reject) => {
+  const t = setTimeout(() => reject(new Error(TIMEOUT_MSG)), IMPORT_TIMEOUT_MS);
+  promise.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
+});
+
 export const importWithRetry = async (factory, retries = 2) => {
   try {
-    return await factory();
+    return await withTimeout(factory());
   } catch (err) {
-    if (retries > 0) {
+    // ⚠️ ค้างจนหมดเวลา = ลองซ้ำไม่ช่วย (เบราว์เซอร์จำ import เดิมที่ยังค้างอยู่) → ไปรีโหลดเลย
+    if (retries > 0 && err?.message !== TIMEOUT_MSG) {
       await wait(retries === 2 ? 400 : 1200);
       return importWithRetry(factory, retries - 1);
     }

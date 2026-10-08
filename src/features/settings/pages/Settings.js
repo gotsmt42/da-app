@@ -88,6 +88,7 @@ export default function Settings() {
   const navigate = useNavigate();
   const isAdmin = can(userData, "manageAll");
   const isSuperAdmin = can(userData, "manageSystem");
+  const canMasterData = can(userData, "manageMasterData");
 
   // ── การแจ้งเตือน ──
   const [pushSubscribed, setPushSubscribed] = useState(false);
@@ -227,11 +228,13 @@ export default function Settings() {
       </Group>
 
       {/* ── ข้อมูลหลัก ── */}
-      {isAdmin && (
+      {/* ✅ (8 ต.ค. 2569) แต่ละแถวโชว์ตามสิทธิ์ที่ใช้เปิดหน้านั้นจริง — เดิมโชว์ทั้งกลุ่มตาม Role แล้วกดเข้าไปโดนเด้งกลับ
+          บัญชีผู้ใช้ = สิทธิ์ระบบ (Role) · ลูกค้า/ประเภทงาน = สิทธิ์ทำงาน “จัดการข้อมูลหลัก” (Rank) */}
+      {(isAdmin || canMasterData) && (
         <Group title="ข้อมูลหลัก" hint="ทะเบียนที่ทั้งระบบหยิบไปใช้">
-          <Row icon={<BusinessOutlined />} title={dest("customers").title} desc="ทะเบียนลูกค้าและผู้ติดต่อ · ใช้เลือกตอนเปิดงานและออกเอกสาร" onClick={() => navigate(dest("customers").href)} />
-          <Row icon={<GroupOutlined />} title="พนักงาน" desc="ทะเบียนพนักงาน · บัญชีผู้ใช้ · ตำแหน่งในองค์กรของแต่ละคน" onClick={() => navigate(dest("staff").href)} />
-          <Row icon={<LocalOfferOutlined />} title={dest("worktype").title} desc={DEST.worktype.sub} onClick={() => navigate(dest("worktype").href)} />
+          {canMasterData && <Row icon={<BusinessOutlined />} title={dest("customers").title} desc="ทะเบียนลูกค้าและผู้ติดต่อ · ใช้เลือกตอนเปิดงานและออกเอกสาร" onClick={() => navigate(dest("customers").href)} />}
+          <Row icon={<GroupOutlined />} title={isAdmin ? "พนักงานและบัญชีผู้ใช้" : "ภาระงานทีมช่าง"} desc={isAdmin ? "ทะเบียนพนักงาน · เพิ่ม/แก้บัญชีผู้ใช้ · ตำแหน่งในองค์กรของแต่ละคน" : "งานที่ช่างแต่ละคนถืออยู่"} onClick={() => navigate(isAdmin ? "/staff?tab=registry" : dest("staff").href)} />
+          {canMasterData && <Row icon={<LocalOfferOutlined />} title={dest("worktype").title} desc={DEST.worktype.sub} onClick={() => navigate(dest("worktype").href)} />}
         </Group>
       )}
 

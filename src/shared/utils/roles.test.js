@@ -190,41 +190,28 @@ describe("ตัวช่วยอื่น", () => {
 
 describe("ความถูกต้องของตารางเอง", () => {
   it("ทุกสิทธิ์ต้องมีอย่างน้อย 1 role ทำได้ (ไม่งั้นคือฟีเจอร์ที่ตายตั้งแต่เกิด)", () => {
-    // ✅ ยกเว้นสิทธิ์ที่ผู้ใช้สั่งให้ Super Admin เท่านั้น (ว่างโดยเจตนา — Super Admin ผ่านทุกสิทธิ์)
-    const SUPER_ONLY = ["manageWebsite", "viewLeads"];
     Object.entries(CAPABILITIES).forEach(([capability, roles]) => {
-      if (SUPER_ONLY.includes(capability)) return;
       expect(roles.length, capability).toBeGreaterThan(0);
     });
   });
 
-  it("เว็บไซต์บริษัท: Super Admin เท่านั้น — เซล/แอดมินที่ไม่ใช่ Super Admin ใช้ไม่ได้", () => {
+  it("Role ในระบบ = ตั้งค่าระบบเท่านั้น · สิทธิ์ทำงานทุกตัวมาจาก Rank (ผู้ใช้สั่ง 8 ต.ค. 2569)", () => {
     const superTech = { rank: "technician", role: "superadmin" };
     const plainAdmin = { rank: "admin", role: "admin" };
-    const sale = { rank: "sale", role: "member" };
-    expect(can(superTech, "manageWebsite")).toBe(true);
-    expect(can(superTech, "viewLeads")).toBe(true);
-    expect(can(plainAdmin, "manageWebsite")).toBe(false);
-    // ✅ Admin ในระบบจัดการคำขอจากลูกค้าได้ (ผู้ใช้สั่ง) — ไม่ว่าตำแหน่งในองค์กรไหน
-    expect(can(plainAdmin, "viewLeads")).toBe(true);
-    expect(can({ rank: "director", role: "admin" }, "viewLeads")).toBe(true);
-    expect(can(sale, "viewLeads")).toBe(false);
-  });
-
-  it("Super Admin = สิทธิ์ดูแลระบบ · สิทธิ์ทำงานตามตำแหน่ง (ช่างเทคนิคที่เป็น Super Admin แก้งานคนอื่นไม่ได้)", () => {
-    const superTech = { rank: "technician", role: "superadmin" };
-    // ดูแลระบบได้ครบ
-    ["manageSystem", "manageAll", "manageMasterData", "manageWebsite", "viewLeads"].forEach((c) => expect(can(superTech, c), c).toBe(true));
-    // 🐛 ผู้ใช้แจ้ง: "ทำไมช่างเทคนิคยังแก้ไขงานของคนอื่นได้" — งานของคนอื่นต้องเป็นของตำแหน่งที่มีสิทธิ์เท่านั้น
-    ["editAnyJob", "approveJobs", "viewAllJobs", "editContracts", "editDocuments", "editFinance", "assignDispatch"].forEach((c) => expect(can(superTech, c), c).toBe(false));
-    // ส่วนสิทธิ์ที่ช่างเทคนิคมีอยู่แล้วตามตำแหน่ง ยังได้ตามปกติ
+    // ตั้งค่าระบบได้
+    ["manageSystem", "manageAll"].forEach((c) => expect(can(superTech, c), c).toBe(true));
+    // สิทธิ์ทำงาน — ตำแหน่งช่างเทคนิคไม่ได้ติ๊ก = ใช้ไม่ได้ แม้เป็น Super Admin
+    ["manageMasterData", "manageWebsite", "viewLeads", "editAnyJob", "approveJobs", "viewAllJobs", "editContracts", "editDocuments", "editFinance", "assignDispatch", "approveExpense"]
+      .forEach((c) => expect(can(superTech, c), c).toBe(false));
+    // ส่วนที่ตำแหน่งช่างเทคนิคมีอยู่แล้ว ยังได้ตามปกติ
     ["viewContracts", "viewDocuments", "requestExpense", "receiveDispatch"].forEach((c) => expect(can(superTech, c), c).toBe(true));
-    // ผู้จัดการที่เป็น Super Admin ได้สิทธิ์ทำงานจากตำแหน่งตามปกติ
     expect(can({ rank: "manager", role: "superadmin" }, "editAnyJob")).toBe(true);
-    expect(can(superTech, "approveExpense")).toBe(false);
+    // Admin ในระบบไม่ได้คำขอจากเว็บไซต์อัตโนมัติอีกแล้ว
+    expect(can(plainAdmin, "viewLeads")).toBe(false);
+    expect(can({ rank: "sale", role: "member" }, "viewLeads")).toBe(false);
+    // จัดการผู้ใช้ (สิทธิ์ระบบ) ยังเป็นของ Role
     expect(canAssignRole(superTech, ROLES.DIRECTOR)).toBe(true);
     expect(canManageUserOfRole(superTech, ROLES.DIRECTOR)).toBe(true);
-    // Admin ในระบบที่ไม่ใช่ Super Admin ยังติดลำดับชั้นเหมือนเดิม
     expect(canAssignRole({ rank: "admin", role: "admin" }, ROLES.MANAGER)).toBe(false);
   });
 
