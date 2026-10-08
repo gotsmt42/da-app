@@ -14,7 +14,7 @@ import "@/shared/utils/momentThaiLocale";
 import { Box, Stack, Typography, Button, ButtonBase } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
-  Add, ViewAgendaOutlined, CalendarMonthOutlined, PhotoCameraOutlined, ChevronRight, EventAvailableOutlined,
+  Add, FileDownloadOutlined, ViewAgendaOutlined, CalendarMonthOutlined, PhotoCameraOutlined, ChevronRight, EventAvailableOutlined,
 } from "@mui/icons-material";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, PRIMARY_BTN_SX } from "@/shared/ui/PageKit";
@@ -54,7 +54,7 @@ export const salesSummary = (events) => {
   };
 };
 
-function Kpi({ label, value, color = INK, onClick, active }) {
+export function Kpi({ label, value, color = INK, onClick, active }) {
   return (
     <ButtonBase onClick={onClick} disabled={!onClick}
       sx={{
@@ -68,7 +68,7 @@ function Kpi({ label, value, color = INK, onClick, active }) {
 }
 
 /** หัวหน้าตารางนัดหมาย */
-export function SalesTopBar({ events, onAdd, onTab, title = "ตารางนัดหมาย", sub }) {
+export function SalesTopBar({ events, onAdd, onTab, onExport, exportDisabled, title = "ตารางนัดหมาย", sub }) {
   const s = useMemo(() => salesSummary(events), [events]);
   return (
     <Box sx={{ mb: { xs: 1, sm: 1.5 } }}>
@@ -80,6 +80,12 @@ export function SalesTopBar({ events, onAdd, onTab, title = "ตารางน�
           <Typography sx={{ fontWeight: 900, fontSize: { xs: "1rem", sm: "1.15rem" }, color: INK, lineHeight: 1.25 }}>{title}</Typography>
           <Typography noWrap sx={{ fontSize: { xs: "0.72rem", sm: "0.78rem" }, color: MUTED }}>{sub || "นัดเข้าพบลูกค้า · สำรวจหน้างาน · นำเสนอ · ติดตามผล"}</Typography>
         </Box>
+        {onExport && (
+          <Button variant="outlined" onClick={onExport} disabled={exportDisabled} startIcon={<FileDownloadOutlined />}
+            sx={{ display: { xs: "none", sm: "inline-flex" }, textTransform: "none", fontWeight: 800, borderRadius: 2, color: "#15803d", borderColor: "#bbf7d0", "&:hover": { borderColor: "#16a34a", bgcolor: "#f0fdf4" } }}>
+            Excel
+          </Button>
+        )}
         <Button variant="contained" startIcon={<Add />} onClick={onAdd} sx={{ ...PRIMARY_BTN_SX, px: { xs: 1.25, sm: 2 }, py: { xs: 0.5, sm: 0.75 }, fontSize: { xs: "0.82rem", sm: "0.875rem" } }}>
           <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>เพิ่มนัดหมาย</Box>
           <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>เพิ่ม</Box>
@@ -90,7 +96,7 @@ export function SalesTopBar({ events, onAdd, onTab, title = "ตารางน�
         <Kpi label="นัดวันนี้" value={s.today} color={ACCENT} onClick={() => onTab("upcoming")} />
         <Kpi label="เลยวันนัด" value={s.overdue} color={AMBER} onClick={() => onTab("follow")} />
         <Kpi label="รอปิดงาน" value={s.toClose} color={TEAL} onClick={() => onTab("follow")} />
-        <Box sx={{ flex: 1, minWidth: 0, display: { xs: "none", sm: "block" } }}>
+        <Box sx={{ flex: 1, minWidth: 0, display: { xs: "none", sm: "flex" } }}>
           <Kpi label="ปิดงานเดือนนี้" value={s.closedMonth} color={GREEN} onClick={() => onTab("history")} />
         </Box>
       </Stack>

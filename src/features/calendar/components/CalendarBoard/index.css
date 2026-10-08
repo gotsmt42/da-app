@@ -2042,7 +2042,8 @@
   display: block; padding: 0 !important; margin: 0 3px !important;
   min-height: 0 !important; max-height: none !important; overflow: hidden !important;
   border-radius: 8px !important; border-width: 0 !important;
-  font-size: 12px !important; line-height: 1.3 !important;
+  /* ✅ (8 ต.ค. 2569 "หน้าจอคอมให้ขยายขนาดขึ้น หน้าจอเล็กใช้เท่านี้") คอม 14px · แท็บเล็ต 12px · มือถือ 8px (ด้านล่าง) */
+  font-size: 14px !important; line-height: 1.3 !important;
   font-family: inherit;
   box-shadow: 0 1px 2px rgba(15, 23, 42, .12);
 }
@@ -2050,14 +2051,17 @@
 
 .ec-sc { display: flex; flex-direction: column; gap: 2px; width: 100%; min-width: 0; padding: 5px 7px 6px; text-align: left; color: #fff; }
 /* 1) ประเภทนัด — ป้ายขาว ตัวหนังสือสีประจำประเภท (เด่นสุด) */
-.ec-sc-type { align-self: flex-start; max-width: 100%; padding: 0 6px; border-radius: 5px; background: #fff; font-size: .68em; font-weight: 800; line-height: 1.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ec-sc-type { align-self: flex-start; max-width: 100%; padding: 0 6px; border-radius: 5px; background: #fff; font-size: .74em; font-weight: 800; line-height: 1.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* 2) สถานที่/โครงการ — ตัวหนา (เนื้อหาหลัก) */
-.ec-sc-site { font-size: .82em; font-weight: 800; line-height: 1.3; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ec-sc-site { font-size: .92em; font-weight: 800; line-height: 1.3; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 /* 3) เวลา · สถานะ — ตัวเล็ก (รอง) */
-.ec-sc-meta { font-size: .72em; font-weight: 600; opacity: .9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.ec-sc-meta { font-size: .78em; font-weight: 600; opacity: .9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 .ec-sc-status { font-weight: 800; opacity: 1; }
 .ec-sc--off .ec-sc-site { text-decoration: line-through; }
 
+@media (min-width: 769px) and (max-width: 1200px) {
+  .modern-calendar-container .calendar-wrapper.ec-sales .fc-daygrid-event { font-size: 12px !important; }
+}
 @media (max-width: 768px) {
   /* คอลัมน์มือถือแคบ (~50px) — ตัวหนังสืออ่านออก ไม่เว้นขอบ · ชื่อสถานที่ได้ 3 บรรทัด · ป้ายสถานะเหลือเครื่องหมาย */
   .modern-calendar-container .calendar-wrapper.ec-sales .fc-daygrid-event {
@@ -2099,5 +2103,39 @@
   .ec-sales-page .ec-sc-site { font-size: .84em; }
   .ec-sales-page .ec-sales-legend { padding: 8px 10px; }
   .ec-sales-page .ec-sales-legend-item { font-size: 11px; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   แถบเครื่องมือจอใหญ่ (8 ต.ค. 2569 ผู้ใช้: "การค้นหา และ select ต่างๆ จัดวางใหม่ให้สมบูรณ์")
+     ≥1281px  แถวเดียว:  [รายการ|ปฏิทิน] [🔍 ค้นหา (กว้างสุด)] [ตัวกรอง][ตัวกรอง][ตัวกรอง] [ไอคอนคำสั่ง]
+     ≤1280px  2 แถว:     [รายการ|ปฏิทิน] [🔍 ค้นหา .................] [ไอคอนคำสั่ง]
+                          [ตัวกรอง][ตัวกรอง][ตัวกรอง][ตัวกรอง]   ← เต็มความกว้าง กว้างเท่ากัน
+   หลักเกณฑ์: ทุกช่องสูง 40px เท่ากัน · ชิดขอบซ้าย-ขวาเท่าการ์ดตัวเลขด้านบน · ไม่มีช่องว่างลอยกลางแถว
+   ⚠️ ปุ่ม Excel ย้ายไปอยู่ข้างปุ่ม "เพิ่ม..." บนหัวหน้าแล้ว · ปุ่มคำสั่งเหลือไอคอน (ชื่อเต็มอยู่ใน title)
+   ⚠️ ใช้ order + ตัวตัดบรรทัด (.tb-break) ไม่ได้ย้าย DOM — มือถือยังเป็นแถวเดียวกะทัดรัดเหมือนเดิม
+   ══════════════════════════════════════════════════════════════════════════ */
+.tb-spacer, .tb-break { display: none; }
+.ec-wide-toolbar .event-toolbar-row { flex-wrap: wrap; row-gap: 10px; column-gap: 10px; }
+.ec-wide-toolbar .event-toolbar-row > .tb-view { order: 1; }
+.ec-wide-toolbar .event-toolbar-row > .event-search-input { order: 2; flex: 2 1 220px; min-width: 200px; height: 40px; box-sizing: border-box; }
+.ec-wide-toolbar .event-toolbar-row > .event-filter-inline {
+  order: 3; flex: 3 1 0; min-width: 0;
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px;
+}
+.ec-wide-toolbar .event-toolbar-row > .filter-toggle-btn,
+.ec-wide-toolbar .event-toolbar-row > .toolbar-icon-btn { order: 4; width: 40px; padding: 0; }
+.ec-wide-toolbar .event-toolbar-row > .filter-toggle-btn .tb-label,
+.ec-wide-toolbar .event-toolbar-row > .toolbar-icon-btn .tb-label { display: none; }
+.ec-wide-toolbar .event-filter-inline .event-filter-msel { width: 100%; max-width: none; min-width: 0; }
+.ec-wide-toolbar .event-filter-inline .event-filter-clear { order: 0; }
+.ec-wide-toolbar .tb-view { display: flex; }
+.ec-wide-toolbar .tb-view > div { height: 40px; box-sizing: border-box; align-items: center; }
+.ec-wide-toolbar .tb-view .MuiButtonBase-root { height: 34px; }
+@media (max-width: 1280px) {
+  .ec-wide-toolbar .event-toolbar-row > .event-search-input { flex: 1 1 220px; }
+  .ec-wide-toolbar .event-toolbar-row > .filter-toggle-btn,
+  .ec-wide-toolbar .event-toolbar-row > .toolbar-icon-btn { order: 3; }
+  .ec-wide-toolbar .event-toolbar-row > .tb-break { display: block; order: 4; flex-basis: 100%; height: 0; }
+  .ec-wide-toolbar .event-toolbar-row > .event-filter-inline { order: 5; flex: 1 1 100%; }
 }
 

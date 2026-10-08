@@ -26,7 +26,6 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"; // Import Font
 
 import {
   faClockRotateLeft,
-  faFileExcel,
 
   faHourglassHalf,
   faCheck,
@@ -83,6 +82,7 @@ import DeliveryNoteDialog from "@/features/documents/components/DeliveryNoteDial
 import WorkNoticeDialog from "@/features/documents/components/WorkNoticeDialog";
 import SalesAppointmentDialog from "../SalesAppointmentDialog";
 import SalesAgenda, { SalesTopBar, SalesViewToggle } from "../SalesAgenda";
+import TechAgenda, { TechTopBar } from "../TechAgenda";
 import { getSaveEventToDB } from "../EventForms/SaveEvent";
 import { getEventDrop } from "../EventForms/EventDrop";
 import { getEventResize } from "../EventForms/EventResize";
@@ -1139,6 +1139,27 @@ function EventCalendar() {
     if (v === "calendar") setTimeout(() => calendarRef.current?.getApi()?.updateSize(), 60);
   };
   const salesListMode = isSalesView && salesView === "list";
+  // ✅ (8 ต.ค. 2569 "ทำหน้าแบบนี้ของช่างด้วย") ตารางงานช่างมี 2 มุมมองเหมือนกัน — จำค่าแยกจากของฝ่ายขาย
+  const [techView, setTechViewState] = useState(() => {
+    try { const v = localStorage.getItem("tt-tech-view"); if (v === "list" || v === "calendar") return v; } catch { /* ข้าม */ }
+    return window.innerWidth < 768 ? "list" : "calendar";
+  });
+  const [techTab, setTechTab] = useState("upcoming");
+  const setTechView = (v) => {
+    setTechViewState(v);
+    try { localStorage.setItem("tt-tech-view", v); } catch { /* ข้าม */ }
+    if (v === "calendar") setTimeout(() => calendarRef.current?.getApi()?.updateSize(), 60);
+  };
+  const techListMode = !isSalesView && techView === "list";
+  const listMode = salesListMode || techListMode;
+  /** เปิดงานช่างจากมุมมองรายการ — ใช้ EventApi จริงของ FullCalendar (ฟอร์มแก้ไขเรียก setExtendedProp) */
+  const openTechFromList = (id) => {
+    const api = calendarRef.current?.getApi();
+    const fcEv = api?.getEventById(String(id));
+    if (!fcEv) return;
+    if (!canViewEvent(fcEv.extendedProps)) { Swal.fire("❌ คุณไม่มีสิทธิ์ดูแผนงานนี้"); return; }
+    handleEditEvent({ event: fcEv });
+  };
   /** ฟอร์มแก้ไขข้อมูลนัด (วัน/เวลา/สถานที่/ประเภท) — เปิดจากหน้ารายละเอียดนัด */
   const openSalesEditForm = async (ev) => {
     setSalesDialogId(null);
@@ -3176,7 +3197,20 @@ function EventCalendar() {
           events={filteredCalendarEvents}
           onAdd={() => handleAddEvent({ dateStr: moment().format("YYYY-MM-DD") })}
           onTab={(t) => { setSalesView("list"); setSalesTab(t); }}
+          onExport={handleExportExcel}
+          exportDisabled={exportingExcel || filteredCalendarEvents.length === 0}
           title={viewingSalesCalendar ? "ตารางนัดหมายฝ่ายขาย" : "นัดหมายของฉัน"}
+        />
+      )}
+      {!isSalesView && (
+        <TechTopBar
+          events={filteredCalendarEvents}
+          canAdd={!isServiceObserver}
+          onAdd={() => handleAddEvent({ dateStr: moment().format("YYYY-MM-DD") })}
+          onTab={(t) => { setTechView("list"); setTechTab(t); }}
+          onExport={handleExportExcel}
+          exportDisabled={exportingExcel || filteredCalendarEvents.length === 0}
+          title={isServiceObserver ? "ตารางงานช่าง (ดูอย่างเดียว)" : "ตารางงานช่าง"}
         />
       )}
 
@@ -3194,12 +3228,19 @@ function EventCalendar() {
         {isWideToolbar && <div className="event-filter-inline">{filterFields}</div>}
 
         {/* ✅ ตารางเซล: ปุ่มสลับ รายการ/ปฏิทิน อยู่แถวเดียวกับช่องค้นหา (ไม่แยกเป็นแถวใหญ่อีกแถว) */}
-        {isSalesView && <SalesViewToggle view={salesView} onView={setSalesView} />}
+        <div className="tb-view">
+          {isSalesView
+            ? <SalesViewToggle view={salesView} onView={setSalesView} />
+            : <SalesViewToggle view={techView} onView={setTechView} />}
+        </div>
+        {/* จอใหญ่: แถว 1 = มุมมอง ......... ปุ่มคำสั่ง · แถว 2 = ค้นหา + ตัวกรอง (ดู .ec-wide-toolbar ใน index.css) */}
+        <div className="tb-spacer" />
+        <div className="tb-break" />
 
         {/* ✅ กาง/ย่อรายละเอียดของการ์ดงานทั้งหมดในหน้าจอนี้ทีเดียว — ค่าเริ่มต้นคือ "ย่อ" เพื่อให้
             ปฏิทินอ่านง่าย (ดูเหตุผลเต็มที่ expandedCardIds) แล้วกดปุ่มนี้ตอนต้องการดูรายละเอียดครบทุกใบ
             ⚠️ ไม่ทำเป็นการตั้งค่าค้างถาวร — เป็นการสลับมุมมองชั่วคราวของการดูรอบนี้เท่านั้น */}
-        {!isSalesView && (
+        {!isSalesView && !techListMode && (
         <button
           className={`filter-toggle-btn ${allCardsExpanded ? "filter-toggle-btn--open" : ""}`}
           onClick={toggleAllCards}
@@ -3228,7 +3269,7 @@ function EventCalendar() {
         {!isSalesView && !isServiceObserver && (
           <button
             className={`filter-toggle-btn ${showDraftsPanel ? "filter-toggle-btn--open" : ""} ${visibleDrafts.length > 0 ? "filter-toggle-btn--active" : ""}`}
-            onClick={() => setShowDraftsPanel((p) => !p)}
+            onClick={() => { if (techListMode) setTechView("calendar"); setShowDraftsPanel((p) => !p); }}
             title="งานวางแผนล่วงหน้า (ยังไม่ลงตาราง)"
           >
             <FontAwesomeIcon icon={faClipboardList} />
@@ -3263,7 +3304,7 @@ function EventCalendar() {
             ครบเหมือนเดิม (ดู generateWorkPermitPDF ที่ส่งเข้า getEditEvent) */}
         {/* ✅ โหมดคนตาบอด (ผู้ใช้สั่ง: "ไว้ข้างซ้ายปุ่ม Excel") — ปุ่มแยกของตัวเอง ไม่ใช่ปุ่มตัวกรอง
             เปิดอยู่ = พื้นดำ ไอคอนตาปิด ให้เห็นชัดว่ากำลังดูแบบขาวดำ */}
-        {!isSalesView && (
+        {!isSalesView && !listMode && (
         <button
           className={`toolbar-icon-btn toolbar-icon-btn--gray${grayMode ? " toolbar-icon-btn--gray-on" : ""}`}
           onClick={toggleGrayMode}
@@ -3277,21 +3318,7 @@ function EventCalendar() {
         )}
 
         {/* ตารางเซลบนมือถือไม่โชว์ปุ่ม Excel (ใช้บนคอมเป็นหลัก) — ลดปุ่มในแถวให้เหลือเท่าที่จำเป็น */}
-        {(!isSalesView || isWideToolbar) && (
-        <button
-          className="toolbar-icon-btn toolbar-icon-btn--excel"
-          onClick={handleExportExcel}
-          disabled={exportingExcel || filteredCalendarEvents.length === 0}
-          title={
-            filteredCalendarEvents.length === 0
-              ? "ไม่มีข้อมูลให้ส่งออก"
-              : `ส่งออก ${filteredCalendarEvents.length} รายการที่กรองอยู่เป็นไฟล์ Excel (.xlsx)`
-          }
-        >
-          <FontAwesomeIcon icon={faFileExcel} />
-          <span className="tb-label">Excel</span>
-        </button>
-        )}
+        {/* ✅ (8 ต.ค. 2569) ปุ่ม Excel ย้ายไปอยู่ข้างปุ่ม "เพิ่ม..." บนหัวหน้า (ดู SalesTopBar/TechTopBar) */}
       </div>
 
       {/* ✅ แถบแจ้ง "กำลังคัดลอกงาน" — โชว์ตราบใดที่ clipboardEvent ยังมีค่าอยู่ (ค้างได้จนกว่าจะกด
@@ -3338,11 +3365,21 @@ function EventCalendar() {
           onTab={setSalesTab}
         />
       )}
+      {techListMode && (
+        <TechAgenda
+          events={filteredCalendarEvents}
+          onOpen={openTechFromList}
+          onAdd={() => handleAddEvent({ dateStr: moment().format("YYYY-MM-DD") })}
+          canAdd={!isServiceObserver}
+          tab={techTab}
+          onTab={setTechTab}
+        />
+      )}
 
       {/* ⚠️ โหมดรายการของเซล: ซ่อนปฏิทินไว้แต่ยัง mount อยู่ (โค้ดหลายส่วนผูกกับ DOM ของ FullCalendar) */}
       <div
         className={`calendar-layout ${showDraftsPanel && !isSalesView ? "calendar-layout--with-drafts" : ""}${grayMode && !isSalesView ? " calendar-layout--gray" : ""}`}
-        style={salesListMode ? { display: "none" } : undefined}
+        style={listMode ? { display: "none" } : undefined}
       >
         {/* ⚠️ กันซ้ำอีกชั้น (ปุ่มเปิดถูกซ่อนไปแล้วด้านบน) เผื่อ showDraftsPanel ยังค้างค่า true
             จากตอนอยู่ปฏิทินช่างก่อนสลับมา — คนละ query string บนหน้าเดียวกัน ไม่ได้ remount */}
@@ -4234,7 +4271,7 @@ function EventCalendar() {
               </div>
             </details>
           )
-        ) : (
+        ) : listMode ? null : (
         <div className="ec-legend-panel">
           <div className="ec-legend-group">
             <div className="ec-legend-group-title">สถานะงาน</div>

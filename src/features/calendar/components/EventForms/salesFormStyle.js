@@ -110,6 +110,22 @@ export const SALES_FORM_CSS = `
     .sa-btn { padding: 11px 14px; }
   }
 
+  /* ✅ (8 ต.ค. 2569 ผู้ใช้: "หน้าเพิ่มนัดหมายในจอคอมให้ขยายให้เท่ากับของช่าง") — จอคอมกว้างเท่าฟอร์มงานช่าง
+     จัด 2 คอลัมน์: ซ้าย = ประเภทนัด + สถานะ · ขวา = ลูกค้า + วันเวลา · ล่างเต็มแถว = รายละเอียด
+     ⚠️ อิงลำดับการ์ด 5 ใบที่เหมือนกันทั้งฟอร์มเพิ่ม/แก้ไข (ประเภท · ลูกค้า · วันเวลา · สถานะ · รายละเอียด) */
+  @media (min-width: 1000px) {
+    .swal-sales-appt.swal2-popup { width: min(96vw, 1200px) !important; max-height: 95vh !important; }
+    #sa-body { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); column-gap: 14px; align-content: start; padding: 16px 20px 20px; }
+    #sa-body > .sa-card { margin-bottom: 14px; }
+    #sa-body > .sa-card:nth-child(1) { grid-column: 1; grid-row: 1 / span 2; }
+    #sa-body > .sa-card:nth-child(2) { grid-column: 2; grid-row: 1; }
+    #sa-body > .sa-card:nth-child(3) { grid-column: 2; grid-row: 2 / span 2; }
+    #sa-body > .sa-card:nth-child(4) { grid-column: 1; grid-row: 3; }
+    #sa-body > .sa-card:nth-child(5) { grid-column: 1 / span 2; grid-row: 4; }
+    #sa-header { padding: 18px 60px 16px 24px; }
+    #sa-action-bar { padding: 14px 24px; }
+  }
+
   /* ✅ (8 ต.ค. 2569 ผู้ใช้: "ทำให้มันเต็มหน้าจอมือถือ") — มือถือเปิดเต็มจอ ไม่มีขอบมน ไม่เหลือพื้นหลังรอบๆ */
   @media (max-width: 600px) {
     .swal2-container:has(.swal-sales-appt) { padding: 0 !important; }

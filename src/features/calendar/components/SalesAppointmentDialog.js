@@ -28,6 +28,7 @@ import { getOptimizedImageUrl } from "@/shared/utils/cloudinaryImage";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, PRIMARY_BTN_SX } from "@/shared/ui/PageKit";
 import { SALES_TYPE_META, salesStatusMeta, toSalesStatus } from "../salesAppointmentTypes";
+import SiteMapCard from "@/shared/ui/SiteMapCard";
 
 const GREEN = "#16a34a";
 const TEAL = "#0d9488";
@@ -236,8 +237,8 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
   ] : [];
 
   return (
-    <Dialog open={Boolean(eventId)} onClose={onClose} fullScreen={fullScreen} fullWidth maxWidth="sm"
-      PaperProps={{ sx: { borderRadius: fullScreen ? 0 : 3, overflow: "hidden", display: "flex", flexDirection: "column" } }}>
+    <Dialog open={Boolean(eventId)} onClose={onClose} fullScreen={fullScreen} fullWidth maxWidth="lg"
+      PaperProps={{ sx: { borderRadius: fullScreen ? 0 : 3, maxWidth: { md: 1120 }, overflow: "hidden", display: "flex", flexDirection: "column" } }}>
       {/* ── หัว ── */}
       <Box sx={{ px: 2.5, pt: 2, pb: 1.75, borderBottom: `1px solid ${LINE}`, bgcolor: "#fff", flexShrink: 0 }}>
         <Stack direction="row" spacing={1.5} alignItems="flex-start">
@@ -279,6 +280,10 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
               ) : <Stepper status={status} ev={ev} />}
             </Box>
 
+            {/* ✅ (8 ต.ค. 2569 "ขยายหน้านี้ · แบ่งส่วนที่ควรแบ่ง") จอคอม 2 คอลัมน์:
+                ซ้าย = ข้อมูลนัด + แผนที่หน้างาน · ขวา = รูปหน้างาน + ผลการเข้าพบ (สิ่งที่ฝ่ายขายต้องทำ) */}
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "minmax(0,1fr) minmax(0,1fr)" }, columnGap: 3, alignItems: "start" }}>
+            <Box sx={{ minWidth: 0 }}>
             <Section icon={<NotesOutlined />} title="ข้อมูลนัดหมาย"
               right={canAct && !locked && onEdit ? (
                 <Button size="small" startIcon={<EditOutlined sx={{ fontSize: 16 }} />} onClick={() => onEdit(ev)}
@@ -314,6 +319,15 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
               </Box>
             </Section>
 
+            {/* ── แผนที่หน้างาน (แบบเดียวกับฟอร์มงานช่าง) ── */}
+            {(ev.site || ev.company) && (
+              <Section icon={<PlaceOutlined />} title="แผนที่หน้างาน">
+                <SiteMapCard company={ev.company} site={ev.site} canEdit={isAdminOrManager} height={fullScreen ? 180 : 220} />
+              </Section>
+            )}
+            </Box>
+
+            <Box sx={{ minWidth: 0 }}>
             {/* ── รูปหน้างาน ── */}
             <Section icon={<PhotoCameraOutlined />} title={`รูปหน้างาน${photos.length ? ` · ${photos.length} รูป` : ""}`}
               hint={!cancelled ? "ต้องแนบอย่างน้อย 1 รูปก่อนบันทึก “เข้าพบแล้ว” และ “ปิดงาน”" : null}
@@ -396,6 +410,9 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
                 )}
               </Section>
             )}
+
+            </Box>
+            </Box>
 
             {(ev.visitedAt || ev.salesClosedAt) && (
               <Typography sx={{ mt: 1.75, fontSize: "0.72rem", color: MUTED, lineHeight: 1.7 }}>

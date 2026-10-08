@@ -183,7 +183,7 @@ export const getAddSalesAppointment = async ({
 
   await Swal.fire({
     html,
-    width: "640px",
+    width: "1200px",
     showConfirmButton: false,
     showCancelButton: false,
     showCloseButton: true,
