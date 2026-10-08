@@ -1,12 +1,4 @@
-import React, {
-  useState,
-  useEffect,
-  useRef,
-  useMemo,
-  useCallback,
-  lazy,
-  Suspense,
-} from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback, Suspense } from "react";
 import SelectField from "@/shared/ui/SelectField";
 import useRealtime from "@/shared/realtime/useRealtime";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -95,10 +87,11 @@ import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { isRole, ROLES, DEPARTMENT, TECHNICIAN_ROLES } from "@/shared/utils/roles";
 import { can } from "@/shared/utils/roles";
+import lazyWithRetry from "@/shared/utils/lazyWithRetry";
 
 // ⚠️ lazy — ฟอร์มใบเบิกใหญ่ (MUI Autocomplete/DatePicker/แนบไฟล์) และน้อยคนที่เปิดจากหน้าปฏิทิน ไม่ควรถ่วง
 // การโหลดหน้าปฏิทินซึ่งเป็นหน้าที่เปิดบ่อยที่สุดของแอป
-const ExpenseFormDialog = lazy(() => import("@/features/expenses/components/ExpenseFormDialog"));
+const ExpenseFormDialog = lazyWithRetry(() => import("@/features/expenses/components/ExpenseFormDialog"));
 
 // ✅ คำอธิบายสถานะแบบยาว (ใช้เป็น tooltip ของไอคอนสถานะบน event)
 const STATUS_DESCRIPTIONS = {

@@ -14,15 +14,16 @@
  * 🐛 ที่แก้ไปพร้อมกัน: เดิมเมนู "ติดตามใบเสนอราคา" ถูกโชว์ให้ช่างเห็นด้วย แต่ตัวหน้ากลับ redirect
  * ช่างออกไป /dashboard ทันทีที่กด = เมนูที่กดแล้วเด้งทิ้งทุกครั้ง ตอนนี้เมนูโชว์เฉพาะคนที่เข้าได้จริง
  */
-import { lazy } from "react";
+
 import { Navigate } from "react-router-dom";
 import { RequestQuote, AccountBalanceWallet } from "@mui/icons-material";
 import TabbedPage from "@/shared/ui/TabbedPage";
 import { useAuth } from "@/features/auth/AuthContext";
 import { can } from "@/shared/utils/roles";
+import lazyWithRetry from "@/shared/utils/lazyWithRetry";
 
-const QuotationTracking = lazy(() => import("./QuotationTracking"));
-const BillingTracking = lazy(() => import("./BillingTracking"));
+const QuotationTracking = lazyWithRetry(() => import("./QuotationTracking"));
+const BillingTracking = lazyWithRetry(() => import("./BillingTracking"));
 
 const FinanceHub = () => {
   const { userData } = useAuth();

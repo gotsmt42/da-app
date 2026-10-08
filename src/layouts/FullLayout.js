@@ -14,6 +14,7 @@ import PushService from "../shared/services/PushService";
 import "./FullLayout.css";
 import AppRebrandNotice from "@/shared/components/AppRebrandNotice";
 import InAppPushBanner from "@/shared/ui/InAppPushBanner";
+import AppErrorBoundary from "@/shared/ui/AppErrorBoundary";
 
 const FullLayout = () => {
   const sidebarRef = useRef(null);
@@ -259,7 +260,10 @@ const FullLayout = () => {
           >
             {/* ✅ แจ้งครั้งเดียวสำหรับคนที่ติดตั้งแอปไว้ก่อนเปลี่ยนชื่อ/ไอคอน (ดูเหตุผลใน AppRebrandNotice) */}
             <AppRebrandNotice />
-            <Outlet />
+            {/* ✅ error ในหน้าใดหน้าหนึ่ง → แสดงกล่อง "โหลดใหม่" เฉพาะเนื้อหา (เมนูยังใช้ได้) ไม่ใช่จอขาวทั้งแอป */}
+            <AppErrorBoundary variant="page" resetKey={location.pathname}>
+              <Outlet />
+            </AppErrorBoundary>
             <SpeedInsights />
           </Container>
 

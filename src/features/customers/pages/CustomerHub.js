@@ -11,15 +11,16 @@
  * CustomerOverview มี guard ในตัวที่ redirect ทั้งแอปไป /dashboard ถ้า role ไม่ผ่าน ถ้าเผลอ
  * mount ไว้จะเด้งออกทันทีแม้ผู้ใช้ไม่ได้เปิดแท็บนั้น (ดูคอมเมนต์ที่ TabbedPage)
  */
-import { lazy } from "react";
+
 import { Navigate } from "react-router-dom";
 import { Dashboard as DashboardIcon, ListAlt } from "@mui/icons-material";
 import TabbedPage from "@/shared/ui/TabbedPage";
 import { useAuth } from "@/features/auth/AuthContext";
 import { can } from "@/shared/utils/roles";
+import lazyWithRetry from "@/shared/utils/lazyWithRetry";
 
-const CustomerOverview = lazy(() => import("./CustomerOverview"));
-const Customer = lazy(() => import("./Customer"));
+const CustomerOverview = lazyWithRetry(() => import("./CustomerOverview"));
+const Customer = lazyWithRetry(() => import("./Customer"));
 
 const CustomerHub = () => {
   const { userData } = useAuth();

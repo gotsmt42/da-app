@@ -8,15 +8,16 @@
  *
  * ⚠️ เหตุผลที่ต้องกรองแท็บตามสิทธิ์ก่อน ไม่ใช่แค่ซ่อน — ดูคอมเมนต์ที่ CustomerHub/TabbedPage
  */
-import { lazy } from "react";
+
 import { Navigate } from "react-router-dom";
 import { InsertChart, ListAlt } from "@mui/icons-material";
 import TabbedPage from "@/shared/ui/TabbedPage";
 import { useAuth } from "@/features/auth/AuthContext";
 import { can } from "@/shared/utils/roles";
+import lazyWithRetry from "@/shared/utils/lazyWithRetry";
 
-const TeamWorkload = lazy(() => import("./TeamWorkload"));
-const Employee = lazy(() => import("./Employee"));
+const TeamWorkload = lazyWithRetry(() => import("./TeamWorkload"));
+const Employee = lazyWithRetry(() => import("./Employee"));
 
 const StaffHub = () => {
   const { userData } = useAuth();

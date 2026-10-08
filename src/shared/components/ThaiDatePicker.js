@@ -1,8 +1,9 @@
-import { Suspense, lazy } from "react";
+import { Suspense } from "react";
 import { TextField } from "@mui/material";
 import { CalendarToday } from "@mui/icons-material";
 import { InputAdornment } from "@mui/material";
 import { THAI_DATE_PLACEHOLDER, thaiDateNumeric } from "../utils/thaiDate";
+import lazyWithRetry from "@/shared/utils/lazyWithRetry";
 
 /**
  * ThaiDatePicker.js — ตัวห่อบางๆ ที่โหลด "ตัวปฏิทินจริง" แบบ lazy
@@ -18,7 +19,7 @@ import { THAI_DATE_PLACEHOLDER, thaiDateNumeric } from "../utils/thaiDate";
  * ⚠️ ระหว่างที่ยังโหลดไม่เสร็จต้องแสดงช่องหน้าตาเหมือนกันเป๊ะ (ขนาด/กรอบ/ค่าที่อ่านได้) ไม่งั้นเลย์เอาต์
  * จะกระตุกตอนสลับ — ดู FallbackField ด้านล่างที่แสดงค่าเป็น พ.ศ. ได้เองโดยไม่ต้องใช้โค้ดปฏิทินเลย
  */
-const Inner = lazy(() => import("./ThaiDatePickerInner"));
+const Inner = lazyWithRetry(() => import("./ThaiDatePickerInner"));
 
 /**
  * ช่องหน้าตาเหมือนของจริงระหว่างรอโหลด — อ่านค่าได้ทันที แต่ยังกดเปิดปฏิทินไม่ได้เสี้ยววินาทีแรก

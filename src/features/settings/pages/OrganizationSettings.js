@@ -155,6 +155,8 @@ const ImageSlot = ({ meta, value, busy, presets = [], onPick, onReset, onUsePres
             const active = value === b.url;
             return (
               <Tooltip key={b.key} title={active ? `ใช้ ${b.label} อยู่` : `ใช้ ${b.label}`} describeChild>
+                {/* ⚠️ ห่อ span — ปุ่มที่ disabled ไม่ส่ง event ให้ Tooltip (MUI เตือนใน console) */}
+                <span style={{ display: "inline-flex" }}>
                 <Box
                   component="button" type="button" disabled={busy || active}
                   onClick={() => onUsePreset(b.key)}
@@ -170,6 +172,7 @@ const ImageSlot = ({ meta, value, busy, presets = [], onPick, onReset, onUsePres
                   <Box component="img" src={b.url} alt={b.label}
                     sx={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
                 </Box>
+                </span>
               </Tooltip>
             );
           })}

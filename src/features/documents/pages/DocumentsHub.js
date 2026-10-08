@@ -13,15 +13,16 @@
  * ใบส่งมอบงาน) เซลเปิดเข้ามาก็เห็นแต่เอกสารของคนอื่น ส่วนเอกสารการค้าของเซล (ใบเสนอราคา/PO)
  * อยู่ในใบแจ้งงานที่เขาส่งเอง (features/dispatch)
  */
-import { lazy } from "react";
+
 import { Navigate } from "react-router-dom";
 import { FolderOpen, Description } from "@mui/icons-material";
 import TabbedPage from "@/shared/ui/TabbedPage";
 import { useAuth } from "@/features/auth/AuthContext";
 import { can } from "@/shared/utils/roles";
+import lazyWithRetry from "@/shared/utils/lazyWithRetry";
 
-const Files = lazy(() => import("./Files"));
-const IssuedDocuments = lazy(() => import("./IssuedDocuments"));
+const Files = lazyWithRetry(() => import("./Files"));
+const IssuedDocuments = lazyWithRetry(() => import("./IssuedDocuments"));
 
 const DocumentsHub = () => {
   const { userData } = useAuth();

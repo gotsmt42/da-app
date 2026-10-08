@@ -1,6 +1,7 @@
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
 import PageLoader from "@/shared/ui/PageLoader";
 import { Navigate, createBrowserRouter, useLocation } from "react-router-dom";
+import lazyWithRetry from "@/shared/utils/lazyWithRetry";
 
 /**
  * พา URL เดิมไปหน้ารวม "พร้อมพาต่อไปให้ถึงจุดที่เจาะจงมา"
@@ -35,68 +36,66 @@ const LegacyTabRedirect = ({ to, tab }) => {
 };
 
 // Layouts และ Pages (Lazy Loaded)
-const FullLayout = lazy(() => import("@/layouts/FullLayout.js"));
-const PrivateRoute = lazy(() => import("./PrivateRoute.js"));
-const AdminRoute = lazy(() => import("./AdminRoute.js"));
+const FullLayout = lazyWithRetry(() => import("@/layouts/FullLayout.js"));
+const PrivateRoute = lazyWithRetry(() => import("./PrivateRoute.js"));
+const AdminRoute = lazyWithRetry(() => import("./AdminRoute.js"));
 
-const Dashboard = lazy(() => import("@/features/dashboard/pages/Dashboard.js"));
-const NoConnection = lazy(() => import("../NoConnection.js"));
-const About = lazy(() => import("@/features/settings/pages/Settings.js"));
+const Dashboard = lazyWithRetry(() => import("@/features/dashboard/pages/Dashboard.js"));
+const NoConnection = lazyWithRetry(() => import("../NoConnection.js"));
+const About = lazyWithRetry(() => import("@/features/settings/pages/Settings.js"));
 // ⚠️ ต้องเป็น /jobs/report ไม่ใช่ /operation/report — เส้นทาง "operation/:id?" จะกลืน
 //    คำว่า report ไปเป็น id แล้วเปิดหน้าการดำเนินงานที่กรองหางานชื่อ report แทน
-const JobReport = lazy(() => import("@/features/operation/pages/JobReport.js"));
+const JobReport = lazyWithRetry(() => import("@/features/operation/pages/JobReport.js"));
 // ⚠️ ลบหน้า demo ของ template MaterialPro ออกแล้ว (Alerts/Badges/Buttons/Cards/Grid/Forms/
 // Breadcrumbs) — เป็นหน้าตัวอย่างที่ติดมากับ template ตั้งแต่ตอนสร้างโปรเจกต์ ไม่เกี่ยวกับธุรกิจ
 // ไม่มีลิงก์จากเมนูไหนเลย และไม่มีใคร import ต่อ
-const Account = lazy(() => import("@/features/staff/pages/Account.js"));
-const LoginDevices = lazy(() => import("@/features/settings/pages/LoginDevices.js"));
-const Product = lazy(() => import("@/features/products/pages/Product"));
-const StockProduct = lazy(() => import("@/features/products/pages/StockProduct"));
-const WorkTypeSystem = lazy(() => import("@/features/settings/pages/WorkTypeSystem.js"));
+const Account = lazyWithRetry(() => import("@/features/staff/pages/Account.js"));
+const LoginDevices = lazyWithRetry(() => import("@/features/settings/pages/LoginDevices.js"));
+const WorkTypeSystem = lazyWithRetry(() => import("@/features/settings/pages/WorkTypeSystem.js"));
 // ✅ ตั้งค่าองค์กร (โลโก้/ข้อมูลบริษัทบนเอกสาร/ค่าตั้งต้น) — ผู้ใช้ขอให้แก้เองได้
-const OrganizationSettings = lazy(() => import("@/features/settings/pages/OrganizationSettings.js"));
+const OrganizationSettings = lazyWithRetry(() => import("@/features/settings/pages/OrganizationSettings.js"));
 // ✅ ตั้งค่าสิทธิ์ (ใครเห็นเมนูอะไร/จัดการอะไรได้) — ผู้ใช้ขอให้ปรับเองได้
-const RolePermissions = lazy(() => import("@/features/settings/pages/RolePermissions.js"));
+const RolePermissions = lazyWithRetry(() => import("@/features/settings/pages/RolePermissions.js"));
 // ✅ ระบบหลังบ้านของเว็บไซต์บริษัท (da-web)
-const WebsiteLeads = lazy(() => import("@/features/website/pages/WebsiteLeads.js"));
-const WebsiteProducts = lazy(() => import("@/features/website/pages/WebsiteProducts.js"));
-const WebsiteProjects = lazy(() => import("@/features/website/pages/WebsiteProjects.js"));
-const WebsiteArticles = lazy(() => import("@/features/website/pages/WebsiteArticles.js"));
-const WebsiteSettings = lazy(() => import("@/features/website/pages/WebsiteSettings.js"));
-const ContractOverview = lazy(() => import("@/features/contracts/pages/ContractOverview.js"));
-const FileUpload = lazy(() => import("@/features/documents/pages/FileUploadPage"));
-const EventCalendar = lazy(() => import("@/features/calendar/pages/EventCalendar.js"));
-const Operate = lazy(() => import("@/features/operation/pages/Operation.js"));
-const Login = lazy(() => import("@/features/auth/pages/Login.js"));
-const Register = lazy(() => import("@/features/auth/pages/Register.js"));
+const WebsiteLeads = lazyWithRetry(() => import("@/features/website/pages/WebsiteLeads.js"));
+const WebsiteProducts = lazyWithRetry(() => import("@/features/website/pages/WebsiteProducts.js"));
+const WebsiteProjects = lazyWithRetry(() => import("@/features/website/pages/WebsiteProjects.js"));
+const WebsiteArticles = lazyWithRetry(() => import("@/features/website/pages/WebsiteArticles.js"));
+const WebsiteSettings = lazyWithRetry(() => import("@/features/website/pages/WebsiteSettings.js"));
+const ContractOverview = lazyWithRetry(() => import("@/features/contracts/pages/ContractOverview.js"));
+const FileUpload = lazyWithRetry(() => import("@/features/documents/pages/FileUploadPage"));
+const EventCalendar = lazyWithRetry(() => import("@/features/calendar/pages/EventCalendar.js"));
+const Operate = lazyWithRetry(() => import("@/features/operation/pages/Operation.js"));
+const Login = lazyWithRetry(() => import("@/features/auth/pages/Login.js"));
+const Register = lazyWithRetry(() => import("@/features/auth/pages/Register.js"));
 
-const PublicRoute = lazy(() => import("./PublicRoute.js"));
-const CheckConnectionToast = lazy(() => import("./CheckConnectionToast.js"));
+const PublicRoute = lazyWithRetry(() => import("./PublicRoute.js"));
+const CheckConnectionToast = lazyWithRetry(() => import("./CheckConnectionToast.js"));
 
 // ✅ "งานของฉัน" ของช่าง = งานตามตารางอย่างเดียว
 // 🧹 เคยห่อด้วยแท็บเพื่อเพิ่ม "งานที่ได้รับมอบหมาย" (ใบ Dispatch) — ตัดออกตามที่ผู้ใช้สั่ง
 // เพราะใบที่อนุมัติแล้วถูกสร้างเป็นงานบนปฏิทินจริงอยู่แล้ว จึงโผล่ในงานตามตารางตั้งแต่แรก
 // แท็บที่สองเลยเป็นรายการเดียวกันซ้ำอีกที่ ในรูปแบบที่ปิดงานไม่ได้
-const MyJobs = lazy(() => import("@/features/technician/pages/MyJobs.js"));
+const MyJobs = lazyWithRetry(() => import("@/features/technician/pages/MyJobs.js"));
 // ✅ งานฝ่ายขาย (ท่อขาย / ปฏิทินนัดหมาย / งานที่ส่งให้ช่าง) — คนละสายงานกับปฏิทินช่างโดยสิ้นเชิง
-const JobRequests = lazy(() => import("@/features/dispatch/pages/JobRequests.js"));
+const JobRequests = lazyWithRetry(() => import("@/features/dispatch/pages/JobRequests.js"));
 // ✅ คิวจ่ายงานของแอดมิน — ใบมอบหมายงานข้ามแผนก
-const JobRequestQueue = lazy(() => import("@/features/dispatch/pages/JobRequestQueue.js"));
+const JobRequestQueue = lazyWithRetry(() => import("@/features/dispatch/pages/JobRequestQueue.js"));
 // ✅ เบิกค่าใช้จ่าย — ใบเบิก Advance / ใบเคลม / รอดำเนินการ / รายงานย้อนหลัง (หน้าเช็คสิทธิ์เอง)
-const ExpensesPage = lazy(() => import("@/features/expenses/pages/ExpensesPage.js"));
-const OtPage = lazy(() => import("@/features/ot/pages/OtPage.js"));
-const PurchasePage = lazy(() => import("@/features/purchase/pages/PurchasePage.js"));
-const PurchaseReport = lazy(() => import("@/features/purchase/pages/PurchaseReport.js"));
+const ExpensesPage = lazyWithRetry(() => import("@/features/expenses/pages/ExpensesPage.js"));
+const OtPage = lazyWithRetry(() => import("@/features/ot/pages/OtPage.js"));
+const PurchasePage = lazyWithRetry(() => import("@/features/purchase/pages/PurchasePage.js"));
+const PurchaseReport = lazyWithRetry(() => import("@/features/purchase/pages/PurchaseReport.js"));
 
 // ✅ หน้ารวม 4 หน้า — ยุบหน้าที่เป็นข้อมูลประเภทเดียวกันให้เหลือหน้าเดียวต่อเรื่อง แล้วแยกด้วยแท็บ
 // (ดูเหตุผลของแต่ละการรวมในหัวไฟล์ของแต่ละตัว) URL เดิมทั้งหมดยัง redirect เข้ามาที่นี่ได้ ลิงก์เก่าไม่พัง
 // ⚠️ Customer / Employee / TeamWorkload / CustomerOverview / BillingTracking / QuotationTracking /
 // IssuedDocuments / Files ไม่ถูก import ที่นี่แล้ว — ย้ายไปโหลดแบบ lazy ภายใน Hub ที่เกี่ยวข้องแทน
 // (Router รู้จักแค่หน้ารวม 4 หน้า ส่วนหน้าย่อยเป็นรายละเอียดภายในของ Hub นั้นๆ)
-const CustomerHub = lazy(() => import("@/features/customers/pages/CustomerHub.js"));
-const StaffHub = lazy(() => import("@/features/staff/pages/StaffHub.js"));
-const DocumentsHub = lazy(() => import("@/features/documents/pages/DocumentsHub.js"));
-const FinanceHub = lazy(() => import("@/features/finance/pages/FinanceHub.js"));
+const CustomerHub = lazyWithRetry(() => import("@/features/customers/pages/CustomerHub.js"));
+const StaffHub = lazyWithRetry(() => import("@/features/staff/pages/StaffHub.js"));
+const DocumentsHub = lazyWithRetry(() => import("@/features/documents/pages/DocumentsHub.js"));
+const FinanceHub = lazyWithRetry(() => import("@/features/finance/pages/FinanceHub.js"));
 
 
 const ThemeRoutes = [
@@ -336,28 +335,9 @@ const ThemeRoutes = [
         ),
         title: "การแสดงผลเว็บไซต์",
       },
-      {
-        path: "product",
-        element: (
-          <AdminRoute cap="manageMasterData">
-            <Suspense fallback={<PageLoader />}>
-              <Product />
-            </Suspense>
-          </AdminRoute>
-        ),
-        title: "Product",
-      },
-      {
-        path: "product/stock",
-        element: (
-          <AdminRoute cap="manageMasterData">
-            <Suspense fallback={<PageLoader />}>
-              <StockProduct />
-            </Suspense>
-          </AdminRoute>
-        ),
-        title: "Stock Product",
-      },
+      // 🧹 (8 ต.ค. 2569 ผู้ใช้: "สต๊อกให้ตัดออกไม่ใช้ · สินค้าด้วย") ระบบสินค้า/สต็อกภายในถูกตัดออก — ลิงก์เก่าพากลับหน้าหลัก
+      { path: "product", element: <Navigate to="/dashboard" replace /> },
+      { path: "product/stock", element: <Navigate to="/dashboard" replace /> },
       {
         path: "fileupload",
         element: (

@@ -14,7 +14,7 @@
  * ⚠️ ทั้งสองแท็บดึงข้อมูลเองแยกกัน (DispatchList / PendingApprovalsPanel) — ไม่ได้แชร์ state
  * เพราะเป็นคนละคอลเลกชันคนละ endpoint ตัวเลขบนแท็บจึงต้องรับกลับขึ้นมาจากแต่ละแผงเอง
  */
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { Navigate, useSearchParams } from "react-router-dom";
 import {
   Box, Stack, Typography, Skeleton, Alert, useMediaQuery,
@@ -28,10 +28,11 @@ import ViewTiles from "@/shared/ui/ViewTiles";
 import DispatchList from "../components/DispatchList";
 import DispatchService from "../services/DispatchService";
 import { TEXT_SUB, BORDER_MAIN } from "../dispatchMeta";
+import lazyWithRetry from "@/shared/utils/lazyWithRetry";
 
 // ⚠️ แผงนี้อยู่ใน feature "operation" เพราะเป็นเรื่องแผนงานของช่างโดยตรง — ไม่ย้ายไฟล์มาที่นี่
 // เพื่อไม่ให้ประวัติ git ของมันขาดตอน แค่เรียกใช้ข้ามฟีเจอร์ (โหลดแบบ lazy เพราะเป็นแผงใหญ่)
-const PendingApprovalsPanel = lazy(() => import("@/features/operation/components/PendingApprovalsPanel"));
+const PendingApprovalsPanel = lazyWithRetry(() => import("@/features/operation/components/PendingApprovalsPanel"));
 
 const SOURCES = [
   {

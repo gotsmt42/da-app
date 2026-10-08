@@ -12,7 +12,7 @@
  * ที่คนอื่นกดอะไรสักอย่าง
  * ⚠️ อย่าใช้กับฟอร์มที่ผู้ใช้กำลังกรอก — ดึงข้อมูลมาทับจะทำให้สิ่งที่พิมพ์ค้างไว้หาย
  *
- * @param {string|string[]} topics  "expenses" | "events" | "dispatch" | "customers" | "users" | "products"
+ * @param {string|string[]} topics  "expenses" | "events" | "dispatch" | "customers" | "users"
  *                                  | "files" | "documents" | "lookups"
  * @param {(evt: object) => void} onChange
  * @param {{ enabled?: boolean, debounceMs?: number, ignoreOwnTab?: boolean }} [opts]

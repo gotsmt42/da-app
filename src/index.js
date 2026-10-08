@@ -10,6 +10,8 @@ import App from "./app/App";
 import reportWebVitals from "./app/reportWebVitals";
 import { BrowserRouter as Router } from "react-router-dom";
 import Loader from "./layouts/Loader";
+import AppErrorBoundary from "./shared/ui/AppErrorBoundary";
+import { reloadForFreshBuild } from "./shared/utils/lazyWithRetry";
 
 import { AuthProvider } from "./features/auth/AuthContext";
 
@@ -45,11 +47,18 @@ window.addEventListener("error", (e) => {
 
 installTomSelectFixes();
 
+// ✅ หลัง deploy ไฟล์ CSS/JS รุ่นเก่าถูกลบ — Vite แจ้ง "vite:preloadError" ก่อน import ล้ม
+//    รีโหลดเอาไฟล์รุ่นใหม่ทันที (ไม่เกิน 1 ครั้ง/30 วินาที) แทนที่จะปล่อยให้เป็นจอขาว ดู lazyWithRetry.js
+window.addEventListener("vite:preloadError", (e) => {
+  if (reloadForFreshBuild()) e.preventDefault();
+});
+
 const root = ReactDOM.createRoot(document.getElementById("root"));
 
 
 root.render(
   <React.StrictMode>
+    <AppErrorBoundary variant="app">
     <Suspense fallback={<Loader />}>
       <Router future={{ v7_relativeSplatPath: true }}>
         <AuthProvider >
@@ -59,6 +68,7 @@ root.render(
         </AuthProvider>
       </Router>
     </Suspense>
+    </AppErrorBoundary>
   </React.StrictMode>
 );
 
