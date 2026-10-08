@@ -271,6 +271,13 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
           <Box sx={{ py: 6, display: "flex", justifyContent: "center" }}><CircularProgress size={28} /></Box>
         ) : (
           <>
+            {/* ✅ (8 ต.ค. 2569 "แมพให้เอาไว้บนสุด") แผนที่หน้างานเต็มความกว้างบนสุด — แบบเดียวกับฟอร์มงานช่าง */}
+            {(ev.site || ev.company) && (
+              <Box sx={{ mb: 2 }}>
+                <SiteMapCard company={ev.company} site={ev.site} canEdit={isAdminOrManager} height={fullScreen ? 170 : 210} />
+              </Box>
+            )}
+
             <Box sx={{ p: 1.75, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}` }}>
               {cancelled ? (
                 <Stack direction="row" spacing={1} alignItems="center">
@@ -281,7 +288,7 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
             </Box>
 
             {/* ✅ (8 ต.ค. 2569 "ขยายหน้านี้ · แบ่งส่วนที่ควรแบ่ง") จอคอม 2 คอลัมน์:
-                ซ้าย = ข้อมูลนัด + แผนที่หน้างาน · ขวา = รูปหน้างาน + ผลการเข้าพบ (สิ่งที่ฝ่ายขายต้องทำ) */}
+                ซ้าย = ข้อมูลนัด · ขวา = รูปหน้างาน + ผลการเข้าพบ (สิ่งที่ฝ่ายขายต้องทำ) */}
             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "minmax(0,1fr) minmax(0,1fr)" }, columnGap: 3, alignItems: "start" }}>
             <Box sx={{ minWidth: 0 }}>
             <Section icon={<NotesOutlined />} title="ข้อมูลนัดหมาย"
@@ -319,12 +326,6 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
               </Box>
             </Section>
 
-            {/* ── แผนที่หน้างาน (แบบเดียวกับฟอร์มงานช่าง) ── */}
-            {(ev.site || ev.company) && (
-              <Section icon={<PlaceOutlined />} title="แผนที่หน้างาน">
-                <SiteMapCard company={ev.company} site={ev.site} canEdit={isAdminOrManager} height={fullScreen ? 180 : 220} />
-              </Section>
-            )}
             </Box>
 
             <Box sx={{ minWidth: 0 }}>
