@@ -1001,16 +1001,16 @@ function injectStyles() {
     .ee-head-owner { margin-left: auto; font-size: 11.5px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 
     /* แผนที่: ปุ่มเรียงใต้ชื่อบนจอแคบ ไม่บีบข้อความ */
-    /* ✅ (8 ต.ค. 2569 "ปุ่มต่างๆ ของช่างให้เป็นธีมสีแดง") */
-    .ee-map-go { background: #dc2626; border-radius: 10px; }
-    .ee-map-go:hover { background: #b91c1c; }
+    /* ✅ (8 ต.ค. 2569 ผู้ใช้: "ปุ่มบันทึก ค้นหา ให้เป็นสีน้ำเงินปกติ ให้สอดคล้อง") — ปุ่มหลักใช้น้ำเงินชุดเดียวกับทั้งแอป */
+    .ee-map-go { background: #2563eb; border-radius: 10px; }
+    .ee-map-go:hover { background: #1d4ed8; }
     .ee-map-edit { border-radius: 10px; }
 
     /* แถบปุ่ม — ขาว · ปุ่มหลักน้ำเงิน */
     #ee-action-bar { background: #fff; padding: 12px 20px; }
     #ee-action-bar .ee-btn { border-radius: 10px; padding: 10px 16px; font-size: 13.5px; }
-    #ee-action-bar .ee-btn-success { background: #dc2626; border-color: #dc2626; box-shadow: none; }
-    #ee-action-bar .ee-btn-success:hover { background: #b91c1c; border-color: #b91c1c; }
+    #ee-action-bar .ee-btn-success { background: #2563eb; border-color: #2563eb; box-shadow: none; }
+    #ee-action-bar .ee-btn-success:hover { background: #1d4ed8; border-color: #1d4ed8; }
     #ee-action-bar .ee-btn-map { background: #fff; border-color: #e2e8f0; color: #334155; }
     #ee-action-bar .ee-btn-map:hover { background: #f8fafc; }
     #ee-action-bar .ee-btn-ghost { border-color: #e2e8f0; background: #fff; color: #475569; }

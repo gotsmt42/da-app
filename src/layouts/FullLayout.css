@@ -134,8 +134,8 @@
        ⚠️ ต้องวาง 100vh ไว้ก่อนเป็นค่าสำรองของเบราว์เซอร์เก่าที่ยังไม่รู้จัก dvh */
     height: 100vh;
     height: 100dvh;
-    width: 280px;
-    max-width: 80vw;
+    width: 288px;
+    max-width: 86vw;
     z-index: 10000;
     transition: transform 0.3s ease-in-out, visibility 0.3s;
     background-color: #1e293b;

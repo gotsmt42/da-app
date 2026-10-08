@@ -362,3 +362,78 @@
   font-size: 9.5px;
   line-height: 16px;
 }
+
+/* ==========================================================================
+   ✅ (8 ต.ค. 2569 ผู้ใช้: "ตรงนี้ทำให้มันสวยขึ้นหน่อย") ปรับหน้าตาเมนูข้างให้เรียบ ทันสมัย และไม่ล้นจอ
+   • ไอคอนอยู่ในช่องสี่เหลี่ยมมนเล็กๆ ขนาดเท่ากันทุกแถว → แนวตรง อ่านง่าย · active = ช่องแดงไอคอนขาว
+   • ข้อความยาว/ตัวอักษรขยายจากการตั้งค่ามือถือ → ตัดด้วย … ไม่ดันปุ่ม/ลูกศรทะลุขอบขวาอีก
+   • หัวข้อหมวดชัดขึ้นเล็กน้อย · ระยะห่างแน่นขึ้นบนมือถือ
+   ========================================================================== */
+.sidebar-content { overflow-x: hidden; }
+.sidebar-container .nav-link,
+.sidebar-container button.menu-dropdown-btn {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  padding: 7px 10px !important;
+  gap: 0;
+}
+.sidebar-container .nav-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-container .nav-icon {
+  width: 32px;
+  height: 32px;
+  margin-right: 12px;
+  border-radius: 9px;
+  font-size: 15px;
+  background: rgba(148, 163, 184, 0.08);
+  transition: background-color 0.18s ease, color 0.18s ease;
+}
+.sidebar-container .nav-link:hover .nav-icon { transform: none; background: rgba(148, 163, 184, 0.16); }
+.sidebar-container .nav-link.active .nav-icon {
+  color: #fff;
+  background: var(--accent-color);
+  box-shadow: 0 4px 10px -4px rgba(220, 38, 38, 0.7);
+}
+.sidebar-container button.menu-dropdown-btn.parent-active .nav-icon {
+  color: var(--accent-color);
+  background: rgba(220, 38, 38, 0.14);
+}
+.sidebar-container .nav-link.active::before { top: 10px; bottom: 10px; }
+.sidebar-container .arrow-icon { flex-shrink: 0; margin-left: 6px; opacity: 0.7; }
+
+/* เมนูย่อย — เส้นนำสายตาอยู่ตรงกลางช่องไอคอนของแม่ · แถวเตี้ยกว่าแม่ */
+.sidebar-container .submenu-wrapper {
+  margin: 2px 0 6px 25px;
+  padding-left: 12px;
+  border-left: 1px solid rgba(148, 163, 184, 0.18);
+}
+.sidebar-container .submenu-link { padding: 8px 10px !important; }
+.sidebar-container .submenu-link.active { background: rgba(220, 38, 38, 0.12) !important; }
+.sidebar-container .submenu-link.active::before { display: none; }
+.sidebar-container .submenu-dot { margin-right: 10px; }
+
+.sidebar-container .admin-divider-label {
+  padding: 14px 10px 6px;
+  font-size: 10.5px;
+  letter-spacing: 0.8px;
+  opacity: 0.65;
+}
+
+/* โหมดย่อ (จอคอม) — ช่องไอคอนอยู่กึ่งกลาง */
+.sidebar-container.collapsed .nav-link,
+.sidebar-container.collapsed button.menu-dropdown-btn { padding: 6px 0 !important; }
+
+@media (max-width: 992px) {
+  .sidebar-container .profilebg { margin: 12px 12px 6px; padding: 12px; border-radius: 14px; }
+  .sidebar-container .profilebg .profile-img,
+  .sidebar-container .profilebg .profile-img-fallback { width: 42px !important; height: 42px !important; }
+  .sidebar-content { padding: 6px 12px 16px; }
+  .sidebar-container .nav-link.active::before { left: -12px; }
+  .sidebar-container .nav-link,
+  .sidebar-container button.menu-dropdown-btn { font-size: 14px; margin-bottom: 2px; }
+}
