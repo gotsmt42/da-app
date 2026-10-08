@@ -3530,20 +3530,24 @@ function EventCalendar() {
             // ✅ (8 ต.ค. 2569 ผู้ใช้: "มันดูยาก ไม่สวย รก") นัดเซลใช้การ์ดแบบเรียบของตัวเอง ไม่ใช่การ์ดงานช่าง:
             //    [● เวลา] / สถานที่ / ประเภทนัด — จุดสี = สถานะนัด · รายละเอียดอื่นอยู่ในหน้ารายละเอียดนัด
             if (extendedProps.department === "sales") {
-              const sMeta = salesStatusMeta(status);
+              // 🐛 (8 ต.ค. 2569 "ดูยาก ไม่มืออาชีพ") จุดสถานะสีเดียวกับพื้นการ์ด (เช่น เข้าพบแล้ว=เขียวอมฟ้า บนการ์ด
+              //    สำรวจหน้างาน) กลายเป็นวงกลมกลวง · "ทั้งวัน" ถูกตัดเหลือ "ทั้..." → ใช้ป้ายข้อความขาวแทนจุด
+              //    บรรทัด: [เวลา ถ้ามี] / สถานที่ (2 บรรทัด) / ป้ายสถานะ (ถ้าเลยขั้น "นัดหมายแล้ว") หรือประเภทนัด
               const st = toSalesStatus(status);
-              const timeTxt = startTime ? `${escapeHtml(startTime)}${endTime ? `–${escapeHtml(endTime)}` : ""}` : "ทั้งวัน";
-              const photoN = (extendedProps.sitePhotoFiles || []).length;
+              const sMeta = salesStatusMeta(status);
+              const SHORT = { "เข้าพบแล้ว": "✓ เข้าพบแล้ว", "ปิดงานแล้ว": "✓ ปิดงาน", "เลื่อนนัด": "เลื่อนนัด", "ยกเลิกนัด": "ยกเลิก" };
+              const timeHtml = startTime
+                ? `<div class="ec-sc-time">${escapeHtml(startTime)}${endTime ? `<span class="ec-sc-end">–${escapeHtml(endTime)}</span>` : ""}</div>`
+                : "";
+              const footHtml = SHORT[st]
+                ? `<span class="ec-sc-pill" style="color:${sMeta.color}">${SHORT[st]}</span>`
+                : `<div class="ec-sc-type">${escapeHtml(title)}</div>`;
               return {
                 html: `
                   <div class="ec-sc${st === "ยกเลิกนัด" ? " ec-sc--off" : ""}" title="${escapeHtml(`${title} · ${site} · ${st}`)}">
-                    <div class="ec-sc-top">
-                      <span class="ec-sc-dot" style="background:${sMeta.color}"></span>
-                      <span class="ec-sc-time">${timeTxt}</span>
-                      ${photoN ? `<span class="ec-sc-photo">📷${photoN}</span>` : ""}
-                    </div>
+                    ${timeHtml}
                     <div class="ec-sc-site">${escapeHtml(site || "-")}</div>
-                    <div class="ec-sc-type">${escapeHtml(title)} · ${escapeHtml(st)}</div>
+                    ${footHtml}
                   </div>`,
               };
             }

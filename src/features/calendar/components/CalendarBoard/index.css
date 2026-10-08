@@ -869,17 +869,6 @@
 }
 .ec-sales-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 
-/* ── การ์ดนัดเซล (เรียบ อ่านง่าย) — ดู eventContent ใน index.js ── */
-.ec-sc { padding: 3px 6px 4px; min-width: 0; width: 100%; text-align: left; line-height: 1.3; color: #fff; }
-.ec-sc-top { display: flex; align-items: center; gap: 4px; min-width: 0; }
-.ec-sc-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 0 1.5px #fff; }
-.ec-sc-time { font-size: .78em; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: .95; }
-.ec-sc-photo { margin-left: auto; font-size: .7em; font-weight: 700; opacity: .9; flex-shrink: 0; }
-.ec-sc-site { font-size: .86em; font-weight: 800; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.ec-sc-type { font-size: .7em; font-weight: 600; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ec-sc--off .ec-sc-site { text-decoration: line-through; }
-.ec-sales .fc-daygrid-event { border-radius: 8px !important; }
-
 /* ป้ายอธิบายสีของตารางเซล — 2 แถวกะทัดรัด */
 .ec-sales-legend { margin-top: 12px; padding: 10px 12px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; display: flex; flex-direction: column; gap: 6px; }
 .ec-sales-legend-row { display: flex; flex-wrap: wrap; gap: 4px 14px; }
@@ -2030,3 +2019,45 @@
   .ec-month-float .ec-month-float-person { padding: 0 8px 0 9px; gap: 4px; }
   .ec-month-float .ec-month-float-person-label { max-width: 70px; font-size: 13px; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   🗓️ ตารางนัดหมายเซล — การ์ดนัด (ดู eventContent ใน index.js: extendedProps.department === "sales")
+   ✅ (8 ต.ค. 2569 ผู้ใช้: "ดูยาก ไม่มืออาชีพ" + "CSS มันจะอยู่หน้า index ด้วย ตรวจสอบให้ละเอียด")
+   รวมไว้ท้ายไฟล์ที่เดียว + selector เจาะจงกว่า เพื่อชนะกฎของการ์ดงานช่างทั้งไฟล์ที่ไปโดนการ์ดนัดเซลด้วย:
+     1. .fc-event (≤768px)                 → font 8px · padding 5px · max-height 100%
+     2. .fc-daygrid .fc-event              → overflow: visible (ข้อความล้นขอบมน)
+     3. .fc-daygrid-event-harness          → padding-bottom 10px/17px (เผื่อป้ายทีมของช่าง)
+     4. .fc-daygrid-day-events             → margin-top 14px (เผื่อป้ายไอคอนมุมบนของช่าง)
+     5. .fc-daygrid-event                  → align-items:center · padding 2px
+   ⚠️ ทุกกฎขึ้นต้นด้วย .calendar-wrapper.ec-sales — ไม่กระทบตารางงานช่างเลย
+   ══════════════════════════════════════════════════════════════════════════ */
+.modern-calendar-container .calendar-wrapper.ec-sales .fc-daygrid-day-events { margin-top: 2px !important; }
+.modern-calendar-container .calendar-wrapper.ec-sales .fc-daygrid-event-harness { padding-bottom: 4px !important; }
+.modern-calendar-container .calendar-wrapper.ec-sales .fc-daygrid-event {
+  display: block; padding: 0 !important; margin: 0 3px !important;
+  min-height: 0 !important; max-height: none !important; overflow: hidden !important;
+  border-radius: 8px !important; border-width: 0 !important;
+  font-size: 12px !important; line-height: 1.3 !important;
+  font-family: inherit;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .12);
+}
+.modern-calendar-container .calendar-wrapper.ec-sales .fc-daygrid-event .fc-event-main { padding: 0; }
+
+.ec-sc { display: flex; flex-direction: column; gap: 2px; width: 100%; min-width: 0; padding: 5px 7px 6px; text-align: left; color: #fff; }
+.ec-sc-time { font-size: .76em; font-weight: 700; opacity: .92; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.ec-sc-site { font-size: .9em; font-weight: 800; line-height: 1.3; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ec-sc-type { font-size: .72em; font-weight: 600; opacity: .88; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ec-sc-pill { align-self: flex-start; max-width: 100%; margin-top: 1px; padding: 0 6px; border-radius: 6px; background: #fff; font-size: .7em; font-weight: 800; line-height: 1.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ec-sc--off .ec-sc-site { text-decoration: line-through; }
+
+@media (max-width: 768px) {
+  /* คอลัมน์มือถือแคบ (~50px) — ตัวหนังสืออ่านออก ไม่เว้นขอบ · ชื่อสถานที่ได้ 3 บรรทัด · ป้ายสถานะเหลือเครื่องหมาย */
+  .modern-calendar-container .calendar-wrapper.ec-sales .fc-daygrid-event {
+    margin: 0 1px !important; border-radius: 5px !important; font-size: 10px !important;
+  }
+  .ec-sc { padding: 3px 3px 4px; gap: 1px; }
+  .ec-sc-site { -webkit-line-clamp: 3; }
+  .ec-sc-pill { padding: 0 3px; border-radius: 4px; }
+  .modern-calendar-container:not(.ec-zoomed) .ec-sc-end { display: none; }
+}
+
