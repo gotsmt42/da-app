@@ -29,7 +29,7 @@ import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import Swal from "sweetalert2";
 import {
-  Box, Stack, Typography, TextField, InputAdornment, IconButton, Tooltip,
+  Box, ButtonBase, Stack, Typography, TextField, InputAdornment, IconButton, Tooltip,
   Table, TableBody, TableCell, TableContainer, TableHead, TableFooter, TableRow, Paper, Skeleton,
   Dialog, DialogTitle, DialogContent, DialogActions, ToggleButtonGroup, ToggleButton,
   Button, Autocomplete, Alert, Chip, Checkbox, Pagination, useMediaQuery, Badge,
@@ -43,7 +43,7 @@ import {
   AddLink, LinkOff, Build, Engineering, ExpandMore, ExpandLess,
   CalendarMonth, Category, Assignment, Description, HourglassEmpty, Apps, DeviceHub,
   SwapHoriz, TableChart, FilterList, ViewAgenda, TableRows, SwipeLeft, ChevronLeft, ChevronRight,
-  AddCircleOutline, Check, Autorenew, EventBusy, History, Apartment, Timelapse, Tune,
+  AddCircleOutline, Check, Autorenew, EventBusy, TaskAlt, History, Apartment, Timelapse, Tune,
 } from "@mui/icons-material";
 import { useAuth } from "@/features/auth/AuthContext";
 import EventService from "@/shared/services/EventService";
@@ -350,6 +350,27 @@ const progressInfo = (c, countUsedRoundsFn) => {
   };
 };
 
+/**
+ * ✅ (8 ต.ค. 2569 ผู้ใช้: "งานไหนเข้างานครบสมบูรณ์ หรือสัญญาที่หมดอายุแล้ว ให้ย้ายออกจากตารางหลัก ไปอยู่อีกหน้าหนึ่ง")
+ * "เข้างานครบแล้ว" — สัญญา: ทุกครั้งเสร็จสิ้นครบตามจำนวนครั้ง (ตรรกะเดียวกับคอลัมน์คืบหน้า progressInfo)
+ *                     งานทั่วไป/โปรเจค/ยังไม่จัดกลุ่ม: ทุกวันที่ลงตารางแล้วเสร็จสิ้นหมด
+ */
+const isCompletedWork = (c, countUsedRoundsFn) => {
+  const visits = (c.visits || []).filter((v) => !v.unscheduled);
+  if (visits.length === 0) return false;
+  if (!c.isRealContract) return visits.every((v) => v.status === "ดำเนินการเสร็จสิ้น");
+  const byRound = new Map();
+  visits.forEach((v) => {
+    const key = String(v.time);
+    if (!byRound.has(key)) byRound.set(key, []);
+    byRound.get(key).push(v);
+  });
+  let done = 0;
+  byRound.forEach((docs) => { if (docs.every((d) => d.status === "ดำเนินการเสร็จสิ้น")) done += 1; });
+  const total = totalRoundsOf(c) || countUsedRoundsFn(c.visits);
+  return total > 0 && done >= total;
+};
+
 // ✅ "สถานะสัญญา" — เทียบ contractEnd กับวันนี้ ช่วยเตือนต่ออายุล่วงหน้า แทนต้องไล่เช็คคอลัมน์
 // "สิ้นสุด" เองทีละแถว ใช้ทั้งในตารางและไฟล์ CSV ที่ส่งออก (ใช้ฟังก์ชันเดียวกัน กันข้อมูลไม่ตรงกัน)
 // ⚠️ contractStatusInfo / isExpiredContract ย้ายไปเป็นของกลางที่ shared/utils/contractOverdue.js แล้ว
@@ -376,7 +397,9 @@ const contractEditHistory = (c) => {
   return out.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 };
 
-const VIEW_FILTER_VALUES = ["contracts", "overdue", "expired", "general", "project", "ungrouped", "all"];
+const VIEW_FILTER_VALUES = ["contracts", "overdue", "expired", "completed", "general", "project", "ungrouped", "all"];
+/** มุมมองที่อยู่ในหน้า "ปิดแล้ว · ประวัติ" (ย้ายออกจากตารางหลัก) */
+const CLOSED_VIEWS = ["expired", "completed"];
 
 // ✅ ยืด/หดความกว้างคอลัมน์ได้เองเหมือน Excel — เดิม fix ความกว้างตายตัวทุกคอลัมน์ (CELL_TRUNCATE)
 // พอชื่อบริษัท/โครงการยาวๆ ก็โดนตัดด้วย ... เสมอ ต้อง hover ดู tooltip ทุกครั้ง ให้ผู้ใช้ลากขยายเองได้
@@ -1449,6 +1472,14 @@ export default function ContractOverview() {
     [events]
   );
 
+  // ✅ แยก "กำลังดำเนินการ" (ตารางหลัก) ออกจาก "ปิดแล้ว" (หมดอายุ / เข้างานครบแล้ว) — ทุกแท็บในตารางหลัก
+  //    นับและแสดงเฉพาะงานที่ยังเปิดอยู่ · งานหนึ่งอยู่หน้าเดียวเสมอ
+  const isClosedOut = useCallback(
+    (c) => isExpiredContract(c) || isCompletedWork(c, countUsedRounds),
+    [] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const activeContracts = useMemo(() => contracts.filter((c) => !isClosedOut(c)), [contracts, isClosedOut]);
+
   // ✅ เลือกจัดกลุ่มเป็นสัญญาได้เฉพาะตอนมองเห็นงานเก่าที่ยังไม่จัดกลุ่ม (แท็บ "งานเก่า.../ทั้งหมด")
   // แท็บ "สัญญา" ล้วนๆ ไม่มีอะไรให้เลือกจัดกลุ่มอยู่แล้ว (ทุกแถวมีสัญญาอยู่แล้วทั้งหมด)
   // ✅ ช่างดูอย่างเดียว ไม่มีทางเลือกงานไปจัดกลุ่มเป็นสัญญาได้ — ปิดตรงนี้จุดเดียวพอ ปิดพ่วงทั้งคอลัมน์
@@ -1463,7 +1494,7 @@ export default function ContractOverview() {
     return row ? roundVisitsOf(row, docsTarget.round) : null;
   }, [docsTarget, contracts]);
 
-  const showCheckboxes = isAdminOrManager && viewFilter !== "contracts" && viewFilter !== "expired";
+  const showCheckboxes = isAdminOrManager && viewFilter !== "contracts" && !CLOSED_VIEWS.includes(viewFilter);
   // ✅ เลือกได้เฉพาะงานที่ยัง "ไม่จัดกลุ่ม" จริงๆ เท่านั้น — งานทั่วไป/งานโปรเจคถูกยืนยันหมวดหมู่ไปแล้ว
   // (isConfirmedGeneral/isConfirmedProject) ไม่ใช่เป้าหมายของ "จัดกลุ่มเป็นสัญญา" อีกต่อไป มี checkbox
   // ให้เลือกไว้จะสับสน/กดผิดได้ — ตัดออกตามที่ผู้ใช้ขอ ใช้ตัวเดียวกันทั้งตาราง/การ์ดมือถือ กันสองจุด
@@ -1866,29 +1897,29 @@ export default function ContractOverview() {
   // สัญญา ซึ่งจะทำให้ isRealContract=true แทน) กันงานเก่าที่ยังไม่มีใครไล่ดูจริงๆ ถูกเข้าใจผิดว่าเป็น
   // "งานทั่วไป" ที่ยืนยันแล้วทั้งที่จริงยังไม่มีใครตรวจสอบเลย
   const realContractCount = useMemo(
-    () => applyCommonFilters(contracts.filter((c) => c.isRealContract)).length,
+    () => applyCommonFilters(activeContracts.filter((c) => c.isRealContract)).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo, search]
+    [contracts, activeContracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo, search]
   );
   const hiddenJobCount = useMemo(
-    () => applyCommonFilters(contracts.filter((c) => !c.isRealContract && !c.isConfirmedGeneral && !c.isConfirmedProject)).length,
+    () => applyCommonFilters(activeContracts.filter((c) => !c.isRealContract && !c.isConfirmedGeneral && !c.isConfirmedProject)).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo, search]
+    [contracts, activeContracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo, search]
   );
   const confirmedGeneralCount = useMemo(
-    () => applyCommonFilters(contracts.filter((c) => !c.isRealContract && c.isConfirmedGeneral)).length,
+    () => applyCommonFilters(activeContracts.filter((c) => !c.isRealContract && c.isConfirmedGeneral)).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo, search]
+    [contracts, activeContracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo, search]
   );
   const confirmedProjectCount = useMemo(
-    () => applyCommonFilters(contracts.filter((c) => !c.isRealContract && c.isConfirmedProject)).length,
+    () => applyCommonFilters(activeContracts.filter((c) => !c.isRealContract && c.isConfirmedProject)).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo, search]
+    [contracts, activeContracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo, search]
   );
   const allFilteredCount = useMemo(
-    () => applyCommonFilters(contracts).length,
+    () => applyCommonFilters(activeContracts).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo, search]
+    [contracts, activeContracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo, search]
   );
   // ✅ สัญญาที่ "เลยกำหนดเข้ารอบถัดไป/คงค้าง" — ถึงเดือนที่ต้องเข้ารอบถัดไปแล้ว (นับจากรอบล่าสุด +
   // intervalMonths — ดู nextVisitOverdueInfo) ⚠️ นับเฉพาะที่ถึง/เลยกำหนดจริงเท่านั้น ไม่รวมคำเตือน
@@ -1896,9 +1927,9 @@ export default function ContractOverview() {
   // แล้วแต่ยังไม่มีวันที่/แผนงานล่วงหน้าของรอบถัดไปเลย (ดู nextVisitOverdueInfo) เดิมมีแค่ badge เตือน
   // ทีละแถวในตาราง ไม่มีทางกรองดูเฉพาะกลุ่มนี้รวดเดียวเลย — เพิ่มเป็นแท็บมุมมองแยกต่างหาก
   const overdueCount = useMemo(
-    () => applyCommonFilters(contracts.filter((c) => c.isRealContract && isRoundOverdue(c))).length,
+    () => applyCommonFilters(activeContracts.filter((c) => c.isRealContract && isRoundOverdue(c))).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo, search]
+    [contracts, activeContracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo, search]
   );
 
   // ✅ สัญญาที่เลยวันสิ้นสุดมาแล้ว — กลุ่มที่ต้องไล่ต่ออายุ/ปิดงาน เดิมมีแต่ชิปสีแดงเตือนทีละแถว ต้อง
@@ -1909,6 +1940,13 @@ export default function ContractOverview() {
     () => applyCommonFilters(contracts.filter(isExpiredContract), { ignoreYear: true }).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [contracts, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo, search]
+  );
+
+  // ✅ "เข้างานครบแล้ว" (ยังไม่หมดอายุ) — หน้า "ปิดแล้ว · ประวัติ" · ใช้ตัวกรองปีตามปกติ (ดูย้อนหลังรายปีได้)
+  const completedCount = useMemo(
+    () => applyCommonFilters(contracts.filter((c) => !isExpiredContract(c) && isCompletedWork(c, countUsedRounds))).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [contracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo, search]
   );
 
   // ✅ สลับแท็บผ่านฟังก์ชันเดียว (ทั้งปุ่มบนจอคอมและเมนูบนมือถือ) เพราะการเข้าแท็บ "สัญญาหมดอายุ" ต้อง
@@ -1929,13 +1967,16 @@ export default function ContractOverview() {
   // ตัวตาราง (filtered) และตัวนับจำนวนในตัวเลือกของตัวกรองแต่ละอัน ทั้งคู่ต้องอิงแท็บเดียวกันเสมอ
   const viewBase = useMemo(() => {
     if (viewFilter === "expired") return contracts.filter(isExpiredContract);
-    return viewFilter === "all" ? contracts
-      : viewFilter === "overdue" ? contracts.filter((c) => c.isRealContract && isRoundOverdue(c))
-      : viewFilter === "ungrouped" ? contracts.filter((c) => !c.isRealContract && !c.isConfirmedGeneral && !c.isConfirmedProject)
-      : viewFilter === "general" ? contracts.filter((c) => !c.isRealContract && c.isConfirmedGeneral)
-      : viewFilter === "project" ? contracts.filter((c) => !c.isRealContract && c.isConfirmedProject)
-      : contracts.filter((c) => c.isRealContract);
-  }, [contracts, viewFilter]);
+    if (viewFilter === "completed") return contracts.filter((c) => !isExpiredContract(c) && isCompletedWork(c, countUsedRounds));
+    // ✅ ตารางหลัก = เฉพาะงานที่ยังเปิดอยู่ (หมดอายุ/เข้างานครบแล้ว ย้ายไปหน้า "ปิดแล้ว · ประวัติ")
+    const base = activeContracts;
+    return viewFilter === "all" ? base
+      : viewFilter === "overdue" ? base.filter((c) => c.isRealContract && isRoundOverdue(c))
+      : viewFilter === "ungrouped" ? base.filter((c) => !c.isRealContract && !c.isConfirmedGeneral && !c.isConfirmedProject)
+      : viewFilter === "general" ? base.filter((c) => !c.isRealContract && c.isConfirmedGeneral)
+      : viewFilter === "project" ? base.filter((c) => !c.isRealContract && c.isConfirmedProject)
+      : base.filter((c) => c.isRealContract);
+  }, [contracts, activeContracts, viewFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filtered = useMemo(() => {
     // ⚠️ แท็บสัญญาหมดอายุข้ามตัวกรองปีเหมือนตอนนับ ไม่งั้นตัวเลขบนแท็บกับจำนวนแถวในตารางจะไม่ตรงกัน
@@ -5270,13 +5311,13 @@ pagedRows.map((c, idx) => {
   if (!loading && !canView) return <Navigate to="/dashboard" replace />;
 
   // กลุ่มการ์ดมุมมอง — จอใหญ่วางบนหน้า · มือถืออยู่ในแผ่นล่าง
-  const viewTileGroups = [
+  // ✅ (8 ต.ค. 2569) 2 หน้า: "กำลังดำเนินการ" (ตารางหลัก) กับ "ปิดแล้ว · ประวัติ" (หมดอายุ / เข้างานครบแล้ว)
+  const activeTileGroups = [
     {
       title: "สัญญาบริการ",
       items: [
         { value: "contracts", label: "งานสัญญา / รายปี", shortLabel: "งานสัญญา", count: realContractCount, unit: "สัญญา", icon: <Description />, color: "#4f46e5" },
         { value: "overdue", label: "เลยกำหนด / คงค้าง", shortLabel: "เลยกำหนด", count: overdueCount, unit: "สัญญา", icon: <WarningAmber />, color: "#dc2626", alert: true },
-        { value: "expired", label: "สัญญาหมดอายุ", shortLabel: "หมดอายุ", count: expiredCount, unit: "สัญญา", icon: <EventBusy />, color: "#ea580c", alert: true },
       ],
     },
     {
@@ -5285,10 +5326,22 @@ pagedRows.map((c, idx) => {
         { value: "general", label: "งานทั่วไป", count: confirmedGeneralCount, unit: "งาน", icon: <Build />, color: "#059669" },
         { value: "project", label: "งานโปรเจค", count: confirmedProjectCount, unit: "งาน", icon: <Engineering />, color: "#2563eb" },
         ...(isAdminOrManager ? [{ value: "ungrouped", label: "งานเก่าที่ยังไม่จัดกลุ่ม", shortLabel: "ยังไม่จัดกลุ่ม", count: hiddenJobCount, unit: "งาน", icon: <HourglassEmpty />, color: "#d97706" }] : []),
-        { value: "all", label: "ทั้งหมด", count: allFilteredCount, unit: "งาน", icon: <Apps />, color: "#475569" },
+        { value: "all", label: "ทั้งหมดที่กำลังดำเนินการ", shortLabel: "ทั้งหมด", count: allFilteredCount, unit: "งาน", icon: <Apps />, color: "#475569" },
       ],
     },
   ];
+  const closedTileGroups = [
+    {
+      title: "ปิดแล้ว · ย้ายออกจากตารางหลัก",
+      items: [
+        { value: "expired", label: "สัญญาหมดอายุ · รอต่อสัญญา", shortLabel: "หมดอายุ", count: expiredCount, unit: "สัญญา", icon: <EventBusy />, color: "#ea580c", alert: true },
+        { value: "completed", label: "เข้างานครบแล้ว", shortLabel: "เข้างานครบ", count: completedCount, unit: "รายการ", icon: <TaskAlt />, color: "#16a34a" },
+      ],
+    },
+  ];
+  const isClosedScope = CLOSED_VIEWS.includes(viewFilter);
+  const viewTileGroups = isClosedScope ? closedTileGroups : activeTileGroups;
+  const allTileGroups = [...activeTileGroups, ...closedTileGroups];
 
   // มือถือ: จำนวนผู้รับผิดชอบสำหรับ select ในแผ่นล่าง (ชุดเดียวกับแผงการ์ดบนจอใหญ่)
   const responsibleOptions = (() => {
@@ -5300,7 +5353,7 @@ pagedRows.map((c, idx) => {
     });
     return { list: [...m].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "th")), unassigned, total: responsibleRows.length };
   })();
-  const viewItem = viewTileGroups.flatMap((g) => g.items).find((i) => i.value === viewFilter);
+  const viewItem = allTileGroups.flatMap((g) => g.items).find((i) => i.value === viewFilter);
   const mobileActiveCount = activeFilterLabels.length + (viewFilter !== "contracts" ? 1 : 0);
 
   return (
@@ -5401,6 +5454,32 @@ pagedRows.map((c, idx) => {
       {/* ── สลับมุมมอง: การ์ดตัวเลขแทนแท็บเทาเล็กๆ ที่ผู้ใช้ไม่รู้ว่ากดได้ (ดู ViewTiles.js) ──
           ✅ กลุ่ม "สัญญา" (งานสัญญา/เลยกำหนด/หมดอายุ — เลยกำหนดเป็นส่วนย่อยของงานสัญญา) แยกจาก "งานอื่นๆ"
           ✅ แท็บ "งานเก่าที่ยังไม่จัดกลุ่ม" ซ่อนจากช่าง — มีไว้ให้แอดมินไล่จัดหมวดหมู่เท่านั้น */}
+      {/* ✅ สลับหน้า "กำลังดำเนินการ" ↔ "ปิดแล้ว · ประวัติ" */}
+      {!loading && (
+        <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "stretch", sm: "center" }} spacing={1.25} sx={{ mb: 1.5 }}>
+          <Stack direction="row" sx={{ p: "3px", borderRadius: "11px", bgcolor: "#eef2f7", alignSelf: { xs: "stretch", sm: "flex-start" } }}>
+            {[
+              { k: "active", label: "กำลังดำเนินการ", n: allFilteredCount, go: "contracts" },
+              { k: "closed", label: "ปิดแล้ว · ประวัติ", n: expiredCount + completedCount, go: expiredCount > 0 ? "expired" : "completed" },
+            ].map((o) => {
+              const on = (o.k === "closed") === isClosedScope;
+              return (
+                <ButtonBase key={o.k} onClick={() => !on && selectView(o.go)}
+                  sx={{ flex: 1, gap: 0.75, px: 2, height: 36, borderRadius: "9px", fontSize: "0.86rem", fontWeight: 800, whiteSpace: "nowrap",
+                    color: on ? "#0f172a" : "#64748b", bgcolor: on ? "#fff" : "transparent", boxShadow: on ? "0 1px 2px rgba(15,23,42,.12)" : "none" }}>
+                  {o.label}
+                  <Box component="span" sx={{ minWidth: 22, height: 20, px: 0.7, borderRadius: 99, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.72rem", bgcolor: on ? "#f1f5f9" : "rgba(255,255,255,.7)", color: "#475569" }}>{o.n}</Box>
+                </ButtonBase>
+              );
+            })}
+          </Stack>
+          {isClosedScope && (
+            <Typography sx={{ fontSize: "0.78rem", color: "text.secondary" }}>
+              สัญญาที่หมดอายุแล้ว และงานที่เข้างานครบทุกครั้งแล้ว ถูกย้ายออกจากตารางหลักมาไว้ที่นี่ — ยังเปิดดู/แก้ไข/ต่อสัญญาได้ตามปกติ
+            </Typography>
+          )}
+        </Stack>
+      )}
       {!loading && !isMobile && (
         <ViewTiles
           value={viewFilter}
