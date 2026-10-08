@@ -30,7 +30,7 @@ export const STAGE_META = {
   open: { label: "ทั้งหมด", color: BLUE },
   overdue: { label: "เลยกำหนดเข้ารอบ", short: "เลยกำหนด", color: "#dc2626" },
   expired: { label: "หมดอายุ · รอต่อสัญญา", short: "หมดอายุ", color: "#ea580c" },
-  completed: { label: "เข้างานครบแล้ว", short: "เข้างานครบ", color: "#16a34a" },
+  completed: { label: "เข้างานครบ / ต่อสัญญาแล้ว", short: "ครบ/ต่อแล้ว", color: "#16a34a" },
 };
 export const isContractish = (category) => category === "contracts" || category === "all";
 
@@ -46,7 +46,7 @@ export default function ContractNav({ scope, category, stage, onScope, onCategor
 
   const scopes = [
     { k: "active", label: "กำลังดำเนินการ", icon: <PlayCircleOutline />, n: counts.scope.active },
-    { k: "closed", label: isMobile ? "ปิดแล้ว · ประวัติ" : "ปิดแล้ว · ประวัติ (หมดอายุ / เข้างานครบ)", icon: <Inventory2 />, n: counts.scope.closed },
+    { k: "closed", label: isMobile ? "ปิดแล้ว · ประวัติ" : "ปิดแล้ว · ประวัติ (หมดอายุ / ครบ / ต่อแล้ว)", icon: <Inventory2 />, n: counts.scope.closed },
   ];
 
   return (
@@ -121,8 +121,8 @@ export default function ContractNav({ scope, category, stage, onScope, onCategor
             {closed && !isMobile && (
               <Typography sx={{ fontSize: "0.76rem", color: MUTED, ml: stages.length > 1 ? 0.5 : 0, flex: { xs: "1 1 100%", md: "1 1 auto" } }}>
                 {stage === "expired"
-                  ? "สัญญาที่เลยวันสิ้นสุดแล้ว — ย้ายออกจากหน้ากำลังดำเนินการ · เปิดดู/แก้ไข/บันทึกต่อสัญญาได้ตามปกติ"
-                  : "เข้างานครบทุกครั้งแล้ว — ย้ายออกจากหน้ากำลังดำเนินการ · ใช้ช่อง “ช่วงเวลา” ดูย้อนหลังรายปีได้"}
+                  ? "สัญญาที่เลยวันสิ้นสุดและยังไม่ได้ต่อ — กด “ต่อสัญญาปีถัดไป” ที่แถวนั้นเพื่อสร้างสัญญาใหม่จากข้อมูลเดิม"
+                  : "เข้างานครบทุกครั้งแล้ว หรือหมดอายุและต่อสัญญาฉบับใหม่แล้ว — ใช้ช่อง “ช่วงเวลา” ดูย้อนหลังรายปีได้"}
               </Typography>
             )}
           </Stack>

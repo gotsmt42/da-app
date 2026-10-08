@@ -1513,6 +1513,31 @@ export default function ContractOverview() {
   );
   const activeContracts = useMemo(() => contracts.filter((c) => !isClosedOut(c)), [contracts, isClosedOut]);
 
+  /**
+   * ✅ (8 ต.ค. 2569 ผู้ใช้: "ปุ่ม ต่อสัญญาปีถัดไป ทำเลย") สัญญาไหน "ต่อแล้ว" — มีสัญญาจริงของ
+   *    บริษัท + โครงการ + ประเภทงาน + ระบบ เดียวกัน ที่เริ่มหลังสัญญานี้ → key ของสัญญาเดิม → สัญญาฉบับถัดไป
+   *    ใช้แยก "หมดอายุ · รอต่อสัญญา" (ยังต้องตาม) ออกจาก "ต่อสัญญาแล้ว" (เป็นประวัติ)
+   */
+  const renewalOf = useMemo(() => {
+    const norm = (v) => String(v || "").trim().toLowerCase();
+    const groups = new Map();
+    contracts.forEach((c) => {
+      if (!c.isRealContract || !c.contractStart) return;
+      const k = [c.company, c.site, c.title, c.system].map(norm).join("|");
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(c);
+    });
+    const m = new Map();
+    groups.forEach((list) => {
+      list.sort((a, b) => moment(a.contractStart).valueOf() - moment(b.contractStart).valueOf());
+      list.forEach((c, i) => {
+        const next = list.slice(i + 1).find((n) => moment(n.contractStart).isAfter(moment(c.contractStart), "day"));
+        if (next) m.set(c.key, next);
+      });
+    });
+    return m;
+  }, [contracts]);
+
   // ✅ เลือกจัดกลุ่มเป็นสัญญาได้เฉพาะตอนมองเห็นงานเก่าที่ยังไม่จัดกลุ่ม (แท็บ "งานเก่า.../ทั้งหมด")
   // แท็บ "สัญญา" ล้วนๆ ไม่มีอะไรให้เลือกจัดกลุ่มอยู่แล้ว (ทุกแถวมีสัญญาอยู่แล้วทั้งหมด)
   // ✅ ช่างดูอย่างเดียว ไม่มีทางเลือกงานไปจัดกลุ่มเป็นสัญญาได้ — ปิดตรงนี้จุดเดียวพอ ปิดพ่วงทั้งคอลัมน์
@@ -1973,9 +1998,10 @@ export default function ContractOverview() {
   const stageRows = useMemo(() => ({
     open: activeContracts,
     overdue: activeContracts.filter((c) => c.isRealContract && isRoundOverdue(c)),
-    expired: contracts.filter(isExpiredContract),
-    completed: contracts.filter((c) => !isExpiredContract(c) && isCompletedWork(c, countUsedRounds)),
-  }), [contracts, activeContracts]); // eslint-disable-line react-hooks/exhaustive-deps
+    // ✅ "หมดอายุ · รอต่อสัญญา" = เฉพาะที่ยังไม่ได้ต่อ · ต่อแล้วย้ายไปอยู่กับ "เข้างานครบ / ต่อสัญญาแล้ว"
+    expired: contracts.filter((c) => isExpiredContract(c) && !renewalOf.has(c.key)),
+    completed: contracts.filter((c) => (isExpiredContract(c) ? renewalOf.has(c.key) : isCompletedWork(c, countUsedRounds))),
+  }), [contracts, activeContracts, renewalOf]); // eslint-disable-line react-hooks/exhaustive-deps
   const viewBase = useMemo(
     () => (stageRows[stage] || stageRows.open).filter(CATEGORY_PRED[category] || CATEGORY_PRED.all),
     [stageRows, stage, category]
@@ -2649,7 +2675,61 @@ export default function ContractOverview() {
     !form.site.trim() || !form.title.trim() || !form.system.trim() || !form.visitCount ||
     hasInvalidContractRange || isContractNoTaken(form.contractNo);
 
+  // ✅ ต่อสัญญาปีถัดไป — เปิดฟอร์ม "เพิ่มสัญญาใหม่" ตัวเดิม เติมข้อมูลจากสัญญาเดิมให้ครบ
+  //    วันเริ่ม = วันถัดจากวันสิ้นสุดเดิม · ระยะเวลาเท่าเดิม (ปัดเป็นเดือน) · จำนวนครั้ง/ระยะห่าง/มูลค่า/ผู้รับผิดชอบเดิม
+  //    เลขที่สัญญาใหม่ = เลขถัดไปของปีนี้ · ใบเสนอราคาเว้นว่าง (เป็นใบใหม่ทุกครั้ง)
+  const [renewFrom, setRenewFrom] = useState(null);
+  const openRenewDialog = (c) => {
+    const oldStart = c.contractStart ? moment(c.contractStart) : null;
+    const oldEnd = c.contractEnd ? moment(c.contractEnd) : null;
+    const start = oldEnd ? oldEnd.clone().add(1, "day") : moment().startOf("day");
+    const months = oldStart && oldEnd
+      ? Math.max(1, Math.round(oldEnd.clone().add(1, "day").diff(oldStart, "months", true)))
+      : 12;
+    setForm({
+      ...emptyForm,
+      company: c.company || "", site: c.site || "", title: c.title || "", system: c.system || "",
+      responsiblePerson: c.rawResponsiblePerson || "",
+      contractNo: suggestNextContractNo(),
+      contractStart: start.format("YYYY-MM-DD"),
+      contractEnd: start.clone().add(months, "months").subtract(1, "day").format("YYYY-MM-DD"),
+      visitCount: c.visitCount ? String(c.visitCount) : "",
+      intervalMonths: c.intervalMonths ? String(c.intervalMonths) : "",
+      jobValue: c.jobValue != null && c.jobValue !== "" ? String(c.jobValue) : "",
+    });
+    setRenewFrom(c);
+    setFormError("");
+    setInlineAddOpen(false);
+    setAddOpen(true);
+  };
+  /** ป้าย/ปุ่มต่อสัญญา ใต้สถานะสัญญา — ต่อแล้ว = ป้ายเขียว · หมดอายุ/ใกล้หมด = ปุ่ม "ต่อสัญญาปีถัดไป" */
+  const renewWidget = (c) => {
+    if (!c.isRealContract) return null;
+    const next = renewalOf.get(c.key);
+    if (next) {
+      return (
+        <Tooltip title={`สัญญาฉบับใหม่เริ่ม ${formatThai(next.contractStart, "D MMM YYYY")}${next.contractEnd ? ` – ${formatThai(next.contractEnd, "D MMM YYYY")}` : ""}`}>
+          <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.4, height: 20, px: 0.8, borderRadius: 99, fontSize: "0.66rem", fontWeight: 800, whiteSpace: "nowrap", color: "#15803d", bgcolor: "#f0fdf4" }}>
+            <Check sx={{ fontSize: 12 }} />ต่อแล้ว · {next.contractNo || "ฉบับใหม่"}
+          </Box>
+        </Tooltip>
+      );
+    }
+    const st = contractStatusInfo(c)?.state;
+    if (!isAdminOrManager || (st !== "expired" && st !== "expiring")) return null;
+    return (
+      <Button
+        size="small" variant="outlined" startIcon={<Autorenew sx={{ fontSize: "15px !important" }} />}
+        onClick={(e) => { e.stopPropagation(); openRenewDialog(c); }}
+        sx={{ height: 24, px: 1, minWidth: 0, borderRadius: 99, textTransform: "none", fontSize: "0.7rem", fontWeight: 800, whiteSpace: "nowrap",
+          color: "#2563eb", borderColor: alpha("#2563eb", 0.4), bgcolor: "#fff", "&:hover": { borderColor: "#2563eb", bgcolor: alpha("#2563eb", 0.06) } }}
+      >
+        ต่อสัญญาปีถัดไป
+      </Button>
+    );
+  };
   const openAddDialog = () => {
+    setRenewFrom(null);
     setForm({ ...emptyForm, contractNo: suggestNextContractNo() });
     setFormError("");
     setInlineAddOpen(false); // ⚠️ ทั้งสองทางใช้ `form` ก้อนเดียวกัน เปิดพร้อมกันไม่ได้ (ดู openInlineAdd)
@@ -2794,8 +2874,10 @@ export default function ContractOverview() {
       setSaving(false);
       setAddOpen(false);
       setInlineAddOpen(false); // ✅ ปิดแถวร่างท้ายตารางด้วย — ฟังก์ชันนี้ใช้ร่วมกันทั้ง 2 ทางเข้า
+      const renewedFromNo = renewFrom?.contractNo;
+      setRenewFrom(null);
       Swal.fire({
-        title: "บันทึกสัญญาใหม่สำเร็จ ✅",
+        title: renewedFromNo ? `ต่อสัญญาจาก ${renewedFromNo} สำเร็จ ✅` : "บันทึกสัญญาใหม่สำเร็จ ✅",
         text: values.firstVisitStart ? undefined : 'ยังไม่ได้ระบุวันที่เข้างาน — สัญญาถูกบันทึกเป็น "สัญญาเปล่า" กดชิป "📌 กดเพื่อลงวันที่" ที่ช่องครั้งที่ 1 ในตารางเมื่อรู้วันที่จริง',
         icon: "success",
         timer: values.firstVisitStart ? 1500 : 2500,
@@ -3857,6 +3939,8 @@ pagedRows.map((c, idx) => {
                                 onCommit={(v) => commitEdit(c, v)}
                                 onCancel={cancelEdit}
                               />
+                              {/* ✅ ต่อสัญญา — อยู่ใต้วันสิ้นสุดสัญญาเลย (ช่องที่ทำให้รู้ว่าต้องต่อ) */}
+                              {renewWidget(c) && <Box sx={{ pt: 0.4 }}>{renewWidget(c)}</Box>}
                             </Stack>
                           </TableCell>
                         )}
@@ -3923,6 +4007,7 @@ pagedRows.map((c, idx) => {
                               const sd = statusDisplay(c);
                               const hint = sd.missing.length > 0 ? `ยังไม่ได้กรอก: ${sd.missing.join(" · ")}` : "";
                               return (
+                                <>
                                 <EditableCell
                                   Wrapper={Box} align="center" width="100%"
                                   editable={isAdminOrManager} columnKey="statusNote"
@@ -3964,6 +4049,7 @@ pagedRows.map((c, idx) => {
                                   onCommit={(v) => commitEdit(c, v)}
                                   onCancel={cancelEdit}
                                 />
+                                </>
                               );
                             })()}
 
@@ -4298,7 +4384,8 @@ pagedRows.map((c, idx) => {
   // อยู่ในเงื่อนไข roundTeamEdit?.visitId === ... จึงปลอดภัย) แต่พอย้ายมาอยู่ใน dep array มันไม่มี
   // เงื่อนไขคุมแล้ว และ roundTeamEdit เริ่มต้นเป็น null → TypeError ตั้งแต่ render แรก
   // ⚠️ ทุก dep ที่เป็นการเข้าถึงสมาชิกของ state ที่มีโอกาสเป็น null ต้องใช้ ?. เสมอ
-  ), [rowEditorKey, renderColumns, responsibleDisplay, beginEdit, beginRoundTeamEdit, canEditBasicField, canEditField, canEditRoundTeam, colWidth, commitEdit, commitRoundTeamEdit, editSaving, editValue, tableEditingCell?.field, tableEditingCell?.key, expandedVisitCells, handleDetachRound, handleOpenBilling, handleOpenDocs, hideContractOnlyColumns, isAdminOrManager, pagedRows, pendingDraftChip, roundTeamEdit?.value, roundTeamEdit?.visitId, roundTeamSaving, selectedIds, showCheckboxes, systemOptions, teamOptions, titleOptions, useMobileTable, visitColumns]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- renewWidget สร้างใหม่ทุก render · ผูกกับ renewalOf แทน
+  ), [renewalOf, rowEditorKey, renderColumns, responsibleDisplay, beginEdit, beginRoundTeamEdit, canEditBasicField, canEditField, canEditRoundTeam, colWidth, commitEdit, commitRoundTeamEdit, editSaving, editValue, tableEditingCell?.field, tableEditingCell?.key, expandedVisitCells, handleDetachRound, handleOpenBilling, handleOpenDocs, hideContractOnlyColumns, isAdminOrManager, pagedRows, pendingDraftChip, roundTeamEdit?.value, roundTeamEdit?.visitId, roundTeamSaving, selectedIds, showCheckboxes, systemOptions, teamOptions, titleOptions, useMobileTable, visitColumns]);
 
   // ── ย้าย "ครั้งที่ N" ไปครั้งที่อื่นได้อย่างอิสระ ──────────────────────────
   // ✅ ย้ายยกทั้งครั้ง (วันที่/สถานะ/ทีม/ประวัติงานทุก document ของครั้งนั้นติดไปด้วยครบ ไม่ใช่แค่เลข) —
@@ -4672,6 +4759,7 @@ pagedRows.map((c, idx) => {
                 <WarningAmber sx={{ fontSize: 13 }} />{overdueInfo.shortLabel}
               </Box>
             )}
+            {renewWidget(c)}
           </Stack>
         </Box>
 
@@ -6437,6 +6525,16 @@ pagedRows.map((c, idx) => {
               </MenuItem>
             ),
             c.isRealContract && (
+              <MenuItem key="renew" onClick={() => { close(); openRenewDialog(c); }}>
+                <ListItemIcon><Autorenew fontSize="small" sx={{ color: "#2563eb" }} /></ListItemIcon>
+                <ListItemText
+                  primary="ต่อสัญญาปีถัดไป"
+                  secondary={renewalOf.get(c.key) ? `ต่อแล้ว → ${renewalOf.get(c.key).contractNo || "ฉบับใหม่"}` : "สร้างสัญญาใหม่จากข้อมูลเดิม"}
+                  secondaryTypographyProps={{ fontSize: "0.7rem" }}
+                />
+              </MenuItem>
+            ),
+            c.isRealContract && (
               <MenuItem key="history" disabled={historyCount === 0} onClick={() => { close(); setHistoryContract(c); }}>
                 <ListItemIcon><History fontSize="small" /></ListItemIcon>
                 <ListItemText primary="ประวัติการแก้ไข" secondary={historyCount ? `${historyCount} ครั้ง` : "ยังไม่เคยแก้ไข"} secondaryTypographyProps={{ fontSize: "0.7rem" }} />
@@ -6500,9 +6598,11 @@ pagedRows.map((c, idx) => {
             <Description sx={{ fontSize: 22 }} />
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography sx={{ fontWeight: 800, fontSize: "1.1rem", lineHeight: 1.3 }}>เพิ่มสัญญาใหม่</Typography>
+            <Typography sx={{ fontWeight: 800, fontSize: "1.1rem", lineHeight: 1.3 }}>{renewFrom ? "ต่อสัญญาปีถัดไป" : "เพิ่มสัญญาใหม่"}</Typography>
             <Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB }}>
-              กรอกข้อมูลหลักของสัญญา — วันที่เข้างานแต่ละครั้งเพิ่มทีหลังในตารางได้
+              {renewFrom
+                ? `ต่อจาก ${renewFrom.contractNo || "สัญญาเดิม"} · ${renewFrom.site || ""} — เติมข้อมูลเดิมให้แล้ว ตรวจวันที่ มูลค่า และเลขที่ใบเสนอราคา แล้วกดบันทึก`
+                : "กรอกข้อมูลหลักของสัญญา — วันที่เข้างานแต่ละครั้งเพิ่มทีหลังในตารางได้"}
             </Typography>
           </Box>
           <IconButton size="small" onClick={closeAddDialog} aria-label="ปิด"><Close fontSize="small" /></IconButton>
