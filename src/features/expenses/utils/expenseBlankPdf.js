@@ -592,14 +592,15 @@ const drawSignatures = (doc, pen, ctx) => {
   doc.setDrawColor(226, 232, 240);
   doc.setLineWidth(0.3);
   doc.line(L, SIG_TOP, R, SIG_TOP);
-  const colW = W / 4;
   const boxes = [
-    // ✅ ช่องลงนามตรงกับใบที่ออกจากระบบ (ผู้ใช้สั่งให้ควบรวมผู้ตรวจสอบ/อนุมัติเป็นช่องเดียว)
+    // ✅ ช่องลงนามตรงกับใบที่ออกจากระบบ — ผู้ตรวจสอบ กับ ผู้อนุมัติ แยกคนละช่อง (ผู้ใช้สั่ง 8 ต.ค. 2569)
     { role: ctx.style.signRole, name: ctx.pre.requester },
-    { role: "ผู้ตรวจสอบ / อนุมัติ" },
+    { role: "ผู้ตรวจสอบ" },
+    { role: "ผู้อนุมัติ" },
     { role: "ผู้อนุมัติเบิกจ่าย" },
     { role: "ผู้บันทึกเข้าระบบ", docLine: true },
   ];
+  const colW = W / boxes.length;
   boxes.forEach((b, i) => {
     const cx = L + colW * i + colW / 2;
     const half = colW / 2 - 3;

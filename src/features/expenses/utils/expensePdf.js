@@ -665,13 +665,9 @@ const fitFontSize = (doc, text, maxW, size, minSize) => {
 };
 
 /**
- * ช่องลงนาม 3 ช่อง
- * ✅ ผู้ใช้สั่ง: "แก้ไขใหม่ให้เหลือแค่ 3 ส่วน ให้ควบรวม ผู้ตรวจสอบ/อนุมัติ"
- *   ผู้เบิกค่าใช้จ่าย → ผู้ตรวจสอบ/อนุมัติ → ผู้อนุมัติเบิกจ่าย
- *
- * ⚠️ ในระบบ "ตรวจสอบ" กับ "อนุมัติ" ยังเป็นคนละมือ คนละสถานะ คนละลายเซ็นเหมือนเดิม (แอดมินตรวจ → ผู้จัดการอนุมัติ)
- * — ที่ควบรวมคือ "ช่องลงนามบนกระดาษ" เท่านั้น ช่องนี้จึงพิมพ์ชื่อ/ลายเซ็นของ **ผู้อนุมัติ** (ขั้นที่ 3)
- * แล้วกำกับบรรทัดเล็กว่าใครเป็นผู้ตรวจสอบ (ขั้นที่ 2) ถ้าเป็นคนละคน — ตรวจย้อนหลังได้ครบเหมือนเดิม
+ * ช่องลงนาม 4 ช่อง (ใบค่าจ้างผู้รับเหมา 5 ช่อง)
+ *   ผู้เบิกค่าใช้จ่าย → ผู้ตรวจสอบ → ผู้อนุมัติ → ผู้อนุมัติเบิกจ่าย (→ ผู้รับเงิน)
+ * ✅ (8 ต.ค. 2569) ผู้ใช้สั่งให้แยก "ผู้ตรวจสอบ" กับ "ผู้อนุมัติ" กลับเป็นคนละช่อง (เดิมเคยควบรวม) — ตรงกับขั้นตอนจริงในระบบ
  * ⚠️ ช่องที่ขั้นยังไม่ถึงเว้นว่างไว้ให้เซ็นมือ (ใบเก่าก่อนมีขั้นไหนก็เว้นช่องนั้นเหมือนเดิม)
  */
 const renderSignatures = (doc, e, hasBold, signatures = null) => {
@@ -679,8 +675,6 @@ const renderSignatures = (doc, e, hasBold, signatures = null) => {
   const approved = e.approvedAt && !["pending", "reviewed", "rejected"].includes(e.status);
   const reviewed = e.reviewedAt && e.status !== "rejected";
   const reviewerName = reviewed ? personFullName(e.reviewedBy) : "";
-  const sameReviewerApprover = reviewed && approved
-    && String(e.reviewedBy?.userId || "") === String(e.approvedBy?.userId || "");
   /**
    * ขั้นอนุมัติเบิกจ่าย = ตอนบันทึกจ่ายเงิน Advance / ปิดส่วนต่างใบเคลม (payment.by คือผู้กด)
    * ⚠️ ใบเคลมที่ใช้พอดี (ส่วนต่าง 0) ปิดจบที่ขั้นอนุมัติ ไม่มีเงินให้เบิกจ่าย — เขียนบอกในช่องแทนการเว้นว่าง
@@ -694,21 +688,10 @@ const renderSignatures = (doc, e, hasBold, signatures = null) => {
   const boxes = [
     // ✅ ชื่อ-นามสกุลในวงเล็บใต้ลายเซ็น (ผู้ใช้ขอ) — ใบเก่า/คนนอกระบบที่ไม่มีนามสกุลในทะเบียนได้ชื่อต้นตามเดิม
     { role: slip === "contractor" ? "ผู้จัดทำ / ผู้เบิก" : "ผู้เบิกค่าใช้จ่าย", name: personFullName(e.requester), date: e.submittedAt || e.docDate, seal: signatures?.requester },
-    /**
-     * ช่องรวม: ลงนามโดย "ผู้อนุมัติ" — ถ้ายังไม่ถึงขั้นอนุมัติแต่ตรวจสอบแล้ว ให้พิมพ์ของผู้ตรวจสอบไปก่อน
-     * ⚠️ ชื่อกับลายเซ็นต้องเป็นคนเดียวกันเสมอ ห้ามเอาลายเซ็นผู้ตรวจสอบไปวางใต้ชื่อผู้อนุมัติ
-     */
-    {
-      role: "ผู้ตรวจสอบ / อนุมัติ",
-      name: approved ? personFullName(e.approvedBy) : reviewerName,
-      date: approved ? e.approvedAt : (reviewed ? e.reviewedAt : null),
-      seal: approved ? signatures?.approver : (reviewed ? signatures?.reviewer : null),
-      extra: approved
-        ? (sameReviewerApprover
-          ? "ตรวจสอบและอนุมัติโดยผู้ลงนามนี้"
-          : reviewerName ? `ตรวจสอบโดย ${reviewerName} · ${thaiDate(e.reviewedAt)}` : "")
-        : (reviewed ? "ตรวจสอบแล้ว · รออนุมัติ" : ""),
-    },
+    // ✅ (8 ต.ค. 2569 ผู้ใช้: "ให้แสดงลายเซ็น ผู้ตรวจสอบ และ อนุมัติแยกกันให้ชัดเจน") แยกกลับเป็น 2 ช่อง
+    //    แต่ละช่อง = ชื่อ + ลายเซ็น + วันที่ของขั้นนั้นเอง (ขั้นที่ยังไม่ถึงเว้นว่างให้เซ็นมือ)
+    { role: "ผู้ตรวจสอบ", name: reviewerName, date: reviewed ? e.reviewedAt : null, seal: reviewed ? signatures?.reviewer : null },
+    { role: "ผู้อนุมัติ", name: approved ? personFullName(e.approvedBy) : "", date: approved ? e.approvedAt : null, seal: approved ? signatures?.approver : null },
     {
       role: "ผู้อนุมัติเบิกจ่าย",
       name: disbursed ? personFullName(e.payment.by) : "",
