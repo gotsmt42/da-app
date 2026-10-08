@@ -31,6 +31,7 @@
 import {
   SALES_APPOINTMENT_TYPES, SALES_TYPE_META, salesEventColors, SALES_MANUAL_STATUSES, SALES_STATUS_DEFAULT, SALES_PHOTO_REQUIRED, toSalesStatus,
 } from "../../salesAppointmentTypes";
+import { SALES_FORM_CSS, salesFormHeader, salesTypeCard } from "./salesFormStyle";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 
 const esc = (s = "") =>
@@ -84,27 +85,19 @@ export const getEditSalesAppointment = async ({
     .sort((a, b) => new Date(a.start) - new Date(b.start));
   const hasSiblings = siblingEvents.length > 0;
 
-  const typeCards = SALES_APPOINTMENT_TYPES.map(
-    (t) => `
-    <label class="sa-type" data-color="${t.color}">
-      <input type="radio" name="saType" value="${esc(t.key)}" ${t.key === currentType ? "checked" : ""} />
-      <span class="sa-type-icon">${t.icon}</span>
-      <span class="sa-type-title">${esc(t.key)}</span>
-      <span class="sa-type-hint">${esc(t.hint)}</span>
-    </label>`
-  ).join("");
+  const typeCards = SALES_APPOINTMENT_TYPES.map((t) => salesTypeCard(t, t.key === currentType, esc)).join("");
 
   // ✅ สถานะนัดหมายเป็นชุดของฝ่ายขายเอง (ดู SALES_STATUSES) ไม่ใช่สถานะงานช่าง
   const currentStatus = toSalesStatus(pick("status"));
   // ✅ เลือกได้เฉพาะสถานะที่ไม่ต้องใช้รูปหน้างาน — "เข้าพบแล้ว/ปิดงานแล้ว" กดจากหน้ารายละเอียดนัด
   const lockedStatus = SALES_PHOTO_REQUIRED.includes(currentStatus);
   const statusChips = lockedStatus
-    ? `<div style="font-size:12.5px;color:#475569;background:#f1f5f9;border-radius:10px;padding:9px 12px;">สถานะปัจจุบัน: <b>${esc(currentStatus)}</b> — เปลี่ยนได้จากหน้ารายละเอียดนัด</div>`
+    ? `<div class="sa-locked">สถานะปัจจุบัน: <b>${esc(currentStatus)}</b> — เปลี่ยนได้จากหน้ารายละเอียดนัด</div>`
     : SALES_MANUAL_STATUSES.map(
     (st) => `
     <label class="sa-stat" data-color="${st.color}">
       <input type="radio" name="saStatus" value="${esc(st.key)}" ${st.key === currentStatus ? "checked" : ""} />
-      <span>${st.icon} ${esc(st.key)}</span>
+      <span>${esc(st.key)}</span>
     </label>`
     ).join("");
 
@@ -118,184 +111,81 @@ export const getEditSalesAppointment = async ({
   ].filter(Boolean).join(" · ") || "ไม่ระบุลูกค้า";
 
   const html = `
-  <style>
-    .swal-sales-appt.swal2-popup {
-      padding: 0 !important; border-radius: 18px !important; overflow: hidden !important;
-      width: min(96vw, 720px) !important; max-height: 92vh !important;
-      display: flex !important; flex-direction: column !important;
-      font-family: 'Inter', system-ui, sans-serif !important;
-      box-shadow: 0 25px 60px rgba(15,23,42,.22) !important;
-    }
-    .swal-sales-appt .swal2-html-container {
-      margin: 0 !important; padding: 0 !important; overflow: hidden !important;
-      display: flex !important; flex-direction: column !important; flex: 1 !important; min-height: 0 !important;
-    }
-    #sa-modal-inner { display: flex; flex-direction: column; height: 100%; min-height: 0; }
-    .swal-sales-appt .swal2-title, .swal-sales-appt .swal2-actions, .swal-sales-appt .swal2-footer {
-      display: none !important;
-    }
-    .swal-sales-appt .swal2-close {
-      position: absolute; top: 14px; right: 16px; z-index: 99;
-      width: 32px; height: 32px; border-radius: 50%;
-      background: rgba(255,255,255,.16) !important; color: #fff !important;
-      font-size: 18px; display: flex; align-items: center; justify-content: center;
-      transition: background .2s;
-    }
-    .swal-sales-appt .swal2-close:hover { background: rgba(255,255,255,.30) !important; }
-
-    /* ── Header (ตรึงบนสุดเสมอ) ── */
-    #sa-header { padding: 18px 46px 16px 22px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
-    #sa-header-icon { font-size: 26px; line-height: 1; }
-    #sa-header-info { flex: 1; min-width: 0; }
-    #sa-header-info h3 { margin: 0; font-size: 17px; font-weight: 700; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.15); }
-    #sa-header-info small {
-      font-size: 12px; color: rgba(255,255,255,.82);
-      display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-
-    /* ── Body (พื้นที่เดียวที่เลื่อนได้) ── */
-    #sa-body { padding: 4px 22px 18px; background: #f8fafc; overflow-y: auto; flex: 1; min-height: 0; }
-
-    .sa-label { font-size: 12px; font-weight: 700; color: #64748b; margin: 14px 0 6px; }
-    .sa-sublabel { font-size: 11px; font-weight: 600; color: #94a3b8; margin: 0 0 4px; }
-    .sa-stats { display: flex; flex-wrap: wrap; gap: 6px; }
-    .sa-stat { position: relative; display: inline-flex; align-items: center; gap: 5px;
-      padding: 6px 12px; border: 1.5px solid #e2e8f0; border-radius: 999px; cursor: pointer;
-      font-size: 13px; font-weight: 700; color: #64748b; transition: border-color .15s, background .15s, color .15s; }
-    .sa-stat input { position: absolute; opacity: 0; pointer-events: none; }
-    .sa-stat:has(input:checked) { border-color: var(--sa-s); background: color-mix(in srgb, var(--sa-s) 12%, white); color: var(--sa-s); }
-    .sa-types { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
-    .sa-type { position: relative; display: block; padding: 10px 12px; border: 1.5px solid #e2e8f0;
-      border-radius: 12px; cursor: pointer; transition: border-color .15s, background .15s; }
-    .sa-type input { position: absolute; opacity: 0; pointer-events: none; }
-    .sa-type-icon { font-size: 18px; display: block; }
-    .sa-type-title { display: block; font-weight: 700; font-size: 13px; margin-top: 2px; }
-    .sa-type-hint { display: block; font-size: 11px; color: #94a3b8; }
-    .sa-type:has(input:checked) { border-color: var(--sa-c); background: color-mix(in srgb, var(--sa-c) 8%, white); }
-    .sa-type:has(input:checked) .sa-type-title { color: var(--sa-c); }
-    .sa-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .sa-wrap input[type="text"], .sa-wrap input[type="date"], .sa-wrap textarea {
-      width: 100%; padding: 9px 11px; border: 1.5px solid #e2e8f0; border-radius: 10px;
-      font-size: 14px; font-family: inherit; box-sizing: border-box; }
-    .sa-wrap textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
-    .sa-wrap input:focus, .sa-wrap textarea:focus { outline: none; border-color: #2563eb; }
-    .sa-req { color: #dc2626; }
-    @media (max-width: 560px) { .sa-row { grid-template-columns: 1fr; } }
-
-    /* ── หลายวัน (ไม่ติดกัน) — มิเรอร์ ee-checkbox-row/ee-multi-date-row ของ EditEvent.js ── */
-    .sa-checkbox-row {
-      display: flex; align-items: center; gap: 8px;
-      font-size: 12.5px; font-weight: 600; color: #374151;
-      margin: 2px 0 4px; cursor: pointer;
-    }
-    .sa-checkbox-row input { width: auto !important; cursor: pointer; }
-    .sa-checkbox-hint { font-size: 11px; color: #94a3b8; margin: 0 0 10px; }
-    /* 🐛 ที่แก้ (ผู้ใช้แจ้ง: "ตรงมันล้น ไม่สวยงาม"): เดิมยัด 2 ช่องวันที่ + ป้ายวันที่ภาษาไทย + ปุ่มลบ
-       ไว้แถวเดียวด้วย flex — ช่องวันที่หลังอัปเกรดเป็นปฏิทิน พ.ศ. (MUI) กว้างกว่า input เปล่าๆ มาก
-       บวกป้ายข้อความอีกก้อนจึงล้นขอบกล่อง ป้ายนั้นซ้ำซ้อนอยู่แล้วด้วย (ปฏิทิน พ.ศ. ที่อัปเกรดให้
-       ก็เขียนวันที่ชัดเจนไม่กำกวมอยู่แล้ว) ✅ ตัดป้ายทิ้ง + ห่อบรรทัดได้เมื่อพื้นที่ไม่พอ (flex-wrap)
-       กันล้นซ้ำอีกในอนาคตถ้าจอแคบมากๆ */
-    .sa-multi-date-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
-    .sa-multi-date-row input { flex: 1; min-width: 130px; }
-    .sa-multi-date-row .sa-range-sep { flex-shrink: 0; color: #94a3b8; font-weight: 700; }
-    .sa-multi-date-remove { flex-shrink: 0; width: 34px; height: 34px; padding: 0 !important; }
-    .sa-row-confirm-bar {
-      display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
-      background: #fef2f2; border: 1.5px dashed #fecaca; border-radius: 8px;
-      padding: 8px 10px; margin: -2px 0 8px; font-size: 11.5px; color: #991b1b;
-    }
-    .sa-row-confirm-actions { display: flex; gap: 6px; flex-shrink: 0; }
-    .sa-row-confirm-actions .sa-btn { padding: 5px 12px; font-size: 11.5px; }
-
-    /* ── Footer (ตรึงล่างสุดเสมอ) ── */
-    #sa-action-bar {
-      display: flex; align-items: center; gap: 10px; padding: 14px 22px 16px;
-      background: #f1f5f9; border-top: 1px solid #e2e8f0;
-      flex-shrink: 0; position: sticky; bottom: 0; z-index: 10; flex-wrap: wrap;
-    }
-    .sa-btn {
-      display: inline-flex; align-items: center; gap: 7px;
-      border: none; border-radius: 9px; padding: 10px 20px;
-      font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;
-      transition: opacity .15s, transform .1s; font-family: inherit;
-    }
-    .sa-btn:hover { opacity: .88; transform: translateY(-1px); }
-    .sa-btn:active { transform: translateY(0); }
-    .sa-btn:disabled { opacity: .6 !important; cursor: not-allowed; transform: none !important; }
-    .sa-btn-primary { background: #2563eb; color: #fff; }
-    .sa-btn-ghost { background: #e2e8f0; color: #475569; }
-    .sa-btn-danger { background: #fef2f2; color: #dc2626; border: 1.5px solid #fecaca; }
-    .sa-btn-danger:hover { background: #fee2e2; opacity: 1; }
-    .sa-btn-spacer { flex: 1; }
-    @media (max-width: 480px) { #sa-action-bar { justify-content: center; } .sa-btn-spacer { display: none; } }
-  </style>
+  <style>${SALES_FORM_CSS}</style>
 
   <div id="sa-modal-inner">
+    ${salesFormHeader({ icon: headerType.icon, color: headerType.color, title: "แก้ไขนัดหมาย", sub: esc(headerSub) })}
 
-    <!-- Header -->
-    <div id="sa-header" style="background: linear-gradient(135deg, ${headerType.color}, color-mix(in srgb, ${headerType.color} 72%, black));">
-      <div id="sa-header-icon">${headerType.icon}</div>
-      <div id="sa-header-info">
-        <h3>แก้ไขนัดหมาย</h3>
-        <small title="${esc(headerSub)}">${esc(headerSub)}</small>
-      </div>
-    </div>
-
-    <!-- Body -->
     <div id="sa-body" class="sa-wrap">
-      <div class="sa-label" style="margin-top:10px;">ประเภทนัดหมาย</div>
-      <div class="sa-types">${typeCards}</div>
+      <div class="sa-card">
+        <div class="sa-card-title">ประเภทนัดหมาย</div>
+        <div class="sa-types">${typeCards}</div>
+      </div>
 
-      <div class="sa-label"><span class="sa-req">*</span> สถานที่ / ชื่อโครงการ</div>
-      <input type="text" id="saSite" value="${esc(currentSite)}" />
+      <div class="sa-card">
+        <div class="sa-card-title">สถานที่และลูกค้า</div>
+        <div class="sa-label"><span class="sa-req">*</span> สถานที่ / ชื่อโครงการ</div>
+        <input type="text" id="saSite" value="${esc(currentSite)}" />
+        <div class="sa-label">ลูกค้า / บริษัท</div>
+        <input type="text" id="saCompany" value="${esc(currentCompany)}" />
+      </div>
 
-      <div class="sa-label">ลูกค้า / บริษัท</div>
-      <input type="text" id="saCompany" value="${esc(currentCompany)}" />
+      <div class="sa-card">
+        <div class="sa-card-title">วันและเวลา</div>
+        <label class="sa-checkbox-row">
+          <input type="checkbox" id="saMultiDateToggle" ${hasSiblings ? "checked" : ""} />
+          <span>นัดหลายวัน (ไม่ติดกันก็ได้)<small>ทุกช่วงวันถือเป็นนัดหมายเดียวกัน</small></span>
+        </label>
+        ${hasSiblings ? `<div class="sa-checkbox-hint">มีอยู่แล้ว ${siblingEvents.length + 1} ช่วงวัน — ลบ/เพิ่มช่วงได้ด้านล่าง</div>` : ""}
 
-      <div class="sa-label">วันที่</div>
-      <label class="sa-checkbox-row">
-        <input type="checkbox" id="saMultiDateToggle" ${hasSiblings ? "checked" : ""} />
-        🗓️ นัดนี้ต้องเข้างานหลายวัน (ไม่ติดกันก็ได้) — ถือเป็นนัดหมายเดียวกัน
-      </label>
-      ${hasSiblings ? `<div class="sa-checkbox-hint">มีอยู่แล้ว ${siblingEvents.length + 1} ช่วงวัน — ลบ/เพิ่มช่วงได้ด้านล่าง</div>` : ""}
-
-      <div id="saSingleDateSection" style="${hasSiblings ? "display:none;" : ""}">
-        <div class="sa-row">
-          <div>
-            <div class="sa-sublabel">วันที่เริ่ม</div>
-            <input type="date" id="saDateStart" value="${start.isValid() ? start.format("YYYY-MM-DD") : ""}" />
-          </div>
-          <div>
-            <div class="sa-sublabel">วันที่สิ้นสุด</div>
-            <input type="date" id="saDateEnd" value="${displayEnd.isValid() ? displayEnd.format("YYYY-MM-DD") : ""}" />
+        <div id="saSingleDateSection" style="${hasSiblings ? "display:none;" : ""}">
+          <div class="sa-row">
+            <div>
+              <div class="sa-sublabel">วันที่เริ่ม</div>
+              <input type="date" id="saDateStart" value="${start.isValid() ? start.format("YYYY-MM-DD") : ""}" />
+            </div>
+            <div>
+              <div class="sa-sublabel">วันที่สิ้นสุด</div>
+              <input type="date" id="saDateEnd" value="${displayEnd.isValid() ? displayEnd.format("YYYY-MM-DD") : ""}" />
+            </div>
           </div>
         </div>
+
+        <div id="saMultiDateSection" style="${hasSiblings ? "" : "display:none;"}">
+          <div id="saMultiDateList"></div>
+          <button type="button" class="sa-btn sa-btn-ghost" id="saAddDateBtn">＋ เพิ่มช่วงวันที่</button>
+        </div>
+
+        <div class="sa-row" style="margin-top:12px">
+          <div>
+            <div class="sa-sublabel">เวลาเริ่ม</div>
+            <input type="text" id="saStart" placeholder="08:30" inputmode="decimal" maxlength="5" value="${esc(pick("startTime"))}" />
+          </div>
+          <div>
+            <div class="sa-sublabel">เวลาสิ้นสุด</div>
+            <input type="text" id="saEnd" placeholder="17:00" inputmode="decimal" maxlength="5" value="${esc(pick("endTime"))}" />
+          </div>
+        </div>
+        <div class="sa-hint">ไม่ระบุเวลา = ทั้งวัน · ระบุเวลาได้เฉพาะนัดวันเดียว (แบบ 24 ชม.)</div>
       </div>
 
-      <div id="saMultiDateSection" style="${hasSiblings ? "" : "display:none;"}">
-        <div id="saMultiDateList"></div>
-        <button type="button" class="sa-btn sa-btn-ghost" id="saAddDateBtn" style="margin-bottom:10px;">➕ เพิ่มช่วงวันที่</button>
+      <div class="sa-card">
+        <div class="sa-card-title">สถานะนัดหมาย</div>
+        <div class="sa-stats">${statusChips}</div>
       </div>
 
-      <div class="sa-label">เวลา (ถ้ามี — เฉพาะนัดวันเดียวเท่านั้นที่ลงเป็นเวลาตรงเป๊ะได้)</div>
-      <div class="sa-row" style="gap:6px">
-        <input type="text" id="saStart" placeholder="เช่น 08:30" inputmode="decimal" maxlength="5" value="${esc(pick("startTime"))}" />
-        <input type="text" id="saEnd" placeholder="เช่น 17:00" inputmode="decimal" maxlength="5" value="${esc(pick("endTime"))}" />
+      <div class="sa-card">
+        <div class="sa-card-title">รายละเอียด <small>สิ่งที่ต้องเตรียม · เรื่องที่จะคุย</small></div>
+        <textarea id="saDetail" rows="5">${esc(pick("description"))}</textarea>
       </div>
-
-      <div class="sa-label">สถานะนัดหมาย</div>
-      <div class="sa-stats">${statusChips}</div>
-
-      <div class="sa-label">รายละเอียด / สิ่งที่ต้องเตรียม</div>
-      <textarea id="saDetail" rows="8">${esc(pick("description"))}</textarea>
     </div>
 
     <!-- Footer -->
     <div id="sa-action-bar">
-      <button class="sa-btn sa-btn-danger" id="sa-btnDelete">🗑 ลบนัดหมาย</button>
+      <button class="sa-btn sa-btn-danger" id="sa-btnDelete">ลบ</button>
       <div class="sa-btn-spacer"></div>
       <button class="sa-btn sa-btn-ghost" id="sa-btnCancel">ยกเลิก</button>
-      <button class="sa-btn sa-btn-primary" id="sa-btnConfirm">💾 บันทึกการแก้ไข</button>
+      <button class="sa-btn sa-btn-primary" id="sa-btnConfirm">บันทึกการแก้ไข</button>
     </div>
 
   </div>`;
@@ -304,7 +194,7 @@ export const getEditSalesAppointment = async ({
 
   await Swal.fire({
     html,
-    width: "720px",
+    width: "640px",
     showConfirmButton: false,
     showCancelButton: false,
     showCloseButton: true,
