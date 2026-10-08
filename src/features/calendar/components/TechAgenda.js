@@ -9,7 +9,7 @@
  *       เสร็จสิ้น     = ดำเนินการเสร็จสิ้น (ล่าสุดก่อน)
  *   ⚠️ ข้อมูลชุดเดียวกับปฏิทิน (filteredCalendarEvents) ตัวกรอง/ค้นหาด้านบนจึงมีผลกับทั้งสองมุมมอง
  */
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import { Box, Stack, Typography, Button, ButtonBase } from "@mui/material";
@@ -17,7 +17,7 @@ import { alpha } from "@mui/material/styles";
 import { Add, FileDownloadOutlined, ChevronRight, EngineeringOutlined, Groups2Outlined } from "@mui/icons-material";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, PRIMARY_BTN_SX } from "@/shared/ui/PageKit";
-import { Kpi } from "./SalesAgenda";
+import { Kpi, usePaged, ListPager } from "./SalesAgenda";
 
 const AMBER = "#d97706";
 const RED = "#dc2626";
@@ -50,7 +50,9 @@ const rowOf = (e) => {
     approval: e.approvalStatus || "approved",
     closeReq: Boolean(e.closeRequested) && e.status !== DONE,
     time: startTime ? `${startTime}${endTime ? `–${endTime}` : ""}` : (multiDay ? `ถึง ${formatThai(end, "D MMM")}` : "ทั้งวัน"),
+    // ✅ (8 ต.ค. 2569 "สีประเภทงานไม่ตรงหน้าปฏิทิน") ใช้คู่สีของงานเอง (พื้น + ตัวหนังสือ) ชุดเดียวกับการ์ดบนปฏิทิน
     color: e.backgroundColor || "#64748b",
+    textColor: e.textColor || "#ffffff",
     team,
   };
 };
@@ -143,10 +145,10 @@ function Row({ r, onOpen }) {
         </Typography>
         {/^\d/.test(r.time) && r.time.includes("–") && <Typography sx={{ fontSize: "0.7rem", color: MUTED }}>{r.time.split("–")[1]}</Typography>}
       </Box>
-      <Box sx={{ width: 3, borderRadius: 2, flexShrink: 0, bgcolor: r.color }} />
+      <Box sx={{ width: 4, borderRadius: 2, flexShrink: 0, bgcolor: r.color, boxShadow: "inset 0 0 0 1px rgba(15,23,42,.12)" }} />
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Stack direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 0, flexWrap: "wrap", rowGap: 0.4 }}>
-          <Box component="span" sx={{ px: 0.75, height: 20, display: "inline-flex", alignItems: "center", borderRadius: 1, fontSize: "0.7rem", fontWeight: 800, color: "#fff", bgcolor: r.color, whiteSpace: "nowrap", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis" }}>
+          <Box component="span" sx={{ px: 0.75, height: 20, display: "inline-flex", alignItems: "center", borderRadius: 1, fontSize: "0.7rem", fontWeight: 800, color: r.textColor, bgcolor: r.color, border: "1px solid rgba(15,23,42,.14)", whiteSpace: "nowrap", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis" }}>
             {r.e.title || "งาน"}
           </Box>
           <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, height: 20, px: 0.8, borderRadius: 99, fontSize: "0.66rem", fontWeight: 800, bgcolor: alpha(c, 0.1), color: c, whiteSpace: "nowrap" }}>
@@ -203,7 +205,6 @@ const timeKey = (r) => (/^\d/.test(r.time) ? r.time.slice(0, 5) : "00:00");
 
 /** มุมมองรายการของตารางงานช่าง */
 export default function TechAgenda({ events, onOpen, onAdd, canAdd = true, tab, onTab }) {
-  const [doneLimit, setDoneLimit] = useState(20);
   const today = moment().startOf("day");
   const rows = useMemo(() => (events || []).filter(isTechRow).map(rowOf), [events]);
   const { upcoming, follow, done } = useMemo(() => {
@@ -221,12 +222,14 @@ export default function TechAgenda({ events, onOpen, onAdd, canAdd = true, tab, 
     { k: "done", label: "เสร็จสิ้น", n: done.length, desc: "งานที่ดำเนินการเสร็จสิ้นแล้ว (ล่าสุดก่อน)" },
   ];
   const cur = tabs.find((t) => t.k === tab) || tabs[0];
-  const list = cur.k === "follow" ? follow : cur.k === "done" ? done.slice(0, doneLimit) : upcoming;
+  const full = cur.k === "follow" ? follow : cur.k === "done" ? done : upcoming;
+  const pg = usePaged(full, cur.k);
+  const list = pg.items;
   // งานหลายวันที่เริ่มไปแล้วแต่ยังไม่จบ → แสดงในกลุ่ม "วันนี้"
   const dayOf = (r) => (cur.k === "upcoming" && r.start.isBefore(today) ? today : r.start);
 
   return (
-    <Box>
+    <Box ref={pg.topRef} sx={{ scrollMarginTop: 80 }}>
       <Stack direction="row" spacing={0.75} sx={{ mb: 0.75, overflowX: "auto", pb: 0.25 }}>
         {tabs.map((t) => {
           const on = cur.k === t.k;
@@ -267,11 +270,7 @@ export default function TechAgenda({ events, onOpen, onAdd, canAdd = true, tab, 
         groupByDay(list, dayOf).map(([day, rs]) => <DayGroup key={day} day={day} rows={rs} onOpen={onOpen} />)
       )}
 
-      {cur.k === "done" && done.length > doneLimit && (
-        <Box sx={{ textAlign: "center", mt: 1 }}>
-          <Button onClick={() => setDoneLimit((n) => n + 30)} sx={{ textTransform: "none", fontWeight: 800 }}>ดูเพิ่มเติม ({done.length - doneLimit})</Button>
-        </Box>
-      )}
+      <ListPager {...pg} />
     </Box>
   );
 }

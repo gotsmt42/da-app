@@ -8,10 +8,10 @@
  *     จัดกลุ่มตามวัน แต่ละแถว = เวลา · ไอคอนประเภท · สถานที่ · ลูกค้า · สถานะ · จำนวนรูป
  *   ⚠️ ข้อมูลชุดเดียวกับปฏิทิน (filteredCalendarEvents) ตัวกรอง/ค้นหาด้านบนจึงมีผลกับทั้งสองมุมมอง
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
-import { Box, Stack, Typography, Button, ButtonBase } from "@mui/material";
+import { Box, Stack, Typography, Button, ButtonBase, Pagination } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
   Add, FileDownloadOutlined, ViewAgendaOutlined, CalendarMonthOutlined, PhotoCameraOutlined, ChevronRight, EventAvailableOutlined,
@@ -102,6 +102,39 @@ export function SalesTopBar({ events, onAdd, onTab, onExport, exportDisabled, ti
       </Stack>
 
     </Box>
+  );
+}
+
+/**
+ * แบ่งหน้าของมุมมองรายการ (8 ต.ค. 2569 ผู้ใช้: "ทำระบบแบ่งหน้าที่ควรมีด้วย") — ใช้ร่วมกันทั้งฝ่ายขายและช่าง
+ * หน้าละ PAGE_SIZE รายการ · กลับหน้า 1 เมื่อเปลี่ยนแท็บ/ข้อมูล (ตัวกรอง/ค้นหา) · เลื่อนกลับหัวรายการเมื่อเปลี่ยนหน้า
+ */
+export const PAGE_SIZE = 15;
+export function usePaged(list, resetKey) {
+  const [page, setPage] = useState(1);
+  const topRef = useRef(null);
+  const pageCount = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  useEffect(() => { setPage(1); }, [resetKey, list.length]);
+  const cur = Math.min(page, pageCount);
+  const items = list.slice((cur - 1) * PAGE_SIZE, cur * PAGE_SIZE);
+  const go = (p) => {
+    setPage(p);
+    requestAnimationFrame(() => topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
+  return { items, page: cur, pageCount, total: list.length, go, topRef };
+}
+export function ListPager({ page, pageCount, total, go }) {
+  if (total <= PAGE_SIZE) return null;
+  const from = (page - 1) * PAGE_SIZE + 1;
+  const to = Math.min(total, page * PAGE_SIZE);
+  return (
+    <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" justifyContent="space-between" spacing={1}
+      sx={{ mt: 1.5, px: 1.5, py: 1, bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3 }}>
+      <Typography sx={{ fontSize: "0.8rem", color: MUTED }}>
+        แสดง <b style={{ color: INK }}>{from}–{to}</b> จาก <b style={{ color: INK }}>{total}</b> รายการ
+      </Typography>
+      <Pagination count={pageCount} page={page} onChange={(_, p) => go(p)} shape="rounded" size="small" color="primary" siblingCount={1} />
+    </Stack>
   );
 }
 
@@ -206,7 +239,6 @@ const timeKey = (r) => (r.time === "ทั้งวัน" ? "00:00" : r.time.sl
 
 /** มุมมองรายการ */
 export default function SalesAgenda({ events, onOpen, onAdd, showOwner, tab, onTab }) {
-  const [pastLimit, setPastLimit] = useState(20);
   const today = moment().startOf("day");
   const rows = useMemo(() => (events || []).filter(isSalesRow).map(rowOf), [events]);
 
@@ -238,10 +270,12 @@ export default function SalesAgenda({ events, onOpen, onAdd, showOwner, tab, onT
     ? { text: "เข้าพบแล้ว — สรุปผลแล้วกดปิดงาน", color: TEAL }
     : { text: `เลยวันนัด ${today.diff(r.start.clone().startOf("day"), "days")} วัน — ยังไม่บันทึกเข้าพบ`, color: AMBER });
 
-  const list = tab === "follow" ? follow : tab === "history" ? past.slice(0, pastLimit) : upcoming;
+  const full = tab === "follow" ? follow : tab === "history" ? past : upcoming;
+  const pg = usePaged(full, tab);
+  const list = pg.items;
 
   return (
-    <Box>
+    <Box ref={pg.topRef} sx={{ scrollMarginTop: 80 }}>
       <Stack direction="row" spacing={0.75} sx={{ mb: 0.75, overflowX: "auto", pb: 0.25 }}>
         {tabs.map((t) => {
           const on = tab === t.k;
@@ -284,11 +318,7 @@ export default function SalesAgenda({ events, onOpen, onAdd, showOwner, tab, onT
         groupByDay(list).map(([day, rs]) => <DayGroup key={day} day={day} rows={rs} onOpen={onOpen} showOwner={showOwner} />)
       )}
 
-      {tab === "history" && past.length > pastLimit && (
-        <Box sx={{ textAlign: "center", mt: 1 }}>
-          <Button onClick={() => setPastLimit((n) => n + 30)} sx={{ textTransform: "none", fontWeight: 800 }}>ดูเพิ่มเติม ({past.length - pastLimit})</Button>
-        </Box>
-      )}
+      <ListPager {...pg} />
     </Box>
   );
 }
