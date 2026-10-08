@@ -2064,7 +2064,7 @@
     margin: 0 1px !important; border-radius: 5px !important; font-size: 10px !important;
   }
   .ec-sc { padding: 3px 3px 4px; gap: 1px; }
-  .ec-sc-site { -webkit-line-clamp: 3; }
+  .ec-sc-site { -webkit-line-clamp: 2; }
   .ec-sc-type { padding: 0 3px; border-radius: 3px; }
   .modern-calendar-container:not(.ec-zoomed) .ec-sc-end { display: none; }
 }
@@ -2090,7 +2090,10 @@
 
   .ec-sales-page .fc-col-header-cell-cushion { font-size: 9.5px !important; padding: 3px 1px !important; }
   .ec-sales-page .fc-daygrid-day-number { font-size: 10.5px; padding: 2px 3px !important; }
-  .modern-calendar-container .calendar-wrapper.ec-sales .fc-daygrid-event { font-size: 9px !important; border-radius: 4px !important; }
+  /* (8 ต.ค. 2569 "ลดขนาด text ลงอีก ยังล้น") — ทั้งโหมดพอดีจอและโหมดขยาย (+) */
+  .modern-calendar-container .calendar-wrapper.ec-sales .fc-daygrid-event { font-size: 8px !important; border-radius: 4px !important; }
+  .ec-sales-page .ec-sc-site { -webkit-line-clamp: 2; line-height: 1.25; }
+  .ec-sales-page .ec-sc-meta { font-size: .78em; }
   .ec-sales-page .ec-sc { padding: 2px 3px 3px; }
   .ec-sales-page .ec-sc-type { font-size: .8em; line-height: 1.5; }
   .ec-sales-page .ec-sales-legend { padding: 8px 10px; }
