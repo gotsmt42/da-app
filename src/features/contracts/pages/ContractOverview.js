@@ -2605,6 +2605,8 @@ export default function ContractOverview() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [form, setForm] = useState(emptyForm);
+  // ✅ รอบเข้าแบบไม่ลงตัว (เช่น ทุก 5 เดือน) — เปิดช่องกรอกเองเฉพาะตอนต้องใช้ ปกติเลือกจากชิป "ปีละ N ครั้ง"
+  const [customRounds, setCustomRounds] = useState(false);
 
   const setField = (field) => (val) => setForm((f) => ({ ...f, [field]: val }));
 
@@ -2757,6 +2759,7 @@ export default function ContractOverview() {
       jobValue: c.jobValue != null && c.jobValue !== "" ? String(c.jobValue) : "",
     });
     setRenewFrom(c);
+    setCustomRounds(Boolean(c.intervalMonths) && !visitsPerYear(c.intervalMonths));
     setFormError("");
     setInlineAddOpen(false);
     setAddOpen(true);
@@ -2796,6 +2799,7 @@ export default function ContractOverview() {
   };
   const openAddDialog = () => {
     setRenewFrom(null);
+    setCustomRounds(false);
     setForm({ ...emptyForm, contractNo: suggestNextContractNo() });
     setFormError("");
     setInlineAddOpen(false); // ⚠️ ทั้งสองทางใช้ `form` ก้อนเดียวกัน เปิดพร้อมกันไม่ได้ (ดู openInlineAdd)
@@ -6687,7 +6691,7 @@ pagedRows.map((c, idx) => {
           !form.site.trim() && "โครงการ",
           !form.title.trim() && "ประเภทงาน",
           !form.system.trim() && "ระบบงาน",
-          !form.visitCount && "จำนวนครั้ง",
+          !form.visitCount && "เข้าปีละกี่ครั้ง",
         ].filter(Boolean);
         return (
         <Dialog
@@ -6714,126 +6718,166 @@ pagedRows.map((c, idx) => {
           <Stack spacing={2} sx={{ pt: { xs: 1.5, sm: 2.5 } }}>
             {formError && <Alert severity="error" sx={{ borderRadius: 2 }}>{formError}</Alert>}
 
-            <FormSection step={1} title="ลูกค้าและงาน" hint="งานนี้ของลูกค้ารายไหน เป็นงานอะไร และใครดูแล">
-              <Stack spacing={1.5}>
+            {/* ✅ (8 ต.ค. 2569 ผู้ใช้: "ปรับจุดวาง ขั้นตอนไหนควรขึ้นก่อนและหลัง ไม่ให้สับสน · กรอกเองน้อยที่สุด")
+                ลำดับตามที่คนคิดจริง: งานอะไร → สัญญากี่ปี เข้าปีละกี่ครั้ง → เลขที่/มูลค่า → ใครดูแล → ครั้งแรกเมื่อไร
+                ช่องที่คำนวณได้ (วันสิ้นสุด · จำนวนครั้งทั้งหมด · ระยะห่าง · เลขที่สัญญา) ระบบเติมให้ แก้เองได้ */}
+            <FormSection step={1} title="งานและลูกค้า" hint="สัญญานี้เป็นงานอะไร ของโครงการไหน">
+              <FieldGrid>
+                <Autocomplete
+                  freeSolo fullWidth options={siteOptions}
+                  inputValue={form.site}
+                  onInputChange={(_, v) => setField("site")(v)}
+                  renderInput={(params) => <TextField {...params} label="โครงการ / สถานที่ *" size="small" autoFocus />}
+                />
+                <Autocomplete
+                  freeSolo fullWidth options={companyOptions}
+                  inputValue={form.company}
+                  onInputChange={(_, v) => setField("company")(v)}
+                  renderInput={(params) => <TextField {...params} label="บริษัท" size="small" />}
+                />
+                <Autocomplete
+                  freeSolo fullWidth options={titleOptions}
+                  inputValue={form.title}
+                  onInputChange={(_, v) => setField("title")(v)}
+                  renderInput={(params) => <TextField {...params} label="ประเภทงาน *" size="small" placeholder="เช่น PM" />}
+                />
+                <Autocomplete
+                  freeSolo fullWidth options={systemOptions}
+                  inputValue={form.system}
+                  onInputChange={(_, v) => setField("system")(v)}
+                  renderInput={(params) => <TextField {...params} label="ระบบงาน *" size="small" placeholder="เช่น Fire Alarm" />}
+                />
+              </FieldGrid>
+            </FormSection>
+
+            <FormSection step={2} title="ระยะสัญญาและรอบเข้างาน" hint="เลือกวันเริ่ม · กี่ปี · เข้าปีละกี่ครั้ง — ที่เหลือระบบคำนวณให้">
+              <Stack spacing={1.75}>
+                {/* ① วันเริ่ม + กี่ปี → วันสิ้นสุด */}
                 <FieldGrid>
-                  <Autocomplete
-                    freeSolo fullWidth options={siteOptions}
-                    inputValue={form.site}
-                    onInputChange={(_, v) => setField("site")(v)}
-                    renderInput={(params) => <TextField {...params} label="โครงการ / สถานที่ *" size="small" autoFocus />}
-                  />
-                  <Autocomplete
-                    freeSolo fullWidth options={companyOptions}
-                    inputValue={form.company}
-                    onInputChange={(_, v) => setField("company")(v)}
-                    renderInput={(params) => <TextField {...params} label="บริษัท" size="small" />}
-                  />
-                  <Autocomplete
-                    freeSolo fullWidth options={titleOptions}
-                    inputValue={form.title}
-                    onInputChange={(_, v) => setField("title")(v)}
-                    renderInput={(params) => <TextField {...params} label="ประเภทงาน *" size="small" placeholder="เช่น PM" />}
-                  />
-                  <Autocomplete
-                    freeSolo fullWidth options={systemOptions}
-                    inputValue={form.system}
-                    onInputChange={(_, v) => setField("system")(v)}
-                    renderInput={(params) => <TextField {...params} label="ระบบงาน *" size="small" placeholder="เช่น Fire Alarm" />}
+                  <ThaiDatePicker label="วันที่เริ่มสัญญา" value={form.contractStart} onChange={setContractStart} />
+                  <ThaiDatePicker
+                    label="วันที่สิ้นสุดสัญญา" value={form.contractEnd} onChange={setContractEnd}
+                    error={hasInvalidContractRange}
+                    helperText={hasInvalidContractRange ? "ต้องไม่ก่อนวันที่เริ่มสัญญา" : form.contractStart ? "ตั้งให้จากจำนวนปี · แก้ได้" : "เลือกวันเริ่มก่อน ระบบตั้งให้"}
                   />
                 </FieldGrid>
-                {/* ✅ "ผู้รับผิดชอบงาน" ≠ "ทีมที่เข้างาน" — ผู้รับผิดชอบติดตามสัญญาทั้งฉบับ ทีมเลือกแยกรายครั้ง */}
-                <ResponsiblePicker
-                  value={form.responsiblePerson}
-                  onChange={setField("responsiblePerson")}
-                  options={teamOptions}
-                  employees={lookups.employees}
-                  helperText="คนที่ติดตามสัญญานี้ทั้งฉบับ — ทีมที่เข้างานเลือกแยกรายครั้งได้"
-                />
+                <Box>
+                  <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: "#334155", mb: 0.75 }}>สัญญากี่ปี</Typography>
+                  <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: "wrap" }}>
+                    {Array.from({ length: MAX_CONTRACT_YEARS }, (_, i) => i + 1).map((y) => {
+                      const on = formYears === y;
+                      return (
+                        <Chip key={y} label={`${y} ปี`} onClick={() => pickYears(y)} onMouseDown={(e) => e.preventDefault()}
+                          sx={{ height: 32, minWidth: 64, fontWeight: 800, fontSize: "0.82rem", cursor: "pointer", borderRadius: 2,
+                            bgcolor: on ? "#2563eb" : "#fff", color: on ? "#fff" : "#334155", border: `1px solid ${on ? "#2563eb" : BORDER_MAIN}`,
+                            "&:hover": { bgcolor: on ? "#1d4ed8" : alpha("#2563eb", 0.06) } }} />
+                      );
+                    })}
+                  </Stack>
+                </Box>
+
+                {/* ② เข้าปีละกี่ครั้ง → ระยะห่าง + จำนวนครั้งทั้งหมด */}
+                <Box>
+                  <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: "#334155", mb: 0.75 }}>เข้าปีละกี่ครั้ง *</Typography>
+                  <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: "wrap" }}>
+                    {INTERVAL_MONTHS_PRESETS.slice().reverse().map((p) => {
+                      const on = !customRounds && String(form.intervalMonths) === String(p.months);
+                      return (
+                        <Chip key={p.months} label={`${p.perYear} ครั้ง`} onClick={() => { setCustomRounds(false); pickInterval(String(p.months)); }}
+                          onMouseDown={(e) => e.preventDefault()} title={p.label}
+                          sx={{ height: 32, minWidth: 64, fontWeight: 800, fontSize: "0.82rem", cursor: "pointer", borderRadius: 2,
+                            bgcolor: on ? "#2563eb" : "#fff", color: on ? "#fff" : "#334155", border: `1px solid ${on ? "#2563eb" : BORDER_MAIN}`,
+                            "&:hover": { bgcolor: on ? "#1d4ed8" : alpha("#2563eb", 0.06) } }} />
+                      );
+                    })}
+                    <Chip label="กำหนดเอง" onClick={() => setCustomRounds(true)} onMouseDown={(e) => e.preventDefault()}
+                      sx={{ height: 32, fontWeight: 700, fontSize: "0.8rem", cursor: "pointer", borderRadius: 2,
+                        bgcolor: customRounds ? alpha("#2563eb", 0.08) : "#fff", color: customRounds ? "#2563eb" : TEXT_SUB,
+                        border: `1px dashed ${customRounds ? "#2563eb" : BORDER_MAIN}` }} />
+                  </Stack>
+                </Box>
+                {customRounds && (
+                  <FieldGrid>
+                    <TextField
+                      fullWidth size="small" type="number" label="เข้าทุกกี่เดือน" value={form.intervalMonths}
+                      onChange={(e) => { const v = e.target.value; if (visitsPerYear(v)) pickInterval(v); else setField("intervalMonths")(v); }}
+                      inputProps={{ min: 1, max: 24 }}
+                      InputProps={{ endAdornment: <InputAdornment position="end">เดือน</InputAdornment> }}
+                      helperText="ใช้เตือนเมื่อถึงรอบเข้างานครั้งถัดไป"
+                    />
+                    <TextField
+                      fullWidth size="small" type="number" label="จำนวนครั้งทั้งหมด *" value={form.visitCount}
+                      onChange={(e) => setField("visitCount")(e.target.value)} inputProps={{ min: 1, max: MAX_VISIT_COUNT }}
+                      InputProps={{ endAdornment: <InputAdornment position="end">ครั้ง</InputAdornment> }}
+                      error={countMismatch}
+                      helperText={countMismatch ? `ไม่ตรงกับรอบเข้า (ปีละ ${perYear} × ${formYears} ปี = ${expectedTotal} ครั้ง)` : `รวมทุกปี · สูงสุด ${MAX_VISIT_COUNT} ครั้ง`}
+                    />
+                  </FieldGrid>
+                )}
+                {countMismatch && (
+                  <Alert
+                    severity="warning" sx={{ borderRadius: 2, py: 0.25, "& .MuiAlert-message": { fontSize: "0.8rem" } }}
+                    action={<Button size="small" color="inherit" sx={{ textTransform: "none", fontWeight: 700 }} onClick={() => setField("visitCount")(String(expectedTotal))}>ใช้ {expectedTotal} ครั้ง</Button>}
+                  >
+                    ปีละ {perYear} ครั้ง × {formYears} ปี = {expectedTotal} ครั้ง — แก้ให้ตรงกันเพื่อไม่ให้ตารางและแจ้งเตือนสับสน
+                  </Alert>
+                )}
+
+                {/* ③ สรุปให้เห็นผลก่อนบันทึก */}
+                {form.visitCount ? (
+                  <Box sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#eff6ff", border: `1px solid ${alpha("#2563eb", 0.2)}` }}>
+                    <Typography sx={{ fontSize: "0.86rem", fontWeight: 800, color: "#1e3a8a" }}>
+                      {perYear
+                        ? `ปีละ ${perYear} ครั้ง × ${formYears} ปี = ${form.visitCount} ครั้ง · เข้าทุก ${form.intervalMonths} เดือน`
+                        : `รวม ${form.visitCount} ครั้ง${form.intervalMonths ? ` · เข้าทุก ${form.intervalMonths} เดือน` : ""}`}
+                    </Typography>
+                    {form.contractStart && (
+                      <Typography sx={{ fontSize: "0.76rem", color: "#334155", mt: 0.3 }}>
+                        {(() => {
+                          const per = perYear || Number(form.visitCount);
+                          const y0 = moment(form.contractStart).year() + 543;
+                          return formYears > 1 && perYear
+                            ? `ในงานจะแสดงเป็น ครั้งที่ 1/${per} - ${y0} … ${per}/${per} - ${y0} แล้วเริ่ม 1/${per} - ${y0 + 1} ในปีถัดไป`
+                            : `ในงานจะแสดงเป็น ครั้งที่ 1/${per} - ${y0} … ${per}/${per} - ${y0}`;
+                        })()}
+                      </Typography>
+                    )}
+                  </Box>
+                ) : (
+                  <Typography sx={{ fontSize: "0.76rem", color: "#b45309" }}>เลือก “เข้าปีละกี่ครั้ง” ระบบจะคำนวณระยะห่างและจำนวนครั้งทั้งหมดให้</Typography>
+                )}
               </Stack>
             </FormSection>
 
-            <FormSection step={2} title="เอกสารและมูลค่าสัญญา" hint="เลขที่เอกสาร ระยะเวลา และมูลค่าทั้งสัญญา">
+            <FormSection step={3} title="เลขที่เอกสารและมูลค่า" hint="เลขที่สัญญาระบบตั้งให้ · ใบเสนอราคาและมูลค่าใส่ภายหลังได้">
               <FieldGrid>
                 <TextField
                   fullWidth size="small" label="เลขที่สัญญา" value={form.contractNo}
                   onChange={(e) => setField("contractNo")(e.target.value)}
                   error={isContractNoTaken(form.contractNo)}
-                  helperText={isContractNoTaken(form.contractNo) ? "เลขที่นี้ถูกใช้ไปแล้ว" : "ระบบแนะนำให้อัตโนมัติ แก้ไขได้"}
+                  helperText={isContractNoTaken(form.contractNo) ? "เลขที่นี้ถูกใช้ไปแล้ว" : "ระบบตั้งให้อัตโนมัติ แก้ไขได้"}
                 />
                 <TextField fullWidth size="small" label="เลขที่ใบเสนอราคา" value={form.quotationNo}
                   onChange={(e) => setField("quotationNo")(e.target.value)} />
-                <ThaiDatePicker label="วันที่เริ่มสัญญา"
-                  value={form.contractStart} onChange={setContractStart} />
-                <ThaiDatePicker label="วันที่สิ้นสุดสัญญา"
-                  value={form.contractEnd} onChange={setContractEnd}
-                  error={hasInvalidContractRange}
-                  helperText={hasInvalidContractRange ? "ต้องไม่ก่อนวันที่เริ่มสัญญา" : ""} />
                 <TextField fullWidth size="small" type="number" label="มูลค่างานทั้งสัญญา" value={form.jobValue}
                   onChange={(e) => setField("jobValue")(e.target.value)} inputProps={{ min: 0 }}
                   InputProps={{ startAdornment: <InputAdornment position="start">฿</InputAdornment>, endAdornment: <InputAdornment position="end">บาท</InputAdornment> }} />
               </FieldGrid>
             </FormSection>
 
-            <FormSection
-              step={3} title="รอบการเข้างาน" hint="เลือกจำนวนครั้งต่อปี ระบบตั้งระยะห่างให้เอง — หรือพิมพ์เองก็ได้"
-              action={perYear && form.visitCount && !countMismatch ? (
-                <Chip size="small" label={formYears > 1 ? `ปีละ ${perYear} ครั้ง × ${formYears} ปี = ${form.visitCount} ครั้ง` : `${form.visitCount} ครั้ง · ทุก ${form.intervalMonths} เดือน`}
-                  sx={{ height: 24, fontWeight: 700, fontSize: "0.72rem", bgcolor: alpha("#16a34a", 0.1), color: "#15803d" }} />
-              ) : null}
-            >
-              <Stack spacing={1.5}>
-                <IntervalMonthsQuickPicks value={form.intervalMonths} onPick={pickInterval} />
-                {/* ✅ จำนวนปีของสัญญา — คำนวณจากวันเริ่ม–สิ้นสุดให้ก่อน แก้เองได้ (แก้แล้ววันสิ้นสุดเลื่อนตาม)
-                    ครั้งที่ของงานนับใหม่ทุกปี เช่น 1/4 - 2569 … 1/4 - 2570 */}
-                <TextField
-                  size="small" type="number" label="สัญญากี่ปี" value={form.contractYears}
-                  onChange={(e) => {
-                    const y = Math.floor(Number(e.target.value));
-                    if (!e.target.value) { setField("contractYears")(""); return; }
-                    if (y >= 1 && y <= MAX_CONTRACT_YEARS) pickYears(y);
-                  }}
-                  inputProps={{ min: 1, max: MAX_CONTRACT_YEARS }}
-                  InputProps={{ endAdornment: <InputAdornment position="end">ปี</InputAdornment> }}
-                  sx={{ maxWidth: { sm: 260 } }}
-                  helperText={form.contractStart && form.contractEnd
-                    ? "คำนวณจากวันเริ่ม–สิ้นสุดสัญญาให้แล้ว · แก้ได้ (วันสิ้นสุดเลื่อนตาม)"
-                    : `1-${MAX_CONTRACT_YEARS} ปี · ระบุวันเริ่มสัญญา ระบบตั้งวันสิ้นสุดให้`}
-                />
-                <FieldGrid>
-                  <TextField
-                    fullWidth size="small" type="number" label="เข้าทุกกี่เดือน" value={form.intervalMonths}
-                    // ✅ พิมพ์รอบเข้าที่หาร 12 ลงตัว = ตั้งจำนวนครั้งให้ตรงกันในตัว (เหมือนกดปุ่มลัด) — กันข้อมูลขัดกัน
-                    //    ตั้งแต่ต้นทาง ซึ่งเคยทำให้ตารางขึ้น "2/2" แต่ยังมีช่องให้ลงครั้งที่ 3
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (visitsPerYear(v)) pickInterval(v); else setField("intervalMonths")(v);
-                    }}
-                    inputProps={{ min: 1, max: 24 }}
-                    InputProps={{ endAdornment: <InputAdornment position="end">เดือน</InputAdornment> }}
-                    helperText="ใช้เตือนเมื่อถึงรอบเข้างานครั้งถัดไป"
-                  />
-                  <TextField
-                    fullWidth size="small" type="number" label="จำนวนครั้งทั้งหมด *" value={form.visitCount}
-                    onChange={(e) => setField("visitCount")(e.target.value)} inputProps={{ min: 1, max: MAX_VISIT_COUNT }}
-                    InputProps={{ endAdornment: <InputAdornment position="end">ครั้ง</InputAdornment> }}
-                    error={countMismatch}
-                    helperText={countMismatch ? `ไม่ตรงกับรอบเข้า (ปีละ ${perYear} ครั้ง × ${formYears} ปี = ${expectedTotal} ครั้ง)` : perYear ? `ปีละ ${perYear} ครั้ง × ${formYears} ปี` : `สูงสุด ${MAX_VISIT_COUNT} ครั้ง`}
-                  />
-                </FieldGrid>
-                {countMismatch && (
-                  <Alert
-                    severity="warning" sx={{ borderRadius: 2, py: 0.25, "& .MuiAlert-message": { fontSize: "0.8rem" } }}
-                    action={<Button size="small" color="inherit" sx={{ textTransform: "none", fontWeight: 700 }} onClick={() => setField("visitCount")(String(expectedTotal))}>ใช้ {expectedTotal} ครั้ง</Button>}
-                  >
-                    ระบบนับจำนวนครั้งจากรอบเข้า × จำนวนปี ({expectedTotal} ครั้ง) — แก้ให้ตรงกันเพื่อไม่ให้ตารางและแจ้งเตือนสับสน
-                  </Alert>
-                )}
-              </Stack>
+            <FormSection step={4} title="ผู้รับผิดชอบ" hint="คนที่ติดตามสัญญานี้ทั้งฉบับ">
+              {/* ✅ "ผู้รับผิดชอบงาน" ≠ "ทีมที่เข้างาน" — ผู้รับผิดชอบติดตามสัญญาทั้งฉบับ ทีมเลือกแยกรายครั้ง */}
+              <ResponsiblePicker
+                value={form.responsiblePerson}
+                onChange={setField("responsiblePerson")}
+                options={teamOptions}
+                employees={lookups.employees}
+                helperText="ทีมที่เข้างานเลือกแยกรายครั้งได้ภายหลัง"
+              />
             </FormSection>
 
             <FormSection
-              step={4} optional title="วันที่เข้างานครั้งที่ 1"
+              step={5} optional title="วันที่เข้างานครั้งที่ 1"
               hint={form.firstVisitStart ? "จะลงตารางเป็นครั้งที่ 1 ทันทีที่บันทึก" : "ยังไม่รู้วันที่ก็เว้นไว้ได้ — เพิ่มทีหลังที่ปุ่ม + ในตาราง"}
             >
               <FieldGrid>
