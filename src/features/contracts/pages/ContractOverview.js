@@ -2677,8 +2677,14 @@ export default function ContractOverview() {
 
   // ✅ ต่อสัญญาปีถัดไป — เปิดฟอร์ม "เพิ่มสัญญาใหม่" ตัวเดิม เติมข้อมูลจากสัญญาเดิมให้ครบ
   //    วันเริ่ม = วันถัดจากวันสิ้นสุดเดิม · ระยะเวลาเท่าเดิม (ปัดเป็นเดือน) · จำนวนครั้ง/ระยะห่าง/มูลค่า/ผู้รับผิดชอบเดิม
-  //    เลขที่สัญญาใหม่ = เลขถัดไปของปีนี้ · ใบเสนอราคาเว้นว่าง (เป็นใบใหม่ทุกครั้ง)
+  //    เลขที่สัญญา = เลขเดิม เปลี่ยนปี (ดู renewContractNo) · ใบเสนอราคาเว้นว่าง (เป็นใบใหม่ทุกครั้ง)
   const [renewFrom, setRenewFrom] = useState(null);
+  // ✅ (8 ต.ค. 2569 ผู้ใช้: "การต่อสัญญาให้เป็นเลข FAPTY เดิม และเปลี่ยน /ปี") FAPTY01-2569 → FAPTY01-2570
+  //    เลขเดิมไม่ตรงรูปแบบ (ตัวอักษร+เลข-ปี) → ใช้เลขถัดไปของปีนี้แทน · เลขซ้ำ → ฟอร์มเตือนให้แก้ก่อนบันทึก
+  const renewContractNo = (oldNo) => {
+    const m = String(oldNo || "").trim().match(CONTRACT_NO_PATTERN);
+    return m ? `${m[1]}${m[2]}-${Number(m[3]) + 1}` : suggestNextContractNo();
+  };
   const openRenewDialog = (c) => {
     const oldStart = c.contractStart ? moment(c.contractStart) : null;
     const oldEnd = c.contractEnd ? moment(c.contractEnd) : null;
@@ -2690,7 +2696,7 @@ export default function ContractOverview() {
       ...emptyForm,
       company: c.company || "", site: c.site || "", title: c.title || "", system: c.system || "",
       responsiblePerson: c.rawResponsiblePerson || "",
-      contractNo: suggestNextContractNo(),
+      contractNo: renewContractNo(c.contractNo),
       contractStart: start.format("YYYY-MM-DD"),
       contractEnd: start.clone().add(months, "months").subtract(1, "day").format("YYYY-MM-DD"),
       visitCount: c.visitCount ? String(c.visitCount) : "",
@@ -2703,7 +2709,7 @@ export default function ContractOverview() {
     setAddOpen(true);
   };
   /** ป้าย/ปุ่มต่อสัญญา ใต้สถานะสัญญา — ต่อแล้ว = ป้ายเขียว · หมดอายุ/ใกล้หมด = ปุ่ม "ต่อสัญญาปีถัดไป" */
-  const renewWidget = (c) => {
+  const renewWidget = (c, { block = false } = {}) => {
     if (!c.isRealContract) return null;
     const next = renewalOf.get(c.key);
     if (next) {
@@ -2717,12 +2723,19 @@ export default function ContractOverview() {
     }
     const st = contractStatusInfo(c)?.state;
     if (!isAdminOrManager || (st !== "expired" && st !== "expiring")) return null;
+    // ✅ (8 ต.ค. 2569 ผู้ใช้: "ปุ่มดูยาก กลมกลืนกับอันอื่นเกินไป") ปุ่มทึบสีน้ำเงิน ทรงสี่เหลี่ยมมน — ไม่ใช่ทรงแคปซูล
+    //    แบบป้ายสถานะ · มือถือวางเป็นแถวของตัวเองเต็มความกว้าง แยกจากกลุ่มป้าย
     return (
       <Button
-        size="small" variant="outlined" startIcon={<Autorenew sx={{ fontSize: "15px !important" }} />}
+        variant="contained" disableElevation fullWidth={block}
+        startIcon={<Autorenew sx={{ fontSize: block ? "19px !important" : "16px !important" }} />}
         onClick={(e) => { e.stopPropagation(); openRenewDialog(c); }}
-        sx={{ height: 24, px: 1, minWidth: 0, borderRadius: 99, textTransform: "none", fontSize: "0.7rem", fontWeight: 800, whiteSpace: "nowrap",
-          color: "#2563eb", borderColor: alpha("#2563eb", 0.4), bgcolor: "#fff", "&:hover": { borderColor: "#2563eb", bgcolor: alpha("#2563eb", 0.06) } }}
+        sx={{
+          height: block ? 40 : 30, px: block ? 2 : 1.25, minWidth: 0, borderRadius: 2, textTransform: "none",
+          fontSize: block ? "0.88rem" : "0.76rem", fontWeight: 800, whiteSpace: "nowrap",
+          bgcolor: "#2563eb", color: "#fff", boxShadow: "0 1px 2px rgba(37,99,235,.35)",
+          "&:hover": { bgcolor: "#1d4ed8" },
+        }}
       >
         ต่อสัญญาปีถัดไป
       </Button>
@@ -3940,7 +3953,7 @@ pagedRows.map((c, idx) => {
                                 onCancel={cancelEdit}
                               />
                               {/* ✅ ต่อสัญญา — อยู่ใต้วันสิ้นสุดสัญญาเลย (ช่องที่ทำให้รู้ว่าต้องต่อ) */}
-                              {renewWidget(c) && <Box sx={{ pt: 0.4 }}>{renewWidget(c)}</Box>}
+                              {renewWidget(c) && <Box sx={{ pt: 0.6 }}>{renewWidget(c)}</Box>}
                             </Stack>
                           </TableCell>
                         )}
@@ -4759,8 +4772,9 @@ pagedRows.map((c, idx) => {
                 <WarningAmber sx={{ fontSize: 13 }} />{overdueInfo.shortLabel}
               </Box>
             )}
-            {renewWidget(c)}
           </Stack>
+          {/* ✅ ต่อสัญญา — แถวของตัวเองใต้ป้าย (ต่อแล้ว = ป้ายเขียว · หมดอายุ/ใกล้หมด = ปุ่มเต็มความกว้าง) */}
+          {renewWidget(c, { block: true }) && <Box sx={{ mt: 1.1 }}>{renewWidget(c, { block: true })}</Box>}
         </Box>
 
         {/* แถบล่าง: ความคืบหน้า · ล่าสุด · แผนที่ · รายละเอียด */}
