@@ -1121,26 +1121,26 @@ function EventCalendar() {
   const [salesDialogId, setSalesDialogId] = useState(null);
   // ✅ (8 ต.ค. 2569) ตารางนัดเซลมี 2 มุมมอง: "รายการ" (ค่าเริ่มต้นบนมือถือ) กับ "ปฏิทิน" — จำค่าที่เลือกไว้
   const [salesView, setSalesViewState] = useState(() => {
-    try { const v = localStorage.getItem("tt-sales-view"); if (v === "list" || v === "calendar") return v; } catch { /* ข้าม */ }
-    return window.innerWidth < 768 ? "list" : "calendar";
+    // ✅ (8 ต.ค. 2569 ผู้ใช้: "เวลาเปิดมาให้ขึ้นหน้าปฏิทินเป็นค่า Default") เปิดหน้ามาเป็นปฏิทินเสมอ ทุกขนาดจอ
+    //    สลับไปรายการได้ด้วยปุ่มด้านบน (ใช้เฉพาะรอบนั้น ไม่จำข้ามการเปิดหน้า)
+    return "calendar";
   });
   const [salesTab, setSalesTab] = useState("upcoming");
   const setSalesView = (v) => {
     setSalesViewState(v);
-    try { localStorage.setItem("tt-sales-view", v); } catch { /* ข้าม */ }
     // ปฏิทินถูกซ่อนไว้ตอนอยู่โหมดรายการ — กลับมาแล้วต้องวัดขนาดใหม่
     if (v === "calendar") setTimeout(() => calendarRef.current?.getApi()?.updateSize(), 60);
   };
   const salesListMode = isSalesView && salesView === "list";
   // ✅ (8 ต.ค. 2569 "ทำหน้าแบบนี้ของช่างด้วย") ตารางงานช่างมี 2 มุมมองเหมือนกัน — จำค่าแยกจากของฝ่ายขาย
   const [techView, setTechViewState] = useState(() => {
-    try { const v = localStorage.getItem("tt-tech-view"); if (v === "list" || v === "calendar") return v; } catch { /* ข้าม */ }
-    return window.innerWidth < 768 ? "list" : "calendar";
+    // ✅ (8 ต.ค. 2569 ผู้ใช้: "เวลาเปิดมาให้ขึ้นหน้าปฏิทินเป็นค่า Default") เปิดหน้ามาเป็นปฏิทินเสมอ ทุกขนาดจอ
+    //    สลับไปรายการได้ด้วยปุ่มด้านบน (ใช้เฉพาะรอบนั้น ไม่จำข้ามการเปิดหน้า)
+    return "calendar";
   });
   const [techTab, setTechTab] = useState("upcoming");
   const setTechView = (v) => {
     setTechViewState(v);
-    try { localStorage.setItem("tt-tech-view", v); } catch { /* ข้าม */ }
     if (v === "calendar") setTimeout(() => calendarRef.current?.getApi()?.updateSize(), 60);
   };
   const techListMode = !isSalesView && techView === "list";

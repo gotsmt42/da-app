@@ -1943,6 +1943,18 @@ export const getEditEvent = async ({
 
     ${stepperHtml}
 
+    <!-- ✅ (8 ต.ค. 2569 ผู้ใช้: "หาจุดวางที่จะกดไปหน้าดำเนินงานได้ง่าย ชัดเจน · อันเดิมซ่อนอยู่ในเมนู ⋯")
+         วางใต้แถบขั้นตอนสถานะ — เป็นงานถัดไปหลังยืนยันแล้ว (เช็คอิน · แนบเอกสาร · ขอปิดงาน) -->
+    ${canViewOperation ? `
+    <button type="button" id="btnGoOperation" style="width:100%;display:flex;align-items:center;gap:12px;margin:0 0 14px;padding:12px 14px;border-radius:14px;border:1px solid #bfdbfe;background:#eff6ff;cursor:pointer;text-align:left;font-family:inherit">
+      <span style="flex-shrink:0;width:36px;height:36px;border-radius:10px;background:#2563eb;color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px">📊</span>
+      <span style="flex:1;min-width:0">
+        <span style="display:block;font-size:14.5px;font-weight:800;color:#1e3a8a">ไปที่หน้าการดำเนินงาน</span>
+        <span style="display:block;font-size:12px;color:#475569;margin-top:1px">เช็คอิน · แนบเอกสาร · ใบเสนอราคา · ขอปิดงาน</span>
+      </span>
+      <span style="flex-shrink:0;font-size:22px;color:#2563eb;font-weight:700">›</span>
+    </button>` : ""}
+
     <!-- ✅ ข้อมูลสัญญา — ย้ายมาไว้บนสุด (เดิมอยู่ล่างสุด ต้องเลื่อนจอไปดู) เพราะเป็นข้อมูลอ้างอิงหลักของ
          "ครั้งที่" นี้ที่มักต้องเช็คก่อนแก้อย่างอื่น ใส่กล่องพื้นหลังโทนม่วง-น้ำเงินแยกจากส่วนอื่นชัดเจน
          ให้เห็นตั้งแต่แวบแรกว่าเป็นข้อมูล "ทั้งสัญญา" ไม่ใช่แค่ครั้งนี้ครั้งเดียว -->
@@ -3741,14 +3753,14 @@ export const getEditEvent = async ({
         }
       });
 
-      /* View operation */
-      document
-        .getElementById("btnViewSchedule")
+      /* View operation — ปุ่มเด่นใต้แถบสถานะ + เมนู ⋯ ทำงานเหมือนกัน */
+      ["btnViewSchedule", "btnGoOperation"].forEach((id) => document
+        .getElementById(id)
         ?.addEventListener("click", () => {
           const jobGroup = resolveOperationGroup({ status: eventStatus });
           navigate(`/operation/${eventId}${jobGroup ? `?group=${jobGroup}` : ""}`);
           Swal.close();
-        });
+        }));
 
       /* Cancel / custom close */
       document

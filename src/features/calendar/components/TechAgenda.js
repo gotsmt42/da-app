@@ -9,7 +9,7 @@
  *       เสร็จสิ้น     = ดำเนินการเสร็จสิ้น (ล่าสุดก่อน)
  *   ⚠️ ข้อมูลชุดเดียวกับปฏิทิน (filteredCalendarEvents) ตัวกรอง/ค้นหาด้านบนจึงมีผลกับทั้งสองมุมมอง
  */
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import { Box, Stack, Typography, Button, ButtonBase } from "@mui/material";
@@ -186,27 +186,38 @@ function Row({ r, onOpen, showDate }) {
   const days = dayCount(r.segs);
   const split = r.segs.length > 1;
   // ✅ บอกวันทำงานจริงทุกครั้งที่ "หัววัน" บอกไม่ครบ: แท็บต้องติดตาม (ไม่มีหัววัน) · งานหลายวัน · งานไม่ต่อเนื่อง
+  // ✅ (8 ต.ค. 2569 ผู้ใช้: "งานหลายๆ วัน จัดวางให้สวยกว่านี้ แบบนี้ดูรก") บรรทัดสรุปบรรทัดเดียว (ช่วงรวม · กี่วัน · กี่ช่วง)
+  //    แล้วแต่ละช่วงเป็นชิปเล็ก — ช่วงที่ผ่านไปแล้วจาง · ช่วงที่กำลังทำ/ถัดไปเด่น · เกิน 4 ช่วงพับไว้ "+N ช่วง"
+  const [showAllSegs, setShowAllSegs] = useState(false);
+  const lastSeg = r.segs[r.segs.length - 1];
   const dateLine = days > 1 || split
-    ? `${segLabel(r.segs)}${days > 1 ? ` · ${days} วัน${split ? " (ไม่ต่อเนื่อง)" : ""}` : ""}`
+    ? `${segLabel([{ start: r.segs[0].start, end: lastSeg.end }])} · ${days} วัน${split ? ` · ${r.segs.length} ช่วง` : ""}`
     : "";
-  const leftLabel = /^\d/.test(r.time) ? null : days > 1 ? "หลายวัน" : "ทั้งวัน";
+  const today0 = moment().startOf("day");
+  const nextSegIdx = r.segs.findIndex((g) => !g.end.isBefore(today0));
+  const SEG_LIMIT = 4;
+  const shownSegs = split ? (showAllSegs ? r.segs : r.segs.slice(0, SEG_LIMIT)) : [];
+  const hasTime = /^\d/.test(r.time);
+  const [tStart, tEnd] = hasTime ? r.time.split("–") : ["", ""];
+  const yearSuffix = r.start.year() !== moment().year() ? ` ${formatThai(r.start, "YY")}` : "";
+  const leftTop = showDate ? `${formatThai(r.start, "D MMM")}${yearSuffix}` : hasTime ? tStart : "ทั้งวัน";
+  const leftBottom = showDate
+    ? [hasTime ? tStart : "ทั้งวัน", days > 1 ? `${days} วัน` : ""].filter(Boolean).join(" · ")
+    : days > 1 ? `${days} วัน` : hasTime && tEnd ? `ถึง ${tEnd}` : "";
   return (
     <ButtonBase onClick={() => onOpen(r.id)}
       sx={{
         width: "100%", display: "flex", alignItems: "stretch", textAlign: "left", gap: 1.25, px: 1.5, py: 1.25,
         borderTop: `1px solid ${LINE}`, "&:first-of-type": { borderTop: 0 }, "&:hover": { bgcolor: SURFACE },
       }}>
-      <Box sx={{ width: 52, flexShrink: 0, pt: 0.25 }}>
-        {/* แท็บที่ไม่มีหัววัน (ต้องติดตาม) — คอลัมน์ซ้ายบอกวันเริ่มงาน */}
-        {showDate && (
-          <Typography sx={{ fontSize: "0.8rem", fontWeight: 900, color: INK, lineHeight: 1.25 }}>
-            {formatThai(r.start, "D MMM")}{r.start.year() !== moment().year() ? <Box component="span" sx={{ display: "block", fontSize: "0.68rem", color: MUTED }}>{formatThai(r.start, "YYYY")}</Box> : null}
-          </Typography>
-        )}
-        {!(showDate && leftLabel) && <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: leftLabel ? MUTED : INK, lineHeight: 1.3, fontVariantNumeric: "tabular-nums" }}>
-          {leftLabel || r.time.split("–")[0]}
-        </Typography>}
-        {/^\d/.test(r.time) && r.time.includes("–") && <Typography sx={{ fontSize: "0.7rem", color: MUTED }}>{r.time.split("–")[1]}</Typography>}
+      {/* ✅ (8 ต.ค. 2569 ผู้ใช้: "บางอันขึ้นหนังสือ บางอันขึ้นวัน บางอันขึ้นเวลา งง") คอลัมน์ซ้ายรูปแบบเดียวทุกแถว
+          บรรทัดบน (ตัวหนา) = เวลาเริ่ม หรือ "ทั้งวัน" · บรรทัดล่าง (จาง) = เวลาจบ / จำนวนวัน
+          แท็บ "ต้องติดตาม" (ไม่มีหัววัน): บรรทัดบน = วันที่เริ่ม · บรรทัดล่าง = เวลา หรือ "ทั้งวัน" */}
+      <Box sx={{ width: 56, flexShrink: 0, pt: 0.25 }}>
+        <Typography sx={{ fontSize: "0.8rem", fontWeight: 900, color: INK, lineHeight: 1.3, fontVariantNumeric: "tabular-nums" }}>
+          {leftTop}
+        </Typography>
+        {leftBottom && <Typography sx={{ fontSize: "0.7rem", color: MUTED, lineHeight: 1.35, fontVariantNumeric: "tabular-nums" }}>{leftBottom}</Typography>}
       </Box>
       <Box sx={{ width: 4, borderRadius: 2, flexShrink: 0, bgcolor: r.color, boxShadow: "inset 0 0 0 1px rgba(15,23,42,.12)" }} />
       <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -234,6 +245,33 @@ function Row({ r, onOpen, showDate }) {
           <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mt: 0.3, color: INK_2 }}>
             <EventOutlined sx={{ fontSize: 15, color: FAINT, mt: "1px" }} />
             <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, lineHeight: 1.4 }}>{dateLine}</Typography>
+          </Stack>
+        )}
+        {split && (
+          <Stack direction="row" useFlexGap sx={{ flexWrap: "wrap", gap: 0.5, mt: 0.5, pl: 2.4 }}>
+            {shownSegs.map((g, i) => {
+              const past = g.end.isBefore(today0);
+              const current = i === nextSegIdx;
+              return (
+                <Box key={i} component="span" sx={{
+                  display: "inline-flex", alignItems: "center", height: 22, px: 0.8, borderRadius: 1.5, fontSize: "0.7rem", fontWeight: 700, whiteSpace: "nowrap",
+                  color: current ? "#1d4ed8" : past ? FAINT : INK_2,
+                  bgcolor: current ? "#eff6ff" : SURFACE,
+                  border: `1px solid ${current ? alpha("#2563eb", 0.35) : LINE}`,
+                  textDecoration: past && isDone ? "none" : undefined,
+                }}>
+                  {segLabel([g])}
+                </Box>
+              );
+            })}
+            {r.segs.length > SEG_LIMIT && (
+              <Box component="span" role="button" tabIndex={0}
+                onClick={(e) => { e.stopPropagation(); setShowAllSegs((v) => !v); }}
+                onMouseDown={(e) => e.stopPropagation()}
+                sx={{ display: "inline-flex", alignItems: "center", height: 22, px: 0.8, borderRadius: 1.5, fontSize: "0.7rem", fontWeight: 800, color: "#2563eb", cursor: "pointer", "&:hover": { bgcolor: "#eff6ff" } }}>
+                {showAllSegs ? "ย่อ" : `+${r.segs.length - SEG_LIMIT} ช่วง`}
+              </Box>
+            )}
           </Stack>
         )}
         {r.note && <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: r.note.color, mt: 0.3 }}>{r.note.text}</Typography>}
