@@ -82,6 +82,7 @@ import { getEditEvent } from "../EventForms/EditEvent";
 import DeliveryNoteDialog from "@/features/documents/components/DeliveryNoteDialog";
 import WorkNoticeDialog from "@/features/documents/components/WorkNoticeDialog";
 import SalesAppointmentDialog from "../SalesAppointmentDialog";
+import SalesAgenda, { SalesTopBar } from "../SalesAgenda";
 import { getSaveEventToDB } from "../EventForms/SaveEvent";
 import { getEventDrop } from "../EventForms/EventDrop";
 import { getEventResize } from "../EventForms/EventResize";
@@ -1125,6 +1126,19 @@ function EventCalendar() {
   };
 
   const [salesDialogId, setSalesDialogId] = useState(null);
+  // ✅ (8 ต.ค. 2569) ตารางนัดเซลมี 2 มุมมอง: "รายการ" (ค่าเริ่มต้นบนมือถือ) กับ "ปฏิทิน" — จำค่าที่เลือกไว้
+  const [salesView, setSalesViewState] = useState(() => {
+    try { const v = localStorage.getItem("tt-sales-view"); if (v === "list" || v === "calendar") return v; } catch { /* ข้าม */ }
+    return window.innerWidth < 768 ? "list" : "calendar";
+  });
+  const [salesTab, setSalesTab] = useState("upcoming");
+  const setSalesView = (v) => {
+    setSalesViewState(v);
+    try { localStorage.setItem("tt-sales-view", v); } catch { /* ข้าม */ }
+    // ปฏิทินถูกซ่อนไว้ตอนอยู่โหมดรายการ — กลับมาแล้วต้องวัดขนาดใหม่
+    if (v === "calendar") setTimeout(() => calendarRef.current?.getApi()?.updateSize(), 60);
+  };
+  const salesListMode = isSalesView && salesView === "list";
   /** ฟอร์มแก้ไขข้อมูลนัด (วัน/เวลา/สถานที่/ประเภท) — เปิดจากหน้ารายละเอียดนัด */
   const openSalesEditForm = async (ev) => {
     setSalesDialogId(null);
@@ -3155,6 +3169,17 @@ function EventCalendar() {
           แบบไอคอนล้วน — เดิมมีทั้งแถวปุ่ม Export ข้อความยาว + แถวค้นหา + dropdown 2 ตัวโชว์
           ตลอดเวลา กินพื้นที่แนวตั้งเยอะมากบนจอมือถือ ตอนนี้ซ่อนตัวกรองทั้งหมดไว้หลังปุ่มเดียว
           กดเปิดเฉพาะตอนต้องการ ไม่เกะกะจอเวลาแค่อยากดูปฏิทินเฉยๆ */}
+      {isSalesView && (
+        <SalesTopBar
+          events={filteredCalendarEvents}
+          view={salesView}
+          onView={setSalesView}
+          onAdd={() => handleAddEvent({ dateStr: moment().format("YYYY-MM-DD") })}
+          onFollowUp={() => { setSalesView("list"); setSalesTab("follow"); }}
+          title={viewingSalesCalendar ? "ตารางนัดหมายเซล" : "นัดหมายของฉัน"}
+        />
+      )}
+
       <div className="event-toolbar-row mb-2">
         <div className="event-search-input">
           <span className="event-search-icon">🔍</span>
@@ -3171,6 +3196,7 @@ function EventCalendar() {
         {/* ✅ กาง/ย่อรายละเอียดของการ์ดงานทั้งหมดในหน้าจอนี้ทีเดียว — ค่าเริ่มต้นคือ "ย่อ" เพื่อให้
             ปฏิทินอ่านง่าย (ดูเหตุผลเต็มที่ expandedCardIds) แล้วกดปุ่มนี้ตอนต้องการดูรายละเอียดครบทุกใบ
             ⚠️ ไม่ทำเป็นการตั้งค่าค้างถาวร — เป็นการสลับมุมมองชั่วคราวของการดูรอบนี้เท่านั้น */}
+        {!isSalesView && (
         <button
           className={`filter-toggle-btn ${allCardsExpanded ? "filter-toggle-btn--open" : ""}`}
           onClick={toggleAllCards}
@@ -3180,6 +3206,7 @@ function EventCalendar() {
           <FontAwesomeIcon icon={faAnglesDown} style={{ transition: "transform .2s ease", transform: allCardsExpanded ? "rotate(180deg)" : "none" }} />
           <span className="tb-label">{allCardsExpanded ? "ย่อทั้งหมด" : "กางทั้งหมด"}</span>
         </button>
+        )}
 
         {!isWideToolbar && (
         <button
@@ -3233,6 +3260,7 @@ function EventCalendar() {
             ครบเหมือนเดิม (ดู generateWorkPermitPDF ที่ส่งเข้า getEditEvent) */}
         {/* ✅ โหมดคนตาบอด (ผู้ใช้สั่ง: "ไว้ข้างซ้ายปุ่ม Excel") — ปุ่มแยกของตัวเอง ไม่ใช่ปุ่มตัวกรอง
             เปิดอยู่ = พื้นดำ ไอคอนตาปิด ให้เห็นชัดว่ากำลังดูแบบขาวดำ */}
+        {!isSalesView && (
         <button
           className={`toolbar-icon-btn toolbar-icon-btn--gray${grayMode ? " toolbar-icon-btn--gray-on" : ""}`}
           onClick={toggleGrayMode}
@@ -3243,6 +3271,7 @@ function EventCalendar() {
           <FontAwesomeIcon icon={grayMode ? faEyeSlash : faEye} />
           <span className="tb-label">โหมดคนตาบอด</span>
         </button>
+        )}
 
         <button
           className="toolbar-icon-btn toolbar-icon-btn--excel"
@@ -3293,7 +3322,22 @@ function EventCalendar() {
           ✅ ปฏิทิน + คอลัมน์นี้เรียงข้างกันบนจอใหญ่ (≥992px) — กดปุ่มด้านบนเพื่อเปิด/ปิด ปฏิทินย่อ
           ความกว้างให้เองอัตโนมัติ (ดู .calendar-layout ใน index.css) จอเล็กกว่านั้นไม่มีที่พอวาง
           ข้างกัน กลับไปเรียงบนล่างเหมือนเดิม (เดิมแผงนี้ดันปฏิทินลงมาทุกครั้งที่เปิด) */}
-      <div className={`calendar-layout ${showDraftsPanel && !isSalesView ? "calendar-layout--with-drafts" : ""}${grayMode ? " calendar-layout--gray" : ""}`}>
+      {salesListMode && (
+        <SalesAgenda
+          events={filteredCalendarEvents}
+          onOpen={(id) => setSalesDialogId(id)}
+          onAdd={() => handleAddEvent({ dateStr: moment().format("YYYY-MM-DD") })}
+          showOwner={viewingSalesCalendar}
+          tab={salesTab}
+          onTab={setSalesTab}
+        />
+      )}
+
+      {/* ⚠️ โหมดรายการของเซล: ซ่อนปฏิทินไว้แต่ยัง mount อยู่ (โค้ดหลายส่วนผูกกับ DOM ของ FullCalendar) */}
+      <div
+        className={`calendar-layout ${showDraftsPanel && !isSalesView ? "calendar-layout--with-drafts" : ""}${grayMode && !isSalesView ? " calendar-layout--gray" : ""}`}
+        style={salesListMode ? { display: "none" } : undefined}
+      >
         {/* ⚠️ กันซ้ำอีกชั้น (ปุ่มเปิดถูกซ่อนไปแล้วด้านบน) เผื่อ showDraftsPanel ยังค้างค่า true
             จากตอนอยู่ปฏิทินช่างก่อนสลับมา — คนละ query string บนหน้าเดียวกัน ไม่ได้ remount */}
         {showDraftsPanel && !isSalesView && (
@@ -3483,6 +3527,27 @@ function EventCalendar() {
             } = extendedProps;
             const approvalState = approvalStatus || "approved";
 
+            // ✅ (8 ต.ค. 2569 ผู้ใช้: "มันดูยาก ไม่สวย รก") นัดเซลใช้การ์ดแบบเรียบของตัวเอง ไม่ใช่การ์ดงานช่าง:
+            //    [● เวลา] / สถานที่ / ประเภทนัด — จุดสี = สถานะนัด · รายละเอียดอื่นอยู่ในหน้ารายละเอียดนัด
+            if (extendedProps.department === "sales") {
+              const sMeta = salesStatusMeta(status);
+              const st = toSalesStatus(status);
+              const timeTxt = startTime ? `${escapeHtml(startTime)}${endTime ? `–${escapeHtml(endTime)}` : ""}` : "ทั้งวัน";
+              const photoN = (extendedProps.sitePhotoFiles || []).length;
+              return {
+                html: `
+                  <div class="ec-sc${st === "ยกเลิกนัด" ? " ec-sc--off" : ""}" title="${escapeHtml(`${title} · ${site} · ${st}`)}">
+                    <div class="ec-sc-top">
+                      <span class="ec-sc-dot" style="background:${sMeta.color}"></span>
+                      <span class="ec-sc-time">${timeTxt}</span>
+                      ${photoN ? `<span class="ec-sc-photo">📷${photoN}</span>` : ""}
+                    </div>
+                    <div class="ec-sc-site">${escapeHtml(site || "-")}</div>
+                    <div class="ec-sc-type">${escapeHtml(title)} · ${escapeHtml(st)}</div>
+                  </div>`,
+              };
+            }
+
             // ✅ สร้าง display string แบบมีเงื่อนไข
             // ⚠️ ป้องกัน stored XSS — ทุกฟิลด์ตรงนี้ (โครงการ/ระบบ/ทีม/เวลา/ชื่องาน) เป็นข้อความที่
             // ผู้ใช้พิมพ์เองได้ทั้งหมด แล้วถูกใช้เป็น eventContent แบบ raw HTML ของ FullCalendar
@@ -3645,20 +3710,7 @@ function EventCalendar() {
               ? `<span class="ec-card-team" style="${badgeChipStyle}" title="ทีมที่เข้างาน: ${escapeHtml(allTeamNames.join(", "))}"><span class="ec-card-team-ico" aria-hidden="true">👷</span>${escapeHtml(allTeamNames.join(", "))}</span>`
               : "";
 
-            // ✅ นัดเซล: แถว "เซล" (เจ้าของนัด) + จำนวนรูปหน้างาน + ป้ายสถานะนัด
-            const isSalesCard = extendedProps.department === "sales";
-            const salesOwner = isSalesCard ? [extendedProps.user?.fname, extendedProps.user?.lname].filter(Boolean).join(" ") : "";
-            const salesPhotoCount = isSalesCard ? (extendedProps.sitePhotoFiles || []).length : 0;
-            const salesOwnerDisplay = salesOwner ? detailRow("เซล", escapeHtml(salesOwner), "👤") : "";
-            const salesPhotoDisplay = salesPhotoCount ? detailRow("รูปหน้างาน", `${salesPhotoCount} รูป`, "📷") : "";
-            const sMeta = isSalesCard ? salesStatusMeta(status) : null;
-            const salesPillHtml = sMeta
-              ? `<div class="ec-sales-pill" title="${escapeHtml(sMeta.hint)}"><span class="ec-sales-dot" style="background:${sMeta.color}"></span>${escapeHtml(toSalesStatus(status))}${salesPhotoCount ? ` · 📷 ${salesPhotoCount}` : ""}</div>`
-              : "";
-
             const detailRows = [
-              [salesOwnerDisplay, ""],
-              [salesPhotoDisplay, ""],
               [systemDisplay, ""],
               [timeDisplay, ""],
               [teamDisplay, " ec-card-row--team"],
@@ -3714,7 +3766,6 @@ function EventCalendar() {
                     <div class="ec-card-title" title="${escapeHtml(title)}"><span class="ec-card-deco">[ </span><span class="ec-card-type" style="${typeChipStyle}">${escapeHtml(title)}</span><span class="ec-card-deco"> ]</span></div>
                   </div>
                   ${approvalPillHtml}
-                  ${salesPillHtml}
                   ${siteDisplay ? `<div class="ec-card-site">${siteDisplay}</div>` : ""}
                   ${hasDetail ? `
                   <div class="ec-card-detail">
@@ -3737,7 +3788,8 @@ function EventCalendar() {
             // ⚠️ ปุ่มย่อ/ขยายโผล่เฉพาะจอมือถือ (ซ่อนด้วย CSS บนจอคอม — ดู .fc-zoomIn-button)
             right: "zoomOut,zoomIn today",
           }}
-          footerToolbar={{
+          // ⚠️ ตารางเซลมีปุ่มสลับ "รายการ/ปฏิทิน" ของตัวเองด้านบนแล้ว — ไม่โชว์ปุ่มมุมมองของ FullCalendar ซ้ำ
+          footerToolbar={isSalesView ? false : {
             right: "dayGridMonth,timeGridWeek,listWeek",
             // right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek",
           }}
@@ -4147,41 +4199,25 @@ function EventCalendar() {
             งานโปรเจค" (เป็นแนวคิดของงานช่างล้วนๆ) การโชว์ให้เซลเห็นคือคำอธิบายของสิ่งที่
             ไม่มีวันเกิดขึ้นในปฏิทินของเขา */}
         {isSalesView ? (
-          <div className="ec-legend-panel">
-            <div className="ec-legend-group">
-              <div className="ec-legend-group-title">ประเภทนัดหมาย</div>
-              {SALES_APPOINTMENT_TYPES.map((t) => (
-                <div key={t.key} className="ec-legend-item">
-                  <span className="ec-legend-icon">
-                    <span className="ec-legend-swatch" style={{ width: 14, height: 14, background: t.color }} />
+          // ✅ (8 ต.ค. 2569 "การจัดวางยังดูมั่วๆ") ป้ายอธิบายแบบกะทัดรัด 2 แถว · ซ่อนในโหมดรายการ
+          !salesListMode && (
+            <div className="ec-sales-legend">
+              <div className="ec-sales-legend-row">
+                {SALES_APPOINTMENT_TYPES.map((t) => (
+                  <span key={t.key} className="ec-sales-legend-item">
+                    <span className="ec-sales-legend-sw" style={{ background: t.color }} />{t.key}
                   </span>
-                  <span>{t.icon} {t.key}</span>
-                </div>
-              ))}
-            </div>
-            {/* ✅ สถานะของฝ่ายขายเอง — คนละชุดกับสถานะงานช่าง (ดู SALES_STATUSES)
-                แก้ได้จากในกล่องแก้ไขนัดหมาย */}
-            <div className="ec-legend-group">
-              <div className="ec-legend-group-title">สถานะนัดหมาย</div>
-              {SALES_STATUSES.map((st) => (
-                <div key={st.key} className="ec-legend-item">
-                  <span className="ec-legend-icon">{st.icon}</span>
-                  <span>{st.key} — {st.hint}</span>
-                </div>
-              ))}
-            </div>
-            <div className="ec-legend-group">
-              <div className="ec-legend-group-title">อื่นๆ</div>
-              <div className="ec-legend-item">
-                <span className="ec-legend-icon">💡</span>
-                <span>กดวันที่บนปฏิทินเพื่อเพิ่มนัดหมายใหม่</span>
+                ))}
               </div>
-              <div className="ec-legend-item">
-                <span className="ec-legend-icon">🔒</span>
-                <span>ปฏิทินนี้เห็นเฉพาะนัดของฝ่ายขาย ไม่ปนกับตารางงานช่าง</span>
+              <div className="ec-sales-legend-row">
+                {SALES_STATUSES.map((st) => (
+                  <span key={st.key} className="ec-sales-legend-item">
+                    <span className="ec-sales-legend-dot" style={{ background: st.color }} />{st.key}
+                  </span>
+                ))}
               </div>
             </div>
-          </div>
+          )
         ) : (
         <div className="ec-legend-panel">
           <div className="ec-legend-group">
