@@ -10,19 +10,14 @@ import { useCallback, useMemo, useRef, useState } from "react";
  */
 
 export const OVERVIEW_COLUMNS = [
-  // ✅ ผู้รับผิดชอบอยู่หน้าสุดตามที่ผู้ใช้ขอ — คำถามแรกที่คนเปิดหน้านี้คือ "งานนี้ใครดูแล"
+  // ✅ (8 ต.ค. 2569) รวมเหลือ 6 คอลัมน์ตามที่ผู้ใช้เลือก — ดู MERGED_COLUMNS ใน ContractOverview.js
+  // ตัวระบุงาน — ซ่อนไม่ได้ ไม่งั้นแถวในตารางจะไม่มีอะไรบอกเลยว่าเป็นงานไหน
+  { key: "customer", label: "โครงการ / เลขที่สัญญา / ผู้ติดต่อ", locked: true },
+  { key: "work", label: "งาน · แผนก" },
   { key: "responsiblePerson", label: "ผู้รับผิดชอบ" },
-  { key: "departmentTag", label: "แผนก" },
-  { key: "doc", label: "เลขที่เอกสาร" },
-  // ตัวระบุงาน — ซ่อนไม่ได้ ไม่งั้นแถวในตารางจะไม่มีอะไรบอกเลยว่าเป็นงานไหน (รวมผู้ติดต่อหน้างานไว้ในช่องนี้แล้ว)
-  { key: "customer", label: "โครงการ / บริษัท / ผู้ติดต่อ", locked: true },
-  { key: "work", label: "งาน (ประเภท / ระบบ)" },
-  { key: "period", label: "ระยะเวลาสัญญา", contractOnly: true },
-  { key: "jobValue", label: "มูลค่างาน" },
-  { key: "commission", label: "ค่าคอมลูกค้า" },
-  { key: "statusProgress", label: "สถานะ / คืบหน้า" },
+  { key: "contract", label: "สัญญา · สถานะ" },
+  { key: "money", label: "มูลค่า · ค่าคอม" },
   { key: "visits", label: "ครั้งที่เข้างาน" },
-  { key: "remark", label: "หมายเหตุ" },
 ];
 
 const DEFAULT_ORDER = OVERVIEW_COLUMNS.map((c) => c.key);

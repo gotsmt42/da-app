@@ -22,7 +22,7 @@
  * (GET /events/event-op, /events/drafts เช็ค resPerson/team/userId ให้อยู่แล้ว) จึงไม่ต้องกรองซ้ำที่นี่
  */
 
-import { Fragment, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Children, Fragment, cloneElement, createContext, isValidElement, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import useRealtime from "@/shared/realtime/useRealtime";
 import { Navigate, Link, useSearchParams } from "react-router-dom";
 import moment from "moment";
@@ -453,12 +453,70 @@ const CLOSED_VIEWS = ["expired", "completed"];
 // เหลือ 9 คอลัมน์ และหัวตารางเหลือแถวเดียว (ไม่ต้องมีหัวข้อกลุ่มคลุม 2 ชั้นอีกต่อไป)
 // ⚠️ ทุกช่องยังแก้ไข inline ได้ครบทุกฟิลด์เหมือนเดิม — EditableCell รับ prop `Wrapper` อยู่แล้ว จึงซ้อน
 // หลายฟิลด์ในเซลล์เดียวได้โดยไม่ต้องแก้ตรรกะการแก้ไขเลย
+/**
+ * ✅ (8 ต.ค. 2569 ผู้ใช้: "ข้อมูลในตาราง อันไหนรวมกันได้ก็รวม ให้กระชับ ดูง่าย ไม่ยาว") รวม 11 คอลัมน์เหลือ 6
+ *   customer = โครงการ/บริษัท + เลขที่สัญญา/ใบเสนอราคา + ผู้ติดต่อ + ป้ายเตือนรอบ
+ *   work     = ประเภทงาน/ระบบ + แผนก
+ *   contract = ระยะสัญญา/รอบเข้า/กี่ปี + สถานะ/คืบหน้า
+ *   money    = มูลค่างาน + ค่าคอมลูกค้า
+ *   (ผู้รับผิดชอบ · ครั้งที่เข้างาน คงเดิม · หมายเหตุอยู่ในกล่อง "แก้ไขข้อมูล")
+ * วิธีทำ: เซลล์ย่อยเดิมยังเขียนแยกเหมือนเดิม แล้วค่อย "ประกอบ" เป็นช่องเดียวตอนวาด — แก้ไขในช่องได้เหมือนเดิมทุกจุด
+ */
+const MERGED_COLUMNS = {
+  customer: ["customer", "doc"],
+  work: ["work", "departmentTag"],
+  contract: ["period", "statusProgress"],
+  money: ["jobValue", "commission"],
+};
+const MERGED_CAPTION = { money: [null, "ค่าคอมลูกค้า"] };
+const mergedWidthKey = (k, hideContractOnly) => ({
+  customer: "customer", work: "work", money: "jobValue",
+  contract: hideContractOnly ? "statusProgress" : "period",
+}[k] || k);
+const mergedHeaderLabel = (k, hideContractOnly) => ({
+  customer: hideContractOnly ? "โครงการ / เอกสาร / ผู้ติดต่อ" : "โครงการ / เลขที่สัญญา / ผู้ติดต่อ",
+  work: "งาน · แผนก",
+  contract: hideContractOnly ? "สถานะ / คืบหน้า" : "สัญญา · สถานะ",
+  money: "มูลค่า · ค่าคอม (฿)",
+}[k]);
+const flatElements = (node) => Children.toArray(node)
+  .flatMap((ch) => (isValidElement(ch) && ch.type === Fragment ? flatElements(ch.props.children) : [ch]))
+  .filter(isValidElement);
+/** ประกอบเซลล์ย่อยหลายอันเป็นช่องเดียว — header: เปลี่ยนป้ายหัวคอลัมน์ · body: ซ้อนเนื้อหาในช่องเดียว */
+const mergeCells = (k, parts, { header = false, hideContractOnly = false } = {}) => {
+  const els = parts.map((p) => flatElements(p));
+  const all = els.flat();
+  if (!all.length) return null;
+  if (header) return cloneElement(all[0], {}, mergedHeaderLabel(k, hideContractOnly));
+  const widthKey = mergedWidthKey(k, hideContractOnly);
+  const captions = MERGED_CAPTION[k] || [];
+  const blocks = [];
+  els.forEach((group, gi) => group.forEach((el) => {
+    const isCell = el.type === TableCell;
+    const content = isCell ? el.props.children : cloneElement(el, { Wrapper: Box, width: "100%" });
+    blocks.push(
+      <Box key={`${gi}-${blocks.length}`} sx={blocks.length ? { mt: 0.6, pt: 0.6, borderTop: `1px dashed ${alpha("#0f172a", 0.1)}` } : undefined}>
+        {captions[gi] && <Typography sx={{ fontSize: "0.62rem", fontWeight: 700, color: "#94a3b8", lineHeight: 1.2 }}>{captions[gi]}</Typography>}
+        {content}
+      </Box>
+    );
+  }));
+  const align = all[0].props.align || "left";
+  return (
+    <TableCell data-col-key={widthKey} align={align}
+      sx={{ width: `var(--col-${widthKey}, ${DEFAULT_COL_WIDTHS[widthKey]}px)`, maxWidth: `var(--col-${widthKey}, ${DEFAULT_COL_WIDTHS[widthKey]}px)`, verticalAlign: "middle" }}>
+      {blocks}
+    </TableCell>
+  );
+};
+
 const DEFAULT_COL_WIDTHS = {
   checkbox: 42, actions: 48,
   docRef: 150, docNo: 150,
-  customer: 260, work: 165,
-  period: 190,
-  jobValue: 110, commission: 110, statusProgress: 175, responsiblePerson: 130, contact: 150, remark: 190,
+  // ✅ (8 ต.ค. 2569) คอลัมน์ที่รวมแล้วกว้างขึ้น — customer = โครงการ+เลขที่+ผู้ติดต่อ · period = สัญญา+สถานะ · jobValue = มูลค่า+ค่าคอม
+  customer: 290, work: 170,
+  period: 240,
+  jobValue: 140, commission: 110, statusProgress: 190, responsiblePerson: 130, contact: 150, remark: 190,
   departmentTag: 112,
 };
 // ✅ ความกว้างคอลัมน์ "แยกกันทุกแท็บ" — เก็บซ้อนอีกชั้นเป็น { [แท็บ]: { [คอลัมน์]: ความกว้าง } }
@@ -468,7 +526,7 @@ const DEFAULT_COL_WIDTHS = {
 // ✅ ใช้คีย์ localStorage ใหม่ (…colWidthsByTab) ไม่ทับของเดิม — ค่าเก่าที่เคยปรับไว้จะถูกละทิ้งไปเอง
 // โดยไม่ต้องเขียนโค้ดแปลงข้อมูล (เป็นแค่ค่าความกว้างหน้าจอ ไม่ใช่ข้อมูลผู้ใช้ที่เสียหายไม่ได้) และไม่มี
 // ทางอ่านค่าเก่าผิดรูปแบบมาใช้จนพัง เพราะคนละคีย์กันคนละอันเลย
-const COL_WIDTHS_STORAGE_KEY = "contractOverview.colWidthsByTab";
+const COL_WIDTHS_STORAGE_KEY = "contractOverview.colWidthsByTab.v2";
 const loadStoredColWidths = () => {
   try {
     const raw = localStorage.getItem(COL_WIDTHS_STORAGE_KEY);
@@ -586,10 +644,12 @@ const AUTO_FIT_MAX_WIDTH = 260;
  * คีย์ "คอลัมน์ที่ผู้ใช้เห็น" ของหัวตารางแต่ละช่อง: docRef/docNo = doc · visit_N = visits (ย้ายทั้งชุด)
  */
 const ColumnDndContext = createContext(null);
-const dragKeyOfColumn = (columnKey) =>
-  columnKey === "docRef" || columnKey === "docNo" ? "doc"
-    : String(columnKey || "").startsWith("visit_") ? "visits"
-      : columnKey;
+const dragKeyOfColumn = (columnKey) => {
+  // ✅ หัวคอลัมน์ที่รวมแล้วใช้คีย์ของเซลล์ย่อยแรก — แปลงกลับเป็นคีย์คอลัมน์ที่ผู้ใช้เห็น (ลาก/เมนูคอลัมน์)
+  const k = String(columnKey || "");
+  if (k.startsWith("visit_")) return "visits";
+  return { docRef: "customer", docNo: "customer", departmentTag: "work", period: "contract", statusProgress: "contract", jobValue: "money", commission: "money" }[k] || columnKey;
+};
 
 const ResizableTh = ({ width, align = "left", children, onResize, rowSpan = 1, columnKey, tableRef, sortable = false, sortDirection = null, onSort, resizable = true }) => {
   const dndCtx = useContext(ColumnDndContext);
@@ -1181,7 +1241,7 @@ const InlineAddRow = ({
             ได้ด้วยการคลิกที่ป้ายในแถวปกติ (ไม่ทำเป็นช่องกรอกตรงนี้ เพราะแถวสร้างใหม่ควรถามเฉพาะข้อมูล
             ที่ "ต้องรู้ตั้งแต่แรก" เท่านั้น) ⚠️ ต้องมีช่องนี้ไว้ ไม่งั้นคอลัมน์ทั้งแถวเลื่อนไป 1 ช่อง */}
         {/* ✅ เรียงช่องตามลำดับคอลัมน์ที่ผู้ใช้จัดไว้ (ตัวเดียวกับหัวตาราง — ดู renderColumns) */}
-        {columns.map((k) => <Fragment key={k}>{({
+        {(() => { const draftCells = ({
           departmentTag: (
             <>
                 <TableCell align="center"><DepartmentPill value={DEPARTMENT.SERVICE} /></TableCell>
@@ -1313,7 +1373,11 @@ const InlineAddRow = ({
                 <TableCell><Dash /></TableCell>
             </>
           ),
-        })[k]}</Fragment>)}
+        }); return columns.map((k) => (
+          <Fragment key={k}>
+            {MERGED_COLUMNS[k] ? mergeCells(k, MERGED_COLUMNS[k].map((p) => draftCells[p]), { hideContractOnly: hideContractOnlyColumns }) : draftCells[k]}
+          </Fragment>
+        )); })()}
         <TableCell />
       </TableRow>
 
@@ -2242,13 +2306,12 @@ export default function ContractOverview() {
     [filtered]
   );
   // ── ลำดับ/การซ่อนคอลัมน์ (ลากหัวตารางสลับได้ · เมนู "คอลัมน์") — ดู hooks/useColumnLayout.js ──
-  const columnLayout = useColumnLayout("contractOverview.columns.v1");
+  const columnLayout = useColumnLayout("contractOverview.columns.v2");
   // จำนวนช่องจริงในตารางของแต่ละคอลัมน์ที่ผู้ใช้เห็น — 0 = แท็บนี้ไม่มีคอลัมน์นั้น
   const spanOfColumn = useCallback((k) => {
     if (k === "visits") return visitColumns.length;
-    if (k === "period") return hideContractOnlyColumns ? 0 : 1;
     return 1;
-  }, [visitColumns.length, hideContractOnlyColumns]);
+  }, [visitColumns.length]);
   const visibleCols = useMemo(
     () => columnLayout.order.filter((k) => !columnLayout.hidden.includes(k) && spanOfColumn(k) > 0),
     [columnLayout.order, columnLayout.hidden, spanOfColumn],
@@ -2259,8 +2322,14 @@ export default function ContractOverview() {
   );
   // ✅ เรนเดอร์เซลล์ตามลำดับที่ผู้ใช้จัด — หัวตาราง แถวข้อมูล และแถวร่างใช้ตัวเดียวกัน ลำดับจึงตรงกันเสมอ
   const renderColumns = useCallback(
-    (cells) => visibleCols.map((k) => <Fragment key={k}>{cells[k]}</Fragment>),
-    [visibleCols],
+    (cells, { header = false } = {}) => visibleCols.map((k) => (
+      <Fragment key={k}>
+        {MERGED_COLUMNS[k]
+          ? mergeCells(k, MERGED_COLUMNS[k].map((p) => cells[p]), { header, hideContractOnly: hideContractOnlyColumns })
+          : cells[k]}
+      </Fragment>
+    )),
+    [visibleCols, hideContractOnlyColumns],
   );
   // เมนูคลิกขวาที่หัวคอลัมน์ — { key, x, y } | null
   const [headerMenu, setHeaderMenu] = useState(null);
@@ -2285,8 +2354,7 @@ export default function ContractOverview() {
     // ✅ นับเฉพาะคอลัมน์ที่มองเห็น (ซ่อนจากเมนู "คอลัมน์" แล้วตารางต้องแคบลงจริง ไม่ใช่เหลือช่องว่าง)
     visibleCols.forEach((k) => {
       if (k === "visits") visitColumns.forEach((n) => { total += colWidth(`visit_${n}`); });
-      else if (k === "doc") total += colWidth(hideContractOnlyColumns ? "docNo" : "docRef");
-      else total += colWidth(k);
+      else total += colWidth(mergedWidthKey(k, hideContractOnlyColumns));
     });
     return total;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2439,7 +2507,7 @@ export default function ContractOverview() {
     const segs = [];
     let run = showCheckboxes ? 1 : 0;
     visibleCols.forEach((k) => {
-      if (k === "jobValue" || k === "commission") {
+      if (k === "money") {
         if (run) segs.push({ type: "gap", span: run });
         segs.push({ type: k, span: 1 });
         run = 0;
@@ -4035,7 +4103,8 @@ pagedRows.map((c, idx) => {
                                 onCommit={(v) => commitEdit(c, v)}
                                 onCancel={cancelEdit}
                               />
-                              {c.isRealContract && (
+                              {/* สัญญา 1 ปีไม่ต้องโชว์ (ค่าปกติ) — แก้จำนวนปีได้ในกล่อง "แก้ไขข้อมูล" */}
+                              {c.isRealContract && contractYearsOf(c) > 1 && (
                                 <EditableCell
                                   Wrapper={Box}
                                   editable={isAdminOrManager} columnKey="contractYears"
@@ -4081,7 +4150,8 @@ pagedRows.map((c, idx) => {
                         {/* ⚠️ โชว์ % ของมูลค่างานเป็นข้อมูลประกอบเท่านั้น ไม่ได้เก็บลงฐานข้อมูล — ค่าที่ตกลง
                             กับลูกค้าคือ "จำนวนเงิน" ถ้าเก็บเป็น % แล้ววันหนึ่งมูลค่างานถูกแก้ ค่าคอมจะเปลี่ยน
                             ตามเองเงียบๆ ทั้งที่ตกลงกันเป็นตัวเงินไปแล้ว (ดูเหตุผลเต็มที่ models/Events.js) */}
-                        <EditableCell
+                        {/* ✅ รวมอยู่ในช่องมูลค่า — โชว์เฉพาะที่มีค่าคอมจริง (แก้/เพิ่มได้ในกล่อง "แก้ไขข้อมูล") */}
+                        {hasMoney(c.commission) && <EditableCell
                           editable={isAdminOrManager && canEditField(c, "commission")} columnKey="commission"
                           editing={tableEditingCell?.key === c.key && tableEditingCell?.field === "commission"}
                           value={c.commission} editValue={editValue} editType="number" saving={editSaving}
@@ -4099,7 +4169,7 @@ pagedRows.map((c, idx) => {
                           onStartEdit={() => beginEdit(c, "commission")}
                           onCommit={(v) => commitEdit(c, v)}
                           onCancel={cancelEdit}
-                        />
+                        />}
                       </>
                     ),
                     statusProgress: (
@@ -6332,7 +6402,7 @@ pagedRows.map((c, idx) => {
                       <ResizableTh width={colWidth("remark")} columnKey="remark" tableRef={tableRef} resizable={!useMobileTable} onResize={handleColResize("remark")} sortable sortDirection={sortConfig.key === "remark" ? sortConfig.direction : null} onSort={handleSortClick}>หมายเหตุ</ResizableTh>
                     </>
                   ),
-                })}
+                }, { header: true })}
                 <TableCell align="center" sx={{ width: colWidth("actions") }} />
               </TableRow>
             </TableHead>
@@ -6404,12 +6474,20 @@ pagedRows.map((c, idx) => {
               >
                 {footerSegments.map((seg, i) => {
                   // ยอดรวมของคอลัมน์ที่ถูกซ่อนไว้ ไปโผล่ในป้ายแทน — ซ่อนคอลัมน์แล้วยอดต้องไม่หายไปด้วย
-                  const jobValueHidden = !visibleCols.includes("jobValue");
-                  const commissionHidden = !visibleCols.includes("commission");
-                  if (seg.type === "jobValue") {
+                  const jobValueHidden = !visibleCols.includes("money");
+                  const commissionHidden = !visibleCols.includes("money");
+                  if (seg.type === "money") {
                     return (
-                      <TableCell key={i} align="right" sx={{ fontWeight: 800, fontSize: "1rem", color: ACCENT, whiteSpace: "nowrap" }}>
-                        {formatBaht(jobValueSummary.total)}
+                      <TableCell key={i} align="center" sx={{ whiteSpace: "nowrap" }}>
+                        <Stack spacing={0.25} alignItems="center">
+                          <Box component="span" sx={{ fontWeight: 800, fontSize: "1rem", color: ACCENT }}>{formatBaht(jobValueSummary.total)}</Box>
+                          {commissionSummary.total > 0 && (
+                            <Box component="span" sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#7c3aed" }}>
+                              ค่าคอม {formatBaht(commissionSummary.total)}
+                              {jobValueSummary.total > 0 ? ` · ${((commissionSummary.total / jobValueSummary.total) * 100).toFixed(2)}%` : ""}
+                            </Box>
+                          )}
+                        </Stack>
                       </TableCell>
                     );
                   }
