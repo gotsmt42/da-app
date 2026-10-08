@@ -14,12 +14,12 @@ import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import {
   Dialog, Box, Stack, Typography, IconButton, Button, TextField, CircularProgress, Tooltip, Menu, MenuItem,
-  ListItemIcon, ListItemText, useMediaQuery, Alert,
+  ListItemIcon, ListItemText, useMediaQuery, Alert, Avatar,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
   Close, AddAPhotoOutlined, DeleteOutline, EditOutlined, MoreHoriz, CheckCircle, FlagOutlined, EventRepeat,
-  EventBusy, Replay, PlaceOutlined, BusinessOutlined, AccessTime, PersonOutline, NotesOutlined, PhotoCameraOutlined,
+  EventBusy, Replay, PlaceOutlined, BusinessOutlined, AccessTime, NotesOutlined, PhotoCameraOutlined,
   LockOutlined, PhoneOutlined, PaidOutlined, EventNote,
 } from "@mui/icons-material";
 import Swal from "sweetalert2";
@@ -29,6 +29,8 @@ import { formatThai } from "@/shared/utils/thaiDate";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, PRIMARY_BTN_SX } from "@/shared/ui/PageKit";
 import { SALES_TYPE_META, salesStatusMeta, toSalesStatus } from "../salesAppointmentTypes";
 import SiteMapCard from "@/shared/ui/SiteMapCard";
+import { personColor, personInitial } from "@/shared/utils/personAvatar";
+import { hasValidAvatar } from "@/shared/utils/user";
 
 const GREEN = "#16a34a";
 const TEAL = "#0d9488";
@@ -58,9 +60,9 @@ const Section = ({ icon, title, right, children, hint, fill = false }) => (
 );
 
 /** แถวข้อมูล ป้ายซ้าย ค่าขวา */
-const InfoRow = ({ icon, label, children }) => (
+const InfoRow = ({ icon, label, children, tone }) => (
   <Stack direction="row" spacing={1.25} alignItems="flex-start" sx={{ py: 0.9, borderTop: `1px solid ${LINE}`, "&:first-of-type": { borderTop: 0 } }}>
-    <Box sx={{ display: "flex", color: FAINT, mt: "1px", "& svg": { fontSize: 17 } }}>{icon}</Box>
+    <Box sx={{ display: "flex", color: tone || FAINT, mt: "1px", "& svg": { fontSize: 17 } }}>{icon}</Box>
     <Typography sx={{ width: 88, flexShrink: 0, fontSize: "0.78rem", color: MUTED, fontWeight: 600 }}>{label}</Typography>
     <Box sx={{ flex: 1, minWidth: 0, fontSize: "0.86rem", color: INK, fontWeight: 600, overflowWrap: "anywhere" }}>{children}</Box>
   </Stack>
@@ -296,7 +298,20 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
                 <Button size="small" startIcon={<EditOutlined sx={{ fontSize: 16 }} />} onClick={() => onEdit(ev)}
                   sx={{ textTransform: "none", fontWeight: 700, color: ACCENT, py: 0.2 }}>แก้ไข</Button>
               ) : null}>
-              <Box sx={{ flex: 1, px: 1.5, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}` }}>
+              <Box sx={{ flex: 1, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}`, overflow: "hidden" }}>
+                {/* ✅ (8 ต.ค. 2569 "เอาชื่อฝ่ายขายขึ้นก่อน ให้รู้ว่าเป็นงานของใคร") เจ้าของนัดเป็นหัวกล่อง */}
+                <Stack direction="row" alignItems="center" spacing={1.25} sx={{ px: 1.5, py: 1.1, bgcolor: SURFACE, borderBottom: `1px solid ${LINE}` }}>
+                  <Avatar
+                    src={hasValidAvatar(ev.user?.imageUrl) ? getOptimizedImageUrl(ev.user.imageUrl, { width: 96 }) : undefined}
+                    sx={{ width: 38, height: 38, fontSize: 16, fontWeight: 800, bgcolor: personColor(owner || "?") }}>
+                    {personInitial(owner || "?")}
+                  </Avatar>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography sx={{ fontSize: "0.7rem", fontWeight: 700, color: MUTED }}>ฝ่ายขายผู้รับผิดชอบ</Typography>
+                    <Typography noWrap sx={{ fontSize: "0.95rem", fontWeight: 900, color: INK }}>{owner || "ไม่ระบุ"}</Typography>
+                  </Box>
+                </Stack>
+                <Box sx={{ px: 1.5 }}>
                 <InfoRow icon={<AccessTime />} label="วัน-เวลา">{dateText}</InfoRow>
                 <InfoRow icon={<PlaceOutlined />} label="สถานที่">{ev.site || "-"}</InfoRow>
                 <InfoRow icon={<BusinessOutlined />} label="ลูกค้า">{ev.company || <Box component="span" sx={{ color: FAINT }}>ไม่ระบุ</Box>}</InfoRow>
@@ -317,19 +332,19 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
                     <Box component="span" sx={{ ml: 0.75, fontSize: "0.72rem", fontWeight: 600, color: MUTED }}>โอกาสการขาย</Box>
                   </InfoRow>
                 )}
-                <InfoRow icon={<PersonOutline />} label="ฝ่ายขาย">{owner || "-"}</InfoRow>
                 {ev.visitedAt && (
-                  <InfoRow icon={<CheckCircle />} label="เข้าพบเมื่อ">
+                  <InfoRow icon={<CheckCircle />} tone={TEAL} label="เข้าพบเมื่อ">
                     {fmtDateTime(ev.visitedAt)}
                     {ev.visitedBy && <Box component="span" sx={{ ml: 0.75, fontWeight: 500, color: MUTED, fontSize: "0.8rem" }}>โดย {ev.visitedBy}</Box>}
                   </InfoRow>
                 )}
                 {ev.salesClosedAt && (
-                  <InfoRow icon={<FlagOutlined />} label="ปิดงานเมื่อ">
+                  <InfoRow icon={<FlagOutlined />} tone={GREEN} label="ปิดงานเมื่อ">
                     {fmtDateTime(ev.salesClosedAt)}
                     {ev.salesClosedBy && <Box component="span" sx={{ ml: 0.75, fontWeight: 500, color: MUTED, fontSize: "0.8rem" }}>โดย {ev.salesClosedBy}</Box>}
                   </InfoRow>
                 )}
+                </Box>
                 {ev.description && (
                   <InfoRow icon={<NotesOutlined />} label="รายละเอียด">
                     <Box component="span" sx={{ whiteSpace: "pre-wrap", fontWeight: 500, color: INK_2 }}>{ev.description}</Box>
@@ -370,12 +385,18 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
                   {canAct && !cancelled && <Typography sx={{ fontSize: "0.74rem", color: MUTED }}>เลือกได้หลายรูปพร้อมกัน · ระบบย่อขนาดให้อัตโนมัติ</Typography>}
                 </Box>
               ) : (
-                <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(3, 1fr)", sm: "repeat(4, 1fr)" }, gap: 1 }}>
+                // ✅ (8 ต.ค. 2569 "จุดวางรูปยังไม่สวย ไม่เต็ม") จำนวนคอลัมน์ตามจำนวนรูป ให้เต็มความกว้างเสมอ
+                //    1 รูป(+ปุ่มเพิ่ม) = 2 คอลัมน์ · 2 รูป = 3 · มากกว่านั้น = 4 (มือถือสูงสุด 3) · สัดส่วน 4:3 แบบรูปถ่ายหน้างาน
+                <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: (() => {
+                  const n = photos.length + (canAct && !locked && !cancelled ? 1 : 0);
+                  const c = n <= 2 ? 2 : n <= 3 ? 3 : 4;
+                  return { xs: `repeat(${Math.min(c, 3)}, minmax(0,1fr))`, sm: `repeat(${c}, minmax(0,1fr))` };
+                })() }}>
                   {photos.map((p) => (
-                    <Box key={p._id} sx={{ position: "relative", pt: "100%", borderRadius: 2, overflow: "hidden", bgcolor: "#e2e8f0", border: `1px solid ${LINE}` }}>
+                    <Box key={p._id} sx={{ position: "relative", aspectRatio: "4 / 3", borderRadius: 2, overflow: "hidden", bgcolor: "#e2e8f0", border: `1px solid ${LINE}`, "&:hover img": { transform: "scale(1.03)" } }}>
                       <Box component="img" src={getOptimizedImageUrl(p.fileUrl, { width: 320 })} alt={p.fileName} loading="lazy"
                         onClick={() => setViewer(p)}
-                        sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", cursor: "zoom-in" }} />
+                        sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", cursor: "zoom-in", transition: "transform .2s" }} />
                       {canAct && !locked && (
                         <IconButton size="small" onClick={() => removePhoto(p)} aria-label="ลบรูป"
                           sx={{ position: "absolute", top: 4, right: 4, width: 26, height: 26, bgcolor: "rgba(15,23,42,.6)", color: "#fff", "&:hover": { bgcolor: RED } }}>
@@ -386,10 +407,10 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
                   ))}
                   {canAct && !locked && !cancelled && (
                     <Box role="button" onClick={() => !uploading && fileRef.current?.click()}
-                      sx={{ position: "relative", pt: "100%", borderRadius: 2, border: "1.5px dashed #cbd5e1", bgcolor: "#fff", cursor: "pointer", "&:hover": { borderColor: ACCENT } }}>
+                      sx={{ position: "relative", aspectRatio: "4 / 3", borderRadius: 2, border: "1.5px dashed #cbd5e1", bgcolor: SURFACE, cursor: "pointer", "&:hover": { borderColor: ACCENT, bgcolor: "#f8fbff" } }}>
                       <Stack alignItems="center" justifyContent="center" sx={{ position: "absolute", inset: 0, color: MUTED }}>
                         {uploading ? <CircularProgress size={20} /> : <AddAPhotoOutlined />}
-                        <Typography sx={{ fontSize: "0.7rem", fontWeight: 700, mt: 0.3 }}>เพิ่มรูป</Typography>
+                        <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, mt: 0.4 }}>เพิ่มรูป</Typography>
                       </Stack>
                     </Box>
                   )}
