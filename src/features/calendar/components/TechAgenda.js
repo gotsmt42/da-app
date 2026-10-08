@@ -14,7 +14,7 @@ import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import { Box, Stack, Typography, Button, ButtonBase } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Add, FileDownloadOutlined, ChevronRight, EngineeringOutlined, Groups2Outlined } from "@mui/icons-material";
+import { Add, FileDownloadOutlined, ChevronRight, EngineeringOutlined, Groups2Outlined, EventOutlined } from "@mui/icons-material";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, PRIMARY_BTN_SX } from "@/shared/ui/PageKit";
 import { Kpi, usePaged, ListPager } from "./SalesAgenda";
@@ -34,10 +34,12 @@ export const TECH_STATUS_COLOR = {
 
 const isTechRow = (e) => !e?.extendedProps?.isHoliday && String(e?.department ?? e?.extendedProps?.department ?? "service") !== "sales";
 
-const rowOf = (e) => {
+export const rowOf = (e) => {
   const start = moment(e.start);
-  let end = e.end ? moment(e.end) : start.clone().add(1, "day");
-  if (e.allDay && e.end) end = end.clone().subtract(1, "ms");
+  // ✅ วันสุดท้ายจริงของงาน — allDay ใช้ end แบบ exclusive (ถอย 1ms) · ไม่มี end = งานวันเดียว
+  //    🐛 เดิมไม่มี end → บวก 1 วัน ทำให้งานวันเดียวกลายเป็น "2 วัน" (ขึ้น "ถึง …" และนับวันเลยกำหนดผิด)
+  let end = e.end ? moment(e.end) : start.clone();
+  if (e.end && (e.allDay || end.format("HH:mm:ss.SSS") === "00:00:00.000") && end.isAfter(start)) end = end.clone().subtract(1, "ms");
   const startTime = e.extendedProps?.startTime || "";
   const endTime = e.extendedProps?.endTime || "";
   const team = [e.team, ...(e.teamMembers || e.extendedProps?.teamMembers || []).map((m) => m?.name)]
@@ -46,6 +48,8 @@ const rowOf = (e) => {
   return {
     id: String(e._id || e.id),
     e, start, end,
+    groupId: e.jobGroupId || e.extendedProps?.jobGroupId || "",
+    segs: [{ start, end, id: String(e._id || e.id), st: e.status || "กำลังรอยืนยัน" }],
     st: e.status || "กำลังรอยืนยัน",
     approval: e.approvalStatus || "approved",
     closeReq: Boolean(e.closeRequested) && e.status !== DONE,
@@ -56,6 +60,52 @@ const rowOf = (e) => {
     team,
   };
 };
+
+/**
+ * ✅ (8 ต.ค. 2569 ผู้ใช้: "วันที่แสดงไม่ตรง · งานที่ลงไม่ต่อเนื่องหลายวัน ให้ตรงตามจริง")
+ * งานหลายวันแบบไม่ต่อเนื่อง = หลาย document ที่ผูก jobGroupId เดียวกัน → รวมเป็น "งานเดียว" ในรายการ
+ * เก็บทุกช่วงวันไว้ใน segs (เรียงตามวัน) · สถานะ = ช่วงแรกที่ยังไม่เสร็จ · เปิดงาน = ช่วงนั้น
+ */
+export const mergeGroups = (rows) => {
+  const out = [];
+  const byGroup = new Map();
+  rows.forEach((r) => {
+    if (!r.groupId) { out.push(r); return; }
+    if (!byGroup.has(r.groupId)) { byGroup.set(r.groupId, []); out.push({ __group: r.groupId }); }
+    byGroup.get(r.groupId).push(r);
+  });
+  return out.map((x) => {
+    if (!x.__group) return x;
+    const list = byGroup.get(x.__group).sort((a, b) => a.start - b.start);
+    if (list.length === 1) return list[0];
+    const open = list.find((r) => r.st !== DONE);
+    const lead = open || list[list.length - 1];
+    return {
+      ...lead,
+      start: list[0].start,
+      end: list.reduce((m, r) => (r.end.isAfter(m) ? r.end : m), list[0].end),
+      segs: list.flatMap((r) => r.segs).sort((a, b) => a.start - b.start),
+      approval: list.some((r) => r.approval === "pending") ? "pending" : list.some((r) => r.approval === "rejected") ? "rejected" : "approved",
+      closeReq: list.some((r) => r.closeReq),
+      team: [...new Set(list.flatMap((r) => r.team))],
+    };
+  });
+};
+
+/** ช่วงวันของงาน — "17 เม.ย." · "15–17 เม.ย." · "28 เม.ย. – 2 พ.ค." · หลายช่วงคั่นด้วย ", " (ปีอื่นต่อท้าย พ.ศ.) */
+export const segLabel = (segs) => {
+  const thisYear = moment().year();
+  const lastDay = (g) => g.end.clone().startOf("day");
+  const yr = (m) => (m.year() !== thisYear ? ` ${formatThai(m, "YY")}` : "");
+  return segs.map((g) => {
+    const a = g.start.clone().startOf("day");
+    const b = lastDay(g);
+    if (b.isSame(a, "day")) return `${formatThai(a, "D MMM")}${yr(a)}`;
+    if (b.isSame(a, "month")) return `${a.date()}–${formatThai(b, "D MMM")}${yr(b)}`;
+    return `${formatThai(a, "D MMM")}${a.year() !== b.year() ? yr(a) : ""} – ${formatThai(b, "D MMM")}${yr(b)}`;
+  }).join(", ");
+};
+const dayCount = (segs) => segs.reduce((n, g) => n + g.end.clone().startOf("day").diff(g.start.clone().startOf("day"), "days") + 1, 0);
 
 /** จัดงานเข้าแท็บ (งานละ 1 แท็บ) */
 const classify = (rows) => {
@@ -81,7 +131,7 @@ const classify = (rows) => {
 /** ตัวเลขสรุปของหัวหน้า */
 export const techSummary = (events) => {
   const today = moment().startOf("day");
-  const rows = (events || []).filter(isTechRow).map(rowOf);
+  const rows = mergeGroups((events || []).filter(isTechRow).map(rowOf));
   const { follow } = classify(rows);
   return {
     today: rows.filter((r) => r.st !== DONE && !r.start.isAfter(today, "day") && !r.end.isBefore(today)).length,
@@ -130,9 +180,16 @@ export function TechTopBar({ events, onAdd, onTab, onExport, exportDisabled, tit
 }
 
 /** แถวงาน 1 รายการ */
-function Row({ r, onOpen }) {
+function Row({ r, onOpen, showDate }) {
   const c = TECH_STATUS_COLOR[r.st] || MUTED;
   const isDone = r.st === DONE;
+  const days = dayCount(r.segs);
+  const split = r.segs.length > 1;
+  // ✅ บอกวันทำงานจริงทุกครั้งที่ "หัววัน" บอกไม่ครบ: แท็บต้องติดตาม (ไม่มีหัววัน) · งานหลายวัน · งานไม่ต่อเนื่อง
+  const dateLine = days > 1 || split
+    ? `${segLabel(r.segs)}${days > 1 ? ` · ${days} วัน${split ? " (ไม่ต่อเนื่อง)" : ""}` : ""}`
+    : "";
+  const leftLabel = /^\d/.test(r.time) ? null : days > 1 ? "หลายวัน" : "ทั้งวัน";
   return (
     <ButtonBase onClick={() => onOpen(r.id)}
       sx={{
@@ -140,9 +197,15 @@ function Row({ r, onOpen }) {
         borderTop: `1px solid ${LINE}`, "&:first-of-type": { borderTop: 0 }, "&:hover": { bgcolor: SURFACE },
       }}>
       <Box sx={{ width: 52, flexShrink: 0, pt: 0.25 }}>
-        <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: /^\d/.test(r.time) ? INK : MUTED, lineHeight: 1.3, fontVariantNumeric: "tabular-nums" }}>
-          {/^\d/.test(r.time) ? r.time.split("–")[0] : r.time}
-        </Typography>
+        {/* แท็บที่ไม่มีหัววัน (ต้องติดตาม) — คอลัมน์ซ้ายบอกวันเริ่มงาน */}
+        {showDate && (
+          <Typography sx={{ fontSize: "0.8rem", fontWeight: 900, color: INK, lineHeight: 1.25 }}>
+            {formatThai(r.start, "D MMM")}{r.start.year() !== moment().year() ? <Box component="span" sx={{ display: "block", fontSize: "0.68rem", color: MUTED }}>{formatThai(r.start, "YYYY")}</Box> : null}
+          </Typography>
+        )}
+        {!(showDate && leftLabel) && <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: leftLabel ? MUTED : INK, lineHeight: 1.3, fontVariantNumeric: "tabular-nums" }}>
+          {leftLabel || r.time.split("–")[0]}
+        </Typography>}
         {/^\d/.test(r.time) && r.time.includes("–") && <Typography sx={{ fontSize: "0.7rem", color: MUTED }}>{r.time.split("–")[1]}</Typography>}
       </Box>
       <Box sx={{ width: 4, borderRadius: 2, flexShrink: 0, bgcolor: r.color, boxShadow: "inset 0 0 0 1px rgba(15,23,42,.12)" }} />
@@ -165,6 +228,12 @@ function Row({ r, onOpen }) {
           <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.25, color: INK_2 }}>
             <Groups2Outlined sx={{ fontSize: 15, color: FAINT }} />
             <Typography noWrap sx={{ fontSize: "0.76rem", fontWeight: 600 }}>{r.team.join(", ")}</Typography>
+          </Stack>
+        )}
+        {dateLine && (
+          <Stack direction="row" spacing={0.5} alignItems="flex-start" sx={{ mt: 0.3, color: INK_2 }}>
+            <EventOutlined sx={{ fontSize: 15, color: FAINT, mt: "1px" }} />
+            <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, lineHeight: 1.4 }}>{dateLine}</Typography>
           </Stack>
         )}
         {r.note && <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: r.note.color, mt: 0.3 }}>{r.note.text}</Typography>}
@@ -201,16 +270,22 @@ const groupByDay = (rows, dayOf) => {
   });
   return [...map.entries()];
 };
+/** วันที่ของงานในแท็บ "งานที่จะถึง" = ช่วงถัดไปที่ยังไม่ผ่าน (เริ่มไปแล้วแต่ยังไม่จบ → วันนี้) */
+const nextDayOf = (r, today) => {
+  const next = r.segs.find((g) => !g.end.isBefore(today)) || r.segs[r.segs.length - 1];
+  return next.start.isBefore(today) ? today : next.start.clone().startOf("day");
+};
 const timeKey = (r) => (/^\d/.test(r.time) ? r.time.slice(0, 5) : "00:00");
 
 /** มุมมองรายการของตารางงานช่าง */
 export default function TechAgenda({ events, onOpen, onAdd, canAdd = true, tab, onTab }) {
   const today = moment().startOf("day");
-  const rows = useMemo(() => (events || []).filter(isTechRow).map(rowOf), [events]);
+  const rows = useMemo(() => mergeGroups((events || []).filter(isTechRow).map(rowOf)), [events]);
   const { upcoming, follow, done } = useMemo(() => {
     const c = classify(rows);
+    const t0 = moment().startOf("day");
     return {
-      upcoming: c.upcoming.sort((a, b) => a.start - b.start || timeKey(a).localeCompare(timeKey(b))),
+      upcoming: c.upcoming.sort((a, b) => nextDayOf(a, t0) - nextDayOf(b, t0) || timeKey(a).localeCompare(timeKey(b))),
       follow: c.follow.sort((a, b) => a.start - b.start),
       done: c.done.sort((a, b) => b.start - a.start),
     };
@@ -226,7 +301,7 @@ export default function TechAgenda({ events, onOpen, onAdd, canAdd = true, tab, 
   const pg = usePaged(full, cur.k);
   const list = pg.items;
   // งานหลายวันที่เริ่มไปแล้วแต่ยังไม่จบ → แสดงในกลุ่ม "วันนี้"
-  const dayOf = (r) => (cur.k === "upcoming" && r.start.isBefore(today) ? today : r.start);
+  const dayOf = (r) => (cur.k === "upcoming" ? nextDayOf(r, today) : r.start);
 
   return (
     <Box ref={pg.topRef} sx={{ scrollMarginTop: 80 }}>
@@ -264,7 +339,7 @@ export default function TechAgenda({ events, onOpen, onAdd, canAdd = true, tab, 
         </Box>
       ) : cur.k === "follow" ? (
         <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflow: "hidden" }}>
-          {list.map((r) => <Row key={r.id} r={r} onOpen={onOpen} />)}
+          {list.map((r) => <Row key={r.id} r={r} onOpen={onOpen} showDate />)}
         </Box>
       ) : (
         groupByDay(list, dayOf).map(([day, rs]) => <DayGroup key={day} day={day} rows={rs} onOpen={onOpen} />)
