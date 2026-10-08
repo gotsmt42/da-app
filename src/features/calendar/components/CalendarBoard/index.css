@@ -859,6 +859,12 @@
 .ec-sales {
   --ec-head-from: #2563eb;
   --ec-head-to: #1e3a8a;
+  /* วันเสาร์-อาทิตย์ และ "วันนี้" ใช้โทนน้ำเงินชุดเดียวกับหัวตาราง (ตารางช่างยังเป็นแดงอ่อนตามเดิม) */
+  --ec-weekend: #eef4ff;
+}
+.calendar-wrapper.ec-sales .fc-day-today {
+  background-color: #e6efff !important;
+  box-shadow: inset 3px 0 0 #2563eb;
 }
 /* ป้ายสถานะนัดเซลบนการ์ด — พื้นขาวโปร่ง อ่านออกบนการ์ดทุกสี */
 .ec-sales-pill {

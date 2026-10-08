@@ -1832,7 +1832,8 @@ function EventCalendar() {
 
         // ✅ เดิมเหลืองอ่อน (#FFFFF4) ไม่ตรงกับธีมสีแดง — เปลี่ยนเป็นแดงอ่อนแบบเดียวกับที่ใช้กับ
         // เซลล์ "วันนี้" (ถ้าตรงกับวันนี้พอดี .fc-day-today จะ !important ทับสีนี้เองอยู่แล้ว)
-        cell.style.backgroundColor = isWeekend && isSameMonth ? "#fef2f2" : "";
+        // ✅ (8 ต.ค. 2569) สีตามธีมของตาราง — ช่าง = แดงอ่อน · ฝ่ายขาย = น้ำเงินอ่อน (ดู --ec-weekend ใน .ec-sales)
+        cell.style.backgroundColor = isWeekend && isSameMonth ? "var(--ec-weekend, #fef2f2)" : "";
       });
     });
   }, []);
@@ -3916,7 +3917,7 @@ function EventCalendar() {
             // ✅ ไฮไลต์วันเสาร์-อาทิตย์ เฉพาะวันที่อยู่ในเดือนปัจจุบัน
             // ✅ เดิมเหลืองอ่อนไม่ตรงธีม เปลี่ยนเป็นแดงอ่อนแบบเดียวกับ handleHighlightWeekends
             if ((isSaturday || isSunday) && isSameMonth) {
-              info.el.style.backgroundColor = "#fef2f2"; // แดงอ่อน (ธีมแอพ)
+              info.el.style.backgroundColor = "var(--ec-weekend, #fef2f2)"; // ช่าง = แดงอ่อน · ฝ่ายขาย = น้ำเงินอ่อน
             }
           }}
 
