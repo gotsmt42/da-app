@@ -538,6 +538,7 @@ export const getAddEvent = async ({
         contractEnd: e.contractEnd || "",
         visitCount: totalRoundsOf(e),
         intervalMonths: e.intervalMonths,
+        contractYears: e.contractYears,
         jobValue: e.jobValue,
         team: e.team || "",
         // ✅ ใช้เป็นค่า fallback ตอนเพิ่ม "ครั้งที่" ใหม่ให้สัญญานี้ ถ้าไม่ได้เลือกหัวหน้าทีมเข้างานเอง
@@ -1394,7 +1395,7 @@ export const getAddEvent = async ({
               ...(jobGroupId ? { jobGroupId } : {}),
               contractNo: c.contractNo, quotationNo: c.quotationNo,
               contractStart: c.contractStart, contractEnd: c.contractEnd,
-              visitCount: c.visitCount, intervalMonths: c.intervalMonths, jobValue: c.jobValue,
+              visitCount: c.visitCount, intervalMonths: c.intervalMonths, contractYears: c.contractYears, jobValue: c.jobValue,
               dates: [{
                 start: cpStart,
                 end: moment(cpEnd).add(1, "days").format("YYYY-MM-DD"),

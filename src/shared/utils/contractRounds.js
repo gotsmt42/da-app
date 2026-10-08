@@ -37,12 +37,56 @@ export const contractYearOf = (ev) => {
   return null;
 };
 
-/** "2/4" · ส่งงาน/สัญญามาด้วย (ctx) → "2/4 - 2569" ถ้ารู้ปีของสัญญา */
+/**
+ * ✅ (8 ต.ค. 2569 ผู้ใช้: "ลงเป็นแบบ เข้าปีละกี่ครั้ง และเข้ากี่ปี · ไม่ให้แสดงเป็น 1/8, 2/8")
+ * จำนวนปีของสัญญา — contractYears ที่เลือกในฟอร์ม → ไม่มี (สัญญาเก่า) คิดจากช่วงวันที่สัญญา → ไม่มีวันที่ = 1 ปี
+ * ⚠️ ฝั่ง server มีตัวเดียวกันที่ utils/contractVisits.js (contractYearsOf) — แก้ต้องแก้คู่กัน
+ */
+export const MAX_CONTRACT_YEARS = 5;
+export const contractYearsOf = (c) => {
+  if (!c) return 1;
+  const src = c.extendedProps ? { ...c.extendedProps, ...c } : c;
+  const y = Number(src.contractYears);
+  if (Number.isInteger(y) && y >= 1) return Math.min(y, MAX_CONTRACT_YEARS);
+  const a = src.contractStart ? new Date(src.contractStart) : null;
+  const b = src.contractEnd ? new Date(src.contractEnd) : null;
+  if (!a || !b || Number.isNaN(a.getTime()) || Number.isNaN(b.getTime()) || b < a) return 1;
+  const days = (b - a) / 86400000 + 1;
+  return Math.min(MAX_CONTRACT_YEARS, Math.max(1, Math.round(days / 365.25)));
+};
+
+/** เข้าปีละกี่ครั้ง — จากรอบเข้า (หาร 12 ลงตัว) · ไม่งั้นแบ่งจำนวนครั้งทั้งหมดตามจำนวนปี (หารลงตัว) */
+export const perYearOf = (c) => {
+  if (!c) return 0;
+  const src = c.extendedProps ? { ...c.extendedProps, ...c } : c;
+  const n = Number(src.intervalMonths);
+  if (n >= 1 && 12 % n === 0) return 12 / n;
+  const total = Number(src.visitCount) || 0;
+  const years = contractYearsOf(src);
+  return years > 1 && total % years === 0 ? total / years : total;
+};
+
+/**
+ * ป้ายครั้งที่ — นับใหม่ทุกปีของสัญญา (ผู้ใช้เลือก 8 ต.ค. 2569)
+ *   ปีละ 4 ครั้ง 2 ปี เริ่ม 2569: ครั้งที่ 5 → "1/4 - 2570" (ไม่ใช่ "5/8")
+ *   ปีของรอบ = ปีที่เริ่มสัญญา + (ปีที่ของสัญญา − 1)
+ * ไม่ส่งงาน/สัญญามา (ctx) → แบบเดิม "2/4"
+ */
 export const formatRoundLabel = (time, visitCount, ctx) => {
   if (time === undefined || time === null || time === "") return "";
-  const base = visitCount ? `${time}/${visitCount}` : `${time}`;
-  const year = ctx ? contractYearOf(ctx) : null;
-  return year ? `${base} - ${year}` : base;
+  if (!ctx) return visitCount ? `${time}/${visitCount}` : `${time}`;
+  const t = Number(time);
+  const per = perYearOf(ctx) || Number(visitCount) || 0;
+  const startYear = contractYearOf(ctx);
+  if (!per || !Number.isInteger(t) || t < 1) {
+    const base = visitCount ? `${time}/${visitCount}` : `${time}`;
+    return startYear ? `${base} - ${startYear}` : base;
+  }
+  const yearIdx = Math.ceil(t / per);
+  const inYear = ((t - 1) % per) + 1;
+  const years = contractYearsOf(ctx);
+  if (startYear) return `${inYear}/${per} - ${startYear + yearIdx - 1}`;
+  return years > 1 ? `${inYear}/${per} (ปีที่ ${yearIdx})` : `${inYear}/${per}`;
 };
 
 export const DEFAULT_INTERVAL_MONTHS = 3;
@@ -58,7 +102,8 @@ export const DEFAULT_INTERVAL_MONTHS = 3;
  */
 export const totalRoundsOf = (c) => {
   const n = Number(c?.intervalMonths);
-  if (n >= 1 && 12 % n === 0) return 12 / n;
+  // ✅ ปีละ N ครั้ง × จำนวนปีของสัญญา (สัญญา 1 ปี = เหมือนเดิมทุกประการ)
+  if (n >= 1 && 12 % n === 0) return (12 / n) * contractYearsOf(c);
   return Number(c?.visitCount) || 0;
 };
 

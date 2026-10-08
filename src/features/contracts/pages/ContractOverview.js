@@ -55,7 +55,7 @@ import JobTypeService from "@/shared/services/JobTypeService";
 import SystemTypeService from "@/shared/services/SystemTypeService";
 import { formatEventDateRange } from "@/shared/utils/formatDateRange";
 import { resolveOperationGroup } from "@/shared/utils/overdueJobs";
-import { countUsedRounds, visitsPerYear, INTERVAL_MONTHS_PRESETS, totalRoundsOf } from "@/shared/utils/contractRounds";
+import { countUsedRounds, visitsPerYear, INTERVAL_MONTHS_PRESETS, totalRoundsOf, contractYearsOf, perYearOf, MAX_CONTRACT_YEARS } from "@/shared/utils/contractRounds";
 import { groupEventsByContract, nextVisitOverdueInfo, isRoundOverdue, contractStatusInfo, isExpiredContract, contractCompleteness } from "@/shared/utils/contractOverdue";
 // ✅ สถานะการวางบิล/รับเงิน — ของกลางชุดเดียวกับหน้า "วางบิล / รับเงิน" (/billing) ห้ามคำนวณซ้ำที่นี่
 import { contractBillingSummary, baht as bahtFmt } from "@/shared/utils/billing";
@@ -98,7 +98,7 @@ const EXCEL_GREEN = "#217346";
 // ✅ เพดานจำนวนครั้งของสัญญา — บังคับทุกจุดที่ตั้งค่านี้ (ฟอร์มเพิ่มสัญญา/แก้ไข inline/จัดกลุ่มเป็นสัญญา
 // ทั้งฝั่งจอและฝั่ง backend) และใช้เป็นเพดานตอนคำนวณจำนวนคอลัมน์ "ครั้งที่ N" ของตารางด้วย (กันไว้อีก
 // ชั้น เผื่อมีข้อมูลเก่า/จากที่อื่นที่หลุดรอดมาสูงกว่านี้ — ไม่งั้นตารางทั้งหน้าจะกว้างจนพังได้)
-const MAX_VISIT_COUNT = 12;
+const MAX_VISIT_COUNT = 60; // ปีละสูงสุด 12 ครั้ง × สูงสุด 5 ปี — ตรงกับ server (calendarEvent/shared.js)
 // ✅ จำนวนวันที่ที่โชว์ในเซลล์ "ครั้งที่ N" ก่อนพับที่เหลือ (ดู expandedVisitCells) — 3 พอดีกับความสูงแถว
 // ปกติของแถวอื่นๆ ในตาราง ทำให้ทุกแถวสูงเท่ากันเป็นระเบียบ ไม่มีแถวไหนพุ่งสูงกว่าเพื่อนเป็นเท่าตัว
 const VISIT_CELL_PREVIEW = 3;
@@ -344,6 +344,28 @@ const progressInfo = (c, countUsedRoundsFn) => {
   // สัญญาจะเก่าหรือใหม่ โดยไม่ต้องไล่แก้ทีละใบ/ไม่ต้องยิง API เขียนทับข้อมูลเดิม — หารไม่ลงตัว (เช่น
   // ทุก 5 เดือน) หรือยังไม่ระบุรอบเข้าเลย ถึง fallback ไปที่ visitCount ที่บันทึกไว้เหมือนเดิม
   const total = totalRoundsOf(c) || countUsedRoundsFn(c.visits);
+  // ✅ (8 ต.ค. 2569 ผู้ใช้: "ความคืบหน้าในตาราง ให้อิงเป็นปีนั้นๆ ไม่เอาจำนวนทั้งหมดมาอิง") สัญญาหลายปี
+  //    โชว์เฉพาะปีที่กำลังเดิน = ปีแรกที่ยังเข้าไม่ครบ เช่น "1/4 · 2570" แทน "5/8"
+  const per = perYearOf(c);
+  const years = contractYearsOf(c);
+  if (years > 1 && per > 0 && total === per * years) {
+    const doneRounds = new Set();
+    byRound.forEach((docs, key) => { if (docs.every((d) => d.status === "ดำเนินการเสร็จสิ้น")) doneRounds.add(Number(key)); });
+    let yearIdx = years;
+    for (let y = 1; y <= years; y += 1) {
+      let doneInYear = 0;
+      for (let t = (y - 1) * per + 1; t <= y * per; t += 1) if (doneRounds.has(t)) doneInYear += 1;
+      if (doneInYear < per) { yearIdx = y; break; }
+    }
+    let doneInYear = 0;
+    for (let t = (yearIdx - 1) * per + 1; t <= yearIdx * per; t += 1) if (doneRounds.has(t)) doneInYear += 1;
+    const startBE = c.contractStart ? moment(c.contractStart).year() + 543 : null;
+    const allDone = doneCount >= total;
+    return {
+      label: `${doneInYear}/${per} · ${startBE ? startBE + yearIdx - 1 : `ปีที่ ${yearIdx}`}`,
+      color: allDone ? STATUS_COLOR["ดำเนินการเสร็จสิ้น"] : doneInYear === 0 ? "#9ca3af" : "#f59e0b",
+    };
+  }
   return {
     label: `${doneCount}/${total}`,
     color: doneCount === 0 ? "#9ca3af" : doneCount >= total ? STATUS_COLOR["ดำเนินการเสร็จสิ้น"] : "#f59e0b",
@@ -1080,7 +1102,7 @@ const GridField = ({ label, ...cellProps }) => (
 // เผื่อกรณีอื่นที่เข้าถึงฉบับร่างนี้ได้)
 const EMPTY_CONTRACT_FORM = {
   company: "", site: "", title: "", system: "", responsiblePerson: "", firstVisitTeam: "",
-  contractNo: "", quotationNo: "", contractStart: "", contractEnd: "", visitCount: "", intervalMonths: "", jobValue: "",
+  contractNo: "", quotationNo: "", contractStart: "", contractEnd: "", visitCount: "", intervalMonths: "", contractYears: "1", jobValue: "",
   firstVisitStart: "", firstVisitEnd: "",
 };
 
@@ -2588,7 +2610,35 @@ export default function ContractOverview() {
 
   // ✅ ปุ่มลัด "ปีละ N ครั้ง" เซ็ตทั้ง intervalMonths และ visitCount ให้สอดคล้องกันในคลิกเดียว —
   // แยกออกมาเพราะใช้ซ้ำกับฟอร์ม "ย้ายเข้าสัญญาที่มีอยู่" ด้านล่างด้วย (pickMergeInterval)
-  const pickInterval = (months) => setForm((f) => ({ ...f, intervalMonths: months, visitCount: String(visitsPerYear(months) || f.visitCount) }));
+  const pickInterval = (months) => setForm((f) => ({
+    ...f, intervalMonths: months,
+    visitCount: String(visitsPerYear(months) ? visitsPerYear(months) * (Number(f.contractYears) || 1) : f.visitCount),
+  }));
+  // ✅ (8 ต.ค. 2569 ผู้ใช้: "ลงเป็นแบบ เข้าปีละกี่ครั้ง และเข้ากี่ปี") เลือกจำนวนปี → วันสิ้นสุดสัญญา + จำนวนครั้งทั้งหมดตั้งให้เอง
+  const endFromYears = (start, years) => (start
+    ? moment(start).add(Number(years) || 1, "years").subtract(1, "day").format("YYYY-MM-DD")
+    : "");
+  const pickYears = (years) => setForm((f) => {
+    const per = visitsPerYear(f.intervalMonths);
+    return {
+      ...f, contractYears: String(years),
+      ...(f.contractStart ? { contractEnd: endFromYears(f.contractStart, years) } : {}),
+      ...(per ? { visitCount: String(per * years) } : {}),
+    };
+  });
+  // ✅ (8 ต.ค. 2569 ผู้ใช้: "จำนวนปีเบื้องต้นให้คำนวณจากเริ่มและสิ้นสุดสัญญาก่อน แต่กรอกเองเพื่อแก้ได้")
+  //    เปลี่ยนวันเริ่ม/วันสิ้นสุด → คำนวณจำนวนปีใหม่ (และจำนวนครั้งทั้งหมด) · ยังไม่มีวันสิ้นสุด → ตั้งจากจำนวนปี
+  const withYearsFromDates = (f) => {
+    if (!f.contractStart || !f.contractEnd) return f;
+    const years = contractYearsOf({ contractStart: f.contractStart, contractEnd: f.contractEnd });
+    const per = visitsPerYear(f.intervalMonths);
+    return { ...f, contractYears: String(years), ...(per ? { visitCount: String(per * years) } : {}) };
+  };
+  const setContractStart = (v) => setForm((f) => withYearsFromDates({
+    ...f, contractStart: v,
+    ...(v && !f.contractEnd ? { contractEnd: endFromYears(v, f.contractYears) } : {}),
+  }));
+  const setContractEnd = (v) => setForm((f) => withYearsFromDates({ ...f, contractEnd: v }));
 
   const companyOptions = useMemo(
     () => [...new Set(lookups.customers.map((c) => c.cCompany).filter(Boolean))],
@@ -2698,9 +2748,12 @@ export default function ContractOverview() {
       responsiblePerson: c.rawResponsiblePerson || "",
       contractNo: renewContractNo(c.contractNo),
       contractStart: start.format("YYYY-MM-DD"),
-      contractEnd: start.clone().add(months, "months").subtract(1, "day").format("YYYY-MM-DD"),
+      contractEnd: (contractYearsOf(c) > 1 || months >= 11)
+        ? start.clone().add(contractYearsOf(c), "years").subtract(1, "day").format("YYYY-MM-DD")
+        : start.clone().add(months, "months").subtract(1, "day").format("YYYY-MM-DD"),
       visitCount: c.visitCount ? String(c.visitCount) : "",
       intervalMonths: c.intervalMonths ? String(c.intervalMonths) : "",
+      contractYears: String(contractYearsOf(c)),
       jobValue: c.jobValue != null && c.jobValue !== "" ? String(c.jobValue) : "",
     });
     setRenewFrom(c);
@@ -2844,6 +2897,7 @@ export default function ContractOverview() {
         contractEnd: values.contractEnd,
         visitCount,
         intervalMonths: values.intervalMonths ? Number(values.intervalMonths) : undefined,
+        contractYears: Number(values.contractYears) || 1,
         jobValue: values.jobValue ? Number(values.jobValue) : undefined,
       };
 
@@ -3217,6 +3271,7 @@ export default function ContractOverview() {
     // ⚠️ document เก่าไม่มีฟิลด์นี้เลย (เพิ่งเพิ่มทีหลัง) ต้องอ่านเป็น "ฝ่ายบริการ" ให้ตรงกับที่แสดงในตาราง
     // ไม่งั้นการเลือก "ฝ่ายบริการ" บนแถวเก่าจะไม่ถูกมองว่า "ไม่ได้แก้" แล้วยิง PUT ทิ้งเปล่าๆ
     if (field === "departmentTag") return c.departmentTag || DEPARTMENT.SERVICE;
+    if (field === "contractYears") return contractYearsOf(c);
     return c[field] ?? "";
   };
 
@@ -3290,7 +3345,20 @@ export default function ContractOverview() {
     let syncedVisitCount;
     if (field === "intervalMonths" && rawValue) {
       const perYear = visitsPerYear(rawValue);
-      if (perYear) syncedVisitCount = perYear;
+      if (perYear) syncedVisitCount = perYear * contractYearsOf(c);
+    }
+    // ✅ แก้จำนวนปีของสัญญา → จำนวนครั้งทั้งหมด + วันสิ้นสุดสัญญาตามไปด้วย (สอดคล้องกับฟอร์มเพิ่มสัญญา)
+    let syncedEnd;
+    if (field === "contractYears") {
+      const y = Number(rawValue);
+      if (!Number.isInteger(y) || y < 1 || y > MAX_CONTRACT_YEARS) {
+        Swal.fire({ title: "แก้ไขไม่สำเร็จ", text: `จำนวนปีของสัญญาต้องอยู่ระหว่าง 1-${MAX_CONTRACT_YEARS} ปี`, icon: "error" });
+        setEditingCell(null);
+        return;
+      }
+      const perYear = visitsPerYear(c.intervalMonths);
+      if (perYear) syncedVisitCount = perYear * y;
+      if (c.contractStart) syncedEnd = moment(c.contractStart).add(y, "years").subtract(1, "day").format("YYYY-MM-DD");
     }
     // 🐛 BUG ที่แก้: แก้ไข inline ก็ไม่เคยตรวจช่วงวันที่สัญญาเลย (ทั้งที่เป็นทางที่แก้วันที่บ่อยที่สุด) —
     // แก้วันสิ้นสุดให้ก่อนวันเริ่มได้ตามใจ แล้วสัญญาจะขึ้น "หมดอายุแล้ว" ทันที เทียบกับอีกฝั่งของช่วงที่
@@ -3323,10 +3391,11 @@ export default function ContractOverview() {
     // สัญญา (จำนวนคอลัมน์ "ครั้งที่ N" คำนวณจากมัน) ล้างเป็นค่าว่างแล้วตารางจะเพี้ยนทั้งหน้า ไม่ใช่แค่
     // ช่องเดียวหาย — ถ้าอยากแก้ต้องใส่ตัวเลขใหม่ทับเท่านั้น
     if (field === "jobValue" || field === "commission") payload[field] = rawValue ? Number(rawValue) : null;
-    else if (field === "visitCount" || field === "intervalMonths") payload[field] = rawValue ? Number(rawValue) : undefined;
+    else if (field === "visitCount" || field === "intervalMonths" || field === "contractYears") payload[field] = rawValue ? Number(rawValue) : undefined;
     else if (field === "responsiblePerson") { payload.responsiblePerson = rawValue; payload.responsiblePersonId = teamToId.get(rawValue) || ""; }
     else payload[field] = rawValue;
     if (syncedVisitCount !== undefined) payload.visitCount = syncedVisitCount;
+    if (syncedEnd !== undefined) payload.contractEnd = syncedEnd;
 
     // ⚠️ BUG ที่แก้: เดิม await fetchData() หลังบันทึกทุกครั้ง — ตั้ง loading=true ทำให้ทั้งตารางเปลี่ยน
     // เป็น <Skeleton> วาบให้เห็น แล้วค่อยเรนเดอร์ใหม่ทั้งหมด (เสียตำแหน่ง scroll/แถวที่กำลังดูอยู่) ทั้งที่
@@ -3952,6 +4021,23 @@ pagedRows.map((c, idx) => {
                                 onCommit={(v) => commitEdit(c, v)}
                                 onCancel={cancelEdit}
                               />
+                              {c.isRealContract && (
+                                <EditableCell
+                                  Wrapper={Box}
+                                  editable={isAdminOrManager} columnKey="contractYears"
+                                  editing={tableEditingCell?.key === c.key && tableEditingCell?.field === "contractYears"}
+                                  value={contractYearsOf(c)} editValue={editValue} editType="number" saving={editSaving}
+                                  title={isAdminOrManager ? `สัญญากี่ปี (1-${MAX_CONTRACT_YEARS}) — แก้แล้ววันสิ้นสุดและจำนวนครั้งเปลี่ยนตาม` : undefined}
+                                  formatDisplay={(v) => (
+                                    <Box component="span" sx={{ display: "inline-flex", alignItems: "center", mt: 0.15, px: 0.6, py: 0.1, borderRadius: 1, bgcolor: alpha("#0f172a", 0.05), color: "text.secondary", fontSize: "0.67rem", fontWeight: 600, whiteSpace: "nowrap" }}>
+                                      สัญญา {v} ปี{perYearOf(c) && Number(v) > 1 ? ` · รวม ${perYearOf(c) * Number(v)} ครั้ง` : ""}
+                                    </Box>
+                                  )}
+                                  onStartEdit={() => beginEdit(c, "contractYears")}
+                                  onCommit={(v) => commitEdit(c, v)}
+                                  onCancel={cancelEdit}
+                                />
+                              )}
                               {/* ✅ ต่อสัญญา — อยู่ใต้วันสิ้นสุดสัญญาเลย (ช่องที่ทำให้รู้ว่าต้องต่อ) */}
                               {renewWidget(c) && <Box sx={{ pt: 0.6 }}>{renewWidget(c)}</Box>}
                             </Stack>
@@ -6594,7 +6680,9 @@ pagedRows.map((c, idx) => {
       {addOpen && (() => {
         // ── สรุปรอบการเข้างาน + ตรวจว่าจำนวนครั้งตรงกับรอบเข้าไหม (กติกาเดียวกับ totalRoundsOf) ──
         const perYear = visitsPerYear(form.intervalMonths);
-        const countMismatch = Boolean(perYear && form.visitCount && Number(form.visitCount) !== perYear);
+        const formYears = Number(form.contractYears) || 1;
+        const expectedTotal = perYear ? perYear * formYears : 0;
+        const countMismatch = Boolean(perYear && form.visitCount && Number(form.visitCount) !== expectedTotal);
         const missingRequired = [
           !form.site.trim() && "โครงการ",
           !form.title.trim() && "ประเภทงาน",
@@ -6676,9 +6764,9 @@ pagedRows.map((c, idx) => {
                 <TextField fullWidth size="small" label="เลขที่ใบเสนอราคา" value={form.quotationNo}
                   onChange={(e) => setField("quotationNo")(e.target.value)} />
                 <ThaiDatePicker label="วันที่เริ่มสัญญา"
-                  value={form.contractStart} onChange={setField("contractStart")} />
+                  value={form.contractStart} onChange={setContractStart} />
                 <ThaiDatePicker label="วันที่สิ้นสุดสัญญา"
-                  value={form.contractEnd} onChange={setField("contractEnd")}
+                  value={form.contractEnd} onChange={setContractEnd}
                   error={hasInvalidContractRange}
                   helperText={hasInvalidContractRange ? "ต้องไม่ก่อนวันที่เริ่มสัญญา" : ""} />
                 <TextField fullWidth size="small" type="number" label="มูลค่างานทั้งสัญญา" value={form.jobValue}
@@ -6690,12 +6778,28 @@ pagedRows.map((c, idx) => {
             <FormSection
               step={3} title="รอบการเข้างาน" hint="เลือกจำนวนครั้งต่อปี ระบบตั้งระยะห่างให้เอง — หรือพิมพ์เองก็ได้"
               action={perYear && form.visitCount && !countMismatch ? (
-                <Chip size="small" label={`${form.visitCount} ครั้ง · ทุก ${form.intervalMonths} เดือน`}
+                <Chip size="small" label={formYears > 1 ? `ปีละ ${perYear} ครั้ง × ${formYears} ปี = ${form.visitCount} ครั้ง` : `${form.visitCount} ครั้ง · ทุก ${form.intervalMonths} เดือน`}
                   sx={{ height: 24, fontWeight: 700, fontSize: "0.72rem", bgcolor: alpha("#16a34a", 0.1), color: "#15803d" }} />
               ) : null}
             >
               <Stack spacing={1.5}>
                 <IntervalMonthsQuickPicks value={form.intervalMonths} onPick={pickInterval} />
+                {/* ✅ จำนวนปีของสัญญา — คำนวณจากวันเริ่ม–สิ้นสุดให้ก่อน แก้เองได้ (แก้แล้ววันสิ้นสุดเลื่อนตาม)
+                    ครั้งที่ของงานนับใหม่ทุกปี เช่น 1/4 - 2569 … 1/4 - 2570 */}
+                <TextField
+                  size="small" type="number" label="สัญญากี่ปี" value={form.contractYears}
+                  onChange={(e) => {
+                    const y = Math.floor(Number(e.target.value));
+                    if (!e.target.value) { setField("contractYears")(""); return; }
+                    if (y >= 1 && y <= MAX_CONTRACT_YEARS) pickYears(y);
+                  }}
+                  inputProps={{ min: 1, max: MAX_CONTRACT_YEARS }}
+                  InputProps={{ endAdornment: <InputAdornment position="end">ปี</InputAdornment> }}
+                  sx={{ maxWidth: { sm: 260 } }}
+                  helperText={form.contractStart && form.contractEnd
+                    ? "คำนวณจากวันเริ่ม–สิ้นสุดสัญญาให้แล้ว · แก้ได้ (วันสิ้นสุดเลื่อนตาม)"
+                    : `1-${MAX_CONTRACT_YEARS} ปี · ระบุวันเริ่มสัญญา ระบบตั้งวันสิ้นสุดให้`}
+                />
                 <FieldGrid>
                   <TextField
                     fullWidth size="small" type="number" label="เข้าทุกกี่เดือน" value={form.intervalMonths}
@@ -6714,15 +6818,15 @@ pagedRows.map((c, idx) => {
                     onChange={(e) => setField("visitCount")(e.target.value)} inputProps={{ min: 1, max: MAX_VISIT_COUNT }}
                     InputProps={{ endAdornment: <InputAdornment position="end">ครั้ง</InputAdornment> }}
                     error={countMismatch}
-                    helperText={countMismatch ? `ไม่ตรงกับรอบเข้า (ทุก ${form.intervalMonths} เดือน = ปีละ ${perYear} ครั้ง)` : `สูงสุด ${MAX_VISIT_COUNT} ครั้ง`}
+                    helperText={countMismatch ? `ไม่ตรงกับรอบเข้า (ปีละ ${perYear} ครั้ง × ${formYears} ปี = ${expectedTotal} ครั้ง)` : perYear ? `ปีละ ${perYear} ครั้ง × ${formYears} ปี` : `สูงสุด ${MAX_VISIT_COUNT} ครั้ง`}
                   />
                 </FieldGrid>
                 {countMismatch && (
                   <Alert
                     severity="warning" sx={{ borderRadius: 2, py: 0.25, "& .MuiAlert-message": { fontSize: "0.8rem" } }}
-                    action={<Button size="small" color="inherit" sx={{ textTransform: "none", fontWeight: 700 }} onClick={() => setField("visitCount")(String(perYear))}>ใช้ {perYear} ครั้ง</Button>}
+                    action={<Button size="small" color="inherit" sx={{ textTransform: "none", fontWeight: 700 }} onClick={() => setField("visitCount")(String(expectedTotal))}>ใช้ {expectedTotal} ครั้ง</Button>}
                   >
-                    ระบบนับจำนวนครั้งจากรอบเข้า ({perYear} ครั้ง) — แก้ให้ตรงกันเพื่อไม่ให้ตารางและแจ้งเตือนสับสน
+                    ระบบนับจำนวนครั้งจากรอบเข้า × จำนวนปี ({expectedTotal} ครั้ง) — แก้ให้ตรงกันเพื่อไม่ให้ตารางและแจ้งเตือนสับสน
                   </Alert>
                 )}
               </Stack>

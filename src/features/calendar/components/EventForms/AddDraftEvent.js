@@ -231,6 +231,7 @@ export const getAddDraftEvent = async ({
         contractEnd: e.contractEnd || "",
         visitCount: totalRoundsOf(e),
         intervalMonths: e.intervalMonths,
+        contractYears: e.contractYears,
         jobValue: e.jobValue,
         team: e.team || "",
         visits: [],

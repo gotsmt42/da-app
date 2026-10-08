@@ -128,6 +128,7 @@ export const groupEventsByContract = (events) => {
       // ค่าที่บันทึกไว้ดิบๆ — ใช้แค่ตอนเปิดช่องแก้ไขจำนวนครั้ง
       storedVisitCount: head.contractGroupId ? head.visitCount : undefined,
       intervalMonths: head.contractGroupId ? head.intervalMonths : undefined,
+      contractYears: head.contractGroupId ? head.contractYears : undefined,
       jobValue: head.jobValue,
       commission: head.commission,   // ค่าคอมให้ลูกค้า — ระดับสัญญาเหมือน jobValue
       team: teamNames.join(", ") || "-",
@@ -278,7 +279,8 @@ const REQUIRED_CONTRACT = [
   { key: "visitCountMismatch", label: "จำนวนครั้งไม่ตรงกับรอบเข้า", missing: (c) => {
     const n = Number(c.intervalMonths);
     const stored = Number(c.storedVisitCount);
-    return n >= 1 && 12 % n === 0 && stored > 0 && stored !== 12 / n;
+    // ✅ สัญญาหลายปี: ถูกต้องเมื่อ = ปีละ N × จำนวนปี (หรือ = ปีละ N ของข้อมูลเก่าก่อนมีจำนวนปี — ระบบคิดรวมให้เองแล้ว)
+    return n >= 1 && 12 % n === 0 && stored > 0 && stored !== 12 / n && stored !== totalRoundsOf(c);
   } },
   { key: "jobValue", label: "มูลค่างาน", missing: (c) => !(Number(c.jobValue) > 0) },
   { key: "responsiblePerson", label: "ผู้รับผิดชอบงาน", missing: (c) => !c.responsiblePerson },

@@ -88,9 +88,19 @@ describe("totalRoundsOf — จำนวนครั้งทั้งหมด�
   it("รอบเข้าหาร 12 ลงตัว ชนะ visitCount ที่ค้างค่าเก่า (บั๊ก 2/2 แต่ยังมีช่องครั้งที่ 3)", () => {
     expect(totalRoundsOf({ intervalMonths: 6, visitCount: 3, contractStart: "2026-01-01", contractEnd: "2026-12-31" })).toBe(2);
   });
-  it("นับเป็นรายปีเสมอ (ตรงกับฟอร์มเพิ่มสัญญา/การแก้รอบเข้า)", () => {
-    expect(totalRoundsOf({ intervalMonths: 6, visitCount: 4, contractStart: "2026-01-01", contractEnd: "2027-12-31" })).toBe(2);
+  it("ปีละ N ครั้ง × จำนวนปีของสัญญา (8 ต.ค. 2569)", () => {
+    // ไม่ระบุจำนวนปี → คิดจากช่วงวันที่สัญญา (2 ปี)
+    expect(totalRoundsOf({ intervalMonths: 6, visitCount: 4, contractStart: "2026-01-01", contractEnd: "2027-12-31" })).toBe(4);
+    // ระบุจำนวนปีไว้ → ใช้ค่านั้น
+    expect(totalRoundsOf({ intervalMonths: 3, contractYears: 2 })).toBe(8);
     expect(totalRoundsOf({ intervalMonths: 4 })).toBe(3);
+  });
+  it("ป้ายครั้งที่นับใหม่ทุกปี พร้อมปีของสัญญา", () => {
+    const c = { intervalMonths: 3, contractYears: 2, contractStart: "2026-10-01" };
+    expect(formatRoundLabel(2, 8, c)).toBe("2/4 - 2569");
+    expect(formatRoundLabel(5, 8, c)).toBe("1/4 - 2570");
+    expect(formatRoundLabel(8, 8, c)).toBe("4/4 - 2570");
+    expect(formatRoundLabel(1, 1, { contractNo: "FAPTY05-2569" })).toBe("1/1 - 2569");
   });
   it("รอบเข้าหารไม่ลงตัว/ไม่ระบุ → ใช้ visitCount ที่กรอกไว้", () => {
     expect(totalRoundsOf({ intervalMonths: 5, visitCount: 3 })).toBe(3);
