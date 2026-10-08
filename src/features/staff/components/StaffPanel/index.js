@@ -586,7 +586,7 @@ const Employee = () => {
           onClear={() => { setSearchTerm(""); setRankFilter("all"); }}
           chips={[
             searchTerm.trim() && { key: "q", label: `ค้นหา: ${searchTerm.trim()}`, onDelete: () => setSearchTerm("") },
-            rankFilter !== "all" && { key: "r", label: rankFilter === "admin" ? "ผู้บริหาร / แอดมิน" : rankFilter === "staff" ? "ทีมช่าง / เซล" : rankFilter === "invalid" ? "Rank ไม่ถูกต้อง" : rankLabel(rankFilter.slice(2)), onDelete: () => setRankFilter("all") },
+            rankFilter !== "all" && { key: "r", label: rankFilter === "admin" ? "ผู้บริหาร / แอดมิน" : rankFilter === "staff" ? "ทีมช่าง / ฝ่ายขาย" : rankFilter === "invalid" ? "Rank ไม่ถูกต้อง" : rankLabel(rankFilter.slice(2)), onDelete: () => setRankFilter("all") },
           ]}>
           {loading ? (
             <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" }, mb: 1.5 }}>
@@ -596,7 +596,7 @@ const Employee = () => {
             <KpiRow columns={4}>
               <Kpi label="ผู้ใช้ทั้งหมด" value={`${stats.total} คน`} onClick={() => setRankFilter("all")} active={rankFilter === "all"} />
               <Kpi label="ผู้บริหาร / แอดมิน" value={`${stats.admin} คน`} sub="กรรมการ · ผู้จัดการ · แอดมิน" onClick={() => setRankFilter("admin")} active={rankFilter === "admin"} />
-              <Kpi label="ทีมช่าง / เซล" value={`${stats.staff} คน`} onClick={() => setRankFilter("staff")} active={rankFilter === "staff"} />
+              <Kpi label="ทีมช่าง / ฝ่ายขาย" value={`${stats.staff} คน`} onClick={() => setRankFilter("staff")} active={rankFilter === "staff"} />
               <Kpi label="Rank ไม่ถูกต้อง" value={`${stats.invalid} คน`} sub={stats.invalid ? "บัญชีจะใช้งานไม่ได้ — กดแก้ไข" : "ทุกบัญชีถูกต้อง"} alert={stats.invalid > 0}
                 onClick={stats.invalid ? () => setRankFilter("invalid") : undefined} active={rankFilter === "invalid"} />
             </KpiRow>
@@ -606,7 +606,7 @@ const Employee = () => {
             <SelectField label="Rank" value={rankFilter} onChange={(e) => setRankFilter(e.target.value)} sx={{ minWidth: { xs: 0, sm: 200 }, flex: { xs: 1, sm: "none" } }}>
               <option value="all">ทุก Rank ({users.length})</option>
               <option value="admin">ผู้บริหาร / แอดมิน</option>
-              <option value="staff">ทีมช่าง / เซล</option>
+              <option value="staff">ทีมช่าง / ฝ่ายขาย</option>
               {ALL_ROLES.map((r) => <option key={r} value={`r:${r}`}>{rankLabel(r)}</option>)}
               {stats.invalid > 0 && <option value="invalid">Rank ไม่ถูกต้อง ({stats.invalid})</option>}
             </SelectField>

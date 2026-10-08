@@ -41,7 +41,7 @@ export const DEST = {
   eventMine: { title: "แผนงานของฉัน", bar: "แผนงาน", sub: "นัดหมายของฉัน", href: "/event", icon: FaCalendarAlt, badgeKey: "pendingApproval" },
   eventOwn: { title: "ตารางงาน", sub: "ปฏิทินงาน", href: "/event", icon: FaCalendarAlt, badgeKey: "pendingApproval" },
   eventServiceReadOnly: { title: "ตารางงานช่าง", sub: "ดูอย่างเดียว", href: `/event?dept=${DEPARTMENT.SERVICE}`, icon: FaWrench },
-  eventSales: { title: "ตารางงานเซล", href: "/event?dept=sales", icon: FaBriefcase },
+  eventSales: { title: "ตารางงานฝ่ายขาย", href: "/event?dept=sales", icon: FaBriefcase },
 
   operation: { title: "การดำเนินงาน", bar: "ดำเนินงาน", sub: "เช็คอิน · ปิดงาน", href: "/operation", icon: FaWrench, badgeKey: "closeRequests" },
   jobReport: { title: "รายงานงาน", short: "รายงาน", sub: "สรุปสถานะ · รายเดือน · ตามลูกค้า/ทีม", href: "/jobs/report", icon: FaChartBar },

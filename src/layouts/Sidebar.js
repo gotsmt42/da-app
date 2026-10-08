@@ -127,7 +127,7 @@ const side = (key, extra) => {
         icon: <FaCalendarAlt />,
         items: [
           { title: "ตารางงานช่าง", href: "/event", badgeKey: "pendingApproval" },
-          { title: "ตารางงานเซล", href: "/event?dept=sales" },
+          { title: "ตารางงานฝ่ายขาย", href: "/event?dept=sales" },
         ],
       }]
     : can(userData, "viewServiceCalendar")

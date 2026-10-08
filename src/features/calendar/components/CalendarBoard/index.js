@@ -3068,7 +3068,7 @@ function EventCalendar() {
                   value={selectedTechnician}
                   onChange={(e) => setSelectedTechnician(e.target.value)}
                 >
-                  <option value="">เซลทุกคน</option>
+                  <option value="">ฝ่ายขายทุกคน</option>
                   {salespersonOptions.map((sp) => (
                     <option key={sp._id} value={sp._id}>
                       {sp.fname ? `${sp.fname} ${sp.lname || ""}`.trim() : sp.username}
@@ -3176,7 +3176,7 @@ function EventCalendar() {
           events={filteredCalendarEvents}
           onAdd={() => handleAddEvent({ dateStr: moment().format("YYYY-MM-DD") })}
           onTab={(t) => { setSalesView("list"); setSalesTab(t); }}
-          title={viewingSalesCalendar ? "ตารางนัดหมายเซล" : "นัดหมายของฉัน"}
+          title={viewingSalesCalendar ? "ตารางนัดหมายฝ่ายขาย" : "นัดหมายของฉัน"}
         />
       )}
 
@@ -4379,7 +4379,7 @@ function EventCalendar() {
           <FloatPersonPicker
             value={selectedTechnician} onChange={setSelectedTechnician}
             options={isSalesView ? salespersonOptions : technicianOptions}
-            allLabel={isSalesView ? "เซลทุกคน" : "ช่างทุกคน"} title={isSalesView ? "เลือกเซล" : "เลือกช่างที่เข้างาน"}
+            allLabel={isSalesView ? "ฝ่ายขายทุกคน" : "ช่างทุกคน"} title={isSalesView ? "เลือกพนักงานฝ่ายขาย" : "เลือกช่างที่เข้างาน"}
           />
         )}
       </div>

@@ -305,7 +305,7 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
                     <Box component="span" sx={{ ml: 0.75, fontSize: "0.72rem", fontWeight: 600, color: MUTED }}>โอกาสการขาย</Box>
                   </InfoRow>
                 )}
-                <InfoRow icon={<PersonOutline />} label="เซล">{owner || "-"}</InfoRow>
+                <InfoRow icon={<PersonOutline />} label="ฝ่ายขาย">{owner || "-"}</InfoRow>
                 {ev.description && (
                   <InfoRow icon={<NotesOutlined />} label="รายละเอียด">
                     <Box component="span" sx={{ whiteSpace: "pre-wrap", fontWeight: 500, color: INK_2 }}>{ev.description}</Box>
@@ -407,7 +407,7 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
             {!canAct && (
               <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 2, color: MUTED }}>
                 <LockOutlined sx={{ fontSize: 16 }} />
-                <Typography sx={{ fontSize: "0.76rem" }}>ดูได้อย่างเดียว — แก้ไขได้เฉพาะเซลเจ้าของนัดและแอดมิน</Typography>
+                <Typography sx={{ fontSize: "0.76rem" }}>ดูได้อย่างเดียว — แก้ไขได้เฉพาะฝ่ายขายเจ้าของนัดและแอดมิน</Typography>
               </Stack>
             )}
             {err && <Alert severity="error" sx={{ mt: 2, borderRadius: 2 }} onClose={() => setErr("")}>{err}</Alert>}

@@ -49,7 +49,7 @@ const scheduleOptionsFor = (isAdminOrManagerRole) =>
   isAdminOrManagerRole
     ? {
         primary: { label: "ตารางงานช่าง", href: "/event", icon: FaWrench },
-        secondary: { label: "ตารางงานเซล", href: "/event?dept=sales", icon: FaBriefcase, dept: "sales" },
+        secondary: { label: "ตารางงานฝ่ายขาย", href: "/event?dept=sales", icon: FaBriefcase, dept: "sales" },
       }
     : {
         primary: { label: "แผนงานของฉัน", href: "/event", icon: FaCalendarAlt },
