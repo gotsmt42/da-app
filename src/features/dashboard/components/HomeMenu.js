@@ -18,7 +18,7 @@ import {
   FaCalendarAlt, FaChevronRight, FaWallet, FaFolderOpen, FaDatabase, FaGlobeAsia, FaShoppingCart, FaUserClock,
 } from "react-icons/fa";
 
-import { can, isRole, ROLES, TECHNICIAN_ROLES } from "@/shared/utils/roles";
+import { can } from "@/shared/utils/roles";
 import useAppBadges, { BADGE_LABEL, badgeTone } from "@/shared/hooks/useAppBadges";
 // ⚠️ ชื่อ/พาธ/ไอคอน/คีย์ป้ายตัวเลข มาจากทะเบียนกลาง — อย่าพิมพ์ทับที่นี่ ไม่งั้นชื่อจะหลุดจาก
 // แถบล่างมือถือและเมนูข้างที่ชี้ปลายทางเดียวกัน (เคยหลุดมาแล้ว: "แผนงาน" / "แผนงานของฉัน" / "ตารางงาน")
@@ -55,22 +55,23 @@ const TONE = {
  * @returns {Array<{key, title, icon, tone, items: Array<{key, title, short?, sub, href, icon, tone?, badgeKey?}>}>}
  */
 export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = false } = {}) => {
-  const isTechnician = isRole(userData, ...TECHNICIAN_ROLES);
+  // ✅ ตัดสินจากสิทธิ์ล้วน (ตารางสิทธิ์) — ชุดเดียวกับเมนูข้าง/แถบล่าง (ดู Sidebar.js)
   const isAdminOrManager = can(userData, "manageMasterData");
+  const seeAllSchedules = can(userData, "viewAllJobs");
   const canSell = can(userData, "createSalesPlan");
-  const isSaleUser = isRole(userData, ROLES.SALE);
+  const canRequestDispatch = can(userData, "requestDispatch") && !can(userData, "assignDispatch");
   const canViewFinance = can(userData, "viewFinance");
   const canExpense = can(userData, "requestExpense") || can(userData, "viewAllExpenses");
   // ✅ ทุกคนที่มีขั้นของตัวเองในสายอนุมัติ 3 ส่วน (ตรวจสอบ / อนุมัติ / อนุมัติเบิกจ่าย) เห็นคิวงาน
   const canApproveExpense = can(userData, "reviewExpense") || can(userData, "approveExpense") || can(userData, "disburseExpense");
   const canAssign = can(userData, "assignDispatch");
   const canViewOperation = can(userData, "editOperation") || can(userData, "receiveDispatch");
-  const canPlanWork = canViewOperation || canSell || isTechnician || isAdminOrManager;
+  const canPlanWork = canViewOperation || canSell || seeAllSchedules || can(userData, "viewServiceCalendar");
 
   // ── งาน ──────────────────────────────────────────────────────────────────
   const work = [];
   if (canPlanWork) {
-    if (isAdminOrManager) {
+    if (seeAllSchedules) {
       work.push(dest("eventService"));
       // ⚠️ "ตารางงานเซล" (/event?dept=sales) ตั้งใจไม่ใส่ในเมนูหลักหน้านี้ — ผู้ใช้สั่งให้เอาออกไปก่อน
       // (ยังเข้าได้ตามปกติจากเมนูข้าง "แผนงาน" และ dropdown บนแถบบน ไม่ได้ปิดฟีเจอร์)
@@ -82,12 +83,12 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
     }
   }
   if (canViewOperation) work.push(dest("operation"));
-  if (isTechnician && !hideMyJobs) work.push(dest("myJobs"));
+  if (can(userData, "receiveDispatch") && !hideMyJobs) work.push(dest("myJobs"));
   // 🧹 "ภาพรวมงาน" ถูกตัดออกจากเมนูหลักตามที่ผู้ใช้สั่ง — เดิมปลายทางนี้โผล่พร้อมกัน 3 ที่ในจอเดียว
   // (ชิปบนแถบบน + ปุ่มตรงนี้ + ช่องบนแถบเมนูล่าง) พร้อมป้ายตัวเลขเดียวกันทั้งสามจุด
   // ⚠️ ยังเข้าได้ตามปกติจากแถบเมนูล่าง (มือถือ) และเมนูข้าง (ทุกจอ) — ไม่ได้ตัดทางเข้าทิ้ง
   if (canAssign) work.push(dest("dispatch"));
-  if (isSaleUser && !hideSalesJobs) work.push(dest("sales", { tone: TONE.sales }));
+  if (canRequestDispatch && !hideSalesJobs) work.push(dest("sales", { tone: TONE.sales }));
   // ✅ ผู้ใช้สั่งให้หมวด "งาน" มีรายงานเหมือนหมวด "เบิกค่าใช้จ่าย" — วางท้ายหมวดตำแหน่งเดียวกัน
   // ⚠️ เห็นเฉพาะคนที่เห็นหน้าการดำเนินงาน เพราะรายงานสรุปจากข้อมูลชุดเดียวกันเป๊ะ
   if (canViewOperation) work.push(dest("jobReport"));

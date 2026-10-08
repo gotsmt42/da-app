@@ -105,7 +105,7 @@ const Dashboard = () => {
   // ✅ เซล — สายงานคนละสายกับช่าง จึงต้องมีทางลัดของตัวเองแทนที่จะเห็นทางลัดของงานช่างที่กดไปก็ทำอะไรไม่ได้
   const isSale = isRole(role, ROLES.SALE);
   // ⚠️ ทางลัดตามสิทธิ์ (การดำเนินงาน/คำขอลงงาน ฯลฯ) ย้ายไปตัดสินใน HomeMenu.js ที่เดียวแล้ว
-  const canViewQuotations = can(userData, "viewQuotations");
+  const canViewQuotations = can(userData, "viewFinance");
 
 
   /**

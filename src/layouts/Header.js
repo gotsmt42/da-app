@@ -126,7 +126,7 @@ const Header = ({ toggleMobileSidebar }) => {
   const canViewContracts = can(userData, "viewContracts");
   // ✅ ซ่อนเมนูที่ผู้ใช้กดไปแล้วไม่มีอะไรให้ทำ แทนที่จะโชว์ไว้แล้วเจอหน้าว่าง/โดนเด้งกลับ
   const canViewOperation = can(userData, "editOperation") || can(userData, "receiveDispatch");
-  const canViewQuotations = can(userData, "viewQuotations");
+  const canViewQuotations = can(userData, "viewFinance");
   // ✅ ทางลัด "ตารางงานช่าง" (ดูอย่างเดียว) — เซลไม่เข้าเงื่อนไข canViewOperation/canViewContracts/
   // canViewQuotations เลยสักข้อ พื้นที่กลาง header จึงว่างเปล่าทั้งจอกว้างและจอมือถือมาตลอด
   const canViewService = can(userData, "viewServiceCalendar");

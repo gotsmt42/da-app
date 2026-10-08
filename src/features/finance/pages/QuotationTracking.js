@@ -698,7 +698,7 @@ const LogRow = ({ l }) => (
 export default function QuotationTracking() {
   const { userData } = useAuth();
   const isDesktop = useMediaQuery("(min-width:900px)");
-  const canAccess = can(userData, "viewQuotations");
+  const canAccess = can(userData, "viewFinance");
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [events, setEvents] = useState([]);

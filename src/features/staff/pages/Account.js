@@ -48,7 +48,7 @@ const CAPS = [
   ["เอกสาร · ลูกค้า", [
     ["viewContracts", "ดูภาพรวมงานและสัญญา"],
     ["editContracts", "เพิ่ม/แก้ไขสัญญา"],
-    ["viewQuotations", "ติดตามใบเสนอราคา"],
+    ["viewFinance", "ใบเสนอราคา / การเงิน"],
     ["viewDocuments", "เปิดเมนูเอกสาร"],
     ["editDocuments", "ออกเอกสารให้ลูกค้า"],
     ["manageMasterData", "จัดการข้อมูลลูกค้า/ประเภทงาน"],

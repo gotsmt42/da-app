@@ -17,7 +17,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthContext";
-import { can, isRole, ROLES, DEPARTMENT } from "@/shared/utils/roles";
+import { can, DEPARTMENT } from "@/shared/utils/roles";
 import useAppBadges, { BADGE_LABEL, badgeTone } from "@/shared/hooks/useAppBadges";
 // ⚠️ ชื่อ/พาธ/ไอคอน/คีย์ป้ายตัวเลข มาจากทะเบียนกลาง — อย่าพิมพ์ทับที่นี่
 // ช่องบนแถบนี้กว้างราว 70px จึงใช้ชื่อที่สั้นที่สุดของปลายทาง (barTitle)
@@ -42,25 +42,26 @@ const bar = (key, match) => {
  * @returns {Array<{key, label, href, icon, match: (loc) => boolean, badgeKey?}>}
  */
 export const buildBottomNav = (userData) => {
-  const isTechnician = isRole(userData, ROLES.TECHNICIAN);
-  const isAdminOrManager = can(userData, "manageMasterData");
-  const isSaleUser = isRole(userData, ROLES.SALE);
+  // ✅ ตัดสินจากสิทธิ์ล้วน (ตารางสิทธิ์) — ชุดเดียวกับเมนูข้าง/หน้าแรก (ดู Sidebar.js)
+  const seeAllSchedules = can(userData, "viewAllJobs");
+  const serviceObserver = !seeAllSchedules && can(userData, "viewServiceCalendar");
   const canExpense = can(userData, "requestExpense") || can(userData, "viewAllExpenses");
   const canViewOperation = can(userData, "editOperation") || can(userData, "receiveDispatch");
-  const canPlanWork = canViewOperation || can(userData, "createSalesPlan") || isTechnician || isAdminOrManager;
+  const canPlanWork = canViewOperation || can(userData, "createSalesPlan") || seeAllSchedules || serviceObserver;
+  const canRequestDispatch = can(userData, "requestDispatch") && !can(userData, "assignDispatch");
 
   const deptOf = (loc) => new URLSearchParams(loc.search).get("dept");
   const items = [bar("home", (loc) => loc.pathname === "/dashboard")];
 
   // ── ปฏิทิน ──────────────────────────────────────────────────────────────
-  if (isSaleUser && can(userData, "viewServiceCalendar")) {
+  if (serviceObserver) {
     // เซล: ปฏิทินของตัวเอง + ตารางงานช่าง (ดูอย่างเดียว) คนละช่อง — /event เฉยๆ ของเซลคือนัดหมายของเซล
     items.push(bar("eventMine", (loc) => loc.pathname === "/event" && deptOf(loc) !== DEPARTMENT.SERVICE));
     items.push(bar("eventServiceReadOnly", (loc) => loc.pathname === "/event" && deptOf(loc) === DEPARTMENT.SERVICE));
   } else if (canPlanWork) {
     // แอดมิน/หัวหน้ามีทั้งตารางงานช่างและเซล — ช่องนี้คือของช่าง (/event ไม่มี dept) ส่วนช่าง/พนักงานคือปฏิทินตัวเอง
     items.push(bar(
-      isAdminOrManager ? "eventService" : "eventOwn",
+      seeAllSchedules ? "eventService" : "eventOwn",
       (loc) => loc.pathname === "/event" && deptOf(loc) !== "sales",
     ));
   }
@@ -75,13 +76,13 @@ export const buildBottomNav = (userData) => {
   }
 
   // ── ภาพรวมงาน ───────────────────────────────────────────────────────────
-  if (isAdminOrManager || isTechnician) {
+  if (can(userData, "viewContracts")) {
     items.push(bar("contracts", (loc) => loc.pathname === "/contracts"));
   }
 
   // ── เติมช่องว่างด้วยเมนูหลักของสายงาน (role ที่ไม่มีสิทธิ์ครบ 4 เมนูข้างบน) ────────────
   const fillers = [];
-  if (isSaleUser) fillers.push(bar("sales", (loc) => loc.pathname.startsWith("/sales")));
+  if (canRequestDispatch) fillers.push(bar("sales", (loc) => loc.pathname.startsWith("/sales")));
   if (canViewOperation) fillers.push(bar("operation", (loc) => loc.pathname.startsWith("/operation")));
   if (can(userData, "viewDocuments")) fillers.push(bar("documents", (loc) => loc.pathname.startsWith("/documents")));
   if (can(userData, "viewFinance")) fillers.push(bar("finance", (loc) => loc.pathname.startsWith("/finance")));

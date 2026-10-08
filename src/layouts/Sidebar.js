@@ -5,7 +5,7 @@ import AuthService from "../shared/services/authService";
 import "./Sidebar.css";
 import { hasValidAvatar } from "../shared/utils/user";
 import { useAuth } from "../features/auth/AuthContext";
-import { can, isRole, rankLabel, ROLES, DEPARTMENT } from "@/shared/utils/roles";
+import { can, rankLabel, DEPARTMENT } from "@/shared/utils/roles";
 // ⚠️ ชื่อ/พาธ/ไอคอน/คีย์ป้ายตัวเลข มาจากทะเบียนกลาง — อย่าพิมพ์ทับ ไม่งั้นหลุดจากการ์ดหน้าแรก
 // และแถบล่างมือถือที่ชี้ปลายทางเดียวกัน
 import { dest } from "./navConfig";
@@ -33,11 +33,16 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
   const location = useLocation();
   const { userData } = useAuth();
 
-  const isTechnician = isRole(userData, ROLES.TECHNICIAN);
+  // ✅ (8 ต.ค. 2569 ผู้ใช้: "หน้าตั้งค่าสิทธิ์ บางจุดใช้ได้ บางจุดใช้ไม่ได้") ทุกเมนูตัดสินจาก "สิทธิ์" ในตารางสิทธิ์
+  //    ไม่ใช่จากชื่อตำแหน่ง — ติ๊ก/ไม่ติ๊กในหน้าตั้งค่าสิทธิ์จึงมีผลกับเมนูจริงทุกตัว (ชุดเดียวกับ Header/แถบล่าง/หน้าแรก)
   const isAdminOrManager = can(userData, "manageMasterData");
+  const seeAllSchedules = can(userData, "viewAllJobs");
+  const canViewContracts = can(userData, "viewContracts");
+  const canMyJobs = can(userData, "receiveDispatch");
   // ✅ เมนูฝ่ายขาย — เห็นเฉพาะคนที่ทำแผนงานขายได้จริง (เซล + หัวหน้า)
   const canSell = can(userData, "createSalesPlan");
-  const isSaleUser = isRole(userData, ROLES.SALE);
+  // แจ้งงานให้ช่าง — คนที่จัดคิวเองได้ (assignDispatch) ไม่ต้องแจ้งตัวเอง
+  const canRequestDispatch = can(userData, "requestDispatch") && !can(userData, "assignDispatch");
   const canViewFinance = can(userData, "viewFinance");
   // ✅ เบิกค่าใช้จ่าย — ช่างเบิกของตัวเอง หัวหน้าเบิกแทน/อนุมัติ/ดูรายงานทั้งบริษัท
   const canExpense = can(userData, "requestExpense") || can(userData, "viewAllExpenses");
@@ -49,9 +54,9 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
   const canViewOperation = can(userData, "editOperation") || can(userData, "receiveDispatch");
   // ✅ ใครลงแผนงานได้ ต้องเห็นเมนูแผนงาน — เซลลงแผนงานของตัวเองด้วยฟอร์ม/ปฏิทินชุดเดียวกับช่าง
   // (ข้อมูลถูกกรองด้วย department ที่ server แล้ว จึงไม่มีทางเห็นงานของอีกฝ่าย)
-  const canPlanWork = canViewOperation || canSell || isTechnician || isAdminOrManager;
+  const canPlanWork = canViewOperation || canSell || seeAllSchedules || can(userData, "viewServiceCalendar");
   // มีอะไรอยู่ในหมวด "งาน" บ้างไหม — ใช้ตัดสินว่าจะโชว์หัวข้อหมวดหรือไม่
-  const hasWorkMenu = canPlanWork || canAssign;
+  const hasWorkMenu = canPlanWork || canAssign || canViewContracts || can(userData, "receiveDispatch");
 
   const { badges } = useAppBadges(userData);
 
@@ -120,7 +125,7 @@ const side = (key, extra) => {
   return { ...d, icon: <Icon /> };
 };
 
-  const workMenu = isAdminOrManager
+  const workMenu = seeAllSchedules
     ? [{
         title: "แผนงาน",
         href: "/event",
@@ -155,7 +160,7 @@ const side = (key, extra) => {
   // ✅ เมนู "แผนงานรออนุมัติ" ถูกตัดออกตามที่ผู้ใช้ขอ — ย้ายไปเป็นแท็บ "รออนุมัติ" ในหน้า "การดำเนินงาน"
   // แทน (ดู PendingApprovalsPanel.js) เพราะเป็นงานเดียวกันกับการไล่จัดการงานในหน้านั้น ไม่ต้องสลับหน้า
   // ไปมา และมี badge บอกจำนวนงานค้างบนแท็บให้เห็นตั้งแต่เข้าหน้ามาแล้ว
-  const workMenuManager = [side("contracts"), side("contractsClosed")];
+  const contractsMenu = [side("contracts"), side("contractsClosed")];
   // ✅ หมวด "งานขาย" — เหลือรายการเดียวคือฟอร์มแจ้งงานข้ามแผนก
   // ⚠️ แผนงานของเซล **ไม่ได้อยู่ในหมวดนี้** แต่อยู่ในหมวด "งาน" ร่วมกับช่าง เพราะเป็นระบบเดียวกันจริงๆ
   // (ฟอร์มเดียวกัน ปฏิทินเดียวกัน) — สิ่งที่แยกคือ *ข้อมูลที่มองเห็น* ซึ่งกรองด้วย department ที่ server
@@ -174,7 +179,7 @@ const side = (key, extra) => {
   // ✅ เดิมประกาศไว้แต่ไม่เคย render เลย — ช่างจึงไม่มีทางกดเข้า "งานของฉัน" จาก sidebar ได้เลย
   // ✅ "ภาพรวมงาน" เดิมเฉพาะแอดมิน/manager (ดู workMenuManager ด้านบน) ตอนนี้ช่างเข้าดูได้ด้วย
   // (เห็นแค่งานของตัวเอง แก้ไขไม่ได้ — ดู ContractOverview.js) เลยเพิ่มเป็นทางลัดให้ตรงนี้ด้วย
-  const workMenuTechnician = [side("myJobs"), side("contracts"), side("contractsClosed")];
+  const myJobsMenu = [side("myJobs")];
 
   // ✅ หมวด "เอกสาร" — ยุบ "เอกสารทั้งหมด" (ไฟล์แนบงาน) + "ทะเบียนเอกสาร" (ใบที่ระบบออก) เหลือหน้าเดียว
   // แยกด้วยแท็บ เพราะคนที่มาหาเอกสารไม่ได้แยกในหัวว่าไฟล์นั้นมาจากไหน รู้แค่ว่า "หาเอกสารของงานนี้"
@@ -390,11 +395,8 @@ const side = (key, extra) => {
               : renderLink(navi, `work-${index}`)
           ))}
           {canViewOperation && operationMenu.map((item, idx) => renderLink(item, `work-op-${idx}`))}
-          {isAdminOrManager && workMenuManager.map((item, idx) => renderLink(item, `work-mgr-${idx}`))}
-          {/* 🐛 คนที่เป็นทั้งแอดมิน (ชั้นในระบบ) และช่าง (ตำแหน่ง) เคยเห็น "ภาพรวมงาน" ซ้ำ 2 อัน — ตัดตัวซ้ำออก */}
-          {isTechnician && workMenuTechnician
-            .filter((item) => !(isAdminOrManager && workMenuManager.some((m) => m.href === item.href)))
-            .map((item, idx) => renderLink(item, `work-tech-${idx}`))}
+          {canMyJobs && myJobsMenu.map((item, idx) => renderLink(item, `work-my-${idx}`))}
+          {canViewContracts && contractsMenu.map((item, idx) => renderLink(item, `work-ct-${idx}`))}
           {canAssign && dispatchMenu.map((item, idx) => renderLink(item, `work-dispatch-${idx}`))}
           {/* ✅ รายงานงานอยู่ท้ายหมวด "งาน" ตำแหน่งเดียวกับ "รายงานการเบิก" ท้ายหมวดเบิกค่าใช้จ่าย */}
           {canViewOperation && jobReportMenu.map((item, idx) => renderLink(item, `work-report-${idx}`))}
@@ -406,7 +408,7 @@ const side = (key, extra) => {
               ⚠️ จำกัดแค่การมองเห็นเมนูนี้เท่านั้น ไม่ได้แตะสิทธิ์ระดับ route/API (JobRequests.js ยังเช็ค
               can("requestDispatch") ของตัวเองอยู่) แอดมิน/หัวหน้ายังเข้าหน้า /sales ได้ถ้าพิมพ์ URL เอง
               แค่ไม่เห็นทางลัดในเมนูซ้าย */}
-          {isSaleUser && (
+          {canRequestDispatch && (
             <>
               <div className="admin-divider-label">งานขาย</div>
               {salesMenu.map((item, idx) => renderLink(item, `sales-${idx}`))}
