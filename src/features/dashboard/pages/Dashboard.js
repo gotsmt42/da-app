@@ -420,6 +420,7 @@ const Dashboard = () => {
       .filter(Boolean)
       .sort((a, b) => a.overdueInfo.monthsUntilDue - b.overdueInfo.monthsUntilDue);
   }, [canViewContracts, events, drafts]);
+  const roundCounts = overdueContracts.reduce((m, c) => ({ ...m, [c.overdueInfo.state]: (m[c.overdueInfo.state] || 0) + 1 }), {});
 
   // ✅ ดึง JSX ของบล็อก "สัญญาที่เลยกำหนด/คงค้าง" ออกมาเป็นตัวแปรเดียว ใช้ซ้ำได้ 2 จุด — จอกว้าง
   // (≥960px) วางไว้ในคอลัมน์หลักฝั่งซ้าย (เทียบ pattern เดียวกับ dashboard-desktop-only/
@@ -429,17 +430,24 @@ const Dashboard = () => {
   // ในนั้นจะไปโผล่ซ้ำที่แถบข้างฝั่งขวาของจอกว้างด้วย ทั้งที่ต้องการให้จอกว้างอยู่ฝั่งซ้ายเท่านั้น
   const overdueContractsBlock =
     canViewContracts && overdueContracts.length > 0 ? (
-      <Widget title="สัญญาที่เลยกำหนด / ใกล้ถึงรอบ" count={overdueContracts.length} hint="รอบเข้างานถัดไปของสัญญา (จากหน้าภาพรวมงาน)"
+      <Widget
+        title="รอบเข้างานที่ต้องนัด" count={overdueContracts.length}
+        // ✅ (8 ต.ค. 2569) 3 ระดับเดียวกับหน้าภาพรวมงาน — แยกจำนวนให้เห็นก่อนว่าเร่งแค่ไหน
+        hint={[
+          roundCounts.overdue && `⛔ เลยกำหนด ${roundCounts.overdue}`,
+          roundCounts.due_now && `🔔 เดือนนี้ ${roundCounts.due_now}`,
+          roundCounts.due_soon && `🕒 เดือนหน้า ${roundCounts.due_soon}`,
+        ].filter(Boolean).join(" · ")}
         to={overdueContracts.length > 5 ? "/contracts?view=overdue" : undefined}>
         {overdueContracts.slice(0, 5).map((c) => {
-          const soon = c.overdueInfo.state === "due_soon";
+          const info = c.overdueInfo;
           return (
             // ✅ เจาะจง: เปิดแท็บ "เลยกำหนด" พร้อมค้นชื่อบริษัท/โครงการนั้นให้เลย (ดู ?q= ใน ContractOverview.js)
-            <Row key={c.key} to={`/contracts?view=overdue&q=${encodeURIComponent(c.company || c.site || "")}`}
-              leading={<Dot color={soon ? "#d97706" : DANGER} />}
-              title={[c.company, c.site].filter(Boolean).join(" · ") || c.title || "สัญญา"}
-              sub={[c.title, c.system].filter(Boolean).join(" · ")}
-              trailing={c.overdueInfo.shortLabel} danger={!soon} />
+            <Row key={c.key} to={`/contracts?${info.state === "due_soon" ? "" : "view=overdue&"}q=${encodeURIComponent(c.site || c.company || "")}`}
+              leading={<Dot color={info.color} />}
+              title={[c.site, c.company].filter(Boolean).join(" · ") || c.title || "สัญญา"}
+              sub={`${info.roundLabel} · ต้องเข้า ${info.dueMonthLabel}`}
+              trailing={info.shortLabel} danger={info.state !== "due_soon"} />
           );
         })}
       </Widget>

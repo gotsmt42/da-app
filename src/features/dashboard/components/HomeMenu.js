@@ -222,14 +222,14 @@ export default function HomeMenu({ userData, badges = {}, hideMyJobs = false, hi
                           >
                             <span className="hm-icon" aria-hidden="true">
                               <Icon />
-                              {count > 0 && <span className={`hm-badge hm-badge--dot hm-badge--${badgeTone(it.badgeKey)}`}>{badgeText(count)}</span>}
+                              {count > 0 && <span className={`hm-badge hm-badge--dot hm-badge--${badgeTone(it.badgeKey, badges)}`}>{badgeText(count)}</span>}
                             </span>
                             <span className="hm-text">
                               <span className="hm-title-full">{it.title}</span>
                               <span className="hm-title-short">{it.short || it.title}</span>
                               <span className="hm-sub">{it.sub}</span>
                             </span>
-                            {count > 0 && <span className={`hm-badge hm-badge--pill hm-badge--${badgeTone(it.badgeKey)}`} aria-hidden="true">{badgeText(count)}</span>}
+                            {count > 0 && <span className={`hm-badge hm-badge--pill hm-badge--${badgeTone(it.badgeKey, badges)}`} aria-hidden="true">{badgeText(count)}</span>}
                             <FaChevronRight className="hm-chevron" aria-hidden="true" />
                           </Link>
                         </li>

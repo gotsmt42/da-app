@@ -273,7 +273,7 @@ const side = (key, extra) => {
   const renderBadge = (item) => {
     const n = item.badgeKey ? Number(badges[item.badgeKey]) || 0 : 0;
     if (!n) return null;
-    return <span className={`nav-badge nav-badge--${badgeTone(item.badgeKey)}`} aria-hidden="true">{n > 99 ? "99+" : n}</span>;
+    return <span className={`nav-badge nav-badge--${badgeTone(item.badgeKey, badges)}`} aria-hidden="true">{n > 99 ? "99+" : n}</span>;
   };
 
   const badgeAria = (item) => {

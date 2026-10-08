@@ -1,5 +1,5 @@
 import moment from "moment";
-import { countUsedRounds, DEFAULT_INTERVAL_MONTHS, totalRoundsOf } from "./contractRounds";
+import { countUsedRounds, DEFAULT_INTERVAL_MONTHS, totalRoundsOf, formatRoundLabel } from "./contractRounds";
 
 /**
  * contractOverdue.js — จัดกลุ่ม event ด้วย contractGroupId ให้เป็น "สัญญา" (1 แถว/สัญญา) และเช็คว่า
@@ -204,18 +204,34 @@ export const nextVisitOverdueInfo = (c) => {
   if (monthsUntilDue > 1) return null;
 
   const monthsOverdue = Math.max(0, -monthsUntilDue);
-  const isDueSoon = monthsUntilDue === 1;
+  /**
+   * ✅ (8 ต.ค. 2569 ผู้ใช้เลือก 3 ระดับ) สัญลักษณ์ + สีต่างกันชัด และบอก "ครั้งที่" กับ "เดือนที่ต้องเข้า" ทุกครั้ง
+   *   due_soon  🕒 ใกล้ถึงรอบ    — รอบตกเดือนหน้า     (อำพัน)
+   *   due_now   🔔 ถึงรอบเดือนนี้ — รอบตกเดือนนี้       (แดง)
+   *   overdue   ⛔ เลยกำหนด N เดือน — เลยเดือนรอบมาแล้ว (แดงเข้ม กะพริบ)
+   */
+  const state = monthsUntilDue === 1 ? "due_soon" : monthsUntilDue === 0 ? "due_now" : "overdue";
+  const usedSet = new Set((c.visits || []).map((v) => String(v.time)));
+  let nextRound = 1;
+  while (usedSet.has(String(nextRound))) nextRound += 1;
+  const roundLabel = `ครั้งที่ ${formatRoundLabel(nextRound, c.visitCount, c)}`;
+  const TH_MONTHS = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+  const dueMonthLabel = `${TH_MONTHS[dueDate.month()]} ${String(dueDate.year() + 543).slice(-2)}`;
+  const META = {
+    due_soon: { color: "#d97706", label: `ใกล้ถึงรอบ · ${roundLabel} · ต้องเข้า ${dueMonthLabel}`, shortLabel: "ใกล้ถึงรอบ" },
+    due_now: { color: "#dc2626", label: `ถึงรอบเดือนนี้ · ${roundLabel} · ยังไม่ได้ลงแผนงาน`, shortLabel: "ถึงรอบเดือนนี้" },
+    overdue: { color: "#991b1b", label: `เลยกำหนด ${monthsOverdue} เดือน · ${roundLabel} (ต้องเข้า ${dueMonthLabel})`, shortLabel: `เลยกำหนด ${monthsOverdue} ด.` },
+  };
   return {
     // คีย์คงที่สำหรับเทียบในโค้ด — ห้ามเทียบจากข้อความ label ที่แก้ถ้อยคำได้ตลอด
-    state: isDueSoon ? "due_soon" : "overdue",
-    color: isDueSoon ? "#f59e0b" : "#dc2626",
-    label: isDueSoon
-      ? "ใกล้ถึงรอบเข้างาน · อีก 1 เดือน"
-      : monthsOverdue === 0
-        ? "ถึงรอบเข้างานแล้ว"
-        : `เลยกำหนดรอบเข้างานแล้ว ${monthsOverdue} เดือน`,
-    // ป้ายแบบสั้นสำหรับที่แคบๆ (การ์ดมือถือ / รายการบนแดชบอร์ด)
-    shortLabel: isDueSoon ? "ใกล้ถึงรอบ" : monthsOverdue === 0 ? "ถึงรอบแล้ว" : `เกิน ${monthsOverdue} ด.`,
+    state,
+    level: state === "due_soon" ? 1 : state === "due_now" ? 2 : 3,
+    color: META[state].color,
+    label: META[state].label,
+    shortLabel: META[state].shortLabel,
+    roundLabel,
+    nextRound,
+    dueMonthLabel,
     monthsUntilDue,
     // ⚠️ 0 = "ถึงรอบพอดีเดือนนี้ ยังไม่เลย" — ต่างจากเดิมที่บังคับขั้นต่ำเป็น 1 เสมอ ที่ไหนเอาไปต่อท้าย
     // คำว่า "เกิน…เดือน" ตรงๆ ต้องเปลี่ยนไปใช้ label/shortLabel แทน ไม่งั้นจะขึ้น "เกิน 0 เดือน"
@@ -229,12 +245,16 @@ export const nextVisitOverdueInfo = (c) => {
 // ✅ "เลยกำหนดจริงแล้ว" เท่านั้น (ไม่รวมสีส้มที่ยังมาไม่ถึง) — ใช้กับทุกที่ที่นับจำนวน/กรองเป็น "งานค้าง"
 // ⚠️ ตัวเลขพวกนั้นอยู่ใต้ป้ายที่เขียนว่า "เลยกำหนด" ถ้านับรวมงานที่ยังไม่ถึงกำหนดเข้าไปด้วย ตัวเลขจะโป่ง
 // ขึ้นทันทีโดยที่ไม่มีงานค้างเพิ่มขึ้นจริงสักงาน — คำเตือนสีส้มเป็นสัญญาณระดับแถว ไม่ใช่ "งานค้าง"
-export const isRoundOverdue = (c) => nextVisitOverdueInfo(c)?.state === "overdue";
+export const isRoundOverdue = (c) => ["due_now", "overdue"].includes(nextVisitOverdueInfo(c)?.state);
+/** ใกล้ถึงรอบ (เดือนหน้า) — ป้ายสีอำพัน */
+export const isRoundDueSoon = (c) => nextVisitOverdueInfo(c)?.state === "due_soon";
 
 // ✅ จำนวนสัญญาที่เกินกำหนดวางแผนรอบถัดไป — ใช้เป็นป้ายสรุปจำนวนแบบเบาๆ (เช่น badge บน Header)
 // โดยไม่ต้องดึง/จัดกลุ่มข้อมูลซ้ำเองที่ปลายทาง
 export const countOverdueContracts = (events) =>
   groupEventsByContract(events).filter(isRoundOverdue).length;
+export const countDueSoonContracts = (events) =>
+  groupEventsByContract(events).filter(isRoundDueSoon).length;
 
 // ✅ "สถานะสัญญา" — เทียบวันสิ้นสุดสัญญากับวันนี้ ใช้ร่วมกันทั้งตาราง "ภาพรวมงาน", ไฟล์ Excel ที่ส่งออก,
 // แท็บ "สัญญาหมดอายุ" และหน้า "ภาพรวมลูกค้า"

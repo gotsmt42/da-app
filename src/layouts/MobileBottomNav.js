@@ -133,7 +133,7 @@ export default function MobileBottomNav() {
               >
                 <span className="mbn-icon" aria-hidden="true">
                   <Icon />
-                  {count > 0 && <span className={`mbn-badge mbn-badge--${badgeTone(it.badgeKey)}`}>{count > 99 ? "99+" : count}</span>}
+                  {count > 0 && <span className={`mbn-badge mbn-badge--${badgeTone(it.badgeKey, badges)}`}>{count > 99 ? "99+" : count}</span>}
                 </span>
                 <span className="mbn-label">{it.label}</span>
               </Link>

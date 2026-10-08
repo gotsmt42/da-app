@@ -55,7 +55,7 @@ import JobTypeService from "@/shared/services/JobTypeService";
 import SystemTypeService from "@/shared/services/SystemTypeService";
 import { formatEventDateRange } from "@/shared/utils/formatDateRange";
 import { resolveOperationGroup } from "@/shared/utils/overdueJobs";
-import { countUsedRounds, visitsPerYear, INTERVAL_MONTHS_PRESETS, totalRoundsOf, contractYearsOf, perYearOf, MAX_CONTRACT_YEARS } from "@/shared/utils/contractRounds";
+import { countUsedRounds, visitsPerYear, INTERVAL_MONTHS_PRESETS, totalRoundsOf, contractYearsOf, perYearOf, MAX_CONTRACT_YEARS, formatRoundLabel } from "@/shared/utils/contractRounds";
 import { groupEventsByContract, nextVisitOverdueInfo, isRoundOverdue, contractStatusInfo, isExpiredContract, contractCompleteness } from "@/shared/utils/contractOverdue";
 // ✅ สถานะการวางบิล/รับเงิน — ของกลางชุดเดียวกับหน้า "วางบิล / รับเงิน" (/billing) ห้ามคำนวณซ้ำที่นี่
 import { contractBillingSummary, baht as bahtFmt } from "@/shared/utils/billing";
@@ -65,6 +65,7 @@ import JobDocsChip from "@/features/documents/components/JobDocsChip";
 import JobDocsDialog from "@/features/documents/components/JobDocsDialog";
 import ResponsibleSummary from "@/shared/ui/ResponsibleSummary";
 import ContractNav, { CATEGORY_META, STAGE_META, stagesFor } from "@/features/contracts/components/ContractNav";
+import RoundDueBadge, { RoundDueChip } from "@/features/contracts/components/RoundDueBadge";
 import ColumnSettings from "@/features/contracts/components/ColumnSettings";
 import ResponsiblePicker from "@/features/contracts/components/ResponsiblePicker";
 import FormSection, { FieldGrid } from "@/shared/ui/FormSection";
@@ -3814,6 +3815,15 @@ pagedRows.map((c, idx) => {
                               onCommit={(v) => commitEdit(c, v)}
                               onCancel={cancelEdit}
                             />
+                            {/* ✅ ป้ายเตือนรอบเข้างาน — ใต้ชื่อโครงการ เห็นทันทีไม่ต้องเลื่อนตารางไปขวา · กดเพื่อลงครั้งถัดไป */}
+                            {overdueInfo && (
+                              <Box component={isAdminOrManager ? "button" : "span"} type={isAdminOrManager ? "button" : undefined}
+                                onClick={isAdminOrManager ? () => openAddVisitDialog(c) : undefined}
+                                title={isAdminOrManager ? `${overdueInfo.label} — กดเพื่อลงครั้งถัดไป` : overdueInfo.label}
+                                sx={{ p: 0, m: 0, mt: 0.3, border: 0, bgcolor: "transparent", cursor: isAdminOrManager ? "pointer" : "default", textAlign: "left", maxWidth: "100%", display: "flex" }}>
+                                <RoundDueChip info={overdueInfo} />
+                              </Box>
+                            )}
                             {/* ✅ ที่เพิ่ม (ผู้ใช้ขอ: "หน้าภาพรวมงานด้วย เพิ่มให้สวยงาม และกดดูได้ง่าย")
                                 ⚠️ ใช้โหมด compact — ตารางนี้คอลัมน์กว้างจำกัดและปรับขนาดได้ ถ้าใส่ปุ่มเต็ม
                                 แบบหน้าอื่นจะดันความกว้างจนตารางเสียทรง · เหลือหมุดเล็กๆ: เขียว = มีพิกัดแล้ว
@@ -4857,12 +4867,13 @@ pagedRows.map((c, idx) => {
             {tag(jobTypeLabel, jobTypeColor)}
             <DepartmentPill value={c.departmentTag} />
             {bs && bs.state !== "not_invoiced" && tag(bs.state === "overdue" && bs.overdueDays > 0 ? `เลยกำหนดชำระ ${bs.overdueDays} วัน` : bs.label, bs.color)}
-            {overdueInfo && (
-              <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.4, height: 22, px: 0.9, borderRadius: 999, fontSize: "0.68rem", fontWeight: 800, whiteSpace: "nowrap", color: overdueInfo.color, bgcolor: alpha(overdueInfo.color, 0.1) }}>
-                <WarningAmber sx={{ fontSize: 13 }} />{overdueInfo.shortLabel}
-              </Box>
-            )}
           </Stack>
+          {/* ✅ เตือนรอบเข้างาน — แถบเต็มความกว้างใต้ป้าย (สัญลักษณ์ + ครั้งที่ + เดือนที่ต้องเข้า + ปุ่มลงครั้งถัดไป) */}
+          {overdueInfo && (
+            <Box sx={{ mt: 1.1 }}>
+              <RoundDueBadge info={overdueInfo} onAdd={isAdminOrManager ? () => openAddVisitDialog(c) : undefined} />
+            </Box>
+          )}
           {/* ✅ ต่อสัญญา — แถวของตัวเองใต้ป้าย (ต่อแล้ว = ป้ายเขียว · หมดอายุ/ใกล้หมด = ปุ่มเต็มความกว้าง) */}
           {renewWidget(c, { block: true }) && <Box sx={{ mt: 1.1 }}>{renewWidget(c, { block: true })}</Box>}
         </Box>
@@ -4974,11 +4985,18 @@ pagedRows.map((c, idx) => {
               <GridField label="สิ้นสุดสัญญา" editable={isAdminOrManager} editType="date" value={c.contractEnd} formatDisplay={(v) => (v ? thaiDateNumeric(v) : <Dash />)} {...fp("contractEnd")} />
               <GridField
                 label="รอบเข้า" editable={isAdminOrManager} editType="intervalMonths" value={c.intervalMonths}
-                formatDisplay={(v) => (v ? `ทุก ${v} เดือน` : <Dash />)}
+                formatDisplay={(v) => (v ? `ทุก ${v} เดือน${visitsPerYear(v) ? ` (ปีละ ${visitsPerYear(v)} ครั้ง)` : ""}` : <Dash />)}
                 title={c.intervalMonths && visitsPerYear(c.intervalMonths) ? `ปีละ ${visitsPerYear(c.intervalMonths)} ครั้ง` : undefined}
                 {...fp("intervalMonths")}
               />
-              <GridField label="จำนวนครั้ง" editable={isAdminOrManager} editType="number" value={c.visitCount} formatDisplay={(v) => (v ? `${v} ครั้ง` : <Dash />)} {...fp("visitCount")} />
+              {/* ✅ ตรงกับตาราง: สัญญากี่ปี (คำนวณจากวันที่ แก้ได้) · จำนวนครั้ง = ปีละ N × ปี */}
+              <GridField label="สัญญากี่ปี" editable={isAdminOrManager} editType="number" value={contractYearsOf(c)}
+                formatDisplay={(v) => `${v} ปี`} {...fp("contractYears")} />
+              <GridField label="จำนวนครั้งทั้งหมด" editable={isAdminOrManager} editType="number" value={c.visitCount}
+                formatDisplay={(v) => (v
+                  ? (contractYearsOf(c) > 1 && perYearOf(c) ? `ปีละ ${perYearOf(c)} × ${contractYearsOf(c)} ปี = ${v} ครั้ง` : `${v} ครั้ง`)
+                  : <Dash />)}
+                {...fp("visitCount")} />
             </Box>
             <FieldRow
               label="ค่าคอมลูกค้า" editable={isAdminOrManager && canEditField(c, "commission")} editType="number"
@@ -4995,7 +5013,9 @@ pagedRows.map((c, idx) => {
             การ์ดหลัก (expandedRounds) เพราะสัญญาที่มีหลายครั้ง (สูงสุด 12) ทำให้ยาวเกินไปถ้าโชว์ตลอด
             เริ่มพับไว้ โชว์แค่สรุปย่อ (จำนวนครั้ง + ครั้งล่าสุด) กดดูทั้งหมดทีหลังได้ตามต้องการ */}
         <DetailSection
-          title={c.isRealContract ? `ครั้งที่เข้างาน · ${rowMaxRound(c)} ครั้ง` : "วันที่เข้างาน"}
+          title={c.isRealContract
+            ? `ครั้งที่เข้างาน · ${contractYearsOf(c) > 1 && perYearOf(c) ? `ปีละ ${perYearOf(c)} ครั้ง × ${contractYearsOf(c)} ปี` : `${rowMaxRound(c)} ครั้ง`}`
+            : "วันที่เข้างาน"}
           action={(
             <Button
               size="small" onClick={() => toggleRoundsExpand(c.key)}
@@ -5011,7 +5031,7 @@ pagedRows.map((c, idx) => {
             <Typography sx={{ display: "block", fontSize: "0.78rem", color: "#334155", fontWeight: 600 }}>
               {latestVisit
                 ? (c.isRealContract
-                  ? `ล่าสุด: ครั้งที่ ${Number(latestVisit.time) || 1} · ${formatEventDateRange(latestVisit)}${latestVisit.team ? ` · 👷 ${latestVisit.team}` : ""}`
+                  ? `ล่าสุด: ครั้งที่ ${formatRoundLabel(Number(latestVisit.time) || 1, c.visitCount, c)} · ${formatEventDateRange(latestVisit)}${latestVisit.team ? ` · 👷 ${latestVisit.team}` : ""}`
                   : `${formatEventDateRange(latestVisit)}${latestVisit.team ? ` · 👷 ${latestVisit.team}` : ""}`)
                 : "ยังไม่ลงตารางจริง"}
             </Typography>
@@ -5023,7 +5043,7 @@ pagedRows.map((c, idx) => {
               const pendingDraft = roundVisits.length === 0 && c.visits.find((v) => v.unscheduled && (Number(v.time) || 1) === n);
               return (
                 <Stack key={n} direction="row" alignItems="flex-start" spacing={1} sx={{ p: 0.75, borderRadius: 1.5, bgcolor: "#fff", border: `1px solid ${alpha("#0f172a", 0.06)}` }}>
-                  <Chip label={n} size="small" sx={{ height: 20, minWidth: 20, fontSize: "0.68rem", fontWeight: 800, bgcolor: "#eff6ff", color: "#2563eb" }} />
+                  <Chip label={c.isRealContract ? formatRoundLabel(n, c.visitCount, c) : n} size="small" sx={{ height: 20, minWidth: 20, fontSize: "0.68rem", fontWeight: 800, bgcolor: "#eff6ff", color: "#2563eb", flexShrink: 0 }} />
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     {roundVisits.length > 0 ? (
                       <>

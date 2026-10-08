@@ -26,12 +26,12 @@ describe("nextVisitOverdueInfo — เตือนตามเดือนที
   it("ถึงเดือนที่ต้องเข้างานพอดี → เตือนสีแดงทันที (ไม่ต้องรอให้เลยวัน)", () => {
     const info = nextVisitOverdueInfo(contract(INTERVAL));
     expect(info).toBeTruthy();
-    expect(info.state).toBe("overdue");
+    expect(info.state).toBe("due_now");
     expect(info.color).toBe("#dc2626");
     expect(info.monthsUntilDue).toBe(0);
     expect(info.monthsOverdue).toBe(0);
-    expect(info.label).toBe("ถึงรอบเข้างานแล้ว");
-    expect(info.shortLabel).toBe("ถึงรอบแล้ว");
+    expect(info.label.startsWith("ถึงรอบเดือนนี้ · ครั้งที่ 2/")).toBe(true);
+    expect(info.shortLabel).toBe("ถึงรอบเดือนนี้");
     expect(isRoundOverdue(contract(INTERVAL))).toBe(true);
   });
 
@@ -39,8 +39,8 @@ describe("nextVisitOverdueInfo — เตือนตามเดือนที
     const info = nextVisitOverdueInfo(contract(INTERVAL + 2));
     expect(info.state).toBe("overdue");
     expect(info.monthsOverdue).toBe(2);
-    expect(info.label).toBe("เลยกำหนดรอบเข้างานแล้ว 2 เดือน");
-    expect(info.shortLabel).toBe("เกิน 2 ด.");
+    expect(info.label.startsWith("เลยกำหนด 2 เดือน · ครั้งที่ 2/")).toBe(true);
+    expect(info.shortLabel).toBe("เลยกำหนด 2 ด.");
   });
 
   it("จะถึงรอบในอีก 1 เดือน → เตือนสีส้ม และไม่ถูกนับเป็น 'เลยกำหนด'", () => {
@@ -48,7 +48,7 @@ describe("nextVisitOverdueInfo — เตือนตามเดือนที
     const info = nextVisitOverdueInfo(c);
     expect(info).toBeTruthy();
     expect(info.state).toBe("due_soon");
-    expect(info.color).toBe("#f59e0b");
+    expect(info.color).toBe("#d97706");
     expect(info.monthsUntilDue).toBe(1);
     expect(info.shortLabel).toBe("ใกล้ถึงรอบ");
     // ⚠️ สำคัญ: ตัวเลขใต้ป้าย "เลยกำหนด" ต้องไม่โป่งขึ้นเพราะคำเตือนสีส้ม

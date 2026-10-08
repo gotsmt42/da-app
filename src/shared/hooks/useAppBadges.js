@@ -25,7 +25,7 @@ import WebsiteService from "@/features/website/services/WebsiteService";
 import { can, isRole, ROLES } from "@/shared/utils/roles";
 import { countDistinctJobs, getOverdueGroupKey } from "@/shared/utils/overdueJobs";
 import { countPendingJobs } from "@/shared/utils/approvalStatus";
-import { countOverdueContracts } from "@/shared/utils/contractOverdue";
+import { countOverdueContracts, countDueSoonContracts } from "@/shared/utils/contractOverdue";
 import { getFollowUpInfo } from "@/shared/utils/quotationTracking";
 import { subscribeRealtime } from "@/shared/realtime/realtimeClient";
 
@@ -36,7 +36,7 @@ import { subscribeRealtime } from "@/shared/realtime/realtimeClient";
 export const BADGE_LABEL = {
   pendingApproval: "แผนงานรออนุมัติ",
   closeRequests: "คำขอปิดงานรอตรวจ",
-  contracts: "สัญญาที่ถึงกำหนดรอบถัดไป",
+  contracts: "สัญญาที่ถึง/เลยกำหนดรอบเข้างาน (ส้ม = ใกล้ถึงรอบเดือนหน้า)",
   myJobs: "งานที่ต้องทำ",
   quotations: "ใบเสนอราคาที่ต้องติดตาม",
   dispatchQueue: "คำขอลงงานรอตัดสินใจ",
@@ -68,7 +68,11 @@ const BADGE_TONE = {
 };
 
 /** โทนสีของป้ายตัวเลขหนึ่งใบ — "act" หรือ "soon" */
-export const badgeTone = (badgeKey) => BADGE_TONE[badgeKey] || "act";
+export const badgeTone = (badgeKey, badges) => {
+  // ✅ ภาพรวมงาน: แดง = มีสัญญาถึง/เลยกำหนดรอบ · อำพัน = มีแค่ที่ใกล้ถึงรอบเดือนหน้า (ดู contractsTone)
+  if (badgeKey === "contracts" && badges?.contractsTone) return badges.contractsTone;
+  return BADGE_TONE[badgeKey] || "act";
+};
 
 const POLL_MS = 30_000;
 
@@ -217,7 +221,13 @@ const computeBadges = (userData, data) => {
   return {
     pendingApproval: countPendingJobs(events, drafts, { userId, isAdminOrManager }),
     closeRequests: countDistinctJobs(events, (e) => e.closeRequested === true && e.status !== "ดำเนินการเสร็จสิ้น"),
-    contracts: scope.contracts ? countOverdueContracts([...events, ...drafts]) : 0,
+    // ✅ ถึง/เลยกำหนดรอบ (แดง) ก่อนเสมอ · ไม่มีค่อยโชว์จำนวนที่ใกล้ถึงรอบเดือนหน้า (อำพัน)
+    ...(() => {
+      if (!scope.contracts) return { contracts: 0, contractsTone: "soon" };
+      const all = [...events, ...drafts];
+      const red = countOverdueContracts(all);
+      return red > 0 ? { contracts: red, contractsTone: "act" } : { contracts: countDueSoonContracts(all), contractsTone: "soon" };
+    })(),
     myJobs: isRole(userData, ROLES.TECHNICIAN)
       ? countDistinctJobs(events, (e) => ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(e.status) && !e.closeRequested)
       : 0,
