@@ -45,15 +45,15 @@ const fmtDate = (d) => (d ? formatThai(moment(d), "D MMM YY") : "");
 const fmtDateTime = (d) => (d ? `${formatThai(moment(d), "D MMM YY HH:mm")} น.` : "");
 
 /** หัวข้อกลุ่มข้อมูล */
-const Section = ({ icon, title, right, children, hint }) => (
-  <Box sx={{ mt: 2.25 }}>
-    <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.9 }}>
+const Section = ({ icon, title, right, children, hint, fill = false }) => (
+  <Box sx={{ mt: 2.25, ...(fill ? { height: "calc(100% - 18px)", display: "flex", flexDirection: "column" } : null) }}>
+    <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.9, minHeight: 28 }}>
       <Box sx={{ display: "flex", color: MUTED, "& svg": { fontSize: 17 } }}>{icon}</Box>
       <Typography sx={{ flex: 1, fontSize: "0.82rem", fontWeight: 800, color: INK }}>{title}</Typography>
       {right}
     </Stack>
     {hint && <Typography sx={{ fontSize: "0.74rem", color: MUTED, mt: -0.5, mb: 1 }}>{hint}</Typography>}
-    {children}
+    {fill ? <Box sx={{ flex: 1, display: "flex", flexDirection: "column" }}>{children}</Box> : children}
   </Box>
 );
 
@@ -288,15 +288,15 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
             </Box>
 
             {/* ✅ (8 ต.ค. 2569 "ขยายหน้านี้ · แบ่งส่วนที่ควรแบ่ง") จอคอม 2 คอลัมน์:
-                ซ้าย = ข้อมูลนัด · ขวา = รูปหน้างาน + ผลการเข้าพบ (สิ่งที่ฝ่ายขายต้องทำ) */}
-            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "minmax(0,1fr) minmax(0,1fr)" }, columnGap: 3, alignItems: "start" }}>
+                ซ้าย = ข้อมูลนัด · ขวา = รูปหน้างาน · ผลการเข้าพบอยู่ล่างเต็มความกว้าง */}
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "minmax(0,1fr) minmax(0,1fr)" }, columnGap: 3, alignItems: "stretch" }}>
             <Box sx={{ minWidth: 0 }}>
-            <Section icon={<NotesOutlined />} title="ข้อมูลนัดหมาย"
+            <Section fill icon={<NotesOutlined />} title="ข้อมูลนัดหมาย"
               right={canAct && !locked && onEdit ? (
                 <Button size="small" startIcon={<EditOutlined sx={{ fontSize: 16 }} />} onClick={() => onEdit(ev)}
                   sx={{ textTransform: "none", fontWeight: 700, color: ACCENT, py: 0.2 }}>แก้ไข</Button>
               ) : null}>
-              <Box sx={{ px: 1.5, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}` }}>
+              <Box sx={{ flex: 1, px: 1.5, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}` }}>
                 <InfoRow icon={<AccessTime />} label="วัน-เวลา">{dateText}</InfoRow>
                 <InfoRow icon={<PlaceOutlined />} label="สถานที่">{ev.site || "-"}</InfoRow>
                 <InfoRow icon={<BusinessOutlined />} label="ลูกค้า">{ev.company || <Box component="span" sx={{ color: FAINT }}>ไม่ระบุ</Box>}</InfoRow>
@@ -318,6 +318,18 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
                   </InfoRow>
                 )}
                 <InfoRow icon={<PersonOutline />} label="ฝ่ายขาย">{owner || "-"}</InfoRow>
+                {ev.visitedAt && (
+                  <InfoRow icon={<CheckCircle />} label="เข้าพบเมื่อ">
+                    {fmtDateTime(ev.visitedAt)}
+                    {ev.visitedBy && <Box component="span" sx={{ ml: 0.75, fontWeight: 500, color: MUTED, fontSize: "0.8rem" }}>โดย {ev.visitedBy}</Box>}
+                  </InfoRow>
+                )}
+                {ev.salesClosedAt && (
+                  <InfoRow icon={<FlagOutlined />} label="ปิดงานเมื่อ">
+                    {fmtDateTime(ev.salesClosedAt)}
+                    {ev.salesClosedBy && <Box component="span" sx={{ ml: 0.75, fontWeight: 500, color: MUTED, fontSize: "0.8rem" }}>โดย {ev.salesClosedBy}</Box>}
+                  </InfoRow>
+                )}
                 {ev.description && (
                   <InfoRow icon={<NotesOutlined />} label="รายละเอียด">
                     <Box component="span" sx={{ whiteSpace: "pre-wrap", fontWeight: 500, color: INK_2 }}>{ev.description}</Box>
@@ -330,8 +342,7 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
 
             <Box sx={{ minWidth: 0 }}>
             {/* ── รูปหน้างาน ── */}
-            <Section icon={<PhotoCameraOutlined />} title={`รูปหน้างาน${photos.length ? ` · ${photos.length} รูป` : ""}`}
-              hint={!cancelled ? "ต้องแนบอย่างน้อย 1 รูปก่อนบันทึก “เข้าพบแล้ว” และ “ปิดงาน”" : null}
+            <Section fill icon={<PhotoCameraOutlined />} title={`รูปหน้างาน${photos.length ? ` · ${photos.length} รูป` : ""}`}
               right={canAct && !locked && !cancelled ? (
                 <Button size="small" startIcon={uploading ? <CircularProgress size={14} /> : <AddAPhotoOutlined sx={{ fontSize: 17 }} />}
                   disabled={Boolean(uploading)} onClick={() => fileRef.current?.click()}
@@ -340,12 +351,14 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
                 </Button>
               ) : null}>
               <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={onPick} />
+              <Box sx={{ flex: 1, p: 1.25, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}`, display: "flex", flexDirection: "column", gap: 1 }}>
               {photos.length === 0 ? (
                 <Box
                   role={canAct && !locked && !cancelled ? "button" : undefined}
                   onClick={canAct && !locked && !cancelled && !uploading ? () => fileRef.current?.click() : undefined}
                   sx={{
-                    py: 3, px: 2, borderRadius: 2.5, textAlign: "center", bgcolor: "#fff",
+                    flex: 1, py: 3, px: 2, borderRadius: 2, textAlign: "center", bgcolor: SURFACE,
+                    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                     border: `1.5px dashed ${canAct && !cancelled ? "#cbd5e1" : LINE}`,
                     cursor: canAct && !locked && !cancelled ? "pointer" : "default",
                     "&:hover": canAct && !locked && !cancelled ? { borderColor: ACCENT, bgcolor: "#f8fbff" } : undefined,
@@ -382,9 +395,19 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
                   )}
                 </Box>
               )}
+              {!cancelled && (
+                <Typography sx={{ mt: "auto", fontSize: "0.72rem", color: MUTED }}>
+                  ต้องแนบอย่างน้อย 1 รูปก่อนบันทึก “เข้าพบแล้ว” และ “ปิดงาน”
+                </Typography>
+              )}
+              </Box>
             </Section>
 
-            {/* ── ผลการเข้าพบ ── */}
+
+            </Box>
+            </Box>
+
+            {/* ── ผลการเข้าพบ — เต็มความกว้างใต้ 2 คอลัมน์ (8 ต.ค. 2569 "ให้ขยายให้เต็มช่อง") ── */}
             {!cancelled && ((status !== "นัดหมายแล้ว" && status !== "เลื่อนนัด") || result) && (
               <Section icon={<FlagOutlined />} title="ผลการเข้าพบ"
                 hint={status === "เข้าพบแล้ว" ? "สรุปสิ่งที่คุยกับลูกค้า ความต้องการ และขั้นตอนต่อไป — จำเป็นก่อนปิดงาน" : null}>
@@ -396,7 +419,7 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
                   <>
                     <TextField
                       value={result} onChange={(e) => { setResult(e.target.value); setResultDirty(true); }}
-                      multiline minRows={3} fullWidth placeholder="เช่น ลูกค้าสนใจระบบ Fire Alarm 3 อาคาร · ขอใบเสนอราคาภายในศุกร์นี้"
+                      multiline minRows={4} fullWidth placeholder="เช่น ลูกค้าสนใจระบบ Fire Alarm 3 อาคาร · ขอใบเสนอราคาภายในศุกร์นี้"
                       sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: 2.5, fontSize: "0.88rem" } }}
                     />
                     {resultDirty && (
@@ -412,15 +435,6 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
               </Section>
             )}
 
-            </Box>
-            </Box>
-
-            {(ev.visitedAt || ev.salesClosedAt) && (
-              <Typography sx={{ mt: 1.75, fontSize: "0.72rem", color: MUTED, lineHeight: 1.7 }}>
-                {ev.visitedAt && <>เข้าพบ {fmtDateTime(ev.visitedAt)}{ev.visitedBy ? ` โดย ${ev.visitedBy}` : ""}<br /></>}
-                {ev.salesClosedAt && <>ปิดงาน {fmtDateTime(ev.salesClosedAt)}{ev.salesClosedBy ? ` โดย ${ev.salesClosedBy}` : ""}</>}
-              </Typography>
-            )}
 
             {!canAct && (
               <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 2, color: MUTED }}>
