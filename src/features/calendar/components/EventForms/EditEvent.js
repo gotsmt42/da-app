@@ -1827,119 +1827,6 @@ export const getEditEvent = async ({
     })
     .join("");
 
-  /**
-   * ✅ (8 ต.ค. 2569 ผู้ใช้: "ข้อมูลต่างๆ ให้เป็นแบบเดียวกับฝ่ายขาย แต่เป็นข้อมูลของช่าง ... ลองดู")
-   * กล่องสรุปข้อมูลงานแบบเดียวกับหน้ารายละเอียดนัดฝ่ายขาย: หัวกล่อง = ผู้รับผิดชอบ (รูป + ชื่อ)
-   * แล้วแถว ป้าย | ค่า — อ่านจบในกล่องเดียว · ช่องแก้ไขทั้งหมดอยู่ใต้ "แก้ไขข้อมูลงาน" (พับไว้ กดแก้ไขเพื่อกาง)
-   * ⚠️ ช่องแก้ไขยังอยู่ใน DOM ครบทุกช่อง (แค่พับ) — โค้ดอ่านค่าตอนบันทึกจึงทำงานเหมือนเดิมทุกประการ
-   */
-  const summaryHtml = (() => {
-    const rp = employeeList.find((e) => String(e._id) === String(eventResponsiblePersonId)) || employeeList.find((e) => e.fname === eventResponsiblePerson);
-    const rpName = eventResponsiblePerson || (rp ? [rp.fname, rp.lname].filter(Boolean).join(" ") : "");
-    const endShown = moment(formattedEnd);
-    const dayText = eventStart.isValid()
-      ? (endShown.isValid() && !endShown.isSame(eventStart, "day")
-        ? `${formatThai(eventStart, "D MMM YY")} – ${formatThai(endShown, "D MMM YY")}`
-        : formatThai(eventStart, "dddd D MMMM YYYY"))
-      : "-";
-    const timeText = eventStartTime ? ` · ${escapeHtml(eventStartTime)}${eventEndTime ? `–${escapeHtml(eventEndTime)}` : ""} น.` : " · ทั้งวัน";
-    // ✅ (8 ต.ค. 2569 "ใช้คำให้ถูก โครงการ บริษัท และข้อมูลอื่นให้ครบถ้วน") ใช้คำเดียวกับช่องในฟอร์ม · แสดงทุกแถวเสมอ
-    //    ค่าว่าง = "ไม่ระบุ" (เห็นทันทีว่าขาดอะไร) · จัด 3 กลุ่ม: ข้อมูลงาน · กำหนดการและทีม · ผู้ติดต่อหน้างาน
-    const none = '<span class="ee-sum-muted">ไม่ระบุ</span>';
-    const personPill = (n, lead) => {
-      const emp = employeeList.find((e) => e.fname === n);
-      return `<span class="ee-sum-person">${personAvatarHtml(n, emp?.imageUrl, 20)}${escapeHtml(n)}${lead ? '<em>หัวหน้าทีม</em>' : ""}</span>`;
-    };
-    const members = eventTeamMembers.map((m) => m?.name).filter(Boolean).filter((n, i, a) => n !== eventTeam && a.indexOf(n) === i);
-    const telDial = String(evenContactTel || "").replace(/[^\d+]/g, "");
-    const row = (ico, label, value) => `<div class="ee-sum-row"><span class="ee-sum-ico">${ico}</span><span class="ee-sum-k">${label}</span><span class="ee-sum-v">${value}</span></div>`;
-    const group = (title, list) => `<div class="ee-sum-group">${title}</div>${list.filter(Boolean).join("")}`;
-    const isContractJob = Boolean(eventContractNo || eventContractGroupId);
-    const rows = [
-      group("ข้อมูลงาน", [
-        row("📍", "โครงการ", eventSite ? `<b>${escapeHtml(eventSite)}</b>` : none),
-        row("🏢", "บริษัท", eventCompany ? escapeHtml(eventCompany) : none),
-        row("🛠️", "ประเภทงาน", eventTitle ? `<b class="ee-sum-chip" style="background:${escapeHtml(ev.backgroundColor || "#64748b")};color:${escapeHtml(ev.textColor || "#fff")}">${escapeHtml(eventTitle)}</b>` : none),
-        row("⚙️", "ระบบงาน", eventSystem ? escapeHtml(eventSystem) : none),
-        row("🗂️", "หมวดงาน", `<span style="color:${eventJobClassMeta.color};font-weight:800">${eventJobClassMeta.emoji} ${escapeHtml(eventJobClassMeta.label)}</span>`),
-        isContractJob ? row("📑", "เลขที่สัญญา", eventContractNo ? escapeHtml(eventContractNo) : none) : "",
-        isContractJob ? row("🔄", "ครั้งที่", eventTime ? escapeHtml(formatRoundLabel(eventTime, eventVisitCount)) : none) : "",
-        row("💰", "มูลค่างาน", Number(eventJobValue) > 0 ? `฿${Number(eventJobValue).toLocaleString("th-TH")}` : none),
-        row("📄", "เลขที่อ้างอิง", evendocNo ? escapeHtml(evendocNo) : none),
-      ]),
-      group("กำหนดการและทีม", [
-        row("🕘", "วัน-เวลา", `${escapeHtml(dayText)}${timeText}`),
-        row("👷", "หัวหน้าทีม", eventTeam ? `<span class="ee-sum-people">${personPill(eventTeam, true)}</span>` : '<span class="ee-sum-muted">ยังไม่ระบุ</span>'),
-        row("👥", "ลูกทีม", members.length ? `<span class="ee-sum-people">${members.map((n) => personPill(n, false)).join("")}</span>` : '<span class="ee-sum-muted">ไม่มี</span>'),
-      ]),
-      group("ผู้ติดต่อหน้างาน", [
-        row("👤", "ชื่อผู้ติดต่อ", evenContactName ? escapeHtml(evenContactName) : none),
-        row("📞", "เบอร์โทร", evenContactTel ? `<a class="ee-sum-tel" style="margin-left:0" href="tel:${escapeHtml(telDial)}">${escapeHtml(evenContactTel)}</a>` : none),
-      ]),
-    ].join("");
-    return `
-    <style>
-      .ee-sum-head { display:flex; align-items:center; justify-content:space-between; margin: 4px 2px 8px; }
-      .ee-sum-head h4 { margin:0; font-size:14px; font-weight:800; color:#0f172a; }
-      /* ✅ (8 ต.ค. 2569 "จุดที่ให้กดแก้ไขให้มองง่าย") ปุ่มแคปซูลขอบน้ำเงินชัดเจน ไม่ใช่ลิงก์ตัวหนังสือเล็กๆ */
-      .ee-sum-edit { display:inline-flex; align-items:center; gap:6px; border:1.5px solid #fecaca; background:#fef2f2; color:#b91c1c; font-weight:800; font-size:13px; cursor:pointer; padding:6px 14px; border-radius:999px; font-family:inherit; transition:background .15s, border-color .15s; }
-      .ee-sum-edit:hover { background:#fee2e2; border-color:#fca5a5; }
-      .ee-sum { background:#fff; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; margin-bottom:12px; }
-      .ee-sum-owner { display:flex; align-items:center; gap:10px; padding:10px 14px; background:#f8fafc; border-bottom:1px solid #e2e8f0; }
-      .ee-sum-owner small { display:block; font-size:11px; font-weight:700; color:#64748b; }
-      .ee-sum-owner b { font-size:15px; font-weight:900; color:#0f172a; }
-      .ee-sum-rows { padding: 0 14px; }
-      .ee-sum-row { display:flex; align-items:flex-start; gap:10px; padding:9px 0; border-top:1px solid #eef2f7; }
-      .ee-sum-row:first-child, .ee-sum-group + .ee-sum-row { border-top:0; }
-      .ee-sum-group { margin: 0 -14px; padding: 7px 14px 5px; font-size:11.5px; font-weight:800; color:#64748b; letter-spacing:.02em; background:#fbfcfe; border-top:1px solid #eef2f7; border-bottom:1px solid #f1f5f9; }
-      .ee-sum-rows > .ee-sum-group:first-child { border-top:0; }
-      .ee-sum-ico { width:18px; flex-shrink:0; text-align:center; font-size:13px; opacity:.75; }
-      .ee-sum-k { width:96px; flex-shrink:0; font-size:12.5px; font-weight:600; color:#64748b; }
-      .ee-sum-v { flex:1; min-width:0; font-size:13.5px; font-weight:700; color:#0f172a; overflow-wrap:anywhere; }
-      .ee-sum-chip { display:inline-block; padding:1px 8px; border-radius:6px; font-size:12px; border:1px solid rgba(15,23,42,.14); }
-      .ee-sum-sub { font-size:12px; font-weight:600; color:#64748b; }
-      .ee-sum-muted { color:#94a3b8; font-weight:600; }
-      .ee-sum-tel { color:#2563eb; font-weight:800; text-decoration:none; margin-left:6px; }
-      .ee-sum-people { display:flex; flex-wrap:wrap; gap:6px; }
-      .ee-sum-person { display:inline-flex; align-items:center; gap:5px; padding:2px 8px 2px 3px; border-radius:999px; background:#f1f5f9; font-size:12.5px; }
-      .ee-sum-person em { font-style:normal; font-size:10.5px; font-weight:800; color:#dc2626; margin-left:2px; }
-      #ee-editGroup > summary { list-style:none; cursor:pointer; display:flex; align-items:center; gap:8px; margin: 4px 0 12px; padding:11px 14px; border:1.5px solid #fecaca; border-radius:12px; background:#fef2f2; font-size:14px; font-weight:800; color:#b91c1c; }
-      #ee-editGroup > summary:hover { background:#fee2e2; }
-      #ee-editGroup > summary .ee-eg-hint { margin-left:auto; font-size:12px; font-weight:700; color:#dc2626; }
-      #ee-editGroup > summary::-webkit-details-marker { display:none; }
-      #ee-editGroup > summary .ee-eg-caret { color:#dc2626; transition:transform .15s; }
-      #ee-editGroup[open] > summary .ee-eg-caret { transform:rotate(90deg); }
-      #ee-editGroup > summary small { font-size:12px; font-weight:600; color:#64748b; }
-      @media (max-width: 480px) { .ee-sum-k { width:78px; } }
-      @media (max-width: 600px) { #ee-editGroup > summary small, #ee-editGroup > summary .ee-eg-hint { display:none; } }
-      /* ✅ (8 ต.ค. 2569 "บริเวณนี้ยังดูไม่ค่อยสวย ดูยาก") ตอนกาง = แผงแก้ไขแผงเดียว: แถบหัว + หัวข้อย่อยบางๆ คั่นด้วยเส้น
-         (ไม่ใช่การ์ด 4 ใบหัวใหญ่ซ้อนกัน) · แถบหัวใช้โทนกลาง ตัดสีแดงเหลือแค่ไอคอน/ลูกศร */
-      #ee-editGroup > summary { background:#fff; border-color:#e2e8f0; color:#0f172a; }
-      #ee-editGroup > summary:hover { background:#f8fafc; }
-      #ee-editGroup > summary small { color:#64748b; }
-      #ee-editGroup[open] { border:1px solid #e2e8f0; border-radius:14px; background:#fff; margin:0 0 12px; overflow:hidden; box-shadow:0 1px 2px rgba(15,23,42,.04); }
-      #ee-editGroup[open] > summary { margin:0; border:0; border-radius:0; border-bottom:1px solid #eef2f7; background:#f8fafc; }
-      #ee-editGroup .ee-card { border:0; border-radius:0; box-shadow:none; margin:0; border-top:1px solid #eef2f7; }
-      #ee-editGroup .ee-card:first-of-type { border-top:0; }
-      #ee-editGroup .ee-card-head { background:transparent; border-bottom:0; padding:12px 14px 2px; gap:8px; }
-      #ee-editGroup .ee-card-ico { width:24px; height:24px; border-radius:7px; font-size:13px; }
-      #ee-editGroup .ee-card-titles h4 { font-size:12.5px; color:#475569; letter-spacing:.01em; }
-      #ee-editGroup .ee-card-titles p { display:none; }
-      #ee-editGroup .ee-card-body { padding:8px 14px 6px; }
-    </style>
-    <div class="ee-sum-head">
-      <h4>ข้อมูลงาน</h4>
-      <button type="button" class="ee-sum-edit" onclick="var d=document.getElementById('ee-editGroup');if(d){d.open=true;d.scrollIntoView({behavior:'smooth',block:'start'});}">${isViewOnly ? "ดูรายละเอียดทั้งหมด" : "✏️ แก้ไขข้อมูลงาน"}</button>
-    </div>
-    <div class="ee-sum">
-      <div class="ee-sum-owner">
-        ${personAvatarHtml(rpName, rp?.imageUrl, 36)}
-        <div><small>ผู้รับผิดชอบ</small><b>${rpName ? escapeHtml(rpName) : '<span class="ee-sum-muted">ยังไม่ระบุ</span>'}</b></div>
-      </div>
-      <div class="ee-sum-rows">${rows}</div>
-    </div>`;
-  })();
-
   const html = `
 <div id="ee-modal-inner">
 
@@ -2055,7 +1942,6 @@ export const getEditEvent = async ({
     ` : ""}
 
     ${stepperHtml}
-    ${summaryHtml}
 
     <!-- ✅ ข้อมูลสัญญา — ย้ายมาไว้บนสุด (เดิมอยู่ล่างสุด ต้องเลื่อนจอไปดู) เพราะเป็นข้อมูลอ้างอิงหลักของ
          "ครั้งที่" นี้ที่มักต้องเช็คก่อนแก้อย่างอื่น ใส่กล่องพื้นหลังโทนม่วง-น้ำเงินแยกจากส่วนอื่นชัดเจน
@@ -2127,8 +2013,23 @@ export const getEditEvent = async ({
     <!-- Status bar -->
     ${/* ✅ ตัวเลือกสถานะย้ายขึ้นไปอยู่บนหัวกล่องแล้ว (ผู้ใช้สั่ง 3 ต.ค. 2569) — ดู #ee-head-status */""}
 
-    <details id="ee-editGroup">
-      <summary><span class="ee-eg-caret">▶</span>${isViewOnly ? "รายละเอียดทั้งหมด" : "✏️ แก้ไขข้อมูลงาน"} <small>ข้อมูลงาน · ผู้ติดต่อ · ทีม · วันที่และเวลา</small><span class="ee-eg-hint">กดเพื่อกาง/ย่อ</span></summary>
+    ${/* ✅ (8 ต.ค. 2569 "ดูยาวและเยอะเกินไป ควรให้กดข้อมูลแก้ไขได้เลย") เลิกใช้กล่องสรุป + แผงพับ
+          แสดงช่องข้อมูลให้แก้ได้ทันทีในแผงเดียวกะทัดรัด (หัวข้อย่อยบาง คั่นด้วยเส้น) */""}
+    <style>
+      #ee-editGroup { border:1px solid #e2e8f0; border-radius:14px; background:#fff; margin:0 0 12px; overflow:hidden; box-shadow:0 1px 2px rgba(15,23,42,.04); }
+      #ee-editGroup > .ee-eg-head { display:flex; align-items:baseline; gap:8px; padding:11px 14px; background:#f8fafc; border-bottom:1px solid #eef2f7; }
+      #ee-editGroup > .ee-eg-head b { font-size:14px; font-weight:800; color:#0f172a; }
+      #ee-editGroup > .ee-eg-head small { font-size:12px; font-weight:600; color:#64748b; }
+      #ee-editGroup .ee-card { border:0; border-radius:0; box-shadow:none; margin:0; border-top:1px solid #eef2f7; }
+      #ee-editGroup .ee-card:first-of-type { border-top:0; }
+      #ee-editGroup .ee-card-head { background:transparent; border-bottom:0; padding:12px 14px 2px; gap:8px; }
+      #ee-editGroup .ee-card-ico { width:24px; height:24px; border-radius:7px; font-size:13px; }
+      #ee-editGroup .ee-card-titles h4 { font-size:12.5px; color:#475569; letter-spacing:.01em; }
+      #ee-editGroup .ee-card-titles p { display:none; }
+      #ee-editGroup .ee-card-body { padding:8px 14px 6px; }
+    </style>
+    <div id="ee-editGroup">
+      <div class="ee-eg-head"><b>รายละเอียดงาน</b><small>${isViewOnly ? "ดูได้อย่างเดียว" : "กดที่ช่องเพื่อแก้ไขได้ทันที"}</small></div>
     <!-- section: โครงการ -->
     <section class="ee-card">
       <div class="ee-card-head">
@@ -2342,7 +2243,7 @@ export const getEditEvent = async ({
       </div>
     </section>
 
-    </details>
+    </div>
 
     <!-- ✅ เพิ่มหัวข้อกำกับให้กลุ่มสี — เดิมเป็นบล็อกลอยไม่มีหัวข้อ อยู่คั่นระหว่าง "วันที่ & เวลา" กับ
          "เอกสาร" อ่านแล้วไม่รู้ว่าสองช่องนี้เป็นของอะไร/มีผลกับอะไร (จริงๆ คือสีของการ์ดงานบนปฏิทิน)
