@@ -17,7 +17,7 @@
 import {
   FaHome, FaTachometerAlt, FaCalendarAlt, FaWrench, FaBriefcase, FaClipboardList,
   FaClipboardCheck, FaPaperPlane, FaMoneyCheckAlt, FaReceipt, FaHardHat, FaUserClock, FaShoppingCart, FaInbox, FaChartBar,
-  FaFileAlt, FaFileInvoiceDollar, FaFileContract, FaBuilding, FaUserFriends,
+  FaFileAlt, FaFileInvoiceDollar, FaFileContract, FaArchive, FaBuilding, FaUserFriends,
   FaCog, FaTags, FaImage, FaUserShield, FaBoxOpen, FaImages, FaNewspaper, FaSlidersH, FaEnvelopeOpenText,
 } from "react-icons/fa";
 import { DEPARTMENT } from "@/shared/utils/roles";
@@ -47,6 +47,8 @@ export const DEST = {
   jobReport: { title: "รายงานงาน", short: "รายงาน", sub: "สรุปสถานะ · รายเดือน · ตามลูกค้า/ทีม", href: "/jobs/report", icon: FaChartBar },
   myJobs: { title: "งานของฉัน", sub: "งานที่ได้รับมอบหมาย", href: "/technician/jobs", icon: FaClipboardList, badgeKey: "myJobs" },
   contracts: { title: "ภาพรวมงาน", href: "/contracts", icon: FaFileContract, badgeKey: "contracts" },
+  // ✅ หน้าเดียวกับ "ภาพรวมงาน" แต่เปิดที่ "ปิดแล้ว · ประวัติ" — สัญญาหมดอายุ (รอต่อสัญญา) + งานที่เข้างานครบแล้ว
+  contractsClosed: { title: "งานปิดแล้ว · ประวัติ", short: "งานปิดแล้ว", sub: "สัญญาหมดอายุ · เข้างานครบ", href: "/contracts?view=closed", icon: FaArchive },
   dispatch: { title: "คำขอลงงาน", sub: "คิวรอมอบหมาย", href: "/dispatch", icon: FaClipboardCheck, badgeKey: "dispatchQueue" },
   sales: { title: "แจ้งงานให้ช่าง", bar: "แจ้งงาน", sub: "ส่งงานเข้าคิวช่าง", href: "/sales", icon: FaPaperPlane, badgeKey: "dispatchMine" },
 
