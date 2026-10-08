@@ -144,7 +144,7 @@ function Row({ r, onOpen, showOwner, note }) {
           {r.e.site || "-"}
         </Typography>
         <Typography noWrap sx={{ fontSize: "0.76rem", color: MUTED }}>
-          {[r.e.company && r.e.company !== r.e.site ? r.e.company : "", showOwner && r.owner ? `เซล: ${r.owner}` : ""].filter(Boolean).join(" · ") || "ไม่ระบุลูกค้า"}
+          {[r.e.company && r.e.company !== r.e.site ? r.e.company : "", r.e.contactName ? `คุณ${String(r.e.contactName).replace(/^คุณ\s*/, "")}` : "", showOwner && r.owner ? `เซล: ${r.owner}` : ""].filter(Boolean).join(" · ") || "ไม่ระบุลูกค้า"}
         </Typography>
         {note && <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: note.color, mt: 0.3 }}>{note.text}</Typography>}
       </Box>

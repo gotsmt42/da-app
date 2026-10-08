@@ -4301,6 +4301,17 @@ function EventCalendar() {
           onChanged={() => fetchEventsFromDB(true)}
           onEdit={openSalesEditForm}
           onDelete={(ev) => { setSalesDialogId(null); handleDeleteEvent(String(ev._id)); }}
+          onNextAppointment={(ev) => {
+            setSalesDialogId(null);
+            getAddSalesAppointment({
+              arg: { dateStr: moment().add(1, "day").format("YYYY-MM-DD") },
+              userData, saveEventToDB, fetchEventsFromDB, Swal, moment, department: DEPARTMENT.SALES,
+              prefill: {
+                title: "ติดตามผล", site: ev.site, company: ev.company,
+                contactName: ev.contactName, contactTel: ev.contactTel, jobValue: ev.jobValue,
+              },
+            });
+          }}
         />
       )}
 

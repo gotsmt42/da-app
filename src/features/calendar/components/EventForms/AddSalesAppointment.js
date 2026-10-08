@@ -38,9 +38,9 @@
  * เอกสารอยู่แล้วไม่ว่าจะอยู่ตรงไหน ผลลัพธ์เหมือนกันแต่โค้ดสั้นกว่า
  */
 import {
-  SALES_APPOINTMENT_TYPES, salesEventColors, SALES_MANUAL_STATUSES, SALES_STATUS_DEFAULT,
+  SALES_APPOINTMENT_TYPES, SALES_TYPE_GROUPS, SALES_TYPE_META, salesEventColors, SALES_MANUAL_STATUSES, SALES_STATUS_DEFAULT,
 } from "../../salesAppointmentTypes";
-import { SALES_FORM_CSS, salesFormHeader, salesTypeCard } from "./salesFormStyle";
+import { SALES_FORM_CSS, salesFormHeader, salesTypePicker } from "./salesFormStyle";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 
 const esc = (s = "") =>
@@ -64,11 +64,15 @@ const normalizeTimeInput = (raw) => {
 
 export const getAddSalesAppointment = async ({
   arg, userData, saveEventToDB, fetchEventsFromDB, Swal, moment, department,
+  // ✅ (8 ต.ค. 2569) "นัดครั้งถัดไป" จากหน้ารายละเอียดนัด — เติมลูกค้า/สถานที่/ผู้ติดต่อ/มูลค่าเดิมให้
+  prefill = null,
 }) => {
+  const pf = prefill || {};
   const clickedDate = arg?.dateStr || moment().format("YYYY-MM-DD");
   const displayDate = moment(clickedDate).locale("th").format("D MMMM YYYY");
 
-  const typeCards = SALES_APPOINTMENT_TYPES.map((t, i) => salesTypeCard(t, i === 0, esc)).join("");
+  const firstType = pf.title || SALES_APPOINTMENT_TYPES[0].key;
+  const typeCards = salesTypePicker(SALES_APPOINTMENT_TYPES, SALES_TYPE_GROUPS, firstType, esc);
 
   // ✅ สถานะนัดหมายเป็นชุดของฝ่ายขายเอง (ดู SALES_STATUSES) ไม่ใช่สถานะงานช่าง
   const currentStatus = SALES_STATUS_DEFAULT;
@@ -83,26 +87,38 @@ export const getAddSalesAppointment = async ({
   // ✅ หัวกล่องไล่สีตามประเภทนัดที่เลือกไว้เป็นค่าเริ่มต้น (ตัวแรกในลิสต์) — ไม่ได้ผูก reactive
   // กับตอนผู้ใช้เปลี่ยนตัวเลือกภายหลัง เทียบ pattern เดียวกับหัวกล่องของ EditEvent.js ที่อิง
   // สถานะ ณ ตอนเปิดกล่อง ไม่ใช่ค่าที่กำลังแก้อยู่สดๆ
-  const headerType = SALES_APPOINTMENT_TYPES[0];
+  const headerType = SALES_TYPE_META[firstType] || SALES_APPOINTMENT_TYPES[0];
 
   const html = `
   <style>${SALES_FORM_CSS}</style>
 
   <div id="sa-modal-inner">
-    ${salesFormHeader({ icon: headerType.icon, color: headerType.color, title: "เพิ่มนัดหมาย", sub: `วันที่ ${esc(displayDate)}` })}
+    ${salesFormHeader({ icon: headerType.icon, color: headerType.color, title: prefill ? "นัดครั้งถัดไป" : "เพิ่มนัดหมาย", sub: prefill ? esc([pf.company, pf.site].filter(Boolean).join(" · ")) : `วันที่ ${esc(displayDate)}` })}
 
     <div id="sa-body" class="sa-wrap">
       <div class="sa-card">
         <div class="sa-card-title">ประเภทนัดหมาย</div>
-        <div class="sa-types">${typeCards}</div>
+        ${typeCards}
       </div>
 
       <div class="sa-card">
-        <div class="sa-card-title">สถานที่และลูกค้า</div>
+        <div class="sa-card-title">ลูกค้าและสถานที่</div>
         <div class="sa-label"><span class="sa-req">*</span> สถานที่ / ชื่อโครงการ</div>
-        <input type="text" id="saSite" placeholder="เช่น อาคาร A ชั้น 12 / โครงการ XYZ" />
+        <input type="text" id="saSite" placeholder="เช่น อาคาร A ชั้น 12 / โครงการ XYZ" value="${esc(pf.site || "")}" />
         <div class="sa-label">ลูกค้า / บริษัท</div>
-        <input type="text" id="saCompany" placeholder="เช่น นิติบุคคลอาคารชุด ABC" />
+        <input type="text" id="saCompany" placeholder="เช่น นิติบุคคลอาคารชุด ABC" value="${esc(pf.company || "")}" />
+        <div class="sa-row" style="margin-top:12px">
+          <div>
+            <div class="sa-sublabel">ผู้ติดต่อ</div>
+            <input type="text" id="saContactName" placeholder="ชื่อผู้ติดต่อ" value="${esc(pf.contactName || "")}" />
+          </div>
+          <div>
+            <div class="sa-sublabel">เบอร์โทร</div>
+            <input type="text" id="saContactTel" placeholder="08x-xxx-xxxx" inputmode="tel" value="${esc(pf.contactTel || "")}" />
+          </div>
+        </div>
+        <div class="sa-label">มูลค่าโอกาสการขาย (บาท)</div>
+        <input type="text" id="saValue" placeholder="เช่น 250,000 — ไม่บังคับ" inputmode="decimal" value="${pf.jobValue ? esc(Number(pf.jobValue).toLocaleString("th-TH")) : ""}" />
       </div>
 
       <div class="sa-card">
@@ -150,7 +166,7 @@ export const getAddSalesAppointment = async ({
 
       <div class="sa-card">
         <div class="sa-card-title">รายละเอียด <small>สิ่งที่ต้องเตรียม · เรื่องที่จะคุย</small></div>
-        <textarea id="saDetail" rows="5" placeholder="เช่น ลูกค้าอยากได้ใบเสนอราคาระบบดับเพลิงชั้น 12"></textarea>
+        <textarea id="saDetail" rows="5" placeholder="เช่น ลูกค้าอยากได้ใบเสนอราคาระบบดับเพลิงชั้น 12">${esc(pf.description || "")}</textarea>
       </div>
     </div>
 
@@ -239,6 +255,10 @@ export const getAddSalesAppointment = async ({
         const startTime = normalizeTimeInput(document.getElementById("saStart").value);
         const endTime = normalizeTimeInput(document.getElementById("saEnd").value);
         const detail = document.getElementById("saDetail").value.trim();
+        const contactName = document.getElementById("saContactName").value.trim();
+        const contactTel = document.getElementById("saContactTel").value.trim();
+        const rawValue = document.getElementById("saValue").value.replace(/[,\s฿]/g, "");
+        if (rawValue && !(Number(rawValue) >= 0)) { Swal.showValidationMessage("มูลค่าต้องเป็นตัวเลข เช่น 250000"); return; }
         const status = document.querySelector('input[name="saStatus"]:checked')?.value || SALES_STATUS_DEFAULT;
 
         // ⚠️ บังคับ "ชื่อโครงการ" ไม่ใช่ "บริษัท" — ตรงกับ AddEvent.js ของช่าง (site คือฟิลด์ที่
@@ -288,7 +308,7 @@ export const getAddSalesAppointment = async ({
         const originalLabel = btn.textContent;
         isSaving = true;
         btn.disabled = true;
-        btn.textContent = "⏳ กำลังบันทึก...";
+        btn.textContent = "กำลังบันทึก…";
 
         try {
           const { backgroundColor, textColor } = salesEventColors(type);
@@ -297,6 +317,9 @@ export const getAddSalesAppointment = async ({
             site,
             title: type,
             description: detail,
+            contactName,
+            contactTel,
+            ...(rawValue ? { jobValue: Number(rawValue) } : {}),
             backgroundColor,
             textColor,
             fontSize: 14,

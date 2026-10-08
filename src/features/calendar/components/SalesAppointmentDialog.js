@@ -20,7 +20,7 @@ import { alpha } from "@mui/material/styles";
 import {
   Close, AddAPhotoOutlined, DeleteOutline, EditOutlined, MoreHoriz, CheckCircle, FlagOutlined, EventRepeat,
   EventBusy, Replay, PlaceOutlined, BusinessOutlined, AccessTime, PersonOutline, NotesOutlined, PhotoCameraOutlined,
-  LockOutlined,
+  LockOutlined, PhoneOutlined, PaidOutlined, EventNote,
 } from "@mui/icons-material";
 import Swal from "sweetalert2";
 import EventService from "@/shared/services/EventService";
@@ -108,7 +108,7 @@ function Stepper({ status, ev }) {
  * @param {Function} props.onEdit        เปิดฟอร์มแก้ไขข้อมูลนัด (วัน/เวลา/สถานที่)
  * @param {Function} props.onDelete      ลบนัด
  */
-export default function SalesAppointmentDialog({ eventId, userData, isAdminOrManager, onClose, onChanged, onEdit, onDelete }) {
+export default function SalesAppointmentDialog({ eventId, userData, isAdminOrManager, onClose, onChanged, onEdit, onDelete, onNextAppointment }) {
   const fullScreen = useMediaQuery("(max-width:600px)");
   const [ev, setEv] = useState(null);
   const [loadErr, setLoadErr] = useState("");
@@ -288,6 +288,23 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
                 <InfoRow icon={<AccessTime />} label="วัน-เวลา">{dateText}</InfoRow>
                 <InfoRow icon={<PlaceOutlined />} label="สถานที่">{ev.site || "-"}</InfoRow>
                 <InfoRow icon={<BusinessOutlined />} label="ลูกค้า">{ev.company || <Box component="span" sx={{ color: FAINT }}>ไม่ระบุ</Box>}</InfoRow>
+                {(ev.contactName || ev.contactTel) && (
+                  <InfoRow icon={<PhoneOutlined />} label="ผู้ติดต่อ">
+                    {ev.contactName || ""}
+                    {ev.contactTel && (
+                      <Box component="a" href={`tel:${String(ev.contactTel).replace(/[^\d+]/g, "")}`}
+                        sx={{ ml: ev.contactName ? 1 : 0, color: ACCENT, fontWeight: 800, textDecoration: "none", whiteSpace: "nowrap" }}>
+                        {ev.contactTel}
+                      </Box>
+                    )}
+                  </InfoRow>
+                )}
+                {Number(ev.jobValue) > 0 && (
+                  <InfoRow icon={<PaidOutlined />} label="มูลค่า">
+                    ฿{Number(ev.jobValue).toLocaleString("th-TH")}
+                    <Box component="span" sx={{ ml: 0.75, fontSize: "0.72rem", fontWeight: 600, color: MUTED }}>โอกาสการขาย</Box>
+                  </InfoRow>
+                )}
                 <InfoRow icon={<PersonOutline />} label="เซล">{owner || "-"}</InfoRow>
                 {ev.description && (
                   <InfoRow icon={<NotesOutlined />} label="รายละเอียด">
@@ -419,6 +436,12 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
                 <MoreHoriz />
               </IconButton>
             </Tooltip>
+            {(status === "เข้าพบแล้ว" || closed) && onNextAppointment && (
+              <Button variant="outlined" startIcon={<EventNote />} onClick={() => onNextAppointment(ev)}
+                sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, whiteSpace: "nowrap", display: { xs: closed ? "inline-flex" : "none", sm: "inline-flex" } }}>
+                นัดครั้งถัดไป
+              </Button>
+            )}
             <Box sx={{ flex: 1 }} />
             {primary ? (
               <Tooltip title={primary.blocked}>
@@ -442,6 +465,11 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
           </Stack>
           <Menu anchorEl={menuEl} open={Boolean(menuEl)} onClose={() => setMenuEl(null)}
             anchorOrigin={{ vertical: "top", horizontal: "left" }} transformOrigin={{ vertical: "bottom", horizontal: "left" }}>
+            {onNextAppointment && (
+              <MenuItem onClick={() => { setMenuEl(null); onNextAppointment(ev); }}>
+                <ListItemIcon><EventNote fontSize="small" sx={{ color: ACCENT }} /></ListItemIcon><ListItemText>นัดครั้งถัดไปกับลูกค้านี้</ListItemText>
+              </MenuItem>
+            )}
             {!locked && onEdit && (
               <MenuItem onClick={() => { setMenuEl(null); onEdit(ev); }}>
                 <ListItemIcon><EditOutlined fontSize="small" /></ListItemIcon><ListItemText>แก้ไขวัน/เวลา/สถานที่</ListItemText>

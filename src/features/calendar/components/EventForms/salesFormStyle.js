@@ -60,13 +60,15 @@ export const SALES_FORM_CSS = `
   .sa-row > div { min-width: 0; }
 
   /* ประเภทนัด — ปุ่มเลือกแบบไอคอน+ชื่อ (2 คอลัมน์บนมือถือ 3 คอลัมน์บนจอใหญ่) */
-  .sa-types { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  @media (max-width: 560px) { .sa-types { grid-template-columns: repeat(2, 1fr); } }
-  .sa-type { position: relative; display: flex; align-items: center; gap: 8px; padding: 10px; border: 1px solid #e2e8f0; border-radius: 12px; cursor: pointer; background: #fff; transition: border-color .15s, background .15s, box-shadow .15s; min-width: 0; }
+  .sa-type-group { font-size: 11.5px; font-weight: 800; color: #94a3b8; letter-spacing: .02em; margin: 12px 0 6px; }
+  .sa-type-group:first-child { margin-top: 0; }
+  .sa-types { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  @media (max-width: 560px) { .sa-types { grid-template-columns: repeat(2, 1fr); } .sa-type-hint { display: none !important; } }
+  .sa-type { position: relative; display: flex; align-items: center; gap: 8px; padding: 8px 9px; border: 1px solid #e2e8f0; border-radius: 11px; cursor: pointer; background: #fff; transition: border-color .15s, background .15s, box-shadow .15s; min-width: 0; }
   .sa-type input { position: absolute; opacity: 0; pointer-events: none; }
-  .sa-type-icon { width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; background: color-mix(in srgb, var(--sa-c) 10%, white); }
+  .sa-type-icon { width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; background: color-mix(in srgb, var(--sa-c) 10%, white); }
   .sa-type-text { min-width: 0; }
-  .sa-type-title { display: block; font-weight: 700; font-size: 13px; color: #0f172a; line-height: 1.3; }
+  .sa-type-title { display: block; font-weight: 700; font-size: 13px; color: #0f172a; line-height: 1.3; overflow-wrap: anywhere; }
   .sa-type-hint { display: block; font-size: 11px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sa-type:has(input:checked) { border-color: var(--sa-c); background: color-mix(in srgb, var(--sa-c) 6%, white); box-shadow: 0 0 0 1px var(--sa-c) inset; }
   .sa-type:has(input:checked) .sa-type-title { color: var(--sa-c); }
@@ -127,6 +129,23 @@ export const salesFormHeader = ({ icon, color, title, sub }) => `
     <div id="sa-header-icon" style="background:color-mix(in srgb, ${color} 10%, white);border:1px solid color-mix(in srgb, ${color} 22%, white)">${icon}</div>
     <div id="sa-header-info"><h3>${title}</h3><small>${sub}</small></div>
   </div>`;
+
+/**
+ * ตัวเลือกประเภทนัด แบ่งกลุ่มตามขั้นตอนการขาย (8 ต.ค. 2569 ผู้ใช้: "ประเภทนัดหมายควรมีเยอะ")
+ * ประเภทที่ไม่อยู่ในรายการ (ข้อมูลเก่า) จะถูกเพิ่มไว้ท้ายกลุ่ม "อื่นๆ" ให้ยังเลือกค้างไว้ได้
+ */
+export const salesTypePicker = (types, groups, currentKey, esc) => {
+  const known = new Set(types.map((t) => t.key));
+  const extra = currentKey && !known.has(currentKey)
+    ? [{ key: currentKey, icon: "📌", color: "#64748b", hint: "ประเภทเดิม", group: "other" }] : [];
+  const all = [...types, ...extra];
+  return groups.map((g) => {
+    const items = all.filter((t) => (t.group || "other") === g.key);
+    if (!items.length) return "";
+    return `<div class="sa-type-group">${g.label}</div>
+      <div class="sa-types">${items.map((t) => salesTypeCard(t, t.key === currentKey, esc)).join("")}</div>`;
+  }).join("");
+};
 
 /** ปุ่มเลือกประเภทนัด 1 ปุ่ม */
 export const salesTypeCard = (t, checked, esc) => `

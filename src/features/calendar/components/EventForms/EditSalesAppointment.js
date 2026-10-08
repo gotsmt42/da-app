@@ -29,9 +29,9 @@
  * เนื้อฟอร์มตรงกลางที่เลื่อนได้ — ต้องเป็นคู่แฝดกับ AddSalesAppointment.js ในเรื่องนี้ด้วยเช่นกัน
  */
 import {
-  SALES_APPOINTMENT_TYPES, SALES_TYPE_META, salesEventColors, SALES_MANUAL_STATUSES, SALES_STATUS_DEFAULT, SALES_PHOTO_REQUIRED, toSalesStatus,
+  SALES_APPOINTMENT_TYPES, SALES_TYPE_GROUPS, SALES_TYPE_META, salesEventColors, SALES_MANUAL_STATUSES, SALES_STATUS_DEFAULT, SALES_PHOTO_REQUIRED, toSalesStatus,
 } from "../../salesAppointmentTypes";
-import { SALES_FORM_CSS, salesFormHeader, salesTypeCard } from "./salesFormStyle";
+import { SALES_FORM_CSS, salesFormHeader, salesTypePicker } from "./salesFormStyle";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 
 const esc = (s = "") =>
@@ -85,7 +85,8 @@ export const getEditSalesAppointment = async ({
     .sort((a, b) => new Date(a.start) - new Date(b.start));
   const hasSiblings = siblingEvents.length > 0;
 
-  const typeCards = SALES_APPOINTMENT_TYPES.map((t) => salesTypeCard(t, t.key === currentType, esc)).join("");
+  const typeCards = salesTypePicker(SALES_APPOINTMENT_TYPES, SALES_TYPE_GROUPS, currentType, esc);
+  const currentValue = Number(pick("jobValue")) || 0;
 
   // ✅ สถานะนัดหมายเป็นชุดของฝ่ายขายเอง (ดู SALES_STATUSES) ไม่ใช่สถานะงานช่าง
   const currentStatus = toSalesStatus(pick("status"));
@@ -119,15 +120,27 @@ export const getEditSalesAppointment = async ({
     <div id="sa-body" class="sa-wrap">
       <div class="sa-card">
         <div class="sa-card-title">ประเภทนัดหมาย</div>
-        <div class="sa-types">${typeCards}</div>
+        ${typeCards}
       </div>
 
       <div class="sa-card">
-        <div class="sa-card-title">สถานที่และลูกค้า</div>
+        <div class="sa-card-title">ลูกค้าและสถานที่</div>
         <div class="sa-label"><span class="sa-req">*</span> สถานที่ / ชื่อโครงการ</div>
         <input type="text" id="saSite" value="${esc(currentSite)}" />
         <div class="sa-label">ลูกค้า / บริษัท</div>
         <input type="text" id="saCompany" value="${esc(currentCompany)}" />
+        <div class="sa-row" style="margin-top:12px">
+          <div>
+            <div class="sa-sublabel">ผู้ติดต่อ</div>
+            <input type="text" id="saContactName" placeholder="ชื่อผู้ติดต่อ" value="${esc(pick("contactName"))}" />
+          </div>
+          <div>
+            <div class="sa-sublabel">เบอร์โทร</div>
+            <input type="text" id="saContactTel" placeholder="08x-xxx-xxxx" inputmode="tel" value="${esc(pick("contactTel"))}" />
+          </div>
+        </div>
+        <div class="sa-label">มูลค่าโอกาสการขาย (บาท)</div>
+        <input type="text" id="saValue" placeholder="เช่น 250,000 — ไม่บังคับ" inputmode="decimal" value="${currentValue ? esc(currentValue.toLocaleString("th-TH")) : ""}" />
       </div>
 
       <div class="sa-card">
@@ -341,6 +354,10 @@ export const getEditSalesAppointment = async ({
         const startTime = normalizeTimeInput(document.getElementById("saStart").value);
         const endTime = normalizeTimeInput(document.getElementById("saEnd").value);
         const detail = document.getElementById("saDetail").value.trim();
+        const contactName = document.getElementById("saContactName").value.trim();
+        const contactTel = document.getElementById("saContactTel").value.trim();
+        const rawValue = document.getElementById("saValue").value.replace(/[,\s฿]/g, "");
+        if (rawValue && !(Number(rawValue) >= 0)) { Swal.showValidationMessage("มูลค่าต้องเป็นตัวเลข เช่น 250000"); return; }
         const status = lockedStatus ? currentStatus : (document.querySelector('input[name="saStatus"]:checked')?.value || SALES_STATUS_DEFAULT);
 
         // ⚠️ บังคับ "ชื่อโครงการ" ไม่ใช่ "บริษัท" — ตรงกับ EditEvent.js ของช่าง
@@ -365,6 +382,9 @@ export const getEditSalesAppointment = async ({
             site,
             title: type,
             description: detail,
+            contactName,
+            contactTel,
+            jobValue: rawValue ? Number(rawValue) : null,
             backgroundColor,
             textColor,
             // ⚠️ ต้องส่ง startTime/endTime ทุกครั้ง ไม่ใช่เฉพาะตอนมีเวลา — ผู้ใช้ลบเวลาออกเพื่อ
