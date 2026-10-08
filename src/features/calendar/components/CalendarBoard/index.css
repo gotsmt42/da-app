@@ -870,7 +870,12 @@
 .ec-sales-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 
 /* ป้ายอธิบายสีของตารางเซล — 2 แถวกะทัดรัด */
-.ec-sales-legend { margin-top: 12px; padding: 10px 12px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; display: flex; flex-direction: column; gap: 6px; }
+.ec-sales-legend { margin-top: 12px; padding: 10px 12px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; }
+.ec-sales-legend > summary { cursor: pointer; font-size: 12.5px; font-weight: 700; color: #475569; list-style: none; }
+.ec-sales-legend > summary::before { content: "▸ "; color: #94a3b8; }
+.ec-sales-legend[open] > summary::before { content: "▾ "; }
+.ec-sales-legend[open] > summary { margin-bottom: 8px; }
+.ec-sales-legend-row + .ec-sales-legend-row { margin-top: 6px; }
 .ec-sales-legend-row { display: flex; flex-wrap: wrap; gap: 4px 14px; }
 .ec-sales-legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #475569; white-space: nowrap; }
 .ec-sales-legend-sw { width: 12px; height: 12px; border-radius: 4px; }
@@ -2044,10 +2049,13 @@
 .modern-calendar-container .calendar-wrapper.ec-sales .fc-daygrid-event .fc-event-main { padding: 0; }
 
 .ec-sc { display: flex; flex-direction: column; gap: 2px; width: 100%; min-width: 0; padding: 5px 7px 6px; text-align: left; color: #fff; }
-.ec-sc-time { font-size: .76em; font-weight: 700; opacity: .92; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+/* 1) ประเภทนัด — ป้ายขาว ตัวหนังสือสีประจำประเภท (เด่นสุด) */
+.ec-sc-type { align-self: flex-start; max-width: 100%; padding: 0 6px; border-radius: 5px; background: #fff; font-size: .74em; font-weight: 800; line-height: 1.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 2) สถานที่/โครงการ — ตัวหนา (เนื้อหาหลัก) */
 .ec-sc-site { font-size: .9em; font-weight: 800; line-height: 1.3; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.ec-sc-type { font-size: .72em; font-weight: 600; opacity: .88; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ec-sc-pill { align-self: flex-start; max-width: 100%; margin-top: 1px; padding: 0 6px; border-radius: 6px; background: #fff; font-size: .7em; font-weight: 800; line-height: 1.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 3) เวลา · สถานะ — ตัวเล็ก (รอง) */
+.ec-sc-meta { font-size: .72em; font-weight: 600; opacity: .9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.ec-sc-meta b { font-weight: 800; }
 .ec-sc--off .ec-sc-site { text-decoration: line-through; }
 
 @media (max-width: 768px) {
@@ -2057,7 +2065,7 @@
   }
   .ec-sc { padding: 3px 3px 4px; gap: 1px; }
   .ec-sc-site { -webkit-line-clamp: 3; }
-  .ec-sc-pill { padding: 0 3px; border-radius: 4px; }
+  .ec-sc-type { padding: 0 3px; border-radius: 3px; }
   .modern-calendar-container:not(.ec-zoomed) .ec-sc-end { display: none; }
 }
 
@@ -2084,7 +2092,7 @@
   .ec-sales-page .fc-daygrid-day-number { font-size: 10.5px; padding: 2px 3px !important; }
   .modern-calendar-container .calendar-wrapper.ec-sales .fc-daygrid-event { font-size: 9px !important; border-radius: 4px !important; }
   .ec-sales-page .ec-sc { padding: 2px 3px 3px; }
-  .ec-sales-page .ec-sc-pill { font-size: .78em; line-height: 1.45; }
+  .ec-sales-page .ec-sc-type { font-size: .8em; line-height: 1.5; }
   .ec-sales-page .ec-sales-legend { padding: 8px 10px; }
   .ec-sales-page .ec-sales-legend-item { font-size: 11px; }
 }
