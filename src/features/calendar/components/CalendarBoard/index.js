@@ -3543,18 +3543,22 @@ function EventCalendar() {
               //    สถานที่/โครงการ (ตัวหนา) → เวลา · สถานะ (ตัวเล็ก รอง) — แบบเดียวกับป้าย [PM] ของการ์ดงานช่าง
               const st = toSalesStatus(status);
               // ⚠️ คำสั้นที่สุดที่ยังสื่อความ — แถวนี้แชร์ที่กับเวลา บนคอลัมน์แคบคำยาวจะถูกตัดเป็น "✓ เข้..."
-              const SHORT = { "เข้าพบแล้ว": "✓ พบแล้ว", "ปิดงานแล้ว": "✓ ปิด", "เลื่อนนัด": "เลื่อน", "ยกเลิกนัด": "ยกเลิก" };
+              // สถานะอยู่บรรทัดของตัวเอง (ผู้ใช้: "เข้าพบแล้วให้ตัดเป็นบรรทัดใหม่เลย") จึงใช้คำเต็มได้
+              const SHORT = { "เข้าพบแล้ว": "✓ เข้าพบแล้ว", "ปิดงานแล้ว": "✓ ปิดงานแล้ว", "เลื่อนนัด": "เลื่อนนัด", "ยกเลิกนัด": "ยกเลิกนัด" };
               const typeColor = st === "ยกเลิกนัด" ? "#64748b" : (SALES_APPOINTMENT_TYPES.find((t) => t.key === title)?.color || "#64748b");
               const timePart = startTime
                 ? `${escapeHtml(startTime)}${endTime ? `<span class="ec-sc-end">–${escapeHtml(endTime)}</span>` : ""}`
                 : "";
-              const meta = [timePart, SHORT[st] ? `<b>${SHORT[st]}</b>` : ""].filter(Boolean).join(" · ");
+              const meta = [
+                timePart ? `<div class="ec-sc-meta">${timePart}</div>` : "",
+                SHORT[st] ? `<div class="ec-sc-meta ec-sc-status">${SHORT[st]}</div>` : "",
+              ].join("");
               return {
                 html: `
                   <div class="ec-sc${st === "ยกเลิกนัด" ? " ec-sc--off" : ""}" title="${escapeHtml(`${title} · ${site} · ${st}`)}">
                     <span class="ec-sc-type" style="color:${typeColor}">${escapeHtml(title)}</span>
                     <div class="ec-sc-site">${escapeHtml(site || "-")}</div>
-                    ${meta ? `<div class="ec-sc-meta">${meta}</div>` : ""}
+                    ${meta}
                   </div>`,
               };
             }
