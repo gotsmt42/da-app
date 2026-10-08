@@ -1666,7 +1666,7 @@ export const getEditEvent = async ({
       const isCurrent = String(n) === String(eventTime || "");
       const taken = roundsTakenByOthers.has(n);
       const note = isCurrent ? " · ครั้งปัจจุบัน" : taken ? " · มีงานลงไว้แล้ว" : " · ว่าง";
-      return `<option value="${n}"${isCurrent ? " selected" : ""}${taken && !isCurrent ? " disabled" : ""}>ครั้งที่ ${n}${note}</option>`;
+      return `<option value="${n}"${isCurrent ? " selected" : ""}${taken && !isCurrent ? " disabled" : ""}>ครั้งที่ ${formatRoundLabel(n, contractTotalRounds, ev)}${note}</option>`;
     }).join("")
     : "";
   // ✅ คัดลอกงานนี้ไปวางเป็นงานใหม่ — เฉพาะงานทั่วไป ไม่ใช่งานผูกสัญญา (คัดลอกงานสัญญาจะทำให้ตัวนับ
@@ -1833,7 +1833,7 @@ export const getEditEvent = async ({
   <!-- ── Header ── -->
   <div id="ee-status-header" style="--ee-status:${cfg0.color};--ee-status-soft:${cfg0.soft};--ee-status-line:${cfg0.line}">
     <div id="ee-status-title">
-      <h3><span >${attrHtml(eventTitle)} · ${attrHtml(eventSystem)} ${eventTime ? `· ครั้งที่ ${attrHtml(formatRoundLabel(eventTime, eventVisitCount))}` : ""}</span></h3>
+      <h3><span >${attrHtml(eventTitle)} · ${attrHtml(eventSystem)} ${eventTime ? `· ครั้งที่ ${attrHtml(formatRoundLabel(eventTime, eventVisitCount, ev))}` : ""}</span></h3>
     </div>
     <span id="ee-head-mini" title="สถานะงาน">${cfg0.icon}<span id="ee-head-mini-text">${attrHtml(eventStatus || "กำลังรอยืนยัน")}</span></span>
     <button id="ee-head-toggle" type="button" title="พับ/กางหัวข้อ" aria-expanded="true"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 15l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>

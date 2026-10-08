@@ -17,9 +17,32 @@ export const countUsedRounds = (visits) => {
 // "1" เฉยๆ ให้เห็นสัดส่วนความคืบหน้าทันทีโดยไม่ต้องเปิดไปดูหน้าภาพรวมสัญญา — visitCount มาจากค่าที่
 // บันทึกไว้ในตัวงานเองตอนสร้าง (ดู AddEvent.js/EditEvent.js) ไม่ต้องไป join กับ record อื่น งานที่ไม่ใช่
 // งานสัญญา (ไม่มี visitCount) ยังคงโชว์แค่เลขครั้งเฉยๆ เหมือนเดิม
-export const formatRoundLabel = (time, visitCount) => {
+/**
+ * ✅ (8 ต.ค. 2569 ผู้ใช้: "การเลือกและแสดงครั้งที่ของงาน ให้แสดงปีของสัญญาด้วย เช่น ครั้งที่ 2/4 - 2569")
+ * ปีของสัญญา (พ.ศ.) — จากวันเริ่มสัญญาก่อน ไม่มีค่อยอ่านจากท้ายเลขที่สัญญา (FAPTY05-2569)
+ * รับได้ทั้งงานดิบจาก API และ event ของปฏิทิน (ข้อมูลอยู่ใน extendedProps)
+ */
+export const contractYearOf = (ev) => {
+  if (!ev) return null;
+  const src = ev.extendedProps ? { ...ev.extendedProps, ...ev } : ev;
+  if (src.contractStart) {
+    const d = new Date(src.contractStart);
+    if (!Number.isNaN(d.getTime())) return d.getFullYear() + 543;
+  }
+  const m = String(src.contractNo || "").trim().match(/-(\d{4})$/);
+  if (m) {
+    const y = Number(m[1]);
+    return y > 2400 ? y : y + 543;
+  }
+  return null;
+};
+
+/** "2/4" · ส่งงาน/สัญญามาด้วย (ctx) → "2/4 - 2569" ถ้ารู้ปีของสัญญา */
+export const formatRoundLabel = (time, visitCount, ctx) => {
   if (time === undefined || time === null || time === "") return "";
-  return visitCount ? `${time}/${visitCount}` : `${time}`;
+  const base = visitCount ? `${time}/${visitCount}` : `${time}`;
+  const year = ctx ? contractYearOf(ctx) : null;
+  return year ? `${base} - ${year}` : base;
 };
 
 export const DEFAULT_INTERVAL_MONTHS = 3;

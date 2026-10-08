@@ -381,7 +381,7 @@ export default function PendingApprovalsPanel({ onCountChange, active = true }) 
                   {sessions.length > 1 && <SoftPill color={BLUE}>เข้างาน {sessions.length} ช่วง</SoftPill>}
                 </>}
                 title={[head.company, head.site].filter(Boolean).join(" · ") || "ไม่ระบุโครงการ"}
-                sub={[head.title, head.system, head.time ? `ครั้งที่ ${formatRoundLabel(head.time, head.visitCount)}` : ""].filter(Boolean).join(" · ")}
+                sub={[head.title, head.system, head.time ? `ครั้งที่ ${formatRoundLabel(head.time, head.visitCount, head)}` : ""].filter(Boolean).join(" · ")}
                 detail={`📅 ${dateLabelOf(sessions)}${team.length ? `  ·  ทีม ${team.join(", ")}` : ""}`}
                 people={<>
                   <PeopleField label="ผู้ส่ง">{head.approvalRequestedBy ? <PersonChip name={head.approvalRequestedBy} size={20} /> : "-"}</PeopleField>

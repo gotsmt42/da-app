@@ -3631,7 +3631,7 @@ function EventCalendar() {
             // ทันทีจากหน้าปฏิทินโดยไม่ต้องเปิดไปดูหน้าภาพรวมสัญญา งานที่ไม่ใช่งานสัญญา (ไม่มี visitCount)
             // ยังโชว์แค่เลขครั้งเฉยๆ เหมือนเดิม (ดู formatRoundLabel)
             // ✅ เขียนคำว่า "ครั้งที่" กำกับเสมอ — ตัวเลข "4/12" ลอยๆ อ่านไม่ออกว่าคืออะไร
-            const timeDisplay = time ? detailRow("ครั้งที่", `ครั้งที่ ${escapeHtml(formatRoundLabel(time, visitCount))}`, "🔄") : "";
+            const timeDisplay = time ? detailRow("ครั้งที่", `ครั้งที่ ${escapeHtml(formatRoundLabel(time, visitCount, extendedProps))}`, "🔄") : "";
             // ✅ รวมช่างหลัก (team) + ลูกทีมเพิ่มเติม (teamMembers) เป็นรายชื่อเดียว ให้เห็นครบ
             // ทุกคนที่ช่วยทำงานนี้ในบรรทัดเดียวกัน แทนที่จะเห็นแค่ช่างหลักคนเดียวเหมือนเดิม
             const allTeamNames = [team, ...teamMembers.map((m) => m?.name)]

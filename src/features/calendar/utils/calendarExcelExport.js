@@ -138,7 +138,7 @@ const serviceValues = (ev, { classifyJob, getApprovalState, formatRoundLabel }) 
       title: ev.title || "", site: ev.site || "", company: ev.company || "", system: ev.system || "",
       jobClass: JOB_CLASS_LABEL[jobClass] || "",
       contractNo: ev.contractNo || "",
-      round: ev.time ? String(formatRoundLabel ? formatRoundLabel(ev.time, ev.visitCount) : ev.time) : "",
+      round: ev.time ? String(formatRoundLabel ? formatRoundLabel(ev.time, ev.visitCount, ev) : ev.time) : "",
       status: ev.status || "", approval: approval.label,
       team: ev.team || "", teamMembers: members.join(", "),
       responsiblePerson: ev.responsiblePerson || "",

@@ -1,4 +1,4 @@
-import { countUsedRounds, totalRoundsOf } from "@/shared/utils/contractRounds";
+import { countUsedRounds, formatRoundLabel, totalRoundsOf } from "@/shared/utils/contractRounds";
 import { escapeHtml } from "@/shared/utils/escapeHtml";
 import { showTeamOverlapWarning } from "@/shared/utils/teamOverlapWarning";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
@@ -1223,12 +1223,14 @@ export const getAddEvent = async ({
       const roundPickedHint = document.getElementById("ae-roundPickedHint");
       // ✅ สรุปตัวเลือกปัจจุบันเป็นข้อความชัดๆ อีกชั้น กันเคส chip สีเขียวเหมือนกันหลายอัน (ครั้งที่ลง
       // ตารางแล้ว) มองแยกไม่ออกว่าอันไหนถูกเลือกอยู่จริงจากสีอย่างเดียว
+      let hintContract = null; // สัญญาที่เลือกอยู่ — ใช้บอกปีของสัญญาในข้อความ (ครั้งที่ 2/4 - 2569)
       const updateRoundPickedHint = (round, isExtend) => {
         if (!roundPickedHint) return;
         if (!round) { roundPickedHint.textContent = ""; return; }
+        const label = formatRoundLabel(round, hintContract?.visitCount, hintContract);
         roundPickedHint.textContent = isExtend
-          ? `✅ กำลังเพิ่มวันที่ไม่ต่อเนื่องให้ "ครั้งที่ ${round}" (ครั้งเดิม ไม่นับเป็นครั้งใหม่)`
-          : `🆕 กำลังจะสร้าง "ครั้งที่ ${round}" เป็นครั้งใหม่`;
+          ? `✅ กำลังเพิ่มวันที่ไม่ต่อเนื่องให้ "ครั้งที่ ${label}" (ครั้งเดิม ไม่นับเป็นครั้งใหม่)`
+          : `🆕 กำลังจะสร้าง "ครั้งที่ ${label}" เป็นครั้งใหม่`;
         roundPickedHint.style.color = isExtend ? "#15803d" : "#b91c1c";
       };
 
@@ -1236,6 +1238,7 @@ export const getAddEvent = async ({
         if (!roundGrid || !selectedRoundInput) return;
         selectedRoundInput.value = "";
         selectedRoundInput.dataset.extend = "0";
+        hintContract = c;
         if (!c || !c.visitCount) { roundGrid.innerHTML = ""; updateRoundPickedHint(null); return; }
         let defaultOpen = null;
         const rounds = Array.from({ length: c.visitCount }, (_, i) => i + 1);

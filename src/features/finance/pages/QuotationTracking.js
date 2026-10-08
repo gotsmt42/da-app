@@ -178,7 +178,7 @@ const DesktopTable = ({ jobs, onOpen, onPreview }) => (
             <TableRow key={a._id} hover onClick={() => onOpen(job)} sx={{ cursor: "pointer", "& td": { py: 1.1, borderColor: BORDER } }}>
               <TableCell sx={{ maxWidth: 300 }}>
                 <Typography noWrap sx={{ fontWeight: 800, fontSize: "0.86rem", color: TEXT_MAIN }}>{siteText(a)}</Typography>
-                <Typography noWrap sx={{ fontSize: "0.74rem", color: TEXT_SUB }}>{jobText(a) || "—"}{a.time ? ` · ครั้งที่ ${formatRoundLabel(a.time, a.visitCount)}` : ""}</Typography>
+                <Typography noWrap sx={{ fontSize: "0.74rem", color: TEXT_SUB }}>{jobText(a) || "—"}{a.time ? ` · ครั้งที่ ${formatRoundLabel(a.time, a.visitCount, a)}` : ""}</Typography>
               </TableCell>
               <TableCell sx={{ whiteSpace: "nowrap" }}>
                 <Stack direction="row" spacing={0.5} alignItems="center">
@@ -549,7 +549,7 @@ const DetailDialog = ({
               {siteText(a)}
             </Typography>
             <Typography noWrap sx={{ fontSize: "0.76rem", color: TEXT_SUB }}>
-              {[jobText(a), a.time ? `ครั้งที่ ${formatRoundLabel(a.time, a.visitCount)}` : "", formatEventDateRange(a)].filter(Boolean).join(" · ")}
+              {[jobText(a), a.time ? `ครั้งที่ ${formatRoundLabel(a.time, a.visitCount, a)}` : "", formatEventDateRange(a)].filter(Boolean).join(" · ")}
             </Typography>
           </Box>
           <IconButton onClick={onClose} size="small" aria-label="ปิด" sx={{ mt: -0.25 }}><Close /></IconButton>

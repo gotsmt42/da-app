@@ -1049,7 +1049,7 @@ const TechnicianJobCard = ({
                     : (event.company || event.site || "ไม่ระบุบริษัท/ไซต์")}
                 </InfoLine>
                 {/* ✅ ย้ายมาไว้ถัดจากโครงการตามที่ขอ (เดิมอยู่คู่กับระบบด้านบนสุด) */}
-                {event.time && <InfoLine label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount)}</InfoLine>}
+                {event.time && <InfoLine label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount, event)}</InfoLine>}
                 {(event.startTime || event.endTime) && (
                   <InfoLine label="เวลา">{event.startTime || "-"} — {event.endTime || "-"}</InfoLine>
                 )}
@@ -1244,7 +1244,7 @@ const TechnicianJobCard = ({
                     {event.company && event.site ? `${event.company} · ${event.site}` : (event.company || event.site || "ไม่ระบุบริษัท/ไซต์")}
                   </InfoLine>
                   {event.system && <InfoLine label="ระบบ">{event.system}</InfoLine>}
-                  {event.time && <InfoLine label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount)}</InfoLine>}
+                  {event.time && <InfoLine label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount, event)}</InfoLine>}
                 </Stack>
               )}
             </Box>
@@ -1270,7 +1270,7 @@ const TechnicianJobCard = ({
                 </Typography>
                 {(() => {
                   const place = [event.company && event.site ? `${event.company} · ${event.site}` : (event.company || event.site),
-                    event.system, event.time ? `ครั้งที่ ${formatRoundLabel(event.time, event.visitCount)}` : ""].filter(Boolean).join(" · ");
+                    event.system, event.time ? `ครั้งที่ ${formatRoundLabel(event.time, event.visitCount, event)}` : ""].filter(Boolean).join(" · ");
                   return place ? <Typography sx={{ fontSize: "0.8rem", color: INK_2, mt: 0.25 }}>{place}</Typography> : null;
                 })()}
               </Box>

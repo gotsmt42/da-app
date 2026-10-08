@@ -287,7 +287,7 @@ const ServiceReportFiles = () => {
   const renderFileRow = (f, i) => {
     const color = DOC_TYPE_COLOR[f.docType] || "#6b7280";
     const DocIcon = DOC_TYPE_ICON[f.docType] || InsertDriveFile;
-    const place = [f.site || f.company, f.system, f.time ? `ครั้งที่ ${formatRoundLabel(f.time, f.visitCount)}` : ""].filter(Boolean).join(" · ") || "ไม่ระบุโครงการ";
+    const place = [f.site || f.company, f.system, f.time ? `ครั้งที่ ${formatRoundLabel(f.time, f.visitCount, f)}` : ""].filter(Boolean).join(" · ") || "ไม่ระบุโครงการ";
     const open = () => { setPreviewUrl(f.fileUrl); setPreviewFileName(f.fileName); };
     return (
       <Stack key={f.fileId} direction="row" alignItems="center" spacing={1.5} onClick={open} role="button"

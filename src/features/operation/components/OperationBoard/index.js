@@ -1619,7 +1619,7 @@ const EventRowCard = ({
                   </InfoLine>
                 )}
                 {/* ✅ ย้ายมาไว้ถัดจากโครงการตามที่ขอ (เดิมอยู่คู่กับระบบด้านบนสุด) */}
-                {event.time && <InfoLine label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount)}</InfoLine>}
+                {event.time && <InfoLine label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount, event)}</InfoLine>}
                 {(event.startTime || event.endTime) && (
                   <InfoLine label="เวลา">{event.startTime || "-"} — {event.endTime || "-"}</InfoLine>
                 )}
@@ -1881,7 +1881,7 @@ const EventRowCard = ({
                 </Typography>
                 {(() => {
                   const place = [companySite(event.company, event.site), event.system,
-                    event.time ? `ครั้งที่ ${formatRoundLabel(event.time, event.visitCount)}` : ""].filter(Boolean).join(" · ");
+                    event.time ? `ครั้งที่ ${formatRoundLabel(event.time, event.visitCount, event)}` : ""].filter(Boolean).join(" · ");
                   return place ? <Typography sx={{ fontSize: "0.82rem", color: INK_2, mt: 0.25 }}>{place}</Typography> : null;
                 })()}
                 <Stack direction="row" alignItems="center" gap={1.25} flexWrap="wrap" sx={{ mt: 0.75 }}>
@@ -2287,7 +2287,7 @@ const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob, employee, canAss
               </TableCell>
               <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
                 {a.time ? (
-                  <Typography variant="caption" fontWeight={700}>{formatRoundLabel(a.time, a.visitCount)}</Typography>
+                  <Typography variant="caption" fontWeight={700}>{formatRoundLabel(a.time, a.visitCount, a)}</Typography>
                 ) : (
                   <Typography variant="caption" color="text.disabled">-</Typography>
                 )}
@@ -2405,7 +2405,7 @@ const JobGroupBlock = ({ sessions, currentUser, ...cardProps }) => {
   return (
     <GlassCard sx={multiDayCardSx(OP_COLOR[head.status] || "#94a3b8")}>
       <MultiDayGroupHeader sessions={sessions} anchorId={anchorId} expanded={expanded} onToggle={() => setExpanded((p) => !p)}
-        title={`${companySite(head.company, head.site)} — ${head.title || ""}${head.system ? ` · ${head.system}` : ""}${head.time ? ` ครั้งที่ ${formatRoundLabel(head.time, head.visitCount)}` : ""}`} />
+        title={`${companySite(head.company, head.site)} — ${head.title || ""}${head.system ? ` · ${head.system}` : ""}${head.time ? ` ครั้งที่ ${formatRoundLabel(head.time, head.visitCount, head)}` : ""}`} />
 
       <Collapse in={expanded}>
         {sessions.map((event, i) => (
