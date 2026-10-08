@@ -2056,7 +2056,8 @@
 .ec-sc-site { font-size: .92em; font-weight: 800; line-height: 1.3; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 /* 3) เวลา · สถานะ — ตัวเล็ก (รอง) */
 .ec-sc-meta { font-size: .78em; font-weight: 600; opacity: .9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
-.ec-sc-status { font-weight: 800; opacity: 1; }
+/* 4) สถานะ — แคปซูลสีของสถานะ ขอบขาว ตัวหนังสือขาว (แยกจากป้ายประเภทพื้นขาว และจากชื่อโครงการ) */
+.ec-sc-status { align-self: flex-start; max-width: 100%; margin-top: 2px; padding: 0 7px; border-radius: 999px; border: 1.5px solid rgba(255,255,255,.9); color: #fff; font-size: .7em; font-weight: 800; line-height: 1.55; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 1px 2px rgba(15,23,42,.25); }
 .ec-sc--off .ec-sc-site { text-decoration: line-through; }
 
 @media (min-width: 769px) and (max-width: 1200px) {
@@ -2100,6 +2101,7 @@
   .ec-sales-page .ec-sc-meta { font-size: .78em; }
   .ec-sales-page .ec-sc { padding: 2px 3px 3px; }
   .ec-sales-page .ec-sc-type { font-size: .74em; line-height: 1.5; }
+  .ec-sales-page .ec-sc-status { font-size: .76em; padding: 0 4px; border-width: 1px; }
   .ec-sales-page .ec-sc-site { font-size: .84em; }
   .ec-sales-page .ec-sales-legend { padding: 8px 10px; }
   .ec-sales-page .ec-sales-legend-item { font-size: 11px; }

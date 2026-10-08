@@ -3,307 +3,364 @@ import { saveAs } from "file-saver";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 
-// ✅ รูปแบบตัวเลขของช่องจำนวนเงินทุกช่องในไฟล์ที่ส่งออก — เก็บเป็น "ตัวเลขจริง" ใน cell (บวก/ลบ/SUM ต่อ
-// ในไฟล์ได้ตามปกติ) แต่ให้ Excel แสดงผลพร้อมสัญลักษณ์ ฿ นำหน้าเสมอ ตรงกับที่แสดงบนหน้าจอ — เดิมเป็น
-// ตัวเลขเปล่าๆ ที่แยกไม่ออกจากคอลัมน์ "จำนวนครั้ง"/"จำนวนวัน" ที่อยู่ข้างกันในไฟล์เดียวกัน
-const MONEY_FMT = '"฿"#,##0';
-
-
 /**
- * calendarExcelExport.js — ส่งออกงานจากหน้าปฏิทิน (Event) เป็นไฟล์ Excel (.xlsx) จริงพร้อมรูปแบบ/สี
+ * calendarExcelExport.js — ส่งออกตารางงานช่าง / ตารางนัดหมายฝ่ายขาย เป็นไฟล์ Excel (.xlsx)
  *
- * ⚠️ ทำไมต้องเปลี่ยนจาก CSV: ไฟล์ CSV เป็นข้อความล้วนตามนิยามของมันเอง ใส่สี/ตัวหนา/เส้นขอบ/ความกว้าง
- * คอลัมน์ไม่ได้เลยแม้แต่อย่างเดียว — เปิดใน Excel ได้ก็จริงแต่เป็นตารางเปล่าๆ ต้องมานั่งจัดรูปแบบเองใหม่
- * ทุกครั้ง ซ้ำยัง "แปลงค่าเอง" ให้ด้วย เช่นครั้งที่ "1/3" โดนตีความเป็นวันที่ 1 มี.ค. (ของเดิมต้องเติม
- * เครื่องหมาย ' นำหน้าไว้กันเอง ซึ่งติดไปในไฟล์จริงเวลาเปิดดู)
- * ✅ .xlsx เป็นรูปแบบจริงของ Excel จึงกำหนดได้ครบทุกอย่าง — ใช้ exceljs ตัวเดียวกับที่หน้า "ภาพรวมงาน"
- * ใช้อยู่แล้ว (ดู features/contracts/utils/contractExcelExport.js) ให้ไฟล์ที่ส่งออกจากทั้งสองหน้าหน้าตาเป็นชุดเดียวกัน
+ * ✅ (8 ต.ค. 2569 ผู้ใช้: "แก้ไข export excel ให้สอดคล้องและสมบูรณ์ แบบมืออาชีพ")
+ *   • แยกชุดคอลัมน์ตามตาราง — ฝ่ายขายได้คอลัมน์ของนัดหมาย (ประเภทนัด · ผู้ติดต่อ · สถานะนัด · เข้าพบ/ปิดงานเมื่อ ·
+ *     รูปหน้างาน · ผลการเข้าพบ · มูลค่าโอกาส · ฝ่ายขาย) ไม่ใช่คอลัมน์ของงานช่าง (ระบบ/สัญญา/ครั้งที่/ทีม)
+ *   • ชื่อรายงาน + สีประจำตาราง (ช่าง = แดง · ฝ่ายขาย = น้ำเงิน) ตรงกับหน้าจอ
+ *   • ชีต "สรุป": จำนวนตามสถานะ · ตามประเภท · ตามคน (ทีมช่าง / ฝ่ายขาย) · มูลค่ารวม
+ *   • พิมพ์: แนวนอน พอดีความกว้าง · หัวตารางพิมพ์ซ้ำทุกหน้า · เลขหน้าท้ายกระดาษ
+ * 🐛 ที่แก้: ตัดวันหยุดราชการออก (เดิมติดมาเป็นแถวงาน) · วันที่สิ้นสุดของงานที่ "มีเวลา" ไม่ต้องลบ 1 วัน
+ *    (ลบเฉพาะงานทั้งวัน ที่เก็บ end แบบ exclusive) · เบอร์โทรเก็บเป็นข้อความ (ศูนย์นำหน้าไม่หาย)
+ *
+ * ⚠️ ไม่ตรึงแถว/คอลัมน์ (ผู้ใช้เคยขอให้เอา freeze ออก — แนวเดียวกับไฟล์ของหน้า "ภาพรวมงาน")
  */
 
-// 🎨 โทนสีเดียวกับหน้าจอ (ACCENT #dc2626) — ExcelJS ใช้รหัสสีแบบ ARGB (มี alpha นำหน้า 2 หลัก)
-const C = {
-  headerBg: "FF7F1D1D",     // แดงเข้ม — แถบหัวตาราง
-  headerText: "FFFFFFFF",
-  groupBg: "FFDC2626",      // แดงหลัก — แถวหัวข้อกลุ่มคอลัมน์
-  titleText: "FF7F1D1D",
-  subtitleText: "FF64748B",
-  zebra: "FFFDF7F7",        // แถบสลับแถวโทนแดงจางมาก
-  border: "FFE2E8F0",
-  muted: "FF94A3B8",
-};
+const MONEY_FMT = '"฿"#,##0';
+const DATE_FMT = "dd/mm/yyyy";
+const DT_FMT = "dd/mm/yyyy hh:mm";
+const FONT = "Tahoma";
 
-// 🎨 สีสถานะงาน — ตรงกับ statusLegend ในหน้าปฏิทิน (index.js) เป๊ะๆ กันคนอ่านไฟล์เทียบกับบนจอแล้วงง
-const STATUS_COLOR = {
-  "กำลังรอยืนยัน": "FF888888",
-  "ยืนยันแล้ว": "FF0C49AC",
-  "กำลังดำเนินการ": "FFA1B50B",
-  "ดำเนินการเสร็จสิ้น": "FF18B007",
-  "ยกเลิก": "FFDC2626",
+const THEMES = {
+  service: { dark: "FF7F1D1D", main: "FFDC2626", zebra: "FFFDF7F7", title: "ตารางงานช่าง" },
+  sales: { dark: "FF1E3A8A", main: "FF2563EB", zebra: "FFF5F8FF", title: "ตารางนัดหมายฝ่ายขาย" },
 };
+const GREY = { border: "FFE2E8F0", muted: "FF94A3B8", sub: "FF64748B", ink: "FF0F172A" };
 
-// 🎨 สีสถานะการอนุมัติ — ตรงกับป้าย "รออนุมัติ/ไม่อนุมัติ" บนการ์ดงานในปฏิทิน
+const TECH_STATUS_COLOR = {
+  "กำลังรอยืนยัน": "FF64748B",
+  "ยืนยันแล้ว": "FF2563EB",
+  "กำลังดำเนินการ": "FFA16207",
+  "ดำเนินการเสร็จสิ้น": "FF16A34A",
+};
+const SALES_STATUS_COLOR = {
+  "นัดหมายแล้ว": "FF2563EB",
+  "เข้าพบแล้ว": "FF0D9488",
+  "ปิดงานแล้ว": "FF16A34A",
+  "เลื่อนนัด": "FFD97706",
+  "ยกเลิกนัด": "FF94A3B8",
+};
 const APPROVAL_META = {
   approved: { label: "อนุมัติแล้ว", color: "FF059669" },
   pending: { label: "รออนุมัติ", color: "FFB45309" },
   rejected: { label: "ไม่อนุมัติ", color: "FFDC2626" },
 };
+const JOB_CLASS_LABEL = { contract: "งานสัญญา", project: "งานโปรเจค", general: "งานทั่วไป" };
+const JOB_CLASS_COLOR = { contract: "FFF97316", project: "FF0D9488", general: "FF475569" };
 
-// 🎨 สีประเภทงาน — ต้องตรงกับ JOB_CLASS_META (shared/utils/jobClassification.js) ที่ใช้วาดแถบสีขอบซ้ายในปฏิทิน
-// ⚠️ อัปเดตพร้อมกันเสมอเมื่อแก้ที่ต้นทาง (ที่นี่เป็น ARGB ของ ExcelJS จึงใช้ค่าเดียวกันตรงๆ ไม่ได้)
-// สัญญาเปลี่ยนจากคราม #6366F1 → ส้ม #F97316 และงานทั่วไปจากเทาอ่อน #94A3B8 → เทาเข้ม #475569
-// เพราะสีเดิมชนกับสีพื้นหลังงานเริ่มต้นในปฏิทินจนแถบมองไม่เห็น (ดูเหตุผลเต็มที่ jobClassification.js)
-const JOB_CLASS_COLOR = {
-  contract: "FFF97316",
-  project: "FF0D9488",
-  general: "FF475569",
+const border = {
+  top: { style: "thin", color: { argb: GREY.border } },
+  left: { style: "thin", color: { argb: GREY.border } },
+  bottom: { style: "thin", color: { argb: GREY.border } },
+  right: { style: "thin", color: { argb: GREY.border } },
 };
-
-const thinBorder = {
-  top: { style: "thin", color: { argb: C.border } },
-  left: { style: "thin", color: { argb: C.border } },
-  bottom: { style: "thin", color: { argb: C.border } },
-  right: { style: "thin", color: { argb: C.border } },
-};
-
+const fill = (argb) => ({ type: "pattern", pattern: "solid", fgColor: { argb } });
 /**
- * สร้างและดาวน์โหลดไฟล์ Excel ของงานในปฏิทิน
- * @param {Array}  rows   งานที่ผ่านตัวกรองแล้ว (โครงสร้างเดียวกับที่ปฏิทินบนจอใช้)
- * @param {Object} meta   { fileName, filterSummary, exportedAt }
- * @param {Function} classifyJob        ฟังก์ชันเดียวกับที่หน้าจอใช้ (กันข้อมูลไม่ตรงกัน)
- * @param {Function} getApprovalState   ฟังก์ชันเดียวกับที่หน้าจอใช้
- * @param {Function} formatRoundLabel   ฟังก์ชันเดียวกับที่หน้าจอใช้ ("1/3")
+ * 🐛 วันที่ใน Excel ไม่มีโซนเวลา — ExcelJS เขียน Date เป็น UTC ตรงๆ เที่ยงคืนเวลาไทย (UTC+7) จึงกลายเป็น 17:00
+ *    ของ "วันก่อนหน้า" ในไฟล์ (นัด 4 ส.ค. ขึ้นเป็น 3 ส.ค.) → สร้าง Date แบบ UTC ที่ตัวเลข วัน/เวลา ตรงกับเวลาไทย
  */
-export async function exportCalendarEventsToExcel({
-  rows,
-  meta,
-  classifyJob,
-  getApprovalState,
-  formatRoundLabel,
-}) {
-  const wb = new ExcelJS.Workbook();
-  wb.creator = "DA-APP";
-  wb.created = new Date();
+const toDate = (v) => {
+  if (!v) return "";
+  const m = moment(v);
+  return m.isValid() ? new Date(Date.UTC(m.year(), m.month(), m.date(), m.hours(), m.minutes())) : "";
+};
 
-  // ✅ ไม่ตรึง (freeze) แถว/คอลัมน์ใดๆ — เลื่อนดูได้อิสระทั้งแผ่นเหมือนตารางปกติ (แนวเดียวกับไฟล์ที่
-  // ส่งออกจากหน้า "ภาพรวมงาน" ซึ่งผู้ใช้ขอให้เอา freeze ออกไปแล้ว)
-  const ws = wb.addWorksheet("งานในปฏิทิน", {
-    pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
+/** ช่วงวันที่จริงของงาน — end ของงานทั้งวันเก็บแบบ exclusive (+1 วัน) ต้องลบคืน · งานที่มีเวลาไม่ต้อง */
+const rangeOf = (ev) => {
+  const start = moment(ev.start);
+  let end = ev.end ? moment(ev.end) : start.clone();
+  if (ev.allDay !== false && ev.end) end = end.clone().subtract(1, "days");
+  if (end.isBefore(start, "day")) end = start.clone();
+  return { start, end, days: Math.max(1, end.clone().startOf("day").diff(start.clone().startOf("day"), "days") + 1) };
+};
+const toSalesStatus = (s) => {
+  const v = String(s || "").trim();
+  if (SALES_STATUS_COLOR[v]) return v;
+  return { "กำลังรอยืนยัน": "นัดหมายแล้ว", "ยืนยันแล้ว": "นัดหมายแล้ว", "กำลังดำเนินการ": "นัดหมายแล้ว", "ดำเนินการเสร็จสิ้น": "ปิดงานแล้ว" }[v] || "นัดหมายแล้ว";
+};
+const personName = (u) => [u?.fname, u?.lname].filter(Boolean).join(" ");
+
+/** ── คอลัมน์ของแต่ละตาราง ── */
+const SERVICE_COLS = [
+  { key: "startDate", header: "วันที่เริ่ม", width: 12, group: "วันเวลา", align: "center", numFmt: DATE_FMT },
+  { key: "endDate", header: "วันที่สิ้นสุด", width: 12, group: "วันเวลา", align: "center", numFmt: DATE_FMT },
+  { key: "days", header: "จำนวนวัน", width: 9, group: "วันเวลา", align: "center" },
+  { key: "time", header: "เวลา", width: 13, group: "วันเวลา", align: "center" },
+  { key: "title", header: "ประเภทงาน", width: 14, group: "ข้อมูลงาน" },
+  { key: "site", header: "โครงการ / สถานที่", width: 28, group: "ข้อมูลงาน", wrap: true },
+  { key: "company", header: "บริษัท / ลูกค้า", width: 26, group: "ข้อมูลงาน", wrap: true },
+  { key: "system", header: "ระบบ", width: 14, group: "ข้อมูลงาน" },
+  { key: "jobClass", header: "หมวดงาน", width: 12, group: "ข้อมูลงาน", align: "center" },
+  { key: "contractNo", header: "เลขที่สัญญา", width: 16, group: "สัญญา" },
+  { key: "round", header: "ครั้งที่", width: 8, group: "สัญญา", align: "center" },
+  { key: "status", header: "สถานะงาน", width: 17, group: "สถานะ", align: "center" },
+  { key: "approval", header: "การอนุมัติ", width: 12, group: "สถานะ", align: "center" },
+  { key: "team", header: "หัวหน้าทีม", width: 16, group: "ผู้เกี่ยวข้อง" },
+  { key: "teamMembers", header: "ลูกทีม", width: 24, group: "ผู้เกี่ยวข้อง", wrap: true },
+  { key: "responsiblePerson", header: "ผู้รับผิดชอบ", width: 16, group: "ผู้เกี่ยวข้อง" },
+  { key: "contactName", header: "ผู้ติดต่อหน้างาน", width: 16, group: "ผู้ติดต่อ" },
+  { key: "contactTel", header: "เบอร์โทร", width: 14, group: "ผู้ติดต่อ" },
+  { key: "jobValue", header: "มูลค่างาน", width: 14, group: "มูลค่า", align: "right", numFmt: MONEY_FMT, sum: true },
+];
+const SALES_COLS = [
+  { key: "startDate", header: "วันที่นัด", width: 12, group: "วันเวลา", align: "center", numFmt: DATE_FMT },
+  { key: "endDate", header: "ถึงวันที่", width: 12, group: "วันเวลา", align: "center", numFmt: DATE_FMT },
+  { key: "time", header: "เวลา", width: 13, group: "วันเวลา", align: "center" },
+  { key: "title", header: "ประเภทนัด", width: 18, group: "นัดหมาย" },
+  { key: "site", header: "สถานที่ / โครงการ", width: 28, group: "นัดหมาย", wrap: true },
+  { key: "company", header: "ลูกค้า / บริษัท", width: 26, group: "นัดหมาย", wrap: true },
+  { key: "contactName", header: "ผู้ติดต่อ", width: 16, group: "ผู้ติดต่อ" },
+  { key: "contactTel", header: "เบอร์โทร", width: 14, group: "ผู้ติดต่อ" },
+  { key: "status", header: "สถานะนัด", width: 13, group: "ผลการนัด", align: "center" },
+  { key: "visitedAt", header: "เข้าพบเมื่อ", width: 16, group: "ผลการนัด", align: "center", numFmt: DT_FMT },
+  { key: "closedAt", header: "ปิดงานเมื่อ", width: 16, group: "ผลการนัด", align: "center", numFmt: DT_FMT },
+  { key: "photos", header: "รูปหน้างาน", width: 10, group: "ผลการนัด", align: "center" },
+  { key: "visitResult", header: "ผลการเข้าพบ", width: 36, group: "ผลการนัด", wrap: true },
+  { key: "owner", header: "ฝ่ายขาย", width: 18, group: "ผู้รับผิดชอบ" },
+  { key: "description", header: "รายละเอียด", width: 32, group: "ผู้รับผิดชอบ", wrap: true },
+  { key: "jobValue", header: "มูลค่าโอกาส", width: 14, group: "มูลค่า", align: "right", numFmt: MONEY_FMT, sum: true },
+];
+
+/** ค่าของแต่ละแถว */
+const serviceValues = (ev, { classifyJob, getApprovalState, formatRoundLabel }) => {
+  const { start, end, days } = rangeOf(ev);
+  const st = ev.extendedProps?.startTime || ev.startTime || "";
+  const et = ev.extendedProps?.endTime || ev.endTime || "";
+  const jobClass = classifyJob ? classifyJob(ev) : "";
+  const approval = APPROVAL_META[getApprovalState ? getApprovalState(ev) : "approved"] || APPROVAL_META.approved;
+  const members = [...new Set((ev.teamMembers || []).map((m) => m?.name).filter(Boolean).filter((n) => n !== ev.team))];
+  return {
+    values: {
+      startDate: toDate(start), endDate: toDate(end), days,
+      time: st ? `${st}${et ? ` – ${et}` : ""}` : "ทั้งวัน",
+      title: ev.title || "", site: ev.site || "", company: ev.company || "", system: ev.system || "",
+      jobClass: JOB_CLASS_LABEL[jobClass] || "",
+      contractNo: ev.contractNo || "",
+      round: ev.time ? String(formatRoundLabel ? formatRoundLabel(ev.time, ev.visitCount) : ev.time) : "",
+      status: ev.status || "", approval: approval.label,
+      team: ev.team || "", teamMembers: members.join(", "),
+      responsiblePerson: ev.responsiblePerson || "",
+      contactName: ev.contactName || "", contactTel: ev.contactTel ? String(ev.contactTel) : "",
+      jobValue: Number(ev.jobValue) > 0 ? Number(ev.jobValue) : "",
+    },
+    colors: {
+      status: TECH_STATUS_COLOR[ev.status], approval: approval.color, jobClass: JOB_CLASS_COLOR[jobClass],
+    },
+    groupKeys: { status: ev.status || "ไม่ระบุ", type: ev.title || "ไม่ระบุ", person: ev.team || ev.responsiblePerson || "ยังไม่มอบหมาย" },
+  };
+};
+const salesValues = (ev) => {
+  const { start, end } = rangeOf(ev);
+  const st = ev.extendedProps?.startTime || ev.startTime || "";
+  const et = ev.extendedProps?.endTime || ev.endTime || "";
+  const status = toSalesStatus(ev.status);
+  const owner = personName(ev.user);
+  return {
+    values: {
+      startDate: toDate(start), endDate: end.isSame(start, "day") ? "" : toDate(end),
+      time: st ? `${st}${et ? ` – ${et}` : ""}` : "ทั้งวัน",
+      title: ev.title || "", site: ev.site || "", company: ev.company || "",
+      contactName: ev.contactName || "", contactTel: ev.contactTel ? String(ev.contactTel) : "",
+      status, visitedAt: toDate(ev.visitedAt), closedAt: toDate(ev.salesClosedAt),
+      photos: (ev.sitePhotoFiles || []).length || "",
+      visitResult: ev.visitResult || "", owner, description: ev.description || "",
+      jobValue: Number(ev.jobValue) > 0 ? Number(ev.jobValue) : "",
+    },
+    colors: { status: SALES_STATUS_COLOR[status] },
+    groupKeys: { status, type: ev.title || "ไม่ระบุ", person: owner || "ไม่ระบุ" },
+  };
+};
+
+/** หัวรายงาน 2 บรรทัด + บรรทัดว่าง */
+function writeTitle(ws, lastCol, theme, title, subtitle) {
+  ws.mergeCells(1, 1, 1, lastCol);
+  const t = ws.getCell(1, 1);
+  t.value = title;
+  t.font = { name: FONT, size: 16, bold: true, color: { argb: theme.dark } };
+  t.alignment = { vertical: "middle" };
+  ws.getRow(1).height = 28;
+  ws.mergeCells(2, 1, 2, lastCol);
+  const s = ws.getCell(2, 1);
+  s.value = subtitle;
+  s.font = { name: FONT, size: 10, color: { argb: GREY.sub } };
+  s.alignment = { vertical: "middle", wrapText: true };
+  ws.getRow(2).height = 20;
+  ws.getRow(3).height = 6;
+}
+
+function headerCell(cell, text, bg) {
+  cell.value = text;
+  cell.font = { name: FONT, size: 10, bold: true, color: { argb: "FFFFFFFF" } };
+  cell.fill = fill(bg);
+  cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+  cell.border = border;
+}
+
+/** ชีตสรุป: ตารางนับตามกลุ่ม */
+function writeSummary(wb, theme, title, subtitle, rowsInfo, mode) {
+  const ws = wb.addWorksheet("สรุป", { pageSetup: { orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
+  ws.columns = [{ width: 32 }, { width: 12 }, { width: 16 }, { width: 4 }, { width: 32 }, { width: 12 }, { width: 16 }];
+  writeTitle(ws, 7, theme, `${title} — สรุป`, subtitle);
+
+  const total = rowsInfo.reduce((a, r) => a + (Number(r.values.jobValue) || 0), 0);
+  const kpi = [
+    ["จำนวนทั้งหมด", rowsInfo.length, ""],
+    [mode === "sales" ? "มูลค่าโอกาสรวม" : "มูลค่างานรวม", total, MONEY_FMT],
+  ];
+  let r = 4;
+  kpi.forEach(([label, val, fmt]) => {
+    const a = ws.getCell(r, 1); a.value = label; a.font = { name: FONT, size: 11, bold: true, color: { argb: GREY.ink } }; a.border = border; a.fill = fill(theme.zebra);
+    ws.mergeCells(r, 2, r, 3);
+    const b = ws.getCell(r, 2); b.value = val; b.font = { name: FONT, size: 12, bold: true, color: { argb: theme.dark } }; b.alignment = { horizontal: "right" }; b.border = border;
+    if (fmt) b.numFmt = fmt;
+    ws.getRow(r).height = 22;
+    r += 1;
   });
 
-  // ── นิยามคอลัมน์ (ลำดับ/ความกว้าง/การจัดวาง) ────────────────────────────
-  const cols = [
-    { key: "startDate", header: "วันที่เริ่ม", width: 13, group: "ช่วงวันที่", align: "center" },
-    { key: "endDate", header: "วันที่สิ้นสุด", width: 13, group: "ช่วงวันที่", align: "center" },
-    { key: "days", header: "จำนวนวัน", width: 10, group: "ช่วงวันที่", align: "center" },
-    { key: "startTime", header: "เวลาเริ่ม", width: 10, group: "ช่วงวันที่", align: "center" },
-    { key: "endTime", header: "เวลาสิ้นสุด", width: 10, group: "ช่วงวันที่", align: "center" },
-    { key: "company", header: "บริษัท", width: 26, group: "ข้อมูลงาน" },
-    { key: "site", header: "โครงการ / สถานที่", width: 26, group: "ข้อมูลงาน" },
-    { key: "title", header: "หัวข้องาน", width: 18, group: "ข้อมูลงาน" },
-    { key: "system", header: "ระบบ", width: 16, group: "ข้อมูลงาน" },
-    { key: "jobClass", header: "ประเภทงาน", width: 13, group: "ข้อมูลงาน", align: "center" },
-    { key: "jobValue", header: "มูลค่างาน (฿)", width: 15, group: "ข้อมูลงาน", align: "right", numFmt: MONEY_FMT },
-    { key: "contractNo", header: "เลขที่สัญญา", width: 18, group: "สัญญา" },
-    { key: "round", header: "ครั้งที่", width: 10, group: "สัญญา", align: "center" },
-    { key: "status", header: "สถานะงาน", width: 18, group: "สถานะ", align: "center" },
-    { key: "approval", header: "การอนุมัติ", width: 13, group: "สถานะ", align: "center" },
-    { key: "team", header: "หัวหน้าทีมเข้างาน", width: 20, group: "ผู้เกี่ยวข้อง" },
-    { key: "teamMembers", header: "ลูกทีม", width: 28, group: "ผู้เกี่ยวข้อง", wrap: true },
-    { key: "responsiblePerson", header: "ผู้รับผิดชอบงาน", width: 20, group: "ผู้เกี่ยวข้อง" },
-    // ✅ ผู้ติดต่อหน้างาน — คนของลูกค้าที่ต้องโทรหาเมื่อไปถึง (คนละฝั่งกับผู้รับผิดชอบซึ่งเป็นคนของเรา)
-    // ⚠️ เบอร์เก็บเป็นข้อความ ไม่ใช่ตัวเลข — เบอร์ที่ขึ้นต้นด้วย 0 จะโดน Excel ตัดศูนย์หน้าทิ้งทันที
-    // ถ้าถูกตีเป็นตัวเลข และ "081-234-5678" จะกลายเป็นสูตรลบ
-    { key: "contactName", header: "ผู้ติดต่อหน้างาน", width: 18, group: "ผู้เกี่ยวข้อง" },
-    { key: "contactTel", header: "เบอร์ผู้ติดต่อ", width: 16, group: "ผู้เกี่ยวข้อง" },
-  ];
+  const block = (col, startRow, heading, key, colorMap) => {
+    const counts = new Map();
+    rowsInfo.forEach((x) => {
+      const k = x.groupKeys[key];
+      const cur = counts.get(k) || { n: 0, v: 0 };
+      cur.n += 1; cur.v += Number(x.values.jobValue) || 0;
+      counts.set(k, cur);
+    });
+    headerCell(ws.getCell(startRow, col), heading, theme.dark);
+    headerCell(ws.getCell(startRow, col + 1), "จำนวน", theme.dark);
+    headerCell(ws.getCell(startRow, col + 2), "มูลค่า", theme.dark);
+    let rr = startRow + 1;
+    [...counts.entries()].sort((a, b) => b[1].n - a[1].n).forEach(([k, v], i) => {
+      const c1 = ws.getCell(rr, col); c1.value = k;
+      const c2 = ws.getCell(rr, col + 1); c2.value = v.n; c2.alignment = { horizontal: "center" };
+      const c3 = ws.getCell(rr, col + 2); c3.value = v.v || ""; c3.numFmt = MONEY_FMT; c3.alignment = { horizontal: "right" };
+      [c1, c2, c3].forEach((c) => { c.border = border; c.font = { name: FONT, size: 10 }; if (i % 2) c.fill = fill(theme.zebra); });
+      if (colorMap?.[k]) c1.font = { name: FONT, size: 10, bold: true, color: { argb: colorMap[k] } };
+      rr += 1;
+    });
+    return rr;
+  };
+  const top = r + 1;
+  const endA = block(1, top, mode === "sales" ? "สถานะนัด" : "สถานะงาน", "status", mode === "sales" ? SALES_STATUS_COLOR : TECH_STATUS_COLOR);
+  const endB = block(5, top, mode === "sales" ? "ประเภทนัด" : "ประเภทงาน", "type");
+  block(1, Math.max(endA, endB) + 1, mode === "sales" ? "ฝ่ายขาย" : "หัวหน้าทีม / ผู้รับผิดชอบ", "person");
+}
+
+/**
+ * สร้างและดาวน์โหลดไฟล์ Excel
+ * @param {object} p
+ * @param {Array}  p.rows   งานที่ผ่านตัวกรองแล้ว (โครงสร้างเดียวกับที่ปฏิทินใช้)
+ * @param {"service"|"sales"} [p.mode]
+ * @param {Object} p.meta   { fileName, title?, filterSummary, exportedAt, exportedBy? }
+ */
+export async function exportCalendarEventsToExcel({ rows, mode = "service", meta, classifyJob, getApprovalState, formatRoundLabel }) {
+  const theme = THEMES[mode] || THEMES.service;
+  const title = meta.title || theme.title;
+  const cols = mode === "sales" ? SALES_COLS : SERVICE_COLS;
+  const data = (rows || []).filter((ev) => !ev?.extendedProps?.isHoliday && !ev?.isHoliday);
+  const rowsInfo = data.map((ev) => (mode === "sales" ? salesValues(ev) : serviceValues(ev, { classifyJob, getApprovalState, formatRoundLabel })));
+
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "TidTam";
+  wb.created = new Date();
+
+  const ws = wb.addWorksheet(mode === "sales" ? "นัดหมาย" : "งาน", {
+    pageSetup: {
+      orientation: "landscape", paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0,
+      margins: { left: 0.3, right: 0.3, top: 0.4, bottom: 0.5, header: 0.2, footer: 0.25 },
+    },
+    headerFooter: { oddFooter: `&L${title}&Rหน้า &P / &N` },
+  });
   ws.columns = cols.map((c) => ({ key: c.key, width: c.width }));
   const lastCol = cols.length;
+  const subtitle = [
+    meta.filterSummary,
+    `รวม ${data.length} รายการ`,
+    `ส่งออก ${meta.exportedAt}${meta.exportedBy ? ` โดย ${meta.exportedBy}` : ""}`,
+  ].filter(Boolean).join("  ·  ");
+  writeTitle(ws, lastCol, theme, title, subtitle);
 
-  // ── แถว 1-3: หัวเรื่องรายงาน ─────────────────────────────────────────────
-  ws.mergeCells(1, 1, 1, lastCol);
-  const titleCell = ws.getCell(1, 1);
-  titleCell.value = "ตารางงาน (ปฏิทิน)";
-  titleCell.font = { name: "Tahoma", size: 16, bold: true, color: { argb: C.titleText } };
-  titleCell.alignment = { vertical: "middle", horizontal: "left" };
-  ws.getRow(1).height = 26;
-
-  ws.mergeCells(2, 1, 2, lastCol);
-  const subCell = ws.getCell(2, 1);
-  subCell.value = `${meta.filterSummary}  ·  รวม ${rows.length} รายการ  ·  ส่งออก ${meta.exportedAt}`;
-  subCell.font = { name: "Tahoma", size: 10, color: { argb: C.subtitleText } };
-  subCell.alignment = { vertical: "middle", horizontal: "left" };
-  ws.getRow(2).height = 18;
-  ws.getRow(3).height = 6; // เว้นบรรทัดหายใจก่อนเข้าตาราง
-
-  // ── แถว 4: หัวข้อกลุ่มคอลัมน์ (merge ตามกลุ่มที่ติดกัน) ──────────────────
+  // แถว 4: กลุ่มคอลัมน์ · แถว 5: หัวคอลัมน์
   const GROUP_ROW = 4;
   const HEADER_ROW = 5;
   let gStart = 1;
   for (let i = 0; i < cols.length; i += 1) {
-    const isLast = i === cols.length - 1;
-    const nextDiffers = isLast || cols[i + 1].group !== cols[i].group;
-    if (nextDiffers) {
+    if (i === cols.length - 1 || cols[i + 1].group !== cols[i].group) {
       const gEnd = i + 1;
       if (gEnd > gStart) ws.mergeCells(GROUP_ROW, gStart, GROUP_ROW, gEnd);
-      const cell = ws.getCell(GROUP_ROW, gStart);
-      cell.value = cols[i].group;
-      cell.font = { name: "Tahoma", size: 10, bold: true, color: { argb: C.headerText } };
-      cell.alignment = { vertical: "middle", horizontal: "center" };
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.groupBg } };
-      cell.border = thinBorder;
-      // เซลล์ที่เหลือในกลุ่มต้องมีพื้น/ขอบด้วย ไม่งั้นช่วงที่ merge จะดูขาดเป็นช่วงๆ
-      for (let k = gStart; k <= gEnd; k += 1) {
-        const c2 = ws.getCell(GROUP_ROW, k);
-        c2.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.groupBg } };
-        c2.border = thinBorder;
-      }
+      for (let k = gStart; k <= gEnd; k += 1) headerCell(ws.getCell(GROUP_ROW, k), k === gStart ? cols[i].group : null, theme.main);
       gStart = gEnd + 1;
     }
   }
   ws.getRow(GROUP_ROW).height = 20;
+  cols.forEach((c, idx) => headerCell(ws.getRow(HEADER_ROW).getCell(idx + 1), c.header, theme.dark));
+  ws.getRow(HEADER_ROW).height = 30;
+  ws.pageSetup.printTitlesRow = `${GROUP_ROW}:${HEADER_ROW}`;
 
-  // ── แถว 5: หัวคอลัมน์จริง ────────────────────────────────────────────────
-  const headerRow = ws.getRow(HEADER_ROW);
-  cols.forEach((c, idx) => {
-    const cell = headerRow.getCell(idx + 1);
-    cell.value = c.header;
-    cell.font = { name: "Tahoma", size: 10, bold: true, color: { argb: C.headerText } };
-    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.headerBg } };
-    cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
-    cell.border = thinBorder;
-  });
-  headerRow.height = 30;
-
-  // ── แถวข้อมูล ────────────────────────────────────────────────────────────
-  const JOB_CLASS_LABEL = { contract: "งานสัญญา", project: "งานโปรเจค", general: "งานทั่วไป" };
-
-  rows.forEach((ev, rIdx) => {
-    // ⚠️ end ของงาน allDay เก็บเป็นค่าแบบ exclusive (บวก +1 วันไว้แล้วตอนบันทึก) ต้องลบคืน 1 วันเสมอ
-    // ไม่งั้นงานวันเดียวปลายเดือน (เช่น 31 ม.ค.) จะกลายเป็น 31 ม.ค. – 1 ก.พ. = ข้ามเดือนทั้งที่ไม่ได้ข้าม
-    const start = moment(ev.start);
-    const rawEnd = ev.end ? moment(ev.end) : null;
-    const end = rawEnd ? rawEnd.clone().subtract(1, "days") : start.clone();
-    const days = Math.max(1, end.diff(start, "days") + 1);
-
-    const jobClass = classifyJob ? classifyJob(ev) : "";
-    const approvalState = getApprovalState ? getApprovalState(ev) : "approved";
-    const approvalMeta = APPROVAL_META[approvalState] || APPROVAL_META.approved;
-
-    const memberNames = [...new Set(
-      (ev.teamMembers || [])
-        .map((m) => m?.name)
-        .filter(Boolean)
-        .filter((name) => name !== ev.team)
-    )];
-
-    const values = {
-      // ⚠️ ส่งเป็น Date จริง ไม่ใช่ string — Excel จะเรียง/กรอง/คำนวณวันที่ได้จริง (CSV เดิมเป็นข้อความ
-      // ล้วน เรียงตามตัวอักษรเท่านั้น) รูปแบบการแสดงผลกำหนดผ่าน numFmt ด้านล่าง
-      startDate: start.isValid() ? start.toDate() : "",
-      endDate: end.isValid() ? end.toDate() : "",
-      days,
-      startTime: ev.extendedProps?.startTime || "",
-      endTime: ev.extendedProps?.endTime || "",
-      company: ev.company || "",
-      site: ev.site || "",
-      title: ev.title || "",
-      system: ev.system || "",
-      jobClass: JOB_CLASS_LABEL[jobClass] || "",
-      jobValue: ev.jobValue ?? "",
-      contractNo: ev.contractNo || "",
-      // ✅ ส่งเป็นข้อความล้วน ไม่ต้องเติม ' นำหน้าเหมือน CSV เดิมแล้ว — .xlsx เก็บชนิดข้อมูลจริงได้
-      // Excel จึงไม่แปลง "1/3" เป็นวันที่ให้เอง และไม่มีเครื่องหมาย ' ติดไปในไฟล์
-      round: ev.time ? String(formatRoundLabel ? formatRoundLabel(ev.time, ev.visitCount) : ev.time) : "",
-      status: ev.status || "",
-      approval: approvalMeta.label,
-      team: ev.team || "",
-      teamMembers: memberNames.join(", "),
-      responsiblePerson: ev.responsiblePerson || "— ยังไม่มอบหมาย —",
-      contactName: ev.contactName || "",
-      contactTel: ev.contactTel || "",
-    };
-
+  rowsInfo.forEach(({ values, colors }, rIdx) => {
     const row = ws.addRow(values);
-    const isZebra = rIdx % 2 === 1;
-    // ⚠️ ต้องคำนวณความสูงแถวเองตามจำนวนบรรทัดจริง — ExcelJS ที่กำหนด row.height ตายตัวจะล็อกความสูงไว้
-    // เท่านั้นเสมอ Excel จะไม่ขยายให้อัตโนมัติแม้เปิด wrapText ไว้ก็ตาม
-    const maxLines = Math.max(
-      1,
-      ...Object.values(values).map((v) => (typeof v === "string" ? v.split("\n").length : 1))
-    );
-    row.height = Math.max(22, maxLines * 14);
-
-    cols.forEach((colDef, idx) => {
+    // ความสูงตามบรรทัดจริงของช่องที่ห่อบรรทัด (ExcelJS ไม่ขยายให้เอง)
+    const lines = Math.max(1, ...cols.filter((c) => c.wrap).map((c) => {
+      const v = String(values[c.key] || "");
+      return v ? Math.ceil(v.length / Math.max(8, c.width * 1.1)) + (v.split("\n").length - 1) : 1;
+    }));
+    row.height = Math.max(22, Math.min(lines, 8) * 15);
+    cols.forEach((c, idx) => {
       const cell = row.getCell(idx + 1);
-      cell.font = { name: "Tahoma", size: 10 };
-      cell.border = thinBorder;
-      cell.alignment = {
-        vertical: colDef.wrap ? "top" : "middle",
-        horizontal: colDef.align || "left",
-        wrapText: Boolean(colDef.wrap),
-      };
-      if (isZebra) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.zebra } };
-      if (colDef.numFmt) cell.numFmt = colDef.numFmt;
-      if (colDef.key === "startDate" || colDef.key === "endDate") cell.numFmt = "dd/mm/yyyy";
-
-      // 🎨 ระบายสีตามความหมายของข้อมูล — จุดที่ CSV ทำไม่ได้เลย และเป็นเหตุผลหลักที่ต้องเปลี่ยนรูปแบบไฟล์
-      if (colDef.key === "status" && STATUS_COLOR[ev.status]) {
-        cell.font = { name: "Tahoma", size: 10, bold: true, color: { argb: STATUS_COLOR[ev.status] } };
-      }
-      if (colDef.key === "approval") {
-        cell.font = { name: "Tahoma", size: 10, bold: true, color: { argb: approvalMeta.color } };
-      }
-      if (colDef.key === "jobClass" && JOB_CLASS_COLOR[jobClass]) {
-        cell.font = { name: "Tahoma", size: 10, bold: true, color: { argb: JOB_CLASS_COLOR[jobClass] } };
-      }
-      if (colDef.key === "responsiblePerson" && !ev.responsiblePerson) {
-        cell.font = { name: "Tahoma", size: 10, italic: true, color: { argb: C.muted } };
+      cell.font = { name: FONT, size: 10, color: { argb: GREY.ink } };
+      cell.border = border;
+      cell.alignment = { vertical: c.wrap ? "top" : "middle", horizontal: c.align || "left", wrapText: Boolean(c.wrap) };
+      if (rIdx % 2 === 1) cell.fill = fill(theme.zebra);
+      if (c.numFmt) cell.numFmt = c.numFmt;
+      if (c.key === "contactTel") cell.numFmt = "@";
+      const color = colors[c.key];
+      if (color) cell.font = { name: FONT, size: 10, bold: true, color: { argb: color } };
+      if (c.key === "responsiblePerson" && !values.responsiblePerson) {
+        cell.value = "— ยังไม่มอบหมาย —";
+        cell.font = { name: FONT, size: 10, italic: true, color: { argb: GREY.muted } };
       }
     });
   });
 
-  // ✅ เปิดตัวกรอง (AutoFilter) ให้ที่หัวตาราง — ผู้ใช้กรอง/เรียงต่อเองได้ทันทีโดยไม่ต้องตั้งเอง
-  if (rows.length > 0) {
-    ws.autoFilter = { from: { row: HEADER_ROW, column: 1 }, to: { row: HEADER_ROW + rows.length, column: lastCol } };
-  }
+  if (data.length > 0) {
+    const firstData = HEADER_ROW + 1;
+    const lastData = HEADER_ROW + data.length;
+    ws.autoFilter = { from: { row: HEADER_ROW, column: 1 }, to: { row: lastData, column: lastCol } };
 
-  // ── แถวสรุปยอดรวมท้ายตาราง ───────────────────────────────────────────────
-  // ✅ ใช้สูตร SUBTOTAL จริง (ไม่ใช่ตัวเลขนิ่งที่คำนวณมาจาก JS) เพื่อให้ยอดอัปเดตตามเองถ้าผู้ใช้แก้ตัวเลข
-  // ต่อในไฟล์ หรือกรองด้วย AutoFilter แล้วดูเฉพาะบางแถว
-  if (rows.length > 0) {
-    const jobValueIdx = cols.findIndex((c) => c.key === "jobValue") + 1;
-    const firstDataRow = HEADER_ROW + 1;
-    const lastDataRow = HEADER_ROW + rows.length;
-    const totalRow = ws.getRow(lastDataRow + 1);
-    const filled = rows.filter((r) => r.jobValue !== null && r.jobValue !== undefined && r.jobValue !== "" && !Number.isNaN(Number(r.jobValue))).length;
-    const missing = rows.length - filled;
-
-    if (jobValueIdx > 1) ws.mergeCells(lastDataRow + 1, 1, lastDataRow + 1, jobValueIdx - 1);
-    const labelCell = totalRow.getCell(1);
-    labelCell.value = missing > 0
-      ? `รวมมูลค่างานทั้งหมด (${filled}/${rows.length} รายการที่ระบุมูลค่าแล้ว · อีก ${missing} รายการยังไม่ได้กรอก)`
-      : `รวมมูลค่างานทั้งหมด (${rows.length} รายการ)`;
-    labelCell.font = { name: "Tahoma", size: 10, bold: true, color: { argb: C.headerText } };
-    labelCell.alignment = { vertical: "middle", horizontal: "right" };
-
-    const colLetter = ws.getColumn(jobValueIdx).letter;
-    const sumCell = totalRow.getCell(jobValueIdx);
-    sumCell.value = { formula: `SUBTOTAL(109,${colLetter}${firstDataRow}:${colLetter}${lastDataRow})` };
-    sumCell.numFmt = MONEY_FMT;
-    sumCell.font = { name: "Tahoma", size: 11, bold: true, color: { argb: C.headerText } };
-    sumCell.alignment = { vertical: "middle", horizontal: "right" };
-
+    // แถวรวมท้ายตาราง — สูตร SUBTOTAL (เปลี่ยนตามการกรองใน Excel)
+    const sumIdx = cols.findIndex((c) => c.sum) + 1;
+    const totalRow = ws.getRow(lastData + 1);
+    const filled = rowsInfo.filter((x) => x.values.jobValue !== "").length;
+    if (sumIdx > 1) ws.mergeCells(lastData + 1, 1, lastData + 1, sumIdx - 1);
+    const label = totalRow.getCell(1);
+    label.value = `รวม${mode === "sales" ? "มูลค่าโอกาส" : "มูลค่างาน"} (${filled}/${data.length} รายการที่ระบุมูลค่า)`;
+    label.font = { name: FONT, size: 10, bold: true, color: { argb: "FFFFFFFF" } };
+    label.alignment = { vertical: "middle", horizontal: "right" };
+    if (sumIdx > 0) {
+      const L = ws.getColumn(sumIdx).letter;
+      const c = totalRow.getCell(sumIdx);
+      c.value = { formula: `SUBTOTAL(109,${L}${firstData}:${L}${lastData})` };
+      c.numFmt = MONEY_FMT;
+      c.font = { name: FONT, size: 11, bold: true, color: { argb: "FFFFFFFF" } };
+      c.alignment = { vertical: "middle", horizontal: "right" };
+    }
     for (let k = 1; k <= lastCol; k += 1) {
-      const cell = totalRow.getCell(k);
-      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.headerBg } };
-      cell.border = thinBorder;
+      const c = totalRow.getCell(k);
+      c.fill = fill(theme.dark);
+      c.border = border;
     }
     totalRow.height = 24;
+  } else {
+    ws.mergeCells(HEADER_ROW + 1, 1, HEADER_ROW + 1, lastCol);
+    const c = ws.getCell(HEADER_ROW + 1, 1);
+    c.value = "ไม่มีรายการตามตัวกรองที่เลือก";
+    c.font = { name: FONT, size: 10, italic: true, color: { argb: GREY.muted } };
+    c.alignment = { horizontal: "center" };
   }
 
+  writeSummary(wb, theme, title, subtitle, rowsInfo, mode);
+
   const buf = await wb.xlsx.writeBuffer();
-  saveAs(
-    new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
-    meta.fileName
-  );
+  saveAs(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), meta.fileName);
 }

@@ -412,15 +412,15 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
               <Section icon={<FlagOutlined />} title="ผลการเข้าพบ"
                 hint={status === "เข้าพบแล้ว" ? "สรุปสิ่งที่คุยกับลูกค้า ความต้องการ และขั้นตอนต่อไป — จำเป็นก่อนปิดงาน" : null}>
                 {locked || !canAct ? (
-                  <Box sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}`, fontSize: "0.86rem", color: INK_2, whiteSpace: "pre-wrap" }}>
+                  <Box sx={{ p: 1.75, minHeight: 150, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${LINE}`, fontSize: "0.92rem", lineHeight: 1.7, color: INK_2, whiteSpace: "pre-wrap" }}>
                     {result || <Box component="span" sx={{ color: FAINT }}>ยังไม่มีสรุปผล</Box>}
                   </Box>
                 ) : (
                   <>
                     <TextField
                       value={result} onChange={(e) => { setResult(e.target.value); setResultDirty(true); }}
-                      multiline minRows={4} fullWidth placeholder="เช่น ลูกค้าสนใจระบบ Fire Alarm 3 อาคาร · ขอใบเสนอราคาภายในศุกร์นี้"
-                      sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: 2.5, fontSize: "0.88rem" } }}
+                      multiline minRows={6} maxRows={16} fullWidth placeholder="เช่น ลูกค้าสนใจระบบ Fire Alarm 3 อาคาร · ขอใบเสนอราคาภายในศุกร์นี้"
+                      sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: 2.5, fontSize: "0.92rem", lineHeight: 1.7, alignItems: "flex-start" } }}
                     />
                     {resultDirty && (
                       <Stack direction="row" justifyContent="flex-end" sx={{ mt: 0.75 }}>

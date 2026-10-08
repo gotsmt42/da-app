@@ -1780,22 +1780,27 @@ function EventCalendar() {
       // ✅ บอกในไฟล์ด้วยว่ายอดนี้มาจากการกรองแบบไหน — กันเปิดไฟล์ย้อนหลังแล้วเข้าใจผิดว่าเป็นงานทั้งระบบ
       const filterParts = [];
       if (searchTerm.trim()) filterParts.push(`ค้นหา "${searchTerm.trim()}"`);
-      if (selectedJobType) filterParts.push(`ประเภทงาน ${selectedJobType}`);
-      if (selectedSystem) filterParts.push(`ระบบ ${selectedSystem}`);
+      if (selectedJobType) filterParts.push(`${isSalesView ? "ประเภทนัด" : "ประเภทงาน"} ${selectedJobType}`);
+      if (!isSalesView && selectedSystem) filterParts.push(`ระบบ ${selectedSystem}`);
       if (selectedStatus) filterParts.push(`สถานะ ${selectedStatus}`);
-      if (selectedApproval) filterParts.push(`การอนุมัติ ${selectedApproval}`);
+      if (!isSalesView && selectedApproval) filterParts.push(`การอนุมัติ ${selectedApproval === "pending" ? "รออนุมัติ" : "ไม่อนุมัติ"}`);
       if (selectedTechnician) {
-        const techName = technicianOptions.find((t) => t._id === selectedTechnician)?.fname;
-        if (techName) filterParts.push(`ช่าง ${techName}`);
+        const p = (isSalesView ? salespersonOptions : technicianOptions).find((t) => String(t._id) === String(selectedTechnician));
+        const name = p ? [p.fname, p.lname].filter(Boolean).join(" ") || p.username : "";
+        if (name) filterParts.push(`${isSalesView ? "ฝ่ายขาย" : "ช่าง"} ${name}`);
       }
+      const mode = isSalesView ? "sales" : "service";
 
       await exportCalendarEventsToExcel({
+        mode,
         // ✅ เรียงตามวันที่เริ่มเหมือนที่ตาเห็นบนปฏิทิน ไม่ใช่ลำดับดิบที่ดึงมาจากฐานข้อมูล
         rows: [...filteredCalendarEvents].sort((a, b) => new Date(a.start) - new Date(b.start)),
         meta: {
-          fileName: `ตารางงาน-${moment().format("YYYYMMDD")}.xlsx`,
-          filterSummary: filterParts.length > 0 ? `ตัวกรอง: ${filterParts.join(" · ")}` : "ไม่ได้กรองเพิ่มเติม",
+          title: isSalesView ? (viewingSalesCalendar ? "ตารางนัดหมายฝ่ายขาย" : "นัดหมายของฉัน") : "ตารางงานช่าง",
+          fileName: `${isSalesView ? "นัดหมายฝ่ายขาย" : "ตารางงานช่าง"}-${moment().format("YYYYMMDD-HHmm")}.xlsx`,
+          filterSummary: filterParts.length > 0 ? `ตัวกรอง: ${filterParts.join(" · ")}` : "ทุกรายการ (ไม่ได้กรอง)",
           exportedAt: formatThai(moment(), "DD/MM/YYYY HH:mm"),
+          exportedBy: [userData?.fname, userData?.lname].filter(Boolean).join(" "),
         },
         // ✅ ส่งฟังก์ชันที่หน้าจอใช้อยู่เข้าไปด้วย เพื่อให้ข้อมูลในไฟล์ตรงกับที่เห็นบนจอเป๊ะๆ เสมอ
         classifyJob,
@@ -3588,7 +3593,8 @@ function EventCalendar() {
                 : "";
               const meta = [
                 timePart ? `<div class="ec-sc-meta">${timePart}</div>` : "",
-                SHORT[st] ? `<div class="ec-sc-meta ec-sc-status">${SHORT[st]}</div>` : "",
+                // ✅ (8 ต.ค. 2569 "สถานะควรเด่นจากเนื้องาน") ป้ายทรงแคปซูลสีของสถานะ + ขอบขาว — คนละแบบกับป้ายประเภท (พื้นขาว)
+                SHORT[st] ? `<span class="ec-sc-status" style="background:${(SALES_STATUSES.find((x) => x.key === st) || {}).color || "#475569"}">${SHORT[st]}</span>` : "",
               ].join("");
               return {
                 html: `
