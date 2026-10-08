@@ -38,7 +38,7 @@
  * เอกสารอยู่แล้วไม่ว่าจะอยู่ตรงไหน ผลลัพธ์เหมือนกันแต่โค้ดสั้นกว่า
  */
 import {
-  SALES_APPOINTMENT_TYPES, salesEventColors, SALES_STATUSES, SALES_STATUS_DEFAULT,
+  SALES_APPOINTMENT_TYPES, salesEventColors, SALES_MANUAL_STATUSES, SALES_STATUS_DEFAULT,
 } from "../../salesAppointmentTypes";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 
@@ -79,7 +79,7 @@ export const getAddSalesAppointment = async ({
 
   // ✅ สถานะนัดหมายเป็นชุดของฝ่ายขายเอง (ดู SALES_STATUSES) ไม่ใช่สถานะงานช่าง
   const currentStatus = SALES_STATUS_DEFAULT;
-  const statusChips = SALES_STATUSES.map(
+  const statusChips = SALES_MANUAL_STATUSES.map(
     (st) => `
     <label class="sa-stat" data-color="${st.color}">
       <input type="radio" name="saStatus" value="${esc(st.key)}" ${st.key === currentStatus ? "checked" : ""} />
@@ -99,7 +99,7 @@ export const getAddSalesAppointment = async ({
       width: min(96vw, 720px) !important; max-height: 92vh !important;
       display: flex !important; flex-direction: column !important;
       font-family: 'Inter', system-ui, sans-serif !important;
-      box-shadow: 0 25px 60px rgba(88,28,135,.28) !important;
+      box-shadow: 0 25px 60px rgba(15,23,42,.22) !important;
     }
     .swal-sales-appt .swal2-html-container {
       margin: 0 !important; padding: 0 !important; overflow: hidden !important;
@@ -150,7 +150,7 @@ export const getAddSalesAppointment = async ({
       width: 100%; padding: 9px 11px; border: 1.5px solid #e2e8f0; border-radius: 10px;
       font-size: 14px; font-family: inherit; box-sizing: border-box; }
     .sa-wrap textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
-    .sa-wrap input:focus, .sa-wrap textarea:focus { outline: none; border-color: #8b5cf6; }
+    .sa-wrap input:focus, .sa-wrap textarea:focus { outline: none; border-color: #2563eb; }
     .sa-req { color: #dc2626; }
     @media (max-width: 560px) { .sa-row { grid-template-columns: 1fr; } }
 
@@ -182,7 +182,7 @@ export const getAddSalesAppointment = async ({
     .sa-btn:hover { opacity: .88; transform: translateY(-1px); }
     .sa-btn:active { transform: translateY(0); }
     .sa-btn:disabled { opacity: .6 !important; cursor: not-allowed; transform: none !important; }
-    .sa-btn-primary { background: #8b5cf6; color: #fff; }
+    .sa-btn-primary { background: #2563eb; color: #fff; }
     .sa-btn-ghost { background: #e2e8f0; color: #475569; }
     .sa-btn-spacer { flex: 1; }
     @media (max-width: 480px) { .sa-btn-spacer { display: none; } #sa-action-bar { justify-content: center; } }

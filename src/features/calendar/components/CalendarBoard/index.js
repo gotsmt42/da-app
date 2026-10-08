@@ -77,10 +77,11 @@ import "tom-select/dist/css/tom-select.css";
 import { getAddEvent } from "../EventForms/AddEvent";
 import { getAddSalesAppointment } from "../EventForms/AddSalesAppointment";
 import { getEditSalesAppointment } from "../EventForms/EditSalesAppointment";
-import { SALES_APPOINTMENT_TYPES, SALES_STATUSES, toSalesStatus } from "../../salesAppointmentTypes";
+import { SALES_APPOINTMENT_TYPES, SALES_STATUSES, toSalesStatus, salesEventColors, salesStatusMeta } from "../../salesAppointmentTypes";
 import { getEditEvent } from "../EventForms/EditEvent";
 import DeliveryNoteDialog from "@/features/documents/components/DeliveryNoteDialog";
 import WorkNoticeDialog from "@/features/documents/components/WorkNoticeDialog";
+import SalesAppointmentDialog from "../SalesAppointmentDialog";
 import { getSaveEventToDB } from "../EventForms/SaveEvent";
 import { getEventDrop } from "../EventForms/EventDrop";
 import { getEventResize } from "../EventForms/EventResize";
@@ -517,6 +518,8 @@ function EventCalendar() {
   // ⚠️ deps มี viewingDept — สลับเมนู "ตารางงานช่าง" ↔ "ตารางงานเซล" เปลี่ยนแค่ query param
   // โดยไม่ remount หน้า ถ้าไม่ใส่ deps ปฏิทินจะค้างข้อมูลของแผนกเดิมจนกว่าจะรีเฟรช
   useEffect(() => {
+    // ✅ สลับแผนก = ล้างงานของแผนกเดิมออกทันที ไม่ให้ค้างโชว์ระหว่างรอข้อมูลใหม่
+    setEvents([]);
     // ✅ รอผลโหลดครั้งแรกก่อนค่อยเปิดตารางให้เห็น (ดู firstEventsLoaded) — กันจอกระตุกตอนเปิดหน้า
     fetchEventsFromDB().finally(() => {
       setFirstEventsLoaded(true);
@@ -982,15 +985,28 @@ function EventCalendar() {
     }
   };
 
+  /**
+   * 🐛 ที่แก้ (7 ต.ค. 2569 ผู้ใช้: "หน้าตารางเซลทำงานเพี้ยนๆ เด้งข้อมูลฝ่ายช่างมาเอง")
+   *    สลับเมนู "ตารางงานช่าง" → "ตารางงานเซล" ไม่ได้ remount หน้า แต่ตัวรีเฟรชเงียบทุก 30 วิ (setInterval
+   *    deps []) และช่องเรียลไทม์ยังถือฟังก์ชันจากรอบแรกที่ dept = ช่าง → ผ่านไปไม่กี่วินาทีโหลดงานช่างมาทับ
+   *    ปฏิทินเซล · อีกกรณี: กดสลับเร็วๆ คำขอเก่าตอบกลับทีหลังแล้วเขียนทับของใหม่
+   * ✅ อ่านแผนกจาก ref (ค่าปัจจุบันเสมอ) + ทิ้งผลลัพธ์ที่ไม่ใช่ของแผนกที่กำลังดูอยู่ตอนตอบกลับ
+   */
+  const noDraftsRef = useRef(false);
+  noDraftsRef.current = isSalesView || isServiceObserver;
+  const viewingDeptRef = useRef(viewingDept);
+  viewingDeptRef.current = viewingDept;
   const fetchEventsFromDB = async (silent = false) => {
+    const dept = viewingDeptRef.current;
+    const stillCurrent = () => viewingDeptRef.current === dept;
     await getFetchEvents({
       defaultFontSize,
-      setEvents,
-      setLoading,
+      setEvents: (list) => { if (stillCurrent()) setEvents(list); },
+      setLoading: (v) => { if (stillCurrent() || !v) setLoading(v); },
       EventService,
       fetchThaiHolidaysFromAPI,
       silent,
-      dept: viewingDept,
+      dept,
     });
   };
 
@@ -1007,11 +1023,13 @@ function EventCalendar() {
     // ⚠️ เซลที่เปิดดูตารางช่างก็ไม่ต้องดึงเหมือนกัน — GET /drafts ยังกรองตามแผนกของผู้ขอ
     // ถ้าดึงมาจะได้ "แผนล่วงหน้าของฝ่ายขาย" มาโผล่ในตารางช่าง ซึ่งผิดแผนกชัดๆ
     // ✅ อีกทั้งแผนงานล่วงหน้ายังไม่มีวันที่ จึงไม่ช่วยตอบคำถามเดียวที่เซลเปิดมาดู: "ช่างว่างวันไหน"
-    if (isSalesView || isServiceObserver) { setDrafts([]); setShowDraftsPanel(false); return; }
+    // ⚠️ อ่านจาก ref — ตัวรีเฟรชทุก 30 วิถือฟังก์ชันรอบแรกไว้ (ดู fetchEventsFromDB)
+    if (noDraftsRef.current) { setDrafts([]); setShowDraftsPanel(false); return; }
     if (!silent) setDraftsLoading(true);
     try {
       const res = await EventService.GetDraftEvents();
       const list = Array.isArray(res?.drafts) ? res.drafts : [];
+      if (noDraftsRef.current) return; // ระหว่างรอ ผู้ใช้สลับไปตารางเซลแล้ว
       setDrafts(list);
       // ✅ เปิดแผงงานล่วงหน้าอัตโนมัติแค่ครั้งแรกสุดที่โหลดสำเร็จ ถ้ามีงานอยู่จริง — หลังจากนั้น
       // ผู้ใช้เปิด/ปิดเองได้ตามปกติโดยไม่ถูก auto เปิดทับซ้ำอีกตอน refresh รอบถัดๆ ไป
@@ -1106,16 +1124,27 @@ function EventCalendar() {
     });
   };
 
+  const [salesDialogId, setSalesDialogId] = useState(null);
+  /** ฟอร์มแก้ไขข้อมูลนัด (วัน/เวลา/สถานที่/ประเภท) — เปิดจากหน้ารายละเอียดนัด */
+  const openSalesEditForm = async (ev) => {
+    setSalesDialogId(null);
+    await getEditSalesAppointment({
+      eventInfo: { event: { id: ev._id, start: ev.start, end: ev.end, allDay: ev.allDay, extendedProps: {} } },
+      events, EventService, fetchEventsFromDB, handleDeleteEvent, Swal, moment,
+    });
+  };
+
   const handleEditEvent = async (eventInfo) => {
     // ✅ เซลได้ฟอร์มแก้ไข "นัดหมาย" คู่แฝดของฟอร์มเพิ่ม ไม่ใช่ฟอร์มงานของช่าง
     // ⚠️ ฟอร์มของช่างมีแผงสัญญา/เอกสาร 4 ชนิด/ทีมเข้างาน/คำขอปิดงาน ซึ่งไม่มีอะไรเกี่ยวกับนัดของเซล
     const src = events.find((e) => String(e._id) === String(eventInfo?.event?.id));
     // ⚠️ เซลที่เปิดดูตารางช่างอยู่ ต้องได้ฟอร์มของงานช่าง (แบบอ่านอย่างเดียว) ไม่ใช่ฟอร์มนัดหมาย
     // — งานที่กดเปิดเป็นงานของช่าง ไม่ใช่นัดของตัวเอง
+    // ✅ (7 ต.ค. 2569) กดนัดของเซล = เปิดหน้ารายละเอียดนัด (ขั้นตอน นัดหมาย → เข้าพบ → ปิดงาน + รูปหน้างาน)
+    //    ฟอร์มแก้ไขเดิมเปิดจากปุ่ม "แก้ไข" ในหน้านั้นแทน (ดู openSalesEditForm)
     if ((isSaleUser && !isServiceObserver) || isSalesEvent(src) || isSalesEvent(eventInfo?.event)) {
-      await getEditSalesAppointment({
-        eventInfo, events, EventService, fetchEventsFromDB, handleDeleteEvent, Swal, moment,
-      });
+      const id = eventInfo?.event?.id;
+      if (id) setSalesDialogId(String(id));
       return;
     }
     await getEditEvent({
@@ -1957,6 +1986,15 @@ function EventCalendar() {
       const matchesApproval = isSalesView || !selectedApproval || getApprovalState(event) === selectedApproval;
 
       return matchesKeyword && matchesTechnician && matchesStatus && matchesJobType && matchesSystem && matchesApproval;
+    }).map((event) => {
+      // ✅ (7 ต.ค. 2569) สีนัดเซลคิดจาก "ประเภทนัด" ตอนแสดงผลเสมอ — นัดเก่าที่บันทึกสีม่วงไว้ก็เปลี่ยนตามชุดสีใหม่
+      //    ยกเลิกนัด = สีเทา (ยังเห็นว่ามีนัด แต่ไม่แย่งสายตา)
+      if (!isSalesEvent(event)) return event;
+      const st = toSalesStatus(event.status);
+      const { backgroundColor, textColor } = st === "ยกเลิกนัด"
+        ? { backgroundColor: "#94a3b8", textColor: "#ffffff" }
+        : salesEventColors(event.title);
+      return { ...event, backgroundColor, borderColor: backgroundColor, textColor };
     });
   }, [events, searchTerm, employeeList, selectedTechnician, selectedStatus, selectedJobType, selectedSystem, selectedApproval, technicianOptions, isSalesView]);
 
@@ -3607,7 +3645,20 @@ function EventCalendar() {
               ? `<span class="ec-card-team" style="${badgeChipStyle}" title="ทีมที่เข้างาน: ${escapeHtml(allTeamNames.join(", "))}"><span class="ec-card-team-ico" aria-hidden="true">👷</span>${escapeHtml(allTeamNames.join(", "))}</span>`
               : "";
 
+            // ✅ นัดเซล: แถว "เซล" (เจ้าของนัด) + จำนวนรูปหน้างาน + ป้ายสถานะนัด
+            const isSalesCard = extendedProps.department === "sales";
+            const salesOwner = isSalesCard ? [extendedProps.user?.fname, extendedProps.user?.lname].filter(Boolean).join(" ") : "";
+            const salesPhotoCount = isSalesCard ? (extendedProps.sitePhotoFiles || []).length : 0;
+            const salesOwnerDisplay = salesOwner ? detailRow("เซล", escapeHtml(salesOwner), "👤") : "";
+            const salesPhotoDisplay = salesPhotoCount ? detailRow("รูปหน้างาน", `${salesPhotoCount} รูป`, "📷") : "";
+            const sMeta = isSalesCard ? salesStatusMeta(status) : null;
+            const salesPillHtml = sMeta
+              ? `<div class="ec-sales-pill" title="${escapeHtml(sMeta.hint)}"><span class="ec-sales-dot" style="background:${sMeta.color}"></span>${escapeHtml(toSalesStatus(status))}${salesPhotoCount ? ` · 📷 ${salesPhotoCount}` : ""}</div>`
+              : "";
+
             const detailRows = [
+              [salesOwnerDisplay, ""],
+              [salesPhotoDisplay, ""],
               [systemDisplay, ""],
               [timeDisplay, ""],
               [teamDisplay, " ec-card-row--team"],
@@ -3663,6 +3714,7 @@ function EventCalendar() {
                     <div class="ec-card-title" title="${escapeHtml(title)}"><span class="ec-card-deco">[ </span><span class="ec-card-type" style="${typeChipStyle}">${escapeHtml(title)}</span><span class="ec-card-deco"> ]</span></div>
                   </div>
                   ${approvalPillHtml}
+                  ${salesPillHtml}
                   ${siteDisplay ? `<div class="ec-card-site">${siteDisplay}</div>` : ""}
                   ${hasDetail ? `
                   <div class="ec-card-detail">
@@ -4196,6 +4248,19 @@ function EventCalendar() {
           open
           onClose={() => setDeliveryNoteJob(null)}
           job={deliveryNoteJob}
+        />
+      )}
+
+      {/* ✅ หน้ารายละเอียดนัดหมายฝ่ายขาย — ขั้นตอน + รูปหน้างาน (ดู SalesAppointmentDialog) */}
+      {salesDialogId && (
+        <SalesAppointmentDialog
+          eventId={salesDialogId}
+          userData={userData}
+          isAdminOrManager={isAdminOrManager}
+          onClose={() => setSalesDialogId(null)}
+          onChanged={() => fetchEventsFromDB(true)}
+          onEdit={openSalesEditForm}
+          onDelete={(ev) => { setSalesDialogId(null); handleDeleteEvent(String(ev._id)); }}
         />
       )}
 

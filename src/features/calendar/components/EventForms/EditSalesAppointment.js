@@ -29,7 +29,7 @@
  * เนื้อฟอร์มตรงกลางที่เลื่อนได้ — ต้องเป็นคู่แฝดกับ AddSalesAppointment.js ในเรื่องนี้ด้วยเช่นกัน
  */
 import {
-  SALES_APPOINTMENT_TYPES, SALES_TYPE_META, salesEventColors, SALES_STATUSES, SALES_STATUS_DEFAULT, toSalesStatus,
+  SALES_APPOINTMENT_TYPES, SALES_TYPE_META, salesEventColors, SALES_MANUAL_STATUSES, SALES_STATUS_DEFAULT, SALES_PHOTO_REQUIRED, toSalesStatus,
 } from "../../salesAppointmentTypes";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 
@@ -96,13 +96,17 @@ export const getEditSalesAppointment = async ({
 
   // ✅ สถานะนัดหมายเป็นชุดของฝ่ายขายเอง (ดู SALES_STATUSES) ไม่ใช่สถานะงานช่าง
   const currentStatus = toSalesStatus(pick("status"));
-  const statusChips = SALES_STATUSES.map(
+  // ✅ เลือกได้เฉพาะสถานะที่ไม่ต้องใช้รูปหน้างาน — "เข้าพบแล้ว/ปิดงานแล้ว" กดจากหน้ารายละเอียดนัด
+  const lockedStatus = SALES_PHOTO_REQUIRED.includes(currentStatus);
+  const statusChips = lockedStatus
+    ? `<div style="font-size:12.5px;color:#475569;background:#f1f5f9;border-radius:10px;padding:9px 12px;">สถานะปัจจุบัน: <b>${esc(currentStatus)}</b> — เปลี่ยนได้จากหน้ารายละเอียดนัด</div>`
+    : SALES_MANUAL_STATUSES.map(
     (st) => `
     <label class="sa-stat" data-color="${st.color}">
       <input type="radio" name="saStatus" value="${esc(st.key)}" ${st.key === currentStatus ? "checked" : ""} />
       <span>${st.icon} ${esc(st.key)}</span>
     </label>`
-  ).join("");
+    ).join("");
 
   // ✅ หัวกล่องไล่สีตามประเภทนัดปัจจุบัน — อิงค่า ณ ตอนเปิดกล่อง ไม่ reactive ตามที่ผู้ใช้แก้ไข
   // สดๆ (เทียบ pattern เดียวกับ EditEvent.js ที่หัวกล่องอิงสถานะตอนเปิด ไม่ใช่ตอนกำลังแก้)
@@ -120,7 +124,7 @@ export const getEditSalesAppointment = async ({
       width: min(96vw, 720px) !important; max-height: 92vh !important;
       display: flex !important; flex-direction: column !important;
       font-family: 'Inter', system-ui, sans-serif !important;
-      box-shadow: 0 25px 60px rgba(88,28,135,.28) !important;
+      box-shadow: 0 25px 60px rgba(15,23,42,.22) !important;
     }
     .swal-sales-appt .swal2-html-container {
       margin: 0 !important; padding: 0 !important; overflow: hidden !important;
@@ -174,7 +178,7 @@ export const getEditSalesAppointment = async ({
       width: 100%; padding: 9px 11px; border: 1.5px solid #e2e8f0; border-radius: 10px;
       font-size: 14px; font-family: inherit; box-sizing: border-box; }
     .sa-wrap textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
-    .sa-wrap input:focus, .sa-wrap textarea:focus { outline: none; border-color: #8b5cf6; }
+    .sa-wrap input:focus, .sa-wrap textarea:focus { outline: none; border-color: #2563eb; }
     .sa-req { color: #dc2626; }
     @media (max-width: 560px) { .sa-row { grid-template-columns: 1fr; } }
 
@@ -218,7 +222,7 @@ export const getEditSalesAppointment = async ({
     .sa-btn:hover { opacity: .88; transform: translateY(-1px); }
     .sa-btn:active { transform: translateY(0); }
     .sa-btn:disabled { opacity: .6 !important; cursor: not-allowed; transform: none !important; }
-    .sa-btn-primary { background: #8b5cf6; color: #fff; }
+    .sa-btn-primary { background: #2563eb; color: #fff; }
     .sa-btn-ghost { background: #e2e8f0; color: #475569; }
     .sa-btn-danger { background: #fef2f2; color: #dc2626; border: 1.5px solid #fecaca; }
     .sa-btn-danger:hover { background: #fee2e2; opacity: 1; }
@@ -447,7 +451,7 @@ export const getEditSalesAppointment = async ({
         const startTime = normalizeTimeInput(document.getElementById("saStart").value);
         const endTime = normalizeTimeInput(document.getElementById("saEnd").value);
         const detail = document.getElementById("saDetail").value.trim();
-        const status = document.querySelector('input[name="saStatus"]:checked')?.value || SALES_STATUS_DEFAULT;
+        const status = lockedStatus ? currentStatus : (document.querySelector('input[name="saStatus"]:checked')?.value || SALES_STATUS_DEFAULT);
 
         // ⚠️ บังคับ "ชื่อโครงการ" ไม่ใช่ "บริษัท" — ตรงกับ EditEvent.js ของช่าง
         if (!site) { Swal.showValidationMessage("กรุณาระบุสถานที่ / ชื่อโครงการ"); return; }

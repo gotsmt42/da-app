@@ -266,6 +266,11 @@ const EventService = {
     }
   },
 
+  /** ขั้นตอนนัดหมายฝ่ายขาย — { status?, visitResult? } (server ตรวจรูปหน้างาน/ผลการเข้าพบ) */
+  async SalesStatus(id, body) {
+    return (await API.put(`/events/${id}/sales-status`, body)).data;
+  },
+
   async DeleteFile(id, type, fileId) {
     try {
       const response = await API.put(`/events/delete-file/${id}`, { type, fileId });
