@@ -1843,25 +1843,39 @@ export const getEditEvent = async ({
         : formatThai(eventStart, "dddd D MMMM YYYY"))
       : "-";
     const timeText = eventStartTime ? ` · ${escapeHtml(eventStartTime)}${eventEndTime ? `–${escapeHtml(eventEndTime)}` : ""} น.` : " · ทั้งวัน";
-    const teamNames = [eventTeam, ...eventTeamMembers.map((m) => m?.name)].filter(Boolean).filter((n, i, a) => a.indexOf(n) === i);
-    const teamHtml = teamNames.length
-      ? teamNames.map((n) => {
-        const emp = employeeList.find((e) => e.fname === n);
-        return `<span class="ee-sum-person">${personAvatarHtml(n, emp?.imageUrl, 20)}${escapeHtml(n)}${n === eventTeam ? '<em>หัวหน้าทีม</em>' : ""}</span>`;
-      }).join("")
-      : '<span class="ee-sum-muted">ยังไม่ระบุทีม</span>';
+    // ✅ (8 ต.ค. 2569 "ใช้คำให้ถูก โครงการ บริษัท และข้อมูลอื่นให้ครบถ้วน") ใช้คำเดียวกับช่องในฟอร์ม · แสดงทุกแถวเสมอ
+    //    ค่าว่าง = "ไม่ระบุ" (เห็นทันทีว่าขาดอะไร) · จัด 3 กลุ่ม: ข้อมูลงาน · กำหนดการและทีม · ผู้ติดต่อหน้างาน
+    const none = '<span class="ee-sum-muted">ไม่ระบุ</span>';
+    const personPill = (n, lead) => {
+      const emp = employeeList.find((e) => e.fname === n);
+      return `<span class="ee-sum-person">${personAvatarHtml(n, emp?.imageUrl, 20)}${escapeHtml(n)}${lead ? '<em>หัวหน้าทีม</em>' : ""}</span>`;
+    };
+    const members = eventTeamMembers.map((m) => m?.name).filter(Boolean).filter((n, i, a) => n !== eventTeam && a.indexOf(n) === i);
     const telDial = String(evenContactTel || "").replace(/[^\d+]/g, "");
     const row = (ico, label, value) => `<div class="ee-sum-row"><span class="ee-sum-ico">${ico}</span><span class="ee-sum-k">${label}</span><span class="ee-sum-v">${value}</span></div>`;
+    const group = (title, list) => `<div class="ee-sum-group">${title}</div>${list.filter(Boolean).join("")}`;
+    const isContractJob = Boolean(eventContractNo || eventContractGroupId);
     const rows = [
-      row("🕘", "วัน-เวลา", `${escapeHtml(dayText)}${timeText}`),
-      row("📍", "โครงการ", escapeHtml(eventSite || "-")),
-      row("🏢", "ลูกค้า", eventCompany ? escapeHtml(eventCompany) : '<span class="ee-sum-muted">ไม่ระบุ</span>'),
-      row("🛠️", "ประเภทงาน", `<b class="ee-sum-chip" style="background:${escapeHtml(ev.backgroundColor || "#64748b")};color:${escapeHtml(ev.textColor || "#fff")}">${escapeHtml(eventTitle || "-")}</b>${eventSystem ? ` <span class="ee-sum-sub">ระบบ ${escapeHtml(eventSystem)}</span>` : ""}`),
-      eventContractNo || eventTime ? row("🔄", "สัญญา", `${eventContractNo ? escapeHtml(eventContractNo) : ""}${eventTime ? ` <span class="ee-sum-sub">ครั้งที่ ${escapeHtml(formatRoundLabel(eventTime, eventVisitCount))}</span>` : ""}`) : "",
-      row("👷", "ทีมเข้างาน", `<span class="ee-sum-people">${teamHtml}</span>`),
-      evenContactName || evenContactTel ? row("📞", "ผู้ติดต่อ", `${escapeHtml(evenContactName || "")}${evenContactTel ? ` <a class="ee-sum-tel" href="tel:${escapeHtml(telDial)}">${escapeHtml(evenContactTel)}</a>` : ""}`) : "",
-      Number(eventJobValue) > 0 ? row("💰", "มูลค่างาน", `฿${Number(eventJobValue).toLocaleString("th-TH")}`) : "",
-      evendocNo ? row("📄", "เลขที่อ้างอิง", escapeHtml(evendocNo)) : "",
+      group("ข้อมูลงาน", [
+        row("📍", "โครงการ", eventSite ? `<b>${escapeHtml(eventSite)}</b>` : none),
+        row("🏢", "บริษัท", eventCompany ? escapeHtml(eventCompany) : none),
+        row("🛠️", "ประเภทงาน", eventTitle ? `<b class="ee-sum-chip" style="background:${escapeHtml(ev.backgroundColor || "#64748b")};color:${escapeHtml(ev.textColor || "#fff")}">${escapeHtml(eventTitle)}</b>` : none),
+        row("⚙️", "ระบบงาน", eventSystem ? escapeHtml(eventSystem) : none),
+        row("🗂️", "หมวดงาน", `<span style="color:${eventJobClassMeta.color};font-weight:800">${eventJobClassMeta.emoji} ${escapeHtml(eventJobClassMeta.label)}</span>`),
+        isContractJob ? row("📑", "เลขที่สัญญา", eventContractNo ? escapeHtml(eventContractNo) : none) : "",
+        isContractJob ? row("🔄", "ครั้งที่", eventTime ? escapeHtml(formatRoundLabel(eventTime, eventVisitCount)) : none) : "",
+        row("💰", "มูลค่างาน", Number(eventJobValue) > 0 ? `฿${Number(eventJobValue).toLocaleString("th-TH")}` : none),
+        row("📄", "เลขที่อ้างอิง", evendocNo ? escapeHtml(evendocNo) : none),
+      ]),
+      group("กำหนดการและทีม", [
+        row("🕘", "วัน-เวลา", `${escapeHtml(dayText)}${timeText}`),
+        row("👷", "หัวหน้าทีม", eventTeam ? `<span class="ee-sum-people">${personPill(eventTeam, true)}</span>` : '<span class="ee-sum-muted">ยังไม่ระบุ</span>'),
+        row("👥", "ลูกทีม", members.length ? `<span class="ee-sum-people">${members.map((n) => personPill(n, false)).join("")}</span>` : '<span class="ee-sum-muted">ไม่มี</span>'),
+      ]),
+      group("ผู้ติดต่อหน้างาน", [
+        row("👤", "ชื่อผู้ติดต่อ", evenContactName ? escapeHtml(evenContactName) : none),
+        row("📞", "เบอร์โทร", evenContactTel ? `<a class="ee-sum-tel" style="margin-left:0" href="tel:${escapeHtml(telDial)}">${escapeHtml(evenContactTel)}</a>` : none),
+      ]),
     ].join("");
     return `
     <style>
@@ -1876,7 +1890,9 @@ export const getEditEvent = async ({
       .ee-sum-owner b { font-size:15px; font-weight:900; color:#0f172a; }
       .ee-sum-rows { padding: 0 14px; }
       .ee-sum-row { display:flex; align-items:flex-start; gap:10px; padding:9px 0; border-top:1px solid #eef2f7; }
-      .ee-sum-row:first-child { border-top:0; }
+      .ee-sum-row:first-child, .ee-sum-group + .ee-sum-row { border-top:0; }
+      .ee-sum-group { margin: 0 -14px; padding: 7px 14px 5px; font-size:11.5px; font-weight:800; color:#64748b; letter-spacing:.02em; background:#fbfcfe; border-top:1px solid #eef2f7; border-bottom:1px solid #f1f5f9; }
+      .ee-sum-rows > .ee-sum-group:first-child { border-top:0; }
       .ee-sum-ico { width:18px; flex-shrink:0; text-align:center; font-size:13px; opacity:.75; }
       .ee-sum-k { width:96px; flex-shrink:0; font-size:12.5px; font-weight:600; color:#64748b; }
       .ee-sum-v { flex:1; min-width:0; font-size:13.5px; font-weight:700; color:#0f172a; overflow-wrap:anywhere; }
