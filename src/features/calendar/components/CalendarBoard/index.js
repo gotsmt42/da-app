@@ -82,7 +82,7 @@ import { getEditEvent } from "../EventForms/EditEvent";
 import DeliveryNoteDialog from "@/features/documents/components/DeliveryNoteDialog";
 import WorkNoticeDialog from "@/features/documents/components/WorkNoticeDialog";
 import SalesAppointmentDialog from "../SalesAppointmentDialog";
-import SalesAgenda, { SalesTopBar } from "../SalesAgenda";
+import SalesAgenda, { SalesTopBar, SalesViewToggle } from "../SalesAgenda";
 import { getSaveEventToDB } from "../EventForms/SaveEvent";
 import { getEventDrop } from "../EventForms/EventDrop";
 import { getEventResize } from "../EventForms/EventResize";
@@ -1972,6 +1972,8 @@ function EventCalendar() {
         event.team ?? "",
         ...[...(event.teamMembers || []), ...(event.extendedProps?.teamMembers || [])].map((m) => m?.name || ""),
         event.time?.toString() ?? "",
+        event.contactName ?? "",
+        event.description ?? "",
         ownerName, // ✅ เพิ่มชื่อเจ้าของเข้าไปในเงื่อนไข search
       ].some((field) => field.toLowerCase().includes(keyword));
 
@@ -3162,7 +3164,7 @@ function EventCalendar() {
 
   return (
     <div
-      className={`modern-calendar-container${mobileZoom > 0 ? " ec-zoomed" : ""}${isWideToolbar ? " ec-wide-toolbar" : ""}`}
+      className={`modern-calendar-container${mobileZoom > 0 ? " ec-zoomed" : ""}${isWideToolbar ? " ec-wide-toolbar" : ""}${isSalesView ? " ec-sales-page" : ""}`}
       style={{ "--ec-m-zoom": mobileColW }}
     >
       {/* ✅ แถบเดียวกระชับ: ค้นหา + ปุ่มตัวกรอง (มี badge บอกจำนวนที่เลือกไว้) + Export
@@ -3172,10 +3174,8 @@ function EventCalendar() {
       {isSalesView && (
         <SalesTopBar
           events={filteredCalendarEvents}
-          view={salesView}
-          onView={setSalesView}
           onAdd={() => handleAddEvent({ dateStr: moment().format("YYYY-MM-DD") })}
-          onFollowUp={() => { setSalesView("list"); setSalesTab("follow"); }}
+          onTab={(t) => { setSalesView("list"); setSalesTab(t); }}
           title={viewingSalesCalendar ? "ตารางนัดหมายเซล" : "นัดหมายของฉัน"}
         />
       )}
@@ -3185,13 +3185,16 @@ function EventCalendar() {
           <span className="event-search-icon">🔍</span>
           <input
             type="search"
-            placeholder="ค้นหาแผนงาน เช่น ชื่อโครงการ หัวข้อ ระบบ..."
+            placeholder={isSalesView ? "ค้นหาสถานที่ ลูกค้า ผู้ติดต่อ..." : "ค้นหาแผนงาน เช่น ชื่อโครงการ หัวข้อ ระบบ..."}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
 
         {isWideToolbar && <div className="event-filter-inline">{filterFields}</div>}
+
+        {/* ✅ ตารางเซล: ปุ่มสลับ รายการ/ปฏิทิน อยู่แถวเดียวกับช่องค้นหา (ไม่แยกเป็นแถวใหญ่อีกแถว) */}
+        {isSalesView && <SalesViewToggle view={salesView} onView={setSalesView} />}
 
         {/* ✅ กาง/ย่อรายละเอียดของการ์ดงานทั้งหมดในหน้าจอนี้ทีเดียว — ค่าเริ่มต้นคือ "ย่อ" เพื่อให้
             ปฏิทินอ่านง่าย (ดูเหตุผลเต็มที่ expandedCardIds) แล้วกดปุ่มนี้ตอนต้องการดูรายละเอียดครบทุกใบ
@@ -3273,6 +3276,8 @@ function EventCalendar() {
         </button>
         )}
 
+        {/* ตารางเซลบนมือถือไม่โชว์ปุ่ม Excel (ใช้บนคอมเป็นหลัก) — ลดปุ่มในแถวให้เหลือเท่าที่จำเป็น */}
+        {(!isSalesView || isWideToolbar) && (
         <button
           className="toolbar-icon-btn toolbar-icon-btn--excel"
           onClick={handleExportExcel}
@@ -3286,6 +3291,7 @@ function EventCalendar() {
           <FontAwesomeIcon icon={faFileExcel} />
           <span className="tb-label">Excel</span>
         </button>
+        )}
       </div>
 
       {/* ✅ แถบแจ้ง "กำลังคัดลอกงาน" — โชว์ตราบใดที่ clipboardEvent ยังมีค่าอยู่ (ค้างได้จนกว่าจะกด

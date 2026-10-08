@@ -2061,3 +2061,31 @@
   .modern-calendar-container:not(.ec-zoomed) .ec-sc-end { display: none; }
 }
 
+/* ✅ (8 ต.ค. 2569 ผู้ใช้: "ลดขนาดลงอีก ดูล้นเกินไป") ทั้งหน้าตารางเซลบนมือถือกระชับลง
+   ⚠️ ขึ้นต้นด้วย .ec-sales-page (ใส่ที่ .modern-calendar-container เฉพาะตอนดูตารางเซล) — ตารางช่างไม่เปลี่ยน */
+@media (max-width: 768px) {
+  .modern-calendar-container.ec-sales-page { padding: 4px; }
+  .ec-sales-page .event-toolbar-row { gap: 6px; }
+  .modern-calendar-container.ec-sales-page .event-toolbar-row { margin-bottom: 12px !important; }
+  .ec-sales-page .event-search-input { padding: 0 10px; border-radius: 9px; }
+  .ec-sales-page .event-search-input input { padding: 7px 0; font-size: 13px; }
+  .ec-sales-page .toolbar-icon-btn,
+  .ec-sales-page .filter-toggle-btn { width: 34px; height: 34px; font-size: 13px; border-radius: 9px; }
+
+  .ec-sales-page .fc .fc-header-toolbar { margin-bottom: 8px !important; gap: 6px; }
+  .ec-sales-page .fc .fc-toolbar-title { font-size: 1.05rem; }
+  .ec-sales-page .fc .fc-prev-button,
+  .ec-sales-page .fc .fc-next-button { width: 48px; height: 32px; border-radius: 9px; }
+  .ec-sales-page .fc .fc-zoomOut-button,
+  .ec-sales-page .fc .fc-zoomIn-button { min-width: 32px; height: 30px; font-size: 15px !important; }
+  .ec-sales-page .fc .fc-header-toolbar > .fc-toolbar-chunk:last-child .fc-today-button { min-height: 30px; font-size: 12.5px; padding-top: 0; padding-bottom: 0; }
+
+  .ec-sales-page .fc-col-header-cell-cushion { font-size: 9.5px !important; padding: 3px 1px !important; }
+  .ec-sales-page .fc-daygrid-day-number { font-size: 10.5px; padding: 2px 3px !important; }
+  .modern-calendar-container .calendar-wrapper.ec-sales .fc-daygrid-event { font-size: 9px !important; border-radius: 4px !important; }
+  .ec-sales-page .ec-sc { padding: 2px 3px 3px; }
+  .ec-sales-page .ec-sc-pill { font-size: .78em; line-height: 1.45; }
+  .ec-sales-page .ec-sales-legend { padding: 8px 10px; }
+  .ec-sales-page .ec-sales-legend-item { font-size: 11px; }
+}
+

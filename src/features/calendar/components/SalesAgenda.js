@@ -47,7 +47,7 @@ export const salesSummary = (events) => {
   const today = moment().startOf("day");
   const rows = (events || []).filter(isSalesRow).map(rowOf);
   return {
-    today: rows.filter((r) => r.start.isSame(today, "day") && r.st !== "ยกเลิกนัด").length,
+    today: rows.filter((r) => r.start.isSame(today, "day") && (r.st === "นัดหมายแล้ว" || r.st === "เลื่อนนัด")).length,
     overdue: rows.filter((r) => r.start.isBefore(today) && (r.st === "นัดหมายแล้ว" || r.st === "เลื่อนนัด")).length,
     toClose: rows.filter((r) => r.st === "เข้าพบแล้ว").length,
     closedMonth: rows.filter((r) => r.st === "ปิดงานแล้ว" && moment(r.e.salesClosedAt || r.e.start).isSame(today, "month")).length,
@@ -58,60 +58,66 @@ function Kpi({ label, value, color = INK, onClick, active }) {
   return (
     <ButtonBase onClick={onClick} disabled={!onClick}
       sx={{
-        flex: 1, minWidth: 0, display: "block", textAlign: "left", px: 1.5, py: 1.1, borderRadius: 2.5,
+        flex: 1, minWidth: 0, display: "block", textAlign: "left", px: { xs: 1.1, sm: 1.5 }, py: { xs: 0.7, sm: 1.1 }, borderRadius: 2.5,
         bgcolor: active ? alpha(color, 0.06) : "#fff", border: `1px solid ${active ? alpha(color, 0.4) : LINE}`,
       }}>
-      <Typography noWrap sx={{ fontSize: "0.7rem", fontWeight: 700, color: MUTED }}>{label}</Typography>
-      <Typography sx={{ fontSize: "1.35rem", fontWeight: 900, lineHeight: 1.2, color: value ? color : FAINT, fontVariantNumeric: "tabular-nums" }}>{value}</Typography>
+      <Typography noWrap sx={{ fontSize: { xs: "0.66rem", sm: "0.7rem" }, fontWeight: 700, color: MUTED }}>{label}</Typography>
+      <Typography sx={{ fontSize: { xs: "1.1rem", sm: "1.35rem" }, fontWeight: 900, lineHeight: 1.2, color: value ? color : FAINT, fontVariantNumeric: "tabular-nums" }}>{value}</Typography>
     </ButtonBase>
   );
 }
 
 /** หัวหน้าตารางนัดหมาย */
-export function SalesTopBar({ events, view, onView, onAdd, onFollowUp, title = "ตารางนัดหมาย", sub }) {
+export function SalesTopBar({ events, onAdd, onTab, title = "ตารางนัดหมาย", sub }) {
   const s = useMemo(() => salesSummary(events), [events]);
   return (
-    <Box sx={{ mb: 1.5 }}>
-      <Stack direction="row" alignItems="center" spacing={1.25} sx={{ mb: 1.25 }}>
-        <Box sx={{ width: 40, height: 40, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: alpha(ACCENT, 0.1), color: ACCENT }}>
+    <Box sx={{ mb: { xs: 1, sm: 1.5 } }}>
+      <Stack direction="row" alignItems="center" spacing={1.25} sx={{ mb: { xs: 1, sm: 1.25 } }}>
+        <Box sx={{ width: { xs: 34, sm: 40 }, height: { xs: 34, sm: 40 }, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: alpha(ACCENT, 0.1), color: ACCENT }}>
           <EventAvailableOutlined />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 900, fontSize: "1.15rem", color: INK, lineHeight: 1.25 }}>{title}</Typography>
-          <Typography noWrap sx={{ fontSize: "0.78rem", color: MUTED }}>{sub || "นัดเข้าพบลูกค้า · สำรวจหน้างาน · นำเสนอ · ติดตามผล"}</Typography>
+          <Typography sx={{ fontWeight: 900, fontSize: { xs: "1rem", sm: "1.15rem" }, color: INK, lineHeight: 1.25 }}>{title}</Typography>
+          <Typography noWrap sx={{ fontSize: { xs: "0.72rem", sm: "0.78rem" }, color: MUTED }}>{sub || "นัดเข้าพบลูกค้า · สำรวจหน้างาน · นำเสนอ · ติดตามผล"}</Typography>
         </Box>
-        <Button variant="contained" startIcon={<Add />} onClick={onAdd} sx={{ ...PRIMARY_BTN_SX, px: { xs: 1.5, sm: 2 } }}>
+        <Button variant="contained" startIcon={<Add />} onClick={onAdd} sx={{ ...PRIMARY_BTN_SX, px: { xs: 1.25, sm: 2 }, py: { xs: 0.5, sm: 0.75 }, fontSize: { xs: "0.82rem", sm: "0.875rem" } }}>
           <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>เพิ่มนัดหมาย</Box>
           <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>เพิ่ม</Box>
         </Button>
       </Stack>
 
-      <Stack direction="row" spacing={1} sx={{ mb: 1.25 }}>
-        <Kpi label="วันนี้" value={s.today} color={ACCENT} />
-        <Kpi label="เลยวันนัด" value={s.overdue} color={AMBER} onClick={s.overdue ? onFollowUp : undefined} />
-        <Kpi label="รอปิดงาน" value={s.toClose} color={TEAL} onClick={s.toClose ? onFollowUp : undefined} />
+      <Stack direction="row" spacing={{ xs: 0.75, sm: 1 }} sx={{ mb: { xs: 1, sm: 1.25 } }}>
+        <Kpi label="นัดวันนี้" value={s.today} color={ACCENT} onClick={() => onTab("upcoming")} />
+        <Kpi label="เลยวันนัด" value={s.overdue} color={AMBER} onClick={() => onTab("follow")} />
+        <Kpi label="รอปิดงาน" value={s.toClose} color={TEAL} onClick={() => onTab("follow")} />
         <Box sx={{ flex: 1, minWidth: 0, display: { xs: "none", sm: "block" } }}>
-          <Kpi label="ปิดงานเดือนนี้" value={s.closedMonth} color={GREEN} />
+          <Kpi label="ปิดงานเดือนนี้" value={s.closedMonth} color={GREEN} onClick={() => onTab("history")} />
         </Box>
       </Stack>
 
-      {/* สลับมุมมอง */}
-      <Stack direction="row" sx={{ p: 0.4, borderRadius: 2.5, bgcolor: "#eef2f7", width: { xs: "100%", sm: "auto" }, display: "inline-flex" }}>
-        {[
-          { k: "list", label: "รายการ", icon: <ViewAgendaOutlined sx={{ fontSize: 18 }} /> },
-          { k: "calendar", label: "ปฏิทิน", icon: <CalendarMonthOutlined sx={{ fontSize: 18 }} /> },
-        ].map((o) => (
-          <ButtonBase key={o.k} onClick={() => onView(o.k)}
-            sx={{
-              flex: 1, gap: 0.75, px: 2, py: 0.75, borderRadius: 2, fontSize: "0.84rem", fontWeight: 800,
-              color: view === o.k ? INK : MUTED, bgcolor: view === o.k ? "#fff" : "transparent",
-              boxShadow: view === o.k ? "0 1px 2px rgba(15,23,42,.12)" : "none",
-            }}>
-            {o.icon}{o.label}
-          </ButtonBase>
-        ))}
-      </Stack>
     </Box>
+  );
+}
+
+/** ปุ่มสลับมุมมอง รายการ/ปฏิทิน แบบกะทัดรัด (วางในแถวค้นหา) */
+export function SalesViewToggle({ view, onView }) {
+  return (
+    <Stack direction="row" sx={{ p: "3px", borderRadius: "10px", bgcolor: "#eef2f7", flexShrink: 0 }}>
+      {[
+        { k: "list", label: "รายการ", icon: <ViewAgendaOutlined sx={{ fontSize: 18 }} /> },
+        { k: "calendar", label: "ปฏิทิน", icon: <CalendarMonthOutlined sx={{ fontSize: 18 }} /> },
+      ].map((o) => (
+        <ButtonBase key={o.k} onClick={() => onView(o.k)} title={o.label} aria-label={o.label} aria-pressed={view === o.k}
+          sx={{
+            gap: 0.6, height: 32, px: { xs: 1, sm: 1.5 }, borderRadius: "8px", fontSize: "0.8rem", fontWeight: 800,
+            color: view === o.k ? ACCENT : MUTED, bgcolor: view === o.k ? "#fff" : "transparent",
+            boxShadow: view === o.k ? "0 1px 2px rgba(15,23,42,.12)" : "none",
+          }}>
+          {o.icon}
+          <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>{o.label}</Box>
+        </ButtonBase>
+      ))}
+    </Stack>
   );
 }
 
@@ -198,35 +204,39 @@ export default function SalesAgenda({ events, onOpen, onAdd, showOwner, tab, onT
   const today = moment().startOf("day");
   const rows = useMemo(() => (events || []).filter(isSalesRow).map(rowOf), [events]);
 
+  // ✅ (8 ต.ค. 2569 ผู้ใช้: "กดที่จะถึง แต่แสดงงานที่ปิดแล้ว") แต่ละนัดอยู่แท็บเดียวเสมอ ตามสถานะ:
+  //    ที่จะถึง = นัดหมายแล้ว/เลื่อนนัด วันนี้เป็นต้นไป · ต้องติดตาม = เลยวันนัดยังไม่เข้าพบ + เข้าพบแล้วรอปิด
+  //    ประวัติ = ปิดงานแล้ว/ยกเลิกนัด
+  const isOpen = (r) => r.st === "นัดหมายแล้ว" || r.st === "เลื่อนนัด";
   const upcoming = useMemo(
-    () => rows.filter((r) => !r.start.isBefore(today)).sort((a, b) => a.start - b.start || timeKey(a).localeCompare(timeKey(b))),
+    () => rows.filter((r) => isOpen(r) && !r.start.isBefore(today)).sort((a, b) => a.start - b.start || timeKey(a).localeCompare(timeKey(b))),
     [rows], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const follow = useMemo(() => {
-    const overdue = rows.filter((r) => r.start.isBefore(today) && (r.st === "นัดหมายแล้ว" || r.st === "เลื่อนนัด"));
+    const overdue = rows.filter((r) => isOpen(r) && r.start.isBefore(today));
     const toClose = rows.filter((r) => r.st === "เข้าพบแล้ว");
     return [...overdue, ...toClose].sort((a, b) => a.start - b.start);
   }, [rows]); // eslint-disable-line react-hooks/exhaustive-deps
   const past = useMemo(
-    () => rows.filter((r) => r.start.isBefore(today)).sort((a, b) => b.start - a.start || timeKey(b).localeCompare(timeKey(a))),
+    () => rows.filter((r) => r.st === "ปิดงานแล้ว" || r.st === "ยกเลิกนัด").sort((a, b) => b.start - a.start || timeKey(b).localeCompare(timeKey(a))),
     [rows], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const tabs = [
-    { k: "upcoming", label: "ที่จะถึง", n: upcoming.length },
-    { k: "follow", label: "ต้องติดตาม", n: follow.length, color: AMBER },
-    { k: "past", label: "ที่ผ่านมา", n: past.length },
+    { k: "upcoming", label: "นัดที่จะถึง", n: upcoming.length, desc: "นัดวันนี้และวันถัดไปที่ยังไม่ได้เข้าพบ" },
+    { k: "follow", label: "ต้องติดตาม", n: follow.length, color: AMBER, desc: "เลยวันนัดแต่ยังไม่บันทึกเข้าพบ · เข้าพบแล้วแต่ยังไม่ปิดงาน" },
+    { k: "history", label: "ปิดงาน/ยกเลิก", n: past.length, desc: "นัดที่ปิดงานแล้ว หรือยกเลิกไปแล้ว (ล่าสุดก่อน)" },
   ];
 
   const followNote = (r) => (r.st === "เข้าพบแล้ว"
     ? { text: "เข้าพบแล้ว — สรุปผลแล้วกดปิดงาน", color: TEAL }
     : { text: `เลยวันนัด ${today.diff(r.start.clone().startOf("day"), "days")} วัน — ยังไม่บันทึกเข้าพบ`, color: AMBER });
 
-  const list = tab === "follow" ? follow : tab === "past" ? past.slice(0, pastLimit) : upcoming;
+  const list = tab === "follow" ? follow : tab === "history" ? past.slice(0, pastLimit) : upcoming;
 
   return (
     <Box>
-      <Stack direction="row" spacing={0.75} sx={{ mb: 1.5, overflowX: "auto", pb: 0.25 }}>
+      <Stack direction="row" spacing={0.75} sx={{ mb: 0.75, overflowX: "auto", pb: 0.25 }}>
         {tabs.map((t) => {
           const on = tab === t.k;
           return (
@@ -243,12 +253,15 @@ export default function SalesAgenda({ events, onOpen, onAdd, showOwner, tab, onT
           );
         })}
       </Stack>
+      <Typography sx={{ px: 0.5, mb: 1.5, fontSize: "0.76rem", color: MUTED }}>
+        {tabs.find((t) => t.k === tab)?.desc}
+      </Typography>
 
       {list.length === 0 ? (
         <Box sx={{ py: 5, px: 2, textAlign: "center", bgcolor: "#fff", border: `1px dashed ${LINE}`, borderRadius: 3 }}>
           <EventAvailableOutlined sx={{ fontSize: 34, color: FAINT }} />
           <Typography sx={{ mt: 0.75, fontWeight: 800, color: INK_2 }}>
-            {tab === "follow" ? "ไม่มีนัดที่ต้องติดตาม" : tab === "past" ? "ยังไม่มีนัดที่ผ่านมา" : "ยังไม่มีนัดที่จะถึง"}
+            {tab === "follow" ? "ไม่มีนัดที่ต้องติดตาม" : tab === "history" ? "ยังไม่มีนัดที่ปิดงานหรือยกเลิก" : "ไม่มีนัดที่จะถึง"}
           </Typography>
           <Typography sx={{ fontSize: "0.8rem", color: MUTED }}>
             {tab === "follow" ? "ทุกนัดบันทึกเข้าพบและปิดงานเรียบร้อย" : "กด “เพิ่มนัดหมาย” เพื่อลงนัดใหม่"}
@@ -265,7 +278,7 @@ export default function SalesAgenda({ events, onOpen, onAdd, showOwner, tab, onT
         groupByDay(list).map(([day, rs]) => <DayGroup key={day} day={day} rows={rs} onOpen={onOpen} showOwner={showOwner} />)
       )}
 
-      {tab === "past" && past.length > pastLimit && (
+      {tab === "history" && past.length > pastLimit && (
         <Box sx={{ textAlign: "center", mt: 1 }}>
           <Button onClick={() => setPastLimit((n) => n + 30)} sx={{ textTransform: "none", fontWeight: 800 }}>ดูเพิ่มเติม ({past.length - pastLimit})</Button>
         </Box>
