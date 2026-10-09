@@ -38,22 +38,24 @@ import { getFollowUpInfo } from "@/shared/utils/quotationTracking";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { can, isRole, rankLabel, ROLES, TECHNICIAN_ROLES, ALL_ROLES } from "@/shared/utils/roles";
 import HomeMenu from "../components/HomeMenu";
-import { Box, Stack, Typography, Skeleton, Avatar } from "@mui/material";
-import { ExpandMore } from "@mui/icons-material";
+import { Box, Typography, Avatar } from "@mui/material";
+import { ExpandMore, Today, EventOutlined, EngineeringOutlined, RequestQuoteOutlined, EventRepeatOutlined, EditCalendarOutlined, ApartmentOutlined, GroupsOutlined, ScheduleOutlined, NotificationsActiveOutlined, ErrorOutline } from "@mui/icons-material";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
-import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, DANGER, CARD_SHADOW } from "@/shared/ui/PageKit";
-import { Widget, Row, Dot, Empty, Loading, Pager, GroupTitle } from "../components/DashWidgets";
+import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, DANGER, CARD_SHADOW, ACCENT } from "@/shared/ui/PageKit";
+import { Widget, Row, Empty, Loading, Pager, GroupTitle, Pill, DateTile, IconTile } from "../components/DashWidgets";
+import { alpha } from "@mui/material/styles";
 
 // 🎨 สีและไอคอนประจำสถานะงาน — ใช้ร่วมกันทั้ง Quick Stats และการ์ดงานวันนี้
 // ✅ เก็บเป็น "component" ไม่ใช่ element ที่ render ไว้แล้ว เพื่อให้เรียกใช้คนละขนาดได้ตามบริบท
 // (เดิม FaClock/FaCheckCircle ถูกใช้ซ้ำข้ามความหมาย ทำให้แยกสถานะจากไอคอนอย่างเดียวไม่ออก
 // เปลี่ยนให้แต่ละสถานะมีไอคอนเฉพาะตัวจริงๆ: เตือน → ติ๊กเดียว → เฟืองหมุน → ติ๊กคู่)
 const STATUS_META = {
-  กำลังรอยืนยัน: { color: "#f97316", bg: "#ffedd5", Icon: FaExclamationCircle },
+  กำลังรอยืนยัน: { color: "#d97706", bg: "#fef3c7", Icon: FaExclamationCircle },
   ยืนยันแล้ว: { color: "#3b82f6", bg: "#dbeafe", Icon: FaCheckCircle },
-  กำลังดำเนินการ: { color: "#a78bfa", bg: "#ede9fe", Icon: FaCogs },
-  ดำเนินการเสร็จสิ้น: { color: "#10b981", bg: "#d1fae5", Icon: FaCheckDouble },
+  กำลังดำเนินการ: { color: "#0891b2", bg: "#cffafe", Icon: FaCogs },
+  ดำเนินการเสร็จสิ้น: { color: "#16a34a", bg: "#dcfce7", Icon: FaCheckDouble },
 };
+const ROUND_ICON = { due_soon: ScheduleOutlined, due_now: NotificationsActiveOutlined, overdue: ErrorOutline };
 const getStatusMeta = (status) =>
   STATUS_META[status] || { color: "#64748b", bg: "#f1f5f9", Icon: FaClock };
 
@@ -172,36 +174,7 @@ const Dashboard = () => {
   const countStatus = (status) =>
     countDistinctJobs(events, (e) => e.status === status);
 
-  // 📊 สถิติงานหลัก 4 สถานะ — การ์ดใหญ่แยกจากกัน แทนแถบเล็กๆ ฝังในปุ่มเดิม
-  // ✅ เพิ่ม group ต่อรายการ — ให้ตรงกับแท็บ (StatusGroupCard) จริงในหน้า Operation เวลากดเข้าไป
-  // (ดู resolveOperationGroup ใน shared/utils/overdueJobs.js) "กำลังรอยืนยัน" ไม่มีแท็บไหนตรงกับสถานะนี้
-  // โดยตรง เลยปล่อยว่างไว้ (ไม่มีแท็บติดสว่าง ดีกว่าให้แท็บผิดๆ ติดสว่างแทน)
-  const statItems = [
-    {
-      label: "รอยืนยัน",
-      status: "กำลังรอยืนยัน",
-      count: countStatus("กำลังรอยืนยัน"),
-      group: "",
-    },
-    {
-      label: "ยืนยันแล้ว",
-      status: "ยืนยันแล้ว",
-      count: countStatus("ยืนยันแล้ว"),
-      group: "active",
-    },
-    {
-      label: "กำลังทำ",
-      status: "กำลังดำเนินการ",
-      count: countStatus("กำลังดำเนินการ"),
-      group: "active",
-    },
-    {
-      label: "เสร็จสิ้น",
-      status: "ดำเนินการเสร็จสิ้น",
-      count: countStatus("ดำเนินการเสร็จสิ้น"),
-      group: "closed",
-    },
-  ];
+
 
   // 📅 งานวันนี้ — เดิมเทียบแค่ฟิลด์ date (=วันแรกที่สร้างงานเท่านั้น) ทำให้งานที่เริ่มเมื่อวาน
   // แต่ยังดำเนินอยู่ข้ามมาถึงวันนี้ (multi-day event, date ปักหมุดไว้ที่วันแรกแต่ start/end ยาวกว่านั้น)
@@ -431,23 +404,25 @@ const Dashboard = () => {
   const overdueContractsBlock =
     canViewContracts && overdueContracts.length > 0 ? (
       <Widget
-        title="รอบเข้างานที่ต้องนัด" count={overdueContracts.length}
+        title="รอบเข้างานที่ต้องนัด" count={overdueContracts.length} icon={EventRepeatOutlined}
+        tone={roundCounts.overdue || roundCounts.due_now ? DANGER : "#d97706"}
+        hint="สัญญาที่ยังไม่ได้ลงแผนรอบถัดไป"
         // ✅ (8 ต.ค. 2569) 3 ระดับเดียวกับหน้าภาพรวมงาน — แยกจำนวนให้เห็นก่อนว่าเร่งแค่ไหน
-        hint={[
-          roundCounts.overdue && `⛔ เลยกำหนด ${roundCounts.overdue}`,
-          roundCounts.due_now && `🔔 เดือนนี้ ${roundCounts.due_now}`,
-          roundCounts.due_soon && `🕒 เดือนหน้า ${roundCounts.due_soon}`,
-        ].filter(Boolean).join(" · ")}
+        summary={[
+          roundCounts.overdue && <Pill key="o" color="#991b1b" icon={<ErrorOutline sx={{ fontSize: 14 }} />}>เลยกำหนด {roundCounts.overdue}</Pill>,
+          roundCounts.due_now && <Pill key="n" color="#dc2626" icon={<NotificationsActiveOutlined sx={{ fontSize: 14 }} />}>เดือนนี้ {roundCounts.due_now}</Pill>,
+          roundCounts.due_soon && <Pill key="s" color="#d97706" icon={<ScheduleOutlined sx={{ fontSize: 14 }} />}>เดือนหน้า {roundCounts.due_soon}</Pill>,
+        ].filter(Boolean)}
         to={overdueContracts.length > 5 ? "/contracts?view=overdue" : undefined}>
         {overdueContracts.slice(0, 5).map((c) => {
           const info = c.overdueInfo;
           return (
             // ✅ เจาะจง: เปิดแท็บ "เลยกำหนด" พร้อมค้นชื่อบริษัท/โครงการนั้นให้เลย (ดู ?q= ใน ContractOverview.js)
             <Row key={c.key} to={`/contracts?${info.state === "due_soon" ? "" : "view=overdue&"}q=${encodeURIComponent(c.site || c.company || "")}`}
-              leading={<Dot color={info.color} />}
-              title={[c.site, c.company].filter(Boolean).join(" · ") || c.title || "สัญญา"}
+              leading={<IconTile icon={ROUND_ICON[info.state]} color={info.color} size={36} />}
+              title={c.site || c.company || c.title || "สัญญา"}
               sub={`${info.roundLabel} · ต้องเข้า ${info.dueMonthLabel}`}
-              trailing={info.shortLabel} danger={info.state !== "due_soon"} />
+              trailing={<Pill color={info.color} solid={info.state === "overdue"}>{info.shortLabel}</Pill>} />
           );
         })}
       </Widget>
@@ -519,7 +494,7 @@ const Dashboard = () => {
   const sidebarContent = isAdminOrManager ? (
     <>
       {/* งานที่กำลังจะถึงใน 7 วัน (ไม่รวมวันนี้ — มีกล่อง "งานวันนี้" แยกแล้ว) */}
-      <Widget title="งานที่กำลังจะถึง" count={upcomingJobs.length || undefined} hint="ภายใน 7 วันข้างหน้า" to={upcomingJobs.length > 5 ? "/operation" : undefined}>
+      <Widget title="งานที่กำลังจะถึง" icon={EventOutlined} count={upcomingJobs.length || undefined} hint="ภายใน 7 วันข้างหน้า" to={upcomingJobs.length > 5 ? "/operation" : undefined}>
         {loading ? <Loading rows={2} /> : upcomingJobs.length === 0 ? <Empty text="ไม่มีงานที่จะถึงใน 7 วันนี้" /> : upcomingJobs.slice(0, 5).map((job) => {
           const jobStart = moment(job.start || job.date).startOf("day");
           const diffDays = jobStart.diff(today, "days");
@@ -527,13 +502,14 @@ const Dashboard = () => {
           return (
             <Row key={job._id} to={`/operation/${job._id}${jobGroup ? `?group=${jobGroup}` : ""}`}
               title={job.title || "งาน"} sub={[job.company, job.site].filter(Boolean).join(" · ") || "ไม่ระบุโครงการ"}
-              trailing={diffDays === 1 ? "พรุ่งนี้" : `อีก ${diffDays} วัน`} trailingSub={formatThai(jobStart, "D MMM")} />
+              leading={<DateTile top={jobStart.format("D")} bottom={formatThai(jobStart, "MMM")} color={ACCENT} strong={diffDays === 1} />}
+              trailing={<Pill color={diffDays === 1 ? ACCENT : MUTED}>{diffDays === 1 ? "พรุ่งนี้" : `อีก ${diffDays} วัน`}</Pill>} />
           );
         })}
       </Widget>
 
       {/* งานค้างของช่างแยกรายคน — กดชื่อเพื่อดูรายการงานค้างของคนนั้น */}
-      <Widget title="งานค้างของช่าง" count={overdueByTechnician.reduce((n, t) => n + t.count, 0) || undefined} hint="เลยกำหนดเกิน 7 วัน · แยกรายคน" to="/staff?tab=workload" toLabel="ภาระงานทีม">
+      <Widget title="งานค้างของช่าง" icon={EngineeringOutlined} tone={DANGER} count={overdueByTechnician.reduce((n, t) => n + t.count, 0) || undefined} hint="เลยกำหนดเกิน 7 วัน · แยกรายคน" to="/staff?tab=workload" toLabel="ภาระงานทีม">
         {loading ? <Loading rows={3} /> : overdueByTechnician.length === 0 ? <Empty text="ไม่มีงานค้างของช่างตอนนี้" /> : overdueByTechnician.map(({ tech, count, severeCount, jobs }) => {
           const isExpanded = expandedOverdueTechIds.has(tech._id);
           const name = [tech.fname, tech.lname].filter(Boolean).join(" ") || tech.username;
@@ -543,7 +519,7 @@ const Dashboard = () => {
                 chevron={false}
                 leading={<Avatar sx={{ width: 30, height: 30, fontSize: "0.8rem", fontWeight: 800, bgcolor: personColor(name) }}>{personInitial(name)}</Avatar>}
                 title={name} sub={`${count} งานค้าง${severeCount > 0 ? ` · ${severeCount} เกิน 2 สัปดาห์` : ""}`}
-                trailing={<Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}>{count}<ExpandMore sx={{ fontSize: 18, color: FAINT, transition: "transform .15s", transform: isExpanded ? "rotate(180deg)" : "none" }} /></Box>}
+                trailing={<Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}><Pill color={severeCount > 0 ? DANGER : "#d97706"}>{count} งาน</Pill><ExpandMore sx={{ fontSize: 18, color: FAINT, transition: "transform .15s", transform: isExpanded ? "rotate(180deg)" : "none" }} /></Box>}
                 danger={severeCount > 0} />
               {isExpanded && (
                 <Box sx={{ bgcolor: SURFACE, borderTop: `1px solid ${LINE}`, pl: 4.5 }}>
@@ -561,12 +537,12 @@ const Dashboard = () => {
 
       {/* ใบเสนอราคาที่ต้องติดตาม — โชว์เฉพาะตอนมีจริง · กดแล้วเปิดใบนั้นในหน้าติดตามใบเสนอราคา */}
       {staleQuotations.length > 0 && (
-        <Widget title="ใบเสนอราคาที่ต้องติดตาม" count={staleQuotations.length} hint="ลูกค้าเงียบเกินกำหนดติดตาม" to="/finance?tab=quotations">
+        <Widget title="ใบเสนอราคาที่ต้องติดตาม" icon={RequestQuoteOutlined} tone="#d97706" count={staleQuotations.length} hint="ลูกค้าเงียบเกินกำหนดติดตาม" to="/finance?tab=quotations">
           {staleQuotations.slice(0, 5).map((q) => (
-            <Row key={q.id} to={`/finance?tab=quotations&jobId=${q.id}`} leading={<Dot color={DANGER} />}
+            <Row key={q.id} to={`/finance?tab=quotations&jobId=${q.id}`}
               title={q.title || "งาน"}
               sub={[[q.company, q.site].filter(Boolean).join(" · "), q.followUpCount ? `ตามแล้ว ${q.followUpCount} ครั้ง` : "ยังไม่เคยตาม"].filter(Boolean).join(" · ")}
-              trailing={`เงียบ ${q.days} วัน`} danger />
+              trailing={<Pill color={q.days >= 60 ? DANGER : "#d97706"}>เงียบ {q.days} วัน</Pill>} />
           ))}
         </Widget>
       )}
@@ -575,12 +551,12 @@ const Dashboard = () => {
       {overdueContractsBlock && <div className="dashboard-mobile-only">{overdueContractsBlock}</div>}
 
       {/* งานวางแผนล่วงหน้า (ยังไม่ลงตาราง · ไม่รวมฉบับร่างของสัญญา) */}
-      <Widget title="งานวางแผนล่วงหน้า" count={generalDrafts.length || undefined} hint="ยังไม่ลงวันที่ในตาราง" to={generalDrafts.length ? "/event" : undefined} toLabel="เปิดปฏิทิน"
+      <Widget title="งานวางแผนล่วงหน้า" icon={EditCalendarOutlined} tone="#475569" count={generalDrafts.length || undefined} hint="ยังไม่ลงวันที่ในตาราง" to={generalDrafts.length ? "/event" : undefined} toLabel="เปิดปฏิทิน"
         footer={<Pager page={draftsSafePage} pages={draftsTotalPages} onChange={setDraftsPage} />}>
         {loading ? <Loading rows={2} /> : draftsPreview.length === 0 ? <Empty text="ยังไม่มีงานวางแผนล่วงหน้า" /> : draftsPreview.map((d) => (
           <Row key={d._id} to="/event" title={d.title || "งาน"}
             sub={[d.system, d.site].filter(Boolean).join(" · ") || "ไม่ระบุโครงการ"}
-            trailing={d.plannedMonth ? formatThai(moment(d.plannedMonth, "YYYY-MM"), "MMM YYYY") : "ไม่ระบุเดือน"} />
+            trailing={<Pill color="#475569">{d.plannedMonth ? formatThai(moment(d.plannedMonth, "YYYY-MM"), "MMM YYYY") : "ไม่ระบุเดือน"}</Pill>} />
         ))}
       </Widget>
     </>
@@ -675,31 +651,18 @@ const Dashboard = () => {
               hideSalesJobs={isSale}
             />
 
-            {/* ─── SECTION 3: QUICK STATS — การ์ด 4 ใบแถวเดียว (ไอคอนบน ตัวเลข/label ล่าง จัดกึ่งกลาง)
-          แต่ละใบมีไอคอนเฉพาะของสถานะนั้นจริงๆ (ไม่ใช่จุดสีลอยๆ แบบเดิม) — ยังลิงก์ไปกรองหน้า
-          Operation ตรงสถานะเหมือนเดิมผ่าน ?status=... ─── */}
-            {/* ⚠️ เซลเรียกสิ่งเหล่านี้ว่า "นัดหมาย" ไม่ใช่ "งาน" — คำที่ใช้ต้องตรงกับฟอร์มที่เขากรอก
-                (AddSalesAppointment) ไม่งั้นตัวเลขชุดเดียวกันถูกเรียกคนละชื่อในสองหน้าจอ */}
-            {/* ✅ สรุปสถานะงาน — ตัวเลขสีเข้ม · สีสถานะอยู่ที่จุดเล็กหน้าชื่อเท่านั้น (กฎ: สีไม่เยอะ) */}
-            <GroupTitle>{isSale ? "สรุปนัดหมายของฉัน" : "สรุปสถานะงาน"}</GroupTitle>
-            <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: "repeat(4, minmax(0, 1fr))", mb: 2 }}>
-              {statItems.map((item) => (
-                <Box key={item.status} component={Link}
-                  to={isSale ? "/event" : `/operation?status=${encodeURIComponent(item.status)}${item.group ? `&group=${item.group}` : ""}`}
-                  sx={{ p: { xs: 1.1, sm: 1.5 }, bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 2.5, boxShadow: CARD_SHADOW, textDecoration: "none", minWidth: 0, "&:hover": { borderColor: FAINT } }}>
-                  <Stack direction="row" spacing={0.6} alignItems="center" sx={{ minWidth: 0 }}>
-                    <Dot color={getStatusMeta(item.status).color} />
-                    <Typography noWrap sx={{ fontSize: "0.74rem", fontWeight: 700, color: MUTED }}>{item.label}</Typography>
-                  </Stack>
-                  {loading ? <Skeleton width={36} height={30} /> : (
-                    <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.15rem", sm: "1.35rem" }, color: INK, lineHeight: 1.3, fontVariantNumeric: "tabular-nums" }}>{item.count.toLocaleString()}</Typography>
-                  )}
-                </Box>
-              ))}
-            </Box>
+          </div>
 
-            {/* ✅ งานวันนี้ — เดิมเป็นการ์ดใหญ่ใบละครึ่งจอ + อีโมจิ ตอนนี้เป็นรายการในกล่องเดียว อ่านไล่ลงได้ทันที */}
+          {/* ✅ (9 ต.ค. 2569) กล่องข้อมูลทั้งหมด — จอคอมกว้าง (≥1280px) จัดเป็น 2 คอลัมน์ไหลต่อกัน ไม่เหลือพื้นที่ว่าง */}
+          <div className="dashboard-widgets">
+            {/* ✅ งานวันนี้ — ช่องเวลาซ้าย · ป้ายสถานะขวา · แถบสรุปจำนวนแต่ละสถานะใต้หัวกล่อง
+                (แทนการ์ด "สรุปสถานะงาน" 4 ใบเดิมที่ผู้ใช้สั่งตัดออก 9 ต.ค. 2569) */}
             <Widget title={`${isSale ? "นัดหมายวันนี้" : "งานวันนี้"} · ${formatThai(moment(), "D MMM")}`} count={todayJobs.length || undefined}
+              icon={Today}
+              summary={todayJobs.length ? Object.keys(STATUS_META).map((st) => {
+                const n = todayJobs.filter((j) => j.status === st).length;
+                return n ? <Pill key={st} color={STATUS_META[st].color}>{st} {n}</Pill> : null;
+              }) : null}
               to={isSale ? "/event" : todayJobs.length ? "/operation" : undefined}>
               {loading ? <Loading rows={2} /> : todayJobs.length === 0 ? (
                 <Empty text={isSale ? "วันนี้ยังไม่มีนัดหมาย" : "ไม่มีงานที่นัดหมายไว้วันนี้"} />
@@ -707,19 +670,15 @@ const Dashboard = () => {
                 const assignedName = getAssignedName(job);
                 return (
                   <Row key={job._id} to={jobLink(job._id, resolveOperationGroup(job))}
-                    leading={<Box sx={{ width: 52, textAlign: "center" }}>
-                      <Typography sx={{ fontSize: "0.78rem", fontWeight: 800, color: INK_2, lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>{job.startTime || "ทั้งวัน"}</Typography>
-                      {job.endTime && <Typography sx={{ fontSize: "0.68rem", color: FAINT, lineHeight: 1.2 }}>{job.endTime}</Typography>}
-                    </Box>}
+                    leading={job.startTime
+                      ? <DateTile top={job.startTime} bottom={job.endTime ? `ถึง ${job.endTime}` : "น."} />
+                      : <DateTile top="ทั้งวัน" />}
                     title={[job.title || job.company || "งาน", job.system].filter(Boolean).join(" · ")}
                     sub={[job.site || job.company, assignedName ? `ทีม ${assignedName}` : "", job.docNo ? `#${job.docNo}` : ""].filter(Boolean).join(" · ")}
-                    trailing={<Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.6, fontWeight: 700, fontSize: "0.76rem", color: INK_2 }}>
-                      <Dot color={getStatusMeta(job.status).color} />{job.status}
-                    </Box>} />
+                    trailing={<Pill color={getStatusMeta(job.status).color}>{job.status}</Pill>} />
                 );
               })}
             </Widget>
-          </div>
 
           {/* ─── แถบข้าง: งานค้างของช่างแยกรายคน (เฉพาะแอดมิน/manager) — ✅ ย้ายมาไว้ตรงนี้ (แทรกระหว่าง
         เนื้อหาช่วงบน/ล่างของหลัก) แทนที่จะอยู่หลังเนื้อหาหลักทั้งหมด เพราะบนมือถือ (คอลัมน์เดียว)
@@ -732,7 +691,6 @@ const Dashboard = () => {
             </div>
           )}
 
-          <div className="dashboard-main">
             {/* ─── SECTION 5.5: สัญญาที่เลยกำหนด/คงค้าง (จากหน้า "ภาพรวมงาน") — เปิดให้ทุกสิทธิ์ที่
           เข้าหน้า "ภาพรวมงาน" ได้เห็น (แอดมิน/manager/ช่าง) เพราะช่างก็มีสัญญาที่ตัวเองรับผิดชอบ
           เลยกำหนดได้เหมือนกัน — ✅ ตามที่ผู้ใช้ขอ: จอกว้าง (แอดมิน/manager) วางไว้ตรงนี้ (คอลัมน์หลัก
@@ -749,19 +707,19 @@ const Dashboard = () => {
             {/* ─── SECTION 6: TOP PROJECTS (เฉพาะแอดมิน/manager — events scope ตาม role มีความหมาย
           เป็น "ภาพรวมทั้งบริษัท" จริงๆ แค่กับสองสิทธิ์นี้เท่านั้น) ─── */}
             {isAdminOrManager && (
-              <Widget title="โครงการที่มีงานมากที่สุด" count={topProjects.length ? `${topProjects.length} โครงการ` : undefined} hint="นับจำนวนงานทั้งหมดในระบบ"
+              <Widget title="โครงการที่มีงานมากที่สุด" icon={ApartmentOutlined} count={topProjects.length ? `${topProjects.length} โครงการ` : undefined} hint="นับจำนวนงานทั้งหมดในระบบ"
                 footer={<Pager page={projectPage} pages={totalProjectPages} onChange={setProjectPage} />}>
                 {loading ? <Loading rows={5} /> : topProjects.length === 0 ? <Empty text="ยังไม่มีข้อมูลงานของโครงการ" /> : pagedProjects.map((p, i) => {
                   const rank = (projectPage - 1) * PROJECTS_PER_PAGE + i + 1;
                   return (
                     <Row key={`${p.company}|${p.site}`}
                       to={`/customers?tab=registry&company=${encodeURIComponent(p.company)}&site=${encodeURIComponent(p.site)}`}
-                      leading={<Typography sx={{ width: 22, textAlign: "center", fontWeight: 800, fontSize: "0.82rem", color: rank <= 3 ? INK : FAINT, fontVariantNumeric: "tabular-nums" }}>{rank}</Typography>}
+                      leading={<Box sx={{ width: 26, height: 26, borderRadius: "50%", display: "grid", placeItems: "center", fontWeight: 800, fontSize: "0.76rem", fontVariantNumeric: "tabular-nums", color: rank <= 3 ? ACCENT : MUTED, bgcolor: rank <= 3 ? alpha(ACCENT, 0.1) : SURFACE }}>{rank}</Box>}
                       title={p.name}
                       sub={<Box component="span" sx={{ display: "block", height: 4, mt: 0.75, borderRadius: 2, bgcolor: SURFACE, overflow: "hidden" }}>
-                        <Box component="span" sx={{ display: "block", height: "100%", width: `${Math.max((p.count / maxProjectCount) * 100, 4)}%`, bgcolor: "#94a3b8", borderRadius: 2 }} />
+                        <Box component="span" sx={{ display: "block", height: "100%", width: `${Math.max((p.count / maxProjectCount) * 100, 4)}%`, bgcolor: alpha(ACCENT, rank <= 3 ? 0.75 : 0.35), borderRadius: 2 }} />
                       </Box>}
-                      trailing={`${p.count} งาน`} />
+                      trailing={<Pill color={INK_2}>{p.count} งาน</Pill>} />
                   );
                 })}
               </Widget>
@@ -770,7 +728,7 @@ const Dashboard = () => {
             {/* ✅ ภาพรวมทีมงาน — 🐛 เดิมนับจาก role (ซึ่งตอนนี้คือ "ตำแหน่งในระบบ") จึงขึ้น "ผู้ดูแลระบบ 0" ผิดความจริง
                 ตอนนี้นับตาม Rank (ตำแหน่งในองค์กร) ด้วย isRole ตัวเดียวกับทั้งแอป และแสดงครบทุก Rank ที่มีคน */}
             {isAdmin && (
-              <Widget title="ภาพรวมทีมงาน" count={loading ? undefined : `${users.length} คน`} to="/staff?tab=registry" toLabel="ทะเบียนพนักงาน">
+              <Widget title="ภาพรวมทีมงาน" icon={GroupsOutlined} tone="#0f766e" count={loading ? undefined : `${users.length} คน`} to="/staff?tab=registry" toLabel="ทะเบียนพนักงาน">
                 {loading ? <Loading rows={1} /> : (
                   <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(3, 1fr)", sm: `repeat(${Math.max(teamItems.length, 1)}, 1fr)` }, py: 1 }}>
                     {teamItems.map((t, i) => (
@@ -849,7 +807,7 @@ const Dashboard = () => {
           }
           .dashboard-side--desktop {
             display: block;
-            width: 300px;
+            width: 360px;
             flex-shrink: 0;
             position: sticky;
             top: 16px;
@@ -859,6 +817,15 @@ const Dashboard = () => {
                แม้ตอนนี้จะไม่กระทบเนื้อหาหลักแล้วก็ตาม (คนละ flex item กันแล้ว) แต่ยังกันตัวเอง
                กระโดดเองเวลาขยาย/หุบ dropdown ภายในตัวมันเองไว้ด้วย */
             overflow-anchor: none;
+          }
+        }
+        @media (min-width: 1280px) {
+          .dashboard-widgets {
+            column-count: 2;
+            column-gap: 16px;
+          }
+          .dashboard-widgets > * {
+            break-inside: avoid;
           }
         }
         .action-hero-btn {
@@ -930,7 +897,7 @@ const baseStyles = {
     padding: "12px 14px 30px 14px",
     backgroundColor: "#f8fafc",
     width: "100%",
-    maxWidth: "1040px",
+    maxWidth: "1480px",
     margin: "0 auto",
     minHeight: "100vh",
   },

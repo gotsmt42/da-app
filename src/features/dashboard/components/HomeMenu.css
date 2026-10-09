@@ -367,3 +367,14 @@
     box-shadow: 0 6px 14px -8px rgba(15, 23, 42, 0.3);
   }
 }
+
+/* ✅ (9 ต.ค. 2569 ผู้ใช้: "หน้าจอคอมพื้นที่ว่างเยอะมาก") จอกว้าง — เมนูในหมวดเรียงเต็มแถวตามที่มี
+   (เดิมล็อก 4 ช่อง → หมวดที่มี 5 เมนูต้องขึ้นแถวใหม่ 1 ตัว เหลือที่ว่างโล่ง) ทำให้เมนูทั้งหมดสั้นลงเกือบครึ่ง */
+@media (min-width: 1280px) {
+  .hm-list {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+  .hm-list--half {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+}
