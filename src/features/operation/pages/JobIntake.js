@@ -22,6 +22,7 @@ import { alpha } from "@mui/material/styles";
 import {
   MoveToInboxOutlined, AddRounded, EditOutlined, ChevronRight, Close, EventAvailableOutlined, CheckRounded,
   ApartmentOutlined, CalendarMonthOutlined, GroupsOutlined, PersonOutlineOutlined, NotesOutlined, HourglassTopRounded, ReportProblemOutlined,
+  BlockRounded, RestoreRounded,
 } from "@mui/icons-material";
 import EventService from "@/shared/services/EventService";
 import CustomerService from "@/shared/services/CustomerService";
@@ -47,6 +48,7 @@ const STAGES = ["รับงาน", "ลงตาราง", "ช่างท�
 
 /** งานนี้อยู่ขั้นไหน + ข้อความสถานะ */
 const stageOf = (e) => {
+  if (e.cancelledAt) return { i: -1, label: "ยกเลิกแล้ว", color: MUTED };
   if (e.unscheduled) return { i: 0, label: "รอส่งลงตาราง", color: AMBER };
   if (e.status === "ดำเนินการเสร็จสิ้น") return { i: 4, label: "เสร็จสิ้น", color: GREEN };
   if (e.closeRequested) return { i: 3, label: "รอตรวจปิดงาน", color: ACCENT };
@@ -59,6 +61,8 @@ const TABS = [
   { key: "waiting", label: "รอส่งลงตาราง", short: "รอลงตาราง", test: (s) => s.i === 0 },
   { key: "active", label: "กำลังดำเนินการ", short: "กำลังทำ", test: (s) => s.i >= 1 && s.i <= 3 },
   { key: "done", label: "เสร็จแล้ว", short: "เสร็จแล้ว", test: (s) => s.i === 4 },
+  // ✅ แท็บ "ยกเลิก" โชว์เฉพาะตอนมีงานที่ยกเลิก (ไม่กินที่บนมือถือโดยไม่จำเป็น)
+  { key: "cancelled", label: "ยกเลิก", short: "ยกเลิก", test: (s) => s.i === -1, hideEmpty: true },
 ];
 
 const BTN = { textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", whiteSpace: "nowrap", fontSize: "0.82rem" };
@@ -158,7 +162,7 @@ const Line = ({ icon: Icon, children, color = "#475569", strong }) => (
   </Stack>
 );
 
-function JobCard({ job, onSchedule, onEdit }) {
+function JobCard({ job, onSchedule, onEdit, onCancel, onRestore }) {
   const st = stageOf(job);
   const fu = openFollowUp(job);
   const team = [job.team, ...(job.teamMembers || []).map((m) => m?.name)].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).join(", ");
@@ -167,12 +171,18 @@ function JobCard({ job, onSchedule, onEdit }) {
     : `เข้างาน ${formatThai(moment(job.start), "D MMM YYYY")}${job.startTime ? ` ${job.startTime}` : ""}`;
   const due = job.dueDate ? formatThai(moment(job.dueDate), "D MMM YYYY") : "";
 
-  const actions = st.i === 0 ? (
+  const GHOST = { ...BTN, color: "#334155", borderColor: LINE, "&:hover": { borderColor: "#cbd5e1", bgcolor: SURFACE } };
+  const actions = st.i === -1 ? (
+    <Button variant="outlined" onClick={() => onRestore(job)} startIcon={<RestoreRounded sx={{ fontSize: "17px !important" }} />}
+      sx={{ ...GHOST, flex: { xs: 1, sm: "0 0 auto" } }}>นำกลับมา</Button>
+  ) : st.i === 0 ? (
     <>
       <Button variant="outlined" onClick={() => onEdit(job)} startIcon={<EditOutlined sx={{ fontSize: "16px !important" }} />}
-        sx={{ ...BTN, flex: { xs: 1, sm: "0 0 auto" }, color: "#334155", borderColor: LINE, "&:hover": { borderColor: "#cbd5e1", bgcolor: SURFACE } }}>แก้ไข</Button>
+        sx={{ ...GHOST, flex: { xs: 1, sm: "0 0 auto" } }}>แก้ไข</Button>
+      <Button variant="outlined" onClick={() => onCancel(job)} startIcon={<BlockRounded sx={{ fontSize: "16px !important" }} />}
+        sx={{ ...BTN, flex: { xs: 1, sm: "0 0 auto" }, color: RED, borderColor: alpha(RED, 0.35), "&:hover": { borderColor: RED, bgcolor: alpha(RED, 0.04) } }}>ยกเลิก</Button>
       <Button variant="contained" onClick={() => onSchedule(job)} startIcon={<EventAvailableOutlined sx={{ fontSize: "17px !important" }} />}
-        sx={{ ...PRIMARY, flex: { xs: 2, sm: "0 0 auto" } }}>ส่งลงตาราง</Button>
+        sx={{ ...PRIMARY, flex: { xs: 1.6, sm: "0 0 auto" } }}>ส่งลงตาราง</Button>
     </>
   ) : (
     <Button component={Link} to={`/operation/${job._id}`} variant="outlined" endIcon={<ChevronRight />}
@@ -211,13 +221,18 @@ function JobCard({ job, onSchedule, onEdit }) {
             {job.description && <Line icon={NotesOutlined}>{job.description}</Line>}
             {job.infoPending && job.infoPendingNote && <Line icon={HourglassTopRounded} color={AMBER}>ขาด: {job.infoPendingNote}</Line>}
             {fu && st.i === 2 && <Line icon={ReportProblemOutlined} color={AMBER} strong>{fu.reason}{fu.note ? ` — ${fu.note}` : ""} · ต่อไป: {fu.nextOwner}</Line>}
+            {st.i === -1 && (
+              <Line icon={BlockRounded} color={RED} strong>
+                เหตุผล: {job.cancelReason || "-"} · ยกเลิกโดย {job.cancelledBy || "-"} {formatThai(moment(job.cancelledAt), "D MMM YYYY HH:mm")}
+              </Line>
+            )}
           </Stack>
-          <StageBar stage={st} />
+          {st.i >= 0 && <StageBar stage={st} />}
           {/* ✅ บอกชัดว่าต่อไปต้องทำอะไร (ตัวเดียวกับกล่อง "ขั้นตอนถัดไป" ในหน้าการดำเนินงาน) */}
           {(() => {
-            const nx = job.unscheduled
+            const nx = job.cancelledAt ? null : job.unscheduled
               ? { title: "ส่งลงตาราง", desc: "กด “ส่งลงตาราง” เลือกวันเข้างานและหัวหน้าทีม" }
-              : st.i < 4 ? nextStepOf(job, "admin") : null;
+              : st.i >= 0 && st.i < 4 ? nextStepOf(job, "admin") : null;
             return nx ? (
               <Typography sx={{ fontSize: "0.78rem", color: "#334155", mt: 0.75 }}>
                 <Box component="span" sx={{ fontWeight: 900, color: nx.tone || AMBER }}>ต่อไป: {nx.title}</Box> — {nx.desc}
@@ -243,12 +258,12 @@ export default function JobIntake() {
   const load = useCallback(async () => {
     try {
       const [dr, ev] = await Promise.all([
-        EventService.GetDraftEvents().catch(() => null),
+        EventService.GetDraftEvents({ includeCancelled: true }).catch(() => null),
         EventService.getEventOp().catch(() => null),
       ]);
       const drafts = Array.isArray(dr?.drafts) ? dr.drafts : [];
       const events = ev?.userEvents || [];
-      setRawDrafts(drafts);
+      setRawDrafts(drafts.filter((d) => !d.cancelledAt));
       setRawEvents(events);
       // ✅ เฉพาะงานที่รับผ่านเมนูนี้ — งานหลายวันรวมเป็นงานเดียว (ใช้วันแรก)
       const seen = new Set();
@@ -275,6 +290,40 @@ export default function JobIntake() {
     CustomerService, AuthService, JobTypeService, SystemTypeService, EventService, Swal, TomSelect, moment,
   });
 
+  // ✅ ยกเลิกงานที่รับไว้แต่ไม่ได้ทำ — บังคับเหตุผล · เก็บไว้ในแท็บ "ยกเลิก" นำกลับมาได้
+  const cancelJob = async (job) => {
+    const r = await Swal.fire({
+      title: "ยกเลิกงานนี้?",
+      html: `<div style="font-size:14px;color:#475569">${[job.title, job.site || job.company, job.jobNo].filter(Boolean).join(" · ")}</div>`,
+      input: "textarea",
+      inputLabel: "เหตุผลที่ยกเลิก",
+      inputPlaceholder: "เช่น ลูกค้ายกเลิก / ได้ช่างที่อื่นแล้ว / รับงานซ้ำ",
+      inputValidator: (v) => (!String(v || "").trim() ? "กรุณาระบุเหตุผล" : undefined),
+      showCancelButton: true,
+      confirmButtonText: "ยกเลิกงาน",
+      cancelButtonText: "ไม่ยกเลิก",
+      confirmButtonColor: RED,
+      reverseButtons: true,
+    });
+    if (!r.isConfirmed) return;
+    try {
+      await EventService.CancelIntake(job._id, { reason: r.value });
+      await load(); refreshAppBadges();
+      Swal.fire({ icon: "success", title: "ยกเลิกงานแล้ว", text: "ดูย้อนหลังได้ที่แท็บ “ยกเลิก”", timer: 1500, showConfirmButton: false });
+    } catch (err) {
+      Swal.fire({ icon: "error", title: "ยกเลิกไม่สำเร็จ", text: err?.response?.data?.message || "กรุณาลองใหม่" });
+    }
+  };
+  const restoreJob = async (job) => {
+    try {
+      await EventService.CancelIntake(job._id, { restore: true });
+      await load(); refreshAppBadges(); setTab("waiting");
+      Swal.fire({ icon: "success", title: "นำงานกลับมาแล้ว", timer: 1200, showConfirmButton: false });
+    } catch (err) {
+      Swal.fire({ icon: "error", title: "ไม่สำเร็จ", text: err?.response?.data?.message || "กรุณาลองใหม่" });
+    }
+  };
+
   const withStage = useMemo(() => (jobs || []).map((j) => ({ j, s: stageOf(j) })), [jobs]);
   const counts = useMemo(() => Object.fromEntries(TABS.map((t) => [t.key, withStage.filter((x) => t.test(x.s)).length])), [withStage]);
   const list = useMemo(() => {
@@ -293,11 +342,13 @@ export default function JobIntake() {
 
       {/* แท็บตามขั้นตอน */}
       <Stack direction="row" spacing={0.75} sx={{ mb: 1.5 }}>
-        {TABS.map((t) => {
+        {TABS.filter((t) => !t.hideEmpty || counts[t.key] > 0 || tab === t.key).map((t) => {
           const on = tab === t.key;
           return (
             <ButtonBase key={t.key} onClick={() => setTab(t.key)} sx={{
-              flex: { xs: 1, sm: "0 0 auto" }, minWidth: 0, height: 40, px: { xs: 0.75, sm: 1.75 }, borderRadius: 2.5, fontSize: { xs: "0.8rem", sm: "0.84rem" }, fontWeight: 800, gap: 0.6, whiteSpace: "nowrap",
+              // ✅ มือถือ: ตัวเลขบน ชื่อล่าง — 4 แท็บไม่ล้นจอ (ผู้ใช้แจ้งแท็บแรกตกขอบ)
+              flex: { xs: 1, sm: "0 0 auto" }, minWidth: 0, height: { xs: 54, sm: 40 }, px: { xs: 0.5, sm: 1.75 }, borderRadius: 2.5,
+              flexDirection: { xs: "column-reverse", sm: "row" }, fontSize: { xs: "0.74rem", sm: "0.84rem" }, fontWeight: 800, gap: { xs: 0.2, sm: 0.6 }, whiteSpace: "nowrap", overflow: "hidden",
               border: `1.5px solid ${on ? ACCENT : LINE}`, bgcolor: on ? alpha(ACCENT, 0.07) : "#fff", color: on ? ACCENT : "#334155",
             }}>
               <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>{t.label}</Box>
@@ -311,10 +362,10 @@ export default function JobIntake() {
       {!jobs ? (
         <Stack spacing={1}>{[0, 1, 2].map((i) => <Skeleton key={i} variant="rounded" height={88} sx={{ borderRadius: 3 }} />)}</Stack>
       ) : list.length ? (
-        <Panel>{list.map((j) => <JobCard key={j._id} job={j} onSchedule={setScheduling} onEdit={openForm} />)}</Panel>
+        <Panel>{list.map((j) => <JobCard key={j._id} job={j} onSchedule={setScheduling} onEdit={openForm} onCancel={cancelJob} onRestore={restoreJob} />)}</Panel>
       ) : (
         <EmptyState icon={<MoveToInboxOutlined />}
-          title={tab === "waiting" ? "ไม่มีงานรอส่งลงตาราง" : tab === "active" ? "ไม่มีงานที่กำลังดำเนินการ" : "ยังไม่มีงานที่เสร็จ"}
+          title={tab === "waiting" ? "ไม่มีงานรอส่งลงตาราง" : tab === "active" ? "ไม่มีงานที่กำลังดำเนินการ" : tab === "cancelled" ? "ไม่มีงานที่ยกเลิก" : "ยังไม่มีงานที่เสร็จ"}
           hint={tab === "waiting" ? "ได้งานมาแล้ว กด “รับงานใหม่” เพื่อกรอกเก็บไว้ก่อน" : undefined}
           action={tab === "waiting" ? <Button variant="contained" startIcon={<AddRounded />} onClick={() => openForm()} sx={{ ...PRIMARY, mt: 1 }}>รับงานใหม่</Button> : null} />
       )}

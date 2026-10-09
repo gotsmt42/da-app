@@ -201,6 +201,11 @@ const EventService = {
     const res = await API.put(`/events/${id}/follow-up`, payload);
     return res.data;
   },
+  /** ยกเลิกงานที่รับไว้ (บังคับเหตุผล) หรือนำกลับมา ({ restore: true }) */
+  async CancelIntake(id, payload) {
+    const res = await API.put(`/events/${id}/cancel-intake`, payload);
+    return res.data;
+  },
   async ResolveFollowUp(id, payload = {}) {
     const res = await API.put(`/events/${id}/follow-up/resolve`, payload);
     return res.data;
@@ -308,7 +313,11 @@ const EventService = {
   /** @param {object} [opts] — รองรับ scope เดียวกับ getEventOp (ดูคำอธิบายที่นั่น) */
   async GetDraftEvents(opts = {}) {
     try {
-      const response = await API.get(`/events/drafts`, { params: opts.scope ? { scope: opts.scope } : {} });
+      const params = {};
+      if (opts.scope) params.scope = opts.scope;
+      // ✅ หน้า "รับงาน" ขอรวมงานที่ยกเลิกแล้วด้วย (แท็บ "ยกเลิก") — ที่อื่นไม่ส่ง = server ตัดออกให้
+      if (opts.includeCancelled) params.includeCancelled = "1";
+      const response = await API.get(`/events/drafts`, { params });
       return response.data;
     } catch (error) {
       console.error("Error fetching draft events:", error);
