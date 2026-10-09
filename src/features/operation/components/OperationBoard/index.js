@@ -1748,7 +1748,7 @@ const EventRowCard = ({
         )}
 
         {/* ✅ ขั้นตอนทำงาน: สถานะรับงาน · รอข้อมูล · อุปกรณ์ · งานไม่เสร็จ (ปุ่ม "จัดการแล้ว") */}
-        {!hideDocuments && <JobFlowPanel event={event} mode="admin" onPatched={onPatched} />}
+        {!hideDocuments && <JobFlowPanel event={event} mode="admin" onPatched={onPatched} onStatusUpdate={onStatusUpdate} />}
 
         {/* แจ้งเตือนคำขอปิดงานจากช่าง (ยังไม่อนุมัติ) — ใช้ Box แทน Alert action slot
             เพราะ Alert วางข้อความ+ปุ่มแถวเดียวกันแล้วทับ/ล้นกันบนจอมือถือ

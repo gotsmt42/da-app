@@ -36,6 +36,7 @@ import { PageHeader, Panel, EmptyState, INK, MUTED, LINE, ACCENT, SURFACE } from
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import { getAddDraftEvent } from "@/features/calendar/components/EventForms/AddDraftEvent";
 import { isUrgent, openFollowUp } from "@/shared/utils/jobFlow";
+import { nextStepOf } from "@/shared/ui/JobFlow";
 
 const AMBER = "#d97706";
 const GREEN = "#16a34a";
@@ -212,6 +213,17 @@ function JobCard({ job, onSchedule, onEdit }) {
             {fu && st.i === 2 && <Line icon={ReportProblemOutlined} color={AMBER} strong>{fu.reason}{fu.note ? ` — ${fu.note}` : ""} · ต่อไป: {fu.nextOwner}</Line>}
           </Stack>
           <StageBar stage={st} />
+          {/* ✅ บอกชัดว่าต่อไปต้องทำอะไร (ตัวเดียวกับกล่อง "ขั้นตอนถัดไป" ในหน้าการดำเนินงาน) */}
+          {(() => {
+            const nx = job.unscheduled
+              ? { title: "ส่งลงตาราง", desc: "กด “ส่งลงตาราง” เลือกวันเข้างานและหัวหน้าทีม" }
+              : st.i < 4 ? nextStepOf(job, "admin") : null;
+            return nx ? (
+              <Typography sx={{ fontSize: "0.78rem", color: "#334155", mt: 0.75 }}>
+                <Box component="span" sx={{ fontWeight: 900, color: nx.tone || AMBER }}>ต่อไป: {nx.title}</Box> — {nx.desc}
+              </Typography>
+            ) : null;
+          })()}
         </Box>
         <Stack direction="row" spacing={0.75} sx={{ flexShrink: 0, width: { xs: "100%", sm: "auto" } }}>{actions}</Stack>
       </Stack>
