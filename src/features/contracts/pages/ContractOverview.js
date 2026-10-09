@@ -367,8 +367,10 @@ const progressInfo = (c, countUsedRoundsFn) => {
       color: allDone ? STATUS_COLOR["ดำเนินการเสร็จสิ้น"] : doneInYear === 0 ? "#9ca3af" : "#f59e0b",
     };
   }
+  // ✅ (9 ต.ค. 2569 ผู้ใช้: "ตัวอื่นที่ไม่ใช่ 2 ปี ควรแสดงปีด้วย") สัญญาปีเดียวก็บอกปีของสัญญา เช่น "2/4 · 2569-70"
+  const y1 = contractYearLabel(c, 1);
   return {
-    label: `${doneCount}/${total}`,
+    label: `${doneCount}/${total}${y1 ? ` · ${y1}` : ""}`,
     color: doneCount === 0 ? "#9ca3af" : doneCount >= total ? STATUS_COLOR["ดำเนินการเสร็จสิ้น"] : "#f59e0b",
   };
 };
