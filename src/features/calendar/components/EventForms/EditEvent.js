@@ -1876,6 +1876,18 @@ export const getEditEvent = async ({
   <!-- ── Body ── -->
   <div id="ee-body">
 
+    <!-- ✅ (8 ต.ค. 2569 ผู้ใช้: "หาจุดวางที่จะกดไปหน้าดำเนินงานได้ง่าย ชัดเจน · อันเดิมซ่อนอยู่ในเมนู ⋯")
+         (9 ต.ค. 2569: "ไม่ควรต้องเลื่อนลงมาหา ให้อยู่โซนบนเจอทันที") — บนสุดของเนื้อหา ใต้หัวกล่อง/สถานะ -->
+    ${canViewOperation ? `
+    <button type="button" id="btnGoOperation" style="width:100%;display:flex;align-items:center;gap:12px;margin:0 0 12px;padding:10px 12px;border-radius:14px;border:1px solid #bfdbfe;background:#eff6ff;cursor:pointer;text-align:left;font-family:inherit">
+      <span style="flex-shrink:0;width:36px;height:36px;border-radius:10px;background:#2563eb;color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px">📊</span>
+      <span style="flex:1;min-width:0">
+        <span style="display:block;font-size:14.5px;font-weight:800;color:#1e3a8a">ไปที่หน้าการดำเนินงาน</span>
+        <span style="display:block;font-size:12px;color:#475569;margin-top:1px">เช็คอิน · แนบเอกสาร · ใบเสนอราคา · ขอปิดงาน</span>
+      </span>
+      <span style="flex-shrink:0;font-size:22px;color:#2563eb;font-weight:700">›</span>
+    </button>` : ""}
+
     <!-- ✅ สถานะอนุมัติ — อยู่บนสุดของฟอร์ม เหนือกล่องสัญญาด้วยซ้ำ เพราะเป็นข้อเท็จจริงสำคัญที่สุดของ
          งานนี้ตอนยังไม่ approved (งานที่สร้างโดยคนที่ไม่ใช่แอดมิน/manager ต้องรอการอนุมัติก่อน) -->
     ${eventApprovalState === "pending" ? `
@@ -1943,17 +1955,7 @@ export const getEditEvent = async ({
 
     ${stepperHtml}
 
-    <!-- ✅ (8 ต.ค. 2569 ผู้ใช้: "หาจุดวางที่จะกดไปหน้าดำเนินงานได้ง่าย ชัดเจน · อันเดิมซ่อนอยู่ในเมนู ⋯")
-         วางใต้แถบขั้นตอนสถานะ — เป็นงานถัดไปหลังยืนยันแล้ว (เช็คอิน · แนบเอกสาร · ขอปิดงาน) -->
-    ${canViewOperation ? `
-    <button type="button" id="btnGoOperation" style="width:100%;display:flex;align-items:center;gap:12px;margin:0 0 14px;padding:12px 14px;border-radius:14px;border:1px solid #bfdbfe;background:#eff6ff;cursor:pointer;text-align:left;font-family:inherit">
-      <span style="flex-shrink:0;width:36px;height:36px;border-radius:10px;background:#2563eb;color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px">📊</span>
-      <span style="flex:1;min-width:0">
-        <span style="display:block;font-size:14.5px;font-weight:800;color:#1e3a8a">ไปที่หน้าการดำเนินงาน</span>
-        <span style="display:block;font-size:12px;color:#475569;margin-top:1px">เช็คอิน · แนบเอกสาร · ใบเสนอราคา · ขอปิดงาน</span>
-      </span>
-      <span style="flex-shrink:0;font-size:22px;color:#2563eb;font-weight:700">›</span>
-    </button>` : ""}
+
 
     <!-- ✅ ข้อมูลสัญญา — ย้ายมาไว้บนสุด (เดิมอยู่ล่างสุด ต้องเลื่อนจอไปดู) เพราะเป็นข้อมูลอ้างอิงหลักของ
          "ครั้งที่" นี้ที่มักต้องเช็คก่อนแก้อย่างอื่น ใส่กล่องพื้นหลังโทนม่วง-น้ำเงินแยกจากส่วนอื่นชัดเจน

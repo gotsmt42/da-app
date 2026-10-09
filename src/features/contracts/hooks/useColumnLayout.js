@@ -13,10 +13,11 @@ export const OVERVIEW_COLUMNS = [
   // ✅ (8 ต.ค. 2569) รวมเหลือ 6 คอลัมน์ตามที่ผู้ใช้เลือก — ดู MERGED_COLUMNS ใน ContractOverview.js
   // ตัวระบุงาน — ซ่อนไม่ได้ ไม่งั้นแถวในตารางจะไม่มีอะไรบอกเลยว่าเป็นงานไหน
   { key: "customer", label: "โครงการ / เลขที่สัญญา / ผู้ติดต่อ", locked: true },
-  { key: "work", label: "งาน · แผนก" },
+  { key: "work", label: "งาน (ประเภท / ระบบ)" },
   { key: "responsiblePerson", label: "ผู้รับผิดชอบ" },
   { key: "contract", label: "สัญญา · สถานะ" },
-  { key: "money", label: "มูลค่า · ค่าคอม" },
+  { key: "jobValue", label: "มูลค่างาน" },
+  { key: "commission", label: "ค่าคอมลูกค้า" },
   { key: "visits", label: "ครั้งที่เข้างาน" },
 ];
 

@@ -462,22 +462,21 @@ const CLOSED_VIEWS = ["expired", "completed"];
  *   (ผู้รับผิดชอบ · ครั้งที่เข้างาน คงเดิม · หมายเหตุอยู่ในกล่อง "แก้ไขข้อมูล")
  * วิธีทำ: เซลล์ย่อยเดิมยังเขียนแยกเหมือนเดิม แล้วค่อย "ประกอบ" เป็นช่องเดียวตอนวาด — แก้ไขในช่องได้เหมือนเดิมทุกจุด
  */
+// ✅ (9 ต.ค. 2569 ผู้ใช้) ตัดแผนกออกจากตาราง (ไม่ได้ใช้ดู) · แยก มูลค่างาน กับ ค่าคอม กลับเป็นคนละคอลัมน์
 const MERGED_COLUMNS = {
   customer: ["customer", "doc"],
-  work: ["work", "departmentTag"],
   contract: ["period", "statusProgress"],
-  money: ["jobValue", "commission"],
 };
-const MERGED_CAPTION = { money: [null, "ค่าคอมลูกค้า"] };
+const MERGED_CAPTION = {};
+// ✅ ช่องที่รวมแล้วจัดชิดซ้ายทั้งช่อง (ผู้ใช้: "ข้อมูลให้ชิดซ้ายเหมือนกัน")
+const MERGED_LEFT = { contract: true };
 const mergedWidthKey = (k, hideContractOnly) => ({
-  customer: "customer", work: "work", money: "jobValue",
+  customer: "customer",
   contract: hideContractOnly ? "statusProgress" : "period",
 }[k] || k);
 const mergedHeaderLabel = (k, hideContractOnly) => ({
   customer: hideContractOnly ? "โครงการ / เอกสาร / ผู้ติดต่อ" : "โครงการ / เลขที่สัญญา / ผู้ติดต่อ",
-  work: "งาน · แผนก",
   contract: hideContractOnly ? "สถานะ / คืบหน้า" : "สัญญา · สถานะ",
-  money: "มูลค่า · ค่าคอม (฿)",
 }[k]);
 const flatElements = (node) => Children.toArray(node)
   .flatMap((ch) => (isValidElement(ch) && ch.type === Fragment ? flatElements(ch.props.children) : [ch]))
@@ -501,10 +500,14 @@ const mergeCells = (k, parts, { header = false, hideContractOnly = false } = {})
       </Box>
     );
   }));
-  const align = all[0].props.align || "left";
+  const left = MERGED_LEFT[k];
+  const align = left ? "left" : (all[0].props.align || "left");
   return (
     <TableCell data-col-key={widthKey} align={align}
-      sx={{ width: `var(--col-${widthKey}, ${DEFAULT_COL_WIDTHS[widthKey]}px)`, maxWidth: `var(--col-${widthKey}, ${DEFAULT_COL_WIDTHS[widthKey]}px)`, verticalAlign: "middle" }}>
+      sx={{
+        width: `var(--col-${widthKey}, ${DEFAULT_COL_WIDTHS[widthKey]}px)`, maxWidth: `var(--col-${widthKey}, ${DEFAULT_COL_WIDTHS[widthKey]}px)`, verticalAlign: "middle",
+        ...(left ? { textAlign: "left", "& .MuiStack-root": { alignItems: "flex-start !important", justifyContent: "flex-start !important" } } : {}),
+      }}>
       {blocks}
     </TableCell>
   );
@@ -648,7 +651,7 @@ const dragKeyOfColumn = (columnKey) => {
   // ✅ หัวคอลัมน์ที่รวมแล้วใช้คีย์ของเซลล์ย่อยแรก — แปลงกลับเป็นคีย์คอลัมน์ที่ผู้ใช้เห็น (ลาก/เมนูคอลัมน์)
   const k = String(columnKey || "");
   if (k.startsWith("visit_")) return "visits";
-  return { docRef: "customer", docNo: "customer", departmentTag: "work", period: "contract", statusProgress: "contract", jobValue: "money", commission: "money" }[k] || columnKey;
+  return { docRef: "customer", docNo: "customer", period: "contract", statusProgress: "contract" }[k] || columnKey;
 };
 
 const ResizableTh = ({ width, align = "left", children, onResize, rowSpan = 1, columnKey, tableRef, sortable = false, sortDirection = null, onSort, resizable = true }) => {
@@ -2306,7 +2309,7 @@ export default function ContractOverview() {
     [filtered]
   );
   // ── ลำดับ/การซ่อนคอลัมน์ (ลากหัวตารางสลับได้ · เมนู "คอลัมน์") — ดู hooks/useColumnLayout.js ──
-  const columnLayout = useColumnLayout("contractOverview.columns.v2");
+  const columnLayout = useColumnLayout("contractOverview.columns.v3");
   // จำนวนช่องจริงในตารางของแต่ละคอลัมน์ที่ผู้ใช้เห็น — 0 = แท็บนี้ไม่มีคอลัมน์นั้น
   const spanOfColumn = useCallback((k) => {
     if (k === "visits") return visitColumns.length;
@@ -2507,7 +2510,7 @@ export default function ContractOverview() {
     const segs = [];
     let run = showCheckboxes ? 1 : 0;
     visibleCols.forEach((k) => {
-      if (k === "money") {
+      if (k === "jobValue" || k === "commission") {
         if (run) segs.push({ type: "gap", span: run });
         segs.push({ type: k, span: 1 });
         run = 0;
@@ -4150,8 +4153,7 @@ pagedRows.map((c, idx) => {
                         {/* ⚠️ โชว์ % ของมูลค่างานเป็นข้อมูลประกอบเท่านั้น ไม่ได้เก็บลงฐานข้อมูล — ค่าที่ตกลง
                             กับลูกค้าคือ "จำนวนเงิน" ถ้าเก็บเป็น % แล้ววันหนึ่งมูลค่างานถูกแก้ ค่าคอมจะเปลี่ยน
                             ตามเองเงียบๆ ทั้งที่ตกลงกันเป็นตัวเงินไปแล้ว (ดูเหตุผลเต็มที่ models/Events.js) */}
-                        {/* ✅ รวมอยู่ในช่องมูลค่า — โชว์เฉพาะที่มีค่าคอมจริง (แก้/เพิ่มได้ในกล่อง "แก้ไขข้อมูล") */}
-                        {hasMoney(c.commission) && <EditableCell
+                        <EditableCell
                           editable={isAdminOrManager && canEditField(c, "commission")} columnKey="commission"
                           editing={tableEditingCell?.key === c.key && tableEditingCell?.field === "commission"}
                           value={c.commission} editValue={editValue} editType="number" saving={editSaving}
@@ -4169,7 +4171,7 @@ pagedRows.map((c, idx) => {
                           onStartEdit={() => beginEdit(c, "commission")}
                           onCommit={(v) => commitEdit(c, v)}
                           onCancel={cancelEdit}
-                        />}
+                        />
                       </>
                     ),
                     statusProgress: (
@@ -4935,7 +4937,6 @@ pagedRows.map((c, idx) => {
               </Box>
             )}
             {tag(jobTypeLabel, jobTypeColor)}
-            <DepartmentPill value={c.departmentTag} />
             {bs && bs.state !== "not_invoiced" && tag(bs.state === "overdue" && bs.overdueDays > 0 ? `เลยกำหนดชำระ ${bs.overdueDays} วัน` : bs.label, bs.color)}
           </Stack>
           {/* ✅ เตือนรอบเข้างาน — แถบเต็มความกว้างใต้ป้าย (สัญลักษณ์ + ครั้งที่ + เดือนที่ต้องเข้า + ปุ่มลงครั้งถัดไป) */}
@@ -6474,8 +6475,15 @@ pagedRows.map((c, idx) => {
               >
                 {footerSegments.map((seg, i) => {
                   // ยอดรวมของคอลัมน์ที่ถูกซ่อนไว้ ไปโผล่ในป้ายแทน — ซ่อนคอลัมน์แล้วยอดต้องไม่หายไปด้วย
-                  const jobValueHidden = !visibleCols.includes("money");
-                  const commissionHidden = !visibleCols.includes("money");
+                  const jobValueHidden = !visibleCols.includes("jobValue");
+                  const commissionHidden = !visibleCols.includes("commission");
+                  if (seg.type === "jobValue") {
+                    return (
+                      <TableCell key={i} align="center" sx={{ fontWeight: 800, fontSize: "1rem", color: ACCENT, whiteSpace: "nowrap" }}>
+                        {formatBaht(jobValueSummary.total)}
+                      </TableCell>
+                    );
+                  }
                   if (seg.type === "money") {
                     return (
                       <TableCell key={i} align="center" sx={{ whiteSpace: "nowrap" }}>
