@@ -878,14 +878,14 @@ function injectStyles() {
     .ee-hm-value small { font-weight: 500; color: #94a3b8; font-size: 11px; }
     .ee-hm-value--empty { color: #94a3b8; font-weight: 600; }
     .ee-hm-value--edit { display: flex; align-items: center; gap: 8px; min-width: 0; }
-    #ee-respSelect {
+    #ee-respSelect, #ee-teamSelect {
       appearance: none; -webkit-appearance: none; min-width: 0; max-width: 100%; flex: 0 1 auto;
       height: 30px; padding: 0 28px 0 10px; border-radius: 8px; border: 1px solid #cbd5e1; cursor: pointer;
       font: inherit; font-size: 13px; font-weight: 700; color: #0f172a; text-overflow: ellipsis;
       background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 8px center / 14px;
     }
-    #ee-respSelect:hover { border-color: #2563eb; }
-    #ee-respSelect:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+    #ee-respSelect:hover, #ee-teamSelect:hover { border-color: #2563eb; }
+    #ee-respSelect:focus, #ee-teamSelect:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
     /* ── เมนูเลือก (enhanceSelect) ── */
     .ee-pick-btn {
       display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; cursor: pointer; text-align: left;
@@ -958,8 +958,8 @@ function injectStyles() {
     .ee-pick-layer--sheet .ee-pick-item { padding: 10px 12px; font-size: 15px; }
     .ee-pick-layer--sheet .ee-pick-item .ee-av, .ee-pick-layer--sheet .ee-pick-item .ee-av-wrap { width: 34px !important; height: 34px !important; font-size: 14px !important; }
     .ee-pick-layer--sheet .ee-pick-item .ee-pick-ico { width: 34px; height: 34px; }
-    #ee-respMsg { font-style: normal; font-size: 11px; font-weight: 700; white-space: nowrap; color: #94a3b8; }
-    #ee-respMsg.ok { color: #16a34a; } #ee-respMsg.err { color: #dc2626; white-space: normal; }
+    #ee-respMsg, .ee-hm-msg { font-style: normal; font-size: 11px; font-weight: 700; white-space: nowrap; color: #94a3b8; }
+    #ee-respMsg.ok, .ee-hm-msg.ok { color: #16a34a; } #ee-respMsg.pending, .ee-hm-msg.pending { color: #d97706; } #ee-respMsg.err, .ee-hm-msg.err { color: #dc2626; white-space: normal; }
     .swal-edit-event #ee-status-title .ee-tag {
       background: #f8fafc; border: 1px solid #e2e8f0; color: #334155; font-size: 11.5px; padding: 2px 9px;
     }
@@ -1745,6 +1745,15 @@ export const getEditEvent = async ({
     .map((e) => optionHtml(e.fname, eventTeam === e.fname))
     .join("");
 
+  // ✅ หัวหน้าทีมเข้างานเลือกจากหัวกล่องได้เลย (ผู้ใช้สั่ง 9 ต.ค. 2569) — ของ "ช่วงวันนี้" (team/resPerson) ไม่ใช่ทั้งงาน
+  const headTeamOpts = [
+    `<option value=""${eventTeam ? "" : " selected"}>— ยังไม่ระบุ —</option>`,
+    ...[...employeeList].filter((e) => e.fname).sort((a, b) => a.fname.localeCompare(b.fname, "th"))
+      .map((e) => optionHtml(e.fname, eventTeam === e.fname)),
+    // ชื่อทีมเดิมที่ไม่ได้อยู่ในรายชื่อพนักงาน (ข้อมูลเก่า) ยังต้องเห็นอยู่
+    ...(eventTeam && !employeeList.some((e) => e.fname === eventTeam) ? [optionHtml(eventTeam, true)] : []),
+  ].join("");
+
   // ✅ มอบหมายผู้รับผิดชอบจากหัวกล่องนี้ได้เลย (ผู้ใช้สั่ง 3 ต.ค. 2569) — สิทธิ์ชุดเดียวกับหน้าการดำเนินงาน
   //    (editContracts) และบันทึกผ่าน /events/basic-info ตัวเดียวกับหน้าภาพรวมงาน/การดำเนินงาน — server
   //    ตั้งค่าให้ทุกวัน/ทุกครั้งของงานเดียวกัน (services/groupResponsible.js) ทุกหน้าจึงเห็นชื่อเดียวกัน
@@ -1854,7 +1863,10 @@ export const getEditEvent = async ({
       </div>
       <div class="ee-hm-item">
         <span class="ee-hm-label"><i aria-hidden="true">👷</i>หัวหน้าทีมเข้างาน</span>
-        <span class="ee-hm-value${eventTeam ? "" : " ee-hm-value--empty"}">${eventTeam ? attrHtml(eventTeam) : "ยังไม่ระบุ"}</span>
+        ${/* ✅ (9 ต.ค. 2569 ผู้ใช้: "ระบุหัวหน้าทีมที่เข้างานได้เลย เหมือนผู้รับผิดชอบ") — เลือกแล้วบันทึกทันที */""}
+        ${canEditTeamAssignment
+          ? `<span class="ee-hm-value ee-hm-value--edit"><select id="ee-teamSelect" aria-label="หัวหน้าทีมเข้างาน">${headTeamOpts}</select><em id="ee-teamMsg" class="ee-hm-msg" aria-live="polite"></em></span>`
+          : `<span class="ee-hm-value${eventTeam ? "" : " ee-hm-value--empty"}">${eventTeam ? attrHtml(eventTeam) : "ยังไม่ระบุ"}</span>`}
       </div>
       ${eventJobClassMeta ? `<div class="ee-hm-item">
         <span class="ee-hm-label"><i aria-hidden="true">${eventJobClassMeta.emoji}</i>ประเภทงาน</span>
@@ -2687,6 +2699,12 @@ export const getEditEvent = async ({
           },
         });
         const imgByName = new Map(employeeList.map((e) => [e.fname, e.imageUrl || ""]));
+        enhanceSelect(document.getElementById("ee-teamSelect"), {
+          host, title: "หัวหน้าทีมเข้างาน", btnClass: "ee-pick-btn--person", search: true, clearLabel: "ไม่ระบุหัวหน้าทีม",
+          renderItem: (o) => (o.value
+            ? `${personAvatarHtml(o.value, imgByName.get(o.value))}<span class="ee-pick-text">${escapeHtml(o.label)}</span>`
+            : `${personAvatarHtml("", "")}<span class="ee-pick-text ee-pick-text--muted">ยังไม่ระบุ</span>`),
+        });
         enhanceSelect(document.getElementById("ee-respSelect"), {
           host, title: "มอบหมายผู้รับผิดชอบ", btnClass: "ee-pick-btn--person", search: true, clearLabel: "ยกเลิกการมอบหมาย",
           renderItem: (o) => (o.value
@@ -2695,31 +2713,38 @@ export const getEditEvent = async ({
         });
       }
 
-      /* ✅ มอบหมายผู้รับผิดชอบจากหัวกล่อง — บันทึกทันทีที่เลือก (ไม่ต้องรอกดบันทึกทั้งฟอร์ม) */
+      /* ✅ หัวหน้าทีมเข้างานจากหัวกล่อง — (9 ต.ค. 2569 ผู้ใช้: "เวลากดเลือกต้องให้กดบันทึกก่อนค่อยบันทึก")
+         เลือกแล้วแค่ตั้งค่าช่อง "หัวหน้าทีม" ในฟอร์มให้ตรงกัน แล้วบันทึกไปพร้อมฟอร์มตอนกด "บันทึก" */
+      {
+        const teamSel = document.getElementById("ee-teamSelect");
+        const teamMsg = document.getElementById("ee-teamMsg");
+        const initialTeam = teamSel?.value || "";
+        teamSel?.addEventListener("change", () => {
+          const name = teamSel.value;
+          const formTeam = document.getElementById("editTeam");
+          if (formTeam?.tomselect) {
+            if (name && !formTeam.tomselect.options[name]) formTeam.tomselect.addOption({ value: name, text: name });
+            formTeam.tomselect.setValue(name, true);
+          } else if (formTeam) formTeam.value = name;
+          if (teamMsg) {
+            const changed = name !== initialTeam;
+            teamMsg.textContent = changed ? "ยังไม่บันทึก — กด “บันทึก”" : "";
+            teamMsg.className = changed ? "ee-hm-msg pending" : "ee-hm-msg";
+          }
+        });
+      }
+
+      /* ✅ มอบหมายผู้รับผิดชอบจากหัวกล่อง — (9 ต.ค. 2569) เลือกแล้วรอกด "บันทึก" เหมือนช่องอื่นในฟอร์ม
+         ค่าที่เลือกบันทึกใน saveHeadResponsible() ตอนกดบันทึก (ดู Save ด้านล่าง) */
       {
         const respSel = document.getElementById("ee-respSelect");
         const respMsg = document.getElementById("ee-respMsg");
-        let prev = respSel?.value || "";
-        respSel?.addEventListener("change", async () => {
-          const name = respSel.value;
-          const person = employeeList.find((e) => e.fname === name);
-          respSel.disabled = true;
-          respSel.nextElementSibling?.setAttribute("disabled", "");
-          if (respMsg) { respMsg.textContent = "กำลังบันทึก..."; respMsg.className = ""; }
-          try {
-            await EventService.UpdateBasicInfo([eventId], { responsiblePerson: name, responsiblePersonId: person?._id ? String(person._id) : "" });
-            prev = name;
-            // อัปเดตการ์ดในปฏิทินทันที (ค่าที่เหลือของทั้งกลุ่มมาตามรอบเรียลไทม์)
-            try { ev.setExtendedProp?.("responsiblePerson", name); ev.setExtendedProp?.("responsiblePersonId", person?._id ? String(person._id) : ""); } catch { /* ไม่สำคัญ */ }
-            if (respMsg) { respMsg.textContent = "✓ บันทึกแล้ว"; respMsg.className = "ok"; }
-          } catch (err) {
-            respSel.value = prev;
-            respSel.dispatchEvent(new Event("change"));
-            if (respMsg) { respMsg.textContent = err?.response?.data?.message || "บันทึกไม่สำเร็จ"; respMsg.className = "err"; }
-          } finally {
-            respSel.disabled = false;
-            respSel.nextElementSibling?.removeAttribute("disabled");
-            setTimeout(() => { if (respMsg?.className === "ok") respMsg.textContent = ""; }, 2500);
+        if (respSel) respSel.dataset.initial = respSel.value || "";
+        respSel?.addEventListener("change", () => {
+          const changed = (respSel.value || "") !== (respSel.dataset.initial || "");
+          if (respMsg) {
+            respMsg.textContent = changed ? "ยังไม่บันทึก — กด “บันทึก”" : "";
+            respMsg.className = changed ? "pending" : "";
           }
         });
       }
@@ -3468,6 +3493,16 @@ export const getEditEvent = async ({
         ]);
       };
 
+      /** ✅ ผู้รับผิดชอบที่เลือกไว้บนหัวกล่อง — บันทึกตอนกด "บันทึก" เท่านั้น (ทั้งงาน ผ่าน /events/basic-info) */
+      const saveHeadResponsible = async () => {
+        const respSel = document.getElementById("ee-respSelect");
+        if (!respSel || (respSel.value || "") === (respSel.dataset.initial || "")) return;
+        const name = respSel.value || "";
+        const person = employeeList.find((e) => e.fname === name);
+        await EventService.UpdateBasicInfo([eventId], { responsiblePerson: name, responsiblePersonId: person?._id ? String(person._id) : "" });
+        respSel.dataset.initial = name;
+      };
+
       /* Save */
       document
         .getElementById("btnConfirm")
@@ -3522,6 +3557,7 @@ export const getEditEvent = async ({
               if (contractFields) {
                 await EventService.UpdateContractFields(eventContractGroupId, contractFields);
               }
+              await saveHeadResponsible();
               setLoading(false);
               Swal.fire({
                 title: "บันทึกสำเร็จ ✅",
@@ -3645,6 +3681,7 @@ export const getEditEvent = async ({
             if (contractFields) {
               await EventService.UpdateContractFields(eventContractGroupId, contractFields);
             }
+            await saveHeadResponsible();
             setLoading(false);
             Swal.fire({
               title: "บันทึกสำเร็จ ✅",
