@@ -18,6 +18,8 @@ import {
   Notifications, NotificationsNone, Close, DoneAll, Build, AccountBalanceWallet, ShoppingCart, AccessTime,
   AssignmentInd, MarkEmailUnread, CalendarMonth, DeleteSweep, Storefront,
 } from "@mui/icons-material";
+import { useAuth } from "@/features/auth/AuthContext";
+import { departmentOf } from "@/shared/utils/roles";
 import useInbox, { markInboxRead, markAllInboxRead, clearReadInbox, loadMoreInbox } from "@/shared/hooks/useInbox";
 
 const TEXT_MAIN = "#0f172a";
@@ -40,16 +42,18 @@ const KINDS = [
  * ✅ (9 ต.ค. 2569 ผู้ใช้: "การแจ้งเตือนของหน้าเซล ช่าง ให้แยกให้ถูกต้อง") หมวดของแจ้งเตือน — อ่านจาก url
  *   sales = นัดหมาย/ใบแจ้งงานของฝ่ายขาย · service = งานช่าง (ปฏิทิน/ดำเนินงาน/สัญญา/คำขอลงงาน) · other = เบิก/OT/จัดซื้อ/เว็บ
  */
-const sectionOf = (url) => {
+const sectionOf = (url, myDept) => {
   const u = String(url || "");
   if (/^\/sales|[?&]dept=sales/.test(u)) return "sales";
+  // ✅ เซล: "/event" คือปฏิทินนัดหมายของตัวเอง (ไม่ใช่ตารางงานช่าง) — ยกเว้น ?dept=service ที่เป็นตารางช่างจริง
+  if (myDept === "sales" && /^\/(event|calendar)/.test(u) && !/[?&]dept=service/.test(u)) return "sales";
   if (/^\/(event|calendar|operation|technician|contracts|jobs|dispatch)/.test(u)) return "service";
   return "other";
 };
 const SECTIONS = [["all", "ทั้งหมด"], ["service", "งานช่าง"], ["sales", "ฝ่ายขาย"], ["other", "อื่นๆ"]];
 /** หมวดตั้งต้นตามหน้าที่เปิดอยู่ — อยู่ตารางงานเซลก็เห็นของเซลก่อน อยู่หน้างานช่างก็เห็นของช่างก่อน */
-const sectionOfPage = (loc) => {
-  const s = sectionOf(`${loc.pathname}${loc.search}`);
+const sectionOfPage = (loc, myDept) => {
+  const s = sectionOf(`${loc.pathname}${loc.search}`, myDept);
   return s === "other" ? "all" : s;
 };
 
@@ -101,6 +105,8 @@ export default function InboxBell({ dark = false }) {
   const [section, setSection] = useState("all");
   const [pageSection, setPageSection] = useState("all");
   const location = useLocation();
+  const { userData } = useAuth() || {};
+  const myDept = departmentOf(userData);
   const [more, setMore] = useState(false);
   const open = Boolean(anchor);
   const close = () => setAnchor(null);
@@ -114,16 +120,16 @@ export default function InboxBell({ dark = false }) {
   const sectionStats = useMemo(() => {
     const st = { all: { n: items.length, unread: unread } };
     ["service", "sales", "other"].forEach((k) => {
-      const rows = items.filter((n) => sectionOf(n.url) === k);
+      const rows = items.filter((n) => sectionOf(n.url, myDept) === k);
       st[k] = { n: rows.length, unread: rows.filter((n) => !n.readAt).length };
     });
     return st;
-  }, [items, unread]);
+  }, [items, unread, myDept]);
   // หมวดที่โชว์ = หมวดที่มีรายการ + หมวดของหน้าที่เปิดอยู่ (แม้ยังว่าง — อยู่หน้าเซลต้องเห็นว่า "ฝ่ายขายยังไม่มีแจ้งเตือน")
   const usedSections = ["service", "sales", "other"].filter((k) => sectionStats[k].n > 0 || k === pageSection);
   const showSections = usedSections.length > 1;
   const activeSection = showSections ? section : "all";
-  const inSection = activeSection === "all" ? items : items.filter((n) => sectionOf(n.url) === activeSection);
+  const inSection = activeSection === "all" ? items : items.filter((n) => sectionOf(n.url, myDept) === activeSection);
   const list = tab === "unread" ? inSection.filter((n) => !n.readAt) : inSection;
   const fresh = list.filter((n) => moment().diff(moment(n.createdAt), "hours") < 24);
   const older = list.filter((n) => moment().diff(moment(n.createdAt), "hours") >= 24);
@@ -207,7 +213,7 @@ export default function InboxBell({ dark = false }) {
   return (
     <>
       <Tooltip title="การแจ้งเตือน">
-        <IconButton onClick={(e) => { const ps = sectionOfPage(location); setPageSection(ps); setSection(ps); setAnchor(e.currentTarget); }} size="small" aria-label={unread ? `การแจ้งเตือน (ยังไม่อ่าน ${unread})` : "การแจ้งเตือน"}
+        <IconButton onClick={(e) => { const ps = sectionOfPage(location, myDept); setPageSection(ps); setSection(ps); setAnchor(e.currentTarget); }} size="small" aria-label={unread ? `การแจ้งเตือน (ยังไม่อ่าน ${unread})` : "การแจ้งเตือน"}
           sx={{ border: "1px solid", borderColor: dark ? "rgba(255,255,255,0.18)" : "divider", borderRadius: 2, color: dark ? "#fff" : "inherit" }}>
           <Badge badgeContent={unread} color="error" max={99}>
             <Notifications fontSize="small" />
