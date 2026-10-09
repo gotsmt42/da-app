@@ -1,186 +1,315 @@
 /**
- * JobIntake — เมนู "รับงาน" (ขั้นที่ 1 ของขั้นตอนทำงาน · 9 ต.ค. 2569 ผู้ใช้: "เรียงเมนูตามขั้นตอนงาน และใช้คำว่ารับงาน")
+ * JobIntake — เมนู "รับงาน" (9 ต.ค. 2569)
  *
- * รับงานจากลูกค้า / LINE / ฝ่ายขาย → เก็บเป็น "งานรอลงแผน" (ยังไม่ต้องรู้วันที่) → ลงตารางทีหลัง
- *   • ปุ่ม "+ รับงานใหม่" = ฟอร์มเดียวกับแผงงานรอลงแผนในปฏิทิน (AddDraftEvent)
- *   • รายการงานรอลงแผน แยกตามเดือนที่ตั้งใจ · กรองด่วน/รอข้อมูล · ปุ่มแก้ไข/ลงตาราง
- *   • ผู้จัดคิว: เห็นคำขอจากฝ่ายขายที่รอตัดสินใจ (ไปหน้า "คำขอลงงาน")
+ * ผู้ใช้: "รับงานคือกรอกรับงานไว้ก่อน ค่อยส่งลงตารางจริง ไม่ต้องอะไรมากมาย ทำให้เข้าใจง่ายๆ"
+ *        "ทำให้ขั้นตอนต่างๆ เชื่อมโยงกัน และดูง่าย" · "ไม่ควรเอางานเก่ามารวม"
+ *
+ *   • เห็นเฉพาะงานที่รับผ่านปุ่ม "รับงานใหม่" (intakeAt) — งานเก่า/งานที่ลงปฏิทินตรงๆ ไม่มาปน
+ *   • ทุกงานมีแถบขั้นตอนเดียวกัน: รับงาน → ลงตาราง → ช่างทำงาน → ตรวจปิดงาน → เสร็จ
+ *     บอกชัดว่าอยู่ขั้นไหน และปุ่มถัดไปคืออะไร (ส่งลงตาราง / ดูงาน)
+ *   • "ส่งลงตาราง" = เลือกวัน + หัวหน้าทีม ในหน้านี้เลย ไม่ต้องไปลากในปฏิทิน
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import moment from "moment";
-import { Box, Stack, Typography, Button, ButtonBase, Skeleton } from "@mui/material";
+import Swal from "sweetalert2";
+import TomSelect from "tom-select";
+import "tom-select/dist/css/tom-select.css";
+import {
+  Box, Stack, Typography, Button, ButtonBase, Skeleton, Dialog, DialogContent, DialogActions, IconButton, TextField, MenuItem,
+} from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { MoveToInboxOutlined, AddRounded, EditOutlined, ChevronRight, InboxOutlined, ArrowForwardRounded } from "@mui/icons-material";
+import {
+  MoveToInboxOutlined, AddRounded, EditOutlined, ChevronRight, Close, EventAvailableOutlined, CheckRounded,
+  ApartmentOutlined, CalendarMonthOutlined, GroupsOutlined, PersonOutlineOutlined, NotesOutlined, HourglassTopRounded, ReportProblemOutlined,
+} from "@mui/icons-material";
 import EventService from "@/shared/services/EventService";
+import CustomerService from "@/shared/services/CustomerService";
+import JobTypeService from "@/shared/services/JobTypeService";
+import SystemTypeService from "@/shared/services/SystemTypeService";
+import AuthService from "@/shared/services/authService";
 import useRealtime from "@/shared/realtime/useRealtime";
-import useAppBadges, { refreshAppBadges } from "@/shared/hooks/useAppBadges";
+import { refreshAppBadges } from "@/shared/hooks/useAppBadges";
 import { useAuth } from "@/features/auth/AuthContext";
-import { can } from "@/shared/utils/roles";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { PageHeader, Panel, EmptyState, INK, MUTED, LINE, ACCENT, SURFACE } from "@/shared/ui/PageKit";
-import { isUrgent, dueInfo } from "@/shared/utils/jobFlow";
-import { JobRow, BTN_SX, openIntakeForm } from "./JobFollow";
+import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
+import { getAddDraftEvent } from "@/features/calendar/components/EventForms/AddDraftEvent";
+import { isUrgent, openFollowUp } from "@/shared/utils/jobFlow";
 
 const AMBER = "#d97706";
-const FILTERS = [
-  { key: "all", label: "ทั้งหมด", test: () => true },
-  { key: "urgent", label: "⚡ ด่วน", test: (d) => isUrgent(d) || dueInfo(d)?.overdue },
-  { key: "info", label: "รอข้อมูล", test: (d) => d.infoPending },
+const GREEN = "#16a34a";
+const RED = "#dc2626";
+
+/** ขั้นตอนของงานที่รับไว้ — ใช้ทั้งแถบขั้นตอนและแท็บ */
+const STAGES = ["รับงาน", "ลงตาราง", "ช่างทำงาน", "ตรวจปิดงาน", "เสร็จ"];
+
+/** งานนี้อยู่ขั้นไหน + ข้อความสถานะ */
+const stageOf = (e) => {
+  if (e.unscheduled) return { i: 0, label: "รอส่งลงตาราง", color: AMBER };
+  if (e.status === "ดำเนินการเสร็จสิ้น") return { i: 4, label: "เสร็จสิ้น", color: GREEN };
+  if (e.closeRequested) return { i: 3, label: "รอตรวจปิดงาน", color: ACCENT };
+  if (openFollowUp(e)) return { i: 2, label: `งานไม่เสร็จ · ${openFollowUp(e).reason}`, color: AMBER };
+  if (e.status === "กำลังดำเนินการ") return { i: 2, label: "ช่างกำลังทำงาน", color: ACCENT };
+  return { i: 1, label: "ลงตารางแล้ว", color: ACCENT };
+};
+
+const TABS = [
+  { key: "waiting", label: "รอส่งลงตาราง", short: "รอลงตาราง", test: (s) => s.i === 0 },
+  { key: "active", label: "กำลังดำเนินการ", short: "กำลังทำ", test: (s) => s.i >= 1 && s.i <= 3 },
+  { key: "done", label: "เสร็จแล้ว", short: "เสร็จแล้ว", test: (s) => s.i === 4 },
 ];
 
-/** 1 รับงาน → 2 ลงตาราง → 3 ติดตามงาน — บอกให้รู้ว่าหน้านี้อยู่ตรงไหนของขั้นตอน */
-function FlowGuide() {
-  const steps = [
-    { n: 1, t: "รับงาน", d: "บันทึกงานที่ได้รับแจ้ง", on: true },
-    { n: 2, t: "ลงตาราง", d: "เลือกวัน · มอบหมายทีม", to: "/event" },
-    { n: 3, t: "ติดตามงาน", d: "ช่างทำงาน · ปิดงาน", to: "/jobs/follow-up" },
-  ];
+const BTN = { textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", whiteSpace: "nowrap", fontSize: "0.82rem" };
+const PRIMARY = { ...BTN, bgcolor: ACCENT, color: "#fff", "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } };
+
+/** แถบขั้นตอน 5 ช่อง — ผ่านแล้วสีเขียว · ขั้นปัจจุบันสีของสถานะ · ยังไม่ถึงสีเทา (กว้างเท่ากันทุกจอ ไม่ล้น) */
+function StageBar({ stage }) {
   return (
-    <Stack direction="row" alignItems="stretch" spacing={0.75} sx={{ mb: 1.5, overflowX: "auto", scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
-      {steps.map((s, i) => (
-        <Stack key={s.n} direction="row" alignItems="center" spacing={0.75} sx={{ flex: 1, minWidth: 150 }}>
-          <Box component={s.to ? Link : "div"} to={s.to} sx={{
-            flex: 1, display: "flex", alignItems: "center", gap: 1, px: 1.25, py: 1, borderRadius: 2.5, textDecoration: "none",
-            bgcolor: s.on ? alpha(ACCENT, 0.07) : "#fff", border: `1px solid ${s.on ? alpha(ACCENT, 0.35) : LINE}`,
-            "&:hover": s.to ? { borderColor: "#cbd5e1" } : {},
-          }}>
-            <Box sx={{ width: 24, height: 24, borderRadius: "50%", display: "grid", placeItems: "center", fontSize: "0.74rem", fontWeight: 900, flexShrink: 0, color: s.on ? "#fff" : MUTED, bgcolor: s.on ? ACCENT : SURFACE }}>{s.n}</Box>
-            <Box sx={{ minWidth: 0 }}>
-              <Typography noWrap sx={{ fontSize: "0.82rem", fontWeight: 800, color: s.on ? ACCENT : INK }}>{s.t}</Typography>
-              <Typography noWrap sx={{ fontSize: "0.68rem", color: MUTED }}>{s.d}</Typography>
-            </Box>
+    <Box sx={{ display: "grid", gridTemplateColumns: `repeat(${STAGES.length}, minmax(0, 1fr))`, gap: 0.5, mt: 1.25 }}>
+      {STAGES.map((name, i) => {
+        const done = i < stage.i || stage.i === 4;
+        const cur = i === stage.i && stage.i !== 4;
+        const c = done ? GREEN : cur ? stage.color : "#e2e8f0";
+        return (
+          <Box key={name} sx={{ minWidth: 0 }}>
+            <Box sx={{ height: 5, borderRadius: 99, bgcolor: c }} />
+            <Stack direction="row" alignItems="center" spacing={0.3} sx={{ mt: 0.5, minWidth: 0 }}>
+              {done && <CheckRounded sx={{ fontSize: 12, color: GREEN, flexShrink: 0 }} />}
+              <Typography noWrap sx={{ fontSize: "0.66rem", fontWeight: cur ? 900 : 600, color: cur ? stage.color : done ? "#15803d" : "#94a3b8" }}>{name}</Typography>
+            </Stack>
           </Box>
-          {i < steps.length - 1 && <ChevronRight sx={{ color: "#cbd5e1", flexShrink: 0 }} />}
-        </Stack>
-      ))}
-    </Stack>
+        );
+      })}
+    </Box>
+  );
+}
+
+/** กล่องส่งลงตาราง — เลือกวันเริ่ม/วันสิ้นสุด และหัวหน้าทีม */
+function ScheduleDialog({ job, employees, onClose, onDone }) {
+  const defStart = job.plannedMonth && job.plannedMonth > moment().format("YYYY-MM")
+    ? moment(job.plannedMonth, "YYYY-MM").startOf("month").format("YYYY-MM-DD")
+    : moment().add(1, "day").format("YYYY-MM-DD");
+  const [start, setStart] = useState(defStart);
+  const [end, setEnd] = useState(defStart);
+  const [team, setTeam] = useState(job.team || "");
+  const [saving, setSaving] = useState(false);
+  const ok = start && (!end || end >= start);
+
+  const save = async () => {
+    if (!ok) return;
+    setSaving(true);
+    try {
+      const emp = employees.find((u) => u.fname === team);
+      const last = end || start;
+      await EventService.ScheduleDraftEvent(job._id, {
+        date: start, start, end: moment(last).add(1, "day").format("YYYY-MM-DD"),
+        ...(team ? { team, resPerson: emp?._id || "" } : {}),
+      });
+      onDone();
+      Swal.fire({ icon: "success", title: "ส่งลงตารางแล้ว", text: "งานขึ้นในตารางงานช่างเรียบร้อย", timer: 1500, showConfirmButton: false });
+    } catch (err) {
+      Swal.fire({ icon: "error", title: "ส่งลงตารางไม่สำเร็จ", text: err?.response?.data?.message || "กรุณาลองใหม่" });
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: 3 } }}>
+      <Stack direction="row" alignItems="center" gap={1.25} sx={{ px: 2.5, pt: 2, pb: 1.5, borderBottom: `1px solid ${LINE}` }}>
+        <Box sx={{ width: 36, height: 36, borderRadius: 2, display: "grid", placeItems: "center", bgcolor: alpha(ACCENT, 0.1), color: ACCENT }}>
+          <EventAvailableOutlined sx={{ fontSize: 20 }} />
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography sx={{ fontWeight: 900, fontSize: "1rem", color: INK }}>ส่งลงตาราง</Typography>
+          <Typography noWrap sx={{ fontSize: "0.76rem", color: MUTED }}>{[job.title, job.site || job.company, job.jobNo].filter(Boolean).join(" · ")}</Typography>
+        </Box>
+        <IconButton size="small" onClick={onClose}><Close fontSize="small" /></IconButton>
+      </Stack>
+      <DialogContent sx={{ px: 2.5, py: 2 }}>
+        <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.25 }}>
+          <ThaiDatePicker label="วันที่เข้างาน" value={start} onChange={(v) => { setStart(v || ""); if (!end || (v && end < v)) setEnd(v || ""); }} />
+          <ThaiDatePicker label="ถึงวันที่" value={end} onChange={(v) => setEnd(v || "")} minDate={start ? moment(start) : undefined} />
+        </Box>
+        <TextField select fullWidth size="small" label="หัวหน้าทีม (ไม่บังคับ)" value={team} onChange={(e) => setTeam(e.target.value)} sx={{ mt: 2 }}>
+          <MenuItem value=""><em>ยังไม่ระบุ — มอบหมายทีหลังได้</em></MenuItem>
+          {employees.map((u) => <MenuItem key={u._id} value={u.fname}>{[u.fname, u.lname].filter(Boolean).join(" ")}</MenuItem>)}
+        </TextField>
+        <Typography sx={{ fontSize: "0.74rem", color: MUTED, mt: 1.5 }}>
+          ส่งแล้วงานจะขึ้นในตารางงานช่างทันที · เวลา/ลูกทีมเพิ่มได้ภายหลังจากหน้าตารางงาน
+        </Typography>
+      </DialogContent>
+      <DialogActions sx={{ px: 2.5, py: 1.5, borderTop: `1px solid ${LINE}`, gap: 1 }}>
+        <Button onClick={onClose} sx={{ ...BTN, color: MUTED }}>ยกเลิก</Button>
+        <Button variant="contained" disabled={!ok || saving} onClick={save} sx={{ ...PRIMARY, px: 2.5 }}>
+          {saving ? "กำลังส่ง..." : "ส่งลงตาราง"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+/** บรรทัดข้อมูล: ไอคอน + ข้อความ (ตัดบรรทัดได้ ไม่ล้น) */
+const Line = ({ icon: Icon, children, color = "#475569", strong }) => (
+  <Stack direction="row" spacing={0.75} alignItems="flex-start" sx={{ minWidth: 0 }}>
+    <Icon sx={{ fontSize: 15, color: "#94a3b8", mt: "2px", flexShrink: 0 }} />
+    <Typography sx={{ fontSize: "0.8rem", color, fontWeight: strong ? 700 : 500, lineHeight: 1.45, minWidth: 0, overflowWrap: "anywhere" }}>{children}</Typography>
+  </Stack>
+);
+
+function JobCard({ job, onSchedule, onEdit }) {
+  const st = stageOf(job);
+  const fu = openFollowUp(job);
+  const team = [job.team, ...(job.teamMembers || []).map((m) => m?.name)].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).join(", ");
+  const when = job.unscheduled
+    ? (job.plannedMonth ? `ตั้งใจเข้างาน ${formatThai(moment(job.plannedMonth, "YYYY-MM"), "MMMM YYYY")}` : "ยังไม่กำหนดเดือน")
+    : `เข้างาน ${formatThai(moment(job.start), "D MMM YYYY")}${job.startTime ? ` ${job.startTime}` : ""}`;
+  const due = job.dueDate ? formatThai(moment(job.dueDate), "D MMM YYYY") : "";
+
+  const actions = st.i === 0 ? (
+    <>
+      <Button variant="outlined" onClick={() => onEdit(job)} startIcon={<EditOutlined sx={{ fontSize: "16px !important" }} />}
+        sx={{ ...BTN, flex: { xs: 1, sm: "0 0 auto" }, color: "#334155", borderColor: LINE, "&:hover": { borderColor: "#cbd5e1", bgcolor: SURFACE } }}>แก้ไข</Button>
+      <Button variant="contained" onClick={() => onSchedule(job)} startIcon={<EventAvailableOutlined sx={{ fontSize: "17px !important" }} />}
+        sx={{ ...PRIMARY, flex: { xs: 2, sm: "0 0 auto" } }}>ส่งลงตาราง</Button>
+    </>
+  ) : (
+    <Button component={Link} to={`/operation/${job._id}`} variant="outlined" endIcon={<ChevronRight />}
+      sx={{ ...BTN, flex: { xs: 1, sm: "0 0 auto" }, color: ACCENT, borderColor: alpha(ACCENT, 0.4), "&:hover": { borderColor: ACCENT, bgcolor: alpha(ACCENT, 0.04) } }}>ดูงาน</Button>
+  );
+
+  return (
+    <Box sx={{ px: { xs: 1.75, sm: 2.25 }, py: 1.75, borderTop: `1px solid ${LINE}`, "&:first-of-type": { borderTop: 0 } }}>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={{ xs: 1.25, sm: 2 }} alignItems={{ sm: "flex-start" }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          {/* หัว: สถานะ · เลข Job · ป้าย */}
+          <Stack direction="row" spacing={0.6} alignItems="center" sx={{ flexWrap: "wrap", rowGap: 0.5, mb: 0.6 }}>
+            <Box component="span" sx={{ px: 1, height: 22, display: "inline-flex", alignItems: "center", borderRadius: 99, fontSize: "0.72rem", fontWeight: 800, color: st.color, bgcolor: alpha(st.color, 0.1) }}>{st.label}</Box>
+            {job.jobNo && <Typography component="span" sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#94a3b8" }}>{job.jobNo}</Typography>}
+            {isUrgent(job) && st.i < 4 && (
+              <Box component="span" sx={{ px: 0.8, height: 22, display: "inline-flex", alignItems: "center", borderRadius: 99, fontSize: "0.7rem", fontWeight: 800, color: "#fff", bgcolor: RED }}>⚡ ด่วน</Box>
+            )}
+            {job.infoPending && st.i < 4 && (
+              <Box component="span" sx={{ px: 0.8, height: 22, display: "inline-flex", alignItems: "center", borderRadius: 99, fontSize: "0.7rem", fontWeight: 800, color: AMBER, bgcolor: alpha(AMBER, 0.12) }}>รอข้อมูล</Box>
+            )}
+          </Stack>
+          {/* ชื่องาน · โครงการ — ตัดบรรทัดได้ ไม่ตัดทิ้ง */}
+          <Typography sx={{ fontWeight: 800, fontSize: "1rem", color: INK, lineHeight: 1.35, overflowWrap: "anywhere" }}>
+            {job.title || "งาน"}{job.system ? ` · ${job.system}` : ""}
+          </Typography>
+          <Stack spacing={0.35} sx={{ mt: 0.6 }}>
+            <Line icon={ApartmentOutlined} strong>{[job.site, job.company && job.company !== job.site ? job.company : ""].filter(Boolean).join(" · ") || "-"}</Line>
+            <Line icon={CalendarMonthOutlined}>{when}{due ? ` · ต้องเสร็จภายใน ${due}` : ""}</Line>
+            {!job.unscheduled && <Line icon={GroupsOutlined}>{team ? `ทีม ${team}` : "ยังไม่มอบหมายทีม"}</Line>}
+            {(job.contactName || job.contactTel) && (
+              <Line icon={PersonOutlineOutlined}>
+                {job.contactName || "ผู้ติดต่อ"}
+                {job.contactTel && <> · <Box component="a" href={`tel:${job.contactTel}`} sx={{ color: ACCENT, fontWeight: 700, textDecoration: "none" }}>{job.contactTel}</Box></>}
+              </Line>
+            )}
+            {job.description && <Line icon={NotesOutlined}>{job.description}</Line>}
+            {job.infoPending && job.infoPendingNote && <Line icon={HourglassTopRounded} color={AMBER}>ขาด: {job.infoPendingNote}</Line>}
+            {fu && st.i === 2 && <Line icon={ReportProblemOutlined} color={AMBER} strong>{fu.reason}{fu.note ? ` — ${fu.note}` : ""} · ต่อไป: {fu.nextOwner}</Line>}
+          </Stack>
+          <StageBar stage={st} />
+        </Box>
+        <Stack direction="row" spacing={0.75} sx={{ flexShrink: 0, width: { xs: "100%", sm: "auto" } }}>{actions}</Stack>
+      </Stack>
+    </Box>
   );
 }
 
 export default function JobIntake() {
   const { userData } = useAuth() || {};
-  const { badges } = useAppBadges(userData);
-  const canAssign = can(userData, "assignDispatch");
-  const [drafts, setDrafts] = useState(null);
-  const [events, setEvents] = useState([]);
-  const [filter, setFilter] = useState("all");
+  const [jobs, setJobs] = useState(null);
+  const [rawEvents, setRawEvents] = useState([]);
+  const [rawDrafts, setRawDrafts] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [tab, setTab] = useState("waiting");
+  const [scheduling, setScheduling] = useState(null);
 
   const load = useCallback(async () => {
     try {
       const [dr, ev] = await Promise.all([
-        EventService.GetDraftEvents(),
+        EventService.GetDraftEvents().catch(() => null),
         EventService.getEventOp().catch(() => null),
       ]);
-      setDrafts((Array.isArray(dr?.drafts) ? dr.drafts : []).filter((d) => d.department !== "sales"));
-      if (ev?.userEvents) setEvents(ev.userEvents);
+      const drafts = Array.isArray(dr?.drafts) ? dr.drafts : [];
+      const events = ev?.userEvents || [];
+      setRawDrafts(drafts);
+      setRawEvents(events);
+      // ✅ เฉพาะงานที่รับผ่านเมนูนี้ — งานหลายวันรวมเป็นงานเดียว (ใช้วันแรก)
+      const seen = new Set();
+      const list = [...drafts, ...events.slice().sort((a, b) => new Date(a.start) - new Date(b.start))]
+        .filter((e) => e.intakeAt)
+        .filter((e) => { const k = e.jobGroupId || e._id; if (seen.has(k)) return false; seen.add(k); return true; });
+      setJobs(list);
     } catch {
-      setDrafts((prev) => prev || []);
+      setJobs((p) => p || []);
     }
   }, []);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { AuthService.getAllUserData().then((r) => setEmployees(r?.allUser || [])).catch(() => {}); }, []);
   useRealtime("events", () => { load(); });
 
-  const openIntake = (existingDraft) => openIntakeForm({
-    existingDraft, events, drafts, userData,
-    onSaved: async () => { await load(); refreshAppBadges(); },
+  const openForm = (existingDraft) => getAddDraftEvent({
+    intake: true,
+    defaultMonth: moment().format("YYYY-MM"),
+    existingDraft,
+    events: rawEvents,
+    drafts: rawDrafts,
+    userData,
+    onSaved: async () => { await load(); refreshAppBadges(); setTab("waiting"); },
+    CustomerService, AuthService, JobTypeService, SystemTypeService, EventService, Swal, TomSelect, moment,
   });
 
-  const counts = useMemo(() => Object.fromEntries(FILTERS.map((f) => [f.key, (drafts || []).filter(f.test).length])), [drafts]);
-  // แยกตามเดือนที่ตั้งใจ — ด่วนขึ้นก่อนในแต่ละเดือน
-  const groups = useMemo(() => {
-    const f = FILTERS.find((x) => x.key === filter) || FILTERS[0];
-    const map = new Map();
-    (drafts || []).filter(f.test).forEach((d) => {
-      const k = d.plannedMonth || "";
-      if (!map.has(k)) map.set(k, []);
-      map.get(k).push(d);
-    });
-    return [...map.entries()]
-      .sort(([a], [b]) => (a || "9999-99").localeCompare(b || "9999-99"))
-      .map(([k, list]) => [k, list.sort((a, b) => (isUrgent(b) - isUrgent(a)) || new Date(a.createdAt || 0) - new Date(b.createdAt || 0))]);
-  }, [drafts, filter]);
-
-  const thisMonth = moment().format("YYYY-MM");
-  const monthTitle = (k) => {
-    if (!k) return "ไม่ระบุเดือน";
-    const m = moment(k, "YYYY-MM");
-    const label = formatThai(m, "MMMM YYYY");
-    if (k < thisMonth) return `${label} · เลยเดือนที่ตั้งใจแล้ว`;
-    if (k === thisMonth) return `${label} · เดือนนี้`;
-    return label;
-  };
-
-  const actionFor = (d) => (
-    <Stack direction="row" spacing={0.75} sx={{ flexShrink: 0 }}>
-      <Button variant="outlined" onClick={() => openIntake(d)} startIcon={<EditOutlined sx={{ fontSize: "16px !important" }} />}
-        sx={{ ...BTN_SX, bgcolor: "#fff", color: ACCENT, borderColor: alpha(ACCENT, 0.4), "&:hover": { bgcolor: alpha(ACCENT, 0.05), borderColor: ACCENT }, display: { xs: "none", sm: "inline-flex" } }}>แก้ไข</Button>
-      <Button component={Link} to="/event" variant="contained" sx={BTN_SX}>ลงตาราง</Button>
-    </Stack>
-  );
+  const withStage = useMemo(() => (jobs || []).map((j) => ({ j, s: stageOf(j) })), [jobs]);
+  const counts = useMemo(() => Object.fromEntries(TABS.map((t) => [t.key, withStage.filter((x) => t.test(x.s)).length])), [withStage]);
+  const list = useMemo(() => {
+    const t = TABS.find((x) => x.key === tab) || TABS[0];
+    return withStage.filter((x) => t.test(x.s)).map((x) => x.j)
+      .sort((a, b) => (isUrgent(b) - isUrgent(a)) || (tab === "done"
+        ? new Date(b.closeApprovedAt || b.updatedAt || 0) - new Date(a.closeApprovedAt || a.updatedAt || 0)
+        : new Date(a.intakeAt) - new Date(b.intakeAt)));
+  }, [withStage, tab]);
 
   return (
-    <Box sx={{ px: { xs: 1.5, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: 1200, mx: "auto" }}>
+    <Box sx={{ px: { xs: 1.5, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: 1000, mx: "auto" }}>
       <PageHeader icon={<MoveToInboxOutlined />} title="รับงาน"
-        subtitle={drafts ? `รับงานจากลูกค้า / LINE / ฝ่ายขาย · รอลงแผน ${drafts.length} งาน` : "กำลังโหลด..."}
-        actions={
-          <Button variant="contained" startIcon={<AddRounded />} onClick={() => openIntake()} disabled={!drafts}
-            sx={{ ...BTN_SX, height: 40, px: { xs: 1.25, sm: 2 } }}>รับงานใหม่</Button>
-        } />
+        subtitle="กรอกไว้ก่อน แล้วส่งลงตาราง"
+        actions={<Button variant="contained" startIcon={<AddRounded />} onClick={() => openForm()} disabled={!jobs} sx={{ ...PRIMARY, height: 40, px: { xs: 1.25, sm: 2 } }}>รับงานใหม่</Button>} />
 
-      <FlowGuide />
+      {/* แท็บตามขั้นตอน */}
+      <Stack direction="row" spacing={0.75} sx={{ mb: 1.5 }}>
+        {TABS.map((t) => {
+          const on = tab === t.key;
+          return (
+            <ButtonBase key={t.key} onClick={() => setTab(t.key)} sx={{
+              flex: { xs: 1, sm: "0 0 auto" }, minWidth: 0, height: 40, px: { xs: 0.75, sm: 1.75 }, borderRadius: 2.5, fontSize: { xs: "0.8rem", sm: "0.84rem" }, fontWeight: 800, gap: 0.6, whiteSpace: "nowrap",
+              border: `1.5px solid ${on ? ACCENT : LINE}`, bgcolor: on ? alpha(ACCENT, 0.07) : "#fff", color: on ? ACCENT : "#334155",
+            }}>
+              <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>{t.label}</Box>
+              <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>{t.short}</Box>
+              <Box component="span" sx={{ minWidth: 20, height: 20, px: 0.6, borderRadius: 99, display: "inline-grid", placeItems: "center", fontSize: "0.72rem", bgcolor: on ? ACCENT : SURFACE, color: on ? "#fff" : MUTED }}>{counts[t.key] || 0}</Box>
+            </ButtonBase>
+          );
+        })}
+      </Stack>
 
-      {/* คำขอจากฝ่ายขาย — อีกช่องทางของการรับงาน ต้องตัดสินใจที่หน้า "คำขอลงงาน" */}
-      {canAssign && badges?.dispatchQueue > 0 && (
-        <Box component={Link} to="/dispatch" sx={{
-          display: "flex", alignItems: "center", gap: 1.25, mb: 1.5, px: 1.75, py: 1.2, borderRadius: 3, textDecoration: "none",
-          bgcolor: alpha(AMBER, 0.06), border: `1px solid ${alpha(AMBER, 0.3)}`, "&:hover": { borderColor: AMBER },
-        }}>
-          <InboxOutlined sx={{ color: AMBER }} />
-          <Typography sx={{ flex: 1, fontSize: "0.85rem", fontWeight: 800, color: "#92400e" }}>
-            มีคำขอลงงานรอตัดสินใจ {badges.dispatchQueue} รายการ <Box component="span" sx={{ fontWeight: 600 }}>(จากฝ่ายขาย/ช่าง)</Box>
-          </Typography>
-          <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: "#92400e", display: "inline-flex", alignItems: "center", gap: 0.3 }}>
-            ไปที่คำขอลงงาน <ArrowForwardRounded sx={{ fontSize: 17 }} />
-          </Typography>
-        </Box>
+      {!jobs ? (
+        <Stack spacing={1}>{[0, 1, 2].map((i) => <Skeleton key={i} variant="rounded" height={88} sx={{ borderRadius: 3 }} />)}</Stack>
+      ) : list.length ? (
+        <Panel>{list.map((j) => <JobCard key={j._id} job={j} onSchedule={setScheduling} onEdit={openForm} />)}</Panel>
+      ) : (
+        <EmptyState icon={<MoveToInboxOutlined />}
+          title={tab === "waiting" ? "ไม่มีงานรอส่งลงตาราง" : tab === "active" ? "ไม่มีงานที่กำลังดำเนินการ" : "ยังไม่มีงานที่เสร็จ"}
+          hint={tab === "waiting" ? "ได้งานมาแล้ว กด “รับงานใหม่” เพื่อกรอกเก็บไว้ก่อน" : undefined}
+          action={tab === "waiting" ? <Button variant="contained" startIcon={<AddRounded />} onClick={() => openForm()} sx={{ ...PRIMARY, mt: 1 }}>รับงานใหม่</Button> : null} />
       )}
 
-      {!drafts ? (
-        <Stack spacing={1}>{[0, 1, 2].map((i) => <Skeleton key={i} variant="rounded" height={72} sx={{ borderRadius: 3 }} />)}</Stack>
-      ) : drafts.length === 0 ? (
-        <EmptyState icon={<MoveToInboxOutlined />} title="ยังไม่มีงานรอลงแผน" hint="ได้รับงานจากลูกค้าแล้ว กด “รับงานใหม่” เพื่อบันทึกไว้ก่อน แล้วค่อยลงตาราง"
-          action={<Button variant="contained" startIcon={<AddRounded />} onClick={() => openIntake()} sx={{ ...BTN_SX, mt: 1 }}>รับงานใหม่</Button>} />
-      ) : (
-        <>
-          <Stack direction="row" spacing={0.75} sx={{ mb: 1.25 }}>
-            {FILTERS.map((f) => {
-              const on = filter === f.key;
-              return (
-                <ButtonBase key={f.key} onClick={() => setFilter(f.key)} sx={{
-                  height: 34, px: 1.5, borderRadius: 99, fontSize: "0.8rem", fontWeight: 700, gap: 0.6,
-                  border: `1.5px solid ${on ? ACCENT : LINE}`, bgcolor: on ? alpha(ACCENT, 0.07) : "#fff", color: on ? ACCENT : "#334155",
-                }}>
-                  {f.label}
-                  <Box component="span" sx={{ fontSize: "0.72rem", fontWeight: 800, color: on ? ACCENT : MUTED }}>{counts[f.key]}</Box>
-                </ButtonBase>
-              );
-            })}
-          </Stack>
-          <Stack spacing={1.5}>
-            {groups.length ? groups.map(([k, list]) => (
-              <Panel key={k || "none"}>
-                <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 2, py: 1.1, borderBottom: `1px solid ${LINE}`, bgcolor: k && k < thisMonth ? alpha("#dc2626", 0.04) : SURFACE }}>
-                  <Typography sx={{ flex: 1, fontWeight: 800, fontSize: "0.86rem", color: k && k < thisMonth ? "#b91c1c" : INK }}>{monthTitle(k)}</Typography>
-                  <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: MUTED }}>{list.length} งาน</Typography>
-                </Stack>
-                {list.map((d) => <JobRow key={d._id} e={d} step="unassigned" color={AMBER} action={actionFor(d)} />)}
-              </Panel>
-            )) : (
-              <EmptyState icon={<MoveToInboxOutlined />} title="ไม่มีงานในตัวกรองนี้" />
-            )}
-          </Stack>
-        </>
+      {scheduling && (
+        <ScheduleDialog job={scheduling} employees={employees} onClose={() => setScheduling(null)}
+          onDone={async () => { setScheduling(null); await load(); refreshAppBadges(); }} />
       )}
     </Box>
   );

@@ -35,7 +35,7 @@ import {
 import { groupEventsByContract, nextVisitOverdueInfo } from "@/shared/utils/contractOverdue";
 // ✅ ตรรกะติดตามใบเสนอราคาตัวกลาง — ใช้ร่วมกับหน้า /quotations และฝั่ง server เพื่อให้เกณฑ์/ตัวเลขตรงกัน
 import { getFollowUpInfo } from "@/shared/utils/quotationTracking";
-import { openFollowUp, isUrgent, acksOf } from "@/shared/utils/jobFlow";
+import { openFollowUp, isUrgent, acksOf, ackTracked } from "@/shared/utils/jobFlow";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { can, isRole, rankLabel, ROLES, TECHNICIAN_ROLES, ALL_ROLES } from "@/shared/utils/roles";
 import HomeMenu from "../components/HomeMenu";
@@ -564,7 +564,7 @@ const Dashboard = () => {
               leading={<DateTile top={jobStart.format("D")} bottom={formatThai(jobStart, "MMM")} color={ACCENT} strong={diffDays === 1} />}
               trailing={<Pill color={diffDays === 1 ? ACCENT : MUTED}>{diffDays === 1 ? "พรุ่งนี้" : `อีก ${diffDays} วัน`}</Pill>}
               // ✅ ขั้นตอนทำงาน — ด่วน / ช่างยังไม่กดรับทราบงาน
-              trailingSub={[isUrgent(job) ? "⚡ ด่วน" : "", acksOf(job).length ? "" : "ยังไม่รับทราบ"].filter(Boolean).join(" · ") || undefined} />
+              trailingSub={[isUrgent(job) ? "⚡ ด่วน" : "", acksOf(job).length || !ackTracked(job) ? "" : "ยังไม่รับทราบ"].filter(Boolean).join(" · ") || undefined} />
           );
         })}
       </Widget>
@@ -612,9 +612,9 @@ const Dashboard = () => {
       {overdueContractsBlock && <div className="dashboard-mobile-only">{overdueContractsBlock}</div>}
 
       {/* งานวางแผนล่วงหน้า (ยังไม่ลงตาราง · ไม่รวมฉบับร่างของสัญญา) */}
-      <Widget title="งานรอลงแผน" icon={EditCalendarOutlined} tone="#475569" count={generalDrafts.length || undefined} hint="รับงานแล้ว ยังไม่ลงวันที่ในตาราง" to="/jobs/intake" toLabel={generalDrafts.length ? "ดูทั้งหมด" : "รับงาน"}
+      <Widget title="งานวางแผนล่วงหน้า" icon={EditCalendarOutlined} tone="#475569" count={generalDrafts.length || undefined} hint="ยังไม่ลงวันที่ในตาราง" to={generalDrafts.length ? "/event" : undefined} toLabel="เปิดปฏิทิน"
         footer={<Pager page={draftsSafePage} pages={draftsTotalPages} onChange={setDraftsPage} />}>
-        {loading ? <Loading rows={2} /> : draftsPreview.length === 0 ? <Empty text="ยังไม่มีงานรอลงแผน" /> : draftsPreview.map((d) => (
+        {loading ? <Loading rows={2} /> : draftsPreview.length === 0 ? <Empty text="ยังไม่มีงานวางแผนล่วงหน้า" /> : draftsPreview.map((d) => (
           <Row key={d._id} to="/event" title={d.title || "งาน"}
             sub={[d.system, d.site].filter(Boolean).join(" · ") || "ไม่ระบุโครงการ"}
             trailing={<Pill color="#475569">{d.plannedMonth ? formatThai(moment(d.plannedMonth, "YYYY-MM"), "MMM YYYY") : "ไม่ระบุเดือน"}</Pill>} />

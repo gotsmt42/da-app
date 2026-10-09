@@ -11,20 +11,23 @@
  *   • เดิมแท็บ "รออนุมัติ" ซ่อนอยู่ในหน้า "การดำเนินงาน" ซึ่งเป็นหน้าไล่จัดการงานที่ *อนุมัติแล้ว* —
  *     คนละขั้นของงานกัน คนที่เข้าไปดูงานที่กำลังทำอยู่ไม่ได้กำลังหาคำขอที่รอตัดสินใจ
  *
- * ⚠️ ทั้งสองแท็บดึงข้อมูลเองแยกกัน (DispatchList / PendingApprovalsPanel) — ไม่ได้แชร์ state
+ * ✅ (9 ต.ค. 2569 ผู้ใช้: "ปรับให้ดูง่ายขึ้น ไม่จำกัดแค่ว่าฝ่ายขาย หรือ ช่าง") เลิกแยกแท็บตามแผนกต้นทาง —
+ *    หน้าเดียวเห็นทุกคำขอเรียงกัน: แผนงานรออนุมัติ (กดอนุมัติได้เลย) → ใบแจ้งงาน (เลือกวัน+ทีมให้)
+ *    ใครแจ้งมาก็ได้ ชื่อผู้แจ้งอยู่บนการ์ดแต่ละใบ · ส่วนที่ไม่มีรายการจะซ่อนไป
+ * ⚠️ สองส่วนดึงข้อมูลเองแยกกัน (DispatchList / PendingApprovalsPanel) — ไม่ได้แชร์ state
  * เพราะเป็นคนละคอลเลกชันคนละ endpoint ตัวเลขบนแท็บจึงต้องรับกลับขึ้นมาจากแต่ละแผงเอง
  */
 import { Suspense, useCallback, useEffect, useState } from "react";
-import { Navigate, useSearchParams } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import {
-  Box, Stack, Typography, Skeleton, Alert, useMediaQuery,
+  Box, Stack, Typography, Skeleton, Alert,
 } from "@mui/material";
-import { Inbox, Storefront, HourglassTop } from "@mui/icons-material";
+import { alpha } from "@mui/material/styles";
+import { Inbox, AssignmentOutlined, HourglassTop } from "@mui/icons-material";
 import { PageHeader } from "@/shared/ui/PageKit";
 
 import usePermissions from "@/shared/hooks/usePermissions";
 import { useAuth } from "@/features/auth/AuthContext";
-import ViewTiles from "@/shared/ui/ViewTiles";
 import DispatchList from "../components/DispatchList";
 import DispatchService from "../services/DispatchService";
 import { TEXT_SUB, BORDER_MAIN } from "../dispatchMeta";
@@ -34,35 +37,28 @@ import lazyWithRetry from "@/shared/utils/lazyWithRetry";
 // เพื่อไม่ให้ประวัติ git ของมันขาดตอน แค่เรียกใช้ข้ามฟีเจอร์ (โหลดแบบ lazy เพราะเป็นแผงใหญ่)
 const PendingApprovalsPanel = lazyWithRetry(() => import("@/features/operation/components/PendingApprovalsPanel"));
 
-const SOURCES = [
-  {
-    key: "sales",
-    label: "จากฝ่ายขาย",
-    icon: <Storefront />,
-    color: "#2563eb",
-    hint: "ฝ่ายขายกรอกฟอร์มแจ้งเข้ามา — ตรวจแล้วจัดลงแผนงานให้",
-  },
-  {
-    key: "approvals",
-    label: "จากฝ่ายช่าง",
-    icon: <HourglassTop />,
-    color: "#d97706",
-    hint: "ช่างสร้างแผนงานเอง — ต้องอนุมัติก่อนถึงจะยืนยันจริง",
-  },
-];
+/** หัวข้อแต่ละส่วน — ไอคอนสี · ชื่อ · จำนวน · คำอธิบายสั้น */
+function SectionHead({ icon, color, title, count, hint }) {
+  return (
+    <Stack direction="row" alignItems="center" spacing={1.25} sx={{ mb: 1.25, px: 0.25 }}>
+      <Box sx={{ width: 34, height: 34, borderRadius: 2, display: "grid", placeItems: "center", bgcolor: alpha(color, 0.12), color, flexShrink: 0, "& svg": { fontSize: 19 } }}>{icon}</Box>
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Typography sx={{ fontWeight: 900, fontSize: "1rem", color: "#0f172a" }}>
+          {title}
+          {count > 0 && <Box component="span" sx={{ ml: 0.75, px: 0.9, py: 0.1, borderRadius: 99, fontSize: "0.76rem", fontWeight: 800, color, bgcolor: alpha(color, 0.12) }}>{count}</Box>}
+        </Typography>
+        <Typography sx={{ fontSize: "0.76rem", color: TEXT_SUB }}>{hint}</Typography>
+      </Box>
+    </Stack>
+  );
+}
 
 export default function JobRequestQueue() {
   const { can } = usePermissions();
   const { userData } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
   const [summary, setSummary] = useState(null);
   const [approvalCount, setApprovalCount] = useState(0);
   const [error, setError] = useState("");
-  const isMobile = useMediaQuery("(max-width:600px)");
-
-  const requested = searchParams.get("tab");
-  const activeKey = SOURCES.some((s) => s.key === requested) ? requested : "sales";
-  const active = SOURCES.find((s) => s.key === activeKey);
 
   const loadSummary = useCallback(async () => {
     try { setSummary(await DispatchService.summary()); }
@@ -70,14 +66,6 @@ export default function JobRequestQueue() {
   }, []);
 
   useEffect(() => { loadSummary(); }, [loadSummary]);
-
-  // ⚠️ replace:true — สลับแท็บไม่ควรทิ้งประวัติไว้ทุกครั้ง ไม่งั้นกด back หลังสลับไปมา 5 รอบ
-  // ต้องกดย้อน 5 ครั้งกว่าจะออกจากหน้านี้ได้ (แบบแผนเดียวกับ TabbedPage.js)
-  const changeTab = (key) => {
-    const next = new URLSearchParams(searchParams);
-    next.set("tab", key);
-    setSearchParams(next, { replace: true });
-  };
 
   if (!can("assignDispatch")) return <Navigate to="/dashboard" replace />;
 
@@ -93,7 +81,7 @@ export default function JobRequestQueue() {
       <PageHeader
         icon={<Inbox />}
         title="คำขอลงงาน"
-        subtitle="คำขอที่รอตัดสินใจก่อนเข้าตารางงานจริง — จากฝ่ายขาย และแผนงานที่ช่างสร้างเอง"
+        subtitle="คำขอจากทุกฝ่ายที่รอตัดสินใจก่อนเข้าตารางงานจริง"
         actions={(
           <Stack alignItems="flex-end" sx={{ pl: 1.5, borderLeft: `1px solid ${BORDER_MAIN}` }}>
             <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: TEXT_SUB, whiteSpace: "nowrap" }}>รอตัดสินใจ</Typography>
@@ -105,44 +93,20 @@ export default function JobRequestQueue() {
         )}
       />
 
-      {/* ── ที่มาของคำขอ: การ์ดตัวเลข (ViewTiles) ชุดเดียวกับหน้าภาพรวมงาน/การดำเนินงาน ──
-          ✅ ที่แก้ (ผู้ใช้: "ดูล้าสมัยมาก"): เดิมเป็นแท็บเส้นใต้ + badge เล็กๆ มองไม่ออกว่าแต่ละฝั่งค้างกี่ใบ
-          ⚠️ แยกตามแผนกต้นทาง ไม่ใช่ตามสถานะ — ของเซลต้องเลือกวัน+ช่างให้ · ของช่างแค่กดอนุมัติ */}
-      <ViewTiles
-        value={activeKey}
-        onChange={changeTab}
-        isMobile={isMobile}
-        groups={[{
-          title: "",
-          items: SOURCES.map((s) => {
-            const count = s.key === "sales" ? waiting : approvalCount;
-            return {
-              // ✅ (5 ต.ค. 2569) ผู้ใช้: "สีจืดเกินไป" — ไอคอน/ขอบตอนเลือกใช้สีประจำแหล่งที่มา (ขาย = น้ำเงิน · ช่าง = ส้ม)
-              value: s.key, label: s.label, count, unit: "ใบ", icon: s.icon, color: s.color, alert: false,
-              sub: s.key === "sales" && urgent > 0 ? `ด่วน ${urgent}` : undefined,
-            };
-          }),
-        }]}
-      />
-
-      <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1.5, mt: isMobile ? -0.75 : -1, px: 0.25 }}>
-        <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#94a3b8", flexShrink: 0 }} />
-        <Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB, fontWeight: 600 }}>{active.hint}</Typography>
-      </Stack>
-
-      {/* ⚠️ ต้อง mount แผงรออนุมัติไว้ตลอด แล้วซ่อนด้วย display แทนการถอดออกจาก DOM —
-          ตัวเลขบน badge มาจากแผงนั้นเอง ถ้า unmount ตอนอยู่แท็บอื่น badge จะเป็น 0 เสมอ
-          จนกว่าจะกดเข้าไปดู ซึ่งทำให้ badge ไร้ประโยชน์ทั้งหมด (แบบแผนเดียวกับที่ OperationBoard
-          เคยใช้ตอนแผงนี้ยังเป็นแท็บอยู่ที่นั่น) ส่วน prop active หยุดรีเฟรชอัตโนมัติเมื่อไม่ได้เปิดอยู่
-          จึงไม่ได้แลกมาด้วยการยิง request ทิ้ง */}
-      <Box sx={{ display: activeKey === "sales" ? "block" : "none" }}>
-        <DispatchList mode="board" myId={String(userData?.userId || "")} />
-      </Box>
-      <Box sx={{ display: activeKey === "approvals" ? "block" : "none" }}>
-        <Suspense fallback={<Skeleton variant="rounded" height={320} sx={{ borderRadius: 3 }} />}>
-          <PendingApprovalsPanel active={activeKey === "approvals"} onCountChange={setApprovalCount} />
+      {/* ✅ แผนงานรออนุมัติ — งานที่มีวันนัดแล้ว แค่กดอนุมัติ/ไม่อนุมัติ (ซ่อนส่วนนี้เมื่อไม่มีรายการ)
+          ⚠️ mount ไว้ตลอดเพื่อให้ได้จำนวน (onCountChange) แล้วค่อยซ่อนด้วย display */}
+      <Box sx={{ display: approvalCount > 0 ? "block" : "none", mb: 3 }}>
+        <SectionHead icon={<HourglassTop />} color="#d97706" title="แผนงานรออนุมัติ" count={approvalCount}
+          hint="ลงวันในตารางไว้แล้ว — ตรวจแล้วกดอนุมัติ หรือไม่อนุมัติพร้อมเหตุผล" />
+        <Suspense fallback={<Skeleton variant="rounded" height={160} sx={{ borderRadius: 3 }} />}>
+          <PendingApprovalsPanel active onCountChange={setApprovalCount} />
         </Suspense>
       </Box>
+
+      {/* ✅ ใบแจ้งงาน — ใครแจ้งมาก็ได้ (ชื่อผู้แจ้งอยู่บนการ์ด) ยังไม่มีวันนัด ต้องเลือกวัน + ทีมให้ */}
+      <SectionHead icon={<AssignmentOutlined />} color="#2563eb" title="ใบแจ้งงาน" count={waiting}
+        hint={`แจ้งเข้ามาแล้ว ยังไม่มีวันนัด — ตรวจแล้วเลือกวันและทีมให้${urgent > 0 ? ` · ด่วน ${urgent} ใบ` : ""}`} />
+      <DispatchList mode="board" myId={String(userData?.userId || "")} />
     </Box>
   );
 }

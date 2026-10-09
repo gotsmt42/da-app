@@ -190,6 +190,7 @@ let isSavingDraft = false;
 ───────────────────────────────────────────── */
 export const getAddDraftEvent = async ({
   defaultMonth, // "YYYY-MM" — เดือนที่กำลังเปิดดูอยู่ในแผงงานล่วงหน้า ใช้เป็นค่าเริ่มต้น
+  intake = false, // ✅ เปิดจากเมนู "รับงาน" — งานทั่วไป/โปรเจคเท่านั้น และติดป้าย "รับงาน" (fromIntake) ให้ server ออกเลข Job
   existingDraft, // ✅ ถ้าส่งมา = โหมดแก้ไข (prefill ค่าเดิม + เรียก UpdateDraftEvent แทน AddDraftEvent)
   events, // ✅ งานที่ลงตารางแล้ว — ใช้หาสัญญาที่มีอยู่แล้วสำหรับขั้นตอน "งานตามสัญญา" (เหมือน AddEvent.js)
   drafts, // ✅ แผนงานล่วงหน้าอื่นที่ค้างอยู่ — อาจจองครั้งที่ของสัญญาเดียวกันไปแล้ว ต้องรวมมานับด้วย
@@ -211,6 +212,7 @@ export const getAddDraftEvent = async ({
   const isAdminOrManagerUser = can(userData, "approveJobs");
 
   const isEditMode = Boolean(existingDraft);
+  const isIntakeForm = intake || Boolean(existingDraft?.intakeAt);
   // ✅ แก้ไขงานที่ผูกสัญญาอยู่แล้ว ไม่ให้สลับกลับเป็นงานทั่วไป/เปลี่ยนบริษัท-โครงการ-ประเภทงาน-ระบบ-ครั้งที่
   // ได้อีก (เผื่อแก้แล้วไม่ตรงกับครั้งอื่นในสัญญาเดียวกัน) เหมือน pattern เดียวกับ EditEvent.js
   const isContractLinked = isEditMode && Boolean(existingDraft?.contractGroupId);
@@ -306,8 +308,8 @@ export const getAddDraftEvent = async ({
   <div id="ade-header">
     <div id="ade-header-icon">📥</div>
     <div id="ade-header-info">
-      <h3>${isEditMode ? "แก้ไขงานรอลงแผน" : "รับงานใหม่"}</h3>
-      <small>รับงานจากลูกค้า / LINE / ฝ่ายขาย — ยังไม่ต้องระบุวันที่ ลงตารางได้ทีหลัง</small>
+      <h3>${isIntakeForm ? (isEditMode ? "แก้ไขงานที่รับไว้" : "รับงานใหม่") : (isEditMode ? "แก้ไขงานวางแผนล่วงหน้า" : "เพิ่มงานวางแผนล่วงหน้า")}</h3>
+      <small>${isIntakeForm ? "กรอกรับงานไว้ก่อน — ยังไม่ต้องระบุวันที่ ส่งลงตารางได้ทีหลังจากเมนู “รับงาน”" : "ยังไม่ต้องระบุวันที่ — ลาก/กดลงตารางได้ทีหลัง"}</small>
     </div>
   </div>
 
@@ -339,7 +341,7 @@ export const getAddDraftEvent = async ({
           </div>
         </div>
       </label>
-      <label class="ade-jobtype-option">
+      <label class="ade-jobtype-option" ${isIntakeForm ? 'style="display:none"' : ""}>
         <input type="radio" name="ade-jobType" id="ade-jobTypeContract" value="contract" ${selectableContracts.length === 0 ? "disabled" : ""}>
         <div class="ade-jobtype-card">
           <div class="ade-jobtype-icon">🔁</div>
@@ -350,7 +352,7 @@ export const getAddDraftEvent = async ({
         </div>
       </label>
     </div>
-    ${selectableContracts.length === 0
+    ${selectableContracts.length === 0 && !isIntakeForm
       ? `<p class="ade-jobtype-note" style="display:block;">${
           contractListForUser.length === 0
             ? (isAdminOrManagerUser
@@ -447,7 +449,7 @@ export const getAddDraftEvent = async ({
   <div id="ade-action-bar">
     <div class="ade-btn-spacer"></div>
     <button class="ade-btn ade-btn-ghost" id="ade-btnCancel">ยกเลิก</button>
-    <button class="ade-btn ade-btn-success" id="ade-btnConfirm">${isEditMode ? "💾 บันทึกการแก้ไข" : "💾 บันทึกงานรอลงแผน"}</button>
+    <button class="ade-btn ade-btn-success" id="ade-btnConfirm">${isEditMode ? "💾 บันทึกการแก้ไข" : (isIntakeForm ? "💾 บันทึกรับงาน" : "💾 บันทึกงานล่วงหน้า")}</button>
   </div>
 </div>
 `;
@@ -670,6 +672,7 @@ export const getAddDraftEvent = async ({
             // เสมอ ไม่ควรเอามาทับหมวดหมู่เดิมที่มีอยู่แล้วของ draft นั้น)
             if (!isEditMode) {
               payload.jobClassification = jobType === "project" ? "project" : "general";
+              if (isIntakeForm) payload.fromIntake = true;
               // ✅ คนที่เพิ่มแผนงานทั่วไป/โปรเจคเองเป็นผู้รับผิดชอบงานนั้นทันทีโดยอัตโนมัติ (งานตามสัญญา
               // ยังคงให้ admin/manager มอบหมายเองผ่านหน้า "ภาพรวมงาน" เหมือนเดิม ไม่ตั้งตรงนี้) — ทีมที่
               // เข้างานจริงยังเลือกได้ตามปกติตอนกดลงตารางจริง (ดู scheduleDraft/swal-schedule-team ใน
@@ -704,7 +707,7 @@ export const getAddDraftEvent = async ({
             isSavingDraft = false;
 
             Swal.fire({
-              title: isEditMode ? "บันทึกการแก้ไขสำเร็จ ✅" : "บันทึกงานรอลงแผนสำเร็จ ✅",
+              title: isEditMode ? "บันทึกการแก้ไขสำเร็จ ✅" : isIntakeForm ? "รับงานแล้ว ✅" : "บันทึกงานล่วงหน้าสำเร็จ ✅",
               icon: "success",
               timer: 1200,
               showConfirmButton: false,

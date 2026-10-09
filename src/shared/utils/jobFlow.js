@@ -16,6 +16,9 @@ export const FOLLOW_UP_REASONS = [
 export const NEXT_OWNERS = ["แอดมิน/ผู้ประสานงาน", "ช่าง (ทีมเดิม)", "ฝ่ายขาย", "ลูกค้า"];
 
 export const isClosedJob = (ev) => ev?.status === "ดำเนินการเสร็จสิ้น";
+/** ✅ "รับทราบงาน" เริ่มใช้ 9 ต.ค. 2569 — งานที่สร้างก่อนหน้านี้ไม่ต้องติดตามการรับทราบ (ตรงกับ ACK_TRACK_SINCE ฝั่ง server) */
+export const ACK_TRACK_SINCE = "2026-10-08T17:00:00.000Z";
+export const ackTracked = (ev) => Boolean(ev?.createdAt) && ev.createdAt >= ACK_TRACK_SINCE;
 export const isUrgent = (ev) => ev?.priority === "urgent";
 export const openFollowUp = (ev) => (ev?.followUpOpen ? [...(ev.followUps || [])].reverse().find((f) => !f.resolvedAt) || null : null);
 export const acksOf = (ev) => ev?.acks || [];

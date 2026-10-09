@@ -1645,7 +1645,7 @@ function EventCalendar() {
     );
 
     const result = await Swal.fire({
-      title: isSoleContractRecord ? "⚠️ ลบแล้วสัญญาทั้งอันจะหายไปจากตาราง!" : "ลบงานรอลงแผนนี้?",
+      title: isSoleContractRecord ? "⚠️ ลบแล้วสัญญาทั้งอันจะหายไปจากตาราง!" : "ลบงานวางแผนล่วงหน้านี้?",
       html: isSoleContractRecord
         ? `นี่เป็นครั้งเดียวที่เหลืออยู่ของสัญญานี้${draft.contractNo ? ` (เลขที่สัญญา ${draft.contractNo})` : ""} —
            ลบแล้วสัญญา <b>${[draft.company, draft.site].filter(Boolean).join(" · ") || "งานนี้"}</b>
@@ -3269,7 +3269,7 @@ function EventCalendar() {
           <button
             className={`filter-toggle-btn ${showDraftsPanel ? "filter-toggle-btn--open" : ""} ${visibleDrafts.length > 0 ? "filter-toggle-btn--active" : ""}`}
             onClick={() => { if (techListMode) setTechView("calendar"); setShowDraftsPanel((p) => !p); }}
-            title="งานรอลงแผน (ยังไม่ลงวันที่)"
+            title="งานวางแผนล่วงหน้า (ยังไม่ลงตาราง)"
           >
             <FontAwesomeIcon icon={faClipboardList} />
             <span className="tb-label">แผนล่วงหน้า</span>

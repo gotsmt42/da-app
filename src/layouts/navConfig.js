@@ -18,7 +18,7 @@ import {
   FaHome, FaTachometerAlt, FaCalendarAlt, FaWrench, FaBriefcase, FaClipboardList,
   FaClipboardCheck, FaPaperPlane, FaMoneyCheckAlt, FaReceipt, FaHardHat, FaUserClock, FaShoppingCart, FaInbox, FaChartBar,
   FaFileAlt, FaFileInvoiceDollar, FaFileContract, FaArchive, FaBuilding, FaUserFriends,
-  FaCog, FaTags, FaImage, FaUserShield, FaBoxOpen, FaImages, FaNewspaper, FaSlidersH, FaEnvelopeOpenText, FaTasks, FaFileImport,
+  FaCog, FaTags, FaImage, FaUserShield, FaBoxOpen, FaImages, FaNewspaper, FaSlidersH, FaEnvelopeOpenText, FaFileImport,
 } from "react-icons/fa";
 import { DEPARTMENT } from "@/shared/utils/roles";
 
@@ -46,8 +46,7 @@ export const DEST = {
   operation: { title: "การดำเนินงาน", bar: "ดำเนินงาน", sub: "เช็คอิน · ปิดงาน", href: "/operation", icon: FaWrench, badgeKey: "closeRequests" },
   // ✅ (9 ต.ค. 2569) งานที่ต้องตามต่อ แยกตามขั้นตอน — รับงาน · รอลงแผน · ยังไม่รับงาน · งานไม่เสร็จ · รอปิดงาน
   // ✅ ขั้นที่ 1 "รับงาน" — รับงานจากลูกค้า/LINE/ฝ่ายขาย เก็บเป็นงานรอลงแผน (ผู้ใช้เลือก 9 ต.ค. 2569: เมนูแรกของหมวดงาน)
-  jobIntake: { title: "รับงาน", sub: "รับงานใหม่ · งานรอลงแผน", href: "/jobs/intake", icon: FaFileImport, badgeKey: "jobIntake" },
-  jobFollow: { title: "ติดตามงาน", sub: "รอลงแผน · ไม่เสร็จ · รอปิดงาน", href: "/jobs/follow-up", icon: FaTasks, badgeKey: "jobFollow" },
+  jobIntake: { title: "รับงาน", sub: "กรอกรับงานไว้ก่อน · ส่งลงตาราง", href: "/jobs/intake", icon: FaFileImport, badgeKey: "jobIntake" },
   jobReport: { title: "รายงานงาน", short: "รายงาน", sub: "สรุปสถานะ · รายเดือน · ตามลูกค้า/ทีม", href: "/jobs/report", icon: FaChartBar },
   myJobs: { title: "งานของฉัน", sub: "งานที่ได้รับมอบหมาย", href: "/technician/jobs", icon: FaClipboardList, badgeKey: "myJobs" },
   contracts: { title: "ภาพรวมงาน", href: "/contracts", icon: FaFileContract, badgeKey: "contracts" },

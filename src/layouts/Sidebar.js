@@ -155,9 +155,8 @@ const side = (key, extra) => {
   // "แผนงาน" ทั้งที่เป็นหน้าที่ใช้บ่อยที่สุดของฝ่ายช่าง (ไล่จัดการงานทีละใบ) และเป็นคนละเรื่องกับ
   // ปฏิทิน (ปฏิทิน = วางแผนว่าจะไปวันไหน · การดำเนินงาน = ตามงานที่ลงตารางแล้ว)
   const operationMenu = [side("operation")];
-  // ✅ (9 ต.ค. 2569) ขั้นตอนงาน: รับงาน (แรกสุด) · ติดตามงาน (หลังทำงาน)
+  // ✅ (9 ต.ค. 2569) ขั้นตอนงาน: "รับงาน" แรกสุดของหมวด
   const intakeMenu = [side("jobIntake")];
-  const followMenu = [side("jobFollow")];
   // ✅ รายงานงาน — คู่กับ "รายงานการเบิก" ของหมวดเบิกค่าใช้จ่าย
   const jobReportMenu = [side("jobReport")];
   // ✅ เมนู "แผนงานรออนุมัติ" ถูกตัดออกตามที่ผู้ใช้ขอ — ย้ายไปเป็นแท็บ "รออนุมัติ" ในหน้า "การดำเนินงาน"
@@ -393,7 +392,7 @@ const side = (key, extra) => {
               🐛 renderParentWithItems เรียก navi.items.map() ตรงๆ ถ้าไม่มี items จะพังทั้งแอป
               (จอขาว) เพราะ Sidebar อยู่ในทุกหน้า */}
           {/* ✅ (9 ต.ค. 2569 ผู้ใช้: "เรียงเมนูตามขั้นตอนงาน") 1 รับงาน → 2 คำขอลงงาน → 3 ตารางงาน (วางแผน)
-              → 4 การดำเนินงาน / งานของฉัน → 5 ติดตามงาน → ภาพรวมงาน · งานปิดแล้ว → รายงาน */}
+              → 4 การดำเนินงาน / งานของฉัน → ภาพรวมงาน · งานปิดแล้ว → รายงาน */}
           {canViewOperation && intakeMenu.map((item, idx) => renderLink(item, `work-in-${idx}`))}
           {canAssign && dispatchMenu.map((item, idx) => renderLink(item, `work-dispatch-${idx}`))}
           {canPlanWork && workMenu.map((navi, index) => (
@@ -403,7 +402,6 @@ const side = (key, extra) => {
           ))}
           {canViewOperation && operationMenu.map((item, idx) => renderLink(item, `work-op-${idx}`))}
           {canMyJobs && myJobsMenu.map((item, idx) => renderLink(item, `work-my-${idx}`))}
-          {canViewOperation && followMenu.map((item, idx) => renderLink(item, `work-fu-${idx}`))}
           {canViewContracts && contractsMenu.map((item, idx) => renderLink(item, `work-ct-${idx}`))}
           {/* ✅ รายงานงานอยู่ท้ายหมวด "งาน" ตำแหน่งเดียวกับ "รายงานการเบิก" ท้ายหมวดเบิกค่าใช้จ่าย */}
           {canViewOperation && jobReportMenu.map((item, idx) => renderLink(item, `work-report-${idx}`))}

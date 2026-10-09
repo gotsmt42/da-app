@@ -22,7 +22,7 @@ import EventService from "@/shared/services/EventService";
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import { formatThai } from "@/shared/utils/thaiDate";
 import {
-  FOLLOW_UP_REASONS, NEXT_OWNERS, isClosedJob, isUrgent, openFollowUp, acksOf, isAckedBy, isParticipant, dueInfo,
+  FOLLOW_UP_REASONS, NEXT_OWNERS, isClosedJob, isUrgent, openFollowUp, acksOf, isAckedBy, isParticipant, dueInfo, ackTracked,
 } from "@/shared/utils/jobFlow";
 
 const BLUE = "#2563eb";
@@ -70,7 +70,7 @@ export function JobFlowChips({ event, showAck = false, sx }) {
   }
   if (event.infoPending && !closed) items.push(<Chip key="i" color={AMBER} icon={<HourglassTopRounded />}>รอข้อมูล</Chip>);
   if (fu && !closed) items.push(<Chip key="f" color={AMBER} icon={<ReportProblemOutlined />}>งานไม่เสร็จ · {fu.reason}</Chip>);
-  if (showAck && !closed && !event.unscheduled) {
+  if (showAck && !closed && !event.unscheduled && (acks.length || ackTracked(event))) {
     items.push(acks.length
       ? <Chip key="a" color={GREEN} icon={<CheckCircleRounded />} title={acks.map((a) => a.name).join(", ")}>รับทราบแล้ว</Chip>
       : <Chip key="a" color={MUTED} icon={<ThumbUpAltOutlined />}>ยังไม่รับทราบ</Chip>);
@@ -88,7 +88,7 @@ export function JobFlowFlags({ event }) {
   if (due?.overdue) items.push(<Chip key="d" color={RED} icon={<EventBusyOutlined />}>เลยกำหนด</Chip>);
   if (openFollowUp(event)) items.push(<Chip key="f" color={AMBER} icon={<ReportProblemOutlined />}>ไม่เสร็จ</Chip>);
   if (event.infoPending) items.push(<Chip key="i" color={AMBER} icon={<HourglassTopRounded />}>รอข้อมูล</Chip>);
-  if (!event.unscheduled && event.approvalStatus !== "pending" && !acksOf(event).length && moment(event.start).isAfter(moment().subtract(1, "day")))
+  if (ackTracked(event) && !event.unscheduled && event.approvalStatus !== "pending" && !acksOf(event).length && moment(event.start).isAfter(moment().subtract(1, "day")))
     items.push(<Chip key="a" color={MUTED} icon={<ThumbUpAltOutlined />}>ยังไม่รับทราบ</Chip>);
   if (!items.length) return null;
   return <Stack direction="row" gap={0.4} flexWrap="wrap" sx={{ mt: 0.5 }}>{items}</Stack>;
@@ -211,7 +211,7 @@ export function JobFlowPanel({ event, mode = "tech", onPatched, sx }) {
           <Typography sx={{ fontSize: "0.7rem", color: "#94a3b8" }}>· {formatThai(moment(acks[acks.length - 1].at), "D MMM HH:mm")}</Typography>
         </Stack>
       );
-    } else if (mode === "admin") {
+    } else if (mode === "admin" && ackTracked(event)) {
       ackArea = (
         <Stack direction="row" alignItems="center" gap={0.6} sx={{ px: 0.5 }}>
           <ThumbUpAltOutlined sx={{ fontSize: 15, color: AMBER }} />
