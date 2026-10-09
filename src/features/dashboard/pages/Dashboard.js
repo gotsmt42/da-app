@@ -55,6 +55,7 @@ const STATUS_META = {
   กำลังดำเนินการ: { color: "#0891b2", bg: "#cffafe", Icon: FaCogs },
   ดำเนินการเสร็จสิ้น: { color: "#16a34a", bg: "#dcfce7", Icon: FaCheckDouble },
 };
+const STATUS_SHORT = { กำลังรอยืนยัน: "รอยืนยัน", ยืนยันแล้ว: "ยืนยันแล้ว", กำลังดำเนินการ: "กำลังทำ", ดำเนินการเสร็จสิ้น: "เสร็จแล้ว" };
 const ROUND_ICON = { due_soon: ScheduleOutlined, due_now: NotificationsActiveOutlined, overdue: ErrorOutline };
 const getStatusMeta = (status) =>
   STATUS_META[status] || { color: "#64748b", bg: "#f1f5f9", Icon: FaClock };
@@ -491,8 +492,40 @@ const Dashboard = () => {
   // (ดู .dashboard-side--mobile / .dashboard-side--desktop) เพื่อไม่ให้ความสูงของแถบนี้ (ซึ่งขยับ
   // ขึ้นลงได้เวลากด dropdown) ไปกระทบ layout ของอีกฝั่งเลย — เดิมใช้ grid-row เดียวกันกับเนื้อหาหลัก
   // ทำให้กด dropdown ขยายแล้วทั้งหน้าสั่น/มีช่องว่างเกิดขึ้นเวลาแถบนี้สูงกว่าเนื้อหาหลักช่วงบน ───
+  const todayBlock = (
+    <>
+    {/* ✅ งานวันนี้ — ช่องเวลาซ้าย · ป้ายสถานะขวา · แถบสรุปจำนวนแต่ละสถานะใต้หัวกล่อง
+        (แทนการ์ด "สรุปสถานะงาน" 4 ใบเดิมที่ผู้ใช้สั่งตัดออก 9 ต.ค. 2569)
+        แอดมิน/หัวหน้า: อยู่บนสุดของแถบข้าง เหนือ "งานที่กำลังจะถึง" (ผู้ใช้ขอ 9 ต.ค. 2569) */}
+    <Widget title={`${isSale ? "นัดหมายวันนี้" : "งานวันนี้"} · ${formatThai(moment(), "D MMM")}`} count={todayJobs.length || undefined}
+      icon={Today} sx={{ borderColor: alpha(ACCENT, 0.35), boxShadow: `0 4px 14px -8px ${alpha(ACCENT, 0.35)}` }}
+      summary={todayJobs.length > 1 ? Object.keys(STATUS_META).map((st) => {
+        const n = todayJobs.filter((j) => j.status === st).length;
+        return n ? <Pill key={st} color={STATUS_META[st].color}>{STATUS_SHORT[st]} {n}</Pill> : null;
+      }) : null}
+      to={isSale ? "/event" : todayJobs.length ? "/operation" : undefined}>
+      {loading ? <Loading rows={2} /> : todayJobs.length === 0 ? (
+        <Empty text={isSale ? "วันนี้ยังไม่มีนัดหมาย" : "ไม่มีงานที่นัดหมายไว้วันนี้"} />
+      ) : todayJobs.map((job) => {
+        const assignedName = getAssignedName(job);
+        return (
+          <Row key={job._id} to={jobLink(job._id, resolveOperationGroup(job))}
+            leading={job.startTime
+              ? <DateTile top={job.startTime} bottom={job.endTime ? `ถึง ${job.endTime}` : "น."} />
+              : <DateTile top="ทั้งวัน" />}
+            title={[job.title || job.company || "งาน", job.system].filter(Boolean).join(" · ")}
+            sub={[job.site || job.company, assignedName ? `ทีม ${assignedName}` : "", job.docNo ? `#${job.docNo}` : ""].filter(Boolean).join(" · ")}
+            trailing={<Pill color={getStatusMeta(job.status).color}>{STATUS_SHORT[job.status] || job.status}</Pill>} />
+        );
+      })}
+    </Widget>
+    </>
+  );
+
   const sidebarContent = isAdminOrManager ? (
     <>
+      {todayBlock}
+
       {/* งานที่กำลังจะถึงใน 7 วัน (ไม่รวมวันนี้ — มีกล่อง "งานวันนี้" แยกแล้ว) */}
       <Widget title="งานที่กำลังจะถึง" icon={EventOutlined} count={upcomingJobs.length || undefined} hint="ภายใน 7 วันข้างหน้า" to={upcomingJobs.length > 5 ? "/operation" : undefined}>
         {loading ? <Loading rows={2} /> : upcomingJobs.length === 0 ? <Empty text="ไม่มีงานที่จะถึงใน 7 วันนี้" /> : upcomingJobs.slice(0, 5).map((job) => {
@@ -653,32 +686,9 @@ const Dashboard = () => {
 
           </div>
 
-          {/* ✅ (9 ต.ค. 2569) กล่องข้อมูลทั้งหมด — จอคอมกว้าง (≥1280px) จัดเป็น 2 คอลัมน์ไหลต่อกัน ไม่เหลือพื้นที่ว่าง */}
+          {/* ✅ (9 ต.ค. 2569) กล่องข้อมูลใต้เมนู — เรียงลงมาคอลัมน์เดียวเต็มกว้าง (ผู้ใช้: แบบ 2 คอลัมน์ไหลต่อกัน "มั่ว") */}
           <div className="dashboard-widgets">
-            {/* ✅ งานวันนี้ — ช่องเวลาซ้าย · ป้ายสถานะขวา · แถบสรุปจำนวนแต่ละสถานะใต้หัวกล่อง
-                (แทนการ์ด "สรุปสถานะงาน" 4 ใบเดิมที่ผู้ใช้สั่งตัดออก 9 ต.ค. 2569) */}
-            <Widget title={`${isSale ? "นัดหมายวันนี้" : "งานวันนี้"} · ${formatThai(moment(), "D MMM")}`} count={todayJobs.length || undefined}
-              icon={Today}
-              summary={todayJobs.length ? Object.keys(STATUS_META).map((st) => {
-                const n = todayJobs.filter((j) => j.status === st).length;
-                return n ? <Pill key={st} color={STATUS_META[st].color}>{st} {n}</Pill> : null;
-              }) : null}
-              to={isSale ? "/event" : todayJobs.length ? "/operation" : undefined}>
-              {loading ? <Loading rows={2} /> : todayJobs.length === 0 ? (
-                <Empty text={isSale ? "วันนี้ยังไม่มีนัดหมาย" : "ไม่มีงานที่นัดหมายไว้วันนี้"} />
-              ) : todayJobs.map((job) => {
-                const assignedName = getAssignedName(job);
-                return (
-                  <Row key={job._id} to={jobLink(job._id, resolveOperationGroup(job))}
-                    leading={job.startTime
-                      ? <DateTile top={job.startTime} bottom={job.endTime ? `ถึง ${job.endTime}` : "น."} />
-                      : <DateTile top="ทั้งวัน" />}
-                    title={[job.title || job.company || "งาน", job.system].filter(Boolean).join(" · ")}
-                    sub={[job.site || job.company, assignedName ? `ทีม ${assignedName}` : "", job.docNo ? `#${job.docNo}` : ""].filter(Boolean).join(" · ")}
-                    trailing={<Pill color={getStatusMeta(job.status).color}>{job.status}</Pill>} />
-                );
-              })}
-            </Widget>
+            {!isAdminOrManager && todayBlock}
 
           {/* ─── แถบข้าง: งานค้างของช่างแยกรายคน (เฉพาะแอดมิน/manager) — ✅ ย้ายมาไว้ตรงนี้ (แทรกระหว่าง
         เนื้อหาช่วงบน/ล่างของหลัก) แทนที่จะอยู่หลังเนื้อหาหลักทั้งหมด เพราะบนมือถือ (คอลัมน์เดียว)
@@ -817,15 +827,6 @@ const Dashboard = () => {
                แม้ตอนนี้จะไม่กระทบเนื้อหาหลักแล้วก็ตาม (คนละ flex item กันแล้ว) แต่ยังกันตัวเอง
                กระโดดเองเวลาขยาย/หุบ dropdown ภายในตัวมันเองไว้ด้วย */
             overflow-anchor: none;
-          }
-        }
-        @media (min-width: 1280px) {
-          .dashboard-widgets {
-            column-count: 2;
-            column-gap: 16px;
-          }
-          .dashboard-widgets > * {
-            break-inside: avoid;
           }
         }
         .action-hero-btn {
