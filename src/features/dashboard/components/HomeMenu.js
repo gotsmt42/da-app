@@ -69,7 +69,12 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
   const canPlanWork = canViewOperation || canSell || seeAllSchedules || can(userData, "viewServiceCalendar");
 
   // ── งาน ──────────────────────────────────────────────────────────────────
+  // ✅ (9 ต.ค. 2569 ผู้ใช้: "เรียงเมนูตามขั้นตอนงาน") รับงาน → คำขอลงงาน → ตารางงาน (วางแผน)
+  //    → การดำเนินงาน / งานของฉัน (ทำงาน · ปิดงาน) → ติดตามงาน → รายงาน
   const work = [];
+  if (canViewOperation) work.push(dest("jobIntake"));
+  if (canAssign) work.push(dest("dispatch"));
+  if (canRequestDispatch && !hideSalesJobs) work.push(dest("sales", { tone: TONE.sales }));
   if (canPlanWork) {
     if (seeAllSchedules) {
       work.push(dest("eventService"));
@@ -83,13 +88,11 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
     }
   }
   if (canViewOperation) work.push(dest("operation"));
-  if (canViewOperation) work.push(dest("jobFollow"));
   if (can(userData, "receiveDispatch") && !hideMyJobs) work.push(dest("myJobs"));
+  if (canViewOperation) work.push(dest("jobFollow"));
   // 🧹 "ภาพรวมงาน" ถูกตัดออกจากเมนูหลักตามที่ผู้ใช้สั่ง — เดิมปลายทางนี้โผล่พร้อมกัน 3 ที่ในจอเดียว
   // (ชิปบนแถบบน + ปุ่มตรงนี้ + ช่องบนแถบเมนูล่าง) พร้อมป้ายตัวเลขเดียวกันทั้งสามจุด
   // ⚠️ ยังเข้าได้ตามปกติจากแถบเมนูล่าง (มือถือ) และเมนูข้าง (ทุกจอ) — ไม่ได้ตัดทางเข้าทิ้ง
-  if (canAssign) work.push(dest("dispatch"));
-  if (canRequestDispatch && !hideSalesJobs) work.push(dest("sales", { tone: TONE.sales }));
   // ✅ ผู้ใช้สั่งให้หมวด "งาน" มีรายงานเหมือนหมวด "เบิกค่าใช้จ่าย" — วางท้ายหมวดตำแหน่งเดียวกัน
   // ⚠️ เห็นเฉพาะคนที่เห็นหน้าการดำเนินงาน เพราะรายงานสรุปจากข้อมูลชุดเดียวกันเป๊ะ
   if (canViewOperation) work.push(dest("jobReport"));

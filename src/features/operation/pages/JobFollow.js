@@ -2,10 +2,10 @@
  * JobFollow — เมนู "ติดตามงาน" (9 ต.ค. 2569 ผู้ใช้: "เมนูอยู่ไหน ไม่เห็น ไม่เจอ")
  *
  * หน้าเดียวรวม "งานที่ต้องตามต่อ" แยกตามขั้นตอนทำงานมาตรฐาน 6 ขั้น — กดขั้นไหนก็เห็นงานของขั้นนั้น
- *   1 รับแจ้งงาน  → รอข้อมูล
+ *   1 รับงาน     → รอข้อมูล
  *   2 เปิด Job    → ด่วน / เลยวันครบกำหนด
  *   3 วางแผน     → งานรอลงแผน (รับแจ้งแล้ว ยังไม่ลงวันที่) + ลงตารางแล้วแต่ยังไม่มีทีม
- *   4 ช่างรับงาน  → ยังไม่กดรับงาน (งานภายใน 7 วัน)
+ *   4 ช่างรับทราบ → ยังไม่กดรับทราบงาน (งานภายใน 7 วัน)
  *   5 ติดตามงาน   → งานไม่เสร็จ รอนัดใหม่
  *   6 ปิดงาน      → รอตรวจปิดงาน
  * ข้อมูลชุดเดียวกับหน้าการดำเนินงาน (GET /events/event-op — server กรองตามสิทธิ์แล้ว ช่างเห็นแค่งานตัวเอง)
@@ -42,10 +42,10 @@ const AMBER = "#d97706";
 const RED = "#dc2626";
 
 const STEPS = [
-  { n: 1, key: "info", step: "รับแจ้งงาน", label: "รอข้อมูล", icon: HourglassTopRounded, color: AMBER, hint: "ข้อมูลงานยังไม่ครบ — ตามข้อมูลจากผู้แจ้ง/ลูกค้าให้ครบก่อนเข้างาน" },
+  { n: 1, key: "info", step: "รับงาน", label: "รอข้อมูล", icon: HourglassTopRounded, color: AMBER, hint: "ข้อมูลงานยังไม่ครบ — ตามข้อมูลจากผู้แจ้ง/ลูกค้าให้ครบก่อนเข้างาน" },
   { n: 2, key: "urgent", step: "เปิด Job", label: "ด่วน / เลยกำหนด", icon: BoltRounded, color: RED, hint: "งานด่วน และงานที่เลยวันครบกำหนดแล้ว" },
   { n: 3, key: "unassigned", step: "วางแผน", label: "รอลงแผน", icon: GroupAddOutlined, color: AMBER, hint: "งานที่รับแจ้งแล้วแต่ยังไม่ลงวันที่ — กด “ลงตาราง” แล้วลากงานจากแผงงานรอลงแผนลงวันในปฏิทิน · รวมงานที่ยังไม่มีทีม" },
-  { n: 4, key: "unacked", step: "ช่างรับงาน", label: "ยังไม่รับงาน", icon: ThumbUpAltOutlined, color: ACCENT, hint: "งานภายใน 7 วันที่ช่างยังไม่กด “รับงาน”" },
+  { n: 4, key: "unacked", step: "ช่างรับทราบ", label: "ยังไม่รับทราบ", icon: ThumbUpAltOutlined, color: ACCENT, hint: "งานภายใน 7 วันที่ช่างยังไม่กด “รับทราบงาน”" },
   { n: 5, key: "followup", step: "ติดตามงาน", label: "งานไม่เสร็จ", icon: EventRepeatOutlined, color: AMBER, hint: "ช่างแจ้งว่างานไม่เสร็จ — ลงวันนัดใหม่ในตารางงาน แล้วกด “จัดการแล้ว”" },
   { n: 6, key: "close", step: "ตรวจและปิดงาน", label: "รอตรวจปิดงาน", icon: TaskAltOutlined, color: "#16a34a", hint: "ช่างขอปิดงานแล้ว — ตรวจรูป/เอกสาร แล้วอนุมัติหรือตีกลับ" },
 ];
@@ -153,7 +153,7 @@ function stepDetail(step, e) {
   }
   if (step === "unassigned") {
     if (e.unscheduled) {
-      return [e.contactName ? `ผู้ติดต่อ ${e.contactName}${e.contactTel ? ` ${e.contactTel}` : ""}` : "", e.description].filter(Boolean).join(" · ") || "รับแจ้งแล้ว — ยังไม่ลงวันที่";
+      return [e.contactName ? `ผู้ติดต่อ ${e.contactName}${e.contactTel ? ` ${e.contactTel}` : ""}` : "", e.description].filter(Boolean).join(" · ") || "รับงานแล้ว — ยังไม่ลงวันที่";
     }
     return "ลงตารางแล้ว แต่ยังไม่ได้มอบหมายหัวหน้าทีม";
   }
@@ -166,7 +166,7 @@ function stepDetail(step, e) {
   return "";
 }
 
-function JobRow({ e, step, color, action }) {
+export function JobRow({ e, step, color, action }) {
   const draft = Boolean(e.unscheduled);
   const start = draft ? moment(e.plannedMonth || moment().format("YYYY-MM"), "YYYY-MM") : moment(e.start);
   const isToday = !draft && start.isSame(moment(), "day");
@@ -208,7 +208,21 @@ function JobRow({ e, step, color, action }) {
   );
 }
 
-const BTN_SX = { flexShrink: 0, textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: ACCENT, "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" }, fontSize: "0.8rem", px: 1.5, whiteSpace: "nowrap" };
+export const BTN_SX = { flexShrink: 0, textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: ACCENT, "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" }, fontSize: "0.8rem", px: 1.5, whiteSpace: "nowrap" };
+
+/**
+ * ✅ ขั้นที่ 1 "รับงาน" — ฟอร์มเดียวกับแผง "งานรอลงแผน" ในปฏิทิน (ยังไม่ต้องรู้วันที่)
+ * ใช้ทั้งหน้า "รับงาน" และ "ติดตามงาน"
+ */
+export const openIntakeForm = ({ existingDraft, events, drafts, userData, onSaved }) => getAddDraftEvent({
+  defaultMonth: moment().format("YYYY-MM"),
+  existingDraft,
+  events: events || [],
+  drafts: drafts || [],
+  userData,
+  onSaved,
+  CustomerService, AuthService, JobTypeService, SystemTypeService, EventService, Swal, TomSelect, moment,
+});
 
 export default function JobFollow() {
   const { userData } = useAuth() || {};
@@ -254,15 +268,9 @@ export default function JobFollow() {
     }
   };
 
-  // ✅ ขั้นที่ 1 รับแจ้งงาน — ฟอร์มเดียวกับ "งานวางแผนล่วงหน้า" ในปฏิทิน (ยังไม่ต้องรู้วันที่)
-  const openIntake = (existingDraft) => getAddDraftEvent({
-    defaultMonth: moment().format("YYYY-MM"),
-    existingDraft,
-    events: events || [],
-    drafts,
-    userData,
+  const openIntake = (existingDraft) => openIntakeForm({
+    existingDraft, events, drafts, userData,
     onSaved: async () => { await load(); refreshAppBadges(); setActive("unassigned"); },
-    CustomerService, AuthService, JobTypeService, SystemTypeService, EventService, Swal, TomSelect, moment,
   });
 
   const { userId, fname } = me();
@@ -280,7 +288,7 @@ export default function JobFollow() {
       return <Button variant="contained" disabled={busyId === e._id} onClick={() => act(e._id, () => EventService.ResolveFollowUp(e._id, { resolution: "ลงนัดใหม่แล้ว" }), "จัดการแล้ว")} sx={BTN_SX}>จัดการแล้ว</Button>;
     }
     if (current === "unacked" && isParticipant(e, userId, fname) && !isAckedBy(e, userId)) {
-      return <Button variant="contained" disabled={busyId === e._id} startIcon={<ThumbUpAltOutlined sx={{ fontSize: "16px !important" }} />} onClick={() => act(e._id, () => EventService.AckJob(e._id), "รับงานแล้ว")} sx={BTN_SX}>รับงาน</Button>;
+      return <Button variant="contained" disabled={busyId === e._id} startIcon={<ThumbUpAltOutlined sx={{ fontSize: "16px !important" }} />} onClick={() => act(e._id, () => EventService.AckJob(e._id), "รับทราบงานแล้ว")} sx={BTN_SX}>รับทราบงาน</Button>;
     }
     if (current === "close" && isAdmin) {
       return <Button component={Link} to={`/operation/${e._id}`} variant="contained" sx={BTN_SX}>ไปตรวจ</Button>;
@@ -298,8 +306,7 @@ export default function JobFollow() {
         actions={
           <Button variant="contained" startIcon={<AddRounded />} onClick={() => openIntake()} disabled={!events}
             sx={{ ...BTN_SX, height: 40, px: { xs: 1.25, sm: 2 } }}>
-            <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>รับแจ้งงานใหม่</Box>
-            <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>รับแจ้งงาน</Box>
+            รับงานใหม่
           </Button>
         } />
 

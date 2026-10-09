@@ -2,8 +2,9 @@
  * JobFlow — ส่วนแสดงผล "ขั้นตอนทำงานมาตรฐาน" ที่ใช้ทั้งการ์ดงานของช่าง (TechnicianJobPanel)
  * และการ์ดงานของแอดมิน (OperationBoard → EventRowCard) — หน้าตาเดียวกันทุกที่
  *
- *   JobFlowChips  ป้ายบรรทัดเดียวใต้ชื่องาน: เลข Job · ด่วน · ครบกำหนด · รอข้อมูล · งานไม่เสร็จ · รับงานแล้ว
- *   JobFlowPanel  กล่องการทำงาน: รอข้อมูล · อุปกรณ์ · ปุ่ม "รับงาน" · งานไม่เสร็จ (แจ้ง/จัดการแล้ว)
+ *   JobFlowChips  ป้ายบรรทัดเดียวใต้ชื่องาน: เลข Job · ด่วน · ครบกำหนด · รอข้อมูล · งานไม่เสร็จ · รับทราบแล้ว
+ *   JobFlowPanel  กล่องการทำงาน: รอข้อมูล · อุปกรณ์ · ปุ่ม "รับทราบงาน" · งานไม่เสร็จ (แจ้ง/จัดการแล้ว)
+ * ⚠️ "รับงาน" = รับงานจากลูกค้า (ขั้นที่ 1 · เมนู "รับงาน") — ปุ่มของช่างใช้คำว่า "รับทราบงาน" กันสับสน
  *
  * กฎ UI: น้ำเงิน = ปุ่มหลัก · แดง = ด่วน/เลยกำหนด · อำพัน = รอ/ค้าง · เขียว = เรียบร้อย
  */
@@ -71,8 +72,8 @@ export function JobFlowChips({ event, showAck = false, sx }) {
   if (fu && !closed) items.push(<Chip key="f" color={AMBER} icon={<ReportProblemOutlined />}>งานไม่เสร็จ · {fu.reason}</Chip>);
   if (showAck && !closed && !event.unscheduled) {
     items.push(acks.length
-      ? <Chip key="a" color={GREEN} icon={<CheckCircleRounded />} title={acks.map((a) => a.name).join(", ")}>รับงานแล้ว</Chip>
-      : <Chip key="a" color={MUTED} icon={<ThumbUpAltOutlined />}>ยังไม่รับงาน</Chip>);
+      ? <Chip key="a" color={GREEN} icon={<CheckCircleRounded />} title={acks.map((a) => a.name).join(", ")}>รับทราบแล้ว</Chip>
+      : <Chip key="a" color={MUTED} icon={<ThumbUpAltOutlined />}>ยังไม่รับทราบ</Chip>);
   }
   if (!items.length) return null;
   return <Stack direction="row" gap={0.5} flexWrap="wrap" sx={{ mt: 0.5, ...sx }}>{items}</Stack>;
@@ -88,7 +89,7 @@ export function JobFlowFlags({ event }) {
   if (openFollowUp(event)) items.push(<Chip key="f" color={AMBER} icon={<ReportProblemOutlined />}>ไม่เสร็จ</Chip>);
   if (event.infoPending) items.push(<Chip key="i" color={AMBER} icon={<HourglassTopRounded />}>รอข้อมูล</Chip>);
   if (!event.unscheduled && event.approvalStatus !== "pending" && !acksOf(event).length && moment(event.start).isAfter(moment().subtract(1, "day")))
-    items.push(<Chip key="a" color={MUTED} icon={<ThumbUpAltOutlined />}>ยังไม่รับ</Chip>);
+    items.push(<Chip key="a" color={MUTED} icon={<ThumbUpAltOutlined />}>ยังไม่รับทราบ</Chip>);
   if (!items.length) return null;
   return <Stack direction="row" gap={0.4} flexWrap="wrap" sx={{ mt: 0.5 }}>{items}</Stack>;
 }
@@ -109,7 +110,7 @@ const Block = ({ color, icon, title, children, action }) => (
 
 /**
  * กล่องการทำงานของงาน
- * @param mode "tech" = มุมมองช่าง (ปุ่มรับงาน · แจ้งงานไม่เสร็จ) · "admin" = มุมมองแอดมิน (สถานะรับงาน · จัดการแล้ว)
+ * @param mode "tech" = มุมมองช่าง (ปุ่มรับทราบงาน · แจ้งงานไม่เสร็จ) · "admin" = มุมมองแอดมิน (สถานะรับทราบ · จัดการแล้ว)
  * @param onPatched (events[]) — เอางานที่ server คืนมาไปอัปเดตหน้าจอ
  */
 export function JobFlowPanel({ event, mode = "tech", onPatched, sx }) {
@@ -189,15 +190,15 @@ export function JobFlowPanel({ event, mode = "tech", onPatched, sx }) {
     );
   }
 
-  // ── ขั้น 4: รับงาน ──
+  // ── ขั้น 4: ช่างรับทราบงาน ──
   let ackArea = null;
   if (!closed && !pendingApproval && !event.unscheduled) {
     if (mode === "tech" && mine && !ackedByMe) {
       ackArea = (
         <Button fullWidth variant="contained" disableElevation disabled={busy} startIcon={<ThumbUpAltOutlined />}
-          onClick={() => run(() => EventService.AckJob(event._id), "รับงานแล้ว")}
+          onClick={() => run(() => EventService.AckJob(event._id), "รับทราบงานแล้ว")}
           sx={{ bgcolor: BLUE, "&:hover": { bgcolor: "#1d4ed8" }, textTransform: "none", fontWeight: 800, borderRadius: 2, py: 1, fontSize: "0.9rem" }}>
-          รับงาน
+          รับทราบงาน
         </Button>
       );
     } else if (acks.length) {
@@ -205,7 +206,7 @@ export function JobFlowPanel({ event, mode = "tech", onPatched, sx }) {
         <Stack direction="row" alignItems="center" gap={0.6} sx={{ px: 0.5 }}>
           <CheckCircleRounded sx={{ fontSize: 16, color: GREEN }} />
           <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: "#15803d" }}>
-            รับงานแล้ว: {acks.map((a) => a.name).join(", ")}
+            รับทราบแล้ว: {acks.map((a) => a.name).join(", ")}
           </Typography>
           <Typography sx={{ fontSize: "0.7rem", color: "#94a3b8" }}>· {formatThai(moment(acks[acks.length - 1].at), "D MMM HH:mm")}</Typography>
         </Stack>
@@ -214,7 +215,7 @@ export function JobFlowPanel({ event, mode = "tech", onPatched, sx }) {
       ackArea = (
         <Stack direction="row" alignItems="center" gap={0.6} sx={{ px: 0.5 }}>
           <ThumbUpAltOutlined sx={{ fontSize: 15, color: AMBER }} />
-          <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: "#92400e" }}>ช่างยังไม่กดรับงาน</Typography>
+          <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: "#92400e" }}>ช่างยังไม่กดรับทราบงาน</Typography>
         </Stack>
       );
     }

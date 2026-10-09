@@ -306,8 +306,8 @@ export const getAddDraftEvent = async ({
   <div id="ade-header">
     <div id="ade-header-icon">📥</div>
     <div id="ade-header-info">
-      <h3>${isEditMode ? "แก้ไขงานรอลงแผน" : "รับแจ้งงานใหม่ (รอลงแผน)"}</h3>
-      <small>ยังไม่ต้องระบุวันที่ — ลงตารางได้ทีหลังจากปฏิทิน หรือเมนู "ติดตามงาน"</small>
+      <h3>${isEditMode ? "แก้ไขงานรอลงแผน" : "รับงานใหม่"}</h3>
+      <small>รับงานจากลูกค้า / LINE / ฝ่ายขาย — ยังไม่ต้องระบุวันที่ ลงตารางได้ทีหลัง</small>
     </div>
   </div>
 
@@ -403,10 +403,10 @@ export const getAddDraftEvent = async ({
       </div>
     </div>
 
-    <!-- ✅ (9 ต.ค. 2569) ขั้นที่ 1 รับแจ้งงาน — ผู้ติดต่อ + อาการเสีย/ขอบเขตงาน (เฉพาะงานทั่วไป/โปรเจค) -->
+    <!-- ✅ (9 ต.ค. 2569) ขั้นที่ 1 รับงาน — ผู้ติดต่อ + อาการเสีย/ขอบเขตงาน (เฉพาะงานทั่วไป/โปรเจค) -->
     <div id="ade-intakeSection">
       <hr class="ade-divider">
-      <p class="ade-section-label">รายละเอียดที่รับแจ้ง <span style="font-weight:600;color:#94a3b8;text-transform:none;">· ไม่บังคับ</span></p>
+      <p class="ade-section-label">รายละเอียดงานที่รับ <span style="font-weight:600;color:#94a3b8;text-transform:none;">· ไม่บังคับ</span></p>
       <div class="ade-grid ade-grid-2">
         <div class="ade-field">
           <label>👤 ผู้ติดต่อหน้างาน</label>

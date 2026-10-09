@@ -47,6 +47,7 @@ const About = lazyWithRetry(() => import("@/features/settings/pages/Settings.js"
 //    คำว่า report ไปเป็น id แล้วเปิดหน้าการดำเนินงานที่กรองหางานชื่อ report แทน
 const JobReport = lazyWithRetry(() => import("@/features/operation/pages/JobReport.js"));
 const JobFollow = lazyWithRetry(() => import("@/features/operation/pages/JobFollow.js"));
+const JobIntake = lazyWithRetry(() => import("@/features/operation/pages/JobIntake.js"));
 // ⚠️ ลบหน้า demo ของ template MaterialPro ออกแล้ว (Alerts/Badges/Buttons/Cards/Grid/Forms/
 // Breadcrumbs) — เป็นหน้าตัวอย่างที่ติดมากับ template ตั้งแต่ตอนสร้างโปรเจกต์ ไม่เกี่ยวกับธุรกิจ
 // ไม่มีลิงก์จากเมนูไหนเลย และไม่มีใคร import ต่อ
@@ -371,6 +372,16 @@ const ThemeRoutes = [
   // ทุกครั้งที่สลับไปมาระหว่างสองเส้นทางนี้ (เช่น กดแจ้งเตือนแล้วเด้งไปงานเฉพาะ) หน้าเลย
   // กระพริบ/โหลดใหม่ทั้งหน้า ให้ความรู้สึกเหมือนรีเฟรช — รวมเป็น route เดียวกันคง state
   // ของ component ไว้ได้ระหว่างเปลี่ยนแค่ :id param
+  // ✅ (9 ต.ค. 2569) เมนู "รับงาน" — ขั้นที่ 1 รับงานจากลูกค้า เก็บเป็นงานรอลงแผน
+  path: "jobs/intake",
+  element: (
+    <Suspense fallback={<PageLoader />}>
+      <JobIntake />
+    </Suspense>
+  ),
+  title: "Job Intake",
+},
+{
   // ✅ (9 ต.ค. 2569) เมนู "ติดตามงาน" — งานที่ต้องตามต่อ แยกตามขั้นตอนทำงาน 6 ขั้น
   path: "jobs/follow-up",
   element: (

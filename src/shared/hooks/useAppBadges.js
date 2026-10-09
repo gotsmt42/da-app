@@ -36,7 +36,8 @@ import { subscribeRealtime } from "@/shared/realtime/realtimeClient";
 export const BADGE_LABEL = {
   pendingApproval: "แผนงานรออนุมัติ",
   closeRequests: "คำขอปิดงานรอตรวจ",
-  jobFollow: "งานที่ต้องตามต่อ (งานไม่เสร็จ/ยังไม่รับงาน)",
+  jobIntake: "งานรอลงแผนที่ถึงเดือนที่ตั้งใจแล้ว",
+  jobFollow: "งานที่ต้องตามต่อ (งานไม่เสร็จ/ยังไม่รับทราบ)",
   contracts: "สัญญาที่ถึง/เลยกำหนดรอบเข้างาน (ส้ม = ใกล้ถึงรอบเดือนหน้า)",
   myJobs: "งานที่ต้องทำ",
   quotations: "ใบเสนอราคาที่ต้องติดตาม",
@@ -66,6 +67,7 @@ export const BADGE_LABEL = {
 const BADGE_TONE = {
   contracts: "soon",    // สัญญาที่ถึงกำหนดรอบถัดไป — เป็นการวางแผน ไม่ใช่ของค้าง
   quotations: "soon",   // ใบเสนอราคาที่ต้องติดตาม — ยังไม่มีใครรอเราตัดสินใจ
+  jobIntake: "soon",    // งานรอลงแผน — ถึงเดือนที่ตั้งใจแล้ว ควรลงตาราง
 };
 
 /** โทนสีของป้ายตัวเลขหนึ่งใบ — "act" หรือ "soon" */
@@ -78,7 +80,7 @@ export const badgeTone = (badgeKey, badges) => {
 const POLL_MS = 30_000;
 
 const EMPTY = {
-  pendingApproval: 0, closeRequests: 0, contracts: 0, myJobs: 0, jobFollow: 0,
+  pendingApproval: 0, closeRequests: 0, contracts: 0, myJobs: 0, jobFollow: 0, jobIntake: 0,
   quotations: 0, dispatchQueue: 0, dispatchMine: 0,
   advance: 0, claim: 0, contractorPay: 0, ot: 0, purchase: 0, expenseInbox: 0, webLeads: 0,
 };
@@ -222,7 +224,11 @@ const computeBadges = (userData, data) => {
   return {
     pendingApproval: countPendingJobs(events, drafts, { userId, isAdminOrManager }),
     closeRequests: countDistinctJobs(events, (e) => e.closeRequested === true && e.status !== "ดำเนินการเสร็จสิ้น"),
-    // ✅ ติดตามงาน: ผู้จัดคิว = งานที่ช่างแจ้งไม่เสร็จรอนัดใหม่ · ช่าง = งานของฉันภายใน 2 วันที่ยังไม่กดรับงาน
+    jobIntake: (() => {
+      const ym = new Date().toISOString().slice(0, 7);
+      return drafts.filter((d) => d.department !== "sales" && !d.contractGroupId && (!d.plannedMonth || d.plannedMonth <= ym)).length;
+    })(),
+    // ✅ ติดตามงาน: ผู้จัดคิว = งานที่ช่างแจ้งไม่เสร็จรอนัดใหม่ · ช่าง = งานของฉันภายใน 2 วันที่ยังไม่กดรับทราบ
     jobFollow: can(userData, "assignDispatch") || isAdminOrManager
       ? countDistinctJobs(events, (e) => e.followUpOpen && e.status !== "ดำเนินการเสร็จสิ้น")
       : countDistinctJobs(events, (e) => {

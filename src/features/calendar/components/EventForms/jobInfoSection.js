@@ -65,7 +65,7 @@ export function jobInfoSectionHtml(v = {}, cls = "ae", disabled = false) {
         </div>
 `;
   const sub = v.jobNo ? `<span class="ji-jobno"># ${esc(v.jobNo)}</span>` : "เลข Job ระบบออกให้อัตโนมัติตอนบันทึก";
-  // ฟอร์มรับแจ้งงาน (AddDraftEvent) ไม่มีการ์ด — ใช้หัวข้อแบบ section label ของฟอร์มนั้นแทน
+  // ฟอร์มรับงาน (AddDraftEvent) ไม่มีการ์ด — ใช้หัวข้อแบบ section label ของฟอร์มนั้นแทน
   if (cls === "ade") {
     return `${CSS}
     <hr class="ade-divider">
