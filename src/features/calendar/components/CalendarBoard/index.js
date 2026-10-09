@@ -3211,7 +3211,8 @@ function EventCalendar() {
           onExport={handleExportExcel}
           exportDisabled={exportingExcel || filteredCalendarEvents.length === 0}
           title={isServiceObserver ? "ตารางงานช่าง (ดูอย่างเดียว)" : "ตารางงานช่าง"}
-          showKpis={techView !== "calendar"}
+          // ✅ เซลดูตารางงานช่างแบบอ่านอย่างเดียว — ไม่ต้องเห็นตัวเลขสถานะงานของช่าง (ผู้ใช้สั่ง 9 ต.ค. 2569)
+          showKpis={techView !== "calendar" && !isServiceObserver}
         />
       )}
 
