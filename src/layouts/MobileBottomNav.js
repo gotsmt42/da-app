@@ -55,9 +55,9 @@ export const buildBottomNav = (userData) => {
 
   // ── ปฏิทิน ──────────────────────────────────────────────────────────────
   if (serviceObserver) {
-    // เซล: ปฏิทินของตัวเอง + ตารางงานช่าง (ดูอย่างเดียว) คนละช่อง — /event เฉยๆ ของเซลคือนัดหมายของเซล
+    // เซล: ปฏิทินของตัวเอง — /event เฉยๆ ของเซลคือนัดหมายของเซล
+    // 🧹 (9 ต.ค. 2569 ผู้ใช้) ตัด "ตารางงานช่าง" ออกจากแถบล่าง — ยังเข้าได้จากเมนูหลักหน้าแรก/เมนูข้าง
     items.push(bar("eventMine", (loc) => loc.pathname === "/event" && deptOf(loc) !== DEPARTMENT.SERVICE));
-    items.push(bar("eventServiceReadOnly", (loc) => loc.pathname === "/event" && deptOf(loc) === DEPARTMENT.SERVICE));
   } else if (canPlanWork) {
     // แอดมิน/หัวหน้ามีทั้งตารางงานช่างและเซล — ช่องนี้คือของช่าง (/event ไม่มี dept) ส่วนช่าง/พนักงานคือปฏิทินตัวเอง
     items.push(bar(

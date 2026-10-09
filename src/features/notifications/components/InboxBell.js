@@ -127,7 +127,8 @@ export default function InboxBell({ dark = false }) {
   }, [items, unread, myDept]);
   // หมวดที่โชว์ = หมวดที่มีรายการ + หมวดของหน้าที่เปิดอยู่ (แม้ยังว่าง — อยู่หน้าเซลต้องเห็นว่า "ฝ่ายขายยังไม่มีแจ้งเตือน")
   const usedSections = ["service", "sales", "other"].filter((k) => sectionStats[k].n > 0 || k === pageSection);
-  const showSections = usedSections.length > 1;
+  // ✅ (9 ต.ค. 2569 ผู้ใช้: "การแจ้งเตือนให้เห็นแค่ของตัวเองก็พอ") แถบหมวดเฉพาะคนที่ไม่สังกัดแผนก (แอดมิน/ผู้จัดการ)
+  const showSections = !myDept && usedSections.length > 1;
   const activeSection = showSections ? section : "all";
   const inSection = activeSection === "all" ? items : items.filter((n) => sectionOf(n.url, myDept) === activeSection);
   const list = tab === "unread" ? inSection.filter((n) => !n.readAt) : inSection;

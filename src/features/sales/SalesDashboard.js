@@ -15,7 +15,7 @@ import "@/shared/utils/momentThaiLocale";
 import { Box, Stack, Typography, Button, Avatar } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
-  Add, Engineering, Today, EventOutlined, ReportProblemOutlined, SendOutlined, LockOutlined, ChevronRight,
+  Add, Today, EventOutlined, ReportProblemOutlined, SendOutlined, LockOutlined, ChevronRight, CalendarMonthOutlined,
 } from "@mui/icons-material";
 
 import useRealtime from "@/shared/realtime/useRealtime";
@@ -192,7 +192,7 @@ export default function SalesDashboard() {
         {/* ── ขวา: งานที่เกี่ยวกับช่าง ── */}
         <Box sx={{ minWidth: 0, position: { lg: "sticky" }, top: { lg: 16 } }}>
           {canRequestDispatch && (
-            <Widget title="งานที่แจ้งให้ช่าง" count={activeDispatches.length || undefined} icon={Engineering} tone={SERVICE}
+            <Widget title="งานที่แจ้งให้ช่าง" count={activeDispatches.length || undefined} icon={SendOutlined} tone={SERVICE}
               to="/sales" toLabel="ดูทั้งหมด"
               summary={[
                 dispatchStats.rejected > 0 && <Pill key="r" color={RED}>ถูกตีกลับ {dispatchStats.rejected}</Pill>,
@@ -222,7 +222,7 @@ export default function SalesDashboard() {
               bgcolor: "#fff", border: `1px solid ${LINE}`, boxShadow: CARD_SHADOW, "&:hover": { borderColor: alpha(SERVICE, 0.5) },
             }}>
               <Box sx={{ width: 36, height: 36, borderRadius: 2, display: "grid", placeItems: "center", bgcolor: alpha(SERVICE, 0.1), color: SERVICE, flexShrink: 0 }}>
-                <Engineering sx={{ fontSize: 20 }} />
+                <CalendarMonthOutlined sx={{ fontSize: 20 }} />
               </Box>
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Stack direction="row" spacing={0.6} alignItems="center">

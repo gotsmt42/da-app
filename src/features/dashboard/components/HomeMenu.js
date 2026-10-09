@@ -38,7 +38,6 @@ import "./HomeMenu.css";
  */
 const TONE = {
   work: "#dc2626",
-  sales: "#7c3aed",
   expense: "#0d9488",
   purchase: "#4338ca",
   people: "#0891b2",
@@ -74,14 +73,14 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
   const work = [];
   if (canViewOperation) work.push(dest("jobIntake"));
   if (canAssign) work.push(dest("dispatch"));
-  if (canRequestDispatch && !hideSalesJobs) work.push(dest("sales", { tone: TONE.sales }));
+  if (canRequestDispatch && !hideSalesJobs) work.push(dest("sales"));
   if (canPlanWork) {
     if (seeAllSchedules) {
       work.push(dest("eventService"));
       // ⚠️ "ตารางงานเซล" (/event?dept=sales) ตั้งใจไม่ใส่ในเมนูหลักหน้านี้ — ผู้ใช้สั่งให้เอาออกไปก่อน
       // (ยังเข้าได้ตามปกติจากเมนูข้าง "แผนงาน" และ dropdown บนแถบบน ไม่ได้ปิดฟีเจอร์)
     } else if (can(userData, "viewServiceCalendar")) {
-      work.push(dest("eventMine", { tone: TONE.sales }));
+      work.push(dest("eventMine"));
       work.push(dest("eventServiceReadOnly"));
     } else {
       work.push(dest(canViewOperation ? "eventOwn" : "eventMine"));

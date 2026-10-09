@@ -15,7 +15,7 @@
  *    ฝั่งที่ต้องการ element ให้เขียน <Icon /> เอง (เมนูข้างทำแบบนั้น)
  */
 import {
-  FaHome, FaTachometerAlt, FaCalendarAlt, FaWrench, FaBriefcase, FaClipboardList,
+  FaHome, FaTachometerAlt, FaCalendarAlt, FaCalendarCheck, FaWrench, FaBriefcase, FaClipboardList,
   FaClipboardCheck, FaPaperPlane, FaMoneyCheckAlt, FaReceipt, FaHardHat, FaUserClock, FaShoppingCart, FaInbox, FaChartBar,
   FaFileAlt, FaFileInvoiceDollar, FaFileContract, FaArchive, FaBuilding, FaUserFriends,
   FaCog, FaTags, FaImage, FaUserShield, FaBoxOpen, FaImages, FaNewspaper, FaSlidersH, FaEnvelopeOpenText,
@@ -39,9 +39,11 @@ export const DEST = {
 
   /** ปฏิทินงาน — ความหมายของ /event ต่างกันตามสิทธิ์ ดู scheduleOptionsFor */
   eventService: { title: "ตารางงานช่าง", sub: "ปฏิทินงานบริการ", href: "/event", icon: FaCalendarAlt, badgeKey: "pendingApproval" },
-  eventMine: { title: "แผนงานของฉัน", bar: "แผนงาน", sub: "นัดหมายของฉัน", href: "/event", icon: FaCalendarAlt, badgeKey: "pendingApproval" },
+  // ✅ (9 ต.ค. 2569 ผู้ใช้: "icon ให้สอดคล้องสื่อความหมาย") นัดหมายของฉัน = ปฏิทินมีเครื่องหมายถูก · ตารางงานช่าง = ปฏิทิน
+  //    ประแจใช้กับ "การดำเนินงาน" อย่างเดียว ไม่ปนกับตารางงาน
+  eventMine: { title: "แผนงานของฉัน", bar: "แผนงาน", sub: "นัดหมายของฉัน", href: "/event", icon: FaCalendarCheck, badgeKey: "pendingApproval" },
   eventOwn: { title: "ตารางงาน", sub: "ปฏิทินงาน", href: "/event", icon: FaCalendarAlt, badgeKey: "pendingApproval" },
-  eventServiceReadOnly: { title: "ตารางงานช่าง", sub: "ดูอย่างเดียว", href: `/event?dept=${DEPARTMENT.SERVICE}`, icon: FaWrench },
+  eventServiceReadOnly: { title: "ตารางงานช่าง", sub: "ดูอย่างเดียว", href: `/event?dept=${DEPARTMENT.SERVICE}`, icon: FaCalendarAlt },
   eventSales: { title: "ตารางงานฝ่ายขาย", href: "/event?dept=sales", icon: FaBriefcase },
 
   operation: { title: "การดำเนินงาน", bar: "ดำเนินงาน", sub: "เช็คอิน · ปิดงาน", href: "/operation", icon: FaWrench, badgeKey: "closeRequests" },
