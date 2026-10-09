@@ -824,10 +824,12 @@ const ResizableTh = ({ width, align = "left", children, onResize, rowSpan = 1, c
       sx={{
         position: "relative", width: cssWidth, minWidth: cssWidth, maxWidth: cssWidth, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", userSelect: "none",
         ...(dragKey ? {
-          cursor: "grab", boxShadow: dropShadow,
+          // ✅ (9 ต.ค. 2569 ผู้ใช้: "ผู้ใช้ไม่รู้ว่าลากเปลี่ยนและขยายได้") จุดจับ ⠿ โชว์ตลอด · ชี้แล้วหัวคอลัมน์เป็นสีฟ้าอ่อน
+          cursor: "grab", boxShadow: dropShadow, pl: "22px !important",
           opacity: dnd?.key === dragKey ? 0.45 : 1,
-          transition: "opacity .12s",
-          "&:hover .co-col-grip": { opacity: 1 },
+          transition: "opacity .12s, background-color .12s",
+          "&:hover": { bgcolor: "#eff6ff !important" },
+          "&:hover .co-col-grip": { opacity: 1, color: "#2563eb" },
         } : {}),
       }}
     >
@@ -835,7 +837,7 @@ const ResizableTh = ({ width, align = "left", children, onResize, rowSpan = 1, c
       {dragKey && (
         <DragIndicator
           className="co-col-grip" aria-hidden
-          sx={{ position: "absolute", left: 1, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: TEXT_SUB, opacity: 0, transition: "opacity .12s", pointerEvents: "none" }}
+          sx={{ position: "absolute", left: 4, top: "50%", transform: "translateY(-50%)", fontSize: 15, color: "#94a3b8", opacity: 0.8, transition: "opacity .12s, color .12s", pointerEvents: "none" }}
         />
       )}
       {/* ✅ คลิกที่ป้ายชื่อคอลัมน์ (ไม่ใช่แถบลากขอบขวา) เพื่อเรียงลำดับ — คลิกแรก = น้อยไปมาก, คลิกซ้ำ
@@ -873,10 +875,10 @@ const ResizableTh = ({ width, align = "left", children, onResize, rowSpan = 1, c
             display: "flex", justifyContent: "center",
             // ✅ เส้นแบ่งบางๆ ตลอดเวลา (ไม่ใช่แค่ตอน hover) ให้เห็นชัดว่าคอลัมน์นี้ลากขยายได้ — ของเดิม
             // ต้องเอาเมาส์ไปชี้ถึงจะรู้ว่ามีจุดลากตรงนี้อยู่ ดูไม่ออกเลยตอนแรก
-            "&::after": { content: '""', width: "1px", height: "60%", alignSelf: "center", bgcolor: alpha("#0f172a", 0.12), transition: "background-color .15s" },
-            "&:hover": { bgcolor: alpha("#dc2626", 0.5) },
-            "&:hover::after": { bgcolor: ACCENT },
-            "&:active": { bgcolor: alpha("#dc2626", 0.6) },
+            // ✅ ที่จับขยายเห็นชัดตลอด: แท่งมน 3px สีเทา · ชี้แล้วเป็นแท่งฟ้าหนาขึ้น
+            "&::after": { content: '""', width: "3px", height: "55%", borderRadius: 2, alignSelf: "center", bgcolor: alpha("#0f172a", 0.18), transition: "all .15s" },
+            "&:hover::after": { width: "4px", height: "80%", bgcolor: "#2563eb" },
+            "&:active::after": { bgcolor: "#1d4ed8" },
           }}
         />
       </Tooltip>
@@ -6142,7 +6144,7 @@ pagedRows.map((c, idx) => {
         {/* ✅ แถบเครื่องมือของตาราง — จัดลำดับ/ซ่อนคอลัมน์ (ลากหัวตารางสลับที่ได้แบบ Excel ด้วย) */}
         {!useMobileTable && (
         <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} flexWrap="wrap" sx={{ mb: 1 }}>
-          <Typography variant="caption" sx={{ color: "text.disabled", display: "flex", alignItems: "center", gap: 0.5, minWidth: 0 }}>
+          <Typography variant="caption" sx={{ color: "text.disabled", display: "flex", alignItems: "center", gap: 0.75, minWidth: 0, flexWrap: "wrap" }}>
             {/* มือถือแสดงจำนวนรายการในแถวสลับการ์ด/ตารางด้านบนแล้ว — ไม่ต้องซ้ำ (เคยซ้อนทับกับป้ายคอลัมน์ที่ซ่อน) */}
             {!isMobile && (
             <Box component="span" sx={{ fontWeight: 800, fontSize: "0.8rem", color: "text.primary", mr: 1, whiteSpace: "nowrap" }}>
@@ -6158,8 +6160,15 @@ pagedRows.map((c, idx) => {
             )}
             {!useMobileTable && (
               <>
-                <DragIndicator sx={{ fontSize: 15 }} />
-                ลากหัวคอลัมน์เพื่อสลับตำแหน่ง · คลิกขวาเพื่อซ่อน · ลากขอบเพื่อปรับความกว้าง
+                <Box component="span" sx={{ color: "#475569", fontWeight: 600 }}>ปรับตารางได้:</Box>
+                <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.4, px: 0.75, py: 0.15, borderRadius: 1, bgcolor: "#f1f5f9", color: "#334155" }}>
+                  <DragIndicator sx={{ fontSize: 14, color: "#2563eb" }} />ลากหัวคอลัมน์ = ย้ายตำแหน่ง
+                </Box>
+                <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, px: 0.75, py: 0.15, borderRadius: 1, bgcolor: "#f1f5f9", color: "#334155" }}>
+                  <Box component="span" sx={{ width: 3, height: 12, borderRadius: 2, bgcolor: "#2563eb" }} />ลากเส้นขอบ = ขยาย · ดับเบิลคลิก = พอดี
+                </Box>
+                <Box component="span" sx={{ display: "inline-flex", alignItems: "center", px: 0.75, py: 0.15, borderRadius: 1, bgcolor: "#f1f5f9", color: "#334155" }}>
+                  คลิกขวา = ซ่อน/ย้าย</Box>
               </>
             )}
           </Typography>
