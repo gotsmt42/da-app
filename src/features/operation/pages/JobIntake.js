@@ -20,7 +20,7 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
-  MoveToInboxOutlined, AddRounded, EditOutlined, ChevronRight, Close, EventAvailableOutlined, CheckRounded,
+  PostAddOutlined, AddRounded, EditOutlined, ChevronRight, Close, EventAvailableOutlined, CheckRounded,
   ApartmentOutlined, CalendarMonthOutlined, GroupsOutlined, PersonOutlineOutlined, NotesOutlined, HourglassTopRounded, ReportProblemOutlined,
   BlockRounded, RestoreRounded,
 } from "@mui/icons-material";
@@ -336,7 +336,7 @@ export default function JobIntake() {
 
   return (
     <Box sx={{ px: { xs: 1.5, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: 1000, mx: "auto" }}>
-      <PageHeader icon={<MoveToInboxOutlined />} title="รับงาน"
+      <PageHeader icon={<PostAddOutlined />} title="งานใหม่"
         subtitle="กรอกไว้ก่อน แล้วส่งลงตาราง"
         actions={<Button variant="contained" startIcon={<AddRounded />} onClick={() => openForm()} disabled={!jobs} sx={{ ...PRIMARY, height: 40, px: { xs: 1.25, sm: 2 } }}>รับงานใหม่</Button>} />
 
@@ -364,7 +364,7 @@ export default function JobIntake() {
       ) : list.length ? (
         <Panel>{list.map((j) => <JobCard key={j._id} job={j} onSchedule={setScheduling} onEdit={openForm} onCancel={cancelJob} onRestore={restoreJob} />)}</Panel>
       ) : (
-        <EmptyState icon={<MoveToInboxOutlined />}
+        <EmptyState icon={<PostAddOutlined />}
           title={tab === "waiting" ? "ไม่มีงานรอส่งลงตาราง" : tab === "active" ? "ไม่มีงานที่กำลังดำเนินการ" : tab === "cancelled" ? "ไม่มีงานที่ยกเลิก" : "ยังไม่มีงานที่เสร็จ"}
           hint={tab === "waiting" ? "ได้งานมาแล้ว กด “รับงานใหม่” เพื่อกรอกเก็บไว้ก่อน" : undefined}
           action={tab === "waiting" ? <Button variant="contained" startIcon={<AddRounded />} onClick={() => openForm()} sx={{ ...PRIMARY, mt: 1 }}>รับงานใหม่</Button> : null} />

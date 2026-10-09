@@ -36,7 +36,7 @@ import { subscribeRealtime } from "@/shared/realtime/realtimeClient";
 export const BADGE_LABEL = {
   pendingApproval: "แผนงานรออนุมัติ",
   closeRequests: "คำขอปิดงานรอตรวจ",
-  jobIntake: "งานที่รับไว้ รอส่งลงตาราง",
+  jobIntake: "งานใหม่ที่รอส่งลงตาราง",
   contracts: "สัญญาที่ถึง/เลยกำหนดรอบเข้างาน (ส้ม = ใกล้ถึงรอบเดือนหน้า)",
   myJobs: "งานที่ต้องทำ",
   quotations: "ใบเสนอราคาที่ต้องติดตาม",
