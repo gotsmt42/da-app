@@ -246,6 +246,8 @@ export const resolveJobFields = (job) => {
     quotationNo: get("quotationNo"), contractNo: get("contractNo"), docNo: get("docNo"),
     time: get("time"), visitCount: get("visitCount"), responsiblePerson: get("responsiblePerson"),
     start: get("start"), end: get("end"), date: get("date"), allDay: get("allDay"),
+    // ✅ ข้อมูลสัญญาสำหรับป้ายครั้งที่รายปี "1/4 - 2569-70" (ดู formatRoundLabel)
+    contractStart: get("contractStart"), contractEnd: get("contractEnd"), contractYears: get("contractYears"), intervalMonths: get("intervalMonths"),
   };
 };
 
@@ -255,7 +257,7 @@ export const referencePresetsFor = (job) => {
     p.quotationNo && `ใบเสนอราคาเลขที่ ${p.quotationNo}`,
     p.contractNo && `สัญญาเลขที่ ${p.contractNo}`,
     p.docNo && `เอกสารเลขที่ ${p.docNo}`,
-    p.contractNo && p.time && `สัญญาเลขที่ ${p.contractNo} ครั้งที่ ${p.time}`,
+    p.contractNo && p.time && `สัญญาเลขที่ ${p.contractNo} ครั้งที่ ${formatRoundLabel(p.time, p.visitCount, p)}`,
   ].filter(Boolean).map(spaceThaiLatin);
 };
 
@@ -329,7 +331,7 @@ export const buildDeliveryNoteDefaults = (job, customer) => {
   // เอกสารหลายใบไว้ด้วยกันจะแยกไม่ออกว่าใบไหนของรอบไหน (โดยเฉพาะเวลาตรวจรับ/วางบิลย้อนหลัง)
   // ⚠️ ใช้ formatRoundLabel ตัวเดียวกับที่ทั้งแอปใช้ (ใบแจ้งเข้างาน/ตารางภาพรวมงาน) กันรูปแบบเลข
   // ครั้งที่ไม่ตรงกันในเอกสารคนละใบของงานเดียวกัน — งานที่ไม่มีครั้งที่ (งานทั่วไป) จะได้ค่าว่าง
-  const roundLabel = formatRoundLabel(p.time, p.visitCount);
+  const roundLabel = formatRoundLabel(p.time, p.visitCount, p);
   // ⚠️ เอาค่าแรกจาก subjectPresetsFor เสมอ ไม่ประกอบข้อความเองซ้ำอีกที่ — ไม่งั้นเปลี่ยนค่าเริ่มต้น
   // ทีต้องไล่แก้ 2 จุดแล้วลืมจุดใดจุดหนึ่ง
   const subject = subjectPresetsFor(workLabel, roundLabel)[0];

@@ -1134,7 +1134,8 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                     <SubTitle icon={<Build />} color={meta.color}>งานที่ผูก</SubTitle>
                     {e.eventId || e.job?.title ? (() => {
                       const jt = jobText(e.job) || "";
-                      const round = (jt.match(/ครั้งที่\s*\d+\s*\/\s*\d+/) || [])[0] || "";
+                      // ✅ ครั้งที่อยู่ท้ายข้อความเสมอ — รวมปีสัญญา "ครั้งที่ 1/4 - 2569-70" / "(ปีที่ 2)" ไว้ในป้ายเดียว
+                      const round = (jt.match(/ครั้งที่\s*\d+(?:\s*\/\s*\d+)?(?:\s*-\s*\d{4}(?:-\d{2})?|\s*\(ปีที่ \d+\))?/) || [])[0] || "";
                       const title = round ? jt.replace(round, "").replace(/\s{2,}/g, " ").trim() : jt;
                       const tags = [round, jobPartText(e.job)].filter(Boolean);
                       const when = jobRangesText(e) || jobRangeText(e.job) || (e.job?.start ? thaiDate(e.job.start) : "");

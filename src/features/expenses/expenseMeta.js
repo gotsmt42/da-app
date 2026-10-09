@@ -375,14 +375,16 @@ export const jobName = (job) => {
 };
 
 /**
- * งานแบบรายละเอียดครบ — "PM Fire Alarm โครงการ Ibis Phuket Patong ครั้งที่ 3/8"
+ * งานแบบรายละเอียดครบ — "PM Fire Alarm โครงการ Ibis Phuket Patong ครั้งที่ 3/4 - 2569-70"
  * ✅ ผู้ใช้ขอ: "เรื่องและงานให้ใส่รายละเอียดให้ครบ เช่น PM Fire Alarm โครงการ ..... ครั้งที่ ......"
  * เดิมเหลือแค่ "PM · Ibis Phuket Patong" — งาน PM ของโครงการเดียวกันมีหลายครั้ง อ่านแล้วไม่รู้ว่าเบิกของครั้งไหน
  * ⚠️ ใบเก่าที่ snapshot งานไว้ก่อนมีฟิลด์ system/round จะได้รูปแบบสั้นลงเอง (ไม่มีส่วนที่ขาด) ไม่พัง
  */
 export const jobText = (job) => {
   const place = String(job?.site || job?.company || "").trim();
-  const round = formatRoundLabel(job?.round, job?.visitCount);
+  // ✅ ครั้งที่รายปีของสัญญา "1/4 - 2569-70" (ใบที่มีข้อมูลสัญญาติด) · ใบที่ไม่มีข้อมูลสัญญาได้แบบเดิม "5/8"
+  const hasContract = Boolean(job?.contractStart || job?.contractNo || job?.contractYears);
+  const round = formatRoundLabel(job?.round, job?.visitCount, hasContract ? job : undefined);
   return [jobName(job), place ? `โครงการ ${place}` : "", round ? `ครั้งที่ ${round}` : ""].filter(Boolean).join(" ");
 };
 

@@ -129,7 +129,7 @@ export const buildWorkNoticeDefaults = (job, customer, issuer) => {
 
   // "ประเภทงาน + ระบบ" เช่น "PM ระบบ Fire Alarm" — ตัวตั้งของทั้งหัวเรื่องและเนื้อความ
   const workLabel = spaceThaiLatin([title, system && `ระบบ ${system}`].filter(Boolean).join(" "));
-  const roundLabel = formatRoundLabel(p.time, p.visitCount);
+  const roundLabel = formatRoundLabel(p.time, p.visitCount, p);
 
   // ⚠️ วันสิ้นสุดของงานแบบทั้งวัน (allDay) ถูกเก็บแบบ exclusive คือบวกมาแล้ว 1 วัน ต้องลบกลับก่อนเสมอ
   // ไม่งั้นเอกสารจะแจ้งวันสิ้นสุดเกินจริงไป 1 วันทุกใบ — และต้องเช็ค "allDay !== false" ไม่ใช่ "=== true"
