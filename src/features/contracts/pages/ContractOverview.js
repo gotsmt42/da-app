@@ -29,7 +29,7 @@ import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import Swal from "sweetalert2";
 import {
-  Box, Stack, Typography, TextField, InputAdornment, IconButton, Tooltip,
+  Box, ButtonBase, Stack, Typography, TextField, InputAdornment, IconButton, Tooltip,
   Table, TableBody, TableCell, TableContainer, TableHead, TableFooter, TableRow, Paper, Skeleton,
   Dialog, DialogTitle, DialogContent, DialogActions, ToggleButtonGroup, ToggleButton,
   Button, Autocomplete, Alert, Chip, Checkbox, Pagination, useMediaQuery, Badge,
@@ -453,6 +453,50 @@ const CLOSED_VIEWS = ["expired", "completed"];
 // เหลือ 9 คอลัมน์ และหัวตารางเหลือแถวเดียว (ไม่ต้องมีหัวข้อกลุ่มคลุม 2 ชั้นอีกต่อไป)
 // ⚠️ ทุกช่องยังแก้ไข inline ได้ครบทุกฟิลด์เหมือนเดิม — EditableCell รับ prop `Wrapper` อยู่แล้ว จึงซ้อน
 // หลายฟิลด์ในเซลล์เดียวได้โดยไม่ต้องแก้ตรรกะการแก้ไขเลย
+/**
+ * ✅ (9 ต.ค. 2569 ผู้ใช้: "แก้ไขให้สวยงาม สอดคล้อง UI ยังเก่า") ชิ้นส่วนกล่องโต้ตอบชุดเดียวกันทั้งหน้า
+ *   หัวกล่อง: ไอคอนในกรอบสี + ชื่อ + คำอธิบาย · พื้นเนื้อหาเทาอ่อน · ปุ่มหลักสีน้ำเงิน
+ */
+const MODERN_PAPER = (isMobile) => ({ sx: { borderRadius: isMobile ? 0 : 3.5, bgcolor: "#f8fafc" } });
+const ModernDialogTitle = ({ icon, color = "#2563eb", title, sub, onClose }) => (
+  <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1.5, bgcolor: "background.paper", borderBottom: `1px solid ${BORDER_MAIN}`, py: 1.75 }}>
+    <Box sx={{ width: 40, height: 40, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: alpha(color, 0.1), color, "& svg": { fontSize: 22 } }}>
+      {icon}
+    </Box>
+    <Box sx={{ flex: 1, minWidth: 0 }}>
+      <Typography sx={{ fontWeight: 800, fontSize: "1.1rem", lineHeight: 1.3 }}>{title}</Typography>
+      {sub && <Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB }}>{sub}</Typography>}
+    </Box>
+    <IconButton size="small" onClick={onClose} aria-label="ปิด"><Close fontSize="small" /></IconButton>
+  </DialogTitle>
+);
+/** การ์ดสรุปงาน/สัญญา — โครงการตัวหนา · บริษัท/ประเภท/ระบบ · ป้ายเลขที่สัญญา · ชิปข้อมูลเสริม */
+const ContractSummaryCard = ({ ct, chips = [] }) => (
+  <Box sx={{ p: 1.75, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}` }}>
+    <Stack direction="row" alignItems="flex-start" spacing={1.25}>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography sx={{ fontWeight: 800, fontSize: "1rem", color: "#0f172a", lineHeight: 1.35 }}>{ct?.site || "-"}</Typography>
+        <Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB }}>{[ct?.company, ct?.title, ct?.system].filter(Boolean).join(" · ")}</Typography>
+      </Box>
+      {ct?.contractNo && (
+        <Box component="span" sx={{ flexShrink: 0, px: 1, py: 0.35, borderRadius: 1.5, fontSize: "0.74rem", fontWeight: 800, bgcolor: "#f1f5f9", color: "#334155" }}>{ct.contractNo}</Box>
+      )}
+    </Stack>
+    {chips.filter(Boolean).length > 0 && (
+      <Stack direction="row" spacing={0.75} useFlexGap sx={{ mt: 1.25, flexWrap: "wrap" }}>
+        {chips.filter(Boolean).map((c, i) => (
+          <Box key={i} component="span" sx={{
+            display: "inline-flex", alignItems: "center", minHeight: 26, px: 1.1, borderRadius: 99, fontSize: "0.76rem", fontWeight: c.strong ? 800 : 700,
+            bgcolor: c.strong ? "#eff6ff" : "#f8fafc", color: c.strong ? "#1d4ed8" : TEXT_SUB, border: c.strong ? 0 : `1px solid ${BORDER_MAIN}`,
+          }}>{c.text}</Box>
+        ))}
+      </Stack>
+    )}
+  </Box>
+);
+const PRIMARY_BLUE_SX = { bgcolor: "#2563eb", textTransform: "none", fontWeight: 800, borderRadius: 2.5, px: 2.5, boxShadow: "none", "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } };
+const MODERN_ACTIONS_SX = { px: { xs: 2, sm: 3 }, py: 1.5, bgcolor: "background.paper", borderTop: `1px solid ${BORDER_MAIN}`, gap: 1 };
+
 /**
  * ✅ (8 ต.ค. 2569 ผู้ใช้: "ข้อมูลในตาราง อันไหนรวมกันได้ก็รวม ให้กระชับ ดูง่าย ไม่ยาว") รวม 11 คอลัมน์เหลือ 6
  *   customer = โครงการ/บริษัท + เลขที่สัญญา/ใบเสนอราคา + ผู้ติดต่อ + ป้ายเตือนรอบ
@@ -7051,142 +7095,127 @@ pagedRows.map((c, idx) => {
           โฟกัสกลับมาทันที ทำให้กดปุ่มยืนยันด้วยคีย์บอร์ด (Enter/Tab) ไม่ได้ — ปิดการล็อกโฟกัสเฉพาะกล่องนี้
           กล่องอื่นในหน้ายังล็อกโฟกัสตามปกติเหมือนเดิม (z-index ที่เคยทำให้กล่องยืนยันไปอยู่ด้านหลัง แก้รวม
           ไว้ที่ src/index.css แล้ว) */}
-      {Boolean(moveRoundTarget) && (
-        <Dialog open onClose={closeMoveRoundDialog} fullWidth maxWidth="xs" fullScreen={isMobile} disableEnforceFocus>
-        <DialogTitle sx={{ fontWeight: 800 }}>
-          ย้ายครั้งที่ {moveRoundTarget?.fromRound} ไปเป็นครั้งที่...
-        </DialogTitle>
-        <DialogContent dividers>
-          {moveRoundTarget && (
-            <Stack spacing={1.5} sx={{ pt: 0.5 }}>
-              <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: alpha(ACCENT, 0.05) }}>
-                <Typography variant="body2" fontWeight={700}>
-                  {moveRoundTarget.contract.company || "-"} · {moveRoundTarget.contract.site || "-"}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {moveRoundTarget.contract.title} · {moveRoundTarget.contract.system}
-                  {moveRoundTarget.contract.contractNo ? ` · เลขที่สัญญา ${moveRoundTarget.contract.contractNo}` : ""}
-                </Typography>
-                <Typography variant="caption" sx={{ display: "block", mt: 0.5, color: "text.secondary" }}>
-                  วันที่ของครั้งที่ {moveRoundTarget.fromRound}:{" "}
-                  {moveRoundTarget.contract.visits
-                    .filter((v) => !v.unscheduled && Number(v.time) === moveRoundTarget.fromRound)
-                    .map((v) => formatEventDateRange(v))
-                    .join(", ") || "-"}
-                </Typography>
-              </Box>
-              <Alert severity="info" sx={{ py: 0.5 }}>
-                ย้ายทั้งวันที่ สถานะ ทีมที่เข้างาน และประวัติงานของครั้งนี้ไปพร้อมกันทั้งหมด — ถ้าครั้งที่ปลายทางมีข้อมูลอยู่แล้ว ระบบจะสลับที่กันให้ ไม่มีข้อมูลไหนถูกลบ
-              </Alert>
-              <SelectField
-                fullWidth size="small" label="ย้ายไปเป็นครั้งที่ *"
-                value={moveRoundValue}
-                onChange={(e) => setMoveRoundValue(e.target.value)}
-                InputLabelProps={{ shrink: true }}
-              >
-                <option value="">— เลือกครั้งที่ —</option>
-                {Array.from(
-                  { length: Math.min(MAX_VISIT_COUNT, Math.max(Number(moveRoundTarget.contract.visitCount) || 0, rowMaxRound(moveRoundTarget.contract))) },
-                  (_, i) => i + 1
-                )
-                  .filter((n) => n !== moveRoundTarget.fromRound)
-                  .map((n) => {
-                    const occupied = moveRoundTarget.contract.visits.some((v) => !v.unscheduled && Number(v.time) === n);
+      {Boolean(moveRoundTarget) && (() => {
+        const ct = moveRoundTarget.contract;
+        const from = moveRoundTarget.fromRound;
+        const label = (n) => `ครั้งที่ ${formatRoundLabel(n, ct.visitCount, ct)}`;
+        const fromDates = ct.visits.filter((v) => !v.unscheduled && Number(v.time) === from).map((v) => formatEventDateRange(v)).join(", ") || "-";
+        const rounds = Array.from({ length: Math.min(MAX_VISIT_COUNT, Math.max(Number(ct.visitCount) || 0, rowMaxRound(ct))) }, (_, i) => i + 1).filter((n) => n !== from);
+        return (
+        <Dialog open onClose={closeMoveRoundDialog} fullWidth maxWidth="sm" fullScreen={isMobile} disableEnforceFocus slotProps={{ paper: MODERN_PAPER(isMobile) }}>
+          <ModernDialogTitle icon={<SwapHoriz />} title={`ย้าย${label(from)}`} sub="เลือกครั้งปลายทาง — ย้ายวันที่ สถานะ ทีม และประวัติไปทั้งหมด" onClose={closeMoveRoundDialog} />
+          <DialogContent sx={{ p: { xs: 1.5, sm: 2.5 } }}>
+            <Stack spacing={2} sx={{ pt: { xs: 1.5, sm: 2.5 } }}>
+              <ContractSummaryCard ct={ct} chips={[{ text: label(from), strong: true }, { text: `วันที่ ${fromDates}` }]} />
+              <FormSection step={1} title="ย้ายไปเป็นครั้งที่" hint="ครั้งที่มีข้อมูลอยู่แล้วจะสลับที่กัน — ไม่มีข้อมูลไหนถูกลบ">
+                <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)" }, gap: 1 }}>
+                  {rounds.map((n) => {
+                    const occupied = ct.visits.some((v) => !v.unscheduled && Number(v.time) === n);
+                    const on = String(moveRoundValue) === String(n);
                     return (
-                      <option key={n} value={n}>
-                        ครั้งที่ {n} {occupied ? "(มีข้อมูลอยู่แล้ว — จะสลับที่กัน)" : "(ว่าง)"}
-                      </option>
+                      <ButtonBase key={n} onClick={() => setMoveRoundValue(String(n))}
+                        sx={{
+                          flexDirection: "column", alignItems: "flex-start", p: 1.1, borderRadius: 2, textAlign: "left", fontFamily: "inherit",
+                          border: `1.5px solid ${on ? "#2563eb" : BORDER_MAIN}`, bgcolor: on ? "#eff6ff" : "#fff",
+                        }}>
+                        <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: on ? "#1d4ed8" : "#0f172a" }}>{label(n)}</Typography>
+                        <Typography sx={{ fontSize: "0.7rem", fontWeight: 700, color: occupied ? "#b45309" : "#15803d" }}>{occupied ? "มีข้อมูล · จะสลับที่กัน" : "ว่าง"}</Typography>
+                      </ButtonBase>
                     );
                   })}
-              </SelectField>
+                </Box>
+              </FormSection>
             </Stack>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeMoveRoundDialog} disabled={moveRoundSaving} sx={{ textTransform: "none" }}>ยกเลิก</Button>
-          <Button
-            variant="contained" onClick={handleMoveRoundSubmit}
-            disabled={moveRoundSaving || !moveRoundValue}
-            sx={{ bgcolor: ACCENT, textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#b91c1c" } }}
-          >
-            {moveRoundSaving ? "กำลังย้าย..." : "ย้าย"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-      )}
+          </DialogContent>
+          <DialogActions sx={MODERN_ACTIONS_SX}>
+            <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.78rem", fontWeight: 600, color: moveRoundValue ? "#15803d" : "#b45309" }}>
+              {moveRoundValue ? `✓ ${label(from)} → ${label(Number(moveRoundValue))}` : "เลือกครั้งปลายทาง"}
+            </Typography>
+            <Button onClick={closeMoveRoundDialog} disabled={moveRoundSaving} sx={{ textTransform: "none", fontWeight: 700, color: "text.secondary" }}>ยกเลิก</Button>
+            <Button variant="contained" disableElevation onClick={handleMoveRoundSubmit} disabled={moveRoundSaving || !moveRoundValue} sx={PRIMARY_BLUE_SX}>
+              {moveRoundSaving ? "กำลังย้าย..." : "ย้าย"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+        );
+      })()}
 
-      {Boolean(addVisitTarget) && (
-        <Dialog open onClose={closeAddVisitDialog} fullWidth maxWidth="xs" fullScreen={isMobile}>
-        <DialogTitle sx={{ fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          {addVisitTarget?.extendRound != null
-            ? `เพิ่มวันที่ต่อเนื่อง — ครั้งที่ ${addVisitTarget.extendRound}`
-            : `เพิ่มครั้งที่ ${addVisitTarget ? countUsedRounds(addVisitTarget.contract.visits.filter((v) => !v.unscheduled)) + 1 : ""} จาก ${addVisitTarget?.contract?.visitCount ?? ""}`}
-          <IconButton size="small" onClick={closeAddVisitDialog}><Close fontSize="small" /></IconButton>
-        </DialogTitle>
-        <DialogContent dividers>
-          <Stack spacing={2} sx={{ mt: 0.5 }}>
-            {addVisitError && <Alert severity="error">{addVisitError}</Alert>}
-            {addVisitTarget && (
-              <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: alpha(ACCENT, 0.06) }}>
-                <Typography variant="body2" fontWeight={700}>{addVisitTarget.contract.company || "-"} · {addVisitTarget.contract.site || "-"}</Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {addVisitTarget.contract.title} · {addVisitTarget.contract.system}
-                  {addVisitTarget.contract.contractNo ? ` · เลขที่สัญญา ${addVisitTarget.contract.contractNo}` : ""}
-                </Typography>
-                {addVisitTarget.extendRound != null && (
-                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
-                    วันที่เดิมของครั้งนี้: {addVisitTarget.contract.visits
-                      .filter((v) => !v.unscheduled && Number(v.time) === addVisitTarget.extendRound)
-                      .map((v) => formatEventDateRange(v))
-                      .join(", ")}
-                  </Typography>
-                )}
-              </Box>
-            )}
-            <Stack direction="row" spacing={1.5}>
-              <ThaiDatePicker label="วันที่เริ่ม"
-                value={newVisitStart} onChange={setNewVisitStart} />
-              <ThaiDatePicker label="วันที่สิ้นสุด"
-                value={newVisitEnd} onChange={setNewVisitEnd} />
+      {/* ✅ (9 ต.ค. 2569 ผู้ใช้: "แก้ไขให้สวยงาม สอดคล้อง UI ยังเก่า") หน้าตาเดียวกับฟอร์มเพิ่มสัญญา:
+          หัวกล่องมีไอคอน+คำอธิบาย · การ์ดสรุปสัญญา · ช่องกรอกในกล่องขาว · ท้ายกล่องบอกสถานะ + ปุ่มหลักสีน้ำเงิน */}
+      {Boolean(addVisitTarget) && (() => {
+        const ct = addVisitTarget.contract;
+        const isExtend = addVisitTarget.extendRound != null;
+        const nextN = isExtend ? addVisitTarget.extendRound : countUsedRounds(ct.visits.filter((v) => !v.unscheduled)) + 1;
+        const roundText = `ครั้งที่ ${formatRoundLabel(nextN, ct.visitCount, ct)}`;
+        const oldDates = isExtend
+          ? ct.visits.filter((v) => !v.unscheduled && Number(v.time) === addVisitTarget.extendRound).map((v) => formatEventDateRange(v)).join(", ")
+          : "";
+        const lastVisit = ct.visits.filter((v) => !v.unscheduled).sort((x, y) => new Date(y.start) - new Date(x.start))[0];
+        const ready = Boolean(newVisitStart);
+        return (
+        <Dialog open onClose={closeAddVisitDialog} fullWidth maxWidth="sm" fullScreen={isMobile}
+          slotProps={{ paper: { sx: { borderRadius: isMobile ? 0 : 3.5, bgcolor: "#f8fafc" } } }}>
+          <ModernDialogTitle icon={<CalendarMonth />}
+            title={isExtend ? `เพิ่มวันที่ให้${roundText}` : `ลง${roundText}`}
+            sub={isExtend ? "เพิ่มวันเข้างานที่ไม่ต่อเนื่องให้ครั้งเดิม (ไม่นับเป็นครั้งใหม่)" : "เลือกวันเข้างานและทีม — ลงตารางงานช่างทันทีที่บันทึก"}
+            onClose={closeAddVisitDialog} />
+
+          <DialogContent sx={{ p: { xs: 1.5, sm: 2.5 } }}>
+            <Stack spacing={2} sx={{ pt: { xs: 1.5, sm: 2.5 } }}>
+              {addVisitError && <Alert severity="error" sx={{ borderRadius: 2 }}>{addVisitError}</Alert>}
+
+              <ContractSummaryCard ct={ct} chips={[
+                { text: roundText, strong: true },
+                !isExtend && lastVisit && { text: `ครั้งล่าสุด ${formatEventDateRange(lastVisit)}` },
+                isExtend && oldDates && { text: `วันที่เดิม ${oldDates}` },
+              ]} />
+
+              <FormSection step={1} title="วันเข้างาน" hint="วันเดียวเว้นวันที่สิ้นสุดไว้ได้">
+                <FieldGrid>
+                  <ThaiDatePicker label="วันที่เริ่ม *" value={newVisitStart} onChange={setNewVisitStart} />
+                  <ThaiDatePicker label="วันที่สิ้นสุด" value={newVisitEnd} onChange={setNewVisitEnd}
+                    helperText="เว้นว่าง = วันเดียวกับวันที่เริ่ม" disabled={!newVisitStart} />
+                </FieldGrid>
+              </FormSection>
+
+              <FormSection step={2} optional title="ทีมที่เข้างาน" hint="เลือกภายหลังได้ในตาราง">
+                <SelectField
+                  fullWidth size="small" label="หัวหน้าทีมเข้างาน"
+                  value={newVisitTeam} onChange={(e) => setNewVisitTeam(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                >
+                  <option value="">— ยังไม่ระบุ —</option>
+                  {teamOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+                </SelectField>
+              </FormSection>
             </Stack>
-            <SelectField
-              fullWidth size="small" label="ทีมที่เข้างาน"
-              value={newVisitTeam} onChange={(e) => setNewVisitTeam(e.target.value)}
-              InputLabelProps={{ shrink: true }}
+          </DialogContent>
+
+          <DialogActions sx={{ px: { xs: 2, sm: 3 }, py: 1.5, bgcolor: "background.paper", borderTop: `1px solid ${BORDER_MAIN}`, gap: 1 }}>
+            <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.78rem", fontWeight: 600, color: ready ? "#15803d" : "#b45309" }}>
+              {ready ? "✓ พร้อมบันทึก" : "เลือกวันที่เริ่มก่อน"}
+            </Typography>
+            <Button onClick={closeAddVisitDialog} disabled={addVisitSaving} sx={{ textTransform: "none", fontWeight: 700, color: "text.secondary" }}>ยกเลิก</Button>
+            <Button
+              variant="contained" disableElevation onClick={handleAddVisitSubmit} disabled={addVisitSaving || !ready}
+              startIcon={addVisitSaving ? <CircularProgress size={14} sx={{ color: "inherit" }} /> : <Check sx={{ fontSize: 18 }} />}
+              sx={{ bgcolor: "#2563eb", textTransform: "none", fontWeight: 800, borderRadius: 2.5, px: 2.5, "&:hover": { bgcolor: "#1d4ed8" } }}
             >
-              <option value="">— ไม่ระบุ —</option>
-              {teamOptions.map((name) => <option key={name} value={name}>{name}</option>)}
-            </SelectField>
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={closeAddVisitDialog} disabled={addVisitSaving} sx={{ textTransform: "none" }}>ยกเลิก</Button>
-          <Button
-            variant="contained" onClick={handleAddVisitSubmit} disabled={addVisitSaving}
-            sx={{ bgcolor: ACCENT, textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#b91c1c" } }}
-          >
-            {addVisitSaving ? "กำลังบันทึก..." : "บันทึก"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-      )}
+              {addVisitSaving ? "กำลังบันทึก..." : `บันทึก${isExtend ? "" : roundText.replace(/ - .*/, "")}`}
+            </Button>
+          </DialogActions>
+        </Dialog>
+        );
+      })()}
 
       {/* ✅ ย้ายงานทั่วไปเข้าสัญญาที่มีอยู่แล้ว — แก้ไขกรณีจัดกลุ่มผิด (สร้างเป็นงานเดี่ยวทั้งที่จริง
           ควรอยู่ในสัญญานี้) ต่างจากปุ่ม "จัดกลุ่มเป็นสัญญา" ที่สร้างสัญญาใหม่เสมอ */}
       {Boolean(attachTarget) && (
-        <Dialog open onClose={closeAttachDialog} fullWidth maxWidth="xs" fullScreen={isMobile}>
-        <DialogTitle sx={{ fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          ย้ายเข้าสัญญาที่มีอยู่แล้ว
-          <IconButton size="small" onClick={closeAttachDialog}><Close fontSize="small" /></IconButton>
-        </DialogTitle>
-        <DialogContent dividers>
-          <Stack spacing={2} sx={{ mt: 0.5 }}>
-            {attachTarget && (
-              <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: alpha(ACCENT, 0.06) }}>
-                <Typography variant="body2" fontWeight={700}>{attachTarget.company || "-"} · {attachTarget.site || "-"}</Typography>
-                <Typography variant="caption" color="text.secondary">{attachTarget.title} · {attachTarget.system}</Typography>
-              </Box>
-            )}
+        <Dialog open onClose={closeAttachDialog} fullWidth maxWidth="sm" fullScreen={isMobile} slotProps={{ paper: MODERN_PAPER(isMobile) }}>
+        <ModernDialogTitle icon={<AddLink />} title="ย้ายเข้าสัญญาที่มีอยู่แล้ว" sub="เลือกสัญญาและครั้งที่ งานนี้จะกลายเป็นส่วนหนึ่งของสัญญานั้น" onClose={closeAttachDialog} />
+        <DialogContent sx={{ p: { xs: 1.5, sm: 2.5 } }}>
+          <Stack spacing={2} sx={{ pt: { xs: 1.5, sm: 2.5 } }}>
+            {attachTarget && <ContractSummaryCard ct={attachTarget} />}
             {attachError && <Alert severity="error">{attachError}</Alert>}
             {/* ✅ พิมพ์ค้นหาได้เลย (บริษัท/โครงการ/ประเภทงาน/ระบบงาน/เลขที่สัญญา — Autocomplete กรองจาก
                 getOptionLabel ให้อัตโนมัติ) แทน native <select> เดิมที่ต้องไล่สโครลหาเองทีละบรรทัดเวลามี
@@ -7250,11 +7279,12 @@ pagedRows.map((c, idx) => {
             )}
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={closeAttachDialog} disabled={attachSaving} sx={{ textTransform: "none" }}>ยกเลิก</Button>
+        <DialogActions sx={MODERN_ACTIONS_SX}>
+          <Box sx={{ flex: 1 }} />
+          <Button onClick={closeAttachDialog} disabled={attachSaving} sx={{ textTransform: "none", fontWeight: 700, color: "text.secondary" }}>ยกเลิก</Button>
           <Button
-            variant="contained" onClick={handleAttachSubmit} disabled={attachSaving || !attachContractId || !attachRound}
-            sx={{ bgcolor: ACCENT, textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#b91c1c" } }}
+            variant="contained" disableElevation onClick={handleAttachSubmit} disabled={attachSaving || !attachContractId || !attachRound}
+            sx={PRIMARY_BLUE_SX}
           >
             {attachSaving ? "กำลังบันทึก..." : "ย้ายเข้าสัญญา"}
           </Button>
