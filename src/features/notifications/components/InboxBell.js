@@ -6,8 +6,8 @@
  *   • ยังไม่อ่าน = จุดสี + ตัวหนา · กดรายการ = อ่านแล้ว + พาไปหน้านั้น · "อ่านทั้งหมด" ด้านบน
  *   • จอคอม: กล่องลอยใต้กระดิ่ง · มือถือ: แผ่นเต็มจอจากด้านล่าง
  */
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import {
@@ -16,7 +16,7 @@ import {
 import { alpha } from "@mui/material/styles";
 import {
   Notifications, NotificationsNone, Close, DoneAll, Build, AccountBalanceWallet, ShoppingCart, AccessTime,
-  AssignmentInd, MarkEmailUnread, CalendarMonth, DeleteSweep,
+  AssignmentInd, MarkEmailUnread, CalendarMonth, DeleteSweep, Storefront,
 } from "@mui/icons-material";
 import useInbox, { markInboxRead, markAllInboxRead, clearReadInbox, loadMoreInbox } from "@/shared/hooks/useInbox";
 
@@ -26,14 +26,33 @@ const BORDER = "#e2e8f0";
 
 /** ไอคอน/สีตามปลายทางของแจ้งเตือน — อ่านจาก url ไม่ต้องให้ทุก route ส่งชนิดมาเอง */
 const KINDS = [
+  // ⚠️ ฝ่ายขายต้องมาก่อน — "/event?dept=sales" ขึ้นต้นด้วย /event เหมือนตารางงานช่าง
+  { re: /^\/sales|[?&]dept=sales/, icon: Storefront, color: "#0891b2", label: "ฝ่ายขาย" },
   { re: /^\/expenses/, icon: AccountBalanceWallet, color: "#0d9488", label: "เบิกค่าใช้จ่าย" },
   { re: /^\/purchase/, icon: ShoppingCart, color: "#4338ca", label: "จัดซื้อ" },
   { re: /^\/ot/, icon: AccessTime, color: "#0891b2", label: "OT" },
-  { re: /^\/(dispatch|sales)/, icon: AssignmentInd, color: "#7c3aed", label: "คำขอลงงาน" },
+  { re: /^\/dispatch/, icon: AssignmentInd, color: "#7c3aed", label: "คำขอลงงาน" },
   { re: /^\/website/, icon: MarkEmailUnread, color: "#0f172a", label: "เว็บไซต์" },
   { re: /^\/(event|calendar)/, icon: CalendarMonth, color: "#dc2626", label: "แผนงาน" },
   { re: /^\/(operation|technician|contracts|jobs)/, icon: Build, color: "#dc2626", label: "งาน" },
 ];
+/**
+ * ✅ (9 ต.ค. 2569 ผู้ใช้: "การแจ้งเตือนของหน้าเซล ช่าง ให้แยกให้ถูกต้อง") หมวดของแจ้งเตือน — อ่านจาก url
+ *   sales = นัดหมาย/ใบแจ้งงานของฝ่ายขาย · service = งานช่าง (ปฏิทิน/ดำเนินงาน/สัญญา/คำขอลงงาน) · other = เบิก/OT/จัดซื้อ/เว็บ
+ */
+const sectionOf = (url) => {
+  const u = String(url || "");
+  if (/^\/sales|[?&]dept=sales/.test(u)) return "sales";
+  if (/^\/(event|calendar|operation|technician|contracts|jobs|dispatch)/.test(u)) return "service";
+  return "other";
+};
+const SECTIONS = [["all", "ทั้งหมด"], ["service", "งานช่าง"], ["sales", "ฝ่ายขาย"], ["other", "อื่นๆ"]];
+/** หมวดตั้งต้นตามหน้าที่เปิดอยู่ — อยู่ตารางงานเซลก็เห็นของเซลก่อน อยู่หน้างานช่างก็เห็นของช่างก่อน */
+const sectionOfPage = (loc) => {
+  const s = sectionOf(`${loc.pathname}${loc.search}`);
+  return s === "other" ? "all" : s;
+};
+
 const kindOf = (url) => KINDS.find((k) => k.re.test(String(url || ""))) || { icon: Notifications, color: "#475569", label: "ระบบ" };
 
 const timeText = (d) => {
@@ -79,6 +98,9 @@ export default function InboxBell({ dark = false }) {
   const { items, unread, hasMore, loaded } = useInbox();
   const [anchor, setAnchor] = useState(null);
   const [tab, setTab] = useState("all");
+  const [section, setSection] = useState("all");
+  const [pageSection, setPageSection] = useState("all");
+  const location = useLocation();
   const [more, setMore] = useState(false);
   const open = Boolean(anchor);
   const close = () => setAnchor(null);
@@ -88,7 +110,21 @@ export default function InboxBell({ dark = false }) {
     close();
     if (n.url) navigate(n.url);
   };
-  const list = tab === "unread" ? items.filter((n) => !n.readAt) : items;
+  // จำนวนแต่ละหมวด (ยังไม่อ่าน) — โชว์แถบหมวดเฉพาะตอนมีมากกว่า 1 หมวดจริง (เซล/ช่างทั่วไปไม่เห็นแถบนี้)
+  const sectionStats = useMemo(() => {
+    const st = { all: { n: items.length, unread: unread } };
+    ["service", "sales", "other"].forEach((k) => {
+      const rows = items.filter((n) => sectionOf(n.url) === k);
+      st[k] = { n: rows.length, unread: rows.filter((n) => !n.readAt).length };
+    });
+    return st;
+  }, [items, unread]);
+  // หมวดที่โชว์ = หมวดที่มีรายการ + หมวดของหน้าที่เปิดอยู่ (แม้ยังว่าง — อยู่หน้าเซลต้องเห็นว่า "ฝ่ายขายยังไม่มีแจ้งเตือน")
+  const usedSections = ["service", "sales", "other"].filter((k) => sectionStats[k].n > 0 || k === pageSection);
+  const showSections = usedSections.length > 1;
+  const activeSection = showSections ? section : "all";
+  const inSection = activeSection === "all" ? items : items.filter((n) => sectionOf(n.url) === activeSection);
+  const list = tab === "unread" ? inSection.filter((n) => !n.readAt) : inSection;
   const fresh = list.filter((n) => moment().diff(moment(n.createdAt), "hours") < 24);
   const older = list.filter((n) => moment().diff(moment(n.createdAt), "hours") >= 24);
   const hasRead = items.some((n) => n.readAt);
@@ -113,6 +149,24 @@ export default function InboxBell({ dark = false }) {
             }}>{l}</Box>
           ))}
         </Stack>
+        {showSections && (
+          <Stack direction="row" spacing={0.5} sx={{ mt: 1, overflowX: "auto", scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
+            {SECTIONS.filter(([k]) => k === "all" || usedSections.includes(k)).map(([k, l]) => {
+              const on = activeSection === k;
+              const u = sectionStats[k].unread;
+              return (
+                <Box key={k} component="button" type="button" onClick={() => setSection(k)} sx={{
+                  flexShrink: 0, border: 0, borderBottom: `2px solid ${on ? "#2563eb" : "transparent"}`, cursor: "pointer", px: 1, height: 30,
+                  fontSize: "0.8rem", fontWeight: on ? 800 : 600, fontFamily: "inherit", bgcolor: "transparent", color: on ? "#1d4ed8" : "#475569",
+                  display: "inline-flex", alignItems: "center", gap: 0.5,
+                }}>
+                  {l}
+                  {u > 0 && <Box component="span" sx={{ minWidth: 18, height: 18, px: 0.5, borderRadius: 99, bgcolor: "#ef4444", color: "#fff", fontSize: "0.66rem", fontWeight: 800, display: "inline-grid", placeItems: "center" }}>{u > 99 ? "99+" : u}</Box>}
+                </Box>
+              );
+            })}
+          </Stack>
+        )}
       </Box>
       <Box sx={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
         {!loaded ? (
@@ -120,7 +174,7 @@ export default function InboxBell({ dark = false }) {
         ) : list.length === 0 ? (
           <Stack alignItems="center" spacing={1} sx={{ py: 6, px: 3, textAlign: "center" }}>
             <NotificationsNone sx={{ fontSize: 44, color: "#cbd5e1" }} />
-            <Typography sx={{ fontWeight: 700, color: TEXT_SUB, fontSize: "0.9rem" }}>{tab === "unread" ? "อ่านครบทุกเรื่องแล้ว" : "ยังไม่มีการแจ้งเตือน"}</Typography>
+            <Typography sx={{ fontWeight: 700, color: TEXT_SUB, fontSize: "0.9rem" }}>{tab === "unread" ? "อ่านครบทุกเรื่องแล้ว" : activeSection === "sales" ? "ยังไม่มีการแจ้งเตือนฝ่ายขาย" : activeSection === "service" ? "ยังไม่มีการแจ้งเตือนงานช่าง" : "ยังไม่มีการแจ้งเตือน"}</Typography>
             <Typography variant="caption" sx={{ color: "#94a3b8" }}>งานใหม่ · ใบเบิก · OT · ใบขอซื้อ ที่เกี่ยวกับคุณจะเด้งมาที่นี่และบนจอมือถือ</Typography>
           </Stack>
         ) : (
@@ -153,7 +207,7 @@ export default function InboxBell({ dark = false }) {
   return (
     <>
       <Tooltip title="การแจ้งเตือน">
-        <IconButton onClick={(e) => setAnchor(e.currentTarget)} size="small" aria-label={unread ? `การแจ้งเตือน (ยังไม่อ่าน ${unread})` : "การแจ้งเตือน"}
+        <IconButton onClick={(e) => { const ps = sectionOfPage(location); setPageSection(ps); setSection(ps); setAnchor(e.currentTarget); }} size="small" aria-label={unread ? `การแจ้งเตือน (ยังไม่อ่าน ${unread})` : "การแจ้งเตือน"}
           sx={{ border: "1px solid", borderColor: dark ? "rgba(255,255,255,0.18)" : "divider", borderRadius: 2, color: dark ? "#fff" : "inherit" }}>
           <Badge badgeContent={unread} color="error" max={99}>
             <Notifications fontSize="small" />
