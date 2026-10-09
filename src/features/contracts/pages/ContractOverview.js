@@ -55,7 +55,7 @@ import JobTypeService from "@/shared/services/JobTypeService";
 import SystemTypeService from "@/shared/services/SystemTypeService";
 import { formatEventDateRange } from "@/shared/utils/formatDateRange";
 import { resolveOperationGroup } from "@/shared/utils/overdueJobs";
-import { countUsedRounds, visitsPerYear, INTERVAL_MONTHS_PRESETS, totalRoundsOf, contractYearsOf, perYearOf, MAX_CONTRACT_YEARS, formatRoundLabel } from "@/shared/utils/contractRounds";
+import { countUsedRounds, visitsPerYear, INTERVAL_MONTHS_PRESETS, totalRoundsOf, contractYearsOf, perYearOf, MAX_CONTRACT_YEARS, formatRoundLabel, contractYearLabel } from "@/shared/utils/contractRounds";
 import { groupEventsByContract, nextVisitOverdueInfo, isRoundOverdue, contractStatusInfo, isExpiredContract, contractCompleteness } from "@/shared/utils/contractOverdue";
 // ✅ สถานะการวางบิล/รับเงิน — ของกลางชุดเดียวกับหน้า "วางบิล / รับเงิน" (/billing) ห้ามคำนวณซ้ำที่นี่
 import { contractBillingSummary, baht as bahtFmt } from "@/shared/utils/billing";
@@ -360,10 +360,10 @@ const progressInfo = (c, countUsedRoundsFn) => {
     }
     let doneInYear = 0;
     for (let t = (yearIdx - 1) * per + 1; t <= yearIdx * per; t += 1) if (doneRounds.has(t)) doneInYear += 1;
-    const startBE = c.contractStart ? moment(c.contractStart).year() + 543 : null;
+    const yl = contractYearLabel(c, yearIdx);
     const allDone = doneCount >= total;
     return {
-      label: `${doneInYear}/${per} · ${startBE ? startBE + yearIdx - 1 : `ปีที่ ${yearIdx}`}`,
+      label: `${doneInYear}/${per} · ${yl || `ปีที่ ${yearIdx}`}`,
       color: allDone ? STATUS_COLOR["ดำเนินการเสร็จสิ้น"] : doneInYear === 0 ? "#9ca3af" : "#f59e0b",
     };
   }
@@ -6941,10 +6941,11 @@ pagedRows.map((c, idx) => {
                       <Typography sx={{ fontSize: "0.76rem", color: "#334155", mt: 0.3 }}>
                         {(() => {
                           const per = perYear || Number(form.visitCount);
-                          const y0 = moment(form.contractStart).year() + 543;
+                          const y1 = contractYearLabel(form, 1);
+                          const y2 = contractYearLabel(form, 2);
                           return formYears > 1 && perYear
-                            ? `ในงานจะแสดงเป็น ครั้งที่ 1/${per} - ${y0} … ${per}/${per} - ${y0} แล้วเริ่ม 1/${per} - ${y0 + 1} ในปีถัดไป`
-                            : `ในงานจะแสดงเป็น ครั้งที่ 1/${per} - ${y0} … ${per}/${per} - ${y0}`;
+                            ? `ในงานจะแสดงเป็น ครั้งที่ 1/${per} - ${y1} … ${per}/${per} - ${y1} แล้วเริ่ม 1/${per} - ${y2} ในปีสัญญาถัดไป`
+                            : `ในงานจะแสดงเป็น ครั้งที่ 1/${per} - ${y1} … ${per}/${per} - ${y1}`;
                         })()}
                       </Typography>
                     )}

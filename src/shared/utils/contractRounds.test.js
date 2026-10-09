@@ -96,10 +96,13 @@ describe("totalRoundsOf — จำนวนครั้งทั้งหมด�
     expect(totalRoundsOf({ intervalMonths: 4 })).toBe(3);
   });
   it("ป้ายครั้งที่นับใหม่ทุกปี พร้อมปีของสัญญา", () => {
+    // เริ่มกลางปี → ปีสัญญาคร่อม 2 ปี พ.ศ.
     const c = { intervalMonths: 3, contractYears: 2, contractStart: "2026-10-01" };
-    expect(formatRoundLabel(2, 8, c)).toBe("2/4 - 2569");
-    expect(formatRoundLabel(5, 8, c)).toBe("1/4 - 2570");
-    expect(formatRoundLabel(8, 8, c)).toBe("4/4 - 2570");
+    expect(formatRoundLabel(2, 8, c)).toBe("2/4 - 2569-70");
+    expect(formatRoundLabel(5, 8, c)).toBe("1/4 - 2570-71");
+    expect(formatRoundLabel(8, 8, c)).toBe("4/4 - 2570-71");
+    // เริ่ม 1 ม.ค. → ปีเดียว
+    expect(formatRoundLabel(5, 8, { ...c, contractStart: "2026-01-01" })).toBe("1/4 - 2570");
     expect(formatRoundLabel(1, 1, { contractNo: "FAPTY05-2569" })).toBe("1/1 - 2569");
   });
   it("รอบเข้าหารไม่ลงตัว/ไม่ระบุ → ใช้ visitCount ที่กรอกไว้", () => {

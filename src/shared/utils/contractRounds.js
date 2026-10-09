@@ -38,6 +38,26 @@ export const contractYearOf = (ev) => {
 };
 
 /**
+ * ✅ (9 ต.ค. 2569 ผู้ใช้เลือก "ช่วงปีแบบสั้น") ป้ายปีของ "ปีสัญญาที่ N"
+ *   สัญญาเริ่ม 1 ม.ค. → ปีสัญญาตรงกับปี พ.ศ. → "2569"
+ *   เริ่มเดือนอื่น → ปีสัญญาคร่อม 2 ปี พ.ศ. → "2568-69" (เช่น พ.ค. 68 – เม.ย. 69)
+ * ไม่มีวันเริ่มสัญญา (อ่านปีจากเลขที่สัญญาแทน) → ปีเดียว
+ * ⚠️ ฝั่ง server มีตัวเดียวกันที่ utils/contractVisits.js (roundLabelOf) — แก้ต้องแก้คู่กัน
+ */
+export const contractYearLabel = (ctx, yearIdx = 1) => {
+  if (!ctx) return "";
+  const src = ctx.extendedProps ? { ...ctx.extendedProps, ...ctx } : ctx;
+  const start = src.contractStart ? new Date(src.contractStart) : null;
+  if (start && !Number.isNaN(start.getTime())) {
+    const be = start.getFullYear() + 543 + yearIdx - 1;
+    const jan1 = start.getMonth() === 0 && start.getDate() === 1;
+    return jan1 ? `${be}` : `${be}-${String(be + 1).slice(-2)}`;
+  }
+  const y = contractYearOf(src);
+  return y ? `${y + yearIdx - 1}` : "";
+};
+
+/**
  * ✅ (8 ต.ค. 2569 ผู้ใช้: "ลงเป็นแบบ เข้าปีละกี่ครั้ง และเข้ากี่ปี · ไม่ให้แสดงเป็น 1/8, 2/8")
  * จำนวนปีของสัญญา — contractYears ที่เลือกในฟอร์ม → ไม่มี (สัญญาเก่า) คิดจากช่วงวันที่สัญญา → ไม่มีวันที่ = 1 ปี
  * ⚠️ ฝั่ง server มีตัวเดียวกันที่ utils/contractVisits.js (contractYearsOf) — แก้ต้องแก้คู่กัน
@@ -77,16 +97,16 @@ export const formatRoundLabel = (time, visitCount, ctx) => {
   if (!ctx) return visitCount ? `${time}/${visitCount}` : `${time}`;
   const t = Number(time);
   const per = perYearOf(ctx) || Number(visitCount) || 0;
-  const startYear = contractYearOf(ctx);
   if (!per || !Number.isInteger(t) || t < 1) {
     const base = visitCount ? `${time}/${visitCount}` : `${time}`;
-    return startYear ? `${base} - ${startYear}` : base;
+    const y1 = contractYearLabel(ctx, 1);
+    return y1 ? `${base} - ${y1}` : base;
   }
   const yearIdx = Math.ceil(t / per);
   const inYear = ((t - 1) % per) + 1;
-  const years = contractYearsOf(ctx);
-  if (startYear) return `${inYear}/${per} - ${startYear + yearIdx - 1}`;
-  return years > 1 ? `${inYear}/${per} (ปีที่ ${yearIdx})` : `${inYear}/${per}`;
+  const yl = contractYearLabel(ctx, yearIdx);
+  if (yl) return `${inYear}/${per} - ${yl}`;
+  return contractYearsOf(ctx) > 1 ? `${inYear}/${per} (ปีที่ ${yearIdx})` : `${inYear}/${per}`;
 };
 
 export const DEFAULT_INTERVAL_MONTHS = 3;
