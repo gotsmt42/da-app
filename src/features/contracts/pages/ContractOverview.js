@@ -93,7 +93,10 @@ import TelLink from "@/shared/components/TelLink";
 import { thaiDateNumeric, formatThai } from "@/shared/utils/thaiDate";
 import { can, DEPARTMENT, DEPARTMENT_LABEL } from "@/shared/utils/roles";
 
-const ACCENT = "#dc2626";
+// ✅ (9 ต.ค. 2569 ผู้ใช้: "ปรับสีสันให้ดูง่าย ทันสมัย ไม่รก รวมถึงปุ่มต่างๆ") สีหลักของหน้านี้เปลี่ยนเป็นน้ำเงินชุดเดียวกับทั้งแอป
+//    แดงเหลือไว้เฉพาะเรื่องที่อันตราย/เร่งด่วนจริง (ลบ · เลยกำหนด · หมดอายุ) — DANGER
+const ACCENT = "#2563eb";
+const DANGER = "#dc2626";
 // ✅ สีแบรนด์ของ Excel — ใช้กับปุ่มส่งออกโดยเฉพาะ ให้เห็นปุ๊บรู้ทันทีว่าคือไฟล์ Excel ไม่ต้องอ่าน tooltip
 const EXCEL_GREEN = "#217346";
 // ✅ เพดานจำนวนครั้งของสัญญา — บังคับทุกจุดที่ตั้งค่านี้ (ฟอร์มเพิ่มสัญญา/แก้ไข inline/จัดกลุ่มเป็นสัญญา
@@ -1468,7 +1471,7 @@ const InlineAddRow = ({
                 sx={{
                   textTransform: "none", fontWeight: 700, fontSize: "0.75rem", borderRadius: 2,
                   boxShadow: "none", bgcolor: ACCENT, px: 1.75,
-                  "&:hover": { bgcolor: "#b91c1c", boxShadow: "none" },
+                  "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" },
                 }}
               >
                 {saving ? "กำลังบันทึก…" : "บันทึกสัญญา"}
@@ -3818,7 +3821,10 @@ pagedRows.map((c, idx) => {
                   sx={{
                     bgcolor: idx % 2 ? SURFACE_STRIPE : "#fff",
                     transition: "background-color .12s",
-                    "&:hover": { bgcolor: alpha(ACCENT, 0.04) },
+                    "&:hover": { bgcolor: alpha(ACCENT, 0.035) },
+                    // ✅ ปุ่มจัดการรายครั้ง (เพิ่มวัน · ย้าย · แยก) จางไว้ — ชี้ที่แถวแล้วค่อยเด่น ลดความรกของตาราง
+                    "& .co-visit-actions": { opacity: 0.3, transition: "opacity .15s" },
+                    "&:hover .co-visit-actions": { opacity: 1 },
                   }}
                 >
                   {showCheckboxes && (
@@ -3873,7 +3879,7 @@ pagedRows.map((c, idx) => {
                                 value={c.contractNo} editValue={editValue} saving={editSaving}
                                 title={c.contractNo}
                                 formatDisplay={(v) => (v
-                                  ? <span style={{ color: ACCENT, fontWeight: 700 }}>{v}</span>
+                                  ? <span style={{ color: "#0f172a", fontWeight: 800, letterSpacing: "0.01em" }}>{v}</span>
                                   : <span style={{ color: "#cbd5e1" }}>— ไม่มีเลขที่สัญญา —</span>)}
                                 onStartEdit={() => beginEdit(c, "contractNo")}
                                 onCommit={(v) => commitEdit(c, v)}
@@ -4338,7 +4344,7 @@ pagedRows.map((c, idx) => {
                           // ไม่ใช่ถูกบังคับไปช่อง 1 เสมอเหมือนเดิม)
                           const withinCount = n <= rowMaxRound(c);
                           if (!withinCount) {
-                            return <TableCell key={n} data-col-key={`visit_${n}`} align="center" sx={{ width: colVar(`visit_${n}`), bgcolor: "action.hover" }} />;
+                            return <TableCell key={n} data-col-key={`visit_${n}`} align="center" sx={{ width: colVar(`visit_${n}`), bgcolor: "#fafbfc" }} />;
                           }
                           // ✅ นับว่า "ถึงรอบแล้ว" เฉพาะครั้งที่ลงตารางจริงเท่านั้น (!unscheduled) — ถ้าเป็นแค่
                           // แผนงานล่วงหน้าที่จองครั้งนี้ไว้ (ยังไม่มีวันที่จริง) ให้ยังถือว่า "ว่าง" อยู่ในตาราง
@@ -4449,7 +4455,7 @@ pagedRows.map((c, idx) => {
                                       ใช้คุมการแก้ทีมรายครั้งอยู่แล้ว จะได้ไม่มีนิยามสิทธิ์ 2 ชุดในไฟล์เดียวกัน
                                       ⚠️ "แยกออกจากสัญญา" ยังเป็นของ admin/manager เท่านั้น (ดูปุ่มที่ 3) */}
                                   {canEditRoundTeam(c) && c.isRealContract && !useMobileTable && (
-                                    <Stack direction="row" spacing={0.25}>
+                                    <Stack direction="row" spacing={0.25} className="co-visit-actions">
                                       <Tooltip title="เพิ่มวันที่ต่อเนื่อง (เข้างานไม่ติดกัน)">
                                         <IconButton
                                           size="small" onClick={() => openExtendVisitDialog(c, n)}
@@ -4537,7 +4543,7 @@ pagedRows.map((c, idx) => {
                                       // เพราะปุ่มทึบคือ "ต้องกดเดี๋ยวนี้" ซึ่งยังไม่ใช่สำหรับรอบที่จะถึงเดือนหน้า
                                       sx={overdueInfo?.state === "overdue" ? {
                                         color: "#fff", bgcolor: overdueInfo.color,
-                                        "&:hover": { bgcolor: "#b91c1c" },
+                                        "&:hover": { bgcolor: "#1d4ed8" },
                                       } : { color: overdueInfo?.color || ACCENT }}
                                     >
                                       <PlaylistAdd fontSize="small" />
@@ -4825,7 +4831,7 @@ pagedRows.map((c, idx) => {
             {/* ✅ ยอดรวมค่าคอมอยู่ใต้ยอดมูลค่างานในแถบเดียวกัน — บนมือถือไม่มีแถวสรุปท้ายตารางให้อ่าน
                 ⚠️ โผล่เฉพาะตอนมีค่าคอมจริง ไม่งั้นแถบนี้จะมี ฿0 ห้อยอยู่ตลอดเวลาโดยไม่มีความหมาย */}
             {commissionSummary.total > 0 && (
-              <Typography sx={{ fontSize: "0.7rem", fontWeight: 700, color: "#7c3aed", whiteSpace: "nowrap" }}>
+              <Typography sx={{ fontSize: "0.7rem", fontWeight: 700, color: "#0f766e", whiteSpace: "nowrap" }}>
                 คอม {formatBaht(commissionSummary.total)}
               </Typography>
             )}
@@ -5722,7 +5728,7 @@ pagedRows.map((c, idx) => {
               variant="contained"
               startIcon={<Add />}
               onClick={openAddDialog}
-              sx={{ bgcolor: ACCENT, textTransform: "none", fontWeight: 700, borderRadius: 2.5, flex: { xs: 1, sm: "initial" }, height: { xs: 40, sm: "auto" }, boxShadow: "none", "&:hover": { bgcolor: "#b91c1c", boxShadow: "none" } }}
+              sx={{ bgcolor: ACCENT, textTransform: "none", fontWeight: 700, borderRadius: 2.5, flex: { xs: 1, sm: "initial" }, height: { xs: 40, sm: "auto" }, boxShadow: "none", "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } }}
             >
               เพิ่มสัญญาใหม่
             </Button>
@@ -5864,7 +5870,7 @@ pagedRows.map((c, idx) => {
           <Button
             size="small" variant="contained" startIcon={<MergeType sx={{ fontSize: 16 }} />}
             onClick={openMergeDialog}
-            sx={{ bgcolor: ACCENT, textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#b91c1c" } }}
+            sx={{ bgcolor: ACCENT, textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#1d4ed8" } }}
           >
             จัดกลุ่มเป็นสัญญา
           </Button>
@@ -6155,7 +6161,7 @@ pagedRows.map((c, idx) => {
             <Button
               size="small" variant="contained" onClick={openAddDialog}
               startIcon={<AddCircleOutline sx={{ fontSize: 18 }} />}
-              sx={{ mt: 1.5, textTransform: "none", fontWeight: 700, borderRadius: 2, bgcolor: ACCENT, "&:hover": { bgcolor: "#b91c1c" } }}
+              sx={{ mt: 1.5, textTransform: "none", fontWeight: 700, borderRadius: 2, bgcolor: ACCENT, "&:hover": { bgcolor: "#1d4ed8" } }}
             >
               เพิ่มสัญญาใหม่
             </Button>
@@ -6545,7 +6551,7 @@ pagedRows.map((c, idx) => {
                         <Stack spacing={0.25} alignItems="center">
                           <Box component="span" sx={{ fontWeight: 800, fontSize: "1rem", color: ACCENT }}>{formatBaht(jobValueSummary.total)}</Box>
                           {commissionSummary.total > 0 && (
-                            <Box component="span" sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#7c3aed" }}>
+                            <Box component="span" sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#0f766e" }}>
                               ค่าคอม {formatBaht(commissionSummary.total)}
                               {jobValueSummary.total > 0 ? ` · ${((commissionSummary.total / jobValueSummary.total) * 100).toFixed(2)}%` : ""}
                             </Box>
@@ -6558,7 +6564,7 @@ pagedRows.map((c, idx) => {
                     return (
                       <TableCell key={i} align="right" sx={{ whiteSpace: "nowrap" }}>
                         <Stack spacing={0} alignItems="flex-end">
-                          <Box component="span" sx={{ fontWeight: 800, fontSize: "1rem", color: "#7c3aed" }}>
+                          <Box component="span" sx={{ fontWeight: 800, fontSize: "1rem", color: "#0f766e" }}>
                             {formatBaht(commissionSummary.total)}
                           </Box>
                           {commissionSummary.total > 0 && jobValueSummary.total > 0 && (
@@ -6581,7 +6587,7 @@ pagedRows.map((c, idx) => {
                             <Box component="span" sx={{ fontWeight: 800, color: ACCENT }}>{formatBaht(jobValueSummary.total)}</Box>
                           )}
                           {commissionHidden && commissionSummary.total > 0 && (
-                            <Box component="span" sx={{ fontWeight: 700, color: "#7c3aed" }}>· ค่าคอม {formatBaht(commissionSummary.total)}</Box>
+                            <Box component="span" sx={{ fontWeight: 700, color: "#0f766e" }}>· ค่าคอม {formatBaht(commissionSummary.total)}</Box>
                           )}
                           <Chip
                             size="small"
@@ -6755,7 +6761,7 @@ pagedRows.map((c, idx) => {
           <Button onClick={() => setContactEdit(null)} disabled={contactSaving} sx={{ textTransform: "none", fontWeight: 700, color: "text.secondary" }}>ยกเลิก</Button>
           <Button
             variant="contained" disableElevation onClick={saveContact} disabled={contactSaving}
-            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, bgcolor: ACCENT, "&:hover": { bgcolor: "#b91c1c" } }}
+            sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, bgcolor: ACCENT, "&:hover": { bgcolor: "#1d4ed8" } }}
           >
             {contactSaving ? "กำลังบันทึก…" : "บันทึก"}
           </Button>
@@ -6806,8 +6812,8 @@ pagedRows.map((c, idx) => {
               </MenuItem>
             ),
             <Divider key="d" sx={{ my: 0.5 }} />,
-            <MenuItem key="delete" onClick={() => { close(); handleDeleteContract(c); }} sx={{ color: ACCENT, "&:hover": { bgcolor: alpha(ACCENT, 0.06) } }}>
-              <ListItemIcon><DeleteOutline fontSize="small" sx={{ color: ACCENT }} /></ListItemIcon>
+            <MenuItem key="delete" onClick={() => { close(); handleDeleteContract(c); }} sx={{ color: DANGER, "&:hover": { bgcolor: alpha(DANGER, 0.06) } }}>
+              <ListItemIcon><DeleteOutline fontSize="small" sx={{ color: DANGER }} /></ListItemIcon>
               <ListItemText primary={c.isRealContract ? "ลบสัญญานี้ทั้งหมด" : "ลบงานนี้"} />
             </MenuItem>,
           ].filter(Boolean);
@@ -6835,7 +6841,7 @@ pagedRows.map((c, idx) => {
           </DialogContent>
           <DialogActions sx={{ px: 2.5, py: 1.25, bgcolor: "background.paper", borderTop: `1px solid ${BORDER_MAIN}` }}>
             <Button onClick={() => setRowEditorKey(null)} variant="contained" disableElevation
-              sx={{ bgcolor: ACCENT, textTransform: "none", fontWeight: 700, borderRadius: 2.5, px: 3, "&:hover": { bgcolor: "#b91c1c" } }}>
+              sx={{ bgcolor: ACCENT, textTransform: "none", fontWeight: 700, borderRadius: 2.5, px: 3, "&:hover": { bgcolor: "#1d4ed8" } }}>
               เสร็จสิ้น
             </Button>
           </DialogActions>
@@ -7079,7 +7085,7 @@ pagedRows.map((c, idx) => {
           <Button
             variant="contained" onClick={() => handleAddSubmit()} disabled={saving || isAddFormInvalid}
             startIcon={saving ? <CircularProgress size={14} sx={{ color: "inherit" }} /> : <Check sx={{ fontSize: 18 }} />}
-            sx={{ bgcolor: ACCENT, textTransform: "none", fontWeight: 700, borderRadius: 2.5, px: 2.5, boxShadow: "none", "&:hover": { bgcolor: "#b91c1c", boxShadow: "none" } }}
+            sx={{ bgcolor: ACCENT, textTransform: "none", fontWeight: 700, borderRadius: 2.5, px: 2.5, boxShadow: "none", "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } }}
           >
             {saving ? "กำลังบันทึก..." : "บันทึกสัญญา"}
           </Button>
@@ -7358,7 +7364,7 @@ pagedRows.map((c, idx) => {
           <Button onClick={closeMergeDialog} disabled={mergeSaving} sx={{ textTransform: "none" }}>ยกเลิก</Button>
           <Button
             variant="contained" onClick={handleMergeSubmit} disabled={mergeSaving}
-            sx={{ bgcolor: ACCENT, textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#b91c1c" } }}
+            sx={{ bgcolor: ACCENT, textTransform: "none", fontWeight: 700, "&:hover": { bgcolor: "#1d4ed8" } }}
           >
             {mergeSaving ? "กำลังบันทึก..." : "จัดกลุ่มเป็นสัญญา"}
           </Button>
