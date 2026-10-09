@@ -330,6 +330,14 @@ export default function MyJobs() {
     );
   }, [filteredJobs]);
 
+
+  // ✅ (9 ต.ค. 2569) ขั้นตอนทำงาน — รับงาน/งานไม่เสร็จ ส่งงานทั้งกลุ่มกลับมา เอามาแทนในหน้าจอเลย
+  const handlePatched = useCallback((docs) => {
+    if (!docs?.length) return;
+    const byId = new Map(docs.map((d) => [d._id, d]));
+    setEvents((prev) => prev.map((e) => (byId.has(e._id) ? { ...e, ...byId.get(e._id), activityLog: e.activityLog } : e)));
+  }, []);
+
   const handleInputUpdate = useCallback(async (id, data) => {
     try {
       await EventService.UpdateEvent(id, data);
@@ -581,6 +589,7 @@ export default function MyJobs() {
                 )}
                 <JobGroupCard
                   sessions={sessions}
+                  onPatched={handlePatched}
                   onInputUpdate={handleInputUpdate}
                   onStatusUpdate={handleStatusUpdate}
                   onFileUpload={handleFileUpload}

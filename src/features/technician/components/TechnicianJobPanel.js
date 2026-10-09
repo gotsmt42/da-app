@@ -41,6 +41,7 @@ import { printFile, shareFile, shareToLine, isMobileDevice } from "@/shared/util
 import InfoLine from "@/shared/ui/InfoLine";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { ROLES } from "@/shared/utils/roles";
+import { JobFlowChips, JobFlowPanel } from "@/shared/ui/JobFlow";
 
 // ✅ ใช้ตัดสินใจลำดับปุ่มแชร์ในเมนู "⋮" ต่อไฟล์ (ดูเหตุผลใน fileActions.js)
 const IS_MOBILE = isMobileDevice();
@@ -720,6 +721,8 @@ const TechnicianJobCard = ({
   // ✅ เวลาอยู่ในกลุ่มงานหลายวัน JobGroupBlock จะรวมทุกวันไว้ใน JobCard ใบเดียวกันเอง (ห่อจาก
   // ข้างนอก) จึงไม่ต้องมี JobCard/เงา/ระยะห่างซ้อนของตัวเองอีกชั้น
   noOuterCard = false,
+  // ✅ ขั้นตอนทำงาน (รับงาน/งานไม่เสร็จ) — server คืนงานทั้งกลุ่ม ให้หน้าแม่เอาไปแทนในรายการ
+  onPatched,
 }) => {
   const [expanded,        setExpanded]        = useState(false);
   const [docsExpanded,    setDocsExpanded]     = useState(false);
@@ -962,6 +965,9 @@ const TechnicianJobCard = ({
                     : log.action === "document_checked"       ? "ทำเครื่องหมายเอกสาร"
                     : log.action === "document_applicable_set" ? "ระบุมี/ไม่มีเอกสาร"
                     : log.action === "close_requested"        ? "ขอปิดงาน"
+                    : log.action === "job_ack"                ? "รับงาน"
+                    : log.action === "follow_up"              ? "แจ้งงานไม่เสร็จ"
+                    : log.action === "follow_up_resolved"     ? "จัดการงานไม่เสร็จแล้ว"
                     : log.action}
                   </Typography>
                   {log.detail && (
@@ -1040,6 +1046,8 @@ const TechnicianJobCard = ({
                   {event.title}
                 </Typography>
               )}
+              {/* ✅ เลข Job · ด่วน · ครบกำหนด · รอข้อมูล · งานไม่เสร็จ */}
+              <JobFlowChips event={event} />
               <Stack spacing={0.35} sx={{ mt: 0.6 }}>
                 {event.system && <InfoLine label="ระบบ">{event.system}</InfoLine>}
                 {/* ✅ เดิม `{company || "—"} · {site || "—"}` โชว์ "— · ไซต์" เป็นขีดลอยๆ เวลาช่องใดช่องหนึ่งว่าง */}
@@ -1073,6 +1081,9 @@ const TechnicianJobCard = ({
               แต่ตอนนี้เปิดเป็น Dialog ทับขึ้นมาแทนแล้ว เปลี่ยนเป็นลูกศรชี้ขวาให้ตรงกับพฤติกรรมจริง */}
           <ChevronRight sx={{ fontSize: 22, color: "#cbd5e1", flexShrink: 0, mt: 0.25 }} />
         </Stack>
+
+        {/* ✅ ขั้นตอนทำงาน: รับงาน · รอข้อมูล · อุปกรณ์ · งานไม่เสร็จ (ของทั้งงาน — แสดงที่การ์ดตัวแทนเท่านั้น) */}
+        {!hideDocuments && <JobFlowPanel event={event} mode="tech" onPatched={onPatched} />}
 
         {/* ── เอกสารประจำงาน + ขอปิดงาน: ซ่อนถ้างานนี้ใช้เอกสารร่วมกับกลุ่ม (แสดงที่การ์ดตัวแทนแทน) ── */}
         {!hideDocuments && (

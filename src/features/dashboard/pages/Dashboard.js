@@ -35,6 +35,7 @@ import {
 import { groupEventsByContract, nextVisitOverdueInfo } from "@/shared/utils/contractOverdue";
 // ✅ ตรรกะติดตามใบเสนอราคาตัวกลาง — ใช้ร่วมกับหน้า /quotations และฝั่ง server เพื่อให้เกณฑ์/ตัวเลขตรงกัน
 import { getFollowUpInfo } from "@/shared/utils/quotationTracking";
+import { openFollowUp, isUrgent, acksOf } from "@/shared/utils/jobFlow";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { can, isRole, rankLabel, ROLES, TECHNICIAN_ROLES, ALL_ROLES } from "@/shared/utils/roles";
 import HomeMenu from "../components/HomeMenu";
@@ -234,6 +235,18 @@ const Dashboard = () => {
   // เดียวกับที่หน้า Operation ใช้เป๊ะๆ (งานหลายวันไม่ติดกันนับเป็น 1 งาน คิดค้างจากวันสุดท้าย)
   // ✅ ต้องคำนวณก่อน myActiveJobsCount เพราะ "งานที่ต้องทำ" ต้องตัดงานที่ค้างออกไปแล้ว (ดูด้านล่าง)
   const daysPastDueMap = buildDaysPastDueMap(events);
+
+  // ✅ (9 ต.ค. 2569) งานที่ช่างแจ้ง "ไม่เสร็จ" รอแอดมินลงนัดใหม่ — 1 แถวต่องาน (งานหลายวันนับครั้งเดียว)
+  const followUpJobs = (() => {
+    if (!isAdminOrManager) return [];
+    const seen = new Set();
+    return events
+      .filter((e) => e.followUpOpen && e.status !== "ดำเนินการเสร็จสิ้น")
+      .filter((e) => { const k = e.jobGroupId || e._id; if (seen.has(k)) return false; seen.add(k); return true; })
+      .map((job) => ({ job, fu: openFollowUp(job) }))
+      .filter((x) => x.fu)
+      .sort((a, b) => new Date(a.fu.reportedAt) - new Date(b.fu.reportedAt));
+  })();
   const myOverdueCount = countFlaggedJobs(
     events,
     daysPastDueMap,
@@ -526,6 +539,19 @@ const Dashboard = () => {
     <>
       {todayBlock}
 
+      {/* ✅ (9 ต.ค. 2569) ขั้นตอนทำงาน ขั้น 5 — ช่างแจ้ง "งานไม่เสร็จ" รอแอดมินลงนัดใหม่ (โชว์เฉพาะตอนมีจริง) */}
+      {followUpJobs.length > 0 && (
+        <Widget title="งานไม่เสร็จ · รอนัดใหม่" icon={EventRepeatOutlined} tone="#d97706" count={followUpJobs.length}
+          hint="ช่างแจ้งสาเหตุแล้ว — ลงวันนัดใหม่ แล้วกด “จัดการแล้ว”">
+          {followUpJobs.slice(0, 5).map(({ job, fu }) => (
+            <Row key={job._id} to={jobLink(job._id, resolveOperationGroup(job))}
+              title={[job.title || "งาน", job.site || job.company].filter(Boolean).join(" · ")}
+              sub={[fu.reason, `ต่อไป: ${fu.nextOwner}`, fu.proposedDate ? `เสนอ ${formatThai(moment(fu.proposedDate), "D MMM")}` : ""].filter(Boolean).join(" · ")}
+              trailing={<Pill color="#d97706">{fu.reason}</Pill>} />
+          ))}
+        </Widget>
+      )}
+
       {/* งานที่กำลังจะถึงใน 7 วัน (ไม่รวมวันนี้ — มีกล่อง "งานวันนี้" แยกแล้ว) */}
       <Widget title="งานที่กำลังจะถึง" icon={EventOutlined} count={upcomingJobs.length || undefined} hint="ภายใน 7 วันข้างหน้า" to={upcomingJobs.length > 5 ? "/operation" : undefined}>
         {loading ? <Loading rows={2} /> : upcomingJobs.length === 0 ? <Empty text="ไม่มีงานที่จะถึงใน 7 วันนี้" /> : upcomingJobs.slice(0, 5).map((job) => {
@@ -536,7 +562,9 @@ const Dashboard = () => {
             <Row key={job._id} to={`/operation/${job._id}${jobGroup ? `?group=${jobGroup}` : ""}`}
               title={job.title || "งาน"} sub={[job.company, job.site].filter(Boolean).join(" · ") || "ไม่ระบุโครงการ"}
               leading={<DateTile top={jobStart.format("D")} bottom={formatThai(jobStart, "MMM")} color={ACCENT} strong={diffDays === 1} />}
-              trailing={<Pill color={diffDays === 1 ? ACCENT : MUTED}>{diffDays === 1 ? "พรุ่งนี้" : `อีก ${diffDays} วัน`}</Pill>} />
+              trailing={<Pill color={diffDays === 1 ? ACCENT : MUTED}>{diffDays === 1 ? "พรุ่งนี้" : `อีก ${diffDays} วัน`}</Pill>}
+              // ✅ ขั้นตอนทำงาน — ด่วน / ช่างยังไม่กดรับงาน
+              trailingSub={[isUrgent(job) ? "⚡ ด่วน" : "", acksOf(job).length ? "" : "ยังไม่รับงาน"].filter(Boolean).join(" · ") || undefined} />
           );
         })}
       </Widget>

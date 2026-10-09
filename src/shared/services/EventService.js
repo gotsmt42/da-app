@@ -192,6 +192,20 @@ const EventService = {
     }
   },
 
+  // ── ขั้นตอนทำงาน (9 ต.ค. 2569): ช่างรับงาน · แจ้งงานไม่เสร็จ · แอดมินจัดการแล้ว — คืน { events } ทั้งงาน ──
+  async AckJob(id) {
+    const res = await API.put(`/events/${id}/ack`);
+    return res.data;
+  },
+  async ReportFollowUp(id, payload) {
+    const res = await API.put(`/events/${id}/follow-up`, payload);
+    return res.data;
+  },
+  async ResolveFollowUp(id, payload = {}) {
+    const res = await API.put(`/events/${id}/follow-up/resolve`, payload);
+    return res.data;
+  },
+
   // ── การวางบิล / รับเงิน ──────────────────────────────────────────────
   // ⚠️ ห้ามส่งยอด VAT / หัก ณ ที่จ่าย / ยอดสุทธิ ขึ้นไปเอง — server คำนวณให้เสมอจากยอดก่อนภาษี
   // กับอัตราภาษี (ดู shared/utils/billing.js ฝั่ง server) ส่งขึ้นไปก็ไม่ถูกใช้

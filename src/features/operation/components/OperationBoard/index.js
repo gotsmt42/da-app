@@ -82,6 +82,7 @@ import LineIcon from "@/shared/ui/LineIcon";
 import { printFile, shareFile, shareToLine, isMobileDevice } from "@/shared/utils/fileActions";
 import DeliveryNoteDialog from "@/features/documents/components/DeliveryNoteDialog";
 import WorkNoticeDialog from "@/features/documents/components/WorkNoticeDialog";
+import { JobFlowChips, JobFlowPanel, JobFlowFlags } from "@/shared/ui/JobFlow";
 import InfoLine from "@/shared/ui/InfoLine";
 // ✅ ตำแหน่งหน้างานบน Google Maps — ตัวเดียวกับที่ระบบใบแจ้งงานใช้ (ดูหัวไฟล์ SiteMapLink.js)
 // ⚠️ หน้านี้ใช้แค่ hook ไม่ใช้ตัวคอมโพเนนต์ — ลิงก์แผนที่ผูกไว้กับ "ชื่อโครงการ" บนการ์ดเลย
@@ -1075,6 +1076,8 @@ const EventRowCard = ({
   // ✅ เวลาอยู่ในกลุ่มงานหลายวัน JobGroupBlock จะรวมทุกวันไว้ใน GlassCard ใบเดียวกันเอง
   // (ห่อจากข้างนอก) จึงไม่ต้องมี GlassCard/เงา/ระยะห่างซ้อนของตัวเองอีกชั้น
   noOuterCard = false,
+  // ✅ ขั้นตอนทำงาน (จัดการงานไม่เสร็จแล้ว) — server คืนงานทั้งกลุ่ม ให้หน้าแม่เอาไปแทน
+  onPatched,
 }) => {
   const avatarMap = useAvatarMap(employee);
   // ✅ มอบหมาย/เปลี่ยนผู้รับผิดชอบจากการ์ดนี้ได้เลย (สิทธิ์เดียวกับหน้าภาพรวมงาน — editContracts)
@@ -1533,6 +1536,8 @@ const EventRowCard = ({
                   {event.title}
                 </Typography>
               )}
+              {/* ✅ เลข Job · ด่วน · ครบกำหนด · รอข้อมูล · งานไม่เสร็จ · ช่างรับงานแล้วหรือยัง */}
+              <JobFlowChips event={event} showAck />
               {/* ✅ เน้น "ใครรับผิดชอบ · ใครเข้าทำงาน" ไว้บนสุดของรายละเอียด (ผู้ใช้ขอ) — ชิปรูป/อักษรย่อสีประจำตัว
                   แทนชื่อคั่นจุลภาคบรรทัดท้ายการ์ดที่อ่านแล้วไม่รู้ว่าใครเป็นอะไร */}
               <PeopleRow
@@ -1741,6 +1746,9 @@ const EventRowCard = ({
             canUseRunningNumber={isAdminOrManager}
           />
         )}
+
+        {/* ✅ ขั้นตอนทำงาน: สถานะรับงาน · รอข้อมูล · อุปกรณ์ · งานไม่เสร็จ (ปุ่ม "จัดการแล้ว") */}
+        {!hideDocuments && <JobFlowPanel event={event} mode="admin" onPatched={onPatched} />}
 
         {/* แจ้งเตือนคำขอปิดงานจากช่าง (ยังไม่อนุมัติ) — ใช้ Box แทน Alert action slot
             เพราะ Alert วางข้อความ+ปุ่มแถวเดียวกันแล้วทับ/ล้นกันบนจอมือถือ
@@ -2261,11 +2269,13 @@ const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob, employee, canAss
               sx={{ cursor: "pointer", bgcolor: idx % 2 ? alpha("#0f172a", 0.02) : "transparent" }}>
               <TableCell sx={{ whiteSpace: "nowrap" }}>
                 <StatusBadge color={OP_COLOR[a.status] || "#6b7280"}>{a.status || "—"}</StatusBadge>
+                <JobFlowFlags event={a} />
               </TableCell>
               <TableCell sx={{ maxWidth: 220 }}>
                 {/* ✅ โครงการเป็นบรรทัดหลัก (มีค่าเสมอ) บริษัทเป็นบรรทัดรอง — เดิมบริษัทขึ้นก่อน งานที่ไม่ได้กรอกบริษัทจึงขึ้น "-" ตัวหนา */}
                 <Typography variant="caption" fontWeight={700} noWrap sx={{ display: "block", fontSize: "0.8rem" }}>{a.site || "-"}</Typography>
                 <Typography variant="caption" color={a.company ? "text.secondary" : "text.disabled"} noWrap sx={{ display: "block" }}>{a.company || "ไม่ระบุบริษัท"}</Typography>
+                {a.jobNo && <Typography variant="caption" noWrap sx={{ display: "block", color: "#94a3b8", fontSize: "0.68rem", fontWeight: 700 }}>{a.jobNo}</Typography>}
               </TableCell>
               {/* ⚠️ หยุด event ไม่ให้ลอยขึ้นไปที่ onClick ของทั้งแถว (ซึ่งเปิดกล่องรายละเอียดงาน) —
                   TelLink หยุดให้อยู่แล้ว แต่พื้นที่ว่างรอบๆ ในเซลล์ยังคลิกทะลุได้ */}
@@ -3092,6 +3102,14 @@ const Operation = () => {
     ids.forEach(gid => EventService.UpdateEvent(gid, { docNo: newDocNo }));
   }, [getGroupEventIds]);
 
+
+  // ✅ (9 ต.ค. 2569) ขั้นตอนทำงาน — รับงาน/งานไม่เสร็จ ส่งงานทั้งกลุ่มกลับมา เอามาแทนในหน้าจอเลย
+  const handlePatched = useCallback((docs) => {
+    if (!docs?.length) return;
+    const byId = new Map(docs.map((d) => [d._id, d]));
+    setEvents((prev) => prev.map((e) => (byId.has(e._id) ? { ...e, ...byId.get(e._id), activityLog: e.activityLog } : e)));
+  }, []);
+
   const handleInputUpdate = useCallback(async (id, data) => {
     try {
       await EventService.UpdateEvent(id, data);
@@ -3710,7 +3728,7 @@ const Operation = () => {
                       onStatusUpdate={handleStatusUpdate}
                       onDateUpdate={handleDateUpdate}
                       onDocNoUpdate={handleDocNoUpdate}
-                      onInputUpdate={handleInputUpdate}
+                      onInputUpdate={handleInputUpdate} onPatched={handlePatched}
                       onFileUpload={handleFileUpload}
                       onDeleteFile={(eid, type, fileId) => { setPendingDelete({ id: eid, type, fileId }); setConfirmOpen(true); }}
                       onPreview={handlePreviewFile}
@@ -3792,7 +3810,7 @@ const Operation = () => {
                   onStatusUpdate={handleStatusUpdate}
                   onDateUpdate={handleDateUpdate}
                   onDocNoUpdate={handleDocNoUpdate}
-                  onInputUpdate={handleInputUpdate}
+                  onInputUpdate={handleInputUpdate} onPatched={handlePatched}
                   onFileUpload={handleFileUpload}
                   onDeleteFile={(eid, type, fileId) => { setPendingDelete({ id: eid, type, fileId }); setConfirmOpen(true); }}
                   onPreview={handlePreviewFile}

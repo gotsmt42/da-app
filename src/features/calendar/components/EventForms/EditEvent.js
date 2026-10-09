@@ -10,6 +10,7 @@ import { getActivityLogMeta } from "@/shared/utils/activityLogMeta";
 import { classifyJob, getJobClassMeta } from "@/shared/utils/jobClassification";
 import { overviewResponsibleOf } from "@/shared/utils/contractOverdue";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
+import { jobInfoSectionHtml, bindJobInfo, readJobInfo } from "./jobInfoSection";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { can } from "@/shared/utils/roles";
 // ✅ พิกัดหน้างาน — ใช้ตัวช่วยชุดเดียวกับหน้าอื่น (ดูหัวไฟล์ SiteMapLink.js)
@@ -2279,6 +2280,11 @@ export const getEditEvent = async ({
       </div>
     </section>
 
+    ${ev.extendedProps?.department === "sales" ? "" : jobInfoSectionHtml({
+      jobNo: ev.extendedProps?.jobNo, priority: ev.extendedProps?.priority, dueDate: ev.extendedProps?.dueDate,
+      equipment: ev.extendedProps?.equipment, infoPending: ev.extendedProps?.infoPending, infoPendingNote: ev.extendedProps?.infoPendingNote,
+    }, "ee", isClosedForTech)}
+
     <!-- section: เอกสาร — ✅ ช่างที่มีชื่อในงาน (หัวหน้าทีม/ลูกทีม) แก้ได้แล้ว และยังแก้ได้แม้งานปิดไปแล้ว
          (เรื่องเอกสารมักตามมาทีหลังงานปิดเสมอ — ดู canEditDocFields) -->
     <section class="ee-card">
@@ -2639,6 +2645,7 @@ export const getEditEvent = async ({
       // ✅ เปลี่ยนช่อง <input type="date"> ทุกช่องในกล่องนี้เป็นปฏิทิน พ.ศ. เดือนไทย
       // (ช่องเดิมถูกซ่อนไว้เป็นตัวเก็บค่า โค้ดที่อ่าน .value ตอนกดบันทึกจึงทำงานเหมือนเดิม)
       Swal.getPopup().__thaiDpCleanup = mountThaiDatePickers(Swal.getPopup());
+      bindJobInfo(Swal.getPopup());
       // ✅ ตัวเลือกสีแบบจานสี + สไลเดอร์ (แทนวงล้อสีของระบบที่ลากยากบนมือถือ) — ดู eventColorPicker.js
       Swal.getPopup().__colorPickerCleanup = mountColorPicker(Swal.getPopup());
 
@@ -3274,6 +3281,8 @@ export const getEditEvent = async ({
           .map((name) => ({ userId: teamToId.get(name) || "", name }));
 
       const buildSharedFields = () => ({
+        // ✅ ข้อมูล Job (ด่วน · ครบกำหนด · อุปกรณ์ · รอข้อมูล) — ไม่มีการ์ดนี้ (นัดฝ่ายขาย) = ไม่ส่ง
+        ...(document.getElementById("ji-dueDate") ? readJobInfo(Swal.getPopup()) : {}),
         docNo: getVal("editdocNo"),
         // ⚠️ งานสัญญาไม่ส่งผู้ติดต่อมาทางนี้ — ไปทาง UpdateContractFields แทน (ดู buildContractFields)
         // ถ้าส่งทั้งสองทางพร้อมกัน สองคำขอจะเขียนทับกันเองแบบไม่แน่นอนว่าอันไหนถึงก่อน

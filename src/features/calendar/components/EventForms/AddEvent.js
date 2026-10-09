@@ -2,6 +2,7 @@ import { countUsedRounds, formatRoundLabel, totalRoundsOf } from "@/shared/utils
 import { escapeHtml } from "@/shared/utils/escapeHtml";
 import { showTeamOverlapWarning } from "@/shared/utils/teamOverlapWarning";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
+import { jobInfoSectionHtml, bindJobInfo, readJobInfo } from "./jobInfoSection";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { can } from "@/shared/utils/roles";
 import {
@@ -896,6 +897,8 @@ export const getAddEvent = async ({
           ⚠️ วางไว้นอกทั้ง #ae-generalSection และ #ae-contractPickSection เพื่อให้ใช้ได้ทั้งสองโหมด
           (ทั้งสองโหมดสร้าง event ด้วย field ชุดเดียวกัน backend รับ docNo/description ตั้งแต่ POST อยู่แล้ว)
           ทั้งคู่ไม่บังคับกรอก — เรื่องเอกสารมักตามมาทีหลัง จึงยังเว้นว่างแล้วมาเติมภายหลังได้ */""}
+    ${jobInfoSectionHtml()}
+
     <section class="ae-card">
       <div class="ae-card-head">
         <span class="ae-card-ico" aria-hidden="true">📄</span>
@@ -954,6 +957,7 @@ export const getAddEvent = async ({
       // ✅ เปลี่ยนช่อง <input type="date"> ทุกช่องในกล่องนี้เป็นปฏิทิน พ.ศ. เดือนไทย
       // (ช่องเดิมถูกซ่อนไว้เป็นตัวเก็บค่า โค้ดที่อ่าน .value ตอนกดบันทึกจึงทำงานเหมือนเดิม)
       Swal.getPopup().__thaiDpCleanup = mountThaiDatePickers(Swal.getPopup());
+      bindJobInfo(Swal.getPopup());
       // ✅ ตัวเลือกสีแบบจานสี + สไลเดอร์ (แทนวงล้อสีของระบบที่ลากยากบนมือถือ) — ดู eventColorPicker.js
       Swal.getPopup().__colorPickerCleanup = mountColorPicker(Swal.getPopup());
       /* TomSelect */
@@ -1385,6 +1389,7 @@ export const getAddEvent = async ({
               company: c.company, site: c.site, title: c.title, system: c.system,
               docNo: getVal("docNo"), description: getVal("description"),
               contactName: getVal("contactName"), contactTel: getVal("contactTel"),
+              ...readJobInfo(Swal.getPopup()),
               time: String(nextIndex),
               team: cpTeam, resPerson: teamToId.get(cpTeam) || "",
               teamMembers: [],
@@ -1481,6 +1486,7 @@ export const getAddEvent = async ({
             .map((name) => ({ userId: teamToId.get(name) || "", name }));
 
           const payload = {
+            ...readJobInfo(Swal.getPopup()),
             company:         getVal("eventCompany"),
             site,
             title,
