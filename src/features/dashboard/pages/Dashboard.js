@@ -612,9 +612,9 @@ const Dashboard = () => {
       {overdueContractsBlock && <div className="dashboard-mobile-only">{overdueContractsBlock}</div>}
 
       {/* งานวางแผนล่วงหน้า (ยังไม่ลงตาราง · ไม่รวมฉบับร่างของสัญญา) */}
-      <Widget title="งานวางแผนล่วงหน้า" icon={EditCalendarOutlined} tone="#475569" count={generalDrafts.length || undefined} hint="ยังไม่ลงวันที่ในตาราง" to={generalDrafts.length ? "/event" : undefined} toLabel="เปิดปฏิทิน"
+      <Widget title="งานรอลงแผน" icon={EditCalendarOutlined} tone="#475569" count={generalDrafts.length || undefined} hint="รับแจ้งแล้ว ยังไม่ลงวันที่ในตาราง" to="/jobs/follow-up" toLabel={generalDrafts.length ? "ติดตามงาน" : "รับแจ้งงาน"}
         footer={<Pager page={draftsSafePage} pages={draftsTotalPages} onChange={setDraftsPage} />}>
-        {loading ? <Loading rows={2} /> : draftsPreview.length === 0 ? <Empty text="ยังไม่มีงานวางแผนล่วงหน้า" /> : draftsPreview.map((d) => (
+        {loading ? <Loading rows={2} /> : draftsPreview.length === 0 ? <Empty text="ยังไม่มีงานรอลงแผน" /> : draftsPreview.map((d) => (
           <Row key={d._id} to="/event" title={d.title || "งาน"}
             sub={[d.system, d.site].filter(Boolean).join(" · ") || "ไม่ระบุโครงการ"}
             trailing={<Pill color="#475569">{d.plannedMonth ? formatThai(moment(d.plannedMonth, "YYYY-MM"), "MMM YYYY") : "ไม่ระบุเดือน"}</Pill>} />

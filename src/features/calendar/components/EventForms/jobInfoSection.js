@@ -38,14 +38,7 @@ export function jobInfoSectionHtml(v = {}, cls = "ae", disabled = false) {
   const dueStr = due && !Number.isNaN(due.getTime())
     ? `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, "0")}-${String(due.getDate()).padStart(2, "0")}` : "";
   const urgent = v.priority === "urgent";
-  return `${CSS}
-    <section class="${cls}-card">
-      <div class="${cls}-card-head">
-        <span class="${cls}-card-ico" aria-hidden="true">🧾</span>
-        <div class="${cls}-card-titles"><h4>ข้อมูล Job</h4><p>${v.jobNo ? `<span class="ji-jobno"># ${esc(v.jobNo)}</span>` : "เลข Job ระบบออกให้อัตโนมัติตอนบันทึก"}</p></div>
-        ${cls === "ae" ? `<span class="ae-card-badge ae-card-badge--muted">ไม่บังคับ</span>` : ""}
-      </div>
-      <div class="${cls}-card-body">
+  const fields = `
         <div class="ji-grid">
           <div class="${cls}-field">
             <label>ความเร่งด่วน</label>
@@ -67,10 +60,27 @@ export function jobInfoSectionHtml(v = {}, cls = "ae", disabled = false) {
           <input type="checkbox" id="ji-infoPending" ${dis} ${v.infoPending ? "checked" : ""}>
           ⏳ ข้อมูลยังไม่ครบ (รอข้อมูล)
         </label>
-        <div class="ae-field ji-note" id="ji-noteWrap" style="${v.infoPending ? "" : "display:none;"}">
+        <div class="${cls}-field ji-note" id="ji-noteWrap" style="${v.infoPending ? "" : "display:none;"}">
           <input id="ji-infoPendingNote" type="text" ${dis} placeholder="ยังขาดอะไร เช่น รอเบอร์ผู้ติดต่อ / รอยืนยันวันเข้า" value="${esc(v.infoPendingNote)}">
         </div>
+`;
+  const sub = v.jobNo ? `<span class="ji-jobno"># ${esc(v.jobNo)}</span>` : "เลข Job ระบบออกให้อัตโนมัติตอนบันทึก";
+  // ฟอร์มรับแจ้งงาน (AddDraftEvent) ไม่มีการ์ด — ใช้หัวข้อแบบ section label ของฟอร์มนั้นแทน
+  if (cls === "ade") {
+    return `${CSS}
+    <hr class="ade-divider">
+    <p class="ade-section-label">ข้อมูล Job <span style="font-weight:600;color:#94a3b8;text-transform:none;">· ${sub} · ไม่บังคับ</span></p>
+    ${fields}`;
+  }
+  return `${CSS}
+    <section class="${cls}-card">
+      <div class="${cls}-card-head">
+        <span class="${cls}-card-ico" aria-hidden="true">🧾</span>
+        <div class="${cls}-card-titles"><h4>ข้อมูล Job</h4><p>${sub}</p></div>
+        ${cls === "ae" ? `<span class="ae-card-badge ae-card-badge--muted">ไม่บังคับ</span>` : ""}
       </div>
+      <div class="${cls}-card-body">
+${fields}      </div>
     </section>`;
 }
 

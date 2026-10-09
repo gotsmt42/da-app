@@ -18,7 +18,7 @@ import {
   FaHome, FaTachometerAlt, FaCalendarAlt, FaWrench, FaBriefcase, FaClipboardList,
   FaClipboardCheck, FaPaperPlane, FaMoneyCheckAlt, FaReceipt, FaHardHat, FaUserClock, FaShoppingCart, FaInbox, FaChartBar,
   FaFileAlt, FaFileInvoiceDollar, FaFileContract, FaArchive, FaBuilding, FaUserFriends,
-  FaCog, FaTags, FaImage, FaUserShield, FaBoxOpen, FaImages, FaNewspaper, FaSlidersH, FaEnvelopeOpenText,
+  FaCog, FaTags, FaImage, FaUserShield, FaBoxOpen, FaImages, FaNewspaper, FaSlidersH, FaEnvelopeOpenText, FaTasks,
 } from "react-icons/fa";
 import { DEPARTMENT } from "@/shared/utils/roles";
 
@@ -44,6 +44,8 @@ export const DEST = {
   eventSales: { title: "ตารางงานฝ่ายขาย", href: "/event?dept=sales", icon: FaBriefcase },
 
   operation: { title: "การดำเนินงาน", bar: "ดำเนินงาน", sub: "เช็คอิน · ปิดงาน", href: "/operation", icon: FaWrench, badgeKey: "closeRequests" },
+  // ✅ (9 ต.ค. 2569) งานที่ต้องตามต่อ แยกตามขั้นตอน — รับแจ้งงาน · รอลงแผน · ยังไม่รับงาน · งานไม่เสร็จ · รอปิดงาน
+  jobFollow: { title: "ติดตามงาน", sub: "รับแจ้ง · รอลงแผน · งานไม่เสร็จ", href: "/jobs/follow-up", icon: FaTasks, badgeKey: "jobFollow" },
   jobReport: { title: "รายงานงาน", short: "รายงาน", sub: "สรุปสถานะ · รายเดือน · ตามลูกค้า/ทีม", href: "/jobs/report", icon: FaChartBar },
   myJobs: { title: "งานของฉัน", sub: "งานที่ได้รับมอบหมาย", href: "/technician/jobs", icon: FaClipboardList, badgeKey: "myJobs" },
   contracts: { title: "ภาพรวมงาน", href: "/contracts", icon: FaFileContract, badgeKey: "contracts" },

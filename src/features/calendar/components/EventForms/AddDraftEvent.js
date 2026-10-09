@@ -3,6 +3,7 @@ import { escapeHtml } from "@/shared/utils/escapeHtml";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 import { can } from "@/shared/utils/roles";
+import { jobInfoSectionHtml, bindJobInfo, readJobInfo } from "./jobInfoSection";
 
 /* ─────────────────────────────────────────────
    STYLE INJECTION — งานวางแผนล่วงหน้า (ยังไม่ลงตาราง)
@@ -37,20 +38,21 @@ function injectAddDraftStyles() {
     .swal-add-draft .swal2-close {
       position: absolute; top: 14px; right: 16px; z-index: 99;
       width: 32px; height: 32px; border-radius: 50%;
-      background: rgba(255,255,255,.15) !important; color: #fff !important;
+      background: #f1f5f9 !important; color: #475569 !important;
       font-size: 18px; display: flex; align-items: center; justify-content: center;
       transition: background .2s;
     }
-    .swal-add-draft .swal2-close:hover { background: rgba(255,255,255,.30) !important; }
+    .swal-add-draft .swal2-close:hover { background: #e2e8f0 !important; }
 
     #ade-header {
       padding: 20px 24px 18px; display: flex; align-items: center; gap: 14px;
-      background: linear-gradient(135deg, #dc2626, #7f1d1d); flex-shrink: 0;
+      background: #fff; border-bottom: 1px solid #e2e8f0; flex-shrink: 0;
     }
-    #ade-header-icon { font-size: 28px; line-height: 1; }
+    #ade-header-icon { width: 42px; height: 42px; border-radius: 12px; background: #eff6ff; display: grid; place-items: center; font-size: 22px; line-height: 1; flex-shrink: 0; }
     #ade-header-info { flex: 1; }
-    #ade-header-info h3 { margin:0; font-size:18px; font-weight:700; color:#fff; }
-    #ade-header-info small { font-size:12px; color:rgba(255,255,255,.75); }
+    #ade-header-info { text-align: left; }
+    #ade-header-info h3 { margin:0; font-size:18px; font-weight:800; color:#0f172a; }
+    #ade-header-info small { font-size:12px; color:#64748b; }
 
     #ade-body { padding: 22px 26px; background: #f8fafc; overflow-y: auto; flex: 1; min-height: 0; }
 
@@ -75,7 +77,7 @@ function injectAddDraftStyles() {
       font-family: inherit;
     }
     .ade-field select:focus, .ade-field input:focus, .ade-field textarea:focus {
-      outline: none; border-color: #dc2626;
+      outline: none; border-color: #2563eb;
       box-shadow: 0 0 0 3px rgba(220,38,38,.12);
     }
 
@@ -98,18 +100,18 @@ function injectAddDraftStyles() {
     .ade-jobtype-title { font-size: 13px; font-weight: 700; color: #1e293b; }
     .ade-jobtype-desc { font-size: 11px; color: #64748b; }
     .ade-jobtype-option input:checked + .ade-jobtype-card {
-      border-color: #dc2626; background: #fef2f2;
+      border-color: #2563eb; background: #eff6ff;
     }
-    .ade-jobtype-option input:checked + .ade-jobtype-card .ade-jobtype-title { color: #b91c1c; }
+    .ade-jobtype-option input:checked + .ade-jobtype-card .ade-jobtype-title { color: #1d4ed8; }
     .ade-jobtype-option input:disabled + .ade-jobtype-card { opacity: .5; cursor: not-allowed; }
     .ade-jobtype-note { font-size: 11px; color: #b91c1c; margin: -12px 0 16px; display: none; }
-    .ade-lock-note { font-size: 11px; color: #b91c1c; margin: -6px 0 12px; }
+    .ade-lock-note { font-size: 11px; color: #92400e; margin: -6px 0 12px; }
 
     .ade-contract-pick-info {
-      background: #fef2f2; border: 1.5px solid #fecaca; border-radius: 10px;
+      background: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 10px;
       padding: 12px 14px; margin-bottom: 16px; font-size: 13px; color: #374151; display: none;
     }
-    .ade-contract-pick-info b { color: #b91c1c; }
+    .ade-contract-pick-info b { color: #1d4ed8; }
     .ade-contract-pick-info .ade-cpi-sub { font-size: 12px; color: #64748b; margin-top: 2px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
     /* ✅ ตัวเลือกสัญญาใน dropdown (TomSelect render.option/item) — เดิมโชว์เป็นข้อความบรรทัดเดียวยาวๆ
@@ -123,7 +125,7 @@ function injectAddDraftStyles() {
     .ade-contract-option-badge,
     .ade-cpi-badge {
       display: inline-flex; align-items: center; flex-shrink: 0;
-      background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;
+      background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe;
       border-radius: 20px; padding: 1px 9px; font-size: 10.5px; font-weight: 700; white-space: nowrap;
     }
     /* ⚠️ ไม่ใส่ .swal-add-draft นำหน้า — dropdown ถูกย้ายไปแปะที่ <body> ตรงๆ ผ่าน dropdownParent:"body"
@@ -138,8 +140,8 @@ function injectAddDraftStyles() {
 
     .ade-month-badge {
       display: inline-flex; align-items: center; gap: 6px;
-      background: #fef2f2; border: 1px solid #fecaca;
-      color: #991b1b; border-radius: 20px; padding: 4px 14px;
+      background: #eff6ff; border: 1px solid #bfdbfe;
+      color: #1d4ed8; border-radius: 20px; padding: 4px 14px;
       font-size: 12px; font-weight: 600; margin-bottom: 16px;
     }
     /* ✅ แจ้งเตือนล่วงหน้าให้ช่าง/เซล (ไม่ใช่ admin/manager) รู้ว่าแผนงานนี้ต้องรออนุมัติก่อน —
@@ -152,7 +154,7 @@ function injectAddDraftStyles() {
 
     #ade-action-bar {
       display: flex; gap: 10px; flex-wrap: wrap;
-      padding: 16px 24px 20px; background: #f1f5f9; border-top: 1px solid #e2e8f0;
+      padding: 14px 24px 16px; background: #fff; border-top: 1px solid #e2e8f0;
       justify-content: flex-end; flex-shrink: 0; position: sticky; bottom: 0; z-index: 10;
     }
     .ade-btn {
@@ -163,7 +165,8 @@ function injectAddDraftStyles() {
     }
     .ade-btn:hover  { opacity: .88; transform: translateY(-1px); }
     .ade-btn:active { transform: translateY(0); }
-    .ade-btn-success { background: #dc2626; color: #fff; }
+    .ade-btn-success { background: #2563eb; color: #fff; }
+    .ade-btn-success:hover { background: #1d4ed8; opacity: 1; }
     .ade-btn-ghost   { background: #e2e8f0; color: #475569; }
     .ade-btn-spacer  { flex: 1; }
     @media(max-width:520px) { .ade-btn-spacer { display:none; } #ade-action-bar { justify-content:center; } }
@@ -173,7 +176,7 @@ function injectAddDraftStyles() {
       border: 1.5px solid #e2e8f0 !important; border-radius: 8px !important;
       padding: 8px 12px !important; font-size: 14px !important; min-height: 40px;
     }
-    .swal-add-draft .ts-wrapper.focus .ts-control { border-color: #dc2626 !important; }
+    .swal-add-draft .ts-wrapper.focus .ts-control { border-color: #2563eb !important; }
   `;
   document.head.appendChild(style);
 }
@@ -297,13 +300,14 @@ export const getAddDraftEvent = async ({
   const monthValue = existingDraft?.plannedMonth || defaultMonth;
   const monthLabel = formatThai(moment(monthValue, "YYYY-MM").locale("th"), "MMMM YYYY");
 
+  const attr = (v) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
   const html = `
 <div id="ade-modal-inner">
   <div id="ade-header">
-    <div id="ade-header-icon">📌</div>
+    <div id="ade-header-icon">📥</div>
     <div id="ade-header-info">
-      <h3>${isEditMode ? "แก้ไขงานวางแผนล่วงหน้า" : "เพิ่มงานวางแผนล่วงหน้า"}</h3>
-      <small>ยังไม่ต้องระบุวันที่ — ลาก/กดลงตารางได้ทีหลัง</small>
+      <h3>${isEditMode ? "แก้ไขงานรอลงแผน" : "รับแจ้งงานใหม่ (รอลงแผน)"}</h3>
+      <small>ยังไม่ต้องระบุวันที่ — ลงตารางได้ทีหลังจากปฏิทิน หรือเมนู "ติดตามงาน"</small>
     </div>
   </div>
 
@@ -399,6 +403,27 @@ export const getAddDraftEvent = async ({
       </div>
     </div>
 
+    <!-- ✅ (9 ต.ค. 2569) ขั้นที่ 1 รับแจ้งงาน — ผู้ติดต่อ + อาการเสีย/ขอบเขตงาน (เฉพาะงานทั่วไป/โปรเจค) -->
+    <div id="ade-intakeSection">
+      <hr class="ade-divider">
+      <p class="ade-section-label">รายละเอียดที่รับแจ้ง <span style="font-weight:600;color:#94a3b8;text-transform:none;">· ไม่บังคับ</span></p>
+      <div class="ade-grid ade-grid-2">
+        <div class="ade-field">
+          <label>👤 ผู้ติดต่อหน้างาน</label>
+          <input id="adeContactName" type="text" placeholder="ชื่อผู้ติดต่อ" value="${attr(existingDraft?.contactName)}">
+        </div>
+        <div class="ade-field">
+          <label>📞 เบอร์โทร</label>
+          <input id="adeContactTel" type="tel" placeholder="เช่น 081-234-5678" value="${attr(existingDraft?.contactTel)}">
+        </div>
+      </div>
+      <div class="ade-field" style="margin-top:12px;">
+        <label>📝 อาการเสีย / ขอบเขตงาน</label>
+        <textarea id="adeDescription" rows="3" placeholder="เช่น ตู้ควบคุมแจ้งเตือน Fault โซน 3 · ลูกค้าขอเข้าก่อน 10 โมง">${attr(existingDraft?.description)}</textarea>
+      </div>
+      ${jobInfoSectionHtml(existingDraft || {}, "ade")}
+    </div>
+
     <div id="ade-contractPickSection" style="display:none;">
       <p class="ade-section-label">ขั้นตอนที่ 2 — เลือกสัญญา</p>
       <div class="ade-field" style="margin-bottom:16px;">
@@ -422,7 +447,7 @@ export const getAddDraftEvent = async ({
   <div id="ade-action-bar">
     <div class="ade-btn-spacer"></div>
     <button class="ade-btn ade-btn-ghost" id="ade-btnCancel">ยกเลิก</button>
-    <button class="ade-btn ade-btn-success" id="ade-btnConfirm">${isEditMode ? "💾 บันทึกการแก้ไข" : "💾 บันทึกงานล่วงหน้า"}</button>
+    <button class="ade-btn ade-btn-success" id="ade-btnConfirm">${isEditMode ? "💾 บันทึกการแก้ไข" : "💾 บันทึกงานรอลงแผน"}</button>
   </div>
 </div>
 `;
@@ -445,6 +470,7 @@ export const getAddDraftEvent = async ({
         // ✅ ช่อง <input type="month"> ของเบราว์เซอร์แสดง ค.ศ. เสมอ และบังคับเป็นไทยไม่ได้
         // — แทนด้วยตัวเลือกเดือนของแอปที่เป็น พ.ศ. (ค่าที่เก็บยังเป็น "YYYY-MM" ของ ค.ศ. เหมือนเดิม)
         Swal.getPopup().__thaiDpCleanup = mountThaiDatePickers(Swal.getPopup());
+        bindJobInfo(Swal.getPopup());
         const mkTs = (id, placeholder = "") => {
           // ⚠️ เดิม fix ไว้ 7 ตัดรายชื่อ/ตัวเลือกที่มีเกิน 7 รายการทิ้งไปเงียบๆ (ห้องสมุด TomSelect
           // ค่า default จริงคือ 50 อยู่แล้ว) ทำให้ dropdown บริษัท/โครงการ/ประเภทงาน/ระบบงาน "หาไม่เจอ"
@@ -580,6 +606,10 @@ export const getAddDraftEvent = async ({
                 team: c.team,
                 time: String(nextIndex),
                 plannedMonth: cPlannedMonth,
+                contactName: getVal("adeContactName"),
+                contactTel: getVal("adeContactTel"),
+                description: getVal("adeDescription"),
+                ...readJobInfo(Swal.getPopup()),
               };
               await EventService.AddDraftEvent(contractPayload);
               isSavingDraft = false;
@@ -629,6 +659,10 @@ export const getAddDraftEvent = async ({
               system,
               time: getVal("adeTime"),
               plannedMonth,
+              contactName: getVal("adeContactName"),
+              contactTel: getVal("adeContactTel"),
+              description: getVal("adeDescription"),
+              ...readJobInfo(Swal.getPopup()),
             };
             // ✅ ตั้งหมวดหมู่ "งานทั่วไป"/"งานโปรเจค" ให้เลยตั้งแต่ตอนสร้าง (ตามที่เลือกไว้ในขั้นตอนที่ 1)
             // แทนที่จะปล่อยว่างไว้แล้วต้องไปกดจัดหมวดหมู่ย้อนหลังทีหลังในหน้า "ภาพรวมงาน" เสมอ — เฉพาะตอน
@@ -670,7 +704,7 @@ export const getAddDraftEvent = async ({
             isSavingDraft = false;
 
             Swal.fire({
-              title: isEditMode ? "บันทึกการแก้ไขสำเร็จ ✅" : "บันทึกงานล่วงหน้าสำเร็จ ✅",
+              title: isEditMode ? "บันทึกการแก้ไขสำเร็จ ✅" : "บันทึกงานรอลงแผนสำเร็จ ✅",
               icon: "success",
               timer: 1200,
               showConfirmButton: false,

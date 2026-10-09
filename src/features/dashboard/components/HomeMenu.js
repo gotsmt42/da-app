@@ -83,6 +83,7 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
     }
   }
   if (canViewOperation) work.push(dest("operation"));
+  if (canViewOperation) work.push(dest("jobFollow"));
   if (can(userData, "receiveDispatch") && !hideMyJobs) work.push(dest("myJobs"));
   // 🧹 "ภาพรวมงาน" ถูกตัดออกจากเมนูหลักตามที่ผู้ใช้สั่ง — เดิมปลายทางนี้โผล่พร้อมกัน 3 ที่ในจอเดียว
   // (ชิปบนแถบบน + ปุ่มตรงนี้ + ช่องบนแถบเมนูล่าง) พร้อมป้ายตัวเลขเดียวกันทั้งสามจุด
