@@ -3199,6 +3199,7 @@ function EventCalendar() {
           onExport={handleExportExcel}
           exportDisabled={exportingExcel || filteredCalendarEvents.length === 0}
           title={viewingSalesCalendar ? "ตารางนัดหมายฝ่ายขาย" : "นัดหมายของฉัน"}
+          showKpis={salesView !== "calendar"}
         />
       )}
       {!isSalesView && (
@@ -3210,6 +3211,7 @@ function EventCalendar() {
           onExport={handleExportExcel}
           exportDisabled={exportingExcel || filteredCalendarEvents.length === 0}
           title={isServiceObserver ? "ตารางงานช่าง (ดูอย่างเดียว)" : "ตารางงานช่าง"}
+          showKpis={techView !== "calendar"}
         />
       )}
 

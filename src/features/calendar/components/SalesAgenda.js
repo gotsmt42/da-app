@@ -68,7 +68,7 @@ export function Kpi({ label, value, color = INK, onClick, active }) {
 }
 
 /** หัวหน้าตารางนัดหมาย */
-export function SalesTopBar({ events, onAdd, onTab, onExport, exportDisabled, title = "ตารางนัดหมาย", sub }) {
+export function SalesTopBar({ events, onAdd, onTab, onExport, exportDisabled, title = "ตารางนัดหมาย", sub, showKpis = true }) {
   const s = useMemo(() => salesSummary(events), [events]);
   return (
     <Box sx={{ mb: { xs: 1, sm: 1.5 } }}>
@@ -92,14 +92,14 @@ export function SalesTopBar({ events, onAdd, onTab, onExport, exportDisabled, ti
         </Button>
       </Stack>
 
-      <Stack direction="row" spacing={{ xs: 0.75, sm: 1 }} sx={{ mb: { xs: 1, sm: 1.25 } }}>
+      {showKpis && <Stack direction="row" spacing={{ xs: 0.75, sm: 1 }} sx={{ mb: { xs: 1, sm: 1.25 } }}>
         <Kpi label="นัดวันนี้" value={s.today} color={ACCENT} onClick={() => onTab("upcoming")} />
         <Kpi label="เลยวันนัด" value={s.overdue} color={AMBER} onClick={() => onTab("follow")} />
         <Kpi label="รอปิดงาน" value={s.toClose} color={TEAL} onClick={() => onTab("follow")} />
         <Box sx={{ flex: 1, minWidth: 0, display: { xs: "none", sm: "flex" } }}>
           <Kpi label="ปิดงานเดือนนี้" value={s.closedMonth} color={GREEN} onClick={() => onTab("history")} />
         </Box>
-      </Stack>
+      </Stack>}
 
     </Box>
   );

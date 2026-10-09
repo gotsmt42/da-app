@@ -142,7 +142,7 @@ export const techSummary = (events) => {
 };
 
 /** หัวหน้าตารางงานช่าง */
-export function TechTopBar({ events, onAdd, onTab, onExport, exportDisabled, title = "ตารางงานช่าง", sub, canAdd = true }) {
+export function TechTopBar({ events, onAdd, onTab, onExport, exportDisabled, title = "ตารางงานช่าง", sub, canAdd = true, showKpis = true }) {
   const s = useMemo(() => techSummary(events), [events]);
   return (
     <Box sx={{ mb: { xs: 1, sm: 1.5 } }}>
@@ -167,14 +167,15 @@ export function TechTopBar({ events, onAdd, onTab, onExport, exportDisabled, tit
           </Button>
         )}
       </Stack>
-      <Stack direction="row" spacing={{ xs: 0.75, sm: 1 }}>
+      {/* ✅ (9 ต.ค. 2569 ผู้ใช้) มุมมองปฏิทินไม่ต้องแสดงตัวเลขสรุป — ให้ปฏิทินได้ที่เต็มๆ */}
+      {showKpis && <Stack direction="row" spacing={{ xs: 0.75, sm: 1 }}>
         <Kpi label="งานวันนี้" value={s.today} color={INK} onClick={() => onTab("upcoming")} />
         <Kpi label="ค้างปิดงาน" value={s.overdue} color={RED} onClick={() => onTab("follow")} />
         <Kpi label="รออนุมัติ" value={s.waiting} color={AMBER} onClick={() => onTab("follow")} />
         <Box sx={{ flex: 1, minWidth: 0, display: { xs: "none", sm: "flex" } }}>
           <Kpi label="เสร็จเดือนนี้" value={s.doneMonth} color={GREEN} onClick={() => onTab("done")} />
         </Box>
-      </Stack>
+      </Stack>}
     </Box>
   );
 }
