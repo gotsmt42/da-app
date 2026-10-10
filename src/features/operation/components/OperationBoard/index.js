@@ -82,7 +82,7 @@ import LineIcon from "@/shared/ui/LineIcon";
 import { printFile, shareFile, shareToLine, isMobileDevice } from "@/shared/utils/fileActions";
 import DeliveryNoteDialog from "@/features/documents/components/DeliveryNoteDialog";
 import WorkNoticeDialog from "@/features/documents/components/WorkNoticeDialog";
-import { JobFlowChips, JobFlowPanel, JobFlowFlags } from "@/shared/ui/JobFlow";
+import { JobFlowChips, JobFlowPanel, JobFlowFlags, nextStepOf } from "@/shared/ui/JobFlow";
 import SitePhotos from "@/shared/ui/SitePhotos";
 import InfoLine from "@/shared/ui/InfoLine";
 // ✅ ตำแหน่งหน้างานบน Google Maps — ตัวเดียวกับที่ระบบใบแจ้งงานใช้ (ดูหัวไฟล์ SiteMapLink.js)
@@ -1084,7 +1084,9 @@ const EventRowCard = ({
   // ✅ มอบหมาย/เปลี่ยนผู้รับผิดชอบจากการ์ดนี้ได้เลย (สิทธิ์เดียวกับหน้าภาพรวมงาน — editContracts)
   const [assignAnchor, setAssignAnchor] = useState(null);
   const canAssign = Boolean(onAssignResponsible) && can(currentUser, "editContracts");
-  const [expanded,   setExpanded]   = useState(defaultExpanded);
+  // open = กางรายละเอียดในการ์ด · expanded = กล่องเอกสาร/คุยกับช่าง/ประวัติ
+  const [open,       setOpen]       = useState(defaultExpanded || inlineDetails);
+  const [expanded,   setExpanded]   = useState(false);
   const [editingDoc, setEditingDoc] = useState(false);
   const [docNo,      setDocNo]      = useState(event.docNo || "");
   const [anchorEl,   setAnchorEl]   = useState(null);
@@ -1120,6 +1122,8 @@ const EventRowCard = ({
   // เลื่อนจอตาม ทั้งที่จอกว้างเปิดลอยทับได้เลยโดยไม่กระทบตำแหน่งการ์ดอื่น (มือถือยังกางลงแบบเดิม)
   const isDesktop = useMediaQuery("(min-width:900px)");
   const canEdit = can(currentUser, "editOperation");
+  // ✅ ขั้นตอนถัดไป (ตัวเดียวกับกล่อง "ขั้นตอนถัดไป" ใน JobFlowPanel) — โชว์สั้นๆ บนหัวการ์ดตอนพับ
+  const nextStep = event.department === "sales" ? null : nextStepOf(event, "admin");
   const isAdminOrManager = can(currentUser, "approveJobs");
 
   // ── Send Comment (คุยกับช่าง เช่น ตอบคำขอใบเสนอราคา) ──────────────────
@@ -1358,18 +1362,14 @@ const EventRowCard = ({
   return (
     <Wrapper {...wrapperProps}>
       <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-        {/* Header — กดที่ไหนก็ได้บนแถวนี้เพื่อกาง/พับการ์ดได้เลย ไม่ต้องเล็งกดลูกศรเล็กๆ อีกต่อไป
-            (ปุ่ม/ลิงก์ย่อยด้านในที่มี action ของตัวเอง เช่น เปลี่ยนสถานะ/เมนู "⋮"/แก้เลขเอกสาร
-            ต้อง stopPropagation ไว้ ไม่งั้นกดแล้วจะกาง/พับซ้อนกับ action หลักโดยไม่ตั้งใจ) */}
-        <Stack
-          direction="row" alignItems="flex-start" justifyContent="space-between" gap={1}
-          onClick={() => setExpanded(p => !p)}
-          sx={{ cursor: "pointer" }}
-        >
-          <Stack direction="row" alignItems="flex-start" gap={1.5} flex={1} minWidth={0}>
-            {/* ✅ ลดขนาดลงบนจอมือถือ (จอกว้างยังคง 40px เท่าเดิม) — การ์ดตอนนี้เนื้อหากระชับขึ้นแล้ว
-                วงกลมไอคอนใหญ่แบบเดิมเลยดูไม่สมส่วนเมื่อเทียบกับตัวหนังสือที่เหลือ */}
-            {/* ✅ มือถือ: ซ่อนวงกลมไอคอน — กินคอลัมน์ซ้ายทั้งการ์ด ทำให้ข้อความถูกบีบตัดบรรทัด (ผู้ใช้: "รก ดูข้อมูลยาก") */}
+        {/* ✅ (10 ต.ค. 2569 ผู้ใช้: "หน้าการดำเนินงานอยากให้เป็นการ์ดหัวข้อ แล้วค่อยเปิดขยายเพื่อดูข้อมูล
+            ทำให้สวยงาม ดูง่าย เข้าใจง่าย และมืออาชีพ")
+            • หัวการ์ด (เห็นเสมอ): สถานะ · วันที่ · ชื่องาน/ระบบ · โครงการ · ป้ายสำคัญ · ผู้รับผิดชอบ · ขั้นตอนถัดไป
+            • กดหัวการ์ด = กาง/พับรายละเอียดลงในการ์ด (คน · ข้อมูลงาน · ขั้นตอนทำงาน · รูปหน้างาน · คำขอปิดงาน)
+            • เอกสาร/คุยกับช่าง/ประวัติ อยู่ปุ่มท้ายรายละเอียด (เปิดกล่องเดิม)
+            ปุ่ม/ลิงก์ย่อยด้านในที่มี action ของตัวเอง ต้อง stopPropagation ไม่งั้นกดแล้วการ์ดกาง/พับไปด้วย */}
+        <Box onClick={() => setOpen((p) => !p)} sx={{ cursor: "pointer" }} role="button" aria-expanded={open}>
+          <Stack direction="row" alignItems="flex-start" gap={1.5}>
             <Avatar sx={{
               display: { xs: "none", sm: "flex" },
               width: { xs: 32, sm: 40 }, height: { xs: 32, sm: 40 }, flexShrink: 0, fontSize: "0.8rem", fontWeight: 700,
@@ -1382,13 +1382,7 @@ const EventRowCard = ({
               })}
             </Avatar>
             <Box minWidth={0} flex={1}>
-              {/* ✅ จัดใหม่ให้เป็นรายการ "ไอคอน + ป้ายกำกับ : ค่า" เรียงทีละบรรทัดเรียบๆ (เทียบสไตล์
-                  การ์ดงานวางแผนล่วงหน้า) แทนแถว chip เดิม (สถานะ/ชื่องาน/ระบบ/ทีม ปนกันแถวเดียว
-                  ดูรกเวลาจอแคบ) — StatusBadge + วันที่ (ย่อแล้ว) ไว้แถวบนสุดด้วยกัน ใช้พื้นที่กว้างๆ
-                  ข้างสถานะที่เคยเว้นว่างไว้ให้เกิดประโยชน์ คู่กับไอคอนเอกสาร/กิจกรรมทางขวา —
-                  ระบบ/ครั้งที่ วางคู่กัน 2 คอลัมน์ (ทั้งสองสั้น ไม่ต้องแยกคนละบรรทัดให้เปลืองที่)
-                  ส่วนทีมย้ายไปไว้ล่างสุดของรายการ */}
-              <Stack direction="row" alignItems="center" gap={1} mb={0.5} flexWrap="wrap">
+              <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap">
                 <Tooltip title="เปลี่ยนสถานะ">
                   <Box onClick={e => { e.stopPropagation(); canEdit && setAnchorEl(e.currentTarget); }} sx={{ cursor: canEdit ? "pointer" : "default" }}>
                     <StatusBadge color={OP_COLOR[localStatus]}>
@@ -1490,202 +1484,74 @@ const EventRowCard = ({
                 </Stack>
               </Popover>
 
-              {/* ✅ ไอคอนเอกสาร/กิจกรรม แยกเป็นบรรทัดของตัวเองเต็มความกว้าง ชิดขวา — เดิมพยายามยัด
-                  ไว้แถวเดียวกับป้ายสถานะ/ลอยไปแถวบนสุดฝั่งขวาซึ่งไปเบียด/ทับกับป้ายสถานะบนจอแคบ
-                  (ความกว้างไม่พอ) อยู่คนละบรรทัดเต็มความกว้างการ์ดแบบนี้รับประกันว่าไม่ทับกันแน่นอน
-                  ไม่ว่าป้ายสถานะ/วันที่จะยาวแค่ไหน — เปลี่ยนไอคอนเอกสารแต่ละชนิดให้ไม่ซ้ำกัน (เทียบ
-                  pattern เดียวกับ DOCUMENT_TYPES ใน TechnicianJobPanel.js) และคั่นกลุ่ม "เอกสาร" กับ
-                  "กิจกรรม/ข้อความ/กลุ่มงาน" ด้วยเส้นแบ่งบางๆ ให้อ่านง่าย ไม่ปนกันรก */}
-              {/* ⚠️ มือถือแสดงเฉพาะเอกสาร/ข้อความ — ไอคอนกิจกรรม/กลุ่มงานลอยเดี่ยวๆ เป็นบรรทัดว่างที่ไม่บอกอะไร */}
-              {(event.reportFiles?.length > 0 || event.quotationFiles?.length > 0 || event.invoiceFiles?.length > 0 || event.completionFiles?.length > 0 || event.comments?.length > 0 || (isDesktop && (event.activityLog?.length > 0 || event.jobGroupId))) && (
-                <Stack direction="row" alignItems="center" justifyContent="flex-end" gap={0.7}
-                  divider={<Divider orientation="vertical" flexItem sx={{ height: 14, my: "auto" }} />}
-                  sx={{ mb: 0.5 }}>
-                  {(event.reportFiles?.length > 0 || event.quotationFiles?.length > 0 || event.invoiceFiles?.length > 0 || event.completionFiles?.length > 0) && (
-                    <Stack direction="row" alignItems="center" gap={0.5}>
-                      {event.reportFiles?.length > 0     && <DocIndicator title={`Service Report: ${event.reportFiles.length} ไฟล์`}  icon={Description}         color="#3b82f6" count={event.reportFiles.length}     showCount={isDesktop} />}
-                      {event.quotationFiles?.length > 0  && <DocIndicator title={`ใบเสนอราคา: ${event.quotationFiles.length} ไฟล์`} icon={RequestQuote}        color="#ef4444" count={event.quotationFiles.length}  showCount={isDesktop} />}
-                      {event.invoiceFiles?.length > 0    && <DocIndicator title={`ใบวางบิล: ${event.invoiceFiles.length} ไฟล์`}    icon={ReceiptLong}         color="#f59e0b" count={event.invoiceFiles.length}    showCount={isDesktop} />}
-                      {event.completionFiles?.length > 0 && <DocIndicator title={`ใบส่งมอบงาน: ${event.completionFiles.length} ไฟล์`} icon={AssignmentTurnedIn} color="#07941a" count={event.completionFiles.length} showCount={isDesktop} />}
-                    </Stack>
-                  )}
-                  {(event.comments?.length > 0 || (isDesktop && (event.activityLog?.length > 0 || event.jobGroupId))) && (
-                    <Stack direction="row" alignItems="center" gap={0.5}>
-                      {event.activityLog?.length > 0 && isDesktop && (
-                        <DocIndicator title={`${event.activityLog.length} กิจกรรม`} icon={History}
-                          color="text.disabled" count={event.activityLog.length} showCount={isDesktop} />
-                      )}
-                      {event.comments?.length > 0 && (
-                        <DocIndicator title={`${event.comments.length} ข้อความ`} icon={Chat}
-                          color="text.disabled" count={event.comments.length} showCount={isDesktop} />
-                      )}
-                      {event.jobGroupId && isDesktop && (
-                        <Tooltip title="งานนี้เป็นส่วนหนึ่งของงานหลายวัน (กลุ่มเดียวกัน)">
-                          <LinkIcon sx={{ fontSize: 16, color: "text.disabled" }} />
-                        </Tooltip>
-                      )}
-                    </Stack>
-                  )}
-                </Stack>
-              )}
-
-              {/* ✅ ตัดวงเล็บ [ ] ครอบชื่องานออก — ไม่ได้สื่อความหมายอะไร เป็นแค่สัญลักษณ์ส่วนเกินที่
-                  โผล่ทุกการ์ด และเพิ่มน้ำหนัก/ระยะห่างให้ชื่องานเป็น "จุดยึดสายตา" ของการ์ดจริงๆ
-                  (เดิมตัวเล็กใกล้เคียงบรรทัดข้อมูลด้านล่าง เลยจมหายไปกับข้อมูลอื่น) */}
-              {event.title && (
-                <Typography fontWeight={800} fontSize="1rem" noWrap sx={{ letterSpacing: "-0.01em" }}>
-                  {event.title}
-                </Typography>
-              )}
+              <Typography fontWeight={800} fontSize="1rem" noWrap sx={{ letterSpacing: "-0.01em", mt: 0.5, color: INK }}>
+                {event.title || "ไม่ระบุประเภทงาน"}
+                {event.system && <Box component="span" sx={{ fontWeight: 600, color: INK_2 }}>{` · ${event.system}`}</Box>}
+              </Typography>
+              <Typography noWrap sx={{ fontSize: "0.84rem", color: MUTED, fontWeight: 600 }}>
+                {companySite(event.company, event.site)}
+                {event.time ? ` · ครั้งที่ ${formatRoundLabel(event.time, event.visitCount, event)}` : ""}
+              </Typography>
               {/* ✅ เลข Job · ด่วน · ครบกำหนด · รอข้อมูล · งานไม่เสร็จ · ช่างรับงานแล้วหรือยัง */}
               <JobFlowChips event={event} showAck />
-              {/* ✅ เน้น "ใครรับผิดชอบ · ใครเข้าทำงาน" ไว้บนสุดของรายละเอียด (ผู้ใช้ขอ) — ชิปรูป/อักษรย่อสีประจำตัว
-                  แทนชื่อคั่นจุลภาคบรรทัดท้ายการ์ดที่อ่านแล้วไม่รู้ว่าใครเป็นอะไร */}
-              <PeopleRow
-                responsible={event.responsiblePerson} team={teamNamesOf(event)} avatars={avatarMap}
-                onAssign={canAssign ? setAssignAnchor : undefined}
-              />
-              {canAssign && (
-                <AssignResponsibleMenu
-                  anchorEl={assignAnchor} onClose={() => setAssignAnchor(null)}
-                  employees={employee} value={event.responsiblePerson || ""}
-                  onPick={(name) => { setAssignAnchor(null); onAssignResponsible(event, name); }}
-                />
-              )}
-              {/* ✅ จอกว้างจัดข้อมูลเป็น 2 คอลัมน์ จอแคบเรียงลงมาคอลัมน์เดียวเหมือนเดิม
-                  🐛 ที่แก้: เดิมเรียงลงมาคอลัมน์เดียวทุกขนาดจอ — บนจอคอมการ์ดกว้างเต็มหน้า แต่เนื้อหา
-                  เกาะอยู่ซ้ายมือแค่ ~30% ที่เหลือว่างเปล่า ทำให้การ์ดสูงเกินจำเป็น เห็นงานได้ทีละไม่กี่
-                  รายการต้องเลื่อนตลอด และ "หน้าตาเหมือนจอมือถือที่ถูกยืดออก" ตามที่ผู้ใช้บอก
-                  ⚠️ minmax(0,1fr) ไม่ใช่ 1fr — ไม่งั้นข้อความยาว (ชื่อโครงการ/รายชื่อทีม) จะดัน
-                  คอลัมน์ให้กว้างเกินแล้วตกขอบการ์ด แทนที่จะตัดด้วย ellipsis */}
-              <Box
-                sx={{
-                  mt: 0.6,
-                  display: "grid",
-                  gridTemplateColumns: { xs: "1fr", md: "minmax(0,1fr) minmax(0,1fr)" },
-                  columnGap: 2.5,
-                  rowGap: 0.35,
-                  alignItems: "start",
-                }}
-              >
-                {event.system && <InfoLine label="ระบบ">{event.system}</InfoLine>}
-                {/* ชื่อโครงการเป็นตัวที่ใช้ระบุงานมากที่สุด ให้กินเต็มความกว้างเสมอ ไม่ต้องตัดคำ
-                    ✅ ชื่อโครงการ = ลิงก์แผนที่ในตัว (ผู้ใช้ขอ: "ให้กดผ่านชื่อโครงการเลย และไม่ต้องมีแก้ไข
-                    แบบนี้ดูรก") — เดิมมีกล่อง "ค้นหาตำแหน่งใน Maps" เต็มความกว้าง + ปุ่มดินสอแยกอีกปุ่ม
-                    วางคั่นกลางการ์ด กินที่เท่าข้อมูลจริง 2 บรรทัดต่อการ์ด พอลิสต์มีหลายงานเลยเห็นแต่กล่อง
-                    ⚠️ ที่ผูกกับชื่อโครงการได้พอดีเพราะพิกัดถูกเก็บ "ต่อโครงการ" (ไม่ใช่ต่องาน) ชื่อที่กด
-                    จึงตรงกับสิ่งที่จะเปิดเป๊ะ ไม่ต้องมีป้ายอธิบายเพิ่ม
-                    ⚠️ การแก้พิกัดยังทำได้ที่ฟอร์มแก้ไขงานและหน้าภาพรวมสัญญาเหมือนเดิม — ตัดออกเฉพาะ
-                    หน้านี้ซึ่งเป็นหน้า "ดูงาน/นำทาง" ไม่ใช่หน้าตั้งค่าข้อมูลโครงการ */}
-                <Box sx={{ gridColumn: { md: "1 / -1" } }}>
-                  <InfoLine label="โครงการ">
-                    <Box
-                      component="a"
-                      href={mapHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      // การ์ดทั้งใบกดเพื่อกาง/ยุบ — ถ้าไม่กั้นไว้ กดลิงก์ทีการ์ดจะกางตามไปด้วยทุกครั้ง
-                      onClick={(e) => e.stopPropagation()}
-                      title={hasSiteMap
-                        ? "เปิดแผนที่นำทางไปหน้างาน"
-                        : "ยังไม่มีพิกัดบันทึกไว้ — เปิดค้นหาชื่อโครงการใน Google Maps"}
-                      sx={{
-                        color: "inherit",
-                        textDecoration: "none",
-                        // เส้นใต้ประ = บอกว่ากดได้โดยไม่ต้องทำให้เป็นสีลิงก์ทั้งบรรทัด (ชื่อโครงการยังต้อง
-                        // อ่านเป็นข้อมูลของการ์ดอยู่ ไม่ใช่กลายเป็นปุ่ม)
-                        borderBottom: "1px dashed",
-                        borderColor: "divider",
-                        "&:hover": { color: "primary.main", borderColor: "primary.main" },
-                      }}
-                    >
-                      {companySite(event.company, event.site)}
-                      {/* หมุดแดงตัวเดียวกับทุกหน้า — บอกว่าชื่อนี้กดแล้วไป Google Maps (เดิมเป็นอีโมจิ
-                          📍/🔍 ซึ่งสื่อได้แค่ "ตำแหน่ง/ค้นหา" ไม่ได้บอกว่าเป็นบริการไหน) */}
-                      <Box
-                        component="span"
-                        sx={{ ml: 0.5, display: "inline-flex", verticalAlign: "-2px" }}
-                      >
-                        <GoogleMapsPin size={13} />
-                      </Box>
-                    </Box>
-                  </InfoLine>
-                </Box>
-                {/* ✅ ผู้ติดต่อหน้างาน — วางถัดจากโครงการทันที เพราะเป็นข้อมูล "ไปถึงแล้วโทรหาใคร"
-                    ที่ต้องอ่านคู่กับ "ไปที่ไหน" เสมอ ⚠️ เบอร์กดโทรออกได้เลย (TelLink) ซึ่งเป็นเหตุผล
-                    หลักที่ต้องมีในหน้านี้ — ช่างเปิดจากมือถือตอนกำลังจะออกรถ/ถึงหน้างาน
-                    ⚠️ ซ่อนทั้งบรรทัดถ้ายังไม่มีข้อมูล ไม่โชว์เป็นช่องว่าง — การ์ดนี้เรียงกันหลายสิบใบ
-                    ในหน้าเดียว บรรทัดว่างทุกใบจะกินพื้นที่มากกว่าข้อมูลจริงที่มีอยู่ */}
-                {(event.contactName || event.contactTel) && (
-                  <InfoLine label="ผู้ติดต่อ">
-                    <Stack direction="row" gap={0.75} alignItems="center" flexWrap="wrap">
-                      {event.contactName && <span>{event.contactName}</span>}
-                      {event.contactTel && <TelLink tel={event.contactTel} />}
-                    </Stack>
-                  </InfoLine>
-                )}
-                {/* ✅ ย้ายมาไว้ถัดจากโครงการตามที่ขอ (เดิมอยู่คู่กับระบบด้านบนสุด) */}
-                {event.time && <InfoLine label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount, event)}</InfoLine>}
-                {(event.startTime || event.endTime) && (
-                  <InfoLine label="เวลา">{event.startTime || "-"} — {event.endTime || "-"}</InfoLine>
-                )}
-                {/* ✅ ถ้ายังไม่มีเลขเอกสาร ซ่อนช่อง "ใส่เลขที่เอกสาร" ไว้ตอนพับการ์ด — เดิมโชว์ทุกการ์ด
-                    ในลิสต์ตลอดเวลาแม้ยังไม่มีข้อมูล ดูรกเวลามีงานหลายรายการ ให้กดขยายก่อนค่อยใส่ */}
-                {(event.docNo || expanded) && (
-                  editingDoc ? (
-                    <Stack direction="row" gap={0.5} alignItems="center" onClick={e => e.stopPropagation()}>
-                      <TextField size="small" variant="standard" value={docNo}
-                        onChange={e => setDocNo(e.target.value)}
-                        onKeyDown={e => e.key === "Enter" && handleDocSave()}
-                        inputProps={{ style: { fontSize: "0.75rem" } }} sx={{ width: 120 }} autoFocus />
-                      <Button size="small" onClick={handleDocSave} sx={{ minWidth: "auto", p: 0.5, fontSize: "0.7rem" }}>บันทึก</Button>
-                      <Button size="small" color="inherit" onClick={() => setEditingDoc(false)} sx={{ minWidth: "auto", p: 0.5, fontSize: "0.7rem" }}>ยกเลิก</Button>
-                    </Stack>
-                  ) : (
-                    <Stack direction="row" spacing={0.5}
-                      sx={{ alignItems: "flex-start", cursor: canEdit ? "pointer" : "default" }}
-                      onClick={e => { e.stopPropagation(); canEdit && setEditingDoc(true); }}>
-                      <Typography variant="caption" color={event.docNo ? "text.secondary" : "text.disabled"} sx={{ flexShrink: 0, whiteSpace: "nowrap", "&:hover": canEdit ? { color: "primary.main", textDecoration: "underline" } : {} }}>
-                        <Description sx={{ fontSize: 13, mr: 0.4, verticalAlign: "-2px" }} />
-                        เอกสาร :
-                      </Typography>
-                      <Typography variant="caption" color={event.docNo ? "text.secondary" : "text.disabled"} sx={{ minWidth: 0, "&:hover": canEdit ? { color: "primary.main", textDecoration: "underline" } : {} }}>
-                        {event.docNo || "ใส่เลขที่เอกสาร"}
-                      </Typography>
-                    </Stack>
-                  )
-                )}
-              </Box>
-              {/* เวลาเข้า/ออก */}
-              {(event.checkedInAt || event.checkedOutAt) && (
-                <Stack direction="row" gap={1} mt={0.5} flexWrap="wrap">
-                  {event.checkedInAt && (
-                    <Typography variant="caption" color="#8b5cf6" fontWeight={600}
-                      sx={{ display: "flex", alignItems: "center", gap: 0.3 }}>
-                      <Login sx={{ fontSize: 12 }} /> {moment(event.checkedInAt).format("HH:mm")}
-                    </Typography>
-                  )}
-                  {event.checkedOutAt && (
-                    <Typography variant="caption" color="#10b981" fontWeight={600}
-                      sx={{ display: "flex", alignItems: "center", gap: 0.3 }}>
-                      <Logout sx={{ fontSize: 12 }} /> {moment(event.checkedOutAt).format("HH:mm")}
-                    </Typography>
-                  )}
-                </Stack>
-              )}
             </Box>
-          </Stack>
-          {/* ✅ ตัดไอคอนลูกศรบอกสถานะกาง/พับออกไปเลยตามที่ขอ (ดูรกเกินไป) — ทั้งแถว Header ยังคงกด
-              เพื่อดูรายละเอียดได้เหมือนเดิม (ไอคอนเอกสาร/กิจกรรมย้ายไปอยู่คนละบรรทัดเต็มความกว้าง
-              ด้านล่างแทน — ดูเหตุผลที่ "แถวไอคอนเอกสาร/กิจกรรม" กันไม่ให้ไปเบียด/ทับกับป้ายสถานะ) */}
-          <Stack direction="row" gap={0.5} flexShrink={0}>
+            <Stack direction="row" alignItems="center" gap={0.25} flexShrink={0} sx={{ mt: -0.5, mr: -0.75 }}>
             {canEdit && (
               <IconButton onClick={e => { e.stopPropagation(); setMoreAnchorEl(e.currentTarget); }} sx={{ p: 1 }}>
                 <MoreVert fontSize="small" />
               </IconButton>
             )}
+              <ExpandMore sx={{ fontSize: 22, color: MUTED, transition: "transform .2s", transform: open ? "rotate(180deg)" : "none" }} />
+            </Stack>
           </Stack>
-        </Stack>
+
+          {/* ท้ายหัวการ์ด: ผู้รับผิดชอบ · ขั้นตอนถัดไป · เอกสาร (ตอนพับ — ตอนกางรายละเอียดมีครบอยู่แล้ว) */}
+          {!open && (
+            <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 1.25, pt: 1.1, borderTop: `1px dashed ${LINE}`, minWidth: 0 }}>
+              {event.responsiblePerson
+                ? <PersonChip name={event.responsiblePerson} avatar={avatarMap.get(event.responsiblePerson)} strong title={`ผู้รับผิดชอบ: ${event.responsiblePerson}`} />
+                : <Typography component="span" sx={{ fontSize: "0.74rem", color: FAINT, fontWeight: 700, whiteSpace: "nowrap" }}>ยังไม่มอบหมายผู้รับผิดชอบ</Typography>}
+              {nextStep && (
+                <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.76rem", color: INK_2 }}>
+                  <Box component="span" sx={{ fontWeight: 900, color: nextStep.tone || ACCENT }}>ต่อไป: {nextStep.title}</Box>
+                </Typography>
+              )}
+              {!nextStep && <Box sx={{ flex: 1 }} />}
+                {(event.reportFiles?.length > 0 || event.quotationFiles?.length > 0 || event.invoiceFiles?.length > 0 || event.completionFiles?.length > 0 || event.comments?.length > 0 || (isDesktop && (event.activityLog?.length > 0 || event.jobGroupId))) && (
+                  <Stack direction="row" alignItems="center" gap={0.7}
+                    divider={<Divider orientation="vertical" flexItem sx={{ height: 14, my: "auto" }} />}
+                    sx={{ flexShrink: 0 }}>
+                    {(event.reportFiles?.length > 0 || event.quotationFiles?.length > 0 || event.invoiceFiles?.length > 0 || event.completionFiles?.length > 0) && (
+                      <Stack direction="row" alignItems="center" gap={0.5}>
+                        {event.reportFiles?.length > 0     && <DocIndicator title={`Service Report: ${event.reportFiles.length} ไฟล์`}  icon={Description}         color="#3b82f6" count={event.reportFiles.length}     showCount={isDesktop} />}
+                        {event.quotationFiles?.length > 0  && <DocIndicator title={`ใบเสนอราคา: ${event.quotationFiles.length} ไฟล์`} icon={RequestQuote}        color="#ef4444" count={event.quotationFiles.length}  showCount={isDesktop} />}
+                        {event.invoiceFiles?.length > 0    && <DocIndicator title={`ใบวางบิล: ${event.invoiceFiles.length} ไฟล์`}    icon={ReceiptLong}         color="#f59e0b" count={event.invoiceFiles.length}    showCount={isDesktop} />}
+                        {event.completionFiles?.length > 0 && <DocIndicator title={`ใบส่งมอบงาน: ${event.completionFiles.length} ไฟล์`} icon={AssignmentTurnedIn} color="#07941a" count={event.completionFiles.length} showCount={isDesktop} />}
+                      </Stack>
+                    )}
+                    {(event.comments?.length > 0 || (isDesktop && (event.activityLog?.length > 0 || event.jobGroupId))) && (
+                      <Stack direction="row" alignItems="center" gap={0.5}>
+                        {event.activityLog?.length > 0 && isDesktop && (
+                          <DocIndicator title={`${event.activityLog.length} กิจกรรม`} icon={History}
+                            color="text.disabled" count={event.activityLog.length} showCount={isDesktop} />
+                        )}
+                        {event.comments?.length > 0 && (
+                          <DocIndicator title={`${event.comments.length} ข้อความ`} icon={Chat}
+                            color="text.disabled" count={event.comments.length} showCount={isDesktop} />
+                        )}
+                        {event.jobGroupId && isDesktop && (
+                          <Tooltip title="งานนี้เป็นส่วนหนึ่งของงานหลายวัน (กลุ่มเดียวกัน)">
+                            <LinkIcon sx={{ fontSize: 16, color: "text.disabled" }} />
+                          </Tooltip>
+                        )}
+                      </Stack>
+                    )}
+                  </Stack>
+                )}
+
+            </Stack>
+          )}
+        </Box>
 
         {/* เมนู "⋮" ของการ์ดงาน — ปุ่มลบ (เดิมโชว์เป็นไอคอนสีแดงตลอดเวลา) ย้ายมารวมที่นี่ */}
         <Menu {...FAST_MENU_PROPS} anchorEl={moreAnchorEl} open={Boolean(moreAnchorEl)} onClose={() => setMoreAnchorEl(null)}
@@ -1748,75 +1614,227 @@ const EventRowCard = ({
           />
         )}
 
-        {/* ✅ ขั้นตอนทำงาน: สถานะรับงาน · รอข้อมูล · อุปกรณ์ · งานไม่เสร็จ (ปุ่ม "จัดการแล้ว") */}
-        {!hideDocuments && <JobFlowPanel event={event} mode="admin" onPatched={onPatched} onStatusUpdate={onStatusUpdate} />}
+        {/* ── รายละเอียด (กางจากหัวการ์ด) ── */}
+        <Collapse in={open} unmountOnExit>
+          <Box onClick={(e) => e.stopPropagation()} sx={{ mt: 1.5, pt: 1.5, borderTop: `1px solid ${LINE}` }}>
+            {/* ✅ ใครรับผิดชอบ · ใครเข้าทำงาน — ชิปรูป/อักษรย่อสีประจำตัว */}
+                <PeopleRow
+                  responsible={event.responsiblePerson} team={teamNamesOf(event)} avatars={avatarMap}
+                  onAssign={canAssign ? setAssignAnchor : undefined}
+                />
+                {canAssign && (
+                  <AssignResponsibleMenu
+                    anchorEl={assignAnchor} onClose={() => setAssignAnchor(null)}
+                    employees={employee} value={event.responsiblePerson || ""}
+                    onPick={(name) => { setAssignAnchor(null); onAssignResponsible(event, name); }}
+                  />
+                )}
+                {/* ✅ จอกว้างจัดข้อมูลเป็น 2 คอลัมน์ จอแคบเรียงลงมาคอลัมน์เดียวเหมือนเดิม
+                    🐛 ที่แก้: เดิมเรียงลงมาคอลัมน์เดียวทุกขนาดจอ — บนจอคอมการ์ดกว้างเต็มหน้า แต่เนื้อหา
+                    เกาะอยู่ซ้ายมือแค่ ~30% ที่เหลือว่างเปล่า ทำให้การ์ดสูงเกินจำเป็น เห็นงานได้ทีละไม่กี่
+                    รายการต้องเลื่อนตลอด และ "หน้าตาเหมือนจอมือถือที่ถูกยืดออก" ตามที่ผู้ใช้บอก
+                    ⚠️ minmax(0,1fr) ไม่ใช่ 1fr — ไม่งั้นข้อความยาว (ชื่อโครงการ/รายชื่อทีม) จะดัน
+                    คอลัมน์ให้กว้างเกินแล้วตกขอบการ์ด แทนที่จะตัดด้วย ellipsis */}
+                <Box
+                  sx={{
+                    mt: 0.6,
+                    display: "grid",
+                    gridTemplateColumns: { xs: "1fr", md: "minmax(0,1fr) minmax(0,1fr)" },
+                    columnGap: 2.5,
+                    rowGap: 0.35,
+                    alignItems: "start",
+                  }}
+                >
+                  {event.system && <InfoLine label="ระบบ">{event.system}</InfoLine>}
+                  {/* ชื่อโครงการเป็นตัวที่ใช้ระบุงานมากที่สุด ให้กินเต็มความกว้างเสมอ ไม่ต้องตัดคำ
+                      ✅ ชื่อโครงการ = ลิงก์แผนที่ในตัว (ผู้ใช้ขอ: "ให้กดผ่านชื่อโครงการเลย และไม่ต้องมีแก้ไข
+                      แบบนี้ดูรก") — เดิมมีกล่อง "ค้นหาตำแหน่งใน Maps" เต็มความกว้าง + ปุ่มดินสอแยกอีกปุ่ม
+                      วางคั่นกลางการ์ด กินที่เท่าข้อมูลจริง 2 บรรทัดต่อการ์ด พอลิสต์มีหลายงานเลยเห็นแต่กล่อง
+                      ⚠️ ที่ผูกกับชื่อโครงการได้พอดีเพราะพิกัดถูกเก็บ "ต่อโครงการ" (ไม่ใช่ต่องาน) ชื่อที่กด
+                      จึงตรงกับสิ่งที่จะเปิดเป๊ะ ไม่ต้องมีป้ายอธิบายเพิ่ม
+                      ⚠️ การแก้พิกัดยังทำได้ที่ฟอร์มแก้ไขงานและหน้าภาพรวมสัญญาเหมือนเดิม — ตัดออกเฉพาะ
+                      หน้านี้ซึ่งเป็นหน้า "ดูงาน/นำทาง" ไม่ใช่หน้าตั้งค่าข้อมูลโครงการ */}
+                  <Box sx={{ gridColumn: { md: "1 / -1" } }}>
+                    <InfoLine label="โครงการ">
+                      <Box
+                        component="a"
+                        href={mapHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        // การ์ดทั้งใบกดเพื่อกาง/ยุบ — ถ้าไม่กั้นไว้ กดลิงก์ทีการ์ดจะกางตามไปด้วยทุกครั้ง
+                        onClick={(e) => e.stopPropagation()}
+                        title={hasSiteMap
+                          ? "เปิดแผนที่นำทางไปหน้างาน"
+                          : "ยังไม่มีพิกัดบันทึกไว้ — เปิดค้นหาชื่อโครงการใน Google Maps"}
+                        sx={{
+                          color: "inherit",
+                          textDecoration: "none",
+                          // เส้นใต้ประ = บอกว่ากดได้โดยไม่ต้องทำให้เป็นสีลิงก์ทั้งบรรทัด (ชื่อโครงการยังต้อง
+                          // อ่านเป็นข้อมูลของการ์ดอยู่ ไม่ใช่กลายเป็นปุ่ม)
+                          borderBottom: "1px dashed",
+                          borderColor: "divider",
+                          "&:hover": { color: "primary.main", borderColor: "primary.main" },
+                        }}
+                      >
+                        {companySite(event.company, event.site)}
+                        {/* หมุดแดงตัวเดียวกับทุกหน้า — บอกว่าชื่อนี้กดแล้วไป Google Maps (เดิมเป็นอีโมจิ
+                            📍/🔍 ซึ่งสื่อได้แค่ "ตำแหน่ง/ค้นหา" ไม่ได้บอกว่าเป็นบริการไหน) */}
+                        <Box
+                          component="span"
+                          sx={{ ml: 0.5, display: "inline-flex", verticalAlign: "-2px" }}
+                        >
+                          <GoogleMapsPin size={13} />
+                        </Box>
+                      </Box>
+                    </InfoLine>
+                  </Box>
+                  {/* ✅ ผู้ติดต่อหน้างาน — วางถัดจากโครงการทันที เพราะเป็นข้อมูล "ไปถึงแล้วโทรหาใคร"
+                      ที่ต้องอ่านคู่กับ "ไปที่ไหน" เสมอ ⚠️ เบอร์กดโทรออกได้เลย (TelLink) ซึ่งเป็นเหตุผล
+                      หลักที่ต้องมีในหน้านี้ — ช่างเปิดจากมือถือตอนกำลังจะออกรถ/ถึงหน้างาน
+                      ⚠️ ซ่อนทั้งบรรทัดถ้ายังไม่มีข้อมูล ไม่โชว์เป็นช่องว่าง — การ์ดนี้เรียงกันหลายสิบใบ
+                      ในหน้าเดียว บรรทัดว่างทุกใบจะกินพื้นที่มากกว่าข้อมูลจริงที่มีอยู่ */}
+                  {(event.contactName || event.contactTel) && (
+                    <InfoLine label="ผู้ติดต่อ">
+                      <Stack direction="row" gap={0.75} alignItems="center" flexWrap="wrap">
+                        {event.contactName && <span>{event.contactName}</span>}
+                        {event.contactTel && <TelLink tel={event.contactTel} />}
+                      </Stack>
+                    </InfoLine>
+                  )}
+                  {/* ✅ ย้ายมาไว้ถัดจากโครงการตามที่ขอ (เดิมอยู่คู่กับระบบด้านบนสุด) */}
+                  {event.time && <InfoLine label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount, event)}</InfoLine>}
+                  {(event.startTime || event.endTime) && (
+                    <InfoLine label="เวลา">{event.startTime || "-"} — {event.endTime || "-"}</InfoLine>
+                  )}
+                  {/* ✅ ถ้ายังไม่มีเลขเอกสาร ซ่อนช่อง "ใส่เลขที่เอกสาร" ไว้ตอนพับการ์ด — เดิมโชว์ทุกการ์ด
+                      ในลิสต์ตลอดเวลาแม้ยังไม่มีข้อมูล ดูรกเวลามีงานหลายรายการ ให้กดขยายก่อนค่อยใส่ */}
+                  {(event.docNo || open) && (
+                    editingDoc ? (
+                      <Stack direction="row" gap={0.5} alignItems="center" onClick={e => e.stopPropagation()}>
+                        <TextField size="small" variant="standard" value={docNo}
+                          onChange={e => setDocNo(e.target.value)}
+                          onKeyDown={e => e.key === "Enter" && handleDocSave()}
+                          inputProps={{ style: { fontSize: "0.75rem" } }} sx={{ width: 120 }} autoFocus />
+                        <Button size="small" onClick={handleDocSave} sx={{ minWidth: "auto", p: 0.5, fontSize: "0.7rem" }}>บันทึก</Button>
+                        <Button size="small" color="inherit" onClick={() => setEditingDoc(false)} sx={{ minWidth: "auto", p: 0.5, fontSize: "0.7rem" }}>ยกเลิก</Button>
+                      </Stack>
+                    ) : (
+                      <Stack direction="row" spacing={0.5}
+                        sx={{ alignItems: "flex-start", cursor: canEdit ? "pointer" : "default" }}
+                        onClick={e => { e.stopPropagation(); canEdit && setEditingDoc(true); }}>
+                        <Typography variant="caption" color={event.docNo ? "text.secondary" : "text.disabled"} sx={{ flexShrink: 0, whiteSpace: "nowrap", "&:hover": canEdit ? { color: "primary.main", textDecoration: "underline" } : {} }}>
+                          <Description sx={{ fontSize: 13, mr: 0.4, verticalAlign: "-2px" }} />
+                          เอกสาร :
+                        </Typography>
+                        <Typography variant="caption" color={event.docNo ? "text.secondary" : "text.disabled"} sx={{ minWidth: 0, "&:hover": canEdit ? { color: "primary.main", textDecoration: "underline" } : {} }}>
+                          {event.docNo || "ใส่เลขที่เอกสาร"}
+                        </Typography>
+                      </Stack>
+                    )
+                  )}
+                </Box>
+                {/* เวลาเข้า/ออก */}
+                {(event.checkedInAt || event.checkedOutAt) && (
+                  <Stack direction="row" gap={1} mt={0.5} flexWrap="wrap">
+                    {event.checkedInAt && (
+                      <Typography variant="caption" color="#8b5cf6" fontWeight={600}
+                        sx={{ display: "flex", alignItems: "center", gap: 0.3 }}>
+                        <Login sx={{ fontSize: 12 }} /> {moment(event.checkedInAt).format("HH:mm")}
+                      </Typography>
+                    )}
+                    {event.checkedOutAt && (
+                      <Typography variant="caption" color="#10b981" fontWeight={600}
+                        sx={{ display: "flex", alignItems: "center", gap: 0.3 }}>
+                        <Logout sx={{ fontSize: 12 }} /> {moment(event.checkedOutAt).format("HH:mm")}
+                      </Typography>
+                    )}
+                  </Stack>
+                )}
 
-        {/* ✅ (10 ต.ค. 2569) รูปและไฟล์หน้างานที่ช่างแนบ — แอดมินดู/เพิ่ม/ลบได้ */}
-        <SitePhotos event={event} canEdit={canEdit} onPreview={onPreview} />
+          {/* ✅ ขั้นตอนทำงาน: สถานะรับงาน · รอข้อมูล · อุปกรณ์ · งานไม่เสร็จ (ปุ่ม "จัดการแล้ว") */}
+          {!hideDocuments && <JobFlowPanel event={event} mode="admin" onPatched={onPatched} onStatusUpdate={onStatusUpdate} />}
 
-        {/* แจ้งเตือนคำขอปิดงานจากช่าง (ยังไม่อนุมัติ) — ใช้ Box แทน Alert action slot
-            เพราะ Alert วางข้อความ+ปุ่มแถวเดียวกันแล้วทับ/ล้นกันบนจอมือถือ
-            ✅ งานที่เข้าหลายวัน (กลุ่มเดียวกัน) ตอนขอปิดงานตอนนี้ตั้ง closeRequested:true ให้ทุกวัน
-            ในกลุ่มพร้อมกัน (ดู handleRequestClose) — ถ้าไม่ซ่อนตรงนี้ด้วย แต่ละวันในกลุ่มจะโชว์กล่อง
-            อนุมัติ/ไม่อนุมัติซ้ำกันทุกวัน ทั้งที่กดปุ่มไหนก็ปิดทั้งกลุ่มเหมือนกันหมด (onApproveClose/
-            onRejectClose resolve ทั้งกลุ่มอยู่แล้ว) จึงโชว์แค่การ์ดตัวแทนของกลุ่มพอ (เทียบ pattern
-            เดียวกับ hideDocuments ที่ซ่อนเอกสารประจำงานในการ์ดรายวันที่เหลือ) */}
-        {!hideDocuments && event.closeRequested && localStatus !== "ดำเนินการเสร็จสิ้น" && (
-          <Box sx={{
-            mt: 1.5, p: 1.5, borderRadius: 2,
-            bgcolor: alpha("#f59e0b", 0.08),
-            border: "1px solid", borderColor: alpha("#f59e0b", 0.25),
-          }}>
-            <Stack direction="row" alignItems="flex-start" gap={1}>
-              <HourglassTop sx={{ fontSize: 18, color: "#f59e0b", mt: 0.2, flexShrink: 0 }} />
-              <Typography variant="body2" sx={{ flex: 1, wordBreak: "break-word" }}>
-                {event.closeRequestedBy || "ช่าง"} ขอปิดงาน
-                {event.closeRequestedAt && ` เมื่อ ${moment(event.closeRequestedAt).locale("th").format("DD MMM HH:mm")}`}
-              </Typography>
-            </Stack>
-            {isAdminOrManager && (
-              <Stack direction={{ xs: "column", sm: "row" }} gap={1} sx={{ mt: 1.25 }}>
-                <Button color="warning" variant="contained" size="small"
-                  startIcon={<TaskAlt sx={{ fontSize: 16 }} />}
-                  onClick={handleApprove} disabled={approving || rejecting}
-                  sx={{ flex: 1, borderRadius: 2, textTransform: "none", fontWeight: 700 }}>
-                  {approving ? "กำลังอนุมัติ..." : "อนุมัติปิดงาน"}
-                </Button>
-                <Button color="error" variant="outlined" size="small"
-                  startIcon={<Cancel sx={{ fontSize: 16 }} />}
-                  onClick={() => setRejectDialogOpen(true)} disabled={approving || rejecting}
-                  sx={{ flex: 1, borderRadius: 2, textTransform: "none", fontWeight: 700 }}>
-                  ไม่อนุมัติ
-                </Button>
+          {/* ✅ (10 ต.ค. 2569) รูปและไฟล์หน้างานที่ช่างแนบ — แอดมินดู/เพิ่ม/ลบได้ */}
+          <SitePhotos event={event} canEdit={canEdit} onPreview={onPreview} />
+
+          {/* แจ้งเตือนคำขอปิดงานจากช่าง (ยังไม่อนุมัติ) — ใช้ Box แทน Alert action slot
+              เพราะ Alert วางข้อความ+ปุ่มแถวเดียวกันแล้วทับ/ล้นกันบนจอมือถือ
+              ✅ งานที่เข้าหลายวัน (กลุ่มเดียวกัน) ตอนขอปิดงานตอนนี้ตั้ง closeRequested:true ให้ทุกวัน
+              ในกลุ่มพร้อมกัน (ดู handleRequestClose) — ถ้าไม่ซ่อนตรงนี้ด้วย แต่ละวันในกลุ่มจะโชว์กล่อง
+              อนุมัติ/ไม่อนุมัติซ้ำกันทุกวัน ทั้งที่กดปุ่มไหนก็ปิดทั้งกลุ่มเหมือนกันหมด (onApproveClose/
+              onRejectClose resolve ทั้งกลุ่มอยู่แล้ว) จึงโชว์แค่การ์ดตัวแทนของกลุ่มพอ (เทียบ pattern
+              เดียวกับ hideDocuments ที่ซ่อนเอกสารประจำงานในการ์ดรายวันที่เหลือ) */}
+          {!hideDocuments && event.closeRequested && localStatus !== "ดำเนินการเสร็จสิ้น" && (
+            <Box sx={{
+              mt: 1.5, p: 1.5, borderRadius: 2,
+              bgcolor: alpha("#f59e0b", 0.08),
+              border: "1px solid", borderColor: alpha("#f59e0b", 0.25),
+            }}>
+              <Stack direction="row" alignItems="flex-start" gap={1}>
+                <HourglassTop sx={{ fontSize: 18, color: "#f59e0b", mt: 0.2, flexShrink: 0 }} />
+                <Typography variant="body2" sx={{ flex: 1, wordBreak: "break-word" }}>
+                  {event.closeRequestedBy || "ช่าง"} ขอปิดงาน
+                  {event.closeRequestedAt && ` เมื่อ ${moment(event.closeRequestedAt).locale("th").format("DD MMM HH:mm")}`}
+                </Typography>
               </Stack>
+              {isAdminOrManager && (
+                <Stack direction={{ xs: "column", sm: "row" }} gap={1} sx={{ mt: 1.25 }}>
+                  <Button color="warning" variant="contained" size="small"
+                    startIcon={<TaskAlt sx={{ fontSize: 16 }} />}
+                    onClick={handleApprove} disabled={approving || rejecting}
+                    sx={{ flex: 1, borderRadius: 2, textTransform: "none", fontWeight: 700 }}>
+                    {approving ? "กำลังอนุมัติ..." : "อนุมัติปิดงาน"}
+                  </Button>
+                  <Button color="error" variant="outlined" size="small"
+                    startIcon={<Cancel sx={{ fontSize: 16 }} />}
+                    onClick={() => setRejectDialogOpen(true)} disabled={approving || rejecting}
+                    sx={{ flex: 1, borderRadius: 2, textTransform: "none", fontWeight: 700 }}>
+                    ไม่อนุมัติ
+                  </Button>
+                </Stack>
+              )}
+            </Box>
+          )}
+
+          {/* ประวัติการไม่อนุมัติล่าสุด (ถ้ายังไม่มีการขอปิดงานใหม่เข้ามา) — ซ่อนในการ์ดรายวันที่เหลือ
+              ของกลุ่มเหมือนกัน (ดูเหตุผลด้านบน) เพราะไม่อนุมัติก็ propagate ไปทั้งกลุ่มเหมือนกันแล้ว */}
+          {!hideDocuments && !event.closeRequested && event.closeRejectReason && localStatus !== "ดำเนินการเสร็จสิ้น" && (
+            <Box sx={{
+              mt: 1.5, p: 1.5, borderRadius: 2,
+              bgcolor: alpha("#ef4444", 0.08),
+              border: "1px solid", borderColor: alpha("#ef4444", 0.25),
+            }}>
+              <Stack direction="row" alignItems="center" gap={0.75}>
+                <Cancel sx={{ fontSize: 16, color: "#ef4444", flexShrink: 0 }} />
+                <Typography variant="body2" fontWeight={700} color="#ef4444">
+                  ไม่อนุมัติคำขอปิดงาน
+                </Typography>
+                {event.closeRejectedAt && (
+                  <Typography variant="caption" color="text.disabled">
+                    · {moment(event.closeRejectedAt).locale("th").format("DD MMM HH:mm")}
+                  </Typography>
+                )}
+              </Stack>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, wordBreak: "break-word" }}>
+                "{event.closeRejectReason}"
+              </Typography>
+            </Box>
+          )}
+
+
+            {/* เอกสาร/คุยกับช่าง/ประวัติ — แผงด้านข้างแสดงต่อท้ายเลย · การ์ดในรายการเปิดเป็นกล่อง */}
+            {inlineDetails ? (
+              <Box sx={{ mt: 2, pt: 1.5, borderTop: `1px solid ${LINE}` }}>{expandedContent}</Box>
+            ) : (
+              <Button fullWidth variant="outlined" onClick={() => setExpanded(true)}
+                startIcon={<Description sx={{ fontSize: 18 }} />} endIcon={<ChevronRight />}
+                sx={{ mt: 1.5, py: 1, borderRadius: 2, textTransform: "none", fontWeight: 800, color: ACCENT, borderColor: ACCENT_LINE, bgcolor: "#fff",
+                  "&:hover": { borderColor: ACCENT, bgcolor: ACCENT_SOFT } }}>
+                เอกสาร · คุยกับช่าง · ประวัติ{docDone ? ` (เอกสาร ${docDone}/${JOB_DOC_TYPES.length})` : ""}
+              </Button>
             )}
           </Box>
-        )}
-
-        {/* ประวัติการไม่อนุมัติล่าสุด (ถ้ายังไม่มีการขอปิดงานใหม่เข้ามา) — ซ่อนในการ์ดรายวันที่เหลือ
-            ของกลุ่มเหมือนกัน (ดูเหตุผลด้านบน) เพราะไม่อนุมัติก็ propagate ไปทั้งกลุ่มเหมือนกันแล้ว */}
-        {!hideDocuments && !event.closeRequested && event.closeRejectReason && localStatus !== "ดำเนินการเสร็จสิ้น" && (
-          <Box sx={{
-            mt: 1.5, p: 1.5, borderRadius: 2,
-            bgcolor: alpha("#ef4444", 0.08),
-            border: "1px solid", borderColor: alpha("#ef4444", 0.25),
-          }}>
-            <Stack direction="row" alignItems="center" gap={0.75}>
-              <Cancel sx={{ fontSize: 16, color: "#ef4444", flexShrink: 0 }} />
-              <Typography variant="body2" fontWeight={700} color="#ef4444">
-                ไม่อนุมัติคำขอปิดงาน
-              </Typography>
-              {event.closeRejectedAt && (
-                <Typography variant="caption" color="text.disabled">
-                  · {moment(event.closeRejectedAt).locale("th").format("DD MMM HH:mm")}
-                </Typography>
-              )}
-            </Stack>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, wordBreak: "break-word" }}>
-              "{event.closeRejectReason}"
-            </Typography>
-          </Box>
-        )}
+        </Collapse>
 
         {/* Dialog: ระบุเหตุผลที่ไม่อนุมัติ */}
         <Dialog open={rejectDialogOpen} onClose={() => !rejecting && setRejectDialogOpen(false)} fullWidth maxWidth="xs">
@@ -1872,13 +1890,7 @@ const EventRowCard = ({
             เลื่อนจอตามอีกต่อไป — จอเล็ก (มือถือ) เปิดแบบเต็มจอ (fullScreen) แทนกล่องลอย */}
       </CardContent>
 
-      {inlineDetails ? (
-        <Collapse in={expanded} unmountOnExit>
-          <Box sx={{ px: { xs: 1.5, sm: 2 }, pb: 2, pt: 1.5, borderTop: "1px solid", borderColor: "divider" }}>
-            {expandedContent}
-          </Box>
-        </Collapse>
-      ) : (
+      {!inlineDetails && (
       <Dialog open={expanded} onClose={() => setExpanded(false)} fullWidth maxWidth="md" fullScreen={!isDesktop}
         PaperProps={{ sx: { borderRadius: { xs: 0, sm: 3 } } }}>
           {/* ✅ หัวกระชับแบบเดียวกับฝั่งช่าง: ประเภทงาน · โครงการ/ระบบ/ครั้งที่ บรรทัดเดียว · ผู้ติดต่อ · สถานะ+วันที่ */}
@@ -3738,6 +3750,8 @@ const Operation = () => {
                       onDelete={handleDeleteRow}
                       onApproveClose={handleApproveClose}
                       onRejectClose={handleRejectClose}
+                      // ดูเฉพาะงานเดียว (กดมาจากหน้าอื่น) → กางรายละเอียดให้เลย ไม่ต้องกดซ้ำ
+                      defaultExpanded={Boolean(focusedJob)}
                       uploadingState={uploadingState}
                       isUploadingState={isUploadingState}
                       uploadProgressState={uploadProgressState}
