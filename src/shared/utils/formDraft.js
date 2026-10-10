@@ -66,7 +66,9 @@ export const draftAgoText = (at) => {
  *   บันทึกสำเร็จ: draft.clear()
  * ───────────────────────────────────────────────────────────── */
 const fieldsOf = (root) => [...root.querySelectorAll("input, select, textarea")]
-  .filter((el) => (el.id || (el.type === "radio" && el.name)) && !["file", "password", "hidden", "button", "submit"].includes(el.type) && !el.closest("[data-no-draft]"));
+  .filter((el) => (el.id || (el.type === "radio" && el.name)) && !["file", "password", "hidden", "button", "submit"].includes(el.type) && !el.closest("[data-no-draft]"))
+  // ⚠️ id แบบ ":r5:" = id อัตโนมัติของ React (ช่องในปฏิทิน พ.ศ./MUI) เปลี่ยนทุกครั้งที่เปิด — ไม่ใช่ช่องของฟอร์ม
+  .filter((el) => !/^:.*:$/.test(el.id || ""));
 
 const collect = (root) => {
   const out = {};
@@ -117,63 +119,114 @@ const apply = (root, data, { fire = false, togglesOnly = false } = {}) => {
   });
 };
 
+/**
+ * ✅ (10 ต.ค. 2569 ผู้ใช้: "ข้อมูลเดิมมันนับเป็นพึ่งกรอกด้วย — ให้นับเฉพาะที่กรอกใหม่จริงๆ")
+ *   • ค่าตั้งต้น (baseline) ถ่ายไว้ "หลัง" ฟอร์มเตรียมตัวเสร็จ (TomSelect/ปฏิทิน/ตัวเลือกสีจัดค่าเรียบร้อยแล้ว)
+ *   • เก็บร่างเป็น { data, base } — กู้คืนเฉพาะช่องที่ data ต่างจาก base จริงๆ · ไม่มีช่องไหนต่าง = ไม่กู้คืน ไม่มีแถบ
+ *   • นับเป็น "แก้" เฉพาะเมื่อมีการกด/พิมพ์จริงของผู้ใช้ไม่นาน (โค้ดเปลี่ยนค่าเอง เช่น โหลดตัวเลือกเสร็จ → ไม่นับ)
+ */
+let lastUserInputAt = 0;
+if (typeof document !== "undefined") {
+  const mark = (e) => { if (e.isTrusted) lastUserInputAt = Date.now(); };
+  ["keydown", "pointerdown", "input", "change", "paste", "drop"].forEach((t) => document.addEventListener(t, mark, true));
+}
+/**
+ * มีการกด/พิมพ์จริงของผู้ใช้ภายใน ms ที่ผ่านมาไหม
+ * @param since นับเฉพาะการกด/พิมพ์หลังเวลานี้ (เช่น ตอนฟอร์มพร้อม) — กดปุ่มเปิดฟอร์มไม่นับว่าเป็นการกรอก
+ */
+export const userActedWithin = (ms = 1500, since = 0) => lastUserInputAt > since && Date.now() - lastUserInputAt < ms;
+
+const diffKeys = (a = {}, b = {}) => [...new Set([...Object.keys(a), ...Object.keys(b)])]
+  .filter((k) => JSON.stringify(a[k] ?? "") !== JSON.stringify(b[k] ?? ""));
+const pick = (obj, keys) => Object.fromEntries(keys.filter((k) => k in obj).map((k) => [k, obj[k]]));
+
 export function domFormDraft(root, key, { bannerHost } = {}) {
-  let restored = null;
-  let defaults = null;
+  let pending = null;   // ร่างที่จะกู้คืน: { at, data: เฉพาะช่องที่ต่าง, base }
+  let baseline = null;  // ค่าตั้งต้นของฟอร์ม (หลังเตรียมตัวเสร็จ / base ของร่างที่กู้คืน)
   let timer = null;
   let active = true;
-  const save = () => {
-    if (!active) return;
-    clearTimeout(timer);
-    timer = setTimeout(() => {
-      if (!active || !root.isConnected) return;
-      const now = collect(root);
-      // ยังไม่แก้อะไรจากค่าตั้งต้น = ไม่ต้องเก็บ (เปิดแล้วปิดเฉยๆ ไม่ทิ้งร่างไว้)
-      if (defaults && JSON.stringify(now) === JSON.stringify(defaults) && !restored) return;
-      saveDraft(key, now);
-    }, 400);
+  let started = false;
+  let startedAt = 0;
+
+  const persist = () => {
+    if (!active || !started || !root.isConnected || !baseline) return;
+    const now = collect(root);
+    const changed = diffKeys(now, baseline);
+    if (!changed.length) { clearDraft(key); return; } // แก้แล้วแก้กลับ = ไม่มีอะไรค้าง
+    saveDraft(key, { v: 2, data: pick(now, changed), base: pick(baseline, changed) });
   };
+  const onEdit = (e) => {
+    if (!active || !started) return;
+    // โค้ดเปลี่ยนค่าเอง (ไม่มีการกด/พิมพ์จริงไม่นาน) → ถือเป็นค่าตั้งต้นใหม่ ไม่ใช่สิ่งที่ผู้ใช้กรอก
+    if (!e.isTrusted && !userActedWithin(1500, startedAt)) {
+      const now = collect(root);
+      const changedByUser = pending ? Object.keys(pending.data) : [];
+      baseline = { ...now, ...pick(baseline, changedByUser) };
+      return;
+    }
+    clearTimeout(timer);
+    timer = setTimeout(persist, 400);
+  };
+
   return {
-    /** เติมค่าที่กรอกค้างไว้ (เรียกก่อน TomSelect/ปฏิทินพ.ศ. mount) */
+    /** อ่านร่างที่ค้างไว้ แล้วเติมเฉพาะช่องที่ผู้ใช้เคยแก้ (เรียกก่อน TomSelect/ปฏิทินพ.ศ. mount) */
     restore() {
-      defaults = collect(root);
       const d = loadDraft(key);
-      if (!d) return false;
-      restored = d;
-      apply(root, d.data);
+      const v2 = d?.data?.v === 2 ? d.data : null;
+      if (!v2 || !Object.keys(v2.data || {}).length) { if (d) clearDraft(key); return false; }
+      pending = { at: d.at, data: v2.data, base: v2.base };
+      apply(root, pending.data);
       return true;
     },
-    /** เริ่มบันทึกตอนพิมพ์ + แสดงแถบกู้คืน (เรียกท้ายสุดของ didOpen) */
+    /** เริ่มติดตามการแก้ + แสดงแถบกู้คืน (เรียกหลังฟอร์มเตรียมตัวเสร็จ) */
     start() {
-      if (restored) {
-        // ส่ง change ให้ตัวเลือกที่ซ่อน/แสดงส่วนอื่นของฟอร์ม (เช่น ประเภทงาน · หลายวัน) ทำงานตามค่าที่เติมคืน
-        // ⚠️ เฉพาะ radio/checkbox — ไม่ยิง change ให้ช่องเลือกบริษัท/โครงการ ไม่งั้นตัวเติมอัตโนมัติจะทับค่าที่กู้คืน
-        apply(root, restored.data, { fire: true, togglesOnly: true });
+      let now = collect(root);
+      if (pending) {
+        // ช่องที่ไม่มีอยู่ในฟอร์มแล้ว (เปลี่ยนรุ่นฟอร์ม/ช่องอัตโนมัติ) ไม่นับ
+        pending.data = pick(pending.data, Object.keys(pending.data).filter((k) => k in now));
+        const keys = Object.keys(pending.data);
+        // ค่าตั้งต้นจริง = ค่าของฟอร์มตอนนี้ โดยช่องที่กู้คืนใช้ค่าเดิมก่อนแก้ (จากร่าง)
+        baseline = { ...now, ...pick(pending.base || {}, keys) };
+        // ⚠️ ฟอร์มบางอันเติมค่าจากข้อมูลงานทีหลัง (ทับค่าที่กู้คืนไว้ตอนต้น) → เติมซ้ำเฉพาะช่องที่ถูกทับ
+        const overwritten = keys.filter((k) => JSON.stringify(now[k] ?? "") !== JSON.stringify(pending.data[k] ?? ""));
+        if (overwritten.length) { apply(root, pick(pending.data, overwritten)); now = collect(root); }
+        // ช่องที่กู้คืนแล้วกลับเท่าค่าตั้งต้น (ข้อมูลงานถูกแก้ไปตรงกันแล้ว) → ไม่ต้องกู้/ไม่ต้องมีแถบ
+        if (!diffKeys(pick(now, Object.keys(pending.data)), pick(baseline, Object.keys(pending.data))).length) {
+          clearDraft(key);
+          pending = null;
+        }
+      } else {
+        baseline = now;
+      }
+      if (pending) {
+        // ส่ง change ให้ตัวเลือกที่ซ่อน/แสดงส่วนอื่นของฟอร์ม (radio/checkbox) — ไม่ยิงช่องเลือกบริษัท ไม่งั้นตัวเติมอัตโนมัติจะทับ
+        apply(root, pending.data, { fire: true, togglesOnly: true });
         const host = (bannerHost && root.querySelector(bannerHost)) || root;
         const bar = document.createElement("div");
         bar.setAttribute("data-no-draft", "");
         bar.style.cssText = "display:flex;align-items:center;gap:10px;margin:0 0 14px;padding:9px 12px;border-radius:10px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;font-size:13px;font-weight:600;text-align:left;";
-        bar.innerHTML = `<span style="flex:1">↺ กู้คืนข้อมูลที่กรอกค้างไว้ (${draftAgoText(restored.at)})</span><button type="button" style="border:0;background:#fff;color:#1d4ed8;font-weight:800;font-size:12px;padding:5px 10px;border-radius:8px;cursor:pointer;border:1px solid #bfdbfe;font-family:inherit">ล้างทิ้ง</button>`;
+        const n = Object.keys(pending.data).length;
+        bar.innerHTML = `<span style="flex:1">↺ กู้คืนข้อมูลที่กรอกค้างไว้ ${n} ช่อง (${draftAgoText(pending.at)})</span><button type="button" style="border:0;background:#fff;color:#1d4ed8;font-weight:800;font-size:12px;padding:5px 10px;border-radius:8px;cursor:pointer;border:1px solid #bfdbfe;font-family:inherit">ล้างทิ้ง</button>`;
         bar.querySelector("button").addEventListener("click", () => {
+          const keys = Object.keys(pending?.data || {});
           clearDraft(key);
-          restored = null;
-          if (defaults) apply(root, defaults, { fire: true });
+          pending = null;
+          apply(root, pick(baseline, keys), { fire: true });
           bar.remove();
         });
         host.prepend(bar);
       }
-      root.addEventListener("input", save, true);
-      root.addEventListener("change", save, true);
+      started = true;
+      startedAt = Date.now();
+      root.addEventListener("input", onEdit, true);
+      root.addEventListener("change", onEdit, true);
     },
     clear() { active = false; clearTimeout(timer); clearDraft(key); },
-    /** ฟอร์มกำลังปิด (ไม่ได้บันทึก) — เก็บค่าล่าสุดทันทีไม่ต้องรอหน่วงเวลา */
+    /** ฟอร์มกำลังปิด (ไม่ได้บันทึก) — เก็บค่าล่าสุดทันที (ถ้ามีช่องที่แก้จริง) */
     stop() {
       if (!active) return;
       clearTimeout(timer);
-      try {
-        const now = collect(root);
-        if (!(defaults && JSON.stringify(now) === JSON.stringify(defaults) && !restored)) saveDraft(key, now);
-      } catch { /* ข้าม */ }
+      try { persist(); } catch { /* ข้าม */ }
       active = false;
     },
   };
