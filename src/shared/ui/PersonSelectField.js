@@ -5,11 +5,13 @@
  *    (FloatPersonPicker): หัวเมนู · แถว "ทุกคน" ไอคอนกลุ่ม · แต่ละคนมีรูป/อักษรย่อสีประจำตัว · ✓ ที่คนที่เลือก
  * ✅ ตอนปิดหน้าตาเหมือนช่องกรอกอื่นในแถบตัวกรอง (ขอบมน · ป้ายลอย · สูง 40px) — วางคู่กับ SelectField ได้กลมกลืน
  *
- * @param label     ป้ายลอยบนช่อง
+ * @param label     ป้ายลอยบนช่อง ("" = ไม่มีป้าย — ใช้เมื่อมีหัวข้อกำกับอยู่แล้วด้านบน)
  * @param value     id ที่เลือก · allValue = ทุกคน
  * @param onChange  (id) => void
  * @param options   [{ id, name, avatar?, count?, note? }]  count = ตัวเลขชิปด้านขวา · note = บรรทัดเล็กใต้ชื่อ
  * @param allLabel / allCount / allValue / title / unit
+ * @param allIcon   ไอคอนของแถว allValue (ค่าปริยาย = ไอคอนกลุ่ม · เช่นใช้ "ยังไม่ระบุ" แทน "ทุกคน")
+ * @param disabled  ดูได้อย่างเดียว เปิดเมนูไม่ได้
  */
 import { useState } from "react";
 import { Avatar, Box, ButtonBase, Popover, Stack, Typography } from "@mui/material";
@@ -30,7 +32,7 @@ const PersonAvatar = ({ name, avatar, size = 30 }) => (
 
 export default function PersonSelectField({
   label = "ชื่อพนักงาน", value, onChange, options = [],
-  allLabel = "ทุกคน", allCount, allValue = "all", title = "เลือกชื่อ", unit = "", sx,
+  allLabel = "ทุกคน", allCount, allValue = "all", title = "เลือกชื่อ", unit = "", allIcon: AllIcon = Groups, disabled = false, sx,
 }) {
   const [anchor, setAnchor] = useState(null);
   const isAll = value === allValue || value == null || value === "";
@@ -69,34 +71,34 @@ export default function PersonSelectField({
     <>
       {/* ช่องตอนปิด — ขอบ/ป้ายลอยแบบเดียวกับ TextField outlined */}
       <ButtonBase
-        onClick={(e) => setAnchor(e.currentTarget)}
-        aria-haspopup="listbox" aria-expanded={Boolean(anchor)} aria-label={label}
+        onClick={(e) => setAnchor(e.currentTarget)} disabled={disabled}
+        aria-haspopup="listbox" aria-expanded={Boolean(anchor)} aria-label={label || title}
         sx={{
           position: "relative", height: 40, minWidth: 0, px: 1.25, gap: 1, borderRadius: 2.5, fontFamily: "inherit",
-          justifyContent: "flex-start", bgcolor: "#fff",
+          justifyContent: "flex-start", bgcolor: disabled ? "#f8fafc" : "#fff",
           border: "1px solid", borderColor: anchor ? "#2563eb" : BORDER,
           boxShadow: anchor ? "0 0 0 1px #2563eb" : "none",
           "&:hover": { borderColor: anchor ? "#2563eb" : "#94a3b8" },
           ...sx,
         }}
       >
-        <Typography component="span" sx={{
-          position: "absolute", top: -9, left: 10, px: 0.5, bgcolor: "#fff", lineHeight: 1.3,
+        {label && <Typography component="span" sx={{
+          position: "absolute", top: -9, left: 10, px: 0.5, bgcolor: "#fff", lineHeight: 1.3, borderRadius: 1,
           fontSize: "0.72rem", color: anchor ? "#2563eb" : "#64748b", fontWeight: 500, pointerEvents: "none",
         }}>
           {label}
-        </Typography>
+        </Typography>}
         {current ? (
           <PersonAvatar name={current.name} avatar={current.avatar} size={24} />
         ) : (
           <Box sx={{ width: 24, height: 24, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#f1f5f9", color: "#475569", flexShrink: 0 }}>
-            <Groups sx={{ fontSize: 15 }} />
+            <AllIcon sx={{ fontSize: 15 }} />
           </Box>
         )}
         <Typography noWrap sx={{ flex: 1, minWidth: 0, textAlign: "left", fontSize: "0.92rem", fontWeight: current ? 700 : 500, color: "#0f172a" }}>
           {current ? current.name : allLabel}
         </Typography>
-        <ExpandMore sx={{ fontSize: 20, color: "#64748b", flexShrink: 0, transform: anchor ? "rotate(180deg)" : "none", transition: "transform .15s" }} />
+        {!disabled && <ExpandMore sx={{ fontSize: 20, color: "#64748b", flexShrink: 0, transform: anchor ? "rotate(180deg)" : "none", transition: "transform .15s" }} />}
       </ButtonBase>
 
       <Popover
@@ -116,7 +118,7 @@ export default function PersonSelectField({
             id={allValue} name={allLabel} count={allCount}
             icon={(
               <Box sx={{ width: 30, height: 30, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#f1f5f9", color: "#475569", flexShrink: 0 }}>
-                <Groups sx={{ fontSize: 18 }} />
+                <AllIcon sx={{ fontSize: 18 }} />
               </Box>
             )}
           />

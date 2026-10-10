@@ -16,13 +16,13 @@ import Swal from "sweetalert2";
 import TomSelect from "tom-select";
 import "tom-select/dist/css/tom-select.css";
 import {
-  Box, Stack, Typography, Button, ButtonBase, Skeleton, Dialog, DialogContent, DialogActions, IconButton, TextField, MenuItem,
+  Box, Stack, Typography, Button, ButtonBase, Skeleton, Dialog, DialogContent, DialogActions, IconButton,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
   PostAddOutlined, AddRounded, EditOutlined, ChevronRight, Close, EventAvailableOutlined, CheckRounded,
   ApartmentOutlined, CalendarMonthOutlined, GroupsOutlined, PersonOutlineOutlined, NotesOutlined, HourglassTopRounded, ReportProblemOutlined,
-  BlockRounded, RestoreRounded, AssignmentIndOutlined,
+  BlockRounded, RestoreRounded, AssignmentIndOutlined, PersonOffOutlined,
 } from "@mui/icons-material";
 import EventService from "@/shared/services/EventService";
 import CustomerService from "@/shared/services/CustomerService";
@@ -39,6 +39,7 @@ import { getAddDraftEvent } from "@/features/calendar/components/EventForms/AddD
 import { isUrgent, openFollowUp } from "@/shared/utils/jobFlow";
 import { nextStepOf } from "@/shared/ui/JobFlow";
 import { can } from "@/shared/utils/roles";
+import PersonSelectField from "@/shared/ui/PersonSelectField";
 
 const AMBER = "#d97706";
 const GREEN = "#16a34a";
@@ -91,6 +92,18 @@ function StageBar({ stage }) {
   );
 }
 
+/** หัวข้อย่อยในกล่องส่งลงตาราง: เลขลำดับ + ชื่อ + คำอธิบายสั้น */
+const Section = ({ n, title, hint, last, children }) => (
+  <Box sx={{ pb: last ? 0 : 2, mb: last ? 0 : 2, borderBottom: last ? 0 : `1px dashed ${LINE}` }}>
+    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.25 }}>
+      <Box sx={{ width: 22, height: 22, borderRadius: "50%", display: "grid", placeItems: "center", bgcolor: alpha(ACCENT, 0.1), color: ACCENT, fontSize: "0.72rem", fontWeight: 900 }}>{n}</Box>
+      <Typography sx={{ fontSize: "0.86rem", fontWeight: 800, color: INK }}>{title}</Typography>
+    </Stack>
+    {children}
+    {hint && <Typography sx={{ fontSize: "0.72rem", color: MUTED, mt: 0.6, px: 0.25 }}>{hint}</Typography>}
+  </Box>
+);
+
 /**
  * กล่องส่งลงตาราง — เลือกวันเริ่ม/วันสิ้นสุด หัวหน้าทีม และผู้รับผิดชอบงาน
  *
@@ -114,8 +127,13 @@ function ScheduleDialog({ job, employees, canAssignResponsible, onClose, onDone 
     () => employees.filter((u) => u.fname).slice().sort((a, b) => a.fname.localeCompare(b.fname, "th")),
     [employees],
   );
-  // ชื่อเดิมที่ไม่อยู่ในรายชื่อพนักงานแล้ว (ข้อมูลเก่า) ยังต้องเห็นอยู่
-  const extra = (v) => (v && !people.some((u) => u.fname === v) ? [<MenuItem key={`x-${v}`} value={v}>{v}</MenuItem>] : []);
+  // ✅ (10 ต.ค. 2569 ผู้ใช้: "ผู้รับผิดชอบงานขึ้นก่อน และทำ UI ให้สวยงาม เห็นรูปด้วย") — ช่องเลือกชื่อแบบมีรูป
+  //    ตัวเดียวกับหน้าภาพรวมงาน/ใบเบิก (PersonSelectField) · ชื่อเดิมที่ไม่อยู่ในรายชื่อพนักงานแล้วยังต้องเห็นอยู่
+  const optionsWith = (v) => [
+    ...people.map((u) => ({ id: u.fname, name: [u.fname, u.lname].filter(Boolean).join(" "), avatar: u.imageUrl, note: u.jobTitle || undefined })),
+    ...(v && !people.some((u) => u.fname === v) ? [{ id: v, name: v }] : []),
+  ];
+  const PICK = { width: "100%", height: 48, borderRadius: 2.5 };
   const ok = start && (!end || end >= start);
 
   const save = async () => {
@@ -162,25 +180,29 @@ function ScheduleDialog({ job, employees, canAssignResponsible, onClose, onDone 
         </Box>
         <IconButton size="small" onClick={onClose}><Close fontSize="small" /></IconButton>
       </Stack>
-      <DialogContent sx={{ px: 2.5, py: 2 }}>
-        <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.25 }}>
-          <ThaiDatePicker label="วันที่เข้างาน" value={start} onChange={(v) => { setStart(v || ""); if (!end || (v && end < v)) setEnd(v || ""); }} />
-          <ThaiDatePicker label="ถึงวันที่" value={end} onChange={(v) => setEnd(v || "")} minDate={start ? moment(start) : undefined} />
-        </Box>
-        <TextField select fullWidth size="small" label="หัวหน้าทีมที่เข้างาน (ไม่บังคับ)" value={team} onChange={(e) => setTeam(e.target.value)} sx={{ mt: 2 }}
-          helperText="คนที่นำทีมเข้าหน้างานรอบนี้">
-          <MenuItem value=""><em>ยังไม่ระบุ — มอบหมายทีหลังได้</em></MenuItem>
-          {people.map((u) => <MenuItem key={u._id} value={u.fname}>{[u.fname, u.lname].filter(Boolean).join(" ")}</MenuItem>)}
-          {extra(team)}
-        </TextField>
-        <TextField select fullWidth size="small" label="ผู้รับผิดชอบงาน" value={resp} onChange={(e) => setResp(e.target.value)} sx={{ mt: 1.5 }}
-          disabled={!canAssignResponsible}
-          helperText={canAssignResponsible ? "คนดูแลงานนี้ทั้งงาน ตั้งแต่ลงตารางจนปิดงาน" : "มอบหมายได้เฉพาะแอดมิน/ผู้จัดการ"}>
-          <MenuItem value=""><em>ยังไม่ได้มอบหมาย</em></MenuItem>
-          {people.map((u) => <MenuItem key={u._id} value={u.fname}>{[u.fname, u.lname].filter(Boolean).join(" ")}</MenuItem>)}
-          {extra(resp)}
-        </TextField>
-        <Typography sx={{ fontSize: "0.74rem", color: MUTED, mt: 1.5 }}>
+      <DialogContent sx={{ px: 2.5, pt: "20px !important", pb: 2 }}>
+        {/* ✅ ลำดับ: ผู้รับผิดชอบงาน (ดูแลทั้งงาน) → วันเข้างาน → หัวหน้าทีมที่เข้างาน (รอบนี้) */}
+        <Section n={1} title="ผู้รับผิดชอบงาน" hint={canAssignResponsible ? "ดูแลงานนี้ทั้งงาน ตั้งแต่ลงตารางจนปิดงาน" : "มอบหมายได้เฉพาะแอดมิน/ผู้จัดการ"}>
+          <PersonSelectField
+            label="" title="เลือกผู้รับผิดชอบงาน" value={resp} onChange={setResp}
+            allValue="" allLabel="ยังไม่ได้มอบหมาย" allIcon={PersonOffOutlined}
+            options={optionsWith(resp)} disabled={!canAssignResponsible} sx={PICK}
+          />
+        </Section>
+        <Section n={2} title="วันเข้างาน">
+          <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.25 }}>
+            <ThaiDatePicker label="วันที่เข้างาน" value={start} onChange={(v) => { setStart(v || ""); if (!end || (v && end < v)) setEnd(v || ""); }} />
+            <ThaiDatePicker label="ถึงวันที่" value={end} onChange={(v) => setEnd(v || "")} minDate={start ? moment(start) : undefined} />
+          </Box>
+        </Section>
+        <Section n={3} title="หัวหน้าทีมที่เข้างาน" hint="นำทีมเข้าหน้างานรอบนี้ · ไม่บังคับ มอบหมายทีหลังได้" last>
+          <PersonSelectField
+            label="" title="เลือกหัวหน้าทีม" value={team} onChange={setTeam}
+            allValue="" allLabel="ยังไม่ระบุ" allIcon={PersonOffOutlined}
+            options={optionsWith(team)} sx={PICK}
+          />
+        </Section>
+        <Typography sx={{ fontSize: "0.74rem", color: MUTED, mt: 2, px: 1.25, py: 1, borderRadius: 2, bgcolor: SURFACE }}>
           ส่งแล้วงานจะขึ้นในตารางงานช่างทันที · เวลา/ลูกทีมเพิ่มได้ภายหลังจากหน้าตารางงาน
         </Typography>
       </DialogContent>
@@ -272,7 +294,7 @@ function JobCard({ job, onSchedule, onEdit, onCancel, onRestore }) {
           {/* ✅ บอกชัดว่าต่อไปต้องทำอะไร (ตัวเดียวกับกล่อง "ขั้นตอนถัดไป" ในหน้าการดำเนินงาน) */}
           {(() => {
             const nx = job.cancelledAt ? null : job.unscheduled
-              ? { title: "ส่งลงตาราง", desc: "กด “ส่งลงตาราง” เลือกวันเข้างาน หัวหน้าทีม และผู้รับผิดชอบงาน" }
+              ? { title: "ส่งลงตาราง", desc: "กด “ส่งลงตาราง” เลือกวันเข้างาน ผู้รับผิดชอบงาน และหัวหน้าทีม" }
               : st.i >= 0 && st.i < 4 ? nextStepOf(job, "admin") : null;
             return nx ? (
               <Typography sx={{ fontSize: "0.78rem", color: "#334155", mt: 0.75 }}>
