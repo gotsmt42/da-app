@@ -546,7 +546,7 @@ const Dashboard = () => {
           {followUpJobs.slice(0, 5).map(({ job, fu }) => (
             <Row key={job._id} to={jobLink(job._id, resolveOperationGroup(job))}
               title={[job.title || "งาน", job.site || job.company].filter(Boolean).join(" · ")}
-              sub={[fu.reason, `ต่อไป: ${fu.nextOwner}`, fu.proposedDate ? `เสนอ ${formatThai(moment(fu.proposedDate), "D MMM")}` : ""].filter(Boolean).join(" · ")}
+              sub={[fu.reason, `ผู้รับผิดชอบต่อ: ${fu.nextOwner}`, fu.proposedDate ? `เสนอ ${formatThai(moment(fu.proposedDate), "D MMM")}` : ""].filter(Boolean).join(" · ")}
               trailing={<Pill color="#d97706">{fu.reason}</Pill>} />
           ))}
         </Widget>

@@ -283,7 +283,7 @@ function JobCard({ job, onSchedule, onEdit, onCancel, onRestore }) {
             )}
             {job.description && <Line icon={NotesOutlined}>{job.description}</Line>}
             {job.infoPending && job.infoPendingNote && <Line icon={HourglassTopRounded} color={AMBER}>ขาด: {job.infoPendingNote}</Line>}
-            {fu && st.i === 2 && <Line icon={ReportProblemOutlined} color={AMBER} strong>{fu.reason}{fu.note ? ` — ${fu.note}` : ""} · ต่อไป: {fu.nextOwner}</Line>}
+            {fu && st.i === 2 && <Line icon={ReportProblemOutlined} color={AMBER} strong>{fu.reason}{fu.note ? ` — ${fu.note}` : ""} · ผู้รับผิดชอบต่อ: {fu.nextOwner}</Line>}
             {st.i === -1 && (
               <Line icon={BlockRounded} color={RED} strong>
                 เหตุผล: {job.cancelReason || "-"} · ยกเลิกโดย {job.cancelledBy || "-"} {formatThai(moment(job.cancelledAt), "D MMM YYYY HH:mm")}
@@ -298,7 +298,9 @@ function JobCard({ job, onSchedule, onEdit, onCancel, onRestore }) {
               : st.i >= 0 && st.i < 4 ? nextStepOf(job, "admin") : null;
             return nx ? (
               <Typography sx={{ fontSize: "0.78rem", color: "#334155", mt: 0.75 }}>
-                <Box component="span" sx={{ fontWeight: 900, color: nx.tone || AMBER }}>ต่อไป: {nx.title}</Box> — {nx.desc}
+                {/* ✅ (10 ต.ค. 2569 ผู้ใช้: "คำว่าต่อไปให้ใช้คำใหม่ ดูแล้วงง" → เลือก "ไม่ต้องมีคำนำหน้า") — จุดสี + ข้อความโทนเดียวกับการ์ด */}
+                <Box component="span" sx={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", bgcolor: nx.tone || AMBER, mr: 0.75, verticalAlign: "1px" }} />
+                <Box component="span" sx={{ fontWeight: 800, color: INK }}>{nx.title}</Box> — {nx.desc}
               </Typography>
             ) : null;
           })()}

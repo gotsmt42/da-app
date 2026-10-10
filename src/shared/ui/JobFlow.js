@@ -125,7 +125,7 @@ export function nextStepOf(ev, mode, { mine, ackedByMe } = {}) {
   if (fu) {
     return mode === "admin"
       ? { tone: AMBER, title: `งานไม่เสร็จ — ${fu.reason}`, desc: "ลงวันนัดใหม่ในตารางงาน แล้วกด “จัดการแล้ว” ในกล่องด้านล่าง", action: { label: "เปิดตารางงาน", to: calendarLinkOf(ev) } }
-      : { tone: AMBER, title: "แจ้งงานไม่เสร็จแล้ว", desc: `รอแอดมินลงนัดใหม่ · ต่อไป: ${fu.nextOwner}` };
+      : { tone: AMBER, title: "แจ้งงานไม่เสร็จแล้ว", desc: `รอแอดมินลงนัดใหม่ · ผู้รับผิดชอบต่อ: ${fu.nextOwner}` };
   }
   if (mode === "admin" && !ev.resPerson && !ev.team) {
     return { tone: AMBER, title: "ยังไม่มีทีมเข้างาน", desc: "เปิดงานในตารางงาน แล้วเลือกหัวหน้าทีม/ลูกทีม", action: { label: "เปิดตารางงาน", to: calendarLinkOf(ev) } };
@@ -159,7 +159,7 @@ function NextStepBox({ step, onConfirm, busy }) {
     <Box sx={{ p: 1.25, pl: 1.5, borderRadius: 2, bgcolor: "#f8fafc", border: "1px solid #e2e8f0" }}>
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography sx={{ fontSize: "0.68rem", fontWeight: 800, color: MUTED, letterSpacing: 0.2 }}>ขั้นตอนถัดไป</Typography>
+          {/* ✅ (10 ต.ค. 2569 ผู้ใช้: "คำว่าต่อไปให้ใช้คำใหม่ ดูแล้วงง" → เลือก "ไม่ต้องมีคำนำหน้า") — ตัดหัว "ขั้นตอนถัดไป" ออก เหลือจุดสี + ข้อความ */}
           <Typography sx={{ fontSize: "0.92rem", fontWeight: 800, color: INK, lineHeight: 1.3, display: "flex", alignItems: "center", gap: 0.75 }}>
             <Box component="span" sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: step.tone, flexShrink: 0 }} />
             {step.title}

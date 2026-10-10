@@ -1125,7 +1125,8 @@ const EventRowCard = ({
   const isDesktop = useMediaQuery("(min-width:900px)");
   const canEdit = can(currentUser, "editOperation");
   // ✅ ขั้นตอนถัดไป (ตัวเดียวกับกล่อง "ขั้นตอนถัดไป" ใน JobFlowPanel) — โชว์สั้นๆ บนหัวการ์ดตอนพับ
-  const nextStep = event.department === "sales" ? null : nextStepOf(event, "admin");
+  // ⚠️ งานปิดแล้วไม่แสดง — ป้ายสถานะ "ดำเนินการเสร็จสิ้น" บอกอยู่แล้ว ไม่ต้องซ้ำ
+  const nextStep = event.department === "sales" || localStatus === "ดำเนินการเสร็จสิ้น" ? null : nextStepOf(event, "admin");
   const isAdminOrManager = can(currentUser, "approveJobs");
 
   // ── Send Comment (คุยกับช่าง เช่น ตอบคำขอใบเสนอราคา) ──────────────────
@@ -1515,9 +1516,10 @@ const EventRowCard = ({
                 : <Typography component="span" sx={{ fontSize: "0.74rem", color: FAINT, fontWeight: 700, whiteSpace: "nowrap" }}>ยังไม่มอบหมายผู้รับผิดชอบ</Typography>}
               {nextStep && (
                 <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.76rem", color: INK_2, fontWeight: 700 }}>
-                  {/* สีสถานะเหลือแค่จุดเล็ก ตัวหนังสือโทนเดียวกับการ์ด (ไม่ใช้ตัวหนังสือสีเขียว/ส้ม/แดงปนกัน) */}
+                  {/* สีสถานะเหลือแค่จุดเล็ก ตัวหนังสือโทนเดียวกับการ์ด (ไม่ใช้ตัวหนังสือสีเขียว/ส้ม/แดงปนกัน)
+                      ✅ (10 ต.ค. 2569 ผู้ใช้: "คำว่าต่อไปให้ใช้คำใหม่ ดูแล้วงง" → เลือก "ไม่ต้องมีคำนำหน้า") */}
                   <Box component="span" sx={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", bgcolor: nextStep.tone || ACCENT, mr: 0.75, verticalAlign: "1px" }} />
-                  <Box component="span" sx={{ color: MUTED, fontWeight: 600 }}>ต่อไป:</Box> {nextStep.title}
+                  {nextStep.title}
                 </Typography>
               )}
               {!nextStep && <Box sx={{ flex: 1 }} />}
