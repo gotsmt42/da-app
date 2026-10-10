@@ -42,6 +42,7 @@ import InfoLine from "@/shared/ui/InfoLine";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { ROLES } from "@/shared/utils/roles";
 import { JobFlowChips, JobFlowPanel } from "@/shared/ui/JobFlow";
+import SitePhotos from "@/shared/ui/SitePhotos";
 
 // ✅ ใช้ตัดสินใจลำดับปุ่มแชร์ในเมนู "⋮" ต่อไฟล์ (ดูเหตุผลใน fileActions.js)
 const IS_MOBILE = isMobileDevice();
@@ -1084,6 +1085,9 @@ const TechnicianJobCard = ({
 
         {/* ✅ ขั้นตอนทำงาน: รับทราบงาน · รอข้อมูล · อุปกรณ์ · งานไม่เสร็จ (ของทั้งงาน — แสดงที่การ์ดตัวแทนเท่านั้น) */}
         {!hideDocuments && <JobFlowPanel event={event} mode="tech" onPatched={onPatched} />}
+
+        {/* ✅ (10 ต.ค. 2569) รูปและไฟล์หน้างาน — แบบเดียวกับรูปหน้างานของนัดเซล (ของแต่ละวันเข้างาน) */}
+        <SitePhotos event={event} canEdit={!isLocked && isApproved(event)} onPreview={onPreview} />
 
         {/* ── เอกสารประจำงาน + ขอปิดงาน: ซ่อนถ้างานนี้ใช้เอกสารร่วมกับกลุ่ม (แสดงที่การ์ดตัวแทนแทน) ── */}
         {!hideDocuments && (
