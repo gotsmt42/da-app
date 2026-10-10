@@ -3133,10 +3133,10 @@ export default function ContractOverview() {
     }
     return {
       label: "📌 รอวางแผน",
-      tip: "วางแผนล่วงหน้าไว้แล้ว ยังไม่ได้ลงวันที่จริง — กดเพื่อไปดูงานนี้",
+      tip: "รับงานไว้แล้ว ยังไม่ได้ลงวันที่จริง — กดเพื่อไปหน้างานใหม่",
       props: {
         component: Link,
-        to: `/event?draft=${pendingDraft._id}${pendingDraft.plannedMonth ? `&month=${pendingDraft.plannedMonth}` : ""}`,
+        to: "/jobs/intake", // งานที่ยังไม่ลงตาราง → หน้า "งานใหม่" (ตารางงานไม่มีแผงแผนล่วงหน้าแล้ว 10 ต.ค. 2569)
       },
     };
   }, [isAdminOrManager]);

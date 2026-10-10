@@ -24,7 +24,6 @@ import {
   faCheckDouble,
   faXmark,
   faSliders,
-  faClipboardList,
   faAnglesDown,
   faEye,
   faEyeSlash,
@@ -50,7 +49,7 @@ import FloatPersonPicker from "./FloatPersonPicker";
 
 import API from "@/shared/api/axiosInstance";
 import { escapeHtml } from "@/shared/utils/escapeHtml";
-import { getApprovalState, isPendingApproval, countPendingJobs } from "@/shared/utils/approvalStatus";
+import { getApprovalState, countPendingJobs } from "@/shared/utils/approvalStatus";
 import { formatRoundLabel } from "@/shared/utils/contractRounds";
 import { classifyJob, JOB_CLASS_META } from "@/shared/utils/jobClassification";
 
@@ -80,10 +79,7 @@ import { getEventDrop } from "../EventForms/EventDrop";
 import { getEventResize } from "../EventForms/EventResize";
 import { getFetchEvents } from "../EventForms/FetchEvents";
 import { getDeleteEvent } from "../EventForms/DeleteEvent";
-import { getAddDraftEvent } from "../EventForms/AddDraftEvent";
 
-import UnscheduledPanel from "../UnscheduledPanel";
-import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { isRole, ROLES, DEPARTMENT, TECHNICIAN_ROLES } from "@/shared/utils/roles";
 import { can } from "@/shared/utils/roles";
@@ -475,18 +471,13 @@ function EventCalendar() {
     setAllCardsExpanded(cardPrefs.def);
   }, [userData?.userId]);
 
-  // ✅ งาน "วางแผนล่วงหน้า" (ยังไม่ลงตาราง) — เก็บแยกจาก events ปกติเสมอ (backend ก็แยก query ให้
-  // อยู่แล้ว) จัดกลุ่มดูทีละเดือนผ่าน draftMonth เริ่มที่เดือนปัจจุบัน
+  // ✅ (10 ต.ค. 2569 ผู้ใช้: "ใน event ตัดระบบแผนงานล่วงหน้าออกเลย ไม่ใช้แล้ว") — ไม่มีแผงแผนล่วงหน้า/
+  //    ลากไป-กลับ/ย้ายไปแผนล่วงหน้าในหน้านี้อีกแล้ว · งานที่ยังไม่ลงตารางจัดการที่เมนู "งานใหม่" (/jobs/intake)
+  //    ⚠️ ยังดึง drafts ไว้เงียบๆ — ฟอร์มเพิ่มงานต้องรู้ "ครั้งที่" ของสัญญาที่จองไว้แล้ว (ไม่ให้ชนกัน)
   const [drafts, setDrafts] = useState([]);
-  const [draftsLoading, setDraftsLoading] = useState(false);
-  const [showDraftsPanel, setShowDraftsPanel] = useState(false);
-  const [draftMonth, setDraftMonth] = useState(moment().format("YYYY-MM"));
-  // ✅ ?draft=<id>&month=YYYY-MM — ใช้ตอนกดลิงก์ "📌 รอวางแผน" จากตาราง ภาพรวมสัญญา (ContractOverview.js)
-  // พาไปเจาะจงงานนั้นในแผงงานล่วงหน้าเลย แทนที่จะต้องมาไล่หาเองว่าอยู่เดือนไหน/หน้าไหน
-  const [highlightDraftId, setHighlightDraftId] = useState("");
 
   // ✅ คัดลอก/วาง event — เก็บเป็น state เฉยๆ (ไม่ persist ข้าม reload) คัดลอกจากงานที่ลงตารางแล้ว
-  // (ปุ่มใน EditEvent.js) หรือจากแผนงานล่วงหน้า (เมนู "···" ใน UnscheduledPanel.js) ก็ได้ ค้างอยู่ได้
+  // (ปุ่มใน EditEvent.js) ค้างอยู่ได้
   // จนกว่าจะกดยกเลิกเอง หรือคัดลอกทับด้วยงานอื่น — ไม่ auto clear หลังวางครั้งเดียว เพื่อวางซ้ำได้หลายวัน
   const [clipboardEvent, setClipboardEvent] = useState(null);
 
@@ -502,12 +493,6 @@ function EventCalendar() {
   // เอง (ไม่ใช่ element ข้างในที่ FullCalendar สร้าง/ทิ้งใหม่เองตอนสลับมุมมอง) ดูเหตุผลเต็มที่ useEffect
   // ที่ผูก touch event ด้านล่าง
   const swipeAreaRef = useRef(null);
-  // ✅ ใช้เช็คว่าตอนลากงานจากปฏิทินจริงออกมา (eventDragStop) ปล่อยเมาส์ทับแผงนี้หรือเปล่า
-  // ถ้าใช่ = ลากกลับไปเป็นงานวางแผนล่วงหน้า (ดู handleEventDragStop ด้านล่าง)
-  const draftsPanelRef = useRef(null);
-  // ✅ เปิดแผงงานล่วงหน้าให้อัตโนมัติแค่ตอนโหลดครั้งแรกสุดถ้ามีงานอยู่จริง (ดู fetchDrafts) —
-  // ป้องกันไม่ให้ auto เปิดซ้ำทับการปิดเองของผู้ใช้ทุกครั้งที่ fetch ใหม่ (เช่น silent refresh 30s)
-  const hasAutoOpenedDraftsRef = useRef(false);
 
   // ⚠️ deps มี viewingDept — สลับเมนู "ตารางงานช่าง" ↔ "ตารางงานเซล" เปลี่ยนแค่ query param
   // โดยไม่ remount หน้า ถ้าไม่ใส่ deps ปฏิทินจะค้างข้อมูลของแผนกเดิมจนกว่าจะรีเฟรช
@@ -529,20 +514,10 @@ function EventCalendar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewingDept]);
 
-  // ✅ ?draft=<id>&month=YYYY-MM (+ ?t=nonce กันกดลิงก์ซ้ำงานเดิมไม่เห็นผล) — เปิดแผงงานล่วงหน้า
-  // สลับไปเดือนที่ถูกต้องให้อัตโนมัติ แล้วส่ง highlightDraftId ลงไปให้ UnscheduledPanel เลื่อนจอ/
-  // ไฮไลต์การ์ดนั้นเอง (ดู UnscheduledPanel.js) — deps: [searchParams] ไม่ใช่ mount-only เพราะกดลิงก์
-  // ซ้ำจากหน้าเดิม (React Router ไม่ remount) ต้องทำงานซ้ำได้ทุกครั้งที่ query เปลี่ยน
+  // ✅ ลิงก์เก่า ?draft=<id> (บุ๊กมาร์ก/แจ้งเตือนเดิม) — แผงแผนล่วงหน้าไม่มีแล้ว ส่งไปหน้า "งานใหม่" แทน
   useEffect(() => {
-    const draftParam = searchParams.get("draft");
-    const monthParam = searchParams.get("month");
-    if (!draftParam) return;
-    setShowDraftsPanel(true);
-    if (monthParam && /^\d{4}-\d{2}$/.test(monthParam)) {
-      setDraftMonth(monthParam);
-      calendarRef.current?.getApi()?.gotoDate(moment(monthParam, "YYYY-MM").format("YYYY-MM-DD"));
-    }
-    setHighlightDraftId(`${draftParam}|${searchParams.get("t") || Date.now()}`);
+    if (searchParams.get("draft")) navigate("/jobs/intake", { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   // ✅ ?event=<id>&date=YYYY-MM-DD (+ ?t=nonce) — เปิดปฏิทินไปที่เดือนของงานนั้นแล้วไฮไลต์การ์ดให้เห็น
@@ -589,16 +564,6 @@ function EventCalendar() {
     }, 100);
     return () => clearInterval(timer);
   }, [highlightEventId]);
-
-  // ✅ FullCalendar v6 มี ResizeObserver ของตัวเองบน .fc คอยจับขนาด container ที่เปลี่ยนอยู่แล้ว
-  // แต่โค้ดชุดนี้ไม่เคยถูกทดสอบกับการ "ย่อความกว้าง container ด้วย CSS" มาก่อน (เดิมปฏิทินกว้างเต็ม
-  // จอเสมอ) — ตอนนี้เปิด/ปิดคอลัมน์งานวางแผนล่วงหน้าทำให้ .calendar-wrapper แคบ/กว้างขึ้นได้ สั่ง
-  // updateSize() ซ้ำอีกชั้นหลังอนิเมชัน CSS จบ (~0.22s) กันตารางวัน/ความสูงแถวค้างค่าความกว้างเดิม
-  // เป็นการเรียกที่ราคาถูกมาก เรียกเกินไม่มีผลเสีย ครอบคลุมทุกจุดที่ setShowDraftsPanel(true/false)
-  useEffect(() => {
-    const t = setTimeout(() => calendarRef.current?.getApi()?.updateSize(), 260);
-    return () => clearTimeout(t);
-  }, [showDraftsPanel]);
 
   // ✅ เรียลไทม์: งาน/แผนงาน/ใบมอบหมายเปลี่ยนจากที่ไหนก็ตาม → ปฏิทินอัปเดตเองทันที (โหลดเงียบ)
   useRealtime("events", () => {
@@ -1018,26 +983,15 @@ function EventCalendar() {
     // ถ้าดึงมาจะได้ "แผนล่วงหน้าของฝ่ายขาย" มาโผล่ในตารางช่าง ซึ่งผิดแผนกชัดๆ
     // ✅ อีกทั้งแผนงานล่วงหน้ายังไม่มีวันที่ จึงไม่ช่วยตอบคำถามเดียวที่เซลเปิดมาดู: "ช่างว่างวันไหน"
     // ⚠️ อ่านจาก ref — ตัวรีเฟรชทุก 30 วิถือฟังก์ชันรอบแรกไว้ (ดู fetchEventsFromDB)
-    if (noDraftsRef.current) { setDrafts([]); setShowDraftsPanel(false); return; }
-    if (!silent) setDraftsLoading(true);
+    if (noDraftsRef.current) { setDrafts([]); return; }
     try {
       const res = await EventService.GetDraftEvents();
       const list = Array.isArray(res?.drafts) ? res.drafts : [];
       if (noDraftsRef.current) return; // ระหว่างรอ ผู้ใช้สลับไปตารางเซลแล้ว
       setDrafts(list);
-      // ✅ เปิดแผงงานล่วงหน้าอัตโนมัติแค่ครั้งแรกสุดที่โหลดสำเร็จ ถ้ามีงานอยู่จริง — หลังจากนั้น
-      // ผู้ใช้เปิด/ปิดเองได้ตามปกติโดยไม่ถูก auto เปิดทับซ้ำอีกตอน refresh รอบถัดๆ ไป
-      // ✅ ไม่นับฉบับร่างของสัญญา (มี contractGroupId) — ไม่โผล่ในแผงนี้อยู่แล้ว (ดู visibleDrafts)
-      // จึงไม่ควรเป็นเหตุให้เปิดแผงอัตโนมัติด้วย
-      if (!hasAutoOpenedDraftsRef.current) {
-        hasAutoOpenedDraftsRef.current = true;
-        if (list.some((d) => !d.contractGroupId)) setShowDraftsPanel(true);
-      }
     } catch (error) {
       console.error("❌ Error fetching draft events:", error);
       if (!silent) setDrafts([]);
-    } finally {
-      if (!silent) setDraftsLoading(false);
     }
   };
 
@@ -1045,8 +999,7 @@ function EventCalendar() {
     await getSaveEventToDB({ newEvent, EventService });
   };
 
-  // ✅ ใช้ทั้งจากปุ่ม "คัดลอกงานนี้" ใน EditEvent.js และเมนู "···" ของแผนงานล่วงหน้าใน
-  // UnscheduledPanel.js — เก็บ template ของงานไว้ใน state แล้วแจ้งเตือนสั้นๆ ว่าคัดลอกแล้ว
+  // ✅ ใช้จากปุ่ม "คัดลอกงานนี้" ใน EditEvent.js — เก็บ template ของงานไว้ใน state แล้วแจ้งเตือนสั้นๆ ว่าคัดลอกแล้ว
   // ผู้ใช้กดวันที่บนปฏิทินต่อเพื่อ "วาง" (ดู handleAddEvent ด้านล่าง ส่ง sourceEvent เข้าฟอร์มเพิ่มงาน)
   const handleCopyEvent = (sourceEvent) => {
     setClipboardEvent(sourceEvent);
@@ -1189,7 +1142,6 @@ function EventCalendar() {
       onOpenDeliveryNote: setDeliveryNoteJob,
       onRequestAdvance: setAdvanceJob,
       handleDeleteEvent,
-      handleUnscheduleEvent: handleUnscheduleViaButton,
       onCopyEvent: handleCopyEvent,
       EventService,
       CustomerService,
@@ -1215,48 +1167,6 @@ function EventCalendar() {
 
       Swal,
     });
-  };
-
-  // ✅ ย้ายงานที่ลงตารางไปแล้วกลับไปเป็น "วางแผนล่วงหน้า" — ใช้ร่วมกันทั้ง 2 ทาง (ปุ่มใน
-  // EditEvent.js / ลากวางบนแผงงานล่วงหน้า) แค่ต่างกันตรงจะถามเดือน/ยืนยันก่อนหรือไม่
-  const unscheduleEvent = async (id, plannedMonth) => {
-    try {
-      await EventService.UnscheduleEvent(id, plannedMonth);
-      await Promise.all([fetchEventsFromDB(), fetchDrafts()]);
-      Swal.fire({
-        title: "ย้ายไปแผนล่วงหน้าสำเร็จ ✅",
-        icon: "success",
-        timer: 1200,
-        showConfirmButton: false,
-      });
-    } catch (error) {
-      console.error("❌ Error unscheduling event:", error);
-      Swal.fire("❌ ย้ายไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
-    }
-  };
-
-  // ✅ ปุ่ม "ย้ายไปแผนล่วงหน้า" ใน EditEvent.js — ให้เลือกเดือน/ปีที่ตั้งใจเองก่อนเสมอ (ไม่ auto
-  // เดาจากวันที่เดิมของงานเหมือนก่อนหน้านี้) การเลือกเดือนแล้วกด "ย้าย" ก็ถือเป็นการยืนยันในตัว
-  // อยู่แล้ว จึงไม่ต้องมีกล่องยืนยัน "แน่ใจไหม" ซ้อนอีกชั้นก่อนหน้านั้น
-  const handleUnscheduleViaButton = async (id) => {
-    const { value: plannedMonth } = await Swal.fire({
-      title: "ย้ายไปแผนวางล่วงหน้าเดือนไหน?",
-      input: "month",
-      inputValue: moment().format("YYYY-MM"),
-      showCancelButton: true,
-      confirmButtonText: "ย้าย",
-      cancelButtonText: "ยกเลิก",
-      confirmButtonColor: "#f59e0b",
-      inputValidator: (value) => (!value ? "กรุณาเลือกเดือน/ปี" : undefined),
-    });
-    if (!plannedMonth) return;
-    await unscheduleEvent(id, plannedMonth);
-  };
-
-  // ✅ ลากงานจากปฏิทินมาวางบนแผงงานล่วงหน้าโดยตรง — ไม่ต้องถามอะไรเลยตามที่ขอ (การลากมาวาง
-  // เองคือการยืนยันความตั้งใจอยู่แล้ว) ใช้เดือนของวันที่เดิมของงานเป็นค่าเริ่มต้นแทน
-  const handleUnscheduleViaDrag = async (id) => {
-    await unscheduleEvent(id);
   };
 
   const handleEventDrop = async (arg) => {
@@ -1288,470 +1198,9 @@ function EventCalendar() {
     });
   };
 
-  const handleAddDraft = async () => {
-    await getAddDraftEvent({
-      defaultMonth: draftMonth,
-      // ✅ ต้องส่ง events + drafts ให้ครบ เพื่อให้ขั้นตอน "งานตามสัญญา" หาสัญญาที่มีอยู่แล้ว และคำนวณ
-      // "ครั้งที่ถัดไป" ถูกต้อง (ไม่ชนกับครั้งที่จองไปแล้วไม่ว่าจะลงตารางแล้วหรือยังเป็นแค่แผนงานก็ตาม)
-      events,
-      drafts,
-      // ✅ ใช้โชว์ข้อความแจ้งช่าง/เซลว่างานที่สร้างจะต้องรออนุมัติก่อน (ดู isAdminOrManagerUser ในฟอร์ม)
-      userData,
-      // ✅ ถ้าใส่วันที่มาด้วยตอนบันทึก จะถูกลงตารางทันที (ย้ายจาก drafts ไปเป็น event จริง)
-      // ต้อง refresh ทั้งคู่เผื่อกรณีนั้น ไม่ใช่แค่ fetchDrafts อย่างเดียว
-      onSaved: () => Promise.all([fetchDrafts(), fetchEventsFromDB()]),
-      CustomerService,
-      AuthService,
-      JobTypeService,
-      SystemTypeService,
-      EventService,
-      Swal,
-      TomSelect,
-      moment,
-    });
-  };
-
-  const handleEditDraftClick = async (draft) => {
-    await getAddDraftEvent({
-      defaultMonth: draftMonth,
-      existingDraft: draft,
-      events,
-      drafts,
-      // ✅ ใช้โชว์ข้อความแจ้งช่าง/เซลว่างานที่แก้ไขจะรออนุมัติใหม่ (ดู isAdminOrManagerUser ในฟอร์ม)
-      userData,
-      // ✅ ถ้าใส่วันที่มาด้วยตอนบันทึก จะถูกลงตารางทันที (ย้ายจาก drafts ไปเป็น event จริง)
-      // ต้อง refresh ทั้งคู่เผื่อกรณีนั้น ไม่ใช่แค่ fetchDrafts อย่างเดียว
-      onSaved: () => Promise.all([fetchDrafts(), fetchEventsFromDB()]),
-      CustomerService,
-      AuthService,
-      JobTypeService,
-      SystemTypeService,
-      EventService,
-      Swal,
-      TomSelect,
-      moment,
-    });
-  };
-
-  // ✅ ใช้ทั้งตอนกดปุ่ม "ลงตาราง" เลือกวันที่เอง และตอนลากการ์ดวางบนปฏิทิน (handleEventReceive)
-  // ✅ end ต้อง +1 วันเสมอ (เหมือน AddEvent.js) เพราะ event เป็น allDay:true โดย default —
-  // FullCalendar ถือว่า end ของ all-day event เป็นแบบ exclusive ถ้าไม่ +1 งาน 1 วันจะโชว์ผิด/ไม่ขึ้นเลย
-  // ✅ รองรับ dateRanges (งานเข้าหลายวันไม่ติดกัน) เป็นทางเลือกแทน startDate/endDate เดี่ยว —
-  // backend /schedule เองก็รองรับ dates[] อยู่แล้ว (ดู POST / ที่สร้างงานหลายวันแบบเดียวกัน)
-  const scheduleDraft = async (draftId, { startDate, endDate, dateRanges, startTime, endTime, team, resPerson, teamMembers } = {}) => {
-    try {
-      const payload = { startTime, endTime, team, resPerson, teamMembers };
-      if (Array.isArray(dateRanges) && dateRanges.length > 0) {
-        payload.dates = dateRanges.map((r) => ({
-          start: r.start,
-          end: moment(r.end).add(1, "days").format("YYYY-MM-DD"),
-          date: r.start,
-        }));
-      } else {
-        const effectiveEnd = endDate || startDate;
-        payload.date = startDate;
-        payload.start = startDate;
-        payload.end = moment(effectiveEnd).add(1, "days").format("YYYY-MM-DD");
-      }
-      await EventService.ScheduleDraftEvent(draftId, payload);
-      await Promise.all([fetchEventsFromDB(), fetchDrafts()]);
-      Swal.fire({
-        title: "ลงตารางสำเร็จ ✅",
-        icon: "success",
-        timer: 1200,
-        showConfirmButton: false,
-      });
-    } catch (error) {
-      console.error("❌ Error scheduling draft event:", error);
-      Swal.fire("❌ ลงตารางไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
-    }
-  };
-
-  // ✅ กล่อง "ลงตาราง" รวมทุกอย่างที่ตัดออกจากฟอร์มเพิ่ม/แก้ไขงานล่วงหน้าไว้ที่นี่แทน — วันที่เริ่ม/
-  // สิ้นสุด (แยกกันเหมือนฟอร์มเพิ่มงานปกติ ไม่ใช่วันเดียวอีกต่อไป), เวลาเริ่ม/สิ้นสุด, และทีม
-  // SweetAlert2 รองรับ input เดียวผ่าน `input` option ตรงๆ ไม่ได้ ต้องประกอบเป็น html เองแล้ว
-  // อ่านค่าใน preConfirm แทน
-  const handleScheduleDraftClick = async (draft) => {
-    const defaultDate = moment(draft.plannedMonth, "YYYY-MM").startOf("month").format("YYYY-MM-DD");
-    const teamToId = new Map(employeeList.map((e) => [e.fname, e._id]));
-    // ✅ ป้องกัน stored XSS — ชื่อ/บริษัท/โครงการที่ผู้ใช้พิมพ์เองต้อง escape ก่อนต่อเป็น HTML string
-    // เสมอ ไม่งั้นถ้ามีใครตั้งชื่อเป็น เช่น "><img src=x onerror="..."> จะยิง JavaScript ทันทีที่มีใคร
-    // เปิดกล่อง "ลงตาราง" ของงานนั้นดู
-    // ✅ ไม่ฝัง selected ในตัวเลือกดิบ (เทียบ plainTeamOpts ใน EditEvent.js) — ทั้งช่อง "ทีม" หลักและ
-    // แถว "ลูกทีมเพิ่มเติม" ตอนนี้เป็น TomSelect ทั้งคู่ ตั้งค่าเริ่มต้นผ่าน ts.setValue(...) แทน เดิม
-    // ใช้ teamOpts.replace(/ selected/g,"") ตัด attribute ออกสำหรับแถวลูกทีม ซึ่งจะพังทันทีถ้ามีชื่อ
-    // พนักงานคนไหนมีคำว่า " selected" อยู่ในชื่อจริง
-    const plainTeamOpts = employeeList
-      .map((e) => `<option value="${escapeHtml(e.fname)}">${escapeHtml(e.fname)}</option>`)
-      .join("");
-
-    const rangeRowHtml = (startVal = "", endVal = "") => `
-      <div class="swal-schedule-range-row" style="display:flex; gap:6px; align-items:center; margin-bottom:8px;">
-        <input type="date" class="swal-schedule-range-start" style="flex:1; box-sizing:border-box; padding:9px 12px; border:1px solid #d9d9d9; border-radius:4px; font-size:14px;" value="${startVal}">
-        <span style="flex-shrink:0; color:#94a3b8; font-weight:700;">–</span>
-        <input type="date" class="swal-schedule-range-end" style="flex:1; box-sizing:border-box; padding:9px 12px; border:1px solid #d9d9d9; border-radius:4px; font-size:14px;" value="${endVal || startVal}">
-        <button type="button" class="swal-schedule-range-remove" style="flex-shrink:0; width:34px; height:34px; border:1px solid #e2e8f0; background:#f1f5f9; border-radius:6px; cursor:pointer;">✕</button>
-      </div>
-    `;
-
-    const { value: formValues } = await Swal.fire({
-      title: "เลือกวันที่ลงตาราง",
-      html: `
-        <style>
-          /* ✅ เดิมช่อง วันที่เริ่ม/สิ้นสุด และ เวลาเริ่ม/สิ้นสุด เรียงข้างกันตายตัวด้วย flex
-             ทำให้บนจอมือถือแคบๆ ช่องแคบเกินไปจน input วันที่ล้นขอบจอ (input[type=date] ของ
-             เบราว์เซอร์มีความกว้างขั้นต่ำของตัวเองบีบต่อไม่ได้) — สลับเป็นเรียงซ้อนกันทีละแถว
-             เต็มความกว้างแทนเมื่อจอแคบ ให้พอดีจอเสมอ ไม่มีการล้น/ตัด */
-          .swal-schedule-row-2col { display:flex; gap:8px; margin-bottom:12px; }
-          .swal-schedule-row-2col > div { flex:1; text-align:left; min-width:0; }
-          @media (max-width: 480px) {
-            .swal-schedule-row-2col { flex-direction: column; gap: 10px; }
-          }
-          /* ✅ ช่อง "ทีม"/"ลูกทีมเพิ่มเติม" ในกล่องนี้เป็น TomSelect เหมือนฟอร์มเพิ่ม/แก้ไขงาน
-             (พิมพ์เพิ่มชื่อเองได้) — สไตล์ .ts-control ให้หน้าตาเหมือน input อื่นๆ ในกล่องนี้ */
-          .swal-schedule-team-member-row { display:flex; gap:6px; align-items:center; margin-bottom:6px; }
-          .swal-schedule-team-member-row .ts-wrapper { flex:1 1 auto; min-width:0; }
-          .swal-schedule-ts .ts-control {
-            border: 1px solid #d9d9d9 !important; border-radius: 4px !important;
-            padding: 7px 10px !important; font-size: 14px !important; min-height: 38px;
-            box-shadow: none !important;
-          }
-          .swal-schedule-ts.focus .ts-control {
-            border-color: #dc2626 !important; box-shadow: 0 0 0 3px rgba(220,38,38,.10) !important;
-          }
-          /* ✅ .swal2-html-container ของ Swal ตั้ง overflow:auto ไว้ (ต่างจากฟอร์มเพิ่ม/แก้ไขงานที่
-             override เป็น hidden แล้วคุม scroll เอง) — dropdown ที่กางอยู่ในกล่องจะโดนตัดขาดทันที
-             เพราะช่อง "ลูกทีม" อยู่ล่างสุดของป๊อปอัพพอดี จึงย้าย dropdown ไปแขวนที่ body แทน
-             (dropdownParent:"body") แล้วดัน z-index ให้สูงกว่า .swal2-container (1060) */
-          .ts-dropdown.swal-schedule-ts-dropdown { z-index: 1100; }
-        </style>
-
-        <div style="text-align:left; font-size:13px; color:#64748b; margin-bottom:14px;">
-          ${escapeHtml(draft.title) || "งาน"} · ${escapeHtml([draft.company, draft.site].filter(Boolean).join(" · "))}
-        </div>
-
-        ${isPendingApproval(draft) ? `
-        <div style="text-align:left; font-size:12.5px; color:#92400e; background:#fef3c7; border:1px solid #fde68a; border-radius:8px; padding:8px 12px; margin-bottom:14px;">
-          ⏳ งานนี้ยังรออนุมัติ — ลงตารางได้ตามปกติ แต่จะยังขึ้นเป็น "รออนุมัติ" บนปฏิทินจนกว่าแอดมิน/manager จะอนุมัติ
-        </div>
-        ` : ""}
-
-        <label style="display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; color:#374151; margin-bottom:12px; cursor:pointer;">
-          <input type="checkbox" id="swal-schedule-multi-toggle" style="width:auto; cursor:pointer;">
-          🗓️ งานนี้ต้องเข้างานหลายวัน (ไม่ติดกันก็ได้) — ถือเป็นงานเดียวกัน
-        </label>
-
-        <div id="swal-schedule-single-section">
-          <div class="swal-schedule-row-2col">
-            <div>
-              <label style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">📅 วันที่เริ่ม</label>
-              <input id="swal-schedule-start-date" type="date" class="swal2-input" style="margin:0; width:100%; box-sizing:border-box;" value="${defaultDate}">
-            </div>
-            <div>
-              <label style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">📅 วันที่สิ้นสุด</label>
-              <input id="swal-schedule-end-date" type="date" class="swal2-input" style="margin:0; width:100%; box-sizing:border-box;" value="${defaultDate}">
-            </div>
-          </div>
-        </div>
-
-        <div id="swal-schedule-multi-section" style="display:none; text-align:left;">
-          <div id="swal-schedule-multi-list" style="margin-bottom:8px;"></div>
-          <button type="button" id="swal-schedule-add-date-btn" style="margin-bottom:12px; padding:8px 14px; border:1px solid #e2e8f0; background:#f1f5f9; border-radius:6px; font-size:12.5px; font-weight:700; color:#475569; cursor:pointer;">➕ เพิ่มช่วงวันที่</button>
-        </div>
-
-        <div class="swal-schedule-row-2col">
-          <div>
-            <label style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">🕐 เวลาเริ่ม</label>
-            <input id="swal-schedule-start-time" type="text" class="swal2-input" placeholder="เช่น 08:30" style="margin:0; width:100%; box-sizing:border-box;" value="${escapeHtml(draft.startTime)}">
-          </div>
-          <div>
-            <label style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">🕔 เวลาสิ้นสุด</label>
-            <input id="swal-schedule-end-time" type="text" class="swal2-input" placeholder="เช่น 17:00" style="margin:0; width:100%; box-sizing:border-box;" value="${escapeHtml(draft.endTime)}">
-          </div>
-        </div>
-        <div style="text-align:left; margin-bottom:12px;">
-          <label style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">👷 ทีม</label>
-          <select id="swal-schedule-team">
-            <option value="">— ไม่ระบุ —</option>
-            ${plainTeamOpts}
-          </select>
-        </div>
-
-        <div style="text-align:left;">
-          <label style="font-size:12px; font-weight:600; color:#374151; display:block; margin-bottom:4px;">👥 ลูกทีมเพิ่มเติม (ถ้ามี)</label>
-          <div id="swal-schedule-team-members-list" style="margin-bottom:6px;"></div>
-          <button type="button" id="swal-schedule-add-team-member-btn" style="padding:8px 14px; border:1px solid #e2e8f0; background:#f1f5f9; border-radius:6px; font-size:12.5px; font-weight:700; color:#475569; cursor:pointer;">➕ เพิ่มลูกทีม</button>
-        </div>
-      `,
-      showCancelButton: true,
-      confirmButtonText: "📅 ลงตาราง",
-      cancelButtonText: "ยกเลิก",
-      focusConfirm: false,
-      didOpen: () => {
-        // ✅ เปลี่ยนช่อง <input type="date"> ทุกช่องในกล่องนี้เป็นปฏิทิน พ.ศ. เดือนไทย
-        // (ช่องเดิมถูกซ่อนไว้เป็นตัวเก็บค่า โค้ดที่อ่าน .value ตอนกดบันทึกจึงทำงานเหมือนเดิม)
-        Swal.getPopup().__thaiDpCleanup = mountThaiDatePickers(Swal.getPopup());
-        const multiToggle  = document.getElementById("swal-schedule-multi-toggle");
-        const singleSection = document.getElementById("swal-schedule-single-section");
-        const multiSection  = document.getElementById("swal-schedule-multi-section");
-        const multiList     = document.getElementById("swal-schedule-multi-list");
-
-        const addRow = (startVal = "", endVal = "") => {
-          const wrapper = document.createElement("div");
-          wrapper.innerHTML = rangeRowHtml(startVal, endVal);
-          const row = wrapper.firstElementChild;
-          row.querySelector(".swal-schedule-range-remove").addEventListener("click", () => {
-            if (multiList.children.length > 1) row.remove();
-          });
-          multiList.appendChild(row);
-        };
-        addRow(defaultDate, defaultDate);
-
-        document.getElementById("swal-schedule-add-date-btn")?.addEventListener("click", () => addRow());
-
-        multiToggle?.addEventListener("change", () => {
-          const isMulti = multiToggle.checked;
-          singleSection.style.display = isMulti ? "none" : "";
-          multiSection.style.display  = isMulti ? "" : "none";
-        });
-
-        // ✅ TomSelect ตัวแรกของไฟล์นี้ — ให้ช่อง "ทีม" กับ "ลูกทีมเพิ่มเติม" ในกล่องนี้ค้นหา/พิมพ์เพิ่ม
-        // เองได้เหมือนช่องเดียวกันในฟอร์มเพิ่ม/แก้ไขงาน (AddEvent/EditEvent) ที่ทำไว้แล้ว
-        const mkScheduleTs = (el, placeholder, prefillName = "") => {
-          if (!el) return null;
-          try {
-            // ⚠️ เดิม fix ไว้ 7 ตัดรายชื่อพนักงานที่มีเกิน 7 คนทิ้งไปเงียบๆ (ห้องสมุด TomSelect ค่า
-            // default จริงคือ 50 อยู่แล้ว) ทำให้ค้นหา/เลือกทีมหรือลูกทีม "หาไม่เจอ" เป็นบางที
-            const ts = new TomSelect(el, {
-              create: true,
-              maxOptions: 20, // ✅ แสดงสูงสุด 20 แถว (กันหน่วง) + ป้ายบอกว่ามีเพิ่ม — ดู MAX_OPTIONS_NOTE ใน shared/utils/tomSelectFixes.js
-              placeholder,
-              sortField: { field: "text", direction: "asc" },
-              allowEmptyOption: true,
-              dropdownParent: "body", // ดูเหตุผลใน <style> ด้านบน
-              wrapperClass: "ts-wrapper swal-schedule-ts",
-              dropdownClass: "ts-dropdown swal-schedule-ts-dropdown",
-            });
-            if (prefillName) {
-              ts.addOption({ value: prefillName, text: prefillName });
-              ts.setValue(prefillName, true);
-            } else {
-              ts.clear(true);
-            }
-            return ts;
-          } catch { return null; }
-        };
-
-        // ช่อง "ทีม" (ช่างหลัก) — prefill ด้วยทีมเดิมของแผนงานนี้
-        mkScheduleTs(document.getElementById("swal-schedule-team"), "เลือกหรือพิมพ์ชื่อทีม", draft.team || "");
-
-        // ✅ ลูกทีมเพิ่มเติม (คนที่ 2, 3, ... แสดงผลอย่างเดียว ไม่กระทบสิทธิ์แก้ไข/แจ้งเตือน)
-        const teamMembersList = document.getElementById("swal-schedule-team-members-list");
-        const addTeamMemberRow = (prefillName = "") => {
-          const wrapper = document.createElement("div");
-          wrapper.innerHTML = `
-            <div class="swal-schedule-team-member-row">
-              <select class="swal-schedule-team-member-select">
-                <option value="">— เลือกลูกทีม —</option>
-                ${plainTeamOpts}
-              </select>
-              <button type="button" class="swal-schedule-team-member-remove" style="flex-shrink:0; width:34px; height:34px; border:1px solid #e2e8f0; background:#f1f5f9; border-radius:6px; cursor:pointer;">✕</button>
-            </div>
-          `;
-          const row = wrapper.firstElementChild;
-          teamMembersList.appendChild(row); // ต้อง append ก่อน init (ดูคอมเมนต์ใน AddEvent.js)
-          const ts = mkScheduleTs(row.querySelector(".swal-schedule-team-member-select"), "เลือกหรือพิมพ์ชื่อลูกทีม", prefillName);
-          row.querySelector(".swal-schedule-team-member-remove").addEventListener("click", () => {
-            // ✅ dropdownParent:"body" ทำให้ dropdown ไม่ได้เป็นลูกของแถวนี้อีกต่อไป — ต้อง destroy()
-            // ก่อนเสมอ ไม่งั้น dropdown จะค้างอยู่ใน body ตลอดไปหลังลบแถว (ต่างจาก AddEvent/EditEvent
-            // ที่ dropdown อยู่ในแถวเอง row.remove() เฉยๆ ยังพอเก็บกวาดฝั่ง DOM ให้ได้บางส่วน)
-            ts?.destroy();
-            row.remove();
-          });
-        };
-        (draft.teamMembers || []).forEach((m) => addTeamMemberRow(m?.name || ""));
-        document.getElementById("swal-schedule-add-team-member-btn")?.addEventListener("click", () => addTeamMemberRow());
-      },
-      // ✅ dropdownParent:"body" ต้องเก็บกวาดตอนปิดกล่องเสมอ (ไม่ใช่แค่ตอนกด ✕ ทีละแถว) ไม่งั้น
-      // dropdown ที่ค้างอยู่ใน body จะกลายเป็น orphan element ถาวรทันทีที่ทั้งกล่องถูกปิด
-      willClose: (popup) => {
-        // ⚠️ คืนทรัพยากรของปฏิทิน พ.ศ. ที่ mount ไว้ด้วย ไม่งั้น React root จะค้างทุกครั้งที่เปิดกล่อง
-        popup.__thaiDpCleanup?.();
-        popup.querySelectorAll(".tomselected").forEach((el) => el.tomselect?.destroy());
-      },
-      preConfirm: () => {
-        const isMultiDate = Boolean(document.getElementById("swal-schedule-multi-toggle")?.checked);
-        const team = document.getElementById("swal-schedule-team")?.value || "";
-        const teamMembers = [...document.querySelectorAll(".swal-schedule-team-member-select")]
-          .map((sel) => sel.value)
-          .filter(Boolean)
-          .filter((name, idx, arr) => arr.indexOf(name) === idx)
-          .map((name) => ({ userId: teamToId.get(name) || "", name }));
-
-        const common = {
-          startTime: document.getElementById("swal-schedule-start-time")?.value || "",
-          endTime: document.getElementById("swal-schedule-end-time")?.value || "",
-          team,
-          resPerson: teamToId.get(team) || "",
-          teamMembers,
-        };
-
-        if (isMultiDate) {
-          const rows = [...document.querySelectorAll(".swal-schedule-range-row")];
-          const dateRanges = [];
-          for (const row of rows) {
-            const s = row.querySelector(".swal-schedule-range-start")?.value;
-            const e = row.querySelector(".swal-schedule-range-end")?.value || s;
-            if (!s) continue;
-            if (moment(e).isBefore(moment(s))) {
-              Swal.showValidationMessage("แต่ละช่วงวันที่ วันสิ้นสุดต้องไม่ก่อนวันเริ่ม");
-              return false;
-            }
-            dateRanges.push({ start: s, end: e });
-          }
-          if (dateRanges.length === 0) {
-            Swal.showValidationMessage("กรุณาเลือกอย่างน้อย 1 ช่วงวันที่");
-            return false;
-          }
-          return { ...common, dateRanges };
-        }
-
-        const startDate = document.getElementById("swal-schedule-start-date")?.value;
-        const endDate   = document.getElementById("swal-schedule-end-date")?.value || startDate;
-        if (!startDate) {
-          Swal.showValidationMessage("กรุณาเลือกวันที่เริ่ม");
-          return false;
-        }
-        if (moment(endDate).isBefore(moment(startDate))) {
-          Swal.showValidationMessage("วันที่สิ้นสุดต้องไม่ก่อนวันที่เริ่ม");
-          return false;
-        }
-        return { ...common, startDate, endDate };
-      },
-    });
-    if (formValues) {
-      await scheduleDraft(draft._id, formValues);
-    }
-  };
-
-  const handleDeleteDraftClick = async (draft) => {
-    // ⚠️ กันลบสัญญาทั้งอันไปโดยไม่ตั้งใจ — สัญญาที่เพิ่งสร้างไว้แบบยังไม่ระบุวันที่เข้างาน (ดูฟอร์ม
-    // "เพิ่มสัญญาใหม่" ใน ContractOverview.js) มี document เดียวในระบบคือฉบับร่างนี้ ถ้าลบทิ้งตอนยังไม่มี
-    // ครั้งไหนลงตารางจริงเลย (ไม่มีทั้งใน events ที่ลงตารางแล้ว และไม่มีฉบับร่างอื่นค้างอยู่ผูก
-    // contractGroupId เดียวกัน) จะไม่เหลือ record ไหนผูกสัญญานี้เลย สัญญาทั้งอันจะหายไปจากตาราง
-    // "ภาพรวมงาน" ทันที (ดู groupEventsByContract) — ต้องเตือนแยกให้ชัดเจนกว่าคำเตือนลบงานปกติ
-    const isSoleContractRecord = Boolean(draft.contractGroupId) && ![...events, ...drafts].some(
-      (e) => String(e._id) !== String(draft._id) && e.contractGroupId === draft.contractGroupId
-    );
-
-    const result = await Swal.fire({
-      title: isSoleContractRecord ? "⚠️ ลบแล้วสัญญาทั้งอันจะหายไปจากตาราง!" : "ลบงานวางแผนล่วงหน้านี้?",
-      html: isSoleContractRecord
-        ? `นี่เป็นครั้งเดียวที่เหลืออยู่ของสัญญานี้${draft.contractNo ? ` (เลขที่สัญญา ${draft.contractNo})` : ""} —
-           ลบแล้วสัญญา <b>${[draft.company, draft.site].filter(Boolean).join(" · ") || "งานนี้"}</b>
-           จะหายไปจากหน้า "ภาพรวมงาน" ทั้งหมดทันที (ต้องสร้างสัญญาใหม่ถ้าจะใช้อีก)`
-        : `${draft.title || "งาน"} · ${[draft.company, draft.site].filter(Boolean).join(" · ")}`,
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: isSoleContractRecord ? "เข้าใจแล้ว ลบเลย" : "ลบ",
-      cancelButtonText: "ยกเลิก",
-      confirmButtonColor: "#dc2626",
-    });
-    if (!result.isConfirmed) return;
-    try {
-      await EventService.DeleteEvent(draft._id);
-      await fetchDrafts();
-    } catch (error) {
-      console.error("❌ Error deleting draft event:", error);
-      Swal.fire("❌ ลบไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
-    }
-  };
-
-  // ✅ อนุมัติ/ไม่อนุมัติแผนงานที่ยังไม่มีวันที่ (ยังเป็น draft อยู่) — เรียกจาก UnscheduledPanel
-  // (ปุ่ม "อนุมัติ/ไม่อนุมัติ" ในเมนู "···" ของแต่ละการ์ด) เฉพาะแอดมิน/manager เท่านั้นที่เห็นปุ่มนี้
-  // (ดู isAdminOrManager ที่ส่งเป็น prop) ฝั่ง backend เช็คสิทธิ์ซ้ำอีกชั้นอยู่แล้วเป็นตัวที่เชื่อถือได้จริง
-  const handleDecideDraftApproval = async (draft, decision) => {
-    let reason;
-    if (decision === "reject") {
-      const { value, isConfirmed } = await Swal.fire({
-        title: "ระบุเหตุผลที่ไม่อนุมัติ (ถ้ามี)",
-        input: "textarea",
-        inputPlaceholder: "เช่น ข้อมูลไม่ครบ/ซ้ำกับงานอื่น...",
-        showCancelButton: true,
-        confirmButtonText: "ไม่อนุมัติ",
-        confirmButtonColor: "#dc2626",
-        cancelButtonText: "ยกเลิก",
-      });
-      if (!isConfirmed) return;
-      reason = value;
-    }
-    try {
-      await EventService.DecideApproval(draft._id, decision, reason);
-      await fetchDrafts(true);
-      Swal.fire({
-        title: decision === "approve" ? "อนุมัติแล้ว ✅" : "ไม่อนุมัติแล้ว ❌",
-        icon: "success",
-        timer: 1200,
-        showConfirmButton: false,
-      });
-    } catch (error) {
-      console.error("❌ Error deciding approval:", error);
-      Swal.fire("❌ ดำเนินการไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
-    }
-  };
-
-  // ✅ เรียกเมื่อลากการ์ดจาก UnscheduledPanel มาวางบนปฏิทิน (FullCalendar Draggable + droppable
-  // จับคู่กันเอง) — FullCalendar จะสร้าง event ชั่วคราวให้ก่อน ต้องลบทิ้งเสมอไม่ว่าผลจะเป็นอย่างไร
-  // เพราะของจริงจะมาจาก fetchEventsFromDB() หลัง schedule สำเร็จแทน
-  const handleEventReceive = async (info) => {
-    const draftId = info.event.extendedProps?.draftId;
-    const dateStr = info.event.startStr;
-    info.event.remove();
-    if (!draftId) return;
-    await scheduleDraft(draftId, { startDate: dateStr });
-  };
-
-  // ✅ ระหว่างลากงานจากปฏิทินจริง ไฮไลต์แผงงานล่วงหน้าไว้เป็น drop-zone ให้เห็นชัดว่าลากมาวางตรงนี้ได้
-  const handleEventDragStart = () => {
-    draftsPanelRef.current?.classList.add("unscheduled-panel--drop-target");
-  };
-
-  // ✅ ลากงานที่ลงตารางแล้วออกจากปฏิทิน มาปล่อยทับแผงงานล่วงหน้า = ย้ายกลับไปเป็น unscheduled
-  // (FullCalendar เองจะ revert ตำแหน่ง event กลับที่เดิมให้อัตโนมัติเพราะไม่ใช่ช่องวันที่ที่ถูกต้อง
-  // เราแค่เรียก API ย้ายสถานะจริงแล้ว fetch ใหม่ทับ ไม่ต้องยุ่งกับตำแหน่ง event บนปฏิทินเอง)
-  const handleEventDragStop = (info) => {
-    draftsPanelRef.current?.classList.remove("unscheduled-panel--drop-target");
+  const handleEventDragStop = () => {
     // ลากย้ายวันเสร็จแล้วการ์ดต้องกลับมาเป็นปกติ ไม่ค้างสถานะกดค้างไว้ (ดูหัวฟังก์ชัน)
     clearStuckDragLookSoon();
-
-    const panelEl = draftsPanelRef.current;
-    if (!panelEl || info.event.extendedProps?.isHoliday) return;
-    // ⚠️ ท่าซูมสองนิ้ว/ลากจัดลำดับ ต้องไม่กลายเป็นการ "ย้ายงานกลับไปเป็นแผนงานล่วงหน้า" โดยไม่ตั้งใจ
-    // (เหตุผลเดียวกับที่ eventDrop ต้องเช็ก — ที่นี่เป็นอีกทางที่ข้อมูลถูกเปลี่ยนจากการลากของ FullCalendar)
-    if (Date.now() < pinchGuardRef.current || Date.now() < reorderGuardRef.current) return;
-
-    const rect = panelEl.getBoundingClientRect();
-    const { clientX, clientY } = info.jsEvent;
-    const isOverPanel =
-      clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
-    if (!isOverPanel) return;
-
-    if (!canEditEvent(info.event.extendedProps)) {
-      Swal.fire("❌ คุณไม่มีสิทธิ์แก้ไขแผนงานนี้");
-      return;
-    }
-    // ❌ ห้ามย้ายกลับไปแผนล่วงหน้าเด็ดขาด ไม่มีข้อยกเว้นแม้แต่ admin/manager สำหรับงานที่ "เสร็จสิ้น/
-    // ยืนยันแล้ว/กำลังดำเนินการ" — เทียบ pattern เดียวกับ canUnscheduleEvent ใน EditEvent.js
-    // (canEditEvent ด้านบนไม่กันเคสนี้ เพราะ admin/manager ผ่าน canEditEvent เสมอไม่ว่างานจะปิดหรือไม่)
-    // ⚠️ ต้องกันทางนี้ด้วย ไม่ใช่แค่ซ่อนปุ่มในฟอร์มแก้ไข — การลากการ์ดจากปฏิทินมาวางบนแผงงานล่วงหน้า
-    // เป็นอีกทางหนึ่งที่ทำให้เกิด unschedule ได้ ถ้ากันแค่ปุ่มก็เลี่ยงได้ด้วยการลากอยู่ดี
-    const UNSCHEDULE_BLOCKED_STATUSES = ["ดำเนินการเสร็จสิ้น", "ยืนยันแล้ว", "กำลังดำเนินการ"];
-    const dragStatus = info.event.extendedProps?.status;
-    if (UNSCHEDULE_BLOCKED_STATUSES.includes(dragStatus)) {
-      Swal.fire(`❌ งานสถานะ "${dragStatus}" ไม่สามารถย้ายกลับไปแผนล่วงหน้าได้`);
-      return;
-    }
-    handleUnscheduleViaDrag(info.event.id);
   };
 
   // ✅ ส่งออกงานที่กรองอยู่เป็นไฟล์ Excel (.xlsx) จริงพร้อมสี/หัวตาราง/ตัวกรอง/ยอดรวม — แทน CSV เดิม
@@ -1831,20 +1280,14 @@ function EventCalendar() {
     });
   }, []);
 
-  // ✅ เดิมเดือนที่แสดงในปฏิทินจริง กับเดือนที่เปิดดูในแผงงานล่วงหน้าเป็นคนละ state แยกกันเลย
-  // เลื่อนเดือนฝั่งไหนก็ไม่กระทบอีกฝั่ง สับสนว่าทำไมดูกันคนละเดือน — sync ให้เป็นเดือนเดียวกันเสมอ
-  // ⚠️ ใช้ info.view.currentStart ที่ FullCalendar ส่งมาให้เอง แทน calendarRef.current.getApi()
+  // ⚠️ ใช้ info.view ที่ FullCalendar ส่งมาให้เอง แทน calendarRef.current.getApi()
   // — ตอน mount ครั้งแรก datesSet จะยิงจาก componentDidMount ภายในก่อนที่ React จะ assign ref
   // ให้ calendarRef เสร็จ (ref ยังเป็น null อยู่) ทำให้ .getApi() พังทันทีถ้าอ่านจาก ref ตรงๆ
   const handleDatesSet = useCallback((info) => {
     handleHighlightWeekends();
     setCalTitle(info.view.title || "");
-    const calendarMonth = moment(info.view.currentStart).format("YYYY-MM");
-    setDraftMonth((prev) => (prev === calendarMonth ? prev : calendarMonth));
   }, [handleHighlightWeekends]);
 
-  // ✅ ทิศทางกลับกัน: เลื่อนเดือนจากปุ่ม ‹ › ของแผงงานล่วงหน้าเอง ก็ต้องพาปฏิทินจริงตามไปเดือน
-  // เดียวกันด้วย (handleDatesSet ด้านบนจะ sync draftMonth ให้ตรงกันเองอัตโนมัติหลังจากนี้)
   // 🐛 ที่แก้ (5 ต.ค. 2569 ผู้ใช้: "ค้นหาชื่อที่ไม่มีในตาราง แถบนี้จะหายไป"): เดิมใช้ IntersectionObserver
   //    เฝ้าแถบหัวปฏิทินตัวเดิม — กรองแล้วปฏิทินเตี้ยลง/วาดหัวใหม่ แถบลอยเลยหายกลางคันทั้งที่ยังเลือกช่างค้างอยู่
   //    ✅ ตอนนี้วัดตำแหน่งแถบหัว "ตัวปัจจุบัน" ทุกครั้งที่เลื่อน/ย่อจอ/ข้อมูลเปลี่ยน
@@ -1867,11 +1310,6 @@ function EventCalendar() {
       window.removeEventListener("scroll", check, { capture: true });
       window.removeEventListener("resize", check);
     };
-  }, []);
-
-  const handleDraftMonthChange = useCallback((newMonth) => {
-    setDraftMonth(newMonth);
-    calendarRef.current?.getApi()?.gotoDate(moment(newMonth, "YYYY-MM").format("YYYY-MM-DD"));
   }, []);
 
   const [employeeList, setEmployeeList] = useState([]);
@@ -1927,30 +1365,12 @@ function EventCalendar() {
     [employeeList],
   );
 
-  // ⚠️ แก้ตามที่ผู้ใช้ขอ: ฉบับร่างของ "สัญญา" (มี contractGroupId — สร้างจากฟอร์ม "เพิ่มสัญญาใหม่" ใน
-  // ContractOverview.js ตอนยังไม่ระบุวันที่เข้างานครั้งที่ 1) ไม่ควรโผล่ปนอยู่ในแผงงานล่วงหน้าของหน้า
-  // ปฏิทินนี้เลย — เพราะแผงนี้ออกแบบไว้ให้ลบ/ลากลงตารางได้อย่างอิสระสำหรับงานทั่วไป/โปรเจคที่ยังไม่มี
-  // วันที่ ถ้ามีคนกดลบฉบับร่างของสัญญาจากตรงนี้โดยไม่รู้ว่าเป็นตัวยึดของทั้งสัญญา จะทำให้สัญญาทั้งอัน
-  // หายไปจากหน้า "ภาพรวมงาน" ทันที — ให้ไปเพิ่มวันที่ครั้งที่ 1 ผ่านปุ่ม "+" ในตาราง "ภาพรวมงาน" แทน
-  // เท่านั้น (ดู openAddVisitDialog ที่นั่น) ฉบับร่างของสัญญายังคงอยู่ในระบบ/นับรวมในตารางตามปกติ แค่ไม่
-  // แสดงในแผงนี้เท่านั้น
-  const visibleDrafts = useMemo(
-    () => drafts.filter((d) => !d.contractGroupId),
-    [drafts],
-  );
-
-  // ✅ กรอง drafts ที่ดึงมาทั้งหมดให้เหลือเฉพาะเดือนที่กำลังเปิดดูอยู่ในแผงงานล่วงหน้า
-  const draftsForMonth = useMemo(
-    () => visibleDrafts.filter((d) => d.plannedMonth === draftMonth),
-    [visibleDrafts, draftMonth],
-  );
-
   // ✅ ยอดรวม "งานรออนุมัติ" — แอดมิน/manager เห็นทั้งระบบ (มีสิทธิ์อนุมัติได้ทุกงาน) คนอื่นเห็นแค่ของ
   // ตัวเอง กันโชว์ตัวเลขที่กดอนุมัติเองไม่ได้อยู่ดี ดูแล้วงงว่าทำไมกดไม่ได้ — นับรวมทั้งงานที่มีวันที่แล้ว
-  // (events) และแผนงานล่วงหน้าที่ยังไม่มีวันที่ (drafts) เข้าด้วยกัน
+  // (events) เท่านั้น — งานที่ยังไม่ลงตารางไม่อยู่ในหน้านี้แล้ว (ดูที่เมนู "งานใหม่")
   const pendingApprovalCount = useMemo(
-    () => countPendingJobs(events, drafts, { userId, isAdminOrManager }),
-    [events, drafts, userId, isAdminOrManager]
+    () => countPendingJobs(events, [], { userId, isAdminOrManager }),
+    [events, userId, isAdminOrManager]
   );
 
   // ⚠️ selectedSystem/selectedApproval ไม่มีช่องให้กรอกในแผงของฝ่ายขาย (ดู JSX ด้านล่าง) แต่ค่าเดิม
@@ -3266,31 +2686,16 @@ function EventCalendar() {
         </button>
         )}
 
-        {/* ⚠️ นัดหมายของเซลไม่มีแนวคิด "วางแผนล่วงหน้าไม่ระบุวันที่" เลย (ดู fetchDrafts) —
-            ปุ่มนี้จึงไม่มีความหมายในโลกฝ่ายขาย ซ่อนไปเลยแทนที่จะโชว์ปุ่มที่กดแล้วว่างเปล่าตลอด */}
-        {!isSalesView && !isServiceObserver && (
-          <button
-            className={`filter-toggle-btn ${showDraftsPanel ? "filter-toggle-btn--open" : ""} ${visibleDrafts.length > 0 ? "filter-toggle-btn--active" : ""}`}
-            onClick={() => { if (techListMode) setTechView("calendar"); setShowDraftsPanel((p) => !p); }}
-            title="งานวางแผนล่วงหน้า (ยังไม่ลงตาราง)"
-          >
-            <FontAwesomeIcon icon={faClipboardList} />
-            <span className="tb-label">แผนล่วงหน้า</span>
-            {visibleDrafts.length > 0 && <span className="filter-badge">{visibleDrafts.length}</span>}
-          </button>
-        )}
 
         {/* ✅ ปุ่ม "N ต้องอนุมัติ" — ซ่อนไปเลยตอนไม่มีอะไรรออนุมัติ (เทียบ pattern เดียวกับ
             ClosureRequestsPanel ในหน้า Operation ที่ return null ตอนไม่มีคำขอ) กดแล้วกรองตารางเหลือ
-            เฉพาะงานรออนุมัติทันที พร้อมเปิดแผงงานล่วงหน้าด้วย (ให้เห็นทั้งงานที่มีวันที่แล้วและแผนงานที่
-            ยังไม่มีวันที่พร้อมกันในมุมมองเดียว) */}
+            เฉพาะงานรออนุมัติทันที */}
         {pendingApprovalCount > 0 && (
           <button
             className="filter-toggle-btn filter-toggle-btn--approval-pending"
             onClick={() => {
               setSelectedApproval("pending");
               setShowFilterPanel(true);
-              setShowDraftsPanel(true);
             }}
             title="งานรออนุมัติ"
           >
@@ -3351,12 +2756,6 @@ function EventCalendar() {
         </div>
       )}
 
-      {/* ✅ งานวางแผนล่วงหน้า (ยังไม่ลงตาราง) แยกเป็นเดือนๆ — ลากการ์ดวางบนปฏิทิน หรือกดปุ่ม
-          "ลงตาราง" เลือกวันที่เองก็ได้ ตาม requirement: บันทึกไว้ก่อนว่ามีงานนี้แน่ๆ เดือนนี้
-          แต่ยังไม่รู้วันที่เป๊ะ ไม่ต้องลงตารางทันที
-          ✅ ปฏิทิน + คอลัมน์นี้เรียงข้างกันบนจอใหญ่ (≥992px) — กดปุ่มด้านบนเพื่อเปิด/ปิด ปฏิทินย่อ
-          ความกว้างให้เองอัตโนมัติ (ดู .calendar-layout ใน index.css) จอเล็กกว่านั้นไม่มีที่พอวาง
-          ข้างกัน กลับไปเรียงบนล่างเหมือนเดิม (เดิมแผงนี้ดันปฏิทินลงมาทุกครั้งที่เปิด) */}
       {salesListMode && (
         <SalesAgenda
           events={filteredCalendarEvents}
@@ -3380,30 +2779,9 @@ function EventCalendar() {
 
       {/* ⚠️ โหมดรายการของเซล: ซ่อนปฏิทินไว้แต่ยัง mount อยู่ (โค้ดหลายส่วนผูกกับ DOM ของ FullCalendar) */}
       <div
-        className={`calendar-layout ${showDraftsPanel && !isSalesView ? "calendar-layout--with-drafts" : ""}${grayMode && !isSalesView ? " calendar-layout--gray" : ""}`}
+        className={`calendar-layout${grayMode && !isSalesView ? " calendar-layout--gray" : ""}`}
         style={listMode ? { display: "none" } : undefined}
       >
-        {/* ⚠️ กันซ้ำอีกชั้น (ปุ่มเปิดถูกซ่อนไปแล้วด้านบน) เผื่อ showDraftsPanel ยังค้างค่า true
-            จากตอนอยู่ปฏิทินช่างก่อนสลับมา — คนละ query string บนหน้าเดียวกัน ไม่ได้ remount */}
-        {showDraftsPanel && !isSalesView && (
-          <aside className="calendar-drafts-col">
-            <UnscheduledPanel
-              ref={draftsPanelRef}
-              drafts={draftsForMonth}
-              loading={draftsLoading}
-              month={draftMonth}
-              onMonthChange={handleDraftMonthChange}
-              onAddClick={handleAddDraft}
-              onEditClick={handleEditDraftClick}
-              onScheduleClick={handleScheduleDraftClick}
-              onDeleteClick={handleDeleteDraftClick}
-              onCopyClick={handleCopyEvent}
-              highlightDraftId={highlightDraftId}
-              isAdminOrManager={isAdminOrManager}
-              onDecideApproval={handleDecideDraftApproval}
-            />
-          </aside>
-        )}
 
         {/* ✅ ไม่ตั้ง CSS zoom เองอีกต่อไป (ปฏิทินแสดงที่ 100% เสมอตอนเปิดหน้า) — การย่อ/ขยายบนมือถือ
             ใช้การหุบ/กางนิ้วของเบราว์เซอร์เองแทน ซึ่งไม่ไปยุ่งกับ layout ของปฏิทิน จึงไม่มีปัญหาพื้นที่
@@ -3463,13 +2841,10 @@ function EventCalendar() {
              ⚠️ ทั้งคู่ยกเลิกเองทันทีที่นิ้วขยับก่อนครบเวลา การปัดเลื่อนดูปฏิทินจึงไม่กลายเป็นการลากงาน */
           selectLongPressDelay={200}
           eventLongPressDelay={500}
-          droppable={true}
           dateClick={(arg) => {
             if (isPinching()) return; // กำลังหุบ/กางนิ้วซูมอยู่ ไม่ใช่การแตะเลือกวัน
             handleAddEvent(arg);
           }}
-          eventReceive={handleEventReceive}
-          eventDragStart={handleEventDragStart}
           eventDragStop={handleEventDragStop}
           eventClick={(arg) => {
             if (isPinching()) return; // กำลังหุบ/กางนิ้วซูมอยู่ ไม่ใช่การแตะเปิดงาน

@@ -3505,10 +3505,9 @@ const Operation = () => {
           </Box>
           <Tooltip title="ดูงานนี้ในปฏิทิน">
             <IconButton aria-label="ดูในปฏิทิน" onClick={() => {
-              const q = selectedEvent.unscheduled
-                ? `draft=${selectedEvent._id}&month=${selectedEvent.plannedMonth || ""}`
-                : `event=${selectedEvent._id}&date=${moment(selectedEvent.start).format("YYYY-MM-DD")}`;
-              navigate(`/event?${q}&t=${Date.now()}`);
+              // งานที่ยังไม่ลงตาราง → หน้า "งานใหม่" (ตารางงานไม่มีแผงแผนล่วงหน้าแล้ว 10 ต.ค. 2569)
+              if (selectedEvent.unscheduled) { navigate("/jobs/intake"); return; }
+              navigate(`/event?event=${selectedEvent._id}&date=${moment(selectedEvent.start).format("YYYY-MM-DD")}&t=${Date.now()}`);
             }} sx={{ width: 38, height: 38, border: "1px solid #e2e8f0", borderRadius: 2, color: "#334155" }}>
               <CalendarMonth sx={{ fontSize: 19 }} />
             </IconButton>
@@ -3792,10 +3791,9 @@ const Operation = () => {
                 <Button
                   size="small" startIcon={<CalendarMonth sx={{ fontSize: 16 }} />}
                   onClick={() => {
-                    const q = head.unscheduled
-                      ? `draft=${head._id}&month=${head.plannedMonth || ""}`
-                      : `event=${head._id}&date=${moment(head.start).format("YYYY-MM-DD")}`;
-                    navigate(`/event?${q}&t=${Date.now()}`);
+                    // งานที่ยังไม่ลงตาราง → หน้า "งานใหม่" (ตารางงานไม่มีแผงแผนล่วงหน้าแล้ว 10 ต.ค. 2569)
+                    if (head.unscheduled) { navigate("/jobs/intake"); return; }
+                    navigate(`/event?event=${head._id}&date=${moment(head.start).format("YYYY-MM-DD")}&t=${Date.now()}`);
                   }}
                   sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, flexShrink: 0 }}
                 >

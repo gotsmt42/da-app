@@ -1301,7 +1301,6 @@ export const getEditEvent = async ({
   // ✅ เบิก Advance ของงานนี้ — ฟอร์มใบเบิกเป็น React Dialog เหมือนกล่องเอกสารด้านบน (ดู advanceJob ใน CalendarBoard)
   onRequestAdvance,
   handleDeleteEvent,
-  handleUnscheduleEvent,
   onCopyEvent,
   EventService,
   CustomerService,
@@ -1461,7 +1460,7 @@ export const getEditEvent = async ({
   // ✅ งานที่ยังรออนุมัติ (ไม่ใช่ "ถูกปฏิเสธ" — เคสนั้นยังต้องแก้ไขได้เพื่อส่งขออนุมัติใหม่ตามปกติ) —
   // ช่าง/ผู้รับผิดชอบเปิดดูได้อย่างเดียว แก้ไข/ทำอะไรไม่ได้เลยจนกว่าแอดมิน/manager จะตัดสินใจก่อน
   // (ตามที่ผู้ใช้ยืนยัน) ล็อกทุกช่อง/ปุ่มที่ปกติช่างแก้ไข/กดได้ (วันที่-เวลา/สถานะ/ทีม/คัดลอก/ลบ/
-  // ย้ายไปแผนล่วงหน้า) เหลือแค่ดูข้อมูล + ปุ่มปิด — admin/manager ไม่ถูกจำกัดเลย ยังทำงานได้ตามปกติ
+  // ฯลฯ) เหลือแค่ดูข้อมูล + ปุ่มปิด — admin/manager ไม่ถูกจำกัดเลย ยังทำงานได้ตามปกติ
   const isPendingForTech = eventApprovalState === "pending" && !isAdminOrManagerUser;
   const isOwnerUser    = Boolean(userId) && userId.toString() === userData?.userId?.toString();
   // ✅ "ผู้รับผิดชอบตัวจริง" (effective) — fallback ไปที่ team/resPerson เฉพาะงานที่ยังไม่เคยตั้งค่า
@@ -1570,21 +1569,6 @@ export const getEditEvent = async ({
   // ❌ งานที่ยังรออนุมัติ ช่างก็ลบเองไม่ได้เช่นกัน (isPendingForTech) — ทำอะไรไม่ได้เลยจนกว่าจะอนุมัติ/
   // ไม่อนุมัติก่อน
   const canDeleteEvent = !readOnly && (isAdminOrManagerUser || (eventStatus !== "ดำเนินการเสร็จสิ้น" && !isViewOnly));
-  // ❌ งานที่ปิดแล้ว (ดำเนินการเสร็จสิ้น) ห้าม "ย้ายไปแผนล่วงหน้า" เด็ดขาด ไม่มีข้อยกเว้นแม้แต่ admin/
-  // manager (ต่างจาก canDeleteEvent ด้านบน) เพราะ unschedule เคลียร์ date/start/end ทิ้งโดยไม่แตะ
-  // status เลย ถ้าปล่อยให้ทำกับงานที่เสร็จแล้วได้ จะได้ "แผนงานล่วงหน้า" ที่ status ยังเป็น "เสร็จสิ้น"
-  // ค้างอยู่ ซึ่งเป็นสถานะขัดแย้งกันเองที่ไม่ควรเกิดขึ้นได้เลย (เทียบ pattern เดียวกับฝั่ง backend
-  // PUT /:id/unschedule ที่ปิดเด็ดขาดเหมือนกัน) — ช่างงานรออนุมัติก็ทำไม่ได้เหมือนกัน (isPendingForTech)
-  // แต่ admin/manager ยังทำได้เสมอไม่ว่าจะรออนุมัติหรือไม่ (ไม่มี isAdminOrManagerUser bypass ตรงนี้ตั้งแต่แรกอยู่แล้ว)
-  // ✅ เพิ่มตามที่ผู้ใช้ขอ: "ยืนยันแล้ว"/"กำลังดำเนินการ" ก็ห้ามย้ายกลับไปแผนล่วงหน้าเหมือนกัน —
-  // สองสถานะนี้แปลว่างานถูกนัดหมาย/เริ่มลงมือไปแล้วจริง (ลูกค้ารับรู้วันแล้ว หรือช่างเข้าหน้างานแล้ว)
-  // การดึงกลับไปเป็น "แผนล่วงหน้าที่ยังไม่มีวันที่" จะทำให้ประวัติงานขัดแย้งกันเอง แบบเดียวกับเคส
-  // "ดำเนินการเสร็จสิ้น" ที่ปิดไว้อยู่แล้ว — เหลือย้ายได้เฉพาะงานที่ยัง "กำลังรอยืนยัน" เท่านั้น
-  // ⚠️ ปิดสำหรับทุก role รวม admin/manager (เจตนาเดียวกับ "ดำเนินการเสร็จสิ้น") ถ้าจำเป็นต้องย้ายจริงๆ
-  // ให้เปลี่ยนสถานะกลับเป็น "กำลังรอยืนยัน" ก่อน จะได้มีร่องรอยว่าตั้งใจถอยสถานะจริง
-  const UNSCHEDULE_BLOCKED_STATUSES = ["ดำเนินการเสร็จสิ้น", "ยืนยันแล้ว", "กำลังดำเนินการ"];
-  const canUnscheduleEvent =
-    !readOnly && !UNSCHEDULE_BLOCKED_STATUSES.includes(eventStatus) && (isAdminOrManagerUser || !isViewOnly);
   // ✅ ช่างแก้ไขสถานะเองได้แค่ตอนยังอยู่ในช่วง กำลังรอยืนยัน/ยืนยันแล้ว เท่านั้น
   // ถ้าสถานะถูกเลื่อนไปไกลกว่านั้นแล้ว (กำลังดำเนินการ/ดำเนินการเสร็จสิ้น) ให้แสดงค่าจริงไว้ แต่แก้ไม่ได้
   // ❌ งานที่ยังรออนุมัติ ช่างเปลี่ยนสถานะเองไม่ได้เช่นกัน (isPendingForTech) — ต้องรออนุมัติก่อน
@@ -1800,7 +1784,7 @@ export const getEditEvent = async ({
   // มีอะไรให้ใส่ในเมนู "เพิ่มเติม" ไหม — ถ้าไม่มีเลย (เช่น เซลเปิดดูอย่างเดียว) ก็ไม่ต้องมีปุ่มเมนู
   const hasMoreActions = Boolean(
     canViewOperation || canRequestAdvance || !readOnly || (canEditDocFields && onOpenDeliveryNote)
-      || canAttachToContract || canUnscheduleEvent || canDeleteEvent
+      || canAttachToContract || canDeleteEvent
   );
   const titleValues = (jobTypes?.items || []).map((t) => t.name);
   const systemValues = (systemTypes?.items || []).map((s) => s.name);
@@ -2381,7 +2365,6 @@ export const getEditEvent = async ({
       ${readOnly ? "" : `<button class="ee-more-item" id="btnGeneratePDF"><span>📄</span> ออกใบแจ้งเข้างาน</button>`}
       ${canEditDocFields && onOpenDeliveryNote ? `<button class="ee-more-item" id="btnDeliveryNote"><span>📦</span> ออกใบส่งมอบงาน</button>` : ""}
       ${canAttachToContract ? `<button class="ee-more-item" id="btnAttachContract"><span>🔗</span> ย้ายเข้าสัญญา</button>` : ""}
-      ${canUnscheduleEvent ? `<button class="ee-more-item" id="btnUnschedule"><span>↩️</span> ย้ายไปแผนล่วงหน้า</button>` : ""}
       ${canDeleteEvent ? `<button class="ee-more-item ee-more-item--danger" id="btnDelete"><span>🗑</span> ลบแผนงาน</button>` : ""}
     </div>` : ""}
 
@@ -3755,18 +3738,9 @@ export const getEditEvent = async ({
         handleDeleteEvent(eventId);
       });
 
-      /* ✅ ย้ายกลับไปเป็นงานวางแผนล่วงหน้า (unscheduled) — สำหรับงานที่ลงตารางไปแล้วแต่อยาก
-         เอาวันที่ออกก่อน กลับไปอยู่ในแผงงานล่วงหน้าเหมือนเดิม โดยไม่ต้องลบทิ้งทั้งงาน
-         handleUnscheduleEvent เปิด Swal ยืนยันของตัวเองอยู่แล้ว จึงปิด modal นี้ก่อนเรียก
-         (แพทเทิร์นเดียวกับ btnDelete ด้านบน) */
-      document.getElementById("btnUnschedule")?.addEventListener("click", () => {
-        Swal.close();
-        handleUnscheduleEvent(eventId);
-      });
-
       /* ✅ ย้ายเข้าสัญญาที่มีอยู่แล้ว — เปิดป๊อปอัพเล็กแยกต่างหาก (ไม่ใช้ scope เดียวกับฟอร์มแก้ไขหลัก
-         ดู injectAttachStyles ด้านบน) ปิด modal แก้ไขนี้ก่อนเหมือน pattern เดียวกับ btnDelete/
-         btnUnschedule ด้านบน กันซ้อนกัน 2 ชั้น */
+         ดู injectAttachStyles ด้านบน) ปิด modal แก้ไขนี้ก่อนเหมือน pattern เดียวกับ btnDelete
+         ด้านบน กันซ้อนกัน 2 ชั้น */
       document.getElementById("btnAttachContract")?.addEventListener("click", () => {
         Swal.close();
         openAttachContractDialog();

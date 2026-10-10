@@ -212,13 +212,10 @@ export default function PendingApprovalsPanel({ onCountChange, active = true }) 
   };
 
   // ✅ ไปดูงานนี้บนหน้าปฏิทินแบบเจาะจง — งานที่ลงตารางแล้วเปิดไปที่เดือน/วันของมันแล้วไฮไลต์การ์ดให้
-  // (?event=) ส่วนงานที่ยังไม่ลงตารางไม่มีวันที่จริง ต้องส่งไปที่แผงงานล่วงหน้า (?draft=) แทน ซึ่งเป็น
-  // ที่ที่การ์ดของมันอยู่จริง — ดูตัวรับพารามิเตอร์ทั้งสองตัวที่ EventCalendar/index.js
+  // (?event=) ส่วนงานที่ยังไม่ลงตารางไม่มีวันที่จริง ส่งไปหน้า "งานใหม่" (ตารางงานไม่มีแผงแผนล่วงหน้าแล้ว)
   const goToCalendar = (head) => {
-    const q = head.unscheduled
-      ? `draft=${head._id}&month=${head.plannedMonth || ""}`
-      : `event=${head._id}&date=${moment(head.start).format("YYYY-MM-DD")}`;
-    navigate(`/event?${q}&t=${Date.now()}`);
+    if (head.unscheduled) { navigate("/jobs/intake"); return; }
+    navigate(`/event?event=${head._id}&date=${moment(head.start).format("YYYY-MM-DD")}&t=${Date.now()}`);
   };
 
   const goToDetail = (head) => {
@@ -230,7 +227,7 @@ export default function PendingApprovalsPanel({ onCountChange, active = true }) 
         navigate("/contracts");
         return;
       }
-      navigate(`/event?draft=${head._id}&month=${head.plannedMonth || ""}&t=${Date.now()}`);
+      navigate("/jobs/intake"); // งานที่ยังไม่ลงตาราง → หน้า "งานใหม่" (ตารางงานไม่มีแผงแผนล่วงหน้าแล้ว 10 ต.ค. 2569)
     } else {
       navigate(`/operation/${head._id}`);
     }
