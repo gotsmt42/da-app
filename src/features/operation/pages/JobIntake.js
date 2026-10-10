@@ -7,7 +7,7 @@
  *   • เห็นเฉพาะงานที่รับผ่านปุ่ม "รับงานใหม่" (intakeAt) — งานเก่า/งานที่ลงปฏิทินตรงๆ ไม่มาปน
  *   • ทุกงานมีแถบขั้นตอนเดียวกัน: รับงาน → ลงตาราง → ช่างทำงาน → ตรวจปิดงาน → เสร็จ
  *     บอกชัดว่าอยู่ขั้นไหน และปุ่มถัดไปคืออะไร (ส่งลงตาราง / ดูงาน)
- *   • "ส่งลงตาราง" = เลือกวัน + หัวหน้าทีม ในหน้านี้เลย ไม่ต้องไปลากในปฏิทิน
+ *   • "ส่งลงตาราง" = เลือกวัน + หัวหน้าทีม + ผู้รับผิดชอบงาน ในหน้านี้เลย ไม่ต้องไปลากในปฏิทิน
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -22,7 +22,7 @@ import { alpha } from "@mui/material/styles";
 import {
   PostAddOutlined, AddRounded, EditOutlined, ChevronRight, Close, EventAvailableOutlined, CheckRounded,
   ApartmentOutlined, CalendarMonthOutlined, GroupsOutlined, PersonOutlineOutlined, NotesOutlined, HourglassTopRounded, ReportProblemOutlined,
-  BlockRounded, RestoreRounded,
+  BlockRounded, RestoreRounded, AssignmentIndOutlined,
 } from "@mui/icons-material";
 import EventService from "@/shared/services/EventService";
 import CustomerService from "@/shared/services/CustomerService";
@@ -38,6 +38,7 @@ import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import { getAddDraftEvent } from "@/features/calendar/components/EventForms/AddDraftEvent";
 import { isUrgent, openFollowUp } from "@/shared/utils/jobFlow";
 import { nextStepOf } from "@/shared/ui/JobFlow";
+import { can } from "@/shared/utils/roles";
 
 const AMBER = "#d97706";
 const GREEN = "#16a34a";
@@ -90,15 +91,31 @@ function StageBar({ stage }) {
   );
 }
 
-/** กล่องส่งลงตาราง — เลือกวันเริ่ม/วันสิ้นสุด และหัวหน้าทีม */
-function ScheduleDialog({ job, employees, onClose, onDone }) {
+/**
+ * กล่องส่งลงตาราง — เลือกวันเริ่ม/วันสิ้นสุด หัวหน้าทีม และผู้รับผิดชอบงาน
+ *
+ * ✅ (10 ต.ค. 2569 ผู้ใช้: "ให้เลือกผู้รับผิดชอบงานได้ด้วย ให้สมบูรณ์และสอดคล้อง")
+ *   • หัวหน้าทีม = คนที่เข้างานรอบนี้ (team/resPerson) · ผู้รับผิดชอบงาน = คนดูแลทั้งงาน (responsiblePerson)
+ *     — แยกกันแบบเดียวกับหัวกล่องแก้ไขงาน (EditEvent) และหน้าภาพรวมงาน
+ *   • บันทึกผู้รับผิดชอบผ่าน /events/basic-info ตัวเดียวกับหน้าอื่น → ทุกหน้าเห็นชื่อเดียวกัน
+ *   • มอบหมายได้เฉพาะผู้มีสิทธิ์ editContracts (เหมือน EditEvent · server เช็คซ้ำ) — คนอื่นเห็นชื่อแต่เลือกไม่ได้
+ */
+function ScheduleDialog({ job, employees, canAssignResponsible, onClose, onDone }) {
   const defStart = job.plannedMonth && job.plannedMonth > moment().format("YYYY-MM")
     ? moment(job.plannedMonth, "YYYY-MM").startOf("month").format("YYYY-MM-DD")
     : moment().add(1, "day").format("YYYY-MM-DD");
   const [start, setStart] = useState(defStart);
   const [end, setEnd] = useState(defStart);
   const [team, setTeam] = useState(job.team || "");
+  const initialResp = job.responsiblePerson || "";
+  const [resp, setResp] = useState(initialResp);
   const [saving, setSaving] = useState(false);
+  const people = useMemo(
+    () => employees.filter((u) => u.fname).slice().sort((a, b) => a.fname.localeCompare(b.fname, "th")),
+    [employees],
+  );
+  // ชื่อเดิมที่ไม่อยู่ในรายชื่อพนักงานแล้ว (ข้อมูลเก่า) ยังต้องเห็นอยู่
+  const extra = (v) => (v && !people.some((u) => u.fname === v) ? [<MenuItem key={`x-${v}`} value={v}>{v}</MenuItem>] : []);
   const ok = start && (!end || end >= start);
 
   const save = async () => {
@@ -111,7 +128,21 @@ function ScheduleDialog({ job, employees, onClose, onDone }) {
         date: start, start, end: moment(last).add(1, "day").format("YYYY-MM-DD"),
         ...(team ? { team, resPerson: emp?._id || "" } : {}),
       });
+      // ผู้รับผิดชอบงาน — หลังลงตารางสำเร็จเท่านั้น (ถ้าส่งลงตารางไม่ผ่าน จะไม่มีอะไรถูกเปลี่ยน)
+      let respFailed = false;
+      if (canAssignResponsible && resp !== initialResp) {
+        const person = people.find((u) => u.fname === resp);
+        try {
+          await EventService.UpdateBasicInfo([job._id], { responsiblePerson: resp, responsiblePersonId: person?._id ? String(person._id) : "" });
+        } catch {
+          respFailed = true;
+        }
+      }
       onDone();
+      if (respFailed) {
+        Swal.fire({ icon: "warning", title: "ส่งลงตารางแล้ว", text: "แต่บันทึกผู้รับผิดชอบงานไม่สำเร็จ — แก้ได้จากหน้าแก้ไขงาน" });
+        return;
+      }
       Swal.fire({ icon: "success", title: "ส่งลงตารางแล้ว", text: "งานขึ้นในตารางงานช่างเรียบร้อย", timer: 1500, showConfirmButton: false });
     } catch (err) {
       Swal.fire({ icon: "error", title: "ส่งลงตารางไม่สำเร็จ", text: err?.response?.data?.message || "กรุณาลองใหม่" });
@@ -136,9 +167,18 @@ function ScheduleDialog({ job, employees, onClose, onDone }) {
           <ThaiDatePicker label="วันที่เข้างาน" value={start} onChange={(v) => { setStart(v || ""); if (!end || (v && end < v)) setEnd(v || ""); }} />
           <ThaiDatePicker label="ถึงวันที่" value={end} onChange={(v) => setEnd(v || "")} minDate={start ? moment(start) : undefined} />
         </Box>
-        <TextField select fullWidth size="small" label="หัวหน้าทีม (ไม่บังคับ)" value={team} onChange={(e) => setTeam(e.target.value)} sx={{ mt: 2 }}>
+        <TextField select fullWidth size="small" label="หัวหน้าทีมที่เข้างาน (ไม่บังคับ)" value={team} onChange={(e) => setTeam(e.target.value)} sx={{ mt: 2 }}
+          helperText="คนที่นำทีมเข้าหน้างานรอบนี้">
           <MenuItem value=""><em>ยังไม่ระบุ — มอบหมายทีหลังได้</em></MenuItem>
-          {employees.map((u) => <MenuItem key={u._id} value={u.fname}>{[u.fname, u.lname].filter(Boolean).join(" ")}</MenuItem>)}
+          {people.map((u) => <MenuItem key={u._id} value={u.fname}>{[u.fname, u.lname].filter(Boolean).join(" ")}</MenuItem>)}
+          {extra(team)}
+        </TextField>
+        <TextField select fullWidth size="small" label="ผู้รับผิดชอบงาน" value={resp} onChange={(e) => setResp(e.target.value)} sx={{ mt: 1.5 }}
+          disabled={!canAssignResponsible}
+          helperText={canAssignResponsible ? "คนดูแลงานนี้ทั้งงาน ตั้งแต่ลงตารางจนปิดงาน" : "มอบหมายได้เฉพาะแอดมิน/ผู้จัดการ"}>
+          <MenuItem value=""><em>ยังไม่ได้มอบหมาย</em></MenuItem>
+          {people.map((u) => <MenuItem key={u._id} value={u.fname}>{[u.fname, u.lname].filter(Boolean).join(" ")}</MenuItem>)}
+          {extra(resp)}
         </TextField>
         <Typography sx={{ fontSize: "0.74rem", color: MUTED, mt: 1.5 }}>
           ส่งแล้วงานจะขึ้นในตารางงานช่างทันที · เวลา/ลูกทีมเพิ่มได้ภายหลังจากหน้าตารางงาน
@@ -212,6 +252,7 @@ function JobCard({ job, onSchedule, onEdit, onCancel, onRestore }) {
             <Line icon={ApartmentOutlined} strong>{[job.site, job.company && job.company !== job.site ? job.company : ""].filter(Boolean).join(" · ") || "-"}</Line>
             <Line icon={CalendarMonthOutlined}>{when}{due ? ` · ต้องเสร็จภายใน ${due}` : ""}</Line>
             {!job.unscheduled && <Line icon={GroupsOutlined}>{team ? `ทีม ${team}` : "ยังไม่มอบหมายทีม"}</Line>}
+            <Line icon={AssignmentIndOutlined}>{job.responsiblePerson ? `ผู้รับผิดชอบ ${job.responsiblePerson}` : "ยังไม่มอบหมายผู้รับผิดชอบ"}</Line>
             {(job.contactName || job.contactTel) && (
               <Line icon={PersonOutlineOutlined}>
                 {job.contactName || "ผู้ติดต่อ"}
@@ -231,7 +272,7 @@ function JobCard({ job, onSchedule, onEdit, onCancel, onRestore }) {
           {/* ✅ บอกชัดว่าต่อไปต้องทำอะไร (ตัวเดียวกับกล่อง "ขั้นตอนถัดไป" ในหน้าการดำเนินงาน) */}
           {(() => {
             const nx = job.cancelledAt ? null : job.unscheduled
-              ? { title: "ส่งลงตาราง", desc: "กด “ส่งลงตาราง” เลือกวันเข้างานและหัวหน้าทีม" }
+              ? { title: "ส่งลงตาราง", desc: "กด “ส่งลงตาราง” เลือกวันเข้างาน หัวหน้าทีม และผู้รับผิดชอบงาน" }
               : st.i >= 0 && st.i < 4 ? nextStepOf(job, "admin") : null;
             return nx ? (
               <Typography sx={{ fontSize: "0.78rem", color: "#334155", mt: 0.75 }}>
@@ -371,7 +412,7 @@ export default function JobIntake() {
       )}
 
       {scheduling && (
-        <ScheduleDialog job={scheduling} employees={employees} onClose={() => setScheduling(null)}
+        <ScheduleDialog job={scheduling} employees={employees} canAssignResponsible={can(userData, "editContracts")} onClose={() => setScheduling(null)}
           onDone={async () => { setScheduling(null); await load(); refreshAppBadges(); }} />
       )}
     </Box>
