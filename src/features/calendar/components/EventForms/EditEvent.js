@@ -12,6 +12,9 @@ import { overviewResponsibleOf } from "@/shared/utils/contractOverdue";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 import { jobInfoSectionHtml, bindJobInfo, readJobInfo } from "./jobInfoSection";
 import { domFormDraft } from "@/shared/utils/formDraft";
+import { createElement } from "react";
+import { createRoot } from "react-dom/client";
+import SitePhotos from "@/shared/ui/SitePhotos";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { can } from "@/shared/utils/roles";
 // ✅ พิกัดหน้างาน — ใช้ตัวช่วยชุดเดียวกับหน้าอื่น (ดูหัวไฟล์ SiteMapLink.js)
@@ -2300,6 +2303,11 @@ export const getEditEvent = async ({
       equipment: ev.extendedProps?.equipment, infoPending: ev.extendedProps?.infoPending, infoPendingNote: ev.extendedProps?.infoPendingNote,
     }, "ee", isClosedForTech)}
 
+    ${/* ✅ (10 ต.ค. 2569 ผู้ใช้: "อัพไฟล์รูปให้ทำใน editEvent ด้วย แล้วให้ข้อมูลเชื่อมต่อกัน")
+         รูปและไฟล์หน้างาน — ชุดเดียวกับการ์ดในหน้าการดำเนินงาน/งานของฉัน (Events.sitePhotoFiles) อัปจากที่ไหนก็เห็นทุกที่
+         ⚠️ data-no-draft: ช่องเลือกไฟล์ไม่ต้องเข้าระบบกู้คืนข้อมูลฟอร์ม */""}
+    ${ev.extendedProps?.department === "sales" ? "" : `<div id="ee-sitePhotosMount" data-no-draft style="margin-bottom:16px"></div>`}
+
     <!-- section: เอกสาร — ✅ ช่างที่มีชื่อในงาน (หัวหน้าทีม/ลูกทีม) แก้ได้แล้ว และยังแก้ได้แม้งานปิดไปแล้ว
          (เรื่องเอกสารมักตามมาทีหลังงานปิดเสมอ — ดู canEditDocFields) -->
     <section class="ee-card">
@@ -2546,6 +2554,10 @@ export const getEditEvent = async ({
       popup.__thaiDpCleanup?.();
       popup.__colorPickerCleanup?.();
       popup.querySelectorAll(".tomselected").forEach((el) => el.tomselect?.destroy());
+      // รูปหน้างาน: ถอด React root · มีการเพิ่ม/ลบ → โหลดข้อมูลปฏิทินใหม่ให้การ์ดอื่นเห็นตรงกัน
+      const photosRoot = popup.__sitePhotosRoot;
+      if (photosRoot) setTimeout(() => photosRoot.unmount(), 0);
+      if (popup.__sitePhotosChanged) fetchEventsFromDB?.();
     },
 
     didOpen: () => {
@@ -2555,6 +2567,22 @@ export const getEditEvent = async ({
         formDraftCtl = fd;
         fd.restore();
         setTimeout(() => fd.start(), 300);
+      }
+      // ✅ รูปและไฟล์หน้างาน (React) — ช่างที่อยู่ในงาน/แอดมินเพิ่ม/ลบได้ · งานปิดแล้ว/รออนุมัติ ดูอย่างเดียว
+      {
+        const host = document.getElementById("ee-sitePhotosMount");
+        if (host) {
+          const popup = Swal.getPopup();
+          const root = createRoot(host);
+          popup.__sitePhotosRoot = root;
+          root.render(createElement(SitePhotos, {
+            event: { ...(ev.extendedProps || {}), _id: eventId },
+            canEdit: !readOnly && !isPendingForTech && !isClosedForTech,
+            onChange: () => { popup.__sitePhotosChanged = true; },
+            confirmFn: (msg) => Promise.resolve(window.confirm(msg)),
+            sx: { mt: 0 },
+          }));
+        }
       }
       /**
        * ── เมนู "เพิ่มเติม" ในแถบล่าง ──────────────────────────────────────

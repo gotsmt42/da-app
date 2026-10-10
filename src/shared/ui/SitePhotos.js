@@ -23,7 +23,12 @@ const INK = "#0f172a";
 
 const isImage = (f) => /^image\//.test(f?.fileType || "") || /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(f?.fileName || "");
 
-export default function SitePhotos({ event, canEdit = false, onPreview, sx }) {
+/**
+ * @param onChange   เรียกหลังเพิ่ม/ลบสำเร็จ (ให้หน้าแม่รีเฟรชข้อมูล)
+ * @param confirmFn  (ข้อความ) => Promise<boolean> — ใช้ในฟอร์ม SweetAlert (EditEvent) ที่เรียก Swal ซ้อนไม่ได้
+ *                   (Swal เปิดได้ทีละกล่อง เรียกซ้อนแล้วฟอร์มที่กรอกอยู่จะถูกปิดทิ้ง)
+ */
+export default function SitePhotos({ event, canEdit = false, onPreview, onChange, confirmFn, sx }) {
   const [files, setFiles] = useState(event?.sitePhotoFiles || []);
   const [uploading, setUploading] = useState(0);
   const [err, setErr] = useState("");
@@ -48,6 +53,7 @@ export default function SitePhotos({ event, canEdit = false, onPreview, sx }) {
       try {
         const saved = await EventService.Upload(event._id, f, "sitePhoto");
         setFiles((prev) => [...prev, { _id: saved.fileId, fileName: saved.fileName, fileUrl: saved.fileUrl, fileType: saved.fileType, uploadedAt: new Date().toISOString() }]);
+        onChange?.();
       } catch {
         failed += 1;
       }
@@ -57,14 +63,18 @@ export default function SitePhotos({ event, canEdit = false, onPreview, sx }) {
   };
 
   const remove = async (f) => {
-    const ok = await Swal.fire({
-      icon: "warning", title: isImage(f) ? "ลบรูปนี้?" : "ลบไฟล์นี้?", text: f.fileName,
-      showCancelButton: true, confirmButtonText: "ลบ", cancelButtonText: "ยกเลิก", confirmButtonColor: "#dc2626", reverseButtons: true,
-    });
-    if (!ok.isConfirmed) return;
+    const question = `${isImage(f) ? "ลบรูปนี้?" : "ลบไฟล์นี้?"}\n${f.fileName}`;
+    const ok = confirmFn
+      ? await confirmFn(question)
+      : (await Swal.fire({
+        icon: "warning", title: isImage(f) ? "ลบรูปนี้?" : "ลบไฟล์นี้?", text: f.fileName,
+        showCancelButton: true, confirmButtonText: "ลบ", cancelButtonText: "ยกเลิก", confirmButtonColor: "#dc2626", reverseButtons: true,
+      })).isConfirmed;
+    if (!ok) return;
     try {
       await EventService.DeleteFile(event._id, "sitePhoto", f._id);
       setFiles((prev) => prev.filter((x) => String(x._id) !== String(f._id)));
+      onChange?.();
     } catch (e2) {
       setErr(e2?.response?.data?.message || e2?.response?.data || "ลบไม่สำเร็จ");
     }
