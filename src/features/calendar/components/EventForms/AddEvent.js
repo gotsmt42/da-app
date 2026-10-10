@@ -3,6 +3,7 @@ import { escapeHtml } from "@/shared/utils/escapeHtml";
 import { showTeamOverlapWarning } from "@/shared/utils/teamOverlapWarning";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 import { jobInfoSectionHtml, bindJobInfo, readJobInfo } from "./jobInfoSection";
+import { domFormDraft } from "@/shared/utils/formDraft";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { can } from "@/shared/utils/roles";
 import {
@@ -10,6 +11,8 @@ import {
   mountColorPicker,
   rememberEventColors,
 } from "./eventColorPicker";
+// ✅ (10 ต.ค. 2569) ข้อมูลที่กรอกค้างไม่หายเมื่อฟอร์มหลุด/ปิด — ดู shared/utils/formDraft.js
+let formDraftCtl = null;
 
 // ✅ ป้องกัน stored XSS — ค่าที่ผู้ใช้พิมพ์เอง (ชื่อบริษัท/โครงการ/ประเภทงาน/ระบบ/ทีม ฯลฯ) ต้อง escape
 // ก่อนต่อเป็น HTML string เสมอ ไม่งั้นถ้ามีใครตั้งชื่อเป็น เช่น "><img src=x onerror="..."> จะยิง
@@ -947,6 +950,7 @@ export const getAddEvent = async ({
     // ในฟอร์มยังค้างอยู่ (รวมแถวลูกทีมที่ผู้ใช้ไม่ได้กด ✕ เอง) — เก็บกวาดให้ครบทีเดียวตอนปิด
     // TomSelect เก็บอินสแตนซ์ไว้ที่ el.tomselect และติดคลาส .tomselected ให้เองเสมอ
     willClose: (popup) => {
+      formDraftCtl?.stop(); // ปิดโดยไม่ได้บันทึก → เก็บค่าล่าสุดไว้กู้คืน
       // ⚠️ คืนทรัพยากรของปฏิทิน พ.ศ. ที่ mount ไว้ด้วย ไม่งั้น React root จะค้างทุกครั้งที่เปิดกล่อง
       popup.__thaiDpCleanup?.();
       popup.__colorPickerCleanup?.();
@@ -955,6 +959,13 @@ export const getAddEvent = async ({
 
     didOpen: () => {
       // ✅ เปลี่ยนช่อง <input type="date"> ทุกช่องในกล่องนี้เป็นปฏิทิน พ.ศ. เดือนไทย
+      // ✅ กู้คืนข้อมูลที่กรอกค้างไว้ (ภายใน 10 นาที) — ต้องก่อน TomSelect/ปฏิทิน พ.ศ. mount ให้มันอ่านค่าที่เติมคืน
+      {
+        const fd = domFormDraft(Swal.getPopup(), "addEvent", { bannerHost: "#ae-body" });
+        formDraftCtl = fd;
+        fd.restore();
+        setTimeout(() => fd.start(), 300);
+      }
       // (ช่องเดิมถูกซ่อนไว้เป็นตัวเก็บค่า โค้ดที่อ่าน .value ตอนกดบันทึกจึงทำงานเหมือนเดิม)
       Swal.getPopup().__thaiDpCleanup = mountThaiDatePickers(Swal.getPopup());
       bindJobInfo(Swal.getPopup());
@@ -1410,6 +1421,7 @@ export const getAddEvent = async ({
             await saveEventToDB(newEvent);
             await fetchEventsFromDB();
             stopSaving();
+            formDraftCtl?.clear(); // บันทึกสำเร็จ → ล้างข้อมูลที่กรอกค้าง
             Swal.fire({
               title: isExtend ? `เพิ่มวันที่ต่อเนื่องให้ครั้งที่ ${nextIndex} สำเร็จ ✅` : `เพิ่มครั้งที่ ${nextIndex} สำเร็จ ✅`,
               icon: "success",
@@ -1578,6 +1590,7 @@ export const getAddEvent = async ({
           await Promise.all([fetchEventsFromDB(), fetchLookupOptions?.()]); // ✅ รีเฟรชตัวเลือกตัวกรองให้เห็นประเภทงาน/ระบบที่เพิ่งพิมพ์ใหม่ทันที
           stopSaving();
 
+          formDraftCtl?.clear(); // บันทึกสำเร็จ → ล้างข้อมูลที่กรอกค้าง
           Swal.fire({
             title: "บันทึกแผนงานสำเร็จ ✅",
             icon: "success",

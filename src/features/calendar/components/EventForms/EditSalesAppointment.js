@@ -33,6 +33,9 @@ import {
 } from "../../salesAppointmentTypes";
 import { SALES_FORM_CSS, salesFormHeader, salesTypePicker } from "./salesFormStyle";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
+import { domFormDraft } from "@/shared/utils/formDraft";
+// ✅ (10 ต.ค. 2569) ข้อมูลที่กรอกค้างไม่หายเมื่อฟอร์มหลุด/ปิด — ดู shared/utils/formDraft.js
+let formDraftCtl = null;
 
 const esc = (s = "") =>
   String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -220,10 +223,18 @@ export const getEditSalesAppointment = async ({
     // ✅ คืนทรัพยากรของปฏิทิน พ.ศ. ที่ mount ไว้ตอนปิดกล่อง ไม่งั้น React root จะค้างทุกครั้งที่เปิด
     // (เทียบ pattern เดียวกับ AddEvent.js/EditEvent.js ของช่าง)
     willClose: (popup) => {
+      formDraftCtl?.stop(); // ปิดโดยไม่ได้บันทึก → เก็บค่าล่าสุดไว้กู้คืน
       popup.__thaiDpCleanup?.();
     },
     didOpen: () => {
       // ✅ เปลี่ยนช่อง <input type="date"> ทุกช่อง (รวมแถวช่วงวันที่ที่เพิ่ม/prefill ทีหลังด้วย —
+      // ✅ กู้คืนข้อมูลที่กรอกค้างไว้ (ภายใน 10 นาที) — ต้องก่อน TomSelect/ปฏิทิน พ.ศ. mount ให้มันอ่านค่าที่เติมคืน
+      {
+        const fd = domFormDraft(Swal.getPopup(), `editSalesAppt:${id}`, { bannerHost: "#sa-body" });
+        formDraftCtl = fd;
+        fd.restore();
+        setTimeout(() => fd.start(), 300);
+      }
       // mountThaiDatePickers ดักด้วย MutationObserver ให้เองอัตโนมัติ) เป็นปฏิทิน พ.ศ. เดือนไทย
       Swal.getPopup().__thaiDpCleanup = mountThaiDatePickers(Swal.getPopup());
 
@@ -486,6 +497,7 @@ export const getEditSalesAppointment = async ({
 
           await fetchEventsFromDB();
 
+          formDraftCtl?.clear(); // บันทึกสำเร็จ → ล้างข้อมูลที่กรอกค้าง
           Swal.fire({
             toast: true, position: "top", icon: "success",
             title: "บันทึกการแก้ไขแล้ว", showConfirmButton: false, timer: 2000,

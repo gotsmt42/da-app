@@ -11,6 +11,7 @@ import { classifyJob, getJobClassMeta } from "@/shared/utils/jobClassification";
 import { overviewResponsibleOf } from "@/shared/utils/contractOverdue";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 import { jobInfoSectionHtml, bindJobInfo, readJobInfo } from "./jobInfoSection";
+import { domFormDraft } from "@/shared/utils/formDraft";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { can } from "@/shared/utils/roles";
 // ✅ พิกัดหน้างาน — ใช้ตัวช่วยชุดเดียวกับหน้าอื่น (ดูหัวไฟล์ SiteMapLink.js)
@@ -22,6 +23,8 @@ import {
   mountColorPicker,
   rememberEventColors,
 } from "./eventColorPicker";
+// ✅ (10 ต.ค. 2569) ข้อมูลที่กรอกค้างไม่หายเมื่อฟอร์มหลุด/ปิด — ดู shared/utils/formDraft.js
+let formDraftCtl = null;
 
 // ✅ ป้องกัน stored XSS — ค่าที่ผู้ใช้พิมพ์เอง (ชื่อบริษัท/โครงการ/ประเภทงาน/ระบบ/ทีม ฯลฯ) ต้อง escape
 // ก่อนต่อเป็น HTML string เสมอ ไม่งั้นถ้ามีใครตั้งชื่อเป็น เช่น "><img src=x onerror="..."> จะยิง
@@ -2538,6 +2541,7 @@ export const getEditEvent = async ({
     // ✅ Swal ลบ DOM ของ popup ทิ้งทั้งก้อนตอนปิด แต่ document/window listener ของทุก TomSelect
     // ในฟอร์มยังค้างอยู่ (รวมแถวลูกทีมที่ผู้ใช้ไม่ได้กด ✕ เอง) — เก็บกวาดให้ครบทีเดียวตอนปิด
     willClose: (popup) => {
+      formDraftCtl?.stop(); // ปิดโดยไม่ได้บันทึก → เก็บค่าล่าสุดไว้กู้คืน
       // ⚠️ คืนทรัพยากรของปฏิทิน พ.ศ. ที่ mount ไว้ด้วย ไม่งั้น React root จะค้างทุกครั้งที่เปิดกล่อง
       popup.__thaiDpCleanup?.();
       popup.__colorPickerCleanup?.();
@@ -2545,6 +2549,13 @@ export const getEditEvent = async ({
     },
 
     didOpen: () => {
+      // ✅ กู้คืนข้อมูลที่กรอกค้างไว้ (ภายใน 10 นาที) — ต้องก่อน TomSelect/ปฏิทิน พ.ศ. mount ให้มันอ่านค่าที่เติมคืน
+      {
+        const fd = domFormDraft(Swal.getPopup(), `editEvent:${eventId}`, { bannerHost: "#ee-body" });
+        formDraftCtl = fd;
+        fd.restore();
+        setTimeout(() => fd.start(), 300);
+      }
       /**
        * ── เมนู "เพิ่มเติม" ในแถบล่าง ──────────────────────────────────────
        * ⚠️ ฟอร์มนี้เป็น HTML ล้วนใน SweetAlert ไม่ใช่ React จึงผูก listener เองตรงนี้
@@ -3558,6 +3569,7 @@ export const getEditEvent = async ({
                 await EventService.UpdateContractFields(eventContractGroupId, contractFields);
               }
               await saveHeadResponsible();
+              formDraftCtl?.clear(); // บันทึกสำเร็จ → ล้างข้อมูลที่กรอกค้าง
               setLoading(false);
               Swal.fire({
                 title: "บันทึกสำเร็จ ✅",
@@ -3682,6 +3694,7 @@ export const getEditEvent = async ({
               await EventService.UpdateContractFields(eventContractGroupId, contractFields);
             }
             await saveHeadResponsible();
+            formDraftCtl?.clear(); // บันทึกสำเร็จ → ล้างข้อมูลที่กรอกค้าง
             setLoading(false);
             Swal.fire({
               title: "บันทึกสำเร็จ ✅",

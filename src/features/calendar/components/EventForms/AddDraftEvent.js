@@ -4,6 +4,9 @@ import { formatThai } from "@/shared/utils/thaiDate";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 import { can } from "@/shared/utils/roles";
 import { jobInfoSectionHtml, bindJobInfo, readJobInfo } from "./jobInfoSection";
+import { domFormDraft } from "@/shared/utils/formDraft";
+// ✅ (10 ต.ค. 2569) ข้อมูลที่กรอกค้างไม่หายเมื่อฟอร์มหลุด/ปิด — ดู shared/utils/formDraft.js
+let formDraftCtl = null;
 
 /* ─────────────────────────────────────────────
    STYLE INJECTION — งานวางแผนล่วงหน้า (ยังไม่ลงตาราง)
@@ -466,9 +469,19 @@ export const getAddDraftEvent = async ({
       allowEscapeKey: false,
 
       // ⚠️ คืนทรัพยากรของช่องเลือกเดือนที่ mount ไว้ ไม่งั้น React root จะค้างทุกครั้งที่เปิดกล่อง
-      willClose: (popup) => popup.__thaiDpCleanup?.(),
+      willClose: (popup) => {
+        popup.__thaiDpCleanup?.();
+        formDraftCtl?.stop(); // ปิดโดยไม่ได้บันทึก → เก็บค่าล่าสุดไว้กู้คืน
+      },
 
       didOpen: () => {
+        // ✅ กู้คืนข้อมูลที่กรอกค้างไว้ (ภายใน 10 นาที) — ต้องก่อน TomSelect/ปฏิทิน พ.ศ. mount ให้มันอ่านค่าที่เติมคืน
+        {
+          const fd = domFormDraft(Swal.getPopup(), (existingDraft ? `editDraft:${existingDraft._id}` : intake ? "intake" : "addDraft"), { bannerHost: "#ade-body" });
+          formDraftCtl = fd;
+          fd.restore();
+          setTimeout(() => fd.start(), 300);
+        }
         // ✅ ช่อง <input type="month"> ของเบราว์เซอร์แสดง ค.ศ. เสมอ และบังคับเป็นไทยไม่ได้
         // — แทนด้วยตัวเลือกเดือนของแอปที่เป็น พ.ศ. (ค่าที่เก็บยังเป็น "YYYY-MM" ของ ค.ศ. เหมือนเดิม)
         Swal.getPopup().__thaiDpCleanup = mountThaiDatePickers(Swal.getPopup());
@@ -616,6 +629,7 @@ export const getAddDraftEvent = async ({
               await EventService.AddDraftEvent(contractPayload);
               isSavingDraft = false;
 
+              formDraftCtl?.clear(); // บันทึกสำเร็จ → ล้างข้อมูลที่กรอกค้าง
               Swal.fire({
                 title: `เพิ่มครั้งที่ ${nextIndex} เป็นแผนงานล่วงหน้าสำเร็จ ✅`,
                 icon: "success",
@@ -706,6 +720,7 @@ export const getAddDraftEvent = async ({
             }
             isSavingDraft = false;
 
+            formDraftCtl?.clear(); // บันทึกสำเร็จ → ล้างข้อมูลที่กรอกค้าง
             Swal.fire({
               title: isEditMode ? "บันทึกการแก้ไขสำเร็จ ✅" : isIntakeForm ? "รับงานแล้ว ✅" : "บันทึกงานล่วงหน้าสำเร็จ ✅",
               icon: "success",
