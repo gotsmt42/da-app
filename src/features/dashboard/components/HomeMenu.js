@@ -116,7 +116,8 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
   // ✅ ผู้ใช้สั่ง "แยกจุดวาง และหมวดหมู่ให้สอดคล้องแบบมืออาชีพ" (2 ต.ค. 2569) — เดิม OT กับใบขอซื้อ
   // ไปต่อท้ายหมวดเบิกค่าใช้จ่าย ทั้งที่เป็นคนละเรื่อง (ขอซื้อของ ≠ เบิกเงิน · OT = เวลาทำงานของพนักงาน)
   // ⚠️ สิทธิ์ยังเป็นชุดเดียวกับระบบเบิก (canExpense) — แยกแค่ "หมวด" ไม่ได้แยกสิทธิ์
-  const purchase = canExpense ? [dest("purchase"), dest("purchaseReport")] : [];
+  // ✅ (10 ต.ค. 2569) จัดซื้อใช้สิทธิ์ของตัวเอง (requestPurchase) — ฝ่ายขายขอซื้อได้โดยไม่มีเมนูเบิก
+  const purchase = can(userData, "requestPurchase") || can(userData, "viewAllExpenses") ? [dest("purchase"), dest("purchaseReport")] : [];
   const people = canExpense ? [dest("ot")] : [];
 
   // ── เอกสารและการเงิน ─────────────────────────────────────────────────────

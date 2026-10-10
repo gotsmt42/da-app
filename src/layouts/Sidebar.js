@@ -426,10 +426,15 @@ const side = (key, extra) => {
               {expenseMenu.map((item, idx) => renderLink(item, `exp-${idx}`))}
             </>
           )}
-          {canExpense && (
+          {/* ✅ (10 ต.ค. 2569) จัดซื้อใช้สิทธิ์ requestPurchase ของตัวเอง — ฝ่ายขายขอซื้อได้โดยไม่มีเมนูเบิก/OT */}
+          {(can(userData, "requestPurchase") || can(userData, "viewAllExpenses")) && (
             <>
               <div className="admin-divider-label">จัดซื้อ</div>
               {purchaseMenu.map((item, idx) => renderLink(item, `pur-${idx}`))}
+            </>
+          )}
+          {canExpense && (
+            <>
               <div className="admin-divider-label">บุคคล</div>
               {peopleMenu.map((item, idx) => renderLink(item, `ppl-${idx}`))}
             </>

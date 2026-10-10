@@ -172,7 +172,7 @@ export default function PurchasePage({ view = "mine" }) {
   const { id: routeId } = useParams();
   const navigate = useNavigate();
   const isDesktop = useMediaQuery("(min-width:900px)");
-  const canUse = can("requestExpense") || can("viewAllExpenses");
+  const canUse = can("requestPurchase") || can("viewAllExpenses");
   const canBuy = can("viewAllExpenses");
   const canHandle = can("reviewExpense") || can("approveExpense") || canBuy;
 
@@ -267,7 +267,8 @@ export default function PurchasePage({ view = "mine" }) {
     ...(view !== "mine" ? [{ to: "/purchase", label: "ใบขอซื้อ" }] : []),
     ...(canHandle && view !== "inbox" ? [{ to: "/purchase/approvals", label: `รอดำเนินการ${summary?.inbox ? ` (${summary.inbox})` : ""}` }] : []),
     { to: "/purchase/report", label: "รายงาน" },
-    { to: "/expenses/advances", label: "ระบบเบิก" },
+    // ⚠️ ฝ่ายขายขอซื้อได้แต่ไม่มีระบบเบิก — ไม่โชว์ลิงก์ที่กดแล้วเข้าไม่ได้
+    ...(can("requestExpense") || can("viewAllExpenses") ? [{ to: "/expenses/advances", label: "ระบบเบิก" }] : []),
   ];
   const waitingAmount = rows.filter((r) => ["approved", "ordered", "partial"].includes(r.status)).reduce((s, r) => s + amountOf(r), 0);
 

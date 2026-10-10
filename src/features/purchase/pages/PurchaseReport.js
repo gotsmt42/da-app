@@ -188,7 +188,7 @@ export default function PurchaseReport() {
   const { can } = usePermissions();
   const navigate = useNavigate();
   const isDesktop = useMediaQuery("(min-width:900px)");
-  const canUse = can("requestExpense") || can("viewAllExpenses");
+  const canUse = can("requestPurchase") || can("viewAllExpenses");
   const viewAll = can("viewAllExpenses");
 
   const [preset, setPreset] = useState("year");
