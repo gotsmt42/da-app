@@ -38,7 +38,7 @@ import { faFileExcel } from "@fortawesome/free-solid-svg-icons";
 import {
   Box, Grid, Paper, Typography, TextField, IconButton, Chip, Avatar,
   Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle,
-  Button, Stack, Tooltip, Badge, Fade, Collapse, LinearProgress,
+  Button, ButtonBase, Stack, Tooltip, Badge, Fade, Collapse, LinearProgress,
   Divider, useMediaQuery, useTheme, InputAdornment,
   Menu, MenuItem, ListItemIcon, ListItemText, Card, CardContent,
   Skeleton, Alert, Snackbar, Popover,
@@ -1048,12 +1048,14 @@ export const CommentThread = ({ comments = [], onSend, myRole }) => {
  * ⚠️ โชว์เฉพาะตอนมากกว่า 1 — เลข "1" ต่อท้ายทุกอันคือ noise เพราะการที่ไอคอนโผล่ก็แปลว่ามีอย่างน้อย 1 อยู่แล้ว
  * ⚠️ จอแคบยังเป็นไอคอนเปล่าเหมือนเดิม พื้นที่ไม่พอให้ใส่ตัวเลข
  */
-const DocIndicator = ({ title, icon: Icon, color, count, showCount }) => (
+// ✅ (10 ต.ค. 2569 ผู้ใช้: "สีสันยังดูรกๆ ตัดกัน") ไอคอนเอกสารเป็นโทนเทาเดียวกันหมด — แยกชนิดด้วยรูปไอคอน/tooltip
+//    (เดิมฟ้า/แดง/ส้ม/เขียว 4 สีเรียงกันท้ายการ์ดทุกใบ) · prop color ยังรับไว้เพื่อไม่ต้องแก้จุดเรียก
+const DocIndicator = ({ title, icon: Icon, count, showCount }) => (
   <Tooltip title={title}>
     <Stack direction="row" alignItems="center" gap={0.2}>
-      <Icon sx={{ fontSize: 16, color, opacity: 0.85 }} />
+      <Icon sx={{ fontSize: 16, color: "#94a3b8" }} />
       {showCount && count > 1 && (
-        <Typography component="span" sx={{ fontSize: "0.68rem", fontWeight: 800, color, lineHeight: 1 }}>
+        <Typography component="span" sx={{ fontSize: "0.68rem", fontWeight: 800, color: "#64748b", lineHeight: 1 }}>
           {count}
         </Typography>
       )}
@@ -1512,8 +1514,10 @@ const EventRowCard = ({
                 ? <PersonChip name={event.responsiblePerson} avatar={avatarMap.get(event.responsiblePerson)} strong title={`ผู้รับผิดชอบ: ${event.responsiblePerson}`} />
                 : <Typography component="span" sx={{ fontSize: "0.74rem", color: FAINT, fontWeight: 700, whiteSpace: "nowrap" }}>ยังไม่มอบหมายผู้รับผิดชอบ</Typography>}
               {nextStep && (
-                <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.76rem", color: INK_2 }}>
-                  <Box component="span" sx={{ fontWeight: 900, color: nextStep.tone || ACCENT }}>ต่อไป: {nextStep.title}</Box>
+                <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.76rem", color: INK_2, fontWeight: 700 }}>
+                  {/* สีสถานะเหลือแค่จุดเล็ก ตัวหนังสือโทนเดียวกับการ์ด (ไม่ใช้ตัวหนังสือสีเขียว/ส้ม/แดงปนกัน) */}
+                  <Box component="span" sx={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", bgcolor: nextStep.tone || ACCENT, mr: 0.75, verticalAlign: "1px" }} />
+                  <Box component="span" sx={{ color: MUTED, fontWeight: 600 }}>ต่อไป:</Box> {nextStep.title}
                 </Typography>
               )}
               {!nextStep && <Box sx={{ flex: 1 }} />}
@@ -1617,11 +1621,24 @@ const EventRowCard = ({
         {/* ── รายละเอียด (กางจากหัวการ์ด) ── */}
         <Collapse in={open} unmountOnExit>
           <Box onClick={(e) => e.stopPropagation()} sx={{ mt: 1.5, pt: 1.5, borderTop: `1px solid ${LINE}` }}>
-            {/* ✅ ใครรับผิดชอบ · ใครเข้าทำงาน — ชิปรูป/อักษรย่อสีประจำตัว */}
-                <PeopleRow
-                  responsible={event.responsiblePerson} team={teamNamesOf(event)} avatars={avatarMap}
-                  onAssign={canAssign ? setAssignAnchor : undefined}
-                />
+            {/* ✅ (10 ต.ค. 2569 ผู้ใช้: "สีสันยังดูรกๆ ตัดกัน มองยาก แก้ไขให้มืออาชีพ")
+                ข้อมูลทั้งหมดเป็นรายการ "ป้าย : ค่า" ชุดเดียว ไม่มีกล่องซ้อนกล่อง/พื้นสี — สีเหลือแค่ปุ่มกด (น้ำเงิน) กับเรื่องเตือน */}
+            <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: MUTED, letterSpacing: ".03em", mb: 0.75 }}>ข้อมูลงาน</Typography>
+                <Box sx={{ display: "grid", rowGap: 0.75, mb: 0.75 }}>
+                  <InfoLine label="ผู้รับผิดชอบ">
+                    <AssignableResponsible responsible={event.responsiblePerson} avatars={avatarMap} onAssign={canAssign ? setAssignAnchor : undefined} />
+                  </InfoLine>
+                  <InfoLine label="ผู้เข้าทำงาน">
+                    {teamNamesOf(event).length ? (
+                      <Box component="span" sx={{ display: "inline-flex", flexWrap: "wrap", gap: 0.5 }}>
+                        {teamNamesOf(event).map((n, i, all) => (
+                          <PersonChip key={n} name={n} avatar={avatarMap.get(n)} badge={i === 0 && all.length > 1 ? "หัวหน้า" : undefined}
+                            title={i === 0 ? `หัวหน้าทีมเข้างาน: ${n}` : `ลูกทีม: ${n}`} />
+                        ))}
+                      </Box>
+                    ) : <Box component="span" sx={{ color: FAINT }}>ยังไม่ระบุ</Box>}
+                  </InfoLine>
+                </Box>
                 {canAssign && (
                   <AssignResponsibleMenu
                     anchorEl={assignAnchor} onClose={() => setAssignAnchor(null)}
@@ -1755,7 +1772,7 @@ const EventRowCard = ({
           {!hideDocuments && <JobFlowPanel event={event} mode="admin" onPatched={onPatched} onStatusUpdate={onStatusUpdate} />}
 
           {/* ✅ (10 ต.ค. 2569) รูปและไฟล์หน้างานที่ช่างแนบ — แอดมินดู/เพิ่ม/ลบได้ */}
-          <SitePhotos event={event} canEdit={canEdit} onPreview={onPreview} />
+          <SitePhotos event={event} canEdit={canEdit} onPreview={onPreview} sx={{ mt: 2, p: 0, border: 0, borderRadius: 0 }} />
 
           {/* แจ้งเตือนคำขอปิดงานจากช่าง (ยังไม่อนุมัติ) — ใช้ Box แทน Alert action slot
               เพราะ Alert วางข้อความ+ปุ่มแถวเดียวกันแล้วทับ/ล้นกันบนจอมือถือ
@@ -1826,12 +1843,18 @@ const EventRowCard = ({
             {inlineDetails ? (
               <Box sx={{ mt: 2, pt: 1.5, borderTop: `1px solid ${LINE}` }}>{expandedContent}</Box>
             ) : (
-              <Button fullWidth variant="outlined" onClick={() => setExpanded(true)}
-                startIcon={<Description sx={{ fontSize: 18 }} />} endIcon={<ChevronRight />}
-                sx={{ mt: 1.5, py: 1, borderRadius: 2, textTransform: "none", fontWeight: 800, color: ACCENT, borderColor: ACCENT_LINE, bgcolor: "#fff",
-                  "&:hover": { borderColor: ACCENT, bgcolor: ACCENT_SOFT } }}>
-                เอกสาร · คุยกับช่าง · ประวัติ{docDone ? ` (เอกสาร ${docDone}/${JOB_DOC_TYPES.length})` : ""}
-              </Button>
+              <ButtonBase onClick={() => setExpanded(true)}
+                sx={{ mt: 2, width: "100%", px: 1.5, py: 1.1, gap: 1.25, borderRadius: 2, border: `1px solid ${LINE}`, bgcolor: "#fff",
+                  justifyContent: "flex-start", fontFamily: "inherit", "&:hover": { bgcolor: SURFACE, borderColor: "#cbd5e1" } }}>
+                <Description sx={{ fontSize: 19, color: MUTED }} />
+                <Typography noWrap sx={{ flex: 1, minWidth: 0, textAlign: "left", fontSize: "0.86rem", fontWeight: 700, color: INK }}>
+                  เอกสาร · คุยกับช่าง · ประวัติ
+                </Typography>
+                <Typography component="span" sx={{ flexShrink: 0, fontSize: "0.74rem", fontWeight: 700, color: MUTED, fontVariantNumeric: "tabular-nums" }}>
+                  เอกสาร {docDone}/{JOB_DOC_TYPES.length}
+                </Typography>
+                <ChevronRight sx={{ fontSize: 20, color: FAINT }} />
+              </ButtonBase>
             )}
           </Box>
         </Collapse>

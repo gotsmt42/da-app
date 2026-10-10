@@ -40,13 +40,17 @@ export function PersonChip({ name, avatar, badge, strong = false, size = 22, tit
   );
 }
 
-/** ป้ายประ "ยังไม่มอบหมาย" — ใช้แทนชิปเมื่อยังไม่มีผู้รับผิดชอบ */
-export function UnassignedChip({ label = "ยังไม่มอบหมาย" }) {
+/**
+ * ป้ายประ "ยังไม่มอบหมาย" — ใช้แทนชิปเมื่อยังไม่มีผู้รับผิดชอบ
+ * ✅ (10 ต.ค. 2569 ผู้ใช้: "สีสันยังดูรกๆ ตัดกัน มองยาก แก้ไขให้มืออาชีพ") — เดิมส้ม ตัดกับสีอื่นในการ์ด
+ *    ตอนนี้: กดมอบหมายได้ = ตัวหนังสือน้ำเงิน (สีปุ่มของแอป) · ดูอย่างเดียว = เทา
+ */
+export function UnassignedChip({ label = "ยังไม่มอบหมาย", action = false }) {
   return (
     <Box component="span" sx={{
       display: "inline-flex", alignItems: "center", px: 1, py: 0.3, borderRadius: 99, whiteSpace: "nowrap",
-      fontSize: "0.72rem", fontWeight: 700, color: "#b45309",
-      border: "1px dashed", borderColor: alpha("#d97706", 0.5), bgcolor: alpha("#f59e0b", 0.06),
+      fontSize: "0.72rem", fontWeight: 700, color: action ? "#2563eb" : "#64748b",
+      border: "1px dashed", borderColor: action ? "#bfdbfe" : "#cbd5e1", bgcolor: "#fff",
     }}>
       {label}
     </Box>
@@ -60,7 +64,7 @@ export function UnassignedChip({ label = "ยังไม่มอบหมา�
 export function AssignableResponsible({ responsible, avatars, onAssign, size }) {
   const chip = responsible
     ? <PersonChip name={responsible} avatar={avatars?.get(responsible)} strong size={size} title={onAssign ? "กดเพื่อเปลี่ยนผู้รับผิดชอบ" : `ผู้รับผิดชอบงาน: ${responsible}`} />
-    : <UnassignedChip label={onAssign ? "+ มอบหมาย" : "ยังไม่มอบหมาย"} />;
+    : <UnassignedChip label={onAssign ? "+ มอบหมาย" : "ยังไม่มอบหมาย"} action={Boolean(onAssign)} />;
   if (!onAssign) return chip;
   return (
     <ButtonBase
@@ -69,7 +73,7 @@ export function AssignableResponsible({ responsible, avatars, onAssign, size }) 
       sx={{ borderRadius: 99, display: "inline-flex", alignItems: "center", gap: 0.4, "&:hover .co-assign-edit": { opacity: 1 }, "&:focus-visible": { outline: "2px solid #dc2626", outlineOffset: 2 } }}
     >
       {chip}
-      <Box component="span" className="co-assign-edit" sx={{ fontSize: "0.7rem", color: "#94a3b8", opacity: 0.6, transition: "opacity .15s" }}>✎</Box>
+      {responsible && <Box component="span" className="co-assign-edit" sx={{ fontSize: "0.7rem", color: "#94a3b8", opacity: 0.6, transition: "opacity .15s" }}>✎</Box>}
     </ButtonBase>
   );
 }

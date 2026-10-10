@@ -154,11 +154,16 @@ function NextStepBox({ step, onConfirm, busy }) {
   if (!step) return null;
   const a = step.action;
   return (
-    <Box sx={{ p: 1.25, pl: 1.5, borderRadius: 2, bgcolor: alpha(step.tone, 0.06), border: `1px solid ${alpha(step.tone, 0.25)}`, borderLeft: `4px solid ${step.tone}` }}>
+    // ✅ (10 ต.ค. 2569 ผู้ใช้: "สีสันยังดูรกๆ ตัดกัน มองยาก แก้ไขให้มืออาชีพ") — พื้นเทาอ่อนกล่องเดียว ไม่มีพื้น/ขอบสีตามสถานะ
+    //    สีของสถานะเหลือแค่จุดเล็กหน้าชื่อขั้นตอน · ปุ่มยังเป็นน้ำเงินสีเดียวทั้งแอป
+    <Box sx={{ p: 1.25, pl: 1.5, borderRadius: 2, bgcolor: "#f8fafc", border: "1px solid #e2e8f0" }}>
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography sx={{ fontSize: "0.68rem", fontWeight: 800, color: MUTED, letterSpacing: 0.2 }}>ขั้นตอนถัดไป</Typography>
-          <Typography sx={{ fontSize: "0.92rem", fontWeight: 900, color: step.tone, lineHeight: 1.3 }}>{step.title}</Typography>
+          <Typography sx={{ fontSize: "0.92rem", fontWeight: 800, color: INK, lineHeight: 1.3, display: "flex", alignItems: "center", gap: 0.75 }}>
+            <Box component="span" sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: step.tone, flexShrink: 0 }} />
+            {step.title}
+          </Typography>
           <Typography sx={{ fontSize: "0.78rem", color: "#334155", mt: 0.2 }}>{step.desc}</Typography>
         </Box>
         {a && (a.to ? (

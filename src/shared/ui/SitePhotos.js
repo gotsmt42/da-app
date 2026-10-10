@@ -86,7 +86,7 @@ export default function SitePhotos({ event, canEdit = false, onPreview, onChange
   return (
     <Box sx={{ mt: 1.5, p: 1.25, borderRadius: 2, border: `1px solid ${LINE}`, bgcolor: "#fff", ...sx }} onClick={(e) => e.stopPropagation()}>
       <Stack direction="row" alignItems="center" spacing={1}>
-        <PhotoLibraryOutlined sx={{ fontSize: 18, color: BLUE }} />
+        <PhotoLibraryOutlined sx={{ fontSize: 18, color: MUTED }} />
         <Typography sx={{ flex: 1, fontSize: "0.84rem", fontWeight: 800, color: INK }}>
           รูปและไฟล์หน้างาน{files.length ? ` · ${files.length}` : ""}
         </Typography>
@@ -102,10 +102,12 @@ export default function SitePhotos({ event, canEdit = false, onPreview, onChange
 
       {!files.length ? (
         <Box component="button" type="button" onClick={() => inputRef.current?.click()} sx={{
-          mt: 1, width: "100%", py: 2, borderRadius: 2, border: `1.5px dashed ${alpha(BLUE, 0.35)}`, bgcolor: alpha(BLUE, 0.03),
-          color: BLUE, fontFamily: "inherit", fontSize: "0.8rem", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 0.75,
+          // ✅ (10 ต.ค. 2569 ผู้ใช้: "สีสันยังดูรกๆ ตัดกัน") ช่องว่างเป็นโทนเทา · ข้อความสั้นบรรทัดเดียว
+          mt: 1, width: "100%", py: 1.75, px: 1.5, borderRadius: 2, border: "1.5px dashed #cbd5e1", bgcolor: "#f8fafc",
+          color: MUTED, fontFamily: "inherit", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 0.75,
+          "&:hover": { borderColor: alpha(BLUE, 0.5), color: BLUE },
         }}>
-          <AddAPhotoOutlined sx={{ fontSize: 20 }} /> ถ่ายรูป/เลือกไฟล์หน้างาน (ก่อน-หลังทำงาน · จุดที่พบปัญหา)
+          <AddAPhotoOutlined sx={{ fontSize: 19 }} /> ยังไม่มีรูป · แตะเพื่อถ่ายรูปหรือเลือกไฟล์
         </Box>
       ) : (
         <>

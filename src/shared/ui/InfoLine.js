@@ -33,6 +33,7 @@ const ICON = {
   ครั้งที่: Numbers,
   เวลา: AccessTime,
   ผู้ติดต่อ: Person,
+  ผู้เข้าทำงาน: Groups,
 };
 
 const InfoLine = ({ label, children }) => {
@@ -41,7 +42,7 @@ const InfoLine = ({ label, children }) => {
     <Stack direction="row" spacing={0.75} sx={{ alignItems: "flex-start" }}>
       <Stack
         direction="row" alignItems="center" spacing={0.4}
-        sx={{ flexShrink: 0, whiteSpace: "nowrap", color: "text.disabled", minWidth: 56 }}
+        sx={{ flexShrink: 0, whiteSpace: "nowrap", color: "text.disabled", minWidth: 84 }}
       >
         {/* ⚠️ mt เล็กน้อยให้ไอคอนอยู่กึ่งกลางบรรทัดแรกของตัวหนังสือ ไม่ลอยสูงกว่า */}
         {Icon && <Icon sx={{ fontSize: 13, mt: "1px" }} />}
