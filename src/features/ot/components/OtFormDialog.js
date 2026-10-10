@@ -23,6 +23,7 @@ import OtService, { errorText } from "../services/OtService";
 import {
   OT_ACCENT, OT_DARK, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, OT_TYPES, typeMeta, lineHours, hoursText, guessType, holidayNote, crossesMidnight,
 } from "../otMeta";
+import useFormDraft, { DraftBanner } from "@/shared/hooks/useFormDraft";
 
 let seq = 0;
 const key = () => `l${Date.now()}_${(seq += 1)}`;
@@ -73,6 +74,22 @@ export default function OtFormDialog({ open, request, onClose, onSaved }) {
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  // ✅ (10 ต.ค. 2569) ข้อมูลที่กรอกค้างไม่หายเมื่อฟอร์มหลุด/ปิด — กู้คืนได้ภายใน 10 นาที (ดู shared/hooks/useFormDraft.js)
+  const draft = useFormDraft({
+    key: editing ? `ot:edit:${request._id}` : "ot:new",
+    enabled: Boolean(open),
+    data: { job, date, start, end, breakMin, task, who, lines, subject, note },
+    restore: (d) => {
+      setJob(d.job || null);
+      if (d.date) setDate(d.date);
+      if (d.start) setStart(d.start);
+      if (d.end) setEnd(d.end);
+      setBreakMin(d.breakMin ?? 0); setTask(d.task || "");
+      if (Array.isArray(d.who)) setWho(d.who);
+      if (Array.isArray(d.lines)) setLines(d.lines);
+      setSubject(d.subject || ""); setNote(d.note || "");
+    },
+  });
 
   useEffect(() => {
     if (!open) return undefined;
@@ -170,6 +187,7 @@ export default function OtFormDialog({ open, request, onClose, onSaved }) {
     };
     try {
       const saved = editing ? await OtService.update(request._id, payload) : await OtService.create(payload);
+      draft.clear(); // บันทึกสำเร็จ → ล้างข้อมูลที่กรอกค้าง
       onSaved?.(saved, { created: !editing });
     } catch (err) {
       setError(errorText(err, "บันทึกไม่สำเร็จ"));
@@ -201,6 +219,7 @@ export default function OtFormDialog({ open, request, onClose, onSaved }) {
       </DialogTitle>
 
       <DialogContent sx={{ bgcolor: "#f8fafc", px: { xs: 1.25, sm: 2.5 }, pt: "16px !important", pb: 1 }}>
+        <DraftBanner draft={draft} />
         {resubmit && request.rejectReason && (
           <Alert severity="warning" sx={{ mb: 1.75, borderRadius: 2 }}><b>ถูกตีกลับ:</b> {request.rejectReason} — แก้แล้วกด “ส่งใหม่”</Alert>
         )}

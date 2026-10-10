@@ -25,6 +25,7 @@ import PurchaseService, { errorText } from "../services/PurchaseService";
 import {
   PR_ACCENT, PR_DARK, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, PRIORITIES, PR_CATEGORIES, FILE_KINDS, money, fmtMoney, baht,
 } from "../prMeta";
+import useFormDraft, { DraftBanner } from "@/shared/hooks/useFormDraft";
 
 let seq = 0;
 const key = () => `p${Date.now()}_${(seq += 1)}`;
@@ -71,6 +72,20 @@ export default function PrFormDialog({ open, request, onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [touched, setTouched] = useState(false);
+  // ✅ (10 ต.ค. 2569) ข้อมูลที่กรอกค้างไม่หายเมื่อฟอร์มหลุด/ปิด — กู้คืนได้ภายใน 10 นาที (ดู shared/hooks/useFormDraft.js)
+  const draft = useFormDraft({
+    key: editing ? `pr:edit:${request._id}` : "pr:new",
+    enabled: Boolean(open),
+    data: { docDate, subject, priority, neededBy, deliverTo, category, contactName, contactPhone, job, purpose, items, vatRate, supplier, note },
+    restore: (d) => {
+      if (d.docDate) setDocDate(d.docDate);
+      setSubject(d.subject || ""); setPriority(d.priority || "normal"); setNeededBy(d.neededBy || ""); setDeliverTo(d.deliverTo || "");
+      setCategory(d.category || "material"); setContactName(d.contactName || ""); setContactPhone(d.contactPhone || "");
+      setJob(d.job || null); setPurpose(d.purpose || "");
+      if (Array.isArray(d.items)) setItems(d.items.map((it) => ({ ...it, key: key() })));
+      setVatRate(d.vatRate ?? 0); setSupplier(d.supplier || ""); setNote(d.note || "");
+    },
+  });
   const fileRef = useRef(null);
   const { userData } = useAuth();
   /** ✅ ลายเซ็นอิเล็กทรอนิกส์ช่อง "ผู้ขอซื้อ" — ติ๊กเลือกได้ (เหมือนใบเบิก) · แก้ใบคนอื่นไม่มีช่องนี้ */
@@ -146,6 +161,7 @@ export default function PrFormDialog({ open, request, onClose, onSaved }) {
     try {
       const payload = files.map((f) => ({ file: f.file, kind: f.kind }));
       const out = editing ? await PurchaseService.update(request._id, fields, payload) : await PurchaseService.create(fields, payload);
+      draft.clear(); // บันทึกสำเร็จ → ล้างข้อมูลที่กรอกค้าง
       onSaved?.(out.request, {
         created: !editing,
         warn: out.rejected?.length ? `บันทึกแล้ว แต่มีไฟล์ที่แนบไม่ได้: ${out.rejected.map((r) => r.name).join(", ")}` : "",
@@ -176,6 +192,7 @@ export default function PrFormDialog({ open, request, onClose, onSaved }) {
       </DialogTitle>
 
       <DialogContent sx={{ bgcolor: "#f8fafc", px: { xs: 1.25, sm: 2.5 }, pt: "16px !important", pb: 1 }}>
+        <DraftBanner draft={draft} />
         {resubmit && request.rejectReason && <Alert severity="warning" sx={{ mb: 1.75, borderRadius: 2 }}><b>ถูกตีกลับ:</b> {request.rejectReason} — แก้แล้วกด “ส่งใหม่”</Alert>}
 
         <Section title="ข้อมูลการขอซื้อ" hint="ฝ่ายจัดซื้อใช้ข้อมูลนี้จัดลำดับและส่งของให้ถูกที่ ถูกเวลา">

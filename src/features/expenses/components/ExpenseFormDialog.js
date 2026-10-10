@@ -45,6 +45,7 @@ import {
   KIND_META, EXPENSE_CATEGORIES, categoryMeta, FILE_KINDS, baht, fmtMoney, itemAmount, itemsTotal,
   differenceMeta, money, jobText, jobSubject, jobRangeText, jobPartText, itemPersonName, personFullName, slipKind, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
 } from "../expenseMeta";
+import useFormDraft, { DraftBanner } from "@/shared/hooks/useFormDraft";
 
 const MAX_ITEMS = 40;
 /** ค้นหาช่อง "ถึง" ได้ทั้งชื่อและตำแหน่ง */
@@ -155,6 +156,21 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
    * ⚠️ แยก undefined ออกจาก "" ให้ชัด: "" คือผู้ใช้ตั้งใจเลือก "ไม่ระบุบัญชี (รับเงินสด)"
    */
   const [payToAccountId, setPayToAccountId] = useState(undefined);
+  // ✅ (10 ต.ค. 2569) ข้อมูลที่กรอกค้างไม่หายเมื่อฟอร์มหลุด/ปิด — กู้คืนได้ภายใน 10 นาที (ดู shared/hooks/useFormDraft.js)
+  const draft = useFormDraft({
+    key: editing ? `expense:edit:${expense._id}` : `expense:new:${slip}:${presetJob?._id || advanceProp?._id || "-"}`,
+    enabled: Boolean(open),
+    data: { docDate, to, position, subject, job, items, dueClearAt, note, advance, payToAccountId: payToAccountId ?? null },
+    restore: (d) => {
+      if (d.docDate) setDocDate(d.docDate);
+      setTo(d.to || ""); setPosition(d.position || ""); setSubject(d.subject || "");
+      setJob(d.job || null);
+      if (Array.isArray(d.items)) setItems(d.items.map((it) => ({ ...it, key: nextKey() })));
+      setDueClearAt(d.dueClearAt || ""); setNote(d.note || "");
+      if (d.advance) setAdvance(d.advance);
+      if (d.payToAccountId !== null && d.payToAccountId !== undefined) setPayToAccountId(d.payToAccountId);
+    },
+  });
   /**
    * ✅ ผู้ใช้ขอ: "ใบ advance และ claim ให้มีให้ติ๊กด้วยว่าจะใช้ลายเซ็นอิเล็กทรอนิกไหม"
    * ⚠️ ติ๊กได้เฉพาะตอนที่ผู้เบิกคือคนที่กำลังกรอกใบเอง — ลายเซ็นของคนอื่นเอามาแปะไม่ได้ (server บังคับซ้ำ)
@@ -454,6 +470,7 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
       const warn = result.rejected?.length
         ? `บันทึกแล้ว แต่มีไฟล์ที่แนบไม่ได้: ${result.rejected.map((r) => `${r.name} (${r.message})`).join(", ")}`
         : "";
+      draft.clear(); // บันทึกสำเร็จ → ล้างข้อมูลที่กรอกค้าง
       onSaved?.(result.expense, { created: !editing, warn });
     } catch (err) {
       setError(errorText(err, "บันทึกไม่สำเร็จ"));
@@ -530,6 +547,7 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
       </DialogTitle>
 
       <DialogContent sx={{ bgcolor: "#f8fafc", px: { xs: 1.25, sm: 2.5 }, pt: "16px !important", pb: 1 }}>
+        <DraftBanner draft={draft} />
         <Box sx={{
           display: "grid", gap: 2, alignItems: "start",
           gridTemplateColumns: { xs: "1fr", md: showAdvancePanel ? "minmax(0, 1fr) 330px" : "1fr" },

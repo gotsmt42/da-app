@@ -38,6 +38,7 @@ import {
   KIND_META, FILE_KINDS, baht, fmtMoney, bahtText, itemAmount, itemsTotal, money, jobText, jobRangeText, jobPartText, jobRangeDates,
   contractorCalc, installmentText, WHT_PRESETS, personFullName, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
 } from "../expenseMeta";
+import useFormDraft, { DraftBanner } from "@/shared/hooks/useFormDraft";
 
 const META = KIND_META.contractor;
 const ACCENT = META.color;
@@ -142,6 +143,24 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
   const [bankCode, setBankCode] = useState("");
   const [accountNo, setAccountNo] = useState("");
   const [accountName, setAccountName] = useState("");
+  // ✅ (10 ต.ค. 2569) ข้อมูลที่กรอกค้างไม่หายเมื่อฟอร์มหลุด/ปิด — กู้คืนได้ภายใน 10 นาที (ดู shared/hooks/useFormDraft.js)
+  const draft = useFormDraft({
+    key: editing ? `contractor:edit:${expense._id}` : `contractor:new:${presetJob?._id || "-"}`,
+    enabled: Boolean(open),
+    data: { docDate, to, position, subject, jobs, cName, cTaxId, cPhone, cAddress, cIsCompany, instNo, instTotal, contractValue, items, rateMode, dailyRate, vatRate, whtRate, deposit, payMode, bankCode, accountNo, accountName },
+    restore: (d) => {
+      if (d.docDate) setDocDate(d.docDate);
+      setTo(d.to || ""); setPosition(d.position || ""); setSubject(d.subject || "");
+      if (Array.isArray(d.jobs)) setJobs(d.jobs);
+      setCName(d.cName || ""); setCTaxId(d.cTaxId || ""); setCPhone(d.cPhone || ""); setCAddress(d.cAddress || ""); setCIsCompany(Boolean(d.cIsCompany));
+      setInstNo(d.instNo || ""); setInstTotal(d.instTotal || ""); setContractValue(d.contractValue || "");
+      if (Array.isArray(d.items)) setItems(d.items.map((it) => ({ ...it, key: nextKey() })));
+      if (d.rateMode) setRateMode(d.rateMode);
+      setDailyRate(d.dailyRate || ""); setVatRate(d.vatRate ?? 0); setWhtRate(d.whtRate ?? 3); setDeposit(d.deposit || "");
+      if (d.payMode) setPayMode(d.payMode);
+      setBankCode(d.bankCode || ""); setAccountNo(d.accountNo || ""); setAccountName(d.accountName || "");
+    },
+  });
   // อื่นๆ
   const [note, setNote] = useState("");
   const [files, setFiles] = useState([]);
@@ -378,6 +397,7 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
       const warn = result.rejected?.length
         ? `บันทึกแล้ว แต่มีไฟล์ที่แนบไม่ได้: ${result.rejected.map((r) => `${r.name} (${r.message})`).join(", ")}`
         : "";
+      draft.clear(); // บันทึกสำเร็จ → ล้างข้อมูลที่กรอกค้าง
       onSaved?.(result.expense, { created: !editing, warn });
     } catch (err) {
       setError(errorText(err, "บันทึกไม่สำเร็จ"));
@@ -419,6 +439,7 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
       </DialogTitle>
 
       <DialogContent sx={{ bgcolor: "#f8fafc", px: { xs: 1.25, sm: 2.5 }, pt: "16px !important", pb: 1 }}>
+        <DraftBanner draft={draft} />
         {resubmit && expense.rejectReason && (
           <Alert severity="warning" sx={{ mb: 1.75, borderRadius: 2 }}>
             <b>ถูกตีกลับ:</b> {expense.rejectReason} — แก้แล้วกด &quot;ส่งใหม่&quot; ใบจะกลับไปรอตรวจสอบ

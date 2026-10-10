@@ -39,6 +39,7 @@ import {
   DOC_TYPE_META,
   DOC_TYPE_ORDER,
 } from "../dispatchMeta";
+import useFormDraft, { DraftBanner } from "@/shared/hooks/useFormDraft";
 
 const empty = () => ({
   title: "", detail: "", system: "", note: "",
@@ -148,6 +149,17 @@ export default function DispatchRequestDialog({ open = true, onClose, onCreated 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [warn, setWarn] = useState("");
+  // ✅ (10 ต.ค. 2569) ข้อมูลที่กรอกค้างไม่หายเมื่อฟอร์มหลุด/ปิด — กู้คืนได้ภายใน 10 นาที (ดู shared/hooks/useFormDraft.js)
+  const draft = useFormDraft({
+    key: "dispatchRequest",
+    enabled: Boolean(open),
+    data: { form, jobMode, nextDocType },
+    restore: (d) => {
+      if (d.form) setForm({ ...empty(), ...d.form });
+      if (d.jobMode) setJobMode(d.jobMode);
+      if (d.nextDocType) setNextDocType(d.nextDocType);
+    },
+  });
 
   // ⚠️ ล้างฟอร์มทุกครั้งที่เปิด — ไม่งั้นแจ้งงานใบที่ 2 จะเห็นข้อมูลของใบแรกค้างอยู่แล้วส่งซ้ำได้ง่ายมาก
   useEffect(() => {
@@ -267,6 +279,7 @@ export default function DispatchRequestDialog({ open = true, onClose, onCreated 
     setSaving(true); setError(""); setWarn("");
     try {
       const { dispatch, rejected } = await DispatchService.create({ ...form, files });
+      draft.clear(); // บันทึกสำเร็จ → ล้างข้อมูลที่กรอกค้าง
       // ⚠️ ไฟล์ที่ถูกปฏิเสธต้องบอกให้รู้ ไม่ใช่เงียบหายไป — คนส่งจะคิดว่าแนบไปแล้ว
       if (rejected?.length) {
         setWarn(`ส่งคำขอสำเร็จ แต่มี ${rejected.length} ไฟล์ที่แนบไม่ได้: ${rejected.map((r) => `${r.name} (${r.message})`).join(", ")}`);
@@ -297,6 +310,7 @@ export default function DispatchRequestDialog({ open = true, onClose, onCreated 
       </DialogTitle>
 
       <DialogContent dividers sx={{ bgcolor: "#f8fafc" }}>
+        <DraftBanner draft={draft} />
         {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>{error}</Alert>}
         {warn && <Alert severity="warning" sx={{ mb: 2 }}>{warn}</Alert>}
 
