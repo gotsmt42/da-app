@@ -2147,3 +2147,10 @@
   .ec-wide-toolbar .event-toolbar-row > .event-filter-inline { order: 5; flex: 1 1 100%; }
 }
 
+
+/* ✅ (10 ต.ค. 2569 ผู้ใช้: "ปุ่มค้นหามันโดนบังทับ ไม่สามารถใช้ได้") มือถือ: ช่องค้นหาเต็มแถวบนสุด
+   ปุ่มมุมมอง/ตัวกรอง/อื่นๆ ขึ้นแถวถัดไป — เดิมทุกอย่างอยู่แถวเดียว ช่องค้นหาถูกบีบเหลือแค่ไอคอน พิมพ์ไม่ได้ */
+@media (max-width: 600px) {
+  .event-toolbar-row { flex-wrap: wrap; row-gap: 8px; }
+  .event-toolbar-row .event-search-input { flex: 1 1 100%; order: -1; min-height: 42px; }
+}
