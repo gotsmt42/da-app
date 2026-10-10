@@ -160,17 +160,22 @@ export const StatCard = styled(GlassCard)(({ color }) => ({
 // ✅ จอกว้าง: คงแบบเดิม (จัดกลาง 3 ชั้น) ซึ่งดูสมส่วนอยู่แล้วเมื่อวางเรียง 4 ใบในแถวเดียว
 // ✅ ตัวเลขจำนวนงานทำให้เด่นขึ้น (ตัวหนา+ใหญ่กว่าคำว่า "งาน") — เป็นข้อมูลที่คนมองการ์ดนี้ต้องการจริงๆ
 // ✅ ป้ายสถานะ — พื้นเทาอ่อน ขอบบาง ตัวหนังสือเข้ม · สีสถานะอยู่ที่จุดเล็กหน้าข้อความ (กฎออกแบบ: สีไม่เยอะ)
-const StatusBadge = styled(Box)(({ color }) => ({
+// ✅ (10 ต.ค. 2569 ผู้ใช้: "สีสถานะจืดชืดไป ไม่ชัดเจน") — ป้ายสถานะพื้นอ่อน + ขอบ + ตัวหนังสือโทนเข้มของสีสถานะ
+//    (เดิมพื้นเทาเหมือนกันทุกสถานะ ต่างกันแค่จุดเล็ก — ในตารางไม่มีจุดเลย แยกสถานะไม่ออก)
+//    ⚠️ สถานะเป็นสีเดียวในการ์ด/แถวที่ "ต้องเด่น" — ส่วนอื่นยังเป็นโทนเทาตามรอบก่อน
+const STATUS_INK = { "#f59e0b": "#b45309", "#3b82f6": "#1d4ed8", "#8b5cf6": "#6d28d9", "#10b981": "#047857" };
+const StatusBadge = styled(Box, { shouldForwardProp: (p) => p !== "color" })(({ color }) => ({
   display: "inline-flex",
   alignItems: "center",
   gap: 6,
   padding: "2px 10px",
   borderRadius: 20,
   fontSize: "0.75rem",
-  fontWeight: 700,
-  background: "#f8fafc",
-  border: "1px solid #e2e8f0",
-  color: "#334155",
+  fontWeight: 800,
+  whiteSpace: "nowrap",
+  background: color ? alpha(color, 0.12) : "#f8fafc",
+  border: `1px solid ${color ? alpha(color, 0.35) : "#e2e8f0"}`,
+  color: STATUS_INK[color] || "#334155",
   "& .MuiSvgIcon-root": { color: color || "#94a3b8", fontSize: 8 },
 }));
 
@@ -2309,7 +2314,7 @@ const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob, employee, canAss
             <TableRow key={a._id} hover onClick={() => onOpenJob(job)}
               sx={{ cursor: "pointer", bgcolor: idx % 2 ? alpha("#0f172a", 0.02) : "transparent" }}>
               <TableCell sx={{ whiteSpace: "nowrap" }}>
-                <StatusBadge color={OP_COLOR[a.status] || "#6b7280"}>{a.status || "—"}</StatusBadge>
+                <StatusBadge color={OP_COLOR[a.status]}><Circle sx={{ fontSize: 6 }} />{a.status || "—"}</StatusBadge>
                 <JobFlowFlags event={a} />
               </TableCell>
               <TableCell sx={{ maxWidth: 220 }}>
