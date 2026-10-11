@@ -22,13 +22,13 @@ import { Navigate } from "react-router-dom";
 import {
   Box, Stack, Typography, Skeleton, Alert,
 } from "@mui/material";
-import { alpha } from "@mui/material/styles";
-import { Inbox, AssignmentOutlined, HourglassTop } from "@mui/icons-material";
+import { Inbox } from "@mui/icons-material";
 import { PageHeader } from "@/shared/ui/PageKit";
 
 import usePermissions from "@/shared/hooks/usePermissions";
 import { useAuth } from "@/features/auth/AuthContext";
 import DispatchList from "../components/DispatchList";
+import { SectionHead } from "../components/QueueKit";
 import DispatchService from "../services/DispatchService";
 import { TEXT_SUB, BORDER_MAIN } from "../dispatchMeta";
 import lazyWithRetry from "@/shared/utils/lazyWithRetry";
@@ -36,22 +36,6 @@ import lazyWithRetry from "@/shared/utils/lazyWithRetry";
 // ⚠️ แผงนี้อยู่ใน feature "operation" เพราะเป็นเรื่องแผนงานของช่างโดยตรง — ไม่ย้ายไฟล์มาที่นี่
 // เพื่อไม่ให้ประวัติ git ของมันขาดตอน แค่เรียกใช้ข้ามฟีเจอร์ (โหลดแบบ lazy เพราะเป็นแผงใหญ่)
 const PendingApprovalsPanel = lazyWithRetry(() => import("@/features/operation/components/PendingApprovalsPanel"));
-
-/** หัวข้อแต่ละส่วน — ไอคอนสี · ชื่อ · จำนวน · คำอธิบายสั้น */
-function SectionHead({ icon, color, title, count, hint }) {
-  return (
-    <Stack direction="row" alignItems="center" spacing={1.25} sx={{ mb: 1.25, px: 0.25 }}>
-      <Box sx={{ width: 34, height: 34, borderRadius: 2, display: "grid", placeItems: "center", bgcolor: alpha(color, 0.12), color, flexShrink: 0, "& svg": { fontSize: 19 } }}>{icon}</Box>
-      <Box sx={{ minWidth: 0, flex: 1 }}>
-        <Typography sx={{ fontWeight: 900, fontSize: "1rem", color: "#0f172a" }}>
-          {title}
-          {count > 0 && <Box component="span" sx={{ ml: 0.75, px: 0.9, py: 0.1, borderRadius: 99, fontSize: "0.76rem", fontWeight: 800, color, bgcolor: alpha(color, 0.12) }}>{count}</Box>}
-        </Typography>
-        <Typography sx={{ fontSize: "0.76rem", color: TEXT_SUB }}>{hint}</Typography>
-      </Box>
-    </Stack>
-  );
-}
 
 export default function JobRequestQueue() {
   const { can } = usePermissions();
@@ -84,10 +68,10 @@ export default function JobRequestQueue() {
         subtitle="คำขอจากทุกฝ่ายที่รอตัดสินใจก่อนเข้าตารางงานจริง"
         actions={(
           <Stack alignItems="flex-end" sx={{ pl: 1.5, borderLeft: `1px solid ${BORDER_MAIN}` }}>
-            <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: TEXT_SUB, whiteSpace: "nowrap" }}>รอตัดสินใจ</Typography>
-            <Typography sx={{ fontWeight: 900, fontSize: "1.15rem", color: "#0f172a", lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>
+            <Typography sx={{ fontSize: "0.7rem", fontWeight: 500, color: TEXT_SUB, whiteSpace: "nowrap" }}>รอตัดสินใจ</Typography>
+            <Typography sx={{ fontWeight: 700, fontSize: "1.1rem", color: "#0f172a", lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>
               {waiting + approvalCount}
-              {urgent > 0 && <Box component="span" sx={{ ml: 0.75, fontSize: "0.74rem", fontWeight: 800, color: "#dc2626" }}>ด่วน {urgent}</Box>}
+              {urgent > 0 && <Box component="span" sx={{ ml: 0.75, fontSize: "0.74rem", fontWeight: 600, color: "#dc2626" }}>ด่วน {urgent}</Box>}
             </Typography>
           </Stack>
         )}
@@ -95,17 +79,17 @@ export default function JobRequestQueue() {
 
       {/* ✅ แผนงานรออนุมัติ — งานที่มีวันนัดแล้ว แค่กดอนุมัติ/ไม่อนุมัติ (ซ่อนส่วนนี้เมื่อไม่มีรายการ)
           ⚠️ mount ไว้ตลอดเพื่อให้ได้จำนวน (onCountChange) แล้วค่อยซ่อนด้วย display */}
-      <Box sx={{ display: approvalCount > 0 ? "block" : "none", mb: 3 }}>
-        <SectionHead icon={<HourglassTop />} color="#d97706" title="แผนงานรออนุมัติ" count={approvalCount}
-          hint="ลงวันในตารางไว้แล้ว — ตรวจแล้วกดอนุมัติ หรือไม่อนุมัติพร้อมเหตุผล" />
+      <Box sx={{ display: approvalCount > 0 ? "block" : "none", mb: 2.5 }}>
+        <SectionHead color="#d97706" title="แผนงานรออนุมัติ" count={approvalCount}
+          hint="ลงวันไว้แล้ว — ตรวจแล้วกดอนุมัติ หรือไม่อนุมัติพร้อมเหตุผล" />
         <Suspense fallback={<Skeleton variant="rounded" height={160} sx={{ borderRadius: 3 }} />}>
           <PendingApprovalsPanel active onCountChange={setApprovalCount} />
         </Suspense>
       </Box>
 
-      {/* ✅ ใบแจ้งงาน — ใครแจ้งมาก็ได้ (ชื่อผู้แจ้งอยู่บนการ์ด) ยังไม่มีวันนัด ต้องเลือกวัน + ทีมให้ */}
-      <SectionHead icon={<AssignmentOutlined />} color="#2563eb" title="ใบแจ้งงาน" count={waiting}
-        hint={`แจ้งเข้ามาแล้ว ยังไม่มีวันนัด — ตรวจแล้วเลือกวันและทีมให้${urgent > 0 ? ` · ด่วน ${urgent} ใบ` : ""}`} />
+      {/* ✅ ใบแจ้งงาน — ใครแจ้งมาก็ได้ (ชื่อผู้แจ้งอยู่บนการ์ด) ยังไม่มีวันนัด ต้องเลือกวัน + ทีมให้
+          🧹 (11 ต.ค. 2569 ผู้ใช้: "หน้าคำขอลงงานดูรก") ตัดหัวข้อใหญ่ "ใบแจ้งงาน" ออก — ซ้ำกับหัวหน้าเพจ
+             และหมวด "รอลงแผนงาน / ลงแผนงานแล้ว" ในรายการบอกอยู่แล้ว */}
       <DispatchList mode="board" myId={String(userData?.userId || "")} />
     </Box>
   );

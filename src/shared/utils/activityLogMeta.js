@@ -8,8 +8,9 @@
  * Operation/index.js เสมอ — เพิ่ม action ใหม่ต้องเพิ่มทั้งสองที่
  */
 export const ACTIVITY_LOG_META = {
-  check_in:       { label: "เช็คอิน",              emoji: "🔑", color: "#8b5cf6" },
+  check_in:       { label: "เข้างาน",              emoji: "🔑", color: "#8b5cf6" },
   check_out:      { label: "เช็คเอาท์",             emoji: "🚪", color: "#10b981" },
+  time_corrected: { label: "แก้เวลาเข้างาน (อนุมัติแล้ว)", emoji: "🕒", color: "#d97706" },
   note_saved:     { label: "บันทึกสรุปงาน",         emoji: "📝", color: "#3b82f6" },
   report_saved:   { label: "บันทึก Report",         emoji: "📋", color: "#10b981" },
   file_uploaded:  { label: "อัปโหลดไฟล์",           emoji: "📎", color: "#f59e0b" },
@@ -35,6 +36,15 @@ export const ACTIVITY_LOG_META = {
   title_changed:    { label: "เปลี่ยนประเภทงาน",         emoji: "🔧", color: "#3b82f6" },
   schedule_changed: { label: "เปลี่ยนวันที่/กำหนดการ",    emoji: "📅", color: "#f59e0b" },
   details_updated:  { label: "แก้ไขรายละเอียดงาน",       emoji: "✏️", color: "#6b7280" },
+
+  // ✅ (11 ต.ค. 2569 ผู้ใช้: "ทุกๆ ขั้นตอนให้มีบันทึกประวัติของผู้ดำเนินการด้วย") — ขั้นตอนงานที่บันทึกจาก server
+  intake_created:       { label: "รับงานใหม่",              emoji: "📥", color: "#2563eb" },
+  scheduled:            { label: "ส่งลงตาราง",              emoji: "📆", color: "#2563eb" },
+  job_ack:              { label: "รับทราบงาน",              emoji: "👍", color: "#2563eb" },
+  job_declined:         { label: "ปฏิเสธงาน",               emoji: "🚫", color: "#dc2626" },
+  job_confirmed:        { label: "ยืนยันนัดแล้ว",            emoji: "✅", color: "#16a34a" },
+  responsible_assigned: { label: "มอบหมายผู้รับผิดชอบ",       emoji: "👤", color: "#8b5cf6" },
+  follow_up:            { label: "แจ้งงานไม่เสร็จ",          emoji: "⚠️", color: "#d97706" },
 };
 
 export const getActivityLogMeta = (action) =>

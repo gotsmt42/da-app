@@ -22,12 +22,14 @@ import OtService from "@/features/ot/services/OtService";
 import PurchaseService from "@/features/purchase/services/PurchaseService";
 import DispatchService from "@/features/dispatch/services/DispatchService";
 import WebsiteService from "@/features/website/services/WebsiteService";
+import AttendanceService from "@/shared/services/AttendanceService";
 import { can, isRole, ROLES } from "@/shared/utils/roles";
 import { countDistinctJobs, getOverdueGroupKey } from "@/shared/utils/overdueJobs";
 import { countPendingJobs } from "@/shared/utils/approvalStatus";
 import { countOverdueContracts, countDueSoonContracts } from "@/shared/utils/contractOverdue";
 import { getFollowUpInfo } from "@/shared/utils/quotationTracking";
 import { subscribeRealtime } from "@/shared/realtime/realtimeClient";
+import { isParticipant, needsMyAction } from "@/shared/utils/jobFlow";
 
 /**
  * คำอธิบายของแต่ละป้าย — ใช้เป็น aria-label ให้ผู้ใช้ screen reader รู้ว่าเลขนั้นคือเรื่องอะไร
@@ -35,8 +37,9 @@ import { subscribeRealtime } from "@/shared/realtime/realtimeClient";
  */
 export const BADGE_LABEL = {
   pendingApproval: "แผนงานรออนุมัติ",
-  closeRequests: "คำขอปิดงานรอตรวจ",
+  closeRequests: "คำขอปิดงานรอตรวจ / งานที่รอคุณรับทราบ-ยืนยันนัด-เข้างาน",
   jobIntake: "งานใหม่ที่รอส่งลงตาราง",
+  attendanceFixes: "คำขอแก้เวลาเข้างานรออนุมัติ",
   contracts: "สัญญาที่ถึง/เลยกำหนดรอบเข้างาน (ส้ม = ใกล้ถึงรอบเดือนหน้า)",
   myJobs: "งานที่ต้องทำ",
   quotations: "ใบเสนอราคาที่ต้องติดตาม",
@@ -79,7 +82,7 @@ export const badgeTone = (badgeKey, badges) => {
 const POLL_MS = 30_000;
 
 const EMPTY = {
-  pendingApproval: 0, closeRequests: 0, contracts: 0, myJobs: 0, jobIntake: 0,
+  pendingApproval: 0, closeRequests: 0, contracts: 0, myJobs: 0, jobIntake: 0, attendanceFixes: 0,
   quotations: 0, dispatchQueue: 0, dispatchMine: 0,
   advance: 0, claim: 0, contractorPay: 0, ot: 0, purchase: 0, expenseInbox: 0, webLeads: 0,
 };
@@ -94,18 +97,20 @@ const scopeOf = (userData) => ({
   dispatchMine: can(userData, "requestDispatch") && isRole(userData, ROLES.SALE),
   // ✅ คำขอจากเว็บไซต์ที่ยังไม่มีใครรับเรื่อง (สถานะ "ใหม่") — ลูกค้ารอสายอยู่ ต้องเห็นทันที
   webLeads: can(userData, "viewLeads"),
+  // ✅ (10 ต.ค. 2569) คำขอแก้เวลาเช็คอิน/เช็คเอาต์ — ผู้อนุมัติ (approveJobs) เท่านั้น
+  attendance: can(userData, "approveJobs"),
 });
 
 let lastUser = null;
-let store = { userId: "", data: { events: [], drafts: [], expense: null, dispatch: null, leads: null, ot: null, purchase: null }, at: 0, loading: false };
+let store = { userId: "", data: { events: [], drafts: [], expense: null, dispatch: null, leads: null, ot: null, purchase: null, attendance: null }, at: 0, loading: false };
 const subscribers = new Set();
 let timer = null;
 
 const emit = () => subscribers.forEach((fn) => fn(store.data));
 
-const ALL_PARTS = ["events", "drafts", "expense", "dispatch", "leads", "ot", "purchase"];
+const ALL_PARTS = ["events", "drafts", "expense", "dispatch", "leads", "ot", "purchase", "attendance"];
 /** ส่วนที่ต้องดึงซ้ำตอนมีสัญญาณเรียลไทม์ — ไม่ดึงงานทั้งก้อน (~150 kB) เพียงเพราะมีคนอนุมัติใบเบิก */
-const PARTS_BY_TOPIC = { events: ["events", "drafts"], dispatch: ["dispatch"], expenses: ["expense"], leads: ["leads"], ot: ["ot"], purchase: ["purchase"] };
+const PARTS_BY_TOPIC = { events: ["events", "drafts"], dispatch: ["dispatch"], expenses: ["expense"], leads: ["leads"], ot: ["ot"], purchase: ["purchase"], attendance: ["attendance"] };
 let queuedParts = null;
 
 /** @param {string[]} [parts] ดึงเฉพาะส่วนนี้ (ไม่ระบุ = ทั้งหมด) */
@@ -118,7 +123,7 @@ const fetchAll = async (userData, parts = ALL_PARTS) => {
   }
   store.loading = true;
   const want = new Set(parts);
-  const [events, drafts, expense, dispatch, leads, ot, purchase] = await Promise.all([
+  const [events, drafts, expense, dispatch, leads, ot, purchase, attendance] = await Promise.all([
     scope.jobs && want.has("events") ? EventService.getEventOp().then((r) => r?.userEvents || []).catch(() => null) : null,
     scope.contracts && want.has("drafts") ? EventService.GetDraftEvents().then((r) => r?.drafts || []).catch(() => null) : null,
     scope.expense && want.has("expense") ? ExpenseService.summary().catch(() => null) : null,
@@ -127,6 +132,7 @@ const fetchAll = async (userData, parts = ALL_PARTS) => {
     // ✅ OT ใช้สิทธิ์ชุดเดียวกับระบบเบิก
     scope.expense && want.has("ot") ? OtService.summary().catch(() => null) : null,
     scope.expense && want.has("purchase") ? PurchaseService.summary().catch(() => null) : null,
+    scope.attendance && want.has("attendance") ? AttendanceService.list({ pending: 1 }).then((r) => ({ pending: Number(r?.pendingCount) || 0 })).catch(() => null) : null,
   ]);
   store.loading = false;
   // ⚠️ ค่าที่ดึงไม่สำเร็จ (null) ต้องคงของเดิมไว้ ไม่ใช่ล้างเป็นว่าง — เน็ตสะดุดทีเดียวป้ายหายทั้งแอป
@@ -138,6 +144,7 @@ const fetchAll = async (userData, parts = ALL_PARTS) => {
     leads: leads ?? store.data.leads,
     ot: ot ?? store.data.ot,
     purchase: purchase ?? store.data.purchase,
+    attendance: attendance ?? store.data.attendance,
   };
   if (want.size === ALL_PARTS.length) store.at = Date.now();
   emit();
@@ -184,7 +191,7 @@ const start = (userData) => {
   const uid = String(userData?.userId || "");
   // เปลี่ยนบัญชี = ทิ้งของเก่าทั้งหมด ห้ามให้ป้ายของคนก่อนหน้าค้างอยู่
   if (store.userId !== uid) {
-    store = { userId: uid, data: { events: [], drafts: [], expense: null, dispatch: null, leads: null, ot: null, purchase: null }, at: 0, loading: false };
+    store = { userId: uid, data: { events: [], drafts: [], expense: null, dispatch: null, leads: null, ot: null, purchase: null, attendance: null }, at: 0, loading: false };
     emit();
   }
   if (Date.now() - store.at > POLL_MS) fetchAll(userData);
@@ -222,9 +229,13 @@ const computeBadges = (userData, data) => {
 
   return {
     pendingApproval: countPendingJobs(events, drafts, { userId, isAdminOrManager }),
-    closeRequests: countDistinctJobs(events, (e) => e.closeRequested === true && e.status !== "ดำเนินการเสร็จสิ้น"),
+    // ✅ (11 ต.ค. 2569) การดำเนินงาน = คำขอปิดงานรอตรวจ + งานที่รอ "ฉัน" ทำขั้นถัดไป (รับทราบ/ยืนยันนัดหมาย/บันทึกเข้างาน)
+    //    — แอดมิน/ผู้จัดการไม่มีเมนูงานของฉันแล้ว ต้องเห็นจำนวนงานที่รอตัวเองที่เมนูนี้
+    closeRequests: countDistinctJobs(events, (e) => (e.closeRequested === true && e.status !== "ดำเนินการเสร็จสิ้น")
+      || (!can(userData, "receiveDispatch") && needsMyAction(e, userId, userData.fname))),
     // ✅ "รับงาน" — งานที่รับไว้ผ่านเมนูนี้แล้วยังไม่ส่งลงตาราง
     jobIntake: drafts.filter((d) => d.intakeAt).length,
+    attendanceFixes: scope.attendance ? Number(data.attendance?.pending) || 0 : 0,
     // ✅ ถึง/เลยกำหนดรอบ (แดง) ก่อนเสมอ · ไม่มีค่อยโชว์จำนวนที่ใกล้ถึงรอบเดือนหน้า (อำพัน)
     ...(() => {
       if (!scope.contracts) return { contracts: 0, contractsTone: "soon" };
@@ -232,9 +243,10 @@ const computeBadges = (userData, data) => {
       const red = countOverdueContracts(all);
       return red > 0 ? { contracts: red, contractsTone: "act" } : { contracts: countDueSoonContracts(all), contractsTone: "soon" };
     })(),
-    myJobs: isRole(userData, ROLES.TECHNICIAN)
-      ? countDistinctJobs(events, (e) => ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(e.status) && !e.closeRequested)
-      : 0,
+    // ✅ (11 ต.ค. 2569 ผู้ใช้: "งานที่ได้รับมอบหมายไม่เข้ามางานของฉัน — แอดมิน กับ ผู้รับผิดชอบงาน")
+    //    นับงานที่ "ฉัน" ถูกมอบหมาย (ผู้รับผิดชอบ/หัวหน้าทีม/ลูกทีม) ทุกตำแหน่ง ไม่ใช่เฉพาะช่าง
+    myJobs: !can(userData, "receiveDispatch") ? 0 : countDistinctJobs(events, (e) => isParticipant(e, userId, userData.fname)
+      && ["กำลังรอยืนยัน", "ยืนยันแล้ว", "กำลังดำเนินการ"].includes(e.status) && !e.closeRequested && !e.unscheduled),
     quotations,
     /**
      * คิว "คำขอลงงาน" = คำขอจากฝ่ายขาย (Dispatch ที่ยังไม่ลงแผนงาน) + แผนงานที่ช่างสร้างเองแล้วรออนุมัติ

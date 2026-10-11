@@ -130,7 +130,7 @@ export function PeopleRow({ responsible, team = [], avatars, onAssign }) {
  * @param value     ผู้รับผิดชอบปัจจุบัน
  * @param onPick    (name) => void — "" = ยกเลิกการมอบหมาย
  */
-export function AssignResponsibleMenu({ anchorEl, onClose, employees = [], value, onPick }) {
+export function AssignResponsibleMenu({ anchorEl, onClose, employees = [], value, onPick, title = "มอบหมายผู้รับผิดชอบ" }) {
   const [q, setQ] = useState("");
   const avatars = useAvatarMap(employees);
   const names = useMemo(
@@ -148,7 +148,7 @@ export function AssignResponsibleMenu({ anchorEl, onClose, employees = [], value
       MenuListProps={{ dense: true, sx: { py: 0.5 } }}
     >
       <Box sx={{ px: 1.5, pt: 0.75, pb: 0.5 }} onKeyDown={(e) => e.stopPropagation()}>
-        <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: "#64748b", mb: 0.75 }}>มอบหมายผู้รับผิดชอบ</Typography>
+        <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: "#64748b", mb: 0.75 }}>{title}</Typography>
         <TextField
           size="small" fullWidth autoFocus placeholder="ค้นหาชื่อ" value={q} onChange={(e) => setQ(e.target.value)}
           sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, fontSize: "0.82rem" } }}

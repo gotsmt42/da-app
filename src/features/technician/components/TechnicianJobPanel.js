@@ -22,7 +22,7 @@ import {
   Box, Card, CardContent, Typography, Stack, Avatar,
   Button, IconButton, TextField, Collapse, Divider, LinearProgress,
   Tooltip, Menu, MenuItem, ListItemIcon, ListItemText,
-  Dialog, DialogTitle, DialogContent, useMediaQuery,
+  Dialog, DialogContent, useMediaQuery, ButtonBase,
 } from "@mui/material";
 import { styled, alpha } from "@mui/material/styles";
 import {
@@ -33,7 +33,8 @@ import {
   AttachFile, Delete, Download, TaskAlt, HourglassTop, NoteAdd,
   RequestQuote, ReceiptLong, AssignmentTurnedIn, Close, Cancel,
   Send, Chat, Link as LinkIcon, MoreVert, Print, Share, CalendarMonth, Lock,
-  CheckCircleOutline, InfoOutlined, RemoveCircleOutline, CheckBox, CheckBoxOutlineBlank,
+  RemoveCircleOutline, CheckBox, CheckBoxOutlineBlank,
+  RadioButtonUnchecked,
 } from "@mui/icons-material";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LINE, SUCCESS } from "@/shared/ui/PageKit";
 import LineIcon from "@/shared/ui/LineIcon";
@@ -43,6 +44,10 @@ import { formatThai } from "@/shared/utils/thaiDate";
 import { ROLES } from "@/shared/utils/roles";
 import { JobFlowChips, JobFlowPanel } from "@/shared/ui/JobFlow";
 import SitePhotos from "@/shared/ui/SitePhotos";
+import { PersonChip } from "@/shared/ui/PersonChip";
+import CheckInOutPanel from "@/features/attendance/components/CheckInOutPanel";
+import { docsUnlocked } from "@/shared/utils/jobFlow";
+import { BTN as MBTN, CARD } from "@/shared/ui/modernUi";
 
 // ✅ ใช้ตัดสินใจลำดับปุ่มแชร์ในเมนู "⋮" ต่อไฟล์ (ดูเหตุผลใน fileActions.js)
 const IS_MOBILE = isMobileDevice();
@@ -53,6 +58,19 @@ const FAST_MENU_PROPS = {
   transitionDuration: { enter: 120, exit: 80 },
   disableScrollLock: true,
 };
+
+/**
+ * ✅ (11 ต.ค. 2569 ผู้ใช้: "ให้ช่างกดรับทราบงาน และยืนยันนัดก่อน เมนูเอกสารงานถึงจะขึ้นมาแสดง")
+ * แถบแทนกล่องเอกสาร ตอนยังไม่ครบขั้น — บอกว่าทำไมยังไม่เห็น (ไม่ให้ดูเหมือนข้อมูลหาย)
+ */
+const DocsLockedRow = ({ event }) => (
+  <Stack direction="row" alignItems="center" gap={0.85} sx={{ mt: 1.5, px: 1.5, py: 1.1, borderRadius: "12px", border: "1px dashed #cbd5e1", bgcolor: "#f8fafc" }}>
+    <Lock sx={{ fontSize: 17, color: "#94a3b8", flexShrink: 0 }} />
+    <Typography sx={{ fontSize: "0.8rem", color: "#475569", lineHeight: 1.45 }}>
+      <b style={{ fontWeight: 600 }}>เอกสารประจำงาน</b> · แสดงหลังผู้รับผิดชอบ{(event?.acks || []).length ? "" : "กดรับทราบงานและ"}ยืนยันนัดหมาย
+    </Typography>
+  </Stack>
+);
 
 // ─── Constants ────────────────────────────────────────────────────────
 const OP_COLOR = {
@@ -344,7 +362,7 @@ const DocumentFileList = ({ type, files, isUploading, uploadProgress, onFileUplo
           {/* ✅ ปุ่มแนบไฟล์แบบกล่องเส้นประ — บอกชนิดไฟล์ที่รับได้ในตัว ไม่ต้องเดา */}
           <Box component="button" type="button" onClick={() => fileRef.current?.click()}
             sx={{
-              width: "100%", display: "flex", alignItems: "center", gap: 1, minHeight: 44,
+              width: "100%", display: "flex", alignItems: "center", gap: 1, minHeight: 40,
               px: 1.5, borderRadius: 2, cursor: "pointer", font: "inherit", textAlign: "left",
               border: `1px dashed ${ACCENT_LINE}`, bgcolor: "#fff", color: ACCENT,
               transition: "background-color .15s, border-color .15s, color .15s",
@@ -386,20 +404,21 @@ const DocumentChecklistItem = ({
   // โหมดที่ 3: ไม่มีปุ่ม "มี/ไม่มี" ให้เลือก (เพราะไม่มีทางเลือก) แต่ก็ไม่มีเช็คบ็อกซ์ให้ติ๊กเหมือน report
   const requiredByJobType = !alwaysRequired && isDocRequired(event, type);
 
-  // ✅ สถานะของช่องนี้ 1 ป้ายทางขวา (แทนวงกลมเปล่า/การระบายสีทั้งการ์ด) — อ่านแล้วรู้ทันทีว่าต้องทำอะไรต่อ
-  const pending = alwaysRequired ? (!hasFiles ? "ต้องแนบไฟล์" : "รอยืนยัน")
-    : requiredByJobType || applicable === true ? "ต้องแนบไฟล์"
-    : "รอเลือก";
-  // ✅ ตอบ "ไม่มี" = ป้ายเทา "ไม่มีเอกสารนี้" ไม่ใช่ "ครบ" (ผู้ใช้: "ถ้าไม่มี ไม่ควรมีคำว่าครบ")
+  // ✅ (11 ต.ค. 2569 ผู้ใช้: "หน้าเอกสารงานของช่างยังดูรกๆ ปรับปรุง")
+  //    เดิม: ไอคอนสีคนละสีทุกชนิด · ป้าย "บังคับ/ถ้ามี" · ป้ายสถานะพื้นสี · คำอธิบายยาว 2-3 บรรทัด · คำใบ้ซ้ำใต้ปุ่ม
+  //    ✅ ตอนนี้: วงกลมสถานะทางซ้าย (✓ เขียว = เสร็จ · ⊖ เทา = ไม่มี · ○ = ยังไม่ทำ) + ชื่อ + ข้อความสถานะสั้นทางขวา
+  //       คำอธิบายบรรทัดเดียวเฉพาะช่องที่ยังไม่เสร็จ · เนื้อหา (แนบไฟล์/ตอบคำถาม) เยื้องตรงกับชื่อ · ไม่มีคำใบ้ซ้ำ
   const notApplicable = complete && applicable === false && !alwaysRequired && !requiredByJobType;
-  const pill = notApplicable
-    ? { text: "ไม่มี", fg: MUTED, bg: "#f1f5f9", dot: FAINT }
-    : complete
-    ? { text: "แนบแล้ว", fg: "#15803d", bg: "#f0fdf4", icon: <CheckCircle sx={{ fontSize: 14 }} /> }
-    : pending === "รอเลือก"
-      ? { text: pending, fg: MUTED, bg: "#f1f5f9", dot: FAINT }
-      : { text: pending, fg: "#b45309", bg: "#fffbeb", dot: "#f59e0b" };
   const required = alwaysRequired || requiredByJobType;
+  const state = notApplicable ? { text: "ไม่มี", fg: MUTED }
+    : complete ? { text: `แนบแล้ว ${files.length} ไฟล์`, fg: "#15803d" }
+    : alwaysRequired && hasFiles ? { text: "รอยืนยัน", fg: "#b45309" }
+    : required || applicable === true ? { text: "ต้องแนบไฟล์", fg: "#b45309" }
+    : { text: "รอตอบ", fg: MUTED };
+  const statusIcon = notApplicable ? <RemoveCircleOutline sx={{ fontSize: 22, color: FAINT }} />
+    : complete ? <CheckCircle sx={{ fontSize: 22, color: SUCCESS }} />
+    : <RadioButtonUnchecked sx={{ fontSize: 22, color: "#cbd5e1" }} />;
+  const sub = requiredByJobType && !complete ? "งาน PM ต้องแนบทุกครั้ง" : !complete ? desc : "";
   const fileList = (
     <DocumentFileList
       type={type} files={files}
@@ -408,142 +427,72 @@ const DocumentChecklistItem = ({
       isLocked={isLocked}
     />
   );
-  const hint = (text) => text ? (
-    <Typography sx={{ fontSize: "0.74rem", color: MUTED, lineHeight: 1.45, mb: 1 }}>{text}</Typography>
-  ) : null;
+  const linkBtn = (text, onClick) => (
+    <Button size="small" onClick={onClick}
+      sx={{ textTransform: "none", fontSize: "0.76rem", fontWeight: 700, minWidth: "auto", px: 0.75, py: 0.25, color: ACCENT, flexShrink: 0 }}>
+      {text}
+    </Button>
+  );
 
   return (
-    <Box sx={{
-      borderRadius: 2.5, bgcolor: "#fff", overflow: "hidden",
-      border: `1px solid ${complete && !notApplicable ? "#d1fae5" : LINE}`,
-      boxShadow: "0 1px 2px rgba(15,23,42,.04)",
-      transition: "border-color .15s ease",
-    }}>
-      {/* ── หัว: ไอคอนชนิดเอกสาร · ชื่อ + ป้ายบังคับ/ถ้ามี · ป้ายสถานะ ── */}
-      <Stack direction="row" alignItems="flex-start" gap={1.25} sx={{ px: 1.75, pt: 1.5, pb: 1 }}>
-        <Box sx={{
-          width: 36, height: 36, borderRadius: "10px", flexShrink: 0,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          bgcolor: alpha(color, 0.1), color,
-        }}>
-          {icon}
-        </Box>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap">
-            <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", color: INK, lineHeight: 1.3 }}>{label}</Typography>
-            <Box component="span" sx={{
-              fontSize: "0.64rem", fontWeight: 800, px: 0.75, py: 0.1, borderRadius: 1,
-              color: required ? INK_2 : MUTED, bgcolor: required ? "#f1f5f9" : "transparent",
-              border: required ? "none" : `1px solid ${LINE}`,
-            }}>
-              {required ? "บังคับ" : "ถ้ามี"}
-            </Box>
-          </Stack>
-          {/* ✅ คำอธิบายเต็ม — ช่างรู้ว่าเอกสารนี้คืออะไร ของอะไร ใช้ทำอะไรต่อ (ผู้ใช้: "อธิบายรายละเอียดให้ครบ") */}
-          {desc && (
-            <Typography sx={{ fontSize: "0.76rem", color: MUTED, lineHeight: 1.45, mt: 0.25 }}>{desc}</Typography>
-          )}
-        </Box>
-        <Box component="span" sx={{
-          display: "inline-flex", alignItems: "center", gap: 0.4, flexShrink: 0, mt: 0.25,
-          height: 24, px: 1, borderRadius: 999, fontSize: "0.72rem", fontWeight: 700, whiteSpace: "nowrap",
-          color: pill.fg, bgcolor: pill.bg,
-        }}>
-          {!pill.icon && <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: pill.dot }} />}
-          {pill.icon}{pill.text}
-        </Box>
+    <Box sx={{ borderRadius: "14px", bgcolor: "#fff", border: `1px solid ${LINE}`, px: 1.5, py: 1.35 }}>
+      {/* ── หัว: วงกลมสถานะ · ชื่อ (* = บังคับ) · ข้อความสถานะ ── */}
+      <Stack direction="row" alignItems="center" gap={1.1}>
+        {statusIcon}
+        <Typography sx={{ flex: 1, minWidth: 0, fontWeight: 600, fontSize: "0.92rem", color: notApplicable ? MUTED : INK, lineHeight: 1.3 }}>
+          {label}{required && <Box component="span" sx={{ color: "#dc2626", ml: 0.25 }}>*</Box>}
+        </Typography>
+        <Typography sx={{ fontSize: "0.74rem", fontWeight: 600, color: state.fg, whiteSpace: "nowrap" }}>{state.text}</Typography>
       </Stack>
 
-      <Box sx={{ px: 1.75, pb: 1.75 }}>
-        {/* ✅ เหตุผลที่ช่องนี้ไม่มีตัวเลือก "ไม่มี" — บอกครั้งเดียวในกล่องเล็ก (เดิมเตือนซ้ำ 2 บรรทัดตัวส้มหนา) */}
-        {requiredByJobType && (
-          <Stack direction="row" gap={0.6} alignItems="flex-start" sx={{ mb: 1 }}>
-            <InfoOutlined sx={{ fontSize: 15, color: FAINT, mt: 0.2 }} />
-            <Typography sx={{ fontSize: "0.74rem", color: INK_2, lineHeight: 1.45 }}>
-              งาน PM ต้องมีเอกสารนี้ทุกครั้ง — แนบไฟล์ก่อนจึงจะขอปิดงานได้
-            </Typography>
-          </Stack>
+      <Box sx={{ pl: "34px" }}>
+        {sub && (
+          <Typography sx={{ fontSize: "0.74rem", color: MUTED, lineHeight: 1.45, mt: 0.25,
+            display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{sub}</Typography>
         )}
 
         {alwaysRequired ? (
-          <>
-            {!hasFiles && hint("แนบไฟล์ Service Report ของงานนี้ แล้วกดยืนยันด้านล่าง — ต้องมีทั้งไฟล์และการยืนยันจึงจะขอปิดงานได้")}
+          <Box sx={{ mt: 1 }}>
             {fileList}
-            {/* ✅ การยืนยันเป็นช่องติ๊กมีคำอธิบาย แทนวงกลมเปล่าทางขวาที่ไม่รู้ว่ากดได้ */}
-            <Stack direction="row" alignItems="center" gap={1} role="checkbox" aria-checked={checked}
+            {/* การยืนยัน — ช่องติ๊กบรรทัดเดียว (ไม่ทำเป็นกล่อง ไม่ให้ดูเหมือนปุ่ม) */}
+            <Stack direction="row" alignItems="center" gap={0.75} role="checkbox" aria-checked={checked}
               onClick={!isLocked ? () => onToggleCheck(type, !checked) : undefined}
-              sx={{
-                mt: 1, px: 1.25, py: 0.9, borderRadius: 2, cursor: isLocked ? "default" : "pointer",
-                border: `1px solid ${checked ? ACCENT_LINE : LINE}`, bgcolor: checked ? ACCENT_SOFT : "#fff",
-                opacity: isLocked ? 0.7 : 1,
-              }}>
-              {checked ? <CheckBox sx={{ fontSize: 22, color: ACCENT }} /> : <CheckBoxOutlineBlank sx={{ fontSize: 22, color: FAINT }} />}
-              <Box sx={{ minWidth: 0 }}>
-                <Typography sx={{ fontSize: "0.82rem", fontWeight: 700, color: INK_2, lineHeight: 1.3 }}>
-                  ยืนยันว่า Service Report ครบถ้วนแล้ว
-                </Typography>
-                {checked && !hasFiles && (
-                  <Typography sx={{ fontSize: "0.7rem", color: "#b45309", fontWeight: 600 }}>ยังไม่มีไฟล์ — แนบไฟล์ก่อนจึงจะนับว่าครบ</Typography>
-                )}
-              </Box>
+              sx={{ mt: 0.75, py: 0.4, cursor: isLocked ? "default" : "pointer", opacity: isLocked ? 0.7 : 1, width: "fit-content" }}>
+              {checked ? <CheckBox sx={{ fontSize: 21, color: ACCENT }} /> : <CheckBoxOutlineBlank sx={{ fontSize: 21, color: FAINT }} />}
+              <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: INK_2 }}>ยืนยันว่า Service Report ครบถ้วนแล้ว</Typography>
             </Stack>
-          </>
+            {checked && !hasFiles && (
+              <Typography sx={{ fontSize: "0.72rem", color: "#b45309", fontWeight: 600 }}>ยังไม่มีไฟล์ — แนบไฟล์ก่อนจึงจะนับว่าครบ</Typography>
+            )}
+          </Box>
         ) : requiredByJobType ? (
-          <>
-            {!hasFiles && hint(uploadHint)}
-            {fileList}
-          </>
+          <Box sx={{ mt: 1 }}>{fileList}</Box>
         ) : applicable === null || applicable === undefined ? (
-          <>
-            {/* ✅ คำถามเจาะจงต่อชนิดเอกสาร + ปุ่มที่บอกผลลัพธ์ตรงๆ — ปุ่มขาวชัดเจน (เดิมสีเทาดูเหมือนกดไม่ได้) */}
+          <Box sx={{ mt: 0.85 }}>
             <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: INK_2, mb: 0.75 }}>
               {question || "งานนี้มีเอกสารนี้หรือไม่?"}
             </Typography>
-            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1 }}>
-              {[["yes", yesLabel || "มี", <CheckCircleOutline key="i" sx={{ fontSize: 18, color: SUCCESS }} />],
-                ["no", noLabel || "ไม่มี", <RemoveCircleOutline key="i" sx={{ fontSize: 18, color: FAINT }} />]].map(([v, text, ic]) => (
-                <Button key={v} disabled={isLocked} onClick={() => onSetApplicable(type, v === "yes")} startIcon={ic}
-                  sx={{
-                    textTransform: "none", fontWeight: 700, fontSize: "0.82rem", borderRadius: 2, py: 0.9,
-                    color: INK_2, bgcolor: "#fff", border: `1px solid ${LINE}`,
-                    "&:hover": { bgcolor: ACCENT_SOFT, borderColor: ACCENT_LINE },
-                  }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0.75 }}>
+              {[["yes", yesLabel || "มี"], ["no", noLabel || "ไม่มี"]].map(([v, text]) => (
+                <Button key={v} variant="outlined" disabled={isLocked} onClick={() => onSetApplicable(type, v === "yes")}
+                  sx={{ ...MBTN.outline(v === "yes" ? ACCENT : "#64748b"), minHeight: 36, fontSize: "0.8rem" }}>
                   {text}
                 </Button>
               ))}
             </Box>
-            {/* ✅ บอกล่วงหน้าว่าตอบแล้วจะเกิดอะไรต่อ — ลดความลังเลว่าจะกดผิดไหม */}
-            <Typography sx={{ fontSize: "0.7rem", color: FAINT, mt: 0.75 }}>
-              {yesLabel ? `เลือก “${yesLabel}” แล้วแนบไฟล์ · ` : ""}เลือกแล้วเปลี่ยนทีหลังได้ · ตอบครบทุกช่องจึงจะขอปิดงานได้
-            </Typography>
-          </>
+          </Box>
         ) : applicable === false ? (
-          <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}
-            sx={{ px: 1.25, py: 0.75, borderRadius: 2, bgcolor: SURFACE }}>
-            {/* ✅ บอกด้วยคำเดียวกับที่ช่างเพิ่งกดเลือกไป (เช่น "ไม่ต้องเสนอราคาเพิ่ม") */}
-            <Typography sx={{ fontSize: "0.8rem", color: INK_2, display: "inline-flex", alignItems: "center", gap: 0.6 }}>
-              <RemoveCircleOutline sx={{ fontSize: 16, color: FAINT }} />
-              {noneText || "ไม่มีเอกสารนี้สำหรับงานนี้"}
-            </Typography>
-            {!isLocked && (
-              <Button size="small" onClick={() => onSetApplicable(type, true)}
-                sx={{ textTransform: "none", fontSize: "0.76rem", fontWeight: 700, minWidth: "auto", color: ACCENT, flexShrink: 0 }}>
-                เปลี่ยน
-              </Button>
-            )}
+          <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} sx={{ mt: 0.25 }}>
+            <Typography sx={{ fontSize: "0.78rem", color: MUTED }}>{noneText || "ไม่มีเอกสารนี้สำหรับงานนี้"}</Typography>
+            {!isLocked && linkBtn("เปลี่ยน", () => onSetApplicable(type, true))}
           </Stack>
         ) : (
-          <>
-            {/* ✅ บอกว่าต้องแนบไฟล์อะไร และไฟล์นั้นถูกเอาไปใช้ต่อที่ไหน */}
-            {!hasFiles && hint(uploadHint)}
+          <Box sx={{ mt: 1 }}>
             {fileList}
             {!hasFiles && !isLocked && (
-              <Button size="small" onClick={() => onSetApplicable(type, false)}
-                sx={{ textTransform: "none", fontSize: "0.74rem", fontWeight: 600, minWidth: "auto", px: 0.5, mt: 0.5, color: MUTED }}>
-                {noLabel ? `เปลี่ยนเป็น “${noLabel}”` : "เปลี่ยนเป็นไม่มี"}
-              </Button>
+              <Box sx={{ mt: 0.5, ml: -0.75 }}>{linkBtn(noLabel ? `เปลี่ยนเป็น “${noLabel}”` : "เปลี่ยนเป็นไม่มี", () => onSetApplicable(type, false))}</Box>
             )}
-          </>
+          </Box>
         )}
       </Box>
     </Box>
@@ -725,8 +674,11 @@ const TechnicianJobCard = ({
   // ✅ ขั้นตอนทำงาน (รับทราบงาน/งานไม่เสร็จ) — server คืนงานทั้งกลุ่ม ให้หน้าแม่เอาไปแทนในรายการ
   onPatched,
 }) => {
-  const [expanded,        setExpanded]        = useState(false);
   const [docsExpanded,    setDocsExpanded]     = useState(false);
+  // ✅ (11 ต.ค. 2569 ผู้ใช้: "เอกสารงานหรืออะไรที่จำเป็นให้แสดงด้านนอกได้เลย" + "ให้ส่วนนี้กดเปิดขึ้นไปอีกหน้าแทนแบบเดิม คงไว้ถึงเอกสารงาน")
+  //    บนการ์ด (เห็นเสมอ): หัวการ์ด · ขั้นตอน/ปุ่มเข้างาน · เอกสารประจำงาน · ขอปิดงาน
+  //    อีกหน้า (กดหัวการ์ด หรือแถบ "ไฟล์แนบ · สรุปงาน · …"): ไฟล์แนบ · สรุปงานที่ทำ · คุยกับแอดมิน · ประวัติกิจกรรม
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [requestingClose, setRequestingClose] = useState(false);
   // ✅ เดิมฝั่งช่างโชว์ประวัติกิจกรรมยาวเหยียดตลอดเวลา ไม่มีปุ่มพับ/กาง ต่างจากฝั่งแอดมิน
   // (ดู ActivityLogMini ใน Operation/index.js) ซึ่งพับไว้เป็นค่าเริ่มต้น กดดูได้เมื่อต้องการ —
@@ -882,7 +834,7 @@ const TechnicianJobCard = ({
   // ✅ เช็คลิสต์เอกสารประจำงาน แยกออกมาเป็นตัวแปรเดียว ใช้ร่วมกันทั้งแบบกางลงในหน้า (Collapse บน
   // มือถือ) และแบบ Dialog ทับขึ้นมา (จอกว้าง) เหมือนกับ expandedContent ด้านล่าง
   const docsContent = (
-    <Stack spacing={1.25}>
+    <Stack spacing={1}>
       {DOCUMENT_TYPES.map(doc => (
         <DocumentChecklistItem
           key={doc.type}
@@ -967,6 +919,16 @@ const TechnicianJobCard = ({
                     : log.action === "document_applicable_set" ? "ระบุมี/ไม่มีเอกสาร"
                     : log.action === "close_requested"        ? "ขอปิดงาน"
                     : log.action === "job_ack"                ? "รับทราบงาน"
+                    : log.action === "job_declined"           ? "ปฏิเสธงาน"
+                    : log.action === "job_confirmed"          ? "ยืนยันนัดแล้ว"
+                    : log.action === "scheduled"              ? "ส่งลงตาราง"
+                    : log.action === "intake_created"         ? "รับงานใหม่"
+                    : log.action === "check_in"               ? "เข้างาน"
+                    : log.action === "responsible_assigned"   ? "มอบหมายผู้รับผิดชอบ"
+                    : log.action === "team_changed"           ? "เปลี่ยนหัวหน้าทีม"
+                    : log.action === "status_changed"         ? "เปลี่ยนสถานะ"
+                    : log.action === "close_approved"         ? "อนุมัติปิดงาน"
+                    : log.action === "close_rejected"         ? "ไม่อนุมัติปิดงาน"
                     : log.action === "follow_up"              ? "แจ้งงานไม่เสร็จ"
                     : log.action === "follow_up_resolved"     ? "จัดการงานไม่เสร็จแล้ว"
                     : log.action}
@@ -996,7 +958,7 @@ const TechnicianJobCard = ({
         {/* ── Header — กดที่ไหนก็ได้บนแถวนี้เพื่อกาง/พับการ์ด ไม่ต้องเล็งกดลูกศรเล็กๆ อีกต่อไป ── */}
         <Stack
           direction="row" alignItems="flex-start" justifyContent="space-between" gap={1.5}
-          onClick={() => setExpanded(p => !p)}
+          onClick={() => setDetailsOpen(true)}
           sx={{ cursor: "pointer" }}
         >
           <Stack direction="row" alignItems="flex-start" gap={1.5} flex={1} minWidth={0}>
@@ -1066,12 +1028,27 @@ const TechnicianJobCard = ({
                 {/* ✅ ทีม อยู่ล่างสุดของรายการ — เพิ่มชื่อลูกทีมเพิ่มเติม (teamMembers) ต่อท้ายชื่อทีม/
                     หัวหน้าทีมด้วย (เดิมมีแค่ event.team ตัวเดียว ไม่เห็นลูกทีมที่เพิ่มมาเลย) กันชื่อซ้ำ
                     ด้วย filter dedupe (เทียบ pattern เดียวกับ teamDisplay ใน EventCalendar/index.js) */}
+                {/* ✅ (11 ต.ค. 2569 ผู้ใช้: "ทีมเข้างาน ผู้รับผิดชอบ ควรจะอยู่ header" + "เพิ่มการแสดงผลผู้รับผิดชอบงานด้วย")
+                    แสดงเป็นชิปรูปคน: ผู้รับผิดชอบ (เสมอ — ยังไม่มอบหมายก็บอก) · ทีม = หัวหน้า (ป้ายหัวหน้า) + ลูกทีม */}
                 {(() => {
-                  const teamNames = [event.team, ...(event.teamMembers || []).map(m => m?.name)]
-                    .filter(Boolean)
-                    .filter((name, idx, arr) => arr.indexOf(name) === idx);
-                  return teamNames.length > 0 && (
-                    <InfoLine label="ทีม">{teamNames.join(", ")}</InfoLine>
+                  const head = event.team || "";
+                  const members = [...new Set((event.teamMembers || []).map(m => m?.name).filter((n) => n && n !== head))];
+                  return (
+                    <>
+                      <InfoLine label="ผู้รับผิดชอบ" center>
+                        {event.responsiblePerson
+                          ? <PersonChip name={event.responsiblePerson} size={20} strong title={`ผู้รับผิดชอบงาน: ${event.responsiblePerson}`} />
+                          : <span style={{ color: "#b45309" }}>ยังไม่มอบหมาย</span>}
+                      </InfoLine>
+                      {(head || members.length > 0) && (
+                        <InfoLine label="ทีม" center>
+                          <Box component="span" sx={{ display: "inline-flex", flexWrap: "wrap", gap: 0.5 }}>
+                            {head && <PersonChip name={head} size={20} badge="หัวหน้า" title={`หัวหน้าทีมเข้างาน: ${head}`} />}
+                            {members.map((n) => <PersonChip key={n} name={n} size={20} title={`ลูกทีม: ${n}`} />)}
+                          </Box>
+                        </InfoLine>
+                      )}
+                    </>
                   );
                 })()}
               </Stack>
@@ -1080,58 +1057,75 @@ const TechnicianJobCard = ({
           {/* ✅ ไม่มี onClick ของตัวเองแล้ว — แค่ไอคอนบอกว่ากดดูรายละเอียดได้ ตัวกดจริงคือทั้งแถว
               Header (คลิกบับเบิลขึ้นมาถึงเอง) — เดิมใช้ลูกศรชี้ลง/ขึ้นสื่อถึงการกางเนื้อหาลงในหน้า
               แต่ตอนนี้เปิดเป็น Dialog ทับขึ้นมาแทนแล้ว เปลี่ยนเป็นลูกศรชี้ขวาให้ตรงกับพฤติกรรมจริง */}
-          <ChevronRight sx={{ fontSize: 22, color: "#cbd5e1", flexShrink: 0, mt: 0.25 }} />
+          <ChevronRight sx={{ fontSize: 22, color: "#94a3b8", flexShrink: 0, mt: 0.25 }} />
         </Stack>
+
+        {/* ✅ (10 ต.ค. 2569) เช็คอิน/เช็คเอาต์ — ของแต่ละวันเข้างาน (ทุกการ์ดในกลุ่มหลายวันมีของตัวเอง)
+            เวลาจาก server · GPS · รูปก่อน/หลัง · สรุปงาน → ต่อท้าย "สรุปงานที่ทำ" ของงานนี้ */}
+        <CheckInOutPanel compact event={event} onPreview={onPreview} onPatched={onPatched} docsComplete={completedDocCount === DOCUMENT_TYPES.length} />
 
         {/* ✅ ขั้นตอนทำงาน: รับทราบงาน · รอข้อมูล · อุปกรณ์ · งานไม่เสร็จ (ของทั้งงาน — แสดงที่การ์ดตัวแทนเท่านั้น) */}
         {!hideDocuments && <JobFlowPanel event={event} mode="tech" onPatched={onPatched} />}
 
-        {/* ✅ (10 ต.ค. 2569) รูปและไฟล์หน้างาน — แบบเดียวกับรูปหน้างานของนัดเซล (ของแต่ละวันเข้างาน) */}
-        <SitePhotos event={event} canEdit={!isLocked && isApproved(event)} onPreview={onPreview} />
 
-        {/* ── เอกสารประจำงาน + ขอปิดงาน: ซ่อนถ้างานนี้ใช้เอกสารร่วมกับกลุ่ม (แสดงที่การ์ดตัวแทนแทน) ── */}
-        {!hideDocuments && (
+        {/* ── เอกสารประจำงาน + ขอปิดงาน: ซ่อนถ้างานนี้ใช้เอกสารร่วมกับกลุ่ม (แสดงที่การ์ดตัวแทนแทน) ──
+            ✅ (11 ต.ค. 2569) แสดงหลังรับทราบงาน + ยืนยันนัด (docsUnlocked) — ก่อนหน้านั้นเป็นแถบบอกเหตุผล */}
+        {!hideDocuments && !docsUnlocked(event) && <DocsLockedRow event={event} />}
+        {!hideDocuments && docsUnlocked(event) && (
         <>
-        <Box sx={{ mt: 1.5 }}>
-          <Box
-            onClick={() => setDocsExpanded(p => !p)}
-            sx={{
-              cursor: "pointer", px: 1.5, py: 1.1, borderRadius: 2,
-              border: "1px solid", borderColor: "divider",
-              "&:active": { bgcolor: alpha("#6b7280", 0.06) },
-              "&:hover": { borderColor: canRequestClose ? "#10b981" : "#3b82f6" },
-            }}>
-            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.75 }}>
-              <Typography variant="body2" fontWeight={800} sx={{ fontSize: "0.84rem", color: "#334155", display: "inline-flex", alignItems: "center", gap: 0.6 }}>
-                <Description sx={{ fontSize: 17, color: "#64748b" }} /> เอกสารประจำงาน
-                {isLocked && <Lock sx={{ fontSize: 14, color: "#94a3b8" }} />}
-              </Typography>
-              <Stack direction="row" alignItems="center" gap={0.5}>
-                <Typography variant="body2" fontWeight={800} color={canRequestClose ? "#10b981" : "text.secondary"}>
+        {/* ✅ (10 ต.ค. 2569 ผู้ใช้: "ช่องเอกสารประจำงานมองไม่เจอเลย ทำให้เด่นกว่านี้ เพราะช่างต้องส่งเอกสารเพื่อขอปิดงาน")
+            เดิมเป็นแถบเทาบางๆ หน้าตาเหมือนลิงก์ทั่วไป — ตอนนี้เป็นกล่องเด่น: หัวข้อชัด · จำนวนที่ครบ ·
+            รายการ 4 ชนิดพร้อมเครื่องหมายถูก · ปุ่มหลัก "แนบเอกสาร" (ครบแล้วกล่องเปลี่ยนเป็นสีเขียว) */}
+        {(() => {
+          const allDone = completedDocCount === DOCUMENT_TYPES.length;
+          const tone = allDone ? "#16a34a" : "#2563eb";
+          return (
+            <Box sx={{ ...CARD, mt: 1.5, p: { xs: 1.75, sm: 2 }, borderColor: alpha(tone, 0.3), boxShadow: `0 1px 2px rgba(15,23,42,.04), 0 8px 20px -12px ${alpha(tone, 0.45)}` }}>
+              <Stack direction="row" alignItems="center" gap={1.25}>
+                <Box sx={{ width: 40, height: 40, borderRadius: 2.5, flexShrink: 0, display: "grid", placeItems: "center", bgcolor: alpha(tone, 0.12), color: tone }}>
+                  {allDone ? <TaskAlt sx={{ fontSize: 22 }} /> : <Description sx={{ fontSize: 22 }} />}
+                </Box>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography sx={{ fontSize: "0.98rem", fontWeight: 900, color: "#0f172a", display: "flex", alignItems: "center", gap: 0.5 }}>
+                    เอกสารสำหรับขอปิดงาน {isLocked && <Lock sx={{ fontSize: 15, color: "#94a3b8" }} />}
+                  </Typography>
+                  <Typography sx={{ fontSize: "0.76rem", color: "#64748b" }}>
+                    {isLocked ? "งานปิดแล้ว — ดูเอกสารได้อย่างเดียว"
+                      : allDone ? "ครบแล้ว — กด “ขอปิดงาน” ด้านล่างได้เลย"
+                      : `แนบ/ระบุให้ครบ ${DOCUMENT_TYPES.length} รายการ จึงขอปิดงานได้`}
+                  </Typography>
+                </Box>
+                <Typography sx={{ flexShrink: 0, fontSize: "1.35rem", fontWeight: 900, color: tone, fontVariantNumeric: "tabular-nums" }}>
                   {completedDocCount}/{DOCUMENT_TYPES.length}
                 </Typography>
-                {/* ✅ เดิมใช้ลูกศรชี้ลง/ขึ้นสื่อถึงการกางลงในหน้า แต่ตอนนี้เปิดเป็น Dialog ทับขึ้นมา
-                    แทนแล้ว เปลี่ยนเป็นลูกศรชี้ขวาให้ตรงกับพฤติกรรมจริง */}
-                <ChevronRight sx={{ fontSize: 22, color: "text.secondary" }} />
               </Stack>
-            </Stack>
-            <LinearProgress
-              variant="determinate"
-              value={(completedDocCount / DOCUMENT_TYPES.length) * 100}
-              sx={{
-                height: 6, borderRadius: 5,
-                bgcolor: alpha("#6b7280", 0.12),
-                "& .MuiLinearProgress-bar": {
-                  bgcolor: canRequestClose ? "#10b981" : "#3b82f6",
-                  borderRadius: 5,
-                },
-              }}
-            />
-          </Box>
-
-          {/* ✅ เปิดเป็น Dialog ทับขึ้นมาเสมอ ไม่ว่าจอเล็ก/ใหญ่ (ดู docsExpanded Dialog ด้านล่าง)
-              แทนการกางลงในหน้าแบบเดิม — จอมือถือก็ไม่ต้องเลื่อนจอตามอีกต่อไป */}
-        </Box>
+              <LinearProgress variant="determinate" value={(completedDocCount / DOCUMENT_TYPES.length) * 100}
+                sx={{ mt: 1.25, height: 6, borderRadius: 5, bgcolor: alpha("#64748b", 0.12), "& .MuiLinearProgress-bar": { bgcolor: tone, borderRadius: 5 } }} />
+              {/* รายการเอกสารทีละชนิด — เห็นทันทีว่าขาดอะไร */}
+              <Box sx={{ mt: 1.25, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0.75 }}>
+                {DOCUMENT_TYPES.map((d) => {
+                  const ok = isDocComplete(event, d.type);
+                  return (
+                    <Stack key={d.type} direction="row" alignItems="center" gap={0.6} sx={{ minWidth: 0 }}>
+                      {ok
+                        ? <CheckCircle sx={{ fontSize: 17, color: "#16a34a", flexShrink: 0 }} />
+                        : <RadioButtonUnchecked sx={{ fontSize: 17, color: "#cbd5e1", flexShrink: 0 }} />}
+                      <Typography noWrap sx={{ fontSize: "0.8rem", fontWeight: ok ? 600 : 800, color: ok ? "#64748b" : "#0f172a" }}>
+                        {d.label}{!ok && isDocRequired(event, d.type) ? " *" : ""}
+                      </Typography>
+                    </Stack>
+                  );
+                })}
+              </Box>
+              <Button fullWidth variant="outlined" disableElevation
+                onClick={() => setDocsExpanded(true)}
+                startIcon={<Description />}
+                sx={{ ...MBTN.outline(tone), mt: 1.5 }}>
+                {isLocked ? "ดูเอกสาร" : allDone ? "ดู / แก้เอกสาร" : `แนบเอกสาร (ขาด ${DOCUMENT_TYPES.length - completedDocCount} รายการ)`}
+              </Button>
+            </Box>
+          );
+        })()}
 
         {/* ── Request Close (ขอปิดงาน) ── */}
         {event.status === "ดำเนินการเสร็จสิ้น" ? (
@@ -1180,15 +1174,11 @@ const TechnicianJobCard = ({
                 </Typography>
               </Box>
             )}
-            <ActionBtn
-              variant="contained"
-              btncolor="#f59e0b"
-              startIcon={<TaskAlt sx={{ fontSize: 16 }} />}
-              onClick={handleRequestClose}
-              disabled={requestingClose}
-              fullWidth>
+            {/* ✅ (10 ต.ค. 2569) ปุ่มขั้นสุดท้าย — สีเขียวแบบใหม่ (เดิมปุ่มส้มทรงเก่า) */}
+            <Button variant="contained" disableElevation fullWidth startIcon={<TaskAlt />}
+              onClick={handleRequestClose} disabled={requestingClose} sx={MBTN.success}>
               {requestingClose ? "กำลังส่งคำขอ..." : event.closeRejectReason ? "ขอปิดงานอีกครั้ง" : "ขอปิดงาน"}
-            </ActionBtn>
+            </Button>
           </Box>
         ) : isNotConfirmed ? (
           <Box sx={{
@@ -1226,51 +1216,49 @@ const TechnicianJobCard = ({
               </Typography>
             </Stack>
           </Box>
-        ) : (
-          <Typography variant="caption" color="text.disabled"
-            onClick={() => setDocsExpanded(true)}
-            sx={{ display: "block", mt: 1.5, textAlign: "center", cursor: "pointer", "&:hover": { textDecoration: "underline" } }}>
-            จัดการเอกสารให้ครบก่อน จึงจะขอปิดงานได้ ({completedDocCount}/{DOCUMENT_TYPES.length})
-          </Typography>
-        )}
+        ) : null /* 🧹 ข้อความ "จัดการเอกสารให้ครบก่อน…" ซ้ำกับกล่องเอกสารด้านบน — ตัดออก */}
         </>
         )}
 
-        {/* ── Expanded: WorkNote + ActivityLog ──
-            ✅ เปิดเป็น Dialog ทับขึ้นมาเสมอ (ดู Dialog ด้านล่าง) ไม่ว่าจอเล็ก/ใหญ่ ไม่ต้องกางลงดัน
-            การ์ดอื่น/เลื่อนจอตามอีกต่อไป — จอเล็ก (มือถือ) เปิดแบบเต็มจอ (fullScreen) แทนกล่องลอย */}
+        {/* ── แถบ "รายละเอียด" — กดแล้วเปิดอีกหน้า (ไฟล์แนบ · สรุปงาน · คุยกับแอดมิน · ประวัติ) ── */}
+        <ButtonBase onClick={(e) => { e.stopPropagation(); setDetailsOpen(true); }}
+          sx={{ width: "100%", mt: 1.5, px: 1.25, py: 0.9, gap: 1, justifyContent: "flex-start", borderRadius: "10px",
+            fontFamily: "inherit", bgcolor: SURFACE, "&:hover": { bgcolor: "#eef2f6" } }}>
+          <Typography noWrap sx={{ flex: 1, minWidth: 0, textAlign: "left", fontSize: "0.78rem", color: INK_2 }}>
+            {[`ไฟล์แนบ ${(event.sitePhotoFiles || []).length}`, "สรุปงาน",
+              `คุยกับแอดมิน${(event.comments || []).length ? ` ${event.comments.length}` : ""}`, "ประวัติ"].join(" · ")}
+          </Typography>
+          <Typography sx={{ fontSize: "0.76rem", fontWeight: 600, color: ACCENT, display: "inline-flex", alignItems: "center", flexShrink: 0 }}>
+            เปิด<ChevronRight sx={{ fontSize: 18 }} />
+          </Typography>
+        </ButtonBase>
 
       </CardContent>
 
-      <Dialog open={expanded} onClose={() => setExpanded(false)} fullWidth maxWidth="sm" fullScreen={!isDesktop}>
-          <DialogTitle sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}>
-            <Box sx={{ minWidth: 0 }}>
-              {/* ✅ สลับตำแหน่ง: ประเภทงานขึ้นเป็นหัวข้อหลัก (ไม่ใส่ label "ประเภท" เพราะเป็นหัวข้อ
-                  อยู่แล้วเหมือนที่โครงการเคยอยู่ตำแหน่งนี้), โครงการย้ายลงไปอยู่แถวข้อมูลแทน */}
-              <Typography fontWeight={800} fontSize="1rem" noWrap>
-                {event.title || "ไม่ระบุประเภทงาน"}
+      <Dialog open={detailsOpen} onClose={() => setDetailsOpen(false)} fullWidth maxWidth="sm" fullScreen={!isDesktop}
+        PaperProps={{ sx: { borderRadius: { xs: 0, sm: 3 } } }}>
+        <Box sx={{ px: { xs: 2, sm: 2.5 }, pt: 2, pb: 1.5, borderBottom: `1px solid ${LINE}` }}>
+          <Stack direction="row" alignItems="flex-start" gap={1}>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography sx={{ fontSize: "0.72rem", fontWeight: 600, color: MUTED }}>รายละเอียดงาน</Typography>
+              <Typography noWrap sx={{ fontWeight: 700, fontSize: "1.05rem", color: INK, lineHeight: 1.35 }}>{event.title || "ไม่ระบุประเภทงาน"}</Typography>
+              <Typography sx={{ fontSize: "0.8rem", color: INK_2, mt: 0.25 }}>
+                {[event.company && event.site ? `${event.company} · ${event.site}` : (event.company || event.site), event.system,
+                  formatEventDateRange(event)].filter(Boolean).join(" · ")}
               </Typography>
-              <Typography variant="caption" color="text.secondary">
-                สรุปงานที่ทำ · คุยกับแอดมิน
-              </Typography>
-              {(event.company || event.site || event.system || event.time) && (
-                <Stack direction="row" gap={2} flexWrap="wrap" sx={{ mt: 0.5 }}>
-                  <InfoLine label="โครงการ">
-                    {event.company && event.site ? `${event.company} · ${event.site}` : (event.company || event.site || "ไม่ระบุบริษัท/ไซต์")}
-                  </InfoLine>
-                  {event.system && <InfoLine label="ระบบ">{event.system}</InfoLine>}
-                  {event.time && <InfoLine label="ครั้งที่">{formatRoundLabel(event.time, event.visitCount, event)}</InfoLine>}
-                </Stack>
-              )}
             </Box>
-            <IconButton size="small" onClick={() => setExpanded(false)}>
+            <IconButton size="small" onClick={() => setDetailsOpen(false)} aria-label="ปิด" sx={{ color: MUTED, mr: -0.5 }}>
               <Close fontSize="small" />
             </IconButton>
-          </DialogTitle>
-          <DialogContent dividers>
+          </Stack>
+        </Box>
+        <DialogContent sx={{ bgcolor: SURFACE, px: { xs: 1.5, sm: 2.5 }, py: 2 }}>
+          <SitePhotos event={event} canEdit={!isLocked && isApproved(event)} onPreview={onPreview} sx={{ mt: 0 }} />
+          <Box sx={{ ...CARD, mt: 1.5, p: { xs: 1.75, sm: 2 } }}>
             {expandedContent}
-          </DialogContent>
-        </Dialog>
+          </Box>
+        </DialogContent>
+      </Dialog>
 
       {!hideDocuments && (
         <Dialog open={docsExpanded} onClose={() => setDocsExpanded(false)} fullWidth maxWidth="sm" fullScreen={!isDesktop}
@@ -1311,7 +1299,7 @@ const TechnicianJobCard = ({
                 ? "งานนี้ปิดแล้ว — ดูเอกสารได้อย่างเดียว"
                 : completedDocCount === DOCUMENT_TYPES.length
                 ? "ทำเอกสารทุกรายการเรียบร้อยแล้ว — กลับไปที่การ์ดงานเพื่อกด “ขอปิดงาน”"
-                : `เหลืออีก ${DOCUMENT_TYPES.length - completedDocCount} รายการ · ต้องแนบหรือตอบทุกรายการจึงจะขอปิดงานได้`}
+                : `เหลืออีก ${DOCUMENT_TYPES.length - completedDocCount} รายการ จึงขอปิดงานได้ · * = ต้องมี`}
             </Typography>
           </Box>
           <DialogContent sx={{ bgcolor: SURFACE, px: { xs: 1.5, sm: 2.5 }, py: 2 }}>

@@ -15,10 +15,14 @@ import MultiDayGroupHeader, { multiDayCardSx } from "@/shared/ui/MultiDayGroup";
 import { useEffect, useMemo, useState, useCallback, useRef, cloneElement } from "react";
 import PdfBlobView from "@/shared/components/PdfBlobView";
 import useRealtime from "@/shared/realtime/useRealtime";
+import { useSearchParams } from "react-router-dom";
+import { isParticipant } from "@/shared/utils/jobFlow";
+import { useAuth } from "@/features/auth/AuthContext";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import EventService from "@/shared/services/EventService";
 import TechnicianJobCard from "../components/TechnicianJobPanel";
+import ActiveCheckInBanner from "@/features/attendance/components/ActiveCheckInBanner";
 import { buildDaysPastDueMap, isFlaggedDays, isSevereDays, getOverdueGroupKey } from "@/shared/utils/overdueJobs";
 import { getOptimizedImageUrl } from "@/shared/utils/cloudinaryImage";
 import {
@@ -166,7 +170,11 @@ const FilePreviewDialog = ({ previewUrl, previewFileName, onClose }) => {
 // ส่วนนี้ไป กดขยายเพื่อดู/จัดการแต่ละวันแยกกันได้ตามเดิม (เทียบ pattern เดียวกับ JobGroupBlock
 // ที่ใช้ในหน้า Operation ฝั่งแอดมิน) — ใช้ getOverdueGroupKey จาก util กลางแทนฟังก์ชันซ้ำของตัวเอง
 const JobGroupCard = ({ sessions, ...cardProps }) => {
-  const [expanded, setExpanded] = useState(false);
+  // ✅ (10 ต.ค. 2569) มีวันเข้างานเป็น "วันนี้" → กางไว้เลย ให้เห็นปุ่มเช็คอินของวันนี้ทันที
+  const [expanded, setExpanded] = useState(() => sessions.some((s) => {
+    const last = moment(s.end || s.start).subtract(s.allDay === false ? 0 : 1, "days");
+    return moment().isBetween(moment(s.start), last.isBefore(moment(s.start)) ? moment(s.start) : last, "day", "[]");
+  }));
   const isGrouped = sessions.length > 1;
   const anchorId = sessions[0]._id;
 
@@ -221,10 +229,14 @@ const matchesGroup = (event, group, daysPastDueMap) => {
   if (group === "overdue") return isOverdue;
   // active: งานที่ยืนยันแล้ว/กำลังดำเนินการ, ยังไม่ได้ขอปิด, และยังไม่เข้าเกณฑ์ค้างงาน
   // (ค้างงานแยกไปแท็บ "ค้างงาน" โดยเฉพาะแล้ว ไม่ต้องซ้ำสองที่)
-  return ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(event.status) && !event.closeRequested && !isOverdue;
+  // 🐛 (11 ต.ค. 2569 ผู้ใช้: "ทำไมงานที่ได้รับมอบหมายไม่เข้ามางานของฉัน") — เดิมไม่รวม "กำลังรอยืนยัน"
+  //    งานที่เพิ่งมอบหมาย (ต้องกดรับทราบ → ยืนยันนัดหมาย ที่นี่) จึงไม่เคยโผล่ในแท็บ "ต้องทำ" เลย
+  return ["กำลังรอยืนยัน", "ยืนยันแล้ว", "กำลังดำเนินการ"].includes(event.status)
+    && !["pending", "rejected"].includes(event.approvalStatus) && !event.closeRequested && !isOverdue;
 };
 
 export default function MyJobs() {
+  const { userData } = useAuth() || {};
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [, setLastRefreshed] = useState(null);
@@ -248,7 +260,11 @@ export default function MyJobs() {
       // ⚠️ detail = ขอ activityLog มาด้วย — การ์ดงานของช่าง (TechnicianJobPanel) แสดงประวัติ
       //    และหน้านี้บันทึกต่อท้ายด้วย ถ้าไม่ขอ ประวัติเดิมจะถูกเขียนทับหาย
       const res = await EventService.getEventOp({ detail: true });
-      setEvents(res?.userEvents || []);
+      // ✅ (11 ต.ค. 2569 ผู้ใช้: "งานที่ได้รับมอบหมายไม่เข้ามางานของฉัน แต่ไปเข้าการดำเนินงาน — แอดมิน กับ ผู้รับผิดชอบงาน")
+      //    แอดมิน/ผู้จัดการได้งานทั้งระบบจาก API — หน้านี้คัดเหลือเฉพาะงานที่ "ฉัน" ถูกมอบหมาย
+      //    (ผู้รับผิดชอบ · หัวหน้าทีม · ลูกทีม) ให้ทุกตำแหน่งเห็นงานของตัวเองที่นี่ที่เดียว
+      const uid = String(userData?.userId || "");
+      setEvents((res?.userEvents || []).filter((e) => isParticipant(e, uid, userData?.fname)));
       setLastRefreshed(new Date());
     } catch (err) {
       console.error(err);
@@ -256,7 +272,7 @@ export default function MyJobs() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, []);
+  }, [userData?.userId, userData?.fname]);
 
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
 
@@ -295,11 +311,29 @@ export default function MyJobs() {
 
   // ✅ เปิดหน้ามาครั้งแรก ถ้าไม่มีงานที่ต้องทำแต่มีงานค้าง → พาไปหมวดค้างงานเลย (ไม่ต้องเจอหน้าว่างก่อน)
   const autoPickedRef = useRef(false);
+  // ✅ (11 ต.ค. 2569 ผู้ใช้: "งานที่ได้รับมอบหมายคือเด้งไปในงานของฉัน") — แจ้งเตือนมอบหมายงานลิงก์มาที่
+  //    /technician/jobs?job=<id> → เลือกหมวดที่งานนั้นอยู่ แล้วเลื่อนไปที่การ์ด + กรอบไฮไลต์ชั่วคราว
+  const [searchParams] = useSearchParams();
+  const focusJobId = searchParams.get("job") || "";
+  const [highlightJob, setHighlightJob] = useState("");
   useEffect(() => {
     if (autoPickedRef.current || loading || !events.length) return;
     autoPickedRef.current = true;
+    const target = focusJobId && events.find((e) => String(e._id) === focusJobId);
+    if (target) {
+      const g = GROUPS.find((x) => matchesGroup(target, x.key, daysPastDueMap));
+      if (g) setGroup(g.key);
+      setHighlightJob(focusJobId);
+      return;
+    }
     if (groupCounts.active === 0 && groupCounts.overdue > 0) setGroup("overdue");
-  }, [loading, events.length, groupCounts]);
+  }, [loading, events, groupCounts, focusJobId, daysPastDueMap]);
+  useEffect(() => {
+    if (!highlightJob) return undefined;
+    const t1 = setTimeout(() => document.getElementById(`myjob-${highlightJob}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 350);
+    const t2 = setTimeout(() => setHighlightJob(""), 4500);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [highlightJob]);
 
   const filteredJobs = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -447,6 +481,9 @@ export default function MyJobs() {
         </Tooltip>
       </Stack>
 
+      {/* ✅ (10 ต.ค. 2569) กำลังเช็คอินอยู่ → แถบเตือนให้เช็คเอาต์ · ไม่มี → ลิงก์ประวัติเข้า-ออกงาน */}
+      <ActiveCheckInBanner />
+
       {/* ✅ แถวเดียว 4 ช่อง — สีประจำหมวด (ฟ้า/แดง/ส้ม/เขียว) ที่ไอคอนและตัวเลข · ช่องที่เลือกพื้นอ่อน+ขอบสีหมวด */}
       <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 0.75, mb: 1.25 }}>
         {GROUPS.map((g) => {
@@ -573,7 +610,9 @@ export default function MyJobs() {
             const daysPastDue = isFlaggedDays(daysPastDueRaw) ? daysPastDueRaw : null;
             const severeOverdue = isSevereDays(daysPastDue);
             return (
-              <Box key={sessions[0].jobGroupId || sessions[0]._id}>
+              <Box key={sessions[0].jobGroupId || sessions[0]._id}
+                id={sessions.some((x) => String(x._id) === highlightJob) ? `myjob-${highlightJob}` : undefined}
+                sx={sessions.some((x) => String(x._id) === highlightJob) ? { borderRadius: "18px", outline: "3px solid #2563eb", outlineOffset: 2, scrollMarginTop: "80px" } : undefined}>
                 {daysPastDue !== null && (
                   <Stack direction="row" alignItems="center" gap={0.75}
                     sx={{

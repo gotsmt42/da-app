@@ -516,7 +516,7 @@ export default function DispatchList({ mode = "board", myId = "" }) {
             {waitingRows.length === 0 ? (
               <AllClear text="เคลียร์หมดแล้ว — ไม่มีคำขอรอลงแผนงาน" />
             ) : (
-              <Stack spacing={1.25} sx={{ mb: 3 }}>
+              <Stack spacing={1} sx={{ mb: 2.5 }}>
                 {waitingRows.map((d) => {
                   const resp = responsibleOf(d);
                   return (
@@ -539,7 +539,7 @@ export default function DispatchList({ mode = "board", myId = "" }) {
                       </>}
                       actions={
                         <Button variant="contained" startIcon={<EventAvailable />} onClick={() => open(d)}
-                          sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: BLUE, py: 1, "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } }}>
+                          sx={{ textTransform: "none", fontWeight: 600, fontSize: "0.84rem", borderRadius: "10px", boxShadow: "none", bgcolor: BLUE, minHeight: 38, py: 0.5, "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } }}>
                           ตรวจและลงแผนงาน
                         </Button>
                       }
@@ -551,7 +551,7 @@ export default function DispatchList({ mode = "board", myId = "" }) {
 
             <SectionHead color={BLUE} title="ลงแผนงานแล้ว" count={assignedRows.length} hint="ลงตารางงานแล้ว — งานที่กำลังทำ/ปิดงานดูต่อที่หน้าการดำเนินงาน" />
             {assignedRows.length === 0 ? (
-              <Typography sx={{ px: 0.5, fontSize: "0.82rem", color: TEXT_SUB }}>ยังไม่มีใบที่ลงแผนงาน</Typography>
+              <Typography sx={{ px: 0.5, fontSize: "0.8rem", color: TEXT_SUB }}>ยังไม่มีใบที่ลงแผนงาน</Typography>
             ) : (
               <>
                 {upcoming.length > 0 && <RowGroup title="กำลังจะเข้างาน" count={upcoming.length} color={BLUE}>{upcoming.map(assignedRow)}</RowGroup>}

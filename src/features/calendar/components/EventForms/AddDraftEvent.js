@@ -3,6 +3,7 @@ import { escapeHtml } from "@/shared/utils/escapeHtml";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
 import { can } from "@/shared/utils/roles";
+import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { jobInfoSectionHtml, bindJobInfo, readJobInfo } from "./jobInfoSection";
 import { domFormDraft } from "@/shared/utils/formDraft";
 // ✅ (10 ต.ค. 2569) ข้อมูลที่กรอกค้างไม่หายเมื่อฟอร์มหลุด/ปิด — ดู shared/utils/formDraft.js
@@ -277,7 +278,7 @@ export const getAddDraftEvent = async ({
     })
     .join("");
 
-  const [customers, , jobTypes, systemTypes] = await Promise.all([
+  const [customers, usersRes, jobTypes, systemTypes] = await Promise.all([
     CustomerService.getCustomers(),
     AuthService.getAllUserData(),
     JobTypeService.getAll(),
@@ -290,6 +291,15 @@ export const getAddDraftEvent = async ({
   // ✅ โหมดแก้ไข: ทำ option ของค่าที่มีอยู่แล้วเป็น "selected" ให้ TomSelect หยิบไปแสดงตอน init
   const opt = (value, current) =>
     `<option value="${escapeHtml(value)}"${current === value ? " selected" : ""}>${escapeHtml(value)}</option>`;
+
+  // ✅ (11 ต.ค. 2569 ผู้ใช้: "ให้มอบหมายผู้รับผิดชอบในช่องของงานใหม่ได้ด้วย ให้สมบูรณ์")
+  //    ฟอร์มรับงานใหม่ (ทั่วไป/โปรเจค) เลือกผู้รับผิดชอบงานได้เลย — เฉพาะคนที่มีสิทธิ์มอบหมาย (เกณฑ์เดียวกับ PUT /basic-info)
+  //    ค่าเริ่มต้น = ผู้รับงานเอง (เหมือนพฤติกรรมเดิม) · ผู้รับผิดชอบจะเห็นงานใน "งานของฉัน" เพื่อกดรับทราบ → ยืนยันนัดหมาย
+  const canAssignResp = isIntakeForm && can(userData, "editContracts");
+  const respUsers = (usersRes?.allUser || []).filter((u) => u.fname).sort((a, b) => a.fname.localeCompare(b.fname, "th"));
+  const initialResp = isEditMode ? (existingDraft?.responsiblePerson || "") : (userData?.fname || "");
+  // ⚠️ ตัวเลือกจริงใส่ผ่าน TomSelect (มีรูป/ตำแหน่ง) — select เก็บแค่ค่าเริ่มต้นไว้ ไม่ให้รายการซ้ำ
+  const respOpts = `<option value="${escapeHtml(initialResp)}" selected>${escapeHtml(initialResp || "ยังไม่มอบหมาย")}</option>`;
 
   const companyOpts = customers.userCustomers
     .map((c) => opt(c.cCompany, existingDraft?.company)).join("");
@@ -422,6 +432,12 @@ export const getAddDraftEvent = async ({
           <input id="adeContactTel" type="tel" placeholder="เช่น 081-234-5678" value="${attr(existingDraft?.contactTel)}">
         </div>
       </div>
+      ${canAssignResp ? `
+      <div class="ade-field" style="margin-top:12px;">
+        <label>🧑‍💼 ผู้รับผิดชอบงาน</label>
+        <select id="adeResp">${respOpts}</select>
+        <div style="font-size:12px;color:#64748b;margin-top:4px;">ผู้รับผิดชอบจะได้รับแจ้งเตือน และกดรับทราบ → ยืนยันนัดหมาย ในหน้า "งานของฉัน"</div>
+      </div>` : ""}
       <div class="ade-field" style="margin-top:12px;">
         <label>📝 อาการเสีย / ขอบเขตงาน</label>
         <textarea id="adeDescription" rows="3" placeholder="เช่น ตู้ควบคุมแจ้งเตือน Fault โซน 3 · ลูกค้าขอเข้าก่อน 10 โมง">${attr(existingDraft?.description)}</textarea>
@@ -509,6 +525,36 @@ export const getAddDraftEvent = async ({
         // ✅ ช่อง "ครั้งที่" ตัดออกไปแล้วสำหรับงานทั่วไป/งานโปรเจค (เหลือเฉพาะตอนแก้ไขงานที่ผูกสัญญา
         // อยู่แล้ว — ดู isContractLinked ตอน render HTML) เช็คว่ามี element อยู่จริงก่อนค่อย init TomSelect
         if (document.getElementById("adeTime")) mkTs("#adeTime", "เลือกครั้งที่", 4);
+
+        // ✅ (11 ต.ค. 2569 ผู้ใช้: "ผู้รับผิดชอบงาน แก้ UI ให้สวย มีรูปเหมือนหน้าอื่นๆ ด้วย")
+        //    รายชื่อพร้อมรูป (ไม่มีรูป = ตัวอักษรย่อบนสีประจำตัว แบบ PersonChip) · ค้นหาชื่อได้
+        if (document.getElementById("adeResp")) {
+          const av = (name, img) => {
+            const letter = `<span style="flex-shrink:0;width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;background:${name ? personColor(name) : "#cbd5e1"}">${escapeHtml(name ? personInitial(name) : "?")}</span>`;
+            return img
+              ? `<span style="position:relative;flex-shrink:0;width:30px;height:30px;">${letter}<img src="${escapeHtml(img)}" alt="" onerror="this.remove()" style="position:absolute;inset:0;width:30px;height:30px;border-radius:50%;object-fit:cover;"></span>`
+              : letter;
+          };
+          const row = (d, small) => `<div style="display:flex;align-items:center;gap:10px;padding:${small ? "2px 0" : "6px 2px"};min-width:0;">
+              ${av(d.value, d.img)}
+              <div style="min-width:0;line-height:1.3;">
+                <div style="font-size:14px;font-weight:600;color:${d.value ? "#0f172a" : "#94a3b8"};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(d.text)}</div>
+                ${d.sub && !small ? `<div style="font-size:12px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(d.sub)}</div>` : ""}
+              </div>
+            </div>`;
+          try {
+            new TomSelect("#adeResp", {
+              options: [{ value: "", text: "ยังไม่มอบหมาย", img: "", sub: "" },
+                ...respUsers.map((u) => ({ value: u.fname, text: [u.fname, u.lname].filter(Boolean).join(" "), img: u.imageUrl || "", sub: u.jobTitle || "" }))],
+              items: [initialResp],
+              searchField: ["text", "sub"],
+              maxOptions: 200,
+              allowEmptyOption: true,
+              dropdownParent: "body",
+              render: { option: (d) => row(d, false), item: (d) => row(d, true) },
+            });
+          } catch { /* ใช้ select ปกติ */ }
+        }
 
         /* ── ขั้นตอนที่ 1: งานทั่วไป vs งานตามสัญญา — สลับ section ทั้งก้อน (เฉพาะตอนสร้างใหม่ ไม่มี
            radio นี้เลยตอนแก้ไข ดูเงื่อนไข isEditMode ตอน render HTML — forEach ด้านล่างเลย no-op ไปเอง) ── */
@@ -692,8 +738,15 @@ export const getAddDraftEvent = async ({
               // เข้างานจริงยังเลือกได้ตามปกติตอนกดลงตารางจริง (ดู scheduleDraft/swal-schedule-team ใน
               // EventCalendar/index.js) เพราะ draft ยังไม่รู้วันที่แน่นอน จึงยังไม่มีช่องเลือกทีมตรงนี้
               if (jobType !== "contract") {
-                payload.responsiblePerson = userData?.fname || "";
-                payload.responsiblePersonId = userData?.userId || "";
+                if (canAssignResp) {
+                  const pick = getVal("adeResp");
+                  const u = respUsers.find((x) => x.fname === pick);
+                  payload.responsiblePerson = pick || "";
+                  payload.responsiblePersonId = u?._id ? String(u._id) : "";
+                } else {
+                  payload.responsiblePerson = userData?.fname || "";
+                  payload.responsiblePersonId = userData?.userId || "";
+                }
               }
             }
 
@@ -715,6 +768,14 @@ export const getAddDraftEvent = async ({
 
             if (isEditMode) {
               await EventService.UpdateDraftEvent(existingDraft._id, payload);
+              // ✅ เปลี่ยนผู้รับผิดชอบจากฟอร์มแก้ไขงานใหม่ → ผ่าน basic-info (บันทึกผู้ดำเนินการ + แจ้งคนใหม่)
+              if (canAssignResp) {
+                const pick = getVal("adeResp");
+                if (pick !== (existingDraft?.responsiblePerson || "")) {
+                  const u = respUsers.find((x) => x.fname === pick);
+                  await EventService.UpdateBasicInfo([existingDraft._id], { responsiblePerson: pick || "", responsiblePersonId: u?._id ? String(u._id) : "" });
+                }
+              }
             } else {
               await EventService.AddDraftEvent(payload);
             }

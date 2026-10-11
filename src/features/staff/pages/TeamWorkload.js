@@ -305,7 +305,7 @@ export default function TeamWorkload() {
             <Kpi label="เวลาเฉลี่ย / ครั้ง" value={avgText(teamTotals.durationMs, teamTotals.durationCount)}
               sub={teamTotals.durationCount ? `จาก ${teamTotals.durationCount.toLocaleString()} ครั้งที่กดเข้า-ออกครบ` : "ยังไม่มีข้อมูลเข้า-ออก"} />
             <Kpi label="เข้างานตรงตามแผน" value={pctText(teamTotals.onTimeCount, teamTotals.checkedInCount)}
-              sub={teamTotals.checkedInCount ? `${teamTotals.onTimeCount} จาก ${teamTotals.checkedInCount} ครั้ง` : "ยังไม่มีข้อมูลเช็คอิน"} />
+              sub={teamTotals.checkedInCount ? `${teamTotals.onTimeCount} จาก ${teamTotals.checkedInCount} ครั้ง` : "ยังไม่มีข้อมูลเข้างาน"} />
           </KpiRow>
         )}
   

@@ -20,7 +20,7 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
-  PostAddOutlined, AddRounded, EditOutlined, ChevronRight, Close, EventAvailableOutlined, CheckRounded,
+  PostAddOutlined, AddRounded, EditOutlined, ChevronRight, Close, EventAvailableOutlined,
   ApartmentOutlined, CalendarMonthOutlined, GroupsOutlined, PersonOutlineOutlined, NotesOutlined, HourglassTopRounded, ReportProblemOutlined,
   BlockRounded, RestoreRounded, AssignmentIndOutlined, PersonOffOutlined,
 } from "@mui/icons-material";
@@ -37,6 +37,7 @@ import { PageHeader, Panel, EmptyState, INK, MUTED, LINE, ACCENT, SURFACE } from
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import { getAddDraftEvent } from "@/features/calendar/components/EventForms/AddDraftEvent";
 import { isUrgent, openFollowUp } from "@/shared/utils/jobFlow";
+import { MiniSteps } from "@/features/attendance/components/CheckInOutPanel";
 import { nextStepOf } from "@/shared/ui/JobFlow";
 import { can } from "@/shared/utils/roles";
 import PersonSelectField from "@/shared/ui/PersonSelectField";
@@ -46,7 +47,8 @@ const GREEN = "#16a34a";
 const RED = "#dc2626";
 
 /** ขั้นตอนของงานที่รับไว้ — ใช้ทั้งแถบขั้นตอนและแท็บ */
-const STAGES = ["รับงาน", "ลงตาราง", "ช่างทำงาน", "ตรวจปิดงาน", "เสร็จ"];
+// ✅ (11 ต.ค. 2569) "ช่างทำงาน" → "เข้างาน" (ขั้นนี้เริ่มเมื่อหัวหน้าทีมกดเข้างาน — คำเดียวกับการ์ดงาน)
+const STAGES = ["รับงาน", "ลงตาราง", "เข้างาน", "ตรวจปิดงาน", "เสร็จ"];
 
 /** งานนี้อยู่ขั้นไหน + ข้อความสถานะ */
 const stageOf = (e) => {
@@ -55,7 +57,7 @@ const stageOf = (e) => {
   if (e.status === "ดำเนินการเสร็จสิ้น") return { i: 4, label: "เสร็จสิ้น", color: GREEN };
   if (e.closeRequested) return { i: 3, label: "รอตรวจปิดงาน", color: ACCENT };
   if (openFollowUp(e)) return { i: 2, label: `งานไม่เสร็จ · ${openFollowUp(e).reason}`, color: AMBER };
-  if (e.status === "กำลังดำเนินการ") return { i: 2, label: "ช่างกำลังทำงาน", color: ACCENT };
+  if (e.status === "กำลังดำเนินการ") return { i: 2, label: "กำลังดำเนินการ", color: ACCENT };
   return { i: 1, label: "ลงตารางแล้ว", color: ACCENT };
 };
 
@@ -71,23 +73,12 @@ const BTN = { textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow
 const PRIMARY = { ...BTN, bgcolor: ACCENT, color: "#fff", "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } };
 
 /** แถบขั้นตอน 5 ช่อง — ผ่านแล้วสีเขียว · ขั้นปัจจุบันสีของสถานะ · ยังไม่ถึงสีเทา (กว้างเท่ากันทุกจอ ไม่ล้น) */
+// ✅ (11 ต.ค. 2569 ผู้ใช้: "สายขั้นตอนควรเป็นสีสัน รูปแบบเดียวกันทั้งหมดที่เกี่ยวข้องกัน") — ใช้แถบขั้นตอนตัวเดียวกับการ์ดงาน
+//    (วงเขียว ✓ = ผ่านแล้ว · วงน้ำเงินมีเลข = ขั้นปัจจุบัน · วงขาว = ยังไม่ถึง) แทนแถบสีเดิม
 function StageBar({ stage }) {
   return (
-    <Box sx={{ display: "grid", gridTemplateColumns: `repeat(${STAGES.length}, minmax(0, 1fr))`, gap: 0.5, mt: 1.25 }}>
-      {STAGES.map((name, i) => {
-        const done = i < stage.i || stage.i === 4;
-        const cur = i === stage.i && stage.i !== 4;
-        const c = done ? GREEN : cur ? stage.color : "#e2e8f0";
-        return (
-          <Box key={name} sx={{ minWidth: 0 }}>
-            <Box sx={{ height: 5, borderRadius: 99, bgcolor: c }} />
-            <Stack direction="row" alignItems="center" spacing={0.3} sx={{ mt: 0.5, minWidth: 0 }}>
-              {done && <CheckRounded sx={{ fontSize: 12, color: GREEN, flexShrink: 0 }} />}
-              <Typography noWrap sx={{ fontSize: "0.66rem", fontWeight: cur ? 900 : 600, color: cur ? stage.color : done ? "#15803d" : "#94a3b8" }}>{name}</Typography>
-            </Stack>
-          </Box>
-        );
-      })}
+    <Box sx={{ mt: 1.25 }}>
+      <MiniSteps labels={STAGES} current={stage.i === 4 ? STAGES.length : stage.i} />
     </Box>
   );
 }
@@ -394,9 +385,13 @@ export default function JobIntake() {
   const list = useMemo(() => {
     const t = TABS.find((x) => x.key === tab) || TABS[0];
     return withStage.filter((x) => t.test(x.s)).map((x) => x.j)
-      .sort((a, b) => (isUrgent(b) - isUrgent(a)) || (tab === "done"
+      // ✅ (11 ต.ค. 2569 ผู้ใช้: "งานใหม่ที่ลงตารางควรมาที่บนสุดด้วย") — ล่าสุดขึ้นก่อนทุกแท็บ
+      //    กำลังทำ = เรียงตามเวลาส่งลงตาราง (scheduledAt) · รอลงตาราง = งานด่วนก่อน แล้วรับเข้าล่าสุด · เสร็จแล้ว = ปิดล่าสุด
+      .sort((a, b) => (tab === "done"
         ? new Date(b.closeApprovedAt || b.updatedAt || 0) - new Date(a.closeApprovedAt || a.updatedAt || 0)
-        : new Date(a.intakeAt) - new Date(b.intakeAt)));
+        : tab === "active"
+          ? new Date(b.scheduledAt || b.createdAt || b.intakeAt || 0) - new Date(a.scheduledAt || a.createdAt || a.intakeAt || 0)
+          : (isUrgent(b) - isUrgent(a)) || new Date(b.intakeAt || 0) - new Date(a.intakeAt || 0)));
   }, [withStage, tab]);
 
   return (

@@ -1,0 +1,258 @@
+/**
+ * AttendanceList — รายการบันทึกเข้างาน (10 ต.ค. 2569)
+ * ใช้ทั้งในการ์ดงาน (ของงานนี้) และหน้า "บันทึกเข้างาน" (showJob = แสดงชื่องานด้วย)
+ * 🧹 11 ต.ค. 2569 ตัดเช็คเอาต์ออก + เปลี่ยนคำ "เช็คอิน" → "เข้างาน" ทุกหน้า (ผู้ใช้สั่ง)
+ *
+ * ✅ (11 ต.ค. 2569 ผู้ใช้: "หน้าบันทึกเข้างานปรับจุดวางให้ดูง่ายขึ้น ไม่ซ้ำซ้อน ใช้งานง่าย ทุกขนาดหน้าจอ"
+ *     + "การใช้น้ำหนักคำ และสีต่างๆ ให้มืออาชีพ")
+ *    • แถวพับ 3 บรรทัด: ชื่อ + เวลา (ขวา) · งาน · บทบาท/ลูกทีม + เฉพาะเรื่องที่ต้องสนใจ (ตำแหน่งผิดปกติ/นอกวันนัด/แก้เวลา)
+ *      ตัดแถบตำแหน่งแยก + ป้ายพื้นสี + ข้อความ "บันทึกพิกัดแล้ว" ที่ไม่ต้องสนใจออก
+ *    • แถวกาง: เฉพาะข้อมูลที่ยังไม่เห็นในแถวพับ (ทีม · ตำแหน่ง+แผนที่ · หมายเหตุ · รูป) — ไม่ซ้ำเวลา/ชื่อหัวหน้าทีม
+ *    • ตัวหนังสือ: หัวข้อ 600 · เนื้อหา 400–500 · สีเทาเป็นหลัก น้ำเงินเฉพาะสิ่งที่กดได้ ส้มเฉพาะเรื่องที่ต้องตรวจ
+ */
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import Swal from "sweetalert2";
+import { Box, Stack, Typography, Button, ButtonBase, Avatar, Collapse } from "@mui/material";
+import { ExpandMore, EditCalendarOutlined, ChevronRight, DescriptionOutlined } from "@mui/icons-material";
+import { personColor, personInitial } from "@/shared/utils/personAvatar";
+import AttendanceService from "@/shared/services/AttendanceService";
+import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT } from "@/shared/ui/PageKit";
+import {
+  fmtDuration, fmtTime, fmtDayTime, locationBadge, resultOf, CORRECTION_STATUS, FIELD_LABEL,
+} from "../attendanceMeta";
+import CorrectionDialog from "./CorrectionDialog";
+import { PersonChip } from "@/shared/ui/PersonChip";
+import { CARD } from "@/shared/ui/modernUi";
+
+const WARN = "#b45309";
+const TONE = { ok: "#16a34a", warn: "#d97706", muted: "#94a3b8" };
+
+/** ปุ่มเล็กแบบเส้นขอบ — ในรายละเอียดของแต่ละรายการ */
+const SMALL_BTN = {
+  textTransform: "none", fontFamily: "inherit", fontSize: "0.8rem", fontWeight: 600, borderRadius: "10px",
+  minHeight: 34, px: 1.5, boxShadow: "none",
+};
+
+/** แถว "ป้าย : ค่า" ในรายละเอียด — ป้ายคอลัมน์ซ้ายกว้างเท่ากันทุกแถว อ่านไล่ลงมาได้ */
+const InfoRow = ({ label, children }) => (children ? (
+  <Box sx={{ display: "grid", gridTemplateColumns: "84px 1fr", columnGap: 1.25, py: 0.9, borderTop: `1px solid ${LINE}`, "&:first-of-type": { borderTop: 0 } }}>
+    <Typography sx={{ fontSize: "0.78rem", color: MUTED, fontWeight: 500 }}>{label}</Typography>
+    <Box sx={{ fontSize: "0.84rem", color: INK, minWidth: 0, whiteSpace: "pre-line", lineHeight: 1.55, wordBreak: "break-word" }}>{children}</Box>
+  </Box>
+) : null);
+
+const isImg = (p) => /^image\//.test(p.fileType || "") || /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(p.fileName || "");
+
+/** รูป = ภาพย่อ · เอกสาร (PDF/Word/Excel) = ชิปชื่อไฟล์ */
+const Files = ({ photos, onPreview }) => (photos?.length ? (
+  <Stack direction="row" gap={0.75} flexWrap="wrap">
+    {photos.map((p) => {
+      const open = () => (onPreview ? onPreview(p.fileUrl, p.fileName) : window.open(p.fileUrl, "_blank", "noopener"));
+      return isImg(p) ? (
+        <Box key={p.fileId} component="img" src={p.fileUrl} alt={p.fileName} loading="lazy" onClick={open}
+          sx={{ width: 64, height: 64, objectFit: "cover", borderRadius: "10px", border: `1px solid ${LINE}`, cursor: "zoom-in" }} />
+      ) : (
+        <ButtonBase key={p.fileId} onClick={open}
+          sx={{ gap: 0.5, px: 1, height: 32, maxWidth: "100%", borderRadius: "10px", bgcolor: SURFACE, fontFamily: "inherit", fontSize: "0.76rem", fontWeight: 500, color: ACCENT }}>
+          <DescriptionOutlined sx={{ fontSize: 16 }} />
+          <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 180 }}>{p.fileName}</Box>
+        </ButtonBase>
+      );
+    })}
+  </Stack>
+) : null);
+
+/** ตำแหน่ง: จุดสี + ข้อความ + ลิงก์เปิดแผนที่ (ถ้ามีพิกัด) */
+const Where = ({ stamp }) => {
+  const b = locationBadge(stamp);
+  if (!b) return null;
+  const href = stamp?.gps === "ok" ? `https://www.google.com/maps/search/?api=1&query=${stamp.lat},${stamp.lng}` : null;
+  return (
+    <Stack direction="row" alignItems="center" gap={0.6} flexWrap="wrap">
+      <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: TONE[b.tone], flexShrink: 0 }} />
+      <span>{b.text}{stamp.accuracy != null ? ` · ±${stamp.accuracy} ม.` : ""}</span>
+      {href && <Box component="a" href={href} target="_blank" rel="noopener noreferrer" sx={{ color: ACCENT, fontWeight: 500, textDecoration: "none", fontSize: "0.8rem" }}>ดูแผนที่</Box>}
+    </Stack>
+  );
+};
+
+/** คั่นข้อความในบรรทัดเดียวกัน */
+const Dot = () => <Box component="span" sx={{ color: "#cbd5e1", mx: 0.6 }}>·</Box>;
+
+function Row({ row, me, isApprover, showJob, onPreview, onChanged, embedded }) {
+  const [open, setOpen] = useState(false);
+  const [fixOpen, setFixOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const legacyOut = Boolean(row.checkOut?.at); // รายการเก่าที่เคยเช็คเอาต์ไว้ (ก่อนตัดระบบ)
+
+  const mine = String(row.userId) === String(me);
+  const result = resultOf(row.checkOut?.result);
+  const pending = (row.corrections || []).filter((c) => c.status === "pending");
+  const history = (row.corrections || []).slice().reverse();
+  const fixed = history.some((c) => c.status === "approved");
+  const inLoc = locationBadge(row.checkIn);
+  // หัวหน้าทีมเป็นคนกดเข้างานเอง? (ชื่อหัวหน้าทีมเก็บเป็นชื่อต้น · ชื่อผู้กดเป็นชื่อเต็ม)
+  const isHeadRow = Boolean(row.team?.head) && String(row.userName || "").startsWith(row.team.head);
+  const teamMembers = (row.team?.members || []).filter(Boolean);
+
+  const decide = async (c, approve) => {
+    let note = "";
+    // ⚠️ ในฟอร์ม SweetAlert (embedded) ห้ามเรียก Swal ซ้อน — ใช้กล่องถามของเบราว์เซอร์แทน
+    if (!approve && embedded) {
+      const v = window.prompt("เหตุผลที่ไม่อนุมัติคำขอแก้เวลา");
+      if (!v?.trim()) return;
+      note = v.trim();
+    } else if (!approve) {
+      const r = await Swal.fire({
+        title: "ไม่อนุมัติคำขอแก้เวลา", input: "text", inputLabel: "เหตุผล", inputPlaceholder: "แจ้งให้ช่างทราบ",
+        showCancelButton: true, confirmButtonText: "ไม่อนุมัติ", cancelButtonText: "ยกเลิก", confirmButtonColor: "#dc2626",
+        inputValidator: (v) => (!v?.trim() ? "กรุณาระบุเหตุผล" : undefined),
+      });
+      if (!r.isConfirmed) return;
+      note = r.value.trim();
+    }
+    setBusy(true);
+    try {
+      const data = await AttendanceService.decideCorrection(row._id, c._id, { decision: approve ? "approve" : "reject", note });
+      onChanged?.(data.attendance);
+    } catch (e) {
+      const msg = e?.response?.data?.message || "ลองใหม่อีกครั้ง";
+      if (embedded) window.alert(`บันทึกไม่สำเร็จ — ${msg}`);
+      else Swal.fire({ icon: "error", title: "บันทึกไม่สำเร็จ", text: msg });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // บรรทัดที่ 3 — บทบาท/ลูกทีม แล้วต่อด้วย "เรื่องที่ต้องสนใจ" เท่านั้น (ปกติไม่ขึ้นอะไรเพิ่ม)
+  const flags = [
+    inLoc?.tone === "warn" && { text: inLoc.text, color: WARN },
+    pending.length > 0 && { text: "ขอแก้เวลา · รออนุมัติ", color: WARN },
+    row.offSchedule && { text: "นอกวันนัด", color: MUTED },
+    fixed && { text: "แก้เวลาแล้ว", color: MUTED },
+  ].filter(Boolean);
+  const role = isHeadRow ? "หัวหน้าทีม" : row.team?.head ? `กดแทนหัวหน้าทีม ${row.team.head}` : "ผู้กดเข้างาน";
+  const crew = teamMembers.length ? `ลูกทีม ${teamMembers.length} คน` : "ไม่มีลูกทีม";
+
+  return (
+    <Box sx={{ ...CARD, borderRadius: "14px", overflow: "hidden" }}>
+      <ButtonBase onClick={() => setOpen((p) => !p)} aria-expanded={open}
+        sx={{ width: "100%", display: "flex", alignItems: "flex-start", gap: 1.1, textAlign: "left", fontFamily: "inherit", px: 1.35, py: 1.1 }}>
+        <Avatar sx={{ width: 32, height: 32, mt: 0.15, fontSize: "0.82rem", fontWeight: 600, bgcolor: personColor(row.userName) }}>{personInitial(row.userName)}</Avatar>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Stack direction="row" alignItems="baseline" gap={1}>
+            <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.92rem", fontWeight: 600, color: INK }}>{row.userName}</Typography>
+            {/* เวลา + ลูกศรกาง อยู่มุมขวาบน (เดิมลูกศรอยู่ท้ายบรรทัดที่ 3 ทับข้อความยาว) */}
+            <Typography sx={{ fontSize: "0.92rem", fontWeight: 600, color: INK, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
+              {fmtTime(row.checkIn?.at)}
+            </Typography>
+            <ExpandMore sx={{ fontSize: 18, color: FAINT, flexShrink: 0, alignSelf: "center", ml: -0.5, transition: "transform .2s", transform: open ? "rotate(180deg)" : "none" }} />
+          </Stack>
+          <Typography noWrap sx={{ fontSize: "0.78rem", color: INK_2, mt: 0.1 }}>
+            {showJob ? [row.jobLabel, row.jobNo].filter(Boolean).join(" · ") : fmtDayTime(row.checkIn?.at).split(" · ")[0]}
+          </Typography>
+          <Stack direction="row" alignItems="center" sx={{ mt: 0.3 }}>
+            <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.74rem", color: MUTED, lineHeight: 1.5 }}>
+              <Box component="span" sx={{ whiteSpace: "nowrap" }}>{role}</Box><Dot /><Box component="span" sx={{ whiteSpace: "nowrap" }}>{crew}</Box>
+              {flags.map((f) => (
+                <Box component="span" key={f.text}><Dot /><Box component="span" sx={{ whiteSpace: "nowrap", color: f.color, fontWeight: f.color === WARN ? 600 : 400 }}>{f.text}</Box></Box>
+              ))}
+            </Typography>
+          </Stack>
+        </Box>
+      </ButtonBase>
+
+      <Collapse in={open} unmountOnExit>
+        <Box sx={{ px: 1.5, pb: 1.5 }}>
+          <Box sx={{ borderTop: `1px solid ${LINE}`, pt: 0.25 }}>
+            {(teamMembers.length > 0 || !isHeadRow) && (
+              <InfoRow label="ทีม">
+                <Stack direction="row" gap={0.5} flexWrap="wrap">
+                  {row.team?.head && <PersonChip name={row.team.head} badge="หัวหน้าทีม" title="หัวหน้าทีมเข้างาน" />}
+                  {teamMembers.map((n) => <PersonChip key={n} name={n} title={`ลูกทีม: ${n}`} />)}
+                </Stack>
+              </InfoRow>
+            )}
+            <InfoRow label="ตำแหน่ง"><Where stamp={row.checkIn} /></InfoRow>
+            <InfoRow label="หมายเหตุ">{row.checkIn?.note}</InfoRow>
+            <InfoRow label="รูปหน้างาน">{row.checkIn?.photos?.length ? <Files photos={row.checkIn.photos} onPreview={onPreview} /> : null}</InfoRow>
+            {/* ข้อมูลเช็คเอาต์ของรายการเก่า (ก่อนตัดระบบ 11 ต.ค. 2569) — แสดงเฉพาะที่มี */}
+            {legacyOut && <InfoRow label="ออก (เดิม)">{`${fmtTime(row.checkOut.at)} · ${fmtDuration(row.durationMin)}${result ? ` · ${result.label}` : ""}`}</InfoRow>}
+            <InfoRow label="สรุปผลงาน">{row.checkOut?.summary}</InfoRow>
+            <InfoRow label="ปัญหาที่พบ">{row.checkOut?.issues}</InfoRow>
+            <InfoRow label="อะไหล่">{row.checkOut?.partsNeeded}</InfoRow>
+            <InfoRow label="ไฟล์แนบ">{row.checkOut?.photos?.length ? <Files photos={row.checkOut.photos} onPreview={onPreview} /> : null}</InfoRow>
+            <InfoRow label="Service Report">{row.checkOut?.reports?.length ? <Files photos={row.checkOut.reports} onPreview={onPreview} /> : null}</InfoRow>
+          </Box>
+
+          {history.length > 0 && (
+            <Box sx={{ mt: 1, p: 1.25, borderRadius: "12px", bgcolor: SURFACE }}>
+              <Typography sx={{ fontSize: "0.76rem", fontWeight: 600, color: MUTED, mb: 0.75 }}>ประวัติการแก้เวลา</Typography>
+              <Stack spacing={1.25}>
+                {history.map((c) => {
+                  const st = CORRECTION_STATUS[c.status] || CORRECTION_STATUS.pending;
+                  return (
+                    <Box key={c._id}>
+                      <Typography sx={{ fontSize: "0.84rem", fontWeight: 600, color: INK }}>
+                        {FIELD_LABEL[c.field]} {fmtTime(c.fromAt)} → {fmtTime(c.toAt)}
+                        <Box component="span" sx={{ ml: 0.75, fontSize: "0.74rem", fontWeight: 600, color: st.color }}>{st.label}</Box>
+                      </Typography>
+                      <Typography sx={{ fontSize: "0.76rem", color: MUTED, mt: 0.25, lineHeight: 1.5 }}>
+                        เหตุผล: {c.reason} · ขอโดย {c.requestedBy} {fmtDayTime(c.requestedAt)}
+                        {c.decidedBy ? ` · ${c.status === "approved" ? "อนุมัติ" : "ตัดสิน"}โดย ${c.decidedBy}` : ""}
+                        {c.decisionNote ? ` (${c.decisionNote})` : ""}
+                      </Typography>
+                      {c.status === "pending" && isApprover && (
+                        <Stack direction="row" gap={1} sx={{ mt: 1 }}>
+                          <Button variant="contained" disableElevation disabled={busy} onClick={() => decide(c, true)}
+                            sx={{ ...SMALL_BTN, flex: 1, bgcolor: ACCENT }}>อนุมัติ</Button>
+                          <Button variant="outlined" disabled={busy} onClick={() => decide(c, false)}
+                            sx={{ ...SMALL_BTN, flex: 1, color: "#dc2626", borderColor: "#fca5a5" }}>ไม่อนุมัติ</Button>
+                        </Stack>
+                      )}
+                    </Box>
+                  );
+                })}
+              </Stack>
+            </Box>
+          )}
+
+          {(showJob || mine || isApprover) && (
+            <Stack direction="row" gap={1} justifyContent="flex-end" sx={{ mt: 1.25 }}>
+              {(mine || isApprover) && (
+                <Button variant="outlined" startIcon={<EditCalendarOutlined sx={{ fontSize: "18px !important" }} />} onClick={() => setFixOpen(true)}
+                  sx={{ ...SMALL_BTN, color: INK_2, borderColor: LINE }}>
+                  {isApprover ? "แก้เวลา" : "ขอแก้เวลา"}
+                </Button>
+              )}
+              {showJob && (
+                <Button component={Link} to={`/operation/${row.eventId}`} variant="outlined" endIcon={<ChevronRight />}
+                  sx={{ ...SMALL_BTN, color: ACCENT, borderColor: "#bfdbfe" }}>เปิดงาน</Button>
+              )}
+            </Stack>
+          )}
+        </Box>
+      </Collapse>
+      <CorrectionDialog open={fixOpen} row={row} isApprover={isApprover} onClose={() => setFixOpen(false)}
+        onDone={(r) => { setFixOpen(false); onChanged?.(r); }} />
+    </Box>
+  );
+}
+
+/**
+ * @param rows        รายการ Attendance
+ * @param me          userId ผู้ใช้ปัจจุบัน
+ * @param isApprover  อนุมัติ/แก้เวลาได้ (approveJobs)
+ * @param showJob     แสดงชื่องาน (หน้ารวม) — จอกว้างเรียง 2 คอลัมน์
+ */
+export default function AttendanceList({ rows = [], me, isApprover, showJob = false, onPreview, onChanged, empty, embedded = false }) {
+  if (!rows.length) return empty || null;
+  return (
+    <Box sx={{ display: "grid", gap: 1, alignItems: "start", gridTemplateColumns: showJob ? { xs: "1fr", lg: "1fr 1fr" } : "1fr" }}>
+      {rows.map((r) => (
+        <Row key={r._id} row={r} me={me} isApprover={isApprover} showJob={showJob} onPreview={onPreview} onChanged={onChanged} embedded={embedded} />
+      ))}
+    </Box>
+  );
+}

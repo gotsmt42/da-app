@@ -34,12 +34,15 @@ const ICON = {
   เวลา: AccessTime,
   ผู้ติดต่อ: Person,
   ผู้เข้าทำงาน: Groups,
+  หัวหน้าทีมเข้างาน: Groups,
+  หัวหน้าทีม: Groups,
 };
 
-const InfoLine = ({ label, children }) => {
+/** @param center จัดป้ายกึ่งกลางแนวตั้งกับค่า — ใช้กับแถวที่ค่าเป็นชิปรูปคน (สูงกว่าตัวหนังสือ) ให้ป้ายไม่ลอยสูงกว่า */
+const InfoLine = ({ label, children, center = false }) => {
   const Icon = ICON[label];
   return (
-    <Stack direction="row" spacing={0.75} sx={{ alignItems: "flex-start" }}>
+    <Stack direction="row" spacing={0.75} sx={{ alignItems: center ? "center" : "flex-start" }}>
       <Stack
         direction="row" alignItems="center" spacing={0.4}
         sx={{ flexShrink: 0, whiteSpace: "nowrap", color: "text.disabled", minWidth: 84 }}

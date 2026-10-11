@@ -1,5 +1,5 @@
 /**
- * SitePhotos — "รูปและไฟล์หน้างาน" ของงานช่าง (10 ต.ค. 2569 ผู้ใช้: "ให้ช่างอัปไฟล์หรือรูปภาพในงานได้แบบของเซล")
+ * SitePhotos — "ไฟล์แนบ" ของงานช่าง (เดิมชื่อ "รูปและไฟล์หน้างาน" — 10 ต.ค. 2569 ผู้ใช้: "แก้ไขคำให้มืออาชีพ เช่น ไฟล์แนบ") (10 ต.ค. 2569 ผู้ใช้: "ให้ช่างอัปไฟล์หรือรูปภาพในงานได้แบบของเซล")
  *
  * ✅ ใช้ช่องเก็บเดียวกับรูปหน้างานของนัดเซล (Events.sitePhotoFiles · PUT /events/upload/:id type=sitePhoto)
  *   แยกจาก "เอกสารประจำงาน" (Service Report/ใบเสนอราคา/วางบิล/ส่งมอบ) — ตรงนี้คือรูปถ่ายหน้างาน/ไฟล์ประกอบทั่วไป
@@ -88,13 +88,13 @@ export default function SitePhotos({ event, canEdit = false, onPreview, onChange
       <Stack direction="row" alignItems="center" spacing={1}>
         <PhotoLibraryOutlined sx={{ fontSize: 18, color: MUTED }} />
         <Typography sx={{ flex: 1, fontSize: "0.84rem", fontWeight: 800, color: INK }}>
-          รูปและไฟล์หน้างาน{files.length ? ` · ${files.length}` : ""}
+          ไฟล์แนบ{files.length ? ` · ${files.length}` : ""}
         </Typography>
         {canEdit && (
           <Button size="small" disabled={Boolean(uploading)} onClick={() => inputRef.current?.click()}
             startIcon={uploading ? <CircularProgress size={14} /> : <AddAPhotoOutlined sx={{ fontSize: 17 }} />}
             sx={{ textTransform: "none", fontWeight: 800, color: BLUE, py: 0.2, borderRadius: 2 }}>
-            {uploading ? `กำลังอัปโหลด ${uploading}` : "เพิ่มรูป/ไฟล์"}
+            {uploading ? `กำลังอัปโหลด ${uploading}` : "แนบไฟล์"}
           </Button>
         )}
         <input ref={inputRef} type="file" hidden multiple accept="image/*,.heic,.heif,.pdf,.doc,.docx,.xls,.xlsx" onChange={onPick} />
@@ -107,7 +107,7 @@ export default function SitePhotos({ event, canEdit = false, onPreview, onChange
           color: MUTED, fontFamily: "inherit", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 0.75,
           "&:hover": { borderColor: alpha(BLUE, 0.5), color: BLUE },
         }}>
-          <AddAPhotoOutlined sx={{ fontSize: 19 }} /> ยังไม่มีรูป · แตะเพื่อถ่ายรูปหรือเลือกไฟล์
+          <AddAPhotoOutlined sx={{ fontSize: 19 }} /> ยังไม่มีไฟล์แนบ · แตะเพื่อถ่ายรูปหรือเลือกไฟล์
         </Box>
       ) : (
         <>
@@ -117,7 +117,12 @@ export default function SitePhotos({ event, canEdit = false, onPreview, onChange
                 <Box key={f._id} sx={{ position: "relative", pt: "100%", borderRadius: 1.5, overflow: "hidden", border: `1px solid ${LINE}`, bgcolor: "#f8fafc" }}>
                   <Box component="img" src={f.fileUrl} alt={f.fileName} loading="lazy" onClick={() => open(f)} title={`${f.fileName}${f.uploadedBy ? ` · ${f.uploadedBy}` : ""}${f.uploadedAt ? ` · ${formatThai(moment(f.uploadedAt), "D MMM HH:mm")}` : ""}`}
                     sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", cursor: "zoom-in" }} />
-                  {canEdit && (
+                  {/* ✅ (10 ต.ค. 2569) ไฟล์ที่มาจากคำขอลงงาน — ป้ายบอกที่มา · ลบจากงานไม่ได้ (ต้นฉบับอยู่ที่ใบคำขอ) */}
+                  {f.source === "dispatch" && (
+                    <Box component="span" title={f.sourceLabel} sx={{ position: "absolute", left: 4, bottom: 4, px: 0.6, py: 0.1, borderRadius: 1,
+                      fontSize: "0.62rem", fontWeight: 800, color: "#fff", bgcolor: alpha("#0f172a", 0.6) }}>คำขอลงงาน</Box>
+                  )}
+                  {canEdit && f.source !== "dispatch" && (
                     <IconButton size="small" aria-label="ลบรูป" onClick={() => remove(f)}
                       sx={{ position: "absolute", top: 3, right: 3, width: 24, height: 24, bgcolor: alpha("#0f172a", 0.55), color: "#fff", "&:hover": { bgcolor: "#dc2626" } }}>
                       <Close sx={{ fontSize: 15 }} />
@@ -132,8 +137,11 @@ export default function SitePhotos({ event, canEdit = false, onPreview, onChange
               {others.map((f) => (
                 <Stack key={f._id} direction="row" alignItems="center" spacing={1} sx={{ px: 1, py: 0.6, borderRadius: 1.5, border: `1px solid ${LINE}` }}>
                   {/\.pdf$/i.test(f.fileName || "") ? <PictureAsPdfOutlined sx={{ fontSize: 18, color: "#dc2626" }} /> : <InsertDriveFileOutlined sx={{ fontSize: 18, color: MUTED }} />}
-                  <Typography noWrap onClick={() => open(f)} sx={{ flex: 1, minWidth: 0, fontSize: "0.8rem", fontWeight: 600, color: BLUE, cursor: "pointer" }}>{f.fileName}</Typography>
-                  {canEdit && <IconButton size="small" aria-label="ลบไฟล์" onClick={() => remove(f)}><Close sx={{ fontSize: 16 }} /></IconButton>}
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography noWrap onClick={() => open(f)} sx={{ fontSize: "0.8rem", fontWeight: 600, color: BLUE, cursor: "pointer" }}>{f.fileName}</Typography>
+                    {f.sourceLabel && <Typography noWrap sx={{ fontSize: "0.7rem", color: MUTED }}>{f.sourceLabel}</Typography>}
+                  </Box>
+                  {canEdit && f.source !== "dispatch" && <IconButton size="small" aria-label="ลบไฟล์" onClick={() => remove(f)}><Close sx={{ fontSize: 16 }} /></IconButton>}
                 </Stack>
               ))}
             </Stack>

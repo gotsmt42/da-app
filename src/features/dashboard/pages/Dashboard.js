@@ -5,7 +5,7 @@ import {
   FaClock,
   FaCheckCircle,
   FaExclamationCircle,
-  FaClipboardList,
+  FaClipboardList, FaUserCheck,
   FaCogs,
   FaCheckDouble,
 } from "react-icons/fa";
@@ -257,7 +257,8 @@ const Dashboard = () => {
   // !isFlaggedDays ออกเหมือนที่เคยลองแก้) แม้จะไม่ mutually-exclusive กับ "ค้างเกินกำหนด" ก็ตาม
   const myActiveJobsCount = countDistinctJobs(
     events,
-    (e) => ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(e.status) && !e.closeRequested,
+    // ✅ (11 ต.ค. 2569) รวม "กำลังรอยืนยัน" — งานที่เพิ่งมอบหมาย ต้องกดรับทราบ/ยืนยันนัดหมาย (ตรงกับหน้างานของฉัน)
+    (e) => ["กำลังรอยืนยัน", "ยืนยันแล้ว", "กำลังดำเนินการ"].includes(e.status) && !["pending", "rejected"].includes(e.approvalStatus) && !e.closeRequested,
   );
   const myPendingApprovalCount = countDistinctJobs(
     events,
@@ -678,24 +679,30 @@ const Dashboard = () => {
             {isTechnician && (
               <Link
                 to="/technician/jobs"
-                style={{ ...styles.myJobsBanner, borderLeftColor: "#0891b2" }}
+                // ✅ (11 ต.ค. 2569 ผู้ใช้: "เมนูงานของฉันให้เด่น ไม่กลมกลืนกับหน้า" → "สีเข้มเกินไป ให้เป็นแบบ outline พอ")
+                //    กรอบน้ำเงิน 1.5px ทั้งใบ + ไอคอน/ตัวเลขสีน้ำเงิน บนพื้นขาว — เด่นกว่าการ์ดอื่น แต่ไม่ทึบ
+                style={{
+                  ...styles.myJobsBanner, textDecoration: "none", background: "#fff",
+                  border: "1.5px solid #bfdbfe", borderLeft: "1.5px solid #bfdbfe",
+                  boxShadow: "0 8px 20px -14px rgba(37,99,235,.55)",
+                }}
                 className="action-hero-btn focus-card"
               >
-                <div style={{ ...styles.myJobsIconCircle, color: "#0891b2", backgroundColor: "rgba(8,145,178,0.1)" }}>
-                  <FaClipboardList size={18} />
+                <div style={{ ...styles.myJobsIconCircle, color: "#2563eb", backgroundColor: "#eff6ff" }}>
+                  <FaUserCheck size={18} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <h3 style={styles.heroBtnTitle}>งานของฉัน</h3>
+                  <h3 style={{ ...styles.heroBtnTitle, color: "#1d4ed8" }}>งานของฉัน</h3>
                   <p style={styles.heroBtnSub}>
                     {loading ? "กำลังโหลด..." : myJobsSummary}
                   </p>
                 </div>
                 {!loading && myActiveJobsCount + myPendingApprovalCount > 0 && (
-                  <span style={{ ...styles.myJobsCountBadge, backgroundColor: "#0891b2" }}>
+                  <span style={{ ...styles.myJobsCountBadge, backgroundColor: "#2563eb" }}>
                     {myActiveJobsCount + myPendingApprovalCount}
                   </span>
                 )}
-                <FaChevronRight size={12} className="arrow-bounce" style={styles.focusCardChevron} />
+                <FaChevronRight size={12} className="arrow-bounce" style={{ ...styles.focusCardChevron, color: "#2563eb" }} />
               </Link>
             )}
 

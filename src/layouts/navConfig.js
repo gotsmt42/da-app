@@ -15,10 +15,11 @@
  *    ฝั่งที่ต้องการ element ให้เขียน <Icon /> เอง (เมนูข้างทำแบบนั้น)
  */
 import {
-  FaHome, FaTachometerAlt, FaCalendarAlt, FaCalendarCheck, FaWrench, FaBriefcase, FaClipboardList,
+  FaHome, FaTachometerAlt, FaCalendarAlt, FaCalendarCheck, FaBriefcase,
   FaClipboardCheck, FaPaperPlane, FaMoneyCheckAlt, FaReceipt, FaHardHat, FaUserClock, FaShoppingCart, FaInbox, FaChartBar,
   FaFileAlt, FaFileInvoiceDollar, FaFileContract, FaArchive, FaBuilding, FaUserFriends,
-  FaCog, FaTags, FaImage, FaUserShield, FaBoxOpen, FaImages, FaNewspaper, FaSlidersH, FaEnvelopeOpenText,
+  FaCog, FaTags, FaImage, FaUserShield, FaBoxOpen, FaImages, FaNewspaper, FaSlidersH, FaEnvelopeOpenText, FaMapMarkerAlt,
+  FaTasks, FaUserCheck,
 } from "react-icons/fa";
 import { MdPostAdd } from "react-icons/md";
 import { DEPARTMENT } from "@/shared/utils/roles";
@@ -46,17 +47,21 @@ export const DEST = {
   eventServiceReadOnly: { title: "ตารางงานช่าง", sub: "ดูอย่างเดียว", href: `/event?dept=${DEPARTMENT.SERVICE}`, icon: FaCalendarAlt },
   eventSales: { title: "ตารางงานฝ่ายขาย", href: "/event?dept=sales", icon: FaBriefcase },
 
-  operation: { title: "การดำเนินงาน", bar: "ดำเนินงาน", sub: "เช็คอิน · ปิดงาน", href: "/operation", icon: FaWrench, badgeKey: "closeRequests" },
+  operation: { title: "การดำเนินงาน", bar: "ดำเนินงาน", sub: "ติดตามทุกงาน · ปิดงาน", href: "/operation", icon: FaTasks, badgeKey: "closeRequests" },
   // ✅ (9 ต.ค. 2569) งานที่ต้องตามต่อ แยกตามขั้นตอน — รับงาน · รอลงแผน · ยังไม่รับงาน · งานไม่เสร็จ · รอปิดงาน
   // ✅ ขั้นที่ 1 "รับงาน" — รับงานจากลูกค้า/LINE/ฝ่ายขาย เก็บเป็นงานรอลงแผน (ผู้ใช้เลือก 9 ต.ค. 2569: เมนูแรกของหมวดงาน)
   // ✅ (9 ต.ค. 2569 ผู้ใช้) ชื่อเมนู "งานใหม่" + ไอคอนเอกสารมีเครื่องหมายบวก (งานที่เพิ่งรับเข้ามา) — ชุดเดียวกับหัวหน้าเพจ
   jobIntake: { title: "งานใหม่", sub: "รับงานไว้ก่อน · ส่งลงตาราง", href: "/jobs/intake", icon: MdPostAdd, badgeKey: "jobIntake" },
+  // ✅ (10 ต.ค. 2569) เช็คอิน/เช็คเอาต์ของช่าง — รายการเข้า-ออกงาน · ชั่วโมงทำงาน · คำขอแก้เวลา
+  attendance: { title: "บันทึกเข้างาน", sub: "เข้างาน · รูปหน้างาน · แก้เวลา", href: "/attendance", icon: FaMapMarkerAlt, badgeKey: "attendanceFixes" },
   jobReport: { title: "รายงานงาน", short: "รายงาน", sub: "สรุปสถานะ · รายเดือน · ตามลูกค้า/ทีม", href: "/jobs/report", icon: FaChartBar },
-  myJobs: { title: "งานของฉัน", sub: "งานที่ได้รับมอบหมาย", href: "/technician/jobs", icon: FaClipboardList, badgeKey: "myJobs" },
+  // ✅ (11 ต.ค. 2569 ผู้ใช้: "Icon ให้สอดคล้อง สื่อความหมาย ไม่ใส่มั่ว") — คน + เครื่องหมายถูก = งานที่มอบหมายให้ฉัน
+  myJobs: { title: "งานของฉัน", sub: "งานที่ได้รับมอบหมาย", href: "/technician/jobs", icon: FaUserCheck, badgeKey: "myJobs" },
   contracts: { title: "ภาพรวมงาน", href: "/contracts", icon: FaFileContract, badgeKey: "contracts" },
   // ✅ หน้าเดียวกับ "ภาพรวมงาน" แต่เปิดที่ "ปิดแล้ว · ประวัติ" — สัญญาหมดอายุ (รอต่อสัญญา) + งานที่เข้างานครบแล้ว
   contractsClosed: { title: "งานปิดแล้ว · ประวัติ", short: "งานปิดแล้ว", sub: "สัญญาหมดอายุ · เข้างานครบ", href: "/contracts?view=closed", icon: FaArchive },
-  dispatch: { title: "คำขอลงงาน", sub: "คิวรอมอบหมาย", href: "/dispatch", icon: FaClipboardCheck, badgeKey: "dispatchQueue" },
+  // ✅ (11 ต.ค. 2569) ถาดรับเข้า = คำขอที่ส่งเข้ามารอจัดคิว (เดิมใช้รูปคลิปบอร์ดติ๊กถูก ซึ่งสื่อว่า "อนุมัติแล้ว")
+  dispatch: { title: "คำขอลงงาน", sub: "คิวรอมอบหมาย", href: "/dispatch", icon: FaInbox, badgeKey: "dispatchQueue" },
   sales: { title: "แจ้งงานให้ช่าง", bar: "แจ้งงาน", sub: "ส่งงานเข้าคิวช่าง", href: "/sales", icon: FaPaperPlane, badgeKey: "dispatchMine" },
 
   advance: { title: "ใบเบิก Advance", short: "ใบ Advance", sub: "เบิกเงินล่วงหน้า", href: "/expenses/advances", icon: FaMoneyCheckAlt, badgeKey: "advance" },
@@ -65,7 +70,8 @@ export const DEST = {
   purchaseReport: { title: "รายงานการจัดซื้อ", short: "รายงาน", sub: "ยอดซื้อ · ร้านค้า · ค้างรับ", href: "/purchase/report", icon: FaChartBar },
   ot: { title: "OT · ทำงานล่วงเวลา", short: "OT", sub: "ขออนุมัติ OT · จ่ายพร้อมเงินเดือน", href: "/ot", icon: FaUserClock, badgeKey: "ot" },
   contractorPay: { title: "ค่าจ้างผู้รับเหมา", sub: "เบิกค่าแรงตามงวดงาน", href: "/expenses/contractors", icon: FaHardHat, badgeKey: "contractorPay" },
-  expenseInbox: { title: "รอดำเนินการ", sub: "ตรวจสอบ · อนุมัติ · เบิกจ่าย", href: "/expenses/approvals", icon: FaInbox, badgeKey: "expenseInbox" },
+  // ✅ (11 ต.ค. 2569) คิวอนุมัติใบเบิก — คลิปบอร์ดติ๊กถูก (ไม่ใช้ถาดรับเข้าซ้ำกับคำขอลงงาน) · ชื่อบอกตรงๆ ว่าต้องอนุมัติ
+  expenseInbox: { title: "รออนุมัติเบิก", short: "รออนุมัติ", sub: "ตรวจสอบ · อนุมัติ · เบิกจ่าย", href: "/expenses/approvals", icon: FaClipboardCheck, badgeKey: "expenseInbox" },
   expenseReport: { title: "รายงานการเบิก", short: "รายงาน", sub: "ยอดค้าง · ย้อนหลัง", href: "/expenses/report", icon: FaChartBar },
 
   documents: { title: "เอกสาร", sub: "ไฟล์ · เอกสารออก", href: "/documents", icon: FaFileAlt },

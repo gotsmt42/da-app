@@ -38,6 +38,8 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
   const isAdminOrManager = can(userData, "manageMasterData");
   const seeAllSchedules = can(userData, "viewAllJobs");
   const canViewContracts = can(userData, "viewContracts");
+  // ✅ (11 ต.ค. 2569) "งานของฉัน" — ทุกคนที่ถูกมอบหมายงานได้ (ช่าง · แอดมิน/ผู้จัดการที่เป็นผู้รับผิดชอบ)
+  // ✅ (11 ต.ค. 2569 ผู้ใช้: "หน้าแอดมินไม่ควรมีเมนูงานของฉัน ให้มีแค่ของช่าง")
   const canMyJobs = can(userData, "receiveDispatch");
   // ✅ เมนูฝ่ายขาย — เห็นเฉพาะคนที่ทำแผนงานขายได้จริง (เซล + หัวหน้า)
   const canSell = can(userData, "createSalesPlan");
@@ -155,6 +157,9 @@ const side = (key, extra) => {
   // "แผนงาน" ทั้งที่เป็นหน้าที่ใช้บ่อยที่สุดของฝ่ายช่าง (ไล่จัดการงานทีละใบ) และเป็นคนละเรื่องกับ
   // ปฏิทิน (ปฏิทิน = วางแผนว่าจะไปวันไหน · การดำเนินงาน = ตามงานที่ลงตารางแล้ว)
   const operationMenu = [side("operation")];
+  // ✅ (10 ต.ค. 2569) เข้า-ออกงาน (เช็คอิน/เช็คเอาต์) — ถัดจากการดำเนินงาน · เห็นเฉพาะผู้ดูงานทั้งหมด/ผู้อนุมัติ
+  const attendanceMenu = [side("attendance")];
+  const canViewAttendance = can(userData, "viewAllJobs") || can(userData, "approveJobs");
   // ✅ (9 ต.ค. 2569) ขั้นตอนงาน: "รับงาน" แรกสุดของหมวด
   const intakeMenu = [side("jobIntake")];
   // ✅ รายงานงาน — คู่กับ "รายงานการเบิก" ของหมวดเบิกค่าใช้จ่าย
@@ -216,7 +221,8 @@ const side = (key, extra) => {
   // เดิม OT/ใบขอซื้อต่อท้ายหมวดเบิก — ตอนนี้: จัดซื้อ = ใบขอซื้อ PR · บุคคล = OT
   // ⚠️ สิทธิ์ยังเป็นชุดเดียวกับระบบเบิก (canExpense) — เปลี่ยนแค่จุดวาง · ลำดับหมวดตรงกับหน้าแรก (HomeMenu)
   const purchaseMenu = [side("purchase"), side("purchaseReport")];
-  const peopleMenu = [side("ot")];
+  // 🚧 (11 ต.ค. 2569 ผู้ใช้: "ตัดเมนู OT ออกไปก่อน") — ซ่อนทางเข้า หน้า /ot ยังอยู่
+  const peopleMenu = [];
 
   const masterDataMenu = [side("customers"), side("staff")];
 
@@ -393,7 +399,8 @@ const side = (key, extra) => {
               (จอขาว) เพราะ Sidebar อยู่ในทุกหน้า */}
           {/* ✅ (9 ต.ค. 2569 ผู้ใช้: "เรียงเมนูตามขั้นตอนงาน") 1 รับงาน → 2 คำขอลงงาน → 3 ตารางงาน (วางแผน)
               → 4 การดำเนินงาน / งานของฉัน → ภาพรวมงาน · งานปิดแล้ว → รายงาน */}
-          {canViewOperation && intakeMenu.map((item, idx) => renderLink(item, `work-in-${idx}`))}
+          {/* ✅ (11 ต.ค. 2569) "งานใหม่" เฉพาะคนจัดคิว (แอดมิน/ผู้จัดการ) — ช่างไม่ต้องเห็น */}
+          {(can(userData, "assignDispatch") || can(userData, "editAnyJob")) && intakeMenu.map((item, idx) => renderLink(item, `work-in-${idx}`))}
           {canAssign && dispatchMenu.map((item, idx) => renderLink(item, `work-dispatch-${idx}`))}
           {canPlanWork && workMenu.map((navi, index) => (
             navi.items?.length
@@ -401,6 +408,7 @@ const side = (key, extra) => {
               : renderLink(navi, `work-${index}`)
           ))}
           {canViewOperation && operationMenu.map((item, idx) => renderLink(item, `work-op-${idx}`))}
+          {canViewAttendance && attendanceMenu.map((item, idx) => renderLink(item, `work-att-${idx}`))}
           {canMyJobs && myJobsMenu.map((item, idx) => renderLink(item, `work-my-${idx}`))}
           {canViewContracts && contractsMenu.map((item, idx) => renderLink(item, `work-ct-${idx}`))}
           {/* ✅ รายงานงานอยู่ท้ายหมวด "งาน" ตำแหน่งเดียวกับ "รายงานการเบิก" ท้ายหมวดเบิกค่าใช้จ่าย */}
@@ -433,7 +441,7 @@ const side = (key, extra) => {
               {purchaseMenu.map((item, idx) => renderLink(item, `pur-${idx}`))}
             </>
           )}
-          {canExpense && (
+          {canExpense && peopleMenu.length > 0 && (
             <>
               <div className="admin-divider-label">บุคคล</div>
               {peopleMenu.map((item, idx) => renderLink(item, `ppl-${idx}`))}

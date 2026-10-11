@@ -197,6 +197,16 @@ const EventService = {
     const res = await API.put(`/events/${id}/ack`);
     return res.data;
   },
+  /** ✅ (11 ต.ค. 2569) ผู้รับผิดชอบยืนยันนัดหมาย (หลังรับทราบ) → สถานะงาน "ยืนยันแล้ว" */
+  async ConfirmJob(id) {
+    const res = await API.put(`/events/${id}/confirm`);
+    return res.data;
+  },
+  /** ✅ (11 ต.ค. 2569) ช่างปฏิเสธงานพร้อมเหตุผล { reason } */
+  async AckDecline(id, payload) {
+    const res = await API.put(`/events/${id}/ack-decline`, payload);
+    return res.data;
+  },
   async ReportFollowUp(id, payload) {
     const res = await API.put(`/events/${id}/follow-up`, payload);
     return res.data;

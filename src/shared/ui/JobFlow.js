@@ -2,8 +2,9 @@
  * JobFlow — ส่วนแสดงผล "ขั้นตอนทำงานมาตรฐาน" ที่ใช้ทั้งการ์ดงานของช่าง (TechnicianJobPanel)
  * และการ์ดงานของแอดมิน (OperationBoard → EventRowCard) — หน้าตาเดียวกันทุกที่
  *
- *   JobFlowChips  ป้ายบรรทัดเดียวใต้ชื่องาน: เลข Job · ด่วน · ครบกำหนด · รอข้อมูล · งานไม่เสร็จ · รับทราบแล้ว
- *   JobFlowPanel  กล่องการทำงาน: รอข้อมูล · อุปกรณ์ · ปุ่ม "รับทราบงาน" · งานไม่เสร็จ (แจ้ง/จัดการแล้ว)
+ *   JobFlowChips  ป้ายบรรทัดเดียวใต้ชื่องาน: เลข Job · ด่วน · ครบกำหนด · รอข้อมูล · รับทราบแล้ว
+ *   JobFlowPanel  กล่องการทำงาน: รอข้อมูล · อุปกรณ์ · ปุ่ม "รับทราบงาน"
+ * 🧹 (10 ต.ค. 2569 ผู้ใช้: "ตัดระบบงานไม่เสร็จต้องเข้าใหม่ออก ให้ช่างเขียนหมายเหตุเองก็พอ") — ตัดปุ่ม/ฟอร์ม/กล่อง "งานไม่เสร็จ" ออก
  * ⚠️ "รับงาน" = รับงานจากลูกค้า (ขั้นที่ 1 · เมนู "รับงาน") — ปุ่มของช่างใช้คำว่า "รับทราบงาน" กันสับสน
  *
  * กฎ UI: น้ำเงิน = ปุ่มหลัก · แดง = ด่วน/เลยกำหนด · อำพัน = รอ/ค้าง · เขียว = เรียบร้อย
@@ -12,17 +13,16 @@ import { useState } from "react";
 import moment from "moment";
 import Swal from "sweetalert2";
 import { Link } from "react-router-dom";
-import { Box, Stack, Typography, Button, Dialog, DialogContent, DialogActions, TextField, IconButton, ButtonBase } from "@mui/material";
+import { Box, Stack, Typography, Button } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
   BoltRounded, EventBusyOutlined, HourglassTopRounded, ReportProblemOutlined, HandymanOutlined,
-  CheckCircleRounded, ThumbUpAltOutlined, Close, EventRepeatOutlined, CalendarMonthOutlined, TagRounded, ArrowForwardRounded,
+  CheckCircleRounded, ThumbUpAltOutlined, TagRounded, ArrowForwardRounded,
 } from "@mui/icons-material";
 import EventService from "@/shared/services/EventService";
-import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import { formatThai } from "@/shared/utils/thaiDate";
 import {
-  FOLLOW_UP_REASONS, NEXT_OWNERS, isClosedJob, isUrgent, openFollowUp, acksOf, isAckedBy, isParticipant, dueInfo, ackTracked,
+  isClosedJob, isUrgent, openFollowUp, attendanceTracked, acksOf, isAckedBy, isParticipant, dueInfo, ackTracked,
 } from "@/shared/utils/jobFlow";
 
 const BLUE = "#2563eb";
@@ -32,7 +32,6 @@ const GREEN = "#16a34a";
 const ACCENT_TONE = "#2563eb";
 const INK = "#0f172a";
 const MUTED = "#64748b";
-const LINE = "#e2e8f0";
 
 const me = () => {
   try {
@@ -41,16 +40,21 @@ const me = () => {
   } catch { return { userId: "", fname: "" }; }
 };
 
-const Chip = ({ color, solid, icon, children, title }) => (
-  <Box component="span" title={title} sx={{
-    display: "inline-flex", alignItems: "center", gap: 0.4, height: 22, px: 0.9, borderRadius: 99,
-    fontSize: "0.7rem", fontWeight: 800, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums",
-    color: solid ? "#fff" : color, bgcolor: solid ? color : alpha(color, 0.1),
-    "& svg": { fontSize: 14 },
-  }}>
-    {icon}{children}
-  </Box>
-);
+// ✅ (10 ต.ค. 2569 ผู้ใช้: "สีสันมันดูเยอะ และรก อ่านยากเกินไป") — ป้ายทั่วไปพื้นเทา ตัวหนังสือเข้ม สีอยู่ที่ไอคอนเท่านั้น
+//    คงสีเต็มไว้เฉพาะเรื่องด่วน/เลยกำหนด (แดง) ให้ยังเด่นอยู่
+const Chip = ({ color, solid, icon, children, title }) => {
+  const loud = solid || color === RED;
+  return (
+    <Box component="span" title={title} sx={{
+      display: "inline-flex", alignItems: "center", gap: 0.4, height: 22, px: 0.9, borderRadius: 99,
+      fontSize: "0.7rem", fontWeight: 800, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums",
+      color: solid ? "#fff" : loud ? color : "#334155", bgcolor: solid ? color : loud ? alpha(color, 0.1) : "#f1f5f9",
+      "& svg": { fontSize: 14, color: solid ? "#fff" : color },
+    }}>
+      {icon}{children}
+    </Box>
+  );
+};
 
 /** ป้ายสถานะขั้นตอนงาน — ไม่มีอะไรให้แสดง = ไม่ render */
 export function JobFlowChips({ event, showAck = false, sx }) {
@@ -71,7 +75,10 @@ export function JobFlowChips({ event, showAck = false, sx }) {
   }
   if (event.infoPending && !closed) items.push(<Chip key="i" color={AMBER} icon={<HourglassTopRounded />}>รอข้อมูล</Chip>);
   if (fu && !closed) items.push(<Chip key="f" color={AMBER} icon={<ReportProblemOutlined />}>งานไม่เสร็จ · {fu.reason}</Chip>);
-  if (showAck && !closed && !event.unscheduled && (acks.length || (ackTracked(event) && (event.resPerson || event.team)))) {
+  // ✅ (11 ต.ค. 2569) ช่างปฏิเสธงาน — ป้ายแดงพร้อมเหตุผล (ชี้ดูได้) แทนป้ายรับทราบ
+  if (showAck && !closed && event.ackDeclined?.userId) {
+    items.push(<Chip key="a" color={RED} icon={<ReportProblemOutlined />} title={`เหตุผล: ${event.ackDeclined.reason || "-"}`}>{event.ackDeclined.name} ปฏิเสธงาน</Chip>);
+  } else if (showAck && !closed && !event.unscheduled && (acks.length || (ackTracked(event) && (event.resPerson || event.team)))) {
     items.push(acks.length
       ? <Chip key="a" color={GREEN} icon={<CheckCircleRounded />} title={acks.map((a) => a.name).join(", ")}>รับทราบแล้ว</Chip>
       : <Chip key="a" color={MUTED} icon={<ThumbUpAltOutlined />}>ยังไม่รับทราบ</Chip>);
@@ -89,7 +96,8 @@ export function JobFlowFlags({ event }) {
   if (due?.overdue) items.push(<Chip key="d" color={RED} icon={<EventBusyOutlined />}>เลยกำหนด</Chip>);
   if (openFollowUp(event)) items.push(<Chip key="f" color={AMBER} icon={<ReportProblemOutlined />}>ไม่เสร็จ</Chip>);
   if (event.infoPending) items.push(<Chip key="i" color={AMBER} icon={<HourglassTopRounded />}>รอข้อมูล</Chip>);
-  if (ackTracked(event) && !event.unscheduled && event.approvalStatus !== "pending" && !acksOf(event).length && moment(event.start).isAfter(moment().subtract(1, "day")))
+  if (event.ackDeclined?.userId) items.push(<Chip key="x" color={RED} icon={<ReportProblemOutlined />}>ปฏิเสธงาน</Chip>);
+  else if (ackTracked(event) && !event.unscheduled && event.approvalStatus !== "pending" && !acksOf(event).length && moment(event.start).isAfter(moment().subtract(1, "day")))
     items.push(<Chip key="a" color={MUTED} icon={<ThumbUpAltOutlined />}>ยังไม่รับทราบ</Chip>);
   if (!items.length) return null;
   return <Stack direction="row" gap={0.4} flexWrap="wrap" sx={{ mt: 0.5 }}>{items}</Stack>;
@@ -127,14 +135,18 @@ export function nextStepOf(ev, mode, { mine, ackedByMe } = {}) {
       ? { tone: AMBER, title: `งานไม่เสร็จ — ${fu.reason}`, desc: "ลงวันนัดใหม่ในตารางงาน แล้วกด “จัดการแล้ว” ในกล่องด้านล่าง", action: { label: "เปิดตารางงาน", to: calendarLinkOf(ev) } }
       : { tone: AMBER, title: "แจ้งงานไม่เสร็จแล้ว", desc: `รอแอดมินลงนัดใหม่ · ผู้รับผิดชอบต่อ: ${fu.nextOwner}` };
   }
-  if (mode === "admin" && !ev.resPerson && !ev.team) {
-    return { tone: AMBER, title: "ยังไม่มีทีมเข้างาน", desc: "เปิดงานในตารางงาน แล้วเลือกหัวหน้าทีม/ลูกทีม", action: { label: "เปิดตารางงาน", to: calendarLinkOf(ev) } };
-  }
-  if (mode === "admin" && ev.status === "กำลังรอยืนยัน") {
-    return { tone: AMBER, title: "รอยืนยันนัด", desc: `ยืนยันวันเข้างาน ${dayText} กับลูกค้าแล้ว กด “ยืนยันนัดแล้ว”`, action: { label: "ยืนยันนัดแล้ว", confirm: true } };
+  // 🧹 (10 ต.ค. 2569 ผู้ใช้: "ตัดปุ่มยังไม่มีทีมเข้างานออก ให้เพิ่มผู้เข้าทำงานได้เหมือนผู้รับผิดชอบ และแก้คำเป็นหัวหน้าทีมเข้างาน")
+  //    ไม่มีกล่อง "ยังไม่มีทีมเข้างาน" อีกแล้ว — เลือกหัวหน้าทีมเข้างานได้ตรงแถวข้อมูลงานในการ์ด
+  // ✅ (11 ต.ค. 2569 ผู้ใช้: "การกดยืนยันแล้ว ควรต่อจากการกดรับทราบอีกขั้น" + "ช่างกดปฏิเสธได้ พร้อมเหตุผล")
+  //    ลำดับ: ช่างปฏิเสธ (มอบหมายใหม่) → รอช่างรับทราบ → รอยืนยันนัด (ปุ่ม "ยืนยันนัดแล้ว" = สถานะ ยืนยันแล้ว ในปฏิทิน)
+  if (mode === "admin" && ev.ackDeclined?.userId) {
+    return { tone: RED, title: `${ev.ackDeclined.name} ปฏิเสธงาน`, desc: `เหตุผล: ${ev.ackDeclined.reason || "-"} — มอบหมายหัวหน้าทีม/ผู้รับผิดชอบคนใหม่ในการ์ดนี้` };
   }
   if (ackTracked(ev) && !acksOf(ev).length && mode === "admin") {
-    return { tone: ACCENT_TONE, title: "รอช่างกดรับทราบงาน", desc: `เข้างาน ${dayText}${team ? ` · แจ้งทีม ${team}` : ""}` };
+    return { tone: ACCENT_TONE, title: "รอผู้รับผิดชอบกดรับทราบงาน", desc: `เข้างาน ${dayText}${ev.responsiblePerson ? ` · ผู้รับผิดชอบ ${ev.responsiblePerson}` : team ? ` · ทีม ${team}` : ""} — รับทราบแล้วจึงยืนยันนัดหมาย` };
+  }
+  if (mode === "admin" && ev.status === "กำลังรอยืนยัน") {
+    return { tone: AMBER, title: "รอผู้รับผิดชอบยืนยันนัดหมาย", desc: `รับทราบแล้ว — รอยืนยันวันเข้างาน ${dayText} (แอดมินกดแทนได้)`, action: { label: "ยืนยันนัดหมายแทน", confirm: true } };
   }
   if (mode === "tech" && mine && ackTracked(ev) && !ackedByMe) {
     return { tone: ACCENT_TONE, title: "กดรับทราบงาน", desc: `เข้างาน ${dayText} — กดปุ่ม “รับทราบงาน” ด้านล่างให้แอดมินรู้ว่าคุณรับงานแล้ว` };
@@ -144,9 +156,20 @@ export function nextStepOf(ev, mode, { mine, ackedByMe } = {}) {
       ? { tone: ACCENT_TONE, title: "นัดหมายแล้ว", desc: `เข้างาน ${dayText}${team ? ` · ทีม ${team}` : ""}` }
       : { tone: ACCENT_TONE, title: `เข้างาน ${dayText}`, desc: "เตรียมอุปกรณ์ตามรายการ แล้วไปตามนัด" };
   }
-  return mode === "admin"
-    ? { tone: ACCENT_TONE, title: "ช่างกำลังทำงาน", desc: "รอช่างแนบเอกสาร แล้วกดขอปิดงาน" }
-    : { tone: ACCENT_TONE, title: "ทำงาน → แนบเอกสาร → ขอปิดงาน", desc: "ถ้ายังไม่เสร็จ กด “งานยังไม่เสร็จ / ต้องนัดใหม่”" };
+  // ✅ (11 ต.ค. 2569 ผู้ใช้: "สถานะที่เขียนว่าช่างกำลังทำงาน ทำให้ตามจริง หรือใช้คำให้สอดคล้อง")
+  //    เดิมขึ้น "ช่างกำลังทำงาน" ทุกงานที่ถึงวันแล้ว แม้ยังไม่มีใครกดเข้างาน — ตอนนี้อิงข้อมูลจริง (checkedInAt)
+  //    และใช้คำชุดเดียวกับแถบขั้นตอน (รับทราบ › เข้างาน › เอกสาร › ขอปิดงาน)
+  if (mode === "admin") {
+    if (ev.checkedInAt) {
+      return { tone: ACCENT_TONE, title: `เข้างานแล้ว ${moment(ev.checkedInAt).format("HH:mm")} · รอเอกสาร`, desc: "รอช่างแนบเอกสารประจำงาน แล้วกดขอปิดงาน" };
+    }
+    if (!ev.team && !ev.resPerson) return { tone: AMBER, title: "ยังไม่มีหัวหน้าทีมเข้างาน", desc: "มอบหมายหัวหน้าทีมในการ์ดนี้ ทีมจึงกดเข้างานได้" };
+    const last = moment(ev.end || ev.start).subtract(ev.allDay && ev.end ? 1 : 0, "days").startOf("day");
+    return moment().startOf("day").isAfter(last)
+      ? { tone: AMBER, title: "เลยวันเข้างาน · ยังไม่กดเข้างาน", desc: `นัดเข้างาน ${dayText}${team ? ` · ทีม ${team}` : ""} — ตรวจสอบกับทีม` }
+      : { tone: ACCENT_TONE, title: "วันนี้ · รอทีมกดเข้างาน", desc: `${team ? `ทีม ${team} · ` : ""}หัวหน้าทีมกดเข้างานพร้อมถ่ายรูปหน้างาน` };
+  }
+  return { tone: ACCENT_TONE, title: "ทำงาน → แนบเอกสาร → ขอปิดงาน", desc: "แนบเอกสารประจำงานให้ครบ แล้วกด “ขอปิดงาน”" };
 }
 
 /** กล่อง "ขั้นตอนถัดไป" — แถบสีซ้าย · หัวข้อ · คำอธิบาย · ปุ่มพาไปทำต่อ */
@@ -178,9 +201,13 @@ function NextStepBox({ step, onConfirm, busy }) {
   );
 }
 
-/** กล่องย่อย — หัวไอคอน + เนื้อหา */
+/**
+ * กล่องย่อย — หัวไอคอน + เนื้อหา
+ * ✅ (10 ต.ค. 2569 ผู้ใช้: "สีสันมันดูเยอะ และรก อ่านยากเกินไป") — พื้นเทาอ่อนเหมือนกันทุกกล่อง
+ *    สีเหลือแค่ไอคอนเล็กหน้าหัวข้อ (เดิมพื้นส้ม/ฟ้า/ส้มเรียงกัน ตัดกันจนอ่านยาก)
+ */
 const Block = ({ color, icon, title, children, action }) => (
-  <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: alpha(color, 0.06), border: `1px solid ${alpha(color, 0.22)}` }}>
+  <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: "#f8fafc", border: "1px solid #e2e8f0" }}>
     <Stack direction="row" alignItems="flex-start" gap={1}>
       <Box sx={{ color, display: "flex", mt: 0.1, "& svg": { fontSize: 18 } }}>{icon}</Box>
       <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -199,7 +226,6 @@ const Block = ({ color, icon, title, children, action }) => (
  */
 export function JobFlowPanel({ event, mode = "tech", onPatched, onStatusUpdate, sx }) {
   const [busy, setBusy] = useState(false);
-  const [fuOpen, setFuOpen] = useState(false);
   if (!event || event.department === "sales") return null;
   const { userId, fname } = me();
   const closed = isClosedJob(event);
@@ -245,34 +271,6 @@ export function JobFlowPanel({ event, mode = "tech", onPatched, onStatusUpdate, 
     );
   }
 
-  // ── ขั้น 5: งานไม่เสร็จ ค้างจัดการ ──
-  if (fu && !closed) {
-    blocks.push(
-      <Block key="fu" color={AMBER} icon={<ReportProblemOutlined />} title={`งานไม่เสร็จ — ${fu.reason}`}
-        action={mode === "admin" ? (
-          <Button size="small" variant="contained" disableElevation disabled={busy}
-            onClick={() => run(() => EventService.ResolveFollowUp(event._id, { resolution: "ลงนัดใหม่แล้ว" }), "บันทึกว่าจัดการแล้ว")}
-            sx={{ flexShrink: 0, bgcolor: BLUE, "&:hover": { bgcolor: "#1d4ed8" }, textTransform: "none", fontWeight: 800, borderRadius: 2, fontSize: "0.76rem", px: 1.25 }}>
-            จัดการแล้ว
-          </Button>
-        ) : null}>
-        {fu.note && <Typography sx={{ fontSize: "0.78rem", color: "#334155", mt: 0.25, wordBreak: "break-word" }}>{fu.note}</Typography>}
-        <Stack direction="row" gap={1.5} flexWrap="wrap" sx={{ mt: 0.5 }}>
-          <Typography sx={{ fontSize: "0.74rem", color: MUTED }}>ผู้รับผิดชอบต่อ: <b style={{ color: INK }}>{fu.nextOwner}</b></Typography>
-          {fu.proposedDate && <Typography sx={{ fontSize: "0.74rem", color: MUTED }}>เสนอนัดใหม่: <b style={{ color: INK }}>{formatThai(moment(fu.proposedDate), "D MMM YYYY")}</b></Typography>}
-        </Stack>
-        <Typography sx={{ fontSize: "0.7rem", color: "#94a3b8", mt: 0.25 }}>
-          แจ้งโดย {fu.reportedBy || "-"} · {formatThai(moment(fu.reportedAt), "D MMM HH:mm")}
-          {mode === "admin" ? " · ลงวันนัดใหม่ในตารางงานแล้วกด “จัดการแล้ว”" : " · รอแอดมินลงนัดใหม่"}
-        </Typography>
-        {mode === "admin" && (
-          <Box component={Link} to="/event" sx={{ display: "inline-flex", alignItems: "center", gap: 0.4, mt: 0.5, fontSize: "0.74rem", fontWeight: 800, color: BLUE, textDecoration: "none" }}>
-            <CalendarMonthOutlined sx={{ fontSize: 15 }} /> เปิดตารางงานเพื่อลงนัดใหม่
-          </Box>
-        )}
-      </Block>,
-    );
-  }
 
   // ── ขั้น 4: ช่างรับทราบงาน ──
   let ackArea = null;
@@ -289,7 +287,7 @@ export function JobFlowPanel({ event, mode = "tech", onPatched, onStatusUpdate, 
       ackArea = (
         <Stack direction="row" alignItems="center" gap={0.6} sx={{ px: 0.5 }}>
           <CheckCircleRounded sx={{ fontSize: 16, color: GREEN }} />
-          <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: "#15803d" }}>
+          <Typography sx={{ fontSize: "0.76rem", fontWeight: 600, color: "#334155" }}>
             รับทราบแล้ว: {acks.map((a) => a.name).join(", ")}
           </Typography>
           <Typography sx={{ fontSize: "0.7rem", color: "#94a3b8" }}>· {formatThai(moment(acks[acks.length - 1].at), "D MMM HH:mm")}</Typography>
@@ -298,111 +296,29 @@ export function JobFlowPanel({ event, mode = "tech", onPatched, onStatusUpdate, 
     }
   }
 
-  // ── ขั้น 5: ปุ่มแจ้งงานไม่เสร็จ (ช่าง) ──
-  const canReport = mode === "tech" && !closed && !pendingApproval && !event.closeRequested && !event.unscheduled && (mine || !userId);
-  const step = event.unscheduled ? null : nextStepOf(event, mode, { mine, ackedByMe });
+  // ✅ (10 ต.ค. 2569) ช่างที่อยู่ในงาน: ขั้นตอน + ปุ่มรับทราบ/เช็คอิน/เช็คเอาต์ รวมอยู่ในกล่อง "ขั้นตอนของฉัน"
+  //    (features/attendance/components/CheckInOutPanel) แล้ว — ไม่แสดงกล่องขั้นตอนถัดไป/ปุ่มรับทราบซ้ำตรงนี้
+  // ✅ (11 ต.ค. 2569 ผู้ใช้: "ทำไมรูปแบบไม่เหมือนกัน ดูสับสน") — ตัดเงื่อนไข mine: คนนอกทีมก็เห็นแถบขั้นตอนเดียวกัน
+  const flowElsewhere = mode === "tech" && !closed && attendanceTracked(event);
+  // แอดมิน: ป้าย "รับทราบแล้ว" บนหัวการ์ดบอกอยู่แล้ว (ชี้ดูชื่อได้) — ไม่ต้องมีบรรทัดซ้ำ (10 ต.ค. 2569 ผู้ใช้: "หน้าดำเนินงานข้อมูลมันดูซ้ำซ้อนและยาวรกเกินไป")
+  if (flowElsewhere || mode === "admin") ackArea = null;
+  let step = event.unscheduled || flowElsewhere || (fu && !closed) ? null : nextStepOf(event, mode, { mine, ackedByMe });
+  // ✅ (11 ต.ค. 2569 ผู้ใช้: "หน้าการดำเนินงานปรับรูปแบบให้คล้ายงานของฉัน") — แอดมิน: งานที่ใช้ระบบเข้างาน
+  //    มีแถบขั้นตอน (รับทราบ › เข้างาน › เอกสาร › ขอปิดงาน) ในการ์ดแล้ว เหลือกล่องนี้เฉพาะขั้นที่มีปุ่มให้กด (อนุมัติแผน/ยืนยันนัด)
+  if (step && mode === "admin" && !closed && attendanceTracked(event) && !step.action) step = null;
+  // งานปิดแล้ว — ป้ายสถานะบนหัวการ์ดบอกอยู่แล้ว ไม่ต้องมีกล่อง "เสร็จสิ้น" ซ้ำ (11 ต.ค. 2569)
+  if (closed) step = null;
   const confirmAppointment = onStatusUpdate ? async () => {
     setBusy(true);
     try { await onStatusUpdate(event._id, { status: "ยืนยันแล้ว", manualStatus: true }); } finally { setBusy(false); }
   } : undefined;
-  if (!step && !blocks.length && !ackArea && !canReport) return null;
+  if (!step && !blocks.length && !ackArea) return null;
 
   return (
     <Stack spacing={1} sx={{ mt: 1.5, ...sx }} onClick={(e) => e.stopPropagation()}>
       <NextStepBox step={step} onConfirm={confirmAppointment} busy={busy} />
       {ackArea}
       {blocks}
-      {canReport && (
-        <Button fullWidth variant="outlined" disabled={busy} startIcon={<EventRepeatOutlined />} onClick={() => setFuOpen(true)}
-          sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, color: "#92400e", borderColor: alpha(AMBER, 0.45), bgcolor: "#fff", "&:hover": { borderColor: AMBER, bgcolor: alpha(AMBER, 0.05) } }}>
-          {fu ? "แจ้งสาเหตุใหม่ / เปลี่ยนวันนัด" : "งานยังไม่เสร็จ / ต้องนัดใหม่"}
-        </Button>
-      )}
-      {fuOpen && (
-        <FollowUpDialog event={event} onClose={() => setFuOpen(false)}
-          onSubmit={(payload) => run(() => EventService.ReportFollowUp(event._id, payload), "ส่งให้แอดมินแล้ว").then(() => setFuOpen(false))} />
-      )}
     </Stack>
-  );
-}
-
-/** ฟอร์ม "งานไม่เสร็จ" — เลือกสาเหตุ (เติมผู้รับผิดชอบต่อให้อัตโนมัติ) · รายละเอียด · วันนัดที่เสนอ */
-function FollowUpDialog({ event, onClose, onSubmit }) {
-  const [reason, setReason] = useState("");
-  const [owner, setOwner] = useState("");
-  const [note, setNote] = useState("");
-  const [date, setDate] = useState("");
-  const [saving, setSaving] = useState(false);
-  const needNote = reason === "อื่นๆ";
-  const ok = reason && owner && (!needNote || note.trim());
-
-  const pickReason = (r) => {
-    setReason(r.key);
-    setOwner(r.owner);
-  };
-  const submit = async () => {
-    if (!ok) return;
-    setSaving(true);
-    await onSubmit({ reason, nextOwner: owner, note: note.trim(), proposedDate: date || null });
-    setSaving(false);
-  };
-
-  const pillSx = (active, color = BLUE) => ({
-    px: 1.4, py: 0.9, borderRadius: 2, border: `1.5px solid ${active ? color : LINE}`, bgcolor: active ? alpha(color, 0.07) : "#fff",
-    textAlign: "left", display: "block", width: "100%", transition: "all .12s", "&:hover": { borderColor: active ? color : "#cbd5e1" },
-  });
-
-  return (
-    <Dialog open onClose={onClose} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: 3 } }}>
-      <Stack direction="row" alignItems="center" gap={1.25} sx={{ px: 2.5, pt: 2, pb: 1.5, borderBottom: `1px solid ${LINE}` }}>
-        <Box sx={{ width: 36, height: 36, borderRadius: 2, display: "grid", placeItems: "center", bgcolor: alpha(AMBER, 0.12), color: AMBER }}>
-          <EventRepeatOutlined sx={{ fontSize: 20 }} />
-        </Box>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 900, fontSize: "1rem", color: INK }}>งานยังไม่เสร็จ / ต้องนัดใหม่</Typography>
-          <Typography noWrap sx={{ fontSize: "0.76rem", color: MUTED }}>{[event.title, event.site || event.company, event.jobNo].filter(Boolean).join(" · ")}</Typography>
-        </Box>
-        <IconButton size="small" onClick={onClose}><Close fontSize="small" /></IconButton>
-      </Stack>
-      <DialogContent sx={{ px: 2.5, py: 2 }}>
-        <Typography sx={{ fontSize: "0.78rem", fontWeight: 800, color: "#334155", mb: 0.75 }}>1. สาเหตุ</Typography>
-        <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0.75 }}>
-          {FOLLOW_UP_REASONS.map((r) => (
-            <ButtonBase key={r.key} onClick={() => pickReason(r)} sx={pillSx(reason === r.key)}>
-              <Typography sx={{ fontSize: "0.82rem", fontWeight: 800, color: reason === r.key ? BLUE : INK }}>{r.key}</Typography>
-              <Typography sx={{ fontSize: "0.68rem", color: MUTED, lineHeight: 1.3 }}>{r.hint}</Typography>
-            </ButtonBase>
-          ))}
-        </Box>
-
-        <Typography sx={{ fontSize: "0.78rem", fontWeight: 800, color: "#334155", mt: 2, mb: 0.75 }}>2. ใครทำขั้นตอนถัดไป</Typography>
-        <Stack direction="row" gap={0.75} flexWrap="wrap">
-          {NEXT_OWNERS.map((o) => (
-            <ButtonBase key={o} onClick={() => setOwner(o)} sx={{
-              px: 1.25, height: 32, borderRadius: 99, fontSize: "0.78rem", fontWeight: 700,
-              border: `1.5px solid ${owner === o ? BLUE : LINE}`, color: owner === o ? BLUE : "#334155", bgcolor: owner === o ? alpha(BLUE, 0.07) : "#fff",
-            }}>{o}</ButtonBase>
-          ))}
-        </Stack>
-
-        <Typography sx={{ fontSize: "0.78rem", fontWeight: 800, color: "#334155", mt: 2, mb: 0.75 }}>
-          3. รายละเอียด {needNote ? <span style={{ color: RED }}>*</span> : <span style={{ color: "#94a3b8", fontWeight: 600 }}>(ถ้ามี)</span>}
-        </Typography>
-        <TextField fullWidth multiline minRows={2} size="small" value={note} onChange={(e) => setNote(e.target.value)}
-          placeholder="เช่น ต้องเปลี่ยนตู้ควบคุม รอของเข้า 3 วัน" />
-
-        <Typography sx={{ fontSize: "0.78rem", fontWeight: 800, color: "#334155", mt: 2, mb: 0.75 }}>
-          4. วันนัดใหม่ที่เสนอ <span style={{ color: "#94a3b8", fontWeight: 600 }}>(ถ้ามี — แอดมินเป็นคนลงตาราง)</span>
-        </Typography>
-        <ThaiDatePicker value={date} onChange={(v) => setDate(v || "")} minDate={moment()} />
-      </DialogContent>
-      <DialogActions sx={{ px: 2.5, py: 1.5, borderTop: `1px solid ${LINE}`, gap: 1 }}>
-        <Button onClick={onClose} sx={{ textTransform: "none", fontWeight: 700, color: MUTED }}>ยกเลิก</Button>
-        <Button variant="contained" disableElevation disabled={!ok || saving} onClick={submit}
-          sx={{ bgcolor: BLUE, "&:hover": { bgcolor: "#1d4ed8" }, textTransform: "none", fontWeight: 800, borderRadius: 2, px: 2.5 }}>
-          {saving ? "กำลังส่ง..." : "ส่งให้แอดมิน"}
-        </Button>
-      </DialogActions>
-    </Dialog>
   );
 }

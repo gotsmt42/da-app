@@ -10,11 +10,12 @@ import { getActivityLogMeta } from "@/shared/utils/activityLogMeta";
 import { classifyJob, getJobClassMeta } from "@/shared/utils/jobClassification";
 import { overviewResponsibleOf } from "@/shared/utils/contractOverdue";
 import { mountThaiDatePickers } from "@/shared/components/mountThaiDatePickers";
-import { jobInfoSectionHtml, bindJobInfo, readJobInfo } from "./jobInfoSection";
+import { bindJobInfo, readJobInfo } from "./jobInfoSection";
 import { domFormDraft } from "@/shared/utils/formDraft";
 import { createElement } from "react";
 import { createRoot } from "react-dom/client";
 import SitePhotos from "@/shared/ui/SitePhotos";
+import CheckInOutPanel from "@/features/attendance/components/CheckInOutPanel";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { can } from "@/shared/utils/roles";
 // ✅ พิกัดหน้างาน — ใช้ตัวช่วยชุดเดียวกับหน้าอื่น (ดูหัวไฟล์ SiteMapLink.js)
@@ -1415,36 +1416,41 @@ export const getEditEvent = async ({
     const rejected = eventApprovalState === "rejected";
     const pending = eventApprovalState === "pending";
     const closeReq = Boolean(xp.closeRequested) && eventStatus !== "ดำเนินการเสร็จสิ้น";
-    const tick = '<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="#fff" d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>';
+    const tick = '<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path fill="#fff" d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>';
+    // ✅ (11 ต.ค. 2569 ผู้ใช้: "สายขั้นตอนควรเป็นสีสัน รูปแบบเดียวกันทั้งหมดที่เกี่ยวข้องกัน")
+    //    ใช้ชุดสีเดียวกับแถบขั้นตอนในการ์ดงาน (CheckInOutPanel → MiniSteps):
+    //    ผ่านแล้ว = วงเขียว ✓ + เส้นเขียว · ขั้นปัจจุบัน = วงน้ำเงินมีเลข + วงแหวน · ยังไม่ถึง = วงขาวขอบเทา
+    //    (ขั้นสุดท้าย "เสร็จสิ้น" ถึงแล้ว = ผ่านแล้ว เป็นสีเขียว) · ไม่อนุมัติ = แดงทั้งเส้นเหมือนเดิม
     const cells = STEPS.map((st, i) => {
-      const done = !rejected && i <= idx;
-      const cur = !rejected && i === idx;
-      const c = rejected ? "#dc2626" : done ? st.color : "#e2e8f0";
+      const done = !rejected && (i < idx || (i === idx && i === STEPS.length - 1));
+      const cur = !rejected && i === idx && !done;
+      const c = rejected ? "#dc2626" : done ? "#16a34a" : cur ? "#2563eb" : "#e2e8f0";
       const date = done && st.at && moment(st.at).isValid() ? formatThai(moment(st.at), "D MMM YY") : "";
       const sub = i === STEPS.length - 1 && closeReq ? '<span class="ee-step-flag">ขอปิดงานแล้ว · รออนุมัติ</span>'
         : i === 0 && pending ? '<span class="ee-step-flag">รออนุมัติงาน</span>'
           : i === 0 && rejected ? '<span class="ee-step-flag ee-step-flag--red">ไม่อนุมัติ</span>' : (date || "&nbsp;");
       return `
         <div class="ee-step${done ? " is-done" : ""}${cur ? " is-cur" : ""}">
-          ${i > 0 ? `<span class="ee-step-line" style="background:${!rejected && i <= idx ? c : "#e2e8f0"}"></span>` : ""}
-          <span class="ee-step-dot" style="${done || rejected ? `background:${c};border-color:${c};` : ""}${cur ? `box-shadow:0 0 0 4px ${c}2e;` : ""}">${done ? tick : `<b>${i + 1}</b>`}</span>
+          ${i > 0 ? `<span class="ee-step-line" style="background:${rejected ? "#dc2626" : i <= idx ? "#16a34a" : "#e2e8f0"}"></span>` : ""}
+          <span class="ee-step-dot" style="${done || cur || rejected ? `background:${c};border-color:${c};` : ""}${cur ? `box-shadow:0 0 0 3px ${c}2e;` : ""}">${done ? tick : `<b${cur || rejected ? ' style="color:#fff"' : ""}>${i + 1}</b>`}</span>
           <span class="ee-step-label">${st.label}</span>
           <span class="ee-step-date">${sub}</span>
         </div>`;
     }).join("");
     return `
     <style>
-      .ee-stepper { display:flex; align-items:flex-start; margin: 0 0 12px; padding: 12px 8px 10px; background:#fff; border:1px solid #e2e8f0; border-radius:12px; }
+      .ee-stepper { display:flex; align-items:flex-start; margin: 0 0 12px; padding: 8px 6px 6px; background:#fff; border:1px solid #e2e8f0; border-radius:12px; }
       .ee-step { flex:1; position:relative; display:flex; flex-direction:column; align-items:center; text-align:center; min-width:0; }
-      .ee-step-line { position:absolute; top:11px; right:50%; width:100%; height:2px; z-index:0; }
-      .ee-step-dot { position:relative; z-index:1; width:24px; height:24px; border-radius:50%; border:2px solid #e2e8f0; background:#fff; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
-      .ee-step-dot b { font-size:11px; color:#94a3b8; font-weight:800; }
-      .ee-step-label { margin-top:5px; font-size:12px; font-weight:800; color:#94a3b8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
-      .ee-step.is-done .ee-step-label { color:#0f172a; }
-      .ee-step-date { font-size:11px; color:#64748b; min-height:16px; }
+      .ee-step-line { position:absolute; top:7px; right:50%; width:100%; height:2px; z-index:0; }
+      .ee-step-dot { position:relative; z-index:1; width:16px; height:16px; border-radius:50%; border:1.5px solid #cbd5e1; background:#fff; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
+      .ee-step-dot b { font-size:9.5px; color:#94a3b8; font-weight:700; }
+      .ee-step-label { margin-top:3px; font-size:11px; font-weight:500; color:#94a3b8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+      .ee-step.is-done .ee-step-label { color:#15803d; }
+      .ee-step.is-cur .ee-step-label { color:#2563eb; font-weight:700; }
+      .ee-step-date { font-size:10.5px; color:#64748b; min-height:14px; }
       .ee-step-flag { display:inline-block; margin-top:2px; padding:0 6px; border-radius:999px; font-size:10.5px; font-weight:800; color:#b45309; background:#fffbeb; border:1px solid #fde68a; white-space:nowrap; }
       .ee-step-flag--red { color:#b91c1c; background:#fef2f2; border-color:#fecaca; }
-      @media (max-width: 480px) { .ee-step-label { font-size:11px; } }
+      @media (max-width: 480px) { .ee-step-label { font-size:10.5px; } }
     </style>
     <div class="ee-stepper" role="list" aria-label="ขั้นตอนงาน">${cells}</div>`;
   })();
@@ -1879,6 +1885,11 @@ export const getEditEvent = async ({
   <!-- ── Body ── -->
   <div id="ee-body">
 
+    ${/* ✅ (10 ต.ค. 2569 ผู้ใช้: "ให้มีปุ่มกดเช็คอินงานในหน้า editEvent ได้ด้วย จุดวางให้มองง่ายชัดเจน")
+         บนสุดของเนื้อหา — กล่อง "ขั้นตอนของฉัน" ตัวเดียวกับการ์ดงาน (รับทราบ → เช็คอิน → เช็คเอาต์ → ขอปิดงาน)
+         แสดงเฉพาะช่างที่อยู่ในงาน / งานที่มีบันทึกเข้า-ออกแล้ว (คอมโพเนนต์ตัดสินเอง ไม่มีอะไร = ไม่กินที่) */""}
+    ${ev.extendedProps?.department === "sales" ? "" : `<div id="ee-checkinMount" data-no-draft></div>`}
+
     <!-- ✅ (8 ต.ค. 2569 ผู้ใช้: "หาจุดวางที่จะกดไปหน้าดำเนินงานได้ง่าย ชัดเจน · อันเดิมซ่อนอยู่ในเมนู ⋯")
          (9 ต.ค. 2569: "ไม่ควรต้องเลื่อนลงมาหา ให้อยู่โซนบนเจอทันที") — บนสุดของเนื้อหา ใต้หัวกล่อง/สถานะ -->
     ${canViewOperation ? `
@@ -1886,7 +1897,7 @@ export const getEditEvent = async ({
       <span style="flex-shrink:0;width:36px;height:36px;border-radius:10px;background:#2563eb;color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px">📊</span>
       <span style="flex:1;min-width:0">
         <span style="display:block;font-size:14.5px;font-weight:800;color:#1e3a8a">ไปที่หน้าการดำเนินงาน</span>
-        <span style="display:block;font-size:12px;color:#475569;margin-top:1px">เช็คอิน · แนบเอกสาร · ใบเสนอราคา · ขอปิดงาน</span>
+        <span style="display:block;font-size:12px;color:#475569;margin-top:1px">แนบเอกสาร · ใบเสนอราคา · ขอปิดงาน</span>
       </span>
       <span style="flex-shrink:0;font-size:22px;color:#2563eb;font-weight:700">›</span>
     </button>` : ""}
@@ -1956,7 +1967,9 @@ export const getEditEvent = async ({
     </div>
     ` : ""}
 
-    ${stepperHtml}
+    ${/* 🧹 (11 ต.ค. 2569) สายสถานะงานย้ายไปอยู่ในกล่องบนสุด (#ee-checkinMount · CheckInOutPanel statusSteps) แล้ว
+         — คงไว้เฉพาะงานที่กล่องนั้นไม่แสดง (นัดฝ่ายขาย / งานยังไม่ลงวัน) */""}
+    ${ev.extendedProps?.department === "sales" || ev.extendedProps?.unscheduled ? stepperHtml : ""}
 
 
 
@@ -2282,10 +2295,8 @@ export const getEditEvent = async ({
       </div>
     </section>
 
-    ${ev.extendedProps?.department === "sales" ? "" : jobInfoSectionHtml({
-      jobNo: ev.extendedProps?.jobNo, priority: ev.extendedProps?.priority, dueDate: ev.extendedProps?.dueDate,
-      equipment: ev.extendedProps?.equipment, infoPending: ev.extendedProps?.infoPending, infoPendingNote: ev.extendedProps?.infoPendingNote,
-    }, "ee", isClosedForTech)}
+    ${/* 🧹 (10 ต.ค. 2569 ผู้ใช้: "ข้อมูล Job ตัดออก") — ไม่แสดงการ์ด "ข้อมูล Job" (ความเร่งด่วน/วันครบกำหนด/อุปกรณ์/รอข้อมูล)
+         ในฟอร์มแก้ไขงานแล้ว · ค่าเดิมในงานไม่ถูกลบ (ตอนบันทึกอ่านค่าเฉพาะเมื่อมีช่อง #ji-dueDate — ดู Save ด้านล่าง) */""}
 
     ${/* ✅ (10 ต.ค. 2569 ผู้ใช้: "อัพไฟล์รูปให้ทำใน editEvent ด้วย แล้วให้ข้อมูลเชื่อมต่อกัน")
          รูปและไฟล์หน้างาน — ชุดเดียวกับการ์ดในหน้าการดำเนินงาน/งานของฉัน (Events.sitePhotoFiles) อัปจากที่ไหนก็เห็นทุกที่
@@ -2297,18 +2308,16 @@ export const getEditEvent = async ({
     <section class="ee-card">
       <div class="ee-card-head">
         <span class="ee-card-ico" aria-hidden="true">📄</span>
-        <div class="ee-card-titles"><h4>เอกสาร</h4><p>เลขที่อ้างอิงและรายละเอียดงาน</p></div>
+        <div class="ee-card-titles"><h4>รายละเอียดงาน</h4><p>หมายเหตุ/รายละเอียดเพิ่มเติมของงานนี้</p></div>
         ${!isAdminOrManagerUser && canEditDocFields ? `<span class="ee-card-badge">✏️ แก้ไขได้</span>` : ""}
       </div>
       <div class="ee-card-body">
     <!-- ⚠️ เดิมเป็นกริด 2 คอลัมน์คู่กับช่อง "ชื่อเรื่อง" ที่ถูกตัดออกไปแล้ว — เหลือช่องเดียวในกริด 2 ช่อง
          ทำให้ช่องกินแค่ครึ่งซ้ายและมีที่ว่างค้างครึ่งขวาทั้งแถว จึงเอาออกจากกริดให้เต็มความกว้างไปเลย -->
+    <!-- 🧹 (10 ต.ค. 2569 ผู้ใช้: "ตัดเลขที่อ้างอิงออก") — ไม่แสดงช่องแล้ว · เก็บค่าเดิมไว้ในช่องซ่อน
+         ตอนบันทึกจึงส่งค่าเดิมกลับไป ไม่ล้างเลขที่เคยกรอกไว้ -->
+    <input id="editdocNo" type="hidden" value="${attrHtml(evendocNo)}">
     <div class="ee-field">
-      <label>เลขที่อ้างอิง (Doc No.)</label>
-      <input id="editdocNo" type="text" value="${attrHtml(evendocNo)}" placeholder="เช่น DOC-2026-001" ${canEditDocFields ? "" : "disabled"}>
-    </div>
-    <div class="ee-field">
-      <label>รายละเอียดงาน</label>
       <textarea id="editDescription" rows="8" placeholder="กรอกรายละเอียดงาน..." ${canEditDocFields ? "" : "disabled"}></textarea>
       <div class="ee-char-count" id="charCount">0 ตัวอักษร</div>
     </div>
@@ -2540,7 +2549,9 @@ export const getEditEvent = async ({
       // รูปหน้างาน: ถอด React root · มีการเพิ่ม/ลบ → โหลดข้อมูลปฏิทินใหม่ให้การ์ดอื่นเห็นตรงกัน
       const photosRoot = popup.__sitePhotosRoot;
       if (photosRoot) setTimeout(() => photosRoot.unmount(), 0);
-      if (popup.__sitePhotosChanged) fetchEventsFromDB?.();
+      const checkinRoot = popup.__checkinRoot;
+      if (checkinRoot) setTimeout(() => checkinRoot.unmount(), 0);
+      if (popup.__sitePhotosChanged || popup.__checkinChanged) fetchEventsFromDB?.();
     },
 
     didOpen: () => {
@@ -2565,6 +2576,51 @@ export const getEditEvent = async ({
             confirmFn: (msg) => Promise.resolve(window.confirm(msg)),
             sx: { mt: 0 },
           }));
+        }
+      }
+      // ✅ เช็คอิน/เช็คเอาต์ (React) — บนสุดของฟอร์ม · ⚠️ embedded: ห้ามเรียก Swal ซ้อน (จะปิดฟอร์มนี้ทิ้ง)
+      {
+        const host = document.getElementById("ee-checkinMount");
+        if (host) {
+          const popup = Swal.getPopup();
+          const root = createRoot(host);
+          popup.__checkinRoot = root;
+          const baseEvent = {
+            ...(ev.extendedProps || {}), _id: eventId, title: eventTitle,
+            start: ev.start, end: ev.end, allDay: ev.allDay,
+          };
+          const render = (evt) => root.render(createElement(CheckInOutPanel, {
+            event: evt,
+            user: userData,
+            embedded: true,
+            // ✅ (11 ต.ค. 2569 ผู้ใช้: "สายขั้นตอนควรเป็นสีสัน รูปแบบเดียวกันทั้งหมด") — แบบย่อเหมือนการ์ดงาน
+            //    (ผู้รับผิดชอบ/หัวหน้าทีมอยู่ส่วนบนของฟอร์มแล้ว)
+            compact: true,
+            // ✅ (11 ต.ค. 2569 ผู้ใช้: "สายขั้นตอนซ้ำซ้อน ตัดส่วนนี้ออก ใช้คำนี้ไปแทนข้างบน") → สายสถานะงาน 4 ขั้นอยู่ในกล่องนี้แทน
+            statusSteps: true,
+            sx: { mt: 0, mb: 1.5 },
+            onChanged: () => { popup.__checkinChanged = true; },
+            // รับทราบงานแล้ว → server คืนงานทั้งกลุ่ม · อัปเดตกล่องด้วยข้อมูลใหม่ (acks)
+            onPatched: (events) => {
+              popup.__checkinChanged = true;
+              const mine = (events || []).find((x) => String(x._id) === String(eventId));
+              if (mine) render({ ...evt, ...mine, start: evt.start, end: evt.end, allDay: evt.allDay });
+              // ✅ (11 ต.ค. 2569) กดเข้างาน → server เปลี่ยนสถานะเป็น "กำลังดำเนินการ" — ช่องสถานะในฟอร์มต้องตามด้วย
+              //    ไม่งั้นกด "บันทึก" ทีหลังจะส่งสถานะเก่า (ยืนยันแล้ว) ทับกลับ · ช่างเปลี่ยนสถานะนี้เองไม่ได้ (ล็อกช่อง)
+              const sel = document.getElementById("editStatus");
+              if (mine?.status && sel && sel.value !== mine.status) {
+                if (![...sel.options].some((o) => o.value === mine.status)) sel.insertAdjacentHTML("beforeend", optionHtml(mine.status, false));
+                if (!isAdminOrManagerUser && !TECH_EDITABLE_STATUSES.includes(mine.status)) {
+                  [...sel.options].forEach((o) => { if (o.value !== mine.status) o.remove(); });
+                  sel.disabled = true;
+                  sel.title = "สถานะนี้เปลี่ยนได้เฉพาะแอดมิน/manager";
+                }
+                sel.value = mine.status;
+                sel.dispatchEvent(new Event("change", { bubbles: true }));
+              }
+            },
+          }));
+          render(baseEvent);
         }
       }
       /**

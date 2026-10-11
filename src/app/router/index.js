@@ -47,6 +47,7 @@ const About = lazyWithRetry(() => import("@/features/settings/pages/Settings.js"
 //    คำว่า report ไปเป็น id แล้วเปิดหน้าการดำเนินงานที่กรองหางานชื่อ report แทน
 const JobReport = lazyWithRetry(() => import("@/features/operation/pages/JobReport.js"));
 const JobIntake = lazyWithRetry(() => import("@/features/operation/pages/JobIntake.js"));
+const AttendancePage = lazyWithRetry(() => import("@/features/attendance/pages/AttendancePage.js"));
 // ⚠️ ลบหน้า demo ของ template MaterialPro ออกแล้ว (Alerts/Badges/Buttons/Cards/Grid/Forms/
 // Breadcrumbs) — เป็นหน้าตัวอย่างที่ติดมากับ template ตั้งแต่ตอนสร้างโปรเจกต์ ไม่เกี่ยวกับธุรกิจ
 // ไม่มีลิงก์จากเมนูไหนเลย และไม่มีใคร import ต่อ
@@ -379,6 +380,16 @@ const ThemeRoutes = [
     </Suspense>
   ),
   title: "Job Intake",
+},
+{
+  // ✅ (10 ต.ค. 2569) เข้า-ออกงาน — แอดมินเห็นทุกคน · ช่างเห็นประวัติของตัวเอง (server กรองให้)
+  path: "attendance",
+  element: (
+    <Suspense fallback={<PageLoader />}>
+      <AttendancePage />
+    </Suspense>
+  ),
+  title: "Attendance",
 },
 {
   // 🧹 เมนู "ติดตามงาน" รวมเข้า "รับงาน" แล้ว (9 ต.ค. 2569) — ลิงก์เก่าพาไปหน้า "รับงาน"
