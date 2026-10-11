@@ -1984,7 +1984,8 @@
 }
 
 /* ระยะห่างระหว่างแถวเครื่องมือกับหัวเดือนด้านล่าง (ผู้ใช้: ชิดเกินไป) */
-.modern-calendar-container .event-toolbar-row { margin-bottom: 28px !important; }
+/* ✅ (11 ต.ค. 2569 ผู้ใช้: "ระยะจากปุ่มถึงเดือนห่างไป ให้ชิดขึ้น") เดิม 28px */
+.modern-calendar-container .event-toolbar-row { margin-bottom: 10px !important; }
 .ec-wide-toolbar .event-toolbar-row { gap: 10px; }
 
 /* ── ช่องเลือกแบบเมนูสวย (SelectField) ในแถบตัวกรองปฏิทิน ── */
@@ -2153,4 +2154,13 @@
 @media (max-width: 600px) {
   .event-toolbar-row { flex-wrap: wrap; row-gap: 8px; }
   .event-toolbar-row .event-search-input { flex: 1 1 100%; order: -1; min-height: 42px; }
+}
+
+/* ✅ (11 ต.ค. 2569 ผู้ใช้: "หน้า Event จัดวางปุ่มใหม่ให้สวย") มือถือแถวที่ 2:
+   [รายการ|ปฏิทิน] ชิดซ้าย ······ [กาง/ย่อ][ตัวกรอง][โหมดสี] ชิดขวา ขนาดเท่ากัน */
+@media (max-width: 600px) {
+  .event-toolbar-row > button:first-of-type { margin-left: auto; }
+  .event-toolbar-row > .filter-toggle-btn,
+  .event-toolbar-row > .toolbar-icon-btn { width: 40px; height: 40px; border-radius: 12px; }
+  .event-toolbar-row .tb-label { display: none; }
 }

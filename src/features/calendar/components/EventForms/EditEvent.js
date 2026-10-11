@@ -1904,7 +1904,9 @@ export const getEditEvent = async ({
 
     <!-- ✅ สถานะอนุมัติ — อยู่บนสุดของฟอร์ม เหนือกล่องสัญญาด้วยซ้ำ เพราะเป็นข้อเท็จจริงสำคัญที่สุดของ
          งานนี้ตอนยังไม่ approved (งานที่สร้างโดยคนที่ไม่ใช่แอดมิน/manager ต้องรอการอนุมัติก่อน) -->
-    ${eventApprovalState === "pending" ? `
+    ${/* ✅ (11 ต.ค. 2569 ผู้ใช้: "ให้กดอนุมัติผ่านตรงนี้ได้") งานบริการกดอนุมัติ/ไม่อนุมัติได้ที่แถบขั้นตอนบนสุด (#ee-checkinMount)
+         แล้ว — กล่องนี้เหลือเฉพาะนัดฝ่ายขาย/งานยังไม่ลงวัน ที่ไม่มีแถบขั้นตอน */""}
+    ${eventApprovalState === "pending" && (ev.extendedProps?.department === "sales" || ev.extendedProps?.unscheduled) ? `
     <div class="ee-approval-box ee-approval-box--pending">
       <b>⏳ งานนี้ยังรออนุมัติ</b>
       ${eventApprovalRequestedBy ? `${attrHtml(eventApprovalRequestedBy)} ส่งงานนี้เข้าระบบ` : "รอการอนุมัติ"}${eventApprovalRequestedAt ? ` เมื่อ ${formatThai(moment(eventApprovalRequestedAt).locale("th"), "D MMM YYYY HH:mm")}` : ""}

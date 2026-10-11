@@ -290,6 +290,34 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
     }
   };
 
+  // ✅ (11 ต.ค. 2569 ผู้ใช้: "ให้กดอนุมัติผ่านตรงนี้ได้") — ผู้มีสิทธิ์อนุมัติกดอนุมัติ/ไม่อนุมัติงานได้จากแถบขั้นตอน
+  const decideApproval = async (approve) => {
+    let reason = "";
+    if (!approve) {
+      if (embedded) {
+        const v = window.prompt("เหตุผลที่ไม่อนุมัติ (ถ้ามี)");
+        if (v === null) return;
+        reason = v.trim();
+      } else {
+        const r = await Swal.fire({ title: "ไม่อนุมัติงานนี้", input: "text", inputPlaceholder: "เหตุผล (ถ้ามี)", showCancelButton: true,
+          confirmButtonText: "ไม่อนุมัติ", cancelButtonText: "ยกเลิก", confirmButtonColor: "#dc2626" });
+        if (!r.isConfirmed) return;
+        reason = (r.value || "").trim();
+      }
+    }
+    setAcking(true);
+    try {
+      const res = await EventService.DecideApproval(event._id, approve ? "approve" : "reject", reason);
+      onPatched?.(res?.events || []);
+      refreshAppBadges();
+      notify({ title: approve ? "อนุมัติงานแล้ว" : "ไม่อนุมัติงานแล้ว", text: approve ? "แจ้งผู้รับผิดชอบให้กดรับทราบงาน" : "", timer: 1600 });
+    } catch (err) {
+      notify({ icon: "error", title: "ไม่สำเร็จ", text: err?.response?.data?.message || "กรุณาลองใหม่" });
+    } finally {
+      setAcking(false);
+    }
+  };
+
   const decline = async (reason) => {
     setAcking(true);
     try {
@@ -389,7 +417,21 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
     const day = formatThai(moment(event.start), "D MMM");
     if (closed) line = <Line icon={<TaskAltRounded />} tone="#16a34a" right={logLink}>ปิดงานแล้ว{event.closeApprovedBy ? ` · อนุมัติโดย ${event.closeApprovedBy}` : ""}</Line>;
     else if (event.approvalStatus === "rejected") line = <Line icon={<InfoOutlined />} tone="#dc2626">ไม่อนุมัติงาน{event.approvalRejectReason ? ` — ${event.approvalRejectReason}` : ""}</Line>;
-    else if (pendingApproval) line = <Line icon={<HourglassTopRounded />} tone="#d97706">รอแอดมินอนุมัติงาน</Line>;
+    else if (pendingApproval) {
+      line = isApprover ? (
+        <Box>
+          <Typography sx={{ fontSize: "0.78rem", color: MUTED, mb: 0.75 }}>
+            {event.approvalRequestedBy ? `${event.approvalRequestedBy} ส่งงานนี้เข้าระบบ · ` : ""}รออนุมัติงาน
+          </Typography>
+          <Stack direction="row" gap={0.75}>
+            <Button variant="contained" disableElevation disabled={acking} onClick={() => decideApproval(true)} startIcon={<TaskAltRounded />}
+              sx={{ ...MBTN.success, minHeight: 40, flex: 2 }}>{acking ? "กำลังบันทึก…" : "อนุมัติงาน"}</Button>
+            <Button variant="outlined" disabled={acking} onClick={() => decideApproval(false)}
+              sx={{ ...MBTN.outline("#dc2626"), minHeight: 40, flex: 1 }}>ไม่อนุมัติ</Button>
+          </Stack>
+        </Box>
+      ) : <Line icon={<HourglassTopRounded />} tone="#d97706">รอแอดมินอนุมัติงาน</Line>;
+    }
     else if (event.closeRequested) line = <Line icon={<HourglassTopRounded />} tone="#d97706" right={logLink}>ส่งขอปิดงานแล้ว · รอแอดมินตรวจและอนุมัติปิดงาน</Line>;
     else if (checkin) {
       const b = locationBadge(checkin.checkIn);

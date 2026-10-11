@@ -2558,6 +2558,9 @@ function EventCalendar() {
                 {statusLegend.map((s) => (
                   <option key={s.label} value={`status:${s.label}`}>{s.label}</option>
                 ))}
+                {/* ✅ (11 ต.ค. 2569 ผู้ใช้: "ตัวเลือกรออนุมัติ/ไม่อนุมัติในตัวกรองสถานะ เอากลับมา") */}
+                <option value="approval:pending">⏳ รออนุมัติ</option>
+                <option value="approval:rejected">❌ ไม่อนุมัติ</option>
               </SelectField>
 
               <SelectField
@@ -3082,7 +3085,9 @@ function EventCalendar() {
             // ✅ ป้าย "รออนุมัติ/ไม่อนุมัติ" — เป็นบรรทัดแรกสุดของการ์ด ไม่ใช่ไอคอนมุมเล็กๆ อีกอันเพราะ
             // การ์ดมีไอคอนมุมอยู่แล้ว 2 จุด (สถานะ/กลุ่มงานหลายวัน) เพิ่มอีกจุดจะอ่านยากเกินไปบนจอเล็ก —
             // นี่คือข้อมูลสำคัญที่สุดของการ์ดตอนที่ยังไม่ approved จึงควรเห็นชัดสุดเป็นบรรทัดแรก
-            const approvalPillHtml = approvalState !== "approved"
+            // 🧹 (11 ต.ค. 2569 ผู้ใช้: "⏳ รออนุมัติให้ตัดออก") — ไม่แสดงป้ายรออนุมัติบนการ์ดแล้ว (จัดการที่หน้าคำขอลงงาน)
+            //    ยังคงป้าย "❌ ไม่อนุมัติ" ไว้ เพราะเจ้าของงานต้องแก้แล้วส่งใหม่
+            const approvalPillHtml = approvalState === "rejected"
               ? `<div style="display:inline-block; font-size:0.72em; font-weight:700; padding:0 5px; border-radius:4px; margin-bottom:2px; background:${approvalState === "pending" ? "rgba(245,158,11,.9)" : "rgba(239,68,68,.9)"}; color:#fff;">${approvalState === "pending" ? "⏳ รออนุมัติ" : "❌ ไม่อนุมัติ"}</div>`
               : "";
 
@@ -3640,10 +3645,6 @@ function EventCalendar() {
 
           <div className="ec-legend-group">
             <div className="ec-legend-group-title">การอนุมัติ</div>
-            <div className="ec-legend-item">
-              <span className="ec-legend-icon">⏳</span>
-              <span>รออนุมัติ — แอดมิน/manager ยังไม่ได้อนุมัติ ทำงานต่อได้แต่ยังปิดงานไม่ได้</span>
-            </div>
             <div className="ec-legend-item">
               <span className="ec-legend-icon">❌</span>
               <span>ไม่อนุมัติ — แก้ไขข้อมูลแล้วบันทึก ระบบจะส่งขออนุมัติใหม่ให้อัตโนมัติ</span>
