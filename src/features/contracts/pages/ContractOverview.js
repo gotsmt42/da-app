@@ -1608,7 +1608,7 @@ export default function ContractOverview() {
   // c.key ซึ่งเป็น string คงที่ ไม่ใช่ object reference ที่เปลี่ยนทุกครั้งที่ fetch ใหม่ และ editValue
   // เป็น state แยกต่างหาก ไม่ถูกเขียนทับจากข้อมูลที่ fetch มาใหม่)
   useEffect(() => {
-    const interval = setInterval(() => fetchData(true), 15000);
+    const interval = setInterval(() => fetchData(true), 60000); // (11 ต.ค. 2569) 15→60 วิ ลดโหลดเซิร์ฟเวอร์
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -2742,7 +2742,7 @@ const Operation = () => {
     if (!currentUser) return;
     const interval = setInterval(() => {
       fetchEventsFromDB(true); // silent refresh
-    }, 15000);
+    }, 60000); // (11 ต.ค. 2569) 15→60 วิ ลดโหลดเซิร์ฟเวอร์
     return () => clearInterval(interval);
   }, [currentUser]);
 

@@ -282,7 +282,7 @@ export default function MyJobs() {
 
   // ✅ รีเฟรชอัตโนมัติทุก 15 วินาที เพื่อให้เห็นผลอนุมัติ/ไม่อนุมัติปิดงานจากแอดมินแบบ realtime
   useEffect(() => {
-    const interval = setInterval(() => fetchJobs(true), 15000);
+    const interval = setInterval(() => fetchJobs(true), 60000); // (11 ต.ค. 2569) 15→60 วิ — เรียลไทม์ด้านบนรับหน้าที่หลักแล้ว ลดโหลดเซิร์ฟเวอร์
     return () => clearInterval(interval);
   }, [fetchJobs]);
 

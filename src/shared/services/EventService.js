@@ -27,6 +27,10 @@ const withOptionalFile = async (fields, file, fileField) => {
   return [formData, { headers: { "Content-Type": "multipart/form-data" } }];
 };
 
+/** คำขอที่กำลังรออยู่ (แชร์ให้ผู้เรียกพร้อมกัน) — ดู getEventOp */
+const inflightEventOp = new Map();
+const inflightDrafts = new Map();
+
 const EventService = {
   /**
    * @param {object} [opts]
@@ -58,20 +62,23 @@ const EventService = {
    *   ตามที่ผู้ใช้ระบุ หน้าอื่นไม่ต้องส่งมา จะได้ตัวกรองเดิมทุกประการ (ดู GET /event-op ฝั่ง server)
    */
   async getEventOp(opts = {}) {
-    try {
-      const response = await API.get(`/events/event-op`, {
-        params: {
-          ...(opts.scope ? { scope: opts.scope } : {}),
-          ...(opts.dept ? { dept: opts.dept } : {}),
-          ...(opts.slim ? { slim: 1 } : {}),
-          ...(opts.detail ? { detail: 1 } : {}),
-        },
-      });
-      return response.data;
-    } catch (error) {
-      console.error("Error fetching user events:", error);
-      throw error;
-    }
+    const params = {
+      ...(opts.scope ? { scope: opts.scope } : {}),
+      ...(opts.dept ? { dept: opts.dept } : {}),
+      ...(opts.slim ? { slim: 1 } : {}),
+      ...(opts.detail ? { detail: 1 } : {}),
+    };
+    // ✅ (11 ต.ค. 2569 ผู้ใช้: "ตอนนี้ช้ามากๆ") — หลายส่วนของหน้าจอ (หน้าแรก · ป้ายตัวเลข · แจ้งเตือน · หน้าที่เปิดอยู่)
+    //    ยิง event-op พร้อมกันทีละหลายครั้ง แต่ละครั้งเซิร์ฟเวอร์ต้องอ่าน/ส่งงานทั้งก้อน → คำขอที่ "เหมือนกัน
+    //    และกำลังรออยู่" ใช้คำตอบเดียวกัน (ยิงจริงครั้งเดียว) · ไม่เก็บแคชหลังได้คำตอบ ข้อมูลจึงสดเสมอ
+    const key = JSON.stringify(params);
+    if (inflightEventOp.has(key)) return inflightEventOp.get(key);
+    const p = API.get(`/events/event-op`, { params })
+      .then((response) => response.data)
+      .catch((error) => { console.error("Error fetching user events:", error); throw error; })
+      .finally(() => inflightEventOp.delete(key));
+    inflightEventOp.set(key, p);
+    return p;
   },
 
   /**
@@ -327,7 +334,12 @@ const EventService = {
       if (opts.scope) params.scope = opts.scope;
       // ✅ หน้า "รับงาน" ขอรวมงานที่ยกเลิกแล้วด้วย (แท็บ "ยกเลิก") — ที่อื่นไม่ส่ง = server ตัดออกให้
       if (opts.includeCancelled) params.includeCancelled = "1";
-      const response = await API.get(`/events/drafts`, { params });
+      // ✅ คำขอเดียวกันที่กำลังรออยู่ ใช้คำตอบเดียวกัน (ดู getEventOp)
+      const key = JSON.stringify(params);
+      if (!inflightDrafts.has(key)) {
+        inflightDrafts.set(key, API.get(`/events/drafts`, { params }).finally(() => inflightDrafts.delete(key)));
+      }
+      const response = await inflightDrafts.get(key);
       return response.data;
     } catch (error) {
       console.error("Error fetching draft events:", error);
