@@ -36,7 +36,7 @@ import EventService from "@/shared/services/EventService";
 import useRealtime from "@/shared/realtime/useRealtime";
 import { useAuth } from "@/features/auth/AuthContext";
 import { can } from "@/shared/utils/roles";
-import { isParticipant, isClosedJob, isAckedBy, ackTracked, attendanceTracked, isConfirmedJob } from "@/shared/utils/jobFlow";
+import { isParticipant, isClosedJob, isAckedBy, ackTracked, attendanceTracked, isConfirmedJob, FLOW_SINCE } from "@/shared/utils/jobFlow";
 import { refreshAppBadges } from "@/shared/hooks/useAppBadges";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { INK, INK_2, MUTED, FAINT, SURFACE, ACCENT, LINE } from "@/shared/ui/PageKit";
@@ -50,7 +50,8 @@ import AttendanceList from "./AttendanceList";
 // ✅ (11 ต.ค. 2569 ผู้ใช้: "เพิ่มสายสถานะงานยืนยันแล้ว · การกดยืนยันแล้วควรต่อจากการกดรับทราบอีกขั้น"
 //     + "ทำให้ช่างโฟกัสกับขั้นตอนทั้งหมดจนจบงาน เพื่อติดตาม")
 //    รับทราบ (ช่าง) › ยืนยันนัด (แอดมิน = สถานะ "ยืนยันแล้ว" ของงาน) › เข้างาน › เอกสาร › ขอปิดงาน › ปิดงาน (แอดมินอนุมัติ)
-const STEPS = ["รับทราบ", "ยืนยันนัด", "เข้างาน", "เอกสาร", "ขอปิดงาน", "ปิดงาน"]; // ยืนยันนัด = ผู้รับผิดชอบยืนยันนัดหมาย
+// ✅ (11 ต.ค. 2569 ผู้ใช้: "ขั้นตอนที่ 6 จากปิดงาน เป็นเสร็จสิ้น")
+const STEPS = ["รับทราบ", "ยืนยันนัด", "เข้างาน", "เอกสาร", "ขอปิดงาน", "เสร็จสิ้น"]; // ยืนยันนัด = ผู้รับผิดชอบยืนยันนัดหมาย
 const DECLINE_PRESETS = ["ติดงานอื่นวันนั้น", "ลา / ป่วย", "ไม่ถนัดงานระบบนี้", "อยู่ไกลเกินไป"];
 // ⚠️ อยู่ในฟอร์ม SweetAlert (.swal2-container z-index 20000) — หน้าต่าง/ปฏิทินเลือกวันของ MUI ต้องลอยเหนือกว่า
 //    (mount ด้วย createRoot แยก จึงไม่มี ThemeProvider ของแอป — ใช้ธีมของแอปแล้วยก zIndex ขึ้น)
@@ -257,9 +258,11 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
   // ปฏิเสธงานที่ยังค้าง (ล้างเองเมื่อมีคนรับทราบ/มอบหมายใหม่ — ดู server jobflow ack-decline)
   const declined = event.ackDeclined?.userId ? event.ackDeclined : null;
   const declinedByMe = declined && String(declined.userId) === me;
+  // งานเดิมก่อนเปิดใช้ระบบบันทึกเข้างาน ที่สถานะ "กำลังดำเนินการ" อยู่แล้ว = ถือว่าเข้างานแล้ว (ให้แถบตรงกับป้ายสถานะ)
+  const legacyStarted = !checkin && event.status === "กำลังดำเนินการ" && Boolean(event.createdAt) && new Date(event.createdAt) < new Date(FLOW_SINCE);
   const current = closed ? STEPS.length
     : event.closeRequested ? 5
-    : checkin ? (docsComplete ? 4 : 3)
+    : checkin || legacyStarted ? (docsComplete ? 4 : 3)
     : acked && !declined ? (confirmed ? 2 : 1)
     : 0;
 
@@ -442,6 +445,8 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
           <Box component="span" sx={{ color: MUTED }}>{docsComplete ? " · เอกสารครบ กดขอปิดงานได้" : " · แนบเอกสารให้ครบ"}</Box>
         </Line>
       );
+    } else if (legacyStarted) {
+      line = <Line icon={<TaskAltRounded />} tone="#16a34a" right={logLink}>กำลังดำเนินการ · {docsComplete ? "เอกสารครบ กดขอปิดงานได้" : "แนบเอกสารประจำงานให้ครบ แล้วขอปิดงาน"}</Line>;
     } else if (declined && !declinedByMe) {
       line = <Line icon={<BlockRounded />} tone="#dc2626"><b style={{ fontWeight: 600 }}>{declined.name} ปฏิเสธงาน</b> — {declined.reason} · รอมอบหมายใหม่</Line>;
     } else if (declinedByMe) {
