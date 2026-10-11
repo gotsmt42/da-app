@@ -49,7 +49,7 @@ import FloatPersonPicker from "./FloatPersonPicker";
 
 import API from "@/shared/api/axiosInstance";
 import { escapeHtml } from "@/shared/utils/escapeHtml";
-import { getApprovalState, countPendingJobs } from "@/shared/utils/approvalStatus";
+import { getApprovalState } from "@/shared/utils/approvalStatus";
 import { formatRoundLabel } from "@/shared/utils/contractRounds";
 import { classifyJob, JOB_CLASS_META } from "@/shared/utils/jobClassification";
 
@@ -1365,14 +1365,6 @@ function EventCalendar() {
     [employeeList],
   );
 
-  // ✅ ยอดรวม "งานรออนุมัติ" — แอดมิน/manager เห็นทั้งระบบ (มีสิทธิ์อนุมัติได้ทุกงาน) คนอื่นเห็นแค่ของ
-  // ตัวเอง กันโชว์ตัวเลขที่กดอนุมัติเองไม่ได้อยู่ดี ดูแล้วงงว่าทำไมกดไม่ได้ — นับรวมทั้งงานที่มีวันที่แล้ว
-  // (events) เท่านั้น — งานที่ยังไม่ลงตารางไม่อยู่ในหน้านี้แล้ว (ดูที่เมนู "งานใหม่")
-  const pendingApprovalCount = useMemo(
-    () => countPendingJobs(events, [], { userId, isAdminOrManager }),
-    [events, userId, isAdminOrManager]
-  );
-
   // ⚠️ selectedSystem/selectedApproval ไม่มีช่องให้กรอกในแผงของฝ่ายขาย (ดู JSX ด้านล่าง) แต่ค่าเดิม
   // อาจค้างมาจากตอนเปิดปฏิทินช่างก่อนสลับมา (คนละ query string บนหน้าเดียวกัน ไม่ได้ remount) —
   // ไม่นับรวมตอนอยู่ในโลกฝ่ายขาย ไม่งั้น badge จำนวนตัวกรองจะขึ้นเลขที่ไม่ตรงกับที่เห็นบนจอ
@@ -2566,8 +2558,6 @@ function EventCalendar() {
                 {statusLegend.map((s) => (
                   <option key={s.label} value={`status:${s.label}`}>{s.label}</option>
                 ))}
-                <option value="approval:pending">⏳ รออนุมัติ</option>
-                <option value="approval:rejected">❌ ไม่อนุมัติ</option>
               </SelectField>
 
               <SelectField
@@ -2687,23 +2677,8 @@ function EventCalendar() {
         )}
 
 
-        {/* ✅ ปุ่ม "N ต้องอนุมัติ" — ซ่อนไปเลยตอนไม่มีอะไรรออนุมัติ (เทียบ pattern เดียวกับ
-            ClosureRequestsPanel ในหน้า Operation ที่ return null ตอนไม่มีคำขอ) กดแล้วกรองตารางเหลือ
-            เฉพาะงานรออนุมัติทันที */}
-        {pendingApprovalCount > 0 && (
-          <button
-            className="filter-toggle-btn filter-toggle-btn--approval-pending"
-            onClick={() => {
-              setSelectedApproval("pending");
-              setShowFilterPanel(true);
-            }}
-            title="งานรออนุมัติ"
-          >
-            <FontAwesomeIcon icon={faHourglassHalf} />
-            <span className="tb-label">รออนุมัติ</span>
-            <span className="filter-badge filter-badge--approval-pending">{pendingApprovalCount}</span>
-          </button>
-        )}
+        {/* 🧹 (11 ต.ค. 2569 ผู้ใช้: "ไม่ต้องมีการแสดงค้นหาการขอลงงานใน Event") — ปุ่ม/ตัวกรอง "รออนุมัติ" ย้ายไปอยู่หน้า
+            "คำขอลงงาน" ที่เดียว (อนุมัติ/มอบหมายได้ที่นั่น) · การ์ดในปฏิทินยังมีป้าย ⏳ รออนุมัติ บอกสถานะเหมือนเดิม */}
 
         {/* ✅ ปุ่ม "สร้าง PDF" (จับภาพทั้งหน้าปฏิทินเป็น PDF) ถูกตัดออกตามที่ผู้ใช้ขอ — ได้ไฟล์เป็นรูป
             ภาพหน้าจอ ค้นหา/คัดลอก/คำนวณต่อไม่ได้เลย ต่างจากไฟล์ Excel ที่เอาไปทำงานต่อได้จริง

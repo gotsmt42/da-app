@@ -41,7 +41,11 @@ import { formatThai } from "@/shared/utils/thaiDate";
 import { PersonChip, UnassignedChip } from "@/shared/ui/PersonChip";
 import { QueueToolbar, SectionHead, AllClear, ActionCard, PeopleField, QueueRow, RowGroup, SoftPill, AMBER, BLUE } from "@/features/dispatch/components/QueueKit";
 
-export default function PendingApprovalsPanel({ onCountChange, active = true }) {
+/**
+ * @param embedded  ฝังในหน้า "คำขอลงงาน" — ใช้ช่องค้นหา/ปุ่มรีเฟรชของหน้าแม่ (search · refreshKey)
+ *                  ไม่มีแถบเครื่องมือของตัวเอง (✅ 11 ต.ค. 2569 ผู้ใช้: "ทำไมมีค้นหาบนล่าง จัดวางแปลกๆ ดูยาก")
+ */
+export default function PendingApprovalsPanel({ onCountChange, active = true, embedded = false, search: extSearch = "", refreshKey = 0 }) {
   const navigate = useNavigate();
 
   const [events, setEvents] = useState([]);
@@ -57,7 +61,8 @@ export default function PendingApprovalsPanel({ onCountChange, active = true }) 
   // ✅ รายชื่อพนักงาน — ใช้เป็นตัวเลือกช่อง "ผู้รับผิดชอบ" ที่มอบหมายได้ตรงจากการ์ดนี้เลย
   const [employees, setEmployees] = useState([]);
   const [assigningKey, setAssigningKey] = useState(null);
-  const [search, setSearch] = useState("");
+  const [ownSearch, setSearch] = useState("");
+  const search = embedded ? extSearch : ownSearch;
   const [quick, setQuick] = useState("all");
 
   // ⚠️ ทั้งสอง endpoint ตอบ 404 เมื่อไม่มีข้อมูลเลย (axios throw) จึงต้อง .catch() ทุกตัว —
@@ -81,6 +86,7 @@ export default function PendingApprovalsPanel({ onCountChange, active = true }) 
   // หน้ามา ไม่งั้นจะขึ้น 0 จนกว่าจะกดเข้ามาดูเอง ซึ่งทำให้ badge ไร้ประโยชน์ (จุดประสงค์คือบอกว่ามีงาน
   // ค้างโดยไม่ต้องกดเข้าไปดู)
   useEffect(() => { fetchData(); }, []);
+  useEffect(() => { if (refreshKey) fetchData(true); }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ✅ เรียลไทม์: มีคำขอใหม่/อนุมัติไปแล้วจากเครื่องอื่น → ตัวเลขและรายการอัปเดตทันที
   useRealtime("events", () => { fetchData(true); });
@@ -257,7 +263,7 @@ export default function PendingApprovalsPanel({ onCountChange, active = true }) 
 
   return (
     <Box>
-      <QueueToolbar
+      {!embedded && <QueueToolbar
         search={search} onSearch={setSearch} placeholder="ค้นหางาน / โครงการ / ผู้ส่ง"
         filter={quick} onFilter={setQuick}
         filters={[
@@ -268,9 +274,9 @@ export default function PendingApprovalsPanel({ onCountChange, active = true }) 
         ]}
         view={viewMode} onView={setViewMode} onRefresh={() => fetchData()} loading={loading}
         note={lastRefreshed ? `อัปเดต ${moment(lastRefreshed).format("HH:mm")}` : ""}
-      />
+      />}
 
-      <SectionHead color={AMBER} title="รออนุมัติ" count={shownGroups.length} hint="ช่างสร้างแผนงานเอง — มอบหมายผู้รับผิดชอบ แล้วกดอนุมัติ" />
+      <SectionHead color={AMBER} title={embedded ? "แผนงานรออนุมัติ" : "รออนุมัติ"} count={shownGroups.length} hint="ลงวันไว้แล้ว — มอบหมายผู้รับผิดชอบ แล้วกดอนุมัติ" />
 
       {loading ? (
         <Stack spacing={1.25}>
@@ -278,7 +284,7 @@ export default function PendingApprovalsPanel({ onCountChange, active = true }) 
         </Stack>
       ) : shownGroups.length === 0 ? (
         <AllClear text={pendingGroups.length ? "ไม่มีรายการในตัวกรองนี้" : "เคลียร์หมดแล้ว — ไม่มีแผนงานรออนุมัติ"} />
-      ) : viewMode === "table" ? (
+      ) : viewMode === "table" && !embedded ? (
         <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2.5, overflowX: "auto" }}>
           <Table size="small" sx={{ minWidth: 760 }}>
             <TableHead>

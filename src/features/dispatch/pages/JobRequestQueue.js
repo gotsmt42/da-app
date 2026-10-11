@@ -20,15 +20,14 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import {
-  Box, Stack, Typography, Skeleton, Alert,
+  Box, Stack, Typography, Skeleton, Alert, TextField, IconButton, Tooltip,
 } from "@mui/material";
-import { Inbox } from "@mui/icons-material";
+import { Inbox, Search, Close, Refresh } from "@mui/icons-material";
 import { PageHeader } from "@/shared/ui/PageKit";
 
 import usePermissions from "@/shared/hooks/usePermissions";
 import { useAuth } from "@/features/auth/AuthContext";
 import DispatchList from "../components/DispatchList";
-import { SectionHead } from "../components/QueueKit";
 import DispatchService from "../services/DispatchService";
 import { TEXT_SUB, BORDER_MAIN } from "../dispatchMeta";
 import lazyWithRetry from "@/shared/utils/lazyWithRetry";
@@ -43,6 +42,8 @@ export default function JobRequestQueue() {
   const [summary, setSummary] = useState(null);
   const [approvalCount, setApprovalCount] = useState(0);
   const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const loadSummary = useCallback(async () => {
     try { setSummary(await DispatchService.summary()); }
@@ -77,20 +78,35 @@ export default function JobRequestQueue() {
         )}
       />
 
-      {/* ✅ แผนงานรออนุมัติ — งานที่มีวันนัดแล้ว แค่กดอนุมัติ/ไม่อนุมัติ (ซ่อนส่วนนี้เมื่อไม่มีรายการ)
-          ⚠️ mount ไว้ตลอดเพื่อให้ได้จำนวน (onCountChange) แล้วค่อยซ่อนด้วย display */}
+      {/* ✅ (11 ต.ค. 2569 ผู้ใช้: "หน้าคำขอลงงานยังแปลกๆ ทำไมมีค้นหาบนล่าง จัดวางแปลกๆ ดูยาก")
+          แถบค้นหา + รีเฟรช "อันเดียว" บนสุด ค้นได้ทั้งหน้า แล้วเรียงหมวดตามลำดับงาน:
+            1) แผนงานรออนุมัติ (ซ่อนเมื่อไม่มี) → 2) ใบแจ้งงานรอลงแผนงาน → 3) ลงแผนงานแล้ว (พับได้) */}
+      <Box sx={{ mb: 1.75, p: 1, display: "flex", gap: 0.75, alignItems: "center", bgcolor: "#fff", border: "1px solid #e2e8f0", borderRadius: "14px" }}>
+        <TextField
+          size="small" fullWidth placeholder="ค้นหางาน / โครงการ / ลูกค้า / เลขที่ใบ / ผู้ส่ง" value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          InputProps={{
+            startAdornment: <Search sx={{ fontSize: 18, color: TEXT_SUB, mr: 0.6 }} />,
+            endAdornment: search ? <IconButton size="small" aria-label="ล้างคำค้น" onClick={() => setSearch("")} sx={{ p: 0.25 }}><Close sx={{ fontSize: 16 }} /></IconButton> : null,
+          }}
+          sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px", bgcolor: "#f8fafc", height: 38, fontSize: "0.86rem", "& fieldset": { borderColor: "transparent" } } }}
+        />
+        <Tooltip title="โหลดข้อมูลใหม่">
+          <IconButton onClick={() => { setRefreshKey((k) => k + 1); loadSummary(); }} aria-label="โหลดข้อมูลใหม่"
+            sx={{ width: 38, height: 38, flexShrink: 0, border: "1px solid #e2e8f0", borderRadius: "10px", color: TEXT_SUB }}>
+            <Refresh sx={{ fontSize: 19 }} />
+          </IconButton>
+        </Tooltip>
+      </Box>
+
+      {/* ⚠️ mount ไว้ตลอดเพื่อให้ได้จำนวน (onCountChange) แล้วค่อยซ่อนด้วย display */}
       <Box sx={{ display: approvalCount > 0 ? "block" : "none", mb: 2.5 }}>
-        <SectionHead color="#d97706" title="แผนงานรออนุมัติ" count={approvalCount}
-          hint="ลงวันไว้แล้ว — ตรวจแล้วกดอนุมัติ หรือไม่อนุมัติพร้อมเหตุผล" />
         <Suspense fallback={<Skeleton variant="rounded" height={160} sx={{ borderRadius: 3 }} />}>
-          <PendingApprovalsPanel active onCountChange={setApprovalCount} />
+          <PendingApprovalsPanel active embedded search={search} refreshKey={refreshKey} onCountChange={setApprovalCount} />
         </Suspense>
       </Box>
 
-      {/* ✅ ใบแจ้งงาน — ใครแจ้งมาก็ได้ (ชื่อผู้แจ้งอยู่บนการ์ด) ยังไม่มีวันนัด ต้องเลือกวัน + ทีมให้
-          🧹 (11 ต.ค. 2569 ผู้ใช้: "หน้าคำขอลงงานดูรก") ตัดหัวข้อใหญ่ "ใบแจ้งงาน" ออก — ซ้ำกับหัวหน้าเพจ
-             และหมวด "รอลงแผนงาน / ลงแผนงานแล้ว" ในรายการบอกอยู่แล้ว */}
-      <DispatchList mode="board" myId={String(userData?.userId || "")} />
+      <DispatchList mode="board" embedded search={search} refreshKey={refreshKey} myId={String(userData?.userId || "")} />
     </Box>
   );
 }

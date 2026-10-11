@@ -39,11 +39,11 @@ export const DEST = {
   dashboard: { title: "ภาพรวม", href: "/dashboard", icon: FaTachometerAlt },
 
   /** ปฏิทินงาน — ความหมายของ /event ต่างกันตามสิทธิ์ ดู scheduleOptionsFor */
-  eventService: { title: "ตารางงานช่าง", sub: "ปฏิทินงานบริการ", href: "/event", icon: FaCalendarAlt, badgeKey: "pendingApproval" },
+  eventService: { title: "ตารางงานช่าง", sub: "ปฏิทินงานบริการ", href: "/event", icon: FaCalendarAlt },
   // ✅ (9 ต.ค. 2569 ผู้ใช้: "icon ให้สอดคล้องสื่อความหมาย") นัดหมายของฉัน = ปฏิทินมีเครื่องหมายถูก · ตารางงานช่าง = ปฏิทิน
   //    ประแจใช้กับ "การดำเนินงาน" อย่างเดียว ไม่ปนกับตารางงาน
-  eventMine: { title: "แผนงานของฉัน", bar: "แผนงาน", sub: "นัดหมายของฉัน", href: "/event", icon: FaCalendarCheck, badgeKey: "pendingApproval" },
-  eventOwn: { title: "ตารางงาน", sub: "ปฏิทินงาน", href: "/event", icon: FaCalendarAlt, badgeKey: "pendingApproval" },
+  eventMine: { title: "แผนงานของฉัน", bar: "แผนงาน", sub: "นัดหมายของฉัน", href: "/event", icon: FaCalendarCheck },
+  eventOwn: { title: "ตารางงาน", sub: "ปฏิทินงาน", href: "/event", icon: FaCalendarAlt },
   eventServiceReadOnly: { title: "ตารางงานช่าง", sub: "ดูอย่างเดียว", href: `/event?dept=${DEPARTMENT.SERVICE}`, icon: FaCalendarAlt },
   eventSales: { title: "ตารางงานฝ่ายขาย", href: "/event?dept=sales", icon: FaBriefcase },
 

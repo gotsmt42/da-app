@@ -1538,19 +1538,26 @@ const EventRowCard = ({
               <Box onClick={(e) => e.stopPropagation()} sx={{ mt: 0.85, cursor: "default" }}>
                 <Box sx={{ display: "grid", rowGap: 0.5 }}>
                   <InfoLine label="ผู้รับผิดชอบ" center>
-                    <AssignableResponsible responsible={event.responsiblePerson} avatars={avatarMap} onAssign={canAssign ? setAssignAnchor : undefined} />
+                    <AssignableResponsible responsible={event.responsiblePerson} avatars={avatarMap} size={20} onAssign={canAssign ? setAssignAnchor : undefined} />
                   </InfoLine>
                   {/* ✅ (10 ต.ค. 2569 ผู้ใช้: "ตัดปุ่มยังไม่มีทีมเข้างานออก ให้เพิ่มผู้เข้าทำงานได้เหมือนผู้รับผิดชอบ และแก้คำเป็นหัวหน้าทีมเข้างาน")
                       กดชื่อ/"+ มอบหมาย" เพื่อเลือกหัวหน้าทีม (บันทึก team/resPerson ของวันนี้ทันที) · ลูกทีมแสดงต่อท้าย */}
                   {/* ป้ายสั้น "หัวหน้าทีม" — ป้ายยาวเกินคอลัมน์ ทำให้ค่าแถวนี้เยื้องไม่ตรงแถวอื่น (11 ต.ค. 2569 ผู้ใช้: "การจัดวางทำไมไม่ชิดเท่ากัน ขัดตา") */}
+                  {/* ✅ (11 ต.ค. 2569 ผู้ใช้: "ทีมเข้างานแต่มีแท็กหัวหน้าทีมอีกที สับสน ไม่รู้ว่าใคร · จัดวางไม่สวย ล้นๆ")
+                      แยกบรรทัด: หัวหน้าทีม (คนเดียว กดเปลี่ยนได้) · ลูกทีม (ชิปเล็กเรียงต่อกัน) — ป้ายตรงกับคนในแถวนั้นเสมอ */}
                   <InfoLine label="หัวหน้าทีม" center>
-                    <Box component="span" sx={{ display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: 0.5 }}>
-                      <AssignableResponsible responsible={event.team} avatars={avatarMap} onAssign={canAssignTeam ? setTeamAnchor : undefined} />
-                      {(event.teamMembers || []).map((m) => m?.name).filter((n) => n && n !== event.team).map((n) => (
-                        <PersonChip key={n} name={n} avatar={avatarMap.get(n)} title={`ลูกทีม: ${n}`} />
-                      ))}
-                    </Box>
+                    <AssignableResponsible responsible={event.team} avatars={avatarMap} size={20} onAssign={canAssignTeam ? setTeamAnchor : undefined} />
                   </InfoLine>
+                  {(() => {
+                    const members = [...new Set((event.teamMembers || []).map((m) => m?.name).filter((n) => n && n !== event.team))];
+                    return members.length > 0 && (
+                      <InfoLine label="ลูกทีม" center>
+                        <Box component="span" sx={{ display: "inline-flex", flexWrap: "wrap", alignItems: "center", gap: 0.5 }}>
+                          {members.map((n) => <PersonChip key={n} name={n} avatar={avatarMap.get(n)} size={18} title={`ลูกทีม: ${n}`} />)}
+                        </Box>
+                      </InfoLine>
+                    );
+                  })()}
                   {canAssignTeam && (
                     <AssignResponsibleMenu title="เลือกหัวหน้าทีมเข้างาน"
                       anchorEl={teamAnchor} onClose={() => setTeamAnchor(null)}

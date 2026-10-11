@@ -133,7 +133,7 @@ const side = (key, extra) => {
         href: "/event",
         icon: <FaCalendarAlt />,
         items: [
-          { title: "ตารางงานช่าง", href: "/event", badgeKey: "pendingApproval" },
+          { title: "ตารางงานช่าง", href: "/event" },
           { title: "ตารางงานฝ่ายขาย", href: "/event?dept=sales" },
         ],
       }]
@@ -147,11 +147,11 @@ const side = (key, extra) => {
           href: "/event",
           icon: <FaCalendarAlt />,
           items: [
-            { title: "แผนงานของฉัน", href: "/event", badgeKey: "pendingApproval" },
+            { title: "แผนงานของฉัน", href: "/event" },
             { title: "ตารางงานช่าง (ดูอย่างเดียว)", href: `/event?dept=${DEPARTMENT.SERVICE}` },
           ],
         }]
-      : [{ title: canViewOperation ? "ตารางงาน" : "แผนงานของฉัน", href: "/event", icon: <FaCalendarAlt />, badgeKey: "pendingApproval" }];
+      : [{ title: canViewOperation ? "ตารางงาน" : "แผนงานของฉัน", href: "/event", icon: <FaCalendarAlt /> }];
 
   // ✅ "การดำเนินงาน" แยกออกมาเป็นเมนูระดับบนสุดตามที่ผู้ใช้สั่ง — เดิมซ่อนอยู่ในเมนูย่อยของ
   // "แผนงาน" ทั้งที่เป็นหน้าที่ใช้บ่อยที่สุดของฝ่ายช่าง (ไล่จัดการงานทีละใบ) และเป็นคนละเรื่องกับ

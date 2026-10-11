@@ -377,12 +377,16 @@ const COLUMN_META = {
   assigned: { icon: <EventAvailable />, hint: "ลงตารางงานแล้ว รอช่างเข้างาน" },
 };
 
-export default function DispatchList({ mode = "board", myId = "" }) {
+/**
+ * @param embedded  ฝังในหน้า "คำขอลงงาน" — ใช้ช่องค้นหา/รีเฟรชของหน้าแม่ ไม่มีแถบเครื่องมือของตัวเอง (11 ต.ค. 2569)
+ */
+export default function DispatchList({ mode = "board", myId = "", embedded = false, search: extSearch = "", refreshKey = 0 }) {
   const isDesktop = useMediaQuery("(min-width:900px)");
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [search, setSearch] = useState("");
+  const [ownSearch, setSearch] = useState("");
+  const search = embedded ? extSearch : ownSearch;
   const [statusFilter, setStatusFilter] = useState("open");
   const [quick, setQuick] = useState("all");
   // ✅ เปิดใบตาม /dispatch/<id> หรือ /sales/<id> ที่มาจากแจ้งเตือน
@@ -413,6 +417,7 @@ export default function DispatchList({ mode = "board", myId = "" }) {
   }, [statusFilter]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (refreshKey) load(true); }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ✅ เรียลไทม์: ใบมอบหมายถูกส่ง/รับ/อัปเดตความคืบหน้าจากเครื่องอื่น → รายการอัปเดตทันที
   useRealtime("dispatch", () => { load(true); });
@@ -496,7 +501,7 @@ export default function DispatchList({ mode = "board", myId = "" }) {
     return (
       <Box>
         {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>{error}</Alert>}
-        <QueueToolbar
+        {!embedded && <QueueToolbar
           search={search} onSearch={setSearch} placeholder="ค้นหางาน / ลูกค้า / เลขที่ใบ"
           filter={quick} onFilter={setQuick}
           filters={[
@@ -506,13 +511,13 @@ export default function DispatchList({ mode = "board", myId = "" }) {
             { key: "soon", label: "เข้างานใน 7 วัน", count: filtered.filter(QUICK.soon).length, color: BLUE },
           ]}
           view={viewMode} onView={setViewMode} onRefresh={() => load()} loading={loading}
-        />
+        />}
 
-        {viewMode === "table" ? (
+        {viewMode === "table" && !embedded ? (
           quickList.length ? <DispatchTable rows={quickList} onOpen={open} /> : <AllClear text={search ? "ไม่พบรายการที่ค้นหา" : "ไม่มีรายการในตัวกรองนี้"} />
         ) : (
           <>
-            <SectionHead color={AMBER} title="รอลงแผนงาน" count={waitingRows.length} hint="ตรวจรายละเอียด แล้วเลือกวันเข้างาน + ช่าง" />
+            <SectionHead color={AMBER} title={embedded ? "ใบแจ้งงานรอลงแผนงาน" : "รอลงแผนงาน"} count={waitingRows.length} hint="ยังไม่มีวันนัด — ตรวจรายละเอียด แล้วเลือกวันเข้างาน + ช่าง" />
             {waitingRows.length === 0 ? (
               <AllClear text="เคลียร์หมดแล้ว — ไม่มีคำขอรอลงแผนงาน" />
             ) : (
