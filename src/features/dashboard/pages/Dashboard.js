@@ -35,7 +35,7 @@ import {
 import { groupEventsByContract, nextVisitOverdueInfo } from "@/shared/utils/contractOverdue";
 // ✅ ตรรกะติดตามใบเสนอราคาตัวกลาง — ใช้ร่วมกับหน้า /quotations และฝั่ง server เพื่อให้เกณฑ์/ตัวเลขตรงกัน
 import { getFollowUpInfo } from "@/shared/utils/quotationTracking";
-import { openFollowUp, isUrgent, acksOf, ackTracked } from "@/shared/utils/jobFlow";
+import { openFollowUp, isUrgent, acksOf, ackTracked, isResponsibleOf, isRespOrHead } from "@/shared/utils/jobFlow";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { can, isRole, rankLabel, ROLES, TECHNICIAN_ROLES, ALL_ROLES } from "@/shared/utils/roles";
 import HomeMenu from "../components/HomeMenu";
@@ -173,8 +173,6 @@ const Dashboard = () => {
 
   // ✅ นับแบบจัดกลุ่มก่อน (countDistinctJobs) ไม่ใช่นับทุกแถว event ดิบ — งานที่เข้าหลายวันไม่ติดกัน
   // (jobGroupId เดียวกัน) ต้องนับเป็น 1 งานเสมอ ไม่งั้นการ์ดสรุปสถานะจะขึ้นตัวเลขสูงเกินจริง
-  const countStatus = (status) =>
-    countDistinctJobs(events, (e) => e.status === status);
 
 
 
@@ -247,8 +245,10 @@ const Dashboard = () => {
       .filter((x) => x.fu)
       .sort((a, b) => new Date(a.fu.reportedAt) - new Date(b.fu.reportedAt));
   })();
+  // ✅ (11 ต.ค. 2569) การ์ด "งานของฉัน" นับเฉพาะงานที่เป็นผู้รับผิดชอบ/หัวหน้าทีม (ตรงกับหน้างานของฉัน)
+  const myEvents = events.filter((e) => isRespOrHead(e, userData?.userId, userData?.fname));
   const myOverdueCount = countFlaggedJobs(
-    events,
+    myEvents,
     daysPastDueMap,
     isFlaggedDays,
   );
@@ -256,16 +256,16 @@ const Dashboard = () => {
   // ✅ ตามที่ผู้ใช้ยืนยัน — "งานที่ต้องทำ" นับรวมงานค้างเกินกำหนดไว้ด้วยเหมือนเดิม (ไม่ตัด
   // !isFlaggedDays ออกเหมือนที่เคยลองแก้) แม้จะไม่ mutually-exclusive กับ "ค้างเกินกำหนด" ก็ตาม
   const myActiveJobsCount = countDistinctJobs(
-    events,
+    myEvents,
     // ✅ (11 ต.ค. 2569) รวม "กำลังรอยืนยัน" — งานที่เพิ่งมอบหมาย ต้องกดรับทราบ/ยืนยันนัดหมาย (ตรงกับหน้างานของฉัน)
     (e) => ["กำลังรอยืนยัน", "ยืนยันแล้ว", "กำลังดำเนินการ"].includes(e.status) && !["pending", "rejected"].includes(e.approvalStatus) && !e.closeRequested,
   );
   const myPendingApprovalCount = countDistinctJobs(
-    events,
+    myEvents,
     (e) => e.closeRequested && e.status !== "ดำเนินการเสร็จสิ้น",
   );
   // ✅ เพิ่มจำนวนงานที่เสร็จสิ้นแล้วเข้าไปในสรุปด้วย (เดิมมีแค่ ต้องทำ/รออนุมัติ/ค้างเกินกำหนด)
-  const myClosedCount = countStatus("ดำเนินการเสร็จสิ้น");
+  const myClosedCount = countDistinctJobs(myEvents, (e) => e.status === "ดำเนินการเสร็จสิ้น");
   const myJobsSummary = (() => {
     const parts = [];
     if (myActiveJobsCount > 0) parts.push(`${myActiveJobsCount} งานที่ต้องทำ`);
@@ -399,7 +399,10 @@ const Dashboard = () => {
   // ช่างเห็นแค่ของตัวเอง) จึงคำนวณตรงๆ ได้เลยไม่ต้องแยกเงื่อนไข role ที่นี่อีก
   const overdueContracts = useMemo(() => {
     if (!canViewContracts) return [];
-    return groupEventsByContract([...events, ...drafts])
+    // ✅ (11 ต.ค. 2569 ผู้ใช้: "แก้ไขให้แสดงแค่ของผู้รับผิดชอบ ไม่ใช่แสดงหมด") — ที่ไม่ใช่แอดมิน/ผู้จัดการ
+    //    เห็นเฉพาะสัญญาที่ตัวเองเป็นผู้รับผิดชอบ (ไม่นับงานที่แค่เป็นหัวหน้าทีม/ลูกทีม) ตรงกับหน้าภาพรวมงาน
+    const mineOnly = (e) => isAdminOrManager || isResponsibleOf(e, userData?.userId, userData?.fname);
+    return groupEventsByContract([...events, ...drafts].filter(mineOnly))
       .filter((c) => c.isRealContract)
       .map((c) => {
         const info = nextVisitOverdueInfo(c);
@@ -407,7 +410,7 @@ const Dashboard = () => {
       })
       .filter(Boolean)
       .sort((a, b) => a.overdueInfo.monthsUntilDue - b.overdueInfo.monthsUntilDue);
-  }, [canViewContracts, events, drafts]);
+  }, [canViewContracts, events, drafts, isAdminOrManager, userData?.userId, userData?.fname]);
   const roundCounts = overdueContracts.reduce((m, c) => ({ ...m, [c.overdueInfo.state]: (m[c.overdueInfo.state] || 0) + 1 }), {});
 
   // ✅ ดึง JSX ของบล็อก "สัญญาที่เลยกำหนด/คงค้าง" ออกมาเป็นตัวแปรเดียว ใช้ซ้ำได้ 2 จุด — จอกว้าง

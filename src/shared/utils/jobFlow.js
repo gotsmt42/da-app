@@ -83,6 +83,20 @@ export const needsMyAction = (ev, userId, fname) => {
   return Boolean(isHead && isConfirmedJob(ev) && ev.status !== "กำลังดำเนินการ" && !ev.checkedInAt && startDay <= new Date());
 };
 
+/**
+ * ✅ (11 ต.ค. 2569 ผู้ใช้: "ภาพรวมงาน/รอบเข้างานที่ต้องนัด ให้แสดงแค่ของผู้รับผิดชอบ")
+ * ฉันเป็น "ผู้รับผิดชอบงาน" นี้ไหม (ไม่นับหัวหน้าทีม/ลูกทีม) — ใช้กับสรุปความรับผิดชอบ (สัญญา/รอบเข้างาน)
+ */
+export const isResponsibleOf = (ev, userId, fname) =>
+  Boolean(ev) && (String(ev.responsiblePersonId || "") === String(userId || "x") || (Boolean(fname) && ev.responsiblePerson === fname));
+
+/**
+ * ✅ (11 ต.ค. 2569 ผู้ใช้: "หน้างานของฉัน ให้แสดงตามเงื่อนไข มีชื่อเป็นผู้รับผิดชอบ หรือ หัวหน้าทีม")
+ * ฉันเป็นผู้รับผิดชอบ หรือหัวหน้าทีมเข้างาน (ไม่นับลูกทีม)
+ */
+export const isRespOrHead = (ev, userId, fname) =>
+  isResponsibleOf(ev, userId, fname) || (Boolean(ev) && (String(ev.resPerson || "") === String(userId || "x") || (Boolean(fname) && ev.team === fname)));
+
 /** คนที่ได้รับมอบหมายงานนี้ (หัวหน้าทีม · ลูกทีม · ผู้รับผิดชอบ) */
 export const isParticipant = (ev, userId, fname) => {
   const uid = String(userId || "");

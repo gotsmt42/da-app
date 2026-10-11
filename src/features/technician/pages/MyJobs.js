@@ -16,7 +16,7 @@ import { useEffect, useMemo, useState, useCallback, useRef, cloneElement } from 
 import PdfBlobView from "@/shared/components/PdfBlobView";
 import useRealtime from "@/shared/realtime/useRealtime";
 import { useSearchParams } from "react-router-dom";
-import { isParticipant } from "@/shared/utils/jobFlow";
+import { isRespOrHead } from "@/shared/utils/jobFlow";
 import { useAuth } from "@/features/auth/AuthContext";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
@@ -264,7 +264,8 @@ export default function MyJobs() {
       //    แอดมิน/ผู้จัดการได้งานทั้งระบบจาก API — หน้านี้คัดเหลือเฉพาะงานที่ "ฉัน" ถูกมอบหมาย
       //    (ผู้รับผิดชอบ · หัวหน้าทีม · ลูกทีม) ให้ทุกตำแหน่งเห็นงานของตัวเองที่นี่ที่เดียว
       const uid = String(userData?.userId || "");
-      setEvents((res?.userEvents || []).filter((e) => isParticipant(e, uid, userData?.fname)));
+      // ✅ (11 ต.ค. 2569) เฉพาะงานที่ฉันเป็น "ผู้รับผิดชอบ" หรือ "หัวหน้าทีม" (ลูกทีมไม่นับ)
+      setEvents((res?.userEvents || []).filter((e) => isRespOrHead(e, uid, userData?.fname)));
       setLastRefreshed(new Date());
     } catch (err) {
       console.error(err);
