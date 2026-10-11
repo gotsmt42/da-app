@@ -6,9 +6,37 @@ import API from "../api/axiosInstance";
  * 🔒 ไม่มีการส่งเวลาจากเครื่องเลย — server ใช้เวลาของตัวเองตอนรับคำขอ
  * ทุกคำสั่งคืน serverNow มาด้วย ใช้เทียบนาฬิกาเครื่อง
  */
+/**
+ * ✅ (11 ต.ค. 2569 แก้แอพช้า) การ์ดงานทุกใบเรียก ofEvent ของตัวเองตอนแสดงผล — รวมคำขอที่เกิดในจังหวะเดียวกัน
+ *    เป็นคำขอเดียว GET /attendance/events?ids=... (เดิมหน้าเดียวยิงหลายสิบคำขอพร้อมกัน)
+ */
+let batch = null;
+const flushBatch = async () => {
+  const cur = batch;
+  batch = null;
+  const ids = [...cur.keys()];
+  try {
+    const { data } = await API.get("/attendance/events", { params: { ids: ids.join(",") } });
+    ids.forEach((id) => cur.get(id).forEach((w) => w.resolve({ attendance: data?.byEvent?.[id] || [], serverNow: data?.serverNow })));
+  } catch (err) {
+    ids.forEach((id) => cur.get(id).forEach((w) => w.reject(err)));
+  }
+};
+
 const AttendanceService = {
   /** @param opts.group ทั้งงานหลายวัน · opts.site ขอพิกัดหน้างานด้วย */
   async ofEvent(eventId, { group = false, site = false } = {}) {
+    if (!group && !site && eventId) {
+      return new Promise((resolve, reject) => {
+        if (!batch) {
+          batch = new Map();
+          setTimeout(flushBatch, 30);
+        }
+        const id = String(eventId);
+        if (!batch.has(id)) batch.set(id, []);
+        batch.get(id).push({ resolve, reject });
+      });
+    }
     const { data } = await API.get(`/attendance/event/${eventId}`, { params: { group: group ? 1 : undefined, site: site ? 1 : undefined } });
     return data;
   },
