@@ -15,6 +15,7 @@ import "./FullLayout.css";
 import AppRebrandNotice from "@/shared/components/AppRebrandNotice";
 import InAppPushBanner from "@/shared/ui/InAppPushBanner";
 import AppErrorBoundary from "@/shared/ui/AppErrorBoundary";
+import useNewBuildReload from "@/shared/hooks/useNewBuildReload";
 
 const FullLayout = () => {
   const sidebarRef = useRef(null);
@@ -30,6 +31,7 @@ const FullLayout = () => {
   const [lastScrollTop, setLastScrollTop] = useState(0);
 
   const location = useLocation();
+  useNewBuildReload(); // มีรุ่นใหม่ → รีโหลดตอนเปลี่ยนหน้า กันหน้า "มีเวอร์ชันใหม่" บนมือถือที่เปิดแอปค้างไว้
   const navigate = useNavigate();
 
   useEffect(() => {
