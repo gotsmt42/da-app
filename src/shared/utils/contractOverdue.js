@@ -90,6 +90,8 @@ export const groupEventsByContract = (events) => {
       isConfirmedProject: jobClassification === "project",
       company: head.company,
       site: head.site,
+      province: head.province || "",
+      city: head.city || "",
       system: head.system,
       title: head.title,
       // ✅ ป้ายกำกับแผนกเจ้าของงาน — ข้อมูลประกอบสำหรับดู/กรอง/ออกรายงานในหน้าภาพรวมงานเท่านั้น
@@ -129,6 +131,7 @@ export const groupEventsByContract = (events) => {
       storedVisitCount: head.contractGroupId ? head.visitCount : undefined,
       intervalMonths: head.contractGroupId ? head.intervalMonths : undefined,
       contractYears: head.contractGroupId ? head.contractYears : undefined,
+      estimatedDaysPerVisit: head.contractGroupId ? head.estimatedDaysPerVisit : undefined,
       jobValue: head.jobValue,
       commission: head.commission,   // ค่าคอมให้ลูกค้า — ระดับสัญญาเหมือน jobValue
       team: teamNames.join(", ") || "-",
@@ -290,6 +293,8 @@ export const isExpiringContract = (c) => contractStatusInfo(c)?.state === "expir
  * คำเตือนหมดความหมาย (คนจะเลิกอ่านแล้วมองข้ามของที่ขาดจริงไปด้วย)
  */
 const REQUIRED_CONTRACT = [
+  { key: "province", label: "จังหวัด", missing: (c) => !String(c.province || "").trim() },
+  { key: "city", label: "เมือง", missing: (c) => !String(c.city || "").trim() },
   { key: "contractNo", label: "เลขที่สัญญา", missing: (c) => !c.contractNo },
   { key: "contractStart", label: "วันเริ่มสัญญา", missing: (c) => !c.contractStart },
   { key: "contractEnd", label: "วันสิ้นสุดสัญญา", missing: (c) => !c.contractEnd },

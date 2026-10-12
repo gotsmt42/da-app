@@ -53,6 +53,7 @@ import SiteMapLink from "@/shared/ui/SiteMapLink";
 import AuthService from "@/shared/services/authService";
 import JobTypeService from "@/shared/services/JobTypeService";
 import SystemTypeService from "@/shared/services/SystemTypeService";
+import { provinceOptionsFor, THAILAND_PROVINCES } from "@/features/contracts/utils/thailandProvinces";
 import { formatEventDateRange } from "@/shared/utils/formatDateRange";
 import { resolveOperationGroup } from "@/shared/utils/overdueJobs";
 import { countUsedRounds, visitsPerYear, INTERVAL_MONTHS_PRESETS, totalRoundsOf, contractYearsOf, perYearOf, MAX_CONTRACT_YEARS, formatRoundLabel, contractYearLabel } from "@/shared/utils/contractRounds";
@@ -1216,8 +1217,8 @@ const GridField = ({ label, ...cellProps }) => (
 // ครั้งที่ 1 ได้ที่ปุ่ม + ในตารางนี้เท่านั้น (ยังมี safeguard คำเตือนซ้ำอีกชั้นที่ handleDeleteDraftClick
 // เผื่อกรณีอื่นที่เข้าถึงฉบับร่างนี้ได้)
 const EMPTY_CONTRACT_FORM = {
-  company: "", site: "", title: "", system: "", responsiblePerson: "", firstVisitTeam: "",
-  contractNo: "", quotationNo: "", contractStart: "", contractEnd: "", visitCount: "", intervalMonths: "", contractYears: "1", jobValue: "",
+  company: "", site: "", province: "", city: "", title: "", system: "", responsiblePerson: "", firstVisitTeam: "",
+  contractNo: "", quotationNo: "", contractStart: "", contractEnd: "", visitCount: "", intervalMonths: "", contractYears: "1", estimatedDaysPerVisit: "", jobValue: "",
   firstVisitStart: "", firstVisitEnd: "",
 };
 
@@ -1883,6 +1884,11 @@ export default function ContractOverview() {
   // ด้านบนเป๊ะๆ (เลือกจากรายชื่อระบบจริงที่ตั้งค่าไว้ในระบบ ไม่ต้องพิมพ์เอง) เดิมค้นหาระบบได้แค่ผ่านช่อง
   // ค้นหาข้อความอิสระ ซึ่งพิมพ์ผิด/สะกดไม่ตรงก็หาไม่เจอ และปนกับผลลัพธ์จากฟิลด์อื่นที่บังเอิญมีคำเดียวกัน
   const [systemFilter, setSystemFilter] = useState("all");
+  const [provinceFilter, setProvinceFilter] = useState("all");
+  const [cityFilter, setCityFilter] = useState("all");
+  const [regionalSummaryOpen, setRegionalSummaryOpen] = useState(false);
+  const [regionalMonthlyOpen, setRegionalMonthlyOpen] = useState(true);
+  const [regionalAnnualOpen, setRegionalAnnualOpen] = useState(false);
   // ✅ กรองตามป้ายกำกับแผนกเจ้าของสัญญา (ฝ่ายบริการ/ฝ่ายขาย) — ตามที่ผู้ใช้ขอให้ "ค้นหาแยกได้ชัดเจน"
   // ⚠️ กรองจากป้ายที่ติดไว้ในหน้านี้ล้วนๆ ไม่เกี่ยวกับขอบเขตการมองเห็นของ role ใดๆ ทั้งสิ้น
   const [departmentFilter, setDepartmentFilter] = useState("all");
@@ -1975,6 +1981,12 @@ export default function ContractOverview() {
   //   ฝ่ายขายจะกลายเป็น 0 ทันที ทั้งที่มีของอยู่จริง
   const applyCommonFilters = (list, { ignoreYear = false, skip } = {}) => {
     let base = list;
+    if (provinceFilter !== "all") {
+      base = base.filter((c) => provinceFilter === "__missing__" ? !String(c.province || "").trim() : String(c.province || "").trim() === provinceFilter);
+    }
+    if (cityFilter !== "all") {
+      base = base.filter((c) => cityFilter === "__missing__" ? !String(c.city || "").trim() : String(c.city || "").trim() === cityFilter);
+    }
     // 🐛 BUG ที่แก้ (สร้างสัญญาแล้วหายไปเลย): เดิมกรองด้วย String(contractYear(c)) === yearFilter ตรงๆ —
     // สัญญาที่ยัง "ระบุปีไม่ได้" (ไม่ได้กรอกวันที่เริ่มสัญญา และยังไม่ลงวันที่เข้างานสักครั้ง = สัญญาเปล่า
     // ที่เพิ่งสร้าง ซึ่งเป็นเรื่องปกติมากตามที่ผู้ใช้ต้องการ) จะได้ contractYear = null → "null" ไม่มีทาง
@@ -2098,7 +2110,7 @@ export default function ContractOverview() {
   const hiddenJobCount = useMemo(
     () => applyCommonFilters(activeContracts.filter((c) => !c.isRealContract && !c.isConfirmedGeneral && !c.isConfirmedProject)).length,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contracts, activeContracts, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo, search]
+    [contracts, activeContracts, yearFilter, responsibleFilter, titleFilter, systemFilter, provinceFilter, cityFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo, search]
   );
   // ✅ สัญญาที่ "เลยกำหนดเข้ารอบถัดไป/คงค้าง" — ถึงเดือนที่ต้องเข้ารอบถัดไปแล้ว (นับจากรอบล่าสุด +
   // intervalMonths — ดู nextVisitOverdueInfo) ⚠️ นับเฉพาะที่ถึง/เลยกำหนดจริงเท่านั้น ไม่รวมคำเตือน
@@ -2158,20 +2170,94 @@ export default function ContractOverview() {
       scope: { active: f.open.length, closed: f.expired.length + f.completed.length },
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stageRows, stage, category, search, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo]);
+  }, [stageRows, stage, category, search, yearFilter, responsibleFilter, titleFilter, systemFilter, provinceFilter, cityFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo]);
 
   const filtered = useMemo(() => {
     // ⚠️ แท็บสัญญาหมดอายุข้ามตัวกรองปีเหมือนตอนนับ ไม่งั้นตัวเลขบนแท็บกับจำนวนแถวในตารางจะไม่ตรงกัน
     return applyCommonFilters(viewBase, { ignoreYear: viewFilter === "expired" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewBase, search, viewFilter, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo]);
+  }, [viewBase, search, viewFilter, yearFilter, responsibleFilter, titleFilter, systemFilter, provinceFilter, cityFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo]);
+
+  const provinceFilterOptions = useMemo(() => [...new Set(viewBase.map((c) => String(c.province || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "th")), [viewBase]);
+  const cityFilterOptions = useMemo(() => [...new Set(viewBase
+    .filter((c) => provinceFilter === "all"
+      || (provinceFilter === "__missing__" ? !String(c.province || "").trim() : String(c.province || "").trim() === provinceFilter))
+    .map((c) => String(c.city || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "th")), [viewBase, provinceFilter]);
+
+  // Count the remaining scheduled calendar days from today, split at month boundaries.
+  const regionalVisitSummary = useMemo(() => {
+    const groups = new Map();
+    const today = moment().startOf("day");
+    filtered.forEach((contract) => {
+      const province = String(contract.province || "").trim() || "ไม่ระบุจังหวัด";
+      const city = String(contract.city || "").trim() || "ไม่ระบุเมือง";
+      const groupKey = `${province}\u0000${city}`;
+      if (!groups.has(groupKey)) groups.set(groupKey, { province, city, months: new Map() });
+      const group = groups.get(groupKey);
+      (contract.visits || []).filter((visit) => !visit.unscheduled).forEach((visit) => {
+        const start = moment(visit.start || visit.date);
+        let end = moment(visit.end || visit.start || visit.date);
+        if (visit.end && visit.allDay) end = end.subtract(1, "day");
+        if (!start.isValid() || !end.isValid() || end.isBefore(today, "day")) return;
+        if (end.isBefore(start, "day")) end = start.clone();
+        const from = moment.max(start.clone().startOf("day"), today);
+        const through = end.clone().startOf("day");
+        const roundKey = contract.isRealContract
+          ? `${contract.key}:${visit.time ?? visit._id ?? visit.id ?? `${visit.start || visit.date}`}`
+          : `${contract.key}:${visit._id || visit.id || `${visit.time ?? ""}:${visit.start || visit.date}:${visit.end || ""}`}`;
+        let cursor = from.clone().startOf("month");
+        while (cursor.isSameOrBefore(through, "month")) {
+          const monthStart = cursor.clone().startOf("month");
+          const monthEnd = cursor.clone().endOf("month");
+          const segmentStart = moment.max(from, monthStart);
+          const segmentEnd = moment.min(through, monthEnd);
+          const key = cursor.format("YYYY-MM");
+          if (!group.months.has(key)) group.months.set(key, { month: key, rounds: new Set(), contracts: new Set(), estimatedRounds: new Set(), days: 0, estimatedDays: 0 });
+          const aggregate = group.months.get(key);
+          aggregate.rounds.add(roundKey);
+          aggregate.contracts.add(contract.key);
+          aggregate.days += segmentEnd.diff(segmentStart, "days") + 1;
+          const estimate = Number(contract.estimatedDaysPerVisit);
+          const startMonth = from.format("YYYY-MM");
+          if (key === startMonth && Number.isFinite(estimate) && estimate > 0 && !aggregate.estimatedRounds.has(roundKey)) {
+            aggregate.estimatedRounds.add(roundKey);
+            aggregate.estimatedDays += estimate;
+          }
+          cursor.add(1, "month");
+        }
+      });
+    });
+    return [...groups.values()].flatMap((group) => [...group.months.values()].map((month) => ({
+      province: group.province, city: group.city, contractCount: month.contracts.size,
+      month: month.month, roundCount: month.rounds.size, days: month.days, estimatedDays: month.estimatedDays,
+    }))).sort((a, b) => a.province.localeCompare(b.province, "th") || a.city.localeCompare(b.city, "th") || a.month.localeCompare(b.month));
+  }, [filtered]);
+
+  const regionalAnnualSummary = useMemo(() => {
+    const areas = new Map();
+    filtered.forEach((contract) => {
+      const daysPerVisit = Number(contract.estimatedDaysPerVisit);
+      if (!Number.isFinite(daysPerVisit) || daysPerVisit <= 0) return;
+      const years = contractYearsOf(contract);
+      const configuredRounds = Number(contract.storedVisitCount);
+      const annualRounds = configuredRounds > 0 ? configuredRounds / years : perYearOf(contract);
+      if (annualRounds <= 0) return;
+      const province = String(contract.province || "").trim() || "ไม่ระบุจังหวัด";
+      const city = String(contract.city || "").trim() || "ไม่ระบุเมือง";
+      const key = `${province}\u0000${city}`;
+      if (!areas.has(key)) areas.set(key, { province, city, annualDays: 0 });
+      const aggregate = areas.get(key);
+      aggregate.annualDays += daysPerVisit * annualRounds;
+    });
+    return [...areas.values()].sort((a, b) => a.province.localeCompare(b.province, "th") || a.city.localeCompare(b.city, "th"));
+  }, [filtered]);
 
   // ✅ แถวสำหรับแผง "งานตามผู้รับผิดชอบ" — กรองเหมือนตารางทุกอย่าง ยกเว้นตัวกรองผู้รับผิดชอบเอง
   //    (เลือกคนหนึ่งอยู่ก็ยังเห็นตัวเลขของทุกคน) ดู ResponsibleSummary.js
   const responsibleRows = useMemo(
     () => applyCommonFilters(viewBase, { ignoreYear: viewFilter === "expired", skip: "responsible" }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [viewBase, search, viewFilter, yearFilter, titleFilter, systemFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo]
+    [viewBase, search, viewFilter, yearFilter, titleFilter, systemFilter, provinceFilter, cityFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo]
   );
   const isRowOverdue = useCallback((c) => c.isRealContract && isRoundOverdue(c), []);
 
@@ -2191,7 +2277,7 @@ export default function ContractOverview() {
       });
     return counts;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewBase, search, viewFilter, yearFilter, responsibleFilter, titleFilter, systemFilter, statusFilter, durationFilter, dateFrom, dateTo]);
+  }, [viewBase, search, viewFilter, yearFilter, responsibleFilter, titleFilter, systemFilter, provinceFilter, cityFilter, statusFilter, durationFilter, dateFrom, dateTo]);
 
   // ⚠️ 1 แถวติดได้หลายสถานะพร้อมกัน (เช่น "หมดอายุแล้ว" + "มีหมายเหตุที่พิมพ์เอง" — ดู statusKinds)
   // ผลรวมของทุกตัวเลือกจึงมากกว่าจำนวนแถวได้ ซึ่งถูกต้องแล้วและตั้งใจ: แต่ละตัวเลขยังตอบคำถามเดิม
@@ -2202,7 +2288,7 @@ export default function ContractOverview() {
       .forEach((c) => { statusKinds(c).forEach((k) => { counts[k] = (counts[k] || 0) + 1; }); });
     return counts;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewBase, search, viewFilter, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, durationFilter, dateFrom, dateTo]);
+  }, [viewBase, search, viewFilter, yearFilter, responsibleFilter, titleFilter, systemFilter, provinceFilter, cityFilter, departmentFilter, durationFilter, dateFrom, dateTo]);
 
   // ✅ ตัวเลือกของตัวกรอง "อายุสัญญา" — สร้างจากอายุที่มีอยู่จริงในแท็บนี้เท่านั้น ไม่ hardcode 1/2/3 ปี
   // ไว้ตายตัว (ที่ไหนมีสัญญา 5 ปีก็ต้องเลือกได้ ที่ไหนมีแต่ปีต่อปีก็ไม่ต้องมีตัวเลือกที่กดแล้วว่างเปล่า)
@@ -2220,7 +2306,7 @@ export default function ContractOverview() {
       none,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewBase, search, viewFilter, yearFilter, responsibleFilter, titleFilter, systemFilter, departmentFilter, statusFilter, dateFrom, dateTo]);
+  }, [viewBase, search, viewFilter, yearFilter, responsibleFilter, titleFilter, systemFilter, provinceFilter, cityFilter, departmentFilter, statusFilter, dateFrom, dateTo]);
 
 
   // ✅ เรียงลำดับตารางได้ด้วยการคลิกหัวตารางแต่ละช่อง (เฉพาะคอลัมน์ข้อมูลตรงๆ ที่เทียบค่าเดียวได้ —
@@ -2293,7 +2379,7 @@ export default function ContractOverview() {
   // (ดู visitColumns) — ยิ่งแถวต่อหน้าน้อย โอกาสที่สัญญาครั้งเยอะๆ จะลากคอลัมน์ว่างมาให้ทั้งหน้าก็ยิ่งน้อย
   const PAGE_SIZE = isMobile ? 5 : 10;
   const [page, setPage] = useState(1);
-  useEffect(() => { setPage(1); }, [search, viewFilter, yearFilter, responsibleFilter, titleFilter, systemFilter, sortConfig, isMobile, useMobileTable]);
+  useEffect(() => { setPage(1); }, [search, viewFilter, yearFilter, responsibleFilter, titleFilter, systemFilter, provinceFilter, cityFilter, sortConfig, isMobile, useMobileTable]);
   // ✅ ป้องกันพลาด: ล้างการเลือกทุกครั้งที่สลับแท็บมุมมอง — เดิมการเลือกค้างข้ามแท็บได้ (checkbox มีเฉพาะ
   // บางแท็บ ดู showCheckboxes) ทำให้เลือกงานไว้ในแท็บหนึ่ง สลับไปอีกแท็บที่มองไม่เห็นแถวพวกนั้นแล้ว แต่แถบ
   // "เลือกไว้ N งาน" ยังลอยอยู่ + กด "จัดกลุ่มเป็นสัญญา" ได้ทันที = รวมงานที่มองไม่เห็นอยู่ตรงหน้าเข้าด้วยกัน
@@ -2584,6 +2670,8 @@ export default function ContractOverview() {
     if (search.trim()) labels.push(`ค้นหา "${search.trim()}"`);
     if (titleFilter !== "all") labels.push(`ประเภทงาน ${titleFilter}`);
     if (systemFilter !== "all") labels.push(`ระบบ ${systemFilter}`);
+    if (provinceFilter !== "all") labels.push(`จังหวัด ${provinceFilter === "__missing__" ? "ไม่ระบุ" : provinceFilter}`);
+    if (cityFilter !== "all") labels.push(`เมือง ${cityFilter === "__missing__" ? "ไม่ระบุ" : cityFilter}`);
     if (responsibleFilter === "unassigned") labels.push("ยังไม่มอบหมายผู้รับผิดชอบ");
     else if (responsibleFilter !== "all") labels.push(`ผู้รับผิดชอบ ${responsibleFilter}`);
     if (yearFilter === YEAR_FILTER_NONE) labels.push("ยังไม่ระบุปี");
@@ -2602,23 +2690,25 @@ export default function ContractOverview() {
     if (durationFilter === "none") labels.push("ยังไม่ระบุอายุสัญญา");
     else if (durationFilter !== "all") labels.push(`สัญญา ${durationFilter} ปี`);
     return labels;
-  }, [search, titleFilter, systemFilter, responsibleFilter, yearFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo]);
+  }, [search, titleFilter, systemFilter, provinceFilter, cityFilter, responsibleFilter, yearFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo]);
   const hasActiveFilters = activeFilterLabels.length > 0;
   // ✅ จำนวนตัวกรองแบบ dropdown ที่ทำงานอยู่ (ไม่นับช่องค้นหา ซึ่งบนมือถือโชว์อยู่ตลอดอยู่แล้ว) — ใช้เป็น
   // ตัวเลขบนปุ่ม "ตัวกรอง" ให้รู้ว่ามีตัวกรองซ่อนอยู่กี่ตัวโดยไม่ต้องกางออกมาดู — ตอนนี้ตัวกรองทุกตัว
   // เริ่มต้นที่ "ทุก…" หมด ตัวเลขนี้จึงเป็น 0 ตอนเปิดหน้ามาเสมอ และทุกครั้งที่ขึ้นเลข = ผู้ใช้กดเอง
   const activeDropdownFilterCount = useMemo(
-    () => [titleFilter, systemFilter, responsibleFilter, yearFilter, departmentFilter, statusFilter, durationFilter]
+    () => [titleFilter, systemFilter, provinceFilter, cityFilter, responsibleFilter, yearFilter, departmentFilter, statusFilter, durationFilter]
       .filter((v) => v !== "all").length
       // ⚠️ เลือก "เลือกช่วงวันที่เอง…" ค้างไว้แต่ยังไม่กรอกวันไหนเลย = ยังไม่ได้กรองอะไร
       // (ตรงกับ applyCommonFilters ที่ข้ามการกรองไปในกรณีนั้น) — yearFilter เองถูกนับไปแล้วด้านบน
       - ((yearFilter === YEAR_FILTER_CUSTOM && !resolveCustomRange(dateFrom, dateTo)) ? 1 : 0),
-    [titleFilter, systemFilter, responsibleFilter, yearFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo]
+    [titleFilter, systemFilter, provinceFilter, cityFilter, responsibleFilter, yearFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo]
   );
   const clearAllFilters = () => {
     setSearch("");
     setTitleFilter("all");
     setSystemFilter("all");
+    setProvinceFilter("all");
+    setCityFilter("all");
     setResponsibleFilter("all");
     setYearFilter("all");
     setDepartmentFilter("all");
@@ -2869,7 +2959,7 @@ export default function ContractOverview() {
       : 12;
     setForm({
       ...emptyForm,
-      company: c.company || "", site: c.site || "", title: c.title || "", system: c.system || "",
+      company: c.company || "", site: c.site || "", province: c.province || "", city: c.city || "", title: c.title || "", system: c.system || "",
       responsiblePerson: c.rawResponsiblePerson || "",
       contractNo: renewContractNo(c.contractNo),
       contractStart: start.format("YYYY-MM-DD"),
@@ -2879,6 +2969,7 @@ export default function ContractOverview() {
       visitCount: c.visitCount ? String(c.visitCount) : "",
       intervalMonths: c.intervalMonths ? String(c.intervalMonths) : "",
       contractYears: String(contractYearsOf(c)),
+      estimatedDaysPerVisit: c.estimatedDaysPerVisit ? String(c.estimatedDaysPerVisit) : "",
       jobValue: c.jobValue != null && c.jobValue !== "" ? String(c.jobValue) : "",
     });
     setRenewFrom(c);
@@ -3001,12 +3092,18 @@ export default function ContractOverview() {
       setFormError("มูลค่างานต้องไม่ติดลบ");
       return;
     }
+    if (values.estimatedDaysPerVisit && (!Number.isInteger(Number(values.estimatedDaysPerVisit)) || Number(values.estimatedDaysPerVisit) < 1 || Number(values.estimatedDaysPerVisit) > 365)) {
+      setFormError("วันเข้างานต่อครั้งต้องเป็นจำนวนเต็มตั้งแต่ 1 ถึง 365 วัน");
+      return;
+    }
 
     setSaving(true);
     try {
       const payload = {
         company: values.company.trim(),
         site: values.site.trim(),
+        province: values.province.trim(),
+        city: values.city.trim(),
         title: values.title.trim(),
         system: values.system.trim(),
         // ✅ "ผู้รับผิดชอบงาน" — คนที่ติดตามสัญญานี้ทั้งหมด มอบหมายโดย admin/manager ตอนสร้างสัญญา
@@ -3025,6 +3122,7 @@ export default function ContractOverview() {
         visitCount,
         intervalMonths: values.intervalMonths ? Number(values.intervalMonths) : undefined,
         contractYears: Number(values.contractYears) || 1,
+        estimatedDaysPerVisit: values.estimatedDaysPerVisit ? Number(values.estimatedDaysPerVisit) : undefined,
         jobValue: values.jobValue ? Number(values.jobValue) : undefined,
       };
 
@@ -3508,6 +3606,11 @@ export default function ContractOverview() {
       setEditingCell(null);
       return;
     }
+    if (field === "estimatedDaysPerVisit" && rawValue && (!Number.isInteger(Number(rawValue)) || Number(rawValue) < 1 || Number(rawValue) > 365)) {
+      Swal.fire({ icon: "warning", title: "กรุณาระบุจำนวนเต็ม 1–365 วัน" });
+      setEditingCell(null);
+      return;
+    }
 
     const payload = {};
     // 🐛 BUG ที่แก้ (ลบค่าเงินที่ใส่ผิดไว้ไม่ได้): เดิมช่องว่าง → undefined ซึ่ง JSON.stringify ตัดคีย์นั้น
@@ -3518,7 +3621,7 @@ export default function ContractOverview() {
     // สัญญา (จำนวนคอลัมน์ "ครั้งที่ N" คำนวณจากมัน) ล้างเป็นค่าว่างแล้วตารางจะเพี้ยนทั้งหน้า ไม่ใช่แค่
     // ช่องเดียวหาย — ถ้าอยากแก้ต้องใส่ตัวเลขใหม่ทับเท่านั้น
     if (field === "jobValue" || field === "commission") payload[field] = rawValue ? Number(rawValue) : null;
-    else if (field === "visitCount" || field === "intervalMonths" || field === "contractYears") payload[field] = rawValue ? Number(rawValue) : undefined;
+    else if (field === "visitCount" || field === "intervalMonths" || field === "contractYears" || field === "estimatedDaysPerVisit") payload[field] = rawValue ? Number(rawValue) : undefined;
     else if (field === "responsiblePerson") { payload.responsiblePerson = rawValue; payload.responsiblePersonId = teamToId.get(rawValue) || ""; }
     else payload[field] = rawValue;
     if (syncedVisitCount !== undefined) payload.visitCount = syncedVisitCount;
@@ -3937,6 +4040,29 @@ pagedRows.map((c, idx) => {
                                 ? <span style={{ fontWeight: 700, color: "#0f172a" }}>{v}</span>
                                 : <span style={{ color: "#cbd5e1" }}>— ไม่ระบุโครงการ —</span>)}
                               onStartEdit={() => beginEdit(c, "site")}
+                              onCommit={(v) => commitEdit(c, v)}
+                              onCancel={cancelEdit}
+                            />
+                            <EditableCell
+                              Wrapper={Box}
+                              editable={isAdminOrManager && canEditField(c, "province")} columnKey="province"
+                              editType="select" editOptions={provinceOptionsFor(c.province)}
+                              editing={tableEditingCell?.key === c.key && tableEditingCell?.field === "province"}
+                              value={c.province} editValue={editValue} saving={editSaving}
+                              title={c.province || "เพิ่มจังหวัด"}
+                              formatDisplay={(v) => <span style={{ fontSize: "0.7rem", color: v ? "#64748b" : "#2563eb" }}>{v ? `จังหวัด${v}` : "+ เพิ่มจังหวัด"}</span>}
+                              onStartEdit={() => beginEdit(c, "province")}
+                              onCommit={(v) => commitEdit(c, v)}
+                              onCancel={cancelEdit}
+                            />
+                            <EditableCell
+                              Wrapper={Box}
+                              editable={isAdminOrManager && canEditField(c, "city")} columnKey="city"
+                              editing={tableEditingCell?.key === c.key && tableEditingCell?.field === "city"}
+                              value={c.city} editValue={editValue} saving={editSaving}
+                              title={c.city || "เพิ่มเมือง"}
+                              formatDisplay={(v) => <span style={{ fontSize: "0.7rem", color: v ? "#64748b" : "#2563eb" }}>{v ? `เมือง${v}` : "+ เพิ่มเมือง"}</span>}
+                              onStartEdit={() => beginEdit(c, "city")}
                               onCommit={(v) => commitEdit(c, v)}
                               onCancel={cancelEdit}
                             />
@@ -5122,6 +5248,8 @@ pagedRows.map((c, idx) => {
                   ? (contractYearsOf(c) > 1 && perYearOf(c) ? `ปีละ ${perYearOf(c)} × ${contractYearsOf(c)} ปี = ${v} ครั้ง` : `${v} ครั้ง`)
                   : <Dash />)}
                 {...fp("visitCount")} />
+              <GridField label="ประมาณการวันเข้างานต่อครั้ง" editable={isAdminOrManager} editType="number" value={c.estimatedDaysPerVisit}
+                formatDisplay={(v) => (v ? `${v} วัน` : <Dash />)} {...fp("estimatedDaysPerVisit")} />
             </Box>
             <FieldRow
               label="ค่าคอมลูกค้า" editable={isAdminOrManager && canEditField(c, "commission")} editType="number"
@@ -5311,6 +5439,8 @@ pagedRows.map((c, idx) => {
 
         {/* ผู้รับผิดชอบ — ฟิลด์อิสระจากทีมที่เข้างานทุกครั้งด้านบนโดยสมบูรณ์ */}
         <DetailSection title="ผู้รับผิดชอบและผู้ติดต่อ">
+        <FieldRow label="จังหวัด" editable={isAdminOrManager && canEditField(c, "province")} editType="select" editOptions={provinceOptionsFor(c.province)} allowEmpty value={c.province} placeholder="ระบุจังหวัด" {...fp("province")} />
+        <FieldRow label="เมือง" editable={isAdminOrManager && canEditField(c, "city")} value={c.city} placeholder="ระบุเมือง" {...fp("city")} />
         <FieldRow label="ผู้รับผิดชอบ" editable={isAdminOrManager && canEditField(c, "responsiblePerson")} editType="select" editOptions={teamOptions} value={c.responsiblePerson} formatDisplay={responsibleDisplay} {...fp("responsiblePerson")} />
         {/* ✅ ผู้ติดต่อหน้างาน — เบอร์กดโทรออกได้ทันที ซึ่งเป็นเหตุผลหลักที่ต้องมีบนมือถือ
             (ช่างเปิดจากรถ/หน้างานแล้วโทรได้เลย ไม่ต้องจดเบอร์แล้วไปพิมพ์ในแอปโทรศัพท์เอง) */}
@@ -5456,6 +5586,21 @@ pagedRows.map((c, idx) => {
         <option value="all">ทุกระบบ</option>
         {systemFilterOptions.map((name) => <option key={name} value={name}>{name}</option>)}
       </SelectField>
+      </>)}
+      {M && (<>
+        <SelectField size="small" label="จังหวัด" value={provinceFilter}
+          onChange={(e) => { setProvinceFilter(e.target.value); setCityFilter("all"); }}>
+          <option value="all">ทุกจังหวัด</option>
+          {provinceFilterOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+          {viewBase.some((c) => !String(c.province || "").trim()) && <option value="__missing__">ไม่ระบุจังหวัด</option>}
+        </SelectField>
+        <SelectField size="small" label="เมือง" value={cityFilter} onChange={(e) => setCityFilter(e.target.value)}>
+          <option value="all">ทุกเมือง</option>
+          {cityFilterOptions.map((name) => <option key={name} value={name}>{name}</option>)}
+          {viewBase.some((c) => (provinceFilter === "all"
+            || (provinceFilter === "__missing__" ? !String(c.province || "").trim() : String(c.province || "").trim() === provinceFilter))
+            && !String(c.city || "").trim()) && <option value="__missing__">ไม่ระบุเมือง</option>}
+        </SelectField>
       </>)}
       {/* ✅ กรองตามป้ายกำกับแผนก — ตามที่ผู้ใช้ขอให้ "ค้นหาแยกได้ชัดเจน" ระหว่างงานฝ่ายบริการกับฝ่ายขาย
           ✅ เปิดให้ทุก role ที่เข้าหน้านี้ได้ใช้ (ไม่ใช่แค่แอดมิน) — ป้ายนี้เป็นข้อมูลประกอบของแถวที่เห็นอยู่
@@ -6018,6 +6163,89 @@ pagedRows.map((c, idx) => {
           </Box>
         </Collapse>
       </Box>
+      )}
+
+      {!loading && (
+        <Paper variant="outlined" sx={{ mb: 2, borderRadius: 3, overflow: "hidden", borderColor: BORDER_MAIN }}>
+          <Box sx={{ px: 1.75, py: 1, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 1, bgcolor: "#f8fafc" }}>
+            <Button onClick={() => setRegionalSummaryOpen((open) => !open)} aria-expanded={regionalSummaryOpen}
+              startIcon={<Apartment sx={{ color: "#475569" }} />} endIcon={regionalSummaryOpen ? <ExpandLess /> : <ExpandMore />}
+              sx={{ flex: 1, minWidth: 260, justifyContent: "flex-start", textAlign: "left", color: "text.primary", textTransform: "none", fontWeight: 800, fontSize: "0.92rem", px: 0.5, py: 0.5, "& .MuiButton-endIcon": { ml: "auto" } }}>
+              สรุปวันเข้างานตามจังหวัด / เมือง
+            </Button>
+            <Chip size="small" variant="outlined" label={`${new Set(regionalVisitSummary.map((r) => r.province)).size} จังหวัด`} sx={{ bgcolor: "#fff", fontWeight: 700 }} />
+            <Chip size="small" variant="outlined" label={`${new Set(regionalVisitSummary.map((r) => `${r.province}/${r.city}`)).size} พื้นที่`} sx={{ bgcolor: "#fff", fontWeight: 700 }} />
+            <Chip size="small" color="success" label={`${regionalVisitSummary.reduce((sum, r) => sum + r.days, 0).toLocaleString()} วันตามแผน`} sx={{ fontWeight: 700 }} />
+          </Box>
+          <Collapse in={regionalSummaryOpen} unmountOnExit>
+            <Box sx={{ borderTop: `1px solid ${BORDER_MAIN}`, px: { xs: 0.75, sm: 1.25 }, py: 1, bgcolor: "#fff" }}>
+          <Button onClick={() => setRegionalMonthlyOpen((open) => !open)} aria-expanded={regionalMonthlyOpen}
+            startIcon={<CalendarMonth sx={{ color: "#0f766e" }} />} endIcon={regionalMonthlyOpen ? <ExpandLess /> : <ExpandMore />}
+            sx={{ width: "100%", justifyContent: "flex-start", textAlign: "left", px: 1.5, py: 1, borderRadius: 2, bgcolor: "#ecfdf5", color: "#065f46", textTransform: "none", fontWeight: 800, "& .MuiButton-endIcon": { ml: "auto" }, "&:hover": { bgcolor: "#d1fae5" } }}>
+            สรุปวันเข้างานจริง
+          </Button>
+          <Collapse in={regionalMonthlyOpen} unmountOnExit>
+          {regionalVisitSummary.length === 0 ? (
+            <Typography sx={{ px: 2, py: 2, color: TEXT_SUB, fontSize: "0.82rem" }}>
+              ไม่มีรอบงานที่มีกำหนดเข้าหน้างานตั้งแต่วันนี้เป็นต้นไปในชุดข้อมูลที่กรองอยู่
+            </Typography>
+          ) : (
+            <TableContainer sx={{ width: "100%", boxSizing: "border-box", maxHeight: 360, mt: 1, border: `1px solid ${BORDER_MAIN}`, borderRadius: 2, overflow: "auto" }}>
+              <Table size="small" stickyHeader aria-label="สรุปวันเข้างานตามจังหวัดและเมือง" sx={{ tableLayout: "fixed", minWidth: 1100 }}>
+                <colgroup>{[12, 12, 24, 12, 12, 9, 19].map((width, index) => <col key={index} style={{ width: `${width}%` }} />)}</colgroup>
+                <TableHead><TableRow>
+                  {["จังหวัด", "เมือง", "วันเข้างานตามจำนวนวันต่อครั้ง", "เดือน", "งาน/สัญญา", "รอบนัด", "วันหน้างานจริงตามแผน"].map((label, index) => (
+                    <TableCell key={label} align={index < 4 ? "left" : "center"} sx={{ fontWeight: 800, bgcolor: "#f1f5f9", color: "#475569", fontSize: "0.76rem", whiteSpace: "nowrap" }}>{label}</TableCell>
+                  ))}
+                </TableRow></TableHead>
+                <TableBody>{regionalVisitSummary.map((row) => (
+                  <TableRow key={`${row.province}-${row.city}-${row.month}`} hover sx={{ "&:nth-of-type(even)": { bgcolor: "#f8fafc" } }}>
+                    <TableCell sx={{ fontWeight: 700 }}>{row.province}</TableCell>
+                    <TableCell>{row.city}</TableCell>
+                    <TableCell align="left" sx={{ fontWeight: 800, color: "#c2410c" }}>{row.estimatedDays ? `${row.estimatedDays.toLocaleString()} วัน` : "—"}</TableCell>
+                    <TableCell>{(() => { const month = moment(`${row.month}-01`).locale("th"); return `${month.format("MMMM")} ${month.year() + 543}`; })()}</TableCell>
+                    <TableCell align="center">{row.contractCount.toLocaleString()}</TableCell>
+                    <TableCell align="center">{row.roundCount.toLocaleString()}</TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 800, color: "#0f766e" }}>{row.days.toLocaleString()} วัน</TableCell>
+                  </TableRow>
+                ))}</TableBody>
+              </Table>
+            </TableContainer>
+          )}
+          </Collapse>
+          {regionalAnnualSummary.length > 0 && (
+            <Box sx={{ borderTop: `1px solid ${BORDER_MAIN}`, py: 1, bgcolor: "#fff" }}>
+              <Button onClick={() => setRegionalAnnualOpen((open) => !open)} aria-expanded={regionalAnnualOpen}
+                startIcon={<Apartment sx={{ color: ACCENT }} />} endIcon={regionalAnnualOpen ? <ExpandLess /> : <ExpandMore />}
+                sx={{ width: "100%", justifyContent: "flex-start", textAlign: "left", px: 1.5, py: 1, borderRadius: 2, bgcolor: "#fff7ed", color: "#9a3412", textTransform: "none", fontWeight: 800, "& .MuiButton-endIcon": { ml: "auto" }, "&:hover": { bgcolor: "#ffedd5" } }}>
+                สรุปวันเข้างานประมาณการ
+              </Button>
+              <Collapse in={regionalAnnualOpen} unmountOnExit>
+                <TableContainer sx={{ width: "100%", boxSizing: "border-box", maxHeight: 240, mt: 1, border: `1px solid ${BORDER_MAIN}`, borderRadius: 2, overflow: "auto" }}>
+                  <Table size="small" stickyHeader aria-label="สรุปวันเข้างานรายปี" sx={{ tableLayout: "fixed", minWidth: 1100 }}>
+                    <colgroup>{[12, 12, 76].map((width, index) => <col key={index} style={{ width: `${width}%` }} />)}</colgroup>
+                    <TableHead><TableRow>
+                      {["จังหวัด", "เมือง", "ประมาณการวันเข้างานทั้งหมดต่อปี"].map((label, index) => (
+                        <TableCell key={index} align="left" sx={{ fontWeight: 800, bgcolor: "#f1f5f9", color: "#475569", fontSize: "0.76rem", whiteSpace: "nowrap" }}>{label}</TableCell>
+                      ))}
+                    </TableRow></TableHead>
+                    <TableBody>{regionalAnnualSummary.map((row) => (
+                      <TableRow key={`${row.province}-${row.city}`} hover sx={{ "&:nth-of-type(even)": { bgcolor: "#f8fafc" } }}>
+                        <TableCell sx={{ fontWeight: 700 }}>{row.province}</TableCell><TableCell>{row.city}</TableCell>
+                        <TableCell sx={{ fontWeight: 800, color: "#c2410c" }}>{row.annualDays.toLocaleString(undefined, { maximumFractionDigits: 2 })} วัน</TableCell>
+                      </TableRow>
+                    ))}</TableBody>
+                  </Table>
+                </TableContainer>
+              </Collapse>
+            </Box>
+          )}
+          <Typography sx={{ px: 1.75, py: 0.75, color: TEXT_SUB, fontSize: "0.7rem" }}>
+            สรุปแยกตามจังหวัดและเมือง รวมทุกสัญญาในพื้นที่ · ตัวอย่างสัญญา 2 ปี: 8 ครั้ง ÷ 2 = 4 ครั้ง/ปี; 3 วัน/ครั้ง × 4 = 12 วัน/ปี · อิงตัวกรองปัจจุบัน
+          </Typography>
+            </Box>
+          </Collapse>
+        </Paper>
       )}
 
       {/* ── มือถือ: สิ่งที่กำลังดูอยู่เป็นชิปบรรทัดเดียว (มุมมอง + ตัวกรอง) · แผงเต็มอยู่ในแผ่นล่าง ── */}
@@ -6823,7 +7051,7 @@ pagedRows.map((c, idx) => {
       {/* ── กล่อง "แก้ไขข้อมูล" — การ์ดรายละเอียดตัวเดียวกับจอมือถือ: ทุกช่องคลิกแก้ได้ บันทึกทันทีเหมือนในตาราง ── */}
       {rowEditorRow && (
         <Dialog
-          open onClose={() => setRowEditorKey(null)} fullWidth maxWidth="sm" fullScreen={isMobile}
+          open onClose={() => setRowEditorKey(null)} fullWidth maxWidth="md" fullScreen={isMobile}
           slotProps={{ paper: { sx: { borderRadius: isMobile ? 0 : 3.5, bgcolor: "#f8fafc" } } }}
         >
           <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1.5, bgcolor: "background.paper", borderBottom: `1px solid ${BORDER_MAIN}`, py: 1.5 }}>
@@ -6890,6 +7118,13 @@ pagedRows.map((c, idx) => {
                 ช่องที่คำนวณได้ (วันสิ้นสุด · จำนวนครั้งทั้งหมด · ระยะห่าง · เลขที่สัญญา) ระบบเติมให้ แก้เองได้ */}
             <FormSection step={1} title="งานและลูกค้า" hint="สัญญานี้เป็นงานอะไร ของโครงการไหน">
               <FieldGrid>
+                <Autocomplete
+                  fullWidth options={THAILAND_PROVINCES} value={form.province || null}
+                  onChange={(_, value) => setField("province")(value || "")}
+                  renderInput={(params) => <TextField {...params} label="จังหวัด" size="small" placeholder="เลือกจังหวัด" />}
+                />
+                <TextField fullWidth size="small" label="เมือง" value={form.city}
+                  onChange={(e) => setField("city")(e.target.value)} placeholder="เช่น เขตวัฒนา" />
                 <Autocomplete
                   freeSolo fullWidth options={siteOptions}
                   inputValue={form.site}
@@ -6989,6 +7224,11 @@ pagedRows.map((c, idx) => {
                     ปีละ {perYear} ครั้ง × {formYears} ปี = {expectedTotal} ครั้ง — แก้ให้ตรงกันเพื่อไม่ให้ตารางและแจ้งเตือนสับสน
                   </Alert>
                 )}
+
+                <TextField fullWidth size="small" type="number" label="ประมาณการวันเข้างานต่อครั้ง" value={form.estimatedDaysPerVisit}
+                  onChange={(e) => setField("estimatedDaysPerVisit")(e.target.value)} inputProps={{ min: 1, max: 365, step: 1 }}
+                  InputProps={{ endAdornment: <InputAdornment position="end">วัน / รอบ</InputAdornment> }}
+                  helperText="กรอกจำนวนวันเอง ระบบใช้คำนวณยอดรายเดือนและรายปีตามจำนวนครั้งและอายุสัญญา" />
 
                 {/* ③ สรุปให้เห็นผลก่อนบันทึก */}
                 {form.visitCount ? (

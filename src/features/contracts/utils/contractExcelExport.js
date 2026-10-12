@@ -103,6 +103,8 @@ export async function exportContractsToExcel({
     { key: "docNo", header: "เอกสารเลขที่", width: 18, group: "เอกสารอ้างอิง" },
     { key: "company", header: "บริษัท", width: 26, group: "ข้อมูลงาน" },
     { key: "site", header: "โครงการ", width: 26, group: "ข้อมูลงาน" },
+    { key: "province", header: "จังหวัด", width: 18, group: "ข้อมูลงาน" },
+    { key: "city", header: "เมือง", width: 18, group: "ข้อมูลงาน" },
     { key: "system", header: "ระบบ", width: 16, group: "ข้อมูลงาน" },
     { key: "title", header: "ประเภทงาน", width: 16, group: "ข้อมูลงาน" },
     { key: "contractStart", header: "เริ่มสัญญา", width: 13, group: "ระยะเวลา", align: "center" },
@@ -111,6 +113,7 @@ export async function exportContractsToExcel({
     // ไม่ใช่ให้เจ้านายมานั่งลบวันที่เอาเองทีละแถว (เทียบคอลัมน์เดียวกับตัวกรอง "อายุสัญญา" บนหน้าจอ)
     { key: "durationYears", header: "อายุสัญญา (ปี)", width: 13, group: "ระยะเวลา", align: "center" },
     { key: "intervalMonths", header: "รอบเข้า (เดือน)", width: 14, group: "ระยะเวลา", align: "center" },
+    { key: "estimatedDaysPerVisit", header: "วันเข้างาน/ครั้ง", width: 20, group: "ระยะเวลา", align: "center" },
     { key: "perYear", header: "เข้าปีละ (ครั้ง)", width: 14, group: "ระยะเวลา", align: "center" },
     { key: "visitCount", header: "จำนวนครั้ง", width: 11, group: "ระยะเวลา", align: "center" },
     { key: "jobValue", header: "มูลค่างาน (฿)", width: 15, group: "มูลค่า", align: "right", numFmt: MONEY_FMT },
@@ -182,7 +185,7 @@ export async function exportContractsToExcel({
   const SCREEN_KEY = {
     departmentTag: "departmentTag", contractNo: "doc", quotationNo: "doc", docNo: "doc",
     company: "customer", site: "customer", system: "work", title: "work",
-    contractStart: "period", contractEnd: "period", durationYears: "period", intervalMonths: "period", perYear: "period", visitCount: "period",
+    contractStart: "period", contractEnd: "period", durationYears: "period", intervalMonths: "period", estimatedDaysPerVisit: "period", perYear: "period", visitCount: "period",
     jobValue: "jobValue", commission: "commission", commissionPct: "commission",
     contractStatus: "statusProgress", missingFields: "statusProgress", progress: "statusProgress",
     billingStatus: "statusProgress", billingInvoiced: "statusProgress", billingPaid: "statusProgress", billingOutstanding: "statusProgress",
@@ -276,6 +279,7 @@ export async function exportContractsToExcel({
       // กวนค่าเฉลี่ย/การกรองใน Excel เหมือนกรณีคอลัมน์ยอดเงินที่เว้นว่างไว้ด้วยเหตุผลเดียวกัน
       durationYears: durationYears ? (durationYears(c) ?? "") : "",
       intervalMonths: c.intervalMonths ?? "",
+      estimatedDaysPerVisit: c.estimatedDaysPerVisit ?? "",
       perYear: visitsPerYear(c.intervalMonths) ?? "",
       visitCount: c.visitCount ?? "",
       jobValue: c.jobValue ?? "",
