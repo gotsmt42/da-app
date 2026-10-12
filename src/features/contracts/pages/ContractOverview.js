@@ -2184,11 +2184,18 @@ export default function ContractOverview() {
       || (provinceFilter === "__missing__" ? !String(c.province || "").trim() : String(c.province || "").trim() === provinceFilter))
     .map((c) => String(c.city || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "th")), [viewBase, provinceFilter]);
 
-  // Count the remaining scheduled calendar days from today, split at month boundaries.
+  // Keep the regional summary independent from the selected category and status tab.
+  // Common filters still apply, while the status filter is skipped so all contract states are combined.
+  const regionalContracts = useMemo(
+    () => applyCommonFilters(contracts, { skip: "status" }).filter(CATEGORY_PRED.contracts),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [contracts, search, yearFilter, responsibleFilter, titleFilter, systemFilter, provinceFilter, cityFilter, departmentFilter, durationFilter, dateFrom, dateTo]
+  );
+
+  // Count all scheduled calendar days, including past and future visits, split at month boundaries.
   const regionalVisitSummary = useMemo(() => {
     const groups = new Map();
-    const today = moment().startOf("day");
-    filtered.forEach((contract) => {
+    regionalContracts.forEach((contract) => {
       const province = String(contract.province || "").trim() || "ไม่ระบุจังหวัด";
       const city = String(contract.city || "").trim() || "ไม่ระบุเมือง";
       const groupKey = `${province}\u0000${city}`;
@@ -2198,9 +2205,9 @@ export default function ContractOverview() {
         const start = moment(visit.start || visit.date);
         let end = moment(visit.end || visit.start || visit.date);
         if (visit.end && visit.allDay) end = end.subtract(1, "day");
-        if (!start.isValid() || !end.isValid() || end.isBefore(today, "day")) return;
+        if (!start.isValid() || !end.isValid()) return;
         if (end.isBefore(start, "day")) end = start.clone();
-        const from = moment.max(start.clone().startOf("day"), today);
+        const from = start.clone().startOf("day");
         const through = end.clone().startOf("day");
         const roundKey = contract.isRealContract
           ? `${contract.key}:${visit.time ?? visit._id ?? visit.id ?? `${visit.start || visit.date}`}`
@@ -2212,13 +2219,18 @@ export default function ContractOverview() {
           const segmentStart = moment.max(from, monthStart);
           const segmentEnd = moment.min(through, monthEnd);
           const key = cursor.format("YYYY-MM");
-          if (!group.months.has(key)) group.months.set(key, { month: key, rounds: new Set(), contracts: new Set(), estimatedRounds: new Set(), days: 0, estimatedDays: 0 });
+          if (!group.months.has(key)) group.months.set(key, { month: key, contracts: new Map(), estimatedRounds: new Set(), days: 0, estimatedDays: 0 });
           const aggregate = group.months.get(key);
-          aggregate.rounds.add(roundKey);
-          aggregate.contracts.add(contract.key);
+          if (!aggregate.contracts.has(contract.key)) {
+            aggregate.contracts.set(contract.key, {
+              contractNo: String(contract.contractNo || "").trim() || "—",
+              rounds: new Set(),
+            });
+          }
+          aggregate.contracts.get(contract.key).rounds.add(Number(visit.time) || 1);
           aggregate.days += segmentEnd.diff(segmentStart, "days") + 1;
           const estimate = Number(contract.estimatedDaysPerVisit);
-          const startMonth = from.format("YYYY-MM");
+          const startMonth = start.format("YYYY-MM");
           if (key === startMonth && Number.isFinite(estimate) && estimate > 0 && !aggregate.estimatedRounds.has(roundKey)) {
             aggregate.estimatedRounds.add(roundKey);
             aggregate.estimatedDays += estimate;
@@ -2228,14 +2240,17 @@ export default function ContractOverview() {
       });
     });
     return [...groups.values()].flatMap((group) => [...group.months.values()].map((month) => ({
-      province: group.province, city: group.city, contractCount: month.contracts.size,
-      month: month.month, roundCount: month.rounds.size, days: month.days, estimatedDays: month.estimatedDays,
+      province: group.province, city: group.city,
+      contractEntries: [...month.contracts.values()]
+        .sort((a, b) => a.contractNo.localeCompare(b.contractNo, "th"))
+        .map((entry) => ({ ...entry, rounds: [...entry.rounds].sort((a, b) => a - b) })),
+      month: month.month, days: month.days, estimatedDays: month.estimatedDays,
     }))).sort((a, b) => a.province.localeCompare(b.province, "th") || a.city.localeCompare(b.city, "th") || a.month.localeCompare(b.month));
-  }, [filtered]);
+  }, [regionalContracts]);
 
   const regionalAnnualSummary = useMemo(() => {
     const areas = new Map();
-    filtered.forEach((contract) => {
+    regionalContracts.forEach((contract) => {
       const daysPerVisit = Number(contract.estimatedDaysPerVisit);
       if (!Number.isFinite(daysPerVisit) || daysPerVisit <= 0) return;
       const years = contractYearsOf(contract);
@@ -2250,7 +2265,7 @@ export default function ContractOverview() {
       aggregate.annualDays += daysPerVisit * annualRounds;
     });
     return [...areas.values()].sort((a, b) => a.province.localeCompare(b.province, "th") || a.city.localeCompare(b.city, "th"));
-  }, [filtered]);
+  }, [regionalContracts]);
 
   // ✅ แถวสำหรับแผง "งานตามผู้รับผิดชอบ" — กรองเหมือนตารางทุกอย่าง ยกเว้นตัวกรองผู้รับผิดชอบเอง
   //    (เลือกคนหนึ่งอยู่ก็ยังเห็นตัวเลขของทุกคน) ดู ResponsibleSummary.js
@@ -6194,19 +6209,33 @@ pagedRows.map((c, idx) => {
               <Table size="small" stickyHeader aria-label="สรุปวันเข้างานตามจังหวัดและเมือง" sx={{ tableLayout: "fixed", minWidth: 1100 }}>
                 <colgroup>{[12, 12, 24, 12, 12, 9, 19].map((width, index) => <col key={index} style={{ width: `${width}%` }} />)}</colgroup>
                 <TableHead><TableRow>
-                  {["จังหวัด", "เมือง", "วันเข้างานตามจำนวนวันต่อครั้ง", "เดือน", "งาน/สัญญา", "รอบนัด", "วันหน้างานจริงตามแผน"].map((label, index) => (
-                    <TableCell key={label} align={index < 4 ? "left" : "center"} sx={{ fontWeight: 800, bgcolor: "#f1f5f9", color: "#475569", fontSize: "0.76rem", whiteSpace: "nowrap" }}>{label}</TableCell>
+                  {["จังหวัด", "เมือง", "วันหน้างานจริงตามแผน", "เดือน", "เลขที่สัญญา", "ครั้งที่", "วันเข้างานตามจำนวนวันต่อครั้ง"].map((label, index) => (
+                    <TableCell key={label} align={index < 6 ? "left" : "center"} sx={{ fontWeight: 800, bgcolor: "#f1f5f9", color: "#475569", fontSize: "0.76rem", whiteSpace: "nowrap" }}>{label}</TableCell>
                   ))}
                 </TableRow></TableHead>
                 <TableBody>{regionalVisitSummary.map((row) => (
                   <TableRow key={`${row.province}-${row.city}-${row.month}`} hover sx={{ "&:nth-of-type(even)": { bgcolor: "#f8fafc" } }}>
                     <TableCell sx={{ fontWeight: 700 }}>{row.province}</TableCell>
                     <TableCell>{row.city}</TableCell>
-                    <TableCell align="left" sx={{ fontWeight: 800, color: "#c2410c" }}>{row.estimatedDays ? `${row.estimatedDays.toLocaleString()} วัน` : "—"}</TableCell>
+                    <TableCell align="left" sx={{ fontWeight: 800, color: "#0f766e" }}>{row.days.toLocaleString()} วัน</TableCell>
                     <TableCell>{(() => { const month = moment(`${row.month}-01`).locale("th"); return `${month.format("MMMM")} ${month.year() + 543}`; })()}</TableCell>
-                    <TableCell align="center">{row.contractCount.toLocaleString()}</TableCell>
-                    <TableCell align="center">{row.roundCount.toLocaleString()}</TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 800, color: "#0f766e" }}>{row.days.toLocaleString()} วัน</TableCell>
+                    <TableCell>
+                      <Stack spacing={0.25}>
+                        {row.contractEntries.map((entry, index) => (
+                          <Typography key={`${entry.contractNo}-${index}`} component="span" sx={{ fontSize: "0.78rem", lineHeight: 1.4 }}>{entry.contractNo}</Typography>
+                        ))}
+                      </Stack>
+                    </TableCell>
+                    <TableCell>
+                      <Stack spacing={0.25}>
+                        {row.contractEntries.map((entry, index) => (
+                          <Typography key={`${entry.contractNo}-${index}`} component="span" sx={{ fontSize: "0.78rem", lineHeight: 1.4 }}>
+                            ครั้งที่ {entry.rounds.join(", ")}
+                          </Typography>
+                        ))}
+                      </Stack>
+                    </TableCell>
+                    <TableCell align="left" sx={{ fontWeight: 800, color: "#c2410c" }}>{row.estimatedDays ? `${row.estimatedDays.toLocaleString()} วัน` : "—"}</TableCell>
                   </TableRow>
                 ))}</TableBody>
               </Table>
