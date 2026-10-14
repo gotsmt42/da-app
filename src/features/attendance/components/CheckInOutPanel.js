@@ -129,6 +129,55 @@ function statusStepsOf(event) {
   return { current, dates, labels: STATUS_STEPS.map((st) => st.label) };
 }
 
+/** แสดงความคืบหน้าการบันทึกแยกตามวัน เมื่องานเดียวมีหลายวันเข้างาน */
+function MultiDayAttendanceProgress({ event, rows }) {
+  if (!Array.isArray(rows)) return null;
+  const start = moment(event.start).utcOffset(7).startOf("day");
+  const end = moment(event.end || event.start).utcOffset(7)
+    .subtract(event.allDay ? 1 : 0, "days").startOf("day");
+  if (!start.isValid() || !end.isValid() || end.isBefore(start)) return null;
+
+  const days = [];
+  for (let day = start.clone(); day.isSameOrBefore(end, "day") && days.length < 366; day.add(1, "day")) {
+    days.push(day.clone());
+  }
+  if (days.length < 2) return null;
+
+  const checked = new Set((rows || [])
+    .filter((row) => row.checkIn?.at)
+    .map((row) => moment(row.checkIn.at).utcOffset(7).format("YYYY-MM-DD")));
+  const completed = days.filter((day) => checked.has(day.format("YYYY-MM-DD"))).length;
+  const visibleDays = days.length > 10 ? days.slice(0, 9) : days;
+
+  return (
+    <Box sx={{ mt: 0.75, px: 1, py: 0.8, borderRadius: 1.5, bgcolor: "#f8fafc", border: `1px solid ${LINE}` }}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
+        <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: INK_2 }}>บันทึกเข้างานรายวัน</Typography>
+        <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: completed === days.length ? "#15803d" : ACCENT, whiteSpace: "nowrap" }}>
+          {completed} / {days.length} วัน
+        </Typography>
+      </Stack>
+      <Stack direction="row" gap={0.5} flexWrap="wrap" sx={{ mt: 0.65 }}>
+        {visibleDays.map((day) => {
+          const done = checked.has(day.format("YYYY-MM-DD"));
+          return (
+            <Box key={day.format("YYYY-MM-DD")} title={done ? `บันทึกแล้ว ${formatThai(day, "D MMM YYYY")}` : `ยังไม่ได้บันทึก ${formatThai(day, "D MMM YYYY")}`}
+              sx={{ display: "inline-flex", alignItems: "center", gap: 0.35, px: 0.7, py: 0.25, borderRadius: 99,
+                bgcolor: done ? "#ecfdf5" : "#fff", border: `1px solid ${done ? "#bbf7d0" : LINE}`,
+                color: done ? "#15803d" : MUTED, fontSize: "0.67rem", fontWeight: 700, whiteSpace: "nowrap" }}>
+              {done ? <CheckRounded sx={{ fontSize: 13 }} /> : <Box component="span" sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#cbd5e1" }} />}
+              {formatThai(day, "D MMM")}
+            </Box>
+          );
+        })}
+        {days.length > visibleDays.length && (
+          <Typography sx={{ alignSelf: "center", fontSize: "0.67rem", color: MUTED }}>และอีก {days.length - visibleDays.length} วัน</Typography>
+        )}
+      </Stack>
+    </Box>
+  );
+}
+
 /**
  * ✅ (11 ต.ค. 2569 ผู้ใช้: "การรับทราบงานของช่างให้กดปฏิเสธได้ โดยกรอกเหตุผลมาด้วย")
  * กล่องปฏิเสธงาน — เลือกเหตุผลสำเร็จรูป หรือพิมพ์เอง (ต้องมีเหตุผลเสมอ)
@@ -234,11 +283,15 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
 
   // ── ทีมของวันนี้: หัวหน้าทีมเข้างานเป็นคนเช็คอินให้ทั้งทีม ──
   const head = event.team || "";
-  const hasHead = Boolean(event.team || event.resPerson);
-  const isHead = (event.resPerson && String(event.resPerson) === me) || (userData?.fname && event.team === userData.fname);
+  const isResponsible = (event.responsiblePersonId && String(event.responsiblePersonId) === me) || (userData?.fname && event.responsiblePerson === userData.fname);
+  const hasResponsible = Boolean(event.responsiblePersonId || event.responsiblePerson);
+  const hasHead = Boolean(event.team || event.resPerson || (!event.team && !event.resPerson && hasResponsible));
+  const isHead = (event.resPerson && String(event.resPerson) === me) || (userData?.fname && event.team === userData.fname) || (!event.team && !event.resPerson && isResponsible);
   const members = [...new Set((event.teamMembers || []).map((m) => m?.name).filter((n) => n && n !== head))];
-  // เช็คอินของงานนี้ (ล่าสุด) — 1 ครั้งต่อการ์ดงาน
-  const checkin = (rows || []).slice().sort((a, b) => new Date(b.checkIn?.at) - new Date(a.checkIn?.at))[0];
+  // เช็คอินนับแยกตามวันไทย: งานเดียวเข้างานซ้ำได้คนละวัน แต่วันเดียวกันบันทึกได้ครั้งเดียว
+  const todayKey = moment().utcOffset(7).format("YYYY-MM-DD");
+  const checkin = (rows || []).find((r) => r.checkIn?.at && moment(r.checkIn.at).utcOffset(7).format("YYYY-MM-DD") === todayKey);
+  const latestCheckin = (rows || []).slice().sort((a, b) => new Date(b.checkIn?.at) - new Date(a.checkIn?.at))[0];
 
   // ── ขั้นปัจจุบัน (ของทีม) ──
   const teamAcks = event.acks || [];
@@ -247,8 +300,6 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
   //    หัวหน้าทีมหรือผู้รับผิดชอบคนใดคนหนึ่งกดแล้ว = รับทราบแล้ว · ลูกทีม/แอดมินกดแทนไม่ได้
   // ✅ (11 ต.ค. 2569 ผู้ใช้ — ขั้นตอนใหม่) รับทราบ + ยืนยันนัดหมาย = ผู้รับผิดชอบงาน
   //    (ยังไม่มอบหมายผู้รับผิดชอบ → หัวหน้าทีมแทน) · บันทึกเข้างาน = หัวหน้าทีม หลังยืนยันนัดหมายแล้ว
-  const isResponsible = (event.responsiblePersonId && String(event.responsiblePersonId) === me) || (userData?.fname && event.responsiblePerson === userData.fname);
-  const hasResponsible = Boolean(event.responsiblePersonId || event.responsiblePerson);
   const canAck = hasResponsible ? Boolean(isResponsible) : Boolean(isHead);
   const respName = event.responsiblePerson || head;
   const acked = !ackTracked(event) || teamAcks.length > 0 || (rows || []).length > 0 || isAckedBy(event, me) || myRows.length > 0;
@@ -259,7 +310,7 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
   const declined = event.ackDeclined?.userId ? event.ackDeclined : null;
   const declinedByMe = declined && String(declined.userId) === me;
   // งานเดิมก่อนเปิดใช้ระบบบันทึกเข้างาน ที่สถานะ "กำลังดำเนินการ" อยู่แล้ว = ถือว่าเข้างานแล้ว (ให้แถบตรงกับป้ายสถานะ)
-  const legacyStarted = !checkin && event.status === "กำลังดำเนินการ" && Boolean(event.createdAt) && new Date(event.createdAt) < new Date(FLOW_SINCE);
+  const legacyStarted = !checkin && !latestCheckin && event.status === "กำลังดำเนินการ" && Boolean(event.createdAt) && new Date(event.createdAt) < new Date(FLOW_SINCE);
   const current = closed ? STEPS.length
     : event.closeRequested ? 5
     : checkin || legacyStarted ? (docsComplete ? 4 : 3)
@@ -345,7 +396,8 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
     if (data?.events?.length) onPatched?.(data.events);
     const a = data?.attendance;
     const b = locationBadge(a?.checkIn);
-    notify({ title: `เข้างานแล้ว ${fmtTime(a?.checkIn?.at)}`, text: [b?.text, "แนบเอกสารประจำงาน แล้วขอปิดงาน"].filter(Boolean).join(" · "), timer: 2200 });
+    const workDay = a?.checkIn?.at ? formatThai(moment(a.checkIn.at).utcOffset(7), "D MMMM YYYY") : "วันนี้";
+    notify({ title: `บันทึกเข้างานวันที่ ${workDay} แล้ว`, text: [b?.text, "วันทำงานถัดไปบันทึกเพิ่มได้"].filter(Boolean).join(" · "), timer: 2400 });
   };
 
   // ── เนื้อหาของขั้นปัจจุบัน (ปุ่มหลักปุ่มเดียว) ──
@@ -359,7 +411,6 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
     // เข้างานแล้ว — กล่องเดียว: เวลา · ใคร/ตำแหน่ง · (เส้นคั่น) ขั้นถัดไปเป็นข้อความธรรมดา
     // ✅ (11 ต.ค. 2569 ผู้ใช้: "ข้างล่างเข้างานอย่าทำให้เป็นเหมือนปุ่มกด เดี๋ยวสับสนได้") — ไม่มีกรอบ/สีปุ่ม
     const inBadge = locationBadge(checkin.checkIn);
-    const where = embedded ? "ที่หน้างานของฉัน / การดำเนินงาน" : "ด้านล่าง";
     action = (
       <Box sx={{ p: 1.5, borderRadius: "14px", bgcolor: SURFACE }}>
         <Stack direction="row" gap={1.25} alignItems="center">
@@ -374,7 +425,7 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
           </Box>
         </Stack>
         <Typography sx={{ mt: 1.25, pt: 1.1, borderTop: "1px dashed #d8dee6", fontSize: "0.8rem", color: INK_2, lineHeight: 1.5 }}>
-          {docsComplete ? `เอกสารครบแล้ว — กด “ขอปิดงาน” ${where}` : `แนบเอกสารประจำงานให้ครบ ${where} แล้วขอปิดงาน`}
+          บันทึกของวันนี้เรียบร้อยแล้ว{rows.length > 1 ? ` · บันทึกแล้ว ${rows.length} วัน` : ""}
         </Typography>
       </Box>
     );
@@ -397,7 +448,7 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
     action = (
       <Box>
         <Button fullWidth variant="contained" disableElevation startIcon={<LoginRounded />} onClick={() => setDialog(true)} sx={MBTN.primary}>
-          เข้างาน · ถ่ายรูปหน้างาน
+          บันทึกเข้างานวันนี้
         </Button>
         <Hint>กดแทนทั้งทีม · ระบบบันทึกเวลาและตำแหน่งให้</Hint>
       </Box>
@@ -440,9 +491,8 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
       const b = locationBadge(checkin.checkIn);
       line = (
         <Line icon={<TaskAltRounded />} tone="#16a34a" right={logLink}>
-          <b style={{ fontWeight: 600, color: INK }}>เข้างานแล้ว {fmtTime(checkin.checkIn?.at)}</b> · {checkin.userName}
+          <b style={{ fontWeight: 600, color: INK }}>บันทึกวันนี้แล้ว · {fmtTime(checkin.checkIn?.at)}</b> · {checkin.userName}
           {b?.tone === "warn" && <Box component="span" sx={{ color: "#b45309" }}> · {b.text}</Box>}
-          <Box component="span" sx={{ color: MUTED }}>{docsComplete ? " · เอกสารครบ กดขอปิดงานได้" : " · แนบเอกสารให้ครบ"}</Box>
         </Line>
       );
     } else if (legacyStarted) {
@@ -500,7 +550,7 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
     else {
       line = (
         <Button fullWidth variant="contained" disableElevation startIcon={<LoginRounded />} onClick={() => setDialog(true)} sx={{ ...MBTN.primary, minHeight: 42 }}>
-          บันทึกเข้างาน · ถ่ายรูปหน้างาน
+          บันทึกเข้างานวันนี้
         </Button>
       );
     }
@@ -516,10 +566,11 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
         {showSteps ? (
           <Box sx={{ px: 1, py: 0.75, borderRadius: "12px", border: `1px solid ${LINE}` }}>
             {statusSteps ? <MiniSteps {...statusStepsOf(event)} /> : <MiniSteps current={pendingApproval ? 0 : current} />}
+            <MultiDayAttendanceProgress event={event} rows={rows} />
             <Box sx={{ mt: 0.75, pt: 0.75, borderTop: `1px solid ${LINE}` }}>{line}</Box>
           </Box>
         ) : (rows || []).length > 0 && (
-          <Line icon={<HistoryRounded />} right={logLink}>บันทึกเข้างาน {rows.length} ครั้ง</Line>
+          <Line icon={<HistoryRounded />} right={logLink}>บันทึกแล้ว {rows.length} วัน</Line>
         )}
         <Collapse in={showLog} unmountOnExit>
           <Box sx={{ pt: 1 }}>
@@ -553,6 +604,7 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
             {members.map((n) => <PersonChip key={n} name={n} title={`ลูกทีม: ${n}`} />)}
           </Stack>
           <Box sx={{ mb: 1.5 }}><MiniSteps current={pendingApproval ? 0 : current} /></Box>
+          <MultiDayAttendanceProgress event={event} rows={rows} />
           {flash && (
             <Box sx={{ mb: 1.25, px: 1.5, py: 1, borderRadius: "12px", bgcolor: flash.ok ? "#f0fdf4" : "#fef2f2" }}>
               <Typography sx={{ fontSize: "0.86rem", fontWeight: 600, color: flash.ok ? "#15803d" : "#b91c1c" }}>{flash.ok ? "✓ " : ""}{flash.title}</Typography>
@@ -571,7 +623,7 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
               bgcolor: SURFACE, "&:hover": { bgcolor: "#eef2f6" } }}>
             <HistoryRounded sx={{ fontSize: 19, color: MUTED }} />
             <Typography sx={{ flex: 1, textAlign: "left", fontSize: "0.84rem", fontWeight: 700, color: INK_2 }}>
-              บันทึกเข้างาน {rows.length} ครั้ง
+              บันทึกแล้ว {rows.length} วัน
             </Typography>
             {pendingFix && (
               <Box component="span" sx={{ px: 0.9, py: 0.15, borderRadius: 99, fontSize: "0.68rem", fontWeight: 600, color: "#b45309", bgcolor: "#fef3c7" }}>ขอแก้เวลา</Box>

@@ -44,7 +44,7 @@ import { formatThai } from "@/shared/utils/thaiDate";
 import { ROLES } from "@/shared/utils/roles";
 import { JobFlowChips, JobFlowPanel } from "@/shared/ui/JobFlow";
 import SitePhotos from "@/shared/ui/SitePhotos";
-import { PersonChip } from "@/shared/ui/PersonChip";
+import { AssignResponsibleMenu, PersonChip } from "@/shared/ui/PersonChip";
 import CheckInOutPanel from "@/features/attendance/components/CheckInOutPanel";
 import { docsUnlocked } from "@/shared/utils/jobFlow";
 import { BTN as MBTN, CARD } from "@/shared/ui/modernUi";
@@ -655,6 +655,8 @@ const CommentThread = ({ comments = [], onSend, myRole }) => {
 // ─── Main: TechnicianJobCard ──────────────────────────────────────────
 const TechnicianJobCard = ({
   event,
+  userData,
+  employees = [],
   onInputUpdate,
   // ✅ อัปเดตฟิลด์ที่ต้อง "ใช้ร่วมกันทั้งกลุ่ม" (เช่น ขอปิดงาน) — เผื่อไว้ ถ้าไม่ส่งมา fallback ไป
   // onInputUpdate เดิม (แก้แค่ใบเดียว) ดู handleRequestClose ด้านล่างว่าทำไมต้องแยกจาก onInputUpdate
@@ -684,6 +686,7 @@ const TechnicianJobCard = ({
   // (ดู ActivityLogMini ใน Operation/index.js) ซึ่งพับไว้เป็นค่าเริ่มต้น กดดูได้เมื่อต้องการ —
   // เพิ่ม toggle แบบเดียวกันให้ฝั่งช่างด้วย
   const [activityLogOpen, setActivityLogOpen] = useState(false);
+  const [teamAnchor, setTeamAnchor] = useState(null);
   // ✅ จอกว้างพอ (≥900px) เปิดส่วน "สรุปงานที่ทำ/คุยกับแอดมิน/ประวัติกิจกรรม" แบบ Dialog ทับขึ้นมา
   // แทนที่จะกางลงในหน้าเดิม (Collapse) — เดิมกางแล้วเนื้อหาดันการ์ดอื่นในคอลัมน์เดียวกันลงมา ต้อง
   // เลื่อนจอตามทั้งที่จอกว้างมีพื้นที่พอจะเปิดลอยทับได้เลยโดยไม่กระทบตำแหน่งการ์ดอื่น (มือถือจอแคบ
@@ -1032,6 +1035,8 @@ const TechnicianJobCard = ({
                     แสดงเป็นชิปรูปคน: ผู้รับผิดชอบ (เสมอ — ยังไม่มอบหมายก็บอก) · ทีม = หัวหน้า (ป้ายหัวหน้า) + ลูกทีม */}
                 {(() => {
                   const head = event.team || "";
+                  const isResponsible = (event.responsiblePersonId && String(event.responsiblePersonId) === String(userData?.userId))
+                    || (userData?.fname && event.responsiblePerson === userData.fname);
                   const members = [...new Set((event.teamMembers || []).map(m => m?.name).filter((n) => n && n !== head))];
                   return (
                     <>
@@ -1040,13 +1045,34 @@ const TechnicianJobCard = ({
                           ? <PersonChip name={event.responsiblePerson} size={20} strong title={`ผู้รับผิดชอบงาน: ${event.responsiblePerson}`} />
                           : <span style={{ color: "#b45309" }}>ยังไม่มอบหมาย</span>}
                       </InfoLine>
-                      {(head || members.length > 0) && (
+                      {(head || members.length > 0 || isResponsible) && (
                         <InfoLine label="ทีม" center>
                           <Box component="span" sx={{ display: "inline-flex", flexWrap: "wrap", gap: 0.5 }}>
                             {head && <PersonChip name={head} size={20} badge="หัวหน้า" title={`หัวหน้าทีมเข้างาน: ${head}`} />}
                             {members.map((n) => <PersonChip key={n} name={n} size={20} title={`ลูกทีม: ${n}`} />)}
+                            {!head && isResponsible && <span style={{ color: "#b45309" }}>ยังไม่ได้มอบหมายหัวหน้าทีม</span>}
+                            {isResponsible && event.status !== "ดำเนินการเสร็จสิ้น" && (
+                              <ButtonBase onClick={(e) => { e.stopPropagation(); setTeamAnchor(e.currentTarget); }}
+                                sx={{ ml: 0.5, px: 1, py: 0.35, borderRadius: 1.5, color: "#2563eb", bgcolor: "#eff6ff", fontSize: "0.74rem", fontWeight: 800 }}>
+                                {head ? "เปลี่ยนหัวหน้าทีม" : "มอบหมายหัวหน้าทีม"}
+                              </ButtonBase>
+                            )}
                           </Box>
                         </InfoLine>
+                      )}
+                      {isResponsible && (
+                        <AssignResponsibleMenu
+                          title="เลือกหัวหน้าทีมเข้างาน"
+                          anchorEl={teamAnchor}
+                          onClose={() => setTeamAnchor(null)}
+                          employees={employees}
+                          value={head}
+                          onPick={(name) => {
+                            setTeamAnchor(null);
+                            const selected = employees.find((person) => person.fname === name);
+                            onInputUpdate?.(event._id, { team: name, resPerson: selected?._id ? String(selected._id) : "" });
+                          }}
+                        />
                       )}
                     </>
                   );

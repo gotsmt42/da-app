@@ -21,6 +21,7 @@ import { useAuth } from "@/features/auth/AuthContext";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import EventService from "@/shared/services/EventService";
+import AuthService from "@/shared/services/authService";
 import TechnicianJobCard from "../components/TechnicianJobPanel";
 import ActiveCheckInBanner from "@/features/attendance/components/ActiveCheckInBanner";
 import { buildDaysPastDueMap, isFlaggedDays, isSevereDays, getOverdueGroupKey } from "@/shared/utils/overdueJobs";
@@ -238,6 +239,7 @@ const matchesGroup = (event, group, daysPastDueMap) => {
 export default function MyJobs() {
   const { userData } = useAuth() || {};
   const [events, setEvents] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [, setLastRefreshed] = useState(null);
   const [search, setSearch] = useState("");
@@ -274,6 +276,14 @@ export default function MyJobs() {
       if (!silent) setLoading(false);
     }
   }, [userData?.userId, userData?.fname]);
+
+  useEffect(() => {
+    let active = true;
+    AuthService.getAllUserData()
+      .then((res) => { if (active) setEmployees(res?.allUser || []); })
+      .catch((err) => console.error("โหลดรายชื่อสำหรับมอบหมายหัวหน้าทีมไม่สำเร็จ", err));
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
 
@@ -629,6 +639,8 @@ export default function MyJobs() {
                 )}
                 <JobGroupCard
                   sessions={sessions}
+                  userData={userData}
+                  employees={employees}
                   onPatched={handlePatched}
                   onInputUpdate={handleInputUpdate}
                   onStatusUpdate={handleStatusUpdate}

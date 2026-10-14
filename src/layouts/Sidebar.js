@@ -38,9 +38,8 @@ const Sidebar = ({ handleMenuClick, isCollapsed = false }) => {
   const isAdminOrManager = can(userData, "manageMasterData");
   const seeAllSchedules = can(userData, "viewAllJobs");
   const canViewContracts = can(userData, "viewContracts");
-  // ✅ (11 ต.ค. 2569) "งานของฉัน" — ทุกคนที่ถูกมอบหมายงานได้ (ช่าง · แอดมิน/ผู้จัดการที่เป็นผู้รับผิดชอบ)
-  // ✅ (11 ต.ค. 2569 ผู้ใช้: "หน้าแอดมินไม่ควรมีเมนูงานของฉัน ให้มีแค่ของช่าง")
-  const canMyJobs = can(userData, "receiveDispatch");
+  // "งานของฉัน" แสดงให้ช่าง/หัวหน้าทีม และแอดมิน/ผู้จัดการเข้าดูงานที่มอบหมายให้ตัวเองได้
+  const canMyJobs = can(userData, "receiveDispatch") || isAdminOrManager;
   // ✅ เมนูฝ่ายขาย — เห็นเฉพาะคนที่ทำแผนงานขายได้จริง (เซล + หัวหน้า)
   const canSell = can(userData, "createSalesPlan");
   // แจ้งงานให้ช่าง — คนที่จัดคิวเองได้ (assignDispatch) ไม่ต้องแจ้งตัวเอง
@@ -390,7 +389,7 @@ const side = (key, extra) => {
         <Nav vertical className="sidebarNav">
           {navigation.map((item, idx) => renderLink(item, `nav-${idx}`))}
 
-          {/* หมวด "งาน" — แผนงาน/ปฏิทิน + ภาพรวมสัญญา (admin/manager) + งานของฉัน (ช่าง)
+          {/* หมวด "งาน" — แผนงาน/ปฏิทิน + ภาพรวมสัญญา + งานของฉัน (งานที่มอบหมายให้ผู้ใช้)
               ⚠️ หัวข้อหมวดต้องหายไปพร้อมกับเมนูข้างใต้ — ไม่งั้นเซล (ซึ่งไม่มีเมนูในหมวดนี้เลย)
               จะเห็นคำว่า "งาน" ลอยอยู่เฉยๆ โดยไม่มีอะไรอยู่ใต้มัน */}
           {hasWorkMenu && <div className="admin-divider-label">งาน</div>}

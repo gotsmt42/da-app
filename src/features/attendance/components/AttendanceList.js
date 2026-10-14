@@ -150,7 +150,7 @@ function Row({ row, me, isApprover, showJob, onPreview, onChanged, embedded }) {
             <ExpandMore sx={{ fontSize: 18, color: FAINT, flexShrink: 0, alignSelf: "center", ml: -0.5, transition: "transform .2s", transform: open ? "rotate(180deg)" : "none" }} />
           </Stack>
           <Typography noWrap sx={{ fontSize: "0.78rem", color: INK_2, mt: 0.1 }}>
-            {showJob ? [row.jobLabel, row.jobNo].filter(Boolean).join(" · ") : fmtDayTime(row.checkIn?.at).split(" · ")[0]}
+            {showJob ? [fmtDayTime(row.checkIn?.at).split(" · ")[0], row.jobLabel, row.jobNo].filter(Boolean).join(" · ") : fmtDayTime(row.checkIn?.at).split(" · ")[0]}
           </Typography>
           <Stack direction="row" alignItems="center" sx={{ mt: 0.3 }}>
             <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.74rem", color: MUTED, lineHeight: 1.5 }}>

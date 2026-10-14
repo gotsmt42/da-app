@@ -11,13 +11,13 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Box, Stack, Typography, Button, ButtonBase, Dialog, DialogContent, DialogActions, IconButton, TextField,
+  Box, Stack, Typography, Button, ButtonBase, Dialog, DialogContent, DialogActions, IconButton, TextField, Collapse,
   CircularProgress, useMediaQuery,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
   Close, LoginRounded, MyLocationRounded, LocationOffRounded, AddAPhotoOutlined, AccessTimeRounded,
-  CheckCircleRounded, RefreshRounded, LockClockOutlined, CheckRounded, DescriptionOutlined,
+  CheckCircleRounded, RefreshRounded, LockClockOutlined, CheckRounded, DescriptionOutlined, ExpandMoreRounded,
 } from "@mui/icons-material";
 import EventService from "@/shared/services/EventService";
 import { BTN as MBTN, CARD } from "@/shared/ui/modernUi";
@@ -105,6 +105,7 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
   const [uploading, setUploading] = useState(0);
   const [notePreset, setNotePreset] = useState("");
   const [noteExtra, setNoteExtra] = useState("");
+  const [noteOpen, setNoteOpen] = useState(false);
   const note = [notePreset, noteExtra.trim()].filter(Boolean).join(" — ");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
@@ -120,7 +121,7 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
   useEffect(() => {
     if (!open || !event?._id) return undefined;
     doneRef.current = false;
-    setPhotos([]); setNotePreset(""); setNoteExtra(""); setErr(""); setSite(null);
+    setPhotos([]); setNotePreset(""); setNoteExtra(""); setNoteOpen(false); setErr(""); setSite(null);
     AttendanceService.ofEvent(event._id, { site: true })
       .then((r) => {
         if (r?.serverNow) setOffset(new Date(r.serverNow).getTime() - Date.now());
@@ -219,7 +220,7 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
           <LoginRounded />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 900, fontSize: "1.05rem", color: INK }}>เข้างาน · ถ่ายรูปหน้างาน</Typography>
+          <Typography sx={{ fontWeight: 900, fontSize: "1.05rem", color: INK }}>บันทึกเข้างานวันนี้</Typography>
           <Typography noWrap sx={{ fontSize: "0.78rem", color: MUTED }}>{[jobLabel, event?.jobNo].filter(Boolean).join(" · ")}</Typography>
         </Box>
         <IconButton onClick={cancel} aria-label="ปิด"><Close /></IconButton>
@@ -234,7 +235,7 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
               <Typography sx={{ fontSize: "1.9rem", fontWeight: 900, color: INK, lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>
                 {fmtTime(serverNow)}
               </Typography>
-              <Typography sx={{ fontSize: "0.76rem", color: MUTED }}>เวลาเข้างาน = เวลาที่กดยืนยัน</Typography>
+              <Typography sx={{ fontSize: "0.76rem", color: MUTED }}>วันที่เข้างาน {new Intl.DateTimeFormat("th-TH", { timeZone: "Asia/Bangkok", day: "numeric", month: "long", year: "numeric" }).format(new Date(serverNow))} · เวลาเข้างาน = เวลาที่กดยืนยัน</Typography>
             </Box>
           </Stack>
           <Stack direction="row" alignItems="center" gap={0.6} sx={{ mt: 1.25, pt: 1, borderTop: `1px dashed ${LINE}` }}>
@@ -263,7 +264,14 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
           <input ref={fileRef} type="file" hidden multiple accept="image/*,.heic,.heif" onChange={onPick} />
         </Section>
 
-        <Section title="หมายเหตุ" hint="ไม่บังคับ">
+        <Box sx={{ ...CARD, mb: 1.5, overflow: "hidden" }}>
+          <ButtonBase onClick={() => setNoteOpen((v) => !v)} aria-expanded={noteOpen}
+            sx={{ width: "100%", justifyContent: "space-between", px: 2, py: 1.5, fontFamily: "inherit", textAlign: "left" }}>
+            <Typography sx={{ fontSize: "0.88rem", fontWeight: 700, color: INK }}>เพิ่มหมายเหตุ <Box component="span" sx={{ fontWeight: 400, color: MUTED }}>(ถ้ามี)</Box></Typography>
+            <ExpandMoreRounded sx={{ color: MUTED, transform: noteOpen ? "rotate(180deg)" : "none", transition: "transform .2s" }} />
+          </ButtonBase>
+          <Collapse in={noteOpen} unmountOnExit>
+            <Box sx={{ px: 2, pb: 2 }}>
             {/* ✅ (10 ต.ค. 2569 ผู้ใช้: "ตรงเลือกหมายเหตุให้เลือกง่ายกว่านี้ ดูเล็กๆ อ่านยาก ไม่สวย")
                 เดิมเป็นชิปเล็กๆ ตัดบรรทัดไม่เป็นระเบียบ — ตอนนี้เป็นแถวเต็มความกว้าง สูงพอกดด้วยนิ้ว
                 มีไอคอน + ตัวหนังสือขนาดปกติ + วงกลมเลือก (กดซ้ำ = ยกเลิก) · พิมพ์เพิ่มเติมได้ช่องล่าง */}
@@ -286,7 +294,9 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
             </Stack>
             <TextField fullWidth multiline minRows={2} label="รายละเอียดเพิ่มเติม (ถ้ามี)" value={noteExtra}
               onChange={(e) => setNoteExtra(e.target.value)} inputProps={{ maxLength: 400 }} sx={{ ...fieldSx, mt: 1.5 }} />
-        </Section>
+            </Box>
+          </Collapse>
+        </Box>
         {err && <Typography sx={{ mt: 2, fontSize: "0.82rem", fontWeight: 700, color: "#dc2626" }}>{err}</Typography>}
       </DialogContent>
 
