@@ -17,7 +17,7 @@ import { createRoot } from "react-dom/client";
 import SitePhotos from "@/shared/ui/SitePhotos";
 import CheckInOutPanel from "@/features/attendance/components/CheckInOutPanel";
 import { formatThai } from "@/shared/utils/thaiDate";
-import { can } from "@/shared/utils/roles";
+import { can, seesOperationBoard } from "@/shared/utils/roles";
 // ✅ พิกัดหน้างาน — ใช้ตัวช่วยชุดเดียวกับหน้าอื่น (ดูหัวไฟล์ SiteMapLink.js)
 import { mapSearchUrl, googleMapsPinSvg, mapEmbedSrc } from "@/shared/ui/SiteMapLink";
 import { faHourglassHalf, faCheck, faClockRotateLeft, faCheckDouble } from "@fortawesome/free-solid-svg-icons";
@@ -1515,6 +1515,14 @@ export const getEditEvent = async ({
   const canViewOperation =
     (isAdminOrManagerUser || isOwnerUser || isEffectiveResponsiblePerson) &&
     eventStatus !== "กำลังรอยืนยัน"; // งานที่ยังไม่ยืนยัน ยังไม่มีอะไรให้ดูในหน้าดำเนินงาน
+  // 🔁 (15 ต.ค. 2569 ผู้ใช้: "ช่างใช้งานของฉันที่เดียว · แก้ลิงก์จากตารางให้ถูก") — ช่างไม่มีหน้าการดำเนินงานแล้ว
+  //    ปุ่ม/ลิงก์ "ไปที่งาน" ของช่างพาไป "งานของฉัน" (เลื่อนไปที่การ์ดงานนั้น) · แอดมิน/ผู้จัดการไปหน้าการดำเนินงานเหมือนเดิม
+  const showBoard = seesOperationBoard(userData);
+  const jobPageUrl = (id) => {
+    if (!showBoard) return `/technician/jobs?job=${id}`;
+    const g = resolveOperationGroup({ status: eventStatus });
+    return `/operation/${id}${g ? `?group=${g}` : ""}`;
+  };
   // ✅ หัวหน้าทีม/ลูกทีม แก้ไขได้เพิ่มจากเดิม (admin/manager เท่านั้น) — ให้ "ผู้รับผิดชอบ" จัดการเองได้ด้วย
   // (ใช้ raw ไม่ fallback — ต้องถูกมอบหมายเป็นผู้รับผิดชอบไว้ชัดเจนก่อน ไม่ใช่แค่บังเอิญเป็นทีมที่เข้างาน
   // อยู่แล้ว ไม่งั้นจะกลายเป็นย้อนแย้งกับสิทธิ์ "ทีมที่เข้างานแก้ไขได้แค่วันที่/เวลา/สถานะ" ที่เพิ่งจำกัดไว้)
@@ -1893,13 +1901,16 @@ export const getEditEvent = async ({
     <!-- ✅ (8 ต.ค. 2569 ผู้ใช้: "หาจุดวางที่จะกดไปหน้าดำเนินงานได้ง่าย ชัดเจน · อันเดิมซ่อนอยู่ในเมนู ⋯")
          (9 ต.ค. 2569: "ไม่ควรต้องเลื่อนลงมาหา ให้อยู่โซนบนเจอทันที") — บนสุดของเนื้อหา ใต้หัวกล่อง/สถานะ -->
     ${canViewOperation ? `
-    <button type="button" id="btnGoOperation" style="width:100%;display:flex;align-items:center;gap:12px;margin:0 0 12px;padding:10px 12px;border-radius:14px;border:1px solid #bfdbfe;background:#eff6ff;cursor:pointer;text-align:left;font-family:inherit">
-      <span style="flex-shrink:0;width:36px;height:36px;border-radius:10px;background:#2563eb;color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px">📊</span>
-      <span style="flex:1;min-width:0">
-        <span style="display:block;font-size:14.5px;font-weight:800;color:#1e3a8a">ไปที่หน้าการดำเนินงาน</span>
-        <span style="display:block;font-size:12px;color:#475569;margin-top:1px">แนบเอกสาร · ใบเสนอราคา · ขอปิดงาน</span>
+    <!-- 🔁 (15 ต.ค. 2569 ผู้ใช้: "ช่าง = งานของฉัน · แอดมิน = การดำเนินงาน · ปุ่มเล็กลง ไม่กินพื้นที่ แต่ชัดเจนสวยงาม") -->
+    <button type="button" id="btnGoOperation" style="width:100%;display:flex;align-items:center;gap:10px;margin:0 0 12px;padding:8px 10px 8px 8px;border-radius:12px;border:1.5px solid #bfdbfe;background:#eff6ff;cursor:pointer;text-align:left;font-family:inherit">
+      <span style="flex-shrink:0;width:30px;height:30px;border-radius:9px;background:#2563eb;color:#fff;display:grid;place-items:center">
+        ${showBoard
+          ? '<svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5h2v2H3V5Zm4 0h14v2H7V5Zm-4 6h2v2H3v-2Zm4 0h14v2H7v-2Zm-4 6h2v2H3v-2Zm4 0h14v2H7v-2Z"/></svg>'
+          : '<svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-7 1.6-7 4v2h11.1a6 6 0 0 1-.1-1c0-1.9.8-3.6 2.1-4.7-1.8-.2-3.6-.3-6.1-.3Zm11.7 1.3-1.4-1.4-3.3 3.3-1.6-1.6-1.4 1.4 3 3 4.7-4.7Z"/></svg>'}
       </span>
-      <span style="flex-shrink:0;font-size:22px;color:#2563eb;font-weight:700">›</span>
+      <span style="flex:1;min-width:0;font-size:14px;font-weight:800;color:#1d4ed8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${showBoard ? "เปิดในการดำเนินงาน" : "เปิดในงานของฉัน"}</span>
+      <span style="flex-shrink:0;font-size:12px;font-weight:600;color:#64748b">${showBoard ? "เอกสาร · ปิดงาน" : "เข้างาน · เอกสาร"}</span>
+      <span style="flex-shrink:0;font-size:18px;color:#2563eb;font-weight:700;line-height:1">›</span>
     </button>` : ""}
 
     <!-- ✅ สถานะอนุมัติ — อยู่บนสุดของฟอร์ม เหนือกล่องสัญญาด้วยซ้ำ เพราะเป็นข้อเท็จจริงสำคัญที่สุดของ
@@ -2372,7 +2383,7 @@ export const getEditEvent = async ({
             ไม่ต้องเลื่อนไปหาการ์ดของช่วงนั้นในรายการวันที่ */""}
       ${canRequestAdvance && hasSiblings ? `<button class="ee-more-item" id="btnAdvanceByRange"><span>🗓</span> <span class="ee-more-item-text">เบิก Advance ตามช่วงวันที่…</span></button>
       <div id="ee-advance-range-list" class="ee-range-picker" hidden></div>` : ""}
-      ${canViewOperation ? `<button class="ee-more-item" id="btnViewSchedule"><span>📊</span> ดูการดำเนินงาน</button>` : ""}
+      ${canViewOperation ? `<button class="ee-more-item" id="btnViewSchedule"><span>📊</span> ${showBoard ? "การดำเนินงาน" : "งานของฉัน"}</button>` : ""}
       ${readOnly ? "" : `<button class="ee-more-item" id="btnGeneratePDF"><span>📄</span> ออกใบแจ้งเข้างาน</button>`}
       ${canEditDocFields && onOpenDeliveryNote ? `<button class="ee-more-item" id="btnDeliveryNote"><span>📦</span> ออกใบส่งมอบงาน</button>` : ""}
       ${canAttachToContract ? `<button class="ee-more-item" id="btnAttachContract"><span>🔗</span> ย้ายเข้าสัญญา</button>` : ""}
@@ -3004,7 +3015,7 @@ export const getEditEvent = async ({
               <button type="button" class="ee-range-more" title="ตัวเลือกของช่วงวันที่นี้" aria-expanded="false">⋯ เพิ่มเติม</button>
               <div class="ee-range-menu" hidden>
                 ${canRequestAdvance ? `<button type="button" class="ee-range-advance"><span>💵</span> <span class="ee-range-advance-text">เบิก Advance ช่วงนี้</span></button>` : ""}
-                ${canViewOperation ? `<button type="button" class="ee-range-operation"><span>📊</span> ดูการดำเนินงานช่วงนี้</button>` : ""}
+                ${canViewOperation ? `<button type="button" class="ee-range-operation"><span>📊</span> ${showBoard ? "การดำเนินงานช่วงนี้" : "งานของฉัน"}</button>` : ""}
                 ${readOnly ? "" : `<button type="button" class="ee-range-worknotice"><span>📄</span> ออกใบแจ้งเข้างานช่วงนี้</button>`}
                 ${canEditDocFields && onOpenDeliveryNote ? `<button type="button" class="ee-range-delivery"><span>📦</span> ออกใบส่งมอบงานช่วงนี้</button>` : ""}
                 ${isViewOnly ? "" : `<hr><button type="button" class="ee-range-menu--danger ee-range-delete"><span>🗑</span> ลบช่วงวันที่นี้</button>`}
@@ -3176,9 +3187,8 @@ export const getEditEvent = async ({
         const rowEvent = eventIdAttr === eventId ? ev : (siblingEvents.find((x) => String(x.id) === String(eventIdAttr)) || ev);
 
         row.querySelector(".ee-range-operation")?.addEventListener("click", () => {
-          const jobGroup = resolveOperationGroup({ status: eventStatus });
           Swal.close();
-          navigate(`/operation/${eventIdAttr}${jobGroup ? `?group=${jobGroup}` : ""}`);
+          navigate(jobPageUrl(eventIdAttr));
         });
         row.querySelector(".ee-range-worknotice")?.addEventListener("click", () => {
           Swal.close();
@@ -3878,8 +3888,7 @@ export const getEditEvent = async ({
       ["btnViewSchedule", "btnGoOperation"].forEach((id) => document
         .getElementById(id)
         ?.addEventListener("click", () => {
-          const jobGroup = resolveOperationGroup({ status: eventStatus });
-          navigate(`/operation/${eventId}${jobGroup ? `?group=${jobGroup}` : ""}`);
+          navigate(jobPageUrl(eventId));
           Swal.close();
         }));
 

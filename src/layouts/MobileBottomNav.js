@@ -17,7 +17,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthContext";
-import { can, DEPARTMENT } from "@/shared/utils/roles";
+import { can, seesOperationBoard, DEPARTMENT } from "@/shared/utils/roles";
 import useAppBadges, { BADGE_LABEL, badgeTone } from "@/shared/hooks/useAppBadges";
 // ⚠️ ชื่อ/พาธ/ไอคอน/คีย์ป้ายตัวเลข มาจากทะเบียนกลาง — อย่าพิมพ์ทับที่นี่
 // ช่องบนแถบนี้กว้างราว 70px จึงใช้ชื่อที่สั้นที่สุดของปลายทาง (barTitle)
@@ -83,7 +83,7 @@ export const buildBottomNav = (userData) => {
   // ── เติมช่องว่างด้วยเมนูหลักของสายงาน (role ที่ไม่มีสิทธิ์ครบ 4 เมนูข้างบน) ────────────
   const fillers = [];
   if (canRequestDispatch) fillers.push(bar("sales", (loc) => loc.pathname.startsWith("/sales")));
-  if (canViewOperation) fillers.push(bar("operation", (loc) => loc.pathname.startsWith("/operation")));
+  if (seesOperationBoard(userData)) fillers.push(bar("operation", (loc) => loc.pathname.startsWith("/operation")));
   if (can(userData, "viewDocuments")) fillers.push(bar("documents", (loc) => loc.pathname.startsWith("/documents")));
   if (can(userData, "viewFinance")) fillers.push(bar("finance", (loc) => loc.pathname.startsWith("/finance")));
   fillers.forEach((f) => { if (items.length < MAX_ITEMS) items.push(f); });

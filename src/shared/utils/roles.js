@@ -434,3 +434,10 @@ export const titleOf = (user) => {
   if (legacy && !ALL_ROLES.includes(legacy.toLowerCase())) return legacy;
   return rankLabel(user) || "";
 };
+
+/**
+ * ✅ (15 ต.ค. 2569 ผู้ใช้เลือก "ช่างใช้งานของฉันที่เดียว") — ใครเห็นหน้า "การดำเนินงาน"
+ *    แอดมิน/ผู้จัดการ (ดูงานทั้งหมด) · พนักงานออฟฟิศที่อัปเดตการดำเนินงานได้แต่ไม่ได้รับงานเอง
+ *    ช่าง/หัวหน้าช่าง (รับงาน) ใช้หน้า "งานของฉัน" แทน — ไม่ว่าตารางสิทธิ์จะติ๊กอัปเดตการดำเนินงานไว้หรือไม่
+ */
+export const seesOperationBoard = (who) => can(who, "viewAllJobs") || (can(who, "editOperation") && !can(who, "receiveDispatch"));

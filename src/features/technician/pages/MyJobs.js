@@ -223,6 +223,17 @@ const GROUPS = [
   { key: "closed", label: "เสร็จสิ้น", icon: <TaskAlt sx={{ fontSize: 15 }} />, color: "#059669" },
 ];
 
+/**
+ * ✅ (15 ต.ค. 2569 ผู้ใช้เลือก "ช่างใช้งานของฉันที่เดียว") — แถบสถานะย่อยในหมวด "ต้องทำ" ชุดเดียวกับหน้าการดำเนินงาน
+ *    ทั้งหมด · รอยืนยัน · ยืนยันแล้ว · กำลังดำเนินการ (หน้าการดำเนินงานซ่อนจากช่างแล้ว)
+ */
+const SUBS = [
+  { key: "all", label: "ทั้งหมด", color: "#475569" },
+  { key: "กำลังรอยืนยัน", label: "รอยืนยัน", color: "#d97706" },
+  { key: "ยืนยันแล้ว", label: "ยืนยันแล้ว", color: "#2563eb" },
+  { key: "กำลังดำเนินการ", label: "กำลังดำเนินการ", color: "#7c3aed" },
+];
+
 const matchesGroup = (event, group, daysPastDueMap) => {
   if (group === "pending") return event.closeRequested === true && event.status !== "ดำเนินการเสร็จสิ้น";
   if (group === "closed") return event.status === "ดำเนินการเสร็จสิ้น";
@@ -244,6 +255,7 @@ export default function MyJobs() {
   const [, setLastRefreshed] = useState(null);
   const [search, setSearch] = useState("");
   const [group, setGroup] = useState("active");
+  const [sub, setSub] = useState("all");
   const [snackbar, setSnackbar] = useState({ open: false, msg: "", severity: "success" });
 
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -320,6 +332,19 @@ export default function MyJobs() {
     return counts;
   }, [events, daysPastDueMap]);
 
+  const subCounts = useMemo(() => {
+    const c = { all: 0, "กำลังรอยืนยัน": 0, "ยืนยันแล้ว": 0, "กำลังดำเนินการ": 0 };
+    const seen = new Set();
+    events.forEach((e) => {
+      const key = getOverdueGroupKey(e);
+      if (seen.has(key) || !matchesGroup(e, "active", daysPastDueMap)) return;
+      seen.add(key);
+      c.all += 1;
+      if (c[e.status] !== undefined) c[e.status] += 1;
+    });
+    return c;
+  }, [events, daysPastDueMap]);
+
   // ✅ เปิดหน้ามาครั้งแรก ถ้าไม่มีงานที่ต้องทำแต่มีงานค้าง → พาไปหมวดค้างงานเลย (ไม่ต้องเจอหน้าว่างก่อน)
   const autoPickedRef = useRef(false);
   // ✅ (11 ต.ค. 2569 ผู้ใช้: "งานที่ได้รับมอบหมายคือเด้งไปในงานของฉัน") — แจ้งเตือนมอบหมายงานลิงก์มาที่
@@ -350,6 +375,7 @@ export default function MyJobs() {
     const keyword = search.trim().toLowerCase();
     const list = events.filter((e) => {
       if (!matchesGroup(e, group, daysPastDueMap)) return false;
+      if (group === "active" && sub !== "all" && e.status !== sub) return false;
       if (!keyword) return true;
       return [e.company, e.site, e.title, e.system, e.docNo]
         .some((v) => (v || "").toLowerCase().includes(keyword));
@@ -359,7 +385,7 @@ export default function MyJobs() {
         ? moment(b.start).valueOf() - moment(a.start).valueOf()
         : moment(a.start).valueOf() - moment(b.start).valueOf()
     );
-  }, [events, group, search, daysPastDueMap]);
+  }, [events, group, search, daysPastDueMap, sub]);
 
   // ✅ รวมงานที่เข้าหลายวันไม่ติดกัน (jobGroupId/ลายเซ็นเดียวกัน) เป็นการ์ดเดียว แทนที่จะแยกโชว์
   // ซ้ำกันทุกวัน — ลำดับกลุ่มยึดตามลำดับที่ปรากฏครั้งแรกใน filteredJobs (เรียงตามวันที่อยู่แล้ว)
@@ -525,6 +551,26 @@ export default function MyJobs() {
           );
         })}
       </Box>
+
+      {group === "active" && subCounts.all > 0 && (
+        <Stack direction="row" gap={0.6} sx={{ mb: 1.25, overflowX: "auto", pb: 0.25, scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
+          {SUBS.map((x) => {
+            const on = sub === x.key;
+            const n = subCounts[x.key] || 0;
+            return (
+              <Box key={x.key} component="button" type="button" onClick={() => setSub(x.key)}
+                sx={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 0.6, height: 32, px: 1.25, borderRadius: 99, font: "inherit", cursor: "pointer",
+                  fontSize: "0.78rem", fontWeight: on ? 800 : 600, color: on ? x.color : "#475569",
+                  bgcolor: on ? alpha(x.color, 0.1) : "#fff", border: `1.5px solid ${on ? alpha(x.color, 0.6) : "#e2e8f0"}` }}>
+                {x.key !== "all" && <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: x.color }} />}
+                {x.label}
+                <Box component="span" sx={{ minWidth: 18, height: 18, px: 0.5, borderRadius: 99, display: "inline-grid", placeItems: "center", fontSize: "0.68rem", fontWeight: 800,
+                  bgcolor: on ? x.color : "#f1f5f9", color: on ? "#fff" : "#64748b" }}>{n}</Box>
+              </Box>
+            );
+          })}
+        </Stack>
+      )}
 
       <TextField
         fullWidth size="small" placeholder="ค้นหาโครงการ / ไซต์ / ประเภทงาน / เลขเอกสาร"

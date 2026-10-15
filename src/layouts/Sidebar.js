@@ -5,7 +5,7 @@ import AuthService from "../shared/services/authService";
 import "./Sidebar.css";
 import { hasValidAvatar } from "../shared/utils/user";
 import { useAuth } from "../features/auth/AuthContext";
-import { can, rankLabel, DEPARTMENT } from "@/shared/utils/roles";
+import { can, seesOperationBoard, rankLabel, DEPARTMENT } from "@/shared/utils/roles";
 // ⚠️ ชื่อ/พาธ/ไอคอน/คีย์ป้ายตัวเลข มาจากทะเบียนกลาง — อย่าพิมพ์ทับ ไม่งั้นหลุดจากการ์ดหน้าแรก
 // และแถบล่างมือถือที่ชี้ปลายทางเดียวกัน
 import { dest } from "./navConfig";
@@ -406,7 +406,7 @@ const side = (key, extra) => {
               ? renderParentWithItems(navi, `work-${index}`)
               : renderLink(navi, `work-${index}`)
           ))}
-          {canViewOperation && operationMenu.map((item, idx) => renderLink(item, `work-op-${idx}`))}
+          {seesOperationBoard(userData) && operationMenu.map((item, idx) => renderLink(item, `work-op-${idx}`))}
           {canViewAttendance && attendanceMenu.map((item, idx) => renderLink(item, `work-att-${idx}`))}
           {canMyJobs && myJobsMenu.map((item, idx) => renderLink(item, `work-my-${idx}`))}
           {canViewContracts && contractsMenu.map((item, idx) => renderLink(item, `work-ct-${idx}`))}

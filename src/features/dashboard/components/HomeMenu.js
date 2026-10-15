@@ -18,7 +18,7 @@ import {
   FaCalendarAlt, FaChevronRight, FaWallet, FaFolderOpen, FaDatabase, FaGlobeAsia, FaShoppingCart, FaUserClock, FaTools,
 } from "react-icons/fa";
 
-import { can } from "@/shared/utils/roles";
+import { can, seesOperationBoard } from "@/shared/utils/roles";
 import useAppBadges, { BADGE_LABEL, badgeTone } from "@/shared/hooks/useAppBadges";
 // ⚠️ ชื่อ/พาธ/ไอคอน/คีย์ป้ายตัวเลข มาจากทะเบียนกลาง — อย่าพิมพ์ทับที่นี่ ไม่งั้นชื่อจะหลุดจาก
 // แถบล่างมือถือและเมนูข้างที่ชี้ปลายทางเดียวกัน (เคยหลุดมาแล้ว: "แผนงาน" / "แผนงานของฉัน" / "ตารางงาน")
@@ -96,7 +96,8 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
   // ✅ (11 ต.ค. 2569) ทุกคนที่ถูกมอบหมายงานได้ (ช่าง · แอดมิน/ผู้จัดการที่เป็นผู้รับผิดชอบ) — ขึ้นก่อน (ใช้บ่อยสุด)
   // ✅ (11 ต.ค. 2569 ผู้ใช้: "หน้าแอดมินไม่ควรมีเมนูงานของฉัน ให้มีแค่ของช่าง") — เฉพาะช่าง (receiveDispatch)
   if (can(userData, "receiveDispatch") && !hideMyJobs) doWork.push(dest("myJobs"));
-  if (canViewOperation) doWork.push(dest("operation"));
+// 🔁 (15 ต.ค. 2569 ผู้ใช้เลือก "ช่างใช้งานของฉันที่เดียว") — ช่าง (รับงานอย่างเดียว) ไม่เห็นหน้าการดำเนินงานแล้ว · ทำงานที่ "งานของฉัน"
+  if (seesOperationBoard(userData)) doWork.push(dest("operation"));
   // ✅ (10 ต.ค. 2569) บันทึกเข้างาน — ผู้ดูงานทั้งหมด/ผู้อนุมัติแก้เวลา
   if (can(userData, "viewAllJobs") || can(userData, "approveJobs")) doWork.push(dest("attendance"));
   // 🧹 "ภาพรวมงาน" ถูกตัดออกจากเมนูหลักตามที่ผู้ใช้สั่ง — เดิมปลายทางนี้โผล่พร้อมกัน 3 ที่ในจอเดียว

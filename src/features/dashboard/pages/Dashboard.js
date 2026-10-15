@@ -37,7 +37,7 @@ import { groupEventsByContract, nextVisitOverdueInfo } from "@/shared/utils/cont
 import { getFollowUpInfo } from "@/shared/utils/quotationTracking";
 import { openFollowUp, isUrgent, acksOf, ackTracked, isResponsibleOf, isRespOrHead } from "@/shared/utils/jobFlow";
 import { formatThai } from "@/shared/utils/thaiDate";
-import { can, isRole, rankLabel, ROLES, TECHNICIAN_ROLES, ALL_ROLES } from "@/shared/utils/roles";
+import { can, seesOperationBoard, isRole, rankLabel, ROLES, TECHNICIAN_ROLES, ALL_ROLES } from "@/shared/utils/roles";
 import HomeMenu from "../components/HomeMenu";
 import { Box, Typography, Avatar, Stack, ButtonBase } from "@mui/material";
 import { ExpandMore, Today, EventOutlined, EngineeringOutlined, RequestQuoteOutlined, EventRepeatOutlined, EditCalendarOutlined, ApartmentOutlined, GroupsOutlined, ScheduleOutlined, NotificationsActiveOutlined, ErrorOutline } from "@mui/icons-material";
@@ -121,7 +121,9 @@ const Dashboard = () => {
   const jobLink = (id, group) =>
     isSale
       ? "/event"
-      : `/operation/${id}${group ? `?group=${group}` : ""}`;
+      // (15 ต.ค. 2569) ช่างใช้ "งานของฉัน" แทนหน้าการดำเนินงาน
+      : !seesOperationBoard(userData) ? `/technician/jobs?job=${id}`
+        : `/operation/${id}${group ? `?group=${group}` : ""}`;
 
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState([]);
@@ -564,7 +566,7 @@ const Dashboard = () => {
           const diffDays = jobStart.diff(today, "days");
           const jobGroup = resolveOperationGroup(job);
           return (
-            <Row key={job._id} to={`/operation/${job._id}${jobGroup ? `?group=${jobGroup}` : ""}`}
+            <Row key={job._id} to={jobLink(job._id, jobGroup)}
               title={job.title || "งาน"} sub={[job.company, job.site].filter(Boolean).join(" · ") || "ไม่ระบุโครงการ"}
               leading={<DateTile top={jobStart.format("D")} bottom={formatThai(jobStart, "MMM")} color={ACCENT} strong={diffDays === 1} />}
               trailing={<Pill color={diffDays === 1 ? ACCENT : MUTED}>{diffDays === 1 ? "พรุ่งนี้" : `อีก ${diffDays} วัน`}</Pill>}
@@ -591,7 +593,7 @@ const Dashboard = () => {
                 <Box sx={{ bgcolor: SURFACE, borderTop: `1px solid ${LINE}`, pl: 4.5 }}>
                   {jobs.map((job) => (
                     // ✅ ?group=overdue — บอกหน้า Operation ให้ไฮไลต์แท็บ "ค้างงาน" ให้ตรงกับที่มา
-                    <Row key={job.id} dense to={`/operation/${job.id}?group=overdue`} title={job.title || "งาน"}
+                    <Row key={job.id} dense to={jobLink(job.id, "overdue")} title={job.title || "งาน"}
                       sub={[job.company, job.site].filter(Boolean).join(" · ")} trailing={`${job.days} วัน`} danger={job.days >= 14} />
                   ))}
                 </Box>
