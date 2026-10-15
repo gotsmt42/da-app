@@ -24,7 +24,7 @@ import { BTN as MBTN, CARD } from "@/shared/ui/modernUi";
 import AttendanceService from "@/shared/services/AttendanceService";
 import { INK, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LINE } from "@/shared/ui/PageKit";
 import {
-  NOTE_PRESETS, ON_SITE_M, getPosition, distanceM, fmtDistance, fmtTime,
+  NOTE_PRESETS, ON_SITE_M, distanceM, fmtDistance, fmtTime, watchBestPosition, GPS_GOOD_M, GPS_OK_M, GPS_MIN_WAIT_MS,
 } from "../attendanceMeta";
 
 const GREEN = "#16a34a";
@@ -112,10 +112,17 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
   const fileRef = useRef(null);
   const doneRef = useRef(false);
 
-  const locate = async () => {
+  // ✅ (15 ต.ค. 2569) ติดตามตำแหน่งต่อเนื่องจนปิดหน้าต่าง — ใช้ค่าที่แม่นที่สุดล่าสุดตอนกดบันทึก (ดู watchBestPosition)
+  const stopWatchRef = useRef(null);
+  const [locStart, setLocStart] = useState(Date.now());
+  const locate = () => {
+    stopWatchRef.current?.();
     setPos(null);
-    setPos(await getPosition());
+    setLocStart(Date.now());
+    stopWatchRef.current = watchBestPosition((p) => setPos(p));
   };
+  useEffect(() => () => stopWatchRef.current?.(), []);
+  useEffect(() => { if (!open) { stopWatchRef.current?.(); stopWatchRef.current = null; } }, [open]);
 
   // เปิดหน้าต่าง → ขอเวลา server + พิกัดหน้างาน · หาตำแหน่งเครื่องพร้อมกัน
   useEffect(() => {
@@ -171,12 +178,17 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
 
   // ✅ (10 ต.ค. 2569 ผู้ใช้: "การเช็คอินต้องอัปรูปภาพหน้างานก่อนถึงจะกดได้") — server เช็คซ้ำ
   const needPhoto = !photos.length;
-  const canSubmit = !saving && !uploading && pos !== null && !needPhoto;
+  // ✅ ตำแหน่งต้อง "แม่นพอ" ก่อนบันทึก: ±30 ม. บันทึกได้ทันที · ยังไม่แม่นพอ ต้องรอให้ GPS ปรับอย่างน้อย 15 วิ
+  //    (ไม่มีสิทธิ์/หาไม่เจอ ยังบันทึกได้เหมือนเดิม — ระบบบันทึกว่าไม่มีพิกัด ให้แอดมินเห็น)
+  const waitedMs = now - locStart;
+  const gpsSettling = pos === null || (pos.gps === "ok" && pos.accuracy > GPS_GOOD_M && waitedMs < GPS_MIN_WAIT_MS);
+  const canSubmit = !saving && !uploading && !gpsSettling && !needPhoto;
 
   const submit = async () => {
     if (!canSubmit) return;
     setSaving(true);
     setErr("");
+    // ใช้ค่าที่แม่นที่สุดล่าสุด ณ ตอนกด (pos อัปเดตตลอดจาก watchBestPosition)
     const gpsPayload = pos?.gps === "ok" ? { gps: "ok", lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy } : { gps: pos?.gps || "unavailable" };
     try {
       const data = await AttendanceService.checkIn({ eventId: event._id, ...gpsPayload, note, photoIds: photos.map((p) => p.fileId) });
@@ -192,7 +204,7 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
   // ── ตำแหน่ง ──
   const locationCard = useMemo(() => {
     if (pos === null) {
-      return { icon: <CircularProgress size={18} />, title: "กำลังหาตำแหน่ง…", sub: "เปิด GPS ไว้จะได้ตำแหน่งแม่นขึ้น", tone: MUTED };
+      return { icon: <CircularProgress size={18} />, title: "กำลังหาตำแหน่ง…", sub: "เปิด GPS (ตำแหน่งแบบแม่นยำสูง) และอยู่ในที่โล่งจะเร็วและแม่นขึ้น", tone: MUTED };
     }
     if (pos.gps === "denied") {
       return { icon: <LocationOffRounded />, title: "ไม่ได้อนุญาตให้ใช้ตำแหน่ง", sub: "ยังบันทึกได้ — ระบบจะบันทึกว่า \"ไม่มีพิกัด\" · เปิดสิทธิ์ตำแหน่งในเบราว์เซอร์แล้วกดหาใหม่", tone: AMBER };
@@ -201,13 +213,21 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
       return { icon: <LocationOffRounded />, title: "หาตำแหน่งไม่เจอ", sub: "ยังบันทึกได้ — ลองออกไปที่โล่งแล้วกดหาใหม่", tone: AMBER };
     }
     const acc = pos.accuracy ? `แม่นยำ ±${Math.round(pos.accuracy)} ม.` : "";
+    // ยังไม่แม่นพอ → บอกให้รอ GPS ปรับค่า (ตัวเลขลดลงเรื่อยๆ ระหว่างรอ)
+    if (pos.accuracy > GPS_GOOD_M && gpsSettling) {
+      const left = Math.max(0, Math.ceil((GPS_MIN_WAIT_MS - waitedMs) / 1000));
+      return { icon: <CircularProgress size={18} />, title: `กำลังปรับตำแหน่งให้แม่นยำ · ±${pos.accuracy} ม.`, sub: `รอสักครู่ (${left} วิ) — ถือเครื่องนิ่งๆ ในที่โล่ง ตัวเลขยิ่งน้อยยิ่งแม่น`, tone: ACCENT };
+    }
+    if (pos.accuracy > GPS_OK_M) {
+      return { icon: <MyLocationRounded />, title: `ตำแหน่งยังคลาดเคลื่อนมาก · ±${pos.accuracy} ม.`, sub: "เปิด GPS แบบแม่นยำสูง / ออกไปที่โล่งแล้วรอสักครู่ · ยังบันทึกได้ แต่แอดมินจะเห็นว่าความแม่นยำต่ำ", tone: AMBER };
+    }
     if (dist == null) {
       return { icon: <MyLocationRounded />, title: "ได้ตำแหน่งแล้ว", sub: [acc, site ? "" : "ยังไม่มีพิกัดหน้างานในทะเบียนลูกค้า — บันทึกพิกัดอย่างเดียว"].filter(Boolean).join(" · "), tone: ACCENT };
     }
     return dist <= ON_SITE_M
       ? { icon: <CheckCircleRounded />, title: `อยู่ที่หน้างาน · ${fmtDistance(dist)}`, sub: acc, tone: GREEN }
       : { icon: <MyLocationRounded />, title: `ห่างจากหน้างาน ${fmtDistance(dist)}`, sub: [acc, "ยังบันทึกได้ แอดมินจะเห็นระยะห่างนี้"].filter(Boolean).join(" · "), tone: AMBER };
-  }, [pos, dist, site]);
+  }, [pos, dist, site, gpsSettling, waitedMs]);
 
   const jobLabel = [event?.title, event?.site || event?.company].filter(Boolean).join(" · ");
 
@@ -305,7 +325,7 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
         <Button variant="contained" disableElevation onClick={submit} disabled={!canSubmit}
           startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <LoginRounded />}
           sx={{ ...MBTN.primary, flex: { xs: 1, sm: "0 0 auto" }, px: 3.5 }}>
-          {saving ? "กำลังบันทึก…" : needPhoto ? "ถ่ายรูปก่อนกดเข้างาน" : "ยืนยันเข้างาน"}
+          {saving ? "กำลังบันทึก…" : needPhoto ? "ถ่ายรูปก่อนกดเข้างาน" : gpsSettling ? "รอตำแหน่งให้แม่นยำ…" : "ยืนยันเข้างาน"}
         </Button>
       </DialogActions>
     </Dialog>

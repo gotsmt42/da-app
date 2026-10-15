@@ -81,6 +81,49 @@ export function getPosition({ timeout = 15000 } = {}) {
   });
 }
 
+/**
+ * ✅ (15 ต.ค. 2569 ผู้ใช้: "ตำแหน่งเวลากดบันทึกให้แม่นยำที่สุด ไม่ให้ผิดพลาด")
+ * ติดตามตำแหน่งต่อเนื่องตลอดที่เปิดหน้าบันทึก (watchPosition + GPS ความแม่นยำสูง) แล้วเลือก "ค่าที่แม่นที่สุด
+ * ในช่วงล่าสุด" — getCurrentPosition ครั้งเดียวมักได้ค่าจากเสาสัญญาณ/Wi-Fi (คลาด 100–2,000 ม.) ก่อน GPS จะล็อกได้
+ *   • ไม่รับค่าเก่าที่เครื่องจำไว้ (timestamp ก่อนเริ่มติดตาม)
+ *   • ค่าที่ดีที่สุด = ความคลาดเคลื่อน (accuracy) ต่ำสุด ภายใน FRESH_MS ล่าสุด — เดินไปที่อื่นแล้วจะไม่ใช้ค่าเก่า
+ * @param onUpdate (pos) => void   pos = { gps:"ok", lat, lng, accuracy, at } | { gps:"denied"|"unavailable" }
+ * @returns stop()
+ */
+export const GPS_GOOD_M = 30;      // แม่นพอ — ล็อก GPS ได้แล้ว
+export const GPS_OK_M = 100;       // ใช้ได้ แต่ควรรอให้แม่นขึ้น
+export const GPS_MIN_WAIT_MS = 15000; // ยังไม่แม่นพอ ต้องรออย่างน้อยเท่านี้ก่อนยอมให้บันทึก
+const FRESH_MS = 45000;
+export function watchBestPosition(onUpdate) {
+  if (typeof navigator === "undefined" || !navigator.geolocation) { onUpdate({ gps: "unavailable" }); return () => {}; }
+  const startedAt = Date.now();
+  const readings = [];
+  let gotAny = false;
+  const pick = () => {
+    const now = Date.now();
+    const recent = readings.filter((r) => now - r.at <= FRESH_MS);
+    if (!recent.length) return null;
+    return recent.reduce((b, r) => (r.accuracy < b.accuracy ? r : b));
+  };
+  const id = navigator.geolocation.watchPosition(
+    (p) => {
+      // ค่าที่เครื่องจำไว้ก่อนเปิดหน้านี้ = อาจเป็นตำแหน่งเก่า (อีกที่หนึ่ง) — ไม่ใช้
+      if (p.timestamp && p.timestamp < startedAt - 2000) return;
+      gotAny = true;
+      readings.push({ gps: "ok", lat: p.coords.latitude, lng: p.coords.longitude, accuracy: Math.round(p.coords.accuracy || 9999), at: Date.now() });
+      if (readings.length > 60) readings.shift();
+      const best = pick();
+      if (best) onUpdate({ ...best, samples: readings.length, startedAt });
+    },
+    (err) => {
+      if (err?.code === 1) onUpdate({ gps: "denied" });
+      else if (!gotAny) onUpdate({ gps: "unavailable" });
+    },
+    { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 },
+  );
+  return () => navigator.geolocation.clearWatch(id);
+}
+
 export const CORRECTION_STATUS = {
   pending: { label: "รออนุมัติ", color: "#d97706" },
   approved: { label: "อนุมัติแล้ว", color: "#16a34a" },
