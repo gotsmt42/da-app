@@ -48,6 +48,63 @@ const Section = ({ title, hint, required, children }) => (
 
 const fieldSx = { "& .MuiOutlinedInput-root": { borderRadius: "12px", bgcolor: "#fff" } };
 
+/**
+ * ✅ (15 ต.ค. 2569 ผู้ใช้: "ระบบแจ้งเตือนว่าผู้ใช้ต้องเปิด GPS ก่อน ทำให้หน้าตาสวยงามแบบมืออาชีพที่ใช้กันทั่วไป")
+ * แผงขอให้เปิดตำแหน่ง — แบบแอปทั่วไป: ไอคอนใหญ่ · หัวข้อ · เหตุผลสั้นๆ · ขั้นตอนตามเครื่องที่ใช้อยู่ · ปุ่มลองอีกครั้ง
+ * denied = ปฏิเสธสิทธิ์ไว้ (ต้องไปเปิดในตั้งค่า) · unavailable = เปิดสิทธิ์แล้วแต่หาสัญญาณ GPS ไม่ได้/ปิด GPS ทั้งเครื่อง
+ */
+const ua = typeof navigator !== "undefined" ? navigator.userAgent || "" : "";
+const IS_IOS = /iPhone|iPad|iPod/i.test(ua);
+const GPS_STEPS = {
+  denied: IS_IOS
+    ? ["เปิด “การตั้งค่า” ของ iPhone", "ความเป็นส่วนตัวและความปลอดภัย → บริการหาตำแหน่ง → เปิด", "เลือกเบราว์เซอร์ที่ใช้ (Safari/Chrome) → “ขณะใช้แอป” และเปิด “ตำแหน่งที่แน่นอน”", "กลับมาที่หน้านี้ แล้วกด “ลองอีกครั้ง”"]
+    : ["แตะไอคอน 🔒 / ⓘ ด้านหน้าช่องที่อยู่เว็บ", "เลือก “สิทธิ์” → “ตำแหน่ง” → “อนุญาต”", "เปิด “ตำแหน่ง” ในแถบด่วนของเครื่อง (ลากจากขอบบนลงมา)", "กลับมาที่หน้านี้ แล้วกด “ลองอีกครั้ง”"],
+  unavailable: IS_IOS
+    ? ["เปิด “การตั้งค่า” → ความเป็นส่วนตัวฯ → บริการหาตำแหน่ง ให้เป็น “เปิด”", "ออกไปที่โล่ง ห่างจากหลังคา/ผนังหนา", "กด “ลองอีกครั้ง”"]
+    : ["ลากแถบด่วนจากขอบบนลงมา แล้วเปิด “ตำแหน่ง”", "ในการตั้งค่าตำแหน่ง เปิด “ความแม่นยำของตำแหน่ง (Google)”", "ออกไปที่โล่ง แล้วกด “ลองอีกครั้ง”"],
+};
+function GpsRequired({ kind, onRetry, onSkip, skipped }) {
+  const steps = GPS_STEPS[kind] || GPS_STEPS.unavailable;
+  return (
+    <Box sx={{ ...CARD, mb: 1.5, overflow: "hidden", border: `1px solid ${alpha(AMBER, 0.35)}` }}>
+      <Box sx={{ px: 2, pt: 2.25, pb: 1.75, textAlign: "center", background: `linear-gradient(180deg, ${alpha(AMBER, 0.1)}, #fff)` }}>
+        <Box sx={{ mx: "auto", width: 64, height: 64, borderRadius: "50%", display: "grid", placeItems: "center", bgcolor: "#fff", color: AMBER,
+          boxShadow: `0 0 0 8px ${alpha(AMBER, 0.12)}, 0 6px 16px -6px ${alpha(AMBER, 0.6)}` }}>
+          <LocationOffRounded sx={{ fontSize: 32 }} />
+        </Box>
+        <Typography sx={{ mt: 1.75, fontSize: "1.05rem", fontWeight: 900, color: INK }}>
+          {kind === "denied" ? "เปิดสิทธิ์ตำแหน่งที่ตั้งก่อนบันทึกเข้างาน" : "เปิด GPS ก่อนบันทึกเข้างาน"}
+        </Typography>
+        <Typography sx={{ mt: 0.5, fontSize: "0.82rem", color: MUTED, lineHeight: 1.55 }}>
+          ระบบใช้ตำแหน่งยืนยันว่าเข้างานที่หน้างานจริง{kind === "denied" ? " — ตอนนี้เบราว์เซอร์ยังไม่ได้รับอนุญาต" : " — ตอนนี้หาสัญญาณ GPS ไม่ได้"}
+        </Typography>
+      </Box>
+      <Box sx={{ px: 2, pb: 2 }}>
+        <Stack spacing={1}>
+          {steps.map((t, i) => (
+            <Stack key={t} direction="row" gap={1.25} alignItems="flex-start">
+              <Box sx={{ width: 22, height: 22, borderRadius: "50%", flexShrink: 0, display: "grid", placeItems: "center", bgcolor: ACCENT_SOFT, color: ACCENT, fontSize: "0.72rem", fontWeight: 900 }}>{i + 1}</Box>
+              <Typography sx={{ fontSize: "0.84rem", color: INK, lineHeight: 1.55, pt: "1px" }}>{t}</Typography>
+            </Stack>
+          ))}
+        </Stack>
+        <Button fullWidth variant="contained" disableElevation onClick={onRetry} startIcon={<MyLocationRounded />} sx={{ ...MBTN.primary, mt: 2, minHeight: 46 }}>
+          ลองอีกครั้ง
+        </Button>
+        {!skipped ? (
+          <ButtonBase onClick={onSkip} sx={{ display: "block", mx: "auto", mt: 1.25, px: 1, py: 0.5, borderRadius: 1, fontFamily: "inherit", fontSize: "0.76rem", color: MUTED, textDecoration: "underline" }}>
+            เปิดไม่ได้จริงๆ — บันทึกโดยไม่มีพิกัด
+          </ButtonBase>
+        ) : (
+          <Typography sx={{ mt: 1.25, textAlign: "center", fontSize: "0.76rem", color: AMBER, fontWeight: 700 }}>
+            จะบันทึกแบบ “ไม่มีพิกัด” — แอดมินจะเห็นว่าไม่ได้ยืนยันตำแหน่ง
+          </Typography>
+        )}
+      </Box>
+    </Box>
+  );
+}
+
 /** ตารางภาพย่อ/ไฟล์ที่อัปแล้ว + ช่องเพิ่ม (ถ้ามี onAdd) */
 function FileGrid({ items, uploading = 0, onRemove, onAdd, addLabel, highlight }) {
   return (
@@ -115,8 +172,10 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
   // ✅ (15 ต.ค. 2569) ติดตามตำแหน่งต่อเนื่องจนปิดหน้าต่าง — ใช้ค่าที่แม่นที่สุดล่าสุดตอนกดบันทึก (ดู watchBestPosition)
   const stopWatchRef = useRef(null);
   const [locStart, setLocStart] = useState(Date.now());
+  const [skipGps, setSkipGps] = useState(false);
   const locate = () => {
     stopWatchRef.current?.();
+    setSkipGps(false);
     setPos(null);
     setLocStart(Date.now());
     stopWatchRef.current = watchBestPosition((p) => setPos(p));
@@ -182,7 +241,10 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
   //    (ไม่มีสิทธิ์/หาไม่เจอ ยังบันทึกได้เหมือนเดิม — ระบบบันทึกว่าไม่มีพิกัด ให้แอดมินเห็น)
   const waitedMs = now - locStart;
   const gpsSettling = pos === null || (pos.gps === "ok" && pos.accuracy > GPS_GOOD_M && waitedMs < GPS_MIN_WAIT_MS);
-  const canSubmit = !saving && !uploading && !gpsSettling && !needPhoto;
+  // ต้องเปิด GPS ก่อน — ไม่มีพิกัดจะบันทึกได้เฉพาะเมื่อผู้ใช้กด "เปิดไม่ได้จริงๆ" เอง
+  const gpsMissing = pos !== null && pos.gps !== "ok";
+  const gpsBlocked = gpsMissing && !skipGps;
+  const canSubmit = !saving && !uploading && !gpsSettling && !gpsBlocked && !needPhoto;
 
   const submit = async () => {
     if (!canSubmit) return;
@@ -264,7 +326,10 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
           </Stack>
         </Box>
 
-        {/* ตำแหน่ง */}
+        {/* ตำแหน่ง — ไม่มีสิทธิ์/หา GPS ไม่ได้ → แผงขอให้เปิด GPS (แบบแอปทั่วไป) */}
+        {gpsMissing ? (
+          <GpsRequired kind={pos.gps === "denied" ? "denied" : "unavailable"} onRetry={locate} onSkip={() => setSkipGps(true)} skipped={skipGps} />
+        ) : (
         <Section title="ตำแหน่งปัจจุบัน">
           <Stack direction="row" alignItems="center" gap={1.25} sx={{ p: 1.5, borderRadius: 2.5, border: `1px solid ${alpha(locationCard.tone, 0.3)}`, bgcolor: alpha(locationCard.tone, 0.05) }}>
             <Box sx={{ color: locationCard.tone, display: "flex", "& svg": { fontSize: 22 } }}>{locationCard.icon}</Box>
@@ -277,6 +342,7 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
             )}
           </Stack>
         </Section>
+        )}
 
         {/* รูปก่อนเริ่มงาน — บังคับอย่างน้อย 1 รูป */}
         <Section title="รูปหน้างาน" required hint={needPhoto ? "ต้องมีอย่างน้อย 1 รูป จึงกดเข้างานได้" : `${photos.length} รูป · บันทึกเป็นไฟล์แนบของงานนี้`}>
@@ -325,7 +391,7 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
         <Button variant="contained" disableElevation onClick={submit} disabled={!canSubmit}
           startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <LoginRounded />}
           sx={{ ...MBTN.primary, flex: { xs: 1, sm: "0 0 auto" }, px: 3.5 }}>
-          {saving ? "กำลังบันทึก…" : needPhoto ? "ถ่ายรูปก่อนกดเข้างาน" : gpsSettling ? "รอตำแหน่งให้แม่นยำ…" : "ยืนยันเข้างาน"}
+          {saving ? "กำลังบันทึก…" : needPhoto ? "ถ่ายรูปก่อนกดเข้างาน" : gpsSettling ? "รอตำแหน่งให้แม่นยำ…" : gpsBlocked ? "เปิด GPS ก่อนบันทึก" : "ยืนยันเข้างาน"}
         </Button>
       </DialogActions>
     </Dialog>
