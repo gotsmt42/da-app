@@ -14,8 +14,11 @@ const CSS = `
 <style>
   .ji-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
   @media (max-width: 600px) { .ji-grid { grid-template-columns: 1fr; } }
-  .ji-prio { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .ji-prio input { position: absolute; opacity: 0; pointer-events: none; }
+  /* 🐛 (15 ต.ค. 2569 ผู้ใช้: "กดความเร่งด่วนแล้วหน้าต่างเพี้ยน") — radio ที่ซ่อนไว้แบบ absolute ไม่มีกรอบอ้างอิง
+     ไปลอยอยู่นอกพื้นที่ฟอร์ม พอกดแล้วเบราว์เซอร์เลื่อนหน้าต่าง (ที่ overflow:hidden) ไปหามัน → ฟอร์มเลื่อนหลุดกรอบ
+     ✅ ตรึงไว้ในกล่องตัวเลือกเอง (position: relative) ขนาด 1px */
+  .ji-prio { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; position: relative; }
+  .ji-prio input { position: absolute; top: 0; left: 0; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none; }
   .ji-prio label {
     display: flex; align-items: center; justify-content: center; gap: 6px; height: 40px; border-radius: 10px;
     border: 1.5px solid #e2e8f0; background: #fff; font-size: 13.5px; font-weight: 700; color: #334155; cursor: pointer;
