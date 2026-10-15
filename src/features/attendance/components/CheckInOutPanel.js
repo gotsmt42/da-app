@@ -590,7 +590,7 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
       // ✅ ขั้นถัดจากรับทราบ: ผู้รับผิดชอบยืนยันนัดหมาย (สถานะงาน → ยืนยันแล้ว)
       line = canAck ? (
         <Box>
-          <Button fullWidth variant="contained" disableElevation startIcon={<TaskAltRounded />} disabled={acking} onClick={confirmJob} sx={{ ...MBTN.primary, minHeight: 40 }}>
+          <Button fullWidth variant="contained" disableElevation startIcon={<TaskAltRounded />} disabled={acking} onClick={confirmJob} sx={{ ...MBTN.success, minHeight: 40 }}>
             {acking ? "กำลังบันทึก…" : `ยืนยันนัดหมาย · เข้างาน ${day}`}
           </Button>
           <Typography sx={{ mt: 0.5, textAlign: "center", fontSize: "0.72rem", color: MUTED }}>ยืนยันวันเข้างานกับลูกค้าแล้ว จึงกด · หัวหน้าทีมจะได้รับแจ้ง</Typography>

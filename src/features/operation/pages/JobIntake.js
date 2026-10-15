@@ -104,6 +104,8 @@ const TABS = [
 
 const BTN = { textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", whiteSpace: "nowrap", fontSize: "0.82rem" };
 const PRIMARY = { ...BTN, bgcolor: ACCENT, color: "#fff", "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } };
+// ✅ (15 ต.ค. 2569 ผู้ใช้: "ใช้สีให้ถูกต้องตามปุ่มต่างๆ หรือการดำเนินการ") — ปุ่มจบขั้น (ทำเสร็จ/ส่งมอบแล้ว) = เขียว · ไปขั้นถัดไป = น้ำเงิน · ยกเลิก = แดง
+const SUCCESS = { ...BTN, bgcolor: GREEN, color: "#fff", "&:hover": { bgcolor: "#15803d", boxShadow: "none" } };
 
 /** แถบขั้นตอน 5 ช่อง — ผ่านแล้วสีเขียว · ขั้นปัจจุบันสีของสถานะ · ยังไม่ถึงสีเทา (กว้างเท่ากันทุกจอ ไม่ล้น) */
 // ✅ (11 ต.ค. 2569 ผู้ใช้: "สายขั้นตอนควรเป็นสีสัน รูปแบบเดียวกันทั้งหมดที่เกี่ยวข้องกัน") — ใช้แถบขั้นตอนตัวเดียวกับการ์ดงาน
@@ -372,7 +374,7 @@ function JobCard({ job, onSchedule, onDeliver, onUploadInvoice, onNoteDone, onEd
         <Button variant="outlined" onClick={() => onCancel(job)} startIcon={<BlockRounded sx={{ fontSize: "16px !important" }} />}
           sx={{ ...BTN, flex: { xs: 1, sm: "0 0 auto" }, color: RED, borderColor: alpha(RED, 0.35), "&:hover": { borderColor: RED, bgcolor: alpha(RED, 0.04) } }}>ยกเลิก</Button>
         <Button variant="contained" onClick={() => onNoteDone(job)} startIcon={<TaskAltRounded sx={{ fontSize: "17px !important" }} />}
-          sx={{ ...PRIMARY, flex: { xs: 1.6, sm: "0 0 auto" } }}>ทำเสร็จแล้ว</Button>
+          sx={{ ...SUCCESS, flex: { xs: 1.6, sm: "0 0 auto" } }}>ทำเสร็จแล้ว</Button>
       </>
     ) : (
       <Button variant="outlined" onClick={() => onNoteDone(job, true)} startIcon={<RestoreRounded sx={{ fontSize: "17px !important" }} />}
@@ -385,7 +387,7 @@ function JobCard({ job, onSchedule, onDeliver, onUploadInvoice, onNoteDone, onEd
       <Button variant="outlined" onClick={() => onCancel(job)} startIcon={<BlockRounded sx={{ fontSize: "16px !important" }} />}
         sx={{ ...BTN, flex: { xs: 1, sm: "0 0 auto" }, color: RED, borderColor: alpha(RED, 0.35), "&:hover": { borderColor: RED, bgcolor: alpha(RED, 0.04) } }}>ยกเลิก</Button>
       <Button variant="contained" onClick={() => onDeliver(job)} startIcon={<LocalShippingOutlined sx={{ fontSize: "17px !important" }} />}
-        sx={{ ...PRIMARY, flex: { xs: 1.6, sm: "0 0 auto" } }}>ส่งมอบแล้ว</Button>
+        sx={{ ...SUCCESS, flex: { xs: 1.6, sm: "0 0 auto" } }}>ส่งมอบแล้ว</Button>
     </>
   ) : st.nv ? (
     <>

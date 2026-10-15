@@ -591,9 +591,9 @@ const DetailDialog = ({
                   <Button variant="contained" startIcon={<EventRepeat />} onClick={goFollow}
                     sx={{ gridColumn: { xs: "1 / -1", sm: "auto" }, textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none" }}>บันทึกการติดตาม</Button>
                   <Button variant="outlined" startIcon={<CheckCircle sx={{ color: "#15803d" }} />} onClick={() => setDecision("approve")}
-                    sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, color: "#334155", borderColor: BORDER, bgcolor: "#fff" }}>อนุมัติ</Button>
+                    sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, color: "#15803d", borderColor: "#86efac", bgcolor: "#fff", "&:hover": { borderColor: "#16a34a", bgcolor: "#f0fdf4" } }}>อนุมัติ</Button>
                   <Button variant="outlined" startIcon={<Cancel sx={{ color: "#b91c1c" }} />} onClick={() => setDecision("reject")}
-                    sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, color: "#334155", borderColor: BORDER, bgcolor: "#fff" }}>ปฏิเสธ</Button>
+                    sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, color: "#b91c1c", borderColor: "#fca5a5", bgcolor: "#fff", "&:hover": { borderColor: "#dc2626", bgcolor: "#fef2f2" } }}>ปฏิเสธ</Button>
                 </Box>
               )}
               {banner.extra?.length > 0 && (

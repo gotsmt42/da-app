@@ -251,9 +251,9 @@ function Row({ row, me, isApprover, showJob, onPreview, onChanged, embedded }) {
                       {c.status === "pending" && isApprover && (
                         <Stack direction="row" gap={1} sx={{ mt: 1 }}>
                           <Button variant="contained" disableElevation disabled={busy} onClick={() => decide(c, true)}
-                            sx={{ ...SMALL_BTN, flex: 1, bgcolor: ACCENT }}>อนุมัติ</Button>
+                            sx={{ ...SMALL_BTN, flex: 1, bgcolor: "#16a34a", "&:hover": { bgcolor: "#15803d" } }}>อนุมัติ</Button>
                           <Button variant="outlined" disabled={busy} onClick={() => decide(c, false)}
-                            sx={{ ...SMALL_BTN, flex: 1, color: "#dc2626", borderColor: "#fca5a5" }}>ไม่อนุมัติ</Button>
+                            sx={{ ...SMALL_BTN, flex: 1, color: "#dc2626", borderColor: "#fca5a5", "&:hover": { borderColor: "#dc2626", bgcolor: "#fef2f2" } }}>ไม่อนุมัติ</Button>
                         </Stack>
                       )}
                     </Box>
