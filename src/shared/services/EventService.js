@@ -360,6 +360,11 @@ const EventService = {
   },
 
   /** ✅ (15 ต.ค. 2569) งานไม่ต้องเข้างาน → ส่งมอบแล้ว { date: "YYYY-MM-DD", note } */
+  /** ✅ (15 ต.ค. 2569) รายการงานใหม่ทั้งหมด (ดูอย่างเดียว — ช่าง) */
+  async GetIntakeList() {
+    const res = await API.get("/events/intake-list");
+    return res.data?.jobs || [];
+  },
   /** ✅ (15 ต.ค. 2569) บันทึกงาน → ทำเสร็จแล้ว · { undo: true } = นำกลับมา */
   async NoteDone(id, body = {}) {
     const res = await API.put(`/events/${id}/note-done`, body);

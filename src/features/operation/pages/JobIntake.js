@@ -347,7 +347,7 @@ const Line = ({ icon: Icon, children, color = "#475569", strong }) => (
   </Stack>
 );
 
-function JobCard({ job, onSchedule, onDeliver, onUploadInvoice, onNoteDone, onEdit, onCancel, onRestore }) {
+function JobCard({ job, readOnly, onSchedule, onDeliver, onUploadInvoice, onNoteDone, onEdit, onCancel, onRestore }) {
   const st = stageOf(job);
   const stall = stalledDays(job, st);
   const intakeDocs = (job.sitePhotoFiles || []).filter((f) => f.source === "intake");
@@ -363,7 +363,8 @@ function JobCard({ job, onSchedule, onDeliver, onUploadInvoice, onNoteDone, onEd
   const due = job.dueDate ? formatThai(moment(job.dueDate), "D MMM YYYY") : "";
 
   const GHOST = { ...BTN, color: "#334155", borderColor: LINE, "&:hover": { borderColor: "#cbd5e1", bgcolor: SURFACE } };
-  const actions = st.i === -1 ? (
+  // 👀 ดูอย่างเดียว (ช่าง) — ไม่มีปุ่มดำเนินการใดๆ
+  const actions = readOnly ? null : st.i === -1 ? (
     <Button variant="outlined" onClick={() => onRestore(job)} startIcon={<RestoreRounded sx={{ fontSize: "17px !important" }} />}
       sx={{ ...GHOST, flex: { xs: 1, sm: "0 0 auto" } }}>นำกลับมา</Button>
   ) : st.note ? (
@@ -547,6 +548,8 @@ const Fact = ({ icon: Icon, children }) => (
 
 export default function JobIntake() {
   const { userData } = useAuth() || {};
+  // ✅ (15 ต.ค. 2569 ผู้ใช้: "ให้ช่างเข้ามาดูได้ด้วย แต่ไม่สามารถดำเนินการได้") — คนจัดคิว = จัดการได้ · คนอื่น = ดูอย่างเดียว
+  const canManage = can(userData, "assignDispatch") || can(userData, "editAnyJob");
   const [jobs, setJobs] = useState(null);
   const [rawEvents, setRawEvents] = useState([]);
   const [rawDrafts, setRawDrafts] = useState([]);
@@ -558,6 +561,14 @@ export default function JobIntake() {
 
   const load = useCallback(async () => {
     try {
+      if (!canManage) {
+        // ดูอย่างเดียว: รายการงานใหม่ทั้งแผนก (ไม่รวมที่ยกเลิก) — เส้นเดียว ไม่ต้องดึงงานทั้งระบบ
+        const all = await EventService.GetIntakeList().catch(() => []);
+        const seenRo = new Set();
+        setJobs(all.filter((e) => !e.cancelledAt)
+          .filter((e) => { const k = e.jobGroupId || e._id; if (seenRo.has(k)) return false; seenRo.add(k); return true; }));
+        return;
+      }
       const [dr, ev] = await Promise.all([
         EventService.GetDraftEvents({ includeCancelled: true }).catch(() => null),
         EventService.getEventOp().catch(() => null),
@@ -575,7 +586,7 @@ export default function JobIntake() {
     } catch {
       setJobs((p) => p || []);
     }
-  }, []);
+  }, [canManage]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => { AuthService.getAllUserData().then((r) => setEmployees(r?.allUser || [])).catch(() => {}); }, []);
   useRealtime("events", () => { load(); });
@@ -669,7 +680,9 @@ export default function JobIntake() {
     <Box sx={{ px: { xs: 1.5, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: 1000, mx: "auto" }}>
       <PageHeader icon={<PostAddOutlined />} title="งานใหม่"
         subtitle="รับงาน → ส่งลงตาราง หรือ ส่งมอบ + วางบิล"
-        actions={<Button variant="contained" startIcon={<AddRounded />} onClick={() => openForm()} disabled={!jobs} sx={{ ...PRIMARY, height: 40, px: { xs: 1.25, sm: 2 } }}>รับงานใหม่</Button>} />
+        actions={canManage
+          ? <Button variant="contained" startIcon={<AddRounded />} onClick={() => openForm()} disabled={!jobs} sx={{ ...PRIMARY, height: 40, px: { xs: 1.25, sm: 2 } }}>รับงานใหม่</Button>
+          : <Box component="span" sx={{ px: 1.25, py: 0.5, borderRadius: 99, fontSize: "0.74rem", fontWeight: 700, color: MUTED, bgcolor: SURFACE, border: `1px solid ${LINE}`, whiteSpace: "nowrap" }}>ดูอย่างเดียว</Box>} />
 
       {/* แท็บตามขั้นตอน */}
       <Stack direction="row" spacing={0.75} sx={{ mb: 1.5 }}>
@@ -702,12 +715,12 @@ export default function JobIntake() {
       {!jobs ? (
         <Stack spacing={1}>{[0, 1, 2].map((i) => <Skeleton key={i} variant="rounded" height={88} sx={{ borderRadius: 3 }} />)}</Stack>
       ) : list.length ? (
-        <Stack spacing={1.25}>{list.map((j) => <JobCard key={j._id} job={j} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone} onEdit={openForm} onCancel={cancelJob} onRestore={restoreJob} />)}</Stack>
+        <Stack spacing={1.25}>{list.map((j) => <JobCard key={j._id} job={j} readOnly={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone} onEdit={openForm} onCancel={cancelJob} onRestore={restoreJob} />)}</Stack>
       ) : (
         <EmptyState icon={<PostAddOutlined />}
           title={q ? "ไม่พบงานที่ค้นหา" : tab === "waiting" ? "ไม่มีงานรอดำเนินการ" : tab === "active" ? "ไม่มีงานที่กำลังดำเนินการ" : tab === "cancelled" ? "ไม่มีงานที่ยกเลิก" : "ยังไม่มีงานที่เสร็จ"}
-          hint={tab === "waiting" ? "ได้งานมาแล้ว กด “รับงานใหม่” เพื่อกรอกเก็บไว้ก่อน" : undefined}
-          action={tab === "waiting" ? <Button variant="contained" startIcon={<AddRounded />} onClick={() => openForm()} sx={{ ...PRIMARY, mt: 1 }}>รับงานใหม่</Button> : null} />
+          hint={tab === "waiting" && canManage ? "ได้งานมาแล้ว กด “รับงานใหม่” เพื่อกรอกเก็บไว้ก่อน" : undefined}
+          action={tab === "waiting" && canManage ? <Button variant="contained" startIcon={<AddRounded />} onClick={() => openForm()} sx={{ ...PRIMARY, mt: 1 }}>รับงานใหม่</Button> : null} />
       )}
 
       {delivering && (

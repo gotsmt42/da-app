@@ -399,7 +399,7 @@ const side = (key, extra) => {
           {/* ✅ (9 ต.ค. 2569 ผู้ใช้: "เรียงเมนูตามขั้นตอนงาน") 1 รับงาน → 2 คำขอลงงาน → 3 ตารางงาน (วางแผน)
               → 4 การดำเนินงาน / งานของฉัน → ภาพรวมงาน · งานปิดแล้ว → รายงาน */}
           {/* ✅ (11 ต.ค. 2569) "งานใหม่" เฉพาะคนจัดคิว (แอดมิน/ผู้จัดการ) — ช่างไม่ต้องเห็น */}
-          {(can(userData, "assignDispatch") || can(userData, "editAnyJob")) && intakeMenu.map((item, idx) => renderLink(item, `work-in-${idx}`))}
+          {(can(userData, "assignDispatch") || can(userData, "editAnyJob") || can(userData, "receiveDispatch")) && intakeMenu.map((item, idx) => renderLink(item, `work-in-${idx}`))}
           {canAssign && dispatchMenu.map((item, idx) => renderLink(item, `work-dispatch-${idx}`))}
           {canPlanWork && workMenu.map((navi, index) => (
             navi.items?.length

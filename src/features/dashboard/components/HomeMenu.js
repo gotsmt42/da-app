@@ -76,7 +76,8 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
   //    → การดำเนินงาน / งานของฉัน (ทำงาน · ปิดงาน) → รายงาน
   const work = [];
   // ✅ (11 ต.ค. 2569 ผู้ใช้: "หน้าของช่างไม่ต้องมีเมนูงานใหม่") — รับงาน/ส่งลงตาราง เป็นงานของคนจัดคิว (แอดมิน/ผู้จัดการ)
-  if (can(userData, "assignDispatch") || can(userData, "editAnyJob")) work.push(dest("jobIntake"));
+  // 🔁 (15 ต.ค. 2569 ผู้ใช้: "หน้างานใหม่ ให้ช่างเข้ามาดูได้ด้วย แต่ไม่สามารถดำเนินการได้") — ช่างเห็นเมนู (ดูอย่างเดียว)
+  if (can(userData, "assignDispatch") || can(userData, "editAnyJob") || can(userData, "receiveDispatch")) work.push(dest("jobIntake"));
   if (canAssign) work.push(dest("dispatch"));
   if (canRequestDispatch && !hideSalesJobs) work.push(dest("sales"));
   if (canPlanWork) {
