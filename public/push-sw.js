@@ -37,7 +37,13 @@ self.addEventListener("push", (event) => {
           visible.forEach((c) => c.postMessage({ type: "app-push", payload: { title: data.title, body: data.body, url: data.url || "/", tag: data.tag, nid: data.nid, kind: data.kind } }));
           return undefined;
         }
-        return self.registration.showNotification(data.title || "🔔 แจ้งเตือน", {
+        // 🐛 (15 ต.ค. 2569 ผู้ใช้: "ไม่เด้งทับ แค่สั่น") — เรื่องเดิม (tag ซ้ำ) ที่ยังค้างในแถบแจ้งเตือน ถูก "อัปเดต" ทับของเก่า
+        //    Android/Samsung ถือเป็นการแก้ไขแจ้งเตือนเดิม → สั่นได้แต่ไม่เด้งแบนเนอร์บนจอ
+        //    ✅ ปิดอันเก่าก่อน แล้วโพสต์ใหม่ = แจ้งเตือนใหม่จริง เด้งทับหน้าจอทุกครั้ง (ยังไม่กองซ้ำเหมือนเดิม)
+        const closeSameTag = data.tag
+          ? self.registration.getNotifications({ tag: data.tag }).then((ns) => ns.forEach((n) => n.close())).catch(() => {})
+          : Promise.resolve();
+        return closeSameTag.then(() => self.registration.showNotification(data.title || "🔔 แจ้งเตือน", {
           body: data.body || "",
           // ✅ ไอคอนแอป (ใหญ่ ข้างข้อความ) + ไอคอนขาวล้วนสำหรับแถบสถานะ Android
           //    🐛 เดิมใช้ /logo192.png (โลโก้เก่า) ทั้งสองช่อง — แถบสถานะ Android แสดงเป็นสี่เหลี่ยมขาวทึบ
@@ -60,7 +66,7 @@ self.addEventListener("push", (event) => {
           lang: "th",
           data: { url: data.url || "/", nid: data.nid || "" },
           actions: [{ action: "open", title: "เปิดดู" }],
-        });
+        }));
       }),
     ])
   );
