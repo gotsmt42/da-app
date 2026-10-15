@@ -31,7 +31,7 @@ import { can, rankLabel, systemRoleLabel } from "@/shared/utils/roles";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { getOptimizedImageUrl } from "@/shared/utils/cloudinaryImage";
 import useOrgSettings from "@/shared/hooks/useOrgSettings";
-import { APP_NAME, APP_VERSION } from "@/shared/appInfo";
+import { APP_NAME, APP_VERSION_LABEL } from "@/shared/appInfo";
 import { dest, DEST } from "@/layouts/navConfig";
 import { ORG_FALLBACK } from "@/shared/services/OrgSettingService";
 import SignatureSettingsDialog from "../components/SignatureSettingsDialog";
@@ -248,7 +248,7 @@ export default function Settings() {
 
       {/* ── เกี่ยวกับแอป + ออกจากระบบ ── */}
       <Group title="เกี่ยวกับ">
-        <Row icon={<InfoOutlined />} tone={MUTED} title={`${APP_NAME} · เวอร์ชัน ${APP_VERSION || "-"}`} desc={`ใช้งานในนาม ${org?.nameTh || ORG_FALLBACK.nameTh}`} right={null} />
+        <Row icon={<InfoOutlined />} tone={MUTED} title={`${APP_NAME} · เวอร์ชัน ${APP_VERSION_LABEL || "-"}`} desc={`ใช้งานในนาม ${org?.nameTh || ORG_FALLBACK.nameTh}`} right={null} />
         <Row icon={<Logout />} tone={RED} title="ออกจากระบบ" desc="ออกจากระบบบนอุปกรณ์นี้" danger onClick={handleLogout} right={null} />
       </Group>
 

@@ -1,5 +1,5 @@
 import "./Footer.css";
-import { APP_VERSION } from "@/shared/appInfo";
+import { APP_VERSION_LABEL } from "@/shared/appInfo";
 
 const Footer = () => {
   const year = new Date().getFullYear();
@@ -9,7 +9,7 @@ const Footer = () => {
       <div className="app-footer__divider" />
       <p className="app-footer__text">
         © {year} Development by <span className="app-footer__author">Santisuk</span>
-        {APP_VERSION && <span className="app-footer__version">v{APP_VERSION}</span>}
+        {APP_VERSION_LABEL && <span className="app-footer__version">v{APP_VERSION_LABEL}</span>}
       </p>
     </footer>
   );

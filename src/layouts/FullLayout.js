@@ -137,34 +137,68 @@ const FullLayout = () => {
             2. เลือก <b>"เพิ่มไปยังหน้าจอโฮม"</b><br/>
             3. เปิดแอปจากไอคอนใหม่ แล้วกด <b>"เปิดการแจ้งเตือน"</b></div>`,
           confirmButtonText: "เข้าใจแล้ว",
-          confirmButtonColor: "#dc2626",
+          confirmButtonColor: "#2563eb",
         });
         return;
       }
       if (!PushService.isSupported()) return;
       const permission = await PushService.getPermissionState();
+      // 🐛 (15 ต.ค. 2569 ผู้ใช้: "เครื่องไหนที่เปิดแจ้งเตือนแล้วไม่ควรเด้งขึ้นมา ทำให้สับสน")
+      //    อนุญาตไว้แล้ว = เปิดแล้ว ไม่ต้องถามอีก — ถ้า subscription หาย/ถูกหมุน ต่อใหม่เงียบๆ (syncSubscription)
+      //    เดิมเช็คแค่ "มี subscription ไหม" ช่วงที่เบราว์เซอร์หมุน subscription หรือ service worker ยังไม่พร้อม จึงเด้งถามซ้ำ
+      if (permission === "granted") { PushService.syncSubscription(); return; }
       if (permission === "denied") return;
+      if (await PushService.isSubscribed()) return;
+      // กด "ไว้ทีหลัง" → ไม่ถามซ้ำ 3 วัน (เดิมถามทุกครั้งที่เปิดแอป)
+      const LATER_KEY = "push.askLater.at";
+      try { if (Date.now() - (Number(localStorage.getItem(LATER_KEY)) || 0) < 3 * 24 * 3600 * 1000) return; } catch { /* ไม่มีที่เก็บ */ }
 
-      const alreadySubscribed = await PushService.isSubscribed();
-      if (alreadySubscribed) return;
-
+      // ✅ หน้าต่างชวนเปิดแจ้งเตือนแบบแอปทั่วไป: ไอคอนกระดิ่ง · หัวข้อ · ประโยชน์ 3 ข้อ · ปุ่มหลักน้ำเงิน / ไว้ทีหลัง
+      const item = (icon, text) => `<div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;background:#f8fafc;text-align:left">
+          <span style="flex-shrink:0;width:32px;height:32px;border-radius:10px;background:#eff6ff;display:grid;place-items:center;font-size:17px">${icon}</span>
+          <span style="font-size:14px;color:#334155;line-height:1.45">${text}</span></div>`;
       const result = await Swal.fire({
-        title: "เปิดการแจ้งเตือนไหม? 🔔",
-        text: "รับแจ้งเตือนงานใหม่ อนุมัติ/ไม่อนุมัติปิดงาน และข้อความถึงคุณทันที ไม่ต้องเปิดแอพค้างไว้",
-        icon: "question",
+        html: `<div style="font-family:inherit">
+          <div style="margin:4px auto 14px;width:72px;height:72px;border-radius:50%;background:#eff6ff;display:grid;place-items:center;box-shadow:0 0 0 10px rgba(37,99,235,.06)">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="#2563eb" aria-hidden="true"><path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 0 0-5.5-6.84V3.5a1.5 1.5 0 0 0-3 0v.66A7 7 0 0 0 5 11v5l-1.7 1.7A1 1 0 0 0 4 19.4h16a1 1 0 0 0 .7-1.7Z"/></svg>
+          </div>
+          <div style="font-size:20px;font-weight:800;color:#0f172a">เปิดการแจ้งเตือนบนเครื่องนี้</div>
+          <div style="margin-top:6px;font-size:14px;color:#64748b">ไม่ต้องเปิดแอปค้างไว้ ก็ไม่พลาดเรื่องสำคัญ</div>
+          <div style="display:grid;gap:8px;margin-top:16px">
+            ${item("📋", "งานใหม่ที่มอบหมายให้คุณ และงานที่ต้องรับทราบ")}
+            ${item("✅", "ผลอนุมัติ / ไม่อนุมัติ ปิดงานและใบเบิก")}
+            ${item("💬", "ข้อความและงานที่ใกล้ถึงกำหนด")}
+          </div>
+        </div>`,
         showCancelButton: true,
         confirmButtonText: "เปิดการแจ้งเตือน",
         cancelButtonText: "ไว้ทีหลัง",
-        confirmButtonColor: "#dc2626",
+        buttonsStyling: false,
+        customClass: { popup: "tt-push-ask", actions: "tt-push-ask-actions", confirmButton: "tt-push-ask-ok", cancelButton: "tt-push-ask-later" },
+        didOpen: () => {
+          if (document.getElementById("tt-push-ask-style")) return;
+          const st = document.createElement("style");
+          st.id = "tt-push-ask-style";
+          st.textContent = `.tt-push-ask{border-radius:20px!important;padding:22px 20px 18px!important;width:min(92vw,420px)!important}
+            .tt-push-ask-actions{flex-direction:column;width:100%;gap:6px;margin-top:18px!important}
+            .tt-push-ask-ok{width:100%;height:48px;border:0;border-radius:12px;background:#2563eb;color:#fff;font:inherit;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 8px 18px -10px rgba(37,99,235,.8)}
+            .tt-push-ask-ok:hover{background:#1d4ed8}
+            .tt-push-ask-ok:focus,.tt-push-ask-later:focus{outline:none;box-shadow:0 0 0 3px rgba(37,99,235,.25)}
+            .tt-push-ask-later{width:100%;height:42px;border:0;border-radius:12px;background:transparent;color:#64748b;font:inherit;font-size:15px;font-weight:700;cursor:pointer}
+            .tt-push-ask-later:hover{background:#f1f5f9}`;
+          document.head.appendChild(st);
+        },
       });
 
       if (result.isConfirmed) {
         try {
           await PushService.subscribe();
-          Swal.fire({ title: "เปิดการแจ้งเตือนแล้ว 🔔", icon: "success", timer: 1200, showConfirmButton: false });
+          Swal.fire({ title: "เปิดการแจ้งเตือนแล้ว", icon: "success", timer: 1300, showConfirmButton: false });
         } catch (error) {
-          Swal.fire("เปิดไม่สำเร็จ", error.message || "กรุณาลองใหม่อีกครั้ง", "error");
+          Swal.fire({ title: "เปิดไม่สำเร็จ", text: error.message || "กรุณาลองใหม่อีกครั้ง", icon: "error", confirmButtonColor: "#2563eb" });
         }
+      } else {
+        try { localStorage.setItem(LATER_KEY, String(Date.now())); } catch { /* ไม่มีที่เก็บ */ }
       }
     };
 

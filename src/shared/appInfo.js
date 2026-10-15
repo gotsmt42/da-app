@@ -9,11 +9,14 @@
  *    สองไฟล์นั้นเป็นไฟล์สแตติก อ่านค่าจากโมดูลนี้ไม่ได้
  */
 
+/** เลขเวอร์ชันจาก package.json (ดูปลั๊กอิน app-version ใน vite.config.js) */
+import APP_VERSION from "virtual:app-version";
+
 /**
  * ชื่อแอปที่แสดงให้ผู้ใช้เห็น
  * TidTam มาจากคำไทย "ติดตาม" — หัวใจของระบบคือตามงาน ตามเอกสาร ตามเงิน ให้จบทุกเรื่อง
  */
 export const APP_NAME = "TidTam";
-
-/** เลขเวอร์ชันจาก package.json (ดูปลั๊กอิน app-version ใน vite.config.js) */
-export { default as APP_VERSION } from "virtual:app-version";
+export { APP_VERSION };
+/** เลขเวอร์ชันสำหรับแสดงผล — ตัด ".0" ท้ายออก (2.35.0 → 2.35) · package.json ยังต้องเป็น semver 3 ท่อน */
+export const APP_VERSION_LABEL = String(APP_VERSION || "").replace(/\.0$/, "");
