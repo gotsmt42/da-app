@@ -146,17 +146,22 @@ function MultiDayAttendanceProgress({ event, rows }) {
   const checked = new Set((rows || [])
     .filter((row) => row.checkIn?.at)
     .map((row) => moment(row.checkIn.at).utcOffset(7).format("YYYY-MM-DD")));
-  const completed = days.filter((day) => checked.has(day.format("YYYY-MM-DD"))).length;
+  const completedByPlan = days.filter((day) => checked.has(day.format("YYYY-MM-DD"))).length;
+  const scheduledKeys = new Set(days.map((day) => day.format("YYYY-MM-DD")));
+  const offPlanDays = [...checked].filter((day) => !scheduledKeys.has(day)).sort();
   const visibleDays = days.length > 10 ? days.slice(0, 9) : days;
 
   return (
     <Box sx={{ mt: 0.75, px: 1, py: 0.8, borderRadius: 1.5, bgcolor: "#f8fafc", border: `1px solid ${LINE}` }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
         <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: INK_2 }}>บันทึกเข้างานรายวัน</Typography>
-        <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: completed === days.length ? "#15803d" : ACCENT, whiteSpace: "nowrap" }}>
-          {completed} / {days.length} วัน
+        <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: checked.size ? "#15803d" : ACCENT, whiteSpace: "nowrap" }}>
+          บันทึกแล้ว {checked.size} วัน
         </Typography>
       </Stack>
+      <Typography sx={{ mt: 0.2, fontSize: "0.66rem", color: MUTED }}>
+        ตรงตามแผน {completedByPlan} / {days.length} วัน
+      </Typography>
       <Stack direction="row" gap={0.5} flexWrap="wrap" sx={{ mt: 0.65 }}>
         {visibleDays.map((day) => {
           const done = checked.has(day.format("YYYY-MM-DD"));
@@ -174,6 +179,18 @@ function MultiDayAttendanceProgress({ event, rows }) {
           <Typography sx={{ alignSelf: "center", fontSize: "0.67rem", color: MUTED }}>และอีก {days.length - visibleDays.length} วัน</Typography>
         )}
       </Stack>
+      {offPlanDays.length > 0 && (
+        <Stack direction="row" alignItems="center" gap={0.5} flexWrap="wrap" sx={{ mt: 0.65 }}>
+          <Typography sx={{ fontSize: "0.66rem", color: "#b45309", fontWeight: 700 }}>บันทึกนอกแผน</Typography>
+          {offPlanDays.map((day) => (
+            <Box key={day} title={`บันทึกเข้างาน ${formatThai(moment(day), "D MMM YYYY")} ซึ่งอยู่นอกช่วงวันที่ตามแผน`}
+              sx={{ px: 0.7, py: 0.25, borderRadius: 99, bgcolor: "#fff7ed", border: "1px solid #fed7aa",
+                color: "#b45309", fontSize: "0.67rem", fontWeight: 700, whiteSpace: "nowrap" }}>
+              {formatThai(moment(day), "D MMM")}
+            </Box>
+          ))}
+        </Stack>
+      )}
     </Box>
   );
 }
