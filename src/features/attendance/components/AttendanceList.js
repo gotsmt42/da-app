@@ -188,16 +188,36 @@ function Row({ row, me, isApprover, showJob, onPreview, onChanged, embedded }) {
           {fmtTime(row.checkIn?.at)}
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography sx={{ fontSize: "0.9rem", fontWeight: 700, color: INK, lineHeight: 1.4, overflowWrap: "anywhere" }}>
-            {showJob ? (row.jobLabel || "งาน") : row.userName}
-            {showJob && row.jobNo && <Box component="span" sx={{ ml: 0.75, fontSize: "0.72rem", fontWeight: 600, color: FAINT, whiteSpace: "nowrap" }}>{row.jobNo}</Box>}
-          </Typography>
-          <Stack direction="row" alignItems="center" gap={0.6} sx={{ mt: 0.35, minWidth: 0 }}>
-            <Avatar sx={{ width: 20, height: 20, fontSize: "0.62rem", fontWeight: 700, bgcolor: personColor(row.userName) }}>{personInitial(row.userName)}</Avatar>
-            <Typography noWrap sx={{ fontSize: "0.78rem", color: INK_2, minWidth: 0 }}>
-              {[showJob ? row.userName : "", isHeadRow ? "หัวหน้าทีม" : role, teamMembers.length ? crew : ""].filter(Boolean).join(" · ")}
-            </Typography>
+          {/* ✅ (15 ต.ค. 2569 ผู้ใช้: "เลื่อนชื่อผู้บันทึกมาไว้บนสุด และชัดเจน") — ชื่อผู้บันทึก (ตัวหนา + รูปย่อ) → บทบาท → งาน */}
+          <Stack direction="row" alignItems="center" gap={0.75} sx={{ minWidth: 0 }}>
+            <Avatar sx={{ width: 26, height: 26, fontSize: "0.74rem", fontWeight: 800, bgcolor: personColor(row.userName) }}>{personInitial(row.userName)}</Avatar>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography noWrap sx={{ fontSize: "0.95rem", fontWeight: 800, color: INK, lineHeight: 1.3 }}>{row.userName || "-"}</Typography>
+              <Typography noWrap sx={{ fontSize: "0.72rem", color: MUTED, lineHeight: 1.3 }}>
+                {[isHeadRow ? "หัวหน้าทีม" : role, teamMembers.length ? crew : ""].filter(Boolean).join(" · ")}
+              </Typography>
+            </Box>
           </Stack>
+          {/* ✅ (15 ต.ค. 2569 ผู้ใช้: "ให้แสดงรายละเอียดงานด้วย · ยังเหยงไม่สวย") — กล่องงานพื้นเทาอ่อน:
+              ประเภท · ระบบ (หนา) / โครงการ · บริษัท / เลข Job / รายละเอียด 2 บรรทัด — ข้อมูลจาก server (row.job) */}
+          {showJob && (
+            <Box sx={{ mt: 0.85, px: 1.1, py: 0.85, borderRadius: "10px", bgcolor: SURFACE, border: `1px solid ${LINE}` }}>
+              <Stack direction="row" alignItems="flex-start" gap={1}>
+                <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.86rem", fontWeight: 700, color: INK, lineHeight: 1.4 }}>
+                  {row.job ? [row.job.title, row.job.system].filter(Boolean).join(" · ") || "งาน" : (row.jobLabel || "งาน").split(" · ")[0]}
+                </Typography>
+                {row.jobNo && <Typography sx={{ flexShrink: 0, fontSize: "0.7rem", fontWeight: 700, color: FAINT, lineHeight: 1.6, whiteSpace: "nowrap" }}>{row.jobNo}</Typography>}
+              </Stack>
+              <Typography noWrap sx={{ fontSize: "0.76rem", color: INK_2, mt: 0.15 }}>
+                {row.job ? [row.job.site, row.job.company && row.job.company !== row.job.site ? row.job.company : ""].filter(Boolean).join(" · ") || "-" : (row.jobLabel || "").split(" · ").slice(1).join(" · ")}
+              </Typography>
+              {row.job?.description && (
+                <Typography sx={{ fontSize: "0.74rem", color: MUTED, mt: 0.35, lineHeight: 1.45, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere" }}>
+                  {row.job.description}
+                </Typography>
+              )}
+            </Box>
+          )}
           <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5, mt: 0.65 }}>
             {inLoc && <Tag tone={locTone} icon={row.checkIn?.gps === "ok" ? <PlaceRounded /> : <LocationOffRounded />}>{shortLoc(row.checkIn, inLoc)}</Tag>}
             {row.offSchedule && <Tag tone="#ea580c" icon={<EventBusyOutlined />}>นอกวันนัด</Tag>}
