@@ -2025,6 +2025,35 @@ const EventRowCard = ({
   );
 };
 
+// ─── StatusStrip ─────────────────────────────────────────────────────
+/** แถบสถานะแถวเดียว: จุดสี + ชื่อ + ตัวเลข · แถบที่เลือกพื้นสีอ่อน · ตัวเลขแดงเมื่อเป็นเรื่องที่ต้องรีบจัดการ */
+const StatusStrip = ({ items, value, onChange }) => (
+  <Box sx={{ display: "flex", gap: 0.5, p: 0.5, mb: 2, bgcolor: "#fff", border: "1px solid #e2e8f0", borderRadius: 3, overflowX: "auto",
+    scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
+    {items.map((it) => {
+      const on = value === it.value;
+      const hot = it.alert && it.count > 0;
+      return (
+        <ButtonBase key={it.value} onClick={() => onChange(it.value)}
+          sx={{
+            flex: "1 0 auto", minWidth: 0, height: 44, px: 1.5, gap: 0.9, borderRadius: 2.5, fontFamily: "inherit", whiteSpace: "nowrap",
+            bgcolor: on ? alpha(it.color, 0.1) : "transparent",
+            boxShadow: on ? `inset 0 0 0 1.5px ${alpha(it.color, 0.55)}` : "none",
+            transition: "background-color .15s", "&:hover": { bgcolor: on ? alpha(it.color, 0.12) : "#f8fafc" },
+          }}>
+          <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: it.color, flexShrink: 0 }} />
+          <Typography component="span" sx={{ fontSize: "0.84rem", fontWeight: on ? 800 : 600, color: on ? it.color : "#334155" }}>{it.label}</Typography>
+          <Box component="span" sx={{
+            minWidth: 24, height: 22, px: 0.75, borderRadius: 99, display: "inline-grid", placeItems: "center", fontSize: "0.76rem", fontWeight: 800,
+            bgcolor: hot ? "#dc2626" : on ? it.color : "#f1f5f9", color: hot || on ? "#fff" : "#475569",
+          }}>{it.count}</Box>
+          {it.sub && <Typography component="span" sx={{ fontSize: "0.68rem", fontWeight: 700, color: "#dc2626" }}>{it.sub}</Typography>}
+        </ButtonBase>
+      );
+    })}
+  </Box>
+);
+
 // ─── FilterPanel ──────────────────────────────────────────────────────
 const FilterPanel = ({
   search, onSearch, filterType, onFilterType, filterSystem, onFilterSystem,
@@ -2940,7 +2969,7 @@ const Operation = () => {
     // สถานะเลย (status ยังเป็น "กำลังรอยืนยัน" อยู่ แต่ closeRequested:true แล้ว) ถูกตัดออกจากรายการ
     // ทั้งที่ pendingCount/ClosureRequestsPanel นับรวมงานนี้ไว้แล้ว ทำให้เห็น badge "2 งาน" แต่เปิด
     // แท็บมาแล้วเจอ "ไม่พบรายการ" ว่างเปล่า ต้องงดเว้นตัดออกในกลุ่มนี้ด้วยเช่นกัน
-    const matchNotPending = (filterOP === "กำลังรอยืนยัน" || group === "overdue" || group === "pending" || group === "all")
+    const matchNotPending = (filterOP === "กำลังรอยืนยัน" || group === "overdue" || group === "pending" || group === "all" || group === "waiting")
       ? true
       : event.status !== "กำลังรอยืนยัน";
 
@@ -2953,6 +2982,12 @@ const Operation = () => {
       && !event.closeRequested
       && !isFlaggedDays(daysPastDueMap.get(event._id)?.days);
     else if (group === "overdue") matchGroup = isFlaggedDays(daysPastDueMap.get(event._id)?.days);
+    // ✅ (15 ต.ค. 2569 ผู้ใช้: "ต้องมีสถานะยืนยันด้วย") — แยกตามสายงาน: รอยืนยัน · ยืนยันแล้ว · กำลังดำเนินการ
+    //    (ไม่รวมงานที่ขอปิดแล้ว/ค้างเกินกำหนด — อยู่แถบของตัวเอง แต่ละงานอยู่แถบเดียว)
+    else if (["waiting", "confirmed", "working"].includes(group)) {
+      const st = { waiting: "กำลังรอยืนยัน", confirmed: "ยืนยันแล้ว", working: "กำลังดำเนินการ" }[group];
+      matchGroup = event.status === st && !event.closeRequested && !isFlaggedDays(daysPastDueMap.get(event._id)?.days);
+    }
     else                          matchGroup = event.status === "ดำเนินการเสร็จสิ้น"; // "closed"
 
     const keyword = search.toLowerCase();
@@ -3021,6 +3056,12 @@ const Operation = () => {
     [countBase, daysPastDueMap]
   );
   const overdueCount     = useMemo(() => countFlaggedJobs(countBase, daysPastDueMap, isFlaggedDays), [countBase, daysPastDueMap]);
+  const flowCount = useCallback((status) => countDistinctJobs(
+    countBase, (e) => e.status === status && !e.closeRequested && !isFlaggedDays(daysPastDueMap.get(e._id)?.days),
+  ), [countBase, daysPastDueMap]);
+  const waitingCount   = useMemo(() => flowCount("กำลังรอยืนยัน"), [flowCount]);
+  const confirmedCount = useMemo(() => flowCount("ยืนยันแล้ว"), [flowCount]);
+  const workingCount   = useMemo(() => flowCount("กำลังดำเนินการ"), [flowCount]);
   const severeOverdueCount = useMemo(() => countFlaggedJobs(countBase, daysPastDueMap, isSevereDays), [countBase, daysPastDueMap]);
 
   // ✅ จัดกลุ่ม event ที่เป็น "งานเดียวกัน" เข้าด้วยกัน กันงานที่ต้องเข้าหลายวันแบบไม่ติดกัน
@@ -3441,10 +3482,12 @@ const Operation = () => {
   const statusTileGroups = [{
     title: "",
     items: [
-      { value: "all", label: "ทั้งหมด", count: allJobsCount, unit: "งาน", icon: <AppsIcon />, color: "#475569" },
+      { value: "all", label: "ทั้งหมด", count: Math.max(0, allJobsCount - closedCount), unit: "งาน", icon: <AppsIcon />, color: "#475569" },
       ...(isAdminOrManager ? [
-        { value: "pending", label: "คำขอปิดงาน", count: pendingCount, unit: "งาน", icon: <HourglassTop />, color: "#d97706", alert: true },
-        { value: "active", label: "กำลังดำเนินการ / ยืนยันแล้ว", shortLabel: "กำลังดำเนินการ", count: inProgressCount, unit: "งาน", icon: <PendingActions />, color: "#7c3aed" },
+        { value: "waiting", label: "รอยืนยัน", count: waitingCount, unit: "งาน", icon: <HourglassTop />, color: "#d97706" },
+        { value: "confirmed", label: "ยืนยันแล้ว", count: confirmedCount, unit: "งาน", icon: <EventAvailable />, color: "#2563eb" },
+        { value: "working", label: "กำลังดำเนินการ", count: workingCount, unit: "งาน", icon: <PendingActions />, color: "#7c3aed" },
+        { value: "pending", label: "คำขอปิดงาน", count: pendingCount, unit: "งาน", icon: <AssignmentTurnedIn />, color: "#0891b2", alert: true },
       ] : []),
       { value: "overdue", label: "ค้างงาน", count: overdueCount, unit: "งาน", icon: <Warning />, color: "#dc2626", alert: true,
         sub: severeOverdueCount > 0 ? `${severeOverdueCount} เกิน 2 สัปดาห์` : undefined },
@@ -3694,13 +3737,11 @@ const Operation = () => {
       {/* ⚠️ เหลือแท็บเดียวแล้ว (รายการงาน) — เงื่อนไขนี้จึงเป็นจริงเสมอ คงไว้เผื่อเพิ่มแท็บในอนาคต */}
       {/* ✅ การ์ดตัวเลขชุดเดียวกับหน้าภาพรวมงาน (ViewTiles) — เดิมเป็นกล่องจัดกลาง ไอคอนเทา ตัวเลขเล็ก
           ผู้ใช้แจ้งว่าดูยาก ไม่รู้ว่ากดสลับได้ · ช่างเห็นแค่ ค้างงาน/เสร็จสิ้น (งานรออนุมัติเป็นของแอดมิน) */}
+      {/* ✅ (15 ต.ค. 2569 ผู้ใช้: "ทำแถบใหม่ให้สอดคล้อง ต้องมีสถานะยืนยันด้วย · สวยงาม ไม่กินพื้นที่ ดูง่าย")
+          แถบสถานะแถวเดียวเรียงตามสายงาน: ทั้งหมด · รอยืนยัน · ยืนยันแล้ว · กำลังดำเนินการ · คำขอปิดงาน · ค้างงาน · เสร็จสิ้น
+          (เดิมการ์ดตัวเลขใหญ่ 5 ใบ สูงเกือบ 100px และไม่มีแถบยืนยันแล้ว) */}
       {activeTab !== 1 && !isMobile && (
-        <ViewTiles
-          value={effectiveGroup}
-          onChange={setStatusGroup}
-          isMobile={isMobile}
-          groups={statusTileGroups}
-        />
+        <StatusStrip items={statusTileGroups[0].items} value={effectiveGroup} onChange={(v) => { setStatusGroup(v); setPage(1); }} />
       )}
 
       {/* ✅ ทางลัดงานตามผู้รับผิดชอบ — ชุดเดียวกับหน้าภาพรวมงาน (กดชื่อเพื่อดูเฉพาะงานของคนนั้น) */}
