@@ -3483,12 +3483,14 @@ const Operation = () => {
     title: "",
     items: [
       { value: "all", label: "ทั้งหมด", count: Math.max(0, allJobsCount - closedCount), unit: "งาน", icon: <AppsIcon />, color: "#475569" },
-      ...(isAdminOrManager ? [
-        { value: "waiting", label: "รอยืนยัน", count: waitingCount, unit: "งาน", icon: <HourglassTop />, color: "#d97706" },
-        { value: "confirmed", label: "ยืนยันแล้ว", count: confirmedCount, unit: "งาน", icon: <EventAvailable />, color: "#2563eb" },
-        { value: "working", label: "กำลังดำเนินการ", count: workingCount, unit: "งาน", icon: <PendingActions />, color: "#7c3aed" },
-        { value: "pending", label: "คำขอปิดงาน", count: pendingCount, unit: "งาน", icon: <AssignmentTurnedIn />, color: "#0891b2", alert: true },
-      ] : []),
+      // ✅ (15 ต.ค. 2569 ผู้ใช้: "แถบสถานะงานของช่างแสดงให้ครบแบบแอดมิน แค่เห็นแค่งานของตัวเอง")
+      //    ทุกคนเห็นแถบครบเหมือนกัน — ช่างนับจากงานที่ตัวเองเกี่ยวข้อง (server กรองให้แล้ว) · ช่าง: "ขอปิดงานแล้ว" ไม่ใช่เรื่องเร่งด่วนของตัวเอง
+      { value: "waiting", label: "รอยืนยัน", count: waitingCount, unit: "งาน", icon: <HourglassTop />, color: "#d97706" },
+      { value: "confirmed", label: "ยืนยันแล้ว", count: confirmedCount, unit: "งาน", icon: <EventAvailable />, color: "#2563eb" },
+      { value: "working", label: "กำลังดำเนินการ", count: workingCount, unit: "งาน", icon: <PendingActions />, color: "#7c3aed" },
+      isAdminOrManager
+        ? { value: "pending", label: "คำขอปิดงาน", count: pendingCount, unit: "งาน", icon: <AssignmentTurnedIn />, color: "#0891b2", alert: true }
+        : { value: "pending", label: "ขอปิดงานแล้ว", count: pendingCount, unit: "งาน", icon: <AssignmentTurnedIn />, color: "#0891b2" },
       { value: "overdue", label: "ค้างงาน", count: overdueCount, unit: "งาน", icon: <Warning />, color: "#dc2626", alert: true,
         sub: severeOverdueCount > 0 ? `${severeOverdueCount} เกิน 2 สัปดาห์` : undefined },
       { value: "closed", label: "เสร็จสิ้น", count: closedCount, unit: "งาน", icon: <CheckCircle />, color: "#059669" },
