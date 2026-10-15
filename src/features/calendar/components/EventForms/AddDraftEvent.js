@@ -159,6 +159,8 @@ function injectAddDraftStyles() {
       #ade-action-bar .ade-btn { flex: 1; justify-content: center; padding: 13px 10px; font-size: 14px; }
       #ade-action-bar .ade-btn-success { flex: 2; }
     }
+    /* ✅ (15 ต.ค. 2569 ผู้ใช้: "กรอบรายละเอียดงานให้ขยายขึ้นอีก") */
+    #adeDescription { min-height: 132px; line-height: 1.6; resize: vertical; }
     .ade-field input.ade-autofilled { background: #eff6ff; border-color: #93c5fd; transition: background 1.2s; }
 
     /* ── ขั้นตอนที่ 1: เลือกประเภทงาน (การ์ดวิทยุ) — โครงเดียวกับ AddEvent.js ── */
@@ -591,7 +593,7 @@ export const getAddDraftEvent = async ({
       </div>` : ""}
       <div class="ade-field" style="margin-top:12px;">
         <label>📝 อาการเสีย / ขอบเขตงาน</label>
-        <textarea id="adeDescription" rows="3" placeholder="เช่น ตู้ควบคุมแจ้งเตือน Fault โซน 3 · ลูกค้าขอเข้าก่อน 10 โมง">${attr(existingDraft?.description)}</textarea>
+        <textarea id="adeDescription" rows="5" placeholder="เช่น ตู้ควบคุมแจ้งเตือน Fault โซน 3 · ลูกค้าขอเข้าก่อน 10 โมง">${attr(existingDraft?.description)}</textarea>
       </div>
       <div id="ade-jobInfoBlock">${jobInfoSectionHtml(existingDraft || {}, "ade")}</div>
     </div>
@@ -693,13 +695,18 @@ export const getAddDraftEvent = async ({
                 : mode === "novisit" ? "📦 รายการสินค้า / สิ่งที่ต้องส่งมอบ" : "📝 อาการเสีย / ขอบเขตงาน";
             }
             if (descArea) {
+              descArea.rows = note ? 8 : 5; // จดงาน = ช่องเดียวในฟอร์ม ให้กว้างพอเขียนได้สบาย
               descArea.placeholder = note ? "เช่น โทรตามลูกค้าเรื่องใบเสนอราคา · เตรียมเอกสารส่งมอบงาน"
                 : mode === "novisit" ? "เช่น อุปกรณ์ Smoke Detector 10 ตัว · ส่งที่ห้องเครื่อง ชั้น B1"
                   : "เช่น ตู้ควบคุมแจ้งเตือน Fault โซน 3 · ลูกค้าขอเข้าก่อน 10 โมง";
             }
-            if (note) descArea?.focus();
+            // 🐛 focus() ธรรมดาทำให้เบราว์เซอร์เลื่อนกล่อง Swal ระหว่างแอนิเมชันเปิด → ฟอร์มเด้งเยื้อง — ใช้ preventScroll
+            if (note) descArea?.focus({ preventScroll: true });
           };
           document.querySelectorAll('input[name="adeVisitMode"]').forEach((r) => r.addEventListener("change", syncMode));
+          // 🐛 (15 ต.ค. 2569 ผู้ใช้: "กดแก้ไขงานจดงาน ไม่เข้าหน้าจดงานทันที ผ่านหน้าอื่นก่อน เด้งเพี้ยน")
+          //    จัดฟอร์มตามรูปแบบงานทันทีตอนเปิด (เดิมรอ 350ms → เห็นฟอร์มเต็มก่อนแล้วค่อยหด) · รอบหลังสำหรับข้อมูลที่กู้คืน
+          syncDoc(); syncMode();
           setTimeout(() => { syncDoc(); syncMode(); }, 350); // หลังกู้คืนข้อมูลที่กรอกค้าง
           const fileInput = document.getElementById("adeIntakeFiles");
           fileInput?.addEventListener("change", () => {
@@ -770,6 +777,7 @@ export const getAddDraftEvent = async ({
           };
           document.querySelectorAll('input[name="adeQuickType"]').forEach((r) => r.addEventListener("change", syncQuick));
           Swal.getPopup()?.addEventListener("ade-mode", syncQuick);
+          syncQuick({ type: "ade-mode" }); // จัดการแสดงผลทันที (ไม่แตะค่า)
           setTimeout(syncQuick, 360);
         }
 
