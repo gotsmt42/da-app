@@ -94,18 +94,32 @@ function injectAddDraftStyles() {
     /* ✅ (15 ต.ค. 2569) การ์ด "ที่มาของงาน" + ตัวเลือกแบบเม็ดยา — โทนเดียวกับการ์ดประเภทงาน (ขาว · ขอบเทา · เลือกแล้วน้ำเงิน) */
     .ade-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px 16px; margin-bottom: 18px; }
     .ade-hint { font-size: 11.5px; font-weight: 500; color: #94a3b8; }
-    .ade-pills { display: flex; flex-wrap: wrap; gap: 8px; }
-    .ade-pill { position: relative; cursor: pointer; margin: 0; }
-    .ade-pill input { position: absolute; opacity: 0; width: 0; height: 0; }
-    .ade-pill span {
       display: inline-flex; align-items: center; height: 36px; padding: 0 14px; border-radius: 999px;
       border: 1.5px solid #e2e8f0; background: #fff; color: #334155; font-size: 13px; font-weight: 600;
       transition: border-color .15s, background .15s, color .15s;
     }
-    .ade-pill:hover span { border-color: #cbd5e1; }
-    .ade-pill input:checked + span { border-color: #2563eb; background: #eff6ff; color: #1d4ed8; }
-    .ade-pill input:focus-visible + span { box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
     .ade-mode-toggle { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    /* แถบเลือกแบบ segmented — กรอบเดียว พื้นเทาอ่อน ช่องที่เลือกเป็นการ์ดขาวตัวหนังสือน้ำเงิน */
+    .ade-seg { display: grid; gap: 4px; padding: 4px; border-radius: 12px; background: #f1f5f9; border: 1px solid #e2e8f0; }
+    .ade-seg-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ade-seg-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .ade-seg-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .ade-gap { margin-top: 16px; }
+    /* ⚠️ ต้องเจาะจงกว่า ".ade-field label" (display:flex/ขนาด 12px) ไม่งั้นช่องกว้างไม่เท่ากัน — ที่ผู้ใช้เห็นว่า "เยื้อง" */
+    .ade-field .ade-seg label { display: block; flex: none; min-width: 0; position: relative; margin: 0; cursor: pointer; font-size: inherit; font-weight: inherit; color: inherit; gap: 0; }
+    .ade-seg input { position: absolute; opacity: 0; width: 0; height: 0; }
+    .ade-seg span {
+      display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 40px; padding: 6px 8px;
+      box-sizing: border-box; border-radius: 9px; text-align: center; color: #475569;
+      transition: background .15s, color .15s, box-shadow .15s;
+    }
+    .ade-seg span b { font-size: 13px; font-weight: 600; line-height: 1.25; }
+    .ade-seg span i { font-style: normal; font-size: 16px; line-height: 1; }
+    .ade-seg label:hover span { color: #1e293b; }
+    .ade-seg input:checked + span { background: #fff; color: #1d4ed8; box-shadow: 0 1px 3px rgba(15,23,42,.14); }
+    .ade-seg input:checked + span b { font-weight: 700; }
+    #ade-modeDesc { display: block; margin-top: 6px; line-height: 1.45; }
+    .ade-seg input:focus-visible + span { box-shadow: 0 0 0 3px rgba(37,99,235,.2); }
     @media(max-width:600px) { .ade-mode-toggle { grid-template-columns: 1fr; } }
     .ade-file {
       position: relative; display: flex; align-items: center; min-height: 40px; padding: 0 12px; cursor: pointer;
@@ -117,7 +131,6 @@ function injectAddDraftStyles() {
     .ade-file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     /* ✅ (15 ต.ค. 2569 ผู้ใช้: "หน้าจอมือถือให้แสดงเต็มหน้า ให้สวยงาม จัดวางให้ทำง่ายๆ")
        มือถือ: เต็มจอ ไม่มีขอบมน · ตัวเลือกเป็นตาราง 2–3 ช่องกดง่าย · ปุ่มล่างเต็มความกว้าง เว้นขอบล่างของ iPhone */
-    .ade-mode-desc { display: none; }
     @media(max-width:600px) {
       .swal2-container:has(.swal-add-draft) { padding: 0 !important; }
       .swal-add-draft.swal2-popup, .swal-add-draft.swal-add-draft-wide.swal2-popup {
@@ -131,15 +144,15 @@ function injectAddDraftStyles() {
       #ade-header-info small { font-size: 11.5px; display: block; line-height: 1.4; }
       .swal-add-draft #ade-body, .swal-add-draft-wide #ade-body { padding: 14px 14px 20px; }
       .ade-card { padding: 12px; border-radius: 12px; margin-bottom: 14px; }
-      .ade-pills { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-      .ade-pill span { width: 100%; justify-content: center; height: 40px; padding: 0 8px; font-size: 13px; box-sizing: border-box; }
+      .ade-seg-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .ade-seg-3 span { flex-direction: column; gap: 3px; min-height: 56px; padding: 6px 4px; }
+      .ade-seg span b { font-size: 12.5px; }
       .ade-mode-toggle, .ade-jobtype-toggle { grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 6px; margin-bottom: 8px; }
       .ade-mode-toggle .ade-jobtype-card, .ade-jobtype-toggle .ade-jobtype-card {
         flex-direction: column; text-align: center; gap: 4px; padding: 10px 4px; height: 100%; box-sizing: border-box; justify-content: center;
       }
       .ade-mode-toggle .ade-jobtype-desc, .ade-jobtype-toggle .ade-jobtype-desc { display: none; }
       .ade-mode-toggle .ade-jobtype-title, .ade-jobtype-toggle .ade-jobtype-title { font-size: 12.5px; }
-      .ade-mode-desc { display: block; font-size: 11.5px; color: #64748b; margin-top: 2px; }
       .ade-grid { gap: 10px; margin-bottom: 12px; }
       .ade-field select, .ade-field input, .ade-field textarea { font-size: 16px; } /* iOS ไม่ซูมเข้าเองตอนแตะช่อง */
       #ade-action-bar { padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); gap: 8px; flex-wrap: nowrap; }
@@ -255,7 +268,6 @@ let isSavingDraft = false;
 ───────────────────────────────────────────── */
 /** ✅ (15 ต.ค. 2569) ตัวเลือกที่มาของงาน — ชุดเดียวกับ server (routes/calendarEvent/drafts.js pickIntakeInfo) */
 export const INTAKE_SOURCE_OPTS = [["sales", "ฝ่ายขาย"], ["service", "ฝ่ายบริการ"], ["project", "ฝ่ายโครงการ"], ["customer", "ลูกค้าแจ้งตรง"]];
-export const INTAKE_DOC_OPTS = [["po", "PO (ใบสั่งซื้อ)"], ["quotation", "ใบเสนอราคา"], ["other", "เอกสารอื่นๆ"]];
 
 export const getAddDraftEvent = async ({
   defaultMonth, // "YYYY-MM" — เดือนที่กำลังเปิดดูอยู่ในแผงงานล่วงหน้า ใช้เป็นค่าเริ่มต้น
@@ -402,75 +414,55 @@ export const getAddDraftEvent = async ({
     <!-- ✅ (15 ต.ค. 2569 ผู้ใช้: "ได้รับแจ้งงานมาเช่น PO หรือใบเสนอราคา ... ลงว่าจากแผนกอะไร ... ถ้าไม่มีเข้างาน เช่นส่งของ ขายของ")
          การ์ดแรกของฟอร์มรับงาน: รับงานจาก · รูปแบบงาน · เอกสารที่ได้รับ (ใช้ได้ทั้งตอนเพิ่มและแก้ไข) -->
     <div class="ade-card">
-      <p class="ade-section-label">ที่มาของงาน</p>
+      <!-- 🔁 (15 ต.ค. 2569 ผู้ใช้: "ตัวเลือกดูสับสน รกเกินไป" · "ยังไม่สวย ดูเยื้องๆ" · "ใช้คำที่สื่อความหมายชัดเจน")
+           แถบเลือกแบบเดียวกันทั้งการ์ด ช่องกว้างเท่ากันทุกช่อง · เรียงตามลำดับที่ต้องตัดสินใจ -->
       <div class="ade-field">
-        <label><span class="req">*</span> รับงานจาก</label>
-        <div class="ade-pills">
-          ${INTAKE_SOURCE_OPTS.map(([v, l]) => `<label class="ade-pill"><input type="radio" name="adeIntakeSource" value="${v}" ${existingDraft?.intakeSource === v ? "checked" : ""}><span>${l}</span></label>`).join("")}
+        <label><span class="req">*</span> งานนี้ต้องทำอะไร</label>
+        <div class="ade-seg ade-seg-3">
+          ${[["visit", "🛠️", "ส่งช่างเข้างาน"], ["novisit", "🚚", "ส่งของ / ขายของ"], ["note", "📝", "จดโน๊ตงาน"]].map(([v, ic, l]) => `<label><input type="radio" name="adeVisitMode" value="${v}" ${(existingDraft?.intakeNote ? "note" : existingDraft?.noVisit ? "novisit" : "visit") === v ? "checked" : ""}><span><i>${ic}</i><b>${l}</b></span></label>`).join("")}
+        </div>
+        <span id="ade-modeDesc" class="ade-hint"></span>
+      </div>
+
+      ${isEditMode ? "" : `
+      <div class="ade-field ade-gap" id="ade-jobTypeField">
+        <label><span class="req">*</span> ประเภทงาน</label>
+        <div class="ade-seg ade-seg-2">
+          <label><input type="radio" name="ade-jobType" id="ade-jobTypeGeneral" value="general" checked><span><b>งานทั่วไป (ครั้งเดียว)</b></span></label>
+          <label><input type="radio" name="ade-jobType" id="ade-jobTypeProject" value="project"><span><b>งานโปรเจค</b></span></label>
+        </div>
+      </div>`}
+
+      <div class="ade-field ade-gap" id="ade-sourceField">
+        <label><span class="req">*</span> ใครเป็นคนส่งงานนี้มา</label>
+        <div class="ade-seg ade-seg-4">
+          ${[["sales", "ฝ่ายขาย"], ["service", "ฝ่ายบริการ"], ["project", "ฝ่ายโครงการ"], ["customer", "ลูกค้าโดยตรง"]].map(([v, l]) => `<label><input type="radio" name="adeIntakeSource" value="${v}" ${existingDraft?.intakeSource === v ? "checked" : ""}><span><b>${l}</b></span></label>`).join("")}
         </div>
       </div>
 
-      <div class="ade-field" style="margin-top:14px;">
-        <label><span class="req">*</span> รูปแบบงาน</label>
-        <div class="ade-mode-toggle">
-          <label class="ade-jobtype-option">
-            <input type="radio" name="adeVisitMode" value="visit" ${existingDraft?.noVisit ? "" : "checked"}>
-            <div class="ade-jobtype-card">
-              <div class="ade-jobtype-icon">🛠️</div>
-              <div>
-                <div class="ade-jobtype-title">ต้องเข้างาน</div>
-                <div class="ade-jobtype-desc">ส่งลงตาราง · มอบหมายช่างเข้าหน้างาน</div>
-              </div>
-            </div>
-          </label>
-          <label class="ade-jobtype-option">
-            <input type="radio" name="adeVisitMode" value="novisit" ${existingDraft?.noVisit ? "checked" : ""}>
-            <div class="ade-jobtype-card">
-              <div class="ade-jobtype-icon">🚚</div>
-              <div>
-                <div class="ade-jobtype-title">ไม่ต้องเข้างาน</div>
-                <div class="ade-jobtype-desc">ส่งของ / ขายของ → ส่งมอบ แล้ววางบิล</div>
-              </div>
-            </div>
-          </label>
-          <label class="ade-jobtype-option">
-            <input type="radio" name="adeVisitMode" value="note" ${existingDraft?.intakeNote ? "checked" : ""}>
-            <div class="ade-jobtype-card">
-              <div class="ade-jobtype-icon">📝</div>
-              <div>
-                <div class="ade-jobtype-title">บันทึกงาน</div>
-                <div class="ade-jobtype-desc">โน๊ตสิ่งที่ต้องทำ · กดทำเสร็จเมื่อเรียบร้อย</div>
-              </div>
-            </div>
-          </label>
-        </div>
-        <span id="ade-modeDesc" class="ade-mode-desc"></span>
-        <span id="ade-noteHint" class="ade-hint" style="display:none;">บันทึกงาน: กรอกแค่ "สิ่งที่ต้องทำ" ด้านล่างก็บันทึกได้ — ข้อมูลโครงการไม่บังคับ</span>
-      </div>
-
-      <div class="ade-field" style="margin-top:14px;">
-        <label>เอกสารที่ได้รับ <span class="ade-hint">· ไม่บังคับ แต่แนะนำ</span></label>
-        <div class="ade-pills">
-          ${[["", "ไม่มีเอกสาร"], ...INTAKE_DOC_OPTS].map(([v, l]) => `<label class="ade-pill"><input type="radio" name="adeIntakeDocType" value="${v}" ${(existingDraft?.intakeDocType || "") === v ? "checked" : ""}><span>${l}</span></label>`).join("")}
+      <div class="ade-field ade-gap">
+        <label>เอกสารที่ได้รับมากับงาน <span class="ade-hint">· ไม่บังคับ</span></label>
+        <div class="ade-seg ade-seg-4">
+          ${[["", "ไม่มีเอกสาร"], ["po", "ใบสั่งซื้อ (PO)"], ["quotation", "ใบเสนอราคา"], ["other", "เอกสารอื่น"]].map(([v, l]) => `<label><input type="radio" name="adeIntakeDocType" value="${v}" ${(existingDraft?.intakeDocType || "") === v ? "checked" : ""}><span><b>${l}</b></span></label>`).join("")}
         </div>
       </div>
       <div id="ade-docFields" class="ade-grid ade-grid-2" style="margin:12px 0 0;${existingDraft?.intakeDocType ? "" : "display:none;"}">
         <div class="ade-field">
-          <label>เลขที่เอกสาร</label>
+          <label>เลขที่เอกสาร <span class="ade-hint">· ถ้ามี</span></label>
           <input id="adeIntakeDocNo" type="text" placeholder="เช่น PO-2569-0123" value="${attr(existingDraft?.intakeDocNo)}">
         </div>
         <div class="ade-field" data-no-draft>
-          <label>แนบไฟล์</label>
+          <label>แนบไฟล์เอกสาร</label>
           <label class="ade-file">
             <input id="adeIntakeFiles" type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx">
-            <span id="ade-fileText">📎 เลือกไฟล์ (รูป / PDF / Word / Excel)</span>
+            <span id="ade-fileText">📎 แตะเพื่อเลือกไฟล์ · รูป, PDF, Word, Excel</span>
           </label>
           ${(existingDraft?.sitePhotoFiles || []).some((f) => f.source === "intake") ? `<span class="ade-hint">แนบไว้แล้ว ${(existingDraft.sitePhotoFiles || []).filter((f) => f.source === "intake").length} ไฟล์ · เลือกเพิ่มได้</span>` : ""}
         </div>
       </div>
     </div>` : ""}
 
-    ${isEditMode ? "" : `
+    ${isEditMode || isIntakeForm ? "" : `
     <div id="ade-jobTypeBlock">
     <p class="ade-section-label">${isIntakeForm ? "ประเภทงาน" : "ขั้นตอนที่ 1 — ประเภทงาน"}</p>
     <div class="ade-jobtype-toggle">
@@ -652,9 +644,14 @@ export const getAddDraftEvent = async ({
           const syncMode = () => {
             const mode = document.querySelector('input[name="adeVisitMode"]:checked')?.value || "visit";
             const note = mode === "note";
-            show("ade-noteHint", note);
             const md = document.getElementById("ade-modeDesc");
-            if (md) md.textContent = note ? "" : mode === "novisit" ? "ส่งของ / ขายของ → ส่งมอบ แล้ววางบิล" : "ส่งลงตาราง · มอบหมายช่างเข้าหน้างาน";
+            if (md) {
+              md.textContent = note ? "จดเรื่องที่ต้องทำไว้กันลืม — กรอกแค่ “สิ่งที่ต้องทำ” ด้านล่าง แล้วกดทำเสร็จเมื่อเรียบร้อย"
+                : mode === "novisit" ? "ไม่ต้องส่งช่าง — กด “ส่งมอบแล้ว” เมื่อส่งของ จากนั้นอัปโหลดใบวางบิล"
+                  : "รับงานไว้ก่อน แล้วกด “ส่งลงตาราง” เลือกวันและช่างที่จะเข้างาน";
+            }
+            show("ade-sourceField", !note);
+            show("ade-jobTypeField", !note);
             show("ade-jobTypeBlock", !note);
             show("ade-generalSection", !note);
             show("ade-contactGrid", !note);
@@ -679,7 +676,7 @@ export const getAddDraftEvent = async ({
           fileInput?.addEventListener("change", () => {
             const n = fileInput.files?.length || 0;
             const t = document.getElementById("ade-fileText");
-            if (t) t.textContent = n ? `📎 ${n === 1 ? fileInput.files[0].name : `เลือกแล้ว ${n} ไฟล์`}` : "📎 เลือกไฟล์ (รูป / PDF / Word / Excel)";
+            if (t) t.textContent = n ? `📎 ${n === 1 ? fileInput.files[0].name : `เลือกแล้ว ${n} ไฟล์`}` : "📎 แตะเพื่อเลือกไฟล์ · รูป, PDF, Word, Excel";
           });
         }
         // ✅ กู้คืนข้อมูลที่กรอกค้างไว้ (ภายใน 10 นาที) — ต้องก่อน TomSelect/ปฏิทิน พ.ศ. mount ให้มันอ่านค่าที่เติมคืน
@@ -942,7 +939,7 @@ export const getAddDraftEvent = async ({
             if (!system) { Swal.showValidationMessage("กรุณาระบุระบบงาน");      return; }
           }
           if (!plannedMonth) { Swal.showValidationMessage("กรุณาระบุเดือนที่ตั้งใจ"); return; }
-          if (isIntakeForm && !radioVal("adeIntakeSource")) { Swal.showValidationMessage("กรุณาเลือกว่ารับงานจากแผนกไหน"); return; }
+          if (isIntakeForm && radioVal("adeVisitMode") !== "note" && !radioVal("adeIntakeSource")) { Swal.showValidationMessage("กรุณาเลือกว่ารับงานจากแผนกไหน"); return; }
           const intakeFiles = isIntakeForm && radioVal("adeIntakeDocType") ? [...(document.getElementById("adeIntakeFiles")?.files || [])] : [];
 
           isSavingDraft = true;
