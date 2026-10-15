@@ -114,8 +114,9 @@ export const resolveOperationGroup = (job, isOverdue = false) => {
   if (isOverdue) return "overdue";
   if (job.status === "ดำเนินการเสร็จสิ้น") return "closed";
   if (job.closeRequested) return "pending";
-  if (["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(job.status)) return "active";
-  // "กำลังรอยืนยัน" (ยังไม่ยืนยันงานเลย) ไม่มีแท็บกลุ่มไหนตรงกับสถานะนี้โดยตรง — ปล่อยว่างไว้
-  // ดีกว่าให้แท็บที่ไม่ตรงความจริงติดสว่างขึ้นมาแทน
+  // ✅ (15 ต.ค. 2569) ตรงกับแถบสถานะใหม่ของหน้าการดำเนินงาน: รอยืนยัน · ยืนยันแล้ว · กำลังดำเนินการ
+  if (job.status === "ยืนยันแล้ว") return "confirmed";
+  if (job.status === "กำลังดำเนินการ") return "working";
+  if (job.status === "กำลังรอยืนยัน") return "waiting";
   return "";
 };

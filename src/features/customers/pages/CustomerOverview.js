@@ -488,7 +488,7 @@ export default function CustomerOverview() {
                     })}
                     {selected.overdueJobCount > 0 && (
                       <TrackRow color={DANGER} title={`งานค้างเกินกำหนด ${selected.overdueJobCount} งาน`} sub="ดูรายละเอียดที่หน้าการดำเนินงาน"
-                        onClick={() => navigate("/operation")} />
+                        onClick={() => navigate("/operation?group=overdue")} />
                     )}
                     {!selected.attention && <Typography sx={{ fontSize: "0.82rem", color: MUTED }}>ไม่มีเรื่องที่ต้องติดตามตอนนี้</Typography>}
                   </Stack>

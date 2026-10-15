@@ -197,7 +197,7 @@ export default function AttendancePage() {
           {/* ✅ (11 ต.ค. 2569 ผู้ใช้: "งานไหนเสร็จแล้วให้ดีดออกจากหน้านี้ ไปเก็บในการดำเนินงาน")
               งานที่ปิดแล้วไม่อยู่ในหน้านี้ — บอกจำนวนไว้และพาไปดูที่หน้าการดำเนินงาน (บันทึกเข้า-ออกในการ์ดงาน) */}
           {closedHidden > 0 && (
-            <ButtonBase component={Link} to="/operation"
+            <ButtonBase component={Link} to="/operation?group=closed"
               sx={{ width: "100%", mb: 1.5, px: 1.5, py: 1.1, gap: 1, justifyContent: "flex-start", borderRadius: "12px", bgcolor: "#eef2f6", fontFamily: "inherit", textDecoration: "none" }}>
               <TaskAltRounded sx={{ fontSize: 18, color: MUTED }} />
               <Typography sx={{ flex: 1, textAlign: "left", fontSize: "0.8rem", color: INK_2 }}>

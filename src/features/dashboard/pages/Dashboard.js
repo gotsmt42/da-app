@@ -521,7 +521,7 @@ const Dashboard = () => {
         const n = todayJobs.filter((j) => j.status === st).length;
         return n ? <Pill key={st} color={STATUS_META[st].color}>{STATUS_SHORT[st]} {n}</Pill> : null;
       }) : null}
-      to={isSale ? "/event" : todayJobs.length ? "/operation" : undefined}>
+      to={todayJobs.length || isSale ? "/event" : undefined} toLabel="เปิดตารางงาน">
       {loading ? <Loading rows={2} /> : todayJobs.length === 0 ? (
         <Empty text={isSale ? "วันนี้ยังไม่มีนัดหมาย" : "ไม่มีงานที่นัดหมายไว้วันนี้"} />
       ) : todayJobs.map((job) => {
@@ -558,7 +558,7 @@ const Dashboard = () => {
       )}
 
       {/* งานที่กำลังจะถึงใน 7 วัน (ไม่รวมวันนี้ — มีกล่อง "งานวันนี้" แยกแล้ว) */}
-      <Widget title="งานที่กำลังจะถึง" icon={EventOutlined} count={upcomingJobs.length || undefined} hint="ภายใน 7 วันข้างหน้า" to={upcomingJobs.length > 5 ? "/operation" : undefined}>
+      <Widget title="งานที่กำลังจะถึง" icon={EventOutlined} count={upcomingJobs.length || undefined} hint="ภายใน 7 วันข้างหน้า" to={upcomingJobs.length > 5 ? "/event" : undefined} toLabel="เปิดตารางงาน">
         {loading ? <Loading rows={2} /> : upcomingJobs.length === 0 ? <Empty text="ไม่มีงานที่จะถึงใน 7 วันนี้" /> : upcomingJobs.slice(0, 5).map((job) => {
           const jobStart = moment(job.start || job.date).startOf("day");
           const diffDays = jobStart.diff(today, "days");
@@ -617,10 +617,10 @@ const Dashboard = () => {
       {overdueContractsBlock && <div className="dashboard-mobile-only">{overdueContractsBlock}</div>}
 
       {/* งานวางแผนล่วงหน้า (ยังไม่ลงตาราง · ไม่รวมฉบับร่างของสัญญา) */}
-      <Widget title="งานวางแผนล่วงหน้า" icon={EditCalendarOutlined} tone="#475569" count={generalDrafts.length || undefined} hint="ยังไม่ลงวันที่ในตาราง" to={generalDrafts.length ? "/event" : undefined} toLabel="เปิดปฏิทิน"
+      <Widget title="งานวางแผนล่วงหน้า" icon={EditCalendarOutlined} tone="#475569" count={generalDrafts.length || undefined} hint="ยังไม่ลงวันที่ในตาราง" to={generalDrafts.length ? "/jobs/intake" : undefined} toLabel="ไปหน้างานใหม่"
         footer={<Pager page={draftsSafePage} pages={draftsTotalPages} onChange={setDraftsPage} />}>
         {loading ? <Loading rows={2} /> : draftsPreview.length === 0 ? <Empty text="ยังไม่มีงานวางแผนล่วงหน้า" /> : draftsPreview.map((d) => (
-          <Row key={d._id} to="/event" title={d.title || "งาน"}
+          <Row key={d._id} to="/jobs/intake" title={d.title || "งาน"}
             sub={[d.system, d.site].filter(Boolean).join(" · ") || "ไม่ระบุโครงการ"}
             trailing={<Pill color="#475569">{d.plannedMonth ? formatThai(moment(d.plannedMonth, "YYYY-MM"), "MMM YYYY") : "ไม่ระบุเดือน"}</Pill>} />
         ))}
