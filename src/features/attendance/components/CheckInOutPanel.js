@@ -129,23 +129,32 @@ function statusStepsOf(event) {
   return { current, dates, labels: STATUS_STEPS.map((st) => st.label) };
 }
 
-/** แสดงความคืบหน้าการบันทึกแยกตามวัน เมื่องานเดียวมีหลายวันเข้างาน */
-function MultiDayAttendanceProgress({ event, rows }) {
-  if (!Array.isArray(rows)) return null;
+function scheduledAttendanceDays(event) {
   const start = moment(event.start).utcOffset(7).startOf("day");
   const end = moment(event.end || event.start).utcOffset(7)
     .subtract(event.allDay ? 1 : 0, "days").startOf("day");
-  if (!start.isValid() || !end.isValid() || end.isBefore(start)) return null;
+  if (!start.isValid() || !end.isValid() || end.isBefore(start)) return [];
 
   const days = [];
   for (let day = start.clone(); day.isSameOrBefore(end, "day") && days.length < 366; day.add(1, "day")) {
     days.push(day.clone());
   }
+  return days;
+}
+
+function recordedAttendanceDayKeys(rows) {
+  return new Set((rows || [])
+    .filter((row) => row.checkIn?.at && moment(row.checkIn.at).isValid())
+    .map((row) => moment(row.checkIn.at).utcOffset(7).format("YYYY-MM-DD")));
+}
+
+/** แสดงความคืบหน้าการบันทึกแยกตามวัน เมื่องานเดียวมีหลายวันเข้างาน */
+function MultiDayAttendanceProgress({ event, rows }) {
+  if (!Array.isArray(rows)) return null;
+  const days = scheduledAttendanceDays(event);
   if (days.length < 2) return null;
 
-  const checked = new Set((rows || [])
-    .filter((row) => row.checkIn?.at)
-    .map((row) => moment(row.checkIn.at).utcOffset(7).format("YYYY-MM-DD")));
+  const checked = recordedAttendanceDayKeys(rows);
   const completedByPlan = days.filter((day) => checked.has(day.format("YYYY-MM-DD"))).length;
   const scheduledKeys = new Set(days.map((day) => day.format("YYYY-MM-DD")));
   const offPlanDays = [...checked].filter((day) => !scheduledKeys.has(day)).sort();
@@ -307,6 +316,9 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
   const members = [...new Set((event.teamMembers || []).map((m) => m?.name).filter((n) => n && n !== head))];
   // เช็คอินนับแยกตามวันไทย: งานเดียวเข้างานซ้ำได้คนละวัน แต่วันเดียวกันบันทึกได้ครั้งเดียว
   const todayKey = moment().utcOffset(7).format("YYYY-MM-DD");
+  const plannedDays = scheduledAttendanceDays(event);
+  const recordedDays = recordedAttendanceDayKeys(rows || []);
+  const allPlannedDaysRecorded = plannedDays.length > 0 && plannedDays.every((day) => recordedDays.has(day.format("YYYY-MM-DD")));
   const checkin = (rows || []).find((r) => r.checkIn?.at && moment(r.checkIn.at).utcOffset(7).format("YYYY-MM-DD") === todayKey);
   const latestCheckin = (rows || []).slice().sort((a, b) => new Date(b.checkIn?.at) - new Date(a.checkIn?.at))[0];
 
@@ -446,6 +458,8 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
         </Typography>
       </Box>
     );
+  } else if (allPlannedDaysRecorded) {
+    action = <Note icon={<TaskAltRounded />} tone="#16a34a">บันทึกเข้างานครบตามวันที่กำหนดแล้ว · {plannedDays.length}/{plannedDays.length} วัน</Note>;
   } else if (!acked) {
     action = (
       <Box>
@@ -512,6 +526,8 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
           {b?.tone === "warn" && <Box component="span" sx={{ color: "#b45309" }}> · {b.text}</Box>}
         </Line>
       );
+    } else if (allPlannedDaysRecorded) {
+      line = <Line icon={<TaskAltRounded />} tone="#16a34a" right={logLink}>บันทึกเข้างานครบตามวันที่กำหนดแล้ว · {plannedDays.length}/{plannedDays.length} วัน</Line>;
     } else if (legacyStarted) {
       line = <Line icon={<TaskAltRounded />} tone="#16a34a" right={logLink}>กำลังดำเนินการ · {docsComplete ? "เอกสารครบ กดขอปิดงานได้" : "แนบเอกสารประจำงานให้ครบ แล้วขอปิดงาน"}</Line>;
     } else if (declined && !declinedByMe) {
