@@ -15,7 +15,18 @@ import { Close } from "@mui/icons-material";
  * ⚠️ เสียงสร้างด้วย Web Audio (ไม่ต้องมีไฟล์เสียง) — เบราว์เซอร์อนุญาตให้เล่นเสียงได้หลังผู้ใช้แตะหน้าจอแล้ว
  *   อย่างน้อยครั้งหนึ่ง (กฎ autoplay) จึงปลดล็อก AudioContext ตอนแตะครั้งแรก · ถ้ายังไม่เคยแตะ = เงียบแต่ยังเด้งแบนเนอร์
  */
-const AUTO_HIDE_MS = 6000;
+const AUTO_HIDE_MS = 8000;
+
+/**
+ * ✅ (15 ต.ค. 2569 ผู้ใช้: "การแจ้งเตือนทั้งหมด ทำให้ชัดเจน ดูง่าย") สีแถบซ้ายตามความหมายของเรื่อง — อ่านจากอีโมจิหัวเรื่อง
+ *   แดง = ไม่อนุมัติ/เลยกำหนด · ส้ม = เตือน/รอดำเนินการ · เขียว = สำเร็จ · น้ำเงิน = ทั่วไป
+ */
+const toneOf = (title = "") => {
+  if (/^(⛔|❌|🚫)/u.test(title)) return "#dc2626";
+  if (/^(⚠️|⏰|⏳|↩️|📄)/u.test(title)) return "#ea580c";
+  if (/^(✅|🎉)/u.test(title)) return "#16a34a";
+  return "#2563eb";
+};
 
 let audioCtx = null;
 const unlockAudio = () => {
@@ -122,8 +133,9 @@ export default function InAppPushBanner() {
         <Box
           sx={{
             pointerEvents: "auto", display: "flex", alignItems: "flex-start", gap: 1.25, p: 1.25, pr: 0.5,
-            borderRadius: 3.5, bgcolor: "rgba(255,255,255,.97)", backdropFilter: "blur(10px)",
-            border: "1px solid #e2e8f0", boxShadow: "0 12px 32px -8px rgba(15,23,42,.35)",
+            borderRadius: 3.5, bgcolor: "rgba(255,255,255,.98)", backdropFilter: "blur(10px)",
+            border: "1px solid #e2e8f0", borderLeft: `5px solid ${toneOf(msg.title)}`,
+            boxShadow: "0 12px 32px -8px rgba(15,23,42,.35)",
           }}
         >
           <ButtonBase
@@ -133,11 +145,14 @@ export default function InAppPushBanner() {
             <Box component="img" src="/app-icon-192.png?v=16" alt="" sx={{ width: 38, height: 38, borderRadius: 2.5, flexShrink: 0 }} />
             <Box sx={{ minWidth: 0, flex: 1 }}>
               <Typography sx={{ fontSize: "0.7rem", fontWeight: 700, color: "#64748b", lineHeight: 1.3 }}>TidTam · ตอนนี้</Typography>
-              <Typography sx={{ fontSize: "0.9rem", fontWeight: 800, color: "#0f172a", lineHeight: 1.35 }} noWrap>{msg.title || "แจ้งเตือน"}</Typography>
+              <Typography sx={{
+                fontSize: "0.92rem", fontWeight: 800, color: "#0f172a", lineHeight: 1.35,
+                display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+              }}>{msg.title || "แจ้งเตือน"}</Typography>
               {msg.body && (
                 <Typography sx={{
-                  fontSize: "0.82rem", color: "#334155", lineHeight: 1.4,
-                  display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden",
+                  fontSize: "0.83rem", color: "#334155", lineHeight: 1.45, mt: 0.25, whiteSpace: "pre-line",
+                  display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden",
                 }}>
                   {msg.body}
                 </Typography>

@@ -15,12 +15,12 @@ import { useNavigate } from "react-router-dom";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import {
-  Box, Stack, Typography, Avatar, Switch, CircularProgress, Snackbar, Alert,
+  Box, Stack, Typography, Avatar, Switch, CircularProgress, Snackbar, Alert, Button, Collapse,
 } from "@mui/material";
 import {
   ChevronRight, DrawOutlined, NotificationsActiveOutlined, NotificationsOffOutlined, BusinessOutlined,
   GroupOutlined, LocalOfferOutlined, ImageOutlined, AdminPanelSettingsOutlined, InfoOutlined, Logout,
-  DevicesOther, PersonOutline,
+  DevicesOther, PersonOutline, SendToMobileOutlined, TuneOutlined, ExpandMore,
 } from "@mui/icons-material";
 import { useAuth } from "@/features/auth/AuthContext";
 import PushService from "@/shared/services/PushService";
@@ -42,6 +42,47 @@ const RED = "#dc2626";
 const AMBER = "#b45309";
 /** ใช้งานภายใน 5 นาที = กำลังใช้งาน (ตรงกับหน้า LoginDevices) */
 const isActive = (x) => moment().diff(moment(x.lastSeenAt), "minutes") < 5;
+
+/**
+ * ✅ (15 ต.ค. 2569 ผู้ใช้: "อยากให้แจ้งเตือนเด้งทับแถบหน้าจอมือถือ แบบ LINE ทำให้สมบูรณ์")
+ *    แอปส่งแจ้งเตือนแบบด่วน + เสียง + สั่นอยู่แล้ว แต่ "เด้งทับหน้าจอ" (heads-up/แบนเนอร์) เป็นสิทธิ์ของระบบเครื่อง
+ *    เว็บแอปเปิดเองไม่ได้ (LINE เป็นแอปเนทีฟ ระบบตั้งให้ตั้งแต่ติดตั้ง) — จึงบอกขั้นตอนตามเครื่องที่ใช้อยู่ให้ทำครั้งเดียว
+ */
+const HEADS_UP_GUIDE = {
+  android: {
+    label: "Android",
+    steps: [
+      "เปิด ตั้งค่าเครื่อง → แอปพลิเคชัน → TidTam (ถ้าติดตั้งแอปไว้บนหน้าจอ) หรือ Chrome → การแจ้งเตือน",
+      "เปิด “อนุญาตการแจ้งเตือน” แล้วแตะหมวดของ TidTam / เว็บไซต์ของเรา",
+      "เลือก “แจ้งเตือน (มีเสียง)” และเปิด “แสดงบนหน้าจอ / ป๊อปอัป” (Pop on screen)",
+      "แบตเตอรี่ของแอปเดียวกัน → ตั้งเป็น “ไม่จำกัด” เพื่อไม่ให้เครื่องหน่วงแจ้งเตือนตอนพักหน้าจอ",
+      "Samsung: ตั้งค่า → การแจ้งเตือน → รูปแบบป๊อปอัป → เลือก “รายละเอียด” และตรวจว่าไม่ได้เปิดโหมดห้ามรบกวน",
+    ],
+  },
+  ios: {
+    label: "iPhone / iPad",
+    steps: [
+      "ต้องเปิดแอปจากไอคอนบนหน้าจอโฮม (Safari → แชร์ → “เพิ่มไปยังหน้าจอโฮม”) · iOS 16.4 ขึ้นไป",
+      "ตั้งค่า → การแจ้งเตือน → TidTam → เปิด “อนุญาตการแจ้งเตือน”",
+      "เปิดการแจ้งเตือนแบบ “แบนเนอร์” และเลือกรูปแบบแบนเนอร์ “ถาวร” ให้ค้างบนจอจนกว่าจะปัดออกแบบ LINE",
+      "เปิด “เสียง” และตรวจว่าโหมดโฟกัส/ห้ามรบกวนไม่ได้ปิดกั้น TidTam",
+    ],
+  },
+  desktop: {
+    label: "คอมพิวเตอร์",
+    steps: [
+      "Windows: ตั้งค่า → ระบบ → การแจ้งเตือน → เปิด Chrome / Edge และ “แสดงแบนเนอร์การแจ้งเตือน”",
+      "Mac: การตั้งค่าระบบ → การแจ้งเตือน → Chrome → รูปแบบ “การแจ้งเตือน” (ค้างจนกว่าจะปิด)",
+      "ปิดโหมดโฟกัส/ห้ามรบกวนในช่วงเวลาทำงาน",
+    ],
+  },
+};
+const detectPlatform = () => {
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+  if (PushService.isIos()) return "ios";
+  if (/android/i.test(ua)) return "android";
+  return "desktop";
+};
 
 /** หัวกลุ่ม + กล่องขาว */
 const Group = ({ title, hint, right, children }) => (
@@ -120,6 +161,25 @@ export default function Settings() {
     SignatureService.me().then((sig) => setHasSignature(Boolean(sig))).catch(() => setHasSignature(false));
     loadSessions();
   }, [loadPushStatus, loadSessions]);
+
+  // ── ทดสอบเด้งทับหน้าจอ: ส่งหน่วง 5 วินาที ให้ผู้ใช้ออกจากแอป/ล็อกจอทัน (แอปเปิดอยู่จะเด้งเป็นแบนเนอร์ในแอปแทน) ──
+  const [testCountdown, setTestCountdown] = useState(0);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [guidePlatform, setGuidePlatform] = useState(detectPlatform);
+  useEffect(() => {
+    if (testCountdown <= 0) return undefined;
+    const t = setTimeout(() => setTestCountdown((n) => n - 1), 1000);
+    return () => clearTimeout(t);
+  }, [testCountdown]);
+  const handleTestPush = async () => {
+    try {
+      await PushService.test(5);
+      setTestCountdown(5);
+      setToast({ type: "info", text: "จะส่งใน 5 วินาที — ออกจากแอปหรือล็อกจอเลย" });
+    } catch (error) {
+      setToast({ type: "error", text: error?.response?.data?.message || "ส่งแจ้งเตือนทดสอบไม่สำเร็จ" });
+    }
+  };
 
   const handleTogglePush = async () => {
     if (!pushSupported) return;
@@ -225,6 +285,57 @@ export default function Settings() {
               sx={{ "& .MuiSwitch-switchBase.Mui-checked": { color: ACCENT }, "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: ACCENT } }} />
           )}
         />
+        {pushSubscribed && (
+          <Row
+            icon={<SendToMobileOutlined />} tone={GREEN}
+            title="ทดสอบการเด้งทับหน้าจอ"
+            desc={testCountdown > 0
+              ? <Box component="span" sx={{ color: GREEN, fontWeight: 700 }}>กำลังส่งใน {testCountdown} วินาที — ออกจากแอปหรือล็อกจอ</Box>
+              : "ส่งแจ้งเตือนทดสอบมาที่เครื่องนี้ในอีก 5 วินาที · ไม่เด้งทับจอ = ทำตามวิธีตั้งค่าด้านล่าง"}
+            right={(
+              <Button size="small" variant="contained" disableElevation disabled={testCountdown > 0} onClick={handleTestPush}
+                sx={{ flexShrink: 0, borderRadius: 2, fontWeight: 800, bgcolor: GREEN, "&:hover": { bgcolor: "#15803d" } }}>
+                {testCountdown > 0 ? testCountdown : "ทดสอบ"}
+              </Button>
+            )}
+          />
+        )}
+        <Row
+          icon={<TuneOutlined />}
+          title="ให้แจ้งเตือนเด้งทับหน้าจอ (แบบ LINE)"
+          desc="ตั้งค่าเครื่องครั้งเดียว — ให้แจ้งเตือนขึ้นแบนเนอร์บนจอพร้อมเสียง แม้กำลังใช้แอปอื่นอยู่"
+          onClick={() => setGuideOpen((o) => !o)}
+          right={<ExpandMore sx={{ color: FAINT, transition: "transform .2s", transform: guideOpen ? "rotate(180deg)" : "none" }} />}
+        />
+        <Collapse in={guideOpen} unmountOnExit>
+          <Box sx={{ px: 2, pb: 2, pt: 0.5, borderTop: `1px solid ${LINE}`, bgcolor: SURFACE }}>
+            <Stack direction="row" gap={0.75} sx={{ my: 1.25, flexWrap: "wrap" }}>
+              {Object.entries(HEADS_UP_GUIDE).map(([key, g]) => {
+                const on = guidePlatform === key;
+                return (
+                  <Box key={key} component="button" type="button" onClick={() => setGuidePlatform(key)}
+                    sx={{ height: 32, px: 1.5, borderRadius: 99, font: "inherit", cursor: "pointer", fontSize: "0.8rem",
+                      fontWeight: on ? 800 : 600, color: on ? "#fff" : INK_2, bgcolor: on ? ACCENT : "#fff",
+                      border: `1px solid ${on ? ACCENT : LINE}` }}>
+                    {g.label}
+                  </Box>
+                );
+              })}
+            </Stack>
+            <Box component="ol" sx={{ m: 0, p: 0, listStyle: "none", display: "grid", gap: 1 }}>
+              {HEADS_UP_GUIDE[guidePlatform].steps.map((t, i) => (
+                <Box component="li" key={t} sx={{ display: "flex", gap: 1.25, alignItems: "flex-start" }}>
+                  <Box sx={{ flexShrink: 0, width: 22, height: 22, borderRadius: "50%", bgcolor: ACCENT_SOFT, color: ACCENT,
+                    border: `1px solid ${ACCENT_LINE}`, display: "grid", placeItems: "center", fontSize: "0.72rem", fontWeight: 800 }}>{i + 1}</Box>
+                  <Typography sx={{ fontSize: "0.84rem", color: INK, lineHeight: 1.5 }}>{t}</Typography>
+                </Box>
+              ))}
+            </Box>
+            <Typography sx={{ mt: 1.5, fontSize: "0.76rem", color: MUTED, lineHeight: 1.5 }}>
+              ตั้งเสร็จแล้วกด “ทดสอบ” ด้านบน แล้วออกจากแอป — ถ้าแบนเนอร์เด้งลงมาจากขอบบนจอพร้อมเสียง แปลว่าใช้งานได้ครบ
+            </Typography>
+          </Box>
+        </Collapse>
       </Group>
 
       {/* ── ข้อมูลหลัก ── */}
@@ -253,7 +364,7 @@ export default function Settings() {
       </Group>
 
       <SignatureSettingsDialog open={signOpen} onClose={() => setSignOpen(false)} onSaved={(sig) => setHasSignature(Boolean(sig))} />
-      <Snackbar open={Boolean(toast)} autoHideDuration={2600} onClose={() => setToast(null)} anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
+      <Snackbar open={Boolean(toast)} autoHideDuration={toast?.type === "info" ? 4500 : 2600} onClose={() => setToast(null)} anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
         {toast ? <Alert severity={toast.type} variant="filled" onClose={() => setToast(null)}>{toast.text}</Alert> : <span />}
       </Snackbar>
     </Box>

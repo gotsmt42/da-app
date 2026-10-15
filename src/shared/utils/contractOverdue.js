@@ -265,7 +265,8 @@ export const countDueSoonContracts = (events) =>
 // ในแจ้งเตือนกับที่เห็นบนจอจะไม่ตรงกัน
 // ⚠️ ต้องคืน `state` ที่เป็นคีย์คงที่ ไม่ใช่มีแต่ label — ตัวกรองที่ไปเทียบข้อความ "หมดอายุแล้ว" ตรงๆ
 // จะพังเงียบๆ ทันทีที่มีคนแก้ถ้อยคำ (และ label ของ "ใกล้หมดอายุ" มีจำนวนวันต่อท้าย เทียบไม่ได้ตั้งแต่ต้น)
-export const CONTRACT_EXPIRY_WARN_DAYS = 60;
+// 🔁 (15 ต.ค. 2569 ผู้ใช้: "แจ้งเตือนสัญญาที่ใกล้หมดอายุ ก่อน 3 เดือน") 60 → 90 วัน
+export const CONTRACT_EXPIRY_WARN_DAYS = 90;
 
 export const contractStatusInfo = (c) => {
   if (!c.isRealContract || !c.contractEnd) return null;

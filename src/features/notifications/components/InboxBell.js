@@ -16,7 +16,7 @@ import {
 import { alpha } from "@mui/material/styles";
 import {
   Notifications, NotificationsNone, Close, DoneAll, Build, AccountBalanceWallet, ShoppingCart, AccessTime,
-  AssignmentInd, MarkEmailUnread, CalendarMonth, DeleteSweep, Storefront,
+  AssignmentInd, MarkEmailUnread, CalendarMonth, DeleteSweep, Storefront, Description,
 } from "@mui/icons-material";
 import { useAuth } from "@/features/auth/AuthContext";
 import { departmentOf } from "@/shared/utils/roles";
@@ -36,6 +36,7 @@ const KINDS = [
   { re: /^\/dispatch/, icon: AssignmentInd, color: "#7c3aed", label: "คำขอลงงาน" },
   { re: /^\/website/, icon: MarkEmailUnread, color: "#0f172a", label: "เว็บไซต์" },
   { re: /^\/(event|calendar)/, icon: CalendarMonth, color: "#dc2626", label: "แผนงาน" },
+  { re: /^\/contracts/, icon: Description, color: "#ea580c", label: "สัญญา · ภาพรวมงาน" },
   { re: /^\/(operation|technician|contracts|jobs)/, icon: Build, color: "#dc2626", label: "งาน" },
 ];
 /**
@@ -85,7 +86,7 @@ const Item = ({ n, onOpen }) => {
           <Typography sx={{ fontSize: "0.68rem", color: unread ? k.color : "#94a3b8", fontWeight: unread ? 700 : 500, whiteSpace: "nowrap" }}>{timeText(n.createdAt)}</Typography>
         </Stack>
         {n.body && (
-          <Typography sx={{ fontSize: "0.79rem", color: unread ? "#334155" : TEXT_SUB, lineHeight: 1.4, mt: 0.25, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", whiteSpace: "pre-line" }}>
+          <Typography sx={{ fontSize: "0.79rem", color: unread ? "#334155" : TEXT_SUB, lineHeight: 1.4, mt: 0.25, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden", whiteSpace: "pre-line" }}>
             {n.body}
           </Typography>
         )}

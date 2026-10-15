@@ -1895,7 +1895,12 @@ export default function ContractOverview() {
   // ✅ กรองตามสถานะสัญญา — ตามที่ผู้ใช้ขอให้ "ค้นหาสถานะสัญญาได้ด้วย" เดิมสถานะเป็นค่าคำนวณที่เห็นได้
   // อย่างเดียว ไล่หาสัญญาที่ใกล้หมดอายุต้องกวาดตาดูทีละแถวเอง (แท็บ "สัญญาหมดอายุ" ครอบเฉพาะที่หมด
   // ไปแล้ว ไม่ครอบที่กำลังจะหมด ซึ่งเป็นกลุ่มที่ต้องรีบต่อสัญญาจริงๆ)
-  const [statusFilter, setStatusFilter] = useState("all");
+  // ✅ (15 ต.ค. 2569) ?status=expiring — กดแจ้งเตือน "สัญญาใกล้หมดอายุ" แล้วเปิดมาพร้อมกรองเฉพาะสัญญากลุ่มนั้น
+  const statusParam = searchParams.get("status");
+  const [statusFilter, setStatusFilter] = useState(() => (STATUS_FILTER_OPTIONS.some((o) => o.value === statusParam) ? statusParam : "all"));
+  useEffect(() => {
+    if (STATUS_FILTER_OPTIONS.some((o) => o.value === statusParam)) setStatusFilter(statusParam);
+  }, [statusParam]);
   // ✅ กรองตามอายุสัญญาเป็นจำนวนปี — ดูเหตุผลที่ contractDurationYears
   const [durationFilter, setDurationFilter] = useState("all");
   // ✅ ช่วงวันที่ที่กรอกเอง — ใช้เฉพาะตอนตัวกรองช่วงเวลาเป็น "เลือกช่วงวันที่เอง…" เท่านั้น

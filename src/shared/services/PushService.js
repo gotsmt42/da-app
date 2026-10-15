@@ -108,7 +108,7 @@ const PushService = {
   async markAllRead() { return (await API.post("/push/inbox/read", { all: true })).data; },
   async clearRead() { return (await API.delete("/push/inbox/read")).data; },
   async status() { return (await API.get("/push/status")).data; },
-  async test() { return (await API.post("/push/test")).data; },
+  async test(delay = 0) { return (await API.post("/push/test", { delay })).data; },
 
   /** ตัวเลขบนไอคอนแอป (Android/iOS ที่ติดตั้งแอปแล้ว) — ไม่รองรับก็ข้ามเงียบๆ */
   setAppBadge(n) {
