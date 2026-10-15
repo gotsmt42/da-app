@@ -892,6 +892,23 @@ function injectStyles() {
       background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 8px center / 14px;
     }
     #ee-respSelect:hover, #ee-teamSelect:hover { border-color: #2563eb; }
+    /* แถววันเข้างานบนหัวกล่อง — ช่องวันที่ 2 ช่องเต็มแถว ไม่มีป้ายซ้ำ */
+    .ee-hm-item--date { grid-column: 1 / -1; }
+    .ee-hm-dates { flex: 1 1 auto; width: 100%; }
+    /* 🔁 (15 ต.ค. 2569 ผู้ใช้: "มีแค่กรอบวันที่ 2 กรอบ ดูไม่เข้าใจ มี - คั่นก็ยังดี") — ป้ายเล็ก "เริ่ม"/"ถึง" + ขีดคั่นกลาง */
+    .ee-hm-daterow { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: 6px; width: 100%; }
+    .ee-hm-dates .ee-field { display: flex; flex-direction: column; gap: 2px !important; margin: 0 !important; min-width: 0; }
+    .ee-hm-dates .ee-field > small { font-size: 10.5px; font-weight: 700; color: #94a3b8; line-height: 1; padding-left: 2px; }
+    .ee-hm-dash { font-size: 16px; font-weight: 800; color: #94a3b8; line-height: 34px; }
+    /* 🐛 (15 ต.ค. 2569 ผู้ใช้: "ให้เห็นปี พ.ศ. ครบ ไม่ขาด และแถวห้ามล้น") — แถววันที่เป็น 2 ชั้น: ป้าย "วันเข้างาน" บน · ช่องวันที่เต็มความกว้างล่าง
+       ช่องจึงกว้างพอแสดง วว/ดด/ปปปป ครบทุกจอ · ตัดขอบในของช่องให้แคบลง */
+    .swal-edit-event .ee-hm-item--date { flex-direction: column !important; align-items: stretch !important; gap: 6px !important; }
+    .ee-hm-item--date .ee-hm-label { flex: none !important; }
+    .ee-hm-dates .MuiOutlinedInput-input { padding: 7px 4px 7px 10px !important; min-width: 0; text-overflow: clip; }
+    .ee-hm-dates .MuiInputAdornment-root { margin-left: 0; }
+    .ee-hm-dates .MuiInputAdornment-root .MuiIconButton-root { padding: 4px; }
+    .ee-hm-dates .MuiInputBase-root, .ee-hm-dates input { font-size: 13px !important; }
+    .ee-hm-dates .MuiOutlinedInput-root { height: 34px; border-radius: 8px; background: #fff; }
     #ee-respSelect:focus, #ee-teamSelect:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
     /* ── เมนูเลือก (enhanceSelect) ── */
     .ee-pick-btn {
@@ -1876,6 +1893,18 @@ export const getEditEvent = async ({
         <span class="ee-hm-label"><i aria-hidden="true">${eventJobClassMeta.emoji}</i>ประเภทงาน</span>
         <span class="ee-hm-value">${attrHtml(eventJobClassMeta.label)}</span>
       </div>` : ""}
+      ${/* ✅ (15 ต.ค. 2569 ผู้ใช้: "ให้ช่องเลือกวันที่ขึ้นมาด้านบน เปลี่ยนง่าย ไว้ข้างล่างประเภทงาน · ข้างล่างก็ยังคงไว้ · เวลาแก้ให้ซิงค์กัน")
+           ทางลัดวันที่บนหัวกล่อง ผูกสองทางกับช่องวันที่เริ่ม/สิ้นสุดด้านล่าง (ตัวที่บันทึกจริง) — งานหลายช่วงวันซ่อนแถวนี้ */""}
+      <div class="ee-hm-item ee-hm-item--date" id="ee-hm-date" style="${hasSiblings ? "display:none;" : ""}">
+        <span class="ee-hm-label"><i aria-hidden="true">📅</i>วันเข้างาน</span>
+        <span class="ee-hm-value ee-hm-value--edit ee-hm-dates">
+          <span class="ee-hm-daterow">
+            <span class="ee-field"><small>เริ่ม</small><input id="ee-hmStart" type="date" aria-label="วันที่เริ่ม" value="${eventStart.format("YYYY-MM-DD")}" ${isViewOnly ? "disabled" : ""}></span>
+            <span class="ee-hm-dash" aria-hidden="true">–</span>
+            <span class="ee-field"><small>ถึง</small><input id="ee-hmEnd" type="date" aria-label="วันที่สิ้นสุด" value="${formattedEnd}" ${isViewOnly ? "disabled" : ""}></span>
+          </span>
+        </span>
+      </div>
     </div>
     ${/* ✅ สถานะงานอยู่บนหัวกล่อง (ผู้ใช้สั่ง 3 ต.ค. 2569: "การเลือกสถานะให้เอาไว้ header ของงาน") — แถวของตัวเอง
          เต็มความกว้าง ไม่เบียดชื่องาน/ป้าย · สีของปุ่มตามสถานะ (ตัวแปร --ee-status ของหัวกล่อง) */""}
@@ -2745,6 +2774,25 @@ export const getEditEvent = async ({
         });
       }
 
+      // ✅ (15 ต.ค. 2569) วันเข้างานบนหัวกล่อง ⇄ ช่องวันที่ด้านล่าง — แก้ที่ไหนก็ซิงค์อีกที่ทันที
+      //    (ปฏิทิน พ.ศ. รับค่าใหม่ผ่าน event "tt-sync" ดู mountThaiDatePickers) · กันวนด้วยการเทียบค่าก่อนเขียน
+      {
+        const link = (fromId, toId) => {
+          const from = document.getElementById(fromId);
+          from?.addEventListener("change", () => {
+            const to = document.getElementById(toId);
+            if (!to || to.value === from.value) return;
+            to.value = from.value;
+            to.dispatchEvent(new Event("tt-sync"));
+            to.dispatchEvent(new Event("change", { bubbles: true }));
+          });
+        };
+        link("ee-hmStart", "editStart"); link("editStart", "ee-hmStart");
+        link("ee-hmEnd", "editEnd"); link("editEnd", "ee-hmEnd");
+        const mt = document.getElementById("ee-multiDateToggle");
+        const row = document.getElementById("ee-hm-date");
+        mt?.addEventListener("change", () => { if (row) row.style.display = mt.checked ? "none" : ""; });
+      }
       // ✅ เปลี่ยนช่อง <input type="date"> ทุกช่องในกล่องนี้เป็นปฏิทิน พ.ศ. เดือนไทย
       // (ช่องเดิมถูกซ่อนไว้เป็นตัวเก็บค่า โค้ดที่อ่าน .value ตอนกดบันทึกจึงทำงานเหมือนเดิม)
       Swal.getPopup().__thaiDpCleanup = mountThaiDatePickers(Swal.getPopup());

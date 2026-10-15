@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import ThaiDatePicker from "./ThaiDatePicker";
 
@@ -15,8 +15,7 @@ import ThaiDatePicker from "./ThaiDatePicker";
  * React แทน ต้องไล่แก้ทุกจุดนั้นพร้อมกัน ซึ่งพลาดจุดเดียวก็บันทึกวันที่ผิดแบบเงียบๆ ทันที
  * วิธีนี้ทำให้ "ทางอ่านค่า" เดิมทั้งหมดทำงานเหมือนเดิมเป๊ะโดยไม่ต้องแตะเลยสักบรรทัด
  *
- * ⚠️ ผูกทางเดียว (picker → input) เท่านั้น ตรวจแล้วว่าไม่มีโค้ดไหนเซ็ต .value ของช่องวันที่กลับเข้ามาเอง
- * ถ้าวันหลังมีขึ้นมา ต้องเพิ่มทางกลับด้วย ไม่งั้นปฏิทินจะแสดงค่าเก่าค้าง
+ * ⚠️ ทางกลับ (input → picker): โค้ดที่เซ็ต .value เองต้องยิง event "tt-sync" ที่ input นั้นด้วย ไม่งั้นปฏิทินจะแสดงค่าเก่าค้าง
  */
 
 /**
@@ -84,6 +83,13 @@ function BoundThaiDatePicker({ input, skin }) {
   // ✅ รองรับ <input type="month"> ด้วย (ฟอร์ม "แผนล่วงหน้า" ใช้เลือกเดือนที่จะเข้างาน) — ค่าที่เก็บ
   // ยังเป็น "YYYY-MM" ของ ค.ศ. เหมือนเดิมทุกประการ เปลี่ยนแค่ตัวเลือกให้เป็นเดือนไทย + ปี พ.ศ.
   const isMonth = input.type === "month";
+  // ✅ (15 ต.ค. 2569) ทางกลับ (input → ปฏิทิน): โค้ดฟอร์มที่เซ็ต .value เองแล้วยิง "tt-sync" ปฏิทินจะแสดงค่าใหม่
+  //    ใช้กับช่องวันที่ที่ผูกกันสองที่ (เช่น วันเข้างานบนหัวกล่อง EditEvent ⇄ ช่องวันที่ด้านล่าง)
+  useEffect(() => {
+    const sync = () => setValue(input.value || "");
+    input.addEventListener("tt-sync", sync);
+    return () => input.removeEventListener("tt-sync", sync);
+  }, [input]);
 
   return (
     <ThaiDatePicker
