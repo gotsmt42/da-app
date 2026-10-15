@@ -896,17 +896,16 @@ function injectStyles() {
     .ee-hm-item--date { grid-column: 1 / -1; }
     .ee-hm-dates { flex: 1 1 auto; width: 100%; }
     /* 🔁 (15 ต.ค. 2569 ผู้ใช้: "มีแค่กรอบวันที่ 2 กรอบ ดูไม่เข้าใจ มี - คั่นก็ยังดี") — ป้ายเล็ก "เริ่ม"/"ถึง" + ขีดคั่นกลาง */
-    .ee-hm-daterow { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: 6px; width: 100%; }
+    .ee-hm-daterow { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 4px; width: 100%; }
     .ee-hm-dates .ee-field { display: flex; flex-direction: column; gap: 2px !important; margin: 0 !important; min-width: 0; }
-    .ee-hm-dates .ee-field > small { font-size: 10.5px; font-weight: 700; color: #94a3b8; line-height: 1; padding-left: 2px; }
     .ee-hm-dash { font-size: 16px; font-weight: 800; color: #94a3b8; line-height: 34px; }
-    /* 🐛 (15 ต.ค. 2569 ผู้ใช้: "ให้เห็นปี พ.ศ. ครบ ไม่ขาด และแถวห้ามล้น") — แถววันที่เป็น 2 ชั้น: ป้าย "วันเข้างาน" บน · ช่องวันที่เต็มความกว้างล่าง
-       ช่องจึงกว้างพอแสดง วว/ดด/ปปปป ครบทุกจอ · ตัดขอบในของช่องให้แคบลง */
-    .swal-edit-event .ee-hm-item--date { flex-direction: column !important; align-items: stretch !important; gap: 6px !important; }
-    .ee-hm-item--date .ee-hm-label { flex: none !important; }
-    .ee-hm-dates .MuiOutlinedInput-input { padding: 7px 4px 7px 10px !important; min-width: 0; text-overflow: clip; }
-    .ee-hm-dates .MuiInputAdornment-root { margin-left: 0; }
-    .ee-hm-dates .MuiInputAdornment-root .MuiIconButton-root { padding: 4px; }
+    /* 🔁 (15 ต.ค. 2569 ผู้ใช้: "เห็นปี พ.ศ. ครบ ไม่ล้น · อยากให้เป็นแถวเดียว") — แถวเดียว: ป้ายสั้น "วันที่" · เริ่ม – ถึง
+       ซ่อนไอคอนปฏิทิน (แตะช่องก็เปิดปฏิทินได้) + ตัดขอบในให้แคบ ช่องจึงพอแสดง วว/ดด/ปปปป ครบบนจอมือถือ */
+    /* (15 ต.ค. 2569 ผู้ใช้: "ตำแหน่งให้ตรงกับจุดอื่น") — ป้ายกว้างเท่าแถวอื่น ช่องวันที่เริ่มแนวเดียวกับชื่อ/ช่องเลือกด้านบน */
+    .ee-hm-dates .MuiOutlinedInput-root { padding-right: 0 !important; }
+    .ee-hm-dates .MuiOutlinedInput-input { padding: 7px 4px !important; min-width: 0; font-size: 12.5px !important; text-align: center; letter-spacing: -.02em; }
+    .ee-hm-dates .MuiInputAdornment-root { display: none !important; }
+    .ee-hm-dash { line-height: 34px; padding: 0 1px; }
     .ee-hm-dates .MuiInputBase-root, .ee-hm-dates input { font-size: 13px !important; }
     .ee-hm-dates .MuiOutlinedInput-root { height: 34px; border-radius: 8px; background: #fff; }
     #ee-respSelect:focus, #ee-teamSelect:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
@@ -1899,9 +1898,9 @@ export const getEditEvent = async ({
         <span class="ee-hm-label"><i aria-hidden="true">📅</i>วันเข้างาน</span>
         <span class="ee-hm-value ee-hm-value--edit ee-hm-dates">
           <span class="ee-hm-daterow">
-            <span class="ee-field"><small>เริ่ม</small><input id="ee-hmStart" type="date" aria-label="วันที่เริ่ม" value="${eventStart.format("YYYY-MM-DD")}" ${isViewOnly ? "disabled" : ""}></span>
+            <span class="ee-field"><input id="ee-hmStart" type="date" aria-label="วันที่เริ่ม" value="${eventStart.format("YYYY-MM-DD")}" ${isViewOnly ? "disabled" : ""}></span>
             <span class="ee-hm-dash" aria-hidden="true">–</span>
-            <span class="ee-field"><small>ถึง</small><input id="ee-hmEnd" type="date" aria-label="วันที่สิ้นสุด" value="${formattedEnd}" ${isViewOnly ? "disabled" : ""}></span>
+            <span class="ee-field"><input id="ee-hmEnd" type="date" aria-label="วันที่สิ้นสุด" value="${formattedEnd}" ${isViewOnly ? "disabled" : ""}></span>
           </span>
         </span>
       </div>
