@@ -115,6 +115,37 @@ function injectAddDraftStyles() {
     .ade-file:hover { border-color: #2563eb; color: #1d4ed8; }
     .ade-file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
     .ade-file span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* ✅ (15 ต.ค. 2569 ผู้ใช้: "หน้าจอมือถือให้แสดงเต็มหน้า ให้สวยงาม จัดวางให้ทำง่ายๆ")
+       มือถือ: เต็มจอ ไม่มีขอบมน · ตัวเลือกเป็นตาราง 2–3 ช่องกดง่าย · ปุ่มล่างเต็มความกว้าง เว้นขอบล่างของ iPhone */
+    .ade-mode-desc { display: none; }
+    @media(max-width:600px) {
+      .swal2-container:has(.swal-add-draft) { padding: 0 !important; }
+      .swal-add-draft.swal2-popup, .swal-add-draft.swal-add-draft-wide.swal2-popup {
+        width: 100vw !important; max-width: 100vw !important; height: 100dvh !important; max-height: 100dvh !important;
+        margin: 0 !important; border-radius: 0 !important;
+      }
+      .swal-add-draft .swal2-close { top: 12px; right: 12px; }
+      #ade-header { padding: 12px 56px 12px 16px; gap: 10px; }
+      #ade-header-icon { width: 36px; height: 36px; font-size: 18px; border-radius: 10px; }
+      #ade-header-info h3 { font-size: 16px; }
+      #ade-header-info small { font-size: 11.5px; display: block; line-height: 1.4; }
+      .swal-add-draft #ade-body, .swal-add-draft-wide #ade-body { padding: 14px 14px 20px; }
+      .ade-card { padding: 12px; border-radius: 12px; margin-bottom: 14px; }
+      .ade-pills { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+      .ade-pill span { width: 100%; justify-content: center; height: 40px; padding: 0 8px; font-size: 13px; box-sizing: border-box; }
+      .ade-mode-toggle, .ade-jobtype-toggle { grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 6px; margin-bottom: 8px; }
+      .ade-mode-toggle .ade-jobtype-card, .ade-jobtype-toggle .ade-jobtype-card {
+        flex-direction: column; text-align: center; gap: 4px; padding: 10px 4px; height: 100%; box-sizing: border-box; justify-content: center;
+      }
+      .ade-mode-toggle .ade-jobtype-desc, .ade-jobtype-toggle .ade-jobtype-desc { display: none; }
+      .ade-mode-toggle .ade-jobtype-title, .ade-jobtype-toggle .ade-jobtype-title { font-size: 12.5px; }
+      .ade-mode-desc { display: block; font-size: 11.5px; color: #64748b; margin-top: 2px; }
+      .ade-grid { gap: 10px; margin-bottom: 12px; }
+      .ade-field select, .ade-field input, .ade-field textarea { font-size: 16px; } /* iOS ไม่ซูมเข้าเองตอนแตะช่อง */
+      #ade-action-bar { padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); gap: 8px; flex-wrap: nowrap; }
+      #ade-action-bar .ade-btn { flex: 1; justify-content: center; padding: 13px 10px; font-size: 14px; }
+      #ade-action-bar .ade-btn-success { flex: 2; }
+    }
     .ade-field input.ade-autofilled { background: #eff6ff; border-color: #93c5fd; transition: background 1.2s; }
 
     /* ── ขั้นตอนที่ 1: เลือกประเภทงาน (การ์ดวิทยุ) — โครงเดียวกับ AddEvent.js ── */
@@ -413,6 +444,7 @@ export const getAddDraftEvent = async ({
             </div>
           </label>
         </div>
+        <span id="ade-modeDesc" class="ade-mode-desc"></span>
         <span id="ade-noteHint" class="ade-hint" style="display:none;">บันทึกงาน: กรอกแค่ "สิ่งที่ต้องทำ" ด้านล่างก็บันทึกได้ — ข้อมูลโครงการไม่บังคับ</span>
       </div>
 
@@ -621,6 +653,8 @@ export const getAddDraftEvent = async ({
             const mode = document.querySelector('input[name="adeVisitMode"]:checked')?.value || "visit";
             const note = mode === "note";
             show("ade-noteHint", note);
+            const md = document.getElementById("ade-modeDesc");
+            if (md) md.textContent = note ? "" : mode === "novisit" ? "ส่งของ / ขายของ → ส่งมอบ แล้ววางบิล" : "ส่งลงตาราง · มอบหมายช่างเข้าหน้างาน";
             show("ade-jobTypeBlock", !note);
             show("ade-generalSection", !note);
             show("ade-contactGrid", !note);
