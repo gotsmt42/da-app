@@ -14,12 +14,13 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import Swal from "sweetalert2";
 import { Box, Stack, Typography, Button, ButtonBase, Avatar, Collapse } from "@mui/material";
-import { ExpandMore, EditCalendarOutlined, ChevronRight, DescriptionOutlined } from "@mui/icons-material";
+import { alpha } from "@mui/material/styles";
+import { ExpandMore, EditCalendarOutlined, ChevronRight, DescriptionOutlined, PlaceRounded, LocationOffRounded, OpenInNewRounded } from "@mui/icons-material";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import AttendanceService from "@/shared/services/AttendanceService";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT } from "@/shared/ui/PageKit";
 import {
-  fmtDuration, fmtTime, fmtDayTime, locationBadge, resultOf, CORRECTION_STATUS, FIELD_LABEL,
+  fmtDuration, fmtTime, fmtDayTime, locationBadge, resultOf, CORRECTION_STATUS, FIELD_LABEL, ON_SITE_M, fmtDistance,
 } from "../attendanceMeta";
 import CorrectionDialog from "./CorrectionDialog";
 import { PersonChip } from "@/shared/ui/PersonChip";
@@ -63,17 +64,56 @@ const Files = ({ photos, onPreview }) => (photos?.length ? (
   </Stack>
 ) : null);
 
-/** ตำแหน่ง: จุดสี + ข้อความ + ลิงก์เปิดแผนที่ (ถ้ามีพิกัด) */
-const Where = ({ stamp }) => {
-  const b = locationBadge(stamp);
-  if (!b) return null;
-  const href = stamp?.gps === "ok" ? `https://www.google.com/maps/search/?api=1&query=${stamp.lat},${stamp.lng}` : null;
+/**
+ * ✅ (15 ต.ค. 2569 ผู้ใช้: "ตำแหน่งพิกัด ทำให้ชัดเจน สวยงามกว่านี้ บางทีผู้ใช้ไม่รู้และดูไม่ออก")
+ * กล่องตำแหน่งเต็มความกว้าง: ไอคอนสีตามผล + หัวข้อเป็นภาษาคน (อยู่ที่หน้างาน / ห่างหน้างาน X / …)
+ * + คำอธิบายว่าหมายความว่าอะไร + แผนที่เห็นหมุดจริง + ปุ่มเปิดใน Google Maps
+ */
+const LocationCard = ({ stamp }) => {
+  if (!stamp) return null;
+  const ok = stamp.gps === "ok" && Number.isFinite(stamp.lat) && Number.isFinite(stamp.lng);
+  const acc = stamp.accuracy != null ? `ความแม่นยำ ±${stamp.accuracy} ม.` : "";
+  let tone; let title; let sub;
+  if (stamp.gps === "denied") {
+    tone = TONE.warn; title = "ไม่มีตำแหน่ง — ไม่ได้อนุญาตให้ใช้ GPS"; sub = "ผู้บันทึกปฏิเสธสิทธิ์ตำแหน่งในเบราว์เซอร์ จึงยืนยันไม่ได้ว่าอยู่ที่หน้างาน";
+  } else if (!ok) {
+    tone = TONE.warn; title = "ไม่มีตำแหน่ง — หา GPS ไม่เจอ"; sub = "เครื่องหาตำแหน่งไม่ได้ตอนบันทึก (อยู่ในอาคาร/ปิด GPS)";
+  } else if (stamp.distanceM == null) {
+    tone = ACCENT; title = "บันทึกตำแหน่งแล้ว"; sub = [acc, "ยังเทียบระยะกับหน้างานไม่ได้ — โครงการนี้ยังไม่มีลิงก์แผนที่ในทะเบียนลูกค้า"].filter(Boolean).join(" · ");
+  } else if (stamp.distanceM <= ON_SITE_M) {
+    tone = TONE.ok; title = `อยู่ที่หน้างาน · ห่าง ${fmtDistance(stamp.distanceM)}`; sub = [acc, `อยู่ในระยะ ${ON_SITE_M} ม. จากพิกัดโครงการ`].filter(Boolean).join(" · ");
+  } else {
+    tone = TONE.warn; title = `อยู่นอกหน้างาน · ห่าง ${fmtDistance(stamp.distanceM)}`; sub = [acc, `เกินระยะ ${ON_SITE_M} ม. จากพิกัดโครงการ — ควรสอบถามผู้บันทึก`].filter(Boolean).join(" · ");
+  }
+  const href = ok ? `https://www.google.com/maps/search/?api=1&query=${stamp.lat},${stamp.lng}` : null;
+  const Icon = ok ? PlaceRounded : LocationOffRounded;
   return (
-    <Stack direction="row" alignItems="center" gap={0.6} flexWrap="wrap">
-      <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: TONE[b.tone], flexShrink: 0 }} />
-      <span>{b.text}{stamp.accuracy != null ? ` · ±${stamp.accuracy} ม.` : ""}</span>
-      {href && <Box component="a" href={href} target="_blank" rel="noopener noreferrer" sx={{ color: ACCENT, fontWeight: 500, textDecoration: "none", fontSize: "0.8rem" }}>ดูแผนที่</Box>}
-    </Stack>
+    <Box sx={{ py: 1.1, borderTop: `1px solid ${LINE}` }}>
+      <Typography sx={{ fontSize: "0.78rem", color: MUTED, fontWeight: 500, mb: 0.75 }}>ตำแหน่งตอนบันทึกเข้างาน</Typography>
+      <Box sx={{ borderRadius: "12px", border: `1px solid ${alpha(tone, 0.35)}`, bgcolor: alpha(tone, 0.05), overflow: "hidden" }}>
+        <Stack direction="row" gap={1.1} alignItems="flex-start" sx={{ p: 1.1 }}>
+          <Box sx={{ width: 34, height: 34, borderRadius: "50%", flexShrink: 0, display: "grid", placeItems: "center", bgcolor: alpha(tone, 0.14), color: tone }}>
+            <Icon sx={{ fontSize: 20 }} />
+          </Box>
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography sx={{ fontSize: "0.9rem", fontWeight: 700, color: INK, lineHeight: 1.35 }}>{title}</Typography>
+            <Typography sx={{ fontSize: "0.76rem", color: INK_2, lineHeight: 1.5, mt: 0.15 }}>{sub}</Typography>
+          </Box>
+        </Stack>
+        {ok && (
+          <>
+            {/* แผนที่ย่อเห็นหมุดจริง (ไม่ต้องใช้ API key) — โหลดเมื่อกางรายการเท่านั้น */}
+            <Box component="iframe" title="แผนที่ตำแหน่งที่บันทึก" loading="lazy" referrerPolicy="no-referrer-when-downgrade"
+              src={`https://maps.google.com/maps?q=${stamp.lat},${stamp.lng}&z=16&output=embed`}
+              sx={{ display: "block", width: "100%", height: 160, border: 0, borderTop: `1px solid ${LINE}` }} />
+            <ButtonBase component="a" href={href} target="_blank" rel="noopener noreferrer"
+              sx={{ width: "100%", gap: 0.6, py: 1, fontFamily: "inherit", fontSize: "0.82rem", fontWeight: 700, color: ACCENT, borderTop: `1px solid ${LINE}`, bgcolor: "#fff", "&:hover": { bgcolor: SURFACE } }}>
+              <OpenInNewRounded sx={{ fontSize: 17 }} /> เปิดใน Google Maps
+            </ButtonBase>
+          </>
+        )}
+      </Box>
+    </Box>
   );
 };
 
@@ -174,7 +214,7 @@ function Row({ row, me, isApprover, showJob, onPreview, onChanged, embedded }) {
                 </Stack>
               </InfoRow>
             )}
-            <InfoRow label="ตำแหน่ง"><Where stamp={row.checkIn} /></InfoRow>
+            <LocationCard stamp={row.checkIn} />
             <InfoRow label="หมายเหตุ">{row.checkIn?.note}</InfoRow>
             <InfoRow label="รูปหน้างาน">{row.checkIn?.photos?.length ? <Files photos={row.checkIn.photos} onPreview={onPreview} /> : null}</InfoRow>
             {/* ข้อมูลเช็คเอาต์ของรายการเก่า (ก่อนตัดระบบ 11 ต.ค. 2569) — แสดงเฉพาะที่มี */}
