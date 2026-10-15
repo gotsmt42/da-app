@@ -89,7 +89,7 @@ const isAndroid = () => typeof navigator !== "undefined" && /android/i.test(navi
 const HEADS_UP_HINT = () => (PushService.isIos()
   ? "ไม่เด้งบนจอ? ตั้งค่าเครื่อง → การแจ้งเตือน → TidTam → เปิด “แบนเนอร์”"
   : isAndroid()
-    ? "ไม่เด้งบนจอ? กดค้างที่แจ้งเตือน → ตั้งค่า → เปิด “ป๊อปอัป / แสดงบนหน้าจอ”"
+    ? "ไม่เด้งบนจอ? กดค้างที่แจ้งเตือน → ตั้งค่า → ติ๊ก “ป๊อปอัป” · Samsung: รูปแบบป๊อปอัป เลือก “รายละเอียด”"
     : "ไม่เด้งบนจอ? เปิดการแจ้งเตือนของ Chrome ในตั้งค่าเครื่อง");
 /** เปิดหน้าเดิมในแอป Chrome (เบราว์เซอร์ในแอปอื่น เช่น LINE/Facebook รับแจ้งเตือนไม่ได้) */
 const openInChrome = () => {
@@ -175,7 +175,7 @@ export default function Settings() {
     loadSessions();
   }, [loadPushStatus, loadSessions]);
 
-  // ── ทดสอบแจ้งเตือน: ส่งหน่วง 5 วินาที ให้ผู้ใช้ออกจากแอป/ล็อกจอทัน (แอปเปิดอยู่จะเด้งเป็นแบนเนอร์ในแอปแทน) ──
+  // ── ทดสอบแจ้งเตือน: ส่งหน่วง 5 วินาที ให้ผู้ใช้กลับหน้าโฮมทัน (ล็อกจอ = ขึ้นในหน้าล็อก ไม่เด้งทับ) (แอปเปิดอยู่จะเด้งเป็นแบนเนอร์ในแอปแทน) ──
   const [testCountdown, setTestCountdown] = useState(0);
   const [testSent, setTestSent] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -190,7 +190,7 @@ export default function Settings() {
       await PushService.test(5);
       setTestCountdown(5);
       setTestSent(true);
-      setToast({ type: "info", text: "ออกจากแอปได้เลย — แจ้งเตือนจะเด้งใน 5 วินาที" });
+      setToast({ type: "info", text: "กดปุ่มโฮมได้เลย (ไม่ต้องล็อกจอ) — แจ้งเตือนจะเด้งใน 5 วินาที" });
     } catch (error) {
       setToast({ type: "error", text: error?.response?.data?.message || "ส่งแจ้งเตือนทดสอบไม่สำเร็จ" });
     }
@@ -310,8 +310,8 @@ export default function Settings() {
             icon={<SendToMobileOutlined />} tone={GREEN}
             title="ทดสอบแจ้งเตือน"
             desc={testCountdown > 0
-              ? <Box component="span" sx={{ color: GREEN, fontWeight: 700 }}>ออกจากแอปได้เลย — เด้งใน {testCountdown} วินาที</Box>
-              : testSent ? HEADS_UP_HINT() : "กดแล้วออกจากแอป แจ้งเตือนจะเด้งขึ้นบนจอ"}
+              ? <Box component="span" sx={{ color: GREEN, fontWeight: 700 }}>กดปุ่มโฮมได้เลย (ไม่ต้องล็อกจอ) — เด้งใน {testCountdown} วินาที</Box>
+              : testSent ? HEADS_UP_HINT() : "กดแล้วกลับหน้าโฮม แจ้งเตือนจะเด้งขึ้นบนจอ · ตอนล็อกจอจะขึ้นในหน้าล็อกแทน (ปกติของทุกแอป)"}
             right={(
               <Button size="small" variant="contained" disableElevation disabled={testCountdown > 0} onClick={handleTestPush}
                 sx={{ flexShrink: 0, borderRadius: 2, fontWeight: 800, bgcolor: GREEN, "&:hover": { bgcolor: "#15803d" } }}>
@@ -352,7 +352,7 @@ export default function Settings() {
               ))}
             </Box>
             <Typography sx={{ mt: 1.5, fontSize: "0.76rem", color: MUTED, lineHeight: 1.5 }}>
-              ตั้งเสร็จแล้วกด “ทดสอบ” ด้านบน แล้วออกจากแอป — ถ้าแบนเนอร์เด้งลงมาจากขอบบนจอพร้อมเสียง แปลว่าใช้งานได้ครบ
+              ตั้งเสร็จแล้วกด “ทดสอบ” ด้านบน แล้วกดปุ่มโฮม (ไม่ต้องล็อกจอ) — ถ้าแบนเนอร์เด้งลงมาจากขอบบนจอพร้อมเสียง แปลว่าใช้งานได้ครบ
             </Typography>
           </Box>
         </Collapse>
