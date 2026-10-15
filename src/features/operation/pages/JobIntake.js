@@ -139,7 +139,7 @@ const Section = ({ n, title, hint, last, children }) => (
  *   • บันทึกผู้รับผิดชอบผ่าน /events/basic-info ตัวเดียวกับหน้าอื่น → ทุกหน้าเห็นชื่อเดียวกัน
  *   • มอบหมายได้เฉพาะผู้มีสิทธิ์ editContracts (เหมือน EditEvent · server เช็คซ้ำ) — คนอื่นเห็นชื่อแต่เลือกไม่ได้
  */
-function ScheduleDialog({ job, employees, canAssignResponsible, onClose, onDone }) {
+function ScheduleDialog({ job, employees, canAssignResponsible, requestMode, onClose, onDone }) {
   const defStart = job.plannedMonth && job.plannedMonth > moment().format("YYYY-MM")
     ? moment(job.plannedMonth, "YYYY-MM").startOf("month").format("YYYY-MM-DD")
     : moment().add(1, "day").format("YYYY-MM-DD");
@@ -187,7 +187,9 @@ function ScheduleDialog({ job, employees, canAssignResponsible, onClose, onDone 
         Swal.fire({ icon: "warning", title: "ส่งลงตารางแล้ว", text: "แต่บันทึกผู้รับผิดชอบงานไม่สำเร็จ — แก้ได้จากหน้าแก้ไขงาน" });
         return;
       }
-      Swal.fire({ icon: "success", title: "ส่งลงตารางแล้ว", text: "งานขึ้นในตารางงานช่างเรียบร้อย", timer: 1500, showConfirmButton: false });
+      Swal.fire(requestMode
+        ? { icon: "success", title: "ส่งขออนุมัติแล้ว", text: "แอดมินจะได้รับแจ้ง — อนุมัติแล้วงานจะขึ้นในตารางงานช่าง", confirmButtonColor: "#2563eb" }
+        : { icon: "success", title: "ส่งลงตารางแล้ว", text: "งานขึ้นในตารางงานช่างเรียบร้อย", timer: 1500, showConfirmButton: false });
     } catch (err) {
       Swal.fire({ icon: "error", title: "ส่งลงตารางไม่สำเร็จ", text: err?.response?.data?.message || "กรุณาลองใหม่" });
       setSaving(false);
@@ -201,7 +203,7 @@ function ScheduleDialog({ job, employees, canAssignResponsible, onClose, onDone 
           <EventAvailableOutlined sx={{ fontSize: 20 }} />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 900, fontSize: "1rem", color: INK }}>ส่งลงตาราง</Typography>
+          <Typography sx={{ fontWeight: 900, fontSize: "1rem", color: INK }}>{requestMode ? "ขอลงตาราง" : "ส่งลงตาราง"}</Typography>
           <Typography noWrap sx={{ fontSize: "0.76rem", color: MUTED }}>{[job.title, job.site || job.company, job.jobNo].filter(Boolean).join(" · ")}</Typography>
         </Box>
         <IconButton size="small" onClick={onClose}><Close fontSize="small" /></IconButton>
@@ -229,13 +231,15 @@ function ScheduleDialog({ job, employees, canAssignResponsible, onClose, onDone 
           />
         </Section>
         <Typography sx={{ fontSize: "0.74rem", color: MUTED, mt: 2, px: 1.25, py: 1, borderRadius: 2, bgcolor: SURFACE }}>
-          ส่งแล้วงานจะขึ้นในตารางงานช่างทันที · เวลา/ลูกทีมเพิ่มได้ภายหลังจากหน้าตารางงาน
+          {requestMode
+            ? "ส่งขออนุมัติให้แอดมิน — อนุมัติแล้วงานจะขึ้นในตารางงานช่าง (ติดตามได้ที่การ์ดงานนี้)"
+            : "ส่งแล้วงานจะขึ้นในตารางงานช่างทันที · เวลา/ลูกทีมเพิ่มได้ภายหลังจากหน้าตารางงาน"}
         </Typography>
       </DialogContent>
       <DialogActions sx={{ px: 2.5, py: 1.5, borderTop: `1px solid ${LINE}`, gap: 1 }}>
         <Button onClick={onClose} sx={{ ...BTN, color: MUTED }}>ยกเลิก</Button>
         <Button variant="contained" disabled={!ok || saving} onClick={save} sx={{ ...PRIMARY, px: 2.5 }}>
-          {saving ? "กำลังส่ง..." : "ส่งลงตาราง"}
+          {saving ? "กำลังส่ง..." : requestMode ? "ส่งขออนุมัติ" : "ส่งลงตาราง"}
         </Button>
       </DialogActions>
     </Dialog>
@@ -347,7 +351,7 @@ const Line = ({ icon: Icon, children, color = "#475569", strong }) => (
   </Stack>
 );
 
-function JobCard({ job, readOnly, onSchedule, onDeliver, onUploadInvoice, onNoteDone, onEdit, onCancel, onRestore }) {
+function JobCard({ job, readOnly, requestMode, onSchedule, onDeliver, onUploadInvoice, onNoteDone, onEdit, onCancel, onRestore }) {
   const st = stageOf(job);
   const stall = stalledDays(job, st);
   const intakeDocs = (job.sitePhotoFiles || []).filter((f) => f.source === "intake");
@@ -414,7 +418,7 @@ function JobCard({ job, readOnly, onSchedule, onDeliver, onUploadInvoice, onNote
       <Button variant="outlined" onClick={() => onCancel(job)} startIcon={<BlockRounded sx={{ fontSize: "16px !important" }} />}
         sx={{ ...BTN, flex: { xs: 1, sm: "0 0 auto" }, color: RED, borderColor: alpha(RED, 0.35), "&:hover": { borderColor: RED, bgcolor: alpha(RED, 0.04) } }}>ยกเลิก</Button>
       <Button variant="contained" onClick={() => onSchedule(job)} startIcon={<EventAvailableOutlined sx={{ fontSize: "17px !important" }} />}
-        sx={{ ...PRIMARY, flex: { xs: 1.6, sm: "0 0 auto" } }}>ส่งลงตาราง</Button>
+        sx={{ ...PRIMARY, flex: { xs: 1.6, sm: "0 0 auto" } }}>{requestMode ? "ขอลงตาราง" : "ส่งลงตาราง"}</Button>
     </>
   ) : (
     <Button component={Link} to={`/operation/${job._id}`} variant="outlined" endIcon={<ChevronRight />}
@@ -462,6 +466,8 @@ function JobCard({ job, readOnly, onSchedule, onDeliver, onUploadInvoice, onNote
               {job.jobNo && <Typography component="span" sx={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8" }}>{job.jobNo}</Typography>}
               {isUrgent(job) && st.i < 4 && <Chip color="#fff" bg={RED} border={RED}>⚡ ด่วน</Chip>}
               {stall > 0 && <Chip color={RED} bg={alpha(RED, 0.08)} border="transparent">⏰ ค้าง {stall} วัน</Chip>}
+              {job.approvalStatus === "pending" && <Chip color={AMBER} bg={alpha(AMBER, 0.12)} border="transparent">รออนุมัติ</Chip>}
+              {job.approvalStatus === "rejected" && <Chip color={RED} bg={alpha(RED, 0.08)} border="transparent">ไม่อนุมัติ</Chip>}
               {job.infoPending && st.i < 4 && <Chip color={AMBER} bg={alpha(AMBER, 0.12)} border="transparent">รอข้อมูล</Chip>}
             </Stack>
             {place && <Typography sx={{ fontSize: "0.86rem", fontWeight: 600, color: "#475569", mt: 0.2, overflowWrap: "anywhere" }}>{place}</Typography>}
@@ -550,6 +556,12 @@ export default function JobIntake() {
   const { userData } = useAuth() || {};
   // ✅ (15 ต.ค. 2569 ผู้ใช้: "ให้ช่างเข้ามาดูได้ด้วย แต่ไม่สามารถดำเนินการได้") — คนจัดคิว = จัดการได้ · คนอื่น = ดูอย่างเดียว
   const canManage = can(userData, "assignDispatch") || can(userData, "editAnyJob");
+  // ✅ (15 ต.ค. 2569 ผู้ใช้: "ช่างกดเพิ่มงานได้ แต่งานที่ขอลงตารางต้องไปขอลงงานแบบเดิม" → ส่งขออนุมัติ)
+  //    ช่าง: รับงานใหม่ได้ + จัดการงานที่ตัวเองรับไว้ (แก้ไข/ยกเลิก/ขอลงตาราง/ส่งมอบ/ทำเสร็จ) · งานของคนอื่นดูอย่างเดียว
+  //    งานที่ช่างรับเป็น "รออนุมัติ" อัตโนมัติ (server) → ขอลงตารางแล้วแอดมินอนุมัติที่หน้าคำขอลงงาน
+  const canCreate = canManage || can(userData, "receiveDispatch");
+  const me = String(userData?.userId || "");
+  const isMine = (j) => String(j.userId || "") === me;
   const [jobs, setJobs] = useState(null);
   const [rawEvents, setRawEvents] = useState([]);
   const [rawDrafts, setRawDrafts] = useState([]);
@@ -680,7 +692,7 @@ export default function JobIntake() {
     <Box sx={{ px: { xs: 1.5, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: 1000, mx: "auto" }}>
       <PageHeader icon={<PostAddOutlined />} title="งานใหม่"
         subtitle="รับงาน → ส่งลงตาราง หรือ ส่งมอบ + วางบิล"
-        actions={canManage
+        actions={canCreate
           ? <Button variant="contained" startIcon={<AddRounded />} onClick={() => openForm()} disabled={!jobs} sx={{ ...PRIMARY, height: 40, px: { xs: 1.25, sm: 2 } }}>รับงานใหม่</Button>
           : <Box component="span" sx={{ px: 1.25, py: 0.5, borderRadius: 99, fontSize: "0.74rem", fontWeight: 700, color: MUTED, bgcolor: SURFACE, border: `1px solid ${LINE}`, whiteSpace: "nowrap" }}>ดูอย่างเดียว</Box>} />
 
@@ -715,12 +727,12 @@ export default function JobIntake() {
       {!jobs ? (
         <Stack spacing={1}>{[0, 1, 2].map((i) => <Skeleton key={i} variant="rounded" height={88} sx={{ borderRadius: 3 }} />)}</Stack>
       ) : list.length ? (
-        <Stack spacing={1.25}>{list.map((j) => <JobCard key={j._id} job={j} readOnly={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone} onEdit={openForm} onCancel={cancelJob} onRestore={restoreJob} />)}</Stack>
+        <Stack spacing={1.25}>{list.map((j) => <JobCard key={j._id} job={j} readOnly={!canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone} onEdit={openForm} onCancel={cancelJob} onRestore={restoreJob} />)}</Stack>
       ) : (
         <EmptyState icon={<PostAddOutlined />}
           title={q ? "ไม่พบงานที่ค้นหา" : tab === "waiting" ? "ไม่มีงานรอดำเนินการ" : tab === "active" ? "ไม่มีงานที่กำลังดำเนินการ" : tab === "cancelled" ? "ไม่มีงานที่ยกเลิก" : "ยังไม่มีงานที่เสร็จ"}
-          hint={tab === "waiting" && canManage ? "ได้งานมาแล้ว กด “รับงานใหม่” เพื่อกรอกเก็บไว้ก่อน" : undefined}
-          action={tab === "waiting" && canManage ? <Button variant="contained" startIcon={<AddRounded />} onClick={() => openForm()} sx={{ ...PRIMARY, mt: 1 }}>รับงานใหม่</Button> : null} />
+          hint={tab === "waiting" && canCreate ? "ได้งานมาแล้ว กด “รับงานใหม่” เพื่อกรอกเก็บไว้ก่อน" : undefined}
+          action={tab === "waiting" && canCreate ? <Button variant="contained" startIcon={<AddRounded />} onClick={() => openForm()} sx={{ ...PRIMARY, mt: 1 }}>รับงานใหม่</Button> : null} />
       )}
 
       {delivering && (
@@ -729,7 +741,7 @@ export default function JobIntake() {
       )}
 
       {scheduling && (
-        <ScheduleDialog job={scheduling} employees={employees} canAssignResponsible={can(userData, "editContracts")} onClose={() => setScheduling(null)}
+        <ScheduleDialog job={scheduling} employees={employees} canAssignResponsible={can(userData, "editContracts")} requestMode={!canManage} onClose={() => setScheduling(null)}
           onDone={async () => { setScheduling(null); await load(); refreshAppBadges(); }} />
       )}
     </Box>
