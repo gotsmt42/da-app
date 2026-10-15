@@ -335,7 +335,10 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
   const todayKey = moment().utcOffset(7).format("YYYY-MM-DD");
   const plannedDays = scheduledAttendanceDays(event);
   const recordedDays = recordedAttendanceDayKeys(rows || []);
-  const allPlannedDaysRecorded = plannedDays.length > 0 && plannedDays.every((day) => recordedDays.has(day.format("YYYY-MM-DD")));
+  // 🐛 (15 ต.ค. 2569 ผู้ใช้: "บันทึกเข้างาน เด้งมาให้กดซ้ำทั้งที่งานเข้าวันเดียว") — เข้างานช้ากว่านัด (นอกวันนัด)
+  //    ก็นับเป็นวันของงาน: บันทึกครบ "จำนวนวัน" ที่นัดไว้แล้ว = ครบ ไม่ต้องให้กดอีก (ตรงกับ server POST /attendance/check-in)
+  const allPlannedDaysRecorded = plannedDays.length > 0
+    && (plannedDays.every((day) => recordedDays.has(day.format("YYYY-MM-DD"))) || recordedDays.size >= plannedDays.length);
   const checkin = (rows || []).find((r) => r.checkIn?.at && moment(r.checkIn.at).utcOffset(7).format("YYYY-MM-DD") === todayKey);
   const latestCheckin = (rows || []).slice().sort((a, b) => new Date(b.checkIn?.at) - new Date(a.checkIn?.at))[0];
 
