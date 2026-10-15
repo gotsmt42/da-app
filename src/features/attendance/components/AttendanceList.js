@@ -15,7 +15,7 @@ import { Link } from "react-router-dom";
 import Swal from "sweetalert2";
 import { Box, Stack, Typography, Button, ButtonBase, Avatar, Collapse } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { ExpandMore, EditCalendarOutlined, ChevronRight, DescriptionOutlined, PlaceRounded, LocationOffRounded, OpenInNewRounded } from "@mui/icons-material";
+import { ExpandMore, EditCalendarOutlined, ChevronRight, DescriptionOutlined, PlaceRounded, LocationOffRounded, OpenInNewRounded, PhotoCameraOutlined, EventBusyOutlined } from "@mui/icons-material";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import AttendanceService from "@/shared/services/AttendanceService";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT } from "@/shared/ui/PageKit";
@@ -26,7 +26,6 @@ import CorrectionDialog from "./CorrectionDialog";
 import { PersonChip } from "@/shared/ui/PersonChip";
 import { CARD } from "@/shared/ui/modernUi";
 
-const WARN = "#b45309";
 const TONE = { ok: "#16a34a", warn: "#d97706", muted: "#94a3b8" };
 
 /** ปุ่มเล็กแบบเส้นขอบ — ในรายละเอียดของแต่ละรายการ */
@@ -117,8 +116,21 @@ const LocationCard = ({ stamp }) => {
   );
 };
 
-/** คั่นข้อความในบรรทัดเดียวกัน */
-const Dot = () => <Box component="span" sx={{ color: "#cbd5e1", mx: 0.6 }}>·</Box>;
+/** ป้ายสถานะเล็ก: ไอคอน + ข้อความ บนพื้นสีอ่อนของโทนนั้น */
+const Tag = ({ tone, icon, children }) => (
+  <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.4, height: 22, px: 0.85, borderRadius: 99,
+    fontSize: "0.7rem", fontWeight: 700, color: tone, bgcolor: alpha(tone, 0.09), whiteSpace: "nowrap", "& svg": { fontSize: 13 } }}>
+    {icon}{children}
+  </Box>
+);
+/** ตำแหน่งแบบสั้นสำหรับป้าย */
+const shortLoc = (stamp, b) => {
+  if (!stamp || stamp.gps === "denied") return "ไม่อนุญาตตำแหน่ง";
+  if (stamp.gps !== "ok") return "ไม่มีพิกัด";
+  if (stamp.distanceM == null) return `มีพิกัด${stamp.accuracy != null ? ` ±${stamp.accuracy} ม.` : ""}`;
+  return b.tone === "ok" ? `อยู่หน้างาน ${fmtDistance(stamp.distanceM)}` : `ห่างหน้างาน ${fmtDistance(stamp.distanceM)}`;
+};
+
 
 function Row({ row, me, isApprover, showJob, onPreview, onChanged, embedded }) {
   const [open, setOpen] = useState(false);
@@ -165,40 +177,43 @@ function Row({ row, me, isApprover, showJob, onPreview, onChanged, embedded }) {
     }
   };
 
-  // บรรทัดที่ 3 — บทบาท/ลูกทีม แล้วต่อด้วย "เรื่องที่ต้องสนใจ" เท่านั้น (ปกติไม่ขึ้นอะไรเพิ่ม)
-  const flags = [
-    inLoc?.tone === "warn" && { text: inLoc.text, color: WARN },
-    pending.length > 0 && { text: "ขอแก้เวลา · รออนุมัติ", color: WARN },
-    row.offSchedule && { text: "นอกวันนัด", color: MUTED },
-    fixed && { text: "แก้เวลาแล้ว", color: MUTED },
-  ].filter(Boolean);
   const role = isHeadRow ? "หัวหน้าทีม" : row.team?.head ? `กดแทนหัวหน้าทีม ${row.team.head}` : "ผู้กดเข้างาน";
   const crew = teamMembers.length ? `ลูกทีม ${teamMembers.length} คน` : "ไม่มีลูกทีม";
 
   return (
     <Box sx={{ ...CARD, borderRadius: "14px", overflow: "hidden" }}>
+      {/* ✅ (15 ต.ค. 2569 ผู้ใช้: "แก้หน้านี้ให้ UX UI สวยงาม ดูง่ายมากยิ่งขึ้น และข้อมูลครบถ้วน")
+          ซ้าย: เวลา (ตัวใหญ่) + วันที่ · ขวา: งาน (หน้ารวม) หรือชื่อคน → คนบันทึก/ทีม → ป้ายสถานะ (ตำแหน่ง · รูป · นอกวันนัด · แก้เวลา) */}
       <ButtonBase onClick={() => setOpen((p) => !p)} aria-expanded={open}
-        sx={{ width: "100%", display: "flex", alignItems: "flex-start", gap: 1.1, textAlign: "left", fontFamily: "inherit", px: 1.35, py: 1.1 }}>
-        <Avatar sx={{ width: 32, height: 32, mt: 0.15, fontSize: "0.82rem", fontWeight: 600, bgcolor: personColor(row.userName) }}>{personInitial(row.userName)}</Avatar>
+        sx={{ width: "100%", display: "flex", alignItems: "stretch", gap: 1.25, textAlign: "left", fontFamily: "inherit", px: 1.25, py: 1.15 }}>
+        <Box sx={{ width: 58, flexShrink: 0, borderRadius: "10px", bgcolor: SURFACE, border: `1px solid ${LINE}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", py: 0.75 }}>
+          <Typography sx={{ fontSize: "1.02rem", fontWeight: 800, color: INK, lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>{fmtTime(row.checkIn?.at)}</Typography>
+          <Typography sx={{ fontSize: "0.66rem", fontWeight: 600, color: MUTED, mt: 0.3, whiteSpace: "nowrap" }}>{fmtDayTime(row.checkIn?.at).split(" · ")[0]}</Typography>
+        </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Stack direction="row" alignItems="baseline" gap={1}>
-            <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.92rem", fontWeight: 600, color: INK }}>{row.userName}</Typography>
-            {/* เวลา + ลูกศรกาง อยู่มุมขวาบน (เดิมลูกศรอยู่ท้ายบรรทัดที่ 3 ทับข้อความยาว) */}
-            <Typography sx={{ fontSize: "0.92rem", fontWeight: 600, color: INK, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
-              {fmtTime(row.checkIn?.at)}
-            </Typography>
-            <ExpandMore sx={{ fontSize: 18, color: FAINT, flexShrink: 0, alignSelf: "center", ml: -0.5, transition: "transform .2s", transform: open ? "rotate(180deg)" : "none" }} />
+          <Stack direction="row" alignItems="flex-start" gap={0.75}>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography sx={{ fontSize: "0.92rem", fontWeight: 700, color: INK, lineHeight: 1.35, overflowWrap: "anywhere" }}>
+                {showJob ? (row.jobLabel || "งาน") : row.userName}
+              </Typography>
+              {showJob && row.jobNo && <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: FAINT, lineHeight: 1.3 }}>{row.jobNo}</Typography>}
+            </Box>
+            <ExpandMore sx={{ fontSize: 20, color: FAINT, flexShrink: 0, mt: 0.1, transition: "transform .2s", transform: open ? "rotate(180deg)" : "none" }} />
           </Stack>
-          <Typography noWrap sx={{ fontSize: "0.78rem", color: INK_2, mt: 0.1 }}>
-            {showJob ? [fmtDayTime(row.checkIn?.at).split(" · ")[0], row.jobLabel, row.jobNo].filter(Boolean).join(" · ") : fmtDayTime(row.checkIn?.at).split(" · ")[0]}
-          </Typography>
-          <Stack direction="row" alignItems="center" sx={{ mt: 0.3 }}>
-            <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.74rem", color: MUTED, lineHeight: 1.5 }}>
-              <Box component="span" sx={{ whiteSpace: "nowrap" }}>{role}</Box><Dot /><Box component="span" sx={{ whiteSpace: "nowrap" }}>{crew}</Box>
-              {flags.map((f) => (
-                <Box component="span" key={f.text}><Dot /><Box component="span" sx={{ whiteSpace: "nowrap", color: f.color, fontWeight: f.color === WARN ? 600 : 400 }}>{f.text}</Box></Box>
-              ))}
+          {/* คนบันทึก + บทบาท + ทีม */}
+          <Stack direction="row" alignItems="center" gap={0.6} sx={{ mt: 0.6, minWidth: 0 }}>
+            <Avatar sx={{ width: 20, height: 20, fontSize: "0.62rem", fontWeight: 700, bgcolor: personColor(row.userName) }}>{personInitial(row.userName)}</Avatar>
+            <Typography noWrap sx={{ fontSize: "0.78rem", color: INK_2, minWidth: 0 }}>
+              {showJob ? <b style={{ fontWeight: 600 }}>{row.userName}</b> : null}{showJob ? " · " : ""}{role} · {crew}
             </Typography>
+          </Stack>
+          {/* ป้ายสถานะ — เห็นเรื่องสำคัญได้ทันทีโดยไม่ต้องกาง */}
+          <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5, mt: 0.75 }}>
+            {inLoc && <Tag tone={inLoc.tone === "ok" ? TONE.ok : inLoc.tone === "warn" ? TONE.warn : ACCENT} icon={inLoc.tone === "warn" && row.checkIn?.gps !== "ok" ? <LocationOffRounded /> : <PlaceRounded />}>{shortLoc(row.checkIn, inLoc)}</Tag>}
+            {(row.checkIn?.photos || []).length > 0 && <Tag tone={MUTED} icon={<PhotoCameraOutlined />}>รูป {row.checkIn.photos.length}</Tag>}
+            {row.offSchedule && <Tag tone={MUTED} icon={<EventBusyOutlined />}>นอกวันนัด</Tag>}
+            {pending.length > 0 && <Tag tone={TONE.warn} icon={<EditCalendarOutlined />}>ขอแก้เวลา · รออนุมัติ</Tag>}
+            {fixed && <Tag tone={MUTED} icon={<EditCalendarOutlined />}>แก้เวลาแล้ว</Tag>}
           </Stack>
         </Box>
       </ButtonBase>
