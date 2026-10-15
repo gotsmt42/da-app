@@ -27,7 +27,8 @@ const KEYFRAMES = `
 
 const ROOT = {
   page: { position: "fixed", inset: 0, zIndex: 5, pointerEvents: "none" },
-  center: { position: "fixed", inset: 0, zIndex: 5, pointerEvents: "none" },
+  // visibility: visible — ยังเห็นได้แม้วางอยู่ในกล่องที่ซ่อนเนื้อหาไว้ระหว่างโหลดครั้งแรก (เช่น ปฏิทิน)
+  center: { position: "fixed", inset: 0, zIndex: 5, pointerEvents: "none", visibility: "visible" },
   fullscreen: { position: "fixed", inset: 0, zIndex: 2000, background: "#f8fafc" },
   overlay: { position: "absolute", inset: 0, zIndex: 20, background: "rgba(248,250,252,.85)" },
   inline: { width: "100%", minHeight: 160, padding: "24px 16px" },

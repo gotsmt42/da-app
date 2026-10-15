@@ -2598,7 +2598,9 @@ function EventCalendar() {
   return (
     <div
       className={`modern-calendar-container${mobileZoom > 0 ? " ec-zoomed" : ""}${isWideToolbar ? " ec-wide-toolbar" : ""}${isSalesView ? " ec-sales-page" : ""}`}
-      style={{ "--ec-m-zoom": mobileColW }}
+      // ✅ (15 ต.ค. 2569 ผู้ใช้: "ไม่ให้ content ขึ้นก่อนหน้าโหลดเสร็จ ไม่มืออาชีพ") — โหลดครั้งแรก: ซ่อนเนื้อหาทั้งหน้า
+      //    (visibility ไม่ใช่ display — ปฏิทินยังวัดขนาด/จัดหน้าได้ปกติ) เหลือแค่หน้าโหลด TidTam กลางจอ แล้วโผล่พร้อมกันทีเดียว
+      style={{ "--ec-m-zoom": mobileColW, visibility: firstEventsLoaded ? "visible" : "hidden" }}
     >
       {/* ✅ แถบเดียวกระชับ: ค้นหา + ปุ่มตัวกรอง (มี badge บอกจำนวนที่เลือกไว้) + Export
           แบบไอคอนล้วน — เดิมมีทั้งแถวปุ่ม Export ข้อความยาว + แถวค้นหา + dropdown 2 ตัวโชว์
