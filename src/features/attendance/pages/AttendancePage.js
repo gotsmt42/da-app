@@ -139,7 +139,7 @@ export default function AttendancePage() {
     <Box sx={{ maxWidth: 1100, mx: "auto", px: { xs: 0.25, sm: 1.5 }, py: { xs: 1, sm: 2 } }}>
       <PageHeader
         icon={<PlaceOutlined />}
-        title={seeAll ? "บันทึกเข้างาน" : "ประวัติเข้างานของฉัน"}
+        title={seeAll ? "ประวัติบันทึกการเข้างาน" : "ประวัติเข้างานของฉัน"}
         subtitle="เวลาเข้างานจากเซิร์ฟเวอร์ · ตำแหน่ง GPS · รูปหน้างาน"
         actions={<Tooltip title="โหลดใหม่"><IconButton onClick={load}><RefreshRounded /></IconButton></Tooltip>}
       />

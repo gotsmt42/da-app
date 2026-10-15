@@ -53,7 +53,7 @@ export const DEST = {
   // ✅ (9 ต.ค. 2569 ผู้ใช้) ชื่อเมนู "งานใหม่" + ไอคอนเอกสารมีเครื่องหมายบวก (งานที่เพิ่งรับเข้ามา) — ชุดเดียวกับหัวหน้าเพจ
   jobIntake: { title: "งานใหม่", sub: "รับงานไว้ก่อน · ส่งลงตาราง", href: "/jobs/intake", icon: MdPostAdd, badgeKey: "jobIntake" },
   // ✅ (10 ต.ค. 2569) เช็คอิน/เช็คเอาต์ของช่าง — รายการเข้า-ออกงาน · ชั่วโมงทำงาน · คำขอแก้เวลา
-  attendance: { title: "บันทึกเข้างาน", sub: "เข้างาน · รูปหน้างาน · แก้เวลา", href: "/attendance", icon: FaMapMarkerAlt, badgeKey: "attendanceFixes" },
+  attendance: { title: "ประวัติบันทึกการเข้างาน", sub: "เข้างาน · รูปหน้างาน · แก้เวลา", href: "/attendance", icon: FaMapMarkerAlt, badgeKey: "attendanceFixes" },
   jobReport: { title: "รายงานงาน", short: "รายงาน", sub: "สรุปสถานะ · รายเดือน · ตามลูกค้า/ทีม", href: "/jobs/report", icon: FaChartBar },
   // ✅ (11 ต.ค. 2569 ผู้ใช้: "Icon ให้สอดคล้อง สื่อความหมาย ไม่ใส่มั่ว") — คน + เครื่องหมายถูก = งานที่มอบหมายให้ฉัน
   myJobs: { title: "งานของฉัน", sub: "งานที่ได้รับมอบหมาย", href: "/technician/jobs", icon: FaUserCheck, badgeKey: "myJobs" },
