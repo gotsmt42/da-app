@@ -189,6 +189,7 @@ const EventService = {
 
       const response = await API.put(`/events/upload/${id}`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
+        timeout: 120000, // ✅ อัปไฟล์บนเน็ตมือถืออาจเกิน 20 วิ (ค่าเริ่มต้นของ API)
         ...config, // ✅ รองรับ onUploadProgress หรืออื่น ๆ
       });
 
@@ -293,6 +294,7 @@ const EventService = {
 
       const response = await API.put(`/events/${id}/quotation-followup`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
+        timeout: file ? 120000 : undefined, // ✅ แนบไฟล์บนเน็ตมือถือ + อัปขึ้น Cloudinary อาจเกิน 20 วิ
       });
 
       return response.data;

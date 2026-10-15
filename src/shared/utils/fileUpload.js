@@ -217,7 +217,18 @@ export const prepareUploadFile = async (file, opts = {}) => {
   const check = validateFile(file, opts);
   if (!check.ok) return { ok: false, message: check.message };
 
-  const out = await compressImage(file, opts);
+  let out = await compressImage(file, opts);
+  // 🐛 (15 ต.ค. 2569 ผู้ใช้: "หน้าติดตามใบเสนอราคากดบันทึกไม่ได้" — ขึ้น Network Error บนมือถือ)
+  //    ไฟล์ที่ไม่ได้ผ่านการบีบอัด (รูปเล็ก/เอกสาร) ยังเป็นตัวชี้ไปที่ไฟล์ในเครื่อง — บน Android ถ้าไฟล์ถูกแตะ/ย้าย
+  //    หรือยังดาวน์โหลดจากคลาวด์ไม่เสร็จ (ภาพหน้าจอ/Google Photos) เบราว์เซอร์จะส่งไม่ได้และขึ้นแค่ "Network Error"
+  //    ✅ อ่านไฟล์เข้าหน่วยความจำก่อนส่งเสมอ — อ่านไม่ได้ก็บอกผู้ใช้ตรงๆ ให้เลือกไฟล์ใหม่
+  if (out === file) {
+    try {
+      out = new File([await file.arrayBuffer()], file.name, { type: file.type, lastModified: file.lastModified });
+    } catch {
+      return { ok: false, message: "อ่านไฟล์ไม่ได้ (ไฟล์อาจถูกย้ายหรือยังโหลดจากคลาวด์ไม่เสร็จ) — กรุณาเลือกไฟล์ใหม่อีกครั้ง" };
+    }
+  }
   return { ok: true, file: out, saved: file.size - out.size };
 };
 

@@ -61,7 +61,7 @@ import {
   Send, Chat, Link as LinkIcon,
   Print, Share, RequestQuote, ReceiptLong, AssignmentTurnedIn, EventAvailable, Tune,
   RemoveCircleOutline, NoteAlt,
-  Lock,
+  Lock, Groups,
 } from "@mui/icons-material";
 
 // MUI Date Picker
@@ -2024,6 +2024,7 @@ const FilterPanel = ({
   filterStatus, onFilterStatus, filterOP, onFilterOP, filterTeam, onFilterTeam,
   showAll, onToggleShowAll, selectedDate, onDateChange, onClearAll, activeCount,
   typeOptions, systemOptions, inSheet = false,
+  peopleToggle = null, // ✅ (15 ต.ค. 2569) { open, onToggle, label } — ปุ่มพับ/กางแผงงานตามผู้รับผิดชอบ (จอคอม · แอดมิน)
 }) => {
   const [open, setOpen] = useState(false);
   // ✅ จอคอม/จอใหญ่ แสดงช่องเลือกตัวกรองตลอด (ผู้ใช้ขอ) — พื้นที่พอ ไม่ต้องกดเปิดก่อน · มือถือยังพับเก็บได้เหมือนเดิม
@@ -2170,6 +2171,19 @@ const FilterPanel = ({
                 onClick={() => { onToggleShowAll(false); onDateChange(moment().format("YYYY-MM")); }}
                 sx={{ borderRadius: 2.5, textTransform: "none", fontSize: "0.82rem", fontWeight: 700, height: 40, px: 1.75, boxShadow: "none" }}>
                 เลือกเดือน
+              </Button>
+            )}
+            {/* ✅ (15 ต.ค. 2569 ผู้ใช้: "ทำให้กดพับผู้รับผิดชอบได้เหมือนภาพรวม") — ปุ่มเดียวกับหน้าภาพรวมงาน */}
+            {peopleToggle && (
+              <Button onClick={peopleToggle.onToggle} startIcon={<Groups sx={{ fontSize: 18 }} />}
+                endIcon={<ExpandMore sx={{ fontSize: 18, transform: peopleToggle.open ? "rotate(180deg)" : "none", transition: "transform .2s" }} />}
+                sx={{
+                  flexShrink: 0, height: 40, textTransform: "none", fontWeight: 700, fontSize: "0.82rem", borderRadius: 2.5, px: 1.5,
+                  border: `1px solid ${peopleToggle.open || peopleToggle.active ? alpha("#2563eb", 0.45) : "#e2e8f0"}`,
+                  color: peopleToggle.open || peopleToggle.active ? "#2563eb" : "text.primary",
+                  bgcolor: peopleToggle.open ? alpha("#2563eb", 0.06) : "background.paper",
+                }}>
+                {peopleToggle.label}
               </Button>
             )}
           </Stack>
@@ -2831,6 +2845,9 @@ const Operation = () => {
   // กลุ่มแล้ว (ดู handleRequestClose) ทำให้ตัวเลขนี้เพี้ยนสูงกว่าจำนวนงานจริง (เช่น 1 งานเข้า 3 วัน
   // ขึ้นเป็น "3 งาน") ใช้ countDistinctJobs จัดกลุ่มก่อนนับแทน ให้ตรงกับจำนวนงานจริงที่เห็นในพาแนล
   const [filterResponsible, setFilterResponsible] = useState("all");
+  // ✅ (15 ต.ค. 2569) แผง "งานตามผู้รับผิดชอบ" พับไว้เป็นค่าเริ่มต้น (เหมือนหน้าภาพรวมงาน) · จำค่าที่ผู้ใช้เลือกไว้
+  const [peopleOpen, setPeopleOpen] = useState(() => { try { return localStorage.getItem("tt-op-people") === "1"; } catch { return false; } });
+  const togglePeople = () => setPeopleOpen((o) => { try { localStorage.setItem("tt-op-people", o ? "0" : "1"); } catch { /* ignore */ } return !o; });
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
   const [headerMenuAnchor, setHeaderMenuAnchor] = useState(null);
   /**
@@ -3440,6 +3457,10 @@ const Operation = () => {
     selectedDate, onDateChange: (d) => { setSelectedDate(d); setShowAll(false); },
     onClearAll: clearAllOpFilters,
     activeCount: activeFilterCount,
+    peopleToggle: isAdminOrManager && activeTab !== 1 && !id ? {
+      open: peopleOpen, onToggle: togglePeople, active: filterResponsible !== "all",
+      label: filterResponsible !== "all" ? `ผู้รับผิดชอบ: ${filterResponsible === "unassigned" ? "ยังไม่มอบหมาย" : filterResponsible}` : "ผู้รับผิดชอบ",
+    } : null,
   };
 
   // ✅ แถบแบ่งหน้าแบบเดียวกับทั้งแอป (สไตล์ปุ่มมาจากธีม — app/theme.js) — ซ้าย: แสดงกี่รายการ + ต่อหน้า · ขวา: เลขหน้า
@@ -3651,6 +3672,7 @@ const Operation = () => {
 
       {/* ✅ ทางลัดงานตามผู้รับผิดชอบ — ชุดเดียวกับหน้าภาพรวมงาน (กดชื่อเพื่อดูเฉพาะงานของคนนั้น) */}
       {isAdminOrManager && activeTab !== 1 && !id && !isMobile && (
+        <Collapse in={peopleOpen} unmountOnExit>
         <ResponsibleSummary
           rows={responsibleRows}
           unit="งาน"
@@ -3660,6 +3682,7 @@ const Operation = () => {
           isOverdue={isRowOverdue}
           isMobile={isMobile}
         />
+        </Collapse>
       )}
 
       {loading && <LinearProgress sx={{ borderRadius: 1, mb: 2 }} />}
