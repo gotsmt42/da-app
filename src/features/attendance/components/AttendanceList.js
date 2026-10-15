@@ -77,7 +77,7 @@ const LocationCard = ({ stamp }) => {
   let tone; let text; let hint = "";
   if (stamp.gps === "denied") { tone = TONE.warn; text = "ไม่มีตำแหน่ง (ไม่ได้อนุญาต GPS)"; }
   else if (!ok) { tone = TONE.warn; text = "ไม่มีตำแหน่ง (หา GPS ไม่เจอ)"; }
-  else if (stamp.distanceM == null) { tone = INK_2; text = `บันทึกตำแหน่งแล้ว${acc}`; hint = "เทียบระยะกับหน้างานไม่ได้ — โครงการยังไม่มีลิงก์แผนที่ในทะเบียนลูกค้า"; }
+  else if (stamp.distanceM == null) { tone = "#dc2626"; text = `บันทึกตำแหน่งแล้ว${acc}`; hint = "เทียบระยะกับหน้างานไม่ได้ — โครงการยังไม่มีลิงก์แผนที่ในทะเบียนลูกค้า"; }
   else if (stamp.distanceM <= ON_SITE_M) { tone = TONE.ok; text = `อยู่ที่หน้างาน · ห่าง ${fmtDistance(stamp.distanceM)}${acc}`; }
   else { tone = TONE.warn; text = `อยู่นอกหน้างาน · ห่าง ${fmtDistance(stamp.distanceM)}${acc}`; }
   const Icon = ok ? PlaceRounded : LocationOffRounded;
@@ -86,7 +86,7 @@ const LocationCard = ({ stamp }) => {
       <Stack direction="row" gap={0.6} alignItems="flex-start">
         <Icon sx={{ fontSize: 17, color: tone, mt: "2px", flexShrink: 0 }} />
         <Box sx={{ minWidth: 0 }}>
-          <Box component="span" sx={{ color: tone === INK_2 ? INK : tone, fontWeight: 600 }}>{text}</Box>
+          <Box component="span" sx={{ color: tone, fontWeight: 600 }}>{text}</Box>
           {hint && <Box sx={{ fontSize: "0.74rem", color: MUTED, lineHeight: 1.45 }}>{hint}</Box>}
           {ok && (
             <Stack direction="row" gap={1.5} sx={{ mt: 0.4 }}>
@@ -173,7 +173,7 @@ function Row({ row, me, isApprover, showJob, onPreview, onChanged, embedded }) {
 
   const role = isHeadRow ? "หัวหน้าทีม" : row.team?.head ? `กดแทนหัวหน้าทีม ${row.team.head}` : "ผู้กดเข้างาน";
   // สีตามผลตำแหน่ง — ใช้ทั้งแถบซ้ายการ์ดและป้ายตำแหน่ง
-  const locTone = inLoc?.tone === "ok" ? TONE.ok : inLoc?.tone === "warn" ? TONE.warn : ACCENT;
+  const locTone = inLoc?.tone === "ok" ? TONE.ok : inLoc?.tone === "warn" ? TONE.warn : "#dc2626"; // (15 ต.ค. 2569 ผู้ใช้) บันทึกพิกัดแล้วแต่ยืนยันหน้างานไม่ได้ = แดง
   const crew = teamMembers.length ? `ลูกทีม ${teamMembers.length} คน` : "ไม่มีลูกทีม";
 
   return (
@@ -200,7 +200,7 @@ function Row({ row, me, isApprover, showJob, onPreview, onChanged, embedded }) {
           </Stack>
           <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5, mt: 0.65 }}>
             {inLoc && <Tag tone={locTone} icon={row.checkIn?.gps === "ok" ? <PlaceRounded /> : <LocationOffRounded />}>{shortLoc(row.checkIn, inLoc)}</Tag>}
-            {row.offSchedule && <Tag tone="#7c3aed" icon={<EventBusyOutlined />}>นอกวันนัด</Tag>}
+            {row.offSchedule && <Tag tone="#ea580c" icon={<EventBusyOutlined />}>นอกวันนัด</Tag>}
             {pending.length > 0 && <Tag tone={TONE.warn} icon={<EditCalendarOutlined />}>ขอแก้เวลา · รออนุมัติ</Tag>}
             {fixed && <Tag tone={MUTED} icon={<EditCalendarOutlined />}>แก้เวลาแล้ว</Tag>}
           </Stack>
