@@ -27,7 +27,7 @@ import {
 import { alpha } from "@mui/material/styles";
 import {
   PostAddOutlined, AddRounded, EditOutlined, ChevronRight, Close, EventAvailableOutlined,
-  ApartmentOutlined, NotesOutlined, HourglassTopRounded, ReportProblemOutlined,
+  NotesOutlined, CalendarMonthOutlined, GroupsOutlined, PersonOutlineOutlined, BuildOutlined, CallReceivedRounded, DescriptionOutlined, PhoneOutlined, HourglassTopRounded, ReportProblemOutlined,
   BlockRounded, RestoreRounded, PersonOffOutlined,
   LocalShippingOutlined, ReceiptLongOutlined, TaskAltRounded, UploadFileOutlined, AttachFileRounded, Search,
 } from "@mui/icons-material";
@@ -110,7 +110,7 @@ const PRIMARY = { ...BTN, bgcolor: ACCENT, color: "#fff", "&:hover": { bgcolor: 
 //    (วงเขียว ✓ = ผ่านแล้ว · วงน้ำเงินมีเลข = ขั้นปัจจุบัน · วงขาว = ยังไม่ถึง) แทนแถบสีเดิม
 function StageBar({ stage }) {
   return (
-    <Box sx={{ mt: 1.25 }}>
+    <Box>
       <MiniSteps labels={stage.note ? STAGES_NOTE : stage.nv ? STAGES_NV : STAGES} current={stage.note || stage.nv ? stage.bar : stage.i === 4 ? STAGES.length : stage.i} />
     </Box>
   );
@@ -306,16 +306,35 @@ function DeliverDialog({ job, onClose, onDone }) {
 }
 
 /** ลิงก์ไฟล์เล็กๆ (เอกสารรับงาน / ใบวางบิล) — กดเปิดในแท็บใหม่ */
-const FileLinks = ({ files }) => (
-  <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5, mt: 0.25 }}>
-    {files.map((f) => (
-      <Box key={f._id || f.fileUrl} component="a" href={f.fileUrl} target="_blank" rel="noreferrer"
-        sx={{ display: "inline-flex", alignItems: "center", gap: 0.4, maxWidth: 220, px: 0.9, height: 24, borderRadius: 99, border: `1px solid ${LINE}`, bgcolor: "#fff", color: "#334155", fontSize: "0.72rem", fontWeight: 700, textDecoration: "none", "&:hover": { borderColor: ACCENT, color: ACCENT } }}>
-        <AttachFileRounded sx={{ fontSize: 13 }} />
-        <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.fileName || "ไฟล์"}</Box>
-      </Box>
-    ))}
-  </Stack>
+// ✅ (15 ต.ค. 2569 ผู้ใช้: "ไฟล์แนบ ยังไม่สวย ดูยาก") — การ์ดไฟล์เล็ก: รูปย่อ (รูปภาพ) / ไอคอนตามชนิด + ชื่อไฟล์ + ที่มา
+const isImageFile = (f) => /^image\//.test(f.fileType || "") || /\.(jpe?g|png|webp|gif|heic)$/i.test(f.fileName || f.fileUrl || "");
+const extOf = (f) => (String(f.fileName || f.fileUrl || "").split(".").pop() || "").slice(0, 4).toUpperCase();
+const thumbOf = (url) => (/res\.cloudinary\.com\/.+\/image\/upload\//.test(url || "") ? url.replace("/image/upload/", "/image/upload/c_fill,w_80,h_80,q_auto,f_auto/") : url);
+const FileLinks = ({ files, label = "เอกสารรับงาน" }) => (
+  <>
+    {files.map((f) => {
+      const img = isImageFile(f);
+      const ext = extOf(f);
+      const color = ext === "PDF" ? RED : /^XLS/.test(ext) ? GREEN : /^DOC/.test(ext) ? ACCENT : MUTED;
+      return (
+        <Box key={f._id || f.fileUrl} component="a" href={f.fileUrl} target="_blank" rel="noreferrer" title={f.fileName}
+          sx={{ display: "inline-flex", alignItems: "center", gap: 1, width: { xs: "100%", sm: 240 }, p: 0.6, pr: 1.25, borderRadius: 2, border: `1px solid ${LINE}`, bgcolor: "#fff", textDecoration: "none", transition: "border-color .15s, box-shadow .15s", "&:hover": { borderColor: ACCENT, boxShadow: `0 0 0 3px ${alpha(ACCENT, 0.08)}` } }}>
+          {img ? (
+            <Box component="img" src={thumbOf(f.fileUrl)} alt="" loading="lazy"
+              sx={{ width: 36, height: 36, borderRadius: 1.5, objectFit: "cover", flexShrink: 0, bgcolor: SURFACE }} />
+          ) : (
+            <Box sx={{ width: 36, height: 36, borderRadius: 1.5, flexShrink: 0, display: "grid", placeItems: "center", bgcolor: alpha(color, 0.1), color, fontSize: "0.62rem", fontWeight: 900 }}>
+              {ext || <AttachFileRounded sx={{ fontSize: 16 }} />}
+            </Box>
+          )}
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography noWrap sx={{ fontSize: "0.78rem", fontWeight: 700, color: INK, lineHeight: 1.3 }}>{f.fileName || "ไฟล์"}</Typography>
+            <Typography noWrap sx={{ fontSize: "0.68rem", fontWeight: 600, color: "#94a3b8", lineHeight: 1.3 }}>{label}</Typography>
+          </Box>
+        </Box>
+      );
+    })}
+  </>
 );
 
 /** บรรทัดข้อมูล: ไอคอน + ข้อความ (ตัดบรรทัดได้ ไม่ล้น) */
@@ -410,100 +429,119 @@ function JobCard({ job, onSchedule, onDeliver, onUploadInvoice, onNoteDone, onEd
         ? { title: "ส่งลงตาราง", desc: "เลือกวันเข้างาน ผู้รับผิดชอบงาน และหัวหน้าทีม" }
         : st.i >= 0 && st.i < 4 ? nextStepOf(job, "admin") : null;
   const place = [job.site && job.site !== "-" ? job.site : "", job.company && job.company !== job.site ? job.company : ""].filter(Boolean).join(" · ");
-  const source = [job.intakeSource ? SOURCE_LABEL[job.intakeSource] || job.intakeSource : ""].filter(Boolean).join("");
   const doc = job.intakeDocType || job.intakeDocNo ? `${DOC_LABEL[job.intakeDocType] || "เอกสาร"}${job.intakeDocNo ? ` ${job.intakeDocNo}` : ""}` : "";
   const schedule = job.intakeNote
-    ? (job.noteDoneAt ? `ทำเสร็จ ${formatThai(moment(job.noteDoneAt), "D MMM YYYY HH:mm")}${job.noteDoneBy ? ` · ${job.noteDoneBy}` : ""}` : `บันทึกเมื่อ ${formatThai(moment(job.intakeAt), "D MMM YYYY")}`)
-    : when;
-  const Chip = ({ children, color = "#334155", bg = SURFACE, border = LINE }) => (
-    <Box component="span" sx={{ px: 0.9, height: 22, display: "inline-flex", alignItems: "center", gap: 0.4, borderRadius: 99, fontSize: "0.7rem", fontWeight: 800, color, bgcolor: bg, border: `1px solid ${border}`, whiteSpace: "nowrap" }}>{children}</Box>
-  );
+    ? (job.noteDoneAt ? `ทำเสร็จ ${formatThai(moment(job.noteDoneAt), "D MMM YYYY")}${job.noteDoneBy ? ` · ${job.noteDoneBy}` : ""}` : `บันทึก ${formatThai(moment(job.intakeAt), "D MMM YYYY")}`)
+    : job.noVisit && job.unscheduled ? "ยังไม่ส่งมอบ" : when;
+  const ModeIcon = job.intakeNote ? NotesOutlined : job.noVisit ? LocalShippingOutlined : BuildOutlined;
+  const modeLabel = job.intakeNote ? "จดงาน" : job.noVisit ? "ส่งของ" : "เข้างาน";
+  const tone = st.i === -1 ? MUTED : ACCENT;
 
+  // ✅ (15 ต.ค. 2569 ผู้ใช้: "ยังจัดวางไม่สวย UI ดูยาก ไม่มืออาชีพ" · "ทำให้ชัดเจน ดูง่าย สวยงาม")
+  //    แถวเดียวอ่านจบ: ไอคอนรูปแบบงาน · ชื่องาน + เลข Job · โครงการ · ข้อมูลสั้นเรียงบรรทัดเดียว | ปุ่มด้านขวา
+  //    ท้ายการ์ด: สถานะ + สิ่งที่ต้องทำต่อ (ซ้าย) · แถบขั้นตอน (ขวา)
   return (
-    <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflow: "hidden", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
-      <Box sx={{ px: { xs: 1.75, sm: 2.25 }, pt: 1.75, pb: 1.75 }}>
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={{ xs: 1.25, sm: 2 }} alignItems={{ sm: "flex-start" }}>
+    <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflow: "hidden", transition: "border-color .15s, box-shadow .15s", "&:hover": { borderColor: "#cbd5e1", boxShadow: "0 4px 14px -8px rgba(15,23,42,.18)" } }}>
+      <Stack direction={{ xs: "column", md: "row" }} spacing={{ xs: 1.5, md: 2 }} alignItems={{ md: "center" }} sx={{ px: { xs: 1.75, sm: 2.25 }, py: 1.75 }}>
+        <Stack direction="row" spacing={1.5} sx={{ flex: 1, minWidth: 0 }}>
+          {/* ✅ (15 ต.ค. 2569 ผู้ใช้: "ให้บอกด้วยว่างานอะไร ส่งของ จดงาน เข้างาน") — ไอคอน + ชื่อรูปแบบงานใต้ไอคอน */}
+          <Stack alignItems="center" spacing={0.4} sx={{ width: 52, flexShrink: 0 }}>
+            <Box sx={{ width: 42, height: 42, borderRadius: 2.5, display: "grid", placeItems: "center", bgcolor: alpha(tone, 0.08), color: tone }}>
+              <ModeIcon sx={{ fontSize: 22 }} />
+            </Box>
+            <Typography sx={{ fontSize: "0.68rem", fontWeight: 800, color: tone, lineHeight: 1.2, textAlign: "center", whiteSpace: "nowrap" }}>{modeLabel}</Typography>
+          </Stack>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            {/* หัว: สถานะ · เลข Job · ป้าย */}
-            <Stack direction="row" spacing={0.6} alignItems="center" sx={{ flexWrap: "wrap", rowGap: 0.5, mb: 0.75 }}>
-              <Chip color={st.color} bg={alpha(st.color, 0.1)} border="transparent">{st.label}</Chip>
-              {job.jobNo && <Typography component="span" sx={{ fontSize: "0.74rem", fontWeight: 700, color: "#94a3b8", letterSpacing: ".01em" }}>{job.jobNo}</Typography>}
-              {job.noVisit && <Chip><LocalShippingOutlined sx={{ fontSize: 13 }} /> ไม่ต้องเข้างาน</Chip>}
-              {job.intakeNote && <Chip><NotesOutlined sx={{ fontSize: 13 }} /> บันทึกงาน</Chip>}
+            <Stack direction="row" spacing={0.75} alignItems="baseline" sx={{ flexWrap: "wrap", rowGap: 0.25 }}>
+              <Typography sx={{ fontWeight: 800, fontSize: "1rem", color: INK, lineHeight: 1.35, overflowWrap: "anywhere", whiteSpace: job.intakeNote ? "pre-line" : undefined }}>
+                {job.intakeNote ? (job.description || "บันทึกงาน") : <>{job.title || "งาน"}{job.system ? ` · ${job.system}` : ""}</>}
+              </Typography>
+              {job.jobNo && <Typography component="span" sx={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8" }}>{job.jobNo}</Typography>}
               {isUrgent(job) && st.i < 4 && <Chip color="#fff" bg={RED} border={RED}>⚡ ด่วน</Chip>}
               {stall > 0 && <Chip color={RED} bg={alpha(RED, 0.08)} border="transparent">⏰ ค้าง {stall} วัน</Chip>}
               {job.infoPending && st.i < 4 && <Chip color={AMBER} bg={alpha(AMBER, 0.12)} border="transparent">รอข้อมูล</Chip>}
             </Stack>
-            {/* ชื่องาน + โครงการ */}
-            <Typography sx={{ fontWeight: 800, fontSize: "1.02rem", color: INK, lineHeight: 1.35, overflowWrap: "anywhere", whiteSpace: job.intakeNote ? "pre-line" : undefined }}>
-              {job.intakeNote ? (job.description || "บันทึกงาน") : <>{job.title || "งาน"}{job.system ? ` · ${job.system}` : ""}</>}
-            </Typography>
-            {place && (
-              <Stack direction="row" spacing={0.6} alignItems="center" sx={{ mt: 0.35, minWidth: 0 }}>
-                <ApartmentOutlined sx={{ fontSize: 15, color: "#94a3b8", flexShrink: 0 }} />
-                <Typography sx={{ fontSize: "0.84rem", fontWeight: 600, color: "#475569", minWidth: 0, overflowWrap: "anywhere" }}>{place}</Typography>
+            {place && <Typography sx={{ fontSize: "0.86rem", fontWeight: 600, color: "#475569", mt: 0.2, overflowWrap: "anywhere" }}>{place}</Typography>}
+
+            {/* ข้อมูลสั้น — บรรทัดเดียว คั่นด้วยไอคอน ตัดขึ้นบรรทัดใหม่เองถ้ายาว */}
+            <Stack direction="row" sx={{ flexWrap: "wrap", columnGap: 2, rowGap: 0.5, mt: 0.9 }}>
+              <Fact icon={CalendarMonthOutlined}>{schedule}{due ? <Box component="span" sx={{ color: AMBER, fontWeight: 700 }}> · เสร็จภายใน {due}</Box> : null}</Fact>
+              {job.intakeSource && <Fact icon={CallReceivedRounded}>จาก{SOURCE_LABEL[job.intakeSource] || job.intakeSource}</Fact>}
+              {doc && <Fact icon={DescriptionOutlined}>{doc}</Fact>}
+              {job.responsiblePerson && <Fact icon={PersonOutlineOutlined}>{job.responsiblePerson}</Fact>}
+              {!job.unscheduled && !job.noVisit && !job.intakeNote && <Fact icon={GroupsOutlined}>{team || "ยังไม่มอบหมายทีม"}</Fact>}
+              {(job.contactName || job.contactTel) && (
+                <Fact icon={PhoneOutlined}>
+                  {job.contactName || ""}{job.contactName && job.contactTel ? " · " : ""}
+                  {job.contactTel && <Box component="a" href={`tel:${job.contactTel}`} sx={{ color: ACCENT, fontWeight: 700, textDecoration: "none" }}>{job.contactTel}</Box>}
+                </Fact>
+              )}
+            </Stack>
+            {/* ✅ (15 ต.ค. 2569 ผู้ใช้: "แสดงรายละเอียดงานคร่าวๆด้วย") — กล่องรายละเอียด (ไม่เกิน 3 บรรทัด) + อุปกรณ์ที่ต้องเตรียม */}
+            {!job.intakeNote && (
+              <Box sx={{ mt: 1, px: 1.25, py: 0.9, borderRadius: 2, bgcolor: SURFACE, border: `1px solid ${LINE}` }}>
+                <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: "#94a3b8", mb: 0.25 }}>{job.noVisit ? "รายการที่ต้องส่ง" : "รายละเอียดงาน"}</Typography>
+                <Typography sx={{ fontSize: "0.82rem", color: job.description ? "#334155" : "#94a3b8", lineHeight: 1.5, whiteSpace: "pre-line", overflowWrap: "anywhere", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                  {job.description || "ยังไม่ได้ใส่รายละเอียด — กด “แก้ไข” เพื่อเพิ่ม"}
+                </Typography>
+                {job.equipment && (
+                  <Typography sx={{ fontSize: "0.76rem", color: MUTED, mt: 0.5, overflowWrap: "anywhere" }}>
+                    <Box component="span" sx={{ fontWeight: 800 }}>อุปกรณ์:</Box> {String(job.equipment).split(/\n+/).map((x) => x.trim()).filter(Boolean).join(" · ")}
+                  </Typography>
+                )}
+              </Box>
+            )}
+            {(intakeDocs.length > 0 || (job.noVisit && invoiceFiles.length > 0)) && (
+              <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75, mt: 1 }}>
+                <FileLinks files={intakeDocs} />
+                {job.noVisit && invoiceFiles.length > 0 && <FileLinks files={invoiceFiles} label="ใบวางบิล" />}
               </Stack>
             )}
+            {(job.infoPending && job.infoPendingNote) || (fu && st.i === 2) || st.i === -1 ? (
+              <Stack spacing={0.4} sx={{ mt: 0.9 }}>
+                {job.infoPending && job.infoPendingNote && <Line icon={HourglassTopRounded} color={AMBER}>ขาด: {job.infoPendingNote}</Line>}
+                {fu && st.i === 2 && <Line icon={ReportProblemOutlined} color={AMBER} strong>{fu.reason}{fu.note ? ` — ${fu.note}` : ""} · ผู้รับผิดชอบต่อ: {fu.nextOwner}</Line>}
+                {st.i === -1 && (
+                  <Line icon={BlockRounded} color={RED} strong>
+                    เหตุผล: {job.cancelReason || "-"} · ยกเลิกโดย {job.cancelledBy || "-"} {formatThai(moment(job.cancelledAt), "D MMM YYYY HH:mm")}
+                  </Line>
+                )}
+              </Stack>
+            ) : null}
           </Box>
-          <Stack direction="row" spacing={0.75} sx={{ flexShrink: 0, width: { xs: "100%", sm: "auto" }, order: { xs: 3, sm: 0 } }}>{actions}</Stack>
         </Stack>
+        <Stack direction="row" spacing={0.75} sx={{ flexShrink: 0, width: { xs: "100%", md: "auto" } }}>{actions}</Stack>
+      </Stack>
 
-        {/* ตารางข้อมูล — ป้ายเล็กสีเทา / ค่าตัวเข้ม · 3 คอลัมน์บนจอคอม 2 คอลัมน์บนมือถือ */}
-        <Box sx={{ mt: 1.5, display: "grid", gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", sm: "repeat(3, minmax(0, 1fr))" }, columnGap: 2, rowGap: 1.25 }}>
-          {source && <Info label="รับงานจาก">{source}</Info>}
-          {doc && <Info label="เอกสารต้นทาง">{doc}</Info>}
-          <Info label={job.intakeNote ? "สถานะ" : job.noVisit ? "ส่งมอบ" : "กำหนดเข้างาน"}>{schedule}{due ? <Box component="span" sx={{ display: "block", fontSize: "0.74rem", color: AMBER, fontWeight: 700 }}>ต้องเสร็จภายใน {due}</Box> : null}</Info>
-          {!job.unscheduled && !job.noVisit && !job.intakeNote && <Info label="ทีมเข้างาน">{team || <Muted>ยังไม่มอบหมาย</Muted>}</Info>}
-          {(job.responsiblePerson || (!job.noVisit && !job.intakeNote && !job.unscheduled)) && <Info label="ผู้รับผิดชอบ">{job.responsiblePerson || <Muted>ยังไม่มอบหมาย</Muted>}</Info>}
-          {(job.contactName || job.contactTel) && (
-            <Info label="ผู้ติดต่อ">
-              {job.contactName || "-"}
-              {job.contactTel && <Box component="a" href={`tel:${job.contactTel}`} sx={{ display: "block", color: ACCENT, fontWeight: 700, textDecoration: "none", fontSize: "0.8rem" }}>{job.contactTel}</Box>}
-            </Info>
-          )}
-          {job.description && !job.intakeNote && <Info label={job.noVisit ? "รายการที่ส่งมอบ" : "รายละเอียดงาน"} wide>{job.description}</Info>}
-          {intakeDocs.length > 0 && <Info label="ไฟล์เอกสารรับงาน" wide><FileLinks files={intakeDocs} /></Info>}
-          {job.noVisit && invoiceFiles.length > 0 && <Info label={`ใบวางบิล (${invoiceFiles.length})`} wide><FileLinks files={invoiceFiles} /></Info>}
-        </Box>
-
-        {/* เรื่องที่ต้องสังเกต */}
-        {(job.infoPending && job.infoPendingNote) || (fu && st.i === 2) || st.i === -1 ? (
-          <Stack spacing={0.5} sx={{ mt: 1.25 }}>
-            {job.infoPending && job.infoPendingNote && <Line icon={HourglassTopRounded} color={AMBER}>ขาด: {job.infoPendingNote}</Line>}
-            {fu && st.i === 2 && <Line icon={ReportProblemOutlined} color={AMBER} strong>{fu.reason}{fu.note ? ` — ${fu.note}` : ""} · ผู้รับผิดชอบต่อ: {fu.nextOwner}</Line>}
-            {st.i === -1 && (
-              <Line icon={BlockRounded} color={RED} strong>
-                เหตุผล: {job.cancelReason || "-"} · ยกเลิกโดย {job.cancelledBy || "-"} {formatThai(moment(job.cancelledAt), "D MMM YYYY HH:mm")}
-              </Line>
-            )}
-          </Stack>
-        ) : null}
-      </Box>
-
-      {/* แถบขั้นตอน + สิ่งที่ต้องทำต่อ — พื้นเทาอ่อนท้ายการ์ด */}
-      {st.i >= 0 && (
-        <Box sx={{ px: { xs: 1.75, sm: 2.25 }, pt: 0.5, pb: 1.25, bgcolor: SURFACE, borderTop: `1px solid ${LINE}` }}>
-          <StageBar stage={st} />
+      {/* ท้ายการ์ด: สถานะ + สิ่งที่ต้องทำต่อ | แถบขั้นตอน */}
+      <Stack direction={{ xs: "column", md: "row" }} spacing={{ xs: 1, md: 2.5 }} alignItems={{ md: "center" }}
+        sx={{ px: { xs: 1.75, sm: 2.25 }, py: 1.1, bgcolor: SURFACE, borderTop: `1px solid ${LINE}` }}>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ flex: 1, minWidth: 0 }}>
+          <Chip color={st.color} bg={alpha(st.color, 0.1)} border="transparent">{st.label}</Chip>
           {nx && (
-            <Typography sx={{ fontSize: "0.78rem", color: "#334155", mt: 0.9 }}>
-              <Box component="span" sx={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", bgcolor: nx.tone || AMBER, mr: 0.75, verticalAlign: "1px" }} />
-              <Box component="span" sx={{ fontWeight: 800, color: INK }}>{nx.title}</Box> — {nx.desc}
+            <Typography sx={{ fontSize: "0.8rem", color: "#334155", minWidth: 0, overflowWrap: "anywhere" }}>
+              <Box component="span" sx={{ fontWeight: 800, color: INK }}>{nx.title}</Box>
+              <Box component="span" sx={{ color: MUTED }}> — {nx.desc}</Box>
             </Typography>
           )}
-        </Box>
-      )}
+        </Stack>
+        {st.i >= 0 && <Box sx={{ width: { xs: "100%", md: 360 }, flexShrink: 0 }}><StageBar stage={st} /></Box>}
+      </Stack>
     </Box>
   );
 }
 
-/** ช่องข้อมูลในการ์ด: ป้ายเล็กสีเทา + ค่า · wide = เต็มแถว */
-const Info = ({ label, children, wide }) => (
-  <Box sx={{ minWidth: 0, gridColumn: wide ? "1 / -1" : undefined }}>
-    <Typography sx={{ fontSize: "0.7rem", fontWeight: 700, color: "#94a3b8", mb: 0.2 }}>{label}</Typography>
-    <Box sx={{ fontSize: "0.84rem", fontWeight: 600, color: INK, lineHeight: 1.45, overflowWrap: "anywhere", whiteSpace: "pre-line" }}>{children}</Box>
-  </Box>
+/** ป้ายเม็ดยาเล็ก (สถานะ / ด่วน / ค้าง) */
+const Chip = ({ children, color = "#334155", bg = SURFACE, border = LINE }) => (
+  <Box component="span" sx={{ px: 0.9, height: 22, display: "inline-flex", alignItems: "center", gap: 0.4, flexShrink: 0, borderRadius: 99, fontSize: "0.7rem", fontWeight: 800, color, bgcolor: bg, border: `1px solid ${border}`, whiteSpace: "nowrap" }}>{children}</Box>
 );
-const Muted = ({ children }) => <Box component="span" sx={{ color: "#94a3b8", fontWeight: 500 }}>{children}</Box>;
+/** ข้อมูลสั้น 1 ชิ้น: ไอคอนเทา + ข้อความ */
+const Fact = ({ icon: Icon, children }) => (
+  <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
+    <Icon sx={{ fontSize: 15, color: "#94a3b8", flexShrink: 0 }} />
+    <Typography component="span" sx={{ fontSize: "0.8rem", fontWeight: 600, color: "#334155", overflowWrap: "anywhere" }}>{children}</Typography>
+  </Stack>
+);
 
 export default function JobIntake() {
   const { userData } = useAuth() || {};
