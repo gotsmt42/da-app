@@ -452,7 +452,7 @@ export const getAddDraftEvent = async ({
       </div>
 
       <div class="ade-field ade-gap" id="ade-sourceField">
-        <label><span class="req">*</span> ใครเป็นคนส่งงานนี้มา</label>
+        <label><span class="req">*</span> รับงานมาจาก</label>
         <div class="ade-seg ade-seg-4">
           ${[["sales", "ฝ่ายขาย"], ["service", "ฝ่ายบริการ"], ["project", "ฝ่ายโครงการ"], ["customer", "ลูกค้าโดยตรง"]].map(([v, l]) => `<label><input type="radio" name="adeIntakeSource" value="${v}" ${existingDraft?.intakeSource === v ? "checked" : ""}><span><b>${l}</b></span></label>`).join("")}
         </div>
