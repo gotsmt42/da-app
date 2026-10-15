@@ -63,8 +63,33 @@ const GPS_STEPS = {
     ? ["เปิด “การตั้งค่า” → ความเป็นส่วนตัวฯ → บริการหาตำแหน่ง ให้เป็น “เปิด”", "ออกไปที่โล่ง ห่างจากหลังคา/ผนังหนา", "กด “ลองอีกครั้ง”"]
     : ["ลากแถบด่วนจากขอบบนลงมา แล้วเปิด “ตำแหน่ง”", "ในการตั้งค่าตำแหน่ง เปิด “ความแม่นยำของตำแหน่ง (Google)”", "ออกไปที่โล่ง แล้วกด “ลองอีกครั้ง”"],
 };
-function GpsRequired({ kind, onRetry, onSkip, skipped }) {
+function GpsRequired({ kind, perm, secure, onRetry, onRequest, onSkip, skipped }) {
+  // ✅ (15 ต.ค. 2569 ผู้ใช้: "การเปิดสิทธิ์ตำแหน่งควรให้กดเปิดจากหน้า UI ได้เลย")
+  //    perm = "prompt" → เบราว์เซอร์ยังถามได้: ปุ่มเดียว "อนุญาตให้ใช้ตำแหน่ง" เด้งหน้าต่างอนุญาตของเครื่องขึ้นมาเลย
+  //    perm = "denied" → เคยกดบล็อกไว้ เบราว์เซอร์ไม่ยอมให้เว็บถามซ้ำ (ข้อจำกัดของทุกเบราว์เซอร์) → บอกขั้นตอนเปิดเอง
+  //    secure = false → เปิดผ่าน http:// (เช่นทดสอบผ่าน IP ในวง LAN) มือถือไม่ให้เว็บใช้ GPS เลย ต้องเปิดผ่าน https
+  const canPrompt = secure && perm === "prompt";
   const steps = GPS_STEPS[kind] || GPS_STEPS.unavailable;
+  if (!secure) {
+    return (
+      <Box sx={{ ...CARD, mb: 1.5, p: 2, border: `1px solid ${alpha(AMBER, 0.35)}` }}>
+        <Stack direction="row" gap={1.25} alignItems="flex-start">
+          <LocationOffRounded sx={{ color: AMBER, fontSize: 26, flexShrink: 0 }} />
+          <Box>
+            <Typography sx={{ fontSize: "0.95rem", fontWeight: 900, color: INK }}>ลิงก์นี้ใช้ GPS ไม่ได้</Typography>
+            <Typography sx={{ mt: 0.4, fontSize: "0.82rem", color: MUTED, lineHeight: 1.55 }}>
+              หน้านี้เปิดผ่าน <b>http://</b> (ไม่ปลอดภัย) มือถือจึงไม่อนุญาตให้เว็บใช้ตำแหน่ง — เปิดแอปผ่านลิงก์จริง <b>https://</b> แล้ว GPS จะใช้ได้ตามปกติ
+            </Typography>
+          </Box>
+        </Stack>
+        {!skipped ? (
+          <Button fullWidth variant="outlined" onClick={onSkip} sx={{ ...MBTN.outline("#64748b"), mt: 1.75, minHeight: 42 }}>บันทึกโดยไม่มีพิกัด</Button>
+        ) : (
+          <Typography sx={{ mt: 1.25, textAlign: "center", fontSize: "0.76rem", color: AMBER, fontWeight: 700 }}>จะบันทึกแบบ “ไม่มีพิกัด”</Typography>
+        )}
+      </Box>
+    );
+  }
   return (
     <Box sx={{ ...CARD, mb: 1.5, overflow: "hidden", border: `1px solid ${alpha(AMBER, 0.35)}` }}>
       <Box sx={{ px: 2, pt: 2.25, pb: 1.75, textAlign: "center", background: `linear-gradient(180deg, ${alpha(AMBER, 0.1)}, #fff)` }}>
@@ -73,13 +98,22 @@ function GpsRequired({ kind, onRetry, onSkip, skipped }) {
           <LocationOffRounded sx={{ fontSize: 32 }} />
         </Box>
         <Typography sx={{ mt: 1.75, fontSize: "1.05rem", fontWeight: 900, color: INK }}>
-          {kind === "denied" ? "เปิดสิทธิ์ตำแหน่งที่ตั้งก่อนบันทึกเข้างาน" : "เปิด GPS ก่อนบันทึกเข้างาน"}
+          {canPrompt ? "อนุญาตให้ใช้ตำแหน่งที่ตั้ง" : kind === "denied" ? "เปิดสิทธิ์ตำแหน่งที่ตั้งก่อนบันทึกเข้างาน" : "เปิด GPS ก่อนบันทึกเข้างาน"}
         </Typography>
         <Typography sx={{ mt: 0.5, fontSize: "0.82rem", color: MUTED, lineHeight: 1.55 }}>
           ระบบใช้ตำแหน่งยืนยันว่าเข้างานที่หน้างานจริง{kind === "denied" ? " — ตอนนี้เบราว์เซอร์ยังไม่ได้รับอนุญาต" : " — ตอนนี้หาสัญญาณ GPS ไม่ได้"}
         </Typography>
       </Box>
       <Box sx={{ px: 2, pb: 2 }}>
+        {canPrompt ? (
+          <>
+            <Button fullWidth variant="contained" disableElevation onClick={onRequest} startIcon={<MyLocationRounded />} sx={{ ...MBTN.primary, minHeight: 48 }}>
+              อนุญาตให้ใช้ตำแหน่ง
+            </Button>
+            <Typography sx={{ mt: 0.9, textAlign: "center", fontSize: "0.76rem", color: MUTED }}>กดแล้วเลือก “อนุญาต” ในหน้าต่างที่เด้งขึ้นมา</Typography>
+          </>
+        ) : (
+        <>
         <Stack spacing={1}>
           {steps.map((t, i) => (
             <Stack key={t} direction="row" gap={1.25} alignItems="flex-start">
@@ -91,6 +125,9 @@ function GpsRequired({ kind, onRetry, onSkip, skipped }) {
         <Button fullWidth variant="contained" disableElevation onClick={onRetry} startIcon={<MyLocationRounded />} sx={{ ...MBTN.primary, mt: 2, minHeight: 46 }}>
           ลองอีกครั้ง
         </Button>
+        <Typography sx={{ mt: 0.75, textAlign: "center", fontSize: "0.72rem", color: FAINT }}>เปิดสิทธิ์แล้ว ระบบจะหาตำแหน่งให้อัตโนมัติ</Typography>
+        </>
+        )}
         {!skipped ? (
           <ButtonBase onClick={onSkip} sx={{ display: "block", mx: "auto", mt: 1.25, px: 1, py: 0.5, borderRadius: 1, fontFamily: "inherit", fontSize: "0.76rem", color: MUTED, textDecoration: "underline" }}>
             เปิดไม่ได้จริงๆ — บันทึกโดยไม่มีพิกัด
@@ -173,6 +210,25 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
   const stopWatchRef = useRef(null);
   const [locStart, setLocStart] = useState(Date.now());
   const [skipGps, setSkipGps] = useState(false);
+  const secure = typeof window === "undefined" || window.isSecureContext !== false;
+  const [perm, setPerm] = useState("unknown"); // granted | prompt | denied | unknown
+  // ติดตามสถานะสิทธิ์ — ผู้ใช้ไปเปิดสิทธิ์แล้วกลับมา → หาตำแหน่งให้เองทันที ไม่ต้องกดลองอีกครั้ง
+  useEffect(() => {
+    if (!open || !navigator.permissions?.query) return undefined;
+    let st; let alive = true;
+    navigator.permissions.query({ name: "geolocation" }).then((r) => {
+      if (!alive) return;
+      st = r; setPerm(r.state);
+      r.onchange = () => { setPerm(r.state); if (r.state === "granted") locate(); };
+    }).catch(() => {});
+    return () => { alive = false; if (st) st.onchange = null; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+  // ปุ่ม "อนุญาตให้ใช้ตำแหน่ง" — ขอสิทธิ์ตรงๆ ให้เบราว์เซอร์เด้งหน้าต่างอนุญาตของเครื่อง แล้วเริ่มติดตามตำแหน่ง
+  const requestPermission = () => {
+    setPos(null);
+    navigator.geolocation?.getCurrentPosition(() => locate(), () => locate(), { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+  };
   const locate = () => {
     stopWatchRef.current?.();
     setSkipGps(false);
@@ -328,7 +384,7 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
 
         {/* ตำแหน่ง — ไม่มีสิทธิ์/หา GPS ไม่ได้ → แผงขอให้เปิด GPS (แบบแอปทั่วไป) */}
         {gpsMissing ? (
-          <GpsRequired kind={pos.gps === "denied" ? "denied" : "unavailable"} onRetry={locate} onSkip={() => setSkipGps(true)} skipped={skipGps} />
+          <GpsRequired kind={pos.gps === "denied" ? "denied" : "unavailable"} perm={perm} secure={secure} onRetry={locate} onRequest={requestPermission} onSkip={() => setSkipGps(true)} skipped={skipGps} />
         ) : (
         <Section title="ตำแหน่งปัจจุบัน">
           <Stack direction="row" alignItems="center" gap={1.25} sx={{ p: 1.5, borderRadius: 2.5, border: `1px solid ${alpha(locationCard.tone, 0.3)}`, bgcolor: alpha(locationCard.tone, 0.05) }}>
