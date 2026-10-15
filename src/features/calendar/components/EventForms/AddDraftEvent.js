@@ -672,7 +672,10 @@ export const getAddDraftEvent = async ({
             // 🔁 (15 ต.ค. 2569 ผู้ใช้: "รูปแบบส่งของ ขายของ ไม่ควรมีรายละเอียดเยอะ ให้ง่ายๆ")
             //    ส่งของ/ขายของ: ไม่ถามประเภทงาน · ระบบงาน · ความเร่งด่วน/อุปกรณ์ · เดือนเข้างาน
             show("ade-jobTypeField", mode === "visit");
-            show("ade-jobInfoBlock", mode !== "novisit");
+            // 🔁 (15 ต.ค. 2569 ผู้ใช้: "จดงาน ให้เหลือแค่รายละเอียดก็พอ ดูรกๆ") — ความเร่งด่วน/อุปกรณ์/รอข้อมูล เฉพาะงานเข้างาน
+            show("ade-jobInfoBlock", mode === "visit");
+            const intakeHead = document.querySelector("#ade-intakeSection > .ade-section-label");
+            if (intakeHead) intakeHead.style.display = note ? "none" : "";
             const sysField = document.getElementById("adeSystem")?.closest(".ade-field");
             if (sysField) sysField.style.display = mode === "visit" ? "" : "none";
             const sectionLabel = document.querySelector("#ade-generalSection .ade-section-label");
