@@ -107,6 +107,23 @@ export function MiniSteps({ current, labels = STEPS, dates }) {
 }
 
 /**
+ * ✅ (15 ต.ค. 2569 ผู้ใช้: "โยกเอาเส้นดำเนินงานมาไว้แสดงขั้นแรก ไม่อยากกดเข้าไปดู")
+ * ขั้นปัจจุบันของงานจากข้อมูลงานอย่างเดียว (ไม่ต้องโหลดบันทึกเข้างาน) — ใช้กับแถบขั้นตอนบนการ์ดที่ยังไม่กาง
+ * ⚠️ ตรรกะเดียวกับ current ใน CheckInOutPanel — เข้างานแล้วดูจาก checkedInAt (server ตั้งจากบันทึกเข้างานจริง)
+ */
+export function jobStepOf(event, docsComplete = false) {
+  if (!event) return 0;
+  if (["pending", "rejected"].includes(event.approvalStatus)) return 0;
+  if (isClosedJob(event)) return STEPS.length;
+  if (event.closeRequested) return 5;
+  const legacyStarted = event.status === "กำลังดำเนินการ" && Boolean(event.createdAt) && new Date(event.createdAt) < new Date(FLOW_SINCE);
+  if (event.checkedInAt || legacyStarted) return docsComplete ? 4 : 3;
+  const acked = !ackTracked(event) || (event.acks || []).length > 0;
+  if (acked && !event.ackDeclined?.userId) return isConfirmedJob(event) ? 2 : 1;
+  return 0;
+}
+
+/**
  * ✅ (11 ต.ค. 2569 ผู้ใช้: "สายขั้นตอนมันซ้ำซ้อน ให้ตัดส่วนนี้ออก และใช้คำนี้ไปแทนข้างบน ใน editevent" → เลือก "ใช้คำสถานะแทน 4 ขั้น")
  * สายขั้นตอนแบบ "สถานะงาน" — รอยืนยัน › ยืนยันแล้ว › กำลังดำเนินการ › เสร็จสิ้น + วันที่ใต้ขั้นที่ผ่านแล้ว
  * (ย้ายมาจาก stepperHtml ใน EditEvent.js · เสร็จสิ้น = ผ่านครบทุกขั้น เป็นสีเขียวทั้งเส้น)

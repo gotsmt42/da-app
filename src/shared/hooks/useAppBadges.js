@@ -246,7 +246,7 @@ const computeBadges = (userData, data) => {
     })(),
     // ✅ (11 ต.ค. 2569 ผู้ใช้: "งานที่ได้รับมอบหมายไม่เข้ามางานของฉัน — แอดมิน กับ ผู้รับผิดชอบงาน")
     //    นับงานที่ "ฉัน" ถูกมอบหมาย (ผู้รับผิดชอบ/หัวหน้าทีม/ลูกทีม) ทุกตำแหน่ง ไม่ใช่เฉพาะช่าง
-    myJobs: !can(userData, "receiveDispatch") ? 0 : countDistinctJobs(events, (e) => isRespOrHead(e, userId, userData.fname)
+    myJobs: !(can(userData, "receiveDispatch") || can(userData, "viewAllJobs")) ? 0 : countDistinctJobs(events, (e) => isRespOrHead(e, userId, userData.fname)
       && ["กำลังรอยืนยัน", "ยืนยันแล้ว", "กำลังดำเนินการ"].includes(e.status) && !e.closeRequested && !e.unscheduled),
     quotations,
     /**

@@ -85,7 +85,7 @@ import DeliveryNoteDialog from "@/features/documents/components/DeliveryNoteDial
 import WorkNoticeDialog from "@/features/documents/components/WorkNoticeDialog";
 import { JobFlowChips, JobFlowPanel, JobFlowFlags, nextStepOf } from "@/shared/ui/JobFlow";
 import SitePhotos from "@/shared/ui/SitePhotos";
-import CheckInOutPanel from "@/features/attendance/components/CheckInOutPanel";
+import CheckInOutPanel, { MiniSteps, jobStepOf } from "@/features/attendance/components/CheckInOutPanel";
 import { docsUnlocked } from "@/shared/utils/jobFlow";
 import { BTN as MBTN, CARD } from "@/shared/ui/modernUi";
 import RadioButtonUnchecked from "@mui/icons-material/RadioButtonUnchecked";
@@ -1661,8 +1661,10 @@ const EventRowCard = ({
           </Stack>
 
           {/* ท้ายหัวการ์ด: ขั้นตอนถัดไป · เอกสาร (ตอนพับ — ตอนกางรายละเอียดมีครบอยู่แล้ว) · ไม่มีอะไรก็ไม่แสดงแถวว่าง */}
-          {!open && (nextStep || event.reportFiles?.length > 0 || event.quotationFiles?.length > 0 || event.invoiceFiles?.length > 0 || event.completionFiles?.length > 0 || event.comments?.length > 0 || (isDesktop && (event.activityLog?.length > 0 || event.jobGroupId))) && (
-            <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 1.25, pt: 1.1, borderTop: `1px dashed ${LINE}`, minWidth: 0 }}>
+          {/* ✅ (15 ต.ค. 2569 ผู้ใช้: "โยกเอาเส้นดำเนินงานมาไว้แสดงขั้นแรก ไม่อยากกดเข้าไปดู ไม่กินพื้นที่")
+              แถบขั้นตอนแบบย่ออยู่แถวเดียวกับขั้นตอนถัดไป (จอคอม: ชิดขวา · มือถือ: บรรทัดล่าง) — งานช่างทุกใบ */}
+          {!open && (event.department !== "sales" || nextStep || event.reportFiles?.length > 0 || event.quotationFiles?.length > 0 || event.invoiceFiles?.length > 0 || event.completionFiles?.length > 0 || event.comments?.length > 0 || (isDesktop && (event.activityLog?.length > 0 || event.jobGroupId))) && (
+            <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 1.25, pt: 1.1, borderTop: `1px dashed ${LINE}`, minWidth: 0, flexWrap: { xs: "wrap", md: "nowrap" }, rowGap: 1 }}>
               {nextStep && (
                 <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.76rem", color: INK_2, fontWeight: 700 }}>
                   {/* สีสถานะเหลือแค่จุดเล็ก ตัวหนังสือโทนเดียวกับการ์ด (ไม่ใช้ตัวหนังสือสีเขียว/ส้ม/แดงปนกัน)
@@ -1704,6 +1706,11 @@ const EventRowCard = ({
                   </Stack>
                 )}
 
+              {event.department !== "sales" && (
+                <Box sx={{ width: { xs: "100%", md: 340 }, flexShrink: 0, order: { xs: 3, md: 0 } }}>
+                  <MiniSteps current={jobStepOf(event, docDone === JOB_DOC_TYPES.length)} />
+                </Box>
+              )}
             </Stack>
           )}
         </Box>
@@ -3027,7 +3034,7 @@ const Operation = () => {
       .join("|");
   };
 
-  const jobGroups = useMemo(() => {
+  const allJobGroups = useMemo(() => {
     const map = new Map();
     sortedEvents.forEach(ev => {
       const key = getJobSignature(ev);
@@ -3039,6 +3046,19 @@ const Operation = () => {
       sessions.slice().sort((a, b) => new Date(b.start) - new Date(a.start))
     );
   }, [sortedEvents]);
+
+  /**
+   * ✅ (15 ต.ค. 2569 ผู้ใช้: "งานไหนที่ปิดแล้วไม่ต้องเอามาแสดงทั้งหมด ให้แยกหัวข้อไว้ต่างหาก เลื่อนดูมันรก หางานยาก")
+   *    มุมมอง "ทั้งหมด" แสดงเฉพาะงานที่ยังไม่ปิด · งานที่ปิดแล้วรวมเป็นแถบเดียวท้ายรายการ กดไปดูที่แท็บ "เสร็จสิ้น"
+   *    (แท็บอื่น/เลือกสถานะเอง/เปิดงานเจาะจง ไม่แยก — ผลตรงตามที่เลือก)
+   */
+  const splitClosed = effectiveGroup === "all" && !filterStatus && !id;
+  const isClosedGroup = (sessions) => sessions.every((e) => e.status === "ดำเนินการเสร็จสิ้น");
+  const jobGroups = useMemo(
+    () => (splitClosed ? allJobGroups.filter((g) => !isClosedGroup(g)) : allJobGroups),
+    [allJobGroups, splitClosed],
+  );
+  const hiddenClosedCount = splitClosed ? allJobGroups.length - jobGroups.length : 0;
 
   // รีเซ็ตกลับหน้า 1 ทุกครั้งที่ตัวกรอง/คำค้นหา/แท็บ/กลุ่มสถานะเปลี่ยน
   useEffect(() => {
@@ -3377,7 +3397,7 @@ const Operation = () => {
   // ด้วยกัน) ตรงกับที่ตาเห็นบนหน้าจอ เดิม CSV แตกเป็นหลายแถวต่องานเดียว จนนับจำนวนงานจากไฟล์ไม่ได้
   const [exporting, setExporting] = useState(false);
   const handleExportExcel = async () => {
-    if (exporting || jobGroups.length === 0) return;
+    if (exporting || allJobGroups.length === 0) return;
     setExporting(true);
     try {
       const { exportOperationToExcel, buildOperationFileName } = await import("@/features/operation/utils/operationExcelExport");
@@ -3387,7 +3407,7 @@ const Operation = () => {
       await exportOperationToExcel({
         // ⚠️ jobGroups เป็น array ของ "array of sessions" ตรงๆ (ดู useMemo ด้านบน) ไม่ใช่ object ที่มี
         // .sessions — ต้องห่อก่อนส่งเข้าโมดูล export ซึ่งอ่าน job.sessions[0] (ไม่ห่อ = undefined[0])
-        jobs: jobGroups.map((sessions) => ({ sessions })),
+        jobs: allJobGroups.map((sessions) => ({ sessions })),
         meta: {
           fileName: buildOperationFileName(groupLabel),
           groupLabel: `กลุ่ม: ${groupLabel}`,
@@ -3465,6 +3485,19 @@ const Operation = () => {
 
   // ✅ แถบแบ่งหน้าแบบเดียวกับทั้งแอป (สไตล์ปุ่มมาจากธีม — app/theme.js) — ซ้าย: แสดงกี่รายการ + ต่อหน้า · ขวา: เลขหน้า
   //    มือถือ: ซ่อนช่อง "ต่อหน้า" (ใช้ค่าเดิม) และตัดปุ่มหน้าแรก/สุดท้าย ให้เลขหน้าอยู่บรรทัดเดียวไม่ล้นจอ
+  // แถบ "งานที่ปิดแล้ว" ท้ายรายการ (มุมมองทั้งหมด) — กดแล้วไปแท็บเสร็จสิ้น
+  const closedBar = hiddenClosedCount > 0 ? (
+    <ButtonBase onClick={() => { setStatusGroup("closed"); setPage(1); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+      sx={{ width: "100%", mt: 1.5, mb: 1, px: 2, py: 1.5, gap: 1.25, justifyContent: "flex-start", borderRadius: 3, fontFamily: "inherit",
+        border: "1px dashed #a7f3d0", bgcolor: "#f0fdf4", "&:hover": { bgcolor: "#dcfce7" } }}>
+      <CheckCircle sx={{ fontSize: 20, color: "#059669" }} />
+      <Box sx={{ flex: 1, minWidth: 0, textAlign: "left" }}>
+        <Typography sx={{ fontSize: "0.88rem", fontWeight: 800, color: "#065f46" }}>งานที่ปิดแล้ว {hiddenClosedCount} งาน</Typography>
+        <Typography sx={{ fontSize: "0.74rem", color: "#047857" }}>แยกไว้ไม่ให้ปนกับงานที่กำลังทำ — กดเพื่อดูในแท็บ “เสร็จสิ้น”</Typography>
+      </Box>
+      <ChevronRight sx={{ color: "#059669" }} />
+    </ButtonBase>
+  ) : null;
   const pageFrom = jobGroups.length ? (page - 1) * pageSize + 1 : 0;
   const pageTo = Math.min(page * pageSize, jobGroups.length);
   const paginationBar = (
@@ -3807,7 +3840,7 @@ const Operation = () => {
               // ✅ กดแถว = เปิดแผงรายละเอียดทับบนตาราง (ไม่สลับทั้งหน้าไปมุมมองการ์ดเหมือนเดิม)
               onOpenJob={(job) => setDetailJobId(job.sessions[0]._id)}
             />
-            {paginationBar}
+            {paginationBar}{closedBar}
             </>
           ) : (
             <>
@@ -3881,7 +3914,7 @@ const Operation = () => {
                 );
               })}
 
-              {paginationBar}
+              {paginationBar}{closedBar}
             </>
           )}
         </>

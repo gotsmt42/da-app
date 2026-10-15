@@ -39,7 +39,7 @@ import { openFollowUp, isUrgent, acksOf, ackTracked, isResponsibleOf, isRespOrHe
 import { formatThai } from "@/shared/utils/thaiDate";
 import { can, isRole, rankLabel, ROLES, TECHNICIAN_ROLES, ALL_ROLES } from "@/shared/utils/roles";
 import HomeMenu from "../components/HomeMenu";
-import { Box, Typography, Avatar } from "@mui/material";
+import { Box, Typography, Avatar, Stack, ButtonBase } from "@mui/material";
 import { ExpandMore, Today, EventOutlined, EngineeringOutlined, RequestQuoteOutlined, EventRepeatOutlined, EditCalendarOutlined, ApartmentOutlined, GroupsOutlined, ScheduleOutlined, NotificationsActiveOutlined, ErrorOutline } from "@mui/icons-material";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, DANGER, CARD_SHADOW, ACCENT } from "@/shared/ui/PageKit";
@@ -102,12 +102,13 @@ const Dashboard = () => {
   const role = userData?.role?.toLowerCase();
   const isAdmin = can(userData, "manageAll");
   const isAdminOrManager = can(userData, "viewAllJobs");
-  const isTechnician = isRole(role, ...TECHNICIAN_ROLES);
   // ✅ หน้า "ภาพรวมงาน" เปิดให้ช่างเข้าดูสัญญาของตัวเองได้แล้ว (ดู ContractOverview.js canView /
   // Header.js canViewContracts) — วิดเจ็ต "สัญญาที่เลยกำหนด/คงค้าง" ด้านล่างต้องเปิดให้ตรงกันด้วย
   const canViewContracts = can(userData, "viewContracts");
   // ✅ เซล — สายงานคนละสายกับช่าง จึงต้องมีทางลัดของตัวเองแทนที่จะเห็นทางลัดของงานช่างที่กดไปก็ทำอะไรไม่ได้
   const isSale = isRole(role, ROLES.SALE);
+  // ✅ (15 ต.ค. 2569) การ์ด "งานของฉัน" ทุกคนยกเว้นเซล — แอดมินก็มีงานที่ตัวเองเป็นผู้รับผิดชอบ/หัวหน้าทีม (หน้านั้นคัดเฉพาะชื่อตัวเองอยู่แล้ว)
+  const showMyJobsHero = !isSale;
   // ⚠️ ทางลัดตามสิทธิ์ (การดำเนินงาน/คำขอลงงาน ฯลฯ) ย้ายไปตัดสินใน HomeMenu.js ที่เดียวแล้ว
   const canViewQuotations = can(userData, "viewFinance");
 
@@ -649,13 +650,47 @@ const Dashboard = () => {
           หรือเลื่อนลงไปที่ส่วน "การแจ้งเตือนล่าสุด" ด้านล่างอยู่แล้ว ไม่จำเป็นต้องมีทางลัดซ้ำที่นี่) ─── */}
             {/* ✅ หัวหน้าแรกแบบกล่องขาวชุดเดียวกับหน้าอื่น (กฎ: component เหมือนกัน · สีไม่เยอะ) —
                 เดิมป้ายตำแหน่งสีแดงขอบแดงลอยมุมขวา แย่งสายตาจากเมนู · ตอนนี้ตำแหน่งเป็นข้อความรองสีเทา */}
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 2, px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.5 }, bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, boxShadow: CARD_SHADOW }}>
+            {/* ✅ (15 ต.ค. 2569 ผู้ใช้: "จัดวางไว้ในแถบเดียวกับชื่อ เอาไว้ด้านขวา ให้สังเกตได้ง่าย ชัดเจน รวมถึงของช่างด้วยรูปแบบเดียวกัน")
+                แถบทักทาย: ชื่อ + ตำแหน่ง (ซ้าย) · ปุ่ม "งานของฉัน" พร้อมตัวเลข (ขวา) — มือถือปุ่มลงไปเต็มแถวล่าง */}
+            <Box sx={{ display: "flex", alignItems: "center", flexWrap: { xs: "wrap", sm: "nowrap" }, gap: 1.5, mb: 2, px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.5 }, bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, boxShadow: CARD_SHADOW }}>
               <Avatar sx={{ width: 42, height: 42, fontWeight: 800, bgcolor: personColor(userData?.fname || "ผู้ใช้") }}>{personInitial(userData?.fname || "ผู้ใช้")}</Avatar>
               <Box sx={{ minWidth: 0, flex: 1 }}>
                 <Typography noWrap sx={{ fontSize: "0.76rem", color: MUTED }}>{getGreeting()} · {formatThai(moment().locale("th"), "D MMMM YYYY")}</Typography>
-                <Typography noWrap sx={{ fontWeight: 900, fontSize: { xs: "1.1rem", sm: "1.25rem" }, color: INK, lineHeight: 1.3 }}>{userData?.fname || "ผู้ใช้งาน"}</Typography>
+                <Stack direction="row" alignItems="center" spacing={0.75} sx={{ minWidth: 0 }}>
+                  <Typography noWrap sx={{ fontWeight: 900, fontSize: { xs: "1.1rem", sm: "1.25rem" }, color: INK, lineHeight: 1.3, minWidth: 0 }}>{userData?.fname || "ผู้ใช้งาน"}</Typography>
+                  <Typography noWrap sx={{ fontSize: "0.7rem", fontWeight: 700, color: INK_2, px: 1, py: 0.25, borderRadius: 999, bgcolor: SURFACE, border: `1px solid ${LINE}`, flexShrink: 1, minWidth: 0 }}>{rankLabel(role)}</Typography>
+                </Stack>
               </Box>
-              <Typography noWrap sx={{ fontSize: "0.76rem", fontWeight: 700, color: INK_2, px: 1.25, py: 0.5, borderRadius: 999, bgcolor: SURFACE, border: `1px solid ${LINE}`, maxWidth: "45%" }}>{rankLabel(role)}</Typography>
+              {showMyJobsHero && (
+                <ButtonBase component={Link} to="/technician/jobs" title={loading ? "" : myJobsSummary}
+                  sx={{
+                    width: { xs: "100%", sm: "auto" }, minWidth: { sm: 260 }, gap: 1.25, px: 1.25, py: 1, borderRadius: 2.5, justifyContent: "flex-start",
+                    bgcolor: "#eff6ff", border: "1.5px solid #bfdbfe", textDecoration: "none", fontFamily: "inherit",
+                    transition: "border-color .15s, box-shadow .15s", "&:hover": { borderColor: "#2563eb", boxShadow: "0 6px 16px -10px rgba(37,99,235,.6)" },
+                  }}>
+                  <Box sx={{ width: 38, height: 38, borderRadius: "50%", bgcolor: "#2563eb", color: "#fff", display: "grid", placeItems: "center", flexShrink: 0 }}>
+                    <FaUserCheck size={17} />
+                  </Box>
+                  <Box sx={{ flex: 1, minWidth: 0, textAlign: "left" }}>
+                    <Typography sx={{ fontWeight: 900, fontSize: "0.95rem", color: "#1d4ed8", lineHeight: 1.25 }}>งานของฉัน</Typography>
+                    <Typography noWrap sx={{ fontSize: "0.74rem", color: INK_2, lineHeight: 1.4 }}>
+                      {loading ? "กำลังโหลด..." : (
+                        <>
+                          {myActiveJobsCount > 0 ? `ต้องทำ ${myActiveJobsCount}` : "ไม่มีงานค้าง"}
+                          {myOverdueCount > 0 && <Box component="span" sx={{ color: "#dc2626", fontWeight: 800 }}> · ค้าง {myOverdueCount}</Box>}
+                          {myPendingApprovalCount > 0 && ` · รอตรวจ ${myPendingApprovalCount}`}
+                        </>
+                      )}
+                    </Typography>
+                  </Box>
+                  {!loading && myActiveJobsCount + myPendingApprovalCount > 0 && (
+                    <Box sx={{ minWidth: 28, height: 28, px: 0.75, borderRadius: 99, bgcolor: "#2563eb", color: "#fff", display: "grid", placeItems: "center", fontWeight: 900, fontSize: "0.85rem", flexShrink: 0 }}>
+                      {myActiveJobsCount + myPendingApprovalCount}
+                    </Box>
+                  )}
+                  <FaChevronRight size={12} style={{ color: "#2563eb", flexShrink: 0 }} />
+                </ButtonBase>
+              )}
             </Box>
 
             {/* ─── SECTION 1.4: "งานขาย" HERO (เฉพาะเซล) — คู่ขนานกับแบนเนอร์ "งานของฉัน" ของช่าง
@@ -677,38 +712,6 @@ const Dashboard = () => {
               </Link>
             )}
 
-            {/* ─── SECTION 1.5: "งานของฉัน" HERO (เฉพาะช่าง) — ให้เด่นและละเอียดกว่าไอคอนเล็กๆ เดิม
-          วางไว้บนสุด (ก่อนแบนเนอร์ปฏิทินทั่วไป) เพราะเป็นสิ่งที่ช่างต้องใช้งานทุกวันมากที่สุด ─── */}
-            {isTechnician && (
-              <Link
-                to="/technician/jobs"
-                // ✅ (11 ต.ค. 2569 ผู้ใช้: "เมนูงานของฉันให้เด่น ไม่กลมกลืนกับหน้า" → "สีเข้มเกินไป ให้เป็นแบบ outline พอ")
-                //    กรอบน้ำเงิน 1.5px ทั้งใบ + ไอคอน/ตัวเลขสีน้ำเงิน บนพื้นขาว — เด่นกว่าการ์ดอื่น แต่ไม่ทึบ
-                style={{
-                  ...styles.myJobsBanner, textDecoration: "none", background: "#fff",
-                  border: "1.5px solid #bfdbfe", borderLeft: "1.5px solid #bfdbfe",
-                  boxShadow: "0 8px 20px -14px rgba(37,99,235,.55)",
-                }}
-                className="action-hero-btn focus-card"
-              >
-                <div style={{ ...styles.myJobsIconCircle, color: "#2563eb", backgroundColor: "#eff6ff" }}>
-                  <FaUserCheck size={18} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <h3 style={{ ...styles.heroBtnTitle, color: "#1d4ed8" }}>งานของฉัน</h3>
-                  <p style={styles.heroBtnSub}>
-                    {loading ? "กำลังโหลด..." : myJobsSummary}
-                  </p>
-                </div>
-                {!loading && myActiveJobsCount + myPendingApprovalCount > 0 && (
-                  <span style={{ ...styles.myJobsCountBadge, backgroundColor: "#2563eb" }}>
-                    {myActiveJobsCount + myPendingApprovalCount}
-                  </span>
-                )}
-                <FaChevronRight size={12} className="arrow-bounce" style={{ ...styles.focusCardChevron, color: "#2563eb" }} />
-              </Link>
-            )}
-
             {/* ─── SECTION 2: เมนูหลัก — แทนปุ่ม gradient ใหญ่ 2 ใบ (แผนงานทั้งหมด/การดำเนินงาน) และแบนเนอร์ส้ม
           "ติดตามใบเสนอราคา" เดิม (ผู้ใช้ขอ: "เพิ่มเมนูหน้าจอหลักให้ดูง่าย สวยงาม ปรับปุ่มไม่ให้รก มืออาชีพ")
           ปุ่มสีจัดเต็มแถวแย่งสายตากับตัวเลขสถานะงานที่อยู่ถัดลงมา และทางเข้าแต่ละหน้าหน้าตาไม่เหมือนกันเลย
@@ -718,7 +721,7 @@ const Dashboard = () => {
             <HomeMenu
               userData={userData}
               badges={{ quotations: canViewQuotations ? staleQuotations.length : 0 }}
-              hideMyJobs={isTechnician}
+              hideMyJobs={showMyJobsHero}
               hideSalesJobs={isSale}
             />
 
