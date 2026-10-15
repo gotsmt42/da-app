@@ -357,6 +357,16 @@ const EventService = {
     }
   },
 
+  /** ✅ (15 ต.ค. 2569) งานไม่ต้องเข้างาน → ส่งมอบแล้ว { date: "YYYY-MM-DD", note } */
+  /** ✅ (15 ต.ค. 2569) บันทึกงาน → ทำเสร็จแล้ว · { undo: true } = นำกลับมา */
+  async NoteDone(id, body = {}) {
+    const res = await API.put(`/events/${id}/note-done`, body);
+    return res.data.event;
+  },
+  async DeliverJob(id, body) {
+    const res = await API.put(`/events/${id}/deliver`, body);
+    return res.data.event;
+  },
   async UpdateDraftEvent(id, draft) {
     try {
       const response = await API.put(`/events/${id}/draft`, draft);

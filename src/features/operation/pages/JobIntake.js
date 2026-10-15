@@ -8,6 +8,12 @@
  *   • ทุกงานมีแถบขั้นตอนเดียวกัน: รับงาน → ลงตาราง → ช่างทำงาน → ตรวจปิดงาน → เสร็จ
  *     บอกชัดว่าอยู่ขั้นไหน และปุ่มถัดไปคืออะไร (ส่งลงตาราง / ดูงาน)
  *   • "ส่งลงตาราง" = เลือกวัน + หัวหน้าทีม + ผู้รับผิดชอบงาน ในหน้านี้เลย ไม่ต้องไปลากในปฏิทิน
+ *
+ * ✅ (15 ต.ค. 2569 ผู้ใช้) "1. ได้รับแจ้งงานมาเช่น PO หรือใบเสนอราคา 2. ลงงานใหม่ โดยลงว่าจากแผนกอะไร
+ *    3.1 ถ้ามีเข้างาน ส่งลงตาราง ดำเนินงานแบบเดิม 3.2 ถ้าไม่มีเข้างาน เช่นส่งของ ขายของ ไปขั้นส่งใบวางบิล อัปโหลดบิล"
+ *   • ฟอร์มรับงานมี: รับงานจาก (แผนก) · เอกสารต้นทาง + เลขที่ + ไฟล์ · รูปแบบงาน (ต้องเข้างาน / ไม่ต้องเข้างาน)
+ *   • งานไม่ต้องเข้างาน: รับงาน → ส่งมอบ → วางบิล (อัปโหลดใบวางบิล) → เสร็จ · ไม่ขึ้นปฏิทิน/งานช่าง
+ *     แต่ขึ้นหน้าติดตามวางบิลให้ตามรับเงินต่อ
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -23,6 +29,7 @@ import {
   PostAddOutlined, AddRounded, EditOutlined, ChevronRight, Close, EventAvailableOutlined,
   ApartmentOutlined, CalendarMonthOutlined, GroupsOutlined, PersonOutlineOutlined, NotesOutlined, HourglassTopRounded, ReportProblemOutlined,
   BlockRounded, RestoreRounded, AssignmentIndOutlined, PersonOffOutlined,
+  LocalShippingOutlined, ReceiptLongOutlined, TaskAltRounded, UploadFileOutlined, AttachFileRounded, SourceOutlined, Search,
 } from "@mui/icons-material";
 import EventService from "@/shared/services/EventService";
 import CustomerService from "@/shared/services/CustomerService";
@@ -35,7 +42,7 @@ import { useAuth } from "@/features/auth/AuthContext";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { PageHeader, Panel, EmptyState, INK, MUTED, LINE, ACCENT, SURFACE } from "@/shared/ui/PageKit";
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
-import { getAddDraftEvent } from "@/features/calendar/components/EventForms/AddDraftEvent";
+import { getAddDraftEvent, INTAKE_SOURCE_OPTS } from "@/features/calendar/components/EventForms/AddDraftEvent";
 import { isUrgent, openFollowUp } from "@/shared/utils/jobFlow";
 import { MiniSteps } from "@/features/attendance/components/CheckInOutPanel";
 import { nextStepOf } from "@/shared/ui/JobFlow";
@@ -49,10 +56,36 @@ const RED = "#dc2626";
 /** ขั้นตอนของงานที่รับไว้ — ใช้ทั้งแถบขั้นตอนและแท็บ */
 // ✅ (11 ต.ค. 2569) "ช่างทำงาน" → "เข้างาน" (ขั้นนี้เริ่มเมื่อหัวหน้าทีมกดเข้างาน — คำเดียวกับการ์ดงาน)
 const STAGES = ["รับงาน", "ลงตาราง", "เข้างาน", "ตรวจปิดงาน", "เสร็จ"];
+/** ✅ (15 ต.ค. 2569) งานไม่ต้องเข้างาน (ส่งของ/ขายของ) */
+const STAGES_NV = ["รับงาน", "ส่งมอบ", "วางบิล", "เสร็จ"];
 
-/** งานนี้อยู่ขั้นไหน + ข้อความสถานะ */
+const SOURCE_LABEL = Object.fromEntries(INTAKE_SOURCE_OPTS);
+const DOC_LABEL = { po: "PO", quotation: "ใบเสนอราคา", other: "เอกสาร" };
+const invoicedOf = (e) => Boolean((e.invoiceFiles || []).length || e.billing?.invoicedAt);
+/** ✅ (15 ต.ค. 2569) บันทึกงาน (โน๊ต) */
+const STAGES_NOTE = ["บันทึก", "ทำ", "เสร็จ"];
+/** ✅ ค้างขั้นเดิมเกิน 2 วัน (ตรงกับตัวแจ้งเตือนฝั่ง server: checkAndNotifyStalledIntake) — คืนจำนวนวัน หรือ 0 */
+const STALL_DAYS = 2;
+const stalledDays = (e, st) => {
+  const since = st.i === 0 ? e.intakeAt : st.nv && st.i === 2 ? (e.deliveredAt || e.scheduledAt) : null;
+  if (!since) return 0;
+  const d = Math.floor((Date.now() - new Date(since).getTime()) / 86400000);
+  return d >= STALL_DAYS ? d : 0;
+};
+
+/** งานนี้อยู่ขั้นไหน + ข้อความสถานะ (bar = ตำแหน่งในแถบขั้นตอนของงานไม่ต้องเข้างาน) */
 const stageOf = (e) => {
   if (e.cancelledAt) return { i: -1, label: "ยกเลิกแล้ว", color: MUTED };
+  if (e.intakeNote) {
+    return e.noteDoneAt
+      ? { i: 4, label: "ทำแล้ว", color: GREEN, note: true, bar: STAGES_NOTE.length }
+      : { i: 0, label: "รอทำ", color: AMBER, note: true, bar: 1 };
+  }
+  if (e.noVisit) {
+    if (e.unscheduled) return { i: 0, label: "รอส่งมอบ", color: AMBER, nv: true, bar: 0 };
+    if (invoicedOf(e)) return { i: 4, label: "วางบิลแล้ว", color: GREEN, nv: true, bar: STAGES_NV.length };
+    return { i: 2, label: "รอวางบิล", color: AMBER, nv: true, bar: 2 };
+  }
   if (e.unscheduled) return { i: 0, label: "รอส่งลงตาราง", color: AMBER };
   if (e.status === "ดำเนินการเสร็จสิ้น") return { i: 4, label: "เสร็จสิ้น", color: GREEN };
   if (e.closeRequested) return { i: 3, label: "รอตรวจปิดงาน", color: ACCENT };
@@ -62,7 +95,7 @@ const stageOf = (e) => {
 };
 
 const TABS = [
-  { key: "waiting", label: "รอส่งลงตาราง", short: "รอลงตาราง", test: (s) => s.i === 0 },
+  { key: "waiting", label: "รอดำเนินการ", short: "รอเริ่ม", test: (s) => s.i === 0 },
   { key: "active", label: "กำลังดำเนินการ", short: "กำลังทำ", test: (s) => s.i >= 1 && s.i <= 3 },
   { key: "done", label: "เสร็จแล้ว", short: "เสร็จแล้ว", test: (s) => s.i === 4 },
   // ✅ แท็บ "ยกเลิก" โชว์เฉพาะตอนมีงานที่ยกเลิก (ไม่กินที่บนมือถือโดยไม่จำเป็น)
@@ -78,7 +111,7 @@ const PRIMARY = { ...BTN, bgcolor: ACCENT, color: "#fff", "&:hover": { bgcolor: 
 function StageBar({ stage }) {
   return (
     <Box sx={{ mt: 1.25 }}>
-      <MiniSteps labels={STAGES} current={stage.i === 4 ? STAGES.length : stage.i} />
+      <MiniSteps labels={stage.note ? STAGES_NOTE : stage.nv ? STAGES_NV : STAGES} current={stage.note || stage.nv ? stage.bar : stage.i === 4 ? STAGES.length : stage.i} />
     </Box>
   );
 }
@@ -207,6 +240,84 @@ function ScheduleDialog({ job, employees, canAssignResponsible, onClose, onDone 
   );
 }
 
+/**
+ * ✅ (15 ต.ค. 2569) ส่งมอบงานที่ไม่ต้องเข้างาน (ส่งของ/ขายของ) — วันที่ส่งมอบ + แนบใบวางบิลได้เลย (ไม่บังคับ)
+ *    แนบใบวางบิลแล้ว = งานเสร็จในหน้านี้ · ยังไม่แนบ = ค้างที่แท็บ "กำลังดำเนินการ" ขั้น "รอวางบิล"
+ */
+function DeliverDialog({ job, onClose, onDone }) {
+  const [date, setDate] = useState(moment().format("YYYY-MM-DD"));
+  const [files, setFiles] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const save = async () => {
+    if (!date) return;
+    setSaving(true);
+    try {
+      await EventService.DeliverJob(job._id, { date });
+      let failed = 0;
+      for (const f of files) {
+        try { await EventService.Upload(job._id, f, "invoice"); } catch { failed += 1; }
+      }
+      onDone();
+      Swal.fire(failed
+        ? { icon: "warning", title: "บันทึกส่งมอบแล้ว", text: `แต่แนบใบวางบิลไม่สำเร็จ ${failed} ไฟล์ — กด “อัปโหลดใบวางบิล” ที่การ์ดงานอีกครั้ง` }
+        : { icon: "success", title: files.length ? "ส่งมอบ + วางบิลแล้ว" : "บันทึกส่งมอบแล้ว", text: files.length ? "ตามรับเงินต่อได้ที่หน้าติดตามวางบิล" : "ขั้นถัดไป: อัปโหลดใบวางบิล", timer: 1800, showConfirmButton: false });
+    } catch (err) {
+      Swal.fire({ icon: "error", title: "บันทึกไม่สำเร็จ", text: err?.response?.data?.message || "กรุณาลองใหม่" });
+      setSaving(false);
+    }
+  };
+  return (
+    <Dialog open onClose={onClose} fullWidth maxWidth="xs" PaperProps={{ sx: { borderRadius: 3 } }}>
+      <Stack direction="row" alignItems="center" gap={1.25} sx={{ px: 2.5, pt: 2, pb: 1.5, borderBottom: `1px solid ${LINE}` }}>
+        <Box sx={{ width: 36, height: 36, borderRadius: 2, display: "grid", placeItems: "center", bgcolor: alpha(ACCENT, 0.1), color: ACCENT }}>
+          <LocalShippingOutlined sx={{ fontSize: 20 }} />
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography sx={{ fontWeight: 900, fontSize: "1rem", color: INK }}>ส่งมอบแล้ว</Typography>
+          <Typography noWrap sx={{ fontSize: "0.76rem", color: MUTED }}>{[job.title, job.site || job.company, job.jobNo].filter(Boolean).join(" · ")}</Typography>
+        </Box>
+        <IconButton size="small" onClick={onClose}><Close fontSize="small" /></IconButton>
+      </Stack>
+      <DialogContent sx={{ px: 2.5, pt: "20px !important", pb: 2 }}>
+        <Section n={1} title="วันที่ส่งมอบ / ส่งของ">
+          <ThaiDatePicker label="วันที่ส่งมอบ" value={date} onChange={(v) => setDate(v || "")} />
+        </Section>
+        <Section n={2} title="ใบวางบิล" hint="ไม่บังคับ — ยังไม่มีบิล กดบันทึกไปก่อน แล้วอัปโหลดทีหลังที่การ์ดงาน" last>
+          <Button component="label" variant="outlined" startIcon={<UploadFileOutlined />} sx={{ ...BTN, color: "#334155", borderColor: LINE }}>
+            {files.length ? `เลือกแล้ว ${files.length} ไฟล์` : "เลือกไฟล์ใบวางบิล"}
+            <input hidden type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={(e) => setFiles([...(e.target.files || [])])} />
+          </Button>
+          {files.length > 0 && (
+            <Typography sx={{ fontSize: "0.74rem", color: MUTED, mt: 0.75, overflowWrap: "anywhere" }}>{files.map((f) => f.name).join(", ")}</Typography>
+          )}
+        </Section>
+        <Typography sx={{ fontSize: "0.74rem", color: MUTED, mt: 2, px: 1.25, py: 1, borderRadius: 2, bgcolor: SURFACE }}>
+          งานไม่ต้องเข้างานจะไม่ขึ้นในตารางงานช่าง · ตามรับเงินต่อได้ที่หน้าติดตามวางบิล
+        </Typography>
+      </DialogContent>
+      <DialogActions sx={{ px: 2.5, py: 1.5, borderTop: `1px solid ${LINE}`, gap: 1 }}>
+        <Button onClick={onClose} sx={{ ...BTN, color: MUTED }}>ยกเลิก</Button>
+        <Button variant="contained" disabled={!date || saving} onClick={save} sx={{ ...PRIMARY, px: 2.5 }}>
+          {saving ? "กำลังบันทึก..." : "บันทึกส่งมอบ"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+/** ลิงก์ไฟล์เล็กๆ (เอกสารรับงาน / ใบวางบิล) — กดเปิดในแท็บใหม่ */
+const FileLinks = ({ files }) => (
+  <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5, mt: 0.25, pl: 2.6 }}>
+    {files.map((f) => (
+      <Box key={f._id || f.fileUrl} component="a" href={f.fileUrl} target="_blank" rel="noreferrer"
+        sx={{ display: "inline-flex", alignItems: "center", gap: 0.4, maxWidth: 220, px: 0.9, height: 24, borderRadius: 99, border: `1px solid ${LINE}`, bgcolor: "#fff", color: "#334155", fontSize: "0.72rem", fontWeight: 700, textDecoration: "none", "&:hover": { borderColor: ACCENT, color: ACCENT } }}>
+        <AttachFileRounded sx={{ fontSize: 13 }} />
+        <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.fileName || "ไฟล์"}</Box>
+      </Box>
+    ))}
+  </Stack>
+);
+
 /** บรรทัดข้อมูล: ไอคอน + ข้อความ (ตัดบรรทัดได้ ไม่ล้น) */
 const Line = ({ icon: Icon, children, color = "#475569", strong }) => (
   <Stack direction="row" spacing={0.75} alignItems="flex-start" sx={{ minWidth: 0 }}>
@@ -215,11 +326,17 @@ const Line = ({ icon: Icon, children, color = "#475569", strong }) => (
   </Stack>
 );
 
-function JobCard({ job, onSchedule, onEdit, onCancel, onRestore }) {
+function JobCard({ job, onSchedule, onDeliver, onUploadInvoice, onNoteDone, onEdit, onCancel, onRestore }) {
   const st = stageOf(job);
+  const stall = stalledDays(job, st);
+  const intakeDocs = (job.sitePhotoFiles || []).filter((f) => f.source === "intake");
+  const invoiceFiles = job.invoiceFiles || [];
+  const [uploading, setUploading] = useState(false);
   const fu = openFollowUp(job);
   const team = [job.team, ...(job.teamMembers || []).map((m) => m?.name)].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).join(", ");
-  const when = job.unscheduled
+  const when = job.noVisit && !job.unscheduled
+    ? `ส่งมอบ ${formatThai(moment(job.deliveredAt || job.start), "D MMM YYYY")}`
+    : job.unscheduled
     ? (job.plannedMonth ? `ตั้งใจเข้างาน ${formatThai(moment(job.plannedMonth, "YYYY-MM"), "MMMM YYYY")}` : "ยังไม่กำหนดเดือน")
     : `เข้างาน ${formatThai(moment(job.start), "D MMM YYYY")}${job.startTime ? ` ${job.startTime}` : ""}`;
   const due = job.dueDate ? formatThai(moment(job.dueDate), "D MMM YYYY") : "";
@@ -228,6 +345,46 @@ function JobCard({ job, onSchedule, onEdit, onCancel, onRestore }) {
   const actions = st.i === -1 ? (
     <Button variant="outlined" onClick={() => onRestore(job)} startIcon={<RestoreRounded sx={{ fontSize: "17px !important" }} />}
       sx={{ ...GHOST, flex: { xs: 1, sm: "0 0 auto" } }}>นำกลับมา</Button>
+  ) : st.note ? (
+    st.i === 0 ? (
+      <>
+        <Button variant="outlined" onClick={() => onEdit(job)} startIcon={<EditOutlined sx={{ fontSize: "16px !important" }} />}
+          sx={{ ...GHOST, flex: { xs: 1, sm: "0 0 auto" } }}>แก้ไข</Button>
+        <Button variant="outlined" onClick={() => onCancel(job)} startIcon={<BlockRounded sx={{ fontSize: "16px !important" }} />}
+          sx={{ ...BTN, flex: { xs: 1, sm: "0 0 auto" }, color: RED, borderColor: alpha(RED, 0.35), "&:hover": { borderColor: RED, bgcolor: alpha(RED, 0.04) } }}>ยกเลิก</Button>
+        <Button variant="contained" onClick={() => onNoteDone(job)} startIcon={<TaskAltRounded sx={{ fontSize: "17px !important" }} />}
+          sx={{ ...PRIMARY, flex: { xs: 1.6, sm: "0 0 auto" } }}>ทำเสร็จแล้ว</Button>
+      </>
+    ) : (
+      <Button variant="outlined" onClick={() => onNoteDone(job, true)} startIcon={<RestoreRounded sx={{ fontSize: "17px !important" }} />}
+        sx={{ ...GHOST, flex: { xs: 1, sm: "0 0 auto" } }}>นำกลับมาทำต่อ</Button>
+    )
+  ) : st.nv && st.i === 0 ? (
+    <>
+      <Button variant="outlined" onClick={() => onEdit(job)} startIcon={<EditOutlined sx={{ fontSize: "16px !important" }} />}
+        sx={{ ...GHOST, flex: { xs: 1, sm: "0 0 auto" } }}>แก้ไข</Button>
+      <Button variant="outlined" onClick={() => onCancel(job)} startIcon={<BlockRounded sx={{ fontSize: "16px !important" }} />}
+        sx={{ ...BTN, flex: { xs: 1, sm: "0 0 auto" }, color: RED, borderColor: alpha(RED, 0.35), "&:hover": { borderColor: RED, bgcolor: alpha(RED, 0.04) } }}>ยกเลิก</Button>
+      <Button variant="contained" onClick={() => onDeliver(job)} startIcon={<LocalShippingOutlined sx={{ fontSize: "17px !important" }} />}
+        sx={{ ...PRIMARY, flex: { xs: 1.6, sm: "0 0 auto" } }}>ส่งมอบแล้ว</Button>
+    </>
+  ) : st.nv ? (
+    <>
+      <Button component={Link} to="/finance?tab=billing" variant="outlined" startIcon={<ReceiptLongOutlined sx={{ fontSize: "16px !important" }} />}
+        sx={{ ...GHOST, flex: { xs: 1, sm: "0 0 auto" } }}>ติดตามวางบิล</Button>
+      <Button component="label" variant={st.i === 2 ? "contained" : "outlined"} disabled={uploading} startIcon={<UploadFileOutlined sx={{ fontSize: "17px !important" }} />}
+        sx={st.i === 2 ? { ...PRIMARY, flex: { xs: 1.6, sm: "0 0 auto" } } : { ...GHOST, flex: { xs: 1, sm: "0 0 auto" } }}>
+        {uploading ? "กำลังอัปโหลด..." : st.i === 2 ? "อัปโหลดใบวางบิล" : "แนบบิลเพิ่ม"}
+        <input hidden type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={async (e) => {
+          const picked = [...(e.target.files || [])];
+          e.target.value = "";
+          if (!picked.length) return;
+          setUploading(true);
+          await onUploadInvoice(job, picked);
+          setUploading(false);
+        }} />
+      </Button>
+    </>
   ) : st.i === 0 ? (
     <>
       <Button variant="outlined" onClick={() => onEdit(job)} startIcon={<EditOutlined sx={{ fontSize: "16px !important" }} />}
@@ -253,26 +410,56 @@ function JobCard({ job, onSchedule, onEdit, onCancel, onRestore }) {
             {isUrgent(job) && st.i < 4 && (
               <Box component="span" sx={{ px: 0.8, height: 22, display: "inline-flex", alignItems: "center", borderRadius: 99, fontSize: "0.7rem", fontWeight: 800, color: "#fff", bgcolor: RED }}>⚡ ด่วน</Box>
             )}
+            {stall > 0 && (
+              <Box component="span" sx={{ px: 0.8, height: 22, display: "inline-flex", alignItems: "center", borderRadius: 99, fontSize: "0.7rem", fontWeight: 800, color: RED, bgcolor: alpha(RED, 0.08) }}>⏰ ค้าง {stall} วัน</Box>
+            )}
+            {job.intakeNote && (
+              <Box component="span" sx={{ px: 0.8, height: 22, display: "inline-flex", alignItems: "center", gap: 0.4, borderRadius: 99, fontSize: "0.7rem", fontWeight: 800, color: "#334155", bgcolor: SURFACE, border: `1px solid ${LINE}` }}>
+                <NotesOutlined sx={{ fontSize: 13 }} /> บันทึกงาน
+              </Box>
+            )}
+            {job.noVisit && (
+              <Box component="span" sx={{ px: 0.8, height: 22, display: "inline-flex", alignItems: "center", gap: 0.4, borderRadius: 99, fontSize: "0.7rem", fontWeight: 800, color: "#334155", bgcolor: SURFACE, border: `1px solid ${LINE}` }}>
+                <LocalShippingOutlined sx={{ fontSize: 13 }} /> ไม่ต้องเข้างาน
+              </Box>
+            )}
             {job.infoPending && st.i < 4 && (
               <Box component="span" sx={{ px: 0.8, height: 22, display: "inline-flex", alignItems: "center", borderRadius: 99, fontSize: "0.7rem", fontWeight: 800, color: AMBER, bgcolor: alpha(AMBER, 0.12) }}>รอข้อมูล</Box>
             )}
           </Stack>
           {/* ชื่องาน · โครงการ — ตัดบรรทัดได้ ไม่ตัดทิ้ง */}
-          <Typography sx={{ fontWeight: 800, fontSize: "1rem", color: INK, lineHeight: 1.35, overflowWrap: "anywhere" }}>
-            {job.title || "งาน"}{job.system ? ` · ${job.system}` : ""}
+          <Typography sx={{ fontWeight: 800, fontSize: "1rem", color: INK, lineHeight: 1.35, overflowWrap: "anywhere", whiteSpace: job.intakeNote ? "pre-line" : undefined }}>
+            {job.intakeNote ? (job.description || "บันทึกงาน") : <>{job.title || "งาน"}{job.system ? ` · ${job.system}` : ""}</>}
           </Typography>
           <Stack spacing={0.35} sx={{ mt: 0.6 }}>
-            <Line icon={ApartmentOutlined} strong>{[job.site, job.company && job.company !== job.site ? job.company : ""].filter(Boolean).join(" · ") || "-"}</Line>
-            <Line icon={CalendarMonthOutlined}>{when}{due ? ` · ต้องเสร็จภายใน ${due}` : ""}</Line>
-            {!job.unscheduled && <Line icon={GroupsOutlined}>{team ? `ทีม ${team}` : "ยังไม่มอบหมายทีม"}</Line>}
-            <Line icon={AssignmentIndOutlined}>{job.responsiblePerson ? `ผู้รับผิดชอบ ${job.responsiblePerson}` : "ยังไม่มอบหมายผู้รับผิดชอบ"}</Line>
+            {!(job.intakeNote && (!job.site || job.site === "-")) && <Line icon={ApartmentOutlined} strong>{[job.site, job.company && job.company !== job.site ? job.company : ""].filter(Boolean).join(" · ") || "-"}</Line>}
+            {(job.intakeSource || job.intakeDocType || job.intakeDocNo) && (
+              <Line icon={SourceOutlined}>
+                {[job.intakeSource ? `รับงานจาก${SOURCE_LABEL[job.intakeSource] || job.intakeSource}` : "",
+                  job.intakeDocType || job.intakeDocNo ? `${DOC_LABEL[job.intakeDocType] || "เอกสาร"}${job.intakeDocNo ? ` ${job.intakeDocNo}` : ""}` : ""].filter(Boolean).join(" · ")}
+              </Line>
+            )}
+            {intakeDocs.length > 0 && <FileLinks files={intakeDocs} />}
+            {job.intakeNote
+              ? <Line icon={CalendarMonthOutlined}>{job.noteDoneAt ? `ทำเสร็จ ${formatThai(moment(job.noteDoneAt), "D MMM YYYY HH:mm")}${job.noteDoneBy ? ` · ${job.noteDoneBy}` : ""}` : `บันทึกเมื่อ ${formatThai(moment(job.intakeAt), "D MMM YYYY")}`}{due ? ` · ต้องเสร็จภายใน ${due}` : ""}</Line>
+              : <Line icon={CalendarMonthOutlined}>{when}{due ? ` · ต้องเสร็จภายใน ${due}` : ""}</Line>}
+            {job.noVisit && invoiceFiles.length > 0 && (
+              <>
+                <Line icon={ReceiptLongOutlined} color={GREEN} strong>ใบวางบิล {invoiceFiles.length} ไฟล์</Line>
+                <FileLinks files={invoiceFiles} />
+              </>
+            )}
+            {!job.unscheduled && !job.noVisit && <Line icon={GroupsOutlined}>{team ? `ทีม ${team}` : "ยังไม่มอบหมายทีม"}</Line>}
+            {(job.responsiblePerson || (!job.noVisit && !job.intakeNote && !job.unscheduled)) && (
+              <Line icon={AssignmentIndOutlined}>{job.responsiblePerson ? `ผู้รับผิดชอบ ${job.responsiblePerson}` : "ยังไม่มอบหมายผู้รับผิดชอบ"}</Line>
+            )}
             {(job.contactName || job.contactTel) && (
               <Line icon={PersonOutlineOutlined}>
                 {job.contactName || "ผู้ติดต่อ"}
                 {job.contactTel && <> · <Box component="a" href={`tel:${job.contactTel}`} sx={{ color: ACCENT, fontWeight: 700, textDecoration: "none" }}>{job.contactTel}</Box></>}
               </Line>
             )}
-            {job.description && <Line icon={NotesOutlined}>{job.description}</Line>}
+            {job.description && !job.intakeNote && <Line icon={NotesOutlined}>{job.description}</Line>}
             {job.infoPending && job.infoPendingNote && <Line icon={HourglassTopRounded} color={AMBER}>ขาด: {job.infoPendingNote}</Line>}
             {fu && st.i === 2 && <Line icon={ReportProblemOutlined} color={AMBER} strong>{fu.reason}{fu.note ? ` — ${fu.note}` : ""} · ผู้รับผิดชอบต่อ: {fu.nextOwner}</Line>}
             {st.i === -1 && (
@@ -284,7 +471,12 @@ function JobCard({ job, onSchedule, onEdit, onCancel, onRestore }) {
           {st.i >= 0 && <StageBar stage={st} />}
           {/* ✅ บอกชัดว่าต่อไปต้องทำอะไร (ตัวเดียวกับกล่อง "ขั้นตอนถัดไป" ในหน้าการดำเนินงาน) */}
           {(() => {
-            const nx = job.cancelledAt ? null : job.unscheduled
+            const nx = job.cancelledAt ? null : st.note
+              ? (st.i === 0 ? { title: "ทำงานนี้", desc: "เสร็จแล้วกด “ทำเสร็จแล้ว”" } : null)
+              : st.nv
+              ? (st.i === 0 ? { title: "ส่งมอบ", desc: "ส่งของ/ส่งมอบให้ลูกค้าแล้ว กด “ส่งมอบแล้ว” (แนบใบวางบิลได้เลย)" }
+                : st.i === 2 ? { title: "วางบิล", desc: "กด “อัปโหลดใบวางบิล” แนบไฟล์บิล แล้วตามรับเงินที่หน้าติดตามวางบิล" } : null)
+              : job.unscheduled
               ? { title: "ส่งลงตาราง", desc: "กด “ส่งลงตาราง” เลือกวันเข้างาน ผู้รับผิดชอบงาน และหัวหน้าทีม" }
               : st.i >= 0 && st.i < 4 ? nextStepOf(job, "admin") : null;
             return nx ? (
@@ -310,6 +502,8 @@ export default function JobIntake() {
   const [employees, setEmployees] = useState([]);
   const [tab, setTab] = useState("waiting");
   const [scheduling, setScheduling] = useState(null);
+  const [delivering, setDelivering] = useState(null);
+  const [q, setQ] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -370,6 +564,28 @@ export default function JobIntake() {
       Swal.fire({ icon: "error", title: "ยกเลิกไม่สำเร็จ", text: err?.response?.data?.message || "กรุณาลองใหม่" });
     }
   };
+  // ✅ (15 ต.ค. 2569) บันทึกงาน → ทำเสร็จแล้ว / นำกลับมาทำต่อ
+  const noteDone = async (job, undo = false) => {
+    try {
+      await EventService.NoteDone(job._id, undo ? { undo: true } : {});
+      await load(); refreshAppBadges();
+      if (undo) setTab("waiting");
+      Swal.fire({ icon: "success", title: undo ? "นำกลับมาทำต่อแล้ว" : "ทำเสร็จแล้ว", timer: 1200, showConfirmButton: false });
+    } catch (err) {
+      Swal.fire({ icon: "error", title: "ไม่สำเร็จ", text: err?.response?.data?.message || "กรุณาลองใหม่" });
+    }
+  };
+  // ✅ (15 ต.ค. 2569) อัปโหลดใบวางบิลของงานไม่ต้องเข้างาน
+  const uploadInvoice = async (job, files) => {
+    let failed = 0;
+    for (const f of files) {
+      try { await EventService.Upload(job._id, f, "invoice"); } catch { failed += 1; }
+    }
+    await load(); refreshAppBadges();
+    Swal.fire(failed
+      ? { icon: "warning", title: "อัปโหลดไม่ครบ", text: `ไม่สำเร็จ ${failed} จาก ${files.length} ไฟล์ — ลองใหม่อีกครั้ง` }
+      : { icon: "success", title: "แนบใบวางบิลแล้ว", text: "ตามรับเงินต่อได้ที่หน้าติดตามวางบิล", timer: 1600, showConfirmButton: false });
+  };
   const restoreJob = async (job) => {
     try {
       await EventService.CancelIntake(job._id, { restore: true });
@@ -384,7 +600,11 @@ export default function JobIntake() {
   const counts = useMemo(() => Object.fromEntries(TABS.map((t) => [t.key, withStage.filter((x) => t.test(x.s)).length])), [withStage]);
   const list = useMemo(() => {
     const t = TABS.find((x) => x.key === tab) || TABS[0];
-    return withStage.filter((x) => t.test(x.s)).map((x) => x.j)
+    // ✅ ค้นหา: ชื่องาน · โครงการ · บริษัท · เลข Job · เลขเอกสาร · ผู้รับผิดชอบ
+    const kw = q.trim().toLowerCase();
+    const hit = (j) => !kw || [j.title, j.system, j.site, j.company, j.jobNo, j.intakeDocNo, j.responsiblePerson, j.description]
+      .some((v) => String(v || "").toLowerCase().includes(kw));
+    return withStage.filter((x) => t.test(x.s) && hit(x.j)).map((x) => x.j)
       // ✅ (11 ต.ค. 2569 ผู้ใช้: "งานใหม่ที่ลงตารางควรมาที่บนสุดด้วย") — ล่าสุดขึ้นก่อนทุกแท็บ
       //    กำลังทำ = เรียงตามเวลาส่งลงตาราง (scheduledAt) · รอลงตาราง = งานด่วนก่อน แล้วรับเข้าล่าสุด · เสร็จแล้ว = ปิดล่าสุด
       .sort((a, b) => (tab === "done"
@@ -392,12 +612,12 @@ export default function JobIntake() {
         : tab === "active"
           ? new Date(b.scheduledAt || b.createdAt || b.intakeAt || 0) - new Date(a.scheduledAt || a.createdAt || a.intakeAt || 0)
           : (isUrgent(b) - isUrgent(a)) || new Date(b.intakeAt || 0) - new Date(a.intakeAt || 0)));
-  }, [withStage, tab]);
+  }, [withStage, tab, q]);
 
   return (
     <Box sx={{ px: { xs: 1.5, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: 1000, mx: "auto" }}>
       <PageHeader icon={<PostAddOutlined />} title="งานใหม่"
-        subtitle="กรอกไว้ก่อน แล้วส่งลงตาราง"
+        subtitle="รับงาน → ส่งลงตาราง หรือ ส่งมอบ + วางบิล"
         actions={<Button variant="contained" startIcon={<AddRounded />} onClick={() => openForm()} disabled={!jobs} sx={{ ...PRIMARY, height: 40, px: { xs: 1.25, sm: 2 } }}>รับงานใหม่</Button>} />
 
       {/* แท็บตามขั้นตอน */}
@@ -419,15 +639,29 @@ export default function JobIntake() {
         })}
       </Stack>
 
+      {(jobs || []).length > 5 && (
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, height: 40, px: 1.5, mb: 1.5, borderRadius: 2.5, border: `1px solid ${LINE}`, bgcolor: "#fff" }}>
+          <Search sx={{ fontSize: 18, color: "#94a3b8" }} />
+          <Box component="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหา ชื่องาน / โครงการ / เลข Job / เลขเอกสาร"
+            sx={{ flex: 1, minWidth: 0, border: 0, outline: 0, fontSize: "0.86rem", fontFamily: "inherit", bgcolor: "transparent", color: INK }} />
+          {q && <IconButton size="small" onClick={() => setQ("")}><Close sx={{ fontSize: 16 }} /></IconButton>}
+        </Box>
+      )}
+
       {!jobs ? (
         <Stack spacing={1}>{[0, 1, 2].map((i) => <Skeleton key={i} variant="rounded" height={88} sx={{ borderRadius: 3 }} />)}</Stack>
       ) : list.length ? (
-        <Panel>{list.map((j) => <JobCard key={j._id} job={j} onSchedule={setScheduling} onEdit={openForm} onCancel={cancelJob} onRestore={restoreJob} />)}</Panel>
+        <Panel>{list.map((j) => <JobCard key={j._id} job={j} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone} onEdit={openForm} onCancel={cancelJob} onRestore={restoreJob} />)}</Panel>
       ) : (
         <EmptyState icon={<PostAddOutlined />}
-          title={tab === "waiting" ? "ไม่มีงานรอส่งลงตาราง" : tab === "active" ? "ไม่มีงานที่กำลังดำเนินการ" : tab === "cancelled" ? "ไม่มีงานที่ยกเลิก" : "ยังไม่มีงานที่เสร็จ"}
+          title={q ? "ไม่พบงานที่ค้นหา" : tab === "waiting" ? "ไม่มีงานรอดำเนินการ" : tab === "active" ? "ไม่มีงานที่กำลังดำเนินการ" : tab === "cancelled" ? "ไม่มีงานที่ยกเลิก" : "ยังไม่มีงานที่เสร็จ"}
           hint={tab === "waiting" ? "ได้งานมาแล้ว กด “รับงานใหม่” เพื่อกรอกเก็บไว้ก่อน" : undefined}
           action={tab === "waiting" ? <Button variant="contained" startIcon={<AddRounded />} onClick={() => openForm()} sx={{ ...PRIMARY, mt: 1 }}>รับงานใหม่</Button> : null} />
+      )}
+
+      {delivering && (
+        <DeliverDialog job={delivering} onClose={() => setDelivering(null)}
+          onDone={async () => { setDelivering(null); await load(); refreshAppBadges(); }} />
       )}
 
       {scheduling && (
