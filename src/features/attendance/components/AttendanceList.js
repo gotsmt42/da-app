@@ -15,7 +15,7 @@ import { Link } from "react-router-dom";
 import Swal from "sweetalert2";
 import { Box, Stack, Typography, Button, ButtonBase, Avatar, Collapse } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { ExpandMore, EditCalendarOutlined, ChevronRight, DescriptionOutlined, PlaceRounded, LocationOffRounded, OpenInNewRounded, PhotoCameraOutlined, EventBusyOutlined } from "@mui/icons-material";
+import { ExpandMore, EditCalendarOutlined, ChevronRight, DescriptionOutlined, PlaceRounded, LocationOffRounded, OpenInNewRounded, EventBusyOutlined } from "@mui/icons-material";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import AttendanceService from "@/shared/services/AttendanceService";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT } from "@/shared/ui/PageKit";
@@ -69,50 +69,44 @@ const Files = ({ photos, onPreview }) => (photos?.length ? (
  * + คำอธิบายว่าหมายความว่าอะไร + แผนที่เห็นหมุดจริง + ปุ่มเปิดใน Google Maps
  */
 const LocationCard = ({ stamp }) => {
+  // 🔁 (15 ต.ค. 2569 ผู้ใช้: "ยังดูรกๆ ตาลาย") — บรรทัดเดียว: ไอคอนสี + สรุปภาษาคน · แผนที่ซ่อนไว้ กด "ดูแผนที่" ค่อยโชว์
+  const [mapOpen, setMapOpen] = useState(false);
   if (!stamp) return null;
   const ok = stamp.gps === "ok" && Number.isFinite(stamp.lat) && Number.isFinite(stamp.lng);
-  const acc = stamp.accuracy != null ? `ความแม่นยำ ±${stamp.accuracy} ม.` : "";
-  let tone; let title; let sub;
-  if (stamp.gps === "denied") {
-    tone = TONE.warn; title = "ไม่มีตำแหน่ง — ไม่ได้อนุญาตให้ใช้ GPS"; sub = "ผู้บันทึกปฏิเสธสิทธิ์ตำแหน่งในเบราว์เซอร์ จึงยืนยันไม่ได้ว่าอยู่ที่หน้างาน";
-  } else if (!ok) {
-    tone = TONE.warn; title = "ไม่มีตำแหน่ง — หา GPS ไม่เจอ"; sub = "เครื่องหาตำแหน่งไม่ได้ตอนบันทึก (อยู่ในอาคาร/ปิด GPS)";
-  } else if (stamp.distanceM == null) {
-    tone = ACCENT; title = "บันทึกตำแหน่งแล้ว"; sub = [acc, "ยังเทียบระยะกับหน้างานไม่ได้ — โครงการนี้ยังไม่มีลิงก์แผนที่ในทะเบียนลูกค้า"].filter(Boolean).join(" · ");
-  } else if (stamp.distanceM <= ON_SITE_M) {
-    tone = TONE.ok; title = `อยู่ที่หน้างาน · ห่าง ${fmtDistance(stamp.distanceM)}`; sub = [acc, `อยู่ในระยะ ${ON_SITE_M} ม. จากพิกัดโครงการ`].filter(Boolean).join(" · ");
-  } else {
-    tone = TONE.warn; title = `อยู่นอกหน้างาน · ห่าง ${fmtDistance(stamp.distanceM)}`; sub = [acc, `เกินระยะ ${ON_SITE_M} ม. จากพิกัดโครงการ — ควรสอบถามผู้บันทึก`].filter(Boolean).join(" · ");
-  }
-  const href = ok ? `https://www.google.com/maps/search/?api=1&query=${stamp.lat},${stamp.lng}` : null;
+  const acc = stamp.accuracy != null ? ` · แม่นยำ ±${stamp.accuracy} ม.` : "";
+  let tone; let text; let hint = "";
+  if (stamp.gps === "denied") { tone = TONE.warn; text = "ไม่มีตำแหน่ง (ไม่ได้อนุญาต GPS)"; }
+  else if (!ok) { tone = TONE.warn; text = "ไม่มีตำแหน่ง (หา GPS ไม่เจอ)"; }
+  else if (stamp.distanceM == null) { tone = INK_2; text = `บันทึกตำแหน่งแล้ว${acc}`; hint = "เทียบระยะกับหน้างานไม่ได้ — โครงการยังไม่มีลิงก์แผนที่ในทะเบียนลูกค้า"; }
+  else if (stamp.distanceM <= ON_SITE_M) { tone = TONE.ok; text = `อยู่ที่หน้างาน · ห่าง ${fmtDistance(stamp.distanceM)}${acc}`; }
+  else { tone = TONE.warn; text = `อยู่นอกหน้างาน · ห่าง ${fmtDistance(stamp.distanceM)}${acc}`; }
   const Icon = ok ? PlaceRounded : LocationOffRounded;
   return (
-    <Box sx={{ py: 1.1, borderTop: `1px solid ${LINE}` }}>
-      <Typography sx={{ fontSize: "0.78rem", color: MUTED, fontWeight: 500, mb: 0.75 }}>ตำแหน่งตอนบันทึกเข้างาน</Typography>
-      <Box sx={{ borderRadius: "12px", border: `1px solid ${alpha(tone, 0.35)}`, bgcolor: alpha(tone, 0.05), overflow: "hidden" }}>
-        <Stack direction="row" gap={1.1} alignItems="flex-start" sx={{ p: 1.1 }}>
-          <Box sx={{ width: 34, height: 34, borderRadius: "50%", flexShrink: 0, display: "grid", placeItems: "center", bgcolor: alpha(tone, 0.14), color: tone }}>
-            <Icon sx={{ fontSize: 20 }} />
-          </Box>
-          <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography sx={{ fontSize: "0.9rem", fontWeight: 700, color: INK, lineHeight: 1.35 }}>{title}</Typography>
-            <Typography sx={{ fontSize: "0.76rem", color: INK_2, lineHeight: 1.5, mt: 0.15 }}>{sub}</Typography>
-          </Box>
-        </Stack>
-        {ok && (
-          <>
-            {/* แผนที่ย่อเห็นหมุดจริง (ไม่ต้องใช้ API key) — โหลดเมื่อกางรายการเท่านั้น */}
-            <Box component="iframe" title="แผนที่ตำแหน่งที่บันทึก" loading="lazy" referrerPolicy="no-referrer-when-downgrade"
-              src={`https://maps.google.com/maps?q=${stamp.lat},${stamp.lng}&z=16&output=embed`}
-              sx={{ display: "block", width: "100%", height: 160, border: 0, borderTop: `1px solid ${LINE}` }} />
-            <ButtonBase component="a" href={href} target="_blank" rel="noopener noreferrer"
-              sx={{ width: "100%", gap: 0.6, py: 1, fontFamily: "inherit", fontSize: "0.82rem", fontWeight: 700, color: ACCENT, borderTop: `1px solid ${LINE}`, bgcolor: "#fff", "&:hover": { bgcolor: SURFACE } }}>
-              <OpenInNewRounded sx={{ fontSize: 17 }} /> เปิดใน Google Maps
-            </ButtonBase>
-          </>
-        )}
-      </Box>
-    </Box>
+    <InfoRow label="ตำแหน่ง">
+      <Stack direction="row" gap={0.6} alignItems="flex-start">
+        <Icon sx={{ fontSize: 17, color: tone, mt: "2px", flexShrink: 0 }} />
+        <Box sx={{ minWidth: 0 }}>
+          <Box component="span" sx={{ color: tone === INK_2 ? INK : tone, fontWeight: 600 }}>{text}</Box>
+          {hint && <Box sx={{ fontSize: "0.74rem", color: MUTED, lineHeight: 1.45 }}>{hint}</Box>}
+          {ok && (
+            <Stack direction="row" gap={1.5} sx={{ mt: 0.4 }}>
+              <ButtonBase onClick={() => setMapOpen((v) => !v)} sx={{ fontFamily: "inherit", fontSize: "0.78rem", fontWeight: 700, color: ACCENT }}>
+                {mapOpen ? "ซ่อนแผนที่" : "ดูแผนที่"}
+              </ButtonBase>
+              <ButtonBase component="a" href={`https://www.google.com/maps/search/?api=1&query=${stamp.lat},${stamp.lng}`} target="_blank" rel="noopener noreferrer"
+                sx={{ gap: 0.3, fontFamily: "inherit", fontSize: "0.78rem", fontWeight: 700, color: ACCENT }}>
+                เปิด Google Maps <OpenInNewRounded sx={{ fontSize: 14 }} />
+              </ButtonBase>
+            </Stack>
+          )}
+        </Box>
+      </Stack>
+      {ok && mapOpen && (
+        <Box component="iframe" title="แผนที่ตำแหน่งที่บันทึก" loading="lazy" referrerPolicy="no-referrer-when-downgrade"
+          src={`https://maps.google.com/maps?q=${stamp.lat},${stamp.lng}&z=16&output=embed`}
+          sx={{ display: "block", width: "100%", height: 170, border: `1px solid ${LINE}`, borderRadius: "10px", mt: 0.75 }} />
+      )}
+    </InfoRow>
   );
 };
 
@@ -127,7 +121,7 @@ const Tag = ({ tone, icon, children }) => (
 const shortLoc = (stamp, b) => {
   if (!stamp || stamp.gps === "denied") return "ไม่อนุญาตตำแหน่ง";
   if (stamp.gps !== "ok") return "ไม่มีพิกัด";
-  if (stamp.distanceM == null) return `มีพิกัด${stamp.accuracy != null ? ` ±${stamp.accuracy} ม.` : ""}`;
+  if (stamp.distanceM == null) return "บันทึกพิกัดแล้ว";
   return b.tone === "ok" ? `อยู่หน้างาน ${fmtDistance(stamp.distanceM)}` : `ห่างหน้างาน ${fmtDistance(stamp.distanceM)}`;
 };
 
@@ -178,44 +172,40 @@ function Row({ row, me, isApprover, showJob, onPreview, onChanged, embedded }) {
   };
 
   const role = isHeadRow ? "หัวหน้าทีม" : row.team?.head ? `กดแทนหัวหน้าทีม ${row.team.head}` : "ผู้กดเข้างาน";
+  // สีตามผลตำแหน่ง — ใช้ทั้งแถบซ้ายการ์ดและป้ายตำแหน่ง
+  const locTone = inLoc?.tone === "ok" ? TONE.ok : inLoc?.tone === "warn" ? TONE.warn : ACCENT;
   const crew = teamMembers.length ? `ลูกทีม ${teamMembers.length} คน` : "ไม่มีลูกทีม";
 
   return (
     <Box sx={{ ...CARD, borderRadius: "14px", overflow: "hidden" }}>
-      {/* ✅ (15 ต.ค. 2569 ผู้ใช้: "แก้หน้านี้ให้ UX UI สวยงาม ดูง่ายมากยิ่งขึ้น และข้อมูลครบถ้วน")
-          ซ้าย: เวลา (ตัวใหญ่) + วันที่ · ขวา: งาน (หน้ารวม) หรือชื่อคน → คนบันทึก/ทีม → ป้ายสถานะ (ตำแหน่ง · รูป · นอกวันนัด · แก้เวลา) */}
+      {/* 🔁 (15 ต.ค. 2569 ผู้ใช้: "รกไป ตาลาย" → "เรียบไป ให้มีสีสันด้วย") — สีสื่อความหมาย ไม่ตกแต่งเปล่าๆ:
+          แถบสีซ้ายการ์ด + ป้ายตำแหน่ง = ผลตำแหน่ง (เขียว อยู่หน้างาน · ส้ม ผิดปกติ · ฟ้า มีพิกัด) · เวลาในกล่องฟ้า · รูปย่อสีประจำตัวคน */}
       <ButtonBase onClick={() => setOpen((p) => !p)} aria-expanded={open}
-        sx={{ width: "100%", display: "flex", alignItems: "stretch", gap: 1.25, textAlign: "left", fontFamily: "inherit", px: 1.25, py: 1.15 }}>
-        <Box sx={{ width: 58, flexShrink: 0, borderRadius: "10px", bgcolor: SURFACE, border: `1px solid ${LINE}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", py: 0.75 }}>
-          <Typography sx={{ fontSize: "1.02rem", fontWeight: 800, color: INK, lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>{fmtTime(row.checkIn?.at)}</Typography>
-          <Typography sx={{ fontSize: "0.66rem", fontWeight: 600, color: MUTED, mt: 0.3, whiteSpace: "nowrap" }}>{fmtDayTime(row.checkIn?.at).split(" · ")[0]}</Typography>
+        sx={{ width: "100%", display: "flex", alignItems: "flex-start", gap: 1.25, textAlign: "left", fontFamily: "inherit", px: 1.5, py: 1.25,
+          boxShadow: `inset 4px 0 0 ${locTone}` }}>
+        <Box sx={{ flexShrink: 0, px: 0.9, py: 0.4, borderRadius: "9px", bgcolor: alpha(ACCENT, 0.08), color: ACCENT,
+          fontSize: "0.95rem", fontWeight: 800, lineHeight: 1.35, fontVariantNumeric: "tabular-nums" }}>
+          {fmtTime(row.checkIn?.at)}
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Stack direction="row" alignItems="flex-start" gap={0.75}>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography sx={{ fontSize: "0.92rem", fontWeight: 700, color: INK, lineHeight: 1.35, overflowWrap: "anywhere" }}>
-                {showJob ? (row.jobLabel || "งาน") : row.userName}
-              </Typography>
-              {showJob && row.jobNo && <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: FAINT, lineHeight: 1.3 }}>{row.jobNo}</Typography>}
-            </Box>
-            <ExpandMore sx={{ fontSize: 20, color: FAINT, flexShrink: 0, mt: 0.1, transition: "transform .2s", transform: open ? "rotate(180deg)" : "none" }} />
-          </Stack>
-          {/* คนบันทึก + บทบาท + ทีม */}
-          <Stack direction="row" alignItems="center" gap={0.6} sx={{ mt: 0.6, minWidth: 0 }}>
+          <Typography sx={{ fontSize: "0.9rem", fontWeight: 700, color: INK, lineHeight: 1.4, overflowWrap: "anywhere" }}>
+            {showJob ? (row.jobLabel || "งาน") : row.userName}
+            {showJob && row.jobNo && <Box component="span" sx={{ ml: 0.75, fontSize: "0.72rem", fontWeight: 600, color: FAINT, whiteSpace: "nowrap" }}>{row.jobNo}</Box>}
+          </Typography>
+          <Stack direction="row" alignItems="center" gap={0.6} sx={{ mt: 0.35, minWidth: 0 }}>
             <Avatar sx={{ width: 20, height: 20, fontSize: "0.62rem", fontWeight: 700, bgcolor: personColor(row.userName) }}>{personInitial(row.userName)}</Avatar>
             <Typography noWrap sx={{ fontSize: "0.78rem", color: INK_2, minWidth: 0 }}>
-              {showJob ? <b style={{ fontWeight: 600 }}>{row.userName}</b> : null}{showJob ? " · " : ""}{role} · {crew}
+              {[showJob ? row.userName : "", isHeadRow ? "หัวหน้าทีม" : role, teamMembers.length ? crew : ""].filter(Boolean).join(" · ")}
             </Typography>
           </Stack>
-          {/* ป้ายสถานะ — เห็นเรื่องสำคัญได้ทันทีโดยไม่ต้องกาง */}
-          <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5, mt: 0.75 }}>
-            {inLoc && <Tag tone={inLoc.tone === "ok" ? TONE.ok : inLoc.tone === "warn" ? TONE.warn : ACCENT} icon={inLoc.tone === "warn" && row.checkIn?.gps !== "ok" ? <LocationOffRounded /> : <PlaceRounded />}>{shortLoc(row.checkIn, inLoc)}</Tag>}
-            {(row.checkIn?.photos || []).length > 0 && <Tag tone={MUTED} icon={<PhotoCameraOutlined />}>รูป {row.checkIn.photos.length}</Tag>}
-            {row.offSchedule && <Tag tone={MUTED} icon={<EventBusyOutlined />}>นอกวันนัด</Tag>}
+          <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5, mt: 0.65 }}>
+            {inLoc && <Tag tone={locTone} icon={row.checkIn?.gps === "ok" ? <PlaceRounded /> : <LocationOffRounded />}>{shortLoc(row.checkIn, inLoc)}</Tag>}
+            {row.offSchedule && <Tag tone="#7c3aed" icon={<EventBusyOutlined />}>นอกวันนัด</Tag>}
             {pending.length > 0 && <Tag tone={TONE.warn} icon={<EditCalendarOutlined />}>ขอแก้เวลา · รออนุมัติ</Tag>}
             {fixed && <Tag tone={MUTED} icon={<EditCalendarOutlined />}>แก้เวลาแล้ว</Tag>}
           </Stack>
         </Box>
+        <ExpandMore sx={{ fontSize: 20, color: FAINT, flexShrink: 0, mt: 0.2, transition: "transform .2s", transform: open ? "rotate(180deg)" : "none" }} />
       </ButtonBase>
 
       <Collapse in={open} unmountOnExit>
