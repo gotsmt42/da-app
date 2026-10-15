@@ -105,6 +105,7 @@ function injectAddDraftStyles() {
     .ade-seg-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .ade-seg-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     .ade-gap { margin-top: 16px; }
+    .ade-card .ts-wrapper .ts-control { min-height: 44px; border-radius: 10px !important; font-size: 15px !important; }
     /* ⚠️ ต้องเจาะจงกว่า ".ade-field label" (display:flex/ขนาด 12px) ไม่งั้นช่องกว้างไม่เท่ากัน — ที่ผู้ใช้เห็นว่า "เยื้อง" */
     .ade-field .ade-seg label { display: block; flex: none; min-width: 0; position: relative; margin: 0; cursor: pointer; font-size: inherit; font-weight: inherit; color: inherit; gap: 0; }
     .ade-seg input { position: absolute; opacity: 0; width: 0; height: 0; }
@@ -269,24 +270,6 @@ let isSavingDraft = false;
    วันที่/เวลา/ทีม ทั้งหมดย้ายไปกำหนดตอนกดปุ่ม "ลงตาราง" แทน (ดู handleScheduleDraftClick)
 ───────────────────────────────────────────── */
 /** ✅ (15 ต.ค. 2569) ตัวเลือกที่มาของงาน — ชุดเดียวกับ server (routes/calendarEvent/drafts.js pickIntakeInfo) */
-/** ✅ (15 ต.ค. 2569) ประเภทงานแบบเลือกด่วนในฟอร์มรับงาน — match = คำที่ใช้หาชื่อประเภทงานเดิมในระบบ */
-const QUICK_TYPES = [
-  { key: "service", icon: "🔧", label: "ซ่อม / บริการ", name: "Service", match: ["service", "ซ่อม", "บริการ"] },
-  { key: "pm", icon: "🗓️", label: "บำรุงรักษา (PM)", name: "PM", match: ["pm", "บำรุง"] },
-  { key: "install", icon: "🧰", label: "ติดตั้ง", name: "ติดตั้งอุปกรณ์", match: ["ติดตั้ง", "install"] },
-  { key: "survey", icon: "🔎", label: "ตรวจสอบ / สำรวจ", name: "ตรวจสอบ / สำรวจ", match: ["ตรวจ", "สำรวจ", "survey", "inspect"] },
-  { key: "project", icon: "🏗️", label: "งานโปรเจค", name: "งานโปรเจค", match: ["โปรเจค", "project"] },
-  { key: "other", icon: "➕", label: "อื่นๆ", name: "", match: [] },
-];
-/** งานเดิม (โหมดแก้ไข) ตรงกับตัวเลือกด่วนอันไหน — ไม่ตรง = "อื่นๆ" · งานใหม่ = ยังไม่เลือก */
-const quickTypeOf = (draft) => {
-  if (!draft) return "";
-  if (draft.jobClassification === "project") return "project";
-  const t = String(draft.title || "").toLowerCase();
-  if (!t) return "";
-  return (QUICK_TYPES.find((q) => q.match.some((m) => t.includes(m))) || { key: "other" }).key;
-};
-
 export const INTAKE_SOURCE_OPTS = [["sales", "ฝ่ายขาย"], ["service", "ฝ่ายบริการ"], ["project", "ฝ่ายโครงการ"], ["customer", "ลูกค้าแจ้งตรง"]];
 
 export const getAddDraftEvent = async ({
@@ -446,13 +429,11 @@ export const getAddDraftEvent = async ({
         <span id="ade-modeDesc" class="ade-hint"></span>
       </div>
 
-      <!-- ✅ (15 ต.ค. 2569 ผู้ใช้: "ประเภทงานควรมีเพิ่มให้เหมาะสม" → เลือก "รวมเป็นช่องเดียว")
-           ตัวเลือกด่วน = ประเภทงาน (title) ที่ใช้บ่อย · "อื่นๆ" = เลือก/พิมพ์จากรายการเดิม · โปรเจค → หมวด "งานโปรเจค" -->
+      <!-- 🔁 (15 ต.ค. 2569 ผู้ใช้: "ประเภทงาน ให้เป็นแบบ Select และพิมพ์เพิ่มได้แบบหน้า event · อิงข้อมูลประเภทงานใน Event ในระบบ")
+           ช่องเลือกประเภทงานตัวเดียวกับฟอร์มลงงาน (รายการจากตั้งค่าประเภทงาน · พิมพ์ชื่อใหม่ได้ ระบบเพิ่มเข้ารายการให้) -->
       <div class="ade-field ade-gap" id="ade-jobTypeField">
         <label><span class="req">*</span> ประเภทงาน</label>
-        <div class="ade-seg ade-seg-3">
-          ${QUICK_TYPES.map((t) => `<label><input type="radio" name="adeQuickType" value="${t.key}" ${quickTypeOf(existingDraft) === t.key ? "checked" : ""}><span><i>${t.icon}</i><b>${t.label}</b></span></label>`).join("")}
-        </div>
+        <select id="adeTitle" ${isContractLinked ? "disabled" : ""}><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${titleOpts}</select>
       </div>
 
       <div class="ade-field ade-gap" id="ade-sourceField">
@@ -541,7 +522,7 @@ export const getAddDraftEvent = async ({
       </p>
       ` : ""}
       <p class="ade-section-label">ข้อมูลโครงการ</p>
-      <div class="ade-grid ade-grid-3">
+      <div class="ade-grid ${isIntakeForm ? "ade-grid-2" : "ade-grid-3"}">
         <div class="ade-field">
           <label>🏢 ชื่อบริษัท</label>
           <select id="adeCompany" ${isContractLinked ? "disabled" : ""}><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${companyOpts}</select>
@@ -550,10 +531,11 @@ export const getAddDraftEvent = async ({
           <label><span class="req">*</span> ชื่อโครงการ</label>
           <select id="adeSite" ${isContractLinked ? "disabled" : ""}><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${siteOpts}</select>
         </div>
+        ${isIntakeForm ? "" : `
         <div class="ade-field">
           <label><span class="req">*</span> ประเภทงาน</label>
           <select id="adeTitle" ${isContractLinked ? "disabled" : ""}><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${titleOpts}</select>
-        </div>
+        </div>`}
       </div>
 
       <!-- ✅ "ครั้งที่" มีความหมายเฉพาะงานตามสัญญาเท่านั้น (รอบที่ N ของสัญญา) — งานทั่วไป/งานโปรเจค
@@ -749,40 +731,6 @@ export const getAddDraftEvent = async ({
         const titleTs = mkTs("#adeTitle",   "เลือกหรือพิมพ์ประเภทงาน", (jobTypes?.items || []).length || 50);
         const systemTs = mkTs("#adeSystem",  "เลือกหรือพิมพ์ระบบงาน", (systemTypes?.items || []).length || 50);
 
-        // ✅ (15 ต.ค. 2569) ประเภทงานแบบเลือกด่วน — ตั้งค่าช่องประเภทงาน (title) ให้ · "อื่นๆ" ค่อยโชว์ช่องเดิมให้เลือก/พิมพ์
-        if (isIntakeForm && !isContractLinked) {
-          const titleField = document.getElementById("adeTitle")?.closest(".ade-field");
-          const titleGrid = titleField?.parentElement;
-          const titleLabel = titleField?.querySelector("label");
-          if (titleLabel) titleLabel.innerHTML = '<span class="req">*</span> ระบุประเภทงาน';
-          const findName = (q) => (jobTypes?.items || []).map((t) => t.name)
-            .find((n) => q.match.some((m) => String(n).toLowerCase().includes(m))) || q.name;
-          let firstSync = true;
-          const syncQuick = (evt) => {
-            const key = document.querySelector('input[name="adeQuickType"]:checked')?.value || "";
-            const q = QUICK_TYPES.find((x) => x.key === key);
-            const other = !q || q.key === "other";
-            const visit = (document.querySelector('input[name="adeVisitMode"]:checked')?.value || "visit") === "visit";
-            const showTitle = visit && other;
-            if (titleField) titleField.style.display = showTitle ? "" : "none";
-            if (titleGrid) { titleGrid.classList.toggle("ade-grid-3", showTitle); titleGrid.classList.toggle("ade-grid-2", !showTitle); }
-            if (!titleTs || evt?.type === "ade-mode") return; // เปลี่ยนรูปแบบงาน = แค่ซ่อน/โชว์ ไม่แตะค่า
-            if (other) {
-              // เปลี่ยนจากตัวเลือกด่วนมาเป็น "อื่นๆ" → ล้างค่าที่ระบบเติมไว้ ให้เลือกเอง (ตอนเปิดฟอร์มแก้ไขคงค่าเดิม)
-              if (!firstSync && key === "other") titleTs.clear(true);
-            } else {
-              const name = findName(q);
-              if (!titleTs.options[name]) titleTs.addOption({ value: name, text: name });
-              titleTs.setValue(name, true);
-            }
-            firstSync = false;
-          };
-          document.querySelectorAll('input[name="adeQuickType"]').forEach((r) => r.addEventListener("change", syncQuick));
-          Swal.getPopup()?.addEventListener("ade-mode", syncQuick);
-          syncQuick({ type: "ade-mode" }); // จัดการแสดงผลทันที (ไม่แตะค่า)
-          setTimeout(syncQuick, 360);
-        }
-
         // ✅ (15 ต.ค. 2569 ผู้ใช้: "ฟอร์มรูปแบบ auto") เลือกโครงการแล้วเติมให้เอง — เฉพาะช่องที่ยังว่าง (ไม่ทับที่กรอกเอง)
         //    บริษัท + ผู้ติดต่อ/เบอร์ จากทะเบียนลูกค้า · ประเภทงาน/ระบบ จากงานล่าสุดของโครงการนี้
         if (isIntakeForm && !isContractLinked) {
@@ -809,7 +757,7 @@ export const getAddDraftEvent = async ({
             fillIfEmpty("adeContactName", cust?.cName);
             fillIfEmpty("adeContactTel", cust?.tel);
             const last = history.find((e) => e.site === site);
-            if (["", "other"].includes(document.querySelector('input[name="adeQuickType"]:checked')?.value || "")) tsFill(titleTs, last?.title);
+            tsFill(titleTs, last?.title);
             tsFill(systemTs, last?.system);
             if (!cust?.cName) fillIfEmpty("adeContactName", last?.contactName);
             if (!cust?.tel) fillIfEmpty("adeContactTel", last?.contactTel);
@@ -934,7 +882,7 @@ export const getAddDraftEvent = async ({
           const radioVal = (name) => document.querySelector(`input[name="${name}"]:checked`)?.value || "";
 
           const jobType = document.querySelector('input[name="ade-jobType"]:checked')?.value
-            || (radioVal("adeQuickType") === "project" ? "project" : "general");
+            || (/โปรเจ|project/i.test(getVal("adeTitle")) ? "project" : "general");
 
           /* ── ขั้นตอนที่ 1 = "งานตามสัญญา": เลือกจากสัญญาที่มีอยู่แล้วเท่านั้น วางแผนแค่ครั้งถัดไป ── */
           if (jobType === "contract") {
@@ -1015,7 +963,6 @@ export const getAddDraftEvent = async ({
             if (!system) { Swal.showValidationMessage("กรุณาระบุระบบงาน");      return; }
           }
           if (!plannedMonth) { Swal.showValidationMessage("กรุณาระบุเดือนที่ตั้งใจ"); return; }
-          if (isIntakeForm && radioVal("adeVisitMode") === "visit" && !radioVal("adeQuickType")) { Swal.showValidationMessage("กรุณาเลือกประเภทงาน"); return; }
           if (isIntakeForm && radioVal("adeVisitMode") !== "note" && !radioVal("adeIntakeSource")) { Swal.showValidationMessage("กรุณาเลือกว่ารับงานจากแผนกไหน"); return; }
           const intakeFiles = isIntakeForm && radioVal("adeIntakeDocType") ? [...(document.getElementById("adeIntakeFiles")?.files || [])] : [];
 
