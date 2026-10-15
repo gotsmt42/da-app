@@ -593,7 +593,7 @@ export const getAddDraftEvent = async ({
         <label>📝 อาการเสีย / ขอบเขตงาน</label>
         <textarea id="adeDescription" rows="3" placeholder="เช่น ตู้ควบคุมแจ้งเตือน Fault โซน 3 · ลูกค้าขอเข้าก่อน 10 โมง">${attr(existingDraft?.description)}</textarea>
       </div>
-      ${jobInfoSectionHtml(existingDraft || {}, "ade")}
+      <div id="ade-jobInfoBlock">${jobInfoSectionHtml(existingDraft || {}, "ade")}</div>
     </div>
 
     <div id="ade-contractPickSection" style="display:none;">
@@ -665,11 +665,19 @@ export const getAddDraftEvent = async ({
             const md = document.getElementById("ade-modeDesc");
             if (md) {
               md.textContent = note ? "จดเรื่องที่ต้องทำไว้กันลืม — กรอกแค่ “สิ่งที่ต้องทำ” ด้านล่าง แล้วกดทำเสร็จเมื่อเรียบร้อย"
-                : mode === "novisit" ? "ไม่ต้องส่งช่าง — กด “ส่งมอบแล้ว” เมื่อส่งของ จากนั้นอัปโหลดใบวางบิล"
+                : mode === "novisit" ? "กรอกแค่ลูกค้า เอกสาร และรายการที่ต้องส่ง — ส่งของแล้วกด “ส่งมอบแล้ว” แล้วอัปโหลดใบวางบิล"
                   : "รับงานไว้ก่อน แล้วกด “ส่งลงตาราง” เลือกวันและช่างที่จะเข้างาน";
             }
             show("ade-sourceField", !note);
-            show("ade-jobTypeField", !note);
+            // 🔁 (15 ต.ค. 2569 ผู้ใช้: "รูปแบบส่งของ ขายของ ไม่ควรมีรายละเอียดเยอะ ให้ง่ายๆ")
+            //    ส่งของ/ขายของ: ไม่ถามประเภทงาน · ระบบงาน · ความเร่งด่วน/อุปกรณ์ · เดือนเข้างาน
+            show("ade-jobTypeField", mode === "visit");
+            show("ade-jobInfoBlock", mode !== "novisit");
+            const sysField = document.getElementById("adeSystem")?.closest(".ade-field");
+            if (sysField) sysField.style.display = mode === "visit" ? "" : "none";
+            const sectionLabel = document.querySelector("#ade-generalSection .ade-section-label");
+            if (sectionLabel) sectionLabel.textContent = mode === "novisit" ? "ลูกค้า" : "ข้อมูลโครงการ";
+            Swal.getPopup()?.dispatchEvent(new Event("ade-mode"));
             show("ade-jobTypeBlock", !note);
             show("ade-generalSection", !note);
             show("ade-contactGrid", !note);
@@ -738,13 +746,15 @@ export const getAddDraftEvent = async ({
           const findName = (q) => (jobTypes?.items || []).map((t) => t.name)
             .find((n) => q.match.some((m) => String(n).toLowerCase().includes(m))) || q.name;
           let firstSync = true;
-          const syncQuick = () => {
+          const syncQuick = (evt) => {
             const key = document.querySelector('input[name="adeQuickType"]:checked')?.value || "";
             const q = QUICK_TYPES.find((x) => x.key === key);
             const other = !q || q.key === "other";
-            if (titleField) titleField.style.display = other ? "" : "none";
-            if (titleGrid) { titleGrid.classList.toggle("ade-grid-3", other); titleGrid.classList.toggle("ade-grid-2", !other); }
-            if (!titleTs) return;
+            const visit = (document.querySelector('input[name="adeVisitMode"]:checked')?.value || "visit") === "visit";
+            const showTitle = visit && other;
+            if (titleField) titleField.style.display = showTitle ? "" : "none";
+            if (titleGrid) { titleGrid.classList.toggle("ade-grid-3", showTitle); titleGrid.classList.toggle("ade-grid-2", !showTitle); }
+            if (!titleTs || evt?.type === "ade-mode") return; // เปลี่ยนรูปแบบงาน = แค่ซ่อน/โชว์ ไม่แตะค่า
             if (other) {
               // เปลี่ยนจากตัวเลือกด่วนมาเป็น "อื่นๆ" → ล้างค่าที่ระบบเติมไว้ ให้เลือกเอง (ตอนเปิดฟอร์มแก้ไขคงค่าเดิม)
               if (!firstSync && key === "other") titleTs.clear(true);
@@ -756,6 +766,7 @@ export const getAddDraftEvent = async ({
             firstSync = false;
           };
           document.querySelectorAll('input[name="adeQuickType"]').forEach((r) => r.addEventListener("change", syncQuick));
+          Swal.getPopup()?.addEventListener("ade-mode", syncQuick);
           setTimeout(syncQuick, 360);
         }
 
@@ -980,15 +991,18 @@ export const getAddDraftEvent = async ({
 
           // ✅ (15 ต.ค. 2569) บันทึกงาน (โน๊ต) — บังคับแค่สิ่งที่ต้องทำ
           const isNoteMode = isIntakeForm && radioVal("adeVisitMode") === "note";
+          const isDeliveryMode = isIntakeForm && radioVal("adeVisitMode") === "novisit";
           if (isNoteMode) {
             if (!getVal("adeDescription")) { Swal.showValidationMessage("กรุณาระบุสิ่งที่ต้องทำ"); return; }
+          } else if (isDeliveryMode) {
+            if (!site) { Swal.showValidationMessage("กรุณาระบุลูกค้า / โครงการ"); return; }
           } else {
             if (!site)   { Swal.showValidationMessage("กรุณาระบุชื่อโครงการ");  return; }
             if (!title)  { Swal.showValidationMessage("กรุณาระบุประเภทงาน");    return; }
             if (!system) { Swal.showValidationMessage("กรุณาระบุระบบงาน");      return; }
           }
           if (!plannedMonth) { Swal.showValidationMessage("กรุณาระบุเดือนที่ตั้งใจ"); return; }
-          if (isIntakeForm && radioVal("adeVisitMode") !== "note" && !radioVal("adeQuickType")) { Swal.showValidationMessage("กรุณาเลือกประเภทงาน"); return; }
+          if (isIntakeForm && radioVal("adeVisitMode") === "visit" && !radioVal("adeQuickType")) { Swal.showValidationMessage("กรุณาเลือกประเภทงาน"); return; }
           if (isIntakeForm && radioVal("adeVisitMode") !== "note" && !radioVal("adeIntakeSource")) { Swal.showValidationMessage("กรุณาเลือกว่ารับงานจากแผนกไหน"); return; }
           const intakeFiles = isIntakeForm && radioVal("adeIntakeDocType") ? [...(document.getElementById("adeIntakeFiles")?.files || [])] : [];
 
@@ -1003,8 +1017,9 @@ export const getAddDraftEvent = async ({
             const payload = {
               company: getVal("adeCompany"),
               site,
-              title,
-              system,
+              // ส่งของ/ขายของ ไม่ถามประเภทงาน/ระบบ — ตั้งชื่อประเภทงานให้เอง
+              title: isDeliveryMode ? "ส่งของ / ขายของ" : title,
+              system: isDeliveryMode ? "" : system,
               time: getVal("adeTime"),
               plannedMonth,
               contactName: getVal("adeContactName"),
