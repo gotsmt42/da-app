@@ -519,174 +519,35 @@ const LiveTrackingPanel = ({ events, onRefresh, lastRefreshed }) => {
 };
 
 // ═══════════════════════════════════════════════════════════════════════
-// ─── NEW: ClosureRequestsPanel ─────────────────────────────────────────
-// แยกงานที่ช่างส่ง "ขอปิดงาน" ออกมาให้เห็นชัดในที่เดียว ไม่ต้องไล่หาใน
-// ลิสต์หลักที่มีการแบ่งหน้า/กรองอยู่ — อนุมัติ/ไม่อนุมัติได้จากพาแนลนี้เลย
-// อ้างอิงจาก events ทั้งหมด (ไม่ผ่านตัวกรอง/pagination ของตาราง)
-// ═══════════════════════════════════════════════════════════════════════
-const ClosureRequestsPanel = ({ events, onReject }) => {
-  const navigate = useNavigate();
-  const [expanded,     setExpanded]     = useState(true);
-  const [busyId,       setBusyId]       = useState(null);
-  const [rejectTarget, setRejectTarget] = useState(null);
-  const [rejectReason, setRejectReason] = useState("");
+/**
+ * 🔁 (17 ต.ค. 2569 ผู้ใช้: "ประเมินและแก้ไขหน้านี้ ว่าควรวางลำดับการแสดงยังไงให้เข้าใจง่าย ทำงานมีประสิทธิภาพสูงสุด")
+ *    เดิมมีแผง "งานที่ช่างขอปิด · รอตรวจสอบ" ใหญ่บนสุด ซ้ำกับแถบ "คำขอปิดงาน" และดันรายการงานลงไปครึ่งจอ
+ *    ✅ มุมมอง "ทั้งหมด" จัดเป็นหัวข้อตามลำดับ "สิ่งที่ต้องทำก่อน" แทน (ดู JOB_SECTIONS) — คำขอปิดงานคือหัวข้อแรก
+ *       เปิดการ์ดดูเอกสารแล้วอนุมัติ/ไม่อนุมัติได้ในการ์ดเลย (ไม่ต้องกด "ตรวจสอบ" แล้วถูกพาไปอีกที่)
+ */
+const JOB_SECTIONS = {
+  pending:   { label: "คำขอปิดงาน", hint: "รอคุณตรวจสอบ · เปิดการ์ดดูเอกสารแล้วอนุมัติหรือไม่อนุมัติ", color: "#0891b2" },
+  overdue:   { label: "ค้างงาน", hint: "เลยกำหนดแล้วยังไม่ปิด · เรียงจากค้างนานสุด", color: "#dc2626" },
+  waiting:   { label: "รอยืนยัน", hint: "ยังไม่ยืนยันนัดหมาย", color: "#d97706" },
+  working:   { label: "กำลังดำเนินการ", hint: "ช่างกำลังเข้างาน", color: "#7c3aed" },
+  confirmed: { label: "ยืนยันแล้ว", hint: "รอถึงวันเข้างาน", color: "#2563eb" },
+  other:     { label: "อื่นๆ", hint: "", color: "#64748b" },
+};
+const JOB_SECTION_ORDER = ["pending", "overdue", "waiting", "working", "confirmed", "other"];
 
-  // ✅ งานที่เข้าหลายวันไม่ติดกัน (ผูกด้วย jobGroupId เดียวกัน) ตอนขอปิดงานตอนนี้ตั้ง
-  // closeRequested:true ให้ทุกวันในกลุ่มพร้อมกันแล้ว (ดู handleRequestClose ใน
-  // TechnicianJobPanel.js) — ถ้าไม่จัดกลุ่มตรงนี้ด้วย จะเห็นงานเดียวกันโผล่ซ้ำเป็นหลายแถวเท่า
-  // จำนวนวันที่เข้างาน ต้องกดอนุมัติทีละแถว ทั้งที่จริงเป็นงานเดียว รวมเป็น 1 แถวต่อ 1 งาน แทน
-  // (เทียบ pattern เดียวกับ JobGroupBlock) กดอนุมัติ/ไม่อนุมัติทีเดียวจบทั้งกลุ่ม
-  const pendingGroups = useMemo(() => {
-    const map = new Map();
-    events
-      .filter(e => e.closeRequested)
-      .forEach(e => {
-        const key = getOverdueGroupKey(e);
-        if (!map.has(key)) map.set(key, []);
-        map.get(key).push(e);
-      });
-    return [...map.values()]
-      .map(sessions => sessions.slice().sort((a, b) => new Date(b.start) - new Date(a.start)))
-      .sort((a, b) => new Date(b[0].closeRequestedAt || 0) - new Date(a[0].closeRequestedAt || 0));
-  }, [events]);
-
-  // ✅ ไม่มีคำขอปิดงานรออยู่เลย = ไม่ต้องโชว์การ์ดนี้ทิ้งไว้เปล่าๆ (เดิมโชว์ตลอดพร้อมข้อความ
-  // "ยังไม่มีคำขอปิดงาน...") กินพื้นที่ด้านบนสุดของหน้าโดยไม่มีอะไรให้ทำ ซ่อนไปเลยดีกว่า
-  if (pendingGroups.length === 0) return null;
-
-  const handleRejectConfirm = async () => {
-    if (!rejectTarget) return;
-    setBusyId(rejectTarget);
-    await onReject(rejectTarget, rejectReason.trim());
-    setBusyId(null);
-    setRejectTarget(null);
-    setRejectReason("");
-  };
-
+const SectionHeader = ({ section, count }) => {
+  const m = JOB_SECTIONS[section] || JOB_SECTIONS.other;
   return (
-    <GlassCard sx={{ mb: 3, border: "1px solid", borderColor: alpha("#f59e0b", 0.25) }}>
-      <CardContent sx={{ p: 2.5 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" mb={expanded ? 2 : 0}>
-          <Stack direction="row" alignItems="center" gap={1}>
-            <PulseDot color="#f59e0b" />
-            <Typography variant="subtitle2" fontWeight={700}>
-              งานที่ช่างขอปิด · รอตรวจสอบ
-            </Typography>
-            <Chip
-              label={`${pendingGroups.length} งาน`}
-              size="small"
-              sx={{
-                height: 20, fontSize: "0.68rem", fontWeight: 700,
-                bgcolor: alpha("#f59e0b", 0.12), color: "#f59e0b",
-              }}
-            />
-          </Stack>
-          <IconButton size="small" onClick={() => setExpanded(p => !p)}>
-            {expanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
-          </IconButton>
-        </Stack>
-
-        <Collapse in={expanded}>
-            <Stack spacing={1.5}>
-              {pendingGroups.map(sessions => {
-                const ev = sessions[0];
-                const isGrouped = sessions.length > 1;
-                // ✅ นับ "จำนวนวันเข้างานจริง" รวมทุกวันในแต่ละช่วง (เทียบ pattern เดียวกับ
-                // JobGroupBlock) ให้แอดมินเห็นก่อนกดอนุมัติว่างานนี้จริงๆ เข้ากี่วัน ไม่ใช่แค่ 1 วัน
-                const dayEnd = s => moment(s.end || s.start).subtract(s.allDay ? 1 : 0, "days").startOf("day");
-                const totalWorkDays = sessions.reduce((sum, s) => {
-                  const days = dayEnd(s).diff(moment(s.start).startOf("day"), "days") + 1;
-                  return sum + Math.max(days, 1);
-                }, 0);
-                return (
-                <Box key={ev.jobGroupId || ev._id} sx={{
-                  p: 1.5, borderRadius: "12px", border: "1px solid #e2e8f0", background: "#fff",
-                }}>
-                  <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ sm: "flex-start" }} gap={1.5}>
-                    <Stack direction="row" alignItems="flex-start" gap={1.5} flex={1} minWidth={0}>
-                      <HourglassTop sx={{ fontSize: 18, color: "#f59e0b", mt: 0.3, flexShrink: 0 }} />
-                      <Box flex={1} minWidth={0}>
-                        <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap">
-                          <Typography fontWeight={700} fontSize="0.875rem" noWrap>
-                            {companySite(ev.company, ev.site)}
-                          </Typography>
-                          {isGrouped && (
-                            <Chip label={`เข้างาน ${totalWorkDays} วัน`} size="small"
-                              sx={{ height: 18, fontSize: "0.65rem", fontWeight: 700, bgcolor: alpha("#dc2626", 0.15), color: "#dc2626" }} />
-                          )}
-                        </Stack>
-                        <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-                          {ev.closeRequestedBy || "ช่าง"} ขอปิดงาน
-                          {ev.closeRequestedAt && ` · ${moment(ev.closeRequestedAt).locale("th").fromNow()}`}
-                        </Typography>
-                        {ev.workNote && (
-                          <Typography variant="caption" color="text.secondary"
-                            sx={{
-                              display: "block", mt: 0.5, fontStyle: "italic",
-                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                            }}>
-                            "{ev.workNote.slice(0, 100)}{ev.workNote.length > 100 ? "…" : ""}"
-                          </Typography>
-                        )}
-                      </Box>
-                    </Stack>
-                    {/* ✅ ปุ่ม "ตรวจสอบ" — เดิมพาไปหน้า Operation แบบเจาะจงงานตัวเดียว (/operation/:id)
-                        เปลี่ยนเป็นพาไปที่ "รายการงานทั้งหมด" ในแท็บ "รอคุณอนุมัติ" แล้วเลื่อนจอ +
-                        ไฮไลต์กรอบกระพริบไปที่งานนั้นแทน ให้เห็นบริบทงานอื่นๆ ที่รอตรวจสอบด้วยกัน ไม่ใช่
-                        เห็นแค่งานเดียวโดดๆ (ดู highlightId/scroll effect ในคอมโพเนนต์หลัก Operation)
-                        ✅ ตัดปุ่ม "อนุมัติ" ออกจากพาแนลนี้ตามที่ขอ — ต้องกด "ตรวจสอบ" ไปดูรายละเอียด
-                        เต็มๆ ก่อนเท่านั้น (อนุมัติได้จากการ์ดงานจริงแทน) กัน "อนุมัติมั่ว" โดยไม่ได้ดู */}
-                    <Stack direction="row" gap={0.75} flexShrink={0} flexWrap="wrap" sx={{ width: { xs: "100%", sm: "auto" } }}>
-                      <Button size="small" variant="contained" disableElevation
-                        startIcon={<Visibility sx={{ fontSize: 15 }} />}
-                        // ✅ ต่อ &t=<timestamp> ต่อท้ายเสมอ — เดิมกด "ตรวจสอบ" งานเดิมซ้ำ (หลังกด
-                        // ครั้งแรกไปแล้ว) จะได้ URL เหมือนเดิมทุกตัวอักษร (ถ้ายังไม่ได้เปลี่ยนหน้า/
-                        // กรองอะไรเลย) react-router มองว่าเป็นการนำทางไปที่เดิม ไม่ถือเป็นการเปลี่ยน
-                        // location ใหม่ ทำให้ effect ที่ฟัง searchParams ไม่ทำงานซ้ำ ต้องรีเฟรชก่อน
-                        // ถึงจะกดซ้ำได้ — ใส่ timestamp ให้ query string ไม่ซ้ำกันทุกครั้งที่กด
-                        // การันตีว่าเป็น navigation ใหม่เสมอ ไม่ว่าจะกดงานเดิมกี่ครั้งก็ตาม
-                        onClick={() => navigate(`/operation?group=pending&highlight=${ev._id}&t=${Date.now()}`)}
-                        sx={{ ...MBTN.primary, ...SBTN, flex: { xs: 1, sm: "initial" } }}>
-                        ตรวจสอบ
-                      </Button>
-                      <Button size="small" variant="outlined"
-                        startIcon={<Cancel sx={{ fontSize: 15 }} />}
-                        disabled={busyId === ev._id}
-                        onClick={() => { setRejectTarget(ev._id); setRejectReason(""); }}
-                        sx={{ ...MBTN.outline("#dc2626"), ...SBTN, flex: { xs: 1, sm: "initial" } }}>
-                        ไม่อนุมัติ
-                      </Button>
-                    </Stack>
-                  </Stack>
-                </Box>
-                );
-              })}
-            </Stack>
-        </Collapse>
-      </CardContent>
-
-      {/* Dialog: ระบุเหตุผลที่ไม่อนุมัติ */}
-      <Dialog open={Boolean(rejectTarget)} onClose={() => !busyId && setRejectTarget(null)} fullWidth maxWidth="xs">
-        <DialogTitle>ไม่อนุมัติปิดงาน</DialogTitle>
-        <DialogContent>
-          <DialogContentText sx={{ mb: 1.5 }}>
-            ระบุเหตุผล/คอมเมนต์ที่ไม่อนุมัติ เพื่อแจ้งให้ช่างทราบและแก้ไข
-          </DialogContentText>
-          <TextField
-            autoFocus fullWidth multiline minRows={3}
-            placeholder="เช่น ไฟล์ใบเสนอราคายังไม่ครบ กรุณาแนบเพิ่ม"
-            value={rejectReason}
-            onChange={e => setRejectReason(e.target.value)}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setRejectTarget(null)} disabled={Boolean(busyId)}>ยกเลิก</Button>
-          <Button variant="contained" color="error" onClick={handleRejectConfirm} disabled={Boolean(busyId)}>
-            {busyId ? "กำลังบันทึก..." : "ยืนยันไม่อนุมัติ"}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </GlassCard>
+    <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 2.5, mb: 1.25, px: 0.5, "&:first-of-type": { mt: 0.5 } }}>
+      <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: m.color, flexShrink: 0 }} />
+      <Typography sx={{ fontSize: "0.95rem", fontWeight: 800, color: "#0f172a" }}>{m.label}</Typography>
+      <Box component="span" sx={{ minWidth: 24, height: 22, px: 0.75, borderRadius: 99, display: "inline-grid", placeItems: "center",
+        fontSize: "0.75rem", fontWeight: 800, bgcolor: alpha(m.color, 0.12), color: m.color }}>{count}</Box>
+      {m.hint && (
+        <Typography noWrap sx={{ fontSize: "0.78rem", color: "#64748b", minWidth: 0 }}>{m.hint}</Typography>
+      )}
+      <Box sx={{ flex: 1, height: "1px", bgcolor: "#e2e8f0", ml: 0.5, minWidth: 16 }} />
+    </Stack>
   );
 };
 
@@ -2027,14 +1888,18 @@ const EventRowCard = ({
 
 // ─── StatusStrip ─────────────────────────────────────────────────────
 /** แถบสถานะแถวเดียว: จุดสี + ชื่อ + ตัวเลข · แถบที่เลือกพื้นสีอ่อน · ตัวเลขแดงเมื่อเป็นเรื่องที่ต้องรีบจัดการ */
+// ✅ (17 ต.ค. 2569) เส้นคั่นกลุ่ม: ทั้งหมด | ลำดับงาน (รอยืนยัน → … → คำขอปิดงาน) | ค้างงาน (ข้อยกเว้น) | เสร็จสิ้น (คลัง)
+const STRIP_SEP_BEFORE = new Set(["waiting", "overdue", "closed"]);
 const StatusStrip = ({ items, value, onChange }) => (
-  <Box sx={{ display: "flex", gap: 0.5, p: 0.5, mb: 2, bgcolor: "#fff", border: "1px solid #e2e8f0", borderRadius: 3, overflowX: "auto",
+  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, p: 0.5, mb: 1.5, bgcolor: "#fff", border: "1px solid #e2e8f0", borderRadius: 3, overflowX: "auto",
     scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
     {items.map((it) => {
       const on = value === it.value;
       const hot = it.alert && it.count > 0;
       return (
-        <ButtonBase key={it.value} onClick={() => onChange(it.value)}
+        <React.Fragment key={it.value}>
+        {STRIP_SEP_BEFORE.has(it.value) && <Box sx={{ width: "1px", alignSelf: "stretch", my: 1, bgcolor: "#e2e8f0", flexShrink: 0 }} />}
+        <ButtonBase onClick={() => onChange(it.value)}
           sx={{
             flex: "1 0 auto", minWidth: 0, height: 44, px: 1.5, gap: 0.9, borderRadius: 2.5, fontFamily: "inherit", whiteSpace: "nowrap",
             bgcolor: on ? alpha(it.color, 0.1) : "transparent",
@@ -2049,6 +1914,7 @@ const StatusStrip = ({ items, value, onChange }) => (
           }}>{it.count}</Box>
           {it.sub && <Typography component="span" sx={{ fontSize: "0.68rem", fontWeight: 700, color: "#dc2626" }}>{it.sub}</Typography>}
         </ButtonBase>
+        </React.Fragment>
       );
     })}
   </Box>
@@ -2080,22 +1946,8 @@ const FilterPanel = ({
   // ✅ ช่องตัวกรองชุดเดียว — จอใหญ่วางในแถวเดียวกับช่องค้นหา (ผู้ใช้ขอ "ให้เหลือแถวเดียว") · มือถืออยู่ในแผงพับ
   const filterSelects = (
     <>
-            <TextField
-              select size="small" label="สถานะงาน" value={filterOP}
-              onChange={(e) => onFilterOP(e.target.value)}
-              sx={SELECT_FIELD_SX} SelectProps={{ MenuProps: SELECT_MENU_PROPS }}
-            >
-              <MenuItem value=""><em>ทั้งหมด</em></MenuItem>
-              {OP_LIST.map((op) => (
-                <MenuItem key={op} value={op}>
-                  <Stack direction="row" alignItems="center" gap={1}>
-                    <Box sx={{ width: 9, height: 9, borderRadius: "50%", bgcolor: OP_COLOR[op], flexShrink: 0 }} />
-                    {op}
-                  </Stack>
-                </MenuItem>
-              ))}
-            </TextField>
-
+            {/* 🧹 (17 ต.ค. 2569) ตัดช่อง "สถานะงาน" — ซ้ำกับแถบสถานะด้านบน (2 ที่เลือกสถานะได้ = สับสนว่าอันไหนมีผล)
+                ลิงก์ที่ส่ง ?status= มายังกรองได้ และโชว์เป็นชิป "สถานะ: …" ให้กดล้างได้เหมือนเดิม */}
             <TextField
               select size="small" label="ประเภทงาน" value={filterType}
               onChange={(e) => onFilterType(e.target.value)}
@@ -2186,7 +2038,7 @@ const FilterPanel = ({
             <Button size="small" variant={showAll ? "contained" : "outlined"}
               onClick={() => onToggleShowAll(true)}
               sx={{ borderRadius: 2.5, textTransform: "none", fontSize: "0.82rem", fontWeight: 700, height: 40, px: 1.75, boxShadow: "none" }}>
-              ทั้งหมด
+              ทุกเดือน
             </Button>
             {/* ✅ ตัวเลือกเดือน — ใช้ ThaiDatePicker เหมือนกันทั้งแอป ปีจึงเป็น พ.ศ. ตรงกับที่อื่น
                 (เดิมเป็น DatePicker ดิบ + AdapterMoment ธรรมดา ขึ้นเป็น ค.ศ. อยู่จุดเดียวในหน้านี้)
@@ -3095,10 +2947,37 @@ const Operation = () => {
    */
   const splitClosed = effectiveGroup === "all" && !filterStatus && !id;
   const isClosedGroup = (sessions) => sessions.every((e) => e.status === "ดำเนินการเสร็จสิ้น");
-  const jobGroups = useMemo(
-    () => (splitClosed ? allJobGroups.filter((g) => !isClosedGroup(g)) : allJobGroups),
-    [allJobGroups, splitClosed],
-  );
+  /**
+   * ✅ (17 ต.ค. 2569 ผู้ใช้: "วางลำดับให้เข้าใจง่าย ทำงานมีประสิทธิภาพสูงสุด") — มุมมอง "ทั้งหมด" เรียงตาม "ต้องทำอะไรก่อน"
+   *    คำขอปิดงาน (เก่าสุดก่อน) → ค้างงาน (ค้างนานสุดก่อน) → รอยืนยัน → กำลังดำเนินการ → ยืนยันแล้ว (ตามวันเข้างาน)
+   *    แต่ละงานอยู่หัวข้อเดียว · แท็บอื่นเรียงแบบเดิม
+   */
+  const sectionOfGroup = useCallback((sessions) => {
+    if (sessions.some((e) => e.closeRequested && e.status !== "ดำเนินการเสร็จสิ้น")) return "pending";
+    if (sessions.some((e) => isFlaggedDays(daysPastDueMap.get(e._id)?.days))) return "overdue";
+    if (sessions.some((e) => e.status === "กำลังดำเนินการ")) return "working";
+    if (sessions.some((e) => e.status === "ยืนยันแล้ว")) return "confirmed";
+    if (sessions.some((e) => e.status === "กำลังรอยืนยัน")) return "waiting";
+    return "other";
+  }, [daysPastDueMap]);
+  const jobGroups = useMemo(() => {
+    if (!splitClosed) return allJobGroups;
+    const maxDays = (g) => Math.max(0, ...g.map((e) => daysPastDueMap.get(e._id)?.days ?? 0));
+    const reqAt = (g) => Math.min(...g.map((e) => (e.closeRequestedAt ? new Date(e.closeRequestedAt).getTime() : Infinity)));
+    return allJobGroups
+      .filter((g) => !isClosedGroup(g))
+      .map((g, i) => ({ g, i, sec: sectionOfGroup(g) }))
+      .sort((a, b) => (JOB_SECTION_ORDER.indexOf(a.sec) - JOB_SECTION_ORDER.indexOf(b.sec))
+        || (a.sec === "overdue" ? maxDays(b.g) - maxDays(a.g) : 0)
+        || (a.sec === "pending" ? reqAt(a.g) - reqAt(b.g) : 0)
+        || a.i - b.i)
+      .map((x) => x.g);
+  }, [allJobGroups, splitClosed, sectionOfGroup, daysPastDueMap]);
+  const sectionCounts = useMemo(() => {
+    const c = {};
+    if (splitClosed) jobGroups.forEach((g) => { const k = sectionOfGroup(g); c[k] = (c[k] || 0) + 1; });
+    return c;
+  }, [jobGroups, splitClosed, sectionOfGroup]);
   const hiddenClosedCount = splitClosed ? allJobGroups.length - jobGroups.length : 0;
 
   // รีเซ็ตกลับหน้า 1 ทุกครั้งที่ตัวกรอง/คำค้นหา/แท็บ/กลุ่มสถานะเปลี่ยน
@@ -3591,7 +3470,8 @@ const Operation = () => {
           <Typography variant="body2" color="text.secondary">
             {loading
               ? "กำลังโหลด..."
-              : `${sortedEvents.length} รายการ${activeFilterCount > 0 ? ` · กรอง ${activeFilterCount} เงื่อนไข` : ""}`}
+              // 🔁 (17 ต.ค. 2569) เดิม "611 รายการ" (นับวันเข้างาน) ขัดกับแถบสถานะ "ทั้งหมด 61" (นับงาน) — ใช้หน่วย "งาน" ให้ตรงกัน
+              : `${Math.max(0, allJobsCount - closedCount)} งานที่ยังไม่ปิด · ปิดแล้ว ${closedCount}${activeFilterCount > 0 ? ` · กรอง ${activeFilterCount} เงื่อนไข` : ""}`}
           </Typography>
         </Box>
         {/* ✅ ปุ่มวงกลม ขนาด 40px ให้แตะง่ายขึ้นบนมือถือ (เดิม size="small" เล็กไปสำหรับนิ้วมือ)
@@ -3683,16 +3563,6 @@ const Operation = () => {
         </Stack>
       </Stack>
 
-      {/* ✅ ย้ายมาไว้บนสุดของหน้า (เหนือแท็บ/การ์ดสรุปสถานะทั้งหมด) ให้แอดมิน/manager เห็นคำขอ
-          ปิดงานที่รอตรวจสอบทันทีที่เปิดหน้า ไม่ต้องเลื่อนหา — และ ClosureRequestsPanel เองจะไม่
-          render อะไรเลยถ้าไม่มีคำขอค้างอยู่ (return null) จึงไม่กินพื้นที่เวลาไม่มีงานรอตรวจสอบ */}
-      {isAdminOrManager && (
-        <ClosureRequestsPanel
-          events={events}
-          onReject={handleRejectClose}
-        />
-      )}
-
       {/* ✅ เดิมเป็นแถบ Alert สีฟ้าเต็มความกว้างเขียนว่า "กรองเฉพาะงาน: ..." ซึ่งกินที่และอ่านแล้วเหมือน
           คำเตือนว่ามีอะไรผิด ทั้งที่เป็นเรื่องปกติ (กดมาจากลิงก์เจาะจงงาน) — ย่อเหลือแถบเล็กๆ บรรทัดเดียว
           และเพิ่มปุ่ม "ดูในปฏิทิน" ตามที่ผู้ใช้ขอ เพื่อกระโดดไปดูงานนี้บนปฏิทินแบบเจาะจงวันได้เลย
@@ -3746,21 +3616,6 @@ const Operation = () => {
         <StatusStrip items={statusTileGroups[0].items} value={effectiveGroup} onChange={(v) => { setStatusGroup(v); setPage(1); }} />
       )}
 
-      {/* ✅ ทางลัดงานตามผู้รับผิดชอบ — ชุดเดียวกับหน้าภาพรวมงาน (กดชื่อเพื่อดูเฉพาะงานของคนนั้น) */}
-      {isAdminOrManager && activeTab !== 1 && !id && !isMobile && (
-        <Collapse in={peopleOpen} unmountOnExit>
-        <ResponsibleSummary
-          rows={responsibleRows}
-          unit="งาน"
-          value={filterResponsible}
-          onChange={(v) => { setFilterResponsible(v); setPage(1); }}
-          employees={employee}
-          isOverdue={isRowOverdue}
-          isMobile={isMobile}
-        />
-        </Collapse>
-      )}
-
       {loading && <LinearProgress sx={{ borderRadius: 1, mb: 2 }} />}
 
       {/* TAB 0: TABLE */}
@@ -3777,6 +3632,23 @@ const Operation = () => {
           )}
 
           {!isMobile && <FilterPanel {...filterPanelProps} />}
+          {/* 🔁 (17 ต.ค. 2569) แผงผู้รับผิดชอบเปิดจากปุ่มในแถบค้นหา → กางใต้แถบค้นหา (เดิมกางเหนือปุ่ม ดูไม่สัมพันธ์กัน) */}
+          {/* ✅ ทางลัดงานตามผู้รับผิดชอบ — ชุดเดียวกับหน้าภาพรวมงาน (กดชื่อเพื่อดูเฉพาะงานของคนนั้น) */}
+      {isAdminOrManager && activeTab !== 1 && !id && !isMobile && (
+        <Collapse in={peopleOpen} unmountOnExit>
+        <ResponsibleSummary
+          rows={responsibleRows}
+          unit="งาน"
+          value={filterResponsible}
+          onChange={(v) => { setFilterResponsible(v); setPage(1); }}
+          employees={employee}
+          isOverdue={isRowOverdue}
+          isMobile={isMobile}
+        />
+        </Collapse>
+      )}
+
+
           {isMobile && (
             <>
               {/* มือถือ: สิ่งที่กำลังดูอยู่เป็นชิปบรรทัดเดียว — แตะเพื่อเปิดแผ่นตัวกรอง */}
@@ -3891,7 +3763,9 @@ const Operation = () => {
                   หลายวันไม่ติดกัน) โชว์แถบวันที่ย่อย + "เข้างาน N วัน" เพิ่มมาตั้งแต่ตอนพับอยู่ ทำให้
                   สูงกว่าการ์ดงานวันเดียวเสมอ วางคู่กันแล้วดูไม่เท่ากัน/ไม่สวย คอลัมน์เดียวเรียงยาวลงมา
                   แทนจะเนียนตากว่า ไม่มีปัญหาความสูงไม่เท่ากันให้กวนตาอีก */}
-              {pagedGroups.map(sessions => {
+              {pagedGroups.map((sessions, idx) => {
+                const section = splitClosed ? sectionOfGroup(sessions) : null;
+                const showSection = section && (idx === 0 || sectionOfGroup(pagedGroups[idx - 1]) !== section);
                 // ✅ ในมุมมอง "ค้างงาน" ให้เห็นความรุนแรงต่างกันชัดๆ ก่อนเปิดการ์ด — เลย 1 สัปดาห์
                 // = แจ้งเตือนสีเหลือง (ให้ทันเห็นก่อน), เลย 2 สัปดาห์ = ค้างงานเต็มตัวสีแดง
                 // ✅ แสดงทุกมุมมอง ไม่ใช่เฉพาะแท็บค้างงาน (ผู้ใช้: "ยังดูงานที่ค้างยาก")
@@ -3903,7 +3777,9 @@ const Operation = () => {
                 const isHighlighted = sessions.some(s => s._id === highlightJobId);
 
                 return (
-                  <Box key={sessions[0].jobGroupId || sessions[0]._id}
+                  <React.Fragment key={sessions[0].jobGroupId || sessions[0]._id}>
+                  {showSection && <SectionHeader section={section} count={sectionCounts[section] || 0} />}
+                  <Box
                     id={isHighlighted ? `job-card-${highlightJobId}` : undefined}
                     sx={{
                       mb: 2, minWidth: 0,
@@ -3954,6 +3830,7 @@ const Operation = () => {
                       uploadingFileSizeState={uploadingFileSizeState}
                     />
                   </Box>
+                  </React.Fragment>
                 );
               })}
 
