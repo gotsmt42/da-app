@@ -539,11 +539,11 @@ const SectionHeader = ({ section, count }) => {
   return (
     <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 2.5, mb: 1.25, px: 0.5, "&:first-of-type": { mt: 0.5 } }}>
       <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: m.color, flexShrink: 0 }} />
-      <Typography sx={{ fontSize: "0.95rem", fontWeight: 800, color: "#0f172a" }}>{m.label}</Typography>
+      <Typography sx={{ fontSize: "0.95rem", fontWeight: 800, color: "#0f172a", whiteSpace: "nowrap", flexShrink: 0 }}>{m.label}</Typography>
       <Box component="span" sx={{ minWidth: 24, height: 22, px: 0.75, borderRadius: 99, display: "inline-grid", placeItems: "center",
-        fontSize: "0.75rem", fontWeight: 800, bgcolor: alpha(m.color, 0.12), color: m.color }}>{count}</Box>
+        fontSize: "0.75rem", fontWeight: 800, bgcolor: alpha(m.color, 0.12), color: m.color, flexShrink: 0 }}>{count}</Box>
       {m.hint && (
-        <Typography noWrap sx={{ fontSize: "0.78rem", color: "#64748b", minWidth: 0 }}>{m.hint}</Typography>
+        <Typography noWrap sx={{ display: { xs: "none", sm: "block" }, fontSize: "0.78rem", color: "#64748b", minWidth: 0 }}>{m.hint}</Typography>
       )}
       <Box sx={{ flex: 1, height: "1px", bgcolor: "#e2e8f0", ml: 0.5, minWidth: 16 }} />
     </Stack>
@@ -1708,30 +1708,51 @@ const EventRowCard = ({
               onRejectClose resolve ทั้งกลุ่มอยู่แล้ว) จึงโชว์แค่การ์ดตัวแทนของกลุ่มพอ (เทียบ pattern
               เดียวกับ hideDocuments ที่ซ่อนเอกสารประจำงานในการ์ดรายวันที่เหลือ) */}
           {!hideDocuments && event.closeRequested && localStatus !== "ดำเนินการเสร็จสิ้น" && (
-            <Box sx={{ mt: 1.5, p: 1.5, borderRadius: "12px", bgcolor: "#fff", border: `1px solid ${LINE}` }}>
-              <Stack direction="row" alignItems="flex-start" gap={1}>
-                <HourglassTop sx={{ fontSize: 18, color: "#d97706", mt: 0.2, flexShrink: 0 }} />
-                <Typography variant="body2" sx={{ flex: 1, wordBreak: "break-word" }}>
-                  {event.closeRequestedBy || "ช่าง"} ขอปิดงาน
-                  {event.closeRequestedAt && ` เมื่อ ${moment(event.closeRequestedAt).locale("th").format("DD MMM HH:mm")}`}
-                </Typography>
+            // 🔁 (17 ต.ค. 2569 ผู้ใช้: "คำขอปิดงาน ทำให้ชัดเจน ดูง่าย สวยงาม") — กล่องเด่นสีฟ้าอมเขียว (สีเดียวกับแถบคำขอปิดงาน)
+            //    หัวกล่อง · ใครขอ/เมื่อไร · บันทึกจากช่าง · เอกสารครบกี่อย่าง · ปุ่มใหญ่ อนุมัติ (เขียว) / ไม่อนุมัติ (ขอบแดง)
+            <Box id={`close-req-${event._id}`} sx={{ mt: 1.5, borderRadius: "14px", bgcolor: "#fff", border: "1.5px solid #67e8f9", overflow: "hidden", scrollMarginTop: 80 }}>
+              <Stack direction="row" alignItems="center" gap={1.25} sx={{ px: 1.75, py: 1.25, bgcolor: "#ecfeff", borderBottom: "1px solid #a5f3fc" }}>
+                <Box sx={{ width: 32, height: 32, borderRadius: "50%", bgcolor: "#0891b2", color: "#fff", display: "grid", placeItems: "center", flexShrink: 0 }}>
+                  <AssignmentTurnedIn sx={{ fontSize: 18 }} />
+                </Box>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography sx={{ fontSize: "0.92rem", fontWeight: 900, color: "#155e75", lineHeight: 1.3 }}>คำขอปิดงาน · รอตรวจสอบ</Typography>
+                  <Typography sx={{ fontSize: "0.76rem", color: "#0e7490" }}>
+                    {event.closeRequestedBy || "ช่าง"} ขอปิดงาน
+                    {event.closeRequestedAt && ` · ${formatThai(moment(event.closeRequestedAt), "D MMM YY HH:mm")} น.`}
+                  </Typography>
+                </Box>
               </Stack>
-              {isAdminOrManager && (
-                <Stack direction={{ xs: "column", sm: "row" }} gap={1} sx={{ mt: 1.25 }}>
-                  <Button variant="contained" disableElevation size="small"
-                    startIcon={<TaskAlt sx={{ fontSize: 16 }} />}
-                    onClick={handleApprove} disabled={approving || rejecting}
-                    sx={{ ...MBTN.success, ...SBTN, flex: 1 }}>
-                    {approving ? "กำลังอนุมัติ..." : "อนุมัติปิดงาน"}
-                  </Button>
-                  <Button variant="outlined" size="small"
-                    startIcon={<Cancel sx={{ fontSize: 16 }} />}
-                    onClick={() => setRejectDialogOpen(true)} disabled={approving || rejecting}
-                    sx={{ ...MBTN.outline("#dc2626"), ...SBTN, flex: 1 }}>
-                    ไม่อนุมัติ
-                  </Button>
+              <Box sx={{ px: 1.75, py: 1.25 }}>
+                {event.workNote && (
+                  <Typography sx={{ fontSize: "0.84rem", color: INK, bgcolor: SURFACE, borderRadius: 2, px: 1.25, py: 0.9, mb: 1, whiteSpace: "pre-line", wordBreak: "break-word" }}>
+                    <Box component="span" sx={{ display: "block", fontSize: "0.7rem", fontWeight: 800, color: MUTED, mb: 0.25 }}>บันทึกจากช่าง</Box>
+                    {event.workNote}
+                  </Typography>
+                )}
+                <Stack direction="row" alignItems="center" gap={0.75} sx={{ mb: isAdminOrManager ? 1.25 : 0 }}>
+                  <Description sx={{ fontSize: 16, color: docDone === JOB_DOC_TYPES.length ? "#059669" : "#d97706" }} />
+                  <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: docDone === JOB_DOC_TYPES.length ? "#047857" : "#b45309" }}>
+                    เอกสารประจำงาน {docDone}/{JOB_DOC_TYPES.length}{docDone === JOB_DOC_TYPES.length ? " · ครบแล้ว" : " · ตรวจเอกสารด้านบนก่อนอนุมัติ"}
+                  </Typography>
                 </Stack>
-              )}
+                {isAdminOrManager && (
+                  <Stack direction={{ xs: "column", sm: "row" }} gap={1}>
+                    <Button variant="contained" disableElevation
+                      startIcon={<TaskAlt sx={{ fontSize: 18 }} />}
+                      onClick={handleApprove} disabled={approving || rejecting}
+                      sx={{ ...MBTN.success, flex: 1, height: 42, borderRadius: 2.5, fontWeight: 800, fontSize: "0.9rem" }}>
+                      {approving ? "กำลังอนุมัติ..." : "อนุมัติปิดงาน"}
+                    </Button>
+                    <Button variant="outlined"
+                      startIcon={<Cancel sx={{ fontSize: 18 }} />}
+                      onClick={() => setRejectDialogOpen(true)} disabled={approving || rejecting}
+                      sx={{ ...MBTN.outline("#dc2626"), flex: 1, height: 42, borderRadius: 2.5, fontWeight: 800, fontSize: "0.9rem" }}>
+                      ไม่อนุมัติ
+                    </Button>
+                  </Stack>
+                )}
+              </Box>
             </Box>
           )}
 
@@ -3793,6 +3814,42 @@ const Operation = () => {
                         },
                       }),
                     }}>
+                    {/* ✅ (17 ต.ค. 2569 ผู้ใช้: "คำขอปิดงานให้เด้งปุ่มมาให้ตรวจสอบ ทำให้ชัดเจนดูง่าย")
+                        แถบติดหัวการ์ดงานที่ช่างขอปิด — ใครขอ · เมื่อไร · ปุ่ม "ตรวจสอบและอนุมัติ" เปิดแผงรายละเอียดเต็ม
+                        (เอกสาร → คำขอปิดงาน: อนุมัติ/ไม่อนุมัติ อยู่ในแผงนั้น) */}
+                    {isAdminOrManager && (() => {
+                      const req = sessions.find((e) => e.closeRequested && e.status !== "ดำเนินการเสร็จสิ้น");
+                      if (!req) return null;
+                      return (
+                        <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ sm: "center" }} gap={{ xs: 1, sm: 1.5 }}
+                          sx={{
+                            mb: -1.25, pb: 2, pt: 1.1, px: 1.5, borderRadius: "14px 14px 0 0",
+                            bgcolor: "#ecfeff", border: "1px solid #a5f3fc", borderBottom: 0,
+                          }}>
+                          <Stack direction="row" alignItems="center" gap={1} sx={{ flex: 1, minWidth: 0 }}>
+                            <Box sx={{ width: 30, height: 30, borderRadius: "50%", bgcolor: "#0891b2", color: "#fff", display: "grid", placeItems: "center", flexShrink: 0 }}>
+                              <AssignmentTurnedIn sx={{ fontSize: 17 }} />
+                            </Box>
+                            <Box sx={{ minWidth: 0 }}>
+                              <Typography sx={{ fontSize: "0.88rem", fontWeight: 900, color: "#155e75", lineHeight: 1.3 }}>ช่างขอปิดงาน · รอคุณตรวจสอบ</Typography>
+                              <Typography noWrap sx={{ fontSize: "0.74rem", color: "#0e7490" }}>
+                                {req.closeRequestedBy || "ช่าง"}{req.closeRequestedAt ? ` · ขอเมื่อ ${moment(req.closeRequestedAt).locale("th").fromNow()}` : ""}
+                              </Typography>
+                            </Box>
+                          </Stack>
+                          <Button variant="contained" disableElevation startIcon={<Visibility sx={{ fontSize: 17 }} />}
+                            onClick={() => {
+                              setDetailJobId(sessions[0]._id);
+                              // เลื่อนแผงไปที่กล่องคำขอปิดงาน (อยู่ในการ์ดหลักของกลุ่ม = sessions[0])
+                              setTimeout(() => document.getElementById(`close-req-${sessions[0]._id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 450);
+                            }}
+                            sx={{ flexShrink: 0, height: 38, px: 2, borderRadius: 2.5, textTransform: "none", fontWeight: 800, fontSize: "0.85rem",
+                              bgcolor: "#0891b2", "&:hover": { bgcolor: "#0e7490" }, width: { xs: "100%", sm: "auto" } }}>
+                            ตรวจสอบและอนุมัติ
+                          </Button>
+                        </Stack>
+                      );
+                    })()}
                     {daysPastDue !== null && daysPastDue !== undefined && (
                       <Stack direction="row" alignItems="center" gap={0.75}
                         sx={{
