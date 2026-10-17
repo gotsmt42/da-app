@@ -161,43 +161,48 @@ export default function TodayBoard({ events, onOpenJob }) {
 
   return (
     <Box>
-      {/* ── สรุปวันนี้ (กดเพื่อกรอง) ── */}
-      <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 0.75, px: 0.5 }}>
-        <Typography sx={{ fontSize: "1rem", fontWeight: 800, color: "#0f172a" }}>
-          งานวันนี้ · {now.locale("th").format("dddd D MMMM")} {now.year() + 543}
-        </Typography>
-        <Typography sx={{ fontSize: "0.74rem", color: "#94a3b8", ml: "auto", whiteSpace: "nowrap" }}>
-          อัปเดต {now.format("HH:mm")} น.
-        </Typography>
+      {/* ── สรุปวันนี้: แถบเดียว — วันที่ซ้าย · ตัวกรองแบบชิปขวา (🔁 17 ต.ค. 2569 ผู้ใช้: "ดูใหญ่กินพื้นที่ จัดวางให้สวยงาม") ── */}
+      <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ sm: "center" }} gap={1}
+        sx={{ mb: 1.5, px: 1.5, py: 1, bgcolor: "#fff", border: "1px solid #e2e8f0", borderRadius: 3 }}>
+        <Box sx={{ minWidth: 0, flexShrink: 0 }}>
+          <Typography noWrap sx={{ fontSize: "0.92rem", fontWeight: 800, color: "#0f172a", lineHeight: 1.3 }}>
+            {now.locale("th").format("dddd D MMM")} {now.year() + 543}
+          </Typography>
+          <Typography sx={{ fontSize: "0.7rem", color: "#94a3b8" }}>อัปเดต {now.format("HH:mm")} น. · รีเฟรชทุก 1 นาที</Typography>
+        </Box>
+        {rows.length > 0 && (
+          <Stack direction="row" gap={0.75} sx={{ ml: { sm: "auto" }, overflowX: "auto", scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
+            {FILTERS.map((f) => {
+              const on = filter === f.key;
+              const n = counts[f.key] || 0;
+              const hot = f.key === "late" && n > 0;
+              return (
+                <ButtonBase key={f.key} onClick={() => setFilter(f.key)}
+                  sx={{
+                    flexShrink: 0, height: 32, px: 1.25, gap: 0.75, borderRadius: 99, fontFamily: "inherit", whiteSpace: "nowrap",
+                    fontSize: "0.8rem", fontWeight: on ? 800 : 600, color: on ? f.color : "#475569",
+                    bgcolor: on ? alpha(f.color, 0.08) : "transparent",
+                    border: `1px solid ${on ? alpha(f.color, 0.5) : "#e2e8f0"}`,
+                  }}>
+                  {f.key !== "all" && <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: f.color }} />}
+                  {f.label}
+                  <Box component="span" sx={{
+                    minWidth: 20, height: 20, px: 0.6, borderRadius: 99, display: "inline-grid", placeItems: "center", fontSize: "0.72rem", fontWeight: 800,
+                    bgcolor: hot ? "#dc2626" : on ? f.color : "#f1f5f9", color: hot || on ? "#fff" : "#64748b",
+                  }}>{n}</Box>
+                </ButtonBase>
+              );
+            })}
+          </Stack>
+        )}
       </Stack>
-      <Box sx={{
-        display: "grid", gap: 1, mb: 2,
-        gridTemplateColumns: { xs: "repeat(2, minmax(0, 1fr))", sm: "repeat(3, minmax(0, 1fr))", md: "repeat(5, minmax(0, 1fr))" },
-      }}>
-        {FILTERS.map((f) => {
-          const on = filter === f.key;
-          const hot = f.key === "late" && counts.late > 0;
-          return (
-            <ButtonBase key={f.key} onClick={() => setFilter(f.key)}
-              sx={{
-                display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 0.25, p: 1.5, borderRadius: 2.5,
-                fontFamily: "inherit", textAlign: "left", bgcolor: on ? alpha(f.color, 0.08) : "#fff",
-                border: `1.5px solid ${on ? alpha(f.color, 0.55) : hot ? alpha(f.color, 0.35) : "#e2e8f0"}`,
-              }}>
-              <Typography sx={{ fontSize: "1.6rem", fontWeight: 900, lineHeight: 1.1, color: f.key === "all" ? "#0f172a" : f.color }}>
-                {counts[f.key] || 0}
-              </Typography>
-              <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: on ? f.color : "#475569" }}>{f.label}</Typography>
-            </ButtonBase>
-          );
-        })}
-      </Box>
 
       {techs.length === 0 ? (
-        <Box sx={{ textAlign: "center", py: 8, color: "text.secondary", bgcolor: "#fff", border: "1px dashed #e2e8f0", borderRadius: 3 }}>
-          <Groups sx={{ fontSize: 48, opacity: 0.25, mb: 1 }} />
-          <Typography fontWeight={700}>{rows.length === 0 ? "วันนี้ไม่มีงานที่ลงตารางไว้" : "ไม่มีงานในกลุ่มนี้"}</Typography>
-        </Box>
+        <Stack direction="row" alignItems="center" justifyContent="center" gap={1}
+          sx={{ py: 3, color: "#94a3b8", bgcolor: "#fff", border: "1px dashed #e2e8f0", borderRadius: 3 }}>
+          <Groups sx={{ fontSize: 22 }} />
+          <Typography sx={{ fontSize: "0.88rem", fontWeight: 700 }}>{rows.length === 0 ? "วันนี้ไม่มีงานที่ลงตารางไว้" : "ไม่มีงานในกลุ่มนี้"}</Typography>
+        </Stack>
       ) : (
         // ── การ์ดละ 1 ช่าง ──
         <Box sx={{ display: "grid", gap: 1.5, alignItems: "start", gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" } }}>
