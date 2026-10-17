@@ -57,7 +57,7 @@ import {
   Refresh, ArrowUpward, ArrowDownward, Circle, ExpandMore,
   ExpandLess, FolderOpen, AttachFile, Login, Logout, Edit,
   NoteAdd, History, Person, AccessTime, FiberManualRecord,
-  TaskAlt, HourglassTop, Cancel,
+  TaskAlt, HourglassTop, Cancel, Today,
   Send, Chat, Link as LinkIcon,
   Print, Share, RequestQuote, ReceiptLong, AssignmentTurnedIn, EventAvailable, Tune,
   RemoveCircleOutline, NoteAlt,
@@ -77,8 +77,6 @@ import { styled, alpha } from "@mui/material/styles";
 
 import TechnicianJobCard, { isDocComplete, isDocRequired } from "@/features/technician/components/TechnicianJobPanel";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LINE, SUCCESS } from "@/shared/ui/PageKit";
-import useEventNotifications from "@/shared/hooks/useEventNotifications";
-import NotificationBell from "@/features/notifications/components/NotificationBell";
 import LineIcon from "@/shared/ui/LineIcon";
 import { printFile, shareFile, shareToLine, isMobileDevice } from "@/shared/utils/fileActions";
 import DeliveryNoteDialog from "@/features/documents/components/DeliveryNoteDialog";
@@ -86,6 +84,7 @@ import WorkNoticeDialog from "@/features/documents/components/WorkNoticeDialog";
 import { JobFlowChips, JobFlowPanel, JobFlowFlags, nextStepOf } from "@/shared/ui/JobFlow";
 import SitePhotos from "@/shared/ui/SitePhotos";
 import CheckInOutPanel, { MiniSteps, jobStepOf } from "@/features/attendance/components/CheckInOutPanel";
+import TodayBoard, { isTodayJob } from "@/features/operation/components/TodayBoard";
 import { docsUnlocked } from "@/shared/utils/jobFlow";
 import { BTN as MBTN, CARD } from "@/shared/ui/modernUi";
 import RadioButtonUnchecked from "@mui/icons-material/RadioButtonUnchecked";
@@ -1889,7 +1888,7 @@ const EventRowCard = ({
 // ─── StatusStrip ─────────────────────────────────────────────────────
 /** แถบสถานะแถวเดียว: จุดสี + ชื่อ + ตัวเลข · แถบที่เลือกพื้นสีอ่อน · ตัวเลขแดงเมื่อเป็นเรื่องที่ต้องรีบจัดการ */
 // ✅ (17 ต.ค. 2569) เส้นคั่นกลุ่ม: ทั้งหมด | ลำดับงาน (รอยืนยัน → … → คำขอปิดงาน) | ค้างงาน (ข้อยกเว้น) | เสร็จสิ้น (คลัง)
-const STRIP_SEP_BEFORE = new Set(["waiting", "overdue", "closed"]);
+const STRIP_SEP_BEFORE = new Set(["today", "waiting", "overdue", "closed"]);
 const StatusStrip = ({ items, value, onChange }) => (
   <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, p: 0.5, mb: 1.5, bgcolor: "#fff", border: "1px solid #e2e8f0", borderRadius: 3, overflowX: "auto",
     scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
@@ -2821,14 +2820,15 @@ const Operation = () => {
     // สถานะเลย (status ยังเป็น "กำลังรอยืนยัน" อยู่ แต่ closeRequested:true แล้ว) ถูกตัดออกจากรายการ
     // ทั้งที่ pendingCount/ClosureRequestsPanel นับรวมงานนี้ไว้แล้ว ทำให้เห็น badge "2 งาน" แต่เปิด
     // แท็บมาแล้วเจอ "ไม่พบรายการ" ว่างเปล่า ต้องงดเว้นตัดออกในกลุ่มนี้ด้วยเช่นกัน
-    const matchNotPending = (filterOP === "กำลังรอยืนยัน" || group === "overdue" || group === "pending" || group === "all" || group === "waiting")
+    const matchNotPending = (filterOP === "กำลังรอยืนยัน" || group === "overdue" || group === "pending" || group === "all" || group === "waiting" || group === "today")
       ? true
       : event.status !== "กำลังรอยืนยัน";
 
     let matchGroup;
     if (!group || group === "all") {
       matchGroup = true;
-    } else if (group === "pending")      matchGroup = event.closeRequested === true && event.status !== "ดำเนินการเสร็จสิ้น";
+    } else if (group === "today")        matchGroup = isTodayJob(event); // ✅ (17 ต.ค. 2569) แท็บงานวันนี้ — แสดงด้วย TodayBoard
+    else if (group === "pending")      matchGroup = event.closeRequested === true && event.status !== "ดำเนินการเสร็จสิ้น";
     // ✅ ตัดงานที่ค้างเกินกำหนดออกจากกลุ่มนี้ ให้ไปอยู่แถบ "ค้างงาน" แถบเดียว (ดูเหตุผลเต็มที่ inProgressCount)
     else if (group === "active")  matchGroup = ["ยืนยันแล้ว", "กำลังดำเนินการ"].includes(event.status)
       && !event.closeRequested
@@ -2915,6 +2915,7 @@ const Operation = () => {
   const confirmedCount = useMemo(() => flowCount("ยืนยันแล้ว"), [flowCount]);
   const workingCount   = useMemo(() => flowCount("กำลังดำเนินการ"), [flowCount]);
   const severeOverdueCount = useMemo(() => countFlaggedJobs(countBase, daysPastDueMap, isSevereDays), [countBase, daysPastDueMap]);
+  const todayCount = useMemo(() => countBase.filter((e) => isTodayJob(e)).length, [countBase]);
 
   // ✅ จัดกลุ่ม event ที่เป็น "งานเดียวกัน" เข้าด้วยกัน กันงานที่ต้องเข้าหลายวันแบบไม่ติดกัน
   // (เช่น PM ครั้งที่ 1 แบ่งเข้า 3 วันเว้นระยะ) ถูกนับ/แสดงเป็นคนละงานแยกกัน
@@ -3322,7 +3323,7 @@ const Operation = () => {
     try {
       const { exportOperationToExcel, buildOperationFileName } = await import("@/features/operation/utils/operationExcelExport");
       const groupLabel = {
-        all: "ทั้งหมด", pending: "คำขอปิดงาน", active: "กำลังดำเนินการ", overdue: "ค้างงาน", closed: "เสร็จสิ้น",
+        all: "ทั้งหมด", today: "งานวันนี้", pending: "คำขอปิดงาน", active: "กำลังดำเนินการ", overdue: "ค้างงาน", closed: "เสร็จสิ้น",
       }[effectiveGroup] || "ทั้งหมด";
       await exportOperationToExcel({
         // ⚠️ jobGroups เป็น array ของ "array of sessions" ตรงๆ (ดู useMemo ด้านบน) ไม่ใช่ object ที่มี
@@ -3346,10 +3347,6 @@ const Operation = () => {
     }
   };
 
-  const { notifications, unread, markRead, markAllRead } = useEventNotifications(
-    events,
-    isAdminOrManager ? "admin" : "technician"
-  );
 
   // ✅ แถบแบ่งหน้าใช้ทั้งมุมมองการ์ดและตาราง — เดิมมีแค่การ์ด ตารางเลยดูข้อมูลหน้าถัดไปไม่ได้ (ผู้ใช้แจ้ง)
   // ✅ มือถือ: การ์ดสถานะ/ผู้รับผิดชอบ/ค้นหา/ตัวกรอง รวมในแผ่นล่างแผ่นเดียว (ผู้ใช้ขอ — เหมือนหน้าภาพรวมงาน)
@@ -3362,6 +3359,8 @@ const Operation = () => {
     title: "",
     items: [
       { value: "all", label: "ทั้งหมด", count: Math.max(0, allJobsCount - closedCount), unit: "งาน", icon: <AppsIcon />, color: "#475569" },
+      // ✅ (17 ต.ค. 2569 ผู้ใช้: "ขอแทปงานวันนี้ ดูว่าช่างทำงานไหนบ้าง กดบันทึกเข้างานหรือยัง")
+      { value: "today", label: "งานวันนี้", count: todayCount, unit: "งาน", icon: <Today />, color: "#0f766e" },
       // ✅ (15 ต.ค. 2569 ผู้ใช้: "แถบสถานะงานของช่างแสดงให้ครบแบบแอดมิน แค่เห็นแค่งานของตัวเอง")
       //    ทุกคนเห็นแถบครบเหมือนกัน — ช่างนับจากงานที่ตัวเองเกี่ยวข้อง (server กรองให้แล้ว) · ช่าง: "ขอปิดงานแล้ว" ไม่ใช่เรื่องเร่งด่วนของตัวเอง
       { value: "waiting", label: "รอยืนยัน", count: waitingCount, unit: "งาน", icon: <HourglassTop />, color: "#d97706" },
@@ -3531,9 +3530,7 @@ const Operation = () => {
               <Refresh fontSize="small" />
             </IconButton>
           </Tooltip>
-          {/* Notification bell — ทุก role เห็น แต่เนื้อหาต่างกันตามฝั่ง (ดูคอมเมนต์ใน NotificationBell) */}
-          {/* 🧹 มือถือ: ตัดกระดิ่งออก (ผู้ใช้ขอ — แถบหัวแอปมีกระดิ่งแจ้งเตือนอยู่แล้ว ปุ่มบนหัวเพจแน่นเกิน) */}
-          {!isMobile && <NotificationBell notifications={notifications} unread={unread} onItemClick={markRead} onMarkAllRead={markAllRead} />}
+          {/* 🧹 (17 ต.ค. 2569 ผู้ใช้: "การแจ้งเตือนตรงนี้เอาออก ไม่มีความหมาย") ตัดกระดิ่งบนหัวเพจ — ใช้กระดิ่งบนแถบหัวแอปที่เดียว */}
           {/* ✅ สลับมุมมองการ์ด ↔ ตาราง — การ์ดอ่านรายละเอียดทีละงานได้ครบ (มีเอกสาร/คอมเมนต์/ปุ่มจัดการ
               ในตัว) ส่วนตารางไว้กวาดดูหลายงานพร้อมกัน/เทียบกัน เทียบ pattern เดียวกับหน้าติดตามใบเสนอราคา */}
           <ToggleButtonGroup
@@ -3657,7 +3654,7 @@ const Operation = () => {
               {!id && (
                 <Box sx={{ display: "flex", gap: 0.75, overflowX: "auto", mx: -1.5, px: 1.5, pb: 0.5, mb: 1, scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
                   {/* ⚠️ ค้างงานอยู่ถัดจาก "ทั้งหมด" เสมอ — เห็นได้โดยไม่ต้องเลื่อนแถบ */}
-                  {[...statusTileGroups[0].items].sort((x, y) => (x.value === "all" ? -2 : x.value === "overdue" ? -1 : 0) - (y.value === "all" ? -2 : y.value === "overdue" ? -1 : 0)).map((it) => {
+                  {[...statusTileGroups[0].items].sort((x, y) => ({ all: -3, today: -2, overdue: -1 }[x.value] || 0) - ({ all: -3, today: -2, overdue: -1 }[y.value] || 0)).map((it) => {
                     const on = effectiveGroup === it.value;
                     const hot = it.alert && it.count > 0;
                     return (
@@ -3736,6 +3733,8 @@ const Operation = () => {
 
           {loading ? (
             [1, 2, 3].map(i => <Skeleton key={i} variant="rounded" height={96} sx={{ mb: 1.5, borderRadius: 2 }} />)
+          ) : effectiveGroup === "today" ? (
+            <TodayBoard events={responsibleFiltered} onOpenJob={(jid) => setDetailJobId(jid)} />
           ) : sortedEvents.length === 0 ? (
             <Box sx={{ textAlign: "center", py: 10, color: "text.secondary" }}>
               <FolderOpen sx={{ fontSize: 56, opacity: 0.25, mb: 1 }} />
