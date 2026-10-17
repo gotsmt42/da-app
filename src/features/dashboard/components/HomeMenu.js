@@ -209,6 +209,15 @@ export default function HomeMenu({ userData, badges = {}, hideMyJobs = false, hi
   // มือถือ: หมวดที่มี ≤2 เมนูวางคู่กันครึ่งจอ — ถ้าเหลือใบเดียวไม่มีคู่ ให้เต็มแถวแทน (ไม่ทิ้งครึ่งจอว่าง)
   const narrow = cats.filter((c) => c.items.length <= 2);
   const loneNarrowKey = narrow.length % 2 === 1 ? narrow[narrow.length - 1].key : null;
+  // ✅ (17 ต.ค. 2569 ผู้ใช้: "วิเคราะห์หน้าแรก จุดไหนไม่มืออาชีพ") จอคอม: หมวดที่มี ≤3 เมนูเต็มแถวจะเหลือที่ว่างโล่ง 2 ใน 3
+  //    → จับคู่หมวดที่ "อยู่ติดกัน" ให้วางคู่กันครึ่งแถว (เช่น รับงาน·วางแผน | ปฏิบัติงาน) · ตัวที่ไม่มีคู่ยังเต็มแถว
+  const widePair = new Set();
+  for (let i = 0; i < cats.length - 1; i += 1) {
+    if (cats[i].items.length <= 3 && cats[i + 1].items.length <= 3) {
+      widePair.add(cats[i].key); widePair.add(cats[i + 1].key);
+      i += 1;
+    }
+  }
 
   return (
     <nav className="hm" aria-label="เมนูหลัก">
@@ -222,7 +231,7 @@ export default function HomeMenu({ userData, badges = {}, hideMyJobs = false, hi
               return (
                 <section
                   key={cat.key}
-                  className={`hm-cat${half ? " hm-cat--half" : ""}`}
+                  className={`hm-cat${half ? " hm-cat--half" : ""}${widePair.has(cat.key) ? " hm-cat--wpair" : ""}`}
                   style={{ order: index, "--hm-tone": cat.tone }}
                   aria-labelledby={`hm-cat-${cat.key}`}
                 >

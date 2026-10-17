@@ -523,7 +523,9 @@ const Dashboard = () => {
         const n = todayJobs.filter((j) => j.status === st).length;
         return n ? <Pill key={st} color={STATUS_META[st].color}>{STATUS_SHORT[st]} {n}</Pill> : null;
       }) : null}
-      to={todayJobs.length || isSale ? "/event" : undefined} toLabel="เปิดตารางงาน">
+      // 🔁 (17 ต.ค. 2569) แอดมิน/ผู้จัดการ → แท็บ "งานวันนี้" หน้าการดำเนินงาน (เห็นว่าช่างคนไหนเข้างานแล้ว)
+      to={!isSale && seesOperationBoard(userData) ? "/operation?group=today" : todayJobs.length || isSale ? "/event" : undefined}
+      toLabel={!isSale && seesOperationBoard(userData) ? "ดูการเข้างาน" : "เปิดตารางงาน"}>
       {loading ? <Loading rows={2} /> : todayJobs.length === 0 ? (
         <Empty text={isSale ? "วันนี้ยังไม่มีนัดหมาย" : "ไม่มีงานที่นัดหมายไว้วันนี้"} />
       ) : todayJobs.map((job) => {
@@ -558,23 +560,6 @@ const Dashboard = () => {
           ))}
         </Widget>
       )}
-
-      {/* งานที่กำลังจะถึงใน 7 วัน (ไม่รวมวันนี้ — มีกล่อง "งานวันนี้" แยกแล้ว) */}
-      <Widget title="งานที่กำลังจะถึง" icon={EventOutlined} count={upcomingJobs.length || undefined} hint="ภายใน 7 วันข้างหน้า" to={upcomingJobs.length > 5 ? "/event" : undefined} toLabel="เปิดตารางงาน">
-        {loading ? <Loading rows={2} /> : upcomingJobs.length === 0 ? <Empty text="ไม่มีงานที่จะถึงใน 7 วันนี้" /> : upcomingJobs.slice(0, 5).map((job) => {
-          const jobStart = moment(job.start || job.date).startOf("day");
-          const diffDays = jobStart.diff(today, "days");
-          const jobGroup = resolveOperationGroup(job);
-          return (
-            <Row key={job._id} to={jobLink(job._id, jobGroup)}
-              title={job.title || "งาน"} sub={[job.company, job.site].filter(Boolean).join(" · ") || "ไม่ระบุโครงการ"}
-              leading={<DateTile top={jobStart.format("D")} bottom={formatThai(jobStart, "MMM")} color={ACCENT} strong={diffDays === 1} />}
-              trailing={<Pill color={diffDays === 1 ? ACCENT : MUTED}>{diffDays === 1 ? "พรุ่งนี้" : `อีก ${diffDays} วัน`}</Pill>}
-              // ✅ ขั้นตอนทำงาน — ด่วน / ช่างยังไม่กดรับทราบงาน
-              trailingSub={[isUrgent(job) ? "⚡ ด่วน" : "", acksOf(job).length || !ackTracked(job) ? "" : "ยังไม่รับทราบ"].filter(Boolean).join(" · ") || undefined} />
-          );
-        })}
-      </Widget>
 
       {/* งานค้างของช่างแยกรายคน — กดชื่อเพื่อดูรายการงานค้างของคนนั้น */}
       <Widget title="งานค้างของช่าง" icon={EngineeringOutlined} tone={DANGER} count={overdueByTechnician.reduce((n, t) => n + t.count, 0) || undefined} hint="เลยกำหนดเกิน 7 วัน · แยกรายคน" to="/staff?tab=workload" toLabel="ภาระงานทีม">
@@ -618,15 +603,37 @@ const Dashboard = () => {
       {/* สัญญาที่เลยกำหนด — มือถือแสดงตรงนี้ (จอกว้างอยู่คอลัมน์หลัก) */}
       {overdueContractsBlock && <div className="dashboard-mobile-only">{overdueContractsBlock}</div>}
 
-      {/* งานวางแผนล่วงหน้า (ยังไม่ลงตาราง · ไม่รวมฉบับร่างของสัญญา) */}
-      <Widget title="งานวางแผนล่วงหน้า" icon={EditCalendarOutlined} tone="#475569" count={generalDrafts.length || undefined} hint="ยังไม่ลงวันที่ในตาราง" to={generalDrafts.length ? "/jobs/intake" : undefined} toLabel="ไปหน้างานใหม่"
+      {/* งานใหม่ที่ยังไม่ลงตาราง (ไม่รวมฉบับร่างของสัญญา)
+          🔁 (17 ต.ค. 2569) เปลี่ยนชื่อจาก "งานวางแผนล่วงหน้า" ให้ตรงกับเมนู/หน้า "งานใหม่" (เดิมเรียกของชุดเดียวกันคนละชื่อ) */}
+      <Widget title="งานใหม่ · รอส่งลงตาราง" icon={EditCalendarOutlined} tone="#475569" count={generalDrafts.length || undefined} hint="รับงานแล้ว ยังไม่ลงวันเข้างาน" to={generalDrafts.length ? "/jobs/intake" : undefined} toLabel="ไปหน้างานใหม่"
         footer={<Pager page={draftsSafePage} pages={draftsTotalPages} onChange={setDraftsPage} />}>
-        {loading ? <Loading rows={2} /> : draftsPreview.length === 0 ? <Empty text="ยังไม่มีงานวางแผนล่วงหน้า" /> : draftsPreview.map((d) => (
+        {loading ? <Loading rows={2} /> : draftsPreview.length === 0 ? <Empty text="ไม่มีงานใหม่ค้างส่งลงตาราง" /> : draftsPreview.map((d) => (
           <Row key={d._id} to="/jobs/intake" title={d.title || "งาน"}
             sub={[d.system, d.site].filter(Boolean).join(" · ") || "ไม่ระบุโครงการ"}
             trailing={<Pill color="#475569">{d.plannedMonth ? formatThai(moment(d.plannedMonth, "YYYY-MM"), "MMM YYYY") : "ไม่ระบุเดือน"}</Pill>} />
         ))}
       </Widget>
+
+      {/* งานที่กำลังจะถึงใน 7 วัน (ไม่รวมวันนี้ — มีกล่อง "งานวันนี้" แยกแล้ว)
+          🔁 (17 ต.ค. 2569 ผู้ใช้: "วิเคราะห์การจัดวางหน้าแรก จุดไหนไม่มืออาชีพ") — ย้ายลงท้าย (ข้อมูลล่วงหน้า ไม่ใช่สิ่งที่ต้องทำตอนนี้)
+          และซ่อนตอนไม่มีงาน (กล่องว่างใหญ่ๆ ไม่ได้บอกอะไร) */}
+      {(loading || upcomingJobs.length > 0) && (
+      <Widget title="งานที่กำลังจะถึง" icon={EventOutlined} count={upcomingJobs.length || undefined} hint="ภายใน 7 วันข้างหน้า" to={upcomingJobs.length > 5 ? "/event" : undefined} toLabel="เปิดตารางงาน">
+        {loading ? <Loading rows={2} /> : upcomingJobs.length === 0 ? <Empty text="ไม่มีงานที่จะถึงใน 7 วันนี้" /> : upcomingJobs.slice(0, 5).map((job) => {
+          const jobStart = moment(job.start || job.date).startOf("day");
+          const diffDays = jobStart.diff(today, "days");
+          const jobGroup = resolveOperationGroup(job);
+          return (
+            <Row key={job._id} to={jobLink(job._id, jobGroup)}
+              title={job.title || "งาน"} sub={[job.company, job.site].filter(Boolean).join(" · ") || "ไม่ระบุโครงการ"}
+              leading={<DateTile top={jobStart.format("D")} bottom={formatThai(jobStart, "MMM")} color={ACCENT} strong={diffDays === 1} />}
+              trailing={<Pill color={diffDays === 1 ? ACCENT : MUTED}>{diffDays === 1 ? "พรุ่งนี้" : `อีก ${diffDays} วัน`}</Pill>}
+              // ✅ ขั้นตอนทำงาน — ด่วน / ช่างยังไม่กดรับทราบงาน
+              trailingSub={[isUrgent(job) ? "⚡ ด่วน" : "", acksOf(job).length || !ackTracked(job) ? "" : "ยังไม่รับทราบ"].filter(Boolean).join(" · ") || undefined} />
+          );
+        })}
+      </Widget>
+      )}
     </>
   ) : null;
 

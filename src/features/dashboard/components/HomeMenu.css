@@ -379,3 +379,17 @@
   }
 }
 
+/* ✅ (17 ต.ค. 2569) จอคอม — หมวดสั้น (≤3 เมนู) ที่อยู่ติดกันวางคู่กันครึ่งแถว (คู่คำนวณใน HomeMenu.js: widePair)
+   เดิมทุกหมวดเต็มแถว หมวด 3 เมนูกินที่แค่ 1 ใน 3 ของความกว้าง เหลือพื้นที่ขาวโล่งด้านขวาทุกหมวด */
+@media (min-width: 1100px) {
+  .hm-cat,
+  .hm-cat--half {
+    grid-column: 1 / -1;
+  }
+  .hm-cat--wpair {
+    grid-column: auto;
+  }
+  .hm-cat--wpair .hm-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
