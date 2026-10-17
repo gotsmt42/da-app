@@ -21,13 +21,10 @@ import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import { formatRoundLabel } from "@/shared/utils/contractRounds";
 import {
-  // ✅ letterIndentFor = แนวเยื้องเส้นเดียวที่ใช้ร่วมกับใบส่งมอบงาน (แทน LABEL_VALUE_X/INDENT แบบตายตัว
-  // ของเดิม ซึ่งทำให้บรรทัดเริ่มไม่ตรงกันหลายแนวในใบเดียว — ดูคอมเมนต์ที่ letterIndentFor)
-  ISSUER, PAGE, CONTENT_W, letterIndentFor,
-  spaceThaiLatin, thaiFullDate, resolveJobFields, referencePresetsFor,
+  ISSUER, LM, spaceThaiLatin, thaiFullDate, resolveJobFields,
   ATTENTION_PRESETS, SIGNER_POSITION_PRESETS,
-  wrapParagraph, createDocument, drawLetterhead, outputDocument, drawSignatureOnLine,
-  preparePrintAssets, printAsset,
+  defaultReferenceFor, createDocument, outputDocument,
+  preparePrintAssets, drawLetterheadModern, drawDocTitle, drawLetterMeta, flowParagraph, flowTable, flowLabeled, placeFlowLetter,
 } from "./deliveryNotePdf";
 
 export { ATTENTION_PRESETS, SIGNER_POSITION_PRESETS, thaiFullDate, ISSUER };
@@ -52,10 +49,11 @@ export const workVerbFor = (title) =>
  * ✅ ข้อความท้ายบล็อกกำหนดการที่บริษัทใช้บ่อย (ขอสนับสนุนอุปกรณ์/เจ้าหน้าที่ประสานงาน)
  * — เติมให้เป็นค่าตั้งต้น ลบทิ้งหรือแก้ถ้อยคำได้ทั้งหมด
  */
+// 🔁 (17 ต.ค. 2569 ผู้ใช้: "หมายเหตุให้ระบุว่าถ้าจำเป็นด้วย") — ขึ้นต้น "หากจำเป็น" ทุกข้อ: เป็นคำขอเผื่อไว้ ไม่ใช่เงื่อนไขบังคับลูกค้า
 export const SUPPORT_REQUEST_PRESETS = [
-  "บริษัท ฯ ขอสนับสนุนอุปกรณ์ขึ้นที่สูง เช่น บันได นั่งร้าน ลิฟท์ และเจ้าหน้าที่ประสานงาน 1 ท่าน",
-  "บริษัท ฯ ขอสนับสนุนเจ้าหน้าที่ประสานงานเพื่อนำเข้าพื้นที่ 1 ท่าน",
-  "บริษัท ฯ ขอความอนุเคราะห์เปิดพื้นที่และระบบไฟฟ้าสำหรับการทดสอบ",
+  "หากจำเป็น บริษัทฯ ขอความอนุเคราะห์อุปกรณ์สำหรับงานที่สูง เช่น บันได นั่งร้าน หรือลิฟต์ และเจ้าหน้าที่ประสานงาน 1 ท่าน",
+  "หากจำเป็น บริษัทฯ ขอความอนุเคราะห์เจ้าหน้าที่ประสานงานเพื่อนำเข้าพื้นที่ 1 ท่าน",
+  "หากจำเป็น บริษัทฯ ขอความอนุเคราะห์เปิดพื้นที่และระบบไฟฟ้าสำหรับการทดสอบ",
 ];
 
 /** ✅ ช่วงเวลาที่พิมพ์บ่อย — ให้เลือกได้ทั้งแบบทั้งวันและครึ่งวัน */
@@ -167,7 +165,7 @@ export const buildWorkNoticeDefaults = (job, customer, issuer) => {
     customerAddress: customer?.address || "",
     customerTaxId: customer?.tax || "",
     attention: ATTENTION_PRESETS[0],
-    reference: referencePresetsFor(job)[0] || "",
+    reference: defaultReferenceFor(job),
     workLabel,
     roundLabel,
     // ⚠️ ไกด์อย่างเดียว ไม่ถูกพิมพ์ลงเอกสาร — ใช้โชว์ในกล่องและปุ่ม "สร้างรายการตามวันที่ในตาราง"
@@ -205,242 +203,83 @@ export const buildWorkNoticeBody = (f) => {
   const ref = f.reference ? ` ตาม${f.reference}` : "";
   const customer = f.customerCompany ? ` จาก ${f.customerCompany}` : "";
   return spaceThaiLatin(
-    `ตามที่ ${ISSUER.nameTh} ได้รับความไว้วางใจ${customer} ให้เข้าดำเนินการ ${work}${place}${ref} นั้น ` +
-    `บริษัทฯ ขอแจ้งให้ท่านทราบถึงกำหนดการเข้าปฏิบัติงาน ${work}${round} โดยมีรายละเอียดดังนี้`
+    `ตามที่ ${ISSUER.nameTh} ได้รับความไว้วางใจ${customer} ให้ดำเนินการ ${work}${place}${ref} นั้น ` +
+    `บริษัทฯ ขอแจ้งกำหนดการเข้าปฏิบัติงาน${round} ดังนี้`
   );
 };
 
 /** ย่อหน้าที่ 2 — ขอความร่วมมือ/ยืนยันมาตรการ */
 export const buildWorkNoticeCooperation = () => spaceThaiLatin(
-  `ทั้งนี้ บริษัทฯ ใคร่ขอความร่วมมือจากท่านในการแจ้งผู้เกี่ยวข้องทุกท่านเพื่อทราบกำหนดการดังกล่าว ` +
-  `โดยบริษัทฯ จะเข้าดำเนินการด้วยความระมัดระวัง ไม่ให้ส่งผลกระทบต่อผู้ใช้งานพื้นที่ พร้อมมีมาตรการ ` +
-  `ความปลอดภัยตามมาตรฐานตลอดระยะเวลาปฏิบัติงาน หากท่านไม่สะดวกตามวันและเวลาดังกล่าว ` +
-  `กรุณาแจ้งกลับมายังบริษัทฯ เพื่อนัดหมายใหม่`
+  `จึงขอความร่วมมือท่านแจ้งผู้เกี่ยวข้องให้ทราบกำหนดการดังกล่าว บริษัทฯ จะปฏิบัติงานอย่างระมัดระวัง ` +
+  `ไม่ให้กระทบผู้ใช้พื้นที่ และปฏิบัติตามมาตรการความปลอดภัยตลอดการทำงาน ` +
+  `หากวันหรือเวลาดังกล่าวไม่สะดวก กรุณาติดต่อกลับเพื่อนัดหมายใหม่`
 );
 
 /**
- * สร้างไฟล์ PDF ใบแจ้งเข้าปฏิบัติงาน
- * @param {"open"|"download"} mode — เปิดดูในแท็บใหม่ หรือดาวน์โหลดไฟล์เลย (เดิมทำทั้งคู่พร้อมกันเสมอ)
+ * สร้างไฟล์ PDF ใบแจ้งเข้าปฏิบัติงาน (รูปแบบใหม่ 17 ต.ค. 2569 — ชุดจัดหน้าอยู่ใน deliveryNotePdf.js)
+ * @param {"open"|"download"|"blob"} mode
  */
 export const generateWorkNoticePdf = async ({ jsPDF, thSarabunFont, form, mode = "open" }) => {
   moment.locale("th");
-
-  // ✅ ย่อโลโก้/ตราประทับให้พอดีความละเอียดงานพิมพ์ก่อนฝังลงไฟล์ (ดูหัวข้อ "ขนาดไฟล์ PDF")
   await preparePrintAssets();
-
   const doc = createDocument(jsPDF, thSarabunFont);
-  const headerY = drawLetterhead(doc);
+  const headerY = drawLetterheadModern(doc);
+  const days = (form.dayRows || []).filter((r) => dayRowText(r));
 
-  // ── ส่วนลงนามถูกตรึงไว้ล่างกระดาษเสมอ — เนื้อหาทั้งหมดต้องจบก่อนถึงเส้นนี้ ────────────────
-  // ✅ มี 2 ขนาด: ปกติ กับ "บีบ" (กรอบเตี้ยลง + ชิดขอบล่างขึ้น) ใช้เป็นตัวช่วยสุดท้ายก่อนยอมขึ้นหน้า 2
-  // ⚠️ ไม่บีบไว้ตลอด — กรอบเซ็นที่เตี้ยเกินไปเขียนชื่อ/ประทับตราลำบากเวลาปริ้นท์ออกมาเซ็นจริง
-  const boxW = 80;
-  const SIGN_VARIANTS = [
-    { boxH: 54, bottom: 26 },
-    { boxH: 46, bottom: 16 },
-  ];
-
-  /**
-   * ✅ วางเนื้อหาทั้งใบ — เรียกได้ 2 โหมด: draw:false = "วัดความสูง" เฉยๆ ไม่วาดอะไรลงกระดาษ,
-   * draw:true = วาดจริง
-   * ⚠️ ทำไมต้องวัดก่อน: ใบแจ้งเข้างานควรจบในหน้าเดียวเสมอ (ลูกค้าปริ้นท์แปะบอร์ด/แนบเมลทีเดียวจบ
-   * และส่วนลงนามต้องอยู่หน้าเดียวกับกำหนดการ ไม่งั้นเซ็นแล้วแยกแฟ้มกัน) แต่ความยาวจริงเดาไม่ได้เลย —
-   * ขึ้นกับที่อยู่ลูกค้ายาวแค่ไหน, งานกี่วัน, ผู้ใช้พิมพ์รายละเอียดรายวันยาวแค่ไหน
-   * ✅ จึงลองวัดด้วยขนาดตัวอักษรไล่จากใหญ่ไปเล็ก แล้วใช้ "ขนาดใหญ่ที่สุดที่ยังจบในหน้าเดียว"
-   * (ไม่ใช่ย่อทุกใบให้เล็กไว้ก่อน ซึ่งจะทำให้ใบสั้นๆ อ่านลำบากโดยไม่จำเป็น)
-   */
-  const layout = ({ fs: fontSize, lh, draw }) => {
-    doc.setFontSize(fontSize);
-    // ✅ ระยะจากหัวกระดาษถึงบล็อกหัวจดหมาย — 2.1 บรรทัดเดิมทำให้เห็นเป็นช่องว่างก้อนใหญ่คั่นกลาง
-    let y = headerY + lh * 1.6;
-    const put = (text, x, yy, opt) => { if (draw) doc.text(text, x, yy, opt); };
-    const gap = (mm) => { y += mm; };
-
-    // ── บล็อกหัวจดหมาย (ป้าย : ค่า) ────────────────────────────────────────
-    // 🐛 ที่แก้ (ระยะห่างดูแปลก): เดิมคอลัมน์ "ค่า" ตรึงไว้ที่ 26mm จากขอบซ้ายตายตัว แต่ป้ายยาวสุดที่ใช้
-    // จริง ("โครงการ") กว้างแค่ราว 16mm — เหลือช่องว่างโล่งกลางบรรทัดเกือบ 10mm ทุกบรรทัด ดูเหมือนจัด
-    // หน้าพลาดมากกว่าตั้งใจ ✅ คิดจากป้ายที่ยาวที่สุดที่ใช้จริงในใบนี้ + ระยะหายใจคงที่ (เทียบ pattern
-    // เดียวกับคอลัมน์ของกำหนดการรายวัน) — ค่าทุกบรรทัดยังเรียงตรงกันเหมือนเดิม แค่ไม่ห่างเกินจำเป็น
-    // ✅ แนวเยื้องเส้นเดียวใช้ร่วมกับใบส่งมอบงาน (letterIndentFor) — ทั้งคอลัมน์ค่าของหัวจดหมาย
-    // ย่อหน้าแรก กำหนดการรายวัน ป้ายหมายเหตุ และคำลงท้าย เริ่มตรงกันหมดในแนวเดียว
-    const indent = letterIndentFor(doc);
-    const valueX = PAGE.left + indent;
-    const VALUE_W = PAGE.w - PAGE.right - valueX;
-    const row = (label, value) => {
-      const text = spaceThaiLatin(value);
-      if (!text) return;
-      const ls = doc.splitTextToSize(text, VALUE_W);
-      if (label) put(label, PAGE.left, y);
-      ls.forEach((ln, i) => put(ln, valueX, y + i * lh));
-      y += ls.length * lh;
-    };
-    row("เลขที่", form.docNumber);
-    row("วันที่", thaiFullDate(form.issuedAt));
-    row("เรื่อง", form.subject);
-    row("โครงการ", form.site);
-    row("", form.customerCompany);
-    row("", form.customerAddress);
-    row("", form.customerTaxId ? `เลขประจำตัวผู้เสียภาษี ${form.customerTaxId}` : "");
-    // ⚠️ ระยะเว้นต้องแยกจาก row() — row() คืนค่าทันทีถ้าช่องนั้นว่าง ถ้าผูกระยะเว้นไว้ด้วยกัน ใบที่ไม่ได้
-    // กรอก "อ้างถึง" (กรณีปกติ) จะเห็นหัวข้อถัดไปขึ้นไปติดบรรทัดบนพอดีจนดูเหมือนจัดหน้าพลาด
-    // ✅ ครึ่งบรรทัดพอ — เต็มบรรทัดกลายเป็นช่องโหว่กลางบล็อก โดยเฉพาะใบที่ไม่ได้กรอกบริษัท/ที่อยู่ลูกค้า
-    // (แถวพวกนั้นถูกข้ามไป ช่องว่างเลยไปกองรวมกันอยู่ตรงเดียว)
-    gap(lh * 0.55);
-    row("เรียน", form.attention);
-    row("อ้างถึง", form.reference);
-
-    // ── ย่อหน้าที่ 1 ───────────────────────────────────────────────────────
-    const para = (text) => {
-      const t = spaceThaiLatin(text);
-      if (!t) return;
-      wrapParagraph(doc, t, CONTENT_W - indent, CONTENT_W).forEach((ln, i) => {
-        put(ln, PAGE.left + (i === 0 ? indent : 0), y);
-        y += lh;
+  placeFlowLetter(doc, {
+    headerY,
+    title: "ใบแจ้งเข้าปฏิบัติงาน",
+    docNumber: form.docNumber,
+    firstY: ({ fs, lh }, draw) => {
+      const y = drawDocTitle(doc, headerY, "ใบแจ้งเข้าปฏิบัติงาน", "WORK NOTICE", draw);
+      return drawLetterMeta(doc, {
+        y: y + 2, fs, lh, draw, docNumber: form.docNumber, date: form.issuedAt,
+        rows: [
+          ["เรื่อง", form.subject],
+          ["โครงการ", form.site],
+          ["", form.customerCompany],
+          ["", form.customerAddress],
+          ["", form.customerTaxId ? `เลขประจำตัวผู้เสียภาษี ${form.customerTaxId}` : ""],
+          ["เรียน", form.attention, { gapBefore: 0.3 }],
+          ["อ้างถึง", form.reference],
+        ],
+      }) + lh;
+    },
+    body: (f) => {
+      flowParagraph(doc, f, form.body);
+      // ✅ กำหนดการเป็นตาราง วันที่ | เวลา | รายละเอียด — หลายวันจนล้นหน้า = ขึ้นหน้าใหม่พร้อมหัวตารางซ้ำ (ไม่ย่อตัวอักษร)
+      if (!days.length) return;
+      f.y += -f.lh + 4.8;
+      flowTable(doc, f, {
+        cols: [
+          { title: "วันที่", w: 34 },
+          { title: "เวลา", w: 30, align: "center" },
+          { title: "รายละเอียดการปฏิบัติงาน" },
+        ],
+        rows: days.map((r) => [r.date ? thaiFullDate(r.date) : "-", r.time || "-", r.detail || "-"]),
       });
-    };
-    gap(lh * 1.5);
-    para(form.body);
-
-    // ── กำหนดการรายวัน — จัดเป็น 3 คอลัมน์ให้ตรงกันทุกบรรทัด ─────────────────
-    // ✅ "วันที่ ..." | "เวลา ..." | "สิ่งที่จะทำ" เรียงตรงกันทุกบรรทัด อ่านไล่ลงมาได้เร็วกว่าปล่อยให้ไหล
-    // ต่อกันเป็นประโยคเดียว (ซึ่งแต่ละบรรทัดจะเริ่มคนละตำแหน่งเพราะชื่อเดือน/วันที่ยาวไม่เท่ากัน)
-    // ⚠️ ความกว้างคอลัมน์คิดจากข้อความจริงในใบนี้ ไม่ใช่ค่าตายตัว — "1 กันยายน" สั้นกว่า "15 กุมภาพันธ์"
-    // อยู่หลายมิลลิเมตร ถ้าตั้งตายตัวจะเว้นห่างเกินไปในใบหนึ่งและชนกันในอีกใบหนึ่ง
-    const SCHED_X = PAGE.left + indent;
-    const HANG = 8; // ระยะเยื้องของบรรทัดที่ 2 เป็นต้นไป ให้เห็นว่ายังเป็นรายการของวันเดิม
-    const writeEntry = (text) => {
-      const t = spaceThaiLatin(text);
-      if (!t) return;
-      wrapParagraph(doc, t, CONTENT_W - indent, CONTENT_W - indent - HANG).forEach((ln, i) => {
-        put(ln, SCHED_X + (i === 0 ? 0 : HANG), y);
-        y += lh;
-      });
-    };
-
-    gap(lh * 0.8);
-    const days = (form.dayRows || []).filter((r) => dayRowText(r));
-    if (days.length > 0) {
-      const dateOf = (r) => (r.date ? `วันที่ ${thaiFullDate(r.date)}` : "");
-      const timeOf = (r) => (r.time ? `เวลา ${spaceThaiLatin(r.time)}` : "");
-      const colW = (fn) => Math.max(0, ...days.map((r) => doc.getTextWidth(fn(r))));
-      const dateW = colW(dateOf) ? colW(dateOf) + 5 : 0;
-      const timeW = colW(timeOf) ? colW(timeOf) + 5 : 0;
-      const detailX = SCHED_X + dateW + timeW;
-      const detailW = PAGE.w - PAGE.right - detailX;
-      days.forEach((r) => {
-        // ⚠️ ถ้าคอลัมน์รายละเอียดแคบเกินไป (ผู้ใช้พิมพ์ช่วงเวลายาวผิดปกติ) ให้ไหลเป็นบรรทัดเดียวแทน
-        // ดีกว่าบีบข้อความจนตัดเป็นคำละบรรทัด
-        if (detailW < 55) { writeEntry(dayRowText(r)); return; }
-        const top = y;
-        put(dateOf(r), SCHED_X, top);
-        put(timeOf(r), SCHED_X + dateW, top);
-        const ls = String(spaceThaiLatin(r.detail) || "").split("\n")
-          .flatMap((ln) => doc.splitTextToSize(ln, detailW));
-        ls.forEach((ln, i) => put(ln, detailX, top + i * lh));
-        y = top + Math.max(1, ls.length) * lh;
-      });
-    }
-
-    // ── หมายเหตุเพิ่มเติม ──────────────────────────────────────────────────
-    // ✅ ต้องแยกออกจากรายการรายวันให้ชัด — เดิมพิมพ์ต่อท้ายด้วยรูปแบบเดียวกันเป๊ะ (เยื้องเท่ากัน ขนาด
-    // เท่ากัน) ลูกค้าอ่านแล้วนึกว่าเป็นรายละเอียดของวันสุดท้าย ไม่ใช่ข้อความที่ใช้กับทั้งใบ
-    // ✅ ใส่ป้าย "หมายเหตุ" คั่นไว้ + เว้นระยะเหนือกว่าปกติ + เนื้อความเยื้องเข้าไปเป็นคอลัมน์ของตัวเอง
-    const noteLines = String(form.supportNote || "").split("\n").map((s) => s.trim()).filter(Boolean);
-    if (noteLines.length > 0) {
-      gap(lh * 0.9);
-      const NOTE_LABEL = "หมายเหตุ";
-      const noteX = SCHED_X + doc.getTextWidth(NOTE_LABEL) + 5;
-      const noteW = PAGE.w - PAGE.right - noteX;
-      put(NOTE_LABEL, SCHED_X, y);
-      noteLines.forEach((ln) => {
-        doc.splitTextToSize(spaceThaiLatin(ln), noteW).forEach((seg) => {
-          put(seg, noteX, y);
-          y += lh;
-        });
-      });
-    }
-
-    // ── ย่อหน้าที่ 2 + คำลงท้าย ────────────────────────────────────────────
-    gap(lh);
-    para(form.cooperationNote);
-    gap(lh * 0.8);
-    put("จึงเรียนมาเพื่อโปรดทราบและขอขอบพระคุณมา ณ โอกาสนี้", PAGE.left + indent, y);
-    y += lh;
-    return y;
-  };
-
-  // ✅ ไล่ขนาดจากปกติ (14pt) ลงไปจนถึงเล็กสุดที่ยังอ่านสบาย (12pt) — TH Sarabun ตัวโปร่งกว่าฟอนต์ละติน
-  // ขนาดเดียวกัน 12pt จึงยังอ่านง่ายบนกระดาษ A4 ถ้าเล็กกว่านี้เริ่มไม่เหมาะกับเอกสารที่ส่งให้ลูกค้า
-  // ⚠️ ระยะบรรทัดต้องย่อตามขนาดตัวอักษรด้วย ไม่งั้นตัวเล็กลงแต่บรรทัดยังห่างเท่าเดิม = ไม่ประหยัดที่เลย
-  const SCALES = [
-    { fs: 14, lh: 6.6 },
-    { fs: 13.5, lh: 6.3 },
-    { fs: 13, lh: 6.0 },
-    { fs: 12.5, lh: 5.7 },
-    { fs: 12, lh: 5.4 },
-  ];
-  // ✅ ลองทุกขนาดตัวอักษรกับกรอบลงนาม "ขนาดปกติ" ก่อน แล้วค่อยลองกรอบแบบบีบ — ลำดับนี้สำคัญ เพราะ
-  // การย่อตัวอักษรลงนิดเดียวรบกวนสายตาน้อยกว่าการบีบกรอบเซ็นให้เขียนลำบาก
-  // ⚠️ วัดความสูงของแต่ละขนาดครั้งเดียวแล้วเก็บไว้ใช้ซ้ำ — ความสูงเนื้อหาไม่ขึ้นกับขนาดกรอบลงนามเลย
-  const measured = SCALES.map((s) => ({ ...s, height: layout({ ...s, draw: false }) }));
-  let chosen = { ...measured[measured.length - 1], ...SIGN_VARIANTS[SIGN_VARIANTS.length - 1] };
-  outer: for (const v of SIGN_VARIANTS) {
-    for (const m of measured) {
-      if (m.height <= PAGE.h - v.bottom - v.boxH - 3) { chosen = { ...m, ...v }; break outer; }
-    }
-  }
-  const { boxH, bottom } = chosen;
-  const boxY = PAGE.h - bottom - boxH;
-  const endY = layout({ ...chosen, draw: true });
-
-  // ── ส่วนลงนาม ────────────────────────────────────────────────────────────
-  // ✅ ตรึงไว้ล่างกระดาษเสมอ (เหมือนใบส่งมอบงาน) — เอกสารทางการต้องมีที่เซ็นตำแหน่งเดียวกันทุกใบ
-  // ⚠️ ปกติจะไม่ถึงตรงนี้แล้ว เพราะขั้นตอนวัดด้านบนย่อขนาดให้พอดีหน้าเดียวไว้ก่อน — แต่ถ้าเนื้อหายาวจริงๆ
-  // จนเล็กสุด (12pt) ยังไม่พอ ก็ต้องขึ้นหน้าใหม่ ดีกว่าปล่อยให้ตัวหนังสือทับกรอบลงนามจนอ่านไม่ได้ทั้งคู่
-  if (endY > boxY - 3) doc.addPage();
-
-  // ฝั่งซ้าย: ลูกค้าลงนามรับทราบกำหนดการ
-  doc.setLineWidth(0.5);
-  doc.rect(PAGE.left, boxY, boxW, boxH);
-  const leftCenter = PAGE.left + boxW / 2;
-  doc.setFontSize(13.5);
-  doc.text("ลงนามรับทราบกำหนดการ", leftCenter, boxY + boxH * 0.15, { align: "center" });
-  doc.setFontSize(13);
-  doc.text("............................................", leftCenter, boxY + boxH * 0.48, { align: "center" });
-  doc.text("(____________________________)", leftCenter, boxY + boxH * 0.61, { align: "center" });
-  doc.text("วันที่ _______ / _______ / _______", leftCenter, boxY + boxH * 0.74, { align: "center" });
-  doc.setFontSize(11.5);
-  doc.splitTextToSize(spaceThaiLatin(form.customerCompany), boxW - 4).slice(0, 2)
-    .forEach((ln, i) => doc.text(ln, leftCenter, boxY + boxH * 0.85 + i * 4.6, { align: "center" }));
-
-  // ฝั่งขวา: ขอแสดงความนับถือ → ตราประทับ → ชื่อ/ตำแหน่ง/เบอร์ติดต่อ
-  const rightCenter = PAGE.w - PAGE.right - boxW / 2;
-  doc.setFontSize(13.5);
-  doc.text("ขอแสดงความนับถือ", rightCenter, boxY + boxH * 0.15, { align: "center" });
-  try {
-    const stamp = printAsset(ISSUER.stamp);
-    const sp = doc.getImageProperties(stamp);
-    const sw = 24;
-    const sh = (sp.height / sp.width) * sw;
-    // ⚠️ ยึด "ขอบล่าง" ของตราไว้ที่ +24.5 แล้วคำนวณขอบบนย้อนขึ้น — ถ้ายึดขอบบนแล้ววันหนึ่งเปลี่ยนไฟล์ตรา
-    // เป็นรูปที่สูงกว่าเดิม ตราจะไหลลงไปทับเส้นเซ็น (บั๊กเดิมของใบส่งมอบงานเป๊ะๆ)
-    doc.addImage(stamp, "PNG", rightCenter - boxW / 2 + 2, boxY + boxH * 0.45 - sh, sw, sh, "company-stamp", "MEDIUM");
-  } catch {
-    // ไม่มีไฟล์ตราประทับก็ออกเอกสารได้ตามปกติ (เว้นที่ว่างไว้ให้ประทับตรามือแทน)
-  }
-  doc.setFontSize(13);
-  // ✅ ลายเซ็นอิเล็กทรอนิกส์ของผู้ออกเอกสาร (ดู drawSignatureOnLine ใน deliveryNotePdf.js)
-  drawSignatureOnLine(doc, form.signatureImage, {
-    centerX: rightCenter, lineY: boxY + boxH * 0.47, maxW: boxW * 0.62, maxH: boxH * 0.26,
+      f.y += f.lh * 1.45;
+    },
+    // ส่วนท้าย (หมายเหตุ · ย่อหน้าปิด · คำลงท้าย) ไปพร้อมช่องเซ็นเสมอ
+    closing: (f) => {
+      if (String(form.supportNote || "").trim()) {
+        flowLabeled(doc, f, "หมายเหตุ", form.supportNote);
+        f.y += f.lh * 0.9;
+      }
+      flowParagraph(doc, f, form.cooperationNote);
+      f.y += f.lh * 0.6;
+      f.need(0);
+      if (f.draw) doc.text("จึงเรียนมาเพื่อโปรดทราบ และขอขอบพระคุณมา ณ โอกาสนี้", LM + 14, f.y);
+    },
+    sign: {
+      leftTitle: "ลงนามรับทราบกำหนดการ",
+      customer: form.customerCompany || form.site,
+      signerName: form.signerName, signerPosition: form.signerPosition,
+      contact: [ISSUER.nameTh, form.signerTel && `โทร. ${form.signerTel}`].filter(Boolean).join(" · "),
+      signatureImage: form.signatureImage,
+    },
+    footerLabel: `ใบแจ้งเข้าปฏิบัติงาน · เลขที่ ${form.docNumber || "-"}`,
   });
-  doc.text("............................................", rightCenter, boxY + boxH * 0.48, { align: "center" });
-  doc.text(`( ${spaceThaiLatin(form.signerName) || "____________________________"} )`, rightCenter, boxY + boxH * 0.61, { align: "center" });
-  doc.text(spaceThaiLatin(form.signerPosition), rightCenter, boxY + boxH * 0.74, { align: "center" });
-  doc.setFontSize(11.5);
-  // ✅ เบอร์ติดต่อกลับอยู่ใต้ตำแหน่ง — จุดที่ลูกค้ามองหาเมื่อไม่สะดวกตามกำหนดการ
-  const contactLine = spaceThaiLatin([ISSUER.nameTh, form.signerTel && `โทร. ${form.signerTel}`].filter(Boolean).join(" · "));
-  doc.splitTextToSize(contactLine, boxW + 12).slice(0, 2)
-    .forEach((ln, i) => doc.text(ln, rightCenter, boxY + boxH * 0.85 + i * 4.6, { align: "center" }));
 
   return outputDocument(doc, `ใบแจ้งเข้างาน ${form.docNumber || ""} ${form.site || ""}`, mode);
 };

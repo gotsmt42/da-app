@@ -24,6 +24,8 @@ import { thaiDateFull } from "@/shared/utils/thaiDate";
 // ── ข้อมูลบริษัทผู้ออกเอกสาร ────────────────────────────────────────────────
 // ✅ รวมไว้ที่เดียว — เดิม GenPDF.js ฝังข้อความพวกนี้กระจายอยู่กลางฟังก์ชัน ย้ายที่อยู่/เบอร์ทีต้องไล่หา
 import OrgSettingService from "@/shared/services/OrgSettingService";
+// ✅ (17 ต.ค. 2569) ตัวหนาสำหรับหัวข้อ/ป้ายของเอกสาร (เดิมมีแค่ตัวปกติ ทุกอย่างหน้าตาเท่ากันหมด อ่านแยกส่วนยาก)
+import thSarabunBold from "@/assets/fonts/THSarabunNewBold_base64";
 
 /**
  * ข้อมูลบริษัทบนหัวกระดาษ
@@ -271,6 +273,9 @@ export const referencePresetsFor = (job) => {
   ].filter(Boolean).map(spaceThaiLatin))];
 };
 
+/** ค่าตั้งต้นของ "อ้างถึง" — เอกสารที่ลูกค้ารู้จัก (PO/ใบเสนอราคา/สัญญา) · เลขที่งานภายในเป็นแค่ตัวเลือก ไม่ใช้เป็นค่าตั้งต้น */
+export const defaultReferenceFor = (job) => referencePresetsFor(job).find((r) => !r.startsWith("เลขที่งาน")) || "";
+
 /** ✅ (17 ต.ค. 2569) "เรียน" — ผู้ติดต่อหน้างานของงานนี้ขึ้นเป็นตัวเลือกแรก (ถ้ามี) ตามด้วยตำแหน่งที่ใช้บ่อย */
 export const attentionPresetsFor = (job) => {
   const name = String(resolveJobFields(job).contactName || "").trim();
@@ -291,35 +296,108 @@ export const thaiFullDate = (d) => thaiDateFull(d);
  * ⚠️ ภาษาไทยไม่มีเว้นวรรคระหว่างคำ ก้อนคำไทยยาวๆ ก้อนเดียวจึงอาจกว้างเกินบรรทัดได้ — กรณีนั้น
  * fallback ไปใช้ splitTextToSize หั่นก้อนนั้นต่อ (ยอมให้ตัดกลางคำ ดีกว่าปล่อยให้ล้นออกนอกกระดาษ)
  */
+/**
+ * 🔁 (17 ต.ค. 2569 ผู้ใช้: "การตัดบรรทัดต่างๆ ที่ไม่สวย ไม่มืออาชีพ แก้ไขให้สมบูรณ์")
+ *    เดิมตัดบรรทัดได้เฉพาะ "ช่องว่าง" — ภาษาไทยเขียนติดกันเป็นก้อนยาว บรรทัดจึงขาดสั้นกุดกลางหน้า (ขอบขวาแหว่ง)
+ *    หรือหั่นกลางคำ ✅ ตัดตาม "ขอบเขตคำไทย" ด้วย Intl.Segmenter (มีในเบราว์เซอร์ทุกตัวที่ใช้แอปนี้)
+ *    บรรทัดเต็มความกว้างสม่ำเสมอ และไม่ตัดกลางคำ · ไม่มี Segmenter = ตัดที่ช่องว่างแบบเดิม
+ * ⚠️ เครื่องหมายที่ห้ามขึ้นต้นบรรทัด (ฯ ๆ . , ) : ;) ติดไปกับคำก่อนหน้าเสมอ
+ */
+const SEGMENTER = typeof Intl !== "undefined" && Intl.Segmenter ? new Intl.Segmenter("th", { granularity: "word" }) : null;
+const NO_LINE_START = /^[ฯๆ.,):;!?%\]]+$/;
+// ✅ คำนำหน้าที่ตัวตัดคำแยกออกจากคำหลัก (ผู้|ใช้ · การ|ทำงาน · ความ|ปลอดภัย) — ห้ามจบบรรทัดด้วยคำพวกนี้ ติดไปกับคำถัดไปเสมอ
+const GLUE_NEXT = new Set(["ผู้", "การ", "ความ", "นัก", "ช่าง", "ผู้ใช้", "ใน", "ณ", "(", "ต่อ", "เพื่อ", "ตาม"]);
+// ✅ คำประสมที่ตัวตัดคำแยกเป็น 2 ชิ้น (ดำเนิน|การ) แล้วไปตกคนละบรรทัด — รวมกลับก่อนตัดบรรทัด
+const COMPOUNDS = new Set([
+  "ดำเนินการ", "ประสานงาน", "ปฏิบัติงาน", "บำรุงรักษา", "ส่วนกลาง", "นัดหมาย", "ร่วมมือ", "ปลอดภัย", "ห้องพัก",
+  "ผู้ใช้", "เรียบร้อย", "ตรวจสอบ", "ตรวจเช็ค", "รับมอบ", "ส่งมอบ", "ติดต่อ", "กลับมา", "อุปกรณ์", "เจ้าหน้าที่", "พิจารณา",
+]);
+const breakTokens = (text) => {
+  const raw = SEGMENTER ? [...SEGMENTER.segment(text)].map((x) => x.segment) : text.split(/(\s+)/);
+  const out = [];
+  let glue = false;
+  raw.forEach((t) => {
+    if (!t) return;
+    const prev = out[out.length - 1];
+    if (out.length && (glue || NO_LINE_START.test(t) || COMPOUNDS.has(prev + t) || /[/]$/.test(prev) || t === "/") && !/^\s+$/.test(t)) out[out.length - 1] += t;
+    else out.push(t);
+    glue = GLUE_NEXT.has(t);
+  });
+  // ✅ รอบสอง: ไม่ตัดกลาง "25 - 50" / "1/2 - 2569" และชื่อเฉพาะภาษาอังกฤษหลายคำ ("Fire Alarm", "Amazon Residence")
+  const isSpace = (t) => /^\s+$/.test(t);
+  const isLatinCap = (t) => /^[A-Z][A-Za-z0-9.&'-]*$/.test(t);
+  const merged = [];
+  for (let k = 0; k < out.length; k += 1) {
+    const t = out[k];
+    const last = merged[merged.length - 1];
+    const prevTok = merged.length >= 2 && isSpace(last) ? merged[merged.length - 2] : null;
+    // "... -" + " " + "50"  หรือ  "25" + " " + "- ..."
+    if (isSpace(t) && last && /[-–]$/.test(last.trim()) && out[k + 1] && !isSpace(out[k + 1])) { merged[merged.length - 1] += t + out[k + 1]; k += 1; continue; }
+    if (/^[-–]/.test(t) && prevTok) { merged.splice(merged.length - 2, 2, prevTok + last + t); continue; }
+    // "1 ท่าน" / "2 ชุด" — ตัวเลขกับหน่วยไม่แยกบรรทัด
+    if (prevTok && /^\d+$/.test(prevTok) && /^[฀-๿]/.test(t) && t.length <= 6) { merged.splice(merged.length - 2, 2, prevTok + last + t); continue; }
+    if (isLatinCap(t) && prevTok && /[A-Za-z]$/.test(prevTok) && (prevTok + last + t).length <= 28) { merged.splice(merged.length - 2, 2, prevTok + last + t); continue; }
+    merged.push(t);
+  }
+  return merged;
+};
+
+/**
+ * ✅ (17 ต.ค. 2569 ผู้ใช้: "ตัวหนังสือที่มันเลยแบบนี้ ไม่สวย ไม่มืออาชีพ") — จัดย่อหน้าแบบ "กระจายแบบไทย" (Thai distributed)
+ *    เหมือนหนังสือราชการ/Word: ทุกบรรทัดยกเว้นบรรทัดสุดท้ายชิดขอบซ้าย-ขวาเท่ากัน โดยเกลี่ยช่องไฟระหว่างคำ
+ *    (ไม่ยืดระยะตัวอักษร — วรรณยุกต์/สระบนล่างจะเพี้ยน) · ช่องไฟเกินควร (บรรทัดมีคำน้อยมาก) = ชิดซ้ายธรรมดา
+ */
+export const drawJustified = (doc, line, x, y, width) => {
+  // ⚠️ ช่องว่างเดิม (ระหว่างคำอังกฤษ/หลังเครื่องหมาย) คงความกว้างปกติไว้แล้วบวกช่องไฟเพิ่ม — ไม่ตัดทิ้ง ไม่งั้น "Fire Alarm" จะชิดกัน
+  const toks = breakTokens(String(line).trim());
+  const textW = toks.reduce((n, t) => n + doc.getTextWidth(t), 0);
+  const gaps = toks.length - 1;
+  const extra = gaps > 0 ? (width - textW) / gaps : 0;
+  if (gaps <= 0 || extra < 0 || extra > 6) { doc.text(line, x, y); return; }
+  let cx = x;
+  toks.forEach((t) => { doc.text(t, cx, y); cx += doc.getTextWidth(t) + extra; });
+};
 export const wrapParagraph = (doc, text, firstWidth, restWidth) => {
-  const words = String(text || "").split(/\s+/).filter(Boolean);
-  const lines = [];
-  let cur = "";
+  const clean = String(text || "").replace(/\s+/g, " ").trim();
+  if (!clean) return [];
+  const isSp = (t) => /^\s+$/.test(t);
+  const lines = []; // แต่ละบรรทัดเก็บเป็นชิ้นคำ (รวมช่องว่าง) — ใช้ย้ายคำระหว่างบรรทัดได้โดยไม่เสียช่องว่างเดิม
+  let cur = [];
+  const spaceBefore = []; // บรรทัดนั้นเริ่มหลังช่องว่างเดิมหรือไม่ (ตัดตรงช่องว่าง)
+  const str = (toks) => toks.join("").trim();
   const limitFor = () => (lines.length === 0 ? firstWidth : restWidth);
-
-  const pushCur = () => { if (cur) { lines.push(cur); cur = ""; } };
-
-  for (const w of words) {
-    const test = cur ? `${cur} ${w}` : w;
-    if (doc.getTextWidth(test) <= limitFor()) { cur = test; continue; }
-    pushCur();
-    // ก้อนคำเดียวยังกว้างเกินบรรทัด → หั่นก้อนนั้นเอง
-    if (doc.getTextWidth(w) > limitFor()) {
-      const chunks = doc.splitTextToSize(w, limitFor());
-      // ⚠️ ใช้ for ธรรมดาไม่ใช่ forEach — callback ที่ประกาศในลูปแล้วเขียนค่าลงตัวแปร `cur` ของลูปชั้นนอก
-      // เป็นรูปแบบที่ผิดพลาดง่าย (ESLint no-loop-func เตือนไว้) ถึงตรงนี้จะทำงานถูกอยู่แล้วเพราะ forEach
-      // ทำงานแบบ synchronous ก็ตาม — เขียนเป็นลูปตรงๆ ชัดเจนกว่าและไม่ต้องพึ่งข้อเท็จจริงข้อนั้น
-      for (let i = 0; i < chunks.length; i += 1) {
-        if (i === chunks.length - 1) cur = chunks[i];
-        else lines.push(chunks[i]);
-      }
-    } else {
-      cur = w;
+  const fits = (toks) => doc.getTextWidth(str(toks)) <= limitFor();
+  for (const tok of breakTokens(clean)) {
+    if (fits([...cur, tok])) { cur.push(tok); continue; }
+    if (str(cur)) { lines.push(cur); cur = []; spaceBefore[lines.length] = isSp(tok); }
+    if (isSp(tok)) continue;
+    if (fits([tok])) { cur = [tok]; continue; }
+    // ก้อนเดียวยาวเกินบรรทัด (เช่น เลขเอกสาร/URL ยาวมาก) → หั่นก้อนนั้นเอง ดีกว่าล้นออกนอกกระดาษ
+    const chunks = doc.splitTextToSize(tok, limitFor());
+    for (let i = 0; i < chunks.length - 1; i += 1) lines.push([chunks[i]]);
+    cur = [chunks[chunks.length - 1]];
+  }
+  if (str(cur)) lines.push(cur);
+  // ✅ กันบรรทัดสุดท้ายเหลือคำเดียวโดดๆ (เช่น "1 ท่าน") — ดึงคำท้ายของบรรทัดก่อนลงมาอยู่ด้วย ถ้ายังพอดีบรรทัด
+  const n = lines.length;
+  if (n >= 2 && doc.getTextWidth(str(lines[n - 1])) < restWidth * 0.2) {
+    const prev = lines[n - 2];
+    let k = prev.length - 1;
+    while (k > 0 && isSp(prev[k])) k -= 1;
+    const words = prev.filter((t) => !isSp(t)).length;
+    const moved = prev.slice(k);
+    const next = [...moved, spaceBefore[n - 1] ? " " : "", ...lines[n - 1]];
+    if (words > 3 && doc.getTextWidth(str(next)) <= restWidth) {
+      lines[n - 2] = prev.slice(0, k);
+      lines[n - 1] = next;
     }
   }
-  pushCur();
-  return lines;
+  return lines.map(str);
 };
+
+/** ตัดบรรทัดข้อความทั่วไป (ความกว้างเท่ากันทุกบรรทัด) — ใช้แทน doc.splitTextToSize กับข้อความไทยทุกจุด */
+export const wrapText = (doc, text, width) =>
+  String(text ?? "").split("\n").flatMap((ln) => (ln.trim() ? wrapParagraph(doc, ln, width, width) : []));
 
 /**
  * ✅ ประกอบ "ค่าเริ่มต้น" ของเอกสารจากตัวงาน — ให้ผู้ใช้กดออกใบได้เลยโดยแทบไม่ต้องพิมพ์อะไร
@@ -377,7 +455,7 @@ export const buildDeliveryNoteDefaults = (job, customer) => {
     customerTaxId: customer?.tax || "",
     attention: ATTENTION_PRESETS[0],
     // เลือกอ้างอิงตัวแรกที่มีจริง (ใบเสนอราคา → สัญญา → เอกสารภายใน) เปลี่ยนเป็นตัวอื่นได้ในกล่อง
-    reference: referencePresetsFor(job)[0] || "",
+    reference: defaultReferenceFor(job),
     // ✅ "สิ่งที่ส่งมาด้วย" = ชื่อรายงานตามลักษณะงาน + ระบบที่เข้าทำ (ดู reportNounFor)
     // เช่น "รายงานการตรวจสอบและบำรุงรักษา ระบบ Fire Alarm จำนวน 1 ชุด"
     attachments: [
@@ -408,21 +486,19 @@ export const buildDeliveryNoteDefaults = (job, customer) => {
 export const buildDeliveryNoteBody = (f) => {
   const work = f.workLabel || "งานบริการ";
   const place = f.site ? ` โครงการ ${f.site}` : "";
-  // ✅ ครั้งที่ต่อท้ายชื่อโครงการ ตามรูปแบบที่ผู้ใช้ระบุ: "PM ระบบ Fire Alarm โครงการ ... ครั้งที่ 1/2"
-  // (งานทั่วไป/งานโปรเจคที่ไม่มีครั้งที่ จะได้ค่าว่างแล้วประโยคข้ามส่วนนี้ไปเองโดยไม่มีช่องว่างค้าง)
   const round = f.roundLabel ? ` ครั้งที่ ${f.roundLabel}` : "";
-  const ref = f.reference ? ` อ้างอิง ${f.reference}` : "";
-  // ⚠️ อ้างชื่อรายงานด้วย "ข้อความจริงในช่องสิ่งที่ส่งมาด้วย" เป็นอันดับแรก — เดิมเนื้อความฝังคำว่า
-  // "เอกสารรายงานการบริการ" ตายตัว ทำให้ในใบเดียวกันเรียกเอกสารฉบับเดียวกันคนละชื่อ 2 ที่ ลูกค้าอ่าน
-  // แล้วสับสนว่าตกลงได้รับกี่ฉบับกันแน่ — ผูกกับช่องเดียวกันไปเลย ต่อให้ผู้ใช้เปลี่ยนคำทีหลังก็ยังตรงกัน
+  // 🔁 (17 ต.ค. 2569 ผู้ใช้: "ใช้คำง่ายๆ ไม่กำกวม") — ประโยคเดียวจบความ: ทำอะไร · ที่ไหน · ตามเอกสารไหน · เสร็จเมื่อไร · ส่งอะไรมา · ขออะไร
+  //    (เดิมซ้ำชื่องาน/โครงการ 2 รอบในย่อหน้าเดียว และ "อ้างอิง ใบ..." อ่านสะดุด)
+  const ref = f.reference ? ` ตาม${f.reference}` : "";
+  // ⚠️ อ้างชื่อรายงานด้วยข้อความจริงในช่อง "สิ่งที่ส่งมาด้วย" — เอกสารฉบับเดียวกันต้องเรียกชื่อเดียวกันทั้งใบ
   const reportNoun =
     (f.attachments || []).find((a) => (a.text || "").trim())?.text?.trim()
     || f.reportNoun
     || DEFAULT_REPORT_NOUN;
   return spaceThaiLatin(
-    `เนื่องจากการดำเนินการ ${work}${place}${round}${ref} ได้ดำเนินการเสร็จสิ้นแล้วในวันที่ ${thaiFullDate(f.completedAt)} ` +
-    `ตาม${reportNoun}ที่ส่งมาด้วยนี้ ${ISSUER.nameTh} จึงใคร่ขอส่งมอบเอกสาร ${work}${place}${round} ทั้งหมด ` +
-    `ให้กับท่าน เพื่อพิจารณาและลงนามรับมอบด้วย จักขอบพระคุณยิ่ง`
+    `ตามที่ ${ISSUER.nameTh} ได้ดำเนินการ ${work}${place}${round}${ref} ` +
+    `แล้วเสร็จเมื่อวันที่ ${thaiFullDate(f.completedAt)} นั้น บริษัทฯ ขอส่งมอบงานพร้อม${reportNoun} ` +
+    `ตามรายการที่ส่งมาด้วย เพื่อโปรดตรวจสอบและลงนามรับมอบงาน`
   );
 };
 
@@ -450,16 +526,37 @@ const downscalePng = (url, maxPx) => new Promise((resolve, reject) => {
   const img = new Image();
   img.crossOrigin = "anonymous";
   img.onload = () => {
-    // รูปที่เล็กกว่าเป้าอยู่แล้วไม่ต้องแตะ — ย่อแล้วขยายกลับมีแต่ทำให้เบลอ
-    if (img.naturalWidth <= maxPx) { resolve(url); return; }
-    const scale = maxPx / img.naturalWidth;
+    // 🔁 (17 ต.ค. 2569 ผู้ใช้: "ตราประทับดูเล็กเกินไป") — ไฟล์ตรามีขอบใสรอบตัวตราเกือบครึ่งภาพ (ตราจริงกินแค่ ~60%)
+    //    กำหนดขนาด 40 มม. แต่ตาเห็นแค่ ~22 มม. ✅ ตัดขอบใสออกก่อน ขนาดที่กำหนด = ขนาดตราที่เห็นจริง
+    let sx = 0; let sy = 0; let sw = img.naturalWidth; let sh = img.naturalHeight;
+    try {
+      const probe = document.createElement("canvas");
+      probe.width = sw; probe.height = sh;
+      const pctx = probe.getContext("2d");
+      pctx.drawImage(img, 0, 0);
+      const { data } = pctx.getImageData(0, 0, sw, sh);
+      let x0 = sw; let y0 = sh; let x1 = -1; let y1 = -1;
+      for (let yy = 0; yy < sh; yy += 2) {
+        for (let xx = 0; xx < sw; xx += 2) {
+          if (data[(yy * sw + xx) * 4 + 3] > 16) {
+            if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (yy < y0) y0 = yy; if (yy > y1) y1 = yy;
+          }
+        }
+      }
+      if (x1 > x0 && y1 > y0) {
+        const pad = Math.round(Math.max(x1 - x0, y1 - y0) * 0.02);
+        sx = Math.max(0, x0 - pad); sy = Math.max(0, y0 - pad);
+        sw = Math.min(img.naturalWidth, x1 + pad + 1) - sx; sh = Math.min(img.naturalHeight, y1 + pad + 1) - sy;
+      }
+    } catch { /* อ่านพิกเซลไม่ได้ (CORS) — ใช้ทั้งภาพตามเดิม */ }
+    const scale = Math.min(1, maxPx / sw);
     const canvas = document.createElement("canvas");
-    canvas.width = Math.round(img.naturalWidth * scale);
-    canvas.height = Math.round(img.naturalHeight * scale);
+    canvas.width = Math.round(sw * scale);
+    canvas.height = Math.round(sh * scale);
     const ctx = canvas.getContext("2d");
     ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    resolve(canvas.toDataURL("image/png"));
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+    try { resolve(canvas.toDataURL("image/png")); } catch { resolve(url); }
   };
   img.onerror = () => reject(new Error(`โหลดรูปไม่สำเร็จ: ${url}`));
   img.src = url;
@@ -510,7 +607,9 @@ export const createDocument = (jsPDF, thSarabunFont) => {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "A4", compress: true });
   doc.addFileToVFS("THSarabun.ttf", thSarabunFont);
   doc.addFont("THSarabun.ttf", "THSarabun", "normal");
-  doc.setFont("THSarabun");
+  doc.addFileToVFS("THSarabunBold.ttf", thSarabunBold);
+  doc.addFont("THSarabunBold.ttf", "THSarabun", "bold");
+  doc.setFont("THSarabun", "normal");
   return doc;
 };
 
@@ -584,205 +683,350 @@ export const outputDocument = (doc, rawName, mode = "open") => {
   return { blob, url, fileName, safeName };
 };
 
-/**
- * สร้างไฟล์ PDF ใบส่งมอบงาน
- * @param {object} opts.jsPDF          — constructor (ส่งเข้ามาแทน import ตรง เทียบ pattern เดียวกับ GenPDF.js)
- * @param {string} opts.thSarabunFont  — ฟอนต์ TH Sarabun แบบ base64 (จำเป็น ไม่งั้นภาษาไทยกลายเป็นสี่เหลี่ยม)
- * @param {object} opts.form           — ค่าที่ผู้ใช้ยืนยันแล้วจากกล่องออกเอกสาร
- * @param {"open"|"download"} opts.mode — เปิดดูในแท็บใหม่ หรือดาวน์โหลดไฟล์เลย
- */
-export const generateDeliveryNotePdf = async ({ jsPDF, thSarabunFont, form, mode = "open" }) => {
-  moment.locale("th");
+// ════════════════════════════════════════════════════════════════════════════
+// 🎨 ชุดจัดหน้าเอกสารแบบใหม่ — ใบแจ้งเข้าปฏิบัติงาน · ใบส่งมอบงาน
+// 🔁 (17 ต.ค. 2569 ผู้ใช้: "รูปแบบ PDF ไม่สวยเลย ลองจัดวางใหม่ทั้งหมด ให้มืออาชีพ และสวยงาม")
+//   • หัวกระดาษแบบหนังสือบริษัท: โลโก้ซ้าย · ชื่อบริษัท (ตัวหนา) + ที่อยู่ ด้านขวาของโลโก้ · เส้นคั่นสีประจำบริษัท
+//   • ชื่อเอกสารตัวหนากลางหน้า + ภาษาอังกฤษตัวเล็ก — รู้ทันทีว่าเป็นเอกสารอะไร
+//   • เลขที่ (ซ้าย) / วันที่ (ขวา) บรรทัดเดียว · ป้ายหัวจดหมายตัวหนา ค่าเรียงแนวเดียว
+//   • กำหนดการ / สิ่งที่ส่งมาด้วย เป็น "ตาราง" มีหัวคอลัมน์ — ข้อความยาวตัดบรรทัดในช่องของตัวเอง ไม่ล้น ไม่เหลื่อม
+//   • ย่อหน้าชิดซ้าย ตัดบรรทัดตามคำไทย (ไม่ยืดช่องไฟ) · ส่วนลงนาม 2 ฝั่งเส้นบาง · ท้ายกระดาษบอกเลขที่เอกสาร
+// ⚠️ ใช้เฉพาะ 2 เอกสารนี้ — ใบเบิก/ใบขอซื้อยังใช้ drawLetterhead เดิม
+// ════════════════════════════════════════════════════════════════════════════
+export const LM = 20;
+export const RM = 20;
+export const CW = 210 - LM - RM;
+const INK_RGB = [30, 41, 59];
+const SUB_RGB = [100, 116, 139];
+const LINE_RGB = [203, 213, 225];
+const HEAD_FILL = [241, 245, 249];
+const BRAND_RGB = [185, 28, 28];
 
-  // ✅ ย่อโลโก้/ตราประทับให้พอดีความละเอียดงานพิมพ์ก่อนฝังลงไฟล์ (ดูหัวข้อ "ขนาดไฟล์ PDF")
-  await preparePrintAssets();
+export const setBold = (doc, on) => doc.setFont("THSarabun", on ? "bold" : "normal");
+const ink = (doc, rgb = INK_RGB) => doc.setTextColor(rgb[0], rgb[1], rgb[2]);
 
-  const doc = createDocument(jsPDF, thSarabunFont);
-
-  // ── หัวกระดาษ ────────────────────────────────────────────────────────────
-  const headerY = drawLetterhead(doc);
-
-  // ── ส่วนลงนามถูกตรึงไว้ล่างกระดาษเสมอ — เนื้อหาทั้งหมดต้องจบก่อนถึงเส้นนี้ ────────────────
-  // ✅ มี 2 ขนาด: ปกติ กับ "บีบ" ใช้เป็นตัวช่วยสุดท้ายก่อนยอมขึ้นหน้า 2 (เหมือนใบแจ้งเข้างาน)
-  const boxW = 80;
-  const SIGN_VARIANTS = [
-    { boxH: 54, bottom: 26 },
-    { boxH: 46, bottom: 16 },
-  ];
-
-  /**
-   * ✅ วางเนื้อหาทั้งใบ — draw:false = "วัดความสูง" เฉยๆ, draw:true = วาดจริง
-   * ⚠️ ใบส่งมอบงานควรจบหน้าเดียวเหมือนใบแจ้งเข้างาน (ลูกค้าเซ็นรับแล้วเก็บเข้าแฟ้มใบเดียวจบ และกรอบ
-   * ลงนามต้องอยู่หน้าเดียวกับรายการสิ่งที่ส่งมาด้วย) แต่ความยาวจริงเดาไม่ได้ — ขึ้นกับที่อยู่ลูกค้า
-   * ยาวแค่ไหนและมีสิ่งที่ส่งมาด้วยกี่รายการ จึงวัดก่อนแล้วเลือกขนาดใหญ่ที่สุดที่ยังจบหน้าเดียว
-   */
-  const layout = ({ fs: fontSize, lh, draw }) => {
-    doc.setFontSize(fontSize);
-    let y = headerY + lh * 1.6;
-    const put = (text, x, yy, opt) => { if (draw) doc.text(text, x, yy, opt); };
-    const gap = (mm) => { y += mm; };
-
-    // ✅ แนวเยื้องเส้นเดียวของทั้งใบ — คอลัมน์ค่าของหัวจดหมาย, ย่อหน้าแรก, รายการสิ่งที่ส่งมาด้วย และ
-    // บรรทัดคำลงท้าย เริ่มตรงกันหมด (ดูเหตุผลเต็มที่ letterIndentFor)
-    const indent = letterIndentFor(doc);
-    const valueX = PAGE.left + indent;
-    const VALUE_W = PAGE.w - PAGE.right - valueX;
-
-    // ✅ เขียนคู่ "ป้าย + ค่า" โดยตัดบรรทัดค่าที่ยาวเกินให้เองและเลื่อน y ต่อให้ถูก (ชื่อโครงการ/ที่อยู่
-    // ลูกค้าของจริงยาวไม่เท่ากันเลย จะกะระยะตายตัวไม่ได้)
-    const row = (label, value) => {
-      const text = spaceThaiLatin(value);
-      if (!text) return;
-      const ls = doc.splitTextToSize(text, VALUE_W);
-      if (label) put(label, PAGE.left, y);
-      ls.forEach((ln, i) => put(ln, valueX, y + i * lh));
-      y += ls.length * lh;
-    };
-
-    row("เลขที่", form.docNumber);
-    row("วันที่", thaiFullDate(form.issuedAt));
-    row("เรื่อง", form.subject);
-    // "โครงการ" มี 3 บรรทัดย่อย: ชื่อโครงการ / บริษัทลูกค้า / ที่อยู่ — ป้ายอยู่แค่บรรทัดแรก
-    row("โครงการ", form.site);
-    row("", form.customerCompany);
-    row("", form.customerAddress);
-    // ✅ เลขประจำตัวผู้เสียภาษีต่อท้ายที่อยู่ — ตำแหน่งมาตรฐานของเอกสารธุรกิจไทย (อยู่ใต้ที่อยู่ผู้รับเสมอ)
-    row("", form.customerTaxId ? `เลขประจำตัวผู้เสียภาษี ${form.customerTaxId}` : "");
-    // 🐛 BUG ที่แก้ (ระยะเว้นหายไปเมื่อช่องว่าง): เดิมระยะเว้นถูกผูกไว้กับ row() เป็น option — แต่ row()
-    // จะ return ทันทีถ้าค่าว่าง ระยะเว้นจึงหายไปด้วย ผลคือใบที่ไม่ได้กรอก "อ้างถึง" (ซึ่งเป็นกรณีปกติ)
-    // หัวข้อ "สิ่งที่ส่งมาด้วย" จะขึ้นไปติดบรรทัด "เรียน" พอดีเป๊ะ ดูเหมือนจัดหน้าพลาด (เห็นในใบจริง)
-    // ✅ ครึ่งบรรทัดพอ — เต็มบรรทัดกลายเป็นช่องโหว่กลางบล็อก โดยเฉพาะใบที่ไม่ได้กรอกบริษัท/ที่อยู่ลูกค้า
-    gap(lh * 0.55);
-    row("เรียน", form.attention);
-    row("อ้างถึง", form.reference);
-
-    // ── สิ่งที่ส่งมาด้วย ──────────────────────────────────────────────────
-    // 🐛 ที่แก้ (บรรทัดเริ่มไม่ตรงกัน): เดิมเลขลำดับอยู่คอลัมน์หนึ่งแล้วข้อความเยื้องเข้าไปอีก 7mm —
-    // กลายเป็นแนวเริ่มที่ 3 ของใบ (22 / 39.2 / 46.2mm) ✅ รวมเลขลำดับกับข้อความเป็นก้อนเดียวเริ่มที่
-    // แนวเยื้องเดียวกับทุกส่วน แล้วให้บรรทัดที่ 2 เป็นต้นไปเยื้องเข้าเล็กน้อยให้ตรงกับข้อความหลังเลข
-    const attachments = (form.attachments || []).filter((a) => (a.text || "").trim());
-    if (attachments.length > 0) {
-      gap(lh * 0.55);
-      put("สิ่งที่ส่งมาด้วย", PAGE.left, y);
-      y += lh;
-      const HANG = 5;
-      attachments.forEach((a, i) => {
-        const text = spaceThaiLatin(`${i + 1}. ${a.text}${a.qty ? ` จำนวน ${a.qty}` : ""}`);
-        wrapParagraph(doc, text, VALUE_W, VALUE_W - HANG).forEach((ln, li) => {
-          put(ln, valueX + (li === 0 ? 0 : HANG), y);
-          y += lh;
-        });
-      });
-    }
-
-    // ── เนื้อความ ──────────────────────────────────────────────────────────
-    // ✅ ย่อหน้าแรกเยื้องเข้ามาตามแบบหนังสือราชการ — jsPDF ไม่มี text-indent จึงตัดบรรทัดเองด้วย
-    // wrapParagraph (บรรทัดแรกแคบลงเท่าระยะเยื้อง บรรทัดที่เหลือเต็มความกว้าง)
-    // 🐛 BUG ที่แก้: เดิมตัดบรรทัดแรกแล้วใช้ .slice(first.length) หาเนื้อความที่เหลือ — ซึ่งเชื่อว่า
-    // ข้อความที่ jsPDF ตัดออกมาจะตรงกับต้นฉบับทีละตัวอักษรเป๊ะๆ (ไม่จริง มันตัด/รวบช่องว่างใหม่)
-    // ผลคือเนื้อความอาจขาดหรือซ้ำคำตรงรอยต่อบรรทัดแรกได้
-    gap(lh * 1.5);
-    const body = spaceThaiLatin(form.body);
-    if (body) {
-      wrapParagraph(doc, body, CONTENT_W - indent, CONTENT_W).forEach((ln, i) => {
-        put(ln, PAGE.left + (i === 0 ? indent : 0), y);
-        y += lh;
-      });
-    }
-
-    gap(lh * 0.8);
-    put("จึงเรียนมาเพื่อทราบและโปรดพิจารณา", PAGE.left + indent, y);
-    y += lh;
-    return y;
-  };
-
-  // ✅ ไล่ขนาดจากปกติ (14pt) ลงไปจนถึงเล็กสุดที่ยังอ่านสบาย (12pt) — ชุดเดียวกับใบแจ้งเข้างาน
-  const SCALES = [
-    { fs: 14, lh: 6.6 },
-    { fs: 13.5, lh: 6.3 },
-    { fs: 13, lh: 6.0 },
-    { fs: 12.5, lh: 5.7 },
-    { fs: 12, lh: 5.4 },
-  ];
-  const measured = SCALES.map((s) => ({ ...s, height: layout({ ...s, draw: false }) }));
-  let chosen = { ...measured[measured.length - 1], ...SIGN_VARIANTS[SIGN_VARIANTS.length - 1] };
-  outer: for (const v of SIGN_VARIANTS) {
-    for (const m of measured) {
-      if (m.height <= PAGE.h - v.bottom - v.boxH - 3) { chosen = { ...m, ...v }; break outer; }
-    }
+/** หัวกระดาษแบบใหม่ — คืนพิกัด y ใต้เส้นคั่น */
+export const drawLetterheadModern = (doc) => {
+  const top = 11;
+  let logoW = 0;
+  let logoH = 0;
+  try {
+    const logo = printAsset(ISSUER.logo);
+    const p = doc.getImageProperties(logo);
+    logoH = 18;
+    logoW = (p.width / p.height) * logoH;
+    if (logoW > 34) { logoW = 34; logoH = (p.height / p.width) * logoW; }
+    doc.addImage(logo, "PNG", LM, top, logoW, logoH, "letterhead-logo", "MEDIUM");
+  } catch {
+    logoW = 0; logoH = 0;
   }
-  const { boxH, bottom } = chosen;
-  const boxY = PAGE.h - bottom - boxH;
-  const endY = layout({ ...chosen, draw: true });
+  const tx = LM + (logoW ? logoW + 5 : 0);
+  const tw = 210 - RM - tx;
+  let y = top + 5;
+  setBold(doc, true); doc.setFontSize(16.5); ink(doc);
+  doc.text(ISSUER.nameTh, tx, y);
+  setBold(doc, false); doc.setFontSize(10.5); ink(doc, SUB_RGB);
+  y += 4.8; doc.text(ISSUER.nameEn, tx, y);
+  doc.setFontSize(10);
+  wrapText(doc, ISSUER.address, tw).forEach((ln) => { y += 4.3; doc.text(ln, tx, y); });
+  if (ISSUER.taxId) { y += 4.3; doc.text(ISSUER.taxId, tx, y); }
+  const ruleY = Math.max(top + logoH, y + 1.2) + 3;
+  doc.setDrawColor(BRAND_RGB[0], BRAND_RGB[1], BRAND_RGB[2]); doc.setLineWidth(0.7);
+  doc.line(LM, ruleY, 210 - RM, ruleY);
+  doc.setDrawColor(LINE_RGB[0], LINE_RGB[1], LINE_RGB[2]); doc.setLineWidth(0.2);
+  doc.line(LM, ruleY + 1.1, 210 - RM, ruleY + 1.1);
+  ink(doc);
+  return ruleY + 1.1;
+};
 
-  // ── ส่วนลงนาม ────────────────────────────────────────────────────────────
-  // ✅ ตรึงไว้ล่างกระดาษเสมอ ไม่ลอยตามความยาวเนื้อความ — เอกสารทางการต้องมีที่เซ็นอยู่ตำแหน่งเดียวกัน
-  // ทุกใบ เพื่อให้ปั๊ม/เซ็น/สแกนเก็บเข้าแฟ้มได้เป็นระเบียบเหมือนกันหมด
-  // ⚠️ กันเนื้อความยาวเกินจนไปทับส่วนลงนาม — ถ้าชนขึ้นหน้าใหม่ให้เลย (ดีกว่าตัวหนังสือทับกันจนอ่านไม่ได้)
-  // 🐛 BUG ที่แก้ (ตราประทับทับชื่อผู้ลงนาม): เดิมวางตราไว้กึ่งกลางฝั่งขวาที่ระยะ +10 ซึ่งความสูงจริง
-  // ของรูปตรา (คำนวณตามสัดส่วนภาพ) ยาวลงมาถึงราว +30 พอดีกับบรรทัด "( ชื่อ )" ที่ +26.5 — ตราเลย
-  // ทับชื่อจนอ่านไม่ออกทั้งคู่ และไม่เหลือที่ว่างให้เซ็นชื่อจริงเลยสักนิด
-  // ✅ จัดใหม่เป็น 3 ชั้นชัดเจน: คำลงท้าย → ช่องว่างสำหรับเซ็น (มีเส้นประให้เซ็นทับ) → ชื่อ/ตำแหน่ง/บริษัท
-  // แล้วย้ายตราไปไว้ "มุมซ้ายบนของช่องเซ็น" ซึ่งเป็นพื้นที่ว่างที่ไม่มีตัวหนังสือใดๆ อยู่ — ตรงกับ
-  // ธรรมเนียมเอกสารไทยที่ประทับตราไว้ข้างลายเซ็น ไม่ใช่ทับลายเซ็น
-  // ⚠️ ปกติจะไม่ถึงตรงนี้แล้ว เพราะขั้นตอนวัดด้านบนย่อขนาดให้พอดีหน้าเดียวไว้ก่อน — แต่ถ้าเนื้อหายาวจริงๆ
-  // จนเล็กสุด (12pt + กรอบแบบบีบ) ยังไม่พอ ก็ต้องขึ้นหน้าใหม่ ดีกว่าปล่อยให้ทับกรอบลงนามจนอ่านไม่ได้
-  if (endY > boxY - 3) doc.addPage();
+/** ชื่อเอกสารกลางหน้า (ไทยตัวหนา + อังกฤษตัวเล็ก) — คืน y ถัดไป */
+export const drawDocTitle = (doc, y, th, en, draw = true) => {
+  if (draw) {
+    setBold(doc, true); doc.setFontSize(19); ink(doc);
+    doc.text(th, 105, y + 8.5, { align: "center" });
+    setBold(doc, false); doc.setFontSize(9.5); ink(doc, SUB_RGB);
+    doc.text(en, 105, y + 13, { align: "center", charSpace: 0.8 });
+    ink(doc);
+  }
+  return y + 19;
+};
 
-  // ฝั่งซ้าย: กรอบให้ลูกค้าลงนามตรวจสอบและรับเอกสาร
-  doc.setLineWidth(0.5);
-  doc.rect(PAGE.left, boxY, boxW, boxH);
-  const leftCenter = PAGE.left + boxW / 2;
-  doc.setFontSize(13.5);
-  doc.text("ลงนามตรวจสอบและรับเอกสาร", leftCenter, boxY + boxH * 0.15, { align: "center" });
-  doc.setFontSize(13);
-  // เว้นช่องว่างครึ่งบนของกรอบไว้ให้เซ็นชื่อ แล้วค่อยมีเส้นประรองรับ
-  // ⚠️ ตำแหน่งอิงสัดส่วนของความสูงกรอบ ไม่ใช่ระยะตายตัว — กรอบแบบบีบ (46mm) จะย่อระยะทุกบรรทัด
-  // ตามไปเอง ไม่หลุดออกนอกกรอบ (ดู SIGN_VARIANTS)
-  doc.text("............................................", leftCenter, boxY + boxH * 0.48, { align: "center" });
-  doc.text("(____________________________)", leftCenter, boxY + boxH * 0.61, { align: "center" });
-  doc.text("วันที่ _______ / _______ / _______", leftCenter, boxY + boxH * 0.74, { align: "center" });
-  // ✅ ชื่อบริษัทลูกค้าใต้กรอบ — ตัดบรรทัดเองเพราะชื่อนิติบุคคลไทยยาวเกินกรอบได้ง่ายมาก
-  doc.setFontSize(11.5);
-  const custLines = doc.splitTextToSize(spaceThaiLatin(form.customerCompany), boxW - 4);
-  custLines.slice(0, 2).forEach((ln, i) => {
-    doc.text(ln, leftCenter, boxY + boxH * 0.85 + i * 4.6, { align: "center" });
+/**
+ * หัวจดหมาย: "เลขที่" ซ้าย / "วันที่" ขวา บรรทัดเดียว แล้วตามด้วยแถว ป้าย(ตัวหนา) : ค่า
+ * rows: [label, value, { gapBefore }] · label ว่าง = บรรทัดต่อของป้ายก่อนหน้า
+ */
+export const drawLetterMeta = (doc, { y, fs, lh, draw, docNumber, date, rows }) => {
+  const put = (t, x, yy, opt) => { if (draw) doc.text(t, x, yy, opt); };
+  doc.setFontSize(fs);
+  setBold(doc, true);
+  const labels = ["เลขที่", "วันที่", ...rows.map((r) => r[0]).filter(Boolean)];
+  const labelW = Math.max(...labels.map((l) => doc.getTextWidth(l))) + 4;
+  put("เลขที่", LM, y);
+  const dateText = thaiFullDate(date);
+  setBold(doc, false);
+  const dateW = doc.getTextWidth(dateText);
+  put(docNumber || "-", LM + labelW, y);
+  put(dateText, 210 - RM, y, { align: "right" });
+  setBold(doc, true);
+  put("วันที่", 210 - RM - dateW - 3, y, { align: "right" });
+  y += lh * 1.25;
+  const valueX = LM + labelW;
+  const valueW = 210 - RM - valueX;
+  rows.forEach(([label, value, opt = {}]) => {
+    const text = spaceThaiLatin(value);
+    if (!text) return;
+    if (opt.gapBefore) y += lh * opt.gapBefore;
+    if (label) { setBold(doc, true); put(label, LM, y); }
+    setBold(doc, false);
+    wrapText(doc, text, valueW).forEach((ln) => { put(ln, valueX, y); y += lh; });
   });
+  setBold(doc, false);
+  return y;
+};
 
-  // ฝั่งขวา: ขอแสดงความนับถือ → ช่องเซ็น (+ตราประทับมุมซ้าย) → ชื่อ/ตำแหน่ง/บริษัท
-  // ✅ จัดให้ "กึ่งกลางฝั่งขวา" อยู่ระดับสายตาเดียวกับกรอบฝั่งซ้าย — 2 ฝั่งจึงดูสมดุลเป็นคู่กัน
-  const rightCenter = PAGE.w - PAGE.right - boxW / 2;
-  doc.setFontSize(13.5);
-  doc.text("ขอแสดงความนับถือ", rightCenter, boxY + boxH * 0.15, { align: "center" });
 
-  // ✅ ตราประทับ — มุมซ้ายของช่องเซ็น จบก่อนถึงเส้นประที่ +26 จึงไม่มีทางทับทั้งลายเซ็นและชื่อ
+
+
+export const SIGN_H = 50;
+
+/** ส่วนลงนาม 2 ฝั่ง — ซ้าย: ลูกค้า (กรอบเส้นบาง) · ขวา: บริษัท (ตรา + ลายเซ็น + ชื่อ/ตำแหน่ง/ติดต่อ) */
+export const drawSignatures = (doc, { y, leftTitle, customer, signerName, signerPosition, contact, signatureImage }) => {
+  const w = 80;
+  const lx = LM;
+  const rx = 210 - RM - w;
+  const lc = lx + w / 2;
+  const rc = rx + w / 2;
+  doc.setDrawColor(LINE_RGB[0], LINE_RGB[1], LINE_RGB[2]); doc.setLineWidth(0.3);
+  doc.roundedRect(lx, y, w, SIGN_H, 2, 2);
+  ink(doc);
+  setBold(doc, true); doc.setFontSize(13);
+  doc.text(leftTitle, lc, y + 7, { align: "center" });
+  setBold(doc, false); doc.setFontSize(12.5);
+  doc.text("ลงชื่อ ...............................................", lc, y + 27, { align: "center" });
+  doc.text("( ............................................... )", lc, y + 34, { align: "center" });
+  doc.text("วันที่ ........ / ........ / ........", lc, y + 41, { align: "center" });
+  doc.setFontSize(10); ink(doc, SUB_RGB);
+  wrapText(doc, spaceThaiLatin(customer), w - 6).slice(0, 1).forEach((ln) => doc.text(ln, lc, y + 47, { align: "center" }));
+  ink(doc);
+
+  doc.setFontSize(13);
+  doc.text("ขอแสดงความนับถือ", rc, y + 7, { align: "center" });
   try {
     const stamp = printAsset(ISSUER.stamp);
     const sp = doc.getImageProperties(stamp);
-    const sw = 24;
-    const sh = (sp.height / sp.width) * sw;
-    // ⚠️ ยึด "ขอบล่าง" ของตราไว้ที่ +24.5 แล้วคำนวณขอบบนย้อนขึ้นไป — ความสูงของตราขึ้นกับสัดส่วน
-    // ของไฟล์รูปซึ่งเปลี่ยนได้ถ้าวันหนึ่งมีการเปลี่ยนไฟล์ตรา ถ้ายึดขอบบนแบบเดิมแล้วรูปสูงขึ้น
-    // ตราจะไหลลงไปทับเส้นเซ็นอีก (ซึ่งคือบั๊กเดิมเป๊ะๆ)
-    doc.addImage(stamp, "PNG", rightCenter - boxW / 2 + 2, boxY + boxH * 0.45 - sh, sw, sh, "company-stamp", "MEDIUM");
-  } catch {
-    // ไม่มีไฟล์ตราประทับก็ออกเอกสารได้ตามปกติ (เว้นที่ว่างไว้ให้ประทับตรามือแทน)
+    let sw = 27;
+    let sh = (sp.height / sp.width) * sw;
+    if (sh > 17) { sh = 17; sw = (sp.width / sp.height) * sh; }
+    // ตราอยู่ซ้ายของช่องเซ็น ขอบล่างเหนือเส้นลงชื่อ — ไม่ทับคำลงท้ายและชื่อผู้ลงนาม
+    doc.addImage(stamp, "PNG", rx - 4, y + 25.5 - sh, sw, sh, "company-stamp", "MEDIUM");
+  } catch { /* ไม่มีตรา = เว้นที่ให้ประทับมือ */ }
+  drawSignatureOnLine(doc, signatureImage, { centerX: rc + 4, lineY: y + 26.2, maxW: 46, maxH: 13 });
+  doc.setFontSize(12.5);
+  doc.text("...............................................", rc, y + 27, { align: "center" });
+  doc.text(`( ${spaceThaiLatin(signerName) || "..............................................."} )`, rc, y + 34, { align: "center" });
+  doc.text(spaceThaiLatin(signerPosition) || "", rc, y + 40.5, { align: "center" });
+  doc.setFontSize(10); ink(doc, SUB_RGB);
+  wrapText(doc, spaceThaiLatin(contact), w + 14).slice(0, 2).forEach((ln, i) => doc.text(ln, rc, y + 46 + i * 4, { align: "center" }));
+  ink(doc);
+};
+
+/** ท้ายกระดาษ: ชื่อเอกสาร + เลขที่ (ซ้าย) · ชื่อบริษัท (ขวา) */
+export const drawFooter = (doc, label) => {
+  const pages = doc.getNumberOfPages();
+  for (let p = 1; p <= pages; p += 1) {
+    doc.setPage(p);
+    doc.setDrawColor(LINE_RGB[0], LINE_RGB[1], LINE_RGB[2]); doc.setLineWidth(0.2);
+    doc.line(LM, 284, 210 - RM, 284);
+    setBold(doc, false); doc.setFontSize(9); ink(doc, SUB_RGB);
+    doc.text(label, LM, 288.5);
+    doc.text(pages > 1 ? `${ISSUER.nameTh} · หน้า ${p}/${pages}` : ISSUER.nameTh, 210 - RM, 288.5, { align: "right" });
+    ink(doc);
   }
+};
 
-  doc.setFontSize(13);
-  // ✅ ลายเซ็นอิเล็กทรอนิกส์ของผู้ออกเอกสาร (ถ้าตั้งไว้และเลือกใช้) — วางบนเส้นก่อนพิมพ์เส้น
-  drawSignatureOnLine(doc, form.signatureImage, {
-    centerX: rightCenter, lineY: boxY + boxH * 0.47, maxW: boxW * 0.62, maxH: boxH * 0.26,
+/** พื้นที่เนื้อหาสิ้นสุดที่นี่ (เหนือท้ายกระดาษ) */
+export const CONTENT_BOTTOM = 282;
+
+
+
+/**
+ * ── การจัดหน้าแบบหลายหน้า (17 ต.ค. 2569 ผู้ใช้: "ตัวหนังสือไม่ควรเล็กเกินไปเมื่อเพิ่มหลายแถว · ถ้ามีหน้าที่ 2
+ *    ไม่ควรโล่ง ให้มีหัวกระดาษและรายละเอียดส่วนอื่นด้วย") ───────────────────────────────────────────
+ *   • ตัวอักษรไม่ต่ำกว่า 13pt — ยาวเกินหน้าเดียว = ขึ้นหน้าใหม่ แทนการย่อจนอ่านยาก
+ *   • หน้าถัดไปมีหัวกระดาษเต็มเหมือนหน้าแรก (ผู้ใช้: "หัวกระดาษหน้า 2 ควรเหมือนหน้าแรก") + "ชื่อเอกสาร (ต่อ) · เลขที่" และตารางแสดงหัวคอลัมน์ซ้ำ
+ *   • ย่อหน้าปิด + คำลงท้าย "ติดไปกับ" ส่วนลงนามเสมอ — ไม่มีหน้าที่มีแต่ช่องเซ็นโดดๆ
+ */
+export const MIN_FLOW_SCALES = [
+  { fs: 14, lh: 6.4 },
+  { fs: 13.5, lh: 6.1 },
+  { fs: 13, lh: 5.85 },
+];
+
+
+/** ตัวเดินหน้ากระดาษ — วัด (draw:false) กับวาดจริง (draw:true) ผ่านเส้นทางเดียวกัน จำนวนหน้าจึงตรงกันเสมอ */
+export const createFlow = (doc, { draw, fs, lh, y, title, docNumber, headerY }) => {
+  const f = { draw, fs, lh, y, pages: 1, bottom: CONTENT_BOTTOM };
+  f.newPage = () => {
+    f.pages += 1;
+    if (draw) {
+      doc.addPage();
+      drawLetterheadModern(doc);
+      setBold(doc, false); doc.setFontSize(10); ink(doc, SUB_RGB);
+      doc.text(`${title} (ต่อ) · เลขที่ ${docNumber || "-"}`, 210 - RM, headerY + 5.5, { align: "right" });
+    }
+    f.y = headerY + 5.5 + lh * 1.5;
+    setBold(doc, false); doc.setFontSize(fs); ink(doc);
+  };
+  /** ต้องมีที่ว่างอย่างน้อย h มม. นับจากบรรทัดปัจจุบัน ไม่งั้นขึ้นหน้าใหม่ */
+  f.need = (h) => { if (f.y + h > f.bottom) f.newPage(); };
+  return f;
+};
+
+/** ย่อหน้า (บรรทัดแรกเยื้อง) — ขึ้นหน้าใหม่ได้ระหว่างบรรทัด */
+export const flowParagraph = (doc, f, text, indent = 14) => {
+  const t = spaceThaiLatin(text);
+  if (!t) return;
+  doc.setFontSize(f.fs);
+  wrapParagraph(doc, t, CW - indent, CW).forEach((ln, i) => {
+    f.need(0);
+    if (f.draw) doc.text(ln, LM + (i === 0 ? indent : 0), f.y);
+    f.y += f.lh;
   });
-  doc.text("............................................", rightCenter, boxY + boxH * 0.48, { align: "center" });
-  doc.text(`( ${spaceThaiLatin(form.signerName) || "____________________________"} )`, rightCenter, boxY + boxH * 0.61, { align: "center" });
-  doc.text(spaceThaiLatin(form.signerPosition), rightCenter, boxY + boxH * 0.74, { align: "center" });
-  doc.setFontSize(11.5);
-  const issuerLines = doc.splitTextToSize(ISSUER.nameTh, boxW + 12);
-  issuerLines.slice(0, 2).forEach((ln, i) => {
-    doc.text(ln, rightCenter, boxY + boxH * 0.85 + i * 4.6, { align: "center" });
+};
+
+/** ตาราง — แถวไม่ถูกตัดครึ่ง · ขึ้นหน้าใหม่แล้วพิมพ์หัวคอลัมน์ซ้ำ · f.y = ขอบบนของตาราง → จบที่ขอบล่าง */
+export const flowTable = (doc, f, { cols, rows }) => {
+  const padX = 2.2;
+  const rowLh = f.lh * 0.92;
+  const widths = cols.map((c, i) => (i === cols.length - 1 ? CW - cols.slice(0, -1).reduce((n, x) => n + x.w, 0) : c.w));
+  const xs = widths.reduce((acc, w, i) => [...acc, acc[i] + w], [LM]);
+  const prep = (cells, head) => {
+    doc.setFontSize(f.fs - 0.5); setBold(doc, head);
+    const lines = cells.map((c, i) => wrapText(doc, spaceThaiLatin(c), widths[i] - padX * 2));
+    return { lines, h: Math.max(1, ...lines.map((l) => l.length)) * rowLh + 3.6, head };
+  };
+  const drawRow = ({ lines, h, head }) => {
+    if (f.draw) {
+      doc.setFontSize(f.fs - 0.5); setBold(doc, head);
+      doc.setLineWidth(0.2); doc.setDrawColor(LINE_RGB[0], LINE_RGB[1], LINE_RGB[2]);
+      if (head) { doc.setFillColor(HEAD_FILL[0], HEAD_FILL[1], HEAD_FILL[2]); doc.rect(LM, f.y, CW, h, "F"); }
+      doc.rect(LM, f.y, CW, h);
+      for (let i = 1; i < xs.length - 1; i += 1) doc.line(xs[i], f.y, xs[i], f.y + h);
+      lines.forEach((ls, i) => {
+        const align = head ? "center" : cols[i].align || "left";
+        const x = align === "center" ? xs[i] + widths[i] / 2 : align === "right" ? xs[i + 1] - padX : xs[i] + padX;
+        ls.forEach((ln, li) => doc.text(ln, x, f.y + 1.8 + rowLh * (li + 0.78), { align }));
+      });
+    }
+    f.y += h;
+  };
+  const head = prep(cols.map((c) => c.title), true);
+  const body = rows.map((r) => prep(r, false));
+  // หัวตารางต้องมีแถวแรกตามมาด้วยในหน้าเดียวกัน
+  if (f.y + head.h + (body[0]?.h || 0) > f.bottom) { f.newPage(); f.y -= f.lh * 0.8; }
+  drawRow(head);
+  body.forEach((r) => {
+    if (f.y + r.h > f.bottom) { f.newPage(); f.y -= f.lh * 0.8; drawRow(head); }
+    drawRow(r);
+  });
+  setBold(doc, false); doc.setFontSize(f.fs);
+};
+
+/** ป้ายตัวหนา + ข้อความ (หมายเหตุ) */
+export const flowLabeled = (doc, f, label, text) => {
+  const lines = String(text || "").split("\n").map((s) => spaceThaiLatin(s)).filter(Boolean);
+  if (!lines.length) return;
+  doc.setFontSize(f.fs);
+  setBold(doc, true);
+  const lw = doc.getTextWidth(label) + 3;
+  f.need(0);
+  if (f.draw) doc.text(label, LM, f.y);
+  setBold(doc, false);
+  lines.flatMap((ln) => wrapText(doc, ln, CW - lw)).forEach((ln) => { f.need(0); if (f.draw) doc.text(ln, LM + lw, f.y); f.y += f.lh; });
+};
+
+/**
+ * วางเอกสารทั้งฉบับ: body(f) = ส่วนเนื้อหาที่ไหลได้ · closing(f) = ส่วนท้ายที่ต้องอยู่หน้าเดียวกับช่องเซ็น
+ * เลือกตัวอักษรใหญ่สุดที่จบหน้าเดียว (ไม่ต่ำกว่า 13pt) · ไม่จบ = หลายหน้าที่ 13.5pt
+ */
+export const placeFlowLetter = (doc, { headerY, firstY, title, docNumber, body, closing, sign, footerLabel }) => {
+  const signY = CONTENT_BOTTOM - SIGN_H;
+  const run = (s, draw) => {
+    const f = createFlow(doc, { draw, fs: s.fs, lh: s.lh, y: firstY(s, draw), title, docNumber, headerY });
+    body(f);
+    // วัดส่วนท้ายก่อน — ไม่พอกับช่องเซ็นในหน้านี้ = ยกส่วนท้ายทั้งก้อนไปหน้าใหม่ (ไม่ปล่อยหน้ามีแต่ช่องเซ็น)
+    const probe = { ...f, draw: false, y: 0, bottom: Infinity, need: () => {}, newPage: () => {} };
+    closing(probe);
+    if (f.y + probe.y + 6 > signY) f.newPage();
+    closing(f);
+    return f.pages;
+  };
+  const one = MIN_FLOW_SCALES.find((s) => run(s, false) === 1);
+  const scale = one || MIN_FLOW_SCALES[1];
+  run(scale, true);
+  drawSignatures(doc, { ...sign, y: signY });
+  drawFooter(doc, footerLabel);
+};
+
+/**
+ * สร้างไฟล์ PDF ใบส่งมอบงาน (รูปแบบใหม่ 17 ต.ค. 2569 — ดูชุดจัดหน้าด้านบน)
+ * @param {"open"|"download"|"blob"} opts.mode
+ */
+export const generateDeliveryNotePdf = async ({ jsPDF, thSarabunFont, form, mode = "open" }) => {
+  moment.locale("th");
+  await preparePrintAssets();
+  const doc = createDocument(jsPDF, thSarabunFont);
+  const headerY = drawLetterheadModern(doc);
+  const attachments = (form.attachments || []).filter((a) => (a.text || "").trim());
+
+  placeFlowLetter(doc, {
+    headerY,
+    title: "ใบส่งมอบงาน",
+    docNumber: form.docNumber,
+    firstY: ({ fs, lh }, draw) => {
+      const y = drawDocTitle(doc, headerY, "ใบส่งมอบงาน", "DELIVERY NOTE", draw);
+      return drawLetterMeta(doc, {
+        y: y + 2, fs, lh, draw, docNumber: form.docNumber, date: form.issuedAt,
+        rows: [
+          ["เรื่อง", form.subject],
+          ["โครงการ", form.site],
+          ["", form.customerCompany],
+          ["", form.customerAddress],
+          ["", form.customerTaxId ? `เลขประจำตัวผู้เสียภาษี ${form.customerTaxId}` : ""],
+          ["เรียน", form.attention, { gapBefore: 0.3 }],
+          ["อ้างถึง", form.reference],
+        ],
+      }) + lh;
+    },
+    body: (f) => {
+      flowParagraph(doc, f, form.body);
+      if (!attachments.length) return;
+      f.y += f.lh * 0.9;
+      f.need(f.lh * 4);
+      setBold(doc, true);
+      if (f.draw) doc.text("สิ่งที่ส่งมาด้วย", LM, f.y);
+      setBold(doc, false);
+      f.y += 2.8;
+      flowTable(doc, f, {
+        cols: [{ title: "ลำดับ", w: 14, align: "center" }, { title: "รายการ", w: CW - 14 - 28 }, { title: "จำนวน", align: "center" }],
+        rows: attachments.map((a, i) => [String(i + 1), a.text, a.qty || "-"]),
+      });
+      f.y += f.lh * 0.55;
+    },
+    closing: (f) => {
+      f.y += f.lh * 0.9;
+      f.need(0);
+      if (f.draw) doc.text("จึงเรียนมาเพื่อโปรดพิจารณา และขอขอบพระคุณมา ณ โอกาสนี้", LM + 14, f.y);
+    },
+    sign: {
+      leftTitle: "ลงนามรับมอบงาน",
+      customer: form.customerCompany || form.site,
+      signerName: form.signerName, signerPosition: form.signerPosition,
+      contact: ISSUER.nameTh,
+      signatureImage: form.signatureImage,
+    },
+    footerLabel: `ใบส่งมอบงาน · เลขที่ ${form.docNumber || "-"}`,
   });
 
-  // ── ส่งออก ───────────────────────────────────────────────────────────────
   return outputDocument(doc, `ใบส่งมอบงาน ${form.docNumber || ""} ${form.site || ""}`, mode);
 };

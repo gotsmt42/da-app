@@ -131,17 +131,19 @@ export function DocDialogHeader({ icon, accent, title, subtitle, savedLabel, onC
 /** การ์ดหัวข้อมีลำดับ — action อยู่ขวาของหัวข้อเสมอ (ตำแหน่งปุ่มเดาได้ทุกก้อน) */
 export function DocSection({ step, icon, title, hint, action, children, highlight }) {
   return (
-    <Box sx={{ p: { xs: 1.75, sm: 2.25 }, mb: 1.75, bgcolor: "#fff", borderRadius: 2.5, border: `1px solid ${highlight ? highlight : LINE}`, boxShadow: highlight ? `0 6px 18px -12px ${highlight}` : "none" }}>
-      <Stack direction="row" alignItems="center" spacing={1.1} sx={{ mb: 1.75, minHeight: 30 }}>
-        <Box sx={{ width: icon ? 30 : 22, height: icon ? 30 : 22, borderRadius: icon ? 2 : "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: highlight || ACCENT_SOFT, color: highlight ? "#fff" : ACCENT, fontSize: "0.74rem", fontWeight: 900, "& svg": { fontSize: 17 } }}>
+    <Box sx={{ p: { xs: 1.5, sm: 2.25 }, mb: 1.75, bgcolor: "#fff", borderRadius: 2.5, border: `1.5px solid ${highlight ? `${highlight}55` : LINE}`, boxShadow: highlight ? `0 8px 20px -14px ${highlight}` : "none" }}>
+      {/* ✅ (17 ต.ค. 2569 ผู้ใช้: "หน้ามือถือ จัดวางให้ดูง่าย ไม่ล้นขอบ") มือถือ: ปุ่มของหัวข้อลงบรรทัดใหม่เต็มความกว้าง ไม่บีบชื่อ/คำอธิบาย */}
+      <Stack direction="row" alignItems="center" spacing={1.1} sx={{ mb: action ? { xs: 1, sm: 1.75 } : 1.75, minHeight: 30 }}>
+        <Box sx={{ width: icon ? 30 : 28, height: icon ? 30 : 28, borderRadius: icon ? 2 : "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: highlight || ACCENT_SOFT, color: highlight ? "#fff" : ACCENT, fontSize: "0.74rem", fontWeight: 900, "& svg": { fontSize: 17 } }}>
           {icon || step}
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography sx={{ fontWeight: 900, fontSize: "0.92rem", color: INK, lineHeight: 1.3 }}>{title}</Typography>
           {hint && <Typography sx={{ fontSize: "0.76rem", color: MUTED, lineHeight: 1.45 }}>{hint}</Typography>}
         </Box>
-        {action}
+        {action && <Box sx={{ display: { xs: "none", sm: "block" }, flexShrink: 0 }}>{action}</Box>}
       </Stack>
+      {action && <Box sx={{ display: { xs: "flex", sm: "none" }, mb: 1.5, "& > *": { flex: 1 }, "& .MuiButton-root": { flex: 1 } }}>{action}</Box>}
       {children}
     </Box>
   );
@@ -152,7 +154,7 @@ export function DocSection({ step, icon, title, hint, action, children, highligh
  *    หัวข้อที่ระบบเติมให้ครบแล้ว (ผู้รับ · เรื่อง/เนื้อความ · ผู้ลงนาม) พับไว้ — หัวพับโชว์ "ค่าที่จะพิมพ์จริง" สรุปบรรทัดเดียว
  *    ตรวจได้ทันทีโดยไม่ต้องกาง · กดเพื่อแก้ · ช่องบังคับที่ยังว่าง (alert) = กางเองพร้อมขอบแดง
  */
-export function FoldSection({ icon, title, summary, alert = false, defaultOpen = false, action, children }) {
+export function FoldSection({ icon, step, title, summary, alert = false, defaultOpen = false, action, children }) {
   const [userOpen, setUserOpen] = useState(defaultOpen);
   const open = userOpen || alert;
   return (
@@ -160,8 +162,11 @@ export function FoldSection({ icon, title, summary, alert = false, defaultOpen =
       <Stack direction="row" alignItems="center" spacing={1.25} role="button" tabIndex={0}
         onClick={() => setUserOpen((o) => !o)} onKeyDown={(e) => { if (e.key === "Enter") setUserOpen((o) => !o); }}
         sx={{ px: { xs: 1.5, sm: 2 }, py: 1.25, cursor: "pointer", "&:hover": { bgcolor: SURFACE } }}>
-        <Box sx={{ width: 30, height: 30, borderRadius: 2, flexShrink: 0, display: "grid", placeItems: "center", bgcolor: SURFACE, color: INK_2, "& svg": { fontSize: 17 } }}>
-          {icon}
+        {/* ✅ (17 ต.ค. 2569) เลขลำดับตามตำแหน่งในเอกสาร (บนลงล่าง) แทนไอคอน — เห็นลำดับทันที */}
+        <Box sx={{ width: 28, height: 28, borderRadius: "50%", flexShrink: 0, display: "grid", placeItems: "center",
+          bgcolor: alert ? "#fee2e2" : SURFACE, color: alert ? "#dc2626" : INK_2, border: `1px solid ${alert ? "#fca5a5" : LINE}`,
+          fontSize: "0.78rem", fontWeight: 900, "& svg": { fontSize: 16 } }}>
+          {step ?? icon}
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography sx={{ fontWeight: 800, fontSize: "0.86rem", color: INK, lineHeight: 1.3 }}>{title}</Typography>
@@ -179,6 +184,35 @@ export function FoldSection({ icon, title, summary, alert = false, defaultOpen =
   );
 }
 
+/**
+ * ✅ (17 ต.ค. 2569 ผู้ใช้: "ตัวที่อิงข้อมูลใหม่ กดเพื่อตามข้อมูลงาน ทำให้ชัดเจน ดูง่าย ให้ผู้ใช้ไม่ผิดพลาด")
+ *    กล่องบอกสถานะข้อความที่ระบบเขียนให้: ตรงกับข้อมูลล่าสุดแล้ว (เขียว) / ยังไม่ตรง (ส้ม + ปุ่มเด่น)
+ *    อธิบายชัดว่ากดแล้วเกิดอะไร (ข้อความที่พิมพ์แก้เองจะถูกแทนที่) และมี "ย้อนกลับ" ทันทีหลังกด กันพลาด
+ */
+export function AutoTextBar({ manual, onReset, sources = "ข้อ 1–3" }) {
+  // 🔁 (17 ต.ค. 2569 ผู้ใช้: "อยากให้อัปเดตข้อความอัตโนมัติไปเลย ไม่ต้องยุ่งยาก") — ไม่มีปุ่มให้กดตามอีกแล้ว
+  //    ข้อความเปลี่ยนตามข้อมูลเองทันที · ถ้าผู้ใช้พิมพ์แก้เอง ระบบหยุดเขียนทับ และมีปุ่มกลับไปใช้แบบอัตโนมัติ
+  const tone = manual ? "#b45309" : "#15803d";
+  return (
+    <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ sm: "center" }} gap={1}
+      sx={{ px: 1.25, py: 1, mb: 1.75, borderRadius: 2, bgcolor: manual ? "#fffbeb" : "#f0fdf4", border: `1px solid ${manual ? "#fde68a" : "#bbf7d0"}` }}>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography sx={{ fontSize: "0.82rem", fontWeight: 800, color: tone }}>
+          {manual ? "คุณแก้ข้อความเองแล้ว — ระบบจะไม่เขียนทับ" : "✓ ข้อความอัปเดตอัตโนมัติ"}
+        </Typography>
+        <Typography sx={{ fontSize: "0.74rem", color: MUTED, lineHeight: 1.5 }}>
+          {manual
+            ? `ถ้าแก้${sources}อีก ข้อความนี้จะไม่เปลี่ยนตาม — กดปุ่มด้านขวาเพื่อกลับไปใช้ข้อความอัตโนมัติ`
+            : `เปลี่ยนตาม${sources}ให้เองทันที · พิมพ์แก้ถ้อยคำได้ (หลังแก้ ระบบจะไม่เขียนทับ)`}
+        </Typography>
+      </Box>
+      {manual && (
+        <Button size="small" onClick={onReset} sx={{ ...OUTLINE_BTN_SX, flexShrink: 0 }}>กลับไปใช้ข้อความอัตโนมัติ</Button>
+      )}
+    </Stack>
+  );
+}
+
 /** หัวข้อย่อยในการ์ด (เช่น "กำหนดการรายวัน") + ตัวนับ + ปุ่มด้านขวา — ชื่อไม่ตัดบรรทัด */
 export function SubHeader({ children, count, action }) {
   return (
@@ -192,6 +226,24 @@ export function SubHeader({ children, count, action }) {
     </Stack>
   );
 }
+
+/**
+ * ✅ (17 ต.ค. 2569 ผู้ใช้: "ux ui ฟอร์มกรอกต่างๆ ให้สวยงามทันสมัย") — หน้าตาช่องกรอกของกล่องออกเอกสารชุดเดียวกัน
+ *    มุมโค้ง 10px · ขอบเทาอ่อน · โฟกัสแล้วมีวงแสงสีประจำเอกสาร · ป้ายตัวหนาเล็กน้อย — ใส่ที่ DialogContent ครั้งเดียวมีผลทุกช่อง
+ */
+export const docFormSx = (accent) => ({
+  "& .MuiOutlinedInput-root": {
+    borderRadius: "10px", bgcolor: "#fff", transition: "box-shadow .15s, border-color .15s",
+    "& fieldset": { borderColor: "#e2e8f0" },
+    "&:hover fieldset": { borderColor: "#cbd5e1" },
+    "&.Mui-focused": { boxShadow: `0 0 0 3px ${accent}22` },
+    "&.Mui-focused fieldset": { borderColor: accent, borderWidth: "1px" },
+    "&.Mui-disabled": { bgcolor: SURFACE },
+  },
+  "& .MuiInputLabel-root": { fontWeight: 600, color: MUTED },
+  "& .MuiInputLabel-root.Mui-focused": { color: accent },
+  "& .MuiFormHelperText-root": { mx: 0.5, color: FAINT },
+});
 
 export const SMALL_BTN_SX = { textTransform: "none", fontWeight: 700, color: INK_2, borderRadius: 2, px: 1.25, minWidth: 0, whiteSpace: "nowrap" };
 export const OUTLINE_BTN_SX = { ...SMALL_BTN_SX, border: `1px solid ${LINE}`, bgcolor: "#fff", "&:hover": { bgcolor: SURFACE } };

@@ -21,7 +21,6 @@ import {
 } from "@mui/material";
 import {
   Visibility, EventAvailable, Refresh, Search, Add, DeleteOutline, ContentPaste, AutoFixHigh,
-  Business, Subject, DrawOutlined,
 } from "@mui/icons-material";
 import { jsPDF } from "jspdf";
 import thSarabunFont from "@/assets/fonts/THSarabunNew_base64";
@@ -43,8 +42,8 @@ import SignatureService from "@/shared/services/SignatureService";
 import StaffDirectoryService from "@/shared/services/StaffDirectoryService";
 import { useAuth } from "@/features/auth/AuthContext";
 import {
-  DocDialogHeader, DocSection, FoldSection, SubHeader, DraftBanner, IssuedSummary, SignerPreview, useDocDraft, useIssuedDoc,
-  SMALL_BTN_SX, OUTLINE_BTN_SX,
+  DocDialogHeader, DocSection, FoldSection, AutoTextBar, docFormSx, SubHeader, DraftBanner, IssuedSummary, SignerPreview, useDocDraft, useIssuedDoc,
+  OUTLINE_BTN_SX,
 } from "./docFormKit";
 import { INK_2, MUTED, FAINT, LINE, SURFACE, DANGER, PRIMARY_BTN_SX } from "@/shared/ui/PageKit";
 
@@ -168,7 +167,16 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
 
   // ✅ สร้างข้อความใหม่จากค่าที่แก้ล่าสุดได้ตลอด — เผื่อผู้ใช้แก้ชื่อโครงการ/งาน/อ้างถึง หลังเปิดกล่อง
   // (ไม่ทำอัตโนมัติ เพราะถ้าเขาแก้ถ้อยคำเองไว้แล้วจะโดนเขียนทับทิ้ง)
-  const regenerateBody = () => setForm((f) => ({ ...f, body: buildWorkNoticeBody(f) }));
+  // ✅ (17 ต.ค. 2569 ผู้ใช้: "อัปเดตข้อความอัตโนมัติไปเลย ไม่ต้องยุ่งยาก") — ข้อความเขียนใหม่ตามข้อมูลทันทีที่ข้อมูลเปลี่ยน
+  //    จนกว่าผู้ใช้จะพิมพ์แก้เอง (bodyManual อยู่ในฟอร์ม → ติดไปกับร่างอัตโนมัติด้วย)
+  const builtBody = form ? buildWorkNoticeBody(form) : "";
+  useEffect(() => {
+    if (!form || form.bodyManual || (form.body || "") === builtBody) return;
+    setFormState((f) => (f ? { ...f, body: builtBody } : f));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ตามเฉพาะข้อความที่ระบบสร้าง/สถานะแก้เอง
+  }, [builtBody, form?.bodyManual]);
+  const editBody = (e) => { const v = e.target.value; setForm((f) => ({ ...f, body: v, bodyManual: true })); };
+  const resetBody = () => setForm((f) => ({ ...f, bodyManual: false, body: buildWorkNoticeBody(f) }));
 
   const subjectOptions = useMemo(
     () => noticeSubjectPresetsFor(form?.workLabel, form?.roundLabel),
@@ -437,86 +445,19 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
         />
       </DialogTitle>
 
-      <DialogContent sx={{ px: { xs: 1.5, sm: 3 }, py: { xs: 1.75, sm: 2.5 }, bgcolor: SURFACE, overflowX: "hidden" }}>
+      <DialogContent sx={{ px: { xs: 1.5, sm: 3 }, py: { xs: 1.75, sm: 2.5 }, bgcolor: SURFACE, overflowX: "hidden", ...docFormSx(ACCENT) }}>
         {error && <Alert severity="error" onClose={() => setError("")} sx={{ mb: 1.75, borderRadius: 2 }}>{error}</Alert>}
         {locked && <IssuedSummary doc={existing.doc} label="ใบแจ้งเข้างาน" onView={viewExisting} viewing={busy} onNavigate={closeAll} />}
         {!locked && draft.restoredLabel && <DraftBanner when={draft.restoredLabel} onDiscard={discardDraft} />}
 
         {/* ✅ ออกแล้ว = แสดงสรุปใบเดิมอย่างเดียว ไม่โชว์ฟอร์ม (แก้/ออกซ้ำไม่ได้อยู่แล้ว) */}
         {!locked && (<Box>
-          {/* 🔁 (17 ต.ค. 2569 ผู้ใช้: "ปรับปรุงหน้าออกเอกสาร ให้สอดคล้องกับระบบปัจจุบัน สวยงาม ดูง่าย เน้นกรอกน้อยที่สุด
-                หรือกรอกส่วนที่จำเป็นที่ปรับเปลี่ยนตลอด")
-              ① ส่วนที่เปลี่ยนทุกใบ (กำหนดการเข้างาน) เปิดไว้บนสุด
-              ② ส่วนที่ระบบเติมให้ครบแล้ว (แจ้งถึง · เรื่องและเนื้อความ · ผู้ออกเอกสาร) พับไว้ หัวพับโชว์ค่าที่จะพิมพ์จริง กดแก้เฉพาะที่ต้องเปลี่ยน */}
-          <DocSection icon={<EventAvailable />} highlight={ACCENT} title={`กำหนดการเข้างาน · ${printedDays.length} วัน`}
-            hint={`ระบบเติมตามตาราง: ${form.jobDateText} · ปรับวัน/เวลา/สิ่งที่เข้าทำตามที่นัดกับลูกค้า`}
-            action={(
-              <Stack direction="row" spacing={0.75}>
-                <Button size="small" onClick={(e) => setToolsAnchor(e.currentTarget)} startIcon={<AutoFixHigh sx={{ fontSize: 16 }} />} sx={OUTLINE_BTN_SX}>
-                  ตัวช่วย
-                </Button>
-                <Button size="small" onClick={addDay} startIcon={<Add sx={{ fontSize: 16 }} />} sx={OUTLINE_BTN_SX}>เพิ่มวัน</Button>
-              </Stack>
-            )}>
-            <Menu anchorEl={toolsAnchor} open={Boolean(toolsAnchor)} onClose={() => setToolsAnchor(null)}
-              anchorOrigin={{ vertical: "bottom", horizontal: "right" }} transformOrigin={{ vertical: "top", horizontal: "right" }}>
-              {[
-                [regenerateDays, <Refresh key="i" fontSize="small" />, "สร้างรายการใหม่ตามตารางในระบบ"],
-                [() => applyFirstToAll("time"), <ContentPaste key="i" fontSize="small" />, "ใช้เวลาของวันแรกกับทุกวัน"],
-                [() => applyFirstToAll("detail"), <ContentPaste key="i" fontSize="small" />, "ใช้รายละเอียดของวันแรกกับทุกวัน"],
-              ].map(([fn, icon, label]) => (
-                <MenuItem key={label} onClick={() => { fn(); setToolsAnchor(null); }} sx={{ fontSize: "0.86rem" }}>
-                  <ListItemIcon sx={{ color: INK_2 }}>{icon}</ListItemIcon>{label}
-                </MenuItem>
-              ))}
-            </Menu>
-            {/* ✅ รายการเดียวคั่นเส้น (ไม่ซ้อนกล่องในกล่อง) · วันที่/เวลาแถวเดียวกัน · ปุ่มลบอยู่ขวาของหัววัน */}
-            <Box sx={{ border: `1px solid ${LINE}`, borderRadius: 2, overflow: "hidden", bgcolor: "#fff" }}>
-              {(form.dayRows || []).map((r, i) => (
-                <Box key={i} sx={{ px: 1.5, pt: 1, pb: 1.5, borderTop: i ? `1px solid ${LINE}` : "none" }}>
-                  <Stack direction="row" alignItems="center" sx={{ mb: 1 }}>
-                    <Typography sx={{ flex: 1, fontSize: "0.8rem", fontWeight: 800, color: INK_2 }}>วันที่ {i + 1}</Typography>
-                    <IconButton size="small" onClick={() => removeDay(i)} aria-label={`ลบวันที่ ${i + 1}`} sx={{ color: FAINT, p: 0.5 }}>
-                      <DeleteOutline sx={{ fontSize: 18 }} />
-                    </IconButton>
-                  </Stack>
-                  <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0,1fr)", sm: "200px minmax(0,1fr)" }, gap: 1 }}>
-                    <ThaiDatePicker label="วันที่" value={r.date} onChange={(v) => updateDay(i, "date", v)} textFieldProps={{ sx: fieldSx }} />
-                    {/* ⚠️ disableClearable — ไม่จองที่ปุ่มล้างด้านขวา เวลา "09.30 - 17.30 น." จะไม่ถูกตัดเป็น "17...." */}
-                    <Autocomplete
-                      freeSolo disableClearable size="small" options={TIME_PRESETS}
-                      inputValue={r.time || ""} onInputChange={(_, v) => { if (v !== (r.time || "")) updateDay(i, "time", v); }}
-                      renderInput={(params) => <TextField {...params} label="เวลา" sx={fieldSx} />}
-                    />
-                  </Box>
-                  <TextField
-                    size="small" fullWidth multiline sx={{ mt: 1, ...fieldSx }}
-                    label="เข้าทำอะไร / บริเวณไหน"
-                    value={r.detail || ""} onChange={(e) => updateDay(i, "detail", e.target.value)}
-                    placeholder="เช่น เข้าทำการตรวจเช็คตู้ควบคุม และทดสอบบริเวณห้องพัก"
-                  />
-                </Box>
-              ))}
-              {(form.dayRows || []).length === 0 && (
-                <Box sx={{ py: 2.5, textAlign: "center" }}>
-                  <Typography sx={{ fontSize: "0.82rem", color: MUTED }}>ยังไม่มีกำหนดการ — กด "เพิ่มวัน" หรือ "ตัวช่วย"</Typography>
-                </Box>
-              )}
-            </Box>
-
-            <SubHeader>หมายเหตุถึงลูกค้า (ไม่บังคับ)</SubHeader>
-            <TextField
-              size="small" fullWidth multiline minRows={2} sx={fieldSx}
-              value={form.supportNote} onChange={setField("supportNote")}
-              placeholder={SUPPORT_REQUEST_PRESETS[0]}
-            />
-          </DocSection>
-
-          <Typography sx={{ fontSize: "0.74rem", fontWeight: 800, color: MUTED, mt: 2.25, mb: 0.75, px: 0.5 }}>
-            ระบบเติมให้แล้ว — ตรวจความถูกต้อง แล้วกด “แก้ไข” เฉพาะส่วนที่ต้องเปลี่ยน
+          {/* 🔁 (17 ต.ค. 2569 ผู้ใช้: "ควรลำดับจากหัวกระดาษมาล่าง ให้เข้าใจง่าย และใช้คำง่ายๆ ไม่กำกวม")
+              เรียงตามเอกสารจริง บนลงล่าง: ① ถึงใคร → ② หัวเรื่อง → ③ เนื้อหาหลัก (เปิดไว้) → ④ ข้อความในจดหมาย → ⑤ ผู้ลงชื่อ */}
+          <Typography sx={{ fontSize: "0.76rem", color: MUTED, mt: 0.5, mb: 1.25, px: 0.5 }}>
+            ระบบกรอกให้ครบแล้ว เรียงตามเอกสารจากบนลงล่าง — ตรวจ แล้วกด “แก้ไข” เฉพาะส่วนที่ต้องเปลี่ยน
           </Typography>
-
-          <FoldSection icon={<Business />} title="แจ้งถึง"
+          <FoldSection step={1} title="ถึงลูกค้า"
             summary={[form.site, form.customerCompany, form.attention && `เรียน ${form.attention}`].filter(Boolean).join(" · ") || "ยังไม่ระบุโครงการ"}
             alert={!form.site?.trim()}>
             <Stack spacing={1.75}>
@@ -569,10 +510,9 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
             </Stack>
           </FoldSection>
 
-          <FoldSection icon={<Subject />} title="เรื่องและเนื้อความ"
-            summary={[form.subject || "ยังไม่ระบุเรื่อง", form.reference && `อ้างถึง ${form.reference}`].filter(Boolean).join(" · ")}
-            alert={!form.subject?.trim()}
-            action={<Button size="small" onClick={regenerateBody} startIcon={<Refresh sx={{ fontSize: 16 }} />} sx={SMALL_BTN_SX}>สร้างเนื้อความใหม่</Button>}>
+          <FoldSection step={2} title="หัวเรื่อง"
+            summary={[form.subject || "ยังไม่ระบุเรื่อง", `วันที่ ${thaiFullDate(form.issuedAt)}`].filter(Boolean).join(" · ")}
+            alert={!form.subject?.trim()}>
             <Stack spacing={1.75}>
               <Stack direction="row" spacing={1.5} sx={{ minWidth: 0 }}>
                 <TextField size="small" fullWidth label="งานที่ดำเนินการ" placeholder="เช่น PM ระบบ Fire Alarm"
@@ -597,17 +537,111 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
                     helperText={thaiFullDate(form.issuedAt)} textFieldProps={{ sx: fieldSx }} />
                 </Box>
               </Stack>
-              <Stack spacing={1.75}>
-                <TextField size="small" fullWidth multiline minRows={3} label="ย่อหน้า 1 · ที่มาและกำหนดการ"
-                  value={form.body} onChange={setField("body")} sx={fieldSx} />
-                <TextField size="small" fullWidth multiline minRows={3} label="ย่อหน้า 2 · ขอความร่วมมือ"
-                  value={form.cooperationNote} onChange={setField("cooperationNote")} sx={fieldSx}
-                  helperText='ปิดท้ายด้วย "จึงเรียนมาเพื่อโปรดทราบ..." ให้อัตโนมัติ' />
-              </Stack>
             </Stack>
           </FoldSection>
 
-          <FoldSection icon={<DrawOutlined />} title="ผู้ออกเอกสาร (ผู้ประสานงาน)"
+          {/* 🔁 (17 ต.ค. 2569 ผู้ใช้: "ปรับปรุงหน้าออกเอกสาร ให้สอดคล้องกับระบบปัจจุบัน สวยงาม ดูง่าย เน้นกรอกน้อยที่สุด
+                หรือกรอกส่วนที่จำเป็นที่ปรับเปลี่ยนตลอด")
+              ① ส่วนที่เปลี่ยนทุกใบ (กำหนดการเข้างาน) เปิดไว้บนสุด
+              ② ส่วนที่ระบบเติมให้ครบแล้ว (แจ้งถึง · เรื่องและเนื้อความ · ผู้ออกเอกสาร) พับไว้ หัวพับโชว์ค่าที่จะพิมพ์จริง กดแก้เฉพาะที่ต้องเปลี่ยน */}
+          <DocSection step={3} highlight={ACCENT} title={`กำหนดการเข้างาน · ${printedDays.length} วัน`}
+            hint={`วันในตารางงาน: ${form.jobDateText} — แก้วัน เวลา และงานที่เข้าทำ ให้ตรงกับที่นัดลูกค้าไว้`}
+            action={(
+              <Stack direction="row" spacing={0.75}>
+                <Button size="small" onClick={(e) => setToolsAnchor(e.currentTarget)} startIcon={<AutoFixHigh sx={{ fontSize: 16 }} />} sx={OUTLINE_BTN_SX}>
+                  ตัวช่วย
+                </Button>
+                <Button size="small" onClick={addDay} startIcon={<Add sx={{ fontSize: 16 }} />} sx={OUTLINE_BTN_SX}>เพิ่มวัน</Button>
+              </Stack>
+            )}>
+            <Menu anchorEl={toolsAnchor} open={Boolean(toolsAnchor)} onClose={() => setToolsAnchor(null)}
+              anchorOrigin={{ vertical: "bottom", horizontal: "right" }} transformOrigin={{ vertical: "top", horizontal: "right" }}>
+              {[
+                [regenerateDays, <Refresh key="i" fontSize="small" />, "สร้างรายการใหม่ตามตารางในระบบ"],
+                [() => applyFirstToAll("time"), <ContentPaste key="i" fontSize="small" />, "ใช้เวลาของวันแรกกับทุกวัน"],
+                [() => applyFirstToAll("detail"), <ContentPaste key="i" fontSize="small" />, "ใช้รายละเอียดของวันแรกกับทุกวัน"],
+              ].map(([fn, icon, label]) => (
+                <MenuItem key={label} onClick={() => { fn(); setToolsAnchor(null); }} sx={{ fontSize: "0.86rem" }}>
+                  <ListItemIcon sx={{ color: INK_2 }}>{icon}</ListItemIcon>{label}
+                </MenuItem>
+              ))}
+            </Menu>
+            {/* ✅ รายการเดียวคั่นเส้น (ไม่ซ้อนกล่องในกล่อง) · วันที่/เวลาแถวเดียวกัน · ปุ่มลบอยู่ขวาของหัววัน */}
+            <Box sx={{ border: `1px solid ${LINE}`, borderRadius: 2, overflow: "hidden", bgcolor: "#fff" }}>
+              {(form.dayRows || []).map((r, i) => (
+                <Box key={i} sx={{ px: { xs: 1.1, sm: 1.5 }, pt: 1, pb: 1.5, borderTop: i ? `1px solid ${LINE}` : "none" }}>
+                  <Stack direction="row" alignItems="center" sx={{ mb: 1 }}>
+                    <Typography sx={{ flex: 1, fontSize: "0.8rem", fontWeight: 800, color: INK_2 }}>วันที่ {i + 1}</Typography>
+                    <IconButton size="small" onClick={() => removeDay(i)} aria-label={`ลบวันที่ ${i + 1}`} sx={{ color: FAINT, p: 0.5 }}>
+                      <DeleteOutline sx={{ fontSize: 18 }} />
+                    </IconButton>
+                  </Stack>
+                  <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0,1fr) minmax(0,1fr)", sm: "200px minmax(0,1fr)" }, gap: 1 }}>
+                    <ThaiDatePicker label="วันที่" value={r.date} onChange={(v) => updateDay(i, "date", v)} textFieldProps={{ sx: fieldSx }} />
+                    {/* ⚠️ disableClearable — ไม่จองที่ปุ่มล้างด้านขวา เวลา "09.30 - 17.30 น." จะไม่ถูกตัดเป็น "17...." */}
+                    <Autocomplete
+                      freeSolo disableClearable size="small" options={TIME_PRESETS}
+                      inputValue={r.time || ""} onInputChange={(_, v) => { if (v !== (r.time || "")) updateDay(i, "time", v); }}
+                      renderInput={(params) => <TextField {...params} label="เวลา" sx={fieldSx} />}
+                    />
+                  </Box>
+                  <TextField
+                    size="small" fullWidth multiline sx={{ mt: 1, ...fieldSx }}
+                    label="เข้าทำอะไร / บริเวณไหน"
+                    value={r.detail || ""} onChange={(e) => updateDay(i, "detail", e.target.value)}
+                    placeholder="เช่น เข้าทำการตรวจเช็คตู้ควบคุม และทดสอบบริเวณห้องพัก"
+                  />
+                </Box>
+              ))}
+              {(form.dayRows || []).length === 0 && (
+                <Box sx={{ py: 2.5, textAlign: "center" }}>
+                  <Typography sx={{ fontSize: "0.82rem", color: MUTED }}>ยังไม่มีกำหนดการ — กด "เพิ่มวัน" หรือ "ตัวช่วย"</Typography>
+                </Box>
+              )}
+            </Box>
+
+            {/* 🔁 (17 ต.ค. 2569 ผู้ใช้: "หมายเหตุให้ระบุว่าถ้าจำเป็นด้วย ดูว่าเอาไว้ไหนถึงจะเหมาะสม")
+                พิมพ์ใต้ตารางกำหนดการในเอกสาร (สิ่งที่ขอจากลูกค้าเผื่อจำเป็น) · เลือกข้อความสำเร็จรูปได้ · ไม่ต้องการ = ลบให้ว่าง */}
+            <SubHeader>หมายเหตุใต้ตารางกำหนดการ (ไม่บังคับ)</SubHeader>
+            <TextField
+              size="small" fullWidth multiline minRows={2} sx={fieldSx}
+              value={form.supportNote} onChange={setField("supportNote")}
+              placeholder="เช่น หากจำเป็น ขอความอนุเคราะห์อุปกรณ์/เจ้าหน้าที่จากลูกค้า — ไม่ต้องการให้เว้นว่าง"
+              helperText="สิ่งที่ขอจากลูกค้าเผื่อจำเป็น · ไม่ต้องการให้ลบข้อความทิ้ง (หัวข้อหมายเหตุจะไม่ถูกพิมพ์)"
+            />
+            <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75, mt: 1 }}>
+              {[
+                ["อุปกรณ์ที่สูง + ผู้ประสานงาน", SUPPORT_REQUEST_PRESETS[0]],
+                ["ผู้ประสานงานนำเข้าพื้นที่", SUPPORT_REQUEST_PRESETS[1]],
+                ["เปิดพื้นที่ + ไฟฟ้าทดสอบ", SUPPORT_REQUEST_PRESETS[2]],
+              ].map(([label, text]) => (
+                <Button key={label} size="small" onClick={() => set("supportNote")(text)}
+                  sx={{ ...OUTLINE_BTN_SX, fontSize: "0.76rem", py: 0.25, borderRadius: 99,
+                    ...(form.supportNote === text ? { borderColor: ACCENT, color: ACCENT, bgcolor: `${ACCENT}0f` } : {}) }}>
+                  {label}
+                </Button>
+              ))}
+              {form.supportNote && (
+                <Button size="small" onClick={() => set("supportNote")("")} sx={{ ...OUTLINE_BTN_SX, fontSize: "0.76rem", py: 0.25, borderRadius: 99, color: MUTED }}>
+                  ไม่ใส่หมายเหตุ
+                </Button>
+              )}
+            </Stack>
+          </DocSection>
+
+          <FoldSection step={4} title="ข้อความในจดหมาย"
+            summary={form.bodyManual ? "แก้ข้อความเองแล้ว (ไม่อัปเดตอัตโนมัติ)" : "ย่อหน้าเปิด (ก่อนกำหนดการ) และย่อหน้าปิด (ขอความร่วมมือ)"}>
+            <AutoTextBar manual={Boolean(form.bodyManual)} onReset={resetBody} />
+              <Stack spacing={1.75}>
+                <TextField size="small" fullWidth multiline minRows={3} label="ย่อหน้าเปิด (อยู่ก่อนกำหนดการ)"
+                  value={form.body} onChange={editBody} sx={fieldSx} />
+                <TextField size="small" fullWidth multiline minRows={3} label="ย่อหน้าปิด (อยู่หลังกำหนดการ)"
+                  value={form.cooperationNote} onChange={setField("cooperationNote")} sx={fieldSx}
+                  helperText='ปิดท้ายด้วย "จึงเรียนมาเพื่อโปรดทราบ..." ให้อัตโนมัติ' />
+              </Stack>
+          </FoldSection>
+
+          <FoldSection step={5} title="ผู้ลงชื่อท้ายจดหมาย"
             summary={[form.signerName || "ยังไม่ระบุชื่อ", form.signerPosition, form.signerTel && `โทร ${form.signerTel}`, signatureImage ? "ลายเซ็นอิเล็กทรอนิกส์" : "เว้นช่องเซ็นมือ"].filter(Boolean).join(" · ")}
             alert={!form.signerName?.trim()}>
             <Stack spacing={1.75}>
