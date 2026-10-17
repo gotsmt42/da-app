@@ -472,17 +472,24 @@ function JobCard({ job, readOnly, requestMode, onSchedule, onDeliver, onUploadIn
             </Stack>
             {place && <Typography sx={{ fontSize: "0.86rem", fontWeight: 600, color: "#475569", mt: 0.2, overflowWrap: "anywhere" }}>{place}</Typography>}
 
-            {/* ✅ (17 ต.ค. 2569 ผู้ใช้: "จุดที่ควรสังเกตให้สีแตกต่าง มืออาชีพ แต่ไม่รก") — ป้ายสีแถวแรก = เรื่องที่ต้องดู
-                กำหนดเวลา (ม่วงคราม · เดือนนี้ส้ม · เลยแล้วแดง) · เสร็จภายใน · ที่มา (สีประจำฝ่าย) · เอกสาร (PO เขียว / ใบเสนอราคาส้ม)
-                แถวที่สอง = ข้อมูลประกอบสีเทา (ผู้รับผิดชอบ · ทีม · ผู้ติดต่อ) */}
+            {/* ✅ (17 ต.ค. 2569) แถวแรก = ป้ายข้อมูลสำคัญโทนเทา (กำหนดเวลา · เสร็จภายใน · ที่มา · เอกสาร) — สีเฉพาะเดือนนี้/เลยกำหนด
+                แถวที่สอง = ข้อมูลประกอบ (ผู้รับผิดชอบ · ทีม · ผู้ติดต่อ) */}
             <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75, mt: 1 }}>
               {(() => {
                 const t = scheduleTagOf(job, schedule);
-                return <Tag icon={t.icon} color={t.color} dashed={t.dashed}>{t.text}{t.rel && <Box component="span" sx={{ fontWeight: 600, opacity: 0.85 }}>· {t.rel}</Box>}</Tag>;
+                return (
+                  <Tag icon={t.icon} accent={t.accent} dashed={t.dashed}>
+                    {t.text}
+                    {t.rel && <Box component="span" sx={{ ml: 0.5, fontWeight: t.accent ? 800 : 600, color: t.accent || "#64748b" }}>· {t.rel}</Box>}
+                  </Tag>
+                );
               })()}
-              {due && st.i < 4 && <Tag icon={FlagOutlined} color={moment(job.dueDate).isBefore(moment(), "day") ? RED : "#b45309"}>เสร็จภายใน {due}</Tag>}
-              {job.intakeSource && <Tag icon={CallReceivedRounded} color={SOURCE_COLOR[job.intakeSource] || "#475569"}>จาก{SOURCE_LABEL[job.intakeSource] || job.intakeSource}</Tag>}
-              {doc && <Tag icon={DescriptionOutlined} color={DOC_COLOR[job.intakeDocType] || "#475569"}>{doc}</Tag>}
+              {due && st.i < 4 && (() => {
+                const late = moment(job.dueDate).isBefore(moment(), "day");
+                return <Tag icon={FlagOutlined} accent={late ? RED : null}>เสร็จภายใน {due}{late && <Box component="span" sx={{ ml: 0.5, color: RED, fontWeight: 800 }}>· เลยกำหนด</Box>}</Tag>;
+              })()}
+              {job.intakeSource && <Tag icon={CallReceivedRounded}>จาก{SOURCE_LABEL[job.intakeSource] || job.intakeSource}</Tag>}
+              {doc && <Tag icon={DescriptionOutlined}>{doc}</Tag>}
             </Stack>
             <Stack direction="row" sx={{ flexWrap: "wrap", columnGap: 2, rowGap: 0.5, mt: 0.9 }}>
               {job.responsiblePerson && <Fact icon={PersonOutlineOutlined}>{job.responsiblePerson}</Fact>}
@@ -552,30 +559,31 @@ function JobCard({ job, readOnly, requestMode, onSchedule, onDeliver, onUploadIn
 const Chip = ({ children, color = "#334155", bg = SURFACE, border = LINE }) => (
   <Box component="span" sx={{ px: 0.9, height: 22, display: "inline-flex", alignItems: "center", gap: 0.4, flexShrink: 0, borderRadius: 99, fontSize: "0.7rem", fontWeight: 800, color, bgcolor: bg, border: `1px solid ${border}`, whiteSpace: "nowrap" }}>{children}</Box>
 );
-/** ✅ (17 ต.ค. 2569) ป้ายสีของ "จุดที่ควรสังเกต" — พื้นสีอ่อน ขอบบาง ตัวอักษรสีเดียวกัน (สีบอกความหมาย ไม่ใช่ตกแต่ง) */
-const Tag = ({ icon: Icon, color, dashed, children }) => (
+/**
+ * ป้ายข้อมูลสำคัญ (กำหนดเวลา · ที่มา · เอกสาร)
+ * 🔁 (17 ต.ค. 2569 ผู้ใช้: "สีดูรกเกินไป ไม่มืออาชีพ") — ป้ายโทนเทาเดียวกันหมด · สีใช้เฉพาะ "สิ่งที่ต้องรีบดู"
+ *    (เดือนนี้ = ส้ม · เลยกำหนด = แดง) ที่ไอคอนกับคำต่อท้ายเท่านั้น ไม่ระบายพื้น
+ */
+const Tag = ({ icon: Icon, accent, dashed, children }) => (
   <Box component="span" sx={{
-    display: "inline-flex", alignItems: "center", gap: 0.5, height: 26, px: 1, borderRadius: 1.5, maxWidth: "100%",
-    fontSize: "0.78rem", fontWeight: 800, color, bgcolor: dashed ? "transparent" : alpha(color, 0.08),
-    border: `1px ${dashed ? "dashed" : "solid"} ${alpha(color, dashed ? 0.45 : 0.25)}`, whiteSpace: "nowrap", overflow: "hidden",
+    display: "inline-flex", alignItems: "center", gap: 0.6, height: 26, px: 1, borderRadius: 1.5, maxWidth: "100%",
+    fontSize: "0.78rem", fontWeight: 700, color: "#334155", bgcolor: dashed ? "transparent" : SURFACE,
+    border: `1px ${dashed ? "dashed" : "solid"} ${accent ? alpha(accent, 0.45) : LINE}`, whiteSpace: "nowrap", overflow: "hidden",
   }}>
-    {Icon && <Icon sx={{ fontSize: 15, flexShrink: 0 }} />}
-    <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", display: "inline-flex", gap: 0.5 }}>{children}</Box>
+    {Icon && <Icon sx={{ fontSize: 15, flexShrink: 0, color: accent || "#94a3b8" }} />}
+    <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis" }}>{children}</Box>
   </Box>
 );
-// สีประจำ "รับงานมาจาก" และประเภทเอกสาร — ใช้ซ้ำทุกการ์ดให้จำได้จากสี
-const SOURCE_COLOR = { sales: "#0e7490", service: "#6d28d9", project: "#c2410c", customer: "#0f766e" };
-const DOC_COLOR = { po: "#15803d", quotation: "#b45309", other: "#475569" };
-/** ป้ายกำหนดเวลา: เดือนที่ตั้งใจเข้างาน (+ อีกกี่เดือน) · วันเข้างาน · ส่งมอบ · บันทึก */
+/** ป้ายกำหนดเวลา: เดือนที่ตั้งใจเข้างาน (+ อีกกี่เดือน) · วันเข้างาน · ส่งมอบ · บันทึก — accent เฉพาะเดือนนี้/เลยกำหนด */
 const scheduleTagOf = (job, text) => {
-  if (job.intakeNote) return { icon: CalendarMonthOutlined, color: "#475569", text };
-  if (job.noVisit) return { icon: LocalShippingOutlined, color: job.unscheduled ? "#b45309" : "#0f766e", text };
-  if (!job.unscheduled) return { icon: EventAvailableOutlined, color: "#1d4ed8", text };
-  if (!job.plannedMonth) return { icon: CalendarMonthOutlined, color: "#64748b", text: "ยังไม่กำหนดเดือนเข้างาน", dashed: true };
+  if (job.intakeNote || job.noVisit || !job.unscheduled) {
+    return { icon: job.noVisit ? LocalShippingOutlined : job.unscheduled || job.intakeNote ? CalendarMonthOutlined : EventAvailableOutlined, text };
+  }
+  if (!job.plannedMonth) return { icon: CalendarMonthOutlined, text: "ยังไม่กำหนดเดือนเข้างาน", dashed: true };
   const diff = moment(job.plannedMonth, "YYYY-MM").diff(moment().startOf("month"), "months");
   return {
     icon: CalendarMonthOutlined,
-    color: diff < 0 ? RED : diff === 0 ? "#b45309" : "#4338ca",
+    accent: diff < 0 ? RED : diff === 0 ? AMBER : null,
     text: `ตั้งใจเข้างาน ${formatThai(moment(job.plannedMonth, "YYYY-MM"), "MMM YYYY")}`,
     rel: diff > 0 ? `อีก ${diff} เดือน` : diff === 0 ? "เดือนนี้" : `เลยมา ${-diff} เดือน`,
   };
