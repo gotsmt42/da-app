@@ -129,12 +129,12 @@ export function DocDialogHeader({ icon, accent, title, subtitle, savedLabel, onC
 }
 
 /** การ์ดหัวข้อมีลำดับ — action อยู่ขวาของหัวข้อเสมอ (ตำแหน่งปุ่มเดาได้ทุกก้อน) */
-export function DocSection({ step, title, hint, action, children }) {
+export function DocSection({ step, icon, title, hint, action, children, highlight }) {
   return (
-    <Box sx={{ p: { xs: 1.75, sm: 2.25 }, mb: 1.75, bgcolor: "#fff", borderRadius: 2.5, border: `1px solid ${LINE}` }}>
+    <Box sx={{ p: { xs: 1.75, sm: 2.25 }, mb: 1.75, bgcolor: "#fff", borderRadius: 2.5, border: `1px solid ${highlight ? highlight : LINE}`, boxShadow: highlight ? `0 6px 18px -12px ${highlight}` : "none" }}>
       <Stack direction="row" alignItems="center" spacing={1.1} sx={{ mb: 1.75, minHeight: 30 }}>
-        <Box sx={{ width: 22, height: 22, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: ACCENT_SOFT, color: ACCENT, fontSize: "0.74rem", fontWeight: 900 }}>
-          {step}
+        <Box sx={{ width: icon ? 30 : 22, height: icon ? 30 : 22, borderRadius: icon ? 2 : "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: highlight || ACCENT_SOFT, color: highlight ? "#fff" : ACCENT, fontSize: "0.74rem", fontWeight: 900, "& svg": { fontSize: 17 } }}>
+          {icon || step}
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography sx={{ fontWeight: 900, fontSize: "0.92rem", color: INK, lineHeight: 1.3 }}>{title}</Typography>
@@ -143,6 +143,38 @@ export function DocSection({ step, title, hint, action, children }) {
         {action}
       </Stack>
       {children}
+    </Box>
+  );
+}
+
+/**
+ * ✅ (17 ต.ค. 2569 ผู้ใช้: "เน้นให้ผู้ใช้กรอกน้อยที่สุด หรือกรอกส่วนที่จำเป็นที่ปรับเปลี่ยนตลอด")
+ *    หัวข้อที่ระบบเติมให้ครบแล้ว (ผู้รับ · เรื่อง/เนื้อความ · ผู้ลงนาม) พับไว้ — หัวพับโชว์ "ค่าที่จะพิมพ์จริง" สรุปบรรทัดเดียว
+ *    ตรวจได้ทันทีโดยไม่ต้องกาง · กดเพื่อแก้ · ช่องบังคับที่ยังว่าง (alert) = กางเองพร้อมขอบแดง
+ */
+export function FoldSection({ icon, title, summary, alert = false, defaultOpen = false, action, children }) {
+  const [userOpen, setUserOpen] = useState(defaultOpen);
+  const open = userOpen || alert;
+  return (
+    <Box sx={{ mb: 1.25, bgcolor: "#fff", borderRadius: 2.5, border: `1px solid ${alert ? "#fca5a5" : LINE}`, overflow: "hidden" }}>
+      <Stack direction="row" alignItems="center" spacing={1.25} role="button" tabIndex={0}
+        onClick={() => setUserOpen((o) => !o)} onKeyDown={(e) => { if (e.key === "Enter") setUserOpen((o) => !o); }}
+        sx={{ px: { xs: 1.5, sm: 2 }, py: 1.25, cursor: "pointer", "&:hover": { bgcolor: SURFACE } }}>
+        <Box sx={{ width: 30, height: 30, borderRadius: 2, flexShrink: 0, display: "grid", placeItems: "center", bgcolor: SURFACE, color: INK_2, "& svg": { fontSize: 17 } }}>
+          {icon}
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography sx={{ fontWeight: 800, fontSize: "0.86rem", color: INK, lineHeight: 1.3 }}>{title}</Typography>
+          {!open && (
+            <Typography noWrap sx={{ fontSize: "0.78rem", color: alert ? "#dc2626" : MUTED, lineHeight: 1.45 }}>{summary}</Typography>
+          )}
+        </Box>
+        {open && action ? <Box onClick={(e) => e.stopPropagation()}>{action}</Box> : null}
+        <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: ACCENT, flexShrink: 0, whiteSpace: "nowrap" }}>
+          {open ? "ซ่อน" : "แก้ไข"}
+        </Typography>
+      </Stack>
+      {open && <Box sx={{ px: { xs: 1.5, sm: 2 }, pb: 2, pt: 0.5, borderTop: `1px solid ${LINE}` }}>{children}</Box>}
     </Box>
   );
 }

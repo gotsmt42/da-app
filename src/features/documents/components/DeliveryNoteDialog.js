@@ -17,7 +17,7 @@ import {
   Switch, FormControlLabel,
 } from "@mui/material";
 import {
-  Add, DeleteOutline, Visibility, Description, Refresh, Search,
+  Add, DeleteOutline, Visibility, Description, Refresh, Search, Business, Subject, DrawOutlined,
 } from "@mui/icons-material";
 import { jsPDF } from "jspdf";
 import thSarabunFont from "@/assets/fonts/THSarabunNew_base64";
@@ -26,7 +26,7 @@ import CustomerService from "@/shared/services/CustomerService";
 import {
   buildDeliveryNoteDefaults, buildDeliveryNoteBody, generateDeliveryNotePdf, thaiFullDate, ISSUER,
   REPORT_NOUN_PRESETS, spaceThaiLatin, resolveJobFields,
-  ATTENTION_PRESETS, SIGNER_POSITION_PRESETS, subjectPresetsFor, referencePresetsFor,
+  SIGNER_POSITION_PRESETS, subjectPresetsFor, referencePresetsFor, attentionPresetsFor,
 } from "../utils/deliveryNotePdf";
 import DocumentPreviewDialog from "./DocumentPreviewDialog";
 import MailService from "@/shared/services/MailService";
@@ -36,7 +36,7 @@ import SignatureService from "@/shared/services/SignatureService";
 import StaffDirectoryService from "@/shared/services/StaffDirectoryService";
 import { useAuth } from "@/features/auth/AuthContext";
 import {
-  DocDialogHeader, DocSection, SubHeader, DraftBanner, IssuedSummary, SignerPreview, useDocDraft, useIssuedDoc,
+  DocDialogHeader, DocSection, FoldSection, SubHeader, DraftBanner, IssuedSummary, SignerPreview, useDocDraft, useIssuedDoc,
   SMALL_BTN_SX, OUTLINE_BTN_SX,
 } from "./docFormKit";
 import { INK_2, MUTED, FAINT, LINE, SURFACE, DANGER, PRIMARY_BTN_SX } from "@/shared/ui/PageKit";
@@ -55,6 +55,10 @@ const findCustomer = (list, job) => {
 
 const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
   const isMobile = useMediaQuery("(max-width:600px)");
+  // ✅ (17 ต.ค. 2569) ผู้ลงนามตั้งต้น = คนที่กำลังออกเอกสาร (ใช้ลายเซ็นอิเล็กทรอนิกส์ของตัวเองได้ทันที) · ไม่มีค่อยใช้ผู้รับผิดชอบงาน
+  const { userData: me } = useAuth();
+  const meRef = useRef(me);
+  meRef.current = me;
   const [form, setFormState] = useState(null);
   // ✅ แยก "ผู้ใช้แก้เอง" (setForm → นับเป็นร่าง) ออกจาก "ระบบเติมให้" (setFormState) — ดู useDocDraft
   const dirtyRef = useRef(false);
@@ -80,6 +84,8 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
   useEffect(() => {
     if (!open || !job) return;
     const base = buildDeliveryNoteDefaults(job, customer);
+    const myName = [meRef.current?.fname, meRef.current?.lname].filter(Boolean).join(" ").trim();
+    if (myName) base.signerName = myName;
     setFormState({ ...base, body: buildDeliveryNoteBody(base) });
     setError("");
 
@@ -168,6 +174,7 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
   }, [job]);
   // ✅ ตัวเลือก "อ้างถึง" มาจากเลขเอกสารที่ผูกกับงานนี้จริงๆ (ดู referencePresetsFor)
   const referenceOptions = useMemo(() => referencePresetsFor(job), [job]);
+  const attentionOptions = useMemo(() => attentionPresetsFor(job), [job]);
   // ✅ ตัวเลือก "เรื่อง" ประกอบจากชื่องาน/ระบบของใบนี้ — อิง workLabel ที่อยู่ในฟอร์ม เพื่อให้ตัวเลือก
   // เปลี่ยนตามด้วยถ้าผู้ใช้แก้ข้อมูลงานในกล่องนี้
   const subjectOptions = useMemo(
@@ -210,6 +217,24 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
     if (!open) return;
     StaffDirectoryService.list().then(setStaffOptions);
   }, [open]);
+
+  // ✅ (17 ต.ค. 2569 "กรอกน้อยที่สุด") ผู้ลงนามที่ระบบเติมให้ → เติมชื่อเต็ม/ตำแหน่ง/เบอร์จากทะเบียนพนักงานให้เอง (ครั้งเดียวต่อการเปิดกล่อง)
+  const signerAutoRef = useRef(false);
+  useEffect(() => { if (!open) signerAutoRef.current = false; }, [open]);
+  useEffect(() => {
+    if (signerAutoRef.current || !staffOptions.length || !form?.signerName) return;
+    signerAutoRef.current = true;
+    const norm = (v) => String(v || "").replace(/\s+/g, " ").trim();
+    const name = norm(form.signerName);
+    const hit = staffOptions.find((o) => norm(o.name) === name) || staffOptions.find((o) => norm(o.name).startsWith(`${name} `));
+    if (!hit) return;
+    setFormState((f) => (f ? {
+      ...f,
+      signerName: hit.name,
+      signerPosition: hit.position && (!f.signerPosition || SIGNER_POSITION_PRESETS.includes(f.signerPosition)) ? hit.position : f.signerPosition,
+      ...("signerTel" in f && !f.signerTel && hit.tel ? { signerTel: hit.tel } : {}),
+    } : f));
+  }, [staffOptions, form?.signerName]);
   const filterStaff = (options, state) => {
     const q = String(state.inputValue || "").trim().toLowerCase();
     if (!q) return options.slice(0, 30);
@@ -367,8 +392,54 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
 
         {/* ✅ ออกแล้ว = แสดงสรุปใบเดิมอย่างเดียว ไม่โชว์ฟอร์ม (แก้/ออกซ้ำไม่ได้อยู่แล้ว) */}
         {!locked && (<Box>
-          {/* ── 1 ผู้รับ ─────────────────────────────────────────────────── */}
-          <DocSection step={1} title="ส่งถึง" hint="เลือกจากทะเบียนลูกค้าเพื่อเติมบริษัท/ที่อยู่/เลขภาษีให้ครบ">
+          {/* 🔁 (17 ต.ค. 2569 ผู้ใช้: "ปรับปรุงหน้าออกเอกสาร ให้สอดคล้องกับระบบปัจจุบัน สวยงาม ดูง่าย เน้นกรอกน้อยที่สุด")
+              ① ส่วนที่เปลี่ยนทุกใบ (วันที่งานเสร็จ · สิ่งที่ส่งมาด้วย) เปิดไว้บนสุด
+              ② ส่วนที่ระบบเติมให้ครบแล้ว (ส่งถึง · เรื่องและเนื้อความ · ผู้ลงนาม) พับไว้ หัวพับโชว์ค่าที่จะพิมพ์จริง */}
+          <DocSection icon={<Description />} highlight={ACCENT} title="งานที่ส่งมอบ"
+            hint={`${form.workLabel || "งาน"}${form.roundLabel ? ` · ครั้งที่ ${form.roundLabel}` : ""} — ตรวจวันที่เสร็จ และรายการเอกสารที่ส่งให้ลูกค้า`}>
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0,1fr)", sm: "minmax(0,1fr) minmax(0,1fr)" }, gap: 1.5 }}>
+              <ThaiDatePicker label="วันที่งานเสร็จ" value={form.completedAt} onChange={set("completedAt")}
+                helperText={thaiFullDate(form.completedAt)} textFieldProps={{ sx: fieldSx }} />
+              <ThaiDatePicker label="วันที่ออกเอกสาร" value={form.issuedAt} onChange={set("issuedAt")}
+                helperText={thaiFullDate(form.issuedAt)} textFieldProps={{ sx: fieldSx }} />
+            </Box>
+
+            <SubHeader count={`${(form.attachments || []).filter((a) => (a.text || "").trim()).length} รายการ`} action={<Button size="small" onClick={addAttachment} startIcon={<Add sx={{ fontSize: 16 }} />} sx={OUTLINE_BTN_SX}>เพิ่มรายการ</Button>}>
+              สิ่งที่ส่งมาด้วย
+            </SubHeader>
+            <Stack spacing={1}>
+              {(form.attachments || []).map((a, i) => (
+                <Stack key={i} direction="row" spacing={1} alignItems="center">
+                  <Typography sx={{ width: 18, flexShrink: 0, fontSize: "0.8rem", fontWeight: 800, color: MUTED }}>{i + 1}.</Typography>
+                  <Autocomplete
+                    freeSolo fullWidth size="small" sx={{ flex: 1, minWidth: 0 }}
+                    options={reportPresetOptions}
+                    inputValue={a.text}
+                    onInputChange={(_, v) => { if (v !== (a.text || "")) updateAttachment(i, "text", v); }}
+                    renderInput={(params) => <TextField {...params} placeholder="ชื่อเอกสาร/สิ่งที่ส่งมอบ" sx={fieldSx} />}
+                  />
+                  <TextField size="small" sx={{ width: { xs: 76, sm: 100 }, flexShrink: 0, ...fieldSx }} placeholder="จำนวน"
+                    value={a.qty} onChange={(e) => updateAttachment(i, "qty", e.target.value)} />
+                  <IconButton size="small" onClick={() => removeAttachment(i)} aria-label={`ลบรายการ ${i + 1}`} sx={{ color: FAINT, p: 0.5 }}>
+                    <DeleteOutline sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </Stack>
+              ))}
+              {(form.attachments || []).length === 0 && (
+                <Box sx={{ py: 2, textAlign: "center", border: `1px dashed ${LINE}`, borderRadius: 2 }}>
+                  <Typography sx={{ fontSize: "0.8rem", color: MUTED }}>ไม่มีรายการ — หัวข้อ "สิ่งที่ส่งมาด้วย" จะไม่ถูกพิมพ์</Typography>
+                </Box>
+              )}
+            </Stack>
+          </DocSection>
+
+          <Typography sx={{ fontSize: "0.74rem", fontWeight: 800, color: MUTED, mt: 2.25, mb: 0.75, px: 0.5 }}>
+            ระบบเติมให้แล้ว — ตรวจความถูกต้อง แล้วกด “แก้ไข” เฉพาะส่วนที่ต้องเปลี่ยน
+          </Typography>
+
+          <FoldSection icon={<Business />} title="ส่งถึง"
+            summary={[form.site, form.customerCompany, form.attention && `เรียน ${form.attention}`].filter(Boolean).join(" · ") || "ยังไม่ระบุโครงการ"}
+            alert={!form.site?.trim()}>
             <Stack spacing={1.75}>
               {/* ✅ ค้นได้ทั้งชื่อโครงการ ชื่อบริษัท และเลขผู้เสียภาษี — ใช้ทะเบียนลูกค้าของบริษัทเอง */}
               <Autocomplete
@@ -408,7 +479,7 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
                 value={form.customerAddress} onChange={setField("customerAddress")} sx={fieldSx} />
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1.75}>
                 <Autocomplete
-                  freeSolo fullWidth size="small" options={ATTENTION_PRESETS}
+                  freeSolo fullWidth size="small" options={attentionOptions}
                   inputValue={form.attention} onInputChange={(_, v) => set("attention")(v)}
                   renderInput={(params) => <TextField {...params} label="เรียน" sx={fieldSx} />}
                 />
@@ -419,67 +490,33 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
                 />
               </Stack>
             </Stack>
-          </DocSection>
+          </FoldSection>
 
-          {/* ── 2 งานที่ส่งมอบ ───────────────────────────────────────────── */}
-          <DocSection step={2} title="งานที่ส่งมอบ">
+          <FoldSection icon={<Subject />} title="เรื่องและเนื้อความ"
+            summary={[form.subject || "ยังไม่ระบุเรื่อง", form.reference && `อ้างถึง ${form.reference}`].filter(Boolean).join(" · ")}
+            alert={!form.subject?.trim()}
+            action={<Button size="small" onClick={regenerateBody} startIcon={<Refresh sx={{ fontSize: 16 }} />} sx={SMALL_BTN_SX}>สร้างเนื้อความใหม่</Button>}>
             <Stack spacing={1.75}>
-              <Stack direction="row" spacing={1.5}>
-                <TextField size="small" fullWidth label="งานที่ดำเนินการ" placeholder="เช่น PM ระบบ Fire Alarm"
-                  value={form.workLabel} onChange={setField("workLabel")} sx={fieldSx} />
-                <TextField size="small" label="ครั้งที่" placeholder="1/2" value={form.roundLabel || ""}
-                  onChange={setField("roundLabel")} sx={{ ...fieldSx, width: { xs: 96, sm: 140 }, flexShrink: 0 }} />
-              </Stack>
-              <Autocomplete
-                freeSolo fullWidth size="small" options={subjectOptions}
-                inputValue={form.subject} onInputChange={(_, v) => set("subject")(v)}
-                renderInput={(params) => <TextField {...params} label="เรื่อง" required sx={fieldSx} />}
-              />
-              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0,1fr)", sm: "minmax(0,1fr) minmax(0,1fr)" }, gap: 1.5 }}>
-                <ThaiDatePicker label="วันที่ออกเอกสาร" value={form.issuedAt} onChange={set("issuedAt")}
-                  helperText={thaiFullDate(form.issuedAt)} textFieldProps={{ sx: fieldSx }} />
-                <ThaiDatePicker label="วันที่งานเสร็จ" value={form.completedAt} onChange={set("completedAt")}
-                  helperText={thaiFullDate(form.completedAt)} textFieldProps={{ sx: fieldSx }} />
-              </Box>
-            </Stack>
-
-            <SubHeader action={<Button size="small" onClick={addAttachment} startIcon={<Add sx={{ fontSize: 16 }} />} sx={OUTLINE_BTN_SX}>เพิ่มรายการ</Button>}>
-              สิ่งที่ส่งมาด้วย
-            </SubHeader>
-            <Stack spacing={1}>
-              {(form.attachments || []).map((a, i) => (
-                <Stack key={i} direction="row" spacing={1} alignItems="center">
-                  <Typography sx={{ width: 18, flexShrink: 0, fontSize: "0.8rem", fontWeight: 800, color: MUTED }}>{i + 1}.</Typography>
-                  <Autocomplete
-                    freeSolo fullWidth size="small" sx={{ flex: 1, minWidth: 0 }}
-                    options={reportPresetOptions}
-                    inputValue={a.text}
-                    onInputChange={(_, v) => { if (v !== (a.text || "")) updateAttachment(i, "text", v); }}
-                    renderInput={(params) => <TextField {...params} placeholder="ชื่อเอกสาร/สิ่งที่ส่งมอบ" sx={fieldSx} />}
-                  />
-                  <TextField size="small" sx={{ width: { xs: 76, sm: 100 }, flexShrink: 0, ...fieldSx }} placeholder="จำนวน"
-                    value={a.qty} onChange={(e) => updateAttachment(i, "qty", e.target.value)} />
-                  <IconButton size="small" onClick={() => removeAttachment(i)} aria-label={`ลบรายการ ${i + 1}`} sx={{ color: FAINT, p: 0.5 }}>
-                    <DeleteOutline sx={{ fontSize: 18 }} />
-                  </IconButton>
+              <Stack spacing={1.75}>
+                <Stack direction="row" spacing={1.5}>
+                  <TextField size="small" fullWidth label="งานที่ดำเนินการ" placeholder="เช่น PM ระบบ Fire Alarm"
+                    value={form.workLabel} onChange={setField("workLabel")} sx={fieldSx} />
+                  <TextField size="small" label="ครั้งที่" placeholder="1/2" value={form.roundLabel || ""}
+                    onChange={setField("roundLabel")} sx={{ ...fieldSx, width: { xs: 96, sm: 140 }, flexShrink: 0 }} />
                 </Stack>
-              ))}
-              {(form.attachments || []).length === 0 && (
-                <Box sx={{ py: 2, textAlign: "center", border: `1px dashed ${LINE}`, borderRadius: 2 }}>
-                  <Typography sx={{ fontSize: "0.8rem", color: MUTED }}>ไม่มีรายการ — หัวข้อ "สิ่งที่ส่งมาด้วย" จะไม่ถูกพิมพ์</Typography>
-                </Box>
-              )}
+                <Autocomplete
+                  freeSolo fullWidth size="small" options={subjectOptions}
+                  inputValue={form.subject} onInputChange={(_, v) => set("subject")(v)}
+                  renderInput={(params) => <TextField {...params} label="เรื่อง" required sx={fieldSx} />}
+                />
+              </Stack>
+              <TextField size="small" fullWidth multiline minRows={4} label="เนื้อความ" value={form.body} onChange={setField("body")} sx={fieldSx} />
             </Stack>
-          </DocSection>
+          </FoldSection>
 
-          {/* ── 3 เนื้อความ ─────────────────────────────────────────────── */}
-          <DocSection step={3} title="เนื้อความ"
-            action={<Button size="small" onClick={regenerateBody} startIcon={<Refresh sx={{ fontSize: 16 }} />} sx={SMALL_BTN_SX}>สร้างใหม่</Button>}>
-            <TextField size="small" fullWidth multiline minRows={4} value={form.body} onChange={setField("body")} sx={fieldSx} />
-          </DocSection>
-
-          {/* ── 4 ผู้ลงนาม ──────────────────────────────────────────────── */}
-          <DocSection step={4} title="ผู้ลงนามฝ่ายบริษัท" hint={`ออกในนาม ${ISSUER.nameTh} · แนบตราประทับให้อัตโนมัติ`}>
+          <FoldSection icon={<DrawOutlined />} title="ผู้ลงนามฝ่ายบริษัท"
+            summary={[form.signerName || "ยังไม่ระบุชื่อ", form.signerPosition, signatureImage ? "ลายเซ็นอิเล็กทรอนิกส์" : "เว้นช่องเซ็นมือ"].filter(Boolean).join(" · ")}
+            alert={!form.signerName?.trim()}>
             <Stack spacing={1.75}>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1.75}>
                 <Autocomplete
@@ -527,7 +564,7 @@ const DeliveryNoteDialog = ({ open, onClose, job, customer, onIssued }) => {
               <SignerPreview name={form.signerName} position={form.signerPosition} tel={""}
                 company={ISSUER.nameTh} signatureImage={signatureImage} />
             </Stack>
-          </DocSection>
+          </FoldSection>
         </Box>)}
       </DialogContent>
 

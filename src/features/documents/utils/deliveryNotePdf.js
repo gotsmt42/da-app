@@ -248,17 +248,34 @@ export const resolveJobFields = (job) => {
     start: get("start"), end: get("end"), date: get("date"), allDay: get("allDay"),
     // ✅ ข้อมูลสัญญาสำหรับป้ายครั้งที่รายปี "1/4 - 2569-70" (ดู formatRoundLabel)
     contractStart: get("contractStart"), contractEnd: get("contractEnd"), contractYears: get("contractYears"), intervalMonths: get("intervalMonths"),
+    // ✅ (17 ต.ค. 2569 "ให้สอดคล้องกับระบบปัจจุบัน") ข้อมูลจากขั้นรับงาน — เลข Job · เอกสารที่ได้รับ (PO/ใบเสนอราคา) · ผู้ติดต่อหน้างาน
+    jobNo: get("jobNo"), intakeDocType: get("intakeDocType"), intakeDocNo: get("intakeDocNo"),
+    contactName: get("contactName"), contactTel: get("contactTel"),
   };
 };
 
 export const referencePresetsFor = (job) => {
   const p = resolveJobFields(job);
-  return [
+  // ✅ เอกสารที่ได้รับตอนรับงาน (หน้างานใหม่) — PO ของลูกค้าคือเอกสารที่ลูกค้าใช้ตรวจรับ/วางบิลจริง จึงขึ้นก่อน
+  const intakeRef = p.intakeDocNo
+    ? (p.intakeDocType === "po" ? `ใบสั่งซื้อ (PO) เลขที่ ${p.intakeDocNo}`
+      : p.intakeDocType === "quotation" ? `ใบเสนอราคาเลขที่ ${p.intakeDocNo}` : `เอกสารเลขที่ ${p.intakeDocNo}`)
+    : "";
+  return [...new Set([
+    intakeRef,
     p.quotationNo && `ใบเสนอราคาเลขที่ ${p.quotationNo}`,
     p.contractNo && `สัญญาเลขที่ ${p.contractNo}`,
     p.docNo && `เอกสารเลขที่ ${p.docNo}`,
     p.contractNo && p.time && `สัญญาเลขที่ ${p.contractNo} ครั้งที่ ${formatRoundLabel(p.time, p.visitCount, p)}`,
-  ].filter(Boolean).map(spaceThaiLatin);
+    p.jobNo && `เลขที่งาน ${p.jobNo}`,
+  ].filter(Boolean).map(spaceThaiLatin))];
+};
+
+/** ✅ (17 ต.ค. 2569) "เรียน" — ผู้ติดต่อหน้างานของงานนี้ขึ้นเป็นตัวเลือกแรก (ถ้ามี) ตามด้วยตำแหน่งที่ใช้บ่อย */
+export const attentionPresetsFor = (job) => {
+  const name = String(resolveJobFields(job).contactName || "").trim();
+  const contact = name ? (/^(คุณ|นาย|นาง|น\.ส\.|ดร\.)/.test(name) ? name : `คุณ${name}`) : "";
+  return [...new Set([contact, ...ATTENTION_PRESETS].filter(Boolean))];
 };
 
 /** วันที่แบบไทยเต็ม เช่น "7 สิงหาคม 2569" */

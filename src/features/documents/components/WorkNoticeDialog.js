@@ -21,6 +21,7 @@ import {
 } from "@mui/material";
 import {
   Visibility, EventAvailable, Refresh, Search, Add, DeleteOutline, ContentPaste, AutoFixHigh,
+  Business, Subject, DrawOutlined,
 } from "@mui/icons-material";
 import { jsPDF } from "jspdf";
 import thSarabunFont from "@/assets/fonts/THSarabunNew_base64";
@@ -30,10 +31,10 @@ import {
   buildWorkNoticeDefaults, buildWorkNoticeBody, buildWorkNoticeCooperation,
   generateWorkNoticePdf, noticeSubjectPresetsFor, buildDayRows, dayRowText,
   TIME_PRESETS, SUPPORT_REQUEST_PRESETS, workVerbFor,
-  ATTENTION_PRESETS, SIGNER_POSITION_PRESETS, thaiFullDate, ISSUER,
+  SIGNER_POSITION_PRESETS, thaiFullDate, ISSUER,
 } from "../utils/workNoticePdf";
 import moment from "moment";
-import { resolveJobFields, referencePresetsFor } from "../utils/deliveryNotePdf";
+import { resolveJobFields, referencePresetsFor, attentionPresetsFor } from "../utils/deliveryNotePdf";
 import DocumentPreviewDialog from "./DocumentPreviewDialog";
 import MailService from "@/shared/services/MailService";
 import IssuedDocumentService from "@/shared/services/IssuedDocumentService";
@@ -42,7 +43,7 @@ import SignatureService from "@/shared/services/SignatureService";
 import StaffDirectoryService from "@/shared/services/StaffDirectoryService";
 import { useAuth } from "@/features/auth/AuthContext";
 import {
-  DocDialogHeader, DocSection, SubHeader, DraftBanner, IssuedSummary, SignerPreview, useDocDraft, useIssuedDoc,
+  DocDialogHeader, DocSection, FoldSection, SubHeader, DraftBanner, IssuedSummary, SignerPreview, useDocDraft, useIssuedDoc,
   SMALL_BTN_SX, OUTLINE_BTN_SX,
 } from "./docFormKit";
 import { INK_2, MUTED, FAINT, LINE, SURFACE, DANGER, PRIMARY_BTN_SX } from "@/shared/ui/PageKit";
@@ -174,6 +175,7 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
     [form?.workLabel, form?.roundLabel],
   );
   const referenceOptions = useMemo(() => referencePresetsFor(job), [job]);
+  const attentionOptions = useMemo(() => attentionPresetsFor(job), [job]);
 
   // ── กำหนดการรายวัน (เพิ่ม/ลบ/แก้ได้ทุกบรรทัด) ────────────────────────────
   const updateDay = (i, k, v) =>
@@ -256,6 +258,24 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
     if (!open) return;
     StaffDirectoryService.list().then(setStaffOptions);
   }, [open]);
+
+  // ✅ (17 ต.ค. 2569 "กรอกน้อยที่สุด") ผู้ลงนามที่ระบบเติมให้ → เติมชื่อเต็ม/ตำแหน่ง/เบอร์จากทะเบียนพนักงานให้เอง (ครั้งเดียวต่อการเปิดกล่อง)
+  const signerAutoRef = useRef(false);
+  useEffect(() => { if (!open) signerAutoRef.current = false; }, [open]);
+  useEffect(() => {
+    if (signerAutoRef.current || !staffOptions.length || !form?.signerName) return;
+    signerAutoRef.current = true;
+    const norm = (v) => String(v || "").replace(/\s+/g, " ").trim();
+    const name = norm(form.signerName);
+    const hit = staffOptions.find((o) => norm(o.name) === name) || staffOptions.find((o) => norm(o.name).startsWith(`${name} `));
+    if (!hit) return;
+    setFormState((f) => (f ? {
+      ...f,
+      signerName: hit.name,
+      signerPosition: hit.position && (!f.signerPosition || SIGNER_POSITION_PRESETS.includes(f.signerPosition)) ? hit.position : f.signerPosition,
+      ...("signerTel" in f && !f.signerTel && hit.tel ? { signerTel: hit.tel } : {}),
+    } : f));
+  }, [staffOptions, form?.signerName]);
   const filterStaff = (options, state) => {
     const q = String(state.inputValue || "").trim().toLowerCase();
     if (!q) return options.slice(0, 30);
@@ -424,8 +444,81 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
 
         {/* ✅ ออกแล้ว = แสดงสรุปใบเดิมอย่างเดียว ไม่โชว์ฟอร์ม (แก้/ออกซ้ำไม่ได้อยู่แล้ว) */}
         {!locked && (<Box>
-          {/* ── 1 ผู้รับ ─────────────────────────────────────────────────── */}
-          <DocSection step={1} title="แจ้งถึง" hint="เลือกจากทะเบียนลูกค้าเพื่อเติมบริษัท/ที่อยู่ให้ครบ">
+          {/* 🔁 (17 ต.ค. 2569 ผู้ใช้: "ปรับปรุงหน้าออกเอกสาร ให้สอดคล้องกับระบบปัจจุบัน สวยงาม ดูง่าย เน้นกรอกน้อยที่สุด
+                หรือกรอกส่วนที่จำเป็นที่ปรับเปลี่ยนตลอด")
+              ① ส่วนที่เปลี่ยนทุกใบ (กำหนดการเข้างาน) เปิดไว้บนสุด
+              ② ส่วนที่ระบบเติมให้ครบแล้ว (แจ้งถึง · เรื่องและเนื้อความ · ผู้ออกเอกสาร) พับไว้ หัวพับโชว์ค่าที่จะพิมพ์จริง กดแก้เฉพาะที่ต้องเปลี่ยน */}
+          <DocSection icon={<EventAvailable />} highlight={ACCENT} title={`กำหนดการเข้างาน · ${printedDays.length} วัน`}
+            hint={`ระบบเติมตามตาราง: ${form.jobDateText} · ปรับวัน/เวลา/สิ่งที่เข้าทำตามที่นัดกับลูกค้า`}
+            action={(
+              <Stack direction="row" spacing={0.75}>
+                <Button size="small" onClick={(e) => setToolsAnchor(e.currentTarget)} startIcon={<AutoFixHigh sx={{ fontSize: 16 }} />} sx={OUTLINE_BTN_SX}>
+                  ตัวช่วย
+                </Button>
+                <Button size="small" onClick={addDay} startIcon={<Add sx={{ fontSize: 16 }} />} sx={OUTLINE_BTN_SX}>เพิ่มวัน</Button>
+              </Stack>
+            )}>
+            <Menu anchorEl={toolsAnchor} open={Boolean(toolsAnchor)} onClose={() => setToolsAnchor(null)}
+              anchorOrigin={{ vertical: "bottom", horizontal: "right" }} transformOrigin={{ vertical: "top", horizontal: "right" }}>
+              {[
+                [regenerateDays, <Refresh key="i" fontSize="small" />, "สร้างรายการใหม่ตามตารางในระบบ"],
+                [() => applyFirstToAll("time"), <ContentPaste key="i" fontSize="small" />, "ใช้เวลาของวันแรกกับทุกวัน"],
+                [() => applyFirstToAll("detail"), <ContentPaste key="i" fontSize="small" />, "ใช้รายละเอียดของวันแรกกับทุกวัน"],
+              ].map(([fn, icon, label]) => (
+                <MenuItem key={label} onClick={() => { fn(); setToolsAnchor(null); }} sx={{ fontSize: "0.86rem" }}>
+                  <ListItemIcon sx={{ color: INK_2 }}>{icon}</ListItemIcon>{label}
+                </MenuItem>
+              ))}
+            </Menu>
+            {/* ✅ รายการเดียวคั่นเส้น (ไม่ซ้อนกล่องในกล่อง) · วันที่/เวลาแถวเดียวกัน · ปุ่มลบอยู่ขวาของหัววัน */}
+            <Box sx={{ border: `1px solid ${LINE}`, borderRadius: 2, overflow: "hidden", bgcolor: "#fff" }}>
+              {(form.dayRows || []).map((r, i) => (
+                <Box key={i} sx={{ px: 1.5, pt: 1, pb: 1.5, borderTop: i ? `1px solid ${LINE}` : "none" }}>
+                  <Stack direction="row" alignItems="center" sx={{ mb: 1 }}>
+                    <Typography sx={{ flex: 1, fontSize: "0.8rem", fontWeight: 800, color: INK_2 }}>วันที่ {i + 1}</Typography>
+                    <IconButton size="small" onClick={() => removeDay(i)} aria-label={`ลบวันที่ ${i + 1}`} sx={{ color: FAINT, p: 0.5 }}>
+                      <DeleteOutline sx={{ fontSize: 18 }} />
+                    </IconButton>
+                  </Stack>
+                  <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0,1fr)", sm: "200px minmax(0,1fr)" }, gap: 1 }}>
+                    <ThaiDatePicker label="วันที่" value={r.date} onChange={(v) => updateDay(i, "date", v)} textFieldProps={{ sx: fieldSx }} />
+                    {/* ⚠️ disableClearable — ไม่จองที่ปุ่มล้างด้านขวา เวลา "09.30 - 17.30 น." จะไม่ถูกตัดเป็น "17...." */}
+                    <Autocomplete
+                      freeSolo disableClearable size="small" options={TIME_PRESETS}
+                      inputValue={r.time || ""} onInputChange={(_, v) => { if (v !== (r.time || "")) updateDay(i, "time", v); }}
+                      renderInput={(params) => <TextField {...params} label="เวลา" sx={fieldSx} />}
+                    />
+                  </Box>
+                  <TextField
+                    size="small" fullWidth multiline sx={{ mt: 1, ...fieldSx }}
+                    label="เข้าทำอะไร / บริเวณไหน"
+                    value={r.detail || ""} onChange={(e) => updateDay(i, "detail", e.target.value)}
+                    placeholder="เช่น เข้าทำการตรวจเช็คตู้ควบคุม และทดสอบบริเวณห้องพัก"
+                  />
+                </Box>
+              ))}
+              {(form.dayRows || []).length === 0 && (
+                <Box sx={{ py: 2.5, textAlign: "center" }}>
+                  <Typography sx={{ fontSize: "0.82rem", color: MUTED }}>ยังไม่มีกำหนดการ — กด "เพิ่มวัน" หรือ "ตัวช่วย"</Typography>
+                </Box>
+              )}
+            </Box>
+
+            <SubHeader>หมายเหตุถึงลูกค้า (ไม่บังคับ)</SubHeader>
+            <TextField
+              size="small" fullWidth multiline minRows={2} sx={fieldSx}
+              value={form.supportNote} onChange={setField("supportNote")}
+              placeholder={SUPPORT_REQUEST_PRESETS[0]}
+            />
+          </DocSection>
+
+          <Typography sx={{ fontSize: "0.74rem", fontWeight: 800, color: MUTED, mt: 2.25, mb: 0.75, px: 0.5 }}>
+            ระบบเติมให้แล้ว — ตรวจความถูกต้อง แล้วกด “แก้ไข” เฉพาะส่วนที่ต้องเปลี่ยน
+          </Typography>
+
+          <FoldSection icon={<Business />} title="แจ้งถึง"
+            summary={[form.site, form.customerCompany, form.attention && `เรียน ${form.attention}`].filter(Boolean).join(" · ") || "ยังไม่ระบุโครงการ"}
+            alert={!form.site?.trim()}>
             <Stack spacing={1.75}>
               <Autocomplete
                 size="small" fullWidth
@@ -462,7 +555,7 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
                 value={form.customerAddress} onChange={setField("customerAddress")} sx={fieldSx} />
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1.75}>
                 <Autocomplete
-                  freeSolo fullWidth size="small" options={ATTENTION_PRESETS}
+                  freeSolo fullWidth size="small" options={attentionOptions}
                   inputValue={form.attention} onInputChange={(_, v) => set("attention")(v)}
                   renderInput={(params) => <TextField {...params} label="เรียน" sx={fieldSx} />}
                 />
@@ -474,118 +567,49 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
                 />
               </Stack>
             </Stack>
-          </DocSection>
+          </FoldSection>
 
-          {/* ── 2 งาน + กำหนดการรายวัน ──────────────────────────────────────
-              ✅ รูปแบบตรงกับเอกสารจริงของบริษัท: 1 บรรทัดต่อ 1 วัน (ระบบเติมทุกวันตามตารางเป็นจุดตั้งต้น) */}
-          <DocSection step={2} title="งานและกำหนดการ" hint={`ตารางในระบบ: ${form.jobDateText}`}>
-            <Stack direction="row" spacing={1.5} sx={{ minWidth: 0 }}>
-              <TextField size="small" fullWidth label="งานที่ดำเนินการ" placeholder="เช่น PM ระบบ Fire Alarm"
-                value={form.workLabel} onChange={setField("workLabel")} sx={fieldSx} />
-              <TextField size="small" label="ครั้งที่" placeholder="1/2" value={form.roundLabel || ""}
-                onChange={setField("roundLabel")} sx={{ ...fieldSx, width: { xs: 96, sm: 140 }, flexShrink: 0 }} />
-            </Stack>
-
-            <SubHeader action={(
-              <Stack direction="row" spacing={0.75}>
-                <Button size="small" onClick={(e) => setToolsAnchor(e.currentTarget)} startIcon={<AutoFixHigh sx={{ fontSize: 16 }} />} sx={OUTLINE_BTN_SX}>
-                  ตัวช่วย
-                </Button>
-                <Button size="small" onClick={addDay} startIcon={<Add sx={{ fontSize: 16 }} />} sx={OUTLINE_BTN_SX}>เพิ่มวัน</Button>
+          <FoldSection icon={<Subject />} title="เรื่องและเนื้อความ"
+            summary={[form.subject || "ยังไม่ระบุเรื่อง", form.reference && `อ้างถึง ${form.reference}`].filter(Boolean).join(" · ")}
+            alert={!form.subject?.trim()}
+            action={<Button size="small" onClick={regenerateBody} startIcon={<Refresh sx={{ fontSize: 16 }} />} sx={SMALL_BTN_SX}>สร้างเนื้อความใหม่</Button>}>
+            <Stack spacing={1.75}>
+              <Stack direction="row" spacing={1.5} sx={{ minWidth: 0 }}>
+                <TextField size="small" fullWidth label="งานที่ดำเนินการ" placeholder="เช่น PM ระบบ Fire Alarm"
+                  value={form.workLabel} onChange={setField("workLabel")} sx={fieldSx} />
+                <TextField size="small" label="ครั้งที่" placeholder="1/2" value={form.roundLabel || ""}
+                  onChange={setField("roundLabel")} sx={{ ...fieldSx, width: { xs: 96, sm: 140 }, flexShrink: 0 }} />
               </Stack>
-            )} count={`${printedDays.length} วัน`}>
-              กำหนดการ
-            </SubHeader>
-            <Menu anchorEl={toolsAnchor} open={Boolean(toolsAnchor)} onClose={() => setToolsAnchor(null)}
-              anchorOrigin={{ vertical: "bottom", horizontal: "right" }} transformOrigin={{ vertical: "top", horizontal: "right" }}>
-              {[
-                [regenerateDays, <Refresh key="i" fontSize="small" />, "สร้างรายการใหม่ตามตารางในระบบ"],
-                [() => applyFirstToAll("time"), <ContentPaste key="i" fontSize="small" />, "ใช้เวลาของวันแรกกับทุกวัน"],
-                [() => applyFirstToAll("detail"), <ContentPaste key="i" fontSize="small" />, "ใช้รายละเอียดของวันแรกกับทุกวัน"],
-              ].map(([fn, icon, label]) => (
-                <MenuItem key={label} onClick={() => { fn(); setToolsAnchor(null); }} sx={{ fontSize: "0.86rem" }}>
-                  <ListItemIcon sx={{ color: INK_2 }}>{icon}</ListItemIcon>{label}
-                </MenuItem>
-              ))}
-            </Menu>
-
-            {/* ✅ รายการเดียวคั่นเส้น (ไม่ซ้อนกล่องในกล่อง) · วันที่/เวลาแถวเดียวกัน · ปุ่มลบอยู่ขวาของหัววัน */}
-            <Box sx={{ border: `1px solid ${LINE}`, borderRadius: 2, overflow: "hidden", bgcolor: "#fff" }}>
-              {(form.dayRows || []).map((r, i) => (
-                <Box key={i} sx={{ px: 1.5, pt: 1, pb: 1.5, borderTop: i ? `1px solid ${LINE}` : "none" }}>
-                  <Stack direction="row" alignItems="center" sx={{ mb: 1 }}>
-                    <Typography sx={{ flex: 1, fontSize: "0.8rem", fontWeight: 800, color: INK_2 }}>วันที่ {i + 1}</Typography>
-                    <IconButton size="small" onClick={() => removeDay(i)} aria-label={`ลบวันที่ ${i + 1}`} sx={{ color: FAINT, p: 0.5 }}>
-                      <DeleteOutline sx={{ fontSize: 18 }} />
-                    </IconButton>
-                  </Stack>
-                  <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0,1fr)", sm: "200px minmax(0,1fr)" }, gap: 1 }}>
-                    <ThaiDatePicker label="วันที่" value={r.date} onChange={(v) => updateDay(i, "date", v)} textFieldProps={{ sx: fieldSx }} />
-                    {/* ⚠️ disableClearable — ไม่จองที่ปุ่มล้างด้านขวา เวลา "09.30 - 17.30 น." จะไม่ถูกตัดเป็น "17...." */}
-                    <Autocomplete
-                      freeSolo disableClearable size="small" options={TIME_PRESETS}
-                      inputValue={r.time || ""} onInputChange={(_, v) => { if (v !== (r.time || "")) updateDay(i, "time", v); }}
-                      renderInput={(params) => <TextField {...params} label="เวลา" sx={fieldSx} />}
-                    />
-                  </Box>
-                  <TextField
-                    size="small" fullWidth multiline sx={{ mt: 1, ...fieldSx }}
-                    label="เข้าทำอะไร / บริเวณไหน"
-                    value={r.detail || ""} onChange={(e) => updateDay(i, "detail", e.target.value)}
-                    placeholder="เช่น เข้าทำการตรวจเช็คตู้ควบคุม และทดสอบบริเวณห้องพัก"
-                  />
-                </Box>
-              ))}
-              {(form.dayRows || []).length === 0 && (
-                <Box sx={{ py: 2.5, textAlign: "center" }}>
-                  <Typography sx={{ fontSize: "0.82rem", color: MUTED }}>ยังไม่มีกำหนดการ — กด "เพิ่มวัน" หรือ "ตัวช่วย"</Typography>
-                </Box>
-              )}
-            </Box>
-
-            <SubHeader>หมายเหตุ (ไม่บังคับ)</SubHeader>
-            <TextField
-              size="small" fullWidth multiline minRows={2} sx={fieldSx}
-              value={form.supportNote} onChange={setField("supportNote")}
-              placeholder={SUPPORT_REQUEST_PRESETS[0]}
-            />
-          </DocSection>
-
-          {/* ── 3 หัวเอกสาร ─────────────────────────────────────────────── */}
-          <DocSection step={3} title="หัวเอกสาร">
-            <Stack spacing={1.75}>
-              <Autocomplete
-                freeSolo fullWidth size="small" options={subjectOptions}
-                inputValue={form.subject} onInputChange={(_, v) => set("subject")(v)}
-                renderInput={(params) => <TextField {...params} label="เรื่อง" required sx={fieldSx} />}
-              />
-              {/* ✅ grid: มือถือเรียงเต็มกว้าง · จอใหญ่ 2 คอลัมน์ — เดิม flex บีบช่องวันที่จนล้นขอบจอมือถือ */}
-              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0,1fr)", sm: "minmax(0,1fr) minmax(0,1fr)" }, gap: 1.5 }}>
-                <TextField
-                  size="small" fullWidth label="เลขที่เอกสาร" value={form.docNumber}
-                  onChange={setField("docNumber")} disabled={canUseRunningNumber} sx={fieldSx}
-                  helperText={canUseRunningNumber ? "ออกให้อัตโนมัติ" : "เลขที่อ้างอิงของงาน"}
+              <Stack spacing={1.75}>
+                <Autocomplete
+                  freeSolo fullWidth size="small" options={subjectOptions}
+                  inputValue={form.subject} onInputChange={(_, v) => set("subject")(v)}
+                  renderInput={(params) => <TextField {...params} label="เรื่อง" required sx={fieldSx} />}
                 />
-                <ThaiDatePicker label="วันที่ออก" value={form.issuedAt} onChange={set("issuedAt")}
-                  helperText={thaiFullDate(form.issuedAt)} textFieldProps={{ sx: fieldSx }} />
-              </Box>
+                {/* ✅ grid: มือถือเรียงเต็มกว้าง · จอใหญ่ 2 คอลัมน์ — เดิม flex บีบช่องวันที่จนล้นขอบจอมือถือ */}
+                <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0,1fr)", sm: "minmax(0,1fr) minmax(0,1fr)" }, gap: 1.5 }}>
+                  <TextField
+                    size="small" fullWidth label="เลขที่เอกสาร" value={form.docNumber}
+                    onChange={setField("docNumber")} disabled={canUseRunningNumber} sx={fieldSx}
+                    helperText={canUseRunningNumber ? "ออกให้อัตโนมัติ" : "เลขที่อ้างอิงของงาน"}
+                  />
+                  <ThaiDatePicker label="วันที่ออก" value={form.issuedAt} onChange={set("issuedAt")}
+                    helperText={thaiFullDate(form.issuedAt)} textFieldProps={{ sx: fieldSx }} />
+                </Box>
+              </Stack>
+              <Stack spacing={1.75}>
+                <TextField size="small" fullWidth multiline minRows={3} label="ย่อหน้า 1 · ที่มาและกำหนดการ"
+                  value={form.body} onChange={setField("body")} sx={fieldSx} />
+                <TextField size="small" fullWidth multiline minRows={3} label="ย่อหน้า 2 · ขอความร่วมมือ"
+                  value={form.cooperationNote} onChange={setField("cooperationNote")} sx={fieldSx}
+                  helperText='ปิดท้ายด้วย "จึงเรียนมาเพื่อโปรดทราบ..." ให้อัตโนมัติ' />
+              </Stack>
             </Stack>
-          </DocSection>
+          </FoldSection>
 
-          {/* ── 4 เนื้อความ ─────────────────────────────────────────────── */}
-          <DocSection step={4} title="เนื้อความ"
-            action={<Button size="small" onClick={regenerateBody} startIcon={<Refresh sx={{ fontSize: 16 }} />} sx={SMALL_BTN_SX}>สร้างใหม่</Button>}>
-            <Stack spacing={1.75}>
-              <TextField size="small" fullWidth multiline minRows={3} label="ย่อหน้า 1 · ที่มาและกำหนดการ"
-                value={form.body} onChange={setField("body")} sx={fieldSx} />
-              <TextField size="small" fullWidth multiline minRows={3} label="ย่อหน้า 2 · ขอความร่วมมือ"
-                value={form.cooperationNote} onChange={setField("cooperationNote")} sx={fieldSx}
-                helperText='ปิดท้ายด้วย "จึงเรียนมาเพื่อโปรดทราบ..." ให้อัตโนมัติ' />
-            </Stack>
-          </DocSection>
-
-          {/* ── 5 ผู้ออกเอกสาร ──────────────────────────────────────────── */}
-          <DocSection step={5} title="ผู้ออกเอกสาร (ผู้ประสานงาน)" hint={`ออกในนาม ${ISSUER.nameTh} · แนบตราประทับให้อัตโนมัติ`}>
+          <FoldSection icon={<DrawOutlined />} title="ผู้ออกเอกสาร (ผู้ประสานงาน)"
+            summary={[form.signerName || "ยังไม่ระบุชื่อ", form.signerPosition, form.signerTel && `โทร ${form.signerTel}`, signatureImage ? "ลายเซ็นอิเล็กทรอนิกส์" : "เว้นช่องเซ็นมือ"].filter(Boolean).join(" · ")}
+            alert={!form.signerName?.trim()}>
             <Stack spacing={1.75}>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1.75}>
                 <Autocomplete
@@ -636,7 +660,7 @@ const WorkNoticeDialog = ({ open, onClose, job, customer, issuer, canUseRunningN
               <SignerPreview name={form.signerName} position={form.signerPosition} tel={form.signerTel}
                 company={ISSUER.nameTh} signatureImage={signatureImage} />
             </Stack>
-          </DocSection>
+          </FoldSection>
         </Box>)}
       </DialogContent>
 
