@@ -26,7 +26,7 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
-  PostAddOutlined, AddRounded, EditOutlined, ChevronRight, Close, EventAvailableOutlined,
+  PostAddOutlined, AddRounded, EditOutlined, ChevronRight, Close, EventAvailableOutlined, FlagOutlined,
   NotesOutlined, CalendarMonthOutlined, GroupsOutlined, PersonOutlineOutlined, BuildOutlined, CallReceivedRounded, DescriptionOutlined, PhoneOutlined, HourglassTopRounded, ReportProblemOutlined,
   BlockRounded, RestoreRounded, PersonOffOutlined,
   LocalShippingOutlined, ReceiptLongOutlined, TaskAltRounded, UploadFileOutlined, AttachFileRounded, Search,
@@ -472,11 +472,19 @@ function JobCard({ job, readOnly, requestMode, onSchedule, onDeliver, onUploadIn
             </Stack>
             {place && <Typography sx={{ fontSize: "0.86rem", fontWeight: 600, color: "#475569", mt: 0.2, overflowWrap: "anywhere" }}>{place}</Typography>}
 
-            {/* ข้อมูลสั้น — บรรทัดเดียว คั่นด้วยไอคอน ตัดขึ้นบรรทัดใหม่เองถ้ายาว */}
+            {/* ✅ (17 ต.ค. 2569 ผู้ใช้: "จุดที่ควรสังเกตให้สีแตกต่าง มืออาชีพ แต่ไม่รก") — ป้ายสีแถวแรก = เรื่องที่ต้องดู
+                กำหนดเวลา (ม่วงคราม · เดือนนี้ส้ม · เลยแล้วแดง) · เสร็จภายใน · ที่มา (สีประจำฝ่าย) · เอกสาร (PO เขียว / ใบเสนอราคาส้ม)
+                แถวที่สอง = ข้อมูลประกอบสีเทา (ผู้รับผิดชอบ · ทีม · ผู้ติดต่อ) */}
+            <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75, mt: 1 }}>
+              {(() => {
+                const t = scheduleTagOf(job, schedule);
+                return <Tag icon={t.icon} color={t.color} dashed={t.dashed}>{t.text}{t.rel && <Box component="span" sx={{ fontWeight: 600, opacity: 0.85 }}>· {t.rel}</Box>}</Tag>;
+              })()}
+              {due && st.i < 4 && <Tag icon={FlagOutlined} color={moment(job.dueDate).isBefore(moment(), "day") ? RED : "#b45309"}>เสร็จภายใน {due}</Tag>}
+              {job.intakeSource && <Tag icon={CallReceivedRounded} color={SOURCE_COLOR[job.intakeSource] || "#475569"}>จาก{SOURCE_LABEL[job.intakeSource] || job.intakeSource}</Tag>}
+              {doc && <Tag icon={DescriptionOutlined} color={DOC_COLOR[job.intakeDocType] || "#475569"}>{doc}</Tag>}
+            </Stack>
             <Stack direction="row" sx={{ flexWrap: "wrap", columnGap: 2, rowGap: 0.5, mt: 0.9 }}>
-              <Fact icon={CalendarMonthOutlined}>{schedule}{due ? <Box component="span" sx={{ color: AMBER, fontWeight: 700 }}> · เสร็จภายใน {due}</Box> : null}</Fact>
-              {job.intakeSource && <Fact icon={CallReceivedRounded}>จาก{SOURCE_LABEL[job.intakeSource] || job.intakeSource}</Fact>}
-              {doc && <Fact icon={DescriptionOutlined}>{doc}</Fact>}
               {job.responsiblePerson && <Fact icon={PersonOutlineOutlined}>{job.responsiblePerson}</Fact>}
               {!job.unscheduled && !job.noVisit && !job.intakeNote && <Fact icon={GroupsOutlined}>{team || "ยังไม่มอบหมายทีม"}</Fact>}
               {(job.contactName || job.contactTel) && (
@@ -544,6 +552,34 @@ function JobCard({ job, readOnly, requestMode, onSchedule, onDeliver, onUploadIn
 const Chip = ({ children, color = "#334155", bg = SURFACE, border = LINE }) => (
   <Box component="span" sx={{ px: 0.9, height: 22, display: "inline-flex", alignItems: "center", gap: 0.4, flexShrink: 0, borderRadius: 99, fontSize: "0.7rem", fontWeight: 800, color, bgcolor: bg, border: `1px solid ${border}`, whiteSpace: "nowrap" }}>{children}</Box>
 );
+/** ✅ (17 ต.ค. 2569) ป้ายสีของ "จุดที่ควรสังเกต" — พื้นสีอ่อน ขอบบาง ตัวอักษรสีเดียวกัน (สีบอกความหมาย ไม่ใช่ตกแต่ง) */
+const Tag = ({ icon: Icon, color, dashed, children }) => (
+  <Box component="span" sx={{
+    display: "inline-flex", alignItems: "center", gap: 0.5, height: 26, px: 1, borderRadius: 1.5, maxWidth: "100%",
+    fontSize: "0.78rem", fontWeight: 800, color, bgcolor: dashed ? "transparent" : alpha(color, 0.08),
+    border: `1px ${dashed ? "dashed" : "solid"} ${alpha(color, dashed ? 0.45 : 0.25)}`, whiteSpace: "nowrap", overflow: "hidden",
+  }}>
+    {Icon && <Icon sx={{ fontSize: 15, flexShrink: 0 }} />}
+    <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", display: "inline-flex", gap: 0.5 }}>{children}</Box>
+  </Box>
+);
+// สีประจำ "รับงานมาจาก" และประเภทเอกสาร — ใช้ซ้ำทุกการ์ดให้จำได้จากสี
+const SOURCE_COLOR = { sales: "#0e7490", service: "#6d28d9", project: "#c2410c", customer: "#0f766e" };
+const DOC_COLOR = { po: "#15803d", quotation: "#b45309", other: "#475569" };
+/** ป้ายกำหนดเวลา: เดือนที่ตั้งใจเข้างาน (+ อีกกี่เดือน) · วันเข้างาน · ส่งมอบ · บันทึก */
+const scheduleTagOf = (job, text) => {
+  if (job.intakeNote) return { icon: CalendarMonthOutlined, color: "#475569", text };
+  if (job.noVisit) return { icon: LocalShippingOutlined, color: job.unscheduled ? "#b45309" : "#0f766e", text };
+  if (!job.unscheduled) return { icon: EventAvailableOutlined, color: "#1d4ed8", text };
+  if (!job.plannedMonth) return { icon: CalendarMonthOutlined, color: "#64748b", text: "ยังไม่กำหนดเดือนเข้างาน", dashed: true };
+  const diff = moment(job.plannedMonth, "YYYY-MM").diff(moment().startOf("month"), "months");
+  return {
+    icon: CalendarMonthOutlined,
+    color: diff < 0 ? RED : diff === 0 ? "#b45309" : "#4338ca",
+    text: `ตั้งใจเข้างาน ${formatThai(moment(job.plannedMonth, "YYYY-MM"), "MMM YYYY")}`,
+    rel: diff > 0 ? `อีก ${diff} เดือน` : diff === 0 ? "เดือนนี้" : `เลยมา ${-diff} เดือน`,
+  };
+};
 /** ข้อมูลสั้น 1 ชิ้น: ไอคอนเทา + ข้อความ */
 const Fact = ({ icon: Icon, children }) => (
   <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
