@@ -68,10 +68,15 @@ export async function registerNativePush({ ask = true } = {}) {
     if (!Capacitor.isPluginAvailable("FirebaseMessaging")) throw new Error("แอปรุ่นนี้ไม่มีระบบแจ้งเตือน — ติดตั้ง APK รุ่นล่าสุด");
     const FirebaseMessaging = await plugin();
     let { receive } = await step("ตรวจสิทธิ์", FirebaseMessaging.checkPermissions());
-    // ⚠️ ขออนุญาตไม่จำกัดเวลา — รอผู้ใช้กดในกล่องของเครื่อง
-    if (receive !== "granted" && ask) ({ receive } = await FirebaseMessaging.requestPermissions());
+    // ⚠️ บางเครื่องไม่เด้งกล่องขออนุญาตเลย แล้ว promise ไม่จบ (ผู้ใช้เจอ: หมุน 10 นาที ไม่มีอะไรขึ้น)
+    //    → จำกัด 45 วินาที แล้วพาไปเปิดสิทธิ์เองในตั้งค่าเครื่อง (เปิดแล้วกดใหม่ = ผ่าน checkPermissions เลย)
+    const MANUAL = "เปิดเองได้ที่ ตั้งค่าเครื่อง › แอป › TidTam › การแจ้งเตือน › เปิด แล้วกลับมากดเปิดแจ้งเตือนอีกครั้ง";
+    if (receive !== "granted" && ask) {
+      ({ receive } = await step("ขออนุญาตแจ้งเตือน", FirebaseMessaging.requestPermissions(), 45000)
+        .catch(() => { throw new Error(`เครื่องไม่แสดงกล่องขออนุญาต — ${MANUAL}`); }));
+    }
     if (receive !== "granted") {
-      if (ask) throw new Error("ยังไม่อนุญาตให้แจ้งเตือน — เปิดได้ที่ ตั้งค่าเครื่อง › แอป › TidTam › การแจ้งเตือน");
+      if (ask) throw new Error(`ยังไม่อนุญาตให้แจ้งเตือน — ${MANUAL}`);
       return false;
     }
     if (Capacitor.getPlatform() === "android") {
