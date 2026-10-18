@@ -38,7 +38,8 @@ const PushService = {
   // ✅ ขอ permission + subscribe + ส่ง subscription ไปเก็บที่ server ผูกกับผู้ใช้ที่ล็อกอินอยู่
   async subscribe() {
     if (isNativeApp()) {
-      if (!(await registerNativePush({ ask: true }))) throw new Error("ผู้ใช้ไม่อนุญาตให้แจ้งเตือน — เปิดได้ที่ ตั้งค่าเครื่อง › แอป › TidTam › การแจ้งเตือน");
+      // ล้ม = throw พร้อมบอกขั้นที่ติด (ดู registerNativePush) → หน้าตั้งค่าแสดงเป็นข้อความแจ้ง
+      await registerNativePush({ ask: true });
       return true;
     }
     if (!this.isSupported()) throw new Error("อุปกรณ์/เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือน");

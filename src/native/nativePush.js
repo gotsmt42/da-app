@@ -51,27 +51,44 @@ const setupListeners = async (FirebaseMessaging) => {
   });
 };
 
-/** ขออนุญาต + ลงทะเบียนเครื่องกับ server (เรียกได้ซ้ำ — ไม่ถามซ้ำถ้าเคยอนุญาตแล้ว) */
+/**
+ * ทุกขั้นมีเวลาจำกัด — เดิมถ้า Firebase/server ไม่ตอบ ปุ่ม "เปิดแจ้งเตือน" หมุนค้างตลอดไป (ผู้ใช้เจอ 18 ต.ค. 2569)
+ * ล้มแล้วบอกชื่อขั้น จะได้รู้ว่าติดที่เครื่อง / Firebase / server
+ */
+const step = (label, promise, ms = 15000) => Promise.race([
+  promise,
+  new Promise((_, reject) => setTimeout(() => reject(new Error("ไม่ตอบสนอง (หมดเวลา)")), ms)),
+]).catch((err) => { throw new Error(`${label}: ${err?.message || err}`); });
+
+/** ขออนุญาต + ลงทะเบียนเครื่องกับ server (เรียกได้ซ้ำ — ไม่ถามซ้ำถ้าเคยอนุญาตแล้ว)
+ *  ask=true (ผู้ใช้กดเอง) → ล้มแล้ว throw พร้อมเหตุผล · ask=false (sync เงียบๆ ตอนเปิดแอป) → คืน false */
 export async function registerNativePush({ ask = true } = {}) {
   if (!isNativeApp()) return false;
   try {
+    if (!Capacitor.isPluginAvailable("FirebaseMessaging")) throw new Error("แอปรุ่นนี้ไม่มีระบบแจ้งเตือน — ติดตั้ง APK รุ่นล่าสุด");
     const FirebaseMessaging = await plugin();
-    let { receive } = await FirebaseMessaging.checkPermissions();
+    let { receive } = await step("ตรวจสิทธิ์", FirebaseMessaging.checkPermissions());
+    // ⚠️ ขออนุญาตไม่จำกัดเวลา — รอผู้ใช้กดในกล่องของเครื่อง
     if (receive !== "granted" && ask) ({ receive } = await FirebaseMessaging.requestPermissions());
-    if (receive !== "granted") return false;
+    if (receive !== "granted") {
+      if (ask) throw new Error("ยังไม่อนุญาตให้แจ้งเตือน — เปิดได้ที่ ตั้งค่าเครื่อง › แอป › TidTam › การแจ้งเตือน");
+      return false;
+    }
     if (Capacitor.getPlatform() === "android") {
       // ช่องแจ้งเตือนความสำคัญสูง (เด้งทับหน้าจอ + เสียง) — id ต้องตรงกับ server (NativePush.js)
-      await FirebaseMessaging.createChannel({
+      await step("สร้างช่องแจ้งเตือน", FirebaseMessaging.createChannel({
         id: "tidtam_default", name: "แจ้งเตือนงาน", description: "งานใหม่ การอนุมัติ และการเตือนประจำวัน",
         importance: 5, visibility: 1, vibration: true,
-      }).catch(() => {});
+      }), 5000).catch(() => {});
     }
-    await setupListeners(FirebaseMessaging);
-    const { token } = await FirebaseMessaging.getToken();
-    await sendToken(token);
+    await step("เตรียมรับแจ้งเตือน", setupListeners(FirebaseMessaging), 5000);
+    const { token } = await step("ขอรหัสเครื่องจาก Firebase", FirebaseMessaging.getToken(), 20000);
+    // server บน Render อาจกำลังตื่น (~30–50 วินาที)
+    await step("ลงทะเบียนกับ server", sendToken(token), 60000);
     return true;
   } catch (err) {
     console.warn("แจ้งเตือนแบบแอป: ลงทะเบียนไม่สำเร็จ", err?.message || err);
+    if (ask) throw err;
     return false;
   }
 }
