@@ -1,0 +1,37 @@
+<!doctype html>
+<!--
+  หน้าที่แอปมือถือ (Capacitor) แสดงเมื่อเปิด https://da-app.vercel.app ไม่ได้ (ไม่มีเน็ต / เว็บล่ม)
+  ตั้งไว้ที่ capacitor.config.json › server.errorPath — ฝังอยู่ในตัวแอป จึงแสดงได้แม้ไม่มีเน็ต
+  ⚠️ ห้ามโหลดอะไรจากภายนอก (ฟอนต์/สคริปต์) — ตอนนี้ไม่มีเน็ต
+-->
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ไม่มีการเชื่อมต่อ · TidTam</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #0f172a; color: #e2e8f0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; text-align: center; }
+    img { width: 72px; height: 72px; margin-bottom: 20px; }
+    h1 { font-size: 20px; margin: 0 0 8px; color: #fff; }
+    p { font-size: 14px; margin: 0 0 24px; color: #94a3b8; line-height: 1.6; }
+    button { font: inherit; font-size: 15px; font-weight: 600; color: #fff; background: #dc2626; border: 0; border-radius: 10px; padding: 12px 28px; }
+    button:active { opacity: .85; }
+  </style>
+</head>
+<body>
+  <main>
+    <img src="app-icon.svg" alt="" />
+    <h1>ไม่มีการเชื่อมต่ออินเทอร์เน็ต</h1>
+    <p>ตรวจสอบ Wi-Fi หรือข้อมูลมือถือ<br />แล้วลองอีกครั้ง</p>
+    <button type="button" id="retry">ลองอีกครั้ง</button>
+  </main>
+  <script>
+    var APP_URL = "https://da-app.vercel.app/";
+    var go = function () { location.href = APP_URL; };
+    document.getElementById("retry").addEventListener("click", go);
+    // เน็ตกลับมาเอง → เข้าแอปให้อัตโนมัติ
+    window.addEventListener("online", go);
+  </script>
+</body>
+</html>

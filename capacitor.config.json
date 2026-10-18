@@ -3,7 +3,9 @@
   "appName": "TidTam",
   "webDir": "build",
   "server": {
-    "androidScheme": "https"
+    "url": "https://da-app.vercel.app",
+    "androidScheme": "https",
+    "errorPath": "app-offline.html"
   },
   "android": {
     "allowMixedContent": false,
