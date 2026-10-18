@@ -1,4 +1,7 @@
 import API from "../api/axiosInstance";
+// ✅ (18 ต.ค. 2569) อยู่ในแอปมือถือ (Capacitor) → สลับไปใช้แจ้งเตือนแบบแอปจริง (Firebase) อัตโนมัติ
+//    จุดที่เรียก PushService (ล็อกอิน/ล็อกเอาต์/หน้าตั้งค่า/ถามเปิดแจ้งเตือน) ไม่ต้องแก้อะไรเลย
+import { isNativeApp, registerNativePush, unregisterNativePush, nativePermissionState, setNativeBadge } from "@/native/nativePush";
 
 // ✅ แปลง VAPID public key จาก base64url เป็น Uint8Array ตามที่ pushManager.subscribe ต้องการ
 function urlBase64ToUint8Array(base64String) {
@@ -10,15 +13,21 @@ function urlBase64ToUint8Array(base64String) {
 
 const PushService = {
   isSupported() {
+    if (isNativeApp()) return true;
     return "serviceWorker" in navigator && "PushManager" in window;
   },
 
   async getPermissionState() {
+    if (isNativeApp()) {
+      const st = await nativePermissionState();
+      return st === "granted" ? "granted" : st === "denied" ? "denied" : "default";
+    }
     if (!this.isSupported()) return "unsupported";
     return Notification.permission; // "default" | "granted" | "denied"
   },
 
   async isSubscribed() {
+    if (isNativeApp()) return (await nativePermissionState()) === "granted";
     if (!this.isSupported()) return false;
     const reg = await navigator.serviceWorker.getRegistration("/push-sw.js");
     if (!reg) return false;
@@ -28,6 +37,10 @@ const PushService = {
 
   // ✅ ขอ permission + subscribe + ส่ง subscription ไปเก็บที่ server ผูกกับผู้ใช้ที่ล็อกอินอยู่
   async subscribe() {
+    if (isNativeApp()) {
+      if (!(await registerNativePush({ ask: true }))) throw new Error("ผู้ใช้ไม่อนุญาตให้แจ้งเตือน — เปิดได้ที่ ตั้งค่าเครื่อง › แอป › TidTam › การแจ้งเตือน");
+      return true;
+    }
     if (!this.isSupported()) throw new Error("อุปกรณ์/เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือน");
 
     const reg = await navigator.serviceWorker.register("/push-sw.js");
@@ -54,6 +67,7 @@ const PushService = {
   // services/PushNotify.js) ทำให้ตอนล็อกเอาต์เรียกแบบ fire-and-forget ได้อย่างปลอดภัย ไม่ต้องรอเน็ต
   // และไม่พังแม้ token จะถูกลบไปก่อนที่ request จะยิงออก
   async unsubscribe() {
+    if (isNativeApp()) { await unregisterNativePush(); return; }
     if (!this.isSupported()) return;
     const reg = await navigator.serviceWorker.getRegistration("/push-sw.js");
     if (!reg) return;
@@ -81,6 +95,7 @@ const PushService = {
   // คนที่ยังไม่เคยเปิด/กดปฏิเสธไว้ จะไม่โดนเด้งขอสิทธิ์เองโดยไม่ได้ตั้งใจ
   async syncSubscription() {
     try {
+      if (isNativeApp()) { await registerNativePush({ ask: false }); return; }
       if (!this.isSupported()) return;
       if (Notification.permission !== "granted") return;
 
@@ -112,6 +127,7 @@ const PushService = {
 
   /** ตัวเลขบนไอคอนแอป (Android/iOS ที่ติดตั้งแอปแล้ว) — ไม่รองรับก็ข้ามเงียบๆ */
   setAppBadge(n) {
+    if (isNativeApp()) { setNativeBadge(n); return; }
     try {
       if (!("setAppBadge" in navigator)) return;
       (n > 0 ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(() => {});
@@ -124,6 +140,7 @@ const PushService = {
     return /iphone|ipad|ipod/i.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   },
   isStandalone() {
+    if (isNativeApp()) return true; // แอปจริง = ไม่ต้องแนะนำ "เพิ่มไปยังหน้าจอโฮม"
     return window.matchMedia?.("(display-mode: standalone)").matches || window.navigator.standalone === true;
   },
 };

@@ -14,7 +14,8 @@
  * ใน URL ซึ่งจะไปค้างอยู่ใน log ของเซิร์ฟเวอร์/พร็อกซีทุกตัว
  */
 
-const API_URL = import.meta.env.REACT_APP_API_URL || "";
+import { API_URL as RESOLVED_API_URL } from "@/shared/api/apiUrl";
+const API_URL = RESOLVED_API_URL || "";
 
 const newId = () =>
   window.crypto?.randomUUID?.() ||`${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;

@@ -1,0 +1,76 @@
+name: Mobile · Android
+
+# สร้างแอป Android บนคลาวด์ (เครื่องเราไม่ต้องลง Android Studio) — ดูวิธีใช้ทั้งหมดที่ MOBILE_APP.md
+#   • กดรันเองได้ที่ GitHub › Actions › "Mobile · Android" › Run workflow
+#   • หรือ push tag รูปแบบ app-v* (เช่น app-v1.0.0) → สร้างรุ่นสำหรับขึ้น Play Store
+# ⚠️ ไม่รันทุก push — ใช้เวลา ~8 นาที/ครั้ง เปลืองโควตา Actions โดยใช่เหตุ (เว็บไม่ได้ใช้ผลนี้)
+on:
+  workflow_dispatch:
+  push:
+    tags: ["app-v*"]
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    env:
+      HAS_FIREBASE: ${{ secrets.GOOGLE_SERVICES_JSON != '' }}
+      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+      # เลขรุ่น: versionCode ต้องเพิ่มทุกครั้งที่อัปโหลด Play Store → ใช้ลำดับการรันของ workflow
+      APP_VERSION_CODE: ${{ github.run_number }}
+      APP_VERSION_NAME: ${{ startsWith(github.ref, 'refs/tags/app-v') && github.ref_name || format('1.0.{0}', github.run_number) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build เว็บสำหรับแอป
+        run: npx vite build --mode native
+
+      - name: ใส่ google-services.json (แจ้งเตือน)
+        if: env.HAS_FIREBASE == 'true'
+        run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
+
+      - name: Capacitor sync
+        run: npx cap sync android
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Debug APK (ติดตั้งทดสอบได้ทันที)
+        working-directory: android
+        run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+
+      - name: ถอดรหัส keystore
+        if: env.HAS_KEYSTORE == 'true'
+        run: echo '${{ secrets.ANDROID_KEYSTORE_BASE64 }}' | base64 -d > "$RUNNER_TEMP/release.keystore"
+
+      - name: Release AAB + APK (ลงชื่อแล้ว · ขึ้น Play Store)
+        if: env.HAS_KEYSTORE == 'true'
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/release.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew bundleRelease assembleRelease --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TidTam-android-${{ env.APP_VERSION_NAME }}
+          path: |
+            android/app/build/outputs/apk/debug/*.apk
+            android/app/build/outputs/apk/release/*.apk
+            android/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+          retention-days: 30

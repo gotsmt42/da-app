@@ -21,6 +21,7 @@ import { StyleSheetManager } from "styled-components";
 // เพิ่ม/แก้ไขงาน) ที่ลอยค้างอยู่กับที่เวลาเลื่อนเนื้อหาในฟอร์ม เพราะมันถูกแปะไว้ที่ <body> ดูรายละเอียด
 // ทั้งหมดที่ src/shared/utils/tomSelectFixes.js — เรียกที่นี่เพราะ TomSelect ถูกสร้างจากหลายไฟล์/หลายจังหวะ
 import { installTomSelectFixes } from "./shared/utils/tomSelectFixes";
+import { installNativeBridge, hideSplash } from "./native/nativeBridge";
 
 import "bootstrap/dist/css/bootstrap.min.css"; // import Bootstrap CSS
 // ✅ ต้อง import เป็น .css ตรงนี้ ไม่ใช่ @import .scss ที่ assets/scss/style.scss (ดูเหตุผลในไฟล์นั้น)
@@ -47,6 +48,10 @@ window.addEventListener("error", (e) => {
 
 installTomSelectFixes();
 
+// ✅ แอปมือถือ (Capacitor) — ดาวน์โหลดไฟล์ / ลิงก์ภายนอก / ปุ่มย้อนกลับ Android ให้ทำงานเหมือนเว็บ
+//    เว็บปกติไม่มีผลอะไร (ฟังก์ชันออกทันทีถ้าไม่ได้อยู่ในแอป) ดู src/native/nativeBridge.js
+installNativeBridge();
+
 // ✅ หลัง deploy ไฟล์ CSS/JS รุ่นเก่าถูกลบ — Vite แจ้ง "vite:preloadError" ก่อน import ล้ม
 //    รีโหลดเอาไฟล์รุ่นใหม่ทันที (ไม่เกิน 1 ครั้ง/30 วินาที) แทนที่จะปล่อยให้เป็นจอขาว ดู lazyWithRetry.js
 window.addEventListener("vite:preloadError", (e) => {
@@ -71,6 +76,8 @@ root.render(
     </AppErrorBoundary>
   </React.StrictMode>
 );
+// ซ่อนหน้าเปิดแอปเมื่อ React วาดหน้าแรกเสร็จ (หน่วงเล็กน้อยกันจอขาวแวบ) — เว็บปกติไม่มีผล
+setTimeout(hideSplash, 300);
 
 // If you want to start measuring performance in your app, pass a function
 // to log results (for example: reportWebVitals(console.log))

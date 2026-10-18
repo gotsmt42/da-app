@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { refreshInbox, markInboxRead } from "@/shared/hooks/useInbox";
 import { Box, ButtonBase, IconButton, Slide, Typography } from "@mui/material";
 import { Close } from "@mui/icons-material";
+import { isNativeApp, takePendingOpen } from "@/native/nativePush";
 
 /**
  * แบนเนอร์แจ้งเตือนในแอป (แบบ LINE) + เสียงเตือน — ใช้ตอน "แอปเปิดอยู่บนจอ"
@@ -72,6 +73,16 @@ export default function InAppPushBanner() {
     clearTimeout(timer.current);
   }, []);
 
+  const showBanner = useCallback((payload) => {
+    refreshInbox();
+    setMsg(payload || {});
+    setOpen(true);
+    playChime();
+    try { navigator.vibrate?.([120, 60, 120]); } catch { /* ไม่รองรับ */ }
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setOpen(false), AUTO_HIDE_MS);
+  }, []);
+
   useEffect(() => {
     // ปลดล็อกเสียงตอนผู้ใช้แตะ/คลิกครั้งแรก (กฎ autoplay ของเบราว์เซอร์)
     window.addEventListener("pointerdown", unlockAudio, { passive: true });
@@ -92,20 +103,34 @@ export default function InAppPushBanner() {
         return;
       }
       if (e.data?.type !== "app-push") return;
-      refreshInbox();
-      setMsg(e.data.payload || {});
-      setOpen(true);
-      playChime();
-      try { navigator.vibrate?.([120, 60, 120]); } catch { /* ไม่รองรับ */ }
-      clearTimeout(timer.current);
-      timer.current = setTimeout(() => setOpen(false), AUTO_HIDE_MS);
+      showBanner(e.data.payload);
     };
     navigator.serviceWorker.addEventListener("message", onMessage);
     return () => {
       navigator.serviceWorker.removeEventListener("message", onMessage);
       clearTimeout(timer.current);
     };
-  }, [navigate]);
+  }, [navigate, showBanner]);
+
+  // ✅ แอปมือถือ (Capacitor) — แจ้งเตือนมาทาง Firebase ไม่ผ่าน service worker (ดู src/native/nativePush.js)
+  //    แอปเปิดอยู่ = แบนเนอร์ + เสียงชุดเดียวกับเว็บ · แตะแจ้งเตือนในแถบระบบ = เปิดหน้าที่เกี่ยวข้อง
+  useEffect(() => {
+    if (!isNativeApp()) return undefined;
+    const onPush = (e) => showBanner(e.detail);
+    const onNavigate = () => {
+      const p = takePendingOpen();
+      if (!p) return;
+      if (p.nid) markInboxRead(p.nid);
+      if (p.url) navigate(p.url);
+    };
+    onNavigate(); // แตะแจ้งเตือนตอนแอปปิดอยู่ — เหตุการณ์มาก่อนหน้านี้ mount
+    window.addEventListener("tidtam:push", onPush);
+    window.addEventListener("tidtam:navigate", onNavigate);
+    return () => {
+      window.removeEventListener("tidtam:push", onPush);
+      window.removeEventListener("tidtam:navigate", onNavigate);
+    };
+  }, [navigate, showBanner]);
 
   // ✅ เปิดแอปจากการกดแจ้งเตือนตอนแอปปิดอยู่ → URL มี ?_n=<id> → ทำเครื่องหมายอ่านแล้ว แล้วลบพารามิเตอร์ทิ้ง
   //    (ไม่ลบ = เมนูที่เทียบ query แบบตรงตัวจะไม่ติดสว่าง และกดย้อนกลับแล้วนับซ้ำ)

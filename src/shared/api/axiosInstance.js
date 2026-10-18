@@ -1,11 +1,13 @@
 // 📁 shared/api/axiosInstance.js
 import axios from "axios";
+import { API_URL } from "./apiUrl";
 import { CLIENT_ID } from "@/shared/realtime/realtimeClient";
 
 // ⚠️ Vite ไม่มี process ในเบราว์เซอร์ ต้องอ่านผ่าน import.meta.env — ชื่อตัวแปรยังเป็น REACT_APP_
 // เหมือนเดิม เพราะตั้ง envPrefix: "REACT_APP_" ไว้ที่ vite.config.js (.env และตัวแปรบน Vercel
 // จึงไม่ต้องแก้อะไรเลย)
-const apiUrl = import.meta.env.REACT_APP_API_URL;
+// ✅ อ่านจากจุดเดียว (ดู apiUrl.js) — แอปมือถือชี้ไป API จริงให้อัตโนมัติ
+const apiUrl = API_URL;
 
 // 🔒 ที่แก้ (ช่องโหว่ร้ายแรง): เดิมแนบ header X-API-Key / X-Secret ไปกับทุก request โดยอ่านจาก
 // REACT_APP_API_KEY / REACT_APP_SECRET

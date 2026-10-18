@@ -22,3 +22,12 @@ yarn-error.log*
 .env
 .env.*
 !.env.example
+
+# 📱 แอปมือถือ (Capacitor) — ไฟล์ตั้งค่า Firebase / กุญแจลงชื่อแอป ใส่ผ่าน GitHub Secrets เท่านั้น (ดู MOBILE_APP.md)
+android/app/google-services.json
+ios/App/App/GoogleService-Info.plist
+*.keystore
+*.jks
+*.p8
+*.p12
+*.mobileprovision

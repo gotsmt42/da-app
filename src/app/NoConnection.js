@@ -1,7 +1,8 @@
+import { API_URL } from "@/shared/api/apiUrl";
 import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-const apiUrl = import.meta.env.REACT_APP_API_URL;
+const apiUrl = API_URL;
 
 const NoConnection = () => {
   const navigate = useNavigate();

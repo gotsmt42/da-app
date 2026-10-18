@@ -1,0 +1,86 @@
+name: Mobile · iPhone
+
+# สร้างแอป iPhone บนเครื่อง Mac ของ GitHub (ไม่ต้องมี Mac เอง) — ดูวิธีใช้ทั้งหมดที่ MOBILE_APP.md
+#   • ยังไม่มีบัญชี Apple Developer → ตรวจว่าแอป build ผ่าน (Simulator) เท่านั้น
+#   • ใส่ Secrets ของ App Store Connect ครบ → ลงชื่อ + อัปโหลดขึ้น TestFlight ให้อัตโนมัติ
+# ⚠️ เครื่อง macOS กินโควตา Actions 10 เท่าของ Linux — จึงรันเฉพาะตอนสั่ง/ติด tag
+on:
+  workflow_dispatch:
+  push:
+    tags: ["app-v*"]
+
+jobs:
+  ios:
+    runs-on: macos-15
+    env:
+      HAS_FIREBASE: ${{ secrets.GOOGLE_SERVICE_INFO_PLIST != '' }}
+      HAS_SIGNING: ${{ secrets.APPSTORE_API_KEY_P8 != '' && secrets.APPLE_TEAM_ID != '' }}
+      APP_BUILD: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build เว็บสำหรับแอป
+        run: npx vite build --mode native
+
+      - name: ใส่ GoogleService-Info.plist (แจ้งเตือน)
+        if: env.HAS_FIREBASE == 'true'
+        run: echo '${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}' > ios/App/App/GoogleService-Info.plist
+
+      - name: Capacitor sync (+ pod install)
+        run: npx cap sync ios
+
+      - name: ตรวจ build (Simulator · ไม่ลงชื่อ)
+        if: env.HAS_SIGNING != 'true'
+        working-directory: ios/App
+        run: |
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build | tail -n 40
+
+      - name: เตรียมกุญแจ App Store Connect
+        if: env.HAS_SIGNING == 'true'
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo '${{ secrets.APPSTORE_API_KEY_P8 }}' > ~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APPSTORE_API_KEY_ID }}.p8
+
+      - name: Archive + Export IPA (ลงชื่ออัตโนมัติ)
+        if: env.HAS_SIGNING == 'true'
+        working-directory: ios/App
+        run: |
+          KEY=~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APPSTORE_API_KEY_ID }}.p8
+          AUTH="-allowProvisioningUpdates -authenticationKeyPath $KEY -authenticationKeyID ${{ secrets.APPSTORE_API_KEY_ID }} -authenticationKeyIssuerID ${{ secrets.APPSTORE_API_ISSUER_ID }}"
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }} CODE_SIGN_STYLE=Automatic \
+            CURRENT_PROJECT_VERSION=$APP_BUILD $AUTH archive | tail -n 40
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>${{ secrets.APPLE_TEAM_ID }}</string>
+            <key>signingStyle</key><string>automatic</string>
+          </dict></plist>
+          EOF
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/ipa" $AUTH
+
+      - name: อัปโหลดขึ้น TestFlight
+        if: env.HAS_SIGNING == 'true'
+        run: |
+          xcrun altool --upload-app -t ios -f "$RUNNER_TEMP"/ipa/*.ipa \
+            --apiKey ${{ secrets.APPSTORE_API_KEY_ID }} --apiIssuer ${{ secrets.APPSTORE_API_ISSUER_ID }}
+
+      - uses: actions/upload-artifact@v4
+        if: env.HAS_SIGNING == 'true'
+        with:
+          name: TidTam-ios-${{ github.run_number }}
+          path: ${{ runner.temp }}/ipa/*.ipa
+          retention-days: 30

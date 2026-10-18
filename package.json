@@ -3,6 +3,16 @@
   "version": "2.35.0",
   "private": true,
   "dependencies": {
+    "@capacitor-firebase/messaging": "^7.5.0",
+    "@capacitor/android": "^7.6.9",
+    "@capacitor/app": "^7.1.2",
+    "@capacitor/browser": "^7.0.5",
+    "@capacitor/core": "^7.6.9",
+    "@capacitor/filesystem": "^7.1.9",
+    "@capacitor/ios": "^7.6.9",
+    "@capacitor/share": "^7.0.4",
+    "@capacitor/splash-screen": "^7.0.5",
+    "@capacitor/status-bar": "^7.0.6",
     "@date-io/moment": "^3.2.0",
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.0",
@@ -27,6 +37,7 @@
     "bootstrap-icons": "1.10.5",
     "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
+    "firebase": "^11.10.0",
     "jspdf": "^4.2.1",
     "jwt-decode": "^4.0.0",
     "mdb-react-ui-kit": "^7.2.0",
@@ -59,7 +70,12 @@
     "lint": "eslint src --ext .js,.jsx --max-warnings 0",
     "test": "vitest run",
     "dev:mobile": "vite --mode mobile --host",
-    "brand": "node scripts/make-brand.js"
+    "brand": "node scripts/make-brand.js",
+    "build:native": "npm run lint && vite build --mode native && cap sync",
+    "cap:sync": "cap sync",
+    "cap:android": "npm run build:native && cap open android",
+    "cap:ios": "npm run build:native && cap open ios",
+    "cap:assets": "node scripts/make-native-assets.js && capacitor-assets generate --android --ios --iconBackgroundColor \"#0f172a\" --iconBackgroundColorDark \"#0f172a\" --splashBackgroundColor \"#0f172a\" --splashBackgroundColorDark \"#0f172a\""
   },
   "eslintConfig": {
     "extends": [
@@ -80,6 +96,8 @@
   },
   "devDependencies": {
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^7.6.9",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
     "@vitejs/plugin-react": "^4.7.0",
