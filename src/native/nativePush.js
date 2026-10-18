@@ -19,7 +19,11 @@ let lastToken = "";
 let pendingOpen = null;
 export const takePendingOpen = () => { const p = pendingOpen; pendingOpen = null; return p; };
 
-const plugin = async () => (await import("@capacitor-firebase/messaging")).FirebaseMessaging;
+// ⚠️ คืน "ทั้งโมดูล" ห้ามคืนตัว plugin ออกจาก async function / Promise ตรงๆ เด็ดขาด
+//    plugin ของ Capacitor เป็น Proxy ที่ตอบทุกชื่อ property เป็นคำสั่ง native — รวมถึง .then
+//    Promise จึงเรียก FirebaseMessaging.then(...) ไปที่เครื่อง ซึ่งไม่มีวันตอบ → await ค้างตลอดไป
+//    (ผู้ใช้เจอ 18 ต.ค. 2569: กดเปิดแจ้งเตือนแล้วหมุน 10 นาที ไม่มีอะไรเด้ง)
+const pluginModule = () => import("@capacitor-firebase/messaging");
 
 const appVersion = async () => {
   try { return (await (await import("@capacitor/app")).App.getInfo()).version || ""; } catch { return ""; }
@@ -66,7 +70,7 @@ export async function registerNativePush({ ask = true } = {}) {
   if (!isNativeApp()) return false;
   try {
     if (!Capacitor.isPluginAvailable("FirebaseMessaging")) throw new Error("แอปรุ่นนี้ไม่มีระบบแจ้งเตือน — ติดตั้ง APK รุ่นล่าสุด");
-    const FirebaseMessaging = await plugin();
+    const { FirebaseMessaging } = await pluginModule();
     let { receive } = await step("ตรวจสิทธิ์", FirebaseMessaging.checkPermissions());
     // ⚠️ บางเครื่องไม่เด้งกล่องขออนุญาตเลย แล้ว promise ไม่จบ (ผู้ใช้เจอ: หมุน 10 นาที ไม่มีอะไรขึ้น)
     //    → จำกัด 45 วินาที แล้วพาไปเปิดสิทธิ์เองในตั้งค่าเครื่อง (เปิดแล้วกดใหม่ = ผ่าน checkPermissions เลย)
@@ -100,14 +104,14 @@ export async function registerNativePush({ ask = true } = {}) {
 
 export async function nativePermissionState() {
   if (!isNativeApp()) return "unsupported";
-  try { return (await (await plugin()).checkPermissions()).receive; } catch { return "denied"; }
+  try { return (await (await pluginModule()).FirebaseMessaging.checkPermissions()).receive; } catch { return "denied"; }
 }
 
 /** ออกจากระบบ — เลิกส่งแจ้งเตือนเข้าเครื่องนี้ (ทั้งฝั่ง server และ token ในเครื่อง) */
 export async function unregisterNativePush() {
   if (!isNativeApp()) return;
   try {
-    const FirebaseMessaging = await plugin();
+    const { FirebaseMessaging } = await pluginModule();
     const token = lastToken || (await FirebaseMessaging.getToken().catch(() => ({}))).token;
     if (token) await API.post("/push/native/unregister", { token }).catch(() => {});
     await FirebaseMessaging.deleteToken().catch(() => {});
@@ -119,7 +123,7 @@ export async function unregisterNativePush() {
 export async function setNativeBadge(n) {
   if (!isNativeApp()) return;
   try {
-    const FirebaseMessaging = await plugin();
+    const { FirebaseMessaging } = await pluginModule();
     if (!n) await FirebaseMessaging.removeAllDeliveredNotifications();
   } catch { /* เงียบไว้ */ }
 }
