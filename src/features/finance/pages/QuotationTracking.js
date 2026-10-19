@@ -136,12 +136,18 @@ const Section = ({ title, icon, action, children }) => (
   </Box>
 );
 
+/** ป้าย "AI" — ช่องที่ AI อ่านจากไฟล์แล้วเติมให้ (ยังไม่มีคนแก้) ให้รู้ว่าควรตรวจ */
+const aiFilled = (a, key) => (a?.quotationAiFilled?.fields || []).includes(key);
+const AiTag = ({ title = "AI อ่านจากไฟล์แล้วเติมให้ — ตรวจแล้วแก้ได้ที่ปุ่มแก้ไข" }) => (
+  <Box component="span" title={title} sx={{ ml: 0.5, px: 0.6, height: 16, display: "inline-flex", alignItems: "center", borderRadius: 99, bgcolor: "#f3e8ff", color: "#7c3aed", fontSize: "0.6rem", fontWeight: 900, verticalAlign: "middle", letterSpacing: 0.3 }}>AI</Box>
+);
+
 /** ช่องข้อมูล: ป้าย · ค่า (ว่าง = "ยังไม่กรอก" จาง / warn = ส้ม "ยังไม่ระบุ") · คำอธิบายเล็ก */
-const Field = ({ label, children, warn, danger, sub, big }) => {
+const Field = ({ label, children, warn, danger, sub, big, ai }) => {
   const empty = children === "" || children == null;
   return (
     <Box sx={{ minWidth: 0 }}>
-      <Typography sx={{ fontSize: "0.68rem", color: TEXT_SUB, fontWeight: 700 }}>{label}</Typography>
+      <Typography sx={{ fontSize: "0.68rem", color: TEXT_SUB, fontWeight: 700 }}>{label}{ai && !empty && <AiTag />}</Typography>
       <Typography sx={{ fontSize: big && !empty ? "1rem" : "0.86rem", fontWeight: empty ? 600 : 800, lineHeight: 1.35, wordBreak: "break-word",
         color: empty ? (warn ? "#b45309" : "#94a3b8") : danger ? "#dc2626" : TEXT_MAIN }}>
         {empty ? (warn ? "ยังไม่ระบุ" : "ยังไม่กรอก") : children}
@@ -198,7 +204,7 @@ const DesktopTable = ({ jobs, onOpen, onPreview }) => {
                   {a.site && a.site !== a.company && <Typography sx={{ ...sub, overflowWrap: "anywhere" }}>{a.site}</Typography>}
                 </Box>
                 <Box component="td" sx={{ ...td, minWidth: 150 }}>
-                  <Typography sx={{ fontSize: "0.82rem", fontWeight: 800, color: a.quotationNo ? TEXT_MAIN : "#94a3b8" }}>{a.quotationNo || "ไม่มีเลขที่"}</Typography>
+                  <Typography sx={{ fontSize: "0.82rem", fontWeight: 800, color: a.quotationNo ? TEXT_MAIN : "#94a3b8" }}>{a.quotationNo || "ไม่มีเลขที่"}{a.quotationNo && aiFilled(a, "quotationNo") && <AiTag />}</Typography>
                   {a.quotationDate && <Typography sx={sub}>ลงวันที่ {thaiDate(a.quotationDate)}</Typography>}
                   {files.length > 0 && (
                     <Box component="button" type="button" onClick={(e) => { e.stopPropagation(); onPreview(files[files.length - 1].fileUrl, files[files.length - 1].fileName); }}
@@ -211,7 +217,7 @@ const DesktopTable = ({ jobs, onOpen, onPreview }) => {
                 <Box component="td" sx={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>
                   {a.quotationAmount ? (
                     <>
-                      <Typography sx={{ fontWeight: 900, fontSize: "0.9rem", color: TEXT_MAIN, fontVariantNumeric: "tabular-nums" }}>{baht(a.quotationAmount)}</Typography>
+                      <Typography sx={{ fontWeight: 900, fontSize: "0.9rem", color: TEXT_MAIN, fontVariantNumeric: "tabular-nums" }}>{aiFilled(a, "quotationAmount") && <AiTag />} {baht(a.quotationAmount)}</Typography>
                       <Typography sx={sub}>{a.quotationVatIncluded ? "รวม VAT" : "ก่อน VAT"}</Typography>
                     </>
                   ) : <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: "#d97706" }}>ยังไม่ระบุ</Typography>}
@@ -443,17 +449,17 @@ const InfoSection = ({ a, isFinance, canEdit, onSave, bare = false, inline = fal
           <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: "#f8fafc", border: `1px solid ${BORDER}` }}>
             <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: TEXT_SUB, mb: 0.75, letterSpacing: 0.2 }}>ใบเสนอราคา</Typography>
             <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: "1fr 1fr" }}>
-              <Field label="เลขที่" warn={!a.quotationNo}>{a.quotationNo}</Field>
-              <Field label="มูลค่า" warn={!a.quotationAmount} sub={a.quotationAmount ? (a.quotationVatIncluded ? "รวม VAT แล้ว" : "ก่อน VAT") : ""} big>
+              <Field label="เลขที่" warn={!a.quotationNo} ai={aiFilled(a, "quotationNo")}>{a.quotationNo}</Field>
+              <Field label="มูลค่า" ai={aiFilled(a, "quotationAmount")} warn={!a.quotationAmount} sub={a.quotationAmount ? (a.quotationVatIncluded ? "รวม VAT แล้ว" : "ก่อน VAT") : ""} big>
                 {a.quotationAmount ? baht(a.quotationAmount) : ""}
               </Field>
-              <Field label="วันที่ใบเสนอราคา">{a.quotationDate ? thaiDate(a.quotationDate) : ""}</Field>
-              <Field label="ยืนราคาถึง" danger={isExpired(a)} sub={isExpired(a) ? "หมดอายุแล้ว" : ""}>{a.quotationValidUntil ? thaiDate(a.quotationValidUntil) : ""}</Field>
+              <Field label="วันที่ใบเสนอราคา" ai={aiFilled(a, "quotationDate")}>{a.quotationDate ? thaiDate(a.quotationDate) : ""}</Field>
+              <Field label="ยืนราคาถึง" ai={aiFilled(a, "quotationValidUntil")} danger={isExpired(a)} sub={isExpired(a) ? "หมดอายุแล้ว" : ""}>{a.quotationValidUntil ? thaiDate(a.quotationValidUntil) : ""}</Field>
             </Box>
           </Box>
           <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: "#f8fafc", border: `1px solid ${BORDER}` }}>
             <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: TEXT_SUB, mb: 0.75, letterSpacing: 0.2 }}>ผู้ติดต่อลูกค้า (คนรับใบเสนอราคา)</Typography>
-            <Field label="ชื่อ">{contact.name || a.contactName}</Field>
+            <Field label="ชื่อ" ai={aiFilled(a, "quotationContact")}>{contact.name || a.contactName}</Field>
             <Stack spacing={0.5} sx={{ mt: 1 }}>
               {(contact.phone || a.contactTel) ? (
                 <Typography component="a" href={`tel:${contact.phone || a.contactTel}`} onClick={(e) => e.stopPropagation()}
@@ -667,12 +673,23 @@ const QuoteScanBox = ({ a, isFinance, onApply }) => {
       setState({ status: "error", fileId: last._id, result: null, error: err?.response?.data?.message || "อ่านไฟล์ไม่สำเร็จ" });
     }
   }, [a._id, last]);
-  // อ่านเองอัตโนมัติ: มีไฟล์ใหม่ + ข้อมูลยังไม่ครบ (เลขที่/มูลค่า) + ยังไม่เคยอ่านไฟล์นี้
+  // 🔁 (19 ต.ค. 2569 ผู้ใช้เลือก "เติมให้อัตโนมัติเลย") ข้อมูลยังไม่ครบ → ให้เซิร์ฟเวอร์อ่านแล้วเติมช่องที่ว่างให้เลย
+  //    (ไฟล์ที่แนบใหม่เซิร์ฟเวอร์เติมเองหลังอัปโหลดอยู่แล้ว — ตรงนี้ช่วยไฟล์เก่าที่แนบไว้ก่อนมีฟีเจอร์)
+  const autoFill = useCallback(async () => {
+    if (!last) return;
+    setState({ status: "filling", fileId: last._id, result: null, error: "" });
+    try {
+      const r = await EventService.ScanQuotation(a._id, last._id, true);
+      setState({ status: "filled", fileId: last._id, result: r?.result || null, filled: r?.filled || [], error: "" });
+    } catch (err) {
+      setState({ status: "error", fileId: last._id, result: null, error: err?.response?.data?.message || "อ่านไฟล์ไม่สำเร็จ" });
+    }
+  }, [a._id, last]);
   useEffect(() => {
     if (!enabled || !scannable || !missingInfo(a)) return;
     if (state.fileId === last._id) return;
-    run();
-  }, [enabled, scannable, a, last, state.fileId, run]);
+    autoFill();
+  }, [enabled, scannable, a, last, state.fileId, autoFill]);
 
   if (!enabled || !scannable) return null;
   const r = state.result;
@@ -686,6 +703,26 @@ const QuoteScanBox = ({ a, isFinance, onApply }) => {
     );
   }
   const box = { mt: 1.25, p: 1.5, borderRadius: 2.5, border: "1px solid #ddd6fe", bgcolor: "#faf5ff" };
+  if (state.status === "filling") {
+    return (
+      <Stack direction="row" alignItems="center" gap={1} sx={box}>
+        <Skeleton variant="circular" width={18} height={18} />
+        <Typography sx={{ fontSize: "0.84rem", fontWeight: 700, color: "#6d28d9" }}>AI กำลังอ่านไฟล์ใบเสนอราคา แล้วเติมเลขที่ · ยอดรวม · วันที่ · ผู้ติดต่อ ให้อัตโนมัติ…</Typography>
+      </Stack>
+    );
+  }
+  if (state.status === "filled") {
+    const LABEL = { quotationNo: "เลขที่", quotationDate: "วันที่", quotationValidUntil: "ยืนราคา", quotationAmount: "มูลค่า", quotationContact: "ผู้ติดต่อ" };
+    const got = (state.filled || []).map((x) => LABEL[x]).filter(Boolean);
+    return (
+      <Stack direction="row" alignItems="center" gap={1} sx={{ ...box, py: 1 }}>
+        <Typography sx={{ flex: 1, fontSize: "0.8rem", color: "#6d28d9", fontWeight: 700 }}>
+          {got.length ? `✦ AI เติมให้แล้ว: ${got.join(" · ")} — ช่องที่มีป้าย AI ตรวจแล้วแก้ได้` : `✦ AI อ่านแล้ว ไม่พบข้อมูลที่จะเติม${state.result?.note ? ` (${state.result.note})` : ""}`}
+        </Typography>
+        <Button size="small" onClick={() => setState((s) => ({ ...s, status: "dismissed" }))} sx={{ textTransform: "none", color: TEXT_SUB }}>ปิด</Button>
+      </Stack>
+    );
+  }
   if (state.status === "loading") {
     return (
       <Stack direction="row" alignItems="center" gap={1} sx={box}>
