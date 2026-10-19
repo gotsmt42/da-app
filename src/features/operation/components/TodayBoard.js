@@ -15,13 +15,18 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import moment from "moment";
 import { Box, ButtonBase, Stack, Typography, Skeleton } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { AccessTime, ChevronRight, Groups, PersonOff } from "@mui/icons-material";
+import { AccessTime, ChevronRight, Groups, PersonOff, LocalShippingOutlined } from "@mui/icons-material";
+import JobKindTag from "@/shared/ui/JobKindTag";
+import JobDocsCell from "@/shared/ui/JobDocsCell";
+import { PersonChip } from "@/shared/ui/PersonChip";
 import AttendanceService from "@/shared/services/AttendanceService";
 import { fmtTime, locationBadge } from "@/features/attendance/attendanceMeta";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 
 const CLOSED = "ดำเนินการเสร็จสิ้น";
 const UNASSIGNED = "ยังไม่มอบหมายช่าง";
+// 🔁 (19 ต.ค. 2569 ผู้ใช้: "หน้านี้ไม่สมบูรณ์") งานส่งของไม่มีช่างเข้างาน — เดิมไปอยู่กลุ่ม "ยังไม่มอบหมายช่าง" ชวนเข้าใจผิด
+const DELIVERY = "ส่งของวันนี้ · ไม่ต้องเข้างาน";
 
 /** วันสุดท้ายของงาน (allDay เก็บ end แบบ exclusive) */
 const lastDay = (e) => (e.end ? moment(e.end).subtract(e.allDay ? 1 : 0, "days") : moment(e.start));
@@ -42,6 +47,7 @@ const STATE = {
   checkin:  { label: "เข้างานแล้ว", short: "เข้างานแล้ว", color: "#2563eb" },
   request:  { label: "ขอปิดงานแล้ว", short: "ขอปิดงาน", color: "#0891b2" },
   closed:   { label: "ปิดงานแล้ว", short: "ปิดงานแล้ว", color: "#059669" },
+  deliver:  { label: "รอส่งของ", short: "รอส่งของ", color: "#0891b2" },
 };
 const FILTERS = [
   { key: "all", label: "งานวันนี้", color: "#0f172a", match: () => true },
@@ -56,6 +62,7 @@ const hasTime = (e) => !e.allDay && moment(e.start).format("HH:mm") !== "00:00";
 function stateOf(e, att, now) {
   if (e.status === CLOSED) return "closed";
   if (e.closeRequested) return "request";
+  if (e.noVisit) return e.deliveredAt ? "closed" : "deliver"; // งานส่งของ ไม่มีการเข้างาน — ไม่นับเป็นเลยเวลานัด
   if (att) return "checkin";
   if (e.approvalStatus === "pending") return "pending";
   // เลยเวลานัด: งานที่มีเวลานัด และวันนี้เป็นวันแรกของงาน (งานหลายวัน: วันถัดไปใช้เวลาเดียวกันของวันนี้)
@@ -72,10 +79,10 @@ function stateOf(e, att, now) {
 const Avatar = ({ name, size = 40 }) => (
   <Box sx={{
     width: size, height: size, borderRadius: "50%", flexShrink: 0, display: "grid", placeItems: "center",
-    bgcolor: name === UNASSIGNED ? "#e2e8f0" : personColor(name), color: name === UNASSIGNED ? "#64748b" : "#fff",
+    bgcolor: name === UNASSIGNED ? "#e2e8f0" : name === DELIVERY ? "#ecfeff" : personColor(name), color: name === UNASSIGNED ? "#64748b" : name === DELIVERY ? "#0891b2" : "#fff",
     fontWeight: 800, fontSize: size * 0.42,
   }}>
-    {name === UNASSIGNED ? <PersonOff sx={{ fontSize: size * 0.5 }} /> : personInitial(name)}
+    {name === UNASSIGNED ? <PersonOff sx={{ fontSize: size * 0.5 }} /> : name === DELIVERY ? <LocalShippingOutlined sx={{ fontSize: size * 0.5 }} /> : personInitial(name)}
   </Box>
 );
 
@@ -100,7 +107,7 @@ const StateChip = ({ state, att }) => {
   );
 };
 
-export default function TodayBoard({ events, onOpenJob }) {
+export default function TodayBoard({ events, onOpenJob, view = "card" }) {
   const [att, setAtt] = useState(null); // eventId → attendance row ของวันนี้
   const [now, setNow] = useState(moment());
   const [filter, setFilter] = useState("all");
@@ -138,7 +145,7 @@ export default function TodayBoard({ events, onOpenJob }) {
     const f = FILTERS.find((x) => x.key === filter) || FILTERS[0];
     const map = new Map();
     rows.filter((r) => f.match(r.state)).forEach((r) => {
-      const head = r.e.team || r.e.responsiblePerson || UNASSIGNED;
+      const head = r.e.noVisit ? DELIVERY : (r.e.team || r.e.responsiblePerson || UNASSIGNED);
       if (!map.has(head)) map.set(head, { name: head, jobs: [], members: new Set() });
       const t = map.get(head);
       t.jobs.push(r);
@@ -147,9 +154,13 @@ export default function TodayBoard({ events, onOpenJob }) {
     const list = [...map.values()];
     list.forEach((t) => t.jobs.sort((a, b) => moment(a.e.start).format("HH:mm").localeCompare(moment(b.e.start).format("HH:mm"))));
     const late = (t) => t.jobs.filter((j) => j.state === "late").length;
-    return list.sort((a, b) => (a.name === UNASSIGNED ? -1 : b.name === UNASSIGNED ? 1 : 0)
+    return list.sort((a, b) => (a.name === DELIVERY) - (b.name === DELIVERY) || (a.name === UNASSIGNED ? -1 : b.name === UNASSIGNED ? 1 : 0)
       || late(b) - late(a) || a.name.localeCompare(b.name, "th"));
   }, [rows, filter]);
+
+  // มุมมองตาราง — แถวละงาน เรียง: เลยเวลานัดก่อน → ตามเวลานัด
+  const flat = techs.flatMap((t) => t.jobs.map((j) => ({ ...j, head: t.name })))
+    .sort((x, y) => (y.state === "late") - (x.state === "late") || moment(x.e.start).format("HH:mm").localeCompare(moment(y.e.start).format("HH:mm")));
 
   if (att === null) {
     return (
@@ -203,9 +214,11 @@ export default function TodayBoard({ events, onOpenJob }) {
           <Groups sx={{ fontSize: 22 }} />
           <Typography sx={{ fontSize: "0.88rem", fontWeight: 700 }}>{rows.length === 0 ? "วันนี้ไม่มีงานที่ลงตารางไว้" : "ไม่มีงานในกลุ่มนี้"}</Typography>
         </Stack>
+      ) : view === "table" ? (
+        <TodayTable rows={flat} onOpenJob={onOpenJob} />
       ) : (
-        // ── การ์ดละ 1 ช่าง ──
-        <Box sx={{ display: "grid", gap: 1.5, alignItems: "start", gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" } }}>
+        // ── การ์ดละ 1 ช่าง ── (มีกลุ่มเดียว = เต็มความกว้าง ไม่เหลือครึ่งจอว่าง)
+        <Box sx={{ display: "grid", gap: 1.5, alignItems: "start", gridTemplateColumns: { xs: "1fr", md: techs.length > 1 ? "repeat(2, minmax(0, 1fr))" : "1fr" } }}>
           {techs.map((t) => {
             const inCount = t.jobs.filter((j) => ["checkin", "request", "closed"].includes(j.state)).length;
             const lateCount = t.jobs.filter((j) => j.state === "late").length;
@@ -218,7 +231,7 @@ export default function TodayBoard({ events, onOpenJob }) {
                 <Stack direction="row" alignItems="center" gap={1.25} sx={{ px: 1.75, py: 1.25, bgcolor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
                   <Avatar name={t.name} />
                   <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography noWrap sx={{ fontSize: "0.95rem", fontWeight: 800, color: t.name === UNASSIGNED ? "#64748b" : "#0f172a" }}>{t.name}</Typography>
+                    <Typography noWrap sx={{ fontSize: "0.95rem", fontWeight: 800, color: t.name === UNASSIGNED || t.name === DELIVERY ? "#64748b" : "#0f172a" }}>{t.name}</Typography>
                     <Typography noWrap sx={{ fontSize: "0.74rem", color: "#64748b" }}>
                       {t.members.size ? `ทีม: ${[...t.members].join(", ")}` : `${t.jobs.length} งานวันนี้`}
                     </Typography>
@@ -263,6 +276,55 @@ export default function TodayBoard({ events, onOpenJob }) {
           })}
         </Box>
       )}
+    </Box>
+  );
+}
+
+/** ตารางงานวันนี้ — ✅ (19 ต.ค. 2569) เลือกมุมมองตารางที่หัวเพจแล้ว แท็บนี้เป็นตารางด้วย (เดิมการ์ดเสมอ) */
+function TodayTable({ rows, onOpenJob }) {
+  const th = { textAlign: "left", fontSize: "0.74rem", fontWeight: 800, color: "#64748b", px: 1.25, py: 1.1, borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap", bgcolor: "#f8fafc" };
+  const td = { fontSize: "0.82rem", color: "#334155", px: 1.25, py: 1.15, borderBottom: "1px solid #e2e8f0", verticalAlign: "top" };
+  return (
+    <Box sx={{ bgcolor: "#fff", border: "1px solid #e2e8f0", borderRadius: 3, overflowX: "auto", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
+      <Box component="table" sx={{ width: "100%", minWidth: 1180, borderCollapse: "collapse" }}>
+        <thead><tr>{["เวลานัด", "งาน", "โครงการ / บริษัท", "ช่าง / ทีม", "การเข้างานวันนี้", "เอกสารที่แนบ", ""].map((h, i) => <Box component="th" key={i} sx={th}>{h}</Box>)}</tr></thead>
+        <tbody>
+          {rows.map(({ e, a, state, head }) => {
+            const members = [...new Set((e.teamMembers || []).map((m) => m?.name).filter((n) => n && n !== head))];
+            return (
+              <Box component="tr" key={e._id} onClick={() => onOpenJob?.(e._id)}
+                sx={{ cursor: "pointer", "&:hover": { bgcolor: "#f8fafc" }, "&:last-child td": { borderBottom: 0 }, boxShadow: `inset 3px 0 0 ${STATE[state].color}` }}>
+                <Box component="td" sx={{ ...td, whiteSpace: "nowrap" }}>
+                  <Typography sx={{ fontSize: "1rem", fontWeight: 900, color: "#0f172a", fontVariantNumeric: "tabular-nums" }}>{hasTime(e) ? moment(e.start).format("HH:mm") : "ทั้งวัน"}</Typography>
+                </Box>
+                <Box component="td" sx={{ ...td, minWidth: 190, maxWidth: 240 }}>
+                  <JobKindTag event={e} />
+                  <Typography sx={{ mt: 0.5, fontSize: "0.86rem", fontWeight: 800, color: "#0f172a" }}>{[e.title, e.system].filter(Boolean).join(" · ") || "งาน"}</Typography>
+                  {e.jobNo && <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#94a3b8" }}>{e.jobNo}</Typography>}
+                </Box>
+                <Box component="td" sx={{ ...td, minWidth: 170, maxWidth: 230 }}>
+                  <Typography sx={{ fontSize: "0.84rem", fontWeight: 700, overflowWrap: "anywhere" }}>{e.site || "—"}</Typography>
+                  {e.company && e.company !== e.site && <Typography sx={{ fontSize: "0.74rem", color: "#64748b", overflowWrap: "anywhere" }}>{e.company}</Typography>}
+                </Box>
+                <Box component="td" sx={{ ...td, minWidth: 160 }}>
+                  {head === UNASSIGNED || head === DELIVERY
+                    ? <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: head === UNASSIGNED ? "#d97706" : "#64748b" }}>{head === DELIVERY ? "ส่งของ · ไม่ต้องเข้างาน" : head}</Typography>
+                    : (
+                      <Stack spacing={0.5}>
+                        <PersonChip name={head} size={20} badge={members.length ? "หัวหน้า" : undefined} />
+                        {members.slice(0, 2).map((n) => <PersonChip key={n} name={n} size={20} />)}
+                        {members.length > 2 && <Typography sx={{ fontSize: "0.72rem", color: "#64748b" }}>+ อีก {members.length - 2} คน</Typography>}
+                      </Stack>
+                    )}
+                </Box>
+                <Box component="td" sx={{ ...td, minWidth: 160 }}><StateChip state={state} att={a} /></Box>
+                <Box component="td" sx={{ ...td, minWidth: 200 }}><JobDocsCell event={e} /></Box>
+                <Box component="td" sx={{ ...td, textAlign: "right", verticalAlign: "middle" }}><ChevronRight sx={{ fontSize: 20, color: "#cbd5e1" }} /></Box>
+              </Box>
+            );
+          })}
+        </tbody>
+      </Box>
     </Box>
   );
 }

@@ -3724,7 +3724,7 @@ const Operation = () => {
           {loading ? (
             [1, 2, 3].map(i => <Skeleton key={i} variant="rounded" height={96} sx={{ mb: 1.5, borderRadius: 2 }} />)
           ) : effectiveGroup === "today" ? (
-            <TodayBoard events={responsibleFiltered} onOpenJob={(jid) => setDetailJobId(jid)} />
+            <TodayBoard events={responsibleFiltered} view={isMobile ? "card" : viewMode} onOpenJob={(jid) => setDetailJobId(jid)} />
           ) : sortedEvents.length === 0 ? (
             <Box sx={{ textAlign: "center", py: 10, color: "text.secondary" }}>
               <FolderOpen sx={{ fontSize: 56, opacity: 0.25, mb: 1 }} />
