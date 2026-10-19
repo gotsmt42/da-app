@@ -1231,7 +1231,7 @@ const TechnicianJobCard = ({
 
       </CardContent>
 
-      <Dialog open={detailsOpen} onClose={() => setDetailsOpen(false)} fullWidth maxWidth="sm" fullScreen={!isDesktop}
+      <Dialog open={detailsOpen} onClose={() => setDetailsOpen(false)} fullWidth maxWidth="md" fullScreen={!isDesktop}
         PaperProps={{ sx: { borderRadius: { xs: 0, sm: 3 } } }}>
         <Box sx={{ px: { xs: 2, sm: 2.5 }, pt: 2, pb: 1.5, borderBottom: `1px solid ${LINE}` }}>
           <Stack direction="row" alignItems="flex-start" gap={1}>
@@ -1257,7 +1257,7 @@ const TechnicianJobCard = ({
       </Dialog>
 
       {!hideDocuments && (
-        <Dialog open={docsExpanded} onClose={() => setDocsExpanded(false)} fullWidth maxWidth="sm" fullScreen={!isDesktop}
+        <Dialog open={docsExpanded} onClose={() => setDocsExpanded(false)} fullWidth maxWidth="md" fullScreen={!isDesktop}
           PaperProps={{ sx: { borderRadius: { xs: 0, sm: 3 } } }}>
           {/* ✅ หัวกระชับ: ชื่องาน · โครงการ/ระบบ/ครั้งที่ 1 บรรทัด · ความคืบหน้า + บอกว่าต้องครบกี่ช่องจึงขอปิดงานได้ */}
           <Box sx={{ px: { xs: 2, sm: 2.5 }, pt: 2, pb: 1.75, borderBottom: `1px solid ${LINE}` }}>
@@ -1298,7 +1298,10 @@ const TechnicianJobCard = ({
                 : `เหลืออีก ${DOCUMENT_TYPES.length - completedDocCount} รายการ จึงขอปิดงานได้ · * = ต้องมี`}
             </Typography>
           </Box>
-          <DialogContent sx={{ bgcolor: SURFACE, px: { xs: 1.5, sm: 2.5 }, py: 2 }}>
+          {/* 🔁 (19 ต.ค. 2569 ผู้ใช้: "หน้าเอกสารประจำงานให้ขยายออกอีก ดูเล็กไป") — กล่องกว้างขึ้น (md) · จอคอมเรียงเอกสาร 2 คอลัมน์ */}
+          <DialogContent sx={{ bgcolor: SURFACE, px: { xs: 1.5, sm: 2.5 }, py: 2.5,
+            "& > .MuiStack-root": { display: { md: "grid" }, gridTemplateColumns: { md: "repeat(2, minmax(0, 1fr))" }, gap: { md: 1.5 }, alignItems: "start" },
+            "& > .MuiStack-root > *": { mt: { md: "0 !important" } } }}>
             {docsContent}
           </DialogContent>
         </Dialog>
