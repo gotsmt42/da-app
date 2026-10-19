@@ -502,14 +502,6 @@ const InfoSection = ({ a, isFinance, canEdit, onSave, bare = false, inline = fal
 // ─── การติดตามลูกค้า ─────────────────────────────────────────────────────────
 // 🔁 (19 ต.ค. 2569 ผู้ใช้: "ตรงนี้ด้วยทำให้เข้าใจง่ายขึ้น") — ฟอร์มเป็นขั้น ① ติดต่อทางไหน ② ลูกค้าว่าอย่างไร ③ นัดครั้งถัดไป/หลักฐาน
 //    ปุ่มบอกว่าบันทึกครั้งที่เท่าไร · ประวัติเป็นการ์ดเรียงใหม่→เก่า (ครั้งที่ · ช่องทาง · วันเวลา · ผู้บันทึก · ข้อความ · หลักฐาน)
-const StepLabel = ({ n, children, hint }) => (
-  <Stack direction="row" alignItems="baseline" gap={0.75} sx={{ mb: 0.75 }}>
-    <Box component="span" sx={{ width: 20, height: 20, borderRadius: "50%", display: "inline-grid", placeItems: "center", bgcolor: "#eff6ff", color: "#2563eb", fontSize: "0.72rem", fontWeight: 900, flexShrink: 0 }}>{n}</Box>
-    <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: TEXT_MAIN }}>{children}</Typography>
-    {hint && <Typography sx={{ fontSize: "0.72rem", color: TEXT_SUB }}>{hint}</Typography>}
-  </Stack>
-);
-
 const FollowUpSection = ({ a, onSubmit, onPreview, canFollow, formRef }) => {
   const followUps = a.quotationFollowUps || [];
   const [note, setNote] = useState("");
@@ -529,50 +521,53 @@ const FollowUpSection = ({ a, onSubmit, onPreview, canFollow, formRef }) => {
   const nextNo = followUps.length + 1;
   return (
     <Section title={`การติดตามลูกค้า${followUps.length ? ` · ติดตามแล้ว ${followUps.length} ครั้ง` : ""}`} icon={<EventRepeat />}>
+      {/* 🔁 (19 ต.ค. 2569 ผู้ใช้: "ดูแล้วไม่สวย ดูรก และตรงแนบไฟล์สังเกตยาก")
+          กล่องเขียนแบบเดียว (composer): หัว = ครั้งที่ + ช่องทาง · กลาง = ข้อความ · ล่าง = แนบหลักฐาน (ปุ่มชัด) · นัดครั้งถัดไป · บันทึก */}
       {canWrite && (
-        <Box ref={formRef} sx={{ p: { xs: 1.25, sm: 1.5 }, borderRadius: 2.5, border: "1px solid #bfdbfe", bgcolor: "#f8fbff", mb: followUps.length ? 2 : 0 }}>
-          <Typography sx={{ fontSize: "0.9rem", fontWeight: 900, color: "#1d4ed8", mb: 1.25 }}>บันทึกการติดตามครั้งที่ {nextNo}</Typography>
-
-          <StepLabel n={1}>ติดต่อลูกค้าทางไหน</StepLabel>
-          <Stack direction="row" spacing={0.75} sx={{ flexWrap: "wrap", rowGap: 0.75, mb: 1.5 }}>
-            {CHANNELS.map((c) => (
-              <Chip key={c.value} label={c.label} onClick={() => setChannel(c.value)}
-                sx={{ height: 32, fontWeight: 800, borderRadius: 2, fontSize: "0.8rem",
-                  bgcolor: channel === c.value ? "#2563eb" : "#fff", color: channel === c.value ? "#fff" : "#334155",
-                  border: `1px solid ${channel === c.value ? "#2563eb" : BORDER}`, "&:hover": { bgcolor: channel === c.value ? "#1d4ed8" : "#f1f5f9" } }} />
-            ))}
+        <Box ref={formRef} sx={{ mb: followUps.length ? 2 : 0, borderRadius: 2.5, border: `1px solid ${BORDER}`, bgcolor: "#fff", overflow: "hidden",
+          "&:focus-within": { borderColor: "#93c5fd", boxShadow: "0 0 0 3px rgba(37,99,235,.10)" } }}>
+          <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ sm: "center" }} gap={1} sx={{ px: 1.5, pt: 1.25, pb: 0.75 }}>
+            <Typography sx={{ flex: 1, fontSize: "0.88rem", fontWeight: 800, color: TEXT_MAIN }}>
+              ติดตามครั้งที่ {nextNo} <Box component="span" sx={{ fontWeight: 600, color: TEXT_SUB, fontSize: "0.78rem" }}>· ติดต่อทาง</Box>
+            </Typography>
+            <Stack direction="row" sx={{ p: 0.4, borderRadius: 2, bgcolor: "#f1f5f9", gap: 0.4, flexWrap: "wrap" }}>
+              {CHANNELS.map((c) => {
+                const on = channel === c.value;
+                return (
+                  <Box key={c.value} component="button" type="button" onClick={() => setChannel(c.value)}
+                    sx={{ height: 28, px: 1.25, border: 0, borderRadius: 1.5, cursor: "pointer", font: "inherit", fontSize: "0.78rem", fontWeight: on ? 800 : 600,
+                      bgcolor: on ? "#fff" : "transparent", color: on ? "#1d4ed8" : "#475569", boxShadow: on ? "0 1px 2px rgba(15,23,42,.12)" : "none" }}>
+                    {c.label}
+                  </Box>
+                );
+              })}
+            </Stack>
           </Stack>
-
-          <StepLabel n={2} hint="* จำเป็น">ลูกค้าว่าอย่างไร</StepLabel>
-          <TextField multiline minRows={5} maxRows={14} fullWidth placeholder="เช่น ลูกค้ารอเข้าที่ประชุมสิ้นเดือน / ขอส่วนลดเพิ่ม 5% / ให้โทรกลับวันศุกร์"
+          <TextField multiline minRows={4} maxRows={14} fullWidth placeholder="ลูกค้าว่าอย่างไร เช่น รอเข้าที่ประชุมสิ้นเดือน / ขอส่วนลดเพิ่ม 5% / ให้โทรกลับวันศุกร์"
             value={note} onChange={(e) => setNote(e.target.value)}
-            sx={{ mb: 1.5, "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: 2, fontSize: "0.92rem", lineHeight: 1.6, alignItems: "flex-start" } }} />
-
-          <StepLabel n={3} hint="ไม่บังคับ">นัดติดตามครั้งถัดไป และหลักฐาน</StepLabel>
-          <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, alignItems: "start" }}>
-            <Box>
-              <ThaiDatePicker label="นัดติดตามครั้งถัดไป" value={next} onChange={(v) => setNext(v || "")} />
-              <Typography sx={{ fontSize: "0.7rem", color: TEXT_SUB, mt: 0.4 }}>ไม่ระบุ = ระบบเตือนให้ติดตามอีก {WARNING_DAYS_AFTER_SENT} วัน</Typography>
+            sx={{ px: 0.5, "& .MuiOutlinedInput-root": { fontSize: "0.92rem", lineHeight: 1.6, alignItems: "flex-start", "& fieldset": { border: 0 } } }} />
+          {file && (
+            <Stack direction="row" alignItems="center" gap={0.5} sx={{ mx: 1.5, mb: 1, px: 1, py: 0.5, width: "fit-content", maxWidth: "calc(100% - 24px)", borderRadius: 2, bgcolor: "#eff6ff", color: "#1d4ed8" }}>
+              <AttachFile sx={{ fontSize: 16 }} />
+              <Typography noWrap sx={{ fontSize: "0.78rem", fontWeight: 700, minWidth: 0 }}>{file.name}</Typography>
+              <IconButton size="small" onClick={() => setFile(null)} sx={{ p: 0.25, color: "#1d4ed8" }}><Close sx={{ fontSize: 15 }} /></IconButton>
+            </Stack>
+          )}
+          <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ sm: "center" }} gap={1} sx={{ px: 1.5, py: 1.1, bgcolor: "#f8fafc", borderTop: `1px solid ${BORDER}` }}>
+            <input ref={inputRef} type="file" hidden onChange={(e) => setFile(e.target.files?.[0] || null)} />
+            <Button variant="outlined" startIcon={<AttachFile />} onClick={() => inputRef.current?.click()}
+              sx={{ height: 38, textTransform: "none", fontWeight: 800, borderRadius: 2, color: "#334155", borderColor: "#cbd5e1", bgcolor: "#fff", flexShrink: 0, "&:hover": { borderColor: "#2563eb", color: "#2563eb", bgcolor: "#fff" } }}>
+              {file ? "เปลี่ยนไฟล์หลักฐาน" : "แนบหลักฐาน"}
+            </Button>
+            <Box sx={{ width: { xs: "100%", sm: 230 }, flexShrink: 0 }} title={`ไม่ระบุ = ระบบเตือนให้ติดตามอีก ${WARNING_DAYS_AFTER_SENT} วัน`}>
+              <ThaiDatePicker label="นัดครั้งถัดไป (ถ้ามี)" value={next} onChange={(v) => setNext(v || "")} />
             </Box>
-            <Box>
-              <input ref={inputRef} type="file" hidden onChange={(e) => setFile(e.target.files?.[0] || null)} />
-              <Stack direction="row" alignItems="center" gap={0.5}
-                sx={{ height: 40, px: 1.25, borderRadius: 2, border: `1px dashed ${file ? "#2563eb" : "#cbd5e1"}`, bgcolor: "#fff", cursor: "pointer" }}
-                onClick={() => inputRef.current?.click()}>
-                <AttachFile sx={{ fontSize: 17, color: file ? "#2563eb" : TEXT_SUB }} />
-                <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.82rem", fontWeight: 700, color: file ? "#2563eb" : TEXT_SUB }}>
-                  {file ? file.name : "แนบหลักฐาน (รูปแชท / อีเมล)"}
-                </Typography>
-                {file && <IconButton size="small" onClick={(e) => { e.stopPropagation(); setFile(null); }}><Close sx={{ fontSize: 16 }} /></IconButton>}
-              </Stack>
-            </Box>
-          </Box>
-
-          <Button fullWidth variant="contained" disabled={!note.trim() || busy} startIcon={<Save sx={{ fontSize: 18 }} />} onClick={submit}
-            sx={{ mt: 1.75, height: 44, textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: "#2563eb", "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } }}>
-            {busy ? "กำลังบันทึก..." : `บันทึกการติดตามครั้งที่ ${nextNo}`}
-          </Button>
-          {!note.trim() && <Typography sx={{ mt: 0.5, textAlign: "center", fontSize: "0.7rem", color: TEXT_SUB }}>กรอกข้อ ② ก่อนจึงบันทึกได้</Typography>}
+            <Box sx={{ flex: 1 }} />
+            <Button variant="contained" disabled={!note.trim() || busy} startIcon={<Save sx={{ fontSize: 18 }} />} onClick={submit}
+              sx={{ height: 40, px: 2.5, textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: "#2563eb", flexShrink: 0, "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } }}>
+              {busy ? "กำลังบันทึก..." : "บันทึกการติดตาม"}
+            </Button>
+          </Stack>
         </Box>
       )}
 
