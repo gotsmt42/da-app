@@ -172,6 +172,7 @@ const QUOTE_ICON = {
   none: DescriptionOutlined, na: DoNotDisturbOnOutlined, po: VerifiedOutlined, intake_qt: RequestQuoteOutlined,
   waiting_file: RequestQuoteOutlined, not_sent: RequestQuoteOutlined, sent: SendOutlined, follow_up: NotificationsActiveOutlined,
   revising: EditNoteOutlined, approved: CheckCircleRounded, rejected: CancelRounded,
+  ref_qt: RequestQuoteOutlined, ref_doc: DescriptionOutlined,
 };
 const QUOTE_STEP = { none: 0, waiting_file: 0, intake_qt: 1, not_sent: 1, sent: 2, follow_up: 2, revising: 2, approved: 3, rejected: 3 };
 const QUOTE_STEPS = ["แนบ", "ส่งลูกค้า", "ลูกค้าตอบ"];
@@ -225,6 +226,16 @@ function QuoteCell({ oc, compact = false, caption = false }) {
   );
 }
 
+/** ช่อง "เอกสารอ้างอิง" (แท็บรอดำเนินการ) — ชนิด + เลขที่ของเอกสารตอนรับงาน · กดไอคอนเปิดไฟล์ */
+function RefDocCell({ job }) {
+  const files = (job.sitePhotoFiles || []).filter((f) => f.source === "intake");
+  const label = job.intakeDocType ? ({ po: "ใบสั่งซื้อ (PO)", quotation: "ใบเสนอราคา", other: "เอกสารอื่น" }[job.intakeDocType] || "เอกสาร") : files.length ? "ไฟล์แนบ" : "";
+  if (!label) return <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>;
+  const key = job.intakeDocType === "po" ? "po" : job.intakeDocType === "quotation" ? "ref_qt" : "ref_doc";
+  const facts = [job.intakeDocNo ? `เลขที่ ${job.intakeDocNo}` : files.length ? `${files.length} ไฟล์` : "ยังไม่แนบไฟล์"];
+  return <QuoteCell oc={{ key, label, color: key === "po" ? GREEN : key === "ref_qt" ? ACCENT : "#475569", facts, files }} compact />;
+}
+
 /** แถบ "ใบเสนอราคา" ในการ์ด — ชิ้นเดียวกับช่องในตาราง + ปุ่มไปอัปเดตที่หน้าติดตามใบเสนอราคา (ถ้ามี) */
 function OutcomeBar({ oc }) {
   const c = oc.quiet ? ACCENT : oc.color;
@@ -262,14 +273,14 @@ const scheduleShort = (j) => (j.intakeNote ? `บันทึก ${formatThai(mo
  * 🔁 (19 ต.ค. 2569 ผู้ใช้: "รายละเอียดให้ครบแบบหน้าการ์ดด้วย") — เพิ่มคอลัมน์รายละเอียดงาน · ทีม/ผู้ติดต่อ · ขั้นถัดไป · กำหนดเสร็จ
  *    และกดแถวเพื่อกางการ์ดเต็มใต้แถว (ไฟล์แนบ · ผลเสนอราคา · แถบขั้นตอน · ปุ่มแก้ไข/ยกเลิก ครบเหมือนมุมมองการ์ด)
  */
-function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, renderCard, employees = [] }) {
+function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, renderCard, employees = [], refMode = false }) {
   const personOf = (name) => employees.find((u) => u.fname === name || [u.fname, u.lname].filter(Boolean).join(" ") === name);
   const [open, setOpen] = useState(() => new Set());
   const toggle = (id) => setOpen((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const th = { textAlign: "left", fontSize: "0.74rem", fontWeight: 800, color: MUTED, px: 1.25, py: 1, borderBottom: `1px solid ${LINE}`, whiteSpace: "nowrap", bgcolor: SURFACE };
   const td = { fontSize: "0.82rem", color: "#334155", px: 1.25, py: 1.1, borderBottom: `1px solid ${LINE}`, verticalAlign: "top" };
   const sub = { fontSize: "0.74rem", color: MUTED, lineHeight: 1.45, overflowWrap: "anywhere" };
-  const COLS = ["", "เลขที่งาน", "งาน / โครงการ", "รายละเอียดงาน", "รับงานจาก", "กำหนดการ", "ผู้ติดต่อ", "สถานะงาน", "ใบเสนอราคา", "ผู้รับผิดชอบ", ""];
+  const COLS = ["", "เลขที่งาน", "งาน / โครงการ", "รายละเอียดงาน", "รับงานจาก", "กำหนดการ", "ผู้ติดต่อ", "สถานะงาน", refMode ? "เอกสารอ้างอิง" : "ใบเสนอราคา", "ผู้รับผิดชอบ", ""];
   return (
     <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflowX: "auto" }}>
       <Box component="table" sx={{ width: "100%", minWidth: 1160, borderCollapse: "collapse" }}>
@@ -356,7 +367,8 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, render
                 {/* ✅ (19 ต.ค. 2569 ผู้ใช้: "ยังดูล้นๆ ไม่สวย · กดเปิดฟอร์มติดตามใบเสนอราคาได้เลย ดำเนินการในหน้านี้")
                     บรรทัดเดียวไม่ตัดคำ · ไฟล์กดเปิดได้ · กดช่องนี้ = เปิดกล่องใบเสนอราคา (ตัวเดียวกับหน้าติดตาม) ทับหน้านี้ */}
                 <Box component="td" sx={{ ...td, width: 210, minWidth: 210, maxWidth: 210 }}>
-                  {oc ? (
+                  {/* ✅ (19 ต.ค. 2569 ผู้ใช้: "หน้ารอดำเนินการเปลี่ยนจากใบเสนอราคาเป็นเอกสารอ้างอิง") — งานยังไม่เริ่ม: โชว์เอกสารที่แนบมาตอนรับงาน */}
+                  {refMode ? <RefDocCell job={j} /> : oc ? (
                     <Box onClick={oc.open ? (e) => { e.stopPropagation(); oc.open(); } : (e) => e.stopPropagation()}
                       role={oc.open ? "button" : undefined} tabIndex={oc.open ? 0 : undefined}
                       sx={{ borderRadius: 2, m: -0.75, p: 0.75, cursor: oc.open ? "pointer" : "default", transition: "background-color .15s",
@@ -1119,7 +1131,7 @@ export default function JobIntake() {
         view === "table" ? (
           <>
           <Typography sx={{ fontSize: "0.76rem", color: MUTED, mb: 0.75, px: 0.5 }}>กดที่แถวเพื่อดูรายละเอียดทั้งหมด</Typography>
-          <JobTable rows={list} employees={employees} readOnlyOf={(j) => !canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering}
+          <JobTable rows={list} employees={employees} refMode={tab === "waiting"} readOnlyOf={(j) => !canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering}
             renderCard={(j, oc) => <JobCard job={j} outcome={oc} readOnly={!canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone} onEdit={openForm} onCancel={cancelJob} onRestore={restoreJob} />} />
           </>
         ) : (
