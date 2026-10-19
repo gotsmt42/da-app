@@ -64,6 +64,8 @@ const STAGES_NV = ["รับงาน", "ส่งมอบ", "วางบิ�
 
 const SOURCE_LABEL = Object.fromEntries(INTAKE_SOURCE_OPTS);
 const DOC_LABEL = { po: "PO", quotation: "ใบเสนอราคา", other: "เอกสาร" };
+/** เอกสารตอนรับงานที่แสดงในช่อง "ใบเสนอราคา" แทน (ไม่ซ้ำสองที่) */
+const QUOTE_DOC = new Set(["po", "quotation"]);
 const invoicedOf = (e) => Boolean((e.invoiceFiles || []).length || e.billing?.invoicedAt);
 /** ✅ (15 ต.ค. 2569) บันทึกงาน (โน๊ต) */
 const STAGES_NOTE = ["บันทึก", "ทำ", "เสร็จ"];
@@ -106,22 +108,36 @@ const stageOf = (e) => {
 const baht = (n) => `฿${Number(n || 0).toLocaleString("th-TH", { maximumFractionDigits: 0 })}`;
 const OUTCOME = {
   waiting_file: { label: "รอแนบใบเสนอราคา", color: AMBER, act: "แนบใบเสนอราคา", to: "op", group: "todo" },
-  not_sent: { label: "ยังไม่ส่งใบเสนอราคา", color: AMBER, act: "บันทึกการส่ง", to: "qt", group: "todo" },
+  not_sent: { label: "แนบแล้ว · ยังไม่ส่งลูกค้า", color: AMBER, act: "บันทึกการส่ง", to: "qt", group: "todo" },
   sent: { label: "รอลูกค้าตอบ", color: "#2563eb", act: "อัปเดตผล", to: "qt", group: "wait" },
   follow_up: { label: "ถึงเวลาติดตามลูกค้า", color: "#ea580c", act: "ติดตาม / อัปเดตผล", to: "qt", group: "wait" },
   revising: { label: "กำลังปรับใบเสนอราคา", color: "#7c3aed", act: "อัปเดตผล", to: "qt", group: "wait" },
   approved: { label: "ได้งาน", color: GREEN, act: "ดูใบเสนอราคา", to: "qt", group: "won" },
   rejected: { label: "ไม่ได้งาน", color: RED, act: "ดูใบเสนอราคา", to: "qt", group: "lost" },
+  // ✅ (19 ต.ค. 2569 ผู้ใช้: "จะรู้ได้ไงว่างานพวกนี้มีใบเสนอราคาแนบแล้ว โดยไม่ต้องเปิดหน้าอื่น") — สถานะที่รู้ได้จากตอนรับงาน
+  intake_qt: { label: "มีใบเสนอราคาแล้ว", color: ACCENT, intake: true },
+  po: { label: "มี PO แล้ว", color: GREEN, intake: true },
+  na: { label: "ไม่ต้องเสนอราคา", color: MUTED, quiet: true, intake: true },
+  none: { label: "ยังไม่มีใบเสนอราคา", color: MUTED, quiet: true, intake: true },
 };
 const outcomeOf = (job, st, sessions) => {
-  if (!st || st.note || st.nv || st.i === -1) return null;
+  if (!st || st.note || st.i === -1) return null;
   const list = (sessions && sessions.length ? sessions : [job]).slice().sort((a, b) => new Date(b.start || 0) - new Date(a.start || 0));
   const anchor = list.find((e) => e.quotationStatus || (e.quotationFiles || []).length || e.quotationApplicable === true) || list[0];
   const key = resolveQuotationGroup(anchor);
   // 🔁 (19 ต.ค. 2569 ผู้ใช้: "สับสน ทำไมมีหลายหน้า ต่างกันยังไง") เดิมงานที่เข้างานแล้วทุกงานขึ้น "ยังไม่มีใบเสนอราคา"
   //    ทั้งที่งานบริการส่วนใหญ่ไม่ต้องเสนอราคา และหน้านี้มีแท็บ "ติดตามผลเสนอราคา" ซ้ำกับหน้าติดตามใบเสนอราคา
   //    → ติดตาม/อัปเดตผลที่หน้า "ติดตามใบเสนอราคา" ที่เดียว · ที่นี่โชว์ผลเฉพาะงานที่มีใบเสนอราคาจริง (อ่านอย่างเดียว + ลิงก์ไป)
-  if (!key) return null;
+  //    🔁 แต่ต้องตอบได้ในหน้านี้เลยว่า "มีใบเสนอราคาหรือยัง" → งานที่ยังไม่อยู่ในระบบติดตาม ใช้ข้อมูลตอนรับงานแทน
+  //       (ใบเสนอราคา/PO ที่แนบมาตอนรับงาน · ระบุว่าไม่ต้องเสนอราคา · หรือยังไม่มี) — แสดงทุกงาน ไม่ต้องเปิดหน้าอื่น
+  if (!key || st.nv) {
+    const intakeFiles = (job.sitePhotoFiles || []).filter((f) => f.source === "intake").length;
+    const no = job.intakeDocNo ? `เลขที่ ${job.intakeDocNo}` : "";
+    const ik = job.intakeDocType === "po" ? "po" : job.intakeDocType === "quotation" ? "intake_qt"
+      : anchor.quotationApplicable === false ? "na" : "none";
+    const facts = ik === "po" ? [no, "ไม่ต้องเสนอราคา"] : ik === "intake_qt" ? [no, intakeFiles ? `แนบไฟล์ ${intakeFiles} ไฟล์` : "ยังไม่แนบไฟล์"] : [];
+    return { key: ik, ...OUTCOME[ik], facts: facts.filter(Boolean), amount: 0, href: null };
+  }
   const fu = getFollowUpInfo(anchor);
   const facts = [];
   if (anchor.quotationNo) facts.push(anchor.quotationNo);
@@ -188,7 +204,7 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, render
   const th = { textAlign: "left", fontSize: "0.74rem", fontWeight: 800, color: MUTED, px: 1.25, py: 1, borderBottom: `1px solid ${LINE}`, whiteSpace: "nowrap", bgcolor: SURFACE };
   const td = { fontSize: "0.82rem", color: "#334155", px: 1.25, py: 1.1, borderBottom: `1px solid ${LINE}`, verticalAlign: "top" };
   const sub = { fontSize: "0.74rem", color: MUTED, lineHeight: 1.45, overflowWrap: "anywhere" };
-  const COLS = ["", "เลข Job", "งาน / โครงการ", "รายละเอียดงาน", "รับจาก · เอกสาร", "กำหนดการ", "ทีม · ผู้ติดต่อ", "สถานะงาน", "ผลเสนอราคา", "ผู้รับผิดชอบ", ""];
+  const COLS = ["", "เลข Job", "งาน / โครงการ", "รายละเอียดงาน", "รับจาก", "กำหนดการ", "ทีม · ผู้ติดต่อ", "สถานะงาน", "ใบเสนอราคา", "ผู้รับผิดชอบ", ""];
   return (
     <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflowX: "auto" }}>
       <Box component="table" sx={{ width: "100%", minWidth: 1120, borderCollapse: "collapse" }}>
@@ -246,7 +262,7 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, render
                 </Box>
                 <Box component="td" sx={td}>
                   <Typography sx={{ fontSize: "0.78rem", whiteSpace: "nowrap" }}>{j.intakeSource ? `จาก${SOURCE_LABEL[j.intakeSource] || j.intakeSource}` : "—"}</Typography>
-                  {doc && <Typography sx={sub}>{doc}</Typography>}
+                  {doc && !QUOTE_DOC.has(j.intakeDocType) && <Typography sx={sub}>{doc}</Typography>}
                 </Box>
                 <Box component="td" sx={{ ...td, whiteSpace: "nowrap" }}>
                   {scheduleShort(j)}
@@ -271,9 +287,9 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, render
                 </Box>
                 <Box component="td" sx={{ ...td, minWidth: 140, maxWidth: 200 }}>
                   {oc ? (
-                    <Box component={Link} to={oc.href} sx={{ textDecoration: "none", display: "block" }}>
-                      <Chip color={oc.quiet ? "#475569" : oc.color} bg={oc.quiet ? SURFACE : alpha(oc.color, 0.1)} border="transparent">{oc.label}</Chip>
-                      {oc.facts.length > 0 && !oc.quiet && <Typography sx={{ ...sub, mt: 0.3 }}>{oc.facts.slice(0, 3).join(" · ")}</Typography>}
+                    <Box component={oc.href ? Link : "div"} to={oc.href || undefined} sx={{ textDecoration: "none", display: "block" }}>
+                      <Chip color={oc.quiet ? "#64748b" : oc.color} bg={oc.quiet ? SURFACE : alpha(oc.color, 0.1)} border={oc.quiet ? LINE : "transparent"}>{oc.label}</Chip>
+                      {oc.facts.length > 0 && <Typography sx={{ ...sub, mt: 0.3 }}>{oc.facts.slice(0, 3).join(" · ")}</Typography>}
                     </Box>
                   ) : <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>}
                 </Box>
@@ -682,7 +698,13 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                 return <Tag icon={FlagOutlined} accent={late ? RED : null}>เสร็จภายใน {due}{late && <Box component="span" sx={{ ml: 0.5, color: RED, fontWeight: 800 }}>· เลยกำหนด</Box>}</Tag>;
               })()}
               {job.intakeSource && <Tag icon={CallReceivedRounded}>จาก{SOURCE_LABEL[job.intakeSource] || job.intakeSource}</Tag>}
-              {doc && <Tag icon={DescriptionOutlined}>{doc}</Tag>}
+              {/* ✅ สถานะใบเสนอราคาเห็นได้ทันทีบนการ์ด (ข้อมูลตอนรับงาน) — ส่วนที่ติดตามแล้วเป็นแถบด้านล่าง */}
+              {outcome?.intake ? (
+                <Tag icon={RequestQuoteOutlined} accent={outcome.quiet ? null : outcome.color} dashed={outcome.key === "none"}>
+                  {outcome.label}{outcome.facts.length > 0 && <Box component="span" sx={{ ml: 0.5, fontWeight: 600, color: "#64748b" }}>· {outcome.facts.join(" · ")}</Box>}
+                </Tag>
+              ) : null}
+              {doc && !(outcome?.intake && QUOTE_DOC.has(job.intakeDocType)) && <Tag icon={DescriptionOutlined}>{doc}</Tag>}
             </Stack>
             <Stack direction="row" sx={{ flexWrap: "wrap", columnGap: 2, rowGap: 0.5, mt: 0.9 }}>
               {job.responsiblePerson && <Fact icon={PersonOutlineOutlined}>{job.responsiblePerson}</Fact>}
@@ -708,7 +730,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                 )}
               </Box>
             )}
-            {outcome && <OutcomeBar oc={outcome} />}
+            {outcome && !outcome.intake && <OutcomeBar oc={outcome} />}
             {(intakeDocs.length > 0 || (job.noVisit && invoiceFiles.length > 0)) && (
               <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75, mt: 1 }}>
                 <FileLinks files={intakeDocs} />
