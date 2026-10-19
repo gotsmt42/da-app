@@ -227,13 +227,47 @@ function QuoteCell({ oc, compact = false, caption = false }) {
 }
 
 /** ช่อง "เอกสารอ้างอิง" (แท็บรอดำเนินการ) — ชนิด + เลขที่ของเอกสารตอนรับงาน · กดไอคอนเปิดไฟล์ */
+const intakeFilesOf = (job) => (job.sitePhotoFiles || []).filter((f) => f.source === "intake");
+const hasRefDoc = (job) => Boolean(job.intakeDocType || job.intakeDocNo || intakeFilesOf(job).length);
+
 function RefDocCell({ job }) {
-  const files = (job.sitePhotoFiles || []).filter((f) => f.source === "intake");
+  const files = intakeFilesOf(job);
   const label = job.intakeDocType ? ({ po: "ใบสั่งซื้อ (PO)", quotation: "ใบเสนอราคา", other: "เอกสารอื่น" }[job.intakeDocType] || "เอกสาร") : files.length ? "ไฟล์แนบ" : "";
   if (!label) return <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>;
   const key = job.intakeDocType === "po" ? "po" : job.intakeDocType === "quotation" ? "ref_qt" : "ref_doc";
   const facts = [job.intakeDocNo ? `เลขที่ ${job.intakeDocNo}` : files.length ? `${files.length} ไฟล์` : "ยังไม่แนบไฟล์"];
   return <QuoteCell oc={{ key, label, color: key === "po" ? GREEN : key === "ref_qt" ? ACCENT : "#475569", facts, files }} compact />;
+}
+
+/**
+ * ช่อง "เอกสาร / ใบเสนอราคา" (แท็บกำลังดำเนินการ · เสร็จแล้ว · ยกเลิก)
+ * ✅ (19 ต.ค. 2569 ผู้ใช้เลือก: "รวมเป็นคอลัมน์เดียว แสดงตามที่งานมีจริง")
+ *    • อยู่ในระบบติดตามแล้ว → สถานะติดตาม + แถบขั้น (กด = อัปเดตในกล่องใบเสนอราคา)
+ *    • มีแค่เอกสารตอนรับงาน → ชนิด + เลขที่ (เหมือนแท็บรอดำเนินการ) · ใบเสนอราคา = กดเพื่อเริ่มติดตาม
+ *    • ไม่มีอะไร → "—" จางๆ · ชี้เมาส์มีปุ่ม "+ แนบใบเสนอราคา" (ไม่ขึ้นป้ายเทาทุกแถวให้รก)
+ */
+function DocQuoteSlot({ job, oc }) {
+  if (!oc) return hasRefDoc(job) ? <RefDocCell job={job} /> : <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>;
+  const tracked = !oc.intake;
+  const empty = !tracked && !hasRefDoc(job);
+  const act = tracked ? oc.act : oc.key === "intake_qt" ? "เริ่มติดตาม" : oc.key === "po" ? "" : "+ แนบใบเสนอราคา";
+  const clickable = Boolean(oc.open && act);
+  const c = tracked ? oc.color : ACCENT;
+  return (
+    <Box onClick={clickable ? (e) => { e.stopPropagation(); oc.open(); } : undefined}
+      role={clickable ? "button" : undefined} tabIndex={clickable ? 0 : undefined}
+      onKeyDown={clickable ? (e) => { if (e.key === "Enter") { e.stopPropagation(); oc.open(); } } : undefined}
+      sx={{ borderRadius: 2, m: -0.75, p: 0.75, minHeight: 34, cursor: clickable ? "pointer" : "default", transition: "background-color .15s",
+        "& .qc-act": { opacity: tracked ? 0.9 : 0, transition: "opacity .15s" },
+        ...(clickable ? { "&:hover": { bgcolor: alpha(c, 0.06) }, "&:hover .qc-act": { opacity: 1 }, "&:focus-visible .qc-act": { opacity: 1 } } : {}) }}>
+      {tracked ? <QuoteCell oc={oc} compact /> : empty ? <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1", lineHeight: 1.6 }}>—</Typography> : <RefDocCell job={job} />}
+      {clickable && (
+        <Typography className="qc-act" sx={{ mt: 0.4, pl: empty ? 0 : 4.25, fontSize: "0.7rem", fontWeight: 800, color: c, whiteSpace: "nowrap" }}>
+          {act}{tracked || oc.key === "intake_qt" ? " ›" : ""}
+        </Typography>
+      )}
+    </Box>
+  );
 }
 
 /** แถบ "ใบเสนอราคา" ในการ์ด — ชิ้นเดียวกับช่องในตาราง + ปุ่มไปอัปเดตที่หน้าติดตามใบเสนอราคา (ถ้ามี) */
@@ -280,7 +314,7 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, render
   const th = { textAlign: "left", fontSize: "0.74rem", fontWeight: 800, color: MUTED, px: 1.25, py: 1, borderBottom: `1px solid ${LINE}`, whiteSpace: "nowrap", bgcolor: SURFACE };
   const td = { fontSize: "0.82rem", color: "#334155", px: 1.25, py: 1.1, borderBottom: `1px solid ${LINE}`, verticalAlign: "top" };
   const sub = { fontSize: "0.74rem", color: MUTED, lineHeight: 1.45, overflowWrap: "anywhere" };
-  const COLS = ["", "เลขที่งาน", "งาน / โครงการ", "รายละเอียดงาน", "รับงานจาก", "กำหนดการ", "ผู้ติดต่อ", "สถานะงาน", refMode ? "เอกสารอ้างอิง" : "ใบเสนอราคา", "ผู้รับผิดชอบ", ""];
+  const COLS = ["", "เลขที่งาน", "งาน / โครงการ", "รายละเอียดงาน", "รับงานจาก", "กำหนดการ", "ผู้ติดต่อ", "สถานะงาน", refMode ? "เอกสารอ้างอิง" : "เอกสาร / ใบเสนอราคา", "ผู้รับผิดชอบ", ""];
   return (
     <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflowX: "auto" }}>
       <Box component="table" sx={{ width: "100%", minWidth: 1160, borderCollapse: "collapse" }}>
@@ -368,17 +402,7 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, render
                     บรรทัดเดียวไม่ตัดคำ · ไฟล์กดเปิดได้ · กดช่องนี้ = เปิดกล่องใบเสนอราคา (ตัวเดียวกับหน้าติดตาม) ทับหน้านี้ */}
                 <Box component="td" sx={{ ...td, width: 210, minWidth: 210, maxWidth: 210 }}>
                   {/* ✅ (19 ต.ค. 2569 ผู้ใช้: "หน้ารอดำเนินการเปลี่ยนจากใบเสนอราคาเป็นเอกสารอ้างอิง") — งานยังไม่เริ่ม: โชว์เอกสารที่แนบมาตอนรับงาน */}
-                  {refMode ? <RefDocCell job={j} /> : oc ? (
-                    <Box onClick={oc.open ? (e) => { e.stopPropagation(); oc.open(); } : (e) => e.stopPropagation()}
-                      role={oc.open ? "button" : undefined} tabIndex={oc.open ? 0 : undefined}
-                      sx={{ borderRadius: 2, m: -0.75, p: 0.75, cursor: oc.open ? "pointer" : "default", transition: "background-color .15s",
-                        ...(oc.open ? { "&:hover": { bgcolor: alpha(oc.quiet ? ACCENT : oc.color, 0.06) }, "&:hover .qc-act": { opacity: 1 } } : {}) }}>
-                      <QuoteCell oc={oc} compact />
-                      {oc.open && oc.act && (
-                        <Typography className="qc-act" sx={{ mt: 0.5, pl: 4.25, fontSize: "0.7rem", fontWeight: 800, color: oc.quiet ? ACCENT : oc.color, opacity: oc.quiet ? 0.7 : 0.9 }}>{oc.act} ›</Typography>
-                      )}
-                    </Box>
-                  ) : <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>}
+                  {refMode ? <RefDocCell job={j} /> : <DocQuoteSlot job={j} oc={oc} />}
                 </Box>
                 <Box component="td" sx={{ ...td, minWidth: 150 }}>
                   {j.responsiblePerson ? (
@@ -832,7 +856,14 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                 )}
               </Box>
             )}
-            {outcome && <OutcomeBar oc={outcome} />}
+            {/* ใบเสนอราคา: แถบเฉพาะงานที่มีจริง (ติดตามแล้ว / มีใบเสนอราคา·PO จากตอนรับงาน) · ไม่มี = ปุ่มเล็ก "+ แนบใบเสนอราคา" */}
+            {outcome && (!outcome.intake || outcome.key === "intake_qt" || outcome.key === "po") && <OutcomeBar oc={outcome} />}
+            {outcome?.key === "none" && outcome.open && (
+              <Button size="small" onClick={outcome.open} startIcon={<RequestQuoteOutlined sx={{ fontSize: "16px !important" }} />}
+                sx={{ ...BTN, mt: 1, height: 30, px: 1.25, color: ACCENT, border: `1px dashed ${alpha(ACCENT, 0.4)}`, bgcolor: "#fff", "&:hover": { bgcolor: alpha(ACCENT, 0.05) } }}>
+                แนบใบเสนอราคา
+              </Button>
+            )}
             {(intakeDocs.length > 0 || (job.noVisit && invoiceFiles.length > 0)) && (
               <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75, mt: 1 }}>
                 <FileLinks files={intakeDocs} />
