@@ -651,7 +651,7 @@ export const getAddDraftEvent = async ({
             const md = document.getElementById("ade-modeDesc");
             if (md) {
               md.textContent = note ? "จดเรื่องที่ต้องทำไว้กันลืม — กรอกแค่ “สิ่งที่ต้องทำ” ด้านล่าง แล้วกดทำเสร็จเมื่อเรียบร้อย"
-                : mode === "novisit" ? "กรอกแค่ลูกค้า เอกสาร และรายการที่ต้องส่ง — ส่งของแล้วกด “ส่งมอบแล้ว” แล้วอัปโหลดใบวางบิล"
+                : mode === "novisit" ? "กรอกแค่ลูกค้า เอกสาร และรายการที่ต้องส่ง — ส่งของแล้วกด “ส่งของแล้ว” แล้วอัปโหลดใบวางบิล"
                   : "รับงานไว้ก่อน แล้วกด “ส่งลงตาราง” เลือกวันและช่างที่จะเข้างาน";
             }
             show("ade-sourceField", !note);
@@ -676,7 +676,7 @@ export const getAddDraftEvent = async ({
             if (contactLabel) contactLabel.textContent = mode === "novisit" ? "👤 ผู้ติดต่อ / ผู้รับของ" : "👤 ผู้ติดต่อหน้างาน";
             if (descLabel) {
               descLabel.innerHTML = note ? '<span class="req">*</span> สิ่งที่ต้องทำ'
-                : mode === "novisit" ? "📦 รายการสินค้า / สิ่งที่ต้องส่งมอบ" : "📝 อาการเสีย / ขอบเขตงาน";
+                : mode === "novisit" ? "📦 รายการสินค้า / สิ่งที่ต้องส่ง" : "📝 อาการเสีย / ขอบเขตงาน";
             }
             if (descArea) {
               descArea.rows = note ? 8 : 5; // จดงาน = ช่องเดียวในฟอร์ม ให้กว้างพอเขียนได้สบาย

@@ -695,6 +695,128 @@ const LogRow = ({ l }) => (
   </Stack>
 );
 
+const errMsg = (err, fallback) => err?.response?.data?.message || err?.response?.data?.err || err?.message || fallback;
+
+/** การบันทึกทั้งหมดของกล่องใบเสนอราคา — ใช้ร่วมกันระหว่างหน้านี้กับ QuotationDialogHost (หน้างานเข้า) */
+function useQuotationActions(fetchJobs, toast, userData) {
+  const [upload, setUpload] = useState({ busy: false, eventId: null, progress: 0 });
+  const onQuotation = useCallback(async (job, body) => {
+    try {
+      await EventService.UpdateQuotation(job.anchor._id, body);
+      await fetchJobs(true);
+      toast(body.action === "approve" ? "บันทึก: ลูกค้าอนุมัติแล้ว" : body.action === "reject" ? "บันทึก: ลูกค้าปฏิเสธ" : body.action === "send" ? "เริ่มนับวันติดตามแล้ว" : body.action === "reset" ? "ย้อนสถานะแล้ว" : "บันทึกข้อมูลแล้ว");
+      return true;
+    } catch (err) {
+      toast(errMsg(err, "บันทึกไม่สำเร็จ"), "error");
+      return false;
+    }
+  }, [fetchJobs, toast]);
+  const onFollowUp = useCallback(async (job, payload) => {
+    try {
+      await EventService.AddQuotationFollowUp(job.anchor._id, payload);
+      await fetchJobs(true);
+      toast("บันทึกการติดตามแล้ว");
+      return true;
+    } catch (err) {
+      toast(errMsg(err, "บันทึกการติดตามไม่สำเร็จ"), "error");
+      return false;
+    }
+  }, [fetchJobs, toast]);
+  const onComment = useCallback(async (job, message) => {
+    const p = JSON.parse(localStorage.getItem("payload") || "{}");
+    const name = p?.fname ? `${p.fname} ${p.lname || ""}`.trim() : (p?.username || "ผู้ใช้");
+    try {
+      await EventService.UpdateEvent(job.anchor._id, {
+        comments: [...(job.anchor.comments || []), { userId: p?.userId || "", userName: name, role: userData?.role?.toLowerCase(), message, timestamp: new Date().toISOString() }],
+      });
+      await fetchJobs(true);
+    } catch (err) {
+      toast(errMsg(err, "ส่งข้อความไม่สำเร็จ"), "error");
+    }
+  }, [fetchJobs, userData, toast]);
+  const onFileUpload = useCallback(async (fileOrFiles, eventId, type) => {
+    const files = Array.from(fileOrFiles?.length !== undefined ? fileOrFiles : [fileOrFiles]);
+    if (!files.length) return;
+    setUpload({ busy: true, eventId, progress: 0 });
+    let ok = 0;
+    try {
+      for (const file of files) {
+        // eslint-disable-next-line no-await-in-loop -- อัปโหลดทีละไฟล์ให้แถบความคืบหน้าถูกต้อง
+        await EventService.Upload(eventId, file, type, {
+          onUploadProgress: (pe) => setUpload((u) => ({ ...u, progress: Math.min(99, Math.round((pe.loaded * 100) / pe.total)) })),
+        });
+        ok += 1;
+      }
+      toast(`อัปโหลด ${ok} ไฟล์เรียบร้อย`);
+    } catch (err) {
+      toast(ok ? `อัปโหลดสำเร็จ ${ok}/${files.length} ไฟล์` : errMsg(err, "อัปโหลดไม่สำเร็จ"), "error");
+    } finally {
+      await fetchJobs(true);
+      setUpload({ busy: false, eventId: null, progress: 0 });
+    }
+  }, [fetchJobs, toast]);
+  const onDeleteFile = useCallback(async (eventId, type, fileId) => {
+    try { await EventService.DeleteFile(eventId, type, fileId); toast("ลบไฟล์เรียบร้อย"); await fetchJobs(true); } catch { toast("ลบไฟล์ไม่สำเร็จ", "error"); }
+  }, [fetchJobs, toast]);
+
+  return { onQuotation, onFollowUp, onComment, onFileUpload, onDeleteFile, upload };
+}
+
+/**
+ * QuotationDialogHost — เปิด "กล่องใบเสนอราคา" ตัวเดียวกับหน้านี้ จากหน้าอื่นได้เลย (เช่นหน้างานเข้า)
+ * ✅ (19 ต.ค. 2569 ผู้ใช้: "อยากให้กดเปิดฟอร์มหน้าติดตามใบเสนอราคาได้เลย · ดำเนินการในหน้านี้ได้เลย")
+ *    แนบไฟล์ · เริ่มนับ · บันทึกติดตาม · ได้งาน/ไม่ได้งาน · คอมเมนต์ — ฟอร์มและการบันทึกชุดเดียวกัน ไม่มีสองเวอร์ชัน
+ * @param eventId  วันใดก็ได้ของงาน (หาทั้งกลุ่มเองแล้วยึดวันล่าสุดเป็นตัวแทน)
+ */
+export function QuotationDialogHost({ eventId, onClose, onChanged }) {
+  const { userData } = useAuth();
+  const [events, setEvents] = useState(null);
+  const [preview, setPreview] = useState({ url: null, name: "" });
+  const [snackbar, setSnackbar] = useState({ open: false, msg: "", severity: "success" });
+  const toast = useCallback((msg, severity = "success") => setSnackbar({ open: true, msg, severity }), []);
+  const fetchJobs = useCallback(async (silent = false) => {
+    try {
+      const res = await EventService.getEventOp({ detail: true });
+      setEvents(res?.userEvents || []);
+      if (silent) onChanged?.();
+    } catch {
+      toast("โหลดข้อมูลไม่สำเร็จ", "error");
+      setEvents([]);
+    }
+  }, [onChanged, toast]);
+  useEffect(() => { fetchJobs(); }, [fetchJobs]);
+  const actions = useQuotationActions(fetchJobs, toast, userData);
+  const job = useMemo(() => {
+    const ev = (events || []).find((e) => e._id === eventId);
+    if (!ev) return null;
+    const key = getOverdueGroupKey(ev);
+    const sessions = events.filter((e) => getOverdueGroupKey(e) === key).sort((x, y) => new Date(y.start) - new Date(x.start));
+    const anchor = sessions[0];
+    // ยังไม่มีใบเสนอราคาเลย → เปิดที่ขั้น "แนบใบเสนอราคา"
+    return { sessions, anchor, groupKey: resolveQuotationGroup(anchor) || "waiting_file", info: getFollowUpInfo(anchor) };
+  }, [events, eventId]);
+
+  return (
+    <>
+      {events === null ? (
+        <Dialog open onClose={onClose} PaperProps={{ sx: { borderRadius: 3, p: 3 } }}><Typography sx={{ color: TEXT_SUB }}>กำลังโหลดใบเสนอราคา...</Typography></Dialog>
+      ) : job ? (
+        <DetailDialog job={job} currentUser={userData} onClose={onClose} {...actions} onPreview={(url, name) => setPreview({ url, name })} />
+      ) : (
+        <Dialog open onClose={onClose} PaperProps={{ sx: { borderRadius: 3, p: 3 } }}>
+          <Typography sx={{ fontWeight: 800 }}>ไม่พบงานนี้ในระบบติดตามใบเสนอราคา</Typography>
+          <Typography sx={{ color: TEXT_SUB, fontSize: "0.85rem", mt: 0.5 }}>งานต้องส่งลงตารางก่อน จึงแนบ/ติดตามใบเสนอราคาได้</Typography>
+          <Button onClick={onClose} sx={{ mt: 2, alignSelf: "flex-end", textTransform: "none", fontWeight: 800 }}>ปิด</Button>
+        </Dialog>
+      )}
+      <FilePreviewDialog previewUrl={preview.url} previewFileName={preview.name} onClose={() => setPreview({ url: null, name: "" })} />
+      <Snackbar open={snackbar.open} autoHideDuration={3000} onClose={() => setSnackbar((p) => ({ ...p, open: false }))} anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
+        <Alert severity={snackbar.severity} variant="filled" sx={{ borderRadius: 2 }}>{snackbar.msg}</Alert>
+      </Snackbar>
+    </>
+  );
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 export default function QuotationTracking() {
   const { userData } = useAuth();
@@ -715,11 +837,9 @@ export default function QuotationTracking() {
   const [detailId, setDetailId] = useState("");
   const [preview, setPreview] = useState({ url: null, name: "" });
   const [snackbar, setSnackbar] = useState({ open: false, msg: "", severity: "success" });
-  const [upload, setUpload] = useState({ busy: false, eventId: null, progress: 0 });
   const topRef = useRef(null);
 
   const toast = (msg, severity = "success") => setSnackbar({ open: true, msg, severity });
-  const errMsg = (err, fallback) => err?.response?.data?.message || err?.response?.data?.err || err?.message || fallback;
 
   const fetchJobs = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -819,65 +939,7 @@ export default function QuotationTracking() {
   const cur = Math.min(page, pageCount);
   const pageRows = visible.slice((cur - 1) * PAGE_SIZE, cur * PAGE_SIZE);
 
-  // ── บันทึก ──
-  const onQuotation = useCallback(async (job, body) => {
-    try {
-      await EventService.UpdateQuotation(job.anchor._id, body);
-      await fetchJobs(true);
-      toast(body.action === "approve" ? "บันทึก: ลูกค้าอนุมัติแล้ว" : body.action === "reject" ? "บันทึก: ลูกค้าปฏิเสธ" : body.action === "send" ? "เริ่มนับวันติดตามแล้ว" : body.action === "reset" ? "ย้อนสถานะแล้ว" : "บันทึกข้อมูลแล้ว");
-      return true;
-    } catch (err) {
-      toast(errMsg(err, "บันทึกไม่สำเร็จ"), "error");
-      return false;
-    }
-  }, [fetchJobs]);
-  const onFollowUp = useCallback(async (job, payload) => {
-    try {
-      await EventService.AddQuotationFollowUp(job.anchor._id, payload);
-      await fetchJobs(true);
-      toast("บันทึกการติดตามแล้ว");
-      return true;
-    } catch (err) {
-      toast(errMsg(err, "บันทึกการติดตามไม่สำเร็จ"), "error");
-      return false;
-    }
-  }, [fetchJobs]);
-  const onComment = useCallback(async (job, message) => {
-    const p = JSON.parse(localStorage.getItem("payload") || "{}");
-    const name = p?.fname ? `${p.fname} ${p.lname || ""}`.trim() : (p?.username || "ผู้ใช้");
-    try {
-      await EventService.UpdateEvent(job.anchor._id, {
-        comments: [...(job.anchor.comments || []), { userId: p?.userId || "", userName: name, role: userData?.role?.toLowerCase(), message, timestamp: new Date().toISOString() }],
-      });
-      await fetchJobs(true);
-    } catch (err) {
-      toast(errMsg(err, "ส่งข้อความไม่สำเร็จ"), "error");
-    }
-  }, [fetchJobs, userData]);
-  const onFileUpload = useCallback(async (fileOrFiles, eventId, type) => {
-    const files = Array.from(fileOrFiles?.length !== undefined ? fileOrFiles : [fileOrFiles]);
-    if (!files.length) return;
-    setUpload({ busy: true, eventId, progress: 0 });
-    let ok = 0;
-    try {
-      for (const file of files) {
-        // eslint-disable-next-line no-await-in-loop -- อัปโหลดทีละไฟล์ให้แถบความคืบหน้าถูกต้อง
-        await EventService.Upload(eventId, file, type, {
-          onUploadProgress: (pe) => setUpload((u) => ({ ...u, progress: Math.min(99, Math.round((pe.loaded * 100) / pe.total)) })),
-        });
-        ok += 1;
-      }
-      toast(`อัปโหลด ${ok} ไฟล์เรียบร้อย`);
-    } catch (err) {
-      toast(ok ? `อัปโหลดสำเร็จ ${ok}/${files.length} ไฟล์` : errMsg(err, "อัปโหลดไม่สำเร็จ"), "error");
-    } finally {
-      await fetchJobs(true);
-      setUpload({ busy: false, eventId: null, progress: 0 });
-    }
-  }, [fetchJobs]);
-  const onDeleteFile = useCallback(async (eventId, type, fileId) => {
-    try { await EventService.DeleteFile(eventId, type, fileId); toast("ลบไฟล์เรียบร้อย"); await fetchJobs(true); } catch { toast("ลบไฟล์ไม่สำเร็จ", "error"); }
-  }, [fetchJobs]);
+  const { onQuotation, onFollowUp, onComment, onFileUpload, onDeleteFile, upload } = useQuotationActions(fetchJobs, toast, userData);
 
   const doExport = async () => {
     if (exporting || !visible.length) return;

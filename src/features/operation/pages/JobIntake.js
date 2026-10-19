@@ -15,7 +15,8 @@
  *   • งานไม่ต้องเข้างาน: รับงาน → ส่งมอบ → วางบิล (อัปโหลดใบวางบิล) → เสร็จ · ไม่ขึ้นปฏิทิน/งานช่าง
  *     แต่ขึ้นหน้าติดตามวางบิลให้ตามรับเงินต่อ
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import lazyWithRetry from "@/shared/utils/lazyWithRetry";
 import { resolveQuotationGroup, getFollowUpInfo } from "@/shared/utils/quotationTracking";
 import { Link } from "react-router-dom";
 import moment from "moment";
@@ -23,8 +24,10 @@ import Swal from "sweetalert2";
 import TomSelect from "tom-select";
 import "tom-select/dist/css/tom-select.css";
 import {
-  Box, Stack, Typography, Button, ButtonBase, Skeleton, Dialog, DialogContent, DialogActions, IconButton,
+  Box, Stack, Typography, Button, ButtonBase, Skeleton, Dialog, DialogContent, DialogActions, IconButton, Avatar,
 } from "@mui/material";
+import { personColor, personInitial } from "@/shared/utils/personAvatar";
+import { hasValidAvatar } from "@/shared/utils/user";
 import { alpha } from "@mui/material/styles";
 import {
   PostAddOutlined, AddRounded, EditOutlined, ChevronRight, Close, EventAvailableOutlined, FlagOutlined,
@@ -32,6 +35,7 @@ import {
   BlockRounded, RestoreRounded, PersonOffOutlined,
   LocalShippingOutlined, ReceiptLongOutlined, TaskAltRounded, UploadFileOutlined, AttachFileRounded, Search,
   ViewAgendaOutlined, TableRowsOutlined, RequestQuoteOutlined,
+  VerifiedOutlined, SendOutlined, NotificationsActiveOutlined, EditNoteOutlined, CheckCircleRounded, CancelRounded, DoNotDisturbOnOutlined,
 } from "@mui/icons-material";
 import EventService from "@/shared/services/EventService";
 import CustomerService from "@/shared/services/CustomerService";
@@ -60,7 +64,7 @@ const RED = "#dc2626";
 // ✅ (11 ต.ค. 2569) "ช่างทำงาน" → "เข้างาน" (ขั้นนี้เริ่มเมื่อหัวหน้าทีมกดเข้างาน — คำเดียวกับการ์ดงาน)
 const STAGES = ["รับงาน", "ลงตาราง", "เข้างาน", "ตรวจปิดงาน", "เสร็จ"];
 /** ✅ (15 ต.ค. 2569) งานไม่ต้องเข้างาน (ส่งของ/ขายของ) */
-const STAGES_NV = ["รับงาน", "ส่งมอบ", "วางบิล", "เสร็จ"];
+const STAGES_NV = ["รับงาน", "ส่งของ", "วางบิล", "เสร็จ"];
 
 const SOURCE_LABEL = Object.fromEntries(INTAKE_SOURCE_OPTS);
 const DOC_LABEL = { po: "PO", quotation: "ใบเสนอราคา", other: "เอกสาร" };
@@ -87,7 +91,7 @@ const stageOf = (e) => {
       : { i: 0, label: "รอทำ", color: AMBER, note: true, bar: 1 };
   }
   if (e.noVisit) {
-    if (e.unscheduled) return { i: 0, label: "รอส่งมอบ", color: AMBER, nv: true, bar: 0 };
+    if (e.unscheduled) return { i: 0, label: "รอส่งของ", color: AMBER, nv: true, bar: 0 };
     if (invoicedOf(e)) return { i: 4, label: "วางบิลแล้ว", color: GREEN, nv: true, bar: STAGES_NV.length };
     return { i: 2, label: "รอวางบิล", color: AMBER, nv: true, bar: 2 };
   }
@@ -105,20 +109,22 @@ const stageOf = (e) => {
  *    "ผลเสนอราคา" ของงานที่รับไว้ — อ่านจากระบบติดตามใบเสนอราคาตัวเดียวกับหน้า "ติดตามใบเสนอราคา" (resolveQuotationGroup)
  *    งานหลายวันใช้วันล่าสุดของกลุ่มเป็นตัวแทน (ตรงกับหน้าติดตามใบเสนอราคา) · งานส่งของ/จดงาน/มี PO แล้ว ไม่มีผลเสนอราคา
  */
+// กล่องใบเสนอราคาตัวเดียวกับหน้าติดตามใบเสนอราคา — โหลดเมื่อกดเปิดเท่านั้น
+const QuotationDialogHost = lazyWithRetry(() => import("@/features/finance/pages/QuotationTracking").then((m) => ({ default: m.QuotationDialogHost })));
 const baht = (n) => `฿${Number(n || 0).toLocaleString("th-TH", { maximumFractionDigits: 0 })}`;
 const OUTCOME = {
-  waiting_file: { label: "รอแนบใบเสนอราคา", color: AMBER, act: "แนบใบเสนอราคา", to: "op", group: "todo" },
-  not_sent: { label: "แนบแล้ว · ยังไม่ส่งลูกค้า", color: AMBER, act: "บันทึกการส่ง", to: "qt", group: "todo" },
+  waiting_file: { label: "รอแนบไฟล์", color: AMBER, act: "แนบใบเสนอราคา", to: "qt", group: "todo" },
+  not_sent: { label: "แนบแล้ว · รอส่งลูกค้า", color: AMBER, act: "เริ่มติดตาม", to: "qt", group: "todo" },
   sent: { label: "รอลูกค้าตอบ", color: "#2563eb", act: "อัปเดตผล", to: "qt", group: "wait" },
-  follow_up: { label: "ถึงเวลาติดตามลูกค้า", color: "#ea580c", act: "ติดตาม / อัปเดตผล", to: "qt", group: "wait" },
-  revising: { label: "กำลังปรับใบเสนอราคา", color: "#7c3aed", act: "อัปเดตผล", to: "qt", group: "wait" },
+  follow_up: { label: "ถึงเวลาติดตาม", color: "#ea580c", act: "บันทึกการติดตาม", to: "qt", group: "wait" },
+  revising: { label: "ลูกค้าขอแก้ไข", color: "#7c3aed", act: "อัปเดตผล", to: "qt", group: "wait" },
   approved: { label: "ได้งาน", color: GREEN, act: "ดูใบเสนอราคา", to: "qt", group: "won" },
   rejected: { label: "ไม่ได้งาน", color: RED, act: "ดูใบเสนอราคา", to: "qt", group: "lost" },
   // ✅ (19 ต.ค. 2569 ผู้ใช้: "จะรู้ได้ไงว่างานพวกนี้มีใบเสนอราคาแนบแล้ว โดยไม่ต้องเปิดหน้าอื่น") — สถานะที่รู้ได้จากตอนรับงาน
-  intake_qt: { label: "มีใบเสนอราคาแล้ว", color: ACCENT, intake: true },
+  intake_qt: { label: "มีใบเสนอราคา", color: ACCENT, act: "เริ่มติดตาม", intake: true },
   po: { label: "มี PO แล้ว", color: GREEN, intake: true },
   na: { label: "ไม่ต้องเสนอราคา", color: MUTED, quiet: true, intake: true },
-  none: { label: "ยังไม่มีใบเสนอราคา", color: MUTED, quiet: true, intake: true },
+  none: { label: "ยังไม่มี", color: MUTED, act: "แนบใบเสนอราคา", quiet: true, intake: true },
 };
 const outcomeOf = (job, st, sessions) => {
   if (!st || st.note || st.i === -1) return null;
@@ -135,8 +141,10 @@ const outcomeOf = (job, st, sessions) => {
     const no = job.intakeDocNo ? `เลขที่ ${job.intakeDocNo}` : "";
     const ik = job.intakeDocType === "po" ? "po" : job.intakeDocType === "quotation" ? "intake_qt"
       : anchor.quotationApplicable === false ? "na" : "none";
-    const facts = ik === "po" ? [no, "ไม่ต้องเสนอราคา"] : ik === "intake_qt" ? [no, intakeFiles ? `แนบไฟล์ ${intakeFiles} ไฟล์` : "ยังไม่แนบไฟล์"] : [];
-    return { key: ik, ...OUTCOME[ik], facts: facts.filter(Boolean), amount: 0, href: null };
+    const facts = ik === "po" || ik === "intake_qt" ? [no || (intakeFiles ? "" : "ยังไม่แนบไฟล์")] : [];
+    // qid = งานที่ลงตารางแล้ว (อยู่ในระบบติดตามได้) → กดเปิดกล่องใบเสนอราคาในหน้านี้ได้เลย
+    return { key: ik, ...OUTCOME[ik], facts: facts.filter(Boolean), amount: 0, href: null, qid: job.unscheduled ? null : anchor._id,
+      files: ik === "intake_qt" || ik === "po" ? (job.sitePhotoFiles || []).filter((f) => f.source === "intake") : [] };
   }
   const fu = getFollowUpInfo(anchor);
   const facts = [];
@@ -152,29 +160,92 @@ const outcomeOf = (job, st, sessions) => {
   }
   if (key === "rejected" && anchor.quotationDecisionNote) facts.push(`เหตุผล: ${anchor.quotationDecisionNote}`);
   const meta = OUTCOME[key];
-  return { key, ...meta, facts, amount: Number(anchor.quotationAmount) || 0, href: meta.to === "qt" ? `/finance?tab=quotations&jobId=${anchor._id}` : `/operation/${anchor._id}` };
+  return { key, ...meta, facts, amount: Number(anchor.quotationAmount) || 0, files: anchor.quotationFiles || [], qid: anchor._id, href: meta.to === "qt" ? `/finance?tab=quotations&jobId=${anchor._id}` : `/operation/${anchor._id}` };
 };
 
-/** แถบ "ผลเสนอราคา" ในการ์ด — สีตามผล · ข้อมูลสั้น · ปุ่มไปอัปเดตที่หน้าติดตามใบเสนอราคา */
-function OutcomeBar({ oc }) {
+/**
+ * ช่อง/แถบ "ใบเสนอราคา" — ไอคอนสีตามสถานะ · ชื่อสถานะตัวหนา · เลขที่/ข้อมูลสั้น · ขั้น 3 ขีด (แนบ → ส่งลูกค้า → ลูกค้าตอบ)
+ * ✅ (19 ต.ค. 2569 ผู้ใช้: "แก้ไขให้ดูง่าย สังเกตได้ง่าย และสวยงามกว่านี้") — เดิมเป็นป้ายตัวเล็กสีจาง กวาดตาแล้วไม่เห็น
+ *    ใช้ชิ้นเดียวกันทั้งตารางและการ์ด · สถานะที่ไม่ต้องทำอะไร (ยังไม่มี / ไม่ต้องเสนอราคา) เป็นสีเทา ไม่แย่งสายตา
+ */
+const QUOTE_ICON = {
+  none: DescriptionOutlined, na: DoNotDisturbOnOutlined, po: VerifiedOutlined, intake_qt: RequestQuoteOutlined,
+  waiting_file: RequestQuoteOutlined, not_sent: RequestQuoteOutlined, sent: SendOutlined, follow_up: NotificationsActiveOutlined,
+  revising: EditNoteOutlined, approved: CheckCircleRounded, rejected: CancelRounded,
+};
+const QUOTE_STEP = { none: 0, waiting_file: 0, intake_qt: 1, not_sent: 1, sent: 2, follow_up: 2, revising: 2, approved: 3, rejected: 3 };
+const QUOTE_STEPS = ["แนบ", "ส่งลูกค้า", "ลูกค้าตอบ"];
+
+function QuoteSteps({ oc, labels = true }) {
+  const n = QUOTE_STEP[oc.key];
+  if (n === undefined || oc.quiet) return null;
   return (
-    <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ sm: "center" }} gap={1}
-      sx={{ mt: 1, px: 1.25, py: 0.9, borderRadius: 2, bgcolor: oc.quiet ? SURFACE : alpha(oc.color, 0.06),
-        border: `1px solid ${oc.quiet ? LINE : alpha(oc.color, 0.3)}`, borderLeft: `4px solid ${oc.color}` }}>
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Stack direction="row" alignItems="center" gap={0.75} sx={{ flexWrap: "wrap" }}>
-          <RequestQuoteOutlined sx={{ fontSize: 17, color: oc.color }} />
-          <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: MUTED }}>ผลเสนอราคา</Typography>
-          <Typography sx={{ fontSize: "0.86rem", fontWeight: 900, color: oc.color }}>{oc.label}</Typography>
-        </Stack>
-        {oc.facts.length > 0 && (
-          <Typography sx={{ fontSize: "0.76rem", color: "#475569", mt: 0.25, overflowWrap: "anywhere" }}>{oc.facts.join(" · ")}</Typography>
-        )}
+    <Stack direction="row" gap={0.4} sx={{ mt: 0.6, maxWidth: 170 }} title={QUOTE_STEPS.map((x, i) => `${i < n ? "✓" : "○"} ${x}`).join("  ")}>
+      {QUOTE_STEPS.map((x, i) => (
+        <Box key={x} sx={{ flex: 1, minWidth: 0 }}>
+          <Box sx={{ height: 4, borderRadius: 99, bgcolor: i < n ? oc.color : "#e2e8f0" }} />
+          {labels && <Typography noWrap sx={{ fontSize: "0.62rem", fontWeight: i < n ? 800 : 600, color: i < n ? "#475569" : "#94a3b8", mt: 0.2 }}>{x}</Typography>}
+        </Box>
+      ))}
+    </Stack>
+  );
+}
+
+/** @param compact ใช้ในตาราง — บรรทัดเดียวไม่ตัดคำ · แถบขั้นไม่มีป้าย */
+function QuoteCell({ oc, compact = false, caption = false }) {
+  const Icon = QUOTE_ICON[oc.key] || RequestQuoteOutlined;
+  const tone = oc.quiet ? "#94a3b8" : oc.color;
+  const box = compact ? 26 : 30;
+  return (
+    <Stack direction="row" spacing={1} alignItems={oc.quiet || !oc.facts.length ? "center" : "flex-start"} sx={{ minWidth: 0 }}>
+      <Box sx={{ width: box, height: box, borderRadius: 2, flexShrink: 0, display: "grid", placeItems: "center",
+        bgcolor: oc.quiet ? "#fff" : alpha(oc.color, 0.1), color: tone, border: oc.quiet ? `1px dashed #cbd5e1` : "none" }}>
+        <Icon sx={{ fontSize: compact ? 16 : 18 }} />
       </Box>
-      <Button component={Link} to={oc.href} size="small" endIcon={<ChevronRight sx={{ fontSize: "16px !important" }} />}
-        sx={{ ...BTN, flexShrink: 0, height: 32, px: 1.25, color: oc.quiet ? "#334155" : oc.color, border: `1px solid ${oc.quiet ? LINE : alpha(oc.color, 0.45)}`, bgcolor: "#fff", "&:hover": { bgcolor: alpha(oc.color, 0.06) } }}>
-        {oc.act}
-      </Button>
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        {caption && <Typography sx={{ fontSize: "0.66rem", fontWeight: 800, color: "#94a3b8", lineHeight: 1.2, letterSpacing: 0.2 }}>ใบเสนอราคา</Typography>}
+        <Typography noWrap={compact} title={oc.label} sx={{ fontSize: compact ? "0.8rem" : "0.84rem", fontWeight: oc.quiet ? 600 : 800, color: oc.quiet ? "#94a3b8" : oc.color, lineHeight: 1.3 }}>{oc.label}</Typography>
+        {oc.facts.length > 0 && (
+          <Typography noWrap={compact} title={oc.facts.join(" · ")} sx={{ fontSize: "0.72rem", color: "#64748b", lineHeight: 1.4, mt: 0.1, overflowWrap: "anywhere" }}>{oc.facts.slice(0, 3).join(" · ")}</Typography>
+        )}
+        <QuoteSteps oc={oc} labels={!compact} />
+      </Box>
+    </Stack>
+  );
+}
+
+/** ปุ่มไฟล์เล็ก (ไม่โชว์ชื่อ — ผู้ใช้: "ไม่ต้องแสดงชื่อไฟล์ ดูล้น ให้กดเปิดเลย") · ชนิดไฟล์ + กดเปิดแท็บใหม่ */
+function FileChips({ files, max = 4, sx }) {
+  if (!files?.length) return null;
+  return (
+    <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5, ...sx }}>
+      {files.slice(0, max).map((f, i) => (
+        <Box key={f._id || f.fileUrl} component="a" href={f.fileUrl} target="_blank" rel="noreferrer" title={`เปิด ${f.fileName || "ไฟล์"}`} onClick={(e) => e.stopPropagation()}
+          sx={{ display: "inline-flex", alignItems: "center", gap: 0.3, height: 24, px: 0.85, borderRadius: 1.5, border: `1px solid ${LINE}`, bgcolor: "#fff",
+            fontSize: "0.7rem", fontWeight: 800, color: "#334155", textDecoration: "none", "&:hover": { borderColor: ACCENT, color: ACCENT } }}>
+          <AttachFileRounded sx={{ fontSize: 14 }} />{extOf(f) || `ไฟล์ ${i + 1}`}
+        </Box>
+      ))}
+      {files.length > max && <Typography sx={{ fontSize: "0.7rem", color: MUTED, alignSelf: "center" }}>+{files.length - max}</Typography>}
+    </Stack>
+  );
+}
+
+/** แถบ "ใบเสนอราคา" ในการ์ด — ชิ้นเดียวกับช่องในตาราง + ปุ่มไปอัปเดตที่หน้าติดตามใบเสนอราคา (ถ้ามี) */
+function OutcomeBar({ oc }) {
+  const c = oc.quiet ? ACCENT : oc.color;
+  // 🔁 (19 ต.ค. 2569 ผู้ใช้: "ยังดูไม่สวย ให้ขยายเต็ม") แถวเดียวเต็มความกว้าง: สถานะ+ขั้น | ไฟล์ | ปุ่ม
+  return (
+    <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ sm: "center" }} gap={{ xs: 1, sm: 2 }}
+      sx={{ mt: 1, px: 1.5, py: 1.1, borderRadius: 2, bgcolor: oc.quiet ? SURFACE : alpha(oc.color, 0.04), border: `1px solid ${oc.quiet ? LINE : alpha(oc.color, 0.25)}` }}>
+      <Box sx={{ flex: 1, minWidth: 0 }}><QuoteCell oc={oc} caption /></Box>
+      <FileChips files={oc.files} />
+      {oc.act && (oc.open || oc.href) && (
+        <Button {...(oc.open ? { onClick: oc.open } : { component: Link, to: oc.href })} size="small" endIcon={<ChevronRight sx={{ fontSize: "16px !important" }} />}
+          sx={{ ...BTN, flexShrink: 0, color: c, border: `1px solid ${alpha(c, 0.45)}`, bgcolor: "#fff", "&:hover": { bgcolor: alpha(c, 0.06) } }}>
+          {oc.act}
+        </Button>
+      )}
     </Stack>
   );
 }
@@ -189,8 +260,8 @@ const TABS = [
 
 /** ข้อความกำหนดการสั้นๆ (ใช้ในตาราง) */
 const scheduleShort = (j) => (j.intakeNote ? `บันทึก ${formatThai(moment(j.intakeAt), "D MMM YY")}`
-  : j.noVisit ? (j.unscheduled ? "ยังไม่ส่งมอบ" : `ส่งมอบ ${formatThai(moment(j.deliveredAt || j.start), "D MMM YY")}`)
-    : j.unscheduled ? (j.plannedMonth ? `ตั้งใจ ${formatThai(moment(j.plannedMonth, "YYYY-MM"), "MMM YY")}` : "ยังไม่กำหนดเดือน")
+  : j.noVisit ? (j.unscheduled ? "ยังไม่ส่งของ" : `ส่งของ ${formatThai(moment(j.deliveredAt || j.start), "D MMM YY")}`)
+    : j.unscheduled ? (j.plannedMonth ? `แผน ${formatThai(moment(j.plannedMonth, "YYYY-MM"), "MMM YY")}` : "ยังไม่กำหนดเดือน")
       : `เข้างาน ${formatThai(moment(j.start), "D MMM YY")}`);
 
 /**
@@ -198,16 +269,17 @@ const scheduleShort = (j) => (j.intakeNote ? `บันทึก ${formatThai(mo
  * 🔁 (19 ต.ค. 2569 ผู้ใช้: "รายละเอียดให้ครบแบบหน้าการ์ดด้วย") — เพิ่มคอลัมน์รายละเอียดงาน · ทีม/ผู้ติดต่อ · ขั้นถัดไป · กำหนดเสร็จ
  *    และกดแถวเพื่อกางการ์ดเต็มใต้แถว (ไฟล์แนบ · ผลเสนอราคา · แถบขั้นตอน · ปุ่มแก้ไข/ยกเลิก ครบเหมือนมุมมองการ์ด)
  */
-function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, renderCard }) {
+function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, renderCard, employees = [] }) {
+  const personOf = (name) => employees.find((u) => u.fname === name || [u.fname, u.lname].filter(Boolean).join(" ") === name);
   const [open, setOpen] = useState(() => new Set());
   const toggle = (id) => setOpen((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const th = { textAlign: "left", fontSize: "0.74rem", fontWeight: 800, color: MUTED, px: 1.25, py: 1, borderBottom: `1px solid ${LINE}`, whiteSpace: "nowrap", bgcolor: SURFACE };
   const td = { fontSize: "0.82rem", color: "#334155", px: 1.25, py: 1.1, borderBottom: `1px solid ${LINE}`, verticalAlign: "top" };
   const sub = { fontSize: "0.74rem", color: MUTED, lineHeight: 1.45, overflowWrap: "anywhere" };
-  const COLS = ["", "เลข Job", "งาน / โครงการ", "รายละเอียดงาน", "รับจาก", "กำหนดการ", "ทีม · ผู้ติดต่อ", "สถานะงาน", "ใบเสนอราคา", "ผู้รับผิดชอบ", ""];
+  const COLS = ["", "เลขที่งาน", "งาน / โครงการ", "รายละเอียดงาน", "ช่องทางรับงาน", "กำหนดการ", "ผู้ติดต่อ", "สถานะงาน", "ใบเสนอราคา", "ผู้รับผิดชอบ", ""];
   return (
     <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflowX: "auto" }}>
-      <Box component="table" sx={{ width: "100%", minWidth: 1120, borderCollapse: "collapse" }}>
+      <Box component="table" sx={{ width: "100%", minWidth: 1160, borderCollapse: "collapse" }}>
         <thead>
           <tr>{COLS.map((h, i) => <Box component="th" key={i} sx={{ ...th, ...(i === 0 ? { width: 34, px: 0.5 } : {}) }}>{h}</Box>)}</tr>
         </thead>
@@ -217,14 +289,11 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, render
             const ro = readOnlyOf(j);
             const isOpen = open.has(j._id);
             const stall = stalledDays(j, s);
-            const team = [j.team, ...(j.teamMembers || []).map((m) => m?.name)].filter(Boolean).filter((x, i, arr) => arr.indexOf(x) === i).join(", ");
+            const owner = j.responsiblePerson ? personOf(j.responsiblePerson) : null;
             const files = (j.sitePhotoFiles || []).filter((f) => f.source === "intake").length;
-            const nx = j.cancelledAt ? null : s.note ? (s.i === 0 ? "ทำงานนี้ แล้วกด “ทำเสร็จแล้ว”" : null)
-              : s.nv ? (s.i === 0 ? "ส่งมอบ แล้วกด “ส่งมอบแล้ว”" : s.i === 2 ? "อัปโหลดใบวางบิล" : null)
-                : j.unscheduled ? "เลือกวันเข้างาน ผู้รับผิดชอบ และหัวหน้าทีม" : s.i >= 0 && s.i < 4 ? nextStepOf(j, "admin")?.title : null;
             const action = !ro && s.i === 0 && !s.note
               ? (s.nv
-                ? <Button size="small" onClick={() => onDeliver(j)} sx={{ ...SUCCESS, height: 30, px: 1.25 }}>ส่งมอบแล้ว</Button>
+                ? <Button size="small" onClick={() => onDeliver(j)} sx={{ ...SUCCESS, height: 30, px: 1.25 }}>ส่งของแล้ว</Button>
                 : <Button size="small" onClick={() => onSchedule(j)} sx={{ ...PRIMARY, height: 30, px: 1.25 }}>{requestMode ? "ขอลงตาราง" : "ส่งลงตาราง"}</Button>)
               : !j.unscheduled && !s.nv && !s.note
                 ? <Button component={Link} to={`/operation/${j._id}`} size="small" sx={{ ...BTN, height: 30, px: 1.25, color: ACCENT, border: `1px solid ${alpha(ACCENT, 0.4)}` }}>ดูงาน</Button>
@@ -237,7 +306,7 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, render
                 </Box>
                 <Box component="td" sx={{ ...td, whiteSpace: "nowrap" }}>
                   <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: INK }}>{j.jobNo || "—"}</Typography>
-                  <Typography sx={sub}>{j.intakeNote ? "จดงาน" : j.noVisit ? "ส่งของ" : "เข้างาน"}</Typography>
+                  <Typography sx={sub}>{j.intakeNote ? "บันทึก" : j.noVisit ? "ส่งของ" : "เข้าหน้างาน"}</Typography>
                 </Box>
                 <Box component="td" sx={{ ...td, minWidth: 160, maxWidth: 220 }}>
                   <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: INK, overflowWrap: "anywhere" }}>
@@ -261,7 +330,7 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, render
                   {j.infoPending && j.infoPendingNote && <Typography sx={{ ...sub, color: AMBER, fontWeight: 700 }}>ขาด: {j.infoPendingNote}</Typography>}
                 </Box>
                 <Box component="td" sx={td}>
-                  <Typography sx={{ fontSize: "0.78rem", whiteSpace: "nowrap" }}>{j.intakeSource ? `จาก${SOURCE_LABEL[j.intakeSource] || j.intakeSource}` : "—"}</Typography>
+                  <Typography sx={{ fontSize: "0.78rem", whiteSpace: "nowrap" }}>{j.intakeSource ? (SOURCE_LABEL[j.intakeSource] || j.intakeSource) : "—"}</Typography>
                   {doc && !QUOTE_DOC.has(j.intakeDocType) && <Typography sx={sub}>{doc}</Typography>}
                 </Box>
                 <Box component="td" sx={{ ...td, whiteSpace: "nowrap" }}>
@@ -272,28 +341,53 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, render
                     </Typography>
                   )}
                 </Box>
-                <Box component="td" sx={{ ...td, minWidth: 120, maxWidth: 170 }}>
-                  <Typography sx={{ fontSize: "0.78rem", overflowWrap: "anywhere" }}>{!j.unscheduled && !j.noVisit && !j.intakeNote ? (team || "ยังไม่มอบหมายทีม") : "—"}</Typography>
-                  {(j.contactName || j.contactTel) && (
-                    <Typography sx={sub}>
-                      {j.contactName || ""}{j.contactName && j.contactTel ? " · " : ""}
-                      {j.contactTel && <Box component="a" href={`tel:${j.contactTel}`} sx={{ color: ACCENT, fontWeight: 700, textDecoration: "none" }}>{j.contactTel}</Box>}
-                    </Typography>
-                  )}
+                {/* ✅ (19 ต.ค. 2569 ผู้ใช้: "แยก col ผู้ติดต่อ · ทีมช่างไม่ต้องใส่ แค่ผู้รับผิดชอบก็พอ แต่ให้มีรูป") */}
+                <Box component="td" sx={{ ...td, minWidth: 130, maxWidth: 180 }}>
+                  {j.contactName || j.contactTel ? (
+                    <>
+                      {j.contactName && <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: "#334155", overflowWrap: "anywhere" }}>{j.contactName}</Typography>}
+                      {j.contactTel && (
+                        <Box component="a" href={`tel:${j.contactTel}`} onClick={(e) => e.stopPropagation()}
+                          sx={{ mt: 0.3, display: "inline-flex", alignItems: "center", gap: 0.4, fontSize: "0.78rem", color: ACCENT, fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap" }}>
+                          <PhoneOutlined sx={{ fontSize: 15 }} />{j.contactTel}
+                        </Box>
+                      )}
+                    </>
+                  ) : <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>}
                 </Box>
                 <Box component="td" sx={{ ...td, minWidth: 140, maxWidth: 190 }}>
                   <Chip color={s.color} bg={alpha(s.color, 0.1)} border="transparent">{s.label}</Chip>
-                  {nx && <Typography sx={{ ...sub, mt: 0.4 }}>ต่อไป: {nx}</Typography>}
                 </Box>
-                <Box component="td" sx={{ ...td, minWidth: 140, maxWidth: 200 }}>
+                {/* ✅ (19 ต.ค. 2569 ผู้ใช้: "ยังดูล้นๆ ไม่สวย · กดเปิดฟอร์มติดตามใบเสนอราคาได้เลย ดำเนินการในหน้านี้")
+                    บรรทัดเดียวไม่ตัดคำ · ไฟล์กดเปิดได้ · กดช่องนี้ = เปิดกล่องใบเสนอราคา (ตัวเดียวกับหน้าติดตาม) ทับหน้านี้ */}
+                <Box component="td" sx={{ ...td, width: 210, minWidth: 210, maxWidth: 210 }}>
                   {oc ? (
-                    <Box component={oc.href ? Link : "div"} to={oc.href || undefined} sx={{ textDecoration: "none", display: "block" }}>
-                      <Chip color={oc.quiet ? "#64748b" : oc.color} bg={oc.quiet ? SURFACE : alpha(oc.color, 0.1)} border={oc.quiet ? LINE : "transparent"}>{oc.label}</Chip>
-                      {oc.facts.length > 0 && <Typography sx={{ ...sub, mt: 0.3 }}>{oc.facts.slice(0, 3).join(" · ")}</Typography>}
+                    <Box onClick={oc.open ? (e) => { e.stopPropagation(); oc.open(); } : (e) => e.stopPropagation()}
+                      role={oc.open ? "button" : undefined} tabIndex={oc.open ? 0 : undefined}
+                      sx={{ borderRadius: 2, m: -0.75, p: 0.75, cursor: oc.open ? "pointer" : "default", transition: "background-color .15s",
+                        ...(oc.open ? { "&:hover": { bgcolor: alpha(oc.quiet ? ACCENT : oc.color, 0.06) }, "&:hover .qc-act": { opacity: 1 } } : {}) }}>
+                      <QuoteCell oc={oc} compact />
+                      <FileChips files={oc.files} max={3} sx={{ mt: 0.6, pl: 4.25 }} />
+                      {oc.open && oc.act && (
+                        <Typography className="qc-act" sx={{ mt: 0.5, pl: 4.25, fontSize: "0.7rem", fontWeight: 800, color: oc.quiet ? ACCENT : oc.color, opacity: oc.quiet ? 0.7 : 0.9 }}>{oc.act} ›</Typography>
+                      )}
                     </Box>
                   ) : <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>}
                 </Box>
-                <Box component="td" sx={{ ...td, whiteSpace: "nowrap" }}>{j.responsiblePerson || <Box component="span" sx={{ color: "#cbd5e1" }}>—</Box>}</Box>
+                <Box component="td" sx={{ ...td, minWidth: 150 }}>
+                  {j.responsiblePerson ? (
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+                      <Avatar src={hasValidAvatar(owner?.imageUrl) ? owner.imageUrl : undefined}
+                        sx={{ width: 32, height: 32, fontSize: "0.85rem", fontWeight: 800, bgcolor: personColor(j.responsiblePerson), boxShadow: "0 0 0 2px #fff, 0 0 0 3px #e2e8f0" }}>
+                        {personInitial(j.responsiblePerson)}
+                      </Avatar>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography noWrap title={j.responsiblePerson} sx={{ fontSize: "0.82rem", fontWeight: 800, color: INK, lineHeight: 1.3 }}>{j.responsiblePerson}</Typography>
+                        {(owner?.position || owner?.rank) && <Typography noWrap sx={{ fontSize: "0.7rem", color: MUTED, lineHeight: 1.3 }}>{owner.position || owner.rank}</Typography>}
+                      </Box>
+                    </Stack>
+                  ) : <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: AMBER }}>ยังไม่ระบุ</Typography>}
+                </Box>
                 <Box component="td" sx={{ ...td, textAlign: "right", whiteSpace: "nowrap", position: "sticky", right: 0, bgcolor: isOpen ? "#f5f8ff !important" : "#fff !important", boxShadow: "-8px 0 8px -8px rgba(15,23,42,.15)" }}>{action}</Box>
               </Box>,
               isOpen && (
@@ -311,7 +405,8 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, render
   );
 }
 
-const BTN = { textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", whiteSpace: "nowrap", fontSize: "0.82rem" };
+// ✅ (19 ต.ค. 2569 ผู้ใช้: "ปุ่มดูไม่สวย เยื้องๆ") ปุ่มทุกแบบสูงเท่ากัน 36px · ไอคอน/ระยะเท่ากัน (เดิมปุ่มขอบกับปุ่มทึบสูงไม่เท่ากัน)
+const BTN = { textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", whiteSpace: "nowrap", fontSize: "0.82rem", height: 36, px: 1.5, lineHeight: 1, "& .MuiButton-startIcon": { mr: 0.6, ml: 0 }, "& .MuiButton-endIcon": { ml: 0.4, mr: 0 } };
 const PRIMARY = { ...BTN, bgcolor: ACCENT, color: "#fff", "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } };
 // ✅ (15 ต.ค. 2569 ผู้ใช้: "ใช้สีให้ถูกต้องตามปุ่มต่างๆ หรือการดำเนินการ") — ปุ่มจบขั้น (ทำเสร็จ/ส่งมอบแล้ว) = เขียว · ไปขั้นถัดไป = น้ำเงิน · ยกเลิก = แดง
 const SUCCESS = { ...BTN, bgcolor: GREEN, color: "#fff", "&:hover": { bgcolor: "#15803d", boxShadow: "none" } };
@@ -474,8 +569,8 @@ function DeliverDialog({ job, onClose, onDone }) {
       }
       onDone();
       Swal.fire(failed
-        ? { icon: "warning", title: "บันทึกส่งมอบแล้ว", text: `แต่แนบใบวางบิลไม่สำเร็จ ${failed} ไฟล์ — กด “อัปโหลดใบวางบิล” ที่การ์ดงานอีกครั้ง` }
-        : { icon: "success", title: files.length ? "ส่งมอบ + วางบิลแล้ว" : "บันทึกส่งมอบแล้ว", text: files.length ? "ตามรับเงินต่อได้ที่หน้าติดตามวางบิล" : "ขั้นถัดไป: อัปโหลดใบวางบิล", timer: 1800, showConfirmButton: false });
+        ? { icon: "warning", title: "บันทึกส่งของแล้ว", text: `แต่แนบใบวางบิลไม่สำเร็จ ${failed} ไฟล์ — กด “อัปโหลดใบวางบิล” ที่การ์ดงานอีกครั้ง` }
+        : { icon: "success", title: files.length ? "ส่งของ + วางบิลแล้ว" : "บันทึกส่งของแล้ว", text: files.length ? "ตามรับเงินต่อได้ที่หน้าติดตามวางบิล" : "ขั้นถัดไป: อัปโหลดใบวางบิล", timer: 1800, showConfirmButton: false });
     } catch (err) {
       Swal.fire({ icon: "error", title: "บันทึกไม่สำเร็จ", text: err?.response?.data?.message || "กรุณาลองใหม่" });
       setSaving(false);
@@ -488,14 +583,14 @@ function DeliverDialog({ job, onClose, onDone }) {
           <LocalShippingOutlined sx={{ fontSize: 20 }} />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 900, fontSize: "1rem", color: INK }}>ส่งมอบแล้ว</Typography>
+          <Typography sx={{ fontWeight: 900, fontSize: "1rem", color: INK }}>ส่งของแล้ว</Typography>
           <Typography noWrap sx={{ fontSize: "0.76rem", color: MUTED }}>{[job.title, job.site || job.company, job.jobNo].filter(Boolean).join(" · ")}</Typography>
         </Box>
         <IconButton size="small" onClick={onClose}><Close fontSize="small" /></IconButton>
       </Stack>
       <DialogContent sx={{ px: 2.5, pt: "20px !important", pb: 2 }}>
-        <Section n={1} title="วันที่ส่งมอบ / ส่งของ">
-          <ThaiDatePicker label="วันที่ส่งมอบ" value={date} onChange={(v) => setDate(v || "")} />
+        <Section n={1} title="วันที่ส่งของ">
+          <ThaiDatePicker label="วันที่ส่งของ" value={date} onChange={(v) => setDate(v || "")} />
         </Section>
         <Section n={2} title="ใบวางบิล" hint="ไม่บังคับ — ยังไม่มีบิล กดบันทึกไปก่อน แล้วอัปโหลดทีหลังที่การ์ดงาน" last>
           <Button component="label" variant="outlined" startIcon={<UploadFileOutlined />} sx={{ ...BTN, color: "#334155", borderColor: LINE }}>
@@ -513,7 +608,7 @@ function DeliverDialog({ job, onClose, onDone }) {
       <DialogActions sx={{ px: 2.5, py: 1.5, borderTop: `1px solid ${LINE}`, gap: 1 }}>
         <Button onClick={onClose} sx={{ ...BTN, color: MUTED }}>ยกเลิก</Button>
         <Button variant="contained" disabled={!date || saving} onClick={save} sx={{ ...PRIMARY, px: 2.5 }}>
-          {saving ? "กำลังบันทึก..." : "บันทึกส่งมอบ"}
+          {saving ? "กำลังบันทึก..." : "บันทึกส่งของ"}
         </Button>
       </DialogActions>
     </Dialog>
@@ -563,15 +658,16 @@ const Line = ({ icon: Icon, children, color = "#475569", strong }) => (
 function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, onUploadInvoice, onNoteDone, onEdit, onCancel, onRestore }) {
   const st = stageOf(job);
   const stall = stalledDays(job, st);
-  const intakeDocs = (job.sitePhotoFiles || []).filter((f) => f.source === "intake");
+  // ไฟล์ตอนรับงานที่เป็นใบเสนอราคา/PO แสดงในแถบใบเสนอราคาแล้ว — ไม่ซ้ำด้านล่าง
+  const intakeDocs = outcome?.files?.length && outcome.intake ? [] : (job.sitePhotoFiles || []).filter((f) => f.source === "intake");
   const invoiceFiles = job.invoiceFiles || [];
   const [uploading, setUploading] = useState(false);
   const fu = openFollowUp(job);
   const team = [job.team, ...(job.teamMembers || []).map((m) => m?.name)].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).join(", ");
   const when = job.noVisit && !job.unscheduled
-    ? `ส่งมอบ ${formatThai(moment(job.deliveredAt || job.start), "D MMM YYYY")}`
+    ? `ส่งของ ${formatThai(moment(job.deliveredAt || job.start), "D MMM YYYY")}`
     : job.unscheduled
-    ? (job.plannedMonth ? `ตั้งใจเข้างาน ${formatThai(moment(job.plannedMonth, "YYYY-MM"), "MMMM YYYY")}` : "ยังไม่กำหนดเดือน")
+    ? (job.plannedMonth ? `แผนเข้างาน ${formatThai(moment(job.plannedMonth, "YYYY-MM"), "MMMM YYYY")}` : "ยังไม่กำหนดเดือน")
     : `เข้างาน ${formatThai(moment(job.start), "D MMM YYYY")}${job.startTime ? ` ${job.startTime}` : ""}`;
   const due = job.dueDate ? formatThai(moment(job.dueDate), "D MMM YYYY") : "";
 
@@ -583,9 +679,9 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
   ) : st.note ? (
     st.i === 0 ? (
       <>
-        <Button variant="outlined" onClick={() => onEdit(job)} startIcon={<EditOutlined sx={{ fontSize: "16px !important" }} />}
+        <Button variant="outlined" onClick={() => onEdit(job)} startIcon={<EditOutlined sx={{ fontSize: "17px !important" }} />}
           sx={{ ...GHOST, flex: { xs: 1, sm: "0 0 auto" } }}>แก้ไข</Button>
-        <Button variant="outlined" onClick={() => onCancel(job)} startIcon={<BlockRounded sx={{ fontSize: "16px !important" }} />}
+        <Button variant="outlined" onClick={() => onCancel(job)} startIcon={<BlockRounded sx={{ fontSize: "17px !important" }} />}
           sx={{ ...BTN, flex: { xs: 1, sm: "0 0 auto" }, color: RED, borderColor: alpha(RED, 0.35), "&:hover": { borderColor: RED, bgcolor: alpha(RED, 0.04) } }}>ยกเลิก</Button>
         <Button variant="contained" onClick={() => onNoteDone(job)} startIcon={<TaskAltRounded sx={{ fontSize: "17px !important" }} />}
           sx={{ ...SUCCESS, flex: { xs: 1.6, sm: "0 0 auto" } }}>ทำเสร็จแล้ว</Button>
@@ -596,16 +692,16 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
     )
   ) : st.nv && st.i === 0 ? (
     <>
-      <Button variant="outlined" onClick={() => onEdit(job)} startIcon={<EditOutlined sx={{ fontSize: "16px !important" }} />}
+      <Button variant="outlined" onClick={() => onEdit(job)} startIcon={<EditOutlined sx={{ fontSize: "17px !important" }} />}
         sx={{ ...GHOST, flex: { xs: 1, sm: "0 0 auto" } }}>แก้ไข</Button>
-      <Button variant="outlined" onClick={() => onCancel(job)} startIcon={<BlockRounded sx={{ fontSize: "16px !important" }} />}
+      <Button variant="outlined" onClick={() => onCancel(job)} startIcon={<BlockRounded sx={{ fontSize: "17px !important" }} />}
         sx={{ ...BTN, flex: { xs: 1, sm: "0 0 auto" }, color: RED, borderColor: alpha(RED, 0.35), "&:hover": { borderColor: RED, bgcolor: alpha(RED, 0.04) } }}>ยกเลิก</Button>
       <Button variant="contained" onClick={() => onDeliver(job)} startIcon={<LocalShippingOutlined sx={{ fontSize: "17px !important" }} />}
-        sx={{ ...SUCCESS, flex: { xs: 1.6, sm: "0 0 auto" } }}>ส่งมอบแล้ว</Button>
+        sx={{ ...SUCCESS, flex: { xs: 1.6, sm: "0 0 auto" } }}>ส่งของแล้ว</Button>
     </>
   ) : st.nv ? (
     <>
-      <Button component={Link} to="/finance?tab=billing" variant="outlined" startIcon={<ReceiptLongOutlined sx={{ fontSize: "16px !important" }} />}
+      <Button component={Link} to="/finance?tab=billing" variant="outlined" startIcon={<ReceiptLongOutlined sx={{ fontSize: "17px !important" }} />}
         sx={{ ...GHOST, flex: { xs: 1, sm: "0 0 auto" } }}>ติดตามวางบิล</Button>
       <Button component="label" variant={st.i === 2 ? "contained" : "outlined"} disabled={uploading} startIcon={<UploadFileOutlined sx={{ fontSize: "17px !important" }} />}
         sx={st.i === 2 ? { ...PRIMARY, flex: { xs: 1.6, sm: "0 0 auto" } } : { ...GHOST, flex: { xs: 1, sm: "0 0 auto" } }}>
@@ -622,9 +718,9 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
     </>
   ) : st.i === 0 ? (
     <>
-      <Button variant="outlined" onClick={() => onEdit(job)} startIcon={<EditOutlined sx={{ fontSize: "16px !important" }} />}
+      <Button variant="outlined" onClick={() => onEdit(job)} startIcon={<EditOutlined sx={{ fontSize: "17px !important" }} />}
         sx={{ ...GHOST, flex: { xs: 1, sm: "0 0 auto" } }}>แก้ไข</Button>
-      <Button variant="outlined" onClick={() => onCancel(job)} startIcon={<BlockRounded sx={{ fontSize: "16px !important" }} />}
+      <Button variant="outlined" onClick={() => onCancel(job)} startIcon={<BlockRounded sx={{ fontSize: "17px !important" }} />}
         sx={{ ...BTN, flex: { xs: 1, sm: "0 0 auto" }, color: RED, borderColor: alpha(RED, 0.35), "&:hover": { borderColor: RED, bgcolor: alpha(RED, 0.04) } }}>ยกเลิก</Button>
       <Button variant="contained" onClick={() => onSchedule(job)} startIcon={<EventAvailableOutlined sx={{ fontSize: "17px !important" }} />}
         sx={{ ...PRIMARY, flex: { xs: 1.6, sm: "0 0 auto" } }}>{requestMode ? "ขอลงตาราง" : "ส่งลงตาราง"}</Button>
@@ -639,7 +735,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
   const nx = job.cancelledAt ? null : st.note
     ? (st.i === 0 ? { title: "ทำงานนี้", desc: "เสร็จแล้วกด “ทำเสร็จแล้ว”" } : null)
     : st.nv
-      ? (st.i === 0 ? { title: "ส่งมอบ", desc: "ส่งของให้ลูกค้าแล้ว กด “ส่งมอบแล้ว” (แนบใบวางบิลได้เลย)" }
+      ? (st.i === 0 ? { title: "ส่งของ", desc: "ส่งของให้ลูกค้าแล้ว กด “ส่งของแล้ว” (แนบใบวางบิลได้เลย)" }
         : st.i === 2 ? { title: "วางบิล", desc: "กด “อัปโหลดใบวางบิล” แล้วตามรับเงินที่หน้าติดตามวางบิล" } : null)
       : job.unscheduled
         ? { title: "ส่งลงตาราง", desc: "เลือกวันเข้างาน ผู้รับผิดชอบงาน และหัวหน้าทีม" }
@@ -648,9 +744,9 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
   const doc = job.intakeDocType || job.intakeDocNo ? `${DOC_LABEL[job.intakeDocType] || "เอกสาร"}${job.intakeDocNo ? ` ${job.intakeDocNo}` : ""}` : "";
   const schedule = job.intakeNote
     ? (job.noteDoneAt ? `ทำเสร็จ ${formatThai(moment(job.noteDoneAt), "D MMM YYYY")}${job.noteDoneBy ? ` · ${job.noteDoneBy}` : ""}` : `บันทึก ${formatThai(moment(job.intakeAt), "D MMM YYYY")}`)
-    : job.noVisit && job.unscheduled ? "ยังไม่ส่งมอบ" : when;
+    : job.noVisit && job.unscheduled ? "ยังไม่ส่งของ" : when;
   const ModeIcon = job.intakeNote ? NotesOutlined : job.noVisit ? LocalShippingOutlined : BuildOutlined;
-  const modeLabel = job.intakeNote ? "จดงาน" : job.noVisit ? "ส่งของ" : "เข้างาน";
+  const modeLabel = job.intakeNote ? "บันทึก" : job.noVisit ? "ส่งของ" : "เข้าหน้างาน";
   const tone = st.i === -1 ? MUTED : ACCENT;
 
   // ✅ (15 ต.ค. 2569 ผู้ใช้: "ยังจัดวางไม่สวย UI ดูยาก ไม่มืออาชีพ" · "ทำให้ชัดเจน ดูง่าย สวยงาม")
@@ -658,8 +754,9 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
   //    ท้ายการ์ด: สถานะ + สิ่งที่ต้องทำต่อ (ซ้าย) · แถบขั้นตอน (ขวา)
   return (
     <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflow: "hidden", transition: "border-color .15s, box-shadow .15s", "&:hover": { borderColor: "#cbd5e1", boxShadow: "0 4px 14px -8px rgba(15,23,42,.18)" } }}>
-      <Stack direction={{ xs: "column", md: "row" }} spacing={{ xs: 1.5, md: 2 }} alignItems={{ md: "center" }} sx={{ px: { xs: 1.75, sm: 2.25 }, py: 1.75 }}>
-        <Stack direction="row" spacing={1.5} sx={{ flex: 1, minWidth: 0 }}>
+      {/* 🔁 (19 ต.ค. 2569 ผู้ใช้: "ให้ขยายเต็ม") ปุ่มย้ายขึ้นแถวชื่องาน (จอคอม) — เนื้อหาด้านล่างกว้างเต็มการ์ด ไม่เหลือช่องว่างด้านขวา */}
+      <Box sx={{ px: { xs: 1.75, sm: 2.25 }, py: 1.75 }}>
+        <Stack direction="row" spacing={1.5} sx={{ minWidth: 0 }}>
           {/* ✅ (15 ต.ค. 2569 ผู้ใช้: "ให้บอกด้วยว่างานอะไร ส่งของ จดงาน เข้างาน") — ไอคอน + ชื่อรูปแบบงานใต้ไอคอน */}
           <Stack alignItems="center" spacing={0.4} sx={{ width: 52, flexShrink: 0 }}>
             <Box sx={{ width: 42, height: 42, borderRadius: 2.5, display: "grid", placeItems: "center", bgcolor: alpha(tone, 0.08), color: tone }}>
@@ -668,6 +765,8 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
             <Typography sx={{ fontSize: "0.68rem", fontWeight: 800, color: tone, lineHeight: 1.2, textAlign: "center", whiteSpace: "nowrap" }}>{modeLabel}</Typography>
           </Stack>
           <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Stack direction="row" spacing={1.5} alignItems="flex-start">
+            <Box sx={{ flex: 1, minWidth: 0 }}>
             <Stack direction="row" spacing={0.75} alignItems="baseline" sx={{ flexWrap: "wrap", rowGap: 0.25 }}>
               <Typography sx={{ fontWeight: 800, fontSize: "1rem", color: INK, lineHeight: 1.35, overflowWrap: "anywhere", whiteSpace: job.intakeNote ? "pre-line" : undefined }}>
                 {job.intakeNote ? (job.description || "บันทึกงาน") : <>{job.title || "งาน"}{job.system ? ` · ${job.system}` : ""}</>}
@@ -680,6 +779,9 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
               {job.infoPending && st.i < 4 && <Chip color={AMBER} bg={alpha(AMBER, 0.12)} border="transparent">รอข้อมูล</Chip>}
             </Stack>
             {place && <Typography sx={{ fontSize: "0.86rem", fontWeight: 600, color: "#475569", mt: 0.2, overflowWrap: "anywhere" }}>{place}</Typography>}
+            </Box>
+            {actions && <Stack direction="row" spacing={0.75} sx={{ flexShrink: 0, display: { xs: "none", md: "flex" } }}>{actions}</Stack>}
+            </Stack>
 
             {/* ✅ (17 ต.ค. 2569) แถวแรก = ป้ายข้อมูลสำคัญโทนเทา (กำหนดเวลา · เสร็จภายใน · ที่มา · เอกสาร) — สีเฉพาะเดือนนี้/เลยกำหนด
                 แถวที่สอง = ข้อมูลประกอบ (ผู้รับผิดชอบ · ทีม · ผู้ติดต่อ) */}
@@ -697,13 +799,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                 const late = moment(job.dueDate).isBefore(moment(), "day");
                 return <Tag icon={FlagOutlined} accent={late ? RED : null}>เสร็จภายใน {due}{late && <Box component="span" sx={{ ml: 0.5, color: RED, fontWeight: 800 }}>· เลยกำหนด</Box>}</Tag>;
               })()}
-              {job.intakeSource && <Tag icon={CallReceivedRounded}>จาก{SOURCE_LABEL[job.intakeSource] || job.intakeSource}</Tag>}
-              {/* ✅ สถานะใบเสนอราคาเห็นได้ทันทีบนการ์ด (ข้อมูลตอนรับงาน) — ส่วนที่ติดตามแล้วเป็นแถบด้านล่าง */}
-              {outcome?.intake ? (
-                <Tag icon={RequestQuoteOutlined} accent={outcome.quiet ? null : outcome.color} dashed={outcome.key === "none"}>
-                  {outcome.label}{outcome.facts.length > 0 && <Box component="span" sx={{ ml: 0.5, fontWeight: 600, color: "#64748b" }}>· {outcome.facts.join(" · ")}</Box>}
-                </Tag>
-              ) : null}
+              {job.intakeSource && <Tag icon={CallReceivedRounded}>รับงานจาก{SOURCE_LABEL[job.intakeSource] || job.intakeSource}</Tag>}
               {doc && !(outcome?.intake && QUOTE_DOC.has(job.intakeDocType)) && <Tag icon={DescriptionOutlined}>{doc}</Tag>}
             </Stack>
             <Stack direction="row" sx={{ flexWrap: "wrap", columnGap: 2, rowGap: 0.5, mt: 0.9 }}>
@@ -730,7 +826,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                 )}
               </Box>
             )}
-            {outcome && !outcome.intake && <OutcomeBar oc={outcome} />}
+            {outcome && <OutcomeBar oc={outcome} />}
             {(intakeDocs.length > 0 || (job.noVisit && invoiceFiles.length > 0)) && (
               <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75, mt: 1 }}>
                 <FileLinks files={intakeDocs} />
@@ -750,8 +846,8 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
             ) : null}
           </Box>
         </Stack>
-        <Stack direction="row" spacing={0.75} sx={{ flexShrink: 0, width: { xs: "100%", md: "auto" } }}>{actions}</Stack>
-      </Stack>
+        {actions && <Stack direction="row" spacing={0.75} sx={{ mt: 1.5, display: { xs: "flex", md: "none" } }}>{actions}</Stack>}
+      </Box>
 
       {/* ท้ายการ์ด: สถานะ + สิ่งที่ต้องทำต่อ | แถบขั้นตอน */}
       <Stack direction={{ xs: "column", md: "row" }} spacing={{ xs: 1, md: 2.5 }} alignItems={{ md: "center" }}
@@ -800,7 +896,7 @@ const scheduleTagOf = (job, text) => {
   return {
     icon: CalendarMonthOutlined,
     accent: diff < 0 ? RED : diff === 0 ? AMBER : null,
-    text: `ตั้งใจเข้างาน ${formatThai(moment(job.plannedMonth, "YYYY-MM"), "MMM YYYY")}`,
+    text: `แผนเข้างาน ${formatThai(moment(job.plannedMonth, "YYYY-MM"), "MMM YYYY")}`,
     rel: diff > 0 ? `อีก ${diff} เดือน` : diff === 0 ? "เดือนนี้" : `เลยมา ${-diff} เดือน`,
   };
 };
@@ -940,10 +1036,15 @@ export default function JobIntake() {
     }
   };
 
+  // ✅ กดที่ใบเสนอราคา → เปิดกล่องใบเสนอราคา (ตัวเดียวกับหน้าติดตามใบเสนอราคา) ในหน้านี้เลย — คนที่มีสิทธิ์ดูการเงิน
+  const [quoteId, setQuoteId] = useState("");
+  const canQuote = can(userData, "viewFinance");
   const withStage = useMemo(() => (jobs || []).map((j) => {
     const s = stageOf(j);
-    return { j, s, oc: outcomeOf(j, s, groups.get(String(j.jobGroupId || j._id))) };
-  }), [jobs, groups]);
+    const oc = outcomeOf(j, s, groups.get(String(j.jobGroupId || j._id)));
+    if (oc) oc.open = canQuote && oc.qid ? () => setQuoteId(oc.qid) : null;
+    return { j, s, oc };
+  }), [jobs, groups, canQuote]);
   const counts = useMemo(() => Object.fromEntries(TABS.map((t) => [t.key, withStage.filter((x) => t.test(x.s, x.oc)).length])), [withStage]);
   const list = useMemo(() => {
     const t = TABS.find((x) => x.key === tab) || TABS[0];
@@ -965,7 +1066,7 @@ export default function JobIntake() {
     <Box sx={PAGE_SX}>
       <SectionTabs group="intake" />
       <PageHeader icon={<PostAddOutlined />} title="งานเข้า · รับงาน"
-        subtitle="รับงาน → ส่งลงตาราง หรือ ส่งมอบ + วางบิล · ผลเสนอราคาอัปเดตที่หน้าติดตามใบเสนอราคา"
+        subtitle="รับงาน → ลงตารางเข้าหน้างาน หรือ ส่งของ → วางบิล · กดช่องใบเสนอราคาเพื่ออัปเดตได้ทันที"
         actions={canCreate
           ? <Button variant="contained" startIcon={<AddRounded />} onClick={() => openForm()} disabled={!jobs} sx={{ ...PRIMARY, height: 40, px: { xs: 1.25, sm: 2 } }}>รับงานใหม่</Button>
           : <Box component="span" sx={{ px: 1.25, py: 0.5, borderRadius: 99, fontSize: "0.74rem", fontWeight: 700, color: MUTED, bgcolor: SURFACE, border: `1px solid ${LINE}`, whiteSpace: "nowrap" }}>ดูอย่างเดียว</Box>} />
@@ -1014,8 +1115,8 @@ export default function JobIntake() {
       ) : list.length ? (
         view === "table" ? (
           <>
-          <Typography sx={{ fontSize: "0.76rem", color: MUTED, mb: 0.75, px: 0.5 }}>กดแถวเพื่อดูรายละเอียดเต็ม (ไฟล์แนบ · ขั้นตอน · แก้ไข/ยกเลิก)</Typography>
-          <JobTable rows={list} readOnlyOf={(j) => !canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering}
+          <Typography sx={{ fontSize: "0.76rem", color: MUTED, mb: 0.75, px: 0.5 }}>กดที่แถวเพื่อดูรายละเอียดทั้งหมด</Typography>
+          <JobTable rows={list} employees={employees} readOnlyOf={(j) => !canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering}
             renderCard={(j, oc) => <JobCard job={j} outcome={oc} readOnly={!canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone} onEdit={openForm} onCancel={cancelJob} onRestore={restoreJob} />} />
           </>
         ) : (
@@ -1033,6 +1134,11 @@ export default function JobIntake() {
           onDone={async () => { setDelivering(null); await load(); refreshAppBadges(); }} />
       )}
 
+      {quoteId && (
+        <Suspense fallback={null}>
+          <QuotationDialogHost eventId={quoteId} onClose={() => setQuoteId("")} onChanged={load} />
+        </Suspense>
+      )}
       {scheduling && (
         <ScheduleDialog job={scheduling} employees={employees} canAssignResponsible={can(userData, "editContracts")} requestMode={!canManage} onClose={() => setScheduling(null)}
           onDone={async () => { setScheduling(null); await load(); refreshAppBadges(); }} />
