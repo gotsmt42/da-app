@@ -144,7 +144,7 @@ const KV = ({ label, children, color }) => (
 
 // ─── ตาราง (จอใหญ่) ───────────────────────────────────────────────────────────
 // 🔁 (19 ต.ค. 2569 ผู้ใช้: "แก้ไขตารางหน้าติดตามใบเสนอราคา จัดวางให้สวยงาม ชัดเจนขึ้น ย้ายผู้รับผิดชอบมาไว้หน้าสุด ข้อมูลสอดคล้อง")
-//    คอลัมน์: ผู้รับผิดชอบ · วันที่งาน · งาน (ประเภท) · ลูกค้า/โครงการ · ใบเสนอราคา (เลขที่/วันที่/เปิดไฟล์) · มูลค่า · การติดตาม · สถานะ · ปุ่ม
+//    คอลัมน์: วันที่งาน · งาน (ประเภท) · ลูกค้า/โครงการ · ใบเสนอราคา · มูลค่า · การติดตาม · ผู้รับผิดชอบ · สถานะ · ปุ่ม (ผู้ใช้: ย้ายผู้รับผิดชอบไว้ก่อนสถานะ)
 //    หัวตาราง/ระยะ/ป้ายชุดเดียวกับตารางหน้าอื่น (การดำเนินงาน · งานเข้า · วางบิล)
 const ACTION = {
   follow_up: { label: "บันทึกติดตาม", primary: true, color: "#dc2626" },
@@ -163,8 +163,8 @@ const DesktopTable = ({ jobs, onOpen, onPreview }) => {
     <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER}`, borderRadius: 3, overflowX: "auto", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
       <Box component="table" sx={{ width: "100%", minWidth: 1280, borderCollapse: "collapse" }}>
         <thead>
-          <tr>{["ผู้รับผิดชอบ", "วันที่งาน", "งาน", "ลูกค้า / โครงการ", "ใบเสนอราคา", "มูลค่า", "การติดตาม", "สถานะ", ""].map((h, i) => (
-            <Box component="th" key={i} sx={{ ...th, ...(i === 5 ? { textAlign: "right" } : {}) }}>{h}</Box>
+          <tr>{["วันที่งาน", "งาน", "ลูกค้า / โครงการ", "ใบเสนอราคา", "มูลค่า", "การติดตาม", "ผู้รับผิดชอบ", "สถานะ", ""].map((h, i) => (
+            <Box component="th" key={i} sx={{ ...th, ...(i === 4 ? { textAlign: "right" } : {}) }}>{h}</Box>
           ))}</tr>
         </thead>
         <tbody>
@@ -178,7 +178,6 @@ const DesktopTable = ({ jobs, onOpen, onPreview }) => {
             return (
               <Box component="tr" key={a._id} onClick={() => onOpen(job)}
                 sx={{ cursor: "pointer", "&:hover": { bgcolor: "#f8fafc" }, "&:last-child td": { borderBottom: 0 }, boxShadow: `inset 3px 0 0 ${m.color}` }}>
-                <Box component="td" sx={{ ...td, minWidth: 150 }}><Owner name={ownerOf(a)} size={30} /></Box>
                 <Box component="td" sx={{ ...td, width: 96 }}><DateCell start={a.start} end={a.end} allDay={a.allDay} /></Box>
                 <Box component="td" sx={{ ...td, minWidth: 180, maxWidth: 230 }}>
                   <JobKindTag event={a} />
@@ -222,6 +221,7 @@ const DesktopTable = ({ jobs, onOpen, onPreview }) => {
                     </>
                   ) : <Typography sx={{ fontSize: "0.76rem", color: "#94a3b8" }}>{job.groupKey === "waiting_file" ? "แนบไฟล์แล้วเริ่มนับเอง" : "—"}</Typography>}
                 </Box>
+                <Box component="td" sx={{ ...td, minWidth: 150 }}><Owner name={ownerOf(a)} size={30} /></Box>
                 <Box component="td" sx={{ ...td, minWidth: 140 }}>
                   <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.6, height: 26, px: 1.1, borderRadius: 99, whiteSpace: "nowrap",
                     bgcolor: alpha(m.color, 0.12), color: m.color, border: `1px solid ${alpha(m.color, 0.35)}`, fontSize: "0.76rem", fontWeight: 800 }}>
