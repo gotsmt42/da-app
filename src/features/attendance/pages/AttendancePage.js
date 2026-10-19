@@ -11,7 +11,7 @@ import SectionTabs from "@/shared/ui/SectionTabs";
 import { Link, useSearchParams } from "react-router-dom";
 import moment from "moment";
 import { Box, Stack, Typography, ButtonBase, Skeleton, IconButton, Tooltip } from "@mui/material";
-import { PlaceOutlined, RefreshRounded, TaskAltRounded, ChevronRightRounded } from "@mui/icons-material";
+import { PlaceOutlined, RefreshRounded, TaskAltRounded, ChevronRightRounded, ViewAgendaOutlined, TableRowsOutlined } from "@mui/icons-material";
 import AttendanceService from "@/shared/services/AttendanceService";
 import AuthService from "@/shared/services/authService";
 import useRealtime from "@/shared/realtime/useRealtime";
@@ -23,7 +23,8 @@ import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import PersonSelectField from "@/shared/ui/PersonSelectField";
 import { PageHeader, EmptyState, INK, INK_2, MUTED, FAINT, PAGE_SX, ICON_BTN_SX } from "@/shared/ui/PageKit";
 import { CARD } from "@/shared/ui/modernUi";
-import AttendanceList from "../components/AttendanceList";
+import AttendanceList, { AttendanceTable } from "../components/AttendanceList";
+import usePaged, { PageBar } from "@/shared/ui/usePaged";
 import { ON_SITE_M } from "../attendanceMeta";
 
 const PRESETS = [
@@ -72,6 +73,10 @@ export default function AttendancePage() {
   const [pendingCount, setPendingCount] = useState(0);
   const [employees, setEmployees] = useState([]);
   const [closedHidden, setClosedHidden] = useState(0);
+  // ✅ (19 ต.ค. 2569 ผู้ใช้: "ให้มีแสดงแบบตารางด้วย") — จำมุมมองไว้ในเครื่อง · มือถือเป็นการ์ดเสมอ
+  const [view, setView] = useState(() => { try { return localStorage.getItem("tt-att-view") || "card"; } catch { return "card"; } });
+  const changeView = (v) => { setView(v); try { localStorage.setItem("tt-att-view", v); } catch { /* ignore */ } };
+  const isTable = view === "table" && (typeof window === "undefined" || window.innerWidth >= 900);
 
   const load = useCallback(async () => {
     try {
@@ -112,16 +117,22 @@ export default function AttendancePage() {
     };
   }, [rows]);
 
+  // แบ่งหน้า — การ์ด 20 / ตาราง 30 รายการ (จัดกลุ่มตามวันเฉพาะรายการในหน้านั้น)
+  const pg = usePaged(rows || [], isTable ? 30 : 20);
+  const { setPage } = pg;
+  useEffect(() => { setPage(1); }, [from, to, person, isTable, setPage]);
+  const goPage = (n) => { setPage(n); window.scrollTo({ top: 0, behavior: "smooth" }); };
+
   // จัดกลุ่มตามวันที่เช็คอิน (ใหม่ → เก่า)
   const groups = useMemo(() => {
     const m = new Map();
-    (rows || []).forEach((r) => {
+    pg.rows.forEach((r) => {
       const k = moment(r.checkIn?.at).format("YYYY-MM-DD");
       if (!m.has(k)) m.set(k, []);
       m.get(k).push(r);
     });
     return [...m.entries()];
-  }, [rows]);
+  }, [pg.rows]);
 
   const people = useMemo(() => employees.filter((u) => u.fname).map((u) => ({
     id: String(u._id), name: [u.fname, u.lname].filter(Boolean).join(" "), avatar: u.imageUrl, note: u.jobTitle || undefined,
@@ -143,7 +154,22 @@ export default function AttendancePage() {
         icon={<PlaceOutlined />}
         title={seeAll ? "ประวัติบันทึกการเข้างาน" : "ประวัติเข้างานของฉัน"}
         subtitle="เวลาเข้างานจากเซิร์ฟเวอร์ · ตำแหน่ง GPS · รูปหน้างาน"
-        actions={<Tooltip title="โหลดใหม่"><IconButton onClick={load} sx={ICON_BTN_SX}><RefreshRounded fontSize="small" /></IconButton></Tooltip>}
+        actions={(
+          <>
+            {tab === "list" && (
+              <Stack direction="row" sx={{ display: { xs: "none", md: "flex" }, p: 0.4, borderRadius: 2.5, border: "1px solid #e2e8f0", bgcolor: "#fff" }}>
+                {[["card", ViewAgendaOutlined, "การ์ด"], ["table", TableRowsOutlined, "ตาราง"]].map(([k, Ico, label]) => (
+                  <ButtonBase key={k} onClick={() => changeView(k)} aria-label={`มุมมอง${label}`}
+                    sx={{ height: 30, px: 1.1, gap: 0.5, borderRadius: 2, fontFamily: "inherit", fontSize: "0.78rem", fontWeight: 800,
+                      color: view === k ? "#fff" : "#475569", bgcolor: view === k ? "#2563eb" : "transparent" }}>
+                    <Ico sx={{ fontSize: 17 }} />{label}
+                  </ButtonBase>
+                ))}
+              </Stack>
+            )}
+            <Tooltip title="โหลดใหม่"><IconButton onClick={load} sx={ICON_BTN_SX}><RefreshRounded fontSize="small" /></IconButton></Tooltip>
+          </>
+        )}
       />
 
       {/* ✅ (10 ต.ค. 2569 ผู้ใช้: "หน้าเข้าออกงานยังไม่สวย UI ดูยาก ใช้งานยาก — จัดวางให้มืออาชีพ")
@@ -213,7 +239,13 @@ export default function AttendancePage() {
             <Stack spacing={1}>{[0, 1, 2].map((i) => <Skeleton key={i} variant="rounded" height={84} />)}</Stack>
           ) : !rows.length ? (
             <EmptyState icon={<PlaceOutlined />} title="ไม่มีบันทึกเข้างานในช่วงนี้" hint="หัวหน้าทีมกดเข้างานได้จากการ์ดงานในหน้า “งานของฉัน”" />
+          ) : isTable ? (
+            <>
+              <AttendanceTable rows={pg.rows} me={me} isApprover={isApprover} onChanged={onChanged} />
+              <PageBar {...pg} setPage={goPage} unit="ครั้ง" />
+            </>
           ) : (
+            <>
             <Stack spacing={2.25}>
               {groups.map(([day, list]) => (
                 <Box key={day}>
@@ -227,6 +259,8 @@ export default function AttendancePage() {
                 </Box>
               ))}
             </Stack>
+            <PageBar {...pg} setPage={goPage} unit="ครั้ง" />
+            </>
           )}
           <Typography sx={{ mt: 2, fontSize: "0.72rem", color: MUTED, textAlign: "center" }}>
             🔒 เวลาทั้งหมดบันทึกจากเซิร์ฟเวอร์ แก้จากเครื่องไม่ได้ — การแก้เวลาต้องผ่านการอนุมัติ และเก็บประวัติไว้ทุกครั้ง

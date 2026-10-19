@@ -341,6 +341,14 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
     && (plannedDays.every((day) => recordedDays.has(day.format("YYYY-MM-DD"))) || recordedDays.size >= plannedDays.length);
   const checkin = (rows || []).find((r) => r.checkIn?.at && moment(r.checkIn.at).utcOffset(7).format("YYYY-MM-DD") === todayKey);
   const latestCheckin = (rows || []).slice().sort((a, b) => new Date(b.checkIn?.at) - new Date(a.checkIn?.at))[0];
+  // 🐛 (19 ต.ค. 2569 ผู้ใช้: "อยู่ขั้นตอนแนบเอกสารแล้ว ยังมีปุ่มบันทึกเข้างาน เกิดจากอะไร")
+  //    สาเหตุ: งานนัด 2 วัน แต่บันทึกเข้างานไว้ 1 วัน (นอกแผน) → ระบบถือว่ายังบันทึกไม่ครบจำนวนวัน จึงโชว์ปุ่มใหญ่ทุกวัน
+  //    แม้วันนัดผ่านไปหมดแล้ว · และแถบขั้นตอนดูแค่ "เข้างานวันนี้" จึงย้อนกลับไปขั้นเข้างาน
+  //    ✅ เลยวันนัดสุดท้ายแล้ว + เคยบันทึกเข้างานอย่างน้อย 1 วัน = ผ่านขั้นเข้างาน → ไปขั้นเอกสาร
+  //       (ยังบันทึกเพิ่มได้ด้วยปุ่มเล็ก "บันทึกเข้างานเพิ่มวันนี้" สำหรับวันที่ต้องกลับไปทำต่อจริง)
+  const lastPlanned = plannedDays.length ? plannedDays[plannedDays.length - 1] : moment(event.end || event.start);
+  const planPassed = moment().utcOffset(7).startOf("day").isAfter(moment(lastPlanned).utcOffset(7).startOf("day"));
+  const attendanceDone = allPlannedDaysRecorded || (Boolean(latestCheckin) && planPassed);
 
   // ── ขั้นปัจจุบัน (ของทีม) ──
   const teamAcks = event.acks || [];
@@ -362,7 +370,7 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
   const legacyStarted = !checkin && !latestCheckin && event.status === "กำลังดำเนินการ" && Boolean(event.createdAt) && new Date(event.createdAt) < new Date(FLOW_SINCE);
   const current = closed ? STEPS.length
     : event.closeRequested ? 5
-    : checkin || legacyStarted ? (docsComplete ? 4 : 3)
+    : checkin || latestCheckin || legacyStarted ? (docsComplete ? 4 : 3)
     : acked && !declined ? (confirmed ? 2 : 1)
     : 0;
 
@@ -478,8 +486,17 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
         </Typography>
       </Box>
     );
-  } else if (allPlannedDaysRecorded) {
-    action = <Note icon={<TaskAltRounded />} tone="#16a34a">บันทึกเข้างานครบตามวันที่กำหนดแล้ว · {plannedDays.length}/{plannedDays.length} วัน</Note>;
+  } else if (attendanceDone) {
+    action = (
+      <Box>
+        <Note icon={<TaskAltRounded />} tone="#16a34a">
+          {allPlannedDaysRecorded ? `บันทึกเข้างานครบตามวันที่กำหนดแล้ว · ${plannedDays.length}/${plannedDays.length} วัน` : `บันทึกเข้างานแล้ว ${recordedDays.size} วัน · ขั้นถัดไป: แนบเอกสารแล้วขอปิดงาน`}
+        </Note>
+        {isHead && !allPlannedDaysRecorded && (
+          <ButtonBase onClick={() => setDialog(true)} sx={{ mt: 0.5, fontFamily: "inherit", fontSize: "0.76rem", fontWeight: 700, color: ACCENT }}>+ บันทึกเข้างานเพิ่มวันนี้ (ถ้ากลับไปทำต่อ)</ButtonBase>
+        )}
+      </Box>
+    );
   } else if (!acked) {
     action = (
       <Box>
@@ -546,8 +563,17 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
           {b?.tone === "warn" && <Box component="span" sx={{ color: "#b45309" }}> · {b.text}</Box>}
         </Line>
       );
-    } else if (allPlannedDaysRecorded) {
-      line = <Line icon={<TaskAltRounded />} tone="#16a34a" right={logLink}>บันทึกเข้างานครบตามวันที่กำหนดแล้ว · {plannedDays.length}/{plannedDays.length} วัน</Line>;
+    } else if (attendanceDone) {
+      line = (
+        <Box>
+          <Line icon={<TaskAltRounded />} tone="#16a34a" right={logLink}>
+            {allPlannedDaysRecorded ? `บันทึกเข้างานครบตามวันที่กำหนดแล้ว · ${plannedDays.length}/${plannedDays.length} วัน` : `บันทึกเข้างานแล้ว ${recordedDays.size} วัน · ขั้นถัดไป: แนบเอกสารแล้วขอปิดงาน`}
+          </Line>
+          {isHead && !allPlannedDaysRecorded && (
+            <ButtonBase onClick={() => setDialog(true)} sx={{ mt: 0.25, ml: 3, fontFamily: "inherit", fontSize: "0.74rem", fontWeight: 700, color: ACCENT }}>+ บันทึกเข้างานเพิ่มวันนี้ (ถ้ากลับไปทำต่อ)</ButtonBase>
+          )}
+        </Box>
+      );
     } else if (legacyStarted) {
       line = <Line icon={<TaskAltRounded />} tone="#16a34a" right={logLink}>กำลังดำเนินการ · {docsComplete ? "เอกสารครบ กดขอปิดงานได้" : "แนบเอกสารประจำงานให้ครบ แล้วขอปิดงาน"}</Line>;
     } else if (declined && !declinedByMe) {

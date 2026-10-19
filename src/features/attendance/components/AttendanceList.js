@@ -13,9 +13,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import Swal from "sweetalert2";
-import { Box, Stack, Typography, Button, ButtonBase, Avatar, Collapse } from "@mui/material";
+import { Box, Stack, Typography, Button, ButtonBase, Avatar, Collapse, Dialog, IconButton } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { ExpandMore, EditCalendarOutlined, ChevronRight, DescriptionOutlined, PlaceRounded, LocationOffRounded, OpenInNewRounded, EventBusyOutlined } from "@mui/icons-material";
+import { ExpandMore, EditCalendarOutlined, ChevronRight, DescriptionOutlined, PlaceRounded, LocationOffRounded, OpenInNewRounded, EventBusyOutlined, Close, PhotoCameraOutlined } from "@mui/icons-material";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import AttendanceService from "@/shared/services/AttendanceService";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT } from "@/shared/ui/PageKit";
@@ -126,8 +126,8 @@ const shortLoc = (stamp, b) => {
 };
 
 
-function Row({ row, me, isApprover, showJob, onPreview, onChanged, embedded }) {
-  const [open, setOpen] = useState(false);
+function Row({ row, me, isApprover, showJob, onPreview, onChanged, embedded, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen);
   const [fixOpen, setFixOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const legacyOut = Boolean(row.checkOut?.at); // รายการเก่าที่เคยเช็คเอาต์ไว้ (ก่อนตัดระบบ)
@@ -314,10 +314,117 @@ function Row({ row, me, isApprover, showJob, onPreview, onChanged, embedded }) {
 export default function AttendanceList({ rows = [], me, isApprover, showJob = false, onPreview, onChanged, empty, embedded = false }) {
   if (!rows.length) return empty || null;
   return (
-    <Box sx={{ display: "grid", gap: 1, alignItems: "start", gridTemplateColumns: showJob ? { xs: "1fr", lg: "1fr 1fr" } : "1fr" }}>
+    // 🔁 (19 ต.ค. 2569 ผู้ใช้: "หน้าประวัติเข้างานดูขาดๆ ไม่สวย") — เดิม 2 คอลัมน์ วันที่มีรายการคี่เหลือช่องโหว่ครึ่งแถว
+    //    → คอลัมน์เดียวเต็มความกว้างทุกจอ (ตารางสำหรับดูหลายรายการพร้อมกันอยู่ใน AttendanceTable)
+    <Box sx={{ display: "grid", gap: 1, alignItems: "start", gridTemplateColumns: "1fr" }}>
       {rows.map((r) => (
         <Row key={r._id} row={r} me={me} isApprover={isApprover} showJob={showJob} onPreview={onPreview} onChanged={onChanged} embedded={embedded} />
       ))}
+    </Box>
+  );
+}
+
+/**
+ * มุมมองตาราง (หน้า "ประวัติเข้างาน") — ✅ (19 ต.ค. 2569 ผู้ใช้: "ให้มีแสดงแบบตารางด้วย")
+ * หนึ่งแถว = หนึ่งครั้งที่เข้างาน · กดแถว = เปิดรายละเอียดเต็ม (ตำแหน่ง/แผนที่ · รูป · ทีม · แก้เวลา) ทับหน้า
+ */
+export function AttendanceTable({ rows = [], me, isApprover, onPreview, onChanged }) {
+  const [openId, setOpenId] = useState("");
+  const openRow = rows.find((r) => r._id === openId) || null;
+  const th = { textAlign: "left", fontSize: "0.74rem", fontWeight: 800, color: MUTED, px: 1.25, py: 1.1, borderBottom: `1px solid ${LINE}`, whiteSpace: "nowrap", bgcolor: SURFACE };
+  const td = { fontSize: "0.82rem", color: INK_2, px: 1.25, py: 1.15, borderBottom: `1px solid ${LINE}`, verticalAlign: "top" };
+  const sub = { fontSize: "0.74rem", color: MUTED, lineHeight: 1.45 };
+  const COLS = ["วันที่ · เวลา", "ผู้บันทึก", "ทีม", "งาน", "โครงการ / บริษัท", "ตำแหน่ง", "หมายเหตุ", "รูป", ""];
+  const fullScreen = typeof window !== "undefined" && window.innerWidth < 600;
+  return (
+    <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflowX: "auto", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
+      <Box component="table" sx={{ width: "100%", minWidth: 1240, borderCollapse: "collapse" }}>
+        <thead><tr>{COLS.map((h, i) => <Box component="th" key={i} sx={th}>{h}</Box>)}</tr></thead>
+        <tbody>
+          {rows.map((row) => {
+            const inLoc = locationBadge(row.checkIn);
+            const locTone = inLoc?.tone === "ok" ? TONE.ok : inLoc?.tone === "warn" ? TONE.warn : "#dc2626";
+            const members = (row.team?.members || []).filter(Boolean);
+            const isHeadRow = Boolean(row.team?.head) && String(row.userName || "").startsWith(row.team.head);
+            const pending = (row.corrections || []).some((c) => c.status === "pending");
+            const fixed = (row.corrections || []).some((c) => c.status === "approved");
+            const photos = row.checkIn?.photos || [];
+            const job = row.job || {};
+            return (
+              <Box component="tr" key={row._id} onClick={() => setOpenId(row._id)}
+                sx={{ cursor: "pointer", "&:hover": { bgcolor: SURFACE }, "&:last-child td": { borderBottom: 0 }, boxShadow: `inset 3px 0 0 ${locTone}` }}>
+                <Box component="td" sx={{ ...td, whiteSpace: "nowrap" }}>
+                  <Typography sx={{ fontSize: "0.95rem", fontWeight: 800, color: ACCENT, fontVariantNumeric: "tabular-nums", lineHeight: 1.3 }}>{fmtTime(row.checkIn?.at)}</Typography>
+                  <Typography sx={sub}>{fmtDayTime(row.checkIn?.at).split(" ").slice(0, -1).join(" ") || ""}</Typography>
+                </Box>
+                <Box component="td" sx={{ ...td, minWidth: 170 }}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Avatar sx={{ width: 28, height: 28, fontSize: "0.76rem", fontWeight: 800, bgcolor: personColor(row.userName) }}>{personInitial(row.userName)}</Avatar>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography noWrap sx={{ fontSize: "0.84rem", fontWeight: 800, color: INK }}>{row.userName || "-"}</Typography>
+                      <Typography noWrap sx={sub}>{isHeadRow ? "หัวหน้าทีม" : row.team?.head ? `กดแทน ${row.team.head}` : "ผู้กดเข้างาน"}</Typography>
+                    </Box>
+                  </Stack>
+                </Box>
+                <Box component="td" sx={{ ...td, minWidth: 120, maxWidth: 170 }}>
+                  {members.length ? (
+                    <>
+                      {members.slice(0, 2).map((n) => <Typography key={n} noWrap sx={{ fontSize: "0.78rem" }}>{n}</Typography>)}
+                      {members.length > 2 && <Typography sx={sub}>+ อีก {members.length - 2} คน</Typography>}
+                    </>
+                  ) : <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>}
+                </Box>
+                <Box component="td" sx={{ ...td, minWidth: 170, maxWidth: 230 }}>
+                  <Typography sx={{ fontSize: "0.84rem", fontWeight: 700, color: INK, lineHeight: 1.35 }}>
+                    {row.job ? [job.title, job.system].filter(Boolean).join(" · ") || "งาน" : (row.jobLabel || "งาน").split(" · ")[0]}
+                  </Typography>
+                  {row.jobNo && <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: FAINT }}>{row.jobNo}</Typography>}
+                </Box>
+                <Box component="td" sx={{ ...td, minWidth: 160, maxWidth: 220 }}>
+                  <Typography sx={{ fontSize: "0.8rem", fontWeight: 600, overflowWrap: "anywhere" }}>
+                    {row.job ? job.site || "—" : (row.jobLabel || "").split(" · ").slice(1).join(" · ") || "—"}
+                  </Typography>
+                  {job.company && job.company !== job.site && <Typography sx={{ ...sub, overflowWrap: "anywhere" }}>{job.company}</Typography>}
+                </Box>
+                <Box component="td" sx={{ ...td, minWidth: 150 }}>
+                  {inLoc && <Tag tone={locTone} icon={row.checkIn?.gps === "ok" ? <PlaceRounded /> : <LocationOffRounded />}>{shortLoc(row.checkIn, inLoc)}</Tag>}
+                  <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5, mt: 0.5 }}>
+                    {row.offSchedule && <Tag tone="#ea580c" icon={<EventBusyOutlined />}>นอกวันนัด</Tag>}
+                    {pending && <Tag tone={TONE.warn} icon={<EditCalendarOutlined />}>ขอแก้เวลา</Tag>}
+                    {fixed && <Tag tone={MUTED} icon={<EditCalendarOutlined />}>แก้เวลาแล้ว</Tag>}
+                  </Stack>
+                </Box>
+                <Box component="td" sx={{ ...td, minWidth: 140, maxWidth: 220 }}>
+                  {row.checkIn?.note
+                    ? <Typography sx={{ fontSize: "0.78rem", lineHeight: 1.45, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", overflowWrap: "anywhere" }}>{row.checkIn.note}</Typography>
+                    : <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>}
+                </Box>
+                <Box component="td" sx={{ ...td, whiteSpace: "nowrap" }} onClick={(e) => photos.length && e.stopPropagation()}>
+                  {photos.length ? (
+                    <ButtonBase onClick={() => (onPreview ? onPreview(photos[0].fileUrl, photos[0].fileName) : window.open(photos[0].fileUrl, "_blank", "noopener"))}
+                      sx={{ gap: 0.5, px: 0.9, height: 28, borderRadius: 2, border: `1px solid ${LINE}`, fontFamily: "inherit", fontSize: "0.76rem", fontWeight: 700, color: INK_2, "&:hover": { borderColor: ACCENT, color: ACCENT } }}>
+                      <PhotoCameraOutlined sx={{ fontSize: 16 }} />{photos.length}
+                    </ButtonBase>
+                  ) : <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>}
+                </Box>
+                <Box component="td" sx={{ ...td, textAlign: "right", verticalAlign: "middle" }}>
+                  <ChevronRight sx={{ fontSize: 20, color: "#cbd5e1" }} />
+                </Box>
+              </Box>
+            );
+          })}
+        </tbody>
+      </Box>
+      <Dialog open={Boolean(openRow)} onClose={() => setOpenId("")} fullWidth maxWidth="sm" fullScreen={fullScreen}
+        PaperProps={{ sx: { borderRadius: fullScreen ? 0 : 3, bgcolor: SURFACE } }}>
+        <Stack direction="row" alignItems="center" sx={{ px: 2, py: 1.1, bgcolor: "#fff", borderBottom: `1px solid ${LINE}` }}>
+          <Typography sx={{ flex: 1, fontWeight: 900, fontSize: "1rem", color: INK }}>บันทึกเข้างาน</Typography>
+          <IconButton onClick={() => setOpenId("")} aria-label="ปิด"><Close /></IconButton>
+        </Stack>
+        <Box sx={{ p: { xs: 1, sm: 1.5 } }}>
+          {openRow && <Row key={openRow._id} row={openRow} me={me} isApprover={isApprover} showJob onPreview={onPreview} onChanged={onChanged} defaultOpen />}
+        </Box>
+      </Dialog>
     </Box>
   );
 }
