@@ -138,6 +138,8 @@ const Section = ({ title, icon, action, children }) => (
 
 /** ป้าย "AI" — ช่องที่ AI อ่านจากไฟล์แล้วเติมให้ (ยังไม่มีคนแก้) ให้รู้ว่าควรตรวจ */
 const aiFilled = (a, key) => (a?.quotationAiFilled?.fields || []).includes(key);
+/** ✅ (19 ต.ค. 2569 ผู้ใช้: "ให้แสดงเลขที่ให้ครบด้วย") งานหนึ่งมีได้หลายใบ — แยกเลขที่ทุกใบ (ไม่ซ้ำ) แสดงครบทุกเลข */
+const quoteNos = (a) => [...new Set(String(a?.quotationNo || "").split(/\s*[,;\n]\s*/).map((x) => x.trim()).filter(Boolean))];
 const AiTag = ({ title = "AI อ่านจากไฟล์แล้วเติมให้ — ตรวจแล้วแก้ได้ที่ปุ่มแก้ไข" }) => (
   <Box component="span" title={title} sx={{ ml: 0.5, px: 0.6, height: 16, display: "inline-flex", alignItems: "center", borderRadius: 99, bgcolor: "#f3e8ff", color: "#7c3aed", fontSize: "0.6rem", fontWeight: 900, verticalAlign: "middle", letterSpacing: 0.3 }}>AI</Box>
 );
@@ -204,7 +206,12 @@ const DesktopTable = ({ jobs, onOpen, onPreview }) => {
                   {a.site && a.site !== a.company && <Typography sx={{ ...sub, overflowWrap: "anywhere" }}>{a.site}</Typography>}
                 </Box>
                 <Box component="td" sx={{ ...td, minWidth: 150 }}>
-                  <Typography sx={{ fontSize: "0.82rem", fontWeight: 800, color: a.quotationNo ? TEXT_MAIN : "#94a3b8" }}>{a.quotationNo || "ไม่มีเลขที่"}{a.quotationNo && aiFilled(a, "quotationNo") && <AiTag />}</Typography>
+                  {quoteNos(a).length ? quoteNos(a).map((no, i) => (
+                    <Typography key={no} sx={{ fontSize: "0.82rem", fontWeight: 800, color: TEXT_MAIN, whiteSpace: "nowrap" }}>
+                      {no}{i === 0 && aiFilled(a, "quotationNo") && <AiTag />}
+                    </Typography>
+                  )) : <Typography sx={{ fontSize: "0.82rem", fontWeight: 800, color: "#94a3b8" }}>ไม่มีเลขที่</Typography>}
+                  {quoteNos(a).length > 1 && <Typography sx={{ ...sub, color: "#7c3aed", fontWeight: 800 }}>{quoteNos(a).length} ใบ</Typography>}
                   {a.quotationDate && <Typography sx={sub}>ลงวันที่ {thaiDate(a.quotationDate)}</Typography>}
                   {files.length > 0 && (
                     <Box component="button" type="button" onClick={(e) => { e.stopPropagation(); onPreview(files[files.length - 1].fileUrl, files[files.length - 1].fileName); }}
@@ -298,8 +305,8 @@ const MobileCard = ({ job, onOpen, onPreview }) => {
         </Stack>
         <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 1, px: 1, py: 0.75, borderRadius: 2, bgcolor: "#f8fafc" }}>
           <Description sx={{ fontSize: 16, color: TEXT_SUB }} />
-          <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.78rem", fontWeight: 700, color: a.quotationNo ? TEXT_MAIN : "#94a3b8" }}>
-            {a.quotationNo ? `เลขที่ ${a.quotationNo}` : "ไม่มีเลขที่"}{a.quotationDate ? ` · ${thaiDate(a.quotationDate)}` : ""}
+          <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.78rem", fontWeight: 700, color: a.quotationNo ? TEXT_MAIN : "#94a3b8", overflowWrap: "anywhere" }}>
+            {quoteNos(a).length ? `เลขที่ ${quoteNos(a).join(", ")}${quoteNos(a).length > 1 ? ` (${quoteNos(a).length} ใบ)` : ""}` : "ไม่มีเลขที่"}{a.quotationDate ? ` · ${thaiDate(a.quotationDate)}` : ""}
           </Typography>
           {files.length > 0 && (
             <Box component="button" type="button" onClick={(e) => { e.stopPropagation(); onPreview?.(files[files.length - 1].fileUrl, files[files.length - 1].fileName); }}
@@ -679,6 +686,12 @@ const QuoteScanBox = ({ a }) => {
     if (state.count === files.length || info.fileCount === files.length) return;
     run();
   }, [enabled, files.length, a, info.fileCount, state.count, run]);
+  // AI เคยเติมด้วยรุ่นเก่า (อ่านแค่ไฟล์ล่าสุด · ไม่มีสรุปรายใบ) → อ่านทุกไฟล์ใหม่หนึ่งครั้ง ให้เลขที่/ยอดครบทุกใบ
+  useEffect(() => {
+    if (!enabled || !files.length || !info.at || Array.isArray(info.quotations) || state.count !== null) return;
+    if (!(info.fields || []).length || missingInfo(a)) return; // ข้อมูลไม่ครบ = effect ด้านบนอ่านให้แล้ว
+    run();
+  }, [enabled, files.length, a, info.at, info.quotations, info.fields, state.count, run]);
 
   if (!enabled || !files.length) return null;
   const box = { mt: 1.25, p: 1.5, borderRadius: 2.5, border: "1px solid #ddd6fe", bgcolor: "#faf5ff" };
