@@ -442,8 +442,8 @@ const FollowUpSection = ({ a, onSubmit, onPreview, canFollow, formRef }) => {
                 }} />
             ))}
           </Stack>
-          <TextField multiline minRows={2} size="small" placeholder="ผลการติดตาม เช่น ลูกค้ารอเข้าที่ประชุมสิ้นเดือน / ขอส่วนลดเพิ่ม 5%"
-            value={note} onChange={(e) => setNote(e.target.value)} sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: 2 } }} />
+          <TextField multiline minRows={5} maxRows={14} placeholder="ผลการติดตาม เช่น ลูกค้ารอเข้าที่ประชุมสิ้นเดือน / ขอส่วนลดเพิ่ม 5%"
+            value={note} onChange={(e) => setNote(e.target.value)} sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: 2, fontSize: "0.92rem", lineHeight: 1.6, alignItems: "flex-start" } }} />
           <Collapse in={showNext} unmountOnExit>
             <ThaiDatePicker label="นัดติดตามครั้งถัดไป" value={next} onChange={(v) => setNext(v || "")} />
           </Collapse>
