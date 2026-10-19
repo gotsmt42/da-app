@@ -32,7 +32,8 @@ export default function JobDocsCell({ event }) {
   //    สิ่งที่ต้องรู้มีแค่ "ส่งของแล้วหรือยัง" กับ "วางบิลแล้วหรือยัง" (ขั้นตอนเดียวกับหน้างานเข้า: รับงาน → ส่งของ → วางบิล)
   if (event.noVisit) {
     const inv = (event.invoiceFiles || []).length;
-    const billed = inv > 0 || Boolean(event.billing?.invoicedAt);
+    const noBill = event.invoiceApplicable === false;
+    const billed = noBill || inv > 0 || Boolean(event.billing?.invoicedAt);
     const delivered = Boolean(event.deliveredAt) || event.status === "ดำเนินการเสร็จสิ้น";
     const Row = ({ ok, icon: Ico, children }) => (
       <Stack direction="row" spacing={0.5} alignItems="center">
@@ -44,11 +45,15 @@ export default function JobDocsCell({ event }) {
     return (
       <Box onClick={(e) => e.stopPropagation()} sx={{ minWidth: 0 }}>
         <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: delivered && billed ? "#15803d" : "#64748b", mb: 0.3 }}>
-          งานส่งของ · {delivered && billed ? "ครบแล้ว" : delivered ? "รอวางบิล" : "รอส่งของ"}
+          งานส่งของ · {delivered && noBill ? "เสร็จสิ้น" : delivered && billed ? "ครบแล้ว" : delivered ? "รอวางบิล" : "รอส่งของ"}
         </Typography>
         <Stack spacing={0.25}>
           <Row ok={delivered} icon={LocalShippingOutlined}>{delivered ? `ส่งของแล้ว${event.deliveredAt ? ` ${formatThai(moment(event.deliveredAt), "D MMM")}` : ""}` : "ยังไม่ส่งของ"}</Row>
-          <Row ok={billed} icon={ReceiptLongOutlined}>{billed ? `วางบิลแล้ว${inv ? ` · ${inv} ไฟล์` : ""}` : "ยังไม่วางบิล"}</Row>
+          <Row ok={billed} icon={ReceiptLongOutlined}>{noBill ? "ไม่ต้องวางบิล" : billed ? `วางบิลแล้ว${inv ? ` · ${inv} ไฟล์` : ""}` : "ยังไม่วางบิล"}</Row>
+          {inv > 0 && (
+            <Box component="a" href={event.invoiceFiles[inv - 1].fileUrl} target="_blank" rel="noreferrer"
+              sx={{ ml: 2.4, fontSize: "0.7rem", fontWeight: 800, color: "#2563eb", textDecoration: "none", "&:hover": { textDecoration: "underline" } }}>เปิดใบวางบิล ›</Box>
+          )}
         </Stack>
       </Box>
     );

@@ -20,6 +20,7 @@ import lazyWithRetry from "@/shared/utils/lazyWithRetry";
 import usePaged, { PageBar } from "@/shared/ui/usePaged";
 import DateCell from "@/shared/ui/DateCell";
 import RefDoc from "@/shared/ui/RefDoc";
+import { billingStatus, BILLING_STATE_META } from "@/shared/utils/billing";
 import JobKindTag from "@/shared/ui/JobKindTag";
 import { resolveQuotationGroup, getFollowUpInfo } from "@/shared/utils/quotationTracking";
 import { Link } from "react-router-dom";
@@ -94,6 +95,8 @@ const stageOf = (e) => {
   if (e.noVisit) {
     if (e.unscheduled) return { i: 0, label: "รอส่งของ", color: AMBER, nv: true, bar: 0 };
     if (invoicedOf(e)) return { i: 4, label: "วางบิลแล้ว", color: GREEN, nv: true, bar: STAGES_NV.length };
+    // ✅ (19 ต.ค. 2569) ส่งของแล้ว + เลือก "ไม่ต้องวางบิล" = เสร็จสิ้น
+    if (e.invoiceApplicable === false) return { i: 4, label: "เสร็จสิ้น", color: GREEN, nv: true, bar: STAGES_NV.length };
     return { i: 2, label: "รอวางบิล", color: AMBER, nv: true, bar: 2 };
   }
   if (e.unscheduled) return { i: 0, label: "รอส่งลงตาราง", color: AMBER };
@@ -302,7 +305,7 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, onUplo
   const td = { fontSize: "0.82rem", color: "#334155", px: 1.25, py: 1.1, borderBottom: `1px solid ${LINE}`, verticalAlign: "top" };
   const sub = { fontSize: "0.74rem", color: MUTED, lineHeight: 1.45, overflowWrap: "anywhere" };
   // เอกสารอ้างอิง (ตอนรับงาน) กับ ใบเสนอราคา (ติดตามภายหลัง) แยกคนละคอลัมน์เสมอ · แท็บรอดำเนินการยังไม่มีใบเสนอราคา
-  const COLS = ["", "กำหนดการ", "เลขที่งาน", "งาน / โครงการ", "รายละเอียดงาน", "รับงานจาก", "ผู้ติดต่อ", "สถานะงาน", "เอกสารอ้างอิง", ...(refMode ? [] : ["ใบเสนอราคาเพิ่มเติม"]), "ผู้รับผิดชอบ", ""];
+  const COLS = ["", "กำหนดการ", "เลขที่งาน", "งาน / โครงการ", "รายละเอียดงาน", "รับงานจาก", "ผู้ติดต่อ", "สถานะงาน", "เอกสารอ้างอิง", ...(refMode ? [] : ["ติดตาม (ใบเสนอราคาเพิ่ม · วางบิล)"]), "ผู้รับผิดชอบ", ""];
   return (
     <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflowX: "auto" }}>
       <Box component="table" sx={{ width: "100%", minWidth: 1560, borderCollapse: "collapse" }}>
@@ -338,7 +341,9 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, onUplo
                           }} />
                         </Button>
                       )
-                      : <Button component={Link} to="/finance?tab=billing" size="small" sx={ghost}>ติดตามวางบิล</Button>)
+                      : j.invoiceApplicable === false
+                        ? <Button size="small" onClick={() => toggle(j._id)} sx={{ ...ghost, color: MUTED, borderColor: LINE }}>รายละเอียด</Button>
+                        : <Button component={Link} to={`/finance?tab=billing&jobId=${j._id}`} size="small" sx={ghost}>ติดตามวางบิล</Button>)
                   : s.i === 0
                     ? <Button size="small" onClick={() => onSchedule(j)} sx={{ ...PRIMARY, height: 30, px: 1.25 }}>{requestMode ? "ขอลงตาราง" : "ส่งลงตาราง"}</Button>
                     : !j.unscheduled
@@ -416,7 +421,7 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, onUplo
                 </Box>
                 {!refMode && (
                   <Box component="td" sx={{ ...td, width: 190, minWidth: 190, maxWidth: 190 }}>
-                    <QuoteSlot oc={oc} />
+                    {j.noVisit ? <BillingSlot job={j} /> : <QuoteSlot oc={oc} />}
                   </Box>
                 )}
                 <Box component="td" sx={{ ...td, minWidth: 170, whiteSpace: "nowrap" }}>
@@ -603,11 +608,12 @@ function DeliverDialog({ job, onClose, onDone }) {
   const [date, setDate] = useState(moment().format("YYYY-MM-DD"));
   const [files, setFiles] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [billing, setBilling] = useState(""); // "need" | "none" — ✅ (19 ต.ค. 2569) ต้องเลือกก่อนบันทึก
   const save = async () => {
-    if (!date) return;
+    if (!date || !billing) return;
     setSaving(true);
     try {
-      await EventService.DeliverJob(job._id, { date });
+      await EventService.DeliverJob(job._id, { date, noBilling: billing === "none" });
       let failed = 0;
       for (const f of files) {
         try { await EventService.Upload(job._id, f, "invoice"); } catch { failed += 1; }
@@ -615,7 +621,9 @@ function DeliverDialog({ job, onClose, onDone }) {
       onDone();
       Swal.fire(failed
         ? { icon: "warning", title: "บันทึกส่งของแล้ว", text: `แต่แนบใบวางบิลไม่สำเร็จ ${failed} ไฟล์ — กด “อัปโหลดใบวางบิล” ที่การ์ดงานอีกครั้ง` }
-        : { icon: "success", title: files.length ? "ส่งของ + วางบิลแล้ว" : "บันทึกส่งของแล้ว", text: files.length ? "ตามรับเงินต่อได้ที่หน้าติดตามวางบิล" : "ขั้นถัดไป: อัปโหลดใบวางบิล", timer: 1800, showConfirmButton: false });
+        : billing === "none"
+          ? { icon: "success", title: "ส่งของแล้ว · งานเสร็จสิ้น", text: "ไม่ต้องวางบิล", timer: 1600, showConfirmButton: false }
+          : { icon: "success", title: files.length ? "ส่งของ + วางบิลแล้ว" : "บันทึกส่งของแล้ว", text: files.length ? "ตามรับเงินต่อได้ที่หน้าติดตามวางบิล" : "ขั้นถัดไป: อัปโหลดใบวางบิล", timer: 1800, showConfirmButton: false });
     } catch (err) {
       Swal.fire({ icon: "error", title: "บันทึกไม่สำเร็จ", text: err?.response?.data?.message || "กรุณาลองใหม่" });
       setSaving(false);
@@ -637,7 +645,19 @@ function DeliverDialog({ job, onClose, onDone }) {
         <Section n={1} title="วันที่ส่งของ">
           <ThaiDatePicker label="วันที่ส่งของ" value={date} onChange={(v) => setDate(v || "")} />
         </Section>
-        <Section n={2} title="ใบวางบิล" hint="ไม่บังคับ — ยังไม่มีบิล กดบันทึกไปก่อน แล้วอัปโหลดทีหลังที่การ์ดงาน" last>
+        <Section n={2} title="งานนี้ต้องวางบิลไหม?" hint="เลือกก่อนบันทึก — ไม่ต้องวางบิล = งานเสร็จสิ้นทันที" last={billing !== "need"}>
+          <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1 }}>
+            {[["need", "ต้องวางบิล", "แนบบิลเลย หรือแนบทีหลัง"], ["none", "ไม่ต้องวางบิล", "จบงานเลย (เสร็จสิ้น)"]].map(([k, t, d]) => (
+              <ButtonBase key={k} onClick={() => setBilling(k)} sx={{ display: "block", textAlign: "left", p: 1.25, borderRadius: 2, fontFamily: "inherit",
+                border: `1.5px solid ${billing === k ? ACCENT : LINE}`, bgcolor: billing === k ? alpha(ACCENT, 0.06) : "#fff" }}>
+                <Typography sx={{ fontSize: "0.86rem", fontWeight: 800, color: billing === k ? ACCENT : INK }}>{t}</Typography>
+                <Typography sx={{ fontSize: "0.72rem", color: MUTED }}>{d}</Typography>
+              </ButtonBase>
+            ))}
+          </Box>
+        </Section>
+        {billing === "need" && (
+        <Section n={3} title="ใบวางบิล" hint="ไม่บังคับ — ยังไม่มีบิล กดบันทึกไปก่อน แล้วอัปโหลดทีหลังที่แถว/การ์ดงาน" last>
           <Button component="label" variant="outlined" startIcon={<UploadFileOutlined />} sx={{ ...BTN, color: "#334155", borderColor: LINE }}>
             {files.length ? `เลือกแล้ว ${files.length} ไฟล์` : "เลือกไฟล์ใบวางบิล"}
             <input hidden type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={(e) => setFiles([...(e.target.files || [])])} />
@@ -646,14 +666,15 @@ function DeliverDialog({ job, onClose, onDone }) {
             <Typography sx={{ fontSize: "0.74rem", color: MUTED, mt: 0.75, overflowWrap: "anywhere" }}>{files.map((f) => f.name).join(", ")}</Typography>
           )}
         </Section>
+        )}
         <Typography sx={{ fontSize: "0.74rem", color: MUTED, mt: 2, px: 1.25, py: 1, borderRadius: 2, bgcolor: SURFACE }}>
           งานไม่ต้องเข้างานจะไม่ขึ้นในตารางงานช่าง · ตามรับเงินต่อได้ที่หน้าติดตามวางบิล
         </Typography>
       </DialogContent>
       <DialogActions sx={{ px: 2.5, py: 1.5, borderTop: `1px solid ${LINE}`, gap: 1 }}>
         <Button onClick={onClose} sx={{ ...BTN, color: MUTED }}>ยกเลิก</Button>
-        <Button variant="contained" disabled={!date || saving} onClick={save} sx={{ ...PRIMARY, px: 2.5 }}>
-          {saving ? "กำลังบันทึก..." : "บันทึกส่งของ"}
+        <Button variant="contained" disabled={!date || !billing || saving} onClick={save} sx={{ ...PRIMARY, px: 2.5 }}>
+          {saving ? "กำลังบันทึก..." : billing === "none" ? "บันทึก · งานเสร็จสิ้น" : "บันทึกส่งของ"}
         </Button>
       </DialogActions>
     </Dialog>
@@ -1278,6 +1299,56 @@ export default function JobIntake() {
       {scheduling && (
         <ScheduleDialog job={scheduling} employees={employees} canAssignResponsible={can(userData, "editContracts")} requestMode={!canManage} onClose={() => setScheduling(null)}
           onDone={async () => { setScheduling(null); await load(); refreshAppBadges(); }} />
+      )}
+    </Box>
+  );
+}
+
+/**
+ * ช่องติดตามวางบิลของงานส่งของ (ตารางงานเข้า)
+ * ✅ (19 ต.ค. 2569 ผู้ใช้: "ใบวางบิลจะดูยังไง กดดูยาก ให้เปิดได้เลย · สถานะการติดตามให้ดูง่าย สวยงาม")
+ *    สถานะ (ยังไม่วางบิล / รอชำระ / เลยกำหนดชำระ / ชำระครบ / ไม่ต้องวางบิล) + ปุ่ม "เปิดใบวางบิล" + ลิงก์ติดตาม
+ */
+function BillingSlot({ job }) {
+  if (job.unscheduled) return <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>;
+  if (job.invoiceApplicable === false) {
+    return (
+      <Stack direction="row" spacing={0.6} alignItems="center">
+        <TaskAltRounded sx={{ fontSize: 16, color: "#94a3b8" }} />
+        <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: "#64748b" }}>ไม่ต้องวางบิล</Typography>
+      </Stack>
+    );
+  }
+  const files = job.invoiceFiles || [];
+  const st = job.billing?.invoicedAt ? billingStatus(job.billing) : files.length ? { state: "unpaid", label: "วางบิลแล้ว" } : { state: "not_invoiced", label: "ยังไม่วางบิล" };
+  const color = st.state === "not_invoiced" ? AMBER : (BILLING_STATE_META[st.state]?.color || ACCENT);
+  const last = files[files.length - 1];
+  return (
+    <Box onClick={(e) => e.stopPropagation()} sx={{ minWidth: 0 }}>
+      <Stack direction="row" spacing={0.75} alignItems="center">
+        <Box sx={{ width: 26, height: 26, borderRadius: 2, flexShrink: 0, display: "grid", placeItems: "center", bgcolor: alpha(color, 0.12), color }}>
+          <ReceiptLongOutlined sx={{ fontSize: 16 }} />
+        </Box>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography noWrap sx={{ fontSize: "0.8rem", fontWeight: 800, color, lineHeight: 1.3 }}>{st.label}</Typography>
+          <Typography noWrap sx={{ fontSize: "0.7rem", color: MUTED, lineHeight: 1.3 }}>
+            {job.billing?.invoiceNo ? `เลขที่ ${job.billing.invoiceNo}` : files.length ? `ใบวางบิล ${files.length} ไฟล์` : "แนบใบวางบิลจากปุ่มท้ายแถว"}
+          </Typography>
+        </Box>
+      </Stack>
+      {(last || job.billing?.invoicedAt) && (
+        <Stack direction="row" gap={0.75} sx={{ mt: 0.6, pl: 4.25, flexWrap: "wrap" }}>
+          {last && (
+            <Box component="a" href={last.fileUrl} target="_blank" rel="noreferrer" title={last.fileName}
+              sx={{ display: "inline-flex", alignItems: "center", gap: 0.4, height: 24, px: 0.9, borderRadius: 99, bgcolor: alpha(ACCENT, 0.08), color: ACCENT, fontSize: "0.7rem", fontWeight: 800, textDecoration: "none", "&:hover": { bgcolor: alpha(ACCENT, 0.14) } }}>
+              <AttachFileRounded sx={{ fontSize: 13 }} />เปิดใบวางบิล
+            </Box>
+          )}
+          <Box component={Link} to={`/finance?tab=billing&jobId=${job._id}`}
+            sx={{ display: "inline-flex", alignItems: "center", height: 24, px: 0.9, borderRadius: 99, border: `1px solid ${LINE}`, color: "#334155", fontSize: "0.7rem", fontWeight: 800, textDecoration: "none", "&:hover": { borderColor: ACCENT, color: ACCENT } }}>
+            ติดตาม ›
+          </Box>
+        </Stack>
       )}
     </Box>
   );

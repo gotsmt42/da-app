@@ -65,6 +65,7 @@ function stateOf(e, att, now) {
   // งานส่งของ ไม่มีการเข้างาน — ขั้นของมันคือ ส่งของ → วางบิล (ไม่นับเป็นเลยเวลานัด)
   if (e.noVisit) {
     if ((e.invoiceFiles || []).length || e.billing?.invoicedAt) return "billed";
+    if (e.invoiceApplicable === false && (e.deliveredAt || e.status === CLOSED)) return "closed"; // ไม่ต้องวางบิล = เสร็จสิ้น
     return e.deliveredAt || e.status === CLOSED ? "delivered" : "deliver";
   }
   if (e.status === CLOSED) return "closed";

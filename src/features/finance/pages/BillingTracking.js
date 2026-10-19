@@ -87,7 +87,8 @@ export default function BillingTracking() {
   useRealtime("events", () => { load(true); });
 
   // ── ประกอบแถว ─────────────────────────────────────────────────────────
-  const rows = useMemo(() => events.map((e) => ({
+  // ✅ (19 ต.ค. 2569) งานที่ระบุ "ไม่ต้องวางบิล" (invoiceApplicable = false) และยังไม่เคยวางบิล ไม่ต้องอยู่ในรายการติดตาม
+  const rows = useMemo(() => events.filter((e) => e.invoiceApplicable !== false || e.billing?.invoicedAt).map((e) => ({
     event: e,
     status: billingStatus(e.billing),
   })), [events]);
