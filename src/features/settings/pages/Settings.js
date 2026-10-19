@@ -35,7 +35,7 @@ import { APP_NAME, APP_VERSION_LABEL } from "@/shared/appInfo";
 import { dest, DEST } from "@/layouts/navConfig";
 import { ORG_FALLBACK } from "@/shared/services/OrgSettingService";
 import SignatureSettingsDialog from "../components/SignatureSettingsDialog";
-import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LINE } from "@/shared/ui/PageKit";
+import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LINE, PAGE_NARROW_SX } from "@/shared/ui/PageKit";
 
 const GREEN = "#16a34a";
 const RED = "#dc2626";
@@ -230,7 +230,7 @@ export default function Settings() {
         : null;
 
   return (
-    <Box sx={{ px: { xs: 0, sm: 2.5 }, py: { xs: 1.5, sm: 2.5 }, maxWidth: 860, mx: "auto" }}>
+    <Box sx={PAGE_NARROW_SX}>
       <Box sx={{ mb: 2.5, px: 0.5 }}>
         <Typography sx={{ fontWeight: 900, fontSize: "1.4rem", color: INK }}>การตั้งค่า</Typography>
         <Typography sx={{ fontSize: "0.84rem", color: MUTED }}>บัญชี · ความปลอดภัย · การแจ้งเตือน · ข้อมูลระบบ</Typography>

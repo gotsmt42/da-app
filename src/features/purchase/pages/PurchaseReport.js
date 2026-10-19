@@ -26,6 +26,7 @@ import PurchaseService, { errorText } from "../services/PurchaseService";
 import PrStatusBadge from "../components/PrStatusBadge";
 import { PR_ACCENT, PR_DARK, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, STATUS_ORDER, prStatus, baht, fmtQty, prJobText } from "../prMeta";
 import { buildPrReport, isLate, pendingReceiveOf } from "../utils/prReport";
+import { PAGE_SX } from "@/shared/ui/PageKit";
 
 const PRESETS = [
   { value: "month", label: "เดือนนี้", range: () => [moment().startOf("month"), moment()] },
@@ -273,7 +274,7 @@ export default function PurchaseReport() {
   }[group];
 
   return (
-    <Box sx={{ px: { xs: 0, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: 1500, mx: "auto" }}>
+    <Box sx={PAGE_SX}>
       {/* ── หัวเพจ (โครงเดียวกับหน้าใบขอซื้อ) ── */}
       <Box sx={{ borderRadius: 3, border: `1px solid ${BORDER_MAIN}`, bgcolor: "#fff", px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.75 }, mb: 1.5 }}>
         <Stack direction="row" alignItems="center" spacing={{ xs: 1.25, sm: 1.5 }}>

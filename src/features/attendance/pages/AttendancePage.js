@@ -21,7 +21,7 @@ import { refreshAppBadges } from "@/shared/hooks/useAppBadges";
 import { formatThai } from "@/shared/utils/thaiDate";
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import PersonSelectField from "@/shared/ui/PersonSelectField";
-import { PageHeader, EmptyState, INK, INK_2, MUTED, FAINT } from "@/shared/ui/PageKit";
+import { PageHeader, EmptyState, INK, INK_2, MUTED, FAINT, PAGE_SX, ICON_BTN_SX } from "@/shared/ui/PageKit";
 import { CARD } from "@/shared/ui/modernUi";
 import AttendanceList from "../components/AttendanceList";
 import { ON_SITE_M } from "../attendanceMeta";
@@ -137,13 +137,13 @@ export default function AttendancePage() {
   const setTab = (t) => setParams((p) => { const n = new URLSearchParams(p); if (t === "list") n.delete("tab"); else n.set("tab", t); return n; }, { replace: true });
 
   return (
-    <Box sx={{ maxWidth: 1100, mx: "auto", px: { xs: 0.25, sm: 1.5 }, py: { xs: 1, sm: 2 } }}>
-      <SectionTabs group="operation" edge />
+    <Box sx={PAGE_SX}>
+      <SectionTabs group="operation" />
       <PageHeader
         icon={<PlaceOutlined />}
         title={seeAll ? "ประวัติบันทึกการเข้างาน" : "ประวัติเข้างานของฉัน"}
         subtitle="เวลาเข้างานจากเซิร์ฟเวอร์ · ตำแหน่ง GPS · รูปหน้างาน"
-        actions={<Tooltip title="โหลดใหม่"><IconButton onClick={load}><RefreshRounded /></IconButton></Tooltip>}
+        actions={<Tooltip title="โหลดใหม่"><IconButton onClick={load} sx={ICON_BTN_SX}><RefreshRounded fontSize="small" /></IconButton></Tooltip>}
       />
 
       {/* ✅ (10 ต.ค. 2569 ผู้ใช้: "หน้าเข้าออกงานยังไม่สวย UI ดูยาก ใช้งานยาก — จัดวางให้มืออาชีพ")
@@ -163,7 +163,7 @@ export default function AttendancePage() {
       ) : (
         <>
           {/* ตัวกรอง — ช่วงเวลาเป็นปุ่มสลับแถวเดียว · เลือก "กำหนดเอง" ค่อยมีช่องวันที่ */}
-          <Box sx={{ ...CARD, borderRadius: "14px", mb: 1.5, p: 1 }}>
+          <Box sx={{ ...CARD, borderRadius: 3, mb: 1.5, p: 1 }}>
             <Stack direction={{ xs: "column", md: "row" }} gap={0.75} alignItems={{ md: "center" }}>
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Segmented value={preset} onChange={pickPreset} items={PRESETS.map((p) => ({ key: p.key, label: p.label }))} />

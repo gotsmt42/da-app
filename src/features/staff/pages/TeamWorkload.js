@@ -23,6 +23,7 @@ import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import {
   PageHeader, Kpi, KpiRow, FilterBar, Panel, EmptyState, INK, MUTED, FAINT, LINE, SURFACE, DANGER, CARD_SHADOW,
   TABLE_HEAD_SX, TABLE_ROW_SX, ICON_BTN_SX,
+  PAGE_SX,
 } from "@/shared/ui/PageKit";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/AuthContext";
@@ -276,7 +277,7 @@ export default function TeamWorkload() {
   );
 
   return (
-    <Box sx={{ px: { xs: 0, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: 1400, mx: "auto" }}>
+    <Box sx={PAGE_SX}>
       <PageHeader
         icon={<Groups />}
         title="ภาระงานทีมช่าง"

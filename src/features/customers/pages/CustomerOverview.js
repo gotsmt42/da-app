@@ -42,6 +42,7 @@ import SelectField from "@/shared/ui/SelectField";
 import {
   PageHeader, Kpi, KpiRow, FilterBar, Panel, EmptyState, DotLabel, INK, INK_2, MUTED, FAINT, LINE, SURFACE, DANGER,
   CARD_SHADOW, TABLE_HEAD_SX, TABLE_ROW_SX, ICON_BTN_SX,
+  PAGE_SX,
 } from "@/shared/ui/PageKit";
 
 const PAGE_SIZE = 15;
@@ -266,7 +267,7 @@ export default function CustomerOverview() {
   );
 
   return (
-    <Box sx={{ px: { xs: 0, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: 1400, mx: "auto" }}>
+    <Box sx={PAGE_SX}>
       <PageHeader
         icon={<Business />}
         title="ภาพรวมลูกค้า"

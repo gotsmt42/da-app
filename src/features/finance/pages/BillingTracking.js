@@ -29,6 +29,7 @@ import BillingDialog from "../components/BillingDialog";
 import { billingStatus, baht, round2, BILLING_STATE_META } from "@/shared/utils/billing";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { can } from "@/shared/utils/roles";
+import { PAGE_SX } from "@/shared/ui/PageKit";
 
 const ACCENT = "#0891b2";
 const TEXT_SUB = "#64748b";
@@ -162,7 +163,7 @@ export default function BillingTracking() {
   if (!canAccess) return <Navigate to="/dashboard" replace />;
 
   return (
-    <Box sx={{ px: { xs: 0, sm: 2 }, py: { xs: 1.5, sm: 2 }, maxWidth: 1400, mx: "auto" }}>
+    <Box sx={PAGE_SX}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
         <Box sx={{ minWidth: 0 }}>
           <Typography sx={{ fontWeight: 800, fontSize: { xs: "1.05rem", sm: "1.25rem" } }}>ติดตามการวางบิล / รับเงิน</Typography>

@@ -24,7 +24,7 @@ import {
   Box, Stack, Typography, Skeleton, Alert, TextField, IconButton, Tooltip,
 } from "@mui/material";
 import { Inbox, Search, Close, Refresh } from "@mui/icons-material";
-import { PageHeader } from "@/shared/ui/PageKit";
+import { PageHeader, PAGE_SX } from "@/shared/ui/PageKit";
 
 import usePermissions from "@/shared/hooks/usePermissions";
 import { useAuth } from "@/features/auth/AuthContext";
@@ -59,8 +59,8 @@ export default function JobRequestQueue() {
   const urgent = summary?.urgentOpen ?? 0;
 
   return (
-    <Box sx={{ px: { xs: 0, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: 1500, mx: "auto" }}>
-      <SectionTabs group="intake" edge />
+    <Box sx={PAGE_SX}>
+      <SectionTabs group="intake" />
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>{error}</Alert>}
 
       {/* ── หัวหน้าเพจ — กล่องขาวชุดเดียวกับทุกหน้า (shared/ui/PageKit) ตามกฎออกแบบ (ผู้ใช้สั่ง 2 ต.ค. 2569

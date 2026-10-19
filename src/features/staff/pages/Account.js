@@ -33,7 +33,7 @@ import { hasValidAvatar } from "@/shared/utils/user";
 import { getOptimizedImageUrl } from "@/shared/utils/cloudinaryImage";
 import { resizeImage } from "@/shared/utils/imageResize";
 import { formatThai } from "@/shared/utils/thaiDate";
-import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LINE } from "@/shared/ui/PageKit";
+import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LINE, PAGE_NARROW_SX } from "@/shared/ui/PageKit";
 
 /** สิทธิ์ที่ผู้ใช้ทั่วไปอยากรู้ว่า "ฉันทำอะไรได้บ้าง" — ชื่อเรียกแบบที่คนใช้งานเข้าใจ */
 const CAPS = [
@@ -198,7 +198,7 @@ export default function Account() {
   ) : null;
 
   return (
-    <Box sx={{ px: { xs: 0, sm: 2.5 }, py: { xs: 1.5, sm: 2.5 }, maxWidth: 1080, mx: "auto" }}>
+    <Box sx={PAGE_NARROW_SX}>
       {/* ── การ์ดตัวตน ── */}
       <Box sx={{ mb: 2, bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflow: "hidden", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
         <Box sx={{ height: { xs: 84, sm: 104 }, background: `linear-gradient(120deg, ${ACCENT_SOFT} 0%, #e0e7ff 55%, #f1f5f9 100%)`, borderBottom: `1px solid ${LINE}` }} />

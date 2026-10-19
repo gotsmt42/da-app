@@ -17,13 +17,14 @@ import {
   Box, Stack, Typography, ToggleButton, ToggleButtonGroup, CircularProgress, Alert, Tooltip,
   Table, TableBody, TableCell, TableHead, TableRow, LinearProgress,
 } from "@mui/material";
-import { Assessment } from "@mui/icons-material";
+import { AssessmentOutlined } from "@mui/icons-material";
 import moment from "moment";
 
 import EventService from "@/shared/services/EventService";
 import { buildDaysPastDueMap } from "@/shared/utils/overdueJobs";
 import { THAI_MONTHS_SHORT } from "@/shared/utils/thaiDate";
 import { buildJobReport } from "../utils/jobReport";
+import { PAGE_SX, PageHeader, KpiRow, Kpi as PkKpi } from "@/shared/ui/PageKit";
 
 const ACCENT = "#8b5cf6";        // สีประจำหมวด "งาน" เดียวกับการ์ดเมนูหน้าแรก
 const BORDER = "#e2e8f0";
@@ -44,16 +45,8 @@ const monthLabel = (key) => {
   return `${THAI_MONTHS_SHORT[Number(m) - 1]} ${String(Number(y) + 543).slice(-2)}`;
 };
 
-const Kpi = ({ label, value, sub, color }) => (
-  <Box sx={{ border: `1px solid ${BORDER}`, borderRadius: 2.5, p: 1.5, bgcolor: "#fff", minWidth: 0 }}>
-    <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }}>{label}</Typography>
-    <Typography sx={{ fontWeight: 900, fontSize: "1.35rem", lineHeight: 1.2, color: color || "#0f172a" }}>{value}</Typography>
-    {sub && <Typography variant="caption" sx={{ color: TEXT_SUB }}>{sub}</Typography>}
-  </Box>
-);
-
 const Panel = ({ title, hint, children }) => (
-  <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER}`, borderRadius: 2.5, p: { xs: 1.5, sm: 2 }, mb: 1.75 }}>
+  <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER}`, borderRadius: 3, p: { xs: 1.5, sm: 2 }, mb: 1.5, boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
     <Typography sx={{ fontWeight: 900, fontSize: "0.95rem" }}>{title}</Typography>
     {hint && <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block", mb: 1.25 }}>{hint}</Typography>}
     {children}
@@ -162,36 +155,31 @@ export default function JobReport() {
   }
 
   return (
-    <Box sx={{ px: { xs: 0, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: 1100, mx: "auto" }}>
-      <SectionTabs group="operation" edge />
-      <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2 }}>
-        <Box sx={{ width: 40, height: 40, borderRadius: 2.5, bgcolor: ACCENT, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Assessment />
-        </Box>
-        <Box>
-          <Typography sx={{ fontWeight: 900, fontSize: "1.3rem", color: "#0f172a", lineHeight: 1.25 }}>รายงานงาน</Typography>
-          <Typography variant="caption" sx={{ color: TEXT_SUB }}>
-            นับเป็น “งาน” — งานที่เข้าหลายวันไม่ติดกันนับเป็นงานเดียว ตรงกับการ์ดในหน้าการดำเนินงาน
-          </Typography>
-        </Box>
-      </Stack>
+    <Box sx={PAGE_SX}>
+      <SectionTabs group="operation" />
+      <PageHeader
+        icon={<AssessmentOutlined />}
+        title="รายงานงาน"
+        subtitle="นับเป็น “งาน” — งานที่เข้าหลายวันไม่ติดกันนับเป็นงานเดียว ตรงกับการ์ดในหน้าการดำเนินงาน"
+      />
 
       {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
 
       <ToggleButtonGroup
         exclusive size="small" value={preset} onChange={(e, v) => v && setPreset(v)}
-        sx={{ mb: 2, flexWrap: "wrap", gap: 0.5, "& .MuiToggleButton-root": { border: `1px solid ${BORDER}`, borderRadius: "999px !important", px: 1.5, textTransform: "none" } }}
+        sx={{ mb: 1.5, flexWrap: "wrap", gap: 0.5, "& .MuiToggleButton-root": { border: `1px solid ${BORDER}`, borderRadius: "999px !important", px: 1.5, textTransform: "none" } }}
       >
         {PRESETS.map((p) => <ToggleButton key={p.value} value={p.value}>{p.label}</ToggleButton>)}
       </ToggleButtonGroup>
 
-      <Box sx={{ display: "grid", gap: 1.25, gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(5, 1fr)" }, mb: 1.75 }}>
-        <Kpi label="งานทั้งหมด" value={report.total} sub={`${report.visits} ครั้งเข้างาน`} />
-        <Kpi label="ปิดแล้ว" value={report.done} sub={`${report.doneRate}% ของทั้งหมด`} color="#10b981" />
-        <Kpi label="กำลังดำเนินการ" value={report.inProgress} color={ACCENT} />
-        <Kpi label="ใกล้ครบกำหนด" value={report.warning} sub="เลยกำหนด 1 สัปดาห์" color="#f59e0b" />
-        <Kpi label="ค้างงาน" value={report.overdue} sub="เลยกำหนด 2 สัปดาห์" color="#dc2626" />
-      </Box>
+      {/* ✅ ตัวเลขสรุปชุดเดียวกับทุกหน้า (PageKit) — ตัวเลขสีเข้ม · แดงเฉพาะค้างงาน (กฎ: สีไม่เยอะ) */}
+      <KpiRow columns={5}>
+        <PkKpi label="งานทั้งหมด" value={report.total} sub={`${report.visits} ครั้งเข้างาน`} />
+        <PkKpi label="ปิดแล้ว" value={report.done} sub={`${report.doneRate}% ของทั้งหมด`} />
+        <PkKpi label="กำลังดำเนินการ" value={report.inProgress} />
+        <PkKpi label="ใกล้ครบกำหนด" value={report.warning} sub="เลยกำหนด 1 สัปดาห์" />
+        <PkKpi label="ค้างงาน" value={report.overdue} sub="เลยกำหนด 2 สัปดาห์" alert={report.overdue > 0} />
+      </KpiRow>
 
       <Panel title="คิวงานกองอยู่ขั้นไหน" hint="รอยืนยัน → ยืนยันแล้ว → กำลังดำเนินการ → เสร็จสิ้น">
         <Pipeline rows={report.pipeline} total={report.total} />

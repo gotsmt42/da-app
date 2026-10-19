@@ -23,6 +23,7 @@ import usePermissions from "@/shared/hooks/usePermissions";
 import useOrgSettings from "@/shared/hooks/useOrgSettings";
 import OrgSettingService, { ORG_FALLBACK } from "@/shared/services/OrgSettingService";
 import { thaiDateTime } from "@/shared/utils/thaiDate";
+import { PAGE_NARROW_SX } from "@/shared/ui/PageKit";
 
 const ACCENT = "#0f766e";
 const TEXT_SUB = "#64748b";
@@ -290,7 +291,7 @@ export default function OrganizationSettings() {
   };
 
   return (
-    <Box sx={{ px: { xs: 0, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: 980, mx: "auto" }}>
+    <Box sx={PAGE_NARROW_SX}>
       <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2 }}>
         <Box sx={{ width: 40, height: 40, borderRadius: 2.5, bgcolor: ACCENT, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Business />

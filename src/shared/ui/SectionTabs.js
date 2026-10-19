@@ -36,15 +36,16 @@ const GROUPS = {
   ],
 };
 
-export default function SectionTabs({ group, edge = false }) {
+// ⚠️ edge (เดิมเว้นขอบมือถือเอง) เลิกใช้แล้ว — ทุกหน้าใช้ PAGE_SX ขอบเดียวกัน แถบจึงตรงแนวหัวเพจพอดี
+export default function SectionTabs({ group }) {
   const { userData } = useAuth() || {};
   const { pathname } = useLocation();
   const { badges } = useAppBadges(userData);
   const tabs = (GROUPS[group] || []).filter((t) => t.show(userData));
   if (tabs.length < 2) return null;
   return (
-    <Stack direction="row" sx={{ mb: { xs: 1.25, sm: 1.75 }, p: 0.5, gap: 0.5, bgcolor: "#fff", border: "1px solid #e2e8f0", borderRadius: 3,
-      overflowX: "auto", scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" }, mx: edge ? { xs: 1.5, sm: 0 } : 0 }}>
+    <Stack direction="row" sx={{ mb: 1.5, p: 0.5, gap: 0.5, bgcolor: "#fff", border: "1px solid #e2e8f0", borderRadius: 3, boxShadow: "0 1px 2px rgba(15,23,42,.04)",
+      overflowX: "auto", scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
       {tabs.map((t) => {
         const on = t.match(pathname);
         const n = t.badge ? Number(badges?.[t.badge]) || 0 : 0;

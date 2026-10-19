@@ -212,13 +212,12 @@ export default function HomeMenu({ userData, badges = {}, hideMyJobs = false, hi
   const loneNarrowKey = narrow.length % 2 === 1 ? narrow[narrow.length - 1].key : null;
   // ✅ (17 ต.ค. 2569 ผู้ใช้: "วิเคราะห์หน้าแรก จุดไหนไม่มืออาชีพ") จอคอม: หมวดที่มี ≤3 เมนูเต็มแถวจะเหลือที่ว่างโล่ง 2 ใน 3
   //    → จับคู่หมวดที่ "อยู่ติดกัน" ให้วางคู่กันครึ่งแถว (เช่น รับงาน·วางแผน | ปฏิบัติงาน) · ตัวที่ไม่มีคู่ยังเต็มแถว
-  const widePair = new Set();
-  for (let i = 0; i < cats.length - 1; i += 1) {
-    if (cats[i].items.length <= 3 && cats[i + 1].items.length <= 3) {
-      widePair.add(cats[i].key); widePair.add(cats[i + 1].key);
-      i += 1;
-    }
-  }
+  // ✅ (19 ต.ค. 2569 ผู้ใช้: "ขนาด กรอบ ระยะให้เท่ากัน รวมถึงเมนูหน้าแรก") ไม่ต้องอยู่ติดกันแล้ว —
+  //    หมวดสั้นทุกหมวดวางครึ่งแถว แล้วให้ grid-auto-flow: dense (CSS) เติมช่องว่างเอง
+  //    (เช่น งาน | จัดซื้อ → เบิกค่าใช้จ่ายเต็มแถว → เอกสาร | ข้อมูลหลัก) · ถ้าจำนวนคี่ ตัวสุดท้ายเต็มแถว
+  const shortKeys = cats.filter((c) => c.items.length <= 3).map((c) => c.key);
+  if (shortKeys.length % 2 === 1) shortKeys.pop();
+  const widePair = new Set(shortKeys);
 
   return (
     <nav className="hm" aria-label="เมนูหลัก">

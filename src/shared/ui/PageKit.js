@@ -30,6 +30,19 @@ export const SUCCESS = "#16a34a";
 /** รายการที่ถูกเลือก (แบ่งหน้า/ตัวสลับ/ชิป) — พื้นฟ้าอ่อน ตัวน้ำเงิน ไม่ใช่พื้นทึบ */
 export const SELECTED_SX = { bgcolor: `${ACCENT_SOFT} !important`, color: `${ACCENT_DARK} !important`, borderColor: `${ACCENT_LINE} !important` };
 
+/**
+ * โครงหน้ามาตรฐาน — ความกว้าง/ระยะขอบเท่ากันทุกหน้า
+ * ✅ (19 ต.ค. 2569 ผู้ใช้: "ปรับแต่งทุกๆหน้า ขนาดและกรอบ ระยะให้มันเท่ากัน ทำให้มืออาชีพ")
+ *    เดิมแต่ละหน้าตั้งเอง 1000 / 1100 / 1400 / 1500 px และระยะบนไม่เท่ากัน → สลับแท็บแล้วหัวเพจกระโดด
+ *    • หน้าข้อมูล/รายการ = กว้าง 1500 · หน้าฟอร์ม/ตั้งค่า = narrow 960
+ *    • มือถือไม่เว้นขอบซ้อน (ขอบมาจาก .app-page-container ชั้นเดียว)
+ */
+export const PAGE_SX = { px: { xs: 0, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: 1500, mx: "auto" };
+export const PAGE_NARROW_SX = { ...PAGE_SX, maxWidth: 960 };
+export function PageShell({ narrow, sx, children }) {
+  return <Box sx={{ ...(narrow ? PAGE_NARROW_SX : PAGE_SX), ...sx }}>{children}</Box>;
+}
+
 /** หัวเพจ: ไอคอนกล่องฟ้าอ่อน · ชื่อ · คำอธิบาย · (ด้านขวา) ปุ่ม/ตัวเลข */
 export function PageHeader({ icon, title, subtitle, actions }) {
   return (

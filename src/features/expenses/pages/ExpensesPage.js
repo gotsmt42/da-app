@@ -38,6 +38,7 @@ import MyExpenseTasks from "../components/MyExpenseTasks";
 import { useAuth } from "@/features/auth/AuthContext";
 import ExpenseReport from "./ExpenseReport";
 import { KIND_META, slipMeta, baht, TEXT_SUB, TEXT_MAIN, BORDER_MAIN } from "../expenseMeta";
+import { PAGE_SX } from "@/shared/ui/PageKit";
 
 const INBOX_COLOR = "#d97706";
 const REPORT_COLOR = "#1d4ed8";
@@ -296,7 +297,7 @@ export default function ExpensesPage({ view: viewProp }) {
   ];
 
   return (
-    <Box sx={{ px: { xs: 0, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: 1500, mx: "auto" }}>
+    <Box sx={PAGE_SX}>
       {/* ── หัวหน้าเพจ: สีประจำหน้า + ปุ่มหลักปุ่มเดียว ─────────────────── */}
       <Box sx={{
         // ✅ หัวหน้าเพจพื้นขาว — สีประจำหน้าเหลือแค่ไอคอนกับปุ่มหลัก (เดิมพื้นสี + ขอบสี + แถบบนสี)

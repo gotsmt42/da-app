@@ -26,6 +26,7 @@ import MobileFilterSheet, { FilterSheetButton, ActiveFilterChips, SheetOptions, 
 import {
   PageHeader, Kpi, KpiRow, FilterBar, Panel, EmptyState, DotLabel,
   INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT_DARK, TABLE_HEAD_SX, TABLE_ROW_SX, ICON_BTN_SX,
+  PAGE_SX,
 } from "@/shared/ui/PageKit";
 import { Link, useSearchParams } from "react-router-dom";
 import "@/shared/utils/momentThaiLocale";
@@ -262,7 +263,7 @@ const IssuedDocuments = () => {
   );
 
   return (
-    <Box sx={{ maxWidth: 1500, mx: "auto", p: { xs: 1.25, sm: 2 } }}>
+    <Box sx={PAGE_SX}>
       {/* ✅ ผู้ใช้สั่ง (3 ต.ค. 2569): "หน้าเอกสารยังไม่เข้าธีม ดูข้อมูลยาก" — ใช้ชุด PageKit เดียวกับทุกหน้า
           (หัวกล่องขาว · ตัวเลขสรุปกดกรองได้ · แถบค้นหา · รายการพื้นขาว สีน้อย) */}
       <PageHeader

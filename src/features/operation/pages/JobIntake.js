@@ -42,7 +42,7 @@ import useRealtime from "@/shared/realtime/useRealtime";
 import { refreshAppBadges } from "@/shared/hooks/useAppBadges";
 import { useAuth } from "@/features/auth/AuthContext";
 import { formatThai } from "@/shared/utils/thaiDate";
-import { PageHeader, EmptyState, INK, MUTED, LINE, ACCENT, SURFACE } from "@/shared/ui/PageKit";
+import { PageHeader, EmptyState, INK, MUTED, LINE, ACCENT, SURFACE, PAGE_SX } from "@/shared/ui/PageKit";
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import { getAddDraftEvent, INTAKE_SOURCE_OPTS } from "@/features/calendar/components/EventForms/AddDraftEvent";
 import { isUrgent, openFollowUp } from "@/shared/utils/jobFlow";
@@ -964,7 +964,7 @@ export default function JobIntake() {
   }, [withStage, tab, q, ocFilter]);
 
   return (
-    <Box sx={{ px: { xs: 1.5, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: view === "table" ? 1500 : 1000, mx: "auto" }}>
+    <Box sx={PAGE_SX}>
       <SectionTabs group="intake" />
       <PageHeader icon={<PostAddOutlined />} title="งานเข้า · รับงาน"
         subtitle="รับงาน → ส่งลงตาราง หรือ ส่งมอบ + วางบิล · ติดตามผลเสนอราคา"

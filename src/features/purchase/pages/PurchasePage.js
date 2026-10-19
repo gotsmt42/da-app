@@ -41,6 +41,7 @@ import PrStatusBadge from "../components/PrStatusBadge";
 import {
   PR_ACCENT, PR_DARK, DARK, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, STATUS_ORDER, prStatus, priorityMeta, baht, prJobText, receiveProgress,
 } from "../prMeta";
+import { PAGE_SX } from "@/shared/ui/PageKit";
 
 const PAGE_SIZE = 10;
 const STATUS_ICON = {
@@ -329,7 +330,7 @@ export default function PurchasePage({ view = "mine" }) {
   );
 
   return (
-    <Box sx={{ px: { xs: 0, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: 1500, mx: "auto" }}>
+    <Box sx={PAGE_SX}>
       {/* ── หัวเพจ (โครงเดียวกับหน้าใบเบิก) ── */}
       <Box sx={{ borderRadius: 3, border: `1px solid ${BORDER_MAIN}`, bgcolor: "#fff", px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.75 }, mb: 1.5 }}>
         <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "stretch", sm: "center" }} spacing={{ xs: 1.25, sm: 2 }}>

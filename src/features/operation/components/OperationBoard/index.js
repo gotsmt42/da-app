@@ -60,7 +60,7 @@ import {
   NoteAdd, History, Person, AccessTime, FiberManualRecord,
   TaskAlt, HourglassTop, Cancel, Today,
   Send, Chat, Link as LinkIcon,
-  Print, Share, RequestQuote, ReceiptLong, AssignmentTurnedIn, EventAvailable, Tune,
+  Print, Share, RequestQuote, ReceiptLong, AssignmentTurnedIn, AssignmentTurnedInOutlined, EventAvailable, Tune,
   RemoveCircleOutline, NoteAlt,
   Lock, Groups,
 } from "@mui/icons-material";
@@ -77,7 +77,7 @@ import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { styled, alpha } from "@mui/material/styles";
 
 import TechnicianJobCard, { isDocComplete, isDocRequired } from "@/features/technician/components/TechnicianJobPanel";
-import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LINE, SUCCESS } from "@/shared/ui/PageKit";
+import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LINE, SUCCESS, PAGE_SX, PageHeader, ICON_BTN_SX } from "@/shared/ui/PageKit";
 import LineIcon from "@/shared/ui/LineIcon";
 import { printFile, shareFile, shareToLine, isMobileDevice } from "@/shared/utils/fileActions";
 import DeliveryNoteDialog from "@/features/documents/components/DeliveryNoteDialog";
@@ -3465,39 +3465,22 @@ const Operation = () => {
   );
 
   return (
-    <Box sx={{ px: { xs: 0, sm: 2, md: 3 }, py: { xs: 1.5, sm: 3 }, maxWidth: 1400, mx: "auto" }}>
-      <SectionTabs group="operation" edge />
+    <Box sx={PAGE_SX}>
+      <SectionTabs group="operation" />
 
       {/* Header
           🐛 เดิมบนมือถือ ชื่อหน้ากับแถวปุ่มตกคนละบรรทัด (flexWrap ทำให้ปุ่ม 5 ตัวห่อลงมาเป็นแถบของ
           ตัวเอง) กินความสูงเกือบ 150px ก่อนถึงเนื้อหา
           ✅ บังคับบรรทัดเดียวบนจอแคบ + ย่อปุ่มกลมเหลือ 34px ให้พอดีจอ 393px */}
-      <Stack
-        direction="row" alignItems="center" justifyContent="space-between"
-        sx={{ mb: { xs: 2, sm: 3 } }}
-        flexWrap={{ xs: "nowrap", sm: "wrap" }} gap={{ xs: 0.75, sm: 1 }}
-      >
-        <Box sx={{ minWidth: 0 }}>
-          <Typography
-            fontWeight={800} letterSpacing={-0.5} noWrap
-            sx={{ fontSize: { xs: "1.15rem", sm: "1.5rem" }, lineHeight: 1.3 }}
-          >
-            การดำเนินงาน
-          </Typography>
-          {/* 🐛 BUG ที่แก้ (ตัวเลขใต้หัวข้อไม่ตรงกับสิ่งที่เห็นบนจอ): เดิมโชว์ sortedEvents.length เสมอ
-              ซึ่งเป็นจำนวนงานของแท็บ "รายการงาน" — พอสลับไปแท็บ "รออนุมัติ" ที่มี 0 งาน หัวข้อยังขึ้น
-              "1 รายการ" ค้างอยู่ (จำนวนของอีกแท็บ) อ่านแล้วขัดกันเองทันที
-              ✅ ให้ตัวเลขเปลี่ยนตามแท็บที่เปิดอยู่จริง และซ่อน "กรอง N เงื่อนไข" ตอนอยู่แท็บรออนุมัติ
-              เพราะตัวกรองพวกนั้นไม่มีผลกับแท็บนั้นเลย */}
-          <Typography variant="body2" color="text.secondary">
-            {loading
-              ? "กำลังโหลด..."
-              // 🔁 (17 ต.ค. 2569) เดิม "611 รายการ" (นับวันเข้างาน) ขัดกับแถบสถานะ "ทั้งหมด 61" (นับงาน) — ใช้หน่วย "งาน" ให้ตรงกัน
-              : `${Math.max(0, allJobsCount - closedCount)} งานที่ยังไม่ปิด · ปิดแล้ว ${closedCount}${activeFilterCount > 0 ? ` · กรอง ${activeFilterCount} เงื่อนไข` : ""}`}
-          </Typography>
-        </Box>
-        {/* ✅ ปุ่มวงกลม ขนาด 40px ให้แตะง่ายขึ้นบนมือถือ (เดิม size="small" เล็กไปสำหรับนิ้วมือ)
-            เข้าธีมเดียวกับปุ่มวงกลมที่ใช้ทั่วแอป (bell button ใน Dashboard/Header) */}
+      {/* ✅ (19 ต.ค. 2569 "ขนาด กรอบ ระยะให้เท่ากันทุกหน้า") หัวเพจกล่องขาวชุดเดียวกับหน้าอื่นในกลุ่ม (PageKit.PageHeader) */}
+      <PageHeader
+        icon={<AssignmentTurnedInOutlined />}
+        title="การดำเนินงาน"
+        subtitle={loading
+                ? "กำลังโหลด..."
+                // 🔁 (17 ต.ค. 2569) เดิม "611 รายการ" (นับวันเข้างาน) ขัดกับแถบสถานะ "ทั้งหมด 61" (นับงาน) — ใช้หน่วย "งาน" ให้ตรงกัน
+                : `${Math.max(0, allJobsCount - closedCount)} งานที่ยังไม่ปิด · ปิดแล้ว ${closedCount}${activeFilterCount > 0 ? ` · กรอง ${activeFilterCount} เงื่อนไข` : ""}`}
+        actions={
         <Stack direction="row" gap={{ xs: 0.5, sm: 1 }} flexShrink={0}>
           {/* ✅ มือถือ: ปุ่มสถานะ/ค้นหา/ตัวกรอง — เปิดแผ่นล่าง */}
           {/* ✅ มือถือ (ผู้ใช้: "ปุ่มไม่ชัดเจน มองยาก"): เดิมเป็นไอคอนกลม 5 ปุ่มคนละแบบเรียงกัน เดาไม่ออกว่าอันไหนคืออะไร
@@ -3549,7 +3532,7 @@ const Operation = () => {
           {!isMobile && (<>
           <Tooltip title="รีเฟรช">
             <IconButton onClick={() => fetchEventsFromDB()}
-              sx={{ border: "1px solid", borderColor: "divider", borderRadius: "50%", width: { xs: 34, sm: 40 }, height: { xs: 34, sm: 40 } }}>
+              sx={ICON_BTN_SX}>
               <Refresh fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -3559,7 +3542,7 @@ const Operation = () => {
           <ToggleButtonGroup
             size="small" exclusive value={viewMode}
             onChange={(_, v) => v && setViewMode(v)}
-            sx={{ "& .MuiToggleButton-root": { px: { xs: 0.85, sm: 1.25 }, py: { xs: 0.4, sm: 0.75 }, borderRadius: 2 } }}
+            sx={{ "& .MuiToggleButton-root": { width: 40, height: 40, borderRadius: 2, borderColor: LINE } }}
           >
             <ToggleButton value="card" title="มุมมองการ์ด"><ViewList sx={{ fontSize: 18 }} /></ToggleButton>
             <ToggleButton value="table" title="มุมมองตาราง"><TableChart sx={{ fontSize: 18 }} /></ToggleButton>
@@ -3569,8 +3552,7 @@ const Operation = () => {
               <span>
                 <IconButton onClick={handleExportExcel} disabled={exporting || jobGroups.length === 0}
                   sx={{
-                    border: "1px solid", borderRadius: "50%",
-                    width: { xs: 34, sm: 40 }, height: { xs: 34, sm: 40 },
+                    ...ICON_BTN_SX,
                     borderColor: alpha("#047857", 0.25), color: "#047857",
                     "&:hover": { bgcolor: alpha("#047857", 0.08), borderColor: "#047857" },
                   }}>
@@ -3581,7 +3563,8 @@ const Operation = () => {
           )}
           </>)}
         </Stack>
-      </Stack>
+        }
+      />
 
       {/* ✅ เดิมเป็นแถบ Alert สีฟ้าเต็มความกว้างเขียนว่า "กรองเฉพาะงาน: ..." ซึ่งกินที่และอ่านแล้วเหมือน
           คำเตือนว่ามีอะไรผิด ทั้งที่เป็นเรื่องปกติ (กดมาจากลิงก์เจาะจงงาน) — ย่อเหลือแถบเล็กๆ บรรทัดเดียว

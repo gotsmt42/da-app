@@ -23,7 +23,7 @@ import { useAuth } from "@/features/auth/AuthContext";
 import SessionService from "@/shared/services/SessionService";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { marketingName } from "@/shared/utils/deviceNames";
-import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LINE, SUCCESS } from "@/shared/ui/PageKit";
+import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LINE, SUCCESS, PAGE_NARROW_SX } from "@/shared/ui/PageKit";
 
 const RED = "#dc2626";
 
@@ -167,7 +167,7 @@ export default function LoginDevices() {
   };
 
   return (
-    <Box sx={{ px: { xs: 0, sm: 2.5 }, py: { xs: 1.5, sm: 2.5 }, maxWidth: 860, mx: "auto" }}>
+    <Box sx={PAGE_NARROW_SX}>
       <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2.5, px: 0.5 }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography sx={{ fontWeight: 900, fontSize: "1.3rem", color: INK, lineHeight: 1.25 }}>อุปกรณ์ที่เข้าสู่ระบบ</Typography>
