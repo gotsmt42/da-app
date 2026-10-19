@@ -94,20 +94,6 @@ const refDateOf = (a) => a.quotationDate || a.quotationSentAt || a.start;
 const isExpired = (a) => a.quotationValidUntil && ["sent", "revising"].includes(a.quotationStatus) && moment(a.quotationValidUntil).isBefore(moment(), "day");
 const missingInfo = (a) => !a.quotationAmount || !a.quotationNo;
 
-/** ✅ ผู้ใช้สั่ง "แก้สีสันไม่ให้รกตา" — ป้ายสถานะพื้นเทาอ่อน + จุดสีเล็กๆ (สีอยู่ที่จุดเท่านั้น ยกเว้นต้องตามด่วน) */
-const StatusChip = ({ k, size = "small" }) => {
-  const m = STATUS[k] || STATUS.not_sent;
-  return (
-    <Box component="span" sx={{
-      display: "inline-flex", alignItems: "center", gap: 0.6, height: size === "small" ? 22 : 26, px: 1, borderRadius: 999,
-      bgcolor: "#f8fafc", color: k === "follow_up" ? m.color : "#334155", border: `1px solid ${BORDER}`,
-      fontSize: size === "small" ? "0.72rem" : "0.8rem", fontWeight: 700, whiteSpace: "nowrap",
-    }}>
-      <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: m.color, flexShrink: 0 }} />{m.label}
-    </Box>
-  );
-};
-
 /** ป้ายกำหนดติดตาม — เลยกำหนด (แดง) / วันนี้ (ส้ม) / อีก N วัน (เทา) */
 const DueChip = ({ info }) => {
   if (!info) return null;
