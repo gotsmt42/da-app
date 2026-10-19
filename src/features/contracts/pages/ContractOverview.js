@@ -27,7 +27,7 @@ import useRealtime from "@/shared/realtime/useRealtime";
 import { Navigate, Link, useSearchParams } from "react-router-dom";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
-import Swal from "sweetalert2";
+import Swal from "@/shared/ui/swal";
 import {
   Box, ButtonBase, Stack, Typography, TextField, InputAdornment, IconButton, Tooltip,
   Table, TableBody, TableCell, TableContainer, TableHead, TableFooter, TableRow, Paper, Skeleton,

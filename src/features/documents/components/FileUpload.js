@@ -3,7 +3,7 @@ import { useDropzone } from "react-dropzone";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUpload, faFileImport, faTimes } from "@fortawesome/free-solid-svg-icons";
 import FileService from "@/shared/services/FileService";
-import Swal from "sweetalert2";
+import Swal from "@/shared/ui/swal";
 import PageLoader from "@/shared/ui/PageLoader";
 import { getFileIcon, getFileIconColor } from "@/shared/utils/CustomFile";
 import { escapeHtml } from "@/shared/utils/escapeHtml";

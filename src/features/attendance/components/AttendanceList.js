@@ -12,7 +12,7 @@
  */
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import Swal from "sweetalert2";
+import Swal from "@/shared/ui/swal";
 import { Box, Stack, Typography, Button, ButtonBase, Avatar, Collapse, Dialog, IconButton } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { ExpandMore, EditCalendarOutlined, ChevronRight, DescriptionOutlined, PlaceRounded, LocationOffRounded, OpenInNewRounded, EventBusyOutlined, Close, PhotoCameraOutlined } from "@mui/icons-material";

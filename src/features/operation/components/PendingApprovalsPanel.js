@@ -27,7 +27,7 @@ import {
   HourglassTop, Cancel, EventNote, CalendarMonth,
   ArrowForwardIos, TaskAlt,
 } from "@mui/icons-material";
-import Swal from "sweetalert2";
+import Swal from "@/shared/ui/swal";
 import EventService from "@/shared/services/EventService";
 import AuthService from "@/shared/services/authService";
 import { isPendingApproval, isRejected } from "@/shared/utils/approvalStatus";

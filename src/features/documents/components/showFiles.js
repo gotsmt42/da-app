@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import useRealtime from "@/shared/realtime/useRealtime";
 import FileService from "@/shared/services/FileService";
 import AuthService from "@/shared/services/authService";
-import Swal from "sweetalert2";
+import Swal from "@/shared/ui/swal";
 
 import moment from "moment";
 import { Link } from "react-router-dom";

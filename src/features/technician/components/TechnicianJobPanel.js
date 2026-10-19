@@ -15,7 +15,7 @@ import { isDocRequired, isDocComplete } from "@/shared/utils/jobDocTypes";
 import React, { useState, useRef, useCallback } from "react";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
-import Swal from "sweetalert2";
+import Swal from "@/shared/ui/swal";
 import { formatEventDateRange } from "@/shared/utils/formatDateRange";
 import { isApproved } from "@/shared/utils/approvalStatus";
 import { formatRoundLabel } from "@/shared/utils/contractRounds";

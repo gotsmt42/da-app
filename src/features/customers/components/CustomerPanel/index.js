@@ -15,7 +15,7 @@ import useRealtime from "@/shared/realtime/useRealtime";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import CustomerService from "@/shared/services/CustomerService";
 import EventService from "@/shared/services/EventService";
-import Swal from "sweetalert2";
+import Swal from "@/shared/ui/swal";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import { resolveOperationGroup } from "@/shared/utils/overdueJobs";

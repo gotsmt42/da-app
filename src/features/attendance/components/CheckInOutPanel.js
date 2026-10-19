@@ -21,7 +21,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import moment from "moment";
-import Swal from "sweetalert2";
+import Swal from "@/shared/ui/swal";
 import { Box, Stack, Typography, Button, ButtonBase, Collapse, Dialog, DialogContent, TextField } from "@mui/material";
 import { alpha, createTheme, ThemeProvider } from "@mui/material/styles";
 import appTheme from "@/app/theme";
@@ -295,6 +295,14 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
     else Swal.fire({ icon, title, text, ...(timer ? { timer, showConfirmButton: false } : {}) });
   };
 
+  /** ✅ (19 ต.ค. 2569 ผู้ใช้: "ให้มีคอนเฟิร์มทุกจุดที่กดปุ่ม") — ถามก่อนบันทึก · ในฟอร์ม SweetAlert ใช้กล่องถามของเบราว์เซอร์ (ซ้อน Swal ไม่ได้) */
+  const ask = async (title, text, confirmButtonText) => {
+    if (embedded) return window.confirm(`${title}
+${text}`);
+    const r = await Swal.fire({ icon: "question", title, text, showCancelButton: true, confirmButtonText });
+    return r.isConfirmed;
+  };
+
   const load = useCallback(async () => {
     if (!event?._id) return;
     try {
@@ -375,6 +383,7 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
     : 0;
 
   const ack = async () => {
+    if (!(await ask("รับทราบงานนี้?", `${event.title || "งาน"}${event.site ? ` · ${event.site}` : ""} — แอดมินจะเห็นว่าคุณรับงานแล้ว`, "รับทราบงาน"))) return;
     setAcking(true);
     try {
       const res = await EventService.AckJob(event._id);
@@ -388,6 +397,7 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
   };
 
   const confirmJob = async () => {
+    if (!(await ask("ยืนยันนัดหมายเข้างาน?", `เข้างาน ${formatThai(moment(event.start), "D MMM YYYY")} — หัวหน้าทีมจะได้รับแจ้ง`, "ยืนยันนัดหมาย"))) return;
     setAcking(true);
     try {
       const res = await EventService.ConfirmJob(event._id);

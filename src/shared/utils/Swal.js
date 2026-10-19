@@ -1,4 +1,4 @@
-import Swal from "sweetalert2";
+import Swal from "@/shared/ui/swal";
 
 export const SwalDelete = () => {
   return new Promise((resolve, reject) => {

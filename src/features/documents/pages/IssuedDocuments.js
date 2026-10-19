@@ -32,7 +32,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import "@/shared/utils/momentThaiLocale";
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import { thaiDateNumeric } from "@/shared/utils/thaiDate";
-import Swal from "sweetalert2";
+import Swal from "@/shared/ui/swal";
 import { jsPDF } from "jspdf";
 import thSarabunFont from "@/assets/fonts/THSarabunNew_base64";
 import { useAuth } from "@/features/auth/AuthContext";

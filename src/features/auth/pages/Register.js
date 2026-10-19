@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import Swal from "sweetalert2";
+import Swal from "@/shared/ui/swal";
 import { Button } from "react-bootstrap";
 import Google from "@mui/icons-material/Google";
 import Facebook from "@mui/icons-material/Facebook";

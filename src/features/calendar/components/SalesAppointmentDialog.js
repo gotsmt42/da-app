@@ -22,7 +22,7 @@ import {
   EventBusy, Replay, PlaceOutlined, BusinessOutlined, AccessTime, NotesOutlined, PhotoCameraOutlined,
   LockOutlined, PhoneOutlined, PaidOutlined, EventNote,
 } from "@mui/icons-material";
-import Swal from "sweetalert2";
+import Swal from "@/shared/ui/swal";
 import EventService from "@/shared/services/EventService";
 import { getOptimizedImageUrl } from "@/shared/utils/cloudinaryImage";
 import ImagePreview from "@/shared/ui/ImagePreview";

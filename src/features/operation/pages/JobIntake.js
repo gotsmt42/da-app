@@ -24,7 +24,7 @@ import JobKindTag from "@/shared/ui/JobKindTag";
 import { resolveQuotationGroup, getFollowUpInfo } from "@/shared/utils/quotationTracking";
 import { Link } from "react-router-dom";
 import moment from "moment";
-import Swal from "sweetalert2";
+import Swal from "@/shared/ui/swal";
 import TomSelect from "tom-select";
 import "tom-select/dist/css/tom-select.css";
 import {
@@ -312,7 +312,7 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, onUplo
         <tbody>
           {rows.map(({ j, s, oc }) => {
             const ro = readOnlyOf(j);
-            const isOpen = !j.intakeNote && open.has(j._id);
+            const isOpen = open.has(j._id);
             const stall = stalledDays(j, s);
             const owner = j.responsiblePerson ? personOf(j.responsiblePerson) : null;
             // ✅ (19 ต.ค. 2569 ผู้ใช้: "ให้มีปุ่มเหมือนอันอื่นด้วยให้สอดคล้องสมบูรณ์") — ทุกแถวมีปุ่มสิ่งที่ต้องทำต่อ
@@ -323,7 +323,7 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, onUplo
               : s.note
                 ? (s.i === 0
                   ? <Button size="small" onClick={() => onNoteDone(j)} sx={{ ...SUCCESS, height: 30, px: 1.25 }}>ทำเสร็จแล้ว</Button>
-                  : <Button size="small" onClick={() => onNoteDone(j, true)} sx={ghost}>นำกลับมาทำต่อ</Button>)
+                  : <Button size="small" onClick={() => toggle(j._id)} sx={{ ...ghost, color: MUTED, borderColor: LINE }}>รายละเอียด</Button>)
                 : s.nv
                   ? (s.i === 0
                     ? <Button size="small" onClick={() => onDeliver(j)} sx={{ ...SUCCESS, height: 30, px: 1.25 }}>ส่งของแล้ว</Button>
@@ -345,10 +345,10 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, onUplo
                       ? <Button component={Link} to={`/operation/${j._id}`} size="small" sx={ghost}>ดูงาน</Button>
                       : <Button size="small" onClick={() => toggle(j._id)} sx={{ ...ghost, color: MUTED, borderColor: LINE }}>รายละเอียด</Button>;
             return [
-              <Box component="tr" key={j._id} onClick={(e) => { if (!j.intakeNote && !e.target.closest("a,button,label")) toggle(j._id); }}
+              <Box component="tr" key={j._id} onClick={(e) => { if (!e.target.closest("a,button,label")) toggle(j._id); }}
                 sx={{ cursor: "pointer", "& > td": { bgcolor: isOpen ? alpha(ACCENT, 0.04) : "transparent" }, "&:hover > td": { bgcolor: isOpen ? alpha(ACCENT, 0.06) : "#f8fafc" } }}>
                 <Box component="td" sx={{ ...td, px: 0.5, textAlign: "center" }}>
-                  {!j.intakeNote && <ChevronRight sx={{ fontSize: 20, color: "#94a3b8", transition: "transform .15s", transform: isOpen ? "rotate(90deg)" : "none" }} />}
+                  <ChevronRight sx={{ fontSize: 20, color: "#94a3b8", transition: "transform .15s", transform: isOpen ? "rotate(90deg)" : "none" }} />
                 </Box>
                 {/* ✅ (19 ต.ค. 2569 ผู้ใช้: "เอาช่องวันที่ไปไว้หน้าสุด ชัดเจน สวยงาม") — กล่องวันที่แบบปฏิทิน (ยังไม่ลงวัน = กล่องเส้นประบอกแผน) */}
                 <Box component="td" sx={{ ...td, width: 96 }}>
@@ -863,6 +863,17 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
               )}
             </Stack>
             </>)}
+            {/* บันทึกงานในแถวตาราง: แสดงข้อความบันทึกเต็ม + ทำเสร็จเมื่อไร/โดยใคร (หัวการ์ดถูกซ่อน) */}
+            {inRow && job.intakeNote && (
+              <Box sx={{ px: 1.25, py: 1, borderRadius: 2, bgcolor: SURFACE, border: `1px solid ${LINE}` }}>
+                <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: "#94a3b8", mb: 0.25 }}>บันทึกงาน</Typography>
+                <Typography sx={{ fontSize: "0.86rem", color: "#334155", lineHeight: 1.55, whiteSpace: "pre-line", overflowWrap: "anywhere" }}>{job.description || "—"}</Typography>
+                <Typography sx={{ fontSize: "0.74rem", color: MUTED, mt: 0.6 }}>
+                  บันทึก {formatThai(moment(job.intakeAt), "D MMM YYYY")}{job.intakeBy ? ` · ${job.intakeBy}` : ""}
+                  {job.noteDoneAt ? ` · ทำเสร็จ ${formatThai(moment(job.noteDoneAt), "D MMM YYYY HH:mm")}${job.noteDoneBy ? ` โดย ${job.noteDoneBy}` : ""}` : ""}
+                </Typography>
+              </Box>
+            )}
             {/* ✅ (15 ต.ค. 2569 ผู้ใช้: "แสดงรายละเอียดงานคร่าวๆด้วย") — กล่องรายละเอียด (ไม่เกิน 3 บรรทัด) + อุปกรณ์ที่ต้องเตรียม */}
             {!job.intakeNote && (
               <Box sx={{ mt: 1, px: 1.25, py: 0.9, borderRadius: 2, bgcolor: SURFACE, border: `1px solid ${LINE}` }}>
@@ -1097,7 +1108,17 @@ export default function JobIntake() {
     }
   };
   // ✅ (15 ต.ค. 2569) บันทึกงาน → ทำเสร็จแล้ว / นำกลับมาทำต่อ
+  // ✅ (19 ต.ค. 2569 ผู้ใช้: "ให้มีคอนเฟิร์มด้วย ทุกจุดที่มีการกดปุ่ม") — ถามก่อนเปลี่ยนสถานะทุกครั้ง
   const noteDone = async (job, undo = false) => {
+    const ok = await Swal.fire({
+      icon: "question",
+      title: undo ? "นำบันทึกนี้กลับมาทำต่อ?" : "ทำงานนี้เสร็จแล้ว?",
+      html: `<div style="font-size:14px;color:#475569;white-space:pre-line">${String(job.description || "บันทึกงาน").replace(/[<>&]/g, "")}</div>`,
+      showCancelButton: true,
+      confirmButtonText: undo ? "นำกลับมาทำต่อ" : "ทำเสร็จแล้ว",
+      confirmButtonColor: undo ? ACCENT : GREEN,
+    });
+    if (!ok.isConfirmed) return;
     try {
       await EventService.NoteDone(job._id, undo ? { undo: true } : {});
       await load(); refreshAppBadges();
@@ -1119,6 +1140,12 @@ export default function JobIntake() {
       : { icon: "success", title: "แนบใบวางบิลแล้ว", text: "ตามรับเงินต่อได้ที่หน้าติดตามวางบิล", timer: 1600, showConfirmButton: false });
   };
   const restoreJob = async (job) => {
+    const ok = await Swal.fire({
+      icon: "question", title: "นำงานนี้กลับมา?",
+      html: `<div style="font-size:14px;color:#475569">${[job.title, job.site || job.company, job.jobNo].filter(Boolean).join(" · ").replace(/[<>&]/g, "")}</div>`,
+      text: undefined, showCancelButton: true, confirmButtonText: "นำกลับมา",
+    });
+    if (!ok.isConfirmed) return;
     try {
       await EventService.CancelIntake(job._id, { restore: true });
       await load(); refreshAppBadges(); setTab("waiting");

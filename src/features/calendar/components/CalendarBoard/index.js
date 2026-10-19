@@ -12,7 +12,7 @@ import interactionPlugin from "@fullcalendar/interaction";
 
 import listPlugin from "@fullcalendar/list";
 
-import Swal from "sweetalert2";
+import Swal from "@/shared/ui/swal";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"; // Import FontAwesomeIcon component
 

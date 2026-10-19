@@ -1,4 +1,4 @@
-import Swal from "sweetalert2";
+import Swal from "@/shared/ui/swal";
 
 // ✅ User.imageUrl มีค่า default เป็น path สัมพัทธ์ "asset/image/userDefault-2.jpg" (ตั้งไว้ที่ backend
 // models/User.js) ซึ่งไม่ใช่ URL จริงที่โหลดได้ (ไม่ใช่ path ที่ frontend serve อยู่) — เดิมเช็คแค่

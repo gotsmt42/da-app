@@ -11,7 +11,7 @@
  */
 import { useState } from "react";
 import moment from "moment";
-import Swal from "sweetalert2";
+import Swal from "@/shared/ui/swal";
 import { Link } from "react-router-dom";
 import { Box, Stack, Typography, Button } from "@mui/material";
 import { alpha } from "@mui/material/styles";

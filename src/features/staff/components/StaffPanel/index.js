@@ -16,7 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import useRealtime from "@/shared/realtime/useRealtime";
 import AuthService from "@/shared/services/authService";
 import API from "@/shared/api/axiosInstance";
-import Swal from "sweetalert2";
+import Swal from "@/shared/ui/swal";
 
 import {
   TextField, Button, Snackbar, Alert, Box, Stack, Typography, Avatar, IconButton, Tooltip, Skeleton,

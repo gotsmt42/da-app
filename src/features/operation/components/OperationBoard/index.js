@@ -20,7 +20,7 @@ import EventService from "@/shared/services/EventService";
 import AuthService from "@/shared/services/authService";
 import JobTypeService from "@/shared/services/JobTypeService";
 import SystemTypeService from "@/shared/services/SystemTypeService";
-import Swal from "sweetalert2";
+import Swal from "@/shared/ui/swal";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import {

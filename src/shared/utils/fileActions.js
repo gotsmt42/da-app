@@ -1,4 +1,4 @@
-import Swal from "sweetalert2";
+import Swal from "@/shared/ui/swal";
 
 // ✅ ตรวจว่าเป็นมือถือ/แท็บเล็ตหรือไม่ — ใช้ตัดสินใจว่าจะเสนอปุ่มไหนเป็นตัวหลักในเมนูแชร์
 // เหตุผล: navigator.share ฝั่ง "แชร์ไฟล์จริง" ใช้ได้ดีบนมือถือเท่านั้น (Android/iOS ที่แอป

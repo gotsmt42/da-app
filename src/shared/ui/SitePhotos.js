@@ -9,7 +9,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import moment from "moment";
-import Swal from "sweetalert2";
+import Swal from "@/shared/ui/swal";
 import { Box, Stack, Typography, Button, IconButton, CircularProgress } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { AddAPhotoOutlined, PhotoLibraryOutlined, Close, InsertDriveFileOutlined, PictureAsPdfOutlined } from "@mui/icons-material";
