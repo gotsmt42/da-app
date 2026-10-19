@@ -91,3 +91,18 @@ export const resolveQuotationGroup = (event) => {
   }
   return event.quotationStatus; // "approved" | "rejected" | "revising"
 };
+
+/**
+ * ✅ (19 ต.ค. 2569 ผู้ใช้: "สถานะต่างๆ ต้องอัปเดตพร้อมๆ กับทุกหน้าดำเนินการ")
+ * ชื่อ/สีสถานะใบเสนอราคาชุดเดียวทั้งแอป — หน้าติดตามใบเสนอราคา · งานเข้า · การดำเนินงาน · งานของฉัน ใช้ตัวนี้
+ * (คีย์ = resolveQuotationGroup) ข้อมูลมาจากงานตัวเดียวกัน และทุกหน้าโหลดใหม่เองเมื่อมีการบันทึก (useRealtime "events")
+ */
+export const QUOTE_STATUS = {
+  waiting_file: { label: "รอแนบใบเสนอราคา", short: "รอแนบไฟล์", color: "#64748b" },
+  not_sent: { label: "กำลังเริ่มนับติดตาม", short: "เริ่มนับ", color: "#d97706" },
+  sent: { label: "รอลูกค้าตอบ", short: "รอลูกค้าตอบ", color: "#2563eb" },
+  follow_up: { label: "ถึงเวลาติดตาม", short: "ถึงเวลาติดตาม", color: "#dc2626" },
+  revising: { label: "ลูกค้าขอแก้ไข", short: "ขอแก้ไข", color: "#7c3aed" },
+  approved: { label: "ได้งาน", short: "ได้งาน", color: "#16a34a" },
+  rejected: { label: "ไม่ได้งาน", short: "ไม่ได้งาน", color: "#64748b" },
+};

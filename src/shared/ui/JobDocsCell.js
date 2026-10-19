@@ -12,17 +12,16 @@ import { CheckCircleRounded, RadioButtonUncheckedRounded, RemoveCircleOutlineRou
 import moment from "moment";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { JOB_DOC_TYPES, isDocComplete, isDocRequired } from "@/shared/utils/jobDocTypes";
-import { resolveQuotationGroup } from "@/shared/utils/quotationTracking";
+import { resolveQuotationGroup, QUOTE_STATUS } from "@/shared/utils/quotationTracking";
 import { useAuth } from "@/features/auth/AuthContext";
 import { can } from "@/shared/utils/roles";
 import lazyWithRetry from "@/shared/utils/lazyWithRetry";
 
 const QuotationDialogHost = lazyWithRetry(() => import("@/features/finance/pages/QuotationTracking").then((m) => ({ default: m.QuotationDialogHost })));
 
-const QUOTE = {
-  waiting_file: ["รอแนบไฟล์", "#d97706", "แนบ"], not_sent: ["กำลังเริ่มนับ", "#d97706", "เปิด"], sent: ["รอลูกค้าตอบ", "#2563eb", "ติดตาม"],
-  follow_up: ["ถึงเวลาติดตาม", "#dc2626", "ติดตาม"], revising: ["ลูกค้าขอแก้ไข", "#7c3aed", "ติดตาม"], approved: ["ได้งาน", "#16a34a", "เปิด"], rejected: ["ไม่ได้งาน", "#64748b", "เปิด"],
-};
+// [ชื่อสั้น, สี, ปุ่ม] — ชื่อ/สีจาก QUOTE_STATUS ชุดเดียวทั้งแอป
+const BTN_LABEL = { waiting_file: "แนบ", not_sent: "เปิด", sent: "ติดตาม", follow_up: "ติดตาม", revising: "ติดตาม", approved: "เปิด", rejected: "เปิด" };
+const QUOTE = Object.fromEntries(Object.entries(QUOTE_STATUS).map(([k, v]) => [k, [v.short, v.color, BTN_LABEL[k]]]));
 
 export default function JobDocsCell({ event }) {
   const { userData } = useAuth() || {};

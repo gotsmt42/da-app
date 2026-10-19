@@ -23,7 +23,7 @@ import { alpha } from "@mui/material/styles";
 import {
   Box, Stack, Typography, TextField, InputAdornment, IconButton, Chip, Avatar, Tooltip, Skeleton, Snackbar, Alert,
   Button, Dialog, DialogTitle, DialogContent, DialogActions, useMediaQuery, Pagination, Checkbox, FormControlLabel,
-  Table, TableBody, TableCell, TableHead, TableRow, Collapse, Drawer, Badge,
+  Collapse, Drawer, Badge,
 } from "@mui/material";
 import {
   Search, Close, Refresh, RequestQuote, Send, CheckCircle, Cancel, Autorenew, HourglassTop, WarningAmber, ChevronRight,
@@ -37,7 +37,9 @@ import { useAuth } from "@/features/auth/AuthContext";
 import EventService from "@/shared/services/EventService";
 import { FileUploadSection, CommentThread, FilePreviewDialog } from "@/features/operation/components/OperationBoard";
 import { getOverdueGroupKey } from "@/shared/utils/overdueJobs";
-import { WARNING_DAYS_AFTER_SENT, getFollowUpInfo, resolveQuotationGroup } from "@/shared/utils/quotationTracking";
+import { WARNING_DAYS_AFTER_SENT, getFollowUpInfo, resolveQuotationGroup, QUOTE_STATUS } from "@/shared/utils/quotationTracking";
+import DateCell from "@/shared/ui/DateCell";
+import JobKindTag from "@/shared/ui/JobKindTag";
 import { formatEventDateRange } from "@/shared/utils/formatDateRange";
 import { formatRoundLabel } from "@/shared/utils/contractRounds";
 import { formatThai, thaiDate } from "@/shared/utils/thaiDate";
@@ -55,15 +57,15 @@ const BORDER = "#e2e8f0";
 const PAGE_SIZE = 15;
 
 /** สถานะย่อยของใบ — ลำดับ = ลำดับขั้นตอนจริง (ใช้ทั้งการ์ดสถานะและการเรียง) */
+// ชื่อ/สีมาจาก QUOTE_STATUS (ชุดเดียวทั้งแอป) — ที่นี่เพิ่มแค่ไอคอน
 const STATUS = {
-  follow_up: { label: "ถึงเวลาติดตาม", short: "ตามด่วน", color: "#dc2626", icon: WarningAmber },
-  sent: { label: "รอลูกค้าตอบ", short: "รอตอบ", color: "#2563eb", icon: Send },
-  revising: { label: "ลูกค้าขอแก้ไข", short: "ขอแก้ไข", color: "#7c3aed", icon: Autorenew },
-  // ✅ ไม่มีขั้น "ส่งลูกค้า" แล้ว — มีไฟล์แต่ยังไม่เริ่มนับ = รอช่างส่งงาน (services/quotationAutoStart.js)
-  not_sent: { label: "กำลังเริ่มนับ", short: "เริ่มนับ", color: "#d97706", icon: HourglassTop },
-  waiting_file: { label: "รอแนบใบเสนอราคา", short: "รอไฟล์", color: "#64748b", icon: AttachFile },
-  approved: { label: "ได้งาน", short: "ได้งาน", color: "#15803d", icon: CheckCircle },
-  rejected: { label: "ไม่ได้งาน", short: "ไม่ได้งาน", color: "#94a3b8", icon: Cancel },
+  follow_up: { ...QUOTE_STATUS.follow_up, short: "ตามด่วน", icon: WarningAmber },
+  sent: { ...QUOTE_STATUS.sent, short: "รอตอบ", icon: Send },
+  revising: { ...QUOTE_STATUS.revising, icon: Autorenew },
+  not_sent: { ...QUOTE_STATUS.not_sent, icon: HourglassTop },
+  waiting_file: { ...QUOTE_STATUS.waiting_file, short: "รอไฟล์", icon: AttachFile },
+  approved: { ...QUOTE_STATUS.approved, icon: CheckCircle },
+  rejected: { ...QUOTE_STATUS.rejected, icon: Cancel },
 };
 const STATUS_ORDER = ["follow_up", "sent", "revising", "not_sent", "waiting_file", "approved", "rejected"];
 const OPEN = ["follow_up", "sent", "revising", "not_sent", "waiting_file"];
@@ -155,83 +157,109 @@ const KV = ({ label, children, color }) => (
 );
 
 // ─── ตาราง (จอใหญ่) ───────────────────────────────────────────────────────────
-const DesktopTable = ({ jobs, onOpen, onPreview }) => (
-  <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER}`, borderRadius: 3, overflowX: "auto", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
-    <Table size="small" sx={{ minWidth: 1080, "& th": { fontWeight: 800, color: TEXT_SUB, fontSize: "0.74rem", bgcolor: "#f8fafc", whiteSpace: "nowrap" } }}>
-      <TableHead>
-        <TableRow>
-          <TableCell>ลูกค้า / โครงการ</TableCell>
-          <TableCell>ใบเสนอราคา</TableCell>
-          <TableCell>ผู้รับผิดชอบ</TableCell>
-          <TableCell align="right">มูลค่า</TableCell>
-          <TableCell>เริ่มนับ / ยืนราคา</TableCell>
-          <TableCell>การติดตาม</TableCell>
-          <TableCell>สถานะ</TableCell>
-          <TableCell width={36} />
-        </TableRow>
-      </TableHead>
-      <TableBody>
-        {jobs.map((job) => {
-          const a = job.anchor;
-          const info = job.info;
-          const files = a.quotationFiles || [];
-          return (
-            <TableRow key={a._id} hover onClick={() => onOpen(job)} sx={{ cursor: "pointer", "& td": { py: 1.1, borderColor: BORDER } }}>
-              <TableCell sx={{ maxWidth: 300 }}>
-                <Typography noWrap sx={{ fontWeight: 800, fontSize: "0.86rem", color: TEXT_MAIN }}>{siteText(a)}</Typography>
-                <Typography noWrap sx={{ fontSize: "0.74rem", color: TEXT_SUB }}>{jobText(a) || "—"}{a.time ? ` · ครั้งที่ ${formatRoundLabel(a.time, a.visitCount, a)}` : ""}</Typography>
-              </TableCell>
-              <TableCell sx={{ whiteSpace: "nowrap" }}>
-                <Stack direction="row" spacing={0.5} alignItems="center">
-                  <Typography sx={{ fontWeight: 700, fontSize: "0.84rem", color: a.quotationNo ? TEXT_MAIN : "#94a3b8" }}>{a.quotationNo || "ไม่มีเลขที่"}</Typography>
+// 🔁 (19 ต.ค. 2569 ผู้ใช้: "แก้ไขตารางหน้าติดตามใบเสนอราคา จัดวางให้สวยงาม ชัดเจนขึ้น ย้ายผู้รับผิดชอบมาไว้หน้าสุด ข้อมูลสอดคล้อง")
+//    คอลัมน์: ผู้รับผิดชอบ · วันที่งาน · งาน (ประเภท) · ลูกค้า/โครงการ · ใบเสนอราคา (เลขที่/วันที่/เปิดไฟล์) · มูลค่า · การติดตาม · สถานะ · ปุ่ม
+//    หัวตาราง/ระยะ/ป้ายชุดเดียวกับตารางหน้าอื่น (การดำเนินงาน · งานเข้า · วางบิล)
+const ACTION = {
+  follow_up: { label: "บันทึกติดตาม", primary: true, color: "#dc2626" },
+  sent: { label: "อัปเดตผล", primary: true },
+  revising: { label: "อัปเดตผล", primary: true },
+  not_sent: { label: "เปิด" },
+  waiting_file: { label: "แนบไฟล์", primary: true },
+  approved: { label: "ดู" },
+  rejected: { label: "ดู" },
+};
+const DesktopTable = ({ jobs, onOpen, onPreview }) => {
+  const th = { textAlign: "left", fontSize: "0.74rem", fontWeight: 800, color: TEXT_SUB, px: 1.25, py: 1.1, borderBottom: `1px solid ${BORDER}`, whiteSpace: "nowrap", bgcolor: "#f8fafc" };
+  const td = { fontSize: "0.82rem", color: "#334155", px: 1.25, py: 1.2, borderBottom: `1px solid ${BORDER}`, verticalAlign: "top" };
+  const sub = { fontSize: "0.74rem", color: TEXT_SUB, lineHeight: 1.45 };
+  return (
+    <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER}`, borderRadius: 3, overflowX: "auto", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
+      <Box component="table" sx={{ width: "100%", minWidth: 1280, borderCollapse: "collapse" }}>
+        <thead>
+          <tr>{["ผู้รับผิดชอบ", "วันที่งาน", "งาน", "ลูกค้า / โครงการ", "ใบเสนอราคา", "มูลค่า", "การติดตาม", "สถานะ", ""].map((h, i) => (
+            <Box component="th" key={i} sx={{ ...th, ...(i === 5 ? { textAlign: "right" } : {}) }}>{h}</Box>
+          ))}</tr>
+        </thead>
+        <tbody>
+          {jobs.map((job) => {
+            const a = job.anchor;
+            const info = job.info;
+            const files = a.quotationFiles || [];
+            const m = STATUS[job.groupKey] || STATUS.not_sent;
+            const act = ACTION[job.groupKey] || { label: "เปิด" };
+            const actColor = act.color || "#2563eb";
+            return (
+              <Box component="tr" key={a._id} onClick={() => onOpen(job)}
+                sx={{ cursor: "pointer", "&:hover": { bgcolor: "#f8fafc" }, "&:last-child td": { borderBottom: 0 }, boxShadow: `inset 3px 0 0 ${m.color}` }}>
+                <Box component="td" sx={{ ...td, minWidth: 150 }}><Owner name={ownerOf(a)} size={30} /></Box>
+                <Box component="td" sx={{ ...td, width: 96 }}><DateCell start={a.start} end={a.end} allDay={a.allDay} /></Box>
+                <Box component="td" sx={{ ...td, minWidth: 180, maxWidth: 230 }}>
+                  <JobKindTag event={a} />
+                  <Typography sx={{ mt: 0.5, fontSize: "0.86rem", fontWeight: 800, color: TEXT_MAIN }}>{jobText(a) || "งาน"}</Typography>
+                  {a.jobNo && <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#94a3b8" }}>{a.jobNo}</Typography>}
+                </Box>
+                <Box component="td" sx={{ ...td, minWidth: 170, maxWidth: 230 }}>
+                  <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: TEXT_MAIN, overflowWrap: "anywhere" }}>{a.company || a.site || "ไม่ระบุลูกค้า"}</Typography>
+                  {a.site && a.site !== a.company && <Typography sx={{ ...sub, overflowWrap: "anywhere" }}>{a.site}</Typography>}
+                </Box>
+                <Box component="td" sx={{ ...td, minWidth: 150 }}>
+                  <Typography sx={{ fontSize: "0.82rem", fontWeight: 800, color: a.quotationNo ? TEXT_MAIN : "#94a3b8" }}>{a.quotationNo || "ไม่มีเลขที่"}</Typography>
+                  {a.quotationDate && <Typography sx={sub}>ลงวันที่ {thaiDate(a.quotationDate)}</Typography>}
                   {files.length > 0 && (
-                    <Tooltip title={`เปิดไฟล์ใบเสนอราคา${files.length > 1 ? ` (${files.length} ไฟล์)` : ""}`}>
-                      <IconButton size="small" onClick={(e) => { e.stopPropagation(); onPreview(files[files.length - 1].fileUrl, files[files.length - 1].fileName); }} sx={{ p: 0.25, color: "#475569" }}>
-                        <Description sx={{ fontSize: 17 }} />
-                      </IconButton>
-                    </Tooltip>
+                    <Box component="button" type="button" onClick={(e) => { e.stopPropagation(); onPreview(files[files.length - 1].fileUrl, files[files.length - 1].fileName); }}
+                      sx={{ mt: 0.4, display: "inline-flex", alignItems: "center", gap: 0.4, height: 22, px: 0.85, border: 0, borderRadius: 99, cursor: "pointer", font: "inherit",
+                        bgcolor: alpha("#2563eb", 0.08), color: "#2563eb", fontSize: "0.7rem", fontWeight: 800, "&:hover": { bgcolor: alpha("#2563eb", 0.14) } }}>
+                      <AttachFile sx={{ fontSize: 13 }} />เปิดไฟล์{files.length > 1 ? ` (${files.length})` : ""}
+                    </Box>
                   )}
-                </Stack>
-                <Typography sx={{ fontSize: "0.72rem", color: TEXT_SUB }}>{a.quotationDate ? thaiDate(a.quotationDate) : `งาน ${formatEventDateRange(a)}`}</Typography>
-              </TableCell>
-              <TableCell sx={{ maxWidth: 170 }}><Owner name={ownerOf(a)} size={28} /></TableCell>
-              <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
-                {a.quotationAmount ? (
-                  <>
-                    <Typography sx={{ fontWeight: 800, fontSize: "0.9rem", color: TEXT_MAIN }}>{baht(a.quotationAmount)}</Typography>
-                    <Typography sx={{ fontSize: "0.68rem", color: TEXT_SUB }}>{a.quotationVatIncluded ? "รวม VAT" : "ก่อน VAT"}</Typography>
-                  </>
-                ) : <Typography sx={{ fontSize: "0.78rem", fontWeight: 600, color: "#94a3b8" }}>ยังไม่ระบุ</Typography>}
-              </TableCell>
-              <TableCell sx={{ whiteSpace: "nowrap" }}>
-                <Typography sx={{ fontSize: "0.8rem", color: a.quotationSentAt ? TEXT_MAIN : TEXT_SUB }}>{a.quotationSentAt ? thaiDate(a.quotationSentAt) : "ยังไม่เริ่มนับ"}</Typography>
-                {a.quotationValidUntil && (
-                  <Typography sx={{ fontSize: "0.7rem", fontWeight: isExpired(a) ? 800 : 500, color: isExpired(a) ? "#dc2626" : TEXT_SUB }}>
-                    {isExpired(a) ? "หมดอายุ " : "ยืนราคาถึง "}{thaiDate(a.quotationValidUntil)}
-                  </Typography>
-                )}
-              </TableCell>
-              <TableCell sx={{ whiteSpace: "nowrap" }}>
-                {info ? (
-                  <>
-                    <DueChip info={info} />
-                    <Typography sx={{ fontSize: "0.7rem", color: TEXT_SUB }}>
-                      {info.followUpCount ? `ตามแล้ว ${info.followUpCount} ครั้ง` : "ยังไม่เคยตาม"} · เงียบ {info.daysSinceLastContact} วัน
-                    </Typography>
-                  </>
-                ) : a.quotationDecisionAt ? (
-                  <Typography sx={{ fontSize: "0.74rem", color: TEXT_SUB }}>ตอบกลับ {thaiDate(a.quotationDecisionAt)}{a.quotationPoNo ? ` · PO ${a.quotationPoNo}` : ""}</Typography>
-                ) : <Typography sx={{ fontSize: "0.74rem", color: "#cbd5e1" }}>—</Typography>}
-              </TableCell>
-              <TableCell><StatusChip k={job.groupKey} /></TableCell>
-              <TableCell><ChevronRight sx={{ color: "#cbd5e1" }} /></TableCell>
-            </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
-  </Box>
-);
+                </Box>
+                <Box component="td" sx={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>
+                  {a.quotationAmount ? (
+                    <>
+                      <Typography sx={{ fontWeight: 900, fontSize: "0.9rem", color: TEXT_MAIN, fontVariantNumeric: "tabular-nums" }}>{baht(a.quotationAmount)}</Typography>
+                      <Typography sx={sub}>{a.quotationVatIncluded ? "รวม VAT" : "ก่อน VAT"}</Typography>
+                    </>
+                  ) : <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: "#d97706" }}>ยังไม่ระบุ</Typography>}
+                </Box>
+                <Box component="td" sx={{ ...td, minWidth: 170 }}>
+                  {info ? (
+                    <>
+                      <DueChip info={info} />
+                      <Typography sx={sub}>เริ่มนับ {thaiDate(a.quotationSentAt)}</Typography>
+                      <Typography sx={sub}>{info.followUpCount ? `ติดตามแล้ว ${info.followUpCount} ครั้ง` : "ยังไม่เคยติดตาม"} · เงียบ {info.daysSinceLastContact} วัน</Typography>
+                    </>
+                  ) : a.quotationDecisionAt ? (
+                    <>
+                      <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: TEXT_MAIN }}>ลูกค้าตอบ {thaiDate(a.quotationDecisionAt)}</Typography>
+                      {a.quotationPoNo && <Typography sx={sub}>PO {a.quotationPoNo}</Typography>}
+                    </>
+                  ) : <Typography sx={{ fontSize: "0.76rem", color: "#94a3b8" }}>{job.groupKey === "waiting_file" ? "แนบไฟล์แล้วเริ่มนับเอง" : "—"}</Typography>}
+                </Box>
+                <Box component="td" sx={{ ...td, minWidth: 140 }}>
+                  <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.6, height: 26, px: 1.1, borderRadius: 99, whiteSpace: "nowrap",
+                    bgcolor: alpha(m.color, 0.12), color: m.color, border: `1px solid ${alpha(m.color, 0.35)}`, fontSize: "0.76rem", fontWeight: 800 }}>
+                    <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: m.color }} />{m.label}
+                  </Box>
+                </Box>
+                <Box component="td" sx={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>
+                  <Stack direction="row" alignItems="center" gap={0.5} justifyContent="flex-end">
+                    <Button size="small" onClick={(e) => { e.stopPropagation(); onOpen(job); }}
+                      sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, height: 32, px: 1.5, boxShadow: "none",
+                        ...(act.primary ? { bgcolor: actColor, color: "#fff", "&:hover": { bgcolor: actColor, filter: "brightness(.92)" } } : { color: actColor, border: `1px solid ${alpha(actColor, 0.4)}` }) }}>
+                      {act.label}
+                    </Button>
+                    <ChevronRight sx={{ color: "#cbd5e1", fontSize: 20 }} />
+                  </Stack>
+                </Box>
+              </Box>
+            );
+          })}
+        </tbody>
+      </Box>
+    </Box>
+  );
+};
 
 // ─── การ์ด (มือถือ) ───────────────────────────────────────────────────────────
 const MobileCard = ({ job, onOpen }) => {

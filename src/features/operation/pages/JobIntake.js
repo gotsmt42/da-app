@@ -22,7 +22,7 @@ import DateCell from "@/shared/ui/DateCell";
 import RefDoc from "@/shared/ui/RefDoc";
 import { billingStatus, BILLING_STATE_META } from "@/shared/utils/billing";
 import JobKindTag from "@/shared/ui/JobKindTag";
-import { resolveQuotationGroup, getFollowUpInfo } from "@/shared/utils/quotationTracking";
+import { resolveQuotationGroup, getFollowUpInfo, QUOTE_STATUS } from "@/shared/utils/quotationTracking";
 import { Link } from "react-router-dom";
 import moment from "moment";
 import Swal from "@/shared/ui/swal";
@@ -117,13 +117,14 @@ const stageOf = (e) => {
 const QuotationDialogHost = lazyWithRetry(() => import("@/features/finance/pages/QuotationTracking").then((m) => ({ default: m.QuotationDialogHost })));
 const baht = (n) => `฿${Number(n || 0).toLocaleString("th-TH", { maximumFractionDigits: 0 })}`;
 const OUTCOME = {
-  waiting_file: { label: "รอแนบไฟล์", color: AMBER, act: "แนบใบเสนอราคา", to: "qt", group: "todo" },
-  not_sent: { label: "แนบแล้ว · กำลังเริ่มนับ", color: AMBER, act: "ดูใบเสนอราคา", to: "qt", group: "todo" },
-  sent: { label: "รอลูกค้าตอบ", color: "#2563eb", act: "อัปเดตผล", to: "qt", group: "wait" },
-  follow_up: { label: "ถึงเวลาติดตาม", color: "#ea580c", act: "บันทึกการติดตาม", to: "qt", group: "wait" },
-  revising: { label: "ลูกค้าขอแก้ไข", color: "#7c3aed", act: "อัปเดตผล", to: "qt", group: "wait" },
-  approved: { label: "ได้งาน", color: GREEN, act: "ดูใบเสนอราคา", to: "qt", group: "won" },
-  rejected: { label: "ไม่ได้งาน", color: RED, act: "ดูใบเสนอราคา", to: "qt", group: "lost" },
+  // ชื่อ/สีจาก QUOTE_STATUS (ชุดเดียวกับหน้าติดตามใบเสนอราคา) — ที่นี่กำหนดแค่ปุ่ม/กลุ่ม
+  waiting_file: { ...QUOTE_STATUS.waiting_file, act: "แนบใบเสนอราคา", to: "qt", group: "todo" },
+  not_sent: { ...QUOTE_STATUS.not_sent, act: "ดูใบเสนอราคา", to: "qt", group: "todo" },
+  sent: { ...QUOTE_STATUS.sent, act: "อัปเดตผล", to: "qt", group: "wait" },
+  follow_up: { ...QUOTE_STATUS.follow_up, act: "บันทึกการติดตาม", to: "qt", group: "wait" },
+  revising: { ...QUOTE_STATUS.revising, act: "อัปเดตผล", to: "qt", group: "wait" },
+  approved: { ...QUOTE_STATUS.approved, act: "ดูใบเสนอราคา", to: "qt", group: "won" },
+  rejected: { ...QUOTE_STATUS.rejected, act: "ดูใบเสนอราคา", to: "qt", group: "lost" },
   // ✅ (19 ต.ค. 2569 ผู้ใช้: "จะรู้ได้ไงว่างานพวกนี้มีใบเสนอราคาแนบแล้ว โดยไม่ต้องเปิดหน้าอื่น") — สถานะที่รู้ได้จากตอนรับงาน
   na: { label: "ไม่ต้องเสนอราคา", color: MUTED, quiet: true, intake: true },
   none: { label: "ยังไม่มี", color: MUTED, act: "แนบใบเสนอราคา", quiet: true, intake: true },
