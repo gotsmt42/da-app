@@ -2645,9 +2645,12 @@ const Operation = () => {
   // 🐛 เดิมตั้ง 5 รายการ/หน้า ทุกขนาดจอ — มี 91 งานก็ต้องเปิด 19 หน้า ซึ่งบนจอคอมที่มีที่เหลือเฟือ
   // คือการบังคับให้กดเปลี่ยนหน้าโดยไม่จำเป็น (5 รายการเหมาะกับมือถือที่เลื่อนยาวๆ ไม่ไหวเท่านั้น)
   // ✅ จอกว้างเริ่มที่ 20 — พอดีกับหนึ่งหน้าจอในมุมมองตาราง ผู้ใช้ยังเปลี่ยนเองได้ที่ช่อง "ต่อหน้า"
-  const [pageSize, setPageSize] = useState(
-    () => (typeof window !== "undefined" && window.innerWidth >= 900 ? 20 : 5)
-  );
+  // ✅ (19 ต.ค. 2569 ผู้ใช้: "การแสดงรายการให้บันทึกไว้ด้วย เวลารีเฟรชให้เอาค่าที่เคยกดไว้") — จำ "ต่อหน้า" ไว้ในเครื่อง
+  const [pageSize, setPageSizeRaw] = useState(() => {
+    try { const v = Number(localStorage.getItem("operation.pageSize")); if ([5, 10, 20, 50, 100].includes(v)) return v; } catch { /* ใช้ค่าตามขนาดจอ */ }
+    return typeof window !== "undefined" && window.innerWidth >= 900 ? 20 : 5;
+  });
+  const setPageSize = (v) => { setPageSizeRaw(v); try { localStorage.setItem("operation.pageSize", String(v)); } catch { /* ignore */ } };
   const [highlightId, setHighlightId] = useState("");
   // ✅ ส่วน id จริงล้วนๆ (ตัด nonce ทิ้ง) ใช้เทียบ/หา DOM element จริง
   const highlightJobId = highlightId ? highlightId.split("|")[0] : "";

@@ -16,7 +16,7 @@ import { useEffect, useMemo, useState, useCallback, useRef, cloneElement } from 
 import PdfBlobView from "@/shared/components/PdfBlobView";
 import useRealtime from "@/shared/realtime/useRealtime";
 import { useSearchParams } from "react-router-dom";
-import { isRespOrHead } from "@/shared/utils/jobFlow";
+import { isRespOrHead, isResponsibleOf, ackTracked, isAckedBy, isClosedJob } from "@/shared/utils/jobFlow";
 import { useAuth } from "@/features/auth/AuthContext";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
@@ -26,6 +26,11 @@ import TechnicianJobCard from "../components/TechnicianJobPanel";
 import ActiveCheckInBanner from "@/features/attendance/components/ActiveCheckInBanner";
 import { buildDaysPastDueMap, isFlaggedDays, isSevereDays, getOverdueGroupKey } from "@/shared/utils/overdueJobs";
 import { getOptimizedImageUrl } from "@/shared/utils/cloudinaryImage";
+import { PAGE_SX, PageHeader, ICON_BTN_SX, INK, INK_2, MUTED, LINE, SURFACE, ACCENT } from "@/shared/ui/PageKit";
+import usePaged, { PageBar } from "@/shared/ui/usePaged";
+import { JobFlowFlags } from "@/shared/ui/JobFlow";
+import { formatEventDateRange } from "@/shared/utils/formatDateRange";
+import { formatRoundLabel } from "@/shared/utils/contractRounds";
 import {
   Box, Stack, Typography, TextField, InputAdornment, IconButton,
   Chip, Skeleton, Dialog, DialogTitle, DialogContent, Divider,
@@ -33,7 +38,8 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
-  Search, Clear, Refresh, WorkOutline, HourglassTop, TaskAlt, Warning,
+  Search, Clear, Refresh, WorkOutline, HourglassTop, TaskAlt, Warning, ViewAgendaOutlined, TableRowsOutlined, ChevronRight,
+  Description, RequestQuote, AssignmentTurnedIn, ReceiptLong,
   Download, Close, PictureAsPdf, FolderOpen, Image, Article, InsertDriveFile, AttachFile,
 } from "@mui/icons-material";
 
@@ -163,6 +169,174 @@ const FilePreviewDialog = ({ previewUrl, previewFileName, onClose }) => {
     </Dialog>
   );
 };
+
+
+// ─── มุมมองตาราง (งานของฉัน) ───────────────────────────────────────────────────
+// ✅ (19 ต.ค. 2569 ผู้ใช้: "ทำแบบตารางด้วย ให้สมบูรณ์") — กวาดดูหลายงานในจอเดียว · กดแถว = กางการ์ดเต็มใต้แถว
+//    (ทำงานต่อได้ครบเหมือนมุมมองการ์ด: รับทราบ · เข้างาน · แนบเอกสาร · ขอปิดงาน)
+const STATUS_TONE = { "กำลังรอยืนยัน": "#d97706", "ยืนยันแล้ว": "#2563eb", "กำลังดำเนินการ": "#7c3aed", "ดำเนินการเสร็จสิ้น": "#16a34a" };
+const DOC_KINDS = [
+  { key: "reportFiles", label: "รายงาน", icon: Description },
+  { key: "quotationFiles", label: "ใบเสนอราคา", icon: RequestQuote },
+  { key: "completionFiles", label: "ใบส่งมอบ", icon: AssignmentTurnedIn },
+  { key: "invoiceFiles", label: "ใบวางบิล", icon: ReceiptLong },
+];
+/**
+ * ปุ่มในแถว = "สิ่งที่ต้องทำต่อ" ของงานนั้น (ผู้ใช้: "เปลี่ยนให้เป็นปุ่มดำเนินการ เช่น บันทึก รับทราบ หรืออื่นๆ ที่เกี่ยวข้อง")
+ * กดแล้วกางการ์ดใต้แถว ซึ่งมีปุ่มทำขั้นนั้นจริง (รับทราบ · ยืนยันนัด · เข้างาน · แนบเอกสาร · ขอปิดงาน)
+ */
+const nextActionOf = (a, uid, fname) => {
+  const DOCS = ["reportFiles", "completionFiles"];
+  if (isClosedJob(a)) return { label: "ดูงาน", tone: "#64748b" };
+  if (a.approvalStatus === "pending") return { label: "รออนุมัติ", tone: "#d97706", wait: true };
+  if (a.closeRequested) return { label: "รอตรวจปิดงาน", tone: "#0891b2", wait: true };
+  if (ackTracked(a) && !isAckedBy(a, uid)) return { label: "รับทราบงาน", tone: "#2563eb", primary: true };
+  if (a.status === "กำลังรอยืนยัน" && isResponsibleOf(a, uid, fname)) return { label: "ยืนยันนัดหมาย", tone: "#2563eb", primary: true };
+  if (moment().startOf("day").isBefore(moment(a.start).startOf("day"))) return { label: "ดูรายละเอียด", tone: "#475569" };
+  // 🐛 (19 ต.ค. 2569 ผู้ใช้: "มีปุ่มบันทึกเข้างาน แต่กดแล้วไม่ให้บันทึก") — บันทึกเข้างานได้เฉพาะหัวหน้าทีม
+  //    ผู้รับผิดชอบที่ไม่ได้เป็นหัวหน้าทีมจึงเห็น "รอหัวหน้าทีมเข้างาน" (ปุ่มรอง) แทนปุ่มที่กดแล้วทำไม่ได้
+  if (!a.checkedInAt) {
+    const isHead = String(a.resPerson || "") === String(uid || "x") || (Boolean(fname) && a.team === fname);
+    if (isHead) return { label: "บันทึกเข้างาน", tone: "#2563eb", primary: true };
+    return a.team
+      ? { label: "รอหัวหน้าทีมเข้างาน", tone: "#475569", wait: true, hint: `รอ ${a.team} บันทึกเข้างาน` }
+      : { label: "เลือกหัวหน้าทีม", tone: "#d97706", hint: "ยังไม่มีหัวหน้าทีมเข้างาน" };
+  }
+  if (!DOCS.some((k) => (a[k] || []).length)) return { label: "แนบเอกสาร", tone: "#7c3aed", primary: true };
+  return { label: "ขอปิดงาน", tone: "#16a34a", primary: true };
+};
+
+function MyJobsTable({ groups, allGroups, overdueOf, renderCard, highlightJob, uid, fname }) {
+  // 🔁 (19 ต.ค. 2569 ผู้ใช้: "กดแล้วแสดงปุ่มหรือฟอร์มขึ้นมาเลย ไม่ต้องกดขยายลงไป") — กดแถว/ปุ่ม = เปิดกล่องงานนั้นทับหน้าเลย
+  //    กล่องอ่านข้อมูลสดจากรายการทั้งหมด (allGroups) — กดรับทราบ/เข้างานแล้วสถานะในกล่องเปลี่ยนตามทันที
+  const [openId, setOpenId] = useState("");
+  const keyOf = (ss) => String(ss[0].jobGroupId || ss[0]._id);
+  const toggle = (id) => setOpenId(id);
+  useEffect(() => {
+    if (!highlightJob) return;
+    const g = groups.find((ss) => ss.some((x) => String(x._id) === highlightJob));
+    if (g) setOpenId(keyOf(g));
+  }, [highlightJob, groups]);
+  const openGroup = openId ? ((allGroups || groups).find((ss) => keyOf(ss) === openId) || null) : null;
+  const fullScreen = typeof window !== "undefined" && window.innerWidth < 600;
+  const th = { textAlign: "left", fontSize: "0.74rem", fontWeight: 800, color: MUTED, px: 1.25, py: 1.1, borderBottom: `1px solid ${LINE}`, whiteSpace: "nowrap", bgcolor: SURFACE };
+  const td = { fontSize: "0.82rem", color: INK_2, px: 1.25, py: 1.25, borderBottom: `1px solid ${LINE}`, verticalAlign: "top" };
+  const sub = { fontSize: "0.74rem", color: MUTED, lineHeight: 1.45 };
+  const COLS = ["", "งาน", "โครงการ / บริษัท", "วันที่เข้างาน", "ทีม", "ผู้ติดต่อ", "สถานะ", "เอกสาร", ""];
+  return (
+    <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflowX: "auto", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
+      <Box component="table" sx={{ width: "100%", minWidth: 1180, borderCollapse: "collapse" }}>
+        <thead><tr>{COLS.map((h, i) => <Box component="th" key={i} sx={{ ...th, ...(i === 0 ? { width: 34, px: 0.5 } : {}) }}>{h}</Box>)}</tr></thead>
+        <tbody>
+          {groups.map((sessions) => {
+            const a = sessions[0];
+            const id = String(a.jobGroupId || a._id);
+            const isOpen = openId === id;
+            const od = overdueOf(sessions);
+            const tone = STATUS_TONE[a.status] || MUTED;
+            const team = [a.team, ...(a.teamMembers || []).map((m) => m?.name)].filter(Boolean).filter((x, k, arr) => arr.indexOf(x) === k);
+            return [
+              <Box component="tr" key={id} onClick={() => toggle(id)}
+                id={sessions.some((x) => String(x._id) === highlightJob) ? `myjob-${highlightJob}` : undefined}
+                sx={{ cursor: "pointer", scrollMarginTop: "80px", bgcolor: isOpen ? "#f5f8ff" : "#fff", "&:hover": { bgcolor: isOpen ? "#f5f8ff" : SURFACE },
+                  ...(od ? { boxShadow: `inset 3px 0 0 ${od.severe ? "#dc2626" : "#d97706"}` } : {}) }}>
+                <Box component="td" sx={{ ...td, px: 0.5, textAlign: "center" }}>
+                  <ChevronRight sx={{ fontSize: 20, color: "#94a3b8" }} />
+                </Box>
+                <Box component="td" sx={{ ...td, minWidth: 190, maxWidth: 240 }}>
+                  <Typography sx={{ fontSize: "0.86rem", fontWeight: 800, color: INK, lineHeight: 1.35 }}>{a.title || "งาน"}{a.system ? ` · ${a.system}` : ""}</Typography>
+                  <Stack direction="row" gap={0.75} alignItems="center" sx={{ mt: 0.25, flexWrap: "wrap" }}>
+                    {a.jobNo && <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#94a3b8" }}>{a.jobNo}</Typography>}
+                    {a.time && <Box component="span" sx={{ px: 0.75, height: 20, display: "inline-flex", alignItems: "center", borderRadius: 99, bgcolor: SURFACE, border: `1px solid ${LINE}`, fontSize: "0.68rem", fontWeight: 800, color: INK_2 }}>ครั้งที่ {formatRoundLabel(a.time, a.visitCount, a)}</Box>}
+                  </Stack>
+                </Box>
+                <Box component="td" sx={{ ...td, minWidth: 170, maxWidth: 240 }}>
+                  <Typography sx={{ fontSize: "0.84rem", fontWeight: 700, color: INK_2, overflowWrap: "anywhere" }}>{a.site || "—"}</Typography>
+                  {a.company && a.company !== a.site && <Typography sx={{ ...sub, overflowWrap: "anywhere" }}>{a.company}</Typography>}
+                </Box>
+                <Box component="td" sx={{ ...td, whiteSpace: "nowrap" }}>
+                  <Typography sx={{ fontSize: "0.82rem", fontWeight: 700 }}>{formatEventDateRange(a)}</Typography>
+                  {sessions.length > 1 && <Typography sx={{ ...sub, color: ACCENT, fontWeight: 700 }}>+ อีก {sessions.length - 1} ช่วงวัน</Typography>}
+                  {od && (
+                    <Box component="span" sx={{ mt: 0.5, px: 0.75, height: 20, display: "inline-flex", alignItems: "center", borderRadius: 99, fontSize: "0.68rem", fontWeight: 800,
+                      bgcolor: alpha(od.severe ? "#dc2626" : "#d97706", 0.1), color: od.severe ? "#dc2626" : "#b45309" }}>
+                      {od.severe ? `ค้าง ${od.days} วัน` : `เลยกำหนด ${od.days} วัน`}
+                    </Box>
+                  )}
+                </Box>
+                <Box component="td" sx={{ ...td, minWidth: 140, maxWidth: 190 }}>
+                  {team.length ? (
+                    <Stack spacing={0.3}>
+                      {team.slice(0, 3).map((n, k) => (
+                        <Typography key={n} noWrap sx={{ fontSize: "0.8rem", fontWeight: k === 0 ? 800 : 600, color: INK_2 }}>
+                          {n}{k === 0 && team.length > 1 && <Box component="span" sx={{ ml: 0.5, fontSize: "0.66rem", fontWeight: 800, color: ACCENT }}>หัวหน้า</Box>}
+                        </Typography>
+                      ))}
+                      {team.length > 3 && <Typography sx={sub}>+ อีก {team.length - 3} คน</Typography>}
+                    </Stack>
+                  ) : <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>}
+                </Box>
+                <Box component="td" sx={{ ...td, minWidth: 130, maxWidth: 170 }} onClick={(e) => a.contactTel && e.stopPropagation()}>
+                  {a.contactName || a.contactTel ? (
+                    <>
+                      {a.contactName && <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, overflowWrap: "anywhere" }}>{a.contactName}</Typography>}
+                      {a.contactTel && <Box component="a" href={`tel:${a.contactTel}`} sx={{ fontSize: "0.78rem", fontWeight: 700, color: ACCENT, textDecoration: "none" }}>{a.contactTel}</Box>}
+                    </>
+                  ) : <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>}
+                </Box>
+                <Box component="td" sx={{ ...td, minWidth: 140 }}>
+                  <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.6, height: 24, px: 1, borderRadius: 99, bgcolor: alpha(tone, 0.1), color: tone, fontSize: "0.74rem", fontWeight: 800, whiteSpace: "nowrap" }}>
+                    <Box component="span" sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: tone }} />{a.status || "—"}
+                  </Box>
+                  <JobFlowFlags event={a} />
+                </Box>
+                <Box component="td" sx={{ ...td, minWidth: 150 }}>
+                  {DOC_KINDS.some((d) => (a[d.key] || []).length) ? (
+                    <Stack spacing={0.35}>
+                      {DOC_KINDS.filter((d) => (a[d.key] || []).length).map((d) => {
+                        const Ico = d.icon;
+                        return (
+                          <Stack key={d.key} direction="row" spacing={0.6} alignItems="center">
+                            <Ico sx={{ fontSize: 15, color: INK_2 }} />
+                            <Typography noWrap sx={{ fontSize: "0.76rem", fontWeight: 700 }}>{d.label} {(a[d.key] || []).length}</Typography>
+                          </Stack>
+                        );
+                      })}
+                    </Stack>
+                  ) : <Typography sx={{ fontSize: "0.76rem", color: "#94a3b8" }}>ยังไม่มีเอกสาร</Typography>}
+                </Box>
+                <Box component="td" sx={{ ...td, whiteSpace: "nowrap", textAlign: "right" }}>
+                  {(() => {
+                    const act = nextActionOf(a, uid, fname);
+                    return (
+                      <Button size="small" title={act.hint} onClick={(e) => { e.stopPropagation(); toggle(id); }}
+                        sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, height: 32, px: 1.5, boxShadow: "none", minWidth: 104, whiteSpace: "nowrap",
+                          ...(act.primary
+                            ? { bgcolor: act.tone, color: "#fff", "&:hover": { bgcolor: act.tone, filter: "brightness(.92)" } }
+                            : { color: act.tone, bgcolor: act.wait ? alpha(act.tone, 0.08) : "#fff", border: `1px solid ${alpha(act.tone, 0.35)}` }) }}>
+                        {act.label}
+                      </Button>
+                    );
+                  })()}
+                </Box>
+              </Box>,
+            ];
+          })}
+        </tbody>
+      </Box>
+      <Dialog open={Boolean(openGroup)} onClose={() => setOpenId("")} fullWidth maxWidth="md" fullScreen={fullScreen}
+        PaperProps={{ sx: { borderRadius: fullScreen ? 0 : 3, bgcolor: SURFACE } }}>
+        <Stack direction="row" alignItems="center" sx={{ px: 2, py: 1.25, bgcolor: "#fff", borderBottom: `1px solid ${LINE}` }}>
+          <Typography sx={{ flex: 1, fontWeight: 900, fontSize: "1rem", color: INK }} noWrap>
+            {openGroup ? `${openGroup[0].title || "งาน"}${openGroup[0].system ? ` · ${openGroup[0].system}` : ""}` : ""}
+          </Typography>
+          <IconButton onClick={() => setOpenId("")} aria-label="ปิด"><Close /></IconButton>
+        </Stack>
+        <DialogContent sx={{ p: { xs: 1, sm: 2 } }}>{openGroup && renderCard(openGroup)}</DialogContent>
+      </Dialog>
+    </Box>
+  );
+}
 
 // ─── JobGroupCard ───────────────────────────────────────────────────────
 // ✅ งานที่เข้าหลายวันไม่ติดกัน (ผูกกันด้วย jobGroupId เดียวกัน หรือลายเซ็น company/site/title/
@@ -352,6 +526,8 @@ export default function MyJobs() {
   const [searchParams] = useSearchParams();
   const focusJobId = searchParams.get("job") || "";
   const [highlightJob, setHighlightJob] = useState("");
+  const [view, setView] = useState(() => { try { return localStorage.getItem("tt-myjobs-view") || "card"; } catch { return "card"; } });
+  const changeView = (v) => { setView(v); try { localStorage.setItem("tt-myjobs-view", v); } catch { /* ignore */ } };
   useEffect(() => {
     if (autoPickedRef.current || loading || !events.length) return;
     autoPickedRef.current = true;
@@ -400,6 +576,18 @@ export default function MyJobs() {
       sessions.slice().sort((a, b) => new Date(b.start) - new Date(a.start))
     );
   }, [filteredJobs]);
+
+  // ✅ (19 ต.ค. 2569 ผู้ใช้: "พร้อมทั้งทำระบบแบ่งหน้าด้วย") การ์ด 10 / ตาราง 20 ต่อหน้า
+  //    เปลี่ยนหมวด/ค้นหา/มุมมอง = กลับหน้า 1 · กดลิงก์มาเจาะจงงาน = ไปหน้าที่มีงานนั้นเอง
+  const pg = usePaged(jobGroups, view === "table" ? 20 : 10);
+  const { setPage } = pg;
+  useEffect(() => { setPage(1); }, [group, sub, search, view, setPage]);
+  useEffect(() => {
+    if (!highlightJob) return;
+    const idx = jobGroups.findIndex((ss) => ss.some((x) => String(x._id) === highlightJob));
+    if (idx >= 0) setPage(Math.floor(idx / (view === "table" ? 20 : 10)) + 1);
+  }, [highlightJob, jobGroups, view, setPage]);
+  const goPage = (n) => { setPage(n); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
 
   // ✅ (9 ต.ค. 2569) ขั้นตอนทำงาน — รับงาน/งานไม่เสร็จ ส่งงานทั้งกลุ่มกลับมา เอามาแทนในหน้าจอเลย
@@ -492,44 +680,89 @@ export default function MyJobs() {
     }
   }, [fetchJobs]);
 
+  // การ์ดของงาน 1 กลุ่ม — ใช้ทั้งมุมมองการ์ดและตอนกางแถวในตาราง (ทำงานได้ครบเหมือนกัน)
+  const renderGroup = (sessions) => {
+            // ✅ ในแท็บ "ค้างงาน" ให้เห็นความรุนแรงต่างกันชัดๆ ก่อนเปิดการ์ด (เทียบ pattern เดียวกับ
+            // หน้า Operation) — เลย 1 สัปดาห์ = แจ้งเตือนสีเหลือง, เลย 2 สัปดาห์ = ค้างงานเต็มตัวสีแดง
+            // ✅ เช็คซ้ำด้วย isFlaggedDays อีกชั้น (เทียบ pattern เดียวกับหน้า Operation) กันป้าย
+            // "เลยกำหนด" ติดลบไร้ความหมายหลุดมาแสดง ถ้าวันที่คำนวณได้ดันไม่เข้าเกณฑ์ค้างจริง
+            // ✅ แสดงทุกหมวด ไม่ใช่เฉพาะแท็บค้างงาน
+            const daysPastDueRaw = group === "closed" ? null : daysPastDueMap.get(sessions[0]._id)?.days ?? null;
+            const daysPastDue = isFlaggedDays(daysPastDueRaw) ? daysPastDueRaw : null;
+            const severeOverdue = isSevereDays(daysPastDue);
+            return (
+              <Box key={sessions[0].jobGroupId || sessions[0]._id}
+                id={sessions.some((x) => String(x._id) === highlightJob) ? `myjob-${highlightJob}` : undefined}
+                sx={sessions.some((x) => String(x._id) === highlightJob) ? { borderRadius: "18px", outline: "3px solid #2563eb", outlineOffset: 2, scrollMarginTop: "80px" } : undefined}>
+                {daysPastDue !== null && (
+                  <Stack direction="row" alignItems="center" gap={0.75}
+                    sx={{
+                      mb: -1.5, pb: 2, pt: 0.75, px: 1.75, borderRadius: "16px 16px 0 0",
+                      bgcolor: severeOverdue ? "#fef2f2" : "#fffbeb", border: `1px solid ${severeOverdue ? "#fecaca" : "#fde68a"}`, borderBottom: 0,
+                    }}>
+                    <Warning sx={{ fontSize: 16, color: severeOverdue ? "#dc2626" : "#d97706" }} />
+                    <Typography sx={{ fontSize: "0.8rem", fontWeight: 900, color: severeOverdue ? "#b91c1c" : "#92400e" }}>
+                      {severeOverdue ? `ค้างงาน ${daysPastDue} วัน` : `เลยกำหนด ${daysPastDue} วัน`}
+                    </Typography>
+                    <Typography sx={{ fontSize: "0.74rem", color: severeOverdue ? "#b91c1c" : "#92400e", opacity: 0.8 }}>· ส่งงาน/ขอปิดงานด้วย</Typography>
+                  </Stack>
+                )}
+                <JobGroupCard
+                  sessions={sessions}
+                  userData={userData}
+                  employees={employees}
+                  onPatched={handlePatched}
+                  onInputUpdate={handleInputUpdate}
+                  onStatusUpdate={handleStatusUpdate}
+                  onFileUpload={handleFileUpload}
+                  onDeleteFile={handleDeleteFile}
+                  onPreview={handlePreviewFile}
+                  uploadingState={uploadingState}
+                  isUploadingState={isUploadingState}
+                  uploadProgressState={uploadProgressState}
+                />
+              </Box>
+            );
+  };
+
   return (
-    <Box sx={{ px: { xs: 0.5, sm: 1.5 }, pt: 1.5, pb: 4, maxWidth: 860, mx: "auto" }}>
-      {/* ✅ ผู้ใช้สั่ง (3 ต.ค. 2569): "UI มองง่ายขึ้น มืออาชีพ แสดงผลครบ" — หัวกล่องขาวชุดเดียวกับทุกหน้า
-          · สถานะ 4 หมวดเห็นครบทุกช่องโดยไม่ต้องเลื่อน (เดิมเป็นชิปเลื่อนแนวนอน หมวดท้ายถูกตัดหาย) */}
-      {/* ✅ หัวหน้าแบบทักทาย + สรุปวันนี้ (ผู้ใช้: "สีสันจืด ไม่ดึงดูดให้ทำงาน") — พื้นน้ำเงินไล่เฉดอ่อนๆ ตัวหนังสือขาว */}
-      {/* ✅ หัวหน้าโทนเรียบ (ผู้ใช้: "สีหัวข้อเด่นเกิน ดูรก") — ขาว ขอบเทา · สีเหลือแค่ไอคอนและข้อความสรุป */}
-      <Stack direction="row" alignItems="center" spacing={1.25}
-        sx={{ mb: 1.25, px: 1.5, py: 1.1, borderRadius: 3, bgcolor: "#fff", border: "1px solid #e2e8f0", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
-        <Box sx={{ width: 36, height: 36, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#eff6ff", color: "#2563eb" }}>
-          <WorkOutline sx={{ fontSize: 20 }} />
-        </Box>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 900, fontSize: "1.05rem", color: "#0f172a", lineHeight: 1.3 }}>งานของฉัน</Typography>
-          <Typography noWrap sx={{ fontSize: "0.76rem", fontWeight: 600, color: !loading && groupCounts.overdue > 0 ? "#b91c1c" : "#64748b" }}>
-            {loading ? "กำลังโหลดงาน…" : groupCounts.overdue > 0
-              ? `มีงานค้าง ${groupCounts.overdue} งาน — ส่งงาน/ขอปิดงานให้เรียบร้อย`
-              : groupCounts.active > 0 ? `วันนี้มีงานต้องทำ ${groupCounts.active} งาน` : "ไม่มีงานค้าง เยี่ยมมาก 🎉"}
-          </Typography>
-        </Box>
-        <Tooltip title="รีเฟรช">
-          <IconButton size="small" onClick={() => fetchJobs()} sx={{ width: 36, height: 36, border: "1px solid #e2e8f0", borderRadius: 2.5, color: "#334155" }}>
-            <Refresh sx={{ fontSize: 18 }} />
-          </IconButton>
-        </Tooltip>
-      </Stack>
+    // 🔁 (19 ต.ค. 2569 ผู้ใช้: "หน้าคอมแก้ไขขนาดของหน้านี้ ให้สอดคล้องกับจุดอื่นๆ มันดูเล็กไป")
+    //    เดิมกว้าง 860px — ใช้ความกว้าง/หัวเพจมาตรฐานเดียวกับทุกหน้า (PageKit) · มือถือเหมือนเดิม
+    <Box sx={{ ...PAGE_SX, pb: 4 }}>
+      <PageHeader
+        icon={<WorkOutline />}
+        title="งานของฉัน"
+        subtitle={loading ? "กำลังโหลดงาน…" : groupCounts.overdue > 0
+          ? `มีงานค้าง ${groupCounts.overdue} งาน — ส่งงาน/ขอปิดงานให้เรียบร้อย`
+          : groupCounts.active > 0 ? `วันนี้มีงานต้องทำ ${groupCounts.active} งาน` : "ไม่มีงานค้าง เยี่ยมมาก 🎉"}
+        actions={(
+          <>
+            <Stack direction="row" sx={{ display: { xs: "none", md: "flex" }, p: 0.4, borderRadius: 2.5, border: "1px solid #e2e8f0", bgcolor: "#fff" }}>
+              {[["card", ViewAgendaOutlined, "การ์ด"], ["table", TableRowsOutlined, "ตาราง"]].map(([k, Ico, label]) => (
+                <Box key={k} component="button" type="button" onClick={() => changeView(k)} aria-label={`มุมมอง${label}`}
+                  sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, height: 30, px: 1.1, border: 0, borderRadius: 2, cursor: "pointer", font: "inherit", fontSize: "0.78rem", fontWeight: 800,
+                    color: view === k ? "#fff" : "#475569", bgcolor: view === k ? "#2563eb" : "transparent" }}>
+                  <Ico sx={{ fontSize: 17 }} />{label}
+                </Box>
+              ))}
+            </Stack>
+            <Tooltip title="รีเฟรช"><IconButton onClick={() => fetchJobs()} sx={ICON_BTN_SX}><Refresh sx={{ fontSize: 18 }} /></IconButton></Tooltip>
+          </>
+        )}
+      />
 
       {/* ✅ (10 ต.ค. 2569) กำลังเช็คอินอยู่ → แถบเตือนให้เช็คเอาต์ · ไม่มี → ลิงก์ประวัติเข้า-ออกงาน */}
       <ActiveCheckInBanner />
 
       {/* ✅ แถวเดียว 4 ช่อง — สีประจำหมวด (ฟ้า/แดง/ส้ม/เขียว) ที่ไอคอนและตัวเลข · ช่องที่เลือกพื้นอ่อน+ขอบสีหมวด */}
-      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 0.75, mb: 1.25 }}>
+      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: { xs: 0.75, md: 1 }, mb: 1.25 }}>
         {GROUPS.map((g) => {
           const on = group === g.key;
           const n = groupCounts[g.key];
           return (
             <Box key={g.key} component="button" type="button" onClick={() => setGroup(g.key)} title={g.label}
               sx={{
-                position: "relative", font: "inherit", cursor: "pointer", py: 0.6, px: 0.5, borderRadius: 2, minWidth: 0, textAlign: "center",
+                position: "relative", font: "inherit", cursor: "pointer", py: { xs: 0.6, md: 1.1 }, px: 0.5, borderRadius: { xs: 2, md: 2.5 }, minWidth: 0, textAlign: "center",
                 bgcolor: on ? alpha(g.color, 0.1) : "#fff",
                 border: `1.5px solid ${on ? g.color : "#e2e8f0"}`,
                 boxShadow: on ? `0 2px 8px ${alpha(g.color, 0.18)}` : "none",
@@ -541,9 +774,9 @@ export default function MyJobs() {
                   width: 20, height: 20, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                   bgcolor: on ? g.color : alpha(g.color, 0.12), color: on ? "#fff" : g.color, "& svg": { fontSize: 12 },
                 }}>{g.icon}</Box>
-                <Typography sx={{ fontSize: "0.98rem", fontWeight: 900, lineHeight: 1.3, color: n > 0 ? g.color : "#94a3b8" }}>{n}</Typography>
+                <Typography sx={{ fontSize: { xs: "0.98rem", md: "1.25rem" }, fontWeight: 900, lineHeight: 1.3, color: n > 0 ? g.color : "#94a3b8" }}>{n}</Typography>
               </Stack>
-              <Typography noWrap sx={{ fontSize: "0.66rem", fontWeight: 800, color: on ? g.color : "#64748b", lineHeight: 1.3 }}>{g.short || g.label}</Typography>
+              <Typography noWrap sx={{ fontSize: { xs: "0.66rem", md: "0.8rem" }, fontWeight: 800, color: on ? g.color : "#64748b", lineHeight: 1.3 }}>{g.short || g.label}</Typography>
               {g.key === "overdue" && n > 0 && !on && (
                 <Box sx={{ position: "absolute", top: 4, right: 4, width: 7, height: 7, borderRadius: "50%", bgcolor: "#dc2626", boxShadow: "0 0 0 3px rgba(220,38,38,.18)" }} />
               )}
@@ -656,51 +889,21 @@ export default function MyJobs() {
           );
         })()
       ) : (
-        <Stack spacing={2}>
-          {jobGroups.map((sessions) => {
-            // ✅ ในแท็บ "ค้างงาน" ให้เห็นความรุนแรงต่างกันชัดๆ ก่อนเปิดการ์ด (เทียบ pattern เดียวกับ
-            // หน้า Operation) — เลย 1 สัปดาห์ = แจ้งเตือนสีเหลือง, เลย 2 สัปดาห์ = ค้างงานเต็มตัวสีแดง
-            // ✅ เช็คซ้ำด้วย isFlaggedDays อีกชั้น (เทียบ pattern เดียวกับหน้า Operation) กันป้าย
-            // "เลยกำหนด" ติดลบไร้ความหมายหลุดมาแสดง ถ้าวันที่คำนวณได้ดันไม่เข้าเกณฑ์ค้างจริง
-            // ✅ แสดงทุกหมวด ไม่ใช่เฉพาะแท็บค้างงาน
-            const daysPastDueRaw = group === "closed" ? null : daysPastDueMap.get(sessions[0]._id)?.days ?? null;
-            const daysPastDue = isFlaggedDays(daysPastDueRaw) ? daysPastDueRaw : null;
-            const severeOverdue = isSevereDays(daysPastDue);
-            return (
-              <Box key={sessions[0].jobGroupId || sessions[0]._id}
-                id={sessions.some((x) => String(x._id) === highlightJob) ? `myjob-${highlightJob}` : undefined}
-                sx={sessions.some((x) => String(x._id) === highlightJob) ? { borderRadius: "18px", outline: "3px solid #2563eb", outlineOffset: 2, scrollMarginTop: "80px" } : undefined}>
-                {daysPastDue !== null && (
-                  <Stack direction="row" alignItems="center" gap={0.75}
-                    sx={{
-                      mb: -1.5, pb: 2, pt: 0.75, px: 1.75, borderRadius: "16px 16px 0 0",
-                      bgcolor: severeOverdue ? "#fef2f2" : "#fffbeb", border: `1px solid ${severeOverdue ? "#fecaca" : "#fde68a"}`, borderBottom: 0,
-                    }}>
-                    <Warning sx={{ fontSize: 16, color: severeOverdue ? "#dc2626" : "#d97706" }} />
-                    <Typography sx={{ fontSize: "0.8rem", fontWeight: 900, color: severeOverdue ? "#b91c1c" : "#92400e" }}>
-                      {severeOverdue ? `ค้างงาน ${daysPastDue} วัน` : `เลยกำหนด ${daysPastDue} วัน`}
-                    </Typography>
-                    <Typography sx={{ fontSize: "0.74rem", color: severeOverdue ? "#b91c1c" : "#92400e", opacity: 0.8 }}>· ส่งงาน/ขอปิดงานด้วย</Typography>
-                  </Stack>
-                )}
-                <JobGroupCard
-                  sessions={sessions}
-                  userData={userData}
-                  employees={employees}
-                  onPatched={handlePatched}
-                  onInputUpdate={handleInputUpdate}
-                  onStatusUpdate={handleStatusUpdate}
-                  onFileUpload={handleFileUpload}
-                  onDeleteFile={handleDeleteFile}
-                  onPreview={handlePreviewFile}
-                  uploadingState={uploadingState}
-                  isUploadingState={isUploadingState}
-                  uploadProgressState={uploadProgressState}
-                />
-              </Box>
-            );
-          })}
-        </Stack>
+        view === "table" ? (
+          <>
+            <MyJobsTable groups={pg.rows} allGroups={jobGroups} highlightJob={highlightJob} renderCard={renderGroup} uid={String(userData?.userId || "")} fname={userData?.fname}
+              overdueOf={(ss) => {
+                const raw = group === "closed" ? null : daysPastDueMap.get(ss[0]._id)?.days ?? null;
+                return isFlaggedDays(raw) ? { days: raw, severe: isSevereDays(raw) } : null;
+              }} />
+            <PageBar {...pg} setPage={goPage} unit="งาน" />
+          </>
+        ) : (
+          <>
+            <Stack spacing={2}>{pg.rows.map((sessions) => renderGroup(sessions))}</Stack>
+            <PageBar {...pg} setPage={goPage} unit="งาน" />
+          </>
+        )
       )}
 
       <FilePreviewDialog
