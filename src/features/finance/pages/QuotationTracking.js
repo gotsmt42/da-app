@@ -262,26 +262,70 @@ const DesktopTable = ({ jobs, onOpen, onPreview }) => {
 };
 
 // ─── การ์ด (มือถือ) ───────────────────────────────────────────────────────────
-const MobileCard = ({ job, onOpen }) => {
+// 🔁 (19 ต.ค. 2569 ผู้ใช้: "หน้าจอมือถือด้วย ให้สอดคล้อง") — ข้อมูลชุดเดียวกับตาราง เรียงสำหรับจอแคบ:
+//    ผู้รับผิดชอบ + สถานะ → ประเภทงาน · ลูกค้า · งาน/วันที่ | มูลค่า → ใบเสนอราคา (เลขที่ · เปิดไฟล์) → การติดตาม + ปุ่ม
+const MobileCard = ({ job, onOpen, onPreview }) => {
   const a = job.anchor;
   const m = STATUS[job.groupKey] || STATUS.not_sent;
+  const act = ACTION[job.groupKey] || { label: "เปิด" };
+  const actColor = act.color || "#2563eb";
+  const files = a.quotationFiles || [];
+  const info = job.info;
   return (
-    <Box onClick={() => onOpen(job)} role="button" sx={{ p: 1.5, bgcolor: "#fff", border: `1px solid ${BORDER}`, borderLeft: `3px solid ${job.groupKey === "follow_up" ? m.color : "#cbd5e1"}`, borderRadius: 2.5, cursor: "pointer", "&:active": { bgcolor: "#f8fafc" } }}>
-      <Stack direction="row" spacing={1} alignItems="flex-start">
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 800, fontSize: "0.9rem", color: TEXT_MAIN, lineHeight: 1.35 }}>{siteText(a)}</Typography>
-          <Typography noWrap sx={{ fontSize: "0.76rem", color: TEXT_SUB }}>{jobText(a) || "—"}</Typography>
-        </Box>
-        <Box sx={{ textAlign: "right", flexShrink: 0 }}>
-          <Typography sx={{ fontWeight: 900, fontSize: "0.92rem", color: a.quotationAmount ? TEXT_MAIN : "#94a3b8" }}>{a.quotationAmount ? baht(a.quotationAmount) : "ไม่ระบุมูลค่า"}</Typography>
-          <Typography sx={{ fontSize: "0.7rem", color: TEXT_SUB }}>{a.quotationNo || "ไม่มีเลขที่"}</Typography>
+    <Box onClick={() => onOpen(job)} role="button"
+      sx={{ bgcolor: "#fff", border: `1px solid ${BORDER}`, borderLeft: `3px solid ${m.color}`, borderRadius: 3, cursor: "pointer", overflow: "hidden", "&:active": { bgcolor: "#f8fafc" } }}>
+      <Stack direction="row" alignItems="center" gap={1} sx={{ px: 1.5, py: 1, bgcolor: "#f8fafc", borderBottom: `1px solid ${BORDER}` }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}><Owner name={ownerOf(a)} size={24} /></Box>
+        <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, height: 24, px: 1, borderRadius: 99, whiteSpace: "nowrap", flexShrink: 0,
+          bgcolor: alpha(m.color, 0.12), color: m.color, border: `1px solid ${alpha(m.color, 0.35)}`, fontSize: "0.72rem", fontWeight: 800 }}>
+          <Box component="span" sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: m.color }} />{m.label}
         </Box>
       </Stack>
-      <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1, pt: 1, borderTop: `1px solid ${BORDER}` }}>
-        <StatusChip k={job.groupKey} />
-        <Box sx={{ flex: 1, minWidth: 0 }}>{job.info ? <DueChip info={job.info} /> : null}</Box>
-        <Typography noWrap sx={{ fontSize: "0.74rem", color: TEXT_SUB, maxWidth: 120 }}>{ownerOf(a) || "ไม่ระบุ"}</Typography>
-      </Stack>
+      <Box sx={{ px: 1.5, pt: 1.1, pb: 1.25 }}>
+        <Stack direction="row" gap={1} alignItems="flex-start">
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <JobKindTag event={a} />
+            <Typography sx={{ mt: 0.5, fontWeight: 800, fontSize: "0.92rem", color: TEXT_MAIN, lineHeight: 1.35 }}>{a.company || a.site || "ไม่ระบุลูกค้า"}</Typography>
+            <Typography sx={{ fontSize: "0.76rem", color: TEXT_SUB }}>
+              {[a.site && a.site !== a.company ? a.site : "", jobText(a), formatEventDateRange(a)].filter(Boolean).join(" · ")}
+            </Typography>
+          </Box>
+          <Box sx={{ textAlign: "right", flexShrink: 0 }}>
+            <Typography sx={{ fontWeight: 900, fontSize: "0.95rem", color: a.quotationAmount ? TEXT_MAIN : "#d97706" }}>{a.quotationAmount ? baht(a.quotationAmount) : "ยังไม่ระบุ"}</Typography>
+            <Typography sx={{ fontSize: "0.68rem", color: TEXT_SUB }}>{a.quotationAmount ? (a.quotationVatIncluded ? "รวม VAT" : "ก่อน VAT") : "มูลค่า"}</Typography>
+          </Box>
+        </Stack>
+        <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 1, px: 1, py: 0.75, borderRadius: 2, bgcolor: "#f8fafc" }}>
+          <Description sx={{ fontSize: 16, color: TEXT_SUB }} />
+          <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.78rem", fontWeight: 700, color: a.quotationNo ? TEXT_MAIN : "#94a3b8" }}>
+            {a.quotationNo ? `เลขที่ ${a.quotationNo}` : "ไม่มีเลขที่"}{a.quotationDate ? ` · ${thaiDate(a.quotationDate)}` : ""}
+          </Typography>
+          {files.length > 0 && (
+            <Box component="button" type="button" onClick={(e) => { e.stopPropagation(); onPreview?.(files[files.length - 1].fileUrl, files[files.length - 1].fileName); }}
+              sx={{ display: "inline-flex", alignItems: "center", gap: 0.4, height: 24, px: 0.9, border: 0, borderRadius: 99, cursor: "pointer", font: "inherit", flexShrink: 0,
+                bgcolor: alpha("#2563eb", 0.1), color: "#2563eb", fontSize: "0.7rem", fontWeight: 800 }}>
+              <AttachFile sx={{ fontSize: 13 }} />เปิดไฟล์
+            </Box>
+          )}
+        </Stack>
+        <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 1 }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            {info ? (
+              <>
+                <DueChip info={info} />
+                <Typography noWrap sx={{ fontSize: "0.7rem", color: TEXT_SUB }}>{info.followUpCount ? `ติดตามแล้ว ${info.followUpCount} ครั้ง` : "ยังไม่เคยติดตาม"} · เงียบ {info.daysSinceLastContact} วัน</Typography>
+              </>
+            ) : a.quotationDecisionAt ? (
+              <Typography noWrap sx={{ fontSize: "0.74rem", color: TEXT_SUB }}>ลูกค้าตอบ {thaiDate(a.quotationDecisionAt)}{a.quotationPoNo ? ` · PO ${a.quotationPoNo}` : ""}</Typography>
+            ) : <Typography sx={{ fontSize: "0.72rem", color: "#94a3b8" }}>{job.groupKey === "waiting_file" ? "แนบไฟล์แล้วเริ่มนับเอง" : ""}</Typography>}
+          </Box>
+          <Button size="small" onClick={(e) => { e.stopPropagation(); onOpen(job); }}
+            sx={{ flexShrink: 0, textTransform: "none", fontWeight: 800, borderRadius: 2, height: 32, px: 1.5, boxShadow: "none",
+              ...(act.primary ? { bgcolor: actColor, color: "#fff", "&:hover": { bgcolor: actColor } } : { color: actColor, border: `1px solid ${alpha(actColor, 0.4)}` }) }}>
+            {act.label}
+          </Button>
+        </Stack>
+      </Box>
     </Box>
   );
 };
@@ -1214,7 +1258,7 @@ export default function QuotationTracking() {
         <>
           {isDesktop
             ? <DesktopTable jobs={pageRows} onOpen={(j) => setDetailId(j.anchor._id)} onPreview={(url, name) => setPreview({ url, name })} />
-            : <Stack spacing={1}>{pageRows.map((j) => <MobileCard key={j.anchor._id} job={j} onOpen={(x) => setDetailId(x.anchor._id)} />)}</Stack>}
+            : <Stack spacing={1}>{pageRows.map((j) => <MobileCard key={j.anchor._id} job={j} onOpen={(x) => setDetailId(x.anchor._id)} onPreview={(url, name) => setPreview({ url, name })} />)}</Stack>}
           <Stack direction={{ xs: "column", sm: "row" }} alignItems="center" spacing={1} sx={{ mt: 1.5 }}>
             <Typography sx={{ flex: 1, fontSize: "0.76rem", color: TEXT_SUB }}>
               {pageCount > 1 ? `แสดง ${(cur - 1) * PAGE_SIZE + 1}–${(cur - 1) * PAGE_SIZE + pageRows.length} จาก ` : ""}{visible.length} ใบ · มูลค่ารวม {baht(visible.reduce((s, j) => s + (Number(j.anchor.quotationAmount) || 0), 0))}
