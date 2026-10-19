@@ -78,6 +78,7 @@ import { styled, alpha } from "@mui/material/styles";
 
 import TechnicianJobCard, { isDocComplete, isDocRequired } from "@/features/technician/components/TechnicianJobPanel";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LINE, SUCCESS, PAGE_SX, PageHeader, ICON_BTN_SX } from "@/shared/ui/PageKit";
+import { resolveQuotationGroup } from "@/shared/utils/quotationTracking";
 import LineIcon from "@/shared/ui/LineIcon";
 import { printFile, shareFile, shareToLine, isMobileDevice } from "@/shared/utils/fileActions";
 import DeliveryNoteDialog from "@/features/documents/components/DeliveryNoteDialog";
@@ -2279,126 +2280,133 @@ export const FilePreviewDialog = ({ previewUrl, previewFileName, onClose }) => {
 // ─── มุมมองตาราง — ทางเลือกของการ์ด สำหรับกวาดดูหลายงานพร้อมกัน/เทียบกัน ─────────────────
 // ✅ การ์ดมีข้อมูลครบและจัดการงานได้ในตัว (เอกสาร/คอมเมนต์/ปุ่ม) แต่พอมี 20-30 งานต้องเลื่อนยาวมาก
 // และเทียบข้ามงานไม่ได้เลย — ตารางตอบโจทย์คนละแบบ กดแถวเพื่อเปิดดูรายละเอียดแบบการ์ดได้เหมือนเดิม
+// 🔁 (19 ต.ค. 2569 ผู้ใช้: "ข้อมูลแบบตารางหน้าดำเนินงาน แก้ไขให้สมบูรณ์ ข้อมูลต่างๆ ให้ครบ และสวยงาม")
+//    เรียงคอลัมน์ตามคำถามที่คนดูตาราง: งานอะไร → ที่ไหน → เมื่อไร (ค้างไหม) → ใครรับผิดชอบ/ใครไป → โทรหาใคร
+//    → สถานะ → เอกสารครบหรือยัง (แยกชนิด: รายงาน · ใบเสนอราคา + ผล · ใบส่งมอบ · ใบวางบิล)
+//    หัวตาราง/ระยะ/ตัวอักษรชุดเดียวกับตารางหน้างานเข้า
+const DOC_KINDS = [
+  { key: "reportFiles", label: "รายงาน", icon: Description },
+  { key: "quotationFiles", label: "ใบเสนอราคา", icon: RequestQuote },
+  { key: "completionFiles", label: "ใบส่งมอบ", icon: AssignmentTurnedIn },
+  { key: "invoiceFiles", label: "ใบวางบิล", icon: ReceiptLong },
+];
+const QUOTE_RESULT = {
+  waiting_file: ["รอแนบ", "#d97706"], not_sent: ["เริ่มนับ", "#d97706"], sent: ["รอลูกค้าตอบ", "#2563eb"],
+  follow_up: ["ถึงเวลาติดตาม", "#dc2626"], revising: ["ขอแก้ไข", "#7c3aed"], approved: ["ได้งาน", "#16a34a"], rejected: ["ไม่ได้งาน", "#64748b"],
+};
+
 const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob, employee, canAssign, onAssignResponsible }) => {
   const avatarMap = useAvatarMap(employee);
   const [assign, setAssign] = useState(null); // { anchor, job } | null
+  const th = { fontWeight: 800, fontSize: "0.74rem", bgcolor: SURFACE, color: MUTED, whiteSpace: "nowrap", borderColor: LINE, py: 1.1 };
+  const sub = { fontSize: "0.74rem", color: MUTED, lineHeight: 1.45 };
+  const dash = <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>;
   return (
-  <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 3, overflowX: "auto" }}>
-    <Table size="small" sx={{ minWidth: 1000, width: "100%" }}>
+  <TableContainer sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflowX: "auto", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
+    <Table size="small" sx={{ minWidth: 1380, width: "100%", "& td": { borderColor: LINE, verticalAlign: "top", py: 1.25, px: 1.25 }, "& th": { px: 1.25 } }}>
       <TableHead>
-        {/* ⚠️ เดิมหัวตารางเป็นสีม่วง (#f5f3ff/#4c1d95) ซึ่งไม่มีที่ไหนในแอปใช้สีนี้เลย — ดูเหมือน
-            คอมโพเนนต์ที่ยกมาจากที่อื่นแล้วลืมปรับสี เปลี่ยนเป็นเทาเข้มกลางๆ ให้เข้าชุดกับหัวตาราง
-            ที่อื่นในระบบ และไม่ไปแย่งสายตากับสีสถานะในแต่ละแถวซึ่งเป็นข้อมูลจริงที่ต้องอ่าน */}
-        <TableRow sx={{ "& th": { fontWeight: 800, fontSize: "0.72rem", bgcolor: "#f1f5f9", color: "#334155", whiteSpace: "nowrap", letterSpacing: 0.2 } }}>
-          <TableCell>สถานะ</TableCell>
+        <TableRow sx={{ "& th": th }}>
+          <TableCell>งาน</TableCell>
           <TableCell>โครงการ / บริษัท</TableCell>
-          {/* ✅ ผู้ติดต่อหน้างาน — วางถัดจากโครงการ อ่านเป็นชุดเดียวกันว่า "ไปที่ไหน แล้วโทรหาใคร" */}
-          <TableCell>ผู้ติดต่อ</TableCell>
-          <TableCell>ประเภทงาน · ระบบ</TableCell>
-          {/* ✅ เพิ่มคอลัมน์ "ครั้งที่" — การ์ดแสดงอยู่แล้วแต่ตารางไม่มี ทำให้สลับมาดูตารางแล้วข้อมูลหาย
-              เป็นตัวเลขที่จำเป็นกับงานสัญญา (รู้ว่าเข้าไปแล้วกี่ครั้งจากทั้งหมดกี่ครั้ง) */}
-          <TableCell align="center">ครั้งที่</TableCell>
           <TableCell>วันที่เข้างาน</TableCell>
           <TableCell>ผู้รับผิดชอบ</TableCell>
-          <TableCell>ผู้เข้าทำงาน</TableCell>
-          <TableCell align="center">ค้าง</TableCell>
-          <TableCell align="center">เอกสาร</TableCell>
-          <TableCell align="center" />
+          <TableCell>ทีมเข้างาน</TableCell>
+          <TableCell>ผู้ติดต่อ</TableCell>
+          <TableCell>สถานะ</TableCell>
+          <TableCell>เอกสาร</TableCell>
+          <TableCell sx={{ width: 32 }} />
         </TableRow>
       </TableHead>
       <TableBody>
-        {jobGroups.map((job, idx) => {
+        {jobGroups.map((job) => {
           const a = job.sessions[0];
           const overdueDays = daysPastDueMap.get(a._id)?.days;
           const isOverdue = isFlaggedDays(overdueDays);
-          const docCount = ["reportFiles", "quotationFiles", "invoiceFiles", "completionFiles"]
-            .reduce((sum, k) => sum + (a[k]?.length || 0), 0);
-          // ⚠️ ตัดชื่อซ้ำออก — หัวหน้าทีม (team) มักถูกใส่ไว้ใน teamMembers ด้วย ทำให้ขึ้นเป็น
-          // "Santisuk, Santisuk" เหมือนมี 2 คนทั้งที่เป็นคนเดียว (เห็นชัดขึ้นหลังชื่อทุกที่ใช้ชื่อต้นเหมือนกันแล้ว)
+          // ⚠️ ตัดชื่อซ้ำ — หัวหน้าทีม (team) มักอยู่ใน teamMembers ด้วย
           const teamNames = teamNamesOf(a);
+          const qKey = resolveQuotationGroup(a);
           return (
             <TableRow key={a._id} hover onClick={() => onOpenJob(job)}
-              sx={{ cursor: "pointer", bgcolor: idx % 2 ? alpha("#0f172a", 0.02) : "transparent" }}>
-              <TableCell sx={{ whiteSpace: "nowrap" }}>
-                <StatusBadge color={OP_COLOR[a.status]}><Circle sx={{ fontSize: 6 }} />{a.status || "—"}</StatusBadge>
-                <JobFlowFlags event={a} />
-              </TableCell>
-              <TableCell sx={{ maxWidth: 220 }}>
-                {/* ✅ โครงการเป็นบรรทัดหลัก (มีค่าเสมอ) บริษัทเป็นบรรทัดรอง — เดิมบริษัทขึ้นก่อน งานที่ไม่ได้กรอกบริษัทจึงขึ้น "-" ตัวหนา */}
-                <Typography variant="caption" fontWeight={700} noWrap sx={{ display: "block", fontSize: "0.8rem" }}>{a.site || "-"}</Typography>
-                <Typography variant="caption" color={a.company ? "text.secondary" : "text.disabled"} noWrap sx={{ display: "block" }}>{a.company || "ไม่ระบุบริษัท"}</Typography>
-                {a.jobNo && <Typography variant="caption" noWrap sx={{ display: "block", color: "#94a3b8", fontSize: "0.68rem", fontWeight: 700 }}>{a.jobNo}</Typography>}
-              </TableCell>
-              {/* ⚠️ หยุด event ไม่ให้ลอยขึ้นไปที่ onClick ของทั้งแถว (ซึ่งเปิดกล่องรายละเอียดงาน) —
-                  TelLink หยุดให้อยู่แล้ว แต่พื้นที่ว่างรอบๆ ในเซลล์ยังคลิกทะลุได้ */}
-              <TableCell sx={{ maxWidth: 160 }}>
-                {(a.contactName || a.contactTel) ? (
-                  <>
-                    <Typography variant="caption" fontWeight={700} noWrap sx={{ display: "block" }}>
-                      {a.contactName || "-"}
-                    </Typography>
-                    {a.contactTel && <TelLink tel={a.contactTel} size="0.72rem" />}
-                  </>
-                ) : (
-                  <Typography variant="caption" color="text.disabled">—</Typography>
-                )}
-              </TableCell>
-              <TableCell sx={{ maxWidth: 170 }}>
-                <Typography variant="caption" noWrap sx={{ display: "block" }}>{a.title || "-"}</Typography>
-                <Typography variant="caption" color="text.secondary" noWrap sx={{ display: "block" }}>{a.system || "-"}</Typography>
-              </TableCell>
-              <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
-                {a.time ? (
-                  <Typography variant="caption" fontWeight={700}>{formatRoundLabel(a.time, a.visitCount, a)}</Typography>
-                ) : (
-                  <Typography variant="caption" color="text.disabled">-</Typography>
-                )}
-              </TableCell>
-              <TableCell sx={{ maxWidth: 200 }}>
-                {/* ✅ งานที่เข้าหลายวันไม่ติดกันโชว์ทุกช่วง + จำนวนช่วง ไม่ใช่แค่วันแรกเหมือนที่เคยเข้าใจผิด */}
-                <Typography variant="caption" sx={{ display: "block" }}>
-                  {formatEventDateRange(a)}
+              sx={{ cursor: "pointer", "&:last-child td": { borderBottom: 0 }, ...(isOverdue ? { boxShadow: "inset 3px 0 0 #dc2626" } : {}) }}>
+              {/* งาน: ประเภท · ระบบ + เลขที่งาน + ครั้งที่ */}
+              <TableCell sx={{ minWidth: 190, maxWidth: 240 }}>
+                <Typography sx={{ fontSize: "0.86rem", fontWeight: 800, color: INK, lineHeight: 1.35 }}>
+                  {a.title || "งาน"}{a.system ? ` · ${a.system}` : ""}
                 </Typography>
-                {job.sessions.length > 1 && (
-                  <Typography variant="caption" color="primary.main" fontWeight={700}>
-                    🔗 อีก {job.sessions.length - 1} ช่วงวัน
-                  </Typography>
+                <Stack direction="row" gap={0.75} alignItems="center" sx={{ mt: 0.25, flexWrap: "wrap" }}>
+                  {a.jobNo && <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#94a3b8" }}>{a.jobNo}</Typography>}
+                  {a.time && (
+                    <Box component="span" sx={{ px: 0.75, height: 20, display: "inline-flex", alignItems: "center", borderRadius: 99, bgcolor: SURFACE, border: `1px solid ${LINE}`, fontSize: "0.68rem", fontWeight: 800, color: INK_2, whiteSpace: "nowrap" }}>
+                      ครั้งที่ {formatRoundLabel(a.time, a.visitCount, a)}
+                    </Box>
+                  )}
+                </Stack>
+              </TableCell>
+              {/* โครงการเป็นบรรทัดหลัก (มีค่าเสมอ) · บริษัทเป็นบรรทัดรอง */}
+              <TableCell sx={{ minWidth: 170, maxWidth: 230 }}>
+                <Typography sx={{ fontSize: "0.84rem", fontWeight: 700, color: INK_2, lineHeight: 1.35, overflowWrap: "anywhere" }}>{a.site || "—"}</Typography>
+                {a.company && a.company !== a.site && <Typography sx={{ ...sub, overflowWrap: "anywhere" }}>{a.company}</Typography>}
+              </TableCell>
+              {/* วันที่ + ช่วงวันอื่นของงานเดียวกัน + ค้างกี่วัน */}
+              <TableCell sx={{ minWidth: 140, whiteSpace: "nowrap" }}>
+                <Typography sx={{ fontSize: "0.82rem", fontWeight: 700, color: INK_2 }}>{formatEventDateRange(a)}</Typography>
+                {job.sessions.length > 1 && <Typography sx={{ ...sub, color: ACCENT, fontWeight: 700 }}>+ อีก {job.sessions.length - 1} ช่วงวัน</Typography>}
+                {isOverdue && (
+                  <Box component="span" sx={{ mt: 0.5, px: 0.75, height: 20, display: "inline-flex", alignItems: "center", borderRadius: 99, bgcolor: alpha("#dc2626", 0.08), fontSize: "0.68rem", fontWeight: 800, color: "#dc2626" }}>
+                    ค้าง {overdueDays} วัน
+                  </Box>
                 )}
               </TableCell>
-              <TableCell sx={{ maxWidth: 170 }} onClick={canAssign ? (e) => e.stopPropagation() : undefined}>
+              <TableCell sx={{ minWidth: 150 }} onClick={canAssign ? (e) => e.stopPropagation() : undefined}>
                 <AssignableResponsible
                   responsible={a.responsiblePerson} avatars={avatarMap}
                   onAssign={canAssign ? (anchor) => setAssign({ anchor, job: a }) : undefined}
                 />
               </TableCell>
-              <TableCell sx={{ maxWidth: 240 }}>
+              {/* ทีม: ชื่อละบรรทัด หัวหน้าทีมอยู่บนสุด */}
+              <TableCell sx={{ minWidth: 150, maxWidth: 200 }}>
                 {teamNames.length > 0 ? (
-                  <Stack direction="row" gap={0.5} flexWrap="wrap">
+                  <Stack spacing={0.5}>
                     {teamNames.slice(0, 3).map((n, i) => (
                       <PersonChip key={n} name={n} avatar={avatarMap.get(n)} size={20} badge={i === 0 && teamNames.length > 1 ? "หัวหน้า" : undefined} />
                     ))}
-                    {teamNames.length > 3 && (
-                      <Typography variant="caption" sx={{ alignSelf: "center", fontWeight: 700, color: "text.secondary" }} title={teamNames.slice(3).join(", ")}>
-                        +{teamNames.length - 3}
-                      </Typography>
-                    )}
+                    {teamNames.length > 3 && <Typography sx={{ ...sub, fontWeight: 700 }} title={teamNames.slice(3).join(", ")}>+ อีก {teamNames.length - 3} คน</Typography>}
                   </Stack>
-                ) : <Typography variant="caption" color="text.disabled">ยังไม่ระบุ</Typography>}
+                ) : <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: "#d97706" }}>ยังไม่มอบหมาย</Typography>}
               </TableCell>
-              <TableCell align="center" sx={{ whiteSpace: "nowrap" }}>
-                {isOverdue ? (
-                  <Typography variant="caption" fontWeight={800} color="error.main">{overdueDays} วัน</Typography>
-                ) : (
-                  <Typography variant="caption" color="text.disabled">-</Typography>
-                )}
+              <TableCell sx={{ minWidth: 130, maxWidth: 170 }} onClick={a.contactTel ? (e) => e.stopPropagation() : undefined}>
+                {(a.contactName || a.contactTel) ? (
+                  <>
+                    {a.contactName && <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: INK_2, overflowWrap: "anywhere" }}>{a.contactName}</Typography>}
+                    {a.contactTel && <TelLink tel={a.contactTel} size="0.76rem" />}
+                  </>
+                ) : dash}
               </TableCell>
-              <TableCell align="center">
-                <Typography variant="caption" fontWeight={docCount > 0 ? 700 : 400}
-                  color={docCount > 0 ? "success.main" : "text.disabled"}>
-                  {docCount > 0 ? `${docCount} ไฟล์` : "ยังไม่มี"}
-                </Typography>
+              <TableCell sx={{ minWidth: 140 }}>
+                <StatusBadge color={OP_COLOR[a.status]}><Circle sx={{ fontSize: 6 }} />{a.status || "—"}</StatusBadge>
+                <JobFlowFlags event={a} />
               </TableCell>
-              <TableCell align="center"><ChevronRight sx={{ color: "text.disabled", fontSize: 18 }} /></TableCell>
+              {/* เอกสารแยกชนิด — มี = ไอคอนสี + จำนวน · ไม่มี = ไม่แสดง · ใบเสนอราคาบอกผลด้วย */}
+              <TableCell sx={{ minWidth: 170 }}>
+                {DOC_KINDS.some((d) => (a[d.key] || []).length) || qKey ? (
+                  <Stack spacing={0.4}>
+                    {DOC_KINDS.map((d) => {
+                      const n = (a[d.key] || []).length;
+                      if (!n && !(d.key === "quotationFiles" && qKey)) return null;
+                      const Ico = d.icon;
+                      const q = d.key === "quotationFiles" ? QUOTE_RESULT[qKey] : null;
+                      return (
+                        <Stack key={d.key} direction="row" spacing={0.6} alignItems="center" sx={{ minWidth: 0 }}>
+                          <Ico sx={{ fontSize: 15, color: n ? INK_2 : "#cbd5e1" }} />
+                          <Typography noWrap sx={{ fontSize: "0.76rem", fontWeight: 700, color: INK_2 }}>{d.label}{n ? ` ${n}` : ""}</Typography>
+                          {q && <Typography noWrap sx={{ fontSize: "0.7rem", fontWeight: 800, color: q[1] }}>· {q[0]}</Typography>}
+                        </Stack>
+                      );
+                    })}
+                  </Stack>
+                ) : <Typography sx={{ fontSize: "0.76rem", color: "#94a3b8" }}>ยังไม่มีเอกสาร</Typography>}
+              </TableCell>
+              <TableCell align="center" sx={{ verticalAlign: "middle !important" }}><ChevronRight sx={{ color: "#cbd5e1", fontSize: 20 }} /></TableCell>
             </TableRow>
           );
         })}
@@ -3489,8 +3497,8 @@ const Operation = () => {
           {totalPages > 1 ? `แสดง ${pageFrom}–${pageTo} จาก ${jobGroups.length} งาน` : `${jobGroups.length} งาน`}
         </Typography>
         {!isMobile && (
-          <SelectField label="ต่อหน้า" value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }} sx={{ width: 120 }}>
-            {[5, 10, 20, 50, 100].map(n => <option key={n} value={n}>{n} รายการ</option>)}
+          <SelectField label="ต่อหน้า" value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }} sx={{ width: 140 }}>
+            {[5, 10, 20, 50, 100].map(n => <option key={n} value={n}>{n} งาน / หน้า</option>)}
           </SelectField>
         )}
       </Stack>
