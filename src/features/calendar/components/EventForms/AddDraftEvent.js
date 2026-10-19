@@ -219,6 +219,37 @@ function injectAddDraftStyles() {
        แปะที่ <body> จะกลายเป็น sibling กับ popup ของ Swal เอง ต้องดันให้สูงกว่าเสมอไม่งั้นโดนซ่อนอยู่หลัง modal */
     .ts-dropdown { z-index: 100000 !important; }
 
+    /* 🔁 (19 ต.ค. 2569 ผู้ใช้: "ตรงงานใหม่ด้วย ยังดูไม่สมบูรณ์") ฟอร์มรับงาน = การ์ดขาวมีหัวข้อเลขลำดับทุกส่วน
+       ① ข้อมูลงาน ② ลูกค้า/โครงการ ③ รายละเอียดงาน ④ แผนเข้างาน · ตัดอีโมจิออกจากป้ายทั้งหมด (ดูเป็นทางการ) */
+    #ade-modal-inner.ade-intake { counter-reset: adesec; }
+    .ade-intake #ade-generalSection, .ade-intake #ade-intakeSection, .ade-intake #ade-monthBlock {
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px 16px 4px; margin-bottom: 18px;
+    }
+    .ade-intake #ade-monthBlock { padding-bottom: 0; }
+    .ade-intake .ade-divider { display: none; }
+    .ade-intake .ade-section-label {
+      counter-increment: adesec; display: flex; align-items: center; gap: 8px;
+      font-size: 14px; font-weight: 800; letter-spacing: 0; text-transform: none; color: #0f172a;
+      margin: 0 -16px 14px; padding: 0 16px 12px; border-bottom: 1px solid #f1f5f9;
+    }
+    .ade-intake .ade-section-label::before {
+      content: counter(adesec); width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+      display: inline-grid; place-items: center; background: #eff6ff; color: #2563eb; font-size: 12px; font-weight: 900;
+    }
+    .ade-intake .ade-section-label .ade-sec-hint { font-weight: 600; font-size: 12px; color: #94a3b8; }
+    .ade-intake .ade-seg span i { display: none; }
+    #ade-header-icon svg { width: 22px; height: 22px; color: #2563eb; }
+    /* 🐛 (19 ต.ค. 2569 ผู้ใช้: "ตรงประเภทงานมันดูกลมกลืน นึกว่าไม่มีช่องนี้") — ช่องเลือก/พิมพ์ (TomSelect) ขอบเข้มขึ้น + ลูกศรลง ให้รู้ว่าเป็นช่องกรอก */
+    #ade-modal-inner .ade-field .ts-wrapper .ts-control {
+      border: 1.5px solid #cbd5e1 !important; border-radius: 10px !important; background-color: #fff !important; min-height: 44px; padding-right: 38px !important;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+      background-repeat: no-repeat !important; background-position: right 12px center !important; cursor: pointer;
+    }
+    #ade-modal-inner .ade-field .ts-wrapper .ts-control:hover { border-color: #94a3b8 !important; }
+    #ade-modal-inner .ade-field .ts-wrapper.focus .ts-control { border-color: #2563eb !important; box-shadow: 0 0 0 3px rgba(37,99,235,.12) !important; }
+    #ade-modal-inner .ade-field .ts-wrapper .ts-control input::placeholder { color: #64748b !important; opacity: 1; }
+    #ade-modal-inner .ade-field input, #ade-modal-inner .ade-field textarea, #ade-modal-inner .ade-field select { border-color: #cbd5e1 !important; }
+
     .ade-month-badge {
       display: inline-flex; align-items: center; gap: 6px;
       background: #eff6ff; border: 1px solid #bfdbfe;
@@ -399,9 +430,9 @@ export const getAddDraftEvent = async ({
 
   const attr = (v) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
   const html = `
-<div id="ade-modal-inner">
+<div id="ade-modal-inner" class="${isIntakeForm ? "ade-intake" : ""}">
   <div id="ade-header">
-    <div id="ade-header-icon">📥</div>
+    <div id="ade-header-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg></div>
     <div id="ade-header-info">
       <h3>${isIntakeForm ? (isEditMode ? "แก้ไขงานที่รับไว้" : "รับงานใหม่") : (isEditMode ? "แก้ไขงานวางแผนล่วงหน้า" : "เพิ่มงานวางแผนล่วงหน้า")}</h3>
       <small>${isIntakeForm ? "กรอกรับงานไว้ก่อน — ยังไม่ต้องระบุวันที่ ส่งลงตารางได้ทีหลังจากเมนู “รับงาน”" : "ยังไม่ต้องระบุวันที่ — ลาก/กดลงตารางได้ทีหลัง"}</small>
@@ -409,7 +440,7 @@ export const getAddDraftEvent = async ({
   </div>
 
   <div id="ade-body">
-    <div class="ade-month-badge" id="ade-monthBadge">📌 เดือนที่ตั้งใจ: ${monthLabel}</div>
+    <div class="ade-month-badge" id="ade-monthBadge">แผนเข้างาน: ${monthLabel}</div>
 
     ${!isAdminOrManagerUser ? `<div class="ade-approval-note">⏳ แผนงานนี้จะขึ้นแสดงทันที แต่ต้องรอแอดมิน/manager อนุมัติก่อน จึงจะถือว่ายืนยันสมบูรณ์</div>` : ""}
 
@@ -421,10 +452,11 @@ export const getAddDraftEvent = async ({
     <div class="ade-card" ${isEditMode ? "data-no-draft" : ""}>
       <!-- 🔁 (15 ต.ค. 2569 ผู้ใช้: "ตัวเลือกดูสับสน รกเกินไป" · "ยังไม่สวย ดูเยื้องๆ" · "ใช้คำที่สื่อความหมายชัดเจน")
            แถบเลือกแบบเดียวกันทั้งการ์ด ช่องกว้างเท่ากันทุกช่อง · เรียงตามลำดับที่ต้องตัดสินใจ -->
+      <p class="ade-section-label">ข้อมูลงาน</p>
       <div class="ade-field">
         <label><span class="req">*</span> งานนี้ต้องทำอะไร</label>
         <div class="ade-seg ade-seg-3">
-          ${[["visit", "🛠️", "ส่งช่างเข้างาน"], ["novisit", "🚚", "ส่งของ / ขายของ"], ["note", "📝", "จดโน๊ตงาน"]].map(([v, ic, l]) => `<label><input type="radio" name="adeVisitMode" value="${v}" ${(existingDraft?.intakeNote ? "note" : existingDraft?.noVisit ? "novisit" : "visit") === v ? "checked" : ""}><span><i>${ic}</i><b>${l}</b></span></label>`).join("")}
+          ${[["visit", "", "ส่งช่างเข้างาน"], ["novisit", "", "ส่งของ / ขายของ"], ["note", "", "บันทึกงาน (โน้ตกันลืม)"]].map(([v, ic, l]) => `<label><input type="radio" name="adeVisitMode" value="${v}" ${(existingDraft?.intakeNote ? "note" : existingDraft?.noVisit ? "novisit" : "visit") === v ? "checked" : ""}><span><i>${ic}</i><b>${l}</b></span></label>`).join("")}
         </div>
         <span id="ade-modeDesc" class="ade-hint"></span>
       </div>
@@ -458,7 +490,7 @@ export const getAddDraftEvent = async ({
           <label>แนบไฟล์เอกสาร</label>
           <label class="ade-file">
             <input id="adeIntakeFiles" type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx">
-            <span id="ade-fileText">📎 แตะเพื่อเลือกไฟล์ · รูป, PDF, Word, Excel</span>
+            <span id="ade-fileText">แตะเพื่อเลือกไฟล์ · รูป, PDF, Word, Excel</span>
           </label>
           ${(existingDraft?.sitePhotoFiles || []).some((f) => f.source === "intake") ? `<span class="ade-hint">แนบไว้แล้ว ${(existingDraft.sitePhotoFiles || []).filter((f) => f.source === "intake").length} ไฟล์ · เลือกเพิ่มได้</span>` : ""}
         </div>
@@ -521,10 +553,10 @@ export const getAddDraftEvent = async ({
         กันข้อมูลไม่ตรงกับครั้งอื่นในสัญญาเดียวกัน
       </p>
       ` : ""}
-      <p class="ade-section-label">ข้อมูลโครงการ</p>
+      <p class="ade-section-label">${isIntakeForm ? "ลูกค้า / โครงการ" : "ข้อมูลโครงการ"}</p>
       <div class="ade-grid ${isIntakeForm ? "ade-grid-2" : "ade-grid-3"}">
         <div class="ade-field">
-          <label>🏢 ชื่อบริษัท</label>
+          <label>ชื่อบริษัท</label>
           <select id="adeCompany" ${isContractLinked ? "disabled" : ""}><option selected disabled value="">— เลือกหรือพิมพ์ —</option>${companyOpts}</select>
         </div>
         <div class="ade-field">
@@ -548,7 +580,7 @@ export const getAddDraftEvent = async ({
         </div>
         ${isContractLinked ? `
         <div class="ade-field">
-          <label>🔢 ครั้งที่</label>
+          <label>ครั้งที่</label>
           <select id="adeTime" disabled><option selected disabled value="">— เลือก —</option>${timeOpts}</select>
         </div>
         ` : ""}
@@ -558,25 +590,25 @@ export const getAddDraftEvent = async ({
     <!-- ✅ (9 ต.ค. 2569) ขั้นที่ 1 รับงาน — ผู้ติดต่อ + อาการเสีย/ขอบเขตงาน (เฉพาะงานทั่วไป/โปรเจค) -->
     <div id="ade-intakeSection">
       <hr class="ade-divider">
-      <p class="ade-section-label">รายละเอียดงานที่รับ <span style="font-weight:600;color:#94a3b8;text-transform:none;">· ไม่บังคับ</span></p>
+      <p class="ade-section-label">รายละเอียดงาน <span class="ade-sec-hint" style="font-weight:600;color:#94a3b8;text-transform:none;">· ไม่บังคับ</span></p>
       <div class="ade-grid ade-grid-2" id="ade-contactGrid">
         <div class="ade-field">
-          <label id="ade-contactLabel">👤 ผู้ติดต่อหน้างาน</label>
+          <label id="ade-contactLabel">ผู้ติดต่อหน้างาน</label>
           <input id="adeContactName" type="text" placeholder="ชื่อผู้ติดต่อ" value="${attr(existingDraft?.contactName)}">
         </div>
         <div class="ade-field">
-          <label>📞 เบอร์โทร</label>
+          <label>เบอร์โทร</label>
           <input id="adeContactTel" type="tel" placeholder="เช่น 081-234-5678" value="${attr(existingDraft?.contactTel)}">
         </div>
       </div>
       ${canAssignResp ? `
       <div class="ade-field" style="margin-top:12px;">
-        <label>🧑‍💼 ผู้รับผิดชอบงาน</label>
+        <label>ผู้รับผิดชอบงาน</label>
         <select id="adeResp">${respOpts}</select>
         <div style="font-size:12px;color:#64748b;margin-top:4px;">ผู้รับผิดชอบจะได้รับแจ้งเตือน และกดรับทราบ → ยืนยันนัดหมาย ในหน้า "งานของฉัน"</div>
       </div>` : ""}
       <div class="ade-field" style="margin-top:12px;">
-        <label>📝 อาการเสีย / ขอบเขตงาน</label>
+        <label>อาการเสีย / ขอบเขตงาน</label>
         <textarea id="adeDescription" rows="5" placeholder="เช่น ตู้ควบคุมแจ้งเตือน Fault โซน 3 · ลูกค้าขอเข้าก่อน 10 โมง">${attr(existingDraft?.description)}</textarea>
       </div>
       <div id="ade-jobInfoBlock">${jobInfoSectionHtml(existingDraft || {}, "ade")}</div>
@@ -594,10 +626,10 @@ export const getAddDraftEvent = async ({
     <div id="ade-monthBlock">
     <hr class="ade-divider">
 
-    <p class="ade-section-label">เดือนที่ตั้งใจจะทำงานนี้</p>
+    <p class="ade-section-label">${isIntakeForm ? "แผนเข้างาน" : "เดือนที่ตั้งใจจะทำงานนี้"}</p>
     <div class="ade-grid ade-grid-2">
       <div class="ade-field">
-        <label><span class="req">*</span> เดือน/ปี</label>
+        <label><span class="req">*</span> เดือน/ปี ที่จะเข้างาน</label>
         <input id="adeMonth" type="month" value="${monthValue}">
       </div>
     </div>
@@ -607,7 +639,7 @@ export const getAddDraftEvent = async ({
   <div id="ade-action-bar">
     <div class="ade-btn-spacer"></div>
     <button class="ade-btn ade-btn-ghost" id="ade-btnCancel">ยกเลิก</button>
-    <button class="ade-btn ade-btn-success" id="ade-btnConfirm">${isEditMode ? "💾 บันทึกการแก้ไข" : (isIntakeForm ? "💾 บันทึกรับงาน" : "💾 บันทึกงานล่วงหน้า")}</button>
+    <button class="ade-btn ade-btn-success" id="ade-btnConfirm">${isEditMode ? "บันทึกการแก้ไข" : (isIntakeForm ? "บันทึกรับงาน" : "บันทึกงานล่วงหน้า")}</button>
   </div>
 </div>
 `;
@@ -665,7 +697,7 @@ export const getAddDraftEvent = async ({
             const sysField = document.getElementById("adeSystem")?.closest(".ade-field");
             if (sysField) sysField.style.display = mode === "visit" ? "" : "none";
             const sectionLabel = document.querySelector("#ade-generalSection .ade-section-label");
-            if (sectionLabel) sectionLabel.textContent = mode === "novisit" ? "ลูกค้า" : "ข้อมูลโครงการ";
+            if (sectionLabel) sectionLabel.textContent = mode === "novisit" ? "ลูกค้า (ผู้รับของ)" : "ลูกค้า / โครงการ";
             Swal.getPopup()?.dispatchEvent(new Event("ade-mode"));
             show("ade-jobTypeBlock", !note);
             show("ade-generalSection", !note);
@@ -673,10 +705,10 @@ export const getAddDraftEvent = async ({
             show("ade-monthBlock", mode === "visit");
             show("ade-monthBadge", mode === "visit");
             const contactLabel = document.getElementById("ade-contactLabel");
-            if (contactLabel) contactLabel.textContent = mode === "novisit" ? "👤 ผู้ติดต่อ / ผู้รับของ" : "👤 ผู้ติดต่อหน้างาน";
+            if (contactLabel) contactLabel.textContent = mode === "novisit" ? "ผู้ติดต่อ / ผู้รับของ" : "ผู้ติดต่อหน้างาน";
             if (descLabel) {
               descLabel.innerHTML = note ? '<span class="req">*</span> สิ่งที่ต้องทำ'
-                : mode === "novisit" ? "📦 รายการสินค้า / สิ่งที่ต้องส่ง" : "📝 อาการเสีย / ขอบเขตงาน";
+                : mode === "novisit" ? "รายการสินค้า / สิ่งที่ต้องส่ง" : "อาการเสีย / ขอบเขตงาน";
             }
             if (descArea) {
               descArea.rows = note ? 8 : 5; // จดงาน = ช่องเดียวในฟอร์ม ให้กว้างพอเขียนได้สบาย
@@ -696,7 +728,7 @@ export const getAddDraftEvent = async ({
           fileInput?.addEventListener("change", () => {
             const n = fileInput.files?.length || 0;
             const t = document.getElementById("ade-fileText");
-            if (t) t.textContent = n ? `📎 ${n === 1 ? fileInput.files[0].name : `เลือกแล้ว ${n} ไฟล์`}` : "📎 แตะเพื่อเลือกไฟล์ · รูป, PDF, Word, Excel";
+            if (t) t.textContent = n ? `${n === 1 ? fileInput.files[0].name : `เลือกแล้ว ${n} ไฟล์`}` : "แตะเพื่อเลือกไฟล์ · รูป, PDF, Word, Excel";
           });
         }
         // ✅ กู้คืนข้อมูลที่กรอกค้างไว้ (ภายใน 10 นาที) — ต้องก่อน TomSelect/ปฏิทิน พ.ศ. mount ให้มันอ่านค่าที่เติมคืน
@@ -895,7 +927,7 @@ export const getAddDraftEvent = async ({
               return;
             }
             const cPlannedMonth = getVal("adeMonth");
-            if (!cPlannedMonth) { Swal.showValidationMessage("กรุณาระบุเดือนที่ตั้งใจ"); return; }
+            if (!cPlannedMonth) { Swal.showValidationMessage("กรุณาระบุเดือนที่จะเข้างาน"); return; }
 
             isSavingDraft = true;
             const cBtn = clickEvt.currentTarget;
@@ -962,7 +994,7 @@ export const getAddDraftEvent = async ({
             if (!title)  { Swal.showValidationMessage("กรุณาระบุประเภทงาน");    return; }
             if (!system) { Swal.showValidationMessage("กรุณาระบุระบบงาน");      return; }
           }
-          if (!plannedMonth) { Swal.showValidationMessage("กรุณาระบุเดือนที่ตั้งใจ"); return; }
+          if (!plannedMonth) { Swal.showValidationMessage("กรุณาระบุเดือนที่จะเข้างาน"); return; }
           if (isIntakeForm && radioVal("adeVisitMode") !== "note" && !radioVal("adeIntakeSource")) { Swal.showValidationMessage("กรุณาเลือกว่ารับงานจากแผนกไหน"); return; }
           const intakeFiles = isIntakeForm && radioVal("adeIntakeDocType") ? [...(document.getElementById("adeIntakeFiles")?.files || [])] : [];
 
