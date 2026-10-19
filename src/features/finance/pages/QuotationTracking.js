@@ -21,7 +21,7 @@ import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 import { alpha } from "@mui/material/styles";
 import {
-  Box, Stack, Typography, TextField, InputAdornment, IconButton, Chip, Avatar, Tooltip, Skeleton, Snackbar, Alert,
+  Box, Stack, Typography, TextField, InputAdornment, IconButton, Chip, Avatar, Tooltip, Skeleton, CircularProgress, Snackbar, Alert,
   Button, Dialog, DialogTitle, DialogContent, DialogActions, useMediaQuery, Pagination, Checkbox, FormControlLabel,
   Collapse, Drawer, Badge,
 } from "@mui/material";
@@ -85,7 +85,7 @@ const PERIODS = [
   { value: "year", label: "ปีนี้" },
 ];
 
-const baht = (n) => `฿${(Number(n) || 0).toLocaleString("th-TH", { maximumFractionDigits: 2 })}`;
+const baht = (n) => `฿${(Number(n) || 0).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const ymd = (d) => (d ? moment(d).format("YYYY-MM-DD") : "");
 const siteText = (a) => [a.company, a.site].filter(Boolean).join(" · ") || "ไม่ระบุโครงการ";
 const jobText = (a) => [a.title, a.system].filter(Boolean).join(" · ");
@@ -647,144 +647,112 @@ const ResultDocs = ({ a, k, onUpload, onDelete, onPreview, uploading, progress }
 
 /**
  * ✅ (19 ต.ค. 2569 ผู้ใช้: "อยากให้วิเคราะห์ข้อมูลในภาพหรือไฟล์อัตโนมัติเลยว่าราคารวมเท่าไรที่แนบ")
- * แนบไฟล์ใบเสนอราคาแล้วข้อมูลยังไม่ครบ → ให้ AI อ่านไฟล์ล่าสุดเองอัตโนมัติ (เลขที่ · วันที่ · ยืนราคา · ยอด · ผู้ติดต่อ)
- * ⚠️ แสดงเป็น "ข้อเสนอ" ให้ตรวจแล้วกด "ใช้ค่านี้" เท่านั้น — ไม่บันทึกเอง (ตัวเลขเงินผิดแล้วตามแก้ยาก)
+ * 🔁 (19 ต.ค. 2569 ผู้ใช้: "ราคาไม่ตรงมั่ว · เลขที่ด้วย · ให้ดูว่ามีกี่ใบกี่ไฟล์ด้วย ให้สมบูรณ์")
+ *    AI อ่าน "ทุกไฟล์" ของงานพร้อมกัน → สรุป "ใบเสนอราคา N ใบ จาก M ไฟล์" รายใบ: เลขที่ · วันที่ · ยอดรวม · อยู่ไฟล์ไหน
+ *    เซิร์ฟเวอร์เติมให้เอง (ช่องว่าง/ช่องที่ AI เติมไว้) — ยอดที่ไม่เห็นครบหรือบวกไม่ตรงจะไม่เติม แล้วบอกเหตุผลไว้
  * ⚠️ ฟีเจอร์ปิดเองถ้าเซิร์ฟเวอร์ไม่มี ANTHROPIC_API_KEY (ไม่มีกล่องนี้ ไม่ error)
  */
 let scanAvailability = null; // แคชทั้งแอป — ถามเซิร์ฟเวอร์ครั้งเดียว
-const QuoteScanBox = ({ a, isFinance, onApply }) => {
-  const files = a.quotationFiles || [];
-  const last = files[files.length - 1];
-  const scannable = last && (/^image\//.test(last.fileType || "") || /\.(png|jpe?g|webp|gif|pdf)$/i.test(last.fileName || "") || /pdf/i.test(last.fileType || ""));
+const isScannable = (f) => /^image\//.test(f?.fileType || "") || /pdf/i.test(f?.fileType || "") || /\.(png|jpe?g|webp|gif|pdf)$/i.test(f?.fileName || "");
+const QuoteScanBox = ({ a }) => {
+  const files = (a.quotationFiles || []).filter(isScannable);
+  const info = a.quotationAiFilled || {};
+  const quotes = Array.isArray(info.quotations) ? info.quotations : [];
   const [enabled, setEnabled] = useState(scanAvailability);
-  const [state, setState] = useState({ status: "idle", fileId: null, result: null, error: "" });
-  const [busy, setBusy] = useState(false);
+  const [state, setState] = useState({ status: "idle", count: null, error: "" });
   useEffect(() => {
     if (scanAvailability !== null) return;
     EventService.BillingScanAvailability().then((r) => { scanAvailability = Boolean(r?.enabled); setEnabled(scanAvailability); }).catch(() => { scanAvailability = false; setEnabled(false); });
   }, []);
   const run = useCallback(async () => {
-    if (!last) return;
-    setState({ status: "loading", fileId: last._id, result: null, error: "" });
+    setState({ status: "filling", count: files.length, error: "" });
     try {
-      const r = await EventService.ScanQuotation(a._id, last._id);
-      setState({ status: "done", fileId: last._id, result: r?.result || null, error: "" });
+      await EventService.ScanQuotation(a._id, null, true);
+      setState({ status: "idle", count: files.length, error: "" }); // ผลมาทาง realtime (หน้าโหลดใหม่เอง)
     } catch (err) {
-      setState({ status: "error", fileId: last._id, result: null, error: err?.response?.data?.message || "อ่านไฟล์ไม่สำเร็จ" });
+      setState({ status: "error", count: files.length, error: err?.response?.data?.message || "อ่านไฟล์ไม่สำเร็จ" });
     }
-  }, [a._id, last]);
-  // 🔁 (19 ต.ค. 2569 ผู้ใช้เลือก "เติมให้อัตโนมัติเลย") ข้อมูลยังไม่ครบ → ให้เซิร์ฟเวอร์อ่านแล้วเติมช่องที่ว่างให้เลย
-  //    (ไฟล์ที่แนบใหม่เซิร์ฟเวอร์เติมเองหลังอัปโหลดอยู่แล้ว — ตรงนี้ช่วยไฟล์เก่าที่แนบไว้ก่อนมีฟีเจอร์)
-  const autoFill = useCallback(async () => {
-    if (!last) return;
-    setState({ status: "filling", fileId: last._id, result: null, error: "" });
-    try {
-      const r = await EventService.ScanQuotation(a._id, last._id, true);
-      setState({ status: "filled", fileId: last._id, result: r?.result || null, filled: r?.filled || [], error: "" });
-    } catch (err) {
-      setState({ status: "error", fileId: last._id, result: null, error: err?.response?.data?.message || "อ่านไฟล์ไม่สำเร็จ" });
-    }
-  }, [a._id, last]);
+  }, [a._id, files.length]);
+  // ข้อมูลยังไม่ครบ + ยังไม่เคยอ่านไฟล์ชุดนี้ → อ่านเองอัตโนมัติ (ไฟล์ที่แนบใหม่ เซิร์ฟเวอร์อ่านเองหลังอัปโหลดอยู่แล้ว)
   useEffect(() => {
-    if (!enabled || !scannable || !missingInfo(a)) return;
-    if (state.fileId === last._id) return;
-    autoFill();
-  }, [enabled, scannable, a, last, state.fileId, autoFill]);
+    if (!enabled || !files.length || !missingInfo(a)) return;
+    if (state.count === files.length || info.fileCount === files.length) return;
+    run();
+  }, [enabled, files.length, a, info.fileCount, state.count, run]);
 
-  if (!enabled || !scannable) return null;
-  const r = state.result;
-  const dismissed = state.status === "dismissed";
-  if (dismissed) return null;
-  if (state.status === "idle") {
-    return (
-      <Button size="small" onClick={run} sx={{ mt: 0.75, textTransform: "none", fontWeight: 800, color: "#7c3aed" }}>
-        ✦ อ่านข้อมูลจากไฟล์อัตโนมัติ (AI)
-      </Button>
-    );
-  }
+  if (!enabled || !files.length) return null;
   const box = { mt: 1.25, p: 1.5, borderRadius: 2.5, border: "1px solid #ddd6fe", bgcolor: "#faf5ff" };
   if (state.status === "filling") {
     return (
       <Stack direction="row" alignItems="center" gap={1} sx={box}>
-        <Skeleton variant="circular" width={18} height={18} />
-        <Typography sx={{ fontSize: "0.84rem", fontWeight: 700, color: "#6d28d9" }}>AI กำลังอ่านไฟล์ใบเสนอราคา แล้วเติมเลขที่ · ยอดรวม · วันที่ · ผู้ติดต่อ ให้อัตโนมัติ…</Typography>
+        <CircularProgress size={16} sx={{ color: "#7c3aed" }} />
+        <Typography sx={{ fontSize: "0.84rem", fontWeight: 700, color: "#6d28d9" }}>AI กำลังอ่านไฟล์ใบเสนอราคาทั้ง {files.length} ไฟล์ — แยกว่ามีกี่ใบ แล้วเติมเลขที่ · ยอดรวม · วันที่ · ผู้ติดต่อ…</Typography>
       </Stack>
     );
   }
-  if (state.status === "filled") {
-    const LABEL = { quotationNo: "เลขที่", quotationDate: "วันที่", quotationValidUntil: "ยืนราคา", quotationAmount: "มูลค่า", quotationContact: "ผู้ติดต่อ" };
-    const got = (state.filled || []).map((x) => LABEL[x]).filter(Boolean);
-    return (
-      <Stack direction="row" alignItems="center" gap={1} sx={{ ...box, py: 1 }}>
-        <Typography sx={{ flex: 1, fontSize: "0.8rem", color: "#6d28d9", fontWeight: 700 }}>
-          {got.length ? `✦ AI เติมให้แล้ว: ${got.join(" · ")} — ช่องที่มีป้าย AI ตรวจแล้วแก้ได้` : `✦ AI อ่านแล้ว ไม่พบข้อมูลที่จะเติม${state.result?.note ? ` (${state.result.note})` : ""}`}
-        </Typography>
-        <Button size="small" onClick={() => setState((s) => ({ ...s, status: "dismissed" }))} sx={{ textTransform: "none", color: TEXT_SUB }}>ปิด</Button>
-      </Stack>
-    );
-  }
-  if (state.status === "loading") {
-    return (
-      <Stack direction="row" alignItems="center" gap={1} sx={box}>
-        <Skeleton variant="circular" width={18} height={18} />
-        <Typography sx={{ fontSize: "0.84rem", fontWeight: 700, color: "#6d28d9" }}>กำลังอ่านข้อมูลจากไฟล์ใบเสนอราคา… (เลขที่ · วันที่ · ยอดรวม · ผู้ติดต่อ)</Typography>
-      </Stack>
-    );
-  }
-  if (state.status === "error" || !r?.found) {
+  if (state.status === "error") {
     return (
       <Stack direction="row" alignItems="center" gap={1} sx={{ ...box, bgcolor: "#fff7ed", borderColor: "#fed7aa" }}>
-        <Typography sx={{ flex: 1, fontSize: "0.82rem", color: "#9a3412" }}>
-          {state.status === "error" ? state.error : `อ่านใบเสนอราคาจากไฟล์นี้ไม่ได้${r?.note ? ` — ${r.note}` : ""}`} · กรอกเองได้ที่ปุ่ม “กรอกให้ครบ”
-        </Typography>
+        <Typography sx={{ flex: 1, fontSize: "0.82rem", color: "#9a3412" }}>{state.error} · กรอกเองได้ที่ปุ่ม “กรอกให้ครบ”</Typography>
         <Button size="small" onClick={run} sx={{ textTransform: "none", fontWeight: 800 }}>ลองใหม่</Button>
       </Stack>
     );
   }
-  const vat = Number(r.vatAmount) || 0;
-  const total = Number(r.grandTotal) || (Number(r.amountBeforeVat) + vat) || 0;
-  const rows = [
-    ["เลขที่", r.quotationNo], ["วันที่", r.quotationDate ? thaiDate(r.quotationDate) : ""], ["ยืนราคาถึง", r.validUntil ? thaiDate(r.validUntil) : ""],
-    ["ยอดก่อน VAT", r.amountBeforeVat ? baht(r.amountBeforeVat) : ""], ["VAT", vat ? baht(vat) : ""],
-    ["ผู้ติดต่อ", [r.contactName, r.contactPhone, r.contactEmail].filter(Boolean).join(" · ")],
-  ].filter(([, v]) => v);
-  const apply = async () => {
-    setBusy(true);
-    const body = {};
-    if (r.quotationNo) body.quotationNo = r.quotationNo;
-    if (r.quotationDate) body.quotationDate = r.quotationDate;
-    if (r.validUntil) body.quotationValidUntil = r.validUntil;
-    if (isFinance && total) { body.quotationAmount = total; body.quotationVatIncluded = vat > 0 || Number(r.grandTotal) > Number(r.amountBeforeVat); }
-    if (r.contactName || r.contactPhone || r.contactEmail) {
-      const c = a.quotationContact || {};
-      body.quotationContact = { name: r.contactName || c.name || "", phone: r.contactPhone || c.phone || "", email: r.contactEmail || c.email || "" };
-    }
-    const ok = await onApply(body);
-    setBusy(false);
-    if (ok) setState((s) => ({ ...s, status: "dismissed" }));
-  };
+  if (!info.at) {
+    return (
+      <Button size="small" onClick={run} sx={{ mt: 0.75, textTransform: "none", fontWeight: 800, color: "#7c3aed" }}>
+        ✦ ให้ AI อ่านไฟล์ทั้ง {files.length} ไฟล์ แล้วเติมข้อมูลให้
+      </Button>
+    );
+  }
+  const stale = info.fileCount && info.fileCount !== files.length;
+  const sum = quotes.reduce((s, q) => s + (Number(q.grandTotal) || 0), 0);
+  const allTotals = quotes.length > 0 && quotes.every((q) => Number(q.grandTotal) > 0);
   return (
     <Box sx={box}>
-      <Stack direction="row" alignItems="baseline" gap={1} sx={{ flexWrap: "wrap" }}>
-        <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: "#6d28d9" }}>✦ อ่านจากไฟล์อัตโนมัติ (AI) — ตรวจก่อนใช้</Typography>
-        {r.confidence !== "high" && <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: "#b45309" }}>ความมั่นใจ{r.confidence === "low" ? "ต่ำ" : "ปานกลาง"}</Typography>}
+      <Stack direction="row" alignItems="center" gap={1} sx={{ flexWrap: "wrap" }}>
+        <Typography sx={{ flex: 1, minWidth: 200, fontSize: "0.84rem", fontWeight: 900, color: "#6d28d9" }}>
+          ✦ AI อ่านแล้ว: {quotes.length ? `ใบเสนอราคา ${quotes.length} ใบ` : "ไม่พบใบเสนอราคา"} จาก {info.fileCount || files.length} ไฟล์
+        </Typography>
+        {info.confidence && info.confidence !== "high" && (
+          <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: "#b45309" }}>ความมั่นใจ{info.confidence === "low" ? "ต่ำ" : "ปานกลาง"} — ควรตรวจ</Typography>
+        )}
+        <Button size="small" onClick={run} sx={{ textTransform: "none", fontWeight: 800, color: "#7c3aed", minWidth: 0 }}>อ่านใหม่</Button>
       </Stack>
-      <Typography sx={{ mt: 0.5, fontSize: "0.72rem", color: TEXT_SUB }}>ราคารวม (รวม VAT)</Typography>
-      <Typography sx={{ fontSize: "1.35rem", fontWeight: 900, color: TEXT_MAIN, lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>{total ? baht(total) : "อ่านยอดไม่ได้"}</Typography>
-      <Box sx={{ display: "grid", gap: 0.5, mt: 1, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
-        {rows.map(([l, v]) => (
-          <Typography key={l} sx={{ fontSize: "0.8rem", color: "#334155" }}><Box component="span" sx={{ color: TEXT_SUB, fontWeight: 700 }}>{l}:</Box> {v}</Typography>
-        ))}
-      </Box>
-      {r.note && <Typography sx={{ mt: 0.75, fontSize: "0.74rem", color: "#9a3412" }}>หมายเหตุ: {r.note}</Typography>}
-      {!isFinance && total > 0 && <Typography sx={{ mt: 0.5, fontSize: "0.72rem", color: TEXT_SUB }}>มูลค่าบันทึกได้เฉพาะฝ่ายบริหาร/การเงิน — จะบันทึกเฉพาะเลขที่/วันที่/ผู้ติดต่อ</Typography>}
-      <Stack direction="row" gap={1} justifyContent="flex-end" sx={{ mt: 1.25 }}>
-        <Button size="small" onClick={() => setState((s) => ({ ...s, status: "dismissed" }))} disabled={busy} sx={{ textTransform: "none", color: TEXT_SUB }}>ไม่ใช้</Button>
-        <Button size="small" variant="contained" onClick={apply} disabled={busy}
-          sx={{ textTransform: "none", fontWeight: 800, boxShadow: "none", borderRadius: 2, bgcolor: "#7c3aed", "&:hover": { bgcolor: "#6d28d9", boxShadow: "none" } }}>
-          {busy ? "กำลังบันทึก..." : "ใช้ค่านี้"}
-        </Button>
-      </Stack>
+      {quotes.length > 0 && (
+        <Box sx={{ mt: 1, borderRadius: 2, border: "1px solid #e9d5ff", bgcolor: "#fff", overflow: "hidden" }}>
+          {quotes.map((q, i) => (
+            <Stack key={`${q.quotationNo}-${i}`} direction="row" alignItems="center" gap={1.25}
+              sx={{ px: 1.25, py: 0.9, borderTop: i ? "1px solid #f3e8ff" : 0, flexWrap: "wrap" }}>
+              <Box sx={{ width: 22, height: 22, borderRadius: 99, bgcolor: "#f3e8ff", color: "#7c3aed", fontSize: "0.72rem", fontWeight: 900, display: "grid", placeItems: "center", flexShrink: 0 }}>{i + 1}</Box>
+              <Box sx={{ flex: 1, minWidth: 140 }}>
+                <Typography sx={{ fontSize: "0.86rem", fontWeight: 800, color: q.quotationNo ? TEXT_MAIN : "#94a3b8" }}>{q.quotationNo || "อ่านเลขที่ไม่ได้"}</Typography>
+                <Typography sx={{ fontSize: "0.72rem", color: TEXT_SUB }}>
+                  {q.quotationDate ? `${thaiDate(q.quotationDate)} · ` : ""}{q.files?.length ? `ไฟล์ที่ ${q.files.join(", ")}` : ""}
+                </Typography>
+              </Box>
+              <Box sx={{ textAlign: "right" }}>
+                {Number(q.grandTotal) > 0
+                  ? <Typography sx={{ fontSize: "0.92rem", fontWeight: 900, color: TEXT_MAIN, fontVariantNumeric: "tabular-nums" }}>{baht(q.grandTotal)}</Typography>
+                  : <Typography sx={{ fontSize: "0.76rem", fontWeight: 800, color: "#b45309" }}>ไม่ได้เติมยอด</Typography>}
+                {q.issues?.length > 0 && <Typography sx={{ fontSize: "0.7rem", color: "#b45309" }}>{q.issues.join(" · ")}</Typography>}
+              </Box>
+            </Stack>
+          ))}
+          {quotes.length > 1 && (
+            <Stack direction="row" justifyContent="space-between" sx={{ px: 1.25, py: 0.9, borderTop: "1px solid #e9d5ff", bgcolor: "#faf5ff" }}>
+              <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: TEXT_SUB }}>รวม {quotes.length} ใบ</Typography>
+              <Typography sx={{ fontSize: "0.92rem", fontWeight: 900, color: allTotals ? TEXT_MAIN : "#b45309", fontVariantNumeric: "tabular-nums" }}>
+                {allTotals ? baht(sum) : "ยอดไม่ครบทุกใบ — ไม่ได้เติมมูลค่า"}
+              </Typography>
+            </Stack>
+          )}
+        </Box>
+      )}
+      {info.note && <Typography sx={{ mt: 0.75, fontSize: "0.74rem", color: "#9a3412" }}>หมายเหตุ: {info.note}</Typography>}
+      <Typography sx={{ mt: 0.5, fontSize: "0.72rem", color: TEXT_SUB }}>
+        {stale ? `มีไฟล์เปลี่ยนไป (ตอนนี้ ${files.length} ไฟล์) — กด "อ่านใหม่"` : "ช่องที่มีป้าย AI ตรวจแล้วแก้ได้ที่ปุ่มแก้ไข · ช่องที่คนกรอกเอง AI จะไม่ทับ"}
+      </Typography>
     </Box>
   );
 };
@@ -1044,7 +1012,7 @@ const DetailDialog = ({
               onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
               uploading={upload.busy && upload.eventId === a._id && upload.type === "quotation"} progress={upload.progress} currentUser={currentUser}
             />
-            <QuoteScanBox a={a} isFinance={isFinance} onApply={(body) => onQuotation(job, body)} />
+            <QuoteScanBox a={a} />
             {open && (
               <Button size="small" startIcon={<Autorenew sx={{ fontSize: 16 }} />} onClick={() => setDecision("resend")}
                 sx={{ mt: 0.5, textTransform: "none", fontWeight: 700, color: TEXT_SUB }}>ส่งฉบับแก้ไขให้ลูกค้าแล้ว (เริ่มนับใหม่)</Button>

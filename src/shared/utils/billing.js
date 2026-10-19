@@ -16,7 +16,7 @@ export const round2 = (n) => {
   return Number(`${Math.round(Number(`${v}e2`))}e-2`);
 };
 
-export const baht = (n) => `฿${round2(n).toLocaleString("th-TH", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+export const baht = (n) => `฿${round2(n).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export const paidTotal = (billing) =>
   round2((billing?.payments || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0));

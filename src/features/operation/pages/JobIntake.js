@@ -115,7 +115,7 @@ const stageOf = (e) => {
  */
 // กล่องใบเสนอราคาตัวเดียวกับหน้าติดตามใบเสนอราคา — โหลดเมื่อกดเปิดเท่านั้น
 const QuotationDialogHost = lazyWithRetry(() => import("@/features/finance/pages/QuotationTracking").then((m) => ({ default: m.QuotationDialogHost })));
-const baht = (n) => `฿${Number(n || 0).toLocaleString("th-TH", { maximumFractionDigits: 0 })}`;
+const baht = (n) => `฿${Number(n || 0).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const OUTCOME = {
   // ชื่อ/สีจาก QUOTE_STATUS (ชุดเดียวกับหน้าติดตามใบเสนอราคา) — ที่นี่กำหนดแค่ปุ่ม/กลุ่ม
   waiting_file: { ...QUOTE_STATUS.waiting_file, act: "แนบใบเสนอราคา", to: "qt", group: "todo" },
