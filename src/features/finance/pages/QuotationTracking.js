@@ -606,6 +606,48 @@ const FollowUpSection = ({ a, onSubmit, onPreview, canFollow, formRef }) => {
 };
 
 // ─── กล่องรายละเอียด ─────────────────────────────────────────────────────────
+/** แก้/เติมรายละเอียดผลลัพธ์ภายหลัง — วันที่ลูกค้าตอบ · เลข PO (ได้งาน) · หมายเหตุ/เหตุผล */
+const ResultDetails = ({ a, k, onSave }) => {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [f, setF] = useState({});
+  const start = () => { setF({ date: ymd(a.quotationDecisionAt), po: a.quotationPoNo || "", note: a.quotationDecisionNote || "" }); setOpen(true); };
+  const invalid = k === "rejected" && !String(f.note || "").trim();
+  const save = async () => {
+    setBusy(true);
+    const ok = await onSave({ quotationDecisionAt: f.date || "", quotationDecisionNote: f.note, ...(k === "approved" ? { quotationPoNo: f.po } : {}) });
+    setBusy(false);
+    if (ok) setOpen(false);
+  };
+  const missing = k === "approved" && !a.quotationPoNo;
+  if (!open) {
+    return (
+      <Button size="small" startIcon={<Edit sx={{ fontSize: 16 }} />} onClick={start}
+        sx={{ mt: 1, textTransform: "none", fontWeight: 800, borderRadius: 2, px: 1.25,
+          ...(missing ? { bgcolor: "#fffbeb", color: "#b45309", border: "1px solid #fde68a" } : { color: "#2563eb" }) }}>
+        {missing ? "เติมเลข PO / รายละเอียดผล" : "แก้ไขรายละเอียดผล"}
+      </Button>
+    );
+  }
+  return (
+    <Box sx={{ mt: 1.25, p: 1.25, borderRadius: 2, bgcolor: "#f8fafc", border: `1px solid ${BORDER}` }}>
+      <Box sx={{ display: "grid", gap: 1.25, gridTemplateColumns: { xs: "1fr", sm: k === "approved" ? "1fr 1fr" : "1fr" } }}>
+        <ThaiDatePicker label="วันที่ลูกค้าตอบ" value={f.date} onChange={(v) => setF((x) => ({ ...x, date: v || "" }))} />
+        {k === "approved" && <TextField size="small" label="เลขที่ PO / ใบสั่งซื้อของลูกค้า" value={f.po} onChange={(e) => setF((x) => ({ ...x, po: e.target.value }))} inputProps={{ maxLength: 60 }} />}
+      </Box>
+      <TextField size="small" fullWidth multiline minRows={2} sx={{ mt: 1.25 }} label={k === "rejected" ? "เหตุผลที่ไม่ได้งาน *" : "หมายเหตุ (ถ้ามี)"}
+        value={f.note} onChange={(e) => setF((x) => ({ ...x, note: e.target.value }))} error={invalid} inputProps={{ maxLength: 500 }} />
+      <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ mt: 1.25 }}>
+        <Button onClick={() => setOpen(false)} disabled={busy} sx={{ textTransform: "none", color: TEXT_SUB }}>ยกเลิก</Button>
+        <Button variant="contained" startIcon={<Save />} disabled={busy || invalid} onClick={save}
+          sx={{ textTransform: "none", fontWeight: 800, boxShadow: "none", borderRadius: 2, bgcolor: "#2563eb", "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } }}>
+          {busy ? "กำลังบันทึก..." : "บันทึกรายละเอียดผล"}
+        </Button>
+      </Stack>
+    </Box>
+  );
+};
+
 // ✅ ผู้ใช้สั่ง (3 ต.ค. 2569): ตัดขั้น "ส่งลูกค้า" — ระบบเริ่มนับติดตามเองเมื่อแนบใบเสนอราคาและช่างส่งงานแล้ว
 //    (server: services/quotationAutoStart.js)
 // 🔁 (19 ต.ค. 2569 ผู้ใช้: "การติดตามใบเสนอราคาไม่ชัดเจน ดูไม่เข้าใจ ดูยาก · ทำให้ครบถ้วนสมบูรณ์ UX/UI สวยงาม")
@@ -798,6 +840,18 @@ const DetailDialog = ({
                     <MiniStat label="บันทึกโดย" value={a.quotationDecisionBy} />
                   </Box>
                   {a.quotationDecisionNote && <Typography sx={{ fontSize: "0.84rem", color: "#334155", mt: 1 }}>{k === "rejected" ? "เหตุผล: " : "หมายเหตุ: "}{a.quotationDecisionNote}</Typography>}
+                  {/* ✅ (19 ต.ค. 2569 ผู้ใช้: "อยากให้แนบหรือกรอกเอกสารภายหลังกดได้งาน หรือไม่ได้งานด้วย")
+                      เติม/แก้รายละเอียดผลได้ภายหลัง (ไม่เปลี่ยนผล) + แนบเอกสารผลลัพธ์ (PO · หนังสือตอบรับ · อีเมลปฏิเสธ) */}
+                  <ResultDetails a={a} k={k} onSave={(body) => onQuotation(job, body)} />
+                  <Box sx={{ mt: 1.25, pt: 1.25, borderTop: `1px dashed ${BORDER}` }}>
+                    <FileUploadSection
+                      eventId={a._id} type="quotationResult"
+                      label={k === "approved" ? "เอกสารผลลัพธ์ (PO / หนังสือตอบรับ)" : "เอกสารผลลัพธ์ (อีเมล / หนังสือแจ้งไม่รับ)"}
+                      files={a.quotationResultFiles}
+                      onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
+                      uploading={upload.busy && upload.eventId === a._id} progress={upload.progress} currentUser={currentUser}
+                    />
+                  </Box>
                 </Box>
                 {isFinance && (
                   <Button size="small" startIcon={<Undo sx={{ fontSize: 16 }} />} onClick={() => setDecision("reset")} disabled={busy}
