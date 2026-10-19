@@ -1,6 +1,8 @@
 package com.tidtam.app;
 
+import android.content.Intent;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
@@ -58,5 +60,31 @@ public class MainActivity extends BridgeActivity {
             return WindowInsetsCompat.CONSUMED;
         });
         ViewCompat.requestApplyInsets(webView);
+
+        openNotificationTarget(getIntent());
+    }
+
+    /**
+     * 🐛 (19 ต.ค. 2569 ผู้ใช้: "กดแจ้งเตือนแล้วเข้าไปแค่หน้าแรกแอป ไม่ไปหน้านั้นๆ")
+     * แอปถูกปิดอยู่ (cold start) แล้วแตะแจ้งเตือน → Android เปิดแอปด้วย intent ที่มีข้อมูลแจ้งเตือน (url/nid)
+     * แต่ปลั๊กอิน Firebase ส่งเหตุการณ์ "แตะแจ้งเตือน" เฉพาะตอนแอปเปิดค้างอยู่ (onNewIntent) เท่านั้น → ตอนเปิดใหม่หายเงียบ
+     * ✅ เปิดหน้าเว็บที่หน้าปลายทางตรงๆ แทนหน้าแรก (+ ?_n=<id> ให้หน้าเว็บทำเครื่องหมายอ่านแล้ว — ดู InAppPushBanner.js)
+     * ⚠️ รับเฉพาะพาธภายในเว็บของเรา (ขึ้นต้นด้วย "/") — ไม่เปิดโดเมนอื่นจากข้อมูลในแจ้งเตือน
+     * ⚠️ แอปเปิดค้างอยู่ (warm start) ปลั๊กอินจัดการเองผ่าน onNewIntent → nativePush.js อยู่แล้ว
+     */
+    private void openNotificationTarget(Intent intent) {
+        if (intent == null || intent.getExtras() == null) return;
+        if (!intent.getExtras().containsKey("google.message_id")) return;
+        String path = intent.getStringExtra("url");
+        if (path == null || !path.startsWith("/") || path.startsWith("//") || "/".equals(path)) return;
+        String nid = intent.getStringExtra("nid");
+        String base = getBridge().getConfig().getServerUrl();
+        if (base == null || base.isEmpty()) base = "https://da-app.vercel.app";
+        if (base.endsWith("/")) base = base.substring(0, base.length() - 1);
+        String target = base + path;
+        if (nid != null && !nid.isEmpty()) target += (path.contains("?") ? "&" : "?") + "_n=" + Uri.encode(nid);
+        intent.removeExtra("google.message_id"); // หมุนจอ/สร้างหน้าใหม่ จะไม่เปิดซ้ำ
+        final String url = target;
+        getBridge().getWebView().post(() -> getBridge().getWebView().loadUrl(url));
     }
 }
