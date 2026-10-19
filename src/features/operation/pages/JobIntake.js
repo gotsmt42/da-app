@@ -19,6 +19,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import lazyWithRetry from "@/shared/utils/lazyWithRetry";
 import usePaged, { PageBar } from "@/shared/ui/usePaged";
 import DateCell from "@/shared/ui/DateCell";
+import RefDoc from "@/shared/ui/RefDoc";
 import JobKindTag from "@/shared/ui/JobKindTag";
 import { resolveQuotationGroup, getFollowUpInfo } from "@/shared/utils/quotationTracking";
 import { Link } from "react-router-dom";
@@ -293,7 +294,7 @@ const scheduleShort = (j) => (j.intakeNote ? `บันทึก ${formatThai(mo
  * 🔁 (19 ต.ค. 2569 ผู้ใช้: "รายละเอียดให้ครบแบบหน้าการ์ดด้วย") — เพิ่มคอลัมน์รายละเอียดงาน · ทีม/ผู้ติดต่อ · ขั้นถัดไป · กำหนดเสร็จ
  *    และกดแถวเพื่อกางการ์ดเต็มใต้แถว (ไฟล์แนบ · ผลเสนอราคา · แถบขั้นตอน · ปุ่มแก้ไข/ยกเลิก ครบเหมือนมุมมองการ์ด)
  */
-function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, renderCard, employees = [], refMode = false }) {
+function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, onUploadInvoice, onNoteDone, renderCard, employees = [], refMode = false }) {
   const personOf = (name) => employees.find((u) => u.fname === name || [u.fname, u.lname].filter(Boolean).join(" ") === name);
   const [open, setOpen] = useState(() => new Set());
   const toggle = (id) => setOpen((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -301,7 +302,7 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, render
   const td = { fontSize: "0.82rem", color: "#334155", px: 1.25, py: 1.1, borderBottom: `1px solid ${LINE}`, verticalAlign: "top" };
   const sub = { fontSize: "0.74rem", color: MUTED, lineHeight: 1.45, overflowWrap: "anywhere" };
   // เอกสารอ้างอิง (ตอนรับงาน) กับ ใบเสนอราคา (ติดตามภายหลัง) แยกคนละคอลัมน์เสมอ · แท็บรอดำเนินการยังไม่มีใบเสนอราคา
-  const COLS = ["", "กำหนดการ", "เลขที่งาน", "งาน / โครงการ", "รายละเอียดงาน", "รับงานจาก", "ผู้ติดต่อ", "สถานะงาน", "เอกสารอ้างอิง", ...(refMode ? [] : ["ใบเสนอราคา"]), "ผู้รับผิดชอบ", ""];
+  const COLS = ["", "กำหนดการ", "เลขที่งาน", "งาน / โครงการ", "รายละเอียดงาน", "รับงานจาก", "ผู้ติดต่อ", "สถานะงาน", "เอกสารอ้างอิง", ...(refMode ? [] : ["ใบเสนอราคาเพิ่มเติม"]), "ผู้รับผิดชอบ", ""];
   return (
     <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflowX: "auto" }}>
       <Box component="table" sx={{ width: "100%", minWidth: 1560, borderCollapse: "collapse" }}>
@@ -311,22 +312,43 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, render
         <tbody>
           {rows.map(({ j, s, oc }) => {
             const ro = readOnlyOf(j);
-            const isOpen = open.has(j._id);
+            const isOpen = !j.intakeNote && open.has(j._id);
             const stall = stalledDays(j, s);
             const owner = j.responsiblePerson ? personOf(j.responsiblePerson) : null;
-            const files = (j.sitePhotoFiles || []).filter((f) => f.source === "intake").length;
-            const action = !ro && s.i === 0 && !s.note
-              ? (s.nv
-                ? <Button size="small" onClick={() => onDeliver(j)} sx={{ ...SUCCESS, height: 30, px: 1.25 }}>ส่งของแล้ว</Button>
-                : <Button size="small" onClick={() => onSchedule(j)} sx={{ ...PRIMARY, height: 30, px: 1.25 }}>{requestMode ? "ขอลงตาราง" : "ส่งลงตาราง"}</Button>)
-              : !j.unscheduled && !s.nv && !s.note
-                ? <Button component={Link} to={`/operation/${j._id}`} size="small" sx={{ ...BTN, height: 30, px: 1.25, color: ACCENT, border: `1px solid ${alpha(ACCENT, 0.4)}` }}>ดูงาน</Button>
-                : null;
+            // ✅ (19 ต.ค. 2569 ผู้ใช้: "ให้มีปุ่มเหมือนอันอื่นด้วยให้สอดคล้องสมบูรณ์") — ทุกแถวมีปุ่มสิ่งที่ต้องทำต่อ
+            //    รอส่งลงตาราง · ส่งของแล้ว · อัปโหลดใบวางบิล · ทำเสร็จแล้ว · ดูงาน · (อื่นๆ) รายละเอียด
+            const ghost = { ...BTN, height: 30, px: 1.25, color: ACCENT, border: `1px solid ${alpha(ACCENT, 0.4)}` };
+            const action = ro
+              ? (!j.unscheduled && !s.nv && !s.note ? <Button component={Link} to={`/operation/${j._id}`} size="small" sx={ghost}>ดูงาน</Button> : <Button size="small" onClick={() => toggle(j._id)} sx={{ ...ghost, color: MUTED, borderColor: LINE }}>รายละเอียด</Button>)
+              : s.note
+                ? (s.i === 0
+                  ? <Button size="small" onClick={() => onNoteDone(j)} sx={{ ...SUCCESS, height: 30, px: 1.25 }}>ทำเสร็จแล้ว</Button>
+                  : <Button size="small" onClick={() => onNoteDone(j, true)} sx={ghost}>นำกลับมาทำต่อ</Button>)
+                : s.nv
+                  ? (s.i === 0
+                    ? <Button size="small" onClick={() => onDeliver(j)} sx={{ ...SUCCESS, height: 30, px: 1.25 }}>ส่งของแล้ว</Button>
+                    : s.i === 2
+                      ? (
+                        <Button component="label" size="small" sx={{ ...PRIMARY, height: 30, px: 1.25 }}>
+                          อัปโหลดใบวางบิล
+                          <input hidden type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={(e) => {
+                            const picked = [...(e.target.files || [])];
+                            e.target.value = "";
+                            if (picked.length) onUploadInvoice(j, picked);
+                          }} />
+                        </Button>
+                      )
+                      : <Button component={Link} to="/finance?tab=billing" size="small" sx={ghost}>ติดตามวางบิล</Button>)
+                  : s.i === 0
+                    ? <Button size="small" onClick={() => onSchedule(j)} sx={{ ...PRIMARY, height: 30, px: 1.25 }}>{requestMode ? "ขอลงตาราง" : "ส่งลงตาราง"}</Button>
+                    : !j.unscheduled
+                      ? <Button component={Link} to={`/operation/${j._id}`} size="small" sx={ghost}>ดูงาน</Button>
+                      : <Button size="small" onClick={() => toggle(j._id)} sx={{ ...ghost, color: MUTED, borderColor: LINE }}>รายละเอียด</Button>;
             return [
-              <Box component="tr" key={j._id} onClick={(e) => { if (!e.target.closest("a,button")) toggle(j._id); }}
+              <Box component="tr" key={j._id} onClick={(e) => { if (!j.intakeNote && !e.target.closest("a,button,label")) toggle(j._id); }}
                 sx={{ cursor: "pointer", "& > td": { bgcolor: isOpen ? alpha(ACCENT, 0.04) : "transparent" }, "&:hover > td": { bgcolor: isOpen ? alpha(ACCENT, 0.06) : "#f8fafc" } }}>
                 <Box component="td" sx={{ ...td, px: 0.5, textAlign: "center" }}>
-                  <ChevronRight sx={{ fontSize: 20, color: "#94a3b8", transition: "transform .15s", transform: isOpen ? "rotate(90deg)" : "none" }} />
+                  {!j.intakeNote && <ChevronRight sx={{ fontSize: 20, color: "#94a3b8", transition: "transform .15s", transform: isOpen ? "rotate(90deg)" : "none" }} />}
                 </Box>
                 {/* ✅ (19 ต.ค. 2569 ผู้ใช้: "เอาช่องวันที่ไปไว้หน้าสุด ชัดเจน สวยงาม") — กล่องวันที่แบบปฏิทิน (ยังไม่ลงวัน = กล่องเส้นประบอกแผน) */}
                 <Box component="td" sx={{ ...td, width: 96 }}>
@@ -360,9 +382,8 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, render
                   <Typography sx={{ ...sub, color: j.description ? "#334155" : "#cbd5e1", fontSize: "0.78rem", whiteSpace: "pre-line", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                     {j.description || "—"}
                   </Typography>
-                  {(files > 0 || j.equipment) && (
-                    <Typography sx={{ ...sub, mt: 0.3 }}>{[files > 0 && `📎 ${files} ไฟล์`, j.equipment && `อุปกรณ์: ${String(j.equipment).split(/\n+/).filter(Boolean).join(", ")}`].filter(Boolean).join(" · ")}</Typography>
-                  )}
+                  {/* 🔁 (19 ต.ค. 2569 ผู้ใช้: "ไฟล์ขึ้นซ้ำ ให้ใส่แค่รายละเอียดงาน ไฟล์อยู่เอกสารอ้างอิง") */}
+                  {j.equipment && <Typography sx={{ ...sub, mt: 0.3 }}>อุปกรณ์: {String(j.equipment).split(/\n+/).filter(Boolean).join(", ")}</Typography>}
                   {j.infoPending && j.infoPendingNote && <Typography sx={{ ...sub, color: AMBER, fontWeight: 700 }}>ขาด: {j.infoPendingNote}</Typography>}
                 </Box>
                 <Box component="td" sx={td}>
@@ -391,7 +412,7 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, render
                     บรรทัดเดียวไม่ตัดคำ · ไฟล์กดเปิดได้ · กดช่องนี้ = เปิดกล่องใบเสนอราคา (ตัวเดียวกับหน้าติดตาม) ทับหน้านี้ */}
                 <Box component="td" sx={{ ...td, width: 210, minWidth: 210, maxWidth: 210 }}>
                   {/* ✅ (19 ต.ค. 2569 ผู้ใช้: "หน้ารอดำเนินการเปลี่ยนจากใบเสนอราคาเป็นเอกสารอ้างอิง") — งานยังไม่เริ่ม: โชว์เอกสารที่แนบมาตอนรับงาน */}
-                  <RefDocCell job={j} />
+                  <RefDoc event={j} />
                 </Box>
                 {!refMode && (
                   <Box component="td" sx={{ ...td, width: 190, minWidth: 190, maxWidth: 190 }}>
@@ -412,7 +433,7 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, render
                     </Stack>
                   ) : <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: AMBER }}>ยังไม่ระบุ</Typography>}
                 </Box>
-                <Box component="td" sx={{ ...td, textAlign: "right", whiteSpace: "nowrap", position: "sticky", right: 0, bgcolor: isOpen ? "#f5f8ff !important" : "#fff !important", boxShadow: "-8px 0 8px -8px rgba(15,23,42,.15)" }}>{action}</Box>
+                <Box component="td" sx={{ ...td, textAlign: "right", whiteSpace: "nowrap", position: "sticky", right: 0, bgcolor: isOpen ? "#f5f8ff !important" : "#fff !important", boxShadow: "-8px 0 8px -8px rgba(15,23,42,.15)" }}>{isOpen ? null : action}</Box>
               </Box>,
               isOpen && (
                 <tr key={`${j._id}-detail`}>
@@ -679,7 +700,7 @@ const Line = ({ icon: Icon, children, color = "#475569", strong }) => (
   </Stack>
 );
 
-function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, onUploadInvoice, onNoteDone, onEdit, onCancel, onRestore }) {
+function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, onUploadInvoice, onNoteDone, onEdit, onCancel, onRestore, inRow = false }) {
   const st = stageOf(job);
   const stall = stalledDays(job, st);
   // ไฟล์ตอนรับงานที่เป็นใบเสนอราคา/PO แสดงในแถบใบเสนอราคาแล้ว — ไม่ซ้ำด้านล่าง
@@ -776,18 +797,23 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
   //    แถวเดียวอ่านจบ: ไอคอนรูปแบบงาน · ชื่องาน + เลข Job · โครงการ · ข้อมูลสั้นเรียงบรรทัดเดียว | ปุ่มด้านขวา
   //    ท้ายการ์ด: สถานะ + สิ่งที่ต้องทำต่อ (ซ้าย) · แถบขั้นตอน (ขวา)
   return (
-    <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflow: "hidden", transition: "border-color .15s, box-shadow .15s", "&:hover": { borderColor: "#cbd5e1", boxShadow: "0 4px 14px -8px rgba(15,23,42,.18)" } }}>
+    // 🔁 (19 ต.ค. 2569 ผู้ใช้: "แบบตาราง ปุ่มดูซ้ำซ้อน รก") inRow = กางใต้แถวตาราง — ตัดหัวการ์ด (ชื่อ/ป้าย/ผู้ติดต่อ ซึ่งแถวมีแล้ว)
+    //    เหลือเฉพาะข้อมูลที่แถวไม่มี (รายละเอียด · เอกสาร · ใบเสนอราคา · ขั้นตอน) และปุ่มอยู่ที่เดียว (แถวซ่อนปุ่มตอนกาง)
+    <Box sx={inRow ? { bgcolor: "#fff", borderRadius: 2, overflow: "hidden", border: `1px solid ${LINE}` } : { bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflow: "hidden", transition: "border-color .15s, box-shadow .15s", "&:hover": { borderColor: "#cbd5e1", boxShadow: "0 4px 14px -8px rgba(15,23,42,.18)" } }}>
       {/* 🔁 (19 ต.ค. 2569 ผู้ใช้: "ให้ขยายเต็ม") ปุ่มย้ายขึ้นแถวชื่องาน (จอคอม) — เนื้อหาด้านล่างกว้างเต็มการ์ด ไม่เหลือช่องว่างด้านขวา */}
       <Box sx={{ px: { xs: 1.75, sm: 2.25 }, py: 1.75 }}>
         <Stack direction="row" spacing={1.5} sx={{ minWidth: 0 }}>
           {/* ✅ (15 ต.ค. 2569 ผู้ใช้: "ให้บอกด้วยว่างานอะไร ส่งของ จดงาน เข้างาน") — ไอคอน + ชื่อรูปแบบงานใต้ไอคอน */}
+          {!inRow && (
           <Stack alignItems="center" spacing={0.4} sx={{ width: 52, flexShrink: 0 }}>
             <Box sx={{ width: 42, height: 42, borderRadius: 2.5, display: "grid", placeItems: "center", bgcolor: alpha(tone, 0.08), color: tone }}>
               <ModeIcon sx={{ fontSize: 22 }} />
             </Box>
             <Typography sx={{ fontSize: "0.68rem", fontWeight: 800, color: tone, lineHeight: 1.2, textAlign: "center", whiteSpace: "nowrap" }}>{modeLabel}</Typography>
           </Stack>
+          )}
           <Box sx={{ flex: 1, minWidth: 0 }}>
+            {!inRow && (
             <Stack direction="row" spacing={1.5} alignItems="flex-start">
             <Box sx={{ flex: 1, minWidth: 0 }}>
             <Stack direction="row" spacing={0.75} alignItems="baseline" sx={{ flexWrap: "wrap", rowGap: 0.25 }}>
@@ -805,9 +831,11 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
             </Box>
             {actions && <Stack direction="row" spacing={0.75} sx={{ flexShrink: 0, display: { xs: "none", md: "flex" } }}>{actions}</Stack>}
             </Stack>
+            )}
 
             {/* ✅ (17 ต.ค. 2569) แถวแรก = ป้ายข้อมูลสำคัญโทนเทา (กำหนดเวลา · เสร็จภายใน · ที่มา · เอกสาร) — สีเฉพาะเดือนนี้/เลยกำหนด
                 แถวที่สอง = ข้อมูลประกอบ (ผู้รับผิดชอบ · ทีม · ผู้ติดต่อ) */}
+            {!inRow && (<>
             <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75, mt: 1 }}>
               {(() => {
                 const t = scheduleTagOf(job, schedule);
@@ -834,6 +862,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                 </Fact>
               )}
             </Stack>
+            </>)}
             {/* ✅ (15 ต.ค. 2569 ผู้ใช้: "แสดงรายละเอียดงานคร่าวๆด้วย") — กล่องรายละเอียด (ไม่เกิน 3 บรรทัด) + อุปกรณ์ที่ต้องเตรียม */}
             {!job.intakeNote && (
               <Box sx={{ mt: 1, px: 1.25, py: 0.9, borderRadius: 2, bgcolor: SURFACE, border: `1px solid ${LINE}` }}>
@@ -856,17 +885,26 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
               const c = outcome && !outcome.intake ? outcome.color : ACCENT;
               return (
                 <Box sx={{ display: "grid", gap: 1, mt: 1, gridTemplateColumns: { xs: "1fr", md: showQuote ? "1fr 1fr" : "1fr" } }}>
-                  <DocBox title="เอกสารอ้างอิง" hint="ได้มาตอนรับงาน">
+                  <DocBox title="เอกสารอ้างอิง" hint="ได้มาตอนรับงาน (ใบเสนอราคาเดิม / PO)">
                     {hasRef ? <RefDocCell job={job} compact={false} /> : <Typography sx={{ fontSize: "0.8rem", color: "#94a3b8" }}>ไม่มีเอกสารอ้างอิง</Typography>}
                     {intakeDocs.length > 0 && <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75, mt: 1 }}><FileLinks files={intakeDocs} /></Stack>}
                   </DocBox>
                   {showQuote && (
-                    <DocBox title="ใบเสนอราคา" hint="ติดตามจนรู้ผล" tone={outcome.intake ? null : outcome.color}>
+                    // ✅ (19 ต.ค. 2569 ผู้ใช้: "อธิบายให้เข้าใจว่าใบเสนอราคาเพิ่มเติมงานนี้มีไหม")
+                    //    ใบเสนอราคาเพิ่มเติม = เสนองาน/อะไหล่ที่พบตอนเข้าหน้างาน (คนละใบกับใบเสนอราคาที่ได้มาตอนรับงาน ด้านซ้าย)
+                    <DocBox title="ใบเสนอราคาเพิ่มเติม" hint="งาน/อะไหล่ที่พบหน้างาน" tone={outcome.intake ? null : outcome.color}>
                       <Stack direction="row" alignItems="center" gap={1.25} sx={{ flexWrap: "wrap" }}>
                         <Box sx={{ flex: 1, minWidth: 180 }}>
-                          {outcome.intake
-                            ? <Typography sx={{ fontSize: "0.8rem", color: "#94a3b8" }}>{outcome.key === "na" ? "ไม่ต้องเสนอราคา" : "ยังไม่มีใบเสนอราคา"}</Typography>
-                            : <QuoteCell oc={outcome} />}
+                          {outcome.intake ? (
+                            <>
+                              <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: "#475569" }}>
+                                {outcome.key === "na" ? "งานนี้ไม่มีเสนอราคาเพิ่มเติม" : "ยังไม่มีใบเสนอราคาเพิ่มเติม"}
+                              </Typography>
+                              <Typography sx={{ fontSize: "0.74rem", color: "#94a3b8", mt: 0.2, lineHeight: 1.45 }}>
+                                {outcome.key === "na" ? "ระบุไว้แล้วว่าไม่ต้องเสนอราคา" : "ถ้าเข้าหน้างานแล้วพบงานเพิ่ม/อะไหล่ที่ต้องเสนอราคา แนบใบเสนอราคาที่นี่ ระบบจะติดตามผลให้จนรู้ว่าได้งานไหม"}
+                              </Typography>
+                            </>
+                          ) : <QuoteCell oc={outcome} />}
                         </Box>
                         {outcome.key !== "na" && (outcome.open || (!outcome.intake && outcome.href)) && (
                           <Button size="small" {...(outcome.open ? { onClick: outcome.open } : { component: Link, to: outcome.href })}
@@ -900,7 +938,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
             ) : null}
           </Box>
         </Stack>
-        {actions && <Stack direction="row" spacing={0.75} sx={{ mt: 1.5, display: { xs: "flex", md: "none" } }}>{actions}</Stack>}
+        {actions && <Stack direction="row" spacing={0.75} sx={{ mt: 1.5, justifyContent: inRow ? "flex-end" : "flex-start", display: inRow ? "flex" : { xs: "flex", md: "none" } }}>{actions}</Stack>}
       </Box>
 
       {/* ท้ายการ์ด: สถานะ + สิ่งที่ต้องทำต่อ | แถบขั้นตอน */}
@@ -1183,8 +1221,8 @@ export default function JobIntake() {
         view === "table" ? (
           <>
           <Typography sx={{ fontSize: "0.76rem", color: MUTED, mb: 0.75, px: 0.5 }}>กดที่แถวเพื่อดูรายละเอียดทั้งหมด</Typography>
-          <JobTable rows={pg.rows} employees={employees} refMode={tab === "waiting"} readOnlyOf={(j) => !canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering}
-            renderCard={(j, oc) => <JobCard job={j} outcome={oc} readOnly={!canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone} onEdit={openForm} onCancel={cancelJob} onRestore={restoreJob} />} />
+          <JobTable rows={pg.rows} employees={employees} refMode={tab === "waiting"} readOnlyOf={(j) => !canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone}
+            renderCard={(j, oc) => <JobCard inRow job={j} outcome={oc} readOnly={!canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone} onEdit={openForm} onCancel={cancelJob} onRestore={restoreJob} />} />
           <PageBar {...pg} setPage={goPage} unit="งาน" />
           </>
         ) : (
