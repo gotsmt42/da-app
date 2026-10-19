@@ -38,7 +38,8 @@ import {
   installmentText, bahtText, jobRangesText, itemTitle,
 } from "../expenseMeta";
 import { bankMeta, formatAccountNo } from "../bankMeta";
-import BankLogo from "./BankLogo";
+import BankLogo from "./BankLogo";
+import { confirmDelete } from "@/shared/ui/swal";
 
 /**
  * บัญชีรับเงินของผู้เบิกที่ระบุไว้ในใบ
@@ -799,7 +800,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
   };
 
   const removeFile = async (file) => {
-    if (!window.confirm(`ลบไฟล์ "${file.fileName}" ?`)) return;
+    if (!(await confirmDelete({ name: file.fileName }))) return;
     setBusy(true);
     try {
       applyResult(await ExpenseService.removeFile(e._id, file._id), "ลบไฟล์แล้ว");

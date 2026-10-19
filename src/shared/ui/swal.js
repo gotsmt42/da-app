@@ -67,3 +67,17 @@ const Swal = BaseSwal.mixin({
 });
 
 export default Swal;
+
+/**
+ * ✅ (19 ต.ค. 2569 ผู้ใช้: "การลบไฟล์ต้องมีคอนเฟิร์มด้วย ไม่ใช่ลบได้เลย") — กล่องยืนยันลบชุดเดียวทั้งแอป
+ * @returns {Promise<boolean>} กดยืนยันลบหรือไม่
+ */
+export const confirmDelete = async ({ title = "ลบไฟล์นี้?", name = "", note = "ลบแล้วกู้คืนไม่ได้" } = {}) => {
+  const esc = (v) => String(v || "").replace(/[<>&"]/g, "");
+  const r = await Swal.fire({
+    icon: "warning", title,
+    html: `${name ? `<div style="font-weight:700;color:#0f172a;word-break:break-all">${esc(name)}</div>` : ""}<div style="margin-top:4px;font-size:13px;color:#64748b">${esc(note)}</div>`,
+    showCancelButton: true, confirmButtonText: "ลบ", confirmButtonColor: "#dc2626",
+  });
+  return r.isConfirmed;
+};

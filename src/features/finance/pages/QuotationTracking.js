@@ -50,6 +50,7 @@ import SelectField from "@/shared/ui/SelectField";
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
 import { PAGE_SX } from "@/shared/ui/PageKit";
+import { confirmDelete } from "@/shared/ui/swal";
 
 const TEXT_MAIN = "#0f172a";
 const TEXT_SUB = "#64748b";
@@ -623,7 +624,7 @@ const ResultDocs = ({ a, k, onUpload, onDelete, onPreview, uploading, progress }
               <AttachFile sx={{ fontSize: 14 }} />
               <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.fileName}</Box>
             </Box>
-            <IconButton size="small" aria-label="ลบไฟล์" onClick={() => { if (window.confirm(`ลบไฟล์ ${f.fileName}?`)) onDelete(a._id, "quotationResult", f._id); }} sx={{ p: 0.4, color: "#94a3b8" }}>
+            <IconButton size="small" aria-label="ลบไฟล์" onClick={async () => { if (await confirmDelete({ name: f.fileName })) onDelete(a._id, "quotationResult", f._id); }} sx={{ p: 0.4, color: "#94a3b8" }}>
               <Close sx={{ fontSize: 14 }} />
             </IconButton>
           </Stack>

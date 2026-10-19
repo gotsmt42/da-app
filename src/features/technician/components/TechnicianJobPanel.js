@@ -48,6 +48,7 @@ import { AssignResponsibleMenu, PersonChip } from "@/shared/ui/PersonChip";
 import CheckInOutPanel from "@/features/attendance/components/CheckInOutPanel";
 import { docsUnlocked } from "@/shared/utils/jobFlow";
 import { BTN as MBTN, CARD } from "@/shared/ui/modernUi";
+import { confirmDelete } from "@/shared/ui/swal";
 
 // ✅ ใช้ตัดสินใจลำดับปุ่มแชร์ในเมนู "⋮" ต่อไฟล์ (ดูเหตุผลใน fileActions.js)
 const IS_MOBILE = isMobileDevice();
@@ -317,7 +318,7 @@ const DocumentFileList = ({ type, files, isUploading, uploadProgress, onFileUplo
         )}
         {!isLocked && [
           <Divider key="file-menu-divider" />,
-          <MenuItem key="file-menu-delete" onClick={() => { onDeleteFile(type, fileMenu.file._id); closeFileMenu(); }} sx={{ gap: 1.5, minHeight: 44, color: "error.main" }}>
+          <MenuItem key="file-menu-delete" onClick={async () => { const f = fileMenu.file; closeFileMenu(); if (await confirmDelete({ name: f.fileName })) onDeleteFile(type, f._id); }} sx={{ gap: 1.5, minHeight: 44, color: "error.main" }}>
             <ListItemIcon><Delete fontSize="small" color="error" /></ListItemIcon>
             <ListItemText>ลบไฟล์</ListItemText>
           </MenuItem>,

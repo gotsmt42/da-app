@@ -110,6 +110,7 @@ import SelectField, { SELECT_FIELD_SX, SELECT_MENU_PROPS } from "@/shared/ui/Sel
 import PersonSelectField from "@/shared/ui/PersonSelectField";
 import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
 import { PeopleRow, PersonChip, AssignableResponsible, AssignResponsibleMenu, useAvatarMap, teamNamesOf } from "@/shared/ui/PersonChip";
+import { confirmDelete } from "@/shared/ui/swal";
 // ✅ (11 ต.ค. 2569 ผู้ใช้: "ปุ่มต่างๆ ที่เป็นของเดิมปรับแก้สีสันให้สอดคล้อง สวยงาม")
 //    ปุ่มหลัก = น้ำเงินทึบ (อนุมัติปิดงาน = เขียวทึบ) · ไม่อนุมัติ = เส้นขอบแดง · ปุ่มรอง = เส้นขอบน้ำเงิน — สูง 36 เท่ากันทั้งหน้า
 const SBTN = { minHeight: 36, py: 0.5, px: 1.5, fontSize: "0.84rem", borderRadius: "10px" };
@@ -806,7 +807,7 @@ export const FileUploadSection = ({
         )}
         {canEdit && [
           <Divider key="file-menu-divider" />,
-          <MenuItem key="file-menu-delete" onClick={() => { onDelete(eventId, type, fileMenu.file._id); closeFileMenu(); }} sx={{ gap: 1.5, minHeight: 44, color: "error.main" }}>
+          <MenuItem key="file-menu-delete" onClick={async () => { const f = fileMenu.file; closeFileMenu(); if (await confirmDelete({ name: f.fileName })) onDelete(eventId, type, f._id); }} sx={{ gap: 1.5, minHeight: 44, color: "error.main" }}>
             <ListItemIcon><Delete fontSize="small" color="error" /></ListItemIcon>
             <ListItemText>ลบไฟล์</ListItemText>
           </MenuItem>,
