@@ -47,22 +47,28 @@ const STATE = {
   checkin:  { label: "เข้างานแล้ว", short: "เข้างานแล้ว", color: "#2563eb" },
   request:  { label: "ขอปิดงานแล้ว", short: "ขอปิดงาน", color: "#0891b2" },
   closed:   { label: "ปิดงานแล้ว", short: "ปิดงานแล้ว", color: "#059669" },
-  deliver:  { label: "รอส่งของ", short: "รอส่งของ", color: "#0891b2" },
+  deliver:  { label: "รอส่งของ", short: "รอส่งของ", color: "#d97706" },
+  delivered: { label: "ส่งของแล้ว · รอวางบิล", short: "ส่งของแล้ว · รอวางบิล", color: "#0891b2" },
+  billed:   { label: "ส่งของ + วางบิลแล้ว", short: "วางบิลแล้ว", color: "#059669" },
 };
 const FILTERS = [
   { key: "all", label: "งานวันนี้", color: "#0f172a", match: () => true },
   { key: "notin", label: "ยังไม่เข้างาน", color: "#d97706", match: (s) => s === "notyet" || s === "late" },
   { key: "late", label: "เลยเวลานัด", color: "#dc2626", match: (s) => s === "late" },
   { key: "in", label: "เข้างานแล้ว", color: "#2563eb", match: (s) => s === "checkin" },
-  { key: "done", label: "ขอปิด / ปิดแล้ว", color: "#059669", match: (s) => s === "request" || s === "closed" },
+  { key: "done", label: "ขอปิด / ปิดแล้ว", color: "#059669", match: (s) => ["request", "closed", "delivered", "billed"].includes(s) },
 ];
 
 const hasTime = (e) => !e.allDay && moment(e.start).format("HH:mm") !== "00:00";
 
 function stateOf(e, att, now) {
+  // งานส่งของ ไม่มีการเข้างาน — ขั้นของมันคือ ส่งของ → วางบิล (ไม่นับเป็นเลยเวลานัด)
+  if (e.noVisit) {
+    if ((e.invoiceFiles || []).length || e.billing?.invoicedAt) return "billed";
+    return e.deliveredAt || e.status === CLOSED ? "delivered" : "deliver";
+  }
   if (e.status === CLOSED) return "closed";
   if (e.closeRequested) return "request";
-  if (e.noVisit) return e.deliveredAt ? "closed" : "deliver"; // งานส่งของ ไม่มีการเข้างาน — ไม่นับเป็นเลยเวลานัด
   if (att) return "checkin";
   if (e.approvalStatus === "pending") return "pending";
   // เลยเวลานัด: งานที่มีเวลานัด และวันนี้เป็นวันแรกของงาน (งานหลายวัน: วันถัดไปใช้เวลาเดียวกันของวันนี้)
@@ -86,11 +92,11 @@ const Avatar = ({ name, size = 40 }) => (
   </Box>
 );
 
-const StateChip = ({ state, att }) => {
+const StateChip = ({ state, att, align = "flex-end" }) => {
   const m = STATE[state];
   const loc = state === "checkin" ? locationBadge(att?.checkIn) : null;
   return (
-    <Stack alignItems="flex-end" gap={0.25} sx={{ flexShrink: 0, maxWidth: 170 }}>
+    <Stack alignItems={align} gap={0.25} sx={{ flexShrink: 0, maxWidth: 170 }}>
       <Box component="span" sx={{
         display: "inline-flex", alignItems: "center", gap: 0.5, px: 1, height: 24, borderRadius: 99, whiteSpace: "nowrap",
         fontSize: "0.74rem", fontWeight: 800, color: m.color, bgcolor: alpha(m.color, 0.1), border: `1px solid ${alpha(m.color, 0.3)}`,
@@ -220,7 +226,7 @@ export default function TodayBoard({ events, onOpenJob, view = "card" }) {
         // ── การ์ดละ 1 ช่าง ── (มีกลุ่มเดียว = เต็มความกว้าง ไม่เหลือครึ่งจอว่าง)
         <Box sx={{ display: "grid", gap: 1.5, alignItems: "start", gridTemplateColumns: { xs: "1fr", md: techs.length > 1 ? "repeat(2, minmax(0, 1fr))" : "1fr" } }}>
           {techs.map((t) => {
-            const inCount = t.jobs.filter((j) => ["checkin", "request", "closed"].includes(j.state)).length;
+            const inCount = t.jobs.filter((j) => ["checkin", "request", "closed", "delivered", "billed"].includes(j.state)).length;
             const lateCount = t.jobs.filter((j) => j.state === "late").length;
             return (
               <Box key={t.name} sx={{
@@ -241,7 +247,7 @@ export default function TodayBoard({ events, onOpenJob, view = "card" }) {
                       {inCount}/{t.jobs.length}
                     </Typography>
                     <Typography sx={{ fontSize: "0.68rem", fontWeight: 700, color: lateCount ? "#dc2626" : "#94a3b8" }}>
-                      {lateCount ? `เลยเวลานัด ${lateCount}` : "เข้างานแล้ว"}
+                      {lateCount ? `เลยเวลานัด ${lateCount}` : t.name === DELIVERY ? "ส่งของแล้ว" : "เข้างานแล้ว"}
                     </Typography>
                   </Stack>
                 </Stack>
@@ -287,7 +293,7 @@ function TodayTable({ rows, onOpenJob }) {
   return (
     <Box sx={{ bgcolor: "#fff", border: "1px solid #e2e8f0", borderRadius: 3, overflowX: "auto", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
       <Box component="table" sx={{ width: "100%", minWidth: 1180, borderCollapse: "collapse" }}>
-        <thead><tr>{["เวลานัด", "งาน", "โครงการ / บริษัท", "ช่าง / ทีม", "การเข้างานวันนี้", "เอกสารที่แนบ", ""].map((h, i) => <Box component="th" key={i} sx={th}>{h}</Box>)}</tr></thead>
+        <thead><tr>{["เวลานัด", "งาน", "โครงการ / บริษัท", "ช่าง / ทีม", "สถานะวันนี้", "เอกสาร / ขั้นตอน", ""].map((h, i) => <Box component="th" key={i} sx={th}>{h}</Box>)}</tr></thead>
         <tbody>
           {rows.map(({ e, a, state, head }) => {
             const members = [...new Set((e.teamMembers || []).map((m) => m?.name).filter((n) => n && n !== head))];
@@ -317,7 +323,7 @@ function TodayTable({ rows, onOpenJob }) {
                       </Stack>
                     )}
                 </Box>
-                <Box component="td" sx={{ ...td, minWidth: 160 }}><StateChip state={state} att={a} /></Box>
+                <Box component="td" sx={{ ...td, minWidth: 160 }}><StateChip state={state} att={a} align="flex-start" /></Box>
                 <Box component="td" sx={{ ...td, minWidth: 200 }}><JobDocsCell event={e} /></Box>
                 <Box component="td" sx={{ ...td, textAlign: "right", verticalAlign: "middle" }}><ChevronRight sx={{ fontSize: 20, color: "#cbd5e1" }} /></Box>
               </Box>

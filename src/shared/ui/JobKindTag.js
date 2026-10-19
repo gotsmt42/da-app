@@ -10,7 +10,8 @@ import { formatRoundLabel } from "@/shared/utils/contractRounds";
 
 export default function JobKindTag({ event, sx }) {
   const kind = classifyJob(event) || "general";
-  const meta = getJobClassMeta(kind) || getJobClassMeta("general");
+  // งานส่งของ (ไม่เข้าหน้างาน) บอกตรงๆ — ไม่ใช่ "งานทั่วไป" ที่ต้องมีช่างเข้างาน
+  const meta = event?.noVisit ? { label: "งานส่งของ", color: "#0891b2" } : (getJobClassMeta(kind) || getJobClassMeta("general"));
   const round = event?.time ? formatRoundLabel(event.time, event.visitCount, event) : "";
   return (
     <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, height: 22, px: 0.9, borderRadius: 99, whiteSpace: "nowrap",

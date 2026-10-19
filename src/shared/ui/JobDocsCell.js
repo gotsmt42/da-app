@@ -8,7 +8,9 @@
 import { Suspense, useState } from "react";
 import { Box, Stack, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { CheckCircleRounded, RadioButtonUncheckedRounded, RemoveCircleOutlineRounded } from "@mui/icons-material";
+import { CheckCircleRounded, RadioButtonUncheckedRounded, RemoveCircleOutlineRounded, LocalShippingOutlined, ReceiptLongOutlined } from "@mui/icons-material";
+import moment from "moment";
+import { formatThai } from "@/shared/utils/thaiDate";
 import { JOB_DOC_TYPES, isDocComplete, isDocRequired } from "@/shared/utils/jobDocTypes";
 import { resolveQuotationGroup } from "@/shared/utils/quotationTracking";
 import { useAuth } from "@/features/auth/AuthContext";
@@ -26,6 +28,31 @@ export default function JobDocsCell({ event }) {
   const { userData } = useAuth() || {};
   const [quoteOpen, setQuoteOpen] = useState(false);
   if (!event) return null;
+  // ✅ (19 ต.ค. 2569 ผู้ใช้: "งานส่งของต้องแสดงเอกสารที่แนบไหม") — งานส่งของไม่มี Service Report/ใบส่งมอบงาน
+  //    สิ่งที่ต้องรู้มีแค่ "ส่งของแล้วหรือยัง" กับ "วางบิลแล้วหรือยัง" (ขั้นตอนเดียวกับหน้างานเข้า: รับงาน → ส่งของ → วางบิล)
+  if (event.noVisit) {
+    const inv = (event.invoiceFiles || []).length;
+    const billed = inv > 0 || Boolean(event.billing?.invoicedAt);
+    const delivered = Boolean(event.deliveredAt) || event.status === "ดำเนินการเสร็จสิ้น";
+    const Row = ({ ok, icon: Ico, children }) => (
+      <Stack direction="row" spacing={0.5} alignItems="center">
+        {ok ? <CheckCircleRounded sx={{ fontSize: 14, color: "#16a34a" }} /> : <RadioButtonUncheckedRounded sx={{ fontSize: 14, color: "#d97706" }} />}
+        <Ico sx={{ fontSize: 14, color: ok ? "#334155" : "#94a3b8" }} />
+        <Typography noWrap sx={{ fontSize: "0.74rem", fontWeight: ok ? 700 : 600, color: ok ? "#334155" : "#94a3b8" }}>{children}</Typography>
+      </Stack>
+    );
+    return (
+      <Box onClick={(e) => e.stopPropagation()} sx={{ minWidth: 0 }}>
+        <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: delivered && billed ? "#15803d" : "#64748b", mb: 0.3 }}>
+          งานส่งของ · {delivered && billed ? "ครบแล้ว" : delivered ? "รอวางบิล" : "รอส่งของ"}
+        </Typography>
+        <Stack spacing={0.25}>
+          <Row ok={delivered} icon={LocalShippingOutlined}>{delivered ? `ส่งของแล้ว${event.deliveredAt ? ` ${formatThai(moment(event.deliveredAt), "D MMM")}` : ""}` : "ยังไม่ส่งของ"}</Row>
+          <Row ok={billed} icon={ReceiptLongOutlined}>{billed ? `วางบิลแล้ว${inv ? ` · ${inv} ไฟล์` : ""}` : "ยังไม่วางบิล"}</Row>
+        </Stack>
+      </Box>
+    );
+  }
   const done = JOB_DOC_TYPES.filter((t) => isDocComplete(event, t.key)).length;
   const all = done === JOB_DOC_TYPES.length;
   const qKey = resolveQuotationGroup(event);
