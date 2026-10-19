@@ -767,7 +767,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
     </>
   ) : st.nv ? (
     <>
-      <Button component={Link} to="/finance?tab=billing" variant="outlined" startIcon={<ReceiptLongOutlined sx={{ fontSize: "17px !important" }} />}
+      <Button component={Link} to={`/finance?tab=billing&jobId=${job._id}`} variant="outlined" startIcon={<ReceiptLongOutlined sx={{ fontSize: "17px !important" }} />}
         sx={{ ...GHOST, flex: { xs: 1, sm: "0 0 auto" } }}>ติดตามวางบิล</Button>
       <Button component="label" variant={st.i === 2 ? "contained" : "outlined"} disabled={uploading} startIcon={<UploadFileOutlined sx={{ fontSize: "17px !important" }} />}
         sx={st.i === 2 ? { ...PRIMARY, flex: { xs: 1.6, sm: "0 0 auto" } } : { ...GHOST, flex: { xs: 1, sm: "0 0 auto" } }}>
