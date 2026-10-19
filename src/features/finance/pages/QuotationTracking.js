@@ -767,8 +767,11 @@ function useQuotationActions(fetchJobs, toast, userData) {
  * ✅ (19 ต.ค. 2569 ผู้ใช้: "อยากให้กดเปิดฟอร์มหน้าติดตามใบเสนอราคาได้เลย · ดำเนินการในหน้านี้ได้เลย")
  *    แนบไฟล์ · เริ่มนับ · บันทึกติดตาม · ได้งาน/ไม่ได้งาน · คอมเมนต์ — ฟอร์มและการบันทึกชุดเดียวกัน ไม่มีสองเวอร์ชัน
  * @param eventId  วันใดก็ได้ของงาน (หาทั้งกลุ่มเองแล้วยึดวันล่าสุดเป็นตัวแทน)
+ * @param importFrom { docNo, files } ใบเสนอราคาที่แนบมาตั้งแต่ตอนรับงาน — ถ้างานยังไม่มีไฟล์ใบเสนอราคาในระบบติดตาม
+ *   จะนำเข้าให้เอง (ไฟล์ + เลขที่) ก่อนเปิดกล่อง
+ *   🐛 (19 ต.ค. 2569 ผู้ใช้ส่งภาพ: หน้างานเข้าบอก "มีใบเสนอราคา" แต่กล่องขึ้น "รอแนบใบเสนอราคา") ข้อมูลอยู่คนละที่ → นำเข้าให้ตรงกัน
  */
-export function QuotationDialogHost({ eventId, onClose, onChanged }) {
+export function QuotationDialogHost({ eventId, onClose, onChanged, importFrom }) {
   const { userData } = useAuth();
   const [events, setEvents] = useState(null);
   const [preview, setPreview] = useState({ url: null, name: "" });
@@ -786,6 +789,8 @@ export function QuotationDialogHost({ eventId, onClose, onChanged }) {
   }, [onChanged, toast]);
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
   const actions = useQuotationActions(fetchJobs, toast, userData);
+  const [importing, setImporting] = useState(false);
+  const importedRef = useRef(false);
   const job = useMemo(() => {
     const ev = (events || []).find((e) => e._id === eventId);
     if (!ev) return null;
@@ -796,10 +801,37 @@ export function QuotationDialogHost({ eventId, onClose, onChanged }) {
     return { sessions, anchor, groupKey: resolveQuotationGroup(anchor) || "waiting_file", info: getFollowUpInfo(anchor) };
   }, [events, eventId]);
 
+  useEffect(() => {
+    const a = job?.anchor;
+    if (!a || importedRef.current || !importFrom) return;
+    if ((a.quotationFiles || []).length || (!importFrom.files?.length && !importFrom.docNo)) return;
+    importedRef.current = true;
+    (async () => {
+      setImporting(true);
+      let copied = 0;
+      for (const f of importFrom.files || []) {
+        try {
+          // eslint-disable-next-line no-await-in-loop -- ทีละไฟล์ (ไฟล์น้อย และให้ลำดับตรงกับตอนรับงาน)
+          const blob = await (await fetch(f.fileUrl)).blob();
+          // eslint-disable-next-line no-await-in-loop
+          await EventService.Upload(a._id, new File([blob], f.fileName || "quotation", { type: f.fileType || blob.type }), "quotation");
+          copied += 1;
+        } catch { /* ไฟล์ที่ดึงไม่ได้ ให้ผู้ใช้แนบเองในกล่อง */ }
+      }
+      try {
+        if (importFrom.docNo && !a.quotationNo) await EventService.UpdateQuotation(a._id, { quotationNo: importFrom.docNo });
+      } catch { /* ไม่ขวางการเปิดกล่อง */ }
+      await fetchJobs(true);
+      setImporting(false);
+      if (copied) toast(`นำใบเสนอราคาจากตอนรับงานเข้าระบบแล้ว (${copied} ไฟล์)`);
+      else if (importFrom.files?.length) toast("ดึงไฟล์จากตอนรับงานไม่ได้ — กรุณาแนบไฟล์ใบเสนอราคาอีกครั้ง", "warning");
+    })();
+  }, [job, importFrom, fetchJobs, toast]);
+
   return (
     <>
-      {events === null ? (
-        <Dialog open onClose={onClose} PaperProps={{ sx: { borderRadius: 3, p: 3 } }}><Typography sx={{ color: TEXT_SUB }}>กำลังโหลดใบเสนอราคา...</Typography></Dialog>
+      {events === null || importing ? (
+        <Dialog open onClose={onClose} PaperProps={{ sx: { borderRadius: 3, p: 3 } }}><Typography sx={{ color: TEXT_SUB }}>{importing ? "กำลังนำใบเสนอราคาจากตอนรับงานเข้าระบบติดตาม..." : "กำลังโหลดใบเสนอราคา..."}</Typography></Dialog>
       ) : job ? (
         <DetailDialog job={job} currentUser={userData} onClose={onClose} {...actions} onPreview={(url, name) => setPreview({ url, name })} />
       ) : (

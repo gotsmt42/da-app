@@ -1031,15 +1031,24 @@ export default function JobIntake() {
   };
 
   // ✅ กดที่ใบเสนอราคา → เปิดกล่องใบเสนอราคา (ตัวเดียวกับหน้าติดตามใบเสนอราคา) ในหน้านี้เลย — คนที่มีสิทธิ์ดูการเงิน
-  const [quoteId, setQuoteId] = useState("");
+  const [quote, setQuote] = useState(null); // { id, importFrom }
   const canQuote = can(userData, "viewFinance");
   const withStage = useMemo(() => (jobs || []).map((j) => {
     const s = stageOf(j);
     const oc = outcomeOf(j, s, groups.get(String(j.jobGroupId || j._id)));
-    if (oc) oc.open = canQuote && oc.qid ? () => setQuoteId(oc.qid) : null;
+    // มีใบเสนอราคาจากตอนรับงาน → ส่งไปให้กล่องนำเข้าระบบติดตามเอง (ไฟล์ + เลขที่) ให้สองที่ตรงกัน
+    const importFrom = oc?.key === "intake_qt" ? { docNo: j.intakeDocNo || "", files: oc.files } : null;
+    if (oc) oc.open = canQuote && oc.qid ? () => setQuote({ id: oc.qid, importFrom }) : null;
     return { j, s, oc };
   }), [jobs, groups, canQuote]);
   const counts = useMemo(() => Object.fromEntries(TABS.map((t) => [t.key, withStage.filter((x) => t.test(x.s, x.oc)).length])), [withStage]);
+  // ✅ (19 ต.ค. 2569 ผู้ใช้: "ถ้าเป็นหน้าว่าง ให้เอาข้อมูลหน้าดำเนินการมาวาง · มีรอดำเนินการค่อยสลับให้แสดงแค่รอดำเนินการ")
+  //    แท็บเริ่มต้นเลือกเอง: มีงานรอ → รอดำเนินการ · ไม่มี → กำลังดำเนินการ (จนกว่าผู้ใช้จะกดเลือกแท็บเอง)
+  const [tabPicked, setTabPicked] = useState(false);
+  useEffect(() => {
+    if (!jobs || tabPicked) return;
+    setTab(counts.waiting > 0 ? "waiting" : "active");
+  }, [jobs, counts.waiting, tabPicked]);
   const list = useMemo(() => {
     const t = TABS.find((x) => x.key === tab) || TABS[0];
     // ✅ ค้นหา: ชื่องาน · โครงการ · บริษัท · เลข Job · เลขเอกสาร · ผู้รับผิดชอบ
@@ -1070,7 +1079,7 @@ export default function JobIntake() {
         {TABS.filter((t) => !t.hideEmpty || counts[t.key] > 0 || tab === t.key).map((t) => {
           const on = tab === t.key;
           return (
-            <ButtonBase key={t.key} onClick={() => setTab(t.key)} sx={{
+            <ButtonBase key={t.key} onClick={() => { setTabPicked(true); setTab(t.key); }} sx={{
               // ✅ มือถือ: ตัวเลขบน ชื่อล่าง — 4 แท็บไม่ล้นจอ (ผู้ใช้แจ้งแท็บแรกตกขอบ)
               flex: { xs: "1 0 auto", sm: "0 0 auto" }, minWidth: { xs: 64, sm: 0 }, height: { xs: 54, sm: 40 }, px: { xs: 0.5, sm: 1.75 }, borderRadius: 2.5,
               flexDirection: { xs: "column-reverse", sm: "row" }, fontSize: { xs: "0.74rem", sm: "0.84rem" }, fontWeight: 800, gap: { xs: 0.2, sm: 0.6 }, whiteSpace: "nowrap", overflow: "hidden",
@@ -1088,7 +1097,7 @@ export default function JobIntake() {
       <Stack direction="row" gap={1} sx={{ mb: 1.5 }}>
         <Box sx={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 1, height: 40, px: 1.5, borderRadius: 2.5, border: `1px solid ${LINE}`, bgcolor: "#fff" }}>
           <Search sx={{ fontSize: 18, color: "#94a3b8" }} />
-          <Box component="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหา ชื่องาน / โครงการ / เลข Job / เลขเอกสาร"
+          <Box component="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหา ชื่องาน / โครงการ / เลขที่งาน / เลขเอกสาร"
             sx={{ flex: 1, minWidth: 0, border: 0, outline: 0, fontSize: "0.86rem", fontFamily: "inherit", bgcolor: "transparent", color: INK }} />
           {q && <IconButton size="small" onClick={() => setQ("")}><Close sx={{ fontSize: 16 }} /></IconButton>}
         </Box>
@@ -1128,9 +1137,9 @@ export default function JobIntake() {
           onDone={async () => { setDelivering(null); await load(); refreshAppBadges(); }} />
       )}
 
-      {quoteId && (
+      {quote && (
         <Suspense fallback={null}>
-          <QuotationDialogHost eventId={quoteId} onClose={() => setQuoteId("")} onChanged={load} />
+          <QuotationDialogHost eventId={quote.id} importFrom={quote.importFrom} onClose={() => setQuote(null)} onChanged={load} />
         </Suspense>
       )}
       {scheduling && (
