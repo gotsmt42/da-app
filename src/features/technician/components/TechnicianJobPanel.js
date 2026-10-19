@@ -11,6 +11,7 @@
  *      แยกจาก activityLog ที่เป็น log อัตโนมัติของระบบ ใช้งานได้แม้งานจะปิดไปแล้ว
  */
 
+import { isDocRequired, isDocComplete } from "@/shared/utils/jobDocTypes";
 import React, { useState, useRef, useCallback } from "react";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
@@ -132,36 +133,14 @@ const DOCUMENT_TYPES = [
 
 // ✅ งาน PM (Preventive Maintenance) = งานตามสัญญาที่ต้องวางบิลและส่งมอบงานทุกครั้งเป็นมาตรฐาน
 // เทียบเกณฑ์เดียวกับที่ ContractOverview.js ใช้จับงาน PM (เทียบชื่อประเภทงานแบบตัดช่องว่าง) — เผื่อ
-// ผู้ใช้พิมพ์ "pm"/"Pm" ด้วย จึงเทียบแบบไม่สนตัวพิมพ์เล็กใหญ่
-const isPMJob = (event) => (event?.title || "").trim().toUpperCase() === "PM";
 
 // ✅ เอกสารชนิดนี้ "บังคับต้องมี" สำหรับงานนี้ไหม — ต่างจากเดิมที่ผูกกับชนิดเอกสารตายตัวอย่างเดียว
 // (report เท่านั้นที่บังคับ) ตอนนี้ขึ้นกับประเภทงานด้วยตามที่ผู้ใช้กำหนด:
 //   • Service Report — บังคับทุกงานเหมือนเดิม
 //   • ใบวางบิล / ใบส่งมอบงาน — บังคับเฉพาะงาน PM (งานอื่นยังเลือก "มี/ไม่มี" ได้ตามเดิม)
 //   • ใบเสนอราคา — ไม่บังคับทุกกรณี (มีงานเพิ่มเติมค่อยเสนอ)
-export const isDocRequired = (event, type) => {
-  if (type === "report") return true;
-  if (type === "quotation") return false;
-  return isPMJob(event); // invoice / completion
-};
-
-// เอกสารชนิดนี้ถือว่า "เสร็จ" แล้วหรือยัง
-//   • report: ต้องติ๊กยืนยัน "และ" มีไฟล์
-//   • เอกสารที่บังคับตามประเภทงาน (เช่น ใบวางบิลของงาน PM): ต้องมีไฟล์เท่านั้น ไม่มีทางเลือก "ไม่มี"
-//   • เอกสารที่ไม่บังคับ: ตอบ "ไม่มี" ก็เสร็จ / ตอบ "มี" ต้องแนบไฟล์อย่างน้อย 1 ไฟล์
-export const isDocComplete = (event, type) => {
-  const hasFiles = (event[`${type}Files`] || []).length > 0;
-  // Service Report: บังคับต้องติ๊ก "และ" ต้องแนบไฟล์จริงอย่างน้อย 1 ไฟล์ ถึงจะถือว่าเสร็จ
-  if (type === "report") return Boolean(event.documentSentReport) && hasFiles;
-  // ⚠️ ต้องเช็คก่อน applicable เสมอ — งาน PM ที่ช่างเคยกด "ไม่มี" ไว้ตอนที่ยังไม่บังคับ ต้องกลับมา
-  // นับว่ายังไม่เสร็จ ไม่ใช่ผ่านไปเพราะค่าเดิมที่ค้างอยู่ในฐานข้อมูล
-  if (isDocRequired(event, type)) return hasFiles;
-  const applicable = event[`${type}Applicable`];
-  if (applicable === false) return true;
-  if (applicable === true) return hasFiles;
-  return false;
-};
+// ⚠️ ย้ายไป shared/utils/jobDocTypes.js (ใช้ร่วมกับตาราง) — re-export ไว้ให้ที่ import เดิมยังใช้ได้
+export { isDocRequired, isDocComplete };
 
 const capitalize = (str = "") => str.charAt(0).toUpperCase() + str.slice(1);
 

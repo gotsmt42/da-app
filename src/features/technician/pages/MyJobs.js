@@ -31,9 +31,9 @@ import usePaged, { PageBar } from "@/shared/ui/usePaged";
 import { JobFlowFlags } from "@/shared/ui/JobFlow";
 import DateCell from "@/shared/ui/DateCell";
 import JobKindTag from "@/shared/ui/JobKindTag";
+import JobDocsCell from "@/shared/ui/JobDocsCell";
 import RefDoc from "@/shared/ui/RefDoc";
 import { PersonChip } from "@/shared/ui/PersonChip";
-import { resolveQuotationGroup } from "@/shared/utils/quotationTracking";
 import {
   Box, Stack, Typography, TextField, InputAdornment, IconButton,
   Chip, Skeleton, Dialog, DialogTitle, DialogContent, Divider,
@@ -42,7 +42,6 @@ import {
 import { alpha } from "@mui/material/styles";
 import {
   Search, Clear, Refresh, WorkOutline, HourglassTop, TaskAlt, Warning, ViewAgendaOutlined, TableRowsOutlined,
-  Description, RequestQuote, AssignmentTurnedIn, ReceiptLong,
   Download, Close, PictureAsPdf, FolderOpen, Image, Article, InsertDriveFile, AttachFile,
 } from "@mui/icons-material";
 
@@ -177,12 +176,6 @@ const FilePreviewDialog = ({ previewUrl, previewFileName, onClose }) => {
 // ✅ (19 ต.ค. 2569 ผู้ใช้: "ทำแบบตารางด้วย ให้สมบูรณ์") — กวาดดูหลายงานในจอเดียว · กดแถว = กางการ์ดเต็มใต้แถว
 //    (ทำงานต่อได้ครบเหมือนมุมมองการ์ด: รับทราบ · เข้างาน · แนบเอกสาร · ขอปิดงาน)
 const STATUS_TONE = { "กำลังรอยืนยัน": "#d97706", "ยืนยันแล้ว": "#2563eb", "กำลังดำเนินการ": "#7c3aed", "ดำเนินการเสร็จสิ้น": "#16a34a" };
-const DOC_KINDS = [
-  { key: "reportFiles", label: "รายงาน", icon: Description },
-  { key: "quotationFiles", label: "ใบเสนอราคา", icon: RequestQuote },
-  { key: "completionFiles", label: "ใบส่งมอบ", icon: AssignmentTurnedIn },
-  { key: "invoiceFiles", label: "ใบวางบิล", icon: ReceiptLong },
-];
 /**
  * ปุ่มในแถว = "สิ่งที่ต้องทำต่อ" ของงานนั้น (ผู้ใช้: "เปลี่ยนให้เป็นปุ่มดำเนินการ เช่น บันทึก รับทราบ หรืออื่นๆ ที่เกี่ยวข้อง")
  * กดแล้วกางการ์ดใต้แถว ซึ่งมีปุ่มทำขั้นนั้นจริง (รับทราบ · ยืนยันนัด · เข้างาน · แนบเอกสาร · ขอปิดงาน)
@@ -208,10 +201,6 @@ const nextActionOf = (a, uid, fname) => {
   return { label: "ขอปิดงาน", tone: "#16a34a", primary: true };
 };
 
-const QUOTE_RESULT = {
-  waiting_file: ["รอแนบ", "#d97706"], not_sent: ["เริ่มนับ", "#d97706"], sent: ["รอลูกค้าตอบ", "#2563eb"],
-  follow_up: ["ถึงเวลาติดตาม", "#dc2626"], revising: ["ขอแก้ไข", "#7c3aed"], approved: ["ได้งาน", "#16a34a"], rejected: ["ไม่ได้งาน", "#64748b"],
-};
 
 function MyJobsTable({ groups, allGroups, overdueOf, renderCard, highlightJob, uid, fname }) {
   // 🔁 (19 ต.ค. 2569 ผู้ใช้: "กดแล้วแสดงปุ่มหรือฟอร์มขึ้นมาเลย ไม่ต้องกดขยายลงไป") — กดแถว/ปุ่ม = เปิดกล่องงานนั้นทับหน้าเลย
@@ -285,30 +274,7 @@ function MyJobsTable({ groups, allGroups, overdueOf, renderCard, highlightJob, u
                   ) : <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>}
                 </Box>
                 <Box component="td" sx={{ ...td, minWidth: 140, maxWidth: 180 }}><RefDoc event={a} /></Box>
-                <Box component="td" sx={{ ...td, minWidth: 170 }}>
-                  {(() => {
-                    const qKey = resolveQuotationGroup(a);
-                    const has = DOC_KINDS.some((d) => (a[d.key] || []).length) || qKey;
-                    if (!has) return <Typography sx={{ fontSize: "0.76rem", color: "#94a3b8" }}>ยังไม่มีเอกสาร</Typography>;
-                    return (
-                      <Stack spacing={0.4}>
-                        {DOC_KINDS.map((d) => {
-                          const n = (a[d.key] || []).length;
-                          if (!n && !(d.key === "quotationFiles" && qKey)) return null;
-                          const Ico = d.icon;
-                          const q = d.key === "quotationFiles" ? QUOTE_RESULT[qKey] : null;
-                          return (
-                            <Stack key={d.key} direction="row" spacing={0.6} alignItems="center">
-                              <Ico sx={{ fontSize: 15, color: n ? INK_2 : "#cbd5e1" }} />
-                              <Typography noWrap sx={{ fontSize: "0.76rem", fontWeight: 700 }}>{d.label}{n ? ` ${n}` : ""}</Typography>
-                              {q && <Typography noWrap sx={{ fontSize: "0.7rem", fontWeight: 800, color: q[1] }}>· {q[0]}</Typography>}
-                            </Stack>
-                          );
-                        })}
-                      </Stack>
-                    );
-                  })()}
-                </Box>
+                <Box component="td" sx={{ ...td, minWidth: 200 }}><JobDocsCell event={a} /></Box>
                 <Box component="td" sx={{ ...td, minWidth: 150 }}>
                   <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.6, height: 28, px: 1.25, borderRadius: 99, whiteSpace: "nowrap",
                     bgcolor: alpha(tone, 0.12), color: tone, border: `1px solid ${alpha(tone, 0.35)}`, fontSize: "0.8rem", fontWeight: 800 }}>

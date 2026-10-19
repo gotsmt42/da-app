@@ -77,10 +77,10 @@ import { styled, alpha } from "@mui/material/styles";
 
 import TechnicianJobCard, { isDocComplete, isDocRequired } from "@/features/technician/components/TechnicianJobPanel";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LINE, SUCCESS, PAGE_SX, PageHeader, ICON_BTN_SX } from "@/shared/ui/PageKit";
-import { resolveQuotationGroup } from "@/shared/utils/quotationTracking";
 import ImagePreview from "@/shared/ui/ImagePreview";
 import DateCell from "@/shared/ui/DateCell";
 import JobKindTag from "@/shared/ui/JobKindTag";
+import JobDocsCell from "@/shared/ui/JobDocsCell";
 import RefDoc from "@/shared/ui/RefDoc";
 import { printFile, shareFile, isMobileDevice } from "@/shared/utils/fileActions";
 import DeliveryNoteDialog from "@/features/documents/components/DeliveryNoteDialog";
@@ -2241,16 +2241,6 @@ export const FilePreviewDialog = ({ previewUrl, previewFileName, onClose }) => {
 //    เรียงคอลัมน์ตามคำถามที่คนดูตาราง: งานอะไร → ที่ไหน → เมื่อไร (ค้างไหม) → ใครรับผิดชอบ/ใครไป → โทรหาใคร
 //    → สถานะ → เอกสารครบหรือยัง (แยกชนิด: รายงาน · ใบเสนอราคา + ผล · ใบส่งมอบ · ใบวางบิล)
 //    หัวตาราง/ระยะ/ตัวอักษรชุดเดียวกับตารางหน้างานเข้า
-const DOC_KINDS = [
-  { key: "reportFiles", label: "รายงาน", icon: Description },
-  { key: "quotationFiles", label: "ใบเสนอราคา", icon: RequestQuote },
-  { key: "completionFiles", label: "ใบส่งมอบ", icon: AssignmentTurnedIn },
-  { key: "invoiceFiles", label: "ใบวางบิล", icon: ReceiptLong },
-];
-const QUOTE_RESULT = {
-  waiting_file: ["รอแนบ", "#d97706"], not_sent: ["เริ่มนับ", "#d97706"], sent: ["รอลูกค้าตอบ", "#2563eb"],
-  follow_up: ["ถึงเวลาติดตาม", "#dc2626"], revising: ["ขอแก้ไข", "#7c3aed"], approved: ["ได้งาน", "#16a34a"], rejected: ["ไม่ได้งาน", "#64748b"],
-};
 
 const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob, employee, canAssign, onAssignResponsible }) => {
   const avatarMap = useAvatarMap(employee);
@@ -2282,7 +2272,6 @@ const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob, employee, canAss
           const isOverdue = isFlaggedDays(overdueDays);
           // ⚠️ ตัดชื่อซ้ำ — หัวหน้าทีม (team) มักอยู่ใน teamMembers ด้วย
           const teamNames = teamNamesOf(a);
-          const qKey = resolveQuotationGroup(a);
           return (
             <TableRow key={a._id} hover onClick={() => onOpenJob(job)}
               sx={{ cursor: "pointer", "&:last-child td": { borderBottom: 0 }, ...(isOverdue ? { boxShadow: "inset 3px 0 0 #dc2626" } : {}) }}>
@@ -2338,26 +2327,8 @@ const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob, employee, canAss
               </TableCell>
               {/* เอกสารอ้างอิง (ตอนรับงาน) แยกจากเอกสารที่แนบภายหลัง */}
               <TableCell sx={{ minWidth: 140, maxWidth: 180 }}><RefDoc event={a} /></TableCell>
-              {/* เอกสารแยกชนิด — มี = ไอคอนสี + จำนวน · ไม่มี = ไม่แสดง · ใบเสนอราคาบอกผลด้วย */}
-              <TableCell sx={{ minWidth: 170 }}>
-                {DOC_KINDS.some((d) => (a[d.key] || []).length) || qKey ? (
-                  <Stack spacing={0.4}>
-                    {DOC_KINDS.map((d) => {
-                      const n = (a[d.key] || []).length;
-                      if (!n && !(d.key === "quotationFiles" && qKey)) return null;
-                      const Ico = d.icon;
-                      const q = d.key === "quotationFiles" ? QUOTE_RESULT[qKey] : null;
-                      return (
-                        <Stack key={d.key} direction="row" spacing={0.6} alignItems="center" sx={{ minWidth: 0 }}>
-                          <Ico sx={{ fontSize: 15, color: n ? INK_2 : "#cbd5e1" }} />
-                          <Typography noWrap sx={{ fontSize: "0.76rem", fontWeight: 700, color: INK_2 }}>{d.label}{n ? ` ${n}` : ""}</Typography>
-                          {q && <Typography noWrap sx={{ fontSize: "0.7rem", fontWeight: 800, color: q[1] }}>· {q[0]}</Typography>}
-                        </Stack>
-                      );
-                    })}
-                  </Stack>
-                ) : <Typography sx={{ fontSize: "0.76rem", color: "#94a3b8" }}>ยังไม่มีเอกสาร</Typography>}
-              </TableCell>
+              {/* เอกสารที่แนบ — ตรรกะเดียวกับการ์ดงาน (x/4 · ครบ/ต้องมี/ไม่มี) · ใบเสนอราคากดติดตามได้ทันที */}
+              <TableCell sx={{ minWidth: 200 }}><JobDocsCell event={a} /></TableCell>
               {/* ✅ (19 ต.ค. 2569 ผู้ใช้: "สถานะงานให้เอาไว้หลังสุด และทำให้ชัดเจน") — ป้ายทึบสีตามสถานะ ตัวหนา อ่านได้จากระยะไกล */}
               <TableCell sx={{ minWidth: 150 }}>
                 {(() => {
