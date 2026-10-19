@@ -17,6 +17,7 @@
  */
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import lazyWithRetry from "@/shared/utils/lazyWithRetry";
+import usePaged, { PageBar } from "@/shared/ui/usePaged";
 import { resolveQuotationGroup, getFollowUpInfo } from "@/shared/utils/quotationTracking";
 import { Link } from "react-router-dom";
 import moment from "moment";
@@ -111,7 +112,7 @@ const QuotationDialogHost = lazyWithRetry(() => import("@/features/finance/pages
 const baht = (n) => `฿${Number(n || 0).toLocaleString("th-TH", { maximumFractionDigits: 0 })}`;
 const OUTCOME = {
   waiting_file: { label: "รอแนบไฟล์", color: AMBER, act: "แนบใบเสนอราคา", to: "qt", group: "todo" },
-  not_sent: { label: "แนบแล้ว · รอส่งลูกค้า", color: AMBER, act: "เริ่มติดตาม", to: "qt", group: "todo" },
+  not_sent: { label: "แนบแล้ว · รอเริ่มนับ", color: AMBER, act: "เริ่มติดตาม", to: "qt", group: "todo" },
   sent: { label: "รอลูกค้าตอบ", color: "#2563eb", act: "อัปเดตผล", to: "qt", group: "wait" },
   follow_up: { label: "ถึงเวลาติดตาม", color: "#ea580c", act: "บันทึกการติดตาม", to: "qt", group: "wait" },
   revising: { label: "ลูกค้าขอแก้ไข", color: "#7c3aed", act: "อัปเดตผล", to: "qt", group: "wait" },
@@ -167,7 +168,7 @@ const QUOTE_ICON = {
   ref_qt: RequestQuoteOutlined, ref_doc: DescriptionOutlined,
 };
 const QUOTE_STEP = { none: 0, waiting_file: 0, not_sent: 1, sent: 2, follow_up: 2, revising: 2, approved: 3, rejected: 3 };
-const QUOTE_STEPS = ["แนบ", "ส่งลูกค้า", "ลูกค้าตอบ"];
+const QUOTE_STEPS = ["แนบ", "ติดตาม", "ผลลัพธ์"];
 
 function QuoteSteps({ oc, labels = true }) {
   const n = QUOTE_STEP[oc.key];
@@ -1115,6 +1116,11 @@ export default function JobIntake() {
           ? new Date(b.scheduledAt || b.createdAt || b.intakeAt || 0) - new Date(a.scheduledAt || a.createdAt || a.intakeAt || 0)
           : (isUrgent(b) - isUrgent(a)) || new Date(b.intakeAt || 0) - new Date(a.intakeAt || 0)));
   }, [withStage, tab, q]);
+  // ✅ (19 ต.ค. 2569 ผู้ใช้: "ทำระบบแบ่งหน้าด้วยให้สมบูรณ์") การ์ด 10 / ตาราง 20 ต่อหน้า · เปลี่ยนแท็บ/ค้นหา/มุมมอง = กลับหน้า 1
+  const pg = usePaged(list, view === "table" ? 20 : 10);
+  const { setPage } = pg;
+  useEffect(() => { setPage(1); }, [tab, q, view, setPage]);
+  const goPage = (n) => { setPage(n); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
   return (
     // ✅ (19 ต.ค. 2569 ผู้ใช้: "ถ้ามันล้นให้ขยายตารางออกอีก") มุมมองตาราง = กว้างเต็มพื้นที่ (ไม่จำกัด 1500)
@@ -1171,11 +1177,15 @@ export default function JobIntake() {
         view === "table" ? (
           <>
           <Typography sx={{ fontSize: "0.76rem", color: MUTED, mb: 0.75, px: 0.5 }}>กดที่แถวเพื่อดูรายละเอียดทั้งหมด</Typography>
-          <JobTable rows={list} employees={employees} refMode={tab === "waiting"} readOnlyOf={(j) => !canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering}
+          <JobTable rows={pg.rows} employees={employees} refMode={tab === "waiting"} readOnlyOf={(j) => !canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering}
             renderCard={(j, oc) => <JobCard job={j} outcome={oc} readOnly={!canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone} onEdit={openForm} onCancel={cancelJob} onRestore={restoreJob} />} />
+          <PageBar {...pg} setPage={goPage} unit="งาน" />
           </>
         ) : (
-          <Stack spacing={1.25}>{list.map(({ j, oc }) => <JobCard key={j._id} job={j} outcome={oc} readOnly={!canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone} onEdit={openForm} onCancel={cancelJob} onRestore={restoreJob} />)}</Stack>
+          <>
+          <Stack spacing={1.25}>{pg.rows.map(({ j, oc }) => <JobCard key={j._id} job={j} outcome={oc} readOnly={!canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone} onEdit={openForm} onCancel={cancelJob} onRestore={restoreJob} />)}</Stack>
+          <PageBar {...pg} setPage={goPage} unit="งาน" />
+          </>
         )
       ) : (
         <EmptyState icon={<PostAddOutlined />}

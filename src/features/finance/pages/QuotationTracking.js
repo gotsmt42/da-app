@@ -56,14 +56,14 @@ const PAGE_SIZE = 15;
 
 /** สถานะย่อยของใบ — ลำดับ = ลำดับขั้นตอนจริง (ใช้ทั้งการ์ดสถานะและการเรียง) */
 const STATUS = {
-  follow_up: { label: "ต้องติดตามด่วน", short: "ตามด่วน", color: "#dc2626", icon: WarningAmber },
+  follow_up: { label: "ถึงเวลาติดตาม", short: "ตามด่วน", color: "#dc2626", icon: WarningAmber },
   sent: { label: "รอลูกค้าตอบ", short: "รอตอบ", color: "#2563eb", icon: Send },
   revising: { label: "ลูกค้าขอแก้ไข", short: "ขอแก้ไข", color: "#7c3aed", icon: Autorenew },
   // ✅ ไม่มีขั้น "ส่งลูกค้า" แล้ว — มีไฟล์แต่ยังไม่เริ่มนับ = รอช่างส่งงาน (services/quotationAutoStart.js)
-  not_sent: { label: "รอช่างส่งงาน", short: "รอส่งงาน", color: "#d97706", icon: HourglassTop },
+  not_sent: { label: "รอเริ่มนับติดตาม", short: "รอเริ่มนับ", color: "#d97706", icon: HourglassTop },
   waiting_file: { label: "รอแนบใบเสนอราคา", short: "รอไฟล์", color: "#64748b", icon: AttachFile },
-  approved: { label: "อนุมัติแล้ว", short: "อนุมัติ", color: "#15803d", icon: CheckCircle },
-  rejected: { label: "ปฏิเสธ", short: "ปฏิเสธ", color: "#94a3b8", icon: Cancel },
+  approved: { label: "ได้งาน", short: "ได้งาน", color: "#15803d", icon: CheckCircle },
+  rejected: { label: "ไม่ได้งาน", short: "ไม่ได้งาน", color: "#94a3b8", icon: Cancel },
 };
 const STATUS_ORDER = ["follow_up", "sent", "revising", "not_sent", "waiting_file", "approved", "rejected"];
 const OPEN = ["follow_up", "sent", "revising", "not_sent", "waiting_file"];
@@ -266,10 +266,10 @@ const DecisionDialog = ({ mode, onClose, onConfirm, busy }) => {
   useEffect(() => { if (mode) { setDate(moment().format("YYYY-MM-DD")); setPo(""); setNote(""); } }, [mode]);
   if (!mode) return null;
   const meta = {
-    send: { title: "เริ่มนับติดตามใบเสนอราคา", color: "#2563eb", btn: "เริ่มนับ", dateLabel: "เริ่มนับจากวันที่" },
+    send: { title: "ส่งใบเสนอราคาให้ลูกค้าแล้ว · เริ่มนับติดตาม", color: "#2563eb", btn: "เริ่มนับติดตาม", dateLabel: "วันที่ส่งให้ลูกค้า" },
     resend: { title: "ส่งใบเสนอราคาฉบับแก้ไขให้ลูกค้าแล้ว", color: "#2563eb", btn: "บันทึก · เริ่มนับใหม่", dateLabel: "วันที่ส่งฉบับแก้ไข" },
-    approve: { title: "ลูกค้าอนุมัติใบเสนอราคา", color: "#15803d", btn: "ยืนยันอนุมัติ", dateLabel: "วันที่ลูกค้าอนุมัติ" },
-    reject: { title: "ลูกค้าปฏิเสธใบเสนอราคา", color: "#b91c1c", btn: "ยืนยันปฏิเสธ", dateLabel: "วันที่ลูกค้าแจ้ง" },
+    approve: { title: "ได้งาน — ลูกค้าตอบรับใบเสนอราคา", color: "#15803d", btn: "บันทึก · ได้งาน", dateLabel: "วันที่ลูกค้าตอบรับ" },
+    reject: { title: "ไม่ได้งาน — ลูกค้าไม่รับใบเสนอราคา", color: "#b91c1c", btn: "บันทึก · ไม่ได้งาน", dateLabel: "วันที่ลูกค้าแจ้ง" },
   }[mode];
   const invalid = mode === "reject" && !note.trim();
   return (
@@ -280,7 +280,7 @@ const DecisionDialog = ({ mode, onClose, onConfirm, busy }) => {
           <ThaiDatePicker label={meta.dateLabel} value={date} onChange={(v) => setDate(v || moment().format("YYYY-MM-DD"))} />
           {mode === "approve" && <TextField size="small" label="เลขที่ PO / ใบสั่งซื้อของลูกค้า (ถ้ามี)" value={po} onChange={(e) => setPo(e.target.value)} inputProps={{ maxLength: 60 }} />}
           {(mode === "approve" || mode === "reject") && (
-            <TextField size="small" multiline minRows={2} label={mode === "reject" ? "เหตุผลที่ลูกค้าปฏิเสธ *" : "หมายเหตุ (ถ้ามี)"} value={note}
+            <TextField size="small" multiline minRows={2} label={mode === "reject" ? "เหตุผลที่ไม่ได้งาน *" : "หมายเหตุ (ถ้ามี)"} value={note}
               onChange={(e) => setNote(e.target.value)} error={invalid && note !== ""} inputProps={{ maxLength: 500 }}
               placeholder={mode === "reject" ? "เช่น ราคาสูงกว่าเจ้าอื่น / เลื่อนโครงการ / ใช้ผู้รับเหมาเดิม" : ""} />
           )}
@@ -298,7 +298,7 @@ const DecisionDialog = ({ mode, onClose, onConfirm, busy }) => {
 };
 
 // ─── ข้อมูลใบเสนอราคา (ดู/แก้ไข) ─────────────────────────────────────────────
-const InfoSection = ({ a, isFinance, canEdit, onSave, bare = false }) => {
+const InfoSection = ({ a, isFinance, canEdit, onSave, bare = false, inline = false }) => {
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [f, setF] = useState({});
@@ -385,6 +385,20 @@ const InfoSection = ({ a, isFinance, canEdit, onSave, bare = false }) => {
       )}
     </>
   );
+  // ✅ inline = ฝังในกล่อง "ใบเสนอราคา" ของกล่องรายละเอียด (หัวข้อเล็ก + ปุ่มแก้ไข) — เห็นเสมอ ไม่ต้องกางแถบพับ
+  if (inline) {
+    return (
+      <Box>
+        <Stack direction="row" alignItems="center" sx={{ mb: 1 }}>
+          <Typography sx={{ flex: 1, fontSize: "0.78rem", fontWeight: 800, color: "#475569" }}>
+            ข้อมูลใบเสนอราคา{missingInfo(a) && !editing ? <Box component="span" sx={{ ml: 0.75, color: "#b45309" }}>· ยังไม่ครบ (เลขที่ / มูลค่า)</Box> : null}
+          </Typography>
+          {editBtn}
+        </Stack>
+        {body}
+      </Box>
+    );
+  }
   return bare ? (
     <Box sx={{ p: 1.75 }}>
       {editBtn && <Box sx={{ display: "flex", justifyContent: "flex-end", mt: -0.75, mb: 0.5 }}>{editBtn}</Box>}
@@ -481,10 +495,30 @@ const FollowUpSection = ({ a, onSubmit, onPreview, canFollow, formRef }) => {
 };
 
 // ─── กล่องรายละเอียด ─────────────────────────────────────────────────────────
-// ✅ ผู้ใช้สั่ง (3 ต.ค. 2569): ตัดขั้น "ส่งลูกค้า" — ระบบเริ่มนับติดตามเองเมื่อแนบใบเสนอราคาและส่งงานแล้ว
-//    (server: services/quotationAutoStart.js) · จัดลำดับใหม่ตามสิ่งที่ทำบ่อย: สถานะ+ปุ่ม → ไฟล์ → ติดตาม → ข้อมูล
-const STEPS = [["file", "แนบใบเสนอราคา"], ["job", "ส่งงาน"], ["follow", "ติดตาม"], ["done", "ผลลัพธ์"]];
+// ✅ ผู้ใช้สั่ง (3 ต.ค. 2569): ตัดขั้น "ส่งลูกค้า" — ระบบเริ่มนับติดตามเองเมื่อแนบใบเสนอราคาและช่างส่งงานแล้ว
+//    (server: services/quotationAutoStart.js)
+// 🔁 (19 ต.ค. 2569 ผู้ใช้: "การติดตามใบเสนอราคาไม่ชัดเจน ดูไม่เข้าใจ ดูยาก · ทำให้ครบถ้วนสมบูรณ์ UX/UI สวยงาม")
+//    โครงใหม่อ่านจากบนลงล่างตามคำถามที่คนเปิดกล่องอยากรู้:
+//      ① ตอนนี้อยู่ขั้นไหน (ขั้นตอน 4 ขั้นมีเลข + คำอธิบายใต้ขั้น)
+//      ② ต้องทำอะไรต่อ (กล่อง "ขั้นตอนถัดไป" ปุ่มหลักปุ่มเดียว + ปุ่มได้งาน/ไม่ได้งาน)
+//      ③ ใบเสนอราคาคืออะไร (ไฟล์ + เลขที่/มูลค่า/ยืนราคา/ผู้ติดต่อ เห็นเสมอ ไม่ซ่อนในแถบพับ)
+//      ④ ติดตามไปแล้วกี่ครั้ง (ฟอร์ม + ไทม์ไลน์) · ⑤ คุยกับช่าง · ประวัติ
+//    คำเรียกตรงความหมาย: อนุมัติ/ปฏิเสธ → "ได้งาน" / "ไม่ได้งาน"
+const STEPS = [
+  { key: "file", label: "แนบใบเสนอราคา", hint: "ไฟล์ + เลขที่ + มูลค่า" },
+  { key: "start", label: "เริ่มนับติดตาม", hint: "อัตโนมัติเมื่อช่างปิดงาน" },
+  { key: "follow", label: "ติดตามลูกค้า", hint: `ทุก ${WARNING_DAYS_AFTER_SENT} วัน หรือตามนัด` },
+  { key: "done", label: "ผลลัพธ์", hint: "ได้งาน / ไม่ได้งาน" },
+];
 const stepIndex = (k) => ({ waiting_file: 0, not_sent: 1, sent: 2, follow_up: 2, revising: 2, approved: 3, rejected: 3 }[k] ?? 0);
+
+/** ตัวเลขสรุปเล็ก (กล่องขั้นตอนถัดไป / ผลลัพธ์) */
+const MiniStat = ({ label, value, color }) => (
+  <Box sx={{ minWidth: 0, px: 1.25, py: 0.9, borderRadius: 2, bgcolor: "#f8fafc", border: `1px solid ${BORDER}` }}>
+    <Typography noWrap sx={{ fontSize: "0.68rem", fontWeight: 700, color: TEXT_SUB }}>{label}</Typography>
+    <Typography noWrap sx={{ fontSize: "0.86rem", fontWeight: 800, color: color || TEXT_MAIN }}>{value || "—"}</Typography>
+  </Box>
+);
 
 const DetailDialog = ({
   job, currentUser, onClose, onQuotation, onFollowUp, onComment, onFileUpload, onDeleteFile, onPreview, upload,
@@ -494,7 +528,7 @@ const DetailDialog = ({
   const [decision, setDecision] = useState(null);
   const [busy, setBusy] = useState(false);
   const [showLog, setShowLog] = useState(false);
-  const [showInfo, setShowInfo] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   const followRef = useRef(null);
   if (!job) return null;
   const a = job.anchor;
@@ -505,6 +539,8 @@ const DetailDialog = ({
   const info = getFollowUpInfo(a);
   const log = (a.activityLog || []).filter((l) => String(l.action || "").startsWith("quotation")).slice().reverse();
   const open = ["sent", "follow_up", "revising"].includes(k);
+  const comments = a.comments || [];
+  const chatOpen = showChat || comments.length > 0;
 
   const confirmDecision = async ({ date, po, note }) => {
     setBusy(true);
@@ -520,152 +556,186 @@ const DetailDialog = ({
     setTimeout(() => el?.querySelector("textarea")?.focus(), 350);
   };
 
-  // ── การ์ดสถานะ: บอกว่าตอนนี้อยู่ตรงไหน + ปุ่มที่ต้องกดต่อ (ปุ่มหลักปุ่มเดียว) ──
-  const banner = (() => {
+  // ── ② ขั้นตอนถัดไป: หัวข้อ · คำอธิบาย · ปุ่ม ──
+  const due = !info ? "" : info.needsFollowUp ? `เลยกำหนดติดตาม ${-info.daysUntilDue} วัน` : info.daysUntilDue === 0 ? "ครบกำหนดติดตามวันนี้" : `ติดตามครั้งถัดไปอีก ${info.daysUntilDue} วัน`;
+  const next = (() => {
     if (k === "waiting_file") {
-      return { title: "รอแนบใบเสนอราคา", text: "แนบไฟล์ในส่วน \"ใบเสนอราคา\" ด้านล่าง — เมื่อแนบแล้วและงานส่งเสร็จ ระบบเริ่มนับวันติดตามให้เอง" };
+      return { title: "แนบไฟล์ใบเสนอราคา", text: "กด “แนบไฟล์” ในกล่องใบเสนอราคาด้านล่าง แล้วกรอกเลขที่และมูลค่า — ระบบเริ่มนับติดตามให้เองเมื่อช่างปิดงาน" };
     }
     if (k === "not_sent") {
       return {
-        title: "แนบใบเสนอราคาแล้ว · รอช่างส่งงาน",
-        text: "ระบบจะเริ่มนับวันติดตามให้เองทันทีที่ช่างส่งงาน/ปิดงาน",
-        extra: isFinance ? [["send", "เริ่มนับตอนนี้", <EventRepeat key="i" />]] : [],
+        title: "แนบแล้ว · รอเริ่มนับติดตาม",
+        text: "ระบบเริ่มนับวันติดตามให้เองเมื่อช่างปิดงาน — ถ้าส่งใบเสนอราคาให้ลูกค้าไปแล้ว กดเริ่มนับได้เลย",
+        primary: isFinance ? { label: "ส่งให้ลูกค้าแล้ว · เริ่มนับตอนนี้", icon: <Send />, onClick: () => setDecision("send") } : null,
       };
     }
     if (open) {
-      const due = !info ? "" : info.needsFollowUp ? `เลยกำหนดติดตาม ${-info.daysUntilDue} วัน` : info.daysUntilDue === 0 ? "ครบกำหนดติดตามวันนี้" : `ติดตามครั้งถัดไปอีก ${info.daysUntilDue} วัน`;
-      const sub = !info ? "" : `เริ่มนับ ${thaiDate(a.quotationSentAt)} · ติดต่อล่าสุด ${thaiDate(info.lastContactAt)} · ครบกำหนด ${thaiDate(info.dueAt)}${info.scheduled ? " (นัดไว้)" : ""}`;
-      return { title: k === "revising" ? `ลูกค้าขอแก้ไข · ${due}` : due, text: sub, follow: true };
+      return {
+        title: k === "revising" ? `ลูกค้าขอแก้ไข · ${due}` : due,
+        tone: k === "follow_up" ? "#dc2626" : null,
+        text: k === "follow_up"
+          ? "ถึงเวลาโทร/ทักลูกค้าแล้ว — บันทึกผลทุกครั้งที่ติดต่อ ระบบจะนับรอบถัดไปให้"
+          : "รอลูกค้าตัดสินใจ — ติดต่อแล้วบันทึกผลไว้ เมื่อลูกค้าตอบ กด “ได้งาน” หรือ “ไม่ได้งาน”",
+        stats: true,
+        decide: true,
+        primary: { label: "บันทึกการติดตาม", icon: <EventRepeat />, onClick: goFollow },
+      };
     }
     return null;
   })();
+  const tone = next?.tone || m.color;
 
   return (
     <Dialog open onClose={onClose} fullScreen={fullScreen} fullWidth maxWidth="md" PaperProps={{ sx: { borderRadius: fullScreen ? 0 : 3, bgcolor: "#f8fafc" } }}>
-      {/* ── หัว: ชื่องาน 1 บรรทัด + มูลค่า · ขั้นตอนเป็นแถบบาง ── */}
-      <Box sx={{ px: { xs: 1.75, sm: 2.5 }, pt: 1.5, pb: 1.25, bgcolor: "#fff", borderBottom: `1px solid ${BORDER}` }}>
-        <Stack direction="row" spacing={1} alignItems="flex-start">
+      {/* ── หัว: ลูกค้า/โครงการ · งาน · มูลค่า ── */}
+      <Box sx={{ px: { xs: 1.75, sm: 2.5 }, pt: 1.75, pb: 1.5, bgcolor: "#fff", borderBottom: `1px solid ${BORDER}` }}>
+        <Stack direction="row" spacing={1.25} alignItems="flex-start">
+          <Box sx={{ width: 42, height: 42, borderRadius: 2.5, flexShrink: 0, display: "grid", placeItems: "center", bgcolor: alpha(m.color, 0.1), color: m.color }}>
+            <RequestQuote />
+          </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography sx={{ fontWeight: 900, fontSize: "1.02rem", color: TEXT_MAIN, lineHeight: 1.35, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+            <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: TEXT_SUB, letterSpacing: 0.2 }}>ใบเสนอราคา{a.quotationNo ? ` · ${a.quotationNo}` : ""}</Typography>
+            <Typography sx={{ fontWeight: 900, fontSize: "1.05rem", color: TEXT_MAIN, lineHeight: 1.35, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
               {siteText(a)}
             </Typography>
             <Typography noWrap sx={{ fontSize: "0.76rem", color: TEXT_SUB }}>
-              {[jobText(a), a.time ? `ครั้งที่ ${formatRoundLabel(a.time, a.visitCount, a)}` : "", formatEventDateRange(a)].filter(Boolean).join(" · ")}
+              {[jobText(a), a.time ? `ครั้งที่ ${formatRoundLabel(a.time, a.visitCount, a)}` : "", formatEventDateRange(a), ownerOf(a) ? `ผู้รับผิดชอบ ${ownerOf(a)}` : ""].filter(Boolean).join(" · ")}
             </Typography>
+          </Box>
+          <Box sx={{ textAlign: "right", flexShrink: 0, display: { xs: "none", sm: "block" } }}>
+            <Typography sx={{ fontSize: "0.68rem", fontWeight: 700, color: TEXT_SUB }}>มูลค่า</Typography>
+            <Typography sx={{ fontWeight: 900, fontSize: "1.1rem", color: a.quotationAmount ? TEXT_MAIN : "#94a3b8" }}>{a.quotationAmount ? baht(a.quotationAmount) : "ยังไม่ระบุ"}</Typography>
           </Box>
           <IconButton onClick={onClose} size="small" aria-label="ปิด" sx={{ mt: -0.25 }}><Close /></IconButton>
         </Stack>
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
-          <StatusChip k={k} />
-          {a.quotationNo && <Typography noWrap sx={{ fontSize: "0.76rem", fontWeight: 700, color: TEXT_SUB }}>{a.quotationNo}</Typography>}
-          <Box sx={{ flex: 1 }} />
-          <Typography noWrap sx={{ fontWeight: 900, fontSize: "1rem", color: a.quotationAmount ? TEXT_MAIN : "#b45309" }}>
-            {a.quotationAmount ? baht(a.quotationAmount) : "ไม่ระบุมูลค่า"}
-          </Typography>
-        </Stack>
-        <Stack direction="row" spacing={0.5} sx={{ mt: 1.25 }}>
-          {STEPS.map(([key, label], i) => {
-            const done = i < step || (i === 3 && step === 3);
-            const cur = i === step && step < 3;
-            const color = i === 3 && step === 3 ? m.color : done ? "#15803d" : cur ? m.color : "#cbd5e1";
+
+        {/* ① ขั้นตอน 4 ขั้น — วงเลข/เครื่องหมายถูก + ชื่อขั้น + คำอธิบาย */}
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", mt: 1.75 }}>
+          {STEPS.map((s, i) => {
+            const final = i === 3 && step === 3;
+            const done = i < step;
+            const cur = i === step && !final;
+            const color = final ? m.color : done ? "#16a34a" : cur ? m.color : "#cbd5e1";
+            const FinalIcon = k === "approved" ? CheckCircle : Cancel;
+            const lineColor = i <= step ? (i < step || final ? "#16a34a" : color) : "#e2e8f0";
             return (
-              <Box key={key} sx={{ flex: 1, minWidth: 0 }}>
-                <Box sx={{ height: 3, borderRadius: 2, bgcolor: done || cur ? color : "#e2e8f0" }} />
-                <Typography noWrap sx={{ fontSize: "0.68rem", fontWeight: cur || done ? 800 : 600, color: done || cur ? color : "#94a3b8", mt: 0.35 }}>
-                  {i === 3 && step === 3 ? m.label : label}
+              <Box key={s.key} sx={{ position: "relative", textAlign: "center", px: 0.5 }}>
+                {i > 0 && <Box sx={{ position: "absolute", top: 13, right: "50%", width: "100%", height: 2, bgcolor: lineColor }} />}
+                <Box sx={{ position: "relative", mx: "auto", width: 28, height: 28, borderRadius: "50%", display: "grid", placeItems: "center",
+                  fontSize: "0.78rem", fontWeight: 900, color: done || cur || final ? "#fff" : "#94a3b8", bgcolor: done || cur || final ? color : "#fff",
+                  border: `2px solid ${color}`, boxShadow: cur ? `0 0 0 4px ${alpha(color, 0.18)}` : "none" }}>
+                  {final ? <FinalIcon sx={{ fontSize: 18 }} /> : done ? "✓" : i + 1}
+                </Box>
+                <Typography noWrap sx={{ mt: 0.5, fontSize: { xs: "0.7rem", sm: "0.78rem" }, fontWeight: cur || final ? 900 : 700, color: cur || final ? color : done ? TEXT_MAIN : "#94a3b8" }}>
+                  {final ? m.label : s.label}
                 </Typography>
+                <Typography noWrap sx={{ fontSize: "0.66rem", color: "#94a3b8", display: { xs: "none", sm: "block" } }}>{s.hint}</Typography>
               </Box>
             );
           })}
-        </Stack>
+        </Box>
       </Box>
 
       <DialogContent sx={{ px: { xs: 1.5, sm: 2.5 }, py: 1.75 }}>
         <Stack spacing={1.5}>
-          {/* ── การ์ดสถานะ + ปุ่ม ── */}
-          {banner && (
-            <Box sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${BORDER}`, borderLeft: `4px solid ${m.color}` }}>
-              <Typography sx={{ fontSize: "0.9rem", fontWeight: 900, color: k === "follow_up" ? "#b91c1c" : TEXT_MAIN }}>{banner.title}</Typography>
-              {banner.text && <Typography sx={{ fontSize: "0.78rem", color: TEXT_SUB, mt: 0.25 }}>{banner.text}</Typography>}
-              {banner.follow && (
-                <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "1.3fr 1fr 1fr" }, gap: 1, mt: 1.25 }}>
-                  <Button variant="contained" startIcon={<EventRepeat />} onClick={goFollow}
-                    sx={{ gridColumn: { xs: "1 / -1", sm: "auto" }, textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none" }}>บันทึกการติดตาม</Button>
-                  <Button variant="outlined" startIcon={<CheckCircle sx={{ color: "#15803d" }} />} onClick={() => setDecision("approve")}
-                    sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, color: "#15803d", borderColor: "#86efac", bgcolor: "#fff", "&:hover": { borderColor: "#16a34a", bgcolor: "#f0fdf4" } }}>อนุมัติ</Button>
-                  <Button variant="outlined" startIcon={<Cancel sx={{ color: "#b91c1c" }} />} onClick={() => setDecision("reject")}
-                    sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, color: "#b91c1c", borderColor: "#fca5a5", bgcolor: "#fff", "&:hover": { borderColor: "#dc2626", bgcolor: "#fef2f2" } }}>ปฏิเสธ</Button>
+          {/* ── ② ขั้นตอนถัดไป ── */}
+          {next && (
+            <Box sx={{ p: { xs: 1.5, sm: 1.75 }, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${alpha(tone, 0.35)}`, boxShadow: `inset 4px 0 0 ${tone}` }}>
+              <Typography sx={{ fontSize: "0.68rem", fontWeight: 800, color: TEXT_SUB, letterSpacing: 0.3 }}>ขั้นตอนถัดไป</Typography>
+              <Typography sx={{ fontSize: "1rem", fontWeight: 900, color: next.tone || TEXT_MAIN, mt: 0.15 }}>{next.title}</Typography>
+              {next.text && <Typography sx={{ fontSize: "0.8rem", color: "#475569", mt: 0.25 }}>{next.text}</Typography>}
+              {next.stats && info && (
+                <Box sx={{ display: "grid", gap: 0.75, mt: 1.25, gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(4, minmax(0, 1fr))" } }}>
+                  <MiniStat label="เริ่มนับ" value={thaiDate(a.quotationSentAt)} />
+                  <MiniStat label="ติดต่อล่าสุด" value={thaiDate(info.lastContactAt)} />
+                  <MiniStat label={info.scheduled ? "นัดติดตาม" : "ครบกำหนดติดตาม"} value={thaiDate(info.dueAt)} color={info.needsFollowUp ? "#dc2626" : undefined} />
+                  <MiniStat label="ติดตามแล้ว" value={`${info.followUpCount || 0} ครั้ง · เงียบ ${info.daysSinceLastContact} วัน`} />
                 </Box>
               )}
-              {banner.extra?.length > 0 && (
-                <Stack direction="row" spacing={1} sx={{ mt: 1.25 }}>
-                  {banner.extra.map(([key, label, icon]) => (
-                    <Button key={key} size="small" variant="outlined" startIcon={icon} onClick={() => setDecision(key)}
-                      sx={{ textTransform: "none", fontWeight: 700, borderRadius: 2, color: "#334155", borderColor: BORDER }}>{label}</Button>
-                  ))}
-                </Stack>
+              {(next.primary || next.decide) && (
+                <Box sx={{ display: "grid", gap: 1, mt: 1.5, gridTemplateColumns: { xs: "1fr", sm: next.decide ? "1.2fr 1fr 1fr" : "auto" }, justifyContent: "start" }}>
+                  {next.primary && (
+                    <Button variant="contained" startIcon={next.primary.icon} onClick={next.primary.onClick}
+                      sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", height: 42, px: 2.5, bgcolor: "#2563eb", "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } }}>
+                      {next.primary.label}
+                    </Button>
+                  )}
+                  {next.decide && (
+                    <>
+                      <Button variant="outlined" startIcon={<CheckCircle />} onClick={() => setDecision("approve")}
+                        sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, height: 42, color: "#15803d", borderColor: "#86efac", bgcolor: "#fff", "&:hover": { borderColor: "#16a34a", bgcolor: "#f0fdf4" } }}>ได้งาน</Button>
+                      <Button variant="outlined" startIcon={<Cancel />} onClick={() => setDecision("reject")}
+                        sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, height: 42, color: "#b91c1c", borderColor: "#fca5a5", bgcolor: "#fff", "&:hover": { borderColor: "#dc2626", bgcolor: "#fef2f2" } }}>ไม่ได้งาน</Button>
+                    </>
+                  )}
+                </Box>
               )}
             </Box>
           )}
-          {/* ── ผลการตัดสินใจ ── */}
+
+          {/* ── ผลลัพธ์ (ได้งาน / ไม่ได้งาน) ── */}
           {["approved", "rejected"].includes(k) && (
-            <Box sx={{ p: 1.5, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${BORDER}`, borderLeft: `4px solid ${m.color}` }}>
-              <Stack direction="row" spacing={1} alignItems="flex-start">
+            <Box sx={{ p: { xs: 1.5, sm: 1.75 }, borderRadius: 2.5, bgcolor: "#fff", border: `1px solid ${alpha(k === "approved" ? "#16a34a" : "#dc2626", 0.35)}`, boxShadow: `inset 4px 0 0 ${k === "approved" ? "#16a34a" : "#dc2626"}` }}>
+              <Stack direction="row" spacing={1.25} alignItems="flex-start">
+                {k === "approved" ? <CheckCircle sx={{ color: "#16a34a", fontSize: 28 }} /> : <Cancel sx={{ color: "#dc2626", fontSize: 28 }} />}
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography sx={{ fontSize: "0.9rem", fontWeight: 900, color: TEXT_MAIN }}>
-                    {k === "approved" ? "ลูกค้าอนุมัติใบเสนอราคา" : "ลูกค้าปฏิเสธใบเสนอราคา"}{a.quotationPoNo ? ` · PO ${a.quotationPoNo}` : ""}
+                  <Typography sx={{ fontSize: "0.68rem", fontWeight: 800, color: TEXT_SUB, letterSpacing: 0.3 }}>ผลลัพธ์</Typography>
+                  <Typography sx={{ fontSize: "1rem", fontWeight: 900, color: k === "approved" ? "#15803d" : "#b91c1c" }}>
+                    {k === "approved" ? "ได้งาน — ลูกค้าตอบรับใบเสนอราคา" : "ไม่ได้งาน — ลูกค้าไม่รับใบเสนอราคา"}
                   </Typography>
-                  {a.quotationDecisionNote && <Typography sx={{ fontSize: "0.82rem", color: "#334155", mt: 0.25 }}>{k === "rejected" ? "เหตุผล: " : ""}{a.quotationDecisionNote}</Typography>}
-                  <Typography sx={{ fontSize: "0.74rem", color: TEXT_SUB, mt: 0.25 }}>
-                    {a.quotationDecisionAt ? thaiDate(a.quotationDecisionAt) : ""}{a.quotationDecisionBy ? ` · บันทึกโดย ${a.quotationDecisionBy}` : ""}
-                  </Typography>
+                  <Box sx={{ display: "grid", gap: 0.75, mt: 1, gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, minmax(0, 1fr))" } }}>
+                    <MiniStat label="วันที่ลูกค้าตอบ" value={a.quotationDecisionAt ? thaiDate(a.quotationDecisionAt) : ""} />
+                    {k === "approved" && <MiniStat label="เลขที่ PO ลูกค้า" value={a.quotationPoNo} />}
+                    <MiniStat label="บันทึกโดย" value={a.quotationDecisionBy} />
+                  </Box>
+                  {a.quotationDecisionNote && <Typography sx={{ fontSize: "0.84rem", color: "#334155", mt: 1 }}>{k === "rejected" ? "เหตุผล: " : "หมายเหตุ: "}{a.quotationDecisionNote}</Typography>}
                 </Box>
                 {isFinance && (
                   <Button size="small" startIcon={<Undo sx={{ fontSize: 16 }} />} onClick={async () => { setBusy(true); await onQuotation(job, { action: "reset" }); setBusy(false); }} disabled={busy}
-                    sx={{ textTransform: "none", fontWeight: 700, color: TEXT_SUB, flexShrink: 0 }}>ย้อนสถานะ</Button>
+                    sx={{ textTransform: "none", fontWeight: 700, color: TEXT_SUB, flexShrink: 0 }}>แก้ผล</Button>
                 )}
               </Stack>
             </Box>
           )}
 
-          {/* ── ไฟล์ใบเสนอราคา ── */}
-          <Box sx={{ border: `1px solid ${BORDER}`, borderRadius: 2.5, bgcolor: "#fff", p: 1.5 }}>
+          {/* ── ③ ใบเสนอราคา: ไฟล์ + ข้อมูล (เห็นเสมอ) ── */}
+          <Section title="ใบเสนอราคา" icon={<Description />}>
             <FileUploadSection
-              eventId={a._id} type="quotation" label="ใบเสนอราคา"
+              eventId={a._id} type="quotation" label="ไฟล์ใบเสนอราคา"
               files={a.quotationFiles} applicable={a.quotationApplicable}
               onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
               uploading={upload.busy && upload.eventId === a._id} progress={upload.progress} currentUser={currentUser}
             />
             {open && (
               <Button size="small" startIcon={<Autorenew sx={{ fontSize: 16 }} />} onClick={() => setDecision("resend")}
-                sx={{ mt: 0.5, textTransform: "none", fontWeight: 700, color: TEXT_SUB }}>ส่งฉบับแก้ไขแล้ว (เริ่มนับใหม่)</Button>
+                sx={{ mt: 0.5, textTransform: "none", fontWeight: 700, color: TEXT_SUB }}>ส่งฉบับแก้ไขให้ลูกค้าแล้ว (เริ่มนับใหม่)</Button>
             )}
-          </Box>
+            <Box sx={{ mt: 1.5, pt: 1.5, borderTop: `1px dashed ${BORDER}` }}>
+              <InfoSection a={a} isFinance={isFinance} canEdit onSave={(body) => onQuotation(job, body)} inline />
+            </Box>
+          </Section>
 
+          {/* ── ④ การติดตามลูกค้า ── */}
           {(open || (a.quotationFollowUps || []).length > 0) && (
             <FollowUpSection a={a} canFollow formRef={followRef} onPreview={onPreview} onSubmit={(payload) => onFollowUp(job, payload)} />
           )}
 
-          {/* ── ข้อมูลใบเสนอราคา: สรุปบรรทัดเดียว กดเพื่อดู/แก้ ── */}
+          {/* ── ⑤ คุยกับช่าง (พับไว้ถ้ายังไม่มีข้อความ) ── */}
           <Box sx={{ border: `1px solid ${BORDER}`, borderRadius: 2.5, bgcolor: "#fff", overflow: "hidden" }}>
-            <Button fullWidth onClick={() => setShowInfo((v) => !v)} endIcon={<ExpandMore sx={{ transform: showInfo ? "rotate(180deg)" : "none", transition: "transform .2s" }} />}
-              sx={{ textTransform: "none", justifyContent: "space-between", px: 1.75, py: 1.1, color: TEXT_MAIN, "& .MuiButton-endIcon": { ml: 1 } }}>
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
-                <RequestQuote sx={{ fontSize: 18, color: TEXT_SUB }} />
-                <Typography sx={{ fontWeight: 800, fontSize: "0.88rem" }}>ข้อมูลใบเสนอราคา</Typography>
-                {missingInfo(a) && <Typography noWrap sx={{ fontSize: "0.74rem", fontWeight: 700, color: "#b45309" }}>· ยังไม่ครบ</Typography>}
+            <Button fullWidth onClick={() => setShowChat((v) => !v)} disabled={comments.length > 0}
+              endIcon={comments.length ? null : <ExpandMore sx={{ transform: chatOpen ? "rotate(180deg)" : "none", transition: "transform .2s" }} />}
+              sx={{ textTransform: "none", justifyContent: "space-between", px: 1.75, py: 1.1, color: `${TEXT_MAIN} !important`, bgcolor: "#f8fafc", borderRadius: 0 }}>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Chat sx={{ fontSize: 18, color: TEXT_SUB }} />
+                <Typography sx={{ fontWeight: 800, fontSize: "0.88rem" }}>คุยกับช่าง{comments.length ? ` · ${comments.length}` : ""}</Typography>
               </Stack>
             </Button>
-            <Collapse in={showInfo} unmountOnExit>
-              <Box sx={{ borderTop: `1px solid ${BORDER}` }}>
-                <InfoSection a={a} isFinance={isFinance} canEdit onSave={(body) => onQuotation(job, body)} bare />
+            <Collapse in={chatOpen} unmountOnExit>
+              <Box sx={{ p: 1.75, borderTop: `1px solid ${BORDER}` }}>
+                <CommentThread comments={a.comments} onSend={(message) => onComment(job, message)} myRole={currentUser} />
               </Box>
             </Collapse>
           </Box>
-
-          <Section title={`คุยกับช่าง${(a.comments || []).length ? ` · ${a.comments.length}` : ""}`} icon={<Chat />}>
-            <CommentThread comments={a.comments} onSend={(message) => onComment(job, message)} myRole={currentUser} />
-          </Section>
 
           {log.length > 0 && (
             <Section title="ประวัติ" icon={<History />}
@@ -704,7 +774,7 @@ function useQuotationActions(fetchJobs, toast, userData) {
     try {
       await EventService.UpdateQuotation(job.anchor._id, body);
       await fetchJobs(true);
-      toast(body.action === "approve" ? "บันทึก: ลูกค้าอนุมัติแล้ว" : body.action === "reject" ? "บันทึก: ลูกค้าปฏิเสธ" : body.action === "send" ? "เริ่มนับวันติดตามแล้ว" : body.action === "reset" ? "ย้อนสถานะแล้ว" : "บันทึกข้อมูลแล้ว");
+      toast(body.action === "approve" ? "บันทึกแล้ว: ได้งาน" : body.action === "reject" ? "บันทึกแล้ว: ไม่ได้งาน" : body.action === "send" ? "เริ่มนับวันติดตามแล้ว" : body.action === "reset" ? "แก้ผลแล้ว — กลับไปรอลูกค้าตอบ" : "บันทึกข้อมูลแล้ว");
       return true;
     } catch (err) {
       toast(errMsg(err, "บันทึกไม่สำเร็จ"), "error");
@@ -1023,7 +1093,7 @@ export default function QuotationTracking() {
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.1rem", sm: "1.25rem" }, color: TEXT_MAIN, lineHeight: 1.25 }}>ติดตามใบเสนอราคา</Typography>
             <Typography noWrap sx={{ fontSize: "0.76rem", color: TEXT_SUB }}>
-              แนบใบเสนอราคา + ส่งงาน → เริ่มนับเอง → ติดตาม (ทุก {WARNING_DAYS_AFTER_SENT} วัน หรือตามนัด) → อนุมัติ / ปฏิเสธ
+              แนบใบเสนอราคา → เริ่มนับติดตาม (อัตโนมัติเมื่อช่างปิดงาน) → ติดตามลูกค้า (ทุก {WARNING_DAYS_AFTER_SENT} วัน หรือตามนัด) → ได้งาน / ไม่ได้งาน
               {lastRefreshed ? ` · อัปเดต ${moment(lastRefreshed).format("HH:mm")}` : ""}
             </Typography>
           </Box>
@@ -1061,8 +1131,8 @@ export default function QuotationTracking() {
         }}>
           <Kpi label="มูลค่ารอลูกค้าตอบ" value={baht(stats.pendingValue)} sub={`${stats.pendingCount} ใบ`} color="#2563eb" onClick={() => setStatus("open")} active={status === "open"} />
           <Kpi label="ต้องติดตามด่วน" value={`${counts.follow_up || 0} ใบ`} sub={counts.follow_up ? `มูลค่า ${baht(stats.urgentValue)}` : "ไม่มีใบเลยกำหนด"} color="#dc2626" alert={counts.follow_up > 0} onClick={() => setStatus("follow_up")} active={status === "follow_up"} />
-          <Kpi label="อนุมัติแล้ว" value={baht(stats.approvedValue)} sub={`${stats.approvedCount} ใบ`} color="#15803d" onClick={() => setStatus("approved")} active={status === "approved"} />
-          <Kpi label="อัตราปิดการขาย" value={stats.winRate === null ? "—" : `${stats.winRate}%`} sub={stats.decided ? `อนุมัติ ${stats.approvedCount} จาก ${stats.decided} ใบที่ได้คำตอบ` : "ยังไม่มีใบที่ได้คำตอบ"} color="#0f172a" />
+          <Kpi label="ได้งานแล้ว" value={baht(stats.approvedValue)} sub={`${stats.approvedCount} ใบ`} color="#15803d" onClick={() => setStatus("approved")} active={status === "approved"} />
+          <Kpi label="อัตราปิดการขาย" value={stats.winRate === null ? "—" : `${stats.winRate}%`} sub={stats.decided ? `ได้งาน ${stats.approvedCount} จาก ${stats.decided} ใบที่ได้คำตอบ` : "ยังไม่มีใบที่ได้คำตอบ"} color="#0f172a" />
           <Box sx={{ display: "grid" }}><Kpi label="ข้อมูลไม่ครบ" value={`${counts.incomplete} ใบ`} sub="ไม่มีเลขที่ หรือ ไม่มีมูลค่า" color="#b45309" alert={counts.incomplete > 0} onClick={() => setStatus("incomplete")} active={status === "incomplete"} /></Box>
         </Box>
       )}
