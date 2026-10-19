@@ -36,28 +36,31 @@ const GROUPS = {
   ],
 };
 
-// ⚠️ edge (เดิมเว้นขอบมือถือเอง) เลิกใช้แล้ว — ทุกหน้าใช้ PAGE_SX ขอบเดียวกัน แถบจึงตรงแนวหัวเพจพอดี
-export default function SectionTabs({ group }) {
-  const { userData } = useAuth() || {};
-  const { pathname } = useLocation();
-  const { badges } = useAppBadges(userData);
-  const tabs = (GROUPS[group] || []).filter((t) => t.show(userData));
-  if (tabs.length < 2) return null;
+/**
+ * แถบแท็บกล่องขาว — ชุดเดียวทั้งแอป (SectionTabs ที่ลิงก์ข้ามหน้า + TabbedPage ที่สลับ ?tab= ในหน้าเดียว)
+ * ✅ (19 ต.ค. 2569 ผู้ใช้: "ทำยังไงไม่ให้สับสน ทำไมมีหลายหน้า") เดิมแท็บมี 2 หน้าตา (เส้นใต้สีแดง vs กล่องปุ่มน้ำเงิน)
+ *    ทำให้ดูเหมือนคนละระบบ → ใช้ตัวนี้ตัวเดียว
+ * @param items [{ key, label, icon?, badge?, on, to? | onClick? }]
+ */
+export function TabStrip({ items }) {
   return (
-    <Stack direction="row" sx={{ mb: 1.5, p: 0.5, gap: 0.5, bgcolor: "#fff", border: "1px solid #e2e8f0", borderRadius: 3, boxShadow: "0 1px 2px rgba(15,23,42,.04)",
+    <Stack direction="row" role="tablist" sx={{ mb: 1.5, p: 0.5, gap: 0.5, bgcolor: "#fff", border: "1px solid #e2e8f0", borderRadius: 3, boxShadow: "0 1px 2px rgba(15,23,42,.04)",
       overflowX: "auto", scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
-      {tabs.map((t) => {
-        const on = t.match(pathname);
-        const n = t.badge ? Number(badges?.[t.badge]) || 0 : 0;
+      {items.map((t) => {
+        const on = t.on;
+        const n = Number(t.badge) || 0;
+        const linkProps = t.to ? { component: Link, to: t.to } : { component: "button", type: "button", onClick: t.onClick };
         return (
-          <Box key={t.href} component={Link} to={t.href} aria-current={on ? "page" : undefined}
+          <Box key={t.key} {...linkProps} role="tab" aria-selected={on} aria-current={on ? "page" : undefined}
             sx={{
               flex: { xs: "1 0 auto", sm: "0 0 auto" }, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 0.75,
-              height: 38, px: 1.75, borderRadius: 2.5, textDecoration: "none", whiteSpace: "nowrap",
+              height: 38, px: 1.75, borderRadius: 2.5, border: 0, cursor: "pointer", font: "inherit", textDecoration: "none", whiteSpace: "nowrap",
               fontSize: "0.86rem", fontWeight: on ? 800 : 600,
               color: on ? "#fff" : "#334155", bgcolor: on ? ACCENT : "transparent",
+              "& svg": { fontSize: 18, display: { xs: "none", sm: "inline-block" } },
               "&:hover": { bgcolor: on ? ACCENT : alpha(ACCENT, 0.06), color: on ? "#fff" : ACCENT },
             }}>
+            {t.icon}
             {t.label}
             {n > 0 && (
               <Box component="span" sx={{ minWidth: 20, height: 20, px: 0.6, borderRadius: 99, display: "inline-grid", placeItems: "center",
@@ -68,4 +71,13 @@ export default function SectionTabs({ group }) {
       })}
     </Stack>
   );
+}
+
+export default function SectionTabs({ group }) {
+  const { userData } = useAuth() || {};
+  const { pathname } = useLocation();
+  const { badges } = useAppBadges(userData);
+  const tabs = (GROUPS[group] || []).filter((t) => t.show(userData));
+  if (tabs.length < 2) return null;
+  return <TabStrip items={tabs.map((t) => ({ key: t.href, label: t.label, to: t.href, on: t.match(pathname), badge: t.badge ? badges?.[t.badge] : 0 }))} />;
 }

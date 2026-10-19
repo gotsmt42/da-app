@@ -20,20 +20,14 @@
  */
 import { Suspense, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Box, Tabs, Tab, Skeleton } from "@mui/material";
-
-// สีเริ่มต้น = แดง (สายงานช่าง ซึ่งเป็นเจ้าของหน้าเดิมทั้งหมดที่ใช้คอมโพเนนต์นี้)
-const DEFAULT_ACCENT = "#dc2626";
-const BORDER_MAIN = "#e2e8f0";
-const TEXT_SUB = "#64748b";
+import { Box, Skeleton } from "@mui/material";
+import { TabStrip } from "@/shared/ui/SectionTabs";
+import { PAGE_SX } from "@/shared/ui/PageKit";
 
 /**
  * @param {Array} tabs [{ key, label, icon, render: () => node }] — กรองตามสิทธิ์มาก่อนแล้ว
- * @param {string} [accent] สีประจำสายงานของหน้านั้น — ฝ่ายขายม่วง ฝ่ายบริการแดง
- *   ⚠️ ไม่ใช่แค่ความสวยงาม: แอปมี 2 สายงานที่แยกกันจริง สีแถบแท็บคือสัญญาณแรกที่บอกว่าตอนนี้
- *   อยู่ฝั่งไหน ถ้าทุกหน้าแดงเหมือนกันหมด หน้าฝ่ายขายจะดูเหมือนหน้าของช่าง
  */
-const TabbedPage = ({ tabs, accent = DEFAULT_ACCENT }) => {
+const TabbedPage = ({ tabs }) => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const visibleTabs = useMemo(() => (tabs || []).filter(Boolean), [tabs]);
@@ -57,46 +51,11 @@ const TabbedPage = ({ tabs, accent = DEFAULT_ACCENT }) => {
     <>
       {/* ✅ ซ่อนแถบแท็บถ้าเหลือแท็บเดียว — เกิดได้จริงตามสิทธิ์ผู้ใช้ (เช่น manager เห็นแค่ "ภาพรวม"
           ไม่เห็น "ทะเบียน" ซึ่งเป็นของ admin) แท็บเดี่ยวๆ ที่กดไปก็ไม่มีอะไรเปลี่ยน มีแต่ทำให้งง */}
+      {/* ✅ (19 ต.ค. 2569) แถบแท็บกล่องขาวชุดเดียวกับกลุ่มงาน (TabStrip) อยู่ในกรอบกว้างเดียวกับเนื้อหา (PAGE_SX)
+          mb ติดลบ = หักระยะบนของหน้าด้านใน (PAGE_SX.py) ออก ให้ระยะแท็บ→หัวเพจเท่ากับหน้าอื่นทุกหน้า (12px) */}
       {visibleTabs.length > 1 && (
-        <Box sx={{ pt: { xs: 0.5, sm: 2 } }}>
-          <Tabs
-            value={activeKey}
-            onChange={handleChange}
-            variant="scrollable"
-            scrollButtons="auto"
-            allowScrollButtonsMobile
-            sx={{
-              minHeight: 42,
-              borderBottom: `1px solid ${BORDER_MAIN}`,
-              // ⚠️ จอแคบต้องให้แท็บครบโดยไม่ต้องเลื่อน — ลดขนาดตัวอักษร/ช่องไฟลงแทนที่จะปล่อยให้
-              // มีปุ่มลูกศรเลื่อนโผล่มา เพราะผู้ใช้ไม่มีทางรู้ว่ามีแท็บซ่อนอยู่ข้างหลัง
-              "& .MuiTab-root": {
-                textTransform: "none", fontWeight: 700,
-                fontSize: { xs: "0.76rem", sm: "0.86rem" },
-                minHeight: 42, color: TEXT_SUB,
-                gap: { xs: 0.4, sm: 0.75 },
-                minWidth: { xs: 0, sm: 90 },
-                // 🐛 BUG ที่แก้ (ผู้ใช้แจ้ง: "ปุ่มแถบมันเยื้องๆ ไม่สวย"): เดิม Box ที่ห่อ Tabs ข้างนอก
-                // มี px:2 (16px) ซ้อนกับ padding ในตัว Tab เองอีกชั้น (px:2 = 16px) รวมเป็น 32px จาก
-                // ขอบซ้ายจริง ในขณะที่ทุกหน้าที่เอามารวมกัน (QuotationTracking/BillingTracking/
-                // CustomerOverview/TeamWorkload) มีขอบซ้ายของเนื้อหาแค่ 16px (p:2) เท่ากันหมด —
-                // ป้ายชื่อแท็บกับหัวข้อหน้าเดียวกันด้านล่างจึงเยื้องกัน 16px วัดจากของจริงแล้วตรงเป๊ะ
-                // ✅ ตัด px ของกล่องนอกออก ให้เหลือ padding มาจากตัว Tab เองแหล่งเดียว 16px บนจอกว้าง
-                // (12px บนมือถือ ให้พอดีกับ p:{xs:1.5} ที่หน้าเหล่านั้นใช้) เท่ากับขอบเนื้อหาด้านล่างเป๊ะ
-                // — ไม่ต้องแยกกฎพิเศษให้แท็บแรก เพราะ Tabs ไม่มี offset ก่อนแท็บแรกอยู่แล้วโดยธรรมชาติ
-                px: { xs: 1.5, sm: 2 },
-              },
-              // ⚠️ จอแคบซ่อนไอคอนทิ้ง — ข้อความไทยยาวกว่าภาษาอังกฤษมาก พอมีไอคอนด้วยจะเกิน
-              // ความกว้างจอแล้วมีลูกศรเลื่อนโผล่มา ซึ่งผู้ใช้ไม่มีทางรู้ว่ามีแท็บซ่อนอยู่ข้างหลัง
-              "& .MuiTab-iconWrapper": { display: { xs: "none", sm: "inline-flex" } },
-              "& .Mui-selected": { color: `${accent} !important` },
-              "& .MuiTabs-indicator": { backgroundColor: accent, height: 2.5, borderRadius: 2 },
-            }}
-          >
-            {visibleTabs.map((t) => (
-              <Tab key={t.key} value={t.key} label={t.label} icon={t.icon} iconPosition="start" />
-            ))}
-          </Tabs>
+        <Box sx={{ ...PAGE_SX, pb: 0, mb: { xs: -1.25, sm: -2.5 } }}>
+          <TabStrip items={visibleTabs.map((t) => ({ key: t.key, label: t.label, icon: t.icon, on: t.key === activeKey, onClick: () => handleChange(null, t.key) }))} />
         </Box>
       )}
 

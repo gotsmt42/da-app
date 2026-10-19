@@ -37,6 +37,7 @@ import SelectField from "@/shared/ui/SelectField";
 import {
   PageHeader, Kpi, KpiRow, FilterBar, Panel, EmptyState, DotLabel, INK, INK_2, MUTED, FAINT, LINE, SURFACE, DANGER,
   CARD_SHADOW, TABLE_HEAD_SX, TABLE_ROW_SX, PRIMARY_BTN_SX,
+  PAGE_SX,
 } from "@/shared/ui/PageKit";
 
 /** สีจุดของ Rank — ไล่ระดับเข้มตามลำดับชั้น (ใช้เป็นจุดเล็กๆ เท่านั้น) */
@@ -568,7 +569,7 @@ const Employee = () => {
 
   return (
     <>
-      <Box sx={{ p: { xs: 1.25, sm: 2.5 }, maxWidth: 1400, mx: "auto" }}>
+      <Box sx={PAGE_SX}>
         <PageHeader
           icon={<BadgeIcon />}
           title="ทะเบียนพนักงาน"

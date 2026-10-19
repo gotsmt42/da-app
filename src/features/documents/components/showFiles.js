@@ -46,7 +46,7 @@ import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
 import CalendarTodayOutlinedIcon from "@mui/icons-material/CalendarTodayOutlined";
 import InventoryOutlinedIcon from "@mui/icons-material/InventoryOutlined";
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
-import { PageHeader, PRIMARY_BTN_SX } from "@/shared/ui/PageKit";
+import { PageHeader, PRIMARY_BTN_SX, PAGE_SX } from "@/shared/ui/PageKit";
 import { FilterArea } from "@/shared/ui/MobileFilterSheet";
 import { formatThai } from "@/shared/utils/thaiDate";
 
@@ -364,7 +364,7 @@ const ShowFiles = () => {
   const allOnPageSelected = pagedData.length > 0 && pagedData.every((f) => isSelected(f._id));
 
   return (
-    <Box sx={{ fontFamily: FONT_UI, color: COLOR.ink, maxWidth: 1500, mx: "auto", p: { xs: 1.25, sm: 2 } }}>
+    <Box sx={{ ...PAGE_SX, fontFamily: FONT_UI, color: COLOR.ink }}>
       {/* ── หัวหน้า + สลับ "เอกสารประจำงาน / ไฟล์ทั่วไป" แบบปุ่มคู่ (ชุดเดียวกับหน้าอื่นใน PageKit) ── */}
       <PageHeader
         icon={<FolderOpen />}
