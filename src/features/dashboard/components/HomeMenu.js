@@ -6,7 +6,7 @@
  *      กระจายเป็นปุ่ม gradient ใหญ่ 2 ใบ + แบนเนอร์ส้มเต็มแถว + "ทางลัด" ท้ายหน้า คนละหน้าตากันหมด
  *   2) "ยังเรียงไม่เป็นหมวดหมู่ ไม่สวยงาม ดูและใช้งานยาก" — รอบแรกทำเป็นกริดไอคอนก้อนเดียว 12 ช่อง
  *      แยกหมวดด้วยสีอย่างเดียว ตาต้องไล่อ่านทีละช่องถึงจะรู้ว่าอะไรอยู่ตรงไหน
- * ✅ ตอนนี้: แต่ละหมวดเป็นการ์ดของตัวเอง มีหัวหมวดชัดเจน (งาน · เบิกค่าใช้จ่าย · เอกสารและการเงิน · ข้อมูลหลัก)
+ * ✅ ตอนนี้: แต่ละหมวดเป็นการ์ดของตัวเอง มีหัวหมวดชัดเจน (งาน · เบิกค่าใช้จ่าย · เอกสาร · ข้อมูลหลัก)
  *   • จอกว้าง: การ์ดหมวดวาง 2 คอลัมน์ ข้างในเป็นรายการแนวนอน [ไอคอน] ชื่อ + คำอธิบาย ›  อ่านไล่ลงได้ทันที
  *   • มือถือ:  การ์ดหมวดเรียงลงมา ข้างในเป็นไอคอนแบบหน้าโฮมแอป (หมวดที่มี ≤2 เมนูวางคู่กันครึ่งจอ)
  *
@@ -135,7 +135,7 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
   // 🚧 (11 ต.ค. 2569 ผู้ใช้: "ตัดเมนู OT ออกไปก่อน เดี๋ยวมาทำอีกทีหลัง") — หน้า /ot ยังอยู่ แค่ซ่อนทางเข้า
   const people = [];
 
-  // ── เอกสารและการเงิน ─────────────────────────────────────────────────────
+  // ── เอกสาร · ใบเสนอราคา ─────────────────────────────────────────────────────
   const docs = [];
   if (can(userData, "viewDocuments")) docs.push(dest("documents"));
   if (canViewFinance) {
@@ -165,9 +165,10 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
     { key: "work", title: "รับงาน · วางแผน", icon: FaCalendarAlt, tone: TONE.work, items: work },
     { key: "do", title: "งาน", icon: FaTools, tone: TONE.work, items: doWork },
     { key: "expense", title: "เบิกค่าใช้จ่าย", icon: FaWallet, tone: TONE.expense, items: expense },
-    { key: "purchase", title: "จัดซื้อ", icon: FaShoppingCart, tone: TONE.purchase, items: purchase },
+    // 🔁 (19 ต.ค. 2569 ผู้ใช้: "ไม่ต้องมีคำว่าการเงิน ไม่ได้เน้น และสลับจุดแสดงกับจัดซื้อ")
+    { key: "docs", title: "เอกสาร · ใบเสนอราคา", icon: FaFolderOpen, tone: TONE.docs, items: docs },
     { key: "people", title: "บุคคล", icon: FaUserClock, tone: TONE.people, items: people },
-    { key: "docs", title: "เอกสารและการเงิน", icon: FaFolderOpen, tone: TONE.docs, items: docs },
+    { key: "purchase", title: "จัดซื้อ", icon: FaShoppingCart, tone: TONE.purchase, items: purchase },
     { key: "master", title: "ข้อมูลหลัก", icon: FaDatabase, tone: TONE.master, items: master },
     { key: "website", title: "เว็บไซต์บริษัท", icon: FaGlobeAsia, tone: TONE.website, items: website },
   ].filter((cat) => cat.items.length);

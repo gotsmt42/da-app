@@ -30,10 +30,10 @@ import { PAGE_SX, PageHeader, ICON_BTN_SX, INK, INK_2, MUTED, LINE, SURFACE, ACC
 import usePaged, { PageBar } from "@/shared/ui/usePaged";
 import { JobFlowFlags } from "@/shared/ui/JobFlow";
 import DateCell from "@/shared/ui/DateCell";
+import JobKindTag from "@/shared/ui/JobKindTag";
 import RefDoc from "@/shared/ui/RefDoc";
 import { PersonChip } from "@/shared/ui/PersonChip";
 import { resolveQuotationGroup } from "@/shared/utils/quotationTracking";
-import { formatRoundLabel } from "@/shared/utils/contractRounds";
 import {
   Box, Stack, Typography, TextField, InputAdornment, IconButton,
   Chip, Skeleton, Dialog, DialogTitle, DialogContent, Divider,
@@ -260,11 +260,9 @@ function MyJobsTable({ groups, allGroups, overdueOf, renderCard, highlightJob, u
                   </DateCell>
                 </Box>
                 <Box component="td" sx={{ ...td, minWidth: 190, maxWidth: 240 }}>
-                  <Typography sx={{ fontSize: "0.86rem", fontWeight: 800, color: INK, lineHeight: 1.35 }}>{a.title || "งาน"}{a.system ? ` · ${a.system}` : ""}</Typography>
-                  <Stack direction="row" gap={0.75} alignItems="center" sx={{ mt: 0.25, flexWrap: "wrap" }}>
-                    {a.jobNo && <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#94a3b8" }}>{a.jobNo}</Typography>}
-                    {a.time && <Box component="span" sx={{ px: 0.75, height: 20, display: "inline-flex", alignItems: "center", borderRadius: 99, bgcolor: SURFACE, border: `1px solid ${LINE}`, fontSize: "0.68rem", fontWeight: 800, color: INK_2 }}>ครั้งที่ {formatRoundLabel(a.time, a.visitCount, a)}</Box>}
-                  </Stack>
+                  <JobKindTag event={a} />
+                  <Typography sx={{ mt: 0.5, fontSize: "0.86rem", fontWeight: 800, color: INK, lineHeight: 1.35 }}>{a.title || "งาน"}{a.system ? ` · ${a.system}` : ""}</Typography>
+                  {a.jobNo && <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#94a3b8" }}>{a.jobNo}</Typography>}
                 </Box>
                 <Box component="td" sx={{ ...td, minWidth: 170, maxWidth: 240 }}>
                   <Typography sx={{ fontSize: "0.84rem", fontWeight: 700, color: INK_2, overflowWrap: "anywhere" }}>{a.site || "—"}</Typography>

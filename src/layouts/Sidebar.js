@@ -435,28 +435,28 @@ const side = (key, extra) => {
               {expenseMenu.map((item, idx) => renderLink(item, `exp-${idx}`))}
             </>
           )}
-          {/* ✅ (10 ต.ค. 2569) จัดซื้อใช้สิทธิ์ requestPurchase ของตัวเอง — ฝ่ายขายขอซื้อได้โดยไม่มีเมนูเบิก/OT */}
-          {(can(userData, "requestPurchase") || can(userData, "viewAllExpenses")) && (
+          {/* หมวด "เอกสาร · ใบเสนอราคา" — ชื่อเดียวกับหน้าแรก (19 ต.ค. 2569 ตัดคำว่าการเงิน · ขึ้นก่อนจัดซื้อ)
+              ✅ เดิมแยก "เอกสาร" / "การเงิน" เป็นสองหัวข้อ หัวละเมนูเดียว — รวมเป็นหมวดเดียวให้ตรงกับ HomeMenu
+              ⚠️ เอกสาร = สิทธิ์ viewDocuments · ใบเสนอราคา = viewFinance (ฝั่ง server คืนเฉพาะงานที่มีชื่ออยู่) */}
+          {(can(userData, "viewDocuments") || canViewFinance) && (
             <>
-              <div className="admin-divider-label">จัดซื้อ</div>
-              {purchaseMenu.map((item, idx) => renderLink(item, `pur-${idx}`))}
+              <div className="admin-divider-label">เอกสาร · ใบเสนอราคา</div>
+              {can(userData, "viewDocuments") && documentsMenu.map((item, idx) => renderLink(item, `doc-${idx}`))}
+              {canViewFinance && financeMenu.map((item, idx) => renderLink(item, `fin-${idx}`))}
             </>
           )}
+
           {canExpense && peopleMenu.length > 0 && (
             <>
               <div className="admin-divider-label">บุคคล</div>
               {peopleMenu.map((item, idx) => renderLink(item, `ppl-${idx}`))}
             </>
           )}
-
-          {/* หมวด "เอกสารและการเงิน" — ชื่อเดียวกับหน้าแรก
-              ✅ เดิมแยก "เอกสาร" / "การเงิน" เป็นสองหัวข้อ หัวละเมนูเดียว — รวมเป็นหมวดเดียวให้ตรงกับ HomeMenu
-              ⚠️ เอกสาร = สิทธิ์ viewDocuments · ใบเสนอราคา = viewFinance (ฝั่ง server คืนเฉพาะงานที่มีชื่ออยู่) */}
-          {(can(userData, "viewDocuments") || canViewFinance) && (
+          {/* ✅ (10 ต.ค. 2569) จัดซื้อใช้สิทธิ์ requestPurchase ของตัวเอง — ฝ่ายขายขอซื้อได้โดยไม่มีเมนูเบิก/OT */}
+          {(can(userData, "requestPurchase") || can(userData, "viewAllExpenses")) && (
             <>
-              <div className="admin-divider-label">เอกสารและการเงิน</div>
-              {can(userData, "viewDocuments") && documentsMenu.map((item, idx) => renderLink(item, `doc-${idx}`))}
-              {canViewFinance && financeMenu.map((item, idx) => renderLink(item, `fin-${idx}`))}
+              <div className="admin-divider-label">จัดซื้อ</div>
+              {purchaseMenu.map((item, idx) => renderLink(item, `pur-${idx}`))}
             </>
           )}
 

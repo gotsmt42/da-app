@@ -80,6 +80,7 @@ import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LI
 import { resolveQuotationGroup } from "@/shared/utils/quotationTracking";
 import ImagePreview from "@/shared/ui/ImagePreview";
 import DateCell from "@/shared/ui/DateCell";
+import JobKindTag from "@/shared/ui/JobKindTag";
 import RefDoc from "@/shared/ui/RefDoc";
 import { printFile, shareFile, isMobileDevice } from "@/shared/utils/fileActions";
 import DeliveryNoteDialog from "@/features/documents/components/DeliveryNoteDialog";
@@ -2298,17 +2299,12 @@ const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob, employee, canAss
               </TableCell>
               {/* งาน: ประเภท · ระบบ + เลขที่งาน + ครั้งที่ */}
               <TableCell sx={{ minWidth: 190, maxWidth: 240 }}>
-                <Typography sx={{ fontSize: "0.86rem", fontWeight: 800, color: INK, lineHeight: 1.35 }}>
+                {/* ประเภทงาน (สัญญา/โปรเจค/ทั่วไป + ครั้งที่) บรรทัดแรก → ชื่องาน → เลขที่งาน */}
+                <JobKindTag event={a} />
+                <Typography sx={{ mt: 0.5, fontSize: "0.86rem", fontWeight: 800, color: INK, lineHeight: 1.35 }}>
                   {a.title || "งาน"}{a.system ? ` · ${a.system}` : ""}
                 </Typography>
-                <Stack direction="row" gap={0.75} alignItems="center" sx={{ mt: 0.25, flexWrap: "wrap" }}>
-                  {a.jobNo && <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#94a3b8" }}>{a.jobNo}</Typography>}
-                  {a.time && (
-                    <Box component="span" sx={{ px: 0.75, height: 20, display: "inline-flex", alignItems: "center", borderRadius: 99, bgcolor: SURFACE, border: `1px solid ${LINE}`, fontSize: "0.68rem", fontWeight: 800, color: INK_2, whiteSpace: "nowrap" }}>
-                      ครั้งที่ {formatRoundLabel(a.time, a.visitCount, a)}
-                    </Box>
-                  )}
-                </Stack>
+                {a.jobNo && <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#94a3b8" }}>{a.jobNo}</Typography>}
               </TableCell>
               {/* โครงการเป็นบรรทัดหลัก (มีค่าเสมอ) · บริษัทเป็นบรรทัดรอง */}
               <TableCell sx={{ minWidth: 170, maxWidth: 230 }}>

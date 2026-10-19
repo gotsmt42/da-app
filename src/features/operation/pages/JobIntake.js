@@ -19,6 +19,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import lazyWithRetry from "@/shared/utils/lazyWithRetry";
 import usePaged, { PageBar } from "@/shared/ui/usePaged";
 import DateCell from "@/shared/ui/DateCell";
+import JobKindTag from "@/shared/ui/JobKindTag";
 import { resolveQuotationGroup, getFollowUpInfo } from "@/shared/utils/quotationTracking";
 import { Link } from "react-router-dom";
 import moment from "moment";
@@ -343,6 +344,7 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, render
                   <Typography sx={sub}>{j.intakeNote ? "บันทึก" : j.noVisit ? "ส่งของ" : "เข้าหน้างาน"}</Typography>
                 </Box>
                 <Box component="td" sx={{ ...td, minWidth: 160, maxWidth: 220 }}>
+                  {!j.intakeNote && <JobKindTag event={j} sx={{ mb: 0.5 }} />}
                   <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: INK, overflowWrap: "anywhere" }}>
                     {j.intakeNote ? "บันทึกงาน" : [j.title, j.system].filter(Boolean).join(" · ") || "งาน"}
                   </Typography>
