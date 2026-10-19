@@ -606,12 +606,157 @@ const FollowUpSection = ({ a, onSubmit, onPreview, canFollow, formRef }) => {
 };
 
 // ─── กล่องรายละเอียด ─────────────────────────────────────────────────────────
-/** แก้/เติมรายละเอียดผลลัพธ์ภายหลัง — วันที่ลูกค้าตอบ · เลข PO (ได้งาน) · หมายเหตุ/เหตุผล */
-const ResultDetails = ({ a, k, onSave }) => {
-  const [open, setOpen] = useState(false);
+/** เอกสารผลลัพธ์ (PO / หนังสือตอบรับ / อีเมลแจ้งไม่รับ) — แถวชิปไฟล์ + ปุ่มแนบ (กะทัดรัด) */
+const ResultDocs = ({ a, k, onUpload, onDelete, onPreview, uploading, progress }) => {
+  const ref = useRef();
+  const files = a.quotationResultFiles || [];
+  return (
+    <Box sx={{ mt: 1.25 }}>
+      <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: TEXT_SUB, mb: 0.5 }}>
+        เอกสารผลลัพธ์ <Box component="span" sx={{ fontWeight: 600, color: "#94a3b8" }}>· {k === "approved" ? "PO / หนังสือตอบรับ" : "อีเมล / หนังสือแจ้งไม่รับ"} (ถ้ามี)</Box>
+      </Typography>
+      <Stack direction="row" gap={0.75} alignItems="center" sx={{ flexWrap: "wrap" }}>
+        {files.map((f) => (
+          <Stack key={f._id} direction="row" alignItems="center" sx={{ height: 30, pl: 1, pr: 0.25, borderRadius: 99, border: `1px solid ${BORDER}`, bgcolor: "#fff", maxWidth: 260 }}>
+            <Box component="button" type="button" onClick={() => onPreview(f.fileUrl, f.fileName)} title={f.fileName}
+              sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, border: 0, bgcolor: "transparent", cursor: "pointer", font: "inherit", minWidth: 0, color: "#1d4ed8", fontSize: "0.76rem", fontWeight: 800 }}>
+              <AttachFile sx={{ fontSize: 14 }} />
+              <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.fileName}</Box>
+            </Box>
+            <IconButton size="small" aria-label="ลบไฟล์" onClick={() => { if (window.confirm(`ลบไฟล์ ${f.fileName}?`)) onDelete(a._id, "quotationResult", f._id); }} sx={{ p: 0.4, color: "#94a3b8" }}>
+              <Close sx={{ fontSize: 14 }} />
+            </IconButton>
+          </Stack>
+        ))}
+        <input ref={ref} type="file" hidden multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={(e) => { const fl = e.target.files; if (fl?.length) onUpload(fl, a._id, "quotationResult"); e.target.value = ""; }} />
+        <Button size="small" startIcon={<AttachFile sx={{ fontSize: 15 }} />} onClick={() => ref.current?.click()} disabled={uploading}
+          sx={{ height: 30, px: 1.25, textTransform: "none", fontWeight: 800, borderRadius: 99, border: "1px dashed #94a3b8", color: "#334155" }}>
+          {uploading ? `กำลังอัปโหลด ${progress || 0}%` : files.length ? "แนบเพิ่ม" : "แนบเอกสาร"}
+        </Button>
+      </Stack>
+    </Box>
+  );
+};
+
+/**
+ * ✅ (19 ต.ค. 2569 ผู้ใช้: "อยากให้วิเคราะห์ข้อมูลในภาพหรือไฟล์อัตโนมัติเลยว่าราคารวมเท่าไรที่แนบ")
+ * แนบไฟล์ใบเสนอราคาแล้วข้อมูลยังไม่ครบ → ให้ AI อ่านไฟล์ล่าสุดเองอัตโนมัติ (เลขที่ · วันที่ · ยืนราคา · ยอด · ผู้ติดต่อ)
+ * ⚠️ แสดงเป็น "ข้อเสนอ" ให้ตรวจแล้วกด "ใช้ค่านี้" เท่านั้น — ไม่บันทึกเอง (ตัวเลขเงินผิดแล้วตามแก้ยาก)
+ * ⚠️ ฟีเจอร์ปิดเองถ้าเซิร์ฟเวอร์ไม่มี ANTHROPIC_API_KEY (ไม่มีกล่องนี้ ไม่ error)
+ */
+let scanAvailability = null; // แคชทั้งแอป — ถามเซิร์ฟเวอร์ครั้งเดียว
+const QuoteScanBox = ({ a, isFinance, onApply }) => {
+  const files = a.quotationFiles || [];
+  const last = files[files.length - 1];
+  const scannable = last && (/^image\//.test(last.fileType || "") || /\.(png|jpe?g|webp|gif|pdf)$/i.test(last.fileName || "") || /pdf/i.test(last.fileType || ""));
+  const [enabled, setEnabled] = useState(scanAvailability);
+  const [state, setState] = useState({ status: "idle", fileId: null, result: null, error: "" });
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (scanAvailability !== null) return;
+    EventService.BillingScanAvailability().then((r) => { scanAvailability = Boolean(r?.enabled); setEnabled(scanAvailability); }).catch(() => { scanAvailability = false; setEnabled(false); });
+  }, []);
+  const run = useCallback(async () => {
+    if (!last) return;
+    setState({ status: "loading", fileId: last._id, result: null, error: "" });
+    try {
+      const r = await EventService.ScanQuotation(a._id, last._id);
+      setState({ status: "done", fileId: last._id, result: r?.result || null, error: "" });
+    } catch (err) {
+      setState({ status: "error", fileId: last._id, result: null, error: err?.response?.data?.message || "อ่านไฟล์ไม่สำเร็จ" });
+    }
+  }, [a._id, last]);
+  // อ่านเองอัตโนมัติ: มีไฟล์ใหม่ + ข้อมูลยังไม่ครบ (เลขที่/มูลค่า) + ยังไม่เคยอ่านไฟล์นี้
+  useEffect(() => {
+    if (!enabled || !scannable || !missingInfo(a)) return;
+    if (state.fileId === last._id) return;
+    run();
+  }, [enabled, scannable, a, last, state.fileId, run]);
+
+  if (!enabled || !scannable) return null;
+  const r = state.result;
+  const dismissed = state.status === "dismissed";
+  if (dismissed) return null;
+  if (state.status === "idle") {
+    return (
+      <Button size="small" onClick={run} sx={{ mt: 0.75, textTransform: "none", fontWeight: 800, color: "#7c3aed" }}>
+        ✦ อ่านข้อมูลจากไฟล์อัตโนมัติ (AI)
+      </Button>
+    );
+  }
+  const box = { mt: 1.25, p: 1.5, borderRadius: 2.5, border: "1px solid #ddd6fe", bgcolor: "#faf5ff" };
+  if (state.status === "loading") {
+    return (
+      <Stack direction="row" alignItems="center" gap={1} sx={box}>
+        <Skeleton variant="circular" width={18} height={18} />
+        <Typography sx={{ fontSize: "0.84rem", fontWeight: 700, color: "#6d28d9" }}>กำลังอ่านข้อมูลจากไฟล์ใบเสนอราคา… (เลขที่ · วันที่ · ยอดรวม · ผู้ติดต่อ)</Typography>
+      </Stack>
+    );
+  }
+  if (state.status === "error" || !r?.found) {
+    return (
+      <Stack direction="row" alignItems="center" gap={1} sx={{ ...box, bgcolor: "#fff7ed", borderColor: "#fed7aa" }}>
+        <Typography sx={{ flex: 1, fontSize: "0.82rem", color: "#9a3412" }}>
+          {state.status === "error" ? state.error : `อ่านใบเสนอราคาจากไฟล์นี้ไม่ได้${r?.note ? ` — ${r.note}` : ""}`} · กรอกเองได้ที่ปุ่ม “กรอกให้ครบ”
+        </Typography>
+        <Button size="small" onClick={run} sx={{ textTransform: "none", fontWeight: 800 }}>ลองใหม่</Button>
+      </Stack>
+    );
+  }
+  const vat = Number(r.vatAmount) || 0;
+  const total = Number(r.grandTotal) || (Number(r.amountBeforeVat) + vat) || 0;
+  const rows = [
+    ["เลขที่", r.quotationNo], ["วันที่", r.quotationDate ? thaiDate(r.quotationDate) : ""], ["ยืนราคาถึง", r.validUntil ? thaiDate(r.validUntil) : ""],
+    ["ยอดก่อน VAT", r.amountBeforeVat ? baht(r.amountBeforeVat) : ""], ["VAT", vat ? baht(vat) : ""],
+    ["ผู้ติดต่อ", [r.contactName, r.contactPhone, r.contactEmail].filter(Boolean).join(" · ")],
+  ].filter(([, v]) => v);
+  const apply = async () => {
+    setBusy(true);
+    const body = {};
+    if (r.quotationNo) body.quotationNo = r.quotationNo;
+    if (r.quotationDate) body.quotationDate = r.quotationDate;
+    if (r.validUntil) body.quotationValidUntil = r.validUntil;
+    if (isFinance && total) { body.quotationAmount = total; body.quotationVatIncluded = vat > 0 || Number(r.grandTotal) > Number(r.amountBeforeVat); }
+    if (r.contactName || r.contactPhone || r.contactEmail) {
+      const c = a.quotationContact || {};
+      body.quotationContact = { name: r.contactName || c.name || "", phone: r.contactPhone || c.phone || "", email: r.contactEmail || c.email || "" };
+    }
+    const ok = await onApply(body);
+    setBusy(false);
+    if (ok) setState((s) => ({ ...s, status: "dismissed" }));
+  };
+  return (
+    <Box sx={box}>
+      <Stack direction="row" alignItems="baseline" gap={1} sx={{ flexWrap: "wrap" }}>
+        <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: "#6d28d9" }}>✦ อ่านจากไฟล์อัตโนมัติ (AI) — ตรวจก่อนใช้</Typography>
+        {r.confidence !== "high" && <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: "#b45309" }}>ความมั่นใจ{r.confidence === "low" ? "ต่ำ" : "ปานกลาง"}</Typography>}
+      </Stack>
+      <Typography sx={{ mt: 0.5, fontSize: "0.72rem", color: TEXT_SUB }}>ราคารวม (รวม VAT)</Typography>
+      <Typography sx={{ fontSize: "1.35rem", fontWeight: 900, color: TEXT_MAIN, lineHeight: 1.2, fontVariantNumeric: "tabular-nums" }}>{total ? baht(total) : "อ่านยอดไม่ได้"}</Typography>
+      <Box sx={{ display: "grid", gap: 0.5, mt: 1, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
+        {rows.map(([l, v]) => (
+          <Typography key={l} sx={{ fontSize: "0.8rem", color: "#334155" }}><Box component="span" sx={{ color: TEXT_SUB, fontWeight: 700 }}>{l}:</Box> {v}</Typography>
+        ))}
+      </Box>
+      {r.note && <Typography sx={{ mt: 0.75, fontSize: "0.74rem", color: "#9a3412" }}>หมายเหตุ: {r.note}</Typography>}
+      {!isFinance && total > 0 && <Typography sx={{ mt: 0.5, fontSize: "0.72rem", color: TEXT_SUB }}>มูลค่าบันทึกได้เฉพาะฝ่ายบริหาร/การเงิน — จะบันทึกเฉพาะเลขที่/วันที่/ผู้ติดต่อ</Typography>}
+      <Stack direction="row" gap={1} justifyContent="flex-end" sx={{ mt: 1.25 }}>
+        <Button size="small" onClick={() => setState((s) => ({ ...s, status: "dismissed" }))} disabled={busy} sx={{ textTransform: "none", color: TEXT_SUB }}>ไม่ใช้</Button>
+        <Button size="small" variant="contained" onClick={apply} disabled={busy}
+          sx={{ textTransform: "none", fontWeight: 800, boxShadow: "none", borderRadius: 2, bgcolor: "#7c3aed", "&:hover": { bgcolor: "#6d28d9", boxShadow: "none" } }}>
+          {busy ? "กำลังบันทึก..." : "ใช้ค่านี้"}
+        </Button>
+      </Stack>
+    </Box>
+  );
+};
+
+/** แก้/เติมรายละเอียดผลลัพธ์ภายหลัง — วันที่ลูกค้าตอบ · เลข PO (ได้งาน) · หมายเหตุ/เหตุผล (เปิดจากปุ่มมุมขวาบน) */
+const ResultDetails = ({ a, k, onSave, open, onClose }) => {
   const [busy, setBusy] = useState(false);
   const [f, setF] = useState({});
-  const start = () => { setF({ date: ymd(a.quotationDecisionAt), po: a.quotationPoNo || "", note: a.quotationDecisionNote || "" }); setOpen(true); };
+  useEffect(() => { if (open) setF({ date: ymd(a.quotationDecisionAt), po: a.quotationPoNo || "", note: a.quotationDecisionNote || "" }); }, [open, a.quotationDecisionAt, a.quotationPoNo, a.quotationDecisionNote]);
+  const setOpen = (v) => { if (!v) onClose(); };
   const invalid = k === "rejected" && !String(f.note || "").trim();
   const save = async () => {
     setBusy(true);
@@ -619,16 +764,7 @@ const ResultDetails = ({ a, k, onSave }) => {
     setBusy(false);
     if (ok) setOpen(false);
   };
-  const missing = k === "approved" && !a.quotationPoNo;
-  if (!open) {
-    return (
-      <Button size="small" startIcon={<Edit sx={{ fontSize: 16 }} />} onClick={start}
-        sx={{ mt: 1, textTransform: "none", fontWeight: 800, borderRadius: 2, px: 1.25,
-          ...(missing ? { bgcolor: "#fffbeb", color: "#b45309", border: "1px solid #fde68a" } : { color: "#2563eb" }) }}>
-        {missing ? "เติมเลข PO / รายละเอียดผล" : "แก้ไขรายละเอียดผล"}
-      </Button>
-    );
-  }
+  if (!open) return null;
   return (
     <Box sx={{ mt: 1.25, p: 1.25, borderRadius: 2, bgcolor: "#f8fafc", border: `1px solid ${BORDER}` }}>
       <Box sx={{ display: "grid", gap: 1.25, gridTemplateColumns: { xs: "1fr", sm: k === "approved" ? "1fr 1fr" : "1fr" } }}>
@@ -682,6 +818,7 @@ const DetailDialog = ({
   const [busy, setBusy] = useState(false);
   const [showLog, setShowLog] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [editResult, setEditResult] = useState(false);
   const followRef = useRef(null);
   if (!job) return null;
   const a = job.anchor;
@@ -840,23 +977,23 @@ const DetailDialog = ({
                     <MiniStat label="บันทึกโดย" value={a.quotationDecisionBy} />
                   </Box>
                   {a.quotationDecisionNote && <Typography sx={{ fontSize: "0.84rem", color: "#334155", mt: 1 }}>{k === "rejected" ? "เหตุผล: " : "หมายเหตุ: "}{a.quotationDecisionNote}</Typography>}
-                  {/* ✅ (19 ต.ค. 2569 ผู้ใช้: "อยากให้แนบหรือกรอกเอกสารภายหลังกดได้งาน หรือไม่ได้งานด้วย")
-                      เติม/แก้รายละเอียดผลได้ภายหลัง (ไม่เปลี่ยนผล) + แนบเอกสารผลลัพธ์ (PO · หนังสือตอบรับ · อีเมลปฏิเสธ) */}
-                  <ResultDetails a={a} k={k} onSave={(body) => onQuotation(job, body)} />
-                  <Box sx={{ mt: 1.25, pt: 1.25, borderTop: `1px dashed ${BORDER}` }}>
-                    <FileUploadSection
-                      eventId={a._id} type="quotationResult"
-                      label={k === "approved" ? "เอกสารผลลัพธ์ (PO / หนังสือตอบรับ)" : "เอกสารผลลัพธ์ (อีเมล / หนังสือแจ้งไม่รับ)"}
-                      files={a.quotationResultFiles}
-                      onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
-                      uploading={upload.busy && upload.eventId === a._id} progress={upload.progress} currentUser={currentUser}
-                    />
-                  </Box>
+                  {/* 🔁 (19 ต.ค. 2569 ผู้ใช้: "ตรงนี้ยังดูรกๆ") เอกสารผลลัพธ์เป็นแถวเดียว: ชิปไฟล์ (กดดู) + ปุ่มแนบ · แก้รายละเอียดอยู่มุมขวาบน */}
+                  <ResultDocs a={a} k={k} onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
+                    uploading={upload.busy && upload.eventId === a._id && upload.type === "quotationResult"} progress={upload.progress} />
+                  <ResultDetails a={a} k={k} onSave={(body) => onQuotation(job, body)} open={editResult} onClose={() => setEditResult(false)} />
                 </Box>
-                {isFinance && (
-                  <Button size="small" startIcon={<Undo sx={{ fontSize: 16 }} />} onClick={() => setDecision("reset")} disabled={busy}
-                    sx={{ textTransform: "none", fontWeight: 700, color: TEXT_SUB, flexShrink: 0 }}>แก้ผล</Button>
-                )}
+                <Stack direction="row" spacing={0.25} sx={{ flexShrink: 0 }}>
+                  {!editResult && (
+                    <Button size="small" startIcon={<Edit sx={{ fontSize: 16 }} />} onClick={() => setEditResult(true)}
+                      sx={{ textTransform: "none", fontWeight: 800, color: k === "approved" && !a.quotationPoNo ? "#b45309" : "#2563eb" }}>
+                      {k === "approved" && !a.quotationPoNo ? "เติมเลข PO" : "แก้รายละเอียด"}
+                    </Button>
+                  )}
+                  {isFinance && (
+                    <Button size="small" startIcon={<Undo sx={{ fontSize: 16 }} />} onClick={() => setDecision("reset")} disabled={busy}
+                      sx={{ textTransform: "none", fontWeight: 700, color: TEXT_SUB }}>แก้ผล</Button>
+                  )}
+                </Stack>
               </Stack>
             </Box>
           )}
@@ -867,8 +1004,9 @@ const DetailDialog = ({
               eventId={a._id} type="quotation" label="ไฟล์ใบเสนอราคา"
               files={a.quotationFiles} applicable={a.quotationApplicable}
               onUpload={onFileUpload} onDelete={onDeleteFile} onPreview={onPreview}
-              uploading={upload.busy && upload.eventId === a._id} progress={upload.progress} currentUser={currentUser}
+              uploading={upload.busy && upload.eventId === a._id && upload.type === "quotation"} progress={upload.progress} currentUser={currentUser}
             />
+            <QuoteScanBox a={a} isFinance={isFinance} onApply={(body) => onQuotation(job, body)} />
             {open && (
               <Button size="small" startIcon={<Autorenew sx={{ fontSize: 16 }} />} onClick={() => setDecision("resend")}
                 sx={{ mt: 0.5, textTransform: "none", fontWeight: 700, color: TEXT_SUB }}>ส่งฉบับแก้ไขให้ลูกค้าแล้ว (เริ่มนับใหม่)</Button>
@@ -971,7 +1109,7 @@ function useQuotationActions(fetchJobs, toast, userData) {
   const onFileUpload = useCallback(async (fileOrFiles, eventId, type) => {
     const files = Array.from(fileOrFiles?.length !== undefined ? fileOrFiles : [fileOrFiles]);
     if (!files.length) return;
-    setUpload({ busy: true, eventId, progress: 0 });
+    setUpload({ busy: true, eventId, type, progress: 0 }); // type: แยกหลอดโหลดของแต่ละช่อง (เดิมขึ้นทุกช่องของงานเดียวกัน)
     let ok = 0;
     try {
       for (const file of files) {
@@ -986,7 +1124,7 @@ function useQuotationActions(fetchJobs, toast, userData) {
       toast(ok ? `อัปโหลดสำเร็จ ${ok}/${files.length} ไฟล์` : errMsg(err, "อัปโหลดไม่สำเร็จ"), "error");
     } finally {
       await fetchJobs(true);
-      setUpload({ busy: false, eventId: null, progress: 0 });
+      setUpload({ busy: false, eventId: null, type: null, progress: 0 });
     }
   }, [fetchJobs, toast]);
   const onDeleteFile = useCallback(async (eventId, type, fileId) => {

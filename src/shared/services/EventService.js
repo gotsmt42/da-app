@@ -264,6 +264,12 @@ const EventService = {
     return res.data;
   },
 
+  /** ✅ (19 ต.ค. 2569) ให้ AI อ่านไฟล์ใบเสนอราคา (รูป/PDF) — คืนค่ามาแสดงให้กด "ใช้ค่านี้" เท่านั้น ไม่ได้บันทึก */
+  async ScanQuotation(id, fileId) {
+    const res = await API.post(`/events/${id}/quotation/scan`, { fileId });
+    return res.data;
+  },
+
   async BillingScanAvailability() {
     const res = await API.get("/events/billing/scan-availability");
     return res.data;
