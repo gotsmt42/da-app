@@ -873,7 +873,9 @@ function injectStyles() {
     .ee-head--compact #ee-status-title h3 { -webkit-line-clamp: 1; font-size: 14.5px; line-height: 1.6; }
     .swal-edit-event #ee-head-meta {
       flex: 1 1 100%; min-width: 0; display: grid; gap: 8px;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      /* 🐛 (19 ต.ค. 2569 ผู้ใช้: "ทำไมเพี้ยนๆ ไม่เหมือนกัน") auto-fit + แถววันที่เต็มแถว ทำให้มีคอลัมน์ว่างค้าง ช่องคนแคบลง
+         (งานที่มีแถววันที่ ช่องกว้าง 150 · งานหลายช่วงที่ซ่อนวันที่ ช่องยืดเต็ม) → ตายตัว 3 ช่องเท่ากันทุกงาน */
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
     .ee-hm-item {
       min-width: 0; display: flex; flex-direction: column; gap: 2px;
@@ -886,7 +888,7 @@ function injectStyles() {
     .ee-hm-value--empty { color: #94a3b8; font-weight: 600; }
     .ee-hm-value--edit { display: flex; align-items: center; gap: 8px; min-width: 0; }
     #ee-respSelect, #ee-teamSelect {
-      appearance: none; -webkit-appearance: none; min-width: 0; max-width: 100%; flex: 0 1 auto;
+      appearance: none; -webkit-appearance: none; min-width: 0; max-width: 100%; flex: 1 1 auto; width: 100%; /* ช่องเลือกกว้างเต็มกล่องเท่ากันทุกงาน */
       height: 30px; padding: 0 28px 0 10px; border-radius: 8px; border: 1px solid #cbd5e1; cursor: pointer;
       font: inherit; font-size: 13px; font-weight: 700; color: #0f172a; text-overflow: ellipsis;
       background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 8px center / 14px;
