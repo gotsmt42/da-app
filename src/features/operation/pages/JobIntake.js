@@ -276,7 +276,7 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, render
   const th = { textAlign: "left", fontSize: "0.74rem", fontWeight: 800, color: MUTED, px: 1.25, py: 1, borderBottom: `1px solid ${LINE}`, whiteSpace: "nowrap", bgcolor: SURFACE };
   const td = { fontSize: "0.82rem", color: "#334155", px: 1.25, py: 1.1, borderBottom: `1px solid ${LINE}`, verticalAlign: "top" };
   const sub = { fontSize: "0.74rem", color: MUTED, lineHeight: 1.45, overflowWrap: "anywhere" };
-  const COLS = ["", "เลขที่งาน", "งาน / โครงการ", "รายละเอียดงาน", "ช่องทางรับงาน", "กำหนดการ", "ผู้ติดต่อ", "สถานะงาน", "ใบเสนอราคา", "ผู้รับผิดชอบ", ""];
+  const COLS = ["", "เลขที่งาน", "งาน / โครงการ", "รายละเอียดงาน", "รับงานจาก", "กำหนดการ", "ผู้ติดต่อ", "สถานะงาน", "ใบเสนอราคา", "ผู้รับผิดชอบ", ""];
   return (
     <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflowX: "auto" }}>
       <Box component="table" sx={{ width: "100%", minWidth: 1160, borderCollapse: "collapse" }}>
@@ -330,7 +330,9 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, render
                   {j.infoPending && j.infoPendingNote && <Typography sx={{ ...sub, color: AMBER, fontWeight: 700 }}>ขาด: {j.infoPendingNote}</Typography>}
                 </Box>
                 <Box component="td" sx={td}>
-                  <Typography sx={{ fontSize: "0.78rem", whiteSpace: "nowrap" }}>{j.intakeSource ? (SOURCE_LABEL[j.intakeSource] || j.intakeSource) : "—"}</Typography>
+                  {j.intakeSource
+                    ? <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: "#334155", whiteSpace: "nowrap" }}>{SOURCE_LABEL[j.intakeSource] || j.intakeSource}</Typography>
+                    : <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>}
                   {doc && !QUOTE_DOC.has(j.intakeDocType) && <Typography sx={sub}>{doc}</Typography>}
                 </Box>
                 <Box component="td" sx={{ ...td, whiteSpace: "nowrap" }}>
