@@ -104,5 +104,5 @@ export const QUOTE_STATUS = {
   follow_up: { label: "ถึงเวลาติดตาม", short: "ถึงเวลาติดตาม", color: "#dc2626" },
   revising: { label: "ลูกค้าขอแก้ไข", short: "ขอแก้ไข", color: "#7c3aed" },
   approved: { label: "ได้งาน", short: "ได้งาน", color: "#16a34a" },
-  rejected: { label: "ไม่ได้งาน", short: "ไม่ได้งาน", color: "#64748b" },
+  rejected: { label: "ไม่ได้งาน", short: "ไม่ได้งาน", color: "#dc2626" }, // ผู้ใช้: ไม่ได้งาน = แดง · ได้งาน = เขียว
 };
