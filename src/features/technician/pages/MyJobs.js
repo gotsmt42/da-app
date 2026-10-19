@@ -29,7 +29,10 @@ import ImagePreview from "@/shared/ui/ImagePreview";
 import { PAGE_SX, PageHeader, ICON_BTN_SX, INK, INK_2, MUTED, LINE, SURFACE, ACCENT } from "@/shared/ui/PageKit";
 import usePaged, { PageBar } from "@/shared/ui/usePaged";
 import { JobFlowFlags } from "@/shared/ui/JobFlow";
-import { formatEventDateRange } from "@/shared/utils/formatDateRange";
+import DateCell from "@/shared/ui/DateCell";
+import RefDoc from "@/shared/ui/RefDoc";
+import { PersonChip } from "@/shared/ui/PersonChip";
+import { resolveQuotationGroup } from "@/shared/utils/quotationTracking";
 import { formatRoundLabel } from "@/shared/utils/contractRounds";
 import {
   Box, Stack, Typography, TextField, InputAdornment, IconButton,
@@ -38,7 +41,7 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
-  Search, Clear, Refresh, WorkOutline, HourglassTop, TaskAlt, Warning, ViewAgendaOutlined, TableRowsOutlined, ChevronRight,
+  Search, Clear, Refresh, WorkOutline, HourglassTop, TaskAlt, Warning, ViewAgendaOutlined, TableRowsOutlined,
   Description, RequestQuote, AssignmentTurnedIn, ReceiptLong,
   Download, Close, PictureAsPdf, FolderOpen, Image, Article, InsertDriveFile, AttachFile,
 } from "@mui/icons-material";
@@ -205,6 +208,11 @@ const nextActionOf = (a, uid, fname) => {
   return { label: "ขอปิดงาน", tone: "#16a34a", primary: true };
 };
 
+const QUOTE_RESULT = {
+  waiting_file: ["รอแนบ", "#d97706"], not_sent: ["เริ่มนับ", "#d97706"], sent: ["รอลูกค้าตอบ", "#2563eb"],
+  follow_up: ["ถึงเวลาติดตาม", "#dc2626"], revising: ["ขอแก้ไข", "#7c3aed"], approved: ["ได้งาน", "#16a34a"], rejected: ["ไม่ได้งาน", "#64748b"],
+};
+
 function MyJobsTable({ groups, allGroups, overdueOf, renderCard, highlightJob, uid, fname }) {
   // 🔁 (19 ต.ค. 2569 ผู้ใช้: "กดแล้วแสดงปุ่มหรือฟอร์มขึ้นมาเลย ไม่ต้องกดขยายลงไป") — กดแถว/ปุ่ม = เปิดกล่องงานนั้นทับหน้าเลย
   //    กล่องอ่านข้อมูลสดจากรายการทั้งหมด (allGroups) — กดรับทราบ/เข้างานแล้วสถานะในกล่องเปลี่ยนตามทันที
@@ -221,11 +229,12 @@ function MyJobsTable({ groups, allGroups, overdueOf, renderCard, highlightJob, u
   const th = { textAlign: "left", fontSize: "0.74rem", fontWeight: 800, color: MUTED, px: 1.25, py: 1.1, borderBottom: `1px solid ${LINE}`, whiteSpace: "nowrap", bgcolor: SURFACE };
   const td = { fontSize: "0.82rem", color: INK_2, px: 1.25, py: 1.25, borderBottom: `1px solid ${LINE}`, verticalAlign: "top" };
   const sub = { fontSize: "0.74rem", color: MUTED, lineHeight: 1.45 };
-  const COLS = ["", "งาน", "โครงการ / บริษัท", "วันที่เข้างาน", "ทีม", "ผู้ติดต่อ", "สถานะ", "เอกสาร", ""];
+  // ✅ (19 ต.ค. 2569 ผู้ใช้: "งานของฉัน กับ การดำเนินงาน แสดงผลคล้ายกัน ยกเว้นไม่ต้องมีช่องผู้รับผิดชอบ")
+  const COLS = ["วันที่เข้างาน", "งาน", "โครงการ / บริษัท", "ทีมเข้างาน", "ผู้ติดต่อ", "เอกสารอ้างอิง", "เอกสารที่แนบ", "สถานะ", ""];
   return (
     <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflowX: "auto", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
-      <Box component="table" sx={{ width: "100%", minWidth: 1180, borderCollapse: "collapse" }}>
-        <thead><tr>{COLS.map((h, i) => <Box component="th" key={i} sx={{ ...th, ...(i === 0 ? { width: 34, px: 0.5 } : {}) }}>{h}</Box>)}</tr></thead>
+      <Box component="table" sx={{ width: "100%", minWidth: 1360, borderCollapse: "collapse" }}>
+        <thead><tr>{COLS.map((h, i) => <Box component="th" key={i} sx={th}>{h}</Box>)}</tr></thead>
         <tbody>
           {groups.map((sessions) => {
             const a = sessions[0];
@@ -239,8 +248,16 @@ function MyJobsTable({ groups, allGroups, overdueOf, renderCard, highlightJob, u
                 id={sessions.some((x) => String(x._id) === highlightJob) ? `myjob-${highlightJob}` : undefined}
                 sx={{ cursor: "pointer", scrollMarginTop: "80px", bgcolor: isOpen ? "#f5f8ff" : "#fff", "&:hover": { bgcolor: isOpen ? "#f5f8ff" : SURFACE },
                   ...(od ? { boxShadow: `inset 3px 0 0 ${od.severe ? "#dc2626" : "#d97706"}` } : {}) }}>
-                <Box component="td" sx={{ ...td, px: 0.5, textAlign: "center" }}>
-                  <ChevronRight sx={{ fontSize: 20, color: "#94a3b8" }} />
+                <Box component="td" sx={{ ...td, width: 96 }}>
+                  <DateCell start={a.start} end={a.end} allDay={a.allDay}>
+                    {sessions.length > 1 && <Typography sx={{ ...sub, color: ACCENT, fontWeight: 700, mt: 0.4, whiteSpace: "nowrap" }}>+ อีก {sessions.length - 1} ช่วง</Typography>}
+                    {od && (
+                      <Box component="span" sx={{ mt: 0.5, px: 0.75, height: 20, display: "inline-flex", alignItems: "center", borderRadius: 99, fontSize: "0.68rem", fontWeight: 800, whiteSpace: "nowrap",
+                        bgcolor: alpha(od.severe ? "#dc2626" : "#d97706", 0.1), color: od.severe ? "#dc2626" : "#b45309" }}>
+                        {od.severe ? `ค้าง ${od.days} วัน` : `เลยกำหนด ${od.days} วัน`}
+                      </Box>
+                    )}
+                  </DateCell>
                 </Box>
                 <Box component="td" sx={{ ...td, minWidth: 190, maxWidth: 240 }}>
                   <Typography sx={{ fontSize: "0.86rem", fontWeight: 800, color: INK, lineHeight: 1.35 }}>{a.title || "งาน"}{a.system ? ` · ${a.system}` : ""}</Typography>
@@ -253,27 +270,13 @@ function MyJobsTable({ groups, allGroups, overdueOf, renderCard, highlightJob, u
                   <Typography sx={{ fontSize: "0.84rem", fontWeight: 700, color: INK_2, overflowWrap: "anywhere" }}>{a.site || "—"}</Typography>
                   {a.company && a.company !== a.site && <Typography sx={{ ...sub, overflowWrap: "anywhere" }}>{a.company}</Typography>}
                 </Box>
-                <Box component="td" sx={{ ...td, whiteSpace: "nowrap" }}>
-                  <Typography sx={{ fontSize: "0.82rem", fontWeight: 700 }}>{formatEventDateRange(a)}</Typography>
-                  {sessions.length > 1 && <Typography sx={{ ...sub, color: ACCENT, fontWeight: 700 }}>+ อีก {sessions.length - 1} ช่วงวัน</Typography>}
-                  {od && (
-                    <Box component="span" sx={{ mt: 0.5, px: 0.75, height: 20, display: "inline-flex", alignItems: "center", borderRadius: 99, fontSize: "0.68rem", fontWeight: 800,
-                      bgcolor: alpha(od.severe ? "#dc2626" : "#d97706", 0.1), color: od.severe ? "#dc2626" : "#b45309" }}>
-                      {od.severe ? `ค้าง ${od.days} วัน` : `เลยกำหนด ${od.days} วัน`}
-                    </Box>
-                  )}
-                </Box>
-                <Box component="td" sx={{ ...td, minWidth: 140, maxWidth: 190 }}>
+                <Box component="td" sx={{ ...td, minWidth: 150, maxWidth: 200 }}>
                   {team.length ? (
-                    <Stack spacing={0.3}>
-                      {team.slice(0, 3).map((n, k) => (
-                        <Typography key={n} noWrap sx={{ fontSize: "0.8rem", fontWeight: k === 0 ? 800 : 600, color: INK_2 }}>
-                          {n}{k === 0 && team.length > 1 && <Box component="span" sx={{ ml: 0.5, fontSize: "0.66rem", fontWeight: 800, color: ACCENT }}>หัวหน้า</Box>}
-                        </Typography>
-                      ))}
+                    <Stack spacing={0.5}>
+                      {team.slice(0, 3).map((n, k) => <PersonChip key={n} name={n} size={20} badge={k === 0 && team.length > 1 ? "หัวหน้า" : undefined} />)}
                       {team.length > 3 && <Typography sx={sub}>+ อีก {team.length - 3} คน</Typography>}
                     </Stack>
-                  ) : <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>}
+                  ) : <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: "#d97706" }}>ยังไม่มอบหมาย</Typography>}
                 </Box>
                 <Box component="td" sx={{ ...td, minWidth: 130, maxWidth: 170 }} onClick={(e) => a.contactTel && e.stopPropagation()}>
                   {a.contactName || a.contactTel ? (
@@ -283,26 +286,37 @@ function MyJobsTable({ groups, allGroups, overdueOf, renderCard, highlightJob, u
                     </>
                   ) : <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>}
                 </Box>
-                <Box component="td" sx={{ ...td, minWidth: 140 }}>
-                  <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.6, height: 24, px: 1, borderRadius: 99, bgcolor: alpha(tone, 0.1), color: tone, fontSize: "0.74rem", fontWeight: 800, whiteSpace: "nowrap" }}>
-                    <Box component="span" sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: tone }} />{a.status || "—"}
-                  </Box>
-                  <JobFlowFlags event={a} />
+                <Box component="td" sx={{ ...td, minWidth: 140, maxWidth: 180 }}><RefDoc event={a} /></Box>
+                <Box component="td" sx={{ ...td, minWidth: 170 }}>
+                  {(() => {
+                    const qKey = resolveQuotationGroup(a);
+                    const has = DOC_KINDS.some((d) => (a[d.key] || []).length) || qKey;
+                    if (!has) return <Typography sx={{ fontSize: "0.76rem", color: "#94a3b8" }}>ยังไม่มีเอกสาร</Typography>;
+                    return (
+                      <Stack spacing={0.4}>
+                        {DOC_KINDS.map((d) => {
+                          const n = (a[d.key] || []).length;
+                          if (!n && !(d.key === "quotationFiles" && qKey)) return null;
+                          const Ico = d.icon;
+                          const q = d.key === "quotationFiles" ? QUOTE_RESULT[qKey] : null;
+                          return (
+                            <Stack key={d.key} direction="row" spacing={0.6} alignItems="center">
+                              <Ico sx={{ fontSize: 15, color: n ? INK_2 : "#cbd5e1" }} />
+                              <Typography noWrap sx={{ fontSize: "0.76rem", fontWeight: 700 }}>{d.label}{n ? ` ${n}` : ""}</Typography>
+                              {q && <Typography noWrap sx={{ fontSize: "0.7rem", fontWeight: 800, color: q[1] }}>· {q[0]}</Typography>}
+                            </Stack>
+                          );
+                        })}
+                      </Stack>
+                    );
+                  })()}
                 </Box>
                 <Box component="td" sx={{ ...td, minWidth: 150 }}>
-                  {DOC_KINDS.some((d) => (a[d.key] || []).length) ? (
-                    <Stack spacing={0.35}>
-                      {DOC_KINDS.filter((d) => (a[d.key] || []).length).map((d) => {
-                        const Ico = d.icon;
-                        return (
-                          <Stack key={d.key} direction="row" spacing={0.6} alignItems="center">
-                            <Ico sx={{ fontSize: 15, color: INK_2 }} />
-                            <Typography noWrap sx={{ fontSize: "0.76rem", fontWeight: 700 }}>{d.label} {(a[d.key] || []).length}</Typography>
-                          </Stack>
-                        );
-                      })}
-                    </Stack>
-                  ) : <Typography sx={{ fontSize: "0.76rem", color: "#94a3b8" }}>ยังไม่มีเอกสาร</Typography>}
+                  <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.6, height: 28, px: 1.25, borderRadius: 99, whiteSpace: "nowrap",
+                    bgcolor: alpha(tone, 0.12), color: tone, border: `1px solid ${alpha(tone, 0.35)}`, fontSize: "0.8rem", fontWeight: 800 }}>
+                    <Box component="span" sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: tone }} />{a.status || "—"}
+                  </Box>
+                  <JobFlowFlags event={a} />
                 </Box>
                 <Box component="td" sx={{ ...td, whiteSpace: "nowrap", textAlign: "right" }}>
                   {(() => {

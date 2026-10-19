@@ -79,6 +79,8 @@ import TechnicianJobCard, { isDocComplete, isDocRequired } from "@/features/tech
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LINE, SUCCESS, PAGE_SX, PageHeader, ICON_BTN_SX } from "@/shared/ui/PageKit";
 import { resolveQuotationGroup } from "@/shared/utils/quotationTracking";
 import ImagePreview from "@/shared/ui/ImagePreview";
+import DateCell from "@/shared/ui/DateCell";
+import RefDoc from "@/shared/ui/RefDoc";
 import { printFile, shareFile, isMobileDevice } from "@/shared/utils/fileActions";
 import DeliveryNoteDialog from "@/features/documents/components/DeliveryNoteDialog";
 import WorkNoticeDialog from "@/features/documents/components/WorkNoticeDialog";
@@ -2257,17 +2259,18 @@ const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob, employee, canAss
   const dash = <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>;
   return (
   <TableContainer sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflowX: "auto", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
-    <Table size="small" sx={{ minWidth: 1380, width: "100%", "& td": { borderColor: LINE, verticalAlign: "top", py: 1.25, px: 1.25 }, "& th": { px: 1.25 } }}>
+    <Table size="small" sx={{ minWidth: 1500, width: "100%", "& td": { borderColor: LINE, verticalAlign: "top", py: 1.25, px: 1.25 }, "& th": { px: 1.25 } }}>
       <TableHead>
         <TableRow sx={{ "& th": th }}>
+          <TableCell>วันที่เข้างาน</TableCell>
           <TableCell>งาน</TableCell>
           <TableCell>โครงการ / บริษัท</TableCell>
-          <TableCell>วันที่เข้างาน</TableCell>
           <TableCell>ผู้รับผิดชอบ</TableCell>
           <TableCell>ทีมเข้างาน</TableCell>
           <TableCell>ผู้ติดต่อ</TableCell>
+          <TableCell>เอกสารอ้างอิง</TableCell>
+          <TableCell>เอกสารที่แนบ</TableCell>
           <TableCell>สถานะ</TableCell>
-          <TableCell>เอกสาร</TableCell>
           <TableCell sx={{ width: 32 }} />
         </TableRow>
       </TableHead>
@@ -2282,6 +2285,17 @@ const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob, employee, canAss
           return (
             <TableRow key={a._id} hover onClick={() => onOpenJob(job)}
               sx={{ cursor: "pointer", "&:last-child td": { borderBottom: 0 }, ...(isOverdue ? { boxShadow: "inset 3px 0 0 #dc2626" } : {}) }}>
+              {/* ✅ (19 ต.ค. 2569 ผู้ใช้: "เอาช่องวันที่ไปไว้หน้าสุด ชัดเจน สวยงาม") กล่องวันที่แบบปฏิทิน + ช่วงวันอื่น + ค้าง */}
+              <TableCell sx={{ width: 96 }}>
+                <DateCell start={a.start} end={a.end} allDay={a.allDay}>
+                  {job.sessions.length > 1 && <Typography sx={{ ...sub, color: ACCENT, fontWeight: 700, mt: 0.4, whiteSpace: "nowrap" }}>+ อีก {job.sessions.length - 1} ช่วง</Typography>}
+                  {isOverdue && (
+                    <Box component="span" sx={{ mt: 0.5, px: 0.75, height: 20, display: "inline-flex", alignItems: "center", borderRadius: 99, bgcolor: alpha("#dc2626", 0.08), fontSize: "0.68rem", fontWeight: 800, color: "#dc2626", whiteSpace: "nowrap" }}>
+                      ค้าง {overdueDays} วัน
+                    </Box>
+                  )}
+                </DateCell>
+              </TableCell>
               {/* งาน: ประเภท · ระบบ + เลขที่งาน + ครั้งที่ */}
               <TableCell sx={{ minWidth: 190, maxWidth: 240 }}>
                 <Typography sx={{ fontSize: "0.86rem", fontWeight: 800, color: INK, lineHeight: 1.35 }}>
@@ -2300,16 +2314,6 @@ const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob, employee, canAss
               <TableCell sx={{ minWidth: 170, maxWidth: 230 }}>
                 <Typography sx={{ fontSize: "0.84rem", fontWeight: 700, color: INK_2, lineHeight: 1.35, overflowWrap: "anywhere" }}>{a.site || "—"}</Typography>
                 {a.company && a.company !== a.site && <Typography sx={{ ...sub, overflowWrap: "anywhere" }}>{a.company}</Typography>}
-              </TableCell>
-              {/* วันที่ + ช่วงวันอื่นของงานเดียวกัน + ค้างกี่วัน */}
-              <TableCell sx={{ minWidth: 140, whiteSpace: "nowrap" }}>
-                <Typography sx={{ fontSize: "0.82rem", fontWeight: 700, color: INK_2 }}>{formatEventDateRange(a)}</Typography>
-                {job.sessions.length > 1 && <Typography sx={{ ...sub, color: ACCENT, fontWeight: 700 }}>+ อีก {job.sessions.length - 1} ช่วงวัน</Typography>}
-                {isOverdue && (
-                  <Box component="span" sx={{ mt: 0.5, px: 0.75, height: 20, display: "inline-flex", alignItems: "center", borderRadius: 99, bgcolor: alpha("#dc2626", 0.08), fontSize: "0.68rem", fontWeight: 800, color: "#dc2626" }}>
-                    ค้าง {overdueDays} วัน
-                  </Box>
-                )}
               </TableCell>
               <TableCell sx={{ minWidth: 150 }} onClick={canAssign ? (e) => e.stopPropagation() : undefined}>
                 <AssignableResponsible
@@ -2336,10 +2340,8 @@ const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob, employee, canAss
                   </>
                 ) : dash}
               </TableCell>
-              <TableCell sx={{ minWidth: 140 }}>
-                <StatusBadge color={OP_COLOR[a.status]}><Circle sx={{ fontSize: 6 }} />{a.status || "—"}</StatusBadge>
-                <JobFlowFlags event={a} />
-              </TableCell>
+              {/* เอกสารอ้างอิง (ตอนรับงาน) แยกจากเอกสารที่แนบภายหลัง */}
+              <TableCell sx={{ minWidth: 140, maxWidth: 180 }}><RefDoc event={a} /></TableCell>
               {/* เอกสารแยกชนิด — มี = ไอคอนสี + จำนวน · ไม่มี = ไม่แสดง · ใบเสนอราคาบอกผลด้วย */}
               <TableCell sx={{ minWidth: 170 }}>
                 {DOC_KINDS.some((d) => (a[d.key] || []).length) || qKey ? (
@@ -2359,6 +2361,19 @@ const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob, employee, canAss
                     })}
                   </Stack>
                 ) : <Typography sx={{ fontSize: "0.76rem", color: "#94a3b8" }}>ยังไม่มีเอกสาร</Typography>}
+              </TableCell>
+              {/* ✅ (19 ต.ค. 2569 ผู้ใช้: "สถานะงานให้เอาไว้หลังสุด และทำให้ชัดเจน") — ป้ายทึบสีตามสถานะ ตัวหนา อ่านได้จากระยะไกล */}
+              <TableCell sx={{ minWidth: 150 }}>
+                {(() => {
+                  const tone = OP_COLOR[a.status] || "#64748b";
+                  return (
+                    <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.6, height: 28, px: 1.25, borderRadius: 99, whiteSpace: "nowrap",
+                      bgcolor: alpha(tone, 0.12), color: tone, border: `1px solid ${alpha(tone, 0.35)}`, fontSize: "0.8rem", fontWeight: 800 }}>
+                      <Box component="span" sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: tone }} />{a.status || "—"}
+                    </Box>
+                  );
+                })()}
+                <JobFlowFlags event={a} />
               </TableCell>
               <TableCell align="center" sx={{ verticalAlign: "middle !important" }}><ChevronRight sx={{ color: "#cbd5e1", fontSize: 20 }} /></TableCell>
             </TableRow>

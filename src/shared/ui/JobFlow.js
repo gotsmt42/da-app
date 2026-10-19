@@ -87,20 +87,45 @@ export function JobFlowChips({ event, showAck = false, sx }) {
   return <Stack direction="row" gap={0.5} flexWrap="wrap" sx={{ mt: 0.5, ...sx }}>{items}</Stack>;
 }
 
-/** ป้ายย่อในตาราง — เฉพาะเรื่องที่ต้องสนใจ (ด่วน · เลยกำหนด · รอข้อมูล · งานไม่เสร็จ · ยังไม่รับงาน) */
+/**
+ * ข้อควรระวังในตาราง — เฉพาะเรื่องที่ต้องสนใจ
+ * 🔁 (19 ต.ค. 2569 ผู้ใช้: "ตรงนี้ทำให้สับสนมากว่าคืออะไร") เดิมเป็นป้ายคำเดียว (ด่วน · เลยกำหนด · รอข้อมูล) เรียงใต้สถานะ
+ *    ดูเหมือนสถานะงานซ้อนกันหลายอัน → เป็นบรรทัดข้อความเต็มความหมาย (เลยกำหนดเสร็จวันไหน · รอข้อมูลอะไร)
+ *    ใต้หัวข้อเล็ก "ต้องระวัง" แยกจากป้ายสถานะชัดเจน
+ */
 export function JobFlowFlags({ event }) {
   if (!event || event.department === "sales" || isClosedJob(event)) return null;
   const due = dueInfo(event);
   const items = [];
-  if (isUrgent(event)) items.push(<Chip key="u" color={RED} solid icon={<BoltRounded />}>ด่วน</Chip>);
-  if (due?.overdue) items.push(<Chip key="d" color={RED} icon={<EventBusyOutlined />}>เลยกำหนด</Chip>);
-  if (openFollowUp(event)) items.push(<Chip key="f" color={AMBER} icon={<ReportProblemOutlined />}>ไม่เสร็จ</Chip>);
-  if (event.infoPending) items.push(<Chip key="i" color={AMBER} icon={<HourglassTopRounded />}>รอข้อมูล</Chip>);
-  if (event.ackDeclined?.userId) items.push(<Chip key="x" color={RED} icon={<ReportProblemOutlined />}>ปฏิเสธงาน</Chip>);
+  const fu = openFollowUp(event);
+  // fix = วิธีทำให้ข้อนี้หายไป (ผู้ใช้: "แล้วสถานะจะแก้ไขยังไง") — ชี้เมาส์/แตะค้างเห็น · ลิงก์ "แก้ไขข้อมูลงาน" ด้านล่างพาไปฟอร์ม
+  if (isUrgent(event)) items.push({ k: "u", color: RED, icon: <BoltRounded />, text: "งานด่วน", fix: "ไม่ด่วนแล้ว: แก้ไขข้อมูลงาน › ความเร่งด่วน = ปกติ" });
+  if (due?.overdue) items.push({ k: "d", color: RED, icon: <EventBusyOutlined />, text: `เลยกำหนดเสร็จ${event.dueDate ? ` (${formatThai(moment(event.dueDate), "D MMM")})` : ""}`, fix: "ทำงานให้เสร็จแล้วขอปิดงาน · หรือเลื่อนกำหนด: แก้ไขข้อมูลงาน › เสร็จภายใน" });
+  if (fu) items.push({ k: "f", color: AMBER, icon: <ReportProblemOutlined />, text: `แจ้งงานไม่เสร็จ${fu.reason ? ` — ${fu.reason}` : ""}`, fix: "แอดมินลงวันนัดใหม่ แล้วกด “จัดการแล้ว” ในการ์ดงาน" });
+  if (event.infoPending) items.push({ k: "i", color: AMBER, icon: <HourglassTopRounded />, text: `รอข้อมูลเพิ่ม${event.infoPendingNote ? `: ${event.infoPendingNote}` : ""}`, fix: "ได้ข้อมูลแล้ว: แก้ไขข้อมูลงาน › เอาติ๊ก “ยังรอข้อมูล” ออก" });
+  if (event.ackDeclined?.userId) items.push({ k: "x", color: RED, icon: <ReportProblemOutlined />, text: `${event.ackDeclined.name || "ช่าง"} ปฏิเสธงาน`, fix: "มอบหมายผู้รับผิดชอบ/หัวหน้าทีมคนใหม่ในการ์ดงาน" });
   else if (ackTracked(event) && !event.unscheduled && event.approvalStatus !== "pending" && !acksOf(event).length && moment(event.start).isAfter(moment().subtract(1, "day")))
-    items.push(<Chip key="a" color={MUTED} icon={<ThumbUpAltOutlined />}>ยังไม่รับทราบ</Chip>);
+    items.push({ k: "a", color: MUTED, icon: <ThumbUpAltOutlined />, text: "ผู้รับผิดชอบยังไม่รับทราบงาน", fix: "ผู้รับผิดชอบกด “รับทราบงาน” ในหน้างานของฉัน" });
   if (!items.length) return null;
-  return <Stack direction="row" gap={0.4} flexWrap="wrap" sx={{ mt: 0.5 }}>{items}</Stack>;
+  return (
+    <Box sx={{ mt: 0.75, pt: 0.6, borderTop: "1px dashed #e2e8f0", maxWidth: 220 }}>
+      <Typography sx={{ fontSize: "0.62rem", fontWeight: 800, color: "#94a3b8", letterSpacing: 0.3, mb: 0.2 }}>ต้องระวัง</Typography>
+      {items.map((x) => (
+        <Stack key={x.k} direction="row" spacing={0.5} alignItems="flex-start" title={`${x.text}
+วิธีแก้: ${x.fix}`}>
+          <Box sx={{ color: x.color, display: "flex", mt: "2px", "& svg": { fontSize: 13 } }}>{x.icon}</Box>
+          <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: x.color, lineHeight: 1.4, overflowWrap: "anywhere",
+            display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{x.text}</Typography>
+        </Stack>
+      ))}
+      {items.some((x) => ["u", "d", "i"].includes(x.k)) && (
+        <Box component={Link} to={calendarLinkOf(event)} onClick={(e) => e.stopPropagation()}
+          sx={{ display: "inline-block", mt: 0.4, fontSize: "0.7rem", fontWeight: 800, color: "#2563eb", textDecoration: "none", "&:hover": { textDecoration: "underline" } }}>
+          แก้ไขข้อมูลงาน ›
+        </Box>
+      )}
+    </Box>
+  );
 }
 
 

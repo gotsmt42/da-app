@@ -18,6 +18,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import lazyWithRetry from "@/shared/utils/lazyWithRetry";
 import usePaged, { PageBar } from "@/shared/ui/usePaged";
+import DateCell from "@/shared/ui/DateCell";
 import { resolveQuotationGroup, getFollowUpInfo } from "@/shared/utils/quotationTracking";
 import { Link } from "react-router-dom";
 import moment from "moment";
@@ -299,7 +300,7 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, render
   const td = { fontSize: "0.82rem", color: "#334155", px: 1.25, py: 1.1, borderBottom: `1px solid ${LINE}`, verticalAlign: "top" };
   const sub = { fontSize: "0.74rem", color: MUTED, lineHeight: 1.45, overflowWrap: "anywhere" };
   // เอกสารอ้างอิง (ตอนรับงาน) กับ ใบเสนอราคา (ติดตามภายหลัง) แยกคนละคอลัมน์เสมอ · แท็บรอดำเนินการยังไม่มีใบเสนอราคา
-  const COLS = ["", "เลขที่งาน", "งาน / โครงการ", "รายละเอียดงาน", "รับงานจาก", "กำหนดการ", "ผู้ติดต่อ", "สถานะงาน", "เอกสารอ้างอิง", ...(refMode ? [] : ["ใบเสนอราคา"]), "ผู้รับผิดชอบ", ""];
+  const COLS = ["", "กำหนดการ", "เลขที่งาน", "งาน / โครงการ", "รายละเอียดงาน", "รับงานจาก", "ผู้ติดต่อ", "สถานะงาน", "เอกสารอ้างอิง", ...(refMode ? [] : ["ใบเสนอราคา"]), "ผู้รับผิดชอบ", ""];
   return (
     <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflowX: "auto" }}>
       <Box component="table" sx={{ width: "100%", minWidth: 1560, borderCollapse: "collapse" }}>
@@ -325,6 +326,17 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, render
                 sx={{ cursor: "pointer", "& > td": { bgcolor: isOpen ? alpha(ACCENT, 0.04) : "transparent" }, "&:hover > td": { bgcolor: isOpen ? alpha(ACCENT, 0.06) : "#f8fafc" } }}>
                 <Box component="td" sx={{ ...td, px: 0.5, textAlign: "center" }}>
                   <ChevronRight sx={{ fontSize: 20, color: "#94a3b8", transition: "transform .15s", transform: isOpen ? "rotate(90deg)" : "none" }} />
+                </Box>
+                {/* ✅ (19 ต.ค. 2569 ผู้ใช้: "เอาช่องวันที่ไปไว้หน้าสุด ชัดเจน สวยงาม") — กล่องวันที่แบบปฏิทิน (ยังไม่ลงวัน = กล่องเส้นประบอกแผน) */}
+                <Box component="td" sx={{ ...td, width: 96 }}>
+                  <DateCell start={j.unscheduled || j.intakeNote ? null : (j.noVisit ? (j.deliveredAt || j.start) : j.start)} end={j.noVisit ? null : j.end} allDay={j.allDay}
+                    label={scheduleShort(j)}>
+                    {j.dueDate && s.i < 4 && (
+                      <Typography sx={{ ...sub, mt: 0.4, color: moment(j.dueDate).isBefore(moment(), "day") ? RED : MUTED, fontWeight: 700, whiteSpace: "nowrap" }}>
+                        เสร็จภายใน {formatThai(moment(j.dueDate), "D MMM")}
+                      </Typography>
+                    )}
+                  </DateCell>
                 </Box>
                 <Box component="td" sx={{ ...td, whiteSpace: "nowrap" }}>
                   <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: INK }}>{j.jobNo || "—"}</Typography>
@@ -355,14 +367,6 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, render
                   {j.intakeSource
                     ? <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: "#334155", whiteSpace: "nowrap" }}>{SOURCE_LABEL[j.intakeSource] || j.intakeSource}</Typography>
                     : <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>}
-                </Box>
-                <Box component="td" sx={{ ...td, whiteSpace: "nowrap" }}>
-                  {scheduleShort(j)}
-                  {j.dueDate && s.i < 4 && (
-                    <Typography sx={{ ...sub, color: moment(j.dueDate).isBefore(moment(), "day") ? RED : MUTED, fontWeight: 700 }}>
-                      เสร็จภายใน {formatThai(moment(j.dueDate), "D MMM YY")}
-                    </Typography>
-                  )}
                 </Box>
                 {/* ✅ (19 ต.ค. 2569 ผู้ใช้: "แยก col ผู้ติดต่อ · ทีมช่างไม่ต้องใส่ แค่ผู้รับผิดชอบก็พอ แต่ให้มีรูป") */}
                 <Box component="td" sx={{ ...td, minWidth: 130, maxWidth: 180 }}>
