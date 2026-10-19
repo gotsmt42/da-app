@@ -605,7 +605,7 @@ const Dashboard = () => {
 
       {/* งานใหม่ที่ยังไม่ลงตาราง (ไม่รวมฉบับร่างของสัญญา)
           🔁 (17 ต.ค. 2569) เปลี่ยนชื่อจาก "งานวางแผนล่วงหน้า" ให้ตรงกับเมนู/หน้า "งานใหม่" (เดิมเรียกของชุดเดียวกันคนละชื่อ) */}
-      <Widget title="งานใหม่ · รอส่งลงตาราง" icon={EditCalendarOutlined} tone="#475569" count={generalDrafts.length || undefined} hint="รับงานแล้ว ยังไม่ลงวันเข้างาน" to={generalDrafts.length ? "/jobs/intake" : undefined} toLabel="ไปหน้างานใหม่"
+      <Widget title="งานเข้า · รอส่งลงตาราง" icon={EditCalendarOutlined} tone="#475569" count={generalDrafts.length || undefined} hint="รับงานแล้ว ยังไม่ลงวันเข้างาน" to={generalDrafts.length ? "/jobs/intake" : undefined} toLabel="ไปหน้างานเข้า"
         footer={<Pager page={draftsSafePage} pages={draftsTotalPages} onChange={setDraftsPage} />}>
         {loading ? <Loading rows={2} /> : draftsPreview.length === 0 ? <Empty text="ไม่มีงานใหม่ค้างส่งลงตาราง" /> : draftsPreview.map((d) => (
           <Row key={d._id} to="/jobs/intake" title={d.title || "งาน"}

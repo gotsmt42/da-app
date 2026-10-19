@@ -166,7 +166,8 @@ const side = (key, extra) => {
   // ✅ เมนู "แผนงานรออนุมัติ" ถูกตัดออกตามที่ผู้ใช้ขอ — ย้ายไปเป็นแท็บ "รออนุมัติ" ในหน้า "การดำเนินงาน"
   // แทน (ดู PendingApprovalsPanel.js) เพราะเป็นงานเดียวกันกับการไล่จัดการงานในหน้านั้น ไม่ต้องสลับหน้า
   // ไปมา และมี badge บอกจำนวนงานค้างบนแท็บให้เห็นตั้งแต่เข้าหน้ามาแล้ว
-  const contractsMenu = [side("contracts"), side("contractsClosed")];
+  // 🔁 (19 ต.ค. 2569) "งานปิดแล้ว · ประวัติ" อยู่ในหน้าภาพรวมงาน (แถบบนของหน้า) — ไม่แยกเมนู
+  const contractsMenu = [side("contracts")];
   // ✅ หมวด "งานขาย" — เหลือรายการเดียวคือฟอร์มแจ้งงานข้ามแผนก
   // ⚠️ แผนงานของเซล **ไม่ได้อยู่ในหมวดนี้** แต่อยู่ในหมวด "งาน" ร่วมกับช่าง เพราะเป็นระบบเดียวกันจริงๆ
   // (ฟอร์มเดียวกัน ปฏิทินเดียวกัน) — สิ่งที่แยกคือ *ข้อมูลที่มองเห็น* ซึ่งกรองด้วย department ที่ server
@@ -400,18 +401,19 @@ const side = (key, extra) => {
               → 4 การดำเนินงาน / งานของฉัน → ภาพรวมงาน · งานปิดแล้ว → รายงาน */}
           {/* ✅ (11 ต.ค. 2569) "งานใหม่" เฉพาะคนจัดคิว (แอดมิน/ผู้จัดการ) — ช่างไม่ต้องเห็น */}
           {(can(userData, "assignDispatch") || can(userData, "editAnyJob") || can(userData, "receiveDispatch")) && intakeMenu.map((item, idx) => renderLink(item, `work-in-${idx}`))}
-          {canAssign && dispatchMenu.map((item, idx) => renderLink(item, `work-dispatch-${idx}`))}
+          {/* 🔁 (19 ต.ค. 2569) คำขอลงงาน → แท็บใน "งานเข้า" · ประวัติเข้างาน/รายงานงาน → แท็บใน "การดำเนินงาน" (shared/ui/SectionTabs.js) */}
+          {canAssign && !(can(userData, "assignDispatch") || can(userData, "editAnyJob") || can(userData, "receiveDispatch")) && dispatchMenu.map((item, idx) => renderLink(item, `work-dispatch-${idx}`))}
           {canPlanWork && workMenu.map((navi, index) => (
             navi.items?.length
               ? renderParentWithItems(navi, `work-${index}`)
               : renderLink(navi, `work-${index}`)
           ))}
           {seesOperationBoard(userData) && operationMenu.map((item, idx) => renderLink(item, `work-op-${idx}`))}
-          {canViewAttendance && attendanceMenu.map((item, idx) => renderLink(item, `work-att-${idx}`))}
+          {canViewAttendance && !seesOperationBoard(userData) && attendanceMenu.map((item, idx) => renderLink(item, `work-att-${idx}`))}
           {canMyJobs && myJobsMenu.map((item, idx) => renderLink(item, `work-my-${idx}`))}
           {canViewContracts && contractsMenu.map((item, idx) => renderLink(item, `work-ct-${idx}`))}
           {/* ✅ รายงานงานอยู่ท้ายหมวด "งาน" ตำแหน่งเดียวกับ "รายงานการเบิก" ท้ายหมวดเบิกค่าใช้จ่าย */}
-          {canViewOperation && jobReportMenu.map((item, idx) => renderLink(item, `work-report-${idx}`))}
+          {canViewOperation && !seesOperationBoard(userData) && jobReportMenu.map((item, idx) => renderLink(item, `work-report-${idx}`))}
 
           {/* หมวด "งานขาย"
               ✅ ที่แก้ (ผู้ใช้ขอ: "เบื้องต้นแถบนี้ให้เฉพาะเซล ที่เข้าได้") — เดิมเงื่อนไข canSell

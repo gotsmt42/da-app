@@ -47,11 +47,11 @@ export const DEST = {
   eventServiceReadOnly: { title: "ตารางงานช่าง", sub: "ดูอย่างเดียว", href: `/event?dept=${DEPARTMENT.SERVICE}`, icon: FaCalendarAlt },
   eventSales: { title: "ตารางงานฝ่ายขาย", href: "/event?dept=sales", icon: FaBriefcase },
 
-  operation: { title: "การดำเนินงาน", bar: "ดำเนินงาน", sub: "ติดตามทุกงาน · ปิดงาน", href: "/operation", icon: FaTasks, badgeKey: "closeRequests" },
+  operation: { title: "การดำเนินงาน", bar: "ดำเนินงาน", sub: "ทุกงาน · เข้างาน · รายงาน", href: "/operation", icon: FaTasks, badgeKey: "opsInbox" },
   // ✅ (9 ต.ค. 2569) งานที่ต้องตามต่อ แยกตามขั้นตอน — รับงาน · รอลงแผน · ยังไม่รับงาน · งานไม่เสร็จ · รอปิดงาน
   // ✅ ขั้นที่ 1 "รับงาน" — รับงานจากลูกค้า/LINE/ฝ่ายขาย เก็บเป็นงานรอลงแผน (ผู้ใช้เลือก 9 ต.ค. 2569: เมนูแรกของหมวดงาน)
   // ✅ (9 ต.ค. 2569 ผู้ใช้) ชื่อเมนู "งานใหม่" + ไอคอนเอกสารมีเครื่องหมายบวก (งานที่เพิ่งรับเข้ามา) — ชุดเดียวกับหัวหน้าเพจ
-  jobIntake: { title: "งานใหม่", sub: "รับงานไว้ก่อน · ส่งลงตาราง", href: "/jobs/intake", icon: MdPostAdd, badgeKey: "jobIntake" },
+  jobIntake: { title: "งานเข้า", sub: "รับงาน · คำขอลงงาน · ผลเสนอราคา", href: "/jobs/intake", icon: MdPostAdd, badgeKey: "jobsInbox" },
   // ✅ (10 ต.ค. 2569) เช็คอิน/เช็คเอาต์ของช่าง — รายการเข้า-ออกงาน · ชั่วโมงทำงาน · คำขอแก้เวลา
   attendance: { title: "ประวัติบันทึกการเข้างาน", sub: "เข้างาน · รูปหน้างาน · แก้เวลา", href: "/attendance", icon: FaMapMarkerAlt, badgeKey: "attendanceFixes" },
   jobReport: { title: "รายงานงาน", short: "รายงาน", sub: "สรุปสถานะ · รายเดือน · ตามลูกค้า/ทีม", href: "/jobs/report", icon: FaChartBar },

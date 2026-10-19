@@ -78,7 +78,8 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
   // ✅ (11 ต.ค. 2569 ผู้ใช้: "หน้าของช่างไม่ต้องมีเมนูงานใหม่") — รับงาน/ส่งลงตาราง เป็นงานของคนจัดคิว (แอดมิน/ผู้จัดการ)
   // 🔁 (15 ต.ค. 2569 ผู้ใช้: "หน้างานใหม่ ให้ช่างเข้ามาดูได้ด้วย แต่ไม่สามารถดำเนินการได้") — ช่างเห็นเมนู (ดูอย่างเดียว)
   if (can(userData, "assignDispatch") || can(userData, "editAnyJob") || can(userData, "receiveDispatch")) work.push(dest("jobIntake"));
-  if (canAssign) work.push(dest("dispatch"));
+  // 🔁 (19 ต.ค. 2569 ผู้ใช้: "หน้าเยอะ ซ้ำซ้อน" → รวมเหลือ 4 หน้าหลัก) คำขอลงงานเป็นแท็บใน "งานเข้า" แล้ว
+  if (canAssign && !work.some((it) => it.key === "jobIntake")) work.push(dest("dispatch"));
   if (canRequestDispatch && !hideSalesJobs) work.push(dest("sales"));
   if (canPlanWork) {
     if (seeAllSchedules) {
@@ -99,13 +100,14 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
 // 🔁 (15 ต.ค. 2569 ผู้ใช้เลือก "ช่างใช้งานของฉันที่เดียว") — ช่าง (รับงานอย่างเดียว) ไม่เห็นหน้าการดำเนินงานแล้ว · ทำงานที่ "งานของฉัน"
   if (seesOperationBoard(userData)) doWork.push(dest("operation"));
   // ✅ (10 ต.ค. 2569) บันทึกเข้างาน — ผู้ดูงานทั้งหมด/ผู้อนุมัติแก้เวลา
-  if (can(userData, "viewAllJobs") || can(userData, "approveJobs")) doWork.push(dest("attendance"));
+  // ประวัติเข้างาน / รายงานงาน เป็นแท็บใน "การดำเนินงาน" — เมนูแยกเฉพาะคนที่ไม่เห็นหน้าการดำเนินงาน
+  if ((can(userData, "viewAllJobs") || can(userData, "approveJobs")) && !seesOperationBoard(userData)) doWork.push(dest("attendance"));
   // 🧹 "ภาพรวมงาน" ถูกตัดออกจากเมนูหลักตามที่ผู้ใช้สั่ง — เดิมปลายทางนี้โผล่พร้อมกัน 3 ที่ในจอเดียว
   // (ชิปบนแถบบน + ปุ่มตรงนี้ + ช่องบนแถบเมนูล่าง) พร้อมป้ายตัวเลขเดียวกันทั้งสามจุด
   // ⚠️ ยังเข้าได้ตามปกติจากแถบเมนูล่าง (มือถือ) และเมนูข้าง (ทุกจอ) — ไม่ได้ตัดทางเข้าทิ้ง
   // ✅ ผู้ใช้สั่งให้หมวด "งาน" มีรายงานเหมือนหมวด "เบิกค่าใช้จ่าย" — วางท้ายหมวดตำแหน่งเดียวกัน
   // ⚠️ เห็นเฉพาะคนที่เห็นหน้าการดำเนินงาน เพราะรายงานสรุปจากข้อมูลชุดเดียวกันเป๊ะ
-  if (canViewOperation) doWork.push(dest("jobReport"));
+  if (canViewOperation && !seesOperationBoard(userData)) doWork.push(dest("jobReport"));
 
   // ── เบิกค่าใช้จ่าย ────────────────────────────────────────────────────────
   // ✅ วางต่อจากหมวดงานทันที — ผู้ใช้เลือกใบ Advance/ใบเคลมเป็นเมนูหลักบนแถบล่างมือถือ = ใช้บ่อยรองจากงาน
@@ -155,14 +157,13 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
   }
 
   // ช่าง/คนที่ไม่ได้จัดคิว (ไม่มีงานใหม่/คำขอลงงาน) — เหลือแค่ตารางงาน → รวมเข้าหมวด "ปฏิบัติงาน" ใบเดียว
-  if (!work.some((it) => it.key === "jobIntake" || it.key === "dispatch")) {
-    doWork.unshift(...work);
-    work.length = 0;
-  }
+  // ✅ (19 ต.ค. 2569) หมวดงานเหลือหมวดเดียว "งาน" เรียงตามขั้นตอน: งานเข้า → ตารางงาน → การดำเนินงาน/งานของฉัน
+  doWork.unshift(...work);
+  work.length = 0;
 
   return [
     { key: "work", title: "รับงาน · วางแผน", icon: FaCalendarAlt, tone: TONE.work, items: work },
-    { key: "do", title: "ปฏิบัติงาน", icon: FaTools, tone: TONE.work, items: doWork },
+    { key: "do", title: "งาน", icon: FaTools, tone: TONE.work, items: doWork },
     { key: "expense", title: "เบิกค่าใช้จ่าย", icon: FaWallet, tone: TONE.expense, items: expense },
     { key: "purchase", title: "จัดซื้อ", icon: FaShoppingCart, tone: TONE.purchase, items: purchase },
     { key: "people", title: "บุคคล", icon: FaUserClock, tone: TONE.people, items: people },

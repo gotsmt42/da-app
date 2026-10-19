@@ -13,6 +13,7 @@
 
 import MultiDayGroupHeader, { multiDayCardSx } from "@/shared/ui/MultiDayGroup";
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import SectionTabs from "@/shared/ui/SectionTabs";
 import PdfBlobView from "@/shared/components/PdfBlobView";
 import useRealtime from "@/shared/realtime/useRealtime";
 import EventService from "@/shared/services/EventService";
@@ -3465,6 +3466,7 @@ const Operation = () => {
 
   return (
     <Box sx={{ px: { xs: 0, sm: 2, md: 3 }, py: { xs: 1.5, sm: 3 }, maxWidth: 1400, mx: "auto" }}>
+      <SectionTabs group="operation" edge />
 
       {/* Header
           🐛 เดิมบนมือถือ ชื่อหน้ากับแถวปุ่มตกคนละบรรทัด (flexWrap ทำให้ปุ่ม 5 ตัวห่อลงมาเป็นแถบของ

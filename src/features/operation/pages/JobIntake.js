@@ -50,6 +50,7 @@ import { MiniSteps } from "@/features/attendance/components/CheckInOutPanel";
 import { nextStepOf } from "@/shared/ui/JobFlow";
 import { can } from "@/shared/utils/roles";
 import PersonSelectField from "@/shared/ui/PersonSelectField";
+import SectionTabs from "@/shared/ui/SectionTabs";
 
 const AMBER = "#d97706";
 const GREEN = "#16a34a";
@@ -964,8 +965,9 @@ export default function JobIntake() {
 
   return (
     <Box sx={{ px: { xs: 1.5, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: view === "table" ? 1500 : 1000, mx: "auto" }}>
-      <PageHeader icon={<PostAddOutlined />} title="งานใหม่"
-        subtitle="รับงาน → ส่งลงตาราง หรือ ส่งมอบ + วางบิล"
+      <SectionTabs group="intake" />
+      <PageHeader icon={<PostAddOutlined />} title="งานเข้า · รับงาน"
+        subtitle="รับงาน → ส่งลงตาราง หรือ ส่งมอบ + วางบิล · ติดตามผลเสนอราคา"
         actions={canCreate
           ? <Button variant="contained" startIcon={<AddRounded />} onClick={() => openForm()} disabled={!jobs} sx={{ ...PRIMARY, height: 40, px: { xs: 1.25, sm: 2 } }}>รับงานใหม่</Button>
           : <Box component="span" sx={{ px: 1.25, py: 0.5, borderRadius: 99, fontSize: "0.74rem", fontWeight: 700, color: MUTED, bgcolor: SURFACE, border: `1px solid ${LINE}`, whiteSpace: "nowrap" }}>ดูอย่างเดียว</Box>} />

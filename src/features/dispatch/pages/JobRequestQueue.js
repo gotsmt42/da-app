@@ -18,6 +18,7 @@
  * เพราะเป็นคนละคอลเลกชันคนละ endpoint ตัวเลขบนแท็บจึงต้องรับกลับขึ้นมาจากแต่ละแผงเอง
  */
 import { Suspense, useCallback, useEffect, useState } from "react";
+import SectionTabs from "@/shared/ui/SectionTabs";
 import { Navigate } from "react-router-dom";
 import {
   Box, Stack, Typography, Skeleton, Alert, TextField, IconButton, Tooltip,
@@ -59,6 +60,7 @@ export default function JobRequestQueue() {
 
   return (
     <Box sx={{ px: { xs: 0, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: 1500, mx: "auto" }}>
+      <SectionTabs group="intake" edge />
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>{error}</Alert>}
 
       {/* ── หัวหน้าเพจ — กล่องขาวชุดเดียวกับทุกหน้า (shared/ui/PageKit) ตามกฎออกแบบ (ผู้ใช้สั่ง 2 ต.ค. 2569

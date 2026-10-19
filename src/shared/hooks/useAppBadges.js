@@ -39,6 +39,8 @@ export const BADGE_LABEL = {
   pendingApproval: "แผนงานรออนุมัติ",
   closeRequests: "คำขอปิดงานรอตรวจ / งานที่รอคุณรับทราบ-ยืนยันนัด-เข้างาน",
   jobIntake: "งานใหม่ที่รอส่งลงตาราง",
+  jobsInbox: "งานเข้า: งานรอส่งลงตาราง + คำขอลงงานรอตัดสินใจ",
+  opsInbox: "การดำเนินงาน: คำขอปิดงาน/งานที่รอคุณ + คำขอแก้เวลาเข้างาน",
   attendanceFixes: "คำขอแก้เวลาเข้างานรออนุมัติ",
   contracts: "สัญญาที่ถึง/เลยกำหนดรอบเข้างาน (ส้ม = ใกล้ถึงรอบเดือนหน้า)",
   myJobs: "งานที่ต้องทำ",
@@ -76,6 +78,8 @@ const BADGE_TONE = {
 export const badgeTone = (badgeKey, badges) => {
   // ✅ ภาพรวมงาน: แดง = มีสัญญาถึง/เลยกำหนดรอบ · อำพัน = มีแค่ที่ใกล้ถึงรอบเดือนหน้า (ดู contractsTone)
   if (badgeKey === "contracts" && badges?.contractsTone) return badges.contractsTone;
+  // งานเข้า: มีคำขอลงงานรอตัดสินใจ = แดง · มีแค่งานรอส่งลงตาราง = อำพัน
+  if (badgeKey === "jobsInbox") return Number(badges?.dispatchQueue) > 0 ? "act" : "soon";
   return BADGE_TONE[badgeKey] || "act";
 };
 
@@ -304,5 +308,9 @@ export default function useAppBadges(userData) {
     };
   }, [userData]);
 
-  return { badges: computeBadges(userData, data), events: data.events, drafts: data.drafts, ready: store.at > 0 };
+  const b = computeBadges(userData, data);
+  // ✅ (19 ต.ค. 2569) เมนูที่รวมหลายหน้าเป็นแท็บ — ป้ายเมนู = ผลรวมของแท็บข้างใน (ดู shared/ui/SectionTabs.js)
+  b.jobsInbox = (Number(b.jobIntake) || 0) + (Number(b.dispatchQueue) || 0);
+  b.opsInbox = (Number(b.closeRequests) || 0) + (Number(b.attendanceFixes) || 0);
+  return { badges: b, events: data.events, drafts: data.drafts, ready: store.at > 0 };
 }

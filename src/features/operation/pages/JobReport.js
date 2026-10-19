@@ -12,6 +12,7 @@
  *    ก่อนกรองช่วงวันเสมอ — ไม่งั้นงานที่เข้าหลายวันจะถูกหั่นจนวันครบกำหนดเพี้ยน
  */
 import { useEffect, useMemo, useState } from "react";
+import SectionTabs from "@/shared/ui/SectionTabs";
 import {
   Box, Stack, Typography, ToggleButton, ToggleButtonGroup, CircularProgress, Alert, Tooltip,
   Table, TableBody, TableCell, TableHead, TableRow, LinearProgress,
@@ -162,6 +163,7 @@ export default function JobReport() {
 
   return (
     <Box sx={{ px: { xs: 0, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: 1100, mx: "auto" }}>
+      <SectionTabs group="operation" edge />
       <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 2 }}>
         <Box sx={{ width: 40, height: 40, borderRadius: 2.5, bgcolor: ACCENT, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Assessment />

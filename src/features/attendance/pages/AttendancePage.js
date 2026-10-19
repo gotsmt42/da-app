@@ -7,6 +7,7 @@
  * ช่าง: เห็นประวัติของตัวเอง (server กรองให้) · ขอแก้เวลาได้จากรายการ
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import SectionTabs from "@/shared/ui/SectionTabs";
 import { Link, useSearchParams } from "react-router-dom";
 import moment from "moment";
 import { Box, Stack, Typography, ButtonBase, Skeleton, IconButton, Tooltip } from "@mui/material";
@@ -137,6 +138,7 @@ export default function AttendancePage() {
 
   return (
     <Box sx={{ maxWidth: 1100, mx: "auto", px: { xs: 0.25, sm: 1.5 }, py: { xs: 1, sm: 2 } }}>
+      <SectionTabs group="operation" edge />
       <PageHeader
         icon={<PlaceOutlined />}
         title={seeAll ? "ประวัติบันทึกการเข้างาน" : "ประวัติเข้างานของฉัน"}
