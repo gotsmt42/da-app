@@ -135,12 +135,20 @@ const Section = ({ title, icon, action, children }) => (
   </Box>
 );
 
-const KV = ({ label, children, color }) => (
-  <Box sx={{ minWidth: 0 }}>
-    <Typography sx={{ fontSize: "0.7rem", color: TEXT_SUB, fontWeight: 700 }}>{label}</Typography>
-    <Typography sx={{ fontSize: "0.88rem", fontWeight: 700, color: color || TEXT_MAIN, wordBreak: "break-word" }}>{children || "—"}</Typography>
-  </Box>
-);
+/** ช่องข้อมูล: ป้าย · ค่า (ว่าง = "ยังไม่กรอก" จาง / warn = ส้ม "ยังไม่ระบุ") · คำอธิบายเล็ก */
+const Field = ({ label, children, warn, danger, sub, big }) => {
+  const empty = children === "" || children == null;
+  return (
+    <Box sx={{ minWidth: 0 }}>
+      <Typography sx={{ fontSize: "0.68rem", color: TEXT_SUB, fontWeight: 700 }}>{label}</Typography>
+      <Typography sx={{ fontSize: big && !empty ? "1rem" : "0.86rem", fontWeight: empty ? 600 : 800, lineHeight: 1.35, wordBreak: "break-word",
+        color: empty ? (warn ? "#b45309" : "#94a3b8") : danger ? "#dc2626" : TEXT_MAIN }}>
+        {empty ? (warn ? "ยังไม่ระบุ" : "ยังไม่กรอก") : children}
+      </Typography>
+      {sub && <Typography sx={{ fontSize: "0.68rem", fontWeight: 700, color: danger ? "#dc2626" : TEXT_SUB }}>{sub}</Typography>}
+    </Box>
+  );
+};
 
 // ─── ตาราง (จอใหญ่) ───────────────────────────────────────────────────────────
 // 🔁 (19 ต.ค. 2569 ผู้ใช้: "แก้ไขตารางหน้าติดตามใบเสนอราคา จัดวางให้สวยงาม ชัดเจนขึ้น ย้ายผู้รับผิดชอบมาไว้หน้าสุด ข้อมูลสอดคล้อง")
@@ -317,7 +325,7 @@ const MobileCard = ({ job, onOpen, onPreview }) => {
 };
 
 // ─── กล่องยืนยันการตัดสินใจของลูกค้า (อนุมัติ = เลข PO · ปฏิเสธ = เหตุผลบังคับ · ส่ง = วันที่ส่ง) ─────
-const DecisionDialog = ({ mode, onClose, onConfirm, busy }) => {
+const DecisionDialog = ({ mode, onClose, onConfirm, busy, resetInfo }) => {
   const [date, setDate] = useState(moment().format("YYYY-MM-DD"));
   const [po, setPo] = useState("");
   const [note, setNote] = useState("");
@@ -328,6 +336,8 @@ const DecisionDialog = ({ mode, onClose, onConfirm, busy }) => {
     resend: { title: "ส่งใบเสนอราคาฉบับแก้ไขให้ลูกค้าแล้ว", color: "#2563eb", btn: "บันทึก · เริ่มนับใหม่", dateLabel: "วันที่ส่งฉบับแก้ไข" },
     approve: { title: "ได้งาน — ลูกค้าตอบรับใบเสนอราคา", color: "#15803d", btn: "บันทึก · ได้งาน", dateLabel: "วันที่ลูกค้าตอบรับ" },
     reject: { title: "ไม่ได้งาน — ลูกค้าไม่รับใบเสนอราคา", color: "#b91c1c", btn: "บันทึก · ไม่ได้งาน", dateLabel: "วันที่ลูกค้าแจ้ง" },
+    // ✅ (19 ต.ค. 2569 ผู้ใช้: "ปุ่มแก้ผลให้มีคอนเฟิร์มก่อน กันกดพลาด และมีคำอธิบายชัดเจน")
+    reset: { title: "แก้ผลใบเสนอราคา?", color: "#b45309", btn: "ยืนยัน · แก้ผล", noDate: true },
   }[mode];
   const invalid = mode === "reject" && !note.trim();
   return (
@@ -335,7 +345,18 @@ const DecisionDialog = ({ mode, onClose, onConfirm, busy }) => {
       <DialogTitle sx={{ fontWeight: 900, fontSize: "1rem", color: meta.color }}>{meta.title}</DialogTitle>
       <DialogContent>
         <Stack spacing={1.5} sx={{ pt: 0.5 }}>
-          <ThaiDatePicker label={meta.dateLabel} value={date} onChange={(v) => setDate(v || moment().format("YYYY-MM-DD"))} />
+          {mode === "reset" && (
+            <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: "#fffbeb", border: "1px solid #fde68a" }}>
+              <Typography sx={{ fontSize: "0.86rem", fontWeight: 800, color: "#92400e" }}>ผลเดิม: {resetInfo?.label || "-"}</Typography>
+              {resetInfo?.detail && <Typography sx={{ fontSize: "0.78rem", color: "#92400e", mt: 0.25 }}>{resetInfo.detail}</Typography>}
+              <Typography component="ul" sx={{ m: 0, mt: 1, pl: 2.25, fontSize: "0.8rem", color: "#475569", lineHeight: 1.6 }}>
+                <li>ผลเดิม (วันที่ลูกค้าตอบ · เลข PO · เหตุผล) จะถูกล้าง</li>
+                <li>ใบนี้กลับไปสถานะ <b>“รอลูกค้าตอบ”</b> ระบบติดตามต่อจากเดิม</li>
+                <li>แล้วกด <b>ได้งาน</b> หรือ <b>ไม่ได้งาน</b> ใหม่ให้ถูกต้อง · ประวัติการแก้ถูกเก็บไว้</li>
+              </Typography>
+            </Box>
+          )}
+          {!meta.noDate && <ThaiDatePicker label={meta.dateLabel} value={date} onChange={(v) => setDate(v || moment().format("YYYY-MM-DD"))} />}
           {mode === "approve" && <TextField size="small" label="เลขที่ PO / ใบสั่งซื้อของลูกค้า (ถ้ามี)" value={po} onChange={(e) => setPo(e.target.value)} inputProps={{ maxLength: 60 }} />}
           {(mode === "approve" || mode === "reject") && (
             <TextField size="small" multiline minRows={2} label={mode === "reject" ? "เหตุผลที่ไม่ได้งาน *" : "หมายเหตุ (ถ้ามี)"} value={note}
@@ -414,17 +435,25 @@ const InfoSection = ({ a, isFinance, canEdit, onSave, bare = false, inline = fal
           </Stack>
         </Stack>
       ) : (
-        <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)" } }}>
-          <KV label="เลขที่" color={a.quotationNo ? undefined : "#b45309"}>{a.quotationNo || "ยังไม่ระบุ"}</KV>
-          <KV label="วันที่ใบเสนอราคา">{a.quotationDate ? thaiDate(a.quotationDate) : ""}</KV>
-          <KV label="ยืนราคาถึง" color={isExpired(a) ? "#dc2626" : undefined}>{a.quotationValidUntil ? `${thaiDate(a.quotationValidUntil)}${isExpired(a) ? " (หมดอายุ)" : ""}` : ""}</KV>
-          <KV label="มูลค่า" color={a.quotationAmount ? undefined : "#b45309"}>
-            {a.quotationAmount ? `${baht(a.quotationAmount)} ${a.quotationVatIncluded ? "(รวม VAT)" : "(ก่อน VAT)"}` : "ยังไม่ระบุ"}
-          </KV>
-          <KV label="ผู้ติดต่อลูกค้า">{contact.name || a.contactName}</KV>
-          <Box sx={{ minWidth: 0 }}>
-            <Typography sx={{ fontSize: "0.7rem", color: TEXT_SUB, fontWeight: 700 }}>ติดต่อ</Typography>
-            <Stack spacing={0.25}>
+        // 🔁 (19 ต.ค. 2569 ผู้ใช้: "รายละเอียดตรงนี้ปรับวางให้สวยงาม ดูง่าย สมบูรณ์กว่านี้")
+        //    2 กลุ่มชัดเจน: ใบเสนอราคา (เลขที่ · วันที่ · ยืนราคาถึง · มูลค่า) | ผู้ติดต่อลูกค้า (ชื่อ · โทร · อีเมล)
+        //    ช่องว่าง = "ยังไม่กรอก" สีจาง · ช่องที่จำเป็นแต่ว่าง (เลขที่/มูลค่า) = ส้ม · ยืนราคาหมดอายุ = แดง
+        <Box sx={{ display: "grid", gap: 1.25, gridTemplateColumns: { xs: "1fr", sm: "1.6fr 1fr" } }}>
+          <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: "#f8fafc", border: `1px solid ${BORDER}` }}>
+            <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: TEXT_SUB, mb: 0.75, letterSpacing: 0.2 }}>ใบเสนอราคา</Typography>
+            <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: "1fr 1fr" }}>
+              <Field label="เลขที่" warn={!a.quotationNo}>{a.quotationNo}</Field>
+              <Field label="มูลค่า" warn={!a.quotationAmount} sub={a.quotationAmount ? (a.quotationVatIncluded ? "รวม VAT แล้ว" : "ก่อน VAT") : ""} big>
+                {a.quotationAmount ? baht(a.quotationAmount) : ""}
+              </Field>
+              <Field label="วันที่ใบเสนอราคา">{a.quotationDate ? thaiDate(a.quotationDate) : ""}</Field>
+              <Field label="ยืนราคาถึง" danger={isExpired(a)} sub={isExpired(a) ? "หมดอายุแล้ว" : ""}>{a.quotationValidUntil ? thaiDate(a.quotationValidUntil) : ""}</Field>
+            </Box>
+          </Box>
+          <Box sx={{ p: 1.25, borderRadius: 2, bgcolor: "#f8fafc", border: `1px solid ${BORDER}` }}>
+            <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: TEXT_SUB, mb: 0.75, letterSpacing: 0.2 }}>ผู้ติดต่อลูกค้า (คนรับใบเสนอราคา)</Typography>
+            <Field label="ชื่อ">{contact.name || a.contactName}</Field>
+            <Stack spacing={0.5} sx={{ mt: 1 }}>
               {(contact.phone || a.contactTel) ? (
                 <Typography component="a" href={`tel:${contact.phone || a.contactTel}`} onClick={(e) => e.stopPropagation()}
                   sx={{ fontSize: "0.86rem", fontWeight: 700, color: "#2563eb", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 0.5 }}>
@@ -436,7 +465,7 @@ const InfoSection = ({ a, isFinance, canEdit, onSave, bare = false, inline = fal
                   <Email sx={{ fontSize: 15 }} />{contact.email}
                 </Typography>
               ) : null}
-              {!contact.phone && !a.contactTel && !contact.email && <Typography sx={{ fontSize: "0.88rem", fontWeight: 700 }}>—</Typography>}
+              {!contact.phone && !a.contactTel && !contact.email && <Typography sx={{ fontSize: "0.8rem", color: "#94a3b8" }}>ยังไม่มีเบอร์/อีเมล</Typography>}
             </Stack>
           </Box>
         </Box>
@@ -451,7 +480,10 @@ const InfoSection = ({ a, isFinance, canEdit, onSave, bare = false, inline = fal
           <Typography sx={{ flex: 1, fontSize: "0.78rem", fontWeight: 800, color: "#475569" }}>
             ข้อมูลใบเสนอราคา{missingInfo(a) && !editing ? <Box component="span" sx={{ ml: 0.75, color: "#b45309" }}>· ยังไม่ครบ (เลขที่ / มูลค่า)</Box> : null}
           </Typography>
-          {editBtn}
+          {canEdit && !editing && missingInfo(a)
+            ? <Button size="small" variant="contained" startIcon={<Edit sx={{ fontSize: 16 }} />} onClick={start}
+                sx={{ textTransform: "none", fontWeight: 800, boxShadow: "none", borderRadius: 2, bgcolor: "#d97706", "&:hover": { bgcolor: "#b45309", boxShadow: "none" } }}>กรอกให้ครบ</Button>
+            : editBtn}
         </Stack>
         {body}
       </Box>
@@ -603,7 +635,7 @@ const DetailDialog = ({
   const confirmDecision = async ({ date, po, note }) => {
     setBusy(true);
     const action = decision === "resend" || decision === "send" ? "send" : decision;
-    const body = { action, ...(action === "send" ? { sentAt: date } : { decidedAt: date, poNo: po, decisionNote: note }) };
+    const body = action === "reset" ? { action } : { action, ...(action === "send" ? { sentAt: date } : { decidedAt: date, poNo: po, decisionNote: note }) };
     const ok = await onQuotation(job, body);
     setBusy(false);
     if (ok) setDecision(null);
@@ -747,7 +779,7 @@ const DetailDialog = ({
                   {a.quotationDecisionNote && <Typography sx={{ fontSize: "0.84rem", color: "#334155", mt: 1 }}>{k === "rejected" ? "เหตุผล: " : "หมายเหตุ: "}{a.quotationDecisionNote}</Typography>}
                 </Box>
                 {isFinance && (
-                  <Button size="small" startIcon={<Undo sx={{ fontSize: 16 }} />} onClick={async () => { setBusy(true); await onQuotation(job, { action: "reset" }); setBusy(false); }} disabled={busy}
+                  <Button size="small" startIcon={<Undo sx={{ fontSize: 16 }} />} onClick={() => setDecision("reset")} disabled={busy}
                     sx={{ textTransform: "none", fontWeight: 700, color: TEXT_SUB, flexShrink: 0 }}>แก้ผล</Button>
                 )}
               </Stack>
@@ -809,7 +841,8 @@ const DetailDialog = ({
           </Button>
         </Stack>
       </DialogContent>
-      <DecisionDialog mode={decision} busy={busy} onClose={() => setDecision(null)} onConfirm={confirmDecision} />
+      <DecisionDialog mode={decision} busy={busy} onClose={() => setDecision(null)} onConfirm={confirmDecision}
+        resetInfo={{ label: m.label, detail: [a.quotationDecisionAt ? `ลูกค้าตอบ ${thaiDate(a.quotationDecisionAt)}` : "", a.quotationPoNo ? `PO ${a.quotationPoNo}` : "", a.quotationDecisionNote ? `เหตุผล: ${a.quotationDecisionNote}` : ""].filter(Boolean).join(" · ") }} />
     </Dialog>
   );
 };
