@@ -196,11 +196,22 @@ function QuoteCell({ oc, compact = false, caption = false }) {
   const Icon = QUOTE_ICON[oc.key] || RequestQuoteOutlined;
   const tone = oc.quiet ? "#94a3b8" : oc.color;
   const box = compact ? 26 : 30;
+  const file = oc.files?.length ? oc.files[oc.files.length - 1] : null;
   return (
     <Stack direction="row" spacing={1} alignItems={oc.quiet || !oc.facts.length ? "center" : "flex-start"} sx={{ minWidth: 0 }}>
-      <Box sx={{ width: box, height: box, borderRadius: 2, flexShrink: 0, display: "grid", placeItems: "center",
-        bgcolor: oc.quiet ? "#fff" : alpha(oc.color, 0.1), color: tone, border: oc.quiet ? `1px dashed #cbd5e1` : "none" }}>
+      {/* ✅ (19 ต.ค. 2569 ผู้ใช้: "ไม่ต้องให้มีไฟล์ขึ้นแสดง กินพื้นที่ รก ให้กดดูเลย") — มีไฟล์ = กดไอคอนเปิดไฟล์ได้ทันที (มีจุดคลิปเล็กบอก) */}
+      <Box component={file ? "a" : "div"} href={file?.fileUrl} target={file ? "_blank" : undefined} rel={file ? "noreferrer" : undefined}
+        title={file ? `เปิดไฟล์${oc.files.length > 1 ? ` (${oc.files.length} ไฟล์ · เปิดไฟล์ล่าสุด)` : ""}` : undefined}
+        onClick={file ? (e) => e.stopPropagation() : undefined}
+        sx={{ position: "relative", width: box, height: box, borderRadius: 2, flexShrink: 0, display: "grid", placeItems: "center", textDecoration: "none",
+          bgcolor: oc.quiet ? "#fff" : alpha(oc.color, 0.1), color: tone, border: oc.quiet ? `1px dashed #cbd5e1` : "none",
+          ...(file ? { cursor: "pointer", transition: "box-shadow .15s", "&:hover": { boxShadow: `0 0 0 2px ${alpha(tone, 0.45)}` } } : {}) }}>
         <Icon sx={{ fontSize: compact ? 16 : 18 }} />
+        {file && (
+          <Box component="span" sx={{ position: "absolute", right: -4, bottom: -4, width: 15, height: 15, borderRadius: "50%", bgcolor: "#fff", border: `1px solid ${LINE}`, display: "grid", placeItems: "center", color: "#475569" }}>
+            <AttachFileRounded sx={{ fontSize: 10 }} />
+          </Box>
+        )}
       </Box>
       <Box sx={{ minWidth: 0, flex: 1 }}>
         {caption && <Typography sx={{ fontSize: "0.66rem", fontWeight: 800, color: "#94a3b8", lineHeight: 1.2, letterSpacing: 0.2 }}>ใบเสนอราคา</Typography>}
@@ -214,23 +225,6 @@ function QuoteCell({ oc, compact = false, caption = false }) {
   );
 }
 
-/** ปุ่มไฟล์เล็ก (ไม่โชว์ชื่อ — ผู้ใช้: "ไม่ต้องแสดงชื่อไฟล์ ดูล้น ให้กดเปิดเลย") · ชนิดไฟล์ + กดเปิดแท็บใหม่ */
-function FileChips({ files, max = 4, sx }) {
-  if (!files?.length) return null;
-  return (
-    <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5, ...sx }}>
-      {files.slice(0, max).map((f, i) => (
-        <Box key={f._id || f.fileUrl} component="a" href={f.fileUrl} target="_blank" rel="noreferrer" title={`เปิด ${f.fileName || "ไฟล์"}`} onClick={(e) => e.stopPropagation()}
-          sx={{ display: "inline-flex", alignItems: "center", gap: 0.3, height: 24, px: 0.85, borderRadius: 1.5, border: `1px solid ${LINE}`, bgcolor: "#fff",
-            fontSize: "0.7rem", fontWeight: 800, color: "#334155", textDecoration: "none", "&:hover": { borderColor: ACCENT, color: ACCENT } }}>
-          <AttachFileRounded sx={{ fontSize: 14 }} />{extOf(f) || `ไฟล์ ${i + 1}`}
-        </Box>
-      ))}
-      {files.length > max && <Typography sx={{ fontSize: "0.7rem", color: MUTED, alignSelf: "center" }}>+{files.length - max}</Typography>}
-    </Stack>
-  );
-}
-
 /** แถบ "ใบเสนอราคา" ในการ์ด — ชิ้นเดียวกับช่องในตาราง + ปุ่มไปอัปเดตที่หน้าติดตามใบเสนอราคา (ถ้ามี) */
 function OutcomeBar({ oc }) {
   const c = oc.quiet ? ACCENT : oc.color;
@@ -239,7 +233,6 @@ function OutcomeBar({ oc }) {
     <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ sm: "center" }} gap={{ xs: 1, sm: 2 }}
       sx={{ mt: 1, px: 1.5, py: 1.1, borderRadius: 2, bgcolor: oc.quiet ? SURFACE : alpha(oc.color, 0.04), border: `1px solid ${oc.quiet ? LINE : alpha(oc.color, 0.25)}` }}>
       <Box sx={{ flex: 1, minWidth: 0 }}><QuoteCell oc={oc} caption /></Box>
-      <FileChips files={oc.files} />
       {oc.act && (oc.open || oc.href) && (
         <Button {...(oc.open ? { onClick: oc.open } : { component: Link, to: oc.href })} size="small" endIcon={<ChevronRight sx={{ fontSize: "16px !important" }} />}
           sx={{ ...BTN, flexShrink: 0, color: c, border: `1px solid ${alpha(c, 0.45)}`, bgcolor: "#fff", "&:hover": { bgcolor: alpha(c, 0.06) } }}>
@@ -369,7 +362,6 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, render
                       sx={{ borderRadius: 2, m: -0.75, p: 0.75, cursor: oc.open ? "pointer" : "default", transition: "background-color .15s",
                         ...(oc.open ? { "&:hover": { bgcolor: alpha(oc.quiet ? ACCENT : oc.color, 0.06) }, "&:hover .qc-act": { opacity: 1 } } : {}) }}>
                       <QuoteCell oc={oc} compact />
-                      <FileChips files={oc.files} max={3} sx={{ mt: 0.6, pl: 4.25 }} />
                       {oc.open && oc.act && (
                         <Typography className="qc-act" sx={{ mt: 0.5, pl: 4.25, fontSize: "0.7rem", fontWeight: 800, color: oc.quiet ? ACCENT : oc.color, opacity: oc.quiet ? 0.7 : 0.9 }}>{oc.act} ›</Typography>
                       )}
@@ -661,7 +653,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
   const st = stageOf(job);
   const stall = stalledDays(job, st);
   // ไฟล์ตอนรับงานที่เป็นใบเสนอราคา/PO แสดงในแถบใบเสนอราคาแล้ว — ไม่ซ้ำด้านล่าง
-  const intakeDocs = outcome?.files?.length && outcome.intake ? [] : (job.sitePhotoFiles || []).filter((f) => f.source === "intake");
+  const intakeDocs = (job.sitePhotoFiles || []).filter((f) => f.source === "intake");
   const invoiceFiles = job.invoiceFiles || [];
   const [uploading, setUploading] = useState(false);
   const fu = openFollowUp(job);
