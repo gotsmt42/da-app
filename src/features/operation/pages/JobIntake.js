@@ -112,7 +112,7 @@ const QuotationDialogHost = lazyWithRetry(() => import("@/features/finance/pages
 const baht = (n) => `฿${Number(n || 0).toLocaleString("th-TH", { maximumFractionDigits: 0 })}`;
 const OUTCOME = {
   waiting_file: { label: "รอแนบไฟล์", color: AMBER, act: "แนบใบเสนอราคา", to: "qt", group: "todo" },
-  not_sent: { label: "แนบแล้ว · รอเริ่มนับ", color: AMBER, act: "เริ่มติดตาม", to: "qt", group: "todo" },
+  not_sent: { label: "แนบแล้ว · กำลังเริ่มนับ", color: AMBER, act: "ดูใบเสนอราคา", to: "qt", group: "todo" },
   sent: { label: "รอลูกค้าตอบ", color: "#2563eb", act: "อัปเดตผล", to: "qt", group: "wait" },
   follow_up: { label: "ถึงเวลาติดตาม", color: "#ea580c", act: "บันทึกการติดตาม", to: "qt", group: "wait" },
   revising: { label: "ลูกค้าขอแก้ไข", color: "#7c3aed", act: "อัปเดตผล", to: "qt", group: "wait" },

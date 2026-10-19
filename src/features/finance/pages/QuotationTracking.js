@@ -27,7 +27,7 @@ import {
 } from "@mui/material";
 import {
   Search, Close, Refresh, RequestQuote, Send, CheckCircle, Cancel, Autorenew, HourglassTop, WarningAmber, ChevronRight,
-  AttachFile, Chat, OpenInNew, History, Apps, Description, Edit, Phone, Email, EventRepeat, Undo, Save, Insights, ExpandMore, Tune,
+  AttachFile, Chat, OpenInNew, History, Apps, Description, Edit, Phone, Email, EventRepeat, Undo, Save, Insights, ExpandMore, Tune, Check,
 } from "@mui/icons-material";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFileExcel } from "@fortawesome/free-solid-svg-icons";
@@ -60,7 +60,7 @@ const STATUS = {
   sent: { label: "รอลูกค้าตอบ", short: "รอตอบ", color: "#2563eb", icon: Send },
   revising: { label: "ลูกค้าขอแก้ไข", short: "ขอแก้ไข", color: "#7c3aed", icon: Autorenew },
   // ✅ ไม่มีขั้น "ส่งลูกค้า" แล้ว — มีไฟล์แต่ยังไม่เริ่มนับ = รอช่างส่งงาน (services/quotationAutoStart.js)
-  not_sent: { label: "รอเริ่มนับติดตาม", short: "รอเริ่มนับ", color: "#d97706", icon: HourglassTop },
+  not_sent: { label: "กำลังเริ่มนับ", short: "เริ่มนับ", color: "#d97706", icon: HourglassTop },
   waiting_file: { label: "รอแนบใบเสนอราคา", short: "รอไฟล์", color: "#64748b", icon: AttachFile },
   approved: { label: "ได้งาน", short: "ได้งาน", color: "#15803d", icon: CheckCircle },
   rejected: { label: "ไม่ได้งาน", short: "ไม่ได้งาน", color: "#94a3b8", icon: Cancel },
@@ -506,7 +506,7 @@ const FollowUpSection = ({ a, onSubmit, onPreview, canFollow, formRef }) => {
 //    คำเรียกตรงความหมาย: อนุมัติ/ปฏิเสธ → "ได้งาน" / "ไม่ได้งาน"
 const STEPS = [
   { key: "file", label: "แนบใบเสนอราคา", hint: "ไฟล์ + เลขที่ + มูลค่า" },
-  { key: "start", label: "เริ่มนับติดตาม", hint: "อัตโนมัติเมื่อช่างปิดงาน" },
+  { key: "start", label: "เริ่มนับติดตาม", hint: "อัตโนมัติทันทีที่แนบไฟล์" },
   { key: "follow", label: "ติดตามลูกค้า", hint: `ทุก ${WARNING_DAYS_AFTER_SENT} วัน หรือตามนัด` },
   { key: "done", label: "ผลลัพธ์", hint: "ได้งาน / ไม่ได้งาน" },
 ];
@@ -560,14 +560,11 @@ const DetailDialog = ({
   const due = !info ? "" : info.needsFollowUp ? `เลยกำหนดติดตาม ${-info.daysUntilDue} วัน` : info.daysUntilDue === 0 ? "ครบกำหนดติดตามวันนี้" : `ติดตามครั้งถัดไปอีก ${info.daysUntilDue} วัน`;
   const next = (() => {
     if (k === "waiting_file") {
-      return { title: "แนบไฟล์ใบเสนอราคา", text: "กด “แนบไฟล์” ในกล่องใบเสนอราคาด้านล่าง แล้วกรอกเลขที่และมูลค่า — ระบบเริ่มนับติดตามให้เองเมื่อช่างปิดงาน" };
+      return { title: "แนบไฟล์ใบเสนอราคา", text: "กด “แนบไฟล์” ในกล่องใบเสนอราคาด้านล่าง (ช่างแนบจากหน้างานได้) — แนบแล้วระบบเริ่มนับวันติดตามให้ทันที ไม่ต้องกดเอง" };
     }
     if (k === "not_sent") {
-      return {
-        title: "แนบแล้ว · รอเริ่มนับติดตาม",
-        text: "ระบบเริ่มนับวันติดตามให้เองเมื่อช่างปิดงาน — ถ้าส่งใบเสนอราคาให้ลูกค้าไปแล้ว กดเริ่มนับได้เลย",
-        primary: isFinance ? { label: "ส่งให้ลูกค้าแล้ว · เริ่มนับตอนนี้", icon: <Send />, onClick: () => setDecision("send") } : null,
-      };
+      // 🔁 (19 ต.ค. 2569 ผู้ใช้: "นับตั้งแต่ช่างอัปไฟล์ · ไม่ต้องมากดเอง") เซิร์ฟเวอร์เริ่มนับทันทีที่อัปไฟล์ — สถานะนี้เห็นแค่ชั่วครู่
+      return { title: "แนบแล้ว · ระบบกำลังเริ่มนับติดตามให้", text: "ไม่ต้องกดอะไร — ระบบเริ่มนับวันติดตามให้อัตโนมัติจากวันที่แนบไฟล์" };
     }
     if (open) {
       return {
@@ -620,11 +617,12 @@ const DetailDialog = ({
             const lineColor = i <= step ? (i < step || final ? "#16a34a" : color) : "#e2e8f0";
             return (
               <Box key={s.key} sx={{ position: "relative", textAlign: "center", px: 0.5 }}>
-                {i > 0 && <Box sx={{ position: "absolute", top: 13, right: "50%", width: "100%", height: 2, bgcolor: lineColor }} />}
-                <Box sx={{ position: "relative", mx: "auto", width: 28, height: 28, borderRadius: "50%", display: "grid", placeItems: "center",
+                {/* เส้นเชื่อมอยู่ "ใต้" วงกลม (zIndex 0) และเริ่ม-จบที่ขอบวง ไม่ลากทับตัวเลข */}
+                {i > 0 && <Box sx={{ position: "absolute", top: 13, right: "calc(50% + 18px)", left: "calc(-50% + 18px)", height: 2, borderRadius: 1, bgcolor: lineColor, zIndex: 0 }} />}
+                <Box sx={{ position: "relative", zIndex: 1, mx: "auto", width: 28, height: 28, borderRadius: "50%", display: "grid", placeItems: "center",
                   fontSize: "0.78rem", fontWeight: 900, color: done || cur || final ? "#fff" : "#94a3b8", bgcolor: done || cur || final ? color : "#fff",
                   border: `2px solid ${color}`, boxShadow: cur ? `0 0 0 4px ${alpha(color, 0.18)}` : "none" }}>
-                  {final ? <FinalIcon sx={{ fontSize: 18 }} /> : done ? "✓" : i + 1}
+                  {final ? <FinalIcon sx={{ fontSize: 18 }} /> : done ? <Check sx={{ fontSize: 17 }} /> : i + 1}
                 </Box>
                 <Typography noWrap sx={{ mt: 0.5, fontSize: { xs: "0.7rem", sm: "0.78rem" }, fontWeight: cur || final ? 900 : 700, color: cur || final ? color : done ? TEXT_MAIN : "#94a3b8" }}>
                   {final ? m.label : s.label}
@@ -1093,7 +1091,7 @@ export default function QuotationTracking() {
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography sx={{ fontWeight: 900, fontSize: { xs: "1.1rem", sm: "1.25rem" }, color: TEXT_MAIN, lineHeight: 1.25 }}>ติดตามใบเสนอราคา</Typography>
             <Typography noWrap sx={{ fontSize: "0.76rem", color: TEXT_SUB }}>
-              แนบใบเสนอราคา → เริ่มนับติดตาม (อัตโนมัติเมื่อช่างปิดงาน) → ติดตามลูกค้า (ทุก {WARNING_DAYS_AFTER_SENT} วัน หรือตามนัด) → ได้งาน / ไม่ได้งาน
+              แนบใบเสนอราคา → เริ่มนับติดตามอัตโนมัติทันที → ติดตามลูกค้า (ทุก {WARNING_DAYS_AFTER_SENT} วัน หรือตามนัด) → ได้งาน / ไม่ได้งาน
               {lastRefreshed ? ` · อัปเดต ${moment(lastRefreshed).format("HH:mm")}` : ""}
             </Typography>
           </Box>
