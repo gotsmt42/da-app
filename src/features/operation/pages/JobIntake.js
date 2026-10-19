@@ -16,6 +16,7 @@
  *     แต่ขึ้นหน้าติดตามวางบิลให้ตามรับเงินต่อ
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { resolveQuotationGroup, getFollowUpInfo } from "@/shared/utils/quotationTracking";
 import { Link } from "react-router-dom";
 import moment from "moment";
 import Swal from "sweetalert2";
@@ -30,6 +31,7 @@ import {
   NotesOutlined, CalendarMonthOutlined, GroupsOutlined, PersonOutlineOutlined, BuildOutlined, CallReceivedRounded, DescriptionOutlined, PhoneOutlined, HourglassTopRounded, ReportProblemOutlined,
   BlockRounded, RestoreRounded, PersonOffOutlined,
   LocalShippingOutlined, ReceiptLongOutlined, TaskAltRounded, UploadFileOutlined, AttachFileRounded, Search,
+  ViewAgendaOutlined, TableRowsOutlined, RequestQuoteOutlined,
 } from "@mui/icons-material";
 import EventService from "@/shared/services/EventService";
 import CustomerService from "@/shared/services/CustomerService";
@@ -94,13 +96,162 @@ const stageOf = (e) => {
   return { i: 1, label: "ลงตารางแล้ว", color: ACCENT };
 };
 
+/**
+ * ✅ (19 ต.ค. 2569 ผู้ใช้: "หน้างานใหม่ ติดตามว่าเข้างานแล้ว งานนี้ได้งานไหม เช่นงาน Inspection ส่งใบเสนอราคาไปแล้ว ได้งานไหม
+ *    มีสถานะบอก ดูเข้าใจง่าย · มีรูปแบบแสดงเป็นตารางด้วย")
+ *    "ผลเสนอราคา" ของงานที่รับไว้ — อ่านจากระบบติดตามใบเสนอราคาตัวเดียวกับหน้า "ติดตามใบเสนอราคา" (resolveQuotationGroup)
+ *    งานหลายวันใช้วันล่าสุดของกลุ่มเป็นตัวแทน (ตรงกับหน้าติดตามใบเสนอราคา) · งานส่งของ/จดงาน/มี PO แล้ว ไม่มีผลเสนอราคา
+ */
+const baht = (n) => `฿${Number(n || 0).toLocaleString("th-TH", { maximumFractionDigits: 0 })}`;
+const OUTCOME = {
+  none: { label: "ยังไม่มีใบเสนอราคา", color: "#64748b", act: "แนบใบเสนอราคา", to: "op", group: "todo", quiet: true },
+  waiting_file: { label: "รอแนบใบเสนอราคา", color: AMBER, act: "แนบใบเสนอราคา", to: "op", group: "todo" },
+  not_sent: { label: "ยังไม่ส่งใบเสนอราคา", color: AMBER, act: "บันทึกการส่ง", to: "qt", group: "todo" },
+  sent: { label: "รอลูกค้าตอบ", color: "#2563eb", act: "อัปเดตผล", to: "qt", group: "wait" },
+  follow_up: { label: "ถึงเวลาติดตามลูกค้า", color: "#ea580c", act: "ติดตาม / อัปเดตผล", to: "qt", group: "wait" },
+  revising: { label: "กำลังปรับใบเสนอราคา", color: "#7c3aed", act: "อัปเดตผล", to: "qt", group: "wait" },
+  approved: { label: "ได้งาน", color: GREEN, act: "ดูใบเสนอราคา", to: "qt", group: "won" },
+  rejected: { label: "ไม่ได้งาน", color: RED, act: "ดูใบเสนอราคา", to: "qt", group: "lost" },
+};
+const OUTCOME_FILTERS = [
+  { key: "all", label: "ทั้งหมด" },
+  { key: "todo", label: "ยังไม่ส่ง", color: AMBER },
+  { key: "wait", label: "รอลูกค้าตอบ", color: "#2563eb" },
+  { key: "won", label: "ได้งาน", color: GREEN },
+  { key: "lost", label: "ไม่ได้งาน", color: RED },
+];
+const outcomeOf = (job, st, sessions) => {
+  if (!st || st.note || st.nv || st.i === -1) return null;
+  const list = (sessions && sessions.length ? sessions : [job]).slice().sort((a, b) => new Date(b.start || 0) - new Date(a.start || 0));
+  const anchor = list.find((e) => e.quotationStatus || (e.quotationFiles || []).length || e.quotationApplicable === true) || list[0];
+  let key = resolveQuotationGroup(anchor);
+  if (!key) {
+    // ยังไม่มีอะไรเกี่ยวกับใบเสนอราคาเลย — แสดงเฉพาะงานที่เข้างานแล้ว และไม่ได้มี PO มาตั้งแต่รับงาน
+    if (st.i < 2 || job.intakeDocType === "po" || anchor.quotationApplicable === false) return null;
+    key = "none";
+  }
+  const fu = getFollowUpInfo(anchor);
+  const facts = [];
+  if (anchor.quotationNo) facts.push(anchor.quotationNo);
+  if (anchor.quotationAmount) facts.push(baht(anchor.quotationAmount));
+  if ((key === "sent" || key === "follow_up") && anchor.quotationSentAt) {
+    facts.push(`ส่ง ${formatThai(moment(anchor.quotationSentAt), "D MMM YY")}`);
+    if (fu) facts.push(fu.followUpCount ? `ติดตามแล้ว ${fu.followUpCount} ครั้ง` : "ยังไม่เคยติดตาม");
+  }
+  if (key === "approved") {
+    if (anchor.quotationPoNo) facts.push(`PO ${anchor.quotationPoNo}`);
+    if (anchor.quotationDecisionAt) facts.push(`ตอบรับ ${formatThai(moment(anchor.quotationDecisionAt), "D MMM YY")}`);
+  }
+  if (key === "rejected" && anchor.quotationDecisionNote) facts.push(`เหตุผล: ${anchor.quotationDecisionNote}`);
+  if (key === "none") facts.push("ถ้าต้องเสนอราคา แนบไฟล์ที่การ์ดงานในหน้าการดำเนินงาน");
+  const meta = OUTCOME[key];
+  return { key, ...meta, facts, amount: Number(anchor.quotationAmount) || 0, href: meta.to === "qt" ? `/finance?tab=quotations&jobId=${anchor._id}` : `/operation/${anchor._id}` };
+};
+
+/** แถบ "ผลเสนอราคา" ในการ์ด — สีตามผล · ข้อมูลสั้น · ปุ่มไปอัปเดตที่หน้าติดตามใบเสนอราคา */
+function OutcomeBar({ oc }) {
+  return (
+    <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ sm: "center" }} gap={1}
+      sx={{ mt: 1, px: 1.25, py: 0.9, borderRadius: 2, bgcolor: oc.quiet ? SURFACE : alpha(oc.color, 0.06),
+        border: `1px solid ${oc.quiet ? LINE : alpha(oc.color, 0.3)}`, borderLeft: `4px solid ${oc.color}` }}>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Stack direction="row" alignItems="center" gap={0.75} sx={{ flexWrap: "wrap" }}>
+          <RequestQuoteOutlined sx={{ fontSize: 17, color: oc.color }} />
+          <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: MUTED }}>ผลเสนอราคา</Typography>
+          <Typography sx={{ fontSize: "0.86rem", fontWeight: 900, color: oc.color }}>{oc.label}</Typography>
+        </Stack>
+        {oc.facts.length > 0 && (
+          <Typography sx={{ fontSize: "0.76rem", color: "#475569", mt: 0.25, overflowWrap: "anywhere" }}>{oc.facts.join(" · ")}</Typography>
+        )}
+      </Box>
+      <Button component={Link} to={oc.href} size="small" endIcon={<ChevronRight sx={{ fontSize: "16px !important" }} />}
+        sx={{ ...BTN, flexShrink: 0, height: 32, px: 1.25, color: oc.quiet ? "#334155" : oc.color, border: `1px solid ${oc.quiet ? LINE : alpha(oc.color, 0.45)}`, bgcolor: "#fff", "&:hover": { bgcolor: alpha(oc.color, 0.06) } }}>
+        {oc.act}
+      </Button>
+    </Stack>
+  );
+}
+
 const TABS = [
   { key: "waiting", label: "รอดำเนินการ", short: "รอเริ่ม", test: (s) => s.i === 0 },
   { key: "active", label: "กำลังดำเนินการ", short: "กำลังทำ", test: (s) => s.i >= 1 && s.i <= 3 },
   { key: "done", label: "เสร็จแล้ว", short: "เสร็จแล้ว", test: (s) => s.i === 4 },
   // ✅ แท็บ "ยกเลิก" โชว์เฉพาะตอนมีงานที่ยกเลิก (ไม่กินที่บนมือถือโดยไม่จำเป็น)
   { key: "cancelled", label: "ยกเลิก", short: "ยกเลิก", test: (s) => s.i === -1, hideEmpty: true },
+  // ✅ (19 ต.ค. 2569) งานที่เข้าไปดูหน้างาน/เสนอราคาแล้ว — ตามผลจนรู้ว่าได้งานหรือไม่
+  { key: "result", label: "ติดตามผลเสนอราคา", short: "ผลเสนอราคา", test: (s, oc) => Boolean(oc) },
 ];
+
+/** ข้อความกำหนดการสั้นๆ (ใช้ในตาราง) */
+const scheduleShort = (j) => (j.intakeNote ? `บันทึก ${formatThai(moment(j.intakeAt), "D MMM YY")}`
+  : j.noVisit ? (j.unscheduled ? "ยังไม่ส่งมอบ" : `ส่งมอบ ${formatThai(moment(j.deliveredAt || j.start), "D MMM YY")}`)
+    : j.unscheduled ? (j.plannedMonth ? `ตั้งใจ ${formatThai(moment(j.plannedMonth, "YYYY-MM"), "MMM YY")}` : "ยังไม่กำหนดเดือน")
+      : `เข้างาน ${formatThai(moment(j.start), "D MMM YY")}`);
+
+/** มุมมองตาราง — ข้อมูลครบในแถวเดียว กวาดตาเทียบหลายงานได้เร็ว (จอแคบเลื่อนซ้าย-ขวาได้) */
+function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver }) {
+  const th = { textAlign: "left", fontSize: "0.74rem", fontWeight: 800, color: MUTED, px: 1.25, py: 1, borderBottom: `1px solid ${LINE}`, whiteSpace: "nowrap", bgcolor: SURFACE, position: "sticky", top: 0 };
+  const td = { fontSize: "0.82rem", color: "#334155", px: 1.25, py: 1, borderBottom: `1px solid ${LINE}`, verticalAlign: "top" };
+  return (
+    <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflowX: "auto" }}>
+      <Box component="table" sx={{ width: "100%", minWidth: 940, borderCollapse: "collapse" }}>
+        <thead>
+          <tr>
+            {["เลข Job", "งาน / โครงการ", "รับจาก · เอกสาร", "กำหนดการ", "สถานะงาน", "ผลเสนอราคา", "ผู้รับผิดชอบ", ""].map((h) => (
+              <Box component="th" key={h} sx={th}>{h}</Box>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(({ j, s, oc }) => {
+            const doc = j.intakeDocType || j.intakeDocNo ? `${DOC_LABEL[j.intakeDocType] || "เอกสาร"}${j.intakeDocNo ? ` ${j.intakeDocNo}` : ""}` : "";
+            const ro = readOnlyOf(j);
+            const action = !ro && s.i === 0 && !s.note
+              ? (s.nv
+                ? <Button size="small" onClick={() => onDeliver(j)} sx={{ ...SUCCESS, height: 30, px: 1.25 }}>ส่งมอบแล้ว</Button>
+                : <Button size="small" onClick={() => onSchedule(j)} sx={{ ...PRIMARY, height: 30, px: 1.25 }}>{requestMode ? "ขอลงตาราง" : "ส่งลงตาราง"}</Button>)
+              : !j.unscheduled && !s.nv && !s.note
+                ? <Button component={Link} to={`/operation/${j._id}`} size="small" sx={{ ...BTN, height: 30, px: 1.25, color: ACCENT, border: `1px solid ${alpha(ACCENT, 0.4)}` }}>ดูงาน</Button>
+                : null;
+            return (
+              <Box component="tr" key={j._id} sx={{ "&:hover td": { bgcolor: "#f8fafc" } }}>
+                <Box component="td" sx={{ ...td, whiteSpace: "nowrap" }}>
+                  <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: INK }}>{j.jobNo || "—"}</Typography>
+                  <Typography sx={{ fontSize: "0.7rem", color: MUTED }}>{j.intakeNote ? "จดงาน" : j.noVisit ? "ส่งของ" : "เข้างาน"}</Typography>
+                </Box>
+                <Box component="td" sx={{ ...td, maxWidth: 260 }}>
+                  <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: INK, overflowWrap: "anywhere" }}>
+                    {j.intakeNote ? String(j.description || "บันทึกงาน").slice(0, 60) : [j.title, j.system].filter(Boolean).join(" · ") || "งาน"}
+                    {isUrgent(j) && s.i < 4 && <Box component="span" sx={{ ml: 0.5, color: RED, fontWeight: 900 }}>⚡</Box>}
+                  </Typography>
+                  <Typography sx={{ fontSize: "0.76rem", color: MUTED, overflowWrap: "anywhere" }}>{[j.site && j.site !== "-" ? j.site : "", j.company && j.company !== j.site ? j.company : ""].filter(Boolean).join(" · ")}</Typography>
+                </Box>
+                <Box component="td" sx={td}>
+                  <Typography sx={{ fontSize: "0.78rem" }}>{j.intakeSource ? `จาก${SOURCE_LABEL[j.intakeSource] || j.intakeSource}` : "—"}</Typography>
+                  {doc && <Typography sx={{ fontSize: "0.74rem", color: MUTED }}>{doc}</Typography>}
+                </Box>
+                <Box component="td" sx={{ ...td, whiteSpace: "nowrap" }}>{scheduleShort(j)}</Box>
+                <Box component="td" sx={{ ...td, whiteSpace: "nowrap" }}>
+                  <Chip color={s.color} bg={alpha(s.color, 0.1)} border="transparent">{s.label}</Chip>
+                </Box>
+                <Box component="td" sx={{ ...td, minWidth: 170 }}>
+                  {oc ? (
+                    <Box component={Link} to={oc.href} sx={{ textDecoration: "none", display: "block" }}>
+                      <Chip color={oc.quiet ? "#475569" : oc.color} bg={oc.quiet ? SURFACE : alpha(oc.color, 0.1)} border="transparent">{oc.label}</Chip>
+                      {oc.amount > 0 && <Typography sx={{ fontSize: "0.74rem", color: MUTED, mt: 0.25 }}>{baht(oc.amount)}</Typography>}
+                    </Box>
+                  ) : <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>}
+                </Box>
+                <Box component="td" sx={{ ...td, whiteSpace: "nowrap" }}>{j.responsiblePerson || <Box component="span" sx={{ color: "#cbd5e1" }}>—</Box>}</Box>
+                <Box component="td" sx={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>{action}</Box>
+              </Box>
+            );
+          })}
+        </tbody>
+      </Box>
+    </Box>
+  );
+}
 
 const BTN = { textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", whiteSpace: "nowrap", fontSize: "0.82rem" };
 const PRIMARY = { ...BTN, bgcolor: ACCENT, color: "#fff", "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } };
@@ -351,7 +502,7 @@ const Line = ({ icon: Icon, children, color = "#475569", strong }) => (
   </Stack>
 );
 
-function JobCard({ job, readOnly, requestMode, onSchedule, onDeliver, onUploadInvoice, onNoteDone, onEdit, onCancel, onRestore }) {
+function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, onUploadInvoice, onNoteDone, onEdit, onCancel, onRestore }) {
   const st = stageOf(job);
   const stall = stalledDays(job, st);
   const intakeDocs = (job.sitePhotoFiles || []).filter((f) => f.source === "intake");
@@ -515,6 +666,7 @@ function JobCard({ job, readOnly, requestMode, onSchedule, onDeliver, onUploadIn
                 )}
               </Box>
             )}
+            {outcome && <OutcomeBar oc={outcome} />}
             {(intakeDocs.length > 0 || (job.noVisit && invoiceFiles.length > 0)) && (
               <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75, mt: 1 }}>
                 <FileLinks files={intakeDocs} />
@@ -614,12 +766,22 @@ export default function JobIntake() {
   const [scheduling, setScheduling] = useState(null);
   const [delivering, setDelivering] = useState(null);
   const [q, setQ] = useState("");
+  const [groups, setGroups] = useState(() => new Map()); // jobGroupId/_id → ทุกวันของงาน (หาใบเสนอราคาของกลุ่ม)
+  const [ocFilter, setOcFilter] = useState("all");
+  const [view, setView] = useState(() => { try { return localStorage.getItem("tt-intake-view") || "card"; } catch { return "card"; } });
+  const changeView = (v) => { setView(v); try { localStorage.setItem("tt-intake-view", v); } catch { /* ignore */ } };
+  const groupOf = (arr) => {
+    const m = new Map();
+    arr.forEach((e) => { const k = String(e.jobGroupId || e._id); if (!m.has(k)) m.set(k, []); m.get(k).push(e); });
+    return m;
+  };
 
   const load = useCallback(async () => {
     try {
       if (!canManage) {
         // ดูอย่างเดียว: รายการงานใหม่ทั้งแผนก (ไม่รวมที่ยกเลิก) — เส้นเดียว ไม่ต้องดึงงานทั้งระบบ
         const all = await EventService.GetIntakeList().catch(() => []);
+        setGroups(groupOf(all));
         const seenRo = new Set();
         setJobs(all.filter((e) => !e.cancelledAt)
           .filter((e) => { const k = e.jobGroupId || e._id; if (seenRo.has(k)) return false; seenRo.add(k); return true; }));
@@ -633,6 +795,7 @@ export default function JobIntake() {
       const events = ev?.userEvents || [];
       setRawDrafts(drafts.filter((d) => !d.cancelledAt));
       setRawEvents(events);
+      setGroups(groupOf(events));
       // ✅ เฉพาะงานที่รับผ่านเมนูนี้ — งานหลายวันรวมเป็นงานเดียว (ใช้วันแรก)
       const seen = new Set();
       const list = [...drafts, ...events.slice().sort((a, b) => new Date(a.start) - new Date(b.start))]
@@ -714,26 +877,40 @@ export default function JobIntake() {
     }
   };
 
-  const withStage = useMemo(() => (jobs || []).map((j) => ({ j, s: stageOf(j) })), [jobs]);
-  const counts = useMemo(() => Object.fromEntries(TABS.map((t) => [t.key, withStage.filter((x) => t.test(x.s)).length])), [withStage]);
+  const withStage = useMemo(() => (jobs || []).map((j) => {
+    const s = stageOf(j);
+    return { j, s, oc: outcomeOf(j, s, groups.get(String(j.jobGroupId || j._id))) };
+  }), [jobs, groups]);
+  const counts = useMemo(() => Object.fromEntries(TABS.map((t) => [t.key, withStage.filter((x) => t.test(x.s, x.oc)).length])), [withStage]);
+  // สรุปผลเสนอราคา (แท็บติดตามผล) — จำนวนต่อกลุ่ม · อัตราได้งาน · มูลค่าที่ได้
+  const ocStats = useMemo(() => {
+    const c = { all: 0, todo: 0, wait: 0, won: 0, lost: 0, wonValue: 0 };
+    withStage.forEach(({ oc }) => { if (!oc) return; c.all += 1; c[oc.group] += 1; if (oc.group === "won") c.wonValue += oc.amount; });
+    return c;
+  }, [withStage]);
   const list = useMemo(() => {
     const t = TABS.find((x) => x.key === tab) || TABS[0];
     // ✅ ค้นหา: ชื่องาน · โครงการ · บริษัท · เลข Job · เลขเอกสาร · ผู้รับผิดชอบ
     const kw = q.trim().toLowerCase();
     const hit = (j) => !kw || [j.title, j.system, j.site, j.company, j.jobNo, j.intakeDocNo, j.responsiblePerson, j.description]
       .some((v) => String(v || "").toLowerCase().includes(kw));
-    return withStage.filter((x) => t.test(x.s) && hit(x.j)).map((x) => x.j)
+    return withStage.filter((x) => t.test(x.s, x.oc) && hit(x.j) && (tab !== "result" || ocFilter === "all" || x.oc?.group === ocFilter))
       // ✅ (11 ต.ค. 2569 ผู้ใช้: "งานใหม่ที่ลงตารางควรมาที่บนสุดด้วย") — ล่าสุดขึ้นก่อนทุกแท็บ
       //    กำลังทำ = เรียงตามเวลาส่งลงตาราง (scheduledAt) · รอลงตาราง = งานด่วนก่อน แล้วรับเข้าล่าสุด · เสร็จแล้ว = ปิดล่าสุด
-      .sort((a, b) => (tab === "done"
-        ? new Date(b.closeApprovedAt || b.updatedAt || 0) - new Date(a.closeApprovedAt || a.updatedAt || 0)
-        : tab === "active"
-          ? new Date(b.scheduledAt || b.createdAt || b.intakeAt || 0) - new Date(a.scheduledAt || a.createdAt || a.intakeAt || 0)
-          : (isUrgent(b) - isUrgent(a)) || new Date(b.intakeAt || 0) - new Date(a.intakeAt || 0)));
-  }, [withStage, tab, q]);
+      .sort(({ j: a, oc: oa }, { j: b, oc: ob }) => (tab === "result"
+        // ติดตามผล: ต้องทำก่อน (ยังไม่ส่ง/ถึงเวลาติดตาม) → รอตอบ → ได้/ไม่ได้งาน
+        ? (["todo", "wait", "won", "lost"].indexOf(oa?.group) - ["todo", "wait", "won", "lost"].indexOf(ob?.group))
+          || ((ob?.key === "follow_up") - (oa?.key === "follow_up"))
+          || new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0)
+        : tab === "done"
+          ? new Date(b.closeApprovedAt || b.updatedAt || 0) - new Date(a.closeApprovedAt || a.updatedAt || 0)
+          : tab === "active"
+            ? new Date(b.scheduledAt || b.createdAt || b.intakeAt || 0) - new Date(a.scheduledAt || a.createdAt || a.intakeAt || 0)
+            : (isUrgent(b) - isUrgent(a)) || new Date(b.intakeAt || 0) - new Date(a.intakeAt || 0)));
+  }, [withStage, tab, q, ocFilter]);
 
   return (
-    <Box sx={{ px: { xs: 1.5, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: 1000, mx: "auto" }}>
+    <Box sx={{ px: { xs: 1.5, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: view === "table" ? 1280 : 1000, mx: "auto" }}>
       <PageHeader icon={<PostAddOutlined />} title="งานใหม่"
         subtitle="รับงาน → ส่งลงตาราง หรือ ส่งมอบ + วางบิล"
         actions={canCreate
@@ -741,13 +918,13 @@ export default function JobIntake() {
           : <Box component="span" sx={{ px: 1.25, py: 0.5, borderRadius: 99, fontSize: "0.74rem", fontWeight: 700, color: MUTED, bgcolor: SURFACE, border: `1px solid ${LINE}`, whiteSpace: "nowrap" }}>ดูอย่างเดียว</Box>} />
 
       {/* แท็บตามขั้นตอน */}
-      <Stack direction="row" spacing={0.75} sx={{ mb: 1.5 }}>
-        {TABS.filter((t) => !t.hideEmpty || counts[t.key] > 0 || tab === t.key).map((t) => {
+      <Stack direction="row" spacing={0.75} sx={{ mb: 1.5, overflowX: "auto", scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
+        {TABS.filter((t) => !(t.hideEmpty || t.key === "result") || counts[t.key] > 0 || tab === t.key).map((t) => {
           const on = tab === t.key;
           return (
             <ButtonBase key={t.key} onClick={() => setTab(t.key)} sx={{
               // ✅ มือถือ: ตัวเลขบน ชื่อล่าง — 4 แท็บไม่ล้นจอ (ผู้ใช้แจ้งแท็บแรกตกขอบ)
-              flex: { xs: 1, sm: "0 0 auto" }, minWidth: 0, height: { xs: 54, sm: 40 }, px: { xs: 0.5, sm: 1.75 }, borderRadius: 2.5,
+              flex: { xs: "1 0 auto", sm: "0 0 auto" }, minWidth: { xs: 64, sm: 0 }, height: { xs: 54, sm: 40 }, px: { xs: 0.5, sm: 1.75 }, borderRadius: 2.5,
               flexDirection: { xs: "column-reverse", sm: "row" }, fontSize: { xs: "0.74rem", sm: "0.84rem" }, fontWeight: 800, gap: { xs: 0.2, sm: 0.6 }, whiteSpace: "nowrap", overflow: "hidden",
               border: `1.5px solid ${on ? ACCENT : LINE}`, bgcolor: on ? alpha(ACCENT, 0.07) : "#fff", color: on ? ACCENT : "#334155",
             }}>
@@ -759,22 +936,65 @@ export default function JobIntake() {
         })}
       </Stack>
 
-      {(jobs || []).length > 5 && (
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, height: 40, px: 1.5, mb: 1.5, borderRadius: 2.5, border: `1px solid ${LINE}`, bgcolor: "#fff" }}>
+      {/* ค้นหา + สลับมุมมอง การ์ด / ตาราง */}
+      <Stack direction="row" gap={1} sx={{ mb: 1.5 }}>
+        <Box sx={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 1, height: 40, px: 1.5, borderRadius: 2.5, border: `1px solid ${LINE}`, bgcolor: "#fff" }}>
           <Search sx={{ fontSize: 18, color: "#94a3b8" }} />
           <Box component="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหา ชื่องาน / โครงการ / เลข Job / เลขเอกสาร"
             sx={{ flex: 1, minWidth: 0, border: 0, outline: 0, fontSize: "0.86rem", fontFamily: "inherit", bgcolor: "transparent", color: INK }} />
           {q && <IconButton size="small" onClick={() => setQ("")}><Close sx={{ fontSize: 16 }} /></IconButton>}
+        </Box>
+        <Stack direction="row" sx={{ flexShrink: 0, p: 0.4, borderRadius: 2.5, border: `1px solid ${LINE}`, bgcolor: "#fff" }}>
+          {[["card", ViewAgendaOutlined, "การ์ด"], ["table", TableRowsOutlined, "ตาราง"]].map(([k, Ico, label]) => (
+            <ButtonBase key={k} onClick={() => changeView(k)} aria-label={`มุมมอง${label}`}
+              sx={{ height: 30, px: 1.1, gap: 0.5, borderRadius: 2, fontFamily: "inherit", fontSize: "0.78rem", fontWeight: 800,
+                color: view === k ? "#fff" : "#475569", bgcolor: view === k ? ACCENT : "transparent" }}>
+              <Ico sx={{ fontSize: 17 }} />
+              <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>{label}</Box>
+            </ButtonBase>
+          ))}
+        </Stack>
+      </Stack>
+
+      {/* แท็บติดตามผล: สรุป + กรองตามผล */}
+      {tab === "result" && (
+        <Box sx={{ mb: 1.5, p: 1.25, borderRadius: 3, border: `1px solid ${LINE}`, bgcolor: "#fff" }}>
+          <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75 }}>
+            {OUTCOME_FILTERS.map((f) => {
+              const on = ocFilter === f.key;
+              const color = f.color || "#334155";
+              return (
+                <ButtonBase key={f.key} onClick={() => setOcFilter(f.key)}
+                  sx={{ height: 32, px: 1.25, gap: 0.6, borderRadius: 99, fontFamily: "inherit", fontSize: "0.8rem", fontWeight: on ? 800 : 600,
+                    color: on ? color : "#475569", bgcolor: on ? alpha(color, 0.08) : "transparent", border: `1px solid ${on ? alpha(color, 0.5) : LINE}` }}>
+                  {f.color && <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: f.color }} />}
+                  {f.label}
+                  <Box component="span" sx={{ minWidth: 20, height: 20, px: 0.6, borderRadius: 99, display: "inline-grid", placeItems: "center", fontSize: "0.72rem", fontWeight: 800, bgcolor: on ? color : SURFACE, color: on ? "#fff" : MUTED }}>{ocStats[f.key] || 0}</Box>
+                </ButtonBase>
+              );
+            })}
+          </Stack>
+          {(ocStats.won + ocStats.lost) > 0 && (
+            <Typography sx={{ mt: 1, fontSize: "0.8rem", color: "#475569" }}>
+              อัตราได้งาน <Box component="span" sx={{ fontWeight: 900, color: GREEN }}>{Math.round((ocStats.won / (ocStats.won + ocStats.lost)) * 100)}%</Box>
+              {" "}({ocStats.won} จาก {ocStats.won + ocStats.lost} งานที่ลูกค้าตอบแล้ว)
+              {ocStats.wonValue > 0 && <> · มูลค่างานที่ได้ <Box component="span" sx={{ fontWeight: 900, color: INK }}>{baht(ocStats.wonValue)}</Box></>}
+            </Typography>
+          )}
         </Box>
       )}
 
       {!jobs ? (
         <Stack spacing={1}>{[0, 1, 2].map((i) => <Skeleton key={i} variant="rounded" height={88} sx={{ borderRadius: 3 }} />)}</Stack>
       ) : list.length ? (
-        <Stack spacing={1.25}>{list.map((j) => <JobCard key={j._id} job={j} readOnly={!canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone} onEdit={openForm} onCancel={cancelJob} onRestore={restoreJob} />)}</Stack>
+        view === "table" ? (
+          <JobTable rows={list} readOnlyOf={(j) => !canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} />
+        ) : (
+          <Stack spacing={1.25}>{list.map(({ j, oc }) => <JobCard key={j._id} job={j} outcome={oc} readOnly={!canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone} onEdit={openForm} onCancel={cancelJob} onRestore={restoreJob} />)}</Stack>
+        )
       ) : (
         <EmptyState icon={<PostAddOutlined />}
-          title={q ? "ไม่พบงานที่ค้นหา" : tab === "waiting" ? "ไม่มีงานรอดำเนินการ" : tab === "active" ? "ไม่มีงานที่กำลังดำเนินการ" : tab === "cancelled" ? "ไม่มีงานที่ยกเลิก" : "ยังไม่มีงานที่เสร็จ"}
+          title={q ? "ไม่พบงานที่ค้นหา" : tab === "waiting" ? "ไม่มีงานรอดำเนินการ" : tab === "active" ? "ไม่มีงานที่กำลังดำเนินการ" : tab === "cancelled" ? "ไม่มีงานที่ยกเลิก" : tab === "result" ? "ไม่มีงานในกลุ่มนี้" : "ยังไม่มีงานที่เสร็จ"}
           hint={tab === "waiting" && canCreate ? "ได้งานมาแล้ว กด “รับงานใหม่” เพื่อกรอกเก็บไว้ก่อน" : undefined}
           action={tab === "waiting" && canCreate ? <Button variant="contained" startIcon={<AddRounded />} onClick={() => openForm()} sx={{ ...PRIMARY, mt: 1 }}>รับงานใหม่</Button> : null} />
       )}
