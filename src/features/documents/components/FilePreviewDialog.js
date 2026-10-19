@@ -10,7 +10,7 @@
 import { Box, Typography, Button, Tooltip, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, useMediaQuery } from "@mui/material";
 import { InsertDriveFile, OpenInNew } from "@mui/icons-material";
 import { isImageFile } from "@/shared/utils/jobDocTypes";
-import { getOptimizedImageUrl } from "@/shared/utils/cloudinaryImage";
+import ImagePreview from "@/shared/ui/ImagePreview";
 
 const TEXT_SUB = "#64748b";
 
@@ -48,13 +48,7 @@ export default function FilePreviewDialog({ file, caption, onClose }) {
           // มาย่อด้วย CSS ให้พอดีจอ — เสียแบนด์วิดท์และเวลาไปกับพิกเซลที่ไม่มีวันได้เห็น
           // ขอกว้างตามขนาดจอจริง (คูณ 2 เผื่อจอความละเอียดสูง) ก็คมพอโดยไฟล์เล็กลงหลายเท่า
           // ⚠️ decoding="async" กันไม่ให้การ decode รูปใหญ่บล็อกการวาดหน้าจอจนรู้สึกว่ากล่องค้าง
-          <Box
-            component="img"
-            src={getOptimizedImageUrl(file.fileUrl, { width: isMobile ? 1080 : 1600 })}
-            alt={file.fileName}
-            decoding="async"
-            sx={{ maxWidth: "100%", maxHeight: isMobile ? "70vh" : "75vh", objectFit: "contain" }}
-          />
+          <Box sx={{ m: -1 }}><ImagePreview key={file.fileUrl} url={file.fileUrl} name={file.fileName} /></Box>
         ) : (
           // ⚠️ PDF/ไฟล์อื่นไม่ฝัง iframe — เบราว์เซอร์บนมือถือหลายตัวแสดงไม่ได้แล้วขึ้นกรอบเปล่า
           // ซึ่งดูเหมือนไฟล์เสียทั้งที่ไฟล์ปกติดี ให้กดเปิดแท็บใหม่ไปเลยชัดเจนกว่า

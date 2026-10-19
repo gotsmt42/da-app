@@ -25,6 +25,7 @@ import {
 import Swal from "sweetalert2";
 import EventService from "@/shared/services/EventService";
 import { getOptimizedImageUrl } from "@/shared/utils/cloudinaryImage";
+import ImagePreview from "@/shared/ui/ImagePreview";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, PRIMARY_BTN_SX } from "@/shared/ui/PageKit";
 import { SALES_TYPE_META, salesStatusMeta, toSalesStatus } from "../salesAppointmentTypes";
@@ -565,8 +566,7 @@ export default function SalesAppointmentDialog({ eventId, userData, isAdminOrMan
         PaperProps={{ sx: { bgcolor: "#0f172a", borderRadius: 2, overflow: "hidden" } }}>
         {viewer && (
           <Box sx={{ position: "relative" }}>
-            <Box component="img" src={getOptimizedImageUrl(viewer.fileUrl, { width: 1600 })} alt={viewer.fileName}
-              sx={{ display: "block", maxWidth: "92vw", maxHeight: "86vh", objectFit: "contain" }} />
+            <Box sx={{ width: "min(92vw, 1100px)" }}><ImagePreview key={viewer.fileUrl} url={viewer.fileUrl} name={viewer.fileName} /></Box>
             <IconButton onClick={() => setViewer(null)} sx={{ position: "absolute", top: 8, right: 8, bgcolor: "rgba(0,0,0,.5)", color: "#fff" }}><Close /></IconButton>
             <Typography sx={{ px: 1.5, py: 1, fontSize: "0.76rem", color: "#cbd5e1" }}>
               {viewer.uploadedBy ? `${viewer.uploadedBy} · ` : ""}{fmtDateTime(viewer.uploadedAt)}

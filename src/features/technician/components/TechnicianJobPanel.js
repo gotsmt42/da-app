@@ -37,8 +37,7 @@ import {
   RadioButtonUnchecked,
 } from "@mui/icons-material";
 import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LINE, SUCCESS } from "@/shared/ui/PageKit";
-import LineIcon from "@/shared/ui/LineIcon";
-import { printFile, shareFile, shareToLine, isMobileDevice } from "@/shared/utils/fileActions";
+import { printFile, shareFile, isMobileDevice } from "@/shared/utils/fileActions";
 import InfoLine from "@/shared/ui/InfoLine";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { ROLES } from "@/shared/utils/roles";
@@ -328,20 +327,12 @@ const DocumentFileList = ({ type, files, isUploading, uploadProgress, onFileUplo
               <ListItemIcon><Share fontSize="small" /></ListItemIcon>
               <ListItemText>แชร์ไฟล์ (รูป/PDF)</ListItemText>
             </MenuItem>
-            <MenuItem onClick={() => { shareToLine(fileMenu.file.fileUrl, fileMenu.file.fileName); closeFileMenu(); }} sx={{ gap: 1.5, minHeight: 44 }}>
-              <ListItemIcon><LineIcon size={20} /></ListItemIcon>
-              <ListItemText>แชร์ลิงก์ไปยัง LINE</ListItemText>
-            </MenuItem>
           </>
         ) : (
           <>
-            <MenuItem onClick={() => { shareToLine(fileMenu.file.fileUrl, fileMenu.file.fileName); closeFileMenu(); }} sx={{ gap: 1.5, minHeight: 44 }}>
-              <ListItemIcon><LineIcon size={20} /></ListItemIcon>
-              <ListItemText>แชร์ไปยัง LINE</ListItemText>
-            </MenuItem>
             <MenuItem onClick={() => { shareFile(fileMenu.file.fileUrl, fileMenu.file.fileName); closeFileMenu(); }} sx={{ gap: 1.5, minHeight: 44 }}>
               <ListItemIcon><Share fontSize="small" /></ListItemIcon>
-              <ListItemText>แชร์ไฟล์ผ่านระบบ (ไม่รวม LINE บนคอม)</ListItemText>
+              <ListItemText>แชร์ไฟล์</ListItemText>
             </MenuItem>
           </>
         )}

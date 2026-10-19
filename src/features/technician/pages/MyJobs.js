@@ -25,7 +25,7 @@ import AuthService from "@/shared/services/authService";
 import TechnicianJobCard from "../components/TechnicianJobPanel";
 import ActiveCheckInBanner from "@/features/attendance/components/ActiveCheckInBanner";
 import { buildDaysPastDueMap, isFlaggedDays, isSevereDays, getOverdueGroupKey } from "@/shared/utils/overdueJobs";
-import { getOptimizedImageUrl } from "@/shared/utils/cloudinaryImage";
+import ImagePreview from "@/shared/ui/ImagePreview";
 import { PAGE_SX, PageHeader, ICON_BTN_SX, INK, INK_2, MUTED, LINE, SURFACE, ACCENT } from "@/shared/ui/PageKit";
 import usePaged, { PageBar } from "@/shared/ui/usePaged";
 import { JobFlowFlags } from "@/shared/ui/JobFlow";
@@ -132,8 +132,7 @@ const FilePreviewDialog = ({ previewUrl, previewFileName, onClose }) => {
       <Divider />
       <DialogContent sx={{ p: 0 }}>
         {type === "image" && (
-          <img src={getOptimizedImageUrl(previewUrl)} alt={previewFileName}
-            style={{ maxWidth: "100%", maxHeight: 780, display: "block", margin: "0 auto", padding: 16 }} />
+          <ImagePreview key={previewUrl} url={previewUrl} name={previewFileName} />
         )}
         {type === "pdf" && (
           pdfLoading ? (

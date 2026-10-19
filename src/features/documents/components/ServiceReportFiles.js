@@ -6,9 +6,9 @@ import "@/shared/utils/momentThaiLocale";
 
 import EventService from "@/shared/services/EventService";
 import { resolveOperationGroup } from "@/shared/utils/overdueJobs";
-import { getOptimizedImageUrl } from "@/shared/utils/cloudinaryImage";
+import ImagePreview from "@/shared/ui/ImagePreview";
 import { formatRoundLabel } from "@/shared/utils/contractRounds";
-import { printFile, shareFile, shareToLine, isMobileDevice } from "@/shared/utils/fileActions";
+import { printFile, shareFile, isMobileDevice } from "@/shared/utils/fileActions";
 
 import {
   Box, Stack, Typography,
@@ -23,7 +23,6 @@ import {
   MoreVert, Print, Share,
   Description, RequestQuote, ReceiptLong, AssignmentTurnedIn,
 } from "@mui/icons-material";
-import LineIcon from "@/shared/ui/LineIcon";
 import SelectField from "@/shared/ui/SelectField";
 import { FilterArea } from "@/shared/ui/MobileFilterSheet";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
@@ -145,7 +144,7 @@ const FilePreviewDialog = ({ previewUrl, previewFileName, onClose }) => {
       <Divider />
       <DialogContent sx={{ p: 0 }}>
         {type === "image" && (
-          <img src={getOptimizedImageUrl(previewUrl)} alt={previewFileName} style={{ maxWidth: "100%", maxHeight: 780, display: "block", margin: "0 auto", padding: 16 }} />
+          <ImagePreview key={previewUrl} url={previewUrl} name={previewFileName} />
         )}
         {type === "pdf" && (
           pdfLoading ? (
@@ -394,17 +393,9 @@ const ServiceReportFiles = () => {
               <ListItemIcon><Share fontSize="small" /></ListItemIcon>
               <ListItemText>แชร์ไฟล์ (รูป/PDF)</ListItemText>
             </MenuItem>
-            <MenuItem onClick={() => { shareToLine(fileMenu.file.fileUrl, fileMenu.file.fileName); closeFileMenu(); }} sx={{ gap: 1.5, minHeight: 44 }}>
-              <ListItemIcon><LineIcon size={20} /></ListItemIcon>
-              <ListItemText>แชร์ลิงก์ไปยัง LINE</ListItemText>
-            </MenuItem>
           </>
         ) : (
           <>
-            <MenuItem onClick={() => { shareToLine(fileMenu.file.fileUrl, fileMenu.file.fileName); closeFileMenu(); }} sx={{ gap: 1.5, minHeight: 44 }}>
-              <ListItemIcon><LineIcon size={20} /></ListItemIcon>
-              <ListItemText>แชร์ไปยัง LINE</ListItemText>
-            </MenuItem>
             <MenuItem onClick={() => { shareFile(fileMenu.file.fileUrl, fileMenu.file.fileName); closeFileMenu(); }} sx={{ gap: 1.5, minHeight: 44 }}>
               <ListItemIcon><Share fontSize="small" /></ListItemIcon>
               <ListItemText>แชร์ไฟล์</ListItemText>
