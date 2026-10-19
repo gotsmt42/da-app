@@ -875,7 +875,14 @@ function injectStyles() {
       flex: 1 1 100%; min-width: 0; display: grid; gap: 8px;
       /* 🐛 (19 ต.ค. 2569 ผู้ใช้: "ทำไมเพี้ยนๆ ไม่เหมือนกัน") auto-fit + แถววันที่เต็มแถว ทำให้มีคอลัมน์ว่างค้าง ช่องคนแคบลง
          (งานที่มีแถววันที่ ช่องกว้าง 150 · งานหลายช่วงที่ซ่อนวันที่ ช่องยืดเต็ม) → ตายตัว 3 ช่องเท่ากันทุกงาน */
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(300px, 1.3fr);
+    }
+    /* 🔁 (19 ต.ค. 2569 ผู้ใช้: "ปรับขนาดช่องวันที่ให้เข้าที่ พอดี สวย") วันเข้างานเป็นช่องที่ 4 ในแถวเดียวกัน (ไม่เต็มแถวยาวเกิน)
+       งานหลายช่วงวัน (ซ่อนช่องวันที่) = 3 ช่องเท่ากัน · กล่องแคบ (<1000px) วันที่ลงแถวใหม่ */
+    .swal-edit-event #ee-head-meta:has(> #ee-hm-date[style*="none"]) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    @media (max-width: 1000px) {
+      .swal-edit-event #ee-head-meta { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .swal-edit-event .ee-hm-item--date { grid-column: 1 / -1; }
     }
     .ee-hm-item {
       min-width: 0; display: flex; flex-direction: column; gap: 2px;
@@ -895,7 +902,6 @@ function injectStyles() {
     }
     #ee-respSelect:hover, #ee-teamSelect:hover { border-color: #2563eb; }
     /* แถววันเข้างานบนหัวกล่อง — ช่องวันที่ 2 ช่องเต็มแถว ไม่มีป้ายซ้ำ */
-    .ee-hm-item--date { grid-column: 1 / -1; }
     .ee-hm-dates { flex: 1 1 auto; width: 100%; }
     /* 🔁 (15 ต.ค. 2569 ผู้ใช้: "มีแค่กรอบวันที่ 2 กรอบ ดูไม่เข้าใจ มี - คั่นก็ยังดี") — ป้ายเล็ก "เริ่ม"/"ถึง" + ขีดคั่นกลาง */
     .ee-hm-daterow { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 4px; width: 100%; }
