@@ -500,12 +500,21 @@ const InfoSection = ({ a, isFinance, canEdit, onSave, bare = false, inline = fal
 };
 
 // ─── การติดตามลูกค้า ─────────────────────────────────────────────────────────
+// 🔁 (19 ต.ค. 2569 ผู้ใช้: "ตรงนี้ด้วยทำให้เข้าใจง่ายขึ้น") — ฟอร์มเป็นขั้น ① ติดต่อทางไหน ② ลูกค้าว่าอย่างไร ③ นัดครั้งถัดไป/หลักฐาน
+//    ปุ่มบอกว่าบันทึกครั้งที่เท่าไร · ประวัติเป็นการ์ดเรียงใหม่→เก่า (ครั้งที่ · ช่องทาง · วันเวลา · ผู้บันทึก · ข้อความ · หลักฐาน)
+const StepLabel = ({ n, children, hint }) => (
+  <Stack direction="row" alignItems="baseline" gap={0.75} sx={{ mb: 0.75 }}>
+    <Box component="span" sx={{ width: 20, height: 20, borderRadius: "50%", display: "inline-grid", placeItems: "center", bgcolor: "#eff6ff", color: "#2563eb", fontSize: "0.72rem", fontWeight: 900, flexShrink: 0 }}>{n}</Box>
+    <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: TEXT_MAIN }}>{children}</Typography>
+    {hint && <Typography sx={{ fontSize: "0.72rem", color: TEXT_SUB }}>{hint}</Typography>}
+  </Stack>
+);
+
 const FollowUpSection = ({ a, onSubmit, onPreview, canFollow, formRef }) => {
   const followUps = a.quotationFollowUps || [];
   const [note, setNote] = useState("");
   const [channel, setChannel] = useState("phone");
   const [next, setNext] = useState("");
-  const [showNext, setShowNext] = useState(false);
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
   const inputRef = useRef();
@@ -514,70 +523,87 @@ const FollowUpSection = ({ a, onSubmit, onPreview, canFollow, formRef }) => {
     setBusy(true);
     const ok = await onSubmit({ note: note.trim(), channel, nextFollowUpAt: next, file });
     setBusy(false);
-    if (ok) { setNote(""); setFile(null); setNext(""); setShowNext(false); }
+    if (ok) { setNote(""); setFile(null); setNext(""); }
   };
   const canWrite = canFollow && ["sent", "revising"].includes(a.quotationStatus);
+  const nextNo = followUps.length + 1;
   return (
-    <Section title={`การติดตามลูกค้า${followUps.length ? ` · ${followUps.length} ครั้ง` : ""}`} icon={<EventRepeat />}>
-      {/* ✅ ฟอร์มอยู่บนสุด (สิ่งที่ทำบ่อยที่สุด) · ช่องทางเป็นปุ่มกดเลือก ไม่ต้องเปิดเมนู · นัดวันถัดไปซ่อนไว้จนกว่าจะใช้ */}
+    <Section title={`การติดตามลูกค้า${followUps.length ? ` · ติดตามแล้ว ${followUps.length} ครั้ง` : ""}`} icon={<EventRepeat />}>
       {canWrite && (
-        <Stack ref={formRef} spacing={1} sx={{ mb: followUps.length ? 1.75 : 0 }}>
-          <Stack direction="row" spacing={0.75} sx={{ flexWrap: "wrap", rowGap: 0.75 }}>
+        <Box ref={formRef} sx={{ p: { xs: 1.25, sm: 1.5 }, borderRadius: 2.5, border: "1px solid #bfdbfe", bgcolor: "#f8fbff", mb: followUps.length ? 2 : 0 }}>
+          <Typography sx={{ fontSize: "0.9rem", fontWeight: 900, color: "#1d4ed8", mb: 1.25 }}>บันทึกการติดตามครั้งที่ {nextNo}</Typography>
+
+          <StepLabel n={1}>ติดต่อลูกค้าทางไหน</StepLabel>
+          <Stack direction="row" spacing={0.75} sx={{ flexWrap: "wrap", rowGap: 0.75, mb: 1.5 }}>
             {CHANNELS.map((c) => (
-              <Chip key={c.value} label={c.label} size="small" onClick={() => setChannel(c.value)}
-                sx={{
-                  height: 28, fontWeight: 700, borderRadius: 1.5,
-                  bgcolor: channel === c.value ? "#eff6ff" : "#fff", color: channel === c.value ? "#1d4ed8" : "#334155",
-                  border: `1px solid ${channel === c.value ? "#bfdbfe" : BORDER}`,
-                }} />
+              <Chip key={c.value} label={c.label} onClick={() => setChannel(c.value)}
+                sx={{ height: 32, fontWeight: 800, borderRadius: 2, fontSize: "0.8rem",
+                  bgcolor: channel === c.value ? "#2563eb" : "#fff", color: channel === c.value ? "#fff" : "#334155",
+                  border: `1px solid ${channel === c.value ? "#2563eb" : BORDER}`, "&:hover": { bgcolor: channel === c.value ? "#1d4ed8" : "#f1f5f9" } }} />
             ))}
           </Stack>
-          <TextField multiline minRows={5} maxRows={14} placeholder="ผลการติดตาม เช่น ลูกค้ารอเข้าที่ประชุมสิ้นเดือน / ขอส่วนลดเพิ่ม 5%"
-            value={note} onChange={(e) => setNote(e.target.value)} sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: 2, fontSize: "0.92rem", lineHeight: 1.6, alignItems: "flex-start" } }} />
-          <Collapse in={showNext} unmountOnExit>
-            <ThaiDatePicker label="นัดติดตามครั้งถัดไป" value={next} onChange={(v) => setNext(v || "")} />
-          </Collapse>
-          <Stack direction="row" spacing={0.5} alignItems="center" sx={{ flexWrap: "wrap", rowGap: 0.5 }}>
-            <input ref={inputRef} type="file" hidden onChange={(e) => setFile(e.target.files?.[0] || null)} />
-            <Button size="small" startIcon={<AttachFile sx={{ fontSize: 16 }} />} onClick={() => inputRef.current?.click()}
-              sx={{ textTransform: "none", fontWeight: 700, color: TEXT_SUB, maxWidth: 180 }}>
-              <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file ? file.name : "หลักฐาน"}</Box>
-            </Button>
-            {file && <IconButton size="small" onClick={() => setFile(null)}><Close sx={{ fontSize: 16 }} /></IconButton>}
-            {!showNext && (
-              <Button size="small" startIcon={<EventRepeat sx={{ fontSize: 16 }} />} onClick={() => setShowNext(true)}
-                sx={{ textTransform: "none", fontWeight: 700, color: TEXT_SUB }}>นัดวันตามต่อ</Button>
-            )}
-            <Box sx={{ flex: 1 }} />
-            <Button variant="contained" disabled={!note.trim() || busy} startIcon={<Save sx={{ fontSize: 17 }} />} onClick={submit}
-              sx={{ textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", px: 2, width: { xs: "100%", sm: "auto" } }}>
-              {busy ? "กำลังบันทึก..." : "บันทึกการติดตาม"}
-            </Button>
-          </Stack>
-        </Stack>
+
+          <StepLabel n={2} hint="* จำเป็น">ลูกค้าว่าอย่างไร</StepLabel>
+          <TextField multiline minRows={5} maxRows={14} fullWidth placeholder="เช่น ลูกค้ารอเข้าที่ประชุมสิ้นเดือน / ขอส่วนลดเพิ่ม 5% / ให้โทรกลับวันศุกร์"
+            value={note} onChange={(e) => setNote(e.target.value)}
+            sx={{ mb: 1.5, "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: 2, fontSize: "0.92rem", lineHeight: 1.6, alignItems: "flex-start" } }} />
+
+          <StepLabel n={3} hint="ไม่บังคับ">นัดติดตามครั้งถัดไป และหลักฐาน</StepLabel>
+          <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, alignItems: "start" }}>
+            <Box>
+              <ThaiDatePicker label="นัดติดตามครั้งถัดไป" value={next} onChange={(v) => setNext(v || "")} />
+              <Typography sx={{ fontSize: "0.7rem", color: TEXT_SUB, mt: 0.4 }}>ไม่ระบุ = ระบบเตือนให้ติดตามอีก {WARNING_DAYS_AFTER_SENT} วัน</Typography>
+            </Box>
+            <Box>
+              <input ref={inputRef} type="file" hidden onChange={(e) => setFile(e.target.files?.[0] || null)} />
+              <Stack direction="row" alignItems="center" gap={0.5}
+                sx={{ height: 40, px: 1.25, borderRadius: 2, border: `1px dashed ${file ? "#2563eb" : "#cbd5e1"}`, bgcolor: "#fff", cursor: "pointer" }}
+                onClick={() => inputRef.current?.click()}>
+                <AttachFile sx={{ fontSize: 17, color: file ? "#2563eb" : TEXT_SUB }} />
+                <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.82rem", fontWeight: 700, color: file ? "#2563eb" : TEXT_SUB }}>
+                  {file ? file.name : "แนบหลักฐาน (รูปแชท / อีเมล)"}
+                </Typography>
+                {file && <IconButton size="small" onClick={(e) => { e.stopPropagation(); setFile(null); }}><Close sx={{ fontSize: 16 }} /></IconButton>}
+              </Stack>
+            </Box>
+          </Box>
+
+          <Button fullWidth variant="contained" disabled={!note.trim() || busy} startIcon={<Save sx={{ fontSize: 18 }} />} onClick={submit}
+            sx={{ mt: 1.75, height: 44, textTransform: "none", fontWeight: 800, borderRadius: 2, boxShadow: "none", bgcolor: "#2563eb", "&:hover": { bgcolor: "#1d4ed8", boxShadow: "none" } }}>
+            {busy ? "กำลังบันทึก..." : `บันทึกการติดตามครั้งที่ ${nextNo}`}
+          </Button>
+          {!note.trim() && <Typography sx={{ mt: 0.5, textAlign: "center", fontSize: "0.7rem", color: TEXT_SUB }}>กรอกข้อ ② ก่อนจึงบันทึกได้</Typography>}
+        </Box>
       )}
 
       {followUps.length > 0 ? (
-        <Stack spacing={0} sx={{ position: "relative", pl: 2.25, pt: canWrite ? 1.5 : 0, borderTop: canWrite ? `1px solid ${BORDER}` : "none", "&::before": { content: '""', position: "absolute", left: 6, top: canWrite ? 20 : 6, bottom: 6, width: 2, bgcolor: BORDER } }}>
-          {followUps.slice().reverse().map((x, i) => (
-            <Box key={x._id || i} sx={{ position: "relative", pb: 1.25 }}>
-              <Box sx={{ position: "absolute", left: -20.5, top: 4, width: 11, height: 11, borderRadius: "50%", bgcolor: i === 0 ? "#2563eb" : "#cbd5e1", border: "2px solid #fff" }} />
-              <Stack direction="row" spacing={1} alignItems="baseline" sx={{ flexWrap: "wrap" }}>
-                <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: TEXT_MAIN }}>ครั้งที่ {x.attemptNumber}</Typography>
-                {x.channel && <Chip size="small" label={channelLabel(x.channel)} sx={{ height: 18, fontSize: "0.66rem", fontWeight: 700 }} />}
-                <Typography sx={{ fontSize: "0.72rem", color: TEXT_SUB }}>{formatThai(moment(x.contactedAt).locale("th"), "D MMM YY HH:mm")} · {x.userName}</Typography>
-              </Stack>
-              {x.note && <Typography sx={{ fontSize: "0.84rem", color: "#334155", whiteSpace: "pre-wrap", mt: 0.25 }}>{x.note}</Typography>}
-              {x.evidenceFileUrl && (
-                <Button size="small" startIcon={<AttachFile sx={{ fontSize: 15 }} />} onClick={() => onPreview(x.evidenceFileUrl, x.evidenceFileName)}
-                  sx={{ textTransform: "none", fontSize: "0.72rem", p: 0, minWidth: 0, mt: 0.25 }}>หลักฐาน</Button>
-              )}
-            </Box>
-          ))}
-        </Stack>
+        <Box>
+          <Typography sx={{ fontSize: "0.76rem", fontWeight: 800, color: TEXT_SUB, mb: 1 }}>ประวัติการติดตาม (ล่าสุดอยู่บน)</Typography>
+          <Stack spacing={1}>
+            {followUps.slice().reverse().map((x, i) => (
+              <Box key={x._id || i} sx={{ p: 1.25, borderRadius: 2, border: `1px solid ${BORDER}`, bgcolor: i === 0 ? "#fff" : "#fcfdfe", boxShadow: i === 0 ? "inset 3px 0 0 #2563eb" : "none" }}>
+                <Stack direction="row" alignItems="center" gap={0.75} sx={{ flexWrap: "wrap" }}>
+                  <Box component="span" sx={{ px: 0.9, height: 22, display: "inline-flex", alignItems: "center", borderRadius: 99, bgcolor: i === 0 ? "#2563eb" : "#e2e8f0", color: i === 0 ? "#fff" : "#334155", fontSize: "0.72rem", fontWeight: 900 }}>
+                    ครั้งที่ {x.attemptNumber}
+                  </Box>
+                  {x.channel && <Chip size="small" label={channelLabel(x.channel)} sx={{ height: 22, fontSize: "0.7rem", fontWeight: 800, bgcolor: "#f1f5f9" }} />}
+                  <Typography sx={{ fontSize: "0.74rem", color: TEXT_SUB }}>{formatThai(moment(x.contactedAt).locale("th"), "D MMM YY · HH:mm")} น. · {x.userName}</Typography>
+                </Stack>
+                {x.note && <Typography sx={{ fontSize: "0.88rem", color: "#1e293b", whiteSpace: "pre-wrap", mt: 0.6, lineHeight: 1.6 }}>{x.note}</Typography>}
+                {x.evidenceFileUrl && (
+                  <Box component="button" type="button" onClick={() => onPreview(x.evidenceFileUrl, x.evidenceFileName)}
+                    sx={{ mt: 0.6, display: "inline-flex", alignItems: "center", gap: 0.4, height: 24, px: 0.9, border: 0, borderRadius: 99, cursor: "pointer", font: "inherit",
+                      bgcolor: alpha("#2563eb", 0.08), color: "#2563eb", fontSize: "0.72rem", fontWeight: 800 }}>
+                    <AttachFile sx={{ fontSize: 14 }} />ดูหลักฐาน
+                  </Box>
+                )}
+              </Box>
+            ))}
+          </Stack>
+        </Box>
       ) : !canWrite ? (
         <Typography sx={{ fontSize: "0.82rem", color: TEXT_SUB }}>
-          {a.quotationStatus ? "ไม่มีบันทึกการติดตาม" : "บันทึกการติดตามได้เมื่อระบบเริ่มนับ (แนบใบเสนอราคา + ส่งงานแล้ว)"}
+          {a.quotationStatus ? "ไม่มีบันทึกการติดตาม" : "บันทึกการติดตามได้เมื่อระบบเริ่มนับ (แนบไฟล์ใบเสนอราคาแล้ว)"}
         </Typography>
       ) : null}
     </Section>
