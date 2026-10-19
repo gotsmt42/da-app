@@ -188,24 +188,35 @@ const scheduleShort = (j) => (j.intakeNote ? `บันทึก ${formatThai(mo
     : j.unscheduled ? (j.plannedMonth ? `ตั้งใจ ${formatThai(moment(j.plannedMonth, "YYYY-MM"), "MMM YY")}` : "ยังไม่กำหนดเดือน")
       : `เข้างาน ${formatThai(moment(j.start), "D MMM YY")}`);
 
-/** มุมมองตาราง — ข้อมูลครบในแถวเดียว กวาดตาเทียบหลายงานได้เร็ว (จอแคบเลื่อนซ้าย-ขวาได้) */
-function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver }) {
-  const th = { textAlign: "left", fontSize: "0.74rem", fontWeight: 800, color: MUTED, px: 1.25, py: 1, borderBottom: `1px solid ${LINE}`, whiteSpace: "nowrap", bgcolor: SURFACE, position: "sticky", top: 0 };
-  const td = { fontSize: "0.82rem", color: "#334155", px: 1.25, py: 1, borderBottom: `1px solid ${LINE}`, verticalAlign: "top" };
+/**
+ * มุมมองตาราง — ข้อมูลหลักครบในแถวเดียว กวาดตาเทียบหลายงานได้เร็ว (จอแคบเลื่อนซ้าย-ขวาได้)
+ * 🔁 (19 ต.ค. 2569 ผู้ใช้: "รายละเอียดให้ครบแบบหน้าการ์ดด้วย") — เพิ่มคอลัมน์รายละเอียดงาน · ทีม/ผู้ติดต่อ · ขั้นถัดไป · กำหนดเสร็จ
+ *    และกดแถวเพื่อกางการ์ดเต็มใต้แถว (ไฟล์แนบ · ผลเสนอราคา · แถบขั้นตอน · ปุ่มแก้ไข/ยกเลิก ครบเหมือนมุมมองการ์ด)
+ */
+function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, renderCard }) {
+  const [open, setOpen] = useState(() => new Set());
+  const toggle = (id) => setOpen((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const th = { textAlign: "left", fontSize: "0.74rem", fontWeight: 800, color: MUTED, px: 1.25, py: 1, borderBottom: `1px solid ${LINE}`, whiteSpace: "nowrap", bgcolor: SURFACE };
+  const td = { fontSize: "0.82rem", color: "#334155", px: 1.25, py: 1.1, borderBottom: `1px solid ${LINE}`, verticalAlign: "top" };
+  const sub = { fontSize: "0.74rem", color: MUTED, lineHeight: 1.45, overflowWrap: "anywhere" };
+  const COLS = ["", "เลข Job", "งาน / โครงการ", "รายละเอียดงาน", "รับจาก · เอกสาร", "กำหนดการ", "ทีม · ผู้ติดต่อ", "สถานะงาน", "ผลเสนอราคา", "ผู้รับผิดชอบ", ""];
   return (
     <Box sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflowX: "auto" }}>
-      <Box component="table" sx={{ width: "100%", minWidth: 940, borderCollapse: "collapse" }}>
+      <Box component="table" sx={{ width: "100%", minWidth: 1120, borderCollapse: "collapse" }}>
         <thead>
-          <tr>
-            {["เลข Job", "งาน / โครงการ", "รับจาก · เอกสาร", "กำหนดการ", "สถานะงาน", "ผลเสนอราคา", "ผู้รับผิดชอบ", ""].map((h) => (
-              <Box component="th" key={h} sx={th}>{h}</Box>
-            ))}
-          </tr>
+          <tr>{COLS.map((h, i) => <Box component="th" key={i} sx={{ ...th, ...(i === 0 ? { width: 34, px: 0.5 } : {}) }}>{h}</Box>)}</tr>
         </thead>
         <tbody>
           {rows.map(({ j, s, oc }) => {
             const doc = j.intakeDocType || j.intakeDocNo ? `${DOC_LABEL[j.intakeDocType] || "เอกสาร"}${j.intakeDocNo ? ` ${j.intakeDocNo}` : ""}` : "";
             const ro = readOnlyOf(j);
+            const isOpen = open.has(j._id);
+            const stall = stalledDays(j, s);
+            const team = [j.team, ...(j.teamMembers || []).map((m) => m?.name)].filter(Boolean).filter((x, i, arr) => arr.indexOf(x) === i).join(", ");
+            const files = (j.sitePhotoFiles || []).filter((f) => f.source === "intake").length;
+            const nx = j.cancelledAt ? null : s.note ? (s.i === 0 ? "ทำงานนี้ แล้วกด “ทำเสร็จแล้ว”" : null)
+              : s.nv ? (s.i === 0 ? "ส่งมอบ แล้วกด “ส่งมอบแล้ว”" : s.i === 2 ? "อัปโหลดใบวางบิล" : null)
+                : j.unscheduled ? "เลือกวันเข้างาน ผู้รับผิดชอบ และหัวหน้าทีม" : s.i >= 0 && s.i < 4 ? nextStepOf(j, "admin")?.title : null;
             const action = !ro && s.i === 0 && !s.note
               ? (s.nv
                 ? <Button size="small" onClick={() => onDeliver(j)} sx={{ ...SUCCESS, height: 30, px: 1.25 }}>ส่งมอบแล้ว</Button>
@@ -213,39 +224,81 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver }) {
               : !j.unscheduled && !s.nv && !s.note
                 ? <Button component={Link} to={`/operation/${j._id}`} size="small" sx={{ ...BTN, height: 30, px: 1.25, color: ACCENT, border: `1px solid ${alpha(ACCENT, 0.4)}` }}>ดูงาน</Button>
                 : null;
-            return (
-              <Box component="tr" key={j._id} sx={{ "&:hover td": { bgcolor: "#f8fafc" } }}>
+            return [
+              <Box component="tr" key={j._id} onClick={(e) => { if (!e.target.closest("a,button")) toggle(j._id); }}
+                sx={{ cursor: "pointer", "& > td": { bgcolor: isOpen ? alpha(ACCENT, 0.04) : "transparent" }, "&:hover > td": { bgcolor: isOpen ? alpha(ACCENT, 0.06) : "#f8fafc" } }}>
+                <Box component="td" sx={{ ...td, px: 0.5, textAlign: "center" }}>
+                  <ChevronRight sx={{ fontSize: 20, color: "#94a3b8", transition: "transform .15s", transform: isOpen ? "rotate(90deg)" : "none" }} />
+                </Box>
                 <Box component="td" sx={{ ...td, whiteSpace: "nowrap" }}>
                   <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: INK }}>{j.jobNo || "—"}</Typography>
-                  <Typography sx={{ fontSize: "0.7rem", color: MUTED }}>{j.intakeNote ? "จดงาน" : j.noVisit ? "ส่งของ" : "เข้างาน"}</Typography>
+                  <Typography sx={sub}>{j.intakeNote ? "จดงาน" : j.noVisit ? "ส่งของ" : "เข้างาน"}</Typography>
                 </Box>
-                <Box component="td" sx={{ ...td, maxWidth: 260 }}>
+                <Box component="td" sx={{ ...td, minWidth: 160, maxWidth: 220 }}>
                   <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: INK, overflowWrap: "anywhere" }}>
-                    {j.intakeNote ? String(j.description || "บันทึกงาน").slice(0, 60) : [j.title, j.system].filter(Boolean).join(" · ") || "งาน"}
-                    {isUrgent(j) && s.i < 4 && <Box component="span" sx={{ ml: 0.5, color: RED, fontWeight: 900 }}>⚡</Box>}
+                    {j.intakeNote ? "บันทึกงาน" : [j.title, j.system].filter(Boolean).join(" · ") || "งาน"}
                   </Typography>
-                  <Typography sx={{ fontSize: "0.76rem", color: MUTED, overflowWrap: "anywhere" }}>{[j.site && j.site !== "-" ? j.site : "", j.company && j.company !== j.site ? j.company : ""].filter(Boolean).join(" · ")}</Typography>
+                  <Typography sx={sub}>{[j.site && j.site !== "-" ? j.site : "", j.company && j.company !== j.site ? j.company : ""].filter(Boolean).join(" · ")}</Typography>
+                  <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.5, mt: 0.4 }}>
+                    {isUrgent(j) && s.i < 4 && <Chip color="#fff" bg={RED} border={RED}>⚡ ด่วน</Chip>}
+                    {stall > 0 && <Chip color={RED} bg={alpha(RED, 0.08)} border="transparent">ค้าง {stall} วัน</Chip>}
+                    {j.approvalStatus === "pending" && <Chip color={AMBER} bg={alpha(AMBER, 0.12)} border="transparent">รออนุมัติ</Chip>}
+                    {j.infoPending && s.i < 4 && <Chip color={AMBER} bg={alpha(AMBER, 0.12)} border="transparent">รอข้อมูล</Chip>}
+                  </Stack>
+                </Box>
+                <Box component="td" sx={{ ...td, minWidth: 170, maxWidth: 240 }}>
+                  <Typography sx={{ ...sub, color: j.description ? "#334155" : "#cbd5e1", fontSize: "0.78rem", whiteSpace: "pre-line", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                    {j.description || "—"}
+                  </Typography>
+                  {(files > 0 || j.equipment) && (
+                    <Typography sx={{ ...sub, mt: 0.3 }}>{[files > 0 && `📎 ${files} ไฟล์`, j.equipment && `อุปกรณ์: ${String(j.equipment).split(/\n+/).filter(Boolean).join(", ")}`].filter(Boolean).join(" · ")}</Typography>
+                  )}
+                  {j.infoPending && j.infoPendingNote && <Typography sx={{ ...sub, color: AMBER, fontWeight: 700 }}>ขาด: {j.infoPendingNote}</Typography>}
                 </Box>
                 <Box component="td" sx={td}>
-                  <Typography sx={{ fontSize: "0.78rem" }}>{j.intakeSource ? `จาก${SOURCE_LABEL[j.intakeSource] || j.intakeSource}` : "—"}</Typography>
-                  {doc && <Typography sx={{ fontSize: "0.74rem", color: MUTED }}>{doc}</Typography>}
+                  <Typography sx={{ fontSize: "0.78rem", whiteSpace: "nowrap" }}>{j.intakeSource ? `จาก${SOURCE_LABEL[j.intakeSource] || j.intakeSource}` : "—"}</Typography>
+                  {doc && <Typography sx={sub}>{doc}</Typography>}
                 </Box>
-                <Box component="td" sx={{ ...td, whiteSpace: "nowrap" }}>{scheduleShort(j)}</Box>
                 <Box component="td" sx={{ ...td, whiteSpace: "nowrap" }}>
-                  <Chip color={s.color} bg={alpha(s.color, 0.1)} border="transparent">{s.label}</Chip>
+                  {scheduleShort(j)}
+                  {j.dueDate && s.i < 4 && (
+                    <Typography sx={{ ...sub, color: moment(j.dueDate).isBefore(moment(), "day") ? RED : MUTED, fontWeight: 700 }}>
+                      เสร็จภายใน {formatThai(moment(j.dueDate), "D MMM YY")}
+                    </Typography>
+                  )}
                 </Box>
-                <Box component="td" sx={{ ...td, minWidth: 170 }}>
+                <Box component="td" sx={{ ...td, minWidth: 120, maxWidth: 170 }}>
+                  <Typography sx={{ fontSize: "0.78rem", overflowWrap: "anywhere" }}>{!j.unscheduled && !j.noVisit && !j.intakeNote ? (team || "ยังไม่มอบหมายทีม") : "—"}</Typography>
+                  {(j.contactName || j.contactTel) && (
+                    <Typography sx={sub}>
+                      {j.contactName || ""}{j.contactName && j.contactTel ? " · " : ""}
+                      {j.contactTel && <Box component="a" href={`tel:${j.contactTel}`} sx={{ color: ACCENT, fontWeight: 700, textDecoration: "none" }}>{j.contactTel}</Box>}
+                    </Typography>
+                  )}
+                </Box>
+                <Box component="td" sx={{ ...td, minWidth: 140, maxWidth: 190 }}>
+                  <Chip color={s.color} bg={alpha(s.color, 0.1)} border="transparent">{s.label}</Chip>
+                  {nx && <Typography sx={{ ...sub, mt: 0.4 }}>ต่อไป: {nx}</Typography>}
+                </Box>
+                <Box component="td" sx={{ ...td, minWidth: 140, maxWidth: 200 }}>
                   {oc ? (
                     <Box component={Link} to={oc.href} sx={{ textDecoration: "none", display: "block" }}>
                       <Chip color={oc.quiet ? "#475569" : oc.color} bg={oc.quiet ? SURFACE : alpha(oc.color, 0.1)} border="transparent">{oc.label}</Chip>
-                      {oc.amount > 0 && <Typography sx={{ fontSize: "0.74rem", color: MUTED, mt: 0.25 }}>{baht(oc.amount)}</Typography>}
+                      {oc.facts.length > 0 && !oc.quiet && <Typography sx={{ ...sub, mt: 0.3 }}>{oc.facts.slice(0, 3).join(" · ")}</Typography>}
                     </Box>
                   ) : <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>}
                 </Box>
                 <Box component="td" sx={{ ...td, whiteSpace: "nowrap" }}>{j.responsiblePerson || <Box component="span" sx={{ color: "#cbd5e1" }}>—</Box>}</Box>
-                <Box component="td" sx={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>{action}</Box>
-              </Box>
-            );
+                <Box component="td" sx={{ ...td, textAlign: "right", whiteSpace: "nowrap", position: "sticky", right: 0, bgcolor: isOpen ? "#f5f8ff !important" : "#fff !important", boxShadow: "-8px 0 8px -8px rgba(15,23,42,.15)" }}>{action}</Box>
+              </Box>,
+              isOpen && (
+                <tr key={`${j._id}-detail`}>
+                  <Box component="td" colSpan={COLS.length} sx={{ p: 1.25, bgcolor: SURFACE, borderBottom: `1px solid ${LINE}` }}>
+                    {renderCard(j, oc)}
+                  </Box>
+                </tr>
+              ),
+            ];
           })}
         </tbody>
       </Box>
@@ -910,7 +963,7 @@ export default function JobIntake() {
   }, [withStage, tab, q, ocFilter]);
 
   return (
-    <Box sx={{ px: { xs: 1.5, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: view === "table" ? 1280 : 1000, mx: "auto" }}>
+    <Box sx={{ px: { xs: 1.5, sm: 2.5 }, py: { xs: 1.25, sm: 2.5 }, maxWidth: view === "table" ? 1500 : 1000, mx: "auto" }}>
       <PageHeader icon={<PostAddOutlined />} title="งานใหม่"
         subtitle="รับงาน → ส่งลงตาราง หรือ ส่งมอบ + วางบิล"
         actions={canCreate
@@ -936,7 +989,7 @@ export default function JobIntake() {
         })}
       </Stack>
 
-      {/* ค้นหา + สลับมุมมอง การ์ด / ตาราง */}
+      {/* ค้นหา + สลับมุมมอง การ์ด / ตาราง · ตาราง: กดแถวเพื่อกางรายละเอียดเต็ม */}
       <Stack direction="row" gap={1} sx={{ mb: 1.5 }}>
         <Box sx={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 1, height: 40, px: 1.5, borderRadius: 2.5, border: `1px solid ${LINE}`, bgcolor: "#fff" }}>
           <Search sx={{ fontSize: 18, color: "#94a3b8" }} />
@@ -988,7 +1041,11 @@ export default function JobIntake() {
         <Stack spacing={1}>{[0, 1, 2].map((i) => <Skeleton key={i} variant="rounded" height={88} sx={{ borderRadius: 3 }} />)}</Stack>
       ) : list.length ? (
         view === "table" ? (
-          <JobTable rows={list} readOnlyOf={(j) => !canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} />
+          <>
+          <Typography sx={{ fontSize: "0.76rem", color: MUTED, mb: 0.75, px: 0.5 }}>กดแถวเพื่อดูรายละเอียดเต็ม (ไฟล์แนบ · ขั้นตอน · แก้ไข/ยกเลิก)</Typography>
+          <JobTable rows={list} readOnlyOf={(j) => !canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering}
+            renderCard={(j, oc) => <JobCard job={j} outcome={oc} readOnly={!canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone} onEdit={openForm} onCancel={cancelJob} onRestore={restoreJob} />} />
+          </>
         ) : (
           <Stack spacing={1.25}>{list.map(({ j, oc }) => <JobCard key={j._id} job={j} outcome={oc} readOnly={!canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone} onEdit={openForm} onCancel={cancelJob} onRestore={restoreJob} />)}</Stack>
         )
