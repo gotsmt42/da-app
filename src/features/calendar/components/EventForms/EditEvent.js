@@ -22,6 +22,7 @@ import { can, seesOperationBoard } from "@/shared/utils/roles";
 import { mapSearchUrl, googleMapsPinSvg, mapEmbedSrc } from "@/shared/ui/SiteMapLink";
 import { faHourglassHalf, faCheck, faClockRotateLeft, faCheckDouble } from "@fortawesome/free-solid-svg-icons";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
+import { JOB_DOC_TYPES, isDocComplete } from "@/shared/utils/jobDocTypes";
 import {
   colorPickerHtml,
   mountColorPicker,
@@ -1030,6 +1031,11 @@ function injectStyles() {
     .swal-edit-event #ee-status-select-wrap select:hover:not(:disabled) { border-color: var(--ee-status, #64748b); }
     .swal-edit-event #ee-status-select-wrap select:focus { outline: none; border-color: var(--ee-status, #2563eb); box-shadow: 0 0 0 3px var(--ee-status-soft, rgba(37,99,235,.12)); }
     .swal-edit-event #ee-status-select-wrap select:disabled { cursor: not-allowed; opacity: .75; }
+    /* 🔁 (20 ต.ค. 2569) สถานะเดินตามขั้นตอน — ปุ่มสถานะที่ล็อก = ป้ายอ่านอย่างเดียว (ไม่จาง ไม่มีลูกศร) · ลิงก์แก้เองของแอดมิน */
+    .swal-edit-event .ee-pick-btn--status:disabled { opacity: 1; cursor: default; }
+    .swal-edit-event .ee-pick-btn--status:disabled .ee-pick-caret { display: none; }
+    .swal-edit-event .ee-status-unlock { flex-shrink: 0; border: 0; background: none; padding: 4px 6px; font: inherit; font-size: 12px; font-weight: 700; color: #64748b; text-decoration: underline; cursor: pointer; }
+    .swal-edit-event .ee-status-unlock:hover { color: #2563eb; }
     .ee-head-owner { margin-left: auto; font-size: 11.5px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 
     /* แผนที่: ปุ่มเรียงใต้ชื่อบนจอแคบ ไม่บีบข้อความ */
@@ -1920,8 +1926,11 @@ export const getEditEvent = async ({
       <div id="ee-status-icon" aria-hidden="true">${cfg0.icon}</div>
       <label for="editStatus">สถานะงาน</label>
       <div id="ee-status-select-wrap">
-        <select id="editStatus" ${canEditStatus ? "" : "disabled title=\"สถานะนี้เปลี่ยนได้เฉพาะแอดมิน/manager\""}>${statusOptions}</select>
+        ${/* 🔁 (20 ต.ค. 2569 ผู้ใช้เลือก "ใช้ขั้นตอนเดียวกันทั้งแอป") สถานะเดินตามขั้นตอนจริงอัตโนมัติ (รับทราบ › ยืนยันนัด › เข้างาน › ขอปิด › อนุมัติ)
+             ช่องนี้จึงล็อกเป็นป้ายอ่านอย่างเดียว · แอดมินแก้เองได้ด้วยปุ่ม "แก้สถานะเอง" (ยืนยันก่อน กันข้ามขั้นตอนโดยไม่ตั้งใจ) */""}
+        <select id="editStatus" disabled title="สถานะเปลี่ยนตามขั้นตอนงานอัตโนมัติ" data-can-edit="${canEditStatus ? "1" : ""}">${statusOptions}</select>
       </div>
+      ${canEditStatus && isAdminOrManagerUser ? '<button type="button" id="ee-status-unlock" class="ee-status-unlock" title="เปลี่ยนสถานะเองโดยไม่ผ่านขั้นตอน">แก้สถานะเอง</button>' : ""}
       <span class="ee-head-owner" title="ผู้สร้างแผนงาน">สร้างโดย ${footerName}</span>
     </div>
   </div>
@@ -2646,7 +2655,9 @@ export const getEditEvent = async ({
             //    (ผู้รับผิดชอบ/หัวหน้าทีมอยู่ส่วนบนของฟอร์มแล้ว)
             compact: true,
             // ✅ (11 ต.ค. 2569 ผู้ใช้: "สายขั้นตอนซ้ำซ้อน ตัดส่วนนี้ออก ใช้คำนี้ไปแทนข้างบน") → สายสถานะงาน 4 ขั้นอยู่ในกล่องนี้แทน
-            statusSteps: true,
+            // 🔁 (20 ต.ค. 2569) ใช้แถบขั้นตอนเดียวกับทั้งแอป (รับทราบ › ยืนยันนัด › เข้างาน › เอกสาร › ขอปิดงาน › เสร็จสิ้น)
+            statusSteps: false,
+            docsComplete: JOB_DOC_TYPES.every((t) => isDocComplete(baseEvent, t.key)),
             sx: { mt: 0, mb: 1.5 },
             onChanged: () => { popup.__checkinChanged = true; },
             // รับทราบงานแล้ว → server คืนงานทั้งกลุ่ม · อัปเดตกล่องด้วยข้อมูลใหม่ (acks)
@@ -2844,6 +2855,20 @@ export const getEditEvent = async ({
             return `<span class="ee-pick-ico" style="color:${c?.color || "#64748b"};background:${c?.soft || "#f1f5f9"}">${c?.icon || ""}</span><span class="ee-pick-text">${escapeHtml(o.label)}</span>`;
           },
         });
+        {
+          const unlock = document.getElementById("ee-status-unlock");
+          unlock?.addEventListener("click", () => {
+            const ok = window.confirm("แก้สถานะเอง?\nปกติสถานะเปลี่ยนตามขั้นตอนอัตโนมัติ (รับทราบ › ยืนยันนัด › เข้างาน › ขอปิดงาน › อนุมัติ)\nใช้เฉพาะกรณีแก้ข้อมูลผิด — ระบบบันทึกประวัติว่าใครเปลี่ยน");
+            if (!ok) return;
+            const sel = document.getElementById("editStatus");
+            if (!sel) return;
+            sel.disabled = false;
+            sel.title = "";
+            sel.dispatchEvent(new Event("change", { bubbles: true }));
+            unlock.remove();
+            setTimeout(() => sel.nextElementSibling?.click?.(), 0);
+          });
+        }
         const imgByName = new Map(employeeList.map((e) => [e.fname, e.imageUrl || ""]));
         enhanceSelect(document.getElementById("ee-teamSelect"), {
           host, title: "หัวหน้าทีมเข้างาน", btnClass: "ee-pick-btn--person", search: true, clearLabel: "ไม่ระบุหัวหน้าทีม",
