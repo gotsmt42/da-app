@@ -12,21 +12,22 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge, Box, Button, ButtonBase, IconButton, Popover, Stack, SwipeableDrawer, Tooltip, Typography, useMediaQuery } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { AssignmentLateOutlined, AssignmentTurnedInOutlined, ThumbUpAltOutlined, EventAvailableOutlined, LoginRounded, ChevronRight, Close } from "@mui/icons-material";
+import { AssignmentLateOutlined, AssignmentTurnedInOutlined, WarningAmberRounded, ThumbUpAltOutlined, EventAvailableOutlined, LoginRounded, ChevronRight, Close } from "@mui/icons-material";
 import useAppBadges from "@/shared/hooks/useAppBadges";
 import useMyAttention from "@/shared/hooks/useMyAttention";
 import { useAuth } from "@/features/auth/AuthContext";
 import { can } from "@/shared/utils/roles";
 import { ATTENTION_META, attentionDayText } from "@/shared/utils/myJobAttention";
 
-const ICON = { checkin: <LoginRounded />, ack: <ThumbUpAltOutlined />, confirm: <EventAvailableOutlined /> };
+const ICON = { checkin: <LoginRounded />, ack: <ThumbUpAltOutlined />, confirm: <EventAvailableOutlined />, overdue: <WarningAmberRounded /> };
 const LINE = "#e2e8f0";
 /** สิ่งที่ต้องกด (สั้น ชัด) */
-const ACTION = { checkin: "กดบันทึกเข้างาน", ack: "กดรับทราบงาน", confirm: "กดยืนยันนัดหมาย" };
+const ACTION = { checkin: "กดบันทึกเข้างาน", ack: "กดรับทราบงาน", confirm: "กดยืนยันนัดหมาย", overdue: "ค้างงาน · ส่งเอกสาร/ขอปิดงาน" };
 /** แยกตามบทบาทของฉันในงาน */
 const ROLES = [
   { key: "head", label: "ในฐานะหัวหน้าทีมเข้างาน", keys: ["checkin"] },
   { key: "resp", label: "ในฐานะผู้รับผิดชอบงาน", keys: ["ack", "confirm"] },
+  { key: "overdue", label: "งานค้าง (เลยกำหนดเกิน 7 วัน)", keys: ["overdue"] },
 ];
 
 export default function HeaderTaskBell() {
@@ -57,7 +58,7 @@ export default function HeaderTaskBell() {
           <Stack alignItems="center" gap={0.75} sx={{ py: 4, px: 2, color: "#16a34a" }}>
             <AssignmentTurnedInOutlined sx={{ fontSize: 40 }} />
             <Typography sx={{ fontWeight: 800, fontSize: "0.9rem", color: "#0f172a" }}>เรียบร้อยดี ไม่มีอะไรค้าง</Typography>
-            <Typography sx={{ fontSize: "0.76rem", color: "#64748b", textAlign: "center" }}>รับทราบ · ยืนยันนัด · บันทึกเข้างานวันนี้ ครบแล้ว</Typography>
+            <Typography sx={{ fontSize: "0.76rem", color: "#64748b", textAlign: "center" }}>รับทราบ · ยืนยันนัด · บันทึกเข้างานวันนี้ ครบ · ไม่มีงานค้าง</Typography>
           </Stack>
         ) : ROLES.filter((r) => r.keys.some((k) => att[k].length)).map((role) => (
           // ✅ (20 ต.ค. 2569 ผู้ใช้: "แยกเป็นบุคคล ไม่รวมกัน ตามผู้รับผิดชอบ หรือหัวหน้างาน · ทำให้ดูง่ายกว่านี้")
@@ -75,7 +76,7 @@ export default function HeaderTaskBell() {
                     borderRadius: 2.5, border: `1px solid ${alpha(m.color, 0.3)}`, bgcolor: alpha(m.color, 0.04), "&:hover": { bgcolor: alpha(m.color, 0.08) } }}>
                   <Box sx={{ width: 40, height: 40, borderRadius: 2.5, flexShrink: 0, display: "grid", placeItems: "center", bgcolor: m.color, color: "#fff", "& svg": { fontSize: 21 } }}>{ICON[k]}</Box>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography sx={{ fontSize: "0.8rem", fontWeight: 900, color: m.color, lineHeight: 1.3 }}>{ACTION[k]} · {attentionDayText(e)}</Typography>
+                    <Typography sx={{ fontSize: "0.8rem", fontWeight: 900, color: m.color, lineHeight: 1.3 }}>{ACTION[k]} · {k === "overdue" ? `เลยกำหนด ${e.__overdueDays} วัน` : attentionDayText(e)}</Typography>
                     <Typography noWrap sx={{ fontSize: "0.9rem", fontWeight: 800, color: "#0f172a", lineHeight: 1.35 }}>{e.site || e.company || "ไม่ระบุโครงการ"}</Typography>
                     <Typography noWrap sx={{ fontSize: "0.72rem", color: "#64748b" }}>{[e.title, e.system, e.jobNo].filter(Boolean).join(" · ")}</Typography>
                   </Box>

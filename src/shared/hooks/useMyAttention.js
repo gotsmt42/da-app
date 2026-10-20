@@ -6,6 +6,8 @@
 import { useMemo } from "react";
 import useTodayCheckins from "@/shared/hooks/useTodayCheckins";
 import { attentionOf } from "@/shared/utils/myJobAttention";
+import { isRespOrHead } from "@/shared/utils/jobFlow";
+import { buildDaysPastDueMap, isFlaggedDays, getOverdueGroupKey } from "@/shared/utils/overdueJobs";
 
 export default function useMyAttention(events, userData) {
   const todayCheckedIds = useTodayCheckins();
@@ -20,6 +22,14 @@ export default function useMyAttention(events, userData) {
       seen.add(key);
       out[k].push(e);
     });
-    return { ...out, total: out.checkin.length + out.ack.length + out.confirm.length, ready: todayCheckedIds !== null };
+    // งานค้าง (เกณฑ์เดียวกับแท็บ "ค้างงาน" — เลยวันสุดท้ายเกิน 7 วัน) ของงานที่ฉันเป็นผู้รับผิดชอบ/หัวหน้าทีม · 1 งานต่อกลุ่ม
+    const mine = (events || []).filter((e) => isRespOrHead(e, userData?.userId, userData?.fname) && !e.unscheduled);
+    const due = buildDaysPastDueMap(mine);
+    const seenG = new Set();
+    out.overdue = mine
+      .filter((e) => { const d = due.get(e._id); if (!d || !isFlaggedDays(d.days)) return false; const k = getOverdueGroupKey(e); if (seenG.has(k)) return false; seenG.add(k); return true; })
+      .map((e) => ({ ...e, __overdueDays: due.get(e._id).days }))
+      .sort((a, b) => b.__overdueDays - a.__overdueDays);
+    return { ...out, total: out.checkin.length + out.ack.length + out.confirm.length + out.overdue.length, ready: todayCheckedIds !== null };
   }, [events, userData?.userId, userData?.fname, todayCheckedIds]);
 }
