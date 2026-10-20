@@ -29,7 +29,7 @@ import Swal from "@/shared/ui/swal";
 import TomSelect from "tom-select";
 import "tom-select/dist/css/tom-select.css";
 import {
-  Box, Stack, Typography, Button, ButtonBase, Skeleton, Dialog, DialogContent, DialogActions, IconButton, Avatar,
+  Box, Stack, Typography, Button, ButtonBase, Skeleton, Dialog, DialogContent, DialogActions, IconButton, Avatar, Collapse,
 } from "@mui/material";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { hasValidAvatar } from "@/shared/utils/user";
@@ -39,7 +39,7 @@ import {
   NotesOutlined, CalendarMonthOutlined, GroupsOutlined, PersonOutlineOutlined, BuildOutlined, CallReceivedRounded, DescriptionOutlined, PhoneOutlined, HourglassTopRounded, ReportProblemOutlined,
   BlockRounded, RestoreRounded, PersonOffOutlined,
   LocalShippingOutlined, ReceiptLongOutlined, TaskAltRounded, UploadFileOutlined, AttachFileRounded, Search,
-  ViewAgendaOutlined, TableRowsOutlined, RequestQuoteOutlined,
+  ViewAgendaOutlined, TableRowsOutlined, RequestQuoteOutlined, ExpandMoreRounded,
   VerifiedOutlined, SendOutlined, NotificationsActiveOutlined, EditNoteOutlined, CheckCircleRounded, CancelRounded, DoNotDisturbOnOutlined,
 } from "@mui/icons-material";
 import EventService from "@/shared/services/EventService";
@@ -77,9 +77,15 @@ const invoicedOf = (e) => Boolean((e.invoiceFiles || []).length || e.billing?.in
 const STAGES_NOTE = ["บันทึก", "ทำ", "เสร็จ"];
 /** ✅ ค้างขั้นเดิมเกิน 2 วัน (ตรงกับตัวแจ้งเตือนฝั่ง server: checkAndNotifyStalledIntake) — คืนจำนวนวัน หรือ 0 */
 const STALL_DAYS = 2;
+// 🐛 (20 ต.ค. 2569 ผู้ใช้: "ทำไมขึ้นค้างงาน ทั้งที่กำหนดเข้าเดือน ม.ค.") งานที่วางแผนเข้าเดือนข้างหน้า ยังไม่ถึงเวลาส่งลงตาราง
+//    = ไม่ค้าง · นับค้างจาก "วันรับงาน หรือ ต้นเดือนที่วางแผนไว้ แล้วแต่อันไหนช้ากว่า" (server: OverdueReminder ใช้กติกาเดียวกัน)
 const stalledDays = (e, st) => {
-  const since = st.i === 0 ? e.intakeAt : st.nv && st.i === 2 ? (e.deliveredAt || e.scheduledAt) : null;
+  let since = st.i === 0 ? e.intakeAt : st.nv && st.i === 2 ? (e.deliveredAt || e.scheduledAt) : null;
   if (!since) return 0;
+  if (st.i === 0 && e.plannedMonth && !st.nv && !st.note) {
+    const planStart = moment(e.plannedMonth, "YYYY-MM").startOf("month");
+    if (planStart.isAfter(moment(since))) since = planStart.toDate();
+  }
   const d = Math.floor((Date.now() - new Date(since).getTime()) / 86400000);
   return d >= STALL_DAYS ? d : 0;
 };
@@ -729,6 +735,10 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
   const intakeDocs = (job.sitePhotoFiles || []).filter((f) => f.source === "intake");
   const invoiceFiles = job.invoiceFiles || [];
   const [uploading, setUploading] = useState(false);
+  // ✅ (20 ต.ค. 2569 ผู้ใช้: "ให้พับรายละเอียดได้ และเริ่ม default ดูรกและกินพื้นที่") การ์ดเริ่มแบบพับ — กางดูรายละเอียด/เอกสารเมื่อกด
+  //    (กางใต้แถวตาราง inRow = เปิดเสมอ เพราะผู้ใช้กดกางเอง)
+  const [open, setOpen] = useState(false);
+  const showMore = inRow || open;
   const fu = openFollowUp(job);
   const team = [job.team, ...(job.teamMembers || []).map((m) => m?.name)].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).join(", ");
   const when = job.noVisit && !job.unscheduled
@@ -874,7 +884,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
               })()}
               {job.intakeSource && <Tag icon={CallReceivedRounded}>รับงานจาก{SOURCE_LABEL[job.intakeSource] || job.intakeSource}</Tag>}
             </Stack>
-            <Stack direction="row" sx={{ flexWrap: "wrap", columnGap: 2, rowGap: 0.5, mt: 0.9 }}>
+            <Stack direction="row" sx={{ flexWrap: "wrap", columnGap: 2, rowGap: 0.5, mt: 0.9, "&:empty": { display: "none" } }}>
               {job.responsiblePerson && <Fact icon={PersonOutlineOutlined}>{job.responsiblePerson}</Fact>}
               {!job.unscheduled && !job.noVisit && !job.intakeNote && <Fact icon={GroupsOutlined}>{team || "ยังไม่มอบหมายทีม"}</Fact>}
               {(job.contactName || job.contactTel) && (
@@ -885,6 +895,26 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
               )}
             </Stack>
             </>)}
+            {!inRow && (() => {
+              const refN = (job.intakeDocType || job.intakeDocNo ? 1 : 0) || ((job.sitePhotoFiles || []).some((f) => f.source === "intake") ? 1 : 0);
+              const bits = [
+                job.intakeNote ? "" : job.description ? (job.noVisit ? "รายการที่ต้องส่ง" : "รายละเอียดงาน") : "ยังไม่มีรายละเอียด",
+                job.intakeNote ? "" : refN ? `เอกสารอ้างอิง${job.intakeDocNo ? ` ${job.intakeDocNo}` : ""}` : "",
+                outcome && !outcome.intake ? `ใบเสนอราคาเพิ่ม: ${outcome.label}` : "",
+                job.noVisit && invoiceFiles.length ? `ใบวางบิล ${invoiceFiles.length}` : "",
+              ].filter(Boolean);
+              return (
+                <ButtonBase onClick={() => setOpen((v) => !v)} aria-expanded={open}
+                  sx={{ mt: 1, width: "100%", justifyContent: "flex-start", gap: 0.75, px: 1.1, py: 0.7, borderRadius: 2, border: `1px solid ${LINE}`, bgcolor: open ? "#fff" : SURFACE, textAlign: "left", "&:hover": { borderColor: "#cbd5e1" } }}>
+                  <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.78rem", color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <Box component="span" sx={{ fontWeight: 800, color: ACCENT }}>{open ? "ซ่อนรายละเอียด" : "ดูรายละเอียด"}</Box>
+                    {!open && bits.length > 0 && <> · {bits.join(" · ")}</>}
+                  </Typography>
+                  <ExpandMoreRounded sx={{ fontSize: 20, color: ACCENT, transition: "transform .2s", transform: open ? "rotate(180deg)" : "none" }} />
+                </ButtonBase>
+              );
+            })()}
+            <Collapse in={showMore} timeout={inRow ? 0 : "auto"} unmountOnExit>
             {/* บันทึกงานในแถวตาราง: แสดงข้อความบันทึกเต็ม + ทำเสร็จเมื่อไร/โดยใคร (หัวการ์ดถูกซ่อน) */}
             {inRow && job.intakeNote && (
               <Box sx={{ px: 1.25, py: 1, borderRadius: 2, bgcolor: SURFACE, border: `1px solid ${LINE}` }}>
@@ -969,6 +999,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                 )}
               </Stack>
             ) : null}
+            </Collapse>
           </Box>
         </Stack>
         {actions && <Stack direction="row" spacing={0.75} sx={{ mt: 1.5, justifyContent: inRow ? "flex-end" : "flex-start", display: inRow ? "flex" : { xs: "flex", md: "none" } }}>{actions}</Stack>}
@@ -986,7 +1017,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
             </Typography>
           )}
         </Stack>
-        {st.i >= 0 && <Box sx={{ width: { xs: "100%", md: 360 }, flexShrink: 0 }}><StageBar stage={st} /></Box>}
+        {st.i >= 0 && showMore && <Box sx={{ width: { xs: "100%", md: 360 }, flexShrink: 0 }}><StageBar stage={st} /></Box>}
       </Stack>
     </Box>
   );
