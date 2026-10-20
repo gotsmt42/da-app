@@ -22,6 +22,7 @@ import { hasValidAvatar } from "../shared/utils/user";
 import useAppBadges from "@/shared/hooks/useAppBadges";
 import HeaderContactMenu from "./HeaderContactMenu";
 import HeaderSearch from "./HeaderSearch";
+import HeaderTaskBell from "./HeaderTaskBell";
 import useOrgSettings from "@/shared/hooks/useOrgSettings";
 // ✅ โลโก้แอปต้องเลือกไฟล์ให้ตรงกับพื้น — หัวเว็บเป็นแถบเข้ม จึงใช้ตัวหนังสือสีขาว
 import { appLogoFor } from "@/shared/services/OrgSettingService";
@@ -328,6 +329,9 @@ const Header = ({ toggleMobileSidebar }) => {
 
           {/* ✅ ช่องทางติดต่อที่ Super Admin ตั้งไว้ — ไม่ได้ตั้งไว้เลยจะไม่ขึ้นปุ่มนี้ */}
           <HeaderContactMenu />
+
+          {/* ✅ (20 ต.ค. 2569 ผู้ใช้: "ทำเป็นรูปแบบแจ้งเตือนตรง header แยกเมนูแจ้งเตือนออกมา") งานที่ต้องทำตอนนี้ (กันลืม) */}
+          <HeaderTaskBell />
 
           <InboxBell dark />
 

@@ -841,7 +841,14 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
     // 🔁 (19 ต.ค. 2569 ผู้ใช้: "แบบตาราง ปุ่มดูซ้ำซ้อน รก") inRow = กางใต้แถวตาราง — ตัดหัวการ์ด (ชื่อ/ป้าย/ผู้ติดต่อ ซึ่งแถวมีแล้ว)
     //    เหลือเฉพาะข้อมูลที่แถวไม่มี (รายละเอียด · เอกสาร · ใบเสนอราคา · ขั้นตอน) และปุ่มอยู่ที่เดียว (แถวซ่อนปุ่มตอนกาง)
     <>
-    <Box sx={inRow ? { bgcolor: "#fff", borderRadius: 2, overflow: "hidden", border: `1px solid ${LINE}` } : { bgcolor: "#fff", border: `1px solid ${LINE}`, borderLeft: { xs: `4px solid ${st.color}`, sm: `1px solid ${LINE}` }, borderRadius: 3, overflow: "hidden", boxShadow: { xs: "0 1px 3px rgba(15,23,42,.06)", sm: "none" }, transition: "border-color .15s, box-shadow .15s", "&:hover": { borderColor: "#cbd5e1", boxShadow: "0 4px 14px -8px rgba(15,23,42,.18)" } }}>
+    <Box
+      // ✅ (20 ต.ค. 2569 ผู้ใช้: "หน้ารับงานให้กดที่การ์ดเปิดรายละเอียดได้เลย") แตะตรงไหนของการ์ดก็เปิดรายละเอียด
+      //    (มือถือ = แผ่นเลื่อนขึ้น · จอคอม = กาง/พับ) · ยกเว้นปุ่ม/ลิงก์/ช่องกรอกในการ์ดที่มีหน้าที่ของตัวเอง
+      onClick={inRow ? undefined : (e) => {
+        if (e.target.closest("button, a, input, label, textarea, [role=button]")) return;
+        if (isXs) setSheetOpen(true); else setOpen((v) => !v);
+      }}
+      sx={inRow ? { bgcolor: "#fff", borderRadius: 2, overflow: "hidden", border: `1px solid ${LINE}` } : { cursor: "pointer", bgcolor: "#fff", border: `1px solid ${LINE}`, borderLeft: { xs: `4px solid ${st.color}`, sm: `1px solid ${LINE}` }, borderRadius: 3, overflow: "hidden", boxShadow: { xs: "0 1px 3px rgba(15,23,42,.06)", sm: "none" }, transition: "border-color .15s, box-shadow .15s", "&:hover": { borderColor: "#cbd5e1", boxShadow: "0 4px 14px -8px rgba(15,23,42,.18)" } }}>
       {/* 🔁 (19 ต.ค. 2569 ผู้ใช้: "ให้ขยายเต็ม") ปุ่มย้ายขึ้นแถวชื่องาน (จอคอม) — เนื้อหาด้านล่างกว้างเต็มการ์ด ไม่เหลือช่องว่างด้านขวา */}
       <Box sx={{ px: { xs: 1.75, sm: 2.25 }, py: 1.75 }}>
         <Stack direction="row" gap={1.5} sx={{ minWidth: 0 }}>

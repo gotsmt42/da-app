@@ -39,7 +39,6 @@ import { openFollowUp, isUrgent, acksOf, ackTracked, isResponsibleOf, isRespOrHe
 import { formatThai } from "@/shared/utils/thaiDate";
 import { can, seesOperationBoard, isRole, rankLabel, ROLES, TECHNICIAN_ROLES, ALL_ROLES } from "@/shared/utils/roles";
 import HomeMenu from "../components/HomeMenu";
-import MyActionAlerts from "../components/MyActionAlerts";
 import { Box, Typography, Avatar, Stack, ButtonBase } from "@mui/material";
 import { ExpandMore, Today, EventOutlined, EngineeringOutlined, RequestQuoteOutlined, EventRepeatOutlined, EditCalendarOutlined, ApartmentOutlined, GroupsOutlined, ScheduleOutlined, NotificationsActiveOutlined, ErrorOutline } from "@mui/icons-material";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
@@ -702,9 +701,6 @@ const Dashboard = () => {
                 </ButtonBase>
               )}
             </Box>
-
-            {/* ✅ (20 ต.ค. 2569) "ต้องทำตอนนี้" — งานที่ยังไม่รับทราบ/ยืนยันนัด/บันทึกเข้างาน (ไม่มีค้าง = ไม่แสดง) */}
-            {showMyJobsHero && !loading && <MyActionAlerts events={events} userData={userData} />}
 
             {/* ─── SECTION 1.4: "งานขาย" HERO (เฉพาะเซล) — คู่ขนานกับแบนเนอร์ "งานของฉัน" ของช่าง
           เซลเปิดแอปมาเพื่อดูท่อขายกับนัดหมายของตัวเอง ไม่ใช่ตารางงานช่าง จึงต้องเป็นสิ่งแรกที่เห็น ─── */}
