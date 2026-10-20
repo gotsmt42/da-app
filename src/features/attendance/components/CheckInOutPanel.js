@@ -382,7 +382,12 @@ ${text}`);
   const declined = event.ackDeclined?.userId ? event.ackDeclined : null;
   const declinedByMe = declined && String(declined.userId) === me;
   // งานเดิมก่อนเปิดใช้ระบบบันทึกเข้างาน ที่สถานะ "กำลังดำเนินการ" อยู่แล้ว = ถือว่าเข้างานแล้ว (ให้แถบตรงกับป้ายสถานะ)
-  const legacyStarted = !checkin && !latestCheckin && event.status === "กำลังดำเนินการ" && Boolean(event.createdAt) && new Date(event.createdAt) < new Date(FLOW_SINCE);
+  // 🐛 (20 ต.ค. 2569 ผู้ใช้: "ขึ้นไม่บันทึกงาน ทั้งที่ไม่มีอะไรให้กด บันทึกไม่ได้") งานเก่า (ก่อนใช้ระบบเข้างาน) ที่ยังมีช่วงวันเข้างาน
+  //    "วันนี้" (เช่นโปรเจคหลายช่วง) เดิมถูกถือว่าเข้างานแล้ว → ไม่มีปุ่มบันทึก ทั้งที่ระบบเตือนให้บันทึก
+  //    ✅ วันนี้เป็นวันเข้างานตามแผน = ให้บันทึกเข้างานได้ตามปกติ (ถือว่าเริ่มแล้วเฉพาะวันที่ไม่ใช่วันนัด)
+  const todayPlanned = plannedDays.some((d) => d.format("YYYY-MM-DD") === todayKey);
+  const todayDayNo = todayPlanned ? plannedDays.findIndex((d) => d.format("YYYY-MM-DD") === todayKey) + 1 : 0;
+  const legacyStarted = !checkin && !latestCheckin && !todayPlanned && event.status === "กำลังดำเนินการ" && Boolean(event.createdAt) && new Date(event.createdAt) < new Date(FLOW_SINCE);
   const current = closed ? STEPS.length
     : event.closeRequested ? 5
     // 🐛 (20 ต.ค. 2569) งานหลายวัน: บันทึกยังไม่ครบ (และยังไม่เลยวันสุดท้าย) = ยังอยู่ขั้น "เข้างาน" — เดิมกระโดดไปขั้นเอกสารตั้งแต่วันแรก
@@ -651,7 +656,7 @@ ${text}`);
     else {
       line = (
         <Button fullWidth variant="contained" disableElevation startIcon={<LoginRounded />} onClick={() => setDialog(true)} sx={{ ...MBTN.primary, minHeight: 42 }}>
-          บันทึกเข้างานวันนี้{plannedDays.length > 1 ? ` · วันที่ ${Math.min(recordedDays.size + 1, plannedDays.length)}/${plannedDays.length}` : ""}
+          บันทึกเข้างานวันนี้{plannedDays.length > 1 ? ` · วันที่ ${todayDayNo || Math.min(recordedDays.size + 1, plannedDays.length)}/${plannedDays.length}` : ""}
         </Button>
       );
     }

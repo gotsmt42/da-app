@@ -72,7 +72,8 @@ const STAGES = ["รับงาน", "ลงตาราง", "เข้าง�
 /** ✅ (15 ต.ค. 2569) งานไม่ต้องเข้างาน (ส่งของ/ขายของ) */
 const STAGES_NV = ["รับงาน", "ส่งของ", "วางบิล", "เสร็จ"];
 
-const SOURCE_LABEL = Object.fromEntries(INTAKE_SOURCE_OPTS);
+// ✅ (20 ต.ค. 2569) งานที่ลงตารางตรง / อนุมัติคำขอลงงาน ก็เข้ามาหน้านี้ — ป้ายที่มาของมันเอง
+const SOURCE_LABEL = { ...Object.fromEntries(INTAKE_SOURCE_OPTS), calendar: "ตารางงาน (ลงตรง)", dispatch: "คำขอลงงาน" };
 const invoicedOf = (e) => Boolean((e.invoiceFiles || []).length || e.billing?.invoicedAt);
 /** ✅ (15 ต.ค. 2569) บันทึกงาน (โน๊ต) */
 const STAGES_NOTE = ["บันทึก", "ทำ", "เสร็จ"];
