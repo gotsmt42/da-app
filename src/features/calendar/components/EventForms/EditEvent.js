@@ -1542,9 +1542,13 @@ export const getEditEvent = async ({
   // ✅ "การดำเนินงาน" (check-in/check-out/ปิดงาน/ติดตามใบเสนอราคา ฯลฯ) เป็นสิทธิ์ของ "ผู้รับผิดชอบ"
   // โดยเฉพาะแล้ว ไม่ใช่ "ทีมที่เข้างาน" อีกต่อไป (หัวหน้าทีมเข้างานไม่มีสิทธิ์จัดการส่วนนี้) — เจ้าของ
   // (คนสร้างงาน)/ผู้รับผิดชอบ (แบบ fallback ด้านบน)/admin/manager กดดูได้
+  // 🔁 (21 ต.ค. 2569 ผู้ใช้: "ทำให้ทุกๆ สถานะเปิดดำเนินงานได้") เปิดได้ทุกสถานะ (รอยืนยัน · ยืนยันแล้ว · กำลังดำเนินการ · เสร็จสิ้น)
+  //    + หัวหน้าทีมเข้างานด้วย (งานของฉันแสดงงานที่เป็นหัวหน้าทีม) · ยกเว้นนัดฝ่ายขาย/งานยังไม่ลงวัน (ไม่มีในหน้าการดำเนินงาน)
+  const isTeamHeadUser = Boolean(userData?.userId && String(ev.extendedProps?.resPerson || "") === String(userData.userId))
+    || Boolean(userData?.fname && ev.extendedProps?.team === userData.fname);
   const canViewOperation =
-    (isAdminOrManagerUser || isOwnerUser || isEffectiveResponsiblePerson) &&
-    eventStatus !== "กำลังรอยืนยัน"; // งานที่ยังไม่ยืนยัน ยังไม่มีอะไรให้ดูในหน้าดำเนินงาน
+    (isAdminOrManagerUser || isOwnerUser || isEffectiveResponsiblePerson || isTeamHeadUser)
+    && ev.extendedProps?.department !== "sales" && !ev.extendedProps?.unscheduled;
   // 🔁 (15 ต.ค. 2569 ผู้ใช้: "ช่างใช้งานของฉันที่เดียว · แก้ลิงก์จากตารางให้ถูก") — ช่างไม่มีหน้าการดำเนินงานแล้ว
   //    ปุ่ม/ลิงก์ "ไปที่งาน" ของช่างพาไป "งานของฉัน" (เลื่อนไปที่การ์ดงานนั้น) · แอดมิน/ผู้จัดการไปหน้าการดำเนินงานเหมือนเดิม
   const showBoard = seesOperationBoard(userData);

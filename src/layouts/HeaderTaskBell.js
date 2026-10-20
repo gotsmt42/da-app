@@ -106,7 +106,7 @@ export default function HeaderTaskBell() {
       {isMobile ? (
         <SwipeableDrawer anchor="bottom" open={open} onClose={close} onOpen={() => {}} disableSwipeToOpen
           transitionDuration={{ enter: 260, exit: 200 }}
-          PaperProps={{ sx: { borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" } }}>
+          PaperProps={{ className: "tt-swipe-native", sx: { borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" } }}>
           {content}
         </SwipeableDrawer>
       ) : (

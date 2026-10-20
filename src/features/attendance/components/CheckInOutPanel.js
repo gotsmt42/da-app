@@ -693,7 +693,8 @@ ${text}`);
         {showSteps ? (
           <Box sx={{ px: 1, py: 0.75, borderRadius: "12px", border: `1px solid ${LINE}` }}>
             {statusSteps ? <MiniSteps {...statusStepsOf(event)} /> : <MiniSteps current={pendingApproval ? 0 : current} />}
-            <MultiDayAttendanceProgress event={event} rows={rows} />
+            {/* งานปิดแล้วที่ไม่มีบันทึกเข้างาน (งานก่อนเริ่มใช้ระบบ) — ไม่แสดง "บันทึกแล้ว 0 วัน" ให้ดูเหมือนตกหล่น */}
+            {!(closed && !(rows || []).length) && <MultiDayAttendanceProgress event={event} rows={rows} />}
             <Box sx={{ mt: 0.75, pt: 0.75, borderTop: `1px solid ${LINE}` }}>{line}</Box>
           </Box>
         ) : (rows || []).length > 0 && (

@@ -38,7 +38,7 @@ export default function MobileSheet({ open, onClose, title, subtitle, actions, c
         disableSwipeToOpen disableDiscovery={iOS} disableBackdropTransition={!iOS}
         transitionDuration={{ enter: 260, exit: 200 }}
         ModalProps={{ keepMounted: false }}
-        PaperProps={{ sx: { height: "92dvh", maxHeight: "92dvh", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden", display: "flex", flexDirection: "column", bgcolor: "#f8fafc" } }}>
+        PaperProps={{ className: "tt-swipe-native", sx: { height: "92dvh", maxHeight: "92dvh", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden", display: "flex", flexDirection: "column", bgcolor: "#f8fafc" } }}>
         {head}
         {body}
       </SwipeableDrawer>

@@ -3706,7 +3706,7 @@ const Operation = () => {
               </Stack>
               <SwipeableDrawer onOpen={() => {}} disableSwipeToOpen transitionDuration={{ enter: 260, exit: 200 }}
                 anchor="bottom" open={mobileSheetOpen} onClose={() => setMobileSheetOpen(false)}
-                PaperProps={{ sx: { borderTopLeftRadius: 18, borderTopRightRadius: 18, px: 2, pt: 1, pb: "calc(16px + env(safe-area-inset-bottom))", maxHeight: "88vh" } }}
+                PaperProps={{ className: "tt-swipe-native", sx: { borderTopLeftRadius: 18, borderTopRightRadius: 18, px: 2, pt: 1, pb: "calc(16px + env(safe-area-inset-bottom))", maxHeight: "88vh" } }}
               >
                 <Box sx={{ width: 40, height: 4, borderRadius: 2, bgcolor: "#cbd5e1", mx: "auto", mb: 1.25, flexShrink: 0 }} />
                 <Stack direction="row" alignItems="center" sx={{ mb: 1.5, flexShrink: 0 }}>
@@ -3909,7 +3909,7 @@ const Operation = () => {
         onOpen={() => {}}
         disableSwipeToOpen
         transitionDuration={{ enter: 260, exit: 200 }}
-        PaperProps={{ sx: {
+        PaperProps={{ className: "tt-swipe-native", sx: {
           width: isMobile ? "100%" : "min(640px, 92vw)",
           height: isMobile ? "92dvh" : "100%",
           borderTopLeftRadius: isMobile ? 16 : 0, borderTopRightRadius: isMobile ? 16 : 0,

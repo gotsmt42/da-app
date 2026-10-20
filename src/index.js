@@ -21,6 +21,7 @@ import { StyleSheetManager } from "styled-components";
 // เพิ่ม/แก้ไขงาน) ที่ลอยค้างอยู่กับที่เวลาเลื่อนเนื้อหาในฟอร์ม เพราะมันถูกแปะไว้ที่ <body> ดูรายละเอียด
 // ทั้งหมดที่ src/shared/utils/tomSelectFixes.js — เรียกที่นี่เพราะ TomSelect ถูกสร้างจากหลายไฟล์/หลายจังหวะ
 import { installTomSelectFixes } from "./shared/utils/tomSelectFixes";
+import { installSwipeToClose } from "./shared/utils/swipeToClose";
 import { installNativeBridge, hideSplash } from "./native/nativeBridge";
 
 import "bootstrap/dist/css/bootstrap.min.css"; // import Bootstrap CSS
@@ -47,6 +48,8 @@ window.addEventListener("error", (e) => {
 });
 
 installTomSelectFixes();
+// ✅ (21 ต.ค. 2569) มือถือ: ลากหน้าต่าง/ลิ้นชัก/กล่องฟอร์มลงเพื่อปิด ได้ทุกหน้า (shared/utils/swipeToClose.js)
+installSwipeToClose();
 
 // ✅ แอปมือถือ (Capacitor) — ดาวน์โหลดไฟล์ / ลิงก์ภายนอก / ปุ่มย้อนกลับ Android ให้ทำงานเหมือนเว็บ
 //    เว็บปกติไม่มีผลอะไร (ฟังก์ชันออกทันทีถ้าไม่ได้อยู่ในแอป) ดู src/native/nativeBridge.js
