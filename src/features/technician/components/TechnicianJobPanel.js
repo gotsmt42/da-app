@@ -42,7 +42,8 @@ import { printFile, shareFile, isMobileDevice } from "@/shared/utils/fileActions
 import InfoLine from "@/shared/ui/InfoLine";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { ROLES } from "@/shared/utils/roles";
-import { JobFlowChips, JobFlowPanel } from "@/shared/ui/JobFlow";
+import { JobFlowChips, JobFlowPanel, nextStepOf } from "@/shared/ui/JobFlow";
+import MobileJobSummary from "@/shared/ui/MobileJobSummary";
 import SitePhotos from "@/shared/ui/SitePhotos";
 import { AssignResponsibleMenu, PersonChip } from "@/shared/ui/PersonChip";
 import CheckInOutPanel from "@/features/attendance/components/CheckInOutPanel";
@@ -652,6 +653,14 @@ const TechnicianJobCard = ({
   //    บนการ์ด (เห็นเสมอ): หัวการ์ด · ขั้นตอน/ปุ่มเข้างาน · เอกสารประจำงาน · ขอปิดงาน
   //    อีกหน้า (กดหัวการ์ด หรือแถบ "ไฟล์แนบ · สรุปงาน · …"): ไฟล์แนบ · สรุปงานที่ทำ · คุยกับแอดมิน · ประวัติกิจกรรม
   const [detailsOpen, setDetailsOpen] = useState(false);
+  // มือถือ: การ์ดย่อเป็นค่าเริ่มต้น — งานที่มีวันเข้างานวันนี้กางไว้เลย (ต้องเห็นปุ่มเข้างาน)
+  const [mOpen, setMOpen] = useState(() => {
+    if (!event.start) return false;
+    const s = moment(event.start);
+    let e = event.end ? moment(event.end) : s.clone();
+    if (event.allDay !== false && event.end && e.isAfter(s)) e = e.subtract(1, "day");
+    return !moment().isBefore(s, "day") && !moment().isAfter(e, "day");
+  });
   const [requestingClose, setRequestingClose] = useState(false);
   // ✅ เดิมฝั่งช่างโชว์ประวัติกิจกรรมยาวเหยียดตลอดเวลา ไม่มีปุ่มพับ/กาง ต่างจากฝั่งแอดมิน
   // (ดู ActivityLogMini ใน Operation/index.js) ซึ่งพับไว้เป็นค่าเริ่มต้น กดดูได้เมื่อต้องการ —
@@ -929,11 +938,28 @@ const TechnicianJobCard = ({
     <Wrapper {...wrapperProps}>
       <CardContent sx={{ px: { xs: 1.75, sm: 2.5 }, py: { xs: 1.75, sm: 2.5 }, "&:last-child": { pb: { xs: 1.75, sm: 2.5 } } }}>
 
+        {/* ✅ (20 ต.ค. 2569 ผู้ใช้: "งานของฉัน ให้เป็นรูปแบบเดียวกับหน้ารับงาน — หน้าแรกข้อมูลไม่เยอะแต่สำคัญ ไม่กินพื้นที่")
+            มือถือตอนพับ = หัวการ์ดย่อ · กดแล้วกางการ์ดเต็ม (ขั้นตอน/เข้างาน · เอกสาร · ขอปิดงาน) · งานวันนี้กางไว้ให้เลย */}
+        {!mOpen && (
+          <Box sx={{ display: { xs: "block", sm: "none" } }}>
+            <MobileJobSummary event={event} statusLabel={event.status || "ไม่ระบุ"} statusColor={statusColor}
+              next={(() => { const n = nextStepOf(event, "tech"); return n ? { title: n.title, tone: n.tone } : null; })()}
+              person={event.responsiblePerson} personSrc={employees.find((u) => u.fname === event.responsiblePerson)?.imageUrl}
+              personSub={event.team ? `หัวหน้าทีม ${event.team}` : "ผู้รับผิดชอบงาน"}
+              onToggle={() => setMOpen(true)} />
+          </Box>
+        )}
+        {mOpen && (
+          <ButtonBase onClick={() => setMOpen(false)} sx={{ display: { xs: "flex", sm: "none" }, ml: "auto", mb: 0.75, px: 1, py: 0.3, borderRadius: 1.5, fontSize: "0.74rem", fontWeight: 800, color: "#64748b", gap: 0.3 }}>
+            ย่อการ์ด <ExpandLess sx={{ fontSize: 18 }} />
+          </ButtonBase>
+        )}
+
         {/* ── Header — กดที่ไหนก็ได้บนแถวนี้เพื่อกาง/พับการ์ด ไม่ต้องเล็งกดลูกศรเล็กๆ อีกต่อไป ── */}
         <Stack
           direction="row" alignItems="flex-start" justifyContent="space-between" gap={1.5}
           onClick={() => setDetailsOpen(true)}
-          sx={{ cursor: "pointer" }}
+          sx={{ cursor: "pointer", display: { xs: mOpen ? "flex" : "none", sm: "flex" } }}
         >
           <Stack direction="row" alignItems="flex-start" gap={1.5} flex={1} minWidth={0}>
             {/* ✅ ลดขนาดลงบนจอมือถือ (จอกว้างยังคง 44px เท่าเดิม) — การ์ดตอนนี้เนื้อหากระชับขึ้นแล้ว
@@ -1057,6 +1083,7 @@ const TechnicianJobCard = ({
           <ChevronRight sx={{ fontSize: 22, color: "#94a3b8", flexShrink: 0, mt: 0.25 }} />
         </Stack>
 
+        <Box sx={{ display: { xs: mOpen ? "block" : "none", sm: "block" } }}>
         {/* ✅ (10 ต.ค. 2569) เช็คอิน/เช็คเอาต์ — ของแต่ละวันเข้างาน (ทุกการ์ดในกลุ่มหลายวันมีของตัวเอง)
             เวลาจาก server · GPS · รูปก่อน/หลัง · สรุปงาน → ต่อท้าย "สรุปงานที่ทำ" ของงานนี้ */}
         <CheckInOutPanel compact event={event} onPreview={onPreview} onPatched={onPatched} docsComplete={completedDocCount === DOCUMENT_TYPES.length} />
@@ -1229,6 +1256,7 @@ const TechnicianJobCard = ({
             เปิด<ChevronRight sx={{ fontSize: 18 }} />
           </Typography>
         </ButtonBase>
+        </Box>
 
       </CardContent>
 

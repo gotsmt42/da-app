@@ -80,6 +80,7 @@ import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LI
 import ImagePreview from "@/shared/ui/ImagePreview";
 import DateCell from "@/shared/ui/DateCell";
 import JobKindTag from "@/shared/ui/JobKindTag";
+import MobileJobSummary from "@/shared/ui/MobileJobSummary";
 import JobDocsCell from "@/shared/ui/JobDocsCell";
 import RefDoc from "@/shared/ui/RefDoc";
 import { printFile, shareFile, isMobileDevice } from "@/shared/utils/fileActions";
@@ -1263,7 +1264,23 @@ const EventRowCard = ({
             • กดหัวการ์ด = กาง/พับรายละเอียดลงในการ์ด (คน · ข้อมูลงาน · ขั้นตอนทำงาน · รูปหน้างาน · คำขอปิดงาน)
             • เอกสาร/คุยกับช่าง/ประวัติ อยู่ปุ่มท้ายรายละเอียด (เปิดกล่องเดิม)
             ปุ่ม/ลิงก์ย่อยด้านในที่มี action ของตัวเอง ต้อง stopPropagation ไม่งั้นกดแล้วการ์ดกาง/พับไปด้วย */}
-        <Box onClick={() => setOpen((p) => !p)} sx={{ cursor: "pointer" }} role="button" aria-expanded={open}>
+        {/* ✅ (20 ต.ค. 2569 ผู้ใช้: "หน้าการดำเนินงาน ให้เป็นรูปแบบเดียวกับหน้ารับงาน — หน้าแรกข้อมูลไม่เยอะแต่สำคัญ")
+            มือถือตอนพับ = หัวการ์ดย่อ (ปฏิทิน · ชื่องาน · โครงการ · ผู้รับผิดชอบ + สถานะ · ขั้นถัดไป) · กดแล้วกางหัวการ์ดเต็ม + รายละเอียด */}
+        {!open && (
+          <Box sx={{ display: { xs: "block", sm: "none" } }}>
+            <MobileJobSummary event={event} statusLabel={localStatus || "ไม่ระบุ"} statusColor={OP_COLOR[localStatus] || "#64748b"}
+              next={nextStep ? { title: nextStep.title, tone: nextStep.tone } : null}
+              person={event.responsiblePerson} personSrc={avatarMap.get(event.responsiblePerson)}
+              personSub={event.team ? `หัวหน้าทีม ${event.team}` : "ผู้รับผิดชอบงาน"}
+              right={canEdit ? (
+                <IconButton onClick={(e) => { e.stopPropagation(); setMoreAnchorEl(e.currentTarget); }} sx={{ p: 0.75, mt: -0.5, mr: -0.75 }}>
+                  <MoreVert fontSize="small" />
+                </IconButton>
+              ) : null}
+              onToggle={() => setOpen(true)} />
+          </Box>
+        )}
+        <Box onClick={() => setOpen((p) => !p)} sx={{ cursor: "pointer", display: { xs: open ? "block" : "none", sm: "block" } }} role="button" aria-expanded={open}>
           <Stack direction="row" alignItems="flex-start" gap={1.5}>
             <Avatar sx={{
               display: { xs: "none", sm: "flex" },
