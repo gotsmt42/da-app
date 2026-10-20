@@ -44,7 +44,7 @@ const GROUPS = {
  */
 export function TabStrip({ items }) {
   return (
-    <Stack direction="row" role="tablist" sx={{ mb: 1.5, p: 0.5, gap: 0.5, bgcolor: "#fff", border: "1px solid #e2e8f0", borderRadius: 3, boxShadow: "0 1px 2px rgba(15,23,42,.04)",
+    <Stack direction="row" role="tablist" sx={{ mb: { xs: 1.25, sm: 1.5 }, p: { xs: 0.4, sm: 0.5 }, gap: 0.5, bgcolor: "#fff", border: "1px solid #e2e8f0", borderRadius: 3, boxShadow: "0 1px 2px rgba(15,23,42,.04)",
       overflowX: "auto", scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
       {items.map((t) => {
         const on = t.on;
@@ -54,8 +54,8 @@ export function TabStrip({ items }) {
           <Box key={t.key} {...linkProps} role="tab" aria-selected={on} aria-current={on ? "page" : undefined}
             sx={{
               flex: { xs: "1 0 auto", sm: "0 0 auto" }, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 0.75,
-              height: 38, px: 1.75, borderRadius: 2.5, border: 0, cursor: "pointer", font: "inherit", textDecoration: "none", whiteSpace: "nowrap",
-              fontSize: "0.86rem", fontWeight: on ? 800 : 600,
+              height: { xs: 34, sm: 38 }, px: { xs: 1.25, sm: 1.75 }, borderRadius: 2.5, border: 0, cursor: "pointer", font: "inherit", textDecoration: "none", whiteSpace: "nowrap",
+              fontSize: { xs: "0.8rem", sm: "0.86rem" }, fontWeight: on ? 800 : 600,
               color: on ? "#fff" : "#334155", bgcolor: on ? ACCENT : "transparent",
               "& svg": { fontSize: 18, display: { xs: "none", sm: "inline-block" } },
               "&:hover": { bgcolor: on ? ACCENT : alpha(ACCENT, 0.06), color: on ? "#fff" : ACCENT },

@@ -46,14 +46,15 @@ export function PageShell({ narrow, sx, children }) {
 /** หัวเพจ: ไอคอนกล่องฟ้าอ่อน · ชื่อ · คำอธิบาย · (ด้านขวา) ปุ่ม/ตัวเลข */
 export function PageHeader({ icon, title, subtitle, actions }) {
   return (
-    <Box sx={{ borderRadius: 3, border: `1px solid ${LINE}`, bgcolor: "#fff", px: { xs: 1.5, sm: 2 }, py: { xs: 1.25, sm: 1.5 }, mb: 1.5, boxShadow: CARD_SHADOW }}>
-      <Stack direction="row" alignItems="center" spacing={1.5}>
-        <Box sx={{ width: 40, height: 40, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: ACCENT_SOFT, color: ACCENT, "& svg": { fontSize: 22 } }}>
+    // 🔁 (20 ต.ค. 2569 ผู้ใช้: "ด้านบนหน้าจอมือถือดูรก กินพื้นที่") มือถือ: ไอคอนเล็ก · ไม่มีคำอธิบายรอง · ขอบบนล่างน้อยลง
+    <Box sx={{ borderRadius: 3, border: `1px solid ${LINE}`, bgcolor: "#fff", px: { xs: 1.25, sm: 2 }, py: { xs: 0.9, sm: 1.5 }, mb: { xs: 1.25, sm: 1.5 }, boxShadow: CARD_SHADOW }}>
+      <Stack direction="row" alignItems="center" spacing={{ xs: 1.1, sm: 1.5 }}>
+        <Box sx={{ width: { xs: 32, sm: 40 }, height: { xs: 32, sm: 40 }, borderRadius: 2.5, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: ACCENT_SOFT, color: ACCENT, "& svg": { fontSize: { xs: 18, sm: 22 } } }}>
           {icon}
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography noWrap sx={{ fontWeight: 900, fontSize: { xs: "1.1rem", sm: "1.25rem" }, color: INK, lineHeight: 1.25 }}>{title}</Typography>
-          {subtitle && <Typography noWrap sx={{ fontSize: "0.76rem", color: MUTED }}>{subtitle}</Typography>}
+          {subtitle && <Typography noWrap sx={{ display: { xs: "none", sm: "block" }, fontSize: "0.76rem", color: MUTED }}>{subtitle}</Typography>}
         </Box>
         {actions && <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0 }}>{actions}</Stack>}
       </Stack>

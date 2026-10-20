@@ -1347,19 +1347,25 @@ export default function JobIntake() {
           : <Box component="span" sx={{ px: 1.25, py: 0.5, borderRadius: 99, fontSize: "0.74rem", fontWeight: 700, color: MUTED, bgcolor: SURFACE, border: `1px solid ${LINE}`, whiteSpace: "nowrap" }}>ดูอย่างเดียว</Box>} />
 
       {/* แท็บตามขั้นตอน */}
-      <Stack direction="row" spacing={0.75} sx={{ mb: 1.5, overflowX: "auto", scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
+      {/* 🔁 (20 ต.ค. 2569 ผู้ใช้: "แถบเลือกข้างบนหน้าจอมือถือดูรก กินพื้นที่ เช่น รอเริ่ม กำลังทำ")
+          มือถือ: แถบแบ่งช่องแถวเดียวในกรอบเดียว (ชื่อ + จำนวนบรรทัดเดียว สูง 34) · ช่องที่เลือก = พื้นขาวยกขึ้น ไม่ใช้กรอบน้ำเงินทุกช่อง */}
+      <Stack direction="row" sx={{ mb: 1.5, gap: { xs: 0.4, sm: 0.75 }, p: { xs: 0.4, sm: 0 }, borderRadius: { xs: 2.5, sm: 0 }, bgcolor: { xs: "#eef2f6", sm: "transparent" },
+        overflowX: "auto", scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
         {TABS.filter((t) => !t.hideEmpty || counts[t.key] > 0 || tab === t.key).map((t) => {
           const on = tab === t.key;
           return (
             <ButtonBase key={t.key} onClick={() => { setTabPicked(true); setTab(t.key); }} sx={{
-              // ✅ มือถือ: ตัวเลขบน ชื่อล่าง — 4 แท็บไม่ล้นจอ (ผู้ใช้แจ้งแท็บแรกตกขอบ)
-              flex: { xs: "1 0 auto", sm: "0 0 auto" }, minWidth: { xs: 64, sm: 0 }, height: { xs: 54, sm: 40 }, px: { xs: 0.5, sm: 1.75 }, borderRadius: 2.5,
-              flexDirection: { xs: "column-reverse", sm: "row" }, fontSize: { xs: "0.74rem", sm: "0.84rem" }, fontWeight: 800, gap: { xs: 0.2, sm: 0.6 }, whiteSpace: "nowrap", overflow: "hidden",
-              border: `1.5px solid ${on ? ACCENT : LINE}`, bgcolor: on ? alpha(ACCENT, 0.07) : "#fff", color: on ? ACCENT : "#334155",
+              flex: { xs: "1 1 0", sm: "0 0 auto" }, minWidth: 0, height: { xs: 34, sm: 40 }, px: { xs: 0.5, sm: 1.75 }, borderRadius: { xs: 2, sm: 2.5 },
+              flexDirection: "row", fontSize: { xs: "0.78rem", sm: "0.84rem" }, fontWeight: 800, gap: { xs: 0.45, sm: 0.6 }, whiteSpace: "nowrap", overflow: "hidden",
+              border: { xs: 0, sm: `1.5px solid ${on ? ACCENT : LINE}` },
+              bgcolor: on ? { xs: "#fff", sm: alpha(ACCENT, 0.07) } : { xs: "transparent", sm: "#fff" },
+              boxShadow: on ? { xs: "0 1px 3px rgba(15,23,42,.14)", sm: "none" } : "none",
+              color: on ? { xs: INK, sm: ACCENT } : { xs: MUTED, sm: "#334155" },
             }}>
               <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>{t.label}</Box>
               <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>{t.short}</Box>
-              <Box component="span" sx={{ minWidth: 20, height: 20, px: 0.6, borderRadius: 99, display: "inline-grid", placeItems: "center", fontSize: "0.72rem", bgcolor: on ? ACCENT : SURFACE, color: on ? "#fff" : MUTED }}>{counts[t.key] || 0}</Box>
+              <Box component="span" sx={{ minWidth: { xs: 18, sm: 20 }, height: { xs: 18, sm: 20 }, px: 0.55, borderRadius: 99, display: "inline-grid", placeItems: "center", fontSize: { xs: "0.68rem", sm: "0.72rem" },
+                bgcolor: on ? ACCENT : { xs: "rgba(100,116,139,.14)", sm: SURFACE }, color: on ? "#fff" : MUTED }}>{counts[t.key] || 0}</Box>
             </ButtonBase>
           );
         })}
