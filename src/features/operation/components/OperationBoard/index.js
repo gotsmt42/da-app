@@ -1886,7 +1886,8 @@ const EventRowCard = ({
             เลื่อนจอตามอีกต่อไป — จอเล็ก (มือถือ) เปิดแบบเต็มจอ (fullScreen) แทนกล่องลอย */}
     </>
   );
-  const sheet = isXs && open && !inlineDetails && !defaultExpanded;
+  // 🔁 (20 ต.ค. 2569 ผู้ใช้: "การดำเนินงานเมื่อกดมาที่งานเดียว กดดูรายละเอียดยังเป็นแบบเลื่อน") งานที่เปิดเจาะจง/ไฮไลต์ ก็ใช้แผ่นเลื่อนขึ้นด้วย
+  const sheet = isXs && open && !inlineDetails;
 
   return (
     <Wrapper {...wrapperProps}>
