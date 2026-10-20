@@ -805,7 +805,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
     </>
   ) : (
     <Button component={Link} to={`/operation/${job._id}`} variant="outlined" endIcon={<ChevronRight />}
-      sx={{ ...BTN, flex: { xs: 1, sm: "0 0 auto" }, color: ACCENT, borderColor: alpha(ACCENT, 0.4), "&:hover": { borderColor: ACCENT, bgcolor: alpha(ACCENT, 0.04) } }}>ดูงาน</Button>
+      sx={{ ...GHOST, flex: { xs: 1, sm: "0 0 auto" } }}>ดูงาน</Button>
   );
 
   // ✅ (15 ต.ค. 2569 ผู้ใช้: "หน้านี้ทำให้สวยงาม และดูข้อมูลง่ายด้วย")
@@ -850,18 +850,27 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
             <Stack direction="row" gap={1.5} alignItems="flex-start">
             {/* ✅ (20 ต.ค. 2569 ผู้ใช้: "ยังดูจืด แยกงานยาก") มือถือ: กล่องวันที่แบบปฏิทินหน้าชื่องาน — กวาดตาแยกงานได้ทันที */}
             <Box sx={{ display: { xs: "block", sm: "none" }, flexShrink: 0 }}>
-              {job.intakeNote ? <DateCell start={job.intakeAt} />
-                : job.unscheduled ? (() => {
+              {(() => {
+                // 🔁 (20 ต.ค. 2569 ผู้ใช้: "ตรงวันที่ยังดูไม่สวย รก ไม่ลงตัว") ไอคอนปฏิทินขนาดเท่ากันทุกใบ: แถบบน = เดือน · กลาง = วัน (ตัวใหญ่) · ล่าง = วัน/ระยะ
+                const d = job.intakeNote ? job.intakeAt : job.unscheduled ? null : (job.noVisit ? (job.deliveredAt || job.start) : job.start);
+                if (d) {
+                  const m = moment(d);
+                  const isToday = m.isSame(moment(), "day");
+                  return <DateTile head={formatThai(m, "MMM YY")} big={m.format("D")} foot={isToday ? "วันนี้" : formatThai(m, "ddd")} color={isToday ? ACCENT : "#475569"} />;
+                }
+                if (job.plannedMonth && !job.noVisit) {
                   const r = scheduleTagOf(job, schedule);
-                  return <DateCell label={job.noVisit ? "รอส่งของ" : job.plannedMonth ? <>แผน<br />{formatThai(moment(job.plannedMonth, "YYYY-MM"), "MMM YY")}{r.rel && <Box component="span" sx={{ display: "block", mt: 0.2, fontSize: "0.64rem", color: r.accent || "#64748b" }}>{r.rel}</Box>}</> : <>ยังไม่<br />กำหนด</>} />;
-                })()
-                : <DateCell start={job.noVisit ? (job.deliveredAt || job.start) : job.start} end={job.noVisit ? null : job.end} allDay={job.allDay} />}
+                  const pm = moment(job.plannedMonth, "YYYY-MM");
+                  return <DateTile dashed head="แผน" big={formatThai(pm, "MMM")} small foot={r.rel || formatThai(pm, "YY")} color={r.accent || "#64748b"} />;
+                }
+                return <DateTile dashed head={job.noVisit ? "ส่งของ" : "วันเข้างาน"} big="—" foot="ยังไม่กำหนด" color="#94a3b8" />;
+              })()}
             </Box>
             <Box sx={{ flex: 1, minWidth: 0 }}>
             {/* ✅ (20 ต.ค. 2569 ผู้ใช้: "มือถือยังจัดวางไม่สวย") มือถือ: ไม่มีคอลัมน์ไอคอนซ้าย — ย้ายเป็นบรรทัดเล็กเหนือชื่องาน ทุกอย่างชิดซ้ายแนวเดียวกับปุ่ม */}
             <Stack direction="row" alignItems="center" sx={{ display: { xs: "flex", sm: "none" }, flexWrap: "wrap", columnGap: 0.6, mb: 0.4, minWidth: 0 }}>
-              <ModeIcon sx={{ fontSize: 15, color: tone }} />
-              <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: tone, whiteSpace: "nowrap" }}>{modeLabel}</Typography>
+              <ModeIcon sx={{ fontSize: 15, color: "#64748b" }} />
+              <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: "#64748b", whiteSpace: "nowrap" }}>{modeLabel}</Typography>
               {job.jobNo && <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#94a3b8", whiteSpace: "nowrap" }}>· {job.jobNo}</Typography>}
             </Stack>
             <Stack direction="row" spacing={0.75} alignItems="baseline" sx={{ flexWrap: "wrap", rowGap: 0.25 }}>
@@ -968,10 +977,10 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                 <ButtonBase onClick={() => setOpen((v) => !v)} aria-expanded={open}
                   sx={{ mt: { xs: 1, sm: 1.25 }, width: "100%", justifyContent: "flex-start", gap: 0.75, px: 1.1, py: { xs: 0.6, sm: 0.8 }, borderRadius: 2, border: `1px solid ${LINE}`, bgcolor: open ? "#fff" : SURFACE, textAlign: "left", "&:hover": { borderColor: "#cbd5e1" } }}>
                   <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.78rem", color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    <Box component="span" sx={{ fontWeight: 800, color: ACCENT }}>{open ? "ซ่อนรายละเอียด" : "ดูรายละเอียด"}</Box>
+                    <Box component="span" sx={{ fontWeight: 800, color: "#334155" }}>{open ? "ซ่อนรายละเอียด" : "ดูรายละเอียด"}</Box>
                     {!open && bits.length > 0 && <> · {bits.join(" · ")}</>}
                   </Typography>
-                  <ExpandMoreRounded sx={{ fontSize: 20, color: ACCENT, transition: "transform .2s", transform: open ? "rotate(180deg)" : "none" }} />
+                  <ExpandMoreRounded sx={{ fontSize: 20, color: MUTED, transition: "transform .2s", transform: open ? "rotate(180deg)" : "none" }} />
                 </ButtonBase>
               );
             })()}
@@ -1085,6 +1094,16 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
     </Box>
   );
 }
+
+/** ไอคอนปฏิทินบนการ์ดมือถือ — กว้าง/สูงเท่ากันทุกใบ แถวการ์ดเรียงตรงกัน */
+const DateTile = ({ head, big, foot, color = "#475569", dashed = false, small = false }) => (
+  <Box sx={{ width: 58, borderRadius: 2, overflow: "hidden", textAlign: "center", bgcolor: "#fff",
+    border: `1px ${dashed ? "dashed" : "solid"} ${dashed ? "#cbd5e1" : alpha(color, 0.35)}` }}>
+    <Box sx={{ py: 0.2, bgcolor: dashed ? SURFACE : color, color: dashed ? "#64748b" : "#fff", fontSize: "0.64rem", fontWeight: 800, lineHeight: 1.5, whiteSpace: "nowrap" }}>{head}</Box>
+    <Typography sx={{ fontSize: small ? "1.02rem" : "1.35rem", fontWeight: 900, lineHeight: 1.15, pt: small ? 0.5 : 0.25, color: dashed ? color : INK, fontVariantNumeric: "tabular-nums" }}>{big}</Typography>
+    <Typography sx={{ fontSize: "0.62rem", fontWeight: 700, lineHeight: 1.3, pb: 0.4, color: dashed ? color : MUTED, whiteSpace: "nowrap" }}>{foot}</Typography>
+  </Box>
+);
 
 /** รูปผู้รับผิดชอบ (ไม่มีรูป = ตัวอักษรแรกบนสีประจำตัว) */
 const PersonPic = ({ name, owner, size = 30 }) => (
