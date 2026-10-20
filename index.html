@@ -61,6 +61,51 @@
         <div style="font-size:13.5px;font-weight:600;color:#64748b">กำลังเปิดระบบ…</div>
       </div>
     </div>
+    <!-- ✅ (21 ต.ค. 2569 ผู้ใช้: "อัปขึ้น production แล้วเปิดแอปค้างหน้ากำลังเปิดระบบ") ตัวช่วยกู้หน้าค้าง + เก็บสาเหตุ
+         • เก็บ error ที่เกิดตั้งแต่เริ่มโหลด (ก่อน React ทำงาน)
+         • ผ่านไป 15 วินาทียังค้างที่ "กำลังเปิดระบบ…" → แสดงกล่องบอกสาเหตุ + ปุ่ม "โหลดใหม่" / "ล้างแคชแล้วเปิดใหม่" (ยังล็อกอินอยู่)
+         ⚠️ สคริปต์ธรรมดา (ไม่ใช่ module) — ต้องทำงานได้แม้ไฟล์แอปหลักโหลด/รันไม่ผ่าน -->
+    <script>
+      (function () {
+        var errs = [];
+        window.__ttBootErrors = errs;
+        window.addEventListener("error", function (e) {
+          if (!e || /ResizeObserver/.test(e.message || "")) return;
+          var where = e.filename ? " @" + String(e.filename).split("/").pop() + ":" + e.lineno : (e.target && e.target.src ? " @" + e.target.src.split("/").pop() : "");
+          errs.push((e.message || "โหลดไฟล์ไม่สำเร็จ") + where);
+        }, true);
+        window.addEventListener("unhandledrejection", function (e) {
+          var r = e && e.reason;
+          errs.push("Promise: " + String((r && (r.message || r)) || "").slice(0, 300));
+        });
+        setTimeout(function () {
+          var root = document.getElementById("root");
+          if (!root || String(root.innerText || "").indexOf("กำลังเปิดระบบ") === -1) return;
+          var box = document.createElement("div");
+          box.setAttribute("style", "position:fixed;left:12px;right:12px;bottom:16px;z-index:99999;background:#fff;border:1px solid #fecaca;border-radius:14px;padding:14px;box-shadow:0 10px 30px rgba(15,23,42,.18);font-family:system-ui,sans-serif");
+          var list = errs.slice(-4).map(function (x) { return "<div style='margin-top:4px;font-size:11px;color:#b91c1c;word-break:break-all'>• " + String(x).replace(/</g, "&lt;") + "</div>"; }).join("");
+          box.innerHTML = "<div style='font-weight:800;font-size:14px;color:#0f172a'>เปิดระบบนานผิดปกติ</div>"
+            + "<div style='font-size:12px;color:#64748b;margin-top:2px'>" + (errs.length ? "พบข้อผิดพลาด (แคปหน้าจอนี้ส่งให้ผู้ดูแล):" : "ยังไม่พบข้อผิดพลาด — อาจเป็นเน็ตช้าหรือเซิร์ฟเวอร์กำลังเริ่มทำงาน") + "</div>" + list
+            + "<div style='display:flex;gap:8px;margin-top:12px'>"
+            + "<button id='tt-boot-reload' style='flex:1;height:40px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;font-weight:700'>โหลดใหม่</button>"
+            + "<button id='tt-boot-clear' style='flex:1.4;height:40px;border:0;border-radius:10px;background:#2563eb;color:#fff;font-weight:800'>ล้างแคชแล้วเปิดใหม่</button></div>";
+          document.body.appendChild(box);
+          document.getElementById("tt-boot-reload").onclick = function () { location.reload(); };
+          document.getElementById("tt-boot-clear").onclick = function () {
+            var jobs = [];
+            try { sessionStorage.clear(); } catch (e) {}
+            try {
+              // ล้างค่าที่แอปจำไว้ (ยกเว้นการล็อกอิน) — ค่าเก่าที่เสียอาจทำให้เปิดไม่ขึ้น
+              var keep = { token: 1, payload: 1 };
+              Object.keys(localStorage).forEach(function (k) { if (!keep[k]) localStorage.removeItem(k); });
+            } catch (e) {}
+            if (window.caches && caches.keys) jobs.push(caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }));
+            if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); }));
+            Promise.all(jobs).catch(function () {}).then(function () { location.replace("/dashboard?fresh=" + Date.now()); });
+          };
+        }, 15000);
+      })();
+    </script>
     <script type="module" src="/src/index.js"></script>
   </body>
 </html>
