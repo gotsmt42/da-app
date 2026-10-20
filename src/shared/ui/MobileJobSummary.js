@@ -36,7 +36,7 @@ export const EventDateTile = ({ event }) => {
   if (!event?.start) return <DateTile dashed head="วันเข้างาน" big="—" foot="ยังไม่กำหนด" color="#94a3b8" />;
   const s = moment(event.start);
   let e = event.end ? moment(event.end) : s.clone();
-  if (event.allDay !== false && event.end && e.isAfter(s)) e = e.subtract(1, "day");
+  if (event.allDay && event.end && e.isAfter(s)) e = e.subtract(1, "day"); // กติกาเดียวกับทั้งแอป (allDay = end เป็นวันถัดไป)
   const multi = e.isAfter(s, "day");
   const today = moment();
   const isToday = !today.isBefore(s, "day") && !today.isAfter(e, "day");

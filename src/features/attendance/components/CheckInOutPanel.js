@@ -117,7 +117,14 @@ export function jobStepOf(event, docsComplete = false) {
   if (isClosedJob(event)) return STEPS.length;
   if (event.closeRequested) return 5;
   const legacyStarted = event.status === "กำลังดำเนินการ" && Boolean(event.createdAt) && new Date(event.createdAt) < new Date(FLOW_SINCE);
-  if (event.checkedInAt || legacyStarted) return docsComplete ? 4 : 3;
+  if (legacyStarted) return docsComplete ? 4 : 3;
+  if (event.checkedInAt) {
+    // 🐛 (20 ต.ค. 2569 ผู้ใช้: "งานหลายช่วงวันยังมีผิดๆ") งานหลายวัน: เข้างานวันแรกแล้วยังไม่ผ่านขั้น "เข้างาน" จนกว่าจะเลยวันนัดสุดท้าย
+    const days = scheduledAttendanceDays(event);
+    const last = days.length ? days[days.length - 1] : moment(event.start);
+    if (days.length > 1 && !moment().utcOffset(7).startOf("day").isAfter(last)) return 2;
+    return docsComplete ? 4 : 3;
+  }
   const acked = !ackTracked(event) || (event.acks || []).length > 0;
   if (acked && !event.ackDeclined?.userId) return isConfirmedJob(event) ? 2 : 1;
   return 0;
@@ -378,7 +385,9 @@ ${text}`);
   const legacyStarted = !checkin && !latestCheckin && event.status === "กำลังดำเนินการ" && Boolean(event.createdAt) && new Date(event.createdAt) < new Date(FLOW_SINCE);
   const current = closed ? STEPS.length
     : event.closeRequested ? 5
-    : checkin || latestCheckin || legacyStarted ? (docsComplete ? 4 : 3)
+    // 🐛 (20 ต.ค. 2569) งานหลายวัน: บันทึกยังไม่ครบ (และยังไม่เลยวันสุดท้าย) = ยังอยู่ขั้น "เข้างาน" — เดิมกระโดดไปขั้นเอกสารตั้งแต่วันแรก
+    : attendanceDone || legacyStarted ? (docsComplete ? 4 : 3)
+    : checkin || latestCheckin ? 2
     : acked && !declined ? (confirmed ? 2 : 1)
     : 0;
 
@@ -570,6 +579,7 @@ ${text}`);
       line = (
         <Line icon={<TaskAltRounded />} tone="#16a34a" right={logLink}>
           <b style={{ fontWeight: 600, color: INK }}>บันทึกวันนี้แล้ว · {fmtTime(checkin.checkIn?.at)}</b> · {checkin.userName}
+          {plannedDays.length > 1 && <Box component="span" sx={{ color: allPlannedDaysRecorded ? "#15803d" : MUTED }}> · {Math.min(recordedDays.size, plannedDays.length)}/{plannedDays.length} วัน{allPlannedDaysRecorded ? " ครบแล้ว" : ""}</Box>}
           {b?.tone === "warn" && <Box component="span" sx={{ color: "#b45309" }}> · {b.text}</Box>}
         </Line>
       );
@@ -605,7 +615,9 @@ ${text}`);
         : pastDay ? <Line icon={<InfoOutlined />} tone="#d97706">{[who, `เลยวันเข้างาน (${day}) · ${confirmed ? "ยังไม่บันทึกเข้างาน" : "ยังไม่ยืนยันนัดหมาย"}`].filter(Boolean).join(" · ")}</Line>
         : (
           <Line icon={<HourglassTopRounded />} tone={MUTED}>
-            {[who, !confirmed ? "รอผู้รับผิดชอบยืนยันนัดหมาย" : beforeDay ? `ยืนยันนัดหมายแล้ว · เข้างาน ${day}` : `รอหัวหน้าทีม ${head} บันทึกเข้างาน`].filter(Boolean).join(" · ")}
+            {[who, !confirmed ? "รอผู้รับผิดชอบยืนยันนัดหมาย" : beforeDay ? `ยืนยันนัดหมายแล้ว · เข้างาน ${day}`
+              : recordedDays.size > 0 && plannedDays.length > 1 ? `บันทึกแล้ว ${recordedDays.size}/${plannedDays.length} วัน · รอหัวหน้าทีม ${head} บันทึกวันนี้`
+              : `รอหัวหน้าทีม ${head} บันทึกเข้างาน`].filter(Boolean).join(" · ")}
           </Line>
         );
     } else if (!acked && !canAck) {
@@ -639,7 +651,7 @@ ${text}`);
     else {
       line = (
         <Button fullWidth variant="contained" disableElevation startIcon={<LoginRounded />} onClick={() => setDialog(true)} sx={{ ...MBTN.primary, minHeight: 42 }}>
-          บันทึกเข้างานวันนี้
+          บันทึกเข้างานวันนี้{plannedDays.length > 1 ? ` · วันที่ ${Math.min(recordedDays.size + 1, plannedDays.length)}/${plannedDays.length}` : ""}
         </Button>
       );
     }

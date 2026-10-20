@@ -324,7 +324,7 @@ function MyJobsTable({ groups, allGroups, overdueOf, renderCard, highlightJob, u
 const JobGroupCard = ({ sessions, ...cardProps }) => {
   // ✅ (10 ต.ค. 2569) มีวันเข้างานเป็น "วันนี้" → กางไว้เลย ให้เห็นปุ่มเช็คอินของวันนี้ทันที
   const [expanded, setExpanded] = useState(() => sessions.some((s) => {
-    const last = moment(s.end || s.start).subtract(s.allDay === false ? 0 : 1, "days");
+    const last = moment(s.end || s.start).subtract(s.allDay && s.end ? 1 : 0, "days"); // 🐛 (20 ต.ค. 2569) เดิม allDay ไม่ระบุก็ลบ 1 วัน — ไม่ตรงกับทั้งแอป
     return moment().isBetween(moment(s.start), last.isBefore(moment(s.start)) ? moment(s.start) : last, "day", "[]");
   }));
   const isGrouped = sessions.length > 1;
