@@ -1277,7 +1277,7 @@ const EventRowCard = ({
                       <MoreVert fontSize="small" />
                     </IconButton>
                   ) : null}
-                  step={jobStepOf(event, docDone === JOB_DOC_TYPES.length)}
+                  step={jobStepOf(event, docDone === JOB_DOC_TYPES.length)} inGroup={noOuterCard}
       actions={<CheckInOutPanel compact lineOnly event={event} onPreview={onPreview} onPatched={onPatched} sx={{ mt: 0 }} docsComplete={docDone === JOB_DOC_TYPES.length} />}
       onToggle={() => setOpen(true)} />
   );

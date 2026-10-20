@@ -103,11 +103,37 @@ export function StepChips({ step }) {
   );
 }
 
-export default function MobileJobSummary({ event, statusLabel, statusColor, next, person, personSrc, personSub, alert, right, actions, onToggle, step }) {
+export default function MobileJobSummary({ event, statusLabel, statusColor, next, person, personSrc, personSub, alert, right, actions, onToggle, step, inGroup = false }) {
   const kind = classifyJob(event) || "general";
   const meta = event?.noVisit ? { label: "งานส่งของ", color: "#0891b2" } : (getJobClassMeta(kind) || getJobClassMeta("general"));
   const round = event?.time ? formatRoundLabel(event.time, event.visitCount, event) : "";
   const place = [event.company, event.site].filter((x) => x && x !== "-").filter((x, i, a) => a.indexOf(x) === i).join(" · ");
+  // ✅ (20 ต.ค. 2569 ผู้ใช้: "งานหลายช่วงวันทำให้แยกง่าย ไม่สับสนกับงานเดี่ยวๆ กันพลาด")
+  //    ช่วงหนึ่งในงานหลายช่วง (inGroup) — ไม่ซ้ำชื่องาน/โครงการ (อยู่หัวกลุ่มแล้ว) · เหลือ ปฏิทิน + คนเข้างาน + สถานะ ในแถวเดียว
+  //    หน้าตาจึงต่างจากการ์ดงานเดี่ยวชัดเจน
+  if (inGroup) {
+    return (
+      <Box onClick={onToggle} role="button" aria-expanded={false} sx={{ cursor: "pointer" }}>
+        <Stack direction="row" gap={1.25} alignItems="center">
+          <EventDateTile event={event} />
+          {person ? (
+            <Stack direction="row" alignItems="center" gap={0.8} sx={{ flex: 1, minWidth: 0 }}>
+              <PersonPic name={person} src={personSrc} size={28} />
+              <Box sx={{ minWidth: 0 }}>
+                <Typography noWrap sx={{ fontSize: "0.8rem", fontWeight: 800, color: INK, lineHeight: 1.25 }}>{person}</Typography>
+                {personSub && <Typography noWrap sx={{ fontSize: "0.68rem", color: MUTED, lineHeight: 1.25 }}>{personSub}</Typography>}
+              </Box>
+            </Stack>
+          ) : <Typography sx={{ flex: 1, fontSize: "0.76rem", fontWeight: 700, color: "#b45309" }}>ยังไม่มอบหมาย</Typography>}
+          {statusLabel && <StatusPill label={statusLabel} color={statusColor} />}
+          {right}
+          <ExpandMoreRounded sx={{ fontSize: 20, color: "#94a3b8", flexShrink: 0, transform: "rotate(-90deg)", mr: -0.5 }} />
+        </Stack>
+        <StepChips step={step} />
+        {actions && <Box onClick={(e) => e.stopPropagation()} sx={{ mt: 0.9, cursor: "default" }}>{actions}</Box>}
+      </Box>
+    );
+  }
   return (
     <Box onClick={onToggle} role="button" aria-expanded={false} sx={{ cursor: "pointer" }}>
       <Stack direction="row" gap={1.5} alignItems="flex-start">

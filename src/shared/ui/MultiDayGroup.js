@@ -17,6 +17,7 @@ import { DateRange, CalendarMonth, Description, ExpandLess, ExpandMore, CheckRou
 import AttendanceService from "@/shared/services/AttendanceService";
 import useRealtime from "@/shared/realtime/useRealtime";
 import { formatThai } from "@/shared/utils/thaiDate";
+import { FLOW_SINCE } from "@/shared/utils/jobFlow";
 
 /** sx ของกรอบการ์ดกลุ่ม (ใส่ให้ Card/Box ภายนอก) */
 export const multiDayCardSx = (statusColor = "#94a3b8") => ({
@@ -89,6 +90,8 @@ export function sessionStateOf(s, recorded) {
     return { key: "upcoming", label: inDays === 1 ? "พรุ่งนี้" : `อีก ${inDays} วัน`, color: "#64748b", planned, done };
   }
   if (closed || (recorded && done >= planned)) return { key: "done", label: `บันทึกครบ ${planned} วัน`, color: "#16a34a", planned, done };
+  // 🐛 (20 ต.ค. 2569) ช่วงที่จบก่อนเริ่มใช้ระบบบันทึกเข้างาน — ไม่มีบันทึกเป็นเรื่องปกติ ไม่ใช่ "บันทึกไม่ครบ"
+  if (dayEnd(s).isBefore(moment(FLOW_SINCE).utcOffset(7).startOf("day")) && !done) return { key: "legacy", label: "ก่อนเริ่มใช้ระบบบันทึก", color: "#64748b", planned, done };
   if (!recorded) return { key: "past", label: "ผ่านไปแล้ว", color: "#64748b", planned, done };
   return { key: "missing", label: done ? `บันทึก ${done}/${planned} วัน` : "ไม่ได้บันทึกเข้างาน", color: "#d97706", planned, done };
 }
@@ -184,7 +187,7 @@ export function SessionBar({ order, total, session, st, isAnchor }) {
   return (
     <Stack direction="row" alignItems="center" gap={1} sx={{ px: 2, py: 0.85, bgcolor: st.key === "today" ? alpha("#2563eb", 0.06) : "#f8fafc", borderBottom: "1px solid #e2e8f0", flexWrap: "wrap", rowGap: 0.5 }}>
       <Typography sx={{ fontSize: "0.76rem", fontWeight: 900, color: "#0f172a", whiteSpace: "nowrap" }}>ช่วงที่ {order}/{total}</Typography>
-      <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.74rem", fontWeight: 600, color: "#64748b" }}>{rangeLabel(session)} · {plannedDaysOf(session)} วัน</Typography>
+      <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.74rem", fontWeight: 600, color: "#64748b", whiteSpace: "nowrap" }}>{rangeLabel(session)} · {plannedDaysOf(session)} วัน</Typography>
       <Box component="span" sx={{ flexShrink: 0, px: 0.9, height: 22, display: "inline-flex", alignItems: "center", borderRadius: 99, fontSize: "0.68rem", fontWeight: 800,
         color: st.color, bgcolor: alpha(st.color, 0.1) }}>{st.label}</Box>
       {isAnchor && (

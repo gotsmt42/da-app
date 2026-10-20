@@ -948,7 +948,7 @@ const TechnicianJobCard = ({
               next={(() => { const n = nextStepOf(event, "tech"); return n ? { title: n.title, tone: n.tone } : null; })()}
               person={event.responsiblePerson} personSrc={employees.find((u) => u.fname === event.responsiblePerson)?.imageUrl}
               personSub={event.team ? `หัวหน้าทีม ${event.team}` : "ผู้รับผิดชอบงาน"}
-              step={jobStepOf(event, completedDocCount === DOCUMENT_TYPES.length)}
+              step={jobStepOf(event, completedDocCount === DOCUMENT_TYPES.length)} inGroup={noOuterCard}
               actions={<CheckInOutPanel compact lineOnly event={event} onPreview={onPreview} onPatched={onPatched} sx={{ mt: 0 }} docsComplete={completedDocCount === DOCUMENT_TYPES.length} />}
               onToggle={() => setSheetOpen(true)} />
           </Box>
