@@ -41,8 +41,9 @@ export const EventDateTile = ({ event }) => {
   const today = moment();
   const isToday = !today.isBefore(s, "day") && !today.isAfter(e, "day");
   return (
-    <DateTile head={formatThai(s, "MMM YY")} big={multi ? `${s.format("D")}–${e.format("D")}` : s.format("D")} small={multi}
-      foot={isToday ? "วันนี้" : multi ? `${e.diff(s.clone().startOf("day"), "days") + 1} วัน` : formatThai(s, "ddd")} footColor={isToday ? ACCENT : null} />
+    // 🔁 (20 ต.ค. 2569 ผู้ใช้: "ตรงวันที่ยังล้น") หลายวัน: ตัวใหญ่ = วันแรก · ล่าง = "ถึง 16" (ไม่ยัด 15–16 ในกล่องแคบ)
+    <DateTile head={formatThai(s, "MMM YY")} big={s.format("D")}
+      foot={isToday ? "วันนี้" : multi ? `ถึง ${e.isSame(s, "month") ? e.format("D") : formatThai(e, "D MMM")}` : formatThai(s, "ddd")} footColor={isToday ? ACCENT : null} />
   );
 };
 
@@ -68,7 +69,7 @@ export const StatusPill = ({ label, color = MUTED }) => (
  * @param right        ปุ่มมุมขวาบน (เช่น ⋮) — ต้อง stopPropagation เอง
  * @param onToggle     กดการ์ด = กางรายละเอียด
  */
-export default function MobileJobSummary({ event, statusLabel, statusColor, next, person, personSrc, personSub, alert, right, onToggle }) {
+export default function MobileJobSummary({ event, statusLabel, statusColor, next, person, personSrc, personSub, alert, right, actions, onToggle }) {
   const kind = classifyJob(event) || "general";
   const meta = event?.noVisit ? { label: "งานส่งของ", color: "#0891b2" } : (getJobClassMeta(kind) || getJobClassMeta("general"));
   const round = event?.time ? formatRoundLabel(event.time, event.visitCount, event) : "";
@@ -105,12 +106,15 @@ export default function MobileJobSummary({ event, statusLabel, statusColor, next
         )}
         {statusLabel && <StatusPill label={statusLabel} color={statusColor} />}
       </Stack>
+      {/* ✅ (20 ต.ค. 2569 ผู้ใช้: "ปุ่มดำเนินการ เช่น รับทราบ บันทึกงาน ต้องอยู่หน้าแรก ให้ดูและใช้ง่าย")
+          actions = แถวปุ่ม/สถานะขั้นตอน (รับทราบ · ยืนยันนัด · บันทึกเข้างาน) กดได้เลยโดยไม่ต้องเปิดการ์ด */}
+      {actions && <Box onClick={(e) => e.stopPropagation()} sx={{ mt: 1, cursor: "default" }}>{actions}</Box>}
       <Stack direction="row" alignItems="center" gap={0.75} sx={{ mt: 1, mx: -0.25, px: 1, py: 0.7, borderRadius: 2, bgcolor: SURFACE }}>
-        <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: next?.tone || "#94a3b8", flexShrink: 0 }} />
-        <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.78rem", fontWeight: 700, color: next ? "#334155" : MUTED }}>
-          {next?.title || "ดูรายละเอียดงาน"}
+        {!actions && <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: next?.tone || "#94a3b8", flexShrink: 0 }} />}
+        <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.78rem", fontWeight: 700, color: next && !actions ? "#334155" : MUTED }}>
+          {actions ? "ดูรายละเอียด · เอกสาร · ขอปิดงาน" : next?.title || "ดูรายละเอียดงาน"}
         </Typography>
-        <ExpandMoreRounded sx={{ fontSize: 20, color: MUTED, flexShrink: 0 }} />
+        <ExpandMoreRounded sx={{ fontSize: 20, color: MUTED, flexShrink: 0, transform: "rotate(-90deg)" }} />
       </Stack>
     </Box>
   );

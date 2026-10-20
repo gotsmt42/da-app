@@ -81,6 +81,7 @@ import ImagePreview from "@/shared/ui/ImagePreview";
 import DateCell from "@/shared/ui/DateCell";
 import JobKindTag from "@/shared/ui/JobKindTag";
 import MobileJobSummary from "@/shared/ui/MobileJobSummary";
+import MobileSheet from "@/shared/ui/MobileSheet";
 import JobDocsCell from "@/shared/ui/JobDocsCell";
 import RefDoc from "@/shared/ui/RefDoc";
 import { printFile, shareFile, isMobileDevice } from "@/shared/utils/fileActions";
@@ -105,7 +106,7 @@ import { ROLES, TECHNICIAN_ROLES, isRole, normalizeRole } from "@/shared/utils/r
 import { can } from "@/shared/utils/roles";
 import ViewTiles from "@/shared/ui/ViewTiles";
 import ResponsibleSummary from "@/shared/ui/ResponsibleSummary";
-import Drawer from "@mui/material/Drawer";
+import SwipeableDrawer from "@mui/material/SwipeableDrawer";
 import AppsIcon from "@mui/icons-material/Apps";
 import SelectField, { SELECT_FIELD_SX, SELECT_MENU_PROPS } from "@/shared/ui/SelectField";
 import PersonSelectField from "@/shared/ui/PersonSelectField";
@@ -138,13 +139,18 @@ const FAST_MENU_PROPS = {
 export const GlassCard = styled(Card)(({ theme }) => ({
   background: alpha(theme.palette.background.paper, 0.9),
   backdropFilter: "blur(10px)",
+  // มือถือ: blur ใต้การ์ดหลายสิบใบทำให้เลื่อน/เปิดแผงกระตุก — ใช้พื้นทึบแทน
+  [theme.breakpoints.down("sm")]: { backdropFilter: "none", background: theme.palette.background.paper },
   borderRadius: 16,
   border: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
   boxShadow: `0 4px 24px ${alpha(theme.palette.common.black, 0.06)}`,
   transition: "transform 0.2s ease, box-shadow 0.2s ease",
-  "&:hover": {
-    transform: "translateY(-2px)",
-    boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.1)}`,
+  // มือถือ (ไม่มีเมาส์) ไม่ยกการ์ด — แตะแล้ว hover ค้างทำให้การ์ดเด้ง
+  "@media (hover: hover) and (pointer: fine)": {
+    "&:hover": {
+      transform: "translateY(-2px)",
+      boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.1)}`,
+    },
   },
 }));
 
@@ -1016,6 +1022,7 @@ const EventRowCard = ({
   // การกางลงในหน้า (Collapse) — เดิมกางแล้วเนื้อหายาวๆ ดันการ์ดอื่นในคอลัมน์เดียวกันลงมา ต้อง
   // เลื่อนจอตาม ทั้งที่จอกว้างเปิดลอยทับได้เลยโดยไม่กระทบตำแหน่งการ์ดอื่น (มือถือยังกางลงแบบเดิม)
   const isDesktop = useMediaQuery("(min-width:900px)");
+  const isXs = useMediaQuery("(max-width:599.95px)");
   const canEdit = can(currentUser, "editOperation");
   // ✅ ขั้นตอนถัดไป (ตัวเดียวกับกล่อง "ขั้นตอนถัดไป" ใน JobFlowPanel) — โชว์สั้นๆ บนหัวการ์ดตอนพับ
   // ⚠️ งานปิดแล้วไม่แสดง — ป้ายสถานะ "ดำเนินการเสร็จสิ้น" บอกอยู่แล้ว ไม่ต้องซ้ำ
@@ -1248,16 +1255,33 @@ const EventRowCard = ({
     : { sx: {
         mb: 1.5,
         transition: "transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease",
-        "&:hover": {
+        // 🐛 (20 ต.ค. 2569 ผู้ใช้: "กดดูรายละเอียดมันเด้งๆ กระพริบ ไม่สมูท") มือถือแตะแล้วค้างสถานะ hover → การ์ดยกขึ้น/ลง
+        //    ทุกครั้งที่แตะ — ยกการ์ดเฉพาะอุปกรณ์ที่มีเมาส์จริง · ในแผงรายละเอียดไม่ยก
+        "&:hover": { transform: "none" },
+        ...(inlineDetails ? {} : { "@media (hover: hover) and (pointer: fine)": { "&:hover": {
           transform: "translateY(-3px)",
           boxShadow: `0 10px 28px ${alpha(theme.palette.common.black, 0.16)}`,
           borderColor: alpha(theme.palette.primary.main, 0.3),
-        },
+        } } }),
       } };
 
-  return (
-    <Wrapper {...wrapperProps}>
-      <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+  // ✅ (20 ต.ค. 2569 ผู้ใช้: "รายละเอียดกดแล้วให้เด้งมาทับแทนเลื่อนลง ดูใช้งานยาก")
+  //    มือถือ: กดการ์ดย่อ = เปิดรายละเอียดเต็มจอทับขึ้นมา (ปิดกลับมาที่เดิมในรายการ) · จอใหญ่กางในการ์ดเหมือนเดิม
+  const mobileSummary = (
+    <MobileJobSummary event={event} statusLabel={localStatus || "ไม่ระบุ"} statusColor={OP_COLOR[localStatus] || "#64748b"}
+                  next={nextStep ? { title: nextStep.title, tone: nextStep.tone } : null}
+                  person={event.responsiblePerson} personSrc={avatarMap.get(event.responsiblePerson)}
+                  personSub={event.team ? `หัวหน้าทีม ${event.team}` : "ผู้รับผิดชอบงาน"}
+                  right={canEdit ? (
+                    <IconButton onClick={(e) => { e.stopPropagation(); setMoreAnchorEl(e.currentTarget); }} sx={{ p: 0.75, mt: -0.5, mr: -0.75 }}>
+                      <MoreVert fontSize="small" />
+                    </IconButton>
+                  ) : null}
+                  actions={<CheckInOutPanel compact event={event} onPreview={onPreview} onPatched={onPatched} sx={{ mt: 0 }} docsComplete={docDone === JOB_DOC_TYPES.length} />}
+      onToggle={() => setOpen(true)} />
+  );
+  const cardBody = (
+    <>
         {/* ✅ (10 ต.ค. 2569 ผู้ใช้: "หน้าการดำเนินงานอยากให้เป็นการ์ดหัวข้อ แล้วค่อยเปิดขยายเพื่อดูข้อมูล
             ทำให้สวยงาม ดูง่าย เข้าใจง่าย และมืออาชีพ")
             • หัวการ์ด (เห็นเสมอ): สถานะ · วันที่ · ชื่องาน/ระบบ · โครงการ · ป้ายสำคัญ · ผู้รับผิดชอบ · ขั้นตอนถัดไป
@@ -1266,20 +1290,7 @@ const EventRowCard = ({
             ปุ่ม/ลิงก์ย่อยด้านในที่มี action ของตัวเอง ต้อง stopPropagation ไม่งั้นกดแล้วการ์ดกาง/พับไปด้วย */}
         {/* ✅ (20 ต.ค. 2569 ผู้ใช้: "หน้าการดำเนินงาน ให้เป็นรูปแบบเดียวกับหน้ารับงาน — หน้าแรกข้อมูลไม่เยอะแต่สำคัญ")
             มือถือตอนพับ = หัวการ์ดย่อ (ปฏิทิน · ชื่องาน · โครงการ · ผู้รับผิดชอบ + สถานะ · ขั้นถัดไป) · กดแล้วกางหัวการ์ดเต็ม + รายละเอียด */}
-        {!open && (
-          <Box sx={{ display: { xs: "block", sm: "none" } }}>
-            <MobileJobSummary event={event} statusLabel={localStatus || "ไม่ระบุ"} statusColor={OP_COLOR[localStatus] || "#64748b"}
-              next={nextStep ? { title: nextStep.title, tone: nextStep.tone } : null}
-              person={event.responsiblePerson} personSrc={avatarMap.get(event.responsiblePerson)}
-              personSub={event.team ? `หัวหน้าทีม ${event.team}` : "ผู้รับผิดชอบงาน"}
-              right={canEdit ? (
-                <IconButton onClick={(e) => { e.stopPropagation(); setMoreAnchorEl(e.currentTarget); }} sx={{ p: 0.75, mt: -0.5, mr: -0.75 }}>
-                  <MoreVert fontSize="small" />
-                </IconButton>
-              ) : null}
-              onToggle={() => setOpen(true)} />
-          </Box>
-        )}
+        {!open && <Box sx={{ display: { xs: "block", sm: "none" } }}>{mobileSummary}</Box>}
         <Box onClick={() => setOpen((p) => !p)} sx={{ cursor: "pointer", display: { xs: open ? "block" : "none", sm: "block" } }} role="button" aria-expanded={open}>
           <Stack direction="row" alignItems="flex-start" gap={1.5}>
             <Avatar sx={{
@@ -1810,7 +1821,7 @@ const EventRowCard = ({
             แถบ "สรุปงาน · คุยกับช่าง · ประวัติ" ท้ายการ์ดเสมอ (ไม่ต้องกางการ์ดก่อน) → เปิดอีกหน้า */}
         {!inlineDetails && (
           <ButtonBase onClick={(e) => { e.stopPropagation(); setExpanded(true); }}
-            sx={{ width: "100%", mt: 1.25, px: 1.25, py: 0.85, gap: 1, justifyContent: "flex-start", borderRadius: "10px",
+            sx={{ width: "100%", mt: 1.25, px: 1.25, py: 0.85, gap: 1, justifyContent: "flex-start", borderRadius: "10px", display: { xs: open ? "flex" : "none", sm: "flex" },
               fontFamily: "inherit", bgcolor: SURFACE, "&:hover": { bgcolor: "#eef2f6" } }}>
             <Typography noWrap sx={{ flex: 1, minWidth: 0, textAlign: "left", fontSize: "0.78rem", color: INK_2 }}>
               {[event.workNote ? "สรุปงาน ✓" : "สรุปงาน", `คุยกับช่าง${(event.comments || []).length ? ` ${event.comments.length}` : ""}`, "ประวัติ"].join(" · ")}
@@ -1873,7 +1884,20 @@ const EventRowCard = ({
 
         {/* Expanded — เปิดเป็น Dialog ทับขึ้นมาเสมอ ไม่ว่าจอเล็ก/ใหญ่ ไม่ต้องกางลงดันการ์ดอื่น/
             เลื่อนจอตามอีกต่อไป — จอเล็ก (มือถือ) เปิดแบบเต็มจอ (fullScreen) แทนกล่องลอย */}
+    </>
+  );
+  const sheet = isXs && open && !inlineDetails && !defaultExpanded;
+
+  return (
+    <Wrapper {...wrapperProps}>
+      <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
+        {sheet ? mobileSummary : cardBody}
       </CardContent>
+      <MobileSheet open={sheet} onClose={() => setOpen(false)}
+        title={`${event.title || "งาน"}${event.system ? ` · ${event.system}` : ""}`}
+        subtitle={[event.jobNo, companySite(event.company, event.site)].filter(Boolean).join(" · ")}>
+        <Box sx={{ m: 1.25, p: 2, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${LINE}` }}>{cardBody}</Box>
+      </MobileSheet>
 
       {!inlineDetails && (
       <Dialog open={expanded} onClose={() => setExpanded(false)} fullWidth maxWidth="md" fullScreen={!isDesktop}
@@ -3696,7 +3720,7 @@ const Operation = () => {
                 {filterSystem && <Chip size="small" label={`ระบบ: ${filterSystem}`} onDelete={() => setFilterSystem("")} sx={{ fontWeight: 700 }} />}
                 {filterTeam && <Chip size="small" label={`ทีม: ${filterTeam}`} onDelete={() => setFilterTeam("")} sx={{ fontWeight: 700 }} />}
               </Stack>
-              <Drawer
+              <SwipeableDrawer onOpen={() => {}} disableSwipeToOpen transitionDuration={{ enter: 260, exit: 200 }}
                 anchor="bottom" open={mobileSheetOpen} onClose={() => setMobileSheetOpen(false)}
                 PaperProps={{ sx: { borderTopLeftRadius: 18, borderTopRightRadius: 18, px: 2, pt: 1, pb: "calc(16px + env(safe-area-inset-bottom))", maxHeight: "88vh" } }}
               >
@@ -3735,14 +3759,14 @@ const Operation = () => {
                 >
                   ดูผลลัพธ์ {sortedEvents.length} รายการ
                 </Button>
-              </Drawer>
+              </SwipeableDrawer>
             </>
           )}
 
           {loading ? (
             [1, 2, 3].map(i => <Skeleton key={i} variant="rounded" height={96} sx={{ mb: 1.5, borderRadius: 2 }} />)
           ) : effectiveGroup === "today" ? (
-            <TodayBoard events={responsibleFiltered} view={isMobile ? "card" : viewMode} onOpenJob={(jid) => setDetailJobId(jid)} />
+            <TodayBoard events={responsibleFiltered} employees={employee} view={isMobile ? "card" : viewMode} onOpenJob={(jid) => setDetailJobId(jid)} />
           ) : sortedEvents.length === 0 ? (
             <Box sx={{ textAlign: "center", py: 10, color: "text.secondary" }}>
               <FolderOpen sx={{ fontSize: 56, opacity: 0.25, mb: 1 }} />
@@ -3893,23 +3917,28 @@ const Operation = () => {
 
 
       {/* ── แผงรายละเอียดงาน (จากตาราง) — ขวามือบนจอใหญ่ · เต็มจอบนมือถือ ── */}
-      <Drawer
+      {/* ✅ (20 ต.ค. 2569 ผู้ใช้: "เลื่อนขึ้นแบบนี้ แต่สมูท เลื่อนลงปิดได้ง่ายๆ") มือถือ: ลากลงเพื่อปิด (SwipeableDrawer) · มีขีดจับ */}
+      <SwipeableDrawer
         anchor={isMobile ? "bottom" : "right"}
         open={Boolean(detailSessions)}
         onClose={() => setDetailJobId(null)}
+        onOpen={() => {}}
+        disableSwipeToOpen
+        transitionDuration={{ enter: 260, exit: 200 }}
         PaperProps={{ sx: {
           width: isMobile ? "100%" : "min(640px, 92vw)",
           height: isMobile ? "92dvh" : "100%",
           borderTopLeftRadius: isMobile ? 16 : 0, borderTopRightRadius: isMobile ? 16 : 0,
-          bgcolor: "#f8fafc",
+          bgcolor: "#f8fafc", overflow: "hidden",
         } }}
       >
         {detailSessions && (() => {
           const head = detailSessions[0];
           return (
             <>
+              {isMobile && <Box sx={{ bgcolor: "background.paper", pt: 1 }}><Box sx={{ width: 40, height: 5, borderRadius: 99, bgcolor: "#cbd5e1", mx: "auto" }} /></Box>}
               <Stack direction="row" alignItems="center" gap={1.25}
-                sx={{ px: 2, py: 1.5, bgcolor: "background.paper", borderBottom: "1px solid #e2e8f0", position: "sticky", top: 0, zIndex: 2 }}>
+                sx={{ px: 2, py: isMobile ? 1 : 1.5, bgcolor: "background.paper", borderBottom: "1px solid #e2e8f0", position: "sticky", top: 0, zIndex: 2 }}>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography noWrap sx={{ fontWeight: 800, fontSize: "1rem", lineHeight: 1.3 }}>
                     {head.site || head.company || "รายละเอียดงาน"}
@@ -3931,7 +3960,7 @@ const Operation = () => {
                 </Button>
                 <IconButton size="small" onClick={() => setDetailJobId(null)} aria-label="ปิด"><Close fontSize="small" /></IconButton>
               </Stack>
-              <Box sx={{ p: { xs: 1.5, sm: 2 }, overflowY: "auto", flex: 1 }}>
+              <Box sx={{ p: { xs: 1.5, sm: 2 }, overflowY: "auto", flex: 1, overscrollBehavior: "contain", WebkitOverflowScrolling: "touch" }}>
                 <JobGroupBlock
                   key={detailJobId}
                   inlineDetails
@@ -3958,7 +3987,7 @@ const Operation = () => {
             </>
           );
         })()}
-      </Drawer>
+      </SwipeableDrawer>
 
       {/* File Preview */}
       <FilePreviewDialog

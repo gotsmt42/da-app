@@ -13,10 +13,11 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import moment from "moment";
-import { Box, ButtonBase, Stack, Typography, Skeleton } from "@mui/material";
+import { Box, ButtonBase, Stack, Typography, Skeleton, useMediaQuery } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { AccessTime, ChevronRight, Groups, PersonOff, LocalShippingOutlined } from "@mui/icons-material";
 import JobKindTag from "@/shared/ui/JobKindTag";
+import MobileJobSummary from "@/shared/ui/MobileJobSummary";
 import JobDocsCell from "@/shared/ui/JobDocsCell";
 import { PersonChip } from "@/shared/ui/PersonChip";
 import AttendanceService from "@/shared/services/AttendanceService";
@@ -114,7 +115,8 @@ const StateChip = ({ state, att, align = "flex-end" }) => {
   );
 };
 
-export default function TodayBoard({ events, onOpenJob, view = "card" }) {
+export default function TodayBoard({ events, onOpenJob, view = "card", employees = [] }) {
+  const isXs = useMediaQuery("(max-width:599.95px)");
   const [att, setAtt] = useState(null); // eventId → attendance row ของวันนี้
   const [now, setNow] = useState(moment());
   const [filter, setFilter] = useState("all");
@@ -223,6 +225,22 @@ export default function TodayBoard({ events, onOpenJob, view = "card" }) {
         </Stack>
       ) : view === "table" ? (
         <TodayTable rows={flat} onOpenJob={onOpenJob} />
+      ) : isXs ? (
+        // ✅ (20 ต.ค. 2569 ผู้ใช้: "งานวันนี้แสดงรูปแบบเหมือนหน้าอื่นด้วย งง") มือถือ: การ์ดย่อชุดเดียวกับทุกหน้า
+        //    (ปฏิทิน · ชื่องาน · โครงการ · รูปผู้รับผิดชอบ + สถานะวันนี้) เรียงเลยเวลานัดก่อน → ตามเวลานัด · กดเปิดรายละเอียด
+        <Stack spacing={1.25}>
+          {flat.map(({ e, a, state }) => (
+            <Box key={e._id} sx={{ p: 2, bgcolor: "#fff", borderRadius: 3, border: "1px solid #e2e8f0", borderLeft: `4px solid ${STATE[state].color}`, boxShadow: "0 1px 3px rgba(15,23,42,.06)" }}>
+              <MobileJobSummary event={e}
+                statusLabel={state === "checkin" ? `เข้างาน ${fmtTime(a?.checkIn?.at)}` : STATE[state].short} statusColor={STATE[state].color}
+                next={{ title: `${hasTime(e) ? `นัด ${moment(e.start).format("HH:mm")} น. · ` : "ทั้งวัน · "}${STATE[state].label}`, tone: STATE[state].color }}
+                person={e.noVisit ? null : (e.responsiblePerson || e.team || null)}
+                personSrc={(employees || []).find((u) => u.fname === (e.responsiblePerson || e.team))?.imageUrl}
+                personSub={e.team && e.team !== e.responsiblePerson ? `หัวหน้าทีม ${e.team}` : "ผู้รับผิดชอบงาน"}
+                onToggle={() => onOpenJob?.(e._id)} />
+            </Box>
+          ))}
+        </Stack>
       ) : (
         // ── การ์ดละ 1 ช่าง ── (มีกลุ่มเดียว = เต็มความกว้าง ไม่เหลือครึ่งจอว่าง)
         <Box sx={{ display: "grid", gap: 1.5, alignItems: "start", gridTemplateColumns: { xs: "1fr", md: techs.length > 1 ? "repeat(2, minmax(0, 1fr))" : "1fr" } }}>

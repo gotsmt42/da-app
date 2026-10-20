@@ -44,6 +44,7 @@ import { formatThai } from "@/shared/utils/thaiDate";
 import { ROLES } from "@/shared/utils/roles";
 import { JobFlowChips, JobFlowPanel, nextStepOf } from "@/shared/ui/JobFlow";
 import MobileJobSummary from "@/shared/ui/MobileJobSummary";
+import MobileSheet from "@/shared/ui/MobileSheet";
 import SitePhotos from "@/shared/ui/SitePhotos";
 import { AssignResponsibleMenu, PersonChip } from "@/shared/ui/PersonChip";
 import CheckInOutPanel from "@/features/attendance/components/CheckInOutPanel";
@@ -157,10 +158,13 @@ const JobCard = styled(Card)(({ theme }) => ({
   marginBottom: theme.spacing(2),
   overflow: "visible",
   transition: "transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease",
-  "&:hover": {
-    transform: "translateY(-3px)",
-    boxShadow: `0 10px 28px ${alpha(theme.palette.common.black, 0.16)}`,
-    borderColor: alpha(theme.palette.primary.main, 0.3),
+  // 🐛 (20 ต.ค. 2569 ผู้ใช้: "กดแล้วเด้งๆ กระพริบ") มือถือแตะแล้ว hover ค้าง — ยกการ์ดเฉพาะอุปกรณ์ที่มีเมาส์
+  "@media (hover: hover) and (pointer: fine)": {
+    "&:hover": {
+      transform: "translateY(-3px)",
+      boxShadow: `0 10px 28px ${alpha(theme.palette.common.black, 0.16)}`,
+      borderColor: alpha(theme.palette.primary.main, 0.3),
+    },
   },
 }));
 
@@ -647,20 +651,18 @@ const TechnicianJobCard = ({
   noOuterCard = false,
   // ✅ ขั้นตอนทำงาน (รับทราบงาน/งานไม่เสร็จ) — server คืนงานทั้งกลุ่ม ให้หน้าแม่เอาไปแทนในรายการ
   onPatched,
+  // แสดงเต็ม (ใช้ในหน้าต่างเต็มจอบนมือถือ)
+  inSheet = false,
 }) => {
   const [docsExpanded,    setDocsExpanded]     = useState(false);
   // ✅ (11 ต.ค. 2569 ผู้ใช้: "เอกสารงานหรืออะไรที่จำเป็นให้แสดงด้านนอกได้เลย" + "ให้ส่วนนี้กดเปิดขึ้นไปอีกหน้าแทนแบบเดิม คงไว้ถึงเอกสารงาน")
   //    บนการ์ด (เห็นเสมอ): หัวการ์ด · ขั้นตอน/ปุ่มเข้างาน · เอกสารประจำงาน · ขอปิดงาน
   //    อีกหน้า (กดหัวการ์ด หรือแถบ "ไฟล์แนบ · สรุปงาน · …"): ไฟล์แนบ · สรุปงานที่ทำ · คุยกับแอดมิน · ประวัติกิจกรรม
   const [detailsOpen, setDetailsOpen] = useState(false);
-  // มือถือ: การ์ดย่อเป็นค่าเริ่มต้น — งานที่มีวันเข้างานวันนี้กางไว้เลย (ต้องเห็นปุ่มเข้างาน)
-  const [mOpen, setMOpen] = useState(() => {
-    if (!event.start) return false;
-    const s = moment(event.start);
-    let e = event.end ? moment(event.end) : s.clone();
-    if (event.allDay !== false && event.end && e.isAfter(s)) e = e.subtract(1, "day");
-    return !moment().isBefore(s, "day") && !moment().isAfter(e, "day");
-  });
+  // ✅ (20 ต.ค. 2569 ผู้ใช้: "รายละเอียดกดแล้วให้เด้งมาทับแทนเลื่อนลง") มือถือ: การ์ดย่อ (ปุ่มรับทราบ/เข้างานอยู่บนการ์ด)
+  //    กดการ์ด = เปิดการ์ดเต็มทับขึ้นมาเต็มจอ · ในหน้าต่างนั้นแสดงเต็มเสมอ (inSheet)
+  const mOpen = inSheet;
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [requestingClose, setRequestingClose] = useState(false);
   // ✅ เดิมฝั่งช่างโชว์ประวัติกิจกรรมยาวเหยียดตลอดเวลา ไม่มีปุ่มพับ/กาง ต่างจากฝั่งแอดมิน
   // (ดู ActivityLogMini ใน Operation/index.js) ซึ่งพับไว้เป็นค่าเริ่มต้น กดดูได้เมื่อต้องการ —
@@ -946,13 +948,9 @@ const TechnicianJobCard = ({
               next={(() => { const n = nextStepOf(event, "tech"); return n ? { title: n.title, tone: n.tone } : null; })()}
               person={event.responsiblePerson} personSrc={employees.find((u) => u.fname === event.responsiblePerson)?.imageUrl}
               personSub={event.team ? `หัวหน้าทีม ${event.team}` : "ผู้รับผิดชอบงาน"}
-              onToggle={() => setMOpen(true)} />
+              actions={<CheckInOutPanel compact event={event} onPreview={onPreview} onPatched={onPatched} sx={{ mt: 0 }} docsComplete={completedDocCount === DOCUMENT_TYPES.length} />}
+              onToggle={() => setSheetOpen(true)} />
           </Box>
-        )}
-        {mOpen && (
-          <ButtonBase onClick={() => setMOpen(false)} sx={{ display: { xs: "flex", sm: "none" }, ml: "auto", mb: 0.75, px: 1, py: 0.3, borderRadius: 1.5, fontSize: "0.74rem", fontWeight: 800, color: "#64748b", gap: 0.3 }}>
-            ย่อการ์ด <ExpandLess sx={{ fontSize: 18 }} />
-          </ButtonBase>
         )}
 
         {/* ── Header — กดที่ไหนก็ได้บนแถวนี้เพื่อกาง/พับการ์ด ไม่ต้องเล็งกดลูกศรเล็กๆ อีกต่อไป ── */}
@@ -1259,6 +1257,18 @@ const TechnicianJobCard = ({
         </Box>
 
       </CardContent>
+
+      {!inSheet && (
+        <MobileSheet open={sheetOpen} onClose={() => setSheetOpen(false)}
+          title={`${event.title || "งาน"}${event.system ? ` · ${event.system}` : ""}`}
+          subtitle={[event.jobNo, event.company || event.site].filter(Boolean).join(" · ")}>
+          <Box sx={{ m: 1.25, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${LINE}`, overflow: "hidden" }}>
+            <TechnicianJobCard event={event} userData={userData} employees={employees} onInputUpdate={onInputUpdate} onStatusUpdate={onStatusUpdate}
+              onFileUpload={onFileUpload} onDeleteFile={onDeleteFile} onPreview={onPreview} uploadingState={uploadingState} isUploadingState={isUploadingState}
+              uploadProgressState={uploadProgressState} hideDocuments={hideDocuments} noOuterCard onPatched={onPatched} inSheet />
+          </Box>
+        </MobileSheet>
+      )}
 
       <Dialog open={detailsOpen} onClose={() => setDetailsOpen(false)} fullWidth maxWidth="md" fullScreen={!isDesktop}
         PaperProps={{ sx: { borderRadius: { xs: 0, sm: 3 } } }}>
