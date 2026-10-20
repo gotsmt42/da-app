@@ -29,7 +29,7 @@ import Swal from "@/shared/ui/swal";
 import TomSelect from "tom-select";
 import "tom-select/dist/css/tom-select.css";
 import {
-  Box, Stack, Typography, Button, ButtonBase, Skeleton, Dialog, DialogContent, DialogActions, IconButton, Avatar, Collapse,
+  Box, Stack, Typography, Button, ButtonBase, Skeleton, Dialog, DialogContent, DialogActions, IconButton, Avatar, Collapse, useMediaQuery,
 } from "@mui/material";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { hasValidAvatar } from "@/shared/utils/user";
@@ -60,6 +60,7 @@ import { nextStepOf } from "@/shared/ui/JobFlow";
 import { can } from "@/shared/utils/roles";
 import PersonSelectField from "@/shared/ui/PersonSelectField";
 import SectionTabs from "@/shared/ui/SectionTabs";
+import MobileSheet from "@/shared/ui/MobileSheet";
 
 const AMBER = "#d97706";
 const GREEN = "#16a34a";
@@ -740,6 +741,10 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
   //    (กางใต้แถวตาราง inRow = เปิดเสมอ เพราะผู้ใช้กดกางเอง)
   const [open, setOpen] = useState(false);
   const showMore = inRow || open;
+  // ✅ (20 ต.ค. 2569 ผู้ใช้: "หน้านี้ให้เป็นรูปแบบเลื่อนขึ้นเมื่อกดดูรายละเอียด แบบหน้าดำเนินงาน")
+  //    มือถือ: "ดูรายละเอียด" = แผ่นรายละเอียดเลื่อนขึ้นจากล่าง (ลากลงปิดได้) แทนการกางในการ์ด
+  const isXs = useMediaQuery("(max-width:599.95px)");
+  const [sheetOpen, setSheetOpen] = useState(false);
   const fu = openFollowUp(job);
   const team = [job.team, ...(job.teamMembers || []).map((m) => m?.name)].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).join(", ");
   const when = job.noVisit && !job.unscheduled
@@ -835,6 +840,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
   return (
     // 🔁 (19 ต.ค. 2569 ผู้ใช้: "แบบตาราง ปุ่มดูซ้ำซ้อน รก") inRow = กางใต้แถวตาราง — ตัดหัวการ์ด (ชื่อ/ป้าย/ผู้ติดต่อ ซึ่งแถวมีแล้ว)
     //    เหลือเฉพาะข้อมูลที่แถวไม่มี (รายละเอียด · เอกสาร · ใบเสนอราคา · ขั้นตอน) และปุ่มอยู่ที่เดียว (แถวซ่อนปุ่มตอนกาง)
+    <>
     <Box sx={inRow ? { bgcolor: "#fff", borderRadius: 2, overflow: "hidden", border: `1px solid ${LINE}` } : { bgcolor: "#fff", border: `1px solid ${LINE}`, borderLeft: { xs: `4px solid ${st.color}`, sm: `1px solid ${LINE}` }, borderRadius: 3, overflow: "hidden", boxShadow: { xs: "0 1px 3px rgba(15,23,42,.06)", sm: "none" }, transition: "border-color .15s, box-shadow .15s", "&:hover": { borderColor: "#cbd5e1", boxShadow: "0 4px 14px -8px rgba(15,23,42,.18)" } }}>
       {/* 🔁 (19 ต.ค. 2569 ผู้ใช้: "ให้ขยายเต็ม") ปุ่มย้ายขึ้นแถวชื่องาน (จอคอม) — เนื้อหาด้านล่างกว้างเต็มการ์ด ไม่เหลือช่องว่างด้านขวา */}
       <Box sx={{ px: { xs: 1.75, sm: 2.25 }, py: 1.75 }}>
@@ -983,7 +989,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                 job.noVisit && invoiceFiles.length ? `ใบวางบิล ${invoiceFiles.length}` : "",
               ].filter(Boolean);
               return (
-                <ButtonBase onClick={() => setOpen((v) => !v)} aria-expanded={open}
+                <ButtonBase onClick={() => (isXs ? setSheetOpen(true) : setOpen((v) => !v))} aria-expanded={open}
                   sx={{ mt: { xs: 1, sm: 1.25 }, width: "100%", justifyContent: "flex-start", gap: 0.75, px: 1.1, py: { xs: 0.6, sm: 0.8 }, borderRadius: 2, border: `1px solid ${LINE}`, bgcolor: open ? "#fff" : SURFACE, textAlign: "left", "&:hover": { borderColor: "#cbd5e1" } }}>
                   <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.78rem", color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     <Box component="span" sx={{ fontWeight: 800, color: "#334155" }}>{open ? "ซ่อนรายละเอียด" : "ดูรายละเอียด"}</Box>
@@ -1102,6 +1108,19 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
         {st.i >= 0 && showMore && <Box sx={{ width: { xs: "100%", md: 360 }, flexShrink: 0 }}><StageBar stage={st} /></Box>}
       </Stack>
     </Box>
+    {!inRow && isXs && (
+      <MobileSheet open={sheetOpen} onClose={() => setSheetOpen(false)}
+        title={job.intakeNote ? "บันทึกงาน" : `${job.title || "งาน"}${job.system ? ` · ${job.system}` : ""}`}
+        subtitle={[job.jobNo, place].filter(Boolean).join(" · ")}>
+        <Box sx={{ p: 1.25 }}>
+          <JobCard inRow job={job} outcome={outcome} readOnly={readOnly} requestMode={requestMode} employees={employees}
+            onSchedule={(j) => { setSheetOpen(false); onSchedule?.(j); }} onDeliver={(j) => { setSheetOpen(false); onDeliver?.(j); }}
+            onUploadInvoice={onUploadInvoice} onNoteDone={onNoteDone} onEdit={(j) => { setSheetOpen(false); onEdit?.(j); }}
+            onCancel={(j) => { setSheetOpen(false); onCancel?.(j); }} onRestore={onRestore} />
+        </Box>
+      </MobileSheet>
+    )}
+    </>
   );
 }
 
