@@ -15,12 +15,13 @@
  */
 
 import { Navigate } from "react-router-dom";
-import { FolderOpen, Description } from "@mui/icons-material";
+import { FolderOpen, Description, Outbox } from "@mui/icons-material";
 import TabbedPage from "@/shared/ui/TabbedPage";
 import { useAuth } from "@/features/auth/AuthContext";
 import { can } from "@/shared/utils/roles";
 import lazyWithRetry from "@/shared/utils/lazyWithRetry";
 
+const JobDocuments = lazyWithRetry(() => import("./JobDocuments"));
 const Files = lazyWithRetry(() => import("./Files"));
 const IssuedDocuments = lazyWithRetry(() => import("./IssuedDocuments"));
 
@@ -31,18 +32,26 @@ const DocumentsHub = () => {
 
   return (
   <TabbedPage
+    // 🔁 (21 ต.ค. 2569 ผู้ใช้: "หน้าเอกสารปรับ UX/UI ใหม่ จัดวาง ดูง่าย ชื่อเมนูสื่อความหมาย")
+    //    3 แท็บชั้นเดียว (เดิมแท็บแรกมีสวิตช์ซ้อนอีกชั้น) — เรียงตามที่ใช้บ่อย
     tabs={[
       {
-        key: "files",
-        label: "ไฟล์แนบของงาน",
-        icon: <FolderOpen sx={{ fontSize: 18 }} />,
-        render: () => <Files />,
+        key: "job",
+        label: "เอกสารประจำงาน",
+        icon: <Description sx={{ fontSize: 18 }} />,
+        render: () => <JobDocuments />,
       },
       {
         key: "issued",
         label: "เอกสารที่ออกจากระบบ",
-        icon: <Description sx={{ fontSize: 18 }} />,
+        icon: <Outbox sx={{ fontSize: 18 }} />,
         render: () => <IssuedDocuments />,
+      },
+      {
+        key: "files",
+        label: "คลังไฟล์",
+        icon: <FolderOpen sx={{ fontSize: 18 }} />,
+        render: () => <Files />,
       },
     ]}
   />

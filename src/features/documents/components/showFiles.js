@@ -6,7 +6,6 @@ import Swal from "@/shared/ui/swal";
 
 import moment from "moment";
 import { Link } from "react-router-dom";
-import ServiceReportFiles from "./ServiceReportFiles";
 import API from "@/shared/api/axiosInstance";
 
 import {
@@ -30,7 +29,6 @@ import {
 
 import Add from "@mui/icons-material/Add";
 import SearchIcon from "@mui/icons-material/Search";
-import Description from "@mui/icons-material/Description";
 import FolderOpen from "@mui/icons-material/FolderOpen";
 import DownloadIcon from "@mui/icons-material/Download";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
@@ -43,7 +41,6 @@ import ImageIcon from "@mui/icons-material/Image";
 import ArticleIcon from "@mui/icons-material/Article";
 import ArchiveIcon from "@mui/icons-material/Archive";
 import InsertDriveFileIcon from "@mui/icons-material/InsertDriveFile";
-import CalendarTodayOutlinedIcon from "@mui/icons-material/CalendarTodayOutlined";
 import InventoryOutlinedIcon from "@mui/icons-material/InventoryOutlined";
 import ThaiDatePicker from "@/shared/components/ThaiDatePicker";
 import { PageHeader, PRIMARY_BTN_SX, PAGE_SX } from "@/shared/ui/PageKit";
@@ -74,7 +71,6 @@ const COLOR = {
 // ที่ใช้ FONT_UI จึงตกไปใช้ฟอนต์สำรองของระบบมาตลอด
 const FONT_DISPLAY = `var(--app-font)`;
 const FONT_UI = `var(--app-font)`;
-const FONT_MONO = `"IBM Plex Mono", ui-monospace, monospace`;
 
 // ---- File-type visual language ------------------------------------------
 const fileVisual = (filename = "") => {
@@ -95,7 +91,6 @@ const fileVisual = (filename = "") => {
 const PAGE_SIZE = 8;
 
 const ShowFiles = () => {
-  const [activeTab, setActiveTab] = useState(0);
   const [files, setFiles] = useState([]);
   const [selectedRows, setSelectedRows] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -365,30 +360,18 @@ const ShowFiles = () => {
 
   return (
     <Box sx={{ ...PAGE_SX, fontFamily: FONT_UI, color: COLOR.ink }}>
-      {/* ── หัวหน้า + สลับ "เอกสารประจำงาน / ไฟล์ทั่วไป" แบบปุ่มคู่ (ชุดเดียวกับหน้าอื่นใน PageKit) ── */}
+      {/* 🔁 (21 ต.ค. 2569 ผู้ใช้: "หน้าเอกสารปรับ UX/UI ใหม่ จัดวาง ดูง่าย") — หน้านี้เหลือแค่ "คลังไฟล์" (ไฟล์ทั่วไป)
+          เอกสารประจำงานย้ายเป็นแท็บของตัวเองในหน้าเอกสาร (ไม่มีสวิตช์ซ้อนในแท็บอีกชั้น) */}
       <PageHeader
         icon={<FolderOpen />}
-        title="ไฟล์แนบของงาน"
-        subtitle={activeTab === 0 ? "Service Report · ใบเสนอราคา · ใบวางบิล · ใบส่งมอบงาน ที่แนบไว้กับงาน" : "ไฟล์ทั่วไปที่อัปโหลดเก็บไว้ในระบบ"}
-        actions={activeTab === 1 ? (
+        title="คลังไฟล์"
+        subtitle="ไฟล์ทั่วไปที่อัปโหลดเก็บไว้ (ไม่ผูกกับงาน) — แบบฟอร์ม · คู่มือ · เอกสารบริษัท"
+        actions={
           <Button component={Link} to="/fileupload" variant="contained" startIcon={<Add />}
             sx={{ ...PRIMARY_BTN_SX, height: 40 }}>อัปโหลด</Button>
-        ) : null}
+        }
       />
-      <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0.5, p: 0.5, mb: 1.5, bgcolor: "#fff", border: `1px solid ${COLOR.line}`, borderRadius: 3, maxWidth: { sm: 420 } }}>
-        {[[0, "เอกสารประจำงาน", <Description key="i" sx={{ fontSize: 18 }} />], [1, "ไฟล์ทั่วไป", <FolderOpen key="i" sx={{ fontSize: 18 }} />]].map(([v, label, icon]) => (
-          <Button key={v} onClick={() => setActiveTab(v)} startIcon={icon}
-            sx={{
-              textTransform: "none", fontWeight: 800, borderRadius: 2.5, height: 38,
-              color: activeTab === v ? COLOR.accentDeep : COLOR.sub, bgcolor: activeTab === v ? COLOR.accentSoft : "transparent",
-              "&:hover": { bgcolor: activeTab === v ? COLOR.accentSoft : COLOR.bg },
-            }}>{label}</Button>
-        ))}
-      </Box>
 
-      {activeTab === 0 ? (
-        <ServiceReportFiles />
-      ) : (
         <Box>
           {/* ✅ มือถือ: ค้นหา/ตัวกรองอยู่ในแผ่นล่าง (FilterArea) */}
           <FilterArea count={(search ? 1 : 0) + (userSearch ? 1 : 0) + (dateSearch ? 1 : 0) + (categorySearch ? 1 : 0)}
@@ -574,13 +557,9 @@ const ShowFiles = () => {
 
           {/* File grid */}
           {loading ? (
-            <Grid container spacing={2}>
-              {Array.from({ length: 8 }).map((_, i) => (
-                <Grid item xs={12} sm={6} md={4} lg={3} key={i}>
-                  <Skeleton variant="rounded" height={150} sx={{ borderRadius: 3 }} />
-                </Grid>
-              ))}
-            </Grid>
+            <Stack spacing={1}>
+              {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} variant="rounded" height={54} sx={{ borderRadius: 2.5 }} />)}
+            </Stack>
           ) : pagedData.length === 0 ? (
             <Paper
               variant="outlined"
@@ -601,170 +580,87 @@ const ShowFiles = () => {
               </Typography>
             </Paper>
           ) : (
-            <Grid container spacing={2}>
-              {pagedData.map((file) => {
+            // 🔁 (21 ต.ค. 2569 ผู้ใช้: "หน้าเอกสารปรับ UX/UI ใหม่ ดูง่าย สวยงาม") การ์ดสูงๆ ตารางละ 4 ใบ → รายการแถวเดียว
+            //    แบบเดียวกับแท็บเอกสารประจำงาน: ไอคอนชนิดไฟล์ · ชื่อ · หมวด/ชนิด · ผู้อัปโหลด · วันที่ · ปุ่มทางขวา
+            <Paper variant="outlined" sx={{ borderRadius: 3, borderColor: COLOR.line, overflow: "hidden", bgcolor: COLOR.surface }}>
+              {pagedData.map((file, i) => {
                 const visual = fileVisual(file.filename);
                 const VisualIcon = visual.icon;
                 const selected = isSelected(file._id);
                 const isEditing = editingRowId === file._id;
-
+                const who = [file.user?.fname, file.user?.lname].filter(Boolean).join(" ");
                 return (
-                  <Grid item xs={12} sm={6} md={4} lg={3} key={file._id}>
-                    <Paper
-                      variant="outlined"
-                      className="file-card"
-                      sx={{
-                        p: 1.75,
-                        borderRadius: 3,
-                        borderColor: selected ? COLOR.accent : COLOR.line,
-                        bgcolor: selected ? COLOR.accentSoft : COLOR.surface,
-                        height: "100%",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 1,
-                        transition: "box-shadow .15s ease, transform .15s ease",
-                        "&:hover": {
-                          boxShadow: "0 6px 18px rgba(32,36,43,0.08)",
-                          transform: "translateY(-2px)",
-                        },
-                      }}
-                    >
-                      <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                          <Checkbox
-                            size="small"
-                            checked={selected}
-                            onChange={() => toggleSelect(file)}
-                            sx={{ p: 0.25, color: COLOR.sub, "&.Mui-checked": { color: COLOR.accent } }}
-                          />
-                          <Avatar
-                            variant="rounded"
-                            sx={{
-                              bgcolor: `${visual.color}1A`,
-                              color: visual.color,
-                              width: 38,
-                              height: 38,
-                              borderRadius: 2,
-                            }}
-                          >
-                            <VisualIcon sx={{ fontSize: 20 }} />
-                          </Avatar>
-                        </Box>
-                        <Stack direction="row" spacing={0.25}>
-                          {isEditing ? (
-                            <>
-                              <Tooltip title="บันทึก">
-                                <IconButton size="small" onClick={() => handleInlineEdit(file._id, editedName)}>
-                                  <CheckIcon sx={{ fontSize: 18, color: COLOR.accent }} />
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title="ยกเลิก">
-                                <IconButton size="small" onClick={cancelEdit}>
-                                  <CloseIcon sx={{ fontSize: 18, color: COLOR.sub }} />
-                                </IconButton>
-                              </Tooltip>
-                            </>
-                          ) : (
-                            <>
-                              <Tooltip title="เปลี่ยนชื่อ">
-                                <IconButton size="small" onClick={() => startEdit(file)}>
-                                  <EditOutlinedIcon sx={{ fontSize: 17, color: COLOR.sub }} />
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title="ดาวน์โหลด">
-                                <IconButton size="small" onClick={() => downloadFile(file.url, file.filename)}>
-                                  <DownloadIcon sx={{ fontSize: 17, color: COLOR.sub }} />
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title="ลบไฟล์">
-                                <IconButton size="small" onClick={() => handleDeleteRow(file._id)}>
-                                  <DeleteOutlineIcon sx={{ fontSize: 17, color: COLOR.danger }} />
-                                </IconButton>
-                              </Tooltip>
-                            </>
-                          )}
-                        </Stack>
-                      </Box>
-
+                  <Stack key={file._id} direction="row" alignItems="center" spacing={{ xs: 0.75, sm: 1.25 }}
+                    sx={{
+                      px: { xs: 1, sm: 1.5 }, py: 1, borderTop: i ? `1px solid ${COLOR.line}` : "none",
+                      bgcolor: selected ? COLOR.accentSoft : "transparent",
+                      "&:hover": { bgcolor: selected ? COLOR.accentSoft : COLOR.bg },
+                    }}>
+                    <Checkbox size="small" checked={selected} onChange={() => toggleSelect(file)}
+                      sx={{ p: 0.5, color: COLOR.sub, "&.Mui-checked": { color: COLOR.accent } }} />
+                    <Avatar variant="rounded" sx={{ bgcolor: `${visual.color}1A`, color: visual.color, width: 36, height: 36, borderRadius: 2, flexShrink: 0 }}>
+                      <VisualIcon sx={{ fontSize: 19 }} />
+                    </Avatar>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
                       {isEditing ? (
-                        <TextField
-                          size="small"
-                          autoFocus
-                          fullWidth
-                          value={editedName}
+                        <TextField size="small" autoFocus fullWidth value={editedName}
                           onChange={(e) => setEditedName(e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === "Enter") handleInlineEdit(file._id, editedName);
                             if (e.key === "Escape") cancelEdit();
                           }}
-                          sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, fontFamily: FONT_UI } }}
-                        />
+                          sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2, fontFamily: FONT_UI, height: 34 } }} />
                       ) : (
-                        <Tooltip title={file.filename}>
-                          <Typography
-                            sx={{
-                              fontFamily: FONT_UI,
-                              fontWeight: 600,
-                              fontSize: 14.5,
-                              color: COLOR.ink,
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {file.filename}
-                          </Typography>
-                        </Tooltip>
+                        <Typography noWrap title={file.filename}
+                          sx={{ fontFamily: FONT_UI, fontWeight: 700, fontSize: 14, color: COLOR.ink, lineHeight: 1.35 }}>
+                          {file.filename}
+                        </Typography>
                       )}
-
-                      <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexWrap: "wrap", rowGap: 0.5 }}>
-                        {file.category && file.category !== "uncategorized" && (
-                          <Chip
-                            label={file.category}
-                            size="small"
-                            sx={{
-                              height: 20,
-                              fontSize: 11,
-                              fontFamily: FONT_UI,
-                              bgcolor: COLOR.accentSoft,
-                              color: COLOR.accentDeep,
-                            }}
-                          />
-                        )}
-                        <Chip
-                          label={visual.label}
-                          size="small"
-                          sx={{
-                            height: 20,
-                            fontSize: 11,
-                            fontFamily: FONT_MONO,
-                            bgcolor: `${visual.color}14`,
-                            color: visual.color,
-                          }}
-                        />
-                      </Stack>
-
-                      <Box sx={{ mt: "auto", pt: 0.5, borderTop: `1px dashed ${COLOR.line}` }}>
-                        <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mt: 1 }}>
-                          <Avatar sx={{ width: 20, height: 20, fontSize: 11, bgcolor: COLOR.gold }}>
-                            {file.user?.fname?.[0] || "?"}
-                          </Avatar>
-                          <Typography sx={{ fontFamily: FONT_UI, fontSize: 12, color: COLOR.sub }} noWrap>
-                            {file.user?.fname} {file.user?.lname}
-                          </Typography>
-                        </Stack>
-                        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.5 }}>
-                          <CalendarTodayOutlinedIcon sx={{ fontSize: 13, color: COLOR.sub }} />
-                          <Typography sx={{ fontFamily: FONT_MONO, fontSize: 11.5, color: COLOR.sub }}>
-                            {formatThai(moment(file.updatedAt), "DD/MM/YYYY HH:mm")}
-                          </Typography>
-                        </Stack>
-                      </Box>
-                    </Paper>
-                  </Grid>
+                      <Typography noWrap sx={{ fontFamily: FONT_UI, fontSize: 12, color: COLOR.sub, lineHeight: 1.4, mt: 0.25 }}>
+                        <Box component="span" sx={{ color: visual.color, fontWeight: 700 }}>{visual.label}</Box>
+                        {file.category && file.category !== "uncategorized" ? ` · ${file.category}` : ""}
+                        {who ? ` · ${who}` : ""}
+                        {` · ${formatThai(moment(file.updatedAt), "D MMM YY")}`}
+                      </Typography>
+                    </Box>
+                    <Stack direction="row" spacing={0} sx={{ flexShrink: 0 }}>
+                      {isEditing ? (
+                        <>
+                          <Tooltip title="บันทึก">
+                            <IconButton size="small" onClick={() => handleInlineEdit(file._id, editedName)}>
+                              <CheckIcon sx={{ fontSize: 18, color: COLOR.accent }} />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="ยกเลิก">
+                            <IconButton size="small" onClick={cancelEdit}>
+                              <CloseIcon sx={{ fontSize: 18, color: COLOR.sub }} />
+                            </IconButton>
+                          </Tooltip>
+                        </>
+                      ) : (
+                        <>
+                          <Tooltip title="ดาวน์โหลด">
+                            <IconButton size="small" onClick={() => downloadFile(file.url, file.filename)}>
+                              <DownloadIcon sx={{ fontSize: 18, color: COLOR.sub }} />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="เปลี่ยนชื่อ">
+                            <IconButton size="small" onClick={() => startEdit(file)}>
+                              <EditOutlinedIcon sx={{ fontSize: 17, color: COLOR.sub }} />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="ลบไฟล์">
+                            <IconButton size="small" onClick={() => handleDeleteRow(file._id)}>
+                              <DeleteOutlineIcon sx={{ fontSize: 17, color: COLOR.danger }} />
+                            </IconButton>
+                          </Tooltip>
+                        </>
+                      )}
+                    </Stack>
+                  </Stack>
                 );
               })}
-            </Grid>
+            </Paper>
           )}
 
           {/* Pagination */}
@@ -782,7 +678,6 @@ const ShowFiles = () => {
             </Box>
           )}
         </Box>
-      )}
     </Box>
   );
 };

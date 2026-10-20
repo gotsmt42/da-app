@@ -393,7 +393,7 @@ const side = (key, extra) => {
           {/* หมวด "งาน" — แผนงาน/ปฏิทิน + ภาพรวมสัญญา + งานของฉัน (งานที่มอบหมายให้ผู้ใช้)
               ⚠️ หัวข้อหมวดต้องหายไปพร้อมกับเมนูข้างใต้ — ไม่งั้นเซล (ซึ่งไม่มีเมนูในหมวดนี้เลย)
               จะเห็นคำว่า "งาน" ลอยอยู่เฉยๆ โดยไม่มีอะไรอยู่ใต้มัน */}
-          {hasWorkMenu && <div className="admin-divider-label">งาน</div>}
+          {(hasWorkMenu || canViewFinance) && <div className="admin-divider-label">งาน</div>}
           {/* ⚠️ เมนูที่ไม่มีลูก (เซล — เหลือแค่ปฏิทิน) ต้อง render เป็นลิงก์ธรรมดา
               🐛 renderParentWithItems เรียก navi.items.map() ตรงๆ ถ้าไม่มี items จะพังทั้งแอป
               (จอขาว) เพราะ Sidebar อยู่ในทุกหน้า */}
@@ -412,6 +412,8 @@ const side = (key, extra) => {
           {canViewAttendance && !seesOperationBoard(userData) && attendanceMenu.map((item, idx) => renderLink(item, `work-att-${idx}`))}
           {canMyJobs && myJobsMenu.map((item, idx) => renderLink(item, `work-my-${idx}`))}
           {canViewContracts && contractsMenu.map((item, idx) => renderLink(item, `work-ct-${idx}`))}
+          {/* 🔁 (21 ต.ค. 2569) ติดตามใบเสนอราคาย้ายมาหมวดงาน (ไม่รวมกับเอกสาร) */}
+          {canViewFinance && financeMenu.map((item, idx) => renderLink(item, `fin-${idx}`))}
           {/* ✅ รายงานงานอยู่ท้ายหมวด "งาน" ตำแหน่งเดียวกับ "รายงานการเบิก" ท้ายหมวดเบิกค่าใช้จ่าย */}
           {canViewOperation && !seesOperationBoard(userData) && jobReportMenu.map((item, idx) => renderLink(item, `work-report-${idx}`))}
 
@@ -438,11 +440,10 @@ const side = (key, extra) => {
           {/* หมวด "เอกสาร · ใบเสนอราคา" — ชื่อเดียวกับหน้าแรก (19 ต.ค. 2569 ตัดคำว่าการเงิน · ขึ้นก่อนจัดซื้อ)
               ✅ เดิมแยก "เอกสาร" / "การเงิน" เป็นสองหัวข้อ หัวละเมนูเดียว — รวมเป็นหมวดเดียวให้ตรงกับ HomeMenu
               ⚠️ เอกสาร = สิทธิ์ viewDocuments · ใบเสนอราคา = viewFinance (ฝั่ง server คืนเฉพาะงานที่มีชื่ออยู่) */}
-          {(can(userData, "viewDocuments") || canViewFinance) && (
+          {can(userData, "viewDocuments") && (
             <>
-              <div className="admin-divider-label">เอกสาร · ใบเสนอราคา</div>
-              {can(userData, "viewDocuments") && documentsMenu.map((item, idx) => renderLink(item, `doc-${idx}`))}
-              {canViewFinance && financeMenu.map((item, idx) => renderLink(item, `fin-${idx}`))}
+              <div className="admin-divider-label">เอกสาร</div>
+              {documentsMenu.map((item, idx) => renderLink(item, `doc-${idx}`))}
             </>
           )}
 

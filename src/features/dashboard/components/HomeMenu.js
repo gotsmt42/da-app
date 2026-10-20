@@ -107,6 +107,8 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
   // ⚠️ ยังเข้าได้ตามปกติจากแถบเมนูล่าง (มือถือ) และเมนูข้าง (ทุกจอ) — ไม่ได้ตัดทางเข้าทิ้ง
   // ✅ ผู้ใช้สั่งให้หมวด "งาน" มีรายงานเหมือนหมวด "เบิกค่าใช้จ่าย" — วางท้ายหมวดตำแหน่งเดียวกัน
   // ⚠️ เห็นเฉพาะคนที่เห็นหน้าการดำเนินงาน เพราะรายงานสรุปจากข้อมูลชุดเดียวกันเป๊ะ
+  // 🔁 (21 ต.ค. 2569 ผู้ใช้: "เอกสารไม่ควรรวมกับใบเสนอราคา") ติดตามใบเสนอราคาเป็นขั้นต่อจากงาน — อยู่หมวดงาน
+  if (canViewFinance) doWork.push(dest("finance"));
   if (canViewOperation && !seesOperationBoard(userData)) doWork.push(dest("jobReport"));
 
   // ── เบิกค่าใช้จ่าย ────────────────────────────────────────────────────────
@@ -135,12 +137,9 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
   // 🚧 (11 ต.ค. 2569 ผู้ใช้: "ตัดเมนู OT ออกไปก่อน เดี๋ยวมาทำอีกทีหลัง") — หน้า /ot ยังอยู่ แค่ซ่อนทางเข้า
   const people = [];
 
-  // ── เอกสาร · ใบเสนอราคา ─────────────────────────────────────────────────────
+  // ── เอกสาร ──────────────────────────────────────────────────────────────
   const docs = [];
   if (can(userData, "viewDocuments")) docs.push(dest("documents"));
-  if (canViewFinance) {
-    docs.push(dest("finance"));
-  }
 
   // ── ข้อมูลหลัก ────────────────────────────────────────────────────────────
   const master = [];
@@ -166,9 +165,10 @@ export const buildHomeMenu = (userData, { hideMyJobs = false, hideSalesJobs = fa
     { key: "do", title: "งาน", icon: FaTools, tone: TONE.work, items: doWork },
     { key: "expense", title: "เบิกค่าใช้จ่าย", icon: FaWallet, tone: TONE.expense, items: expense },
     // 🔁 (19 ต.ค. 2569 ผู้ใช้: "ไม่ต้องมีคำว่าการเงิน ไม่ได้เน้น และสลับจุดแสดงกับจัดซื้อ")
-    { key: "docs", title: "เอกสาร · ใบเสนอราคา", icon: FaFolderOpen, tone: TONE.docs, items: docs },
-    { key: "people", title: "บุคคล", icon: FaUserClock, tone: TONE.people, items: people },
+    // 🔁 (21 ต.ค. 2569 ผู้ใช้: "หน้าแรกสลับหมวดตำแหน่งเอกสาร และจัดซื้อ")
     { key: "purchase", title: "จัดซื้อ", icon: FaShoppingCart, tone: TONE.purchase, items: purchase },
+    { key: "people", title: "บุคคล", icon: FaUserClock, tone: TONE.people, items: people },
+    { key: "docs", title: "เอกสาร", icon: FaFolderOpen, tone: TONE.docs, items: docs },
     { key: "master", title: "ข้อมูลหลัก", icon: FaDatabase, tone: TONE.master, items: master },
     { key: "website", title: "เว็บไซต์บริษัท", icon: FaGlobeAsia, tone: TONE.website, items: website },
   ].filter((cat) => cat.items.length);

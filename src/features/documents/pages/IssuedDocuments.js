@@ -268,8 +268,8 @@ const IssuedDocuments = () => {
           (หัวกล่องขาว · ตัวเลขสรุปกดกรองได้ · แถบค้นหา · รายการพื้นขาว สีน้อย) */}
       <PageHeader
         icon={<Description />}
-        title="ทะเบียนเอกสาร"
-        subtitle="ใบแจ้งเข้างาน / ใบส่งมอบงาน ที่ออกจากระบบ — ดู พิมพ์ ส่งอีเมล และติดตามสถานะ"
+        title="เอกสารที่ออกจากระบบ"
+        subtitle="ใบแจ้งเข้างาน · ใบส่งมอบงาน ที่ระบบออกให้ — ดู พิมพ์ ส่งอีเมล และติดตามสถานะการเซ็นรับ"
         actions={isMobile
           ? <FilterSheetButton count={(appliedSearch ? 1 : 0) + (status !== "all" ? 1 : 0) + filterCount} onClick={() => setSheetOpen(true)} />
           : <Tooltip title="โหลดใหม่"><IconButton onClick={() => fetchRows()} sx={ICON_BTN_SX}><Refresh sx={{ fontSize: 20 }} /></IconButton></Tooltip>}

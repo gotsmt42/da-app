@@ -74,8 +74,9 @@ export const DEST = {
   expenseInbox: { title: "รออนุมัติเบิก", short: "รออนุมัติ", sub: "ตรวจสอบ · อนุมัติ · เบิกจ่าย", href: "/expenses/approvals", icon: FaClipboardCheck, badgeKey: "expenseInbox" },
   expenseReport: { title: "รายงานการเบิก", short: "รายงาน", sub: "ยอดค้าง · ย้อนหลัง", href: "/expenses/report", icon: FaChartBar },
 
-  documents: { title: "เอกสาร", sub: "ไฟล์ · เอกสารออก", href: "/documents", icon: FaFileAlt },
-  finance: { title: "ใบเสนอราคา / การเงิน", short: "ใบเสนอราคา", sub: "ติดตาม · วางบิล", href: "/finance", icon: FaFileInvoiceDollar, badgeKey: "quotations" },
+  // 🔁 (21 ต.ค. 2569 ผู้ใช้: "ชื่อเมนูให้สื่อความหมาย สอดคล้อง · เอกสารไม่ควรรวมกับใบเสนอราคา · ใบเสนอราคาแก้เป็นติดตามใบเสนอราคา")
+  documents: { title: "เอกสาร", sub: "เอกสารประจำงาน · เอกสารที่ออก · คลังไฟล์", href: "/documents", icon: FaFileAlt },
+  finance: { title: "ติดตามใบเสนอราคา", bar: "ใบเสนอราคา", sub: "ผลเสนอราคา · วางบิล", href: "/finance", icon: FaFileInvoiceDollar, badgeKey: "quotations" },
 
   // ⚠️ /customers และ /staff คือพาธจริง ส่วน /customer และ /employee เป็นแค่ตัว redirect ของเก่า
   //    ชี้ไปพาธจริงเสมอ ไม่งั้นผู้ใช้ต้องเด้งสองต่อกว่าจะถึงหน้า

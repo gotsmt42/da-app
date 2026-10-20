@@ -880,7 +880,11 @@ function injectStyles() {
     }
     /* 🔁 (19 ต.ค. 2569 ผู้ใช้: "ปรับขนาดช่องวันที่ให้เข้าที่ พอดี สวย") วันเข้างานเป็นช่องที่ 4 ในแถวเดียวกัน (ไม่เต็มแถวยาวเกิน)
        งานหลายช่วงวัน (ซ่อนช่องวันที่) = 3 ช่องเท่ากัน · กล่องแคบ (<1000px) วันที่ลงแถวใหม่ */
-    .swal-edit-event #ee-head-meta:has(> #ee-hm-date[style*="none"]) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    /* 🐛 (21 ต.ค. 2569 ผู้ใช้: "หน้า editevent แสดงผิดเพี้ยน") กฎนี้ (:has + id) แรงกว่ากฎมือถือ "แถวละบทบาท" ด้านล่าง
+       งานหลายช่วงวันบนมือถือจึงถูกบีบเป็น 3 คอลัมน์ ป้ายทับกัน ช่องเลือกเหลือเป็นวงรี → ใช้เฉพาะจอกว้าง */
+    @media (min-width: 601px) {
+      .swal-edit-event #ee-head-meta:has(> #ee-hm-date[style*="none"]) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
     @media (max-width: 1000px) {
       .swal-edit-event #ee-head-meta { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .swal-edit-event .ee-hm-item--date { grid-column: 1 / -1; }
