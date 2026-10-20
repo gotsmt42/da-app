@@ -728,7 +728,8 @@ const Line = ({ icon: Icon, children, color = "#475569", strong }) => (
   </Stack>
 );
 
-function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, onUploadInvoice, onNoteDone, onEdit, onCancel, onRestore, inRow = false }) {
+function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, onUploadInvoice, onNoteDone, onEdit, onCancel, onRestore, inRow = false, employees = [] }) {
+  const owner = job.responsiblePerson ? employees.find((u) => u.fname === job.responsiblePerson || [u.fname, u.lname].filter(Boolean).join(" ") === job.responsiblePerson) : null;
   const st = stageOf(job);
   const stall = stalledDays(job, st);
   // ไฟล์ตอนรับงานที่เป็นใบเสนอราคา/PO แสดงในแถบใบเสนอราคาแล้ว — ไม่ซ้ำด้านล่าง
@@ -831,7 +832,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
   return (
     // 🔁 (19 ต.ค. 2569 ผู้ใช้: "แบบตาราง ปุ่มดูซ้ำซ้อน รก") inRow = กางใต้แถวตาราง — ตัดหัวการ์ด (ชื่อ/ป้าย/ผู้ติดต่อ ซึ่งแถวมีแล้ว)
     //    เหลือเฉพาะข้อมูลที่แถวไม่มี (รายละเอียด · เอกสาร · ใบเสนอราคา · ขั้นตอน) และปุ่มอยู่ที่เดียว (แถวซ่อนปุ่มตอนกาง)
-    <Box sx={inRow ? { bgcolor: "#fff", borderRadius: 2, overflow: "hidden", border: `1px solid ${LINE}` } : { bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflow: "hidden", transition: "border-color .15s, box-shadow .15s", "&:hover": { borderColor: "#cbd5e1", boxShadow: "0 4px 14px -8px rgba(15,23,42,.18)" } }}>
+    <Box sx={inRow ? { bgcolor: "#fff", borderRadius: 2, overflow: "hidden", border: `1px solid ${LINE}` } : { bgcolor: "#fff", border: `1px solid ${LINE}`, borderLeft: { xs: `4px solid ${st.color}`, sm: `1px solid ${LINE}` }, borderRadius: 3, overflow: "hidden", boxShadow: { xs: "0 1px 3px rgba(15,23,42,.06)", sm: "none" }, transition: "border-color .15s, box-shadow .15s", "&:hover": { borderColor: "#cbd5e1", boxShadow: "0 4px 14px -8px rgba(15,23,42,.18)" } }}>
       {/* 🔁 (19 ต.ค. 2569 ผู้ใช้: "ให้ขยายเต็ม") ปุ่มย้ายขึ้นแถวชื่องาน (จอคอม) — เนื้อหาด้านล่างกว้างเต็มการ์ด ไม่เหลือช่องว่างด้านขวา */}
       <Box sx={{ px: { xs: 1.75, sm: 2.25 }, py: 1.75 }}>
         <Stack direction="row" gap={1.5} sx={{ minWidth: 0 }}>
@@ -846,7 +847,13 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
           )}
           <Box sx={{ flex: 1, minWidth: 0 }}>
             {!inRow && (
-            <Stack direction="row" spacing={1.5} alignItems="flex-start">
+            <Stack direction="row" gap={1.5} alignItems="flex-start">
+            {/* ✅ (20 ต.ค. 2569 ผู้ใช้: "ยังดูจืด แยกงานยาก") มือถือ: กล่องวันที่แบบปฏิทินหน้าชื่องาน — กวาดตาแยกงานได้ทันที */}
+            <Box sx={{ display: { xs: "block", sm: "none" }, flexShrink: 0 }}>
+              {job.intakeNote ? <DateCell start={job.intakeAt} />
+                : job.unscheduled ? <DateCell label={job.noVisit ? "รอส่งของ" : job.plannedMonth ? <>แผน<br />{formatThai(moment(job.plannedMonth, "YYYY-MM"), "MMM YY")}</> : <>ยังไม่<br />กำหนด</>} />
+                : <DateCell start={job.noVisit ? (job.deliveredAt || job.start) : job.start} end={job.noVisit ? null : job.end} allDay={job.allDay} />}
+            </Box>
             <Box sx={{ flex: 1, minWidth: 0 }}>
             {/* ✅ (20 ต.ค. 2569 ผู้ใช้: "มือถือยังจัดวางไม่สวย") มือถือ: ไม่มีคอลัมน์ไอคอนซ้าย — ย้ายเป็นบรรทัดเล็กเหนือชื่องาน ทุกอย่างชิดซ้ายแนวเดียวกับปุ่ม */}
             <Stack direction="row" alignItems="center" gap={0.6} sx={{ display: { xs: "flex", sm: "none" }, mb: 0.4, minWidth: 0 }}>
@@ -910,7 +917,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                 ["กำหนดการ", <><t.icon sx={{ fontSize: 15, color: t.accent || ACCENT, mr: 0.5, verticalAlign: "-2px" }} />{t.text.replace(/^แผนเข้างาน /, "แผน ")}{t.rel && <Box component="span" sx={{ ml: 0.5, fontWeight: 800, color: t.accent || MUTED }}>· {t.rel}</Box>}</>],
                 due && st.i < 4 ? ["เสร็จภายใน", <>{due}{late && <Box component="span" sx={{ ml: 0.5, color: RED, fontWeight: 800 }}>· เลยกำหนด</Box>}</>] : null,
                 job.intakeSource ? ["รับงานจาก", SOURCE_LABEL[job.intakeSource] || job.intakeSource] : null,
-                job.responsiblePerson ? ["ผู้รับผิดชอบ", job.responsiblePerson] : null,
+                job.responsiblePerson ? ["ผู้รับผิดชอบ", <Stack direction="row" alignItems="center" gap={0.75}><PersonPic name={job.responsiblePerson} owner={owner} size={24} /><span>{job.responsiblePerson}</span></Stack>] : null,
                 !job.unscheduled && !job.noVisit && !job.intakeNote ? ["ทีม", team || <Box component="span" sx={{ color: "#94a3b8" }}>ยังไม่มอบหมาย</Box>] : null,
                 job.contactName || job.contactTel ? ["ผู้ติดต่อ", <>{job.contactName || ""}{job.contactName && job.contactTel ? " · " : ""}
                   {job.contactTel && <Box component="a" href={`tel:${job.contactTel}`} sx={{ color: ACCENT, fontWeight: 800, textDecoration: "none" }}>{job.contactTel}</Box>}</>] : null,
@@ -918,20 +925,24 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
               // 🔁 (20 ต.ค. 2569 ผู้ใช้: "ตอนยังไม่เปิดดู หลายบรรทัดกินพื้นที่ ทำให้กะทัดรัด") พับ = บรรทัดสรุปเดียว · กาง = ตารางเต็ม
               const who = job.responsiblePerson || (team && !job.unscheduled ? team : "") || (job.intakeSource ? `จาก${SOURCE_LABEL[job.intakeSource] || job.intakeSource}` : "");
               return (<>
-                <Stack direction="row" alignItems="center" gap={1} sx={{ display: { xs: open ? "none" : "flex", sm: "none" }, mt: 0.9, minWidth: 0 }}>
-                  {/* ✅ (20 ต.ค. 2569 ผู้ใช้: "กำหนดการทำให้ชัดเจน") ป้ายกำหนดการพื้นสี ตัวหนา เห็นก่อนอย่างอื่น */}
-                  <Stack direction="row" alignItems="center" gap={0.6} sx={{ minWidth: 0, flexShrink: 1, px: 1, height: 28, borderRadius: 1.5,
-                    bgcolor: alpha(t.accent || ACCENT, 0.08), border: `1px solid ${alpha(t.accent || ACCENT, 0.25)}` }}>
-                    <t.icon sx={{ fontSize: 16, color: t.accent || ACCENT, flexShrink: 0 }} />
-                    <Typography noWrap sx={{ fontSize: "0.82rem", fontWeight: 800, color: INK }}>
-                      {t.text.replace(/^แผนเข้างาน /, "แผน ")}{t.rel && <Box component="span" sx={{ ml: 0.4, fontWeight: 800, color: t.accent || MUTED }}>· {t.rel}</Box>}
-                    </Typography>
-                  </Stack>
-                  {who && (
-                    <Stack direction="row" alignItems="center" gap={0.5} sx={{ minWidth: 0, pl: 1, borderLeft: `1px solid ${LINE}` }}>
-                      {(job.responsiblePerson || (team && !job.unscheduled)) ? <PersonOutlineOutlined sx={{ fontSize: 16, color: "#94a3b8", flexShrink: 0 }} /> : <CallReceivedRounded sx={{ fontSize: 15, color: "#94a3b8", flexShrink: 0 }} />}
-                      <Typography noWrap sx={{ fontSize: "0.8rem", fontWeight: 700, color: "#334155" }}>{who}</Typography>
+                <Stack direction="row" alignItems="center" gap={1} sx={{ display: { xs: open ? "none" : "flex", sm: "none" }, mt: 1.1, pt: 1.1, borderTop: `1px dashed ${LINE}`, minWidth: 0 }}>
+                  {job.responsiblePerson ? (
+                    <Stack direction="row" alignItems="center" gap={0.9} sx={{ flex: 1, minWidth: 0 }}>
+                      <PersonPic name={job.responsiblePerson} owner={owner} size={30} />
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography noWrap sx={{ fontSize: "0.8rem", fontWeight: 800, color: INK, lineHeight: 1.25 }}>{job.responsiblePerson}</Typography>
+                        <Typography noWrap sx={{ fontSize: "0.68rem", color: MUTED, lineHeight: 1.25 }}>{owner?.position || owner?.rank || "ผู้รับผิดชอบงาน"}{team && !job.unscheduled && team !== job.responsiblePerson ? ` · ทีม ${team}` : ""}</Typography>
+                      </Box>
                     </Stack>
+                  ) : (
+                    <Stack direction="row" alignItems="center" gap={0.6} sx={{ flex: 1, minWidth: 0 }}>
+                      <Box sx={{ width: 30, height: 30, borderRadius: 99, display: "grid", placeItems: "center", border: `1px dashed #cbd5e1`, color: "#94a3b8", flexShrink: 0 }}><PersonOutlineOutlined sx={{ fontSize: 17 }} /></Box>
+                      <Typography noWrap sx={{ fontSize: "0.78rem", fontWeight: 700, color: MUTED }}>{who || "ยังไม่มีผู้รับผิดชอบ"}</Typography>
+                    </Stack>
+                  )}
+                  {t.rel && (
+                    <Box component="span" sx={{ flexShrink: 0, px: 0.9, height: 24, display: "inline-flex", alignItems: "center", borderRadius: 99, fontSize: "0.72rem", fontWeight: 800,
+                      color: t.accent || "#475569", bgcolor: alpha(t.accent || "#64748b", 0.1) }}>{t.rel}</Box>
                   )}
                 </Stack>
                 <Box sx={{ display: { xs: open ? "block" : "none", sm: "none" }, mt: 1.25, borderTop: `1px solid ${LINE}` }}>
@@ -1074,6 +1085,14 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
     </Box>
   );
 }
+
+/** รูปผู้รับผิดชอบ (ไม่มีรูป = ตัวอักษรแรกบนสีประจำตัว) */
+const PersonPic = ({ name, owner, size = 30 }) => (
+  <Avatar src={hasValidAvatar(owner?.imageUrl) ? owner.imageUrl : undefined}
+    sx={{ width: size, height: size, fontSize: size * 0.42, fontWeight: 800, bgcolor: personColor(name), flexShrink: 0, boxShadow: "0 0 0 2px #fff, 0 0 0 3px #e2e8f0" }}>
+    {personInitial(name)}
+  </Avatar>
+);
 
 /** ป้ายเม็ดยาเล็ก (สถานะ / ด่วน / ค้าง) */
 const Chip = ({ children, color = "#334155", bg = SURFACE, border = LINE }) => (
@@ -1354,12 +1373,12 @@ export default function JobIntake() {
           <>
           <Typography sx={{ fontSize: "0.76rem", color: MUTED, mb: 0.75, px: 0.5 }}>กดที่แถวเพื่อดูรายละเอียดทั้งหมด</Typography>
           <JobTable rows={pg.rows} employees={employees} refMode={tab === "waiting"} readOnlyOf={(j) => !canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone}
-            renderCard={(j, oc) => <JobCard inRow job={j} outcome={oc} readOnly={!canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone} onEdit={openForm} onCancel={cancelJob} onRestore={restoreJob} />} />
+            renderCard={(j, oc) => <JobCard inRow employees={employees} job={j} outcome={oc} readOnly={!canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone} onEdit={openForm} onCancel={cancelJob} onRestore={restoreJob} />} />
           <PageBar {...pg} setPage={goPage} unit="งาน" />
           </>
         ) : (
           <>
-          <Stack spacing={1.25}>{pg.rows.map(({ j, oc }) => <JobCard key={j._id} job={j} outcome={oc} readOnly={!canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone} onEdit={openForm} onCancel={cancelJob} onRestore={restoreJob} />)}</Stack>
+          <Stack spacing={1.25}>{pg.rows.map(({ j, oc }) => <JobCard key={j._id} employees={employees} job={j} outcome={oc} readOnly={!canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone} onEdit={openForm} onCancel={cancelJob} onRestore={restoreJob} />)}</Stack>
           <PageBar {...pg} setPage={goPage} unit="งาน" />
           </>
         )
