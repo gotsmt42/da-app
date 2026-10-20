@@ -907,7 +907,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
               const t = scheduleTagOf(job, schedule);
               const late = due && moment(job.dueDate).isBefore(moment(), "day");
               const rows = [
-                ["กำหนดการ", <>{t.text.replace(/^แผนเข้างาน /, "แผน ")}{t.rel && <Box component="span" sx={{ ml: 0.5, fontWeight: 800, color: t.accent || MUTED }}>· {t.rel}</Box>}</>],
+                ["กำหนดการ", <><t.icon sx={{ fontSize: 15, color: t.accent || ACCENT, mr: 0.5, verticalAlign: "-2px" }} />{t.text.replace(/^แผนเข้างาน /, "แผน ")}{t.rel && <Box component="span" sx={{ ml: 0.5, fontWeight: 800, color: t.accent || MUTED }}>· {t.rel}</Box>}</>],
                 due && st.i < 4 ? ["เสร็จภายใน", <>{due}{late && <Box component="span" sx={{ ml: 0.5, color: RED, fontWeight: 800 }}>· เลยกำหนด</Box>}</>] : null,
                 job.intakeSource ? ["รับงานจาก", SOURCE_LABEL[job.intakeSource] || job.intakeSource] : null,
                 job.responsiblePerson ? ["ผู้รับผิดชอบ", job.responsiblePerson] : null,
@@ -915,8 +915,26 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                 job.contactName || job.contactTel ? ["ผู้ติดต่อ", <>{job.contactName || ""}{job.contactName && job.contactTel ? " · " : ""}
                   {job.contactTel && <Box component="a" href={`tel:${job.contactTel}`} sx={{ color: ACCENT, fontWeight: 800, textDecoration: "none" }}>{job.contactTel}</Box>}</>] : null,
               ].filter(Boolean);
-              return (
-                <Box sx={{ display: { xs: "block", sm: "none" }, mt: 1.25, borderTop: `1px solid ${LINE}` }}>
+              // 🔁 (20 ต.ค. 2569 ผู้ใช้: "ตอนยังไม่เปิดดู หลายบรรทัดกินพื้นที่ ทำให้กะทัดรัด") พับ = บรรทัดสรุปเดียว · กาง = ตารางเต็ม
+              const who = job.responsiblePerson || (team && !job.unscheduled ? team : "") || (job.intakeSource ? `จาก${SOURCE_LABEL[job.intakeSource] || job.intakeSource}` : "");
+              return (<>
+                <Stack direction="row" alignItems="center" gap={1} sx={{ display: { xs: open ? "none" : "flex", sm: "none" }, mt: 0.9, minWidth: 0 }}>
+                  {/* ✅ (20 ต.ค. 2569 ผู้ใช้: "กำหนดการทำให้ชัดเจน") ป้ายกำหนดการพื้นสี ตัวหนา เห็นก่อนอย่างอื่น */}
+                  <Stack direction="row" alignItems="center" gap={0.6} sx={{ minWidth: 0, flexShrink: 1, px: 1, height: 28, borderRadius: 1.5,
+                    bgcolor: alpha(t.accent || ACCENT, 0.08), border: `1px solid ${alpha(t.accent || ACCENT, 0.25)}` }}>
+                    <t.icon sx={{ fontSize: 16, color: t.accent || ACCENT, flexShrink: 0 }} />
+                    <Typography noWrap sx={{ fontSize: "0.82rem", fontWeight: 800, color: INK }}>
+                      {t.text.replace(/^แผนเข้างาน /, "แผน ")}{t.rel && <Box component="span" sx={{ ml: 0.4, fontWeight: 800, color: t.accent || MUTED }}>· {t.rel}</Box>}
+                    </Typography>
+                  </Stack>
+                  {who && (
+                    <Stack direction="row" alignItems="center" gap={0.5} sx={{ minWidth: 0, pl: 1, borderLeft: `1px solid ${LINE}` }}>
+                      {(job.responsiblePerson || (team && !job.unscheduled)) ? <PersonOutlineOutlined sx={{ fontSize: 16, color: "#94a3b8", flexShrink: 0 }} /> : <CallReceivedRounded sx={{ fontSize: 15, color: "#94a3b8", flexShrink: 0 }} />}
+                      <Typography noWrap sx={{ fontSize: "0.8rem", fontWeight: 700, color: "#334155" }}>{who}</Typography>
+                    </Stack>
+                  )}
+                </Stack>
+                <Box sx={{ display: { xs: open ? "block" : "none", sm: "none" }, mt: 1.25, borderTop: `1px solid ${LINE}` }}>
                   {rows.map(([k, v]) => (
                     <Stack key={k} direction="row" gap={1.5} sx={{ py: 0.75, borderBottom: `1px solid ${LINE}` }}>
                       <Typography sx={{ width: 84, flexShrink: 0, fontSize: "0.76rem", color: MUTED, fontWeight: 600 }}>{k}</Typography>
@@ -924,7 +942,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                     </Stack>
                   ))}
                 </Box>
-              );
+              </>);
             })()}
             </>)}
             {!inRow && (() => {
@@ -937,7 +955,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
               ].filter(Boolean);
               return (
                 <ButtonBase onClick={() => setOpen((v) => !v)} aria-expanded={open}
-                  sx={{ mt: 1.25, width: "100%", justifyContent: "flex-start", gap: 0.75, px: 1.1, py: 0.8, borderRadius: 2, border: `1px solid ${LINE}`, bgcolor: open ? "#fff" : SURFACE, textAlign: "left", "&:hover": { borderColor: "#cbd5e1" } }}>
+                  sx={{ mt: { xs: 1, sm: 1.25 }, width: "100%", justifyContent: "flex-start", gap: 0.75, px: 1.1, py: { xs: 0.6, sm: 0.8 }, borderRadius: 2, border: `1px solid ${LINE}`, bgcolor: open ? "#fff" : SURFACE, textAlign: "left", "&:hover": { borderColor: "#cbd5e1" } }}>
                   <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.78rem", color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     <Box component="span" sx={{ fontWeight: 800, color: ACCENT }}>{open ? "ซ่อนรายละเอียด" : "ดูรายละเอียด"}</Box>
                     {!open && bits.length > 0 && <> · {bits.join(" · ")}</>}
@@ -1044,7 +1062,8 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
           <Box sx={{ display: inRow ? "inline-flex" : { xs: "none", sm: "inline-flex" } }}><Chip color={st.color} bg={alpha(st.color, 0.1)} border="transparent">{st.label}</Chip></Box>
           {nx && !inRow && <Typography sx={{ display: { xs: "block", sm: "none" }, fontSize: "0.68rem", fontWeight: 800, color: "#94a3b8", letterSpacing: 0.3 }}>ขั้นถัดไป</Typography>}
           {nx && (
-            <Typography sx={{ fontSize: "0.8rem", color: "#334155", minWidth: 0, overflowWrap: "anywhere" }}>
+            <Typography sx={{ fontSize: "0.8rem", color: "#334155", minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere",
+              ...(showMore ? {} : { whiteSpace: { xs: "nowrap", sm: "normal" }, overflow: { xs: "hidden", sm: "visible" }, textOverflow: { xs: "ellipsis", sm: "clip" } }) }}>
               <Box component="span" sx={{ fontWeight: 800, color: INK }}>{nx.title}</Box>
               <Box component="span" sx={{ color: MUTED }}> — {nx.desc}</Box>
             </Typography>
