@@ -25,6 +25,7 @@ import { useAuth } from "@/features/auth/AuthContext";
 import usePermissions from "@/shared/hooks/usePermissions";
 import PurchaseService, { errorText } from "../services/PurchaseService";
 import PrStatusBadge from "./PrStatusBadge";
+import { thumbUrl } from "@/shared/utils/cloudinaryImage";
 import {
   PR_ACCENT, PR_DARK, TEXT_MAIN, TEXT_SUB, BORDER_MAIN, priorityMeta, fileKindLabel, fmtMoney, fmtQty, baht, prJobText, receiveProgress, money, categoryLabel,
 } from "../prMeta";
@@ -470,7 +471,7 @@ export default function PrDetailDialog({ open, id, reloadKey = 0, notice, onClos
                       return (
                         <Stack key={f._id} direction="row" spacing={1} alignItems="center" sx={{ p: 0.75, border: `1px solid ${BORDER_MAIN}`, borderRadius: 2, minWidth: 0 }}>
                           <Box component="a" href={f.fileUrl} target="_blank" rel="noreferrer" sx={{ width: 40, height: 40, borderRadius: 1.5, overflow: "hidden", bgcolor: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", color: TEXT_SUB, flexShrink: 0 }}>
-                            {isImg ? <Box component="img" src={f.fileUrl} alt="" sx={{ width: "100%", height: "100%", objectFit: "cover" }} /> : String(f.fileType).includes("pdf") ? <Description /> : <ImageIcon />}
+                            {isImg ? <Box component="img" src={thumbUrl(f.fileUrl)} decoding="async" alt="" sx={{ width: "100%", height: "100%", objectFit: "cover" }} /> : String(f.fileType).includes("pdf") ? <Description /> : <ImageIcon />}
                           </Box>
                           <Box sx={{ flex: 1, minWidth: 0 }}>
                             <Typography component="a" href={f.fileUrl} target="_blank" rel="noreferrer" sx={{ fontSize: "0.82rem", fontWeight: 700, color: TEXT_MAIN, textDecoration: "none", display: "block" }} noWrap>{f.fileName}</Typography>

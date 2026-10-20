@@ -272,7 +272,7 @@ const Hint = ({ children }) => (
 /**
  * @param docsComplete  เอกสารประจำงานครบแล้วหรือยัง (ส่งมาจากการ์ดงาน) — ใช้เลื่อนแถบขั้นตอน "เอกสาร → ขอปิดงาน"
  */
-export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched, user, embedded = false, compact = false, statusSteps = false, docsComplete, sx }) {
+export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched, user, embedded = false, compact = false, statusSteps = false, docsComplete, sx, lineOnly = false }) {
   const auth = useAuth() || {};
   const userData = user || auth.userData;
   const me = String(userData?.userId || "");
@@ -642,6 +642,23 @@ ${text}`);
           บันทึกเข้างานวันนี้
         </Button>
       );
+    }
+    // ✅ (20 ต.ค. 2569 ผู้ใช้: "การ์ดย่อยังกินพื้นที่ ยาวไป") lineOnly = เฉพาะแถวปุ่ม/สถานะบรรทัดเดียว (ไม่มีแถบขั้นตอน/บันทึกรายวัน)
+    //    ใช้บนการ์ดย่อมือถือ — รายละเอียดเต็มอยู่ในแผ่นรายละเอียด
+    if (lineOnly) {
+      const slim = (
+        <Box sx={{ ...sx }} onClick={(e) => e.stopPropagation()}>
+          {flash && (
+            <Box sx={{ mb: 0.75, px: 1.25, py: 0.75, borderRadius: "12px", bgcolor: flash.ok ? "#f0fdf4" : "#fef2f2" }}>
+              <Typography sx={{ fontSize: "0.8rem", fontWeight: 600, color: flash.ok ? "#15803d" : "#b91c1c" }}>{flash.ok ? "✓ " : ""}{flash.title}</Typography>
+            </Box>
+          )}
+          {line}
+          <CheckDialog open={dialog} event={event} onClose={() => setDialog(false)} onDone={onDone} />
+          <DeclineDialog open={declineOpen} busy={acking} onClose={() => setDeclineOpen(false)} onSubmit={decline} />
+        </Box>
+      );
+      return embedded ? <ThemeProvider theme={EMBEDDED_THEME}>{slim}</ThemeProvider> : slim;
     }
     const out = (
       <Box sx={{ mt: 1.25, ...sx }} onClick={(e) => e.stopPropagation()}>

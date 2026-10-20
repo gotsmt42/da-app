@@ -23,6 +23,7 @@ import EventService from "@/shared/services/EventService";
 import { BTN as MBTN, CARD } from "@/shared/ui/modernUi";
 import AttendanceService from "@/shared/services/AttendanceService";
 import { INK, MUTED, FAINT, LINE, SURFACE, ACCENT, ACCENT_SOFT, ACCENT_LINE } from "@/shared/ui/PageKit";
+import { thumbUrl } from "@/shared/utils/cloudinaryImage";
 import {
   NOTE_PRESETS, ON_SITE_M, distanceM, fmtDistance, fmtTime, watchBestPosition, GPS_GOOD_M, GPS_OK_M, GPS_MIN_WAIT_MS,
 } from "../attendanceMeta";
@@ -149,7 +150,7 @@ function FileGrid({ items, uploading = 0, onRemove, onAdd, addLabel, highlight }
       {items.map((p) => (
         <Box key={p.fileId} sx={{ position: "relative", pt: "100%", borderRadius: 2, overflow: "hidden", border: `1px solid ${LINE}`, bgcolor: SURFACE }}>
           {isImg(p) ? (
-            <Box component="img" src={p.fileUrl} alt={p.fileName} sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+            <Box component="img" src={thumbUrl(p.fileUrl)} decoding="async" alt={p.fileName} sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
           ) : (
             <Stack alignItems="center" justifyContent="center" spacing={0.5} sx={{ position: "absolute", inset: 0, p: 1 }}>
               <DescriptionOutlined sx={{ fontSize: 26, color: /\.pdf$/i.test(p.fileName || "") ? "#dc2626" : MUTED }} />

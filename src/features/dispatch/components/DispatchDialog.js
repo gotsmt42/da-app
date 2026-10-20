@@ -42,6 +42,7 @@ import { useAuth } from "@/features/auth/AuthContext";
 import DispatchService from "../services/DispatchService";
 import AssignDialog from "./AssignDialog";
 import ReviewDialog from "./ReviewDialog";
+import { thumbUrl } from "@/shared/utils/cloudinaryImage";
 import {
   DISPATCH_STATUS_META, DISPATCH_ACCENT, TEXT_SUB, BORDER_MAIN, SURFACE_SUBTLE, jobStatusColor,
 } from "../dispatchMeta";
@@ -460,7 +461,7 @@ export default function DispatchDialog({ dispatchId, onClose, onSaved }) {
                               bgcolor: SURFACE_SUBTLE, "&:hover": { borderColor: "#2563eb" },
                             }}>
                               {isImageFile(f)
-                                ? <Box component="img" src={f.fileUrl} alt={f.fileName} loading="lazy" sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                ? <Box component="img" src={thumbUrl(f.fileUrl)} decoding="async" alt={f.fileName} loading="lazy" sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
                                 : <InsertDriveFile sx={{ fontSize: 28, color: TEXT_SUB }} />}
                             </Box>
                           </Tooltip>

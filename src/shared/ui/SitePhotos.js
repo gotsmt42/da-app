@@ -15,6 +15,7 @@ import { alpha } from "@mui/material/styles";
 import { AddAPhotoOutlined, PhotoLibraryOutlined, Close, InsertDriveFileOutlined, PictureAsPdfOutlined } from "@mui/icons-material";
 import EventService from "@/shared/services/EventService";
 import { formatThai } from "@/shared/utils/thaiDate";
+import { thumbUrl } from "@/shared/utils/cloudinaryImage";
 
 const BLUE = "#2563eb";
 const LINE = "#e2e8f0";
@@ -112,10 +113,10 @@ export default function SitePhotos({ event, canEdit = false, onPreview, onChange
       ) : (
         <>
           {images.length > 0 && (
-            <Box sx={{ mt: 1, display: "grid", gap: 0.75, gridTemplateColumns: "repeat(auto-fill, minmax(84px, 1fr))" }}>
+            <Box sx={{ mt: 1, display: "grid", gap: 0.75, gridTemplateColumns: "repeat(auto-fill, minmax(68px, 76px))" }}>
               {images.map((f) => (
                 <Box key={f._id} sx={{ position: "relative", pt: "100%", borderRadius: 1.5, overflow: "hidden", border: `1px solid ${LINE}`, bgcolor: "#f8fafc" }}>
-                  <Box component="img" src={f.fileUrl} alt={f.fileName} loading="lazy" onClick={() => open(f)} title={`${f.fileName}${f.uploadedBy ? ` · ${f.uploadedBy}` : ""}${f.uploadedAt ? ` · ${formatThai(moment(f.uploadedAt), "D MMM HH:mm")}` : ""}`}
+                  <Box component="img" src={thumbUrl(f.fileUrl)} decoding="async" alt={f.fileName} loading="lazy" onClick={() => open(f)} title={`${f.fileName}${f.uploadedBy ? ` · ${f.uploadedBy}` : ""}${f.uploadedAt ? ` · ${formatThai(moment(f.uploadedAt), "D MMM HH:mm")}` : ""}`}
                     sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", cursor: "zoom-in" }} />
                   {/* ✅ (10 ต.ค. 2569) ไฟล์ที่มาจากคำขอลงงาน — ป้ายบอกที่มา · ลบจากงานไม่ได้ (ต้นฉบับอยู่ที่ใบคำขอ) */}
                   {f.source === "dispatch" && (

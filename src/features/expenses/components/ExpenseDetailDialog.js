@@ -38,6 +38,7 @@ import {
   installmentText, bahtText, jobRangesText, itemTitle,
 } from "../expenseMeta";
 import { bankMeta, formatAccountNo } from "../bankMeta";
+import { thumbUrl } from "@/shared/utils/cloudinaryImage";
 import BankLogo from "./BankLogo";
 import { confirmDelete } from "@/shared/ui/swal";
 
@@ -1282,7 +1283,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                                   width: 44, height: 44, borderRadius: 1.5, flexShrink: 0, overflow: "hidden", bgcolor: "#f1f5f9",
                                   display: "flex", alignItems: "center", justifyContent: "center", color: TEXT_SUB,
                                 }}>
-                                  {isImg ? <Box component="img" src={f.fileUrl} alt="" loading="lazy" sx={{ width: "100%", height: "100%", objectFit: "cover" }} onError={(ev) => { ev.currentTarget.style.display = "none"; }} />
+                                  {isImg ? <Box component="img" src={thumbUrl(f.fileUrl)} decoding="async" alt="" loading="lazy" sx={{ width: "100%", height: "100%", objectFit: "cover" }} onError={(ev) => { ev.currentTarget.style.display = "none"; }} />
                                     : String(f.fileType).includes("pdf") ? <Description /> : <ImageIcon />}
                                 </Box>
                                 <Box sx={{ flex: 1, minWidth: 0 }}>

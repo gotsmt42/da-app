@@ -25,6 +25,7 @@ import {
 import CorrectionDialog from "./CorrectionDialog";
 import { PersonChip } from "@/shared/ui/PersonChip";
 import { CARD } from "@/shared/ui/modernUi";
+import { thumbUrl } from "@/shared/utils/cloudinaryImage";
 
 const TONE = { ok: "#16a34a", warn: "#d97706", muted: "#94a3b8" };
 
@@ -50,7 +51,7 @@ const Files = ({ photos, onPreview }) => (photos?.length ? (
     {photos.map((p) => {
       const open = () => (onPreview ? onPreview(p.fileUrl, p.fileName) : window.open(p.fileUrl, "_blank", "noopener"));
       return isImg(p) ? (
-        <Box key={p.fileId} component="img" src={p.fileUrl} alt={p.fileName} loading="lazy" onClick={open}
+        <Box key={p.fileId} component="img" src={thumbUrl(p.fileUrl)} decoding="async" alt={p.fileName} loading="lazy" onClick={open}
           sx={{ width: 64, height: 64, objectFit: "cover", borderRadius: "10px", border: `1px solid ${LINE}`, cursor: "zoom-in" }} />
       ) : (
         <ButtonBase key={p.fileId} onClick={open}

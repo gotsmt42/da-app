@@ -105,17 +105,19 @@ export default function MobileJobSummary({ event, statusLabel, statusColor, next
           <Typography sx={{ flex: 1, fontSize: "0.78rem", fontWeight: 700, color: "#b45309" }}>ยังไม่มอบหมายผู้รับผิดชอบ</Typography>
         )}
         {statusLabel && <StatusPill label={statusLabel} color={statusColor} />}
+        {/* 🔁 (20 ต.ค. 2569 ผู้ใช้: "ยังกินพื้นที่ ยาวไป") ตัดแถบ "ดูรายละเอียด" ล่างสุด — ลูกศรท้ายแถวบอกว่ากดการ์ดเปิดรายละเอียดได้ */}
+        <ExpandMoreRounded sx={{ fontSize: 20, color: "#94a3b8", flexShrink: 0, transform: "rotate(-90deg)", mr: -0.5 }} />
       </Stack>
       {/* ✅ (20 ต.ค. 2569 ผู้ใช้: "ปุ่มดำเนินการ เช่น รับทราบ บันทึกงาน ต้องอยู่หน้าแรก ให้ดูและใช้ง่าย")
-          actions = แถวปุ่ม/สถานะขั้นตอน (รับทราบ · ยืนยันนัด · บันทึกเข้างาน) กดได้เลยโดยไม่ต้องเปิดการ์ด */}
-      {actions && <Box onClick={(e) => e.stopPropagation()} sx={{ mt: 1, cursor: "default" }}>{actions}</Box>}
-      <Stack direction="row" alignItems="center" gap={0.75} sx={{ mt: 1, mx: -0.25, px: 1, py: 0.7, borderRadius: 2, bgcolor: SURFACE }}>
-        {!actions && <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: next?.tone || "#94a3b8", flexShrink: 0 }} />}
-        <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.78rem", fontWeight: 700, color: next && !actions ? "#334155" : MUTED }}>
-          {actions ? "ดูรายละเอียด · เอกสาร · ขอปิดงาน" : next?.title || "ดูรายละเอียดงาน"}
-        </Typography>
-        <ExpandMoreRounded sx={{ fontSize: 20, color: MUTED, flexShrink: 0, transform: "rotate(-90deg)" }} />
-      </Stack>
+          actions = ปุ่ม/สถานะขั้นตอนบรรทัดเดียว (รับทราบ · ยืนยันนัด · บันทึกเข้างาน) กดได้เลยโดยไม่ต้องเปิดการ์ด
+          ไม่มี actions = บรรทัดขั้นถัดไป */}
+      {actions ? <Box onClick={(e) => e.stopPropagation()} sx={{ mt: 0.9, cursor: "default" }}>{actions}</Box>
+        : next && (
+          <Stack direction="row" alignItems="center" gap={0.75} sx={{ mt: 0.9, px: 1, py: 0.6, borderRadius: 2, bgcolor: SURFACE }}>
+            <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: next.tone || "#94a3b8", flexShrink: 0 }} />
+            <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.78rem", fontWeight: 700, color: "#334155" }}>{next.title}</Typography>
+          </Stack>
+        )}
     </Box>
   );
 }

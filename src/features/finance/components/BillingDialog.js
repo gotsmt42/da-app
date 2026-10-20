@@ -27,6 +27,7 @@ import FilePreviewDialog from "@/features/documents/components/FilePreviewDialog
 import { isImageFile } from "@/shared/utils/jobDocTypes";
 import { billingStatus, previewAmounts, paidTotal, baht, perRoundAmount, BILLING_STATE_META } from "@/shared/utils/billing";
 import { formatThai } from "@/shared/utils/thaiDate";
+import { thumbUrl } from "@/shared/utils/cloudinaryImage";
 
 const ACCENT = "#0891b2";
 const TEXT_SUB = "#64748b";
@@ -565,7 +566,7 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle }) {
                         sx={{ position: "absolute", inset: 0, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
                       >
                         {isImage
-                          ? <Box component="img" src={f.fileUrl} alt={f.fileName} loading="lazy" sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          ? <Box component="img" src={thumbUrl(f.fileUrl)} decoding="async" alt={f.fileName} loading="lazy" sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
                           : <InsertDriveFile sx={{ fontSize: 26, color: TEXT_SUB }} />}
                       </Box>
 

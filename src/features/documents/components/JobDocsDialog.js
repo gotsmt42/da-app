@@ -21,6 +21,7 @@ import EventService from "@/shared/services/EventService";
 import { formatEventDateRange } from "@/shared/utils/formatDateRange";
 import FilePreviewDialog from "./FilePreviewDialog";
 import { formatThai } from "@/shared/utils/thaiDate";
+import { thumbUrl } from "@/shared/utils/cloudinaryImage";
 
 const TEXT_SUB = "#64748b";
 
@@ -173,7 +174,7 @@ export default function JobDocsDialog({ roundVisits, title, onClose, canUpload =
                           }}
                         >
                           {isImageFile(f)
-                            ? <Box component="img" src={f.fileUrl} alt={f.fileName} loading="lazy"
+                            ? <Box component="img" src={thumbUrl(f.fileUrl)} decoding="async" alt={f.fileName} loading="lazy"
                                 sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
                             : <InsertDriveFile sx={{ fontSize: 30, color: TEXT_SUB }} />}
                         </Box>
