@@ -7,7 +7,7 @@
  */
 import { Avatar, Box, Stack, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { ExpandMoreRounded } from "@mui/icons-material";
+import { ExpandMoreRounded, CheckRounded } from "@mui/icons-material";
 import moment from "moment";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
@@ -69,7 +69,41 @@ export const StatusPill = ({ label, color = MUTED }) => (
  * @param right        ปุ่มมุมขวาบน (เช่น ⋮) — ต้อง stopPropagation เอง
  * @param onToggle     กดการ์ด = กางรายละเอียด
  */
-export default function MobileJobSummary({ event, statusLabel, statusColor, next, person, personSrc, personSub, alert, right, actions, onToggle }) {
+/**
+ * ✅ (20 ต.ค. 2569 ผู้ใช้: "สถานะที่บอก รับทราบแล้ว ยืนยันแล้ว ในหน้าแรก ให้สวยงาม ชัดเจน")
+ *    แถบขั้นตอนแบบชิป: ขั้นที่ผ่านแล้ว = เขียว ✓ · ขั้นปัจจุบัน = น้ำเงิน · ขั้นที่เหลือ = เทาจาง (ไม่ใส่คำยาว)
+ */
+const STEP_LABELS = ["รับทราบ", "ยืนยันนัด", "เข้างาน", "เอกสาร", "ขอปิดงาน"];
+export function StepChips({ step }) {
+  if (step === null || step === undefined) return null;
+  const doneAll = step > STEP_LABELS.length; // jobStepOf: 6 = ปิดงานแล้ว
+  return (
+    // แถวเดียว 5 ช่องเท่ากัน (ไม่ขึ้นบรรทัดใหม่) — ✓ = ผ่านแล้ว
+    <Box sx={{ mt: 0.9, display: "grid", gridTemplateColumns: doneAll ? "1fr" : `repeat(${STEP_LABELS.length}, minmax(0,1fr))`, gap: 0.4 }}>
+      {doneAll ? (
+        <Box component="span" sx={{ height: 24, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 0.35, borderRadius: 99, fontSize: "0.72rem", fontWeight: 800, color: "#15803d", bgcolor: "#dcfce7" }}>
+          <CheckRounded sx={{ fontSize: 15 }} /> เสร็จสิ้นทุกขั้นตอน
+        </Box>
+      ) : STEP_LABELS.map((l, i) => {
+        const done = i < step;
+        const cur = i === step;
+        return (
+          <Box key={l} component="span" sx={{
+            minWidth: 0, height: 24, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 0.2, borderRadius: 99, fontSize: "0.64rem", whiteSpace: "nowrap", overflow: "hidden",
+            fontWeight: done || cur ? 800 : 600,
+            color: done ? "#15803d" : cur ? "#fff" : "#94a3b8",
+            bgcolor: done ? "#dcfce7" : cur ? ACCENT : "#f1f5f9",
+          }}>
+            {done && <CheckRounded sx={{ fontSize: 12, flexShrink: 0 }} />}
+            {l}
+          </Box>
+        );
+      })}
+    </Box>
+  );
+}
+
+export default function MobileJobSummary({ event, statusLabel, statusColor, next, person, personSrc, personSub, alert, right, actions, onToggle, step }) {
   const kind = classifyJob(event) || "general";
   const meta = event?.noVisit ? { label: "งานส่งของ", color: "#0891b2" } : (getJobClassMeta(kind) || getJobClassMeta("general"));
   const round = event?.time ? formatRoundLabel(event.time, event.visitCount, event) : "";
@@ -111,6 +145,7 @@ export default function MobileJobSummary({ event, statusLabel, statusColor, next
       {/* ✅ (20 ต.ค. 2569 ผู้ใช้: "ปุ่มดำเนินการ เช่น รับทราบ บันทึกงาน ต้องอยู่หน้าแรก ให้ดูและใช้ง่าย")
           actions = ปุ่ม/สถานะขั้นตอนบรรทัดเดียว (รับทราบ · ยืนยันนัด · บันทึกเข้างาน) กดได้เลยโดยไม่ต้องเปิดการ์ด
           ไม่มี actions = บรรทัดขั้นถัดไป */}
+      <StepChips step={step} />
       {actions ? <Box onClick={(e) => e.stopPropagation()} sx={{ mt: 0.9, cursor: "default" }}>{actions}</Box>
         : next && (
           <Stack direction="row" alignItems="center" gap={0.75} sx={{ mt: 0.9, px: 1, py: 0.6, borderRadius: 2, bgcolor: SURFACE }}>

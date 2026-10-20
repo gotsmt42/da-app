@@ -15,7 +15,8 @@ import MultiDayGroupHeader, { multiDayCardSx, useGroupAttendance, SessionList } 
 import { useEffect, useMemo, useState, useCallback, useRef, cloneElement } from "react";
 import PdfBlobView from "@/shared/components/PdfBlobView";
 import useRealtime from "@/shared/realtime/useRealtime";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
+import { History } from "@mui/icons-material";
 import { isRespOrHead, isResponsibleOf, ackTracked, isAckedBy, isClosedJob } from "@/shared/utils/jobFlow";
 import { useAuth } from "@/features/auth/AuthContext";
 import moment from "moment";
@@ -23,7 +24,6 @@ import "@/shared/utils/momentThaiLocale";
 import EventService from "@/shared/services/EventService";
 import AuthService from "@/shared/services/authService";
 import TechnicianJobCard from "../components/TechnicianJobPanel";
-import ActiveCheckInBanner from "@/features/attendance/components/ActiveCheckInBanner";
 import { buildDaysPastDueMap, isFlaggedDays, isSevereDays, getOverdueGroupKey } from "@/shared/utils/overdueJobs";
 import ImagePreview from "@/shared/ui/ImagePreview";
 import { PAGE_SX, PageHeader, ICON_BTN_SX, INK, INK_2, MUTED, LINE, SURFACE, ACCENT } from "@/shared/ui/PageKit";
@@ -758,54 +758,47 @@ export default function MyJobs() {
                 </Box>
               ))}
             </Stack>
+            <Tooltip title="ประวัติเข้างาน"><IconButton component={Link} to="/attendance" aria-label="ประวัติเข้างาน" sx={ICON_BTN_SX}><History sx={{ fontSize: 18 }} /></IconButton></Tooltip>
             <Tooltip title="รีเฟรช"><IconButton onClick={() => fetchJobs()} sx={ICON_BTN_SX}><Refresh sx={{ fontSize: 18 }} /></IconButton></Tooltip>
           </>
         )}
       />
 
-      {/* ✅ (10 ต.ค. 2569) กำลังเช็คอินอยู่ → แถบเตือนให้เช็คเอาต์ · ไม่มี → ลิงก์ประวัติเข้า-ออกงาน */}
-      <ActiveCheckInBanner />
-
-      {/* ✅ แถวเดียว 4 ช่อง — สีประจำหมวด (ฟ้า/แดง/ส้ม/เขียว) ที่ไอคอนและตัวเลข · ช่องที่เลือกพื้นอ่อน+ขอบสีหมวด */}
-      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: { xs: 0.75, md: 1 }, mb: 1.25 }}>
+      {/* 🔁 (20 ต.ค. 2569 ผู้ใช้: "แถบด้านบนยังรก กินพื้นที่ ไม่สวย ปรับให้กะทัดรัด แต่ยังดูง่าย")
+          • ลิงก์ "ประวัติเข้างาน" ย้ายเป็นปุ่มไอคอนบนหัวหน้า (ไม่กินแถว)
+          • หมวด 4 ช่อง = แถบแบ่งช่องแถวเดียวในกรอบเทา (ชื่อ + จำนวน สูง 36) ชุดเดียวกับหน้างานเข้า — ค้างงานตัวเลขแดง */}
+      <Stack direction="row" sx={{ mb: 1, p: 0.4, gap: 0.4, borderRadius: 2.5, bgcolor: "#eef2f6" }}>
         {GROUPS.map((g) => {
           const on = group === g.key;
           const n = groupCounts[g.key];
+          const hot = g.key === "overdue" && n > 0;
           return (
             <Box key={g.key} component="button" type="button" onClick={() => setGroup(g.key)} title={g.label}
               sx={{
-                position: "relative", font: "inherit", cursor: "pointer", py: { xs: 0.6, md: 1.1 }, px: 0.5, borderRadius: { xs: 2, md: 2.5 }, minWidth: 0, textAlign: "center",
-                bgcolor: on ? alpha(g.color, 0.1) : "#fff",
-                border: `1.5px solid ${on ? g.color : "#e2e8f0"}`,
-                boxShadow: on ? `0 2px 8px ${alpha(g.color, 0.18)}` : "none",
-                transition: "all .15s",
+                flex: "1 1 0", minWidth: 0, height: { xs: 34, md: 38 }, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 0.5,
+                font: "inherit", cursor: "pointer", border: 0, borderRadius: 2, whiteSpace: "nowrap", overflow: "hidden",
+                fontSize: { xs: "0.76rem", md: "0.86rem" }, fontWeight: 800,
+                bgcolor: on ? "#fff" : "transparent", color: on ? "#0f172a" : "#64748b",
+                boxShadow: on ? "0 1px 3px rgba(15,23,42,.14)" : "none", transition: "background-color .15s",
               }}>
-              {/* ไอคอน + ตัวเลขบรรทัดเดียว · ชื่อหมวดบรรทัดล่าง */}
-              <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.5}>
-                <Box sx={{
-                  width: 20, height: 20, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                  bgcolor: on ? g.color : alpha(g.color, 0.12), color: on ? "#fff" : g.color, "& svg": { fontSize: 12 },
-                }}>{g.icon}</Box>
-                <Typography sx={{ fontSize: { xs: "0.98rem", md: "1.25rem" }, fontWeight: 900, lineHeight: 1.3, color: n > 0 ? g.color : "#94a3b8" }}>{n}</Typography>
-              </Stack>
-              <Typography noWrap sx={{ fontSize: { xs: "0.66rem", md: "0.8rem" }, fontWeight: 800, color: on ? g.color : "#64748b", lineHeight: 1.3 }}>{g.short || g.label}</Typography>
-              {g.key === "overdue" && n > 0 && !on && (
-                <Box sx={{ position: "absolute", top: 4, right: 4, width: 7, height: 7, borderRadius: "50%", bgcolor: "#dc2626", boxShadow: "0 0 0 3px rgba(220,38,38,.18)" }} />
-              )}
+              <Box component="span" sx={{ display: { xs: "none", sm: "inline-flex" }, color: g.color, "& svg": { fontSize: 15 } }}>{g.icon}</Box>
+              {g.short || g.label}
+              <Box component="span" sx={{ minWidth: 18, height: 18, px: 0.5, borderRadius: 99, display: "inline-grid", placeItems: "center", fontSize: "0.68rem", fontWeight: 900,
+                bgcolor: hot ? "#dc2626" : on ? g.color : "rgba(100,116,139,.14)", color: hot || on ? "#fff" : "#64748b" }}>{n}</Box>
             </Box>
           );
         })}
-      </Box>
+      </Stack>
 
       {group === "active" && subCounts.all > 0 && (
-        <Stack direction="row" gap={0.6} sx={{ mb: 1.25, overflowX: "auto", pb: 0.25, scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
+        <Stack direction="row" gap={0.5} sx={{ mb: 1, overflowX: "auto", pb: 0.25, scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
           {SUBS.map((x) => {
             const on = sub === x.key;
             const n = subCounts[x.key] || 0;
             return (
               <Box key={x.key} component="button" type="button" onClick={() => setSub(x.key)}
-                sx={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 0.6, height: 32, px: 1.25, borderRadius: 99, font: "inherit", cursor: "pointer",
-                  fontSize: "0.78rem", fontWeight: on ? 800 : 600, color: on ? x.color : "#475569",
+                sx={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 0.5, height: { xs: 28, md: 32 }, px: 1.1, borderRadius: 99, font: "inherit", cursor: "pointer",
+                  fontSize: { xs: "0.74rem", md: "0.78rem" }, fontWeight: on ? 800 : 600, color: on ? x.color : "#475569",
                   bgcolor: on ? alpha(x.color, 0.1) : "#fff", border: `1.5px solid ${on ? alpha(x.color, 0.6) : "#e2e8f0"}` }}>
                 {x.key !== "all" && <Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: x.color }} />}
                 {x.label}
@@ -821,7 +814,7 @@ export default function MyJobs() {
         fullWidth size="small" placeholder="ค้นหาโครงการ / ไซต์ / ประเภทงาน / เลขเอกสาร"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        sx={{ mb: 1.5, "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: "#fff", height: 40, fontSize: "0.9rem" } }}
+        sx={{ mb: 1.5, "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: "#fff", height: { xs: 38, md: 40 }, fontSize: "0.88rem" } }}
         InputProps={{
           startAdornment: <InputAdornment position="start"><Search sx={{ fontSize: 19, color: "text.disabled" }} /></InputAdornment>,
           endAdornment: search ? (

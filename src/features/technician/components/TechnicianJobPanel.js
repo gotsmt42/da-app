@@ -47,7 +47,7 @@ import MobileJobSummary from "@/shared/ui/MobileJobSummary";
 import MobileSheet from "@/shared/ui/MobileSheet";
 import SitePhotos from "@/shared/ui/SitePhotos";
 import { AssignResponsibleMenu, PersonChip } from "@/shared/ui/PersonChip";
-import CheckInOutPanel from "@/features/attendance/components/CheckInOutPanel";
+import CheckInOutPanel, { jobStepOf } from "@/features/attendance/components/CheckInOutPanel";
 import { docsUnlocked } from "@/shared/utils/jobFlow";
 import { BTN as MBTN, CARD } from "@/shared/ui/modernUi";
 import { confirmDelete } from "@/shared/ui/swal";
@@ -948,6 +948,7 @@ const TechnicianJobCard = ({
               next={(() => { const n = nextStepOf(event, "tech"); return n ? { title: n.title, tone: n.tone } : null; })()}
               person={event.responsiblePerson} personSrc={employees.find((u) => u.fname === event.responsiblePerson)?.imageUrl}
               personSub={event.team ? `หัวหน้าทีม ${event.team}` : "ผู้รับผิดชอบงาน"}
+              step={jobStepOf(event, completedDocCount === DOCUMENT_TYPES.length)}
               actions={<CheckInOutPanel compact lineOnly event={event} onPreview={onPreview} onPatched={onPatched} sx={{ mt: 0 }} docsComplete={completedDocCount === DOCUMENT_TYPES.length} />}
               onToggle={() => setSheetOpen(true)} />
           </Box>
