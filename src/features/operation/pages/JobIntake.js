@@ -853,6 +853,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
               <ModeIcon sx={{ fontSize: 15, color: tone }} />
               <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: tone, whiteSpace: "nowrap" }}>{modeLabel}</Typography>
               {job.jobNo && <Typography noWrap sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#94a3b8", minWidth: 0 }}>· {job.jobNo}</Typography>}
+              <Box sx={{ ml: "auto", pl: 1, flexShrink: 0 }}><Chip color={st.color} bg={alpha(st.color, 0.1)} border="transparent">{st.label}</Chip></Box>
             </Stack>
             <Stack direction="row" spacing={0.75} alignItems="baseline" sx={{ flexWrap: "wrap", rowGap: 0.25 }}>
               <Typography sx={{ fontWeight: 800, fontSize: "1rem", color: INK, lineHeight: 1.35, overflowWrap: "anywhere", whiteSpace: job.intakeNote ? "pre-line" : undefined }}>
@@ -875,7 +876,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                 แถวที่สอง = ข้อมูลประกอบ (ผู้รับผิดชอบ · ทีม · ผู้ติดต่อ) */}
             {!inRow && (<>
             {/* ✅ (20 ต.ค. 2569 ผู้ใช้: "มือถือยังไม่เป็นระเบียบ") มือถือ: ข้อมูลเรียงเป็นรายการบรรทัดละเรื่อง ขอบซ้ายตรงกัน */}
-            <Stack sx={{ flexDirection: { xs: "column", sm: "row" }, alignItems: { xs: "flex-start", sm: "center" }, flexWrap: "wrap", gap: { xs: 0.25, sm: 0.75 }, mt: 1 }}>
+            <Stack direction="row" sx={{ display: { xs: "none", sm: "flex" }, flexWrap: "wrap", gap: 0.75, mt: 1 }}>
               {(() => {
                 const t = scheduleTagOf(job, schedule);
                 return (
@@ -891,7 +892,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
               })()}
               {job.intakeSource && <Tag icon={CallReceivedRounded}>รับงานจาก{SOURCE_LABEL[job.intakeSource] || job.intakeSource}</Tag>}
             </Stack>
-            <Stack sx={{ flexDirection: { xs: "column", sm: "row" }, flexWrap: "wrap", columnGap: 2, rowGap: { xs: 0.4, sm: 0.5 }, mt: { xs: 0.4, sm: 0.9 }, "&:empty": { display: "none" } }}>
+            <Stack direction="row" sx={{ display: { xs: "none", sm: "flex" }, flexWrap: "wrap", columnGap: 2, rowGap: 0.5, mt: 0.9, "&:empty": { display: "none !important" } }}>
               {job.responsiblePerson && <Fact icon={PersonOutlineOutlined}>{job.responsiblePerson}</Fact>}
               {!job.unscheduled && !job.noVisit && !job.intakeNote && <Fact icon={GroupsOutlined}>{team || "ยังไม่มอบหมายทีม"}</Fact>}
               {(job.contactName || job.contactTel) && (
@@ -901,6 +902,30 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                 </Fact>
               )}
             </Stack>
+            {/* ✅ (20 ต.ค. 2569 ผู้ใช้: "ทำให้สวย มืออาชีพ") มือถือ: ตารางข้อมูล ป้ายซ้าย · ค่าขวา บรรทัดละเรื่อง เส้นคั่นบาง */}
+            {(() => {
+              const t = scheduleTagOf(job, schedule);
+              const late = due && moment(job.dueDate).isBefore(moment(), "day");
+              const rows = [
+                ["กำหนดการ", <>{t.text.replace(/^แผนเข้างาน /, "แผน ")}{t.rel && <Box component="span" sx={{ ml: 0.5, fontWeight: 800, color: t.accent || MUTED }}>· {t.rel}</Box>}</>],
+                due && st.i < 4 ? ["เสร็จภายใน", <>{due}{late && <Box component="span" sx={{ ml: 0.5, color: RED, fontWeight: 800 }}>· เลยกำหนด</Box>}</>] : null,
+                job.intakeSource ? ["รับงานจาก", SOURCE_LABEL[job.intakeSource] || job.intakeSource] : null,
+                job.responsiblePerson ? ["ผู้รับผิดชอบ", job.responsiblePerson] : null,
+                !job.unscheduled && !job.noVisit && !job.intakeNote ? ["ทีม", team || <Box component="span" sx={{ color: "#94a3b8" }}>ยังไม่มอบหมาย</Box>] : null,
+                job.contactName || job.contactTel ? ["ผู้ติดต่อ", <>{job.contactName || ""}{job.contactName && job.contactTel ? " · " : ""}
+                  {job.contactTel && <Box component="a" href={`tel:${job.contactTel}`} sx={{ color: ACCENT, fontWeight: 800, textDecoration: "none" }}>{job.contactTel}</Box>}</>] : null,
+              ].filter(Boolean);
+              return (
+                <Box sx={{ display: { xs: "block", sm: "none" }, mt: 1.25, borderTop: `1px solid ${LINE}` }}>
+                  {rows.map(([k, v]) => (
+                    <Stack key={k} direction="row" gap={1.5} sx={{ py: 0.75, borderBottom: `1px solid ${LINE}` }}>
+                      <Typography sx={{ width: 84, flexShrink: 0, fontSize: "0.76rem", color: MUTED, fontWeight: 600 }}>{k}</Typography>
+                      <Typography component="div" sx={{ flex: 1, minWidth: 0, fontSize: "0.82rem", fontWeight: 700, color: INK, overflowWrap: "anywhere" }}>{v}</Typography>
+                    </Stack>
+                  ))}
+                </Box>
+              );
+            })()}
             </>)}
             {!inRow && (() => {
               const refN = (job.intakeDocType || job.intakeDocNo ? 1 : 0) || ((job.sitePhotoFiles || []).some((f) => f.source === "intake") ? 1 : 0);
@@ -912,7 +937,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
               ].filter(Boolean);
               return (
                 <ButtonBase onClick={() => setOpen((v) => !v)} aria-expanded={open}
-                  sx={{ mt: 1, width: "100%", justifyContent: "flex-start", gap: 0.75, px: 1.1, py: 0.7, borderRadius: 2, border: `1px solid ${LINE}`, bgcolor: open ? "#fff" : SURFACE, textAlign: "left", "&:hover": { borderColor: "#cbd5e1" } }}>
+                  sx={{ mt: 1.25, width: "100%", justifyContent: "flex-start", gap: 0.75, px: 1.1, py: 0.8, borderRadius: 2, border: `1px solid ${LINE}`, bgcolor: open ? "#fff" : SURFACE, textAlign: "left", "&:hover": { borderColor: "#cbd5e1" } }}>
                   <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.78rem", color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     <Box component="span" sx={{ fontWeight: 800, color: ACCENT }}>{open ? "ซ่อนรายละเอียด" : "ดูรายละเอียด"}</Box>
                     {!open && bits.length > 0 && <> · {bits.join(" · ")}</>}
@@ -1015,8 +1040,9 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
       {/* ท้ายการ์ด: สถานะ + สิ่งที่ต้องทำต่อ | แถบขั้นตอน */}
       <Stack direction={{ xs: "column", md: "row" }} spacing={{ xs: 1, md: 2.5 }} alignItems={{ md: "center" }}
         sx={{ px: { xs: 1.75, sm: 2.25 }, py: 1.1, bgcolor: SURFACE, borderTop: `1px solid ${LINE}` }}>
-        <Stack sx={{ flex: 1, minWidth: 0, flexDirection: { xs: "column", md: "row" }, alignItems: { xs: "flex-start", md: "center" }, gap: { xs: 0.6, md: 1 } }}>
-          <Chip color={st.color} bg={alpha(st.color, 0.1)} border="transparent">{st.label}</Chip>
+        <Stack sx={{ flex: 1, minWidth: 0, flexDirection: { xs: "column", md: "row" }, alignItems: { xs: "flex-start", md: "center" }, gap: { xs: 0.25, md: 1 } }}>
+          <Box sx={{ display: inRow ? "inline-flex" : { xs: "none", sm: "inline-flex" } }}><Chip color={st.color} bg={alpha(st.color, 0.1)} border="transparent">{st.label}</Chip></Box>
+          {nx && !inRow && <Typography sx={{ display: { xs: "block", sm: "none" }, fontSize: "0.68rem", fontWeight: 800, color: "#94a3b8", letterSpacing: 0.3 }}>ขั้นถัดไป</Typography>}
           {nx && (
             <Typography sx={{ fontSize: "0.8rem", color: "#334155", minWidth: 0, overflowWrap: "anywhere" }}>
               <Box component="span" sx={{ fontWeight: 800, color: INK }}>{nx.title}</Box>
