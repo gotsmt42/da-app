@@ -187,7 +187,8 @@ export function SessionBar({ order, total, session, st, isAnchor }) {
   return (
     <Stack direction="row" alignItems="center" gap={1} sx={{ px: 2, py: 0.85, bgcolor: st.key === "today" ? alpha("#2563eb", 0.06) : "#f8fafc", borderBottom: "1px solid #e2e8f0", flexWrap: "wrap", rowGap: 0.5 }}>
       <Typography sx={{ fontSize: "0.76rem", fontWeight: 900, color: "#0f172a", whiteSpace: "nowrap" }}>ช่วงที่ {order}/{total}</Typography>
-      <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.74rem", fontWeight: 600, color: "#64748b", whiteSpace: "nowrap" }}>{rangeLabel(session)} · {plannedDaysOf(session)} วัน</Typography>
+      {/* 🐛 (21 ต.ค. 2569 ผู้ใช้: "ตัวหนังสือทับกัน") วันที่ไม่หดจนป้ายสถานะทับ — ที่ไม่พอ ป้ายลงบรรทัดใหม่แทน */}
+      <Typography sx={{ flex: "1 0 auto", fontSize: "0.74rem", fontWeight: 600, color: "#64748b", whiteSpace: "nowrap" }}>{rangeLabel(session)} · {plannedDaysOf(session)} วัน</Typography>
       <Box component="span" sx={{ flexShrink: 0, px: 0.9, height: 22, display: "inline-flex", alignItems: "center", borderRadius: 99, fontSize: "0.68rem", fontWeight: 800,
         color: st.color, bgcolor: alpha(st.color, 0.1) }}>{st.label}</Box>
       {isAnchor && (

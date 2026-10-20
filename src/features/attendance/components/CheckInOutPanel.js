@@ -116,8 +116,12 @@ export function jobStepOf(event, docsComplete = false) {
   if (["pending", "rejected"].includes(event.approvalStatus)) return 0;
   if (isClosedJob(event)) return STEPS.length;
   if (event.closeRequested) return 5;
-  const legacyStarted = event.status === "กำลังดำเนินการ" && Boolean(event.createdAt) && new Date(event.createdAt) < new Date(FLOW_SINCE);
+  // งานเก่าที่วันนี้ยังเป็นวันเข้างานตามแผน = ยังอยู่ขั้นเข้างาน (ตรงกับปุ่ม "บันทึกเข้างานวันนี้")
+  const todayKey = moment().utcOffset(7).format("YYYY-MM-DD");
+  const todayPlanned = scheduledAttendanceDays(event).some((d) => d.format("YYYY-MM-DD") === todayKey);
+  const legacyStarted = !todayPlanned && event.status === "กำลังดำเนินการ" && Boolean(event.createdAt) && new Date(event.createdAt) < new Date(FLOW_SINCE);
   if (legacyStarted) return docsComplete ? 4 : 3;
+  if (todayPlanned && !event.checkedInAt && event.status === "กำลังดำเนินการ") return 2;
   if (event.checkedInAt) {
     // 🐛 (20 ต.ค. 2569 ผู้ใช้: "งานหลายช่วงวันยังมีผิดๆ") งานหลายวัน: เข้างานวันแรกแล้วยังไม่ผ่านขั้น "เข้างาน" จนกว่าจะเลยวันนัดสุดท้าย
     const days = scheduledAttendanceDays(event);
