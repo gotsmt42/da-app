@@ -874,7 +874,8 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
             {/* ✅ (17 ต.ค. 2569) แถวแรก = ป้ายข้อมูลสำคัญโทนเทา (กำหนดเวลา · เสร็จภายใน · ที่มา · เอกสาร) — สีเฉพาะเดือนนี้/เลยกำหนด
                 แถวที่สอง = ข้อมูลประกอบ (ผู้รับผิดชอบ · ทีม · ผู้ติดต่อ) */}
             {!inRow && (<>
-            <Stack direction="row" sx={{ flexWrap: "wrap", gap: 0.75, mt: 1 }}>
+            {/* ✅ (20 ต.ค. 2569 ผู้ใช้: "มือถือยังไม่เป็นระเบียบ") มือถือ: ข้อมูลเรียงเป็นรายการบรรทัดละเรื่อง ขอบซ้ายตรงกัน */}
+            <Stack sx={{ flexDirection: { xs: "column", sm: "row" }, alignItems: { xs: "flex-start", sm: "center" }, flexWrap: "wrap", gap: { xs: 0.25, sm: 0.75 }, mt: 1 }}>
               {(() => {
                 const t = scheduleTagOf(job, schedule);
                 return (
@@ -890,7 +891,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
               })()}
               {job.intakeSource && <Tag icon={CallReceivedRounded}>รับงานจาก{SOURCE_LABEL[job.intakeSource] || job.intakeSource}</Tag>}
             </Stack>
-            <Stack direction="row" sx={{ flexWrap: "wrap", columnGap: 2, rowGap: 0.5, mt: 0.9, "&:empty": { display: "none" } }}>
+            <Stack sx={{ flexDirection: { xs: "column", sm: "row" }, flexWrap: "wrap", columnGap: 2, rowGap: { xs: 0.4, sm: 0.5 }, mt: { xs: 0.4, sm: 0.9 }, "&:empty": { display: "none" } }}>
               {job.responsiblePerson && <Fact icon={PersonOutlineOutlined}>{job.responsiblePerson}</Fact>}
               {!job.unscheduled && !job.noVisit && !job.intakeNote && <Fact icon={GroupsOutlined}>{team || "ยังไม่มอบหมายทีม"}</Fact>}
               {(job.contactName || job.contactTel) && (
@@ -1014,7 +1015,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
       {/* ท้ายการ์ด: สถานะ + สิ่งที่ต้องทำต่อ | แถบขั้นตอน */}
       <Stack direction={{ xs: "column", md: "row" }} spacing={{ xs: 1, md: 2.5 }} alignItems={{ md: "center" }}
         sx={{ px: { xs: 1.75, sm: 2.25 }, py: 1.1, bgcolor: SURFACE, borderTop: `1px solid ${LINE}` }}>
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ flex: 1, minWidth: 0 }}>
+        <Stack sx={{ flex: 1, minWidth: 0, flexDirection: { xs: "column", md: "row" }, alignItems: { xs: "flex-start", md: "center" }, gap: { xs: 0.6, md: 1 } }}>
           <Chip color={st.color} bg={alpha(st.color, 0.1)} border="transparent">{st.label}</Chip>
           {nx && (
             <Typography sx={{ fontSize: "0.8rem", color: "#334155", minWidth: 0, overflowWrap: "anywhere" }}>
@@ -1040,11 +1041,11 @@ const Chip = ({ children, color = "#334155", bg = SURFACE, border = LINE }) => (
  */
 const Tag = ({ icon: Icon, accent, dashed, children }) => (
   <Box component="span" sx={{
-    display: "inline-flex", alignItems: "center", gap: 0.6, height: 26, px: 1, borderRadius: 1.5, maxWidth: "100%",
-    fontSize: "0.78rem", fontWeight: 700, color: "#334155", bgcolor: dashed ? "transparent" : SURFACE,
-    border: `1px ${dashed ? "dashed" : "solid"} ${accent ? alpha(accent, 0.45) : LINE}`, whiteSpace: "nowrap", overflow: "hidden",
+    display: "inline-flex", alignItems: "center", gap: 0.6, height: { xs: 22, sm: 26 }, px: { xs: 0, sm: 1 }, borderRadius: 1.5, maxWidth: "100%",
+    fontSize: "0.78rem", fontWeight: 700, color: "#334155", bgcolor: { xs: "transparent", sm: dashed ? "transparent" : SURFACE },
+    border: { xs: 0, sm: `1px ${dashed ? "dashed" : "solid"} ${accent ? alpha(accent, 0.45) : LINE}` }, whiteSpace: "nowrap", overflow: "hidden",
   }}>
-    {Icon && <Icon sx={{ fontSize: 15, flexShrink: 0, color: accent || "#94a3b8" }} />}
+    {Icon && <Icon sx={{ fontSize: 16, flexShrink: 0, color: accent || "#94a3b8" }} />}
     <Box component="span" sx={{ overflow: "hidden", textOverflow: "ellipsis" }}>{children}</Box>
   </Box>
 );
