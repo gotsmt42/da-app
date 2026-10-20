@@ -31,6 +31,8 @@ import usePaged, { PageBar } from "@/shared/ui/usePaged";
 import { JobFlowFlags } from "@/shared/ui/JobFlow";
 import DateCell from "@/shared/ui/DateCell";
 import JobKindTag from "@/shared/ui/JobKindTag";
+import useTodayCheckins from "@/shared/hooks/useTodayCheckins";
+import { attentionOf, ATTENTION_META, attentionDayText, isTodayJob } from "@/shared/utils/myJobAttention";
 import JobDocsCell from "@/shared/ui/JobDocsCell";
 import RefDoc from "@/shared/ui/RefDoc";
 import { PersonChip } from "@/shared/ui/PersonChip";
@@ -459,6 +461,24 @@ export default function MyJobs() {
     return () => clearInterval(interval);
   }, [fetchJobs]);
 
+  // ✅ (20 ต.ค. 2569 ผู้ใช้: "งานของฉันให้มีงานวันนี้แยกตามเดิม และเด้งงานที่ยังไม่รับทราบ/บันทึกเข้างานขึ้นก่อน กันลืม")
+  const todayCheckedIds = useTodayCheckins();
+  /** งานกลุ่มนี้ต้องทำอะไรด่วน (checkin/ack/confirm) — ดูทุกวันของงาน */
+  const attentionOfGroup = useCallback((sessions) => {
+    let best = null;
+    sessions.forEach((e) => {
+      const k = attentionOf(e, { userId: userData?.userId, fname: userData?.fname, todayCheckedIds });
+      if (k && (!best || ATTENTION_META[k].rank < ATTENTION_META[best.k].rank)) best = { k, e };
+    });
+    return best;
+  }, [userData?.userId, userData?.fname, todayCheckedIds]);
+  /** ลำดับ: บันทึกเข้างาน 0 · รับทราบ 1 · ยืนยันนัด 2 · งานวันนี้ 3 · อื่นๆ 4 */
+  const rankOfGroup = useCallback((sessions) => {
+    const a = attentionOfGroup(sessions);
+    if (a) return ATTENTION_META[a.k].rank;
+    return sessions.some(isTodayJob) ? 3 : 4;
+  }, [attentionOfGroup]);
+
   // ✅ ต้องคำนวณจาก events ทั้งหมด (ไม่ผ่านตัวกรองอื่นมาก่อน) เพื่อให้ทุกกลุ่มงานครบทุกแถวเสมอ
   // เทียบ pattern เดียวกับหน้า Operation
   const daysPastDueMap = useMemo(() => buildDaysPastDueMap(events), [events]);
@@ -549,10 +569,13 @@ export default function MyJobs() {
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(ev);
     });
-    return [...map.values()].map((sessions) =>
+    const list = [...map.values()].map((sessions) =>
       sessions.slice().sort((a, b) => new Date(b.start) - new Date(a.start))
     );
-  }, [filteredJobs]);
+    if (group === "closed") return list;
+    // เรียงตามความด่วน (ต้องทำก่อน → งานวันนี้ → งานถัดไป) · ในกลุ่มเดียวกันคงลำดับวันที่เดิม
+    return list.map((ss, i) => ({ ss, i, r: rankOfGroup(ss) })).sort((a, b) => a.r - b.r || a.i - b.i).map((x) => x.ss);
+  }, [filteredJobs, group, rankOfGroup]);
 
   // ✅ (19 ต.ค. 2569 ผู้ใช้: "พร้อมทั้งทำระบบแบ่งหน้าด้วย") การ์ด 10 / ตาราง 20 ต่อหน้า
   //    เปลี่ยนหมวด/ค้นหา/มุมมอง = กลับหน้า 1 · กดลิงก์มาเจาะจงงาน = ไปหน้าที่มีงานนั้นเอง
@@ -667,11 +690,23 @@ export default function MyJobs() {
             const daysPastDueRaw = group === "closed" ? null : daysPastDueMap.get(sessions[0]._id)?.days ?? null;
             const daysPastDue = isFlaggedDays(daysPastDueRaw) ? daysPastDueRaw : null;
             const severeOverdue = isSevereDays(daysPastDue);
+            const att = group === "closed" ? null : attentionOfGroup(sessions);
+            const attMeta = att ? ATTENTION_META[att.k] : null;
             return (
               <Box key={sessions[0].jobGroupId || sessions[0]._id}
                 id={sessions.some((x) => String(x._id) === highlightJob) ? `myjob-${highlightJob}` : undefined}
                 sx={sessions.some((x) => String(x._id) === highlightJob) ? { borderRadius: "18px", outline: "3px solid #2563eb", outlineOffset: 2, scrollMarginTop: "80px" } : undefined}>
-                {daysPastDue !== null && (
+                {/* ✅ (20 ต.ค. 2569) ป้ายกันลืมเหนือการ์ด: ยังไม่บันทึกเข้างานวันนี้ / ยังไม่รับทราบ / ยังไม่ยืนยันนัด */}
+                {attMeta && (
+                  <Stack direction="row" alignItems="center" gap={0.75}
+                    sx={{ mb: -1.5, pb: 2, pt: 0.75, px: 1.75, borderRadius: "16px 16px 0 0",
+                      bgcolor: alpha(attMeta.color, 0.08), border: `1px solid ${alpha(attMeta.color, 0.3)}`, borderBottom: 0 }}>
+                    <Box component="span" sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: attMeta.color, boxShadow: `0 0 0 3px ${alpha(attMeta.color, 0.18)}`, flexShrink: 0 }} />
+                    <Typography sx={{ fontSize: "0.8rem", fontWeight: 900, color: attMeta.color }}>{attMeta.short}</Typography>
+                    <Typography noWrap sx={{ fontSize: "0.74rem", color: attMeta.color, opacity: 0.85, minWidth: 0 }}>· {attentionDayText(att.e)}{daysPastDue !== null ? ` · เลยกำหนด ${daysPastDue} วัน` : ""}</Typography>
+                  </Stack>
+                )}
+                {!attMeta && daysPastDue !== null && (
                   <Stack direction="row" alignItems="center" gap={0.75}
                     sx={{
                       mb: -1.5, pb: 2, pt: 0.75, px: 1.75, borderRadius: "16px 16px 0 0",
@@ -877,7 +912,28 @@ export default function MyJobs() {
           </>
         ) : (
           <>
-            <Stack spacing={2}>{pg.rows.map((sessions) => renderGroup(sessions))}</Stack>
+            {/* ✅ (20 ต.ค. 2569) แบ่งหัวข้อ: ต้องทำก่อน · งานวันนี้ · งานถัดไป (หมวดเสร็จสิ้นไม่แบ่ง) */}
+            <Stack spacing={2}>{pg.rows.map((sessions, i) => {
+              if (group === "closed") return renderGroup(sessions);
+              const sec = (ss) => { const r = rankOfGroup(ss); return r <= 2 ? "urgent" : r === 3 ? "today" : "later"; };
+              const cur = sec(sessions);
+              const prev = i > 0 ? sec(pg.rows[i - 1]) : null;
+              const SEC = { urgent: { t: "ต้องทำก่อน · กันลืม", c: "#dc2626" }, today: { t: "งานวันนี้", c: "#2563eb" }, later: { t: "งานถัดไป", c: "#64748b" } };
+              const n = pg.rows.filter((ss) => sec(ss) === cur).length;
+              return (
+                <Box key={sessions[0].jobGroupId || sessions[0]._id}>
+                  {cur !== prev && (
+                    <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1.25, mt: i ? 0.5 : 0 }}>
+                      <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: SEC[cur].c }} />
+                      <Typography sx={{ fontWeight: 900, fontSize: "0.92rem", color: "#0f172a" }}>{SEC[cur].t}</Typography>
+                      <Box component="span" sx={{ px: 0.8, borderRadius: 99, bgcolor: alpha(SEC[cur].c, 0.1), color: SEC[cur].c, fontSize: "0.74rem", fontWeight: 900 }}>{n}</Box>
+                      <Box sx={{ flex: 1, height: 1, bgcolor: "#e2e8f0" }} />
+                    </Stack>
+                  )}
+                  {renderGroup(sessions)}
+                </Box>
+              );
+            })}</Stack>
             <PageBar {...pg} setPage={goPage} unit="งาน" />
           </>
         )
