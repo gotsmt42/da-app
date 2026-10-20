@@ -851,16 +851,18 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
             {/* ✅ (20 ต.ค. 2569 ผู้ใช้: "ยังดูจืด แยกงานยาก") มือถือ: กล่องวันที่แบบปฏิทินหน้าชื่องาน — กวาดตาแยกงานได้ทันที */}
             <Box sx={{ display: { xs: "block", sm: "none" }, flexShrink: 0 }}>
               {job.intakeNote ? <DateCell start={job.intakeAt} />
-                : job.unscheduled ? <DateCell label={job.noVisit ? "รอส่งของ" : job.plannedMonth ? <>แผน<br />{formatThai(moment(job.plannedMonth, "YYYY-MM"), "MMM YY")}</> : <>ยังไม่<br />กำหนด</>} />
+                : job.unscheduled ? (() => {
+                  const r = scheduleTagOf(job, schedule);
+                  return <DateCell label={job.noVisit ? "รอส่งของ" : job.plannedMonth ? <>แผน<br />{formatThai(moment(job.plannedMonth, "YYYY-MM"), "MMM YY")}{r.rel && <Box component="span" sx={{ display: "block", mt: 0.2, fontSize: "0.64rem", color: r.accent || "#64748b" }}>{r.rel}</Box>}</> : <>ยังไม่<br />กำหนด</>} />;
+                })()
                 : <DateCell start={job.noVisit ? (job.deliveredAt || job.start) : job.start} end={job.noVisit ? null : job.end} allDay={job.allDay} />}
             </Box>
             <Box sx={{ flex: 1, minWidth: 0 }}>
             {/* ✅ (20 ต.ค. 2569 ผู้ใช้: "มือถือยังจัดวางไม่สวย") มือถือ: ไม่มีคอลัมน์ไอคอนซ้าย — ย้ายเป็นบรรทัดเล็กเหนือชื่องาน ทุกอย่างชิดซ้ายแนวเดียวกับปุ่ม */}
-            <Stack direction="row" alignItems="center" gap={0.6} sx={{ display: { xs: "flex", sm: "none" }, mb: 0.4, minWidth: 0 }}>
+            <Stack direction="row" alignItems="center" sx={{ display: { xs: "flex", sm: "none" }, flexWrap: "wrap", columnGap: 0.6, mb: 0.4, minWidth: 0 }}>
               <ModeIcon sx={{ fontSize: 15, color: tone }} />
               <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: tone, whiteSpace: "nowrap" }}>{modeLabel}</Typography>
-              {job.jobNo && <Typography noWrap sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#94a3b8", minWidth: 0 }}>· {job.jobNo}</Typography>}
-              <Box sx={{ ml: "auto", pl: 1, flexShrink: 0 }}><Chip color={st.color} bg={alpha(st.color, 0.1)} border="transparent">{st.label}</Chip></Box>
+              {job.jobNo && <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#94a3b8", whiteSpace: "nowrap" }}>· {job.jobNo}</Typography>}
             </Stack>
             <Stack direction="row" spacing={0.75} alignItems="baseline" sx={{ flexWrap: "wrap", rowGap: 0.25 }}>
               <Typography sx={{ fontWeight: 800, fontSize: "1rem", color: INK, lineHeight: 1.35, overflowWrap: "anywhere", whiteSpace: job.intakeNote ? "pre-line" : undefined }}>
@@ -914,6 +916,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
               const t = scheduleTagOf(job, schedule);
               const late = due && moment(job.dueDate).isBefore(moment(), "day");
               const rows = [
+                ["สถานะ", <Chip color={st.color} bg={alpha(st.color, 0.1)} border="transparent">{st.label}</Chip>],
                 ["กำหนดการ", <><t.icon sx={{ fontSize: 15, color: t.accent || ACCENT, mr: 0.5, verticalAlign: "-2px" }} />{t.text.replace(/^แผนเข้างาน /, "แผน ")}{t.rel && <Box component="span" sx={{ ml: 0.5, fontWeight: 800, color: t.accent || MUTED }}>· {t.rel}</Box>}</>],
                 due && st.i < 4 ? ["เสร็จภายใน", <>{due}{late && <Box component="span" sx={{ ml: 0.5, color: RED, fontWeight: 800 }}>· เลยกำหนด</Box>}</>] : null,
                 job.intakeSource ? ["รับงานจาก", SOURCE_LABEL[job.intakeSource] || job.intakeSource] : null,
@@ -940,10 +943,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                       <Typography noWrap sx={{ fontSize: "0.78rem", fontWeight: 700, color: MUTED }}>{who || "ยังไม่มีผู้รับผิดชอบ"}</Typography>
                     </Stack>
                   )}
-                  {t.rel && (
-                    <Box component="span" sx={{ flexShrink: 0, px: 0.9, height: 24, display: "inline-flex", alignItems: "center", borderRadius: 99, fontSize: "0.72rem", fontWeight: 800,
-                      color: t.accent || "#475569", bgcolor: alpha(t.accent || "#64748b", 0.1) }}>{t.rel}</Box>
-                  )}
+                  <Box sx={{ flexShrink: 0 }}><Chip color={st.color} bg={alpha(st.color, 0.1)} border="transparent">{st.label}</Chip></Box>
                 </Stack>
                 <Box sx={{ display: { xs: open ? "block" : "none", sm: "none" }, mt: 1.25, borderTop: `1px solid ${LINE}` }}>
                   {rows.map(([k, v]) => (
