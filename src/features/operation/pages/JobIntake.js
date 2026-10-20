@@ -808,6 +808,9 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
       sx={{ ...GHOST, flex: { xs: 1, sm: "0 0 auto" } }}>ดูงาน</Button>
   );
 
+  // ปุ่มเดียวคือ "ดูงาน" (งานที่ลงตารางแล้ว) — มือถือย้ายไปมุมขวาบนของการ์ด
+  const viewOnly = !readOnly && st.i > 0 && !st.note && !st.nv;
+
   // ✅ (15 ต.ค. 2569 ผู้ใช้: "หน้านี้ทำให้สวยงาม และดูข้อมูลง่ายด้วย")
   //    การ์ดแยกใบ: หัว (สถานะ · เลข Job · ป้าย) → ชื่องาน + โครงการ → ตารางข้อมูล "ป้าย : ค่า" → แถบขั้นตอนพื้นเทาด้านล่าง
   const nx = job.cancelledAt ? null : st.note
@@ -856,7 +859,8 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                 if (d) {
                   const m = moment(d);
                   const isToday = m.isSame(moment(), "day");
-                  return <DateTile head={formatThai(m, "MMM YY")} big={m.format("D")} foot={isToday ? "วันนี้" : formatThai(m, "ddd")} color={isToday ? ACCENT : "#475569"} />;
+                  // 🔁 (20 ต.ค. 2569 ผู้ใช้: "ทำไมสีวันที่ไม่เหมือนกัน") สีเดียวกันทุกใบ — วันนี้บอกด้วยคำว่า "วันนี้" สีน้ำเงินด้านล่างเท่านั้น
+                  return <DateTile head={formatThai(m, "MMM YY")} big={m.format("D")} foot={isToday ? "วันนี้" : formatThai(m, "ddd")} footColor={isToday ? ACCENT : null} />;
                 }
                 if (job.plannedMonth && !job.noVisit) {
                   const r = scheduleTagOf(job, schedule);
@@ -887,6 +891,11 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
             {place && <Typography sx={{ fontSize: "0.86rem", fontWeight: 600, color: "#475569", mt: 0.2, overflowWrap: "anywhere" }}>{place}</Typography>}
             </Box>
             {actions && <Stack direction="row" spacing={0.75} sx={{ flexShrink: 0, display: { xs: "none", md: "flex" } }}>{actions}</Stack>}
+            {viewOnly && (
+              <Button component={Link} to={`/operation/${job._id}`} size="small" endIcon={<ChevronRight sx={{ fontSize: "16px !important", ml: -0.5 }} />}
+                sx={{ display: { xs: "inline-flex", md: "none" }, flexShrink: 0, height: 30, px: 1.1, minWidth: 0, borderRadius: 2, textTransform: "none", fontWeight: 800, fontSize: "0.76rem",
+                  color: "#334155", border: `1px solid ${LINE}`, bgcolor: "#fff", "&:hover": { bgcolor: SURFACE } }}>ดูงาน</Button>
+            )}
             </Stack>
             )}
 
@@ -1072,15 +1081,16 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
             </Collapse>
           </Box>
         </Stack>
-        {actions && <Stack direction="row" spacing={0.75} sx={{ mt: 1.5, justifyContent: inRow ? "flex-end" : "flex-start", display: inRow ? "flex" : { xs: "flex", md: "none" } }}>{actions}</Stack>}
+        {/* 🔁 (20 ต.ค. 2569 ผู้ใช้: "ย่อการ์ดลงอีก ดูยาวไป · ดูงาน เห็นด้านขวาว่าง") มือถือ: ปุ่ม "ดูงาน" ย้ายขึ้นมุมขวาบน ไม่กินแถวเต็ม */}
+        {actions && <Stack direction="row" spacing={0.75} sx={{ mt: { xs: 1.25, md: 1.5 }, justifyContent: inRow ? "flex-end" : "flex-start", display: inRow ? "flex" : { xs: viewOnly ? "none" : "flex", md: "none" } }}>{actions}</Stack>}
       </Box>
 
       {/* ท้ายการ์ด: สถานะ + สิ่งที่ต้องทำต่อ | แถบขั้นตอน */}
       <Stack direction={{ xs: "column", md: "row" }} spacing={{ xs: 1, md: 2.5 }} alignItems={{ md: "center" }}
-        sx={{ px: { xs: 1.75, sm: 2.25 }, py: 1.1, bgcolor: SURFACE, borderTop: `1px solid ${LINE}` }}>
+        sx={{ px: { xs: 1.75, sm: 2.25 }, py: { xs: 0.85, sm: 1.1 }, bgcolor: SURFACE, borderTop: `1px solid ${LINE}` }}>
         <Stack sx={{ flex: 1, minWidth: 0, flexDirection: { xs: "column", md: "row" }, alignItems: { xs: "flex-start", md: "center" }, gap: { xs: 0.25, md: 1 } }}>
           <Box sx={{ display: inRow ? "inline-flex" : { xs: "none", sm: "inline-flex" } }}><Chip color={st.color} bg={alpha(st.color, 0.1)} border="transparent">{st.label}</Chip></Box>
-          {nx && !inRow && <Typography sx={{ display: { xs: "block", sm: "none" }, fontSize: "0.68rem", fontWeight: 800, color: "#94a3b8", letterSpacing: 0.3 }}>ขั้นถัดไป</Typography>}
+          {nx && !inRow && showMore && <Typography sx={{ display: { xs: "block", sm: "none" }, fontSize: "0.68rem", fontWeight: 800, color: "#94a3b8", letterSpacing: 0.3 }}>ขั้นถัดไป</Typography>}
           {nx && (
             <Typography sx={{ fontSize: "0.8rem", color: "#334155", minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere",
               ...(showMore ? {} : { whiteSpace: { xs: "nowrap", sm: "normal" }, overflow: { xs: "hidden", sm: "visible" }, textOverflow: { xs: "ellipsis", sm: "clip" } }) }}>
@@ -1096,12 +1106,13 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
 }
 
 /** ไอคอนปฏิทินบนการ์ดมือถือ — กว้าง/สูงเท่ากันทุกใบ แถวการ์ดเรียงตรงกัน */
-const DateTile = ({ head, big, foot, color = "#475569", dashed = false, small = false }) => (
-  <Box sx={{ width: 58, borderRadius: 2, overflow: "hidden", textAlign: "center", bgcolor: "#fff",
-    border: `1px ${dashed ? "dashed" : "solid"} ${dashed ? "#cbd5e1" : alpha(color, 0.35)}` }}>
-    <Box sx={{ py: 0.2, bgcolor: dashed ? SURFACE : color, color: dashed ? "#64748b" : "#fff", fontSize: "0.64rem", fontWeight: 800, lineHeight: 1.5, whiteSpace: "nowrap" }}>{head}</Box>
-    <Typography sx={{ fontSize: small ? "1.02rem" : "1.35rem", fontWeight: 900, lineHeight: 1.15, pt: small ? 0.5 : 0.25, color: dashed ? color : INK, fontVariantNumeric: "tabular-nums" }}>{big}</Typography>
-    <Typography sx={{ fontSize: "0.62rem", fontWeight: 700, lineHeight: 1.3, pb: 0.4, color: dashed ? color : MUTED, whiteSpace: "nowrap" }}>{foot}</Typography>
+// 🔁 (20 ต.ค. 2569 ผู้ใช้: "ลดขนาดวันที่ลงอีกให้พอดี") กว้าง 48 · ตัวเลข 1.1rem
+const DateTile = ({ head, big, foot, color = "#475569", footColor = null, dashed = false, small = false }) => (
+  <Box sx={{ width: 48, borderRadius: 1.75, overflow: "hidden", textAlign: "center", bgcolor: "#fff",
+    border: `1px ${dashed ? "dashed" : "solid"} ${dashed ? "#cbd5e1" : "#d5dce5"}` }}>
+    <Box sx={{ py: 0.1, bgcolor: dashed ? SURFACE : "#475569", color: dashed ? "#64748b" : "#fff", fontSize: "0.58rem", fontWeight: 800, lineHeight: 1.5, whiteSpace: "nowrap" }}>{head}</Box>
+    <Typography sx={{ fontSize: small ? "0.9rem" : "1.1rem", fontWeight: 900, lineHeight: 1.15, pt: small ? 0.35 : 0.15, color: dashed ? color : INK, fontVariantNumeric: "tabular-nums" }}>{big}</Typography>
+    <Typography sx={{ fontSize: "0.56rem", fontWeight: 700, lineHeight: 1.3, pb: 0.3, color: footColor || (dashed ? color : MUTED), whiteSpace: "nowrap" }}>{foot}</Typography>
   </Box>
 );
 
