@@ -11,7 +11,7 @@
  *      เพื่อให้ผลอนุมัติ/ไม่อนุมัติ render กลับไปหาช่างแบบ realtime โดยไม่ต้องรีเฟรชเอง
  */
 
-import MultiDayGroupHeader, { multiDayCardSx } from "@/shared/ui/MultiDayGroup";
+import MultiDayGroupHeader, { multiDayCardSx, useGroupAttendance, SessionList } from "@/shared/ui/MultiDayGroup";
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import SectionTabs from "@/shared/ui/SectionTabs";
 import PdfBlobView from "@/shared/components/PdfBlobView";
@@ -2410,6 +2410,7 @@ const JobGroupBlock = ({ sessions, currentUser, ...cardProps }) => {
   const [expanded, setExpanded] = useState(Boolean(cardProps.defaultExpanded));
   useEffect(() => { if (cardProps.defaultExpanded) setExpanded(true); }, [cardProps.defaultExpanded]);
   const isGrouped = sessions.length > 1;
+  const groupAtt = useGroupAttendance(sessions, isGrouped);
 
   // ✅ งานกลุ่มเดียวกันใช้เอกสาร (Service Report/ใบเสนอราคา/ใบวางบิล/ใบส่งมอบงาน) และ "ขอปิดงาน"
   // ร่วมกันชุดเดียว แทนที่จะให้อัปโหลด/ขอปิดซ้ำทุกวัน — ยึดวันล่าสุด (sessions[0]) เป็น "การ์ดหลัก"
@@ -2453,36 +2454,17 @@ const JobGroupBlock = ({ sessions, currentUser, ...cardProps }) => {
   // ✅ หัวการ์ดงานหลายช่วงวัน — ตัวกลางชุดเดียวกับหน้างานของฉัน (shared/ui/MultiDayGroup)
   return (
     <GlassCard sx={multiDayCardSx(OP_COLOR[head.status] || "#94a3b8")}>
-      <MultiDayGroupHeader sessions={sessions} anchorId={anchorId} expanded={expanded} onToggle={() => setExpanded((p) => !p)}
+      <MultiDayGroupHeader sessions={sessions} anchorId={anchorId} expanded={expanded} onToggle={() => setExpanded((p) => !p)} att={groupAtt}
         title={`${companySite(head.company, head.site)} — ${head.title || ""}${head.system ? ` · ${head.system}` : ""}${head.time ? ` ครั้งที่ ${formatRoundLabel(head.time, head.visitCount, head)}` : ""}`} />
 
       {/* ✅ (10 ต.ค. 2569 ผู้ใช้: "ทำกรอบแบ่งงานกันให้ชัดเจนกว่านี้หน่อย มองแยกยาก")
           เดิมแต่ละช่วงวันคั่นด้วยเส้นบางเส้นเดียว ข้อมูลไหลต่อกันจนแยกไม่ออกว่าจบช่วงไหน
           ✅ ตอนนี้แต่ละช่วงเป็นกรอบขาวของตัวเอง วางบนพื้นเทาอ่อน + แถบหัว "ช่วงที่ n/N · วันที่" */}
       <Collapse in={expanded}>
-        <Stack spacing={1.25} sx={{ p: { xs: 1, sm: 1.5 }, pt: { xs: 1.25, sm: 1.5 }, bgcolor: SURFACE, borderRadius: "0 0 16px 16px" }}>
-          {sessions.map((event, i) => {
-            const order = sortedByStart.findIndex((x) => x._id === event._id) + 1;
-            return (
-              <Box key={event._id} sx={{ bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflow: "hidden", boxShadow: "0 1px 2px rgba(15,23,42,.05)" }}>
-                <Stack direction="row" alignItems="center" gap={1} sx={{ px: 2, py: 0.85, bgcolor: "#f8fafc", borderBottom: `1px solid ${LINE}` }}>
-                  <Typography sx={{ fontSize: "0.74rem", fontWeight: 900, color: INK_2, whiteSpace: "nowrap" }}>
-                    ช่วงที่ {order}/{sessions.length}
-                  </Typography>
-                  <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.74rem", fontWeight: 600, color: MUTED }}>
-                    {formatEventDateRange(event)}
-                  </Typography>
-                  {event._id === anchorId && (
-                    <Box component="span" sx={{ flexShrink: 0, px: 0.9, py: 0.15, borderRadius: 99, fontSize: "0.66rem", fontWeight: 800, color: ACCENT, bgcolor: ACCENT_SOFT, border: `1px solid ${ACCENT_LINE}` }}>
-                      ถือเอกสาร/ขอปิดงาน
-                    </Box>
-                  )}
-                </Stack>
-                {renderCard(event)}
-              </Box>
-            );
-          })}
-        </Stack>
+        {/* 🔁 (20 ต.ค. 2569 ผู้ใช้: "แยกให้ละเอียดและชัดเจน งานไม่ต่อเนื่อง หลายช่วงวัน") ช่วงวันนี้/ถัดไปขึ้นก่อน · ช่วงที่ผ่านมาพับไว้ (shared/ui/MultiDayGroup) */}
+        <Box sx={{ p: { xs: 1, sm: 1.5 }, pt: { xs: 1.25, sm: 1.5 }, bgcolor: SURFACE, borderRadius: "0 0 16px 16px" }}>
+          <SessionList sessions={sessions} anchorId={anchorId} att={groupAtt} renderCard={renderCard} />
+        </Box>
       </Collapse>
     </GlassCard>
   );

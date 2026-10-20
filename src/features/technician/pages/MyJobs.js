@@ -11,7 +11,7 @@
  *    Operation ฝั่งแอดมิน)
  */
 
-import MultiDayGroupHeader, { multiDayCardSx } from "@/shared/ui/MultiDayGroup";
+import MultiDayGroupHeader, { multiDayCardSx, useGroupAttendance, SessionList } from "@/shared/ui/MultiDayGroup";
 import { useEffect, useMemo, useState, useCallback, useRef, cloneElement } from "react";
 import PdfBlobView from "@/shared/components/PdfBlobView";
 import useRealtime from "@/shared/realtime/useRealtime";
@@ -331,6 +331,7 @@ const JobGroupCard = ({ sessions, ...cardProps }) => {
   }));
   const isGrouped = sessions.length > 1;
   const anchorId = sessions[0]._id;
+  const groupAtt = useGroupAttendance(sessions, isGrouped);
 
   const renderCard = (event) => (
     <TechnicianJobCard
@@ -348,15 +349,14 @@ const JobGroupCard = ({ sessions, ...cardProps }) => {
   // ✅ หัวการ์ดงานหลายช่วงวัน — ตัวกลางชุดเดียวกับหน้าการดำเนินงาน (shared/ui/MultiDayGroup)
   return (
     <Box sx={multiDayCardSx(STATUS_DOT[head.status] || "#94a3b8")}>
-      <MultiDayGroupHeader sessions={sessions} anchorId={anchorId} expanded={expanded} onToggle={() => setExpanded((p) => !p)}
+      <MultiDayGroupHeader sessions={sessions} anchorId={anchorId} expanded={expanded} onToggle={() => setExpanded((p) => !p)} att={groupAtt}
         title={`${head.company && head.site ? `${head.company} · ${head.site}` : (head.company || head.site || "")}${head.title ? ` — ${head.title}` : ""}${head.system ? ` · ${head.system}` : ""}`} />
+      {/* 🔁 (20 ต.ค. 2569 ผู้ใช้: "แยกให้ละเอียดและชัดเจน งานไม่ต่อเนื่อง หลายช่วงวัน") — แต่ละช่วงมีกรอบ + "ช่วงที่ k/N · สถานะ"
+          ช่วงวันนี้/ถัดไปขึ้นก่อน · ช่วงที่ผ่านมาพับไว้ (ชุดเดียวกับหน้าการดำเนินงาน) */}
       <Collapse in={expanded}>
-        {sessions.map((event, i) => (
-          <Box key={event._id}>
-            {i > 0 && <Divider />}
-            {renderCard(event)}
-          </Box>
-        ))}
+        <Box sx={{ p: { xs: 1, sm: 1.5 }, bgcolor: "#f8fafc", borderRadius: "0 0 16px 16px" }}>
+          <SessionList sessions={sessions} anchorId={anchorId} att={groupAtt} renderCard={renderCard} />
+        </Box>
       </Collapse>
     </Box>
   );
