@@ -276,8 +276,8 @@ function QuoteSlot({ oc }) {
 function DocBox({ title, hint, tone, children }) {
   return (
     <Box sx={{ minWidth: 0, px: 1.5, py: 1.1, borderRadius: 2, bgcolor: "#fff", border: `1px solid ${LINE}`, ...(tone ? { borderLeft: `3px solid ${tone}` } : {}) }}>
-      <Stack direction="row" alignItems="baseline" gap={0.75} sx={{ mb: 0.75 }}>
-        <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: "#475569" }}>{title}</Typography>
+      <Stack direction="row" alignItems="baseline" sx={{ mb: 0.75, flexWrap: "wrap", columnGap: 0.75 }}>
+        <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: "#475569", whiteSpace: "nowrap" }}>{title}</Typography>
         {hint && <Typography sx={{ fontSize: "0.68rem", color: "#94a3b8" }}>· {hint}</Typography>}
       </Stack>
       {children}
@@ -834,10 +834,10 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
     <Box sx={inRow ? { bgcolor: "#fff", borderRadius: 2, overflow: "hidden", border: `1px solid ${LINE}` } : { bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflow: "hidden", transition: "border-color .15s, box-shadow .15s", "&:hover": { borderColor: "#cbd5e1", boxShadow: "0 4px 14px -8px rgba(15,23,42,.18)" } }}>
       {/* 🔁 (19 ต.ค. 2569 ผู้ใช้: "ให้ขยายเต็ม") ปุ่มย้ายขึ้นแถวชื่องาน (จอคอม) — เนื้อหาด้านล่างกว้างเต็มการ์ด ไม่เหลือช่องว่างด้านขวา */}
       <Box sx={{ px: { xs: 1.75, sm: 2.25 }, py: 1.75 }}>
-        <Stack direction="row" spacing={1.5} sx={{ minWidth: 0 }}>
+        <Stack direction="row" gap={1.5} sx={{ minWidth: 0 }}>
           {/* ✅ (15 ต.ค. 2569 ผู้ใช้: "ให้บอกด้วยว่างานอะไร ส่งของ จดงาน เข้างาน") — ไอคอน + ชื่อรูปแบบงานใต้ไอคอน */}
           {!inRow && (
-          <Stack alignItems="center" spacing={0.4} sx={{ width: 52, flexShrink: 0 }}>
+          <Stack alignItems="center" spacing={0.4} sx={{ width: 52, flexShrink: 0, display: { xs: "none", sm: "flex" } }}>
             <Box sx={{ width: 42, height: 42, borderRadius: 2.5, display: "grid", placeItems: "center", bgcolor: alpha(tone, 0.08), color: tone }}>
               <ModeIcon sx={{ fontSize: 22 }} />
             </Box>
@@ -848,11 +848,17 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
             {!inRow && (
             <Stack direction="row" spacing={1.5} alignItems="flex-start">
             <Box sx={{ flex: 1, minWidth: 0 }}>
+            {/* ✅ (20 ต.ค. 2569 ผู้ใช้: "มือถือยังจัดวางไม่สวย") มือถือ: ไม่มีคอลัมน์ไอคอนซ้าย — ย้ายเป็นบรรทัดเล็กเหนือชื่องาน ทุกอย่างชิดซ้ายแนวเดียวกับปุ่ม */}
+            <Stack direction="row" alignItems="center" gap={0.6} sx={{ display: { xs: "flex", sm: "none" }, mb: 0.4, minWidth: 0 }}>
+              <ModeIcon sx={{ fontSize: 15, color: tone }} />
+              <Typography sx={{ fontSize: "0.72rem", fontWeight: 800, color: tone, whiteSpace: "nowrap" }}>{modeLabel}</Typography>
+              {job.jobNo && <Typography noWrap sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#94a3b8", minWidth: 0 }}>· {job.jobNo}</Typography>}
+            </Stack>
             <Stack direction="row" spacing={0.75} alignItems="baseline" sx={{ flexWrap: "wrap", rowGap: 0.25 }}>
               <Typography sx={{ fontWeight: 800, fontSize: "1rem", color: INK, lineHeight: 1.35, overflowWrap: "anywhere", whiteSpace: job.intakeNote ? "pre-line" : undefined }}>
                 {job.intakeNote ? (job.description || "บันทึกงาน") : <>{job.title || "งาน"}{job.system ? ` · ${job.system}` : ""}</>}
               </Typography>
-              {job.jobNo && <Typography component="span" sx={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8" }}>{job.jobNo}</Typography>}
+              {job.jobNo && <Typography component="span" sx={{ display: { xs: "none", sm: "inline" }, fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8" }}>{job.jobNo}</Typography>}
               {isUrgent(job) && st.i < 4 && <Chip color="#fff" bg={RED} border={RED}>⚡ ด่วน</Chip>}
               {stall > 0 && <Chip color={RED} bg={alpha(RED, 0.08)} border="transparent">⏰ ค้าง {stall} วัน</Chip>}
               {job.approvalStatus === "pending" && <Chip color={AMBER} bg={alpha(AMBER, 0.12)} border="transparent">รออนุมัติ</Chip>}
