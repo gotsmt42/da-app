@@ -12,7 +12,8 @@ const KIND = {
   other: { label: "เอกสารอื่น", icon: DescriptionOutlined, color: "#475569" },
 };
 
-export const refFilesOf = (ev) => (ev?.sitePhotoFiles || []).filter((f) => f.source === "intake");
+// 🔁 (21 ต.ค. 2569) ไฟล์ที่แนบมากับใบแจ้งงาน (QT/PO) ก็เป็นเอกสารอ้างอิงตอนรับงานเหมือนกัน
+export const refFilesOf = (ev) => (ev?.sitePhotoFiles || []).filter((f) => f.source === "intake" || f.source === "dispatch");
 export const hasRefDoc = (ev) => Boolean(ev?.intakeDocType || ev?.intakeDocNo || refFilesOf(ev).length);
 
 export default function RefDoc({ event, onOpenFile }) {

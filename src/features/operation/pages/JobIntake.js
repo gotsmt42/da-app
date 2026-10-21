@@ -57,7 +57,7 @@ import { getAddDraftEvent, INTAKE_SOURCE_OPTS } from "@/features/calendar/compon
 import { isUrgent, openFollowUp } from "@/shared/utils/jobFlow";
 import { MiniSteps } from "@/features/attendance/components/CheckInOutPanel";
 import { nextStepOf } from "@/shared/ui/JobFlow";
-import { can } from "@/shared/utils/roles";
+import { can, rankLabel } from "@/shared/utils/roles";
 import PersonSelectField from "@/shared/ui/PersonSelectField";
 import DispatchList from "@/features/dispatch/components/DispatchList";
 import MobileSheet from "@/shared/ui/MobileSheet";
@@ -76,6 +76,8 @@ const STAGES_NV = ["รับงาน", "ส่งของ", "วางบิ�
 
 // ✅ (20 ต.ค. 2569) งานที่ลงตารางตรง / อนุมัติคำขอลงงาน ก็เข้ามาหน้านี้ — ป้ายที่มาของมันเอง
 const SOURCE_LABEL = { ...Object.fromEntries(INTAKE_SOURCE_OPTS), calendar: "ตารางงาน (ลงตรง)", dispatch: "คำขอลงงาน" };
+/** รับงานจาก — แผนก (+ ผู้แจ้ง สำหรับงานจากใบแจ้งงาน) */
+const sourceText = (j) => [SOURCE_LABEL[j.intakeSource] || j.intakeSource, j.dispatchNo && j.intakeBy ? j.intakeBy : ""].filter(Boolean).join(" · ");
 const invoicedOf = (e) => Boolean((e.invoiceFiles || []).length || e.billing?.invoicedAt);
 /** ✅ (15 ต.ค. 2569) บันทึกงาน (โน๊ต) */
 const STAGES_NOTE = ["บันทึก", "ทำ", "เสร็จ"];
@@ -387,6 +389,7 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, onUplo
                 <Box component="td" sx={{ ...td, whiteSpace: "nowrap" }}>
                   <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: INK }}>{j.jobNo || "—"}</Typography>
                   <Typography sx={sub}>{j.intakeNote ? "บันทึก" : j.noVisit ? "ส่งของ" : "เข้าหน้างาน"}</Typography>
+                  {j.dispatchNo && <Typography sx={{ ...sub, color: "#94a3b8" }} title="เลขที่ใบแจ้งงาน">ใบแจ้ง {j.dispatchNo}</Typography>}
                 </Box>
                 <Box component="td" sx={{ ...td, minWidth: 160, maxWidth: 220 }}>
                   {!j.intakeNote && <JobKindTag event={j} sx={{ mb: 0.5 }} />}
@@ -413,6 +416,7 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, onUplo
                   {j.intakeSource
                     ? <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: "#334155", whiteSpace: "nowrap" }}>{SOURCE_LABEL[j.intakeSource] || j.intakeSource}</Typography>
                     : <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>}
+                  {j.intakeSource && j.dispatchNo && j.intakeBy && <Typography sx={sub}>{j.intakeBy}</Typography>}
                 </Box>
                 {/* ✅ (19 ต.ค. 2569 ผู้ใช้: "แยก col ผู้ติดต่อ · ทีมช่างไม่ต้องใส่ แค่ผู้รับผิดชอบก็พอ แต่ให้มีรูป") */}
                 <Box component="td" sx={{ ...td, minWidth: 130, maxWidth: 180 }}>
@@ -451,7 +455,7 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, onUplo
                       </Avatar>
                       <Box sx={{ minWidth: 0 }}>
                         <Typography noWrap title={j.responsiblePerson} sx={{ fontSize: "0.82rem", fontWeight: 800, color: INK, lineHeight: 1.3 }}>{j.responsiblePerson}</Typography>
-                        {(owner?.position || owner?.rank) && <Typography noWrap sx={{ fontSize: "0.7rem", color: MUTED, lineHeight: 1.3 }}>{owner.position || owner.rank}</Typography>}
+                        {owner && <Typography noWrap sx={{ fontSize: "0.7rem", color: MUTED, lineHeight: 1.3 }}>{owner.position || rankLabel(owner)}</Typography>}
                       </Box>
                     </Stack>
                   ) : <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: AMBER }}>ยังไม่ระบุ</Typography>}
@@ -737,7 +741,7 @@ const Line = ({ icon: Icon, children, color = "#475569", strong }) => (
   </Stack>
 );
 
-function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, onUploadInvoice, onNoteDone, onEdit, onCancel, onRestore, inRow = false, employees = [] }) {
+function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, onUploadInvoice, onNoteDone, onEdit, onCancel, onRestore, inRow = false, inSheet = false, employees = [] }) {
   const owner = job.responsiblePerson ? employees.find((u) => u.fname === job.responsiblePerson || [u.fname, u.lname].filter(Boolean).join(" ") === job.responsiblePerson) : null;
   const st = stageOf(job);
   const stall = stalledDays(job, st);
@@ -938,7 +942,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                 const late = moment(job.dueDate).isBefore(moment(), "day");
                 return <Tag icon={FlagOutlined} accent={late ? RED : null}>เสร็จภายใน {due}{late && <Box component="span" sx={{ ml: 0.5, color: RED, fontWeight: 800 }}>· เลยกำหนด</Box>}</Tag>;
               })()}
-              {job.intakeSource && <Tag icon={CallReceivedRounded}>รับงานจาก{SOURCE_LABEL[job.intakeSource] || job.intakeSource}</Tag>}
+              {job.intakeSource && <Tag icon={CallReceivedRounded}>รับงานจาก{sourceText(job)}</Tag>}
             </Stack>
             <Stack direction="row" sx={{ display: { xs: "none", sm: "flex" }, flexWrap: "wrap", columnGap: 2, rowGap: 0.5, mt: 0.9, "&:empty": { display: "none !important" } }}>
               {job.responsiblePerson && <Fact icon={PersonOutlineOutlined}>{job.responsiblePerson}</Fact>}
@@ -958,7 +962,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                 ["สถานะ", <Chip color={st.color} bg={alpha(st.color, 0.1)} border="transparent">{st.label}</Chip>],
                 ["กำหนดการ", <><t.icon sx={{ fontSize: 15, color: t.accent || ACCENT, mr: 0.5, verticalAlign: "-2px" }} />{t.text.replace(/^แผนเข้างาน /, "แผน ")}{t.rel && <Box component="span" sx={{ ml: 0.5, fontWeight: 800, color: t.accent || MUTED }}>· {t.rel}</Box>}</>],
                 due && st.i < 4 ? ["เสร็จภายใน", <>{due}{late && <Box component="span" sx={{ ml: 0.5, color: RED, fontWeight: 800 }}>· เลยกำหนด</Box>}</>] : null,
-                job.intakeSource ? ["รับงานจาก", SOURCE_LABEL[job.intakeSource] || job.intakeSource] : null,
+                job.intakeSource ? ["รับงานจาก", sourceText(job)] : null,
                 job.responsiblePerson ? ["ผู้รับผิดชอบ", <Stack direction="row" alignItems="center" gap={0.75}><PersonPic name={job.responsiblePerson} owner={owner} size={24} /><span>{job.responsiblePerson}</span></Stack>] : null,
                 !job.unscheduled && !job.noVisit && !job.intakeNote ? ["ทีม", team || <Box component="span" sx={{ color: "#94a3b8" }}>ยังไม่มอบหมาย</Box>] : null,
                 job.contactName || job.contactTel ? ["ผู้ติดต่อ", <>{job.contactName || ""}{job.contactName && job.contactTel ? " · " : ""}
@@ -973,7 +977,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                       <PersonPic name={job.responsiblePerson} owner={owner} size={30} />
                       <Box sx={{ minWidth: 0 }}>
                         <Typography noWrap sx={{ fontSize: "0.8rem", fontWeight: 800, color: INK, lineHeight: 1.25 }}>{job.responsiblePerson}</Typography>
-                        <Typography noWrap sx={{ fontSize: "0.68rem", color: MUTED, lineHeight: 1.25 }}>{owner?.position || owner?.rank || "ผู้รับผิดชอบงาน"}{team && !job.unscheduled && team !== job.responsiblePerson ? ` · ทีม ${team}` : ""}</Typography>
+                        <Typography noWrap sx={{ fontSize: "0.68rem", color: MUTED, lineHeight: 1.25 }}>{owner ? (owner.position || rankLabel(owner)) : "ผู้รับผิดชอบงาน"}{team && !job.unscheduled && team !== job.responsiblePerson ? ` · ทีม ${team}` : ""}</Typography>
                       </Box>
                     </Stack>
                   ) : (
@@ -1015,6 +1019,38 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
               );
             })()}
             <Collapse in={showMore} timeout={inRow ? 0 : "auto"} unmountOnExit>
+            {/* 🔁 (21 ต.ค. 2569 ผู้ใช้: "รายละเอียดไม่ตรง ไม่ครบถ้วน · ให้ดูง่ายสวยงาม") หน้าต่างรายละเอียด: สรุปข้อมูลงานครบในกล่องเดียว
+                (กำหนดการ · สถานะ · รับงานจาก · เลขที่ใบแจ้ง · ผู้รับผิดชอบ · หัวหน้าทีม · ผู้ติดต่อ · โครงการ) */}
+            {inSheet && !job.intakeNote && (() => {
+              const t = scheduleTagOf(job, schedule);
+              const late = due && moment(job.dueDate).isBefore(moment(), "day");
+              const cells = [
+                ["กำหนดการ", <>{t.text}{t.rel && <Box component="span" sx={{ ml: 0.5, fontWeight: 700, color: t.accent || MUTED }}>· {t.rel}</Box>}</>],
+                ["สถานะ", <Chip color={st.color} bg={alpha(st.color, 0.1)} border="transparent">{st.label}</Chip>],
+                due ? ["เสร็จภายใน", <>{due}{late && st.i < 4 && <Box component="span" sx={{ ml: 0.5, color: RED, fontWeight: 800 }}>· เลยกำหนด</Box>}</>] : null,
+                ["เลขที่งาน", job.jobNo || <Box component="span" sx={{ color: "#94a3b8" }}>—</Box>],
+                job.intakeSource ? ["รับงานจาก", sourceText(job)] : null,
+                job.dispatchNo ? ["ใบแจ้งงาน", job.dispatchNo] : null,
+                job.intakeAt ? ["วันที่รับงาน", formatThai(moment(job.intakeAt), "D MMM YYYY")] : null,
+                ["ผู้รับผิดชอบ", job.responsiblePerson
+                  ? <Stack direction="row" alignItems="center" gap={0.75}><PersonPic name={job.responsiblePerson} owner={owner} size={22} /><span>{job.responsiblePerson}</span>{owner && <Box component="span" sx={{ color: MUTED, fontWeight: 500, fontSize: "0.74rem" }}>{owner.position || rankLabel(owner)}</Box>}</Stack>
+                  : <Box component="span" sx={{ color: AMBER }}>ยังไม่ระบุ</Box>],
+                !job.unscheduled && !job.noVisit ? ["หัวหน้าทีม", team || <Box component="span" sx={{ color: "#94a3b8" }}>ยังไม่มอบหมาย</Box>] : null,
+                ["ผู้ติดต่อ", job.contactName || job.contactTel ? <>{job.contactName || ""}{job.contactName && job.contactTel ? " · " : ""}{job.contactTel && <Box component="a" href={`tel:${job.contactTel}`} sx={{ color: ACCENT, fontWeight: 700, textDecoration: "none" }}>{job.contactTel}</Box>}</> : <Box component="span" sx={{ color: "#94a3b8" }}>—</Box>],
+                place ? ["โครงการ / ลูกค้า", place] : null,
+              ].filter(Boolean);
+              return (
+                <Box sx={{ mb: 1.5, display: "grid", gridTemplateColumns: { xs: "minmax(0,1fr)", sm: "repeat(2, minmax(0,1fr))", md: "repeat(3, minmax(0,1fr))" },
+                  border: `1px solid ${LINE}`, borderRadius: 2.5, overflow: "hidden", bgcolor: "#fff" }}>
+                  {cells.map(([k, v]) => (
+                    <Box key={k} sx={{ px: 1.5, py: 1, borderBottom: `1px solid ${LINE}`, borderRight: { sm: `1px solid ${LINE}` }, minWidth: 0, mb: "-1px", mr: "-1px" }}>
+                      <Typography sx={{ fontSize: "0.7rem", fontWeight: 700, color: MUTED, mb: 0.25 }}>{k}</Typography>
+                      <Typography component="div" sx={{ fontSize: "0.86rem", fontWeight: 700, color: INK, overflowWrap: "anywhere", lineHeight: 1.45 }}>{v}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+              );
+            })()}
             {/* บันทึกงานในแถวตาราง: แสดงข้อความบันทึกเต็ม + ทำเสร็จเมื่อไร/โดยใคร (หัวการ์ดถูกซ่อน) */}
             {inRow && job.intakeNote && (
               <Box sx={{ px: 1.25, py: 1, borderRadius: 2, bgcolor: SURFACE, border: `1px solid ${LINE}` }}>
@@ -1128,7 +1164,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
         title={job.intakeNote ? "บันทึกงาน" : `${job.title || "งาน"}${job.system ? ` · ${job.system}` : ""}`}
         subtitle={[job.jobNo, place].filter(Boolean).join(" · ")}>
         <Box sx={{ p: { xs: 1.25, sm: 2 } }}>
-          <JobCard inRow job={job} outcome={outcome} readOnly={readOnly} requestMode={requestMode} employees={employees}
+          <JobCard inRow inSheet job={job} outcome={outcome} readOnly={readOnly} requestMode={requestMode} employees={employees}
             onSchedule={(j) => { setSheetOpen(false); onSchedule?.(j); }} onDeliver={(j) => { setSheetOpen(false); onDeliver?.(j); }}
             onUploadInvoice={onUploadInvoice} onNoteDone={onNoteDone} onEdit={(j) => { setSheetOpen(false); onEdit?.(j); }}
             onCancel={(j) => { setSheetOpen(false); onCancel?.(j); }} onRestore={onRestore} />
@@ -1478,7 +1514,7 @@ export default function JobIntake() {
           <>
           <Typography sx={{ fontSize: "0.76rem", color: MUTED, mb: 0.75, px: 0.5 }}>กดที่แถวเพื่อดูรายละเอียดทั้งหมด</Typography>
           <JobTable rows={pg.rows} employees={employees} refMode={tab === "waiting"} readOnlyOf={(j) => !canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone}
-            renderCard={(j, oc, close) => <JobCard inRow employees={employees} job={j} outcome={oc} readOnly={!canManage && !isMine(j)} requestMode={!canManage}
+            renderCard={(j, oc, close) => <JobCard inRow inSheet employees={employees} job={j} outcome={oc} readOnly={!canManage && !isMine(j)} requestMode={!canManage}
               onSchedule={(x) => { close?.(); setScheduling(x); }} onDeliver={(x) => { close?.(); setDelivering(x); }} onUploadInvoice={uploadInvoice} onNoteDone={noteDone}
               onEdit={(x) => { close?.(); openForm(x); }} onCancel={(x) => { close?.(); cancelJob(x); }} onRestore={restoreJob} />} />
           <PageBar {...pg} setPage={goPage} unit="งาน" />
