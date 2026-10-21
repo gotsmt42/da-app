@@ -82,7 +82,6 @@ const MyJobs = lazyWithRetry(() => import("@/features/technician/pages/MyJobs.js
 // ✅ งานฝ่ายขาย (ท่อขาย / ปฏิทินนัดหมาย / งานที่ส่งให้ช่าง) — คนละสายงานกับปฏิทินช่างโดยสิ้นเชิง
 const JobRequests = lazyWithRetry(() => import("@/features/dispatch/pages/JobRequests.js"));
 // ✅ คิวจ่ายงานของแอดมิน — ใบมอบหมายงานข้ามแผนก
-const JobRequestQueue = lazyWithRetry(() => import("@/features/dispatch/pages/JobRequestQueue.js"));
 // ✅ เบิกค่าใช้จ่าย — ใบเบิก Advance / ใบเคลม / รอดำเนินการ / รายงานย้อนหลัง (หน้าเช็คสิทธิ์เอง)
 const ExpensesPage = lazyWithRetry(() => import("@/features/expenses/pages/ExpensesPage.js"));
 const OtPage = lazyWithRetry(() => import("@/features/ot/pages/OtPage.js"));
@@ -456,7 +455,8 @@ const ThemeRoutes = [
         path: "dispatch/:id?",
         element: (
           <Suspense fallback={<PageLoader />}>
-            <JobRequestQueue />
+            {/* 🔁 (21 ต.ค. 2569) คำขอลงงานรวมเข้าหน้ารับงาน — เปิดแท็บ คำขอ · รออนุมัติ (:id = เปิดใบนั้นเลย) */}
+            <JobIntake />
           </Suspense>
         ),
         title: "Dispatch",

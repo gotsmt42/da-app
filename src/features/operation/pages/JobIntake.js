@@ -23,7 +23,7 @@ import RefDoc from "@/shared/ui/RefDoc";
 import { billingStatus, BILLING_STATE_META } from "@/shared/utils/billing";
 import JobKindTag from "@/shared/ui/JobKindTag";
 import { resolveQuotationGroup, getFollowUpInfo, QUOTE_STATUS } from "@/shared/utils/quotationTracking";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import moment from "moment";
 import Swal from "@/shared/ui/swal";
 import TomSelect from "tom-select";
@@ -59,7 +59,7 @@ import { MiniSteps } from "@/features/attendance/components/CheckInOutPanel";
 import { nextStepOf } from "@/shared/ui/JobFlow";
 import { can } from "@/shared/utils/roles";
 import PersonSelectField from "@/shared/ui/PersonSelectField";
-import SectionTabs from "@/shared/ui/SectionTabs";
+import DispatchList from "@/features/dispatch/components/DispatchList";
 import MobileSheet from "@/shared/ui/MobileSheet";
 
 const AMBER = "#d97706";
@@ -122,6 +122,10 @@ const stageOf = (e) => {
  *    งานหลายวันใช้วันล่าสุดของกลุ่มเป็นตัวแทน (ตรงกับหน้าติดตามใบเสนอราคา) · งานส่งของ/จดงาน/มี PO แล้ว ไม่มีผลเสนอราคา
  */
 // กล่องใบเสนอราคาตัวเดียวกับหน้าติดตามใบเสนอราคา — โหลดเมื่อกดเปิดเท่านั้น
+// 🔁 (21 ต.ค. 2569 ผู้ใช้: "หน้าคำขอลงงานให้ดำเนินการรวมกันกับหน้ารับงาน แยกกันไปมาดูสับสน")
+//    คำขอลงงาน (ใบแจ้งงานจากทุกฝ่าย) + แผนงานรออนุมัติ = แท็บ "คำขอ · รออนุมัติ" ในหน้านี้ (/dispatch เปิดแท็บนี้)
+//    ส่วน "ลงแผนงานแล้ว" ไม่ต้องมีแยก — งานที่ลงแล้วอยู่แท็บ กำลังดำเนินการ ของหน้านี้อยู่แล้ว
+const PendingApprovalsPanel = lazyWithRetry(() => import("@/features/operation/components/PendingApprovalsPanel"));
 const QuotationDialogHost = lazyWithRetry(() => import("@/features/finance/pages/QuotationTracking").then((m) => ({ default: m.QuotationDialogHost })));
 const baht = (n) => `฿${Number(n || 0).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const OUTCOME = {
@@ -1207,7 +1211,8 @@ export default function JobIntake() {
   const [rawEvents, setRawEvents] = useState([]);
   const [rawDrafts, setRawDrafts] = useState([]);
   const [employees, setEmployees] = useState([]);
-  const [tab, setTab] = useState("waiting");
+  const fromDispatch = useLocation().pathname.startsWith("/dispatch");
+  const [tab, setTab] = useState(fromDispatch ? "requests" : "waiting");
   const [scheduling, setScheduling] = useState(null);
   const [delivering, setDelivering] = useState(null);
   const [q, setQ] = useState("");
@@ -1349,11 +1354,22 @@ export default function JobIntake() {
   const counts = useMemo(() => Object.fromEntries(TABS.map((t) => [t.key, withStage.filter((x) => t.test(x.s, x.oc)).length])), [withStage]);
   // ✅ (19 ต.ค. 2569 ผู้ใช้: "ถ้าเป็นหน้าว่าง ให้เอาข้อมูลหน้าดำเนินการมาวาง · มีรอดำเนินการค่อยสลับให้แสดงแค่รอดำเนินการ")
   //    แท็บเริ่มต้นเลือกเอง: มีงานรอ → รอดำเนินการ · ไม่มี → กำลังดำเนินการ (จนกว่าผู้ใช้จะกดเลือกแท็บเอง)
-  const [tabPicked, setTabPicked] = useState(false);
+  const [tabPicked, setTabPicked] = useState(fromDispatch);
+  // คำขอ · รออนุมัติ (เฉพาะคนจัดคิว) — ตัวเลขรับมาจากแผงทั้งสอง (mount ไว้ตลอด)
+  const canQueue = can(userData, "assignDispatch");
+  const [approveN, setApproveN] = useState(null);
+  const [reqCounts, setReqCounts] = useState(null);
+  const reqTotal = (approveN || 0) + (reqCounts?.waiting || 0);
+  const reqReady = !canQueue || (approveN !== null && reqCounts !== null);
   useEffect(() => {
-    if (!jobs || tabPicked) return;
-    setTab(counts.waiting > 0 ? "waiting" : "active");
-  }, [jobs, counts.waiting, tabPicked]);
+    if (!jobs || tabPicked || !reqReady) return;
+    setTab(canQueue && reqTotal > 0 ? "requests" : counts.waiting > 0 ? "waiting" : "active");
+  }, [jobs, counts.waiting, tabPicked, reqReady, canQueue, reqTotal]);
+  const tabsShown = [
+    ...(canQueue && (reqTotal > 0 || tab === "requests") ? [{ key: "requests", label: "คำขอ · รออนุมัติ", short: "คำขอ" }] : []),
+    ...TABS.filter((t) => !t.hideEmpty || counts[t.key] > 0 || tab === t.key),
+  ];
+  const tabCount = (k) => (k === "requests" ? reqTotal : counts[k] || 0);
   const list = useMemo(() => {
     const t = TABS.find((x) => x.key === tab) || TABS[0];
     // ✅ ค้นหา: ชื่องาน · โครงการ · บริษัท · เลข Job · เลขเอกสาร · ผู้รับผิดชอบ
@@ -1378,7 +1394,6 @@ export default function JobIntake() {
   return (
     // ✅ (19 ต.ค. 2569 ผู้ใช้: "ถ้ามันล้นให้ขยายตารางออกอีก") มุมมองตาราง = กว้างเต็มพื้นที่ (ไม่จำกัด 1500)
     <Box sx={{ ...PAGE_SX, maxWidth: "none" }}>
-      <SectionTabs group="intake" />
       <PageHeader icon={<PostAddOutlined />} title="งานเข้า · รับงาน"
         subtitle="รับงาน → ลงตารางเข้าหน้างาน หรือ ส่งของ → วางบิล · กดช่องใบเสนอราคาเพื่ออัปเดตได้ทันที"
         actions={canCreate
@@ -1390,7 +1405,7 @@ export default function JobIntake() {
           มือถือ: แถบแบ่งช่องแถวเดียวในกรอบเดียว (ชื่อ + จำนวนบรรทัดเดียว สูง 34) · ช่องที่เลือก = พื้นขาวยกขึ้น ไม่ใช้กรอบน้ำเงินทุกช่อง */}
       <Stack direction="row" sx={{ mb: 1.5, gap: { xs: 0.4, sm: 0.75 }, p: { xs: 0.4, sm: 0 }, borderRadius: { xs: 2.5, sm: 0 }, bgcolor: { xs: "#eef2f6", sm: "transparent" },
         overflowX: "auto", scrollbarWidth: "none", "&::-webkit-scrollbar": { display: "none" } }}>
-        {TABS.filter((t) => !t.hideEmpty || counts[t.key] > 0 || tab === t.key).map((t) => {
+        {tabsShown.map((t) => {
           const on = tab === t.key;
           return (
             <ButtonBase key={t.key} onClick={() => { setTabPicked(true); setTab(t.key); }} sx={{
@@ -1404,7 +1419,8 @@ export default function JobIntake() {
               <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>{t.label}</Box>
               <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>{t.short}</Box>
               <Box component="span" sx={{ minWidth: { xs: 18, sm: 20 }, height: { xs: 18, sm: 20 }, px: 0.55, borderRadius: 99, display: "inline-grid", placeItems: "center", fontSize: { xs: "0.68rem", sm: "0.72rem" },
-                bgcolor: on ? ACCENT : { xs: "rgba(100,116,139,.14)", sm: SURFACE }, color: on ? "#fff" : MUTED }}>{counts[t.key] || 0}</Box>
+                bgcolor: on ? ACCENT : { xs: "rgba(100,116,139,.14)", sm: SURFACE }, color: on ? "#fff" : MUTED,
+                ...(t.key === "requests" && !on && reqTotal > 0 ? { bgcolor: "#d97706", color: "#fff" } : {}) }}>{tabCount(t.key)}</Box>
             </ButtonBase>
           );
         })}
@@ -1430,7 +1446,30 @@ export default function JobIntake() {
         </Stack>
       </Stack>
 
-      {!jobs ? (
+      {/* ── แท็บ คำขอ · รออนุมัติ — แผงทั้งสอง mount ไว้ตลอด (ได้ตัวเลขบนแท็บ) ซ่อนด้วย display ── */}
+      {canQueue && (
+        <Box sx={{ display: tab === "requests" ? "block" : "none" }}>
+          {reqReady && reqTotal === 0 && (
+            <EmptyState icon={<PostAddOutlined />} title={q ? "ไม่พบคำขอที่ค้นหา" : "ไม่มีคำขอรออนุมัติ"}
+              hint="แผนงานที่ช่างลงเอง และใบแจ้งงานจากฝ่ายอื่น จะมารอตัดสินใจที่นี่" />
+          )}
+          <Box sx={{ display: approveN > 0 ? "block" : "none", mb: 2 }}>
+            <Suspense fallback={<Skeleton variant="rounded" height={120} sx={{ borderRadius: 3 }} />}>
+              <PendingApprovalsPanel active embedded search={q} onCountChange={setApproveN} />
+            </Suspense>
+          </Box>
+          <Box sx={{ display: reqCounts?.waiting > 0 ? "block" : "none" }}>
+            <Typography sx={{ display: "flex", alignItems: "center", gap: 0.75, mb: 1, px: 0.5, fontSize: "0.86rem", fontWeight: 800, color: INK }}>
+              <Box component="span" sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "#d97706" }} />
+              ใบแจ้งงานรอลงแผนงาน
+              <Box component="span" sx={{ fontWeight: 600, fontSize: "0.76rem", color: MUTED }}>{reqCounts?.waiting || 0} · ยังไม่มีวันนัด — ตรวจรายละเอียด แล้วเลือกวันเข้างาน + ช่าง</Box>
+            </Typography>
+            <DispatchList mode="board" embedded section="waiting" search={q} myId={String(userData?.userId || "")} onCounts={setReqCounts} />
+          </Box>
+        </Box>
+      )}
+
+      {tab === "requests" ? null : !jobs ? (
         <Stack spacing={1}>{[0, 1, 2].map((i) => <Skeleton key={i} variant="rounded" height={88} sx={{ borderRadius: 3 }} />)}</Stack>
       ) : list.length ? (
         view === "table" ? (
