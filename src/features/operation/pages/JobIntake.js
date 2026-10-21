@@ -113,9 +113,11 @@ const stageOf = (e) => {
   }
   if (e.unscheduled) return { i: 0, label: "รอส่งลงตาราง", color: AMBER };
   if (e.status === "ดำเนินการเสร็จสิ้น") return { i: 4, label: "เสร็จสิ้น", color: GREEN };
-  if (e.closeRequested) return { i: 3, label: "รอตรวจปิดงาน", color: ACCENT };
+  // 🔁 (21 ต.ค. 2569 ผู้ใช้: "สีกลมกลืนไป ทำให้ดูง่ายกว่านี้") แต่ละขั้นคนละสี — ชุดเดียวกับหน้าการดำเนินงาน
+  //    ลงตารางแล้ว = น้ำเงิน · กำลังดำเนินการ = ม่วง · รอตรวจปิด = ฟ้าอมเขียว · เสร็จ = เขียว · รอ/ค้าง = ส้ม
+  if (e.closeRequested) return { i: 3, label: "รอตรวจปิดงาน", color: "#0891b2" };
   if (openFollowUp(e)) return { i: 2, label: `งานไม่เสร็จ · ${openFollowUp(e).reason}`, color: AMBER };
-  if (e.status === "กำลังดำเนินการ") return { i: 2, label: "กำลังดำเนินการ", color: ACCENT };
+  if (e.status === "กำลังดำเนินการ") return { i: 2, label: "กำลังดำเนินการ", color: "#7c3aed" };
   return { i: 1, label: "ลงตารางแล้ว", color: ACCENT };
 };
 
@@ -436,7 +438,7 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, onUplo
                   ) : <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>}
                 </Box>
                 <Box component="td" sx={{ ...td, minWidth: 140, maxWidth: 190 }}>
-                  <Chip color={s.color} bg={alpha(s.color, 0.1)} border="transparent">{s.label}</Chip>
+                  <StageChip st={s} />
                 </Box>
                 {/* ✅ (19 ต.ค. 2569 ผู้ใช้: "ยังดูล้นๆ ไม่สวย · กดเปิดฟอร์มติดตามใบเสนอราคาได้เลย ดำเนินการในหน้านี้")
                     บรรทัดเดียวไม่ตัดคำ · ไฟล์กดเปิดได้ · กดช่องนี้ = เปิดกล่องใบเสนอราคา (ตัวเดียวกับหน้าติดตาม) ทับหน้านี้ */}
@@ -962,7 +964,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
               const t = scheduleTagOf(job, schedule);
               const late = due && moment(job.dueDate).isBefore(moment(), "day");
               const rows = [
-                ["สถานะ", <Chip color={st.color} bg={alpha(st.color, 0.1)} border="transparent">{st.label}</Chip>],
+                ["สถานะ", <StageChip st={st} />],
                 ["กำหนดการ", <><t.icon sx={{ fontSize: 15, color: t.accent || ACCENT, mr: 0.5, verticalAlign: "-2px" }} />{t.text.replace(/^แผนเข้างาน /, "แผน ")}{t.rel && <Box component="span" sx={{ ml: 0.5, fontWeight: 800, color: t.accent || MUTED }}>· {t.rel}</Box>}</>],
                 due && st.i < 4 ? ["เสร็จภายใน", <>{due}{late && <Box component="span" sx={{ ml: 0.5, color: RED, fontWeight: 800 }}>· เลยกำหนด</Box>}</>] : null,
                 job.intakeSource ? ["รับงานจาก", sourceText(job)] : null,
@@ -989,7 +991,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                       <Typography noWrap sx={{ fontSize: "0.78rem", fontWeight: 700, color: MUTED }}>{who || "ยังไม่มีผู้รับผิดชอบ"}</Typography>
                     </Stack>
                   )}
-                  <Box sx={{ flexShrink: 0 }}><Chip color={st.color} bg={alpha(st.color, 0.1)} border="transparent">{st.label}</Chip></Box>
+                  <Box sx={{ flexShrink: 0 }}><StageChip st={st} /></Box>
                 </Stack>
                 <Box sx={{ display: { xs: open ? "block" : "none", sm: "none" }, mt: 1.25, borderTop: `1px solid ${LINE}` }}>
                   {rows.map(([k, v]) => (
@@ -1029,7 +1031,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
               const late = due && moment(job.dueDate).isBefore(moment(), "day");
               const cells = [
                 ["กำหนดการ", <>{t.text}{t.rel && <Box component="span" sx={{ ml: 0.5, fontWeight: 700, color: t.accent || MUTED }}>· {t.rel}</Box>}</>],
-                ["สถานะ", <Chip color={st.color} bg={alpha(st.color, 0.1)} border="transparent">{st.label}</Chip>],
+                ["สถานะ", <StageChip st={st} />],
                 due ? ["เสร็จภายใน", <>{due}{late && st.i < 4 && <Box component="span" sx={{ ml: 0.5, color: RED, fontWeight: 800 }}>· เลยกำหนด</Box>}</>] : null,
                 ["เลขที่งาน", job.jobNo || <Box component="span" sx={{ color: "#94a3b8" }}>—</Box>],
                 job.intakeSource ? ["รับงานจาก", sourceText(job)] : null,
@@ -1149,7 +1151,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
       <Stack direction={{ xs: "column", md: "row" }} spacing={{ xs: 1, md: 2.5 }} alignItems={{ md: "center" }}
         sx={{ px: { xs: 1.75, sm: 2.25 }, py: { xs: 0.85, sm: 1.1 }, bgcolor: SURFACE, borderTop: `1px solid ${LINE}` }}>
         <Stack sx={{ flex: 1, minWidth: 0, flexDirection: { xs: "column", md: "row" }, alignItems: { xs: "flex-start", md: "center" }, gap: { xs: 0.25, md: 1 } }}>
-          <Box sx={{ display: inRow ? "inline-flex" : { xs: "none", sm: "inline-flex" } }}><Chip color={st.color} bg={alpha(st.color, 0.1)} border="transparent">{st.label}</Chip></Box>
+          <Box sx={{ display: inRow ? "inline-flex" : { xs: "none", sm: "inline-flex" } }}><StageChip st={st} /></Box>
           {nx && !inRow && showMore && <Typography sx={{ display: { xs: "block", sm: "none" }, fontSize: "0.68rem", fontWeight: 800, color: "#94a3b8", letterSpacing: 0.3 }}>ขั้นถัดไป</Typography>}
           {nx && (
             <Typography sx={{ fontSize: "0.8rem", color: "#334155", minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere",
@@ -1198,9 +1200,13 @@ const PersonPic = ({ name, owner, size = 30 }) => (
 );
 
 /** ป้ายเม็ดยาเล็ก (สถานะ / ด่วน / ค้าง) */
-const Chip = ({ children, color = "#334155", bg = SURFACE, border = LINE }) => (
-  <Box component="span" sx={{ px: 0.9, height: 22, display: "inline-flex", alignItems: "center", gap: 0.4, flexShrink: 0, borderRadius: 99, fontSize: "0.7rem", fontWeight: 800, color, bgcolor: bg, border: `1px solid ${border}`, whiteSpace: "nowrap" }}>{children}</Box>
+const Chip = ({ children, color = "#334155", bg = SURFACE, border = LINE, dot = false }) => (
+  <Box component="span" sx={{ px: 0.9, height: 22, display: "inline-flex", alignItems: "center", gap: 0.5, flexShrink: 0, borderRadius: 99, fontSize: "0.7rem", fontWeight: 800, color, bgcolor: bg, border: `1px solid ${border}`, whiteSpace: "nowrap" }}>
+    {dot && <Box component="span" sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: color, flexShrink: 0 }} />}{children}
+  </Box>
 );
+/** ป้ายสถานะขั้นงาน — สีของขั้น + จุด + ขอบ (แยกขั้นได้ทันที ไม่กลืนกับลิงก์สีน้ำเงินอื่นในตาราง) */
+const StageChip = ({ st }) => <Chip dot color={st.color} bg={alpha(st.color, 0.1)} border={alpha(st.color, 0.35)}>{st.label}</Chip>;
 /**
  * ป้ายข้อมูลสำคัญ (กำหนดเวลา · ที่มา · เอกสาร)
  * 🔁 (17 ต.ค. 2569 ผู้ใช้: "สีดูรกเกินไป ไม่มืออาชีพ") — ป้ายโทนเทาเดียวกันหมด · สีใช้เฉพาะ "สิ่งที่ต้องรีบดู"
