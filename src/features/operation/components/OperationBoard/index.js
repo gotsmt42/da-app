@@ -1281,7 +1281,8 @@ const EventRowCard = ({
       actions={<CheckInOutPanel compact lineOnly event={event} onPreview={onPreview} onPatched={onPatched} sx={{ mt: 0 }} docsComplete={docDone === JOB_DOC_TYPES.length} />}
       onToggle={() => setOpen(true)} />
   );
-  const cardBody = (
+  // 🔁 (21 ต.ค. 2569) เนื้อการ์ดเป็นฟังก์ชัน — ในหน้า = แบบพับ · ในหน้าต่างรายละเอียด = แบบกาง (o = กางรายละเอียด)
+  const renderBody = (o) => (
     <>
         {/* ✅ (10 ต.ค. 2569 ผู้ใช้: "หน้าการดำเนินงานอยากให้เป็นการ์ดหัวข้อ แล้วค่อยเปิดขยายเพื่อดูข้อมูล
             ทำให้สวยงาม ดูง่าย เข้าใจง่าย และมืออาชีพ")
@@ -1291,8 +1292,8 @@ const EventRowCard = ({
             ปุ่ม/ลิงก์ย่อยด้านในที่มี action ของตัวเอง ต้อง stopPropagation ไม่งั้นกดแล้วการ์ดกาง/พับไปด้วย */}
         {/* ✅ (20 ต.ค. 2569 ผู้ใช้: "หน้าการดำเนินงาน ให้เป็นรูปแบบเดียวกับหน้ารับงาน — หน้าแรกข้อมูลไม่เยอะแต่สำคัญ")
             มือถือตอนพับ = หัวการ์ดย่อ (ปฏิทิน · ชื่องาน · โครงการ · ผู้รับผิดชอบ + สถานะ · ขั้นถัดไป) · กดแล้วกางหัวการ์ดเต็ม + รายละเอียด */}
-        {!open && <Box sx={{ display: { xs: "block", sm: "none" } }}>{mobileSummary}</Box>}
-        <Box onClick={() => setOpen((p) => !p)} sx={{ cursor: "pointer", display: { xs: open ? "block" : "none", sm: "block" } }} role="button" aria-expanded={open}>
+        {!o && <Box sx={{ display: { xs: "block", sm: "none" } }}>{mobileSummary}</Box>}
+        <Box onClick={() => { if (inlineDetails) setOpen((p) => !p); else if (!o) setOpen(true); }} sx={{ cursor: o && !inlineDetails ? "default" : "pointer", display: { xs: o ? "block" : "none", sm: "block" } }} role="button" aria-expanded={o}>
           <Stack direction="row" alignItems="flex-start" gap={1.5}>
             <Avatar sx={{
               display: { xs: "none", sm: "flex" },
@@ -1542,14 +1543,14 @@ const EventRowCard = ({
                 <MoreVert fontSize="small" />
               </IconButton>
             )}
-              <ExpandMore sx={{ fontSize: 22, color: MUTED, transition: "transform .2s", transform: open ? "rotate(180deg)" : "none" }} />
+              <ExpandMore sx={{ fontSize: 22, color: MUTED, transition: "transform .2s", transform: o ? "rotate(180deg)" : "none" }} />
             </Stack>
           </Stack>
 
           {/* ท้ายหัวการ์ด: ขั้นตอนถัดไป · เอกสาร (ตอนพับ — ตอนกางรายละเอียดมีครบอยู่แล้ว) · ไม่มีอะไรก็ไม่แสดงแถวว่าง */}
           {/* ✅ (15 ต.ค. 2569 ผู้ใช้: "โยกเอาเส้นดำเนินงานมาไว้แสดงขั้นแรก ไม่อยากกดเข้าไปดู ไม่กินพื้นที่")
               แถบขั้นตอนแบบย่ออยู่แถวเดียวกับขั้นตอนถัดไป (จอคอม: ชิดขวา · มือถือ: บรรทัดล่าง) — งานช่างทุกใบ */}
-          {!open && (event.department !== "sales" || nextStep || event.reportFiles?.length > 0 || event.quotationFiles?.length > 0 || event.invoiceFiles?.length > 0 || event.completionFiles?.length > 0 || event.comments?.length > 0 || (isDesktop && (event.activityLog?.length > 0 || event.jobGroupId))) && (
+          {!o && (event.department !== "sales" || nextStep || event.reportFiles?.length > 0 || event.quotationFiles?.length > 0 || event.invoiceFiles?.length > 0 || event.completionFiles?.length > 0 || event.comments?.length > 0 || (isDesktop && (event.activityLog?.length > 0 || event.jobGroupId))) && (
             <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 1.25, pt: 1.1, borderTop: `1px dashed ${LINE}`, minWidth: 0, flexWrap: { xs: "wrap", md: "nowrap" }, rowGap: 1 }}>
               {nextStep && (
                 <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.76rem", color: INK_2, fontWeight: 700 }}>
@@ -1663,7 +1664,7 @@ const EventRowCard = ({
         )}
 
         {/* ── รายละเอียด (กางจากหัวการ์ด) ── */}
-        <Collapse in={open} unmountOnExit>
+        <Collapse in={o} unmountOnExit>
           <Box onClick={(e) => e.stopPropagation()} sx={{ mt: 1.5, pt: 1.5, borderTop: `1px solid ${LINE}` }}>
             {/* ✅ (10 ต.ค. 2569 ผู้ใช้: "สีสันยังดูรกๆ ตัดกัน มองยาก แก้ไขให้มืออาชีพ")
                 ข้อมูลทั้งหมดเป็นรายการ "ป้าย : ค่า" ชุดเดียว ไม่มีกล่องซ้อนกล่อง/พื้นสี — สีเหลือแค่ปุ่มกด (น้ำเงิน) กับเรื่องเตือน */}
@@ -1822,7 +1823,7 @@ const EventRowCard = ({
             แถบ "สรุปงาน · คุยกับช่าง · ประวัติ" ท้ายการ์ดเสมอ (ไม่ต้องกางการ์ดก่อน) → เปิดอีกหน้า */}
         {!inlineDetails && (
           <ButtonBase onClick={(e) => { e.stopPropagation(); setExpanded(true); }}
-            sx={{ width: "100%", mt: 1.25, px: 1.25, py: 0.85, gap: 1, justifyContent: "flex-start", borderRadius: "10px", display: { xs: open ? "flex" : "none", sm: "flex" },
+            sx={{ width: "100%", mt: 1.25, px: 1.25, py: 0.85, gap: 1, justifyContent: "flex-start", borderRadius: "10px", display: { xs: o ? "flex" : "none", sm: "flex" },
               fontFamily: "inherit", bgcolor: SURFACE, "&:hover": { bgcolor: "#eef2f6" } }}>
             <Typography noWrap sx={{ flex: 1, minWidth: 0, textAlign: "left", fontSize: "0.78rem", color: INK_2 }}>
               {[event.workNote ? "สรุปงาน ✓" : "สรุปงาน", `คุยกับช่าง${(event.comments || []).length ? ` ${event.comments.length}` : ""}`, "ประวัติ"].join(" · ")}
@@ -1888,17 +1889,20 @@ const EventRowCard = ({
     </>
   );
   // 🔁 (20 ต.ค. 2569 ผู้ใช้: "การดำเนินงานเมื่อกดมาที่งานเดียว กดดูรายละเอียดยังเป็นแบบเลื่อน") งานที่เปิดเจาะจง/ไฮไลต์ ก็ใช้แผ่นเลื่อนขึ้นด้วย
-  const sheet = isXs && open && !inlineDetails;
+  // 🔁 (21 ต.ค. 2569 ผู้ใช้: "ทำไมหน้าดำเนินงานกดแล้วเลื่อนลงอยู่ ไม่เปิดหน้าต่างขึ้นมา") ทุกขนาดจอเปิดหน้าต่างรายละเอียด
+  //    (จอคอม = กล่องกลางจอ · มือถือ = แผ่นเลื่อนขึ้น) · ในหน้าการ์ดคงแบบพับไว้ · งานที่เปิดเจาะจง (inlineDetails) กางในหน้าตามเดิม
+  const sheet = open && !inlineDetails;
+  const cardBody = renderBody(inlineDetails ? open : false);
 
   return (
     <Wrapper {...wrapperProps}>
       <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-        {sheet ? mobileSummary : cardBody}
+        {sheet && isXs ? mobileSummary : cardBody}
       </CardContent>
-      <MobileSheet open={sheet} onClose={() => setOpen(false)}
+      <MobileSheet open={sheet} onClose={() => setOpen(false)} maxWidth="lg"
         title={`${event.title || "งาน"}${event.system ? ` · ${event.system}` : ""}`}
         subtitle={[event.jobNo, companySite(event.company, event.site)].filter(Boolean).join(" · ")}>
-        <Box sx={{ m: 1.25, p: 2, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${LINE}` }}>{cardBody}</Box>
+        <Box sx={{ m: { xs: 1.25, sm: 2 }, p: 2, borderRadius: 3, bgcolor: "#fff", border: `1px solid ${LINE}` }}>{sheet ? renderBody(true) : null}</Box>
       </MobileSheet>
 
       {!inlineDetails && (
