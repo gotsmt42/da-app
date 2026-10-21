@@ -82,6 +82,13 @@ export default function SitePhotos({ event, canEdit = false, onPreview, onChange
   };
 
   const images = files.filter(isImage);
+  // 🔁 (21 ต.ค. 2569 ผู้ใช้: "บอกด้วยว่าไฟล์แนบ แนบจากตอนไหน ให้ไม่งง") ที่มาของไฟล์ + วันเวลา ใต้ไฟล์ทุกไฟล์
+  const originOf = (f) => (f.source === "intake" ? { t: "ตอนรับงาน", c: "#0891b2" }
+    : f.source === "dispatch" ? { t: "จากใบแจ้งงาน", c: "#7c3aed" }
+      : f.stage === "before" ? { t: "ตอนเข้างาน", c: "#16a34a" }
+        : f.stage === "after" ? { t: "ตอนจบงาน", c: "#16a34a" }
+          : { t: "แนบเพิ่ม", c: MUTED });
+  const whenOf = (f) => (f.uploadedAt ? formatThai(moment(f.uploadedAt), "D MMM HH:mm") : "");
   const others = files.filter((f) => !isImage(f));
 
   return (
@@ -113,22 +120,21 @@ export default function SitePhotos({ event, canEdit = false, onPreview, onChange
       ) : (
         <>
           {images.length > 0 && (
-            <Box sx={{ mt: 1, display: "grid", gap: 0.75, gridTemplateColumns: "repeat(auto-fill, minmax(68px, 76px))" }}>
+            <Box sx={{ mt: 1, display: "grid", gap: 1, gridTemplateColumns: "repeat(auto-fill, minmax(84px, 92px))" }}>
               {images.map((f) => (
-                <Box key={f._id} sx={{ position: "relative", pt: "100%", borderRadius: 1.5, overflow: "hidden", border: `1px solid ${LINE}`, bgcolor: "#f8fafc" }}>
+                <Box key={f._id} sx={{ minWidth: 0 }}>
+                <Box sx={{ position: "relative", pt: "100%", borderRadius: 1.5, overflow: "hidden", border: `1px solid ${LINE}`, bgcolor: "#f8fafc" }}>
                   <Box component="img" src={thumbUrl(f.fileUrl)} decoding="async" alt={f.fileName} loading="lazy" onClick={() => open(f)} title={`${f.fileName}${f.uploadedBy ? ` · ${f.uploadedBy}` : ""}${f.uploadedAt ? ` · ${formatThai(moment(f.uploadedAt), "D MMM HH:mm")}` : ""}`}
                     sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", cursor: "zoom-in" }} />
-                  {/* ✅ (10 ต.ค. 2569) ไฟล์ที่มาจากคำขอลงงาน — ป้ายบอกที่มา · ลบจากงานไม่ได้ (ต้นฉบับอยู่ที่ใบคำขอ) */}
-                  {f.source === "dispatch" && (
-                    <Box component="span" title={f.sourceLabel} sx={{ position: "absolute", left: 4, bottom: 4, px: 0.6, py: 0.1, borderRadius: 1,
-                      fontSize: "0.62rem", fontWeight: 800, color: "#fff", bgcolor: alpha("#0f172a", 0.6) }}>คำขอลงงาน</Box>
-                  )}
                   {canEdit && f.source !== "dispatch" && (
                     <IconButton size="small" aria-label="ลบรูป" onClick={() => remove(f)}
                       sx={{ position: "absolute", top: 3, right: 3, width: 24, height: 24, bgcolor: alpha("#0f172a", 0.55), color: "#fff", "&:hover": { bgcolor: "#dc2626" } }}>
                       <Close sx={{ fontSize: 15 }} />
                     </IconButton>
                   )}
+                </Box>
+                <Typography noWrap title={f.sourceLabel || originOf(f).t} sx={{ mt: 0.4, fontSize: "0.68rem", fontWeight: 800, color: originOf(f).c, lineHeight: 1.3 }}>{originOf(f).t}</Typography>
+                {whenOf(f) && <Typography noWrap sx={{ fontSize: "0.64rem", color: MUTED, lineHeight: 1.3 }}>{whenOf(f)}</Typography>}
                 </Box>
               ))}
             </Box>
@@ -140,7 +146,10 @@ export default function SitePhotos({ event, canEdit = false, onPreview, onChange
                   {/\.pdf$/i.test(f.fileName || "") ? <PictureAsPdfOutlined sx={{ fontSize: 18, color: "#dc2626" }} /> : <InsertDriveFileOutlined sx={{ fontSize: 18, color: MUTED }} />}
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography noWrap onClick={() => open(f)} sx={{ fontSize: "0.8rem", fontWeight: 600, color: BLUE, cursor: "pointer" }}>{f.fileName}</Typography>
-                    {f.sourceLabel && <Typography noWrap sx={{ fontSize: "0.7rem", color: MUTED }}>{f.sourceLabel}</Typography>}
+                    <Typography noWrap sx={{ fontSize: "0.7rem", color: MUTED }}>
+                      <Box component="span" sx={{ fontWeight: 800, color: originOf(f).c }}>{originOf(f).t}</Box>
+                      {[whenOf(f), f.uploadedBy].filter(Boolean).map((x) => ` · ${x}`).join("")}
+                    </Typography>
                   </Box>
                   {canEdit && f.source !== "dispatch" && <IconButton size="small" aria-label="ลบไฟล์" onClick={() => remove(f)}><Close sx={{ fontSize: 16 }} /></IconButton>}
                 </Stack>
