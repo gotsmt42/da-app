@@ -127,6 +127,7 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle }) {
   const [payForm, setPayForm] = useState(emptyPayment);
   const [saving, setSaving] = useState(false);
   const [previewFile, setPreviewFile] = useState(null);
+  const [previewFiles, setPreviewFiles] = useState(null); // ไฟล์ทั้งช่อง — เลื่อนดูต่อกันได้
   // ⚠️ ใช้ ref + .click() แทน <Button component="label"> ที่ครอบ <input hidden> — วิธี label ใช้ได้
   // ในหลายเบราว์เซอร์แต่ไม่รับประกัน โดยเฉพาะเมื่อ MUI ห่อ children ด้วย span หลายชั้น
   // การสั่ง .click() ที่ input โดยตรงคือทางที่คุมได้แน่นอนที่สุด
@@ -562,7 +563,7 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle }) {
                       }}
                     >
                       <Box
-                        onClick={() => { setPreviewCaption("ใบวางบิล"); setPreviewFile(f); }}
+                        onClick={() => { setPreviewCaption("ใบวางบิล"); setPreviewFiles(attachments); setPreviewFile(f); }}
                         sx={{ position: "absolute", inset: 0, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
                       >
                         {isImage
@@ -722,6 +723,7 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle }) {
                         size="small" startIcon={<AttachFile sx={{ fontSize: 14 }} />}
                         onClick={() => {
                           setPreviewCaption(p.receiptNo ? `สลิป/ใบเสร็จ เลขที่ ${p.receiptNo}` : "สลิป/ใบเสร็จการรับเงิน");
+                          setPreviewFiles(null);
                           setPreviewFile({ fileName: p.slipFileName, fileUrl: p.slipFileUrl, fileType: p.slipFileType });
                         }}
                         sx={{
@@ -910,6 +912,7 @@ export default function BillingDialog({ event, onClose, onSaved, subtitle }) {
           กล่องเอกสารของงานใช้ ไม่ได้เขียนแยกกัน 2 ชุด */}
       <FilePreviewDialog
         file={previewFile}
+        files={previewFiles}
         caption={previewCaption}
         onClose={() => setPreviewFile(null)}
       />

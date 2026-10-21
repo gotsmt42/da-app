@@ -71,7 +71,7 @@ function PdfView({ url, onDownload }) {
 
 const STRIP_H = 76;
 
-export default function FileGalleryDialog({ previewUrl, previewFileName, gallery, onNavigate, onClose }) {
+export default function FileGalleryDialog({ previewUrl, previewFileName, gallery, onNavigate, onClose, caption }) {
   const list = useMemo(() => {
     const g = (gallery || []).filter((f) => f?.fileUrl);
     return g.some((f) => f.fileUrl === previewUrl) ? g : (previewUrl ? [{ fileUrl: previewUrl, fileName: previewFileName }] : []);
@@ -126,7 +126,10 @@ export default function FileGalleryDialog({ previewUrl, previewFileName, gallery
       PaperProps={{ sx: { borderRadius: mobile ? 0 : 3, overflow: "hidden" } }}>
       <DialogTitle sx={{ m: 0, p: { xs: 1.5, sm: 2 }, display: "flex", alignItems: "center", gap: 1.5 }}>
         {kindIcon(previewFileName)}
-        <Typography fontWeight={700} noWrap flex={1} title={previewFileName}>{previewFileName || "ดูไฟล์"}</Typography>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography fontWeight={700} noWrap title={previewFileName}>{previewFileName || "ดูไฟล์"}</Typography>
+          {caption && <Typography noWrap sx={{ fontSize: "0.74rem", color: "#64748b" }}>{caption}</Typography>}
+        </Box>
         {multi && <Box sx={{ px: 1, py: 0.25, borderRadius: 99, bgcolor: "#f1f5f9", fontSize: "0.78rem", fontWeight: 800, color: "#334155", whiteSpace: "nowrap" }}>{idx + 1} / {list.length}</Box>}
         <Stack direction="row" gap={0.5}>
           {previewUrl && <Tooltip title="ดาวน์โหลด"><IconButton onClick={() => downloadFile(previewUrl, previewFileName)}><Download /></IconButton></Tooltip>}

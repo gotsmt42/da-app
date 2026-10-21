@@ -1,25 +1,24 @@
+import FileGalleryDialog from "@/shared/ui/FileGalleryDialog";
 import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
-import PdfBlobView from "@/shared/components/PdfBlobView";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
 
 import EventService from "@/shared/services/EventService";
 import { resolveOperationGroup } from "@/shared/utils/overdueJobs";
-import ImagePreview from "@/shared/ui/ImagePreview";
 import { formatRoundLabel } from "@/shared/utils/contractRounds";
 import { printFile, shareFile, isMobileDevice } from "@/shared/utils/fileActions";
 
 import {
   Box, Stack, Typography,
-  IconButton, Tooltip, Dialog, DialogTitle,
-  DialogContent, Divider, LinearProgress, Button, Pagination,
+  IconButton, Tooltip,
+  Divider, LinearProgress, Pagination,
   Menu, MenuItem, ListItemIcon, ListItemText, Avatar,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
-  Download, Visibility, Close, PictureAsPdf, Image, Article,
-  InsertDriveFile, AttachFile, FolderOpen, OpenInNew, Refresh,
+  Download, Visibility,
+  InsertDriveFile, FolderOpen, OpenInNew, Refresh,
   MoreVert, Print, Share,
   Description, RequestQuote, ReceiptLong, AssignmentTurnedIn,
 } from "@mui/icons-material";
@@ -60,24 +59,7 @@ const DOC_TYPES = [
 ];
 
 // ─── File type helpers (เหมือนหน้า Operation) ──────────────────────────────
-const getFileType = (fileName = "") => {
-  if (!fileName || typeof fileName !== "string") return "unknown";
-  const lower = fileName.toLowerCase();
-  if ([".jpg", ".jpeg", ".png", ".webp"].some((e) => lower.endsWith(e))) return "image";
-  if (lower.endsWith(".pdf")) return "pdf";
-  if (lower.endsWith(".doc") || lower.endsWith(".docx")) return "word";
-  if (lower.endsWith(".xls") || lower.endsWith(".xlsx")) return "excel";
-  return "unknown";
-};
 
-const fileTypeIcon = (fileName) => {
-  const t = getFileType(fileName);
-  if (t === "image") return <Image sx={{ color: "#10b981" }} />;
-  if (t === "pdf") return <PictureAsPdf sx={{ color: "#ef4444" }} />;
-  if (t === "word") return <Article sx={{ color: "#3b82f6" }} />;
-  if (t === "excel") return <InsertDriveFile sx={{ color: "#10b981" }} />;
-  return <AttachFile sx={{ color: "#6b7280" }} />;
-};
 
 // ⚠️ ไฟล์เก็บบน Cloudinary (คนละโดเมน) จึงดึงมาเป็น blob แล้วสั่งดาวน์โหลดเอง
 // เพื่อบังคับชื่อไฟล์ที่ถูกต้องจากฐานข้อมูลเสมอ (เหมือนหน้า Operation)
@@ -101,83 +83,8 @@ const downloadFile = async (url, fileName) => {
   }
 };
 
-// ─── Preview Dialog (เหมือนหน้า Operation) ─────────────────────────────────
-const FilePreviewDialog = ({ previewUrl, previewFileName, onClose }) => {
-  const type = getFileType(previewFileName || previewUrl || "");
-  const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
-  const [pdfLoading, setPdfLoading] = useState(false);
-  const [pdfError, setPdfError] = useState(false);
-
-  useEffect(() => {
-    if (type !== "pdf" || !previewUrl) {
-      setPdfBlobUrl(null);
-      setPdfError(false);
-      return;
-    }
-    let cancelled = false;
-    let objectUrl = null;
-    setPdfLoading(true);
-    setPdfError(false);
-    fetch(previewUrl)
-      .then((res) => { if (!res.ok) throw new Error("โหลดไฟล์ไม่สำเร็จ"); return res.blob(); })
-      .then((blob) => { if (cancelled) return; objectUrl = URL.createObjectURL(blob); setPdfBlobUrl(objectUrl); })
-      .catch(() => { if (!cancelled) setPdfError(true); })
-      .finally(() => { if (!cancelled) setPdfLoading(false); });
-    return () => { cancelled = true; if (objectUrl) URL.revokeObjectURL(objectUrl); };
-  }, [type, previewUrl]);
-
-  return (
-    <Dialog open={Boolean(previewUrl)} onClose={onClose} maxWidth="xl" fullWidth fullScreen={window.matchMedia?.("(max-width:600px)").matches}
-      PaperProps={{ sx: { borderRadius: 3, overflow: "hidden" } }}>
-      <DialogTitle sx={{ m: 0, p: 2, display: "flex", alignItems: "center", gap: 1.5 }}>
-        {fileTypeIcon(previewFileName)}
-        <Typography fontWeight={700} noWrap flex={1}>{previewFileName || "ดูไฟล์"}</Typography>
-        <Stack direction="row" gap={0.5}>
-          {previewUrl && (
-            <Tooltip title="ดาวน์โหลด">
-              <IconButton onClick={() => downloadFile(previewUrl, previewFileName)}><Download /></IconButton>
-            </Tooltip>
-          )}
-          <IconButton onClick={onClose}><Close /></IconButton>
-        </Stack>
-      </DialogTitle>
-      <Divider />
-      <DialogContent sx={{ p: 0 }}>
-        {type === "image" && (
-          <ImagePreview key={previewUrl} url={previewUrl} name={previewFileName} />
-        )}
-        {type === "pdf" && (
-          pdfLoading ? (
-            <Box sx={{ textAlign: "center", py: 8, color: "text.secondary" }}>
-              <LinearProgress sx={{ mx: 6, mb: 2, borderRadius: 1 }} />
-              <Typography variant="body2">กำลังโหลดไฟล์...</Typography>
-            </Box>
-          ) : pdfError ? (
-            <Box sx={{ textAlign: "center", py: 8, color: "text.secondary" }}>
-              <PictureAsPdf sx={{ fontSize: 48, opacity: 0.3 }} />
-              <Typography>ไม่สามารถแสดงตัวอย่างไฟล์นี้ได้</Typography>
-              <Button size="small" variant="outlined" sx={{ mt: 1.5, borderRadius: 2 }}
-                onClick={() => downloadFile(previewUrl, previewFileName)}>
-                ดาวน์โหลดแทน
-              </Button>
-            </Box>
-          ) : pdfBlobUrl ? (
-            <PdfBlobView url={pdfBlobUrl} />
-          ) : null
-        )}
-        {(type === "word" || type === "excel") && (
-          <iframe src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewUrl)}`} width="100%" height="780px" style={{ border: "none" }} title="Office" />
-        )}
-        {type === "unknown" && (
-          <Box sx={{ textAlign: "center", py: 8, color: "text.secondary" }}>
-            <FolderOpen sx={{ fontSize: 48 }} />
-            <Typography>ไม่สามารถแสดงไฟล์นี้ได้</Typography>
-          </Box>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-};
+// 🔁 (21 ต.ค. 2569) กล่องดูไฟล์ตัวกลาง — เลื่อนดูไฟล์อื่นในรายการได้เลย (← → · ปัด · แถบรูปย่อ)
+const FilePreviewDialog = (props) => <FileGalleryDialog {...props} />;
 
 // ─── Main: ServiceReportFiles ──────────────────────────────────────────────
 // รวมไฟล์เอกสารประจำงาน (Service Report / ใบเสนอราคา / ใบวางบิล / ใบส่งมอบงาน)
@@ -419,6 +326,8 @@ const ServiceReportFiles = () => {
       <FilePreviewDialog
         previewUrl={previewUrl}
         previewFileName={previewFileName}
+        gallery={filtered}
+        onNavigate={(f) => { setPreviewUrl(f.fileUrl); setPreviewFileName(f.fileName); }}
         onClose={() => { setPreviewUrl(null); setPreviewFileName(null); }}
       />
     </Box>

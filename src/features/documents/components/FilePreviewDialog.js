@@ -1,73 +1,23 @@
 /**
- * FilePreviewDialog.js — ดูไฟล์แนบ 1 ไฟล์แบบเต็มจอ (ของกลาง)
+ * FilePreviewDialog.js — ดูไฟล์แนบแบบเต็มจอ (ของกลาง: กล่องวางบิล · เอกสารของงาน · ใบแจ้งงาน)
  *
- * ⚠️ ใช้ทั้งกล่องวางบิลและกล่องเอกสารของงาน — เดิมโค้ดชุดนี้อยู่ในกล่องวางบิลอย่างเดียว พอหน้า
- * "ภาพรวมงาน" ต้องเปิดดูเอกสารอีก 4 ชนิดด้วย ถ้าก๊อปไปอีกชุดจะกลายเป็นตัวดูไฟล์ 2 ชุดที่ต้องแก้พร้อมกัน
+ * 🔁 (21 ต.ค. 2569 ผู้ใช้: "เลื่อนดูรูปอื่นในช่องเดียวกันได้เลย ไม่ต้องกดเปิดปิด") ใช้กล่องดูไฟล์ตัวกลาง
+ *    (shared/ui/FileGalleryDialog) — ส่ง files มาด้วย = เลื่อนดูไฟล์อื่นในช่องเดียวกันได้ (← → · ปัด · แถบรูปย่อ)
+ * ⚠️ ซ้อนบนกล่องเดิมเสมอ ไม่ใช่เปลี่ยนหน้า/เปิดแท็บใหม่ — ค่าที่พิมพ์ค้างไว้ในกล่องเดิมไม่หาย
  *
- * ⚠️ ซ้อนบนกล่องเดิมเสมอ ไม่ใช่เปลี่ยนหน้า/เปิดแท็บใหม่ — คนใช้กำลังทำงานอยู่ในกล่องที่เปิดค้างไว้
- * (เช่นพิมพ์ยอดตามรูปใบวางบิล) ถ้าพาออกไปที่อื่นแล้วกลับมา ค่าที่พิมพ์ค้างไว้จะหาย
+ * @param {object|null} props.file   ไฟล์ที่จะดู — null = ปิด
+ * @param {object[]}    [props.files] ไฟล์ทั้งหมดในช่องเดียวกัน
+ * @param {string}      [props.caption] คำอธิบายใต้ชื่อไฟล์
  */
-import { Box, Typography, Button, Tooltip, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, useMediaQuery } from "@mui/material";
-import { InsertDriveFile, OpenInNew } from "@mui/icons-material";
-import { isImageFile } from "@/shared/utils/jobDocTypes";
-import ImagePreview from "@/shared/ui/ImagePreview";
+import { useEffect, useState } from "react";
+import FileGalleryDialog from "@/shared/ui/FileGalleryDialog";
 
-const TEXT_SUB = "#64748b";
-
-/**
- * @param {object|null} props.file  ไฟล์ที่จะดู — null = ปิด
- * @param {string} [props.caption]  คำอธิบายใต้ชื่อไฟล์ (เช่น ชนิดเอกสาร · วันที่เข้างาน)
- */
-export default function FilePreviewDialog({ file, caption, onClose }) {
-  const isMobile = useMediaQuery("(max-width:900px)");
-  if (!file) return null;
-
+export default function FilePreviewDialog({ file, files, caption, onClose }) {
+  const [cur, setCur] = useState(file);
+  useEffect(() => { setCur(file); }, [file]);
+  if (!file || !cur) return null;
   return (
-    <Dialog open onClose={onClose} maxWidth="lg" fullScreen={isMobile}>
-      <DialogTitle sx={{ fontSize: "0.9rem", fontWeight: 700, pr: 6, pb: caption ? 0.5 : 2 }}>
-        {file.fileName || "ไฟล์แนบ"}
-        {caption && (
-          <Typography variant="caption" sx={{ display: "block", color: TEXT_SUB, fontWeight: 500 }}>
-            {caption}
-          </Typography>
-        )}
-        <Tooltip title="เปิดไฟล์ในแท็บใหม่ (ซูม / ดาวน์โหลด)">
-          <IconButton
-            size="small" component="a" href={file.fileUrl} target="_blank" rel="noopener noreferrer"
-            sx={{ position: "absolute", right: 8, top: 8 }}
-          >
-            <OpenInNew sx={{ fontSize: 18 }} />
-          </IconButton>
-        </Tooltip>
-      </DialogTitle>
-
-      <DialogContent dividers sx={{ p: 1, textAlign: "center" }}>
-        {isImageFile(file) ? (
-          // ✅ โหลดผ่าน Cloudinary transformation (f_auto,q_auto,w_...) แทนไฟล์ต้นฉบับ
-          // 🐛 เดิมชี้ที่ file.fileUrl ตรงๆ = ดึงรูปเต็มความละเอียดจากมือถือ (3000-4000px, หลาย MB)
-          // มาย่อด้วย CSS ให้พอดีจอ — เสียแบนด์วิดท์และเวลาไปกับพิกเซลที่ไม่มีวันได้เห็น
-          // ขอกว้างตามขนาดจอจริง (คูณ 2 เผื่อจอความละเอียดสูง) ก็คมพอโดยไฟล์เล็กลงหลายเท่า
-          // ⚠️ decoding="async" กันไม่ให้การ decode รูปใหญ่บล็อกการวาดหน้าจอจนรู้สึกว่ากล่องค้าง
-          <Box sx={{ m: -1 }}><ImagePreview key={file.fileUrl} url={file.fileUrl} name={file.fileName} /></Box>
-        ) : (
-          // ⚠️ PDF/ไฟล์อื่นไม่ฝัง iframe — เบราว์เซอร์บนมือถือหลายตัวแสดงไม่ได้แล้วขึ้นกรอบเปล่า
-          // ซึ่งดูเหมือนไฟล์เสียทั้งที่ไฟล์ปกติดี ให้กดเปิดแท็บใหม่ไปเลยชัดเจนกว่า
-          <Box sx={{ py: 6 }}>
-            <InsertDriveFile sx={{ fontSize: 48, color: TEXT_SUB, mb: 1 }} />
-            <Typography variant="body2" sx={{ color: TEXT_SUB, mb: 2 }}>ไฟล์ชนิดนี้ดูในหน้านี้ไม่ได้</Typography>
-            <Button
-              variant="outlined" component="a" href={file.fileUrl} target="_blank" rel="noopener noreferrer"
-              startIcon={<OpenInNew sx={{ fontSize: 16 }} />} sx={{ textTransform: "none" }}
-            >
-              เปิดไฟล์
-            </Button>
-          </Box>
-        )}
-      </DialogContent>
-
-      <DialogActions sx={{ p: 1.5 }}>
-        <Button onClick={onClose} sx={{ textTransform: "none" }}>ปิด</Button>
-      </DialogActions>
-    </Dialog>
+    <FileGalleryDialog previewUrl={cur.fileUrl} previewFileName={cur.fileName || "ไฟล์แนบ"} caption={caption}
+      gallery={files} onNavigate={(f) => setCur(f)} onClose={onClose} />
   );
 }

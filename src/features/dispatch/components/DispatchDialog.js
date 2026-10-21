@@ -535,7 +535,7 @@ export default function DispatchDialog({ dispatchId, onClose, onSaved }) {
             onClose={() => setAssignOpen(false)}
             onAssigned={(updated) => { apply(updated); setAssignOpen(false); }}
           />
-          <FilePreviewDialog file={preview} caption={preview ? `ไฟล์ของ ${d.dispatchNo || "ใบมอบหมาย"}` : ""} onClose={() => setPreview(null)} />
+          <FilePreviewDialog file={preview} files={d.attachments} caption={preview ? `ไฟล์ของ ${d.dispatchNo || "ใบมอบหมาย"}` : ""} onClose={() => setPreview(null)} />
         </>
       )}
     </Dialog>

@@ -164,7 +164,7 @@ export default function JobDocsDialog({ roundVisits, title, onClose, canUpload =
                     {files.map((f) => (
                       <Box key={f._id || f.fileUrl}>
                         <Box
-                          onClick={() => setPreview({ file: f, label })}
+                          onClick={() => setPreview({ file: f, label, files })}
                           sx={{
                             width: "100%", aspectRatio: "1", borderRadius: 2, overflow: "hidden", cursor: "pointer",
                             border: "1px solid", borderColor: "divider", bgcolor: alpha("#0f172a", 0.03),
@@ -202,6 +202,7 @@ export default function JobDocsDialog({ roundVisits, title, onClose, canUpload =
 
       <FilePreviewDialog
         file={preview?.file}
+        files={preview?.files}
         caption={[
           preview?.label,
           preview?.file?._visit && multiVisit ? formatEventDateRange(preview.file._visit) : null,
