@@ -368,17 +368,17 @@ export default function CustomerOverview() {
           </Table>
         </Panel>
       ) : (
-        <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
+        <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { xs: "minmax(0, 1fr)", sm: "repeat(2, minmax(0, 1fr))" } }}>
           {paged.map((c) => {
             const flags = flagsOf(c);
             return (
               <Box key={c.key} role="button" onClick={() => setSelectedKey(c.key)}
-                sx={{ p: 1.5, bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, cursor: "pointer", boxShadow: CARD_SHADOW, "&:active": { bgcolor: SURFACE } }}>
+                sx={{ minWidth: 0, p: 1.5, bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, cursor: "pointer", boxShadow: CARD_SHADOW, "&:active": { bgcolor: SURFACE } }}>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <Box sx={{ flex: 1, minWidth: 0 }}><Who c={c} /></Box>
                   <ChevronRight sx={{ color: "#cbd5e1" }} />
                 </Stack>
-                <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", mt: 1.25, pt: 1.25, borderTop: `1px solid ${LINE}` }}>
+                <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", mt: 1.25, pt: 1.25, borderTop: `1px solid ${LINE}` }}>
                   {[["งาน", c.jobCount], ["สัญญา", c.contracts.length], ["มูลค่างาน", c.totalValue, true]].map(([l, v, money], i) => (
                     <Box key={l} sx={{ textAlign: "center", borderLeft: i ? `1px solid ${LINE}` : 0, minWidth: 0 }}>
                       <Num v={v} money={money} />

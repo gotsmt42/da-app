@@ -75,6 +75,9 @@ const companySite = (company, site) => {
 };
 
 const statusBadge = (d) => {
+  // 🔁 (21 ต.ค. 2569 ผู้ใช้: "ตรวจสอบงานที่โดนลบหรือผิดเพี้ยน ให้ตรงตามจริง") บอกสถานะจริงของงานในตาราง
+  if (d.job?.approvalStatus === "pending") return { label: "แผนงานรออนุมัติ", color: AMBER };
+  if (d.job?.unscheduled) return { label: d.job.plannedMonth ? "วางแผนไว้ · ยังไม่ลงวัน" : "ยังไม่ลงวัน", color: AMBER };
   if (d.job?.status) return { label: d.job.status, color: jobStatusColor(d.job.status) };
   // ⚠️ fallback เสมอ — สถานะใหม่ที่เพิ่มฝั่ง server แต่ยังไม่ได้เพิ่มในตารางนี้ ต้องไม่ทำให้จอขาว
   const m = DISPATCH_STATUS_META[d.status];
@@ -497,9 +500,10 @@ export default function DispatchList({ mode = "board", myId = "", embedded = fal
       return (
         <QueueRow
           key={d._id} onOpen={() => open(d)} edge={m.color}
-          date={d.job?.start} dateTone={d.job?.start ? "blue" : "amber"}
+          date={d.job?.unscheduled ? null : d.job?.start} dateEnd={d.job?.end}
+          dateLabel={d.job?.unscheduled && d.job?.plannedMonth ? `แผน ${formatThai(moment(d.job.plannedMonth, "YYYY-MM"), "MMM YY")}` : "ยังไม่กำหนด"}
           title={companySite(d.customer?.company, d.customer?.site)}
-          sub={[d.dispatchNo, [d.title, d.system].filter(Boolean).join(" · ")].filter(Boolean).join("  ·  ")}
+          sub={[d.job?.jobNo || d.dispatchNo, [d.title, d.system].filter(Boolean).join(" · ")].filter(Boolean).join("  ·  ")}
           right={<>
             {resp ? <PersonChip name={resp} strong size={20} /> : <UnassignedChip />}
             <SoftPill color={m.color}>{m.label}</SoftPill>

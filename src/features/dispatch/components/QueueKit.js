@@ -19,7 +19,8 @@ import { Box, Stack, Typography, IconButton, Tooltip, TextField, ButtonBase, Col
 import { alpha } from "@mui/material/styles";
 import { Search, Close, Refresh, ExpandMore, ChevronRight, TaskAlt } from "@mui/icons-material";
 import ViewToggle from "@/shared/ui/ViewToggle";
-import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT } from "@/shared/ui/PageKit";
+import { INK, INK_2, MUTED, FAINT, LINE, SURFACE, ACCENT } from "@/shared/ui/PageKit";import DateCell from "@/shared/ui/DateCell";
+
 
 export const AMBER = "#d97706";
 export const BLUE = ACCENT;
@@ -142,7 +143,7 @@ export function AllClear({ text }) {
  * การ์ดคำขอที่ต้องจัดการ — กล่องวันที่ · เนื้อหา · ปุ่มทำงาน (ขวาบนจอใหญ่ / ล่างบนมือถือ)
  * แถบซ้ายสีส้ม = รอคุณตัดสินใจ
  */
-export function ActionCard({ date, dateTone, dateLabel, top, title, sub, detail, people, actions, extra, onOpen, urgent }) {
+export function ActionCard({ date, dateEnd, dateTone, dateLabel, top, title, sub, detail, people, actions, extra, onOpen, urgent }) {
   const edge = urgent ? "#dc2626" : AMBER;
   return (
     <Box sx={{
@@ -153,7 +154,8 @@ export function ActionCard({ date, dateTone, dateLabel, top, title, sub, detail,
       <Box sx={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 4, bgcolor: edge }} />
       <Stack direction={{ xs: "column", md: "row" }} spacing={{ xs: 1, md: 2 }} sx={{ pl: 2, pr: 1.5, py: 1.25 }}>
         <Stack direction="row" spacing={1.25} sx={{ flex: 1, minWidth: 0, cursor: onOpen ? "pointer" : "default" }} onClick={onOpen}>
-          <DateBlock date={date} tone={dateTone} label={dateLabel} size={46} />
+          {/* 🔁 (21 ต.ค. 2569) กล่องวันที่แบบเดียวกับหน้ารับงาน/การดำเนินงาน (DateCell) */}
+          <Box sx={{ flexShrink: 0 }}><DateCell start={date} end={dateEnd} label={dateLabel || "ยังไม่กำหนด"} /></Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             {top && <Stack direction="row" spacing={0.6} useFlexGap alignItems="center" sx={{ flexWrap: "wrap", mb: 0.5 }}>{top}</Stack>}
             <Typography sx={{ fontWeight: 600, fontSize: "0.94rem", color: INK, lineHeight: 1.35 }}>{title}</Typography>
@@ -188,17 +190,19 @@ export function PeopleField({ label, children }) {
 }
 
 /** แถวกระชับในหมวดประวัติ */
-export function QueueRow({ date, dateTone, title, sub, right, onOpen, edge }) {
+export function QueueRow({ date, dateEnd, dateLabel, title, sub, right, onOpen, edge }) {
   return (
     <ButtonBase onClick={onOpen} sx={{
       width: "100%", textAlign: "left", display: "flex", alignItems: "center", gap: 1.5, px: 1.5, py: 1, fontFamily: "inherit",
       borderTop: `1px solid ${LINE}`, "&:first-of-type": { borderTop: 0 }, borderLeft: `3px solid ${edge || "transparent"}`,
       "&:hover": { bgcolor: SURFACE },
     }}>
-      <DateBlock date={date} tone={dateTone} size={46} />
+      <Box sx={{ flexShrink: 0 }}><DateCell start={date} end={dateEnd} label={dateLabel || "ยังไม่กำหนด"} /></Box>
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Typography noWrap sx={{ fontWeight: 600, fontSize: "0.86rem", color: INK }}>{title}</Typography>
         {sub && <Typography noWrap sx={{ fontSize: "0.76rem", color: MUTED }}>{sub}</Typography>}
+        {/* มือถือ: ผู้รับผิดชอบ/สถานะลงบรรทัดใต้ชื่อ (จอใหญ่อยู่ขวา) */}
+        {right && <Stack direction="row" spacing={0.75} alignItems="center" useFlexGap sx={{ mt: 0.5, flexWrap: "wrap", display: { xs: "flex", sm: "none" } }}>{right}</Stack>}
       </Box>
       <Stack direction="row" spacing={1} alignItems="center" sx={{ flexShrink: 0, display: { xs: "none", sm: "flex" } }}>{right}</Stack>
       <ChevronRight sx={{ color: FAINT, fontSize: 20, flexShrink: 0 }} />
