@@ -61,6 +61,8 @@ import { can } from "@/shared/utils/roles";
 import PersonSelectField from "@/shared/ui/PersonSelectField";
 import DispatchList from "@/features/dispatch/components/DispatchList";
 import MobileSheet from "@/shared/ui/MobileSheet";
+import { initialViewMode } from "@/shared/ui/ViewToggle";
+
 
 const AMBER = "#d97706";
 const GREEN = "#16a34a";
@@ -1217,7 +1219,7 @@ export default function JobIntake() {
   const [delivering, setDelivering] = useState(null);
   const [q, setQ] = useState("");
   const [groups, setGroups] = useState(() => new Map()); // jobGroupId/_id → ทุกวันของงาน (หาใบเสนอราคาของกลุ่ม)
-  const [view, setView] = useState(() => { try { return localStorage.getItem("tt-intake-view") || "card"; } catch { return "card"; } });
+  const [view, setView] = useState(() => initialViewMode("tt-intake-view"));
   const changeView = (v) => { setView(v); try { localStorage.setItem("tt-intake-view", v); } catch { /* ignore */ } };
   const groupOf = (arr) => {
     const m = new Map();

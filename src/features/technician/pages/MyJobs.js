@@ -11,6 +11,7 @@
  *    Operation ฝั่งแอดมิน)
  */
 
+import { initialViewMode } from "@/shared/ui/ViewToggle";
 import MultiDayGroupHeader, { multiDayCardSx, useGroupAttendance, SessionList } from "@/shared/ui/MultiDayGroup";
 import { useEffect, useMemo, useState, useCallback, useRef, cloneElement } from "react";
 import PdfBlobView from "@/shared/components/PdfBlobView";
@@ -524,7 +525,7 @@ export default function MyJobs() {
   const [searchParams] = useSearchParams();
   const focusJobId = searchParams.get("job") || "";
   const [highlightJob, setHighlightJob] = useState("");
-  const [view, setView] = useState(() => { try { return localStorage.getItem("tt-myjobs-view") || "card"; } catch { return "card"; } });
+  const [view, setView] = useState(() => initialViewMode("tt-myjobs-view"));
   const changeView = (v) => { setView(v); try { localStorage.setItem("tt-myjobs-view", v); } catch { /* ignore */ } };
   useEffect(() => {
     if (autoPickedRef.current || loading || !events.length) return;

@@ -37,10 +37,13 @@ export default function ViewToggle({ value, onChange, accent: _accent }) {
 }
 
 /**
- * ค่าเริ่มต้นของมุมมอง — จอกว้างเริ่มที่ตาราง จอแคบเริ่มที่การ์ด
- * ⚠️ อ่าน localStorage ก่อนเสมอ: ตรงนี้กำหนดแค่ "ค่าตั้งต้นตอนยังไม่เคยเลือก" ไม่ใช่บังคับทับ
+ * ค่าเริ่มต้นของมุมมอง
+ * 🔁 (21 ต.ค. 2569 ผู้ใช้: "หน้าจอคอมให้ default เป็นรูปแบบตารางเสมอ")
+ *    จอคอม (กว้าง ≥ 900) = เปิดหน้ามาเป็นตารางเสมอ (สลับเป็นการ์ดได้ระหว่างใช้ แต่เปิดใหม่กลับเป็นตาราง)
+ *    จอแคบ = ค่าที่เลือกไว้ล่าสุด หรือการ์ด
  */
 export const initialViewMode = (storageKey) => {
+  if (typeof window !== "undefined" && window.innerWidth >= 900) return "table";
   try {
     const saved = localStorage.getItem(storageKey);
     if (saved === "card" || saved === "table") return saved;

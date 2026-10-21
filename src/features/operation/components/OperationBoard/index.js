@@ -113,6 +113,8 @@ import PersonSelectField from "@/shared/ui/PersonSelectField";
 import useCloseOnPick from "@/shared/hooks/useCloseOnPick";
 import { PeopleRow, PersonChip, AssignableResponsible, AssignResponsibleMenu, useAvatarMap, teamNamesOf } from "@/shared/ui/PersonChip";
 import { confirmDelete } from "@/shared/ui/swal";
+import { initialViewMode } from "@/shared/ui/ViewToggle";
+
 // ✅ (11 ต.ค. 2569 ผู้ใช้: "ปุ่มต่างๆ ที่เป็นของเดิมปรับแก้สีสันให้สอดคล้อง สวยงาม")
 //    ปุ่มหลัก = น้ำเงินทึบ (อนุมัติปิดงาน = เขียวทึบ) · ไม่อนุมัติ = เส้นขอบแดง · ปุ่มรอง = เส้นขอบน้ำเงิน — สูง 36 เท่ากันทั้งหน้า
 const SBTN = { minHeight: 36, py: 0.5, px: 1.5, fontSize: "0.84rem", borderRadius: "10px" };
@@ -2500,13 +2502,7 @@ const Operation = () => {
   // ✅ จอกว้างเริ่มที่ "ตาราง" ซึ่งเป็นรูปแบบมาตรฐานของหน้าจัดการงานบนเว็บ — คอลัมน์ตรงกันทุกแถว
   // กวาดสายตาลงมาเทียบกันได้ เห็นได้ 15-20 รายการต่อหน้าจอ (ตารางมีอยู่แล้ว แค่ไม่เคยเป็นค่าเริ่มต้น)
   // ⚠️ เคารพค่าที่ผู้ใช้เลือกเองเสมอ — ตรงนี้เปลี่ยนแค่ "ค่าตั้งต้นตอนยังไม่เคยเลือก" เท่านั้น
-  const [viewMode, setViewMode] = useState(() => {
-    try {
-      const saved = localStorage.getItem("operation.viewMode");
-      if (saved === "table" || saved === "card") return saved;
-    } catch { /* localStorage ใช้ไม่ได้ (โหมดส่วนตัว/ถูกบล็อก) → ตกไปใช้ค่าตามขนาดจอ */ }
-    return typeof window !== "undefined" && window.innerWidth >= 900 ? "table" : "card";
-  });
+  const [viewMode, setViewMode] = useState(() => initialViewMode("operation.viewMode")); // 🔁 (21 ต.ค. 2569) จอคอมเปิดเป็นตารางเสมอ
   useEffect(() => {
     try { localStorage.setItem("operation.viewMode", viewMode); } catch {}
   }, [viewMode]);

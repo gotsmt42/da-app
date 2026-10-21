@@ -26,6 +26,8 @@ import { CARD } from "@/shared/ui/modernUi";
 import AttendanceList, { AttendanceTable } from "../components/AttendanceList";
 import usePaged, { PageBar } from "@/shared/ui/usePaged";
 import { ON_SITE_M } from "../attendanceMeta";
+import { initialViewMode } from "@/shared/ui/ViewToggle";
+
 
 const PRESETS = [
   { key: "today", label: "วันนี้", range: () => [moment(), moment()] },
@@ -74,7 +76,7 @@ export default function AttendancePage() {
   const [employees, setEmployees] = useState([]);
   const [closedHidden, setClosedHidden] = useState(0);
   // ✅ (19 ต.ค. 2569 ผู้ใช้: "ให้มีแสดงแบบตารางด้วย") — จำมุมมองไว้ในเครื่อง · มือถือเป็นการ์ดเสมอ
-  const [view, setView] = useState(() => { try { return localStorage.getItem("tt-att-view") || "card"; } catch { return "card"; } });
+  const [view, setView] = useState(() => initialViewMode("tt-att-view"));
   const changeView = (v) => { setView(v); try { localStorage.setItem("tt-att-view", v); } catch { /* ignore */ } };
   const isTable = view === "table" && (typeof window === "undefined" || window.innerWidth >= 900);
 
