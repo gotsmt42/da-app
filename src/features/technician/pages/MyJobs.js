@@ -12,9 +12,9 @@
  */
 
 import { initialViewMode } from "@/shared/ui/ViewToggle";
+import FileGalleryDialog from "@/shared/ui/FileGalleryDialog";
 import MultiDayGroupHeader, { multiDayCardSx, useGroupAttendance, SessionList } from "@/shared/ui/MultiDayGroup";
 import { useEffect, useMemo, useState, useCallback, useRef, cloneElement } from "react";
-import PdfBlobView from "@/shared/components/PdfBlobView";
 import useRealtime from "@/shared/realtime/useRealtime";
 import { Link, useSearchParams } from "react-router-dom";
 import { History } from "@mui/icons-material";
@@ -26,7 +26,6 @@ import EventService from "@/shared/services/EventService";
 import AuthService from "@/shared/services/authService";
 import TechnicianJobCard from "../components/TechnicianJobPanel";
 import { buildDaysPastDueMap, isFlaggedDays, isSevereDays, getOverdueGroupKey } from "@/shared/utils/overdueJobs";
-import ImagePreview from "@/shared/ui/ImagePreview";
 import { PAGE_SX, PageHeader, ICON_BTN_SX, INK, INK_2, MUTED, LINE, SURFACE, ACCENT } from "@/shared/ui/PageKit";
 import usePaged, { PageBar } from "@/shared/ui/usePaged";
 import { JobFlowFlags } from "@/shared/ui/JobFlow";
@@ -39,140 +38,17 @@ import RefDoc from "@/shared/ui/RefDoc";
 import { PersonChip } from "@/shared/ui/PersonChip";
 import {
   Box, Stack, Typography, TextField, InputAdornment, IconButton,
-  Chip, Skeleton, Dialog, DialogTitle, DialogContent, Divider,
-  Tooltip, Button, Snackbar, Alert, LinearProgress, Collapse,
+  Chip, Skeleton, Dialog, DialogContent,
+  Tooltip, Button, Snackbar, Alert, Collapse,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
   Search, Clear, Refresh, WorkOutline, HourglassTop, TaskAlt, Warning, ViewAgendaOutlined, TableRowsOutlined,
-  Download, Close, PictureAsPdf, FolderOpen, Image, Article, InsertDriveFile, AttachFile,
+  Close,
 } from "@mui/icons-material";
 
-// ─── file-type helpers (เหมือนกับที่ใช้ใน Operation/ServiceReportFiles) ───
-const getFileType = (fileName = "") => {
-  const lower = (fileName || "").toLowerCase();
-  if ([".jpg", ".jpeg", ".png", ".webp"].some((e) => lower.endsWith(e))) return "image";
-  if (lower.endsWith(".pdf")) return "pdf";
-  if (lower.endsWith(".doc") || lower.endsWith(".docx")) return "word";
-  if (lower.endsWith(".xls") || lower.endsWith(".xlsx")) return "excel";
-  return "unknown";
-};
-
-const fileTypeIcon = (fileName) => {
-  const t = getFileType(fileName);
-  if (t === "image") return <Image sx={{ color: "#10b981", fontSize: 18 }} />;
-  if (t === "pdf") return <PictureAsPdf sx={{ color: "#ef4444", fontSize: 18 }} />;
-  if (t === "word") return <Article sx={{ color: "#3b82f6", fontSize: 18 }} />;
-  if (t === "excel") return <InsertDriveFile sx={{ color: "#10b981", fontSize: 18 }} />;
-  return <AttachFile sx={{ color: "#6b7280", fontSize: 18 }} />;
-};
-
-const downloadFile = async (url, fileName) => {
-  if (!url) return;
-  try {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error("Download failed");
-    const blob = await response.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = blobUrl;
-    a.download = fileName || "download";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-  } catch (err) {
-    console.error("Download error:", err);
-    window.open(url, "_blank");
-  }
-};
-
-// ─── FilePreviewDialog (ตัวเดียวกับ pattern ที่ใช้ทั่วแอป) ───
-const FilePreviewDialog = ({ previewUrl, previewFileName, onClose }) => {
-  const type = getFileType(previewFileName || previewUrl || "");
-  const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
-  const [pdfLoading, setPdfLoading] = useState(false);
-  const [pdfError, setPdfError] = useState(false);
-
-  useEffect(() => {
-    if (type !== "pdf" || !previewUrl) {
-      setPdfBlobUrl(null);
-      setPdfError(false);
-      return;
-    }
-    let cancelled = false;
-    let objectUrl = null;
-    setPdfLoading(true);
-    setPdfError(false);
-    fetch(previewUrl)
-      .then((res) => { if (!res.ok) throw new Error("โหลดไฟล์ไม่สำเร็จ"); return res.blob(); })
-      .then((blob) => {
-        if (cancelled) return;
-        objectUrl = URL.createObjectURL(blob);
-        setPdfBlobUrl(objectUrl);
-      })
-      .catch(() => { if (!cancelled) setPdfError(true); })
-      .finally(() => { if (!cancelled) setPdfLoading(false); });
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [type, previewUrl]);
-
-  return (
-    <Dialog open={Boolean(previewUrl)} onClose={onClose} maxWidth="xl" fullWidth fullScreen={window.matchMedia?.("(max-width:600px)").matches}
-      PaperProps={{ sx: { borderRadius: 3, overflow: "hidden" } }}>
-      <DialogTitle sx={{ m: 0, p: 2, display: "flex", alignItems: "center", gap: 1.5 }}>
-        {fileTypeIcon(previewFileName)}
-        <Typography fontWeight={700} noWrap flex={1}>{previewFileName || "ดูไฟล์"}</Typography>
-        <Stack direction="row" gap={0.5}>
-          {previewUrl && (
-            <Tooltip title="ดาวน์โหลด">
-              <IconButton onClick={() => downloadFile(previewUrl, previewFileName)}><Download /></IconButton>
-            </Tooltip>
-          )}
-          <IconButton onClick={onClose}><Close /></IconButton>
-        </Stack>
-      </DialogTitle>
-      <Divider />
-      <DialogContent sx={{ p: 0 }}>
-        {type === "image" && (
-          <ImagePreview key={previewUrl} url={previewUrl} name={previewFileName} />
-        )}
-        {type === "pdf" && (
-          pdfLoading ? (
-            <Box sx={{ textAlign: "center", py: 8, color: "text.secondary" }}>
-              <LinearProgress sx={{ mx: 6, mb: 2, borderRadius: 1 }} />
-              <Typography variant="body2">กำลังโหลดไฟล์...</Typography>
-            </Box>
-          ) : pdfError ? (
-            <Box sx={{ textAlign: "center", py: 8, color: "text.secondary" }}>
-              <PictureAsPdf sx={{ fontSize: 48, opacity: 0.3 }} />
-              <Typography>ไม่สามารถแสดงตัวอย่างไฟล์นี้ได้</Typography>
-              <Button size="small" variant="outlined" sx={{ mt: 1.5, borderRadius: 2 }}
-                onClick={() => downloadFile(previewUrl, previewFileName)}>
-                ดาวน์โหลดแทน
-              </Button>
-            </Box>
-          ) : pdfBlobUrl ? (
-            <PdfBlobView url={pdfBlobUrl} />
-          ) : null
-        )}
-        {(type === "word" || type === "excel") && (
-          <iframe
-            src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewUrl)}`}
-            width="100%" height="780px" style={{ border: "none" }} title="Office" />
-        )}
-        {type === "unknown" && (
-          <Box sx={{ textAlign: "center", py: 8, color: "text.secondary" }}>
-            <FolderOpen sx={{ fontSize: 48 }} />
-            <Typography>ไม่สามารถแสดงไฟล์นี้ได้</Typography>
-          </Box>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-};
+// 🔁 (21 ต.ค. 2569) กล่องดูไฟล์ตัวกลาง — เลื่อนดูไฟล์อื่นในช่องเดียวกัน (← → · ปัด · แถบรูปย่อ)
+const FilePreviewDialog = (props) => <FileGalleryDialog {...props} />;
 
 
 // ─── มุมมองตาราง (งานของฉัน) ───────────────────────────────────────────────────
@@ -417,7 +293,8 @@ export default function MyJobs() {
   const [previewFileName, setPreviewFileName] = useState("");
   // ✅ perf: reference คงที่ — จำเป็นให้แถวไฟล์ที่ memo ไว้ (เทียบ props ด้วย reference) bail out
   // re-render ได้จริง ไม่งั้น prop นี้เปลี่ยนทุกครั้งที่ MyJobs re-render ทำให้ memo ไม่มีผลอะไรเลย
-  const handlePreviewFile = useCallback((url, name) => { setPreviewUrl(url); setPreviewFileName(name); }, []);
+  const [previewList, setPreviewList] = useState(null);
+  const handlePreviewFile = useCallback((url, name, list) => { setPreviewUrl(url); setPreviewFileName(name); setPreviewList(Array.isArray(list) ? list : null); }, []);
 
   const [uploadingState, setUploadingState] = useState({ quotation: null, report: null, invoice: null, completion: null });
   const [uploadProgressState, setUploadProgressState] = useState({ quotation: 0, report: 0, invoice: 0, completion: 0 });
@@ -937,7 +814,8 @@ export default function MyJobs() {
       <FilePreviewDialog
         previewUrl={previewUrl}
         previewFileName={previewFileName}
-        onClose={() => { setPreviewUrl(null); setPreviewFileName(""); }}
+        gallery={previewList} onNavigate={(f) => { setPreviewUrl(f.fileUrl); setPreviewFileName(f.fileName || ""); }}
+        onClose={() => { setPreviewUrl(null); setPreviewFileName(""); setPreviewList(null); }}
       />
 
       <Snackbar

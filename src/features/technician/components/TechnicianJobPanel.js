@@ -268,6 +268,10 @@ const FileRow = React.memo(
 const DocumentFileList = ({ type, files, isUploading, uploadProgress, onFileUpload, onDeleteFile, onPreview, isLocked }) => {
   const fileRef = useRef();
   const fileList = files || [];
+  // 🔁 (21 ต.ค. 2569) ส่งไฟล์ทั้งช่องให้กล่องดูไฟล์ เลื่อนดูไฟล์อื่นได้เลย (reference คงที่ — FileRow memo)
+  const listRef = useRef(fileList);
+  listRef.current = fileList;
+  const previewInSection = useCallback((url, name) => onPreview?.(url, name, listRef.current), [onPreview]);
 
   // ✅ เมนู "⋮" ต่อไฟล์ — เดิมโชว์ปุ่มดู/ดาวน์โหลด/ลบ เรียงเป็นไอคอนแยกทุกแถว ดูรกเวลามีหลายไฟล์
   // รวมเป็นเมนูเดียว เหลือแค่ปุ่มดูไฟล์ (บ่อยสุด) + ปุ่ม "⋮" ที่มีดาวน์โหลด/พิมพ์/แชร์ LINE/ลบ
@@ -287,7 +291,7 @@ const DocumentFileList = ({ type, files, isUploading, uploadProgress, onFileUplo
       {fileList.length > 0 && (
         <Stack spacing={0.75} sx={{ mb: 1, maxHeight: 260, overflowY: "auto" }}>
           {fileList.map(f => (
-            <FileRow key={f._id || f.fileUrl} file={f} onPreview={onPreview} onOpenMenu={handleOpenFileMenu} />
+            <FileRow key={f._id || f.fileUrl} file={f} onPreview={previewInSection} onOpenMenu={handleOpenFileMenu} />
           ))}
         </Stack>
       )}

@@ -49,7 +49,7 @@ const isImg = (p) => /^image\//.test(p.fileType || "") || /\.(jpe?g|png|webp|gif
 const Files = ({ photos, onPreview }) => (photos?.length ? (
   <Stack direction="row" gap={0.75} flexWrap="wrap">
     {photos.map((p) => {
-      const open = () => (onPreview ? onPreview(p.fileUrl, p.fileName) : window.open(p.fileUrl, "_blank", "noopener"));
+      const open = () => (onPreview ? onPreview(p.fileUrl, p.fileName, photos) : window.open(p.fileUrl, "_blank", "noopener"));
       return isImg(p) ? (
         <Box key={p.fileId} component="img" src={thumbUrl(p.fileUrl)} decoding="async" alt={p.fileName} loading="lazy" onClick={open}
           sx={{ width: 64, height: 64, objectFit: "cover", borderRadius: "10px", border: `1px solid ${LINE}`, cursor: "zoom-in" }} />
@@ -403,7 +403,7 @@ export function AttendanceTable({ rows = [], me, isApprover, onPreview, onChange
                 </Box>
                 <Box component="td" sx={{ ...td, whiteSpace: "nowrap" }} onClick={(e) => photos.length && e.stopPropagation()}>
                   {photos.length ? (
-                    <ButtonBase onClick={() => (onPreview ? onPreview(photos[0].fileUrl, photos[0].fileName) : window.open(photos[0].fileUrl, "_blank", "noopener"))}
+                    <ButtonBase onClick={() => (onPreview ? onPreview(photos[0].fileUrl, photos[0].fileName, photos) : window.open(photos[0].fileUrl, "_blank", "noopener"))}
                       sx={{ gap: 0.5, px: 0.9, height: 28, borderRadius: 2, border: `1px solid ${LINE}`, fontFamily: "inherit", fontSize: "0.76rem", fontWeight: 700, color: INK_2, "&:hover": { borderColor: ACCENT, color: ACCENT } }}>
                       <PhotoCameraOutlined sx={{ fontSize: 16 }} />{photos.length}
                     </ButtonBase>

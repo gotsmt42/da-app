@@ -18,7 +18,11 @@ const MIN = 0.5;
 const MAX = 6;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
-export default function ImagePreview({ url, name }) {
+/**
+ * @param reserve  ความสูง (px) ที่กล่องแม่ใช้ไปแล้ว เช่น แถบรูปย่อของ FileGalleryDialog
+ * @param onSwipe  (dir) ปัดซ้าย/ขวาด้วยนิ้วเดียวตอนรูปไม่ล้นจอแนวนอน → เปลี่ยนไปไฟล์ถัดไป/ก่อนหน้า
+ */
+export default function ImagePreview({ url, name, reserve = 0, onSwipe }) {
   const boxRef = useRef(null);
   const [loaded, setLoaded] = useState(false);
   const [nat, setNat] = useState(null);           // ขนาดจริงของรูป (px)
@@ -28,6 +32,7 @@ export default function ImagePreview({ url, name }) {
   const pointers = useRef(new Map());
   const pinch = useRef(null);
   const lastTap = useRef(0);
+  const swipe = useRef(null);
 
   const fitW = Math.min(2000, Math.round((window.innerWidth || 1200) * Math.min(window.devicePixelRatio || 1, 2)));
   const thumb = getOptimizedImageUrl(url, { width: 48 });
@@ -98,6 +103,7 @@ export default function ImagePreview({ url, name }) {
   const onPointerDown = (e) => {
     boxRef.current.setPointerCapture?.(e.pointerId);
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    swipe.current = pointers.current.size === 1 ? { x: e.clientX, y: e.clientY, t: Date.now(), fits: !nat || nat.w * view.s <= box.w + 4 } : null;
     if (pointers.current.size === 2) {
       const [a, b] = [...pointers.current.values()];
       pinch.current = { d: Math.hypot(a.x - b.x, a.y - b.y) };
@@ -127,6 +133,13 @@ export default function ImagePreview({ url, name }) {
     setView((v) => ({ ...v, x: v.x + (cur.x - prev.x), y: v.y + (cur.y - prev.y) }));
   };
   const onPointerUp = (e) => {
+    // ปัดเร็วๆ แนวนอน (รูปไม่ได้ซูมเกินจอ) = ไปไฟล์ถัดไป/ก่อนหน้า
+    const sw = swipe.current;
+    if (onSwipe && sw && sw.fits && pointers.current.size === 1) {
+      const dx = e.clientX - sw.x; const dy = e.clientY - sw.y;
+      if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5 && Date.now() - sw.t < 700) { swipe.current = null; onSwipe(dx < 0 ? 1 : -1); return; }
+    }
+    swipe.current = null;
     pointers.current.delete(e.pointerId);
     if (pointers.current.size < 2) pinch.current = null;
   };
@@ -136,9 +149,9 @@ export default function ImagePreview({ url, name }) {
   const btn = { color: "#fff", width: 36, height: 36, "&:hover": { bgcolor: "rgba(255,255,255,.12)" } };
 
   return (
-    <Box ref={boxRef}
+    <Box ref={boxRef} data-no-swipe
       onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
-      sx={{ position: "relative", bgcolor: "#0f172a", height: { xs: "calc(100vh - 66px)", sm: "min(84vh, 900px)" }, overflow: "hidden",
+      sx={{ position: "relative", bgcolor: "#0f172a", height: { xs: `calc(100dvh - ${66 + reserve}px)`, sm: `calc(min(calc(100vh - 150px), 900px) - ${reserve}px)` }, overflow: "hidden",
         touchAction: "none", cursor: pointers.current.size ? "grabbing" : "grab", userSelect: "none" }}>
       {!loaded && thumb !== url && (
         <Box component="img" src={thumb} alt="" aria-hidden sx={{ position: "absolute", inset: 0, m: "auto", maxWidth: "100%", maxHeight: "100%", height: "100%", objectFit: "contain", filter: "blur(14px)", opacity: 0.8 }} />

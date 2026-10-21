@@ -82,6 +82,7 @@ import DateCell from "@/shared/ui/DateCell";
 import JobKindTag from "@/shared/ui/JobKindTag";
 import MobileJobSummary from "@/shared/ui/MobileJobSummary";
 import MobileSheet from "@/shared/ui/MobileSheet";
+import FileGalleryDialog from "@/shared/ui/FileGalleryDialog";
 import JobDocsCell from "@/shared/ui/JobDocsCell";
 import RefDoc from "@/shared/ui/RefDoc";
 import { printFile, shareFile, isMobileDevice } from "@/shared/utils/fileActions";
@@ -694,6 +695,10 @@ export const FileUploadSection = ({
 
   const fileList = files || [];
   const hasFiles = fileList.length > 0;
+  // 🔁 (21 ต.ค. 2569 ผู้ใช้: "เลื่อนดูรูปอื่นในช่องเดียวกันได้เลย") ส่งไฟล์ทั้งช่องไปให้กล่องดูไฟล์ — reference คงที่ (FileRow memo)
+  const listRef = useRef(fileList);
+  listRef.current = fileList;
+  const previewInSection = useCallback((url, name) => onPreview?.(url, name, listRef.current), [onPreview]);
 
   const handleDrop = e => {
     e.preventDefault();
@@ -780,7 +785,7 @@ export const FileUploadSection = ({
       {hasFiles && (
         <Stack spacing={0.75} sx={{ mb: uploading || canEdit ? 1 : 0, maxHeight: 260, overflowY: "auto" }}>
           {fileList.map(f => (
-            <FileRow key={f._id || f.fileUrl} file={f} onPreview={onPreview} onOpenMenu={handleOpenFileMenu} />
+            <FileRow key={f._id || f.fileUrl} file={f} onPreview={previewInSection} onOpenMenu={handleOpenFileMenu} />
           ))}
         </Stack>
       )}
@@ -2207,81 +2212,8 @@ const FilterPanel = ({
 // ─── FilePreviewDialog ────────────────────────────────────────────────
 // ✅ export เพิ่ม (เทียบ pattern เดียวกับ GlassCard/StatCard/FileUploadSection/CommentThread ด้านบน)
 // ให้หน้าอื่น (เช่น /quotations) เปิด preview ไฟล์ในหน้าเดิมได้เลย แทนที่จะต้อง window.open แท็บใหม่
-export const FilePreviewDialog = ({ previewUrl, previewFileName, onClose }) => {
-  const type = getFileType(previewFileName || previewUrl || "");
-
-  // PDF: โหลดเป็น blob เองแล้วใช้ตัวแสดงผล PDF ในตัวของเบราว์เซอร์
-  // (เลี่ยงปัญหา CDN ของ Cloudinary ที่ประกาศรองรับ Range request แต่จริง ๆ ไม่ทำงานตามนั้น
-  // ซึ่งทำให้ตัวแสดงผล PDF ภายนอกโหลดไฟล์ไม่สำเร็จ)
-  const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
-  const [pdfLoading, setPdfLoading] = useState(false);
-  const [pdfError,   setPdfError]   = useState(false);
-
-  useEffect(() => {
-    if (type !== "pdf" || !previewUrl) {
-      setPdfBlobUrl(null);
-      setPdfError(false);
-      return;
-    }
-    let cancelled = false;
-    let objectUrl = null;
-    setPdfLoading(true);
-    setPdfError(false);
-    fetch(previewUrl)
-      .then(res => { if (!res.ok) throw new Error("โหลดไฟล์ไม่สำเร็จ"); return res.blob(); })
-      .then(blob => {
-        if (cancelled) return;
-        objectUrl = URL.createObjectURL(blob);
-        setPdfBlobUrl(objectUrl);
-      })
-      .catch(() => { if (!cancelled) setPdfError(true); })
-      .finally(() => { if (!cancelled) setPdfLoading(false); });
-
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [type, previewUrl]);
-
-  return (
-    <Dialog open={Boolean(previewUrl)} onClose={onClose} maxWidth="xl" fullWidth fullScreen={window.matchMedia?.("(max-width:600px)").matches}
-      PaperProps={{ sx: { borderRadius: 3, overflow: "hidden" } }}>
-      <DialogTitle sx={{ m: 0, p: 2, display: "flex", alignItems: "center", gap: 1.5 }}>
-        {fileTypeIcon(previewFileName)}
-        <Typography fontWeight={700} noWrap flex={1}>{previewFileName || "ดูไฟล์"}</Typography>
-        <Stack direction="row" gap={0.5}>
-          {previewUrl && <Tooltip title="ดาวน์โหลด"><IconButton onClick={() => downloadFile(previewUrl, previewFileName)}><Download /></IconButton></Tooltip>}
-          <IconButton onClick={onClose}><Close /></IconButton>
-        </Stack>
-      </DialogTitle>
-      <Divider />
-      <DialogContent sx={{ p: 0 }}>
-        {type === "image" && <ImagePreview key={previewUrl} url={previewUrl} name={previewFileName} />}
-        {type === "pdf" && (
-          pdfLoading ? (
-            <Box sx={{ textAlign: "center", py: 8, color: "text.secondary" }}>
-              <LinearProgress sx={{ mx: 6, mb: 2, borderRadius: 1 }} />
-              <Typography variant="body2">กำลังโหลดไฟล์...</Typography>
-            </Box>
-          ) : pdfError ? (
-            <Box sx={{ textAlign: "center", py: 8, color: "text.secondary" }}>
-              <PictureAsPdf sx={{ fontSize: 48, opacity: 0.3 }} />
-              <Typography>ไม่สามารถแสดงตัวอย่างไฟล์นี้ได้</Typography>
-              <Button size="small" variant="outlined" sx={{ mt: 1.5, borderRadius: 2 }}
-                onClick={() => downloadFile(previewUrl, previewFileName)}>
-                ดาวน์โหลดแทน
-              </Button>
-            </Box>
-          ) : pdfBlobUrl ? (
-            <PdfBlobView url={pdfBlobUrl} />
-          ) : null
-        )}
-        {(type === "word" || type === "excel") && <iframe src={`https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewUrl)}`} width="100%" height="780px" style={{ border: "none" }} title="Office" />}
-        {type === "unknown" && <Box sx={{ textAlign: "center", py: 8, color: "text.secondary" }}><FolderOpen sx={{ fontSize: 48 }} /><Typography>ไม่สามารถแสดงไฟล์นี้ได้</Typography></Box>}
-      </DialogContent>
-    </Dialog>
-  );
-};
+// 🔁 (21 ต.ค. 2569) ใช้กล่องดูไฟล์ตัวกลาง (เลื่อนดูไฟล์อื่นในช่องเดียวกันได้ · ← → · ปัด · แถบรูปย่อ)
+export const FilePreviewDialog = (props) => <FileGalleryDialog {...props} />;
 
 // ═══════════════════════════════════════════════════════════════════════
 // ─── มุมมองตาราง — ทางเลือกของการ์ด สำหรับกวาดดูหลายงานพร้อมกัน/เทียบกัน ─────────────────
@@ -2622,7 +2554,8 @@ const Operation = () => {
   // ✅ perf: reference คงที่ (ไม่สร้าง arrow function ใหม่ทุก render) — จำเป็นสำหรับให้ FileRow ที่
   // memo ไว้ (เทียบ props ด้วย reference) bail out re-render ได้จริง ไม่งั้น prop นี้เปลี่ยนทุกครั้ง
   // ทำให้ memo ไม่มีผลอะไรเลย
-  const handlePreviewFile = useCallback((url, name) => { setPreviewUrl(url); setPreviewFileName(name); }, []);
+  const [previewList, setPreviewList] = useState(null);
+  const handlePreviewFile = useCallback((url, name, list) => { setPreviewUrl(url); setPreviewFileName(name); setPreviewList(Array.isArray(list) ? list : null); }, []);
   const [confirmOpen,      setConfirmOpen]        = useState(false);
   const [pendingDelete,    setPendingDelete]      = useState(null);
   const [snackbar,         setSnackbar]           = useState({ open: false, msg: "", severity: "success" });
@@ -3975,8 +3908,9 @@ const Operation = () => {
 
       {/* File Preview */}
       <FilePreviewDialog
-        previewUrl={previewUrl} previewFileName={previewFileName}
-        onClose={() => { setPreviewUrl(null); setPreviewFileName(""); }}
+        previewUrl={previewUrl} previewFileName={previewFileName} gallery={previewList}
+        onNavigate={(f) => { setPreviewUrl(f.fileUrl); setPreviewFileName(f.fileName || ""); }}
+        onClose={() => { setPreviewUrl(null); setPreviewFileName(""); setPreviewList(null); }}
       />
 
       {/* Confirm Delete File */}

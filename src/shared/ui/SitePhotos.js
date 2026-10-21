@@ -41,7 +41,8 @@ export default function SitePhotos({ event, canEdit = false, onPreview, onChange
   if (!event) return null;
   if (!files.length && !canEdit) return null;
 
-  const open = (f) => (onPreview ? onPreview(f.fileUrl, f.fileName) : window.open(f.fileUrl, "_blank", "noopener"));
+  // 🔁 (21 ต.ค. 2569) ส่งไฟล์ทั้งช่อง (รูปก่อน แล้วเอกสาร) ให้กล่องดูไฟล์เลื่อนดูต่อได้
+  const open = (f) => (onPreview ? onPreview(f.fileUrl, f.fileName, [...files.filter(isImage), ...files.filter((x) => !isImage(x))]) : window.open(f.fileUrl, "_blank", "noopener"));
 
   const onPick = async (e) => {
     const picked = [...(e.target.files || [])];
