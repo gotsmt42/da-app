@@ -74,13 +74,14 @@ const LocationCard = ({ stamp }) => {
   const [mapOpen, setMapOpen] = useState(false);
   if (!stamp) return null;
   const ok = stamp.gps === "ok" && Number.isFinite(stamp.lat) && Number.isFinite(stamp.lng);
-  const acc = stamp.accuracy != null ? ` · แม่นยำ ±${stamp.accuracy} ม.` : "";
+  // 🔁 (21 ต.ค. 2569 ผู้ใช้: "ใช้คำให้เข้าใจง่าย") ±X ม. → คำอธิบาย
+  const acc = stamp.accuracy != null ? ` · คลาดเคลื่อนได้ราว ${Math.round(stamp.accuracy)} ม.` : "";
   let tone; let text; let hint = "";
   if (stamp.gps === "denied") { tone = TONE.warn; text = "ไม่มีตำแหน่ง (ไม่ได้อนุญาต GPS)"; }
   else if (!ok) { tone = TONE.warn; text = "ไม่มีตำแหน่ง (หา GPS ไม่เจอ)"; }
-  else if (stamp.distanceM == null) { tone = "#dc2626"; text = `บันทึกตำแหน่งแล้ว${acc}`; hint = "เทียบระยะกับหน้างานไม่ได้ — โครงการยังไม่มีลิงก์แผนที่ในทะเบียนลูกค้า"; }
+  else if (stamp.distanceM == null) { tone = "#dc2626"; text = `บันทึกตำแหน่งแล้ว (ยังไม่รู้ว่าที่หน้างานหรือไม่)${acc}`; hint = "หน้างานนี้ยังไม่มีพิกัดในทะเบียนลูกค้า จึงเทียบไม่ได้ — กด ดูแผนที่ เพื่อตรวจตำแหน่งที่บันทึก"; }
   else if (stamp.distanceM <= ON_SITE_M) { tone = TONE.ok; text = `อยู่ที่หน้างาน · ห่าง ${fmtDistance(stamp.distanceM)}${acc}`; }
-  else { tone = TONE.warn; text = `อยู่นอกหน้างาน · ห่าง ${fmtDistance(stamp.distanceM)}${acc}`; }
+  else { tone = TONE.warn; tone = "#dc2626"; text = `ไม่ได้อยู่ที่หน้างาน · ห่าง ${fmtDistance(stamp.distanceM)}${acc}`; }
   const Icon = ok ? PlaceRounded : LocationOffRounded;
   return (
     <InfoRow label="ตำแหน่ง">

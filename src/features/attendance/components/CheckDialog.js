@@ -30,6 +30,7 @@ import {
 
 const GREEN = "#16a34a";
 const AMBER = "#d97706";
+const RED_TONE = "#dc2626";
 
 /**
  * หัวข้อย่อยในหน้าต่าง — ✅ (10 ต.ค. 2569 ผู้ใช้: "ยังไม่สวย ดูยาก ปุ่มล้าสมัย การจัดวางให้ดูง่ายกว่านี้")
@@ -331,21 +332,28 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
     if (pos.gps !== "ok") {
       return { icon: <LocationOffRounded />, title: "หาตำแหน่งไม่เจอ", sub: "ยังบันทึกได้ — ลองออกไปที่โล่งแล้วกดหาใหม่", tone: AMBER };
     }
-    const acc = pos.accuracy ? `แม่นยำ ±${Math.round(pos.accuracy)} ม.` : "";
+    // 🔁 (21 ต.ค. 2569 ผู้ใช้: "การหาตำแหน่งใช้คำให้เข้าใจง่าย · บางทีบันทึกที่อื่น ไม่ตรงกับชื่อหน้างาน แต่ขึ้นแม่นยำ ดูสับสน")
+    //    • ความแม่นยำ = คำง่ายๆ (แม่นยำดี / พอใช้ / ยังไม่แม่น) + "คลาดเคลื่อนได้ราว X ม." แทน ±X ม.
+    //    • บอกเสมอว่าเทียบกับหน้างานไหน: อยู่ที่หน้างาน / อยู่ห่างจากหน้างาน X (ไม่ใช่ที่หน้างาน) / หน้างานยังไม่มีพิกัด (เทียบไม่ได้)
+    const r = Math.round(pos.accuracy || 0);
+    const quality = !r ? "" : r <= GPS_GOOD_M ? `แม่นยำดี (คลาดเคลื่อนไม่เกิน ${r} ม.)` : r <= GPS_OK_M ? `แม่นยำพอใช้ (คลาดเคลื่อนได้ราว ${r} ม.)` : `ยังไม่แม่น (คลาดเคลื่อนได้ถึง ${r} ม.)`;
     // ยังไม่แม่นพอ → บอกให้รอ GPS ปรับค่า (ตัวเลขลดลงเรื่อยๆ ระหว่างรอ)
     if (pos.accuracy > GPS_GOOD_M && gpsSettling) {
       const left = Math.max(0, Math.ceil((GPS_MIN_WAIT_MS - waitedMs) / 1000));
-      return { icon: <CircularProgress size={18} />, title: `กำลังปรับตำแหน่งให้แม่นยำ · ±${pos.accuracy} ม.`, sub: `รอสักครู่ (${left} วิ) — ถือเครื่องนิ่งๆ ในที่โล่ง ตัวเลขยิ่งน้อยยิ่งแม่น`, tone: ACCENT };
-    }
-    if (pos.accuracy > GPS_OK_M) {
-      return { icon: <MyLocationRounded />, title: `ตำแหน่งยังคลาดเคลื่อนมาก · ±${pos.accuracy} ม.`, sub: "เปิด GPS แบบแม่นยำสูง / ออกไปที่โล่งแล้วรอสักครู่ · ยังบันทึกได้ แต่แอดมินจะเห็นว่าความแม่นยำต่ำ", tone: AMBER };
+      return { icon: <CircularProgress size={18} />, title: "กำลังหาตำแหน่งให้ตรงขึ้น…", sub: `ตอนนี้คลาดเคลื่อนได้ราว ${r} ม. · รออีก ${left} วินาที — ถือเครื่องนิ่งๆ ในที่โล่ง`, tone: ACCENT };
     }
     if (dist == null) {
-      return { icon: <MyLocationRounded />, title: "ได้ตำแหน่งแล้ว", sub: [acc, site ? "" : "ยังไม่มีพิกัดหน้างานในทะเบียนลูกค้า — บันทึกพิกัดอย่างเดียว"].filter(Boolean).join(" · "), tone: ACCENT };
+      return {
+        icon: <MyLocationRounded />, title: "ได้ตำแหน่งของคุณแล้ว",
+        sub: [quality, site ? "" : "หน้างานนี้ยังไม่มีพิกัดในทะเบียนลูกค้า — ระบบเทียบไม่ได้ว่าคุณอยู่ที่หน้างานหรือไม่ (บันทึกตำแหน่งไว้ให้แอดมินดู)"].filter(Boolean).join(" · "),
+        tone: pos.accuracy > GPS_OK_M ? AMBER : ACCENT,
+      };
     }
+    // ระยะห่างน้อยกว่าความคลาดเคลื่อน = ยังสรุปไม่ได้แน่ชัด
+    const unsure = pos.accuracy > GPS_OK_M;
     return dist <= ON_SITE_M
-      ? { icon: <CheckCircleRounded />, title: `อยู่ที่หน้างาน · ${fmtDistance(dist)}`, sub: acc, tone: GREEN }
-      : { icon: <MyLocationRounded />, title: `ห่างจากหน้างาน ${fmtDistance(dist)}`, sub: [acc, "ยังบันทึกได้ แอดมินจะเห็นระยะห่างนี้"].filter(Boolean).join(" · "), tone: AMBER };
+      ? { icon: <CheckCircleRounded />, title: `อยู่ที่หน้างาน (ห่าง ${fmtDistance(dist)})`, sub: [quality, unsure ? "สัญญาณยังไม่แม่น ผลอาจคลาดเคลื่อน" : ""].filter(Boolean).join(" · "), tone: unsure ? AMBER : GREEN }
+      : { icon: <LocationOffRounded />, title: `ไม่ได้อยู่ที่หน้างาน — ห่าง ${fmtDistance(dist)}`, sub: ["ตรวจว่าเปิดงานถูกหน้างาน หรือไปถึงแล้วกด “หาใหม่”", quality, "ยังบันทึกได้ แอดมินจะเห็นระยะห่างนี้"].filter(Boolean).join(" · "), tone: RED_TONE };
   }, [pos, dist, site, gpsSettling, waitedMs]);
 
   const jobLabel = [event?.title, event?.site || event?.company].filter(Boolean).join(" · ");
@@ -387,7 +395,8 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
         {gpsMissing ? (
           <GpsRequired kind={pos.gps === "denied" ? "denied" : "unavailable"} perm={perm} secure={secure} onRetry={locate} onRequest={requestPermission} onSkip={() => setSkipGps(true)} skipped={skipGps} />
         ) : (
-        <Section title="ตำแหน่งปัจจุบัน">
+        <Section title="ตำแหน่งของคุณ เทียบกับหน้างาน">
+          {jobLabel && <Typography sx={{ mb: 0.75, fontSize: "0.78rem", color: MUTED }}>หน้างาน: <Box component="span" sx={{ fontWeight: 800, color: INK }}>{event?.site || event?.company || jobLabel}</Box></Typography>}
           <Stack direction="row" alignItems="center" gap={1.25} sx={{ p: 1.5, borderRadius: 2.5, border: `1px solid ${alpha(locationCard.tone, 0.3)}`, bgcolor: alpha(locationCard.tone, 0.05) }}>
             <Box sx={{ color: locationCard.tone, display: "flex", "& svg": { fontSize: 22 } }}>{locationCard.icon}</Box>
             <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -448,7 +457,7 @@ export default function CheckDialog({ open, event, onClose, onDone, zIndex }) {
         <Button variant="contained" disableElevation onClick={submit} disabled={!canSubmit}
           startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <LoginRounded />}
           sx={{ ...MBTN.primary, flex: { xs: 1, sm: "0 0 auto" }, px: 3.5 }}>
-          {saving ? "กำลังบันทึก…" : needPhoto ? "ถ่ายรูปก่อนกดเข้างาน" : gpsSettling ? "รอตำแหน่งให้แม่นยำ…" : gpsBlocked ? "เปิด GPS ก่อนบันทึก" : "ยืนยันเข้างาน"}
+          {saving ? "กำลังบันทึก…" : needPhoto ? "ถ่ายรูปก่อนกดเข้างาน" : gpsSettling ? "กำลังหาตำแหน่ง…" : gpsBlocked ? "เปิด GPS ก่อนบันทึก" : "ยืนยันเข้างาน"}
         </Button>
       </DialogActions>
     </Dialog>
