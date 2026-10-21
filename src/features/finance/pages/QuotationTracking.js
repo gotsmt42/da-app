@@ -1160,7 +1160,8 @@ function useQuotationActions(fetchJobs, toast, userData) {
  */
 async function withQuotedNotes(events) {
   try {
-    const dr = await EventService.GetDraftEvents();
+    // ⚠️ ต้องขอรวมที่ทำเสร็จแล้วด้วย — ค่าเริ่มต้นตัดบันทึกที่ทำเสร็จ (noteDoneAt) ออก ซึ่งคือตัวที่แนบใบเสนอราคา
+    const dr = await EventService.GetDraftEvents({ includeCancelled: true });
     const have = new Set(events.map((e) => String(e._id)));
     const notes = (dr?.drafts || [])
       .filter((d) => d.intakeNote && !d.cancelledAt && !have.has(String(d._id)) && ((d.quotationFiles || []).length || d.quotationStatus))
