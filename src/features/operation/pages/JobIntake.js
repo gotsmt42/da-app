@@ -353,7 +353,7 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, onUplo
               ? (!j.unscheduled && !s.nv && !s.note ? <Button component={Link} to={`/operation/${j._id}`} size="small" sx={ghost}>ดูงาน</Button> : <Button size="small" onClick={() => toggle(j._id)} sx={{ ...ghost, color: MUTED, borderColor: LINE }}>รายละเอียด</Button>)
               : s.note
                 ? (s.i === 0
-                  ? <Button size="small" onClick={() => onNoteDone(j)} sx={{ ...SUCCESS, height: 30, px: 1.25 }}>ยืนยันทำเสร็จ</Button>
+                  ? <Button size="small" onClick={() => onNoteDone(j)} sx={{ ...PRIMARY, height: 30, px: 1.25 }}>ยืนยันทำเสร็จ</Button>
                   : <Button size="small" onClick={() => toggle(j._id)} sx={{ ...ghost, color: MUTED, borderColor: LINE }}>รายละเอียด</Button>)
                 : s.nv
                   ? (s.i === 0
@@ -853,7 +853,7 @@ function NoteDoneDialog({ job, onClose, onDone }) {
       </DialogContent>
       <DialogActions sx={{ px: 2.5, pb: 2, gap: 1 }}>
         <Button onClick={onClose} disabled={saving} sx={{ ...BTN, color: MUTED, border: `1px solid ${LINE}` }}>ยกเลิก</Button>
-        <Button variant="contained" onClick={confirm} disabled={saving} startIcon={<TaskAltRounded sx={{ fontSize: "17px !important" }} />} sx={{ ...SUCCESS, px: 2 }}>
+        <Button variant="contained" onClick={confirm} disabled={saving} startIcon={<TaskAltRounded sx={{ fontSize: "17px !important" }} />} sx={{ ...PRIMARY, px: 2 }}>
           {saving ? (list.length ? "กำลังอัปโหลดและบันทึก…" : "กำลังบันทึก…") : "ยืนยันทำเสร็จ"}
         </Button>
       </DialogActions>
@@ -907,7 +907,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
         <Button variant="outlined" onClick={() => onCancel(job)} startIcon={<BlockRounded sx={{ fontSize: "17px !important" }} />}
           sx={{ ...BTN, flex: { xs: 1, sm: "0 0 auto" }, color: RED, borderColor: alpha(RED, 0.35), "&:hover": { borderColor: RED, bgcolor: alpha(RED, 0.04) } }}>ยกเลิก</Button>
         <Button variant="contained" onClick={() => onNoteDone(job)} startIcon={<TaskAltRounded sx={{ fontSize: "17px !important" }} />}
-          sx={{ ...SUCCESS, flex: { xs: 1.6, sm: "0 0 auto" } }}>ยืนยันทำเสร็จ</Button>
+          sx={{ ...PRIMARY, flex: { xs: 1.6, sm: "0 0 auto" } }}>ยืนยันทำเสร็จ</Button>
       </>
     ) : (
       <Button variant="outlined" onClick={() => onNoteDone(job, true)} startIcon={<RestoreRounded sx={{ fontSize: "17px !important" }} />}
