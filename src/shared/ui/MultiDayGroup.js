@@ -18,6 +18,9 @@ import AttendanceService from "@/shared/services/AttendanceService";
 import useRealtime from "@/shared/realtime/useRealtime";
 import { formatThai } from "@/shared/utils/thaiDate";
 import { FLOW_SINCE } from "@/shared/utils/jobFlow";
+import { GroupSessionContext } from "./groupSessionContext";
+const PRIMARY = { primary: true };
+const FOLLOWER = { primary: false };
 
 /** sx ของกรอบการ์ดกลุ่ม (ใส่ให้ Card/Box ภายนอก) */
 export const multiDayCardSx = (statusColor = "#94a3b8") => ({
@@ -211,11 +214,15 @@ export function SessionList({ sessions, anchorId, att, renderCard }) {
   const pastOpen = showPast || (!now.length && !next.length);
   // ช่วงที่ถือเอกสาร/ขอปิดงาน ต้องเห็นเสมอ แม้อยู่ในกลุ่มที่ผ่านมา
   const anchorPast = past.find((x) => x.s._id === anchorId);
+  // ช่วงหลัก = ช่วงบนสุดที่แสดง (วันนี้ → ถัดไป → ช่วงที่ถือเอกสาร) — ปุ่มรับทราบ/ยืนยันนัด (มีผลทั้งงาน) อยู่ที่ช่วงนี้ช่วงเดียว
+  const primaryId = (now[0] || next[0] || anchorPast || past[0])?.s._id;
   const frame = (x) => (
-    <Box key={x.s._id} sx={{ bgcolor: "#fff", border: `1px solid ${x.st.key === "today" ? alpha("#2563eb", 0.4) : "#e2e8f0"}`, borderRadius: 3, overflow: "hidden", boxShadow: "0 1px 2px rgba(15,23,42,.05)" }}>
+    <GroupSessionContext.Provider key={x.s._id} value={x.s._id === primaryId ? PRIMARY : FOLLOWER}>
+    <Box sx={{ bgcolor: "#fff", border: `1px solid ${x.st.key === "today" ? alpha("#2563eb", 0.4) : "#e2e8f0"}`, borderRadius: 3, overflow: "hidden", boxShadow: "0 1px 2px rgba(15,23,42,.05)" }}>
       <SessionBar order={x.order} total={total} session={x.s} st={x.st} isAnchor={x.s._id === anchorId} />
       {renderCard(x.s)}
     </Box>
+    </GroupSessionContext.Provider>
   );
   return (
     <Stack spacing={1.25}>

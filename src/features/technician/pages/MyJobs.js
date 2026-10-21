@@ -17,7 +17,7 @@ import PdfBlobView from "@/shared/components/PdfBlobView";
 import useRealtime from "@/shared/realtime/useRealtime";
 import { Link, useSearchParams } from "react-router-dom";
 import { History } from "@mui/icons-material";
-import { isRespOrHead, isResponsibleOf, ackTracked, isAckedBy, isClosedJob } from "@/shared/utils/jobFlow";
+import { isRespOrHead, isResponsibleOf, ackTracked, isClosedJob } from "@/shared/utils/jobFlow";
 import { useAuth } from "@/features/auth/AuthContext";
 import moment from "moment";
 import "@/shared/utils/momentThaiLocale";
@@ -187,7 +187,8 @@ const nextActionOf = (a, uid, fname) => {
   if (isClosedJob(a)) return { label: "ดูงาน", tone: "#64748b" };
   if (a.approvalStatus === "pending") return { label: "รออนุมัติ", tone: "#d97706", wait: true };
   if (a.closeRequested) return { label: "รอตรวจปิดงาน", tone: "#0891b2", wait: true };
-  if (ackTracked(a) && !isAckedBy(a, uid)) return { label: "รับทราบงาน", tone: "#2563eb", primary: true };
+  // 🔁 (21 ต.ค. 2569) รับทราบเป็นของทั้งทีม — ตรงกับกล่องขั้นตอนในการ์ด (มีคนในทีมกดแล้ว = รับทราบแล้ว)
+  if (ackTracked(a) && !(a.acks || []).length) return { label: "รับทราบงาน", tone: "#2563eb", primary: true };
   if (a.status === "กำลังรอยืนยัน" && isResponsibleOf(a, uid, fname)) return { label: "ยืนยันนัดหมาย", tone: "#2563eb", primary: true };
   if (moment().startOf("day").isBefore(moment(a.start).startOf("day"))) return { label: "ดูรายละเอียด", tone: "#475569" };
   // 🐛 (19 ต.ค. 2569 ผู้ใช้: "มีปุ่มบันทึกเข้างาน แต่กดแล้วไม่ให้บันทึก") — บันทึกเข้างานได้เฉพาะหัวหน้าทีม

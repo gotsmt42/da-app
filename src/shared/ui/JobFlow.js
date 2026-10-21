@@ -331,6 +331,14 @@ export function JobFlowPanel({ event, mode = "tech", onPatched, onStatusUpdate, 
   // ✅ (11 ต.ค. 2569 ผู้ใช้: "หน้าการดำเนินงานปรับรูปแบบให้คล้ายงานของฉัน") — แอดมิน: งานที่ใช้ระบบเข้างาน
   //    มีแถบขั้นตอน (รับทราบ › เข้างาน › เอกสาร › ขอปิดงาน) ในการ์ดแล้ว เหลือกล่องนี้เฉพาะขั้นที่มีปุ่มให้กด (อนุมัติแผน/ยืนยันนัด)
   if (step && mode === "admin" && !closed && attendanceTracked(event) && !step.action) step = null;
+  // 🐛 (21 ต.ค. 2569 ผู้ใช้: "บางทีปุ่ม รับทราบ ยืนยันนัดหมาย บันทึก ขึ้นซ้ำในหน้า สีเขียวและน้ำเงิน")
+  //    แอดมินที่เป็นผู้รับผิดชอบ (หรือหัวหน้าทีมเมื่อไม่มีผู้รับผิดชอบ) มีปุ่ม "ยืนยันนัดหมาย" ในกล่องขั้นตอน (CheckInOutPanel) อยู่แล้ว
+  //    → ไม่ต้องมีปุ่ม "ยืนยันนัดหมายแทน" ซ้ำตรงนี้ · ปุ่ม "แทน" เหลือไว้ให้แอดมินที่ไม่ได้อยู่ในงาน
+  if (step?.action?.confirm && mode === "admin" && attendanceTracked(event) && mine) {
+    const resp = event.responsiblePerson;
+    const confirmsInPanel = resp ? resp === fname : (event.team === fname || (event.resPerson && String(event.resPerson) === String(userId)));
+    if (confirmsInPanel) step = null;
+  }
   // งานปิดแล้ว — ป้ายสถานะบนหัวการ์ดบอกอยู่แล้ว ไม่ต้องมีกล่อง "เสร็จสิ้น" ซ้ำ (11 ต.ค. 2569)
   if (closed) step = null;
   const confirmAppointment = onStatusUpdate ? async () => {

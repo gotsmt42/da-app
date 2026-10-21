@@ -19,7 +19,7 @@
  * @param user      ผู้ใช้ปัจจุบัน — ส่งมาเองเมื่อ mount นอก AuthProvider (เช่นในฟอร์ม EditEvent ที่เป็น SweetAlert)
  * @param embedded  อยู่ในฟอร์ม SweetAlert — ห้ามเรียก Swal ซ้อน (จะปิดฟอร์มที่เปิดอยู่ทิ้ง) ใช้ข้อความในกล่องแทน
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 import moment from "moment";
 import Swal from "@/shared/ui/swal";
 import { Box, Stack, Typography, Button, ButtonBase, Collapse, Dialog, DialogContent, TextField } from "@mui/material";
@@ -42,7 +42,8 @@ import { formatThai } from "@/shared/utils/thaiDate";
 import { INK, INK_2, MUTED, FAINT, SURFACE, ACCENT, LINE } from "@/shared/ui/PageKit";
 import { fmtTime, locationBadge } from "../attendanceMeta";
 import CheckDialog from "./CheckDialog";
-import AttendanceList from "./AttendanceList";
+import AttendanceList from "./AttendanceList";import { GroupSessionContext } from "@/shared/ui/groupSessionContext";
+
 
 // ✅ (10 ต.ค. 2569 ผู้ใช้: "เช็คอินให้ยึดหัวหน้าทีมเป็นหลัก แสดงชื่อลูกทีมด้วย ต้องสอดคล้องกับงานใน event ต้องตามขั้นตอน")
 //    ขั้นตอนเต็ม: รับทราบ → เช็คอิน (วันเข้างาน + รูป) → เช็คเอาต์ (+ Service Report) → ส่งเอกสาร → ขอปิดงาน
@@ -288,6 +289,7 @@ export default function CheckInOutPanel({ event, onPreview, onChanged, onPatched
   const userData = user || auth.userData;
   const me = String(userData?.userId || "");
   const participant = Boolean(event) && isParticipant(event, me, userData?.fname);
+  const groupPrimary = useContext(GroupSessionContext).primary;
   const isApprover = can(userData, "approveJobs");
   const [rows, setRows] = useState(null);
   const [dialog, setDialog] = useState(false);
@@ -631,6 +633,8 @@ ${text}`);
         );
     } else if (!acked && !canAck) {
       line = <Line icon={<InfoOutlined />} tone={MUTED}>รอผู้รับผิดชอบ{respName ? ` ${respName}` : ""} กดรับทราบงาน · เข้างาน {day}</Line>;
+    } else if (!acked && !groupPrimary) {
+      line = <Line icon={<InfoOutlined />} tone={MUTED}>ยังไม่รับทราบ · กดรับทราบที่ช่วงบนสุด (ครั้งเดียวทั้งงาน)</Line>;
     } else if (!acked) {
       // ✅ รับทราบ (ปุ่มหลัก) + ปฏิเสธ (เส้นขอบแดง) คู่กัน — เฉพาะผู้รับผิดชอบ (ไม่มีผู้รับผิดชอบ → หัวหน้าทีม)
       line = (
@@ -645,9 +649,10 @@ ${text}`);
       );
     } else if (!confirmed) {
       // ✅ ขั้นถัดจากรับทราบ: ผู้รับผิดชอบยืนยันนัดหมาย (สถานะงาน → ยืนยันแล้ว)
-      line = canAck ? (
+      line = canAck && !groupPrimary ? <Line icon={<InfoOutlined />} tone={MUTED}>รับทราบแล้ว · กดยืนยันนัดหมายที่ช่วงบนสุด (ครั้งเดียวทั้งงาน)</Line>
+      : canAck ? (
         <Box>
-          <Button fullWidth variant="contained" disableElevation startIcon={<TaskAltRounded />} disabled={acking} onClick={confirmJob} sx={{ ...MBTN.success, minHeight: 40 }}>
+          <Button fullWidth variant="contained" disableElevation startIcon={<TaskAltRounded />} disabled={acking} onClick={confirmJob} sx={{ ...MBTN.primary, minHeight: 40 }}>
             {acking ? "กำลังบันทึก…" : `ยืนยันนัดหมาย · เข้างาน ${day}`}
           </Button>
           <Typography sx={{ mt: 0.5, textAlign: "center", fontSize: "0.72rem", color: MUTED }}>ยืนยันวันเข้างานกับลูกค้าแล้ว จึงกด · หัวหน้าทีมจะได้รับแจ้ง</Typography>
