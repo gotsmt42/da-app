@@ -21,6 +21,7 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
 } from "@mui/material";
 import PageLoader from "@/shared/ui/PageLoader";
+import { EmptyState } from "@/shared/ui/PageKit";
 import { alpha } from "@mui/material/styles";
 import {
   Refresh, Search, Bolt, Schedule, Inbox, Description, Place,
@@ -380,7 +381,11 @@ const COLUMN_META = {
 /**
  * @param embedded  ฝังในหน้า "คำขอลงงาน" — ใช้ช่องค้นหา/รีเฟรชของหน้าแม่ ไม่มีแถบเครื่องมือของตัวเอง (11 ต.ค. 2569)
  */
-export default function DispatchList({ mode = "board", myId = "", embedded = false, search: extSearch = "", refreshKey = 0 }) {
+/**
+ * @param section  (board + embedded) แสดงเฉพาะส่วน "waiting" (รอลงแผนงาน) หรือ "assigned" (ลงแผนงานแล้ว) — หน้าแม่ทำแท็บเอง
+ * @param onCounts รายงานจำนวนแต่ละส่วนให้หน้าแม่ (ตัวเลขบนแท็บ)
+ */
+export default function DispatchList({ mode = "board", myId = "", embedded = false, search: extSearch = "", refreshKey = 0, section = null, onCounts }) {
   const isDesktop = useMediaQuery("(min-width:900px)");
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -471,6 +476,10 @@ export default function DispatchList({ mode = "board", myId = "", embedded = fal
   const waitingRows = quickList.filter((d) => d.status === "requested")
     .sort((a, b) => (b.priority === "urgent") - (a.priority === "urgent") || new Date(a.requestedAt) - new Date(b.requestedAt));
   const assignedRows = quickList.filter((d) => d.status === "assigned");
+  const nWaiting = waitingRows.length;
+  const nAssigned = assignedRows.length;
+  const loaded = !loading || rows.length > 0;
+  useEffect(() => { if (loaded) onCounts?.({ waiting: nWaiting, assigned: nAssigned }); }, [loaded, nWaiting, nAssigned, onCounts]);
   const upcoming = assignedRows.filter((d) => !d.job?.start || !moment(d.job.start).isBefore(today, "day"))
     .sort((a, b) => new Date(a.job?.start || 0) - new Date(b.job?.start || 0));
   const past = assignedRows.filter((d) => d.job?.start && moment(d.job.start).isBefore(today, "day"))
@@ -517,9 +526,11 @@ export default function DispatchList({ mode = "board", myId = "", embedded = fal
           quickList.length ? <DispatchTable rows={quickList} onOpen={open} /> : <AllClear text={search ? "ไม่พบรายการที่ค้นหา" : "ไม่มีรายการในตัวกรองนี้"} />
         ) : (
           <>
-            <SectionHead color={AMBER} title={embedded ? "ใบแจ้งงานรอลงแผนงาน" : "รอลงแผนงาน"} count={waitingRows.length} hint="ยังไม่มีวันนัด — ตรวจรายละเอียด แล้วเลือกวันเข้างาน + ช่าง" />
+            {section !== "assigned" && (<>
+            {!section && <SectionHead color={AMBER} title={embedded ? "ใบแจ้งงานรอลงแผนงาน" : "รอลงแผนงาน"} count={waitingRows.length} hint="ยังไม่มีวันนัด — ตรวจรายละเอียด แล้วเลือกวันเข้างาน + ช่าง" />}
             {waitingRows.length === 0 ? (
-              <AllClear text="เคลียร์หมดแล้ว — ไม่มีคำขอรอลงแผนงาน" />
+              section ? <EmptyState icon={<TaskAlt />} title={search ? "ไม่พบคำขอที่ค้นหา" : "เคลียร์หมดแล้ว"} hint={search ? "ลองคำค้นอื่น" : "ไม่มีใบแจ้งงานรอลงแผนงาน"} />
+                : <AllClear text="เคลียร์หมดแล้ว — ไม่มีคำขอรอลงแผนงาน" />
             ) : (
               <Stack spacing={1} sx={{ mb: 2.5 }}>
                 {waitingRows.map((d) => {
@@ -554,15 +565,19 @@ export default function DispatchList({ mode = "board", myId = "", embedded = fal
               </Stack>
             )}
 
-            <SectionHead color={BLUE} title="ลงแผนงานแล้ว" count={assignedRows.length} hint="ลงตารางงานแล้ว — งานที่กำลังทำ/ปิดงานดูต่อที่หน้าการดำเนินงาน" />
+            </>)}
+            {section !== "waiting" && (<>
+            {!section && <SectionHead color={BLUE} title="ลงแผนงานแล้ว" count={assignedRows.length} hint="ลงตารางงานแล้ว — งานที่กำลังทำ/ปิดงานดูต่อที่หน้าการดำเนินงาน" />}
             {assignedRows.length === 0 ? (
-              <Typography sx={{ px: 0.5, fontSize: "0.8rem", color: TEXT_SUB }}>ยังไม่มีใบที่ลงแผนงาน</Typography>
+              section ? <EmptyState icon={<EventAvailable />} title={search ? "ไม่พบคำขอที่ค้นหา" : "ยังไม่มีใบที่ลงแผนงาน"} hint="ใบแจ้งงานที่ลงแผนงานแล้วจะอยู่ที่นี่ — งานที่กำลังทำดูต่อที่หน้าการดำเนินงาน" />
+                : <Typography sx={{ px: 0.5, fontSize: "0.8rem", color: TEXT_SUB }}>ยังไม่มีใบที่ลงแผนงาน</Typography>
             ) : (
               <>
                 {upcoming.length > 0 && <RowGroup title="กำลังจะเข้างาน" count={upcoming.length} color={BLUE}>{upcoming.map(assignedRow)}</RowGroup>}
                 {past.length > 0 && <RowGroup title="เข้างานไปแล้ว" count={past.length} color={FAINT_DOT} defaultOpen={upcoming.length === 0}>{past.map(assignedRow)}</RowGroup>}
               </>
             )}
+            </>)}
           </>
         )}
 

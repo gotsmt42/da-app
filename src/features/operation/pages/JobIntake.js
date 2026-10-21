@@ -368,7 +368,7 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, onUplo
                   <ChevronRight sx={{ fontSize: 20, color: "#94a3b8", transition: "transform .15s", transform: isOpen ? "rotate(90deg)" : "none" }} />
                 </Box>
                 {/* ✅ (19 ต.ค. 2569 ผู้ใช้: "เอาช่องวันที่ไปไว้หน้าสุด ชัดเจน สวยงาม") — กล่องวันที่แบบปฏิทิน (ยังไม่ลงวัน = กล่องเส้นประบอกแผน) */}
-                <Box component="td" sx={{ ...td, width: 96 }}>
+                <Box component="td" sx={{ ...td, width: 84 }}>
                   <DateCell start={j.unscheduled || j.intakeNote ? null : (j.noVisit ? (j.deliveredAt || j.start) : j.start)} end={j.noVisit ? null : j.end} allDay={j.allDay}
                     label={scheduleShort(j)}>
                     {j.dueDate && s.i < 4 && (
@@ -1377,7 +1377,7 @@ export default function JobIntake() {
 
   return (
     // ✅ (19 ต.ค. 2569 ผู้ใช้: "ถ้ามันล้นให้ขยายตารางออกอีก") มุมมองตาราง = กว้างเต็มพื้นที่ (ไม่จำกัด 1500)
-    <Box sx={view === "table" ? { ...PAGE_SX, maxWidth: "none" } : PAGE_SX}>
+    <Box sx={{ ...PAGE_SX, maxWidth: "none" }}>
       <SectionTabs group="intake" />
       <PageHeader icon={<PostAddOutlined />} title="งานเข้า · รับงาน"
         subtitle="รับงาน → ลงตารางเข้าหน้างาน หรือ ส่งของ → วางบิล · กดช่องใบเสนอราคาเพื่ออัปเดตได้ทันที"

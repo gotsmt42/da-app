@@ -240,7 +240,7 @@ function MyJobsTable({ groups, allGroups, overdueOf, renderCard, highlightJob, u
                 id={sessions.some((x) => String(x._id) === highlightJob) ? `myjob-${highlightJob}` : undefined}
                 sx={{ cursor: "pointer", scrollMarginTop: "80px", bgcolor: isOpen ? "#f5f8ff" : "#fff", "&:hover": { bgcolor: isOpen ? "#f5f8ff" : SURFACE },
                   ...(od ? { boxShadow: `inset 3px 0 0 ${od.severe ? "#dc2626" : "#d97706"}` } : {}) }}>
-                <Box component="td" sx={{ ...td, width: 96 }}>
+                <Box component="td" sx={{ ...td, width: 84 }}>
                   <DateCell start={a.start} end={a.end} allDay={a.allDay}>
                     {sessions.length > 1 && <Typography sx={{ ...sub, color: ACCENT, fontWeight: 700, mt: 0.4, whiteSpace: "nowrap" }}>+ อีก {sessions.length - 1} ช่วง</Typography>}
                     {od && (

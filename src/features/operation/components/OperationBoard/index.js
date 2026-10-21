@@ -2320,7 +2320,7 @@ const OperationTable = ({ jobGroups, daysPastDueMap, onOpenJob, employee, canAss
             <TableRow key={a._id} hover onClick={() => onOpenJob(job)}
               sx={{ cursor: "pointer", "&:last-child td": { borderBottom: 0 }, ...(isOverdue ? { boxShadow: "inset 3px 0 0 #dc2626" } : {}) }}>
               {/* ✅ (19 ต.ค. 2569 ผู้ใช้: "เอาช่องวันที่ไปไว้หน้าสุด ชัดเจน สวยงาม") กล่องวันที่แบบปฏิทิน + ช่วงวันอื่น + ค้าง */}
-              <TableCell sx={{ width: 96 }}>
+              <TableCell sx={{ width: 84 }}>
                 <DateCell start={a.start} end={a.end} allDay={a.allDay}>
                   {job.sessions.length > 1 && <Typography sx={{ ...sub, color: ACCENT, fontWeight: 700, mt: 0.4, whiteSpace: "nowrap" }}>+ อีก {job.sessions.length - 1} ช่วง</Typography>}
                   {isOverdue && (
