@@ -1154,6 +1154,24 @@ function useQuotationActions(fetchJobs, toast, userData) {
 }
 
 /**
+ * 🔁 (21 ต.ค. 2569 ผู้ใช้: "บันทึกงาน แนบใบเสนอราคาตอนทำเสร็จ แล้วใบเสนอราคาให้เข้าไปดำเนินการได้")
+ *    บันทึกงาน (ไม่ลงตาราง) ที่แนบใบเสนอราคา ไม่อยู่ใน event-op → ดึงจากรายการงานรอลงตารางมาต่อท้าย
+ *    ใช้วันที่ทำเสร็จ/วันที่บันทึกแทนวันเข้างาน
+ */
+async function withQuotedNotes(events) {
+  try {
+    const dr = await EventService.GetDraftEvents();
+    const have = new Set(events.map((e) => String(e._id)));
+    const notes = (dr?.drafts || [])
+      .filter((d) => d.intakeNote && !d.cancelledAt && !have.has(String(d._id)) && ((d.quotationFiles || []).length || d.quotationStatus))
+      .map((d) => ({ ...d, start: d.start || d.noteDoneAt || d.intakeAt, end: d.end || d.noteDoneAt || d.intakeAt, title: d.title || "บันทึกงาน", site: d.site || d.description?.slice(0, 60) || "" }));
+    return [...events, ...notes];
+  } catch {
+    return events;
+  }
+}
+
+/**
  * QuotationDialogHost — เปิด "กล่องใบเสนอราคา" ตัวเดียวกับหน้านี้ จากหน้าอื่นได้เลย (เช่นหน้างานเข้า)
  * ✅ (19 ต.ค. 2569 ผู้ใช้: "อยากให้กดเปิดฟอร์มหน้าติดตามใบเสนอราคาได้เลย · ดำเนินการในหน้านี้ได้เลย")
  *    แนบไฟล์ · เริ่มนับ · บันทึกติดตาม · ได้งาน/ไม่ได้งาน · คอมเมนต์ — ฟอร์มและการบันทึกชุดเดียวกัน ไม่มีสองเวอร์ชัน
@@ -1168,7 +1186,7 @@ export function QuotationDialogHost({ eventId, onClose, onChanged }) {
   const fetchJobs = useCallback(async (silent = false) => {
     try {
       const res = await EventService.getEventOp({ detail: true });
-      setEvents(res?.userEvents || []);
+      setEvents(await withQuotedNotes(res?.userEvents || []));
       if (silent) onChanged?.();
     } catch {
       toast("โหลดข้อมูลไม่สำเร็จ", "error");
@@ -1237,7 +1255,7 @@ export default function QuotationTracking() {
     try {
       // ⚠️ detail = ขอ activityLog มาด้วย (ประวัติใบเสนอราคาในกล่องรายละเอียด)
       const res = await EventService.getEventOp({ detail: true });
-      setEvents(res?.userEvents || []);
+      setEvents(await withQuotedNotes(res?.userEvents || []));
       setLastRefreshed(new Date());
     } catch {
       if (!silent) toast("โหลดรายการไม่สำเร็จ", "error");

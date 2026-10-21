@@ -15,7 +15,7 @@
  *   • งานไม่ต้องเข้างาน: รับงาน → ส่งมอบ → วางบิล (อัปโหลดใบวางบิล) → เสร็จ · ไม่ขึ้นปฏิทิน/งานช่าง
  *     แต่ขึ้นหน้าติดตามวางบิลให้ตามรับเงินต่อ
  */
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import lazyWithRetry from "@/shared/utils/lazyWithRetry";
 import usePaged, { PageBar } from "@/shared/ui/usePaged";
 import DateCell from "@/shared/ui/DateCell";
@@ -61,6 +61,7 @@ import { can, rankLabel } from "@/shared/utils/roles";
 import PersonSelectField from "@/shared/ui/PersonSelectField";
 import DispatchList from "@/features/dispatch/components/DispatchList";
 import MobileSheet from "@/shared/ui/MobileSheet";
+import { useFileGallery } from "@/shared/ui/FileGalleryDialog";
 import { initialViewMode } from "@/shared/ui/ViewToggle";
 
 
@@ -148,7 +149,9 @@ const OUTCOME = {
   none: { label: "ยังไม่มี", color: MUTED, act: "แนบใบเสนอราคา", quiet: true, intake: true },
 };
 const outcomeOf = (job, st, sessions) => {
-  if (!st || st.note || st.i === -1) return null;
+  if (!st || st.i === -1) return null;
+  // 🔁 (21 ต.ค. 2569) บันทึกงานที่แนบใบเสนอราคาตอนทำเสร็จ → ติดตามผลเสนอราคาได้เหมือนงานอื่น
+  if (st.note && !(job.quotationFiles || []).length && !job.quotationStatus) return null;
   const list = (sessions && sessions.length ? sessions : [job]).slice().sort((a, b) => new Date(b.start || 0) - new Date(a.start || 0));
   const anchor = list.find((e) => e.quotationStatus || (e.quotationFiles || []).length || e.quotationApplicable === true) || list[0];
   const key = resolveQuotationGroup(anchor);
@@ -162,7 +165,7 @@ const outcomeOf = (job, st, sessions) => {
   if (!key) {
     if (st.nv) return null; // งานส่งของ ไม่มีขั้นเสนอราคา
     const ik = anchor.quotationApplicable === false ? "na" : "none";
-    return { key: ik, ...OUTCOME[ik], facts: [], amount: 0, href: null, files: [], qid: job.unscheduled ? null : anchor._id };
+    return { key: ik, ...OUTCOME[ik], facts: [], amount: 0, href: null, files: [], qid: job.unscheduled && !job.intakeNote ? null : anchor._id };
   }
   const fu = getFollowUpInfo(anchor);
   const facts = [];
@@ -350,7 +353,7 @@ function JobTable({ rows, readOnlyOf, requestMode, onSchedule, onDeliver, onUplo
               ? (!j.unscheduled && !s.nv && !s.note ? <Button component={Link} to={`/operation/${j._id}`} size="small" sx={ghost}>ดูงาน</Button> : <Button size="small" onClick={() => toggle(j._id)} sx={{ ...ghost, color: MUTED, borderColor: LINE }}>รายละเอียด</Button>)
               : s.note
                 ? (s.i === 0
-                  ? <Button size="small" onClick={() => onNoteDone(j)} sx={{ ...SUCCESS, height: 30, px: 1.25 }}>ทำเสร็จแล้ว</Button>
+                  ? <Button size="small" onClick={() => onNoteDone(j)} sx={{ ...SUCCESS, height: 30, px: 1.25 }}>ยืนยันทำเสร็จ</Button>
                   : <Button size="small" onClick={() => toggle(j._id)} sx={{ ...ghost, color: MUTED, borderColor: LINE }}>รายละเอียด</Button>)
                 : s.nv
                   ? (s.i === 0
@@ -738,6 +741,126 @@ const FileLinks = ({ files, label = "เอกสารรับงาน" }) =>
   </>
 );
 
+/**
+ * ไฟล์ของบันทึกงาน (ในหน้าต่างรายละเอียด)
+ * ✅ (21 ต.ค. 2569 ผู้ใช้: "รายละเอียดแสดงให้ครบ แนบไฟล์ไปไม่ขึ้น · ใบเสนอราคาให้เข้าไปดำเนินการได้")
+ *    ไฟล์ตอนบันทึก · ไฟล์ที่แนบเพิ่ม · ใบเสนอราคา (+ สถานะติดตาม กดอัปเดตผลได้) · แนบเพิ่มได้ · เลื่อนดูไฟล์ต่อกันได้
+ */
+const NOTE_FILE_TYPES = [["quotation", "ใบเสนอราคา", RequestQuoteOutlined], ["sitePhoto", "ไฟล์อื่น", AttachFileRounded]];
+function NoteFiles({ job, outcome, readOnly, onChanged }) {
+  const gal = useFileGallery();
+  const inputRef = useRef(null);
+  const [pickType, setPickType] = useState("quotation");
+  const [busy, setBusy] = useState(0);
+  const items = [
+    ...(job.sitePhotoFiles || []).map((f) => ({ ...f, tag: f.source === "intake" ? "ตอนบันทึก" : "แนบเพิ่ม", tone: f.source === "intake" ? "#0891b2" : MUTED })),
+    ...(job.quotationFiles || []).map((f) => ({ ...f, tag: "ใบเสนอราคา", tone: ACCENT })),
+  ];
+  const pick = (t) => { setPickType(t); setTimeout(() => inputRef.current?.click(), 0); };
+  const onPick = async (e) => {
+    const files = [...(e.target.files || [])]; e.target.value = "";
+    if (!files.length) return;
+    let failed = 0;
+    setBusy(files.length);
+    for (const f of files) { try { await EventService.Upload(job._id, f, pickType); } catch { failed += 1; } setBusy((n) => n - 1); }
+    if (failed) Swal.fire({ icon: "warning", title: "อัปโหลดไม่ครบ", text: `ไม่สำเร็จ ${failed} ไฟล์` });
+    onChanged?.();
+  };
+  return (
+    <Box sx={{ mt: 1, px: 1.25, py: 1, borderRadius: 2, bgcolor: "#fff", border: `1px solid ${LINE}` }}>
+      <Stack direction="row" alignItems="center" gap={1} sx={{ flexWrap: "wrap" }}>
+        <Typography sx={{ flex: 1, fontSize: "0.78rem", fontWeight: 800, color: INK }}>ไฟล์แนบ{items.length ? ` · ${items.length}` : ""}</Typography>
+        {!readOnly && NOTE_FILE_TYPES.map(([t, label, Icon]) => (
+          <Button key={t} size="small" disabled={Boolean(busy)} onClick={() => pick(t)} startIcon={<Icon sx={{ fontSize: "16px !important" }} />}
+            sx={{ ...BTN, height: 30, px: 1.1, color: ACCENT, border: `1px solid ${alpha(ACCENT, 0.35)}` }}>+ {label}</Button>
+        ))}
+        <input ref={inputRef} type="file" hidden multiple accept="image/*,.heic,.heif,.pdf,.doc,.docx,.xls,.xlsx" onChange={onPick} />
+      </Stack>
+      {busy > 0 && <Typography sx={{ mt: 0.5, fontSize: "0.74rem", color: ACCENT, fontWeight: 700 }}>กำลังอัปโหลด {busy} ไฟล์…</Typography>}
+      {items.length ? (
+        <Stack spacing={0.5} sx={{ mt: 0.75 }}>
+          {items.map((f) => (
+            <Stack key={f._id || f.fileUrl} direction="row" alignItems="center" gap={1} onClick={() => gal.open(f.fileUrl, f.fileName, items)}
+              sx={{ px: 1, py: 0.6, borderRadius: 1.5, bgcolor: SURFACE, cursor: "pointer", "&:hover": { bgcolor: "#eef2f6" } }}>
+              <AttachFileRounded sx={{ fontSize: 16, color: MUTED }} />
+              <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.8rem", fontWeight: 600, color: INK }}>{f.fileName}</Typography>
+              <Box component="span" sx={{ flexShrink: 0, fontSize: "0.68rem", fontWeight: 800, color: f.tone }}>{f.tag}</Box>
+              {f.uploadedAt && <Box component="span" sx={{ flexShrink: 0, fontSize: "0.66rem", color: "#94a3b8" }}>{formatThai(moment(f.uploadedAt), "D MMM HH:mm")}</Box>}
+            </Stack>
+          ))}
+        </Stack>
+      ) : <Typography sx={{ mt: 0.5, fontSize: "0.76rem", color: "#94a3b8" }}>ยังไม่มีไฟล์แนบ</Typography>}
+      {outcome && (outcome.files || []).length > 0 && (
+        <Box sx={{ mt: 1, pt: 1, borderTop: `1px dashed ${LINE}` }}>
+          <Typography sx={{ fontSize: "0.7rem", fontWeight: 800, color: "#94a3b8", mb: 0.5 }}>ติดตามใบเสนอราคา · กดเพื่ออัปเดตผล</Typography>
+          <QuoteCell oc={outcome} compact={false} />
+        </Box>
+      )}
+      {gal.dialog}
+    </Box>
+  );
+}
+
+/** ยืนยันทำบันทึกงานเสร็จ + แนบไฟล์ตอนทำเสร็จ (ไม่บังคับ) — ใบเสนอราคาเข้าระบบติดตามทันที */
+function NoteDoneDialog({ job, onClose, onDone }) {
+  const inputRef = useRef(null);
+  const [pickType, setPickType] = useState("quotation");
+  const [list, setList] = useState([]); // { file, type }
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+  const pick = (t) => { setPickType(t); setTimeout(() => inputRef.current?.click(), 0); };
+  const onPick = (e) => { const fs = [...(e.target.files || [])]; e.target.value = ""; setList((p) => [...p, ...fs.map((file) => ({ file, type: pickType }))]); };
+  const confirm = async () => {
+    setSaving(true); setErr("");
+    try {
+      for (const it of list) await EventService.Upload(job._id, it.file, it.type);
+      await EventService.NoteDone(job._id, {});
+      onDone?.(list.some((x) => x.type === "quotation"));
+    } catch (e) {
+      setErr(e?.response?.data?.message || e?.message || "บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง");
+      setSaving(false);
+    }
+  };
+  return (
+    <Dialog open onClose={saving ? undefined : onClose} fullWidth maxWidth="sm" PaperProps={{ sx: { borderRadius: 3 } }}>
+      <Box sx={{ px: 2.5, pt: 2.25, pb: 1 }}>
+        <Typography sx={{ fontSize: "1.05rem", fontWeight: 900, color: INK }}>ยืนยันว่าทำงานนี้เสร็จแล้ว</Typography>
+        <Typography sx={{ mt: 0.75, px: 1.25, py: 1, borderRadius: 2, bgcolor: SURFACE, border: `1px solid ${LINE}`, fontSize: "0.86rem", color: "#334155", whiteSpace: "pre-line", overflowWrap: "anywhere" }}>{job.description || "บันทึกงาน"}</Typography>
+      </Box>
+      <DialogContent sx={{ pt: 1 }}>
+        <Typography sx={{ fontSize: "0.82rem", fontWeight: 800, color: INK }}>แนบไฟล์ตอนทำเสร็จ <Box component="span" sx={{ fontWeight: 500, color: MUTED }}>(ไม่บังคับ)</Box></Typography>
+        <Typography sx={{ fontSize: "0.74rem", color: MUTED, mb: 1 }}>เช่น ทำใบเสนอราคาเสร็จ → แนบใบเสนอราคา ระบบจะติดตามผลต่อที่หน้า “ติดตามใบเสนอราคา”</Typography>
+        <Stack direction="row" gap={1} sx={{ mb: 1 }}>
+          {NOTE_FILE_TYPES.map(([t, label, Icon]) => (
+            <Button key={t} disabled={saving} onClick={() => pick(t)} startIcon={<Icon sx={{ fontSize: "17px !important" }} />}
+              sx={{ ...BTN, flex: 1, color: ACCENT, border: `1px solid ${alpha(ACCENT, 0.35)}` }}>+ {label}</Button>
+          ))}
+          <input ref={inputRef} type="file" hidden multiple accept="image/*,.heic,.heif,.pdf,.doc,.docx,.xls,.xlsx" onChange={onPick} />
+        </Stack>
+        {list.length > 0 && (
+          <Stack spacing={0.5}>
+            {list.map((it, i) => (
+              <Stack key={i} direction="row" alignItems="center" gap={1} sx={{ px: 1, py: 0.6, borderRadius: 1.5, border: `1px solid ${LINE}` }}>
+                {it.type === "quotation" ? <RequestQuoteOutlined sx={{ fontSize: 17, color: ACCENT }} /> : <AttachFileRounded sx={{ fontSize: 17, color: MUTED }} />}
+                <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.8rem", fontWeight: 600 }}>{it.file.name}</Typography>
+                <Box component="span" sx={{ fontSize: "0.68rem", fontWeight: 800, color: it.type === "quotation" ? ACCENT : MUTED }}>{it.type === "quotation" ? "ใบเสนอราคา" : "ไฟล์อื่น"}</Box>
+                <IconButton size="small" disabled={saving} onClick={() => setList((p) => p.filter((_, k) => k !== i))} aria-label="เอาออก"><Close sx={{ fontSize: 16 }} /></IconButton>
+              </Stack>
+            ))}
+          </Stack>
+        )}
+        {err && <Typography sx={{ mt: 1, fontSize: "0.78rem", color: RED, fontWeight: 700 }}>{err}</Typography>}
+      </DialogContent>
+      <DialogActions sx={{ px: 2.5, pb: 2, gap: 1 }}>
+        <Button onClick={onClose} disabled={saving} sx={{ ...BTN, color: MUTED, border: `1px solid ${LINE}` }}>ยกเลิก</Button>
+        <Button variant="contained" onClick={confirm} disabled={saving} startIcon={<TaskAltRounded sx={{ fontSize: "17px !important" }} />} sx={{ ...SUCCESS, px: 2 }}>
+          {saving ? (list.length ? "กำลังอัปโหลดและบันทึก…" : "กำลังบันทึก…") : "ยืนยันทำเสร็จ"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 /** บรรทัดข้อมูล: ไอคอน + ข้อความ (ตัดบรรทัดได้ ไม่ล้น) */
 const Line = ({ icon: Icon, children, color = "#475569", strong }) => (
   <Stack direction="row" spacing={0.75} alignItems="flex-start" sx={{ minWidth: 0 }}>
@@ -746,7 +869,7 @@ const Line = ({ icon: Icon, children, color = "#475569", strong }) => (
   </Stack>
 );
 
-function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, onUploadInvoice, onNoteDone, onEdit, onCancel, onRestore, inRow = false, inSheet = false, employees = [] }) {
+function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, onUploadInvoice, onNoteDone, onNoteChanged, onEdit, onCancel, onRestore, inRow = false, inSheet = false, employees = [] }) {
   const owner = job.responsiblePerson ? employees.find((u) => u.fname === job.responsiblePerson || [u.fname, u.lname].filter(Boolean).join(" ") === job.responsiblePerson) : null;
   const st = stageOf(job);
   const stall = stalledDays(job, st);
@@ -784,7 +907,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
         <Button variant="outlined" onClick={() => onCancel(job)} startIcon={<BlockRounded sx={{ fontSize: "17px !important" }} />}
           sx={{ ...BTN, flex: { xs: 1, sm: "0 0 auto" }, color: RED, borderColor: alpha(RED, 0.35), "&:hover": { borderColor: RED, bgcolor: alpha(RED, 0.04) } }}>ยกเลิก</Button>
         <Button variant="contained" onClick={() => onNoteDone(job)} startIcon={<TaskAltRounded sx={{ fontSize: "17px !important" }} />}
-          sx={{ ...SUCCESS, flex: { xs: 1.6, sm: "0 0 auto" } }}>ทำเสร็จแล้ว</Button>
+          sx={{ ...SUCCESS, flex: { xs: 1.6, sm: "0 0 auto" } }}>ยืนยันทำเสร็จ</Button>
       </>
     ) : (
       <Button variant="outlined" onClick={() => onNoteDone(job, true)} startIcon={<RestoreRounded sx={{ fontSize: "17px !important" }} />}
@@ -836,7 +959,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
   // ✅ (15 ต.ค. 2569 ผู้ใช้: "หน้านี้ทำให้สวยงาม และดูข้อมูลง่ายด้วย")
   //    การ์ดแยกใบ: หัว (สถานะ · เลข Job · ป้าย) → ชื่องาน + โครงการ → ตารางข้อมูล "ป้าย : ค่า" → แถบขั้นตอนพื้นเทาด้านล่าง
   const nx = job.cancelledAt ? null : st.note
-    ? (st.i === 0 ? { title: "ทำงานนี้", desc: "เสร็จแล้วกด “ทำเสร็จแล้ว”" } : null)
+    ? (st.i === 0 ? { title: "ทำงานนี้", desc: "ทำเสร็จแล้วกด “ยืนยันทำเสร็จ” (แนบไฟล์ เช่น ใบเสนอราคา ได้ตอนกด)" } : null)
     : st.nv
       ? (st.i === 0 ? { title: "ส่งของ", desc: "ส่งของให้ลูกค้าแล้ว กด “ส่งของแล้ว” (แนบใบวางบิลได้เลย)" }
         : st.i === 2 ? { title: "วางบิล", desc: "กด “อัปโหลดใบวางบิล” แล้วตามรับเงินที่หน้าติดตามวางบิล" } : null)
@@ -1067,6 +1190,9 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                 </Typography>
               </Box>
             )}
+            {/* 🔁 (21 ต.ค. 2569 ผู้ใช้: "รายละเอียดแสดงให้ครบ แนบไฟล์ไปไม่ขึ้น") ไฟล์ของบันทึกงาน — ตอนบันทึก / ตอนทำเสร็จ / ใบเสนอราคา
+                + แนบเพิ่มได้ · ใบเสนอราคา = ติดตามผลต่อที่หน้าติดตามใบเสนอราคา */}
+            {inRow && job.intakeNote && <NoteFiles job={job} outcome={outcome} readOnly={readOnly} onChanged={onNoteChanged} />}
             {/* ✅ (15 ต.ค. 2569 ผู้ใช้: "แสดงรายละเอียดงานคร่าวๆด้วย") — กล่องรายละเอียด (ไม่เกิน 3 บรรทัด) + อุปกรณ์ที่ต้องเตรียม */}
             {!job.intakeNote && (
               <Box sx={{ mt: 1, px: 1.25, py: 0.9, borderRadius: 2, bgcolor: SURFACE, border: `1px solid ${LINE}` }}>
@@ -1171,7 +1297,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
         <Box sx={{ p: { xs: 1.25, sm: 2 } }}>
           <JobCard inRow inSheet job={job} outcome={outcome} readOnly={readOnly} requestMode={requestMode} employees={employees}
             onSchedule={(j) => { setSheetOpen(false); onSchedule?.(j); }} onDeliver={(j) => { setSheetOpen(false); onDeliver?.(j); }}
-            onUploadInvoice={onUploadInvoice} onNoteDone={onNoteDone} onEdit={(j) => { setSheetOpen(false); onEdit?.(j); }}
+            onUploadInvoice={onUploadInvoice} onNoteDone={onNoteDone} onNoteChanged={onNoteChanged} onEdit={(j) => { setSheetOpen(false); onEdit?.(j); }}
             onCancel={(j) => { setSheetOpen(false); onCancel?.(j); }} onRestore={onRestore} />
         </Box>
       </MobileSheet>
@@ -1343,7 +1469,10 @@ export default function JobIntake() {
   };
   // ✅ (15 ต.ค. 2569) บันทึกงาน → ทำเสร็จแล้ว / นำกลับมาทำต่อ
   // ✅ (19 ต.ค. 2569 ผู้ใช้: "ให้มีคอนเฟิร์มด้วย ทุกจุดที่มีการกดปุ่ม") — ถามก่อนเปลี่ยนสถานะทุกครั้ง
+  const [noteDoneJob, setNoteDoneJob] = useState(null);
   const noteDone = async (job, undo = false) => {
+    // 🔁 (21 ต.ค. 2569 ผู้ใช้: "บันทึกงานให้แนบไฟล์เพิ่มได้เวลาจะกดเสร็จ เช่น ใบเสนอราคา") → กล่องยืนยันพร้อมแนบไฟล์
+    if (!undo) { setNoteDoneJob(job); return; }
     const ok = await Swal.fire({
       icon: "question",
       title: undo ? "นำบันทึกนี้กลับมาทำต่อ?" : "ทำงานนี้เสร็จแล้ว?",
@@ -1530,13 +1659,13 @@ export default function JobIntake() {
           <Typography sx={{ fontSize: "0.76rem", color: MUTED, mb: 0.75, px: 0.5 }}>กดที่แถวเพื่อดูรายละเอียดทั้งหมด</Typography>
           <JobTable rows={pg.rows} employees={employees} refMode={tab === "waiting"} readOnlyOf={(j) => !canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone}
             renderCard={(j, oc, close) => <JobCard inRow inSheet employees={employees} job={j} outcome={oc} readOnly={!canManage && !isMine(j)} requestMode={!canManage}
-              onSchedule={(x) => { close?.(); setScheduling(x); }} onDeliver={(x) => { close?.(); setDelivering(x); }} onUploadInvoice={uploadInvoice} onNoteDone={noteDone}
+              onSchedule={(x) => { close?.(); setScheduling(x); }} onDeliver={(x) => { close?.(); setDelivering(x); }} onUploadInvoice={uploadInvoice} onNoteDone={noteDone} onNoteChanged={load}
               onEdit={(x) => { close?.(); openForm(x); }} onCancel={(x) => { close?.(); cancelJob(x); }} onRestore={restoreJob} />} />
           <PageBar {...pg} setPage={goPage} unit="งาน" />
           </>
         ) : (
           <>
-          <Stack spacing={1.25}>{pg.rows.map(({ j, oc }) => <JobCard key={j._id} employees={employees} job={j} outcome={oc} readOnly={!canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone} onEdit={openForm} onCancel={cancelJob} onRestore={restoreJob} />)}</Stack>
+          <Stack spacing={1.25}>{pg.rows.map(({ j, oc }) => <JobCard key={j._id} employees={employees} job={j} outcome={oc} readOnly={!canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone} onNoteChanged={load} onEdit={openForm} onCancel={cancelJob} onRestore={restoreJob} />)}</Stack>
           <PageBar {...pg} setPage={goPage} unit="งาน" />
           </>
         )
@@ -1547,6 +1676,13 @@ export default function JobIntake() {
           action={tab === "waiting" && canCreate ? <Button variant="contained" startIcon={<AddRounded />} onClick={() => openForm()} sx={{ ...PRIMARY, mt: 1 }}>รับงานใหม่</Button> : null} />
       )}
 
+      {noteDoneJob && (
+        <NoteDoneDialog job={noteDoneJob} onClose={() => setNoteDoneJob(null)}
+          onDone={async (hasQuote) => {
+            setNoteDoneJob(null); await load(); refreshAppBadges();
+            Swal.fire({ icon: "success", title: "บันทึกว่าทำเสร็จแล้ว", text: hasQuote ? "ใบเสนอราคาเข้าระบบติดตามแล้ว — ตามผลต่อที่หน้าติดตามใบเสนอราคา" : undefined, timer: hasQuote ? 2200 : 1200, showConfirmButton: false });
+          }} />
+      )}
       {delivering && (
         <DeliverDialog job={delivering} onClose={() => setDelivering(null)}
           onDone={async () => { setDelivering(null); await load(); refreshAppBadges(); }} />
