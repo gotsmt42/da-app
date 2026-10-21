@@ -13,8 +13,11 @@ const KIND = {
 };
 
 // 🔁 (21 ต.ค. 2569) ไฟล์ที่แนบมากับใบแจ้งงาน (QT/PO) ก็เป็นเอกสารอ้างอิงตอนรับงานเหมือนกัน
-export const refFilesOf = (ev) => (ev?.sitePhotoFiles || []).filter((f) => f.source === "intake" || f.source === "dispatch");
-export const hasRefDoc = (ev) => Boolean(ev?.intakeDocType || ev?.intakeDocNo || refFilesOf(ev).length);
+//    งานหลายช่วงวัน: ไฟล์อาจอยู่ที่ช่วงอื่นของกลุ่ม — หน้ารับงานส่ง __groupFiles (ไฟล์ทั้งกลุ่ม) มาให้
+export const refFilesOf = (ev) => (ev?.__groupFiles || ev?.sitePhotoFiles || []).filter((f) => f.source === "intake" || f.source === "dispatch");
+// 🐛 (21 ต.ค. 2569 ผู้ใช้: "เอกสารอ้างอิงไม่มี ทำไมมีขึ้น งง") ขึ้นเฉพาะเมื่อมีของจริง — มีไฟล์ หรือมีเลขที่เอกสาร
+//    (ชนิดเอกสารอย่างเดียว ไม่มีไฟล์/เลขที่ = ไม่มีเอกสารให้ดู → ไม่แสดง)
+export const hasRefDoc = (ev) => Boolean(ev?.intakeDocNo || refFilesOf(ev).length);
 
 export default function RefDoc({ event, onOpenFile }) {
   const files = refFilesOf(event);

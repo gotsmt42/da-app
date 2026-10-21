@@ -19,7 +19,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import lazyWithRetry from "@/shared/utils/lazyWithRetry";
 import usePaged, { PageBar } from "@/shared/ui/usePaged";
 import DateCell from "@/shared/ui/DateCell";
-import RefDoc from "@/shared/ui/RefDoc";
+import RefDoc, { refFilesOf } from "@/shared/ui/RefDoc";
 import { billingStatus, BILLING_STATE_META } from "@/shared/utils/billing";
 import JobKindTag from "@/shared/ui/JobKindTag";
 import { resolveQuotationGroup, getFollowUpInfo, QUOTE_STATUS } from "@/shared/utils/quotationTracking";
@@ -243,10 +243,13 @@ function QuoteCell({ oc, compact = false, caption = false }) {
 }
 
 /** ช่อง "เอกสารอ้างอิง" (แท็บรอดำเนินการ) — ชนิด + เลขที่ของเอกสารตอนรับงาน · กดไอคอนเปิดไฟล์ */
-const intakeFilesOf = (job) => (job.sitePhotoFiles || []).filter((f) => f.source === "intake");
+// 🔁 (21 ต.ค. 2569) ไฟล์อ้างอิง = แนบตอนรับงาน + แนบมากับใบแจ้งงาน (ทั้งกลุ่มงาน) — ตัวเดียวกับ RefDoc
+const intakeFilesOf = (job) => refFilesOf(job);
 
 function RefDocCell({ job, compact = true }) {
   const files = intakeFilesOf(job);
+  // 🐛 (21 ต.ค. 2569 ผู้ใช้: "เอกสารอ้างอิงไม่มี ทำไมมีขึ้น") ไม่มีไฟล์และไม่มีเลขที่ = ไม่มีเอกสาร → "—"
+  if (!files.length && !job.intakeDocNo) return <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>;
   const label = job.intakeDocType ? ({ po: "ใบสั่งซื้อ (PO)", quotation: "ใบเสนอราคา", other: "เอกสารอื่น" }[job.intakeDocType] || "เอกสาร") : files.length ? "ไฟล์แนบ" : "";
   if (!label) return <Typography sx={{ fontSize: "0.76rem", color: "#cbd5e1" }}>—</Typography>;
   const key = job.intakeDocType === "po" ? "po" : job.intakeDocType === "quotation" ? "ref_qt" : "ref_doc";
@@ -746,7 +749,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
   const st = stageOf(job);
   const stall = stalledDays(job, st);
   // ไฟล์ตอนรับงานที่เป็นใบเสนอราคา/PO แสดงในแถบใบเสนอราคาแล้ว — ไม่ซ้ำด้านล่าง
-  const intakeDocs = (job.sitePhotoFiles || []).filter((f) => f.source === "intake");
+  const intakeDocs = intakeFilesOf(job);
   const invoiceFiles = job.invoiceFiles || [];
   const [uploading, setUploading] = useState(false);
   // ✅ (20 ต.ค. 2569 ผู้ใช้: "ให้พับรายละเอียดได้ และเริ่ม default ดูรกและกินพื้นที่") การ์ดเริ่มแบบพับ — กางดูรายละเอียด/เอกสารเมื่อกด
@@ -1080,7 +1083,7 @@ function JobCard({ job, outcome, readOnly, requestMode, onSchedule, onDeliver, o
                 เอกสารอ้างอิง (ได้มาตอนรับงาน + ไฟล์) | ใบเสนอราคา (ติดตามภายหลัง + ปุ่มดำเนินการ) */}
             {!job.intakeNote && (() => {
               const showQuote = Boolean(outcome);
-              const hasRef = Boolean(job.intakeDocType || job.intakeDocNo || intakeDocs.length);
+              const hasRef = Boolean(job.intakeDocNo || intakeDocs.length);
               const c = outcome && !outcome.intake ? outcome.color : ACCENT;
               return (
                 <Box sx={{ display: "grid", gap: 1, mt: 1, gridTemplateColumns: { xs: "1fr", md: showQuote ? "1fr 1fr" : "1fr" } }}>
@@ -1385,7 +1388,13 @@ export default function JobIntake() {
   const canQuote = can(userData, "viewFinance");
   const withStage = useMemo(() => (jobs || []).map((j) => {
     const s = stageOf(j);
-    const oc = outcomeOf(j, s, groups.get(String(j.jobGroupId || j._id)));
+    const grp = groups.get(String(j.jobGroupId || j._id));
+    const oc = outcomeOf(j, s, grp);
+    // ไฟล์อ้างอิงของทั้งกลุ่ม (งานหลายช่วงวัน ไฟล์อาจผูกอยู่ที่ช่วงอื่น) — ใช้แสดงช่องเอกสารอ้างอิงเท่านั้น
+    if (grp && grp.length > 1) {
+      const seenF = new Set();
+      j = { ...j, __groupFiles: grp.flatMap((e) => e.sitePhotoFiles || []).filter((f) => f?.fileUrl && !seenF.has(f.fileUrl) && seenF.add(f.fileUrl)) };
+    }
     if (oc) oc.open = canQuote && oc.qid ? () => setQuote({ id: oc.qid }) : null;
     return { j, s, oc };
   }), [jobs, groups, canQuote]);
