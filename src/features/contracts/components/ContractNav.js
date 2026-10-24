@@ -12,7 +12,7 @@
  */
 import { Box, Stack, Typography, ButtonBase } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Description, Build, Engineering, HourglassEmpty, Apps, PlayCircleOutline, Inventory2 } from "@mui/icons-material";
+import { Description, Build, Engineering, HourglassEmpty, Apps, PlayCircleOutline, Inventory2, EventBusy } from "@mui/icons-material";
 
 const INK = "#0f172a";
 const MUTED = "#64748b";
@@ -30,7 +30,7 @@ export const STAGE_META = {
   open: { label: "ทั้งหมด", color: BLUE },
   overdue: { label: "เลยกำหนดเข้ารอบ", short: "เลยกำหนด", color: "#dc2626" },
   expired: { label: "หมดอายุ · รอต่อสัญญา", short: "หมดอายุ", color: "#ea580c" },
-  completed: { label: "เข้างานครบ / ต่อสัญญาแล้ว", short: "ครบ/ต่อแล้ว", color: "#16a34a" },
+  completed: { label: "จบแล้ว · ประวัติ", short: "จบแล้ว", color: "#16a34a" },
 };
 export const isContractish = (category) => category === "contracts" || category === "all";
 
@@ -44,9 +44,19 @@ export default function ContractNav({ scope, category, stage, onScope, onCategor
   const stages = stagesFor(scope, category);
   const closed = scope === "closed";
 
+  /**
+   * 🔁 (24 ต.ค. 2569 ผู้ใช้: "ชื่อหัวข้อให้ชัดเจน ไม่กำกวม หรือแยกออกมาให้ชัด ไม่งง")
+   *    เดิม "ปิดแล้ว · ประวัติ" รวม 2 เรื่องที่ต่างกันมาก — สัญญาหมดอายุที่ "ยังต้องตามต่อสัญญา" กับงานที่จบไปแล้วจริง
+   *    → แยกเป็น 3 ปุ่มระดับเดียวกัน: กำลังดำเนินการ · หมดอายุ รอต่อสัญญา (ต้องทำ) · จบแล้ว (ประวัติ)
+   */
   const scopes = [
-    { k: "active", label: "กำลังดำเนินการ", icon: <PlayCircleOutline />, n: counts.scope.active },
-    { k: "closed", label: "ปิดแล้ว · ประวัติ", icon: <Inventory2 />, n: counts.scope.closed },
+    { k: "active", label: "กำลังดำเนินการ", icon: <PlayCircleOutline />, n: counts.scope.active, on: !closed, color: BLUE, go: () => onScope("active") },
+    ...(isContractish(category) || (counts.scope.expired ?? 0) > 0 ? [{
+      k: "expired", label: "หมดอายุ · รอต่อสัญญา", short: "รอต่อสัญญา", icon: <EventBusy />, n: counts.scope.expired ?? 0, on: closed && stage === "expired", color: "#ea580c",
+      go: () => { onScope("closed"); onStage("expired"); },
+    }] : []),
+    { k: "done", label: "จบแล้ว · ประวัติ", short: "จบแล้ว", icon: <Inventory2 />, n: counts.scope.completed ?? counts.scope.closed, on: closed && stage !== "expired", color: "#16a34a",
+      go: () => { onScope("closed"); onStage("completed"); } },
   ];
 
   /**
@@ -57,17 +67,17 @@ export default function ContractNav({ scope, category, stage, onScope, onCategor
   const scopeSwitch = (
     <Stack direction="row" sx={{ p: "3px", borderRadius: "10px", bgcolor: "#f1f5f9", flexShrink: 0, width: { xs: "100%", md: "auto" } }}>
       {scopes.map((o) => {
-        const on = o.k === scope;
+        const on = o.on;
         return (
-          <ButtonBase key={o.k} onClick={() => !on && onScope(o.k)} aria-pressed={on}
+          <ButtonBase key={o.k} onClick={() => !on && o.go()} aria-pressed={on} title={o.label}
             sx={{
               flex: { xs: 1, md: "initial" }, gap: 0.6, px: 1.25, height: 32, borderRadius: "8px", whiteSpace: "nowrap",
               fontSize: "0.8rem", fontWeight: 800,
               color: on ? INK : MUTED, bgcolor: on ? "#fff" : "transparent", boxShadow: on ? "0 1px 2px rgba(15,23,42,.14)" : "none",
-              "& svg": { fontSize: 16, color: on ? (o.k === "closed" ? "#16a34a" : BLUE) : "#94a3b8" },
+              "& svg": { fontSize: 16, color: on ? o.color : "#94a3b8" },
             }}>
             {o.icon}
-            {o.label}
+            {isMobile && o.short ? o.short : o.label}
             <Box component="span" sx={{ fontSize: "0.72rem", fontWeight: 800, color: on ? "#475569" : "#94a3b8", fontVariantNumeric: "tabular-nums" }}>
               {o.n.toLocaleString()}
             </Box>
@@ -76,7 +86,8 @@ export default function ContractNav({ scope, category, stage, onScope, onCategor
       })}
     </Stack>
   );
-  const showStageRow = stages.length > 1 || closed;
+  // หน้า "จบแล้ว"/"รอต่อสัญญา" เลือกจากปุ่มด้านบนแล้ว — แถบล่างเหลือแค่คำอธิบาย
+  const showStageRow = (!closed && stages.length > 1) || closed;
 
   return (
     <Box sx={{ mb: { xs: 1.5, sm: 2 }, bgcolor: "#fff", border: `1px solid ${LINE}`, borderRadius: 3, overflow: "hidden", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
@@ -112,7 +123,7 @@ export default function ContractNav({ scope, category, stage, onScope, onCategor
       {showStageRow && (
         <Stack direction="row" alignItems="center" spacing={0.75} useFlexGap
           sx={{ px: { xs: 1, md: 1.5 }, py: 0.9, bgcolor: "#f8fafc", flexWrap: "wrap", rowGap: 0.75 }}>
-          {stages.length > 1 && stages.map((k) => {
+          {!closed && stages.length > 1 && stages.map((k) => {
             const m = STAGE_META[k];
             const on = stage === k;
             return (
@@ -129,10 +140,10 @@ export default function ContractNav({ scope, category, stage, onScope, onCategor
             );
           })}
           {closed && !isMobile && (
-            <Typography sx={{ fontSize: "0.76rem", color: MUTED, ml: stages.length > 1 ? 0.5 : 0 }}>
+            <Typography sx={{ fontSize: "0.76rem", color: MUTED }}>
               {stage === "expired"
-                ? "สัญญาที่เลยวันสิ้นสุดและยังไม่ได้ต่อ — กด “ต่อสัญญาปีถัดไป” เพื่อสร้างสัญญาใหม่จากข้อมูลเดิม"
-                : "เข้างานครบทุกครั้งแล้ว หรือต่อสัญญาฉบับใหม่แล้ว"}
+                ? "สัญญาที่เลยวันสิ้นสุดแล้วแต่ยังไม่ได้ต่อ — ต้องติดตามลูกค้า · กด “ต่อสัญญาปีถัดไป” เพื่อสร้างสัญญาใหม่จากข้อมูลเดิม"
+                : "งานที่จบแล้ว: เข้างานครบทุกครั้ง หรือต่อสัญญาฉบับใหม่แล้ว — ไว้ดูย้อนหลัง ไม่ต้องทำอะไรเพิ่ม"}
             </Typography>
           )}
         </Stack>

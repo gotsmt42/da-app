@@ -2172,7 +2172,8 @@ export default function ContractOverview() {
     return {
       byCat: Object.fromEntries(Object.keys(CATEGORY_PRED).map((k) => [k, inCat(k, f[stage] || f.open)])),
       byStage: Object.fromEntries(Object.keys(f).map((k) => [k, inCat(category, f[k])])),
-      scope: { active: f.open.length, closed: f.expired.length + f.completed.length },
+      // ⚠️ นับตามหมวดที่เลือก — ตรงกับรายการที่จะเห็นเมื่อกดปุ่มนั้น
+      scope: { active: inCat(category, f.open), closed: f.expired.length + f.completed.length, expired: inCat(category, f.expired), completed: inCat(category, f.completed) },
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stageRows, stage, category, search, yearFilter, responsibleFilter, titleFilter, systemFilter, provinceFilter, cityFilter, departmentFilter, statusFilter, durationFilter, dateFrom, dateTo]);
@@ -5876,7 +5877,7 @@ pagedRows.map((c, idx) => {
             <Assignment sx={{ fontSize: 22 }} />
           </Box>
           <Box>
-            <Typography variant="h6" fontWeight={800}>{isClosedScope ? "งานปิดแล้ว · ประวัติ" : isAdminOrManager ? "ภาพรวมงาน" : "ภาพรวมงานของฉัน"}</Typography>
+            <Typography variant="h6" fontWeight={800}>{isClosedScope ? (stage === "expired" ? "สัญญาหมดอายุ · รอต่อสัญญา" : "งานจบแล้ว · ประวัติ") : isAdminOrManager ? "ภาพรวมงาน" : "ภาพรวมงานของฉัน"}</Typography>
             {/* ✅ แท็บ "เลยกำหนด/คงค้าง" กรองเฉพาะ isRealContract เหมือนแท็บ "งานสัญญา" ทุกประการ (ดู
                 filtered) แถวทั้งหมดจึงเป็นสัญญา ไม่ใช่ "งาน" — เดิมเช็คแค่ viewFilter==="contracts"
                 ทำให้แท็บนี้ขึ้นหน่วยผิดเป็น "งาน" */}
