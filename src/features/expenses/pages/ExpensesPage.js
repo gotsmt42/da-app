@@ -270,7 +270,7 @@ export default function ExpensesPage({ view: viewProp }) {
     stats.push({ key: "pending", label: "รอตรวจสอบ", value: c?.pending ?? "–", color: "#d97706", onClick: () => pick("pending") });
     stats.push({ key: "reviewed", label: "รออนุมัติ", value: c?.reviewing ?? "–", color: "#b45309", onClick: () => pick("reviewed") });
     stats.push({ key: "approved", label: "รออนุมัติเบิกจ่าย", value: c?.toPay ?? "–", color: meta.color, onClick: () => pick("approved") });
-    stats.push({ key: "__ctrmoney", label: "ยอดรอจ่ายผู้รับเหมา (สุทธิ)", value: c ? baht(c.toPayAmount) : "–", color: meta.dark });
+    stats.push({ key: "__ctrmoney", label: "อนุมัติแล้ว รอจ่ายผู้รับเหมา (สุทธิ)", value: c ? baht(c.toPayAmount) : "–", color: meta.dark });
   } else if (view === "inbox") {
     // ✅ ตัวเลขตามขั้นของสายอนุมัติ 3 ส่วน — การ์ดของขั้นที่ตัวเองไม่ได้รับผิดชอบไม่ต้องโชว์ให้รก
     if (canReview) stats.push({ key: "__p", label: "รอตรวจสอบ", value: summary?.pending ?? "–", color: "#d97706" });
@@ -291,7 +291,8 @@ export default function ExpensesPage({ view: viewProp }) {
   const navItems = [
     { key: "advance", to: "/expenses/advances", label: "ใบ Advance", color: KIND_META.advance.color },
     { key: "claim", to: "/expenses/claims", label: "ใบเคลม", color: KIND_META.claim.color },
-    { key: "contractor", to: "/expenses/contractors", label: "ผู้รับเหมา", color: KIND_META.contractor.color },
+    // 🔁 (24 ต.ค. 2569 ผู้ใช้: "ใช้คำในแถบให้สื่อความหมาย ไม่ใช่ ผรม. อย่างเดียว")
+    { key: "contractor", to: "/expenses/contractors", label: "ค่าจ้างผู้รับเหมา", color: KIND_META.contractor.color },
     ...(canHandle ? [{ key: "inbox", to: "/expenses/approvals", label: "รอดำเนินการ", color: INBOX_COLOR }] : []),
     { key: "report", to: "/expenses/report", label: "รายงาน", color: REPORT_COLOR },
   ];

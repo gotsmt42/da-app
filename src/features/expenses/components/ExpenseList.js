@@ -148,7 +148,55 @@ const AmountCell = ({ e }) => (
   </Box>
 );
 
-const MobileCard = ({ e, onOpen, avatars }) => (
+/**
+ * การ์ดใบค่าจ้างผู้รับเหมา (มือถือ)
+ * ✅ (24 ต.ค. 2569 ผู้ใช้: "หน้าแรกให้ดูข้อมูลง่ายๆ สวยงาม") — ผู้รับเหมา (ผู้รับเงิน) เด่นสุด · ยอดจ่ายสุทธิ · งาน/งวด ·
+ *    สรุปวันทำงาน (วัน · แรง) · สถานะ — ข้อความเรื่องยาวๆ ไม่ต้องอ่านก็รู้ว่าใบนี้คืออะไร
+ */
+const ContractorCard = ({ e, onOpen }) => {
+  const c = e.contractor || {};
+  const name = c.name || "ผู้รับเหมา";
+  const days = (e.items || []).filter((it) => it.workDate);
+  const manDays = days.reduce((n, it) => n + (Number(it.people) || 0), 0);
+  const net = money(e.difference ?? e.total);
+  const meta = [
+    days.length ? `${days.length} วัน${manDays ? ` · ${manDays} แรง` : ""}` : `${e.items?.length || 0} รายการ`,
+    installmentText(e.installment),
+  ].filter(Boolean).join(" · ");
+  return (
+    <Box onClick={() => onOpen(e._id)} role="button" sx={{
+      p: 1.5, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, cursor: "pointer",
+      boxShadow: "0 1px 2px rgba(15,23,42,.04)", "&:active": { bgcolor: "#f8fafc" },
+    }}>
+      <Stack direction="row" spacing={1.25} alignItems="center">
+        <Avatar sx={{ width: 38, height: 38, fontSize: "1rem", fontWeight: 800, bgcolor: personColor(name), flexShrink: 0 }}>{personInitial(name)}</Avatar>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography noWrap sx={{ fontWeight: 800, fontSize: "0.95rem", color: TEXT_MAIN }}>{name}</Typography>
+          <Typography noWrap sx={{ fontSize: "0.74rem", color: TEXT_SUB }}>{c.isCompany ? "นิติบุคคล" : "บุคคลธรรมดา"} · {e.docNo}</Typography>
+        </Box>
+        <StatusText e={e} />
+      </Stack>
+      {jobsShortText(e) && (
+        <Typography sx={{ mt: 1, fontSize: "0.84rem", fontWeight: 600, color: "#334155", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+          {jobsShortText(e)}
+        </Typography>
+      )}
+      <Stack direction="row" alignItems="flex-end" sx={{ mt: 1, pt: 1, borderTop: `1px solid ${BORDER_MAIN}` }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography noWrap sx={{ fontSize: "0.76rem", fontWeight: 700, color: "#475569" }}>{meta}</Typography>
+          <Typography noWrap sx={{ fontSize: "0.7rem", color: TEXT_SUB }}>{thaiDate(e.docDate)}{e.requester?.name ? ` · จัดทำโดย ${personFullName(e.requester) || e.requester.name}` : ""}</Typography>
+        </Box>
+        <Box sx={{ textAlign: "right", flexShrink: 0 }}>
+          <Typography sx={{ fontSize: "0.68rem", color: TEXT_SUB, lineHeight: 1.2 }}>จ่ายสุทธิ</Typography>
+          <Typography sx={{ fontWeight: 900, fontSize: "1.05rem", color: TEXT_MAIN, lineHeight: 1.25, whiteSpace: "nowrap" }}>{baht(net)}</Typography>
+          {money(e.total) !== net && <Typography sx={{ fontSize: "0.68rem", color: TEXT_SUB, whiteSpace: "nowrap" }}>ค่าจ้าง {baht(e.total)}</Typography>}
+        </Box>
+      </Stack>
+    </Box>
+  );
+};
+
+const MobileCard = ({ e, onOpen, avatars }) => (slipKind(e) === "contractor" ? <ContractorCard e={e} onOpen={onOpen} /> : (
   <Box onClick={() => onOpen(e._id)} role="button" sx={{
     p: 1.5, bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, cursor: "pointer",
     boxShadow: "0 1px 2px rgba(15,23,42,.04)", "&:active": { bgcolor: "#f8fafc" },
@@ -172,7 +220,7 @@ const MobileCard = ({ e, onOpen, avatars }) => (
       <StatusText e={e} />
     </Stack>
   </Box>
-);
+));
 
 const DesktopTable = ({ rows, onOpen, avatars }) => (
   <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER_MAIN}`, borderRadius: 3, overflowX: "auto", boxShadow: "0 1px 2px rgba(15,23,42,.04)" }}>
@@ -190,7 +238,18 @@ const DesktopTable = ({ rows, onOpen, avatars }) => (
       <TableBody>
         {rows.map((e) => (
           <TableRow key={e._id} hover onClick={() => onOpen(e._id)} sx={{ cursor: "pointer", "& td": { py: 1.2, borderColor: BORDER_MAIN }, "&:last-child td": { borderBottom: 0 } }}>
-            <TableCell sx={{ maxWidth: 240 }}><Requester e={e} avatars={avatars} /></TableCell>
+            <TableCell sx={{ maxWidth: 240 }}>
+              {/* ใบค่าจ้างผู้รับเหมา: ผู้รับเงิน = ผู้รับเหมา (เด่น) · ผู้จัดทำเป็นบรรทัดรอง */}
+              {slipKind(e) === "contractor" ? (
+                <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+                  <Avatar sx={{ width: 34, height: 34, fontSize: "0.9rem", fontWeight: 800, bgcolor: personColor(e.contractor?.name || "-"), flexShrink: 0 }}>{personInitial(e.contractor?.name || "-")}</Avatar>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography noWrap sx={{ fontWeight: 800, fontSize: "0.86rem", color: TEXT_MAIN }}>{e.contractor?.name || "-"}</Typography>
+                    <Typography noWrap variant="caption" sx={{ color: TEXT_SUB, display: "block" }}>จัดทำโดย {personFullName(e.requester) || e.requester?.name || "-"}</Typography>
+                  </Box>
+                </Stack>
+              ) : <Requester e={e} avatars={avatars} />}
+            </TableCell>
             <TableCell sx={{ whiteSpace: "nowrap" }}>
               <Stack direction="row" spacing={0.75} alignItems="center">
                 <KindBadge kind={slipKind(e)} variant="soft" />
