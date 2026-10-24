@@ -29,7 +29,7 @@ import Swal from "@/shared/ui/swal";
 import TomSelect from "tom-select";
 import "tom-select/dist/css/tom-select.css";
 import {
-  Box, Stack, Typography, Button, ButtonBase, Skeleton, Dialog, DialogContent, DialogActions, IconButton, Avatar, Collapse, Tooltip, CircularProgress, useMediaQuery,
+  Box, Stack, Typography, Button, ButtonBase, Skeleton, Dialog, DialogContent, DialogActions, IconButton, Avatar, Collapse, Tooltip, CircularProgress,
 } from "@mui/material";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { hasValidAvatar } from "@/shared/utils/user";
@@ -305,93 +305,13 @@ function DocBox({ title, hint, tone, children }) {
   );
 }
 
-/**
- * 🔁 (24 ต.ค. 2569 ผู้ใช้: "ส่วนนี้ซ้ำซ้อนกับการดำเนินงานไหม จัดการยังไงไม่ให้สับสน ทำงานซ้ำซ้อน" → เลือก "แบ่งหน้าที่ชัด")
- *    หน้ารับงาน = รับงานจนส่งลงตาราง + สิ่งที่หน้านี้ยังต้องตามต่อเอง (ส่งของ→วางบิล · ใบเสนอราคาที่รอผล)
- *    งานเข้าหน้างานที่ลงตารางแล้ว (มอบทีม · เข้างาน · ปิดงาน) ทำที่หน้า "การดำเนินงาน" ที่เดียว
- *    → แท็บ "ลงตารางแล้ว" = รายการสั้นอ่านอย่างเดียว ไว้ดูว่างานที่รับมาไปถึงไหน + ปุ่มไปหน้าการดำเนินงาน
- *    แต่ละงานอยู่แท็บเดียวเสมอ (ต้องทำ มาก่อน ลงตารางแล้ว/เสร็จแล้ว)
- * 🔁 (24 ต.ค. 2569 ผู้ใช้: "ทำไมมีหลายแถบกว่าเดิม จะไม่สับสนหรอ") รวม "รอเริ่ม" + "ต้องติดตาม" เป็นแท็บเดียว "ต้องทำ"
- *    (แบ่งหัวข้อในแท็บ: รอลงตาราง/ส่งของ → ติดตามผล) — เหลือ 3 แท็บหลักเท่าเดิม: ต้องทำ · ลงตารางแล้ว · เสร็จแล้ว (+ ยกเลิก เมื่อมี)
- */
-/**
- * 🐛 (24 ต.ค. 2569 ผู้ใช้: "ทำไมแถบทำแล้ว มาอยู่ที่ต้องทำ สับสน ย้อนแย้ง")
- *    เดิมเอางานที่ "ใบเสนอราคาเพิ่มเติมรอผล" ไปรวมในแท็บต้องทำ — งานที่ทำเสร็จ/ปิดแล้วจึงโผล่ในต้องทำพร้อมป้าย "ทำแล้ว"
- *    ✅ แท็บตามสถานะงานจริงเท่านั้น (งานหนึ่งอยู่แท็บเดียว):
- *       ต้องทำ = ยังไม่ได้ลงตาราง/ส่งของ (+ บันทึกที่ยังไม่ทำ) และงานส่งของที่รอวางบิล — สิ่งที่หน้านี้ต้องลงมือ
- *       ลงตารางแล้ว = งานเข้าหน้างานระหว่างดำเนินการ · เสร็จแล้ว = จบงานแล้ว · ยกเลิก
- *    ✅ ใบเสนอราคาเพิ่มเติม = แท็บ "มุมมอง" แยกสีส้ม (ไม่ใช่สถานะงาน) — รวมทุกงานที่ยังรอผลใบเสนอราคา
- *       ไม่ว่างานจะอยู่ขั้นไหน (งานเสร็จแล้วก็ยังต้องตามผลใบเสนอราคา) · บนการ์ดแสดงสถานะงานจริง
- */
-const isBilling = (s) => Boolean(s.nv && s.i === 2);
-const hasOpenQuote = (s, oc) => s.i >= 1 && Boolean(oc && !oc.intake && ["todo", "wait"].includes(oc.group));
-const QUOTE_TAB_COLOR = "#ea580c";
 const TABS = [
-  { key: "waiting", label: "ต้องทำ", short: "ต้องทำ", test: (s) => s.i === 0 || isBilling(s) },
-  // 🔁 (24 ต.ค. 2569 ผู้ใช้: "ใช้คำสื่อความหมาย ส่งต่อแล้วคืออะไร") → "ลงตารางแล้ว"
-  { key: "handed", label: "ลงตารางแล้ว", short: "ลงตารางแล้ว", test: (s) => s.i >= 1 && s.i <= 3 && !isBilling(s) },
+  { key: "waiting", label: "รอดำเนินการ", short: "รอเริ่ม", test: (s) => s.i === 0 },
+  { key: "active", label: "กำลังดำเนินการ", short: "กำลังทำ", test: (s) => s.i >= 1 && s.i <= 3 },
   { key: "done", label: "เสร็จแล้ว", short: "เสร็จแล้ว", test: (s) => s.i === 4 },
-  // ✅ (24 ต.ค. 2569 ผู้ใช้: "แถบตามใบเสนอราคาให้กดดูง่ายๆ · ใช้คำว่า รายการที่มีใบเสนอราคาเพิ่มเติม · สีส้ม")
-  { key: "quote", label: "รายการที่มีใบเสนอราคาเพิ่มเติม", short: "ใบเสนอราคาเพิ่มเติม", test: hasOpenQuote, color: QUOTE_TAB_COLOR, hideEmpty: true },
   // ✅ แท็บ "ยกเลิก" โชว์เฉพาะตอนมีงานที่ยกเลิก (ไม่กินที่บนมือถือโดยไม่จำเป็น)
   { key: "cancelled", label: "ยกเลิก", short: "ยกเลิก", test: (s) => s.i === -1, hideEmpty: true },
 ];
-
-/**
- * แท็บ "ลงตารางแล้ว" — รายการสั้นอ่านอย่างเดียว: วันเข้างาน · งาน · ทีม · ขั้นตอนตอนนี้ · ไปหน้าการดำเนินงาน
- * (มอบทีม/เข้างาน/ปิดงาน ทำที่หน้าการดำเนินงาน — ไม่ทำซ้ำที่นี่)
- */
-function HandedList({ rows }) {
-  // 🔁 (24 ต.ค. 2569 ผู้ใช้: "ทำให้สวยงาม ดูง่าย และสอดคล้อง") ใช้หน้าตาเดียวกับการ์ดแท็บอื่น:
-  //    แถบสีซ้ายตามขั้นตอน · ไอคอนปฏิทิน · ชื่องาน/โครงการ · ล่างการ์ด = ป้ายขั้นตอน + ขั้นถัดไป
-  const today = moment();
-  return (
-    <Stack spacing={1.25}>
-      <Stack direction="row" alignItems="center" gap={1} sx={{ px: 1.25, py: 0.9, borderRadius: 2.5, bgcolor: alpha(ACCENT, 0.05), border: `1px solid ${alpha(ACCENT, 0.18)}` }}>
-        <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.78rem", color: "#334155", lineHeight: 1.45 }}>
-          งานที่ลงตารางแล้ว <Box component="span" sx={{ color: MUTED }}>— มอบทีม · เข้างาน · ปิดงาน ทำต่อที่หน้าการดำเนินงาน</Box>
-        </Typography>
-        <Button component={Link} to="/operation" size="small" endIcon={<ChevronRight sx={{ fontSize: "16px !important", ml: -0.5 }} />}
-          sx={{ ...BTN, height: 30, px: 1.1, fontSize: "0.76rem", flexShrink: 0, color: ACCENT, bgcolor: "#fff", border: `1px solid ${alpha(ACCENT, 0.35)}`, "&:hover": { bgcolor: alpha(ACCENT, 0.06) } }}>
-          การดำเนินงาน
-        </Button>
-      </Stack>
-      {rows.map(({ j, s: st }) => {
-        const nx = nextStepOf(j, "admin");
-        const m = moment(j.start);
-        const isToday = m.isSame(today, "day");
-        const place = [j.site && j.site !== "-" ? j.site : "", j.company && j.company !== j.site ? j.company : ""].filter(Boolean).join(" · ");
-        return (
-          <ButtonBase key={j._id} component={Link} to={`/operation/${j._id}`}
-            sx={{ display: "block", width: "100%", textAlign: "left", bgcolor: "#fff", borderRadius: 3, overflow: "hidden",
-              border: `1px solid ${LINE}`, borderLeft: `4px solid ${st.color}`, boxShadow: "0 1px 3px rgba(15,23,42,.06)",
-              transition: "border-color .15s, box-shadow .15s", "&:hover": { borderColor: "#cbd5e1", borderLeftColor: st.color, boxShadow: "0 4px 14px -8px rgba(15,23,42,.18)" } }}>
-            <Stack direction="row" alignItems="center" gap={1.5} sx={{ px: { xs: 1.5, sm: 2 }, py: 1.25 }}>
-              <Box sx={{ flexShrink: 0 }}>
-                <DateTile head={formatThai(m, "MMM YY")} big={m.format("D")} foot={isToday ? "วันนี้" : formatThai(m, "ddd")} footColor={isToday ? ACCENT : null} />
-              </Box>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography noWrap sx={{ fontSize: "0.72rem", fontWeight: 700, color: "#94a3b8" }}>{j.jobNo || "ยังไม่มีเลขที่งาน"}</Typography>
-                <Typography noWrap sx={{ fontSize: "0.95rem", fontWeight: 900, color: INK, lineHeight: 1.35 }}>{[j.title, j.system].filter(Boolean).join(" · ") || "งาน"}</Typography>
-                <Typography noWrap sx={{ fontSize: "0.8rem", fontWeight: 600, color: "#475569" }}>{place || "—"}</Typography>
-              </Box>
-              <ChevronRight sx={{ fontSize: 22, color: "#94a3b8", flexShrink: 0 }} />
-            </Stack>
-            <Stack direction="row" alignItems="center" gap={1} sx={{ px: { xs: 1.5, sm: 2 }, py: 0.8, bgcolor: SURFACE, borderTop: `1px solid ${LINE}`, minWidth: 0 }}>
-              <Box sx={{ flexShrink: 0 }}><StageChip st={st} /></Box>
-              <Typography noWrap sx={{ flex: 1, minWidth: 0, fontSize: "0.76rem", color: MUTED }}>
-                {j.team
-                  ? <><GroupsOutlined sx={{ fontSize: 14, mr: 0.4, verticalAlign: "-2px" }} />{j.team}</>
-                  : <Box component="span" sx={{ color: AMBER, fontWeight: 700 }}>ยังไม่มีทีม</Box>}
-                {nx && <Box component="span"> · {nx.title}</Box>}
-              </Typography>
-            </Stack>
-          </ButtonBase>
-        );
-      })}
-    </Stack>
-  );
-}
 
 /** ข้อความกำหนดการสั้นๆ (ใช้ในตาราง) */
 const scheduleShort = (j) => (j.intakeNote ? `บันทึก ${formatThai(moment(j.intakeAt), "D MMM YY")}`
@@ -1541,10 +1461,7 @@ export default function JobIntake() {
   const [delivering, setDelivering] = useState(null);
   const [q, setQ] = useState("");
   const [groups, setGroups] = useState(() => new Map()); // jobGroupId/_id → ทุกวันของงาน (หาใบเสนอราคาของกลุ่ม)
-  // 🔁 (24 ต.ค. 2569 ผู้ใช้: "ดูล้นๆ กดใช้งานยาก") มือถือใช้การ์ดเสมอ (ตารางหลายคอลัมน์ล้นจอแคบ) · จอใหญ่เลือกได้
-  const [viewPref, setView] = useState(() => initialViewMode("tt-intake-view"));
-  const isPhone = useMediaQuery("(max-width:599.95px)");
-  const view = isPhone ? "card" : viewPref;
+  const [view, setView] = useState(() => initialViewMode("tt-intake-view"));
   const changeView = (v) => { setView(v); try { localStorage.setItem("tt-intake-view", v); } catch { /* ignore */ } };
   const groupOf = (arr) => {
     const m = new Map();
@@ -1699,7 +1616,7 @@ export default function JobIntake() {
   const reqReady = !canQueue || (approveN !== null && reqCounts !== null);
   useEffect(() => {
     if (!jobs || tabPicked || !reqReady) return;
-    setTab(canQueue && reqTotal > 0 ? "requests" : counts.waiting > 0 ? "waiting" : "handed");
+    setTab(canQueue && reqTotal > 0 ? "requests" : counts.waiting > 0 ? "waiting" : "active");
   }, [jobs, counts.waiting, tabPicked, reqReady, canQueue, reqTotal]);
   const tabsShown = [
     ...(canQueue && (reqTotal > 0 || tab === "requests") ? [{ key: "requests", label: "คำขอ · รออนุมัติ", short: "คำขอ" }] : []),
@@ -1715,10 +1632,9 @@ export default function JobIntake() {
     return withStage.filter((x) => t.test(x.s, x.oc) && hit(x.j))
       // ✅ (11 ต.ค. 2569 ผู้ใช้: "งานใหม่ที่ลงตารางควรมาที่บนสุดด้วย") — ล่าสุดขึ้นก่อนทุกแท็บ
       //    กำลังทำ = เรียงตามเวลาส่งลงตาราง (scheduledAt) · รอลงตาราง = งานด่วนก่อน แล้วรับเข้าล่าสุด · เสร็จแล้ว = ปิดล่าสุด
-      // แท็บต้องทำ: งานรอลงตาราง/ส่งของ (ขั้นแรก) ขึ้นก่อน งานติดตามผลตามหลัง
-      .sort(({ j: a, s: sa }, { j: b, s: sb }) => (tab === "waiting" && (sa.i === 0) !== (sb.i === 0) ? (sa.i === 0 ? -1 : 1) : 0) || (tab === "done"
+      .sort(({ j: a }, { j: b }) => (tab === "done"
         ? new Date(b.closeApprovedAt || b.updatedAt || 0) - new Date(a.closeApprovedAt || a.updatedAt || 0)
-        : tab === "handed"
+        : tab === "active"
           ? new Date(b.scheduledAt || b.createdAt || b.intakeAt || 0) - new Date(a.scheduledAt || a.createdAt || a.intakeAt || 0)
           : (isUrgent(b) - isUrgent(a)) || new Date(b.intakeAt || 0) - new Date(a.intakeAt || 0)));
   }, [withStage, tab, q]);
@@ -1765,36 +1681,22 @@ export default function JobIntake() {
           const on = tab === t.key;
           return (
             <ButtonBase key={t.key} onClick={() => { setTabPicked(true); setTab(t.key); }} sx={{
-              flex: { xs: "1 0 auto", sm: "0 0 auto" }, minWidth: 0, height: { xs: 34, sm: 40 }, px: { xs: 0.9, sm: 1.75 }, borderRadius: { xs: 2, sm: 2.5 },
+              flex: { xs: "1 1 0", sm: "0 0 auto" }, minWidth: 0, height: { xs: 34, sm: 40 }, px: { xs: 0.5, sm: 1.75 }, borderRadius: { xs: 2, sm: 2.5 },
               flexDirection: "row", fontSize: { xs: "0.78rem", sm: "0.84rem" }, fontWeight: 800, gap: { xs: 0.45, sm: 0.6 }, whiteSpace: "nowrap", overflow: "hidden",
               border: { xs: 0, sm: `1.5px solid ${on ? ACCENT : LINE}` },
               bgcolor: on ? { xs: "#fff", sm: alpha(ACCENT, 0.07) } : { xs: "transparent", sm: "#fff" },
               boxShadow: on ? { xs: "0 1px 3px rgba(15,23,42,.14)", sm: "none" } : "none",
-              color: on ? { xs: t.color || INK, sm: t.color || ACCENT } : t.color ? t.color : { xs: MUTED, sm: "#334155" },
-              ...(t.color && on ? { border: { xs: 0, sm: `1.5px solid ${t.color}` }, bgcolor: { xs: "#fff", sm: alpha(t.color, 0.07) } } : {}),
+              color: on ? { xs: INK, sm: ACCENT } : { xs: MUTED, sm: "#334155" },
             }}>
               <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>{t.label}</Box>
               <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>{t.short}</Box>
               <Box component="span" sx={{ minWidth: { xs: 18, sm: 20 }, height: { xs: 18, sm: 20 }, px: 0.55, borderRadius: 99, display: "inline-grid", placeItems: "center", fontSize: { xs: "0.68rem", sm: "0.72rem" },
-                bgcolor: on ? (t.color || ACCENT) : t.color ? alpha(t.color, 0.12) : { xs: "rgba(100,116,139,.14)", sm: SURFACE }, color: on ? "#fff" : t.color || MUTED,
+                bgcolor: on ? ACCENT : { xs: "rgba(100,116,139,.14)", sm: SURFACE }, color: on ? "#fff" : MUTED,
                 ...(t.key === "requests" && !on && reqTotal > 0 ? { bgcolor: "#d97706", color: "#fff" } : {}) }}>{tabCount(t.key)}</Box>
             </ButtonBase>
           );
         })}
       </Stack>
-
-      {/* แท็บใบเสนอราคาเพิ่มเติม: บอกชัดว่าเป็นมุมมองติดตามผล (สถานะงานบนการ์ด = สถานะจริง) */}
-      {tab === "quote" && (
-        <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1.25, px: 1.25, py: 0.8, borderRadius: 2.5, bgcolor: alpha(QUOTE_TAB_COLOR, 0.05), border: `1px solid ${alpha(QUOTE_TAB_COLOR, 0.25)}` }}>
-          <Typography sx={{ flex: 1, minWidth: 0, fontSize: "0.78rem", color: "#334155", lineHeight: 1.45 }}>
-            ใบเสนอราคาเพิ่มเติมที่ยังรอผล <Box component="span" sx={{ color: MUTED }}>— งานจะอยู่ที่นี่จนรู้ผล แม้งานจะเสร็จแล้ว</Box>
-          </Typography>
-          <Button component={Link} to="/finance?tab=quotations" size="small" endIcon={<ChevronRight sx={{ fontSize: "16px !important", ml: -0.5 }} />}
-            sx={{ ...BTN, height: 30, px: 1.1, fontSize: "0.76rem", flexShrink: 0, color: QUOTE_TAB_COLOR, bgcolor: "#fff", border: `1px solid ${alpha(QUOTE_TAB_COLOR, 0.4)}`, "&:hover": { bgcolor: alpha(QUOTE_TAB_COLOR, 0.06) } }}>
-            ติดตามใบเสนอราคา
-          </Button>
-        </Stack>
-      )}
 
       {/* ค้นหา + สลับมุมมอง การ์ด / ตาราง · ตาราง: กดแถวเพื่อกางรายละเอียดเต็ม */}
       <Stack direction="row" gap={1} sx={{ mb: 1.5 }}>
@@ -1814,7 +1716,7 @@ export default function JobIntake() {
             </ButtonBase>
           </span>
         </Tooltip>
-        <Stack direction="row" sx={{ flexShrink: 0, p: 0.4, borderRadius: 2.5, border: `1px solid ${LINE}`, bgcolor: "#fff", display: { xs: "none", sm: tab === "handed" ? "none" : "flex" } }}>
+        <Stack direction="row" sx={{ flexShrink: 0, p: 0.4, borderRadius: 2.5, border: `1px solid ${LINE}`, bgcolor: "#fff" }}>
           {[["card", ViewAgendaOutlined, "การ์ด"], ["table", TableRowsOutlined, "ตาราง"]].map(([k, Ico, label]) => (
             <ButtonBase key={k} onClick={() => changeView(k)} aria-label={`มุมมอง${label}`}
               sx={{ height: 30, px: 1.1, gap: 0.5, borderRadius: 2, fontFamily: "inherit", fontSize: "0.78rem", fontWeight: 800,
@@ -1852,12 +1754,7 @@ export default function JobIntake() {
       {tab === "requests" ? null : !jobs ? (
         <Stack spacing={1}>{[0, 1, 2].map((i) => <Skeleton key={i} variant="rounded" height={88} sx={{ borderRadius: 3 }} />)}</Stack>
       ) : list.length ? (
-        tab === "handed" ? (
-          <>
-          <HandedList rows={pg.rows} />
-          <PageBar {...pg} setPage={goPage} unit="งาน" />
-          </>
-        ) : view === "table" ? (
+        view === "table" ? (
           <>
           <Typography sx={{ fontSize: "0.76rem", color: MUTED, mb: 0.75, px: 0.5 }}>กดที่แถวเพื่อดูรายละเอียดทั้งหมด</Typography>
           <JobTable rows={pg.rows} employees={employees} refMode={tab === "waiting"} readOnlyOf={(j) => !canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone}
@@ -1868,30 +1765,13 @@ export default function JobIntake() {
           </>
         ) : (
           <>
-          <Stack spacing={1.25}>{pg.rows.map(({ j, oc, s: st }, i) => <Box key={j._id}>
-            {/* แท็บต้องทำ: หัวข้อแบ่ง 2 กลุ่ม — ทำอะไรก่อนเห็นชัด */}
-            {tab === "waiting" && (i === 0 || (pg.rows[i - 1].s.i === 0) !== (st.i === 0)) && (() => {
-              const first = st.i === 0;
-              const n = list.filter((x) => (x.s.i === 0) === first).length;
-              const c = first ? ACCENT : "#0891b2";
-              return (
-                <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1, mt: i ? 1 : 0 }}>
-                  <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: c }} />
-                  <Typography sx={{ fontWeight: 900, fontSize: "0.9rem", color: INK }}>{first ? "รอลงตาราง / รอส่งของ" : "รอวางบิล"}</Typography>
-                  <Box component="span" sx={{ px: 0.8, borderRadius: 99, bgcolor: alpha(c, 0.1), color: c, fontSize: "0.74rem", fontWeight: 900 }}>{n}</Box>
-                  <Typography noWrap sx={{ fontSize: "0.72rem", color: MUTED, display: { xs: "none", sm: "block" } }}>{first ? "รับงานแล้ว ยังไม่ได้ลงตาราง/ส่งของ" : "ส่งของแล้ว แนบใบวางบิล"}</Typography>
-                  <Box sx={{ flex: 1, height: 1, bgcolor: LINE }} />
-                </Stack>
-              );
-            })()}
-            <JobCard employees={employees} job={j} outcome={oc} readOnly={!canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone} onNoteChanged={load} onEdit={openForm} onCancel={cancelJob} onRestore={restoreJob} />
-          </Box>)}</Stack>
+          <Stack spacing={1.25}>{pg.rows.map(({ j, oc }) => <JobCard key={j._id} employees={employees} job={j} outcome={oc} readOnly={!canManage && !isMine(j)} requestMode={!canManage} onSchedule={setScheduling} onDeliver={setDelivering} onUploadInvoice={uploadInvoice} onNoteDone={noteDone} onNoteChanged={load} onEdit={openForm} onCancel={cancelJob} onRestore={restoreJob} />)}</Stack>
           <PageBar {...pg} setPage={goPage} unit="งาน" />
           </>
         )
       ) : (
         <EmptyState icon={<PostAddOutlined />}
-          title={q ? "ไม่พบงานที่ค้นหา" : tab === "waiting" ? "ไม่มีงานที่ต้องทำ" : tab === "quote" ? "ไม่มีใบเสนอราคาที่รอผล" : tab === "handed" ? "ยังไม่มีงานที่ลงตาราง" : tab === "cancelled" ? "ไม่มีงานที่ยกเลิก" : "ยังไม่มีงานที่เสร็จ"}
+          title={q ? "ไม่พบงานที่ค้นหา" : tab === "waiting" ? "ไม่มีงานรอดำเนินการ" : tab === "active" ? "ไม่มีงานที่กำลังดำเนินการ" : tab === "cancelled" ? "ไม่มีงานที่ยกเลิก" : "ยังไม่มีงานที่เสร็จ"}
           hint={tab === "waiting" && canCreate ? "ได้งานมาแล้ว กด “รับงานใหม่” เพื่อกรอกเก็บไว้ก่อน" : undefined}
           action={tab === "waiting" && canCreate ? <Button variant="contained" startIcon={<AddRounded />} onClick={() => openForm()} sx={{ ...PRIMARY, mt: 1 }}>รับงานใหม่</Button> : null} />
       )}
