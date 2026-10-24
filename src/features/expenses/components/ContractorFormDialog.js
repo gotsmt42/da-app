@@ -163,6 +163,7 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
     restore: (d) => {
       if (d.docDate) setDocDate(d.docDate);
       setTo(d.to || ""); setPosition(d.position || ""); setSubject(d.subject || "");
+      if (String(d.subject || "").startsWith("เบิกค่าจ้างผู้รับเหมา")) autoSubjectsRef.current.add(d.subject);
       if (Array.isArray(d.jobs)) setJobs(d.jobs);
       setCName(d.cName || ""); setCTaxId(d.cTaxId || ""); setCPhone(d.cPhone || ""); setCAddress(d.cAddress || ""); setCIsCompany(Boolean(d.cIsCompany));
       setInstNo(d.instNo || ""); setInstTotal(d.instTotal || ""); setContractValue(d.contractValue || "");
@@ -183,6 +184,9 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
   const [touched, setTouched] = useState(false);
   const fileInputRef = useRef(null);
   const autoSubjectRef = useRef("");
+  // 🐛 (24 ต.ค. 2569 ผู้ใช้: "ชื่อเรื่อง เวลากดผูกงานผิดแล้วเลือกตัวอื่น ให้แก้ตามด้วย") จำทุกเรื่องที่ระบบเคยเติมให้
+  //    (รวมเรื่องที่กู้คืนจากฉบับร่าง) — เรื่องยังเป็นของระบบ = เปลี่ยนตามงาน/ผู้รับเหมา/งวดเสมอ · พิมพ์เองแล้วไม่ทับ
+  const autoSubjectsRef = useRef(new Set());
   const autoInstRef = useRef(false);
 
   // ── ค่าเริ่มต้นทุกครั้งที่เปิด ─────────────────────────────────────────
@@ -300,8 +304,9 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
     const parts = ["เบิกค่าจ้างผู้รับเหมา", String(cName).trim(), installmentText({ no: instNo, total: instTotal }),
       job ? `งาน ${jobText(job)}${span ? ` (${span})` : ""}` : ""].filter(Boolean);
     const next = parts.length > 1 ? parts.join(" ") : "";
-    setSubject((cur) => (!String(cur).trim() || cur === autoSubjectRef.current ? next : cur));
+    setSubject((cur) => (!String(cur).trim() || cur === autoSubjectRef.current || autoSubjectsRef.current.has(cur) ? next : cur));
     autoSubjectRef.current = next;
+    if (next) autoSubjectsRef.current.add(next);
   }, [open, editing, cName, instNo, instTotal, job, jobs]);
 
   const gross = useMemo(() => itemsTotal(items), [items]);
