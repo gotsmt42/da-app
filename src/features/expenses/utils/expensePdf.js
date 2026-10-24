@@ -327,7 +327,7 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold, attachNote = "") =>
   cols.forEach((c) => { c.x = cx; cx += c.w; });
   const col = (k) => cols.find((c) => c.key === k);
   const headers = isCtr
-    ? { no: "ลำดับ", desc: "รายการค่าจ้าง / เนื้องานที่ส่งมอบ", qty: "จำนวน / หน่วย", amount: "จำนวนเงิน (บาท)" }
+    ? { no: "ลำดับ", desc: "รายการ", qty: "จำนวน / หน่วย", amount: "จำนวนเงิน (บาท)" }
     : isReimburse
     ? { no: "ลำดับ", desc: "รายการที่สำรองจ่าย", receipt: "เลขที่ใบเสร็จ", qty: "จำนวน / หน่วย", amount: "จำนวนเงิน (บาท)" }
     : isClaim
