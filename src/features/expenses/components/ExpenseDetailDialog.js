@@ -29,6 +29,8 @@ import usePermissions from "@/shared/hooks/usePermissions";
 import ExpenseService, { errorText } from "../services/ExpenseService";
 import SignatureService from "@/shared/services/SignatureService";
 import ExpensePrintDialog from "./ExpensePrintDialog";
+import { useFileGallery } from "@/shared/ui/FileGalleryDialog";
+import { useAttendanceByDay, AttendanceDayStrip } from "./AttendanceRefs";
 import AdvancePanel from "./AdvancePanel";
 import KindBadge from "./KindBadge";
 import StatusBadge from "./StatusBadge";
@@ -638,6 +640,11 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
   const { can } = usePermissions();
   const [panelOpen, setPanelOpen] = useState(false);
   const [expense, setExpense] = useState(null);
+  // ✅ (24 ต.ค. 2569) ใบค่าจ้างผู้รับเหมาคิดรายวัน — บันทึกเข้างานจริงของงานที่อ้างอิง (เวลา · ผู้บันทึก · รูป) ใต้แต่ละวัน
+  const attIds = expense && expense.claimType === "contractor" && (expense.items || []).some((it) => it.workDate)
+    ? [...(expense.jobRanges || []).map((r) => r.eventId), ...jobsOf(expense).map((j) => j.eventId)] : [];
+  const attByDay = useAttendanceByDay(attIds);
+  const attGallery = useFileGallery();
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [action, setAction] = useState("");
@@ -1232,6 +1239,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
 
               {!isClearClaim && (
                 <Card title={`${isCtr ? "รายการค่าจ้าง" : "รายการ"} (${e.items?.length || 0})`} action={<Typography sx={{ fontWeight: 800, color: meta.color }}>{baht(e.total)}</Typography>}>
+                  {attGallery.dialog}
                   {!e.items?.length && <Typography variant="body2" sx={{ color: TEXT_SUB }}>ไม่มีรายการค่าใช้จ่าย{e.note ? " — ดูหมายเหตุ" : ""}</Typography>}
                   <Stack divider={<Divider flexItem />} spacing={1}>
                     {(e.items || []).map((it, i) => {
@@ -1247,6 +1255,11 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                               {it.receiptNo && <Typography variant="caption" sx={{ color: TEXT_SUB }}>· ใบเสร็จ {it.receiptNo}</Typography>}
                             </Stack>
                             {it.detail && <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }}>{it.detail}</Typography>}
+                            {isCtr && it.workDate && attIds.length > 0 && (
+                              <Box sx={{ mt: 0.75, display: "grid" }}>
+                                <AttendanceDayStrip entries={attByDay.get(moment(it.workDate).utcOffset(7).format("YYYY-MM-DD"))} onOpen={attGallery.open} />
+                              </Box>
+                            )}
                           </Box>
                           <Box sx={{ textAlign: "right" }}>
                             <Typography sx={{ fontWeight: 800, fontSize: "0.92rem" }}>{fmtMoney(it.amount)}</Typography>

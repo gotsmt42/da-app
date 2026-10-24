@@ -39,6 +39,8 @@ import {
   contractorCalc, installmentText, WHT_PRESETS, personFullName, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
 } from "../expenseMeta";
 import useFormDraft, { DraftBanner } from "@/shared/hooks/useFormDraft";
+import { useFileGallery } from "@/shared/ui/FileGalleryDialog";
+import { useAttendanceByDay, AttendanceDayStrip } from "./AttendanceRefs";
 
 const META = KIND_META.contractor;
 const ACCENT = META.color;
@@ -47,13 +49,18 @@ let keySeq = 0;
 const nextKey = () => `c${Date.now()}_${(keySeq += 1)}`;
 const blankItem = () => ({ key: nextKey(), category: "labor", description: "", detail: "", qty: 1, unit: "งาน", unitPrice: "", workDate: "" });
 /** แถวค่าแรงรายวัน — 1 แถว = 1 วันทำงาน (ผู้ใช้: "อยากได้ใส่วันที่ เพราะเขาเบิกเป็นวัน") */
+const DEFAULT_FROM = "08:30";
+const DEFAULT_TO = "17:30";
 // 🔁 (24 ต.ค. 2569 ผู้ใช้: "ใบเบิกผู้รับเหมา ใส่จำนวนคนต่อวันได้ จะได้อ้างอิงได้") จำนวน = จำนวนคน · ราคา = ค่าแรงต่อคนต่อวัน
 const dayItem = (workDate = "", unitPrice = "", auto = false, people = 1) => ({
   key: nextKey(), category: "labor", description: "ค่าแรง", detail: "", qty: people || 1, unit: "คน", unitPrice, workDate, auto,
+  // ✅ (24 ต.ค. 2569 ผู้ใช้: "ใส่เวลาได้ด้วย default 08.30-17.30")
+  timeFrom: DEFAULT_FROM, timeTo: DEFAULT_TO,
 });
 const fromDoc = (it) => ({
   key: nextKey(), category: it.category || "labor", description: it.description || "", detail: it.detail || "",
   qty: it.qty ?? 1, unit: it.unit || "", unitPrice: it.unitPrice ?? "", workDate: it.workDate ? moment(it.workDate).format("YYYY-MM-DD") : "",
+  timeFrom: it.timeFrom || "", timeTo: it.timeTo || "",
 });
 /** วันทำงานทุกวันของช่วงงาน — end ของงานทั้งวันเป็นแบบ "ไม่รวมวันสุดท้าย" (เหมือน jobRangeText) */
 const daysOfRange = (r) => {
@@ -138,6 +145,8 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
   const [dailyRate, setDailyRate] = useState("");
   /** จำนวนคนต่อวัน — กรอกครั้งเดียวใช้กับทุกวัน (แก้รายวันได้) */
   const [dailyPeople, setDailyPeople] = useState(1);
+  // บันทึกเข้างานของงานที่อ้างอิง แยกตามวัน + ตัวดูรูป
+  const gallery = useFileGallery();
   const [vatRate, setVatRate] = useState(0);
   const [whtRate, setWhtRate] = useState(3);
   const [deposit, setDeposit] = useState("");
@@ -336,6 +345,7 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
    * ⚠️ ไม่ทำตอนแก้ใบเดิม — รายการที่บันทึกไว้แล้วต้องไม่เปลี่ยนเองเงียบๆ
    */
   const jobsKey = jobs.map((j) => j._id).join(",");
+  const attByDay = useAttendanceByDay(jobs.map((j) => j._id));
   useEffect(() => {
     if (!open || editing || rateMode !== "daily") return;
     const days = [...new Set(jobs.flatMap(daysOfRange))].sort();
@@ -669,12 +679,13 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
           {rateMode === "daily" && dupDates.length > 0 && (
             <Alert severity="warning" sx={{ mb: 1, py: 0 }}>วันที่ซ้ำกัน: {dupDates.map((d) => thaiDate(d)).join(", ")}</Alert>
           )}
+          {gallery.dialog}
           <Stack spacing={rateMode === "daily" ? 0.75 : 1.25}>
             {rateMode === "daily" && items.map((row) => (
               <Box key={row.key} sx={{
                 display: "grid", gap: 1, alignItems: "center", p: 1, bgcolor: "#fff", borderRadius: 2,
                 border: `1px solid ${dupDates.includes(row.workDate) ? "#f59e0b" : BORDER_MAIN}`, borderLeft: `3px solid ${ACCENT}`,
-                gridTemplateColumns: { xs: "1fr 1fr 1fr auto", md: "170px 1fr 92px 130px 110px auto" },
+                gridTemplateColumns: { xs: "1fr 1fr 1fr auto", md: "160px 1fr 190px 76px 118px 100px auto" },
               }}>
                 <Box sx={{ gridColumn: { xs: "1 / 4", md: "auto" } }}>
                   <ThaiDatePicker label="วันที่ทำงาน *" value={row.workDate} onChange={(v) => setItem(row.key, { workDate: v || "", auto: false })}
@@ -687,11 +698,18 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
                 <TextField size="small" label="งานที่ทำ" value={row.description} onChange={(e) => setItem(row.key, { description: e.target.value })}
                   inputProps={{ maxLength: 300 }} placeholder="ค่าแรง" error={touched && !String(row.description).trim()}
                   sx={{ gridColumn: { xs: "1 / -1", md: "auto" } }} />
+                {/* เวลาทำงานของวันนั้น (ค่าเริ่มต้น 08:30–17:30) */}
+                <Stack direction="row" alignItems="center" gap={0.5} sx={{ gridColumn: { xs: "1 / -1", md: "auto" } }}>
+                  <TextField size="small" label="เริ่ม" type="time" value={row.timeFrom || ""} onChange={(e) => setItem(row.key, { timeFrom: e.target.value, auto: false })}
+                    InputLabelProps={{ shrink: true }} inputProps={{ step: 300 }} sx={{ flex: 1 }} />
+                  <Typography sx={{ color: TEXT_SUB }}>–</Typography>
+                  <TextField size="small" label="ถึง" type="time" value={row.timeTo || ""} onChange={(e) => setItem(row.key, { timeTo: e.target.value, auto: false })}
+                    InputLabelProps={{ shrink: true }} inputProps={{ step: 300 }} sx={{ flex: 1 }} />
+                </Stack>
                 <TextField size="small" label="คน" type="number" value={row.qty} onChange={(e) => setItem(row.key, { qty: e.target.value, unit: "คน", auto: false })}
                   inputProps={{ min: 1, step: 1, ...numberField }} error={Number(row.qty) <= 0} />
-                <TextField size="small" label="ค่าแรง/คน" type="number" value={row.unitPrice} onChange={(e) => setItem(row.key, { unitPrice: e.target.value, unit: "คน", auto: false })}
-                  inputProps={{ min: 0, step: "any", ...numberField }}
-                  InputProps={{ endAdornment: <InputAdornment position="end">฿</InputAdornment> }} />
+                <TextField size="small" label="บาท/คน" type="number" value={row.unitPrice} onChange={(e) => setItem(row.key, { unitPrice: e.target.value, unit: "คน", auto: false })}
+                  inputProps={{ min: 0, step: "any", ...numberField }} />
                 {/* รวมของวันนั้น = คน × ค่าแรงต่อคน — เห็นทั้งมือถือและจอคอม */}
                 <Box sx={{ textAlign: "right", gridColumn: { xs: "3 / -1", md: "auto" } }}>
                   <Typography sx={{ fontSize: "0.68rem", color: TEXT_SUB, lineHeight: 1.2 }}>รวมวันนี้</Typography>
@@ -699,6 +717,8 @@ export default function ContractorFormDialog({ open, expense, presetJob, onClose
                 </Box>
                 <IconButton size="small" aria-label="ลบวันนี้" disabled={items.length === 1} sx={{ display: { xs: "none", md: "inline-flex" } }}
                   onClick={() => setItems((rows) => rows.filter((r) => r.key !== row.key))}><DeleteOutline fontSize="small" /></IconButton>
+                {/* บันทึกเข้างานจริงของวันนั้น (งานที่อ้างอิง) — เวลา · ผู้บันทึก · รูปหน้างาน */}
+                {row.workDate && <AttendanceDayStrip entries={attByDay.get(row.workDate)} hasJobs={jobs.length > 0} onOpen={gallery.open} />}
               </Box>
             ))}
             {rateMode === "lump" && items.map((row, idx) => (
