@@ -12,10 +12,11 @@ import "@/shared/utils/momentThaiLocale";
  */
 
 const C = {
-  headerBg: "FF4C1D95",   // ม่วงเข้ม — โทนเดียวกับ "กำลังดำเนินการ" ที่เป็นแกนของหน้านี้
+  // 🔁 (24 ต.ค. 2569 ผู้ใช้: "export excel ให้ข้อมูลสอดคล้องกับที่แก้มา ดูง่าย ครบถ้วน") หัวตารางโทนเทาเข้ม อ่านง่าย พิมพ์ชัด
+  headerBg: "FF1E293B",
   headerText: "FFFFFFFF",
-  groupBg: "FF7C3AED",
-  titleText: "FF4C1D95",
+  groupBg: "FF475569",
+  titleText: "FF0F172A",
   subtitleText: "FF64748B",
   zebra: "FFF8F7FF",
   border: "FFE2E8F0",
@@ -45,7 +46,11 @@ const thinBorder = {
  * @param {Object} meta   { fileName, groupLabel, filterSummary, exportedAt }
  * @param {Map}    daysPastDueMap  ผลการคำนวณ "ค้างกี่วัน" ชุดเดียวกับที่หน้าจอใช้ (กันตัวเลขไม่ตรงกัน)
  */
-export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFlaggedDays, formatEventDateRange }) {
+/**
+ * @param stepOf     (sessions) => "รับทราบ" | "ยืนยันนัด" | "เข้างาน" | "เอกสาร" | "ขอปิดงาน" | "เสร็จสิ้น" — ขั้นตอนเดียวกับแถบบนหน้าจอ
+ * @param roundLabel (event) => "1/4 - 2569-70" — ครั้งที่แบบเดียวกับหน้าจอ
+ */
+export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFlaggedDays, formatEventDateRange, stepOf, roundLabel }) {
   const wb = new ExcelJS.Workbook();
   wb.creator = "DA-APP";
   wb.created = new Date();
@@ -55,21 +60,28 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
 
   const cols = [
     { key: "status", header: "สถานะงาน", width: 18, group: "สถานะ", align: "center" },
+    { key: "step", header: "ขั้นตอนตอนนี้", width: 14, group: "สถานะ", align: "center" },
     { key: "overdue", header: "ค้างกี่วัน", width: 11, group: "สถานะ", align: "center" },
     { key: "approval", header: "การอนุมัติ", width: 13, group: "สถานะ", align: "center" },
+    { key: "jobNo", header: "เลขที่งาน (JOB)", width: 17, group: "ข้อมูลงาน" },
     { key: "company", header: "บริษัท", width: 24, group: "ข้อมูลงาน" },
     { key: "site", header: "โครงการ", width: 24, group: "ข้อมูลงาน" },
     { key: "title", header: "ประเภทงาน", width: 16, group: "ข้อมูลงาน" },
     { key: "system", header: "ระบบ", width: 16, group: "ข้อมูลงาน" },
-    { key: "round", header: "ครั้งที่", width: 9, group: "ข้อมูลงาน", align: "center" },
-    { key: "docNo", header: "เลขที่เอกสาร", width: 16, group: "ข้อมูลงาน" },
+    { key: "round", header: "ครั้งที่", width: 15, group: "ข้อมูลงาน", align: "center" },
+    { key: "docNo", header: "เลขที่สัญญา/เอกสาร", width: 16, group: "ข้อมูลงาน" },
+    { key: "source", header: "รับงานจาก", width: 16, group: "ข้อมูลงาน" },
+    { key: "dispatchNo", header: "เลขที่ใบแจ้งงาน", width: 15, group: "ข้อมูลงาน" },
     { key: "dateRange", header: "วันที่เข้างาน", width: 26, group: "กำหนดการ", wrap: true },
     { key: "startDate", header: "วันเริ่ม", width: 12, group: "กำหนดการ", align: "center" },
     { key: "endDate", header: "วันสิ้นสุด", width: 12, group: "กำหนดการ", align: "center" },
     { key: "dayCount", header: "จำนวนวัน", width: 10, group: "กำหนดการ", align: "center" },
+    { key: "parts", header: "จำนวนช่วง", width: 10, group: "กำหนดการ", align: "center" },
     { key: "timeRange", header: "เวลา", width: 14, group: "กำหนดการ", align: "center" },
-    { key: "team", header: "ทีมที่เข้างาน", width: 20, group: "ผู้เกี่ยวข้อง" },
     { key: "responsible", header: "ผู้รับผิดชอบงาน", width: 20, group: "ผู้เกี่ยวข้อง" },
+    { key: "head", header: "หัวหน้าทีมเข้างาน", width: 18, group: "ผู้เกี่ยวข้อง" },
+    { key: "team", header: "ลูกทีม", width: 22, group: "ผู้เกี่ยวข้อง", wrap: true },
+    { key: "ack", header: "รับทราบโดย / เมื่อ", width: 24, group: "ผู้เกี่ยวข้อง", wrap: true },
     { key: "checkIn", header: "เวลาเข้างานจริง", width: 17, group: "การปฏิบัติงาน", align: "center" },
     { key: "checkOut", header: "เวลาเสร็จงานจริง", width: 17, group: "การปฏิบัติงาน", align: "center" },
     { key: "workNote", header: "สรุปงาน (ช่างบันทึก)", width: 36, group: "การปฏิบัติงาน", wrap: true },
@@ -152,13 +164,20 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
 
     const row = ws.addRow({
       status: a.status || "-",
+      step: stepOf ? stepOf(sessions) : "",
+      jobNo: a.jobNo || "",
+      source: { sales: "ฝ่ายขาย", service: "ฝ่ายบริการ", project: "ฝ่ายโครงการ", customer: "ลูกค้าแจ้งตรง", calendar: "ลงตารางตรง", dispatch: "คำขอลงงาน" }[a.intakeSource] || "",
+      dispatchNo: a.dispatchNo || "",
+      parts: sessions.length,
+      head: a.team || "",
+      ack: (a.acks || []).map((k) => `${k.name || ""}${k.at ? ` ${moment(k.at).format("DD/MM/YY HH:mm")}` : ""}`).filter((x) => x.trim()).join(", "),
       overdue: isOverdue ? overdueDays : "",
       approval: approvalState,
       company: a.company || "",
       site: a.site || "",
       title: a.title || "",
       system: a.system || "",
-      round: a.time || "",
+      round: a.time ? (roundLabel ? roundLabel(a) : String(a.time)) : "",
       docNo: a.docNo || "",
       // ✅ ข้อความช่วงวันที่แบบอ่านง่าย (รวมทุกช่วงของงานหลายวันไม่ติดกัน) เหมือนที่เห็นบนการ์ด
       dateRange: sessions.map((e) => formatEventDateRange(e)).join("\n"),
@@ -166,7 +185,7 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
       endDate: maxEnd.toDate(),
       dayCount,
       timeRange: a.startTime || a.endTime ? `${a.startTime || "-"}-${a.endTime || "-"}` : "ทั้งวัน",
-      team: [a.team, ...(a.teamMembers || []).map((m) => m?.name)].filter(Boolean).join(", "),
+      team: [...new Set((a.teamMembers || []).map((m) => m?.name).filter((n) => n && n !== a.team))].join(", "),
       responsible: a.responsiblePerson || "",
       checkIn: a.checkedInAt ? new Date(a.checkedInAt) : "",
       checkOut: a.checkedOutAt ? new Date(a.checkedOutAt) : "",
@@ -212,6 +231,8 @@ export async function exportOperationToExcel({ jobs, meta, daysPastDueMap, isFla
     });
   });
 
+  // ตรึงหัวตาราง — เลื่อนลงแล้วยังเห็นชื่อคอลัมน์
+  ws.views = [{ state: "frozen", ySplit: HEADER_ROW, xSplit: 0 }];
   if (jobs.length > 0) {
     ws.autoFilter = { from: { row: HEADER_ROW, column: 1 }, to: { row: HEADER_ROW + jobs.length, column: lastCol } };
   }

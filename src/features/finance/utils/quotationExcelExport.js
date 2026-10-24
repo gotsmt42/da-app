@@ -80,6 +80,9 @@ export async function exportQuotationsToExcel({ jobs, meta, getFollowUpInfo, for
     { key: "system", header: "ระบบ", width: 16, group: "ข้อมูลงาน" },
     { key: "round", header: "ครั้งที่", width: 10, group: "ข้อมูลงาน", align: "center" },
     { key: "docNo", header: "เลขที่เอกสาร", width: 16, group: "ข้อมูลงาน" },
+    // ✅ (24 ต.ค. 2569) เลข JOB · ที่มา (งานในตาราง / บันทึกงาน ที่แนบใบเสนอราคาตอนทำเสร็จ)
+    { key: "jobNo", header: "เลขที่งาน (JOB)", width: 17, group: "ข้อมูลงาน" },
+    { key: "origin", header: "ที่มา", width: 14, group: "ข้อมูลงาน", align: "center" },
     { key: "jobDate", header: "วันที่เข้างาน", width: 22, group: "ข้อมูลงาน" },
     { key: "sentAt", header: "วันที่เริ่มนับ", width: 14, group: "การติดตาม", align: "center" },
     { key: "followUpCount", header: "ติดตามแล้ว (ครั้ง)", width: 15, group: "การติดตาม", align: "center" },
@@ -96,6 +99,7 @@ export async function exportQuotationsToExcel({ jobs, meta, getFollowUpInfo, for
     { key: "fileCount", header: "ไฟล์แนบ (ไฟล์)", width: 13, group: "เอกสาร", align: "center" },
     { key: "fileName", header: "ชื่อไฟล์ใบเสนอราคา", width: 30, group: "เอกสาร", wrap: true },
   ];
+  ws.views = [{ state: "frozen", ySplit: 5, xSplit: 0 }]; // ตรึงหัวตาราง (แถว 1–5)
   ws.columns = cols.map((c) => ({ key: c.key, width: c.width }));
   const lastCol = cols.length;
 
@@ -173,7 +177,9 @@ export async function exportQuotationsToExcel({ jobs, meta, getFollowUpInfo, for
       system: a.system || "",
       round: a.time || "",
       docNo: a.docNo || "",
-      jobDate: formatEventDateRange(a),
+      jobNo: a.jobNo || "",
+      origin: a.intakeNote ? "บันทึกงาน" : a.unscheduled ? "ยังไม่ลงตาราง" : "งานในตาราง",
+      jobDate: a.intakeNote ? (a.noteDoneAt ? `ทำเสร็จ ${new Date(a.noteDoneAt).toLocaleDateString("th-TH")}` : "") : formatEventDateRange(a),
       sentAt: a.quotationSentAt ? new Date(a.quotationSentAt) : "",
       followUpCount: followUps.length,
       lastContact: info ? info.lastContactAt.toDate() : "",

@@ -93,6 +93,7 @@ const SERVICE_COLS = [
   { key: "company", header: "บริษัท / ลูกค้า", width: 26, group: "ข้อมูลงาน", wrap: true },
   { key: "system", header: "ระบบ", width: 14, group: "ข้อมูลงาน" },
   { key: "jobClass", header: "หมวดงาน", width: 12, group: "ข้อมูลงาน", align: "center" },
+  { key: "jobNo", header: "เลขที่งาน (JOB)", width: 17, group: "ข้อมูลงาน" },
   { key: "contractNo", header: "เลขที่สัญญา", width: 16, group: "สัญญา" },
   { key: "round", header: "ครั้งที่", width: 8, group: "สัญญา", align: "center" },
   { key: "status", header: "สถานะงาน", width: 17, group: "สถานะ", align: "center" },
@@ -137,6 +138,7 @@ const serviceValues = (ev, { classifyJob, getApprovalState, formatRoundLabel }) 
       time: st ? `${st}${et ? ` – ${et}` : ""}` : "ทั้งวัน",
       title: ev.title || "", site: ev.site || "", company: ev.company || "", system: ev.system || "",
       jobClass: JOB_CLASS_LABEL[jobClass] || "",
+      jobNo: ev.jobNo || "",
       contractNo: ev.contractNo || "",
       round: ev.time ? String(formatRoundLabel ? formatRoundLabel(ev.time, ev.visitCount, ev) : ev.time) : "",
       status: ev.status || "", approval: approval.label,
@@ -327,6 +329,7 @@ export async function exportCalendarEventsToExcel({ rows, mode = "service", meta
     const firstData = HEADER_ROW + 1;
     const lastData = HEADER_ROW + data.length;
     ws.autoFilter = { from: { row: HEADER_ROW, column: 1 }, to: { row: lastData, column: lastCol } };
+    ws.views = [{ state: "frozen", ySplit: HEADER_ROW, xSplit: 0 }]; // ตรึงหัวตาราง
 
     // แถวรวมท้ายตาราง — สูตร SUBTOTAL (เปลี่ยนตามการกรองใน Excel)
     const sumIdx = cols.findIndex((c) => c.sum) + 1;

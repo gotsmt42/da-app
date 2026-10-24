@@ -101,6 +101,8 @@ export async function exportContractsToExcel({
     { key: "contractNo", header: "เลขที่สัญญา", width: 18, group: "เอกสารอ้างอิง" },
     { key: "quotationNo", header: "ใบเสนอราคา", width: 18, group: "เอกสารอ้างอิง" },
     { key: "docNo", header: "เอกสารเลขที่", width: 18, group: "เอกสารอ้างอิง" },
+    // ✅ (24 ต.ค. 2569) เลข JOB ของงาน (งานสัญญาหลายครั้ง = หลายเลข) — ค้นกลับไปหางานในแอปได้
+    { key: "jobNo", header: "เลขที่งาน (JOB)", width: 20, group: "เอกสารอ้างอิง", wrap: true },
     { key: "company", header: "บริษัท", width: 26, group: "ข้อมูลงาน" },
     { key: "site", header: "โครงการ", width: 26, group: "ข้อมูลงาน" },
     { key: "province", header: "จังหวัด", width: 18, group: "ข้อมูลงาน" },
@@ -183,7 +185,7 @@ export async function exportContractsToExcel({
   //    (วางบิล/เอกสารแนบ/ลูกทีม) ติดไปกับคอลัมน์บนจอที่ใกล้เคียงที่สุด
   // ⚠️ ส่งออกครบทุกคอลัมน์เสมอแม้ซ่อนไว้บนจอ — ไฟล์มีไว้เก็บ/ส่งต่อ ข้อมูลต้องไม่หายตามการซ่อนชั่วคราว
   const SCREEN_KEY = {
-    departmentTag: "departmentTag", contractNo: "doc", quotationNo: "doc", docNo: "doc",
+    departmentTag: "departmentTag", contractNo: "doc", quotationNo: "doc", docNo: "doc", jobNo: "doc",
     company: "customer", site: "customer", system: "work", title: "work",
     contractStart: "period", contractEnd: "period", durationYears: "period", intervalMonths: "period", estimatedDaysPerVisit: "period", perYear: "period", visitCount: "period",
     jobValue: "jobValue", commission: "commission", commissionPct: "commission",
@@ -267,6 +269,7 @@ export async function exportContractsToExcel({
       contractNo: c.contractNo || "",
       quotationNo: c.quotationNo || "",
       docNo: c.docNo || "",
+      jobNo: [...new Set((c.visits || []).map((v) => v?.jobNo).filter(Boolean))].join(", "),
       company: c.company || "",
       site: c.site || "",
       system: c.system || "",
@@ -438,6 +441,7 @@ export async function exportContractsToExcel({
   // ✅ เปิดตัวกรอง (AutoFilter) ให้ที่หัวตาราง — ผู้ใช้กรอง/เรียงต่อเองได้ทันทีโดยไม่ต้องตั้งเอง
   if (rows.length > 0) {
     ws.autoFilter = { from: { row: HEADER_ROW, column: 1 }, to: { row: HEADER_ROW + rows.length, column: lastCol } };
+    ws.views = [{ state: "frozen", ySplit: HEADER_ROW, xSplit: 0 }]; // ตรึงหัวตาราง
   }
 
   // ── แถวสรุปยอดรวมท้ายตาราง ───────────────────────────────────────────────

@@ -8,8 +8,14 @@
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { thaiDate } from "@/shared/utils/thaiDate";
-import { statusMeta, categoryMeta, jobText, differenceMeta, personFullName, money } from "../expenseMeta";
+import { statusMeta, categoryMeta, jobText, jobsOf, differenceMeta, personFullName, money } from "../expenseMeta";
 import { formatAccountNo, bankMeta } from "../bankMeta";
+
+// ✅ (24 ต.ค. 2569) ใบที่อ้างอิงหลายงาน — ทุกงานในช่องเดียว คั่นด้วย " | " (งานแรก = งานหลัก)
+const jobsCell = (doc) => {
+  const list = jobsOf(doc);
+  return list.length > 1 ? `(${list.length} งาน) ${list.map((j) => jobText(j)).join(" | ")}` : jobText(list[0] || doc?.job);
+};
 
 /**
  * ข้อความบัญชีรับเงินสำหรับไฟล์ Excel
@@ -282,7 +288,7 @@ export async function exportExpenseReport(report, { periodLabel = "", fileName =
       date: thaiDate(a.docDate),
       person: personFullName(a.requester),
       subject: a.subject,
-      job: jobText(a.job),
+      job: jobsCell(a),
       total: a.total,
       status: statusMeta(a.status, "advance").label,
       reviewer: a.reviewedAt ? personFullName(a.reviewedBy) : "",
@@ -325,7 +331,7 @@ export async function exportExpenseReport(report, { periodLabel = "", fileName =
     date: thaiDate(r.docDate),
     person: personFullName(r.requester),
     subject: r.subject,
-    job: jobText(r.job),
+    job: jobsCell(r),
     total: r.total,
     status: statusMeta(r.status, "reimburse").label,
     reviewer: reviewerOf(r),

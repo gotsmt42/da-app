@@ -3303,6 +3303,13 @@ const Operation = () => {
         daysPastDueMap,
         isFlaggedDays,
         formatEventDateRange,
+        // ✅ ขั้นตอนชุดเดียวกับแถบบนหน้าจอ (เอกสารครบ = ครบในช่วงใดช่วงหนึ่งของงาน)
+        stepOf: (sessions) => {
+          const a = sessions[0];
+          const docsOk = JOB_DOC_TYPES.every((t) => sessions.some((s) => isDocComplete(s, t.key)));
+          return ["รับทราบ", "ยืนยันนัด", "เข้างาน", "เอกสาร", "ขอปิดงาน", "เสร็จสิ้น"][Math.min(5, jobStepOf(a, docsOk))] || "";
+        },
+        roundLabel: (e) => formatRoundLabel(e.time, e.visitCount, e),
       });
       setSnackbar({ open: true, msg: "ส่งออก Excel เรียบร้อย", severity: "success" });
     } catch (err) {
