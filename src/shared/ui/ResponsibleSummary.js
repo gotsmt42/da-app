@@ -39,8 +39,18 @@ export default function ResponsibleSummary({
   rows, unit = "งาน", value = "all", onChange, employees = [], isOverdue, isMobile = false,
   title = "งานตามผู้รับผิดชอบ", hint = "กดที่ชื่อเพื่อดูเฉพาะงานของคนนั้น · กดซ้ำเพื่อดูทั้งหมด",
   amountOf, formatAmount = (n) => n.toLocaleString(), noteOf,
+  collapsible = false, storageKey = "",
 }) {
   const [expanded, setExpanded] = useState(false);
+  // ✅ (24 ต.ค. 2569 ผู้ใช้: "ส่วนหัวรกเกินไป ให้พับได้ สวยงาม") พับเป็นแถวรายชื่อสั้นบรรทัดเดียว · จำค่าที่เลือกไว้
+  const [folded, setFolded] = useState(() => {
+    if (!collapsible) return false;
+    try { return localStorage.getItem(storageKey || "tt-people-folded") !== "0"; } catch { return true; }
+  });
+  const toggleFold = () => setFolded((v) => {
+    try { localStorage.setItem(storageKey || "tt-people-folded", v ? "0" : "1"); } catch { /* ignore */ }
+    return !v;
+  });
 
   const avatarOf = useMemo(() => {
     const m = new Map();
@@ -140,6 +150,38 @@ export default function ResponsibleSummary({
     </ButtonBase>
   );
 
+  if (collapsible && folded) {
+    // แบบพับ: หัวข้อ + รายชื่อเป็นชิปเล็กบรรทัดเดียว (กดกรองได้เหมือนเดิม) · กดลูกศรเพื่อกางการ์ดเต็ม
+    return (
+      <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1.5, px: 1.25, py: 0.75, border: "1px solid", borderColor: BORDER, borderRadius: 3, bgcolor: "#fff", minWidth: 0 }}>
+        <Stack direction="row" alignItems="center" gap={0.6} sx={{ flexShrink: 0, px: 0.25 }}>
+          <Groups sx={{ fontSize: 18, color: ACCENT }} />
+          <Typography sx={{ fontWeight: 800, fontSize: "0.82rem", whiteSpace: "nowrap" }}>{title}</Typography>
+        </Stack>
+        <Box sx={{ flex: 1, minWidth: 0, display: "flex", gap: 0.6, overflowX: "auto", scrollbarWidth: "thin", py: 0.25 }}>
+          {people.map((p) => {
+            const sel = value === p.name; const c = colorOf(p.name);
+            return (
+              <ButtonBase key={p.name} onClick={() => toggle(p.name)} aria-pressed={sel}
+                sx={{ flexShrink: 0, gap: 0.6, pl: 0.4, pr: 1, py: 0.3, borderRadius: 99, border: "1px solid", borderColor: sel ? c : BORDER, bgcolor: sel ? alpha(c, 0.08) : "#fff", "&:hover": { borderColor: c } }}>
+                <Avatar src={avatarOf.get(p.name)} sx={{ width: 22, height: 22, fontSize: "0.7rem", fontWeight: 700, bgcolor: c }}>{initialOf(p.name)}</Avatar>
+                <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, whiteSpace: "nowrap" }}>{p.name.split(" ")[0]}</Typography>
+                <Typography sx={{ fontSize: "0.74rem", fontWeight: 800, color: sel ? c : TEXT_SUB, fontVariantNumeric: "tabular-nums" }}>{p.count}</Typography>
+              </ButtonBase>
+            );
+          })}
+        </Box>
+        {value !== "all" && (
+          <ButtonBase onClick={() => onChange("all")} sx={{ flexShrink: 0, fontSize: "0.76rem", fontWeight: 700, color: ACCENT, px: 1, py: 0.4, borderRadius: 1.5 }}>ดูทุกคน</ButtonBase>
+        )}
+        {/* ปุ่มกาง — ป้ายชัด กดง่าย (ผู้ใช้: "กดเปิดปิดพับยาก") */}
+        <ButtonBase onClick={toggleFold} sx={{ flexShrink: 0, height: 32, px: 1.25, gap: 0.4, borderRadius: 2, border: `1px solid ${BORDER}`, fontFamily: "inherit", fontSize: "0.78rem", fontWeight: 700, color: "#334155", "&:hover": { bgcolor: "#f8fafc", borderColor: "#cbd5e1" } }}>
+          ดูยอดรายคน <ExpandMore sx={{ fontSize: 18 }} />
+        </ButtonBase>
+      </Stack>
+    );
+  }
+
   return (
     <Box sx={{ mb: 2, border: "1px solid", borderColor: BORDER, borderRadius: 3, bgcolor: "#fbfcfe", p: { xs: 1.25, sm: 1.5 } }}>
       <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1.25 }}>
@@ -160,6 +202,11 @@ export default function ResponsibleSummary({
         {value !== "all" && (
           <ButtonBase onClick={() => onChange("all")} sx={{ fontSize: "0.78rem", fontWeight: 700, color: ACCENT, px: 1, py: 0.5, borderRadius: 1.5, "&:hover": { bgcolor: alpha(ACCENT, 0.06) } }}>
             ดูทุกคน
+          </ButtonBase>
+        )}
+        {collapsible && (
+          <ButtonBase onClick={toggleFold} sx={{ height: 32, px: 1.25, gap: 0.4, borderRadius: 2, border: `1px solid ${BORDER}`, fontFamily: "inherit", fontSize: "0.78rem", fontWeight: 700, color: "#334155", "&:hover": { bgcolor: "#f8fafc", borderColor: "#cbd5e1" } }}>
+            ย่อ <ExpandLess sx={{ fontSize: 18 }} />
           </ButtonBase>
         )}
       </Stack>

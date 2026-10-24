@@ -43,7 +43,7 @@ import ExpensePrintDialog from "./ExpensePrintDialog";
 import BankAccountPicker from "./BankAccountPicker";
 import {
   KIND_META, EXPENSE_CATEGORIES, categoryMeta, FILE_KINDS, baht, fmtMoney, itemAmount, itemsTotal,
-  differenceMeta, money, jobText, jobSubject, jobRangeText, jobPartText, itemPersonName, personFullName, slipKind, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
+  differenceMeta, money, jobText, jobSubject, jobsSubject, jobChipText, jobRangeText, jobPartText, itemPersonName, personFullName, slipKind, TEXT_SUB, TEXT_MAIN, BORDER_MAIN,
 } from "../expenseMeta";
 import useFormDraft, { DraftBanner } from "@/shared/hooks/useFormDraft";
 
@@ -134,7 +134,9 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
   const [requester, setRequester] = useState(null);
   const [position, setPosition] = useState("");
   const [subject, setSubject] = useState("");
-  const [job, setJob] = useState(null);
+  // ✅ (24 ต.ค. 2569 ผู้ใช้: "ใบเบิก/เคลมทุกใบ อ้างอิงงานได้หลายงานพร้อมกัน") — งานแรก = งานหลักของใบ
+  const [jobs, setJobs] = useState([]);
+  const job = jobs[0] || null;
   const [jobOptions, setJobOptions] = useState([]);
   const [jobQuery, setJobQuery] = useState("");
   const [jobLoading, setJobLoading] = useState(false);
@@ -160,11 +162,11 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
   const draft = useFormDraft({
     key: editing ? `expense:edit:${expense._id}` : `expense:new:${slip}:${presetJob?._id || advanceProp?._id || "-"}`,
     enabled: Boolean(open),
-    data: { docDate, to, position, subject, job, items, dueClearAt, note, advance, payToAccountId: payToAccountId ?? null },
+    data: { docDate, to, position, subject, jobs, items, dueClearAt, note, advance, payToAccountId: payToAccountId ?? null },
     restore: (d) => {
       if (d.docDate) setDocDate(d.docDate);
       setTo(d.to || ""); setPosition(d.position || ""); setSubject(d.subject || "");
-      setJob(d.job || null);
+      setJobs(Array.isArray(d.jobs) ? d.jobs : d.job ? [d.job] : []);
       if (Array.isArray(d.items)) setItems(d.items.map((it) => ({ ...it, key: nextKey() })));
       setDueClearAt(d.dueClearAt || ""); setNote(d.note || "");
       if (d.advance) setAdvance(d.advance);
@@ -205,7 +207,9 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
       setRequester({ userId: expense.requester?.userId, name: expense.requester?.name, fullName: expense.requester?.fullName, position: expense.requester?.position });
       setPosition(expense.requester?.position || "");
       setSubject(expense.subject || "");
-      setJob(expense.eventId ? { _id: expense.eventId, ...expense.job } : null);
+      setJobs((expense.jobs || []).length
+        ? expense.jobs.map((j) => ({ _id: j.eventId, ...j }))
+        : expense.eventId ? [{ _id: expense.eventId, ...expense.job }] : []);
       setItems((expense.items || []).map(fromDoc));
       setDueClearAt(dayOf(expense.dueClearAt));
       setNote(expense.note || "");
@@ -219,9 +223,9 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
       setPosition("");
       // ✅ เปิดมาจากหน้าตารางงาน — ผูกงานให้ทันที และตั้งเรื่องจากชื่องาน/โครงการ (แก้ได้)
       // ✅ เรื่องแบบรายละเอียดครบ "เบิกค่าใช้จ่ายงาน PM Fire Alarm โครงการ ... ครั้งที่ ..." (ดู jobSubject)
-      autoSubjectRef.current = presetJob ? jobSubject(presetJob, subjectPrefix) : "";
+      autoSubjectRef.current = presetJob ? jobsSubject([presetJob], subjectPrefix) : "";
       setSubject(autoSubjectRef.current);
-      setJob(presetJob ? { ...presetJob } : null);
+      setJobs(presetJob ? [{ ...presetJob }] : []);
       // ใบเคลมที่อ้าง Advance เริ่มด้วยรายการว่าง (รอคัดลอกจากใบ Advance) ที่เหลือเริ่มด้วยแถวเปล่า
       setItems(isClearClaim ? [] : [blankItem(isReimburseForm ? "fuel" : "allowance")]);
       setDueClearAt("");
@@ -256,17 +260,19 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
    * ⚠️ ไม่นับใบที่กำลังแก้อยู่ — แก้ใบ Advance เดิมของงานนั้นต้องบันทึกได้ตามปกติ
    */
   const checksJobAdvance = open && kind === "advance";
+  const jobIdsKey = jobs.map((j) => j._id).join(",");
   useEffect(() => {
     setJobAdvance(null);
-    if (!checksJobAdvance || !job?._id) return undefined;
+    const ids = jobIdsKey ? jobIdsKey.split(",") : [];
+    if (!checksJobAdvance || !ids.length) return undefined;
     let alive = true;
     setJobAdvanceChecking(true);
-    ExpenseService.jobAdvance(job._id)
-      .then((adv) => { if (alive) setJobAdvance(adv && adv._id !== expense?._id ? adv : null); })
-      .catch(() => { if (alive) setJobAdvance(null); })
+    // ตรวจทุกงานที่เลือก — งานแรกที่มีใบ Advance แล้ว (ไม่นับใบที่กำลังแก้อยู่)
+    Promise.all(ids.map((id) => ExpenseService.jobAdvance(id).then((adv) => (adv && adv._id !== expense?._id ? { ...adv, eventId: id } : null)).catch(() => null)))
+      .then((res) => { if (alive) setJobAdvance(res.find(Boolean) || null); })
       .finally(() => { if (alive) setJobAdvanceChecking(false); });
     return () => { alive = false; };
-  }, [checksJobAdvance, job?._id, expense?._id]);
+  }, [checksJobAdvance, jobIdsKey, expense?._id]);
 
   // ── ใบเคลม: รายการใบ Advance ที่เคลียร์ได้ ───────────────────────────
   useEffect(() => {
@@ -317,7 +323,7 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
   };
 
   /** รายชื่อคนในงาน (หัวหน้าทีม + ลูกทีม) จากงานที่ผูก — ใช้กับปุ่ม "เบี้ยเลี้ยงทีมงาน" */
-  const teamNames = useMemo(() => [...new Set((job?.teamNames || []).map((n) => String(n || "").trim()).filter(Boolean))], [job]);
+  const teamNames = useMemo(() => [...new Set(jobs.flatMap((j) => j?.teamNames || []).map((n) => String(n || "").trim()).filter(Boolean))], [jobs]);
 
   /**
    * ✅ เพิ่มเบี้ยเลี้ยงให้ทุกคนในงานคนละบรรทัด (ข้ามคนที่มีบรรทัดเบี้ยเลี้ยงอยู่แล้ว)
@@ -421,9 +427,10 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
   // ✅ งานที่ล็อกมาจากตารางงานเปลี่ยนไม่ได้ — บอกให้ไปดูใบเดิม ไม่ใช่บอกให้ "เลือกงานอื่น" ที่ทำไม่ได้
   const jobLocked = Boolean(presetJob) && !editing;
   if (kind === "advance" && jobAdvance) {
-    problems.push(jobLocked
+    const jName = jobs.length > 1 ? `${jobText(jobs.find((j) => j._id === jobAdvance.eventId) || {}) || "งานหนึ่ง"}: ` : "";
+    problems.push(jName + (jobLocked
       ? `ตรวจสอบใบเดิม — งานนี้มีใบเบิก Advance แล้ว (${jobAdvance.docNo}) ออกซ้ำไม่ได้`
-      : `เลือกงานอื่นหรือไม่ผูกงาน — งานนี้มีใบเบิก Advance แล้ว (${jobAdvance.docNo})`);
+      : `เอางานนี้ออก หรือเลือกงานอื่น — งานนี้มีใบเบิก Advance แล้ว (${jobAdvance.docNo})`));
   }
 
   const addFiles = (list) => {
@@ -443,6 +450,8 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
       })),
     };
     if (!isClearClaim) {
+      // ✅ หลายงาน — งานแรก = งานหลักของใบ (ส่ง eventId ไว้ด้วยให้ server รุ่นเก่ายังอ่านได้)
+      fields.eventIds = jobs.map((j) => j._id);
       fields.eventId = job?._id || "";
       // กำหนดเคลียร์เป็นเรื่องของเงินที่จ่ายล่วงหน้าเท่านั้น ใบสำรองจ่ายไม่มีขั้นนี้
       if (!isClaim) fields.dueClearAt = dueClearAt || "";
@@ -715,19 +724,36 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
             {!isClearClaim && (
               <Autocomplete
                 sx={{ gridColumn: { sm: "1 / -1" } }}
-                options={job && !jobOptions.some((j) => j._id === job._id) ? [job, ...jobOptions] : jobOptions}
-                value={job}
+                // ✅ (24 ต.ค. 2569) เลือกได้หลายงาน — รายการเดียวกันอ้างอิงหลายงานพร้อมกัน · งานแรก = งานหลักของใบ
+                multiple
+                filterSelectedOptions
+                options={jobOptions}
+                value={jobs}
                 loading={jobLoading}
                 filterOptions={(x) => x}
                 onChange={(_, v) => {
-                  setJob(v);
+                  // ✅ เปิดมาจากเมนู "เบิก Advance งานนี้" — งานนั้นเอาออกไม่ได้ (เพิ่มงานอื่นได้)
+                  let next = v.slice(0, 20);
+                  if (presetJob && !editing && !next.some((j) => j._id === presetJob._id)) next = [presetJob, ...next];
+                  setJobs(next);
                   // ✅ เติมเรื่องจากงานให้ — เฉพาะตอนช่องเรื่องยังว่างหรือยังเป็นค่าที่ระบบเติมไว้ (ไม่ทับที่ผู้ใช้พิมพ์เอง)
-                  const next = v ? jobSubject(v, subjectPrefix) : "";
-                  setSubject((cur) => (!String(cur).trim() || cur === autoSubjectRef.current ? next : cur));
-                  autoSubjectRef.current = next;
+                  const subj = jobsSubject(next, subjectPrefix);
+                  // ✅ (24 ต.ค. 2569 ผู้ใช้: "เรื่องควรลงงานที่เพิ่มเข้ามาด้วย") เรื่องที่ระบบเติมไว้ (แบบไหนก็ตาม) ปรับตามงานที่เลือกเสมอ
+                  //    เปลี่ยนเฉพาะเมื่อผู้ใช้ไม่ได้พิมพ์เรื่องเอง
+                  const autoForms = new Set([autoSubjectRef.current, jobsSubject(jobs, subjectPrefix), jobs[0] ? jobSubject(jobs[0], subjectPrefix) : ""].filter(Boolean));
+                  setSubject((cur) => (!String(cur).trim() || autoForms.has(cur) ? subj : cur));
+                  autoSubjectRef.current = subj;
                 }}
-                // ✅ เปิดมาจากเมนู "เบิก Advance งานนี้" ในตารางงาน — ล็อกงานไว้ กันเผลอเปลี่ยนเป็นงานอื่น
-                disabled={Boolean(presetJob) && !editing}
+                renderTags={(value, getTagProps) => value.map((o, i) => {
+                  const { key, ...tagProps } = getTagProps({ index: i });
+                  const locked = presetJob && !editing && o._id === presetJob._id;
+                  const taken = kind === "advance" && jobAdvance?.eventId === o._id;
+                  return (
+                    <Chip key={key} {...tagProps} size="small" onDelete={locked ? undefined : tagProps.onDelete}
+                      label={`${i === 0 && value.length > 1 ? "หลัก · " : ""}${jobChipText(o) || o.title || ""}`}
+                      sx={{ maxWidth: "100%", fontWeight: 700, ...(taken ? { bgcolor: alpha("#dc2626", 0.1), color: "#b91c1c" } : {}) }} />
+                  );
+                })}
                 onInputChange={(_, v, reason) => { if (reason === "input") setJobQuery(v); if (reason === "clear") setJobQuery(""); }}
                 isOptionEqualToValue={(o, v) => o._id === v._id}
                 // ✅ ค่าที่เลือกแล้วต้องเห็นช่วงวันที่ด้วย — งานที่เข้าหลายช่วง ชื่องานอย่างเดียวแยกไม่ออกว่าเป็นการเข้างานรอบไหน
@@ -772,13 +798,16 @@ export default function ExpenseFormDialog({ open, kind: kindProp, claimType: cla
                 }}
                 renderInput={(params) => (
                   <TextField {...params} size="small"
-                    label={presetJob && !editing ? "งานที่เบิก" : "ผูกกับงาน (ไม่บังคับ)"} placeholder="ค้นหาชื่องาน / โครงการ / เลขที่"
+                    label={jobs.length > 1 ? `งานที่อ้างอิง (${jobs.length} งาน)` : presetJob && !editing ? "งานที่เบิก" : "ผูกกับงาน (ไม่บังคับ · เลือกได้หลายงาน)"}
+                    placeholder={jobs.length ? "+ เพิ่มงาน" : "ค้นหาชื่องาน / โครงการ / เลขที่"}
                     error={Boolean(jobAdvance)}
                     helperText={presetJob && !editing
-                      ? "เปิดจากตารางงาน — ผูกกับงานนี้แล้ว"
-                      : kind === "advance"
+                      ? "เปิดจากตารางงาน — ผูกกับงานนี้แล้ว · เพิ่มงานอื่นที่ใช้ค่าใช้จ่ายร่วมกันได้"
+                      : jobs.length > 1
+                        ? "อ้างอิงหลายงานในใบเดียว — งานแรกเป็นงานหลักของใบ (ใช้ในรายงาน)"
+                        : kind === "advance"
                         ? "1 ช่วงงานออกได้ 1 ใบ — งานที่เข้าหลายช่วง เบิกแยกได้ทุกช่วง · ผูกงานแล้วดูงบที่ใช้ได้ในหน้ารายงาน"
-                        : "ผูกงานแล้วจะดูได้ว่างานนี้ใช้งบไปเท่าไรในหน้ารายงาน"}
+                          : "ผูกงานแล้วจะดูได้ว่างานนี้ใช้งบไปเท่าไรในหน้ารายงาน · ค่าใช้จ่ายรวมหลายงาน เลือกเพิ่มได้"}
                     InputProps={{ ...params.InputProps, endAdornment: (<>{jobLoading || jobAdvanceChecking ? <CircularProgress size={16} /> : null}{params.InputProps.endAdornment}</>) }} />
                 )}
               />

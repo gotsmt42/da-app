@@ -429,6 +429,63 @@ export const jobRangesText = (e) => {
   return list.map((r) => [Number(r.part) > 0 ? `ช่วงที่ ${r.part}` : "", jobRangeDates(r)].filter(Boolean).join(" · ")).join(", ");
 };
 
+/**
+ * งานทั้งหมดที่ใบอ้างอิง — ✅ (24 ต.ค. 2569 ผู้ใช้: "ใบเบิก/เคลมทุกใบอ้างอิงงานได้หลายงานพร้อมกัน")
+ * ใบใหม่มี jobs[] (งานแรก = งานหลัก) · ใบเก่ามีแค่ eventId/job → คืนเป็นรายการ 1 งาน · ไม่ผูกงาน = []
+ */
+export const jobsOf = (e) => {
+  if ((e?.jobs || []).length) return e.jobs;
+  return e?.eventId || e?.job?.title ? [{ ...(e.job || {}), eventId: e.eventId }] : [];
+};
+/**
+ * ✅ (24 ต.ค. 2569 ผู้ใช้: "ชื่อเรื่องกะทัดรัด ได้ใจความ เข้าใจง่าย ถ้ามีหลายงานก็สื่อความหมาย")
+ * ช่วงวันที่แบบสั้น "10–13 พ.ย. 69" / "30 ต.ค.–2 พ.ย. 69" / "21 ต.ค. 69"
+ */
+export const shortDates = (job) => {
+  if (!job?.start) return "";
+  const s = new Date(job.start);
+  const rawEnd = job.end ? new Date(job.end) : null;
+  const days = rawEnd && rawEnd > s ? Math.max(1, Math.round((rawEnd - s) / 86400000)) : 1;
+  const e = new Date(s.getTime() + (days - 1) * 86400000);
+  const dm = (d) => d.toLocaleDateString("th-TH", { day: "numeric", month: "short" });
+  const yy = String((e.getFullYear() + 543) % 100).padStart(2, "0");
+  if (days <= 1) return `${dm(s)} ${yy}`;
+  return s.getMonth() === e.getMonth() ? `${s.getDate()}–${dm(e)} ${yy}` : `${dm(s)}–${dm(e)} ${yy}`;
+};
+/** ชื่องานแบบสั้น — "PM Fire Alarm · The Elegance55 ครั้งที่ 2/4" (ไม่มีคำว่าโครงการ/วันที่) */
+export const jobShortName = (job, { round = true } = {}) => {
+  const place = String(job?.site || job?.company || "").trim();
+  const hasContract = Boolean(job?.contractStart || job?.contractNo || job?.contractYears);
+  const r = round ? formatRoundLabel(job?.round, job?.visitCount, hasContract ? job : undefined) : "";
+  return [jobName(job), place ? `· ${place}` : "", r ? `ครั้งที่ ${String(r).split(" - ")[0]}` : ""].filter(Boolean).join(" ");
+};
+/** ป้ายงานในช่องเลือก — "PM Fire Alarm · The Elegance55 ครั้งที่ 2/4 (10–13 พ.ย. 69)" */
+export const jobChipText = (job) => {
+  const d = shortDates(job);
+  return `${jobShortName(job)}${d ? ` (${d})` : ""}`;
+};
+/**
+ * เรื่องของใบจากงานที่เลือก
+ *   1 งาน  → "เบิกค่าใช้จ่ายงาน PM Fire Alarm · The Elegance55 ครั้งที่ 2/4 (10–13 พ.ย. 69)"
+ *   หลายงาน → "เบิกค่าใช้จ่ายรวม 3 งาน: PM Fire Alarm · The Elegance55, Service · ABCDEFG, CCTV · adsd"
+ */
+export const jobsSubject = (jobs, prefix = "เบิกค่าใช้จ่ายงาน") => {
+  const list = (jobs || []).filter(Boolean);
+  if (!list.length) return "";
+  if (list.length === 1) return `${prefix} ${jobChipText(list[0])}`;
+  const base = prefix.replace(/งาน$/, "").trim();
+  const names = list.map((j) => jobShortName(j, { round: false }));
+  const shown = names.slice(0, 3).join(", ");
+  return `${base}รวม ${list.length} งาน: ${shown}${names.length > 3 ? ` และอีก ${names.length - 3} งาน` : ""}`;
+};
+
+/** ข้อความงานของใบแบบสั้น — "PM Fire Alarm โครงการ ... +2 งาน" */
+export const jobsShortText = (e) => {
+  const list = jobsOf(e);
+  if (!list.length) return "";
+  return `${jobText(list[0])}${list.length > 1 ? ` +${list.length - 1} งาน` : ""}`;
+};
+
 /** ป้าย "ช่วงที่ n/N" — ว่างเมื่องานนั้นเข้าช่วงเดียว */
 export const jobPartText = (job) =>
   (Number(job?.partCount) > 1 && Number(job?.part) > 0 ? `ช่วงวันที่ ${job.part}/${job.partCount}` : "");

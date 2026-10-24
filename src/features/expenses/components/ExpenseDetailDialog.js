@@ -36,6 +36,7 @@ import { compareItems, COMPARE_KIND_LABEL } from "../utils/expenseCompare";
 import {
   KIND_META, slipKind, categoryMeta, baht, fmtMoney, qtyText, differenceMeta, paymentLabel, PAYMENT_METHODS, fileKindLabel, jobText, jobRangeText, jobPartText, isOverdueClear, money, TEXT_SUB, TEXT_MAIN, BORDER_MAIN, personFullName, groupFilesByStage,
   installmentText, bahtText, jobRangesText, itemTitle,
+  jobsOf,
 } from "../expenseMeta";
 import { bankMeta, formatAccountNo } from "../bankMeta";
 import { thumbUrl } from "@/shared/utils/cloudinaryImage";
@@ -1133,16 +1134,18 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                   {/* ✅ งานที่ผูก — การ์ดขาวขอบเทาชุดเดียวกับตารางข้อมูลด้านบน (ผู้ใช้: "ไม่เข้าธีม" — เดิมกล่องพื้นสี + อีโมจิ)
                       ชื่องานตัวหนา · ครั้งที่/ช่วงวันที่เป็นป้ายเทา · วันที่มีไอคอนปฏิทินแบบเดียวกับทั้งแอป */}
                   <Box>
-                    <SubTitle icon={<Build />} color={meta.color}>งานที่ผูก</SubTitle>
-                    {e.eventId || e.job?.title ? (() => {
-                      const jt = jobText(e.job) || "";
+                    <SubTitle icon={<Build />} color={meta.color}>{jobsOf(e).length > 1 ? `งานที่อ้างอิง (${jobsOf(e).length} งาน)` : "งานที่ผูก"}</SubTitle>
+                    {jobsOf(e).length ? <Stack spacing={0.75}>{jobsOf(e).map((jj, ji) => (() => {
+                      // ✅ (24 ต.ค. 2569) ใบเดียวอ้างอิงได้หลายงาน — การ์ดละงาน · งานแรก = งานหลัก
+                      const one = jobsOf(e).length === 1;
+                      const jt = jobText(jj) || "";
                       // ✅ ครั้งที่อยู่ท้ายข้อความเสมอ — รวมปีสัญญา "ครั้งที่ 1/4 - 2569-70" / "(ปีที่ 2)" ไว้ในป้ายเดียว
                       const round = (jt.match(/ครั้งที่\s*\d+(?:\s*\/\s*\d+)?(?:\s*-\s*\d{4}(?:-\d{2})?|\s*\(ปีที่ \d+\))?/) || [])[0] || "";
                       const title = round ? jt.replace(round, "").replace(/\s{2,}/g, " ").trim() : jt;
-                      const tags = [round, jobPartText(e.job)].filter(Boolean);
-                      const when = jobRangesText(e) || jobRangeText(e.job) || (e.job?.start ? thaiDate(e.job.start) : "");
+                      const tags = [!one && ji === 0 ? "งานหลัก" : "", round, jobPartText(jj), jj.jobNo || ""].filter(Boolean);
+                      const when = (one && jobRangesText(e)) || jobRangeText(jj) || (jj.start ? thaiDate(jj.start) : "");
                       return (
-                        <Box sx={{ p: 1.25, px: 1.5, borderRadius: 2, border: `1px solid ${BORDER_MAIN}`, bgcolor: "#fff" }}>
+                        <Box key={jj.eventId || ji} sx={{ p: 1.25, px: 1.5, borderRadius: 2, border: `1px solid ${BORDER_MAIN}`, bgcolor: "#fff" }}>
                           {/* 🧹 ตัดไอคอนประแจในการ์ดออก (ผู้ใช้ขอ) — หัวข้อด้านบนมีไอคอนอยู่แล้ว */}
                           <Box sx={{ minWidth: 0 }}>
                             <Typography sx={{ fontSize: "0.92rem", fontWeight: 800, color: "#0f172a", lineHeight: 1.45 }}>{title || "-"}</Typography>
@@ -1162,7 +1165,7 @@ export default function ExpenseDetailDialog({ open, expenseId, reloadKey = 0, no
                           </Box>
                         </Box>
                       );
-                    })() : <Typography sx={{ fontSize: "0.86rem", color: TEXT_SUB, px: 1.25, py: 1, borderRadius: 2, bgcolor: "#f8fafc", border: `1px dashed ${BORDER_MAIN}` }}>ไม่ผูกงาน</Typography>}
+                    })())}</Stack> : <Typography sx={{ fontSize: "0.86rem", color: TEXT_SUB, px: 1.25, py: 1, borderRadius: 2, bgcolor: "#f8fafc", border: `1px dashed ${BORDER_MAIN}` }}>ไม่ผูกงาน</Typography>}
                   </Box>
 
                   {(() => {

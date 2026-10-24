@@ -102,7 +102,32 @@ function Tile({ item, selected, onClick, isMobile }) {
   );
 }
 
-export default function ViewTiles({ groups, value, onChange, isMobile = false }) {
+/** @param compact  จอใหญ่แบบแถวเดียวกะทัดรัด (การ์ดเล็กบรรทัดเดียว เหมือนมือถือ) */
+export default function ViewTiles({ groups, value, onChange, isMobile = false, compact = false }) {
+  if (compact && !isMobile) {
+    // 🔁 (24 ต.ค. 2569 ผู้ใช้: "มองยาก ไม่สวย") แท็บเม็ดยาความกว้างพอดีข้อความ — แบบเดียวกับแท็บหน้ารับงาน
+    const items = groups.flatMap((g) => g.items);
+    return (
+      <Stack direction="row" sx={{ mb: 1.5, gap: 0.75, flexWrap: "wrap" }}>
+        {items.map((item) => {
+          const on = item.value === value;
+          const hot = item.alert && item.count > 0;
+          const c = item.color || "#2563eb";
+          return (
+            <ButtonBase key={item.value} onClick={() => onChange(item.value)} aria-pressed={on} title={item.label}
+              sx={{ height: 38, px: 1.5, gap: 0.75, borderRadius: 2.5, fontFamily: "inherit", whiteSpace: "nowrap",
+                border: `1.5px solid ${on ? c : BORDER}`, bgcolor: on ? alpha(c, 0.08) : "#fff",
+                "&:hover": { borderColor: c } }}>
+              <Box sx={{ display: "flex", color: c, "& svg": { fontSize: 17 } }}>{item.icon}</Box>
+              <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: on ? c : "#334155" }}>{item.shortLabel || item.label}</Typography>
+              <Box component="span" sx={{ minWidth: 22, height: 22, px: 0.6, borderRadius: 99, display: "inline-grid", placeItems: "center", fontSize: "0.74rem", fontWeight: 800,
+                bgcolor: on ? c : hot ? alpha("#dc2626", 0.12) : "#f1f5f9", color: on ? "#fff" : hot ? "#dc2626" : TEXT_SUB }}>{item.count.toLocaleString()}</Box>
+            </ButtonBase>
+          );
+        })}
+      </Stack>
+    );
+  }
   if (isMobile) {
     return (
       <Box sx={{ mb: 2 }}>

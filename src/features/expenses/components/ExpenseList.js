@@ -27,7 +27,8 @@ import ResponsibleSummary from "@/shared/ui/ResponsibleSummary";
 import { personColor, personInitial } from "@/shared/utils/personAvatar";
 import { hasValidAvatar } from "@/shared/utils/user";
 import {
-  KIND_META, statusMeta, STATUS_FILTERS, CLAIM_TYPE_FILTERS, baht, differenceMeta, isOverdueClear, jobText, slipKind, TEXT_SUB, TEXT_MAIN, BORDER_MAIN, personFullName, installmentText, money,
+  KIND_META, statusMeta, STATUS_FILTERS, CLAIM_TYPE_FILTERS, baht, differenceMeta, isOverdueClear, slipKind, TEXT_SUB, TEXT_MAIN, BORDER_MAIN, personFullName, installmentText, money,
+  jobsShortText,
 } from "../expenseMeta";
 
 const PERIODS = [
@@ -200,7 +201,7 @@ const DesktopTable = ({ rows, onOpen, avatars }) => (
             <TableCell sx={{ maxWidth: 380 }}>
               <Typography sx={{ fontWeight: 600, fontSize: "0.86rem" }} noWrap>{e.subject}</Typography>
               <Typography variant="caption" sx={{ color: TEXT_SUB, display: "block" }} noWrap>
-                {[refLabel(e), jobText(e.job), `${e.items?.length || 0} รายการ`].filter(Boolean).join(" · ")}
+                {[refLabel(e), jobsShortText(e), `${e.items?.length || 0} รายการ`].filter(Boolean).join(" · ")}
               </Typography>
             </TableCell>
             <TableCell align="right"><AmountCell e={e} /></TableCell>
@@ -420,6 +421,7 @@ export default function ExpenseList({
       employees={avatarPeople}
       isMobile={!isDesktop}
       title="ใบเบิกตามผู้เบิก"
+      collapsible storageKey="tt-expense-people-folded"
       hint="กดที่ชื่อเพื่อดูเฉพาะใบของคนนั้น · กดซ้ำเพื่อดูทุกคน · ยอดเงิน = ยอดรวมในใบ (ไม่รวมใบที่ยกเลิก)"
       amountOf={(r) => r.total}
       formatAmount={baht}
@@ -437,7 +439,8 @@ export default function ExpenseList({
       const Icon = STATUS_ICON[s] || Apps;
       return { value: s, label: st.label, shortLabel: String(st.label).split(" · ")[0], count: counts[s] || 0, unit: "ใบ", icon: <Icon />, color: st.color, alert: s === "rejected" };
     });
-    return <ViewTiles value={status} onChange={setStatus} isMobile={!isDesktop} groups={[{ title: "", items }]} />;
+    // 🔁 (24 ต.ค. 2569 ผู้ใช้: "ส่วนหัวรกเกินไป ให้กะทัดรัด") การ์ดสถานะแบบบรรทัดเดียว
+    return <ViewTiles compact value={status} onChange={setStatus} isMobile={!isDesktop} groups={[{ title: "", items }]} />;
   })();
 
   const renderRows = (list) => (isDesktop

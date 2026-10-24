@@ -236,7 +236,13 @@ const renderBody = (doc, e, { s, compact, filler }, hasBold, attachNote = "") =>
   y += rowH;
   const subjLines = field("เรื่อง", e.subject, L, R, y);
   y += rowH * subjLines;
-  if (e.eventId || e.job?.title) {
+  if ((e.jobs || []).length > 1) {
+    // ✅ (24 ต.ค. 2569) ใบที่อ้างอิงหลายงาน — พิมพ์ทุกงาน บรรทัดละงาน
+    e.jobs.forEach((j, i) => {
+      y += rowH * field(i === 0 ? `งาน / โครงการ (${e.jobs.length} งาน)` : "",
+        `${i + 1}. ${[jobText(j), jobPartText(j), jobRangeText(j)].filter(Boolean).join(" · ")}${j.docNo ? ` (${j.docNo})` : ""}`, L, R, y);
+    });
+  } else if (e.eventId || e.job?.title) {
     // ✅ งานที่เข้าหลายช่วง: ใบที่พิมพ์ออกไปต้องระบุชัดว่าเป็นค่าใช้จ่ายของการเข้างานช่วงไหน
     // 🐛 เดิม y += rowH ตายตัว — ชื่องานยาวตัดเป็น 2 บรรทัดแล้วบรรทัด "ผู้รับเหมา" ทับกัน (ผู้ใช้แจ้ง "ซ้อนกันมั่ว")
     y += rowH * field("งาน / โครงการ",
